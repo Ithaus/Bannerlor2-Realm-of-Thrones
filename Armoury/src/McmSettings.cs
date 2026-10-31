@@ -7256,6 +7256,34 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool FodderFromHorseState { get; set; } = true;
 
+        [SettingPropertyBool("Horses Armoury Carry Footmen", HintText = "free horses in a lord's troops' armoury carry footmen in the game's own speed bonus too ('Footmen on horses (armoury)', the same +0.15 per carried share and the same wet-weather cut as the game's 'Footmen on horses'); the game counted only spare horses in the baggage, so lords' footmen never rode the horses they had (off = only baggage horses, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HorsesArmouryCarryFootmen { get; set; } = true;
+
+        [SettingPropertyBool("Horse Quality Speed", HintText = "a party's map speed depends on how good its horses are: riders on fine horses go somewhat faster, on cheap or lame ones somewhat slower, and footmen on spare horses get the best spare mounts ('Horse quality: riders' and 'Horse quality: spare horses' in the speed tooltip; the marching-column cap of an all-rider column or of footmen on spare horses moves by the same share); a hero rides his own horse, soldiers the horse they really have in the troops' armoury; pack animals do not count (off = every horse is as fast as any other, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HorseQualitySpeed { get; set; } = true;
+
+        [SettingPropertyInteger("Horse Quality Ref Speed", 30, 90, "0", HintText = "with Horse Quality Speed: the horse speed that neither speeds up nor slows down (56 = a good riding horse; cheap horses are about 44-52, noble ones 60-72)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int HorseQualityRefSpeed { get; set; } = 56;
+
+        [SettingPropertyInteger("Horse Quality Slope Percent", 0, 200, "0", HintText = "with Horse Quality Speed: how strongly horse speed turns into map speed - 60 = a horse 10% faster than the reference makes its rider 6% faster", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int HorseQualitySlopePercent { get; set; } = 60;
+
+        [SettingPropertyInteger("Horse Quality Max Bonus Percent", 0, 50, "0", HintText = "with Horse Quality Speed: the most a fine horse adds to its rider's share of the map speed, in percent", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int HorseQualityMaxBonusPercent { get; set; } = 10;
+
+        [SettingPropertyInteger("Horse Quality Max Penalty Percent", 0, 50, "0", HintText = "with Horse Quality Speed: the most a poor or lame horse takes from its rider's share of the map speed, in percent", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int HorseQualityMaxPenaltyPercent { get; set; } = 15;
+
+        [SettingPropertyBool("Riders Without Horse Walk", HintText = "with Troops Fight With Own Kit Only, a mounted soldier who has no horse in the troops' armoury is not cavalry on the map: the game's 'Cavalry' bonus is taken back for him ('Riders without horses') and the marching column counts him among the footmen - a spare horse can still carry him (off = such men march as cavalry, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool RidersWithoutHorseWalk { get; set; } = true;
+
         [SettingPropertyBool("Hamlet Kinds In District", HintText = "the hamlets of a district shape what it sends to market: fishing hamlets land fish in place of part of the grain (the same number of loads), mills and granaries keep it grain. Needs Village Book Enabled (off = the district sends grain as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HamletKindsInDistrict { get; set; } = true;
@@ -12585,6 +12613,13 @@ namespace Armoury
             s.QarthStablesBuyCamels = QarthStablesBuyCamels;
             s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;
             s.FodderFromHorseState = FodderFromHorseState;
+            s.HorsesArmouryCarryFootmen = HorsesArmouryCarryFootmen;
+            s.HorseQualitySpeed = HorseQualitySpeed;
+            s.HorseQualityRefSpeed = HorseQualityRefSpeed;
+            s.HorseQualitySlopePercent = HorseQualitySlopePercent;
+            s.HorseQualityMaxBonusPercent = HorseQualityMaxBonusPercent;
+            s.HorseQualityMaxPenaltyPercent = HorseQualityMaxPenaltyPercent;
+            s.RidersWithoutHorseWalk = RidersWithoutHorseWalk;
             s.HamletKindsInDistrict = HamletKindsInDistrict;
             s.HorsesDieOnlyKilled = HorsesDieOnlyKilled;
             s.HorseDeathRatioMinBattles = HorseDeathRatioMinBattles;

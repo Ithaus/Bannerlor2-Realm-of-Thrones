@@ -86824,5 +86824,200 @@ def main(argv):
     return _bitwa310_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 311d (31.10): konie a tempo na mapie - grupa konie311d
+# H311-S self-test; H311-0 linia startu "Konie a tempo (HQ): start sesji" (latka MarchPace.SpeedPostfix w >= 1 modelu) i H311-0b szybkosc koni wedlug kategorii
+# (INFO: potwierdzenie Ref 56 mediana kategorii horse / war_horse); H311-1 linie doby: format, potkniecia 0; H311-2 jakosc koni F w granicach [-kara, +premia]
+# kazdej doby, pieszo <= konnych szeregowych; H311-3 krok 1: piechurzy niesieni przez wolne konie zbrojowni AI > 0 przy kluczu TAK; H311-4 krok 3: jezdzcy bez
+# konia pieszo > 0 przy kluczu TAK i TroopsFightWithOwnKitOnly TAK; H311-5 probki "teraz / bez 311d" zgodne ze znakiem F; H311-6 koszt goracej sciezki
+# <= 2 ms/dobe; H311-7 grupy jazdy (INFO: predkosc jazdy dobrej > taniej); H311-8 sufit kolumny przed / po (INFO).
+H311_P = "Konie a tempo (HQ): "
+H311_RX_START = re.compile(r"start sesji \| klucze: zbrojownia niesie piechure \(HorsesArmouryCarryFootmen\) (TAK|NIE), jakosc konia \(HorseQualitySpeed\) (TAK|NIE), "
+                           r"jezdzcy bez konia pieszo \(RidersWithoutHorseWalk\) (TAK|NIE) \(TroopsFightWithOwnKitOnly (TAK|NIE)\) \| wzor: Ref ([\d.]+), nachylenie ([\d.]+), "
+                           r"premia do ([+-][\d.]+)%, kara do ([+-][\d.]+)% \| szybkosc koni wczytanych \(HorseComponent\.Speed\): (.*) \| latka: MarchPace\.SpeedPostfix \(modeli (\d+)\)\.$")
+H311_RX_CAT = re.compile(r"(horse|war_horse|noble_horse|juczne|egzotyczne) (\d+)(?: \(min (\d+), mediana (\d+), max (\d+)(?:, d mediany ([+-][\d.]+)%)?\))?")
+H311_RX_DAY = re.compile(r"dzien (\d+) \| klucze: zbrojownia niesie piechure (TAK|NIE), jakosc konia (TAK|NIE), jezdzcy bez konia pieszo (TAK|NIE) \(TroopsFightWithOwnKitOnly (TAK|NIE)\) \| "
+                         r"partie marszu (\d+): (.*) \| jezdzcy z koniem (\d+) \(zbrojownia (\d+), wzorzec (\d+), bohaterowie (\d+)\), d srednio ([+-][\d.]+)%, szybkosc konia srednio ([\d.]+) \| "
+                         r"luzaki pod piechura (\d+), d srednio ([+-][\d.]+)%, szybkosc srednio ([\d.]+) \| zbrojownia AI niesie piechure \(krok 1\): partii (\d+), piechurow (\d+), "
+                         r"wspolczynnik srednio ([+-][\d.]+)% \| jezdzcy bez konia \(krok 3\): (\d+) z (\d+) konnych szeregowych, pieszo (\d+) \| sufit kolumny \(krok 2\): wywolan (\d+), "
+                         r"srednio przed ([\d.]+|-) / po ([\d.]+|-), wyzszy (\d+), nizszy (\d+) \| probki: (.*) \| kontrola: \|F\| najwiecej ([\d.]+), jakosc koni F od (-?[\d.]+) do (-?[\d.]+) "
+                         r"\(granice -([\d.]+) / \+([\d.]+)\), stany koni 311d (\d+) \(wolne 311d inne niz Balance - jezdzcy egzotyczni: (\d+)\) \| koszt: goraca sciezka ([\d.]+) ms/(\d+) wywolan "
+                         r"\(prog 2 ms/dobe\), przeliczen rekordu na mapie (\d+) \(([\d.]+) ms\), w linii doby (\d+) \(([\d.]+) ms\) \| potkniecia dzis (\d+), od startu sesji (\d+)(?: \(.*\))? \| linia ([\d.]+) ms\.$")
+H311_RX_GRP = re.compile(r"(jazda tania|jazda srednia|jazda dobra|piechota na luzakach|pieszo) (\d+)(?: \(d ([+-][\d.]+)%, F ([+-][\d.]+)%, predkosc ([\d.]+)\))?")
+H311_RX_SMP = re.compile(r" ludzi, F ([+-][\d.]+)%: teraz (-?[\d.]+) / bez 311d (-?[\d.]+), mnoznik sufitu jazda x([\d.]+) luzaki x([\d.]+)")
+
+
+def h311_new():
+    return {"start": None, "ref": None, "cats": {}, "days": 0, "fmt": 0, "stum": 0, "k1": None, "k2": None, "k3": None, "own": None, "bound_bad": [], "extra": 0, "walk": 0,
+            "un": 0, "reg": 0, "smp": 0, "smp_bad": [], "hot": [], "builds": 0, "bms": 0.0, "dms": 0.0, "grp": {}, "cap": [0, 0.0, 0.0, 0, 0], "riders": 0, "rq": 0.0}
+
+
+def h311_feed(D, ln):
+    i = ln.find(H311_P)
+    if i < 0:
+        return
+    body = ln[i + len(H311_P):].rstrip()
+    if body.startswith("start sesji"):
+        m = H311_RX_START.search(body)
+        if not m:
+            D["fmt"] += 1
+            return
+        D["start"] = int(m.group(10))
+        D["ref"] = float(m.group(5))
+        for c in H311_RX_CAT.finditer(m.group(9)):
+            D["cats"][c.group(1)] = (int(c.group(2)), int(c.group(4)) if c.group(4) else None)
+        return
+    m = H311_RX_DAY.search(body)
+    if not m:
+        D["fmt"] += 1
+        return
+    g = m.groups()
+    D["days"] += 1
+    D["k1"], D["k2"], D["k3"], D["own"] = g[1], g[2], g[3], g[4]
+    for x in H311_RX_GRP.finditer(g[6]):
+        e = D["grp"].setdefault(x.group(1), [0, 0.0, 0.0])
+        n = int(x.group(2))
+        if n and x.group(5):
+            e[0] += n; e[1] += n * float(x.group(3)); e[2] += n * float(x.group(5))
+    D["riders"] += int(g[7]); D["rq"] += int(g[7]) * float(g[12])
+    D["extra"] += int(g[17])
+    D["un"] += int(g[19]); D["reg"] += int(g[20]); D["walk"] += int(g[21])
+    if int(g[21]) > int(g[20]):
+        D["bound_bad"].append(f"d{g[0]}: pieszo {g[21]} > konnych {g[20]}")
+    cap = D["cap"]; cn = int(g[22]); cap[0] += cn
+    if cn and g[23] != "-":
+        cap[1] += cn * float(g[23]); cap[2] += cn * float(g[24])
+    cap[3] += int(g[25]); cap[4] += int(g[26])
+    for x in H311_RX_SMP.finditer(g[27]):
+        D["smp"] += 1
+        f, now, wo = float(x.group(1)), float(x.group(2)), float(x.group(3))
+        if (f >= 0.5 and now < wo - 0.02) or (f <= -0.5 and now > wo + 0.02):
+            D["smp_bad"].append(f"d{g[0]}: F {f:+.1f}% teraz {now} / bez {wo}")
+    lo, hi, pen, bon = float(g[29]), float(g[30]), float(g[31]), float(g[32])
+    if lo < -pen - 0.001 or hi > bon + 0.001:
+        D["bound_bad"].append(f"d{g[0]}: F {lo}..{hi} poza -{pen}..+{bon}")
+    D["hot"].append(float(g[35]))
+    D["builds"] += int(g[37]); D["bms"] += float(g[38]); D["dms"] += float(g[40])
+    D["stum"] += int(g[41])
+
+
+def h311_rows(rep, D):
+    rep.add("H311-0: linia startu 311d (latka MarchPace.SpeedPostfix)", f"modeli {D['start']}", ">= 1 model predkosci", None if D["start"] is None else D["start"] >= 1)
+    cats = D["cats"]
+    ref = D["ref"]
+    rep.add("H311-0b: szybkosc koni wczytanych - mediana kategorii (potwierdzenie Ref)",
+            (", ".join(f"{k} {v[0]} szt. mediana {v[1]}" for k, v in cats.items()) + (f"; Ref {ref:.0f}" if ref else "")) if cats else "brak",
+            "INFO (Ref ~ mediana war_horse / gorna czesc horse)", None)
+    rep.add("H311-1: linie doby 311d, format i potkniecia", f"dob {D['days']}, zly format {D['fmt']}, potkniecia {D['stum']}", ">= 1 doba, format 0, potkniecia 0",
+            D["days"] >= 1 and D["fmt"] == 0 and D["stum"] == 0)
+    rep.add("H311-2: jakosc koni F w granicach, pieszo <= konnych", f"{len(D['bound_bad'])} naruszen" + (f" [{'; '.join(D['bound_bad'][:4])}]" if D["bound_bad"] else ""),
+            "0", (len(D["bound_bad"]) == 0) if D["days"] else None)
+    rep.add("H311-3: krok 1 - piechurzy AI niesieni przez wolne konie zbrojowni (suma okna)", f"klucz {D['k1']}, piechurow {D['extra']}", "> 0 przy kluczu TAK",
+            (D["extra"] > 0) if D["k1"] == "TAK" else None)
+    on3 = D["k3"] == "TAK" and D["own"] == "TAK"
+    rep.add("H311-4: krok 3 - jezdzcy bez konia ida pieszo (suma okna)", f"klucz {D['k3']} (OwnKit {D['own']}), bez konia {D['un']} z {D['reg']}, pieszo {D['walk']}",
+            "pieszo > 0 przy kluczu TAK i TroopsFightWithOwnKitOnly TAK", (D["walk"] > 0) if on3 else None)
+    rep.add("H311-5: probki 'teraz / bez 311d' zgodne ze znakiem F", f"probek {D['smp']}, sprzecznych {len(D['smp_bad'])}" + (f" [{'; '.join(D['smp_bad'][:3])}]" if D["smp_bad"] else ""),
+            "0 sprzecznych", (len(D["smp_bad"]) == 0) if D["smp"] else None)
+    hot = D["hot"]
+    m = sum(hot) / len(hot) if hot else 0.0
+    rep.add("H311-6: koszt goracej sciezki 311d", f"srednio {m:.2f} ms/dobe, najwiecej {max(hot) if hot else 0:.2f}; przeliczen na mapie {D['builds']} ({D['bms']:.1f} ms), "
+            f"w linii doby {D['dms']:.1f} ms", "srednio <= 2 ms/dobe", (m <= 2.0) if hot else None)
+    G = D["grp"]
+
+    def gs(k):
+        e = G.get(k)
+        return f"{k} {e[0]} (d {e[1] / e[0]:+.1f}%, predkosc {e[2] / e[0]:.2f})" if e and e[0] else f"{k} 0"
+    rep.add("H311-7: grupy partii marszu (jazda tania / srednia / dobra, luzaki, pieszo)",
+            "; ".join(gs(k) for k in ("jazda tania", "jazda srednia", "jazda dobra", "piechota na luzakach", "pieszo"))
+            + (f"; jezdzcy z koniem - szybkosc konia srednio {D['rq'] / D['riders']:.1f}" if D["riders"] else ""), "INFO (cel: jazda dobra szybsza niz tania)", None)
+    c = D["cap"]
+    rep.add("H311-8: sufit kolumny przed / po jakosci koni", f"wywolan {c[0]}, srednio {c[1] / c[0]:.2f} / {c[2] / c[0]:.2f}, wyzszy {c[3]}, nizszy {c[4]}" if c[0] else "wywolan 0",
+            "INFO", None)
+
+
+H311_SAMPLES = [
+    H311_P + "start sesji | klucze: zbrojownia niesie piechure (HorsesArmouryCarryFootmen) TAK, jakosc konia (HorseQualitySpeed) TAK, jezdzcy bez konia pieszo (RidersWithoutHorseWalk) TAK "
+    "(TroopsFightWithOwnKitOnly TAK) | wzor: Ref 56.00, nachylenie 0.60, premia do +10.0%, kara do -15.0% | szybkosc koni wczytanych (HorseComponent.Speed): horse 120 (min 40, mediana 52, max 60, "
+    "d mediany -4.3%); war_horse 60 (min 50, mediana 57, max 64, d mediany +1.1%); noble_horse 30 (min 60, mediana 68, max 72, d mediany +10.0%); juczne 12 (min 20, mediana 30, max 40); "
+    "egzotyczne 0 | latka: MarchPace.SpeedPostfix (modeli 6).",
+    H311_P + "dzien 108967 | klucze: zbrojownia niesie piechure TAK, jakosc konia TAK, jezdzcy bez konia pieszo TAK (TroopsFightWithOwnKitOnly TAK) | partie marszu 3000: jazda tania 40 "
+    "(d -6.0%, F -5.1%, predkosc 3.30); jazda srednia 30 (d +0.5%, F +0.4%, predkosc 3.45); jazda dobra 20 (d +7.0%, F +6.5%, predkosc 3.70); piechota na luzakach 100 (d -2.0%, F +1.0%, "
+    "predkosc 3.00); pieszo 2810 (d +0.0%, F -1.0%, predkosc 2.50) | jezdzcy z koniem 11000 (zbrojownia 9000, wzorzec 1500, bohaterowie 500), d srednio -2.1%, szybkosc konia srednio 53.80 | "
+    "luzaki pod piechura 2500, d srednio -1.0%, szybkosc srednio 54.00 | zbrojownia AI niesie piechure (krok 1): partii 600, piechurow 1400, wspolczynnik srednio +1.2% | "
+    "jezdzcy bez konia (krok 3): 2700 z 13900 konnych szeregowych, pieszo 2700 | sufit kolumny (krok 2): wywolan 900, srednio przed 3.10 / po 3.08, wyzszy 200, nizszy 500 | "
+    "probki: 'Jeff' 60 ludzi, F +3.0%: teraz 3.40 / bez 311d 3.30, mnoznik sufitu jazda x1.020 luzaki x0.990; 'Ser A; B' 200 ludzi, F -8.0%: teraz 2.40 / bez 311d 2.60, mnoznik sufitu "
+    "jazda x0.950 luzaki x1.000 | kontrola: |F| najwiecej 0.180, jakosc koni F od -0.120 do 0.090 (granice -0.150 / +0.100), stany koni 311d 1500 (wolne 311d inne niz Balance - "
+    "jezdzcy egzotyczni: 12) | koszt: goraca sciezka 1.20 ms/9000 wywolan (prog 2 ms/dobe), przeliczen rekordu na mapie 3000 (6.00 ms), w linii doby 2000 (4.00 ms) | "
+    "potkniecia dzis 0, od startu sesji 0 | linia 25.0 ms.",
+]
+
+
+def konie311d_selftest():
+    D = h311_new()
+    for ln in H311_SAMPLES:
+        h311_feed(D, "[06:39:07] " + ln)
+    rep = Report(); h311_rows(rep, D)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    keys = ("H311-0", "H311-1", "H311-2", "H311-3", "H311-4", "H311-5", "H311-6")
+    bad = [k for k in keys if v.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad} ({v})"
+    B = h311_new()
+    for ln in H311_SAMPLES:
+        x = ln.replace("(modeli 6)", "(modeli 0)").replace("potkniecia dzis 0", "potkniecia dzis 2").replace("do 0.090 (granice", "do 0.130 (granice")
+        x = x.replace("piechurow 1400", "piechurow 0").replace("pieszo 2700 |", "pieszo 0 |").replace("teraz 3.40 / bez 311d 3.30", "teraz 3.10 / bez 311d 3.30")
+        x = x.replace("goraca sciezka 1.20 ms", "goraca sciezka 7.50 ms")
+        h311_feed(B, "[06:39:07] " + x)
+    rep = Report(); h311_rows(rep, B)
+    vb = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in keys if vb.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss} ({vb})"
+    C = h311_new()
+    h311_feed(C, "[06:39:07] " + H311_SAMPLES[1].replace("pieszo TAK (Troops", "pieszo NIE (Troops").replace("piechure TAK, jakosc", "piechure NIE, jakosc"))
+    rep = Report(); h311_rows(rep, C)
+    vc = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if vc.get("H311-3") != "INFO" or vc.get("H311-4") != "INFO" or vc.get("H311-1") != "TAK" or vc.get("H311-0") != "INFO":
+        return f"klucze NIE zle: {vc}"
+    E = h311_new()
+    h311_feed(E, "[06:39:07] " + H311_SAMPLES[1].replace("linia 25.0 ms.", "linia 25.0 ms"))
+    if E["fmt"] != 1:
+        return "zly format nie wykryty"
+    return None
+
+
+def konie311d_main(logp):
+    """konie311d (31.10, paczka 311d): H311-S, H311-0..H311-8. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = konie311d_selftest()
+    rep.add("H311-S: self-test wyrazen (linie jak w HorsePace.cs)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("H311-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = h311_new()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            h311_feed(D, ln.rstrip("\r\n"))
+    print(f"plik: {logp}")
+    h311_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_konie311d_main_prev = main
+
+
+def main(argv):
+    # paczka 311d: grupa konie311d - opakowanie main jak bitwa310
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "konie311d":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return konie311d_main(rest[0] if rest else None)
+    return _konie311d_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

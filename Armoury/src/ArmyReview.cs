@@ -622,6 +622,14 @@ namespace Armoury
                   .Append(" that go free with ").Append(col.Men).Append(" men: at most ").Append(capText).Append('.');
             else
                 sb.Append("Marching column: all riders - at most ").Append(capText).Append('.');
+            // 311d: jakosc koni w suficie (te same mnozniki co ColumnPostfix - Explain) i jezdzcy bez konia w piechocie
+            float hqMul = col.Kind == 1 ? col.MulRider : col.Kind == 2 ? col.MulFoot : 1f;
+            if (Math.Abs(hqMul - 1f) > 0.0005f)
+                sb.Append(" The quality of the ").Append(col.Kind == 1 ? "riders' horses" : "spare horses under the footmen").Append(hqMul > 1f ? " raises" : " lowers")
+                  .Append(" this cap by ").Append(Math.Abs((hqMul - 1f) * 100f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)).Append("% (Horse Quality Speed).");
+            if (col.Walk > 0)
+                sb.Append(" ").Append(col.Walk).Append(col.Walk == 1 ? " rider has" : " riders have").Append(" no horse in the troops' armoury and ").Append(col.Walk == 1 ? "walks" : "walk")
+                  .Append(" with the footmen (Riders Without Horse Walk).");
             if (!col.Applies) sb.Append(" (So slow a cap is not applied - the game's own pace holds.)");
             float now = -1f;
             try { if (mp.IsActive) now = mp.Speed; } catch { now = -1f; }

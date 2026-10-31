@@ -100,7 +100,7 @@ namespace Armoury
         }
 
         /// <summary>Czy ktos czyta stan (b): kolumna marszu albo pasza.</summary>
-        private static bool Wanted(Settings s) { return s != null && (s.SpareHorsesCarryFootmen || s.FodderFromHorseState); }
+        private static bool Wanted(Settings s) { return s != null && (s.SpareHorsesCarryFootmen || s.FodderFromHorseState || HorsePace.WantsState(s)); }   // 311d: kroki koni a tempa czytaja ten stan
 
         // ------------------------------------------------------------ odczyt (MarchPace, pasza, K2/K5)
 
