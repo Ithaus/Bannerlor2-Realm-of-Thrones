@@ -85504,6 +85504,9 @@ B307_FF = re.compile(r"\| bramki gry otwarte: wrecz (\d+), .*?\| wrecz AI wedlug
                      r"sr\. szansa (\S+)")
 B307_FFU = re.compile(r"udzial FF w trafieniach ludzi (\S+)% \((\d+)/(\d+)\)")
 B307_WD = re.compile(r"\| krok w tyl przodem do wroga \(307b, klucz (TAK|NIE)\): ludzi (\d+), rozkazow (\d+), potem odwrot natywny (\d+), padl przy kroku (\d+)")
+# recenzja 307b: los i kierunek ludzi z kroku (B307-4c), padl przy kroku poza "zginal w drodze" (B307-4b liczy oba)
+B307_WDR = re.compile(r"\| krok w tyl - los i kierunek \(recenzja 307b\): doszedl do punktu (\d+), punkt przed pierwszym szeregiem (\d+), patrzy na wroga (\d+) "
+                      r"z (\d+) ocen \(plecami (\d+)\); padl przy kroku poza 'zginal w drodze'; tyl szyku od srodka sredniego \(klucz (TAK|NIE)\)")
 B307_WDN = re.compile(r"\| odwrot rannych (\d+) \(.*?\| za linia (\d+) \(.*?\| zginal w drodze (\d+) \(")
 
 B307_SAMPLE_PR = ("[07:54:37] Bieg zlamanych (147): misja bitwa, klucz TAK (...) | zlamani pieszo 11 (strona gracza 4 / wroga 7; ...) | czas w panice pieszo 40 s: na 50% "
@@ -85527,14 +85530,16 @@ B307_SAMPLE_FF = ("FF (pole): klucze pociski 100%, wrecz 50%, szarza 50% | trafi
                   "60, zatrzymane (zasada gry) 143, sr. szansa 0.31 | machiny (zasada gry): ... | udzial FF w trafieniach ludzi 9.1% (50/550) | potkniecia 0 (sesja 0)")
 B307_SAMPLE_WD = ("ODWROT RANNYCH (143): misja bitwa, klucz TAK (...) | odwrot rannych 18 (strona gracza 5 / wroga 13; ...) | za linia 9 (cel: tyl szyku 9, ...) | zginal "
                   "w drodze 2 (zabici 1 / nieprzytomni 1), padl na postoju 1, ... | rozkazy: odwrot 4, ... | krok w tyl przodem do wroga (307b, klucz TAK): ludzi 12, "
-                  "rozkazow 30, potem odwrot natywny 8, padl przy kroku 1 (pieszy wrog blizej niz 6 m albo brak bezpiecznego celu; odwrot plecami dopiero od 10 m) "
-                  "| morale do 0.02 0 razy | ...")
+                  "rozkazow 30, potem odwrot natywny 8, padl przy kroku 1 (wrog pieszy albo konny blizej niz 6 m albo brak bezpiecznego celu; odwrot plecami dopiero od 10 m) "
+                  "| krok w tyl - los i kierunek (recenzja 307b): doszedl do punktu 7, punkt przed pierwszym szeregiem 0, patrzy na wroga 20 z 26 ocen (plecami 3); "
+                  "padl przy kroku poza 'zginal w drodze'; tyl szyku od srodka sredniego (klucz TAK) | morale do 0.02 0 razy | ...")
 
 
 def bitwa307b_selftest():
     for name, rx, s in (("PR", B307_PR, B307_SAMPLE_PR), ("PR0", B307_PR, B307_SAMPLE_PR0), ("PRT", B307_PRT, B307_SAMPLE_PR), ("LZ", B307_LZ, B307_SAMPLE_LZ),
                         ("CH", B307_CH, B307_SAMPLE_CH), ("CHK", B307_CHK, B307_SAMPLE_CH), ("FF", B307_FF, B307_SAMPLE_FF), ("FFU", B307_FFU, B307_SAMPLE_FF),
-                        ("WD", B307_WD, B307_SAMPLE_WD), ("WDN", B307_WDN, B307_SAMPLE_WD)):
+                        ("WD", B307_WD, B307_SAMPLE_WD), ("WDN", B307_WDN, B307_SAMPLE_WD),
+                        ("WDR", B307_WDR, B307_SAMPLE_WD)):
         if not rx.search(s):
             return "wyrazenie " + name + " nie pasuje do probki"
     return None
@@ -85665,6 +85670,7 @@ def bitwa307b_main(logp):
     # B307-4
     bad4, n4, men, orders, back, died = [], 0, 0, 0, 0, 0
     wdn, wline, wdied = 0, 0, 0
+    n4c, reached, ahead, face_f, face_n, face_b, center = 0, 0, 0, 0, 0, 0, False
     for l in wd:
         m = B307_WD.search(l)
         if not m:
@@ -85679,11 +85685,23 @@ def bitwa307b_main(logp):
         w = B307_WDN.search(l)
         if w:
             wdn += int(w.group(1)); wline += int(w.group(2)); wdied += int(w.group(3))
+        r = B307_WDR.search(l)
+        if r:
+            n4c += 1
+            reached += int(r.group(1)); ahead += int(r.group(2)); face_f += int(r.group(3)); face_n += int(r.group(4)); face_b += int(r.group(5))
+            if r.group(6) == "TAK":
+                center = True
+            if int(r.group(1)) > a or int(r.group(3)) + int(r.group(5)) > int(r.group(4)):
+                bad4.append("los kroku: " + r.group(0)[:120])
     rep.add("B307-4: krok w tyl rannego przodem do wroga - rozkazow >= ludzi, padl przy kroku <= ludzi",
             f"linii {n4}, ludzi {men}, rozkazow {orders}, potem odwrot {back}, padl przy kroku {died}, zlych {len(bad4)}" + (f" ({bad4[0]})" if bad4 else ""),
             "zlych 0 (brak linii z kluczem TAK - INFO)", None if n4 == 0 and not bad4 else not bad4)
-    rep.add("B307-4b: odwrot rannych - zginal w drodze i za linia", f"odwrotow {wdn}, zginal w drodze {wdied} ({(100.0 * wdied / wdn) if wdn else 0:.0f}%), "
-            f"za linia {wline} ({(100.0 * wline / wdn) if wdn else 0:.0f}%)", "INFO (cel: w drodze < 15%, za linia > 40%; 142a: 41% / 11%)", None)
+    rep.add("B307-4b: odwrot rannych - zginal w drodze (bez kroku), padl przy kroku, za linia", f"odwrotow {wdn}, zginal w drodze {wdied} "
+            f"({(100.0 * wdied / wdn) if wdn else 0:.0f}%), padl przy kroku {died}, razem jak dawne 'w drodze' {wdied + died} ({(100.0 * (wdied + died) / wdn) if wdn else 0:.0f}%), "
+            f"za linia {wline} ({(100.0 * wline / wdn) if wdn else 0:.0f}%)", "INFO (cel: razem < 25%, za linia > 20%; 142a: 41% / 11%)", None)
+    rep.add("B307-4c: krok w tyl - doszli do punktu, punkt przed pierwszym szeregiem, kierunek patrzenia", f"linii {n4c}, doszedl do punktu {reached} z {men}, "
+            f"punkt przed linia {ahead}, przodem do wroga {face_f} z {face_n} ocen ({(100.0 * face_f / face_n) if face_n else 0:.0f}%), plecami {face_b}; "
+            f"tyl od srodka sredniego {'TAK' if center else 'NIE/brak'}", "INFO (cel: punkt przed linia ~0, przodem > 60%; plecami duzo = krok nie jest 'przodem do wroga')", None)
     rep.show()
     return 0
 

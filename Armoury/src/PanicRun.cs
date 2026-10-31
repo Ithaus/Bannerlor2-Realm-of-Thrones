@@ -174,7 +174,7 @@ namespace Armoury
             if (!a.IsRunningAway) { _sNotRun += step; any = true; }
             var rp = a.GetRetreatPos();
             Vec2 rv = rp.AsVec2;
-            if (rv.IsValid && rv.DistanceSquared(my) < 25f) { _sGoal += step; any = true; }
+            if (a.IsRunningAway && rv.IsValid && rv.DistanceSquared(my) < 25f) { _sGoal += step; any = true; }   // recenzja 307b: cel tylko przy natywnym odwrocie (inaczej stary/zerowy)
             float v = a.GetCurrentVelocity().Length;
             float mx = a.GetMaximumForwardUnlimitedSpeed();
             if (v >= 0f && !float.IsInfinity(v)) _vSum += v * step;

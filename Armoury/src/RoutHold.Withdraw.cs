@@ -28,7 +28,8 @@ namespace Armoury
     ///  - wejscie RoutKeeper.Withdraw (BrokenMen co 0.5 s, raz na czlowieka na bitwe; klucz zostaje po losie): czlowiek AI w waznej druzynie, nie w zbiorze zlamanych;
     ///    juz w panice gry - nic (142 przejmie; bez RoutedMenNeverRally - stara regula Break), cudzy odwrot (komponent albo natywny) - czekamy; cudzy odwrot
     ///    bez paniki W TRAKCIE naszego (szarza RBM, rozkaz odwrotu szyku) konczy nasz i zdejmuje klucz - po nim BrokenMen wycofa rannego od nowa;
-    ///  - cel co RefreshEvery (4 s): tyl wlasnego szyku = CurrentPosition - Direction x (Depth/2 + 5 m), potem Depth/2 + 2 m, potem 3 m za najblizszym chorazym strony
+    ///  - cel co RefreshEvery (4 s): tyl wlasnego szyku = srodek - Direction x (Depth/2 + 5 m), potem Depth/2 + 2 m (srodek: CachedAveragePosition przy
+    ///    WoundedWithdrawRearFromCenter, NIE - CurrentPosition = pierwszy szereg, recenzja 307b), potem 3 m za najblizszym chorazym strony
     ///    (BannerBearerLogic) do 80 m; cel w granicach pola, 15 m od granicy, bez wroga (nie uciekajacego) w 10 m, z droga (Scene.GetPathDistanceBetweenPositions,
     ///    najwyzej PathPerFrame zapytan na klatke). Brak bezpiecznego miejsca - nic nie wysylamy, w szyku walczy dalej, proba za RefreshEvery;
     ///  - w drodze: Agent.Retreat(cel) natywnie - pierwszy raz, gdy cel przesunal sie o ponad 5 m albo natywny odwrot zgasl (ponowienie co RefreshEvery);
@@ -189,10 +190,11 @@ namespace Armoury
                 Wd w;
                 if (a == null || !_wd.TryGetValue(a, out w) || w.Done) return;
                 w.Done = true;
-                if (w.Step && !w.Arrived && (state == AgentState.Killed || state == AgentState.Unconscious)) WoundedWithdraw.StepDied++;   // 307b
+                bool inStep = w.Step && !w.Arrived;
+                if (inStep && (state == AgentState.Killed || state == AgentState.Unconscious)) WoundedWithdraw.StepDied++;   // 307b
                 bool wpn, sh;
                 BrokenFate.Arms(a, out wpn, out sh);                      // przed zrzutem broni z trupa (Mission.OnAgentRemoved)
-                WoundedWithdraw.Fate(w.Arrived, state, wpn, sh);          // Arrived: byl za linia (postoj albo po koncu bitwy postoj zdjety)
+                WoundedWithdraw.Fate(w.Arrived, inStep, state, wpn, sh);  // Arrived: byl za linia; inStep: padl w kroku (recenzja 307b - nie "w drodze")
             }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteWithdraw, "RoutKeeper.WithdrawRemoved", e); }
         }
@@ -381,7 +383,7 @@ namespace Armoury
                 Vec2 pos = a.Position.AsVec2;
                 if (f != null && f.CountOfUnits > 1 && pos.IsValid)
                 {
-                    Vec2 cen = f.CurrentPosition, dir = f.Direction;
+                    Vec2 cen = Center(f), dir = f.Direction;           // recenzja 307b: srodek sredni (klucz WoundedWithdrawRearFromCenter)
                     if (cen.IsValid && dir.IsValid && dir.LengthSquared > 0.25f && (pos - cen).DotProduct(dir.Normalized()) > 0f)
                     {
                         w.Returned = true;
@@ -391,30 +393,44 @@ namespace Armoury
             }
             int kind;
             WorldPosition wp;
-            Vec2 t = Pick(a, m, out kind, out wp);
-            if (kind == KindLimit) { WoundedWithdraw.PathLimit++; w.NextEval = now + 0.5f; return; }   // budzet zapytan - proba za chwile
-            // 307b (klucz WoundedBackStepFacingFoe; krytyk 307: 142a 66 odwrotow, 27 zginelo w drodze, 7 za linia): pieszy wrog blizej niz StepNear albo brak
-            // bezpiecznego celu - krok w tyl przodem do wroga (pozycja skryptowa bez NoAttack: broni sie, nie odwraca plecow) za wlasna pierwsza linie;
-            // natywny Agent.Retreat dopiero, gdy pieszy wrog dalej niz StepFar i cel bezpieczny
+            Vec2 t;
+            // 307b (klucz WoundedBackStepFacingFoe; krytyk 307: 142a 66 odwrotow, 27 zginelo w drodze, 7 za linia): wrog blizej niz StepNear (pieszy albo konny) albo
+            // brak bezpiecznego celu - krok w tyl (pozycja skryptowa bez NoAttack: broni sie) za wlasna pierwsza linie; natywny Agent.Retreat (plecami) dopiero,
+            // gdy pieszy wrog dalej niz StepFar, konny dalej niz StepNear i cel bezpieczny. Recenzja 307b: wrog liczony PRZED Pick - przy kroku bez zapytan o droge
+            // i bez odkladania przez budzet zapytan.
             var c307 = Settings.Current;
             if (!w.Holding && c307 != null && c307.WoundedBackStepFacingFoe)
             {
-                Vec2 foePos;
-                float fd = NearestFootFoe(a, m, WoundedWithdraw.StepFar, out foePos);
-                bool near = fd < WoundedWithdraw.StepNear;
-                if (!t.IsValid || near || (w.Step && fd <= WoundedWithdraw.StepFar))
+                Vec2 foePos, horsePos;
+                float hd;
+                float fd = NearestFoe(a, m, WoundedWithdraw.StepFar, out foePos, out hd, out horsePos);
+                bool near = fd < WoundedWithdraw.StepNear || hd < WoundedWithdraw.StepNear;
+                Vec2 threat = hd < fd ? horsePos : foePos;               // od kogo odejsc, gdy bez szyku
+                if (near || (w.Step && fd <= WoundedWithdraw.StepFar))
                 {
-                    if (!t.IsValid) WoundedWithdraw.NoSpot++;
-                    StepBack(w, m, foePos);
+                    StepBack(w, m, threat);
+                    return;
+                }
+                t = Pick(a, m, out kind, out wp);
+                if (kind == KindLimit) { WoundedWithdraw.PathLimit++; w.NextEval = now + 0.5f; return; }   // budzet zapytan - proba za chwile
+                if (!t.IsValid)
+                {
+                    WoundedWithdraw.NoSpot++;
+                    StepBack(w, m, threat);
                     return;
                 }
                 if (w.Step)
                 {
-                    // wrog odstapil (dalej niz StepFar), cel bezpieczny - pozycja kroku zdjeta, dalej natywny odwrot do celu (ponizej)
+                    // wrog odstapil, cel bezpieczny - pozycja kroku zdjeta, dalej natywny odwrot do celu (ponizej)
                     w.Step = false;
                     try { a.DisableScriptedMovement(); } catch { }
                     WoundedWithdraw.StepToRetreat++;
                 }
+            }
+            else
+            {
+                t = Pick(a, m, out kind, out wp);
+                if (kind == KindLimit) { WoundedWithdraw.PathLimit++; w.NextEval = now + 0.5f; return; }   // budzet zapytan - proba za chwile
             }
             bool lost = false;
             if (w.Holding)
@@ -469,10 +485,13 @@ namespace Armoury
             Resend(w, now);
         }
 
-        /// <summary>307b: najblizszy pieszy wrog (aktywny czlowiek bez konia, nie uciekajacy) w promieniu r; float.MaxValue = nikogo. Zapytanie natywne do wlasnej listy.</summary>
-        private float NearestFootFoe(Agent a, Mission m, float r, out Vec2 at)
+        /// <summary>307b: najblizszy pieszy wrog (aktywny czlowiek bez konia, nie uciekajacy) w promieniu r; float.MaxValue = nikogo. Osobno najblizszy konny
+        /// (recenzja 307b: jezdziec w 6 m to najgrozniejszy przypadek dla rannego plecami) - liczony do "blisko", nie do "odstapil". Zapytanie natywne do wlasnej listy.</summary>
+        private float NearestFoe(Agent a, Mission m, float r, out Vec2 at, out float horse, out Vec2 horseAt)
         {
             at = Vec2.Invalid;
+            horseAt = Vec2.Invalid;
+            horse = float.MaxValue;
             float best = float.MaxValue;
             Vec2 my = a.Position.AsVec2;
             if (!my.IsValid) return best;
@@ -482,16 +501,34 @@ namespace Armoury
                 for (int i = 0; i < _near.Count; i++)
                 {
                     var x = _near[i];
-                    if (x == null || !x.IsActive() || !x.IsHuman || x.IsRunningAway || x.MountAgent != null) continue;
-                    float d = x.Position.AsVec2.Distance(my);
-                    if (d < best) { best = d; at = x.Position.AsVec2; }
+                    if (x == null || !x.IsActive() || !x.IsHuman || x.IsRunningAway) continue;
+                    Vec2 xp = x.Position.AsVec2;
+                    float d = xp.Distance(my);
+                    if (x.MountAgent != null) { if (d < horse) { horse = d; horseAt = xp; } }
+                    else if (d < best) { best = d; at = xp; }
                 }
             }
             finally { _near.Clear(); }
             return best;
         }
 
-        /// <summary>307b: krok w tyl przodem do wroga - punkt StepBehindFront za pierwsza linia wlasnego szyku (srodek + kierunek x glebokosc/2 - 4 m); kto juz
+        /// <summary>Recenzja 307b (dekompilacja 1.4.8): Formation.CurrentPosition to srodek PIERWSZEGO szeregu (Formation.cs:548-563 - CachedAveragePosition +
+        /// TransformToParentUnitF(-OrderLocalAveragePosition), LineFormation.GetLocalPositionOfUnit:961 - szereg 0 na y = 0), a w kolumnie - pozycja czola (Vanguard).
+        /// Srodek glebokosci = CachedAveragePosition (gra: BehaviorAdvance.cs:100 przod = srodek + kierunek x Depth/2). Klucz WoundedWithdrawRearFromCenter;
+        /// NIE = stary CurrentPosition (tyl szyku i "wrocil do walki" liczone od pierwszego szeregu jak od srodka).</summary>
+        private static Vec2 Center(Formation f)
+        {
+            var c = Settings.Current;
+            if (c != null && c.WoundedWithdrawRearFromCenter)
+            {
+                Vec2 avg = f.CachedAveragePosition;
+                if (avg.IsValid) return avg;
+            }
+            return f.CurrentPosition;
+        }
+
+        /// <summary>307b: krok w tyl przodem do wroga - punkt StepBehindFront za pierwsza linia wlasnego szyku (srodek SREDNI CachedAveragePosition + kierunek x
+        /// glebokosc/2 - 4 m; recenzja 307b: CurrentPosition to juz pierwszy szereg, wiec stary wzor przy Depth > 8 m dawal punkt PRZED linia); kto juz
         /// stoi za tym punktem, stoi tam, gdzie jest; bez szyku - 4 m od najblizszego pieszego wroga. Natywny odwrot zgaszony (plecy do wroga), pozycja skryptowa
         /// bez NoAttack (broni sie). Nowy rozkaz tylko przy przesunieciu punktu o ponad 1.5 m albo gdy ktos zdjal pozycje (RBM StanceLogic).</summary>
         private static void StepBack(Wd w, Mission m, Vec2 foePos)
@@ -503,12 +540,15 @@ namespace Armoury
             var f = a.Formation;
             if (f != null && f.CountOfUnits > 1)
             {
-                Vec2 cen = f.CurrentPosition, dir = f.Direction;
+                Vec2 cen = f.CachedAveragePosition, dir = f.Direction;
                 if (cen.IsValid && dir.IsValid && dir.LengthSquared > 0.25f)
                 {
                     dir = dir.Normalized();
                     float half = Math.Max(0f, f.Depth) * 0.5f;
                     sp = cen + dir * (half - WoundedWithdraw.StepBehindFront);
+                    // pomiar: punkt przed pierwszym szeregiem gry (CurrentPosition; w kolumnie - czolo) - inny uklad niz linia albo szyk w ruchu
+                    Vec2 front = f.CurrentPosition;
+                    if (front.IsValid && (sp - front).DotProduct(dir) > 0f) WoundedWithdraw.StepAhead++;
                     if ((my - sp).DotProduct(dir) < 0f) sp = my;          // juz za tym punktem - zostaje, przodem do wroga
                 }
             }
@@ -520,6 +560,26 @@ namespace Armoury
             }
             if (!sp.IsValid) sp = my;
             if (!m.IsPositionInsideBoundaries(sp)) sp = my;
+            // recenzja 307b: pomiar - doszedl do punktu kroku (raz na czlowieka) i kat patrzenia wobec wroga (czy krok jest "przodem do wroga": ruch i obrot - AI natywne)
+            if (w.Step)
+            {
+                if (my.DistanceSquared(sp) <= 2.25f) WoundedWithdraw.StepReachedPeople.Add(a.Index);   // 1.5 m od punktu (albo juz za nim - punkt = on)
+                if (foePos.IsValid)
+                {
+                    Vec2 to = foePos - my;
+                    float lt = to.Length;
+                    Vec2 look = Vec2.Invalid;
+                    try { look = a.LookDirection.AsVec2; } catch { }
+                    float ll = look.IsValid ? look.Length : 0f;
+                    if (lt > 0.05f && ll > 0.05f)
+                    {
+                        float cos = look.DotProduct(to) / (lt * ll);
+                        WoundedWithdraw.FaceN++;
+                        if (cos >= 0.5f) WoundedWithdraw.FaceFront++;
+                        else if (cos <= -0.5f) WoundedWithdraw.FaceBack++;
+                    }
+                }
+            }
             bool moved = !w.Step || !w.Target.IsValid || w.Target.DistanceSquared(sp) > 2.25f;
             if (!moved)
             {
@@ -596,7 +656,7 @@ namespace Armoury
             var f = a.Formation;
             if (f != null && f.CountOfUnits > 1)
             {
-                Vec2 cen = f.CurrentPosition;
+                Vec2 cen = Center(f);                                     // recenzja 307b: srodek sredni (klucz WoundedWithdrawRearFromCenter), NIE - pierwszy szereg
                 Vec2 dir = f.Direction;
                 if (cen.IsValid && dir.IsValid && dir.LengthSquared > 0.25f)
                 {

@@ -10608,7 +10608,7 @@ namespace Armoury
         [SettingPropertyGroup("Autotest probes (306b)")]
         public bool Autotest306Probes { get; set; } = true;
 
-        [SettingPropertyBool("Panic Flee Hold Course", HintText = "A man who has broken and runs keeps the course he took - toward a gap, his own rear or the edge of the field - and turns only when an enemy who is not fleeing himself stands in his way within 12 m. Off = his course is chosen again every few seconds and he turns whenever the best direction changes by more than 45 degrees, as before", RequireRestart = false)]
+        [SettingPropertyBool("Panic Flee Hold Course", HintText = "A man who has broken and runs keeps the course he took - toward a gap, his own rear or the edge of the field - and turns only when an enemy who is not fleeing himself stands in his way - within 12 m and within 60 degrees either side of his course. Off = his course is chosen again every few seconds and he turns whenever the best direction changes by more than 45 degrees, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
         public bool PanicFleeHoldCourse { get; set; } = true;
 
@@ -10620,9 +10620,13 @@ namespace Armoury
         [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
         public bool FriendlyFireMeleeBySkill { get; set; } = true;
 
-        [SettingPropertyBool("Wounded Back Step Facing Foe", HintText = "With Wounded Withdraw With Arms: a wounded man with an enemy on foot within 6 m - or with no safe place to go - steps back facing the enemy, still defending himself, to a point 4 m behind his own front rank, and turns his back to walk to the rear only once no enemy on foot is within 10 m. Off = he turns and walks to the rear at once, or stays in the line when there is no safe place, as before", RequireRestart = false)]
+        [SettingPropertyBool("Wounded Back Step Facing Foe", HintText = "With Wounded Withdraw With Arms: a wounded man with an enemy within 6 m (on foot or mounted) - or with no safe place to go - steps back facing the enemy, still defending himself, to a point 4 m behind his own front rank, and turns his back to walk to the rear only once no enemy on foot is within 10 m. Off = he turns and walks to the rear at once, or stays in the line when there is no safe place, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
         public bool WoundedBackStepFacingFoe { get; set; } = true;
+
+        [SettingPropertyBool("Wounded Withdraw Rear From Center", HintText = "With Wounded Withdraw With Arms: the rear of a wounded man's formation is measured from the middle of its depth, so he walks to a spot behind its last rank, and 'back in the fight' means the front half of the formation. Off = it is measured from the front rank as if that were the middle, as before - in a deep formation the spot lies inside its own ranks", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
+        public bool WoundedWithdrawRearFromCenter { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -13279,6 +13283,7 @@ namespace Armoury
             s.BannerLossBreakByShare = BannerLossBreakByShare;
             s.FriendlyFireMeleeBySkill = FriendlyFireMeleeBySkill;
             s.WoundedBackStepFacingFoe = WoundedBackStepFacingFoe;
+            s.WoundedWithdrawRearFromCenter = WoundedWithdrawRearFromCenter;
         }
 
         internal static void Apply()
