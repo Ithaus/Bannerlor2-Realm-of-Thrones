@@ -51,6 +51,25 @@ namespace Armoury
         private static bool _probe;
         private static float _pBefore = -1f, _pAfter = -1f;
 
+        // 305d: rozbicie XP na zrodla - droga XP zostawia slowo zrodla tuz przed AddSkillXp (Tag), prefiks je zuzywa; bez slowa (albo starsze niz 1 s) = "inne"
+        private static readonly string[] SrcNames = { "luk", "kusza", "amunicja", "pancerz", "miecz", "zlecenie", "przetop", "rafinacja", "inne" };
+        private static readonly int[] _srcN = new int[9];
+        private static readonly double[] _srcXp = new double[9];
+        private static string _tag;
+        private static int _tagAt;
+
+        /// <summary>305d: slowo zrodla nastepnego XP Smithing (luk / kusza / amunicja / pancerz / miecz / zlecenie / przetop / rafinacja).</summary>
+        internal static void Tag(string src) { _tag = src; _tagAt = Environment.TickCount; }
+
+        private static int TakeTag()
+        {
+            string t = _tag;
+            _tag = null;
+            if (t == null || unchecked(Environment.TickCount - _tagAt) > 1000) return 8;
+            for (int i = 0; i < 8; i++) if (SrcNames[i] == t) return i;
+            return 8;
+        }
+
         internal static float Factor
         {
             get
@@ -143,6 +162,8 @@ namespace Armoury
             try
             {
                 if (!isAffectedByFocusFactor) { _dPlain++; return; }
+                int si = TakeTag();   // 305d: zrodlo XP (surowe, przed cieciem)
+                _srcN[si]++; _srcXp[si] += rawXp;
                 float f = Factor;
                 if (Neutral(f)) return;
                 float before = rawXp;
@@ -172,6 +193,33 @@ namespace Armoury
         {
             for (int i = 0; i < 3; i++) { _dN[i] = 0; _dBefore[i] = 0; _dAfter[i] = 0; }
             _dPlain = 0;
+            for (int i = 0; i < _srcN.Length; i++) { _srcN[i] = 0; _srcXp[i] = 0; }
+            SmithXpRule.ResetDay();
+            HistoricalPrices.RoundFixed = 0;
+        }
+
+        /// <summary>305d: linia doby "Kowalstwo - zrodla XP (305d)" - surowe XP Smithing (przed cieciem SmithingXpFactor) wedlug zrodla, podstawienia zasady pracy
+        /// i liczba wynikow liczonych od dawnej wartosci (SmithXpRoundFix). Tylko w dobie, w ktorej cos sie dzialo.</summary>
+        private static void DailySources(int day)
+        {
+            int n = 0;
+            for (int i = 0; i < _srcN.Length; i++) n += _srcN[i];
+            if (n == 0 && SmithXpRule.DayFree + SmithXpRule.DayArmour + SmithXpRule.DayOrder + SmithXpRule.DayOrderBonus == 0 && HistoricalPrices.RoundFixed == 0) return;
+            var sb = new System.Text.StringBuilder();
+            double sum = 0;
+            for (int i = 0; i < _srcN.Length; i++)
+            {
+                sum += _srcXp[i];
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append(SrcNames[i]).Append(" ").Append(_srcN[i].ToString(Inv)).Append(" x / ").Append(F1(_srcXp[i]));
+            }
+            var s = Settings.Current;
+            Log.Info("Kowalstwo - zrodla XP (305d): dzien " + day + " | surowe XP " + F1(sum) + " w " + n + " wywolaniach: " + sb
+                     + " | zasada pracy " + (SmithXpRule.On ? "TAK (" + (s != null ? s.SmithXpPerStaminaTier : 0) + " XP na stamine x tier)" : "NIE")
+                     + ": wolne kucie broni " + SmithXpRule.DayFree + " / " + F1(SmithXpRule.DayFreeXp) + ", pancerz CRAFT " + SmithXpRule.DayArmour + " / " + F1(SmithXpRule.DayArmourXp)
+                     + ", zlecenie " + SmithXpRule.DayOrder + " / " + F1(SmithXpRule.DayOrderXp) + " + premia " + SmithXpRule.DayOrderBonus + " / " + F1(SmithXpRule.DayOrderBonusXp)
+                     + " | od dawnej wartosci (SmithXpRoundFix " + (s != null && s.SmithXpRoundFix ? "TAK" : "NIE") + ") " + HistoricalPrices.RoundFixed
+                     + " | potkniecia zasady " + SmithXpRule.Stumbles + ".");
         }
 
         /// <summary>ArmouryBehavior.OnDailyTickBodyInner: linia doby (gdy cokolwiek sie dzialo albo sa potkniecia) i zerowanie; test autotestu raz na sesje.</summary>
@@ -188,6 +236,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Daily", e); }
+            try { DailySources(day); } catch (Exception e) { Stumble("DailySources", e); }
             ResetDay();
             if (!_testDone && TestWanted())
             {

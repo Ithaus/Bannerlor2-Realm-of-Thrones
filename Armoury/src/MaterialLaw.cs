@@ -155,7 +155,17 @@ namespace Armoury
                 var it = Recipes.MaterialItem(refineFormula.Output);
                 if (it == null || it.Value <= 0) return;
                 int orig = Orig(it);
-                if (orig > 0 && orig != it.Value) __result = Math.Max(1, (int)Math.Round(__result * (double)orig / it.Value));
+                if (orig <= 0 || orig == it.Value) return;
+                var s = Settings.Current;
+                if (s != null && s.SmithXpRoundFix)
+                {
+                    // 305d: wzor gry wprost od dawnej wartosci (DefaultSmithingModel 1.4.8: MathF.Round(0.3f x (Value x OutputCount))) zamiast skalowania
+                    // juz zaokraglonego wyniku; sufit SmithAudit.RefineXpPostfix (RefineXpCap) biegnie potem jak dotad
+                    __result = TaleWorlds.Library.MathF.Round(0.3f * (float)(orig * refineFormula.OutputCount));
+                    HistoricalPrices.RoundFixed++;
+                    return;
+                }
+                __result = Math.Max(1, (int)Math.Round(__result * (double)orig / it.Value));
             }
             catch { }
         }

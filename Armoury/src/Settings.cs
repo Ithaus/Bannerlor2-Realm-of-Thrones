@@ -4992,6 +4992,13 @@ namespace Armoury
         public bool LordEscortFromGarrison = true;         // With Lords Avoid Danger: a weak lord inside a town or castle of his own house takes men from its garrison until his healthy men fill 60% of his party - real men with their own kit, the garrison never drops below the game's own minimum (75 in a castle, 125 in a town), and nothing is taken while the fortress is besieged or an enemy lord is near. Off = he waits for recruits instead
         public bool LordsJoinNearArmy = true;              // With Lords Avoid Danger: a weak lord joins an army of his own realm whose leader is within about a day's ride, if he has food for the march and the army's leader has the influence the game charges for calling him; a ruler never joins another lord's army. Off = he rides with a stronger lord or goes to a fortress instead
 
+        // --- Smithing XP (305d) ---
+        // 305d (Jeff 31.10: "kowalstwo sprawdz czy jest zbalansowane, czy nie za duzo xp dostaje za luki a za malo za wykucie mieczy"): SmithXpRule.cs.
+        // Log 30.10: luki 51% surowego XP kuzni, wlasny miecz 1 XP (zaokraglenie gry przed przeliczeniem HistoricalPrices), przetop 1 XP. NIE = jak 140 co do bitu.
+        public bool SmithXpRoundFix = true;                // Smithing XP of a forged weapon, a smelted item, a crafting order and refining is counted straight from the item's value before the historical price change (the game's own rates: 2% of the value for forging and smelting, 10% for an order, 30% of the output for refining). Off = the game's XP from the new low price is scaled up afterwards, so a cheap blade or a smelted item gives 1 XP
+        public bool SmithXpOneRule = true;                 // One rule for Smithing XP from work at the forge: XP = stamina spent x Smith XP Per Stamina Tier x the item's tier x your learning (full up to the item's difficulty plus the full-credit margin, then less). It holds for bows, crossbows, ammunition, armour from the CRAFT tab, weapons you design and crafting orders (an order adds a quarter of that when its demands are met, as the game does). A bow, a sword or a cuirass of the same tier then teach the same per point of stamina. Off = bows pay by forge days, weapons and armour by their price
+        public int SmithXpPerStaminaTier = 7;              // With Smith XP One Rule: Smithing XP per point of stamina per tier of the item (7 keeps bows where they were: 238, 546 and 980 XP for tier 2, 3 and 4)
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

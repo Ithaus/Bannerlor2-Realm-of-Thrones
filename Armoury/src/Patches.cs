@@ -25,6 +25,9 @@ namespace Armoury
                 if (item == null) return;
                 int tier = Recipes.Grade(item);
                 int cap = MathF.Max(50, s.WeaponXpCapPerTier * tier);
+                // 305d (SmithXpOneRule): pancerz z CRAFT BK (ta sama metoda gry) ma sufit pracy kowala XpCapPerTier x tier - plyta t4 (ok. 100 staminy x 7 x 4 = 2 800)
+                // nie moze byc scieta do 500 x tier broni; NIE = jeden sufit jak dotad
+                if (s.SmithXpOneRule && !(item.WeaponDesign != null || item.IsCraftedWeapon)) cap = MathF.Max(50, s.XpCapPerTier * tier);
                 if (__result > cap) __result = cap;
             }
             catch (Exception e) { Log.Error("WeaponXpPatch", e); }

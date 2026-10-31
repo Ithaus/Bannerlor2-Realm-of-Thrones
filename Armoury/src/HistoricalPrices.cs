@@ -1186,13 +1186,27 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ XP kowalstwa od wartosci sprzed zmiany
-        public static void XpPostfix(ItemObject item, ref int __result)
+        // 305d (SmithXpRoundFix): gra zwraca juz zaokraglone Round(0.02 x nowa wartosc) - przy nowej cenie 12 d. to 0, a 0 x (dawna / nowa) dawalo
+        // podloge 1 XP za kazdy wlasny miecz i kazdy przetop (log 30.10: "wywolan 9 ... XP przed 9"). Liczymy wzor gry wprost od dawnej wartosci
+        // (DefaultSmithingModel 1.4.8: przetop i wolne kucie MathF.Round(0.02f x Value), zlecenie MathF.Round(0.1f x Value); BKSmithingModel ich nie nadpisuje).
+        // NIE = stare skalowanie z podloga 1. Sufity (WeaponXpPatch, SmithAudit.SmeltXpPostfix) biegna potem jak dotad (Priority.High tutaj).
+        internal static int RoundFixed;
+        public static void XpPostfix(ItemObject item, ref int __result, System.Reflection.MethodBase __originalMethod)
         {
             try
             {
                 if (!_applied || item == null || item.Value <= 0) return;
                 int orig = Orig(item);
-                if (orig > 0 && orig != item.Value) __result = Math.Max(1, (int)Math.Round(__result * (double)orig / item.Value));
+                if (orig <= 0 || orig == item.Value) return;
+                var s = Settings.Current;
+                if (s != null && s.SmithXpRoundFix && __originalMethod != null)
+                {
+                    float rate = __originalMethod.Name == "GetSkillXpForSmithingInCraftingOrderMode" ? 0.1f : 0.02f;
+                    __result = TaleWorlds.Library.MathF.Round(rate * (float)orig);
+                    RoundFixed++;
+                    return;
+                }
+                __result = Math.Max(1, (int)Math.Round(__result * (double)orig / item.Value));
             }
             catch { }
         }

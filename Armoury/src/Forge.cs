@@ -354,8 +354,7 @@ namespace Armoury
                 int skill = Hero.MainHero.GetSkillValue(DefaultSkills.Crafting);
                 // nauka z TRUDNOSCI sztuki (pokretla Jeffa 07.10): ta sama sztuka przy tej samej umiejetnosci uczy
                 // tyle co dawniej; droge skraca to, ze wyzszy tier (wiecej XP) otwiera sie wczesniej
-                float margin = MathF.Max(0f, (float)(skill - r.Difficulty - s.XpFullCreditMargin));
-                float learning = MathF.Max(s.XpFloorFactor, 1f - margin / MathF.Max(1f, s.XpDiminishingRange));
+                float learning = Learning(skill, r.Difficulty);   // 305d: krzywa nauki wydzielona (ta sama w SmithXpRule.WorkXp) - wynik co do bitu jak dotad
                 float days = timed ? BaseDays(r) : 1f;
                 int xp = (int)(days * r.Tier * s.XpPerDayPerTier * learning);
                 int cap = MathF.Max(50, s.XpCapPerTier * r.Tier);
@@ -363,6 +362,15 @@ namespace Armoury
                 return Math.Min(cap, Math.Max(20, xp));
             }
             catch (Exception e) { Log.Error("ProjectXp", e); return 50; }
+        }
+
+        /// <summary>305d: krzywa nauki kowala - pelna nauka do (trudnosc + XpFullCreditMargin), potem w dol do XpFloorFactor na XpDiminishingRange punktach.
+        /// Jedna dla ProjectXp i dla zasady pracy (SmithXpRule.WorkXp).</summary>
+        internal static float Learning(int skill, int difficulty)
+        {
+            var s = Settings.Current;
+            float margin = MathF.Max(0f, (float)(skill - difficulty - s.XpFullCreditMargin));
+            return MathF.Max(s.XpFloorFactor, 1f - margin / MathF.Max(1f, s.XpDiminishingRange));
         }
 
         internal static int ForgeFee(Recipes.Recipe r)
@@ -636,7 +644,9 @@ namespace Armoury
                 {
                     Recipes.TakePartial(r, s.MaterialLossOnFailure);
                     RareMaterials.Take(item, true);   // m97-surowce: klepka peka z lukiem
-                    hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r, false) * 0.3f * xpMul);
+                    SmithXp.Tag(SmithXpRule.SourceOf(item));   // 305d: rozbicie XP na zrodla w linii dobowej
+                    hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, SmithXpRule.On ? SmithXpRule.WorkXp(r.Stamina, Recipes.Grade(item), r.Difficulty, hero) * 0.3f   // 305d: jedna zasada - 0.3 pracy
+                                                                                         : ProjectXp(r, false) * 0.3f * xpMul);
                     Log.Player("The piece cracked on the anvil. Half your metal is slag.", true);
                     Log.Info("Kucie nieudane: " + item.StringId + " (skill " + skill + "/" + r.SkillNeeded + ", trudnosc " + r.Difficulty + ")");
                     return;
@@ -655,7 +665,9 @@ namespace Armoury
                     ForgeClock.NoteQueued(item, made, fh, ForgeClock.HoursOf(r.Stamina));
                     if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId)) ArmouryBehavior.Legends.Add(item.StringId);
                     RangedLore.OnCrafted(item, hero);   // m96-wzory: losowanie wedlug reki kowala przy kowadle
-                    hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMul);
+                    SmithXp.Tag(SmithXpRule.SourceOf(item));   // 305d
+                    hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, SmithXpRule.On ? SmithXpRule.WorkXp(r.Stamina, Recipes.Grade(item), r.Difficulty, hero)   // 305d: XP = stamina x stawka x tier x nauka
+                                                                                         : ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMul);
                     Log.Info("Wykuto (na lawe): " + item.StringId + " x" + made + " jakosc=" + (quality != null ? quality.StringId : "zwykla")
                              + " skill=" + skill + "/" + r.SkillNeeded + " trudnosc=" + r.Difficulty);   // ForgeOneClock (domyslnie wlaczony): ta linia, nie "Wykuto:"
                     return;
@@ -669,8 +681,9 @@ namespace Armoury
                 if (Recipes.IsLegendary(item) && !ArmouryBehavior.Legends.Contains(item.StringId))
                     ArmouryBehavior.Legends.Add(item.StringId);
                 RangedLore.OnCrafted(item, hero);   // m96-wzory: losowanie wedlug reki kowala przy kowadle
-                hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
-                    ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMul);
+                SmithXp.Tag(SmithXpRule.SourceOf(item));   // 305d
+                hero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting, SmithXpRule.On ? SmithXpRule.WorkXp(r.Stamina, Recipes.Grade(item), r.Difficulty, hero)   // 305d: jedna zasada
+                                                                     : ProjectXp(r) * (1f - Settings.Current.XpShareWhileWorking) * xpMul);
 
                 string qname = quality != null ? quality.Name + " " : "";
                 Log.Player("You forged " + (made > 1 ? made + " x " : "") + qname + item.Name + ".");

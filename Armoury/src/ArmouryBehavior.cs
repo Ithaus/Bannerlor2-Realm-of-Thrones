@@ -2732,9 +2732,12 @@ namespace Armoury
                         totalDays = MathF.Max(1f / 24f, ForgeClock.WorkHours(p.Item, 1, totalDays * 24f) / 24f * (p.Kind == "van" ? 1f : Project.TimeFactor(p.Tempo)));
                     else
                         totalDays *= ForgeClock.TimeMult;   // m109-czas: robota trwa ForgeTimeMult razy dluzej - XP sztuki rozlozone na dluzsza robote, suma bez zmian
-                    if (atForge && p.Kind != "bk")   // XP tylko za wlasna prace przy kowadle (bk: XP dal BK przy kliknieciu)
+                    if (atForge && p.Kind != "bk" && !(p.Kind == "van" && SmithXpRule.On))   // XP tylko za wlasna prace przy kowadle (bk: XP dal BK przy kliknieciu; 305d: van - przy kliknieciu z zasady pracy)
+                    {
+                        SmithXp.Tag(SmithXpRule.SourceOf(p.Item));   // 305d: rozbicie XP na zrodla
                         Hero.MainHero.HeroDeveloper.AddSkillXp(DefaultSkills.Crafting,
                             Forge.ProjectXp(rr) * Settings.Current.XpShareWhileWorking / totalDays / 24f * stepH * Forge.AmmoXpMul(p.Item));   // sklad8-s (przeglad, uwaga 2): amunicja x0.05 takze w trakcie pracy; m96: XP za przepracowana czesc godziny
+                    }
 
                     // wpis 89 (audyt): zapis W MIEJSCU - dotad Remove + Add przesuwal tykajaca sztuke na koniec listy,
                     // wiec "najstarsza" zmieniala sie co godzine i cala kolejka szla na zmiane, konczac sie razem
