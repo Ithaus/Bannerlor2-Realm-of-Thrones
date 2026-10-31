@@ -14,6 +14,10 @@
   wyjatku ROT smoka; KOWALSTWO: blad zaokraglenia XP (miecz i przetop 1 XP), luk XP z 'dni plyty'; INWESTYCJE: prace okregu dzialaja (ok. 15%/rok), panel dzieli przez 28 dob.
 - 05:05 Workflow wf_ceed2ee0-bec: paczki 305a karawany / 305b warsztaty / 305c bitwa / 305d kowalstwo / 305e drobne (worktree zb\n305a..e, galezie noc/305a-karawany itd.
   od noc/305-jeff-31-10), kazda: kod -> recenzja -> poprawki. Potem scalenie do noc/305-jeff-31-10, test 141a, porownanie z 141base, WGRANIE 141.
+- 05:35 141base (140 na nowym zapisie): 7 bitew + 90 dob kod 0, ERROR 0 (logi m113\logi\141base-*). Paczki 305a-e gotowe i scalone (union.py w scratchpad d16b0e41 dla
+  CHANGELOG/sprawdz_logi/McmSettings + gen_mcm 2645 ustawien) -> noc/305-jeff-31-10 e739ad5c wypchniete; Armoury 7bca3bbe (build 0 bledow; UWAGA worktree bez libs:
+  -p:GameLibs=C:/Users/GAME/Bannerlor2-Realm-of-Thrones/libs). CrashScribe testowy z latka smokow: scratchpad d16b0e41\cs-at305\CrashScribe-at-n305.dll (kopia cs-at283 + DragonShips).
+  Produkcyjny CrashScribe z n305: e158884f (NIE wgrany). AUTOTEST 141a w toku (m113\seria-141a.out.txt) + przeglad scalenia wf_a2e498c8-afe.
 
 ## DOPISEK 30.10 ok. 04:45 CEST - WGRANIE 140 (noc/304-karawany-odcinki c9fca017, status 6888ffa3 wypchniety) - KONIEC NOCY, START DLA NASTEPNEJ SESJI / DRUGIEGO KONTA
 - W GRZE: Armoury.dll 2845835689cd2ca7e26199c38d8d279c (140). Kopie 139: Armoury.dll.bak-2026-10-30-przed-wgranie140 i D:\Backup-Bannerlord\wgrane\2026-10-30-wgranie140-przed.
