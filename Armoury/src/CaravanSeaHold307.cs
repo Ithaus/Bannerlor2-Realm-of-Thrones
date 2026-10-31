@@ -23,18 +23,22 @@ namespace Armoury
     /// i nie wrogie (te same warunki BK) trzyma cel: tik BK pominiety (jedyne, co by zrobil, to losowa nowa decyzja - ogon metody nic nie zmienia, gdy cel jest
     /// miastem). Wyjscia: wojna albo oblezenie celu (BK decyduje jak dotad), cel nie miasto z portem (BK flag4 - jak dotad), przekroczenie dni drogi z decyzji:
     /// limit = Caravan Sea Hold Factor x dni drogi do celu w chwili pierwszego tiku z tym celem (CaravanEscort.RoadDaysTo - prosta / dzien drogi x zmierzony
-    /// wspolczynnik odcinka), w granicach Caravan Sea Hold Min Days .. Max Days. Po limicie BK jak dotad (1% na tik). Nowy cel - zawsze w miescie albo po
+    /// wspolczynnik odcinka), w granicach Caravan Sea Hold Min Days .. Max Days. 307e: po limicie od razu decyzja BK (ThinkNextDestination - NewTargetNow; ten sam
+    /// cel albo brak - wpis 'po limicie' bez trzymania, BK jak dotad 1% na tik); Factor 3.0 (143a-probyN: rejs / droga ladowa srednio 1.78, przy 2.0 28% po limicie). Nowy cel - zawsze w miescie albo po
     /// wyjsciu z trzymania - wybiera ThinkNextDestination z regulami 294c / 139 C / D1-D2 (odcinek K294-19/31) jak dotad.
     /// Pomiar (takze przy kluczu NIE): postfiks MobileParty.SetMoveGoToSettlement - zmiana celu karawany w drodze (stary / nowy cel, dni od decyzji, zrodlo:
     /// BK tik w drodze z powodem albo inna droga ze stosem dla karawany gracza). Linia doby "Karawany morskie - cel do doplyniecia (307a): dzien N".
     /// </summary>
     internal static class CaravanSeaHold307
     {
-        private sealed class Hold { public Settlement T; public double Start, Limit, Days0; }
+        private sealed class Hold { public Settlement T; public double Start, Limit, Days0; public bool Expired; }   // 307e: Expired - limit minal, BK juz decydowal
         private static readonly Dictionary<MobileParty, Hold> _h = new Dictionary<MobileParty, Hold>();
         private static bool _wImpl, _wMove;
         private static MobileParty _inBk; private static int _inWhy;   // karawana w tiku BK w drodze i powod wpuszczenia (0 brak / 1 wojna / 2 oblezenie / 3 limit / 4 cel nie port / 5 klucz NIE / 6 inne)
         private static long _ticks, _held, _newHold, _exWar, _exSiege, _exLimit, _exNotPort, _exOff, _exIdle;   // 307d: _exIdle - ShortTermBehavior None (BK zwalnia karawane)
+        // 307e (K307-8): po limicie decyzja BK od razu (ThinkNextDestination) - nowy cel / ten sam albo brak (BK dalej jak dotad, wpis bez trzymania)
+        private static long _limNew, _limSame;
+        private static System.Reflection.MethodInfo _think; private static bool _thinkLooked;
         private static readonly HashSet<MobileParty> _heldCars = new HashSet<MobileParty>();
         private static long _chSea, _chLand, _chSeaPlayer, _chOther;
         // recenzja 307a (pomiar trafnosci limitu): doplyniecia do trzymanego celu - liczba, suma i najwiekszy stosunek dni rejsu / droga z decyzji, w tym ponad limit
@@ -52,6 +56,7 @@ namespace Armoury
         {
             _h.Clear(); _inBk = null; _inWhy = 0;
             _ticks = _held = _newHold = _exWar = _exSiege = _exLimit = _exNotPort = _exOff = _exIdle = 0; _heldCars.Clear();
+            _limNew = _limSame = 0;
             _chSea = _chLand = _chSeaPlayer = _chOther = 0; Array.Clear(_chWhy, 0, _chWhy.Length); _det.Clear();
             _arr = _arrOver = 0; _arrRatioSum = _arrRatioMax = 0; _arrDet.Clear();
             _stumbles = _stumbleSess = 0; _err.Clear();
@@ -74,7 +79,7 @@ namespace Armoury
                 if (mp == null || h == null || h.T == null || mp.CurrentSettlement != h.T) return;
                 double days = CampaignTime.Now.ToDays - h.Start;
                 _arr++;
-                if (days > h.Limit) _arrOver++;
+                if (h.Expired || days > h.Limit) _arrOver++;
                 if (h.Days0 > 0)
                 {
                     double q = days / h.Days0;
@@ -97,7 +102,7 @@ namespace Armoury
         }
 
         /// <summary>Prefiks BKCaravansBehavior.HourlyTickPartyImpl(MobileParty): karawana morska w drodze z waznym celem - tik BK pominiety (cel trzymany).</summary>
-        public static bool ImplPrefix(MobileParty __0)
+        public static bool ImplPrefix(object __instance, MobileParty __0)
         {
             _inBk = null; _inWhy = 0;
             try
@@ -128,12 +133,44 @@ namespace Armoury
                     h.Limit = LimitDays(mp, t, s, out d0); h.Days0 = d0;
                     _h[mp] = h; _newHold++;
                 }
-                if (now - h.Start > h.Limit) { _exLimit++; _inWhy = 3; return true; }
+                if (h.Expired) { _inWhy = 3; return true; }                       // 307e: po limicie - BK jak dotad (ten sam cel wybrany ponownie albo brak celu)
+                if (now - h.Start > h.Limit)
+                {
+                    // 307e (K307-8, 143a-probyN: 148 z 523 doplyniec po limicie, wpisy trzymane do 59 dob przy limicie 30): limit minal - jedna decyzja BK
+                    // od razu (ta sama metoda, ktora BK wola przy nowej decyzji w drodze, z naszymi regulami celu 294c / 139 C / D1-D2), zamiast czekac na 1% na tik
+                    h.Expired = true; _exLimit++; _inWhy = 3;
+                    return !NewTargetNow(__instance, mp, t);
+                }
                 _held++; _heldCars.Add(mp);
                 _inBk = null; _inWhy = 0;
                 return false;
             }
             catch (Exception e) { Stumble("ImplPrefix", e); _inBk = null; return true; }
+        }
+
+        /// <summary>307e: limit trzymania minal - BK ThinkNextDestination (jak blok "flag3" HourlyTickPartyImpl w drodze, bez zakupow - karawana nie w miescie)
+        /// i ruch do nowego miasta tym samym SetMoveGoToSettlement co BK (morska: Naval, do portu). true - nowy cel ustawiony (tik BK pominiety);
+        /// false - ten sam cel albo brak (tik BK jak dotad). Zmiana celu liczy sie w pomiarze jako "BK limit" (_inBk / _inWhy = 3).</summary>
+        private static bool NewTargetNow(object bk, MobileParty mp, Settlement old)
+        {
+            try
+            {
+                if (bk == null || mp == null) { _limSame++; return false; }
+                if (!_thinkLooked)
+                {
+                    _thinkLooked = true;
+                    _think = AccessTools.DeclaredMethod(bk.GetType(), "ThinkNextDestination", new[] { typeof(MobileParty) });
+                }
+                if (_think == null) { _limSame++; return false; }
+                var town = _think.Invoke(bk, new object[] { mp }) as Town;
+                var st = town != null ? town.Settlement : null;
+                if (st == null || st == old) { _limSame++; return false; }
+                _inBk = mp; _inWhy = 3;
+                mp.SetMoveGoToSettlement(st, MobileParty.NavigationType.Naval, true);
+                _limNew++;
+                return true;
+            }
+            catch (Exception e) { Stumble("NewTargetNow", e); _limSame++; return false; }
         }
 
         /// <summary>Finalizer HourlyTickPartyImpl: koniec tiku BK (zrodlo zmiany celu w pomiarze).</summary>
@@ -237,10 +274,11 @@ namespace Armoury
                     if (gone != null) foreach (var g in gone) { Hold ha; if (g != null && g.IsActive && _h.TryGetValue(g, out ha)) Arrived(g, ha); _h.Remove(g); }
                 }
                 // recenzja 307a (tylko pomiar): wpisy trzymane dluzej niz droga z decyzji i najstarszy wpis (brak postepu wychodzi tu, zanim zmieni sie regula)
-                int hOver = 0; double hMax = 0, nowD = CampaignTime.Now.ToDays;
+                int hOver = 0, hExp = 0; double hMax = 0, nowD = CampaignTime.Now.ToDays;
                 foreach (var kv in _h)
                 {
                     var hh = kv.Value; if (hh == null) continue;
+                    if (hh.Expired) { hExp++; continue; }                     // 307e: po limicie bez trzymania (BK decyduje) - nie liczy sie do najstarszego trzymania
                     double age = nowD - hh.Start;
                     if (age > hMax) hMax = age;
                     if (hh.Days0 > 0 && age > hh.Days0) hOver++;
@@ -255,6 +293,7 @@ namespace Armoury
                   .Append(_newHold).Append(", w trzymaniu teraz ").Append(_h.Count)
                   .Append(" | wpuszczone do BK: wojna ").Append(_exWar).Append(", oblezenie ").Append(_exSiege).Append(", limit dni ").Append(_exLimit).Append(", cel nie miasto z portem ")
                   .Append(_exNotPort).Append(", klucz NIE ").Append(_exOff).Append(", stoi (zachowanie None - BK zwalnia, 307d) ").Append(_exIdle)
+                  .Append(", limit minal (307e: decyzja BK od razu) - nowy cel ").Append(_limNew).Append(", ten sam albo brak ").Append(_limSame)
                   .Append(" | zmiany celu w drodze: morskie ").Append(_chSea).Append(" (BK: wojna ").Append(_chWhy[1]).Append(", oblezenie ").Append(_chWhy[2])
                   .Append(", limit ").Append(_chWhy[3]).Append(", nie port ").Append(_chWhy[4]).Append(", losowa przy kluczu NIE ").Append(_chWhy[5]).Append(", inne ").Append(_chWhy[6])
                   .Append("; inna droga ").Append(_chOther).Append("), w tym karawany gracza ").Append(_chSeaPlayer).Append(", ladowe ").Append(_chLand)
@@ -262,12 +301,14 @@ namespace Armoury
                   .Append(" | doplyniecia do trzymanego celu ").Append(_arr).Append(" (po limicie ").Append(_arrOver).Append("), dni rejsu / droga z decyzji: srednio ")
                   .Append((_arr > 0 ? _arrRatioSum / _arr : 0).ToString("0.00", Inv)).Append(", najwiecej ").Append(_arrRatioMax.ToString("0.00", Inv))
                   .Append("; trzymane dluzej niz droga z decyzji ").Append(hOver).Append(", najstarsze trzymanie ").Append(hMax.ToString("0.0", Inv)).Append(" dob")
+                  .Append(" (307e: wpisow po limicie bez trzymania ").Append(hExp).Append(')')
                   .Append("; gracza: ").Append(_arrDet.Count == 0 ? "-" : string.Join("; ", _arrDet.ToArray()))
                   .Append(" | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
             _ticks = _held = _newHold = _exWar = _exSiege = _exLimit = _exNotPort = _exOff = _exIdle = 0; _heldCars.Clear();
+            _limNew = _limSame = 0;
             _chSea = _chLand = _chSeaPlayer = _chOther = 0; Array.Clear(_chWhy, 0, _chWhy.Length); _det.Clear(); _stumbles = 0;
             _arr = _arrOver = 0; _arrRatioSum = _arrRatioMax = 0; _arrDet.Clear();
         }

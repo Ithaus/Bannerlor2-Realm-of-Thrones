@@ -17,6 +17,9 @@ RANGES = {
     'SiegeRepelRetryAfter': (1, 10, "0"),
     'SiegeRepelRetryMinRatio': (2.0, 20.0, "0.0"),
     'WorkshopPriceStockDays': (1, 28, "0"),
+    # 307e: rozbici zwyciezcow wracaja (RoutedReturn307e - clamp 0..1), zastoj bitwy (BattleStall307e - clamp 20..300 s)
+    'RoutedWinnersReturnShare': (0.0, 1.0, "0.00"),
+    'BattleStallSeconds': (20, 300, "0"),
     # m113-zakup: kupno ziemi - relacje -100..100 (regula ogolna dalaby przy -10 suwak -30..0), lata zakupu 1..40, udzialy 0..1
     'LandRelationSideVillage': (-100, 100, "0"),
     'LandRelationLordship': (-100, 100, "0"),

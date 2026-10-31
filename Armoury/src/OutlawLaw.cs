@@ -702,6 +702,8 @@ namespace Armoury
             try
             {
                 if (me == null) return;
+                // 307e: rozbici zwycieskiej strony wracaja do swoich druzyn (RoutedWinnersReturnShare) - PRZED DoomedPartyMen i H3, ktore dziela juz tylko reszte
+                try { RoutedReturn307e.Apply(me); } catch (Exception e307) { Log.Error("RoutedReturn307e", e307); }
                 // A17 (poz. 11, DestroyedPartyMenRouted): ludzie partii, ktora gra skasuje po tej bitwie (HandleMapEventEnd biegnie po nasluchach) - jency zwyciezcow
                 // albo rozbici tej bitwy (RoutedInBattle), PRZED podzialem rozbitych H3; bez H3 tylko pomiar (nie rzuca)
                 DoomedPartyMen.Before(me, LosersFlee.On);
@@ -755,6 +757,7 @@ namespace Armoury
             _h3Routed = _h3Pool = _h3PoolArmy = _h3PoolBand = _h3PoolGarr = _h3HomeBk = _h3HomeVillage = _h3HomeTemplate = _h3Homeless = _h3Vanished = _h3Stumbles = 0;
             _h3BackBk = 0; _h3BackCommon = _h3BackBandit = _h3BackTemplate = 0f;
             _h3Undead = _h3FracKeys = _h3FracSent = _h3Tavern = _h3Rally = 0; _h3BackUndead = _h3FracMass = 0f;
+            RoutedReturn307e.NewDay();   // 307e: licznik doby powrotow rozbitych zwyciezcow (segment tego samego dopisku)
         }
 
         /// <summary>H3: n ludzi do puli regionu w swoim typie (liczby calkowite; "bez domu" i uwolnieni jency bez odbiorcy).</summary>
@@ -1522,6 +1525,7 @@ namespace Armoury
                        + " | powrot z puli: do hearth " + (_h3BackCommon + _h3BackBandit).ToString("0.0", ci) + " (prosci " + _h3BackCommon.ToString("0.0", ci) + ", bandyci " + _h3BackBandit.ToString("0.0", ci) + ")"
                        + ", do ludnosci BK " + _h3BackBk + " (w tym z reszt ponizej 1 czlowieka " + _h3FracSent + ": zamkniete klucze " + _h3FracKeys + ", ulamki razem " + _h3FracMass.ToString("0.00", ci) + ")"
                        + ", z szablonu " + _h3BackTemplate.ToString("0.0", ci) + ", wighty do niczego " + _h3BackUndead.ToString("0.0", ci)
+                       + RoutedReturn307e.DayText()
                        + (_h3Stumbles > 0 ? " | potkniecia rozbitych " + _h3Stumbles : "") + ".";
             }
             catch { return " H3: blad dopisku."; }

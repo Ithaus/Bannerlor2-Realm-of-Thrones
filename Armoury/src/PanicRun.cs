@@ -50,7 +50,8 @@ namespace Armoury
         private static float _sFoe, _sLim, _sNotRun, _sGoal, _sStuck, _sWound, _sCrowd, _sOther, _sNoProbe, _vSum, _mxSum, _limSum, _limSecs, _hpSum;
         private static readonly MBList<Agent> _near = new MBList<Agent>();
 
-        /// <summary>307b: RoutKeeper.Decide - kurs utrzymany mimo zmiany najlepszego kierunku (0), zmieniony (1), zmieniony bo droga zablokowana (2).</summary>
+        /// <summary>307b: RoutKeeper.Decide - kurs utrzymany mimo zmiany najlepszego kierunku (0), zmieniony (1), zmieniony bo droga zablokowana (2);
+        /// 307e: 1 i 2 rozlaczne (linia: "zmieniony bez blokady N, zmieniony przy zablokowanej drodze M").</summary>
         internal static void Course(int what)
         {
             if (what == 0) _courseHeld++;
@@ -274,7 +275,8 @@ namespace Armoury
             sb.Append(" | HP przy wejsciu w panike sr. ").Append(_hpN > 0 ? S(_hpSum / _hpN * 100f) + "%" : "-").Append(" (ponizej progu bolu ").Append(_entryPain)
               .Append(", ponizej progu kary ran ").Append(_entryWound).Append(", zdrowszych ").Append(_hpN - _entryPain - _entryWound).Append(')');
             sb.Append(" | kurs ucieczki (307b, klucz ").Append(c.PanicFleeHoldCourse ? "TAK" : "NIE").Append("): utrzymany ").Append(_courseHeld)
-              .Append(", zmieniony ").Append(_courseTurned).Append(" (w tym droga zablokowana ").Append(_courseBlocked).Append(')');
+              // 307e: liczniki rozlaczne (Course: 1 albo 2) - napis "w tym" mylil (zmieniony 0, w tym zablokowana 1)
+              .Append(", zmieniony bez blokady ").Append(_courseTurned).Append(", zmieniony przy zablokowanej drodze ").Append(_courseBlocked);
             sb.Append(" | odsapki w panice (wyjscia z zadyszki) ").Append(_recover).Append(c.PanicRunsUntilSpent ? " (oczekiwane 0)" : " (stara regula)");
             sb.Append(" | na koniec misji w panice na polu ").Append(_endIn).Append(", z nich na 50% ").Append(_endHalf);
             sb.Append(" | potkniecia bieg ").Append(_fails).Append(" (wypadli z probek ").Append(_out).Append(").");

@@ -168,15 +168,29 @@ namespace Armoury
             }
             catch (Exception e) { TLine("T3", "wyjatek " + e.GetType().Name + ": " + (e.InnerException != null ? e.InnerException.Message : e.Message), "NIE"); }
             // T4
+            // 307e (K307-7 / K307-4 w 143a-probyN): Import czysci _cars / _wss i sklada rekordy z samego zapisu - pola sesji (pierwsza partia, konie, pierscien
+            // tygodnia, nazwa, dziennik 305a) ginely w dobie testu (sonda: '?' i "pierwsza partia za 0" mimo zakupow doby utworzenia). Test sprawdza zapis
+            // na kopii i przywraca zywe rekordy (te same obiekty) oraz liczniki importu.
+            Dictionary<string, CarRec> keepCars = null; Dictionary<string, WsRec> keepWs = null;
+            int kc = _impCars, kw = _impWs, kb = _impBad; bool kh = _impHad;
             try
             {
+                keepCars = new Dictionary<string, CarRec>(_cars, StringComparer.Ordinal);
+                keepWs = new Dictionary<string, WsRec>(_wss, StringComparer.Ordinal);
                 string a = Export();
                 Import(a);
                 string b = Export();
-                TLine("T4", "zapis tam i z powrotem: rekordow karawan " + _cars.Count + ", warsztatow " + _wss.Count + ", dlugosc " + a.Length + " znakow, identyczny " + Tn(a == b) + ", bledne " + _impBad,
-                      a == b && _impBad == 0 ? "TAK" : "NIE");
+                int bad = _impBad;
+                TLine("T4", "zapis tam i z powrotem: rekordow karawan " + _cars.Count + ", warsztatow " + _wss.Count + ", dlugosc " + a.Length + " znakow, identyczny " + Tn(a == b) + ", bledne " + bad
+                      + " (zywe rekordy przywrocone - 307e)", a == b && bad == 0 ? "TAK" : "NIE");
             }
             catch (Exception e) { TLine("T4", "wyjatek " + e.GetType().Name + ": " + e.Message, "NIE"); }
+            finally
+            {
+                if (keepCars != null) { _cars.Clear(); foreach (var kv in keepCars) _cars[kv.Key] = kv.Value; }
+                if (keepWs != null) { _wss.Clear(); foreach (var kv in keepWs) _wss[kv.Key] = kv.Value; }
+                _impCars = kc; _impWs = kw; _impBad = kb; _impHad = kh;
+            }
             // T5
             try
             {

@@ -10624,9 +10624,9 @@ namespace Armoury
         [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
         public bool CaravanSeaHoldTarget { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Caravan Sea Hold Factor", 0.00f, 8.00f, "0.00", HintText = "With Caravan Sea Hold Target: how many times the planned days of the voyage a caravan keeps its port before it may choose again", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Caravan Sea Hold Factor", 0.00f, 12.00f, "0.00", HintText = "With Caravan Sea Hold Target: how many times the planned days of the voyage a caravan keeps its port before it may choose again", RequireRestart = false)]
         [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
-        public float CaravanSeaHoldFactor { get; set; } = 2.0f;
+        public float CaravanSeaHoldFactor { get; set; } = 3.0f;
 
         [SettingPropertyInteger("Caravan Sea Hold Min Days", 0, 24, "0", HintText = "With Caravan Sea Hold Target: the shortest a caravan keeps its port at sea, days", RequireRestart = false)]
         [SettingPropertyGroup("Player and world caravans: every purchase on the books, sea voyages kept (307a)")]
@@ -10654,7 +10654,7 @@ namespace Armoury
 
         [SettingPropertyBool("Wounded Back Step Facing Foe", HintText = "With Wounded Withdraw With Arms: a wounded man with an enemy within 6 m (on foot or mounted) - or with no safe place to go - steps back facing the enemy, still defending himself, to a point 4 m behind his own front rank, and turns his back to walk to the rear only once no enemy on foot is within 10 m. Off = he turns and walks to the rear at once, or stays in the line when there is no safe place, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
-        public bool WoundedBackStepFacingFoe { get; set; } = true;
+        public bool WoundedBackStepFacingFoe { get; set; } = false;
 
         [SettingPropertyBool("Wounded Withdraw Rear From Center", HintText = "With Wounded Withdraw With Arms: the rear of a wounded man's formation is measured from the middle of its depth, so he walks to a spot behind its last rank, and 'back in the fight' means the front half of the formation. Off = it is measured from the front rank as if that were the middle, as before - in a deep formation the spot lies inside its own ranks", RequireRestart = false)]
         [SettingPropertyGroup("Battle: flight, breaking and friendly blows (307b)")]
@@ -10707,6 +10707,22 @@ namespace Armoury
         [SettingPropertyBool("Bk Estate Share Cap Sum", HintText = "Banner Kings estates in one village never take more of its trade tax together than the whole tax: when the village's workforce is smaller than the estates' own people, each share is reckoned against those people instead. Off = each estate's share capped alone, as in Banner Kings", RequireRestart = false)]
         [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
         public bool BkEstateShareCapSum { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Routed Winners Return Share", 0.00f, 1.00f, "0.00", HintText = "Men who fled the field return to their own party after the battle when their side won it; this share of them comes back at once, the rest go home or to the woods as fled men always have. Men of a beaten side are untouched (they gather under their lord's banner or scatter, as before). 0 = none return, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
+        public float RoutedWinnersReturnShare { get; set; } = 0.9f;
+
+        [SettingPropertyBool("Banner Break Battle State", HintText = "With Banner Companies: how the battle stands weighs on whether a shaken company breaks - the chance is multiplied by the strength still fighting against it divided by its own side's (no less than x0.3, no more than x1.5), so a company that sees the day being won rarely runs and one facing a stronger foe breaks sooner. The same rule for both sides", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
+        public bool BannerBreakBattleState { get; set; } = true;
+
+        [SettingPropertyBool("Battle Stall Break", HintText = "In a field battle where no blow has landed and no shot has been loosed for a while after the lines first met, every man who has nothing left to fight with - no hand weapon and no ammunition - leaves the field, so the battle can end instead of standing still. A short report of who is left goes to the log", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
+        public bool BattleStallBreak { get; set; } = true;
+
+        [SettingPropertyInteger("Battle Stall Seconds", 20, 300, "0", HintText = "With Battle Stall Break: seconds of battle time without a blow or a shot (after the first blow) before men with nothing to fight with leave the field", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
+        public int BattleStallSeconds { get; set; } = 60;
 
         public void ApplyTo(Settings s)
         {
@@ -13384,6 +13400,10 @@ namespace Armoury
             s.SiegeMbSameRoll = SiegeMbSameRoll;
             s.SiegeRepelHoldRansom = SiegeRepelHoldRansom;
             s.BkEstateShareCapSum = BkEstateShareCapSum;
+            s.RoutedWinnersReturnShare = RoutedWinnersReturnShare;
+            s.BannerBreakBattleState = BannerBreakBattleState;
+            s.BattleStallBreak = BattleStallBreak;
+            s.BattleStallSeconds = BattleStallSeconds;
         }
 
         internal static void Apply()

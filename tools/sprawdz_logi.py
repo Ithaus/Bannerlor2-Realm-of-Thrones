@@ -85499,6 +85499,7 @@ K307_RX_MADE = re.compile(r"karawana - utworzona \| '([^']+)'.*?kiesa karawany (
 K307_RX_RES = re.compile(r"karawana - wynik doby (\d+) \(307a\) \| (.*)\.$")
 K307_RX_RESC = re.compile(r"netto dla rodu (-?\d+).*?\| konie i zwierzeta: sprzedaz (-?\d+), zysk (-?\d+) \| pierwsza partia .*?: sprzedana za (-?\d+), zysk (-?\d+) \| wynik bez pierwszej partii (-?\d+)"
                          r".*?wynik handlu bez pierwszej partii \(zysk ze sprzedazy bez niej - zold rodu\) (-?\d+)")   # recenzja 307a: K307-7 na wyniku handlu
+K307_RX_LIM = re.compile(r", limit minal \(307e: decyzja BK od razu\) - nowy cel (\d+), ten sam albo brak (\d+)")   # 307e: po limicie decyzja BK od razu
 K307_RX_ARR = re.compile(r"\| doplyniecia do trzymanego celu (\d+) \(po limicie (\d+)\), dni rejsu / droga z decyzji: srednio ([\d.]+), najwiecej ([\d.]+); trzymane dluzej niz droga z decyzji (\d+), najstarsze trzymanie ([\d.]+) dob")
 K307_RX_NOW = re.compile(r"\| teraz: kiesa (-?\d+), .*?\| dzis: sprzedaz (\d+) \(myto (\d+)\), zakupy (\d+), .*?doplata BK (\d+), .*?\| wyplaty dzis: rozliczenie 259 (\d+), BK (\d+), E3/9 (\d+), gra 10% (\d+), rozwiazanie (\d+)")
 K307_RX_RUN = re.compile(r"bez handlu z rzedu (\d+) dob \(najdluzej od wczytania (\d+)\)")
@@ -85546,6 +85547,9 @@ def k307_feed(D, ln):
         if m:
             D["arr"] += int(m.group(1)); D["arr_over"] += int(m.group(2))
             D["arr_qmax"] = max(D["arr_qmax"], float(m.group(4))); D["hold_max"] = max(D["hold_max"], float(m.group(6)))
+        m = K307_RX_LIM.search(ln)
+        if m:
+            D["lim_new"] = D.get("lim_new", 0) + int(m.group(1)); D["lim_same"] = D.get("lim_same", 0) + int(m.group(2))
         m = K307_RX_STUM.search(ln)
         if m:
             D["stum"] += int(m.group(1))
@@ -85634,6 +85638,10 @@ def k307_rows(rep, D):
     else:
         rep.add("K307-8: doplyniecia do trzymanego celu (trafnosc limitu)", f"doplyniecia {D['arr']}, po limicie {D['arr_over']}, najwiecej dni rejsu / droga {D['arr_qmax']:.2f}, "
                 f"najstarsze trzymanie {D['hold_max']:.1f} dob", "doplyniecia > 0, po limicie <= 20%", D["arr"] > 0 and D["arr_over"] * 5 <= D["arr"])
+    # 307e: po limicie decyzja BK od razu (ThinkNextDestination) - ile razy nowy cel, ile ten sam albo brak (INFO; starszy log - brak segmentu)
+    if "lim_new" in D:
+        rep.add("K307-8b: limit trzymania minal - decyzja BK od razu (307e)", f"nowy cel {D['lim_new']}, ten sam albo brak {D['lim_same']}",
+                "INFO (najstarsze trzymanie <= Caravan Sea Hold Max Days)", None)
 
 
 K307_SAMPLES = [
@@ -86023,7 +86031,7 @@ B307_PR = re.compile(r"\| ponizej progu biegu - przyczyny \(307b, nie rozlaczne\
                      r"bez natywnego odwrotu (\d+) s \(([\d-]+%?)\), cel odwrotu w 5 m (\d+) s \(([\d-]+%?)\), stoi < 0\.5 m/s (\d+) s \(([\d-]+%?)\), kara ran (\d+) s "
                      r"\(([\d-]+%?)\), tlok swoich w 1\.5 m (\d+) s \(([\d-]+%?)\), zadna z nich (\d+) s \(([\d-]+%?)\), bez probki (\d+) s; predkosc sr\. (\S+) m/s "
                      r"przy mozliwej (\S+) m/s, limit natywny sr\. (\S+) \| HP przy wejsciu w panike sr\. (\S+) \(ponizej progu bolu (\d+), ponizej progu kary ran (\d+), "
-                     r"zdrowszych (-?\d+)\) \| kurs ucieczki \(307b, klucz (TAK|NIE)\): utrzymany (\d+), zmieniony (\d+) \(w tym droga zablokowana (\d+)\)")
+                     r"zdrowszych (-?\d+)\) \| kurs ucieczki \(307b, klucz (TAK|NIE)\): utrzymany (\d+), zmieniony (?:bez blokady )?(\d+)(?: \(w tym droga zablokowana (\d+)\)|, zmieniony przy zablokowanej drodze (\d+))")
 B307_PRT = re.compile(r"\| czas w panice pieszo (\d+) s: .*?ponizej progu biegu (\d+) s \(")
 B307_LZ = re.compile(r"LOS ZLAMANYCH \(139\): misja \S+ \| nasi (\d+) \(zabici (\d+) / nieprzytomni (\d+) / uszli (\d+) / na polu (\d+)\).*?\| sr\. bieg: dopadnieci (\S+) m / (\S+) s")
 B307_CH = re.compile(r"\| straty wedlug udzialu \(307b\) (TAK|NIE): rzutow (\d+) \(przy 2/6 (\d+), 3/6 (\d+), 4/6 (\d+), 5/6 (\d+); sr\. utracona czesc (\S+), "
@@ -86044,6 +86052,7 @@ B307_SAMPLE_PR = ("[07:54:37] Bieg zlamanych (147): misja bitwa, klucz TAK (...)
                   "12 s (36%), kara ran 30 s (91%), tlok swoich w 1.5 m 9 s (27%), zadna z nich 0 s (0%), bez probki 0 s; predkosc sr. 1.20 m/s przy mozliwej 4.10 m/s, "
                   "limit natywny sr. 0.73 | HP przy wejsciu w panike sr. 8% (ponizej progu bolu 10, ponizej progu kary ran 1, zdrowszych 0) | kurs ucieczki (307b, "
                   "klucz TAK): utrzymany 5, zmieniony 2 (w tym droga zablokowana 2) | odsapki w panice (wyjscia z zadyszki) 0 (oczekiwane 0) | ...")
+B307_SAMPLE_PR2 = B307_SAMPLE_PR.replace("zmieniony 2 (w tym droga zablokowana 2)", "zmieniony bez blokady 0, zmieniony przy zablokowanej drodze 2")   # 307e: nowy napis
 B307_SAMPLE_PR0 = ("Bieg zlamanych (147): misja bitwa, ... | czas w panice pieszo 0 s: na 50% (zadyszka) 0 s - udzial biegu na 50% -, strefa 10% 0 s, ponizej progu biegu 0 s "
                    "(drenaz tylko przez 147) | ponizej progu biegu - przyczyny (307b, nie rozlaczne): wrog w 3 m 0 s (-), limit predkosci < 1 0 s (-), bez natywnego "
                    "odwrotu 0 s (-), cel odwrotu w 5 m 0 s (-), stoi < 0.5 m/s 0 s (-), kara ran 0 s (-), tlok swoich w 1.5 m 0 s (-), zadna z nich 0 s (-), bez probki "
@@ -86065,7 +86074,7 @@ B307_SAMPLE_WD = ("ODWROT RANNYCH (143): misja bitwa, klucz TAK (...) | odwrot r
 
 
 def bitwa307b_selftest():
-    for name, rx, s in (("PR", B307_PR, B307_SAMPLE_PR), ("PR0", B307_PR, B307_SAMPLE_PR0), ("PRT", B307_PRT, B307_SAMPLE_PR), ("LZ", B307_LZ, B307_SAMPLE_LZ),
+    for name, rx, s in (("PR", B307_PR, B307_SAMPLE_PR), ("PR0", B307_PR, B307_SAMPLE_PR0), ("PR2", B307_PR, B307_SAMPLE_PR2), ("PRT", B307_PRT, B307_SAMPLE_PR), ("LZ", B307_LZ, B307_SAMPLE_LZ),
                         ("CH", B307_CH, B307_SAMPLE_CH), ("CHK", B307_CHK, B307_SAMPLE_CH), ("FF", B307_FF, B307_SAMPLE_FF), ("FFU", B307_FFU, B307_SAMPLE_FF),
                         ("WD", B307_WD, B307_SAMPLE_WD), ("WDN", B307_WDN, B307_SAMPLE_WD),
                         ("WDR", B307_WDR, B307_SAMPLE_WD)):
@@ -86124,18 +86133,17 @@ def bitwa307b_main(logp):
         pain += int(m.group(22)); woundn += int(m.group(23)); healthy += int(m.group(24))
         if m.group(25) == "TAK":
             keyon = True
-        held += int(m.group(26)); turned += int(m.group(27)); blocked += int(m.group(28))
-        if int(m.group(28)) > int(m.group(27)):
-            bad1.append("zablokowane > zmienione: " + m.group(0)[-90:])
+        # 307e: liczniki rozlaczne (stary napis "w tym droga zablokowana" mylil - RoutKeeper.Decide liczy 1 albo 2); stary i nowy format
+        held += int(m.group(26)); turned += int(m.group(27)); blocked += int(m.group(28) if m.group(28) is not None else m.group(29))
     share = f"{100.0 * slow / secs:.0f}%" if secs > 0 else "-"
-    rep.add("B307-1: bieg zlamanych - linia 307b w formacie, zablokowane <= zmienione", f"linii 147 {len(pr)}, z segmentem 307b {n1}, zlych {len(bad1)}" + (f" ({bad1[0]})" if bad1 else ""),
+    rep.add("B307-1: bieg zlamanych - linia 307b w formacie (kurs: zmiany bez blokady i przy blokadzie rozlaczne, 307e)", f"linii 147 {len(pr)}, z segmentem 307b {n1}, zlych {len(bad1)}" + (f" ({bad1[0]})" if bad1 else ""),
             "zlych 0 (brak linii 147 - INFO)", None if n1 == 0 and not bad1 else not bad1)
     names = ("wrog w 3 m", "limit < 1", "bez odwrotu", "cel w 5 m", "stoi", "kara ran", "tlok", "zadna")
     rep.add("B307-1a: czas ponizej progu biegu w panice i przyczyny (nie rozlaczne)", f"panika pieszo {secs} s, ponizej progu {slow} s ({share}); "
             + ", ".join(f"{names[j]} {cause[j]} s" for j in range(8)), "INFO (cel < 30%; 142a: 82-98%)", None)
     rep.add("B307-1b: HP przy wejsciu w panike", f"ponizej progu bolu {pain}, ponizej progu kary ran {woundn}, zdrowszych {healthy}",
             "INFO (ilu lamie sie prawie martwych - bol FieldCraft)", None)
-    rep.add("B307-1c: kurs ucieczki (PanicFleeHoldCourse)", f"klucz {'TAK' if keyon else 'NIE/brak'}: utrzymany {held}, zmieniony {turned} (zablokowany {blocked})",
+    rep.add("B307-1c: kurs ucieczki (PanicFleeHoldCourse)", f"klucz {'TAK' if keyon else 'NIE/brak'}: utrzymany {held}, zmieniony bez blokady {turned}, przy zablokowanej drodze {blocked}",
             "INFO (przy TAK zmiany prawie tylko zablokowane)", None)
     esc, n_lz, run = 0, 0, []
     for l in lz:

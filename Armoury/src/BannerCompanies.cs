@@ -107,6 +107,10 @@ namespace Armoury
         internal static int ShareRolls, ShareBreaks;
         internal static float ShareLostSum, SharePSum;
         internal static readonly int[] ShareStep = new int[7];
+        // 307e (klucz BannerBreakBattleState): mnoznik stanu bitwy B = clamp(sila wroga / sila naszych, 0.3, 1.5) w rzucie - liczba, suma, najmniej, najwiecej;
+        // zalamania wedlug zrodla rzutu (0 inne, 1 sztandar, 2 dowodca, 3 udzial strat 307b, 4 straty 305c / polowa skladu)
+        internal static int StateRolls; internal static float StateSum, StateMin = 9f, StateMax;
+        internal static readonly int[] BreakBySrc = new int[5];
 
         internal static void ResetCounters()
         {
@@ -120,6 +124,7 @@ namespace Armoury
             ShareRolls = ShareBreaks = 0;
             ShareLostSum = SharePSum = 0f;
             Array.Clear(ShareStep, 0, ShareStep.Length);
+            StateRolls = 0; StateSum = 0f; StateMin = 9f; StateMax = 0f; Array.Clear(BreakBySrc, 0, BreakBySrc.Length);
         }
 
         internal static int Activity { get { return Companies + StdField + StdFell + CmdFell + Breaks + Stumbles; } }
@@ -675,7 +680,7 @@ namespace Armoury
                         if (!co.ThirdDone) { co.ThirdDone = true; if (k == 2) BannerCompanies.Third++; }
                         if (k >= 3 && !co.HalfDone) { co.HalfDone = true; BannerCompanies.Half++; }
                         BannerCompanies.ShareStep[k]++;
-                        Roll(co, k == 2 ? 0.5f : 1f, c, now, true, lost);
+                        Roll(co, k == 2 ? 0.5f : 1f, c, now, true, lost, 3);
                     }
                 }
             }
@@ -688,13 +693,13 @@ namespace Armoury
                     co.HalfDone = true;
                     co.ThirdDone = true;
                     BannerCompanies.Half++;
-                    Roll(co, 1f, c, now, loss);
+                    Roll(co, 1f, c, now, loss, -1f, 4);
                 }
                 else if (loss && !co.ThirdDone && ranks * 3 <= co.Peak * 2)
                 {
                     co.ThirdDone = true;
                     BannerCompanies.Third++;
-                    Roll(co, 0.5f, c, now, true);
+                    Roll(co, 0.5f, c, now, true, -1f, 4);
                 }
             }
         }
@@ -845,7 +850,7 @@ namespace Armoury
             Shock(co, -c.BannerShockStandardLost);
             if (PlayerSide(co)) Msg("The standard of " + NameOf(co) + " has fallen!", now, c, true);
             BannerCompanies.StandardFell(co.F, co.Index, pos);
-            Roll(co, 1f, c, now);
+            Roll(co, 1f, c, now, false, -1f, 1);
         }
 
         private void CommanderLost(Company co, Vec3 pos, float now, Settings c)
@@ -865,7 +870,7 @@ namespace Armoury
                                                      : "The sergeant of " + name + " has fallen - the company wavers!", now, c, true);
             }
             BannerCompanies.CommanderFell(co.F, co.Index, pos);
-            Roll(co, co.CmdGeneral ? 2f : (co.CmdHero ? 1.5f : 1f), c, now);
+            Roll(co, co.CmdGeneral ? 2f : (co.CmdHero ? 1.5f : 1f), c, now, false, -1f, 2);
         }
 
         /// <summary>154: linia zdarzenia sztandaru (kto, strona, co) - dowod do testu okrzyku "Save the banner!" i podnoszenia; najwyzej StdLinesMax na misje
@@ -914,7 +919,7 @@ namespace Armoury
 
         /// <summary>Rzut na zalamanie (raz na zdarzenie): p = szansa x F x M / R. 305c: loss = rzut po stratach (trzecia czesc / polowa skladu) przy kluczu
         /// BannerLossBreakIgnoresMorale - bez bramki morale ponizej 50 (M przy wysokim morale zostaje na dole 0.4).</summary>
-        private void Roll(Company co, float factor, Settings c, float now, bool loss = false, float share = -1f)
+        private void Roll(Company co, float factor, Settings c, float now, bool loss = false, float share = -1f, int src = 0)
         {
             if (co.Broken) return;
             float sum = 0f, tsum = 0f;
@@ -942,6 +947,16 @@ namespace Armoury
             if (mm < 0.4f) mm = 0.4f;
             if (mm > 1.6f) mm = 1.6f;
             float p = c.BannerBreakChance * factor * mm / r;
+            // 307e (143a bitwa 4: kompania T5 Swordmasterow zalamala sie przy 32 zywych gracza na 7 wroga - rzut z upadku sierzanta): zywy czlowiek widzi, jak
+            // idzie bitwa - p x B, B = clamp(sila walczacych wroga / sila walczacych naszych, 0.3, 1.5); jedna regula dla obu stron (klucz BannerBreakBattleState)
+            if (c.BannerBreakBattleState)
+            {
+                float b = BattleState(co);
+                p *= b;
+                BannerCompanies.StateRolls++; BannerCompanies.StateSum += b;
+                if (b < BannerCompanies.StateMin) BannerCompanies.StateMin = b;
+                if (b > BannerCompanies.StateMax) BannerCompanies.StateMax = b;
+            }
             if (p < 0f) p = 0f;
             if (p > BannerCompanies.PMax) p = BannerCompanies.PMax;
             BannerCompanies.Rolls++;
@@ -962,8 +977,36 @@ namespace Armoury
             {
                 if (share >= 0f) BannerCompanies.ShareBreaks++;
                 if (loss) { co.LossBreak = true; BannerCompanies.LossBreaks++; }
+                BannerCompanies.BreakBySrc[src >= 0 && src < BannerCompanies.BreakBySrc.Length ? src : 0]++;
                 Break(co, ix, c, now);
             }
+        }
+
+        /// <summary>307e: stan bitwy wobec kompanii - sila walczacych wroga / sila walczacych jej strony (CharacterPowerCached ludzi czynnych, nie w ucieczce
+        /// ani w zbiorze zlamanych RoutHold), clamp 0.3..1.5; bez danych - 1 (rzut jak dotad). Rzuty sa rzadkie (zdarzenia kompanii) - pelny przeglad Mission.Agents.</summary>
+        private float BattleState(Company co)
+        {
+            try
+            {
+                var m = Mission;
+                if (m == null || co == null || co.T == null) return 1f;
+                var side = co.T.Side;
+                float ours = 0f, foe = 0f;
+                foreach (var a in m.Agents)
+                {
+                    if (a == null || !a.IsHuman || !a.IsActive() || a.Team == null || a.IsRunningAway) continue;
+                    if (RoutHold.KnownAnyThread(a)) continue;
+                    float pw = a.CharacterPowerCached;
+                    if (!(pw > 0f)) pw = 1f;
+                    if (a.Team.Side == side) ours += pw; else if (a.Team.IsEnemyOf(co.T)) foe += pw;
+                }
+                if (!(ours > 0f)) return 1.5f;
+                float q = foe / ours;
+                if (q < 0.3f) q = 0.3f;
+                if (q > 1.5f) q = 1.5f;
+                return q;
+            }
+            catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.BattleState", e); return 1f; }
         }
 
         private void Break(Company co, int ix, Settings c, float now)
@@ -1161,6 +1204,15 @@ namespace Armoury
               .Append("; sr. utracona czesc ").Append(sr > 0 ? (BannerCompanies.ShareLostSum / sr).ToString("0.00", inv305) : "-")
               .Append(", sr. szansa ").Append(sr > 0 ? (BannerCompanies.SharePSum / sr).ToString("0.000", inv305) : "-")
               .Append("), zalaman wedlug udzialu ").Append(BannerCompanies.ShareBreaks);
+            // 307e: stan bitwy w rzucie (klucz BannerBreakBattleState) i zrodlo zalaman
+            int st = BannerCompanies.StateRolls;
+            sb.Append(" | stan bitwy w rzucie (307e) ").Append(c305 != null && c305.BannerBreakBattleState ? "TAK" : "NIE")
+              .Append(": rzutow ").Append(st).Append(", mnoznik sr. ").Append(st > 0 ? (BannerCompanies.StateSum / st).ToString("0.00", inv305) : "-")
+              .Append(" (najmniej ").Append(st > 0 ? BannerCompanies.StateMin.ToString("0.00", inv305) : "-").Append(", najwiecej ")
+              .Append(st > 0 ? BannerCompanies.StateMax.ToString("0.00", inv305) : "-").Append(")")
+              .Append(" | zalamania wedlug rzutu: sztandar ").Append(BannerCompanies.BreakBySrc[1]).Append(", dowodca ").Append(BannerCompanies.BreakBySrc[2])
+              .Append(", udzial strat ").Append(BannerCompanies.BreakBySrc[3]).Append(", straty 305c / polowa ").Append(BannerCompanies.BreakBySrc[4])
+              .Append(", inne ").Append(BannerCompanies.BreakBySrc[0]);
             sb.Append(" | potkniecia ").Append(BannerCompanies.Stumbles).Append('.');
             Log.Info(sb.ToString());
         }
