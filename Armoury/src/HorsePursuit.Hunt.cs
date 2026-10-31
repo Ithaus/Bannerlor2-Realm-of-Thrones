@@ -127,6 +127,7 @@ namespace Armoury
             public byte Cov, CovSt;               // 311a: rola oslony (CvFlankL/R, CvRushL/R; 0 - brak), stan obchodzacego (w drodze / stoi)
             public int CovBlind;                  // 311a: kontroli z rzedu bez linii u stojacego obchodzacego
             public float Leash;                   // 311a: smycz szturmujacego (0 - InfRearm jak R2)
+            public float CovAt;                   // 311a (recenzja 4): chwila wyslania obchodzacego na punkt (limit drogi CovMoveMax)
         }
 
         private struct FI
@@ -802,7 +803,7 @@ namespace Armoury
                 float dk = FootLeash(h, a.Position.AsVec2);
                 if (dk > _rFootFar) _rFootFar = dk;
                 float lk = FootLim(h);   // 311a
-                if (dk > lk || LeashAhead(h, a, dk, now, false, lk)) { if (h.Anchor.IsValid) _l291LeashBack++; _rLeashStep++; return ULeash; }
+                if (dk > lk || LeashAhead(h, a, dk, now, false, lk)) { if (h.Anchor.IsValid && h.Cov == 0) _l291LeashBack++; _rLeashStep++; return ULeash; }
             }
             if (!pass) return rider && a.MountAgent == null ? UOther : -1;
             // klucze: jezdzcy 204, piechota 283, lucznicy - ktorykolwiek (283 sam strzela, gdy jazda wylaczona)
@@ -823,8 +824,8 @@ namespace Armoury
                 float dh = FootLeash(h, a.Position.AsVec2);   // poprawka 132b: straz strzelcow - od drogi do szyku strzezonego
                 if (dh > _rFootFar) _rFootFar = dh;
                 float lim = FootLim(h);   // 311a: szturmujacy - smycz do celu + 25 m
-                if (dh > lim) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }
-                if (_leashAhead && LeashAhead(h, a, dh, now, true, lim)) { if (h.Anchor.IsValid) _l291LeashBack++; return ULeash; }   // 305c: zawrot z wyprzedzeniem
+                if (dh > lim) { if (h.Anchor.IsValid && h.Cov == 0) _l291LeashBack++; return ULeash; }   // recenzja 311a (4): szturmujacy - bez licznika 291
+                if (_leashAhead && LeashAhead(h, a, dh, now, true, lim)) { if (h.Anchor.IsValid && h.Cov == 0) _l291LeashBack++; return ULeash; }   // 305c: zawrot z wyprzedzeniem
                 if (now - h.Start >= MaxSeconds) return UTime;
                 if (s.MountAgent != null && !MeleeKind(h.T) && a.Position.AsVec2.Distance(s.Position.AsVec2) > HuntScreen) return URange;
                 return -1;
@@ -1402,7 +1403,8 @@ namespace Armoury
                 }
             }
             if (cool && (rider || foot) && a != null) HuntCool[a] = now + CounterCool;
-            if ((rider || foot) && t.Active && t.Melee + t.Foot <= 0) EndEp(t, Outcome(why), now);
+            // recenzja 311a (5): ostatni szturmujacy przy zywym epizodzie oslony - epizod 283 trwa (obchodzacy zostaja; konczy go cisza po koncu oslony)
+            if ((rider || foot) && t.Active && t.Melee + t.Foot <= 0 && !(cov && t.Cov != null)) EndEp(t, Outcome(why), now);
         }
 
         /// <summary>Po wyjatku przy zwalnianiu - tylko wypisanie ze stanu (bez wolania gry).</summary>

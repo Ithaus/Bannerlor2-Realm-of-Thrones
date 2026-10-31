@@ -40,6 +40,10 @@ namespace Armoury
     ///    (HuntEndAll); swoi w 6 m od celu (283 RespNear) zdejmuja strzelcow jak dotad (bez strzalu w zwarcie).
     /// RBM: DisableScriptedMovement tylko przy zmianie szyku (RBMAI.cs:10279, agentsToChangeFormation) - wtedy HunterCheck "inne" zwalnia; rozkazy szyku RBM
     /// nie zdejmuja pozycji czlowieka (jak krok R1b i R2). Wyjatek w epizodzie = licznik potkniec epizodu (FailsOut - koniec tego epizodu, bez wylacznika).
+    /// Poprawki recenzji 311a: wlasny zegar dopiero po probce ukrytej (otwarte pole - koniec po 8 s ciszy jak dotad); najwyzej 8 epizodow naraz; odpowiedz
+    /// wstrzymana przy RespNear / zwarciu ze swoimi (132b), rozrzut z punktu luku; szturm z przerwa FootCool; wszyscy strzelcy obchodza - patrza biali, a bez
+    /// obserwatorow probki obchodzacych; obchodzacy w drodze najdluzej 30 s; zatrzymanie z Hold; R1 z czysta linia zostaje; ostatni szturmujacy nie konczy
+    /// epizodu 283 przy zywej oslonie; wyslani bez epizodu 283 - StartEp od razu.
     /// Linie: "Oslona strzelca (311a) start: ..." raz na proces, "Oslona strzelca (311a): misja ..." raz na bitwe polowa.
     /// </summary>
     internal static partial class HorsePursuit
@@ -50,6 +54,8 @@ namespace Armoury
         private const float CovRMin = 20f, CovRMax = 40f, CovOdds = 3f, CovFoesR = 30f, CovArrive = 2.5f, CovEyeZ = 1.6f, CovRushSide = 12f, CovLeashPlus = 25f;
         private const float CovLeashMax = HuntClose + 20f;
         private const int CovBlindReplan = 4;
+        private const int CovEpMax = 8;          // recenzja 311a (koszt): najwyzej tyle epizodow naraz (zbieranie grupy co 3 s - ApplyActionOnEachUnit)
+        private const float CovMoveMax = 30f;    // recenzja 311a (4): obchodzacy w drodze najdluzej tyle - potem staje (punkt nieosiagalny: rzeka, urwisko)
         private const byte CvFlankL = 1, CvFlankR = 2, CvRushL = 3, CvRushR = 4;
         private const byte CsMove = 0, CsPin = 1;
         // koniec epizodu
@@ -84,6 +90,7 @@ namespace Armoury
         private static int _cvEp, _cvHidEp, _cvResp, _cvReplanN, _cvRays, _cvRayBlk, _cvRayCap, _cvEngNot, _cvEngClear, _cvNoPoint, _cvNoLos, _cvNoOdds, _cvConv,
                            _cvSight, _cvArriveBlind, _cvReflank, _cvHitAfter, _cvKillAfter, _cvTgtDown, _cvTgtDownCov, _cvEnded, _cvRel, _cvLeft, _cvPlayerSkip,
                            _cvQOver, _cvStum, _cvRespN, _cvNoMen, _cvChecks;
+        private static int _cvEpCap, _cvNoHide, _cvFootCool, _cvRespHeld, _cvMoveOut, _cvClearKeep, _cvSpread;   // poprawki recenzji 311a
         private static float _cvHidSec, _cvToResp;
         private static long _cvTicks, _cvMaxTicks;
         private static int _cvTickN;
@@ -119,6 +126,7 @@ namespace Armoury
             _cvEp = _cvHidEp = _cvResp = _cvReplanN = _cvRays = _cvRayBlk = _cvRayCap = _cvEngNot = _cvEngClear = _cvNoPoint = _cvNoLos = _cvNoOdds = _cvConv = 0;
             _cvSight = _cvArriveBlind = _cvReflank = _cvHitAfter = _cvKillAfter = _cvTgtDown = _cvTgtDownCov = _cvEnded = _cvRel = _cvLeft = _cvPlayerSkip = 0;
             _cvQOver = _cvStum = _cvRespN = _cvNoMen = _cvChecks = 0;
+            _cvEpCap = _cvNoHide = _cvFootCool = _cvRespHeld = _cvMoveOut = _cvClearKeep = _cvSpread = 0;
             _cvHidSec = _cvToResp = 0f;
             _cvTicks = _cvMaxTicks = 0L;
             _cvTickN = 0;
@@ -181,15 +189,18 @@ namespace Armoury
                 if (why < 0 && dAll > HuntClose) why = CeFar;
                 if (why < 0 && !lone) why = CeNotLone;   // jego ludzie nadeszli - zwykla bitwa (283 / RBM)
                 if (why >= 0) { CoverEnd(t, why, now, true); return false; }
-                return true;
+                // recenzja 311a (1): wlasny zegar dopiero po dowodzie ukrycia (probka ukryta albo ukryty kiedykolwiek) - strzelec na otwartym polu konczy sie
+                // jak dotad cisza ShieldsUpHoldSeconds (bez 45 s postoju R4 / R5 i fal R2)
+                return ep.EverHidden || ep.HidSince >= 0f;
             }
             if (t.LastHarm < 0f || now - t.LastHarm > _cvHold) return false;
             if (s.MountAgent != null || !lone || dAll > HuntClose || MeleeKind(t)) return false;
+            if (CovList.Count >= CovEpMax) { _cvEpCap++; return false; }   // recenzja 311a (koszt): limit epizodow naraz
             ep = new CovEp { T = t, Start = now, NextCheck = now, NextCollect = now };
             t.Cov = ep;
             CovList.Add(ep);
             _cvEp++;
-            return true;
+            return false;   // recenzja 311a (1): nowy epizod bez probek - zegar 283 bez zmian
         }
 
         /// <summary>-1 = epizod trwa, inaczej Ce* (bez odleglosci - ta w passie z szykow).</summary>
@@ -212,6 +223,7 @@ namespace Armoury
             t.Cov = null;
             CovList.Remove(ep);
             CeN[why]++;
+            if (!ep.EverHidden) _cvNoHide++;
             if (t.S != null) MarkIn(ref _covered, t.S, false);
             if (!release) return;
             CovH.Clear();
@@ -263,27 +275,21 @@ namespace Armoury
             var t = ep.T;
             var s = t.S;
             Threat cur;
-            if (s == null || !Threats.TryGetValue(s, out cur) || !ReferenceEquals(cur, t)) { CoverEnd(t, CeOther, now, false); return; }   // zagrozenie zdjete bez EndThreat
+            // zagrozenie zdjete bez EndThreat (RunThreat catch -> RemoveThreat): recenzja 311a - ludzie 311a tez oddani grze (EndHunter), nie do konca misji
+            if (s == null || !Threats.TryGetValue(s, out cur) || !ReferenceEquals(cur, t)) { CoverEnd(t, CeOther, now, true); return; }
             int why = CoverWhyEnd(m, t, now);
             if (why >= 0) { CoverEnd(t, why, now, true); return; }
             if (now >= ep.NextCollect) { CoverCollect(ep); ep.NextCollect = now + CovCollectEvery; }
             _cvChecks++;
             Vec3 tc = s.GetChestGlobalPosition();
-            // czy grupa go widzi (bez obchodzacych - ci maja wlasna kontrole)
-            var obs = ep.Shoot.Count > 0 ? ep.Shoot : ep.Melee;
-            int seen = 0, blind = 0, n = obs.Count;
-            for (int k = 0, used = 0; k < n && used < CovObsPerCheck; k++)
-            {
-                int i = (ep.ObsRot + k) % n;
-                var a = obs[i];
-                if (a == null || !a.IsActive()) continue;
-                Hunter h;
-                if (Hunters.TryGetValue(a, out h) && h.Cov != 0 && h.Cov <= CvFlankR) continue;
-                used++;
-                int v = Sight(m, a, t, tc, true, now);
-                if (v == 1) seen++; else if (v == 0) blind++;
-            }
-            if (n > 0) ep.ObsRot = (ep.ObsRot + CovObsPerCheck) % n;
+            // czy grupa go widzi (bez obchodzacych - ci maja wlasna kontrole); recenzja 311a (3): wszyscy strzelcy obchodza - patrza ludzie z bronia biala
+            int seen = 0, blind = 0;
+            Observe(m, ep, ep.Shoot, tc, now, ref seen, ref blind);
+            if (seen + blind == 0 && ep.Melee.Count > 0) Observe(m, ep, ep.Melee, tc, now, ref seen, ref blind);
+            if (ep.Shoot.Count + ep.Melee.Count > 0) ep.ObsRot = (ep.ObsRot + CovObsPerCheck) % Math.Max(1, Math.Max(ep.Shoot.Count, ep.Melee.Count));
+            // obchodzacy przed odpowiedzia (recenzja 311a (3): bez obserwatorow ich probki decyduja o ukryciu - inaczej HidSince stal, a ukrycie trwalo do konca)
+            bool noObs = seen + blind == 0;
+            FlankersStep(m, ep, tc, now, noObs, ref seen, ref blind);
             if (seen + blind > 0)
             {
                 if (blind > seen)
@@ -296,7 +302,24 @@ namespace Armoury
             ep.Hidden = ep.HidSince >= 0f && now - ep.HidSince >= _cvHid;
             if (ep.Hidden && !ep.EverHidden) { ep.EverHidden = true; _cvHidEp++; }
             if (ep.Hidden && now >= ep.NextReplan && (!ep.Sent || (ep.NeedReplan && ep.Replans < CovReplanMax))) Respond(m, ep, now);
-            FlankersStep(m, ep, tc, now);
+        }
+
+        /// <summary>Do CovObsPerCheck obserwatorow z listy (bez obchodzacych) - probka widzi / zasloniety.</summary>
+        private static void Observe(Mission m, CovEp ep, List<Agent> obs, Vec3 tc, float now, ref int seen, ref int blind)
+        {
+            var t = ep.T;
+            int n = obs.Count;
+            for (int k = 0, used = 0; k < n && used < CovObsPerCheck; k++)
+            {
+                int i = (ep.ObsRot + k) % n;
+                var a = obs[i];
+                if (a == null || !a.IsActive()) continue;
+                Hunter h;
+                if (Hunters.TryGetValue(a, out h) && h.Cov != 0 && h.Cov <= CvFlankR) continue;
+                used++;
+                int v = Sight(m, a, t, tc, true, now);
+                if (v == 1) seen++; else if (v == 0) blind++;
+            }
         }
 
         /// <summary>1 = widzi, 0 = zasloniety, -1 = bez promienia (budzet). engine - lucznik z celem 283 na nekajacego od co najmniej 1 s: najpierw stan silnika
@@ -377,6 +400,13 @@ namespace Armoury
         {
             var t = ep.T;
             var s = t.S;
+            // recenzja 311a (1): swoi walcza z nim (283 RespNear - R2 / szturm w 6 m) albo nekajacy wrecz w zwarciu ze swoimi (132b) - bez nowych
+            // strzelcow na luk (RangedRecheck i tak by ich zdjal; promien nie widzi ludzi) - proba za 2 s, NeedReplan zostaje
+            if (RespNear(t)) { _cvRespHeld++; ep.NextReplan = now + 2f; return; }
+            if (_cvQSec >= CovQPerSec) { _cvQOver++; return; }
+            _cvQSec++;
+            NearFriends(m, t);
+            if (_nearMelee) { _cvRespHeld++; ep.NextReplan = now + 2f; return; }
             CoverCollect(ep);
             ep.NextCollect = now + CovCollectEvery;
             ep.NextReplan = now + CovReplan;
@@ -397,7 +427,8 @@ namespace Armoury
             if (!okR) _cvNoPoint++;
             // szturm: przewaga 3:1 nad nekajacym i jego ludzmi w 30 m (jedno zapytanie z budzetu sekundy)
             bool rush = false;
-            if (_cvQSec < CovQPerSec)
+            if (now < t.FootCool) _cvFootCool++;   // recenzja 311a (2): piechota wrocila ze smyczy / czasu - przerwa 30 s jak R2 (React.cs FootPass)
+            else if (_cvQSec < CovQPerSec)
             {
                 _cvQSec++;
                 rush = ep.Men >= CovOdds * Math.Max(1, FoesNear(m, s, t.SSide));
@@ -415,7 +446,7 @@ namespace Armoury
                     var h = t.Hs[i];
                     if (h.Role != RoleFoot || h.A == null || !h.A.IsActive()) continue;
                     if (h.Cov == 0) _cvConv++;
-                    RushSet(h, c, ep.G, n);
+                    RushSet(h, c, ep.G, n, false);   // recenzja 311a (4): smycz od dotychczasowej podstawy R2 (szyk / Anchor 291), nie od miejsca przejecia
                     rushed++;
                 }
                 PickNear(ep.Melee, t, c, now, CovRushMax - t.Foot, CovRush);
@@ -441,7 +472,7 @@ namespace Armoury
                     int fx = FiOf(t.Side, a.Formation);
                     if (fx < 0) continue;
                     var h = StartHunter(t, a, HForms[t.Side][fx], RoleFoot, 0f, now);
-                    RushSet(h, c, ep.G, n);
+                    RushSet(h, c, ep.G, n, true);
                     Steer(h, now);
                     rushed++;
                 }
@@ -459,6 +490,7 @@ namespace Armoury
                     {
                         if (!ReferenceEquals(h.T, t) || h.Role != RoleRanged) continue;
                         if (h.Cov != 0 && h.CovSt == CsPin && h.CovBlind < CovBlindReplan) continue;   // obchodzacy z linia - zostaje
+                        if (h.Cov == 0 && now - h.Start >= 1f && VisClear(a)) { _cvClearKeep++; continue; }   // recenzja 311a (6): lucznik R1 z czysta linia zostaje
                     }
                     else if (!CovElig(a, t, now)) continue;
                     Vec2 o = a.Position.AsVec2 - ep.G;
@@ -476,6 +508,7 @@ namespace Armoury
                     Vec2 w = left ? wl : wr;
                     int k = left ? kl++ : kr++;
                     Vec2 p = FlankSpot(s, c, w, k);
+                    if (NearSpread(a, p, t)) { _cvSpread++; continue; }   // recenzja 311a (1): swoj przy celu w rozrzucie z punktu (132b (b))
                     Hunter h;
                     if (!Hunters.TryGetValue(a, out h))
                     {
@@ -487,11 +520,12 @@ namespace Armoury
                         h = StartHunter(t, a, HForms[t.Side][fx], RoleRanged, range, now);
                     }
                     else if (h.Cov != 0) _cvReflank++;
-                    ApplyStep(h, p);
+                    ApplyStep(h, p, h.Hold);
                     if (!h.Step) continue;
                     h.Cov = left ? CvFlankL : CvFlankR;
                     h.CovSt = CsMove;
                     h.CovBlind = 0;
+                    h.CovAt = now;
                     if (left) CvL.Add(a.Index); else CvR.Add(a.Index);
                     flanked++;
                 }
@@ -507,6 +541,20 @@ namespace Armoury
                 _cvToResp += now - ep.Start;
                 MarkIn(ref _covered, s, true);
             }
+            // recenzja 311a (6, stan): ludzie wyslani bez epizodu 283 - epizod od razu (jak koniec ThreatPass), zeby EndEp / kontakt / ReactEndLine ich liczyly;
+            // odleglosc w linii startu - od srodka grupy (ThreatPass - od krawedzi szyku)
+            if (!t.Active)
+            {
+                int dn;
+                DownBy.TryGetValue(s, out dn);
+                StartEp(t, now, 0, 0, flanked, dd, dn);
+            }
+        }
+
+        /// <summary>Recenzja 311a (6): stan silnika u lucznika - czysta linia do celu.</summary>
+        private static bool VisClear(Agent a)
+        {
+            try { return a.GetLastTargetVisibilityState() == AITargetVisibilityState.TargetIsClear; } catch { return false; }
         }
 
         /// <summary>Punkt luku po stronie sgn (1 lewa - normalna n, -1 prawa): na siatce i z czystym promieniem z wysokosci oka do piersi celu.</summary>
@@ -556,15 +604,16 @@ namespace Armoury
             return wp.GetNavMesh() != UIntPtr.Zero ? q : w;
         }
 
-        /// <summary>Szturmujacy: strona wedlug linii grupa-cel, smycz od miejsca wyslania (odleglosc do celu + 25 m, najwyzej 130 m).</summary>
-        private static void RushSet(Hunter h, Vec2 c, Vec2 g, Vec2 n)
+        /// <summary>Szturmujacy: strona wedlug linii grupa-cel, smycz od miejsca wyslania (odleglosc do celu + 25 m, najwyzej 130 m). fresh - nowy (Anchor
+        /// = miejsce wyslania); przejety z R2 albo ponowny plan - smycz od jego dotychczasowej podstawy (FootLeash), najwyzej 130 m od niej.</summary>
+        private static void RushSet(Hunter h, Vec2 c, Vec2 g, Vec2 n, bool fresh)
         {
             var a = h.A;
             Vec2 ap = a.Position.AsVec2;
             bool left = Vec2.DotProduct(ap - g, n) >= 0f;
             h.Cov = left ? CvRushL : CvRushR;
             if (left) CvRL.Add(a.Index); else CvRR.Add(a.Index);
-            if (h.Home == null && !h.Anchor.IsValid) h.Anchor = ap;
+            if (fresh && h.Home == null && !h.Anchor.IsValid) h.Anchor = ap;
             float lim = Math.Min(CovLeashMax, FootLeash(h, ap) + ap.Distance(c) + CovLeashPlus);
             if (lim > h.Leash) h.Leash = Math.Max(MarchToContact.InfRearm, lim);
         }
@@ -616,7 +665,7 @@ namespace Armoury
             if (MeleeUntil.TryGetValue(a, out mu) && now < mu) return false;
             if (IntactNear(t.SSide, a.Position.AsVec2, CounterFootGap)) return false;
             var f = a.Formation;
-            if (f == null || PlayerForm(f)) { _cvPlayerSkip++; return false; }
+            if (f == null || PlayerForm(f)) return false;   // recenzja 311a: licznik tylko przy zbieraniu (bez podwojnego liczenia)
             return FiOf(t.Side, f) >= 0;
         }
 
@@ -660,12 +709,13 @@ namespace Armoury
 
         /// <summary>Obchodzacy (co 0.5 s): w drodze - zobaczyl cel (stan silnika albo promien) = staje tam i strzela, na punkcie bez linii = staje; stoi
         /// i nie widzi przez CovBlindReplan kontroli przy ukrytym celu - ponowny plan.</summary>
-        private static void FlankersStep(Mission m, CovEp ep, Vec3 tc, float now)
+        private static void FlankersStep(Mission m, CovEp ep, Vec3 tc, float now, bool noObs, ref int seen, ref int blind)
         {
             var t = ep.T;
             CovH.Clear();
             for (int i = 0; i < t.Hs.Count; i++) { var h = t.Hs[i]; if (h.Cov == CvFlankL || h.Cov == CvFlankR) CovH.Add(h); }
             int alive = 0;
+            bool near = RespNear(t);   // recenzja 311a (1): swoi walcza z nim - bez ponownego planu
             for (int i = 0; i < CovH.Count; i++)
             {
                 var h = CovH[i];
@@ -675,18 +725,24 @@ namespace Armoury
                 alive++;
                 if (h.CovSt == CsMove)
                 {
+                    // recenzja 311a (3): zatrzymanie z h.Hold - NoAttack 132b (zwarcie ze swoimi) nie skasowany
                     int v = Sight(m, a, t, tc, false, now);
-                    if (v == 1) { ApplyStep(h, a.Position.AsVec2); h.CovSt = CsPin; h.CovBlind = 0; _cvSight++; continue; }
-                    if (h.StepAt.IsValid && a.Position.AsVec2.Distance(h.StepAt) <= CovArrive) { ApplyStep(h, h.StepAt); h.CovSt = CsPin; h.CovBlind = 0; _cvArriveBlind++; }
+                    if (v == 1) { ApplyStep(h, a.Position.AsVec2, h.Hold); h.CovSt = CsPin; h.CovBlind = 0; _cvSight++; if (noObs) seen++; continue; }
+                    if (h.StepAt.IsValid && a.Position.AsVec2.Distance(h.StepAt) <= CovArrive) { ApplyStep(h, h.StepAt, h.Hold); h.CovSt = CsPin; h.CovBlind = 0; _cvArriveBlind++; }
+                    else if (now - h.CovAt >= CovMoveMax) { ApplyStep(h, a.Position.AsVec2, h.Hold); h.CovSt = CsPin; h.CovBlind = 0; _cvMoveOut++; }   // recenzja 311a (4)
                     continue;
                 }
-                if (!ep.Hidden) { h.CovBlind = 0; continue; }
+                if (!ep.Hidden && !noObs) { h.CovBlind = 0; continue; }
                 int vb = Sight(m, a, t, tc, true, now);
-                if (vb == 0) { if (++h.CovBlind >= CovBlindReplan) ep.NeedReplan = true; }
-                else if (vb == 1) h.CovBlind = 0;
+                if (vb == 0)
+                {
+                    if (noObs) blind++;
+                    if (ep.Hidden && ++h.CovBlind >= CovBlindReplan && !near) ep.NeedReplan = true;
+                }
+                else if (vb == 1) { h.CovBlind = 0; if (noObs) seen++; }
             }
             CovH.Clear();
-            if (ep.Sent && alive == 0 && ep.Hidden) ep.NeedReplan = true;   // obchodzacy zdjeci (zwarcie przy celu, smycz) - nowy plan, gdy dalej ukryty
+            if (ep.Sent && alive == 0 && ep.Hidden && !near) ep.NeedReplan = true;   // obchodzacy zdjeci (smycz, zasieg) - nowy plan, gdy dalej ukryty
         }
 
         // ------------------------------------------------------------ koniec misji i linia bitwy
@@ -726,7 +782,10 @@ namespace Armoury
               .Append(" | pod sterowaniem 311a na koniec ").Append(_cvLeft).Append(" (oczekiwane 0)")
               .Append(" | koszt sr. ").Append(_cvTickN > 0 ? (_cvTicks * 1000.0 / fr / _cvTickN).ToString("0.000", Inv) : "-")
               .Append(" / max ").Append(_cvTickN > 0 ? (_cvMaxTicks * 1000.0 / fr).ToString("0.000", Inv) : "-").Append(" ms (krokow ").Append(_cvTickN).Append(')')
-              .Append(" | potkniecia ").Append(_cvStum).Append('.');
+              .Append(" | potkniecia ").Append(_cvStum)
+              .Append(" | recenzja: bez ukrycia ").Append(_cvNoHide).Append(", ponad limit epizodow ").Append(_cvEpCap).Append(", szturm w przerwie ").Append(_cvFootCool)
+              .Append(", odpowiedz wstrzymana - swoi przy celu ").Append(_cvRespHeld).Append(", rozrzut przy celu ").Append(_cvSpread)
+              .Append(", R1 z linia zostal ").Append(_cvClearKeep).Append(", droga za dluga ").Append(_cvMoveOut).Append('.');
             Log.Info(sb.ToString());
         }
     }

@@ -86829,6 +86829,7 @@ def main(argv):
 # B311a-1 linia bitwy: format, potkniecia 0, pod sterowaniem 311a na koniec 0, koszt kroku najwiecej < 2 ms; B311a-2 spojnosc: z odpowiedzia <= z ukryciem
 # <= epizody, suma powodow konca = epizody (gdy nikt nie zostal), pozycji zdjetych <= zwolnien, ludzie wyslani tylko przy odpowiedzi; B311a-3 przebieg (INFO:
 # sekundy ukrycia, obchodzacy lewo / prawo, szturm, linia odzyskana, po obejsciu); B311a-4 promienie i budzet (INFO, ponad budzet blisko 0);
+# B311a-6 (poprawki recenzji): bez ukrycia <= epizody, z ukryciem + bez ukrycia >= epizody (INFO reszta);
 # B311a-5 epizody 283 'koniec: inne po 8.0 s' (INFO - przed 311a koniec po ciszy ShieldsUpHoldSeconds; przy kluczu TAK rzadziej przy samotnym strzelcu).
 B311A_L = re.compile(r"Oslona strzelca \(311a\): misja (\S+), klucz (TAK|NIE) \(283 (TAK|NIE)\), trzymanie (\d+) s, ukryty po (\S+) s \| epizody (\d+) "
                      r"\(z ukryciem (\d+), z odpowiedzia (\d+), planow (\d+), ponownych (\d+)\), sekund ukrycia (\S+), sr\. do odpowiedzi (\S+) s \| kontroli (\d+), "
@@ -86837,7 +86838,9 @@ B311A_L = re.compile(r"Oslona strzelca \(311a\): misja (\S+), klucz (TAK|NIE) \(
                      r"przewaga ponizej 3:1 (\d+) \| linia odzyskana (\d+), na punkcie bez linii (\d+), ponowne obejscie (\d+) \| po obejsciu: trafien nekajacego "
                      r"(\d+), powalonych przez niego (\d+); nekajacy trafiony (\d+), padl (\d+) \(od obchodzacych / szturmu (\d+)\) \| koniec: (.+?) \| zwolnien "
                      r"ludzi (\d+), pozycji zdjetych (\d+) \| pominieci z szyku gracza (\d+), ponad limit zapytan (\d+) \| pod sterowaniem 311a na koniec (\d+) "
-                     r"\(oczekiwane 0\) \| koszt sr\. (\S+) / max (\S+) ms \(krokow (\d+)\) \| potkniecia (\d+)\.")
+                     r"\(oczekiwane 0\) \| koszt sr\. (\S+) / max (\S+) ms \(krokow (\d+)\) \| potkniecia (\d+) \| recenzja: bez ukrycia (\d+), ponad limit epizodow "
+                     r"(\d+), szturm w przerwie (\d+), odpowiedz wstrzymana - swoi przy celu (\d+), rozrzut przy celu (\d+), R1 z linia zostal (\d+), droga za "
+                     r"dluga (\d+)\.")
 B311A_START = re.compile(r"Oslona strzelca \(311a\) start: klucz (TAK|NIE) \(z 283 (TAK|NIE)\), trzymanie (\d+) s po ostatniej szkodzie, ukryty po (\S+) s")
 B311A_SAMPLE = ("Oslona strzelca (311a): misja bitwa, klucz TAK (283 TAK), trzymanie 45 s, ukryty po 2.5 s | epizody 3 (z ukryciem 2, z odpowiedzia 2, planow 3, "
                 "ponownych 1), sekund ukrycia 14.5, sr. do odpowiedzi 4.5 s | kontroli 120, promieni 300 (zasloniete 90, ponad budzet 0), silnik: nie widzi 12, "
@@ -86845,13 +86848,14 @@ B311A_SAMPLE = ("Oslona strzelca (311a): misja bitwa, klucz TAK (283 TAK), trzym
                 "bez szturmu - przewaga ponizej 3:1 0 | linia odzyskana 4, na punkcie bez linii 1, ponowne obejscie 1 | po obejsciu: trafien nekajacego 2, "
                 "powalonych przez niego 1; nekajacy trafiony 3, padl 1 (od obchodzacych / szturmu 1) | koniec: czas po szkodzie 1, nekajacy padl 1, dalej niz 110 m 0, "
                 "konno 0, koniec bitwy 1, klucz 0, inne 0, nie samotny 0 | zwolnien ludzi 10, pozycji zdjetych 9 | pominieci z szyku gracza 0, ponad limit zapytan 0 "
-                "| pod sterowaniem 311a na koniec 0 (oczekiwane 0) | koszt sr. 0.020 / max 0.640 ms (krokow 400) | potkniecia 0.")
+                "| pod sterowaniem 311a na koniec 0 (oczekiwane 0) | koszt sr. 0.020 / max 0.640 ms (krokow 400) | potkniecia 0 | recenzja: bez ukrycia 1, "
+                "ponad limit epizodow 0, szturm w przerwie 0, odpowiedz wstrzymana - swoi przy celu 2, rozrzut przy celu 0, R1 z linia zostal 1, droga za dluga 0.")
 B311A_SAMPLE_START = ("Oslona strzelca (311a) start: klucz TAK (z 283 TAK), trzymanie 45 s po ostatniej szkodzie, ukryty po 2.5 s, kontrola co 0.5 s, promieni najwyzej "
                       "64 na s, obchodzacych najwyzej 16, szturm najwyzej 12 przy przewadze 3:1, luk 20-40 m.")
 
 
 def b311a_rows(rep, lines, starts, inne8):
-    bad, n, run, rays = [], 0, [], []
+    bad, n, run, rays, rev = [], 0, [], [], []
     for l in lines:
         m = B311A_L.search(l)
         if not m:
@@ -86860,6 +86864,12 @@ def b311a_rows(rep, lines, starts, inne8):
         g = lambda i: int(m.group(i))
         if g(45) > 0:
             bad.append("potkniecia " + m.group(45))
+        if g(46) > g(6):
+            bad.append(f"bez ukrycia {g(46)} > epizody {g(6)}")
+        if g(7) + g(46) < g(6) and g(41) == 0:
+            bad.append(f"z ukryciem {g(7)} + bez ukrycia {g(46)} < epizody {g(6)}")
+        rev.append(f"bez ukrycia {g(46)}, ponad limit {g(47)}, szturm w przerwie {g(48)}, wstrzymana {g(49)}, rozrzut {g(50)}, R1 zostal {g(51)}, "
+                   f"droga za dluga {g(52)}")
         if g(41) > 0:
             bad.append("pod sterowaniem na koniec " + m.group(41))
         mx = _f310(m.group(43))
@@ -86890,6 +86900,7 @@ def b311a_rows(rep, lines, starts, inne8):
             f"linii {n}, zlych {len(bad)}" + (f" ({bad[0]})" if bad else ""), "zlych 0 (brak linii - INFO)", None if n == 0 and not bad else not bad)
     rep.add("B311a-3: przebieg oslony", "; ".join(run[:6]) or "-", "INFO (przypadek Jeffa: ukrycie > 0, obchodzacy z obu stron, linia odzyskana > 0)", None)
     rep.add("B311a-4: promienie i budzet", "; ".join(rays[:6]) or "-", "INFO (ponad budzet blisko 0)", None)
+    rep.add("B311a-6: poprawki recenzji 311a", "; ".join(rev[:6]) or "-", "INFO (droga za dluga i ponad limit blisko 0)", None)
     rep.add("B311a-5: epizody 283 'koniec: inne po 8.0 s'", str(inne8), "INFO (przed 311a: koniec po ciszy strzelca; mniej przy samotnym strzelcu za oslona)", None)
 
 
@@ -86903,7 +86914,8 @@ def bitwa311a_selftest():
     v = {r[0].split(":")[0]: r[3] for r in rep.rows}
     if v.get("B311a-0") != "TAK" or v.get("B311a-1/2") != "TAK":
         return f"dobry bieg - nie TAK: {v}"
-    for name, bad in (("potkniecia", B311A_SAMPLE.replace("potkniecia 0.", "potkniecia 2.")),
+    for name, bad in (("potkniecia", B311A_SAMPLE.replace("potkniecia 0 |", "potkniecia 2 |")),
+                      ("bez ukrycia", B311A_SAMPLE.replace("bez ukrycia 1,", "bez ukrycia 4,")),
                       ("na koniec", B311A_SAMPLE.replace("na koniec 0 (", "na koniec 3 (")),
                       ("koszt", B311A_SAMPLE.replace("max 0.640 ms", "max 2.400 ms")),
                       ("powody", B311A_SAMPLE.replace("koniec bitwy 1,", "koniec bitwy 0,")),
