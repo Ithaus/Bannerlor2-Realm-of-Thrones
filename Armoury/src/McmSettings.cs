@@ -7280,6 +7280,54 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool FodderFromHorseState { get; set; } = true;
 
+        [SettingPropertyBool("Horses Armoury Carry Footmen", HintText = "free horses in a lord's troops' armoury carry footmen in the game's own speed bonus too ('Footmen on horses (armoury)', the same +0.15 per carried share and the same wet-weather cut as the game's 'Footmen on horses'); the game counted only spare horses in the baggage, so lords' footmen never rode the horses they had (off = only baggage horses, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HorsesArmouryCarryFootmen { get; set; } = true;
+
+        [SettingPropertyBool("Horse Quality Speed", HintText = "a party's map speed depends on how good its horses are: riders on fine horses go somewhat faster, on cheap or lame ones somewhat slower, and footmen on spare horses get the best spare mounts ('Horse quality: riders' and 'Horse quality: spare horses' in the speed tooltip; the marching-column cap of an all-rider column or of footmen on spare horses moves by the same share); a hero rides his own horse, soldiers the horse they really have in the troops' armoury; pack animals do not count (off = every horse is as fast as any other, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HorseQualitySpeed { get; set; } = true;
+
+        [SettingPropertyInteger("Horse Quality Ref Speed", 30, 90, "0", HintText = "with Horse Quality Speed: the horse speed that neither speeds up nor slows down (56 = a good riding horse; cheap horses are about 44-52, noble ones 60-72)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int HorseQualityRefSpeed { get; set; } = 56;
+
+        [SettingPropertyInteger("Horse Quality Slope Percent", 0, 200, "0", HintText = "with Horse Quality Speed: how strongly horse speed turns into map speed - 60 = a horse 10% faster than the reference makes its rider 6% faster", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int HorseQualitySlopePercent { get; set; } = 60;
+
+        [SettingPropertyInteger("Horse Quality Max Bonus Percent", 0, 50, "0", HintText = "with Horse Quality Speed: the most a fine horse adds to its rider's share of the map speed, in percent", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int HorseQualityMaxBonusPercent { get; set; } = 10;
+
+        [SettingPropertyInteger("Horse Quality Max Penalty Percent", 0, 50, "0", HintText = "with Horse Quality Speed: the most a poor or lame horse takes from its rider's share of the map speed, in percent", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public int HorseQualityMaxPenaltyPercent { get; set; } = 15;
+
+        [SettingPropertyBool("Riders Without Horse Walk", HintText = "with Troops Fight With Own Kit Only, a mounted soldier who has no horse in the troops' armoury is not cavalry on the map: the game's 'Cavalry' bonus is taken back for him ('Riders without horses') and the marching column counts him among the footmen - a spare horse can still carry him (off = such men march as cavalry, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool RidersWithoutHorseWalk { get; set; } = true;
+
+        [SettingPropertyBool("Footmen On Spare Horses Ride Pace", HintText = "a footman on a spare riding horse rides at the riders' pace (the marching-column cap of all riders, moved by the quality of the spare horses), less a small share for men not born in the saddle - medieval mounted infantry kept up with light horse; in wet weather the gain over the old cap is cut by 30% (off = footmen on spare horses keep their own slower cap, March Foot Rider Pace)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool FootmenOnSpareHorsesRidePace { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Footmen Ride Pace Penalty", 0.00f, 0.50f, "0.00", HintText = "with Footmen On Spare Horses Ride Pace: how much slower than true riders the footmen on spare horses go (0.05 = 5% below the riding pace)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float FootmenRidePacePenalty { get; set; } = 0.05f;
+
+        [SettingPropertyBool("Ride Double Few Footmen", HintText = "a few footmen left without any horse ride double behind the riders: while there is at most one footman on foot for every four men on a riding horse (heroes count, pack animals do not carry), the column is not held to the walking pace but rides at the riding pace less a share, the horses carrying two ('Marching column: riding double' in the speed tooltip); prisoners on the rope still walk; in wet weather the gain over the walking pace is cut by 30% (off = one man on foot holds the whole column to the walking pace, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool RideDoubleFewFootmen { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ride Double Ratio", 0.00f, 1.00f, "0.00", HintText = "with Ride Double Few Footmen: the most footmen on foot for each man on a riding horse that can still ride double (0.25 = one footman for every four riders)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float RideDoubleRatio { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Ride Double Penalty", 0.00f, 0.50f, "0.00", HintText = "with Ride Double Few Footmen: how much slower the column rides while horses carry two men (0.10 = 10% below the riding pace)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float RideDoublePenalty { get; set; } = 0.10f;
+
         [SettingPropertyBool("Hamlet Kinds In District", HintText = "the hamlets of a district shape what it sends to market: fishing hamlets land fish in place of part of the grain (the same number of loads), mills and granaries keep it grain. Needs Village Book Enabled (off = the district sends grain as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HamletKindsInDistrict { get; set; } = true;
@@ -12643,6 +12691,18 @@ namespace Armoury
             s.QarthStablesBuyCamels = QarthStablesBuyCamels;
             s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;
             s.FodderFromHorseState = FodderFromHorseState;
+            s.HorsesArmouryCarryFootmen = HorsesArmouryCarryFootmen;
+            s.HorseQualitySpeed = HorseQualitySpeed;
+            s.HorseQualityRefSpeed = HorseQualityRefSpeed;
+            s.HorseQualitySlopePercent = HorseQualitySlopePercent;
+            s.HorseQualityMaxBonusPercent = HorseQualityMaxBonusPercent;
+            s.HorseQualityMaxPenaltyPercent = HorseQualityMaxPenaltyPercent;
+            s.RidersWithoutHorseWalk = RidersWithoutHorseWalk;
+            s.FootmenOnSpareHorsesRidePace = FootmenOnSpareHorsesRidePace;
+            s.FootmenRidePacePenalty = FootmenRidePacePenalty;
+            s.RideDoubleFewFootmen = RideDoubleFewFootmen;
+            s.RideDoubleRatio = RideDoubleRatio;
+            s.RideDoublePenalty = RideDoublePenalty;
             s.HamletKindsInDistrict = HamletKindsInDistrict;
             s.HorsesDieOnlyKilled = HorsesDieOnlyKilled;
             s.HorseDeathRatioMinBattles = HorseDeathRatioMinBattles;

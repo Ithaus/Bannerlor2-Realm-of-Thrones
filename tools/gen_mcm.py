@@ -4,6 +4,15 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 311d: jakosc konia a tempo - kod przycina do 30..90, 0..200 %, 0..50 %, 0..50 % (HorsePace.Params)
+    'HorseQualityRefSpeed': (30, 90, "0"),
+    'HorseQualitySlopePercent': (0, 200, "0"),
+    'HorseQualityMaxBonusPercent': (0, 50, "0"),
+    'HorseQualityMaxPenaltyPercent': (0, 50, "0"),
+    # 311d2: piechur na luzaku tempem jazdy, jazda "na drugiego" - kod przycina kary do 0..0.5, stosunek do 0..1 (MarchPace.Cap)
+    'FootmenRidePacePenalty': (0.0, 0.5, "0.00"),
+    'RideDoubleRatio': (0.0, 1.0, "0.00"),
+    'RideDoublePenalty': (0.0, 0.5, "0.00"),
     # 299b: tempo pamieci podazy rynku - kod przycina do 0.02..0.15 (RawPrice.Pace)
     'PriceSupplyMemoryDaily': (0.02, 0.15, "0.000"),
     # 299c: udzial od razu - kod przycina do 0.02..0.15 (RawPrice.Share)
