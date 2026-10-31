@@ -15,9 +15,12 @@ namespace Armoury
     ///  - mediana branzy = mediana pamieci miesiaca (rec.Avg, prawdziwy wynik po placach i utrzymaniu) warsztatow tego typu z pamiecia >= Span dob, co najmniej 3
     ///    warsztaty; liczona raz na dobe (EnsureInd) - ta sama miara co "wedle typu" w linii "Warsztaty towarowe", ale z miesiaca, nie z jednej doby;
     ///  - cena targu (Expected, w calosci albo polowa) liczy sie najwyzej do WorkshopQuoteMarketCap x wiekszej z: pamiec warsztatu, mediana branzy;
-    ///  - krotka historia (Mem < WorkshopBuyerShortHistoryDays): zysk = waga pamieci (Mem / dni) x pamiec + reszta x mediana branzy (zamiast dzisiejszej ceny targu);
-    ///  - krok doby: zysk wyceny najwyzej x WorkshopQuoteDayStep w gore albo / w dol wobec poprzedniej doby wyceny (od 10 d/d; Daily wycenia kazdy warsztat
-    ///    co dobe, wiec lancuch idzie doba po dobie); zmiana typu (Get) albo wlasciciela miedzy notablami / lordami - od nowa (kupno i odsprzedaz przez gracza -
+    ///  - krotka historia (Mem < WorkshopBuyerShortHistoryDays): cena targu ponad pamiec liczy sie najwyzej do waga pamieci (Mem / dni) x pamiec + reszta x mediana
+    ///    branzy (recenzja: nigdy ponizej wlasnej pamieci i nigdy ponad wiekszy z pamieci i targu - mediana tnie tylko czesc z targu);
+    ///  - krok doby: zysk wyceny ponad podstawe (pamiec warsztatu; bez historii / same linie towarowe - mediana branzy) rosnie najwyzej x WorkshopQuoteDayStep wobec
+    ///    poprzedniej doby wyceny (od 10 d/d; Daily wycenia kazdy warsztat co dobe). Do podstawy cena wraca od razu (recenzja: inaczej warsztat po zlym dniu targu szedl
+    ///    graczowi przez kilka dob za ulamek wartosci), w dol krok nie trzyma (spadek do pamieci ogranicza samo przyciecie). Bez historii i bez mediany branzy - bez
+    ///    reguly (dzisiejszy targ jak dotad). Zmiana typu (Get) albo wlasciciela miedzy notablami / lordami - od nowa (kupno i odsprzedaz przez gracza -
     ///    ten sam lancuch, zeby odkup notabla, przyciety cena gracza w CostNotablePostfix, nie przeskoczyl ceny kupna).
     /// Regula ceny bez zmian: 3 x roczny zysk po podatku kupujacego (nie mniej niz sprzet) + kapital + robota w toku. Zadne zloto sie nie rusza - sama wycena.
     /// Linie: "Warsztaty - wycena stala (311c)" co dobe, "Warsztaty ranking (311c)" w dobie linii (LogGate.Lines, klucz WorkshopRankingLog).
@@ -59,29 +62,39 @@ namespace Armoury
         {
             int d = DayNow311();
             if (_indDay == d) return;
-            _indDay = d; _ind.Clear(); _indN.Clear();
-            var by = new Dictionary<string, List<float>>(StringComparer.Ordinal);
-            int span = Span;
-            foreach (var t in Town.AllTowns)
+            // recenzja: doba odhaczona dopiero po przeliczeniu (finally) - wyjatek zostawia mediany z wczoraj, nie puste; bez ponawiania co wywolanie
+            try
             {
-                if (t == null || t.Workshops == null) continue;
-                foreach (var w in t.Workshops)
+                var by = new Dictionary<string, List<float>>(StringComparer.Ordinal);
+                int span = Span;
+                foreach (var t in Town.AllTowns)
                 {
-                    if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || w.Owner == null) continue;
-                    var r = Get(w);   // pamiec z zapisu tez (po wczytaniu przed pierwszym tickiem miast) - Get jak w petli Daily
-                    if (r == null || r.Mem < span) continue;
-                    List<float> l;
-                    if (!by.TryGetValue(r.Type, out l)) { l = new List<float>(); by[r.Type] = l; }
-                    l.Add(r.Avg);
+                    if (t == null || t.Workshops == null) continue;
+                    foreach (var w in t.Workshops)
+                    {
+                        if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden || w.Owner == null) continue;
+                        Rec r;
+                        // recenzja: rekord ze zmienionym typem pomijamy (Get zrobilby SyncInitialCapital cudzego warsztatu w trakcie rozmowy - zostaje petli Daily);
+                        // brak rekordu - Get (sam odczyt pamieci z zapisu, bez skutkow ubocznych)
+                        if (_rec.TryGetValue(w, out r)) { if (r.Type != TypeId(w)) continue; }
+                        else r = Get(w);
+                        if (r == null || r.Mem < span) continue;
+                        List<float> l;
+                        if (!by.TryGetValue(r.Type, out l)) { l = new List<float>(); by[r.Type] = l; }
+                        l.Add(r.Avg);
+                    }
+                }
+                _ind.Clear(); _indN.Clear();
+                foreach (var kv in by)
+                {
+                    if (kv.Value.Count < 3) continue;
+                    kv.Value.Sort();
+                    _ind[kv.Key] = kv.Value[kv.Value.Count / 2];
+                    _indN[kv.Key] = kv.Value.Count;
                 }
             }
-            foreach (var kv in by)
-            {
-                if (kv.Value.Count < 3) continue;
-                kv.Value.Sort();
-                _ind[kv.Key] = kv.Value[kv.Value.Count / 2];
-                _indN[kv.Key] = kv.Value.Count;
-            }
+            catch (Exception e) { Stumble("WorkshopTrade.EnsureInd", e); }
+            finally { _indDay = d; }
         }
 
         private static bool Industry(string type, out float v)
@@ -102,25 +115,40 @@ namespace Armoury
             int shortD = Math.Max(1, Settings.Current.WorkshopBuyerShortHistoryDays);
             bool hist = rec.Days > 0 && !float.IsNaN(q.MemP);
             bool shortH = false;
-            float anchor;
-            if (!hist) anchor = hasInd ? ind : raw;
-            else if (rec.Mem < shortD && hasInd) { float k = Math.Max(0f, Math.Min(1f, rec.Mem / (float)shortD)); anchor = k * q.MemP + (1f - k) * ind; shortH = true; }
-            else anchor = q.MemP;
-            float cap = Math.Max(0f, Math.Max(anchor, hasInd ? ind : anchor)) * QCap;
-            float p;
-            if (q.ArmsIdle || !hist) p = hasInd ? Math.Min(raw, cap) : raw;   // bez historii / same linie towarowe: dzisiejszy targ, ale nie ponad przyciecie
-            else if (q.Exp) p = Math.Max(anchor, Math.Min(raw, cap));         // cena targu ponad pamiec: najwyzej przyciecie
-            else p = anchor;                                                  // pamiec (krotka - ku medianie branzy)
-            var why = new StringBuilder();
-            if (p < raw - 0.05f && raw > cap + 0.05f && (q.Exp || !hist || q.ArmsIdle))
+            float p, stable, capV, shortV = float.MaxValue;
+            if (q.ArmsIdle || !hist)
             {
-                q.SteadyKind |= 2;
-                why.Append("Today's market prices promise about ").Append(raw.ToString("0.#", inv)).Append(" a day, but they jump from day to day; I count them only up to what this shop and shops of its trade really earn. ");
+                // bez historii / same linie towarowe: dzisiejszy targ, ale nie ponad przyciecie; podstawa kroku = mediana branzy (bez niej - bez reguly)
+                float baseV = hist ? Math.Max(q.MemP, hasInd ? ind : q.MemP) : (hasInd ? ind : raw);
+                capV = Math.Max(0f, baseV) * QCap;
+                p = hasInd ? Math.Min(raw, capV) : raw;
+                stable = hasInd ? Math.Min(p, ind) : p;
             }
-            if (shortH && Math.Abs(p - raw) > 0.05f && (q.SteadyKind & 2) == 0)
+            else
             {
-                q.SteadyKind |= 1;
-                why.Append("My records are short, so I lean on what shops of this trade earn across the land - about ").Append(ind.ToString("0.#", inv)).Append(" a day. ");
+                // pamiec warsztatu; cena targu ponad nia najwyzej do przyciecia (krotka historia - do mieszanki pamieci i mediany branzy, nie ponizej pamieci)
+                capV = Math.Max(0f, Math.Max(q.MemP, hasInd ? ind : q.MemP)) * QCap;
+                if (rec.Mem < shortD && hasInd)
+                {
+                    float k = Math.Max(0f, Math.Min(1f, rec.Mem / (float)shortD));
+                    shortV = Math.Max(q.MemP, k * q.MemP + (1f - k) * ind); shortH = true;
+                }
+                p = q.Exp ? Math.Max(q.MemP, Math.Min(raw, Math.Min(capV, shortV))) : q.MemP;
+                stable = q.MemP;
+            }
+            var why = new StringBuilder();
+            if (p < raw - 0.05f)
+            {
+                if (shortH && shortV < capV)
+                {
+                    q.SteadyKind |= 1;
+                    why.Append("My records are short, so I count today's market prices only as far as shops of this trade earn across the land - about ").Append(ind.ToString("0.#", inv)).Append(" a day. ");
+                }
+                else
+                {
+                    q.SteadyKind |= 2;
+                    why.Append("Today's market prices promise about ").Append(raw.ToString("0.#", inv)).Append(" a day, but they jump from day to day; I count them only up to what this shop and shops of its trade really earn. ");
+                }
             }
             // krok doby
             int d = DayNow311();
@@ -142,10 +170,11 @@ namespace Armoury
                 float st = QStep;
                 if (st > 1.0001f)
                 {
+                    // recenzja: gorny krok liczony od wiekszej z (wczoraj, 10 d/d) i nigdy ponizej podstawy - po zlym dniu targu cena wraca do pamieci / mediany od razu;
+                    // dolnego kroku nie ma (trzymal cene ponad pamiecia i targiem przy zalamaniu wsadu - gracz przeplacal)
                     float k = (float)Math.Pow(st, gap), pv = rec.QPrevProfit, before = p;
-                    float hi = (pv >= StepMin ? pv : Math.Max(StepMin, hasInd ? ind : StepMin)) * k;
+                    float hi = Math.Max(Math.Max(pv, StepMin) * k, stable);
                     if (p > hi) p = hi;
-                    if (pv >= StepMin && p < pv / k) p = pv / k;
                     if (Math.Abs(p - before) > 0.05f)
                     {
                         q.SteadyKind |= 4;
@@ -154,7 +183,7 @@ namespace Armoury
                 }
             }
             rec.QProfit = p; rec.QRaw = raw;
-            q.Profit = p;
+            q.Profit = p; q.Stable = stable;
             if (why.Length > 0) q.SteadyWhy = why.ToString();
         }
 
@@ -189,10 +218,11 @@ namespace Armoury
                 if (q.Gap > 0)
                 {
                     double inv = 1.0 / q.Gap;
-                    if (q.PrevP >= StepMin && q.Profit >= StepMin)
+                    // recenzja: po regule mierzymy to, co regula gwarantuje - wzrost ponad podstawe (pamiec / mediana) wobec max(wczoraj, 10 d/d); powrot do podstawy i spadek bez limitu
+                    if (!float.IsNaN(q.Stable) && !float.IsNaN(q.PrevP) && q.Profit > q.Stable + 0.05f && q.Profit >= StepMin)
                     {
                         _sStepPairs++;
-                        float r = (float)Math.Pow(Ratio(q.Profit, q.PrevP), inv);
+                        float r = (float)Math.Pow(Math.Max(1f, q.Profit / Math.Max(q.PrevP, StepMin)), inv);
                         if (r > _sMaxFin) { _sMaxFin = r; _sMaxFinW = ShopName(w); }
                     }
                     if (q.PrevRaw >= StepMin && q.RawP >= StepMin)
@@ -205,7 +235,9 @@ namespace Armoury
                 if (before != q.Price && Math.Abs(before - q.Price) > Math.Abs(_sBigBefore - _sBigAfter))
                 { _sBigBefore = before; _sBigAfter = q.Price; _sBigRaw = q.RawP; _sBigFin = q.Profit; _sBigW = ShopName(w); }
             }
-            if (rec.Mem >= Span && q.Price > 0) _rank.Add(new RankRow { Name = ShopName(w), Net = rec.Avg, Tax = q.Tax, Price = q.Price });
+            // recenzja: ranking bez warsztatow gracza (jego "cena kupna" nic nie mowi) i tylko przy wlaczonym kluczu
+            var st = Settings.Current;
+            if (st != null && st.WorkshopRankingLog && w.Owner != Hero.MainHero && rec.Mem >= Span && q.Price > 0) _rank.Add(new RankRow { Name = ShopName(w), Net = rec.Avg, Tax = q.Tax, Price = q.Price });
         }
 
         private static string RankText(RankRow r, int i)
@@ -221,13 +253,13 @@ namespace Armoury
             var inv = CultureInfo.InvariantCulture;
             var s = Settings.Current;
             var sb = new StringBuilder();
-            sb.Append("Warsztaty - wycena stala (311c): dzien ").Append(day).Append(" | klucz ").Append(SteadyOn ? "TAK" : "NIE").Append(", krok doby x").Append(QStep.ToString("0.00", inv))
+            sb.Append("Warsztaty - wycena stala (311c): dzien ").Append(day).Append(" | klucz ").Append(SteadyOn ? "TAK" : "NIE").Append(", krok doby w gore x").Append(QStep.ToString("0.00", inv))
               .Append(" (od ").Append(StepMin.ToString("0", inv)).Append(" d/d), cena targu najwyzej x").Append(QCap.ToString("0.00", inv)).Append(" wiekszej z pamieci i mediany branzy, krotka historia ")
               .Append(Math.Max(1, s.WorkshopBuyerShortHistoryDays)).Append(" dob ku medianie branzy");
             if (SteadyOn)
             {
                 sb.Append(" | wycen dzis ").Append(_sN).Append(": krotka historia ku branzy ").Append(_sShort).Append(", cena targu przycieta ").Append(_sCap).Append(", krok doby przyciety ").Append(_sStep)
-                  .Append(" | najwiekszy skok zysku wyceny doba do doby (par od ").Append(StepMin.ToString("0", inv)).Append(" d/d ").Append(_sStepPairs).Append("): przed regula x").Append(_sMaxRaw.ToString("0.00", inv))
+                  .Append(" | najwiekszy skok zysku wyceny doba do doby (przed regula: par od ").Append(StepMin.ToString("0", inv)).Append(" d/d; po regule: wzrost ponad pamiec / mediane, wycen ").Append(_sStepPairs).Append("): przed regula x").Append(_sMaxRaw.ToString("0.00", inv))
                   .Append(" (").Append(_sMaxRawW).Append("), po regule x").Append(_sMaxFin.ToString("0.00", inv)).Append(" (").Append(_sMaxFinW).Append(")")
                   .Append(" | najwieksza poprawka: ").Append(_sBigBefore < 0 ? "-" : _sBigW + " cena przed " + _sBigBefore + " po " + _sBigAfter + " (zysk/d " + _sBigRaw.ToString("0.0", inv) + " -> " + _sBigFin.ToString("0.0", inv) + ")");
             }
@@ -244,8 +276,8 @@ namespace Armoury
             all.Sort((a, b) => b.Net.CompareTo(a.Net));
             var top = new List<string>(); var bot = new List<string>();
             for (int i = 0; i < Math.Min(10, all.Count); i++) top.Add(RankText(all[i], i));
-            for (int i = 0; i < Math.Min(10, all.Count); i++) bot.Add(RankText(all[all.Count - 1 - i], i));
-            Log.Info("Warsztaty ranking (311c): dzien " + day + " | warsztatow z pamiecia >= " + Span + " dob " + all.Count + " | top 10 (zysk/d z pamieci miesiaca, po placach, wsadzie i utrzymaniu, przed podatkiem): "
+            for (int i = 0; i < Math.Min(10, all.Count - top.Count); i++) bot.Add(RankText(all[all.Count - 1 - i], i));   // recenzja: bez warsztatow z top 10
+            Log.Info("Warsztaty ranking (311c): dzien " + day + " | warsztatow z pamiecia >= " + Span + " dob (bez warsztatow gracza) " + all.Count + " | top 10 (zysk/d z pamieci miesiaca, po placach, wsadzie i utrzymaniu, przed podatkiem): "
                      + (top.Count > 0 ? string.Join("; ", top.ToArray()) : "-") + " | bottom 10: " + (bot.Count > 0 ? string.Join("; ", bot.ToArray()) : "-")
                      + " | cena = cena kupna dla gracza dzis (wycena " + (SteadyOn ? "stala 311c" : "bez 311c") + "), zwrot = zysk/d x (1 - podatek gracza) x " + Math.Max(1, CampaignTime.DaysInYear) + " / cena.");
         }

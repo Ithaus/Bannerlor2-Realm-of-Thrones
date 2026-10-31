@@ -86826,29 +86826,29 @@ def main(argv):
 
 
 # ---------------------------------------------------------------- paczka 311c (31.10): wycena stala warsztatow, ranking, kapital przy spadku znacznika - grupa warsztaty311c
-# W311-S self-test wyrazen i wierszy; W311-1 'Warsztaty - wycena stala (311c)': format, potkniecia 0, przy kluczu TAK najwiekszy skok zysku wyceny doba do doby
-# po regule <= krok doby (+0.01); W311-1b przed regula i najwieksza poprawka (INFO, cel: Draconys-podobne x10+ -> po regule <= x1.5);
-# W311-2 'Warsztaty ranking (311c)': format, 10 wierszy (albo tyle, ile warsztatow), top malejaco, bottom rosnaco, znak zwrotu = znak zysku; W311-2b top 3 (INFO);
-# W311-3 'Warsztaty gracza - kapital (311c)': format (INFO - pojawia sie tylko przy spadku znacznika bez przelewu); W311-3b linia 259: wyplata zysku dnia >= 0.
-W311_ST = re.compile(r"Warsztaty - wycena stala \(311c\): dzien (\d+) \| klucz (TAK|NIE), krok doby x(\S+) \(od \d+ d/d\), cena targu najwyzej x(\S+) wiekszej z pamieci "
+# W311-S self-test wyrazen i wierszy; W311-1 'Warsztaty - wycena stala (311c)': format, potkniecia 0, przy kluczu TAK najwiekszy wzrost zysku wyceny ponad pamiec / mediane
+# doba do doby po regule <= krok doby (+0.01); W311-1b przed regula i najwieksza poprawka (INFO, cel: Draconys-podobne x10+ -> po regule <= x1.5);
+# W311-2 'Warsztaty ranking (311c)': format, top 10 (albo tyle, ile warsztatow), bottom 10 bez warsztatow z top, top malejaco, bottom rosnaco, znak zwrotu = znak zysku,
+# bez warsztatow gracza; W311-2b top 3 (INFO); W311-3 linia 'Warsztaty gracza - kapital (311c)' nie wystepuje (WorkshopLedgerMarkDrop cofniety w recenzji);
+# W311-3b linia 259: wyplata zysku dnia >= 0.
+W311_ST = re.compile(r"Warsztaty - wycena stala \(311c\): dzien (\d+) \| klucz (TAK|NIE), krok doby w gore x(\S+) \(od \d+ d/d\), cena targu najwyzej x(\S+) wiekszej z pamieci "
                      r"i mediany branzy, krotka historia (\d+) dob ku medianie branzy(?: \| wycen dzis (\d+): krotka historia ku branzy (\d+), cena targu przycieta (\d+), "
-                     r"krok doby przyciety (\d+) \| najwiekszy skok zysku wyceny doba do doby \(par od \d+ d/d (\d+)\): przed regula x(\S+) \((.*?)\), po regule x(\S+) "
+                     r"krok doby przyciety (\d+) \| najwiekszy skok zysku wyceny doba do doby \(przed regula: par od \d+ d/d; po regule: wzrost ponad pamiec / mediane, wycen (\d+)\): przed regula x(\S+) \((.*?)\), po regule x(\S+) "
                      r"\((.*?)\) \| najwieksza poprawka: (.*?))? \| mediana branzy \(pamiec miesiaca, warsztaty >= \d+ dob, od 3\): (.*?) \| potkniecia (\d+)\.")
-W311_RK = re.compile(r"Warsztaty ranking \(311c\): dzien (\d+) \| warsztatow z pamiecia >= \d+ dob (\d+) \| top 10 \([^)]*\): (.*?) \| bottom 10: (.*?) \| cena = ")
+W311_RK = re.compile(r"Warsztaty ranking \(311c\): dzien (\d+) \| warsztatow z pamiecia >= \d+ dob \(bez warsztatow gracza\) (\d+) \| top 10 \([^)]*\): (.*?) \| bottom 10: (.*?) \| cena = ")
 W311_ROW = re.compile(r"^(\d+)\. (.+?) (-?\d+\.\d) d/d, cena (\d+), zwrot (-?\d+\.\d)%/rok$")
 W311_CAP = re.compile(r"Warsztaty gracza - kapital \(311c\): (.+?) \| znacznik w dol bez przelewu (\d+) -> (\d+), kapital (\d+), kapital wlasny (\S+) -> (\d+) ")
 W311_259 = re.compile(r"dzis 305b: wyplata zysku (-?\d+), zwrot kapitalu w wyplacie (-?\d+)")
 
-W311_SAMPLE_ST = ("[10:00:00] Warsztaty - wycena stala (311c): dzien 108878 | klucz TAK, krok doby x1.50 (od 10 d/d), cena targu najwyzej x1.50 wiekszej z pamieci i mediany "
+W311_SAMPLE_ST = ("[10:00:00] Warsztaty - wycena stala (311c): dzien 108878 | klucz TAK, krok doby w gore x1.50 (od 10 d/d), cena targu najwyzej x1.50 wiekszej z pamieci i mediany "
                   "branzy, krotka historia 60 dob ku medianie branzy | wycen dzis 291: krotka historia ku branzy 12, cena targu przycieta 30, krok doby przyciety 5 | "
-                  "najwiekszy skok zysku wyceny doba do doby (par od 10 d/d 250): przed regula x15.20 (Draconys silversmithy (notabl)), po regule x1.50 (Lannisport "
+                  "najwiekszy skok zysku wyceny doba do doby (przed regula: par od 10 d/d; po regule: wzrost ponad pamiec / mediane, wycen 250): przed regula x15.20 (Draconys silversmithy (notabl)), po regule x1.50 (Lannisport "
                   "bakery (notabl)) | najwieksza poprawka: Draconys silversmithy (notabl) cena przed 2673693 po 250000 (zysk/d 3314.8 -> 293.4) | mediana branzy "
                   "(pamiec miesiaca, warsztaty >= 30 dob, od 3): velvet_weavery 190.0 (n 4), silversmithy 156.0 (n 18) | potkniecia 0.")
-W311_SAMPLE_RK = ("[10:00:00] Warsztaty ranking (311c): dzien 108878 | warsztatow z pamiecia >= 30 dob 3 | top 10 (zysk/d z pamieci miesiaca, po placach, wsadzie i "
+W311_SAMPLE_RK = ("[10:00:00] Warsztaty ranking (311c): dzien 108878 | warsztatow z pamiecia >= 30 dob (bez warsztatow gracza) 3 | top 10 (zysk/d z pamieci miesiaca, po placach, wsadzie i "
                   "utrzymaniu, przed podatkiem): 1. Mantarys velvet_weavery (notabl) 1049.0 d/d, cena 1052000, zwrot 26.1%/rok; 2. King's Landing silversmithy (lord) "
-                  "300.0 d/d, cena 300000, zwrot 25.9%/rok; 3. Lannisport wool_weavery (notabl) -2.0 d/d, cena 3000, zwrot -17.5%/rok | bottom 10: 1. Lannisport "
-                  "wool_weavery (notabl) -2.0 d/d, cena 3000, zwrot -17.5%/rok; 2. King's Landing silversmithy (lord) 300.0 d/d, cena 300000, zwrot 25.9%/rok; 3. "
-                  "Mantarys velvet_weavery (notabl) 1049.0 d/d, cena 1052000, zwrot 26.1%/rok | cena = cena kupna dla gracza dzis (wycena stala 311c), zwrot = zysk/d x "
+                  "300.0 d/d, cena 300000, zwrot 25.9%/rok; 3. Lannisport wool_weavery (notabl) -2.0 d/d, cena 3000, zwrot -17.5%/rok | bottom 10: - "
+                  "| cena = cena kupna dla gracza dzis (wycena stala 311c), zwrot = zysk/d x "
                   "(1 - podatek gracza) x 364 / cena.")
 W311_SAMPLE_CAP = ("[10:00:00] Warsztaty gracza - kapital (311c): Seagard silversmithy | znacznik w dol bez przelewu 10000 -> 5000, kapital 9994, kapital wlasny 5000 -> 9994 "
                    "(wyplata kasy ponizej 9994 = zwrot kapitalu, nie zysk; spadkow w tym warsztacie 1).")
@@ -86865,6 +86865,8 @@ def _f311(x):
 
 def _w311_rows(seg):
     out = []
+    if seg.strip() == "-":
+        return out
     for part in seg.split("; "):
         m = W311_ROW.match(part.strip())
         if not m:
@@ -86905,8 +86907,11 @@ def w311_rows(rep, st, rk, cap, l259):
         if top is None or bot is None:
             bad2.append(f"dzien {m.group(1)}: wiersz rankingu bez formatu"); continue
         want = min(10, cnt)
-        if len(top) != want or len(bot) != want:
-            bad2.append(f"dzien {m.group(1)}: wierszy {len(top)}/{len(bot)} zamiast {want}")
+        wantb = min(10, max(0, cnt - want))
+        if len(top) != want or len(bot) != wantb:
+            bad2.append(f"dzien {m.group(1)}: wierszy {len(top)}/{len(bot)} zamiast {want}/{wantb}")
+        if any("(gracz)" in r[1] for r in top + bot):
+            bad2.append(f"dzien {m.group(1)}: warsztat gracza w rankingu")
         if any(top[i][2] < top[i + 1][2] for i in range(len(top) - 1)):
             bad2.append(f"dzien {m.group(1)}: top nie malejaco")
         if any(bot[i][2] > bot[i + 1][2] for i in range(len(bot) - 1)):
@@ -86915,22 +86920,13 @@ def w311_rows(rep, st, rk, cap, l259):
             if (r[2] > 0 and r[4] < 0) or (r[2] < 0 and r[4] > 0):
                 bad2.append(f"dzien {m.group(1)}: znak zwrotu {r[1]}"); break
         if top:
-            tops.append(f"{m.group(1)}: " + ", ".join(f"{r[1]} {r[2]} d/d {r[4]}%" for r in top[:3]) + (f" | najgorszy {bot[0][1]} {bot[0][2]} d/d" if bot else ""))
-    rep.add("W311-2: ranking warsztatow (311c) - format, 10 wierszy, top malejaco, bottom rosnaco, znak zwrotu = znak zysku",
+            tops.append(f"{m.group(1)}: " + ", ".join(f"{r[1]} {r[2]} d/d {r[4]}%" for r in top[:3]) + (f" | najgorszy {bot[0][1]} {bot[0][2]} d/d" if bot else f" | najgorszy {top[-1][1]} {top[-1][2]} d/d"))
+    rep.add("W311-2: ranking warsztatow (311c) - format, 10 + 10 wierszy bez nakladania, top malejaco, bottom rosnaco, znak zwrotu = znak zysku, bez warsztatow gracza",
             f"linii {n2}, zlych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else ""), "zlych 0 (brak linii - INFO; w grze co QuietLogEveryDays dob)", None if n2 == 0 and not bad2 else not bad2)
     rep.add("W311-2b: top 3 i najgorszy (gdzie inwestowac)", "; ".join(tops[-3:]) or "-", "INFO (velvet / silversmithy przy kopalni na gorze, welna / garbarnie na dole)", None)
-    # W311-3
-    bad3, n3, cl = [], 0, []
-    for l in cap:
-        m = W311_CAP.search(l)
-        if not m:
-            bad3.append("format: " + l[:140]); continue
-        n3 += 1
-        if int(m.group(3)) >= int(m.group(2)):
-            bad3.append("znacznik nie w dol: " + m.group(1))
-        cl.append(f"{m.group(1)}: {m.group(2)} -> {m.group(3)}, kapital wlasny {m.group(5)} -> {m.group(6)}")
-    rep.add("W311-3: kapital przy spadku znacznika bez przelewu (311c)", f"linii {n3}, zlych {len(bad3)}" + (f" ({bad3[0]})" if bad3 else "") + ("; " + "; ".join(cl[:3]) if cl else ""),
-            "zlych 0 (brak linii - INFO: przy RetoolSettle TAK spadek wyrownuje przelew)", None if n3 == 0 and not bad3 else not bad3)
+    # W311-3 (recenzja 311c: WorkshopLedgerMarkDrop cofniety - linia kapitalu 311c nie moze sie pojawic; jest = stara DLL)
+    rep.add("W311-3: brak linii 'Warsztaty gracza - kapital (311c)' (galaz cofnieta w recenzji)", f"linii {len(cap)}" + (f" ({cap[0][:120]})" if cap else ""),
+            "0 (jest = w grze DLL sprzed recenzji 311c)", not cap)
     bad4, n4 = [], 0
     for l in l259:
         for m in W311_259.finditer(l):
@@ -86942,11 +86938,11 @@ def w311_rows(rep, st, rk, cap, l259):
 
 
 def warsztaty311c_selftest():
-    for name, rx, s in (("ST", W311_ST, W311_SAMPLE_ST), ("RK", W311_RK, W311_SAMPLE_RK), ("CAP", W311_CAP, W311_SAMPLE_CAP), ("259", W311_259, W311_SAMPLE_259)):
+    for name, rx, s in (("ST", W311_ST, W311_SAMPLE_ST), ("RK", W311_RK, W311_SAMPLE_RK), ("259", W311_259, W311_SAMPLE_259)):
         if not rx.search(s):
             return "wyrazenie " + name + " nie pasuje do probki"
     rep = Report()
-    w311_rows(rep, [W311_SAMPLE_ST], [W311_SAMPLE_RK], [W311_SAMPLE_CAP], [W311_SAMPLE_259])
+    w311_rows(rep, [W311_SAMPLE_ST], [W311_SAMPLE_RK], [], [W311_SAMPLE_259])
     v = {r[0].split(":")[0]: (r[3], r[1]) for r in rep.rows}
     bad = [k for k in ("W311-1", "W311-2", "W311-3", "W311-3b") if v.get(k, ("?",))[0] != "TAK"]
     if bad:
@@ -86956,7 +86952,7 @@ def warsztaty311c_selftest():
     rep = Report()
     w311_rows(rep, [W311_SAMPLE_ST.replace("po regule x1.50", "po regule x2.10")],
               [W311_SAMPLE_RK.replace("1. Mantarys velvet_weavery (notabl) 1049.0", "1. Mantarys velvet_weavery (notabl) 10.0")],
-              [W311_SAMPLE_CAP.replace("10000 -> 5000", "5000 -> 5000")], [W311_SAMPLE_259.replace("wyplata zysku 0", "wyplata zysku -5")])
+              [W311_SAMPLE_CAP], [W311_SAMPLE_259.replace("wyplata zysku 0", "wyplata zysku -5")])
     v = {r[0].split(":")[0]: r[3] for r in rep.rows}
     miss = [k for k in ("W311-1", "W311-2", "W311-3", "W311-3b") if v.get(k) != "NIE"]
     if miss:

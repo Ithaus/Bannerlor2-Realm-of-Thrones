@@ -1338,6 +1338,7 @@ namespace Armoury
             // 311c (WorkshopQuoteSteady): zysk z pamieci przed cena targu (NaN = bez historii), zysk przed regula, mediana branzy (NaN = brak), poprzednia doba
             // wyceny (po i przed regula, NaN = brak), odstep dob; rodzaj poprawki (1 krotka historia ku branzy, 2 cena targu przycieta, 4 krok doby), zdanie rozmowy
             public float MemP = float.NaN, RawP = float.NaN, Ind = float.NaN, PrevP = float.NaN, PrevRaw = float.NaN; public int Gap, SteadyKind; public string SteadyWhy;
+            public float Stable = float.NaN;    // 311c recenzja: podstawa kroku doby (pamiec, bez niej mediana branzy; NaN = bez reguly) - ponad nia zysk rosnie najwyzej o krok
         }
 
         /// <summary>
@@ -1488,7 +1489,7 @@ namespace Armoury
                 int worth = Math.Max(q.Going, q.Equip);
                 // 305b (WorkshopTradeBuyerMemory): ta sama miara co przy kupnie (pol na pol pamieci) - i nigdy wiecej niz udzial tego, co za ten warsztat zaplacilby
                 // dzis gracz (inny podatek notabla nie robi z kupna i odsprzedazy zysku)
-                if (q.Blend || q.ArmsIdle || SteadyOn)   // 311c: przy wycenie stalej zawsze (krok doby moze trzymac cene gracza ponizej pamieci notabla); 305f: takze cena z linii towarowych (ArmsIdle) - w rozruchu rynku (bez Blend) podatek notabla nizszy od gracza nie da zysku
+                if (q.Blend || q.ArmsIdle || (SteadyOn && __0.Owner == Hero.MainHero))   // 311c: przy wycenie stalej zawsze przy odkupie od gracza (krok doby moze trzymac cene gracza ponizej pamieci notabla; recenzja: tylko warsztat gracza - cudzych sprzedazy i kosztu wyceny nie rusza); 305f: takze cena z linii towarowych (ArmsIdle) - w rozruchu rynku (bez Blend) podatek notabla nizszy od gracza nie da zysku
                 {
                     var qp = QuoteFor(__0, Hero.MainHero);
                     int wp = Math.Max(qp.Going, qp.Equip);

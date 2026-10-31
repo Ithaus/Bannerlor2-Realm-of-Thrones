@@ -10540,15 +10540,11 @@ namespace Armoury
         [SettingPropertyGroup("Your workshops (305b)")]
         public bool WorkshopLedgerCapitalSplit { get; set; } = true;
 
-        [SettingPropertyBool("Workshop Ledger Mark Drop", HintText = "with Workshop Ledger Capital Split: when the capital mark of your workshop drops without the till being settled (a change of trade with Workshop Retool Settles Capital off, a change made by other code, a settlement that failed), the coin between the new and the old mark that the shop then pays out is counted as your own working capital coming back, not as profit. Report only, no gold moves. Off = as before: only payouts below the mark count as returned capital", RequireRestart = false)]
-        [SettingPropertyGroup("Your workshops (305b)")]
-        public bool WorkshopLedgerMarkDrop { get; set; } = true;
-
-        [SettingPropertyBool("Workshop Quote Steady", HintText = "the price you pay for a workshop no longer follows one day's market jump: today's market prices count only up to Workshop Quote Market Cap times the larger of the shop's own record and what shops of the same trade across the world earned over their last month (median), a shop with short records is priced partly by that same trade median instead of by today's market, and the profit the price is reckoned from moves at most Workshop Quote Day Step times from one day to the next, unless the shop changed its trade or its owner. The price is still Workshop Trade Price Years of yearly profit after your tax plus the capital in the till. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Workshop Quote Steady", HintText = "the price you pay for a workshop no longer follows one day's market jump: today's market prices count only up to Workshop Quote Market Cap times the larger of the shop's own record and what shops of the same trade across the world earned over their last month (median), a shop with short records is priced partly by that same trade median instead of by today's market, and the profit the price is reckoned from may rise above the shop's own record (or, without one, above the trade median) at most Workshop Quote Day Step times from one day to the next, unless the shop changed its trade or its owner; it is never held above the shop's own record when the market falls. The price is still Workshop Trade Price Years of yearly profit after your tax plus the capital in the till. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Your workshops (305b)")]
         public bool WorkshopQuoteSteady { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Workshop Quote Day Step", 1.00f, 4.00f, "0.00", HintText = "with Workshop Quote Steady: the most the profit behind a workshop's price may rise or fall from one day to the next (1.5 = by half up, or by a third down)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Workshop Quote Day Step", 1.00f, 4.00f, "0.00", HintText = "with Workshop Quote Steady: the most the profit behind a workshop's price may rise from one day to the next above the shop's own record or the trade median (1.5 = by half)", RequireRestart = false)]
         [SettingPropertyGroup("Your workshops (305b)")]
         public float WorkshopQuoteDayStep { get; set; } = 1.5f;
 
@@ -13426,7 +13422,6 @@ namespace Armoury
             s.WorkshopBuyerShortHistoryDays = WorkshopBuyerShortHistoryDays;
             s.WorkshopBuyerPaceCorrection = WorkshopBuyerPaceCorrection;
             s.WorkshopLedgerCapitalSplit = WorkshopLedgerCapitalSplit;
-            s.WorkshopLedgerMarkDrop = WorkshopLedgerMarkDrop;
             s.WorkshopQuoteSteady = WorkshopQuoteSteady;
             s.WorkshopQuoteDayStep = WorkshopQuoteDayStep;
             s.WorkshopQuoteMarketCap = WorkshopQuoteMarketCap;
