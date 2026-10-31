@@ -859,6 +859,7 @@ namespace Armoury
                     anyCar = true;
                     if (q * kg < minKg) { anySmall = true; continue; }   // recenzja 174: ladunek za maly na dni drogi bez handlu - czekamy, az brak urosnie
                     // ilosc wedlug zysku (krytyka 174b: polowienie, gdy duzy ladunek zbija cene celu ponizej zakupu + oplaty)
+                    bool netRej = false;   // recenzja 308a: odrzucenie po koszcie dni liczone raz na opcje
                     for (int guard = 0; guard < 8 && q >= 1 && q * kg >= minKg; guard++, q /= 2)
                     {
                         int mid = Math.Max(0, q - 1) / 2;
@@ -874,12 +875,14 @@ namespace Armoury
                         }
                         float perKg = margin / (q * kg);
                         // 308a (klucz CaravanSeaTrueDistance): kontrakt karawany tylko z zyskiem po koszcie dni drogi (zold + jedzenie x dni) - ta sama regula co cel karawan
-                        float net = CaravanSea308.ContractNet(car, margin, TradeCarts.DaysFor(d), naval);
-                        if (!(net > 0f)) continue;   // mniejszy ladunek - jak marza <= 0 (petla polowienia)
+                        float net = CaravanSea308.ContractNet(car, margin, TradeCarts.DaysFor(d));
+                        if (!(net > 0f)) { netRej = true; continue; }   // mniejszy ladunek - jak marza <= 0 (petla polowienia); recenzja 308a: licznik raz na opcje
                         float score = perDay ? (net / (q * kg)) / Math.Max(1, TradeCarts.DaysFor(d)) : net / (q * kg);   // 282 (F2): zysk na kg i dobe drogi (doby z modelu wozow)
                         if (score > bestScore) { bestScore = score; bestPerKg = perKg; bestSrc = src; bestCar = car; bestQ = q; bestDist = d; bestNaval = naval; bestMargin = margin; bestPacks = packs; }
+                        netRej = false;   // ta opcja dala kontrakt - nie odrzucona
                         break;
                     }
+                    if (netRej) CaravanSea308.NoteContractRejected(naval);
                 }
             }
             if (bestSrc == null)

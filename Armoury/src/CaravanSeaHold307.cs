@@ -23,7 +23,7 @@ namespace Armoury
     /// i nie wrogie (te same warunki BK) trzyma cel: tik BK pominiety (jedyne, co by zrobil, to losowa nowa decyzja - ogon metody nic nie zmienia, gdy cel jest
     /// miastem). Wyjscia: wojna albo oblezenie celu (BK decyduje jak dotad), cel nie miasto z portem (BK flag4 - jak dotad), przekroczenie dni drogi z decyzji:
     /// limit = Caravan Sea Hold Factor x dni drogi do celu w chwili pierwszego tiku z tym celem (CaravanEscort.RoadDaysTo - prosta / dzien drogi x zmierzony
-    /// wspolczynnik odcinka), w granicach Caravan Sea Hold Min Days .. Max Days. 307e: po limicie od razu decyzja BK (ThinkNextDestination - NewTargetNow; ten sam
+    /// wspolczynnik odcinka; 308a przy CaravanSeaTrueDistance: droga morska NavalDLC / dzien drogi taboru - Factor 3.0 dobrany do prostej, po autotescie przeliczyc z K307-8), w granicach Caravan Sea Hold Min Days .. Max Days. 307e: po limicie od razu decyzja BK (ThinkNextDestination - NewTargetNow; ten sam
     /// cel albo brak - wpis 'po limicie' bez trzymania, BK jak dotad 1% na tik); Factor 3.0 (143a-probyN: rejs / droga ladowa srednio 1.78, przy 2.0 28% po limicie). Nowy cel - zawsze w miescie albo po
     /// wyjsciu z trzymania - wybiera ThinkNextDestination z regulami 294c / 139 C / D1-D2 (odcinek K294-19/31) jak dotad.
     /// Pomiar (takze przy kluczu NIE): postfiks MobileParty.SetMoveGoToSettlement - zmiana celu karawany w drodze (stary / nowy cel, dni od decyzji, zrodlo:
@@ -73,7 +73,7 @@ namespace Armoury
         private static bool Naval(MobileParty mp) { try { return mp.HasNavalNavigationCapability; } catch { return false; } }
 
         /// <summary>Recenzja 307a (tylko pomiar): karawana w osadzie z wpisem trzymania - doplynela do trzymanego celu? Faktyczne dni rejsu wobec drogi z decyzji
-        /// (Days0, CaravanEscort.RoadDaysTo - miara ladowa) - do doboru Caravan Sea Hold Factor / Min Days po autotescie.</summary>
+        /// (Days0, CaravanEscort.RoadDaysTo - miara ladowa; 308a: przy CaravanSeaTrueDistance droga morska) - do doboru Caravan Sea Hold Factor / Min Days po autotescie.</summary>
         private static void Arrived(MobileParty mp, Hold h)
         {
             try

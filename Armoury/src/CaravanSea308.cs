@@ -54,8 +54,13 @@ namespace Armoury
         // liczniki doby (oceny BK moga biec z watkow BK - Interlocked)
         private static long _sSea, _sLand, _sHome;
         private static int _dec, _decFar, _decNoSea, _decPlayer;
-        private static readonly int[] _bucket = new int[5];   // <=5, 5-10, 10-20, 20-30, >30 dob
+        private static readonly int[] _bucket = new int[5];   // <=5, 5-10, 10-20, 20-30, >30 dob (cel BK po (a), przed (c))
         private static double _daysSum, _daysMax;
+        private static readonly int[] _bucketF = new int[5];  // recenzja 308a: ten sam rozklad dla celu koncowego (po (c))
+        private static double _daysMaxF;
+        private static int _keepHome, _keepPrev;              // recenzja 308a: dom/udzialowiec zostawione wyborowi BK, kandydaci pominieci z listy BK 'porzucone przez wroga'
+        // recenzja 308a: BKCaravansBehavior._previouslyChangedCaravanTargetsDueToEnemyOnWay (Dictionary<MobileParty, List<Settlement>>) - ten sam wykluczony cel co BK
+        private static FieldInfo _prevFi; private static bool _prevTried;
         private static int _rN, _rWorse, _rWorseBefore, _swap;
         private static double _rChosen, _rNear;
         private static int _moLand, _moSea;
@@ -77,6 +82,7 @@ namespace Armoury
         {
             Interlocked.Exchange(ref _sSea, 0); Interlocked.Exchange(ref _sLand, 0); Interlocked.Exchange(ref _sHome, 0);
             _dec = _decFar = _decNoSea = _decPlayer = 0; Array.Clear(_bucket, 0, _bucket.Length); _daysSum = _daysMax = 0;
+            Array.Clear(_bucketF, 0, _bucketF.Length); _daysMaxF = 0; _keepHome = _keepPrev = 0;
             _rN = _rWorse = _rWorseBefore = _swap = 0; _rChosen = _rNear = 0; _moLand = _moSea = 0; _det.Clear();
         }
 
@@ -191,10 +197,32 @@ namespace Armoury
         /// <summary>Z CaravanRoute294c.FindPostfix: drugi przebieg BK (bez limitu odleglosci) dla tej karawany.</summary>
         internal static void NoteFar(MobileParty mp) { if (mp != null && Naval(mp)) _far.Add(mp); }
 
-        private static bool Allowed(MobileParty mp, Town t)
+        /// <summary>Recenzja 308a: lista BK celow porzuconych z powodu wroga na drodze dla tej karawany; ok = false - pola BK brak (wtedy bez zamiany, wybor BK).</summary>
+        private static List<Settlement> PrevChanged(object bk, MobileParty mp, out bool ok)
+        {
+            ok = false;
+            if (bk == null) return null;
+            if (!_prevTried)
+            {
+                _prevTried = true;
+                _prevFi = AccessTools.DeclaredField(bk.GetType(), "_previouslyChangedCaravanTargetsDueToEnemyOnWay");
+                if (_prevFi != null && !typeof(Dictionary<MobileParty, List<Settlement>>).IsAssignableFrom(_prevFi.FieldType)) _prevFi = null;
+                if (_prevFi == null) Log.Info(P + "BRAK BKCaravansBehavior._previouslyChangedCaravanTargetsDueToEnemyOnWay - limit odcinka (c) bez zamian (wybor BK).");
+            }
+            if (_prevFi == null) return null;
+            var d = _prevFi.GetValue(bk) as Dictionary<MobileParty, List<Settlement>>;
+            ok = true;
+            List<Settlement> l;
+            return d != null && d.TryGetValue(mp, out l) ? l : null;
+        }
+
+        private const string P = "Karawany morskie - cel wedlug zysku na dobe (308a): ";
+
+        private static bool Allowed(MobileParty mp, Town t, List<Settlement> prev)
         {
             var st = t != null ? t.Settlement : null;
             if (st == null || !t.IsTown || !st.HasPort || st == mp.LastVisitedSettlement || st == mp.CurrentSettlement || st.IsUnderSiege) return false;
+            if (prev != null && prev.Contains(st)) { _keepPrev++; return false; }   // recenzja 308a: jak BK FindNextDestinationForCaravan (value2.Contains)
             if (t.MapFaction != null && mp.MapFaction != null && t.MapFaction.IsAtWarWith(mp.MapFaction)) return false;
             var main = MobileParty.MainParty;
             if (main != null && main.CurrentSettlement == st && main.MapFaction != null && mp.MapFaction != null && main.MapFaction.IsAtWarWith(mp.MapFaction)) return false;
@@ -202,8 +230,10 @@ namespace Armoury
         }
 
         /// <summary>Wynik ThinkNextDestination (po obejsciu 294c, przed wpisem Inbound): karawana ze statkami - pomiar dni drogi; z towarem handlowym - zysk na
-        /// dobe wybranego i najlepszego portu w zasiegu Caravan Sea Near Days; przy kluczu rejs dalszy niz ten zasieg tylko z lepszym zyskiem na dobe (c).</summary>
-        internal static void Decide(MobileParty mp, ref Town result)
+        /// dobe wybranego i najlepszego portu w zasiegu Caravan Sea Near Days; przy kluczu rejs dalszy niz ten zasieg tylko z lepszym zyskiem na dobe (c).
+        /// Recenzja 308a: dom karawany i miasto udzialowca klanu - wybor BK bez zmian (jak regula C, CaravanWait139.Route); kandydaci bez celow z listy BK
+        /// 'porzucone przez wroga'; bez tej listy (pole BK brak) - bez zamiany.</summary>
+        internal static void Decide(object bk, MobileParty mp, ref Town result)
         {
             if (mp == null) return;
             bool far = _far.Remove(mp);
@@ -216,59 +246,71 @@ namespace Armoury
                 if (far) _decFar++;
                 double dc = SeaDaysRaw(mp, result.Settlement);
                 if (dc < 0) { _decNoSea++; return; }
-                Bucket(dc);
-                bool player = mp.ActualClan == Clan.PlayerClan;
-                if (player) _decPlayer++;
-                var pantry = CaravanTrade284.PantryCopy(mp);
-                if (!CaravanWait139.HasTrade(mp, pantry)) { if (player) Det(mp, result, dc, null, 0, 0, double.NaN, far, false); return; }
-                double near = Math.Max(1.0, s.CaravanSeaNearDays);
-                var cand = new List<KeyValuePair<Town, double>>();
-                foreach (var t in Town.AllTowns)
+                Bucket(_bucket, dc, ref _daysMax, true);
+                double dFinal = dc;
+                try
                 {
-                    if (t == result || !Allowed(mp, t)) continue;
-                    double d = SeaDaysRaw(mp, t.Settlement);
-                    if (d >= 0 && d <= near) cand.Add(new KeyValuePair<Town, double>(t, d));
+                    bool player = mp.ActualClan == Clan.PlayerClan;
+                    if (player) _decPlayer++;
+                    var pantry = CaravanTrade284.PantryCopy(mp);
+                    if (!CaravanWait139.HasTrade(mp, pantry)) { if (player) Det(mp, result, dc, null, 0, 0, double.NaN, far, false); return; }
+                    // recenzja 308a: dom karawany (przyciaganie domu BK rosnie z dobami od wizyty) i miasto udzialowca klanu (BK x1.5, wyplaty K259) - jak regula C
+                    if ((mp.HomeSettlement != null && result.Settlement == mp.HomeSettlement) || CaravanWait139.Stakeholder(mp, result.Settlement))
+                    { _keepHome++; if (player) Det(mp, result, dc, null, 0, 0, double.NaN, far, false, true); return; }
+                    bool prevOk;
+                    var prev = PrevChanged(bk, mp, out prevOk);
+                    double near = Math.Max(1.0, s.CaravanSeaNearDays);
+                    var cand = new List<KeyValuePair<Town, double>>();
+                    foreach (var t in Town.AllTowns)
+                    {
+                        if (t == result || !Allowed(mp, t, prev)) continue;
+                        double d = SeaDaysRaw(mp, t.Settlement);
+                        if (d >= 0 && d <= near) cand.Add(new KeyValuePair<Town, double>(t, d));
+                    }
+                    cand.Sort((a, b) => a.Value.CompareTo(b.Value));
+                    double rc = CaravanWait139.PerDayNet(mp, result, dc, pantry);
+                    Town best = null; double rb = double.NegativeInfinity, db = 0;
+                    for (int i = 0; i < cand.Count && i < NearTowns; i++)
+                    {
+                        double r = CaravanWait139.PerDayNet(mp, cand[i].Key, cand[i].Value, pantry);
+                        if (r > rb) { rb = r; best = cand[i].Key; db = cand[i].Value; }
+                    }
+                    CaravanWait139.ClearDecision();
+                    bool worse = dc > near && best != null && rb > 0 && rb > rc;
+                    if (worse) _rWorseBefore++;
+                    bool swap = worse && On(s) && prevOk;
+                    if (best != null) { _rN++; _rChosen += rc; _rNear += rb; }
+                    if (player) Det(mp, result, dc, best, db, rb, rc, far, swap);
+                    if (swap)
+                    {
+                        _swap++;
+                        result = best;
+                        dFinal = db;
+                    }
+                    else if (worse) _rWorse++;
                 }
-                cand.Sort((a, b) => a.Value.CompareTo(b.Value));
-                double rc = CaravanWait139.PerDayNet(mp, result, dc, pantry);
-                Town best = null; double rb = double.NegativeInfinity, db = 0;
-                for (int i = 0; i < cand.Count && i < NearTowns; i++)
-                {
-                    double r = CaravanWait139.PerDayNet(mp, cand[i].Key, cand[i].Value, pantry);
-                    if (r > rb) { rb = r; best = cand[i].Key; db = cand[i].Value; }
-                }
-                CaravanWait139.ClearDecision();
-                bool worse = dc > near && best != null && rb > 0 && rb > rc;
-                if (worse) _rWorseBefore++;
-                bool swap = worse && On(s);
-                if (best != null) { _rN++; _rChosen += rc; _rNear += rb; }
-                if (player) Det(mp, result, dc, best, db, rb, rc, far, swap);
-                if (swap)
-                {
-                    _swap++;
-                    result = best;
-                }
-                else if (worse) _rWorse++;
+                finally { Bucket(_bucketF, dFinal, ref _daysMaxF, false); }
             }
             catch (Exception e) { Stumble("Decide", e); }
         }
 
-        private static void Bucket(double d)
+        private static void Bucket(int[] b, double d, ref double max, bool sum)
         {
             int k = d <= 5 ? 0 : d <= 10 ? 1 : d <= 20 ? 2 : d <= 30 ? 3 : 4;
-            _bucket[k]++; _daysSum += d; if (d > _daysMax) _daysMax = d;
+            b[k]++; if (sum) _daysSum += d; if (d > max) max = d;
         }
 
         private static string Nm(Settlement s) { return s == null ? "-" : s.Name != null ? s.Name.ToString() : s.StringId; }
 
-        private static void Det(MobileParty mp, Town to, double d, Town best, double db, double rb, double rc, bool far, bool swap)
+        private static void Det(MobileParty mp, Town to, double d, Town best, double db, double rb, double rc, bool far, bool swap, bool home = false)
         {
             if (_det.Count >= DetMax) return;
             var from = mp.CurrentSettlement ?? mp.LastVisitedSettlement;
             var sb = new StringBuilder(160);
             sb.Append('\'').Append(mp.Name != null ? mp.Name.ToString() : mp.StringId).Append("' ").Append(Nm(from)).Append(" -> ").Append(Nm(to.Settlement))
               .Append(' ').Append(d.ToString("0.0", Inv)).Append(" dob morzem").Append(far ? " (drugi przebieg BK)" : "");
-            if (double.IsNaN(rc)) sb.Append(", bez towaru handlowego");
+            if (home) sb.Append(", dom albo udzialowiec - wybor BK");
+            else if (double.IsNaN(rc)) sb.Append(", bez towaru handlowego");
             else
             {
                 sb.Append(", zysk/dobe ").Append(rc.ToString("0", Inv));
@@ -281,13 +323,14 @@ namespace Armoury
 
         // ------------------------------------------------------------ (d) kontrakt surowca (MaterialOrders.Order)
         /// <summary>Zysk netto kontraktu karawany: marza - koszt dnia karawany x dni drogi; przy kluczu NIE - marza (jak dotad).</summary>
-        internal static float ContractNet(MobileParty car, float margin, int days, bool naval)
+        internal static float ContractNet(MobileParty car, float margin, int days)
         {
             if (car == null || !On(Settings.Current)) return margin;
-            double net = margin - CaravanWait139.DayCost(car) * Math.Max(1, days);
-            if (!(net > 0)) { if (naval) _moSea++; else _moLand++; }
-            return (float)net;
+            return (float)(margin - CaravanWait139.DayCost(car) * Math.Max(1, days));
         }
+
+        /// <summary>Recenzja 308a: kontrakt (opcja zrodlo x przewoz) odrzucony po koszcie dni - liczony raz na opcje (MaterialOrders po petli polowienia).</summary>
+        internal static void NoteContractRejected(bool naval) { if (naval) _moSea++; else _moLand++; }
 
         // ------------------------------------------------------------ wpiecie i linia doby
         internal static void ApplyAll(Harmony h)
@@ -330,9 +373,12 @@ namespace Armoury
                   .Append(", gracza ").Append(_decPlayer).Append("), dni drogi morzem: <=5 ").Append(_bucket[0]).Append(", 5-10 ").Append(_bucket[1]).Append(", 10-20 ").Append(_bucket[2])
                   .Append(", 20-30 ").Append(_bucket[3]).Append(", >30 ").Append(_bucket[4]).Append(", srednio ").Append((nd > 0 ? _daysSum / nd : 0).ToString("0.0", Inv))
                   .Append(", najwiecej ").Append(_daysMax.ToString("0.0", Inv))
+                  .Append(" | cel po regule: <=5 ").Append(_bucketF[0]).Append(", 5-10 ").Append(_bucketF[1]).Append(", 10-20 ").Append(_bucketF[2])
+                  .Append(", 20-30 ").Append(_bucketF[3]).Append(", >30 ").Append(_bucketF[4]).Append(", najwiecej ").Append(_daysMaxF.ToString("0.0", Inv))
                   .Append(" | z towarem i bliskim portem ").Append(_rN).Append(": zysk/dobe wybranego srednio ").Append((_rN > 0 ? _rChosen / _rN : 0).ToString("0", Inv))
                   .Append(", najlepszego bliskiego srednio ").Append((_rN > 0 ? _rNear / _rN : 0).ToString("0", Inv))
                   .Append(", daleki rejs gorszy niz bliski port: przed regula ").Append(_rWorseBefore).Append(", zamienione na bliski ").Append(_swap).Append(", zostalo ").Append(_rWorse)
+                  .Append(", dom/udzialowiec zostawione ").Append(_keepHome).Append(", porzucone przez BK pominiete ").Append(_keepPrev)
                   .Append(" | kontrakty surowcow karawana bez zysku po koszcie dni: lad ").Append(_moLand).Append(", morze ").Append(_moSea)
                   .Append(" | gracza: ").Append(_det.Count == 0 ? "-" : string.Join("; ", _det.ToArray()))
                   .Append(" | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumbleSess).Append(").");

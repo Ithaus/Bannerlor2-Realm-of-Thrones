@@ -730,7 +730,7 @@ namespace Armoury
         }
 
         /// <summary>Recenzja 139: miasto udzialowca klanu wlasciciela karawany (BK CaravanOrdersBehavior.IsClanStakeholderTown - ocena BK x1.5); bez BK - false.</summary>
-        private static bool Stakeholder(MobileParty mp, Settlement st)
+        internal static bool Stakeholder(MobileParty mp, Settlement st)   // recenzja 308a: takze CaravanSea308.Decide (ta sama regula)
         {
             if (_stakeMi == null || _ordInst == null || st == null || mp == null || mp.Owner == null || mp.Owner.Clan == null) return false;
             try

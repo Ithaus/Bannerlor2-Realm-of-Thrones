@@ -86291,13 +86291,14 @@ K308_P = "Karawany morskie - cel wedlug zysku na dobe (308a): "
 K308_RX_DAY = re.compile(r"dzien (\d+) \| klucz Caravan Sea True Distance (TAK|NIE), blisko <= ([\d.]+) dob \| ocena BK: (wpieta|NIE), odleglosc morska (\d+), "
                          r"bez drogi morskiej \(BK ladem\) (\d+), dom morzem (\d+) \| decyzje karawan ze statkami (\d+) \(drugi przebieg BK (\d+), cel bez drogi morskiej (\d+), "
                          r"gracza (\d+)\), dni drogi morzem: <=5 (\d+), 5-10 (\d+), 10-20 (\d+), 20-30 (\d+), >30 (\d+), srednio ([\d.]+), najwiecej ([\d.]+) \| "
+                         r"cel po regule: <=5 (\d+), 5-10 (\d+), 10-20 (\d+), 20-30 (\d+), >30 (\d+), najwiecej ([\d.]+) \| "
                          r"z towarem i bliskim portem (\d+): zysk/dobe wybranego srednio (-?\d+), najlepszego bliskiego srednio (-?\d+), daleki rejs gorszy niz bliski port: "
-                         r"przed regula (\d+), zamienione na bliski (\d+), zostalo (\d+) \| kontrakty surowcow karawana bez zysku po koszcie dni: lad (\d+), morze (\d+) \| "
+                         r"przed regula (\d+), zamienione na bliski (\d+), zostalo (\d+), dom/udzialowiec zostawione (\d+), porzucone przez BK pominiete (\d+) \| kontrakty surowcow karawana bez zysku po koszcie dni: lad (\d+), morze (\d+) \| "
                          r"gracza: (.*) \| potkniecia (\d+) \(sesja (\d+)\)\.$")
 
 
 def k308_new():
-    return {"start": None, "days": 0, "key": None, "sea": 0, "land": 0, "dec": 0, "far": 0, "b": [0, 0, 0, 0, 0], "rn": 0, "rc": 0, "rb": 0,
+    return {"start": None, "days": 0, "key": None, "sea": 0, "land": 0, "dec": 0, "far": 0, "b": [0, 0, 0, 0, 0], "bf": [0, 0, 0, 0, 0], "rn": 0, "rc": 0, "rb": 0, "home": 0, "prev": 0,
             "before": 0, "swap": 0, "left": 0, "mo_l": 0, "mo_s": 0, "stum": 0, "fmt": 0, "pl": [], "k307": k307_new()}
 
 
@@ -86317,11 +86318,14 @@ def k308_feed(D, ln):
     D["sea"] += int(g[4]); D["land"] += int(g[5]); D["dec"] += int(g[7]); D["far"] += int(g[8])
     for k in range(5):
         D["b"][k] += int(g[11 + k])
-    n = int(g[18]); D["rn"] += n; D["rc"] += n * int(g[19]); D["rb"] += n * int(g[20])
-    D["before"] += int(g[21]); D["swap"] += int(g[22]); D["left"] += int(g[23]); D["mo_l"] += int(g[24]); D["mo_s"] += int(g[25])
-    if g[26] != "-" and len(D["pl"]) < 12:
-        D["pl"].append(f"d{g[0]}: {g[26][:160]}")
-    D["stum"] += int(g[27])
+    for k in range(5):
+        D["bf"][k] += int(g[18 + k])
+    n = int(g[24]); D["rn"] += n; D["rc"] += n * int(g[25]); D["rb"] += n * int(g[26])
+    D["before"] += int(g[27]); D["swap"] += int(g[28]); D["left"] += int(g[29]); D["home"] += int(g[30]); D["prev"] += int(g[31])
+    D["mo_l"] += int(g[32]); D["mo_s"] += int(g[33])
+    if g[34] != "-" and len(D["pl"]) < 12:
+        D["pl"].append(f"d{g[0]}: {g[34][:160]}")
+    D["stum"] += int(g[35])
 
 
 def k308_rows(rep, D):
@@ -86333,9 +86337,15 @@ def k308_rows(rep, D):
             (D["sea"] > 0) if on else None)
     nb = sum(D["b"])
     longv = D["b"][3] + D["b"][4]
-    rep.add("K308-3: decyzje karawan ze statkami - rejsy > 20 dob", f"decyzji {D['dec']} (z droga morska {nb}; drugi przebieg BK {D['far']}), <=5 {D['b'][0]}, 5-10 {D['b'][1]}, "
-            f"10-20 {D['b'][2]}, 20-30 {D['b'][3]}, >30 {D['b'][4]} ({(100.0 * longv / nb) if nb else 0:.1f}% > 20 dob)", "<= 10% decyzji przy kluczu TAK (143c gracz: 29.9 doby)",
-            (nb > 0 and longv * 10 <= nb) if on else None)
+    # recenzja 308a: K308-3 na celu koncowym (po regule c); rozklad celu BK (po a, przed c) - K308-3a INFO
+    rep.add("K308-3a: cel BK (po ocenie droga morska, przed limitem odcinka) - rejsy > 20 dob", f"decyzji {D['dec']} (z droga morska {nb}; drugi przebieg BK {D['far']}), <=5 {D['b'][0]}, 5-10 {D['b'][1]}, "
+            f"10-20 {D['b'][2]}, 20-30 {D['b'][3]}, >30 {D['b'][4]} ({(100.0 * longv / nb) if nb else 0:.1f}% > 20 dob)", "INFO", None)
+    nf = sum(D["bf"])
+    longf = D["bf"][3] + D["bf"][4]
+    rep.add("K308-3: cel koncowy karawan ze statkami (po regule) - rejsy > 20 dob", f"z droga morska {nf}, <=5 {D['bf'][0]}, 5-10 {D['bf'][1]}, "
+            f"10-20 {D['bf'][2]}, 20-30 {D['bf'][3]}, >30 {D['bf'][4]} ({(100.0 * longf / nf) if nf else 0:.1f}% > 20 dob); dom/udzialowiec zostawione {D['home']}, "
+            f"porzucone przez BK pominiete {D['prev']}", "<= 10% decyzji przy kluczu TAK (143c gracz: 29.9 doby)",
+            (nf > 0 and longf * 10 <= nf) if on else None)
     rep.add("K308-4: daleki rejs gorszy niz bliski port (zysk na dobe)", f"przed regula {D['before']}, zamienione {D['swap']}, zostalo {D['left']}",
             "zostalo 0 przy kluczu TAK", (D["left"] == 0) if on else None)
     rep.add("K308-4b: zysk na dobe wybranego / najlepszego bliskiego portu, drugi przebieg BK, kontrakty bez zysku po dniach",
@@ -86356,7 +86366,7 @@ K308_SAMPLES = [
     K308_P + "ocena miast BK wpieta (odleglosc partia - miasto 1, miasto - dom 1).",
     K308_P + "dzien 108900 | klucz Caravan Sea True Distance TAK, blisko <= 12 dob | ocena BK: wpieta, odleglosc morska 5000, bez drogi morskiej (BK ladem) 10, dom morzem 300 | "
     "decyzje karawan ze statkami 70 (drugi przebieg BK 3, cel bez drogi morskiej 0, gracza 1), dni drogi morzem: <=5 40, 5-10 20, 10-20 8, 20-30 2, >30 0, srednio 6.1, najwiecej 24.0 | "
-    "z towarem i bliskim portem 30: zysk/dobe wybranego srednio 120, najlepszego bliskiego srednio 100, daleki rejs gorszy niz bliski port: przed regula 4, zamienione na bliski 4, zostalo 0 | "
+    "cel po regule: <=5 42, 5-10 21, 10-20 7, 20-30 0, >30 0, najwiecej 12.0 | z towarem i bliskim portem 30: zysk/dobe wybranego srednio 120, najlepszego bliskiego srednio 100, daleki rejs gorszy niz bliski port: przed regula 4, zamienione na bliski 4, zostalo 0, dom/udzialowiec zostawione 2, porzucone przez BK pominiete 1 | "
     "kontrakty surowcow karawana bez zysku po koszcie dni: lad 1, morze 2 | gracza: 'Convoy of Ser X' Driftwood Hall -> Duskendale 3.1 dob morzem, zysk/dobe 300, najlepszy bliski Rosby 2.0 dob 200 | potkniecia 0 (sesja 0).",
 ] + list(K307_SAMPLES)
 
@@ -86372,7 +86382,7 @@ def karawany308_selftest():
         return f"dobry bieg - nie TAK: {bad} ({v})"
     B = k308_new()
     for ln in K308_SAMPLES:
-        x = ln.replace(" wpieta (odleglosc", " NIE (brak").replace("odleglosc morska 5000", "odleglosc morska 0").replace(">30 0,", ">30 30,").replace("zostalo 0 |", "zostalo 3 |")
+        x = ln.replace(" wpieta (odleglosc", " NIE (brak").replace("odleglosc morska 5000", "odleglosc morska 0").replace(">30 0,", ">30 30,").replace("zostalo 0, dom", "zostalo 3, dom")
         x = x.replace("potkniecia 0 (sesja 0).", "potkniecia 1 (sesja 1).").replace("najdluzej od wczytania 18", "najdluzej od wczytania 64").replace("zold rodu) 3279", "zold rodu) -14700")
         k308_feed(B, "[06:39:07] " + x)
     rep = Report(); k308_rows(rep, B)
@@ -86381,10 +86391,10 @@ def karawany308_selftest():
     if miss:
         return f"zly bieg nie wykryty: {miss} ({vb})"
     C = k308_new()
-    k308_feed(C, "[06:39:07] " + K308_SAMPLES[1].replace("Distance TAK", "Distance NIE").replace("zostalo 0 |", "zostalo 3 |"))
+    k308_feed(C, "[06:39:07] " + K308_SAMPLES[1].replace("Distance TAK", "Distance NIE").replace("zostalo 0, dom", "zostalo 3, dom"))
     rep = Report(); k308_rows(rep, C)
     vc = {r[0].split(":")[0]: r[3] for r in rep.rows}
-    if vc.get("K308-2") != "INFO" or vc.get("K308-3") != "INFO" or vc.get("K308-4") != "INFO" or vc.get("K308-1") != "TAK":
+    if vc.get("K308-2") != "INFO" or vc.get("K308-3") != "INFO" or vc.get("K308-3a") != "INFO" or vc.get("K308-4") != "INFO" or vc.get("K308-1") != "TAK":
         return f"klucz NIE zle: {vc}"
     return None
 

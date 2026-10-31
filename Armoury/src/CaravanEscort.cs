@@ -140,7 +140,8 @@ namespace Armoury
         private static int _hDep, _hSkipHungry;
         private static long _hUnits, _hGold;
 
-        /// <summary>294c (CaravanRoute294c, D1): dni drogi karawany do miasta - ta sama miara co jedzenie na droge (RoadDays): prosta odleglosc z miejsca karawany
+        /// <summary>294c (CaravanRoute294c, D1): dni drogi karawany do miasta - ta sama miara co jedzenie na droge (RoadDays; wyjatek 308a: karawana ze statkami przy
+        /// CaravanSeaTrueDistance - droga morska / dzien drogi taboru, RoadDays zostaje przy prostej; predkosc statku nie zmierzona - K307-8): prosta odleglosc z miejsca karawany
         /// (miasto, w ktorym stoi, albo pozycja na mapie) / dzien drogi taboru x wspolczynnik droga / prosta (294b, 1..2); bez pomiaru - sama prosta. Bez zaokraglenia.</summary>
         internal static double RoadDaysTo(MobileParty mp, Settlement to)
         {

@@ -274,7 +274,7 @@ namespace Armoury
                     if (__result == null) _fallNull++;
                 }
                 // 308a: karawana ze statkami - rejs dalszy niz Caravan Sea Near Days tylko z lepszym zyskiem na dobe niz bliski port; pomiar dni drogi morskiej
-                if (ReferenceEquals(_mp, __0)) CaravanSea308.Decide(__0, ref __result);
+                if (ReferenceEquals(_mp, __0)) CaravanSea308.Decide(__instance, __0, ref __result);
                 if (__result != null && __result.Settlement != null && CaravanBulk.TradesForT1(__0))
                 {
                     var rec = RecOf(__0, __result);
