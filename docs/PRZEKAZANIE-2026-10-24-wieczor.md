@@ -1,5 +1,10 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 16:00 CET - WGRANIE 145 (noc/309-bitwa-armie, wypchniete) - START DLA NASTEPNEJ SESJI
+- W GRZE: Armoury.dll 050a484260b7004038507783a9b1264b (145 = 144 + 309 bitwa armii). Kopie 144: .bak-2026-10-31-przed-wgranie145 i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie145-przed.
+  CrashScribe bef9db58. LINIA GLOWNA: noc/309-bitwa-armie (zb n309). Testy 145a/145b (tylko bitwy, z armiami).
+- Otwarte z 309 (nie zrobione): FF strzal AI w swoich (ok. 18% trafien strzal), ShieldWall pod ostrzalem poza RBM, przegrani padli 67-76% (cel 15-40%), szczyty klatki 14-18 ms.
+
 ## DOPISEK 31.10 ok. 14:45 CET - WGRANIE 144 (noc/308a-rejsy, wypchniete) - START DLA NASTEPNEJ SESJI
 - W GRZE: Armoury.dll ba2c13480c953fb80f9ff0a84d1fe508 (144 = 143 + 308a rejsy karawan wedlug zysku na dobe drogi morskiej). Kopie 143: .bak-2026-10-31-przed-wgranie144
   i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie144-przed. CrashScribe bef9db58. LINIA GLOWNA: noc/308a-rejsy (zb n308a). Zapis testowy na D: zapisy-testowe-archiwum 2026-10-31-144.
