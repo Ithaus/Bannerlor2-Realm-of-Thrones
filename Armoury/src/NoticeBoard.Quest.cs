@@ -527,12 +527,13 @@ namespace Armoury
                 if (_listTest && _tSaveWait) { _tSaveWait = false; Log.Info(PQ + "TEST po zapisie - zapis NIEUDANY - NIE"); }
                 return;
             }
+            var why = new StringBuilder();   // 305e: przyczyny Reattach = false (log Jeffa 30.10 03:30:09 "przywrocone 0 z 1" przy zapisie przed wyjsciem z gry)
             if (QuestsOn && !_bqLatch && qm != null)
             {
                 foreach (var q in _bq)
                 {
                     if (!q.Detached) continue;
-                    try { if (Reattach(q, qm, ref tr)) r++; }   // bez listu - siatka doby
+                    try { if (Reattach(q, qm, ref tr)) r++; else if (why.Length < 400) why.Append(why.Length > 0 ? "; " : "").Append(ReattachWhy(q)); }   // bez listu - siatka doby
                     catch (Exception e) { BStumble("SaveOver", e); }
                 }
                 try
@@ -547,7 +548,8 @@ namespace Armoury
             }
             _selSaved = null;
             _bdRe += r;
-            if (_bqSaveLine) Log.Info(PQ + "po zapisie OK - przywrocone " + r + " z " + m + " (tracker " + tr + "), wybor przywrocony " + YN(sel) + (QuestsOn ? "" : " (klucz NIE)"));
+            if (_bqSaveLine) Log.Info(PQ + "po zapisie OK - przywrocone " + r + " z " + m + " (tracker " + tr + "), wybor przywrocony " + YN(sel) + (QuestsOn ? "" : " (klucz NIE)")
+                                      + (why.Length > 0 ? " | 305e: nieprzywrocone - " + why : ""));
             _bqSaveLine = false;
             if (_listTest && _tSaveWait) { _tSaveWait = false; TestAfterSave(m, r, sel); }
         }
@@ -563,6 +565,21 @@ namespace Armoury
             if (q.Saved != null) foreach (var o in q.Saved) if (o != null) { q.AddTrackedObject(o); tr++; }
             q.Saved = null;
             return true;
+        }
+
+        /// <summary>305e: przyczyna Reattach = false (tylko log) i co bedzie z listem: przyjety list na tablicy (arm_board zapisany w tym samym zapisie) -
+        /// po wczytaniu zadanie odtworzy BountySessionStart (RestoreQuest); bez listu - zamknie je siatka doby. Nie rzuca.</summary>
+        private static string ReattachWhy(BountyQuest q)
+        {
+            try
+            {
+                var nt = q.Tag as Notice;
+                string w = !q.IsOngoing ? "zadanie juz nie trwa (IsOngoing NIE)" : nt == null ? "zadanie bez listu" : !ReferenceEquals(nt.Quest, q) ? "list ma inne zadanie"
+                         : !nt.Taken ? "list nieprzyjety" : !_notices.Contains(nt) ? "listu nie ma na tablicy" : "?";
+                bool back = nt != null && nt.Taken && _notices.Contains(nt);
+                return (nt != null ? nt.Town + " " + nt.Band : "?") + ": " + w + (back ? " - list przyjety w arm_board, po wczytaniu odtworzony (linia 'wczytanie - listy przyjete')" : " - bez listu, siatka doby");
+            }
+            catch (Exception e) { BStumble("ReattachWhy", e); return "?"; }
         }
 
         // ------------------------------------------------------------ start sesji (po QuestManager.OnGameLoaded) i doba

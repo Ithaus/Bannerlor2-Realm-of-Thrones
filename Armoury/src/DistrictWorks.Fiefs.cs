@@ -19,6 +19,8 @@ namespace Armoury
             public double Units, Eff, Standing, Homesteads, Idle, Lost, Reb, RebCost;
             public int FullDay = -1, RebDay = -1, Today;
             public long In, PaidAll; public double Paid28; public int PaidDaysN = 28;   // PaidDaysN - ile ostatnich dob obejmuje Paid28 (mniej po zapisie sprzed m112)
+            public int AgeDays = -1;                                 // 305e: doby od zakupu prac (r.Day0; -1 - nieznane, wiersz bez Day0)
+            public bool SinceBuy;                                    // 305e: PaidDaysN przyciete do dob od zakupu (klucz WorksPaidSinceBuy) - prace mlodsze niz historia
             public string WarWith, Paused;                           // wojna z krolestwem okregu (bez wyplat); wstrzymane z innego powodu (klucz, droga produkcji)
             internal string Dist, Part;
         }
@@ -33,11 +35,15 @@ namespace Armoury
                 if (pid == null) return res;
                 int today = Today();
                 int hn = HistDays(today);                                    // m112-inwest po recenzji: zapis sprzed m112 - doby od wczytania
+                var st0 = Settings.Current;
+                bool sinceBuy = st0 != null && st0.WorksPaidSinceBuy;      // 305e: srednia od zakupu, gdy prace mlodsze niz historia (Seven Elms: 22 zl w 13 dobach pokazane jako 1 zl/d)
                 lock (Gate)
                     foreach (var r in _rows)
                     {
                         if (r.Clan != pid || (!(r.Held() > 1e-6) && r.In <= 0)) continue;
                         var w = new MyWork { Dist = r.Dist, Part = r.Part, Main = r.Part == MainPart, Today = today, In = r.In, PaidAll = r.Out, Paid28 = r.PaidSince(today - 27), PaidDaysN = hn };
+                        if (r.Day0 >= 0) w.AgeDays = Math.Max(1, today - r.Day0 + 1);
+                        if (sinceBuy && w.AgeDays > 0 && w.AgeDays < hn) { w.PaidDaysN = w.AgeDays; w.SinceBuy = true; }   // Paid28 = PaidSince(today - 27) obejmuje i tak tylko doby od zakupu
                         w.Kind = r.Kind >= 0 && r.Kind < Kinds ? KindName[r.Kind] : "works";
                         w.Units = r.U + r.Building(); w.Eff = r.Eff(today); w.Idle = r.I; w.Lost = r.Z; w.Reb = r.Rebuildable();
                         foreach (var l in r.Ramp) if (l.Units > 1e-9 && l.Day + l.Ready > w.FullDay) w.FullDay = l.Day + l.Ready;

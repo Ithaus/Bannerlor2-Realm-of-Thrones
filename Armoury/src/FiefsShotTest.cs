@@ -130,10 +130,10 @@ namespace Armoury
                 int wExp = on ? w : 0;
                 // po recenzji m115: oczekiwanie NIE przez ViewWorks - przy w = 0 porownania wyzej to 0 == 0 (blad widoku, zgubione linie, niewczytane arm_works
                 // dawaly OK). Wyplaty ksiegi w 28 dobach / max(7, doby historii), suma zaokraglona raz (jak widok); > 0 przy kluczu - linia prac musi byc
-                double expRaw = 0;
+                double expRaw = 0; bool expYoung = false;
                 foreach (var pw in DistrictWorks.PlayerWorks())
-                    if (pw != null && pw.WarWith == null && pw.Paused == null && pw.Eff > 1e-6 && pw.Paid28 > 0) expRaw += pw.Paid28 / Math.Max(7, pw.PaidDaysN);
-                long expLed = (long)Math.Round(expRaw);
+                    if (pw != null && pw.WarWith == null && pw.Paused == null && pw.Eff > 1e-6 && pw.Paid28 > 0) { expRaw += pw.Paid28 / DistrictWorks.ViewDays(pw); if (pw.SinceBuy) expYoung = true; }   // 305e: ten sam dzielnik co widok (od zakupu przy WorksPaidSinceBuy)
+                long expLed = DistrictWorks.ViewRound(expRaw, expYoung);                                            // 305e: to samo zaokraglenie co widok
                 bool pend = DistrictWorks.ImportPending;
                 var per = new System.Text.StringBuilder();
                 if (vl != null) foreach (var l in vl) per.Append(per.Length > 0 ? ", " : "").Append(l.Name).Append(' ').Append(l.Amt);

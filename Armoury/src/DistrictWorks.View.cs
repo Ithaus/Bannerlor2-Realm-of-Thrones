@@ -21,9 +21,29 @@ namespace Armoury
         private static int _vwHour = int.MinValue, _vwStamp, _vwSeen = -1;
         private static List<ViewLine> _vw = new List<ViewLine>();
         private static int _vwTotal, _vwDays;
+        private static int _vwSince;                                 // 305e: prace w widoku liczone od zakupu (klucz WorksPaidSinceBuy) - linia "widok finansow"
         private static TextObject _vwSumTxt;
         // liczniki doby (linia "widok finansow" w DayLine): linie dodane do panelu Finance i do podpowiedzi zlota, potkniecia widoku
         internal static int _dVwBox, _dVwTip, _vwStumble;
+
+        /// <summary>305e: dzielnik sredniej na dobe jednej pracy w widoku. Klucz WorksPaidSinceBuy i prace mlodsze niz historia - doby od zakupu (najmniej 1);
+        /// inaczej jak m115: max(7, doby historii). Ten sam wzor w FiefsShotTest (oczekiwanie z ksiegi).</summary>
+        internal static int ViewDays(MyWork w)
+        {
+            if (w == null) return 7;
+            return w.SinceBuy ? Math.Max(1, w.PaidDaysN) : Math.Max(7, w.PaidDaysN);
+        }
+
+        /// <summary>305e: zaokraglenie sumy widoku. Klucz WorksPaidSinceBuy - od zera (0.5 -> 1), a suma w (0, 1) jako 1 tylko gdy w sumie jest praca liczona od zakupu
+        /// (anyYoung; po recenzji 305e - stare prace z pelna historia 28 dob nie sa zawyzane: 6 zl / 28 dob = 0.21/d -> 0); NIE - jak m115 (Math.Round, do parzystej).</summary>
+        internal static long ViewRound(double sum, bool anyYoung)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.WorksPaidSinceBuy) return (long)Math.Round(sum);
+            long t = (long)Math.Round(sum, MidpointRounding.AwayFromZero);
+            if (t <= 0 && sum > 1e-9 && anyYoung) t = 1;
+            return t;
+        }
 
         /// <summary>m115: wyplata, wczytanie albo nowa kampania - widok liczony od nowa przy nastepnym odczycie.</summary>
         internal static void ViewDirty() { _vwStamp++; }
@@ -43,23 +63,29 @@ namespace Armoury
                 var raw = new List<KeyValuePair<string, double>>();
                 var paid = new List<double>();                               // wyplacone w znanych dobach wedlug wioski (napis, jak w zakladce Fiefs)
                 var idx = new Dictionary<string, int>(StringComparer.Ordinal);
-                int d = 7, h = 28;
+                var young = new List<int>();                                 // 305e: najmlodsze prace wioski liczone od zakupu (doby; 0 - brak)
+                var old = new List<int>();                                   // po recenzji 305e: prace wioski z historia (nie od zakupu) - opis wioski mieszanej
+                int d = 7, h = 28, since = 0, yMax = 0; bool anyOld = false;
                 foreach (var w in PlayerWorks())
                 {
                     if (w == null || w.WarWith != null || w.Paused != null || !(w.Eff > 1e-6)) continue;
-                    int dn = Math.Max(7, w.PaidDaysN);
-                    d = Math.Max(d, dn);
+                    int dn = ViewDays(w);                                    // 305e: od zakupu przy kluczu WorksPaidSinceBuy; inaczej max(7, doby historii)
+                    if (!w.SinceBuy) d = Math.Max(d, dn);
                     double x = w.Paid28 / dn;
                     if (!(x > 0)) continue;
-                    h = Math.Min(h, Math.Max(1, w.PaidDaysN));
+                    if (!w.SinceBuy) { h = Math.Min(h, Math.Max(1, w.PaidDaysN)); anyOld = true; }   // 305e: napis "spread over 7 days" tylko dla historii krotszej od wczytania
+                    else { since++; yMax = Math.Max(yMax, dn); }
                     string n = w.Village ?? "?";
                     int i;
                     if (idx.TryGetValue(n, out i)) { raw[i] = new KeyValuePair<string, double>(n, raw[i].Value + x); paid[i] += w.Paid28; }
-                    else { idx[n] = raw.Count; raw.Add(new KeyValuePair<string, double>(n, x)); paid.Add(w.Paid28); }
+                    else { idx[n] = i = raw.Count; raw.Add(new KeyValuePair<string, double>(n, x)); paid.Add(w.Paid28); young.Add(0); old.Add(0); }
+                    if (w.SinceBuy && (young[i] == 0 || dn < young[i])) young[i] = dn;
+                    if (!w.SinceBuy) old[i]++;
                 }
+                if (!anyOld && since > 0) d = yMax;                          // po recenzji 305e: same prace od zakupu - "dni" w logu to najdluzszy okres od zakupu, nie 7
                 // suma zaokraglona raz, na wioski metoda najwiekszej reszty (jak OnCartReturn) - linie sumuja sie dokladnie do sumy
                 double sum = 0; foreach (var kv in raw) sum += kv.Value;
-                long total = (long)Math.Round(sum);
+                long total = ViewRound(sum, since > 0);                      // 305e: przy kluczu WorksPaidSinceBuy 0.5 -> 1, suma w (0, 1) jako 1 tylko z praca od zakupu
                 var whole = new long[raw.Count]; long left = total;
                 for (int i = 0; i < whole.Length; i++) { whole[i] = Math.Max(0L, (long)Math.Floor(raw[i].Value + 1e-9)); left -= whole[i]; }
                 var ord = new List<int>(); for (int i = 0; i < whole.Length; i++) ord.Add(i);
@@ -73,14 +99,18 @@ namespace Armoury
                     int a = (int)Math.Min(int.MaxValue, whole[i]);
                     // po recenzji m115: historia krotsza niz 7 dob (zapis sprzed m112, kilka dob od wczytania) - napis uczciwy: ile wyplacono w ilu znanych dobach,
                     // kwota rozlozona na 7 dob (doby przed wczytaniem = 0); zakladka Fiefs pokazuje te same doby
-                    string why = h < 7
+                    string why = young[i] > 0 && old[i] == 0
+                        ? "average since you first paid for the works " + young[i] + (young[i] == 1 ? " day ago" : " days ago")   // 305e
+                        : h < 7
                         ? "paid " + Math.Round(paid[i]).ToString("N0", CultureInfo.InvariantCulture) + " in the last " + h + (h == 1 ? " day" : " days") + ", shown spread over 7 days"
                         : "average of the last " + d + " days";
+                    if (young[i] > 0 && old[i] > 0)                          // po recenzji 305e: wioska mieszana - starsze prace z historii, nowsze od zakupu
+                        why += "; newer works since you first paid " + young[i] + (young[i] == 1 ? " day ago" : " days ago");
                     res.Add(new ViewLine { Name = raw[i].Key, Amt = a, Txt = new TextObject("{=!}Village works: " + raw[i].Key + " (" + why + ", paid when the carts return)") });
                     sumOut += a;
                 }
                 _vwSumTxt = res.Count > 0 ? new TextObject("{=!}Village works (" + res.Count + " villages, average paid when the carts return)") : null;
-                _vw = res; _vwTotal = sumOut; _vwDays = d; _vwHour = hour; _vwSeen = stamp;
+                _vw = res; _vwTotal = sumOut; _vwDays = d; _vwHour = hour; _vwSeen = stamp; _vwSince = since;
                 lines = _vw; days = _vwDays;
                 return _vwTotal;
             }
@@ -129,7 +159,8 @@ namespace Armoury
                 if (total <= 0 && box == 0 && tip == 0 && st == 0) return;
                 var s = Settings.Current;
                 Log.Info(P + "widok finansow (m115, klucz Works Income Shown " + (s != null && s.WorksIncomeShown ? "TAK" : "WYL") + "): prace gracza " + total + "/dobe (wioski " + n + ", dni " + d
-                         + "), linie panelu " + box + ", linie podpowiedzi " + tip + ", potkniecia " + st + " | panel Finance " + FinanceBox.State + ".");
+                         + "), linie panelu " + box + ", linie podpowiedzi " + tip + ", potkniecia " + st + " | panel Finance " + FinanceBox.State
+                         + " | 305e: od zakupu (klucz Works Paid Since Buy " + (s != null && s.WorksPaidSinceBuy ? "TAK" : "NIE") + ") prac " + _vwSince + ".");
             }
             catch (Exception e) { _vwStumble++; Stumble("ViewDayLine", e); }
         }

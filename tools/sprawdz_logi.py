@@ -5237,6 +5237,8 @@ def valve_decisions(lines, start, until):
 # Jeff 16.10 (VillageLayoutV5, po recenzji D2/D3): crc ukladu wiosek ("uid:osady;" jak VillageBook) plikow modulu - tools/wioski-v5/raport-v5.txt
 LAYOUT_V5_CRC, LAYOUT_V5_N = "68BB06AD", 1957
 LAYOUT_V4_CRC, LAYOUT_V4_N = "5A8C2735", 2446
+# 305e: uklad v7 (f10-uklad, NPR_CRC7) pod nazwa arm_map_villages.tsv - te same wioski i okregi co v5/v6 (1953 w 423), tylko rozstawione po ziemi okregu
+LAYOUT_V7_CRC = "5F9875B1"
 
 
 def etap4_e411(rep, lines, start, win, until, logp):
@@ -5275,7 +5277,7 @@ def etap4_e411(rep, lines, start, win, until, logp):
         shr = num(r"pomniejszonymi (\d+)", fd, int, 0)
         vals = tuple(int(g) for g in m.groups()) if m else None
         # Jeff 16.10 (VillageLayoutV5): uklad v5 (tools/wioski-v5) - 1957 wiosek, z tego 4 w okregach ROT_town40_village2/3 bez wlasnego Village
-        v5 = "layout v5" in fd
+        v5 = "layout v5" in fd or "layout v6" in fd or "layout v7" in fd   # 305e: v6/v7 - te same wioski i okregi co v5
         if v5:
             g2_rule = g2_rule.replace("wiosek 2441 w 423 okregach", "uklad v5: wiosek 1953 w 423 okregach").replace("brak 5 wiosek", "brak 4 wiosek")
         ok = vals == ((1953, 423, 0, 4) if v5 else (2441, 423, 0, 5)) and mb == 2 and tot == 569 and saved + new == tot
@@ -5287,11 +5289,11 @@ def etap4_e411(rep, lines, start, win, until, logp):
     for x in [y for y in lines if y.startswith("Ksiega wiosek (E4/11): start sesji")]:
         mf = re.search(r"\(crc ukladu ([0-9A-F]{8}), plik crc32 [0-9A-F]{8}, (arm_map_villages(?:_v4)?\.tsv)", x)
         if mf:
-            want = LAYOUT_V4_CRC if mf.group(2).endswith("_v4.tsv") else LAYOUT_V5_CRC
+            want = (LAYOUT_V4_CRC,) if mf.group(2).endswith("_v4.tsv") else (LAYOUT_V5_CRC, LAYOUT_V7_CRC)   # 305e: v7 pod nazwa arm_map_villages.tsv
             g2b.append((mf.group(2), mf.group(1), want))
     if g2b:
         rep.add("E4/11 G2b: plik ukladu wiosek w grze (v5 / v4)", "; ".join(f"{n} crc {c}" for n, c, _ in g2b[-3:]),
-                f"arm_map_villages.tsv = v5 (crc ukladu {LAYOUT_V5_CRC}), arm_map_villages_v4.tsv = v4 ({LAYOUT_V4_CRC}) w kazdej sesji", all(c == w for _, c, w in g2b))
+                f"arm_map_villages.tsv = v5 (crc ukladu {LAYOUT_V5_CRC}) albo v7 ({LAYOUT_V7_CRC}), arm_map_villages_v4.tsv = v4 ({LAYOUT_V4_CRC}) w kazdej sesji", all(c in w for _, c, w in g2b))
     # poprawka po recenzji (R1-3): bieg z ksiega wylaczona (G13) - wiersz CZYNNA jako INFO, G13 oceniany przed wyjsciem z bloku
     if off and not on:
         rep.add("E4/11: linia dzienna CZYNNA", f"czynna 0 dob, WYLACZONA {len(off)} dob z {len(win)} - bieg z ksiega wylaczona (patrz G13)", "czynna w kazdej dobie z ruchem (bieg zwykly)", None)
@@ -21593,6 +21595,19 @@ def _gl1_week_ok(r):
         return False
 
 
+def _okno305e(lines, days, start, lo, until):
+    """305e (log Jeffa 30.10 - nowa kampania, log od doby kampanii 57): okno lo-until przyciete do dob od PIERWSZEJ doby serii w logu (days - doby gry
+    linii sprawdzanej; kazda linia ma swoja numeracje: GL1 pisze dzis, "Pieniadz swiata" wczoraj). Zwraca (doby kampanii okna od pierwszej doby serii,
+    czy to log kontynuacji z zapisu). Kontynuacja tylko, gdy CALY log (linia "Pieniadz swiata") zaczyna sie po poczatku okna - w logu od startu kampanii
+    brak linii w pierwszych dobach dalej jest bledem. Pusta seria albo log od startu - (None, False): wolajacy liczy jak dotad (cale okno)."""
+    rd = sorted(run_day(d, start) for d in days)
+    lg = sorted(run_day(d, start) for d in by_day(lines, "Pieniadz swiata: dzien"))
+    if not rd or not lg or lg[0] <= lo:
+        return None, False
+    first = max(lo, min(rd[0], lg[0] + 1))   # +1: "Pieniadz swiata" pisze dobe wczorajsza
+    return list(range(first, until + 1)), True
+
+
 def gl1_main(logp, start_arg, until=120, bdp=None):
     """GL-1 (P1 + P6, projekt docs/gospodarka-od-ludzi/PROJEKT-GOSPODARKA-OD-LUDZI-2026-10-13.md rozdz. 8 "Progi testu 120 dob" P1): plon wsi od ludzi
     (Armoury/src/VillageByPeople.cs) i wyjatek Strazy / Sarnor 0.25 mln. Okno: doby kampanii 2-until (--do-doby); progi sumy surowcow - doby 2-29.
@@ -21628,12 +21643,16 @@ def gl1_main(logp, start_arg, until=120, bdp=None):
     else:
         last = max(run_day(d, start) for d in win)
         expect = min(until, last) - 1
+        have, cont = _okno305e(lines, day_l, start, 2, min(until, last))   # 305e: okno przyciete do dob obecnych w logu (log kontynuacji z zapisu)
+        if have is not None and cont:
+            expect = len(have)
         how = re.search(r"kalibracja \(([^)]*)", cal_l[0]).group(1) if cal_l else "-"
         gm = re.search(r"po wsiach typu pod regula \(suma swiata kazdego typu w tym dniu = wzor gry co do sztuki, przed zima, budowlami i regulatorem\): ([^;]*)", cal_l[0]) if cal_l else None
         ntyp = len(gm.group(1).split(", ")) if gm else 0
         rep.add("GL1-0: linia doby GL1 w kazdej dobie okna, kalibracja g", f"dob z linia {len(win)} z {expect}, linii kalibracji {len(cal_l)} (pierwsza: {how}; typow z g {ntyp})"
                 + (f"; linii WYLACZONY {len(off_l)}" if off_l else ""),
-                ">= 1 kalibracja, linia doby w kazdej dobie okna", bool(cal_l) and len(win) >= expect)
+                ">= 1 kalibracja, linia doby w kazdej dobie okna" + (" (305e: log kontynuacji - okno przyciete do dob w logu, kalibracja tylko w logu od startu kampanii)" if cont else ""),
+                (bool(cal_l) or cont) and len(win) >= expect)
     # ---- GL1-1 surowce i typy wobec kalibracji (doby 2-29)
     if early:
         lo, hi, n = {}, {}, 0
@@ -21932,6 +21951,9 @@ def gl2_main(logp, start_arg, until=120, csvp=None, bdp=None):
         rep.add("GL2-0: linia Rynek od ludzi (GL2) kazdej doby", "brak w logu", "jest od wgrania GL-2; bez niej wiersze paczki = INFO (bieg odniesienia)", None)
     else:
         span = until - 1
+        have, cont = _okno305e(lines, gl, start, 2, min(until, max(run_day(d, start) for d in win)))   # 305e: okno przyciete do dob obecnych w logu (log kontynuacji z zapisu)
+        if have is not None and cont:
+            span = len(have)
         rep.add("GL2-0: linia GL2 kazdej doby okna i klucze", f"dob z linia {len(win)} z {span}, MarketByPeople tak w {len(on)}, VillageHeadsByPeople tak w {len(hon)}",
                 f"{span}/{span} dob z linia, klucze tak przez caly bieg (projekt rozdz. 8 'kazdy')", (len(win) >= span and len(on) == len(win) and len(hon) == len(win)) if on else None)
         st_ = [num(r"\| potkniecia (\d+)\.", gl[d]) for d in win]
@@ -40098,7 +40120,8 @@ M104_SD = re.compile(r"dzien opowiesci (-?[0-9.]+)")
 M104_CAL = re.compile(r"\(dzien kalendarza (\d+)\)")
 M104_ESSOS_N = re.compile(r"na kalendarzu (\d+) \((.*?)\), w wojnie (\d+)/(\d+)")
 M104_ESSOS_DECL = re.compile(r"ESSOS - wojna (\S+)-(\S+) (WYPOWIEDZIANA|NIE weszla).*?\(dzien kalendarza (\d+), dzien opowiesci (-?[0-9.]+)\)")
-M104_PATCH = re.compile(r"latka wojen essoskich \((.*?)\): ROTStorylineWar\.Enforced (\S+)\.")
+# 305e: po m116 po TAK idzie " (prefiks Essos, postfiks Dorzecza m116) | okno ROT ..." zamiast kropki - WK-2 'latka brak linii' na logu Jeffa 30.10
+M104_PATCH = re.compile(r"latka wojen essoskich \((.*?)\): ROTStorylineWar\.Enforced ([A-Za-z]+)(?:\.| \(| \|)")
 M104_DRAG = re.compile(r"\(3\) smoki Daenerys: klucz (TAK|NIE), (etap (\S+)(?: \(klucz NIE[^)]*\))? \| siodlo (\S+)(.*?)\(D=(\d+)\))?")
 M104_REACH = re.compile(r"\| \(2\) Reach: (.*?) \| Dorne: (.*?) \| \(3\)")
 M104_GONE = re.compile(r", zniszczone (\d+) \((.*?)\)")
@@ -43180,6 +43203,7 @@ NZJ_BAND = re.compile(r"(?P<band><30k|30-60k|60-90k|>=90k): (?P<n>\d+), (?P<med>
 NZJ_NN = re.compile(r"najblizszy sasiad min (?P<nn>[\d.]+) \(prog 25\)")
 NZJ_PEO = re.compile(r"ludzie wokol min/mediana/maks (?P<mn>\d+)/(?P<md>\d+)/(?P<mx>\d+)")
 NZJ_LAND = re.compile(r"lad: Westeros (?P<w>\d+), Essos (?P<e>\d+)")
+# 305e: odcinki miedzy potknieciami widoku a tickiem dojazdu (np. 'kolko najechania') pominiete - ZJ-3 na logu Jeffa 30.10 (174 doby nierozpoznane)
 NZJ_DAY = re.compile(r"Zajazdy \(ZJ\): dzien (?P<day>-?\d+) \| .*?\| zajazdow (?P<inns>\d+).*?\| wejscia (?P<enter>\d+) \(po kliku (?P<click>\d+), z pytania (?P<askyes>\d+)\), "
                      r"pytania (?P<ask>\d+), odmowy (?P<no>\d+), kliki na zajazd (?P<clicks>\d+) "
                      r"\| noclegi (?P<stays>\d+): .*?\| zaplacone (?P<paid>\d+) \(ludzie (?P<men>\d+), towarzysze (?P<comp>\d+) \(z sakiewki ludzi (?P<cpurse>\d+)\), gracz (?P<pl>\d+)\) "
@@ -43188,7 +43212,7 @@ NZJ_DAY = re.compile(r"Zajazdy \(ZJ\): dzien (?P<day>-?\d+) \| .*?\| zajazdow (?
                      r"\| widok: obrazki postawione (?P<made>\d+) \(dzis (?P<madeday>\d+)\), pokazane najwiecej naraz (?P<shownmax>\d+), pokaz/schowaj dzis (?P<show>\d+)/(?P<hide>\d+), "
                      r"przebudowy (?P<rebuild>\d+) .*?pominiete (?P<failed>\d+), brak siatek (?P<miss>\d+), .*?sredni czas obrazka (?P<pms>[\d.]+) ms, kliki (?P<vclicks>\d+) "
                      r"\| potkniecia widoku: tworzenie (?P<vc>\d+), widocznosc (?P<vv>\d+), dymek (?P<vh>\d+), klik (?P<vk>\d+) "
-                     r"\| tick dojazdu: (?P<ticks>\d+) sprawdzen, srednio (?P<tms>[\d.]+) ms \| potkniecia dzis (?P<stum>\d+) \(od wczytania (?P<stumall>\d+)\)\.$")
+                     r"(?:\|(?! tick dojazdu:)[^|]*)*\| tick dojazdu: (?P<ticks>\d+) sprawdzen, srednio (?P<tms>[\d.]+) ms \| potkniecia dzis (?P<stum>\d+) \(od wczytania (?P<stumall>\d+)\)\.$")
 NZJ_STAY = re.compile(r"Zajazdy \(ZJ\): nocleg w .*?\| razem (?P<tot>\d+) \(ludzie (?P<men>\d+), towarzysze (?P<comp>\d+), gracz (?P<pl>\d+)\) -> kiesa wsi (?P<purse>-?\d+), "
                       r"podatek pana wsi (?P<tax>\d+), korona \(DS\) (?P<crown>\d+) \| kontrola obiegu: roznica (?P<diff>-?\d+) \| osoby .*?"
                       r"\| premia po snie: predkosc \+(?P<sp>\d+\.\d)%, morale \+(?P<mo>\d+\.\d), sen x(?P<sl>\d+\.\d\d), gojenie \+(?P<he>\d+)%\.$")
@@ -52889,11 +52913,12 @@ def nzw_main(logp, bdp=None):
 NPO_HEAD = "Prace okregu (PO): "
 NPO_START = re.compile(r"Prace okregu \(PO\): start \| klucz District Works (?P<key>TAK|WYLACZONY)[^,]*, AI (?P<ai>TAK|WYLACZONE) \| menu (?P<menu>[^|]*) \| BEE: (?P<bee>[^|]*) "
                        r"\| krok 112 \(wyplata przy wozie\) (?P<cart>wpiety|NIECZYNNY) \| z zapisu: (?P<load>[^|]*)\|")
+# 305e: odcinki miedzy wyplatami a ogniem (np. 'udzial dodatku w utargu' klucza Works Pay Market Share) pominiete - NPO-1 na logu Jeffa 30.10 (6 dob nierozpoznanych)
 NPO_DAY = re.compile(r"Prace okregu \(PO\): dzien (?P<day>-?\d+) \| prac (?P<rows>\d+), jednostek (?P<units>[\d.]+), kapital (?P<cap>-?\d+) zl "
                      r"\| nowe: gracz (?P<newp>\d+), AI (?P<newa>\d+), wplacone (?P<inn>\d+) = place (?P<wage>-?\d+) \+ material polka (?P<mt>\d+) \+ material magazyn wsi (?P<mv>\d+) \(szt\. (?P<pcs>\d+); roznica (?P<indiff>-?\d+)\) "
                      r"\| wyplaty: powrotow (?P<pays>\d+), utarg (?P<handed>\d+), pula (?P<pool>\d+), wyplacone (?P<out>\d+) = z licznika pana (?P<tax>\d+) \+ z kiesy wsi (?P<vil>\d+) "
                      r"\(oczekiwane (?P<exp>\d+), wstrzymane wojna (?P<war>\d+), powroty bez wyceny (?P<nocart>\d+)(?:, bez drogi produkcji (?P<nopath>\d+))?\) "
-                     r"\| ogien: uderzen (?P<burn>\d+), stracone (?P<lostu>[\d.]+) jedn\. \((?P<lostg>\d+) zl\), bezczynne (?P<idle>[\d.]+), stada do napastnikow (?P<herd>\d+) \(szt\. (?P<herdp>\d+)\)"
+                     r"(?:\|(?! ogien:)[^|]*)*\| ogien: uderzen (?P<burn>\d+), stracone (?P<lostu>[\d.]+) jedn\. \((?P<lostg>\d+) zl\), bezczynne (?P<idle>[\d.]+), stada do napastnikow (?P<herd>\d+) \(szt\. (?P<herdp>\d+)\)"
                      r".*?\| kontrole: wplacone - place - material (?P<cdiff>-?\d+), wyplacone - licznik - kiesa 0, naruszenia \([^)]*\) (?P<viol>\d+)"
                      r".*?\| koszt (?P<ms>[\d.]+) ms \| potkniecia dzis (?P<st>\d+) \(od wczytania (?P<stall>\d+)\)\.$")
 NPO_TEST = re.compile(r"Prace okregu \(PO\): test \(autotest, plik armoury-po-test\.flag zuzyty\) \| wynik TAK (?P<p>\d+), NIE (?P<f>\d+), INFO (?P<i>\d+)(?P<rest>.*)$")
@@ -84421,6 +84446,102 @@ def karawany305_main(logp):
     return 0
 
 
+# ============================================================ 305e (31.10, paczka drobne: inwestycje i przeglad ogolny)
+D305_VIEW = re.compile(r"widok finansow \(m115, klucz Works Income Shown (TAK|WYL)\): prace gracza (-?\d+)/dobe .*?\| 305e: od zakupu \(klucz Works Paid Since Buy (TAK|NIE)\) prac (\d+)\.")
+D305_YEAR = re.compile(r"Majatki i prace w Fiefs \(m112\): dzien (-?\d+).*?\| 305e: zwrot roczny prac \(klucz WorksTabYearlyReturn (TAK|NIE), rok (\d+) dob\): prac z wyplata (\d+), bez (\d+), "
+                       r"srednio ([\d.]+) zl/d = (\d+) zl/rok(?: \(([\d.]+)% wplat (\d+)\))?, od zakupu \(klucz WorksPaidSinceBuy\) (\d+)")
+D305_FISH = re.compile(r"Ryby z niczego \(A17 F2\): dzien (-?\d+) \| klucz A17FishFromHands (TAK|NIE) \| KS zastosowany (TAK|NIE) \|.*?\| razem ryby z niczego (\d+) "
+                       r"\| 305e: Night Raider przy KS we wszystkich wsiach \(klucz A17NightRaiderBlockAllKs (TAK|NIE)\): z zablokowanych poza stawkami KS (\d+) szt\. w (\d+) wsiach")
+D305_SAVE = re.compile(r"Listy goncze - zadania \(m109\): po zapisie OK - przywrocone (\d+) z (\d+)")
+D305_LOAD = re.compile(r"Listy goncze - zadania \(m109\): wczytanie - listy przyjete (\d+), odtworzone (\d+)")
+D305_ERR = ("ERROR in DistrictWorks.ViewWorks", "ERROR in DistrictWorks.PlayerWorks", "ERROR in FiefInvestments.YearLine", "ERROR in FiefInvestments.WorksTab",
+            "ERROR in NoticeBoard.ReattachWhy", "ERROR in A17Fix.NavalVillagePre")
+
+
+def drobne305e_main(logp):
+    """drobne305e (31.10, paczka 305e). Wejscie: log Armoury (strumieniowo). D305-1 widok finansow prac: odcinek '305e: od zakupu' w kazdej linii 'widok finansow'
+    (klucz WorksPaidSinceBuy), D305-2 zwrot roczny prac w linii 'Majatki i prace w Fiefs (m112)' (klucz WorksTabYearlyReturn; liczby - INFO; rok 364 dob), D305-3 ryby
+    z niczego przy KS zastosowanym i kluczu A17NightRaiderBlockAllKs TAK = 0 (suma dob, NA17-2e), zablokowane poza stawkami KS - INFO, D305-4 zapis z nieprzywroconym
+    zadaniem listu ma przyczyne ('305e: nieprzywrocone'), wczytanie odtwarza wszystkie przyjete listy, D305-5 ERROR miejsc paczki 0. Log bez paczki - INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("D305-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    view_all, view, year, fish_all, fish, saves, loads, errs = 0, [], [], 0, [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            t = m.group(2) if m else ln.rstrip("\n")
+            if "widok finansow (m115" in t:
+                view_all += 1
+                mm = D305_VIEW.search(t)
+                if mm:
+                    view.append(mm.groups())
+            elif t.startswith("Majatki i prace w Fiefs (m112): dzien"):
+                mm = D305_YEAR.search(t)
+                if mm:
+                    year.append(mm.groups())
+            elif t.startswith("Ryby z niczego (A17 F2): dzien"):
+                fish_all += 1
+                mm = D305_FISH.search(t)
+                if mm:
+                    fish.append(mm.groups())
+            elif t.startswith("Listy goncze - zadania (m109): po zapisie OK"):
+                mm = D305_SAVE.search(t)
+                if mm:
+                    saves.append((int(mm.group(1)), int(mm.group(2)), "305e: nieprzywrocone" in t, t))
+            elif t.startswith("Listy goncze - zadania (m109): wczytanie - listy przyjete"):
+                mm = D305_LOAD.search(t)
+                if mm:
+                    loads.append((int(mm.group(1)), int(mm.group(2))))
+            elif t.startswith(D305_ERR):
+                errs += 1
+    print(f"plik: {logp} | widok finansow {view_all} (z 305e {len(view)}), linie m112 z 305e {len(year)}, ryby A17 F2 {fish_all} (z 305e {len(fish)}), "
+          f"zapisy m109 {len(saves)}, wczytania {len(loads)}")
+    if not view and not year and not fish:
+        rep.add("D305-0: odcinki '305e' w liniach", "brak", "INFO (log sprzed paczki 305e)", None)
+    # D305-1
+    if view:
+        on = [v for v in view if v[2] == "TAK"]
+        rep.add("D305-1: widok finansow prac - odcinek 305e (od zakupu)", f"linii {len(view)} z {view_all}, klucz TAK w {len(on)}, prace od zakupu najwiecej "
+                f"{max(int(v[3]) for v in view)}, prace gracza ostatnio {view[-1][1]}/dobe", "kazda linia 'widok finansow' z odcinkiem 305e", len(view) == view_all)
+    elif view_all:
+        rep.add("D305-1: widok finansow prac - odcinek 305e", f"0 z {view_all}", "INFO (DLL sprzed 305e)", None)
+    # D305-2
+    if year:
+        y = year[-1]
+        rep.add("D305-2: zwrot roczny prac gracza (ostatnia doba)", f"dzien {y[0]}, klucz {y[1]}, rok {y[2]} dob, prac z wyplata {y[3]}, bez {y[4]}, {y[5]} zl/d = {y[6]} zl/rok"
+                + (f" ({y[7]}% wplat {y[8]})" if y[7] else "") + f", od zakupu {y[9]}", "INFO (Seven Elms 30.10: ok. 1.7-1.8 zl/d, ok. 14-16%/rok)", None)
+        bad = [x for x in year if x[2] != "364"]
+        rep.add("D305-2b: rok kalendarza w linii", f"dob z rokiem innym niz 364: {len(bad)}" + (f" (np. {bad[0][2]})" if bad else ""), "0 (Armoury: 364 dni)", not bad)
+    # D305-3
+    if fish:
+        ks = [f for f in fish if f[2] == "TAK" and f[4] == "TAK" and f[1] == "TAK"]
+        zn = sum(int(f[3]) for f in ks)
+        rep.add("D305-3: ryby z niczego przy KS i kluczu A17NightRaiderBlockAllKs (suma dob)", f"{zn} (dob z KS i kluczem {len(ks)} z {len(fish)})", "0", (zn == 0) if ks else None)
+        rep.add("D305-3b: zablokowane poza stawkami KS (kraina wrocona, pierwsza doba sesji)", f"{sum(int(f[5]) for f in fish)} szt., wsio-dob {sum(int(f[6]) for f in fish)}", "INFO", None)
+    elif fish_all:
+        rep.add("D305-3: ryby z niczego - odcinek 305e", f"0 z {fish_all}", "INFO (DLL sprzed 305e)", None)
+    # D305-4
+    if saves:
+        lost = [x for x in saves if x[0] < x[1]]
+        nowhy = [x for x in lost if not x[2]]
+        ex = ""
+        if lost and lost[-1][2]:
+            t = lost[-1][3]
+            ex = f" (np. {t[t.find('305e'):][:200]})"
+        rep.add("D305-4: zapis - nieprzywrocone zadania listow maja przyczyne", f"zapisow {len(saves)}, z nieprzywroconymi {len(lost)}, bez przyczyny {len(nowhy)}" + ex,
+                "bez przyczyny 0 (DLL 305e; log bez odcinkow 305e - INFO)", (not nowhy) if (lost and (view or year or fish)) else None)
+    if loads:
+        bad = [x for x in loads if x[1] < x[0]]
+        rep.add("D305-4b: wczytanie - odtworzone wszystkie przyjete listy", f"wczytan {len(loads)}, ostatnie: przyjete {loads[-1][0]}, odtworzone {loads[-1][1]}; nieodtworzone w {len(bad)}",
+                "odtworzone = przyjete", not bad)
+    rep.add("D305-5: ERROR miejsc paczki 305e", errs, "0", errs == 0)
+    rep.show()
+    return 0
+
+
 # ---------------------------------------------------------------- paczka 305c (31.10): bitwa i AI - grupa bitwa305c
 # B305-S self-test wyrazen; B305-1 'Choragwie (CH) koniec' segment 'straty bez bramki morale (305c)': przy kluczu TAK kazde zdarzenie strat
 # (trzecia czesc + polowa skladu) daje rzut strat (rzutow strat >= polowa + trzecia czesc minus kompanie juz zlamane - tolerancja: rzutow > 0, gdy zdarzen > 0),
@@ -84877,6 +84998,18 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return kowal305_main(rest[0] if rest else None)
     return _kowal305_main_prev(argv)
+_drobne305e_main_prev = main
+
+
+def main(argv):
+    # paczka 305e: grupa drobne305e - opakowanie main jak dowodca139
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "drobne305e":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return drobne305e_main(rest[0] if rest else None)
+    return _drobne305e_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

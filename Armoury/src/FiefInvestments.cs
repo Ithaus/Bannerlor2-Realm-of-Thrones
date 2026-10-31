@@ -81,6 +81,19 @@ namespace Armoury
 
         private static int Today() { return (int)CampaignTime.Now.ToDays; }
         private static string N0(double x) { return Math.Round(x).ToString("N0", Inv); }
+
+        private static bool YearOn { get { var s = Settings.Current; return s != null && s.WorksTabYearlyReturn; } }   // 305e
+
+        /// <summary>305e: oczekiwany zwrot roczny jednej pracy - srednia wyplaconego na dobe (ten sam dzielnik co widok finansow, DistrictWorks.ViewDays) razy doby roku
+        /// kalendarza gry (Armoury: 364). Tylko widok; false - wojna, wstrzymane, bezczynne (Eff 0 - ta sama zasada co ViewWorks, po recenzji 305e) albo nic nie wyplacono.</summary>
+        private static bool YearOf(DistrictWorks.MyWork w, out double perDay, out double year)
+        {
+            perDay = year = 0;
+            if (w == null || w.WarWith != null || w.Paused != null || !(w.Eff > 1e-6) || !(w.Paid28 > 0)) return false;
+            perDay = w.Paid28 / DistrictWorks.ViewDays(w);
+            year = perDay * Math.Max(1, CampaignTime.DaysInYear);
+            return year > 0;
+        }
         private static string Txt(TaleWorlds.Localization.TextObject t) { try { return t != null ? t.ToString() : "?"; } catch { return "?"; } }
 
         // ============================================================ majatki BK
@@ -245,7 +258,23 @@ namespace Armoury
                         sb.Append(", ready ").Append(Math.Round(100 * ready).ToString("0", Inv)).Append('%');
                         if (w.FullDay > w.Today) sb.Append(" - full in ").Append(w.FullDay - w.Today).Append(w.FullDay - w.Today == 1 ? " day" : " days");   // test 24.10: bez surowego numeru doby kampanii (108820 nic graczowi nie mowi)
                     }
-                    sb.Append("\nPut in ").Append(w.In.ToString("N0", Inv)).Append(" - paid to you ").Append(N0(w.Paid28)).Append(" in the last ").Append(w.PaidDaysN).Append(w.PaidDaysN == 1 ? " day, " : " days, ").Append(w.PaidAll.ToString("N0", Inv)).Append(" in all");
+                    sb.Append("\nPut in ").Append(w.In.ToString("N0", Inv)).Append(" - paid to you ").Append(N0(w.Paid28))
+                      .Append(w.SinceBuy ? " since you first paid for the works " : " in the last ").Append(w.PaidDaysN).Append(w.PaidDaysN == 1 ? " day" : " days").Append(w.SinceBuy ? " ago, " : ", ")   // 305e
+                      .Append(w.PaidAll.ToString("N0", Inv)).Append(" in all");
+                    if (YearOn && w.WarWith == null && w.Paused == null)   // 305e: oczekiwany zwrot roczny (tylko widok)
+                    {
+                        double pd, yr;
+                        if (YearOf(w, out pd, out yr))
+                            sb.Append("\nAt this pace: about ").Append(N0(yr)).Append(" a year (").Append(pd.ToString("0.0", Inv)).Append(" a day x ").Append(Math.Max(1, CampaignTime.DaysInYear))
+                              .Append(" days)").Append(w.In > 0 ? ", " + (100.0 * yr / w.In).ToString("0", Inv) + "% of what you put in" : "")
+                              .Append(w.FullDay > w.Today ? " - more once the kit is fully ready" : "");
+                        else if (!(w.Eff > 1e-6))                            // po recenzji 305e: bezczynne - jak panel Finance (bez linii), osobny napis
+                            sb.Append(w.FullDay > w.Today ? "\nAt this pace: nothing yet - the works start paying once the kit is ready"
+                                                          : "\nAt this pace: nothing - no homestead works the kit now");
+                        else if (w.PaidAll > 0)                              // po recenzji 305e: juz placila, ostatnio nic - bez "nothing paid yet"
+                            sb.Append("\nAt this pace: nothing paid in the last ").Append(w.PaidDaysN).Append(w.PaidDaysN == 1 ? " day" : " days");
+                        else sb.Append("\nAt this pace: nothing paid yet - the first coin comes when the district's carts return from market");
+                    }
                     if (w.WarWith != null) sb.Append("\nPaused - at war with ").Append(w.WarWith).Append(": pays nothing until peace");
                     if (w.Paused != null) sb.Append('\n').Append(char.ToUpperInvariant(w.Paused[0])).Append(w.Paused.Substring(1));
                     if (w.Lost > 1e-3) sb.Append("\nLost to fire: ").Append(w.Lost.ToString("0.0", Inv)).Append(" units - the homesteads stand empty; you may rebuild when people come back");
@@ -309,7 +338,11 @@ namespace Armoury
                 if (ws.Count > 0)
                 {
                     double p28 = 0; long inAll = 0; int dn = 28; var names = new List<string>();
-                    foreach (var w in ws) { p28 += w.Paid28; inAll += w.In; dn = Math.Min(dn, Math.Max(1, w.PaidDaysN)); if (!names.Contains(w.Village)) names.Add(w.Village); }
+                    var s305 = Settings.Current;
+                    bool since = s305 != null && s305.WorksPaidSinceBuy;
+                    int dMax = 1;
+                    foreach (var w in ws) { p28 += w.Paid28; inAll += w.In; dn = Math.Min(dn, Math.Max(1, w.PaidDaysN)); dMax = Math.Max(dMax, w.PaidDaysN); if (!names.Contains(w.Village)) names.Add(w.Village); }
+                    if (since) dn = Math.Min(28, dMax);   // 305e: prace mlodsze niz historia - p28 obejmuje doby najstarszej pracy (wczesniej min = doby najmlodszej)
                     // test 24.10 (zdjecie): lewa strona mowila "w ostatnich 4 dobach" (historia od wczytania zapisu sprzed m112), prawa "28" - to samo okno po obu stronach
                     sb.Append("Your village works: ").Append(string.Join(", ", names.ToArray())).Append(" - ").Append(inAll.ToString("N0", Inv)).Append(" put in, ")
                       .Append(N0(p28)).Append(" paid to you in the last ").Append(dn).Append(dn == 1 ? " day." : " days.");
@@ -367,6 +400,7 @@ namespace Armoury
                       .Append(" (wyplat ").Append(_dEstNotes).Append("), od wczytania ").Append(sesE.ToString("0", Inv))
                       .Append(" | komunikaty: prace ").Append(msgW ? "TAK" : "nie").Append(", majatki ").Append(msgE ? "TAK" : "nie")
                       .Append(" | odczyty zakladki ").Append(_dUi).Append(", lista - ").Append(SideVillageFiefUi.State)
+                      .Append(" | 305e: ").Append(YearLine())
                       .Append(" | potkniecia doby ").Append(_stDay).Append(", sesji ").Append(_st).Append('.');
                     Log.Info(sb.ToString());
                 }
@@ -380,6 +414,25 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { _stDay = 0; _dUi = 0; _dEstNotes = 0; }
+        }
+
+        /// <summary>305e: odcinek linii doby - oczekiwany zwrot roczny prac gracza (te same liczby co zakladka Fiefs) i prace liczone od zakupu.</summary>
+        private static string YearLine()
+        {
+            try
+            {
+                double yr = 0, pd = 0; long inAll = 0; int n = 0, since = 0, none = 0;
+                foreach (var w in DistrictWorks.PlayerWorks())
+                {
+                    if (w.SinceBuy) since++;
+                    double a, b;
+                    if (YearOf(w, out a, out b)) { pd += a; yr += b; inAll += w.In; n++; } else none++;
+                }
+                return "zwrot roczny prac (klucz WorksTabYearlyReturn " + (YearOn ? "TAK" : "NIE") + ", rok " + Math.Max(1, CampaignTime.DaysInYear) + " dob): prac z wyplata " + n + ", bez " + none
+                       + ", srednio " + pd.ToString("0.00", Inv) + " zl/d = " + yr.ToString("0", Inv) + " zl/rok" + (inAll > 0 ? " (" + (100.0 * yr / inAll).ToString("0.0", Inv) + "% wplat " + inAll + ")" : "")
+                       + ", od zakupu (klucz WorksPaidSinceBuy) " + since;
+            }
+            catch (Exception e) { Stumble("YearLine", e); return "zwrot roczny - blad"; }
         }
 
         private static string List(List<KeyValuePair<string, double>> per)
