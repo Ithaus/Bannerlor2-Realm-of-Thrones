@@ -62,6 +62,7 @@ namespace Armoury
         {
             public byte Want, Why;
             public bool Fire, Contact, Ours, SeenOk;
+            public bool Any, Guard;   // poprawka recenzji 310: Any = nasz szyk z decyzji 310 (poza RBM); Guard = szyk w zakresie 310 i RBM nie pyta (straz tylko wtedy)
             public ArrangementOrder.ArrangementOrderEnum Seen, Applied, Before;
             public float LastChange = -100f, LastCall = -100f, FireStart = -1f, Ratio;
         }
@@ -102,7 +103,7 @@ namespace Armoury
         private static volatile bool _guard;
         internal static bool GuardPatched;
         private static string _guardTarget = "bez latki";
-        private static int _anyWall, _anyLoose, _anyKeep, _anyHold, _anyReactN;
+        private static int _anyWall, _anyLoose, _anyKeep, _anyHold, _anyReactN, _anyOut;
         private static double _anyReact;
         private static int _gCalls, _gSwaps;                                    // prefiks (dowolny watek) - Interlocked
         private const int SArr = 4, SBeh = 7;
@@ -206,7 +207,7 @@ namespace Armoury
                 {
                     St st;
                     if (!Forms.TryGetValue(f, out st)) return;
-                    if (!st.Ours || st.Applied != ArrangementOrder.ArrangementOrderEnum.ShieldWall || !st.Fire || st.Contact) return;
+                    if (!st.Ours || st.Applied != ArrangementOrder.ArrangementOrderEnum.ShieldWall || !st.Fire || st.Contact || !st.Guard) return;
                 }
                 order = ArrangementOrder.ArrangementOrderShieldWall;
                 Interlocked.Increment(ref _gSwaps);
@@ -289,6 +290,7 @@ namespace Armoury
                                 if (st.FireStart >= 0f) { _react += now - st.FireStart; _reactN++; }
                             }
                             st.Ours = true;
+                            st.Any = false;   // poprawka recenzji 310: szyk z decyzji RBM (146), nie 310
                             st.Applied = target;
                             st.LastChange = now;
                             st.Seen = target;
@@ -482,7 +484,7 @@ namespace Armoury
                 _rbmRuns = _rbmWall = _rbmChg = _rbmToLine = _rbmToLoose = _rbmToWall = _rbmChgFire = 0;
                 for (int i = 0; i < Dry.Length; i++) Dry[i] = 0f;
                 for (int i = 0; i < Hit.Length; i++) Hit[i] = 0;
-                _anyWall = _anyLoose = _anyKeep = _anyHold = _anyReactN = 0;
+                _anyWall = _anyLoose = _anyKeep = _anyHold = _anyReactN = _anyOut = 0;
                 _anyReact = 0;
                 for (int i = 0; i < Sec.Length; i++) Sec[i] = 0f;
             }
@@ -529,7 +531,8 @@ namespace Armoury
             var cur = f.ArrangementOrder.OrderEnum;
             bool sit = false, sure = false;
             float gap = float.MaxValue;
-            int beh = 6;
+            int beh = 6, cnt = 0;
+            try { cnt = f.CountOfUnitsWithoutDetachedOnes; } catch { cnt = 0; }
             if (ai && inf)
             {
                 var fai = f.AI;
@@ -629,8 +632,13 @@ namespace Armoury
                 // 310: pomiar - szyko-sekundy pod ostrzalem przed zwarciem wedlug szyku x zachowania x tarcz w rece (szyk AI piechoty z ludzmi)
                 if (ai && inf && fire && !contact && men > 0)
                     Sec[(ArrOf(cur) * SBeh + beh) * 2 + ((float)hand / men >= WallFrom ? 1 : 0)] += PassEvery;
-                // 310: szyk, ktorego RBM nie pyta o szyk (HoldHighGround / ProtectFlank / Regroup / Defend, kompania ponizej 30) - ta sama decyzja w passie
-                if (_on && _any && !_ended && ai && inf && fire && !contact && men >= MinMenAny && _now - st.LastCall > StaleCall && (want == WWall || want == WLoose))
+                // 310: szyk, ktorego RBM nie pyta o szyk (HoldHighGround / ProtectFlank / Regroup / Defend, kompania ponizej 30) - ta sama decyzja w passie.
+                // Poprawka recenzji 310: Advance / Charge od 30 ludzi (marsz duzego szyku, RBM nie pyta przy wrogu > 150 m) poza zakresem - tam dalej 146
+                // (przywrocenie szyku sprzed zmiany); ShieldWall ma limit biegu 0.3 zamiast 0.8 w Line - podejscie pod ostrzalem 2.7 raza wolniejsze
+                bool stale = _now - st.LastCall > StaleCall;
+                bool scope = beh >= 2 || cnt < MinMen;
+                st.Guard = scope && stale;
+                if (_on && _any && !_ended && ai && inf && fire && !contact && men >= MinMenAny && scope && stale && (want == WWall || want == WLoose))
                 {
                     target = want == WWall ? ArrangementOrder.ArrangementOrderEnum.ShieldWall : ArrangementOrder.ArrangementOrderEnum.Loose;
                     if (cur == target) _anyKeep++;
@@ -643,6 +651,7 @@ namespace Armoury
                             if (st.FireStart >= 0f) { _anyReact += _now - st.FireStart; _anyReactN++; }
                         }
                         st.Ours = true;
+                        st.Any = true;
                         st.Applied = target;
                         st.LastChange = _now;
                         st.Seen = target;
@@ -651,12 +660,15 @@ namespace Armoury
                         apply = true;
                     }
                 }
-                // nasz szyk niepotrzebny, a RBM nie wola decyzji (wrog > 150 m, < 30 ludzi, inne zachowanie) - przywrocenie szyku sprzed naszej zmiany
-                if (_on && !_ended && st.Ours && ai && want == WNone && cur == st.Applied && _now - st.LastChange >= MinGap && _now - st.LastCall > StaleCall)
+                // nasz szyk niepotrzebny, a RBM nie wola decyzji (wrog > 150 m, < 30 ludzi, inne zachowanie) - przywrocenie szyku sprzed naszej zmiany.
+                // Poprawka recenzji 310: takze szyk z decyzji 310, ktory wyszedl poza jej zakres (np. HoldHighGround -> Advance od 30 ludzi)
+                if (_on && !_ended && st.Ours && ai && (want == WNone || (st.Any && !scope)) && cur == st.Applied && _now - st.LastChange >= MinGap && stale)
                 {
+                    if (want != WNone) _anyOut++;
                     restore = true;
                     back = st.Before;
                     st.Ours = false;
+                    st.Any = false;
                     st.LastChange = _now;
                     st.Seen = back;
                     _restored++;
@@ -729,7 +741,8 @@ namespace Armoury
                   .Append(" | 310 szyk bez decyzji RBM ").Append(_any ? "TAK" : "NIE").Append(" (od ").Append(MinMenAny).Append(" ludzi, RBM nie pytal od ")
                   .Append(StaleCall.ToString("0", Inv)).Append(" s): ShieldWall ").Append(_anyWall).Append(", Loose ").Append(_anyLoose).Append(", juz w szyku ").Append(_anyKeep)
                   .Append(", wstrzymane do ").Append(MinGap.ToString("0", Inv)).Append(" s ").Append(_anyHold).Append(", sr. od poczatku ostrzalu ").Append(Avg(_anyReact, _anyReactN, "0.0"))
-                  .Append(" s; straz szyku (Formation.SetArrangementOrder) ").Append(_guardTarget).Append(": wywolan ").Append(Volatile.Read(ref _gCalls))
+                  .Append(" s, przywrocone po wyjsciu z zakresu (Advance/Charge od ").Append(MinMen).Append(") ").Append(_anyOut)
+                  .Append("; straz szyku (Formation.SetArrangementOrder, tylko zakres 310 bez RBM) ").Append(_guardTarget).Append(": wywolan ").Append(Volatile.Read(ref _gCalls))
                   .Append(", Line/Loose zamienione na ShieldWall ").Append(Volatile.Read(ref _gSwaps));
                 float wl = 0f, all = 0f;
                 for (int i = 0; i < Sec.Length; i++) all += Sec[i];

@@ -600,14 +600,15 @@ namespace Armoury
             {
                 // 204: wykrycie konnego strzelca - przed bramkami 140 (wlasny try w OnFire)
                 if (hunt) HorsePursuit.OnFire(m, q[i].K, q[i].A, q[i].V, q[i].P, q[i].Vel);
-                // 310: strzal AI - czysty cel (po 204, ktory moze wziac strzelca; wlasny try w OnShot, niezaleznie od bramki 140)
-                if (clean && q[i].K == 1) CleanShot.OnShot(m, q[i].A, q[i].Thrown);
                 try
                 {
                     if (q[i].K == 1) Shot(m, ref q[i], act && deployed);
                     else if (q[i].K == 2) Hit(m, ref q[i], act && deployed, deployed);
                 }
                 catch (Exception e) { Stumble("ShieldsUp.Zdarzenie", e); }
+                // 310: strzal AI - czysty cel (po 204, ktory moze wziac strzelca; wlasny try w OnShot, niezaleznie od bramki 140).
+                // Poprawka recenzji 310: PO 140 (S2) - 140 czyta cel, w ktory strzala naprawde leci; CleanShot moze go potem zmienic
+                if (clean && q[i].K == 1) CleanShot.OnShot(m, q[i].A, q[i].Thrown);
                 q[i].A = null; q[i].V = null;
             }
             if (clean) CleanShot.FrameEnd();

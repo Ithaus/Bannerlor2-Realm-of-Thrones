@@ -86118,6 +86118,7 @@ def bitwa307b_main(logp):
     cause = [0] * 8
     pain = woundn = healthy = 0
     held = turned = blocked = 0
+    free310 = 0
     keyon = False
     for l in pr:
         m = B307_PR.search(l)
@@ -86126,6 +86127,9 @@ def bitwa307b_main(logp):
                 bad1.append("format: " + l[:120])
             continue
         n1 += 1
+        fr = re.search(r"droga wolna bez oceny kierunku \(310\) (\d+)", l)
+        if fr:
+            free310 += int(fr.group(1))
         t = B307_PRT.search(l)
         if t:
             secs += int(t.group(1)); slow += int(t.group(2))
@@ -86144,8 +86148,9 @@ def bitwa307b_main(logp):
             + ", ".join(f"{names[j]} {cause[j]} s" for j in range(8)), "INFO (cel < 30%; 142a: 82-98%)", None)
     rep.add("B307-1b: HP przy wejsciu w panike", f"ponizej progu bolu {pain}, ponizej progu kary ran {woundn}, zdrowszych {healthy}",
             "INFO (ilu lamie sie prawie martwych - bol FieldCraft)", None)
-    rep.add("B307-1c: kurs ucieczki (PanicFleeHoldCourse)", f"klucz {'TAK' if keyon else 'NIE/brak'}: utrzymany {held}, zmieniony bez blokady {turned}, przy zablokowanej drodze {blocked}",
-            "INFO (przy TAK zmiany prawie tylko zablokowane)", None)
+    rep.add("B307-1c: kurs ucieczki (PanicFleeHoldCourse)", f"klucz {'TAK' if keyon else 'NIE/brak'}: utrzymany {held + free310} (w tym droga wolna bez oceny 310: {free310}), "
+            f"zmieniony bez blokady {turned}, przy zablokowanej drodze {blocked}",
+            "INFO (przy TAK zmiany prawie tylko zablokowane; od 310 kurs trzymany = utrzymany + droga wolna bez oceny)", None)
     esc, n_lz, run = 0, 0, []
     for l in lz:
         m = B307_LZ.search(l)
@@ -86620,13 +86625,14 @@ def main(argv):
 B310_CS = re.compile(r"Czysty strzal \(310\): misja (\S+), klucz (TAK|NIE)[^|]*\| strzalow AI w kolejce (\d+), kontroli (\d+), czyste (\d+), brudne: klebowisko (\d+) "
                      r"\(<10/10-39/40-99/100\+ m (\d+)/(\d+)/(\d+)/(\d+)\), linia zajeta (\d+) \((\d+)/(\d+)/(\d+)/(\d+)\), nasz cel znow brudny (\d+) \| reakcja: nowy cel (\d+) "
                      r"\(tyl szyku (\d+), strzelcy (\d+), inny szyk (\d+)\), bez czystego celu (\d+) \(wstrzyman (\d+), szyk piechoty bez wstrzymania (\d+)\), wstrzymanie sr\. "
-                     r"(\S+) s, najdluzsze (\S+) s, ludzi wstrzymanych ponad 20 s lacznie (\d+), strzalow mimo wstrzymania (\d+) \| zwolnienia: .*?\| pominiete: .*?"
-                     r"ponad budzet (\d+) \| zapytan (\d+), promieni (\d+) \| koszt (\S+) ms razem, najwiecej (\S+) ms na klatke \| potkniecia (\d+)\.")
+                     r"(\S+) s, najdluzsze (\S+) s, ludzi wstrzymanych ponad 20 s lacznie (\d+), strzalow mimo wstrzymania (\d+)[^|]* \| zwolnienia: .*?\| pominiete: .*?"
+                     r"ponad budzet (\d+).*? \| zapytan (\d+), promieni (\d+) \| koszt (\S+) ms razem, najwiecej (\S+) ms na klatke(?: \(Drain \+ przeglad\))? \| potkniecia (\d+)\.")
 B310_FF = re.compile(r"FF \(pole\): klucze .*?pociski (\d+) \(AI (\d+), gracz (\d+)\).*?\| pociski AI w swoich \(310\) wedlug odleglosci <10/10-39/40-99/100\+ m "
                      r"(\d+)/(\d+)/(\d+)/(\d+), ofiara konny/strzelec/pieszy (\d+)/(\d+)/(\d+)")
 B310_140 = re.compile(r"Bitwa \(140 tarcze\): .*?strzalow AI z celem (\d+), .*?trafien (\d+) \(tarcza w rece (\d+), tarcza na plecach (\d+), cialo (\d+)\)")
 B310_SZ = re.compile(r"\| 310 szyk bez decyzji RBM (TAK|NIE) \(od (\d+) ludzi, RBM nie pytal od (\d+) s\): ShieldWall (\d+), Loose (\d+), juz w szyku (\d+), wstrzymane do "
-                     r"(\d+) s (\d+), sr\. od poczatku ostrzalu (\S+) s; straz szyku \(Formation\.SetArrangementOrder\) (.+?): wywolan (\d+), Line/Loose zamienione na "
+                     r"(\d+) s (\d+), sr\. od poczatku ostrzalu (\S+) s(?:, przywrocone po wyjsciu z zakresu \(Advance/Charge od \d+\) \d+)?; "
+                     r"straz szyku \(Formation\.SetArrangementOrder(?:, tylko zakres 310 bez RBM)?\) (.+?): wywolan (\d+), Line/Loose zamienione na "
                      r"ShieldWall (\d+) \| szyko-s pod ostrzalem przed zwarciem \(310\): razem (\S+), Line z >=60% tarcz w rece (\S+) \(")
 B310_RK = re.compile(r"\| tick RoutKeeper: sr\. (\S+) ms \(klatek z praca (\d+)\), najwiecej (\S+) ms \| budzet RoutKeeper \(310, klucz (TAK|NIE)\): limit czasu ticku "
                      r"(\S+) ms trafiony (\d+) razy, faza ocen rozrzucona (\d+) \|")
@@ -86637,17 +86643,19 @@ B310_SAMPLE_CS = ("[16:20:00] Czysty strzal (310): misja bitwa, klucz TAK (swoj 
                   "kandydatow, wlasnosc 8 s, wstrzymanie 3 s) | strzalow AI w kolejce 2200, kontroli 1800, czyste 1300, brudne: klebowisko 400 (<10/10-39/40-99/100+ m "
                   "10/40/200/150), linia zajeta 100 (20/80/0/0), nasz cel znow brudny 30 | reakcja: nowy cel 300 (tyl szyku 200, strzelcy 50, inny szyk 50), bez czystego "
                   "celu 200 (wstrzyman 150, szyk piechoty bez wstrzymania 50), wstrzymanie sr. 3.1 s, najdluzsze 3.5 s, ludzi wstrzymanych ponad 20 s lacznie 0, strzalow "
-                  "mimo wstrzymania 2 | zwolnienia: cel padl 50, czas 200, panika 5, przejete przez 204/283/148 3, chorazy 0, koniec misji 10 | pominiete: gracz 0, bron "
-                  "rzucana 20, bez celu 49, 204/283/148 24, chorazy 1, panika / odwrot 5, poza szykiem 30, machina 0, ponad budzet 12 | zapytan 2500, promieni 300 | koszt "
-                  "40.2 ms razem, najwiecej 0.450 ms na klatke | potkniecia 0.")
+                  "mimo wstrzymania 2, przedluzen (cel silnika wciaz w klebowisku, do 9 s) 40, zdjete przez wroga w 6 m 3 | zwolnienia: cel padl 50, czas 200, panika 5, "
+                  "przejete przez 204/283/148 3, chorazy 0, koniec misji 10, wrog w 6 m 12, bron biala / pusty kolczan 4, szarza szyku 1 (kontroli zagrozenia 900) | "
+                  "pominiete: gracz 0, bron rzucana 20, bez celu 49, 204/283/148 24, chorazy 1, panika / odwrot 5, poza szykiem 30, machina 0, ponad budzet 12, szyk gracza "
+                  "ze wskazanym celem (tylko tyl szyku celu) 0 | bez reakcji na brudny strzal: wrog w 6 m 7, szarza szyku 2 | zapytan 2500, promieni 300 | koszt "
+                  "40.2 ms razem, najwiecej 0.450 ms na klatke (Drain + przeglad) | potkniecia 0.")
 B310_SAMPLE_FF = ("[16:20:00] FF (pole): klucze pociski 100%, wrecz 50%, szarza 50% | trafienia swoich: wrecz 33 (AI 33, gracz 0), pociski 15 (AI 15, gracz 0), szarza 1 "
                   "(AI 1, gracz 0) | pociski AI w swoich (310) wedlug odleglosci <10/10-39/40-99/100+ m 2/3/6/4, ofiara konny/strzelec/pieszy 5/2/8 | bramki gry otwarte: "
                   "wrecz 52, pociski AI 15, szarza 1; pociski anulowane przy 0% 0 | potkniecia 0 (sesja 0) | koniec: koniec misji.")
 B310_SAMPLE_140 = ("[16:20:00] Bitwa (140 tarcze): misja bitwa, klucz TAK (...) | ostrzal: strzalow AI z celem 2163, AI bez celu 49, gracza 0, bohatera gracza pod SI 0 "
                    "(bez celu: punkt upadku z balistyki), pudel z punktem upadku 242, trafien 485 (tarcza w rece 200, tarcza na plecach 0, cialo 285), szykow pod ostrzalem 4")
 B310_SAMPLE_SZ = ("[16:20:00] Szyk pod ostrzalem (146): misja bitwa, klucz TAK (...) | trafienia pociskami przed zwarciem ... | 310 szyk bez decyzji RBM TAK (od 8 ludzi, RBM "
-                  "nie pytal od 3 s): ShieldWall 5, Loose 1, juz w szyku 40, wstrzymane do 10 s 3, sr. od poczatku ostrzalu 2.5 s; straz szyku (Formation.SetArrangementOrder) "
-                  "TAK: wywolan 900, Line/Loose zamienione na ShieldWall 120 | szyko-s pod ostrzalem przed zwarciem (310): razem 300.0, Line z >=60% tarcz w rece 4.5 "
+                  "nie pytal od 3 s): ShieldWall 5, Loose 1, juz w szyku 40, wstrzymane do 10 s 3, sr. od poczatku ostrzalu 2.5 s, przywrocone po wyjsciu z zakresu "
+                  "(Advance/Charge od 30) 1; straz szyku (Formation.SetArrangementOrder, tylko zakres 310 bez RBM) TAK: wywolan 900, Line/Loose zamienione na ShieldWall 120 | szyko-s pod ostrzalem przed zwarciem (310): razem 300.0, Line z >=60% tarcz w rece 4.5 "
                   "(szyk/zachowanie/tarcze>=60%: ShieldWall/HoldHighGround/TAK 200.0, Line/ProtectFlank/TAK 4.5) | potkniecia szyk 0 (w latce 0).")
 B310_SAMPLE_RK = ("[16:20:00] PANIKA BEZ POWROTU (142): misja bitwa ... (koniec misji 500 s) | tick RoutKeeper: sr. 0.150 ms (klatek z praca 3000), najwiecej 1.420 ms "
                   "| budzet RoutKeeper (310, klucz TAK): limit czasu ticku 1.2 ms trafiony 12 razy, faza ocen rozrzucona 180 | potkniecia powrot 0.")
@@ -86672,16 +86680,21 @@ def b310_rows(rep, cs, ff, h140, sz, rk, ku):
         n += 1
         if int(m.group(33)) > 0:
             bad.append("potkniecia " + m.group(33))
-        if m.group(2) == "TAK" and int(m.group(26)) > 0:
-            bad.append("wstrzymani ponad 20 s " + m.group(26))
+        hm = _f310(m.group(25))
+        if m.group(2) == "TAK" and hm is not None and hm > 11.0:
+            bad.append("najdluzsze wstrzymanie " + m.group(25) + " s")
         w = _f310(m.group(32))
         if w is not None and w >= 2.0:
             bad.append("koszt najwiecej " + m.group(32) + " ms")
         chk = int(m.group(4))
         dirty.append(f"{m.group(2)}: kontroli {chk}, klebowisko {m.group(6)} ({m.group(7)}/{m.group(8)}/{m.group(9)}/{m.group(10)}), linia {m.group(11)}")
         react.append(f"nowy cel {m.group(17)} (tyl {m.group(18)}/strzelcy {m.group(19)}/inny {m.group(20)}), wstrzyman {m.group(22)} (sr. {m.group(24)} s), "
-                     f"piechota bez {m.group(23)}, ponad budzet {m.group(28)}, koszt {m.group(31)} ms (najw. {m.group(32)})")
-    rep.add("B310-1: czysty strzal (310) - format, potkniecia 0, wstrzymani ponad 20 s 0 (klucz TAK), koszt < 2 ms na klatke",
+                     f"piechota bez {m.group(23)}, ludzi ponad 20 s lacznie {m.group(26)}, ponad budzet {m.group(28)}, koszt {m.group(31)} ms (najw. {m.group(32)})")
+        zw = re.search(r"wrog w 6 m (\d+), bron biala / pusty kolczan (\d+), szarza szyku (\d+)", l)
+        if zw:
+            react.append(f"zwolnienia: wrog blisko {zw.group(1)}, bron biala/kolczan {zw.group(2)}, szarza {zw.group(3)}")
+    rep.add("B310-1: czysty strzal (310) - format, potkniecia 0, najdluzsze wstrzymanie <= 11 s (klucz TAK; 3 s + przedluzenia do 9 s + przeglad), "
+            "koszt Drain + przeglad < 2 ms na klatke",
             f"linii {n}, zlych {len(bad)}" + (f" ({bad[0]})" if bad else ""), "zlych 0 (brak linii - INFO)", None if n == 0 and not bad else not bad)
     rep.add("B310-1b: kontrole i reakcje", "; ".join(dirty[:6]) + (" || " + "; ".join(react[:6]) if react else "") or "-",
             "INFO (brudne przy kluczu NIE = baza; przy TAK nowy cel >> wstrzymania)", None)
@@ -86707,7 +86720,8 @@ def b310_rows(rep, cs, ff, h140, sz, rk, ku):
             continue
         rows.append(f"{100.0 * ai / (ai + hits):.1f}% ({ai}/{ai + hits}, strzalow AI z celem {h.group(1)})")
     rep.add("B310-2: udzial pociskow AI w swoich = FF AI / (FF AI + trafienia wroga 140), bitwy od 100 trafien", "; ".join(rows[:9]) or "-",
-            "INFO (cel < 5%; baza 144a/145a/145b b8/b9 12.4-21.4%, Willow 17.6%)", None)
+            "INFO (licznik FF AI obejmuje tez bron rzucana, ktorej 310 nie rusza; realny cel 8-12% - pierwsza strzala w klebowisko leci; porownac z kluczem NIE; "
+            "baza 144a/145a/145b b8/b9 12.4-21.4%, Willow 17.6%)", None)
     rep.add("B310-2a: format FF (310) i koszyki odleglosci FF AI <10/10-39/40-99/100+ m", f"zlych {len(bad2)}; " + ("; ".join(bk[:9]) or "-"),
             "zlych 0 (brak linii - INFO); probka 6 bitew: 18/16/38/25", None if not ff and not bad2 else not bad2)
     # B310-3
@@ -86740,7 +86754,7 @@ def b310_rows(rep, cs, ff, h140, sz, rk, ku):
         m = B310_KU.search(l)
         if m:
             ks.append(f"{m.group(1)}: utrzymany {m.group(2)}, przy blokadzie {m.group(4)}, droga wolna bez oceny {m.group(5)}")
-    rep.add("B310-5: kurs ucieczki - droga wolna bez oceny kierunku", "; ".join(ks[:9]) or "-", "INFO (klucz TAK: wolna >> utrzymany; zmieniony bez blokady 0)", None)
+    rep.add("B310-5: kurs ucieczki - droga wolna bez oceny kierunku", "; ".join(ks[:9]) or "-", "INFO (klucz TAK: utrzymany przechodzi do 'droga wolna' - z definicji wolna >> utrzymany; patrz B307-1c suma; zmieniony bez blokady 0)", None)
 
 
 def bitwa310_selftest():
@@ -86757,7 +86771,7 @@ def bitwa310_selftest():
     if "3.0% (15/500" not in v["B310-2"][1]:
         return "udzial FF: " + v["B310-2"][1]
     rep = Report()
-    b310_rows(rep, [B310_SAMPLE_CS.replace("ponad 20 s lacznie 0", "ponad 20 s lacznie 3")], [(10, B310_SAMPLE_FF.replace("(310) wedlug", "(310) wg"))], [],
+    b310_rows(rep, [B310_SAMPLE_CS.replace("najdluzsze 3.5 s", "najdluzsze 14.5 s")], [(10, B310_SAMPLE_FF.replace("(310) wedlug", "(310) wg"))], [],
               [B310_SAMPLE_SZ.replace("| 310 szyk bez", "| 310 szk bez")], [B310_SAMPLE_RK.replace("trafiony 12 razy", "trafiony razy")], [])
     v = {r[0].split(":")[0]: r[3] for r in rep.rows}
     miss = [k for k in ("B310-1", "B310-2a", "B310-3", "B310-4") if v.get(k) != "NIE"]

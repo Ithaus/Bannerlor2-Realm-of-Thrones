@@ -29,14 +29,20 @@ namespace Armoury
     /// Pominieci: gracz, bron rzucana (FF z probki to same strzaly), 204/283 i 148 (maja swoj cel), chorazy (RBM steruje celem), panika / odwrot,
     /// odlaczeni od szyku, machiny, bitwy morskie i oblezenia (na start tylko bitwa polowa).
     /// Budzet: najwyzej 6 kontroli i 12 zapytan / promieni na klatke (nadmiar liczony i pominiety); przeglad wlasnosci i wstrzyman co 0.5 s, najwyzej 16 wpisow.
+    /// Poprawki recenzji 310: wywolanie PO 140 (S2 czyta cel, w ktory strzala leci); terminy calej listy co 0.5 s; wrog w 6 m / bron biala / pusty kolczan /
+    /// szarza szyku - zwolnienie (automat celu gry, czlowiek walczy o zycie; 48 zapytan na pass) i bez reakcji przy strzale; wstrzymanie przedluzane do 9 s,
+    /// gdy cel silnika wciaz w klebowisku; szyk gracza ze wskazanym celem - tylko tyl szyku celu; koszt = Drain + przeglad, raz na klatke.
     /// Strzal przychodzi po zwolnieniu cieciwy - pierwsza strzala w klebowisko i tak poleci (lucznik widzi efekt i zmienia cel).
     /// Bez zmiany obrazen i procentu FF, bez premii. Potkniecia liczone (RoutHold miejsce "tarcze"), funkcji nie gasimy.
     /// Linia "Czysty strzal (310)" raz na bitwe polowa (BattleSense.Clean po linii 140).
     /// </summary>
     internal static class CleanShot
     {
-        internal const int ChecksPerFrame = 6, QueriesPerFrame = 12, CandMax = 4, ReviewPer = 16, UnitScan = 120;
+        internal const int ChecksPerFrame = 6, QueriesPerFrame = 12, CandMax = 4, ReviewPer = 16, UnitScan = 120, ThreatPer = 48;
         internal const float FlatRange = 40f, NearR = ShieldsUp.RaiseNear + ShieldsUp.MissRadius, OwnFor = 8f, HoldFor = 3f, ReviewEvery = 0.5f, Screen = 30f;
+        // poprawka recenzji 310: wrog w ThreatR od strzelca z naszym celem / wstrzymaniem - zwolnienie (automat celu gry wraca, czlowiek walczy o zycie;
+        // RBM AgentAi.cs:617-629 robi to samo chorazym w 5 m); wstrzymanie przedluzane, gdy cel silnika wciaz w klebowisku - najwyzej HoldMax lacznie
+        internal const float ThreatR = 6f, HoldMax = 9f;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private sealed class Own
@@ -50,13 +56,14 @@ namespace Armoury
         private static bool _live, _key, _written;
         private static string _kind = "?";
         private static float _now, _acc;
-        private static int _frameChecks, _frameQ, _rot, _scan;
+        private static int _frameChecks, _frameQ, _rot, _scan, _rotT;
         private static bool _anyDue;
         private static long _frameTicks, _sumTicks, _maxTicks;
 
         private static readonly Dictionary<Agent, Own> By = new Dictionary<Agent, Own>();
         private static readonly List<Own> L = new List<Own>();
-        private static readonly Dictionary<int, float> HoldSum = new Dictionary<int, float>();
+        private static readonly Dictionary<Agent, float> HoldSum = new Dictionary<Agent, float>();   // poprawka recenzji 310: klucz Agent (Index wraca u posilkow)
+        private static readonly MBList<Agent> TBuf = new MBList<Agent>();
         private static readonly MBList<Agent> Buf = new MBList<Agent>();
         private static readonly List<Agent> Units = new List<Agent>();
         private static readonly Action<Agent> Collect = a => Units.Add(a);
@@ -68,6 +75,7 @@ namespace Armoury
         private static readonly int[] DirtyBy = new int[4], LineBy = new int[4];
         private static int _newRear, _newRanged, _newOther, _held, _heldInf, _noCand, _shotHeld, _reDirty;
         private static int _relDead, _relTime, _relPanic, _relTaken, _relBanner, _relEnd;
+        private static int _relNear, _relWeapon, _relCharge, _holdExt, _holdNear, _skOrder, _threatChecks, _skNear, _skCharge;
         private static int _skPlayer, _skThrown, _skNoTarget, _skHunt, _skBanner, _skPanic, _skDetached, _skObject;
         private static float _holdSecs, _holdMax;
         private static int _holdN;
@@ -95,13 +103,14 @@ namespace Armoury
 
         private static void Clear()
         {
-            By.Clear(); L.Clear(); HoldSum.Clear(); Buf.Clear(); Units.Clear(); Cand.Clear(); CandKind.Clear();
-            _acc = 0f; _frameChecks = _frameQ = _rot = _scan = 0; _anyDue = false;
+            By.Clear(); L.Clear(); HoldSum.Clear(); Buf.Clear(); TBuf.Clear(); Units.Clear(); Cand.Clear(); CandKind.Clear();
+            _acc = 0f; _frameChecks = _frameQ = _rot = _scan = _rotT = 0; _anyDue = false;
             _frameTicks = _sumTicks = _maxTicks = 0;
             _seen = _checks = _clean = _dirty = _line = _over = _queries = _rays = _stum = 0;
             Array.Clear(DirtyBy, 0, 4); Array.Clear(LineBy, 0, 4);
             _newRear = _newRanged = _newOther = _held = _heldInf = _noCand = _shotHeld = _reDirty = 0;
             _relDead = _relTime = _relPanic = _relTaken = _relBanner = _relEnd = 0;
+            _relNear = _relWeapon = _relCharge = _holdExt = _holdNear = _skOrder = _threatChecks = _skNear = _skCharge = 0;
             _skPlayer = _skThrown = _skNoTarget = _skHunt = _skBanner = _skPanic = _skDetached = _skObject = 0;
             _holdSecs = _holdMax = 0f; _holdN = 0;
         }
@@ -122,16 +131,18 @@ namespace Armoury
 
         // ------------------------------------------------------------ klatka (ShieldsUp.Drain / Tick, glowny watek)
 
-        /// <summary>Poczatek Drain: budzet klatki od zera.</summary>
+        /// <summary>Poczatek Drain: budzet klatki od zera (czas klatki zbierany dalej - oddaje go Tick, raz na klatke).</summary>
         internal static void Frame()
         {
             _frameChecks = 0;
             _frameQ = 0;
-            _frameTicks = 0;
         }
 
-        /// <summary>Koniec Drain: czas klatki do linii 310 i do 309 (modul bez dokladania do sumy klatki - liczony juz w "tarcze 140").</summary>
-        internal static void FrameEnd()
+        /// <summary>Koniec Drain - poprawka recenzji 310: czas oddaje Flush w Tick (suma Drain + przeglad, jedno AddTicks na klatke).</summary>
+        internal static void FrameEnd() { }
+
+        /// <summary>Czas klatki (Drain + przeglad) do linii 310 i do 309 (modul bez dokladania do sumy klatki - liczony juz w "tarcze 140").</summary>
+        private static void Flush()
         {
             if (_frameTicks <= 0) return;
             _sumTicks += _frameTicks;
@@ -187,6 +198,17 @@ namespace Armoury
             if (dirty) { _dirty++; DirtyBy[b]++; } else { _line++; LineBy[b]++; }
             if (e != null && e.Owned) _reDirty++;
             if (!_key) return;   // klucz NIE: tylko pomiar
+            // poprawka recenzji 310: wrog przy strzelcu albo szarza szyku - bez reakcji (automat celu gry, czlowiek broni sie jak umie)
+            {
+                var sf = s.Formation;
+                var oe = sf != null ? sf.GetReadonlyMovementOrderReference().OrderEnum : MovementOrder.MovementOrderEnum.Stop;
+                if (oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget) { _skCharge++; return; }
+            }
+            if (d < ThreatR) { _skNear++; return; }
+            if (_frameQ >= QueriesPerFrame) { _over++; return; }
+            _frameQ++;
+            _queries++;
+            if (EnemyNear(m, s)) { _skNear++; return; }
             byte kind;
             Agent c = Pick(m, s, t, d, out kind);
             if (c != null)
@@ -321,8 +343,12 @@ namespace Armoury
                 if (b1 != null) { Cand.Add(b1); CandKind.Add(0); }
                 if (b2 != null) { Cand.Add(b2); CandKind.Add(0); }
             }
-            // 1 / 2: inne szyki strony celu - strzelcy najpierw, po jednym (mediana)
-            if (team != null)
+            // 1 / 2: inne szyki strony celu - strzelcy najpierw, po jednym (mediana). Poprawka recenzji 310: szyk pod rozkazami gracza ze wskazanym
+            // szykiem celu (TargetFormation) - tylko tyl szyku celu, bez zmiany szyku wbrew rozkazowi
+            bool ordered = false;
+            try { var sf = s.Formation; ordered = sf != null && !sf.IsAIControlled && sf.TargetFormation != null; } catch { ordered = false; }
+            if (ordered) _skOrder++;
+            if (team != null && !ordered)
             {
                 var fl = team.FormationsIncludingSpecialAndEmpty;
                 int nf = fl != null ? fl.Count : 0;
@@ -360,13 +386,16 @@ namespace Armoury
         {
             if (!Mine(m)) return;
             _now = m.CurrentTime;
-            if (L.Count == 0) { _acc = 0f; return; }
+            if (L.Count == 0) { _acc = 0f; Flush(); return; }
             long t0 = Stopwatch.GetTimestamp();
             try
             {
                 _acc += dt;
                 bool pass = _acc >= ReviewEvery;
                 if (pass) _acc = 0f;
+                // poprawka recenzji 310: terminy (koniec wstrzymania / wlasnosci) dla CALEJ listy co 0.5 s - same porownania; wrog blisko, bron biala,
+                // pusty kolczan, szarza - najwyzej ThreatPer zapytan na pass (osobna rotacja)
+                if (pass) Due(m);
                 if (pass || _anyDue)
                 {
                     _anyDue = false;
@@ -389,10 +418,65 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("CleanShot.Przeglad", e); }
-            long dtk = Stopwatch.GetTimestamp() - t0;
-            _sumTicks += dtk;
-            if (dtk > _maxTicks) _maxTicks = dtk;
-            FrameCost309.AddTicks(FrameCost309.MClean, dtk);
+            _frameTicks += Stopwatch.GetTimestamp() - t0;
+            Flush();
+        }
+
+        /// <summary>Pass co 0.5 s: terminy calej listy (Due) i zagrozenie strzelca (zwolnienie od razu - czlowiek walczy o zycie).</summary>
+        private static void Due(Mission m)
+        {
+            int n = L.Count;
+            for (int i = 0; i < n; i++)
+            {
+                var e = L[i];
+                if ((e.Held && _now >= e.HoldUntil) || (e.Owned && _now >= e.OwnUntil)) { e.Due = true; _anyDue = true; }
+            }
+            int start = n > 0 ? _rotT % n : 0, done = 0;
+            for (int k = 0; k < n && done < ThreatPer; k++)
+            {
+                var e = L[(start + k) % n];
+                if (!e.Owned && !e.Held) continue;
+                done++;
+                try { Threat(m, e); }
+                catch (Exception ex) { Stumble("CleanShot.Zagrozenie", ex); }
+            }
+            _rotT = start + done;
+        }
+
+        private static void Threat(Mission m, Own e)
+        {
+            var a = e.A;
+            if (a == null || !a.IsActive() || a.Team == null) return;
+            if (e.Owned)
+            {
+                bool ranged = false;
+                int ammo = 1;
+                try
+                {
+                    var w = a.WieldedWeapon;
+                    var u = w.IsEmpty ? null : w.CurrentUsageItem;
+                    ranged = u != null && u.IsRangedWeapon;
+                    if (ranged)
+                    {
+                        var mi = a.GetPrimaryWieldedItemIndex();
+                        if (u.IsConsumable) ammo = w.Amount;
+                        else if (mi != TaleWorlds.Core.EquipmentIndex.None) ammo = a.Equipment.GetAmmoAmount(mi);
+                    }
+                }
+                catch { ranged = true; ammo = 1; }
+                if (!ranged || ammo <= 0) { _relWeapon++; Release(e, true); }
+                else
+                {
+                    var f = a.Formation;
+                    var oe = f != null ? f.GetReadonlyMovementOrderReference().OrderEnum : MovementOrder.MovementOrderEnum.Stop;
+                    if (oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget) { _relCharge++; Release(e, true); }
+                }
+            }
+            if (!e.Owned && !e.Held) return;
+            _threatChecks++;
+            if (!EnemyNear(m, a)) return;
+            if (e.Owned) { _relNear++; Release(e, true); }
+            if (e.Held) { _holdNear++; EndHold(e, true); }
         }
 
         private static void Review(Own e)
@@ -411,7 +495,14 @@ namespace Armoury
                     if (e.Owned) Release(e, true);
                     return;
                 }
-                if (e.Held && _now >= e.HoldUntil) EndHold(e, true);
+                if (e.Held && _now >= e.HoldUntil)
+                {
+                    // poprawka recenzji 310: cel silnika wciaz w klebowisku ze swoimi - wstrzymanie dluzej (najwyzej HoldMax od poczatku); bez budzetu - nastepna klatka
+                    int r = _key ? StillDirty(a) : 0;
+                    if (r < 0 && _now - e.HoldUntil < 1f) { e.Due = true; _anyDue = true; }   // bez budzetu najwyzej 1 s zwloki - potem koniec wstrzymania
+                    else if (r == 1 && _now - e.HoldStart + HoldFor <= HoldMax + 0.01f) { e.HoldUntil = _now + HoldFor; _holdExt++; }
+                    else EndHold(e, true);
+                }
                 if (e.Owned)
                 {
                     var t = e.T;
@@ -420,6 +511,40 @@ namespace Armoury
                 }
             }
             catch (Exception ex) { Stumble("CleanShot.Wpis", ex); e.Owned = false; e.Held = false; }
+        }
+
+        /// <summary>Aktywny, nieuciekajacy wrog (czlowiek albo kon z jezdzcem) w ThreatR od strzelca - jedno zapytanie.</summary>
+        private static bool EnemyNear(Mission m, Agent a)
+        {
+            try
+            {
+                m.GetNearbyEnemyAgents(a.Position.AsVec2, ThreatR, a.Team, TBuf);
+                for (int i = 0; i < TBuf.Count; i++)
+                {
+                    var x = TBuf[i];
+                    if (x == null || !x.IsActive()) continue;
+                    var o = x.IsMount ? x.RiderAgent : x;
+                    if (o == null || !o.IsHuman || !o.IsActive() || o.IsRunningAway) continue;
+                    return true;
+                }
+            }
+            finally { TBuf.Clear(); }
+            return false;
+        }
+
+        /// <summary>Koniec wstrzymania: czy cel silnika (automat celu dziala) wciaz w klebowisku. 1 = brudny, 0 = czysty / brak celu, -1 = bez budzetu klatki.</summary>
+        private static int StillDirty(Agent s)
+        {
+            Agent t = null;
+            try { t = s.GetTargetAgent(); } catch { t = null; }
+            if (t == null || !t.IsActive()) return 0;
+            Agent tm = t.IsMount ? t.RiderAgent : t;
+            if (tm == null || tm.Team == null || s.Team == null || !tm.Team.IsEnemyOf(s.Team)) return 0;
+            if (_frameQ >= QueriesPerFrame) return -1;
+            var m = s.Mission;
+            if (m == null) return 0;
+            Vec2 from = s.Position.AsVec2;
+            return Dirty(m, s, t, from, from.Distance(t.Position.AsVec2)) ? 1 : 0;
         }
 
         /// <summary>Automat celu gry z powrotem (wzor HorsePursuit.cs:311/966).</summary>
@@ -446,8 +571,8 @@ namespace Armoury
             if (a != null)
             {
                 float s;
-                HoldSum.TryGetValue(a.Index, out s);
-                HoldSum[a.Index] = s + dur;
+                HoldSum.TryGetValue(a, out s);
+                HoldSum[a] = s + dur;
             }
             if (!apply || a == null || !a.IsActive()) return;
             try
@@ -541,14 +666,19 @@ namespace Armoury
               .Append(", inny szyk ").Append(_newOther).Append("), bez czystego celu ").Append(_noCand).Append(" (wstrzyman ").Append(_held)
               .Append(", szyk piechoty bez wstrzymania ").Append(_heldInf).Append("), wstrzymanie sr. ").Append(_holdN > 0 ? (_holdSecs / _holdN).ToString("0.0", Inv) : "-")
               .Append(" s, najdluzsze ").Append(_holdMax.ToString("0.0", Inv)).Append(" s, ludzi wstrzymanych ponad 20 s lacznie ").Append(over20)
-              .Append(", strzalow mimo wstrzymania ").Append(_shotHeld)
+              .Append(", strzalow mimo wstrzymania ").Append(_shotHeld).Append(", przedluzen (cel silnika wciaz w klebowisku, do ").Append(HoldMax.ToString("0", Inv))
+              .Append(" s) ").Append(_holdExt).Append(", zdjete przez wroga w ").Append(ThreatR.ToString("0", Inv)).Append(" m ").Append(_holdNear)
               .Append(" | zwolnienia: cel padl ").Append(_relDead).Append(", czas ").Append(_relTime).Append(", panika ").Append(_relPanic)
               .Append(", przejete przez 204/283/148 ").Append(_relTaken).Append(", chorazy ").Append(_relBanner).Append(", koniec misji ").Append(_relEnd)
+              .Append(", wrog w ").Append(ThreatR.ToString("0", Inv)).Append(" m ").Append(_relNear).Append(", bron biala / pusty kolczan ").Append(_relWeapon)
+              .Append(", szarza szyku ").Append(_relCharge).Append(" (kontroli zagrozenia ").Append(_threatChecks).Append(')')
               .Append(" | pominiete: gracz ").Append(_skPlayer).Append(", bron rzucana ").Append(_skThrown).Append(", bez celu ").Append(_skNoTarget)
               .Append(", 204/283/148 ").Append(_skHunt).Append(", chorazy ").Append(_skBanner).Append(", panika / odwrot ").Append(_skPanic)
               .Append(", poza szykiem ").Append(_skDetached).Append(", machina ").Append(_skObject).Append(", ponad budzet ").Append(_over)
+              .Append(", szyk gracza ze wskazanym celem (tylko tyl szyku celu) ").Append(_skOrder)
+              .Append(" | bez reakcji na brudny strzal: wrog w ").Append(ThreatR.ToString("0", Inv)).Append(" m ").Append(_skNear).Append(", szarza szyku ").Append(_skCharge)
               .Append(" | zapytan ").Append(_queries).Append(", promieni ").Append(_rays).Append(" | koszt ").Append(Ms(_sumTicks).ToString("0.0", Inv))
-              .Append(" ms razem, najwiecej ").Append(Ms(_maxTicks).ToString("0.000", Inv)).Append(" ms na klatke | potkniecia ").Append(_stum).Append('.');
+              .Append(" ms razem, najwiecej ").Append(Ms(_maxTicks).ToString("0.000", Inv)).Append(" ms na klatke (Drain + przeglad) | potkniecia ").Append(_stum).Append('.');
             Log.Info(sb.ToString());
         }
     }
