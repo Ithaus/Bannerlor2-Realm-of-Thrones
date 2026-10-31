@@ -10,6 +10,11 @@
   zaokraglenia (miecz/przetop 1 XP) naprawiony; 305e widok prac okregu od zakupu, ryby Night Raider; 305f poprawki przegladu (ksiega Basis, petla kupno-odsprzedaz, robota w toku w cenie).
 - W TOKU: runda 306 (wf_89f0090f-a58): 306a arbitraz karawany Bjorna 10k -> 119k (przyczyna ceny?), 306b sondy autotestu (kowalstwo XP, karawana gracza, zmiana produkcji) -
   worktree zb\n306a, zb\n306b. Potem test 142a z flagami sond, WGRANIE 142.
+- 08:40 306a: przyczyna arbitrazu = pasmo indeksu gry 0.1-10 dla kazdego towaru (aksamit x6 + bizuteria x1, indeks 0.37 -> 5.9); poprawka PriceBand306 (pasmo od kosztu przewozu,
+  klucze PriceBandByCarriage / PriceBandMerchantMargin / PriceBandHaulKm). 306b sondy (flagi armoury-kowal305/karawana305/warsztat305.flag, grupa sondy306). Scalone noc/306-integracja.
+  142a (marza 1.0): bitwy OK, sondy WSZYSTKIE TAK (kowal 33/33, Caravan wages 90/90, zmiana produkcji rozmowa = przelew), ALE karawany AI gorzej niz 141b: placace zold
+  0.579 -> 0.441, mediana wynik-zold +50 -> -16, marza miast 72% -> 42%. 142b = marza 2.0 (pasmo ok. 3x) w toku (tylko probyN 90 dob, m113\seria-142b.out.txt).
+  Decyzja: gdy 142b karawany ok. jak 141b - WGRANIE 142 (marza 2.0); inaczej 306a domyslnie NIE i pytanie do Jeffa.
 
 ## DOPISEK 31.10 ok. 04:35 CEST - NOWA SESJA (d16b0e41): Jeff wyjezdza do niedzieli, pelna zgoda "pracuj tak dlugo az naprawisz", wgrywac samemu
 - Jeff gra NOWA kampanie: Ironman0gXONzURi8yO.sav (rod KARDA, bohater Przemyslaw, doby 108648-108878, ok. 220k zl). Logi 30.10 18:01/19:48/21:04-03:30 skopiowane do
