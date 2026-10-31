@@ -155,7 +155,7 @@ namespace Armoury
 
         private static int _xpCalls, _xpScaled;
 
-        /// <summary>Postfiks CraftingOrder.GetOrderExperience: gra liczy 0.25 x 1.3 x wartosc PROJEKTU - po przeliczeniu projektu od dawnej wartosci
+        /// <summary>Postfiks CraftingOrder.GetOrderExperience: gra liczy 0.25 x GetTheoreticalMaxItemMarketValue(PROJEKT) (1.4.8: bez czynnika 1.3; przy niespelnionym x 0.5 x kara tieru) - po przeliczeniu projektu od dawnej wartosci
         /// (ta sama regula co HistoricalPrices.XpPostfix dla wykutej sztuki).</summary>
         public static void OrderXpPostfix(CraftingOrder __instance, ItemObject __0, ref float __result)
         {

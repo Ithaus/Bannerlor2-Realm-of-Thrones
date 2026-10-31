@@ -158,10 +158,11 @@ namespace Armoury
         /// (GainRawXp), wiec rosnie jak bez ciecia. Nic innego nie zmienia.</summary>
         public static void XpPrefix(HeroDeveloper __instance, SkillObject skill, ref float rawXp, bool isAffectedByFocusFactor, bool shouldNotify)
         {
-            if (!(rawXp > 0f) || skill == null || (object)skill != (object)_crafting) return;
+            if (skill == null || (object)skill != (object)_crafting) return;
+            if (!(rawXp > 0f)) { _tag = null; return; }   // recenzja 305d: slowo zrodla nie przechodzi na nastepne XP
             try
             {
-                if (!isAffectedByFocusFactor) { _dPlain++; return; }
+                if (!isAffectedByFocusFactor) { _tag = null; _dPlain++; return; }
                 int si = TakeTag();   // 305d: zrodlo XP (surowe, przed cieciem)
                 _srcN[si]++; _srcXp[si] += rawXp;
                 float f = Factor;

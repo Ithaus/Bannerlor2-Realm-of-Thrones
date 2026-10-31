@@ -107,7 +107,26 @@ namespace Armoury
         private static int WeaponStamina(ItemObject item, Hero hero)
         {
             var m = Campaign.Current != null ? Campaign.Current.Models.SmithingModel : null;
-            return m != null ? m.GetEnergyCostForSmithing(item, hero) : 15;
+            if (m == null) return 15;
+            // recenzja 305d: perk Practical Smith (-50% staminy w DefaultSmithingModel) nie moze ciac XP za prace - luki z Forge.Smith licza stamine
+            // przepisu bez perka. Przy perku liczymy wzor gry bez perka: 10 + 5 x Tier, a gdy model to nie czysty DefaultSmithingModel (BK) -
+            // mnoznik klasy BK (x1.2 jednoreczne miecz/topor/buzdygan, x1.5 dwureczne) i zakres BK 15..max staminy kowala (dekompilacja BKSmithingModel).
+            if (hero == null || !hero.GetPerkValue(TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Crafting.PracticalSmith))
+                return m.GetEnergyCostForSmithing(item, hero);
+            int st = 10 + 5 * (int)item.Tier;
+            if (m.GetType() != typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultSmithingModel))
+            {
+                var w = item.WeaponComponent != null ? item.WeaponComponent.PrimaryWeapon : null;
+                if (w != null)
+                {
+                    var c = w.WeaponClass;
+                    if (c == WeaponClass.TwoHandedSword || c == WeaponClass.TwoHandedAxe || c == WeaponClass.TwoHandedMace) st = (int)(st * 1.5f);
+                    else if (c == WeaponClass.OneHandedSword || c == WeaponClass.OneHandedAxe || c == WeaponClass.Mace) st = (int)(st * 1.2f);
+                }
+                int max = 100 + TaleWorlds.Library.MathF.Round(hero.GetSkillValue(DefaultSkills.Crafting) * 0.5f);   // CraftingCampaignBehavior.GetMaxHeroCraftingStamina
+                st = TaleWorlds.Library.MBMath.ClampInt(st, 15, max);
+            }
+            return st;
         }
 
         /// <summary>XP pracy za sztuke z kuzni gry albo z CRAFT BK (bez czesci zlecenia).</summary>
