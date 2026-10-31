@@ -131,7 +131,9 @@ namespace Armoury
                 if (map == null || !map.TryGetValue(cat, out li)) return baseCeil;
                 Folk f;
                 if (!_f.TryGetValue(st, out f)) f = null;   // bez tworzenia ludu (wolane tez przed kalibracja) - bez ludu bazowa
-                return LxCeilFor(f, li, baseCeil);
+                double c = LxCeilFor(f, li, baseCeil);
+                double kb = PriceBand306.BandK(cat);                     // recenzja 306a (2): kupiec nie placi wiecej, niz targ da przy pasmie przewozu (klucz NIE - 10, bez zmian)
+                return kb < c ? kb : c;
             }
             catch (Exception e) { LxStumble("PeopleCeilingIndex", e); return baseCeil; }
         }
@@ -219,7 +221,7 @@ namespace Armoury
                     _lxGa[g] += v;                                       // (b) suma grupy razem z kategoriami, ktore wypadna ponad cena graniczna
                     if (sig && (_lxSig[i] || c))
                     {
-                        double ix = town.GetItemCategoryPriceIndex(_lxCats[i]);
+                        double ix = PriceBand306.RawIndex(town, _lxCats[i]);   // recenzja 306a (2): niedobor polki bez pasma - podzial jak w 141
                         double ceilI = LxCeilFor(f, i, ceil);            // obieg2 (2): cena graniczna wedlug zasobnosci (klucz wylaczony - bazowa)
                         if (ceilI > ceil) { myCeil = ceilI; myCeilN = 1; }
                         if (ix > ceilI)   // (a) plotno i skora tez (przy kluczu)
@@ -502,7 +504,7 @@ namespace Armoury
                 bool wide = false;
                 if (sig && (_lxSig[i] || c))
                 {
-                    double ix = town.GetItemCategoryPriceIndex(_lxCats[i]);
+                    double ix = PriceBand306.RawIndex(town, _lxCats[i]);   // recenzja 306a (2): bramka na indeksie bez pasma - jak w 141 (przyciety indeks nie przekracza k, bramka by nie blokowala)
                     if (ix > LxCeilFor(mf, i, ceil)) continue;             // obieg2 (2): cena graniczna wedlug zasobnosci ludu miasta targowego (klucz wylaczony - bazowa)
                     wide = ix > ceil;
                 }
@@ -708,6 +710,8 @@ namespace Armoury
                 double ceil = LxCeilFor(f, i, LxCeil(Settings.Current));   // obieg2 (2): cena graniczna wedlug zasobnosci (klucz wylaczony - bazowa)
                 float d0 = Math.Max(0f, __result);
                 _lxw.SigOff += e;
+                bool rawPrev = PriceBand306.BeginRaw();               // recenzja 306a (2): obciecie dopisku na indeksie bez pasma - jak w 141 (przyciety do k nie przekroczylby ceny granicznej)
+                try {
                 float i0 = model.GetBasePriceFactor(__2, cd.InStoreValue, cd.Supply, d0, false, 0);
                 if (i0 >= ceil) { _lxw.SigRoom++; _lxw.SigCut += e; return; }
                 double ep = e;
@@ -723,6 +727,7 @@ namespace Armoury
                     if (ep > 0 && model.GetBasePriceFactor(__2, cd.InStoreValue, cd.Supply, (float)(d0 + ep), false, 0) > ceil + 1e-3) _lxw.SigOver++;
                 }
                 if (ep > 0) { __result = (float)(d0 + ep); _lxw.SigN++; _lxw.SigAdd += ep; }
+                } finally { PriceBand306.EndRaw(rawPrev); }
             }
             catch (Exception ex) { LxStumble("LxEstPostfix", ex); }
             finally { _lxw.Ticks += Stopwatch.GetTimestamp() - t0; }

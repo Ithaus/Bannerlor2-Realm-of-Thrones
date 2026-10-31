@@ -49,6 +49,9 @@ namespace Armoury
     /// Sufit x10 zostaje z gry - jeden dla wszystkich towarow handlowych. Historycznie (woz ok. 1.5 d za tone na mile, Anglia
     /// XIV w. - szacunek): rudzie po 75 d za tone droga ladowa doklada jej wlasna wartosc co ok. 80 km, drewnu po 35 d co
     /// ok. 37 km - x10 to ruda wieziona ok. 700 km i drewno ok. 330 km; dalej nikt masowego towaru wozem nie wiozl.
+    /// 306a (klucz PriceBandByCarriage): sufit x10 jest juz tylko gorna granica - pasmo PriceBand306 liczy k od ceny kilograma W GRZE (po przeliczeniu cen
+    /// historycznych), marzy kupca i drogi PriceBandHaulKm; kategoria 'iron' (ok. 2.5 d/kg) dostaje 0.29-3.49, wiec sygnal niedoboru rudy dla kuzni i
+    /// warsztatow zbrojnych (WorkshopLaw.MatPrice) slabnie z ok. x9 do x3.5. Drewno, sol, glina, kamien - pasmo gry. Klucz NIE - jak wyzej.
     /// Warsztaty zbrojne placa za rude i drewno cene targu (WorkshopLaw.MatPrice), nie stala cene historyczna - inaczej drogi
     /// surowiec oplacalaby kasa miasta, a w jednym miescie byly dwie ceny rudy.
     /// Nowa kampania: popyt i podaz wygladzone przez ticki startowe sa jeszcze w starej monecie (przeliczenie wchodzi dopiero
@@ -78,8 +81,8 @@ namespace Armoury
         internal static void Reset()
         {
             _errFactor = false; _errUse = false; _errLog = false; _errBudget = false; _stFactor = 0; _stUse = 0; _stBudget = 0;
-            MemoryLive = false; _errPace = false;
-            PriceBand306.Reset();   // 306a: migawka pasm i liczniki nowej kampanii   // 299b: ticki startowe nowej kampanii (przed OnSessionLaunched) wygladzaja podaz tempem gry
+            MemoryLive = false; _errPace = false;   // 299b: ticki startowe nowej kampanii (przed OnSessionLaunched) wygladzaja podaz tempem gry
+            PriceBand306.Reset();   // 306a: migawka pasm i liczniki nowej kampanii
             lock (_paceLock) { _paceDay = -1; _paceNow = 0; _paceLast = 0; _paceNowGame = 0; _paceLastGame = 0; }
             System.Threading.Interlocked.Exchange(ref _paceBefore, 0); System.Threading.Interlocked.Exchange(ref _stPace, 0);
         }

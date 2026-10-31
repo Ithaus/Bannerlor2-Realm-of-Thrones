@@ -48,7 +48,7 @@ namespace Armoury
             internal int Km;
             internal Dictionary<ItemCategory, float> K;           // tylko kategorie z pasmem wezszym niz gra
             internal List<KeyValuePair<ItemCategory, string>> Rows; // opis do linii: kategoria -> "id vpk d/kg lo-hi"
-            internal int Food, Wide;                                 // jedzenie (bez pasma), przewoz ponad x10 (pasmo gry)
+            internal int Food, Wide, Animal;                         // jedzenie (bez pasma), przewoz ponad x10 (pasmo gry), zwierzeta (bez pasma - recenzja 306a)
         }
 
         private static volatile Snap _snap;
@@ -131,6 +131,7 @@ namespace Armoury
             {
                 var it = kv.Value;
                 if (it.IsFood) { sn.Food++; continue; }
+                if (kv.Key.IsAnimal) { sn.Animal++; continue; }   // recenzja 306a (1): konie, bydlo, drob ida same (przewoz wozem ich nie dotyczy), a kategoria ROT 'horse' miesza konie z drobiem - pasmo gry
                 double vpk = Vpk(it);
                 double k = KFor(vpk, m, km);
                 if (k >= GameCap - 1e-6) { sn.Wide++; continue; }
@@ -157,7 +158,7 @@ namespace Armoury
             if (_raw) return;
             try
             {
-                if (__0 == null || !__0.IsTradeGood) return;
+                if (__0 == null || !__0.IsTradeGood || __0.IsAnimal) return;   // recenzja 306a (1): zwierzeta - pasmo gry
                 var s = Settings.Current;
                 if (s == null || !s.PriceBandByCarriage) return;
                 var sn = Get(s);
@@ -219,7 +220,7 @@ namespace Armoury
                 Snap sn = GetForLine(s);   // przy kluczu NIE - pasma, ktore wzialby klucz (sam rachunek)
                 bool prev;
                 if (sn == null) { sb.Append(" | pasma: brak (ceny historyczne jeszcze nie przeliczone)"); Log.Info(sb.Append(" | potkniecia ").Append(st).Append('.').ToString()); return; }
-                sb.Append(" | kategorii z pasmem ").Append(sn.K.Count).Append(" (jedzenie bez pasma ").Append(sn.Food).Append(", przewoz ponad x10 - pasmo gry ").Append(sn.Wide).Append("): ");
+                sb.Append(" | kategorii z pasmem ").Append(sn.K.Count).Append(" (jedzenie bez pasma ").Append(sn.Food).Append(", zwierzeta bez pasma ").Append(sn.Animal).Append(", przewoz ponad x10 - pasmo gry ").Append(sn.Wide).Append("): ");
                 for (int i = 0; i < sn.Rows.Count; i++) { if (i > 0) sb.Append(", "); sb.Append(sn.Rows[i].Value); }
                 // indeks miast bez pasma i z pasmem
                 var stats = new List<KeyValuePair<double, string>>();
@@ -259,12 +260,41 @@ namespace Armoury
             }
         }
 
-        /// <summary>Migawka do linii takze przy kluczu NIE (pasma, ktore wzialby klucz) - bez zapisu do _snap, gdy klucz NIE i migawki brak.</summary>
+        /// <summary>Migawka do linii takze przy kluczu NIE (pasma, ktore wzialby klucz). Zapisuje migawke do _snap (tylko cache - przy kluczu NIE postfiks i tak
+        /// wychodzi przed jej odczytem; stan gry bez zmian). Migawka odswieza sie przy zmianie marzy / drogi i nowej kampanii, NIE przy pozniejszej zmianie Value
+        /// przedmiotu w tej samej kampanii (np. przelaczenie Bloomery) - wtedy pasma do wczytania zapisu.</summary>
         private static Snap GetForLine(Settings s)
         {
             if (HistoricalPrices.On && !HistoricalPrices.Applied) return null;
             return Get(s);
         }
+
+        // ------------------------------------------------------------ dla innych regul (recenzja 306a, uwaga 2)
+        /// <summary>Sufit pasma k kategorii `c` (10 = pasmo gry: klucz NIE, jedzenie, zwierzeta, przewoz ponad x10, migawki jeszcze brak). Sam odczyt.</summary>
+        internal static float BandK(ItemCategory c)
+        {
+            try
+            {
+                if (c == null || !c.IsTradeGood || c.IsAnimal) return (float)GameCap;
+                var s = Settings.Current;
+                if (s == null || !s.PriceBandByCarriage) return (float)GameCap;
+                var sn = Get(s);
+                float k;
+                return sn != null && sn.K.TryGetValue(c, out k) ? k : (float)GameCap;
+            }
+            catch { return (float)GameCap; }
+        }
+
+        /// <summary>Indeks miasta BEZ pasma (surowy wzor gry, jak w 141) - dla regul, ktore mierza niedobor polki, nie cene zaplaty (P4 ludu: szacunek popytu i bramka zakupow).</summary>
+        internal static float RawIndex(Town t, ItemCategory c)
+        {
+            bool prev = _raw; _raw = true;
+            try { return t.GetItemCategoryPriceIndex(c); } finally { _raw = prev; }
+        }
+
+        /// <summary>Wlacza odczyt bez pasma na tym watku (zwraca poprzedni stan do EndRaw) - dla wielu wywolan modelu cen pod rzad (bisekcja P4).</summary>
+        internal static bool BeginRaw() { bool prev = _raw; _raw = true; return prev; }
+        internal static void EndRaw(bool prev) { _raw = prev; }
 
         private static string Five(List<float> l)
         {

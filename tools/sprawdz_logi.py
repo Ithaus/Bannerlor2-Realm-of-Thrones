@@ -85037,7 +85037,10 @@ def p306_parse(t):
     m = P306_DAY.search(t)
     if not m:
         return None
-    d = {"day": int(m.group(1)), "key": m.group(2), "margin": float(m.group(3)), "km": int(m.group(4)), "models": int(m.group(5)), "rows": {}, "towns": {}, "tail": None}
+    d = {"day": int(m.group(1)), "key": m.group(2), "margin": float(m.group(3)), "km": int(m.group(4)), "models": int(m.group(5)), "rows": {}, "towns": {}, "tail": None, "animal": None}
+    ma = P306_ANIMAL.search(t)
+    if ma:
+        d["animal"] = int(ma.group(1))
     i = t.find("kategorii z pasmem ")
     j = t.find(" | miasta (")
     if i >= 0 and j > i:
@@ -85054,6 +85057,11 @@ def p306_parse(t):
     return d
 
 
+# recenzja 306a (1): zwierzeta bez pasma - licznik w linii doby i zadna kategoria zwierzat w pasmach
+P306_ANIMAL = re.compile(r"\(jedzenie bez pasma \d+, zwierzeta bez pasma (\d+), przewoz ponad x10")
+P306_ANIMAL_IDS = ("horse", "war_horse", "pack_animal", "sheep", "cow", "hog")
+
+
 def p306_selftest():
     # wzor: aksamit 4000 d / 10 kg przy marzy 1.0 i 2000 km = 2.0093; sol 0.18 d/kg - sufit gry 10; ruda 2.5 d/kg = 3.4913
     k = p306_k(400.0, 1.0, 2000)
@@ -85064,12 +85072,12 @@ def p306_selftest():
     if abs(p306_k(2.5, 1.0, 2000) - 3.4913) > 0.001:
         return f"k rudy {p306_k(2.5, 1.0, 2000):.4f} != 3.4913"
     ln = ("Pasmo cen od przewozu (306a): dzien 108900 | klucz TAK, marza kupca 1.00, droga 2000 km, przewoz 1.5 d za tone na mile = 1.86 d/kg na droge | latka wpieta w 2 modelach"
-          " | kategorii z pasmem 2 (jedzenie bez pasma 30, przewoz ponad x10 - pasmo gry 5): velvet 400 d/kg 0.50-2.01, iron 2.5 d/kg 0.29-3.49"
+          " | kategorii z pasmem 2 (jedzenie bez pasma 30, zwierzeta bez pasma 6, przewoz ponad x10 - pasmo gry 5): velvet 400 d/kg 0.50-2.01, iron 2.5 d/kg 0.29-3.49"
           " | miasta (indeks bez pasma -> z pasmem: min/p25/p50/p75/max, rozpietosc max/min; 8 najszerszych): velvet 0.37/2.41/9.90/10.00/10.00 (x27.0) -> 0.50/2.01/2.01/2.01/2.01 (x4.0)"
           " ; iron 0.20/1.00/1.50/2.00/9.00 (x45.0) -> 0.29/1.00/1.50/2.00/3.49 (x12.0)"
           " | miasto-kategorii 194: teraz przy podlodze 3, przy suficie 80 | wycen przycietych od ostatniej linii: do podlogi 10, do sufitu 2000 | potkniecia 0.")
     d = p306_parse(ln)
-    if not d or d["day"] != 108900 or d["key"] != "TAK" or d["models"] != 2:
+    if not d or d["day"] != 108900 or d["key"] != "TAK" or d["models"] != 2 or d["animal"] != 6:
         return "naglowek linii doby"
     if d["rows"].get("velvet") != (400.0, 0.5, 2.01) or d["rows"].get("iron") != (2.5, 0.29, 3.49):
         return f"pasma {d['rows']}"
@@ -85204,6 +85212,10 @@ def pasmo306a_main(logp):
     st = sum(d["tail"][5] for d in days if d["tail"])
     rep.add("P306-6: potkniecia i ERROR PriceBand306", f"potkniecia {st}, ERROR {errs}, linii bez ogona {sum(1 for d in days if not d['tail'])}", "0 / 0 / 0",
             st == 0 and errs == 0 and all(d["tail"] for d in days))
+    # P306-8: zwierzeta bez pasma (recenzja 306a, uwaga 1)
+    anim = [f"{d['day']} {c}" for d in days for c in d["rows"] if c in P306_ANIMAL_IDS]
+    rep.add("P306-8: zwierzeta (konie, bydlo, drob) bez pasma - pasmo gry", f"kategorii zwierzat w pasmach {len(anim)}" + (f" (np. {anim[0]})" if anim else "")
+            + f"; licznik 'zwierzeta bez pasma' ostatnio {last['animal']}", "0 w pasmach, licznik >= 1", not anim and (last["animal"] or 0) >= 1)
     # P306-7: INFO
     rep.add("P306-7: najwiekszy zysk dnia karawany gracza (259)", f"dzien {best[0]} '{best[1]}': sprzedaz {best[2]}, zysk {best[3]}" if best else "brak karawany gracza",
             "INFO (30.10 przed 306a: 110177 w 108850, reszta 173 dob ok. 465/d)", None)
