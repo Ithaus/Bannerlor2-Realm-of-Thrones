@@ -148,6 +148,9 @@ namespace Armoury
                                 if (it == null) continue;
                                 int have = shelf.GetItemNumber(it);
                                 if (have <= 0) continue;
+                                // 311b-2 (autotest 311a: srebro do warsztatu gracza w Seagard 416 -> 78 szt. w 90 dob, do linii zlotnikow swiata 58 -> 48/d): zlotnik bierze rude
+                                // cyklem po 25 szt., a zapas z dziennego wsadu tego nie widzi - w miescie ze zlotnikiem mennica srebra nie bierze wcale (zloto jak dotad)
+                                if (m == MSilver && smith > 0f && s.MintSilverSkipSmithTowns) { kept[m] += have; continue; }
                                 double need = (m == MSilver ? smith : 0f) + perTown[m];
                                 int reserve = (int)Math.Ceiling(days * need);
                                 // recenzja 311b: mennica to ujscie zbytkowe - jak dwory (CourtGoods) tylko ponad prog polki (MaterialOrders.ShelfReserve: prog zrodla + pas
