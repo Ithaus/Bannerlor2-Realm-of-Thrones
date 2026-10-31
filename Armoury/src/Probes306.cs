@@ -606,10 +606,16 @@ namespace Armoury
             var w = _revW; var t = _revType;
             if (w == null || t == null || w.Owner != Hero.MainHero) { Log.Info(P + "warsztat - powrot produkcji doba " + day + " | warsztat nie jest juz gracza albo brak typu -> wynik POMINIETY."); return; }
             int g0 = Hero.MainHero.Gold; string from = w.WorkshopType != null ? w.WorkshopType.StringId : "?";
+            int tools, mark, cap, back, add;
+            WorkshopTrade.RetoolPromise(w, t, g0, out tools, out mark, out cap, out back, out add);   // recenzja: zloto wedlug tej samej obietnicy co zmiana produkcji
             ChangeProductionTypeOfWorkshopAction.Apply(w, t);
-            bool ok = w.WorkshopType == t;
-            Log.Info(P + "warsztat - powrot produkcji doba " + day + " | " + w.Settlement.Name + " " + from + " -> " + t.StringId + " | zloto gracza " + g0 + " -> " + Hero.MainHero.Gold
-                     + " | typ przywrocony " + Tn(ok) + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
+            bool typeOk = w.WorkshopType == t;
+            int g1 = Hero.MainHero.Gold, goldWant = g0 - tools + back - add;
+            bool goldOk = g1 == goldWant;
+            bool ok = typeOk && goldOk;
+            Log.Info(P + "warsztat - powrot produkcji doba " + day + " | " + w.Settlement.Name + " " + from + " -> " + t.StringId + " | zloto gracza " + g0 + " -> " + g1
+                     + " (oczekiwane " + goldWant + " = przed - sprzet " + tools + " + zwrot " + back + " - doplata " + add + ", " + Tn(goldOk) + ")"
+                     + " | typ przywrocony " + Tn(typeOk) + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
         }
 
         /// <summary>
@@ -662,6 +668,17 @@ namespace Armoury
                     paid = g3 - g2;
                 }
             }
+            string left = "";
+            if (pick.Owner == hero && !sold)
+            {
+                // recenzja: bez kupca warsztat nie zostaje u gracza do konca testu (przeklamalby pomiary 305b) - odsprzedaz sprzedawcy, ta sama akcja
+                try
+                {
+                    if (seller != null && seller.IsAlive && seller.IsNotable) { ChangeOwnerOfWorkshopAction.ApplyByPlayerSelling(pick, seller, pick.WorkshopType); }
+                    left = pick.Owner == hero ? " | warsztat zostal u gracza" : " | bez kupca - odsprzedany sprzedawcy " + seller.Name + " (zloto gracza " + g1 + " -> " + hero.Gold + ")";
+                }
+                catch (Exception e) { left = " | odsprzedaz sprzedawcy: wyjatek " + e.GetType().Name + " - warsztat zostal u gracza"; }
+            }
             bool noLoop = back >= 0 && back <= price;
             bool payOk = sold && paid == Math.Min(back, Math.Max(0, b0)) && b0 - b1 == paid;
             bool capOk = cap2 == cap0;
@@ -669,7 +686,7 @@ namespace Armoury
             Log.Info(P + "warsztat - kupno i odsprzedaz doba " + day + " | " + town.Name + " " + type + " od " + seller.Name + " | cena kupna (GetCostForPlayer) " + price
                      + " | zloto gracza " + g0 + " -> " + g1 + ", kiesa sprzedawcy " + s0 + " -> " + s1 + ", kapital " + cap0 + " -> " + cap1 + " (" + Tn(buyOk) + ")"
                      + " | odkup (GetCostForNotable) " + back + " <= cena kupna " + Tn(noLoop) + " | kupiec " + buyerName + ": kiesa " + b0 + " -> " + b1 + ", zloto gracza " + g2 + " -> " + g3
-                     + " (zaplata " + paid + ", " + Tn(payOk) + "), kapital po odsprzedazy " + cap2 + " (" + Tn(capOk) + ") | strata gracza na obrocie " + (g0 - g3)
+                     + " (zaplata " + paid + ", " + Tn(payOk) + "), kapital po odsprzedazy " + cap2 + " (" + Tn(capOk) + ") | strata gracza na obrocie " + (g0 - g3) + left
                      + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
         }
     }

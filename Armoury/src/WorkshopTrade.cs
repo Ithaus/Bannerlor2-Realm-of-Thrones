@@ -1383,14 +1383,14 @@ namespace Armoury
                 q.Profit = year ? rec.Slow : rec.Avg;
                 q.Window = Math.Min(rec.Mem, year ? YearSpan : Span);   // R3-11b: okno = doby w pamieci (po rozruchu rynku od 7 ostatnich dob rozruchu)
             }
-            else { q.Profit = Expected(w); q.StockCut |= _lastExpCut; q.ExpRaw = q.Profit; }
+            else { q.Profit = Expected(w, true); q.StockCut |= _lastExpCut; q.ExpRaw = q.Profit; }
             q.Avg = rec.Avg; q.Slow = rec.Slow; q.Mem = rec.Mem;
             // 241: pamieci (ok. 30 dob, rok) trzymaja jeszcze wyniki sprzed ceny kupca (przyciete do kosztu x marza) - sprzedajacy nie odda warsztatu za ulamek
             // tego, co da dzis kupiec: bierze lepsze z pamieci i oczekiwanego wyniku z cen (Expected - istniejacy model, ten sam co bez historii). Notabl (gorsza pamiec) bez zmian
             // 305b: przy WorkshopTradeBuyerMemory cena targu w calosci tylko przy krotkiej historii (< WorkshopBuyerShortHistoryDays), potem najwyzej polowa
             if (sellerAsks && rec.Days > 0 && Fair)
             {
-                float exp = Expected(w); q.StockCut |= _lastExpCut; q.ExpRaw = exp;
+                float exp = Expected(w, true); q.StockCut |= _lastExpCut; q.ExpRaw = exp;
                 bool half = q.Blend && rec.Mem >= Math.Max(1, Settings.Current.WorkshopBuyerShortHistoryDays);
                 if (half) exp *= 0.5f;
                 if (exp > q.Profit) { q.Profit = exp; q.Exp = true; q.ExpHalf = half; if (_qCount) { if (half) _dQExpHalf++; else if (q.Blend) _dQExpFull++; } }
@@ -1401,7 +1401,7 @@ namespace Armoury
             // dotad odkup liczyl sie od pamieci notabla z zarobkiem broni (MemToNewOwner pomija linie broni), wiec kupno i natychmiastowa odsprzedaz dawaly zysk
             if ((sellerAsks || w.Owner == Hero.MainHero) && BuyerBlend && HasArmsInputLine(w.WorkshopType) && !PlayerArmsLive)
             {
-                q.Profit = Expected(w); q.StockCut |= _lastExpCut; q.ExpRaw = q.Profit; q.Exp = true; q.ExpHalf = false; q.ArmsIdle = true; if (_qCount) _dQArms++;
+                q.Profit = Expected(w, true); q.StockCut |= _lastExpCut; q.ExpRaw = q.Profit; q.Exp = true; q.ExpHalf = false; q.ArmsIdle = true; if (_qCount) _dQArms++;
             }
             q.Tax = tax;
             q.Years = Math.Max(0f, s.WorkshopTradePriceYears);
@@ -1578,15 +1578,23 @@ namespace Armoury
         /// (utarg wedle ceny sprzedazy &gt; wsad + place cyklu), licza utarg wedle ceny kupna targu (tyle warsztatowi dopisuje BK),
         /// minus wsad i place, razy szybkosc linii; minus utrzymanie. Linie uzbrojenia nie sa wyceniane (wynik da dopiero srednia).
         /// </summary>
-        internal static float Expected(Workshop w)
+        internal static float Expected(Workshop w, bool forQuote = false)
         {
-            bool pace = StockPaceOn, cut = false; _lastExpCut = false;
+            // 307c (recenzja): przyciecie zapasem polki tylko w wycenie (QuoteFor) - start pamieci sredniej (Daily, rec.Avg) bez zmian
+            bool pace = StockPaceOn && forQuote, cut = false; _lastExpCut = false;
             try
             {
                 var town = w != null && w.Settlement != null ? w.Settlement.Town : null;
                 var type = w != null ? w.WorkshopType : null;
                 if (town == null || type == null) return 0f;
                 var roster = town.Owner != null ? town.Owner.ItemRoster : null;
+                int same = 1;   // 307c (recenzja): polke dziela warsztaty tego samego typu w miescie
+                if (pace && town.Workshops != null)
+                {
+                    same = 0;
+                    foreach (var o in town.Workshops) if (o != null && o.WorkshopType == type) same++;
+                    if (same < 1) same = 1;
+                }
                 float sum = 0f;
                 foreach (var p in type.Productions)
                 {
@@ -1602,7 +1610,7 @@ namespace Armoury
                             {
                                 long have = 0;
                                 for (int i = 0; i < roster.Count; i++) { var it = roster.GetItemAtIndex(i); if (it != null && it.ItemCategory == inp.Item1) have += Math.Max(0, roster.GetElementNumber(i)); }
-                                cyc = Math.Min(cyc, (double)have / need);
+                                cyc = Math.Min(cyc, (double)have / same / need);
                             }
                             if (roster != null)
                                 for (int i = 0; i < roster.Count && need > 0; i++)

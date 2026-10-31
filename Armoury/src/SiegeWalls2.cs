@@ -775,7 +775,7 @@ namespace Armoury
                 if (m.Empty || m.SGame <= 1.0) return false;                             // gra: sila / (obroncy x przewaga^w) <= 1 - bez szturmu
                 string held307;
                 int rep307 = SiegeWalls.RepelsOf(ev);
-                if (rep307 > 0 && RetryHeld(camp, m, rep307, SiegeWalls.RetryHoldUntil(ev), false, out held307)) return false;   // 307c (2): Veto i tak wstrzyma - bez losowania i linii MB
+                if (rep307 > 0 && !RetryRansomOn && RetryHeld(camp, m, rep307, SiegeWalls.RetryHoldUntil(ev), false, out held307)) return false;   // 307c (2): Veto i tak wstrzyma - bez losowania i linii MB (przy SiegeRepelHoldRansom Veto wstrzymuje sam szturm, okup liczy sie dalej)
                 double sg = SaneS(m);                                                     // 307c (1): czlon czasu gry bez ujemnych murow (klucz wylaczony - s gry)
                 NoteSane(m.SGame, sg);
                 if (sg <= 1.0) return false;
@@ -802,6 +802,14 @@ namespace Armoury
                 _dUnRolls++;
                 if (MBRandom.RandomFloat >= (pt - pGame) / (1.0 - pGame)) return false;  // razem z losowaniem gry: szansa pt
                 if (why == "machiny") _dUnEng++; else if (why == "wyrwa") _dUnGap++; else _dUnLad++;
+                // 307c recenzja (SiegeMbSameRoll): szansa OB1 dla tej samej drogi (s OB1 zamiast s gry) - Veto losuje nasze / MB jak przy decyzji gry (razem: nasza szansa)
+                double po = 0.0;
+                if (m.S > 1.0)
+                {
+                    if (why == "machiny") { double p2 = prog + 0.25 * (5 - m.Eq); double pen2 = Math.Min(3, m.Eq) / 3.0 * (1.0 - 0.85 * p2 * p2); po = pen2 > 0 ? Clamp(0.1 * m.S * pen2, 0.0, 1.0) : 0.0; }
+                    else po = Clamp(0.1 * m.S, 0.0, 1.0);
+                }
+                NoteMb(camp, pt, po);
                 if (LogOn && _unLogged.Add(ev))
                 {
                     double def = Math.Max(m.Def, m.Def0);
@@ -809,7 +817,7 @@ namespace Armoury
                              + (lp.MapFaction != null ? lp.MapFaction.StringId : "-") + ") | oblezenie " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob | powod: " + why
                              + " | taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie") + ", wyrwa " + (m.Gap ? "tak" : "nie") + ", gotowe machiny " + m.Eq
                              + ", taran / wieza w budowie " + F(prog * 100.0, "0") + "%, kara gry " + F(m.Pen, "0.000") + " | sila oblegajacy " + F(m.Att, "0") + " / obroncy " + F(def, "0")
-                             + " = " + F(def > 0 ? m.Att / def : 0.0, "0.00") + ", s gry " + F(m.SGame, "0.000") + (sg < m.SGame ? " (307c: do szansy " + F(sg, "0.000") + ")" : "") + " | szansa gry " + F(pGame, "0.000") + " -> " + F(pt, "0.000") + " | dalej OB1 i okup.");
+                             + " = " + F(def > 0 ? m.Att / def : 0.0, "0.00") + ", s gry " + F(m.SGame, "0.000") + (sg < m.SGame ? " (307c: do szansy " + F(sg, "0.000") + ")" : "") + " | szansa gry " + F(pGame, "0.000") + " -> " + F(pt, "0.000") + (MbRollOn ? " (OB1 " + F(po, "0.000") + ")" : "") + " | dalej OB1 i okup.");
                 }
                 return true;
             }

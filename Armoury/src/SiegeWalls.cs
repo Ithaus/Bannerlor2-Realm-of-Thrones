@@ -362,8 +362,9 @@ namespace Armoury
         /// <summary>true = szturm AI wstrzymany (przerwa po odparciu albo brama - bez taranu i wiezy i bez wyrwy - albo mury trzymaja albo losowanie wzoru gry
         /// z naszym w). Wolane tylko przy "true" gry.
         /// Wyjatek - false (wynik gry bez zmian).</summary>
-        internal static bool Veto(BesiegerCamp camp)
+        internal static bool Veto(BesiegerCamp camp, out bool ransomOnly)
         {
+            ransomOnly = false;   // recenzja 307c: true = szturm wstrzymany po odparciach (307c), ale okup / kapitulacja (O0) liczy sie dalej - wywolujacy daje false po okupie
             try
             {
                 if (!Live || camp == null) return false;
@@ -390,7 +391,9 @@ namespace Armoury
                     if (SiegeWalls2.RetryHeld(camp, mPre, pz.Repels, pz.Until + 3.0 * PauseDays, true, out why307))
                     {
                         _dPause++;
-                        if (LogOn && _vetoLogged.Add(ev)) VetoLine(camp, mPre, why307, null);
+                        bool ro = SiegeWalls2.RetryRansomOn;
+                        if (LogOn && _vetoLogged.Add(ev)) VetoLine(camp, mPre, why307 + (ro ? " - bez szturmu, okup / kapitulacja liczone dalej" : ""), null);
+                        if (ro) { ransomOnly = true; return false; }
                         return true;
                     }
                 }
@@ -417,10 +420,14 @@ namespace Armoury
                     if (LogOn && (_vetoLogged.Add(ev) || sw != null)) VetoLine(camp, m, "mury trzymaja (s OB1 " + F(m.S, "0.000") + " <= 1)", sw);
                     return true;
                 }
-                if (m.PGame > 0 && m.POurs < m.PGame && MBRandom.RandomFloat >= m.POurs / m.PGame)
+                // recenzja 307c (SiegeMbSameRoll): decyzja z MB - gra ma PGame = 0, wiec losujemy szanse OB1 tej drogi / szanse MB (razem: szansa OB1, jak przy decyzji gry)
+                double pg = m.PGame, po = m.POurs, mbPg, mbPo;
+                bool mb = SiegeWalls2.MbOdds(camp, out mbPg, out mbPo);
+                if (mb) { pg = mbPg; po = mbPo; }
+                if (pg > 0 && po < pg && MBRandom.RandomFloat >= po / pg)
                 {
                     if (dr) { SiegeWalls2.LadderPass(camp, m, "losowanie"); _lastDrCamp = camp; _lastDrAt = Now; _dPass++; return false; }
-                    _dRoll++; return true;
+                    _dRoll++; if (mb) SiegeWalls2.NoteMbVeto(); return true;
                 }
                 _dPass++;
                 return false;

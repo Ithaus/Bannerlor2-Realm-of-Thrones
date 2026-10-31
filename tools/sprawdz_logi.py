@@ -85504,11 +85504,16 @@ P307_BKSTART = re.compile(r"^Udzial majatku BK \(307c\): latka (.*?) \| klucz Bk
 P307_BKDAY = re.compile(r"^Udzial majatku BK \(307c\): doba \| latka (.*?), klucz (TAK|NIE) \| wywolan (\d+), udzial 0 przy sile roboczej <= 0: (\d+) \| .*?potkniecia (\d+)")
 P307_TAX = re.compile(r"^Licznik podatku osady: przepelnienie \(.*?\) \| .*?\| wartosc (-?\d+) -> (-?\d+) \((odwrocony|zero)")
 P307_SWS = re.compile(r"^Sondy autotestu \(306b\): warsztat - (zmiana produkcji|powrot produkcji|kupno i odsprzedaz) doba (-?\d+) \| (.*) -> wynik (TAK|NIE|POMINIETY)\.")
+P307_O0OUT = re.compile(r"\| wynik (.*?)(?: \| OB1 |\.$)")
+P307_MBEDGE = re.compile(r"\| sila oblegajacy (\d+) / obroncy (\d+) = ([\d.]+)")
+# recenzja 307c: fragment OB0 "recenzja: MB losowanie OB1 tak (losowan N, wstrzymane M), okup przy wstrzymaniu tak (ocen N, umow M)"
+P307_OB0R = re.compile(r"\| recenzja: MB losowanie OB1 (tak|nie) \(losowan (\d+), wstrzymane (\d+)\), okup przy wstrzymaniu (tak|nie) \(ocen (\d+), umow (\d+)\)")
+P307_BKCAP = re.compile(r"\| suma udzialow > 1 przycieta \(klucz Cap Sum (TAK|NIE)\): (\d+)")
 P307_ERR = re.compile(r"^ERROR in (BkEstateShare307|SiegeWalls2\.RetryHeld|SiegeWalls\.RepelsOf|Probes306\.(?:Revert|BuyResell))")
 
 
 def p307_new():
-    return dict(ob0=[], mb=[], ob2=[], o0=[], wt=[], b305=[], firm=[], bkstart=[], bkday=[], tax=[], sws=[], err=0)
+    return dict(ob0=[], mb=[], ob2=[], o0=[], wt=[], b305=[], firm=[], bkstart=[], bkday=[], tax=[], sws=[], err=0, ob0r=[], bkcap=[])
 
 
 def p307_feed(D, ln):
@@ -85521,10 +85526,15 @@ def p307_feed(D, ln):
         if m:
             D["ob0"].append(dict(d=int(m.group(1)), on=m.group(2) == "tak", rolls=int(m.group(3)), cut=int(m.group(4)), gmax=float(m.group(5)), umax=float(m.group(6)),
                                  held=int(m.group(7)), gap=int(m.group(8)), edge=int(m.group(9)), late=int(m.group(10) or 0), grown=int(m.group(11))))
+        r = P307_OB0R.search(s)
+        if r:
+            D["ob0r"].append(dict(mb=r.group(1) == "tak", rolls=int(r.group(2)), veto=int(r.group(3)), ro=r.group(4) == "tak", evals=int(r.group(5)), deals=int(r.group(6))))
     elif c == "S" and s.startswith("Szturm bez czekania na machiny (MB)"):
         m = P307_MB.match(s)
         if m:
-            D["mb"].append(dict(d=int(m.group(1)), st=m.group(2), sg=float(m.group(3)), su=float(m.group(5)) if m.group(5) else None, p0=float(m.group(6)), p1=float(m.group(7))))
+            e = P307_MBEDGE.search(s)
+            D["mb"].append(dict(d=int(m.group(1)), st=m.group(2), sg=float(m.group(3)), su=float(m.group(5)) if m.group(5) else None, p0=float(m.group(6)), p1=float(m.group(7)),
+                                edge=float(e.group(3)) if e else None))
     elif c == "S" and s.startswith("Szturm odparty (OB2)"):
         m = P307_OB2.match(s)
         if m:
@@ -85534,7 +85544,9 @@ def p307_feed(D, ln):
         m = P307_O0.match(s)
         if m:
             g = P307_O0GAP.search(s)
-            D["o0"].append(dict(d=int(m.group(1)), st=m.group(2), age=float(m.group(3)), att=float(m.group(4)), def0=float(m.group(6)), gap=bool(g and g.group(1) == "tak")))
+            o = P307_O0OUT.search(s)
+            D["o0"].append(dict(d=int(m.group(1)), st=m.group(2), age=float(m.group(3)), att=float(m.group(4)), def0=float(m.group(6)), gap=bool(g and g.group(1) == "tak"),
+                                out=o.group(1) if o else ""))
     elif c == "W" and s.startswith("Warsztaty towarowe: dzien"):
         m = P307_WT.match(s)
         if m:
@@ -85554,6 +85566,9 @@ def p307_feed(D, ln):
         m = P307_BKDAY.match(s)
         if m:
             D["bkday"].append((m.group(1), m.group(2), int(m.group(3)), int(m.group(4)), int(m.group(5))))
+            cp = P307_BKCAP.search(s)
+            if cp:
+                D["bkcap"].append((cp.group(1), int(cp.group(2))))
     elif c == "L" and s.startswith("Licznik podatku osady: przepelnienie"):
         m = P307_TAX.match(s)
         if m:
@@ -85597,7 +85612,7 @@ def p307_verdicts(D):
             if n_ >= 2:
                 after += 1
                 edge = r["att"] / r["def0"] if r["def0"] > 0 else 999.0
-                if not r["gap"] and edge < 6.0 - 0.05 and d + 1.0 <= win - 0.05:   # cala doba O0 przed koncem okna (po nim proba jak dotad)
+                if r["out"].startswith("szturm") and not r["gap"] and edge < 6.0 - 0.05 and d + 1.0 <= win - 0.05:   # cala doba O0 przed koncem okna (po nim proba jak dotad); recenzja: tylko wynik "szturm"
                     viol.append((st, d, round(edge, 2)))
         else:
             rep[st] = (r["n"], r["until"] + 3.0 * r["base"])
@@ -85657,12 +85672,24 @@ def p307_verdicts(D):
         f"zmian produkcji {len(ws)}, z luksusem bez powrotu {len(lux_bad)}, powrotow {len(rv)}" + (f" ({rv[-1][3]})" if rv else ""))
     put("P307-8b", (br[-1][3] == "TAK") if br and br[-1][3] != "POMINIETY" else None, (f"{br[-1][3]}: {br[-1][2][:400]}" if br else "brak linii (flaga warsztat305 albo doba N+4)"))
     put("P307-9", D["err"] == 0, f"bledy 307c {D['err']}")
+    # recenzja 307c: P307-10 MB losuje szanse OB1 (licznik w OB0), P307-11 okup przy wstrzymaniu po odparciach, P307-12 BK suma udzialow, P307-13 jakosc szturmow (INFO)
+    rr = D["ob0r"]
+    put("P307-10", (rr[-1]["mb"]) if rr else None, (f"dob {len(rr)}, losowan OB1 przy MB {sum(x['rolls'] for x in rr)}, wstrzymane {sum(x['veto'] for x in rr)}" if rr else "brak fragmentu recenzji w OB0"))
+    o0h = [r for r in D["o0"] if r["out"].startswith("bez szturmu (307c")]
+    put("P307-11", (rr[-1]["ro"]) if rr else None, (f"ocen okupu przy wstrzymaniu {sum(x['evals'] for x in rr)}, umow {sum(x['deals'] for x in rr)}; linii O0 'bez szturmu (307c' {len(o0h)}" if rr else "brak fragmentu recenzji w OB0"))
+    bc = D["bkcap"]
+    put("P307-12", (bc[-1][0] == "TAK") if bc else None, (f"dob {len(bc)}, udzialow liczonych wzgledem sumy ludzi majatkow {sum(x[1] for x in bc)}" if bc else "brak fragmentu Cap Sum w linii doby BK"))
+    asl = [r for r in D["o0"] if r["out"].startswith("szturm") and r["def0"] > 0]
+    weak = [r for r in asl if r["att"] / r["def0"] < 3.0]
+    mbw = [r for r in D["mb"] if r["edge"] is not None and r["edge"] < 3.0]
+    put("P307-13", None, f"decyzji O0 'szturm' {len(asl)}, z sila / obroncy < 3: {len(weak)}; linii MB {len(D['mb'])}, z sila / obroncy < 3: {len(mbw)} (porownaj z baza 142b)")
     return v, txt
 
 
 P307_SAMPLES = [
     "Mury oblezen (OB0): dzien 108940 | klucze: OB1 tak | w pamieci: szturmy 0, przerwy 1 | 307c: klucze szansa MB bez ujemnych murow tak (w >= 0.00), nauka z odparc tak (przerwa +0.50 na odparcie, po 2 odparciach wyrwa albo >= 6.0:1)"
-    " | MB losowan 3, s przyciete 3 (s gry max 2.827E+18, uzyte max 4.60) | ponowny szturm: wstrzymane 5, przez wyrwe 0, przy przewadze 1, po czekaniu 0 | przerwy wydluzone 1 (sr. x1.50) | potkniecia 0 (od wczytania 0).",
+    " | MB losowan 3, s przyciete 3 (s gry max 2.827E+18, uzyte max 4.60) | ponowny szturm: wstrzymane 5, przez wyrwe 0, przy przewadze 1, po czekaniu 0 | przerwy wydluzone 1 (sr. x1.50)"
+    " | recenzja: MB losowanie OB1 tak (losowan 3, wstrzymane 1), okup przy wstrzymaniu tak (ocen 2, umow 1) | potkniecia 0 (od wczytania 0).",
     "Szturm bez czekania na machiny (MB): dzien 108929 | osada town_K3 (Vaes Dothrak, stolica) | wodz D (frakcja empire_s) | oblezenie 43.0 dob | powod: machiny | taran tak, wieza tak, wyrwa nie, gotowe machiny 2,"
     " taran / wieza w budowie 0%, kara gry -0.001 | sila oblegajacy 1825 / obroncy 458 = 3.99, s gry 2503330018301380.000 (307c: do szansy 3.985) | szansa gry 0.000 -> 0.139 | dalej OB1 i okup.",
     "Szturm odparty (OB2): dzien 108925 | osada town_K3 (Vaes Dothrak, miasto, stolica tak) | frakcja empire_s, wodz D | ludzi na starcie 880, zostalo 659; obroncow bylo 533, zostalo 312 | prog armii 23.9%, straty 24.3%"
@@ -85680,7 +85707,11 @@ P307_SAMPLES = [
     "Warsztaty gracza jak firma (305b): dzien 108953 - klucz TAK | warsztatow 1, cykli linii broni/zbroi z wsadem przez firme 4, sztuk 1, sprzedaz miastu 150, koszt (surowiec + place) 70, wynik 80 | cykli oddanych grze (wyjatek albo brak miasta) 0"
     " | powody cykli bez sztuki (307c): cykli bez sztuki 3, w robocie 2, brak surowca 1 [ruda 0, drewno 1, skora 0, len/welna 0], brak zlota/kupca 0, bez zysku 0, czeka na strzelarzy 0 | cykl gry pominiety w kazdym cyklu firmy (bron nie powstaje za darmo).",
     "Udzial majatku BK (307c): latka wpieta | klucz Bk Estate Share No Workforce TAK - sila robocza wsi <= 0 -> udzial 0 (BK: 0/0 = NaN, x/0 = 1).",
-    "Udzial majatku BK (307c): doba | latka wpieta, klucz TAK | wywolan 120, udzial 0 przy sile roboczej <= 0: 3 | w sesji wywolan 120, poprawek 3, potkniecia 0 (doba 0).",
+    "Udzial majatku BK (307c): doba | latka wpieta, klucz TAK | wywolan 120, udzial 0 przy sile roboczej <= 0: 3 | suma udzialow > 1 przycieta (klucz Cap Sum TAK): 4"
+    " | w sesji wywolan 120, poprawek 3, przyciec sumy 4, potkniecia 0 (doba 0).",
+    "Okup oblezenia (O0): dzien 108936 | osada town_K3 (Vaes Dothrak, miasto, krolestwo khuzait, rod c) | oblegajacy: frakcja empire_s, wodz D (armia tak), druzyn 4 (ludzi 780, Inni 0), oblezenie 50.5 dob, szturmow bez zdobycia 2"
+    " | stosunek gry 2.000 (oblegajacy 900 / obroncy 300 x przewaga 6.688^0.100; maszyny 3, taran, wieza; szansa na mysl 10.0%) | mury 1.5 (bez czlonu czasu: obroncy 300 x przewaga^0.435)"
+    " | wynik bez szturmu (307c: po odparciach te same mury; bez umowy - szturm (obronca nie zaplaci: x)) | OB1 tak: HP murow 54%, taran tak, wieza tak, w 0.435 (gra 0.100), s OB1 1.500 (gra 2.000), wyrwa nie (najslabszy odcinek 9%), obroncy 300.",
     "Sondy autotestu (306b): warsztat - zmiana produkcji doba 108881 | Seagard pottery_shop -> bakery (ProfitMade 0) | rozmowa: x | typ zmieniony TAK | 307c: z linia luksusu pominiete 1 -> wynik TAK.",
     "Sondy autotestu (306b): warsztat - kupno i odsprzedaz doba 108882 | Gulltown wool_weavery od Z | cena kupna (GetCostForPlayer) 15000 | zloto gracza 190000 -> 175000, kiesa sprzedawcy 1000 -> 16000, kapital 9000 -> 9000 (TAK)"
     " | odkup (GetCostForNotable) 11000 <= cena kupna TAK | kupiec Y: kiesa 20000 -> 9000, zloto gracza 175000 -> 186000 (zaplata 11000, TAK), kapital po odsprzedazy 9000 (TAK) | strata gracza na obrocie 4000 -> wynik TAK.",
@@ -85693,26 +85724,27 @@ def p307_selftest():
         p307_feed(A, "[09:00:00] " + ln)
     va, ta = p307_verdicts(A)
     want = {"P307-0": "TAK", "P307-1": "TAK", "P307-2": "TAK", "P307-3": "TAK", "P307-4a": "TAK", "P307-4b": "TAK", "P307-5": "TAK", "P307-6": "TAK",
-            "P307-7a": "TAK", "P307-7b": "TAK", "P307-8a": "TAK", "P307-8b": "TAK", "P307-9": "TAK"}
+            "P307-7a": "TAK", "P307-7b": "TAK", "P307-8a": "TAK", "P307-8b": "TAK", "P307-9": "TAK", "P307-10": "TAK", "P307-11": "TAK", "P307-12": "TAK", "P307-13": "INFO"}
     bad = {k: va.get(k) for k in want if va.get(k) != want[k]}
     if bad:
         return f"dobry bieg: {bad} ({ {k: ta.get(k) for k in bad} })"
     B = p307_new()
     for ln in P307_SAMPLES:
         x = ln.replace(" (307c: do szansy 3.985)", "").replace(" x wczesniejsze odparcia 1 -> 1.50 (307c)", "").replace("oblegajacy 1318 / obroncy 204", "oblegajacy 1000 / obroncy 204")
+        x = x.replace("MB losowanie OB1 tak", "MB losowanie OB1 nie").replace("okup przy wstrzymaniu tak", "okup przy wstrzymaniu nie").replace("klucz Cap Sum TAK", "klucz Cap Sum NIE")
         x = x.replace("do 700000 (291", "do 7000000 (291").replace("cykli bez sztuki 3,", "cykli bez sztuki 9,").replace("pottery_shop -> bakery", "silversmithy -> bakery")
         x = x.replace("zaplata 11000, TAK), kapital po odsprzedazy 9000 (TAK) | strata gracza na obrocie 4000 -> wynik TAK.", "zaplata 11000, NIE), kapital po odsprzedazy 9000 (TAK) | strata gracza na obrocie 4000 -> wynik NIE.")
         p307_feed(B, "[09:00:00] " + x)
     p307_feed(B, "[09:00:01] Licznik podatku osady: przepelnienie (powrot taboru) | wies X | wartosc -2147483388 -> 260 (odwrocony bit znaku 2^31 - szkoda z majatku BK z proporcja NaN) | potkniecia w sesji 1.")
     p307_feed(B, "[09:00:02] ERROR in BkEstateShare307 (potkniecie 1)")
     vb, tb = p307_verdicts(B)
-    miss = [k for k in ("P307-1", "P307-2", "P307-3", "P307-4b", "P307-6", "P307-7b", "P307-8a", "P307-8b", "P307-9") if vb.get(k) != "NIE"]
+    miss = [k for k in ("P307-1", "P307-2", "P307-3", "P307-4b", "P307-6", "P307-7b", "P307-8a", "P307-8b", "P307-9", "P307-10", "P307-11", "P307-12") if vb.get(k) != "NIE"]
     if miss:
         return f"zly bieg nie wykryty: {miss} ({ {k: (vb.get(k), tb.get(k)) for k in miss} })"
     C = p307_new()
     p307_feed(C, "[09:00:00] Mury oblezen (OB0): dzien 1 | klucze: OB1 tak | potkniecia 0 (od wczytania 0).")
     vc, _ = p307_verdicts(C)
-    if vc.get("P307-1") != "INFO" or vc.get("P307-4a") != "INFO" or vc.get("P307-7a") != "INFO":
+    if vc.get("P307-1") != "INFO" or vc.get("P307-4a") != "INFO" or vc.get("P307-7a") != "INFO" or vc.get("P307-10") != "INFO" or vc.get("P307-12") != "INFO":
         return f"log sprzed paczki nie INFO: {vc}"
     return None
 
@@ -85746,6 +85778,10 @@ def paczka307c_main(logp):
         "P307-8a": ("P307-8a: sonda zmiany produkcji nie rusza warsztatu z luksusem", "bez luksusu albo powrot TAK"),
         "P307-8b": ("P307-8b: sonda kupna i odsprzedazy warsztatu", "TAK (cena = GetCostForPlayer, odkup <= cena, kiesy zgodne)"),
         "P307-9": ("P307-9: bledy 307c", "0"),
+        "P307-10": ("P307-10: MB losuje szanse OB1 (recenzja)", "klucz tak, losowan > 0 przy liniach MB"),
+        "P307-11": ("P307-11: okup / kapitulacja przy wstrzymaniu po odparciach", "klucz tak (oceny i umowy - INFO)"),
+        "P307-12": ("P307-12: BK suma udzialow majatkow <= 1", "klucz TAK (liczba przyciec - INFO)"),
+        "P307-13": ("P307-13: szturmy przy sile / obroncy < 3 (INFO)", "porownac z baza 142b"),
     }
     for k, (nm, rule) in names.items():
         verdict = v.get(k)

@@ -10632,7 +10632,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
         public float SiegeRepelRetryMinRatio { get; set; } = 6f;
 
-        [SettingPropertyBool("Workshop Price Stock Pace", HintText = "The price a workshop asks of you counts a trade line's expected profit only as far as the market holds its materials: a line whose stock feeds it for a day or two is priced as working a day or two in a week, not every day. Off = full profit whenever one batch of materials is on the market, as before", RequireRestart = false)]
+        [SettingPropertyBool("Workshop Price Stock Pace", HintText = "The price a workshop asks of you counts a trade line's expected profit only as far as the market holds its materials, shared among the workshops of that kind in the town: a line whose stock feeds it for a day or two is priced as working a day or two in a week, not every day. Off = full profit whenever one batch of materials is on the market, as before", RequireRestart = false)]
         [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
         public bool WorkshopPriceStockPace { get; set; } = true;
 
@@ -10643,6 +10643,18 @@ namespace Armoury
         [SettingPropertyBool("Bk Estate Share No Workforce", HintText = "Banner Kings estates take no share of a village's trade tax when the village has no workforce at all (Banner Kings divided by zero there: the share came out as nothing-at-all or as the whole tax). Off = as in Banner Kings", RequireRestart = false)]
         [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
         public bool BkEstateShareNoWorkforce { get; set; } = true;
+
+        [SettingPropertyBool("Siege Mb Same Roll", HintText = "An AI lord who storms without waiting for engines still being built has the same second thought as any other assault: his walls-and-men odds are weighed against the attempt, as for the game's own decision. Off = only the bare walls test, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public bool SiegeMbSameRoll { get; set; } = true;
+
+        [SettingPropertyBool("Siege Repel Hold Ransom", HintText = "With Siege Repel Learn: a commander held back from storming the same walls again can still offer terms - ransom or surrender talks go on while the assault waits. Off = no talks either while he waits, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public bool SiegeRepelHoldRansom { get; set; } = true;
+
+        [SettingPropertyBool("Bk Estate Share Cap Sum", HintText = "Banner Kings estates in one village never take more of its trade tax together than the whole tax: when the village's workforce is smaller than the estates' own people, each share is reckoned against those people instead. Off = each estate's share capped alone, as in Banner Kings", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges, workshop prices, estates (307c)")]
+        public bool BkEstateShareCapSum { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -13304,6 +13316,9 @@ namespace Armoury
             s.WorkshopPriceStockPace = WorkshopPriceStockPace;
             s.WorkshopPriceStockDays = WorkshopPriceStockDays;
             s.BkEstateShareNoWorkforce = BkEstateShareNoWorkforce;
+            s.SiegeMbSameRoll = SiegeMbSameRoll;
+            s.SiegeRepelHoldRansom = SiegeRepelHoldRansom;
+            s.BkEstateShareCapSum = BkEstateShareCapSum;
         }
 
         internal static void Apply()

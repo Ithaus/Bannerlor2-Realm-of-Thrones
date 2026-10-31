@@ -33,7 +33,29 @@ namespace Armoury
         internal static bool LearnOn { get { var s = Settings.Current; return s != null && s.SiegeRepelLearn; } }
         internal static double RepelGrowth { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelPauseGrowth) ? 0.5 : Clamp(s.SiegeRepelPauseGrowth, 0.0, 2.0); } }
         private static int RetryAfter { get { var s = Settings.Current; return s == null ? 2 : (int)Clamp(s.SiegeRepelRetryAfter, 1, 10); } }
-        private static double RetryRatio { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelRetryMinRatio) ? 6.0 : Clamp(s.SiegeRepelRetryMinRatio, 2.0, 20.0); } }
+        // recenzja 307c: po odparciach prog nie nizszy niz DR (SiegeLadderMinRatio) - jedna miara miazdzacej przewagi, po odparciach co najmniej tak ostra
+        private static double RetryRatio { get { var s = Settings.Current; double r = s == null || float.IsNaN(s.SiegeRepelRetryMinRatio) ? 6.0 : Clamp(s.SiegeRepelRetryMinRatio, 2.0, 20.0); return Math.Max(r, LadderRatio); } }
+        // recenzja 307c (1): MB - Veto losuje szanse OB1 / szanse MB (gra ma tu PGame = 0, wiec dotad zostawal sam warunek s OB1 > 1)
+        internal static bool MbRollOn { get { var s = Settings.Current; return s != null && s.SiegeMbSameRoll; } }
+        // recenzja 307c (2): wstrzymanie po odparciach dotyczy samego szturmu - okup / kapitulacja (O0) liczy sie dalej
+        internal static bool RetryRansomOn { get { var s = Settings.Current; return s != null && s.SiegeRepelHoldRansom && LearnOn; } }
+        private static BesiegerCamp _mbCamp; private static float _mbAt = -1f; private static double _mbPt, _mbPo;
+        private static int _dMbRolls, _dMbVeto, _dRetryRansom, _dRetryRansomDeal;
+
+        /// <summary>Unblock (MB) przepuscil decyzje: szansa MB (pt) i OB1 tej samej drogi (po) - dla Veto w tej samej chwili.</summary>
+        private static void NoteMb(BesiegerCamp camp, double pt, double po) { _mbCamp = camp; _mbAt = Now; _mbPt = pt; _mbPo = po; }
+
+        /// <summary>Veto: true = ta decyzja przyszla z MB w tej chwili (klucz SiegeMbSameRoll) - pg = szansa MB, po = szansa OB1 tej drogi.</summary>
+        internal static bool MbOdds(BesiegerCamp camp, out double pg, out double po)
+        {
+            pg = po = 0.0;
+            if (!MbRollOn || camp == null || _mbCamp != camp || Math.Abs(Now - _mbAt) >= 0.01f) return false;
+            pg = _mbPt; po = _mbPo; _mbCamp = null;
+            _dMbRolls++;
+            return true;
+        }
+        internal static void NoteMbVeto() { _dMbVeto++; }
+        internal static void NoteRetryRansom(bool deal) { _dRetryRansom++; if (deal) _dRetryRansomDeal++; }
 
         private static int _dSaneRolls, _dSaneCut, _dRetryHeld, _dRetryGap, _dRetryEdge, _dRetryLate, _dPauseGrown;
         private static double _dSaneMax, _dGameMax, _dGrowSum;
@@ -96,8 +118,11 @@ namespace Armoury
                      + ", nauka z odparc " + (LearnOn ? "tak (przerwa +" + F(RepelGrowth, "0.00") + " na odparcie, po " + RetryAfter + " odparciach wyrwa albo >= " + F(RetryRatio, "0.0") + ":1)" : "nie")
                      + " | MB losowan " + _dSaneRolls + ", s przyciete " + _dSaneCut + " (s gry max " + (_dGameMax > 1e12 ? _dGameMax.ToString("0.###E+0", Inv) : F(_dGameMax, "0.00"))
                      + ", uzyte max " + F(_dSaneMax, "0.00") + ") | ponowny szturm: wstrzymane " + _dRetryHeld + ", przez wyrwe " + _dRetryGap + ", przy przewadze " + _dRetryEdge + ", po czekaniu " + _dRetryLate
-                     + " | przerwy wydluzone " + _dPauseGrown + (_dPauseGrown > 0 ? " (sr. x" + F(_dGrowSum / _dPauseGrown, "0.00") + ")" : "");
+                     + " | przerwy wydluzone " + _dPauseGrown + (_dPauseGrown > 0 ? " (sr. x" + F(_dGrowSum / _dPauseGrown, "0.00") + ")" : "")
+                     + " | recenzja: MB losowanie OB1 " + (MbRollOn ? "tak" : "nie") + " (losowan " + _dMbRolls + ", wstrzymane " + _dMbVeto + ")"
+                     + ", okup przy wstrzymaniu " + (RetryRansomOn ? "tak" : "nie") + " (ocen " + _dRetryRansom + ", umow " + _dRetryRansomDeal + ")";
             _dSaneRolls = _dSaneCut = _dRetryHeld = _dRetryGap = _dRetryEdge = _dRetryLate = _dPauseGrown = 0; _dSaneMax = _dGameMax = _dGrowSum = 0;
+            _dMbRolls = _dMbVeto = _dRetryRansom = _dRetryRansomDeal = 0;
             return t;
         }
     }

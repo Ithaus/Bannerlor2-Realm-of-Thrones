@@ -134,7 +134,6 @@ namespace Armoury
             if (Campaign.Current == null) return;
             foreach (var v in Village.All) FixVillage(v, "przeglad doby");
             foreach (var t in Town.AllFiefs) FixTown(t, "przeglad doby");
-            try { BkEstateShare307.Daily(); } catch (Exception e) { Log.Error("BkEstateShare307.Daily", e); }   // 307c: linia doby latki u zrodla (BK)
             if (_dayN > 0)
             {
                 // korekta licznika, nie ujscie ani zrodlo zlota: okna ksiegi (utarg wsi, 112) i migawki "Pieniadz swiata" widza juz naprawione

@@ -3197,6 +3197,7 @@ namespace Armoury
             try { MoneyLedger.Probe169("SaddleLaw.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { KingdomBalance.Daily(); } catch (Exception e) { Log.Error("KingdomBalance.Daily", e); } DayProfile.Lap("KingdomBalance.Daily");   // 175.0: linia "Balans krolestw (175)" + balans-krolestw.csv (tylko log)
             try { CanonWarBalance.Daily(); } catch (Exception e) { Log.Error("CanonWarBalance.Daily", e); } DayProfile.Lap("CanonWarBalance.Daily");   // 274: strony, miara, przelacznik, W2 nowe druzyny, linia "Rownowaga wojny (274)" - po 175 i p9
+            try { BkEstateShare307.Daily(); } catch (Exception e) { Log.Error("BkEstateShare307.Daily", e); }   // 307c (recenzja): linia doby latki udzialu majatku BK - wlasne wywolanie, niezalezne od strazy licznika podatku
             try { MoneyLedger.Daily(); } catch (Exception e) { Log.Error("MoneyLedger.Daily", e); } DayProfile.Lap("MoneyLedger.Daily");     // K1: "Pieniadz swiata" i "Przeplywy osad" (tylko log) - po calym naszym rozliczeniu doby
             try { Stage6Measure.Daily(); } catch (Exception e) { Log.Error("Stage6Measure.Daily", e); } DayProfile.Lap("Stage6Measure.Daily");   // E6/0 (206): ksiega uzbrojenia, ksiega koni, warsztaty wedlug krainy (tylko log) - stan po wszystkich przeplywach dnia
             try { WorkshopInputs.Daily(); } catch (Exception e) { Log.Error("WorkshopInputs.Daily", e); } DayProfile.Lap("WorkshopInputs.Daily");   // E6/M2 (208): linia "Warsztaty wedlug surowca (208)" przy wyborach typu (tylko log)
