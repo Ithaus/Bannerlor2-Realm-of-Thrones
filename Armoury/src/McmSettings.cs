@@ -4266,7 +4266,11 @@ namespace Armoury
 
         [SettingPropertyInteger("Mint Silver Reserve Days", 1, 120, "0", HintText = "the mint takes metal only beyond this many days of what the town needs: the daily ore of its silversmith workshops plus the world's daily use of that metal shared out over all towns (gold ore: the townsfolk's share alone), and never below what the stall keeps for trade contracts, merchant carts and caravans to other towns, so the smiths, the folk and the towns without ore find their metal first", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
-        public int MintSilverReserveDays { get; set; } = 15;
+        public int MintSilverReserveDays { get; set; } = 30;
+
+        [SettingPropertyBool("Mint Silver Skip Smith Towns", HintText = "the mint never takes silver ore in a town that has a silversmith workshop (yours included): a smith works it 25 loads at a time and must find it on the stall; gold ore is minted as before. Off = only the reserve days rule", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool MintSilverSkipSmithTowns { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Coin Wear Per Year", 0.0000f, 0.2000f, "0.0000", HintText = "share of the coin in townsfolk purses and in town and castle merchants' purses lost each year to wear, clipping and loss (around 0.003 in history). 0 = coin never wears away - the default until the mint is seen striking real coin, so the world's money does not shrink while the mint has little metal to strike", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
@@ -11938,6 +11942,7 @@ namespace Armoury
             s.CrownMint = CrownMint;
             s.MintSeigniorage = MintSeigniorage;
             s.MintSilverReserveDays = MintSilverReserveDays;
+            s.MintSilverSkipSmithTowns = MintSilverSkipSmithTowns;
             s.CoinWearPerYear = CoinWearPerYear;
             s.DebasementMintExtra = DebasementMintExtra;
             s.MonopolyFromDailyProfit = MonopolyFromDailyProfit;
