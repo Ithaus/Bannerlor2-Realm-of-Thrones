@@ -96,6 +96,9 @@ namespace Armoury
         // 305b: zmiana produkcji gracza z wyrownaniem kapitalu (WorkshopRetoolSettlesCapital) - zwrot do kiesy, doplata z kiesy, brak (gracza nie stac), zmian;
         // wyceny dla gracza (WorkshopTradeBuyerMemory) - z pamieci pol na pol, z cen targu w calosci (krotka historia), z polowa cen targu, z korekta tempa, bez linii broni
         private static long _dRetBack, _dRetAdd, _dRetShort; private static int _dRetN, _dQBlend, _dQExpFull, _dQExpHalf, _dQPace, _dQArms, _dQResaleCap;
+        // recenzja 305b: _qCount - Build liczy wyceny tylko z CostPlayerPostfix; _dMemPace - pamieci (Avg, Slow) przeliczone na tempo nowego wlasciciela przy zmianie
+        // wlasciciela gracz <-> notabl (kupno: / F, odkup: x F); _ownF, _ownOld - F i wlasciciel sprzed zmiany (OwnerPrefix)
+        private static bool _qCount; private static int _dMemPace; private static float _ownF = 1f; private static Hero _ownOld;
         private static int _gatePatched;                    // ile razy transpiler podmienil stala 200 (Harmony przelicza go przy kazdej nowej latce na metodzie - liczy sie przyrost w ApplyAll)
         private static Harmony _harmony;                    // do latki zakladanej w kampanii (raz na proces - Reset jej nie rusza)
         private static bool _finTried, _finPatched;
@@ -144,7 +147,7 @@ namespace Armoury
             _dWageCap = _dWagePurse = _dKeepCap = _dKeepPurse = _dUnpaid = _dPayNotable = _dPayLord = _dPayPlayer = _dFunded = _dSalePaid = _dSaleShort = _dGear = 0;
             _dNotFrom = _dNotTo = 0;
             _dFail = _dNoTaker = _dStumbles = 0;
-            _dRetBack = _dRetAdd = _dRetShort = 0; _dRetN = _dQBlend = _dQExpFull = _dQExpHalf = _dQPace = _dQArms = _dQResaleCap = 0;   // 305b
+            _dRetBack = _dRetAdd = _dRetShort = 0; _dRetN = _dQBlend = _dQExpFull = _dQExpHalf = _dQPace = _dQArms = _dQResaleCap = _dMemPace = 0;   // 305b
             _dGateCut = 0; _dGateCutGold = 0;
             _dClampN = 0; _dClampBack = _dClampLeft = 0;
         }
@@ -982,6 +985,10 @@ namespace Armoury
             __state = null;
             try { if (On && __instance != null) { __2 = __instance.Capital; __state = __instance.WorkshopType; } }
             catch (Exception e) { Stumble("WorkshopTrade.OwnerPrefix", e); }
+            // recenzja 305b: wlasciciel i F sprzed zmiany (ShopFactor gracza = 1) - do przeliczenia pamieci w OwnerPostfix
+            _ownOld = null; _ownF = 1f;
+            try { if (__instance != null && MemPaceOn) { _ownOld = __instance.Owner; _ownF = WorkshopPace.ShopFactor(__instance); } }
+            catch (Exception e) { _ownOld = null; _ownF = 1f; Stumble("WorkshopTrade.OwnerPrefix(tempo)", e); }
         }
 
         /// <summary>... a gdy przy okazji zmienil sie typ (bankructwo), znacznik kapitalu poczatkowego idzie za nowym typem.</summary>
@@ -989,6 +996,36 @@ namespace Armoury
         {
             try { if (__state != null && On && __instance != null && __instance.WorkshopType != __state) SyncInitialCapital(__instance); }
             catch (Exception e) { Stumble("WorkshopTrade.OwnerPostfix", e); }
+            try { if (__state != null && __instance != null && __instance.WorkshopType == __state && MemPaceOn) MemToNewOwner(__instance); }
+            catch (Exception e) { Stumble("WorkshopTrade.OwnerPostfix(tempo)", e); }
+            _ownOld = null; _ownF = 1f;
+        }
+
+        private static bool MemPaceOn { get { var s = Settings.Current; return On && s != null && s.WorkshopTradeBuyerMemory && s.WorkshopBuyerPaceCorrection; } }
+
+        /// <summary>
+        /// Recenzja 305b: pamiec wyniku (Avg, Slow) liczy sie w tempie WLASCICIELA (notabl - WorkshopPace F, gracz - tempo gry). Build przelicza ja przy kupnie
+        /// przez gracza (/ F), ale bez przeliczenia przy zmianie wlasciciela odkup liczyl sie od pamieci notabla - przy F > ok. 1.25 kupno i natychmiastowa
+        /// odsprzedaz dawaly zysk. Teraz przy zmianie wlasciciela notabl/lord -> gracz pamiec idzie przez ten sam wzor co cena: (x + up) / F - up, a gracz -> notabl
+        /// odwrotnie: (x + up) x F - up - jedna regula dla obu stron. Te same warunki co korekta w Build (bez linii broni, |F - 1| > 0.02). Pamiec rozruchu (Week) bez zmian.
+        /// </summary>
+        private static void MemToNewOwner(Workshop w)
+        {
+            var now = w.Owner;
+            if (now == null || _ownOld == null || now == _ownOld || w.WorkshopType == null || HasArmsLine(w.WorkshopType)) return;
+            bool toPlayer = now == Hero.MainHero && _ownOld != Hero.MainHero, fromPlayer = _ownOld == Hero.MainHero && now != Hero.MainHero;
+            if (!toPlayer && !fromPlayer) return;
+            Rec r;
+            if (!_rec.TryGetValue(w, out r) || r.Type != TypeId(w) || r.Days <= 0) return;
+            float f = toPlayer ? _ownF : WorkshopPace.ShopFactor(w);
+            if (!(f > 0.01f) || Math.Abs(f - 1f) <= 0.02f) return;
+            float up = UpkeepAt(w);
+            if (toPlayer) { r.Avg = (r.Avg + up) / f - up; r.Slow = (r.Slow + up) / f - up; }
+            else { r.Avg = (r.Avg + up) * f - up; r.Slow = (r.Slow + up) * f - up; }
+            _dMemPace++;
+            Log.Info("Warsztaty gracza - kapital i cena (305b): pamiec wyniku (" + (w.Settlement != null ? w.Settlement.Name.ToString() : "?") + ", " + TypeId(w)
+                     + ") przeliczona na tempo nowego wlasciciela (" + (toPlayer ? "do gracza, / " : "od gracza, x ") + f.ToString("0.00", CultureInfo.InvariantCulture)
+                     + ", utrzymanie " + ((int)Math.Round(up)) + "): miesiac " + ((int)Math.Round(r.Avg)) + ", rok " + ((int)Math.Round(r.Slow)) + ".");
         }
 
         /// <summary>
@@ -1035,6 +1072,7 @@ namespace Armoury
             __state = 0;
             try
             {
+                _retoolOldMark = __0 != null ? Math.Max(0, __0.InitialCapital) : -1;   // recenzja 305b: stary znacznik (przed SyncInitialCapital) do RetoolSettle
                 if (!On || __2 || __0 == null || __1 == null || __0.Owner == null || __0.Settlement == null) return;
                 __state = Math.Max(0, Campaign.Current.Models.WorkshopModel.GetConvertProductionCost(__1));
                 __2 = true;
@@ -1062,7 +1100,10 @@ namespace Armoury
             // 305b (WorkshopRetoolSettlesCapital): po sprzecie - kapital do znacznika nowego typu od razu (wlasny try; tylko warsztat gracza)
             try { if (On && __0 != null && __0.Owner == Hero.MainHero && RetoolSettleOn) RetoolSettle(__0); }
             catch (Exception e) { Stumble("WorkshopTrade.RetoolSettle", e); }
+            _retoolOldMark = -1;
         }
+
+        private static int _retoolOldMark = -1;   // recenzja 305b: InitialCapital przed zmiana produkcji (ConvertPrefix); -1 = nieznany
 
         private static bool RetoolSettleOn { get { var s = Settings.Current; return s != null && s.WorkshopRetoolSettlesCapital; } }
 
@@ -1082,9 +1123,12 @@ namespace Armoury
             var rec = Get(w);   // typ juz nowy - Get zaczyna pamiec od nowa (jak dotad przy pierwszym odczycie po zmianie)
             bool pn = PayNotes.On;
             _dRetN++;
-            if (cap > mark)
+            // recenzja 305b: kapital ponad STARY znacznik to niewyplacony zysk (gra wyplaca ProfitMade / 5 na dobe) - zostaje w kasie na zwykla wyplate z D11-3;
+            // zwrot kapitalu = najwyzej o tyle, o ile nowy typ potrzebuje mniej (stary znacznik - nowy). Stary nieznany - jak dotad (cala nadwyzka).
+            int backMax = _retoolOldMark >= 0 ? Math.Max(0, _retoolOldMark - mark) : int.MaxValue;
+            if (cap > mark && backMax > 0)
             {
-                int back = cap - mark;
+                int back = Math.Min(cap - mark, backMax);
                 w.ChangeGold(-back);
                 owner.ChangeHeroGold(back);
                 if (rec.HasEnd) rec.CapEnd -= back;
@@ -1290,7 +1334,7 @@ namespace Armoury
                 // przy kupnie od cudzego wlasciciela pamiec przeliczona na tempo gracza (warsztat gracza pracuje w tempie gry - WorkshopPace pomija gracza)
                 q.Profit = 0.5f * (rec.Avg + rec.Slow);
                 q.Window = Math.Min(rec.Mem, YearSpan);
-                q.Blend = true; if (sellerAsks) _dQBlend++;
+                q.Blend = true; if (sellerAsks && _qCount) _dQBlend++;
                 if (sellerAsks && Settings.Current.WorkshopBuyerPaceCorrection && w.Owner != Hero.MainHero && !HasArmsLine(w.WorkshopType))
                 {
                     float f = WorkshopPace.ShopFactor(w);
@@ -1298,7 +1342,7 @@ namespace Armoury
                     {
                         float up = UpkeepAt(w);
                         q.Profit = (q.Profit + up) / f - up;   // wynik = (linie x F) - utrzymanie -> (linie x 1) - utrzymanie
-                        q.Pace = f; _dQPace++;
+                        q.Pace = f; if (_qCount) _dQPace++;
                     }
                 }
             }
@@ -1318,13 +1362,13 @@ namespace Armoury
                 float exp = Expected(w);
                 bool half = q.Blend && rec.Mem >= Math.Max(1, Settings.Current.WorkshopBuyerShortHistoryDays);
                 if (half) exp *= 0.5f;
-                if (exp > q.Profit) { q.Profit = exp; q.Exp = true; q.ExpHalf = half; if (half) _dQExpHalf++; else if (q.Blend) _dQExpFull++; }
+                if (exp > q.Profit) { q.Profit = exp; q.Exp = true; q.ExpHalf = half; if (_qCount) { if (half) _dQExpHalf++; else if (q.Blend) _dQExpFull++; } }
             }
             // 305b: warsztat z linia broni/zbroi z wsadem, gdy te linie nic graczowi nie dadza (PlayerArmsAsFirm wylaczone) - pamiec notabla zawiera zarobek broni
             // (WorkshopLaw.CyclePrefix), ktorego gracz nie dostanie: cena z linii towarowych (Expected - tylko IsTradeLine)
             if (sellerAsks && BuyerBlend && w.Owner != Hero.MainHero && HasArmsInputLine(w.WorkshopType) && !PlayerArmsLive)
             {
-                q.Profit = Expected(w); q.Exp = true; q.ExpHalf = false; q.ArmsIdle = true; _dQArms++;
+                q.Profit = Expected(w); q.Exp = true; q.ExpHalf = false; q.ArmsIdle = true; if (_qCount) _dQArms++;
             }
             q.Tax = tax;
             q.Years = Math.Max(0f, s.WorkshopTradePriceYears);
@@ -1375,9 +1419,11 @@ namespace Armoury
             try
             {
                 if (!On || !Live || __0 == null || __0.WorkshopType == null || __0.WorkshopType.IsHidden) return;
+                _qCount = true;   // recenzja 305b: liczniki wycen tylko z prawdziwej ceny dla gracza (nie z cennika doby i nie z przyciecia odkupu)
                 __result = QuoteFor(__0, Hero.MainHero).Price;
             }
             catch (Exception e) { Stumble("WorkshopTrade.CostPlayerPostfix", e); }
+            finally { _qCount = false; }
         }
 
         /// <summary>DefaultWorkshopModel.GetCostForNotable - tyle notabl daje graczowi: czesc wartosci DLA NIEGO (jego podatek, gorsza pamiec) plus kapital w kasie.
@@ -1615,8 +1661,8 @@ namespace Armoury
                      + ", Workshop Trade Buyer Memory " + (s.WorkshopTradeBuyerMemory ? "TAK (pol na pol)" : "NIE (lepsza pamiec)") + ", Pace Correction " + (s.WorkshopBuyerPaceCorrection ? "TAK" : "NIE")
                      + ", krotka historia " + s.WorkshopBuyerShortHistoryDays + " dob, Player Arms As Firm " + (PlayerArmsLive ? "TAK" : "NIE")
                      + " | zmiany produkcji gracza " + _dRetN + ": zwrot kapitalu do kiesy " + _dRetBack + ", doplata z kiesy " + _dRetAdd + ", brak (odbudowa z utargu) " + _dRetShort
-                     + " | wyceny dla gracza: pol na pol " + _dQBlend + ", cena targu w calosci (krotka historia) " + _dQExpFull + ", polowa ceny targu " + _dQExpHalf
-                     + ", korekta tempa " + _dQPace + ", bez linii broni " + _dQArms + ", odkup notabla przyciety do ceny gracza " + _dQResaleCap + " | potkniecia " + _dStumbles + ".");
+                     + " | wyceny dla gracza (cena gry GetCostForPlayer): pol na pol " + _dQBlend + ", cena targu w calosci (krotka historia) " + _dQExpFull + ", polowa ceny targu " + _dQExpHalf
+                     + ", korekta tempa " + _dQPace + ", bez linii broni " + _dQArms + ", odkup notabla przyciety do ceny gracza " + _dQResaleCap + ", pamiec przeliczona na tempo nowego wlasciciela " + _dMemPace + " | potkniecia " + _dStumbles + ".");
         }
 
         // ------------------------------------------------------------ linia dnia

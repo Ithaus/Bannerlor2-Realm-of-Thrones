@@ -199,7 +199,7 @@ namespace Armoury
                 var r = Ws(w, true);
                 if (r == null) return;
                 if (r.Basis < 0) r.Basis = Math.Max(0, capBefore);
-                if (back > 0) { r.CapRet += back; r.DCapRet += back; r.Basis = Math.Max(0L, r.Basis - back); if (CapSplit) WkAdd(_wk, _wkDay, 5, back); }
+                if (back > 0) { r.CapRet += back; r.DCapRet += back; r.Basis = Math.Max(0L, r.Basis - back); if (CapSplit) WkAdd(_wk, _wkDay, 5, back); else WkAdd(_wk, _wkDay, 3, back); }   // recenzja 305b: bez podzialu - jak dotad "workshops paid you"
                 if (added > 0) { r.CapAdd += added; r.DCapAdd += added; r.Basis += added; }
             }
             catch (Exception e) { Stumble("NoteWsCapital", e); }

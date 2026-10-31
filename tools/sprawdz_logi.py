@@ -72103,7 +72103,7 @@ K259_RX = {
     "ws": re.compile(r"^warsztat '(.+?)' \((.+), glowa rodu\) \| kapital (\d+) \(poczatkowy (\d+)\), zysk przed wyplata (-?\d+|-), wyplata (\d+), "
                      r"podatek BK \(D11-3\) nalezny (\d+) zaplacony (\d+) \| (od zakupu|od wczytania 259) "),
     "tot": re.compile(r"^razem dzis: karawany do rodu (\d+) \(rozliczenie 259 (\d+), BK (\d+), E3/9 (\d+), gra 10% (\d+), rozwiazanie (\d+)\), zold rodu (\d+), doplaty BK (\d+), "
-                      r"brak rodu (\d+), warsztaty do rodu (\d+), podatek warsztatow (\d+) \| komunikaty: wyplata (\S+), ponizej kapitalu (\d+), tydzien (TAK|NIE) "
+                      r"brak rodu (\d+), warsztaty do rodu (\d+)(?: \(305b: w tym zwrot kapitalu \d+, klucz podzialu (?:TAK|NIE)\))?, podatek warsztatow (\d+) \| komunikaty: wyplata (\S+), ponizej kapitalu (\d+), tydzien (TAK|NIE) "
                       r"\| BK Workshop taxes w modelu warsztatow (TAK|NIE)[^|]* \| potkniecia (\d+)\.$"),
     "pay": re.compile(r"^komunikat - wyplata \((PayNotes|ekran)\) (\d+) \| "),
     "low": re.compile(r"^komunikat - ponizej kapitalu: karawana '(.+?)' ponizej kapitalu (\d+) dob \| "),
@@ -72191,6 +72191,10 @@ def k259_selftest():
     m = R["tot"].match(T["tot"].format(y=520, b=0, m="PayNotes", s=0))
     if not m or m.group(2) != "520" or m.group(12) != "PayNotes" or m.group(16) != "0":
         probs.append("tot")
+    # recenzja 305b: dopisek zwrotu kapitalu po "warsztaty do rodu N" (linia od 305b)
+    m = R["tot"].match(T["tot"].format(y=520, b=0, m="PayNotes", s=0).replace("warsztaty do rodu 1000, ", "warsztaty do rodu 1000 (305b: w tym zwrot kapitalu 40, klucz podzialu TAK), "))
+    if not m or m.group(10) != "1000" or m.group(11) != "150" or m.group(16) != "0":
+        probs.append("tot (305b)")
     if not R["pay"].match(T["pay"].format(y=520)):
         probs.append("pay")
     m = R["low"].match(T["low"].format(n=7))
@@ -84324,7 +84328,7 @@ W305_SAMPLE_FIRM = ("Warsztaty gracza jak firma (305b): dzien 108900 - klucz TAK
                     " koszt (surowiec + place) 655, wynik 157 | cykli oddanych grze (wyjatek albo brak miasta) 0 | cykl gry pominiety w kazdym cyklu firmy (bron nie powstaje za darmo).")
 W305_SAMPLE_DAY = ("Warsztaty gracza - kapital i cena (305b): dzien 108900 | klucze: Workshop Retool Settles Capital TAK, Workshop Trade Buyer Memory TAK (pol na pol), Pace Correction TAK,"
                    " krotka historia 60 dob, Player Arms As Firm TAK | zmiany produkcji gracza 1: zwrot kapitalu do kiesy 7968, doplata z kiesy 0, brak (odbudowa z utargu) 0"
-                   " | wyceny dla gracza: pol na pol 280, cena targu w calosci (krotka historia) 4, polowa ceny targu 31, korekta tempa 190, bez linii broni 0, odkup notabla przyciety do ceny gracza 0 | potkniecia 0.")
+                   " | wyceny dla gracza (cena gry GetCostForPlayer): pol na pol 28, cena targu w calosci (krotka historia) 4, polowa ceny targu 3, korekta tempa 19, bez linii broni 0, odkup notabla przyciety do ceny gracza 0, pamiec przeliczona na tempo nowego wlasciciela 1 | potkniecia 0.")
 W305_SAMPLE_WS = ("Majatek gracza (karawany i warsztaty) (259): dzien 108900 || warsztat 'Smithy' (Fairmarket, glowa rodu) | kapital 10120 (poczatkowy 10000), zysk przed wyplata 240, wyplata 0,")
 
 
