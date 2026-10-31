@@ -2,11 +2,10 @@
 
 ## DOPISEK 31.10 ok. 04:35 CEST - NOWA SESJA (d16b0e41): Jeff wyjezdza do niedzieli, pelna zgoda "pracuj tak dlugo az naprawisz", wgrywac samemu
 - Jeff gra NOWA kampanie: Ironman0gXONzURi8yO.sav (rod KARDA, bohater Przemyslaw, doby 108648-108878, ok. 220k zl). Logi 30.10 18:01/19:48/21:04-03:30 skopiowane do
-  D:\Backup-Bannerlord\logi-jeffa6-10-31-sesje-30-10 i scratchpad d16b0e41\logi. Stary zapis testowy (KkUpHftX7ZIq) przeniesiony na D:\...\zapisy-testowe-archiwum6-10-31-stary-przekierowany.
+  D:\Backup-Bannerlord\logi-jeffa\2026-10-31-sesje-30-10 i scratchpad d16b0e41\logi. Stary zapis testowy (KkUpHftX7ZIq) przeniesiony na D:\...\zapisy-testowe-archiwum\2026-10-31-stary-przekierowany.
 - Zadania Jeffa: (1) karawany - dzialanie, zysk, OSOBNA linia kosztu karawan w wydatkach rodu; (2) warsztaty prawie nic nie zarabiaja - blad czy ekonomia (bez sztucznego zarobku);
   (3) bitwy - logi, poprawki, mocniejsze/rozsadniejsze AI; (4) kowalstwo - balans XP luki vs miecze; (5) inwestycje - czy dzialaja; (6) reszta bledow z logu i zapisu.
-- LINIA: noc/305-jeff-31-10 (worktree scratchpad d16b0e41\zb
-305 od 6888ffa3 = WGRANE 140). Diagnoza wf_4fb41c95-b70 w toku; autotest bazowy 141base (140 na nowym zapisie,
+- LINIA: noc/305-jeff-31-10 (worktree scratchpad d16b0e41\zb\n305 od 6888ffa3 = WGRANE 140). Diagnoza wf_4fb41c95-b70 w toku; autotest bazowy 141base (140 na nowym zapisie,
   -JeffSave autotest-przekierowany-Ironman0gXONzURi8yO, 7 bitew + 90 dob) w toku - wynik m113\seria-141base.out.txt.
 
 ## DOPISEK 30.10 ok. 04:45 CEST - WGRANIE 140 (noc/304-karawany-odcinki c9fca017, status 6888ffa3 wypchniety) - KONIEC NOCY, START DLA NASTEPNEJ SESJI / DRUGIEGO KONTA
