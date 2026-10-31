@@ -1182,13 +1182,26 @@ namespace Armoury
                 var t = _lastType.GetValue(beh) as WorkshopType;
                 var w = _findShop.Invoke(beh, null) as Workshop;
                 if (t == null || w == null || w.Owner != Hero.MainHero || t.IsHidden) return false;
-                int tools = Math.Max(0, Campaign.Current.Models.WorkshopModel.GetConvertProductionCost(t));
-                int mark = StartCapitalFor(t), cap = Math.Max(0, w.Capital);
-                int purse = Math.Max(0, Hero.MainHero.Gold - tools);
+                int tools, mark, cap, back, add;
+                MBTextManager.SetTextVariable("ARM_WS_RETOOL", RetoolPromise(w, t, Hero.MainHero.Gold, out tools, out mark, out cap, out back, out add), false);
+                return true;
+            }
+            catch (Exception e) { Stumble("WorkshopTrade.RetoolCondition", e); return false; }
+        }
+
+        /// <summary>306b: liczby i zdanie potwierdzenia zmiany produkcji (linia rozmowy 'arm_ws_retool_confirm') - wydzielone z RetoolCondition bez zmiany wyniku,
+        /// zeby sonda autotestu (Probes306, plik armoury-warsztat305.flag) porownala obietnice rozmowy z przelewem RetoolSettle. add = doplata, ktora gracz zdola dac
+        /// (min(brak, kiesa po sprzecie)) - ta sama kwota co w RetoolSettle (owner.Gold po zaplacie za sprzet).</summary>
+        internal static string RetoolPromise(Workshop w, WorkshopType t, int gold, out int tools, out int mark, out int cap, out int back, out int add)
+        {
+                tools = Math.Max(0, Campaign.Current.Models.WorkshopModel.GetConvertProductionCost(t));
+                mark = StartCapitalFor(t); cap = Math.Max(0, w.Capital);
+                int purse = Math.Max(0, gold - tools);
                 // 305f (przeglad scalenia): zwrot tym samym wzorem co RetoolSettle - min(kapital - nowy znacznik, stary znacznik - nowy); reszta nadwyzki to zysk
                 // jeszcze niewyplacony, zostaje w kasie i idzie zwykla wyplata (stary znacznik = InitialCapital teraz, tak jak ConvertPrefix go zapisze)
                 int oldMark = Math.Max(0, w.InitialCapital);
-                int back = cap > mark ? Math.Min(cap - mark, Math.Max(0, oldMark - mark)) : 0;
+                back = cap > mark ? Math.Min(cap - mark, Math.Max(0, oldMark - mark)) : 0;
+                add = cap < mark ? Math.Min(mark - cap, purse) : 0;
                 var sb = new StringBuilder();
                 sb.Append("All right. Just to confirm - you want us to switch to ").Append(t.Name).Append("? New tools cost ").Append(tools).Append(" denars. ");
                 sb.Append("The new trade needs ").Append(mark).Append(" in its till and the shop holds ").Append(cap);
@@ -1201,11 +1214,12 @@ namespace Armoury
                 else if (cap == mark) sb.Append(" - just what it needs.");
                 else if (purse >= mark - cap) sb.Append(", so you add ").Append(mark - cap).Append(" from your purse.");
                 else sb.Append(". You can add only ").Append(purse).Append(" after the tools; until its own takings make up the rest, the shop pays you no profit.");
-                MBTextManager.SetTextVariable("ARM_WS_RETOOL", sb.ToString(), false);
-                return true;
-            }
-            catch (Exception e) { Stumble("WorkshopTrade.RetoolCondition", e); return false; }
+                return sb.ToString();
         }
+
+        // 306b (sonda autotestu): odczyty bez zmian stanu
+        internal static bool ProbeHasArmsLine(WorkshopType t) { return HasArmsLine(t); }
+        internal static void ProbeRetoolCounters(out long back, out long add, out long shortfall, out int n) { back = _dRetBack; add = _dRetAdd; shortfall = _dRetShort; n = _dRetN; }
 
         // ------------------------------------------------------------ latki: stale modelu w nowej monecie
 

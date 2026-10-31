@@ -85011,5 +85011,221 @@ def main(argv):
             return drobne305e_main(rest[0] if rest else None)
     return _drobne305e_main_prev(argv)
 
+# ============================================================ 306b (31.10): sondy autotestu dla zmian 305 - grupa sondy306
+# Linie C# (Probes306.cs, tylko DLL autotestu i pliki armoury-kowal305.flag / armoury-karawana305.flag / armoury-warsztat305.flag):
+# "Sondy autotestu (306b): start sesji | doba N | klucz Autotest306Probes TAK | flagi: kowal305 X, karawana305 Y, warsztat305 Z | ...",
+# "... kowal - <robota> | <id> tN | ... -> TAK|NIE|INFO.", "... kowal - werdykt | probek N, zgodnych z wzorem Z/N (niezgodnych B), luk surowe t2/t3/t4 a/b/c ...,
+# miecz najmniej M ..., przetop srednio P w K ... | stan bohatera bez zmian TAK ... | potkniecia 0 -> wynik TAK.", "... karawana - utworzona | ... -> wynik TAK.",
+# "... karawana - bez tworzenia: ... -> wynik POMINIETY.", "... karawana - wydatki doby N | karawan gracza K | ... 'Caravan wages' W, ... -> wynik TAK|NIE|POMINIETY.",
+# "... warsztat - zmiana produkcji doba N | ... -> wynik TAK|NIE|POMINIETY."; krzyzowo: linia 305a (rozliczenie rodu z zoldem karawan), 259 gracza "gdzie (305a):",
+# linia 305b "zmiany produkcji gracza N". Uzycie: --grupa sondy306 <Armoury-*.log>.
+S306_P = "Sondy autotestu (306b): "
+S306_RE_START = re.compile(r"Sondy autotestu \(306b\): start sesji \| doba (-?\d+) \| klucz Autotest306Probes TAK \| flagi: kowal305 (TAK|NIE), karawana305 (TAK|NIE), warsztat305 (TAK|NIE)")
+S306_RE_KV = re.compile(r"Sondy autotestu \(306b\): kowal - werdykt \| probek (\d+), zgodnych z wzorem (\d+)/(\d+) \(niezgodnych (\d+)\), luk surowe t2/t3/t4 (-?\d+)/(-?\d+)/(-?\d+) .*?"
+                        r", miecz najmniej (-?\d+) .*?, przetop srednio (-?[\d.]+) w (\d+) .*?\| stan bohatera bez zmian (TAK|NIE) .*?\| potkniecia (\d+) -> wynik (TAK|NIE)\.")
+S306_RE_KVX = re.compile(r"Sondy autotestu \(306b\): kowal - werdykt \|.*-> wynik (TAK|NIE)\.")
+S306_RE_KROW = re.compile(r"Sondy autotestu \(306b\): kowal - (?!werdykt)(.+?) \| (.+?) \| .* -> (TAK|NIE|INFO)\.$")
+S306_RE_CAR = re.compile(r"Sondy autotestu \(306b\): karawana - (utworzona \|.*|bez tworzenia: .*|wyjatek .*) -> wynik (TAK|NIE|POMINIETY)\.")
+S306_RE_CDAY = re.compile(r"Sondy autotestu \(306b\): karawana - wydatki doby (-?\d+) \| karawan gracza (\d+) \| .*?'Caravan wages' (-?\d+), .* -> wynik (TAK|NIE|POMINIETY)\.")
+S306_RE_CDAYX = re.compile(r"Sondy autotestu \(306b\): karawana - wydatki doby (-?\d+) \|.* -> wynik (TAK|NIE|POMINIETY)\.")
+S306_RE_WS = re.compile(r"Sondy autotestu \(306b\): warsztat - zmiana produkcji doba (-?\d+) \| (.*) -> wynik (TAK|NIE|POMINIETY)\.")
+S306_RE_305A = re.compile(r"Karawany gracza - osobna linia zoldu \(305a\): dzien (\d+) .*?\| rozliczenie rodu \(apply\): wywolan (\d+), zold karawan w linii BK (\d+)")
+S306_RE_305AW = re.compile(r"\| samotest: .*?'Caravan wages' (-?\d+)")
+S306_RE_305B = re.compile(r"Warsztaty gracza - kapital i cena \(305b\): dzien (\d+) .*?\| zmiany produkcji gracza (\d+): zwrot kapitalu do kiesy (\d+), doplata z kiesy (\d+)")
+
+S306_SAMPLES = [
+    S306_P + "start sesji | doba 108878 | klucz Autotest306Probes TAK | flagi: kowal305 TAK, karawana305 TAK, warsztat305 TAK | karawana testu z zapisu brak | zmiana produkcji w dobie 108881.",
+    S306_P + "kowal - luk t2 | bow_a t2 | stamina 17, trudnosc 40, nauka 1.000 | droga Forge.Smith (SmithXpRule.WorkXp): XP 238 | wzor niezaleznie 238 | surowe (nauka 1, bez sufitu) 238 | tabela 305d 238 | pekniecie 71.4 -> TAK.",
+    S306_P + "kowal - rafinacja | charcoal x1 | stamina -, trudnosc -, nauka - | droga SmithingModel.GetSkillXpForRefining: XP 3 | wzor niezaleznie 3 | surowe (nauka 1, bez sufitu) - | wartosc 10, dawna 10 -> TAK.",
+    S306_P + "kowal - werdykt | probek 22, zgodnych z wzorem 20/20 (niezgodnych 0), luk surowe t2/t3/t4 238/546/980 wobec 238/546/980 +-15% (TAK), miecz najmniej 252 (wymog > 50: TAK),"
+             " przetop srednio 18.5 w 8 (wymog > 1.5: TAK), rafinacja 4 formul, najmniej 3 | kowal Jeff: Smithing 150, perk Practical Smith NIE | klucze SmithXpOneRule TAK, SmithXpPerStaminaTier 7,"
+             " SmithXpRoundFix TAK, WeaponXpFromValueCapped TAK | model BKSmithingModel, latki: wolne kucie [a, b], przetop [c], rafinacja [d] | stan bohatera bez zmian TAK (XP umiejetnosci 1.5 -> 1.5,"
+             " TotalXp 5 -> 5, stamina 100 -> 100, zloto 5 -> 5) | potkniecia 0 -> wynik TAK.",
+    S306_P + "karawana - utworzona | 'Caravan of Jeff' (caravan_1) w Lys (port NIE, gracz w miescie NIE), wodz Bjorn (towarzysz), szablon t | koszt rozmowy 15000, zloto gracza 50000 -> 35000"
+             " (zaplacone 15000, TAK) | kiesa karawany 15000 (E3/7 kontekst gracza: kapital modelu 15000, oczekiwane min(kapital, zaplacone) 15000, TAK), kasa miasta 1 -> 1 | wlasciciel gracz,"
+             " rod gracza TAK | latki na konsekwencji rozmowy (sonda idzie sekwencja z dekompilacji, kontekst E3/7 wprost): x | znacznik zapisu caravan_1@108878 -> wynik TAK.",
+    S306_P + "karawana - wydatki doby 108879 | karawan gracza 1 | podglad z opisem: suma bez rozbicia -300, z rozbiciem -300 (roznica 0) | 'Caravan wages' -90, 'Garrison and Party Expense' -210"
+             " (bez rozbicia -300) | klucz CaravanWagesSeparateLine TAK, latki 305a 2/2, BK PartyExpensesPrefix TAK | linie (z rozbiciem): 'Garrison and Party Expense' -210; 'Caravan wages' -90 -> wynik TAK.",
+    S306_P + "warsztat - zmiana produkcji doba 108881 | Seagard silversmith -> bakery (ProfitMade 0) | rozmowa: sprzet 1200, nowy znacznik 2000, kapital 4978, zwrot 2978, doplata 0 | 'All right.'"
+             " | przelew RetoolSettle: zwrot 2978, doplata 0, brak 0, zmian 1 (TAK) | typ zmieniony TAK -> wynik TAK.",
+    "Karawany gracza - osobna linia zoldu (305a): dzien 108880 | klucze: osobna linia TAK, dziennik karawany TAK, koniec karawany TAK | latki wpiete 2/2 (brak: -), BK PartyExpensesPrefix TAK"
+    " | rozliczenie rodu (apply): wywolan 1, zold karawan w linii BK 90, doplata BK do kiesy 0, linia partii i zalog BK razem 300 | samotest: wydatki rodu (podglad) bez rozbicia -300, z rozbiciem -300"
+    " (roznica 0) | linie: 'Garrison and Party Expense' -300 -> -210, 'Caravan wages' -90, 'Caravan purse top-up' 0 -> ZGODNE | potkniecia 0 (sesja 0).",
+    "Majatek gracza (karawany i warsztaty) (259): dzien 108880 || karawana 'Caravan of Jeff' (wodz Bjorn, zwykla) | gdzie (305a): w drodze, cel Lys | transakcje dnia (305a) 0",
+    "Warsztaty gracza - kapital i cena (305b): dzien 108881 | klucze: Workshop Retool Settles Capital TAK | zmiany produkcji gracza 1: zwrot kapitalu do kiesy 2978, doplata z kiesy 0, brak (odbudowa z utargu) 0 | potkniecia 0.",
+]
+
+
+def s306_new():
+    return dict(start=0, flags=None, kv=None, kvx=None, rows=0, rowbad=0, rowbadx=None, car=None, carx=None, cday=0, cdayok=0, cdaybad=0, cdayskip=0, cdaybadx=None, cwage=0,
+                ws=None, wsx=None, a305=0, a305w=0, d259=0, b305=0, b305back=0, err=0)
+
+
+def s306_feed(D, s):
+    if "ERROR in Probes306" in s or "ERROR in SyncData.arm_306_sondy" in s:
+        D["err"] += 1
+    if "Sondy autotestu (306b): " in s:
+        m = S306_RE_START.search(s)
+        if m:
+            D["start"] += 1
+            D["flags"] = (m.group(2), m.group(3), m.group(4))
+            return
+        m = S306_RE_KV.search(s)
+        if m:
+            D["kv"] = m.groups()
+            return
+        m = S306_RE_KVX.search(s)
+        if m:
+            D["kvx"] = m.group(1)
+            return
+        m = S306_RE_KROW.search(s)
+        if m:
+            D["rows"] += 1
+            if m.group(3) == "NIE":
+                D["rowbad"] += 1
+                if D["rowbadx"] is None:
+                    D["rowbadx"] = (m.group(1) + " | " + m.group(2))[:120]
+            return
+        m = S306_RE_CAR.search(s)
+        if m:
+            if D["car"] != "TAK":
+                D["car"] = m.group(2)
+                D["carx"] = m.group(1)[:160]
+            return
+        m = S306_RE_CDAY.search(s)
+        mx = m or S306_RE_CDAYX.search(s)
+        if mx:
+            D["cday"] += 1
+            v = mx.groups()[-1]
+            if v == "TAK":
+                D["cdayok"] += 1
+            elif v == "NIE":
+                D["cdaybad"] += 1
+                if D["cdaybadx"] is None:
+                    D["cdaybadx"] = s[s.find("wydatki doby"):][:160]
+            else:
+                D["cdayskip"] += 1
+            if m and int(m.group(3)) < 0:
+                D["cwage"] += 1
+            return
+        m = S306_RE_WS.search(s)
+        if m:
+            D["ws"] = m.group(3)
+            D["wsx"] = m.group(2)[:200]
+        return
+    if "(305a)" in s:
+        m = S306_RE_305A.search(s)
+        if m and int(m.group(2)) > 0 and int(m.group(3)) > 0:
+            D["a305"] += 1
+        mw = S306_RE_305AW.search(s)
+        if m and mw and int(mw.group(1)) < 0:
+            D["a305w"] += 1
+        if "Majatek gracza" in s and "gdzie (305a):" in s:
+            D["d259"] += 1
+        return
+    if "(305b): dzien" in s:
+        m = S306_RE_305B.search(s)
+        if m and int(m.group(2)) > 0:
+            D["b305"] += int(m.group(2))
+            D["b305back"] += int(m.group(3))
+
+
+def s306_rows(rep, D):
+    rep.add("S306-0: linia startu sond (flagi)", f"{D['start']} (flagi kowal/karawana/warsztat {D['flags']})",
+            "> 0 (bieg z -ExtraFlags armoury-kowal305.flag,armoury-karawana305.flag,armoury-warsztat305.flag)", D["start"] > 0)
+    kv = D["kv"]
+    if kv:
+        n, ok_n, of_n, bad, b2, b3, b4, sw, sm, smn, same, st, res = kv
+        rep.add("S306-1: kowal - werdykt sondy", f"{res} (probek {n}, zgodnych {ok_n}/{of_n}, niezgodnych {bad}, stan bohatera bez zmian {same}, potkniecia {st})", "TAK", res == "TAK")
+        tab = (238, 546, 980)
+        bows = (int(b2), int(b3), int(b4))
+        bows_ok = all(b >= 0 and abs(b - t) <= 0.15 * t for b, t in zip(bows, tab))
+        rep.add("S306-1a: luk surowe t2/t3/t4 (305d)", "/".join(str(b) for b in bows), "238/546/980 +-15%", bows_ok)
+        rep.add("S306-1b: miecz najmniej (305d)", sw, "> 50", int(sw) > 50)
+        rep.add("S306-1c: przetop srednio (305d)", f"{sm} w {smn}", "> 1.5", float(sm) > 1.5)
+    else:
+        rep.add("S306-1: kowal - werdykt sondy", "brak linii werdyktu" + (f" (linia nierozpoznana, wynik {D['kvx']})" if D["kvx"] else ""), "TAK", False)
+    rep.add("S306-2: kowal - wiersze tabeli bez NIE", f"wierszy {D['rows']}, NIE {D['rowbad']}" + (f" (np. {D['rowbadx']})" if D["rowbadx"] else ""), "wierszy > 0, NIE 0",
+            D["rows"] > 0 and D["rowbad"] == 0)
+    car = D["car"]
+    car_ok = car == "TAK" or (car == "POMINIETY" and D["carx"] is not None and ("ma juz karawan" in D["carx"] or "juz utworzona" in D["carx"]))
+    rep.add("S306-3: karawana gracza utworzona droga rozmowy", f"{car} ({D['carx']})" if car else "brak linii", "TAK (POMINIETY tylko gdy gracz juz ma karawane / znacznik z zapisu)", car_ok)
+    rep.add("S306-4: podglad wydatkow z opisem co dobe", f"dob {D['cday']}: TAK {D['cdayok']}, NIE {D['cdaybad']}, POMINIETY {D['cdayskip']}, z 'Caravan wages' < 0 {D['cwage']}"
+            + (f" (np. {D['cdaybadx']})" if D["cdaybadx"] else ""), "TAK > 0, NIE 0", D["cdayok"] > 0 and D["cdaybad"] == 0)
+    rep.add("S306-5: linia 305a - rozliczenie rodu z zoldem karawan i samotest z 'Caravan wages'", f"dob z zoldem karawan w rozliczeniu {D['a305']}, samotest z 'Caravan wages' < 0 {D['a305w']}",
+            "obie > 0", D["a305"] > 0 and D["a305w"] > 0)
+    rep.add("S306-6: linia 259 gracza z dziennikiem 'gdzie (305a)'", str(D["d259"]), "> 0", D["d259"] > 0)
+    rep.add("S306-7: warsztat - zmiana produkcji (obietnica rozmowy = przelew = zloto)", f"{D['ws']} ({D['wsx']})" if D["ws"] else "brak linii", "TAK", D["ws"] == "TAK")
+    rep.add("S306-8: linia 305b - zmiany produkcji gracza", f"zmian {D['b305']}, zwrot do kiesy {D['b305back']}", ">= 1", D["b305"] >= 1)
+    rep.add("S306-9: bledy Probes306 (ERROR)", str(D["err"]), "0", D["err"] == 0)
+
+
+def s306_verdicts(D):
+    rep = Report()
+    s306_rows(rep, D)
+    return {r[0].split(":")[0]: r[3] for r in rep.rows}
+
+
+def sondy306_selftest():
+    D = s306_new()
+    for ln in S306_SAMPLES:
+        s306_feed(D, "[06:39:07] " + ln)
+    v = s306_verdicts(D)
+    bad = [k for k, x in v.items() if x != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad} ({D})"
+    B = s306_new()
+    for ln in S306_SAMPLES:
+        x = ln.replace("-> wynik TAK.", "-> wynik NIE.").replace("238/546/980 wobec", "120/546/980 wobec").replace("miecz najmniej 252", "miecz najmniej 1")
+        x = x.replace("przetop srednio 18.5", "przetop srednio 1.0").replace("pekniecie 71.4 -> TAK.", "pekniecie 71.4 -> NIE.").replace("zmiany produkcji gracza 1:", "zmiany produkcji gracza 0:")
+        x = x.replace("wywolan 1, zold karawan w linii BK 90", "wywolan 0, zold karawan w linii BK 0").replace("gdzie (305a):", "gdzie:")
+        s306_feed(B, "[06:39:07] " + x)
+    s306_feed(B, "[06:40:00] ERROR in Probes306.Kowal (potkniecie 1)")
+    vb = s306_verdicts(B)
+    miss = [k for k in ("S306-1", "S306-1a", "S306-1b", "S306-1c", "S306-2", "S306-3", "S306-4", "S306-5", "S306-6", "S306-7", "S306-8", "S306-9") if vb.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss} ({vb})"
+    C = s306_new()
+    s306_feed(C, "[06:39:07] " + S306_P + "karawana - bez tworzenia: gracz ma juz karawan 1 (linie 305a i 259 maja co liczyc) -> wynik POMINIETY.")
+    s306_feed(C, "[06:39:07] " + S306_P + "kowal - werdykt | wyjatek NullReferenceException -> wynik NIE.")
+    vc = s306_verdicts(C)
+    if vc.get("S306-3") != "TAK" or vc.get("S306-1") != "NIE" or vc.get("S306-0") != "NIE":
+        return f"POMINIETY / wyjatek zle: {vc}"
+    return None
+
+
+def sondy306_main(logp):
+    """sondy306 (31.10, paczka 306b): S306-S, S306-0..S306-9. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = sondy306_selftest()
+    rep.add("S306-S: self-test wyrazen (linie jak w Probes306.cs)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("S306-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = s306_new()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            s306_feed(D, ln.rstrip("\r\n"))
+    print(f"plik: {logp}")
+    s306_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_sondy306_main_prev = main
+
+
+def main(argv):
+    # paczka 306b: grupa sondy306 - opakowanie main jak karawany305
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "sondy306":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return sondy306_main(rest[0] if rest else None)
+    return _sondy306_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

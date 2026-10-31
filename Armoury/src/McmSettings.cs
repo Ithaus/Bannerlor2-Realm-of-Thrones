@@ -10592,6 +10592,10 @@ namespace Armoury
         [SettingPropertyGroup("Small fixes (31.10)")]
         public bool A17NightRaiderBlockAllKs { get; set; } = true;
 
+        [SettingPropertyBool("Autotest306 Probes", HintText = "Test runs only: lets the automatic test check smithing XP, give the player a caravan and change the trade of one of the player's workshops, when the test's own flag files are present. In a normal game it does nothing. Off = those checks never run, even with the flag files", RequireRestart = false)]
+        [SettingPropertyGroup("Autotest probes (306b)")]
+        public bool Autotest306Probes { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -13239,6 +13243,7 @@ namespace Armoury
             s.WorksPaidSinceBuy = WorksPaidSinceBuy;
             s.WorksTabYearlyReturn = WorksTabYearlyReturn;
             s.A17NightRaiderBlockAllKs = A17NightRaiderBlockAllKs;
+            s.Autotest306Probes = Autotest306Probes;
         }
 
         internal static void Apply()

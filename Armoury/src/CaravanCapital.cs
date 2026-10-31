@@ -107,6 +107,19 @@ namespace Armoury
             catch (Exception e) { __state = null; Seal31.Stumble("CaravanCapital.PlayerPre", e); }
         }
 
+        /// <summary>306b (sonda autotestu armoury-karawana305.flag): ten sam kontekst co PlayerPre na konsekwencji rozmowy z kupcem, z miastem podanym wprost
+        /// (sonda tworzy karawane ta sama sekwencja co rozmowa, ale gracz nie musi stac w miescie). Zamkniecie: CtxFin (rozliczenie E3/7 jak po rozmowie).</summary>
+        internal static Ctx OpenPlayerFor(Settlement town)
+        {
+            try
+            {
+                if (!On || !Live || Hero.MainHero == null) return null;
+                var c = new Ctx { Kind = KPlayer, Buyer = Hero.MainHero, Town = town, G0 = Hero.MainHero.Gold };
+                return Push(c) ? c : null;
+            }
+            catch (Exception e) { Seal31.Stumble("CaravanCapital.OpenPlayerFor", e); return null; }
+        }
+
         public static void CtxFin(Ctx __state)
         {
             if (__state == null) return;

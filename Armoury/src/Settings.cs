@@ -5034,6 +5034,11 @@ namespace Armoury
         // 305e (diagnoza OGOLNY PRZEGLAD, NA17-2e 3560 szt.): A17Fix.NavalVillagePre blokowal ryby z atutu Night Raider tylko we wsiach ze stawkami KS
         // (StartCalibration.AppliedFor) - w krainach wroconych przez bramke (freefolk od 108817, skagosi od 108862) ryby z niczego dalej szly na targ.
         public bool A17NightRaiderBlockAllKs = true;       // While the start calibration (KS) is applied, the Night Raider governor perk (War Sails) adds no fish from nothing to any village - also in lands the calibration handed back to the game's own economy. Fish only come from fishermen's hands. Off = the perk still adds its fish in those lands
+        // --- Autotest probes (306b) ---
+        // 306b (Jeff 31.10 "rob tak dlugo az bedzie to dzialalo perfekcyjnie"): sondy autotestu dla zmian 305, ktorych autotest 141b nie pokryl (kucie, karawana gracza,
+        // zmiana produkcji warsztatu) - Probes306.cs. Dzialaja TYLKO w DLL autotestu CrashScribe (LogGate.Mode 1/2) i tylko przy plikach armoury-kowal305.flag,
+        // armoury-karawana305.flag, armoury-warsztat305.flag w Documents\Mount and Blade II Bannerlord\CrashScribe. W zwyklej grze klucz nic nie zmienia.
+        public bool Autotest306Probes = true;              // Test runs only: lets the automatic test check smithing XP, give the player a caravan and change the trade of one of the player's workshops, when the test's own flag files are present. In a normal game it does nothing. Off = those checks never run, even with the flag files
 
         public static void Load(string moduleDataDir)
         {
