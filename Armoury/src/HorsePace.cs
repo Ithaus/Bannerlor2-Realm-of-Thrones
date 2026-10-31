@@ -498,6 +498,16 @@ namespace Armoury
             return WetNow(mp);
         }
 
+        /// <summary>311d2: probka "bez 311d" w linii doby (MarchPace.Cap pomija wtedy takze reguly 311d2).</summary>
+        internal static bool Dry { get { return _dry; } }
+
+        /// <summary>311d2: mnoznik mokra (0.7 / 1) z pamieci jednego wywolania SpeedPostfix - MarchPace.Cap pyta tylko, gdy regula 311d2 moze zadzialac.</summary>
+        internal static float WetOf(MobileParty mp)
+        {
+            if (mp == null) return 1f;
+            return WetMul(mp);
+        }
+
         private static float WetNow(MobileParty mp)
         {
             try
@@ -659,11 +669,20 @@ namespace Armoury
                 int mism = 0, withState = 0;
                 var cand = new List<KeyValuePair<float, MobileParty>>();
                 bool on = AnyOn(s);
+                // 311d2: kolumna z MarchPace.Explain (ten sam Cap co ColumnPostfix) - luzaki tempem jazdy / na drugiego, sufit przed / po regulach 311d2
+                int rpP = 0, rpBind = 0, dbP = 0, dbBind = 0, dbN = 0, chg = 0; double chB = 0, chA = 0;
                 foreach (var mp in MobileParty.All)
                 {
                     try
                     {
                         if (mp == null || !mp.IsActive || !InScope(mp) || mp.AttachedTo != null) continue;
+                        var col = MarchPace.Explain(mp);
+                        if (col != null)
+                        {
+                            if (col.RidePace) { rpP++; if (col.Kind == 2) rpBind++; }
+                            if (col.Double > 0) { dbP++; dbN += col.Double; if (col.Kind == 4) dbBind++; }
+                            if (Math.Abs(col.Cap - col.CapOld) > 0.001f) { chg++; chB += col.CapOld; chA += col.Cap; }
+                        }
                         if (!on) continue;
                         var r = Get(mp);
                         if (r == null) continue;
@@ -699,7 +718,7 @@ namespace Armoury
                 cand.Sort((a, b) => b.Key.CompareTo(a.Key));
                 var pick = new List<MobileParty>();
                 var main = MobileParty.MainParty;
-                if (on && main != null && main.IsActive && InScope(main) && main.AttachedTo == null) pick.Add(main);
+                if (main != null && main.IsActive && InScope(main) && main.AttachedTo == null) pick.Add(main);   // 311d2: probka gracza zawsze
                 foreach (var kv in cand) { if (pick.Count >= 5) break; if (kv.Value != main) pick.Add(kv.Value); }
                 var samples = new List<string>();
                 foreach (var mp in pick)
@@ -709,8 +728,10 @@ namespace Armoury
                         float now, without; Sample(mp, out now, out without);
                         var r = Get(mp);
                         float mr, mf; CapMul(mp, out mr, out mf);
+                        var col = MarchPace.Explain(mp);   // 311d2: sufit kolumny przed / po regulach 311d2 (ten sam Cap co ColumnPostfix)
                         samples.Add("'" + (mp.Name != null ? mp.Name.ToString() : mp.StringId) + "' " + (r != null ? r.Men : 0) + " ludzi, F " + Pc(r != null ? r.FDry : 0)
-                                    + ": teraz " + F2(now) + " / bez 311d " + F2(without) + ", mnoznik sufitu jazda x" + F3(mr) + " luzaki x" + F3(mf));
+                                    + ": teraz " + F2(now) + " / bez 311d " + F2(without) + ", mnoznik sufitu jazda x" + F3(mr) + " luzaki x" + F3(mf)
+                                    + ", kolumna 311d2 " + (col != null ? F2(col.CapOld) + " -> " + F2(col.Cap) + " (rodzaj " + col.Kind + ", na drugiego " + col.Double + ", na luzakach " + col.RidingFoot + ")" : "-"));
                     }
                     catch (Exception e) { Stumble("Daily(probka)", e); }
                 }
@@ -739,6 +760,9 @@ namespace Armoury
                   .Append(" | jezdzcy bez konia (krok 3): ").Append(unhorsed).Append(" z ").Append(regRiders).Append(" konnych szeregowych, pieszo ").Append(walk)
                   .Append(" | sufit kolumny (krok 2): wywolan ").Append(_capN).Append(", srednio przed ").Append(_capN > 0 ? F2(_capBefore / _capN) : "-")
                   .Append(" / po ").Append(_capN > 0 ? F2(_capAfter / _capN) : "-").Append(", wyzszy ").Append(_capUp).Append(", nizszy ").Append(_capDown)
+                  .Append(" | 311d2: luzaki tempem jazdy ").Append(s != null && s.FootmenOnSpareHorsesRidePace ? "TAK" : "NIE").Append(", partii ").Append(rpP).Append(" (ten rodzaj sufitu ").Append(rpBind)
+                  .Append("); na drugiego ").Append(s != null && s.RideDoubleFewFootmen ? "TAK" : "NIE").Append(", partii ").Append(dbP).Append(" (ten rodzaj sufitu ").Append(dbBind).Append("), piechurow ").Append(dbN)
+                  .Append("; sufit kolumny zmieniony w ").Append(chg).Append(" partiach, srednio przed ").Append(chg > 0 ? F2(chB / chg) : "-").Append(" / po ").Append(chg > 0 ? F2(chA / chg) : "-")
                   .Append(" | probki: ").Append(samples.Count > 0 ? string.Join("; ", samples) : "-")
                   .Append(" | kontrola: |F| najwiecej ").Append(F3(fMax)).Append(", jakosc koni F od ").Append(F3(hqMin)).Append(" do ").Append(F3(hqMax))
                   .Append(" (granice -").Append(F3(s != null ? Params(s).Pen : 0)).Append(" / +").Append(F3(s != null ? Params(s).Bon : 0)).Append(")")

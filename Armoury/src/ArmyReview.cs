@@ -583,7 +583,7 @@ namespace Armoury
         private static string MarchRow(MarchPace.Column col)
         {
             if (col == null) return "On the march: the column rule is off";
-            string what = col.Kind == 0 ? col.N + " afoot - the column walks" : col.Kind == 2 ? col.N + " footmen on spare horses" : col.Kind == 3 ? "the baggage train sets the pace" : "all riders";
+            string what = col.Kind == 0 ? col.N + " afoot - the column walks" : col.Kind == 2 ? col.N + " footmen on spare horses" : col.Kind == 3 ? "the baggage train sets the pace" : col.Kind == 4 ? col.N + " footmen riding double" : "all riders";
             return "On the march: " + what + " (at most " + Num(col.Cap) + ")";
         }
 
@@ -600,7 +600,9 @@ namespace Armoury
             sb.Append(", ").Append(col.Foot).Append(" of them without a horse of their own, ").Append(col.Prisoners).Append(" prisoners on the rope.");
             sb.Append("\nSpare horses in your baggage: ").Append(col.Mounts);
             if (col.K0 && col.Armory > 0) sb.Append(", and ").Append(col.Armory).Append(" free horses in the armouries of your army's parties");
-            sb.Append(". Spare horses carry the footmen first, then the prisoners.");
+            // 311d2: przy jezdzie na drugiego luzaki najpierw pod jencow (MarchPace.Cap)
+            sb.Append(col.Double > 0 ? ". Spare horses carry the prisoners first, then the footmen; the footmen left over ride double behind the riders."
+                                     : ". Spare horses carry the footmen first, then the prisoners.");
             sb.Append("\n\n");
             string capText = Num(col.Cap) + " on the map (" + Num(col.CapRaw) + " at full pace x " + Math.Max(5, Math.Min(100, c.WorldPacePercent)) + "% world pace)";
             if (col.Kind == 0)
@@ -614,18 +616,39 @@ namespace Armoury
                 sb.Append(string.Join(" and ", parts.ToArray())).Append(" walk, so the whole column keeps the walking pace: at most ").Append(capText).Append('.');
                 int need = col.Walkers;
                 sb.Append("\nWith ").Append(need).Append(need == 1 ? " more spare horse" : " more spare horses").Append(" in the baggage nobody would walk.");
+                // 311d2: ilu pieszych mogloby jechac na drugiego (te same reguly co MarchPace.Cap)
+                if (c.RideDoubleFewFootmen && col.Riders > 0)
+                {
+                    int most = (int)Math.Floor(MBMath.ClampFloat(c.RideDoubleRatio, 0f, 1f) * col.Riders);
+                    sb.Append(" Up to ").Append(most).Append(most == 1 ? " footman" : " footmen").Append(" could ride double behind your ").Append(col.Riders)
+                      .Append(" riders (Ride Double Few Footmen)").Append(prisWalk > 0 ? ", but not while prisoners walk on the rope." : ".");
+                }
             }
             else if (col.Kind == 2)
-                sb.Append("Marching column: ").Append(col.N).Append(" footmen on spare horses - a man in the saddle is not a horseman born: at most ").Append(capText).Append('.');
+            {
+                if (col.RidePace)
+                    sb.Append("Marching column: ").Append(col.N).Append(" footmen on spare horses ride at the riders' pace, ")
+                      .Append((MBMath.ClampFloat(c.FootmenRidePacePenalty, 0f, 0.5f) * 100f).ToString("0", CultureInfo.InvariantCulture))
+                      .Append("% slower for men not born in the saddle: at most ").Append(capText).Append('.');
+                else
+                    sb.Append("Marching column: ").Append(col.N).Append(" footmen on spare horses - a man in the saddle is not a horseman born: at most ").Append(capText).Append('.');
+            }
+            else if (col.Kind == 4)
+                sb.Append("Marching column: riding double - ").Append(col.N).Append(col.N == 1 ? " footman rides" : " footmen ride").Append(" behind the riders, few enough for your ")
+                  .Append(col.Riders).Append(" riders to carry; the horses bear two men, so the column rides ")
+                  .Append((MBMath.ClampFloat(c.RideDoublePenalty, 0f, 0.5f) * 100f).ToString("0", CultureInfo.InvariantCulture))
+                  .Append("% below the riding pace: at most ").Append(capText).Append('.');
             else if (col.Kind == 3)
                 sb.Append("Marching column: baggage train - ").Append(col.Train).Append(" pack animals and livestock, more than the ").Append(col.Allowance)
                   .Append(" that go free with ").Append(col.Men).Append(" men: at most ").Append(capText).Append('.');
             else
                 sb.Append("Marching column: all riders - at most ").Append(capText).Append('.');
             // 311d: jakosc koni w suficie (te same mnozniki co ColumnPostfix - Explain) i jezdzcy bez konia w piechocie
-            float hqMul = col.Kind == 1 ? col.MulRider : col.Kind == 2 ? col.MulFoot : 1f;
+            float hqMul = col.Kind == 1 || col.Kind == 4 ? col.MulRider : col.Kind == 2 ? col.MulFoot : 1f;
+            if (col.Double > 0 && col.Kind != 4)
+                sb.Append(" ").Append(col.Double).Append(col.Double == 1 ? " footman rides" : " footmen ride").Append(" double behind the riders (Ride Double Few Footmen).");
             if (Math.Abs(hqMul - 1f) > 0.0005f)
-                sb.Append(" The quality of the ").Append(col.Kind == 1 ? "riders' horses" : "spare horses under the footmen").Append(hqMul > 1f ? " raises" : " lowers")
+                sb.Append(" The quality of the ").Append(col.Kind == 1 || col.Kind == 4 ? "riders' horses" : "spare horses under the footmen").Append(hqMul > 1f ? " raises" : " lowers")
                   .Append(" this cap by ").Append(Math.Abs((hqMul - 1f) * 100f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)).Append("% (Horse Quality Speed).");
             if (col.Walk > 0)
                 sb.Append(" ").Append(col.Walk).Append(col.Walk == 1 ? " rider has" : " riders have").Append(" no horse in the troops' armoury and ").Append(col.Walk == 1 ? "walks" : "walk")

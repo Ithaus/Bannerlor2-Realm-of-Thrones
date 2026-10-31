@@ -9,6 +9,10 @@ RANGES = {
     'HorseQualitySlopePercent': (0, 200, "0"),
     'HorseQualityMaxBonusPercent': (0, 50, "0"),
     'HorseQualityMaxPenaltyPercent': (0, 50, "0"),
+    # 311d2: piechur na luzaku tempem jazdy, jazda "na drugiego" - kod przycina kary do 0..0.5, stosunek do 0..1 (MarchPace.Cap)
+    'FootmenRidePacePenalty': (0.0, 0.5, "0.00"),
+    'RideDoubleRatio': (0.0, 1.0, "0.00"),
+    'RideDoublePenalty': (0.0, 0.5, "0.00"),
     # 299b: tempo pamieci podazy rynku - kod przycina do 0.02..0.15 (RawPrice.Pace)
     'PriceSupplyMemoryDaily': (0.02, 0.15, "0.000"),
     # 299c: udzial od razu - kod przycina do 0.02..0.15 (RawPrice.Share)

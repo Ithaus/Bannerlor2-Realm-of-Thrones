@@ -86829,7 +86829,8 @@ def main(argv):
 # (INFO: potwierdzenie Ref 56 mediana kategorii horse / war_horse); H311-1 linie doby: format, potkniecia 0; H311-2 jakosc koni F w granicach [-kara, +premia]
 # kazdej doby, pieszo <= konnych szeregowych; H311-3 krok 1: piechurzy niesieni przez wolne konie zbrojowni AI > 0 przy kluczu TAK; H311-4 krok 3: jezdzcy bez
 # konia pieszo > 0 przy kluczu TAK i TroopsFightWithOwnKitOnly TAK; H311-5 probki "teraz / bez 311d" zgodne ze znakiem F; H311-6 koszt goracej sciezki
-# <= 2 ms/dobe; H311-7 grupy jazdy (INFO: predkosc jazdy dobrej > taniej); H311-8 sufit kolumny przed / po (INFO).
+# <= 2 ms/dobe; H311-7 grupy jazdy (INFO: predkosc jazdy dobrej > taniej); H311-8 sufit kolumny przed / po (INFO); H311-9 (311d2) piechur na luzaku tempem jazdy
+# i jazda "na drugiego": sufit tylko w gore (srednio i w probkach), klucz NIE bez partii, rodzaj 4 z piechurami; probki ze zmienionym sufitem 311d2 poza H311-5.
 H311_P = "Konie a tempo (HQ): "
 H311_RX_START = re.compile(r"start sesji \| klucze: zbrojownia niesie piechure \(HorsesArmouryCarryFootmen\) (TAK|NIE), jakosc konia \(HorseQualitySpeed\) (TAK|NIE), "
                            r"jezdzcy bez konia pieszo \(RidersWithoutHorseWalk\) (TAK|NIE) \(TroopsFightWithOwnKitOnly (TAK|NIE)\) \| wzor: Ref ([\d.]+), nachylenie ([\d.]+), "
@@ -86839,16 +86840,21 @@ H311_RX_DAY = re.compile(r"dzien (\d+) \| klucze: zbrojownia niesie piechure (TA
                          r"partie marszu (\d+): (.*) \| jezdzcy z koniem (\d+) \(zbrojownia (\d+), wzorzec (\d+), bohaterowie (\d+)\), d srednio ([+-][\d.]+)%, szybkosc konia srednio ([\d.]+) \| "
                          r"luzaki pod piechura (\d+), d srednio ([+-][\d.]+)%, szybkosc srednio ([\d.]+) \| zbrojownia AI niesie piechure \(krok 1\): partii (\d+), piechurow (\d+), "
                          r"wspolczynnik srednio ([+-][\d.]+)% \| jezdzcy bez konia \(krok 3\): (\d+) z (\d+) konnych szeregowych, pieszo (\d+) \| sufit kolumny \(krok 2\): wywolan (\d+), "
-                         r"srednio przed ([\d.]+|-) / po ([\d.]+|-), wyzszy (\d+), nizszy (\d+) \| probki: (.*) \| kontrola: \|F\| najwiecej ([\d.]+), jakosc koni F od (-?[\d.]+) do (-?[\d.]+) "
+                         r"srednio przed ([\d.]+|-) / po ([\d.]+|-), wyzszy (\d+), nizszy (\d+)(?: \| 311d2: [^|]*)? \| probki: (.*) \| kontrola: \|F\| najwiecej ([\d.]+), jakosc koni F od (-?[\d.]+) do (-?[\d.]+) "
                          r"\(granice -([\d.]+) / \+([\d.]+)\), stany koni 311d (\d+) \(wolne 311d inne niz Balance - jezdzcy egzotyczni: (\d+)\) \| koszt: goraca sciezka ([\d.]+) ms/(\d+) wywolan "
                          r"\(prog 2 ms/dobe\), przeliczen rekordu na mapie (\d+) \(([\d.]+) ms\), w linii doby (\d+) \(([\d.]+) ms\) \| potkniecia dzis (\d+), od startu sesji (\d+)(?: \(.*\))? \| linia ([\d.]+) ms\.$")
 H311_RX_GRP = re.compile(r"(jazda tania|jazda srednia|jazda dobra|piechota na luzakach|pieszo) (\d+)(?: \(d ([+-][\d.]+)%, F ([+-][\d.]+)%, predkosc ([\d.]+)\))?")
-H311_RX_SMP = re.compile(r" ludzi, F ([+-][\d.]+)%: teraz (-?[\d.]+) / bez 311d (-?[\d.]+), mnoznik sufitu jazda x([\d.]+) luzaki x([\d.]+)")
+H311_RX_SMP = re.compile(r" ludzi, F ([+-][\d.]+)%: teraz (-?[\d.]+) / bez 311d (-?[\d.]+), mnoznik sufitu jazda x([\d.]+) luzaki x([\d.]+)"
+                         r"(?:, kolumna 311d2 (?:([\d.]+) -> ([\d.]+) \(rodzaj (\d), na drugiego (\d+), na luzakach (\d+)\)|-))?")
+# 311d2 (31.10): piechur na luzaku tempem jazdy, garstka piechurow "na drugiego" - odcinek linii doby i dopisek probki
+H311_RX_D2 = re.compile(r" \| 311d2: luzaki tempem jazdy (TAK|NIE), partii (\d+) \(ten rodzaj sufitu (\d+)\); na drugiego (TAK|NIE), partii (\d+) \(ten rodzaj sufitu (\d+)\), piechurow (\d+); "
+                        r"sufit kolumny zmieniony w (\d+) partiach, srednio przed ([\d.]+|-) / po ([\d.]+|-) \| probki:")
 
 
 def h311_new():
     return {"start": None, "ref": None, "cats": {}, "days": 0, "fmt": 0, "stum": 0, "k1": None, "k2": None, "k3": None, "own": None, "bound_bad": [], "extra": 0, "walk": 0,
-            "un": 0, "reg": 0, "smp": 0, "smp_bad": [], "hot": [], "builds": 0, "bms": 0.0, "dms": 0.0, "grp": {}, "cap": [0, 0.0, 0.0, 0, 0], "riders": 0, "rq": 0.0}
+            "un": 0, "reg": 0, "smp": 0, "smp_bad": [], "hot": [], "builds": 0, "bms": 0.0, "dms": 0.0, "grp": {}, "cap": [0, 0.0, 0.0, 0, 0], "riders": 0, "rq": 0.0,
+            "d2days": 0, "d2keys": None, "rp": [0, 0], "db": [0, 0, 0], "d2chg": 0, "d2bad": [], "d2smp": 0}
 
 
 def h311_feed(D, ln):
@@ -86887,9 +86893,33 @@ def h311_feed(D, ln):
     if cn and g[23] != "-":
         cap[1] += cn * float(g[23]); cap[2] += cn * float(g[24])
     cap[3] += int(g[25]); cap[4] += int(g[26])
+    m2 = H311_RX_D2.search(body)
+    if m2:
+        D["d2days"] += 1
+        D["d2keys"] = (m2.group(1), m2.group(4))
+        D["rp"][0] += int(m2.group(2)); D["rp"][1] += int(m2.group(3))
+        D["db"][0] += int(m2.group(5)); D["db"][1] += int(m2.group(6)); D["db"][2] += int(m2.group(7))
+        D["d2chg"] += int(m2.group(8))
+        if m2.group(9) != "-" and m2.group(10) != "-" and float(m2.group(10)) < float(m2.group(9)) - 0.005:
+            D["d2bad"].append(f"d{g[0]}: sufit srednio {m2.group(9)} -> {m2.group(10)}")
+        if m2.group(1) == "NIE" and int(m2.group(2)) > 0:
+            D["d2bad"].append(f"d{g[0]}: klucz NIE, a luzaki tempem jazdy w {m2.group(2)} partiach")
+        if m2.group(4) == "NIE" and int(m2.group(5)) > 0:
+            D["d2bad"].append(f"d{g[0]}: klucz NIE, a na drugiego w {m2.group(5)} partiach")
     for x in H311_RX_SMP.finditer(g[27]):
         D["smp"] += 1
         f, now, wo = float(x.group(1)), float(x.group(2)), float(x.group(3))
+        col_chg = False
+        if x.group(6):
+            D["d2smp"] += 1
+            b2, a2 = float(x.group(6)), float(x.group(7))
+            col_chg = abs(a2 - b2) > 0.005
+            if a2 < b2 - 0.005:
+                D["d2bad"].append(f"d{g[0]}: probka sufit {b2} -> {a2}")
+            if int(x.group(8)) == 4 and int(x.group(9)) <= 0:
+                D["d2bad"].append(f"d{g[0]}: probka rodzaj 4 bez piechurow na drugiego")
+        if col_chg:
+            continue   # 311d2 podniosl sufit kolumny - znak F (wspolczynniki) nie przesadza o 'teraz / bez 311d'
         if (f >= 0.5 and now < wo - 0.02) or (f <= -0.5 and now > wo + 0.02):
             D["smp_bad"].append(f"d{g[0]}: F {f:+.1f}% teraz {now} / bez {wo}")
     lo, hi, pen, bon = float(g[29]), float(g[30]), float(g[31]), float(g[32])
@@ -86930,6 +86960,10 @@ def h311_rows(rep, D):
     rep.add("H311-7: grupy partii marszu (jazda tania / srednia / dobra, luzaki, pieszo)",
             "; ".join(gs(k) for k in ("jazda tania", "jazda srednia", "jazda dobra", "piechota na luzakach", "pieszo"))
             + (f"; jezdzcy z koniem - szybkosc konia srednio {D['rq'] / D['riders']:.1f}" if D["riders"] else ""), "INFO (cel: jazda dobra szybsza niz tania)", None)
+    rep.add("H311-9: 311d2 - piechur na luzaku tempem jazdy, na drugiego: sufit tylko w gore, klucze NIE bez skutku",
+            f"dob {D['d2days']} (klucze {D['d2keys']}), luzaki tempem jazdy partii {D['rp'][0]} (wiaze {D['rp'][1]}), na drugiego partii {D['db'][0]} (wiaze {D['db'][1]}, "
+            f"piechurow {D['db'][2]}), zmienionych sufitow {D['d2chg']}, probek z kolumna {D['d2smp']}; naruszen {len(D['d2bad'])}"
+            + (f" [{'; '.join(D['d2bad'][:4])}]" if D["d2bad"] else ""), "0 naruszen", (len(D["d2bad"]) == 0) if D["d2days"] else None)
     c = D["cap"]
     rep.add("H311-8: sufit kolumny przed / po jakosci koni", f"wywolan {c[0]}, srednio {c[1] / c[0]:.2f} / {c[2] / c[0]:.2f}, wyzszy {c[3]}, nizszy {c[4]}" if c[0] else "wywolan 0",
             "INFO", None)
@@ -86945,8 +86979,10 @@ H311_SAMPLES = [
     "predkosc 3.00); pieszo 2810 (d +0.0%, F -1.0%, predkosc 2.50) | jezdzcy z koniem 11000 (zbrojownia 9000, wzorzec 1500, bohaterowie 500), d srednio -2.1%, szybkosc konia srednio 53.80 | "
     "luzaki pod piechura 2500, d srednio -1.0%, szybkosc srednio 54.00 | zbrojownia AI niesie piechure (krok 1): partii 600, piechurow 1400, wspolczynnik srednio +1.2% | "
     "jezdzcy bez konia (krok 3): 2700 z 13900 konnych szeregowych, pieszo 2700 | sufit kolumny (krok 2): wywolan 900, srednio przed 3.10 / po 3.08, wyzszy 200, nizszy 500 | "
-    "probki: 'Jeff' 60 ludzi, F +3.0%: teraz 3.40 / bez 311d 3.30, mnoznik sufitu jazda x1.020 luzaki x0.990; 'Ser A; B' 200 ludzi, F -8.0%: teraz 2.40 / bez 311d 2.60, mnoznik sufitu "
-    "jazda x0.950 luzaki x1.000 | kontrola: |F| najwiecej 0.180, jakosc koni F od -0.120 do 0.090 (granice -0.150 / +0.100), stany koni 311d 1500 (wolne 311d inne niz Balance - "
+    "311d2: luzaki tempem jazdy TAK, partii 120 (ten rodzaj sufitu 40); na drugiego TAK, partii 35 (ten rodzaj sufitu 30), piechurow 60; sufit kolumny zmieniony w 70 partiach, srednio przed 3.00 / po 4.20 | "
+    "probki: 'Jeff' 60 ludzi, F +3.0%: teraz 3.40 / bez 311d 3.30, mnoznik sufitu jazda x1.020 luzaki x0.990, kolumna 311d2 4.66 -> 4.66 (rodzaj 2, na drugiego 0, na luzakach 13); "
+    "'Ser A; B' 200 ludzi, F -8.0%: teraz 2.40 / bez 311d 2.60, mnoznik sufitu jazda x0.950 luzaki x1.000, kolumna 311d2 3.00 -> 3.00 (rodzaj 0, na drugiego 0, na luzakach 0); "
+    "'Ser C' 31 ludzi, F -1.0%: teraz 4.30 / bez 311d 3.00, mnoznik sufitu jazda x1.000 luzaki x1.000, kolumna 311d2 3.00 -> 4.39 (rodzaj 4, na drugiego 1, na luzakach 0) | kontrola: |F| najwiecej 0.180, jakosc koni F od -0.120 do 0.090 (granice -0.150 / +0.100), stany koni 311d 1500 (wolne 311d inne niz Balance - "
     "jezdzcy egzotyczni: 12) | koszt: goraca sciezka 1.20 ms/9000 wywolan (prog 2 ms/dobe), przeliczen rekordu na mapie 3000 (6.00 ms), w linii doby 2000 (4.00 ms) | "
     "potkniecia dzis 0, od startu sesji 0 | linia 25.0 ms.",
 ]
@@ -86958,7 +86994,7 @@ def konie311d_selftest():
         h311_feed(D, "[06:39:07] " + ln)
     rep = Report(); h311_rows(rep, D)
     v = {r[0].split(":")[0]: r[3] for r in rep.rows}
-    keys = ("H311-0", "H311-1", "H311-2", "H311-3", "H311-4", "H311-5", "H311-6")
+    keys = ("H311-0", "H311-1", "H311-2", "H311-3", "H311-4", "H311-5", "H311-6", "H311-9")
     bad = [k for k in keys if v.get(k) != "TAK"]
     if bad:
         return f"dobry bieg - nie TAK: {bad} ({v})"
@@ -86966,7 +87002,7 @@ def konie311d_selftest():
     for ln in H311_SAMPLES:
         x = ln.replace("(modeli 6)", "(modeli 0)").replace("potkniecia dzis 0", "potkniecia dzis 2").replace("do 0.090 (granice", "do 0.130 (granice")
         x = x.replace("piechurow 1400", "piechurow 0").replace("pieszo 2700 |", "pieszo 0 |").replace("teraz 3.40 / bez 311d 3.30", "teraz 3.10 / bez 311d 3.30")
-        x = x.replace("goraca sciezka 1.20 ms", "goraca sciezka 7.50 ms")
+        x = x.replace("goraca sciezka 1.20 ms", "goraca sciezka 7.50 ms").replace("srednio przed 3.00 / po 4.20", "srednio przed 4.20 / po 3.00")
         h311_feed(B, "[06:39:07] " + x)
     rep = Report(); h311_rows(rep, B)
     vb = {r[0].split(":")[0]: r[3] for r in rep.rows}
@@ -86983,11 +87019,24 @@ def konie311d_selftest():
     h311_feed(E, "[06:39:07] " + H311_SAMPLES[1].replace("linia 25.0 ms.", "linia 25.0 ms"))
     if E["fmt"] != 1:
         return "zly format nie wykryty"
+    # 311d2: linia sprzed 311d2 (bez odcinka i dopisku) dalej czytana; klucz NIE z partiami = naruszenie
+    O = h311_new()
+    old = re.sub(r" \| 311d2: [^|]*(?= \|)", "", H311_SAMPLES[1])
+    old = re.sub(r", kolumna 311d2 [^;|]*\)", "", old)
+    h311_feed(O, "[06:39:07] " + old)
+    if O["fmt"] != 0 or O["days"] != 1 or O["d2days"] != 0 or O["smp"] != 3:
+        return f"linia sprzed 311d2 zle czytana (fmt {O['fmt']}, dob {O['days']}, d2 {O['d2days']}, probek {O['smp']})"
+    K = h311_new()
+    h311_feed(K, "[06:39:07] " + H311_SAMPLES[1].replace("luzaki tempem jazdy TAK", "luzaki tempem jazdy NIE"))
+    rep = Report(); h311_rows(rep, K)
+    vk = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if vk.get("H311-9") != "NIE":
+        return f"311d2 klucz NIE z partiami nie wykryty: {vk.get('H311-9')}"
     return None
 
 
 def konie311d_main(logp):
-    """konie311d (31.10, paczka 311d): H311-S, H311-0..H311-8. Strumieniowo, tylko odczyt logu."""
+    """konie311d (31.10, paczka 311d + 311d2): H311-S, H311-0..H311-9. Strumieniowo, tylko odczyt logu."""
     rep = Report()
     s1 = konie311d_selftest()
     rep.add("H311-S: self-test wyrazen (linie jak w HorsePace.cs)", s1 or "OK", "OK", s1 is None)
