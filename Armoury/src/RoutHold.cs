@@ -1092,7 +1092,18 @@ namespace Armoury
             if (mustSend) send = true;
             else if (first) send = kind == SectorKind || lost;            // cel gry juz wyslany przez handler - bez drugiego wywolania
             else if (lost) send = true;
-            else send = Turned(a, e.Target, pick);
+            else
+            {
+                send = Turned(a, e.Target, pick);
+                // 307b (klucz PanicFleeHoldCourse; krytyk 307: w Willow 562 zmian kierunku na 1146 zlamanych): uciekajacy trzyma raz obrany kurs - nowy kierunek
+                // tylko, gdy na drodze do celu stoi wrog (nie uciekajacy) w 12 m w stozku 60 stopni; inaczej bez nowego Agent.Retreat (bez zawracania co ocene)
+                if (send && c.PanicFleeHoldCourse && e.Target.IsValid)
+                {
+                    if (CourseBlocked(a, m, e.Target)) PanicRun.Course(2);
+                    else { PanicRun.Course(0); send = false; }
+                }
+                else if (send) PanicRun.Course(1);
+            }
             if (!send) return;
             // ponowienie nie czesciej niz co RefreshEvery (pierwszy cel - zaraz po handlerze, w tej samej klatce co odwrot gry; wczesne ponowienie
             // po zgaszeniu paniki przez innych - raz, od Since + DebacleMax)
@@ -1111,6 +1122,33 @@ namespace Armoury
             }
             e.Target = pick;
             e.LastSend = now;
+        }
+
+        /// <summary>307b: na drodze do biezacego celu stoi wrog (aktywny czlowiek, nie uciekajacy) blizej niz 12 m i blizej niz cel, w stozku 60 stopni
+        /// (cos &gt;= 0.5) od kierunku do celu. Zapytanie natywne do wlasnej listy (co ocene, czyli najwyzej co RefreshEvery na czlowieka).</summary>
+        private bool CourseBlocked(Agent a, Mission m, WorldPosition target)
+        {
+            Vec2 my = a.Position.AsVec2;
+            Vec2 to = target.AsVec2 - my;
+            float lt = to.Length;
+            if (!my.IsValid || !(lt > 1f)) return false;
+            Vec2 u = to * (1f / lt);
+            float reach = Math.Min(12f, lt);
+            try
+            {
+                m.GetNearbyEnemyAgents(my, reach, a.Team, _near);
+                for (int i = 0; i < _near.Count; i++)
+                {
+                    var x = _near[i];
+                    if (x == null || !x.IsActive() || !x.IsHuman || x.IsRunningAway) continue;
+                    Vec2 v = x.Position.AsVec2 - my;
+                    float d = v.Length;
+                    if (!(d > 0.05f) || d > reach) continue;
+                    if (v.DotProduct(u) / d >= 0.5f) return true;
+                }
+            }
+            finally { _near.Clear(); }
+            return false;
         }
 
         /// <summary>Kierunek do celu zmienil sie o ponad 45 stopni (cos &lt; 0,707).</summary>

@@ -58,6 +58,10 @@ namespace Armoury
         private static volatile bool _active;          // bramka otwarta w misji _mref
         private static WeakReference _mref;            // misja ostatniego Begin
         private static volatile int _rangedPct = 100, _meleePct = 50, _chargePct = 50;
+        // 307b (klucz FriendlyFireMeleeBySkill): cios AI w swojego przechodzi z p = clamp(0.5 - umiejetnosc broni / 400, 0.05, 0.5), reszta = zasada gry (cios zatrzymany)
+        private static volatile bool _meleeSkill;
+        private static int _mSkillPass, _mSkillStop;
+        private static long _mSkillP1000;
         private static string _kind = "-";
         private static string _why;                    // dlaczego bramka zamknieta (null = otwarta)
         private static bool _inBattle;                 // bitwa gracza na mapie (linia FF takze przy zamknietej bramce)
@@ -353,10 +357,39 @@ namespace Armoury
             {
                 if (!Open(m) || _meleePct <= 0 || Blocked(m)) return cancel;
                 if (!OwnSide(attacker, victim, true)) return cancel;   // neutralni - jak w grze
+                // 307b: AI (nie gracz - gracz celuje sam) zatrzymuje cios na swoim wedlug umiejetnosci broni: rekrut czasem trafi kompana, weteran prawie nigdy
+                var atk = Rider(attacker);
+                if (_meleeSkill && atk != null && atk.IsAIControlled && !atk.IsMainAgent)
+                {
+                    float p = SkillPass(atk);
+                    Interlocked.Add(ref _mSkillP1000, (long)(p * 1000f));
+                    if (MBRandom.RandomFloat >= p) { Interlocked.Increment(ref _mSkillStop); return cancel; }
+                    Interlocked.Increment(ref _mSkillPass);
+                }
                 Interlocked.Increment(ref _openMelee);
                 return false;
             }
             catch (Exception e) { Stumble("Melee", e); return cancel; }
+        }
+
+        /// <summary>307b: szansa, ze cios AI w swojego przejdzie - umiejetnosc broni w rece (bez broni - Atletyka): 0 -> 0.5, 100 -> 0.25, 180 i wiecej -> 0.05.</summary>
+        private static float SkillPass(Agent a)
+        {
+            SkillObject sk = null;
+            try
+            {
+                MissionWeapon w = a.WieldedWeapon;
+                var u = w.IsEmpty ? null : w.CurrentUsageItem;
+                if (u != null) sk = u.RelevantSkill;
+            }
+            catch { sk = null; }
+            if (sk == null) sk = DefaultSkills.Athletics;
+            int v = 0;
+            try { v = a.Character != null ? a.Character.GetSkillValue(sk) : 0; } catch { v = 0; }
+            float p = 0.5f - v / 400f;
+            if (p < 0.05f) p = 0.05f;
+            if (p > 0.5f) p = 0.5f;
+            return p;
         }
 
         /// <summary>MissileHitCallback, miejsce 1 (swoj) i 2 (kon swojego): attacker.Controller porownywany z AI. Swoj przy otwartej bramce - AI jak gracz
@@ -485,6 +518,8 @@ namespace Armoury
         {
             _meleeAi = _meleePl = _missAi = _missPl = _chargeAi = _chargePl = 0;
             _openMelee = _openMissAi = _openCharge = _cancelMiss = 0;
+            _mSkillPass = _mSkillStop = 0;
+            Interlocked.Exchange(ref _mSkillP1000, 0);
             _siegeCancel = _siegeHit = 0;
             Interlocked.Exchange(ref _hpBefore10, 0);
             Interlocked.Exchange(ref _hpAfter10, 0);
@@ -519,6 +554,7 @@ namespace Armoury
             _rangedPct = s != null ? Clamp(siegeFf ? s.FriendlyFireSiegeRangedPercent : s.FriendlyFireRangedPercent) : (siegeFf ? 50 : 100);
             _meleePct = s != null ? Clamp(s.FriendlyFireMeleePercent) : 50;
             _chargePct = s != null ? Clamp(s.FriendlyFireChargePercent) : 50;
+            _meleeSkill = s != null && s.FriendlyFireMeleeBySkill;
             _mref = new WeakReference(m);
             _kind = KindOf(m);
             _inBattle = false;
@@ -580,6 +616,10 @@ namespace Armoury
               .Append(", szarza ").Append(charge).Append(" (AI ").Append(_chargeAi).Append(", gracz ").Append(_chargePl).Append(')');
             sb.Append(" | bramki gry otwarte: wrecz ").Append(_openMelee).Append(", pociski AI ").Append(_openMissAi).Append(", szarza ").Append(_openCharge)
               .Append("; pociski anulowane przy 0% ").Append(_cancelMiss);
+            int msk = _mSkillPass + _mSkillStop;
+            sb.Append(" | wrecz AI wedlug umiejetnosci (307b) ").Append(_meleeSkill ? "TAK" : "NIE").Append(": przepuszczone ").Append(_mSkillPass)
+              .Append(", zatrzymane (zasada gry) ").Append(_mSkillStop).Append(", sr. szansa ")
+              .Append(msk > 0 ? (Interlocked.Read(ref _mSkillP1000) / 1000.0 / msk).ToString("0.00", inv) : "-");
             sb.Append(" | machiny (zasada gry): AI w swoich anulowane ").Append(_siegeCancel).Append(", trafienia swoich ").Append(_siegeHit);
             sb.Append(" | HP od swoich przed/po skali ").Append((Interlocked.Read(ref _hpBefore10) / 10.0).ToString("0", inv))
               .Append('/').Append((Interlocked.Read(ref _hpAfter10) / 10.0).ToString("0", inv));
