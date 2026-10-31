@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-31 WGRANIE 146cs - CrashScribe z latka smokow ROT (305c DragonShips); CrashScribe.dll 535aa8cd13717fbc45f1df6f7009bdba (bylo bef9db58 od 136), kopia: CrashScribe.dll.bak-2026-10-31-przed-wgranie146cs i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie146cs-przed
+**Problem:** ROT-Dragon AIDragon.RefreshAllCachedTargets -> GetAllShipPositions w kazdej bitwie ladowej rzuca AmbiguousMatchException (GetMethod bez typow) - ok. 544 wyjatkow na sesje bitew (log Jeffa 30.10, koszt spisu encji sceny).
+**Dowod zgodnosci zrodla:** zrodlo bef9db58 (commit 84205371) nie bylo w repo - zbudowany CrashScribe z 6888ffa3 (= WGRANE 140) zdekompilowany (ilspycmd -p) i porownany z zainstalowanym bef9db58: identyczny poza AssemblyInfo. Wgrana DLL = 6888ffa3 + tylko 305c (Config.RotDragonShipsOnLand, DragonShips.cs, SubModuleMain.OnMissionBehaviorInitialize) - dekompilacja potwierdza (roznice tylko w tych 3 plikach + AssemblyInfo).
+**Ryzyko / co sprawdzic:** ten sam kod DragonShips byl w testowym CrashScribe-at (cs-at305, cs-at308) we wszystkich autotestach 141a-146c (linia 'Mends: smoki ROT na ladzie (305c) ... wpiety 1/1', wyjatki smoka w bitwach 544 -> 0, bledy prefiksu 0). Produkcyjny DLL nie da sie uruchomic w autotescie (autotest podmienia CrashScribe na wersje -at). Wylaczenie: CrashScribe config RotDragonShipsOnLand=false; cofniecie: kopia .bak.
+**Status:** WGRANE 146cs (31.10 ok. 18:15 CET).
+
 ## 2026-10-31 WGRANIE 146 - noc/310-strzaly-tarcze b357ccb5 (145 + 310: lucznicy AI nie strzelaja w klebowisko ze swoimi, sciana tarcz pod ostrzalem poza RBM, budzet RoutKeeper); Armoury.dll ed0199b997bebb13c90e4106d94e1dfe, kopia 145: Armoury.dll.bak-2026-10-31-przed-wgranie146 i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie146-przed
 **Ryzyko / co sprawdzic:** 2 biegi bitew 146a / 146b (7 band + 2 bitwy armii, CrashScribe-at-n308): kod 0, ERROR 0, bitwy 9/9 zgodnie z planem, bitwa310 / bitwa309 / bitwa307b / bitwa305c bez NIE. FF pociskow AI w bitwach armii 10.3% / 12.7% (145: 12-21%; jedna mala bitwa 24.9% przy 277 trafieniach); RoutKeeper tick max ok. 3.1 ms (145: 3.6-7.6); szczyt klatki 18.4 / 6.1 ms. Sciana tarcz 310 w testach 0 szyko-sekund - sytuacja (piechota w Line pod ostrzalem przed zwarciem) nie wystapila; niesprawdzona w dzialaniu.
 **Status:** WGRANE 146 (31.10 ok. 17:15 CET).
