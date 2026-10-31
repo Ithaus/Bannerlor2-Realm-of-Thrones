@@ -10596,9 +10596,9 @@ namespace Armoury
         [SettingPropertyGroup("Market prices: band between towns by cost of carriage (306a)")]
         public bool PriceBandByCarriage { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Price Band Merchant Margin", 0.25f, 9.00f, "0.00", HintText = "With Price Band By Carriage: the long-distance merchant's share for risk, tolls, time and profit (1.0 = he wants twice what he paid, so velvet ranges about 0.5-2 times its price; 9 = the game's range)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Price Band Merchant Margin", 0.25f, 9.00f, "0.00", HintText = "With Price Band By Carriage: the long-distance merchant's share for risk, tolls, time and profit (2.0 = he wants three times what he paid, so velvet ranges about 0.33-3 times its price; 9 = the game's range). 142b: 1.0 halved the caravans' trade (142a: caravans paying their wages 0.58 -> 0.44)", RequireRestart = false)]
         [SettingPropertyGroup("Market prices: band between towns by cost of carriage (306a)")]
-        public float PriceBandMerchantMargin { get; set; } = 1.0f;
+        public float PriceBandMerchantMargin { get; set; } = 2.0f;
 
         [SettingPropertyInteger("Price Band Haul Km", 100, 6000, "0", HintText = "With Price Band By Carriage: the longest land haul a merchant prices in, km (carriage 1.5 pence per ton per mile, 14th-century England): the longer, the wider the band of cheap heavy goods", RequireRestart = false)]
         [SettingPropertyGroup("Market prices: band between towns by cost of carriage (306a)")]
