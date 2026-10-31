@@ -25,7 +25,12 @@ namespace Armoury
             TaleWorlds.CampaignSystem.ExplainedNumber a;
             try { _suppress305 = true; a = fm.CalculateClanExpenses(pc, true, false, false); }
             finally { _suppress305 = q; }
-            var b = fm.CalculateClanExpenses(pc, true, false, false);
+            // poprawka recenzji 306b: drugie wywolanie (z rozbiciem) liczyloby sie w liczniku podgladu 305a ('podpowiedz zlota') - liczniki przywracane
+            int sv, ss, sn, sd; long sw; float sm;
+            lock (_lk) { sv = _pViewN; ss = _pSplitN; sn = _pNoLineN; sd = _pDiffN; sw = _pViewWage; sm = _pDiffMax; }
+            TaleWorlds.CampaignSystem.ExplainedNumber b;
+            try { b = fm.CalculateClanExpenses(pc, true, false, false); }
+            finally { lock (_lk) { _pViewN = sv; _pSplitN = ss; _pNoLineN = sn; _pDiffN = sd; _pViewWage = sw; _pDiffMax = sm; } }
             string gName = TxtOf(ref _tGarrison, "{=ChUDSiJw}Garrison and Party Expense"), wName = TxtOf(ref _tCarWage, "{=arm305cw}Caravan wages");
             float ga = 0, gb = 0, wb = 0;
             var lines = new StringBuilder(400);

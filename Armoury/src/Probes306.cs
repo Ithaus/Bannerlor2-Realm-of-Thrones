@@ -24,8 +24,8 @@ namespace Armoury
     /// 306b - SONDY AUTOTESTU dla zmian 305, ktorych autotest 141b nie pokryl (CHANGELOG WGRANIE 141: "NIE pokryte w autotescie: kucie (nikt nie kul), karawana gracza
     /// (brak w zapisie), zmiana produkcji warsztatu"). TYLKO DLL autotestu CrashScribe (LogGate.Mode 1/2), klucz Autotest306Probes i pliki w
     /// Documents\Mount and Blade II Bannerlord\CrashScribe (tylko czytane). Bez pliku - nic (nawet linii), w zwyklej grze nic.
-    ///  (1) armoury-kowal305.flag - pierwsza doba sesji: XP kowalstwa dla probek liczone TYMI SAMYMI drogami co w grze po 305d: luki / kusze / amunicja przez
-    ///      SmithXpRule.WorkXp (wyrazenie z Forge.Smith; klucz NIE - Forge.ProjectXp jak tam), bron, pancerz i zlecenie przez czynny SmithingModel
+    ///  (1) armoury-kowal305.flag - pierwsza doba sesji: XP kowalstwa dla probek. Luki / kusze / amunicja: KOPIA WYRAZENIA z Forge.Smith (SmithXpRule.WorkXp;
+    ///      klucz NIE - Forge.ProjectXp), nie wywolanie Forge.Smith/FletchForge - sprawdza stale przepisu i wzor, nie sama droge kucia (recenzja 306b). Bron, pancerz i zlecenie przez czynny SmithingModel
     ///      (GetSkillXpForSmithingInFreeBuildMode / InCraftingOrderMode - z latkami HistoricalPrices.XpPostfix, SmithXpRule, WeaponXpPatch), przetop
     ///      (GetSkillXpForSmelting - XpPostfix, sufit SmithAudit) i rafinacja (GetSkillXpForRefining - MaterialLaw.RefineXpPostfix, sufit RefineXpCap).
     ///      Podglad modelu nie dodaje XP i nie bierze staminy; liczniki doby SmithXpRule / HistoricalPrices.RoundFixed przywracane, slowo zrodla SmithXp zdjete.
@@ -36,7 +36,8 @@ namespace Armoury
     ///      CaravanHelper.GetRandomCaravanTemplate(kultura miasta, zwykla, !port), CaravanPartyComponent.CreateCaravanParty(gracz, miasto, szablon, false, wodz, null, false),
     ///      GiveGoldAction.ApplyForCharacterToSettlement(gracz, miasto, CaravanModel.GetCaravanFormingCost(false, port)) - w kontekscie E3/7 KPlayer
     ///      (CaravanCapital.OpenPlayerFor / CtxFin - jak latka na rozmowie: kapital z zaplaty, miasto -> karawana). Wodz: wolny towarzysz z druzyny
-    ///      (warunki FindSuitableCompanionsToLeadCaravan), inaczej bez wodza (mistrz karawany kultury). Raz na kampanie testu: znacznik w zapisie
+    ///      (warunki FindSuitableCompanionsToLeadCaravan), inaczej czlonek rodu; bez wodza - NIE bez tworzenia (rozmowa go wymaga). Druzyna w bitwie/oblezeniu/niewoli -
+    ///      POMINIETY i proba nastepnej doby (najwyzej 5). Kasa miasta sprawdzana: + zaplata - kapital E3/7. Raz na kampanie testu: znacznik w zapisie
     ///      (klucz arm_306_sondy, zapisywany tylko gdy jest) i nic, gdy gracz juz ma karawane. Co dobe: podglad CalculateClanExpenses gracza z opisem
     ///      bez rozbicia 305a i z nim (CaravanSettle.ExpProbe306).
     ///  (3) armoury-warsztat305.flag - doba N+3 sesji: zmiana produkcji warsztatu gracza bez linii broni o najmniejszym ProfitMade (nie kuznia - ta jest firma
@@ -52,13 +53,13 @@ namespace Armoury
         private const string SaveKey = "arm_306_sondy";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        private static int _flagDay = -1, _firstDay = -1, _stumbles;
+        private static int _flagDay = -1, _firstDay = -1, _stumbles, _carTries;
         private static bool _fK, _fC, _fW, _startDone, _kowalDone, _carDone, _wsDone;
         private static string _carMark;   // znacznik karawany testu z zapisu albo z tej sesji ("id@doba"); null = brak
 
         internal static void Reset()
         {
-            _flagDay = -1; _firstDay = -1; _stumbles = 0;
+            _flagDay = -1; _firstDay = -1; _stumbles = 0; _carTries = 0;
             _fK = _fC = _fW = false; _startDone = _kowalDone = _carDone = _wsDone = false;
             _carMark = null;
         }
@@ -122,7 +123,12 @@ namespace Armoury
                          + " | karawana testu z zapisu " + (_carMark ?? "brak") + " | zmiana produkcji w dobie " + (_firstDay + 3) + ".");
             }
             if (_fK && !_kowalDone) { _kowalDone = true; try { Kowal(); } catch (Exception e) { Stumble("Kowal", e); Log.Info(P + "kowal - werdykt | wyjatek " + e.GetType().Name + " -> wynik NIE."); } }
-            if (_fC && !_carDone) { _carDone = true; try { Caravan(day); } catch (Exception e) { Stumble("Caravan", e); Log.Info(P + "karawana - wyjatek " + e.GetType().Name + ": " + e.Message + " -> wynik NIE."); } }
+            if (_fC && !_carDone)
+            {
+                _carDone = true;
+                try { if (!Caravan(day) && ++_carTries < 5) _carDone = false; }   // recenzja 306b: druzyna w bitwie / oblezeniu / niewoli - proba nastepnej doby (najwyzej 5)
+                catch (Exception e) { Stumble("Caravan", e); Log.Info(P + "karawana - wyjatek " + e.GetType().Name + ": " + e.Message + " -> wynik NIE."); }
+            }
             if (_fC) { try { CaravanDay(day); } catch (Exception e) { Stumble("CaravanDay", e); Log.Info(P + "karawana - wydatki doby " + day + " | wyjatek " + e.GetType().Name + " -> wynik NIE."); } }
             if (_fW && !_wsDone && day >= _firstDay + 3) { _wsDone = true; try { Retool(day); } catch (Exception e) { Stumble("Retool", e); Log.Info(P + "warsztat - zmiana produkcji doba " + day + " | wyjatek " + e.GetType().Name + ": " + e.Message + " -> wynik NIE."); } }
         }
@@ -294,8 +300,8 @@ namespace Armoury
                         int orig = HistoricalPrices.Orig(it);
                         int e = TaleWorlds.Library.MathF.Round(0.02f * (float)(s.SmithXpRoundFix && orig > 0 ? orig : it.Value));
                         if (s.WeaponXpFromValueCapped) e = Math.Min(e, Math.Max(25, s.WeaponXpCapPerTier * row.Grade / 2));
-                        row.Exp = e; row.Ok = Math.Abs(row.Xp - e) <= 1;
-                        row.Note = "wartosc " + it.Value + ", dawna " + orig;
+                        row.Exp = e; row.Ok = s.SmithXpRoundFix ? Math.Abs(row.Xp - e) <= 1 : (bool?)null;   // recenzja 306b: klucz NIE - gra skaluje po staremu (XpPostfix)
+                        row.Note = "wartosc " + it.Value + ", dawna " + orig + (s.SmithXpRoundFix ? "" : " (klucz SmithXpRoundFix NIE - stare skalowanie, wzor tylko informacyjnie)");
                     }
                     catch (Exception e) { Stumble("Kowal(przetop)", e); row.Note = "wyjatek " + e.GetType().Name; row.Ok = false; }
                 }
@@ -313,8 +319,8 @@ namespace Armoury
                             int orig = MaterialLaw.Orig(outIt);   // jak MaterialLaw.RefineXpPostfix (ceny surowcow sprzed prawa surowcow)
                             int e = TaleWorlds.Library.MathF.Round(0.3f * (float)((s.SmithXpRoundFix && orig > 0 ? orig : outIt.Value) * f.OutputCount));
                             if (s.WeaponXpFromValueCapped) e = Math.Min(e, s.RefineXpCap);
-                            row.Exp = e; row.Ok = Math.Abs(row.Xp - e) <= 1;
-                            row.Note = "wartosc " + outIt.Value + ", dawna " + orig;
+                            row.Exp = e; row.Ok = s.SmithXpRoundFix ? Math.Abs(row.Xp - e) <= 1 : (bool?)null;   // recenzja 306b: jak przetop
+                            row.Note = "wartosc " + outIt.Value + ", dawna " + orig + (s.SmithXpRoundFix ? "" : " (klucz SmithXpRoundFix NIE - stare skalowanie, wzor tylko informacyjnie)");
                         }
                     }
                 }
@@ -428,17 +434,27 @@ namespace Armoury
             return n;
         }
 
-        private static void Caravan(int day)
+        /// <summary>false = proba odlozona (druzyna gracza w bitwie / oblezeniu / niewoli) - Daily ponawia nastepnej doby; true = rozstrzygnieta.</summary>
+        private static bool Caravan(int day)
         {
-            if (_carMark != null) { Log.Info(P + "karawana - bez tworzenia: karawana testu juz utworzona w tej kampanii (zapis: " + _carMark + "), karawan gracza " + PlayerCaravans() + " -> wynik POMINIETY."); return; }
+            var mp0 = MobileParty.MainParty;
+            if (Hero.MainHero.IsPrisoner || mp0 == null || mp0.MapEvent != null || mp0.SiegeEvent != null)
+            {
+                Log.Info(P + "karawana - bez tworzenia: druzyna gracza w bitwie/oblezeniu/niewoli (rozmowa z kupcem jest tylko w miescie, poza bitwa), proba " + (_carTries + 1) + "/5"
+                         + (_carTries + 1 < 5 ? ", nastepna doba" : ", ostatnia") + " -> wynik POMINIETY.");
+                return false;
+            }
+            if (_carMark != null) { Log.Info(P + "karawana - bez tworzenia: karawana testu juz utworzona w tej kampanii (zapis: " + _carMark + "), karawan gracza " + PlayerCaravans() + " -> wynik POMINIETY."); return true; }
             int have = PlayerCaravans();
-            if (have > 0) { Log.Info(P + "karawana - bez tworzenia: gracz ma juz karawan " + have + " (linie 305a i 259 maja co liczyc) -> wynik POMINIETY."); return; }
+            if (have > 0) { Log.Info(P + "karawana - bez tworzenia: gracz ma juz karawan " + have + " (linie 305a i 259 maja co liczyc) -> wynik POMINIETY."); return true; }
             var town = PickTown();
-            if (town == null) { Log.Info(P + "karawana - bez tworzenia: brak miasta (bez oblezenia, bitwy i wojny z graczem, z szablonem karawany) -> wynik NIE."); return; }
+            if (town == null) { Log.Info(P + "karawana - bez tworzenia: brak miasta (bez oblezenia, bitwy i wojny z graczem, z szablonem karawany) -> wynik NIE."); return true; }
             var hero = Hero.MainHero;
             int cost = Campaign.Current.Models.CaravanModel.GetCaravanFormingCost(false, town.HasPort);
-            if (hero.Gold < cost) { Log.Info(P + "karawana - bez tworzenia: zloto gracza " + hero.Gold + " < koszt rozmowy " + cost + " (" + town.Name + ") -> wynik POMINIETY."); return; }
+            if (hero.Gold < cost) { Log.Info(P + "karawana - bez tworzenia: zloto gracza " + hero.Gold + " < koszt rozmowy " + cost + " (" + town.Name + ") -> wynik POMINIETY."); return true; }
             var leader = PickLeader();
+            // recenzja 306b: rozmowa 1.4.8 wymaga wodza (FindSuitableCompanionsToLeadCaravan().Count > 0) - karawana bez wodza to droga, ktorej gracz nie ma
+            if (leader == null) { Log.Info(P + "karawana - bez tworzenia: brak wolnego towarzysza ani czlonka rodu w druzynie (rozmowa z kupcem go wymaga) -> wynik NIE."); return true; }
             string patches = Owners(AccessTools.Method(typeof(CaravanConversationsCampaignBehavior), "conversation_magistrate_form_a_caravan_accept_on_consequence"));
             int g0 = hero.Gold, t0 = town.Town.Gold;
             var tpl = CaravanHelper.GetRandomCaravanTemplate(town.Culture, false, !town.HasPort);
@@ -446,7 +462,7 @@ namespace Armoury
             MobileParty mp = null;
             try
             {
-                if (leader != null && leader.CurrentSettlement != null) LeaveSettlementAction.ApplyForCharacterOnly(leader);
+                if (leader.CurrentSettlement != null) LeaveSettlementAction.ApplyForCharacterOnly(leader);
                 mp = CaravanPartyComponent.CreateCaravanParty(hero, town, tpl, false, leader, null, false);
                 GiveGoldAction.ApplyForCharacterToSettlement(hero, town, cost);
             }
@@ -460,13 +476,17 @@ namespace Armoury
             bool own = mp != null && mp.IsActive && mp.IsCaravan && mp.CaravanPartyComponent != null && mp.CaravanPartyComponent.Owner == hero && mp.ActualClan == Clan.PlayerClan;
             bool goldOk = paid == cost;
             bool purseOk = want < 0 ? purse > 0 : purse == want;
-            bool ok = own && goldOk && purseOk;
+            // recenzja 306b: zamknieta ekonomia po stronie miasta - zaplata wchodzi do kasy, kapital E3/7 z niej wychodzi (bez E3/7 kiesa z modelu, kasa + zaplata)
+            long tWant = (long)t0 + paid - (ctx != null ? Math.Max(0, purse) : 0);
+            bool townOk = t1 == tWant;
+            bool ok = own && goldOk && purseOk && townOk;
             Log.Info(P + "karawana - utworzona | '" + (mp != null && mp.Name != null ? mp.Name.ToString() : "-") + "' (" + (mp != null ? mp.StringId : "-") + ") w " + town.Name + " (port " + Tn(town.HasPort)
-                     + ", gracz w miescie " + Tn(Settlement.CurrentSettlement == town) + "), wodz " + (leader != null ? leader.Name + (leader.IsPlayerCompanion ? " (towarzysz)" : " (rod)") : "brak (mistrz karawany)")
+                     + ", gracz w miescie " + Tn(Settlement.CurrentSettlement == town) + "), wodz " + leader.Name + (leader.IsPlayerCompanion ? " (towarzysz)" : " (rod)")
                      + ", szablon " + (tpl != null ? tpl.StringId : "-") + " | koszt rozmowy " + cost + ", zloto gracza " + g0 + " -> " + g1 + " (zaplacone " + paid + ", " + Tn(goldOk) + ")"
                      + " | kiesa karawany " + purse + " (E3/7 " + (ctx != null ? "kontekst gracza: kapital modelu " + k + ", oczekiwane min(kapital, zaplacone) " + want : "WYLACZONE (Caravan Capital Real) - kapital z modelu") + ", " + Tn(purseOk) + ")"
-                     + ", kasa miasta " + t0 + " -> " + t1 + " | wlasciciel gracz, rod gracza " + Tn(own) + " | latki na konsekwencji rozmowy (sonda idzie sekwencja z dekompilacji, kontekst E3/7 wprost): " + patches
+                     + ", kasa miasta " + t0 + " -> " + t1 + " (oczekiwane " + tWant + (ctx != null ? " = przed + zaplacone - kiesa" : " = przed + zaplacone") + ", " + Tn(townOk) + ") | wlasciciel gracz, rod gracza " + Tn(own) + " | latki na konsekwencji rozmowy (sonda idzie sekwencja z dekompilacji, kontekst E3/7 wprost): " + patches
                      + " | znacznik zapisu " + (_carMark ?? "-") + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
+            return true;
         }
 
         private static void CaravanDay(int day)
@@ -535,13 +555,16 @@ namespace Armoury
                 bWant = Math.Max(0L, start - back) + add;
             }
             bool basisOk = b1 == bWant;
-            bool ok = typeOk && settleOk && goldOk && capOk && markOk && basisOk;
+            // recenzja 306b: kasa miasta + sprzet (ConvertPostfix: gracz -> kasa miasta; RetoolSettle miasta nie rusza)
+            long tgWant = (long)tg0 + tools;
+            bool townOk = tg1 == tgWant;
+            bool ok = typeOk && settleOk && goldOk && capOk && markOk && basisOk && townOk;
             Log.Info(P + "warsztat - zmiana produkcji doba " + day + " | " + town.Name + " " + from + " -> " + to.StringId + (armsOnly ? " (gracz ma tylko warsztaty z linia broni)" : "")
                      + " (ProfitMade " + pick.ProfitMade + ") | rozmowa: sprzet " + tools + ", nowy znacznik " + mark + ", kapital " + cap + ", zwrot " + back + ", doplata " + add
                      + " | '" + talk + "' | przelew RetoolSettle: zwrot " + dBack + ", doplata " + dAdd + ", brak " + dShort + ", zmian " + (rn1 - rn0) + " (" + Tn(settleOk) + ")"
                      + " | kapital " + cap0 + " -> " + cap1 + " (oczekiwane " + capWant + ", " + Tn(capOk) + "), znacznik " + mark0 + " -> " + mark1 + " (" + Tn(markOk) + ")"
                      + ", kapital wlasny (259) " + b0 + " -> " + b1 + " (oczekiwane " + bWant + ", " + Tn(basisOk) + ")"
-                     + " | zloto gracza " + g0 + " -> " + g1 + " (oczekiwane " + goldWant + " = przed - sprzet + zwrot - doplata, " + Tn(goldOk) + "), kasa miasta " + tg0 + " -> " + tg1 + " (sprzet " + tools + ")"
+                     + " | zloto gracza " + g0 + " -> " + g1 + " (oczekiwane " + goldWant + " = przed - sprzet + zwrot - doplata, " + Tn(goldOk) + "), kasa miasta " + tg0 + " -> " + tg1 + " (oczekiwane " + tgWant + " = przed + sprzet, " + Tn(townOk) + ")"
                      + " | typ zmieniony " + Tn(typeOk) + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
         }
     }
