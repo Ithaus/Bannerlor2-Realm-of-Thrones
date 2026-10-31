@@ -7,6 +7,13 @@
   (3) bitwy - logi, poprawki, mocniejsze/rozsadniejsze AI; (4) kowalstwo - balans XP luki vs miecze; (5) inwestycje - czy dzialaja; (6) reszta bledow z logu i zapisu.
 - LINIA: noc/305-jeff-31-10 (worktree scratchpad d16b0e41\zb\n305 od 6888ffa3 = WGRANE 140). Diagnoza wf_4fb41c95-b70 w toku; autotest bazowy 141base (140 na nowym zapisie,
   -JeffSave autotest-przekierowany-Ironman0gXONzURi8yO, 7 bitew + 90 dob) w toku - wynik m113\seria-141base.out.txt.
+- 05:00 DIAGNOZA GOTOWA (scratchpad d16b0e41\diagnoza.json, 6 obszarow x diagnoza + recenzja). Najwazniejsze: karawana Bjorna +168k netto w 175 dobach (2/3 z jednej
+  podejrzanej transakcji 10k -> 119k), zniknela 108877 z 15k kapitalu; zold karawan w linii 'Garrison and Party Expense' (BK PartyExpensesPrefix); WARSZTATY: kuznia gracza nie
+  zarabia na broni (WorkshopLaw.cs:241 gracz = vanilla, gra robi bron bez zlota), cena kupna z pamieci notabla (Fairmarket 55k -> 2 zl/d), zmiana produkcji przesuwa znacznik
+  kapitalu (zwrot kapitalu jako zysk z podatkiem); BITWA: kompanie nie lamia sie (bramka morale 50), poscig 148 nigdy nie przydziela, FF 27.9% (szarze przez swoich), spam
+  wyjatku ROT smoka; KOWALSTWO: blad zaokraglenia XP (miecz i przetop 1 XP), luk XP z 'dni plyty'; INWESTYCJE: prace okregu dzialaja (ok. 15%/rok), panel dzieli przez 28 dob.
+- 05:05 Workflow wf_ceed2ee0-bec: paczki 305a karawany / 305b warsztaty / 305c bitwa / 305d kowalstwo / 305e drobne (worktree zb\n305a..e, galezie noc/305a-karawany itd.
+  od noc/305-jeff-31-10), kazda: kod -> recenzja -> poprawki. Potem scalenie do noc/305-jeff-31-10, test 141a, porownanie z 141base, WGRANIE 141.
 
 ## DOPISEK 30.10 ok. 04:45 CEST - WGRANIE 140 (noc/304-karawany-odcinki c9fca017, status 6888ffa3 wypchniety) - KONIEC NOCY, START DLA NASTEPNEJ SESJI / DRUGIEGO KONTA
 - W GRZE: Armoury.dll 2845835689cd2ca7e26199c38d8d279c (140). Kopie 139: Armoury.dll.bak-2026-10-30-przed-wgranie140 i D:\Backup-Bannerlord\wgrane\2026-10-30-wgranie140-przed.
