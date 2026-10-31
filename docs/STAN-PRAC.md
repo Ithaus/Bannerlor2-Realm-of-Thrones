@@ -1,5 +1,20 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 31.10.2026 ok. 18:00 CET (najnowszy - starsze sekcje nizej sa historyczne; pelny dziennik dnia w docs/PRZEKAZANIE-2026-10-24-wieczor.md, wpisy 31.10)
+- W GRZE: Armoury.dll ed0199b997bebb13c90e4106d94e1dfe = WGRANIE 146 (galaz noc/310-strzaly-tarcze, wypchnieta; worktree scratchpad sesji d16b0e41 zb n310).
+  CrashScribe bef9db58 (bez zmian od 136). Kampania Jeffa: Ironman0gXONzURi8yO.sav (rod KARDA, Przemyslaw), nowa od 30.10.
+- Wgrania 31.10: 141 (305a-f karawany/warsztaty/bitwa/kowalstwo/drobne), 142 (306a pasmo cen od przewozu marza 2.0 + 306b sondy), 143 (307a-f karawany, bitwa, oblezenia),
+  144 (308a rejsy karawan), 145 (309 bitwa armii), 146 (310 strzaly i tarcze). Kopie poprzednich: Modules/Armoury/bin/Win64_Shipping_Client/Armoury.dll.bak-2026-10-31-przed-wgranieNNN
+  i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranieNNN-przed.
+- Ostatni pelny test 146c (9 bitew w tym 2 armii lordow + 90 dob na kopii zapisu Jeffa + sondy): kod 0, ERROR 0, ARYTMETYKA OK 89/89, karawany AI 0.620 placacych zold (cel 0.60 TAK),
+  karawana gracza 11 dob max bez handlu, +68.8k bez pierwszej partii; pozostale NIE: P307-4b (cennik warsztatow skok x3.8), H287-6 (miasta bez rudy - szum).
+- Narzedzia testu: m113/testy-noc-283.ps1 (scratchpad 6570af7b), CrashScribe-at-n308 z bitwami armii (scratchpad d16b0e41 cs-at308, flaga armoury-bitwa-armie.flag), sondy 306b.
+- DO SPRAWDZENIA PRZEZ JEFFA W GRZE: podpowiedz zlota rodu (linia 'Caravan wages'), kuznia gracza (zarabia na broni), rozmowa zmiany produkcji (zwrot kapitalu),
+  XP kowalstwa (miecz/luk/przetop), komunikaty karawany (koniec karawany, 'Since it was formed'), bitwy (zalamania, poscig, lucznicy), ceny luksusu (pasmo ok. 3x).
+- OTWARTE: latka smokow ROT dla produkcyjnego CrashScribe (zrodlo bef9db58 = commit 84205371 nieobecny w repo); sciana tarcz 310 i reguly 307e niesprawdzone w dzialaniu;
+  przegrani w bitwach armii padli 67-76%; cennik warsztatow skok x3.8; FF strzalow AI ok. 10-13%.
+
+
 Czytaj najpierw: `CLAUDE.md` (zwlaszcza sekcja 8, **zasada 0**: kazda zmiana = kontrola regresji, kolizji
 i spojnosci calej logiki; oraz pulapka MCM w sekcji 7), potem ten plik, potem gorne wpisy `CHANGELOG.md`.
 

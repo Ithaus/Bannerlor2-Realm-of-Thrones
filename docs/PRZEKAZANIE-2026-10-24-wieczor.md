@@ -1,5 +1,9 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 18:00 CET - TEST REGRESJI 146c (wersja w grze) - CZYSTY; podsumowanie w docs/STAN-PRAC.md (sekcja 31.10)
+- 146c: 9 bitew (7 band + armia + sojusz) wygrane/przegrane wedlug planu, 90 dob kod 0, ERROR 0, ARYTMETYKA OK 89/89; K294-1 0.620 TAK (pierwszy raz >= 0.60); K308-5 11 dob,
+  K308-6 +68 848; NIE tylko P307-4b i H287-6. Zapis testowy na D:/Backup-Bannerlord/zapisy-testowe-archiwum/2026-10-31-146c; Game Saves czyste; flagi testu usuniete.
+
 ## DOPISEK 31.10 ok. 17:15 CET - WGRANIE 146 (noc/310-strzaly-tarcze, wypchniete) - START DLA NASTEPNEJ SESJI
 - W GRZE: Armoury.dll ed0199b997bebb13c90e4106d94e1dfe (146 = 145 + 310 czysty strzal AI, sciana tarcz pod ostrzalem, budzet RoutKeeper). Kopie 145: .bak-2026-10-31-przed-wgranie146
   i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie146-przed. CrashScribe bef9db58. LINIA GLOWNA: noc/310-strzaly-tarcze (zb n310). Testy 146a/146b (bitwy z armiami).
