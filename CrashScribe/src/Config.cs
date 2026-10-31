@@ -171,6 +171,9 @@ namespace CrashScribe
         // --- 305c (31.10, Jeff: "sprawdz save i logi i popraw inne rzeczy"; DragonShips.cs) ---
         public static bool RotDragonShipsOnLand = true;       // smok ROT (AIDragon.RefreshAllCachedTargets -> ROTDragonMissionBehavior.GetAllShipPositions) w misji bez NavalShipsLogic (bitwa ladowa): pusta lista od razu, bez spisu encji sceny i bez AmbiguousMatchException ROT (GetMethod("HasScriptOfType") bez typow - 2 przeciazenia) co odswiezenie; wynik ten sam (oryginal i tak zwraca pusta liste); false = jak w ROT
 
+        // --- 311f (31.10, Jeff: "sprawdz czemu mapa wojen stoi"; PovertyPeace.cs - krok 1 rozp311e) ---
+        public static bool PeaceSkipForbiddenProposal = true;   // wniosek gry o pokoj (ConsiderPeace), ktorego zgody gry nie dopuszczaja (ROT: wojna fabularna wymuszona; Diplomacy), nie powstaje - gra i tak anulowalaby go w StartElection, ale dopiero po pobraniu wplywow wnioskodawcy; wymaga PovertyPeace; false = jak w grze (wplyw przepada)
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -285,6 +288,7 @@ namespace CrashScribe
                         case "CanonReachNorthWar": CanonReachNorthWar = B(v); break;
                         case "PovertyPeaceSkipOneOff": PovertyPeaceSkipOneOff = B(v); break;
                         case "RotDragonShipsOnLand": RotDragonShipsOnLand = B(v); break;
+                        case "PeaceSkipForbiddenProposal": PeaceSkipForbiddenProposal = B(v); break;
                     }
                 }
             }

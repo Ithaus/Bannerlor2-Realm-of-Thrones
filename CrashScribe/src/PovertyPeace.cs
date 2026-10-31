@@ -107,7 +107,20 @@ namespace CrashScribe
     ///     przyciete do 0-1; n swiata = srednia n krolestw z naleznym zwrotem w oknie (kazde krolestwo liczy sie raz - "wyraznie
     ///     biedniejsze od reszty", nie od kilku duzych); krolestwo bez naleznego zwrotu w oknie - T = 0. Brak danych Armoury - miara
     ///     skarbca (log mowi).
-    /// Wylaczniki E1b: PovertyPeaceProposals (wniosek), PovertyPeaceArrearsMeasure (miara); diagnoza z PovertyPeace.
+    ///  4. 311f (krok 1 rozp311e "czemu mapa wojen stoi"): wniosek gry o pokoj, ktorego zgody gry nie dopuszczaja, nie powstaje.
+    ///     ConsiderPeace gry nie pyta modelu zgod; po true gra wola Kingdom.AddDecision: najpierw pobiera wplywy wnioskodawcy
+    ///     (KingdomDecision.GetInfluenceCost = DiplomacyModel.GetInfluenceCostOfProposingPeace), potem StartElection ->
+    ///     ShouldBeCancelled -> !IsAllowed -> MakePeaceKingdomDecision.IsAllowed pyta KingdomDecisionPermissionModel - przy wojnie
+    ///     wymuszonej ROT (ROTKingdomDecisionPermissionModel: IsWarForced -> false) wniosek jest anulowany, a wplyw przepada
+    ///     (autotest 31.10: 127 wnioskow gry, ok. 116 anulowanych tak, ok. 10 zatrzymala Armoury 264 w AddDecision bez oplaty).
+    ///     Postfiks ConsiderPeace: gdy __result == true i model zgod gry (ROT -> Diplomacy) odpowiada false - __result = false
+    ///     (decision = null): ten sam wynik co gra (wniosek i tak anulowany), tylko bez oplaty. Klucz PeaceSkipForbiddenProposal
+    ///     (domyslnie true; wymaga PovertyPeace - postfiks E1b). Liczniki w linii E1b: "POMINIETE (zgody gry)", powody i wplywy
+    ///     zachowane (koszt, ktory gra by pobrala - GetInfluenceCost wnioskodawcy z decyzji). Armoury 264 bez zmian: blokuje pary kanonu
+    ///     w AddDecision / IsAllowed / ApplyPeace (nie w modelu zgod) - nasz odczyt modelu zgod nie wola jego Note, wiec nie liczy sie
+    ///     drugi raz; pary kanonu, ktore ROT wymusza, nie dochodza teraz do AddDecision z ConsiderPeace (mniej linii 264 "decyzja
+    ///     krolestwa", znaczenie licznika to samo). Krolestwo gracza jako strona 1 - ROT dopuszcza, wiec bez zmian.
+    /// Wylaczniki E1b: PovertyPeaceProposals (wniosek), PovertyPeaceArrearsMeasure (miara), PeaceSkipForbiddenProposal (311f); diagnoza z PovertyPeace.
     /// Bez zapisu w grze: staly dzien tygodnia krolestwa liczony z dnia kampanii i StringId (wczytanie go nie przesuwa); pamiec
     /// par "wniosek < 5 dob" od wczytania (wnioskow sprzed wczytania nie widzimy; gra widzi - jej lista jest w zapisie i ma tez nasze).
     /// </summary>
@@ -192,7 +205,11 @@ namespace CrashScribe
         private static readonly Ctr _ppElig = new Ctr(), _ppWait = new Ctr(), _ppMade = new Ctr(), _ppVote = new Ctr(), _ppYes = new Ctr(), _ppCancel = new Ctr(), _ppOffer = new Ctr();
         private static readonly Ctr _ppElim = new Ctr();   // wojny pominiete: pokoj zniszczylby krolestwo bez lenn (Diplomacy)
         private static readonly Why _ppWhy = new Why();
-        private static readonly Ctr[] _ctrs = { _cpCall, _cpPoor, _cpOk, _addGame, _addBk, _addMine, _addOther, _ppElig, _ppWait, _ppMade, _ppVote, _ppYes, _ppCancel, _ppOffer, _ppElim };
+        // 311f: wnioski gry pominiete, bo zgody gry (ROT -> Diplomacy) ich nie dopuszczaja (PeaceSkipForbiddenProposal); wplywy zachowane
+        private static readonly Ctr _cpSkip = new Ctr();
+        private static readonly Why _cpSkipWhy = new Why();
+        private static long _dSkipInf, _tSkipInf;
+        private static readonly Ctr[] _ctrs = { _cpCall, _cpPoor, _cpOk, _addGame, _addBk, _addMine, _addOther, _ppElig, _ppWait, _ppMade, _ppVote, _ppYes, _ppCancel, _ppOffer, _ppElim, _cpSkip };
         private static readonly Dictionary<Kingdom, int> _ppByK = new Dictionary<Kingdom, int>();     // wnioski z biedy od wczytania
         private static readonly Dictionary<(Kingdom, Kingdom), int> _pairLast = new Dictionary<(Kingdom, Kingdom), int>();   // (krolestwo wniosku, wrog) -> doba ostatniego wniosku o pokoj z dowolnego zrodla
         private static readonly Dictionary<KingdomDecision, int> _mine = new Dictionary<KingdomDecision, int>();   // nasze wnioski (takze oferty dla gracza do konca AddDecision) -> doba
@@ -227,6 +244,7 @@ namespace CrashScribe
 
         internal static void Install(Harmony harmony)
         {
+            WarProposals.SetHarmony(harmony);   // 311f E1w: latki wpinane w kampanii (OnSessionLaunched), tylko przy PovertyPeace
             try
             {
                 if (!Config.PovertyPeace)
@@ -342,6 +360,8 @@ namespace CrashScribe
                             + "; miara biedy " + (Config.PovertyPeaceArrearsMeasure ? "NIEDOPLATA KORONY z " + ArrearsDays + " dob (PovertyPeaceArrearsMeasure)" : "zapas skarbca (E1)")
                             + "; diagnoza: ConsiderPeace gry " + (_diagOn ? "wpieta" : "NIE") + ", ForceProposePeaceFromLosingSide BK " + (_bkOn ? "wpieta" : "NIE")
                             + ", zgody Diplomacy " + (_mDipExc != null ? "odczyt MakePeaceConditions" : "NIE")
+                            + "; wnioski gry niedopuszczone przez zgody gry (ROT/Diplomacy - gra anulowalaby je po oplacie wplywu) "
+                            + (!_diagOn ? "BEZ ZMIAN (ConsiderPeace niewpiete)" : Config.PeaceSkipForbiddenProposal ? "POMIJANE bez oplaty (PeaceSkipForbiddenProposal)" : "jak w grze (PeaceSkipForbiddenProposal = false)")
                             + (miss.Count > 0 ? " | brak: " + string.Join("; ", miss.ToArray()) : "") + ".");
             }
             catch (Exception e) { Stumble("PovertyPeace.InstallE1b", e); }
@@ -667,6 +687,7 @@ namespace CrashScribe
 
         internal static void OnSessionLaunched()
         {
+            WarProposals.OnSessionLaunched();   // 311f E1w (wlasny try/catch)
             try
             {
                 if (!On) return;
@@ -853,7 +874,9 @@ namespace CrashScribe
                 int today = (int)CampaignTime.Now.ToDays;
                 foreach (var old in _mine.Where(p => today - p.Value > MineKeepDays).Select(p => p.Key).ToList()) _mine.Remove(old);
                 foreach (var old in _pairLast.Where(p => today - p.Value >= PairGapDays).Select(p => p.Key).ToList()) _pairLast.Remove(old);
+                _cpSkipWhy.D.Clear(); _dSkipInf = 0;
             }
+            WarProposals.Daily();   // 311f E1w: linia doby wnioskow o wojne (wlasny try/catch, zeruje dobe)
         }
 
         /// <summary>E1b: linia doby - wnioski o pokoj gry (ConsiderPeace) z powodami odrzucen, zrodla wnioskow w glosowaniach,
@@ -864,14 +887,16 @@ namespace CrashScribe
             {
                 string byK = _ppByK.Count == 0 ? "-" : string.Join(", ", _ppByK.OrderByDescending(p => p.Value).Select(p => N(p.Key) + " " + p.Value).ToArray());
                 return "Pokoj z biedy (E1b): dzien " + Day() + " - WNIOSKI O POKOJ dzis: gra ConsiderPeace wolane " + _cpCall.D + " (z krolestw w biedzie " + _cpPoor.D + "), przeszlo " + _cpOk.D
-                       + ", odrzucone " + (_cpCall.D - _cpOk.D) + " - pierwszy niespelniony warunek: " + _cpWhy.Fmt(true)
+                       + ", POMINIETE (zgody gry, PeaceSkipForbiddenProposal) " + _cpSkip.D + " (wplywy zachowane " + _dSkipInf + "; " + _cpSkipWhy.Fmt(true) + ")"
+                       + ", odrzucone " + (_cpCall.D - _cpOk.D - _cpSkip.D) + " - pierwszy niespelniony warunek: " + _cpWhy.Fmt(true)
                        + (_cpScoreN > 0 ? " (sredni wynik pokoju BK przy odrzuceniu progiem " + (int)(_cpScoreSum / _cpScoreN) + ")" : "")
                        + "; do glosowania: gra " + _addGame.D + ", BK ForceProposePeaceFromLosingSide " + _addBk.D + ", z biedy " + _addMine.D + ", inne " + _addOther.D
                        + "; z biedy: krolestw z bieda skarbca >= " + ProposeT.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " w wojnie z krolestwem " + _ppElig.D
                        + " (nie ich dzien tygodnia " + _ppWait.D + "), wnioskow z biedy " + _ppMade.D + ", bez wniosku: " + _ppWhy.Fmt(true)
                        + (_ppElim.D > 0 ? "; wojen pominietych (" + WhyElim + ") " + _ppElim.D : "")
                        + "; glosowan nad wnioskami z biedy " + _ppVote.D + " (POKOJ " + _ppYes.D + ", anulowane " + _ppCancel.D + ")" + (_ppOffer.D > 0 ? ", ofert pokoju dla gracza " + _ppOffer.D : "")
-                       + " | od wczytania: ConsiderPeace wolane " + _cpCall.T + " (z krolestw w biedzie " + _cpPoor.T + "), przeszlo " + _cpOk.T + ", odrzucone: " + _cpWhy.Fmt(false)
+                       + " | od wczytania: ConsiderPeace wolane " + _cpCall.T + " (z krolestw w biedzie " + _cpPoor.T + "), przeszlo " + _cpOk.T
+                       + ", POMINIETE (zgody gry) " + _cpSkip.T + " (wplywy zachowane " + _tSkipInf + "; " + _cpSkipWhy.Fmt(false) + ")" + ", odrzucone: " + _cpWhy.Fmt(false)
                        + "; do glosowania: gra " + _addGame.T + ", BK " + _addBk.T + ", z biedy " + _addMine.T + ", inne " + _addOther.T
                        + "; WNIOSKOW Z BIEDY " + _ppMade.T + " (na krolestwo: " + byK + "), bez wniosku: " + _ppWhy.Fmt(false)
                        + ", wojen pominietych (zniszczenie bez lenn) " + _ppElim.T
@@ -881,9 +906,10 @@ namespace CrashScribe
 
         // ------------------------------------------------------------------ E1b: diagnoza wnioskow o pokoj
 
-        /// <summary>Postfiks gry KingdomDecisionProposalBehavior.ConsiderPeace(clan, otherClan, otherFaction, out decision) - tylko log.
-        /// Postfiks biegnie takze, gdy prefiks Diplomacy pominal oryginal.</summary>
-        public static void ConsiderPeacePostfix(Clan clan, Clan otherClan, IFaction otherFaction, ref MakePeaceKingdomDecision decision, bool __result)
+        /// <summary>Postfiks gry KingdomDecisionProposalBehavior.ConsiderPeace(clan, otherClan, otherFaction, out decision) - log, a przy
+        /// PeaceSkipForbiddenProposal (311f) wniosek niedopuszczony przez model zgod gry -> false (bez oplaty; gra i tak by go anulowala).
+        /// Postfiks biegnie takze, gdy prefiks Diplomacy pominal oryginal (wtedy __result false - bez zmian). Wyjatek = wynik gry bez zmian.</summary>
+        public static void ConsiderPeacePostfix(Clan clan, Clan otherClan, IFaction otherFaction, ref MakePeaceKingdomDecision decision, ref bool __result)
         {
             if (!_diagOn || !Config.PovertyPeace) return;
             try
@@ -893,6 +919,14 @@ namespace CrashScribe
                 bool poor = k != null && !k.IsEliminated && Poverty(k, out T, out en) && T > 0f;
                 if (__result)
                 {
+                    string skipWhy; int cost;
+                    if (Forbidden(k, otherFaction as Kingdom, clan, decision, out skipWhy, out cost))
+                    {
+                        __result = false;
+                        decision = null;
+                        lock (_lock) { _cpCall.Inc(); if (poor) _cpPoor.Inc(); _cpSkip.Inc(); _cpSkipWhy.Inc(skipWhy); _dSkipInf += cost; _tSkipInf += cost; }
+                        return;
+                    }
                     lock (_lock) { _cpCall.Inc(); if (poor) _cpPoor.Inc(); _cpOk.Inc(); _lastGame = decision; }
                     return;
                 }
@@ -906,6 +940,21 @@ namespace CrashScribe
                 }
             }
             catch (Exception ex) { Stumble("PovertyPeace.ConsiderPeacePostfix", ex); }
+        }
+
+        /// <summary>311f: wniosek gry, ktorego model zgod gry (ROT -> Diplomacy; ten sam, ktory pyta MakePeaceKingdomDecision.IsAllowed
+        /// w StartElection) nie dopuszcza - true, powod (krotki) i koszt wplywu, ktory gra pobralaby w AddDecision. Tylko odczyt.</summary>
+        private static bool Forbidden(Kingdom k, Kingdom e, Clan clan, MakePeaceKingdomDecision decision, out string why, out int cost)
+        {
+            why = null; cost = 0;
+            if (!Config.PeaceSkipForbiddenProposal || k == null || e == null || decision == null) return false;
+            var pm = Campaign.Current != null ? Campaign.Current.Models.KingdomDecisionPermissionModel : null;
+            if (pm == null) return false;
+            TextObject r;
+            if (pm.IsPeaceDecisionAllowedBetweenKingdoms(k, e, out r)) return false;
+            why = Short(r);
+            try { cost = decision.GetInfluenceCost(decision.ProposerClan ?? clan); } catch { cost = 0; }
+            return true;
         }
 
         /// <summary>Pierwszy niespelniony warunek wniosku o pokoj w kolejnosci gry (Diplomacy prefiks -> ConsiderPeace gry 1.4.8).
@@ -1305,6 +1354,7 @@ namespace CrashScribe
         /// <summary>Nowa gra / wczytanie: stan i liczniki od zera (latka zakladana raz przy starcie gry).</summary>
         internal static void ResetSession()
         {
+            WarProposals.Reset();   // 311f E1w
             lock (_lock)
             {
                 _k.Clear(); _forced.Clear(); _flips.Clear();
@@ -1318,6 +1368,7 @@ namespace CrashScribe
                 _cpScoreSum = 0; _cpScoreN = 0;
                 _ppByK.Clear(); _pairLast.Clear(); _mine.Clear();
                 _lastGame = null; _inBk = false; _adding = null;
+                _cpSkipWhy.D.Clear(); _cpSkipWhy.T.Clear(); _dSkipInf = _tSkipInf = 0;   // 311f
                 _arr.Clear(); _nWorld = -1f; _arrLastDay = -1; _arrLastSum = -1;
             }
         }
@@ -1354,5 +1405,444 @@ namespace CrashScribe
         }
 
         public override void SyncData(IDataStore dataStore) { }
+    }
+
+    /// <summary>
+    /// E1w (311f, krok 2 rozp311e "czemu mapa wojen stoi"; Jeff 31.10 "sprawdz czemu mapa wojen stoi"): POMIAR wnioskow AI o wojne - tylko log,
+    /// zadnej zmiany zachowania. Dowod: "decyzji o wojnie 0" we wszystkich sesjach (autotest 90 dob i 9 sesji Jeffa 30.10); przyczyna to dotad
+    /// hipoteza (kary BK za trwajaca wojne, brak uzasadnienia, odleglosc, bramki Diplomacy, rozejm BK).
+    /// Droga gry 1.4.8 (dekompilacja KingdomDecisionProposalBehavior): DailyTickClan (rod AI z wplywem >= 100, los < 2 x num2 i wplyw >
+    /// GetInfluenceCostOfProposingWar) -> GetRandomWarDecision(clan): (a) w krolestwie czeka juz DeclareWarDecision -> null; (b) losowe krolestwo
+    /// nie w wojnie z nami i z pokojem > 20 dni (brak - null); (c) new DeclareWarBarterable(own, cel).GetValueForFaction(clan) < DiplomacyModel.
+    /// GetDecisionMakingThreshold(cel) -> null; (d) ConsiderWar(clan, own, cel): prefiks Diplomacy (DeclareWarConditions.CanApply - przyjazn,
+    /// dobre relacje, malzenstwo, pakty, DeclareWarCooldown) -> false; wplyw < polowa kosztu wniosku -> false; DeclareWarDecision.CalculateSupport
+    /// (clan) > 50, potem los gry RandomFloat < 1.4 x szansa TAK - 0.55; (e) wynik -> postfiks BK GetRandomWarDecisionPatch (rozejm BK IsInTruce
+    /// -> null; uzasadnienie wojny -> BKDeclareWarDecision), postfiks Armoury E7/K (Priority.Low: pokoj <= ok. 87 dni -> null).
+    /// Latki (raz na proces, w kampanii - OnSessionLaunched; wzor CrownCallToWar.EnsureHooks): prefiks First / postfiks Last / finalizer na
+    /// GetRandomWarDecision (Last = po BK 400 i Armoury Low 200 - linia startu sprawdza kolejnosc), prefiks First / postfiks Last na ConsiderWar,
+    /// postfiks DeclareWarBarterable.GetUnitValueForFaction (cel i wartosc - tylko pierwsze wywolanie przed ConsiderWar) i DeclareWarDecision.
+    /// CalculateSupport (poparcie - tylko wewnatrz ConsiderWar). Kontekst [ThreadStatic] ustawiany tylko w GetRandomWarDecision - poza nim
+    /// postfiksy barteru i poparcia koncza sie na jednym odczycie pola. Odczyty: model zgod gry IsWarDecisionAllowedBetweenKingdoms (ROT ->
+    /// Diplomacy) dla wylosowanego celu, Diplomacy DeclareWarConditions.CanApplyExceptions (powod prefiksu), BK KingdomDiplomacy.IsInTruce,
+    /// raz na dobe Diplomacy WarExhaustionManager.GetWarExhaustion trwajacych wojen krolestw. Koszt: tylko w przebiegu gry (kilkadziesiat losowan
+    /// na dobe) i raz na dobe; nic na tick. Wylacznik: PovertyPeace (rodzina E1). Bledy: potkniecia liczone, wynik gry zawsze bez zmian.
+    /// </summary>
+    internal static class WarProposals
+    {
+        private sealed class Draw
+        {
+            public Clan Clan; public Kingdom Own;
+            public IFaction Target; public bool HasValue; public int Value;
+            public bool InConsider, ConsiderRan, ConsiderResult, HasSupport; public float Support;
+        }
+
+        private sealed class Tally
+        {
+            public readonly Dictionary<string, int> D = new Dictionary<string, int>(), T = new Dictionary<string, int>();
+            public void Inc(string k) { int v; D.TryGetValue(k, out v); D[k] = v + 1; T.TryGetValue(k, out v); T[k] = v + 1; }
+            public string Fmt(bool day)
+            {
+                var src = day ? D : T;
+                return src.Count == 0 ? "-" : string.Join(", ", src.OrderByDescending(p => p.Value).Select(p => p.Key + " " + p.Value).ToArray());
+            }
+        }
+
+        private const string WhyPending = "wniosek o wojne juz czeka w krolestwie";
+        private const string WhyNoTarget = "brak celu (kazde krolestwo w wojnie z nami albo pokoj <= 20 dni)";
+        private const string WhyValue = "wartosc wojny < prog";
+        private const string WhyInfluence = "wplyw < polowa kosztu wniosku";
+        private const string WhySupport = "poparcie wnioskodawcy <= 50";
+        private const string WhyRoll = "los gry (1.4 x szansa TAK - 0.55)";
+        private const string WhyBkTruce = "zdjety po grze: rozejm BK";
+        private const string WhyOther = "zdjety po grze: inna latka (Armoury E7/K rozejm?)";
+        private const string WhyGame = "WNIOSEK (DeclareWarDecision)";
+        private const string WhyBkCb = "WNIOSEK (BK casus belli)";
+
+        [ThreadStatic] private static Draw _cur;
+        private static Harmony _harmony;
+        private static bool _tried, _on;
+        private static MethodInfo _mGrwd, _mCw, _mVal, _mSup;
+        private static readonly List<string> _miss = new List<string>();
+        // odczyty (refleksja, szukane raz na proces)
+        private static object _dipWar; private static MethodInfo _mDipWarExc;
+        private static Type _tBkBeh; private static MethodInfo _mGetBeh, _mGetKd, _mTruce;
+        private static PropertyInfo _pWem; private static MethodInfo _mWe;
+
+        private static readonly object _lock = new object();
+        private static int _dDraw, _tDraw, _dTarget, _tTarget, _dProp, _tProp, _dPermNo, _tPermNo, _dSup, _tSup, _dSupOk, _tSupOk, _dValOk, _tValOk;
+        private static long _dValSum, _tValSum; private static double _dSupSum;
+        private static int _dBest = int.MinValue; private static string _dBestTxt;
+        private static readonly Tally _why = new Tally(), _perm = new Tally();
+        private static readonly List<string> _ex = new List<string>();
+        private static readonly HashSet<string> _exWhy = new HashSet<string>();
+        private static int _stumbles, _dStumbles;
+
+        private static void Stumble(string where, Exception e)
+        {
+            lock (_lock) { _stumbles++; _dStumbles++; }
+            if (_stumbles == 1) { try { Scribe.Report("CrashScribe", e, where, null); } catch { } }
+        }
+
+        internal static void SetHarmony(Harmony h) { _harmony = h; }
+
+        internal static void Reset()
+        {
+            lock (_lock)
+            {
+                _dDraw = _tDraw = _dTarget = _tTarget = _dProp = _tProp = _dPermNo = _tPermNo = _dSup = _tSup = _dSupOk = _tSupOk = _dValOk = _tValOk = 0;
+                _dValSum = _tValSum = 0; _dSupSum = 0; _dBest = int.MinValue; _dBestTxt = null;
+                _why.D.Clear(); _why.T.Clear(); _perm.D.Clear(); _perm.T.Clear(); _ex.Clear(); _exWhy.Clear();
+                _dStumbles = 0;
+            }
+            _cur = null;
+        }
+
+        /// <summary>Raz na proces w kampanii: latki i odczyty; przy kazdej sesji linia startu z kolejnoscia postfiksow.</summary>
+        internal static void OnSessionLaunched()
+        {
+            try
+            {
+                if (!Config.PovertyPeace || Campaign.Current == null) return;
+                if (!_tried && _harmony != null)
+                {
+                    _tried = true;
+                    var tProp = typeof(TaleWorlds.CampaignSystem.CampaignBehaviors.KingdomDecisionProposalBehavior);
+                    _mGrwd = AccessTools.DeclaredMethod(tProp, "GetRandomWarDecision", new[] { typeof(Clan) });
+                    _mCw = AccessTools.DeclaredMethod(tProp, "ConsiderWar", new[] { typeof(Clan), typeof(Kingdom), typeof(IFaction) });
+                    _mVal = AccessTools.DeclaredMethod(typeof(TaleWorlds.CampaignSystem.BarterSystem.Barterables.DeclareWarBarterable), "GetUnitValueForFaction", new[] { typeof(IFaction) });
+                    _mSup = AccessTools.DeclaredMethod(typeof(DeclareWarDecision), "CalculateSupport", new[] { typeof(Clan) });
+                    bool ok = true;
+                    ok &= Wire("GetRandomWarDecision", _mGrwd, nameof(GrwdPrefix), nameof(GrwdPostfix), nameof(GrwdFinalizer), _mGrwd != null && _mGrwd.ReturnType == typeof(KingdomDecision));
+                    ok &= Wire("ConsiderWar", _mCw, nameof(CwPrefix), nameof(CwPostfix), null, _mCw != null && _mCw.ReturnType == typeof(bool));
+                    ok &= Wire("DeclareWarBarterable.GetUnitValueForFaction", _mVal, null, nameof(ValuePostfix), null, _mVal != null && _mVal.ReturnType == typeof(int));
+                    ok &= Wire("DeclareWarDecision.CalculateSupport", _mSup, null, nameof(SupportPostfix), null, _mSup != null && _mSup.ReturnType == typeof(float));
+                    _on = ok;
+                    Bind();
+                }
+                string order = Order();
+                Scribe.Line("Wojny - wnioski (E1w): start sesji - pomiar wnioskow AI o wojne " + (_on ? "WPIETY" : "NIEWPIETY") + " (tylko log, wynik gry bez zmian)"
+                            + "; latki: GetRandomWarDecision " + Has(_mGrwd) + ", ConsiderWar " + Has(_mCw) + ", wartosc barteru wojny " + Has(_mVal) + ", poparcie " + Has(_mSup)
+                            + "; postfiksy GetRandomWarDecision (wlasciciel/waga): " + Owners(_mGrwd) + "; " + order
+                            + "; odczyty: zgody Diplomacy DeclareWarConditions " + (_mDipWarExc != null ? "TAK" : "NIE") + ", rozejm BK " + (_mTruce != null ? "TAK" : "NIE")
+                            + ", zmeczenie Diplomacy " + (_mWe != null ? "TAK" : "NIE")
+                            + (_miss.Count > 0 ? " | brak: " + string.Join("; ", _miss.ToArray()) : "") + ".");
+            }
+            catch (Exception e) { Stumble("WarProposals.OnSessionLaunched", e); }
+        }
+
+        private static string Has(MethodInfo m) { return m != null && _on ? "TAK" : (m != null ? "znaleziona" : "BRAK"); }
+
+        private static bool Wire(string label, MethodInfo m, string pre, string post, string fin, bool sig)
+        {
+            if (m == null || !sig) { _miss.Add(label + (m == null ? "" : " (sygnatura)")); return false; }
+            try
+            {
+                _harmony.Patch(m,
+                    prefix: pre != null ? new HarmonyMethod(typeof(WarProposals), pre) { priority = Priority.First } : null,
+                    postfix: post != null ? new HarmonyMethod(typeof(WarProposals), post) { priority = Priority.Last } : null,
+                    finalizer: fin != null ? new HarmonyMethod(typeof(WarProposals), fin) : null);
+                return true;
+            }
+            catch (Exception e) { _miss.Add(label + " (blad " + e.GetType().Name + ")"); Stumble("WarProposals.Wire." + label, e); return false; }
+        }
+
+        private static void Bind()
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("Diplomacy.DiplomaticAction.WarPeace.DeclareWarConditions");
+                var tb = t != null ? t.BaseType : null;
+                var pi = tb != null ? tb.GetProperty("Instance", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static) : null;
+                var mx = tb != null ? tb.GetMethod("CanApplyExceptions", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null,
+                                                   new[] { typeof(Kingdom), typeof(Kingdom), typeof(bool), typeof(bool) }, null) : null;
+                object inst = pi != null ? pi.GetValue(null, null) : null;
+                if (inst != null && mx != null && typeof(System.Collections.IList).IsAssignableFrom(mx.ReturnType)) { _dipWar = inst; _mDipWarExc = mx; }
+            }
+            catch { _dipWar = null; _mDipWarExc = null; }
+            try
+            {
+                _tBkBeh = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.BKDiplomacyBehavior");
+                var tKd = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.KingdomDiplomacy");
+                var g = typeof(Campaign).GetMethods(BindingFlags.Public | BindingFlags.Instance).FirstOrDefault(x => x.Name == "GetCampaignBehavior" && x.IsGenericMethodDefinition && x.GetParameters().Length == 0);
+                if (_tBkBeh != null && tKd != null && g != null)
+                {
+                    _mGetBeh = g.MakeGenericMethod(_tBkBeh);
+                    _mGetKd = AccessTools.Method(_tBkBeh, "GetKingdomDiplomacy", new[] { typeof(Kingdom) });
+                    _mTruce = AccessTools.Method(tKd, "IsInTruce", new[] { typeof(Kingdom) });
+                    if (_mGetKd == null || _mTruce == null || _mTruce.ReturnType != typeof(bool)) { _mGetKd = null; _mTruce = null; }
+                }
+            }
+            catch { _mGetKd = null; _mTruce = null; }
+            try
+            {
+                var tw = AccessTools.TypeByName("Diplomacy.WarExhaustion.WarExhaustionManager");
+                _pWem = tw != null ? AccessTools.Property(tw, "Instance") : null;
+                _mWe = tw != null ? AccessTools.Method(tw, "GetWarExhaustion", new[] { typeof(Kingdom), typeof(Kingdom) }) : null;
+                if (_pWem == null || _mWe == null || _mWe.ReturnType != typeof(float)) { _pWem = null; _mWe = null; }
+            }
+            catch { _pWem = null; _mWe = null; }
+        }
+
+        private static string Owners(MethodInfo m)
+        {
+            if (m == null) return "-";
+            try
+            {
+                var info = Harmony.GetPatchInfo(m);
+                if (info == null || info.Postfixes == null || info.Postfixes.Count == 0) return "brak";
+                return string.Join(", ", info.Postfixes.Select(x => x.owner + "/" + x.priority).ToArray());
+            }
+            catch { return "?"; }
+        }
+
+        /// <summary>Czy nasz postfiks GetRandomWarDecision biegnie po BK i po Armoury (Harmony: wyzsza waga pierwsza, przy rownej - kolejnosc wpiecia).</summary>
+        private static string Order()
+        {
+            try
+            {
+                var info = _mGrwd != null ? Harmony.GetPatchInfo(_mGrwd) : null;
+                if (info == null || info.Postfixes == null) return "kolejnosc: -";
+                Patch ours = null, bk = null, arm = null;
+                foreach (var p in info.Postfixes)
+                {
+                    var t = p != null && p.PatchMethod != null ? p.PatchMethod.DeclaringType : null;
+                    if (t == null) continue;
+                    string an = t.Assembly.GetName().Name ?? "";
+                    if (t == typeof(WarProposals)) ours = p;
+                    else if (an.StartsWith("BannerKings", StringComparison.Ordinal)) bk = p;
+                    else if (an == "Armoury") arm = p;
+                }
+                Func<Patch, string> after = o => o == null ? "brak ich postfiksu" : ours == null ? "- (nasz niewpiety)"
+                    : (ours.priority < o.priority || (ours.priority == o.priority && ours.index > o.index) ? "tak" : "NIE");
+                return "nasz po BK: " + after(bk) + ", po Armoury E7/K: " + after(arm);
+            }
+            catch { return "kolejnosc: ?"; }
+        }
+
+        // ------------------------------------------------------------ latki (tylko odczyt)
+
+        public static void GrwdPrefix(Clan clan)
+        {
+            try { _cur = Config.PovertyPeace ? new Draw { Clan = clan, Own = clan != null ? clan.Kingdom : null } : null; }
+            catch { _cur = null; }
+        }
+
+        public static void GrwdPostfix(Clan clan, KingdomDecision __result)
+        {
+            var d = _cur;
+            _cur = null;
+            if (d == null || !_on) return;
+            try { Classify(d, __result); }
+            catch (Exception e) { Stumble("WarProposals.Classify", e); }
+        }
+
+        /// <summary>Kontekst zawsze zdjety (wyjatek gry lub innej latki - oddany bez zmian, jak Fabula.WarFinalizer).</summary>
+        public static Exception GrwdFinalizer(Exception __exception) { _cur = null; return __exception; }
+
+        public static void CwPrefix()
+        {
+            var d = _cur;
+            if (d != null) { d.InConsider = true; d.ConsiderRan = true; }
+        }
+
+        public static void CwPostfix(bool __result)
+        {
+            var d = _cur;
+            if (d != null) { d.InConsider = false; d.ConsiderResult = __result; }
+        }
+
+        /// <summary>Pierwsze wywolanie w GetRandomWarDecision przed ConsiderWar = bramka gry (c); dalsze (glosy w ConsiderWar, BK) pomijane.</summary>
+        public static void ValuePostfix(TaleWorlds.CampaignSystem.BarterSystem.Barterables.DeclareWarBarterable __instance, int __result)
+        {
+            var d = _cur;
+            if (d == null || d.HasValue || d.InConsider) return;
+            try { d.HasValue = true; d.Value = __result; d.Target = __instance != null ? __instance.OtherFaction : null; }
+            catch { }
+        }
+
+        public static void SupportPostfix(float __result)
+        {
+            var d = _cur;
+            if (d == null || !d.InConsider || d.HasSupport) return;
+            d.HasSupport = true; d.Support = __result;
+        }
+
+        // ------------------------------------------------------------ ocena losowania
+
+        private static void Classify(Draw d, KingdomDecision result)
+        {
+            var own = d.Own;
+            string why, perm = null, ex = null;
+            float thr = 0f;
+            bool target = d.HasValue && d.Target != null;
+            if (!target)
+            {
+                bool pending = false;
+                try { pending = own != null && own.UnresolvedDecisions.Any(x => x is DeclareWarDecision); } catch { }
+                why = pending ? WhyPending : WhyNoTarget;
+            }
+            else
+            {
+                var dm = Campaign.Current.Models.DiplomacyModel;
+                thr = dm.GetDecisionMakingThreshold(d.Target);
+                var tk = d.Target as Kingdom;
+                perm = PermWhy(own, tk);
+                if (d.Value < thr) why = WhyValue;
+                else if (!d.ConsiderRan) why = "ConsiderWar niewolane (inna latka?)";
+                else if (!d.HasSupport)
+                {
+                    string dip = DipWhy(own, tk);
+                    if (dip != null) why = "Diplomacy: " + dip;
+                    else if (d.Clan != null && d.Clan.Influence < (float)(dm.GetInfluenceCostOfProposingWar(d.Clan) / 2)) why = WhyInfluence;
+                    else why = "ConsiderWar false bez poparcia (inna latka?)";
+                }
+                else if (d.Support <= 50f) why = WhySupport;
+                else if (!d.ConsiderResult) why = WhyRoll;
+                else if (result == null) why = BkTruce(own, tk) ? WhyBkTruce : WhyOther + ", pokoj " + PeaceDays(own, tk) + " dni temu";
+                else why = result.GetType().Name == "BKDeclareWarDecision" ? WhyBkCb : WhyGame;
+                if (result != null && perm != null) why += " - zgody gry odmawiaja (gra anuluje go po oplacie)";
+                ex = N(d.Clan) + " (" + N(own) + ") -> " + N(d.Target) + ": wartosc " + d.Value + " / prog " + ((int)thr)
+                     + (d.HasSupport ? ", poparcie " + ((int)d.Support) : "") + ", zgody gry " + (perm ?? "TAK") + ", wynik " + why;
+            }
+            string key = why.StartsWith(WhyOther, StringComparison.Ordinal) ? WhyOther : why;
+            lock (_lock)
+            {
+                _dDraw++; _tDraw++;
+                _why.Inc(key);
+                if (target)
+                {
+                    _dTarget++; _tTarget++;
+                    _dValSum += d.Value; _tValSum += d.Value;
+                    if (d.Value >= thr) { _dValOk++; _tValOk++; }
+                    if (d.Value > _dBest) { _dBest = d.Value; _dBestTxt = N(own) + " -> " + N(d.Target) + " " + d.Value + " / prog " + ((int)thr); }
+                    if (perm != null) { _dPermNo++; _tPermNo++; _perm.Inc(perm); } else _perm.Inc("TAK");
+                    if (d.HasSupport) { _dSup++; _tSup++; _dSupSum += d.Support; if (d.Support > 50f) { _dSupOk++; _tSupOk++; } }
+                }
+                if (result != null) { _dProp++; _tProp++; }
+                if (ex != null && _ex.Count < 3 && _exWhy.Add(key)) _ex.Add(ex);
+            }
+        }
+
+        /// <summary>Model zgod gry (ROT -> Diplomacy - ten sam, ktory pyta DeclareWarDecision.IsAllowed w StartElection); null = dozwolone.</summary>
+        private static string PermWhy(Kingdom own, Kingdom tk)
+        {
+            if (own == null || tk == null) return null;
+            try
+            {
+                var pm = Campaign.Current.Models.KingdomDecisionPermissionModel;
+                TextObject r;
+                if (pm == null || pm.IsWarDecisionAllowedBetweenKingdoms(own, tk, out r)) return null;
+                return Short(r);
+            }
+            catch (Exception e) { Stumble("WarProposals.PermWhy", e); return null; }
+        }
+
+        /// <summary>Powod prefiksu Diplomacy na ConsiderWar (DeclareWarConditions.CanApply(own, cel, false, bypassCosts: true)); null = dopuszcza.</summary>
+        private static string DipWhy(Kingdom own, Kingdom tk)
+        {
+            if (_dipWar == null || _mDipWarExc == null || own == null || tk == null) return null;
+            try
+            {
+                var list = _mDipWarExc.Invoke(_dipWar, new object[] { own, tk, false, true }) as System.Collections.IList;
+                return list == null || list.Count == 0 ? null : Short(list[0] as TextObject);
+            }
+            catch (Exception e) { Stumble("WarProposals.DipWhy", e); return null; }
+        }
+
+        private static bool BkTruce(Kingdom own, Kingdom tk)
+        {
+            if (_mGetBeh == null || _mTruce == null || own == null || tk == null) return false;
+            try
+            {
+                var beh = _mGetBeh.Invoke(Campaign.Current, null);
+                var kd = beh != null ? _mGetKd.Invoke(beh, new object[] { own }) : null;
+                return kd != null && (bool)_mTruce.Invoke(kd, new object[] { tk });
+            }
+            catch (Exception e) { Stumble("WarProposals.BkTruce", e); return false; }
+        }
+
+        private static string PeaceDays(Kingdom own, Kingdom tk)
+        {
+            try { var s = own != null && tk != null ? own.GetStanceWith(tk) : null; return s != null ? ((int)s.PeaceDeclarationDate.ElapsedDaysUntilNow).ToString() : "?"; }
+            catch { return "?"; }
+        }
+
+        /// <summary>Zmeczenie Diplomacy trwajacych wojen krolestw (raz na dobe): "A-B a/b", najwyzsze najpierw, do 16 wojen.</summary>
+        private static string Exhaustion()
+        {
+            if (_pWem == null || _mWe == null) return "niedostepne (brak Diplomacy WarExhaustionManager)";
+            object wem;
+            try { wem = _pWem.GetValue(null, null); } catch { wem = null; }
+            if (wem == null) return "niedostepne (WarExhaustionManager.Instance null)";
+            var rows = new List<KeyValuePair<float, string>>();
+            var ks = Kingdom.All.Where(k => k != null && !k.IsEliminated).ToList();
+            for (int i = 0; i < ks.Count; i++)
+                for (int j = i + 1; j < ks.Count; j++)
+                {
+                    if (!ks[i].IsAtWarWith(ks[j])) continue;
+                    float a = (float)_mWe.Invoke(wem, new object[] { ks[i], ks[j] }), b = (float)_mWe.Invoke(wem, new object[] { ks[j], ks[i] });
+                    rows.Add(new KeyValuePair<float, string>(Math.Max(a, b), N(ks[i]) + "-" + N(ks[j]) + " " + a.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+                                                                              + "/" + b.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)));
+                }
+            if (rows.Count == 0) return "brak wojen krolestw";
+            var top = rows.OrderByDescending(p => p.Key).Take(16).Select(p => p.Value).ToList();
+            return "wojen " + rows.Count + ": " + string.Join("; ", top.ToArray()) + (rows.Count > top.Count ? "; i " + (rows.Count - top.Count) + " innych" : "") + " (100 = pokoj wymuszony)";
+        }
+
+        /// <summary>Linia doby "Wojny - wnioski (E1w)" (po linii E1b); zeruje dobe.</summary>
+        internal static void Daily()
+        {
+            if (!Config.PovertyPeace || !_on) return;
+            try
+            {
+                string ex;
+                try { ex = Exhaustion(); } catch (Exception e) { Stumble("WarProposals.Exhaustion", e); ex = "blad odczytu"; }
+                string line;
+                lock (_lock)
+                {
+                    line = "Wojny - wnioski (E1w): dzien " + Day() + " - LOSOWANIA WNIOSKU O WOJNE dzis " + _dDraw + " (z celem " + _dTarget + "), wnioskow " + _dProp
+                           + "; wynik / pierwszy niespelniony warunek: " + _why.Fmt(true)
+                           + "; wartosc wojny (barter, wnioskodawca): >= prog " + _dValOk + " z " + _dTarget + (_dTarget > 0 ? ", srednia " + (_dValSum / _dTarget) : "")
+                           + (_dBestTxt != null ? ", najwyzsza " + _dBestTxt : "")
+                           + "; poparcie liczone " + _dSup + (_dSup > 0 ? " (srednie " + (int)(_dSupSum / _dSup) + ")" : "") + ", > 50: " + _dSupOk
+                           + "; zgody gry dla wylosowanych celow (ROT/Diplomacy): odmowa " + _dPermNo + " - " + _perm.Fmt(true)
+                           + "; przyklady: " + (_ex.Count > 0 ? string.Join(" || ", _ex.ToArray()) : "-")
+                           + " | zmeczenie Diplomacy: " + ex
+                           + " | od wczytania: losowan " + _tDraw + " (z celem " + _tTarget + "), wnioskow " + _tProp + "; " + _why.Fmt(false)
+                           + "; wartosc >= prog " + _tValOk + (_tTarget > 0 ? " (srednia " + (_tValSum / _tTarget) + ")" : "") + ", poparcie > 50: " + _tSupOk + " z " + _tSup
+                           + "; zgody gry odmowa " + _tPermNo
+                           + "; potkniecia dzis " + _dStumbles + " (razem " + _stumbles + (_stumbles > 0 ? ", pierwsze w raporcie; wynik gry bez zmian" : "") + ").";
+                }
+                Scribe.Line(line);
+            }
+            catch (Exception e) { Stumble("WarProposals.Daily", e); }
+            lock (_lock)
+            {
+                _dDraw = _dTarget = _dProp = _dPermNo = _dSup = _dSupOk = _dValOk = 0;
+                _dValSum = 0; _dSupSum = 0; _dBest = int.MinValue; _dBestTxt = null;
+                _why.D.Clear(); _perm.D.Clear(); _ex.Clear(); _exWhy.Clear(); _dStumbles = 0;
+            }
+        }
+
+        /// <summary>Opis warunku: do pierwszej kropki/wykrzyknika, najwyzej 60 znakow (jak PovertyPeace.Short).</summary>
+        private static string Short(TextObject t)
+        {
+            string s;
+            try { s = t != null ? t.ToString() : "?"; } catch { s = "?"; }
+            if (string.IsNullOrEmpty(s)) return "?";
+            int i = s.IndexOfAny(new[] { '.', '!' });
+            if (i > 0) s = s.Substring(0, i);
+            return s.Length > 60 ? s.Substring(0, 60) : s;
+        }
+
+        private static int Day()
+        {
+            try { return (int)(CampaignTime.Now - Campaign.Current.Models.CampaignTimeModel.CampaignStartTime).ToDays; } catch { return 0; }
+        }
+
+        private static string N(IFaction f)
+        {
+            try { return f == null ? "?" : (f.Name != null ? f.Name.ToString() : f.StringId); } catch { return "?"; }
+        }
     }
 }
