@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-31 WGRANIE 141 - noc/305-jeff-31-10 6162fc0b (140 + 305a karawany, 305b warsztaty, 305c bitwa, 305d kowalstwo, 305e drobne, 305f poprawki przegladu); Armoury.dll bd055889e03a5e8c3be9ae673be33157, kopia 140: Armoury.dll.bak-2026-10-31-przed-wgranie141 i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie141-przed
+**Problem:** Jeff 31.10 (wyjazd do niedzieli, pelna zgoda na wgrywanie): karawany - zysk i osobna linia kosztu w wydatkach; warsztaty prawie nic nie zarabiaja; bitwa i AI; balans XP kowalstwa (luki vs miecze); inwestycje; reszta bledow z logu i zapisu nowej kampanii (Ironman0gXONzURi8yO).
+**Przyczyna / Zmiana:** opisy we wpisach 305a-305f ponizej (diagnoza 6 obszarow z recenzja, scratchpad sesji d16b0e41 diagnoza.json).
+**Ryzyko / co sprawdzic:** autotest 141base (= 140) / 141a (305a-e) / 141b (+ 305f) na kopii zapisu Jeffa, 7 bitew + 90 dob: wszystkie kod 0, ERROR 0, Armoury.json Jeffa nietkniety; self-testy grup karawany305, warsztaty305b, bitwa305c, kowal305 OK; ARYTMETYKA OK 89/89, zloto z niczego / w nicosc 0. 141b: mocne bitwy 3/3 wygrane (w 141a jedna mocna przegrana - padl sztandar i dowodca, nie rzut strat 305c), szarze konnicy w swoich 21 -> 1 (141a), kuznia Fairmarket gracza: wyplaty 0 -> ok. 5.5k w 90 dobach (firma 380 cykli, wynik +6554, 0 cykli oddanych grze). K259-11 w 141b NIE (0.137 -> 0.120, karawany AI - kod 305 ich nie dotyka; 141a 1.01, baza 1.02 - szum). NIE pokryte w autotescie: kucie (nikt nie kul), karawana gracza (brak w zapisie), zmiana produkcji warsztatu, bitwy w kampanii. CrashScribe NIE wgrany (latka smokow ROT 305c przetestowana w testowym CrashScribe-at-n305; produkcyjny bef9db58 zbudowany z 84205371, ktorego nie ma w repo - budowa z n305 wnioslaby niewgrane 133a) - zostaje bef9db58.
+**Status:** WGRANE 141 (31.10 ok. 07:15 CET).
+
 ## 2026-10-31 305f poprawki przegladu scalenia 305a-e
 **Problem:** niezalezny przeglad scalenia paczek 305a-e (galaz noc/305-jeff-31-10) zglosil 6 uwag - 2 powazne (falszywy "zwrot kapitalu" w ksiedze 259 warsztatow; petla kupno-odsprzedaz warsztatu z linia broni przy PlayerArmsAsFirm = NIE), 4 drobne. Wszystkie sprawdzone w kodzie - wszystkie prawdziwe.
 **Przyczyna:**
