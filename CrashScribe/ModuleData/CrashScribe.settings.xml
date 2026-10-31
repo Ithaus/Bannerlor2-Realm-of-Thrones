@@ -535,4 +535,8 @@
        usual daily change is left out of the daily trend, the same way for every realm; the treasury itself still counts, and the daily loss
        is never measured higher than before. Set to false for the old measure. -->
   <PovertyPeaceSkipOneOff>true</PovertyPeaceSkipOneOff>
+  <!-- Peace proposals that cannot pass (needs PovertyPeace). Realm of Thrones forbids peace in its story wars, but a lord could still
+       propose it: the game took his influence first and only then cancelled the vote. With this on, such a proposal is simply not made
+       and the lord keeps his influence; every other peace proposal is unchanged. Set to false for the old behaviour. -->
+  <PeaceSkipForbiddenProposal>true</PeaceSkipForbiddenProposal>
 </CrashScribe>

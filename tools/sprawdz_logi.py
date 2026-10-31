@@ -87684,6 +87684,220 @@ def trening311e_main(logp):
     return 0
 
 
+# ---------------------------------------------------------------- paczka 311f (31.10): wnioski o pokoj bez oplaty i pomiar wnioskow o wojne - grupa wojny311f
+# Log sesji CrashScribe (session-*.log; linie mozna z "[hh:mm:ss] " albo bez). Uzycie: --grupa wojny311f <session-*.log> [--armoury <Armoury-*.log>].
+# W311F-S self-test wyrazen i wierszy (linie jak w C# PovertyPeace.cs / WarProposals);
+# W311F-0 linia startu E1b: "POMIJANE bez oplaty (PeaceSkipForbiddenProposal)";
+# W311F-1 linie doby E1b: format nowy (POMINIETE), odrzucone = wolane - przeszlo - pominiete >= 0, pominiete 0 => wplywy zachowane 0;
+# W311F-2 od wczytania: pominiete > 0 i "do glosowania: gra" < pominiete (dotad ok. 127 wnioskow gry, prawie wszystkie w wojnach ROT), wplywy zachowane > 0;
+# W311F-3 linia startu E1w: WPIETY, nasz postfiks po BK i po Armoury E7/K, bez "brak:";
+# W311F-4 linie doby E1w: format, suma powodow = losowan, wnioskow <= losowan, potkniecia 0;
+# W311F-5 losowania od wczytania > 0 (pomiar cos widzi); W311F-6..8 INFO: powody od wczytania, przyklady, zmeczenie Diplomacy;
+# W311F-A (z --armoury) INFO: linia doby 264 - zablokowane w sesji i drogi (po 311f mniej "decyzja krolestwa", znaczenie bez zmian).
+W311F_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
+W311F_E1B = re.compile(r"^Pokoj z biedy \(E1b\): dzien (\d+) - WNIOSKI O POKOJ dzis: gra ConsiderPeace wolane (\d+) \(z krolestw w biedzie \d+\), przeszlo (\d+), "
+                       r"POMINIETE \(zgody gry, PeaceSkipForbiddenProposal\) (\d+) \(wplywy zachowane (-?\d+); (.*?)\), odrzucone (-?\d+) - pierwszy niespelniony warunek: "
+                       r".*?; do glosowania: gra (\d+), .*? \| od wczytania: ConsiderPeace wolane (\d+) \(z krolestw w biedzie \d+\), przeszlo (\d+), "
+                       r"POMINIETE \(zgody gry\) (\d+) \(wplywy zachowane (-?\d+); (.*?)\), odrzucone: .*?; do glosowania: gra (\d+), BK (\d+), z biedy (\d+), inne (\d+);")
+W311F_E1W = re.compile(r"^Wojny - wnioski \(E1w\): dzien (\d+) - LOSOWANIA WNIOSKU O WOJNE dzis (\d+) \(z celem (\d+)\), wnioskow (\d+); "
+                       r"wynik / pierwszy niespelniony warunek: (.*?); wartosc wojny \(barter, wnioskodawca\): >= prog (\d+) z (\d+)(.*?); "
+                       r"poparcie liczone (\d+)(?: \(z tego przez nas \d+\))?(?: \(srednie -?\d+\))?, > 50: (\d+); zgody gry dla wylosowanych celow \(ROT/Diplomacy\): odmowa (\d+) - (.*?); "
+                       r"przyklady: (.*?) \| zmeczenie Diplomacy: (.*?) \| od wczytania: losowan (\d+) \(z celem (\d+)\), wnioskow (\d+); (.*?); "
+                       r"wartosc >= prog (\d+)(?: \(srednia -?\d+\))?, poparcie > 50: (\d+) z (\d+); zgody gry odmowa (\d+); potkniecia dzis (\d+) \(razem (\d+)")
+W311F_START_W = re.compile(r"^Wojny - wnioski \(E1w\): start sesji - pomiar wnioskow AI o wojne (WPIETY|NIEWPIETY) .*?; nasz po BK: (\S+?)(?: [^,;]*)?, po Armoury E7/K: ([^;]+);")
+W311F_REASON = re.compile(r"(?:^|, )(.+?) (\d+)(?=, |$)")
+W311F_264 = re.compile(r"Pokoj kanonu \(264\): dzien (\d+) \|.*\| zablokowane dzis (\d+)(?: \[([^\]]*)\])?, sesja (\d+) \|")
+
+W311F_SAMPLE_E1B = ("Pokoj z biedy (E1b): dzien 232 - WNIOSKI O POKOJ dzis: gra ConsiderPeace wolane 18 (z krolestw w biedzie 2), przeszlo 1, "
+                    "POMINIETE (zgody gry, PeaceSkipForbiddenProposal) 5 (wplywy zachowane 520; Your sovereign will not entertain peace 5), odrzucone 12 - "
+                    "pierwszy niespelniony warunek: Diplomacy: This war hasn't gone on long enough to consider peace 8, glos wnioskodawcy <= 0 4; "
+                    "do glosowania: gra 1, BK ForceProposePeaceFromLosingSide 0, z biedy 0, inne 0; z biedy: krolestw z bieda skarbca >= 0.5 w wojnie z krolestwem 1 "
+                    "(nie ich dzien tygodnia 1), wnioskow z biedy 0, bez wniosku: -; glosowan nad wnioskami z biedy 0 (POKOJ 0, anulowane 0) | od wczytania: "
+                    "ConsiderPeace wolane 18 (z krolestw w biedzie 2), przeszlo 1, POMINIETE (zgody gry) 5 (wplywy zachowane 520; Your sovereign will not entertain peace 5), "
+                    "odrzucone: Diplomacy: This war hasn't gone on long enough to consider peace 8, glos wnioskodawcy <= 0 4; do glosowania: gra 1, BK 0, z biedy 0, inne 0; "
+                    "WNIOSKOW Z BIEDY 0 (na krolestwo: -), bez wniosku: -, wojen pominietych (zniszczenie bez lenn) 0; GLOSOWAN NAD WNIOSKAMI Z BIEDY 0, POKOJ 0, "
+                    "anulowane 0, ofert pokoju dla gracza 0.")
+W311F_SAMPLE_START_B = ("Pokoj z biedy (E1b): wniosek z biedy WLACZONY (...); miara biedy zapas skarbca (E1); diagnoza: ConsiderPeace gry wpieta, ForceProposePeaceFromLosingSide BK "
+                        "wpieta, zgody Diplomacy odczyt MakePeaceConditions; wnioski gry niedopuszczone przez zgody gry (ROT/Diplomacy - gra anulowalaby je po oplacie wplywu) "
+                        "POMIJANE bez oplaty (PeaceSkipForbiddenProposal).")
+W311F_SAMPLE_START_W = ("Wojny - wnioski (E1w): start sesji - pomiar wnioskow AI o wojne WPIETY (tylko log, wynik gry bez zmian); latki: GetRandomWarDecision TAK, "
+                        "ConsiderWar TAK, wartosc barteru wojny TAK, poparcie TAK; postfiksy GetRandomWarDecision (wlasciciel/waga): BannerKings/400, com.jeff.armoury/200, "
+                        "com.jeff.crashscribe/0; nasz po BK: tak, po Armoury E7/K: tak; odczyty: zgody Diplomacy DeclareWarConditions TAK, rozejm BK TAK, zmeczenie Diplomacy TAK.")
+W311F_SAMPLE_E1W = ("Wojny - wnioski (E1w): dzien 232 - LOSOWANIA WNIOSKU O WOJNE dzis 40 (z celem 6), wnioskow 0; wynik / pierwszy niespelniony warunek: "
+                    "brak celu (kazde krolestwo w wojnie z nami albo pokoj <= 20 dni) 34, wartosc wojny < prog 5, poparcie wnioskodawcy <= 50 1; "
+                    "wartosc wojny (barter, wnioskodawca): >= prog 1 z 6, srednia -2400, najwyzsza Skagos -> Braavos 120 / prog 0; poparcie liczone 1 (z tego przez nas 0) (srednie 12), > 50: 0; "
+                    "zgody gry dla wylosowanych celow (ROT/Diplomacy): odmowa 2 - TAK 4, Cannot declare war on Skagos 2; przyklady: House Stark 900 (The North) -> Braavos: "
+                    "wartosc -3000 / prog 0, zgody gry TAK, wynik wartosc wojny < prog || House Greyjoy 50 (Iron Islands) -> Skagos: wartosc 120 / prog 0, poparcie 12, "
+                    "zgody gry Cannot declare war on Skagos, wynik poparcie wnioskodawcy <= 50 | zmeczenie Diplomacy: wojen 13: The Vale-Iron Islands 40.0/12.5; "
+                    "i 12 innych (100 = pokoj wymuszony) | od wczytania: losowan 40 (z celem 6), wnioskow 0; brak celu (kazde krolestwo w wojnie z nami albo pokoj <= 20 dni) 34, "
+                    "wartosc wojny < prog 5, poparcie wnioskodawcy <= 50 1; wartosc >= prog 1 (srednia -2400), poparcie > 50: 0 z 1; zgody gry odmowa 2; potkniecia dzis 0 (razem 0).")
+W311F_SAMPLE_264 = ("Pokoj kanonu (264): dzien 108900 | blokada CZYNNA (Robb zyje, RedWeddingEvent 0) | Polnoc-korona: CZYNNA, wojna TAK od dnia 8.7 | Dorzecze-korona: CZYNNA, "
+                    "wojna TAK od dnia 8.7 | zablokowane dzis 1 [Diplomacy zmeczenie wojna 1], sesja 6 | gracz rzadzi: nie | potkniecia 0 (sesja 0).")
+
+
+def w311f_strip(line):
+    return W311F_TS.sub("", line.rstrip("\r\n"))
+
+
+def w311f_reasons(s):
+    return [(k, int(v)) for k, v in W311F_REASON.findall(s)] if s and s != "-" else []
+
+
+def w311f_rows(rep, startb, e1b, startw, e1w, a264=None):
+    # W311F-0
+    ok0 = [l for l in startb if "POMIJANE bez oplaty (PeaceSkipForbiddenProposal)" in l]
+    rep.add("W311F-0: linia startu E1b - wnioski niedopuszczone przez zgody gry pomijane (klucz PeaceSkipForbiddenProposal)",
+            f"linii startu z wnioskiem z biedy {len(startb)}, z pomijaniem {len(ok0)}", "kazda linia startu z 'POMIJANE bez oplaty'",
+            None if not startb else len(ok0) == len(startb))
+    # W311F-1
+    bad, n, last = [], 0, None
+    for l in e1b:
+        m = W311F_E1B.search(l)
+        if not m:
+            bad.append("format: " + l[:140]); continue
+        n += 1
+        last = m
+        call, okk, skip, inf, odr = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5)), int(m.group(7))
+        if odr != call - okk - skip or odr < 0:
+            bad.append(f"dzien {m.group(1)}: odrzucone {odr} != {call}-{okk}-{skip}")
+        if skip == 0 and inf != 0:
+            bad.append(f"dzien {m.group(1)}: pominiete 0, wplywy {inf}")
+        if sum(v for _, v in w311f_reasons(m.group(6))) != skip:
+            bad.append(f"dzien {m.group(1)}: suma powodow pominiecia != {skip}")
+    rep.add("W311F-1: linie doby E1b - format 311f i rachunek (odrzucone = wolane - przeszlo - pominiete)", f"linii {n}, zlych {len(bad)}" + (f" ({bad[0]})" if bad else ""),
+            "zlych 0, linii >= 1", None if not e1b else (n > 0 and not bad))
+    # W311F-2
+    if last is None:
+        rep.add("W311F-2: od wczytania - wnioski gry w glosowaniu vs pominiete", "brak linii E1b", "pominiete > 0, gra < pominiete, wplywy > 0", None)
+    else:
+        skipT, infT, graT = int(last.group(11)), int(last.group(12)), int(last.group(14))
+        v = f"dzien {last.group(1)}: ConsiderPeace wolane {last.group(9)}, przeszlo {last.group(10)}, POMINIETE {skipT} (wplywy zachowane {infT}; {last.group(13)}), " \
+            f"do glosowania: gra {graT}, BK {last.group(15)}, z biedy {last.group(16)}, inne {last.group(17)}"
+        rep.add("W311F-2: od wczytania - wnioski gry w glosowaniu vs pominiete (dotad ok. 127 wnioskow gry, prawie wszystkie anulowane przez ROT po oplacie)", v,
+                "pominiete > 0, gra < pominiete, wplywy zachowane > 0 (bez pominietych - INFO)",
+                None if skipT == 0 else (graT < skipT and infT > 0))
+    # W311F-3
+    if not startw:
+        rep.add("W311F-3: linia startu E1w", "brak linii", "WPIETY, nasz po BK: tak, po Armoury E7/K: tak (albo brak ich postfiksu), bez 'brak:'", False if e1b else None)
+    else:
+        badw = []
+        for l in startw:
+            m = W311F_START_W.search(l)
+            if not m:
+                badw.append("format: " + l[:140]); continue
+            if m.group(1) != "WPIETY":
+                badw.append("NIEWPIETY")
+            if m.group(2) not in ("tak", "brak"):
+                badw.append("po BK: " + m.group(2))
+            if not (m.group(3).startswith("tak") or m.group(3).startswith("brak ich postfiksu")):
+                badw.append("po Armoury: " + m.group(3))
+            if " | brak: " in l:
+                badw.append("brak: " + l.split(" | brak: ", 1)[1][:80])
+        rep.add("W311F-3: linia startu E1w - latki wpiete, nasz postfiks po BK i Armoury", f"linii {len(startw)}, zlych {len(badw)}" + (f" ({badw[0]})" if badw else ""),
+                "zlych 0", not badw)
+    # W311F-4
+    bad4, n4, lw = [], 0, None
+    for l in e1w:
+        m = W311F_E1W.search(l)
+        if not m:
+            bad4.append("format: " + l[:140]); continue
+        n4 += 1
+        lw = m
+        draws, prop = int(m.group(2)), int(m.group(4))
+        if sum(v for _, v in w311f_reasons(m.group(5))) != draws:
+            bad4.append(f"dzien {m.group(1)}: suma powodow != losowan {draws}")
+        if prop > draws:
+            bad4.append(f"dzien {m.group(1)}: wnioskow {prop} > losowan {draws}")
+        if int(m.group(23)) > 0:
+            bad4.append(f"dzien {m.group(1)}: potkniecia {m.group(23)}")
+    rep.add("W311F-4: linie doby E1w - format, suma powodow = losowan, potkniecia 0", f"linii {n4}, zlych {len(bad4)}" + (f" ({bad4[0]})" if bad4 else ""),
+            "zlych 0, linii >= 1", None if not e1w and not startw else (n4 > 0 and not bad4))
+    if a264 is not None:
+        if not a264:
+            rep.add("W311F-A: Armoury 264 - linia doby", "brak linii", "INFO", None)
+        else:
+            m = W311F_264.search(a264[-1])
+            rep.add("W311F-A: Armoury 264 - zablokowane w sesji (ostatnia doba) i drogi dzis",
+                    (f"dzien {m.group(1)}: sesja {m.group(4)}, dzis {m.group(2)}" + (f" [{m.group(3)}]" if m.group(3) else "")) if m else "format: " + a264[-1][:120],
+                    "INFO (po 311f mniej 'decyzja krolestwa' z ConsiderPeace - pary ROT pominiete wczesniej; znaczenie licznika bez zmian)", None)
+    if lw is None:
+        rep.add("W311F-5: losowania wniosku o wojne od wczytania", "brak linii E1w", "> 0", None)
+        return
+    rep.add("W311F-5: losowania wniosku o wojne od wczytania", f"losowan {lw.group(15)} (z celem {lw.group(16)}), wnioskow {lw.group(17)}, potkniecia razem {lw.group(24)}",
+            "> 0 losowan, potkniecia razem 0", int(lw.group(15)) > 0 and int(lw.group(24)) == 0)
+    rep.add("W311F-6: powody od wczytania (pierwszy niespelniony warunek)", lw.group(18) + f" | wartosc >= prog {lw.group(19)}, poparcie > 50: {lw.group(20)} z {lw.group(21)}, "
+            f"zgody gry odmowa {lw.group(22)}", "INFO (krok 4 rozp311e: ujemne oceny BK = 'wartosc wojny < prog' - decyzja Jeffa)", None)
+    rep.add("W311F-7: przyklady ostatniej doby", lw.group(13)[:600], "INFO", None)
+    rep.add("W311F-8: zmeczenie Diplomacy trwajacych wojen (ostatnia doba)", lw.group(14)[:600], "INFO (100 = pokoj wymuszony)", None)
+
+
+def wojny311f_selftest():
+    for name, rx, s in (("E1B", W311F_E1B, W311F_SAMPLE_E1B), ("E1W", W311F_E1W, W311F_SAMPLE_E1W), ("STW", W311F_START_W, W311F_SAMPLE_START_W),
+                        ("264", W311F_264, W311F_SAMPLE_264)):
+        if not rx.search(s):
+            return "wyrazenie " + name + " nie pasuje do probki"
+    if sum(v for _, v in w311f_reasons("brak celu (kazde krolestwo w wojnie z nami albo pokoj <= 20 dni) 34, wartosc wojny < prog 5, poparcie wnioskodawcy <= 50 1")) != 40:
+        return "suma powodow"
+    rep = Report()
+    w311f_rows(rep, [W311F_SAMPLE_START_B], [W311F_SAMPLE_E1B], [W311F_SAMPLE_START_W], [W311F_SAMPLE_E1W], [W311F_SAMPLE_264])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    bad = [k for k in ("W311F-0", "W311F-1", "W311F-2", "W311F-3", "W311F-4", "W311F-5") if v.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad}"
+    rep = Report()
+    w311f_rows(rep, [W311F_SAMPLE_START_B.replace("POMIJANE bez oplaty", "jak w grze")],
+               [W311F_SAMPLE_E1B.replace("odrzucone 12 -", "odrzucone 13 -")],
+               [W311F_SAMPLE_START_W.replace("nasz po BK: tak", "nasz po BK: NIE")],
+               [W311F_SAMPLE_E1W.replace("potkniecia dzis 0 (razem 0)", "potkniecia dzis 1 (razem 1)")], None)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("W311F-0", "W311F-1", "W311F-3", "W311F-4", "W311F-5") if v.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss}"
+    rep = Report()
+    w311f_rows(rep, [], [W311F_SAMPLE_E1B.replace("do glosowania: gra 1, BK 0", "do glosowania: gra 9, BK 0")], [W311F_SAMPLE_START_W],
+               [W311F_SAMPLE_E1W.replace("brak celu (kazde krolestwo w wojnie z nami albo pokoj <= 20 dni) 34, wartosc", "brak celu (kazde krolestwo w wojnie z nami albo pokoj <= 20 dni) 33, wartosc", 1)])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("W311F-2", "W311F-4") if v.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg (gra >= pominiete / suma powodow) nie wykryty: {miss}"
+    return None
+
+
+def wojny311f_main(logp, armp=None):
+    """wojny311f (31.10, paczka 311f): W311F-S, W311F-0..8, W311F-A - opis nad W311F_*. Strumieniowo, tylko odczyt logow."""
+    rep = Report()
+    s1 = wojny311f_selftest()
+    rep.add("W311F-S: self-test wyrazen i wierszy (linie 311f jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("W311F-L: log sesji CrashScribe", f"brak pliku {logp}", "podaj <session-*.log>", None)
+        rep.show()
+        return 0
+    startb, e1b, startw, e1w = [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = w311f_strip(line)
+            if s.startswith("Pokoj z biedy (E1b): dzien") and "WNIOSKI O POKOJ dzis" in s:
+                e1b.append(s)
+            elif s.startswith("Pokoj z biedy (E1b): wniosek z biedy"):
+                startb.append(s)
+            elif s.startswith("Wojny - wnioski (E1w): start sesji"):
+                startw.append(s)
+            elif s.startswith("Wojny - wnioski (E1w): dzien"):
+                e1w.append(s)
+    a264 = None
+    if armp:
+        a264 = []
+        if os.path.isfile(armp):
+            with open(armp, encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    if "Pokoj kanonu (264): dzien" in line and "zablokowane dzis" in line:
+                        a264.append(line.strip())
+    print(f"plik: {logp}" + (f", Armoury: {armp}" if armp else ""))
+    w311f_rows(rep, startb, e1b, startw, e1w, a264)
+    rep.show()
+    return 0
+
+
 _bitwa311a_main_prev = main
 
 
@@ -87747,6 +87961,23 @@ def main(argv):
             return konie311d_main(rest[0] if rest else None)
     return _konie311d_main_prev(argv)
 
+_wojny311f_main_prev = main
+
+
+def main(argv):
+    # paczka 311f: grupa wojny311f - opakowanie main jak bitwa310
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "wojny311f":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            armp = None
+            if "--armoury" in rest:
+                k = rest.index("--armoury")
+                armp = rest[k + 1] if k + 1 < len(rest) else None
+                rest = [x for j, x in enumerate(rest) if j != k and j != k + 1]
+            return wojny311f_main(rest[0] if rest else None, armp)
+    return _wojny311f_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
