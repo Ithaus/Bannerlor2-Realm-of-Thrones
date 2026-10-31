@@ -1,5 +1,12 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 14:45 CET - WGRANIE 144 (noc/308a-rejsy, wypchniete) - START DLA NASTEPNEJ SESJI
+- W GRZE: Armoury.dll ba2c13480c953fb80f9ff0a84d1fe508 (144 = 143 + 308a rejsy karawan wedlug zysku na dobe drogi morskiej). Kopie 143: .bak-2026-10-31-przed-wgranie144
+  i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie144-przed. CrashScribe bef9db58. LINIA GLOWNA: noc/308a-rejsy (zb n308a). Zapis testowy na D: zapisy-testowe-archiwum 2026-10-31-144.
+- NOWE NARZEDZIE: bitwy armii lordow w autotescie - scratchpad d16b0e41 cs-at308 (CrashScribe-at-n308.dll, opis ZRODLO-308.txt, lokalny git), flaga armoury-bitwa-armie.flag,
+  testy-noc-283.ps1 ... -BattleSec 220 -CsAt <cs-at308 dll> -ExtraFlags ...,armoury-bitwa-armie.flag (bitwy 8 armia, 9 sojusz).
+- 144a: karawana gracza 11 dob max bez handlu, +86k bez pierwszej partii; AI 0.597 placacych; bitwy 9/9.
+
 ## DOPISEK 31.10 ok. 13:20 CET - WGRANIE 143 (noc/307-integracja, wypchniete) - START DLA NASTEPNEJ SESJI
 - W GRZE: Armoury.dll fa2bd807d67098d590b870222f189c68 (143 = 142 + 307a-f). Kopie 142: .bak-2026-10-31-przed-wgranie143 i D:/Backup-Bannerlord/wgrane/2026-10-31-wgranie143-przed.
   CrashScribe bef9db58 bez zmian. Zapis testowy na D:/Backup-Bannerlord/zapisy-testowe-archiwum/2026-10-31-143 (Game Saves czyste). LINIA GLOWNA: noc/307-integracja (zb n307).
