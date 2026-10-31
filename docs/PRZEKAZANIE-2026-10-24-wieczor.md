@@ -5,6 +5,8 @@
   D:\Backup-Bannerlord\wgrane\2026-10-31-wgranie142-przed. CrashScribe bef9db58 bez zmian. Zapis testowy na D:\...\zapisy-testowe-archiwum\2026-10-31-142 (Game Saves czyste).
 - LINIA GLOWNA: noc/306-integracja (worktree scratchpad d16b0e41\zb\n306). Testy 142a/142b w m113\logi\142*; sondy: flagi armoury-kowal305/karawana305/warsztat305.flag, grupa sondy306.
 - Otwarte: karawany AI 0.559 placacych (141b 0.579) - pasmo cen; CrashScribe latka smokow ROT (DragonShips.cs w n305) niewgrana - brak zrodla bef9db58 (84205371);
+  UWAGA: wynik floty karawan AI 141b +126k -> 142b +43k zl/d (pasmo 306a; udzial placacych 0.579 -> 0.559). Runda 307 w toku (wf_306f99cc-e5f, zb n307a/b/c):
+  307a karawana gracza (zakupy poza ksiega, karawana morska zmienia cel), 307b bitwa (ucieczka zlamanych, zalamania ze strat, FF wrecz, odwrot rannych), 307c szturmy/cennik/NaN BK.
   N283-2/3 scenariusze testowe, K294-1 >= 0.60, NWAR-15. Do sprawdzenia przez Jeffa w grze: podpowiedz zlota ('Caravan wages'), kuznia gracza, rozmowa zmiany produkcji, XP kucia.
 
 ## DOPISEK 31.10 ok. 07:20 CET - WGRANIE 141 (noc/305-jeff-31-10 8deb9735 wypchniete) - START DLA NASTEPNEJ SESJI
