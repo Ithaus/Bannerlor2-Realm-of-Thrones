@@ -10540,7 +10540,7 @@ namespace Armoury
         [SettingPropertyGroup("Your workshops (305b)")]
         public bool WorkshopLedgerCapitalSplit { get; set; } = true;
 
-        [SettingPropertyBool("Caravan Wages Separate Line", HintText = "In the daily gold tooltip, the wages of your caravans and the Banner Kings top-up of a caravan purse below 5 000 are shown as their own lines, Caravan wages and Caravan purse top-up, instead of inside Garrison and Party Expense. Only the display changes: the daily total and the gold paid stay exactly the same. Off = one line, as before", RequireRestart = false)]
+        [SettingPropertyBool("Caravan Wages Separate Line", HintText = "In the daily gold tooltip, the wages of your caravans are shown as their own line, Caravan wages, instead of inside Garrison and Party Expense. The Banner Kings top-up of a caravan purse below 5 000 is added only when the day is settled, so the tooltip never shows it; it is paid within Garrison and Party Expense. Only the display changes: the daily total and the gold paid stay exactly the same. Off = one line, as before", RequireRestart = false)]
         [SettingPropertyGroup("Player caravans: wages line, caravan diary and caravan loss (305a)")]
         public bool CaravanWagesSeparateLine { get; set; } = true;
 

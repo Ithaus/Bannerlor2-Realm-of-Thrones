@@ -200,14 +200,15 @@ namespace Armoury
         private static bool CapSplit { get { var s = Settings.Current; return s != null && s.WorkshopLedgerCapitalSplit; } }
 
         /// <summary>305b: WorkshopTrade.RetoolSettle - zwrot kapitalu do kiesy (back) albo doplata z kiesy (added) przy zmianie produkcji warsztatu gracza; capBefore -
-        /// kapital przed przelewem (punkt wyjscia kapitalu wlasnego, gdy rekord nowy). Tylko licznik.</summary>
-        internal static void NoteWsCapital(Workshop w, long back, long added, int capBefore)
+        /// kapital przed przelewem, oldMark - znacznik gry (InitialCapital) sprzed zmiany produkcji, -1 = nieznany. Tylko licznik.
+        /// 305f: punkt wyjscia kapitalu wlasnego (rekord nowy) = min(stary znacznik, kapital) - kapital ponad znacznik to niewyplacony zysk, nie wklad gracza.</summary>
+        internal static void NoteWsCapital(Workshop w, long back, long added, int capBefore, int oldMark)
         {
             try
             {
                 var r = Ws(w, true);
                 if (r == null) return;
-                if (r.Basis < 0) r.Basis = Math.Max(0, capBefore);
+                if (r.Basis < 0) r.Basis = Math.Max(0, oldMark >= 0 ? Math.Min(oldMark, capBefore) : capBefore);
                 if (back > 0) { r.CapRet += back; r.DCapRet += back; r.Basis = Math.Max(0L, r.Basis - back); if (CapSplit) WkAdd(_wk, _wkDay, 5, back); else WkAdd(_wk, _wkDay, 3, back); }   // recenzja 305b: bez podzialu - jak dotad "workshops paid you"
                 if (added > 0) { r.CapAdd += added; r.DCapAdd += added; r.Basis += added; }
             }
@@ -302,7 +303,9 @@ namespace Armoury
                         int prof; _tickProfit.TryGetValue(w, out prof);
                         wr.DProfit = prof; wr.DPaid += payout; wr.Paid += payout; wr.DTick = true;
                         // 305b (WorkshopLedgerCapitalSplit): wyplata, ktora zbija kapital ponizej kapitalu wlasnego gracza, to zwrot jego pieniedzy, nie zysk
-                        if (wr.Basis < 0) wr.Basis = Math.Max(0, kv.Value);
+                        // 305f (przeglad scalenia): punkt wyjscia = znacznik gry (InitialCapital), nie cala kasa - kapital ponad znacznik to niewyplacony zysk
+                        // (BK/gra wyplaca ProfitMade czesciami co dobe), wiec jego wyplata to zysk, nie "zwrot kapitalu"; kasa ponizej znacznika - tyle wkladu zostalo
+                        if (wr.Basis < 0) wr.Basis = Math.Max(0, Math.Min(w.InitialCapital, kv.Value));
                         long ret = Math.Max(0L, Math.Min(payout, Math.Max(0L, wr.Basis - w.Capital) - Math.Max(0L, wr.Basis - kv.Value)));
                         if (ret > 0) { wr.PaidRet += ret; wr.DPaidRet += ret; wr.Basis -= ret; }
                         if (CapSplit) { WkAdd(_wk, _wkDay, 3, payout - ret); WkAdd(_wk, _wkDay, 5, ret); }

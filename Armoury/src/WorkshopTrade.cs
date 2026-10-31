@@ -1133,7 +1133,7 @@ namespace Armoury
                 owner.ChangeHeroGold(back);
                 if (rec.HasEnd) rec.CapEnd -= back;
                 _dRetBack += back;
-                CaravanSettle.NoteWsCapital(w, back, 0, cap);
+                CaravanSettle.NoteWsCapital(w, back, 0, cap, _retoolOldMark);   // 305f: stary znacznik - punkt wyjscia kapitalu wlasnego
                 string why = " from your workshop's till in " + w.Settlement.Name + ": working capital returned - its new trade needs only " + mark + " to work with.";
                 if (pn) PayNotes.Got("workshopcapital", back, why); else Log.Player("You received " + back + " denars" + why);
                 Log.Info("Warsztaty gracza - kapital i cena (305b): zmiana produkcji (" + w.Settlement.Name + ", " + TypeId(w) + ") - kapital " + cap + " nad znacznikiem " + mark + ", zwrot do kiesy " + back + ".");
@@ -1148,7 +1148,7 @@ namespace Armoury
                     w.ChangeGold(add);
                     if (rec.HasEnd) rec.CapEnd += add;
                     _dRetAdd += add;
-                    CaravanSettle.NoteWsCapital(w, 0, add, cap);
+                    CaravanSettle.NoteWsCapital(w, 0, add, cap, _retoolOldMark);
                     string why = " into your workshop's till in " + w.Settlement.Name + ": working capital for its new trade, which needs " + mark + " to work with.";
                     if (pn) PayNotes.Paid("workshopcapital", add, why); else Log.Player("You paid " + add + " denars" + why);
                 }
@@ -1185,10 +1185,19 @@ namespace Armoury
                 int tools = Math.Max(0, Campaign.Current.Models.WorkshopModel.GetConvertProductionCost(t));
                 int mark = StartCapitalFor(t), cap = Math.Max(0, w.Capital);
                 int purse = Math.Max(0, Hero.MainHero.Gold - tools);
+                // 305f (przeglad scalenia): zwrot tym samym wzorem co RetoolSettle - min(kapital - nowy znacznik, stary znacznik - nowy); reszta nadwyzki to zysk
+                // jeszcze niewyplacony, zostaje w kasie i idzie zwykla wyplata (stary znacznik = InitialCapital teraz, tak jak ConvertPrefix go zapisze)
+                int oldMark = Math.Max(0, w.InitialCapital);
+                int back = cap > mark ? Math.Min(cap - mark, Math.Max(0, oldMark - mark)) : 0;
                 var sb = new StringBuilder();
                 sb.Append("All right. Just to confirm - you want us to switch to ").Append(t.Name).Append("? New tools cost ").Append(tools).Append(" denars. ");
                 sb.Append("The new trade needs ").Append(mark).Append(" in its till and the shop holds ").Append(cap);
-                if (cap > mark) sb.Append(", so ").Append(cap - mark).Append(" of your working capital comes back to your purse.");
+                if (cap > mark)
+                {
+                    if (back > 0) sb.Append(", so ").Append(back).Append(" of your working capital comes back to your purse.");
+                    else sb.Append(" - more than it needs.");
+                    if (cap - mark > back) sb.Append(" The other ").Append(cap - mark - back).Append(" is profit not yet paid out; it stays in the till and reaches you the usual way, with the workshop's daily profit.");
+                }
                 else if (cap == mark) sb.Append(" - just what it needs.");
                 else if (purse >= mark - cap) sb.Append(", so you add ").Append(mark - cap).Append(" from your purse.");
                 else sb.Append(". You can add only ").Append(purse).Append(" after the tools; until its own takings make up the rest, the shop pays you no profit.");
@@ -1294,6 +1303,7 @@ namespace Armoury
         internal sealed class Quote
         {
             public int Price, Going, Equip, Capital, Days, Window;
+            public int Wip;                     // 305f: surowiec sztuk w robocie (WorkshopLaw._wip) - przechodzi z warsztatem, w cenie jak kapital
             public float Profit, Tax, Years;
             public bool Floor;                  // zysk nie dzwiga wartosci sprzetu - cena to sam sprzet
             public bool Exp;                    // 241: zysk z cen targu (Expected) wyzszy niz pamiec - sprzedajacy liczy wedlug dzisiejszej ceny kupca
@@ -1366,7 +1376,9 @@ namespace Armoury
             }
             // 305b: warsztat z linia broni/zbroi z wsadem, gdy te linie nic graczowi nie dadza (PlayerArmsAsFirm wylaczone) - pamiec notabla zawiera zarobek broni
             // (WorkshopLaw.CyclePrefix), ktorego gracz nie dostanie: cena z linii towarowych (Expected - tylko IsTradeLine)
-            if (sellerAsks && BuyerBlend && w.Owner != Hero.MainHero && HasArmsInputLine(w.WorkshopType) && !PlayerArmsLive)
+            // 305f (przeglad scalenia): ta sama miara po obu stronach - takze odkup od gracza (QuoteForNotable) i przyciecie odkupu (QuoteFor przy wlascicielu-graczu);
+            // dotad odkup liczyl sie od pamieci notabla z zarobkiem broni (MemToNewOwner pomija linie broni), wiec kupno i natychmiastowa odsprzedaz dawaly zysk
+            if ((sellerAsks || w.Owner == Hero.MainHero) && BuyerBlend && HasArmsInputLine(w.WorkshopType) && !PlayerArmsLive)
             {
                 q.Profit = Expected(w); q.Exp = true; q.ExpHalf = false; q.ArmsIdle = true; if (_qCount) _dQArms++;
             }
@@ -1376,8 +1388,9 @@ namespace Armoury
             q.Going = (int)Math.Round(net * Math.Max(1, CampaignTime.DaysInYear) * q.Years);
             q.Equip = Math.Max(1, (int)Math.Round(w.WorkshopType.EquipmentCost * EquipScale));
             q.Capital = Math.Max(0, w.Capital);
+            q.Wip = WorkshopLaw.WipMatCost(w);   // 305f (przeglad scalenia): robota w toku przechodzi z warsztatem - nowy wlasciciel placi za surowiec, ktory kupil poprzedni
             q.Floor = q.Going <= q.Equip;
-            q.Price = Math.Max(q.Going, q.Equip) + q.Capital;
+            q.Price = Math.Max(q.Going, q.Equip) + q.Capital + q.Wip;
             return q;
         }
 
@@ -1439,13 +1452,13 @@ namespace Armoury
                 int worth = Math.Max(q.Going, q.Equip);
                 // 305b (WorkshopTradeBuyerMemory): ta sama miara co przy kupnie (pol na pol pamieci) - i nigdy wiecej niz udzial tego, co za ten warsztat zaplacilby
                 // dzis gracz (inny podatek notabla nie robi z kupna i odsprzedazy zysku)
-                if (q.Blend)
+                if (q.Blend || q.ArmsIdle)   // 305f: takze cena z linii towarowych (ArmsIdle) - w rozruchu rynku (bez Blend) podatek notabla nizszy od gracza nie da zysku
                 {
                     var qp = QuoteFor(__0, Hero.MainHero);
                     int wp = Math.Max(qp.Going, qp.Equip);
                     if (wp < worth) { worth = wp; _dQResaleCap++; }
                 }
-                __result = (int)Math.Round(worth * share) + q.Capital;
+                __result = (int)Math.Round(worth * share) + q.Capital + q.Wip;   // 305f: surowiec robot w toku w calosci (jak kapital) - ta sama kwota co przy kupnie
                 int purse = RichestBuyerPurse(__0);
                 if (purse >= 0 && __result > purse) __result = purse;
             }
@@ -1628,7 +1641,9 @@ namespace Armoury
                 if (taxed) sb.Append("; the town takes about ").Append(N1(q.Tax * 100f)).Append("% of that in tax");
                 sb.Append(". I ask ").Append(N1(q.Years)).Append(taxed ? " years of what is left: " : " years of that: ").Append(q.Going).Append(". ");
             }
-            sb.Append("The ").Append(q.Capital).Append(" in its till stays with the shop and becomes yours. Are you willing to pay?");
+            sb.Append("The ").Append(q.Capital).Append(" in its till stays with the shop and becomes yours");
+            if (q.Wip > 0) sb.Append(", and so does the work in hand - ").Append(q.Wip).Append(" in materials already bought for pieces still being made, which is in the price");   // 305f
+            sb.Append(". Are you willing to pay?");
             return sb.ToString();
         }
 
@@ -1649,7 +1664,9 @@ namespace Armoury
                 if (taxed) sb.Append("The town takes about ").Append(N1(q.Tax * 100f)).Append("% of that in tax. ");
                 sb.Append("I ask ").Append(N1(q.Years)).Append(taxed ? " years of what is left: " : " years of that: ").Append(q.Going).Append(". ");
             }
-            sb.Append("The ").Append(q.Capital).Append(" in its till stays with the shop and becomes yours. Are you willing to pay?");
+            sb.Append("The ").Append(q.Capital).Append(" in its till stays with the shop and becomes yours");
+            if (q.Wip > 0) sb.Append(", and so does the work in hand - ").Append(q.Wip).Append(" in materials already bought for pieces still being made, which is in the price");   // 305f
+            sb.Append(". Are you willing to pay?");
             return sb.ToString();
         }
 

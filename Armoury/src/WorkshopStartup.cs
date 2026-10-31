@@ -241,7 +241,7 @@ namespace Armoury
             {
                 int daysInYear = Math.Max(1, CampaignTime.DaysInYear);
                 int going = (int)Math.Round(Math.Max(0f, oldProfit) * (1f - q.Tax) * daysInYear * q.Years);
-                int old = Math.Max(going, q.Equip) + q.Capital;
+                int old = Math.Max(going, q.Equip) + q.Capital + q.Wip;   // 305f: robota w toku w obu cenach (porownanie bez przesuniecia)
                 _with.Add(q.Price); _no.Add(old);
                 _sumWith += q.Price; _sumNo += old;
                 if (q.Price < 0.75 * old) _lower25++;

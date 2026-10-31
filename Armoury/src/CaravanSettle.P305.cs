@@ -23,8 +23,10 @@ namespace Armoury
     ///       prefiks Priority.First na AddExpensesFromPartiesAndGarrisons - okno [ThreadStatic] tylko dla Clan.PlayerClan (lista karawan jak w BK, kiesy przed);
     ///       postfiks Priority.Last na CalculatePartyWage - koncowy wynik (po SoldierPay / MoneyLedger / GentryService) karawany z listy, bez pominietych przez BK;
     ///       postfiks Priority.Last na AddExpensesFromPartiesAndGarrisons - doplata = suma max(0, kiesa po - kiesa przed) karawan niepominietych (tylko apply);
-    ///       przy includeDescriptions i !includeDetails: +(zold + doplata) do linii BK (ta sama nazwa - StatExplainer skleja), -zold "Caravan wages",
-    ///       -doplata "Caravan purse top-up". Suma (BaseNumber) bez zmian z budowy; przeplyw zlota bez zmian (tylko opis). Finalizer zamyka okno.
+    ///       przy includeDescriptions i !includeDetails: +zold do linii BK (ta sama nazwa - StatExplainer skleja), -zold "Caravan wages".
+    ///       305f (przeglad scalenia): doplata BK +200 idzie tylko przy applyWithdrawals, a rozbicie tylko w podgladzie (bez apply) - w podgladzie doplata = 0,
+    ///       wiec linii "Caravan purse top-up" nigdy nie bylo (galaz usunieta); doplata zostaje w linii BK rozliczenia doby i w licznikach (apply) linii 305a.
+    ///       Suma (BaseNumber) bez zmian z budowy; przeplyw zlota bez zmian (tylko opis). Finalizer zamyka okno.
     ///     Linia ruszana tylko, gdy ma wartosc <= -(zold + doplata) (inaczej nie nasza sytuacja - licznik). Bez prefiksu BK (_bkRefund) - nic (gra: karawana placi sama).
     /// (2) DZIENNIK KARAWANY GRACZA (klucz CaravanPlayerDiary, tylko log): kazda transakcja (towar StringId, miasto, szt., cena/szt., cena polki miasta po transakcji,
     ///     Value, kategoria i jej indeks ceny w miescie, koszt/szt. z ksiegi E3-T1 przy sprzedazy) i raz na dobe miejsce / cel / zachowanie AI / doby od ostatniej
@@ -183,7 +185,7 @@ namespace Armoury
                 float before = __1.ResultNumber;
                 __1.Add(all, new TextObject("{=ChUDSiJw}Garrison and Party Expense"));
                 __1.Add(-w.Wage, new TextObject("{=arm305cw}Caravan wages"));
-                if (top > 0) __1.Add(-top, new TextObject("{=arm305ct}Caravan purse top-up"));
+                // 305f: bez linii "Caravan purse top-up" - tu zawsze podglad (bez apply), a BK dolicza doplate 200 tylko przy applyWithdrawals, wiec top = 0
                 float d = __1.ResultNumber - before;
                 lock (_lk)
                 {

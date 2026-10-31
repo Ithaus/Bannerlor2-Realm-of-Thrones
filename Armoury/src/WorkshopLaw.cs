@@ -1695,6 +1695,29 @@ namespace Armoury
         /// strzaly - TownFletchers.ClosesLine (przed ta metoda), ruda dla strzelarzy - kod 5 w TryStart (PlayerGatePostfix nie przychodzi, bo gra nie rusza).
         /// true = cykl idzie do gry (klucz NIE, nie bron z wsadem, wyjatek w firmie - jak dotad).
         /// </summary>
+        /// <summary>
+        /// 305f (przeglad scalenia 305a-e): koszt surowca sztuk w robocie warsztatu (_wip, MatCost zaplacony z kasy warsztatu przy DoStart). Sztuka przechodzi z warsztatem
+        /// do nowego wlasciciela (klucz _wip bez wlasciciela) - WorkshopTrade.Build dolicza te kwote do ceny (jak kapital w kasie), wiec poprzedni wlasciciel dostaje
+        /// zwrot surowca, ktory kupil, a nowy placi za sztuke, ktora skonczy i sprzeda. Ta sama kwota po obu stronach (kupno i odkup). Tylko odczyt.
+        /// </summary>
+        internal static int WipMatCost(Workshop w)
+        {
+            try
+            {
+                if (!On || w == null || w.WorkshopType == null || _wip.Count == 0) return 0;
+                FastSync();   // tryb kluczy _wip jak w cyklu (E8/O2)
+                long sum = 0;
+                foreach (var p in w.WorkshopType.Productions)
+                {
+                    if (!AllOutputsArms(p)) continue;
+                    Wip x;
+                    if (_wip.TryGetValue(new KeyValuePair<Workshop, string>(w, LineKey(p)), out x) && x != null && x.Item != null) sum += Math.Max(0, x.MatCost);
+                }
+                return (int)Math.Min(int.MaxValue, sum);
+            }
+            catch (Exception e) { PlayerStumble(e); return 0; }
+        }
+
         private static bool PlayerFirm(WorkshopsCampaignBehavior beh, WorkshopType.Production p, Workshop w, ref bool result)
         {
             var s = Settings.Current;

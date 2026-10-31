@@ -38,6 +38,9 @@ namespace Armoury
         internal const float Step = 2.0f;               // m/s - step konia (lekki step; klus podejscia 128 to ok. 0.45 x pelna, odpoczynek 136 step / lekki klus)
         internal const float TickEvery = 0.2f, MinSpeed = 1.5f, HeadOff = 1.3f, LookMin = 3f, LookMax = 8f, LookSec = 0.5f, Side = 1.1f;
         private const int QueriesPerTick = 160;
+        // 305f (przeglad scalenia): zwolnieni tez z budzetem - najwyzej polowa zapytan taktu (osobny wskaznik obrotu, niesprawdzonym tylko odnowiony limit),
+        // i twardy sufit liczby zwolnionych naraz (ponad niego jezdziec nie jest zwalniany - licznik w linii)
+        private const int HeldQueriesPerTick = QueriesPerTick / 2, MaxSlowed = 200;
         // recenzja 305c: zwolniony (do stepa 2 m/s) puszczany dopiero ponizej 0.5 m/s - inaczej step pod 1.5 m/s w tlumie dawal petle zwolnij-pusc;
         // kierunek korytarza zwolnionego wolnego konia z kierunku ruchu agenta (GetMovementDirection), nie ze skaczacego wektora predkosci
         private const float HeldMinSpeed = 0.5f;
@@ -52,7 +55,7 @@ namespace Armoury
         private static bool _key, _field;
         private static string _kind = "-";
         private static float _acc;
-        private static int _rot;
+        private static int _rot, _heldRot;
         private static readonly List<Agent> Riders = new List<Agent>();
         private static readonly List<Agent> Slowed = new List<Agent>();
         private static readonly HashSet<Agent> SlowSet = new HashSet<Agent>();
@@ -61,7 +64,7 @@ namespace Armoury
         private static readonly Stopwatch Sw = new Stopwatch();
 
         // ---- liczniki misji
-        private static int _ticks, _queries, _budgetHit, _episodes, _withFoeFurther, _maxAtOnce, _stum;
+        private static int _ticks, _queries, _budgetHit, _episodes, _withFoeFurther, _maxAtOnce, _stum, _heldDeferred, _capHit;
         private static float _slowSec, _msSum, _msMax;
         private static string _stumWhere;
         // (a) szarze AI w swoich: stan jezdzca x klasa ofiary, w czasie zwolnienia
@@ -180,8 +183,8 @@ namespace Armoury
             Volatile.Write(ref _slow, null);
             Interlocked.Exchange(ref _postHits, 0);
             Riders.Clear(); Slowed.Clear(); SlowSet.Clear(); Buf.Clear(); SeenRiders.Clear(); SlowRiders.Clear();
-            _acc = 0f; _rot = 0;
-            _ticks = _queries = _budgetHit = _episodes = _withFoeFurther = _maxAtOnce = _stum = 0;
+            _acc = 0f; _rot = 0; _heldRot = 0;
+            _ticks = _queries = _budgetHit = _episodes = _withFoeFurther = _maxAtOnce = _stum = _heldDeferred = _capHit = 0;
             _slowSec = _msSum = _msMax = 0f;
             _stumWhere = null;
             Array.Clear(Ff, 0, Ff.Length);
@@ -200,16 +203,27 @@ namespace Armoury
             _ticks++;
             _slowSec += Slowed.Count * step;
             int budget = QueriesPerTick;
-            // 1) zwolnieni - co takt (zdjecie zaraz po oczyszczeniu drogi)
-            for (int i = Slowed.Count - 1; i >= 0; i--)
+            // 1) zwolnieni - co takt (zdjecie zaraz po oczyszczeniu drogi); 305f: zapytanie korytarza najwyzej HeldQueriesPerTick zwolnionym na takt, po kolei
+            // od wskaznika _heldRot (kazdy sprawdzony najdalej co ceil(n / 80) taktow), reszta - tylko Eligible (bez zapytania) i odnowiony limit
+            int heldN = Slowed.Count, heldQ = Math.Min(heldN, HeldQueriesPerTick);
+            if (_heldRot >= heldN) _heldRot = 0;
+            int qFrom = _heldRot, qTo = _heldRot + heldQ;   // zakres indeksow (z zawinieciem) sprawdzanych w tym takcie - wedlug stanu listy na poczatku taktu
+            for (int i = heldN - 1; i >= 0; i--)
             {
                 var a = Slowed[i];
+                bool ask = (i >= qFrom && i < qTo) || (qTo > heldN && i < qTo - heldN);
                 bool keep = false;
-                try { keep = Eligible(a) && Blocked(m, a, true); budget--; }
+                try
+                {
+                    keep = Eligible(a);
+                    if (keep && ask) { keep = Blocked(m, a, true); budget--; }
+                    else if (keep) _heldDeferred++;
+                }
                 catch (Exception e) { Stumble("OwnFootAhead.Zwolniony", e); keep = false; }
                 if (!keep) Release(i);
                 else Apply(a);   // limit odnowiony co takt (bez latki AdjustSpeedLimit gra wpisalaby swoj po ok. 0.5 s)
             }
+            _heldRot = heldN > 0 ? qTo % heldN : 0;   // nastepny takt od kolejnych (po zwolnieniach z listy wskaznik moze przeskoczyc kilku - dojda w nastepnym obrocie)
             // 2) reszta jezdzcow po kolei (lista odswiezana na poczatku obrotu)
             if (_rot == 0 || _rot >= Riders.Count) { Collect(m); _rot = 0; }
             while (_rot < Riders.Count)
@@ -303,6 +317,7 @@ namespace Armoury
 
         private static void Slow(Agent a)
         {
+            if (Slowed.Count >= MaxSlowed) { _capHit++; return; }   // 305f: twardy sufit zwolnionych naraz
             if (!SlowSet.Add(a)) return;
             Slowed.Add(a);
             Mark(a, true);
@@ -354,7 +369,8 @@ namespace Armoury
             {
                 sb.Append(" | taktow ").Append(_ticks).Append(" (sr. ").Append(_ticks > 0 ? (_msSum / _ticks).ToString("0.000", inv) : "-").Append(" ms, najwyzej ")
                   .Append(_msMax.ToString("0.000", inv)).Append(" ms), jezdzcow sprawdzonych ").Append(SeenRiders.Count).Append(", zapytan ").Append(_queries)
-                  .Append(" (limit taktu ").Append(_budgetHit).Append(')')
+                  .Append(" (limit taktu ").Append(_budgetHit).Append(", 305f: zwolnionych bez zapytania w takcie ").Append(_heldDeferred).Append(" (najwyzej ").Append(HeldQueriesPerTick)
+                  .Append(" zapytan zwolnionym na takt), sufit ").Append(MaxSlowed).Append(" zwolnionych naraz - odmow ").Append(_capHit).Append(')')
                   .Append(" | zwolnieni przed swoim pieszym: razy ").Append(_episodes).Append(" (jezdzcow ").Append(SlowRiders.Count).Append("), jezdzco-sekund ")
                   .Append(_slowSec.ToString("0", inv)).Append(", ocen z wrogiem dalej w drodze ").Append(_withFoeFurther).Append(", naraz najwyzej ").Append(_maxAtOnce)
                   .Append(", limit w latce ").Append(Volatile.Read(ref _postHits));
