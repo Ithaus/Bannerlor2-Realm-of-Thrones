@@ -86841,7 +86841,7 @@ W311F_E1B = re.compile(r"^Pokoj z biedy \(E1b\): dzien (\d+) - WNIOSKI O POKOJ d
                        r"POMINIETE \(zgody gry\) (\d+) \(wplywy zachowane (-?\d+); (.*?)\), odrzucone: .*?; do glosowania: gra (\d+), BK (\d+), z biedy (\d+), inne (\d+);")
 W311F_E1W = re.compile(r"^Wojny - wnioski \(E1w\): dzien (\d+) - LOSOWANIA WNIOSKU O WOJNE dzis (\d+) \(z celem (\d+)\), wnioskow (\d+); "
                        r"wynik / pierwszy niespelniony warunek: (.*?); wartosc wojny \(barter, wnioskodawca\): >= prog (\d+) z (\d+)(.*?); "
-                       r"poparcie liczone (\d+)(?: \(srednie -?\d+\))?, > 50: (\d+); zgody gry dla wylosowanych celow \(ROT/Diplomacy\): odmowa (\d+) - (.*?); "
+                       r"poparcie liczone (\d+)(?: \(z tego przez nas \d+\))?(?: \(srednie -?\d+\))?, > 50: (\d+); zgody gry dla wylosowanych celow \(ROT/Diplomacy\): odmowa (\d+) - (.*?); "
                        r"przyklady: (.*?) \| zmeczenie Diplomacy: (.*?) \| od wczytania: losowan (\d+) \(z celem (\d+)\), wnioskow (\d+); (.*?); "
                        r"wartosc >= prog (\d+)(?: \(srednia -?\d+\))?, poparcie > 50: (\d+) z (\d+); zgody gry odmowa (\d+); potkniecia dzis (\d+) \(razem (\d+)")
 W311F_START_W = re.compile(r"^Wojny - wnioski \(E1w\): start sesji - pomiar wnioskow AI o wojne (WPIETY|NIEWPIETY) .*?; nasz po BK: (\S+?)(?: [^,;]*)?, po Armoury E7/K: ([^;]+);")
@@ -86865,7 +86865,7 @@ W311F_SAMPLE_START_W = ("Wojny - wnioski (E1w): start sesji - pomiar wnioskow AI
                         "com.jeff.crashscribe/0; nasz po BK: tak, po Armoury E7/K: tak; odczyty: zgody Diplomacy DeclareWarConditions TAK, rozejm BK TAK, zmeczenie Diplomacy TAK.")
 W311F_SAMPLE_E1W = ("Wojny - wnioski (E1w): dzien 232 - LOSOWANIA WNIOSKU O WOJNE dzis 40 (z celem 6), wnioskow 0; wynik / pierwszy niespelniony warunek: "
                     "brak celu (kazde krolestwo w wojnie z nami albo pokoj <= 20 dni) 34, wartosc wojny < prog 5, poparcie wnioskodawcy <= 50 1; "
-                    "wartosc wojny (barter, wnioskodawca): >= prog 1 z 6, srednia -2400, najwyzsza Skagos -> Braavos 120 / prog 0; poparcie liczone 1 (srednie 12), > 50: 0; "
+                    "wartosc wojny (barter, wnioskodawca): >= prog 1 z 6, srednia -2400, najwyzsza Skagos -> Braavos 120 / prog 0; poparcie liczone 1 (z tego przez nas 0) (srednie 12), > 50: 0; "
                     "zgody gry dla wylosowanych celow (ROT/Diplomacy): odmowa 2 - TAK 4, Cannot declare war on Skagos 2; przyklady: House Stark 900 (The North) -> Braavos: "
                     "wartosc -3000 / prog 0, zgody gry TAK, wynik wartosc wojny < prog || House Greyjoy 50 (Iron Islands) -> Skagos: wartosc 120 / prog 0, poparcie 12, "
                     "zgody gry Cannot declare war on Skagos, wynik poparcie wnioskodawcy <= 50 | zmeczenie Diplomacy: wojen 13: The Vale-Iron Islands 40.0/12.5; "

@@ -951,7 +951,9 @@ namespace CrashScribe
             var pm = Campaign.Current != null ? Campaign.Current.Models.KingdomDecisionPermissionModel : null;
             if (pm == null) return false;
             TextObject r;
-            if (pm.IsPeaceDecisionAllowedBetweenKingdoms(k, e, out r)) return false;
+            // recenzja 311f: wyjatek modelu (np. ROT _previousModel == null) = jak gra (wniosek idzie), potkniecie, liczniki E1b dalej licza
+            try { if (pm.IsPeaceDecisionAllowedBetweenKingdoms(k, e, out r)) return false; }
+            catch (Exception ex) { Stumble("PovertyPeace.Forbidden", ex); return false; }
             why = Short(r);
             try { cost = decision.GetInfluenceCost(decision.ProposerClan ?? clan); } catch { cost = 0; }
             return true;
@@ -1469,7 +1471,7 @@ namespace CrashScribe
         private static PropertyInfo _pWem; private static MethodInfo _mWe;
 
         private static readonly object _lock = new object();
-        private static int _dDraw, _tDraw, _dTarget, _tTarget, _dProp, _tProp, _dPermNo, _tPermNo, _dSup, _tSup, _dSupOk, _tSupOk, _dValOk, _tValOk;
+        private static int _dDraw, _tDraw, _dTarget, _tTarget, _dProp, _tProp, _dPermNo, _tPermNo, _dSup, _tSup, _dSupOk, _tSupOk, _dValOk, _tValOk, _dSupSelf, _tSupSelf;
         private static long _dValSum, _tValSum; private static double _dSupSum;
         private static int _dBest = int.MinValue; private static string _dBestTxt;
         private static readonly Tally _why = new Tally(), _perm = new Tally();
@@ -1489,7 +1491,7 @@ namespace CrashScribe
         {
             lock (_lock)
             {
-                _dDraw = _tDraw = _dTarget = _tTarget = _dProp = _tProp = _dPermNo = _tPermNo = _dSup = _tSup = _dSupOk = _tSupOk = _dValOk = _tValOk = 0;
+                _dDraw = _tDraw = _dTarget = _tTarget = _dProp = _tProp = _dPermNo = _tPermNo = _dSup = _tSup = _dSupOk = _tSupOk = _dValOk = _tValOk = _dSupSelf = _tSupSelf = 0;
                 _dValSum = _tValSum = 0; _dSupSum = 0; _dBest = int.MinValue; _dBestTxt = null;
                 _why.D.Clear(); _why.T.Clear(); _perm.D.Clear(); _perm.T.Clear(); _ex.Clear(); _exWhy.Clear();
                 _dStumbles = 0;
@@ -1512,10 +1514,12 @@ namespace CrashScribe
                     _mVal = AccessTools.DeclaredMethod(typeof(TaleWorlds.CampaignSystem.BarterSystem.Barterables.DeclareWarBarterable), "GetUnitValueForFaction", new[] { typeof(IFaction) });
                     _mSup = AccessTools.DeclaredMethod(typeof(DeclareWarDecision), "CalculateSupport", new[] { typeof(Clan) });
                     bool ok = true;
-                    ok &= Wire("GetRandomWarDecision", _mGrwd, nameof(GrwdPrefix), nameof(GrwdPostfix), nameof(GrwdFinalizer), _mGrwd != null && _mGrwd.ReturnType == typeof(KingdomDecision));
-                    ok &= Wire("ConsiderWar", _mCw, nameof(CwPrefix), nameof(CwPostfix), null, _mCw != null && _mCw.ReturnType == typeof(bool));
+                    // recenzja 311f: liscie najpierw (barter, poparcie), potem ConsiderWar i GetRandomWarDecision - Harmony kompiluje kopie od razu,
+                    // a mala niewirtualna CalculateSupport wstawiona (inline) w kopie ConsiderWar przed jej zalataniem ominelaby nasz postfiks
                     ok &= Wire("DeclareWarBarterable.GetUnitValueForFaction", _mVal, null, nameof(ValuePostfix), null, _mVal != null && _mVal.ReturnType == typeof(int));
                     ok &= Wire("DeclareWarDecision.CalculateSupport", _mSup, null, nameof(SupportPostfix), null, _mSup != null && _mSup.ReturnType == typeof(float));
+                    ok &= Wire("ConsiderWar", _mCw, nameof(CwPrefix), nameof(CwPostfix), null, _mCw != null && _mCw.ReturnType == typeof(bool));
+                    ok &= Wire("GetRandomWarDecision", _mGrwd, nameof(GrwdPrefix), nameof(GrwdPostfix), nameof(GrwdFinalizer), _mGrwd != null && _mGrwd.ReturnType == typeof(KingdomDecision));
                     _on = ok;
                     Bind();
                 }
@@ -1672,7 +1676,7 @@ namespace CrashScribe
         private static void Classify(Draw d, KingdomDecision result)
         {
             var own = d.Own;
-            string why, perm = null, ex = null;
+            string why, perm = null, ex = null, dip = null;
             float thr = 0f;
             bool target = d.HasValue && d.Target != null;
             if (!target)
@@ -1689,13 +1693,10 @@ namespace CrashScribe
                 perm = PermWhy(own, tk);
                 if (d.Value < thr) why = WhyValue;
                 else if (!d.ConsiderRan) why = "ConsiderWar niewolane (inna latka?)";
-                else if (!d.HasSupport)
-                {
-                    string dip = DipWhy(own, tk);
-                    if (dip != null) why = "Diplomacy: " + dip;
-                    else if (d.Clan != null && d.Clan.Influence < (float)(dm.GetInfluenceCostOfProposingWar(d.Clan) / 2)) why = WhyInfluence;
-                    else why = "ConsiderWar false bez poparcia (inna latka?)";
-                }
+                else if (!d.HasSupport && !d.ConsiderResult && (dip = DipWhy(own, tk)) != null) why = "Diplomacy: " + dip;
+                else if (!d.HasSupport && !d.ConsiderResult && d.Clan != null && d.Clan.Influence < (float)(dm.GetInfluenceCostOfProposingWar(d.Clan) / 2)) why = WhyInfluence;
+                // recenzja 311f: brak poparcia z postfiksu (wstawka JIT?) - liczymy sami i dalej ten sam lancuch powodow
+                else if (!d.HasSupport && !SupportSelf(d)) why = d.ConsiderResult ? "ConsiderWar true bez poparcia (inna latka?)" : "ConsiderWar false bez poparcia (inna latka?)";
                 else if (d.Support <= 50f) why = WhySupport;
                 else if (!d.ConsiderResult) why = WhyRoll;
                 else if (result == null) why = BkTruce(own, tk) ? WhyBkTruce : WhyOther + ", pokoj " + PeaceDays(own, tk) + " dni temu";
@@ -1721,6 +1722,22 @@ namespace CrashScribe
                 if (result != null) { _dProp++; _tProp++; }
                 if (ex != null && _ex.Count < 3 && _exWhy.Add(key)) _ex.Add(ex);
             }
+        }
+
+        /// <summary>Recenzja 311f: postfiks CalculateSupport nie zlapal poparcia (np. wstawka JIT) - liczymy je sami tak jak ConsiderWar gry
+        /// (new DeclareWarDecision(clan, cel).CalculateSupport(clan); deterministyczne, bez losu i bez zapisu stanu). _cur jest juz null,
+        /// wiec nasze postfiksy barteru/poparcia tego nie licza. true = poparcie ustawione.</summary>
+        private static bool SupportSelf(Draw d)
+        {
+            if (d == null || d.Clan == null || d.Target == null) return false;
+            try
+            {
+                d.Support = new DeclareWarDecision(d.Clan, d.Target).CalculateSupport(d.Clan);
+                d.HasSupport = true;
+                lock (_lock) { _dSupSelf++; _tSupSelf++; }
+                return true;
+            }
+            catch (Exception e) { Stumble("WarProposals.SupportSelf", e); return false; }
         }
 
         /// <summary>Model zgod gry (ROT -> Diplomacy - ten sam, ktory pyta DeclareWarDecision.IsAllowed w StartElection); null = dozwolone.</summary>
@@ -1804,7 +1821,7 @@ namespace CrashScribe
                            + "; wynik / pierwszy niespelniony warunek: " + _why.Fmt(true)
                            + "; wartosc wojny (barter, wnioskodawca): >= prog " + _dValOk + " z " + _dTarget + (_dTarget > 0 ? ", srednia " + (_dValSum / _dTarget) : "")
                            + (_dBestTxt != null ? ", najwyzsza " + _dBestTxt : "")
-                           + "; poparcie liczone " + _dSup + (_dSup > 0 ? " (srednie " + (int)(_dSupSum / _dSup) + ")" : "") + ", > 50: " + _dSupOk
+                           + "; poparcie liczone " + _dSup + " (z tego przez nas " + _dSupSelf + ")" + (_dSup > 0 ? " (srednie " + (int)(_dSupSum / _dSup) + ")" : "") + ", > 50: " + _dSupOk
                            + "; zgody gry dla wylosowanych celow (ROT/Diplomacy): odmowa " + _dPermNo + " - " + _perm.Fmt(true)
                            + "; przyklady: " + (_ex.Count > 0 ? string.Join(" || ", _ex.ToArray()) : "-")
                            + " | zmeczenie Diplomacy: " + ex
@@ -1818,7 +1835,7 @@ namespace CrashScribe
             catch (Exception e) { Stumble("WarProposals.Daily", e); }
             lock (_lock)
             {
-                _dDraw = _dTarget = _dProp = _dPermNo = _dSup = _dSupOk = _dValOk = 0;
+                _dDraw = _dTarget = _dProp = _dPermNo = _dSup = _dSupOk = _dValOk = _dSupSelf = 0;
                 _dValSum = 0; _dSupSum = 0; _dBest = int.MinValue; _dBestTxt = null;
                 _why.D.Clear(); _perm.D.Clear(); _ex.Clear(); _exWhy.Clear(); _dStumbles = 0;
             }
