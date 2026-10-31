@@ -172,7 +172,9 @@ namespace Armoury
                 {
                     lock (_lk) { _pApplyN++; _pApplyWage += w.Wage; _pApplyTop += top; _pApplyBk += (long)Math.Round(-bk); _pSkipN += w.Skip.Count; _pSkipWage += w.SkipWage; }
                 }
-                if (!__1.IncludeDescriptions || __3 || _suppress305 || all <= 0) return;
+                // rozbicie tylko w podgladzie: BKClanFinanceModel.CalculateClanGoldChange wymusza opis (includeDescriptions=true) takze w rozliczeniu doby,
+                // wiec przy apply tylko liczniki rozliczenia (poprawka recenzji 305a)
+                if (__2 || !__1.IncludeDescriptions || __3 || _suppress305 || all <= 0) return;
                 lock (_lk) { _pViewN++; _pViewWage += w.Wage; }
                 string gName = TxtOf(ref _tGarrison, "{=ChUDSiJw}Garrison and Party Expense");
                 float gVal = 0f; bool has = false;
@@ -293,9 +295,10 @@ namespace Armoury
             try
             {
                 if (mp == null || st == null || !st.IsTown || !mp.IsCaravan || !Live || !DiaryOn) return;
-                if (mp.ActualClan != Clan.PlayerClan) return;
+                if (mp.ActualClan != Clan.PlayerClan || Measure31.IsDteConvoy(mp)) return;
                 var r = Car(mp, true);
                 if (r == null) return;
+                if (r.Name == "?") r.Name = NameOf(mp);
                 r.LastTownDay = Today; r.LastTownName = Nm(st.Name, st.StringId);
             }
             catch (Exception e) { Stumble305("OnEntered305", e); }
@@ -368,6 +371,7 @@ namespace Armoury
                 var leader = mp.LeaderHero ?? r.LeaderRef;
                 var at = mp.CurrentSettlement ?? Nearest305(mp);
                 string name = NameOf(mp);
+                if (r.Name == "?") r.Name = name;
                 string ldr = leader != null ? Nm(leader.Name, leader.StringId) : "-";
                 string lstate = leader == null ? "-" : leader.IsDead ? "nie zyje" : leader.IsPrisoner ? "w niewoli" + (leader.PartyBelongedToAsPrisoner != null ? " (" + Nm(leader.PartyBelongedToAsPrisoner.Name, "?") + ")" : "") : "wolny";
                 string dName = destroyer != null ? Nm(destroyer.Name, "?") : "-";
@@ -384,21 +388,23 @@ namespace Armoury
                     long coin = Math.Max(purse, r.LastPurse), gd = Math.Max(goods, r.LastGoods);
                     string txt = "Your caravan " + name + (leader != null ? " led by " + ldr : "") + " was destroyed by " + dName + (df != null ? " of " + dFac : "")
                                  + (at != null ? " near " + StName(at) : "") + ". At its last count it carried " + N(coin) + " denars in coin and goods worth about " + N(gd)
-                                 + "; they were lost to the attackers.";
+                                 + "; your clan has lost them.";
                     Log.Player(txt, true);
                     r.EndMsg = true;
-                    Log.Info(PP + "komunikat - karawana rozbita | " + txt);
+                    Log.Info(PP + "komunikat - karawana rozbita | " + txt + " | podzial reszty kiesy ustala BeatenPurse 3.2 (zwyciezca, osada albo miasto)");
                 }
             }
             catch (Exception e) { Stumble305("OnDestroyed305", e); }
         }
 
-        /// <summary>PlayerDaily, petla zakonczonych: przyczyna do linii i komunikat dla rozwiazanej / znikniętej bez bitwy (kiesa wrocila albo nie).</summary>
+        /// <summary>PlayerDaily, petla zakonczonych: przyczyna do linii i komunikat dla rozwiazanej / zniknietej bez bitwy (kiesa wrocila albo nie).</summary>
         private static string EndText305(CarRec r)
         {
             string cause = r.EndCause ?? "bez zdarzenia zniszczenia (usunieta przez gre albo inny mod - OnPartyRemoved)";
             try
             {
+                // rekord bez imienia (nigdy niewidziany w PlayerDaily ani w nasluchu z partia - Name zostal "?") - bez komunikatu z pustym imieniem, tylko linia w logu
+                if (LossOn && !r.EndMsg && (string.IsNullOrEmpty(r.Name) || r.Name == "?")) { r.EndMsg = true; Log.Info(PP + "komunikat pominiety - karawana bez imienia (nie widziana w dobie) | przyczyna " + cause); }
                 if (LossOn && !r.EndMsg)
                 {
                     string txt = r.DPayEnd > 0
