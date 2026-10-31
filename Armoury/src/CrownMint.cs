@@ -31,9 +31,12 @@ namespace Armoury
     ///  - KSIEGI: kruszec w ramce FMint ksiegi towarow (koszyk "mennica (311b)" - ujscie), nowa moneta (wartosc + psucie) w Seal31.ZMint (zrodlo Z6 linii przyczyn);
     ///    zuzycie monety w Seal31.UCoinWear (ujscie U11). Zloto przez ChangeGold / KingdomBudgetWallet bez zdarzenia gry - poza "z niczego" (from) i w RB tylko
     ///    raz, przez pozycje nazwana.
-    ///  - ZUZYCIE: CoinWearPerYear / dni roku na dobe z kies ludu (TownFolk.CoinWear) i kas miast, ulamki przechodza na jutro.
+    ///  - ZUZYCIE: CoinWearPerYear / dni roku na dobe z kies ludu (TownFolk.CoinWear) i kas miast i zamkow, ulamki przechodza na jutro. Domyslnie 0 (recenzja 311b):
+    ///    na liczbach 31.10 polki maja 3-4 szt. srebra i <1 szt. rudy zlota na miasto - mennica bije prawie nic, a zuzycie od pierwszej doby zmniejszaloby pieniadz
+    ///    swiata (odwrotnie niz chcial Jeff); wlaczyc dopiero, gdy linia "Mennica (311b)" pokaze realna monete (decyzja Jeffa).
+    ///  - Wsie, sakiewki panow, skarbce i Bank sie nie zuzywaja (moneta tam lezy, nie krazy na targu).
     ///  - KONTROLA: zloto swiata przed i po (MoneyLedger.WorldNow) - roznica musi byc rowna moneta - zuzycie (rozjazd 0), linia "Mennica (311b)".
-    ///  - Potkniecia liczone na miasto, pierwszy wyjatek z miejsca do logu; nic nie gasi funkcji. Raz na dobe, w pozycji MFolk ksiegi pieniadza (po Bloomery.Daily,
+    ///  - Potkniecia liczone na miasto, pierwszy wyjatek z miejsca do logu; nic nie gasi funkcji. Raz na dobe, wlasna pozycja MMint ksiegi pieniadza (po Bloomery.Daily,
     ///    przed KingdomTreasury.Levies - oplata jest juz w skarbcu, gdy korona liczy dzien).
     /// </summary>
     internal static class CrownMint
@@ -50,7 +53,6 @@ namespace Armoury
         private static Campaign _camp;
         private static int _lastDay = -1;
         private static readonly ItemObject[] _item = new ItemObject[Metals];
-        private static readonly long[] _yPcs = new long[Metals];            // wczoraj zbite sztuki (odjete od zuzycia swiata z ksiegi)
         private static readonly Dictionary<Settlement, double> _wearTown = new Dictionary<Settlement, double>();   // ulamek zuzycia kasy miasta na jutro
         private static readonly Dictionary<string, double[]> _ks = new Dictionary<string, double[]>(StringComparer.Ordinal);
         private static long _sessCoin, _sessWear; private static int _sessDays;
@@ -69,7 +71,7 @@ namespace Armoury
             var c = Campaign.Current;
             if (ReferenceEquals(c, _camp)) return;
             _camp = c; _lastDay = -1;
-            for (int m = 0; m < Metals; m++) { _item[m] = null; _yPcs[m] = 0; }
+            for (int m = 0; m < Metals; m++) _item[m] = null;
             _wearTown.Clear(); _ks.Clear(); _sessCoin = _sessWear = 0; _sessDays = 0; _err.Clear();
         }
 
@@ -82,7 +84,7 @@ namespace Armoury
 
         private sealed class KRow { public string Name; public readonly long[] Pcs = new long[Metals]; public long Coin, Seig, Extra; public int Towns; public bool Debase; }
 
-        /// <summary>Raz na dobe (ArmouryBehavior, po Bloomery.Daily, w pozycji MFolk ksiegi pieniadza). Nie rzuca.</summary>
+        /// <summary>Raz na dobe (ArmouryBehavior, po Bloomery.Daily, wlasna pozycja MMint ksiegi pieniadza). Nie rzuca.</summary>
         internal static void Daily()
         {
             try
@@ -102,7 +104,7 @@ namespace Armoury
                 int yearDays = Math.Max(1, LongYearTimeModel.DaysPerYear(s));
                 double wearDay = Math.Max(0.0, Math.Min(0.2, s.CoinWearPerYear)) / yearDays;
 
-                // zuzycie swiata na miasto z ostatniej linii ksiegi towarow (bez wczorajszej mennicy)
+                // zuzycie swiata na miasto z ostatniej linii ksiegi towarow (KsCons jest bez mennicy - GoodsLedger.KsNote, recenzja 311b)
                 int nTowns = 0;
                 foreach (var st in Settlement.All) if (st != null && st.IsTown && st.Town != null) nTowns++;
                 var perTown = new double[Metals];
@@ -112,7 +114,7 @@ namespace Armoury
                 {
                     double[] v;
                     if (ksDay >= 0 && _ks.TryGetValue(MetalId[m], out v) && v != null && v.Length > GoodsLedger.KsCons)
-                        perTown[m] = Math.Max(0.0, v[GoodsLedger.KsCons] - _yPcs[m]) / Math.Max(1, nTowns);
+                        perTown[m] = Math.Max(0.0, v[GoodsLedger.KsCons]) / Math.Max(1, nTowns);
                     else perTown[m] = ksDay >= 0 ? 0.0 : (m == MSilver ? FallbackPerTown0 : FallbackPerTown1);   // towar bez ruchu w ksiedze - zuzycie 0
                 }
 
@@ -148,6 +150,10 @@ namespace Armoury
                                 if (have <= 0) continue;
                                 double need = (m == MSilver ? smith : 0f) + perTown[m];
                                 int reserve = (int)Math.Ceiling(days * need);
+                                // recenzja 311b: mennica to ujscie zbytkowe - jak dwory (CourtGoods) tylko ponad prog polki (MaterialOrders.ShelfReserve: prog zrodla + pas
+                                // wywozu kontraktow 174, wozow i karawan), inaczej miasto kopalniane bez zlotnikow nie ma czego wyslac miastom zlotnikow (285)
+                                int shelfKeep = MaterialOrders.ShelfReserve(town, it);
+                                if (shelfKeep > reserve) reserve = shelfKeep;
                                 int take = have - reserve;
                                 kept[m] += Math.Min(have, Math.Max(0, reserve));
                                 if (take <= 0) continue;
@@ -159,6 +165,10 @@ namespace Armoury
                                 long value = (long)take * price;
                                 long fee = (long)Math.Floor(value * seigR);
                                 long ext = debase ? (long)Math.Floor(value * extraR) : 0;
+                                // recenzja 311b: skarbiec (int) bez przepelnienia - oplata ponad miejsce w skarbcu zostaje w kasie miasta, psucie ponad miejsce nie powstaje
+                                long room = Math.Max(0L, (long)int.MaxValue - Math.Max(0, k.KingdomBudgetWallet));
+                                if (fee > room) fee = room;
+                                if (ext > room - fee) ext = room - fee;
                                 long toTown = value - fee;
                                 // kruszec z polki do mennicy (ramka ksiegi towarow), nowa moneta do kasy kupcow i skarbca
                                 var gf = GoodsLedger.Begin(GoodsLedger.FMint, town);
@@ -167,7 +177,7 @@ namespace Armoury
                                 if (toTown > 0) st.SettlementComponent.ChangeGold((int)toTown);
                                 if (fee + ext > 0) k.KingdomBudgetWallet += (int)(fee + ext);
                                 Seal31.AddWorld(Seal31.ZMint, value + ext);
-                                try { TownFolk.Sale(st, (int)value, TownFolk.MixGoods); } catch { }   // sprzedaz kupcow (podstawa robocizny handlu - jak dymarki)
+                                try { TownFolk.Sale(st, (int)toTown, TownFolk.MixGoods); } catch { }   // sprzedaz kupcow (podstawa robocizny handlu - jak dymarki): tyle, ile dostala kasa
                                 pcs[m] += take; val[m] += value; coin += value + ext; seig += fee; extra += ext; toTowns += toTown;
                                 if (row == null) { row = new KRow { Name = k.Name != null ? k.Name.ToString() : k.StringId, Debase = debase }; rows.Add(row); }
                                 row.Pcs[m] += take; row.Coin += value + ext; row.Seig += fee; row.Extra += ext;
@@ -178,9 +188,8 @@ namespace Armoury
                         catch (Exception e) { Stumble("Town", e); }
                     }
                 }
-                for (int m = 0; m < Metals; m++) _yPcs[m] = pcs[m];
 
-                // ---- zuzycie monety: kiesy ludu i kasy miast
+                // ---- zuzycie monety: kiesy ludu (miasta i podzamcza) i kasy miast i zamkow - ta sama regula po obu stronach (recenzja 311b)
                 int folkPurses = 0, wearTowns = 0;
                 long wearFolk = 0, wearTown = 0;
                 if (wearDay > 0)
@@ -188,7 +197,7 @@ namespace Armoury
                     wearFolk = TownFolk.CoinWear(wearDay, out folkPurses);
                     foreach (var st in Settlement.All)
                     {
-                        if (st == null || !st.IsTown || st.Town == null || st.SettlementComponent == null) continue;
+                        if (st == null || !(st.IsTown || st.IsCastle) || st.SettlementComponent == null) continue;
                         try
                         {
                             int g = st.SettlementComponent.Gold;
@@ -236,8 +245,8 @@ namespace Armoury
                 sb.Append(" | zapas dni ").Append(F(days, "0")).Append(", ksiega towarow z dnia ").Append(ksDay >= 0 ? ksDay.ToString(Inv) : "- (zapas ze stalej)");
                 sb.Append(" | nowa moneta ").Append(coin).Append(" = do kas miast ").Append(toTowns).Append(" + oplata mennicza do skarbcow ").Append(seig)
                   .Append(" (").Append(F(seigR * 100, "0.0")).Append("%) + psucie monety do skarbcow ").Append(extra).Append(" (").Append(F(extraR * 100, "0.0")).Append("%)");
-                sb.Append(" | zuzycie monety ").Append(wear).Append(" = kiesy ludu ").Append(wearFolk).Append(" (").Append(folkPurses).Append(" kies) + kasy miast ").Append(wearTown)
-                  .Append(" (").Append(wearTowns).Append(" miast); stawka ").Append(F(wearYear * 100, "0.000")).Append("%/rok");
+                sb.Append(" | zuzycie monety ").Append(wear).Append(" = kiesy ludu ").Append(wearFolk).Append(" (").Append(folkPurses).Append(" kies) + kasy miast i zamkow ").Append(wearTown)
+                  .Append(" (").Append(wearTowns).Append(" osad); stawka ").Append(F(wearYear * 100, "0.000")).Append("%/rok");
                 double pct = w0 > 0 ? net * (double)yearDays * 100.0 / w0 : 0.0;
                 double sessPct = w0 > 0 && _sessDays > 0 ? (_sessCoin - _sessWear) / (double)_sessDays * yearDays * 100.0 / w0 : 0.0;
                 sb.Append(" | netto swiata ").Append(net >= 0 ? "+" : "").Append(net).Append(" (").Append(F(pct, "0.0000")).Append("%/rok; od wczytania ").Append(_sessDays)

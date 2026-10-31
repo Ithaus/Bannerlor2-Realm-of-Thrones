@@ -86836,7 +86836,7 @@ M311_LINE = re.compile(
     r" ruda zlota (\d+) szt\. za (\d+) \(zapas zostawiony na polkach (\d+), zuzycie swiata na miasto ([\d.]+)/d\)"
     r" \| zapas dni (\d+), ksiega towarow z dnia ([^|]+?)"
     r" \| nowa moneta (\d+) = do kas miast (\d+) \+ oplata mennicza do skarbcow (\d+) \(([\d.]+)%\) \+ psucie monety do skarbcow (\d+) \(([\d.]+)%\)"
-    r" \| zuzycie monety (\d+) = kiesy ludu (\d+) \((\d+) kies\) \+ kasy miast (\d+) \((\d+) miast\); stawka ([\d.]+)%/rok"
+    r" \| zuzycie monety (\d+) = kiesy ludu (\d+) \((\d+) kies\) \+ kasy miast i zamkow (\d+) \((\d+) osad\); stawka ([\d.]+)%/rok"
     r" \| netto swiata ([+-]?\d+) \(([+-]?[\d.]+)%/rok; od wczytania (\d+) dob: moneta (\d+), zuzycie (\d+), ([+-]?[\d.]+)%/rok; rok (\d+) dni\)"
     r" \| kontrola swiata: przed (-?\d+), po (-?\d+), roznica (-?\d+), oczekiwane (-?\d+), rozjazd (-?\d+)"
     r" \| krolestwa: (.*?) \| koszt ([\d.]+) ms(?: \| potkniecia (\d+)[^.]*)?\.$")
@@ -86852,7 +86852,7 @@ M311_ERR = ("ERROR in CrownMint", "ERROR in TownFolk.CoinWear", "ERROR in GoodsP
 M311_SAMPLE = ("Mennica (311b): dzien 108900 | klucz TAK | mennic 90 (bily dzis 7, miast ze zlotnikami 20, krolestw z psuciem monety 1) | kruszec: srebro 40 szt. za 1600"
                " (zapas zostawiony na polkach 300, zuzycie swiata na miasto 2.20/d); ruda zlota 6 szt. za 600 (zapas zostawiony na polkach 2, zuzycie swiata na miasto"
                " 0.07/d) | zapas dni 15, ksiega towarow z dnia 108899 | nowa moneta 2210 = do kas miast 2090 + oplata mennicza do skarbcow 110 (5.0%) + psucie monety"
-               " do skarbcow 10 (10.0%) | zuzycie monety 250 = kiesy ludu 80 (300 kies) + kasy miast 170 (97 miast); stawka 0.300%/rok | netto swiata +1960"
+               " do skarbcow 10 (10.0%) | zuzycie monety 250 = kiesy ludu 80 (300 kies) + kasy miast i zamkow 170 (97 osad); stawka 0.300%/rok | netto swiata +1960"
                " (0.3245%/rok; od wczytania 3 dob: moneta 6000, zuzycie 750, 0.2899%/rok; rok 364 dni) | kontrola swiata: przed 219800000, po 219801960, roznica"
                " 1960, oczekiwane 1960, rozjazd 0 | krolestwa: Ziemie Zachodnie [miast 3, srebro 40, ruda zlota 6, moneta 2210, oplata 110, psucie 10, Debasement]"
                " | koszt 4.2 ms.")
@@ -86896,6 +86896,8 @@ def m311_rows(rep, days, ctl, avg, tow, errs):
             bad1.append(f"{d['day']}: netto {d['net']} != moneta - zuzycie")
         elif d["extrap"] == 0 and d["extra"] != 0:
             bad1.append(f"{d['day']}: psucie przy stawce 0")
+        elif d["wyear"] == 0 and d["wear"] != 0:
+            bad1.append(f"{d['day']}: zuzycie {d['wear']} przy stawce 0")   # recenzja 311b: Coin Wear Per Year domyslnie 0
     rep.add("M311-1: arytmetyka linii (moneta, zuzycie, netto)", f"bledow {len(bad1)}" + (f" (np. {bad1[0]})" if bad1 else ""), "0", not bad1)
     bad2 = [f"{d['day']}: rozjazd {d['rozj']}" for d in days if d["rozj"] != 0 or d["diff"] != d["w1"] - d["w0"] or d["exp"] != d["net"]]
     rep.add("M311-2: kontrola swiata (zloto po - przed = moneta - zuzycie)", f"dob z rozjazdem {len(bad2)}" + (f" (np. {bad2[0]})" if bad2 else ""), "0 (rozjazd 0 w kazdej dobie)", not bad2)
@@ -86969,6 +86971,11 @@ def mennica311b_selftest():
     bad = [k for k in ("M311-0", "M311-1", "M311-2", "M311-3", "M311-4", "M311-5", "M311-6", "M311-7") if v.get(k) != "TAK"]
     if bad:
         return f"dobry bieg - nie TAK: {bad}"
+    z = dict(d); z["wyear"] = 0.0
+    rep = Report()
+    m311_rows(rep, [z], {108900: (2210, 250)}, [(108900, -871)], {}, 0)
+    if {r[0].split(":")[0]: r[3] for r in rep.rows}.get("M311-1") != "NIE":
+        return "zuzycie przy stawce 0 nie wykryte"
     e = dict(d); e["rozj"] = 5; e["net"] = 1; e["seig"] = 300
     rep = Report()
     m311_rows(rep, [e], {108900: (2211, 250)}, [(108900, 20000)], {(108900, "silver"): (1953, 39, 50, "+3")}, 1)

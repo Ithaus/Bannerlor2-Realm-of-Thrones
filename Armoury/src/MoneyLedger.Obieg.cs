@@ -196,6 +196,7 @@ namespace Armoury
                 case MFolk: return "kiesa ludu"; case MFolkStart: return "start kies ludu"; case MZc6: return "ziemia ZC6"; case MKs: return "KS"; case MKsH: return "kupcy KS-H";
                 case MVetPurse: return "weterani";
                 case MTownHire: return "roboty miast (p6-a7)";
+                case MMint: return "mennica (311b)";
                 default: return "M" + k;
             }
         }

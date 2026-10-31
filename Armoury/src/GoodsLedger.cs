@@ -1326,7 +1326,9 @@ namespace Armoury
             v[KsVil] = Group(a.Src, GVil); v[KsArmy] = Group(a.Sink, GFood); v[KsCastle] = Group(a.Sink, GCastle); v[KsCourt] = Group(a.Sink, GCourt);
             v[KsBuild] = Group(a.Sink, GBuild);
             v[KsShop] = Group(a.Sink, GShopIn) + Group(a.Sink, GArms) + Group(a.Sink, GArt) + Group(a.Sink, GCraft) + Group(a.Sink, GMend) + Group(a.Sink, GFletch) + Group(a.Sink, GBloom);
-            v[KsCons] = cons; v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
+            // 311b (recenzja): mennica bierze tylko nadwyzke ponad zapas polki - to nie popyt; w KsCons (Plan KS: popyt 1:1, CrownMint: zuzycie swiata) bez niej, inaczej
+            // Plan podnosi wydobycie pod mennice, a mennica bije wiecej (petla)
+            v[KsCons] = Math.Max(0, cons - Group(a.Sink, GMint)); v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
             v[KsCloth] = Group(a.Sink, GArmyCloth) + Group(a.Sink, GArms) + Group(a.Sink, GMend);
             _ksDay[it.StringId] = v;
             StartCalibration.M96LenLedger(it.StringId, _ksDayN, Group(a.Sink, GFolkVill));   // m96-len: zakupy plotna i sukna przez wsie w miastach (nie rzuca)

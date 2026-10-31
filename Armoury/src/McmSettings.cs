@@ -4264,13 +4264,13 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float MintSeigniorage { get; set; } = 0.05f;
 
-        [SettingPropertyInteger("Mint Silver Reserve Days", 1, 120, "0", HintText = "the mint takes metal only beyond this many days of what the town needs: the daily ore of its silversmith workshops plus the world's daily use of that metal shared out over all towns (gold ore: the townsfolk's share alone), so the smiths and the folk find their metal first", RequireRestart = false)]
+        [SettingPropertyInteger("Mint Silver Reserve Days", 1, 120, "0", HintText = "the mint takes metal only beyond this many days of what the town needs: the daily ore of its silversmith workshops plus the world's daily use of that metal shared out over all towns (gold ore: the townsfolk's share alone), and never below what the stall keeps for trade contracts, merchant carts and caravans to other towns, so the smiths, the folk and the towns without ore find their metal first", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public int MintSilverReserveDays { get; set; } = 15;
 
-        [SettingPropertyFloatingInteger("Coin Wear Per Year", 0.0000f, 0.2000f, "0.0000", HintText = "share of the coin in townsfolk purses and town merchants' purses lost each year to wear, clipping and loss (0 = coin never wears away)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Coin Wear Per Year", 0.0000f, 0.2000f, "0.0000", HintText = "share of the coin in townsfolk purses and in town and castle merchants' purses lost each year to wear, clipping and loss (around 0.003 in history). 0 = coin never wears away - the default until the mint is seen striking real coin, so the world's money does not shrink while the mint has little metal to strike", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
-        public float CoinWearPerYear { get; set; } = 0.003f;
+        public float CoinWearPerYear { get; set; } = 0f;
 
         [SettingPropertyFloatingInteger("Debasement Mint Extra", 0.00f, 1.00f, "0.00", HintText = "while a realm has the Debasement of the Currency policy, its mints strike this much more coin from the same metal (lighter, baser coin) and the crown keeps the extra; the old daily share of town purses for the crown stays as it was", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]

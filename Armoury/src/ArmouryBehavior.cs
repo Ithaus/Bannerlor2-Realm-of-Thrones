@@ -2907,9 +2907,12 @@ namespace Armoury
             try { Bloomery.Daily(); } catch (Exception e) { Log.Error("Bloomery.Daily", e); } DayProfile.Lap("Bloomery.Daily");
             try { MoneyLedger.Probe169("Bloomery.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // 311b (klucz CrownMint): mennica korony - ruda zlota i srebro z polek miast ponad zapas zlotnikow i ludu (po zakupach mieszczan tej doby) na nowa monete
-            // (kasa kupcow + oplata mennicza i psucie do skarbca - PRZED Levies i CrownIncome.Begin), zuzycie monety kies ludu i kas miast; pozycja MFolk ksiegi
+            // (kasa kupcow + oplata mennicza i psucie do skarbca - PRZED Levies i CrownIncome.Begin), zuzycie monety kies ludu i kas miast i zamkow; pozycja MMint ksiegi
             // pieniadza (Seal31.ZMint / UCoinWear, klucze Z6 / U11), wlasna ramka ksiegi towarow FMint, linia "Mennica (311b)"
+            // recenzja 311b: wlasna pozycja MMint - zmiany kas przed mennica zamykane w MFolk (Mark sumuje), mennica i zuzycie w MMint, reszta dalej w MFolk
+            try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             try { CrownMint.Daily(); } catch (Exception e) { Log.Error("CrownMint.Daily", e); } DayProfile.Lap("CrownMint.Daily");
+            try { MoneyLedger.Mark(MoneyLedger.MMint); } catch { }
             try { MoneyLedger.Probe169("CrownMint.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // N2-E4 (noc 16.10, noc-ekonomia2): opal mieszczan z polki miasta za zloto kiesy ludu ponad jutrzejszy koszyk - PO koniach roboczych (ta sama regula zaplaty)
             // i PO dymarkach (drewno dymarek pierwsze), w tej samej pozycji MFolk ksiegi pieniadza (kiesa -> kasa miasta); wlasna ramka ksiegi towarow FCons ("mieszczanie")

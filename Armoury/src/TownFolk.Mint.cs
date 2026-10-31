@@ -5,7 +5,7 @@ namespace Armoury
     /// <summary>
     /// 311b (CrownMint, CoinWearPerYear) - STRONA LUDU zuzycia monety: moneta w kiesach ludu sciera sie, gubi i obcina (historycznie ok. 0.2-0.5% rocznie).
     ///  - ILE: kazda klasa (W, R, P, gmina; podzamcze - KW) traci perDay x swoja kiesa; ulamek zlotowki przechodzi na jutro (Folk.WearCarry, bez zapisu).
-    ///  - Tylko kiesa czynna (Live) i osada skalibrowana (Cal), miasta i podzamcza (Kind 0, 1); wsie maja kiese w kasie osady (te liczy CrownMint przy kasach).
+    ///  - Tylko kiesa czynna (Live) i osada skalibrowana (Cal), miasta i podzamcza (Kind 0, 1); kasy miast i zamkow zuzywa CrownMint, wsie (kiesa = kasa wsi) - nie.
     ///  - Zdjecie: kiesa klasy -> nicosc (ujscie "zuzycie monety" ksiegi pieniadza - wolajacy wpisuje je w Seal31.UCoinWear), ksiega kies: _ctlOut i LDayOut
     ///    (kontrola zamknieta kies r = 0, jak TourneyPurseTake). Nie rzuca.
     /// </summary>
