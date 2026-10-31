@@ -453,7 +453,11 @@ namespace Armoury
                 float after = pct >= 100 ? before : Math.Max(0f, before * pct * 0.01f);
                 __result = after;
                 bool pl = r != null && (r.IsMainAgent || r.IsPlayerControlled);
-                if (charge) { if (pl) Interlocked.Increment(ref _chargePl); else Interlocked.Increment(ref _chargeAi); }
+                if (charge)
+                {
+                    if (pl) Interlocked.Increment(ref _chargePl);
+                    else { Interlocked.Increment(ref _chargeAi); OwnFootAhead.NoteChargeFf(r, v); }   // 305c: stan szyku jezdzca x klasa ofiary (pomiar)
+                }
                 else if (missile) { if (pl) Interlocked.Increment(ref _missPl); else Interlocked.Increment(ref _missAi); }
                 else { if (pl) Interlocked.Increment(ref _meleePl); else Interlocked.Increment(ref _meleeAi); }
                 Interlocked.Add(ref _hpBefore10, (long)Math.Round(before * 10f));

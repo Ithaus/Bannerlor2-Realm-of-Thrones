@@ -168,6 +168,9 @@ namespace CrashScribe
         public static bool CanonReachNorthWar = true;         // (4) po smierci Renly'ego (ROT OnRenlysDeath) wlaczona wojna fabularna ROT FIVE_KINGS_REACH_NORTH (Reach - Polnoc), ktora ROT ma zapisana, ale nigdy jej nie wlacza; wypowiada ja ROT (EnforceWars), raz; false = jak w ROT
         public static bool PovertyPeaceSkipOneOff = true;     // (5) E1: ubytek skarbca na dobe bez jednorazowych odplywow (przelew skarbca stolicy, okup) - doba ze spadkiem ponad 3 x max(mediana zmian z 7 dob, sasiednie doby, 1000) nie wchodzi do sredniej, ubytek nigdy wiekszy niz dotad; ta sama regula dla wszystkich krolestw; false = srednia z pierwszej i ostatniej doby jak dotad
 
+        // --- 305c (31.10, Jeff: "sprawdz save i logi i popraw inne rzeczy"; DragonShips.cs) ---
+        public static bool RotDragonShipsOnLand = true;       // smok ROT (AIDragon.RefreshAllCachedTargets -> ROTDragonMissionBehavior.GetAllShipPositions) w misji bez NavalShipsLogic (bitwa ladowa): pusta lista od razu, bez spisu encji sceny i bez AmbiguousMatchException ROT (GetMethod("HasScriptOfType") bez typow - 2 przeciazenia) co odswiezenie; wynik ten sam (oryginal i tak zwraca pusta liste); false = jak w ROT
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -281,6 +284,7 @@ namespace CrashScribe
                         case "CanonAlliancesBreakOnLoad": CanonAlliancesBreakOnLoad = B(v); break;
                         case "CanonReachNorthWar": CanonReachNorthWar = B(v); break;
                         case "PovertyPeaceSkipOneOff": PovertyPeaceSkipOneOff = B(v); break;
+                        case "RotDragonShipsOnLand": RotDragonShipsOnLand = B(v); break;
                     }
                 }
             }

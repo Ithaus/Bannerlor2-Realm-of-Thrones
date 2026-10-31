@@ -727,6 +727,9 @@ namespace Armoury
                 // noc 25.10 P6: bramka friendly fire (pole, oblezenie, kryjowka, morze - liczona raz w EarlyStart; turniej i arena poza)
                 if (Settings.Current.FriendlyFireEnabled && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new FriendlyFire.Logic());
+                // 305c: jezdziec AI zwalnia przed swoim pieszym (klucz CavalrySlowsForOwnFoot) i pomiar szarz w swoich (przy FriendlyFireEnabled) - samo sprawdza bitwe polowa
+                if ((Settings.Current.CavalrySlowsForOwnFoot || Settings.Current.FriendlyFireEnabled) && Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new OwnFootAhead.Logic());
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
                     && (NightRest.PlayerCamped || CampScene.TestWanted()))   // m109-oboz: test autotestu (plik armoury-oboz-bitwa.flag) - kazda bitwa w polu jak w obozie
                     mission.AddMissionBehavior(new CampScene());

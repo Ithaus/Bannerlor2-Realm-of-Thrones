@@ -100,6 +100,9 @@ namespace Armoury
         internal static int StdFell, StdRaised, StdMoved, CmdFell, CmdFellHero, CmdFellGeneral, CmdFellPlayer, CmdMoved, Half, Rolls, RollsSkipped,
                             Breaks, BrokenMen, BrokenRout, BrokenMorale, BrokenRefused, Cheers, CheersNoEnemy, Msgs, MsgsLimited, Joined, Moved, Lazy, Shocked, Stumbles;
         internal static readonly int[] TierRolls = new int[8], TierBreaks = new int[8];
+        // 305c (klucz BannerLossBreakIgnoresMorale): rzut po stratach bez bramki morale - trzecia czesc strat, rzuty strat (w tym ponad bramka), suma morale i p, zalamania ze strat
+        internal static int Third, LossRolls, LossOverGate, LossBreaks, LossBrokenMen;
+        internal static float LossMoraleSum, LossPSum;
 
         internal static void ResetCounters()
         {
@@ -108,6 +111,8 @@ namespace Armoury
             StdFell = StdRaised = StdMoved = CmdFell = CmdFellHero = CmdFellGeneral = CmdFellPlayer = CmdMoved = Half = Rolls = RollsSkipped = 0;
             Breaks = BrokenMen = BrokenRout = BrokenMorale = BrokenRefused = Cheers = CheersNoEnemy = Msgs = MsgsLimited = Joined = Moved = Lazy = Shocked = Stumbles = 0;
             for (int i = 0; i < 8; i++) { TierRolls[i] = 0; TierBreaks[i] = 0; }
+            Third = LossRolls = LossOverGate = LossBreaks = LossBrokenMen = 0;
+            LossMoraleSum = LossPSum = 0f;
         }
 
         internal static int Activity { get { return Companies + StdField + StdFell + CmdFell + Breaks + Stumbles; } }
@@ -145,6 +150,7 @@ namespace Armoury
             public string CmdName;
             public int Peak;
             public bool HalfDone, Broken;
+            public bool ThirdDone, LossBreak;              // 305c: rzut po trzeciej czesci strat juz byl; zalamanie przyszlo z rzutu strat
             public List<Agent> Queue;
             public int Wave, Chunk;
             public float NextWave;
@@ -621,6 +627,7 @@ namespace Armoury
                     var a = co.Queue[i];
                     if (a == null || !a.IsActive() || !a.IsAIControlled || a.IsRunningAway) continue;
                     BannerCompanies.BrokenMen++;
+                    if (co.LossBreak) BannerCompanies.LossBrokenMen++;
                     if (rout)
                     {
                         if (RoutHold.Break(a, MissionTeams.Flee)) BannerCompanies.BrokenRout++;
@@ -642,15 +649,24 @@ namespace Armoury
                 else if (!ReferenceEquals(b.Formation, co.F)) StandardLost(co, b.Position, true, now, c);
                 else co.LastPos = b.Position;
             }
-            // polowa skladu
+            // polowa skladu; 305c (BannerLossBreakIgnoresMorale): takze trzecia czesc strat (InRanks x 3 <= Peak x 2, pol szansy) - oba rzuty strat bez bramki
+            // morale (ludzie widza, ile padlo, bez wzgledu na morale gry), wzor p bez zmian (mm i odpornosc tieru - weterani trzymaja sie dluzej)
             if (!co.HalfDone && !co.Broken && co.Peak >= 4)
             {
                 int ranks = InRanks(co);
+                bool loss = c.BannerLossBreakIgnoresMorale;
                 if (ranks * 2 <= co.Peak)
                 {
                     co.HalfDone = true;
+                    co.ThirdDone = true;
                     BannerCompanies.Half++;
-                    Roll(co, 1f, c, now);
+                    Roll(co, 1f, c, now, loss);
+                }
+                else if (loss && !co.ThirdDone && ranks * 3 <= co.Peak * 2)
+                {
+                    co.ThirdDone = true;
+                    BannerCompanies.Third++;
+                    Roll(co, 0.5f, c, now, true);
                 }
             }
         }
@@ -868,8 +884,9 @@ namespace Armoury
             }
         }
 
-        /// <summary>Rzut na zalamanie (raz na zdarzenie): p = szansa x F x M / R.</summary>
-        private void Roll(Company co, float factor, Settings c, float now)
+        /// <summary>Rzut na zalamanie (raz na zdarzenie): p = szansa x F x M / R. 305c: loss = rzut po stratach (trzecia czesc / polowa skladu) przy kluczu
+        /// BannerLossBreakIgnoresMorale - bez bramki morale ponizej 50 (M przy wysokim morale zostaje na dole 0.4).</summary>
+        private void Roll(Company co, float factor, Settings c, float now, bool loss = false)
         {
             if (co.Broken) return;
             float sum = 0f, tsum = 0f;
@@ -886,7 +903,11 @@ namespace Armoury
             float avg = sum / n, tier = tsum / n;
             int ix = TierIx(tier);
             co.TierIx = ix;
-            if (avg >= BannerCompanies.RollBelow) { BannerCompanies.RollsSkipped++; return; }
+            if (avg >= BannerCompanies.RollBelow)
+            {
+                if (!loss) { BannerCompanies.RollsSkipped++; return; }
+                BannerCompanies.LossOverGate++;
+            }
             float r = 0.5f * tier + 1f;
             if (r < 1f) r = 1f;
             float mm = 2f - avg / 25f;
@@ -897,7 +918,17 @@ namespace Armoury
             if (p > BannerCompanies.PMax) p = BannerCompanies.PMax;
             BannerCompanies.Rolls++;
             BannerCompanies.TierRolls[ix]++;
-            if (MBRandom.RandomFloat < p) Break(co, ix, c, now);
+            if (loss)
+            {
+                BannerCompanies.LossRolls++;
+                BannerCompanies.LossMoraleSum += avg;
+                BannerCompanies.LossPSum += p;
+            }
+            if (MBRandom.RandomFloat < p)
+            {
+                if (loss) { co.LossBreak = true; BannerCompanies.LossBreaks++; }
+                Break(co, ix, c, now);
+            }
         }
 
         private void Break(Company co, int ix, Settings c, float now)
@@ -1077,8 +1108,17 @@ namespace Armoury
               .Append(BannerCompanies.CheersNoEnemy).Append("), komunikatow ").Append(BannerCompanies.Msgs).Append(" (pominiete limitem ").Append(BannerCompanies.MsgsLimited).Append(')')
               .Append(" | posilkow dolaczonych ").Append(BannerCompanies.Joined).Append(", przeniesionych ").Append(BannerCompanies.Moved)
               .Append(", formacji podzielonych pozniej ").Append(BannerCompanies.Lazy)
-              .Append(" | linie sztandaru (154) ").Append(_stdLines).Append(" (ponad limit ").Append(_stdLinesCut).Append(')')
-              .Append(" | potkniecia ").Append(BannerCompanies.Stumbles).Append('.');
+              .Append(" | linie sztandaru (154) ").Append(_stdLines).Append(" (ponad limit ").Append(_stdLinesCut).Append(')');
+            // 305c: rzuty po stratach bez bramki morale (klucz BannerLossBreakIgnoresMorale)
+            var c305 = Settings.Current;
+            var inv305 = System.Globalization.CultureInfo.InvariantCulture;
+            int lr = BannerCompanies.LossRolls;
+            sb.Append(" | straty bez bramki morale (305c) ").Append(c305 != null && c305.BannerLossBreakIgnoresMorale ? "TAK" : "NIE")
+              .Append(": trzecia czesc strat ").Append(BannerCompanies.Third).Append(", rzutow strat ").Append(lr).Append(" (morale od 50: ").Append(BannerCompanies.LossOverGate)
+              .Append(", sr. morale ").Append(lr > 0 ? (BannerCompanies.LossMoraleSum / lr).ToString("0.0", inv305) : "-")
+              .Append(", sr. szansa ").Append(lr > 0 ? (BannerCompanies.LossPSum / lr).ToString("0.000", inv305) : "-")
+              .Append("), zalaman ze strat ").Append(BannerCompanies.LossBreaks).Append(" (ludzi ").Append(BannerCompanies.LossBrokenMen).Append(')');
+            sb.Append(" | potkniecia ").Append(BannerCompanies.Stumbles).Append('.');
             Log.Info(sb.ToString());
         }
     }
