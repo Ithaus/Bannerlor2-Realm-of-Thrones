@@ -1,5 +1,246 @@
 # PRZEKAZANIE 24.10.2026 (aktualne 22:30 CEST) - kontynuacja na drugim koncie (limit tygodnia tego konta 100%)
 
+## DOPISEK 31.10 ok. 04:35 CEST - NOWA SESJA (d16b0e41): Jeff wyjezdza do niedzieli, pelna zgoda "pracuj tak dlugo az naprawisz", wgrywac samemu
+- Jeff gra NOWA kampanie: Ironman0gXONzURi8yO.sav (rod KARDA, bohater Przemyslaw, doby 108648-108878, ok. 220k zl). Logi 30.10 18:01/19:48/21:04-03:30 skopiowane do
+  D:\Backup-Bannerlord\logi-jeffa6-10-31-sesje-30-10 i scratchpad d16b0e41\logi. Stary zapis testowy (KkUpHftX7ZIq) przeniesiony na D:\...\zapisy-testowe-archiwum6-10-31-stary-przekierowany.
+- Zadania Jeffa: (1) karawany - dzialanie, zysk, OSOBNA linia kosztu karawan w wydatkach rodu; (2) warsztaty prawie nic nie zarabiaja - blad czy ekonomia (bez sztucznego zarobku);
+  (3) bitwy - logi, poprawki, mocniejsze/rozsadniejsze AI; (4) kowalstwo - balans XP luki vs miecze; (5) inwestycje - czy dzialaja; (6) reszta bledow z logu i zapisu.
+- LINIA: noc/305-jeff-31-10 (worktree scratchpad d16b0e41\zb
+305 od 6888ffa3 = WGRANE 140). Diagnoza wf_4fb41c95-b70 w toku; autotest bazowy 141base (140 na nowym zapisie,
+  -JeffSave autotest-przekierowany-Ironman0gXONzURi8yO, 7 bitew + 90 dob) w toku - wynik m113\seria-141base.out.txt.
+
+## DOPISEK 30.10 ok. 04:45 CEST - WGRANIE 140 (noc/304-karawany-odcinki c9fca017, status 6888ffa3 wypchniety) - KONIEC NOCY, START DLA NASTEPNEJ SESJI / DRUGIEGO KONTA
+- W GRZE: Armoury.dll 2845835689cd2ca7e26199c38d8d279c (140). Kopie 139: Armoury.dll.bak-2026-10-30-przed-wgranie140 i D:\Backup-Bannerlord\wgrane\2026-10-30-wgranie140-przed.
+  CrashScribe bef9db58 i pliki danych bez zmian od 136. Skrypt scratchpad b2a84731\wgraj140.ps1. Zapis testowy D:\...\zapisy-testowe-archiwum\2026-10-30-140 (Game Saves czyste).
+- LINIA GLOWNA: noc/304-karawany-odcinki (worktree scratchpad sesji b2a84731\zb\n304). Kolejne paczki: nowa galaz od 6888ffa3.
+- Wersje tej sesji: 137 (290-299), 138 (299b/c ceny plaskie, 291d obronca, 300b lupy gracza, 138c wywoz), 139 (139 czekanie/limit BK/trasa, 139b/c dowodca karawany), 140 (odcinek
+  z karawan w ruchu, utkniete szukaja miasta placacego). 140a wobec 136a: placace zold ok. 0.37 -> 0.584, mediana -52 -> +46 zl/d, wynik floty +6k -> +102k zl/d, psucie 216 -> ok. 0.
+- OTWARTE: placace >= 0.60 (0.584; doby 61-90 0.547), zelazo zima -5..-19/d (caly rok ok. 0), strata 1.3-1.7k zl/d, N283-2/3 scenariusze testowe (reakcja w bitwach dziala),
+  NWAR-15; DO SPRAWDZENIA PRZEZ JEFFA W GRZE: kryjowka 293 (dialog szefa), lupy 300b (ok. 33% wartosci), dowodca karawany 139b/c (ceny, XP Handlu), bieg piechoty bez tarcz 291.
+- Procedura testu: m113\testy-noc-283.ps1 -Tree <wt> -Dll mfinalNNN -NowyArmoury <dll> -Prefix NNN -Runs kopia,bitwaN,probyN -ProbyDays 90 -Harasser 3 -CsAt scratchpad 1e1c276a
+  \cs-at283\CrashScribe-at-n283.dll -ExtraFlags armoury-dzwiek-bitwy.flag,armoury-pokoj264.flag,armoury-zbroja268.flag,armoury-rownowaga274.flag,armoury-karawany.flag,armoury-rody277.flag;
+  zapis testowy: skopiowac Ironman Jeffa jako autotest-przekierowany-IronmanKkUpHftX7ZIq.sav (gdy gral: usunac m113\zapisy\baza-*.sav), po serii przeniesc na D:.
+  Grupy: python -I <wt>\tools\sprawdz_logi.py --grupa <g> <log> (kopia checkera z commitu testu, bo worktree moze sie zmieniac).
+
+## DOPISEK 30.10 ok. 04:00 CEST - 140 GOTOWE (noc/304-karawany-odcinki aa37ccd6 + c9fca017, Armoury 28458356), AUTOTEST 140a w toku; tydzien 90%
+- Analiza 139a: odcinek 288 = wszystkie karawany / wyjazdy - liczyl karawany stojace w zamkach/wsiach (17 -> 38, +19), to +0.22 z +0.42 dnia; zawyzony odcinek podnosil spizarnie 7 -> 8 dob
+  i RoadDaysTo. 116 'czeka' trzyma 585k zl towaru, mediana 16 dob bez sprzedazy, dla 85% jest miasto placace 2.75 x koszt ok. 1.5 dnia drogi; regula C widziala tylko 11 utknietych decyzji/d.
+- 140: klucz CaravanLegMovingOnly (odcinek tylko z karawan w ruchu; linia postoju z rozbiciem zamki/wsie), CaravanStuckSeekPayingTown (utknieta karawana szuka miasta placacego - takze
+  przy pustym pierwszym przebiegu BK). Oczekiwane: K294-1 0.58-0.62, odcinek 4.5-4.8.
+- Seria m113\seria-140a.out.txt (DLL scratchpad\dll140a). Po tescie: porownanie z 139a, WGRANIE 140 gdy lepiej (wgraj139.ps1 jako wzor), potem STOP (tydzien) i przekazanie.
+
+## DOPISEK 30.10 ok. 03:15 CEST - Jeff "pracuj jeszcze nad karawana dobranoc" (spi) -> runda 140 w toku (wf_a6b759b2-cac, noc/304-karawany-odcinki, zb\n304 od c825acb0 = WGRANE 139); tydzien 89%
+- Zakres: czemu odcinki 4.47 -> 5.09 dnia w 139a (regula C skraca zmienione wybory), co trzyma 44% karawan ponizej zoldu (K294-22 ok. 110 'czeka', p25 -78), strata 1300 zl/d.
+- Potem: test 140a (bitwy + 90 dob; gra wylaczona, Jeff spi), WGRANIE 140 gdy lepiej niz 139a. Przy ok. 97% tygodnia: stop i przekazanie (nic nie zaczynac, czego nie da sie zapisac).
+
+## DOPISEK 30.10 ok. 03:10 CEST - WGRANIE 139 (noc/303-integracja c333583e, status c825acb0 wypchniety) - START DLA NASTEPNEJ SESJI
+- W GRZE: Armoury.dll 49fdc97f885c1fe783b82264c7cc67ef (139). Kopie 138: Armoury.dll.bak-2026-10-30-przed-wgranie139 i D:\Backup-Bannerlord\wgrane\2026-10-30-wgranie139-przed.
+  Skrypt scratchpad b2a84731\wgraj139.ps1. Zapis testowy D:\...\zapisy-testowe-archiwum\2026-10-30-139 (Game Saves czyste). LINIA GLOWNA: noc/303-integracja (zb\n303).
+- 139a (grupy-139a, checker scratchpad b2a84731\chk139) wobec 138c: placace 0.529 -> 0.560, mediana +11 -> +37, wynik floty +78.9k -> +128.6k zl/d, T1 0.342 -> 0.400, zelazo zima
+  -19.3 -> -5.5, strata 1014 -> 1300; NIE: odcinek 4.47 -> 5.09 (K294-19/31; regula C skraca zmienione wybory 5.11 -> 2.83 dnia - wydluzenie z innej przyczyny), N283-2/3/4.
+- Otwarte: odcinki, placace >= 0.60, N283 scenariusze testowe, NWAR-15; do sprawdzenia przez Jeffa: kryjowka 293, lupy 300b, dowodca karawany 139b/139c.
+
+## DOPISEK 30.10 ok. 02:30 CEST - 139c gotowe (n303 d4ad91e3 + c333583e, Armoury 49fdc97f), AUTOTEST 139a w toku (7 bitew + 90 dob)
+- 139c: J = SkillJudge (tylko karawany z bohaterem-dowodca): regula A prog czekania obnizony o J x (prog - koszt), nigdy ponizej kosztu; trasa C zasieg x (1 + J); klucz
+  CaravanLeaderJudgement; segment 'dowodca (139c)' w linii 139, wiersz K294-34. J=0 = 139 co do bitu (samotest C#).
+- Seria m113\seria-139a.out.txt (DLL scratchpad\dll139a). Po tescie porownanie z 138c, WGRANIE 139 gdy lepiej.
+
+## DOPISEK 30.10 ok. 02:20 CEST - 139 + 139b scalone (noc/303-integracja 265223bd od 713e3d1c, zb\n303, Armoury e36c20e0); 139c (SkillJudge w reguly 139) w toku (wf_dee3d176-53a)
+- 139 (f9243c43 + 83894650): A CaravanWaitCostsWage (T1 ponad polowe stosu, gdy czekanie kosztuje wiecej niz da), B limit BK BuyCategory 1500 w skali ceny (transpiler; straznik
+  zakupu tylko w locie podniesionym), C trasa z kosztem drogi (SaleValue tymi regulami kasy co sprzedaz; limit odcinka). Oczekiwane: placace 0.529 -> 0.54-0.58.
+- 139b (d3d405d1 + 3df325fd): kara karawany z bohaterem-dowodca x max(0, 2H-1) (H jak 300b; S=300 -> marza T1 54 -> 61%), XP Handlu 0.5 x zysk ze sprzedazy; AI bez bohaterow (0/393).
+- Potem: test 139a (bitwy + 90 dob przy wylaczonej grze), porownanie z 138c, WGRANIE 139.
+
+## DOPISEK 30.10 ok. 01:25 CEST - Jeff "tak zrob": Handel + perswazja dowodcy karawany -> 139b w toku (wf_756ce95f-bfc, noc/302-karawana-handel-dowodcy, zb\n302 od 713e3d1c)
+- Dzis: dowodca karawany wplywa tylko przez kare gry 1/(1+0.002 x Handel) na mala kare karawan (~0.5-1% ceny), BK nie patrzy na umiejetnosci, XP Handlu za zysk karawan nie widac.
+- 139b: ceny karawany wedlug Handlu + perswazji dowodcy (ksztalt jak 300b), pomocnik SkillJudge(mp) dla decyzji 139 (czekanie/droga), XP Handlu z zysku wedlug stawki gry; grupa dowodca139.
+- Potem scalic 301 (139) + 302 (139b) na nowej galezi od 713e3d1c, test 139a, WGRANIE 139.
+
+## DOPISEK 30.10 ok. 01:05 CEST - Jeff "Napraw karawany" -> runda 139 w toku (wf_4fb21713-6bf, noc/301-karawany-czekanie, zb\n301 od 713e3d1c = WGRANE 138); tydzien 85%
+- Zakres: (A) czekanie na rynek kosztem zoldu (106 ze 139 bez sprzedazy 'czeka' w 138c), (B) limit BK BuyCategory 1500 zl w skali ceny towaru (bawelna/bizuteria/futra 0-2 szt.),
+  (C) wybor miasta BK z kosztem drogi (zold x dni) przy tych samych regulach kasy co sprzedaz (lekcja 294c D1). Cel 90 dob: K294-1 >= 0.58, odcinki nie dluzsze.
+- Potem: build, test 139a (bitwy + 90 dob przy wylaczonej grze; zapis z Ironmana Jeffa), WGRANIE 139 gdy lepiej niz 138c.
+
+## DOPISEK 30.10 ok. 00:45 CEST - WGRANIE 138 (noc/300-integracja fc263b03, status 713e3d1c wypchniety) - START DLA NASTEPNEJ SESJI
+- W GRZE: Armoury.dll b17e67c108f7dfc8d550341cc74ed128 (138). Kopie 137: Armoury.dll.bak-2026-10-30-przed-wgranie138 i D:\Backup-Bannerlord\wgrane\2026-10-30-wgranie138-przed.
+  CrashScribe bef9db58 i pliki danych bez zmian. Skrypt scratchpad b2a84731\wgraj138.ps1. Zapis testowy na D:\...\zapisy-testowe-archiwum\2026-10-30-138 (Game Saves czyste).
+- 138 = 137 + 299b (pamiec polki sprzetu, plaski krok dla wszystkich przedmiotow) + 291d (obronca trzyma przy wylaczonej obronie gry) + 299c (waga od razu 0.14 x 0.06, pamiec podazy 0.15)
+  + 300b (sprzedaz sprzetu gracza od ok. 31% wartosci, Handel + perswazja; ksiega odkupu) + 138c (wywoz kupcow: cel z polki fizycznej z towarem w drodze).
+- Wyniki 138c (grupy-138c, checker scratchpad b2a84731\chk138c) wobec 299a: placace 0.564 -> 0.529, mediana +26 -> +11, wynik floty +31.5k -> +78.9k zl/d, strata 2245 -> 1014 zl/d,
+  glodne 0.126, wywoz sprzetu x0.88, zelazo caly bieg 0.0 (zima -19); bitwy B291-2 TAK; J204-2/3 i N283-1 w tym biegu bez epizodu jazdy (kod bitew jak 138b, tam TAK - losowe).
+- LINIA GLOWNA: noc/300-integracja (zb\n300). Otwarte: placace >= 0.60, zelazo zima, N283-2/3 scenariusze testowe, NWAR-15; kryjowka 293 i lupy 300b - czekaja na gre Jeffa.
+
+## DOPISEK 30.10 ok. 00:20 CEST - 138c GOTOWE (n300 b37fbf0d + fc263b03, Armoury b17e67c1), AUTOTEST 138c w toku (7 bitew + 90 dob)
+- Analiza 299a vs 138b: (b) rozklad - zysk floty bez zmian w granicach szumu (90.9k +- 6k vs 92.4k), przeszedl z T1 (16.5k -> 11.5k) na hurtowa sprzedaz BK/gry (6.6k -> 13.0k);
+  T1 blokowane kasa miast (BuyFloor 124 -> 152 krokow/d). Kasy drenowal wywoz kupcow sprzetu: cel wedlug pamieci polki (sztuka w drodze 6%) -> ping-pong, wozy 9.5k -> 30.5k szt.,
+  zloto 0.20M -> 1.31M zl/d. Krzywa DepthNet - nie glowna przyczyna; strata K294-3 - pojedyncze doby (szum); glod - dluzsze odcinki i stojace karawany.
+- 138c (klucz TradeExportPhysicalShelf): cel wywozu z polki fizycznej z towarem w drodze, zrodlo z pamieci polki (ta sama, z ktorej kupiec placi); linia 'Rozklad wyniku karawan
+  (138c)' p25/p50/p75/top10% (K294-26 INFO), C299-18e INFO. Seria m113\seria-138c.out.txt (DLL scratchpad\dll138c).
+
+## DOPISEK 29.10 ok. 23:25 CEST - WYNIK 138b (ca055bde, 7 bitew + 90 dob, kod 0, ERROR 0) - NIE wgrane (karawany typowo gorzej); 138c w toku (wf_2b4fafc8-046)
+- grupy-138b (checker scratchpad\chk138b). 299a -> 138b: placace 0.564 -> 0.485, mediana +26 -> -11, wynik floty +31.5k -> +33.4k, strata wszystkie drogi 2245 -> 4301 zl/d,
+  glodne 0.120 -> 0.153, wywoz sprzetu kupcow x3.26 (C299-18 NIE), zelazo ost. 30 dob -24.6 -> -9.3 (TAK); C299-14 spadek 20. sztuki 63% -> 19% (TAK); B291-2 TAK; tylko N283-2/3 NIE.
+- 138c: 2 analizy (karawany: niezgodnosc krzywej DepthNet/MaxAtCost z plaska sprzedaza 299c?, rozklad zysku; sprzet: wywoz x3.3) -> poprawka -> recenzja, na n300.
+- Zapis testowy przeniesiony do D:\...\zapisy-testowe-archiwum\2026-10-29-138b. W grze 137.
+
+## DOPISEK 29.10 ok. 22:30 CEST - 299c + 300b scalone (n300 ca055bde = 137 + 299b + 291d + 299c + 300b, Armoury 08fc9aec), AUTOTEST 138b w toku (7 bitew + 90 dob); tydzien 79%
+- 299c (8e09811c + 7a863675): PriceInstantShare 0.06 (waga od razu 0.0084 / podaz 0.1316) osobno od PriceSupplyMemoryDaily = 0.15 (tempo gry). Dowod 138a: przesyt w miastach
+  drozszych (287 p75) x0.79-0.81 w dobach 31-90, marza miast 94.5% -> 71%, karawany stloczone (K294-18 0.666 -> 0.588). Oczekiwane: karawany wracaja do poziomu 299a.
+- Seria m113\seria-138b.out.txt (DLL scratchpad\dll138b; zapis testowy skopiowany z Ironmana 01:31). Po tescie: porownanie z 299a, WGRANIE 138 gdy bez regresji;
+  sprzatnac zapis testowy (D:\...\zapisy-testowe-archiwum), CHANGELOG statusy, push noc/300-integracja, pamiec jeff-gra-od-15-10-monitoring.
+
+## DOPISEK 29.10 ok. 22:15 CEST - 300b GOTOWE (noc/300b-lupy-cena 7a5e74c4, Armoury 8650b541, po recenzji); czeka na 299c, potem scalenie do n300 i test 138b
+- PlayerHaggle: strona gracza (gracz, partie klanu z bohaterem) przy sprzedazy broni/zbroi/uprzezy bez x5 BK, kara gry x 1/(1/tfHandel + 0.002 x perswazja) - perswazja
+  (Persuasion.Measure: Urok + perki) dodana do Handlu punkt za punkt (stawka gry 0.002). Ulamek wartosci (bez perkow, bpf 0.8): tier1 0.31 (S=0) / 0.35 (100) / 0.39 (250),
+  tier6 0.21 / 0.24 / 0.275, kon 0.54 / 0.58 / 0.64; Jeff (Handel 18 + Urok 18) tier1 0.33. Kupno: narzut gracza RetailMarkupPercent x h (10% -> mniej z umiejetnoscia).
+- Sufit 1/10 ceny nowej (SellByCondition.Cap, Jeff 07.10 - petla kup wrak/napraw/sprzedaj) dla gracza zastapiony ksiega odkupu PlayerRebuyCap (sprzedaz nie drozej niz kupiles
+  w tym miescie); zawsze cena sprzedazy <= kupno - 1. Grupa lupy300. DO POWIEDZENIA JEFFOWI.
+
+## DOPISEK 29.10 ok. 22:05 CEST - WYNIK 138a (137 + 299b + 291d, 7 bitew + 90 dob, kod 0): bitwy OK (B291-2 TAK), karawany GORZEJ -> 299c w toku; NIE wgrane
+- grupy-138a (checker scratchpad\chk138): B291-2 TAK (0 s ataku przy trzymaniu, bez wagi obrony 0); N283-4 NIE (FF lucznikow 4 przy 66 strzalach); C299-14 TAK (spadek 20. sztuki
+  sprzetu 63% -> 18%). ALE karawany 299a -> 138a: placace 0.564 -> 0.402, mediana +26 -> -31, wynik floty +31.5k -> +14.0k zl/d, miasta bez rudy 11.0 -> 16.1, wywoz sprzetu x1.77.
+- Hipoteza: pamiec podazy 6%/d trzyma przesyt po sprzedazy 2.5x dluzej (karawany sprzedaja taniej); Jeffowi chodzilo o spadek OD RAZU. 299c (wf_a0026752-793, na n300):
+  PriceInstantShare 0.06 (waga od razu 0.14 x 0.06) osobno od PriceSupplyMemoryDaily z powrotem 0.15. Potem test 138b, 300b (lupy gracza) do scalenia.
+- Zapis testowy przeniesiony do D:\Backup-Bannerlord\zapisy-testowe-archiwum\2026-10-29-138a (Jeff moze grac na 137).
+
+## DOPISEK 29.10 ok. 21:45 CEST - 291d scalone do n300 (438ae94f = 137 + 299b + 291d, Armoury e92b9e81), AUTOTEST 138a w toku (7 bitew + 90 dob)
+- 291d (071d93d5 + 7304bd1e po recenzji): postfiks TeamAIComponent.CheckIsDefenseApplicable - obronca trzymajacy (regula B) dostaje obrone gry TAK (gra gasila ja po poleglych od
+  pociskow: wzor (czlonkow x MaxUnderRangedAttackRatio + zabici pociskiem) / ... ^(3 x udzial strzelcow wroga) > 1.5); po S2 bez wymuszenia (bez wahadla).
+- Jeff nie gral na 137 (zapis 01:31, md5 2fd910a1) - zapis testowy ten sam. UWAGA: stare logi m113\logi\138a-* z 25.10 - brac najnowszy po dacie.
+- Seria m113\seria-138a.out.txt (DLL scratchpad\dll138a). 300b (lupy gracza 30% + Handel/perswazja, wf_3a7bf5da-2e1) w toku - do scalenia po tescie.
+
+## DOPISEK 29.10 ok. 21:10 CEST - po WGRANIU 137: 299b gotowe, 291d w recenzji, 300b (lupy gracza) w toku; linia 138 = noc/300-integracja (zb\n300)
+- noc/300-integracja od 94d88559 (137): merge 299b (b5b9f4be, Armoury f1961410) - pamiec podazy 6%/d (RawPrice.SupplyPacePostfix na DefaultSettlementEconomyModel), plaski krok
+  ceny sprzetu/lupow/koni (ShelfMemory w SupplyDemand). Odkrycie 299b: gracz sprzedaje sprzet za ok. 8% wartosci przez kare BK x5 (AI lordowie 37-43%, inne partie 60-64%).
+- Jeff 21:05: "dajmy startowo np. 30% ale ceny zalezne sa od persuazion i trade im wiecej trade i persuwazion tym mam lepsze ceny, tak aby to mechnik aograc a nie na sztywno"
+  -> 300b (wf_3a7bf5da-2e1, noc/300b-lupy-cena od b5b9f4be, zb\n300b).
+- 291d (wf_94efa800-3f4, noc/291d-obronca od 94d88559): obronca bez wagi obrony tez trzyma (071d93d5 + recenzja).
+- Nastepne: scalic 291d i 300b do n300, test 138a (bitwy + 90 dob, gra wylaczona, zapis testowy z Ironmana Jeffa jesli gral), WGRANIE 138.
+
+## DOPISEK 29.10 ok. 20:40 CEST - WGRANIE 137 (noc/296-integracja 204deda8, status 94d88559 wypchniety) - START DLA NASTEPNEJ SESJI
+- W GRZE: Armoury.dll be4919561c34926b534d2b2d7672cf78 (137). Kopie 136: Modules\Armoury\bin\Win64_Shipping_Client\Armoury.dll.bak-2026-10-29-przed-wgranie137 i
+  D:\Backup-Bannerlord\wgrane\2026-10-29-wgranie137-przed. CrashScribe bef9db58 i pliki danych bez zmian. Skrypt: scratchpad sesji b2a84731\wgraj137.ps1.
+  Zapis testowy przeniesiony do D:\Backup-Bannerlord\zapisy-testowe-archiwum\2026-10-29-137 (w Game Saves brak autotest-*); BannerlordConfig LatestSave = Ironman Jeffa.
+- 137 = 136 + 290 (zelazo/jedzenie karawan), 291/291b/291c (bitwa: armia nie staje, obronca trzyma, bieg bez tarcz, poscig 360 m), 292 (stamina x2), 293 (boss kryjowki - bez
+  autotestu), 294/294b/294c(D1/D2 NIE)/298/298b (karawany: jedzenie wedlug rodzaju, cena wedlug glebokosci rynku, bramka jedzenia z miast placacych, spizarnia na odcinek,
+  straz gracza jak AI), 295 (orszaki BK z ludzi wsi), 297/297b (zima nie tnie kopaln, eskorta milicji wozow), 299 (plaski krok ceny towarow handlowych 0.021/0.119).
+- Wyniki 299a wobec 136a: placace zold 0.37 -> 0.56, mediana -52 -> +26 zl/d, wynik floty +6k -> +31.5k zl/d, psucie 216 -> 6 szt./d, glodne 0.15 -> 0.12, zelazo ost. 30 dob
+  -66 -> -25 (caly bieg +2.2; zima -30). Grupy: m113\wyniki\grupy-299a (checker scratchpad b2a84731\chk299).
+- LINIA GLOWNA od teraz: noc/296-integracja (zb\n296-integracja, scratchpad sesji b2a84731). Starsze noc/285-* NIEAKTUALNE.
+- W TOKU / NASTEPNE: 299b (wf_cade3230-ca8, noc/299b-ceny-wszystkie od 204deda8) - plaski krok dla lupow/sprzetu/koni + pamiec podazy 6%/d (Jeff: "15% dziennie za duzo,
+  dajmy 5-8%"); B291-2 obronca bez wagi obrony atakuje (1 z 7 bitew 30 s) - wymusic trzymanie; cele nieosiagniete: placace >= 0.60 (0.56), zelazo w zimie -30/d, N283-2/3
+  scenariusze testowe; NWAR-15; L2 (limit BK 1500 zl na kategorie) jako kandydat karawan.
+
+## DOPISEK 29.10 ok. 20:25 CEST - Jeff o cenach: "tak dla wszysatkich - 15% dziennie za duzo, dajmy 5-8% dziennie. Czemu 15%?" -> 299b w toku
+- 15% = stala gry dailyChangeFactor (DefaultSettlementEconomyModel.GetSupplyDemandForCategory), ustawiona pod rok 84 dni; u nas rok 364. Decyzja: 6%/d.
+- Workflow wf_cade3230-ca8: 299b na noc/299b-ceny-wszystkie (zb\n299b od 204deda8): plaski krok ceny dla WSZYSTKICH przedmiotow (lupy, sprzet, konie) + pamiec podazy 6%/d
+  (wagi 299: od razu 0.14 x 0.06, podaz reszta). Test 299a (bez 299b) dalej w toku jako baza; potem test 299b, WGRANIE 137 z lepszej.
+
+## DOPISEK 29.10 ok. 20:15 CEST - 299 scalone (n296 204deda8 = 298b + 299, Armoury be491956), AUTOTEST 299a (7 bitew + 90 dob) w toku - kandydat WGRANIE 137
+- 299 (f3ad423f + 9de47b57): PriceFlatterLotWalk - w RawPrice.FactorPrefix (GetBasePriceFactor, tylko towary handlowe) swiezy towar wazy od razu 0.021 zamiast 0.04, podaz 0.119
+  zamiast 0.10 (razem 0.14 jak gra) - lot przesuwa cene ok. 1.9x mniej, cena rownowagi bez zmian, bez arbitrazu w jednej wizycie; DepthNet 294b po recenzji liczy kolejke krzywa gry;
+  sonda i linie PriceWalk299, grupa ceny299. NIE obejmuje lupow/sprzetu (recenzja: w logu Jeffa tylko sprzedaz sprzetu) - pytanie do Jeffa.
+- Seria m113\seria-299a.out.txt (DLL scratchpad\dll299a). Po tescie: grupy bitew + 90 dob (chk z 204deda8), porownanie z 298a, WGRANIE 137 gdy bez regresji.
+
+## DOPISEK 29.10 ok. 19:35 CEST - WYNIK 298a (298 + 298b, 90 dob, kod 0) - lepiej niz 296e; czeka 299 ceny
+- (checker scratchpad\chk298, wyniki m113\wyniki\grupy-298a-v298 i grupy-296e-v298) 296e / 298a: placace ost. 7 dob 0.474 / 0.484 (doby 61-90 0.415 / 0.426), mediana -10 / -4,
+  wynik floty po wszystkim +22 975 / +20 382 zl/d, strata wszystkie drogi 2713 / 1817 zl/d, sprzedaz jedzenia 625 / 935 szt./d, glodne 0.111 / 0.128, zelazo caly bieg -0.6 / +7.4
+  (zima -21.6 / -10.7), miasta bez rudy 9.3 / 13.2 (Z297-5 NIE w 298a). K294-22: 144 z 420 bez sprzedazy, w tym 108 'towar z rynkiem z zyskiem - czeka'.
+- Karawana Jeffa w 298a rozbita dzien 109086 przez armie krola Joffreya (370 ludzi, wojna) - nie przez zwolnienia strazy.
+- Nastepne: 299 (ceny plaskie - glebokosc rynku, wiecej sztuk z zyskiem na wizyte) + ewentualnie L2 (limit BK 1500 zl na kategorie), scalenie 298+299 do n296, test.
+
+## DOPISEK 29.10 ok. 19:00 CEST - 298 + 298b na noc/298-karawany-l1 (ef19a8fb, Armoury 242a9e71), AUTOTEST 298a w toku; 299 ceny w toku (wf_ad3c0943-9e5)
+- 298 (1b5a72a0 + poprawki po recenzji): L1 CaravanFoodGateByPayingTowns (bramka psujacego jedzenia = N miast placacych x zjedzone w odcinku), miary M1-M6 (K294-6, K294-2b
+  pelny wynik floty, K294-3 wszystkie drogi, K294-1/2 doby 61-90, linia 'Karawany bez handlu i kohorta (298)'). Bazy poprawionymi miarami 296c / 296d: wynik floty po wszystkim
+  +7460 / -2819 zl/d; strata wszystkie drogi 3169 / 5580 zl/d; K294-1 doby 61-90 0.427 / 0.392.
+- 298b (ef19a8fb): E5 CaravanPantryLegDays (spizarnia eskorty = odcinek + 2 doby, max 10) i CaravanGuardPlayerAfterNotice TAK (Jeff 18:35).
+- Seria m113\seria-298a.out.txt (DLL scratchpad\dll298a). Potem: scalic 298 i 299 do n296, test 90 dob (+ bitwy przed wgraniem), WGRANIE 137.
+
+## DOPISEK 29.10 ok. 18:45 CEST - dwie decyzje/prosby Jeffa w trakcie
+- Jeff 18:35: "moja krawana tez moze zwlaniac strazników jak AI" -> CaravanGuardPlayerAfterNotice domyslnie TAK (klucza nie ma w jego Armoury.json); do zrobienia na n298 po workflow 298.
+- Jeff 18:40: "plus zmiana ceny wydjae mi sie ze za bardzo spada cena jak sprzedaje towar, ze trzeba bardziej wyplaszczyc zmiane kursu twoaru gdy jest sprzedaz i zakup"
+  -> paczka 299 (wf_ad3c0943-9e5: 2 analizy -> projekt -> kod -> recenzja) na noc/299-ceny-plaskie (zb\n299-ceny od 2db296ae); potem scalic z 298, test 90 dob.
+
+## DOPISEK 29.10 ok. 18:25 CEST - WYNIK 296e (2db296ae = 294c bez D1/D2, 90 dob, kod 0) + analiza wf_75d54b6f-4eb; runda 4 (298) w toku
+- 296c / 296d / 296e: placace 0.503 / 0.441 / 0.474; mediana -1 / -26 / -10; glodne 0.204 / 0.174 / 0.111 (TAK); odcinek 4.31 / 5.39 / 4.33; zelazo caly bieg -7.5 / +5.0 / -0.6
+  (zima -32 / -20 / -22); miasta bez rudy 14.4 / 10.6 / 9.3 (TAK); sprzedaz jedzenia karawan 939 / 609 / 625 szt./d; ruda do miast z brakiem 26.4/d.
+- Analiza: D1 zerowal miasta z kasa <= rezerwy kupcow (54% zer), a BK placi z calej kasy - sprzedaz z takich miast -24k zl/d, kursy x1.25; D2 bez zysku. Dzwignia: bramka psujacego
+  jedzenia swiata 124 ryb wobec popytu 1718/d (L1). Miary: K294-6 'pula 0' to blad checkera, K294-3 tylko T1, K294-1/2 bez najmu strazy i jedzenia drogi. Plan: scratchpad\plan-runda4.md.
+- Decyzje: D1/D2 zostaja NIE; bulk D1 niepotrzebny (ruda do miast z brakiem 1.6 wjazdu/d); E5 - sprzedaz jedzenia < 750 przy H1 - spizarnia eskorty na zmierzony kurs zamiast 10 dob.
+- W toku wf_9644b104-bae: 298 (L1 CaravanFoodGateByPayingTowns + miary M1-M6) na noc/298-karawany-l1 (zb\n298-karawany-l1 od 2db296ae); potem E5 i test 298a.
+
+## DOPISEK 29.10 ok. 17:50 CEST - WYNIK 296d (294c, 90 dob, kod 0): karawany GORZEJ niz 296c, zelazo lepiej; eksperyment 296e (D1/D2 NIE) w toku + analiza wf_75d54b6f-4eb
+- grupy-296d (chk296d): placace 0.503 -> 0.441, mediana -1 -> -26 (wynik 65 / zold 89), sprzedaz w 7 dobach 0.71 -> 0.61, odcinek 4.31 -> 5.39 dob, K294-6 'pula 0' (miara?),
+  glodne 0.174 (zima 0.087 TAK), strata 2461 zl/d, karawana Jeffa rozbita po 54 dobach; zelazo caly bieg +5.0/d, ost. 30 dob -15.6 (zima -20), miasta bez rudy 10.6 TAK.
+- 2db296ae: D1 CaravanRouteBySale i D2 CaravanRouteByBuyRules domyslnie NIE (G/F/H1 zostaja), Armoury 47fb37ca -> test 296e (m113\seria-296e.out.txt).
+  Rownolegle analiza (3 soczewki: czemu D1/D2 zle, sufit zysku z roznicy cen, poprawnosc miar K294) + plan rundy 4.
+
+## DOPISEK 29.10 ok. 17:10 CEST - 294c GOTOWE (n296 7cbdc711 + ce9f772e po recenzji, Armoury 04a7bc8b), AUTOTEST 296d w toku (90 dob)
+- 294c: D1 CaravanRouteBySale (wybor miasta BK wedlug tego, ile towaru sie tam sprzeda powyzej progu, z kolejka innych karawan i kasa miasta), D2 CaravanRouteByBuyRules (BK nie jedzie
+  kupowac tam, gdzie nasze reguly zablokuja), G CaravanOreGateByShortTowns (bramka rudy z popytu miast z brakiem), F KsIronWorldFlowOwnTownCut (krok 290 tnie przy PELNY tylko
+  powyzej progu i tylko kopalnie miast pelnych), H1 CaravanPantryAllSales (spizarnia eskorty przy kazdej sprzedazy). Kapital obrotowy (CapFloor) NIE ruszany - projektant: nie wiaze.
+- Oczekiwane wg projektu: placace 0.56-0.65, mediana +10..+30, glodne 0.12-0.17, strata 1-2k zl/d (dalej NIE), karawana Jeffa -8..-12k (straz gracza bez zwolnien
+  - CaravanGuardPlayerAfterNotice NIE - decyzja Jeffa). Seria m113\seria-296d.out.txt (DLL scratchpad\dll296d).
+
+## DOPISEK 29.10 ok. 15:55 CEST - WYNIK 296c (90 dob, n296 971570ad z 294b, kod 0): karawany duzo lepiej, ale nie u celu; runda 3 (294c) w toku na n296
+- grupy-296c (checker scratchpad\chk296c): K294-1 placace 0.325 -> 0.503, K294-2 mediana -54 -> -1 zl/d (wynik 87 / zold 83), K294-6 pula x10.8, K294-11 obrot 17 dob, K294-13
+  liczba 0.91; NIE: K294-3 strata T1 3728 zl/d (stary towar regula 5), K294-9 glodne 0.204, K294-10 sprzedaz w 7 dobach 0.71, karawana Jeffa -15 908 w 89 dobach,
+  udzial wyplat 259 0.123; zelazo w zimie -32/d (296b -9), cena rudy bez rudy/zrodla 2.81 -> 4.07, miasta bez rudy 14.4.
+- Workflow wf_4b3014e3-6ad (294c: kapital obrotowy CapFloor, glod, strata starego towaru, karawana gracza, ruda karawanami) pisze prosto na noc/296-integracja (zb\n296-integracja).
+  Potem test 296d (probyN 90; bitwy bez zmian od 296b).
+
+## DOPISEK 29.10 ok. 15:15 CEST - WYNIK 296b (bitwy + 90 dob na n296 2fa9d4d3 = 291b/c + 297/297b, bez 294b): BITWY i ZELAZO OK; 294b scalone (971570ad, Armoury 61c746de), AUTOTEST 296c w toku
+- Wyniki m113\wyniki\grupy-296b (checker scratchpad\chk296b). Bitwy: B291-1/2 TAK, N283-4 TAK (jazda 113 m), S292-7/8 x1.97/x2.04, S292-9 TAK; NIE tylko scen. testowe N283-2 B / N283-3 C
+  (w bitwach wykrycia wrecz 156 - reakcja dziala, scenariusz testu slaby). ZELAZO: Z297-1 zima 1.00, Z297-3 ost. 30 dob -8.3/d (caly bieg -9.5), Z297-4 2.6%, Z297-10 zatkane
+  kopalnie 0.30/26, miasta bez rudy 12.7 (TAK). Karawany (bez 294b): placace 0.405, mediana -45, glodne 24.5% (NIE).
+- 294b (55f4568f + 3b94543a): cena sztuki wedlug glebokosci rynku (CaravanBuyByMarketDepth), bramka jedzenia 290 bez spizarni eskorty (CaravanFoodGateTradeStock), jedzenie
+  na zmierzona droge (CaravanRoadFoodMeasuredLeg); 294 B/C (zwijanie, bramka nowych) domyslnie NIE. Oczekiwane wg projektanta: placace 0.40-0.50 (ogranicza kapital obrotowy
+  CapFloor ok. 4.9k miejsca wobec 5.7-8k towaru) - nastepna runda: kapital obrotowy karawan.
+- Seria m113\seria-296c.out.txt (testy-noc-204.ps1 kopia,probyN 90, DLL scratchpad\dll296c).
+
+## DOPISEK 29.10 ok. 14:45 CEST - 291b/291c + 297/297b na n296 (2fa9d4d3, Armoury 60b6de3e), AUTOTEST 296b w toku; 294b karawany w toku
+- 291b (c472b9f2 + 65d2134a): scen. C celuje w najblizszego pieszego strzelca wroga, pieszy nekajacy testu z limitem oddechu; smycz jezdzca od srodka szyku (LeashHome);
+  S292-9 konie - roznica to inne konie w zapisie (porownanie tylko tych samych). 291c (629b5264) Jeff 14:30: "moze zostac te 358 metrow" - RideLeash 360 m (noca polowa),
+  N283_CAV_FAR 375. 297 (zima nie tnie rudy/wyrebu) + 297b (eskorta milicji wsi dla wozow trzymanych przez bandy - zatkane kopalnie, m107 K1) scalone (merge 2fa9d4d3).
+- Otwarte z 297b: miasta bez rudy (poza zasiegiem wozow kopaln 250 - to robota karawan/zamowien 282; karawany kupno rudy stoi) - do 294b/nastepnej rundy.
+- Seria m113\seria-296b.out.txt (DLL kopia scratchpad\dll296b, prefiks 296b, bitwaN + probyN 90). Potem: 294b do n296, test 296c.
+
+## DOPISEK 29.10 ok. 14:10 CEST - WYNIK 296a (7 bitew + 90 dob, kod 0, gra przywrocona) - NIE do wgrania (karawany); runda 2 w toku
+- Wyniki m113\wyniki\grupy-296a (bitwaN-*, probyN-*; checker z 1e75662c w scratchpad\chk296). BITWY: B291-1 armia nie staje (R5 0), B291-2 obronca trzyma (862 s),
+  stamina x1.97/x2.03 TAK; NIE: N283-3 scen. C (wrecz) wykryc 0, N283-4 smycz jazdy 358 m > 265, S292-9 konie dluzszy galop (77->88, 68->94 s), B291-3 bieg bez tarcz 0 wejsc.
+- 90 DOB: D295-2 'w nicosc inne' 4.26 -> 0.06/d TAK, jedzenie psuje sie 0. ZLE: karawany 294 - zwijanie zabilo 2/3 handlu (zmierzonych 423 -> 133, pula wyniku 0.43),
+  wyprzedaz zwinietych ponizej kosztu 3195 zl/d, placace zold 0.325, mediana wynik-zold -54 (zold 111), glodne w drodze 24.6%; zelazo przed zima 0.0/d, w zimie -146/d (297 nie w tym tescie);
+  NWAR-15 plotno/len 1.33 -> 1.08 dalej NIE; rozbite karawany ost. 30 dob 4.93/d.
+- W toku: wf_a7f0e9a1-0e4 (297b zatkane kopalnie, n297), wf_79a02b88-d4b (291b bitwa runda 2 na n296-integracja), wf_d420bf82-97f (294b karawany od nowa: 3 analizy ->
+  projekt -> kod na n294-karawany-zysk). Potem: scalic 294b + 297 do n296, test 296b (bitwy + 90 dob).
+
+## DOPISEK 29.10 ok. 13:40 CEST - 291-295 SCALONE (noc/296-integracja 1e75662c, zb\n296-integracja, Armoury 1f40b2bf), AUTOTEST 296a w toku (7 bitew + 90 dob)
+- 291 bitwa (d7e34c5b): bez R5 (cala armia nie staje przez nekajacego), R4 tylko strzelcy, smycz R2 od miejsca wyslania (ArmyMarchesPastHarassers); obronca atakowany
+  trzyma pozycje, konni lucznicy nekaja (DefendersHoldTheirGround, Doctrine.Hold291.cs); piechota bez tarcz biegnie pod ostrzalem (UnshieldedRushUnderFire); test 283 B/C oslona
+  nekajacego testu, J204-1 regex. 292 stamina x2 (HumanStaminaMultiplier 2.0, RBM pula/stan/regeneracja, oddech 137). 293 boss kryjowki (HideoutBossTalkFix - wiersz rozmowy
+  ponad guard gry + zapas walki; brak autotestu kryjowki - sprawdzi Jeff). 294 karawany: jedzenie psuje sie wedlug rodzaju (CaravanFoodKeepsByKind), stratne karawany zwijane
+  (CaravanLosingWoundUp), nowe tylko gdy handel placi (CaravanEntryWhenTradePays). 295 orszaki dworow BK z ludzi wsi (BkRetinueFromVillage) - 'w nicosc/z niczego inne'.
+- Seria: m113\seria-296a.out.txt (testy-noc-283.ps1 -Prefix 296a -Runs kopia,bitwaN,probyN -ProbyDays 90 -Harasser 3, CsAt cs-at283). 297 zelazo w toku (wf_e3b8a33f-099) - do scalenia potem.
+
+## DOPISEK 29.10 ok. 12:50 CEST - WYNIK 137a (sama 290, 90 dob, kod 0, gra przywrocona do 136) - 290 NIE do wgrania samo
+- Wyniki m113\wyniki\grupy-137a. DOBRZE: sprzedaz na stracie 2649 -> 8 zl/d (Z290-4 TAK), jedzenie na stracie 0. ZLE: zelazo swiata ostatnie 30 dob -106.6/d (136a -66.5),
+  wydobycie 358 -> 242 lup/d przy zuzyciu ok. 340 (rece tylko -19%, model wsi 355 -> 235 - przyczyna nie w rekach), miasta bez rudy 7.6 -> 11.9; K288-3 karawany glodne
+  w drodze 26% (136a 13.4%) - bramka jedzenia 290 za ciasna (do 294); H287-2 wynik handlu 30 wobec zoldu 85 zl/d (bez zmian).
+- Workflow wf_e3b8a33f-099: paczka 297 zelazo (noc/297-zelazo, zb\n297-zelazo od 0b2ed557) - do scalenia recznie do n296 po workflow wf_113dbfca-f46.
+
+## DOPISEK 29.10 ok. 12:15 CEST - NOWE KONTO (sesja b2a84731): 290 zacommitowane, test 137a w toku, 4 uwagi Jeffa + drobne w workflow wf_113dbfca-f46
+- W GRZE dalej 136 (Armoury ba0fbc05, CrashScribe bef9db58 - sprawdzone md5). Logi sesji Jeffa 29.10 00:09-01:52: D:\Backup-Bannerlord\logi-jeffa\2026-10-29-1200-sesja-0009.
+- 290 (agent poprzedniego konta urwany limitem tuz przed commitem) = commit 0b2ed557 na noc/285-zold-srebro-ruda (zb\n285), Armoury a1fe2235, bez recenzji.
+- AUTOTEST 137a = sama 290, kopia,probyN 90 dob (m113\seria-137a.out.txt; zapis testowy odswiezony z Ironmana Jeffa 01:31, md5 2fd910a1).
+- Jeff 12:00: (1) AI bitwy - cala armia staje, gdy gracz atakuje jazde; piechota miota sie miedzy graczem z tylu a lucznikami z przodu (ma isc glowna sila, maly oddzial na gracza);
+  atakowany przez gracza broni sie w miejscu zamiast kontratakowac; piechota bez tarcz pod ostrzalem ma biec, z tarczami mur tarcz; (2) stamina ludzi x2 (konie bez zmian);
+  (3) kryjowka: brak dialogu bossa, boss bez obrazen, trzeba Retreat; (4) karawany glownie traca - jedzenie ma sie nie psuc albo duzo wolniej.
+  Potem: "i napraw pozostale bledy i pusc test 90, rob tak dlugo porawi az bedziesz zadowlony z wyniku."
+- Galezie od 0b2ed557 (worktree scratchpad sesji b2a84731\zb\): noc/291-bitwa-ai (+ testy 283 B/C, J204-1), noc/292-stamina, noc/293-kryjowka-boss, noc/294-karawany-zysk,
+  noc/295-drobne (NWAR-15, 'w nicosc', bledy z logu Jeffa); scalenie -> noc/296-integracja (zb\n296-integracja). Workflow wf_113dbfca-f46 (skrypt
+  ~\.claude\projects\C--Program-Files--x86--Steam-...\b2a84731-...\workflows\scripts\jeff-29-10-uwagi-wf_113dbfca-f46.js; wznowienie tylko w tej sesji - inaczej sprawdzic git log galezi).
+- Dalej: test 90 dob + bitwy na n296 (testy-noc-204.ps1 probyN 90 + testy-noc-283.ps1 bitwy), poprawki w petli az wynik dobry, WGRANIE 137.
+
 ## DOPISEK 29.10 - Jeff "sprobuj to" (zelazo swiata -66/d, sprzedaz na stracie 2.6k/d) - paczka 290 w toku (workflow wf_86d2f62a-4ca)
 - Skrypt workflows/scripts/paczka-290-wf_86d2f62a-4ca.js (bez args; resumeFromRunId), galaz noc/285-zold-srebro-ruda (zb/n285, od 40d2e207 = WGRANE 136).
   Potem test 90 dob (testy-noc-204.ps1 -Runs kopia,probyN -ProbyDays 90; Jeff gra na 136 - test dopiero po zamknieciu gry; odswiezyc zapis testowy) i WGRANIE 137.
