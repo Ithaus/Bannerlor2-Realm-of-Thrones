@@ -15,7 +15,7 @@ namespace Armoury
     /// <summary>
     /// m109-musztra (Jeff 22.10 ok. 21:50, zatwierdzone 23.10 "Ok"): "jak czekam w miescie, wojsko ma rozkaz drill, ale mniej, bo wydaja kase, pija, chodza
     /// na kobiety itd., wiec nie w glowie im musztra". POSTOJ W OSADZIE - jedna zasada dla wszystkich partii pod zasada obozu m97 (gracz, strona gracza, lordowie AI):
-    ///  - musztra w osadzie liczy sie sama, tylko w godzinach cwiczen (CampDrill.DayHour, 3:00-17:59), we wspolnym limicie 8 h od switu, z limitem godzin
+    ///  - musztra w osadzie liczy sie sama, tylko w godzinach cwiczen (CampDrill.DayHour; 315b: noc obozu NightRest.BedNight - przy obozie 21-3 godziny 3:00-20:59, dotad 3:00-17:59 - wejscie 18:00-20:59 tez otwiera dobe postoju), we wspolnym limicie 8 h od switu, z limitem godzin
     ///    w osadzie malejacym z dobami postoju: miasto 4, 3, 2, od 4. doby 1 (poranny apel); zamek i wies 6, 5, od 3. doby 4 (mniej pokus) - klucz DrillTownStay;
     ///  - doba postoju = kolejny poranek (godziny cwiczen jednej doby od switu) spedzony w osadzie z postojem - wejscie po poludniu daje 1. dobe do konca porannych
     ///    godzin, nastepny poranek to 2. doba (recenzja m109 R4: dotad 24 h od wejscia - wejscie o 14:00 dawalo 4/4/3/2/1); godziny poza osada doby nie postarzaja;

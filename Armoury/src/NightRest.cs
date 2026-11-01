@@ -344,7 +344,7 @@ namespace Armoury
                 // nie liczy drugi raz
                 CreditRest(s);
 
-                // 311e (NightRest.TrainBeforeSleep.cs): postoj na trening przed noca snu - N godzin przed SleepNightStart, z warunkami obozu z rozkazu i menu cwiczen
+                // 311e (NightRest.TrainBeforeSleep.cs): postoj na trening przed noca snu - N godzin przed BedNightStart (315b: poczatek obozu, 21:00), z warunkami obozu z rozkazu i menu cwiczen
                 TbsHour(s, mp, captive, enl, raidNow, forced);
 
                 // ZMIERZCH (Jeff 31.08: "jade i zapada noc - popup czy rozbijamy

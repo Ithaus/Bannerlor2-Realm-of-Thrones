@@ -90872,7 +90872,7 @@ S315B_CFG = re.compile(r"^NightRest: oboz swiata (\d+):00-(\d+):00.*?noc obozu g
 S315B_TSTART = re.compile(r"^Trening przed snem \(311e\): start o (\d+):00 \| .*?cwiczen do nocy snu (\d+) h \(noc snu od (\d+):00")
 S315B_TEND = re.compile(r"^Trening przed snem \(311e\): koniec o (\d+):00 \| .*?\| powod: (.+?) \| dzis od switu")
 S315B_START = re.compile(r"^Sen do switu \(315a\): sen w menu od (\d+):(\d\d) .*?\| cel snu ([\d.]+) h \(potrzeba ([\d.]+) h, odpoczynek doby ([\d.]+) h, dlug (\d+)\) \| (pobudka nie przed switem (\d+):00)?")
-S315B_END = re.compile(r"^Sen do switu \(315a\): (pobudka|koniec snu) o (\d+):(\d\d) \(od (\d+):(\d\d), zegara ([\d.]+) h, w menu ([\d.]+) h z celu ([\d.]+) h\) \| powod: (.+?) \|")
+S315B_END = re.compile(r"^Sen do switu \(315a\): (pobudka|koniec snu) o (\d+):(\d\d) \(od (\d+):(\d\d), zegara ([\d.]+) h, w menu ([\d.]+) h(?: z celu ([\d.]+) h)?\) \| powod: (.+?)(?: \||$)")   # 315b recenzja: "koniec snu" bez celu
 S315B_DAWN = re.compile(r"^NocnyMarsz: gracz o swicie - odpoczynek doby ([\d.]+) h \(baza ([\d.]+),.*?dlug przed (\d+), po (\d+)")
 S315B_DRILL = re.compile(r"^Szkolenie w obozie \(m97\): start sesji .*?godziny cwiczen (\d+):00-(\d+):59 \(noc obozu (\d+):00-")
 
@@ -90926,7 +90926,11 @@ def sen315b_main(logp):
             m = S315B_END.match(s)
             if m and cur is not None:
                 wh, wm, why = int(m.group(2)), int(m.group(3)), m.group(9)
-                menu, target = float(m.group(7)), float(m.group(8))
+                menu = float(m.group(7))
+                if m.group(8) is None:   # 315b recenzja: sen przerwany ("koniec snu", bez celu) - bez oceny, biezacy sen zamkniety
+                    cur = None
+                    continue
+                target = float(m.group(8))
                 late = cur["h"] == (camp_st - 1) % 24 and cur["mm"] >= 45
                 if cur["hold"] and cur["debt"] == 0 and (cur["h"] == camp_st or late) and why.startswith("swit gracza"):
                     pend_full = s[:160]
