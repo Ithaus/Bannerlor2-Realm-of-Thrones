@@ -1,6 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
-## W TOKU 01.11.2026 popoludnie: seria 312 (decyzje Jeffa 01.11 na liste z raportu 147)
+## STAN 01.11.2026 ok. 14:50 CET: WGRANIE 148 (najnowszy)
+- W GRZE: Armoury.dll ef080a64a09b09787dddc7e8f7c6a977 (galaz noc/312x-integracja, wypchnieta, commit 2aec1664) + CrashScribe aa32d04e (bez zmian od 147).
+  Kopia 147: Armoury.dll.bak-2026-11-01-przed-wgranie148 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie148-przed.
+- Test 312x: bitwy kod 0, 120 dob KONIEC OK, ERROR 0; szczegoly we wpisie CHANGELOG "WGRANIE 148". Jeff sprawdza w swojej grze.
+- NARZEDZIA TESTU teraz w C:\Users\GAME\bannerlord-autotest (Temp skasowal safe-mode-guard.ps1 i n112b); baza DLL test\prod148.
+- DO ZROBIENIA: bieg z flaga armoury-tron312-porw.flag (wojny o tron po Krwawych Godach - niesprawdzone); S312F-2 rozjazd 1/125 w linii strat;
+  po pomiarze notabli kroki 2-4 (rozp312/notable-krytyk.md), straty F2 (decyzja Jeffa po pomiarze 312f).
+
+## (historia) W TOKU 01.11.2026 popoludnie: seria 312 (decyzje Jeffa 01.11 na liste z raportu 147)
 - Jeff: 1 konce zatargow ROT tak ("kazdy chce zostac krolem i zdobyc zelazny tron"), 2 sprawdz czemu traca korony, 3 napraw przezbrojenia notabli,
   4 rozbij straty przegranych, 5 wlacz mennice (zuzycie monety), 6 nowe wojny o Westeros bez psucia Wojny Pieciu Kroli (Polnoc chce byc osobna, poludnie
   nie odda korony; wojna z rozejmami az ktos zjednoczy Westeros). Odpowiedzi na pytania: CISZA w Westeros do Krwawych Godow; na Polnoc dopiero po Bitwie Bekartow.
