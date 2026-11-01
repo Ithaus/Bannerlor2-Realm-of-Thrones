@@ -180,17 +180,19 @@ namespace Armoury
             if (_stumblesSession <= 3) Log.Error("WeaponEase (potkniecie " + _stumblesSession + ")", e);
         }
 
-        // atakujacy: __args = (defenderAgent, attackerAgent, ref collisionData, meleeHitType, isUnarmedAttack)
-        private static void AttPostfix(ref float __result, object[] __args)
+        // atakujacy: (defenderAgent __0, attackerAgent __1, ref collisionData __2, meleeHitType __3, isUnarmedAttack __4); recenzja: parametry typowane
+        // zamiast object[] __args (bez alokacji i kopii AttackCollisionData przy kazdej kolizji); MeleeHitType (enum int RBM) jako int - sprawdzone na
+        // Harmony z gry (scratchpad/htest313: int __3 = wartosc enuma, bool __4 = flaga)
+        private static void AttPostfix(ref float __result, Agent __1, int __3, bool __4)
         {
             try
             {
                 var c = Settings.Current;
-                if (c == null || __args == null || __args.Length < 5) return;
+                if (c == null) return;
                 MissionCheck();
-                if ((bool)__args[4]) return;                        // bez broni - RBM z Atletyki
-                var a = __args[1] as Agent;
-                int ht = Convert.ToInt32(__args[3], CultureInfo.InvariantCulture);
+                if (__4) return;                                    // bez broni - RBM z Atletyki
+                var a = __1;
+                int ht = __3;
                 if (ht < 1 || ht > 7) return;                       // None / inne - bez zmian
                 int s = WeaponSkill(a);
                 if (s < 0) return;                                  // pusta reka - RBM z Atletyki
@@ -210,16 +212,16 @@ namespace Armoury
         }
 
         // obronca: przyjety cios w cialo (AgentHit) - bol, bez zmian
-        private static void DefPostfix(ref float __result, object[] __args)
+        private static void DefPostfix(ref float __result, Agent __0, int __3, bool __4)
         {
             try
             {
                 var c = Settings.Current;
-                if (c == null || __args == null || __args.Length < 5) return;
+                if (c == null) return;
                 MissionCheck();
-                if ((bool)__args[4]) return;
-                var a = __args[0] as Agent;
-                int ht = Convert.ToInt32(__args[3], CultureInfo.InvariantCulture);
+                if (__4) return;
+                var a = __0;
+                int ht = __3;
                 if (ht < 2 || ht > 7) return;
                 int s = WeaponSkill(a);
                 if (s < 0) return;

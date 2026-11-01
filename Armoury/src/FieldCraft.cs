@@ -24,9 +24,20 @@ namespace Armoury
     /// 3. JEZ ZE STRZAL: strzala, ktora ledwo drasnela (pancerz ja zatrzymal),
     ///    nie zostaje wbita w czlowieka - odpada. W tarczy zostaje jak nalezy.
     /// </summary>
-    internal sealed class FieldCraft : MissionBehavior
+    internal sealed class FieldCraft : MissionBehavior, IPlayerInputEffector
     {
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
+
+        // 313c (recenzja): flagi chodu/biegu gracza przez oficjalne wejscie gry - MissionMainAgentController.ControlTick zeruje EventControlFlags
+        // i zaraz potem zbiera je od IPlayerInputEffector (mmac.cs:957-966); jednorazowo, potem zero
+        private static Agent.EventControlFlag _p3Want;
+
+        public Agent.EventControlFlag OnCollectPlayerEventControlFlags()
+        {
+            var f = _p3Want;
+            _p3Want = (Agent.EventControlFlag)0;
+            return f;
+        }
 
         private sealed class State
         {
@@ -61,6 +72,10 @@ namespace Armoury
             public float Run292Max;          // 292: maxStamina RBM przy Run292Prev (zmiana puli w biegu - takt pominiety)
             public bool Walk313;             // 313c: gracz po pustym pasku idzie (histereza do StaminaWalkUntilBar) - takze przy kluczu NIE (pomiar "bylby")
             public bool Walk313Forced;       // 313c: MY przelaczylismy gracza w tryb chodu gry (tylko wtedy oddajemy mu bieg)
+            public bool Walk313Seen;         // 313c (recenzja): po naszym wymuszeniu gra pokazala WalkMode = true (potem false = gracz sam wlaczyl bieg)
+            public float F313Prev = 1f;      // 313c (recenzja): mnoznik krzywej paska z poprzedniego taktu (prog biegu gracza wzgledem limitu)
+            public bool Ctrl313Prev;         // 313c (recenzja): w poprzednim takcie limit gracza scial klawisz chodu (Ctrl) - wtedy prog biegu bez zmian
+            public bool Meas313;             // 313c (recenzja): ten takt kwalifikuje sie do pomiaru limitu (klucz TAK, f < 1, poza chodem)
         }
 
         // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
@@ -105,19 +120,25 @@ namespace Armoury
         // i u gracza), a przy pustym pasku wymuszony tryb chodu gry (EventControlFlag.Walk - to samo, co wysyla CapsLock, MissionMainAgentController:811)
         // do StaminaWalkUntilBar. Zadyszka (st.Winded) dalej rzadzi zamachem (st.Pace), ruchem gracza juz krzywa. Konno - nic (i zdjety nasz chod).
         // AI bez zmian (AiBreath 144). Pomiar takze przy kluczu NIE ("bylby"). Linia "Bieg gracza (313c)" na koniec misji.
-        private static float _p3Foot, _p3Low, _p3LowRun, _p3Min = 1f, _p3WalkSec, _p3SpdSum, _p3LimSum;
-        private static int _p3WalkIn, _p3Reforce, _p3Out, _p3Samples, _p3Stumbles, _p3StumblesSession;
+        // Recenzja 313c: (1) prog biegu gracza wzgledem limitu krzywej (RunThr313) - bez tego drenaz stawal przy ok. 11% paska i chodu nie bylo;
+        // (2) flagi Walk/Run gracza przez IPlayerInputEffector (zbierane tuz po wyzerowaniu w ControlTick), nie wprost w OnMissionTick;
+        // (3) pomiar limitu po koncowym limicie i tylko do przodu (Sample313); (4) tempo chodu krzywej >= 0.4 (podloga limitu);
+        // (5) osobno "gracz wlaczyl bieg" i "flaga nie weszla"; (6) agent bez gracza w naszym chodzie - bieg oddany.
+        private static float _p3Foot, _p3Low, _p3LowRun, _p3Min = 1f, _p3WalkSec, _p3SpdSum, _p3LimSum, _p3NoDrain;
+        private static int _p3WalkIn, _p3Reforce, _p3NoTake, _p3Out, _p3Samples, _p3Over, _p3Stumbles, _p3StumblesSession;
 
         private static void Reset313()
         {
-            _p3Foot = _p3Low = _p3LowRun = _p3WalkSec = _p3SpdSum = _p3LimSum = 0f; _p3Min = 1f;
-            _p3WalkIn = _p3Reforce = _p3Out = _p3Samples = _p3Stumbles = 0;
+            _p3Foot = _p3Low = _p3LowRun = _p3WalkSec = _p3SpdSum = _p3LimSum = _p3NoDrain = 0f; _p3Min = 1f;
+            _p3WalkIn = _p3Reforce = _p3NoTake = _p3Out = _p3Samples = _p3Over = _p3Stumbles = 0;
+            _p3Want = (Agent.EventControlFlag)0;
         }
 
-        // zakresy jak RANGES w tools/gen_mcm.py
+        // zakresy jak RANGES w tools/gen_mcm.py; tempo chodu krzywej nie nizej niz podloga limitu ruchu 0.4 (if (limit < 0.4f) nizej) - recenzja: krzywa i log
+        // pokazuja ten sam mnoznik, ktory naprawde trafia do limitu (klawisz Ctrl dalej wedlug WalkSpeedShare od 0.2)
         private static float SlowFrom313(Settings c) { return Math.Max(0.2f, Math.Min(0.9f, c.StaminaSlowFromBar)); }
         private static float WalkUntil313(Settings c) { return Math.Max(0.05f, Math.Min(0.5f, c.StaminaWalkUntilBar)); }
-        private static float WalkShare313(Settings c) { return Math.Max(0.2f, Math.Min(1f, c.WalkSpeedShare)); }
+        private static float WalkShare313(Settings c) { return Math.Max(0.4f, Math.Min(1f, c.WalkSpeedShare)); }
 
         /// <summary>313c: mnoznik ruchu z paska - 1 od progu w gore, liniowo do tempa chodu przy 0.</summary>
         internal static float RunCurve313(float ratio, Settings c)
@@ -128,17 +149,45 @@ namespace Armoury
             return walk + (1f - walk) * ratio / from;
         }
 
+        /// <summary>313c (recenzja, usterka WYSOKA): prog biegu gracza pieszo przy kluczu TAK liczony wzgledem limitu krzywej z poprzedniego taktu
+        /// (0.85 x f x pelna predkosc), inaczej przy pasku ok. 11% limit spychal predkosc pod staly prog 0.55 - drenaz stawal, pasek krazyl wokol 11%
+        /// i gracz nigdy nie dochodzil do zera (chodu). Tylko ruch do przodu (cofanie i krok bokiem w zwarciu nie pija jak bieg), nie w trybie chodu
+        /// gry i nie przy klawiszu Ctrl. Klucz NIE, AI, konno - prog jak dotad.</summary>
+        private static float RunThr313(Agent agent, State st, Settings c, float runThr, float run)
+        {
+            try
+            {
+                if (!agent.IsMainAgent || !c.StaminaSlowsRunning || st.Ctrl313Prev || st.F313Prev >= 0.999f || run <= 0.8f || agent.WalkMode) return runThr;
+                var mv = agent.MovementVelocity;
+                float len = mv.Length;
+                if (len < 0.5f || mv.y < 0.7f * len) return runThr;
+                float t = run * st.F313Prev * 0.85f;
+                if (t < 1.0f) t = 1.0f;
+                return Math.Min(runThr, t);
+            }
+            catch (Exception e)
+            {
+                _p3Stumbles++; _p3StumblesSession++;
+                if (_p3StumblesSession <= 3) Log.Error("FieldCraft.Run313 prog (potkniecie " + _p3StumblesSession + ")", e);
+                return runThr;
+            }
+        }
+
         private static void Release313(Agent agent, State st)
         {
             st.Walk313Forced = false;
+            st.Walk313Seen = false;
             _p3Out++;
-            if (agent.WalkMode) agent.EventControlFlags |= Agent.EventControlFlag.Run;
+            if (!agent.WalkMode) return;
+            if (agent.IsMainAgent) _p3Want = Agent.EventControlFlag.Run;      // przez IPlayerInputEffector (kontroler zeruje flagi gracza co klatke)
+            else agent.EventControlFlags |= Agent.EventControlFlag.Run;     // recenzja: agent stracil gracza (przejecie przez AI) - bez kontrolera gracza
         }
 
         /// <summary>313c: tempo ruchu gracza (zamiast st.Pace) - przy kluczu NIE, konno albo bez Sprint Fatigue zwraca st.Pace (jak dotad).</summary>
         private static float Run313(Agent agent, State st, Settings c, float step, float speedNow, bool sprintNow)
         {
             float pace = st.Pace;
+            st.Meas313 = false;
             try
             {
                 bool on = c.StaminaSlowsRunning;
@@ -146,12 +195,14 @@ namespace Armoury
                 {
                     if (st.Walk313Forced) Release313(agent, st);   // w siodle nasz chod szedlby na konia
                     st.Walk313 = false;
+                    st.F313Prev = 1f;
                     return pace;
                 }
                 float r = st.Ratio;
                 if (r <= 0.005f) { if (!st.Walk313) _p3WalkIn++; st.Walk313 = true; }   // ten sam prog pustego paska co zadyszka
                 else if (st.Walk313 && r >= WalkUntil313(c)) st.Walk313 = false;
                 float f = RunCurve313(r, c);
+                st.F313Prev = on ? f : 1f;                 // prog biegu w nastepnym takcie (RunThr313) - przy kluczu NIE bez zmian
                 _p3Foot += step;
                 if (f < 0.999f || st.Walk313)
                 {
@@ -165,18 +216,28 @@ namespace Armoury
                     if (st.Walk313Forced) Release313(agent, st);   // klucz zdjety w trakcie misji
                     return pace;
                 }
-                // pomiar: czy limit trzyma gracza (predkosc / pelna predkosc wobec mnoznika) - w ruchu, poza chodem
-                if (f < 0.999f && !st.Walk313 && speedNow > 0.5f)
+                // pomiar (recenzja): ruch blisko limitu krzywej bez drenazu - tak wygladalaby petla wokol 11% paska (powinno byc ok. 0)
+                if (f < 0.999f && !st.Walk313 && !sprintNow && !st.Ctrl313Prev && speedNow > 0.5f && !agent.WalkMode)
                 {
                     float full = agent.GetMaximumForwardUnlimitedSpeed();
-                    if (full > 0.8f) { _p3SpdSum += speedNow / full; _p3LimSum += f; _p3Samples++; }
+                    if (full > 0.8f && speedNow / full > 0.75f * f) _p3NoDrain += step;
                 }
+                st.Meas313 = f < 0.999f && !st.Walk313;    // pomiar limitu po koncowym limicie (Sample313)
                 if (st.Walk313)
                 {
-                    if (!agent.WalkMode)
+                    if (agent.WalkMode)
                     {
-                        if (st.Walk313Forced) _p3Reforce++;   // gracz wlaczyl bieg (CapsLock) albo flaga nie weszla - znow chod
-                        agent.EventControlFlags |= Agent.EventControlFlag.Walk;
+                        if (st.Walk313Forced) st.Walk313Seen = true;
+                    }
+                    else
+                    {
+                        if (st.Walk313Forced)
+                        {
+                            if (st.Walk313Seen) _p3Reforce++;   // gra weszla w chod, a gracz wlaczyl bieg (CapsLock) - znow chod
+                            else _p3NoTake++;                   // flaga chodu nie weszla (woda, drabina, stan skryptowy) - ponawiamy
+                        }
+                        st.Walk313Seen = false;
+                        _p3Want = Agent.EventControlFlag.Walk;   // przez IPlayerInputEffector (OnCollectPlayerEventControlFlags)
                         st.Walk313Forced = true;
                     }
                 }
@@ -189,6 +250,30 @@ namespace Armoury
                 if (_p3StumblesSession <= 3) Log.Error("FieldCraft.Run313 (potkniecie " + _p3StumblesSession + ")", e);
             }
             return pace;
+        }
+
+        /// <summary>313c (recenzja): pomiar "czy limit trzyma gracza" po KONCOWYM limicie (rany, Ctrl, podloga 0.4), tylko ruch do przodu
+        /// (cofanie i krok bokiem sa natywnie wolniejsze); osobno probki ponad limit + 10 pp. Zapamietuje Ctrl dla progu biegu.</summary>
+        private static void Sample313(Agent agent, State st, float limit, float speedNow, bool ctrl)
+        {
+            try
+            {
+                st.Ctrl313Prev = ctrl;
+                if (!st.Meas313 || speedNow <= 0.5f) return;
+                var mv = agent.MovementVelocity;
+                float len = mv.Length;
+                if (len < 0.5f || mv.y < 0.8f * len) return;
+                float full = agent.GetMaximumForwardUnlimitedSpeed();
+                if (full <= 0.8f) return;
+                float share = speedNow / full;
+                _p3SpdSum += share; _p3LimSum += limit; _p3Samples++;
+                if (share > limit + 0.1f) _p3Over++;
+            }
+            catch (Exception e)
+            {
+                _p3Stumbles++; _p3StumblesSession++;
+                if (_p3StumblesSession <= 3) Log.Error("FieldCraft.Run313 pomiar (potkniecie " + _p3StumblesSession + ")", e);
+            }
         }
 
         private void Line313(Settings c)
@@ -205,10 +290,11 @@ namespace Armoury
                          + " | regula: od " + (SlowFrom313(c) * 100f).ToString("0", ic) + "% paska plynnie do chodu (" + WalkShare313(c).ToString("0.00", ic)
                          + " pelnej) przy 0, po pustym pasku chod do " + (WalkUntil313(c) * 100f).ToString("0", ic) + "%"
                          + " | gracz pieszo " + _p3Foot.ToString("0", ic) + " s, ponizej progu " + _p3Low.ToString("0", ic) + " s (w biegu " + _p3LowRun.ToString("0", ic)
-                         + " s), najnizszy mnoznik " + _p3Min.ToString("0.00", ic)
-                         + " | chod po pustym pasku: wejsc " + _p3WalkIn + ", sekund " + _p3WalkSec.ToString("0", ic) + ", ponowien " + _p3Reforce + ", oddan biegu " + _p3Out
-                         + " | pomiar limitu: probek " + _p3Samples + (_p3Samples > 0 ? ", sr. predkosc " + (_p3SpdSum / _p3Samples * 100f).ToString("0", ic)
-                            + "% pelnej przy mnozniku sr. " + (_p3LimSum / _p3Samples * 100f).ToString("0", ic) + "%" : "")
+                         + " s, bez drenazu blisko limitu " + _p3NoDrain.ToString("0", ic) + " s), najnizszy mnoznik " + _p3Min.ToString("0.00", ic)
+                         + " | chod po pustym pasku: wejsc " + _p3WalkIn + ", sekund " + _p3WalkSec.ToString("0", ic) + ", ponowien (gracz wlaczyl bieg) " + _p3Reforce
+                         + ", flaga nie weszla " + _p3NoTake + ", oddan biegu " + _p3Out
+                         + " | pomiar limitu (do przodu): probek " + _p3Samples + (_p3Samples > 0 ? ", sr. predkosc " + (_p3SpdSum / _p3Samples * 100f).ToString("0", ic)
+                            + "% pelnej przy limicie sr. " + (_p3LimSum / _p3Samples * 100f).ToString("0", ic) + "%, ponad limit +10 pp " + _p3Over : "")
                          + " | potkniecia " + _p3Stumbles + " (sesja " + _p3StumblesSession + ")");
             }
             catch (Exception e) { Log.Error("FieldCraft.Line313", e); }
@@ -938,6 +1024,7 @@ namespace Armoury
                                     runThr = run * 0.55f;
                                     if (runThr < 2.2f) runThr = 2.2f;   // marsz (~1.6 m/s) to NIE bieg
                                     if (runThr > 4.2f) runThr = 4.2f;
+                                    runThr = RunThr313(agent, st, c, runThr, run);   // 313c (recenzja): gracz - prog wzgledem limitu krzywej paska
                                 }
                             }
                             catch { }
@@ -1116,9 +1203,15 @@ namespace Armoury
 
                     // ruch: zadyszka (ostatnie 10% puli -> do -50%) i rany licza sie razem; 313c: gracz pieszo - krzywa paska i chod po pustym pasku
                     float movePace = agent.IsMainAgent ? Run313(agent, st, c, step, speedNow, sprintNow) : st.Pace;
+                    if (!agent.IsMainAgent && st.Walk313Forced)
+                    {
+                        // 313c (recenzja): agent stracil gracza (przejecie przez AI) w naszym chodzie - oddajemy bieg raz
+                        try { st.Walk313 = false; Release313(agent, st); } catch { st.Walk313Forced = false; }
+                    }
                     float limit = movePace;
                     limit = Math.Min(limit, 1f - woundSlow);
                     if (limit < 0.4f) limit = 0.4f;
+                    bool ctrl313 = false;   // 313c (recenzja): Ctrl gracza w tym takcie (pomiar limitu i prog biegu w nastepnym)
 
                     // chod na zyczenie: trzymanie lewego Ctrl = idziesz, stamina odpoczywa, wygladasz
                     // jak czlowiek, nie jak sprinter. 136 (poprawka komentarza, bez zmiany zachowania):
@@ -1131,10 +1224,14 @@ namespace Armoury
                         try
                         {
                             if (TaleWorlds.InputSystem.Input.IsKeyDown(TaleWorlds.InputSystem.InputKey.LeftControl))
+                            {
                                 limit = Math.Min(limit, Math.Max(0.2f, c.WalkSpeedShare));
+                                ctrl313 = true;
+                            }
                         }
                         catch { }
                     }
+                    if (agent.IsMainAgent) Sample313(agent, st, limit, speedNow, ctrl313);   // 313c (recenzja): pomiar po koncowym limicie
                     // noc 25.10 P1 (M0, Jeff: "armie nie biegly non stop tylko szly"): dawniej limit 1.0 co 0.2 s KAZDEMU kasowal limit szyku, ktory
                     // silnik liczy co 0.5 s (HumanAIComponent.AdjustSpeedLimit - linia i tempo szyku, progi RBM). Teraz zapis tylko przy karze
                     // (zadyszka, rany, klawisz chodu: limit < 0.999), a po jej zejsciu raz (-1, bez mnoznika) - silnik przywraca swoj limit w ciagu 0.5 s.

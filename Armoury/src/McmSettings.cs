@@ -1380,7 +1380,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float WindedExitBar { get; set; } = 0.30f;
 
-        [SettingPropertyBool("Weapon Skill Eases Stamina", HintText = "the better you know the weapon in your hand, the less a blow that lands, a blocked blow and a block take out of your stamina: a raw recruit tires about a fifth faster than before, an average soldier (skill 100) pays what he paid for a block, a master (300) about half; the same rule for you, lords and soldiers of both sides. One-handed, two-handed and polearm skill count for the weapon you hold. A blow taken on the body, fighting barehanded and missiles are unchanged; bows, crossbows and throwing weapons already work this way in Realistic Battle Mod and are left to it. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Weapon Skill Eases Stamina", HintText = "the better you know the weapon in your hand, the less a blow that lands, a blocked blow and a block take out of your stamina: a raw recruit tires about a fifth faster than before, an average soldier (skill 100) pays what he paid for a block, a master (300) about half for a blow that lands and about three quarters for a block; the same rule for you, lords and soldiers of both sides. One-handed, two-handed and polearm skill count for the weapon you hold. A blow taken on the body, fighting barehanded and missiles are unchanged; bows, crossbows and throwing weapons already work this way in Realistic Battle Mod and are left to it. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool WeaponSkillEasesStamina { get; set; } = true;
 
@@ -1512,11 +1512,11 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float WalkSpeedShare { get; set; } = 0.42f;
 
-        [SettingPropertyBool("Stamina Slows Running", HintText = "on foot your run slows down smoothly as your stamina runs low instead of staying at full speed until the bar is empty: from Stamina Slow From Bar down to walking pace at an empty bar. When the bar is empty you drop to a walk (the game's own walk, as with Caps Lock) and cannot run again until it has refilled to Stamina Walk Until Bar. You only, on foot; your horse has its own stamina. Off = as before (full speed down to the last tenth, half speed when winded)", RequireRestart = false)]
+        [SettingPropertyBool("Stamina Slows Running", HintText = "on foot your run slows down smoothly as your stamina runs low instead of staying at full speed until the bar is empty: from Stamina Slow From Bar down to walking pace at an empty bar; running at the slowed pace still drains the bar. When the bar is empty you drop to a walk (the game's own walk, as with Caps Lock) and cannot run again until it has refilled to Stamina Walk Until Bar. You only, on foot; your horse has its own stamina. Off = as before (full speed down to the last tenth, half speed when winded)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool StaminaSlowsRunning { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Stamina Slow From Bar", 0.20f, 0.90f, "0.00", HintText = "with Stamina Slows Running: below this share of your stamina bar your running pace starts to drop, evenly, down to walking pace (Walk Speed Share) at an empty bar", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Stamina Slow From Bar", 0.20f, 0.90f, "0.00", HintText = "with Stamina Slows Running: below this share of your stamina bar your running pace starts to drop, evenly, down to walking pace (Walk Speed Share, never below 0.40) at an empty bar", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float StaminaSlowFromBar { get; set; } = 0.5f;
 
