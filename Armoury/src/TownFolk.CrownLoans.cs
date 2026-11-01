@@ -292,6 +292,7 @@ namespace Armoury
                 p.Acc = Math.Max(0.0, p.Acc - ia);
             }
             if (placed < took) k.KingdomBudgetWallet += (int)(took - placed);   // nic w nicosc: niewplacone wraca do skarbca, dlug tej czesci bez zmian
+            try { var kd = CrownIncome.DayOf(k); if (kd != null && placed > 0) kd.TownRepaid += placed; } catch { }   // 312e: tylko licznik linii "Skarbce:"
             return placed;
         }
 

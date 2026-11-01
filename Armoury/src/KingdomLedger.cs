@@ -18,10 +18,15 @@ namespace Armoury
         private static readonly Dictionary<Kingdom, int> _lastWallet = new Dictionary<Kingdom, int>();
         private static readonly Dictionary<Clan, int> _lastGold = new Dictionary<Clan, int>();
 
-        internal static void Reset() { _lastWallet.Clear(); _lastGold.Clear(); }
+        internal static void Reset() { _lastWallet.Clear(); _lastGold.Clear(); _st312 = 0; }
 
         internal static void Daily()
         {
+            // 312e: przesuniecia migawki korony od wczorajszej linii - odczyt na poczatku i okno zamkniete zawsze (takze przy wylaczonej ksiedze)
+            var shifts = new Dictionary<Kingdom, long[]>();
+            try { foreach (var k in Kingdom.All) if (k != null && !k.IsEliminated) shifts[k] = CrownIncome.ShiftWindowOf(k); }
+            catch (Exception e) { Log.Error("KingdomLedger(312e)", e); }
+            finally { CrownIncome.ShiftWindowClear(); }
             try
             {
                 var s = Settings.Current;
@@ -62,6 +67,7 @@ namespace Armoury
                              + KingdomTreasury.RefundNote(k) + CrownBorrow.LedgerNote(k)
                              + ", krol " + (ruler != null ? ruler.Name.ToString() : "-") + " kiesa " + rg + " bilans " + Sign(rb) + "/dzien"
                              + "; rodow " + clans + ", kiesy razem " + sumGold + ", biednych (<" + s.FinanceLedgerPoor + ") " + poor + ", na minusie " + minus
+                             + Split312(k, hadW, wallet - (long)lastW, shifts)   // 312e: rozklad zmiany doby - PRZED "; wojsko rodow" (wzory sprawdz_logi.py)
                              + "; wojsko rodow " + men + " ludzi.");
                     rows.Sort((a, b) => a.Value.CompareTo(b.Value));
                     var parts = new List<string>();
@@ -79,5 +85,52 @@ namespace Armoury
         }
 
         private static string Sign(int v) { return v >= 0 ? "+" + v : v.ToString(); }
+        private static string Sg(long v) { return v >= 0 ? "+" + v : v.ToString(); }
+        private static int _st312;   // 312e: potkniecia rozkladu (per krolestwo; linia dalej bez rozkladu)
+
+        /// <summary>
+        /// 312e (Jeff 01.11 "sprawdz czemu traca korony"; raport rozp312 P1) - TYLKO NAPIS: rozklad zmiany skarbca od wczorajszej linii na kanaly z ksiegi doby korony
+        /// (CrownIncome.KDay - te same liczby co linia 165) i z przesuniec migawki. Okno: wczorajsza linia -> dzisiejsza (po End). Tozsamosc:
+        /// zmiana = wplywy - z budzetu dnia - z zapasu + korona-korona + kredyty + tarczowe W6 - splaty pozyczek miast + do zapasu poza wplywami + reszta;
+        /// reszta = to, czego zadna z tych pozycji nie liczy (nagrody 178, zaokraglenia darow, wplywy bloku korony spoza okien) - liczona, nie dopasowana.
+        /// "Ponad wplywy dnia" (1/450 zapasu wydane z budzetu) to czesc "z budzetu dnia", nie osobny skladnik sumy. Bez wpisu doby korony albo bez wczorajszej
+        /// migawki - napis "brak rozkladu". Nie rzuca (potkniecie - licznik, linia bez rozkladu).
+        /// </summary>
+        private static string Split312(Kingdom k, bool hadW, long chg, Dictionary<Kingdom, long[]> shifts)
+        {
+            try
+            {
+                string g = DsSeason.GrantNote(k);
+                long res;   // zapas wojny - ta sama liczba co W5b / f23 (TreasurySurplusFor po End: bez reszty wplywow dnia)
+                double sur = KingdomTreasury.TreasurySurplusFor(k, out res);
+                string tail = (g.Length > 0 ? "; " + g : "; nadanie wojenne -") + ", zapas wojny " + res + ", nadwyzka " + (long)Math.Floor(sur)
+                              + (_st312 > 0 ? ", potkniecia rozkladu " + _st312 : "");
+                var d = CrownIncome.LedgerDayOf(k);
+                if (!hadW || d == null || !d.Snap) return "; zmiana doby (312e): brak rozkladu (" + (!hadW ? "pierwsza linia" : d == null ? "bez doby korony 165" : "bez wczorajszej migawki") + ")" + tail;
+                long[] sh; if (!shifts.TryGetValue(k, out sh) || sh == null) sh = new long[3];
+                long inc = d.Own + d.Other + d.OwnLate;
+                long zw = d.RefundGiven - d.DsTreas, rent = d.Rent, mer = d.Contract - d.ContractTr;
+                long oth = (d.CallToWar - d.CallToWarTr) + (d.LoanOut - d.LoanTr) + d.NeedAid + d.NeedAidRent + d.Bread + d.Court;
+                long bud = zw + rent + mer + oth;
+                long f24 = d.LoanTr + d.ContractTr + d.CallToWarTr, hb = KingdomTreasury.HoardUsedToday(k), hr = -sh[1];
+                long rs = d.CrownAid + d.MidAid + d.DsTreas + f24 + hb + hr;
+                long kk = d.RepIn - d.RepOut - d.GiftOut + sh[0];
+                long cr = d.LoanIn + d.DsAnt, sc = d.ScutIn - d.ScutOut, tr = d.TownRepaid, oz = sh[2];
+                long rest = chg - (inc - bud - rs + kk + cr + sc - tr + oz);
+                // czesc wydatkow z budzetu dnia ponad wplywy dnia (z 1/450 zapasu; raty i dary tez z budzetu, kredyty i raty przyjete go powiekszaja) - tylko informacja
+                long over = Math.Max(0, Math.Min(d.Release, bud + d.RepOut + d.GiftOut + tr - d.Measured - cr - d.RepIn));
+                return "; zmiana doby (312e) " + Sg(chg) + " = wplywy " + Sg(inc) + " (nasze " + d.Own + ", inne " + Sg(d.Other) + ", po otwarciu " + Sg(d.OwnLate) + ")"
+                       + " - z budzetu dnia " + bud + " (zwrot " + zw + ", renty " + rent + ", najemnicy " + mer + ", reszta budzetu " + oth + "; ponad wplywy dnia z 1/450 zapasu ok. " + over + ")"
+                       + " - z zapasu " + rs + " (W5b " + d.CrownAid + ", W5c " + d.MidAid + ", K5 " + d.DsTreas + ", f24 " + f24 + ", m105 chleb " + hb + ", m105 rachunki " + hr + ")"
+                       + " + korona-korona " + Sg(kk) + " (raty +" + d.RepIn + " -" + d.RepOut + ", dary -" + d.GiftOut + ", przejecia skarbu " + Sg(sh[0]) + ")"
+                       + " + kredyty " + Sg(cr) + " + tarczowe W6 " + Sg(sc) + " - splaty pozyczek miast " + tr + " + do zapasu poza wplywami " + Sg(oz) + " + reszta " + Sg(rest)
+                       + tail;
+            }
+            catch (Exception e)
+            {
+                if (_st312++ == 0) Log.Error("KingdomLedger.Split312", e);
+                return "; zmiana doby (312e): brak rozkladu (potkniecie)";
+            }
+        }
     }
 }

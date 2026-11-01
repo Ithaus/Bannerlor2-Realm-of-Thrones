@@ -7148,7 +7148,7 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownSurplusFeedsNeedAid { get; set; } = true;
 
-        [SettingPropertyInteger("Crown Surplus Aid Days", 1, 360, "0", HintText = "with Crown Surplus Feeds Need Aid: each day the crown spends at most one part in this many of its treasure above the war reserve (30 = a month's worth; the reserve itself is never touched)", RequireRestart = false)]
+        [SettingPropertyInteger("Crown Surplus Aid Days", 1, 360, "0", HintText = "with Crown Surplus Feeds Need Aid: each day the crown's aid to the wages of its houses from the treasure above the war reserve (the aid by need and the aid for houses of modest means, together) is at most one part in this many of that surplus (30 = a month's worth). This is not a limit on all spending from the treasury: the bread and food bills of hungry towns (Crown Hoard Feeds Hungry) have a limit of their own of the same size, the part of the wage refund the day's income cannot cover may take the whole surplus, and so may the dues of the day (mercenary contracts, Iron Bank instalments, calls to war) while the crown pays its war before the people's grant. The war reserve itself is never touched", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public int CrownSurplusAidDays { get; set; } = 30;
 

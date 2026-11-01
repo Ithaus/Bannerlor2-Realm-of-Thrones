@@ -72,6 +72,10 @@ namespace Armoury
             public long LoanTr, ContractTr, CallToWarTr;
             public bool DuesTrDry;
             public bool Snap;
+            // 312e (pomiar skarbcow koron, tylko liczniki - zadnej zmiany zlota): doba gry wpisu (KingdomLedger czyta wpis po End, do nastepnego Begin), wplywy "nasze"
+            // z okien 184/P1/M9 wplacone po Begin (przed End; zamkniete z oknem - w zadnych wplywach dnia) i splaty pozyczek koron u miast (korona2, KlRepay)
+            public int Day = -1;
+            public long OwnLate, TownRepaid;
         }
 
         private static readonly Dictionary<Kingdom, KDay> _day = new Dictionary<Kingdom, KDay>();
@@ -156,6 +160,7 @@ namespace Armoury
             _day.Clear(); _wEnd.Clear(); _wEndDay = -1; _open = false; _debts.Clear(); _ownSpend.Clear(); _advance.Clear();
             _wfRing.Clear(); _wfN.Clear(); LastWindfall = 0; LastWindfallN = 0; _dWf = 0; _dWfN = 0;   // ds-akumulator: pierscien "inne" - pamiec sesji
             _refDueY.Clear(); _refDueYDay = -1;   // M2b
+            _shiftWin.Clear();                    // 312e: przesuniecia migawki w oknie linii "Skarbce:" (pamiec sesji)
             _dNewKing = 0; _dNewKingN = 0;        // L1 (recenzja): nowe dlugi okupow krolow - licznik linii 165 czyszczony miedzy kampaniami
             ZeroLast(); _dDebtRepaid = _dNewDebt = _dDropped = 0; _dNewDebtN = _dDroppedN = 0; _dAdvRepaid = _dAdvNew = 0;
             _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
@@ -307,6 +312,7 @@ namespace Armoury
                     {
                         if (k == null || k.IsEliminated || k.StringId == null) continue;
                         var d = new KDay();
+                        d.Day = today;                                  // 312e: wpis tej doby (KingdomLedger po End)
                         long w = k.KingdomBudgetWallet;
                         d.Wallet0 = w;
                         long dues; KingdomTreasury.DuesToday.TryGetValue(k, out dues);
@@ -424,10 +430,42 @@ namespace Armoury
         }
 
         /// <summary>GL-2 (zloto startowe): przelew `delta` do skarbca poza wplywami - wczorajsza migawka przesunieta o niego, wiec "inne wplywy" dnia go nie licza (nie wydaje sie go jak dochodu).</summary>
-        internal static void ShiftSnapshot(Kingdom k, long delta)
+        /// 312e: `tag` - tylko licznik okna linii "Skarbce:" (KingdomLedger): 'k' przelew korona-korona / przejecie skarbu (stolica, unia, upadek korony, prolog,
+        /// ksiega lenn), 'm' rachunki zywnosci m105 ze skarbca (KsLordFood), reszta 'o' (do zapasu poza wplywami: pozyczki miast korona2, myto, straz, rynek ludzi).
+        internal static void ShiftSnapshot(Kingdom k, long delta, char tag = 'o')
         {
             try { long w; if (k != null && k.StringId != null && delta != 0 && _wEnd.TryGetValue(k.StringId, out w)) _wEnd[k.StringId] = w + delta; }
             catch (Exception e) { Log.Error("CrownIncome.ShiftSnapshot", e); }
+            try
+            {
+                if (k == null || delta == 0) return;
+                long[] r;
+                if (!_shiftWin.TryGetValue(k, out r)) { r = new long[3]; _shiftWin[k] = r; }
+                r[tag == 'k' ? 0 : tag == 'm' ? 1 : 2] += delta;
+            }
+            catch (Exception e) { Stumble("ShiftSnapshot(312e)", e); }
+        }
+
+        // 312e: przesuniecia migawki na krolestwo od ostatniej linii "Skarbce:" ([0] korona-korona, [1] m105 rachunki, [2] inne do zapasu) - zloto przeszlo przez skarbiec
+        // poza wplywami dnia; czysci KingdomLedger.Daily (zawsze, takze przy wylaczonej ksiedze). Tylko licznik.
+        private static readonly Dictionary<Kingdom, long[]> _shiftWin = new Dictionary<Kingdom, long[]>();
+
+        /// <summary>312e: przesuniecia migawki krolestwa w oknie linii "Skarbce:" (kopia; zera - brak). Tylko odczyt.</summary>
+        internal static long[] ShiftWindowOf(Kingdom k)
+        {
+            long[] r;
+            return k != null && _shiftWin.TryGetValue(k, out r) ? (long[])r.Clone() : new long[3];
+        }
+
+        /// <summary>312e: okno przesuniec zamkniete (KingdomLedger.Daily, po linii "Skarbce:").</summary>
+        internal static void ShiftWindowClear() { _shiftWin.Clear(); }
+
+        /// <summary>312e: wpis doby korony krolestwa po End (do nastepnego Begin) - tylko gdy z dzisiejszej doby gry; null - brak (165 wylaczone, krolestwo bez wpisu).
+        /// Tylko odczyt (linia "Skarbce:").</summary>
+        internal static KDay LedgerDayOf(Kingdom k)
+        {
+            KDay d;
+            return k != null && Campaign.Current != null && _day.TryGetValue(k, out d) && d.Day == (int)CampaignTime.Now.ToDays ? d : null;
         }
 
         // ------------------------------------------------------------ koniec: migawka skarbcow i linia "Korona: wplywy dnia (165)"
@@ -441,6 +479,17 @@ namespace Armoury
                 _wEnd.Clear();
                 foreach (var k in Kingdom.All) if (k != null && !k.IsEliminated && k.StringId != null) _wEnd[k.StringId] = k.KingdomBudgetWallet;
                 _wEndDay = today;
+                // 312e (tylko licznik): wplywy okien 184 / P1 / M9 wplacone po Begin - okna zamykane zaraz nizej, wiec ich nie ma w zadnych wplywach dnia (sa w migawce)
+                foreach (var kv in _day)
+                {
+                    try
+                    {
+                        var k = kv.Key; var d = kv.Value;
+                        if (k == null || d == null) continue;
+                        d.OwnLate = KingdomTreasury.FolkWarTaxWindow(k) + KingdomTreasury.FolkWarAidWindow(k) + DsSeason.MovWindow(k) - d.WarTax - d.WarAid - d.DsMov;
+                    }
+                    catch (Exception e) { Stumble("End(312e)", e); }
+                }
                 KingdomTreasury.FolkWarTaxWindowClear();   // E5/B2 (184): okno wplywow dnia zamkniete razem z migawka (pobor po Begin jest juz w migawce - zapas)
                 DsSeason.WindowClear();                    // DS F3 (M9): okno dziesiatej zamkniete razem z oknem 184
                 LastAdvanceRepaid = _dAdvRepaid; LastAdvanceNew = _dAdvNew; _dAdvRepaid = 0; _dAdvNew = 0;   // recenzja C1 (OBIEG-1): zaliczka gry (licznik doby)
@@ -485,7 +534,8 @@ namespace Armoury
                               + (d.ScutIn > 0 || d.ScutOut > 0 ? " tarczowe W6 +" + d.ScutIn + " -" + d.ScutOut : "")
                               + (d.CrownAid > 0 ? " ze skarbca W5b -" + d.CrownAid : "")
                               + (d.MidAid > 0 ? " dla srednich W5c -" + d.MidAid : "")
-                              + (d.Windfall > 0 ? " jednoraz. do zapasu " + d.Windfall : "")));
+                              + (d.Windfall > 0 ? " jednoraz. do zapasu " + d.Windfall : "")
+                              + K312(k, d)));
                 }
                 parts.Sort((x, y) => y.Key.CompareTo(x.Key));
                 var txt = new List<string>(); foreach (var p in parts) txt.Add(p.Value);
@@ -553,6 +603,18 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("End", e); }
             finally { _open = false; }
+        }
+
+        /// <summary>312e (tylko napis linii 165, na krolestwo): dwor krolewski E3-P1 tej doby, m105 chleb ze skarbca tej doby i m105 rachunki zywnosci ze skarbca
+        /// po wczorajszym zamknieciu korony (KsLordFood biegnie po End - w oknie przesuniec od wczorajszej linii "Skarbce:"). Zera - pusto (napis jak dotad). Nie rzuca.</summary>
+        private static string K312(Kingdom k, KDay d)
+        {
+            try
+            {
+                long hb = KingdomTreasury.HoardUsedToday(k), hr = -ShiftWindowOf(k)[1];
+                return (d.Court > 0 ? " dwor -" + d.Court : "") + (hb > 0 ? " m105 chleb -" + hb : "") + (hr != 0 ? " m105 rachunki wczoraj -" + hr : "");
+            }
+            catch (Exception e) { Stumble("K312", e); return ""; }
         }
 
         // ------------------------------------------------------------ Diplomacy: odszkodowania jako dlug korona -> korona

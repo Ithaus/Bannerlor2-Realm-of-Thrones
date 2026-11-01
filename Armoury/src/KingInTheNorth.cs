@@ -700,7 +700,7 @@ namespace Armoury
                 river.KingdomBudgetWallet -= rest;
                 north.KingdomBudgetWallet += rest;
                 long got = (long)north.KingdomBudgetWallet - nv0;
-                CrownIncome.ShiftSnapshot(north, got);   // 165: skarb przejety, nie wplyw dnia (jak G14 a)
+                CrownIncome.ShiftSnapshot(north, got, 'k');   // 165: skarb przejety, nie wplyw dnia (jak G14 a)
                 taken += rest; added += got;
                 double loan = CrownBorrow.MoveLoan(river, north);
                 sb.Append("skarbiec Dorzecza ").Append(w0).Append(" -> splata Banku ").Append(paid).Append(", do skarbca Polnocy ").Append(rest)
