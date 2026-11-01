@@ -2167,6 +2167,11 @@ namespace Armoury
                 // R3-08c (ForcedMarch.cs): przelacznik marszu forsownego
                 if (ForcedMarch.Offerable())
                     copts.Add(new InquiryElement(4, ForcedMarch.Active ? "End the forced march" : "Forced march", null, true, ForcedMarch.Hint()));
+                // 312g (Jeff 01.11: "wchodze do obozu O i nie moge ustawic ile godzin maja cwiczyc moi ludzie"): trening przed snem tez z panelu O,
+                // nie tylko z menu rozbitego obozu - to samo okno wyboru (TbsChoose), ten sam stan w zapisie
+                if (CampDrill.PlayerRuleOn)
+                    copts.Add(new InquiryElement(5, "Train before sleep: " + TbsLabel(TbsHours), null, true,
+                        "How many hours before nightfall the column halts each day to drill in camp (off, or 1 to 8 hours)."));
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
                     "Camp", "Pitch the tents - or set the standing orders for nightfall.",
                     copts, true, 1, 1, "Choose", GameTexts.FindText("str_cancel").ToString(),
@@ -2183,6 +2188,7 @@ namespace Armoury
                                 case 2: CampPromptMode = 1; Msg(PartyWords.NoTroops ? "Nightfall orders: you will make camp at dusk on your own." : "Nightfall orders: the column will camp at dusk on its own.", Colors.White); break;
                                 case 3: CampPromptMode = 2; Msg("Nightfall orders: no questions - march at will.", Colors.White); break;
                                 case 4: ForcedMarch.Toggle("klawisz O"); break;   // R3-08c
+                                case 5: TbsChoose(); break;                         // 312g
                             }
                         }
                         catch (Exception e) { Log.Error("NightRest.CampPanel", e); }

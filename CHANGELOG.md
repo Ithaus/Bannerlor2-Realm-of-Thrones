@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-01 WGRANIE 149 - 312g trening przed snem tez z panelu klawisza O; Armoury.dll 36388366ec48be9633aec620c6225a11 (galaz noc/312g-o-trening); kopia 148: Armoury.dll.bak-2026-11-01-przed-wgranie149 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie149-przed
+
+**Problem:** Jeff 01.11: "wchodze do obozu O i nie moge ustawic ile godzin maja cwiczyc moi ludzie". Opcja "Train before sleep: N h" (311e) byla tylko w menu rozbitego obozu (arm_camp_wait), a panel klawisza O (okno "Camp") jej nie mial.
+**Przyczyna:** 311e dodalo opcje tylko przez AddGameMenuOption("arm_camp_wait", ...), panel O to osobne okno wyboru (NightRest.cs, InquiryElement 0-4).
+**Zmiana:** NightRest.cs: w panelu O pozycja 5 "Train before sleep: off / N h" (gdy CampDrill.PlayerRuleOn), wybor otwiera to samo okno TbsChoose; stan ten sam (arm_nightrest). Nic wiecej.
+**Ryzyko / co sprawdzic:** okno wyboru otwierane z callbacku okna O (_askOpen zdjete przed); TbsChoose przelacza menu tylko w arm_camp_wait, na mapie nie. Test 312g: 2 doby na zapisie Jeffa, kod 0, ERROR 0 (samego klikniecia autotest nie sprawdza - Jeff w grze: O -> "Train before sleep").
+**Status:** WGRANE 149
+
 ## 2026-11-01 WGRANIE 148 - noc/312x-integracja (147 + 312a zuzycie monety, 312b konce zatargow ROT, 312c ambicja Zelaznego Tronu, 312d przezbrojenia notabli z rynku miasta, 312e pomiar skarbcow, 312f linia strat bitwy); Armoury.dll ef080a64a09b09787dddc7e8f7c6a977 (CrashScribe bez zmian aa32d04e); kopia 147: Armoury.dll.bak-2026-11-01-przed-wgranie148 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie148-przed
 
 **Problem:** decyzje Jeffa 01.11 (1 konce zatargow "kazdy chce zostac krolem i zdobyc zelazny tron", 2 czemu traca korony, 3 napraw notabli, 4 rozbij straty, 5 wlacz mennice, 6 nowe wojny o Westeros bez psucia Wojny Pieciu Kroli; odpowiedzi: cisza do Krwawych Godow, na Polnoc po Bitwie Bekartow).
