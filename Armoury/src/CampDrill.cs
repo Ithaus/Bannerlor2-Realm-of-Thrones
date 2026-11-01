@@ -509,7 +509,7 @@ namespace Armoury
         {
             MBTextManager.SetTextVariable("ARM_DRILL_TEXT", "The men drill in camp - sword and shield, the spear wall, volleys at the butts, marching in step. Today: "
                 + F1(_dayHours) + " of " + (int)FullHours + " hours. What they learn is counted with their daily drill."
-                + (_pre ? " The column halted to drill before sleep; at nightfall (" + NightRest.SleepNightStart + ":00) the men bed down." : ""));   // 311e
+                + (_pre ? " The column halted to drill before sleep; at nightfall (" + NightRest.SleepNightStart + ":00) the men bed down" + NightRest.TbsUntilDawn() + "." : ""));   // 311e; 315a: do switu (klucz SleepUntilDawn)
         }
 
         /// <summary>311e: postoj na trening przed snem - wejscie w menu cwiczen z czystej mapy (NightRest.TbsHour z ticku godzinowego, po wszystkich warunkach).

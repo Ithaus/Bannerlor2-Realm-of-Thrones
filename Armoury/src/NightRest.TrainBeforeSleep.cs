@@ -181,9 +181,10 @@ namespace Armoury
             Tent(mp, true);              // namiot raz, przy zmianie stanu (CLAUDE.md 7)
             _tbsStarts++; _tbsWant = want; _tbsStartAt = CampaignTime.Now.ToHours;
             int hc = CampaignTime.Now.GetHourOfDay;
-            Msg(PartyWords.Pick("The column halts " + want + "h before nightfall to drill in camp; at nightfall the men bed down.",
-                                "You halt " + want + "h before nightfall to train; at nightfall you bed down.",
-                                "You and your companions halt " + want + "h before nightfall to train; at nightfall you bed down."), Colors.White);
+            string dawnTxt = TbsUntilDawn();   // 315a: sen po treningu trwa do switu (klucz SleepUntilDawn)
+            Msg(PartyWords.Pick("The column halts " + want + "h before nightfall to drill in camp; at nightfall the men bed down" + dawnTxt + ".",
+                                "You halt " + want + "h before nightfall to train; at nightfall you bed down" + dawnTxt + ".",
+                                "You and your companions halt " + want + "h before nightfall to train; at nightfall you bed down" + dawnTxt + "."), Colors.White);
             Log.Info(TbsP + "start o " + hc + ":00 | ustawienie " + n + " h " + TbsSource() + ", cwiczen do nocy snu " + want + " h (noc snu od " + SleepNightStart
                      + ":00, dzis od switu juz " + F2(CampDrill.PlayerDayHours) + " h z 8) | ludzi zdolnych " + men
                      + (armyParties > 0 ? ", armia gracza: druzyn doczepionych " + armyParties + ", ludzi " + armyMen + " (cwicza z godzin postoju za dnia - Drill.RestHour)" : "")
@@ -210,7 +211,7 @@ namespace Armoury
                 if (sleep) _tbsSleeps++;
                 Log.Info(TbsP + "koniec o " + CampaignTime.Now.GetHourOfDay + ":00 | cwiczen " + F2(hours) + " h (zegara " + F2(clock) + " h, zamierzone " + _tbsWant
                          + " h) | powod: " + why + " | dzis od switu " + F2(CampDrill.PlayerDayHours) + " h z 8, do policzenia " + F2(CampDrill.PlayerOwed)
-                         + " h - XP policzy tick musztry (linia 'Szkolenie w obozie (m97): gracz' z dopiskiem 311e) | dalej: " + (sleep ? "sen w menu (arm_sleep_wait)" : "menu obozu")
+                         + " h - XP policzy tick musztry (linia 'Szkolenie w obozie (m97): gracz' z dopiskiem 311e) | dalej: " + (sleep ? "sen w menu (arm_sleep_wait" + (s != null && s.SleepUntilDawn ? ", do switu " + PlayerDawn + ":00 - linia 'Sen do switu (315a)'" : "") + ")" : "menu obozu")
                          + ".");
             }
             catch (Exception e) { TbsStumble("End", e); }
@@ -248,6 +249,13 @@ namespace Armoury
         // ------------------------------------------------------------ menu obozu
         private static string TbsLabel(int n) { return n <= 0 ? "off" : n + " h"; }
 
+        /// <summary>315a: dopisek do napisow 311e - sen po treningu trwa do switu gracza (klucz SleepUntilDawn); wylaczony - pusty (jak dotad).</summary>
+        internal static string TbsUntilDawn()
+        {
+            var s = Settings.Current;
+            return s != null && s.SleepUntilDawn ? " until dawn (" + PlayerDawn + ":00)" : "";
+        }
+
         private static void TbsAddMenus(CampaignGameStarter starter)
         {
             starter.AddGameMenuOption("arm_camp_wait", "arm_camp_train_pre", "{=!}{ARM_TBS}",
@@ -260,7 +268,7 @@ namespace Armoury
                         int n = TbsHours;
                         if (a.Text != null) a.Text.SetTextVariable("ARM_TBS", "Train before sleep: " + TbsLabel(n));
                         a.Tooltip = new TextObject("{=!}Each day on the march your party - and the army you lead - halts this many hours before nightfall ("
-                            + SleepNightStart + ":00), drills in camp like Train the men and at nightfall beds down. Off, or 1 to 8 hours (a day holds at most 8 hours of drill)."
+                            + SleepNightStart + ":00), drills in camp like Train the men and at nightfall beds down" + TbsUntilDawn() + ". Off, or 1 to 8 hours (a day holds at most 8 hours of drill)."
                             + " Only on open land, by day and with no enemy near. "
                             + (_tbsSet >= 0 ? "Chosen here for this campaign." : "Now following the MCM setting (" + TbsLabel(TbsMcm) + ")."));
                         return true;

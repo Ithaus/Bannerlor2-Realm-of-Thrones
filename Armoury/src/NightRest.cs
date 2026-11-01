@@ -83,6 +83,13 @@ namespace Armoury
         // KA (16.10, karczmy - TownInns.cs): "Rouse the men early" w osadzie tylko podnosi flage - pobudke robi SleepTick (SwitchToMenu z opcji menu
         // oczekiwania = CTD, CLAUDE.md 7; ExitToLast w miescie laduje w town_outside - SmithMenu). Tylko pamiec
         private static bool _rouseAsked;
+        // 315a (Jeff 01.11 "czemu koncze wypoczynek o 00.00 przeciez to bez sensu, wypoczynek powinien byc wtedy jak jest noc a konczyc sie jak wstaje slonce"):
+        // sen w menu zaczety w nocy snu (MenuNight, przy obozie 21-3 godziny 18:00-2:59) poza noclegiem w karczmie trwa do switu gracza (PlayerDawn) - dotad
+        // konczyl sie po NeededHours (18:00 + 6 h = 0:00) i kolumna szla noca 0-3. _dawnHoldH = bezwzgledna godzina tego switu (CampaignTime.ToHours), -1 = bez
+        // czekania (sen za dnia do wyspania, jak dotad); _wakeWhy - powod pobudki do linii logu (ustawiany tuz przed LeaveSleep). Tylko pamiec - wczytanie
+        // w snie wola SleepInit od nowa i liczy czekanie od nowa.
+        private static double _dawnHoldH = -1;
+        private static string _wakeWhy;
 
         /// <summary>KA: gracz spi w menu snu (arm_sleep_wait) - odczyt dla karczm (gojenie w dobrym domu tylko tej nocy).</summary>
         internal static bool SleepingNow { get { return _sleeping; } }
@@ -137,6 +144,26 @@ namespace Armoury
 
         /// <summary>Bezpiecznik snu w menu w godzinach zegara (SleepInit: _sleepUntil) - nikt nie spi wiecznie, ale przy dlugu zegar biegnie dluzej niz sen.</summary>
         internal static float SleepCapHours() { return Math.Max(14f, NeededHours() * 1.8f + 2f); }
+
+        /// <summary>315a: bezwzgledna godzina switu gracza (PlayerDawn), do ktorej trwa sen w menu zaczety teraz - tylko w nocy snu (MenuNight: swit-9 do switu,
+        /// wiec swit najwyzej 9 h przed nami); -1 = bez czekania (sen za dnia do wyspania jak dotad, klucz SleepUntilDawn wylaczony). Nocleg w karczmie ma
+        /// wlasne czekanie (TownInns.HoldAbed) - SleepInit tego tam nie wola.</summary>
+        private static double DawnHoldFromNow(Settings s)
+        {
+            if (s == null || !s.SleepUntilDawn) return -1;
+            if (!MenuNight(CampaignTime.Now.GetHourOfDay)) return -1;
+            double hd = CampaignTime.Now.CurrentHourInDay;
+            double d = ((PlayerDawn - hd) % 24.0 + 24.0) % 24.0;
+            if (d < 0.01) return -1;
+            return CampaignTime.Now.ToHours + d;
+        }
+
+        /// <summary>315a: godzina zegara H:MM (do linii logu snu).</summary>
+        private static string Hm(double hourInDay)
+        {
+            int m = (int)Math.Round(((hourInDay % 24.0) + 24.0) % 24.0 * 60.0) % 1440;
+            return (m / 60) + ":" + (m % 60).ToString("00", CultureInfo.InvariantCulture);
+        }
 
         // kary % za dlug 0..3 (Jeff 30.08: juz PIERWSZA zarwana noc boli -25%;
         // morale procentowo przez AddFactor - "spada o 95%", nie o 95 punktow)
@@ -526,6 +553,7 @@ namespace Armoury
                 _lastRestPlayer = false; _lastMovedPlayer = false;
                 _menuDawnCut = 0f; _dawnOwed = 0f; _dawnDeferredUp = 0;
                 _menuNeeded = -1f; _menuDebt0 = 0; _menuDawns = 0;
+                _dawnHoldH = -1; _wakeWhy = null;   // 315a: czekanie do switu z poprzedniej kampanii nie przechodzi
                 _promptNight = -1; _warnNight = -1; _campMsgNight = -1; _raidNight = -1;
                 _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _lastDawnMsg = null;
                 _lastRaidAt = -1e9; _raidWorkHoursDay = 0; _raidWorkLogDay = long.MinValue;   // m103-drobne: rabunek gracza z poprzedniej kampanii nie jest praca tej godziny
@@ -1838,6 +1866,14 @@ namespace Armoury
                 try { clockH = (float)(CampaignTime.Now - _sleepStart).ToHours; } catch { }
                 Log.Info("Nocleg: sen w menu przerwany poza menu snu (menu '" + why + "') - koniec snu: w menu " + F1(_menuRest) + " h (zegara " + F1(clockH)
                          + " h), odpoczynek doby " + F1(_restTonight) + " h, dlug " + Debt + d + ".");
+                try
+                {
+                    Log.Info("Sen do switu (315a): koniec snu o " + Hm(CampaignTime.Now.CurrentHourInDay) + " (od " + Hm(_sleepStart.CurrentHourInDay) + ", zegara " + F1(clockH)
+                             + " h, w menu " + F1(_menuRest) + " h) | powod: przerwany (menu '" + why + "')"
+                             + (_dawnHoldH >= 0 ? " | czekanie do switu " + PlayerDawn + ":00 przerwane" : " | bez czekania do switu") + ".");
+                }
+                catch { }
+                _dawnHoldH = -1; _wakeWhy = null;
                 InnDrink.OnWake(_menuRest, false, "sen przerwany");   // m98-plotki (recenzja technika): odsypianie kufli z paska tego snu (wlasny try)
                 TownInns.OnInterrupted(_menuRest, why);   // KA: sen w karczmie przerwany - premia tylko po przespanej bazie (wlasny try)
                 _menuNeeded = -1f; _menuDawns = 0;
@@ -2363,6 +2399,7 @@ namespace Armoury
                         // KA (karczmy): w osadzie pobudka z ticku snu (flaga) - z opcji menu oczekiwania nie wolno SwitchToMenu, a ExitToLast laduje w town_outside;
                         // zegar ruszamy sami (ratunek po wczytaniu w srodku menu oczekiwania - wzor SmithMenu "Step away"). Poza osada - jak dotad
                         var here = MobileParty.MainParty != null ? MobileParty.MainParty.CurrentSettlement : null;
+                        _wakeWhy = "gracz (Rouse the men early)";   // 315a: powod pobudki do linii logu
                         if (here == null) { LeaveSleep(); return; }
                         _rouseAsked = true;
                         try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
@@ -2423,6 +2460,19 @@ namespace Armoury
                 }
                 catch { }
                 bool innFull = _menuNeeded > 0f && whole + 0.01f >= _menuNeeded;   // KA: pelny pasek - do premii karczmy (TownInns.OnWake nizej)
+                // 315a: linia snu gracza - od ktorej godziny, pobudka o ktorej, powod (swit / wyspani / bezpiecznik / gracz)
+                string wakeWhy = _wakeWhy ?? "?";
+                bool dawnWake = wakeWhy.StartsWith("swit", StringComparison.Ordinal);
+                try
+                {
+                    float clockS = (float)(CampaignTime.Now - _sleepStart).ToHours;
+                    Log.Info("Sen do switu (315a): pobudka o " + Hm(CampaignTime.Now.CurrentHourInDay) + " (od " + Hm(_sleepStart.CurrentHourInDay) + ", zegara " + F1(clockS)
+                             + " h, w menu " + F1(_menuRest) + " h z celu " + F1(_menuTarget) + " h) | powod: " + wakeWhy
+                             + (_dawnHoldH >= 0 ? " | czekanie do switu " + PlayerDawn + ":00 (Sleep Until Dawn)" : " | bez czekania do switu")
+                             + " | odpoczynek doby " + F1(_restTonight) + " h, dlug " + Debt + ".");
+                }
+                catch { }
+                _dawnHoldH = -1; _wakeWhy = null;
                 _menuNeeded = -1f; _menuDawns = 0;
                 // ZEGAREK SNU (Jeff 31.08): po pobudce liczby - ile zegara
                 // uplynelo, ile snu sie NALICZYLO (dzien liczy sie slabiej)
@@ -2432,7 +2482,7 @@ namespace Armoury
                     float clockH = (float)(CampaignTime.Now - _sleepStart).ToHours;
                     float effH = _menuRest;
                     int hh = CampaignTime.Now.GetHourOfDay;
-                    string when = "It is " + hh + ":00, " + DayPart(hh) + ". ";
+                    string when = "It is " + hh + ":00, " + (dawnWake ? "dawn" : DayPart(hh)) + ". ";   // 315a: pobudka o swicie gracza (3:00 przy obozie 21-3) to swit
                     if (clockH < 0.5f)
                         Msg(when + "You barely closed your eyes - no rest to speak of.", Colors.White);
                     else
@@ -2538,11 +2588,26 @@ namespace Armoury
                 _rouseAsked = false;
                 // KA (karczmy): sen w osadzie po oplaconym noclegu - pobudka nie przed switem (gdy swit w 12 h), tlo miasta, wlasny tekst (null = jak dotad)
                 string inn = TownInns.OnSleepInit(args);
+                // 315a: sen zaczety w nocy snu poza karczma trwa do switu gracza (karczma trzyma wlasny swit - TownInns.HoldAbed)
+                _dawnHoldH = inn == null ? DawnHoldFromNow(s) : -1;
+                _wakeWhy = null;
+                string untilDawn = " until dawn (" + PlayerDawn + ":00)";
                 // m110-sam: bez wojska (sam albo sami towarzysze) - "You ..." zamiast "The men ..."
                 MBTextManager.SetTextVariable("ARM_SLEEP_TEXT", inn ??
                     (_restTonight >= needed
-                        ? PartyWords.MenCap() + " have already slept " + (PartyWords.NoTroops ? "your" : "their") + " fill today - but a little more never hurt."
-                        : (PartyWords.MenCap() + " bed down and sleep" + (night ? "." : " - by daylight the rest comes slower."))));
+                        ? PartyWords.MenCap() + " have already slept " + (PartyWords.NoTroops ? "your" : "their") + " fill today - "
+                          + (_dawnHoldH >= 0 ? "but the night is long and " + (PartyWords.NoTroops ? "you sleep on" : "they sleep on") + untilDawn + "." : "but a little more never hurt.")
+                        : (PartyWords.MenCap() + " bed down and sleep" + (_dawnHoldH >= 0 ? untilDawn + "." : night ? "." : " - by daylight the rest comes slower."))));
+                try
+                {
+                    Log.Info("Sen do switu (315a): sen w menu od " + Hm(CampaignTime.Now.CurrentHourInDay) + " (powrot: " + (_sleepReturn ?? "?") + (again ? ", ponowne wejscie w ten sam sen" : "")
+                             + ") | cel snu " + F1(_menuTarget) + " h (potrzeba " + F1(needed) + " h, odpoczynek doby " + F1(_restTonight) + " h, dlug " + Debt + ") | "
+                             + (inn != null ? "nocleg w karczmie - pobudke trzyma karczma"
+                                : _dawnHoldH >= 0 ? "pobudka nie przed switem " + PlayerDawn + ":00 (za " + F1((float)(_dawnHoldH - CampaignTime.Now.ToHours)) + " h zegara, noc snu " + SleepNightStart + ":00-" + PlayerDawn + ":00)"
+                                : (s != null && !s.SleepUntilDawn ? "klucz Sleep Until Dawn wylaczony" : "sen za dnia (poza noca snu " + SleepNightStart + ":00-" + PlayerDawn + ":00)") + " - do wyspania")
+                             + ".");
+                }
+                catch { }
                 args.MenuContext.GameMenu.StartWait();
             }
             catch (Exception e) { Log.Error("NightRest.SleepInit", e); }
@@ -2595,7 +2660,7 @@ namespace Armoury
                 // oblezenie, bitwa pod murami, armia. Samo rozpoczecie oblezenia menu nie przelacza, a straznik snu reaguje dopiero na zmiane menu
                 if (SettlementInterrupt(s)) { _rouseAsked = false; return; }
                 // KA (karczmy): "Rouse the men early" w osadzie - pobudka tutaj (SwitchToMenu z ticku, wzor vanilla i SmithMenu)
-                if (_rouseAsked) { _rouseAsked = false; LeaveSleep(); return; }
+                if (_rouseAsked) { _rouseAsked = false; if (_wakeWhy == null) _wakeWhy = "gracz (Rouse the men early)"; LeaveSleep(); return; }
                 // wlasne godziny snu: noc pelna stawka, dzien slabiej - te same
                 // zasady co rachunek doby w OnHourly, ale bez jego zerowania
                 int h = CampaignTime.Now.GetHourOfDay;
@@ -2604,12 +2669,20 @@ namespace Armoury
                 // KA: w lozku karczmy sen idzie szybciej (wazone liczba ludzi w porzadnej karczmie i dobrym domu, x1.25); poza karczma 1 - jak dotad
                 _menuRest += (float)dt.ToHours * (night ? 1f : day) * TownInns.SleepFactor();
                 // KA: oplacony nocleg - pobudka nie przed switem (TownInns.HoldAbed; bezpiecznik _sleepUntil bez zmian)
-                if ((_menuRest >= _menuTarget && !TownInns.HoldAbed()) || (float)(_sleepUntil - CampaignTime.Now).ToHours <= 0.02f)
+                // 315a: sen zaczety w nocy snu - tez nie przed switem gracza (_dawnHoldH); po swicie dalej do wyspania (dlug), jak karczma
+                double nowH = CampaignTime.Now.ToHours;
+                bool dawnHold = _dawnHoldH >= 0 && nowH < _dawnHoldH;
+                bool cap = (float)(_sleepUntil - CampaignTime.Now).ToHours <= 0.02f;
+                if ((_menuRest >= _menuTarget && !TownInns.HoldAbed() && !dawnHold) || cap)
                 {
+                    _wakeWhy = cap ? "bezpiecznik zegara snu" : _dawnHoldH >= 0 && nowH - _dawnHoldH < 0.5 ? "swit gracza" : "wyspani (cel snu)";
                     LeaveSleep();
                     return;
                 }
-                args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(TownInns.Progress(Math.Min(1f, _menuRest / _menuTarget)));
+                float prog = TownInns.Progress(Math.Min(1f, _menuRest / _menuTarget));
+                if (_dawnHoldH >= 0 && _dawnHoldH > _sleepStart.ToHours)   // 315a: pasek przy czekaniu do switu - mniejsze z paska snu i zegara do switu (jak karczma)
+                    prog = Math.Max(0f, Math.Min(prog, (float)((nowH - _sleepStart.ToHours) / (_dawnHoldH - _sleepStart.ToHours))));
+                args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(prog);
             }
             catch (Exception e) { Log.Error("NightRest.SleepTick", e); }
         }

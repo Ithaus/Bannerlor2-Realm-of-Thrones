@@ -5496,6 +5496,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool PlayerSleepGuard { get; set; } = true;
 
+        [SettingPropertyBool("Sleep Until Dawn", HintText = "when you bed down in camp in the evening or at night (from nightfall of the sleep night - 18:00 with the camp hours 21-3 - until dawn), you and your men sleep until dawn (the end of the camp hours) instead of rising once the hours you need are slept - the column no longer wakes at midnight and marches through the rest of the night. A sleep begun by day still ends when you have slept enough; an inn keeps its own rule. Off = as before (you rise once the needed hours are slept)", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool SleepUntilDawn { get; set; } = true;
+
         [SettingPropertyBool("Night March Notice", HintText = "night marches are told plainly: the first camp hour your column is on the move (not only the camp-start hour) brings the nightfall question or your standing order, marching on brings a warning, standing still pitches camp with a note, and each dawn says how long the men rested and why they do or do not owe sleep; off = as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool NightMarchNotice { get; set; } = true;
@@ -12481,6 +12485,7 @@ namespace Armoury
             s.NightfallPromptEnabled = NightfallPromptEnabled;
             s.NightLedgerClock = NightLedgerClock;
             s.PlayerSleepGuard = PlayerSleepGuard;
+            s.SleepUntilDawn = SleepUntilDawn;
             s.NightMarchNotice = NightMarchNotice;
             s.RaidCountsAsWork = RaidCountsAsWork;
             s.ForcedMarch = ForcedMarch;

@@ -90752,5 +90752,110 @@ def main(argv):
             return zold314c_main(rest[0] if rest else None)
     return _zold314c_main_prev(argv)
 
+# ---------------------------------------------------------------- paczka 315a (01.11): sen w menu do switu - grupa sen315a
+# Jeff 01.11: "czemu koncze wypoczynek o 00.00 przeciez to bez sensu, wypoczynek powinien byc wtedy jak jest noc a konczyc sie jak wstaje slonce".
+# Sen w menu zaczety w nocy snu (18:00-2:59 przy obozie 21-3) poza karczma trwa do switu gracza (koniec obozu). Armoury/src/NightRest.cs (SleepInit,
+# SleepTick, LeaveSleep, EndSleepQuiet), klucz SleepUntilDawn.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa sen315a <Armoury-*.log>
+#  S315-0  linie "Sen do switu (315a): sen w menu od" sa (INFO bez snu w menu)
+#  S315-1  sen z czekaniem do switu: pobudka "swit gracza" o godzinie switu (do :30), "wyspani" nie przed switem (zegara >= godzin do switu - 0.1)
+#  S315-2  koniec treningu przed snem (311e) z "dalej: sen w menu" -> nastepny sen z czekaniem do switu (przy kluczu)
+#  S315-3  po snie z czekaniem do switu zaczetym nie pozniej niz poczatek obozu i pobudce o swicie: linia gracza o swicie "marsz w godzinach obozu 0 h"
+#  S315-4  zero linii ERROR w NightRest.SleepInit / SleepTick / LeaveSleep / EndSleepQuiet
+S315_START = re.compile(r"^Sen do switu \(315a\): sen w menu od (\d+):(\d\d) .*?\| (pobudka nie przed switem (\d+):00 \(za ([\d.]+) h|nocleg w karczmie|klucz Sleep Until Dawn wylaczony|sen za dnia)")
+S315_END = re.compile(r"^Sen do switu \(315a\): (pobudka|koniec snu) o (\d+):(\d\d) \(od (\d+):(\d\d), zegara ([\d.]+) h.*?\| powod: (.+?) \| (czekanie do switu|bez czekania)")
+S315_CAMP = re.compile(r"^NightRest: oboz swiata (\d+):00-(\d+):00")
+S315_DAWN = re.compile(r"^NocnyMarsz: gracz o swicie .*?marsz w godzinach obozu (\d+) h")
+
+
+def sen315a_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("S315-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, bad1, ok1, tbs_ends, tbs_bad, errors = 0, [], 0, 0, [], []
+    dawn_checks, dawn_bad = 0, []
+    camp_start = 21
+    cur = None            # biezacy sen: dict(start h, hold, dawn, ahead)
+    pend_tbs = False      # koniec 311e czeka na nastepny start snu
+    pend_dawn = None      # sen z czekaniem do switu skonczony o swicie - czeka na linie gracza o swicie
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            m = S315_CAMP.match(s)
+            if m:
+                camp_start = int(m.group(1))
+                continue
+            if s.startswith("Trening przed snem (311e): koniec o") and "dalej: sen w menu" in s:
+                pend_tbs = "do switu" in s   # przy kluczu wylaczonym (albo log sprzed 315a) linia nie mowi "do switu" - bez oczekiwania
+                if pend_tbs:
+                    tbs_ends += 1
+                continue
+            m = S315_START.match(s)
+            if m:
+                starts += 1
+                hold = m.group(4) is not None
+                cur = {"h": int(m.group(1)), "mm": int(m.group(2)), "hold": hold,
+                       "dawn": int(m.group(4)) if hold else None, "ahead": float(m.group(5)) if hold else None}
+                if pend_tbs and not hold:
+                    tbs_bad.append(s[:200])
+                pend_tbs = False
+                continue
+            m = S315_END.match(s)
+            if m:
+                wh, wm, clock, why = int(m.group(2)), int(m.group(3)), float(m.group(6)), m.group(7)
+                if cur is not None and cur["hold"]:
+                    if why.startswith("swit gracza"):
+                        good = wh == cur["dawn"] and wm <= 30
+                    elif why.startswith("wyspani"):
+                        good = clock >= cur["ahead"] - 0.1
+                    else:
+                        good = None   # gracz, przerwany, bezpiecznik - bez oceny
+                    if good is True:
+                        ok1 += 1
+                    elif good is False:
+                        bad1.append(s[:220])
+                    # sen zaczety najpozniej o poczatku obozu (godziny przed polnoca: od 12:00 do camp_start) i pobudka o swicie - noc bez marszu
+                    if why.startswith("swit gracza") and 12 <= cur["h"] <= camp_start:
+                        pend_dawn = s[:160]
+                cur = None
+                continue
+            m = S315_DAWN.match(s)
+            if m and pend_dawn is not None:
+                dawn_checks += 1
+                if int(m.group(1)) != 0:
+                    dawn_bad.append(f"{pend_dawn} -> marsz {m.group(1)} h")
+                pend_dawn = None
+                continue
+            if "ERROR" in s and any(k in s for k in ("NightRest.SleepInit", "NightRest.SleepTick", "NightRest.LeaveSleep", "NightRest.EndSleepQuiet")):
+                errors.append(s)
+    print(f"plik: {logp}")
+    rep.add("S315-0: sny w menu z linia 315a", f"{starts}", "> 0 (INFO bez snu w menu)", True if starts > 0 else None)
+    rep.add("S315-1: pobudka snu z czekaniem do switu", f"ocenionych dobrze {ok1}, zle {len(bad1)}" + (f" (pierwsza: {bad1[0]})" if bad1 else ""),
+            "zle 0 (swit o godzinie switu, wyspani nie przed switem)", (len(bad1) == 0) if (ok1 or bad1) else None)
+    rep.add("S315-2: trening 311e -> sen do switu", f"koncow 311e ze snem do switu {tbs_ends}, bez czekania do switu {len(tbs_bad)}" + (f" (pierwszy: {tbs_bad[0]})" if tbs_bad else ""),
+            "0 bez czekania", (len(tbs_bad) == 0) if tbs_ends else None)
+    rep.add("S315-3: noc po snie do switu bez marszu", f"sprawdzonych switow {dawn_checks}, z marszem {len(dawn_bad)}" + (f" (pierwszy: {dawn_bad[0]})" if dawn_bad else ""),
+            "marsz w godzinach obozu 0 h", (len(dawn_bad) == 0) if dawn_checks else None)
+    rep.add("S315-4: bledy snu w menu", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
+_sen315a_main_prev = main
+
+
+def main(argv):
+    # paczka 315a: grupa sen315a - opakowanie main jak leczenie314a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "sen315a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return sen315a_main(rest[0] if rest else None)
+    return _sen315a_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
