@@ -77,6 +77,7 @@ namespace Armoury
             public int Day = -1;
             public long OwnLate, TownRepaid;
             public long Reward178;   // 312e (recenzja): nagrody 178 za wielkiego jenca ze skarbca tej doby (Ransom178.CrownStep) - tylko licznik
+            public long Wage314, Gift314;   // 314c: zold krolewski i dary za zwyciestwo ze skarbca tej doby (CrownWar314.Daily) - tylko liczniki rozkladu 312e (czesc "nagrody 178")
         }
 
         private static readonly Dictionary<Kingdom, KDay> _day = new Dictionary<Kingdom, KDay>();

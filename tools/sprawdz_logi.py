@@ -88649,12 +88649,12 @@ KR312_RX = re.compile(r"; zmiana doby \(312e\) ([+-]\d+) = wplywy ([+-]\d+) \(na
                       r" - z budzetu dnia (-?\d+) \(zwrot (-?\d+), renty (-?\d+), najemnicy (-?\d+), reszta budzetu (-?\d+); ponad wplywy dnia z 1/(\d+) zapasu najwyzej (-?\d+)\)"
                       r" - z zapasu (-?\d+) \(W5b (-?\d+), W5c (-?\d+), K5 (-?\d+), f24 (-?\d+), m105 chleb (-?\d+), m105 rachunki wczoraj (-?\d+)\)"
                       r" \+ korona-korona ([+-]\d+) \(raty \+(-?\d+) -(-?\d+), dary -(-?\d+), przejecia skarbu ([+-]\d+)\)"
-                      r" \+ kredyty ([+-]\d+) \+ tarczowe W6 ([+-]\d+) - splaty pozyczek miast (-?\d+) - nagrody 178 (-?\d+) \+ do zapasu poza wplywami ([+-]\d+) \+ reszta ([+-]\d+)"
+                      r" \+ kredyty ([+-]\d+) \+ tarczowe W6 ([+-]\d+) - splaty pozyczek miast (-?\d+) - nagrody 178 (-?\d+)(?: \(w tym zold krolewski 314c (-?\d+), dary za zwyciestwo 314c (-?\d+)\))? \+ do zapasu poza wplywami ([+-]\d+) \+ reszta ([+-]\d+)"
                       r"; nadanie wojenne (?:g ([\d.]+)( \(najpierw skarbiec\))?|-), zapas wojny (-?\d+), nadwyzka (-?\d+)")
 KR312_NO = re.compile(r"; zmiana doby \(312e\): brak rozkladu \(([^)]*)\)")
 KR312_ST = re.compile(r"potkniecia rozkladu (\d+)")
 KR312_F = ("chg", "inc", "own", "oth", "late", "bud", "zw", "rent", "mer", "bo", "rdays", "over", "rs", "w5b", "w5c", "k5", "f24", "hb", "hr",
-           "kk", "rin", "rout", "dar", "prz", "cr", "sc", "tr", "rw", "oz", "rest", "g", "tf", "res", "sur")
+           "kk", "rin", "rout", "dar", "prz", "cr", "sc", "tr", "rw", "w314", "g314", "oz", "rest", "g", "tf", "res", "sur")
 KR312_ERR = ("KingdomLedger.Split312", "KingdomLedger(312e)", "CrownIncome.K312", "CrownIncome.End(312e)", "CrownIncome.ShiftSnapshot(312e)", "DsSeason.GrantNote")
 KR312_165 = "Korona: wplywy dnia (165): dzien "
 KR312_165SEG = "na krolestwo (wplywy+zapas, wydatki): "
@@ -88685,6 +88685,8 @@ def kr312_parse(s):
                 d[k] = float(v) if v is not None else None
             elif k == "tf":
                 d[k] = v is not None
+            elif k in ("w314", "g314"):
+                d[k] = int(v) if v is not None else 0   # 314c: dopisek tylko przy zoldzie / darach krola tej doby (w "nagrody 178")
             else:
                 d[k] = int(v)
     n = KR312_NO.search(s)
@@ -90513,6 +90515,242 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return leczenie314a_main(rest[0] if rest else None)
     return _leczenie314a_main_prev(argv)
+
+
+# ---------------------------------------------------------------- paczka 314c (01.11): zold krolewski i nagroda krola - grupa zold314c
+# Jeff 01.11 "tak zrob a i b": zold krolewski po 40 dniach sluzby w armii krolestwa (ze skarbca, tylko gdy jest zloto) i dar + wplywy za pobicie lorda / armii.
+# Linie C# (Armoury/src/CrownWar314.cs): "Zold krolewski (314c): dzien N ..." raz na dobe (blok korony) i "Nagroda krola (314c): dzien N ..." na bitwe i krolestwo.
+# Z314-S self-test wyrazen na probkach; Z314-0 linie doby obecne i czytelne (brak - NIEPOKRYTY); Z314-1 ksiegowosc doby: ze skarbca razem = z wplywow dnia + ponad
+#   zapas wojny = zold wyplacony + dary wyplacone (0 bledow - zloto ma platnika i odbiorce); Z314-2 wyplacone <= nalezne i niedoplata = nalezne - wyplacone;
+# Z314-3 rody: bez zaplaty + platnych = w armiach, wyplacono <= platnych; Z314-4 dni sluzby gracza: rosna najwyzej o 1 na dobe;
+# Z314-5 ciecie zwrotu 70% doby N <= zold wyplacony doby N-1 (0 bledow; jeden zloty raz); Z314-6 linie nagrody: pobitych lordow >= 1, "(armia)" <=> >= 2,
+#   w kolejce + czesc krola <= dar (0 bledow; bandy nic - linia tylko przy lordach); Z314-7 kolejka darow: w kolejce(N) = w kolejce(N-1) + dodane miedzy liniami
+#   - wyplacone(N) - przepadlo(N) (pary dob kolejnych bez wczytania zapisu; 0 bledow); Z314-8 ERROR CrownWar314 i potkniecia (0 i 0);
+# Z314-9 rozklad 312e: suma "zold krolewski 314c" / "dary za zwyciestwo 314c" w liniach "Skarbce:" doby = wyplacone w linii 314c tej doby (gdy dopiski sa; brak - NIEPOKRYTY).
+Z314_DAY = re.compile(r"^Zold krolewski \(314c\): dzien (\d+) \| zold (tak|nie) \(([\d.]+)% zoldu szeregowych, (\d+) dni w roku bez zaplaty\) \| krolestw w wojnie (\d+)"
+                      r" \| rody w armiach (\d+) \(bez zaplaty (\d+), platnych (-?\d+), wyplacono (\d+)\), szeregowych platnych (\d+) \| nalezne (\d+), wyplacone (\d+)"
+                      r" \| dary za zwyciestwo: wyplacone (\d+), w kolejce (\d+) \(pozycji (\d+)\), przepadlo (\d+) \| ze skarbca razem (\d+) \(z wplywow dnia (\d+), ponad zapas wojny (\d+)(?:; wplywy dnia zostawione dla W5 (\d+))?\)"
+                      r", niedoplata zoldu (\d+) w (\d+) krolestwach \| ciecie zwrotu 70% \(zold 314c z wczoraj\) (\d+)(?:, zold 314c mniej o gotowke pana 277 (\d+))? \| gracz: dni sluzby (\d+)/(\d+), zold (\d+), dar (\d+) \| potkniecia (\d+)\.")
+Z314_DF = ("day", "on", "pct", "free", "wark", "svc", "fr", "paidc", "paidn", "men", "due", "paid", "gpaid", "pend", "pendn", "lapsed", "tot", "left", "stock",
+           "keep", "short", "shortk", "cut", "c277", "pld", "plfree", "plw", "plg", "st")   # recenzja 314c: keep (wplywy zostawione dla W5), c277 - pola opcjonalne (brak = 0)
+Z314_GIFT = re.compile(r"^Nagroda krola \(314c\): dzien (\d+) \| (.+?) pokonal (.+?) \| pobitych partii lordow (\d+)( \(armia\))?, ich ludzi na starcie (\d+)"
+                       r" \| udzial krolestwa w wkladzie (\d+)% \| dar (\d+) zl \(w kolejce do skarbca (\d+), czesc krola i najemnikow (\d+)\), wplywy ([\d.]+) dla (\d+) rodow"
+                       r"(?:; gracz: dar (\d+), wplywy ([\d.]+))?\.")
+Z314_SAMPLE = ("Zold krolewski (314c): dzien 109000 | zold tak (50% zoldu szeregowych, 40 dni w roku bez zaplaty) | krolestw w wojnie 18 | rody w armiach 12 (bez zaplaty 5,"
+               " platnych 7, wyplacono 7), szeregowych platnych 900 | nalezne 4000, wyplacone 3500 | dary za zwyciestwo: wyplacone 1500, w kolejce 2000 (pozycji 3), przepadlo 0"
+               " | ze skarbca razem 5000 (z wplywow dnia 3000, ponad zapas wojny 2000; wplywy dnia zostawione dla W5 700), niedoplata zoldu 500 w 1 krolestwach | ciecie zwrotu 70% (zold 314c z wczoraj) 1200, zold 314c mniej o gotowke pana 277 40"
+               " | gracz: dni sluzby 41/40, zold 300, dar 0 | potkniecia 0.")
+Z314_GSAMPLE = ("Nagroda krola (314c): dzien 109000 | Polnoc pokonal Lannister | pobitych partii lordow 2 (armia), ich ludzi na starcie 300 | udzial krolestwa w wkladzie 100%"
+                " | dar 4500 zl (w kolejce do skarbca 3000, czesc krola i najemnikow 1500), wplywy 15 dla 2 rodow; gracz: dar 2000, wplywy 10.")
+
+
+def z314_day(t):
+    m = Z314_DAY.match(t)
+    if not m:
+        return None
+    d = {}
+    for i, k in enumerate(Z314_DF):
+        v = m.group(i + 1)
+        d[k] = (v == "tak") if k == "on" else (float(v) if k == "pct" else (int(v) if v is not None else 0))
+    return d
+
+
+def z314_gift(t):
+    m = Z314_GIFT.match(t)
+    if not m:
+        return None
+    return {"day": int(m.group(1)), "k": m.group(2), "foe": m.group(3), "lords": int(m.group(4)), "army": bool(m.group(5)), "men": int(m.group(6)),
+            "share": int(m.group(7)), "gold": int(m.group(8)), "queued": int(m.group(9)), "kept": int(m.group(10)), "infl": float(m.group(11)),
+            "clans": int(m.group(12)), "plg": int(m.group(13)) if m.group(13) else None}
+
+
+def z314_bad_day(d):
+    out = []
+    if d["left"] + d["stock"] != d["tot"]:
+        out.append(f"{d['day']}: z wplywow {d['left']} + ponad zapas {d['stock']} != razem {d['tot']}")
+    if d["paid"] + d["gpaid"] != d["tot"]:
+        out.append(f"{d['day']}: zold {d['paid']} + dary {d['gpaid']} != ze skarbca {d['tot']}")
+    return out
+
+
+def z314_bad_gift(g):
+    out = []
+    if g["lords"] < 1:
+        out.append(f"{g['day']} {g['k']}: pobitych lordow {g['lords']}")
+    if g["army"] != (g["lords"] >= 2):
+        out.append(f"{g['day']} {g['k']}: armia {g['army']} przy {g['lords']} lordach")
+    if g["queued"] + g["kept"] > g["gold"]:
+        out.append(f"{g['day']} {g['k']}: w kolejce {g['queued']} + krol {g['kept']} > dar {g['gold']}")
+    return out
+
+
+def zold314c_selftest():
+    d = z314_day(Z314_SAMPLE)
+    if not d or d["paid"] != 3500 or d["cut"] != 1200 or d["pld"] != 41 or d["plfree"] != 40 or not d["on"] or d["pct"] != 50.0 or d["keep"] != 700 or d["c277"] != 40:
+        return f"probka linii doby: {d}"
+    d0 = z314_day(Z314_SAMPLE.replace("; wplywy dnia zostawione dla W5 700", "").replace(", zold 314c mniej o gotowke pana 277 40", ""))
+    if not d0 or d0["keep"] != 0 or d0["c277"] != 0 or d0["paid"] != 3500:
+        return f"probka linii doby sprzed recenzji: {d0}"
+    if z314_bad_day(d):
+        return "tozsamosc probki doby: " + z314_bad_day(d)[0]
+    if not z314_bad_day(z314_day(Z314_SAMPLE.replace("razem 5000", "razem 5001"))):
+        return "zla probka doby przeszla"
+    g = z314_gift(Z314_GSAMPLE)
+    if not g or g["lords"] != 2 or not g["army"] or g["plg"] != 2000 or g["queued"] != 3000:
+        return f"probka nagrody: {g}"
+    if z314_bad_gift(g):
+        return "probka nagrody: " + z314_bad_gift(g)[0]
+    g2 = z314_gift(Z314_GSAMPLE.replace("; gracz: dar 2000, wplywy 10", "").replace(" (armia)", ""))
+    if not g2 or g2["plg"] is not None or not z314_bad_gift(g2):
+        return "probka nagrody bez gracza / armia przy 2 lordach bez znacznika - nie wykryto"
+    sk = KR312_SAMPLE.replace("nagrody 178 0 +", "nagrody 178 0 (w tym zold krolewski 314c 0, dary za zwyciestwo 314c 0) +")
+    r = kr312_parse(sk)
+    if not r or r[5] is None or r[5]["w314"] != 0 or kr312_bad(r):
+        return "linia 312e z dopiskiem 314c"
+    r0 = kr312_parse(KR312_SAMPLE)
+    if not r0 or r0[5] is None or r0[5]["w314"] != 0 or r0[5]["g314"] != 0:
+        return "linia 312e bez dopisku 314c"
+    return None
+
+
+def zold314c_main(logp):
+    """zold314c (01.11, paczka 314c): Z314-S, Z314-0..9 - opis nad Z314_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = zold314c_selftest()
+    rep.add("Z314-S: self-test wyrazen linii 314c i dopisku w 'Skarbce:'", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("Z314-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    days, bad_rows, gifts, errs = [], 0, [], 0
+    loaded = set()   # id linii doby z dopiskiem "Wczytano z zapisu" (para z poprzednia doba pomijana w Z314-7)
+    events = []      # kolejnosc w logu: ("d", dict) / ("g", dict)
+    sk = {}          # dzien -> [suma w314, suma g314, linii z dopiskiem]
+    gaps = set()     # doby z linia "Skarbce:" bez rozkladu 312e
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            t = m.group(2) if m else ln.rstrip("\r\n")
+            if t.startswith("Zold krolewski (314c): dzien "):
+                d = z314_day(t)
+                if d is None:
+                    bad_rows += 1
+                    continue
+                if "Wczytano z zapisu" in t:
+                    loaded.add(id(d))
+                days.append(d)
+                events.append(("d", d))
+            elif t.startswith("Nagroda krola (314c): dzien "):
+                g = z314_gift(t)
+                if g is None:
+                    bad_rows += 1
+                    continue
+                gifts.append(g)
+                events.append(("g", g))
+            elif t.startswith("Skarbce: dzien "):
+                r = kr312_parse(t)
+                if r is None:
+                    continue
+                if r[5] is None:
+                    gaps.add(r[0])   # krolestwo bez rozkladu tej doby (pierwsza linia, po wczytaniu) - suma dopiskow doby niepelna
+                elif r[5]["w314"] or r[5]["g314"]:
+                    a = sk.setdefault(r[0], [0, 0, 0])
+                    a[0] += r[5]["w314"]
+                    a[1] += r[5]["g314"]
+                    a[2] += 1
+            elif "CrownWar314" in t and ("ERROR" in t or "Exception" in t):
+                errs += 1
+    print(f"plik: {logp} | linii doby 314c {len(days)}, linii nagrody {len(gifts)}, nieczytelnych {bad_rows}, dob z dopiskiem 314c w 'Skarbce:' {len(sk)}")
+    have = bool(days)
+    rep.add("Z314-0: linie 'Zold krolewski (314c)' obecne i czytelne",
+            f"linii {len(days)}, nieczytelnych 314c {bad_rows}" if (have or bad_rows) else "NIEPOKRYTY (log sprzed 314c albo bez dob kampanii)",
+            ">= 1, nieczytelnych 0", (have and bad_rows == 0) if (have or bad_rows) else None)
+    if not have:
+        for c in ("Z314-1: ksiegowosc doby", "Z314-2: nalezne i wyplacone", "Z314-3: rody", "Z314-4: dni sluzby gracza", "Z314-5: ciecie zwrotu",
+                  "Z314-7: kolejka darow", "Z314-9: rozklad 312e"):
+            rep.add(c, "NIEPOKRYTY (brak linii doby)", "-", None)
+    else:
+        b1 = [x for d in days for x in z314_bad_day(d)]
+        rep.add("Z314-1: ze skarbca = z wplywow dnia + ponad zapas wojny = zold + dary (kazda doba)", f"dob {len(days)}, bledow {len(b1)}" + (f" (np. {b1[0]})" if b1 else "")
+                + f"; razem ze skarbca {sum(d['tot'] for d in days)} (z wplywow {sum(d['left'] for d in days)}, ponad zapas {sum(d['stock'] for d in days)})", "0 bledow", not b1)
+        b2 = [d["day"] for d in days if d["paid"] > d["due"] or d["short"] != max(0, d["due"] - d["paid"])]
+        rep.add("Z314-2: wyplacone <= nalezne, niedoplata = nalezne - wyplacone", f"bledow {len(b2)}" + (f" (doba {b2[0]})" if b2 else "")
+                + f"; nalezne razem {sum(d['due'] for d in days)}, wyplacone {sum(d['paid'] for d in days)}, dob z niedoplata {sum(1 for d in days if d['short'] > 0)}",
+                "0 bledow", not b2)
+        b3 = [d["day"] for d in days if d["fr"] + d["paidc"] != d["svc"] or d["paidn"] > d["paidc"] or d["paidc"] < 0]
+        rep.add("Z314-3: rody w armiach = bez zaplaty + platnych, wyplacono <= platnych", f"bledow {len(b3)}; rodo-dni sluzby {sum(d['svc'] for d in days)}, "
+                f"w tym bez zaplaty {sum(d['fr'] for d in days)}, z wyplata {sum(d['paidn'] for d in days)}",
+                "0 bledow (rodo-dni > 0 tylko gdy rody byly w armiach w wojnie)", not b3)
+        b4 = []
+        for a, b in zip(days, days[1:]):
+            if b["day"] == a["day"] + 1 and b["pld"] > a["pld"] + 1:
+                b4.append(f"{a['day']}->{b['day']}: {a['pld']}->{b['pld']}")
+        rep.add("Z314-4: dni sluzby gracza rosna najwyzej o 1 na dobe", f"bledow {len(b4)}" + (f" (np. {b4[0]})" if b4 else "")
+                + f"; ostatnia doba {days[-1]['pld']}/{days[-1]['plfree']}, zold gracza razem {sum(d['plw'] for d in days)}, dary gracza {sum(d['plg'] for d in days)}",
+                "0 bledow", not b4)
+        b5, n5 = [], 0
+        for a, b in zip(days, days[1:]):
+            if b["day"] != a["day"] + 1:
+                continue
+            n5 += 1
+            if b["cut"] > a["paid"]:
+                b5.append(f"{b['day']}: ciecie {b['cut']} > zold wczoraj {a['paid']}")
+        rep.add("Z314-5: ciecie zwrotu 70% <= zold 314c doby poprzedniej (jeden zloty raz)", f"par dob {n5}, bledow {len(b5)}" + (f" (np. {b5[0]})" if b5 else "")
+                + f"; ciecie razem {sum(d['cut'] for d in days)}", "0 bledow", (not b5) if n5 else None)
+        b7, n7, added, last = [], 0, 0, None
+        for kind, x in events:
+            if kind == "g":
+                added += x["queued"]
+                continue
+            if last is not None and x["day"] == last["day"] + 1 and id(x) not in loaded:
+                n7 += 1
+                exp = last["pend"] + added - x["gpaid"] - x["lapsed"]
+                if exp != x["pend"]:
+                    b7.append(f"{x['day']}: w kolejce {x['pend']} != {last['pend']} + {added} - {x['gpaid']} - {x['lapsed']}")
+            last = x
+            added = 0
+        rep.add("Z314-7: kolejka darow domknieta (w kolejce = wczoraj + dodane - wyplacone - przepadlo)", f"par dob {n7}, bledow {len(b7)}" + (f" (np. {b7[0]})" if b7 else "")
+                + f"; dary wyplacone {sum(d['gpaid'] for d in days)}, przepadlo {sum(d['lapsed'] for d in days)}, w kolejce na koniec {days[-1]['pend']}",
+                "0 bledow", (not b7) if n7 else None)
+        if sk:
+            byday = {d["day"]: d for d in days}
+            b9, n9 = [], 0
+            for dd, (w, g, _) in sk.items():
+                d = byday.get(dd)
+                if d is None or dd in gaps:
+                    continue
+                n9 += 1
+                if w != d["paid"] or g != d["gpaid"]:
+                    b9.append(f"{dd}: Skarbce zold {w} / dary {g} wobec 314c {d['paid']} / {d['gpaid']}")
+            rep.add("Z314-9: dopiski 314c w 'Skarbce:' = wyplacone w linii doby 314c", f"dob {n9}, bledow {len(b9)}" + (f" (np. {b9[0]})" if b9 else ""),
+                    "0 bledow (wymaga CrownCurrentIncome - bez doby korony dopiskow nie ma)", (not b9) if n9 else None)
+        else:
+            rep.add("Z314-9: dopiski 314c w 'Skarbce:'", "NIEPOKRYTY (brak dopiskow - brak wyplat 314c albo ksiega skarbcow wylaczona)", "-", None)
+    if gifts:
+        b6 = [x for g in gifts for x in z314_bad_gift(g)]
+        rep.add("Z314-6: linie nagrody krola - lordowie >= 1, armia <=> >= 2, kolejka + krol <= dar",
+                f"linii {len(gifts)} (armii {sum(1 for g in gifts if g['army'])}), bledow {len(b6)}" + (f" (np. {b6[0]})" if b6 else "")
+                + f"; dar razem {sum(g['gold'] for g in gifts)}, w kolejce {sum(g['queued'] for g in gifts)}, wplywy {sum(g['infl'] for g in gifts):.0f},"
+                f" gracz: linii {sum(1 for g in gifts if g['plg'] is not None)}", "0 bledow", not b6)
+    else:
+        rep.add("Z314-6: linie nagrody krola", "NIEPOKRYTY (brak zwyciestw nad lordami wrogow w logu)", "-", None)
+    st = max([d["st"] for d in days] + [0])
+    rep.add("Z314-8: potkniecia i ERROR CrownWar314", f"potkniecia {st}, ERROR {errs}", "0 i 0", st == 0 and errs == 0)
+    rep.show()
+    return 0
+
+_zold314c_main_prev = main
+
+
+def main(argv):
+    # paczka 314c: grupa zold314c - opakowanie main jak korony312e
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "zold314c":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return zold314c_main(rest[0] if rest else None)
+    return _zold314c_main_prev(argv)
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

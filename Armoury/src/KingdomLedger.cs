@@ -119,7 +119,7 @@ namespace Armoury
                 long f24 = d.LoanTr + d.ContractTr + d.CallToWarTr, hb = KingdomTreasury.HoardUsedToday(k), hr = -sh[1];
                 long rs = d.CrownAid + d.MidAid + d.DsTreas + f24 + hb + hr;
                 long kk = d.RepIn - d.RepOut - d.GiftOut + sh[0];
-                long cr = d.LoanIn + d.DsAnt, sc = d.ScutIn - d.ScutOut, tr = d.TownRepaid, oz = sh[2], rw = d.Reward178;
+                long cr = d.LoanIn + d.DsAnt, sc = d.ScutIn - d.ScutOut, tr = d.TownRepaid, oz = sh[2], rw = d.Reward178 + d.Wage314 + d.Gift314;   // 314c: zold i dary krola w tej samej pozycji (wyplata ze skarbca do glow rodow poza budzetem rent)
                 long rest = chg - (inc - bud - rs + kk + cr + sc - tr - rw + oz);
                 // czesc wydatkow z budzetu dnia ponad wplywy dnia (z 1/N zapasu; raty i dary tez z budzetu, kredyty i raty przyjete go powiekszaja) - tylko informacja, GORNA granica
                 // (splaty miast z nadwyzki KlRepay(extra) i nagrody 178 nie sa tu odejmowane od budzetu - recenzja 312e)
@@ -128,7 +128,7 @@ namespace Armoury
                        + " - z budzetu dnia " + bud + " (zwrot " + zw + ", renty " + rent + ", najemnicy " + mer + ", reszta budzetu " + oth + "; ponad wplywy dnia z 1/" + Math.Max(1f, s.CrownReserveReleaseDays).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " zapasu najwyzej " + over + ")"
                        + " - z zapasu " + rs + " (W5b " + d.CrownAid + ", W5c " + d.MidAid + ", K5 " + d.DsTreas + ", f24 " + f24 + ", m105 chleb " + hb + ", m105 rachunki wczoraj " + hr + ")"
                        + " + korona-korona " + Sg(kk) + " (raty +" + d.RepIn + " -" + d.RepOut + ", dary -" + d.GiftOut + ", przejecia skarbu " + Sg(sh[0]) + ")"
-                       + " + kredyty " + Sg(cr) + " + tarczowe W6 " + Sg(sc) + " - splaty pozyczek miast " + tr + " - nagrody 178 " + rw + " + do zapasu poza wplywami " + Sg(oz) + " + reszta " + Sg(rest)
+                       + " + kredyty " + Sg(cr) + " + tarczowe W6 " + Sg(sc) + " - splaty pozyczek miast " + tr + " - nagrody 178 " + rw + (d.Wage314 + d.Gift314 > 0 ? " (w tym zold krolewski 314c " + d.Wage314 + ", dary za zwyciestwo 314c " + d.Gift314 + ")" : "") + " + do zapasu poza wplywami " + Sg(oz) + " + reszta " + Sg(rest)
                        + tail;
             }
             catch (Exception e)
