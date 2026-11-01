@@ -820,6 +820,7 @@ namespace Armoury
                     CirculationWindows.NoteHeroGold(h, ip);
                     if (h != Hero.MainHero) ClanIncomeBook.NoteInflow(h, ip, ClanIncomeBook.KRansom);
                     r.Left -= ip; _dRewardPaid += ip;
+                    try { var kd = CrownIncome.DayOf(k); if (kd != null) kd.Reward178 += ip; } catch { }   // 312e (recenzja): tylko licznik linii "Skarbce:"
                     if (h == Hero.MainHero) Log.Player("The crown of " + k.Name + " pays you " + ip + " denars as the reward for a royal captive.");
                     if (r.Left <= 0) _rewards.Remove(r);
                 }

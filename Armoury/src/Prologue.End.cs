@@ -112,8 +112,8 @@ namespace Armoury
                     to.KingdomBudgetWallet += (int)moved;
                     got = (long)to.KingdomBudgetWallet - v0;
                     _nr = "done:" + moved.ToString(Inv);    // recenzja m116: znacznik zaraz po przelewie - wyjatek nizej nie powtorzy go jutro
-                    CrownIncome.ShiftSnapshot(to, got);      // 165: zwrot skarbu, nie wplyw dnia
-                    CrownIncome.ShiftSnapshot(from, -moved); // 165: ubytek skarbu, nie "ujemny wplyw"
+                    CrownIncome.ShiftSnapshot(to, got, 'k');      // 165: zwrot skarbu, nie wplyw dnia
+                    CrownIncome.ShiftSnapshot(from, -moved, 'k'); // 165: ubytek skarbu, nie "ujemny wplyw"
                     e1 = " | historia skarbca E1 (CrashScribe): " + BookHoldings.E1Text(BookHoldings.E1Shift(to, got), to.Name.ToString())
                          + ", " + BookHoldings.E1Text(BookHoldings.E1Shift(from, -moved), from.Name.ToString());
                 }

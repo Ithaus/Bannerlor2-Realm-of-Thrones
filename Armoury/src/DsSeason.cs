@@ -387,6 +387,14 @@ namespace Armoury
         private static string N0(double v) { return double.IsNaN(v) || double.IsInfinity(v) ? "0" : Math.Round(v).ToString("0", Inv); }
         private static string G2(double v) { return v.ToString("0.0#", Inv); }
 
+        /// <summary>312e (tylko napis linii "Skarbce:"): stan nadania wojennego krolestwa - g ostatniej sesji i "najpierw skarbiec" (f23, nadanie 0 dzieki skarbcowi).
+        /// Pusto - krolestwo bez stanu DS. Nie rzuca.</summary>
+        internal static string GrantNote(Kingdom k)
+        {
+            try { var g = GkOf(k, false); return g == null ? "" : "nadanie wojenne g " + G2(g.G) + (g.HoldTf ? " (najpierw skarbiec)" : ""); }
+            catch (Exception e) { Stumble("GrantNote", e); return ""; }
+        }
+
         /// <summary>Bieg fin74 (17.10): srednia z OSTATNICH 'last' probek wojny (pierscien od glowy H) - sesja 'po rampie' liczy zwykle wplywy juz bez starych poborow
         /// (P1, zawor, podatek od skarbca ludu), ktore w oknie pomiaru firm zawyzaly prognoze (np. King's Landing: 85k prognozy wobec ok. 25k po rampie, g zostalo 0.5).</summary>
         /// <summary>fin75: mediana z ostatnich 'last' probek wojny (pierscien od glowy H); brak - 0.</summary>

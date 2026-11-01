@@ -1331,8 +1331,8 @@ namespace Armoury
                 moved = w0 - from.KingdomBudgetWallet;
                 to.KingdomBudgetWallet += (int)moved;
                 got = (long)to.KingdomBudgetWallet - v0;
-                CrownIncome.ShiftSnapshot(to, got);                    // 165: zwrot skarbu, nie wplyw dnia
-                CrownIncome.ShiftSnapshot(from, -moved);               // 165: ubytek skarbu, nie "ujemny wplyw"
+                CrownIncome.ShiftSnapshot(to, got, 'k');                    // 165: zwrot skarbu, nie wplyw dnia
+                CrownIncome.ShiftSnapshot(from, -moved, 'k');               // 165: ubytek skarbu, nie "ujemny wplyw"
                 // po recenzji: E1 CrashScribe (PovertyPeace) liczy ubytek z 7 dob historii skarbca i migawki 165 nie czyta - ta sama zasada co 165: przeniesienie
                 // skarbu, nie ubytek ani wplyw doby (inaczej Polnoc przez 7 dob "w biedzie": ubytek ok. 160 tys./d, zapas ponizej 28 dob)
                 e1 = ", historia skarbca E1 (CrashScribe): " + E1Text(E1Shift(to, got), Nm(to)) + ", " + E1Text(E1Shift(from, -moved), Nm(from));

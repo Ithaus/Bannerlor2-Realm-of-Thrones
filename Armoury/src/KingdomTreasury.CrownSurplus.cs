@@ -75,6 +75,14 @@ namespace Armoury
             catch (Exception e) { CsStumble("HoardRoom", e); return 0; }
         }
 
+        /// <summary>312e (tylko odczyt, linie "Skarbce:" i 165): ile skarbiec `k` wydal dzis na glodne miasta z limitu m105 (chleb M3 w BreadRest; rachunki KS-H
+        /// dochodza pozniej, po linii "Skarbce:"). 0 - inna doba albo nic.</summary>
+        internal static long HoardUsedToday(Kingdom k)
+        {
+            long[] r;
+            return k != null && Campaign.Current != null && _hfDay == (int)CampaignTime.Now.ToDays && _hf.TryGetValue(k, out r) ? Math.Max(0, r[1]) : 0;
+        }
+
         /// <summary>m105 G2: skarbiec `k` wydal dzis `x` zl na glodne miasta (limit doby).</summary>
         internal static void HoardUse(Kingdom k, long x)
         {

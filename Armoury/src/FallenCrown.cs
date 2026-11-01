@@ -142,7 +142,7 @@ namespace Armoury
                         long v0 = wk.KingdomBudgetWallet;
                         wk.KingdomBudgetWallet += ir;
                         got = (long)wk.KingdomBudgetWallet - v0;
-                        CrownIncome.ShiftSnapshot(wk, got);                       // 165: skarb przejety, nie wplyw dnia (jak L5b-1)
+                        CrownIncome.ShiftSnapshot(wk, got, 'k');                       // 165: skarb przejety, nie wplyw dnia (jak L5b-1)
                         pGot = Clan.PlayerClan != null && ReferenceEquals(Clan.PlayerClan.Kingdom, wk);
                     }
                     else

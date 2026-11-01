@@ -265,7 +265,7 @@ namespace Armoury
                 {
                     wk.KingdomBudgetWallet += (int)moved;
                     got = (long)wk.KingdomBudgetWallet - v0;
-                    CrownIncome.ShiftSnapshot(wk, got);                          // 165: skarb przejety, nie wplyw dnia zdobywcy
+                    CrownIncome.ShiftSnapshot(wk, got, 'k');                          // 165: skarb przejety, nie wplyw dnia zdobywcy
                     _dToCrowns += got;
                 }
                 else if (head != null)
@@ -277,7 +277,7 @@ namespace Armoury
                     _dToHeads += got; _dToHeadsN++;
                 }
                 else { loser.KingdomBudgetWallet += (int)moved; moved = 0; }     // nie ma komu dac - zloto wraca (nic nie znika)
-                CrownIncome.ShiftSnapshot(loser, -moved);                        // 165: ubytek skarbu, nie "ujemny wplyw" przegranego
+                CrownIncome.ShiftSnapshot(loser, -moved, 'k');                        // 165: ubytek skarbu, nie "ujemny wplyw" przegranego
                 _dTaken += moved; _dDiff += moved - got;
                 mode = "przelew";
             }

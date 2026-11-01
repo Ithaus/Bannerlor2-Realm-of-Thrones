@@ -694,8 +694,9 @@ namespace Armoury
                 else to.S.SettlementComponent.ChangeGold(moved);
                 try
                 {
-                    if (from.K != null) CrownIncome.ShiftSnapshot(from.K, -moved);
-                    if (to.K != null) CrownIncome.ShiftSnapshot(to.K, moved);
+                    char tg = from.K != null && to.K != null ? 'k' : 'o';   // 312e (recenzja): 'k' tylko korona-korona; korona <-> bohater / osada - 'o'
+                    if (from.K != null) CrownIncome.ShiftSnapshot(from.K, -moved, tg);
+                    if (to.K != null) CrownIncome.ShiftSnapshot(to.K, moved, tg);
                     if (from.H != null) CirculationWindows.NoteHeroGold(from.H, -moved);
                     if (to.H != null)
                     {

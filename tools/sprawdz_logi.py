@@ -88585,6 +88585,316 @@ def main(argv):
     return _notable312d_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 312e (01.11): pomiar skarbcow koron - grupa korony312e
+# Jeff 01.11 "sprawdz czemu traca korony" (raport rozp312 P1, krytyka P2a) - tylko pomiar, zero zmian ekonomii. Log Armoury (Armoury-*.log).
+# KR312-S self-test: wyrazenie linii nowego formatu, tozsamosc na probkach, STARE czytniki linii "Skarbce:" (kingdom_war_series, K2_SKARB / R["skb"],
+#   NSK_RX_SK, NKR_RX_SKR + "dlug w Banku (186)", NZR ": skarbiec (-?\d+) \(", "na minusie N") i linii 165 (_nds_kmeas) na liniach nowego formatu - te same pola
+#   co bez dopisku;
+# KR312-0 dopisek "zmiana doby (312e)" w liniach "Skarbce:" (od pierwszej linii z dopiskiem - kazda; brak w logu - NIEPOKRYTY);
+# KR312-1 KONTROLA ZAPISU LINII (nie ksiegowosci - C# liczy reszte jako zmiana minus suma, wiec suma zawsze sie domyka): zmiana = wplywy - z budzetu - z zapasu
+#   + korona-korona + kredyty + W6 - splaty miast - nagrody 178 + do zapasu + reszta, sumy czesciowe nawiasow i zmiana = "(+X)" przy skarbcu (0 bledow);
+# KR312-2 PRAWDZIWY ROZJAZD = reszta rozkladu (to, czego zaden kanal nie liczy; w reszcie: zaokraglenia darow 182 u odbiorcy, wplywy bloku korony spoza okien):
+#   suma |reszty| / obrot brutto okna <= 2% (ponad - DECYZJA: kanal bez licznika, do rozpoznania), najwieksza pojedyncza reszta doby i krolestwa;
+# KR312-3 kanaly swiata na dobe (INFO): wplywy, z budzetu (w tym ponad wplywy z 1/450), z zapasu (W5b, W5c, K5, f24, m105 chleb / rachunki), korona-korona;
+# KR312-4 najwieksze straty krolestw w oknie z rozkladem (INFO); KR312-5 nadanie wojenne: krolestwa w wojnie przy "najpierw skarbiec" / g > 0 (INFO, ostatnia doba);
+# KR312-6 linie "brak rozkladu" wedlug powodu (INFO); KR312-7 linia 165 na krolestwo: "m105 chleb" = to samo krolestwo i doba w "Skarbce:", "m105 rachunki
+#   wczoraj" (165 doby N) = "m105 rachunki wczoraj" (Skarbce doby N) (0 bledow; brak - NIEPOKRYTY); KR312-8 potkniecia rozkladu i ERROR paczki (0; log bez dopisku - NIEPOKRYTY).
+# KR312-3: "ponad wplywy dnia z 1/N" to GORNA granica (splaty miast z nadwyzki i nagrody 178 nie sa odejmowane od budzetu).
+KR312_HEAD = re.compile(r"^Skarbce: dzien (\d+) - (.+?)( \(WOJNA\))?: skarbiec (-?\d+)(?: \(([+-]\d+)\))?")
+KR312_RX = re.compile(r"; zmiana doby \(312e\) ([+-]\d+) = wplywy ([+-]\d+) \(nasze (-?\d+), inne ([+-]\d+), po otwarciu ([+-]\d+)\)"
+                      r" - z budzetu dnia (-?\d+) \(zwrot (-?\d+), renty (-?\d+), najemnicy (-?\d+), reszta budzetu (-?\d+); ponad wplywy dnia z 1/(\d+) zapasu najwyzej (-?\d+)\)"
+                      r" - z zapasu (-?\d+) \(W5b (-?\d+), W5c (-?\d+), K5 (-?\d+), f24 (-?\d+), m105 chleb (-?\d+), m105 rachunki wczoraj (-?\d+)\)"
+                      r" \+ korona-korona ([+-]\d+) \(raty \+(-?\d+) -(-?\d+), dary -(-?\d+), przejecia skarbu ([+-]\d+)\)"
+                      r" \+ kredyty ([+-]\d+) \+ tarczowe W6 ([+-]\d+) - splaty pozyczek miast (-?\d+) - nagrody 178 (-?\d+) \+ do zapasu poza wplywami ([+-]\d+) \+ reszta ([+-]\d+)"
+                      r"; nadanie wojenne (?:g ([\d.]+)( \(najpierw skarbiec\))?|-), zapas wojny (-?\d+), nadwyzka (-?\d+)")
+KR312_NO = re.compile(r"; zmiana doby \(312e\): brak rozkladu \(([^)]*)\)")
+KR312_ST = re.compile(r"potkniecia rozkladu (\d+)")
+KR312_F = ("chg", "inc", "own", "oth", "late", "bud", "zw", "rent", "mer", "bo", "rdays", "over", "rs", "w5b", "w5c", "k5", "f24", "hb", "hr",
+           "kk", "rin", "rout", "dar", "prz", "cr", "sc", "tr", "rw", "oz", "rest", "g", "tf", "res", "sur")
+KR312_ERR = ("KingdomLedger.Split312", "KingdomLedger(312e)", "CrownIncome.K312", "CrownIncome.End(312e)", "CrownIncome.ShiftSnapshot(312e)", "DsSeason.GrantNote")
+KR312_165 = "Korona: wplywy dnia (165): dzien "
+KR312_165SEG = "na krolestwo (wplywy+zapas, wydatki): "
+KR312_SAMPLE = ("Skarbce: dzien 108900 - Qarth (WOJNA): skarbiec 900000 (-20000), dlug w Banku (186) 1234, krol Xaro kiesa 5000 bilans -10/dzien; rodow 5, kiesy razem 70000,"
+                " biednych (<1000) 1, na minusie 2; zmiana doby (312e) -20000 = wplywy +3000 (nasze 2000, inne +900, po otwarciu +100) - z budzetu dnia 5000 (zwrot 1000,"
+                " renty 2000, najemnicy 1500, reszta budzetu 500; ponad wplywy dnia z 1/450 zapasu najwyzej 2000) - z zapasu 18000 (W5b 5000, W5c 1000, K5 2000, f24 0,"
+                " m105 chleb 6000, m105 rachunki wczoraj 4000) + korona-korona -300 (raty +200 -400, dary -100, przejecia skarbu +0) + kredyty +250 + tarczowe W6 +50"
+                " - splaty pozyczek miast 100 - nagrody 178 0 + do zapasu poza wplywami +80 + reszta +20; nadanie wojenne g 0.0 (najpierw skarbiec), zapas wojny 500000, nadwyzka 400000;"
+                " wojsko rodow 321 ludzi.")
+KR312_SAMPLE_OLD = KR312_SAMPLE.split("; zmiana doby (312e)")[0] + "; wojsko rodow 321 ludzi."
+KR312_SAMPLE_NO = KR312_SAMPLE_OLD.replace("; wojsko", "; zmiana doby (312e): brak rozkladu (pierwsza linia); nadanie wojenne -, zapas wojny 500000, nadwyzka 0; wojsko")
+KR312_SAMPLE_165 = ("Korona: wplywy dnia (165): dzien 108900 | wplywy dnia 1 | na krolestwo (wplywy+zapas, wydatki): Qarth 2900+100 zwrot 1000/1000 renty 2000 wstrz. 0"
+                    " dwor -300 m105 chleb -6000 m105 rachunki wczoraj -4000, House Targaryen, Aegon 10+5 renty 1 wstrz. 0.")
+
+
+def kr312_parse(s):
+    """Linia "Skarbce:" -> (dzien, krolestwo, wojna, skarbiec, zmiana z nawiasu albo None, slownik rozkladu albo None, powod braku albo None, potkniecia)."""
+    m = KR312_HEAD.match(s)
+    if not m:
+        return None
+    r = KR312_RX.search(s)
+    d = None
+    if r:
+        d = {}
+        for i, k in enumerate(KR312_F):
+            v = r.group(i + 1)
+            if k == "g":
+                d[k] = float(v) if v is not None else None
+            elif k == "tf":
+                d[k] = v is not None
+            else:
+                d[k] = int(v)
+    n = KR312_NO.search(s)
+    st = KR312_ST.search(s)
+    return (int(m.group(1)), m.group(2), bool(m.group(3)), int(m.group(4)), int(m.group(5)) if m.group(5) else None, d,
+            n.group(1) if n else None, int(st.group(1)) if st else 0)
+
+
+def kr312_bad(row):
+    """Bledy tozsamosci jednego wiersza (lista napisow; pusta - zgodny)."""
+    day, name, war, wal, chg0, d, why, st = row
+    out = []
+    if d is None:
+        return out
+    tot = d["inc"] - d["bud"] - d["rs"] + d["kk"] + d["cr"] + d["sc"] - d["tr"] - d["rw"] + d["oz"] + d["rest"]
+    if tot != d["chg"]:
+        out.append(f"{day} {name}: suma skladnikow {tot} != zmiana {d['chg']}")
+    if d["own"] + d["oth"] + d["late"] != d["inc"]:
+        out.append(f"{day} {name}: wplywy {d['inc']} != nasze+inne+po otwarciu")
+    if d["zw"] + d["rent"] + d["mer"] + d["bo"] != d["bud"]:
+        out.append(f"{day} {name}: z budzetu {d['bud']} != zwrot+renty+najemnicy+reszta")
+    if d["w5b"] + d["w5c"] + d["k5"] + d["f24"] + d["hb"] + d["hr"] != d["rs"]:
+        out.append(f"{day} {name}: z zapasu {d['rs']} != suma W5b..m105")
+    if d["rin"] - d["rout"] - d["dar"] + d["prz"] != d["kk"]:
+        out.append(f"{day} {name}: korona-korona {d['kk']} != raty-dary+przejecia")
+    if chg0 is None or chg0 != d["chg"]:
+        out.append(f"{day} {name}: zmiana {d['chg']} != zmiana przy skarbcu {chg0}")
+    return out
+
+
+def kr312_165(s):
+    """Linia 165 -> (dzien, {krolestwo: (m105 chleb, m105 rachunki wczoraj)}) - tylko krolestwa z ktoryms z dopiskow 312e."""
+    day = num(r"dzien (\d+)", s)
+    i = s.find(KR312_165SEG)
+    out = {}
+    if day is None or i < 0:
+        return day, out
+    seg = s[i + len(KR312_165SEG):].split(" | ")[0].rstrip(".")
+    pend = ""
+    for part in _NDS_KSPLIT.split(seg):
+        mm = _NDS_KPART.match(part)
+        if not mm:
+            pend = (pend + ", " if pend else "") + part
+            continue
+        name = (((pend + ", ") if pend else "") + mm.group(1)).strip()
+        pend = ""
+        hb = re.search(r" m105 chleb -(\d+)", part)
+        hr = re.search(r" m105 rachunki wczoraj -(\d+)", part)
+        if hb or hr:
+            out[name] = (int(hb.group(1)) if hb else 0, int(hr.group(1)) if hr else 0)
+    return day, out
+
+
+def kr312_rows(rep, rows, k165, errs):
+    """Wiersze KR312-0..8 z wierszy kr312_parse (kolejnosc logu), linii 165 {dzien: {krolestwo: (chleb, rachunki)}} i liczby ERROR paczki."""
+    have = [r for r in rows if r[5] is not None or r[6] is not None]
+    if not rows:
+        rep.add("KR312-0: dopisek 'zmiana doby (312e)' w liniach 'Skarbce:'", "NIEPOKRYTY (brak linii 'Skarbce:')", "kazda linia od pierwszej z dopiskiem", None)
+    elif not have:
+        rep.add("KR312-0: dopisek 'zmiana doby (312e)' w liniach 'Skarbce:'", f"NIEPOKRYTY (linii {len(rows)}, z dopiskiem 0 - log sprzed 312e)",
+                "kazda linia od pierwszej z dopiskiem", None)
+    else:
+        first = next(i for i, r in enumerate(rows) if r[5] is not None or r[6] is not None)
+        tail = rows[first:]
+        miss = [r for r in tail if r[5] is None and r[6] is None]
+        rep.add("KR312-0: dopisek 'zmiana doby (312e)' w liniach 'Skarbce:'", f"linii od pierwszej z dopiskiem {len(tail)}, bez dopisku {len(miss)}"
+                + (f" (np. {miss[0][0]} {miss[0][1]})" if miss else "") + f"; z rozkladem {sum(1 for r in tail if r[5] is not None)}",
+                "0 bez dopisku", not miss)
+    full = [r for r in rows if r[5] is not None]
+    bad = [b for r in full for b in kr312_bad(r)]
+    rep.add("KR312-1: zapis linii (suma skladnikow = zmiana doby = zmiana przy skarbcu, sumy nawiasow; rozjazd ksiegowy - KR312-2)",
+            (f"wierszy {len(full)}, bledow {len(bad)}" + (f" (np. {bad[0]})" if bad else "")) if full else "NIEPOKRYTY (brak wierszy z rozkladem)",
+            "0 bledow", (not bad) if full else None)
+    if full:
+        gross = sum(abs(d["inc"]) + d["bud"] + d["rs"] + abs(d["kk"]) + abs(d["cr"]) + abs(d["sc"]) + d["tr"] + d["rw"] + abs(d["oz"]) for d in (r[5] for r in full))
+        ra = sum(abs(r[5]["rest"]) for r in full)
+        byk = {}
+        for r in full:
+            byk[r[1]] = byk.get(r[1], 0) + r[5]["rest"]
+        top = sorted(byk.items(), key=lambda kv: -abs(kv[1]))[:3]
+        big = max(full, key=lambda r: abs(r[5]["rest"]))
+        pct = (100.0 * ra / gross) if gross else 0.0
+        rep.add("KR312-2: reszta rozkladu (czego zaden kanal nie liczy) wobec obrotu brutto", f"suma |reszty| {ra} wobec obrotu brutto {gross} ({pct:.2f}%), swiat netto "
+                f"{sum(byk.values())}; najwieksza doba: {big[0]} {big[1]} {big[5]['rest']:+d}; najwieksze krolestwa: " + ", ".join(f"{k} {v:+d}" for k, v in top),
+                "<= 2% (ponad - DECYZJA: kanal bez licznika, w reszcie m.in. zaokraglenia darow 182 u odbiorcy)", pct <= 2.0, decide=True)
+        days = sorted({r[0] for r in full})
+        n = max(1, len(days))
+        S = {k: sum(r[5][k] for r in full) for k in ("chg", "inc", "bud", "over", "rs", "w5b", "w5c", "k5", "f24", "hb", "hr", "kk", "cr", "sc", "tr", "rw", "oz")}
+        rep.add("KR312-3: kanaly swiata na dobe (INFO)", f"{len(days)} dob: zmiana {S['chg'] / n:+.0f}, wplywy {S['inc'] / n:.0f}, z budzetu {S['bud'] / n:.0f} (ponad wplywy z 1/N zapasu, gorna granica "
+                f"{S['over'] / n:.0f}), z zapasu {S['rs'] / n:.0f} (W5b {S['w5b'] / n:.0f}, W5c {S['w5c'] / n:.0f}, K5 {S['k5'] / n:.0f}, f24 {S['f24'] / n:.0f}, m105 chleb "
+                f"{S['hb'] / n:.0f}, rachunki {S['hr'] / n:.0f}), korona-korona {S['kk'] / n:+.0f}, kredyty {S['cr'] / n:+.0f}, W6 {S['sc'] / n:+.0f}, splaty miast "
+                f"{S['tr'] / n:.0f}, nagrody 178 {S['rw'] / n:.0f}, do zapasu {S['oz'] / n:+.0f}", "INFO (raport rozp312: W5b ok. 47 tys./d, m105 ok. 24 tys./d)", None)
+        agg = {}
+        for r in full:
+            a = agg.setdefault(r[1], dict.fromkeys(("chg", "inc", "bud", "over", "w5b", "w5c", "k5", "f24", "hb", "hr", "kk", "rw", "rest"), 0))
+            for k in a:
+                a[k] += r[5][k]
+        worst = sorted(agg.items(), key=lambda kv: kv[1]["chg"])[:5]
+        rep.add("KR312-4: najwieksze straty krolestw w oknie (INFO)", "; ".join(
+            f"{k} {a['chg']:+d} (wplywy {a['inc']}, budzet {a['bud']} w tym ponad wplywy {a['over']}, W5b {a['w5b']}, W5c {a['w5c']}, K5 {a['k5']}, f24 {a['f24']},"
+            f" m105 {a['hb'] + a['hr']}, korona-korona {a['kk']:+d}, nagrody 178 {a['rw']}, reszta {a['rest']:+d})" for k, a in worst), "INFO", None)
+        last = max(days)
+        lw = [r for r in full if r[0] == last and r[2]]
+        rep.add(f"KR312-5: nadanie wojenne krolestw w wojnie (dzien {last}) - INFO", f"w wojnie {len(lw)}: najpierw skarbiec {sum(1 for r in lw if r[5]['tf'])}, "
+                f"g > 0 {sum(1 for r in lw if (r[5]['g'] or 0) > 0)}, bez stanu DS {sum(1 for r in lw if r[5]['g'] is None)}; nadwyzka ponad zapas wojny razem "
+                f"{sum(r[5]['sur'] for r in lw)}", "INFO (krytyka rozp312: 22 z 25 'nadanie 0 najpierw skarbiec')", None)
+    else:
+        for c in ("KR312-2: reszta rozkladu", "KR312-3: kanaly swiata", "KR312-4: straty krolestw", "KR312-5: nadanie wojenne"):
+            rep.add(c, "NIEPOKRYTY (brak wierszy z rozkladem)", "INFO", None)
+    why = {}
+    for r in rows:
+        if r[6] is not None:
+            why[r[6]] = why.get(r[6], 0) + 1
+    rep.add("KR312-6: linie 'brak rozkladu' wedlug powodu (INFO)", ", ".join(f"{k} {v}" for k, v in sorted(why.items())) if why else ("0" if have else "NIEPOKRYTY"),
+            "INFO (pierwsza linia sesji - tak; bez migawki / bez doby korony - po wczytaniu)", None)
+    idx = {(r[0], r[1]): r[5] for r in full}
+    seen7, bad7 = 0, []
+    for day, ks in k165.items():
+        for name, (hb, hr) in ks.items():
+            d = idx.get((day, name))
+            if d is None:
+                continue
+            seen7 += 1
+            if hb != d["hb"] or hr != d["hr"]:
+                bad7.append(f"{day} {name}: 165 chleb {hb} / rachunki {hr} wobec Skarbce {d['hb']} / {d['hr']}")
+    rep.add("KR312-7: linia 165 - m105 chleb i rachunki na krolestwo = rozklad 'Skarbce:' tej doby",
+            (f"par {seen7}, bledow {len(bad7)}" + (f" (np. {bad7[0]})" if bad7 else "")) if seen7 else "NIEPOKRYTY (brak dopiskow m105 w 165 albo rozkladu)",
+            "0 bledow", (not bad7) if seen7 else None)
+    st = max([r[7] for r in rows] + [0])
+    rep.add("KR312-8: potkniecia rozkladu i ERROR paczki 312e", f"potkniecia {st}, ERROR {errs}" + ("" if have else " (NIEPOKRYTY - log bez dopisku 312e)"), "0 i 0",
+            (st == 0 and errs == 0) if have else None)
+
+
+def korony312e_selftest():
+    r = kr312_parse(KR312_SAMPLE)
+    if not r or r[5] is None:
+        return "wyrazenie rozkladu nie pasuje do probki"
+    if (r[4] != -20000 or r[5]["hb"] != 6000 or r[5]["hr"] != 4000 or r[5]["rest"] != 20 or not r[5]["tf"] or r[5]["g"] != 0.0 or r[5]["sur"] != 400000
+            or r[5]["rdays"] != 450 or r[5]["over"] != 2000 or r[5]["rw"] != 0):
+        return f"zle pola: {r}"
+    if kr312_bad(r):
+        return "tozsamosc probki: " + kr312_bad(r)[0]
+    if not kr312_bad(kr312_parse(KR312_SAMPLE.replace("reszta +20", "reszta +21"))):
+        return "zla suma nie wykryta"
+    if not kr312_bad(kr312_parse(KR312_SAMPLE.replace("(-20000), dlug", "(-20001), dlug"))):
+        return "zmiana przy skarbcu nie porownana"
+    rw = kr312_parse(KR312_SAMPLE.replace("nagrody 178 0 + do", "nagrody 178 7 + do").replace("reszta +20", "reszta +27").replace("1/450", "1/300"))
+    if rw is None or rw[5] is None or rw[5]["rw"] != 7 or rw[5]["rdays"] != 300 or kr312_bad(rw):
+        return "nagrody 178 / 1/N nie czytane albo nie liczone w sumie"
+    gp = kr312_parse(KR312_SAMPLE_NO.replace("(pierwsza linia)", "(przerwa w ksiedze)"))
+    if gp is None or gp[6] != "przerwa w ksiedze":
+        return "powod 'przerwa w ksiedze' nie czytany"
+    nr = kr312_parse(KR312_SAMPLE_NO)
+    if nr is None or nr[5] is not None or nr[6] != "pierwsza linia":
+        return "linia 'brak rozkladu' nie czytana"
+    # stare czytniki linii "Skarbce:" - linia nowego formatu (z rozkladem i "brak rozkladu") daje te same pola co bez dopisku
+    ref = kingdom_war_series([KR312_SAMPLE_OLD])
+    for s in (KR312_SAMPLE, KR312_SAMPLE_NO):
+        if not ref or kingdom_war_series([s]) != ref:
+            return "kingdom_war_series - inny wynik na linii 312e"
+        for nm, rx in (("K2_SKARB", K2_SKARB), ("NSK_RX_SK", NSK_RX_SK), ("NKR_RX_SKR", NKR_RX_SKR)):
+            a, b = rx.match(s), rx.match(KR312_SAMPLE_OLD)
+            if not a or not b or (nm != "NKR_RX_SKR" and a.groups() != b.groups()) or (nm == "NKR_RX_SKR" and a.groups()[:4] != b.groups()[:4]):
+                return nm + " - inny wynik na linii 312e"
+        if re.search(r"dlug w Banku \(186\) (\d+)", NKR_RX_SKR.match(s).group(5)).group(1) != "1234":
+            return "NKR dlug w Banku - inny wynik"
+        for pat, want in ((r": skarbiec (-?\d+) \(", 900000), (r"dlug w Banku \(186\) (\d+)", 1234), (r"na minusie (\d+)", 2), (r"dzien (\d+)", 108900)):
+            if num(pat, s) != want:
+                return f"num({pat}) - inny wynik na linii 312e"
+        if not s.startswith(NZR_SK):
+            return "poczatek linii (NZR_SK)"
+    day, k = kr312_165(KR312_SAMPLE_165)
+    if day != 108900 or k != {"Qarth": (6000, 4000)}:
+        return f"linia 165 nie czytana: {k}"
+    old165 = KR312_SAMPLE_165.replace(" dwor -300 m105 chleb -6000 m105 rachunki wczoraj -4000", "")
+    k_new = _nds_kmeas(KR312_SAMPLE_165[KR312_SAMPLE_165.find(KR312_165SEG) + len(KR312_165SEG):])
+    if not k_new or k_new.get("Qarth") != 2900 or k_new != _nds_kmeas(old165[old165.find(KR312_165SEG) + len(KR312_165SEG):]):
+        return "_nds_kmeas (stary czytnik 165) - inny wynik z dopiskiem 312e"
+    rep = Report()
+    kr312_rows(rep, [r], {108900: k}, 0)
+    v = {x[0].split(":")[0]: x[3] for x in rep.rows}
+    bad = [c for c in ("KR312-0", "KR312-1", "KR312-7", "KR312-8") if v.get(c) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad}"
+    rep = Report()
+    kr312_rows(rep, [r, kr312_parse(KR312_SAMPLE_OLD), kr312_parse(KR312_SAMPLE.replace("reszta +20", "reszta +29"))], {108900: {"Qarth": (6001, 4000)}}, 1)
+    v = {x[0].split(":")[0]: x[3] for x in rep.rows}
+    miss = [c for c in ("KR312-0", "KR312-1", "KR312-7", "KR312-8") if v.get(c) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss}"
+    if v.get("KR312-2") != "TAK":
+        return "mala reszta - KR312-2 nie TAK"
+    rep = Report()
+    big = KR312_SAMPLE.replace("reszta +20", "reszta +5020").replace("(-20000), dlug", "(-15000), dlug").replace("(312e) -20000 =", "(312e) -15000 =")
+    kr312_rows(rep, [kr312_parse(big)], {}, 0)
+    v = {x[0].split(":")[0]: x[3] for x in rep.rows}
+    if v.get("KR312-1") != "TAK" or v.get("KR312-2") != "DECYZJA":
+        return f"duza reszta - KR312-2 nie DECYZJA ({v.get('KR312-1')}, {v.get('KR312-2')})"
+    rep = Report()
+    kr312_rows(rep, [kr312_parse(KR312_SAMPLE_OLD)], {}, 0)
+    v = {x[0].split(":")[0]: x[3] for x in rep.rows}
+    if v.get("KR312-0") != "INFO" or v.get("KR312-1") != "INFO" or v.get("KR312-7") != "INFO" or v.get("KR312-8") != "INFO":
+        return "log sprzed 312e - nie NIEPOKRYTY"
+    return None
+
+
+def korony312e_main(logp):
+    """korony312e (01.11, paczka 312e): KR312-S, KR312-0..8 - opis nad KR312_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = korony312e_selftest()
+    rep.add("KR312-S: self-test wyrazen, tozsamosci i starych czytnikow 'Skarbce:' / 165 na liniach 312e", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("KR312-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    rows, k165, errs, raw = [], {}, 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            t = m.group(2) if m else ln.rstrip("\r\n")
+            if t.startswith("Skarbce: dzien "):
+                raw += 1
+                r = kr312_parse(t)
+                if r:
+                    rows.append(r)
+            elif t.startswith(KR312_165):
+                if " m105 chleb -" in t or " m105 rachunki wczoraj -" in t:
+                    day, ks = kr312_165(t)
+                    if day is not None and ks:
+                        k165[day] = ks
+            elif any(x in t for x in KR312_ERR) and ("ERROR" in t or "Exception" in t):
+                errs += 1
+    print(f"plik: {logp} | linii 'Skarbce:' {raw} (czytelnych {len(rows)}, z rozkladem {sum(1 for r in rows if r[5] is not None)}), linii 165 z dopiskiem m105 {len(k165)}")
+    if raw == 0 and os.path.basename(logp).lower().startswith("session-"):
+        rep.add("KR312-L: log Armoury", f"{os.path.basename(logp)} to log CrashScribe (bez linii 'Skarbce:')", "podaj <Armoury-*.log>", None)
+    if raw and len(rows) != raw:
+        rep.add("KR312-P: linie 'Skarbce:' czytelne", f"{len(rows)} z {raw}", "wszystkie (zmieniony format w C#?)", False)
+    kr312_rows(rep, rows, k165, errs)
+    rep.show()
+    return 0
+
+_korony312e_main_prev = main
+
+
+def main(argv):
+    # paczka 312e: grupa korony312e - opakowanie main jak bitwa310
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "korony312e":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return korony312e_main(rest[0] if rest else None)
+    return _korony312e_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
