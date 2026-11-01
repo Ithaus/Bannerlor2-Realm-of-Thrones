@@ -88,6 +88,11 @@ namespace Armoury
             public ItemCategory Tight;
             public float TightPer = -1f;
             public int TightNeed;
+            // recenzja 312d (wazne): bramka liczy tylko produkcje miasta (prod x f / (n+1) na warsztat na dobe); polka (sztuki dzis) osobno w logu
+            public float TightProd = -1f, TightShelf = -1f;
+            // recenzja 312d: typ z najwyzszym wynikiem PRZED kara x0.8 (krok 0 - czy kandydat padl na karze)
+            public WorkshopType RawBest;
+            public float RawBestScore = NoScore;
         }
 
         // ------------------------------------------------------------ liczniki doby i pamiec przezbrojen sesji
@@ -108,7 +113,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.WorkshopRetoolFairScore; } }
         /// <summary>312d: przezbrojenie notabla (krok b E3-D3) liczone z rynku WLASNEGO miasta (klucz WorkshopRetoolOwnMarket, tylko z F4).</summary>
         internal static bool OwnMarket { get { var s = Settings.Current; return s != null && s.WorkshopRetoolFairScore && s.WorkshopRetoolOwnMarket; } }
-        internal const int FullCycleDays = 30;          // 312d: bramka pelnego cyklu - budzet wsadu miasta na warsztat x 30 dob >= sztuk wsadu na cykl
+        internal const int FullCycleDays = 30;          // 312d: bramka pelnego cyklu - produkcja wsadu miasta na warsztat x 30 dob >= sztuk wsadu na cykl (recenzja: bez polki)
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
         /// <summary>Regula decyduje (nie tylko mierzy): klucz, kampania trwa, >= 7 pelnych dob pomiaru wsadu.</summary>
         internal static bool Ready { get { if (!On || !Live) return false; ResolvePending(); return _days >= WarmDays; } }
@@ -416,6 +421,12 @@ namespace Armoury
         /// </summary>
         private static float Budget(TD td, ItemCategory c, HashSet<ItemCategory> selfUses, bool own)
         {
+            float pp, su; return Budget(td, c, selfUses, own, out pp, out su);
+        }
+
+        /// <summary>Recenzja 312d (wazne): `prodPart` - czesc budzetu z produkcji (prod x f / (n+1) na warsztat na dobe), `shelfUnits` - sztuk na polce (rynek) dzis.</summary>
+        private static float Budget(TD td, ItemCategory c, HashSet<ItemCategory> selfUses, bool own, out float prodPart, out float shelfUnits)
+        {
             double prod = 0, shelf = 0; int n = 0;
             // 312d (klucz WorkshopRetoolOwnMarket): gra puszcza cykl tylko z polki wlasnego miasta (WorkshopsCampaignBehavior :754) - budzet z samego miasta
             // (produkcja wsi targowych miasta i warsztatow miasta, jego polka, jego warsztaty z tym wsadem)
@@ -428,6 +439,7 @@ namespace Armoury
             }
             if (selfUses != null && selfUses.Contains(c)) n--;
             double f = prod > 0 ? Math.Min(1.0, shelf / (KeepDays * prod)) : 0.0;
+            prodPart = (float)(prod * f / Math.Max(1, n + 1)); shelfUnits = (float)shelf;
             return (float)((prod * f + shelf / ShelfDays) / Math.Max(1, n + 1));
         }
 
@@ -450,36 +462,50 @@ namespace Armoury
             order.Sort((a, b) => lines[b].Net.CompareTo(lines[a].Net));
             HashSet<ItemCategory> selfUses = self != null && self.WorkshopType != null ? Uses(self.WorkshopType) : null;
             var budget = new Dictionary<ItemCategory, float>();
+            var prodB = own ? new Dictionary<ItemCategory, float>() : null;    // recenzja 312d: czesc budzetu z produkcji miasta (bramka pelnego cyklu)
+            var shelfU = own ? new Dictionary<ItemCategory, float>() : null;   // sztuk na polce miasta dzis (tylko log)
             float total = 0f, cyc = 0f;
             foreach (int i in order)
             {
                 var p = ps[i];
                 float c = Math.Max(0f, p.ConversionSpeed);
                 ItemCategory lim = null; float limB = -1f;
-                ItemCategory tight = null; float tightB = -1f, tightR = float.MaxValue; int tightN = 0;
+                ItemCategory tight = null; float tightB = -1f, tightR = float.MaxValue, tightP = -1f, tightS = -1f; int tightN = 0;
                 bool gated = false;
                 foreach (var inp in p.Inputs)
                 {
                     if (inp.Item1 == null || inp.Item2 <= 0) continue;
                     float b;
-                    if (!budget.TryGetValue(inp.Item1, out b)) { b = Budget(td, inp.Item1, selfUses, own); budget[inp.Item1] = b; }
+                    if (!budget.TryGetValue(inp.Item1, out b))
+                    {
+                        float pp0, su0;
+                        b = Budget(td, inp.Item1, selfUses, own, out pp0, out su0); budget[inp.Item1] = b;
+                        if (own) { prodB[inp.Item1] = pp0; shelfU[inp.Item1] = su0; }
+                    }
                     float lc = b / inp.Item2;
                     if (lc < c) { c = lc; lim = inp.Item1; limB = b; }
                     if (own)
                     {
-                        // 312d: bramka pelnego cyklu - wsad miasta z 30 dob musi dac choc jeden pelny cykl (symboliczny wsad na polce nie wystarcza)
-                        float r = b * FullCycleDays / inp.Item2;
-                        if (r < tightR) { tightR = r; tight = inp.Item1; tightB = b; tightN = inp.Item2; }
+                        // 312d: bramka pelnego cyklu - wsad miasta z 30 dob musi dac choc jeden pelny cykl. Recenzja (wazne): liczy sie tylko PRODUKCJA miasta
+                        // (wsie targowe i warsztaty miasta, prod x f), nie polka - polka to zapas dzis, nie doplyw (5 sztuk srebra wpuszczalo srebrnika bez srebra)
+                        float pb, sh; prodB.TryGetValue(inp.Item1, out pb); shelfU.TryGetValue(inp.Item1, out sh);
+                        float r = pb * FullCycleDays / inp.Item2;
+                        if (r < tightR) { tightR = r; tight = inp.Item1; tightB = b; tightN = inp.Item2; tightP = pb; tightS = sh; }
                         if (r < 1f) gated = true;
                     }
                 }
-                if (gated) { c = 0f; q.Gated++; _dGated++; }
                 if (self != null && self.Capital < lines[i].In) c = 0f;   // gra: cykl tylko przy kapitale >= cena wsadu (CanNotableWorkshopProduceThisCycle)
+                // recenzja 312d (drobne): licznik bramki tylko dla linii, ktora bez bramki by ruszyla (budzet po lepszych liniach i kapital wystarczaja)
+                if (gated) { if (c > 0f) { q.Gated++; _dGated++; } c = 0f; }
                 if (q.Limit == null && lim != null) { q.Limit = lim; q.LimitPer = limB; }
                 if (!(c > 0f)) continue;
-                if (own && q.Tight == null && tight != null) { q.Tight = tight; q.TightPer = tightB; q.TightNeed = tightN; }
+                if (own && q.Tight == null && tight != null) { q.Tight = tight; q.TightPer = tightB; q.TightNeed = tightN; q.TightProd = tightP; q.TightShelf = tightS; }
                 foreach (var inp in p.Inputs)
-                    if (inp.Item1 != null && inp.Item2 > 0) { float b; budget.TryGetValue(inp.Item1, out b); budget[inp.Item1] = Math.Max(0f, b - c * inp.Item2); }
+                    if (inp.Item1 != null && inp.Item2 > 0)
+                    {
+                        float b; budget.TryGetValue(inp.Item1, out b); budget[inp.Item1] = Math.Max(0f, b - c * inp.Item2);
+                        if (own) { float pb; prodB.TryGetValue(inp.Item1, out pb); prodB[inp.Item1] = Math.Max(0f, pb - c * inp.Item2); }   // lepsza linia bierze najpierw z produkcji
+                    }
                 total += c * lines[i].Net; cyc += c;
             }
             q.Cycles = cyc;
@@ -544,7 +570,7 @@ namespace Armoury
         private static WorkshopType BestCore(Town town, WorkshopType exclude, IDictionary<ItemCategory, float> dict, Workshop self, bool own, out float score, out Quote quote)
         {
             score = NoScore; quote = null;
-            WorkshopType pick = null;
+            WorkshopType pick = null, rawPick = null; float rawScore = NoScore;
             if (town == null) return null;
             TD td;
             if (!Data().TryGetValue(town, out td)) return null;
@@ -560,11 +586,13 @@ namespace Armoury
                     int dup = 0;
                     foreach (var r in td.Region) { int n; if (r.Types.TryGetValue(t, out n)) dup += n; }
                     if (self != null && self.WorkshopType == t) dup--;
+                    if (rawPick == null || q.Score > rawScore) { rawPick = t; rawScore = q.Score; }   // recenzja 312d: najlepszy PRZED kara (krok 0, tylko log)
                     if (dup > 0) sc *= (float)Math.Pow(DupKeep, dup);
                     if (pick == null || sc > score) { pick = t; score = sc; quote = q; }
                 }
                 catch (Exception e) { Stumble("Best(typ)", e); }
             }
+            if (quote != null) { quote.RawBest = rawPick; quote.RawBestScore = rawScore; }
             return pick;
         }
 
@@ -583,8 +611,10 @@ namespace Armoury
             {
                 // 312d: rynek wlasnego miasta i najciasniejszy wsad linii, ktora rusza (checker notable312d: budzet x 30 >= sztuk na cykl)
                 sb.Append(", rynek miasta");
-                if (q.Tight != null) sb.Append(": najciasniejszy wsad ").Append(q.Tight.StringId).Append(' ').Append(q.TightPer.ToString("0.00", Inv)).Append("/d x ").Append(FullCycleDays)
-                                       .Append(" = ").Append((q.TightPer * FullCycleDays).ToString("0.0", Inv)).Append(" na cykl ").Append(q.TightNeed);
+                // recenzja 312d (wazne): produkcja miasta (bramka) i polka (sztuki dzis) osobno; budzet = produkcja + polka / 30 dob
+                if (q.Tight != null) sb.Append(": najciasniejszy wsad ").Append(q.Tight.StringId).Append(" produkcja miasta ").Append(q.TightProd.ToString("0.00", Inv)).Append("/d x ")
+                                       .Append(FullCycleDays).Append(" = ").Append((q.TightProd * FullCycleDays).ToString("0.0", Inv)).Append(" na cykl ").Append(q.TightNeed)
+                                       .Append(", polka ").Append(q.TightShelf.ToString("0", Inv)).Append(" szt., budzet ").Append(q.TightPer.ToString("0.00", Inv)).Append("/d na warsztat");
                 if (q.Gated > 0) sb.Append(", linii bez pelnego cyklu ").Append(q.Gated);
             }
             sb.Append("), przed kara ").Append(F1(raw));
@@ -606,8 +636,8 @@ namespace Armoury
             return "ocena F4 (Workshop Retool Fair Score) tak: cena sprawiedliwa cyklu, cykle z wsadu regionu (promien " + RegionRange.ToString("0", Inv) + "), zmierzony wynik >= "
                    + MeasuredDays + " dob, kara x" + DupKeep.ToString("0.0", Inv) + " w regionie; pomiar wsadu z zapisu "
                    + (_loadedDays >= 0 ? _loadedDays + " dob, miast " + _loadedTowns : "brak (pierwsze " + WarmDays + " dob tylko pomiar)")
-                   + (OwnMarket ? " | prognoza z rynku wlasnego miasta (Workshop Retool Own Market) tak: przezbrojenie notabla - budzet wsadu i zmierzony wynik z miasta, bramka pelnego cyklu (wsad "
-                                  + FullCycleDays + " dob >= sztuk na cykl); kara w regionie, progi, kiesa, limity bez zmian; bankructwo i N10 - region"
+                   + (OwnMarket ? " | prognoza z rynku wlasnego miasta (Workshop Retool Own Market) tak: przezbrojenie notabla - budzet wsadu i zmierzony wynik z miasta, bramka pelnego cyklu (produkcja miasta "
+                                  + FullCycleDays + " dob >= sztuk na cykl, polka sie nie liczy); kara w regionie, progi, kiesa, limity bez zmian; bankructwo i N10 - region"
                                 : " | prognoza z rynku wlasnego miasta (Workshop Retool Own Market) nie - przezbrojenie z wsadu regionu");
         }
 
@@ -635,7 +665,7 @@ namespace Armoury
                 sb.Append(" | kopalnie BK w miastach (N10): wyborow z ocena F4 ").Append(n10).Append(", bez typu z wynikiem F4 -> ocena z cen ").Append(n10f);
                 // 312d: prognoza przezbrojen notabli z rynku wlasnego miasta
                 sb.Append(" | prognoza z rynku wlasnego miasta (Workshop Retool Own Market) ").Append(OwnMarket ? "tak" : "nie").Append(": oceny dzis ").Append(_dOwn)
-                  .Append(", linii bez pelnego cyklu (wsad ").Append(FullCycleDays).Append(" dob < sztuk na cykl) ").Append(_dGated);
+                  .Append(", linii-ocen bez pelnego cyklu (produkcja miasta ").Append(FullCycleDays).Append(" dob < sztuk na cykl, linia inaczej by ruszyla) ").Append(_dGated);
                 // spodziewany vs rzeczywisty: przezbrojone w tej sesji, po >= 30 dobach, typ bez zmian
                 int k = 0, work = 0, gone = 0; double se = 0, sa = 0;
                 foreach (var tr in _tracks)

@@ -39,6 +39,7 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const int MinDays = 60, TownGapDays = 30, ShopGapDays = 120, PerDay = 3, PurseFloor = 4500;
+        private const int YoungDays = 180;   // recenzja 312d: zmiana warsztatu, ktorego obecny typ ma < 180 dob rachunku (ponowna zmiana widoczna takze po wczytaniu - tylko log)
         private const float GainShare = 1.3f, GainMin = 10f, BankruptGain = 1.25f;
 
         private static readonly Dictionary<Town, int> _townLast = new Dictionary<Town, int>();
@@ -50,6 +51,7 @@ namespace Armoury
         // 312d krok 0 (tylko log): probki odrzuconych kandydatow, warsztaty "stoja, ale rok na plusie" (warunek kandydata slow < 0 ich nie wpuszcza), ponowne zmiany warsztatu w sesji
         private static readonly List<string> _dRejSamples = new List<string>(), _dYearPlusSamples = new List<string>();
         private static int _dYearPlus, _dRe, _sessRe;
+        private static int _dYoung, _sessYoung;   // recenzja 312d: zmiany warsztatu z typem mlodszym niz YoungDays (rachunek obecnego typu)
         private static long _dGear;
         private static bool _startDone;
 
@@ -57,13 +59,13 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _townLast.Clear(); _shopLast.Clear(); _err.Clear(); _sessStumbles = 0; _sessChanged = 0; _sessRe = 0; _startDone = false;
+            _townLast.Clear(); _shopLast.Clear(); _err.Clear(); _sessStumbles = 0; _sessChanged = 0; _sessRe = 0; _sessYoung = 0; _startDone = false;
             ZeroDay();
         }
 
         private static void ZeroDay()
         {
-            _dDone.Clear(); _dBankSamples.Clear(); _dRejSamples.Clear(); _dYearPlusSamples.Clear(); _dYearPlus = 0; _dRe = 0;
+            _dDone.Clear(); _dBankSamples.Clear(); _dRejSamples.Clear(); _dYearPlusSamples.Clear(); _dYearPlus = 0; _dRe = 0; _dYoung = 0;
             _dShops = _dCands = _dChanged = _dNoInput = _dNoGain = _dNoPurse = _dLimit = _dBankPicks = _dBankSwaps = _dStumbles = 0;
             _dBankWarm = 0;
             _dGear = 0;
@@ -117,7 +119,7 @@ namespace Armoury
             catch (Exception e) { Stumble("BankruptStep", e); }
         }
 
-        private sealed class Cand { public Workshop W; public Town T; public float Slow, Avg; }
+        private sealed class Cand { public Workshop W; public Town T; public float Slow, Avg; public int Days; }
 
         /// <summary>312d krok 0: probka odrzuconego kandydata (do 4 na dobe) - miasto, typ obecny i jego wynik, najlepszy typ, wynik przed i po karze za dubel, powod.</summary>
         private static void Rej(Cand c, WorkshopType cur, float sc, WorkshopType best, WorkshopFairScore.Quote fq, float sb, string why)
@@ -126,8 +128,10 @@ namespace Armoury
             {
                 if (_dRejSamples.Count >= 4) return;
                 float raw = fq != null ? fq.Score : sb;
+                // recenzja 312d: typ z najwyzszym wynikiem PRZED kara x0.8 (F4) - checker liczy "padl na karze" (bez kary >= potrzeba > po karze)
+                string rb = fq != null && fq.RawBest != null ? ", najlepszy bez kary " + fq.RawBest.StringId + " " + F1(fq.RawBestScore) : "";
                 _dRejSamples.Add(Name(c.T.Settlement) + " " + (cur != null ? cur.StringId : "?") + " (obecny " + F1(sc) + ", srednia " + c.Avg.ToString("0.0", Inv) + " / rok " + c.Slow.ToString("0.0", Inv)
-                                 + ") -> " + (best != null ? best.StringId + " (przed kara " + F1(raw) + ", po karze " + F1(sb) + ")" : "-") + ": " + why);
+                                 + ") -> " + (best != null ? best.StringId + " (przed kara " + F1(raw) + ", po karze " + F1(sb) + rb + ")" : "-") + ": " + why);
             }
             catch { }
         }
@@ -172,7 +176,7 @@ namespace Armoury
                                                                                          + " / rok " + slow.ToString("0.0", Inv) + ", dob " + days + ")");
                                     continue;
                                 }
-                                cands.Add(new Cand { W = w, T = t, Slow = slow, Avg = avg });
+                                cands.Add(new Cand { W = w, T = t, Slow = slow, Avg = avg, Days = days });
                             }
                             catch (Exception e) { Stumble("Daily(kandydat)", e); }
                         }
@@ -220,11 +224,15 @@ namespace Armoury
                             done++; _dChanged++; _sessChanged++;
                             _dGear += Math.Max(0, g0 - o.Gold);
                             if (_shopLast.ContainsKey(c.W)) { _dRe++; _sessRe++; }   // 312d krok 0: ten sam warsztat zmieniony drugi raz w tej sesji (pamiec sesji, jak blokada 120 dob)
+                            if (c.Days < YoungDays) { _dYoung++; _sessYoung++; }      // recenzja 312d: obecny typ mlodszy niz 180 dob rachunku (widac takze po wczytaniu zapisu)
+                            int nr = -1;
+                            try { var ws = c.T.Workshops; if (ws != null) for (int k = 0; k < ws.Length; k++) if (ws[k] == c.W) { nr = k; break; } } catch { nr = -1; }
                             _townLast[c.T] = today; _shopLast[c.W] = today;
                             float raw = fq != null ? fq.Score : sb;
                             if (f4) WorkshopFairScore.NoteRetool(c.W, best, raw, today);   // F4: spodziewany wynik (przed kara za dubel) do porownania po 30 dobach
                             if (_dDone.Count < 8) _dDone.Add(Name(c.T.Settlement) + " " + from + " -> " + best.StringId + " (wynik " + F1(sc) + " -> " + F1(sb) + " d/d, srednia " + c.Avg.ToString("0.0", Inv)
-                                                         + " / rok " + c.Slow.ToString("0.0", Inv) + ", sprzet " + Math.Max(0, g0 - o.Gold) + (f4 ? ", " + WorkshopFairScore.QuoteText(fq, raw) : "") + ")");
+                                                         + " / rok " + c.Slow.ToString("0.0", Inv) + ", sprzet " + Math.Max(0, g0 - o.Gold) + ", warsztat nr " + nr + ", dob w typie " + c.Days
+                                                         + (f4 ? ", " + WorkshopFairScore.QuoteText(fq, raw) : "") + ")");
                         }
                         catch (Exception e) { Stumble("Daily(zmiana)", e); }
                     }
@@ -255,6 +263,7 @@ namespace Armoury
                    .Append(" | zmian w sesji ").Append(_sessChanged)
                    // 312d krok 0 (tylko log): ponowne zmiany, probki odrzuconych kandydatow, "stoja, ale rok na plusie"
                    .Append(" | ponowne zmiany tego samego warsztatu dzis ").Append(_dRe).Append(" (sesja ").Append(_sessRe).Append(')')
+                   .Append(" | mlode typy przy zmianie (< ").Append(YoungDays).Append(" dob rachunku obecnego typu) dzis ").Append(_dYoung).Append(" (sesja ").Append(_sessYoung).Append(')')
                    .Append(" | odrzuceni kandydaci (probki ").Append(_dRejSamples.Count).Append(')').Append(_dRejSamples.Count > 0 ? " [" + string.Join("; ", _dRejSamples.ToArray()) + "]" : "")
                    .Append(" | stoja, ale rok na plusie (>= ").Append(MinDays).Append(" dob, srednia < 0, rok >= 0 - poza kandydatami) ").Append(_dYearPlus)
                    .Append(_dYearPlusSamples.Count > 0 ? " [" + string.Join("; ", _dYearPlusSamples.ToArray()) + "]" : "")
