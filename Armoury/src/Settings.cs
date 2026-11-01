@@ -562,10 +562,33 @@ namespace Armoury
         public bool WoundedPenaltiesEnabled = true;        // hurt men move and swing slower, the worse the wound the worse the arm
         public int WoundedBelowPercent = 50;               // penalties begin below this share of health
         public float WoundedMaxSlow = 0.3f;                // top movement penalty at death's door
-        public int BleedBelowHp = 10;                      // bleeding starts at this many hit points or fewer
+        public int BleedBelowHp = 10;                      // old rule (Bleed From Wounds off): bleeding starts at this many hit points or fewer
         public int AiFleeBelowPercent = 10;                // AI soldiers below this share of health break and run
-        public float BleedPerSecond = 0.5f;                // health lost per second while bleeding out
+        public float BleedPerSecond = 0.5f;                // old rule (Bleed From Wounds off): health lost per second while bleeding out
         public bool AiFleeWhenNearDeath = true;            // AI soldiers below the bleeding threshold break and run for their lives
+        // 313d (01.11, Jeff: "nie zawsze powinno byc krwawienie, tylko zalezne od atletyki, szansy na krwawienie i glebokosci rany"; "ranny ... nie biega jak glupi
+        // tylko wolno wycofuje sie"): FieldCraft (krwawienie z rany, rzut paniki z bolu, kustykanie), BrokenMen (rzut odwrotu 143), WoundedLimp (cap predkosci).
+        // Linia 'Krwawienie (313d)' po bitwie. Wylaczone klucze = stare reguly bez zmian
+        public bool BleedDeathLog = true;                  // write a 'Krwawienie (313d)' line to the Armoury log after each battle: wounds that bled, how many stopped, deaths from bleeding (killed / knocked out), rolls to withdraw and to break from pain, limping men. Log only, no change in play
+        public bool BleedFromWounds = true;                // bleeding comes from the wound, not from the health bar: a deep cut may bleed, a scratch never does, and the bleeding slows down and stops as the blood clots (about a minute). The chance grows with the depth of the wound; cuts bleed most, stabs and arrows less, crushing blows hardly at all; armour that took part of the blow makes it shallower; Athletics makes a man bleed less. Only in battles on the map, not in tournaments or the arena. Off = old rule (Bleed Below Hp, Bleed Per Second)
+        public bool BleedAffectsPlayer = true;             // with Bleed From Wounds on: you can bleed from a deep wound too (a message tells you). Off = only the AI bleeds
+        public float BleedChanceDeepWound = 0.60f;         // chance that a deep unarmoured cut (a wound of Bleed Full Wound Share of health or more) starts bleeding, for a man of Athletics 100
+        public float BleedMinWoundShare = 0.10f;           // wounds smaller than this share of a man's full health never bleed
+        public float BleedFullWoundShare = 0.50f;          // wound depth (share of full health) at which the full bleeding chance applies; in between it grows evenly
+        public float BleedPierceFactor = 0.8f;             // bleeding chance of stabs and arrows compared with cuts
+        public float BleedBluntFactor = 0.15f;             // bleeding chance of crushing blows compared with cuts
+        public float BleedArmourFactor = 0.3f;             // how much armour that absorbed part of the blow lowers the bleeding chance (0 = not at all, 1 = a blow mostly stopped by armour hardly ever bleeds)
+        public float BleedLossShare = 0.5f;                // blood a bleeding wound costs in all, as a share of the blow's damage (a 40 damage wound bleeds away about 20 more health)
+        public float BleedClotSeconds = 30f;               // how fast bleeding slows down: after this many seconds it is down to about a third, and it stops after a minute or two
+        public float BleedAthleticsPer100 = 0.25f;         // each 100 Athletics above 100 cuts the bleeding chance and the blood lost by this share; below 100 it grows (at most x1.25, at least x0.5)
+        public bool WoundedFleeByChance = true;            // an AI man below Wounded Flee Percent does not always withdraw: each fresh wound gives a roll from his morale, his Athletics and whether he bleeds; who stays fights on carefully. Below Wounded Limp Below Hp he always withdraws. Off = everyone below the threshold withdraws, as before
+        public float WoundedFleeChance = 0.35f;            // base chance that a fresh wound below Wounded Flee Percent makes a man withdraw (doubled when he bleeds, higher with low morale, lower with high Athletics; 5% to 95%)
+        public bool PainBreakByChance = true;              // an AI man below AI Flee Below Percent does not always break from pain: each fresh wound (and the start of bleeding) gives a roll from his morale, his Athletics and whether he bleeds. Off = everyone below the threshold breaks, as before
+        public float PainBreakChance = 0.5f;               // base chance that a fresh wound below AI Flee Below Percent breaks a man (5% to 95%)
+        public float PainBreakBleedingFactor = 1.5f;       // a bleeding man breaks from pain this many times more easily
+        public bool WoundedLimp = true;                    // a badly wounded AI man on foot does not sprint: a man withdrawing with his wounds behind his own line, and any man at Wounded Limp Below Hp or fewer (also when he breaks and flees), goes no faster than a limping walk. Battles on the map only. Off = they run, as before
+        public int WoundedLimpBelowHp = 10;                // at this many hit points or fewer an AI man on foot only limps and always withdraws (0 = only men already withdrawing limp)
+        public float WoundedLimpWalkShare = 0.7f;          // limping pace as a share of the walking pace
         public bool ArrowUnstickEnabled = true;            // arrows the armour stopped do not stay stuck in a man (shields keep theirs)
         public int ArrowStickMinDamage = 8;                // an arrow must deal at least this to lodge in flesh
         public int JavelinStickMinDamage = 80;             // a thrown javelin, axe or knife stays in a man only when it kills him or deals at least this much - anything less bounces off

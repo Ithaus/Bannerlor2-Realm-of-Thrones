@@ -4,6 +4,21 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 313d: krwawienie z rany, rzuty odwrotu i bolu, kustykanie - kod przycina do tych zakresow (FieldCraft.Bleed313 / BrokenMen / WoundedLimp)
+    'BleedChanceDeepWound': (0.0, 1.0, "0.00"),
+    'BleedMinWoundShare': (0.0, 0.5, "0.00"),
+    'BleedFullWoundShare': (0.2, 1.0, "0.00"),
+    'BleedPierceFactor': (0.0, 1.5, "0.00"),
+    'BleedBluntFactor': (0.0, 1.0, "0.00"),
+    'BleedArmourFactor': (0.0, 1.0, "0.00"),
+    'BleedLossShare': (0.0, 1.5, "0.00"),
+    'BleedClotSeconds': (5, 120, "0"),
+    'BleedAthleticsPer100': (0.0, 0.5, "0.00"),
+    'WoundedFleeChance': (0.0, 1.0, "0.00"),
+    'PainBreakChance': (0.0, 1.0, "0.00"),
+    'PainBreakBleedingFactor': (1.0, 3.0, "0.00"),
+    'WoundedLimpBelowHp': (0, 40, "0"),
+    'WoundedLimpWalkShare': (0.3, 1.0, "0.00"),
     # 311d: jakosc konia a tempo - kod przycina do 30..90, 0..200 %, 0..50 %, 0..50 % (HorsePace.Params)
     'HorseQualityRefSpeed': (30, 90, "0"),
     'HorseQualitySlopePercent': (0, 200, "0"),

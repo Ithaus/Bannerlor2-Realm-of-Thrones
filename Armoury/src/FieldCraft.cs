@@ -59,6 +59,16 @@ namespace Armoury
             public float RunSeconds0 = -1f;  // 292: pelny bieg do zera z reguly 127/203 PRZED mnoznikiem staminy ludzi (pomiar biegu w linii "Bieg (127)")
             public float Run292Prev = -1f;   // 292: pasek na koniec poprzedniego taktu ciaglego biegu (-1 = poprzedni takt bez biegu)
             public float Run292Max;          // 292: maxStamina RBM przy Run292Prev (zmiana puli w biegu - takt pominiety)
+            // 313d (Bleed313): krwawienie z rany, rzut paniki z bolu, kustykanie
+            public float BleedRate;          // HP/s z ran (suma), maleje wykladniczo (BleedClotSeconds); 0 = nie krwawi (regula BleedFromWounds)
+            public int BleedBy = -1;         // indeks ostatniego, kto zadal krwawiaca rane (kredyt za zgon z krwawienia)
+            public float BleedHp0;           // HP na starcie krwawienia (pomiar BleedDeathLog)
+            public float Ath = -1f;          // Atletyka (raz na czlowieka)
+            public int Hits;                 // trafienia z obrazeniami w bitwie (kolejka Bleed313) - rzut odwrotu 143 raz na swieza rane (BrokenMen)
+            public bool PainDue;             // swieza rana od ostatniego taktu - rzut paniki z bolu, gdy ponizej progu
+            public bool PainRolled;          // byl juz rzut z bolu (pierwsze zejscie ponizej progu bez ciosu - np. krwawieniem - tez rzuca raz)
+            public bool PainBroken;          // rzut z bolu wygrany - lamie sie jak dotad (RoutHold.Break)
+            public float LimpCap;            // cap kustykania wpisany do Bleed313 (m/s, 0 = brak)
         }
 
         // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
@@ -281,6 +291,50 @@ namespace Armoury
             return f != null && a != null && f._states.TryGetValue(a, out st) && st.Winded;
         }
 
+        // ---- 313d: odczyty dla BrokenMen (rzut odwrotu 143) i RoutKeeper (powod "z bolu") - glowny watek
+        internal static int HitsOf(Agent a)
+        {
+            var f = _live;
+            State st;
+            return f != null && a != null && f._states.TryGetValue(a, out st) ? st.Hits : 0;
+        }
+
+        /// <summary>Czlowiek krwawi teraz: regula BleedFromWounds - rana krwawi (BleedRate &gt; 0); stara regula - HP &lt;= BleedBelowHp.</summary>
+        internal static bool BleedingNow(Agent a)
+        {
+            var c = Settings.Current;
+            if (a == null || c == null) return false;
+            if (!c.BleedFromWounds) return a.Health <= c.BleedBelowHp;
+            var f = _live;
+            State st;
+            return f != null && f._states.TryGetValue(a, out st) && st.BleedRate > 0f;
+        }
+
+        internal static float AthOf(Agent a)
+        {
+            var f = _live;
+            State st;
+            if (f != null && a != null && f._states.TryGetValue(a, out st))
+            {
+                if (st.Ath < 0f) st.Ath = ReadAth(a);
+                return st.Ath;
+            }
+            return ReadAth(a);
+        }
+
+        internal static bool PainBrokeNow(Agent a)
+        {
+            var f = _live;
+            State st;
+            return f != null && a != null && f._states.TryGetValue(a, out st) && st.PainBroken;
+        }
+
+        private static float ReadAth(Agent a)
+        {
+            try { var ch = a != null ? a.Character : null; return ch != null ? ch.GetSkillValue(TaleWorlds.Core.DefaultSkills.Athletics) : 100f; }
+            catch { return 100f; }
+        }
+
         public override void OnRemoveBehavior()
         {
             if (ReferenceEquals(_live, this)) _live = null;   // 139
@@ -306,6 +360,7 @@ namespace Armoury
                 if (gone != null && gone.Ai != null) AiBreath.CloseRun(gone.Ai);   // 144: bieg do licznikow, wpis tablicy capu zwolniony
                 AiBreath.Forget(affectedAgent);
                 WindedShow.Forget(affectedAgent);
+                Bleed313.SetLimp(affectedAgent, 0f);   // 313d: cap kustykania zdjety
                 _states.Remove(affectedAgent); _mountOwners.Remove(affectedAgent);
             }
             catch { }
@@ -504,6 +559,16 @@ namespace Armoury
                 PanicRun.Line(Mission, Settings.Current);
             }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRun, "PanicRun.Line", e); }
+            // 313d: linia "Krwawienie (313d)" raz na misje - kto jeszcze krwawi, potem capy kustykania zdjete
+            try
+            {
+                foreach (var kv in _states)
+                    if (kv.Value != null && kv.Value.BleedRate > 0f && kv.Key != null && kv.Key.IsActive()) Bleed313.BleedingAtEnd++;
+                if (InBattle()) Bleed313.NoteBattle();
+                Bleed313.Line(Settings.Current);
+            }
+            catch (Exception e) { Bleed313.Stumble("Line", e); }
+            try { Bleed313.ClearLimp(); } catch { }
             ResetRunStats();
             try { BattleWind.BreathFlush(); } catch { }      // 137: linia "Oddech (137)" raz na misje
             try { MissionTeams.Flush(Mission); } catch { }   // NM: linia "Druzyny w misji (NM)" raz na misje
@@ -519,6 +584,7 @@ namespace Armoury
             _k292Said = false;                                // 292: linia "Stamina (292)" kilka sekund po starcie misji
             try { _k292From = Mission.CurrentTime; } catch { _k292From = 0f; }
             try { AiBreath.Begin(Mission); } catch { }        // 144: liczniki i capy oddechu AI od zera
+            try { Bleed313.Begin(); } catch { }               // 313d: liczniki, kolejka trafien i capy kustykania od zera
             _live = this;                                     // 139: odczyt zadyszki dla BrokenFate
             base.AfterStart();
         }
@@ -607,6 +673,23 @@ namespace Armoury
                 var c = Settings.Current;
                 // E8/A: ksiegi zuzycia pisza tylko w bitwie kampanii (arena, turniej, bojka - nie); odpinanie strzal nizej dziala wszedzie jak dotad
                 bool counts = !c.ArenaNoWear || InBattle();
+
+                // 313d: rana do kolejki (pod zamkiem - OnAgentHit bywa wolany z ticku asynchronicznego); rzut krwawienia i liczniki ran w ticku na glownym watku.
+                // Tylko czlowiek, cios z obrazeniami, nie blok tarcza, tylko bitwa na mapie (turniej, arena, bojka - bez krwawienia i rzutow)
+                if ((c.BleedFromWounds || c.PainBreakByChance || c.WoundedFleeByChance) && affectedAgent != null && affectedAgent.IsHuman
+                    && blow.InflictedDamage > 0 && !attackCollisionData.AttackBlockedWithShield && InBattle())
+                {
+                    try
+                    {
+                        Bleed313.Enqueue(new Bleed313.Hit
+                        {
+                            V = affectedAgent, By = blow.OwnerId, Dmg = blow.InflictedDamage, Abs = Math.Max(0, attackCollisionData.AbsorbedByArmor),
+                            Type = blow.DamageType, Part = blow.VictimBodyPart, Missile = blow.IsMissile
+                        });
+                    }
+                    catch { }
+                }
+
                 if (!counts && c.WearEnabled && blow.InflictedDamage + Math.Max(0, attackCollisionData.AbsorbedByArmor) > 0
                     && ((affectedAgent != null && affectedAgent.IsMainAgent) || (affectorAgent != null && affectorAgent.IsMainAgent)))
                     _skipHits++;
@@ -747,6 +830,9 @@ namespace Armoury
                 if (_accum < 0.2f) return;                    // reszta co 0.2 s wystarczy
                 float step = _accum; _accum = 0f;
 
+                // 313d: rany z kolejki OnAgentHit - rzut krwawienia (BleedFromWounds), liczniki ran dla rzutow bolu i odwrotu
+                ProcessHits(c);
+
                 // 144: AI oszczedza sily (AiBreath - decyzja co 0.6 s na czlowieka) i zadyszke widac / slychac (WindedShow) - bramki na takt
                 float now = Mission.CurrentTime;
                 bool aiLive = false, show = false;
@@ -786,6 +872,16 @@ namespace Armoury
                     float hpr = agent.HealthLimit > 0f ? agent.Health / agent.HealthLimit : 1f;
                     bool sprintNow = false;      // 144: bieg w tym takcie (AiBreath: sekundy biegu wedlug sytuacji)
                     float speedNow = -1f;        // 144: predkosc pieszego (-1 = konny albo nieliczona)
+
+                    // 313d (klucz WoundedLimp, Jeff: ranny "nie biega jak glupi tylko wolno wycofuje sie"): pieszy AI w odwrocie 143 albo z HP <= WoundedLimpBelowHp
+                    // (takze w panice) - cap kustykania (Bleed313: tablica dla latki AdjustSpeedLimit), wpis limitu nizej w sekcji ruchu
+                    float limpCap = 0f;
+                    if (c.WoundedLimp || st.LimpCap > 0f)
+                    {
+                        try { limpCap = c.WoundedLimp ? LimpNow(agent, c) : 0f; }
+                        catch (Exception e) { limpCap = 0f; Bleed313.Stumble("Limp", e); }
+                        if (Math.Abs(limpCap - st.LimpCap) > 0.001f) { Bleed313.SetLimp(agent, limpCap); st.LimpCap = limpCap; }
+                    }
 
                     // --- zadyszka (tylko piechota, sprint) - MODEL PUNKTOWY:
                     // pula staminy w punktach (RBM: 1000 * bonus z Atletyki; my raz dokladamy
@@ -838,7 +934,8 @@ namespace Armoury
                         // regeneracja RBM pominieta, dlug biegu nie wraca), bez mnoznika strachu. Po wyczerpaniu pasek nie dochodzi do progu wyjscia - 50% do konca.
                         // Dotad zwolnienie ponizej progu biegu (strefa 10%, zadyszka) konczylo "bieg" i oddech wracal - odsapka w ucieczce. Jezdziec bez zmian.
                         bool panicNow = !agent.IsMainAgent && SurvivalMode.InPanic(agent);
-                        bool drains = sprinting || (onFoot && panicNow && c.PanicRunsUntilSpent);
+                        // 313d: kustykajacy (cap kustykania) nie biegnie - panika nie pije mu oddechu jak bieg
+                        bool drains = sprinting || (onFoot && panicNow && c.PanicRunsUntilSpent && limpCap <= 0f);
                         var stance = c.UseRbmStamina ? RbmStanceOf(agent, st, step) : null;
                         // 127: w biegu oddech nie wraca nikomu (BattleWind.TickStaminaPrefix pomija regeneracje RBM tej postawy); 147: takze w panice
                         if (stance != null)
@@ -1017,7 +1114,22 @@ namespace Armoury
                     // silnik liczy co 0.5 s (HumanAIComponent.AdjustSpeedLimit - linia i tempo szyku, progi RBM). Teraz zapis tylko przy karze
                     // (zadyszka, rany, klawisz chodu: limit < 0.999), a po jej zejsciu raz (-1, bez mnoznika) - silnik przywraca swoj limit w ciagu 0.5 s.
                     // Kara spotyka marsz (MarchToContact): Min(limit x pelna predkosc, gorny limit marszu), wartosc bezwzgledna. Klucz NIE = jak dawniej.
-                    if (!c.SpeedCapOnlyWhenWinded)
+                    if (limpCap > 0f)
+                    {
+                        // 313d: kustykanie - limit bezwzgledny (m/s) co takt: cap kustykania, a przy karze (zadyszka, rany) nizszy z dwoch; po zejsciu capu
+                        // st.SpeedApplied zdejmuje limit galezia nizej (jak po karze)
+                        float lim = limpCap;
+                        if (limit < 0.999f)
+                        {
+                            float runL = 0f;
+                            try { runL = agent.GetMaximumForwardUnlimitedSpeed(); } catch { runL = 0f; }
+                            if (runL > 0.5f && limit * runL < lim) lim = limit * runL;
+                        }
+                        agent.SetMaximumSpeedLimit(lim, false);
+                        st.SpeedApplied = true;
+                        Bleed313.LimpWrites++;
+                    }
+                    else if (!c.SpeedCapOnlyWhenWinded)
                     {
                         agent.SetMaximumSpeedLimit(limit, true);
                         st.SpeedApplied = true;
@@ -1118,35 +1230,54 @@ namespace Armoury
                         st.SwingApplied = true;
                     }
 
-                    // --- wykrwawianie (od BleedBelowHp punktow zdrowia) i zalamanie ---
-                    bool bleeding = agent.Health <= c.BleedBelowHp;
+                    // --- wykrwawianie i zalamanie ---
+                    // 313d (klucz BleedFromWounds): krwawi rana z rzutu przy trafieniu (st.BleedRate, ProcessHits), nie pasek HP; pelne HP zeruje krwawienie
+                    // (leczenie autotestu HorsePursuit.TestGuard, RBM). Klucz NIE - stara regula od BleedBelowHp punktow zdrowia
+                    if (st.BleedRate > 0f && agent.HealthLimit > 0f && agent.Health >= agent.HealthLimit - 0.5f) { st.BleedRate = 0f; st.BleedDebt = 0f; }
+                    bool bleeding = c.BleedFromWounds ? st.BleedRate > 0f : agent.Health <= c.BleedBelowHp;
                     bool broken = hpr < c.AiFleeBelowPercent / 100f;
+                    // 313d (klucz PainBreakByChance): ponizej progu bolu lamie sie tylko ten, kto przegral rzut - raz na swieza rane (i raz przy pierwszym zejsciu
+                    // ponizej progu bez ciosu, np. krwawieniem), nie co takt. Kto sie oparl - zostaje w odwrocie 143 albo walczy ostroznie (145)
+                    if (broken && c.PainBreakByChance)
+                    {
+                        if (!st.PainBroken && (st.PainDue || !st.PainRolled) && c.AiFleeWhenNearDeath && !agent.IsMainAgent && agent.IsAIControlled && !st.Panicked
+                            && (!c.WoundedFleeBattlesOnly || InBattle()))
+                        {
+                            try { RollPain(agent, st, bleeding, c); }
+                            catch (Exception e) { Bleed313.Stumble("Pain", e); }
+                        }
+                        broken = st.PainBroken;
+                    }
+                    st.PainDue = false;
                     if (bleeding || broken)
                     {
-                        if (bleeding && c.BleedPerSecond > 0f)
+                        float bleedRate = c.BleedFromWounds ? st.BleedRate : c.BleedPerSecond;
+                        if (bleeding && bleedRate > 0f)
                         {
+                            if (st.BleedHp0 <= 0f) st.BleedHp0 = agent.Health;   // 313d: pomiar - HP na starcie krwawienia (stara regula: pierwszy takt krwawienia)
                             // ZAOKRAGLANIE SILNIKA (13.09, audyt): setter Agent.Health robi
                             // MathF.Ceiling na kazdym zapisie, wiec strata 0.1 HP na takt
                             // (0.5/s x 0.2 s) zaokraglala sie z powrotem w gore i NIGDY sie
                             // nie zapisywala - krwawienie bylo martwym kodem, nikt nigdy
                             // nie wykrwawil sie na polu. Zbieramy ulamki w dlugu i zdejmujemy
                             // dopiero PELNE punkty, ktore silnik przyjmuje.
-                            st.BleedDebt += c.BleedPerSecond * step;
+                            st.BleedDebt += bleedRate * step;
+                            if (c.BleedFromWounds)
+                            {
+                                // 313d: krzepniecie - tempo maleje wykladniczo, ponizej 0.05 HP/s krwawienie ustaje
+                                st.BleedRate *= (float)Math.Exp(-step / Bleed313.ClotSeconds(c));
+                                if (st.BleedRate < Bleed313.StopRate) { st.BleedRate = 0f; Bleed313.Stopped++; }
+                            }
                             int lose = (int)st.BleedDebt;
                             if (lose > 0)
                             {
                                 st.BleedDebt -= lose;
                                 float nh = agent.Health - lose;
-                                if (nh <= 0f)
-                                {
-                                    var b = new Blow(agent.Index);
-                                    b.DamageType = DamageTypes.Cut;
-                                    b.InflictedDamage = (int)agent.Health + 1;
-                                    b.GlobalPosition = agent.Position;
-                                    agent.Die(b, Agent.KillInfo.Invalid);
-                                }
+                                if (nh <= 0f) BleedDeath(agent, st, c);
                                 else agent.Health = nh;
                             }
+                            if (st.BleedRate <= 0f && c.BleedFromWounds) { st.BleedDebt = 0f; st.BleedHp0 = 0f; }
+                            if (!agent.IsActive()) continue;   // 313d: wykrwawil sie w tym takcie - bez zalamania trupa
                         }
                         // NM: FleeHere na koncu warunku - poza bitwa na mapie (turniej, arena, bojka) st.Panicked zostaje false
                         // NB2 (16.10, klucz BrokenMenNeverRally): jedna regula z BrokenMen - RoutHold.Break (raz Panic na bitwe, morale
@@ -1189,6 +1320,138 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("FieldCraft.Tick", e); }
+        }
+
+        // ------------------------------------------------------------ 313d: krwawienie z rany, rzut bolu, kustykanie (glowny watek)
+
+        /// <summary>313d: rany z kolejki OnAgentHit. Kazda: licznik ran (rzut odwrotu 143, BrokenMen) i znacznik swiezej rany (rzut bolu); przy BleedFromWounds
+        /// rzut krwawienia (Bleed313.Chance) i strata calkowita do tempa (strata / BleedClotSeconds). Wyjatek na rane liczony, reszta kolejki dalej.</summary>
+        private void ProcessHits(Settings c)
+        {
+            var list = Bleed313.Take();
+            if (list.Count == 0) return;
+            try
+            {
+                float clot = Bleed313.ClotSeconds(c);
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var h = list[i];
+                    var v = h.V;
+                    try
+                    {
+                        if (v == null || !v.IsActive() || !v.IsHuman || Undead.Character(v.Character)) continue;
+                        State st;
+                        if (!_states.TryGetValue(v, out st)) { st = new State(); _states[v] = st; }
+                        st.Hits++;
+                        st.PainDue = true;
+                        if (!c.BleedFromWounds) continue;
+                        if (v.IsMainAgent && !c.BleedAffectsPlayer) continue;
+                        Bleed313.Hits++;
+                        if (st.Ath < 0f) st.Ath = ReadAth(v);
+                        float cond = Bleed313.Cond(st.Ath, c);
+                        float w;
+                        float p = Bleed313.Chance(h, v.HealthLimit, cond, c, out w);
+                        if (w <= 0f) { Bleed313.Shallow++; continue; }
+                        if (p <= 0f || MBRandom.RandomFloat >= p) continue;
+                        float loss = Bleed313.Loss(h.Dmg, cond, c);
+                        if (loss <= 0f) continue;
+                        bool was = st.BleedRate > 0f;
+                        st.BleedRate += loss / clot;
+                        st.BleedBy = h.By;
+                        Bleed313.Bleeds++;
+                        Bleed313.ByType[Bleed313.TypeGroup(h)]++;
+                        Bleed313.ByPart[Bleed313.PartGroup(h.Part)]++;
+                        Bleed313.PSum += p;
+                        Bleed313.LSum += loss;
+                        Bleed313.AthSum += st.Ath;
+                        if (!was)
+                        {
+                            st.BleedHp0 = v.Health;
+                            if (v.IsMainAgent)
+                            {
+                                Bleed313.PlayerBleeds++;
+                                TaleWorlds.Library.InformationManager.DisplayMessage(new TaleWorlds.Library.InformationMessage("You are bleeding.", TaleWorlds.Library.Colors.Red));
+                            }
+                        }
+                    }
+                    catch (Exception e) { Bleed313.Stumble("Hit", e); }
+                }
+            }
+            finally { list.Clear(); }
+        }
+
+        /// <summary>313d: rzut paniki z bolu - PainBreakChance x (krwawi ? PainBreakBleedingFactor : 1) x (1.5 - morale/100) x kondycja, obciete 5..95%.</summary>
+        private static void RollPain(Agent agent, State st, bool bleeding, Settings c)
+        {
+            st.PainRolled = true;
+            float morale = 50f;
+            try { morale = agent.GetMorale(); } catch { morale = 50f; }
+            if (st.Ath < 0f) st.Ath = ReadAth(agent);
+            float p = Bleed313.Clamp(c.PainBreakChance, 0f, 1f) * (bleeding ? Bleed313.Clamp(c.PainBreakBleedingFactor, 1f, 3f) : 1f)
+                      * Bleed313.MoraleMul(morale) * Bleed313.Cond(st.Ath, c);
+            p = Bleed313.Clamp(p, 0.05f, 0.95f);
+            Bleed313.PainRolls++;
+            Bleed313.PainMoraleSum += morale;
+            if (MBRandom.RandomFloat < p)
+            {
+                st.PainBroken = true;
+                Bleed313.PainBroke++;
+                if (bleeding) Bleed313.PainBrokeBleeding++;
+            }
+            else Bleed313.PainResist++;
+        }
+
+        /// <summary>313d: zgon z krwawienia - Blow od siebie jak dotad, ale przy BleedFromWounds na konto tego, kto zadal rane (gdy jeszcze stoi na polu; inaczej
+        /// gra sama bierze ostatni cios z 5 s - Agent.Die, CanOverrideBlow). Pomiar BleedDeathLog: stan (zabity / nieprzytomny), kredyt, panika, odwrot 143.</summary>
+        private void BleedDeath(Agent agent, State st, Settings c)
+        {
+            bool log = c.BleedDeathLog, panic = false, wd = false;
+            if (log)
+            {
+                try { panic = st.Panicked || SurvivalMode.InPanic(agent); } catch { panic = false; }
+                try { var k = RoutHold.Live; wd = k != null && k.Withdrawing(agent); } catch { wd = false; }
+            }
+            var b = new Blow(agent.Index);
+            bool credit = false;
+            if (c.BleedFromWounds && st.BleedBy >= 0 && st.BleedBy != agent.Index)
+            {
+                Agent by = null;
+                try { by = Mission.FindAgentWithIndex(st.BleedBy); } catch { by = null; }
+                if (by != null && by.IsActive()) { b.OwnerId = st.BleedBy; credit = true; }
+            }
+            b.DamageType = DamageTypes.Cut;
+            b.InflictedDamage = (int)agent.Health + 1;
+            b.GlobalPosition = agent.Position;
+            float hp0 = st.BleedHp0;
+            agent.Die(b, Agent.KillInfo.Invalid);
+            if (!log) return;
+            AgentState s = AgentState.Killed;
+            try { s = agent.State; } catch { s = AgentState.Killed; }
+            if (s == AgentState.Unconscious) Bleed313.DeathUncon++; else Bleed313.DeathKilled++;
+            if (credit) Bleed313.DeathCredit++;
+            if (panic) Bleed313.DeathPanic++;
+            if (wd) Bleed313.DeathWithdraw++;
+            if (!c.BleedFromWounds) Bleed313.DeathOld++;
+            Bleed313.DeathHp0Sum += hp0;
+        }
+
+        /// <summary>313d: cap kustykania (m/s) albo 0 - pieszy AI (nie gracz, nie nekajacy autotestu) w bitwie na mapie: w odwrocie rannego 143 albo z HP &lt;=
+        /// WoundedLimpBelowHp (takze w panice z bolu). Liczniki ludzi do linii.</summary>
+        private float LimpNow(Agent agent, Settings c)
+        {
+            if (agent.IsMainAgent || !agent.IsAIControlled || agent.MountAgent != null) return 0f;
+            if (!InBattle()) return 0f;
+            bool low = c.WoundedLimpBelowHp > 0 && agent.Health <= c.WoundedLimpBelowHp;
+            bool wd = false;
+            var k = RoutHold.Live;
+            if (k != null && ReferenceEquals(k.Mission, Mission)) wd = k.Withdrawing(agent);
+            if (!low && !wd) return 0f;
+            if (HorsePursuit.TestRunAnyThread(agent)) return 0f;   // nekajacy autotestu - test bez zmian
+            int id = agent.Index;
+            Bleed313.LimpMen.Add(id);
+            if (wd) Bleed313.LimpWithdraw.Add(id);
+            else if (SurvivalMode.InPanic(agent)) Bleed313.LimpPanic.Add(id);
+            return Bleed313.LimpSpeed(agent, c);
         }
 
         // NM (klucz WoundedFleeBattlesOnly): zlamany ucieka tylko w bitwie na mapie (MissionTeams.IsBattle, raz na misje) - w turnieju, na arenie

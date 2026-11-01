@@ -168,8 +168,16 @@ namespace Armoury
         private static bool Pain(Agent a)
         {
             var c = Settings.Current;
+            // 313d (klucz PainBreakByChance): "z bolu" = przegrany rzut bolu FieldCraft (zlamany przez kompanie przy HP ponizej progu to nie bol)
+            if (c != null && c.PainBreakByChance) return FieldCraft.PainBrokeNow(a);
             float max = a.HealthLimit;
             return c != null && max > 0f && a.Health / max < c.AiFleeBelowPercent / 100f;
+        }
+
+        /// <summary>313d: czlowiek mial juz odwrot rannego w tej bitwie (w toku albo zakonczony - Withdraw raz na bitwe). Glowny watek.</summary>
+        internal bool WithdrawSeen(Agent a)
+        {
+            return a != null && _wd.ContainsKey(a);
         }
 
         /// <summary>Postoj zdjety (DisableScriptedMovement), gdy byl. Natywnego odwrotu w drodze nie ruszamy - nadpisze go cudzy odwrot albo handler paniki.</summary>
