@@ -87983,30 +87983,38 @@ def main(argv):
 # Log Armoury (Armoury-*.log; linie z "[hh:mm:ss] " albo bez). Uzycie: --grupa zatargi312b <Armoury-*.log>. Linie jak w C# Prologue.Feuds.cs.
 # TR-S self-test wyrazen i wierszy (dobry i zly bieg na probkach);
 # TR-0 linia startu: latka Enforced (zatargi) TAK (kazda linia startu);
-# TR-1 zero "ERROR in CanonFeuds." i potkniecia 0 w liniach doby;
+# TR-1 zero "ERROR in CanonFeuds." i potkniecia 0 w liniach doby i w liniach startu;
 # TR-2 zwolnione (linie ZWOLNIONY i lista "razem" linii doby) tylko z listy 10 zatargow, nigdy para kanonu ani sturgia-battania;
 # TR-3 dla par zwolnionych: zero linii E7/0 "NOWA WOJNA < N DNI PO POKOJU" od dnia zwolnienia i zero "ROT WZNOWIL" (ROT wznowil zwolniony 0);
 #      zatarg zakonczony zmeczeniem PRZED zwolnieniem ROT wznawia jak dotad - poza ta kontrola (krytyk LUKI 7);
-# TR-6 264 dalej blokuje: kazda linia doby 264 z "blokada CZYNNA (Robb zyje" ma "Polnoc-korona: CZYNNA";
+#      pary zwolnione to linie ZWOLNIONY oraz "ZWOLNIONY od dnia N" z linii startu (zatrzask z zapisu - recenzja 312b);
+#      E7 tej pary i dnia z linia 312b "WOJNA w zwolnionym zatargu ... nowa wojna, nie ROT / kaskada / klucz NIE" - INFO (wezwanie 168, sojusz Diplomacy
+#      omijaja cooldown 21 dni; recenzja 312b), E7 bez takiej linii - NIE;
+# TR-6 264 dalej blokuje: kazda linia doby 264 z "blokada CZYNNA (Robb zyje, RedWeddingEvent 0/1 | Krwawe Gody nie widac" (stan przed Godami) ma
+#      "Polnoc-korona: CZYNNA" (takze "CZYNNA (ROT wymusza)");
+# TR-L ostrzezenie: w pliku nie ma zadnej linii Armoury m104/312b (zly plik, np. session-*.log) - NIE;
 # TR-4/5/7 INFO: stan 10 zatargow z linii startu, pokoje po zwolnieniu (drogi), nowe wojny w zwolnionych parach (nie ROT).
 ZT312_FEUDS = ("empire-sturgia", "empire_w-aserai", "bravos-nord", "tyrosh-lys", "pentos-myr", "norvos-qohor", "volantis-valyrian",
                "qarth-empire_s", "khuzait-empire_s", "sarnor-ibb")
 ZT312_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
 ZT312_START = re.compile(r"^Zatargi ROT \(312b\): start sesji \| latka Enforced \(zatargi\) (.+?) \| klucze: Old Feuds Can End (TAK|NIE), Feud War Min Days (\d+) "
                          r"\| zatargi (\d+): (.*?) \| wojna bez daty \(WarStartDate Zero\) (\d+), wojna sprzed startu opowiesci (\d+) \| wykluczona: (\S+) \(kanon\) "
-                         r"\| poza lista \(regula ROT bez wyzwalacza, EndDay > 0\): (.*?) \| zwolnione w zapisie (\d+)(?: \[(.*?)\])? \| potkniecia (\d+)\.$")
+                         r"\| poza lista \(regula ROT bez wyzwalacza, EndDay > 0\): (.*?) \| zwolnione z zapisu (\d+), przy starcie (\d+), razem (\d+)(?: \[(.*?)\])? \| potkniecia (\d+)\.$")
+ZT312_STARTITEM = re.compile(r"^(\S+) \((.+?) - (.+)\): wojna .*, ZWOLNIONY od dnia (\d+)$")
 ZT312_FREE = re.compile(r"^Zatargi ROT \(312b\): dzien (\d+) \| ZWOLNIONY zatarg (\S+) \((.+?) - (.+)\): wojna od dnia (\d+) trwa ([\d.]+) dni >= (\d+) ")
 ZT312_DAY = re.compile(r"^Zatargi ROT \(312b\): doba \| dzien (\d+) \| klucz (TAK|NIE), min (\d+) dni \| zwolnione dzis (\d+)(?: \[(.*?)\])?, razem (\d+)(?: \[(.*?)\])? "
                        r"\| pokoje po zwolnieniu dzis (\d+)(?: \[(.*?)\])?, od wczytania (\d+)(?: \[(.*?)\])? \| ROT wznowil zwolniony dzis (\d+), od wczytania (\d+) "
                        r"\| nowe wojny w zwolnionych parach \(nie ROT\) dzis (\d+)(?: \[(.*?)\])?, od wczytania (\d+) \| potkniecia dzis (\d+) \(razem (\d+)\)\.$")
 ZT312_ROTWAR = re.compile(r"^Zatargi ROT \(312b\): dzien (\d+) \| WOJNA w zwolnionym zatargu (\S+) .*ROT WZNOWIL")
+ZT312_NEWWAR = re.compile(r"^Zatargi ROT \(312b\): dzien (\d+) \| WOJNA w zwolnionym zatargu (\S+) \(.*\): (nowa wojna, nie ROT|kaskada w czasie wypowiedzenia ROT|wypowiedzial ROT, klucz NIE)")
 ZT312_E7 = re.compile(r"^Wojna i pokoj \(E7/0\): dzien (\d+) \| (.+?): WOJNA .*NOWA WOJNA < \d+ DNI PO POKOJU")
-ZT312_264 = re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| blokada (\S+) \((.*?)\) \| Polnoc-korona: (\S+?),")
+ZT312_264 = re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| blokada (\S+) \((.*?)\) \| Polnoc-korona: (CZYNNA(?: \(ROT wymusza\))?|KONIEC),")
+ZT312_264_PRE = ("Robb zyje, RedWeddingEvent 0", "Robb zyje, RedWeddingEvent 1", "Robb zyje, Krwawe Gody nie widac")   # stan przed Godami (CanonPeaceLock.Locked)
 
 ZT312_SAMPLE_START = ("Zatargi ROT (312b): start sesji | latka Enforced (zatargi) TAK | klucze: Old Feuds Can End TAK, Feud War Min Days 91 | zatargi 10: "
                       "empire-sturgia (The Vale - Iron Islands): wojna TAK od dnia 108879 (1.0 dni), ROT wymusza; bravos-nord (Braavos - Lorath): wojna TAK od dnia 108800 "
                       "(100.0 dni), ZWOLNIONY od dnia 108900 | wojna bez daty (WarStartDate Zero) 0, wojna sprzed startu opowiesci 1 | wykluczona: sturgia-battania (kanon) "
-                      "| poza lista (regula ROT bez wyzwalacza, EndDay > 0): - | zwolnione w zapisie 1 [bravos-nord@108900] | potkniecia 0.")
+                      "| poza lista (regula ROT bez wyzwalacza, EndDay > 0): - | zwolnione z zapisu 1, przy starcie 0, razem 1 [bravos-nord@108900] | potkniecia 0.")
 ZT312_SAMPLE_FREE = ("Zatargi ROT (312b): dzien 108900 | ZWOLNIONY zatarg bravos-nord (Braavos - Lorath): wojna od dnia 108800 trwa 100.0 dni >= 91 - pokoj mozliwy "
                      "(glos rady, zmeczenie Diplomacy, bieda), ROT nie wypowie tej wojny od nowa.")
 ZT312_SAMPLE_DAY = ("Zatargi ROT (312b): doba | dzien 108901 | klucz TAK, min 91 dni | zwolnione dzis 0, razem 1 [bravos-nord@108900] | pokoje po zwolnieniu dzis 1 "
@@ -88014,6 +88022,7 @@ ZT312_SAMPLE_DAY = ("Zatargi ROT (312b): doba | dzien 108901 | klucz TAK, min 91
                     "od wczytania 0 | nowe wojny w zwolnionych parach (nie ROT) dzis 0, od wczytania 0 | potkniecia dzis 0 (razem 0).")
 ZT312_SAMPLE_E7 = ("Wojna i pokoj (E7/0): dzien 108902 | Braavos - Lorath: WOJNA (przyczyna Default, wola: x) | dni od poprzedniego zdarzenia tej pary 1 (POKOJ) "
                    "- NOWA WOJNA < 21 DNI PO POKOJU")
+ZT312_SAMPLE_NEWWAR = ("Zatargi ROT (312b): dzien 108902 | WOJNA w zwolnionym zatargu bravos-nord (Braavos - Lorath): nowa wojna, nie ROT (Default).")
 ZT312_SAMPLE_264 = ("Pokoj kanonu (264): dzien 108968 | blokada CZYNNA (Robb zyje, RedWeddingEvent 0) | Polnoc-korona: CZYNNA, wojna TAK od dnia 9.0 | Dorzecze-korona: "
                     "KONIEC, wojna NIE | zablokowane dzis 0, sesja 2 | gracz rzadzi: nie | potkniecia 0 (sesja 0).")
 
@@ -88022,7 +88031,7 @@ def zt312_strip(line):
     return ZT312_TS.sub("", line.rstrip("\r\n"))
 
 
-def zt312_rows(rep, starts, frees, days, rotwars, e7, l264, errors):
+def zt312_rows(rep, starts, frees, days, rotwars, e7, l264, errors, newwars=()):
     # TR-0
     if not starts:
         rep.add("TR-0: linia startu - latka Enforced (zatargi)", "NIEPOKRYTY (brak linii startu 312b)", "kazda linia startu: TAK", None)
@@ -88045,6 +88054,10 @@ def zt312_rows(rep, starts, frees, days, rotwars, e7, l264, errors):
             bad1.append("format: " + l[:140])
         elif int(m.group(17)) > 0:
             bad1.append(f"dzien {m.group(1)}: potkniecia {m.group(17)}")
+    for l in starts:
+        m = ZT312_START.search(l)
+        if m and int(m.group(14)) > 0:
+            bad1.append(f"start sesji: potkniecia {m.group(14)}")
     if not starts and not days and not errors:
         rep.add("TR-1: zero ERROR CanonFeuds, linie doby bez potkniec", "NIEPOKRYTY (brak linii 312b)", "ERROR 0, potkniecia 0, format linii doby", None)
     else:
@@ -88073,8 +88086,8 @@ def zt312_rows(rep, starts, frees, days, rotwars, e7, l264, errors):
                 bad2.append("razem spoza listy: " + key)
     for l in starts:
         m = ZT312_START.search(l)
-        if m and m.group(11):
-            for it in m.group(11).split(", "):
+        if m and m.group(13):
+            for it in m.group(13).split(", "):
                 if it.split("@")[0] not in ZT312_FEUDS:
                     bad2.append("zapis spoza listy: " + it)
     bad2 = [b for b in bad2] + [f"para kanonu: {k}" for k in freed if k == "sturgia-battania"]
@@ -88083,16 +88096,30 @@ def zt312_rows(rep, starts, frees, days, rotwars, e7, l264, errors):
     else:
         rep.add("TR-2: zwolnione tylko z listy 10 zatargow", f"zwolnien w sesji {len(freed)} [" + ", ".join(f"{k}@{v[0]}" for k, v in freed.items()) + f"], zlych {len(bad2)}"
                 + (f" ({bad2[0]})" if bad2 else ""), "zadna para spoza listy (sturgia-battania, Wojna Pieciu Krolow - nigdy)", not bad2)
-    # TR-3
-    bad3 = []
+    # TR-3 - pary zwolnione: linie ZWOLNIONY + zatrzaski z linii startu (wczytany zapis z fz=, recenzja 312b)
+    freed3 = dict(freed)
+    for l in starts:
+        m = ZT312_START.search(l)
+        if not m:
+            continue
+        for it in m.group(5).split("; "):
+            mi = ZT312_STARTITEM.search(it)
+            if mi and mi.group(1) in ZT312_FEUDS:
+                freed3.setdefault(mi.group(1), (int(mi.group(4)), mi.group(2), mi.group(3)))
+    notrot = set()   # (para, dzien) z linia 312b "nowa wojna, nie ROT / kaskada / klucz NIE"
+    for l in newwars:
+        m = ZT312_NEWWAR.search(l)
+        if m:
+            notrot.add((m.group(2), int(m.group(1))))
+    bad3, info3 = [], []
     for l in e7:
         m = ZT312_E7.search(l)
         if not m:
             continue
         d, pair = int(m.group(1)), m.group(2)
-        for k, (fd, n1, n2) in freed.items():
+        for k, (fd, n1, n2) in freed3.items():
             if d >= fd and pair in (f"{n1} - {n2}", f"{n2} - {n1}"):
-                bad3.append(f"{k} dzien {d} (zwolniony {fd})")
+                (info3 if (k, d) in notrot else bad3).append(f"{k} dzien {d} (zwolniony {fd})")
     for l in rotwars:
         m = ZT312_ROTWAR.search(l)
         bad3.append(f"ROT WZNOWIL {m.group(2) if m else l[:80]}")
@@ -88103,23 +88130,23 @@ def zt312_rows(rep, starts, frees, days, rotwars, e7, l264, errors):
             rot_total = max(rot_total, int(m.group(13)))
     if rot_total > 0 and not rotwars:
         bad3.append(f"linia doby: ROT wznowil od wczytania {rot_total}")
-    if not freed and not days:
+    if not freed3 and not days:
         rep.add("TR-3: zwolnione pary - zero NOWA WOJNA < 21 DNI PO POKOJU i zero ROT WZNOWIL", "NIEPOKRYTY (brak zwolnionych par / linii doby 312b)",
                 "0 dla par zwolnionych (zatarg zakonczony zmeczeniem przed zwolnieniem - poza kontrola, stan sprzed 312b)", None)
     else:
-        rep.add("TR-3: zwolnione pary - zero NOWA WOJNA < 21 DNI PO POKOJU i zero ROT WZNOWIL", f"zwolnionych {len(freed)}, naruszen {len(bad3)}"
-                + (f" ({bad3[0]})" if bad3 else ""), "0 dla par zwolnionych (zatarg zakonczony zmeczeniem przed zwolnieniem - poza kontrola, stan sprzed 312b)", not bad3)
+        rep.add("TR-3: zwolnione pary - zero NOWA WOJNA < 21 DNI PO POKOJU i zero ROT WZNOWIL", f"zwolnionych {len(freed3)}, naruszen {len(bad3)}"
+                + (f" ({bad3[0]})" if bad3 else "") + (f" | INFO: E7 < 21 dni nie z ROT (wezwanie/sojusz) {len(info3)} ({info3[0]})" if info3 else ""), "0 dla par zwolnionych (zatarg zakonczony zmeczeniem przed zwolnieniem - poza kontrola, stan sprzed 312b)", not bad3)
     # TR-6
     n6, bad6 = 0, []
     for l in l264:
         m = ZT312_264.search(l)
         if not m:
             continue
-        if m.group(2) == "CZYNNA" and m.group(3).startswith("Robb zyje"):
+        if m.group(2) == "CZYNNA" and m.group(3).startswith(ZT312_264_PRE):
             n6 += 1
-            if m.group(4) != "CZYNNA":
+            if not m.group(4).startswith("CZYNNA"):
                 bad6.append(f"dzien {m.group(1)}: Polnoc-korona {m.group(4)}")
-    rep.add("TR-6: 264 dalej blokuje (Polnoc-korona CZYNNA, gdy Robb zyje)", (f"linii doby 264 z blokada {n6}, zlych {len(bad6)}" + (f" ({bad6[0]})" if bad6 else ""))
+    rep.add("TR-6: 264 dalej blokuje (Polnoc-korona CZYNNA przed Krwawymi Godami)", (f"linii doby 264 z blokada {n6}, zlych {len(bad6)}" + (f" ({bad6[0]})" if bad6 else ""))
             if n6 else "NIEPOKRYTY (brak linii doby 264 z blokada CZYNNA)", "zlych 0", None if not n6 else not bad6)
     # INFO
     if starts:
@@ -88134,11 +88161,11 @@ def zt312_rows(rep, starts, frees, days, rotwars, e7, l264, errors):
         if m:
             last = m
     if last is None:
-        rep.add("TR-5: pokoje po zwolnieniu (od wczytania, drogi)", "NIEPOKRYTY (brak linii doby 312b)", "INFO (glos rady / zmeczenie Diplomacy / bieda)", None)
+        rep.add("TR-5: pokoje po zwolnieniu (od wczytania, drogi)", "NIEPOKRYTY (brak linii doby 312b)", "INFO (glos rady - takze wniosek z biedy, patrz E1b CS / zmeczenie Diplomacy / bieda)", None)
         rep.add("TR-7: nowe wojny w zwolnionych parach (nie ROT)", "NIEPOKRYTY (brak linii doby 312b)", "INFO (AI, wezwania - dozwolone)", None)
     else:
         rep.add("TR-5: pokoje po zwolnieniu (od wczytania, drogi)", f"dzien {last.group(1)}: {last.group(10)}" + (f" [{last.group(11)[:500]}]" if last.group(11) else "")
-                + f" | zwolnione razem {last.group(6)}", "INFO (glos rady / zmeczenie Diplomacy / bieda)", None)
+                + f" | zwolnione razem {last.group(6)}", "INFO (glos rady - takze wniosek z biedy, patrz E1b CS / zmeczenie Diplomacy / bieda)", None)
         rep.add("TR-7: nowe wojny w zwolnionych parach (nie ROT)", f"od wczytania {last.group(16)}", "INFO (AI, wezwania - dozwolone)", None)
 
 
@@ -88172,6 +88199,32 @@ def zatargi312b_selftest():
     v = {r[0].split(":")[0]: r[3] for r in rep.rows}
     if v.get("TR-3") != "TAK":
         return "TR-3 liczy E7 sprzed zwolnienia"
+    # recenzja 312b: zatrzask z linii startu (bez linii ZWOLNIONY) widzi E7 - NIE; E7 z linia "nowa wojna, nie ROT" tego dnia - TAK (INFO w opisie)
+    rep = Report()
+    zt312_rows(rep, [ZT312_SAMPLE_START], [], [ZT312_SAMPLE_DAY], [], [ZT312_SAMPLE_E7], [ZT312_SAMPLE_264], [])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if v.get("TR-3") != "NIE":
+        return "TR-3 nie widzi zatrzasku z linii startu"
+    rep = Report()
+    zt312_rows(rep, [ZT312_SAMPLE_START], [ZT312_SAMPLE_FREE], [ZT312_SAMPLE_DAY], [], [ZT312_SAMPLE_E7], [ZT312_SAMPLE_264], [], [ZT312_SAMPLE_NEWWAR])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if v.get("TR-3") != "TAK":
+        return "TR-3 liczy E7 wojny nie z ROT (wezwanie/sojusz)"
+    # recenzja 312b: potkniecia w linii startu - TR-1 NIE
+    rep = Report()
+    zt312_rows(rep, [ZT312_SAMPLE_START.replace("| potkniecia 0.", "| potkniecia 2.")], [], [], [], [], [], [])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if v.get("TR-1") != "NIE":
+        return "TR-1 nie czyta potkniec linii startu"
+    # recenzja 312b: 264 "CZYNNA (ROT wymusza)" lapane i dobre; po Godach (RedWeddingEvent 2) KONIEC poza TR-6
+    s264w = ZT312_SAMPLE_264.replace("Polnoc-korona: CZYNNA,", "Polnoc-korona: CZYNNA (ROT wymusza),")
+    s264p = ZT312_SAMPLE_264.replace("(Robb zyje, RedWeddingEvent 0)", "(Robb zyje, RedWeddingEvent 2 - ROT wymusza te wojne, pokoj cofnalby nastepnej doby)").replace(
+        "Polnoc-korona: CZYNNA,", "Polnoc-korona: KONIEC,")
+    rep = Report()
+    zt312_rows(rep, [ZT312_SAMPLE_START], [ZT312_SAMPLE_FREE], [ZT312_SAMPLE_DAY], [], [], [s264w, s264p], [])
+    r6 = [r for r in rep.rows if r[0].startswith("TR-6")][0]
+    if r6[3] != "TAK" or "z blokada 1," not in r6[1]:
+        return "TR-6: CZYNNA (ROT wymusza) / stan po Godach - zly werdykt: " + r6[1]
     # brak linii - NIEPOKRYTY (INFO), bez wyjatku
     rep = Report()
     zt312_rows(rep, [], [], [], [], [], [], [])
@@ -88189,10 +88242,13 @@ def zatargi312b_main(logp):
         rep.add("TR-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    starts, frees, days, rotwars, e7, l264, errors = [], [], [], [], [], [], []
+    starts, frees, days, rotwars, e7, l264, errors, newwars = [], [], [], [], [], [], [], []
+    n_arm = 0   # linie Armoury m104/312b (TR-L - zly plik)
     with open(logp, encoding="utf-8", errors="replace") as f:
         for line in f:
             s = zt312_strip(line)
+            if s.startswith("Wojny kanonu (m104): ") or s.startswith("Zatargi ROT (312b): "):
+                n_arm += 1
             if s.startswith("Zatargi ROT (312b): "):
                 if s.startswith("Zatargi ROT (312b): start sesji"):
                     starts.append(s)
@@ -88202,6 +88258,8 @@ def zatargi312b_main(logp):
                     frees.append(s)
                 elif "ROT WZNOWIL" in s:
                     rotwars.append(s)
+                elif "| WOJNA w zwolnionym zatargu " in s:
+                    newwars.append(s)
             elif s.startswith("Wojna i pokoj (E7/0): dzien") and "DNI PO POKOJU" in s:
                 e7.append(s)
             elif s.startswith("Pokoj kanonu (264): dzien") and "zablokowane dzis" in s:
@@ -88209,7 +88267,10 @@ def zatargi312b_main(logp):
             elif s.startswith("ERROR in CanonFeuds."):
                 errors.append(s)
     print(f"plik: {logp}")
-    zt312_rows(rep, starts, frees, days, rotwars, e7, l264, errors)
+    if n_arm == 0:
+        rep.add("TR-L: log Armoury", "w pliku nie ma zadnej linii 'Wojny kanonu (m104)' ani 'Zatargi ROT (312b)' - zly plik (np. session-*.log)?",
+                "log Armoury z liniami m104/312b", False)
+    zt312_rows(rep, starts, frees, days, rotwars, e7, l264, errors, newwars)
     rep.show()
     return 0
 

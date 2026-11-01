@@ -239,7 +239,9 @@ namespace Armoury
             catch (Exception e) { FzStumble("FeudOnPeace", e); }
         }
 
-        /// <summary>CampaignEvents.WarDeclared: wojna w zwolnionym zatargu - ROT (CallingDeclareWar; sprawdzian, ma byc 0) albo inna droga (AI, wezwanie, gracz).</summary>
+        /// <summary>CampaignEvents.WarDeclared: wojna w zwolnionym zatargu - ROT (CallingDeclareWar i ROT dalej wymusza te pare przy kluczu TAK; sprawdzian, ma byc 0)
+        /// albo inna droga (AI, wezwanie, gracz). Recenzja 312b: CallingDeclareWar jest true takze przy wypowiedzeniach KingInTheNorth/Prologue.River, a sojusze
+        /// Diplomacy moga wtedy kaskadowo wypowiedziec wojne zwolnionej parze - to nie ROT (osobna etykieta, poza licznikiem bledu); klucz NIE - ROT decyduje jak dawniej.</summary>
         internal static void FeudOnWar(IFaction a, IFaction b, DeclareWarAction.DeclareWarDetail detail)
         {
             try
@@ -247,9 +249,23 @@ namespace Armoury
                 string key = FreedKey(a, b);
                 if (key == null) return;
                 int day = (int)CampaignTime.Now.ToDays;
-                bool rot = false;
-                try { var beh = RotWarsBehavior(); rot = _fCalling != null && beh != null && (bool)_fCalling.GetValue(beh); } catch { rot = false; }
-                if (rot)
+                bool calling = false;
+                try { var beh = RotWarsBehavior(); calling = _fCalling != null && beh != null && (bool)_fCalling.GetValue(beh); } catch { calling = false; }
+                bool keyOn = FeudKey;
+                bool rot = calling && keyOn && WarForced(a, b);
+                if (calling && !keyOn)
+                {
+                    _fzNewWarDay++; _fzNewWarS++;
+                    if (_fzWarToday.Count < 10) _fzWarToday.Add(key + " klucz NIE");
+                    Log.Info(FzTag + "dzien " + day + " | WOJNA w zwolnionym zatargu " + key + " (" + FName(a) + " - " + FName(b) + "): wypowiedzial ROT, klucz NIE - ROT decyduje (" + detail + ").");
+                }
+                else if (calling && !rot)
+                {
+                    _fzNewWarDay++; _fzNewWarS++;
+                    if (_fzWarToday.Count < 10) _fzWarToday.Add(key + " kaskada");
+                    Log.Info(FzTag + "dzien " + day + " | WOJNA w zwolnionym zatargu " + key + " (" + FName(a) + " - " + FName(b) + "): kaskada w czasie wypowiedzenia ROT, para niewymuszona (" + detail + ").");
+                }
+                else if (rot)
                 {
                     _fzRotDay++; _fzRotS++;
                     Log.Info(FzTag + "dzien " + day + " | WOJNA w zwolnionym zatargu " + key + " (" + FName(a) + " - " + FName(b) + "): ROT WZNOWIL (CallingDeclareWar) - BLAD 312b.");
@@ -273,15 +289,17 @@ namespace Armoury
                 for (int i = 0; i < st.FrameCount && i < 40; i++)
                 {
                     var m = st.GetFrame(i)?.GetMethod();
-                    if (m == null || m.DeclaringType == null) continue;
-                    string n = m.Name ?? "", t = m.DeclaringType.FullName ?? "";
+                    if (m == null) continue;
+                    // metoda zalatana przez Harmony jest na stosie jako DMD bez DeclaringType - jej nazwa zawiera pelna nazwe typu i metody (recenzja 312b)
+                    string n = m.Name ?? "", t = m.DeclaringType != null ? m.DeclaringType.FullName ?? "" : n;
                     if (n.IndexOf("ConsiderPeaceActions", StringComparison.Ordinal) >= 0 || t.IndexOf("WarExhaustion", StringComparison.Ordinal) >= 0) return "zmeczenie Diplomacy";
                     if (t.IndexOf("PovertyPeace", StringComparison.Ordinal) >= 0) return "bieda (CrashScribe)";
                     if (t.IndexOf("Chronicle", StringComparison.Ordinal) >= 0) return "Kronika";
                 }
             }
             catch { }
-            return detail == MakePeaceAction.MakePeaceDetail.ByKingdomDecision ? "glos rady" : "inna (" + detail + ")";
+            // wniosek z biedy CrashScribe idzie przez glosowanie rady (PovertyPeace nie ma wtedy na stosie) - nazwa uczciwa, zestawienie z linia E1b CS (recenzja 312b)
+            return detail == MakePeaceAction.MakePeaceDetail.ByKingdomDecision ? "glos rady (takze wniosek z biedy - patrz E1b CS)" : "inna (" + detail + ")";
         }
 
         // ---------------------------------------------------------------- doba i linie
@@ -349,6 +367,7 @@ namespace Armoury
             sb.Append(FzTag).Append("start sesji | latka Enforced (zatargi) ").Append(_fzWire)
               .Append(" | klucze: Old Feuds Can End ").Append(FeudKey ? "TAK" : "NIE").Append(", Feud War Min Days ").Append(FeudMinDays);
             int noDate = 0, beforeStory = 0;
+            int fromSave = _feudFree.Count;   // zatrzaski z zapisu - przed petla (Enforced w petli moze zalozyc nowe, recenzja 312b)
             var items = new List<string>();
             var outside = new List<string>();
             if (RotWarsReady() && FeudPropsReady())
@@ -409,7 +428,7 @@ namespace Armoury
               .Append(" | wojna bez daty (WarStartDate Zero) ").Append(noDate).Append(", wojna sprzed startu opowiesci ").Append(beforeStory)
               .Append(" | wykluczona: ").Append(FeudExcluded).Append(" (kanon)")
               .Append(" | poza lista (regula ROT bez wyzwalacza, EndDay > 0): ").Append(outside.Count > 0 ? string.Join(", ", outside.ToArray()) : "-")
-              .Append(" | zwolnione w zapisie ").Append(FreedAllText())
+              .Append(" | zwolnione z zapisu ").Append(fromSave).Append(", przy starcie ").Append(_feudFree.Count - fromSave).Append(", razem ").Append(FreedAllText())
               .Append(" | potkniecia ").Append(_fzStumbles).Append('.');
             Log.Info(sb.ToString());
         }

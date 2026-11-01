@@ -21,6 +21,13 @@
 - Watpliwosc: klucz wylaczony po zwolnieniu Reach-Dorne, gdy m104 (2) zrobila juz pokoj bez IsEnabled = false - ROT wymusi te wojne znowu do EndDay (wylaczenie klucza = "as Realm of Thrones decides").
 - Armoury.json Jeffa nie zna nowych kluczy - wezma domyslne (grep '"CanonFeud' po pierwszym starcie).
 - Pomiar w autotescie 312: grupa zatargi312b na logu Armoury + wojny311f (E1b "do glosowania: gra" > 0 po zwolnieniu, mniej POMINIETE z powodem ROT).
+**Recenzja (2 przeglady, bez KRYTYCZNYCH; poprawione):**
+- WAZNA TR-6: wyrazenie 264 nie lapalo "Polnoc-korona: CZYNNA (ROT wymusza)," (cicho pomijane), a po Krwawych Godach z Robbem zywym (RedWeddingEvent 2) dawalo falszywe NIE. Teraz `Polnoc-korona: (CZYNNA(?: \(ROT wymusza\))?|KONIEC),` i TR-6 tylko dla stanu przed Godami (powod "Robb zyje, RedWeddingEvent 0" / "... 1" / "Krwawe Gody nie widac" - CanonPeaceLock.Locked).
+- TR-3: pary zwolnione takze z linii startu ("ZWOLNIONY od dnia N" - zatrzask z zapisu fz=, bez linii ZWOLNIONY w tym logu). E7 "NOWA WOJNA < 21 DNI PO POKOJU" tej pary i dnia z linia 312b "nowa wojna, nie ROT" / "kaskada" / "klucz NIE" - INFO (wezwanie 168 i sojusz Diplomacy omijaja cooldown 21 dni), bez takiej linii - NIE.
+- FeudOnWar: ROT WZNOWIL (blad) tylko gdy CallingDeclareWar && klucz TAK && WarForced(a, b). CallingDeclareWar jest true takze przy wypowiedzeniach KingInTheNorth.cs:1166 / Prologue.River.cs:263 - kaskada sojuszy w zwolnionej parze ma etykiete "kaskada w czasie wypowiedzenia ROT, para niewymuszona"; klucz NIE - "wypowiedzial ROT, klucz NIE - ROT decyduje" (oba w liczniku nowych wojen, nie bledu).
+- Linia startu: "zwolnione z zapisu N, przy starcie M, razem K [...]" (licznik z zapisu brany przed petla, ktora wola Enforced). TR-1 czyta tez "potkniecia N" linii startu.
+- PeacePath: ramki DMD (metoda zalatana Harmony, DeclaringType null) dopasowywane po nazwie. Droga glosowania nazwana "glos rady (takze wniosek z biedy - patrz E1b CS)" - wniosek z biedy CrashScribe idzie przez glosowanie, PovertyPeace nie ma wtedy na stosie (rozroznienie: zestawic pare i dzien z linia E1b "z biedy" w session-*.log).
+- Checker: TR-L NIE, gdy w pliku nie ma zadnej linii "Wojny kanonu (m104)" ani "Zatargi ROT (312b)" (zly plik). Self-test: nowe przypadki (zatrzask z linii startu, E7 nie z ROT, potkniecia startu, 264 CZYNNA (ROT wymusza) i stan po Godach). Na logu 311x i pustym: TR-S TAK, TR-6 TAK (90), TR-L NIE na pustym.
 **Status:** DO SPRAWDZENIA (autotest zbiorczy 312)
 
 ## 2026-11-01 312a mennica - zuzycie monety wlaczone (CoinWearPerYear 0 -> 0.003)
