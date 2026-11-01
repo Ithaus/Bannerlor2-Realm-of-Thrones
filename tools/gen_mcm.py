@@ -25,6 +25,8 @@ RANGES = {
     'DebasementMintExtra': (0.0, 1.0, "0.00"),
     'MintSilverReserveDays': (1, 120, "0"),
     'CoinWearPerYear': (0.0, 0.2, "0.0000"),
+    # 312b: konce zatargow ROT - kod przycina do 1..364 dni (Prologue.FeudMinDays)
+    'CanonFeudWarMinDays': (1, 364, "0"),
     # 307c: oblezenia i cena warsztatu - kod przycina (SiegeWalls2.TimeFloor / SiegeWalls.RepelGrowth / RetryAfter / RetryRatio, WorkshopTrade.StockDays)
     'SiegeGameTimeTermFloor': (0.0, 0.8, "0.00"),
     'SiegeRepelPauseGrowth': (0.0, 2.0, "0.00"),
@@ -728,6 +730,9 @@ LABELS = {
     'UnarmedMenAllowedPercent': 'Unarmed Men Allowed (%)',
     # 277: nazwy bez numeru paczki (regula ogolna dalaby "Canon Houses277")
     'CanonHouses277': 'Canon Houses of the West',
+    # 312b: nazwy z projektu (regula ogolna dalaby "Canon Feud Wars End")
+    'CanonFeudWarsEnd': 'Old Feuds Can End',
+    'CanonFeudWarMinDays': 'Feud War Min Days',
     'CanonHouses277Rename': 'Canon Houses of the West - Book Names',
     'CanonHouses277LiegePay': 'Canon Houses of the West - Liege Pays the Host',
     # 282: nazwy opisowe (regula ogolna dalaby "Caravan Bulk Flow Gate", "Town Material Order Ore Equal Cover")

@@ -290,11 +290,12 @@ namespace Armoury
             ResetCrown();
             ResetDragons();
             ResetRiver();    // m116-fabula (4)
+            ResetFeuds();    // 312b: zatrzaski zatargow ROT (fz=)
         }
 
         internal static string PackWars()
         {
-            return "v=1;nw=" + (_wNew ? "1" : "0") + ";" + PackCrown() + PackDragons() + PackRiver();
+            return "v=1;nw=" + (_wNew ? "1" : "0") + ";" + PackCrown() + PackDragons() + PackRiver() + PackFeuds();
         }
 
         internal static void UnpackWars(string v)
@@ -312,6 +313,7 @@ namespace Armoury
             UnpackCrown(map);
             UnpackDragons(map);
             UnpackRiver(map);   // m116-fabula (4): zapis bez "rw=" - stan od zera (wojna zastana zapisana w pierwszej dobie)
+            UnpackFeuds(map);   // 312b: zapis bez "fz=" - brak zatrzaskow
         }
 
         private static bool _warsEventDay;   // cos sie dzis wydarzylo (linia doby mimo rytmu 7 dob)
@@ -338,6 +340,7 @@ namespace Armoury
             try { EssosDaily(); } catch (Exception e) { CwStumble("EssosDaily", e); }
             try { CrownDaily(); } catch (Exception e) { CwStumble("CrownDaily", e); }
             try { RiverDaily(); } catch (Exception e) { CwStumble("RiverDaily", e); }   // m116-fabula (4): wojna korona-Dorzecze i sojusz Polnoc+Dorzecze
+            try { FeudDaily(); } catch (Exception e) { FzStumble("FeudDaily", e); }   // 312b: konce zatargow ROT - zatrzask i linia doby
             double sd = StoryDays();
             bool essosWindow = Active && EssosKey && sd < 1.0;
             int every = (int)Math.Floor(sd);
@@ -366,6 +369,8 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDaily);
             CampaignEvents.HeroPrisonerReleased.AddNonSerializedListener(this, OnHeroReleased);   // (3) Daenerys z niewoli - etap smokow od razu
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => Prologue.WarsOnNewGame());   // R1: zakres (2) i (3) - znacznik nowej kampanii
+            CampaignEvents.WarDeclared.AddNonSerializedListener(this, Prologue.FeudOnWar);    // 312b: wojna w zwolnionym zatargu (ROT wznowil - ma byc 0)
+            CampaignEvents.MakePeace.AddNonSerializedListener(this, Prologue.FeudOnPeace);    // 312b: pokoj w zwolnionym zatargu (droga)
         }
 
         public override void SyncData(IDataStore dataStore)
@@ -380,6 +385,8 @@ namespace Armoury
         {
             Prologue.DragonsApply("start sesji");   // (3) przed linia startu - linia mowi stan po zmianie
             try { Prologue.WarsStartLine(); } catch (Exception e) { Prologue.CwStumble("WarsStartLine", e); }
+            try { Prologue.InstallFeuds(); } catch (Exception e) { Prologue.FzStumble("InstallFeuds", e); }   // 312b: raz na proces, kazda kampania
+            try { Prologue.FeudStartLine(); } catch (Exception e) { Prologue.FzStumble("FeudStartLine", e); }
         }
 
         private void OnHeroReleased(Hero prisoner, PartyBase party, IFaction capturer, EndCaptivityDetail detail, bool notify)

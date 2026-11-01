@@ -10160,6 +10160,14 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarNoPeaceUntilRedWedding { get; set; } = true;
 
+        [SettingPropertyBool("Old Feuds Can End", HintText = "the old storyline feuds of Realm of Thrones (the Vale and the Iron Islands, the Reach and Dorne, the wars of the Free Cities, Qarth and the Dothraki against Daenerys) are no longer forced forever: once such a war has lasted Feud War Min Days, peace may be made by council vote, war weariness or poverty, and Realm of Thrones no longer declares it again. The War of the Five Kings, the Night's Watch and the Free Folk, and the Ironborn raid on the North are not affected (off = as Realm of Thrones decides)", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonFeudWarsEnd { get; set; } = true;
+
+        [SettingPropertyInteger("Feud War Min Days", 1, 364, "0", HintText = "how many days an old storyline feud must have been fought before it may end (91 = one season of the long year, the same as Diplomacy's minimum war duration)", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public int CanonFeudWarMinDays { get; set; } = 91;
+
         [SettingPropertyBool("Daenerys Dragons Grow", HintText = "Daenerys' dragons grow up with the story: in the prologue they are still eggs, and while they grow none of them can carry her, so Daenerys rides a horse from her own train. Drogon first carries her when he is full-grown, as in the books (about the time of Daznak's Pit, before her invasion of Westeros). Only in Prologue 298 campaigns and in campaigns started after this update. Off = Drogon is full-grown from the first day, as in Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool DaenerysDragonsGrow { get; set; } = true;
@@ -13415,6 +13423,8 @@ namespace Armoury
             s.CanonRiverlandsWarAtPrologueEnd = CanonRiverlandsWarAtPrologueEnd;
             s.CanonNorthRiverlandsAlliance = CanonNorthRiverlandsAlliance;
             s.CanonWarNoPeaceUntilRedWedding = CanonWarNoPeaceUntilRedWedding;
+            s.CanonFeudWarsEnd = CanonFeudWarsEnd;
+            s.CanonFeudWarMinDays = CanonFeudWarMinDays;
             s.DaenerysDragonsGrow = DaenerysDragonsGrow;
             s.CanonNorthRiverlandsUnion = CanonNorthRiverlandsUnion;
             s.CanonWarBalance = CanonWarBalance;
