@@ -89958,6 +89958,248 @@ def ostrzal313b_main(logp):
     return 0
 
 
+# ---------------------------------------------------------------- paczka 313c (01.11): stamina - wprawa w broni i bieg gracza - grupa stamina313c
+# Log Armoury (Armoury-*.log; linie z "[hh:mm:ss] " albo bez). Uzycie: --grupa stamina313c <Armoury-*.log>. Linie jak w C# WeaponEase.ApplyAll / WeaponEase.Flush
+# i FieldCraft.Line313. Jeff 01.11: "im wiecej mam umiejetnosci walki tym mniej staminy zuzywa"; "jak biegalem i spadla mi stamina do 0 to nadal biegne zamiast
+# caly czas stopniowo zwalniac, az jak dojdzie do 0 po prostu powinienem przejsc w tryb marszu".
+# ST-S self-test wyrazen i wierszy (dobry i zly bieg na probkach);
+# ST-L w pliku jest linia startu "Wprawa (WeaponEase): latki" (inaczej zly plik albo DLL sprzed 313c) - NIE;
+# ST-0 latki atakujacy/obronca wpiete TAK/TAK (sygnatura OK) w linii startu i w kazdej linii misji;
+# ST-1 zero "ERROR in WeaponEase" i "ERROR in FieldCraft.Run313/Line313", potkniecia 0 w liniach misji (WeaponEase i Bieg gracza);
+# ST-2 linie misji WeaponEase: kolizji atak + obrona = suma n koszykow; sr. M koszyka w granicach reguly z linii (0-99: M(99)..M(0), 100-199: M(199)..M(100),
+#      200-299: M(299)..M(200), 300+: dno..M(300)); koszt po regule <= koszt RBM w koszyku 300+ (mistrz taniej);
+# ST-3 Bieg gracza przy kluczu TAK: po wejsciu w chod (wejsc > 0) sekund chodu > 0 i najnizszy mnoznik <= tempo chodu + 0.05; flaga nie weszla <= 2 x wejsc + 2
+#      (wiecej = flaga chodu gry nie wchodzi); recenzja: bez wejsc, a w biegu ponizej progu > 30 s i najnizszy mnoznik > chod + 0.05 = NIE (pasek krazy
+#      nad zerem - petla progu biegu); bez drenazu blisko limitu <= 10% sekund ponizej progu + 5 s; "ponowien (gracz wlaczyl bieg)" tylko INFO;
+# ST-4 pomiar limitu (Bieg gracza, tylko ruch do przodu, probek >= 10): sr. predkosc gracza <= sr. KONCOWY limit + 10 pp i probek ponad limit + 10 pp <= 20%
+#      (limit trzyma gracza; NIE = SetMaximumSpeedLimit nie dziala u gracza);
+# ST-2 (recenzja): latki TAK w linii startu, bitwa z "Oddech (137): ludzi" >= 100, a zadnej linii misji WeaponEase = NIE (latka po cichu nie dziala);
+# Uwaga: autotest bitew armii nie prowadzi gracza pieszo - ST-3/ST-4 ocenia tylko gra Jeffa (pieszo, bieg do pustego paska).
+# INFO: koszt RBM -> po regule w misjach, gracz (skill broni, sr. M), sekundy gracza ponizej progu i w chodzie.
+ST313_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
+ST313_START = re.compile(r"^Wprawa \(WeaponEase\): latki atakujacy/obronca wpiete (TAK|NIE)/(TAK|NIE) \((.*?)\) \| klucz Weapon Skill Eases Stamina (TAK|NIE)")
+ST313_RULE = re.compile(r"regula U (\d+\.\d+), -(\d+(?:\.\d)?)%/100 pkt, dno (\d+\.\d+)")
+ST313_MIS = re.compile(r"^Wprawa \(WeaponEase\): misja \| klucz (TAK|NIE)[^,]*, latki (TAK|NIE)/(TAK|NIE) \| regula U (\d+\.\d+), -(\d+(?:\.\d)?)%/100 pkt, dno (\d+\.\d+) "
+                       r"\| kolizji: atak (\d+), obrona (\d+) \| koszt RBM bez zbroi (\d+) -> (?:po regule|bylby) (\d+) \(x(\d+\.\d+)\) "
+                       r"\| koszyki skilla broni 0-99/100-199/200-299/300\+: (.*?) \| gracz: (.*?) \| potkniecia (\d+) \(sesja (\d+)\)$")
+ST313_BUCKET = re.compile(r"^(0-99|100-199|200-299|300\+) n (\d+)(?:, sr\. skill (\d+), sr\. M (\d+\.\d+), koszt x(\d+\.\d+))?$")
+ST313_RUN = re.compile(r"^Bieg gracza \(313c\): klucz Stamina Slows Running (TAK|NIE)[^|]*\| regula: od (\d+)% paska plynnie do chodu \((\d+\.\d+) pelnej\) przy 0, "
+                       r"po pustym pasku chod do (\d+)% \| gracz pieszo (\d+) s, ponizej progu (\d+) s \(w biegu (\d+) s, bez drenazu blisko limitu (\d+) s\), "
+                       r"najnizszy mnoznik (\d+\.\d+) \| chod po pustym pasku: wejsc (\d+), sekund (\d+), ponowien \(gracz wlaczyl bieg\) (\d+), "
+                       r"flaga nie weszla (\d+), oddan biegu (\d+) \| pomiar limitu \(do przodu\): probek (\d+)"
+                       r"(?:, sr\. predkosc (\d+)% pelnej przy limicie sr\. (\d+)%, ponad limit \+10 pp (\d+))? \| potkniecia (\d+) \(sesja (\d+)\)$")
+# grupy ST313_RUN: 1 klucz, 2 od %, 3 chod, 4 do %, 5 pieszo, 6 ponizej, 7 w biegu, 8 bez drenazu, 9 min, 10 wejsc, 11 sekund, 12 ponowien, 13 nie weszla,
+# 14 oddan, 15 probek, 16 sr. predkosc, 17 sr. limit, 18 ponad limit, 19 potkniecia, 20 sesja
+ST313_BREATH = re.compile(r"Oddech \(137\): ludzi (\d+)")
+ST313_ERR = ("ERROR in WeaponEase", "ERROR in FieldCraft.Run313", "ERROR in FieldCraft.Line313")
+
+ST313_SAMPLE_START = ("Wprawa (WeaponEase): latki atakujacy/obronca wpiete TAK/TAK (sygnatura OK) | klucz Weapon Skill Eases Stamina TAK | regula U 1.20, -25%/100 pkt, "
+                      "dno 0.40 | bron biala: trafienie atakujacego x M, bloki i parady obu stron x M zamiast (1 - s/1000) RBM; bez zmian: przyjety cios, bez broni, "
+                      "pociski, luk / kusza / rzut (RBM liczy skill w strzale)")
+ST313_SAMPLE_MIS = ("Wprawa (WeaponEase): misja | klucz TAK, latki TAK/TAK | regula U 1.20, -25%/100 pkt, dno 0.40 | kolizji: atak 120, obrona 80 | koszt RBM bez zbroi "
+                    "7000 -> po regule 6100 (x0.87) | koszyki skilla broni 0-99/100-199/200-299/300+: 0-99 n 60, sr. skill 55, sr. M 1.03, koszt x1.08; 100-199 n 90, "
+                    "sr. skill 140, sr. M 0.81, koszt x0.86; 200-299 n 40, sr. skill 230, sr. M 0.62, koszt x0.70; 300+ n 10, sr. skill 310, sr. M 0.49, koszt x0.62 "
+                    "| gracz: kolizji 30, sr. skill broni 250 (ostatni 250), sr. M 0.58, koszt 1200 -> 820 (oszczedzone 380 pkt) | potkniecia 0 (sesja 0)")
+ST313_SAMPLE_RUN = ("Bieg gracza (313c): klucz Stamina Slows Running TAK | regula: od 50% paska plynnie do chodu (0.42 pelnej) przy 0, po pustym pasku chod do 15% "
+                    "| gracz pieszo 240 s, ponizej progu 70 s (w biegu 40 s, bez drenazu blisko limitu 1 s), najnizszy mnoznik 0.42 | chod po pustym pasku: "
+                    "wejsc 1, sekund 14, ponowien (gracz wlaczyl bieg) 0, flaga nie weszla 0, oddan biegu 1 | pomiar limitu (do przodu): probek 120, "
+                    "sr. predkosc 61% pelnej przy limicie sr. 66%, ponad limit +10 pp 3 | potkniecia 0 (sesja 0)")
+
+
+def st313_strip(line):
+    return ST313_TS.sub("", line.rstrip("\r\n"))
+
+
+def st313_m(s, u, p, fl):
+    return max(fl, u * (1.0 - p / 100.0) ** (max(0, s) / 100.0))
+
+
+def st313_mis_bad(m):
+    """Lista bledow spojnosci linii misji WeaponEase (ST-2); m - dopasowanie ST313_MIS."""
+    bad = []
+    u, p, fl = float(m.group(4)), float(m.group(5)), float(m.group(6))
+    n_att, n_def = int(m.group(7)), int(m.group(8))
+    tot = 0
+    lim = {"0-99": (99, 0), "100-199": (199, 100), "200-299": (299, 200), "300+": (None, 300)}
+    for part in m.group(12).split("; "):
+        b = ST313_BUCKET.match(part.strip())
+        if not b:
+            bad.append("koszyk nieczytelny: " + part[:40])
+            continue
+        n = int(b.group(2))
+        tot += n
+        if n == 0 or b.group(4) is None:
+            continue
+        mm, k = float(b.group(4)), float(b.group(5))
+        hi_s, lo_s = lim[b.group(1)]
+        lo = fl if hi_s is None else st313_m(hi_s, u, p, fl)
+        hi = st313_m(lo_s, u, p, fl)
+        if mm < lo - 0.011 or mm > hi + 0.011:
+            bad.append(f"koszyk {b.group(1)}: sr. M {mm:.2f} poza {lo:.2f}..{hi:.2f}")
+        if b.group(1) == "300+" and k > 1.0 + 1e-9:
+            bad.append(f"koszyk 300+: koszt x{k:.2f} > 1")
+    if tot != n_att + n_def:
+        bad.append(f"suma koszykow {tot} != kolizji {n_att + n_def}")
+    return bad
+
+
+def st313_rows(rep, starts, mis, runs, errors, battles=0):
+    if not starts:
+        rep.add("ST-0: latki WeaponEase wpiete", "brak linii startu", "TAK/TAK", None)
+    else:
+        sm = [ST313_START.search(x) for x in starts]
+        badst = [x for x in sm if not x or x.group(1) != "TAK" or x.group(2) != "TAK"]
+        badm = [x for x in (ST313_MIS.search(y) for y in mis) if x and (x.group(2) != "TAK" or x.group(3) != "TAK")]
+        rep.add("ST-0: latki WeaponEase wpiete", f"startow {len(starts)}, nie TAK/TAK {len(badst)}" + (f" ({badst[0].group(3) if badst[0] else 'nieczytelna'})" if badst else "")
+                + f", misji z latka NIE {len(badm)}", "TAK/TAK", not badst and not badm)
+    mm = [ST313_MIS.search(x) for x in mis]
+    rm = [ST313_RUN.search(x) for x in runs]
+    unp = sum(1 for x in mm if x is None) + sum(1 for x in rm if x is None)
+    stum = sum(1 for x in mm if x and int(x.group(14)) != 0) + sum(1 for x in rm if x and int(x.group(19)) != 0)
+    rep.add("ST-1: bez bledow i potkniec", f"bledow {len(errors)}" + (f" ({errors[0][:120]})" if errors else "") + f", linii z potknieciami {stum}"
+            + (f", linii nieczytelnych {unp}" if unp else ""), "0 i 0", not errors and stum == 0 and unp == 0)
+    mm = [x for x in mm if x]
+    rm = [x for x in rm if x]
+    sm_ok = any((lambda x: x and x.group(1) == "TAK" and x.group(2) == "TAK")(ST313_START.search(y)) for y in starts)
+    if not mm and sm_ok and battles > 0:
+        rep.add("ST-2: linie misji WeaponEase spojne z regula", f"latki TAK w linii startu, bitew (Oddech 137, ludzi >= 100) {battles}, linii misji 0",
+                "po bitwie linia misji (latka dziala)", False)
+    elif not mm:
+        rep.add("ST-2: linie misji WeaponEase spojne z regula", "brak linii misji", "koszyki w granicach reguly", None)
+    else:
+        bad2 = []
+        for x in mm:
+            bad2.extend(st313_mis_bad(x))
+        rep.add("ST-2: linie misji WeaponEase spojne z regula", f"misji {len(mm)}, bledow {len(bad2)}" + (f" ({bad2[0]})" if bad2 else ""),
+                "suma koszykow = kolizji, sr. M w granicach, 300+ taniej", not bad2)
+        rbm = sum(int(x.group(9)) for x in mm)
+        rule = sum(int(x.group(10)) for x in mm)
+        pl = [x.group(13) for x in mm if x.group(13) != "-"]
+        rep.add("ST-I1: koszt RBM -> po regule (INFO)", f"misji {len(mm)}, {rbm} -> {rule}" + (f" (x{rule / rbm:.2f})" if rbm else "")
+                + f", klucz TAK w {sum(1 for x in mm if x.group(1) == 'TAK')}" + (f" | gracz (ostatnia): {pl[-1][:140]}" if pl else " | gracz: -"), "-", None)
+    on = [x for x in rm if x.group(1) == "TAK"]
+    if not on:
+        rep.add("ST-3: chod gracza po pustym pasku", "brak linii 'Bieg gracza (313c)' z kluczem TAK", "wejscie -> sekundy, mnoznik do chodu", None)
+        rep.add("ST-4: limit predkosci trzyma gracza", "brak linii", "predkosc <= mnoznik + 10 pp", None)
+    else:
+        walk_in = sum(int(x.group(10)) for x in on)
+        bad3 = []
+        for x in on:
+            wi, ws, nt = int(x.group(10)), int(x.group(11)), int(x.group(13))
+            walk, mn = float(x.group(3)), float(x.group(9))
+            low, lowrun, nod = int(x.group(6)), int(x.group(7)), int(x.group(8))
+            if wi > 0 and ws <= 0:
+                bad3.append("wejscie bez sekund chodu")
+            if wi > 0 and mn > walk + 0.05:
+                bad3.append(f"najnizszy mnoznik {mn:.2f} > chod {walk:.2f}")
+            if nt > 2 * wi + 2:
+                bad3.append(f"flaga chodu nie weszla {nt} przy wejsciach {wi}")
+            if wi == 0 and lowrun > 30 and mn > walk + 0.05:
+                bad3.append(f"w biegu ponizej progu {lowrun} s bez zera (najnizszy mnoznik {mn:.2f} > chod {walk:.2f}) - petla progu biegu")
+            if nod > 0.1 * low + 5:
+                bad3.append(f"bez drenazu blisko limitu {nod} s przy {low} s ponizej progu")
+        if walk_in == 0 and not bad3:
+            rep.add("ST-3: chod gracza po pustym pasku", "pasek gracza nie zszedl do 0 (wejsc 0), bez petli progu biegu", "wejscie -> sekundy, mnoznik do chodu", None)
+        else:
+            rep.add("ST-3: chod gracza po pustym pasku", f"misji {len(on)}, wejsc {walk_in}, sekund {sum(int(x.group(11)) for x in on)}, "
+                    f"ponowien gracza {sum(int(x.group(12)) for x in on)} (INFO), bledow {len(bad3)}" + (f" ({bad3[0]})" if bad3 else ""),
+                    "wejscie -> sekundy, mnoznik do chodu, flaga nie weszla <= 2 x wejsc + 2, bez petli przy ~11%", not bad3)
+        smp = sum(int(x.group(15)) for x in on)
+        if smp < 10:
+            rep.add("ST-4: limit predkosci trzyma gracza", f"probek {smp}", ">= 10 probek: predkosc <= limit + 10 pp", None)
+        else:
+            sp = sum(int(x.group(15)) * int(x.group(16)) for x in on if x.group(16)) / smp
+            lm = sum(int(x.group(15)) * int(x.group(17)) for x in on if x.group(17)) / smp
+            ov = sum(int(x.group(18)) for x in on if x.group(18))
+            rep.add("ST-4: limit predkosci trzyma gracza", f"probek {smp} (do przodu), sr. predkosc {sp:.0f}% pelnej przy limicie {lm:.0f}%, ponad limit +10 pp {ov}",
+                    "predkosc <= limit + 10 pp, ponad limit <= 20% probek", sp <= lm + 10.0 and ov <= 0.2 * smp)
+    if rm:
+        rep.add("ST-I2: gracz pieszo (INFO)", f"misji {len(rm)}, pieszo {sum(int(x.group(5)) for x in rm)} s, ponizej progu {sum(int(x.group(6)) for x in rm)} s "
+                f"(w biegu {sum(int(x.group(7)) for x in rm)} s), w chodzie {sum(int(x.group(11)) for x in rm)} s, klucz NIE w {sum(1 for x in rm if x.group(1) != 'TAK')}",
+                "-", None)
+
+
+def stamina313c_selftest():
+    if not ST313_START.search(ST313_SAMPLE_START) or not ST313_RULE.search(ST313_SAMPLE_START):
+        return "wyrazenie START nie pasuje do probki"
+    m = ST313_MIS.search(ST313_SAMPLE_MIS)
+    if not m:
+        return "wyrazenie MIS nie pasuje do probki"
+    if st313_mis_bad(m):
+        return f"dobra probka MIS z bledami: {st313_mis_bad(m)}"
+    if not ST313_RUN.search(ST313_SAMPLE_RUN):
+        return "wyrazenie RUN nie pasuje do probki"
+    if not ST313_RUN.search(ST313_SAMPLE_RUN.replace(", sr. predkosc 61% pelnej przy limicie sr. 66%, ponad limit +10 pp 3", "").replace("probek 120", "probek 0")):
+        return "wyrazenie RUN bez pomiaru nie pasuje"
+    keys = ("ST-0", "ST-1", "ST-2", "ST-3", "ST-4")
+    rep = Report()
+    st313_rows(rep, [ST313_SAMPLE_START], [ST313_SAMPLE_MIS], [ST313_SAMPLE_RUN], [])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    bad = [k for k in keys if v.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad}"
+    mis_bad = (ST313_SAMPLE_MIS.replace("300+ n 10, sr. skill 310, sr. M 0.49, koszt x0.62", "300+ n 11, sr. skill 310, sr. M 0.95, koszt x1.10")
+               .replace("potkniecia 0 (sesja 0)", "potkniecia 2 (sesja 2)").replace("latki TAK/TAK", "latki TAK/NIE"))
+    run_bad = (ST313_SAMPLE_RUN.replace("najnizszy mnoznik 0.42", "najnizszy mnoznik 0.80").replace("flaga nie weszla 0", "flaga nie weszla 9")
+               .replace("sr. predkosc 61%", "sr. predkosc 95%"))
+    rep = Report()
+    st313_rows(rep, [ST313_SAMPLE_START.replace("wpiete TAK/TAK (sygnatura OK)", "wpiete NIE/NIE (RBM nieobecny)")], [mis_bad], [run_bad],
+               ["ERROR in WeaponEase (potkniecie 1): x"])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in keys if v.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss}"
+    rep = Report()
+    st313_rows(rep, [], [], [], [])
+    if any(r[3] not in ("INFO", "TAK") for r in rep.rows):
+        return "pusty log - werdykt inny niz INFO/TAK"
+    # recenzja: petla progu biegu (pasek krazy ~11%, bez zera) i niewpieta latka po bitwie - NIE
+    loop = (ST313_SAMPLE_RUN.replace("wejsc 1, sekund 14", "wejsc 0, sekund 0").replace("najnizszy mnoznik 0.42", "najnizszy mnoznik 0.55")
+            .replace("(w biegu 40 s, bez drenazu blisko limitu 1 s)", "(w biegu 60 s, bez drenazu blisko limitu 30 s)"))
+    if not ST313_RUN.search(loop):
+        return "probka petli nie pasuje do wyrazenia RUN"
+    rep = Report()
+    st313_rows(rep, [ST313_SAMPLE_START], [], [loop], [], battles=1)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("ST-2", "ST-3") if v.get(k) != "NIE"]
+    if miss:
+        return f"petla progu / brak linii misji po bitwie nie wykryte: {miss}"
+    return None
+
+
+def stamina313c_main(logp):
+    """stamina313c (01.11, paczka 313c): ST-S, ST-L, ST-0..4 - opis nad ST313_*. Strumieniowo, tylko odczyt logu Armoury."""
+    rep = Report()
+    s1 = stamina313c_selftest()
+    rep.add("ST-S: self-test wyrazen i wierszy (linie 313c jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("ST-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, mis, runs, errors = [], [], [], []
+    battles = 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = st313_strip(line)
+            if s.startswith("Wprawa (WeaponEase): latki"):
+                starts.append(s)
+            elif s.startswith("Wprawa (WeaponEase): misja"):
+                mis.append(s)
+            elif s.startswith("Bieg gracza (313c):"):
+                runs.append(s)
+            elif s.startswith(ST313_ERR):
+                errors.append(s)
+            else:
+                b = ST313_BREATH.search(s)
+                if b and int(b.group(1)) >= 100:
+                    battles += 1
+    print(f"plik: {logp}")
+    rep.add("ST-L: log Armoury z linia startu 313c", f"linii startu {len(starts)}", ">= 1 (inaczej zly plik albo DLL sprzed 313c)", len(starts) > 0)
+    st313_rows(rep, starts, mis, runs, errors, battles)
+    rep.show()
+    return 0
+
+
 _ostrzal313b_main_prev = main
 
 
@@ -89970,6 +90212,19 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return ostrzal313b_main(rest[0] if rest else None)
     return _ostrzal313b_main_prev(argv)
+_stamina313c_main_prev = main
+
+
+def main(argv):
+    # paczka 313c: grupa stamina313c - opakowanie main jak arakh313a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "stamina313c":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return stamina313c_main(rest[0] if rest else None)
+    return _stamina313c_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

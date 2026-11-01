@@ -339,6 +339,8 @@ namespace Armoury
                 try { VeteranAi.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VeteranAi.ApplyAll", e); }
                 // m111-walka (24.10): haki postury w pojedynku (RBM calculate*PostureDamage, handleDefender/handleAttacker, HitStopLogic.TriggerHitStop, Artem OnAgentHit)
                 try { DuelGuard.ApplyAll(_harmony); } catch (Exception e) { Log.Error("DuelGuard.ApplyAll", e); }
+                // 313c (01.11): wprawa w broni bialej a koszt staminy RBM (postfiksy calculateAttacker/DefenderStaminaLoss; pomiar takze przy kluczu NIE); wlasny try
+                try { WeaponEase.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WeaponEase.ApplyAll", e); }
                 BkSupplyTemper.ApplyAll(_harmony);
                 try { BkSupplyMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSupplyMarket.ApplyAll", e); }   // 3.4: zakupy zaopatrzenia BK wedlug zapasu partii, zaplata do kasy osady (PRZED ksiega towarow)
                 try { BkSeal34.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSeal34.ApplyAll", e); }               // 3.4: rynek wsi BK, sprzedaz niewolnikow, wyposazenie rycerza BKROT - bez zlota z niczego (PRZED oknami ksiegi obiegu)
