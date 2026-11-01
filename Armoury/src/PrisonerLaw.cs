@@ -439,6 +439,7 @@ namespace Armoury
         /// </summary>
         public static void LootEndPrefix(TroopRoster __1, TroopRoster __2)
         {
+            BattleLosses312.NoteLootEnd(__2);   // 312f (recenzja): zostawieni na ekranie lupu - sam odczyt, przed Clear; wlasny klucz BattleLossesLog, nie rzuca
             if (!On) return;
             try
             {

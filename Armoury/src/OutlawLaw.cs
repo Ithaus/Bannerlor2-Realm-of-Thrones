@@ -699,6 +699,12 @@ namespace Armoury
 
         internal static void OnMapEventEnded(MapEvent me)
         {
+            OnMapEventEndedCore(me);
+            BattleLosses312.OnEnded(me);   // 312f: linia strat bitwy - po A17 i podziale rozbitych H3 (kazda droga wyjscia wyzej), nie rzuca
+        }
+
+        private static void OnMapEventEndedCore(MapEvent me)
+        {
             try
             {
                 if (me == null) return;
@@ -937,6 +943,8 @@ namespace Armoury
                         try { fac = mp != null ? mp.MapFaction : (mep.Party != null ? mep.Party.MapFaction : null); } catch { }
                         float sh = kind == LosersFlee.KBand ? bandShare : (kind == LosersFlee.KVillager || kind == LosersFlee.KCaravan) ? 0f : share;
                         var roster = mep.RoutedInBattle;
+                        // 312f: stan licznikow bitwy przed ta partia - przyrost = podzial jej rozbitych (linia "Straty bitwy (312f)")
+                        int r0 = routed, ra0 = rally, p0 = pool, hm0 = bk + village + template, hl0 = homeless, t0 = tavern, u0 = undead, v0 = _h3Vanished;
                         // E4/9 (4.5): rozbici Strazy "do lasu" i bez domu - pula najblizszego regionu Polnocy (region liczony na partie; reszta - region bitwy jak dotad)
                         var preg = (region != null ? WatchLaw.DeserterRegion(mp) : null) ?? region;
                         // N7 (decyzja Jeffa 13.10 "proporcje pasuja"): pobita druzyna lorda w bitwie objetej H3 (albo w walce gracza w polu - gracz i druzyny lordow pobitej strony, recenzja O2) - czesc rozbitych
@@ -992,6 +1000,8 @@ namespace Armoury
                             else { _h3Vanished += left; if (slice != null) { try { PeopleBook.Lost(slice); } catch { } } }
                         }
                         if (n7 != null) StragglersRally.BattleLine(n7, me);            // N7: wpis w bitwy.log z podzialem tej druzyny
+                        int dv = _h3Vanished - v0;
+                        BattleLosses312.NoteRouted(me, side.MissionSide, routed - r0, rally - ra0, bk + village + template - hm0, pool - p0 + (homeless - hl0) - dv, tavern - t0, dv, undead - u0);
                     }
                     catch (Exception ex) { _h3Stumbles++; if (!_errH3) { _errH3 = true; Log.Error("OutlawLaw.RoutedH3", ex); } }
                 }

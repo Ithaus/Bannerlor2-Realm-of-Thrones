@@ -1596,6 +1596,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool FateOfTheBrokenLog { get; set; } = true;
 
+        [SettingPropertyBool("Battle Losses Log", HintText = "battle log only, nothing changes: after each of your battles, and each battle of others with at least 100 men a side, the Armoury log gets a line on the beaten side - men in the field, killed, knocked out, fled and still standing at the end of the fight, then how many were taken captive (by you or by others, wounded or hale), lost with no captor, fled home, to the woods, to the tavern or back to their lord's banner, whether the beaten host was struck off and what became of its leader, the victors' losses and a balance check. Off = no line", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool BattleLossesLog { get; set; } = true;
+
         [SettingPropertyBool("Wounded Withdraw With Arms", HintText = "with Broken Men Never Rally on: in a field battle a man wounded below the Wounded Flee Percent no longer panics - no scream, no dropped weapons, no fright spreading to his mates. He keeps his weapon and shield, falls back behind his own line (or to the nearest banner of his side) and stands there, fighting only whoever reaches him. He breaks and runs only when the pain gets too much (below the AI Flee Below Percent), his company breaks, the fighting breaks his morale or his own formation falls apart. Both sides alike, your men too. Sieges, sorties, sea battles and hideouts keep the old rule. Off = the wounded man panics and runs, as before", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool WoundedWithdrawWithArms { get; set; } = true;
@@ -11286,6 +11290,7 @@ namespace Armoury
             s.BrokenMenNeverRally = BrokenMenNeverRally;
             s.FleeAwayFromEnemies = FleeAwayFromEnemies;
             s.FateOfTheBrokenLog = FateOfTheBrokenLog;
+            s.BattleLossesLog = BattleLossesLog;
             s.WoundedWithdrawWithArms = WoundedWithdrawWithArms;
             s.WoundedFightWarily = WoundedFightWarily;
             s.RoutedMenNeverRally = RoutedMenNeverRally;

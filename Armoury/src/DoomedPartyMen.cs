@@ -140,7 +140,7 @@ namespace Armoury
             bool undeadParty = Undead.Party(mp);
             bool left = LosersFlee.A17LeftFor(pb, me);
             int path = !victory ? PB : winner ? POther : me.RetreatingSide != BattleSideEnum.None ? PA : left ? PC : POther;
-            int capt = 0, routed = 0, freed = 0; string recvName = "-";
+            int capt = 0, captW = 0, routed = 0, freed = 0; string recvName = "-";
             if (undeadParty) { _undead += men + und; Diag(me, side, pb, path, men, wnd, pmen, winner, act, "Inni - bez zmian (z niczego, do niczego)"); return; }
             _undead += und;
             if (!act)
@@ -203,7 +203,7 @@ namespace Armoury
                             roster.AddToCounts(c, -k, false, -kw);
                             recv.AddToCounts(c, k, false, kw);
                             if (org != null) { try { PeopleBook.Give(recv, org, PeopleBook.FCaptured); } catch { } }
-                            capt += k; n -= k; w -= kw;
+                            capt += k; captW += kw; n -= k; w -= kw;
                             try { recvName = to.Party != null && to.Party.Name != null ? to.Party.Name.ToString() : "?"; } catch { }
                         }
                     }
@@ -238,11 +238,15 @@ namespace Armoury
                     freed += n; _freedTavern += vt; _freedHome += got; _freedLeft += lf;
                 }
             }
+            if (capt > 0) BattleLosses312.NoteDoomed(me, capt, captW);   // 312f: jency A17 w linii strat bitwy (tylko pomiar, nie rzuca)
             _parties++; _men += men; _routed += routed; if (!victory) _routedNoWin += routed; _freed += freed;
             _pathParties[path]++; _pathMen[path] += men; _capt[path] += capt;
             _ctl += men - capt - routed;
             Diag(me, side, pb, path, men, wnd, pmen, winner, act, "CZYNNA: do niewoli " + capt + (capt > 0 ? " (" + recvName + ")" : "") + ", rozbici " + routed + ", jency uwolnieni " + freed);
         }
+
+        /// <summary>312f: partia, ktora gra skasuje po biezacej bitwie (warunek gry z Before - wazne do nastepnego Before).</summary>
+        internal static bool DoomedNow(PartyBase pb) { return pb != null && _doomedNow.Contains(pb); }
 
         /// <summary>PeopleBook.OriginPartyGone: resztka slownika (sklad albo loch) partii przy zniknieciu - liczona, gdy to partia skasowana po biezacej bitwie. Nie rzuca.</summary>
         internal static void NoteGone(PartyBase pb, double sum)
