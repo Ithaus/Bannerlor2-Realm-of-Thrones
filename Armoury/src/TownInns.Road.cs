@@ -194,13 +194,7 @@ namespace Armoury
                 if (b.Spare + b.ArmorySpare > 0) t.Append(" + ").Append(b.Spare + b.ArmorySpare).Append(" horses that carry nobody x ").Append(PHorse[q]);
                 t.Append(" = ").Append(b.PlayerCost).Append(" d (you have ").Append(Hero.MainHero.Gold).Append(").");
                 float sp, mo, sl, he; Bonus(b, out sp, out mo, out sl, out he);
-                bool atDawn; long dawn;
-                long wake = PredictWake(NowMin(), sl, out atDawn, out dawn);
-                string slept = PartyWords.Pick("the men have slept", "you have slept enough", "you and your companions have slept");   // m110-sam: bez zolnierzy - o graczu
-                t.Append(!atDawn ? "\nBy day you sleep until " + slept + " (about " : wake <= dawn ? "\nYou sleep until dawn (" : "\nYou sleep past dawn, until " + slept + " (about ")
-                 .Append(Clock(wake)).Append(") and wake rested until ").Append(Clock(RestedUntil(wake))).Append(": +").Append(F1(sp)).Append("% speed, +").Append(F1(mo)).Append(" morale");
-                if (sl > 1.001f) t.Append(", sleep x").Append(sl.ToString("0.00", Inv));
-                if (he > 0.001f) t.Append(", healing tonight +").Append((he * 100f).ToString("0", Inv)).Append("%");
+                WakeLine(t, sl, sp, mo, he);   // 315c poprawka recenzji (2): wspolna linia pobudki (krotka noc wprost)
                 t.Append(". The coin goes to the village of ").Append(inn.Village.Name).Append(RoadTax(inn.Village, 100) > 0 ? " (its lord takes his share)." : ".");
                 if (NightRest.Debt > 0) t.Append(" ").Append(PartyWords.MenCap()).Append(" still owe sleep - the bed's comfort shows once it is paid off.");
                 if (!b.PlayerCan) { args.IsEnabled = false; t.Append("\nYou cannot pay your own part (").Append(b.PlayerCost).Append(" d)."); }

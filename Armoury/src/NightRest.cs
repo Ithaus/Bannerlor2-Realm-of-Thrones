@@ -218,6 +218,20 @@ namespace Armoury
             return need + InnDrink.ExtraSleepH(need, 0f);
         }
 
+        /// <summary>315c poprawka recenzji (1): zapas pelnej nocy - noc 21-3 to rowno 6 h, polozenie sie o 21:14 dawalo 5.8 h i dlug +1. JEDNA regula
+        /// "przespana noc / baza" dla gracza (SettleNightCore, dlug odlozony, CreditRest, CreditWholeSleep, ZB-6, ostrzezenie marszu, linia switu, karczma)
+        /// i AI (splata od reki, SettleAi) oraz marszu forsownego (doba wypoczynku).</summary>
+        internal const float NightFullSlackH = 0.5f;
+
+        /// <summary>315c: baza snu (SleepHoursNeeded) - prog przespanej nocy i splaty dlugu (takze dla pijanego: kufle wydluzaja tylko sen za dnia i odsypianie).</summary>
+        internal static float BaseHours() { var s = Settings.Current; return s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f; }
+
+        /// <summary>315c: noc pelna - odpoczynek (zaokraglony do 0.1 h jak w komunikatach i logu, "0.0") + NightFullSlackH >= potrzeba.</summary>
+        internal static bool FullNight(float rest, float need)
+        {
+            return (float)Math.Round(rest, 1, MidpointRounding.AwayFromZero) + NightFullSlackH + 0.001f >= need;
+        }
+
         // ------------------------------------------------------------ rachunek nocy
         internal static void OnHourly()
         {
@@ -365,7 +379,7 @@ namespace Armoury
                 // o 3:00 i ruch kolumny dawaly zaraz "Night Falls - make camp?"): odpoczynek doby bez braku odlozonego >= NeededHours (baza + odsetki dlugu - ten sam
                 // prog co splata od reki CreditRest), wiec marsz nie zrobi dlugu o swicie (SettleNight) i nie ma czego odsypiac - ani pytania, ani obozu z rozkazu
                 // "always make camp"; noc odhaczona (raz na noc, jak pytanie), linia logu i licznik ZB
-                if (promptHour && CampStart != CampEnd && movedH && s.NightPromptSkipWhenRested && _restTonight - Math.Max(0f, _dawnOwed) >= NeededHours()
+                if (promptHour && CampStart != CampEnd && movedH && s.NightPromptSkipWhenRested && FullNight(_restTonight - Math.Max(0f, _dawnOwed), BaseHours())
                     && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped && !captive
                     && mp.CurrentSettlement == null && mp.MapEvent == null && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
                     && PlayerEncounter.Current == null && !enl && !raidNow)
@@ -375,7 +389,7 @@ namespace Armoury
                     promptHour = false;
                     ArmouryZb.NotePromptSkip();
                     Log.Info("Nocleg: gracz - zmierzch o " + h + ":00, kolumna w marszu, ale odpoczynek doby " + F1(_restTonight) + " h (bez braku " + F1(Math.Max(0f, _dawnOwed))
-                             + " h) >= potrzeba " + F1(NeededHours()) + " h (dlug " + Debt + ") - bez pytania o nocleg (ZB-6, Night Prompt Skip When Rested), noc " + nightId + ".");
+                             + " h) >= potrzeba " + F1(BaseHours()) + " h - zapas " + F1(NightFullSlackH) + " h (dlug " + Debt + ") - bez pytania o nocleg (ZB-6, Night Prompt Skip When Rested), noc " + nightId + ".");
                 }
                 if (promptHour && CampStart != CampEnd && movedH
                     && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped
@@ -417,7 +431,7 @@ namespace Armoury
                 if (marchField && InCamp(h))
                 {
                     float bazaW = Math.Max(1f, s.SleepHoursNeeded);
-                    if (s.NightMarchNotice && _warnNight != nightId && !promptNow && _restTonight < bazaW)
+                    if (s.NightMarchNotice && _warnNight != nightId && !promptNow && !FullNight(_restTonight, bazaW))
                     {
                         _warnNight = nightId;
                         int nd = Math.Min(3, Debt + 1);
@@ -461,13 +475,13 @@ namespace Armoury
         {
             // noc 15/16.10 (PlayerSleepGuard): przy dlugu odlozonym do pobudki (sen przez swit) godziny po swicie najpierw dospiewaja stara noc - do splaty
             // liczy sie tylko nadwyzka (bez odlozonego brak = 0, jak dotad)
-            if (_credited || _restTonight - Math.Max(0f, _dawnOwed) < NeededHours()) return;
+            if (_credited || !FullNight(_restTonight - Math.Max(0f, _dawnOwed), BaseHours())) return;   // 315c: baza z zapasem (bez kufli i odsetek)
             _credited = true;
             if (Debt > 0)
             {
                 // poprawka recenzji 3: splata takze w logu (dotad sam komunikat w grze)
                 Log.Info("Nocleg: splata dlugu od reki - odpoczynek doby " + F2(_restTonight) + " h (bez braku " + F2(Math.Max(0f, _dawnOwed)) + " h) >= "
-                         + F2(NeededHours()) + " h, dlug " + Debt + " -> 0.");
+                         + F2(BaseHours()) + " h (zapas " + F1(NightFullSlackH) + " h), dlug " + Debt + " -> 0.");
                 Debt = 0;   // odespali baze i wszystkie odsetki naraz
                 // MUSZTRA-jp (recenzja 8): dzien cwiczen rozstrzyga swit (DawnDebt) - splata zdejmuje kare marszu od reki, a musztra wraca od nastepnego
                 // switu (przespana baza jest juz w _restTonight, wiec swit nie doliczy dlugu); bez tego zdania "wake fresh" kloci sie z dniem bez cwiczen
@@ -1740,7 +1754,7 @@ namespace Armoury
             // Przespana baza przy niesplaconych odsetkach: dlug STOI w miejscu.
             float baza = Math.Max(1f, s.SleepHoursNeeded);
             float sleptH = _restTonight;
-            bool sleptBase = _sleeping || _restTonight >= baza;
+            bool sleptBase = _sleeping || FullNight(_restTonight, baza);   // 315c: zapas pelnej nocy
             bool paidInFull = _credited;
             // noc 15/16.10 (PlayerSleepGuard): sen w menu przez swit - licznik snu w menu od poprzedniego ciecia (pasek: "prawda o tym snie") przed
             // zerowaniem doby; od tej chwili sen w menu liczy sie do nowej doby (LeaveSleep odejmuje _menuDawnCut - stara doba nie idzie drugi raz)
@@ -1772,7 +1786,7 @@ namespace Armoury
                     Log.Info("Nocleg: swit we snie - dlug odlozony: po swicie " + F2(had) + " h z brakujacych " + F2(owed)
                              + " h (brak pokryty " + (covered ? "tak" : "nie") + ") -> dlug " + before + " -> " + Debt + " (brak z poprzedniego switu w tym samym snie).");
                 }
-                _dawnOwed = slept + 0.01f >= baza ? 0f : baza - slept;
+                _dawnOwed = FullNight(slept, baza) ? 0f : baza - NightFullSlackH - slept;   // 315c: brak do bazy z zapasem
                 if (_dawnOwed > 0f && notice)
                 {
                     string they = PartyWords.NoTroops ? "you" : "they";   // m110-sam: bez wojska zdanie do gracza
@@ -1790,7 +1804,7 @@ namespace Armoury
                 // i praca, nie drzemka. Dlug i splata licza sie jak dotad.
                 if (!_sleeping && sleptH >= 1f)
                 {
-                    float shown = Math.Min(sleptH, NeededHours());
+                    float shown = Math.Min(sleptH, BaseHours());
                     // noc 15/16.10 (NightMarchNotice): marsz noca przy przespanej bazie - powiedziane wprost, dlaczego dlugu nie ma (zasada Jeffa 30.08:
                     // sen o kazdej porze, dzien slabiej - odpoczynek w osadzie za dnia pokrywa noc w marszu)
                     // poprawka recenzji 8: liczba w kulturze niezmiennej (kropka) - komunikat jest tez w logu
@@ -1804,7 +1818,7 @@ namespace Armoury
                 }
                 if (Debt > 0 && !paidInFull)
                     MsgLog(PartyWords.MenCap() + " slept, but not a full night - the weariness lingers until a night of "
-                        + (int)Math.Ceiling(NeededHours()) + " hours' sleep." + DrillNote(s), Colors.Yellow);   // 315c: bez dosypiania - jedna pelna noc
+                        + (int)Math.Ceiling(BaseHours()) + " hours' sleep." + DrillNote(s), Colors.Yellow);   // 315c: bez dosypiania - jedna pelna noc
                 return;
             }
 
@@ -1815,16 +1829,16 @@ namespace Armoury
             if (Debt == 1)
                 MsgLog(PartyWords.Pick("The men marched through the night.", "You went without sleep last night.", "You and your companions went without sleep last night.")
                     + " One sleepless night - speed -" + SpdPenalty[1] + "%, morale -"
-                    + MorPenalty[1] + "%; one full night's sleep (" + (int)Math.Ceiling(NeededHours()) + " hours) sets it right." + rested + DrillNote(s), Colors.Yellow);
+                    + MorPenalty[1] + "%; one full night's sleep (" + (int)Math.Ceiling(BaseHours()) + " hours) sets it right." + rested + DrillNote(s), Colors.Yellow);
             else if (Debt == 2)
                 MsgLog("Second night without sleep - " + PartyWords.Pick("the column staggers", "you stagger on, half asleep", "you and your companions stagger on")
                     + " (speed -" + SpdPenalty[2] + "%, morale -"
-                    + MorPenalty[2] + "%). One full night's sleep (" + (int)Math.Ceiling(NeededHours()) + " hours) sets it right." + rested + DrillNote(s), Colors.Red);
+                    + MorPenalty[2] + "%). One full night's sleep (" + (int)Math.Ceiling(BaseHours()) + " hours) sets it right." + rested + DrillNote(s), Colors.Red);
             else
             {
                 MsgLog("Third sleepless night - " + PartyWords.Pick("the company collapses where it stands", "you collapse where you stand",
                         "you and your companions collapse where you stand") + " (speed -" + SpdPenalty[3]
-                    + "%, morale -" + MorPenalty[3] + "%). " + (PartyWords.NoTroops ? "You" : "They") + " need a full night's sleep (" + (int)Math.Ceiling(NeededHours())
+                    + "%, morale -" + MorPenalty[3] + "%). " + (PartyWords.NoTroops ? "You" : "They") + " need a full night's sleep (" + (int)Math.Ceiling(BaseHours())
                     + " hours)." + rested + DrillNote(s), Colors.Red);
                 // wojsko ZASYPIA: kolumna staje w miejscu (raz, przy zapasci -
                 // jesli gracz mimo to pogna dalej, powlecze sie na 10% predkosci)
@@ -1922,7 +1936,7 @@ namespace Armoury
             {
                 if (s == null || !s.PlayerSleepGuard || _credited || Debt <= 0 || _menuNeeded <= 0f) return false;
                 float whole = _menuBase + _menuRest;
-                if (whole + 0.01f < _menuNeeded || Debt > _menuDebt0) return false;
+                if (!FullNight(whole, _menuNeeded) || Debt > _menuDebt0) return false;   // 315c: baza z zapasem
                 int before = Debt;
                 Debt = 0; _credited = true;
                 // m110-sam: jak CreditRest - bez wojska "you" i bez zdania o musztrze
@@ -2477,7 +2491,7 @@ namespace Armoury
                 // poprawka recenzji 3: pobudka w logu - pelny pasek i dlug przed / po (prog NO-10: pelny pasek bez wzrostu dlugu w snie = dlug 0)
                 try
                 {
-                    bool full = _menuNeeded > 0f && whole + 0.01f >= _menuNeeded;
+                    bool full = _menuNeeded > 0f && FullNight(whole, _menuNeeded);
                     float clockW = (float)(CampaignTime.Now - _sleepStart).ToHours;
                     Log.Info("Nocleg: pobudka - pasek " + F2(whole) + " h z celu " + (_menuNeeded > 0f ? F2(_menuNeeded) : "-") + " h (pelny pasek " + (full ? "tak" : "nie")
                              + "), zegara " + F1(clockW) + " h, przez swit " + (_menuDawns > 0 ? "tak (" + _menuDawns + ")" : "nie") + ", odpoczynek doby " + F2(_restTonight)
@@ -2486,7 +2500,7 @@ namespace Armoury
                              + (d.Length > 0 ? ", dlug odlozony rozliczony (linia wyzej)" : "") + ".");
                 }
                 catch { }
-                bool innFull = _menuNeeded > 0f && whole + 0.01f >= _menuNeeded;   // KA: pelny pasek - do premii karczmy (TownInns.OnWake nizej)
+                bool innFull = _menuNeeded > 0f && FullNight(whole, _menuNeeded);   // KA: pelny pasek - do premii karczmy (TownInns.OnWake nizej)
                 // 315a: linia snu gracza - od ktorej godziny, pobudka o ktorej, powod (swit / wyspani / bezpiecznik / gracz)
                 string wakeWhy = _wakeWhy ?? "?";
                 bool dawnWake = wakeWhy.StartsWith("swit", StringComparison.Ordinal);
@@ -2525,7 +2539,7 @@ namespace Armoury
                             line = when + "You slept " + clockH.ToString("0.#") + "h of fitful daylight sleep - it counted for "
                                  + effH.ToString("0.#") + "h.";
                         if (Debt > 0)
-                            line += " The weariness lingers until a full night's sleep (" + (int)Math.Ceiling(NeededHours()) + "h).";   // 315c
+                            line += " The weariness lingers until a full night's sleep (" + (int)Math.Ceiling(BaseHours()) + "h).";   // 315c
                         Msg(line, Debt > 0 ? Colors.Yellow : Colors.White);
                     }
                 }
@@ -2605,7 +2619,7 @@ namespace Armoury
                 _menuDawnCut = 0f;
                 if (!again) { _dawnOwed = 0f; _menuDawns = 0; }
                 // poprawka recenzji 1: cel calego snu i dlug przy polozeniu sie - do splaty calym paskiem (CreditWholeSleep)
-                _menuNeeded = needed; _menuDebt0 = Debt;
+                _menuNeeded = BaseHours(); _menuDebt0 = Debt;   // 315c poprawka recenzji (3): pelny pasek i splata calym snem wobec bazy (kufle tylko wydluzaja sen)
                 InnDrink.OnSleepInit();   // m98-plotki: odpoczynek od kufla przy polozeniu sie (pobudka wyrownuje z paskiem; wlasny try)
                 // cel snu: ile jeszcze brakuje DO wyspania - pasek liczy wlasne
                 // godziny i NIE cofa sie, gdy swit wyzeruje rachunek doby

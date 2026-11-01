@@ -19,8 +19,9 @@ namespace Armoury
     ///    po ostatnim kuflu zeruje licznik, gdy gracz nie jest pijany). Karczmarz nie naleje ponad prog + 3 (MaxCups).
     ///  - PIJANY (kufel ponad prog): predkosc na mapie -DrunkSpeedPenaltyPercent (15%) za pierwszy kufel ponad prog, +5% za kazdy nastepny, najwyzej 2 x (30%);
     ///    do odespania: trzeba odpoczac SleepHoursNeeded (6 h) + 1 h na kufel ponad prog, liczone od ostatniego kufla tym samym odpoczynkiem co ksiega snu NightRest
-    ///    (noc 1/h, dzien DayRestFactor, sen w karczmie x SleepFactor). Dlug snu rosnie o te godziny: NightRest.NeededHours dolicza ExtraSleepH, wiec sen w menu
-    ///    trwa dluzej (gracz "dosypia"), a splata starego dlugu wymaga i tych godzin. Recenzja (technika): pobudka z menu snu wyrownuje odpoczynek z paskiem snu
+    ///    (noc 1/h, dzien DayRestFactor, sen w karczmie x SleepFactor). NightRest.NeededHours dolicza ExtraSleepH, wiec sen w menu za dnia
+    ///    trwa dluzej (odsypianie kufli); 315c: noc i tak konczy sie o swicie, a przespana noc i splata dlugu licza sie wobec samej bazy (NightRest.BaseHours,
+    ///    FullNight) - kufle nie dokladaja godzin do dlugu snu. Recenzja (technika): pobudka z menu snu wyrownuje odpoczynek z paskiem snu
     ///    (OnSleepInit / OnWake - pelny pasek = odespane od razu; tiki godzinowe gubily brzegi i gracz budzil sie pijany). Kowadlo: NightRest.NeededHoursFresh.
     ///  - KAC (po odespaniu): predkosc -HangoverSpeedPenaltyPercent (10%) i morale -HangoverMoralePenaltyPercent (10%, czynnik jak kara snu) do zmierzchu (18:00)
     ///    dnia, w ktorym gracz odespal (odespane od poludnia - 6 h). Kufel w czasie kaca zdejmuje kac (pijany zamiast skacowanego). Komunikat: po menu snu "You wake

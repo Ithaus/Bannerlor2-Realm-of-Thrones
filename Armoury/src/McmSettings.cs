@@ -5576,7 +5576,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool GossipMatchmaking { get; set; } = true;
 
-        [SettingPropertyBool("Drink Drunk Hangover", HintText = "drink too much and you pay for it: past your limit (Drunk After Tankards, one more with Endurance 5 and one more with Athletics 150) you are drunk - your party moves slower on the map until you sleep it off, and you need an extra hour of sleep for every tankard past your limit. When you have slept it off you wake with a hangover: slower and in a worse mood until dusk. The innkeeper pours no more than three past your limit. Needs Night Rest. Off = ale has no effect on you, as before", RequireRestart = false)]
+        [SettingPropertyBool("Drink Drunk Hangover", HintText = "drink too much and you pay for it: past your limit (Drunk After Tankards, one more with Endurance 5 and one more with Athletics 150) you are drunk - your party moves slower on the map until you sleep it off, and you need an extra hour of sleep for every tankard past your limit to sleep it off (a night's sleep still ends at dawn, and a full night still clears your sleep debt). When you have slept it off you wake with a hangover: slower and in a worse mood until dusk. The innkeeper pours no more than three past your limit. Needs Night Rest. Off = ale has no effect on you, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool DrinkDrunkHangover { get; set; } = true;
 

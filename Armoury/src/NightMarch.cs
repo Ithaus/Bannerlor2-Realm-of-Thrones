@@ -1053,7 +1053,7 @@ namespace Armoury
                         // (oboz oblezenia, oblezona osada, morze, czlonek armii, AI trzyma inny mod); licznik biegnie jak w snie dlugu, ruch go konczy.
                         // Doczepieni do gracza - jak dotad (o snie decyduje gracz).
                         bool inDebtSleep = _debtSleep.ContainsKey(mp);
-                        // 315c: bez snu ciaglego na miejscu (R6) - nikt nie dosypia; dlug zeruje pelna noc w ksiedze (Rest), wpis z zapisu/poprzedniego ticku konczy LeaveAcc
+                        // 315c: bez snu ciaglego na miejscu (R6; galaz passive i liczniki PassiveHours / PassivePaid - martwe od 315c, zawsze 0) - nikt nie dosypia; dlug zeruje pelna noc w ksiedze (Rest), wpis z zapisu/poprzedniego ticku konczy LeaveAcc
                         bool passive = false;
                         if (passive) { if (e.Acc < 0f) e.Acc = e.Rest; _day.PassiveHours++; }
                         else if (e.Passive && !withLead && !inDebtSleep) LeaveAcc(e);
@@ -1089,7 +1089,7 @@ namespace Armoury
                         e.Pos = pos; e.Stamp = stamp;
                         // splata od reki (jak CreditRest gracza): cala suma -> dlug 0
                         float eff = e.Acc >= 0f ? Math.Max(e.Rest, e.Acc) : e.Rest;
-                        if (!e.Credited && eff >= NeededAi(baza, e.Debt))
+                        if (!e.Credited && FullNight(eff, NeededAi(baza, e.Debt)))   // 315c: zapas pelnej nocy jak gracz
                         {
                             e.Credited = true;
                             if (e.Debt > 0)
@@ -1149,7 +1149,7 @@ namespace Armoury
         private static bool SettleAi(AiSleep e, float baza, double nowH, int maxF)
         {
             bool full = nowH - e.SinceH >= 18.0;
-            bool sleptBase = e.Acc >= 0f || e.Rest >= baza;
+            bool sleptBase = e.Acc >= 0f || FullNight(e.Rest, baza);   // 315c: zapas pelnej nocy jak gracz
             bool ch = false;
             bool wasMust = Must(e, maxF);
             if (e.NightFlags != 0) { _day.Marched++; if (sleptBase) _day.MarchedNoDebt++; }
@@ -1293,7 +1293,7 @@ namespace Armoury
               .Append("; alarmy ").Append(d.HAlarm).Append(" (ucieczka ").Append(d.HAlarmFled).Append(", spi dalej ").Append(d.HAlarmSlept)
               .Append(", inny marsz ").Append(d.HAlarmOther).Append(")")
               .Append("; w osadach zostalo na noc (partio-godziny) ").Append(d.HTownHeld).Append(", wyjechalo z powodem ").Append(d.HTownOut)
-              .Append("; oboz splaty od ").Append(DebtCampHour).Append(":00 partii ").Append(d.EveningCamps).Append(", sen ciagly ").Append(d.ContSleeps)
+              .Append("; oboz splaty od ").Append(DebtCampHour).Append(":00 partii ").Append(d.EveningCamps).Append(", sen ciagly ").Append(d.ContSleeps).Append(" (martwe od 315c, zawsze 0)")
               .Append(", zwolnione ze snu dlugu ").Append(d.Released).Append(", dluznik szedl z powodem ").Append(d.DebtReason)
               .Append(", alarm dluznika ").Append(d.DebtAlarm).Append(", dluznicy obudzeni cudza reka ").Append(d.DebtWoken)
               .Append("; zapasci (nowy dlug 3) ").Append(d.Collapses);
@@ -1368,7 +1368,7 @@ namespace Armoury
               .Append(" (partio-godzin ").Append(d.CrushHours).Append(")")
               .Append("; wodzowie armii spia za zmeczonych czlonkow (partio-godziny) ").Append(d.ArmyHeld)
               .Append("; sen ciagly na miejscu bez snu dlugu (oblezenie, oblezona osada, morze, armia, inny mod - partio-godziny) ").Append(d.PassiveHours)
-              .Append(", splacone tak ").Append(d.PassivePaid)
+              .Append(", splacone tak ").Append(d.PassivePaid).Append(" (martwe od 315c, zawsze 0)")
               .Append("; ticki nadrabiane w jednej klatce ").Append(d.CatchUps);
         }
 
@@ -1436,7 +1436,7 @@ namespace Armoury
             {
                 float baza = Math.Max(1f, s.SleepHoursNeeded);
                 bool enlisted = RotEnlisted();
-                int expect = enlisted ? 0 : ((sleeping || rest >= baza) ? Math.Min(3, before + _dawnDeferredUp) : Math.Min(3, before + 1));
+                int expect = enlisted ? 0 : ((sleeping || FullNight(rest, baza)) ? Math.Min(3, before + _dawnDeferredUp) : Math.Min(3, before + 1));
                 Log.Info("NocnyMarsz: gracz o swicie - odpoczynek doby " + F1(rest) + " h (baza " + F1(baza) + ", sen w menu "
                          + (sleeping ? "tak" : "nie") + ", splata od reki w tej dobie " + (credited ? "tak" : "nie")
                          + (enlisted ? ", w sluzbie ROT" : "") + "), dlug przed " + before + ", po " + Debt
@@ -1548,7 +1548,8 @@ namespace Armoury
                     if (!inDebt) EnterDebt(mp, e, null, ed);
                     else
                     {
-                        // 315c: bez awansu na sen ciagly (Kind 2) - sen dlugu to zawsze oboz splaty do switu
+                        // 315c: bez awansu na sen ciagly (Kind 2) - sen dlugu to zawsze oboz splaty do switu; galezie Kind == 2 (SleepsWithLeader, EnterDebt,
+                        // poprawka 315a o swicie) i licznik ContSleeps - martwe od 315c (zawsze 0), zostawione bez usuwania (jedna zmiana naraz)
                         mp.Ai.DisableForHours(1);
                         if (st == null && mp.DefaultBehavior != AiBehavior.Hold)
                         {

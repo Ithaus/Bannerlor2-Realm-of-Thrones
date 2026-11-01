@@ -221,7 +221,7 @@ namespace Armoury
                 if (day == _lastDawnDay) return;
                 _lastDawnDay = day;
                 float baza = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
-                bool slept = sleeping || restDay + 0.01f >= baza;   // zapas 0.01 h na zaokraglenie float (jak SettleNightCore)
+                bool slept = sleeping || NightRest.FullNight(restDay, baza);   // 315c: zapas pelnej nocy (jak SettleNightCore)   // zapas 0.01 h na zaokraglenie float (jak SettleNightCore)
                 float before = _hours;
                 if (!_on && _dayHours == 0 && slept && _hours > 0f) _hours = Math.Max(0f, _hours - FadePerDay);
                 if (_dayHours > 0 || _dStarts + _dEnds + _dSteps > 0 || before > 0f || _on)

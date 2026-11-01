@@ -29622,8 +29622,9 @@ def noboz_main(logp):
                 ev["wake"] += 1
                 if mw.group(2) != "-":
                     n = float(mw.group(2))
-                    # decyzja "pelny pasek" zgodna z liczbami (2 miejsca, zapas kodu 0.01 h)
-                    if (full and w < n - 0.025) or (not full and w >= n + 0.005):
+                    # decyzja "pelny pasek" zgodna z liczbami (2 miejsca, zapas kodu 0.01 h); 315c: pelna noc z zapasem NightFullSlackH (0.5 h, pasek
+                    # zaokraglony do 0.1 h - s315b_full) - poza strefa zaokraglenia +-0.06 h wokol progu decyzja musi sie zgadzac
+                    if full != s315b_full(w, n) and abs(w + S315B_SLACK - n) > 0.06:
                         ev["wake_bad"] += 1
                         ev["wake_bad_ex"].append(s[:160])
                 if full and a > 0 and a <= s0:
@@ -90865,8 +90866,9 @@ def main(argv):
 #  S315B-0  linia NightRest "noc obozu gracza (...) X:00-Y:00": X = poczatek obozu, Y = koniec obozu (INFO bez linii)
 #  S315B-1  start treningu 311e: "noc snu od X:00" = poczatek obozu, godzina startu + zamierzone h = poczatek obozu
 #  S315B-2  koniec treningu 311e z powodem "noc": o poczatku obozu (albo "pelny dzien" najwyzej 0.25 h przed nim - godzina startu obozu - 1)
-#  S315B-3  pelna noc (315c: przy kazdym dlugu): sen do switu zaczety o poczatku obozu (albo :45-:59 godzine wczesniej), pobudka o swicie -> linia gracza
-#           o swicie: odpoczynek doby >= baza i dlug po 0
+#  S315B-3  pelna noc (315c: przy kazdym dlugu): sen do switu z pobudka o swicie i paskiem w menu, ktory jest pelna noca wedlug zapasu NightFullSlackH
+#           (round(pasek, 1) + 0.5 >= baza - NightRest.FullNight) -> linia gracza o swicie: odpoczynek doby + 0.5 >= baza i dlug po 0
+#           (315c recenzja: polozenie sie o 21:14 = 5.8 h to pelna noc; sen od 22:30 = 4.5 h nie jest)
 #  S315B-4  315c: sen z czekaniem do switu - pobudka (swit / wyspani / bezpiecznik) o godzinie switu, najpozniej :30 (bez dosypiania po swicie)
 #  S315B-5  linia startu sesji musztry: "godziny cwiczen D:00-(X-1):59 (noc obozu X:00-" - X = poczatek obozu
 #  S315B-6  315c: sen w menu z dlugiem >= 1 - "potrzeba" rozna od starej reguly baza + 3*(2*dlug-1) (odsetki dlugu zdjete)
@@ -90878,6 +90880,14 @@ S315B_START = re.compile(r"^Sen do switu \(315a\): sen w menu od (\d+):(\d\d) .*
 S315B_END = re.compile(r"^Sen do switu \(315a\): (pobudka|koniec snu) o (\d+):(\d\d) \(od (\d+):(\d\d), zegara ([\d.]+) h, w menu ([\d.]+) h(?: z celu ([\d.]+) h)?\) \| powod: (.+?)(?: \||$)")   # 315b recenzja: "koniec snu" bez celu
 S315B_DAWN = re.compile(r"^NocnyMarsz: gracz o swicie - odpoczynek doby ([\d.]+) h \(baza ([\d.]+),.*?dlug przed (\d+), po (\d+)")
 S315B_DRILL = re.compile(r"^Szkolenie w obozie \(m97\): start sesji .*?godziny cwiczen (\d+):00-(\d+):59 \(noc obozu (\d+):00-")
+S315B_SLACK = 0.5   # NightRest.NightFullSlackH
+
+
+def s315b_full(rest, need):
+    # jak NightRest.FullNight: odpoczynek zaokraglony do 0.1 h (jak "0.0" w logu) + zapas >= potrzeba
+    return int(rest * 10 + 0.5) / 10 + S315B_SLACK + 0.001 >= need   # rest >= 0 - int jak floor
+
+
 S315B_AI = re.compile(r"^NocnyMarsz: swit dnia .*?; oboz splaty od (\d+):00 partii (\d+), sen ciagly (\d+)")
 
 
@@ -90941,8 +90951,8 @@ def sen315b_main(logp):
                     cur = None
                     continue
                 wh, wm, why = int(m.group(2)), int(m.group(3)), m.group(9)
-                late = cur["h"] == (camp_st - 1) % 24 and cur["mm"] >= 45
-                if cur["hold"] and (cur["h"] == camp_st or late) and why.startswith("swit gracza"):
+                menu = float(m.group(7))
+                if cur["hold"] and why.startswith("swit gracza") and s315b_full(menu, baza):
                     pend_full = s[:160]
                 if cur["hold"] and m.group(1) == "pobudka" and not why.startswith("gracz"):
                     hold_n += 1
@@ -90956,7 +90966,7 @@ def sen315b_main(logp):
                 if pend_full is not None:
                     full_n += 1
                     rest, after = float(m.group(1)), int(m.group(4))
-                    if rest < baza - 0.01 or after != 0:
+                    if not s315b_full(rest, baza) or after != 0:
                         bad3.append(f"{pend_full} -> odpoczynek {rest} h z bazy {baza}, dlug po {after}")
                     pend_full = None
                 continue
@@ -90981,7 +90991,7 @@ def sen315b_main(logp):
     rep.add("S315B-2: koniec 311e o poczatku obozu", f"koncow 'noc' {te}, zlych {len(bad2)}" + (f" (pierwszy: {bad2[0]})" if bad2 else ""),
             "zle 0", (len(bad2) == 0) if te else None)
     rep.add("S315B-3: pelna noc obozu = baza, dlug po 0 (315c: przy kazdym dlugu)", f"nocy {full_n}, z brakiem {len(bad3)}" + (f" (pierwsza: {bad3[0]})" if bad3 else ""),
-            "odpoczynek doby >= baza, dlug po 0", (len(bad3) == 0) if full_n else None)
+            "odpoczynek doby + 0.5 >= baza, dlug po 0", (len(bad3) == 0) if full_n else None)
     rep.add("S315B-4: sen nocny konczy sie o swicie (315c, bez dosypiania)", f"pobudek {hold_n}, po switcie albo przed {len(bad4)}" + (f" (pierwsza: {bad4[0]})" if bad4 else ""),
             "pobudka o godzinie switu do :30", (len(bad4) == 0) if hold_n else None)
     rep.add("S315B-5: godziny cwiczen do poczatku obozu", f"linii {dr}, zlych {len(bad5)}" + (f" (pierwsza: {bad5[0]})" if bad5 else ""),

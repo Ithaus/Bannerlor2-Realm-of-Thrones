@@ -375,15 +375,23 @@ namespace Armoury
         /// snu NightRest.SleepCapHours. atDawn - nocleg czeka do switu. Szacunek co 15 min (podpowiedz menu).</summary>
         private static long PredictWake(long now, float sleepFactor, out bool atDawn, out long dawn)
         {
+            float acc, target;
+            return PredictWake(now, sleepFactor, out atDawn, out dawn, out acc, out target);
+        }
+
+        /// <summary>315c poprawka recenzji (2): jak wyzej, plus pasek snu przy pobudce (acc, przy noclegu do switu - przespane do switu) i cel paska (target).</summary>
+        private static long PredictWake(long now, float sleepFactor, out bool atDawn, out long dawn, out float acc, out float target)
+        {
             dawn = NextAt(now, NightRest.PlayerDawn);
             atDawn = dawn - now <= HoldMaxMin;
             var s = Settings.Current;
             float day = s != null ? Math.Max(0.1f, Math.Min(1f, s.DayRestFactor)) : 0.5f;
-            float target = NightRest.SleepTargetNow(), f = Math.Max(1f, sleepFactor);
+            target = NightRest.SleepTargetNow();
+            float f = Math.Max(1f, sleepFactor);
             long cap = now + (long)(NightRest.SleepCapHours() * 60f);
-            float acc = 0f;
+            acc = 0f;
             long t = now;
-            while (t < cap && acc < target)
+            while (t < cap && acc < target && (!atDawn || t < dawn))   // 315c: nocleg do switu - liczymy tylko do switu (o swicie pobudka zawsze)
             {
                 long h = Mod(t, 1440) / 60;
                 acc += 0.25f * (NightRest.MenuNight((int)h) ? 1f : day) * f;   // m97-oboz: noc snu do switu gracza (swit-9), jak sen w menu
@@ -391,6 +399,27 @@ namespace Armoury
             }
             if (atDawn) t = dawn;   // 315c: nocleg do switu konczy sie o swicie zawsze (bylo: po swicie dalej do celu snu)
             return Math.Min(t, cap);
+        }
+
+        /// <summary>315c poprawka recenzji (2): linia pobudki w podpowiedzi noclegu (karczma i zajazd) - za dnia do wyspania, noca do switu; gdy do switu zostaje
+        /// za malo snu (pasek < cel i ponizej bazy z zapasem NightRest.FullNight - ta sama regula co premia w Wake), zdanie o krotkiej nocy bez obietnicy wypoczynku.
+        /// Zwraca, czy noc za krotka (wtedy bez zdania o cenach).</summary>
+        private static bool WakeLine(StringBuilder t, float sl, float sp, float mo, float he)
+        {
+            bool atDawn; long dawn; float acc, target;
+            long wake = PredictWake(NowMin(), sl, out atDawn, out dawn, out acc, out target);
+            float baseH = NightRest.BaseHours();
+            bool shortNight = atDawn && acc + 0.01f < target && !NightRest.FullNight(acc, baseH);
+            string slept = PartyWords.Pick("the men have slept", "you have slept enough", "you and your companions have slept");   // m110-sam: bez zolnierzy - o graczu
+            if (shortNight)
+                t.Append("\nThe night is too short to sleep your fill (about ").Append(F1(acc)).Append("h of ").Append(F1(baseH))
+                 .Append("h): you sleep until dawn (").Append(Clock(wake)).Append(") and nobody wakes rested");
+            else
+                t.Append(!atDawn ? "\nBy day you sleep until " + slept + " (about " : "\nYou sleep until dawn (")
+                 .Append(Clock(wake)).Append(") and wake rested until ").Append(Clock(RestedUntil(wake))).Append(": +").Append(F1(sp)).Append("% speed, +").Append(F1(mo)).Append(" morale");
+            if (sl > 1.001f) t.Append(", sleep x").Append(sl.ToString("0.00", Inv));
+            if (he > 0.001f) t.Append(", healing tonight +").Append((he * 100f).ToString("0", Inv)).Append("%");
+            return shortNight;
         }
 
         /// <summary>Koniec stanu "wypoczeci": najblizszy zmierzch po pobudce, najwyzej 12 h od pobudki.</summary>
@@ -536,12 +565,8 @@ namespace Armoury
                 // recenzja 16.10: godzina pobudki wprost - wieczorem i w nocy do switu, w dzien do wyspania
                 bool atDawn; long dawn;
                 long wake = PredictWake(NowMin(), sl, out atDawn, out dawn);
-                string slept = PartyWords.Pick("the men have slept", "you have slept enough", "you and your companions have slept");   // m110-sam: bez zolnierzy - o graczu
-                t.Append(!atDawn ? "\nBy day you sleep until " + slept + " (about " : wake <= dawn ? "\nYou sleep until dawn (" : "\nYou sleep past dawn, until " + slept + " (about ")
-                 .Append(Clock(wake)).Append(") and wake rested until ").Append(Clock(RestedUntil(wake))).Append(": +").Append(F1(sp)).Append("% speed, +").Append(F1(mo)).Append(" morale");
-                if (sl > 1.001f) t.Append(", sleep x").Append(sl.ToString("0.00", Inv));
-                if (he > 0.001f) t.Append(", healing tonight +").Append((he * 100f).ToString("0", Inv)).Append("%");
-                if (q == 2 && PriceKey) t.Append(atDawn ? ", you trade up to 3% better here" : " (better prices here only after a night until dawn)");
+                bool shortNight = WakeLine(t, sl, sp, mo, he);   // 315c poprawka recenzji (2): krotka noc powiedziana wprost
+                if (q == 2 && PriceKey && !shortNight) t.Append(atDawn ? ", you trade up to 3% better here" : " (better prices here only after a night until dawn)");
                 t.Append(".");
                 if (NightRest.Debt > 0) t.Append(" ").Append(PartyWords.MenCap()).Append(" still owe sleep - the bed's comfort shows once it is paid off.");
                 if (!b.PlayerCan) { args.IsEnabled = false; t.Append("\nYou cannot pay your own part (").Append(b.PlayerCost).Append(" d)."); }
@@ -750,7 +775,7 @@ namespace Armoury
                 }
                 var s = Settings.Current;
                 float baseH = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
-                bool ok = full || menuRest + 0.01f >= baseH;
+                bool ok = full || NightRest.FullNight(menuRest, baseH);   // 315c: zapas pelnej nocy (jak SettleNightCore)
                 long now = NowMin();
                 if (!ok)
                 {
