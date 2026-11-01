@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-01 313y integracja: poprawki recenzji scalenia 313b+313c+313d (ranny lord kustyka, histereza kustykania, zgon z krwawienia od strzaly = zgon od pocisku, R4 na szyk, zapas tchu w szarzy pod ostrzalem, chod gracza bez krzywej); Armoury.dll 37eacfbe559cd9cd7d3e58d7be84e503 (worktree n313y, galaz noc/313y-integracja)
+
+**Problem:** Jeff 01.11: "ranny nie biega jak glupi tylko wolno wycofuje sie", "przy 0 [staminy] przejsc w tryb marszu", "jak strzelam z luku na koniu do piechoty to ta ma na mnie biec a nie wolno isc". Trzy recenzje integracji n313y (predkosc agenta, ucieczki/morale, stamina/koszty) - 0 krytycznych, 4 WAZNE, kilka drobnych; dowody w kodzie (bez logu z gry - nic nie wgrane).
+**Przyczyna:**
+- (W1) ranny lord AI 10-45% HP (HeroCaution tryb ranny) wycofywal sie za szyk sprintem: pozycja skryptowa bez DoNotRun, a FieldCraft.LimpNow znal tylko odwrot 143 i HP <= 10 - jedno zjawisko, dwie zasady.
+- (W2) wyjatek 283 `OutshotRush.Live` byl na cala druzyne - w bitwie armii po kilku sekundach ostrzalu pieszy szyk lucznikow trafiony z boku/tylu juz nie stawal (R4 = 0, postoj zwalniany LFire), regula 291 A po cichu martwa.
+- (W3) zgon z krwawienia po strzale: `new Blow(agent.Index)` ma pusty WeaponRecord, wiec Agent.Die (Agent.cs:4645) nie wolal RegisterDeathByRanged - nie liczyly sie do DeathByRangedCount (291e FireDead, OutshotRush.Live, bilans ognia gry TeamAIComponent.CheckIsDefenseApplicable); banda nekana lukami dluzej stala.
+- (W4) szarza blizej 60 m pod ostrzalem: 313b tylko mierzyl, `_rushNow` false - AiBreath.Reserve dawal zwykly zapas 50% przy UnderRangedAttackRatio < 0.33 (2-3 trafienia / 10 s od jednego konnego lucznika), cap kroku - banda znow "wolno szla".
+- (D) histereza: RBM leczy +0.9 HP / 10 s przy pasku > 85% (RBMAI.cs:10263) - kustykajacy z 10 HP po ok. 10 s mial 11, tracil cap i biegl (miganie). Gracz w trybie chodu 313c mial jeszcze mnoznik krzywej ok. 0.42 (natywne SetMaximumSpeedLimit - niesprawdzalne, mogl mnozyc chod). Opisy w liniach 143 ("panika dopiero z bolu", "w miejscu po 30 s drogi") nieaktualne po 313d.
+**Zmiana:**
+- FieldCraft.LimpNow: `hero = HeroCaution.WoundedWithdrawing(agent)` (nowa, tryb ranny, klucz HeroesKeepBehindTheirMen TAK, nie Out) - ta sama sciezka capu kustykania (Bleed313 tablica -> PostSpeed i FieldCraft, jedno miejsce skladania limitu); licznik "ranny bohater" w linii 313d. Pieszo tylko (konny jak dotad).
+- Histereza: `st.LimpLow` - raz pod WoundedLimpBelowHp kustyka do HP > prog + 5 (Bleed313.LimpHystHp).
+- MarchToContact.OutshotPushes(f): wyjatek 283 na szyk - szyk nie-strzelecki, szyk z tarczami >= CloseRanks.WallFrom albo w biezacym biegu 313b; HaltAsk (R4) i HaltWhy (LFire) uzywaja go zamiast Live, a R5 pomija szyki pchane (dotad cala druzyna wychodzila wczesniej).
+- BleedDeath: `st.BleedMissile` (ktoras rana biezacego krwawienia od pocisku, Hit.Missile) -> `Formation.Team.QuerySystem.RegisterDeathByRanged()` przed Die (tylko BleedFromWounds TAK); licznik "od pocisku" w linii 313d.
+- MarchToContact: `_chgFire313[idx]` ustawiane w galezi szarzy 313b (fireC || ShieldsUp.FormFire), zerowane na poczatku Eval; `Rushing(f)` = `_rushNow || _chgFire313` - zapas tchu 25% (licznik `_underFire`).
+- Run313: przy `st.Walk313 && agent.WalkMode` tempo = 1 (chod gry daje tempo), rany i Ctrl dalej przez Math.Min.
+- Linie 143 (WoundedWithdraw, RoutHold): "(rzut, Pain Break By Chance)" przy kluczu TAK, "(kustykajacy do 90 s)".
+- tools/sprawdz_logi.py: KW313 - pola opcjonalne `od pocisku`, `ranny bohater` (linie sprzed 313y dalej pasuja), KW-2 sumy z nimi, KW-I; probki zaktualizowane.
+**Odrzucone / odlozone:** rec. 1 (4) kara FieldCraft u AI nadpisywana co 0.5 s przez gre - stara luka, nie z tej integracji (zasada jednej zmiany; ewentualnie pozniej tablica jak Bleed313). Rec. 1 (5) Artem/RBM mnoznik - opisane w 313d.
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Ranny lord kustyka ok. 1.1 m/s: HeroCaution.TravelMax 25 s -> czesciej "postoj w miejscu" (KInPlace) blizej linii niz dotad; w trybie rannym (do konca bitwy) bohater broni sie w miejscu w tempie kustykania. Konny bohater bez zmian (LimpNow odrzuca konnych). Klucz HeroesKeepBehindTheirMen NIE - bez kustykania (na sucho).
+- Histereza: kustykajacy z 10 HP, podleczony do 11-15 HP dalej kustyka (zamierzone); zdjecie przy 16+ HP.
+- R4 na szyk: lucznicy armii OutshotRush.Live znow staja (283 R4, linia 'Nekanie (283)' "bieg pod ostrzalem" mniejszy, R4 wiekszy); banda z tarczami (Rng, tarcze >= 60%) bez postoju jak w 313b. Przy _rMarchOn NIE R5 moze teraz zatrzymac szyki niepchane tej druzyny (dotad cala druzyna bez R5).
+- RegisterDeathByRanged: DeathByRangedCount rosnie szybciej (291e i OutshotRush.Live wczesniej, bilans ognia gry przechyla sie na obrone/atak wczesniej - zgodnie z Jeffem); bez podwojenia (nasz Blow nie IsMissile). Segment E "sr. s od 2. zabitego" krotszy.
+- Zapas 25% w szarzy pod ostrzalem: dluzszy bieg piechoty AI pod ostrzalem przed krokiem - wiecej zmeczenia w zwarciu (jak bieg 313b w MarchCap).
+- Chod gracza: przy pustym pasku limit 1 (bez krzywej) - jesli natywny mnoznik dotyczyl biegu, bez roznicy; jesli chodu - gracz idzie normalnym chodem zamiast ok. 0.7 m/s. ST-4/Sample313 w chodzie dalej nie mierza.
+- Watki: HeroCaution.Men czytane w FieldCraft.OnMissionTick (glowny watek, jak zapis); PostSpeed czyta tylko tablice Bleed313 jak dotad.
+- Self-testy: ostrzal313b, stamina313c, krwawienie313d OK; py_compile OK; build 0 bledow (6 starych ostrzezen).
+**Status:** DO SPRAWDZENIA
+
 ## 2026-11-01 WGRANIE 150 - noc/313x-integracja (149 + 312h oboz na suchym gruncie i spiacy w namiotach + 313a arakhy tylko u Dothrakow); Armoury.dll d2d14d21a30451641eeaa79071a371d0; kopia 149: Armoury.dll.bak-2026-11-01-przed-wgranie150 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie150-przed
 
 **Problem:** Jeff 01.11: oboz na bagnie stawiany w wodzie, ludzie spia poza namiotami; "czemu tyle wojska biega z arakhami ... wywal arakhi z Westeros".

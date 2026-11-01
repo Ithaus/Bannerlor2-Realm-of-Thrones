@@ -183,7 +183,8 @@ namespace Armoury
             // 313b 291e (krytyka 313 luka 2): obronca puszczony bilansem ognia idzie na strzelca - postoj 283 (wrog dalej niz 110 m) zatrzymalby go pod ostrzalem;
             // recenzja 313b (1): tak samo druzyna, ktora idzie pod ostrzalem (OutshotRush.Live) - Jeff "nie stoj"
             if (Doctrine.FireReleased(team)) { if (LNo(vf, 6)) _lNoFire++; return 0; }
-            if (OutshotRush.Live(team)) { if (LNo(vf, 7)) _lNoRush++; return 0; }
+            // 313y (recenzja integracji): wyjatek na szyk, nie na druzyne - pieszy szyk lucznikow bez tarcz armii idacej pod ostrzalem dalej staje (R4, 291 A)
+            if (MarchToContact.OutshotPushes(vf)) { if (LNo(vf, 7)) _lNoRush++; return 0; }
             // recenzja 283 (4): pieszy przy swoim nietknietym szyku (gracz w swojej linii) - zwykla bitwa; nekajacy przed czolem szyku ofiary - szyk idzie dalej
             // (pod pociskami z przodu sie zwiera, nie staje - S2/141)
             if (!t.Lone && t.S.MountAgent == null) { if (LNo(vf, 3)) _lNoFootNear++; return 0; }
@@ -219,6 +220,7 @@ namespace Armoury
                 {
                     var fi = fl[i];
                     if (!ReferenceEquals(fi.F.Team, team) || fi.Ha) continue;
+                    if (MarchToContact.OutshotPushes(fi.F)) continue;   // 313y: szyk pchany przez 313b nie staje w R5 (dotad cala druzyna odpadala wyzej)
                     if (!CanHalt(fi)) continue;
                     if (!TakeHalt(fi.F, t, true, now)) continue;
                     LR5F.Add(fi.F);
@@ -405,7 +407,7 @@ namespace Armoury
             if (FormRetreat(f)) return LRetreat;
             if (Charging(f)) return LCharge;
             if (Doctrine.S4Held(f)) return LS4;
-            if (Doctrine.FireReleased(f.Team) || OutshotRush.Live(f.Team)) return LFire;   // recenzja 313b (1): postoj sprzed puszczenia 291e / biegu pod ostrzalem
+            if (Doctrine.FireReleased(f.Team) || MarchToContact.OutshotPushes(f)) return LFire;   // 313y: OutshotRush na szyk (jak HaltAsk)   // recenzja 313b (1): postoj sprzed puszczenia 291e / biegu pod ostrzalem
             if (now - h.Start >= MaxSeconds) return LTime;
             if (FootGapOf(f) <= HuntClose) return LNear;   // poprawka 132b: pieszy szyk wroga (jak CanHalt)
             var t = h.T;

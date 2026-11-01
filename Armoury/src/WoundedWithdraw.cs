@@ -196,7 +196,8 @@ namespace Armoury
             var sb = new StringBuilder(1500);
             sb.Append("ODWROT RANNYCH (143): misja bitwa, klucz ").Append(_key ? "TAK" : "NIE");
             if (on) sb.Append(" (ranny ponizej ").Append(c != null ? c.WoundedFleePercent.ToString("0", Inv) : "?")
-                      .Append("% HP bez Panic: natywny odwrot za tyl szyku albo do sztandaru, bez okrzyku, zrzutu broni i zarazania; postoj za linia; panika dopiero z bolu ponizej ")
+                      .Append("% HP bez Panic: natywny odwrot za tyl szyku albo do sztandaru, bez okrzyku, zrzutu broni i zarazania; postoj za linia; panika dopiero z bolu")
+                      .Append(c != null && c.PainBreakByChance ? " (rzut, Pain Break By Chance)" : "").Append(" ponizej ")
                       .Append(c != null ? c.AiFleeBelowPercent.ToString(Inv) : "?").Append("% HP, przy zalamaniu kompanii, panice gry albo gdy szyk rozbity)");
             else if (_key) sb.Append(" (nieczynne: ").Append(!_rally ? "Broken Men Never Rally NIE" : "Wounded Flee NIE").Append(" - stara regula NB2)");
             else sb.Append(" (stara regula NB2 z 16.10: ranny ponizej progu panikuje - Panic, okrzyk, zrzut broni)");
@@ -206,7 +207,7 @@ namespace Armoury
               .Append(" / rozkazu szyku ").Append(WaitOrder.Count).Append("; ponowne wejscia po cudzym odwrocie ").Append(_restarts).Append(')');
             int arrived = Arrived[0] + Arrived[1] + Arrived[2];
             sb.Append(" | za linia ").Append(arrived).Append(" (cel: tyl szyku ").Append(Arrived[KindRear]).Append(", sztandar ").Append(Arrived[KindBanner])
-              .Append(", w miejscu po ").Append(WalkMax.ToString("0", Inv)).Append(" s drogi ").Append(Arrived[KindInPlace])
+              .Append(", w miejscu po ").Append(WalkMax.ToString("0", Inv)).Append(" s drogi (kustykajacy do ").Append(Bleed313.LimpWalkMaxCap.ToString("0", Inv)).Append(" s) ").Append(Arrived[KindInPlace])
               .Append("; sr. droga ").Append(_walkN > 0 ? (_walkSum / _walkN).ToString("0.0", Inv) : "-").Append(" s), na koniec: w drodze ").Append(_endWalk)
               .Append(", na postoju ").Append(_endHold)
               .Append(" | zginal w drodze ").Append(_diedWalkK + _diedWalkU).Append(" (zabici ").Append(_diedWalkK).Append(" / nieprzytomni ").Append(_diedWalkU)

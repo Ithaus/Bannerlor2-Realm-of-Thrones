@@ -88,6 +88,8 @@ namespace Armoury
             public bool PainBroken;          // rzut z bolu wygrany - lamie sie jak dotad (RoutHold.Break)
             public float LimpCap;            // cap kustykania wpisany do Bleed313 (m/s, 0 = brak)
             public float LimpSince = -1f;    // recenzja 313d (pomiar): czas misji wpisania capu (predkosc mierzona po Bleed313.LimpSettle s)
+            public bool LimpLow;             // 313y (histereza): kustyka z HP <= WoundedLimpBelowHp; zdjete dopiero powyzej progu + Bleed313.LimpHystHp
+            public bool BleedMissile;        // 313y: krwawiaca rana (biezace krwawienie) od pocisku - zgon z krwawienia liczy sie jako zgon od pocisku
         }
 
         // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
@@ -255,6 +257,9 @@ namespace Armoury
                 }
                 else if (st.Walk313Forced) Release313(agent, st);
                 pace = f;
+                // 313y (recenzja integracji): w trybie chodu gry tempo daje sam chod - bez mnoznika krzywej (natywne SetMaximumSpeedLimit x 0.42 moglo mnozyc
+                // predkosc chodu, gracz wloklby sie ok. 0.7 m/s); kara za rany i Ctrl dalej przez Math.Min nizej
+                if (st.Walk313 && agent.WalkMode) pace = 1f;
             }
             catch (Exception e)
             {
@@ -1102,7 +1107,7 @@ namespace Armoury
                     float limpCap = 0f;
                     if (c.WoundedLimp || st.LimpCap > 0f)
                     {
-                        try { limpCap = c.WoundedLimp ? LimpNow(agent, c) : 0f; }
+                        try { limpCap = c.WoundedLimp ? LimpNow(agent, st, c) : 0f; }
                         catch (Exception e) { limpCap = 0f; Bleed313.Stumble("Limp", e); }
                         // recenzja 313d (pomiar): predkosc czlowieka, ktory ma cap od co najmniej LimpSettle s (limit z poprzednich taktow juz dziala)
                         if (limpCap > 0f && st.LimpCap > 0f && st.LimpSince >= 0f && now - st.LimpSince >= Bleed313.LimpSettle)
@@ -1613,6 +1618,8 @@ namespace Armoury
                         float loss = Bleed313.Loss(h.Dmg, cond, c);
                         if (loss <= 0f) continue;
                         bool was = st.BleedRate > 0f;
+                        if (!was) st.BleedMissile = false;   // 313y: nowe krwawienie - od pocisku tylko, gdy ktoras z jego ran byla od pocisku
+                        st.BleedMissile |= h.Missile;
                         st.BleedRate += loss / clot;
                         st.BleedBy = h.By;
                         st.BleedByA = h.ByA;
@@ -1682,6 +1689,20 @@ namespace Armoury
             b.InflictedDamage = (int)agent.Health + 1;
             b.GlobalPosition = agent.Position;
             float hp0 = st.BleedHp0;
+            // 313y (recenzja integracji, WAZNA): Agent.Die liczy zgon od pocisku tylko przy b.IsMissile (WeaponRecord) - nasz Blow go nie ma, wiec smierc
+            // z krwawienia po strzale nie podnosila TeamQuerySystem.DeathByRangedCount (prog 291e FireDead, OutshotRush.Live, bilans ognia gry). Liczymy sami
+            // (jak gra: druzyna szyku przed Die), tylko przy BleedFromWounds - stara regula nie wie, skad rana
+            bool byMissile = c.BleedFromWounds && st.BleedMissile;
+            if (byMissile)
+            {
+                try
+                {
+                    var fm = agent.Formation;
+                    var tq = fm != null && fm.Team != null ? fm.Team.QuerySystem : null;
+                    if (tq != null) { tq.RegisterDeathByRanged(); if (log) Bleed313.DeathMissile++; }
+                }
+                catch (Exception e) { Bleed313.Stumble("DeathMissile", e); }
+            }
             agent.Die(b, Agent.KillInfo.Invalid);
             if (!log) return;
             AgentState s = AgentState.Killed;
@@ -1696,19 +1717,28 @@ namespace Armoury
 
         /// <summary>313d: cap kustykania (m/s) albo 0 - pieszy AI (nie gracz, nie nekajacy autotestu) w bitwie na mapie: w odwrocie rannego 143 albo z HP &lt;=
         /// WoundedLimpBelowHp (takze w panice z bolu). Liczniki ludzi do linii.</summary>
-        private float LimpNow(Agent agent, Settings c)
+        private float LimpNow(Agent agent, State st, Settings c)
         {
             if (agent.IsMainAgent || !agent.IsAIControlled || agent.MountAgent != null) return 0f;
             if (!InBattle()) return 0f;
-            bool low = c.WoundedLimpBelowHp > 0 && agent.Health <= c.WoundedLimpBelowHp;
-            bool wd = false;
+            // 313y (recenzja integracji, histereza): RBM leczy +0.9 HP co 10 s przy pasku > 85% - kustykajacy odpoczywa, wiec po ok. 10 s mial 11 HP, tracil cap
+            // i znow biegl (miganie). Raz pod progiem: kustyka, az HP przekroczy prog + LimpHystHp
+            int thrHp = c.WoundedLimpBelowHp;
+            float hpNow = agent.Health;
+            bool low = thrHp > 0 && (hpNow <= thrHp || (st.LimpLow && hpNow <= thrHp + Bleed313.LimpHystHp));
+            st.LimpLow = low;
+            bool wd = false, hero = false;
             var k = RoutHold.Live;
             // recenzja 313d: w odwrocie 143 kustyka do konca odwrotu, ale nie ten, kto wrocil do walki (na postoju znow w przedniej polowie szyku)
             if (k != null && ReferenceEquals(k.Mission, Mission)) wd = k.LimpingWithdraw(agent);
-            if (!low && !wd) return 0f;
+            // 313y (recenzja integracji, WAZNA): ranny lord / bohater AI (HeroCaution tryb ranny, ponizej 45% HP) wycofuje sie za szyk - tez krokiem rannego,
+            // nie sprintem (Jeff 01.11: "ranny nie biega jak glupi tylko wolno wycofuje sie"); ta sama sciezka capu co odwrot 143 (PostSpeed i FieldCraft)
+            if (!wd) hero = HeroCaution.WoundedWithdrawing(agent);
+            if (!low && !wd && !hero) return 0f;
             if (HorsePursuit.TestRunAnyThread(agent)) return 0f;   // nekajacy autotestu - test bez zmian
             Bleed313.LimpMen.Add(agent);
             if (wd) Bleed313.LimpWithdraw.Add(agent);
+            else if (hero) Bleed313.LimpHero.Add(agent);
             else if (SurvivalMode.InPanic(agent)) Bleed313.LimpPanic.Add(agent);
             return Bleed313.LimpSpeed(agent, c);
         }

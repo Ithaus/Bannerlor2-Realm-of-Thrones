@@ -231,12 +231,15 @@ namespace Armoury
         internal static readonly int[] ByType = new int[3], ByPart = new int[4];
         internal static double PSum, LSum, AthSum;
         internal static int DeathKilled, DeathUncon, DeathCredit, DeathPanic, DeathWithdraw, DeathOld;
+        internal static int DeathMissile;   // 313y: zgony z krwawienia po ranie od pocisku, wliczone do DeathByRangedCount druzyny
         internal static double DeathHp0Sum;
         internal static int WdRolls, WdYes, WdNo, WdForced;
         internal static int PainRolls, PainBroke, PainBrokeBleeding, PainResist;
         internal static double PainMoraleSum;
         // recenzja 313d: zbiory po Agent (nie po Index - indeksy wracaja do posilkow), czyszczone w Begin i po linii (EndMission)
         internal static readonly HashSet<Agent> LimpMen = new HashSet<Agent>(), LimpWithdraw = new HashSet<Agent>(), LimpPanic = new HashSet<Agent>();
+        internal static readonly HashSet<Agent> LimpHero = new HashSet<Agent>();   // 313y: ranny bohater AI w wycofaniu HeroCaution
+        internal const float LimpHystHp = 5f;   // 313y: histereza progu WoundedLimpBelowHp (RBM leczy ok. +1 HP / 10 s)
         internal static int LimpWrites;
         // recenzja 313d (pomiar): predkosc kustykajacych (agent.Velocity) po co najmniej LimpSettle s z capem - czy limit naprawde trzyma; postoj w miejscu po
         // limicie drogi 143 u kustykajacego (RoutKeeper)
@@ -255,11 +258,12 @@ namespace Armoury
             Array.Clear(ByPart, 0, ByPart.Length);
             PSum = LSum = AthSum = 0.0;
             DeathKilled = DeathUncon = DeathCredit = DeathPanic = DeathWithdraw = DeathOld = 0;
+            DeathMissile = 0;
             DeathHp0Sum = 0.0;
             WdRolls = WdYes = WdNo = WdForced = 0;
             PainRolls = PainBroke = PainBrokeBleeding = PainResist = 0;
             PainMoraleSum = 0.0;
-            LimpMen.Clear(); LimpWithdraw.Clear(); LimpPanic.Clear();
+            LimpMen.Clear(); LimpWithdraw.Clear(); LimpPanic.Clear(); LimpHero.Clear();
             LimpWrites = 0;
             LimpSpeedN = LimpFast = LimpHoldInPlace = 0;
             LimpSpeedSum = 0.0;
@@ -278,7 +282,7 @@ namespace Armoury
         internal static void EndMission()
         {
             ClearQueue();
-            LimpMen.Clear(); LimpWithdraw.Clear(); LimpPanic.Clear();
+            LimpMen.Clear(); LimpWithdraw.Clear(); LimpPanic.Clear(); LimpHero.Clear();
         }
 
         /// <summary>Recenzja 313d: limit drogi odwrotu 143 (s) - kustykajacy idzie ok. 1.1 m/s, wiec 30 s (WalkMax) to ok. 33 m, a cel bywa do 80 m (sztandar).
@@ -328,7 +332,7 @@ namespace Armoury
             else sb.Append(", sr. szansa -, sr. utrata -, sr. Atletyka -");
             sb.Append(" | ustalo ").Append(Stopped).Append(", na koniec krwawi ").Append(BleedingAtEnd)
               .Append(" | zgony z krwawienia ").Append(deaths).Append(" (zabici ").Append(DeathKilled).Append(" / nieprzytomni ").Append(DeathUncon)
-              .Append("; z kredytem ").Append(DeathCredit).Append("; w panice ").Append(DeathPanic).Append(", w odwrocie ").Append(DeathWithdraw)
+              .Append("; z kredytem ").Append(DeathCredit).Append("; od pocisku ").Append(DeathMissile).Append("; w panice ").Append(DeathPanic).Append(", w odwrocie ").Append(DeathWithdraw)
               .Append("; stara regula ").Append(DeathOld).Append("; sr. HP na starcie krwawienia ")
               .Append(deaths > 0 ? (DeathHp0Sum / deaths).ToString("0.0", Inv) : "-").Append(')')
               .Append(" | odwrot 143: rzutow ").Append(WdRolls).Append(" (wycofal sie ").Append(WdYes).Append(" / zostal ").Append(WdNo)
@@ -337,7 +341,7 @@ namespace Armoury
               .Append(" / nie ").Append(PainBroke - PainBrokeBleeding).Append("; oparli sie ").Append(PainResist).Append("), sr. morale ")
               .Append(PainRolls > 0 ? (PainMoraleSum / PainRolls).ToString("0", Inv) : "-")
               .Append(" | kustykanie: ludzi ").Append(LimpMen.Count).Append(" (w odwrocie ").Append(LimpWithdraw.Count).Append(", w panice ").Append(LimpPanic.Count)
-              .Append("), zapisow limitu ").Append(LimpWrites).Append(", w latce ").Append(Volatile.Read(ref _limpPost))
+              .Append(", ranny bohater ").Append(LimpHero.Count).Append("), zapisow limitu ").Append(LimpWrites).Append(", w latce ").Append(Volatile.Read(ref _limpPost))
               .Append(", pomiarow predkosci ").Append(LimpSpeedN).Append(" (sr. ")
               .Append(LimpSpeedN > 0 ? (LimpSpeedSum / LimpSpeedN).ToString("0.00", Inv) : "-").Append(" m/s, maks ")
               .Append(LimpSpeedN > 0 ? LimpSpeedMax.ToString("0.00", Inv) : "-").Append(", szybciej niz limit ").Append(LimpFast)

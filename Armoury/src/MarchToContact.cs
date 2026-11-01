@@ -102,6 +102,7 @@ namespace Armoury
         private static readonly float[] _shield = new float[Slots];
         private static readonly bool[] _rushNow = new bool[Slots];
         private static readonly bool[] _rush313 = new bool[Slots];      // 313b: biezacy bieg to bieg z tarczami (OutshotRush) - koniec liczony tam
+        private static readonly bool[] _chgFire313 = new bool[Slots];   // 313y: szarza blizej progu biegu pod ostrzalem (druzyna OutshotRush.Live) - zapas tchu 25%
         // recenzja 313b (4): pomiar predkosci srodka szyku - ostatnia probka (pozycja, chwila, rodzaj 1 bieg 313b / 2 szarza pod ostrzalem; 0 brak)
         private static readonly Vec2[] _spPos = new Vec2[Slots];
         private static readonly float[] _spAt = new float[Slots];
@@ -385,6 +386,7 @@ namespace Armoury
                 _chargeHeld[i] = false; _rest[i] = false; _capRest[i] = false; _freshUntil[i] = 0f;
                 _shield[i] = -1f; _rushNow[i] = false;   // 291
                 _rush313[i] = false; _spKind[i] = 0;   // 313b
+                _chgFire313[i] = false;   // 313y
             }
             _any = false;
         }
@@ -522,6 +524,7 @@ namespace Armoury
                 _chargeHeld[idx] = false; _rest[idx] = false; _capRest[idx] = false; _freshUntil[idx] = 0f;
                 _shield[idx] = -1f; _rushNow[idx] = false;   // 291
                 _rush313[idx] = false; _spKind[idx] = 0;   // 313b
+                _chgFire313[idx] = false;   // 313y
                 _who[idx] = f;
             }
             // 291: bieg pod ostrzalem trwa tylko przez MarchCap tego taktu (zwarcie, szarza, inny rozkaz - koniec biegu, zwykla sciezka)
@@ -529,6 +532,7 @@ namespace Armoury
             _evalWas313 = _rush313[idx];   // 313b
             if (_rushNow[idx]) { _rushNow[idx] = false; if (_rush313[idx]) OutshotRush.NoteRushEnd(); else _rushOut++; }
             _rush313[idx] = false;
+            _chgFire313[idx] = false;   // 313y: tylko przez galaz szarzy tego taktu
             if (f.CountOfUnits <= 0) { Set(f, idx, 0f, 0f, false); return; }
 
             if (now >= _nextScan[idx])
@@ -604,7 +608,9 @@ namespace Armoury
                 {
                     bool fireC = false;
                     try { fireC = q.UnderRangedAttackRatio >= 0.33f; } catch { fireC = false; }
-                    if (fireC || ShieldsUp.FormFire(f)) { OutshotRush.NoteCharge(TickEvery); SpeedSample(f, idx, 2); }
+                    // 313y (recenzja integracji, WAZNA): ten sam zapas tchu pod ostrzalem (25%) co bieg 313b w MarchCap - inaczej przy 2-3 trafieniach na 10 s
+                    // (UnderRangedAttackRatio < 0.33) zwykly zapas 50% dawal cap kroku i banda znow "wolno szla" na strzelca (AiBreath.Reserve czyta Rushing)
+                    if (fireC || ShieldsUp.FormFire(f)) { OutshotRush.NoteCharge(TickEvery); SpeedSample(f, idx, 2); _chgFire313[idx] = true; }
                 }
                 Set(f, idx, 0f, 0f, false);
                 return;
@@ -910,7 +916,22 @@ namespace Armoury
         {
             if (!_on || f == null) return false;
             int idx = Idx(f);
-            return idx >= 0 && ReferenceEquals(_who[idx], f) && _rushNow[idx];
+            return idx >= 0 && ReferenceEquals(_who[idx], f) && (_rushNow[idx] || _chgFire313[idx]);
+        }
+
+        /// <summary>313y (recenzja integracji, WAZNA; HorsePursuit R4 / postoj 283): czy druzyna idaca pod ostrzalem (OutshotRush.Live) naprawde pcha TEN szyk na
+        /// strzelca - szyk nie-strzelecki (piechota, jazda - jak dotad), szyk z tarczami u co najmniej CloseRanks.WallFrom ludzi albo szyk w biezacym biegu 313b.
+        /// Pieszy szyk lucznikow bez tarcz dalej staje i strzela (291 A, R4) - wyjatek 283 byl dotad na cala druzyne.</summary>
+        internal static bool OutshotPushes(Formation f)
+        {
+            if (f == null || !OutshotRush.Live(f.Team)) return false;
+            bool rng = false;
+            try { var q = f.QuerySystem; rng = q != null && q.IsRangedFormation; } catch { rng = false; }
+            if (!rng) return true;
+            if (!_on) return false;
+            int idx = Idx(f);
+            if (idx < 0 || !ReferenceEquals(_who[idx], f)) return false;
+            return _rush313[idx] || _shield[idx] >= CloseRanks.WallFrom;
         }
 
         /// <summary>291: liczniki segmentu C linii 'Bitwa (291)' od zera (Battle291.Begin, przed Begin paczek).</summary>

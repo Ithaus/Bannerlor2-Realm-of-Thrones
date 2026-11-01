@@ -210,6 +210,15 @@ namespace Armoury
             }
         }
 
+        /// <summary>313y (FieldCraft.LimpNow, glowny watek): bohater AI w trybie rannym (ponizej WoundedBelow, w drodze albo na postoju za szykiem) -
+        /// kustyka jak ranny w odwrocie 143. Klucz HeroesKeepBehindTheirMen NIE (na sucho) - false.</summary>
+        internal static bool WoundedWithdrawing(Agent a)
+        {
+            if (!_live || !_key || a == null) return false;
+            Man man;
+            return Men.TryGetValue(a, out man) && ReferenceEquals(man.A, a) && !man.Out && man.Mode == ModeWounded;
+        }
+
         /// <summary>BattleSense.OnAgentRemoved (blok Night): los bohatera (zabity / nieprzytomny / uszedl), w wycofaniu czy nie.</summary>
         internal static void OnRemoved(Mission m, Agent a, AgentState state)
         {

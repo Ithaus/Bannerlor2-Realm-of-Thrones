@@ -493,7 +493,7 @@ namespace Armoury
               .Append(" (bitwa polowa: ranny ponizej ").Append(c.WoundedFleePercent.ToString("0", System.Globalization.CultureInfo.InvariantCulture))
               .Append("% HP bez Panic - natywny odwrot za tyl szyku (srodek - kierunek x (glebokosc/2 + 5 m)) albo do sztandaru, ponowienie co ")
               .Append(RefreshEvery.ToString("0")).Append(" s, postoj za linia (ScriptedPosition) od ").Append(WoundedWithdraw.ArriveRadius.ToString("0", System.Globalization.CultureInfo.InvariantCulture))
-              .Append(" m od celu, morale co najmniej 0.02; panika dopiero z bolu ponizej ").Append(c.AiFleeBelowPercent)
+              .Append(" m od celu, morale co najmniej 0.02; panika dopiero z bolu").Append(c.PainBreakByChance ? " (rzut, Pain Break By Chance)" : "").Append(" ponizej ").Append(c.AiFleeBelowPercent)
               .Append("% HP (FieldCraft), przy zalamaniu kompanii albo gdy szyk rozbity (bez szyku, sam, polowa w panice); oblezenia, kryjowki, morze - stara regula)")
               // 140: tarcza pod ostrzalem (linia 'Bitwa (140 tarcze)' po bitwie)
               .Append(" | AI Shields Up Under Fire ").Append(c.AiShieldsUpUnderFire ? "TAK" : "NIE").Append(" (trzymanie ")
