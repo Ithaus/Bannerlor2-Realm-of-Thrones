@@ -90469,16 +90469,16 @@ def main(argv):
 # Z314-9 rozklad 312e: suma "zold krolewski 314c" / "dary za zwyciestwo 314c" w liniach "Skarbce:" doby = wyplacone w linii 314c tej doby (gdy dopiski sa; brak - NIEPOKRYTY).
 Z314_DAY = re.compile(r"^Zold krolewski \(314c\): dzien (\d+) \| zold (tak|nie) \(([\d.]+)% zoldu szeregowych, (\d+) dni w roku bez zaplaty\) \| krolestw w wojnie (\d+)"
                       r" \| rody w armiach (\d+) \(bez zaplaty (\d+), platnych (-?\d+), wyplacono (\d+)\), szeregowych platnych (\d+) \| nalezne (\d+), wyplacone (\d+)"
-                      r" \| dary za zwyciestwo: wyplacone (\d+), w kolejce (\d+) \(pozycji (\d+)\), przepadlo (\d+) \| ze skarbca razem (\d+) \(z wplywow dnia (\d+), ponad zapas wojny (\d+)\)"
-                      r", niedoplata zoldu (\d+) w (\d+) krolestwach \| ciecie zwrotu 70% \(zold 314c z wczoraj\) (\d+) \| gracz: dni sluzby (\d+)/(\d+), zold (\d+), dar (\d+) \| potkniecia (\d+)\.")
+                      r" \| dary za zwyciestwo: wyplacone (\d+), w kolejce (\d+) \(pozycji (\d+)\), przepadlo (\d+) \| ze skarbca razem (\d+) \(z wplywow dnia (\d+), ponad zapas wojny (\d+)(?:; wplywy dnia zostawione dla W5 (\d+))?\)"
+                      r", niedoplata zoldu (\d+) w (\d+) krolestwach \| ciecie zwrotu 70% \(zold 314c z wczoraj\) (\d+)(?:, zold 314c mniej o gotowke pana 277 (\d+))? \| gracz: dni sluzby (\d+)/(\d+), zold (\d+), dar (\d+) \| potkniecia (\d+)\.")
 Z314_DF = ("day", "on", "pct", "free", "wark", "svc", "fr", "paidc", "paidn", "men", "due", "paid", "gpaid", "pend", "pendn", "lapsed", "tot", "left", "stock",
-           "short", "shortk", "cut", "pld", "plfree", "plw", "plg", "st")
+           "keep", "short", "shortk", "cut", "c277", "pld", "plfree", "plw", "plg", "st")   # recenzja 314c: keep (wplywy zostawione dla W5), c277 - pola opcjonalne (brak = 0)
 Z314_GIFT = re.compile(r"^Nagroda krola \(314c\): dzien (\d+) \| (.+?) pokonal (.+?) \| pobitych partii lordow (\d+)( \(armia\))?, ich ludzi na starcie (\d+)"
                        r" \| udzial krolestwa w wkladzie (\d+)% \| dar (\d+) zl \(w kolejce do skarbca (\d+), czesc krola i najemnikow (\d+)\), wplywy ([\d.]+) dla (\d+) rodow"
                        r"(?:; gracz: dar (\d+), wplywy ([\d.]+))?\.")
 Z314_SAMPLE = ("Zold krolewski (314c): dzien 109000 | zold tak (50% zoldu szeregowych, 40 dni w roku bez zaplaty) | krolestw w wojnie 18 | rody w armiach 12 (bez zaplaty 5,"
                " platnych 7, wyplacono 7), szeregowych platnych 900 | nalezne 4000, wyplacone 3500 | dary za zwyciestwo: wyplacone 1500, w kolejce 2000 (pozycji 3), przepadlo 0"
-               " | ze skarbca razem 5000 (z wplywow dnia 3000, ponad zapas wojny 2000), niedoplata zoldu 500 w 1 krolestwach | ciecie zwrotu 70% (zold 314c z wczoraj) 1200"
+               " | ze skarbca razem 5000 (z wplywow dnia 3000, ponad zapas wojny 2000; wplywy dnia zostawione dla W5 700), niedoplata zoldu 500 w 1 krolestwach | ciecie zwrotu 70% (zold 314c z wczoraj) 1200, zold 314c mniej o gotowke pana 277 40"
                " | gracz: dni sluzby 41/40, zold 300, dar 0 | potkniecia 0.")
 Z314_GSAMPLE = ("Nagroda krola (314c): dzien 109000 | Polnoc pokonal Lannister | pobitych partii lordow 2 (armia), ich ludzi na starcie 300 | udzial krolestwa w wkladzie 100%"
                 " | dar 4500 zl (w kolejce do skarbca 3000, czesc krola i najemnikow 1500), wplywy 15 dla 2 rodow; gracz: dar 2000, wplywy 10.")
@@ -90491,7 +90491,7 @@ def z314_day(t):
     d = {}
     for i, k in enumerate(Z314_DF):
         v = m.group(i + 1)
-        d[k] = (v == "tak") if k == "on" else (float(v) if k == "pct" else int(v))
+        d[k] = (v == "tak") if k == "on" else (float(v) if k == "pct" else (int(v) if v is not None else 0))
     return d
 
 
@@ -90526,8 +90526,11 @@ def z314_bad_gift(g):
 
 def zold314c_selftest():
     d = z314_day(Z314_SAMPLE)
-    if not d or d["paid"] != 3500 or d["cut"] != 1200 or d["pld"] != 41 or d["plfree"] != 40 or not d["on"] or d["pct"] != 50.0:
+    if not d or d["paid"] != 3500 or d["cut"] != 1200 or d["pld"] != 41 or d["plfree"] != 40 or not d["on"] or d["pct"] != 50.0 or d["keep"] != 700 or d["c277"] != 40:
         return f"probka linii doby: {d}"
+    d0 = z314_day(Z314_SAMPLE.replace("; wplywy dnia zostawione dla W5 700", "").replace(", zold 314c mniej o gotowke pana 277 40", ""))
+    if not d0 or d0["keep"] != 0 or d0["c277"] != 0 or d0["paid"] != 3500:
+        return f"probka linii doby sprzed recenzji: {d0}"
     if z314_bad_day(d):
         return "tozsamosc probki doby: " + z314_bad_day(d)[0]
     if not z314_bad_day(z314_day(Z314_SAMPLE.replace("razem 5000", "razem 5001"))):

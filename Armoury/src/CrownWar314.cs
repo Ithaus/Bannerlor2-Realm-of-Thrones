@@ -21,13 +21,17 @@ namespace Armoury
     ///  - Pierwsze RoyalWarWageFreeDays (40) dni sluzby w roku kalendarzowym (CampaignTime.GetYear - rok Armoury 364 dni, Calendar.cs) rod sluzy za darmo
     ///    (powinnosc lenna); od 41. dnia sluzby korona placi glowie rodu co dobe RoyalWarWagePercent (50%) dziennego zoldu kazdego szeregowego tych partii
     ///    (CharacterObject.TroopWage - ten sam model zoldu, ktory placi rod; bohaterowie poza zoldem). Licznik dni na rod, w zapisie (arm_zold314).
-    ///  - SKAD: najpierw reszta wplywow dnia (CrownIncome.LeftFor, Spent), potem skarbiec PONAD ZAPAS WOJNY i dlugi (KingdomTreasury.TreasurySurplusFor -
+    ///  - SKAD: najpierw reszta wplywow dnia PONAD garnek W5 (recenzja 314c: garnek daniny wojennej W5 i potrzeba W5 z wplywow - jak rezerwa M2b w CrownCallToWar -
+    ///    zostaje w wplywach dla W5; CrownIncome.LeftFor, Spent), potem skarbiec PONAD ZAPAS WOJNY i dlugi (KingdomTreasury.TreasurySurplusFor -
     ///    ta sama miara co W5b / f23 / "najpierw skarbiec" 8a: krol placi wojne ze skarbca do zapasu, nigdy z kredytu). Gdy nie starcza - wszystkim rodom
     ///    krolestwa proporcjonalnie mniej (KingdomTreasury.Split), niedoplata przepada (bez dlugu korony). Zloto: skarbiec -> kiesa glowy rodu.
     ///  - ZWROT 70% (CrownWageRefundEnabled) a zold 314c - jeden zloty zoldu korona oddaje najwyzej raz: zold krolewski wyplacony wczoraj jest CIECIEM podstawy
     ///    zwrotu nastepnej doby (RefundCut, jak W5 / W7 / 277 - "korona nie zwraca zoldu, ktory juz oplacila"). Zwrot (pierwszy z wydatkow wojska) biegnie
-    ///    przed tym krokiem i nie traci przez niego wplywow dnia (bez tego zold 314c pchalby zwrot do Banku 186). Dla szeregowych w armii: rod dostaje
-    ///    p + 0.7 f (1 - p) ich zoldu (p = 50%, f - miara potrzeby f6), nigdy wiecej niz zold; bogaty rod (f = 0, dzis bez zwrotu) dostaje p.
+    ///    przed tym krokiem i nie traci przez niego wplywow dnia (bez tego zold 314c pchalby zwrot do Banku 186). Bogaty rod (f = 0, dzis bez zwrotu) dostaje p.
+    ///  - RODZINA W5 (recenzja 314c): zold 314c tej doby jest czescia wlasnego pulapu rodu Pc0 w NeedAidKingdom (PaidToday) - W5, W5b, W6, M1, W5c i W7 (plan W5)
+    ///    licza gotowke jako koszt - Pc0, wiec nie placa drugi raz za tych samych ludzi; ClanBudget dolicza go do b.AidCash. Gotowka pana lennego 277 tej doby
+    ///    (CanonHouses277 placi wczesniej w dobie) zmniejsza nalezny zold 314c. Suma korony i pana za szeregowych w armii: najwyzej koszt rodu przy poziomie
+    ///    W5 (gdy W5 doplaca) albo p x zold (gdy nie), plus zwrot 70% f od reszty oplaconej z wlasnej kiesy.
     ///
     /// B. NAGRODA KROLA ZA WIELKIE ZWYCIESTWO (klucz RoyalVictoryRewardEnabled), MapEventEnded:
     ///  - bitwa z wynikiem, w ktorej strona pobita miala co najmniej jedna PARTIE LORDA (IsLordParty, frakcja nie bandycka) z frakcji w wojnie z krolestwem
@@ -46,7 +50,7 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        private sealed class Svc { public int Year, Days; }
+        private sealed class Svc { public int Year, Days; public string Kingdom; }   // recenzja 314c: krolestwo, ktoremu rod sluzy - zmiana krolestwa = dni od zera
         private sealed class Gift { public string Clan, Kingdom; public long Left; public int Day; }
 
         private static readonly Dictionary<string, Svc> _svc = new Dictionary<string, Svc>();          // id rodu -> rok i dni sluzby w tym roku
@@ -59,7 +63,7 @@ namespace Armoury
 
         // liczniki doby (zerowane po linii)
         private static int _dWarK, _dSvc, _dFree, _dPaidN, _dMen, _dShortK, _dBattles, _dGiftClans;
-        private static long _dDue, _dPaidAmt, _dFromLeft, _dFromStock, _dCut, _dGiftPaid, _dGiftLapsed, _dGiftQueued, _dInfl;
+        private static long _dDue, _dPaidAmt, _dFromLeft, _dFromStock, _dCut, _dGiftPaid, _dGiftLapsed, _dGiftQueued, _dInfl, _dKeptW5, _dCut277;
         private static long _dPlWage, _dPlGift; private static int _dPlDays = -1;
 
         internal static bool WageOn { get { var s = Settings.Current; return s != null && s.RoyalWarWageEnabled; } }
@@ -73,7 +77,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _dWarK = _dSvc = _dFree = _dPaidN = _dMen = _dShortK = _dBattles = _dGiftClans = 0;
-            _dDue = _dPaidAmt = _dFromLeft = _dFromStock = _dCut = _dGiftPaid = _dGiftLapsed = _dGiftQueued = _dInfl = 0;
+            _dDue = _dPaidAmt = _dFromLeft = _dFromStock = _dCut = _dGiftPaid = _dGiftLapsed = _dGiftQueued = _dInfl = _dKeptW5 = _dCut277 = 0;
             _dPlWage = _dPlGift = 0; _dPlDays = -1;
         }
 
@@ -121,6 +125,17 @@ namespace Armoury
             catch (Exception e) { Stumble("RefundCut", e); return 0; }
         }
 
+        /// <summary>Recenzja 314c (rodzina W5): zold 314c wyplacony rodowi DZIS (krok biegnie przed W5 w CrownRents.Daily i przed budzetem 166). 0 - inna doba albo brak. Nie rzuca.</summary>
+        internal static long PaidToday(Clan c)
+        {
+            try
+            {
+                long v;
+                return c != null && c.StringId != null && Campaign.Current != null && _paidDay == (int)CampaignTime.Now.ToDays && _paid.TryGetValue(c.StringId, out v) ? Math.Max(0, v) : 0;
+            }
+            catch (Exception e) { Stumble("PaidToday", e); return 0; }
+        }
+
         // ------------------------------------------------------------ skarbiec: reszta wplywow dnia, potem nadwyzka ponad zapas wojny
         private sealed class Purse { public long Left, Stock; }
 
@@ -133,8 +148,18 @@ namespace Armoury
             long res;
             double sur = KingdomTreasury.TreasurySurplusFor(k, out res);   // skarbiec - reszta wplywow dnia - zapas wojny - dlugi (Bank, miasta); nigdy z kredytu
             long wallet = Math.Max(0, (long)k.KingdomBudgetWallet);
-            p.Left = Math.Max(0, Math.Min(left, wallet));
-            p.Stock = Math.Max(0, Math.Min((long)Math.Floor(sur), wallet - p.Left));
+            // recenzja 314c (wzor M2b, CrownCallToWar): garnek W5 siedzi w tej samej reszcie wplywow dnia - zostaje dla W5 (wieksze z dzisiejszego garnka daniny
+            // wojennej i z tego, czego W5 wczoraj potrzebowalo z wplywow: garnek + niepokryta potrzeba przed M1); przy wylaczonym W5 - nic nie zostawiamy
+            long keep = 0;
+            if (KingdomTreasury.NeedAidOn)
+            {
+                long pot = 0;
+                try { var kd = CrownIncome.DayOf(k); if (kd != null) pot = Math.Max(0, DsTowns.FarmsLive ? DsSeason.WarPot(k, kd) + Math.Max(0, kd.WarAid) : kd.WarAid); } catch (Exception e) { Stumble("PurseOf(garnek W5)", e); }
+                keep = Math.Max(0, Math.Min(left, Math.Max(pot, KingdomTreasury.NeedAidFromIncomeYesterday(k))));
+            }
+            p.Left = Math.Max(0, Math.Min(left - keep, wallet));
+            p.Stock = Math.Max(0, Math.Min((long)Math.Floor(sur), wallet - left));   // od calej reszty wplywow - czesc zostawiona dla W5 nie przecieka do nadwyzki
+            _dKeptW5 += keep;
             cache[k] = p;
             return p;
         }
@@ -183,9 +208,11 @@ namespace Armoury
                 {
                     var k = KingdomById(g.Kingdom); var c = ClanById(g.Clan);
                     var h = c != null && !c.IsEliminated ? c.Leader : null;
-                    if (k == null || k.IsEliminated || c == null || c.Kingdom != k || h == null || !h.IsAlive)
+                    if (k == null || k.IsEliminated || c == null || c.Kingdom != k || c.IsUnderMercenaryService || c == k.RulingClan || h == null || !h.IsAlive)
                     {
-                        _dGiftLapsed += g.Left; _gifts.Remove(g); continue;   // nikt nie odbierze (rod poza krolestwem, wymarly) - dar przepada, zloto zostaje w skarbcu
+                        // nikt nie odbierze (rod poza krolestwem, wymarly) albo rod zostal krolem / najemnikiem (recenzja 314c: ta sama zasada co przy wpisie i w zoldzie)
+                        // - dar przepada, zloto zostaje w skarbcu
+                        _dGiftLapsed += g.Left; _gifts.Remove(g); continue;
                     }
                     int got = Pay(k, PurseOf(k, cache), h, g.Left, false);
                     if (got > 0)
@@ -241,13 +268,17 @@ namespace Armoury
                             }
                             if (!serving) continue;
                             Svc v;
-                            if (!_svc.TryGetValue(c.StringId, out v)) { v = new Svc { Year = year }; _svc[c.StringId] = v; }
+                            if (!_svc.TryGetValue(c.StringId, out v)) { v = new Svc { Year = year, Kingdom = k.StringId }; _svc[c.StringId] = v; }
                             if (v.Year != year) { v.Year = year; v.Days = 0; }       // nowy rok kalendarzowy - znow 40 dni bez zaplaty
+                            if (v.Kingdom != k.StringId) { v.Kingdom = k.StringId; v.Days = 0; }   // recenzja 314c: nowy pan - 40 dni bez zaplaty winne nowej koronie
                             v.Days++;
                             _dSvc++;
                             if (c == Clan.PlayerClan) _dPlDays = v.Days;
                             if (v.Days <= free) { _dFree++; continue; }
                             long due = (long)Math.Floor(wage * pct);
+                            // recenzja 314c: gotowka pana lennego 277 tej doby (CanonHouses277 placi wczesniej w dobie) oplacila juz czesc tych ludzi - jeden zloty raz
+                            long c277 = Math.Min(due, (long)Math.Floor(Math.Max(0, CanonHouses277.CashOf(c))));
+                            if (c277 > 0) { due -= c277; _dCut277 += c277; }
                             if (due <= 0) continue;
                             rows.Add(new Row { C = c, Base = due, Men = men });
                         }
@@ -280,9 +311,15 @@ namespace Armoury
         private static void Report(Settings s, int day)
         {
             if (!s.LogEnabled) return;
-            if (!WageOn && !GiftOn && _gifts.Count == 0) return;
+            if (!WageOn && !GiftOn && _gifts.Count == 0 && _dGiftPaid == 0 && _dGiftLapsed == 0) return;   // recenzja 314c: linia takze w dobie, w ktorej kolejka sie oproznila
             long pend = 0; foreach (var g in _gifts) pend += g.Left;
-            Svc pv = null; try { if (Clan.PlayerClan != null && Clan.PlayerClan.StringId != null) _svc.TryGetValue(Clan.PlayerClan.StringId, out pv); } catch { }
+            Svc pv = null;
+            try
+            {
+                var pc = Clan.PlayerClan;
+                if (pc != null && pc.StringId != null && _svc.TryGetValue(pc.StringId, out pv) && (pc.Kingdom == null || pv.Kingdom != pc.Kingdom.StringId)) pv = null;   // dni u innej korony sie nie licza
+            }
+            catch { }
             int year = CampaignTime.Now.GetYear;
             var sb = new StringBuilder(600);
             sb.Append("Zold krolewski (314c): dzien ").Append(day)
@@ -293,9 +330,10 @@ namespace Armoury
               .Append(", szeregowych platnych ").Append(_dMen)
               .Append(" | nalezne ").Append(_dDue).Append(", wyplacone ").Append(_dPaidAmt)
               .Append(" | dary za zwyciestwo: wyplacone ").Append(_dGiftPaid).Append(", w kolejce ").Append(pend).Append(" (pozycji ").Append(_gifts.Count).Append("), przepadlo ").Append(_dGiftLapsed)
-              .Append(" | ze skarbca razem ").Append(_dFromLeft + _dFromStock).Append(" (z wplywow dnia ").Append(_dFromLeft).Append(", ponad zapas wojny ").Append(_dFromStock).Append(')')
+              .Append(" | ze skarbca razem ").Append(_dFromLeft + _dFromStock).Append(" (z wplywow dnia ").Append(_dFromLeft).Append(", ponad zapas wojny ").Append(_dFromStock)
+              .Append("; wplywy dnia zostawione dla W5 ").Append(_dKeptW5).Append(')')
               .Append(", niedoplata zoldu ").Append(Math.Max(0, _dDue - _dPaidAmt)).Append(" w ").Append(_dShortK).Append(" krolestwach")
-              .Append(" | ciecie zwrotu 70% (zold 314c z wczoraj) ").Append(_dCut)
+              .Append(" | ciecie zwrotu 70% (zold 314c z wczoraj) ").Append(_dCut).Append(", zold 314c mniej o gotowke pana 277 ").Append(_dCut277)
               .Append(" | gracz: dni sluzby ").Append(pv != null && pv.Year == year ? pv.Days : 0).Append('/').Append(FreeDays(s))
               .Append(", zold ").Append(_dPlWage).Append(", dar ").Append(_dPlGift)
               .Append(" | potkniecia ").Append(_stumbles).Append('.');
@@ -394,13 +432,17 @@ namespace Armoury
                 float iv = (float)(infl * part);
                 if (c.IsEliminated || c.IsUnderMercenaryService || c == k.RulingClan || c.StringId == null) { kept += g; continue; }   // krol i najemnicy - czesc zostaje w skarbcu
                 if (g > 0) { _gifts.Add(new Gift { Clan = c.StringId, Kingdom = k.StringId, Left = g, Day = day }); queued += g; }
-                if (iv >= 0.5f) { try { ChangeClanInfluenceAction.Apply(c, iv); gave += iv; } catch (Exception e) { Stumble("Influence", e); } }
+                float applied = 0f;
+                if (iv >= 0.5f) { try { ChangeClanInfluenceAction.Apply(c, iv); applied = iv; gave += iv; } catch (Exception e) { Stumble("Influence", e); } }
                 n++;
                 if (c == Clan.PlayerClan)
                 {
-                    pl = "; gracz: dar " + g + ", wplywy " + iv.ToString("0.#", Inv);
-                    Log.Player("King's reward for the victory over " + foeLead + ": " + g + " denars from the treasury of " + Name(k)
-                               + " (paid at the next settlement, when there is gold in it) and " + iv.ToString("0.#", Inv) + " influence.");
+                    pl = "; gracz: dar " + g + ", wplywy " + applied.ToString("0.#", Inv);
+                    // recenzja 314c: komunikat tylko o tym, co naprawde dano (wplywy ponizej 0.5 nie sa nadawane; dar 0 - bez wzmianki o zlocie)
+                    string gTxt = g > 0 ? g + " denars from the treasury of " + Name(k) + " (paid at the next settlement, when there is gold in it)" : null;
+                    string iTxt = applied > 0f ? applied.ToString("0.#", Inv) + " influence" : null;
+                    if (gTxt != null || iTxt != null)
+                        Log.Player("King's reward for the victory over " + foeLead + ": " + (gTxt != null && iTxt != null ? gTxt + " and " + iTxt : (gTxt ?? iTxt)) + ".");
                 }
             }
             _dGiftQueued += queued; _dInfl += (long)Math.Round(gave); _dGiftClans += n;
@@ -415,7 +457,7 @@ namespace Armoury
         // ------------------------------------------------------------ zapis (SaveText, "arm_zold314")
         private static readonly char[] Bad = { '|', ';', ':', ',' };
 
-        /// <summary>"v1|rod:rok:dni;...|doba|rod:zl;...|rod:krolestwo:reszta:doba;..."</summary>
+        /// <summary>"v1|rod:rok:dni[:krolestwo];...|doba|rod:zl;...|rod:krolestwo:reszta:doba;..."</summary>
         internal static string Export()
         {
             try
@@ -423,7 +465,7 @@ namespace Armoury
                 var sb = new StringBuilder(256);
                 sb.Append("v1|");
                 bool f = true;
-                foreach (var kv in _svc) { if (kv.Key.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(kv.Key).Append(':').Append(kv.Value.Year.ToString(Inv)).Append(':').Append(kv.Value.Days.ToString(Inv)); }
+                foreach (var kv in _svc) { if (kv.Key.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(kv.Key).Append(':').Append(kv.Value.Year.ToString(Inv)).Append(':').Append(kv.Value.Days.ToString(Inv)); if (kv.Value.Kingdom != null && kv.Value.Kingdom.IndexOfAny(Bad) < 0) sb.Append(':').Append(kv.Value.Kingdom); }
                 sb.Append('|').Append(_paidDay.ToString(Inv)).Append('|'); f = true;
                 foreach (var kv in _paid) { if (kv.Value <= 0 || kv.Key.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(kv.Key).Append(':').Append(kv.Value.ToString(Inv)); }
                 sb.Append('|'); f = true;
@@ -441,7 +483,7 @@ namespace Armoury
                 if (string.IsNullOrEmpty(data)) return;
                 var f = data.Split('|');
                 if (f.Length < 5 || f[0] != "v1") { _importBad++; return; }
-                foreach (var p in f[1].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); int y, d; if (x.Length == 3 && int.TryParse(x[1], NumberStyles.Integer, Inv, out y) && int.TryParse(x[2], NumberStyles.Integer, Inv, out d)) { _svc[x[0]] = new Svc { Year = y, Days = Math.Max(0, d) }; _importN++; } else _importBad++; }
+                foreach (var p in f[1].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); int y, d; if ((x.Length == 3 || x.Length == 4) && int.TryParse(x[1], NumberStyles.Integer, Inv, out y) && int.TryParse(x[2], NumberStyles.Integer, Inv, out d)) { _svc[x[0]] = new Svc { Year = y, Days = Math.Max(0, d), Kingdom = x.Length == 4 ? x[3] : null }; _importN++; } else _importBad++; }
                 int pd; if (int.TryParse(f[2], NumberStyles.Integer, Inv, out pd)) _paidDay = pd; else _importBad++;
                 foreach (var p in f[3].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); long v; if (x.Length == 2 && long.TryParse(x[1], NumberStyles.Integer, Inv, out v) && v > 0) { _paid[x[0]] = v; _importN++; } else _importBad++; }
                 foreach (var p in f[4].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); long v; int d; if (x.Length == 4 && long.TryParse(x[2], NumberStyles.Integer, Inv, out v) && v > 0 && int.TryParse(x[3], NumberStyles.Integer, Inv, out d)) { _gifts.Add(new Gift { Clan = x[0], Kingdom = x[1], Left = v, Day = d }); _importN++; } else _importBad++; }

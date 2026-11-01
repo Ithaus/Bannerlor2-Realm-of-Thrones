@@ -168,7 +168,7 @@ namespace Armoury
                             _scNoBase++;
                             if (pl) _plWhy6 = "pulap bez dworu nie ponad zold druzyn przy celu";
                             double pc0;   // pomiar: ile z nich ma potrzebe W5 (ten sam rachunek co kandydat W5, bez warunku rent)
-                            if ((pl ? PlCapW5(out pc0) : ClanBudget.PartyCapOwn(c, out pc0)) && NaCost(new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = perMan, Pl = pl }, target) > 0) _scNeed++;
+                            if ((pl ? PlCapW5(out pc0) : ClanBudget.PartyCapOwn(c, out pc0)) && NaCost(new NaClan { C = c, Pc0 = pc0 + CrownWar314.PaidToday(c), W = wage, M = men, L = limit, P = perMan, Pl = pl }, target) > 0) _scNeed++;
                             continue;
                         }
                         double sur = ClanIncomeBook.FamilyGoldOf(c) - reserve;

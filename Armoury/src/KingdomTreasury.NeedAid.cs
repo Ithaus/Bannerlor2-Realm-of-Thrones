@@ -217,6 +217,9 @@ namespace Armoury
                         else if (!ClanBudget.PartyCapOwn(c, out pc0)) { row.NoBudget++; continue; }   // Straz bez zoldu, najemnik, rod bez budzetu 166 (pierwsza doba sesji)
                         int limit, men; long wage;
                         if (!NaParties(c, out limit, out men, out wage)) { if (pl) _plWhy = "bez czynnej druzyny"; continue; }   // bez czynnej druzyny (niewola, brak dowodcy, rod rycerza 179)
+                        // recenzja 314c: zold krolewski tej doby (CrownWar314, krok przed W5) to gotowka rodu na tych samych ludzi - czesc wlasnego pulapu; jedna zasada
+                        // dla wszystkich krokow liczacych koszt - Pc0 (W5, W5b, W6, M1, W5c, plan W7)
+                        pc0 += CrownWar314.PaidToday(c);
                         var x = new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = men >= 20 && wage > 0 ? (double)wage / men : avgWage * CrownGifts.GoldWageShare(c), Pl = pl };   // WW-J: rod bez ludzi - srednia gry x czesc w zlocie
                         row.Cand++;
                         all.Add(x);
