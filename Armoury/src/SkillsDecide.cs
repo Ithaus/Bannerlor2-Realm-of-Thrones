@@ -132,20 +132,20 @@ namespace Armoury
                 }
 
                 var slots = new List<ItemObject>();
-                AddWeaponFor(slots, main, SkillFor(ch, main), capT);
+                AddWeaponFor(slots, main, SkillFor(ch, main), capT, ch.Culture);
                 // AMUNICJA WEDLE SKILLA (Jeff 02.09: "strzal t6 bandyci nie moga
                 // miec"): Prawo Tieru daje strzalom/beltom wymog Bow/Crossbow,
                 // wiec wzorzec amunicji dobieramy po skillu strzelca, nie po zerze
                 // (zero = "najlepsza w grze", stad t6 u kazdego lucznika)
-                if (main == "bow") { AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT); AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT); }
-                else if (main == "xbow") { AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT); AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT); }
-                else if (main == "thr") AddWeaponFor(slots, "thr", sThr, capT);   // drugi pek oszczepow
+                if (main == "bow") { AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT, ch.Culture); AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT, ch.Culture); }
+                else if (main == "xbow") { AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT, ch.Culture); AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT, ch.Culture); }
+                else if (main == "thr") AddWeaponFor(slots, "thr", sThr, capT, ch.Culture);   // drugi pek oszczepow
                 if (shield != null && main != "two" && main != "pole" && slots.Count < 4) slots.Add(shield);
                 if (second != null && slots.Count < 4)
                 {
-                    AddWeaponFor(slots, second, SkillFor(ch, second), capT);
-                    if (second == "bow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT);
-                    else if (second == "xbow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT);
+                    AddWeaponFor(slots, second, SkillFor(ch, second), capT, ch.Culture);
+                    if (second == "bow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT, ch.Culture);
+                    else if (second == "xbow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT, ch.Culture);
                 }
 
                 // KSIEGA MUSZTRY: reczne przypisania gracza maja pierwszenstwo
@@ -200,8 +200,8 @@ namespace Armoury
                     else if (it0.ItemType == ItemObject.ItemTypeEnum.Bolts) nBolts++;
                 }
                 int wantAmmo = anyPin ? 2 : 1;
-                for (int k = nArrows; hasBow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT);
-                for (int k = nBolts; hasXbow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT);
+                for (int k = nArrows; hasBow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT, ch.Culture);
+                for (int k = nBolts; hasXbow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT, ch.Culture);
                 // wolny slot po rozkazie: bron boczna wzorca (miecz lucznika), gdy zadnej nie ma
                 if (anyPin && second != null && slots.Contains(null))
                 {
@@ -213,7 +213,7 @@ namespace Armoury
                     if (!melee)
                     {
                         var tmp = new List<ItemObject>();
-                        AddWeaponFor(tmp, second, SkillFor(ch, second), capT);
+                        AddWeaponFor(tmp, second, SkillFor(ch, second), capT, ch.Culture);
                         int free = slots.IndexOf(null);
                         if (tmp.Count > 0 && tmp[0] != null && free >= 0) slots[free] = tmp[0];
                     }
@@ -304,7 +304,7 @@ namespace Armoury
             }
         }
 
-        private static void AddWeaponFor(List<ItemObject> slots, string cls, int skill, int maxTier = 0)
+        private static void AddWeaponFor(List<ItemObject> slots, string cls, int skill, int maxTier = 0, CultureObject cult = null)
         {
             ItemObject.ItemTypeEnum type;
             switch (cls)
@@ -316,7 +316,7 @@ namespace Armoury
                 case "xbow": type = ItemObject.ItemTypeEnum.Crossbow; break;
                 default: type = ItemObject.ItemTypeEnum.Thrown; break;
             }
-            AddPattern(slots, type, skill, maxTier);
+            AddPattern(slots, type, skill, maxTier, cult);
         }
 
         /// <summary>Najlepsza bron danego typu W RAMACH skilla - do podmian
@@ -328,13 +328,27 @@ namespace Armoury
             return tmp.Count > 0 ? tmp[0] : null;
         }
 
-        private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo, int skill, int maxTier = 0)
+        /// <summary>313a: to samo dla konkretnego zolnierza (tez bohatera) - przy Skills Decide Culture Pattern stary wzorzec, chyba ze to bron Dothrakow dla
+        /// kogos, komu jej nie wolno (SkillsDecide.DothBarred) - wtedy bron tego typu wedlug jego kultury; klucz wylaczony albo bez zolnierza - jak PatternFor(type,
+        /// skill). maxTier - sufit tieru jak w RearmBySkill (0 = bez; recenzja 313a: straz przy spawnie). Bez licznika przydzialow.</summary>
+        internal static ItemObject PatternFor(ItemObject.ItemTypeEnum type, int skill, CharacterObject who, int maxTier = 0)
+        {
+            return BestPattern(type, skill, maxTier, who != null ? who.Culture : null, false);
+        }
+
+        /// <summary>313a (recenzja): sufit tieru wzorca dla zolnierza - ten sam co w RearmBySkill (capT).</summary>
+        internal static int TierCap(CharacterObject ch)
+        {
+            return ch != null && CsMarks.TierGearApplied ? Math.Max(1, ch.Tier) : 0;
+        }
+
+        private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo, int skill, int maxTier = 0, CultureObject cult = null)
         {
             for (int i = 0; i < 4 && i < slots.Count; i++)
                 if (slots[i] == null)
                 {
                     var tmp = new List<ItemObject>();
-                    AddPattern(tmp, ammo, skill, maxTier);
+                    AddPattern(tmp, ammo, skill, maxTier, cult);
                     if (tmp.Count > 0) slots[i] = tmp[0];
                     return;
                 }
@@ -456,43 +470,148 @@ namespace Armoury
         /// <summary>Wzorzec klasy: najlepsza bron (Effectiveness), ktorej
         /// WYMAGANIA jednostka spelnia (Difficulty <= skill; kubelki co 25 pkt,
         /// zeby cache nie pecznial). Legendy poza wzorcami.</summary>
-        private static void AddPattern(List<ItemObject> slots, ItemObject.ItemTypeEnum type, int skill, int maxTier = 0)
+        private static void AddPattern(List<ItemObject> slots, ItemObject.ItemTypeEnum type, int skill, int maxTier = 0, CultureObject cult = null)
         {
             if (slots.Count >= 4) return;
+            var best = BestPattern(type, skill, maxTier, cult, true);
+            if (best != null) slots.Add(best);
+        }
+
+        // ================================================================ 313a (Jeff 01.11: "te arakhi wywal ... pozamieniaj im to ... daj dobre miecze buzdygany")
+        // ZRODLO ARAKHOW: wzorzec klasy (bez kultury) to najlepsza bron typu w CALYM swiecie w granicy umiejetnosci i tieru - dla OneHandedWeapon przy
+        // umiejetnosci od 70 i tierze 3 jest nim arakh (wymog 70, mocny, tani). RearmBySkill wklada wzorzec do referencji DTE Assignment, a DTE dla partii, ktorych
+        // nie obsluguje zbrojownia (bandy, karawany, wiesniacy, milicje, patrole - SpawnAgentPatch.IsPartyValidForProcessing false, RandomizeNonHeroLedAiPartiesArmor
+        // TAK u Jeffa) robi new Assignment(...) + FillEmptySlots, czyli bron = wzorzec wprost (log 01.11 15:21:50: clegane_footman i mallister_footman bandy looters
+        // z arakhem i tarcza wzorca - "tarcza z szablonu zostaje").
+        // Recenzja 313a: zmiana TYLKO tam, gdzie stary wzorzec jest bronia Dothrakow dla zolnierza, ktoremu jej nie wolno (DothBarred) - wtedy najlepsza bron tego
+        // samego typu bez broni Dothrakow, wedlug kultury zolnierza: (0) jego kultura albo bez kultury, (1) ta sama strona Waskiego Morza, (2) reszta; w poziomie
+        // najlepsza jak dotad (RangedRank.Key). Kazdy inny wzorzec (luki, kusze, strzaly, drzewce, wzorce Dothrakow, wzorce bez broni Dothrakow) - dokladnie stary
+        // wybor i stary klucz pamieci. Klucz wylaczony = jak przed 313a.
+        private static readonly object PatternLock = new object();
+
+        internal static bool CultOn { get { var s = Settings.Current; return s != null && s.SkillsDecideCulturePattern; } }
+
+        /// <summary>313a: czy zolnierz tej kultury NIE dostaje broni Dothrakow ze wzorca: nie-Dothrak; przy Gear Fit Dothraki Only kazdy (tez Essos - Wolne Miasta,
+        /// Ghis - jak regula sklepow i bitwy), przy wylaczonym tylko Westeros (opis klucza: "off = anyone from the Essos side may carry an arakh").</summary>
+        internal static bool DothBarred(string tc)
+        {
+            if (string.IsNullOrEmpty(tc) || GearFit.IsDoth(tc)) return false;
+            return GearFit.DothOn || !GearFit.IsEssos(tc);
+        }
+
+        /// <summary>Bron Dothrakow wedlug spisu (DothOnly); spis niegotowy (przed startem gry DothOnly daje false dla wszystkiego) - kazda bron kultury
+        /// Dothrakow (recenzja 313a p. 7: inaczej Assignment z OnGameLoaded DTE dostalby arakh w referencji).</summary>
+        internal static bool DothArm(ItemObject it, bool kinReady)
+        {
+            if (it == null) return false;
+            if (kinReady) return GearFit.DothOnly(it);
+            return it.Culture != null && GearFit.IsDoth(it.Culture.StringId);
+        }
+
+        /// <summary>313a: wzorce wedlug kultury od nowa (DothrakiArms.Reset; GearFit.SessionStart i Census - nowy spis broni Dothrakow). Stare klucze zostaja.</summary>
+        internal static void ResetCulturePatterns()
+        {
+            lock (PatternLock)
+            {
+                var drop = new List<string>();
+                foreach (var k in Pattern.Keys) if (k.IndexOf("|c=", StringComparison.Ordinal) >= 0) drop.Add(k);
+                foreach (var k in drop) Pattern.Remove(k);
+            }
+        }
+
+        private static int CultLevel(string tc, ItemObject it)
+        {
+            string ic = it.Culture != null ? it.Culture.StringId : null;
+            if (string.IsNullOrEmpty(ic) || ic == "neutral_culture" || string.IsNullOrEmpty(tc) || ic == tc) return 0;
+            return GearFit.IsEssos(ic) == GearFit.IsEssos(tc) ? 1 : 2;
+        }
+
+        /// <summary>Czy sztuka moze byc wzorcem (filtr jak dotad: umiejetnosc, sufit tieru, bez ognistej amunicji, legend, maczug olbrzymow, unikatow, smokow).</summary>
+        private static bool PatternCandidate(ItemObject it, ItemObject.ItemTypeEnum type, int skill, int maxTier)
+        {
+            if (it == null || it.ItemType != type || !it.HasWeaponComponent) return false;
+            if (it.Difficulty > skill) return false;                     // statystyki rzadza
+            if (maxTier > 0 && Recipes.Grade(it) > maxTier) return false; // przeglad 175: nie ponad tier jednostki (8b)
+            // OGNISTA AMUNICJA NIE JEST WZORCEM (Jeff 02.09: "lucznicy
+            // biegaja z plonacymi strzalami, daj im normalne strzaly
+            // ich tieru") - burning/flaming to specjal okretowy, nie
+            // kolczan piechoty; Effectiveness i tak ja faworyzuje
+            if ((type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts)
+                && it.StringId != null
+                && (it.StringId.IndexOf("burning", StringComparison.OrdinalIgnoreCase) >= 0
+                    || it.StringId.IndexOf("flaming", StringComparison.OrdinalIgnoreCase) >= 0)) return false;
+            if (LegendaryLaw.IsLegend(it)) return false;                 // legendy nie sa wzorcem
+            if (GiantGear.Is(it)) return false;                          // maczugi olbrzymow tez nie (Jeff 14.09)
+            if (it.NotMerchandise) return false;                         // unikaty imienne i itemy testowe
+            if (it.StringId != null && it.StringId.StartsWith("dragon_")) return false;
+            return true;
+        }
+
+        /// <summary>Wzorzec klasy (pamiec na klucz). Najpierw stary wybor (stary klucz, bez zmian). Gdy klucz 313a czynny, zolnierz ma kulture z zakazem broni
+        /// Dothrakow (DothBarred), a stary wzorzec jest bronia Dothrakow - zamiennik tego samego typu wedlug kultury (opis wyzej), klucz "|c=kultura". count - licznik
+        /// przydzialow z poprawionym wzorcem (RearmBySkill) do linii "Arakhy (313a)". Spis broni Dothrakow niegotowy - zamiennik bez zapisu w pamieci.
+        /// Pamiec pod zamkiem (ctor Assignment bywa na watku DTE).</summary>
+        internal static ItemObject BestPattern(ItemObject.ItemTypeEnum type, int skill, int maxTier, CultureObject cult, bool count)
+        {
             if (skill < 0) skill = 0;
             string key = type + "|" + skill + "|" + maxTier;   // prog dokladny, jak przy pancerzu; przeglad 175: sufit tieru (0 = bez)
-            ItemObject best;
-            if (!Pattern.TryGetValue(key, out best))
+            ItemObject old;
+            bool hit;
+            lock (PatternLock) hit = Pattern.TryGetValue(key, out old);
+            if (!hit)
             {
                 bool ok = true;
+                old = null;
                 try
                 {
                     var all = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
                     foreach (var it in all)
                     {
-                        if (it == null || it.ItemType != type || !it.HasWeaponComponent) continue;
-                        if (it.Difficulty > skill) continue;                     // statystyki rzadza
-                        if (maxTier > 0 && Recipes.Grade(it) > maxTier) continue; // przeglad 175: nie ponad tier jednostki (8b)
-                        // OGNISTA AMUNICJA NIE JEST WZORCEM (Jeff 02.09: "lucznicy
-                        // biegaja z plonacymi strzalami, daj im normalne strzaly
-                        // ich tieru") - burning/flaming to specjal okretowy, nie
-                        // kolczan piechoty; Effectiveness i tak ja faworyzuje
-                        if ((type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts)
-                            && it.StringId != null
-                            && (it.StringId.IndexOf("burning", StringComparison.OrdinalIgnoreCase) >= 0
-                                || it.StringId.IndexOf("flaming", StringComparison.OrdinalIgnoreCase) >= 0)) continue;
-                        if (LegendaryLaw.IsLegend(it)) continue;                 // legendy nie sa wzorcem
-                        if (GiantGear.Is(it)) continue;                          // maczugi olbrzymow tez nie (Jeff 14.09)
-                        if (it.NotMerchandise) continue;                         // unikaty imienne i itemy testowe
-                        if (it.StringId != null && it.StringId.StartsWith("dragon_")) continue;
+                        if (!PatternCandidate(it, type, skill, maxTier)) continue;
                         // 16.09: luki/kusze wg RangedRank (pod RBM naciag), reszta jak dawniej
-                        if (best == null || RangedRank.Key(it) > RangedRank.Key(best)) best = it;
+                        if (old == null || RangedRank.Key(it) > RangedRank.Key(old)) old = it;
                     }
                 }
                 catch (Exception e) { ok = false; Log.Error("SkillsDecide.AddPattern", e); }
-                if (ok) Pattern[key] = best;
+                if (ok) lock (PatternLock) Pattern[key] = old;
             }
-            if (best != null) slots.Add(best);
+            if (old == null || cult == null || !CultOn) return old;
+            string tc = cult.StringId;
+            if (!DothBarred(tc)) return old;                     // Dothrakowie (i Essos przy wylaczonym Gear Fit Dothraki Only) - bez zmian
+            bool kinReady = GearFit.KinReady;
+            if (!DothArm(old, kinReady)) return old;             // stary wzorzec nie jest bronia Dothrakow - bez zmian
+            string ckey = key + "|c=" + tc;
+            ItemObject best;
+            lock (PatternLock) hit = Pattern.TryGetValue(ckey, out best);
+            if (!hit)
+            {
+                bool ok = true;
+                var lv = new ItemObject[3];
+                try
+                {
+                    var all = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
+                    foreach (var it in all)
+                    {
+                        if (!PatternCandidate(it, type, skill, maxTier)) continue;
+                        if (DothArm(it, kinReady)) continue;     // 313a: bron Dothrakow nigdy dla takiego zolnierza
+                        int l = CultLevel(tc, it);
+                        if (lv[l] == null || RangedRank.Key(it) > RangedRank.Key(lv[l])) lv[l] = it;
+                    }
+                }
+                catch (Exception e) { ok = false; Log.Error("SkillsDecide.AddPattern", e); }
+                best = null;
+                int level = 3;
+                for (int l = 0; l < 3 && best == null; l++) if (lv[l] != null) { best = lv[l]; level = l; }
+                if (ok && kinReady)
+                {
+                    bool fresh;
+                    lock (PatternLock) { fresh = !Pattern.ContainsKey(ckey); Pattern[ckey] = best; }
+                    if (fresh) DothrakiArms.NotePatternKey(level, true, true);
+                }
+            }
+            // brak innej broni tego typu w granicy umiejetnosci - pusty slot zamiast broni Dothrakow (DTE FillEmptySlots zostawia go pustym)
+            if (count) DothrakiArms.NotePatternFixed();
+            return best;
         }
     }
 }

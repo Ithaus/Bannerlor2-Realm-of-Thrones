@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -61,6 +62,126 @@ namespace Armoury
             _bands = _toPack = _sold = _soldGold = _packLeft = _packBands = _stum = _stumAll = 0;
             _err = false;
             _cenDay = int.MinValue;
+            // 313a
+            _aFix = _aFixS = _aKeys = _aK0 = _aK1 = _aK2 = _aKn = _aKSkip = _aKFix = 0;
+            _aSwap = _aSwapS = _aLeft = _aLeftS = _aMis = _aMisS = _aMisNo = _aMisNoS = _aStum = _aStumS = 0;
+            _aErr = false;
+            try { SkillsDecide.ResetCulturePatterns(); } catch (Exception e) { Note313Stumble("ResetCulturePatterns", e); }
+        }
+
+        // ================================================================ 313a (Jeff 01.11: "czemu tyle wojska biega z arakhami, pozamieniaj im to i wywal arakhi z Westeros")
+        // ZRODLO (rozpoznanie 313a): SkillsDecide.RearmBySkill (postfiks ctora DTE Assignment) - wzorzec broni bez kultury = najlepsza bron klasy w swiecie, przy
+        // umiejetnosci od 70 i tierze 3 arakh; partie bez zbrojowni DTE (bandy, karawany, wiesniacy, milicje, patrole) dostaja bron WPROST ze wzorca (DTE
+        // SpawnAgentPatch: RandomizeNonHeroLedAiPartiesArmor -> new Assignment + FillEmptySlots). Naprawa: wzorzec wedlug kultury (SkillsDecide.BestPattern) i straz
+        // przy spawnie (DragonUnmount -> SpawnGuard nizej). Liczniki do linii "Arakhy (313a): dzien N"; wzorce i przydzialy bywaja na watku DTE - Interlocked.
+        private static int _aFix, _aFixS;                    // przydzialy (RearmBySkill) z wzorcem poprawionym: stara regula dalaby bron Dothrakow
+        private static int _aKeys, _aK0, _aK1, _aK2, _aKn, _aKSkip, _aKFix;   // nowe klucze wzorca kultury (od ostatniej linii): poziom 0/1/2, bez broni, z pominieta bronia Dothrakow, poprawione
+        private static int _aSwap, _aSwapS, _aLeft, _aLeftS;   // straz przy spawnie: wymienione, bez zamiennika zostawione
+        private static int _aMis, _aMisS, _aMisNo, _aMisNoS;   // pomiar w bitwie gracza (po strazach): bron Dothrakow u nie-Dothrakow, z tego partie bez zbrojowni DTE
+        private static int _aStum, _aStumS;
+        private static bool _aErr;
+
+        internal static void NotePatternFixed() { Interlocked.Increment(ref _aFix); Interlocked.Increment(ref _aFixS); }
+
+        internal static void NotePatternKey(int level, bool skippedDoth, bool fixedDoth)
+        {
+            Interlocked.Increment(ref _aKeys);
+            if (level == 0) Interlocked.Increment(ref _aK0);
+            else if (level == 1) Interlocked.Increment(ref _aK1);
+            else if (level == 2) Interlocked.Increment(ref _aK2);
+            else Interlocked.Increment(ref _aKn);
+            if (skippedDoth) Interlocked.Increment(ref _aKSkip);
+            if (fixedDoth) Interlocked.Increment(ref _aKFix);
+        }
+
+        internal static void NoteMissionCarrier(bool noStores)
+        {
+            Interlocked.Increment(ref _aMis); Interlocked.Increment(ref _aMisS);
+            if (noStores) { Interlocked.Increment(ref _aMisNo); Interlocked.Increment(ref _aMisNoS); }
+        }
+
+        internal static void Note313Stumble(string where, Exception e)
+        {
+            Interlocked.Increment(ref _aStum); Interlocked.Increment(ref _aStumS);
+            if (!_aErr) { _aErr = true; try { Log.Error("DothrakiArms313a." + where, e); } catch { } }
+        }
+
+        /// <summary>Partia, ktorej DTE nie obsluguje zbrojownia (lustro DTE SpawnAgentPatch.IsPartyValidForProcessing: karawana, wiesniacy, milicja, banda, patrol) -
+        /// jej ludzie walcza wzorcem (RandomizeNonHeroLed) albo zestawem gry, sprzet nie schodzi ze zbrojowni i do niej nie wraca.</summary>
+        internal static bool NoStores(MobileParty mp)
+        {
+            return mp != null && (mp.IsCaravan || mp.IsVillager || mp.IsMilitia || mp.IsBandit || mp.IsPatrolParty);
+        }
+
+        /// <summary>Recenzja 313a p. 4: dokladne lustro DTE IsPartyValidForProcessing (dte_all311.cs:7201-7219) po pochodzeniu agenta - partia z PartyAgentOrigin,
+        /// PartyGroupAgentOrigin albo SimpleAgentOrigin; brak partii, partia niewazna albo bez MobileParty = tez bez zbrojowni (DTE losuje wtedy wzorzec).</summary>
+        internal static bool NoStoresOrigin(IAgentOriginBase origin)
+        {
+            if (origin == null) return false;   // DTE wychodzi wtedy z prefiksu przed wzorcem (AgentOrigin == null)
+            PartyBase pb = null;
+            var po = origin as PartyAgentOrigin;
+            if (po != null) pb = po.Party;
+            else
+            {
+                var pg = origin as PartyGroupAgentOrigin;
+                if (pg != null) pb = pg.Party;
+                else { var so = origin as SimpleAgentOrigin; if (so != null) pb = so.Party; }
+            }
+            if (pb == null || !pb.IsValid || pb.MobileParty == null) return true;
+            return NoStores(pb.MobileParty);
+        }
+
+        /// <summary>313a (c): STRAZ PRZY SPAWNIE (DragonUnmount.StripDragonMount, prefiks Mission.SpawnAgent po DTE): szeregowy nie-Dothrak partii bez zbrojowni DTE
+        /// z bronia Dothrakow w slotach 0-3 (SkillsDecide.DothArm; kto: SkillsDecide.DothBarred - ta sama regula co wzorzec) dostaje bron tego samego typu wedlug kultury
+        /// (SkillsDecide.PatternFor z zolnierzem - w granicy umiejetnosci, bez broni Dothrakow). Tylko tam: sprzet tych partii jest zestawem z niczego (wzorzec
+        /// albo zestaw gry) - nie schodzi ze zbrojowni i do niej nie wraca, wiec zamiana sztuki na sztuke nie tworzy niczego w gospodarce (lup z ciala to jak
+        /// dotad sztuka, ktora czlowiek ma). Partie ze zbrojownia DTE pilnuje RealmWard (zamiennik z ich polki) - tu tylko pomiar. Brak zamiennika - zostaje (licznik).</summary>
+        internal static void SpawnGuard(AgentBuildData abd, CharacterObject soldier, Equipment eq)
+        {
+            if (abd == null || soldier == null || eq == null || soldier.IsHero || !SkillsDecide.CultOn) return;
+            try
+            {
+                string tc = soldier.Culture != null ? soldier.Culture.StringId : null;
+                if (!SkillsDecide.DothBarred(tc)) return;   // recenzja 313a p. 6: ta sama regula co wzorzec (Dothrakowie nietknieci; Essos wedlug Gear Fit Dothraki Only)
+                if (!NoStoresOrigin(abd.AgentOrigin)) return;   // recenzja 313a p. 4: lustro DTE po pochodzeniu
+                bool kinReady = GearFit.KinReady;
+                int capT = SkillsDecide.TierCap(soldier);   // recenzja 313a p. 3: sufit tieru jak RearmBySkill - zamiennik nie lepszy od zolnierza (lup bez zysku z niczego)
+                for (int slot = 0; slot < 4; slot++)
+                {
+                    var it = eq[(EquipmentIndex)slot].Item;
+                    if (it == null || !SkillsDecide.DothArm(it, kinReady)) continue;
+                    var sk = ItemReq.SkillFor(it);
+                    int skv = sk != null ? soldier.GetSkillValue(sk) : 0;
+                    var repl = SkillsDecide.PatternFor(it.ItemType, skv, soldier, capT);
+                    if (repl != null && repl != it && !SkillsDecide.DothArm(repl, kinReady))
+                    {
+                        eq[(EquipmentIndex)slot] = new EquipmentElement(repl);
+                        Interlocked.Increment(ref _aSwap); Interlocked.Increment(ref _aSwapS);
+                    }
+                    else { Interlocked.Increment(ref _aLeft); Interlocked.Increment(ref _aLeftS); }
+                }
+            }
+            catch (Exception e) { Note313Stumble("SpawnGuard", e); }
+        }
+
+        /// <summary>Linia doby "Arakhy (313a): dzien N" (z Daily, po linii "Bron Dothrakow"): liczniki od ostatniej linii i od startu sesji, potem zero dobowych.</summary>
+        private static void Line313(int day)
+        {
+            var s = Settings.Current;
+            bool on = SkillsDecide.CultOn, doth = s != null && s.GearFitDothrakiOnly;
+            int fix = Interlocked.Exchange(ref _aFix, 0), keys = Interlocked.Exchange(ref _aKeys, 0), k0 = Interlocked.Exchange(ref _aK0, 0), k1 = Interlocked.Exchange(ref _aK1, 0),
+                k2 = Interlocked.Exchange(ref _aK2, 0), kn = Interlocked.Exchange(ref _aKn, 0), ksk = Interlocked.Exchange(ref _aKSkip, 0), kfx = Interlocked.Exchange(ref _aKFix, 0),
+                sw = Interlocked.Exchange(ref _aSwap, 0), lf = Interlocked.Exchange(ref _aLeft, 0), mi = Interlocked.Exchange(ref _aMis, 0), mno = Interlocked.Exchange(ref _aMisNo, 0),
+                st = Interlocked.Exchange(ref _aStum, 0);
+            Log.Info("Arakhy (313a): dzien " + day + " | Skills Decide Culture Pattern " + Yes(on) + ", Gear Fit Dothraki Only " + Yes(doth)
+                     + " | zrodlo: wzorzec broni SkillsDecide (postfiks ctora DTE Assignment; dotad bez kultury - najlepsza bron klasy w swiecie, przy umiejetnosci od 70 i tierze 3 arakh)"
+                     + " - partie bez zbrojowni DTE (bandy, karawany, wiesniacy, milicje, patrole: DTE RandomizeNonHeroLed daje im bron wprost ze wzorca)"
+                     + " | wzorce: przydzialow z wzorcem poprawionym (stara regula dalaby bron Dothrakow) dzis " + fix + " (sesja " + _aFixS + "), nowych kluczy wzorca " + keys
+                     + " (wlasna kultura " + k0 + ", ta sama strona morza " + k1 + ", inna " + k2 + ", bez broni " + kn + "; z pominieta bronia Dothrakow " + ksk + ", poprawionych " + kfx + ")"
+                     + " | straz przy spawnie (partie bez zbrojowni DTE): wymienione dzis " + sw + " (sesja " + _aSwapS + "), bez zamiennika zostawione dzis " + lf + " (sesja " + _aLeftS + ")"
+                     + " | bitwy gracza (pomiar, Dothraki Arms Census Log " + Yes(CensusOn) + "): bron Dothrakow u nie-Dothrakow po strazach dzis " + mi + " (sesja " + _aMisS + ")"
+                     + ", w partiach bez zbrojowni DTE dzis " + mno + " (sesja " + _aMisNoS + "; ma byc 0)"
+                     + " | potkniecia dzis " + st + " (sesja " + _aStumS + ").");
         }
 
         internal static void NoteFloorLastResort() { Interlocked.Increment(ref _floor); }
@@ -200,7 +321,12 @@ namespace Armoury
                          + "; potkniecia " + _stum + " (sesja " + _stumAll + ").");
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { _bands = _toPack = _sold = _soldGold = _packLeft = _packBands = _stum = 0; }
+            finally
+            {
+                _bands = _toPack = _sold = _soldGold = _packLeft = _packBands = _stum = 0;
+                // 313a: linia "Arakhy (313a)" zawsze (takze przy wylaczonych kluczach - recenzja 313a p. 5: dotad return wyzej ja pomijal)
+                try { Line313(day); } catch (Exception e) { Note313Stumble("Line313", e); }
+            }
         }
 
         // ================================================================ POMIAR (recenzja n20-drobne): kto nosi bron Dothrakow i ilu Dothrakow jest w Westeros
@@ -430,7 +556,7 @@ namespace Armoury
                 if (es) _essos++; else _west++;
                 bool doth = co.Culture != null && GearFit.IsDoth(co.Culture.StringId);
                 if (doth) { _doth++; if (kd == 0 && !es) _dothWestBand++; }
-                else _other++;
+                else { _other++; DothrakiArms.NoteMissionCarrier(DothrakiArms.NoStoresOrigin(agent.Origin)); }   // 313a: do linii "Arakhy (313a)"
                 string key = co.StringId + " (" + (co.Culture != null ? co.Culture.StringId : "-") + ", " + DothrakiArms.KindName[kd] + " " + DothrakiArms.PartyCulture(mp)
                              + ", " + (es ? "Essos" : "Westeros") + ", " + (si == 0 ? "Twoi" : (si == 1 ? "sojusznik" : "wrog")) + ")";
                 int n;

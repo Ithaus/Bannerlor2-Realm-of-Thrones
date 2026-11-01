@@ -80,7 +80,7 @@ namespace Armoury
                 if (GiantGear.Is(it) && !GiantGear.MayWear(soldier))
                 {
                     int gs = it.RelevantSkill != null ? soldier.GetSkillValue(it.RelevantSkill) : 0;
-                    repl = SkillsDecide.PatternFor(it.ItemType, gs);
+                    repl = SkillsDecide.PatternFor(it.ItemType, gs, soldier);   // 313a: wedlug kultury zolnierza (klucz wylaczony - jak dotad)
                     return StripGiant;
                 }
                 if (LegendaryLaw.IsLegend(it))
@@ -90,7 +90,7 @@ namespace Armoury
                     {
                         var rsk = ItemReq.SkillFor(it);
                         int skl = rsk != null ? soldier.GetSkillValue(rsk) : 0;
-                        repl = SkillsDecide.PatternFor(it.ItemType, skl);
+                        repl = SkillsDecide.PatternFor(it.ItemType, skl, soldier);   // 313a
                     }
                     return StripLegend;
                 }
@@ -98,7 +98,7 @@ namespace Armoury
                 if (ItemReq.Meets(soldier, it, out whyNot)) return Keeps;
                 var rsk2 = ItemReq.SkillFor(it);
                 int sk = rsk2 != null ? soldier.GetSkillValue(rsk2) : 0;
-                repl = SkillsDecide.PatternFor(it.ItemType, sk);
+                repl = SkillsDecide.PatternFor(it.ItemType, sk, soldier);   // 313a: bez arakhu u nie-Dothraka (klucz Skills Decide Culture Pattern)
                 return repl != null ? StripSkill : StayHeavy;
             }
             if (slot >= 5 && slot <= 9)
@@ -144,6 +144,8 @@ namespace Armoury
                     var soldier = agentBuildData.AgentData.AgentCharacter as TaleWorlds.CampaignSystem.CharacterObject;
                     if (soldier != null && !soldier.IsHero)
                     {
+                        // 313a (c): bron Dothrakow u nie-Dothraka partii bez zbrojowni DTE (bandy, karawany, milicje...) - bron tego samego typu wedlug kultury
+                        DothrakiArms.SpawnGuard(agentBuildData, soldier, eq);
                         // 133c (K3): decyzja "zostaje / schodzi i czym zastapic" w jednej funkcji WouldStrip (ta sama dla bitwy i podgladu okna armii - KitPreview);
                         // tu tylko zapis slotu i linie logu - jak dotad
                         for (int slot = 0; slot < 4; slot++)
@@ -284,7 +286,7 @@ namespace Armoury
                                     else
                                     {
                                         var rsk0 = ItemReq.SkillFor(it);
-                                        best = SkillsDecide.PatternFor(it.ItemType, rsk0 != null ? soldier.GetSkillValue(rsk0) : 0);
+                                        best = SkillsDecide.PatternFor(it.ItemType, rsk0 != null ? soldier.GetSkillValue(rsk0) : 0, soldier);   // recenzja 313a: bez broni Dothrakow u nie-Dothraka
                                     }
                                     if (best != null)
                                     {
@@ -334,7 +336,7 @@ namespace Armoury
                             var w = eq[(EquipmentIndex)slot].Item;
                             if (!GiantGear.Is(w) || GiantGear.MayWear(soldier)) continue;
                             int gs = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
-                            var gswap = SkillsDecide.PatternFor(w.ItemType, gs);
+                            var gswap = SkillsDecide.PatternFor(w.ItemType, gs, soldier);   // recenzja 313a
                             eq[(EquipmentIndex)slot] = gswap != null ? new EquipmentElement(gswap) : new EquipmentElement(null);
                             if (_floorLog++ < 20)
                                 Log.Info("GiantGear: " + w.StringId + " zdjety z bohatera " + soldier.StringId
@@ -362,7 +364,7 @@ namespace Armoury
                             if (ItemReq.Meets(soldier, w, out whyNot)) continue;
                             var rsk = ItemReq.SkillFor(w);
                             int sk = rsk != null ? soldier.GetSkillValue(rsk) : 0;
-                            var swap = SkillsDecide.PatternFor(w.ItemType, sk);
+                            var swap = SkillsDecide.PatternFor(w.ItemType, sk, soldier);   // recenzja 313a: lord Westeros nie dostaje arakhu jako zamiennika
                             if (swap == null) continue;
                             eq[(EquipmentIndex)slot] = new EquipmentElement(swap);
                             // m111-walka (24.10): w turnieju bez limitu 20 linii - lista broni wydanych rycerzom (dotad 4 linie na caly turniej KP)

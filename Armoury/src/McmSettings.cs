@@ -6356,6 +6356,10 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitKinItemLevel { get; set; } = true;
 
+        [SettingPropertyBool("Skills Decide Culture Pattern", HintText = "where the weapon a soldier is matched to by his skills would be an arakh or another Dothraki-only weapon and he is not Dothraki, he gets the best weapon of the same kind without it, of his own people first, then of his side of the Narrow Sea - good swords, maces and axes; bands, caravans, militia and villagers, who carry that pattern outright, no longer run about with arakhs, such a man who still turns up in battle with one gets a weapon of the same kind and no better tier instead, and lords who cannot wield their blade are not handed one; Dothraki and every other weapon choice stay as they were, and with Gear Fit Dothraki Only off men of the Essos side may still get one (off = as before: the best weapon of its class in the whole world, often an arakh)", RequireRestart = false)]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool SkillsDecideCulturePattern { get; set; } = true;
+
         [SettingPropertyBool("Gear Fit Dothraki Only", HintText = "the arakh and the other Dothraki weapons no other people's troops carry in Realm of Thrones are for Dothraki soldiers only: Free Cities, Ghis, Yi Ti and every army of Westeros no longer buy or wear them, battle takes them off such men and gives them a weapon from the stores instead, and a bare-handed man gets one only when the stores hold no other weapon he can wield; lords, wanderers and named items are not touched (off = as before: anyone from the Essos side may carry an arakh)", RequireRestart = false)]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitDothrakiOnly { get; set; } = true;
@@ -12532,6 +12536,7 @@ namespace Armoury
             s.GearFitKits = GearFitKits;
             s.GearFitCulture = GearFitCulture;
             s.GearFitKinItemLevel = GearFitKinItemLevel;
+            s.SkillsDecideCulturePattern = SkillsDecideCulturePattern;
             s.GearFitDothrakiOnly = GearFitDothrakiOnly;
             s.DothrakiArmsCensusLog = DothrakiArmsCensusLog;
             s.GearFitWeaponFloor = GearFitWeaponFloor;
