@@ -6356,7 +6356,7 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitKinItemLevel { get; set; } = true;
 
-        [SettingPropertyBool("Skills Decide Culture Pattern", HintText = "the weapons a soldier is matched to by his skills come from his own people first, then from his side of the Narrow Sea - never an arakh or other Dothraki-only weapon for a man who is not Dothraki; bands, caravans, militia and villagers, who carry that pattern outright, now get good swords, maces and axes of their own land, and such a man who still turns up in battle with a Dothraki weapon gets one of the same kind from his people instead (off = as before: the best weapon of its class in the whole world, often an arakh)", RequireRestart = false)]
+        [SettingPropertyBool("Skills Decide Culture Pattern", HintText = "where the weapon a soldier is matched to by his skills would be an arakh or another Dothraki-only weapon and he is not Dothraki, he gets the best weapon of the same kind without it, of his own people first, then of his side of the Narrow Sea - good swords, maces and axes; bands, caravans, militia and villagers, who carry that pattern outright, no longer run about with arakhs, such a man who still turns up in battle with one gets a weapon of the same kind and no better tier instead, and lords who cannot wield their blade are not handed one; Dothraki and every other weapon choice stay as they were, and with Gear Fit Dothraki Only off men of the Essos side may still get one (off = as before: the best weapon of its class in the whole world, often an arakh)", RequireRestart = false)]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool SkillsDecideCulturePattern { get; set; } = true;
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -112,27 +113,47 @@ namespace Armoury
             return mp != null && (mp.IsCaravan || mp.IsVillager || mp.IsMilitia || mp.IsBandit || mp.IsPatrolParty);
         }
 
+        /// <summary>Recenzja 313a p. 4: dokladne lustro DTE IsPartyValidForProcessing (dte_all311.cs:7201-7219) po pochodzeniu agenta - partia z PartyAgentOrigin,
+        /// PartyGroupAgentOrigin albo SimpleAgentOrigin; brak partii, partia niewazna albo bez MobileParty = tez bez zbrojowni (DTE losuje wtedy wzorzec).</summary>
+        internal static bool NoStoresOrigin(IAgentOriginBase origin)
+        {
+            if (origin == null) return false;   // DTE wychodzi wtedy z prefiksu przed wzorcem (AgentOrigin == null)
+            PartyBase pb = null;
+            var po = origin as PartyAgentOrigin;
+            if (po != null) pb = po.Party;
+            else
+            {
+                var pg = origin as PartyGroupAgentOrigin;
+                if (pg != null) pb = pg.Party;
+                else { var so = origin as SimpleAgentOrigin; if (so != null) pb = so.Party; }
+            }
+            if (pb == null || !pb.IsValid || pb.MobileParty == null) return true;
+            return NoStores(pb.MobileParty);
+        }
+
         /// <summary>313a (c): STRAZ PRZY SPAWNIE (DragonUnmount.StripDragonMount, prefiks Mission.SpawnAgent po DTE): szeregowy nie-Dothrak partii bez zbrojowni DTE
-        /// z bronia Dothrakow w slotach 0-3 (GearFit.DothBar - klucz Gear Fit Dothraki Only, poza wlasnym wzorcem) dostaje bron tego samego typu wedlug kultury
+        /// z bronia Dothrakow w slotach 0-3 (SkillsDecide.DothArm; kto: SkillsDecide.DothBarred - ta sama regula co wzorzec) dostaje bron tego samego typu wedlug kultury
         /// (SkillsDecide.PatternFor z zolnierzem - w granicy umiejetnosci, bez broni Dothrakow). Tylko tam: sprzet tych partii jest zestawem z niczego (wzorzec
         /// albo zestaw gry) - nie schodzi ze zbrojowni i do niej nie wraca, wiec zamiana sztuki na sztuke nie tworzy niczego w gospodarce (lup z ciala to jak
         /// dotad sztuka, ktora czlowiek ma). Partie ze zbrojownia DTE pilnuje RealmWard (zamiennik z ich polki) - tu tylko pomiar. Brak zamiennika - zostaje (licznik).</summary>
         internal static void SpawnGuard(AgentBuildData abd, CharacterObject soldier, Equipment eq)
         {
-            if (abd == null || soldier == null || eq == null || soldier.IsHero || !SkillsDecide.CultOn || !GearFit.DothOn) return;
+            if (abd == null || soldier == null || eq == null || soldier.IsHero || !SkillsDecide.CultOn) return;
             try
             {
-                MobileParty mp = null;
-                try { var pb = abd.AgentOrigin != null ? abd.AgentOrigin.BattleCombatant as PartyBase : null; mp = pb != null ? pb.MobileParty : null; } catch { mp = null; }
-                if (!NoStores(mp)) return;
+                string tc = soldier.Culture != null ? soldier.Culture.StringId : null;
+                if (!SkillsDecide.DothBarred(tc)) return;   // recenzja 313a p. 6: ta sama regula co wzorzec (Dothrakowie nietknieci; Essos wedlug Gear Fit Dothraki Only)
+                if (!NoStoresOrigin(abd.AgentOrigin)) return;   // recenzja 313a p. 4: lustro DTE po pochodzeniu
+                bool kinReady = GearFit.KinReady;
+                int capT = SkillsDecide.TierCap(soldier);   // recenzja 313a p. 3: sufit tieru jak RearmBySkill - zamiennik nie lepszy od zolnierza (lup bez zysku z niczego)
                 for (int slot = 0; slot < 4; slot++)
                 {
                     var it = eq[(EquipmentIndex)slot].Item;
-                    if (it == null || !GearFit.DothBar(soldier, it)) continue;
+                    if (it == null || !SkillsDecide.DothArm(it, kinReady)) continue;
                     var sk = ItemReq.SkillFor(it);
                     int skv = sk != null ? soldier.GetSkillValue(sk) : 0;
-                    var repl = SkillsDecide.PatternFor(it.ItemType, skv, soldier);
-                    if (repl != null && repl != it && !GearFit.DothOnly(repl))
+                    var repl = SkillsDecide.PatternFor(it.ItemType, skv, soldier, capT);
+                    if (repl != null && repl != it && !SkillsDecide.DothArm(repl, kinReady))
                     {
                         eq[(EquipmentIndex)slot] = new EquipmentElement(repl);
                         Interlocked.Increment(ref _aSwap); Interlocked.Increment(ref _aSwapS);
@@ -300,8 +321,12 @@ namespace Armoury
                          + "; potkniecia " + _stum + " (sesja " + _stumAll + ").");
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { _bands = _toPack = _sold = _soldGold = _packLeft = _packBands = _stum = 0; }
-            try { Line313(day); } catch (Exception e) { Note313Stumble("Line313", e); }   // 313a: linia "Arakhy (313a)" zawsze (takze przy wylaczonych kluczach)
+            finally
+            {
+                _bands = _toPack = _sold = _soldGold = _packLeft = _packBands = _stum = 0;
+                // 313a: linia "Arakhy (313a)" zawsze (takze przy wylaczonych kluczach - recenzja 313a p. 5: dotad return wyzej ja pomijal)
+                try { Line313(day); } catch (Exception e) { Note313Stumble("Line313", e); }
+            }
         }
 
         // ================================================================ POMIAR (recenzja n20-drobne): kto nosi bron Dothrakow i ilu Dothrakow jest w Westeros
@@ -531,7 +556,7 @@ namespace Armoury
                 if (es) _essos++; else _west++;
                 bool doth = co.Culture != null && GearFit.IsDoth(co.Culture.StringId);
                 if (doth) { _doth++; if (kd == 0 && !es) _dothWestBand++; }
-                else { _other++; DothrakiArms.NoteMissionCarrier(DothrakiArms.NoStores(mp)); }   // 313a: do linii "Arakhy (313a)"
+                else { _other++; DothrakiArms.NoteMissionCarrier(DothrakiArms.NoStoresOrigin(agent.Origin)); }   // 313a: do linii "Arakhy (313a)"
                 string key = co.StringId + " (" + (co.Culture != null ? co.Culture.StringId : "-") + ", " + DothrakiArms.KindName[kd] + " " + DothrakiArms.PartyCulture(mp)
                              + ", " + (es ? "Essos" : "Westeros") + ", " + (si == 0 ? "Twoi" : (si == 1 ? "sojusznik" : "wrog")) + ")";
                 int n;

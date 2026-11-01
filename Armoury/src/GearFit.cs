@@ -151,6 +151,7 @@ namespace Armoury
         internal static void SessionStart()
         {
             lock (_lock) { _tpl.Clear(); _kin = null; _kinTop.Clear(); }
+            SkillsDecide.ResetCulturePatterns();   // recenzja 313a: zamienniki wzorca wedlug nowego spisu broni Dothrakow
             _live = true;
         }
 
@@ -928,6 +929,7 @@ namespace Armoury
                 bool started = false;
                 try { started = Campaign.Current != null && Campaign.Current.GameStarted; } catch { }
                 if (started) lock (_lock) BuildKin();
+                SkillsDecide.ResetCulturePatterns();   // recenzja 313a: spis broni Dothrakow od nowa - zamienniki wzorca tez
                 foreach (var c in MBObjectManager.Instance.GetObjectTypeList<CharacterObject>())
                 {
                     if (!Troop(c)) continue;

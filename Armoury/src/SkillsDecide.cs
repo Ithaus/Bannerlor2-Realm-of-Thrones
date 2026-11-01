@@ -328,11 +328,18 @@ namespace Armoury
             return tmp.Count > 0 ? tmp[0] : null;
         }
 
-        /// <summary>313a: to samo dla konkretnego zolnierza - przy Skills Decide Culture Pattern wzorzec wedlug jego kultury (bez broni Dothrakow u nie-Dothraka);
-        /// klucz wylaczony albo bez zolnierza - jak PatternFor(type, skill). Bez licznika przydzialow (zamienniki DragonUnmount, podglad okna armii).</summary>
-        internal static ItemObject PatternFor(ItemObject.ItemTypeEnum type, int skill, CharacterObject who)
+        /// <summary>313a: to samo dla konkretnego zolnierza (tez bohatera) - przy Skills Decide Culture Pattern stary wzorzec, chyba ze to bron Dothrakow dla
+        /// kogos, komu jej nie wolno (SkillsDecide.DothBarred) - wtedy bron tego typu wedlug jego kultury; klucz wylaczony albo bez zolnierza - jak PatternFor(type,
+        /// skill). maxTier - sufit tieru jak w RearmBySkill (0 = bez; recenzja 313a: straz przy spawnie). Bez licznika przydzialow.</summary>
+        internal static ItemObject PatternFor(ItemObject.ItemTypeEnum type, int skill, CharacterObject who, int maxTier = 0)
         {
-            return BestPattern(type, skill, 0, who != null ? who.Culture : null, false);
+            return BestPattern(type, skill, maxTier, who != null ? who.Culture : null, false);
+        }
+
+        /// <summary>313a (recenzja): sufit tieru wzorca dla zolnierza - ten sam co w RearmBySkill (capT).</summary>
+        internal static int TierCap(CharacterObject ch)
+        {
+            return ch != null && CsMarks.TierGearApplied ? Math.Max(1, ch.Tier) : 0;
         }
 
         private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo, int skill, int maxTier = 0, CultureObject cult = null)
@@ -475,22 +482,40 @@ namespace Armoury
         // umiejetnosci od 70 i tierze 3 jest nim arakh (wymog 70, mocny, tani). RearmBySkill wklada wzorzec do referencji DTE Assignment, a DTE dla partii, ktorych
         // nie obsluguje zbrojownia (bandy, karawany, wiesniacy, milicje, patrole - SpawnAgentPatch.IsPartyValidForProcessing false, RandomizeNonHeroLedAiPartiesArmor
         // TAK u Jeffa) robi new Assignment(...) + FillEmptySlots, czyli bron = wzorzec wprost (log 01.11 15:21:50: clegane_footman i mallister_footman bandy looters
-        // z arakhem i tarcza wzorca - "tarcza z szablonu zostaje"). Przy kluczu SkillsDecideCulturePattern: wzorzec wedlug kultury zolnierza - (0) jego kultura albo
-        // bez kultury, (1) ta sama strona Waskiego Morza, (2) reszta; w poziomie najlepsza jak dotad (RangedRank.Key). Bron Dothrakow (GearFit.DothOnly - nie nosi
-        // jej w ROT zaden zolnierz innej kultury) nigdy dla nie-Dothraka. Klucz wylaczony albo bez kultury = dokladnie stary wybor i stary klucz pamieci.
-        private static readonly Dictionary<string, bool> PatternDoth = new Dictionary<string, bool>();   // klucz wzorca kultury -> stara regula dalaby bron Dothrakow
+        // z arakhem i tarcza wzorca - "tarcza z szablonu zostaje").
+        // Recenzja 313a: zmiana TYLKO tam, gdzie stary wzorzec jest bronia Dothrakow dla zolnierza, ktoremu jej nie wolno (DothBarred) - wtedy najlepsza bron tego
+        // samego typu bez broni Dothrakow, wedlug kultury zolnierza: (0) jego kultura albo bez kultury, (1) ta sama strona Waskiego Morza, (2) reszta; w poziomie
+        // najlepsza jak dotad (RangedRank.Key). Kazdy inny wzorzec (luki, kusze, strzaly, drzewce, wzorce Dothrakow, wzorce bez broni Dothrakow) - dokladnie stary
+        // wybor i stary klucz pamieci. Klucz wylaczony = jak przed 313a.
         private static readonly object PatternLock = new object();
 
         internal static bool CultOn { get { var s = Settings.Current; return s != null && s.SkillsDecideCulturePattern; } }
 
-        /// <summary>313a: wzorce wedlug kultury od nowa (GearFit.Reset przez DothrakiArms.Reset - nowa sesja, nowy spis broni Dothrakow). Stare klucze (bez kultury) zostaja.</summary>
+        /// <summary>313a: czy zolnierz tej kultury NIE dostaje broni Dothrakow ze wzorca: nie-Dothrak; przy Gear Fit Dothraki Only kazdy (tez Essos - Wolne Miasta,
+        /// Ghis - jak regula sklepow i bitwy), przy wylaczonym tylko Westeros (opis klucza: "off = anyone from the Essos side may carry an arakh").</summary>
+        internal static bool DothBarred(string tc)
+        {
+            if (string.IsNullOrEmpty(tc) || GearFit.IsDoth(tc)) return false;
+            return GearFit.DothOn || !GearFit.IsEssos(tc);
+        }
+
+        /// <summary>Bron Dothrakow wedlug spisu (DothOnly); spis niegotowy (przed startem gry DothOnly daje false dla wszystkiego) - kazda bron kultury
+        /// Dothrakow (recenzja 313a p. 7: inaczej Assignment z OnGameLoaded DTE dostalby arakh w referencji).</summary>
+        internal static bool DothArm(ItemObject it, bool kinReady)
+        {
+            if (it == null) return false;
+            if (kinReady) return GearFit.DothOnly(it);
+            return it.Culture != null && GearFit.IsDoth(it.Culture.StringId);
+        }
+
+        /// <summary>313a: wzorce wedlug kultury od nowa (DothrakiArms.Reset; GearFit.SessionStart i Census - nowy spis broni Dothrakow). Stare klucze zostaja.</summary>
         internal static void ResetCulturePatterns()
         {
             lock (PatternLock)
             {
-                var drop = new List<string>(PatternDoth.Keys);
+                var drop = new List<string>();
+                foreach (var k in Pattern.Keys) if (k.IndexOf("|c=", StringComparison.Ordinal) >= 0) drop.Add(k);
                 foreach (var k in drop) Pattern.Remove(k);
-                PatternDoth.Clear();
             }
         }
 
@@ -501,80 +526,91 @@ namespace Armoury
             return GearFit.IsEssos(ic) == GearFit.IsEssos(tc) ? 1 : 2;
         }
 
-        /// <summary>Wzorzec klasy (pamiec na klucz). cult == null albo klucz 313a wylaczony - stary wybor; inaczej wedlug kultury (opis wyzej). count - licznik
-        /// przydzialow z poprawionym wzorcem (RearmBySkill) do linii "Arakhy (313a)". Spis broni Dothrakow jeszcze niegotowy (przed startem gry) - wynik bez zapisu
-        /// w pamieci (inaczej arakh zostalby wzorcem na cala sesje). Pamiec pod zamkiem (ctor Assignment bywa na watku DTE).</summary>
+        /// <summary>Czy sztuka moze byc wzorcem (filtr jak dotad: umiejetnosc, sufit tieru, bez ognistej amunicji, legend, maczug olbrzymow, unikatow, smokow).</summary>
+        private static bool PatternCandidate(ItemObject it, ItemObject.ItemTypeEnum type, int skill, int maxTier)
+        {
+            if (it == null || it.ItemType != type || !it.HasWeaponComponent) return false;
+            if (it.Difficulty > skill) return false;                     // statystyki rzadza
+            if (maxTier > 0 && Recipes.Grade(it) > maxTier) return false; // przeglad 175: nie ponad tier jednostki (8b)
+            // OGNISTA AMUNICJA NIE JEST WZORCEM (Jeff 02.09: "lucznicy
+            // biegaja z plonacymi strzalami, daj im normalne strzaly
+            // ich tieru") - burning/flaming to specjal okretowy, nie
+            // kolczan piechoty; Effectiveness i tak ja faworyzuje
+            if ((type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts)
+                && it.StringId != null
+                && (it.StringId.IndexOf("burning", StringComparison.OrdinalIgnoreCase) >= 0
+                    || it.StringId.IndexOf("flaming", StringComparison.OrdinalIgnoreCase) >= 0)) return false;
+            if (LegendaryLaw.IsLegend(it)) return false;                 // legendy nie sa wzorcem
+            if (GiantGear.Is(it)) return false;                          // maczugi olbrzymow tez nie (Jeff 14.09)
+            if (it.NotMerchandise) return false;                         // unikaty imienne i itemy testowe
+            if (it.StringId != null && it.StringId.StartsWith("dragon_")) return false;
+            return true;
+        }
+
+        /// <summary>Wzorzec klasy (pamiec na klucz). Najpierw stary wybor (stary klucz, bez zmian). Gdy klucz 313a czynny, zolnierz ma kulture z zakazem broni
+        /// Dothrakow (DothBarred), a stary wzorzec jest bronia Dothrakow - zamiennik tego samego typu wedlug kultury (opis wyzej), klucz "|c=kultura". count - licznik
+        /// przydzialow z poprawionym wzorcem (RearmBySkill) do linii "Arakhy (313a)". Spis broni Dothrakow niegotowy - zamiennik bez zapisu w pamieci.
+        /// Pamiec pod zamkiem (ctor Assignment bywa na watku DTE).</summary>
         internal static ItemObject BestPattern(ItemObject.ItemTypeEnum type, int skill, int maxTier, CultureObject cult, bool count)
         {
             if (skill < 0) skill = 0;
-            string tc = cult != null && CultOn ? (cult.StringId ?? "") : null;
             string key = type + "|" + skill + "|" + maxTier;   // prog dokladny, jak przy pancerzu; przeglad 175: sufit tieru (0 = bez)
-            if (tc != null) key += "|c=" + tc;
-            ItemObject best;
-            bool hit, fixedDoth = false;
-            lock (PatternLock)
-            {
-                hit = Pattern.TryGetValue(key, out best);
-                if (hit && tc != null) PatternDoth.TryGetValue(key, out fixedDoth);
-            }
+            ItemObject old;
+            bool hit;
+            lock (PatternLock) hit = Pattern.TryGetValue(key, out old);
             if (!hit)
             {
                 bool ok = true;
-                ItemObject old = null;
-                var lv = new ItemObject[3];
-                bool dothTroop = tc != null && GearFit.IsDoth(tc);
-                bool kinReady = tc == null || GearFit.KinReady;
-                int skipped = 0;
+                old = null;
                 try
                 {
                     var all = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
                     foreach (var it in all)
                     {
-                        if (it == null || it.ItemType != type || !it.HasWeaponComponent) continue;
-                        if (it.Difficulty > skill) continue;                     // statystyki rzadza
-                        if (maxTier > 0 && Recipes.Grade(it) > maxTier) continue; // przeglad 175: nie ponad tier jednostki (8b)
-                        // OGNISTA AMUNICJA NIE JEST WZORCEM (Jeff 02.09: "lucznicy
-                        // biegaja z plonacymi strzalami, daj im normalne strzaly
-                        // ich tieru") - burning/flaming to specjal okretowy, nie
-                        // kolczan piechoty; Effectiveness i tak ja faworyzuje
-                        if ((type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts)
-                            && it.StringId != null
-                            && (it.StringId.IndexOf("burning", StringComparison.OrdinalIgnoreCase) >= 0
-                                || it.StringId.IndexOf("flaming", StringComparison.OrdinalIgnoreCase) >= 0)) continue;
-                        if (LegendaryLaw.IsLegend(it)) continue;                 // legendy nie sa wzorcem
-                        if (GiantGear.Is(it)) continue;                          // maczugi olbrzymow tez nie (Jeff 14.09)
-                        if (it.NotMerchandise) continue;                         // unikaty imienne i itemy testowe
-                        if (it.StringId != null && it.StringId.StartsWith("dragon_")) continue;
+                        if (!PatternCandidate(it, type, skill, maxTier)) continue;
                         // 16.09: luki/kusze wg RangedRank (pod RBM naciag), reszta jak dawniej
                         if (old == null || RangedRank.Key(it) > RangedRank.Key(old)) old = it;
-                        if (tc == null) continue;
-                        if (!dothTroop && GearFit.DothOnly(it)) { skipped++; continue; }   // 313a: bron Dothrakow nigdy dla nie-Dothraka
+                    }
+                }
+                catch (Exception e) { ok = false; Log.Error("SkillsDecide.AddPattern", e); }
+                if (ok) lock (PatternLock) Pattern[key] = old;
+            }
+            if (old == null || cult == null || !CultOn) return old;
+            string tc = cult.StringId;
+            if (!DothBarred(tc)) return old;                     // Dothrakowie (i Essos przy wylaczonym Gear Fit Dothraki Only) - bez zmian
+            bool kinReady = GearFit.KinReady;
+            if (!DothArm(old, kinReady)) return old;             // stary wzorzec nie jest bronia Dothrakow - bez zmian
+            string ckey = key + "|c=" + tc;
+            ItemObject best;
+            lock (PatternLock) hit = Pattern.TryGetValue(ckey, out best);
+            if (!hit)
+            {
+                bool ok = true;
+                var lv = new ItemObject[3];
+                try
+                {
+                    var all = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
+                    foreach (var it in all)
+                    {
+                        if (!PatternCandidate(it, type, skill, maxTier)) continue;
+                        if (DothArm(it, kinReady)) continue;     // 313a: bron Dothrakow nigdy dla takiego zolnierza
                         int l = CultLevel(tc, it);
                         if (lv[l] == null || RangedRank.Key(it) > RangedRank.Key(lv[l])) lv[l] = it;
                     }
                 }
                 catch (Exception e) { ok = false; Log.Error("SkillsDecide.AddPattern", e); }
+                best = null;
                 int level = 3;
-                if (tc == null) best = old;
-                else
-                {
-                    best = null;
-                    for (int l = 0; l < 3 && best == null; l++) if (lv[l] != null) { best = lv[l]; level = l; }
-                    fixedDoth = old != null && best != old && !dothTroop && GearFit.DothOnly(old);
-                }
+                for (int l = 0; l < 3 && best == null; l++) if (lv[l] != null) { best = lv[l]; level = l; }
                 if (ok && kinReady)
                 {
                     bool fresh;
-                    lock (PatternLock)
-                    {
-                        fresh = !Pattern.ContainsKey(key);
-                        Pattern[key] = best;
-                        if (tc != null) PatternDoth[key] = fixedDoth;
-                    }
-                    if (fresh && tc != null) DothrakiArms.NotePatternKey(level, skipped > 0, fixedDoth);
+                    lock (PatternLock) { fresh = !Pattern.ContainsKey(ckey); Pattern[ckey] = best; }
+                    if (fresh) DothrakiArms.NotePatternKey(level, true, true);
                 }
             }
-            if (count && fixedDoth) DothrakiArms.NotePatternFixed();
+            // brak innej broni tego typu w granicy umiejetnosci - pusty slot zamiast broni Dothrakow (DTE FillEmptySlots zostawia go pustym)
+            if (count) DothrakiArms.NotePatternFixed();
             return best;
         }
     }

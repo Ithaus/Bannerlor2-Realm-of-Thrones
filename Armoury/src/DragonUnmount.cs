@@ -286,7 +286,7 @@ namespace Armoury
                                     else
                                     {
                                         var rsk0 = ItemReq.SkillFor(it);
-                                        best = SkillsDecide.PatternFor(it.ItemType, rsk0 != null ? soldier.GetSkillValue(rsk0) : 0);
+                                        best = SkillsDecide.PatternFor(it.ItemType, rsk0 != null ? soldier.GetSkillValue(rsk0) : 0, soldier);   // recenzja 313a: bez broni Dothrakow u nie-Dothraka
                                     }
                                     if (best != null)
                                     {
@@ -336,7 +336,7 @@ namespace Armoury
                             var w = eq[(EquipmentIndex)slot].Item;
                             if (!GiantGear.Is(w) || GiantGear.MayWear(soldier)) continue;
                             int gs = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
-                            var gswap = SkillsDecide.PatternFor(w.ItemType, gs);
+                            var gswap = SkillsDecide.PatternFor(w.ItemType, gs, soldier);   // recenzja 313a
                             eq[(EquipmentIndex)slot] = gswap != null ? new EquipmentElement(gswap) : new EquipmentElement(null);
                             if (_floorLog++ < 20)
                                 Log.Info("GiantGear: " + w.StringId + " zdjety z bohatera " + soldier.StringId
@@ -364,7 +364,7 @@ namespace Armoury
                             if (ItemReq.Meets(soldier, w, out whyNot)) continue;
                             var rsk = ItemReq.SkillFor(w);
                             int sk = rsk != null ? soldier.GetSkillValue(rsk) : 0;
-                            var swap = SkillsDecide.PatternFor(w.ItemType, sk);
+                            var swap = SkillsDecide.PatternFor(w.ItemType, sk, soldier);   // recenzja 313a: lord Westeros nie dostaje arakhu jako zamiennika
                             if (swap == null) continue;
                             eq[(EquipmentIndex)slot] = new EquipmentElement(swap);
                             // m111-walka (24.10): w turnieju bez limitu 20 linii - lista broni wydanych rycerzom (dotad 4 linie na caly turniej KP)
