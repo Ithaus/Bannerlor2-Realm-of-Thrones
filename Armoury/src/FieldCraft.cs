@@ -89,6 +89,7 @@ namespace Armoury
             public float LimpCap;            // cap kustykania wpisany do Bleed313 (m/s, 0 = brak)
             public float LimpSince = -1f;    // recenzja 313d (pomiar): czas misji wpisania capu (predkosc mierzona po Bleed313.LimpSettle s)
             public bool LimpLow;             // 313y (histereza): kustyka z HP <= WoundedLimpBelowHp; zdjete dopiero powyzej progu + Bleed313.LimpHystHp
+            public bool DieFailed;           // recenzja 314x: Agent.Die z krwawienia rzucil wyjatek (AV w silniku) - agent pomijany do konca misji (bez drugiego Die i zapisow)
             public bool BleedMissile;        // 313y: krwawiaca rana (biezace krwawienie) od pocisku - zgon z krwawienia liczy sie jako zgon od pocisku
         }
 
@@ -1084,6 +1085,7 @@ namespace Armoury
                     // wight nie zna zadyszki, ran, krwawienia ani strachu - trup
                     // maszeruje i bije, poki go nie potna na kawalki
                     if (Undead.Character(agent.Character)) continue;
+                    if (_states.TryGetValue(agent, out var stF) && stF != null && stF.DieFailed) continue;   // recenzja 314x: Die z krwawienia zawiodl - bez dalszych zapisow
                     State st;
                     if (!_states.TryGetValue(agent, out st)) { st = new State(); _states[agent] = st; }
 
@@ -1713,7 +1715,22 @@ namespace Armoury
                 }
                 catch (Exception e) { Bleed313.Stumble("DeathMissile", e); }
             }
-            agent.Die(b, Agent.KillInfo.Invalid);
+            try { agent.Die(b, Agent.KillInfo.Invalid); }
+            catch (Exception e)
+            {
+                // recenzja 314x: AV w silniku (autotest 313y bitwa 8/9) - jeden wpis z pelnym stanem zamiast ogolnego "FieldCraft.Tick" i dalszego ticku polowicznie
+                // zabitego agenta; agent pomijany do konca misji (bez globalnego wylacznika, licznik w Bleed313)
+                st.DieFailed = true;
+                Bleed313.DieFailed++;
+                if (Bleed313.DieFailed <= 3)
+                {
+                    string ss = "-";
+                    try { ss = "stan " + agent.State + ", HP " + agent.Health.ToString("0.#") + ", czynny " + agent.IsActive() + ", konno " + (agent.MountAgent != null); } catch { }
+                    Log.Error("FieldCraft.BleedDeath Agent.Die (agent " + agent.Index + ", " + ss + ", kredyt " + credit + " wlasciciel " + b.OwnerId
+                              + ", pocisk " + byMissile + ")", e);
+                }
+                return;
+            }
             if (!log) return;
             AgentState s = AgentState.Killed;
             try { s = agent.State; } catch { s = AgentState.Killed; }

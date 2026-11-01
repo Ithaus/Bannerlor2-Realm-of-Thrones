@@ -1048,7 +1048,7 @@ namespace Armoury
                             // pulapu ponad W5 i gotowka za ludzi, ktorzy sa); klucz LordWarLevy wylaczony albo rod bez poboru = 0 i budzet jak przed paczka
                             // 277 (CanonHouses277.Pay.cs): zold od pana lennego rodom panow 277 - ten sam przydzial znaczony na druzyny co W5 (miejsce + gotowka pana tej doby);
                             // rod bez przydzialu i klucz wylaczony = 0 i budzet co do zlotowki jak dotad
-                            double aid = KingdomTreasury.NeedAidBoostOf(c) + KingdomTreasury.LordLevyBoostOf(c) + CanonHouses277.BoostOf(c);
+                            double aid = KingdomTreasury.NeedAidBoostOf(c) + KingdomTreasury.LordLevyBoostOf(c) + CanonHouses277.BoostOf(c) + CrownWar314.PaidToday(c);   // recenzja 314x: zold 314c tej doby to miejsce w pulapie (W5 liczy go w Pc0, bez wpisu do D)
                             if (aid > 0) { b.Aid = aid; b.PartyCap += aid; b.Cap += aid; b.AidCash = Math.Max(0, Math.Min(Math.Min(aid, (double)b.WPar), (double)(KingdomTreasury.NeedAidCashOf(c) + KingdomTreasury.LordLevyCashOf(c) + CrownWar314.PaidToday(c)) + CanonHouses277.CashOf(c))); }   // 314c: zold krolewski tej doby tez jest gotowka na druzyny
                             // 277: pan lenny oddaje to miejsce ze swojego pulapu partii (pulap rodu o tyle samo) - jedna zlotowka pulapu nie sluzy dwom rodom
                             double give277 = CanonHouses277.CommitOf(c);

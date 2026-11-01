@@ -231,6 +231,7 @@ namespace Armoury
         internal static readonly int[] ByType = new int[3], ByPart = new int[4];
         internal static double PSum, LSum, AthSum;
         internal static int DeathKilled, DeathUncon, DeathCredit, DeathPanic, DeathWithdraw, DeathOld;
+        internal static int DieFailed;   // recenzja 314x: Agent.Die z krwawienia zawiodl (sesja - bez zerowania; pelny wpis pierwszych 3)
         internal static int DeathMissile;   // 313y: zgony z krwawienia po ranie od pocisku, wliczone do DeathByRangedCount druzyny
         internal static double DeathHp0Sum;
         internal static int WdRolls, WdYes, WdNo, WdForced;

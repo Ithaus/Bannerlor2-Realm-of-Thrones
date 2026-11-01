@@ -29,7 +29,7 @@ namespace Armoury
     ///    zwrotu nastepnej doby (RefundCut, jak W5 / W7 / 277 - "korona nie zwraca zoldu, ktory juz oplacila"). Zwrot (pierwszy z wydatkow wojska) biegnie
     ///    przed tym krokiem i nie traci przez niego wplywow dnia (bez tego zold 314c pchalby zwrot do Banku 186). Bogaty rod (f = 0, dzis bez zwrotu) dostaje p.
     ///  - RODZINA W5 (recenzja 314c): zold 314c tej doby jest czescia wlasnego pulapu rodu Pc0 w NeedAidKingdom (PaidToday) - W5, W5b, W6, M1, W5c i W7 (plan W5)
-    ///    licza gotowke jako koszt - Pc0, wiec nie placa drugi raz za tych samych ludzi; ClanBudget dolicza go do b.AidCash. Gotowka pana lennego 277 tej doby
+    ///    licza gotowke jako koszt - Pc0, wiec nie placa drugi raz za tych samych ludzi; ClanBudget dolicza go do b.Aid (pulap druzyn) i b.AidCash; bez wpisu do D (recenzja 314x, wzor 277). Gotowka pana lennego 277 tej doby
     ///    (CanonHouses277 placi wczesniej w dobie) zmniejsza nalezny zold 314c. Suma korony i pana za szeregowych w armii: najwyzej koszt rodu przy poziomie
     ///    W5 (gdy W5 doplaca) albo p x zold (gdy nie), plus zwrot 70% f od reszty oplaconej z wlasnej kiesy.
     ///
@@ -177,7 +177,9 @@ namespace Armoury
             k.KingdomBudgetWallet -= ix;                       // najpierw skarbiec, potem odbiorca: skarbiec oddaje dokladnie tyle, ile dostaje glowa rodu
             h.ChangeHeroGold(ix);
             CirculationWindows.NoteHeroGold(h, ix);
-            ClanIncomeBook.NoteInflow(h, ix, wage ? ClanIncomeBook.KContract : ClanIncomeBook.KRansom);   // zold - staly wplyw od korony (jak kontrakt 185), dar - jednorazowy
+            // recenzja 314x (wzor 277): zold NIE idzie do D rodu - miejsce w pulapie daje b.Aid tej doby (ClanBudget: PaidToday w aid), wpis do D liczylby te sama
+            // zlotowke drugi raz (W5 widzialby ja w Pc0 i w D i dawalby o caly zold za malo); dar - jednorazowy wplyw (KRansom)
+            if (!wage) ClanIncomeBook.NoteInflow(h, ix, ClanIncomeBook.KRansom);
             if (fromLeft > 0) CrownIncome.Spent(k, fromLeft);
             p.Left -= fromLeft; p.Stock -= fromStock;
             _dFromLeft += fromLeft; _dFromStock += fromStock;
