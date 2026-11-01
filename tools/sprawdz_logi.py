@@ -88298,6 +88298,9 @@ def main(argv):
 # TR-7 odstep kolejnych wojen o tron (linie "WOJNA O TRON") >= przerwa N dni (z ostatniej linii doby; domyslnie 14);
 # TR-8 czlon z udzialem battania (a albo t) tylko w dobie "Polnoc po Bekartach TAK" albo "flaga testu TAK";
 # TR-9 zadna para z czlonem przy biedzie skarbca T >= 0.5;
+# TR-10 (recenzja) pozycje z czlonem i wojny o tron tylko miedzy krolestwami Westeros (TT312_WEST, najezdzcy valyrian/empire_s dopuszczeni - najazd z linii nieznany);
+# recenzja: TR-4 i TR-8 czytaja tez stan z samej linii "WOJNA O TRON" (kanon/Bekarty/flaga - wojna w ostatniej dobie bez linii doby), TR-8 - battania jako A tylko
+# z powodem "ziemie Polnocy"; TR-0 tez linia "kolejnosc latek (pierwsza doba)" (PovertyPeace wpiety po starcie sesji); INFO - tempo wojen o tron na rok 364 dni;
 # TR-L w pliku nie ma zadnej linii "Wojny o tron (312c)" (zly plik albo DLL sprzed 312c) - NIE;
 # INFO: wojny o tron (od wczytania), dolaczenia, pokoje, w dawnej parze zatargu, srednia oceny przed/po, bramki (suma), wywolania postfiksu na dobe.
 TT312_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
@@ -88306,30 +88309,34 @@ TT312_START = re.compile(r"^Wojny o tron \(312c\): start sesji \| latka GetScore
 # grupy: 1 dzien, 2 klucz, 3 flaga, 4 kanon, 5 Polnoc, 6 tron, 7 max wojen, 8-9 sila, 10 przerwa, 11 zmeczenie, 12 odczyt, 13 wywolania dzis, 14 z ocena pary,
 # 15 z czlonem, 16-17 srednia, 18 zmienil znak, 19 ocen par, 20 czlon>0 par, 21 pozycje, 22 bramki, 23 wojny o tron dzis, 24 lista, 25 od wczytania, 26 trwajace,
 # 27-28 pokoje, 29 dawna para zatargu, 30-32 dolaczenia, 33-34 inne, 35 przerwa do dnia, 36 wywolan, 37 z czlonem, 38-39 srednia, 40 potkniecia dzis, 41 razem
-TT312_DAY = re.compile(r"^Wojny o tron \(312c\): doba \| dzien (\d+) \| klucz (TAK|NIE), flaga testu (TAK|NIE), kanon skonczony (TAK|NIE), Polnoc po Bekartach (TAK|NIE) "
-                       r"\| tron: (.*?) \| limity: max wojen (\d+), sila ([\d.]+)-([\d.]+), przerwa (\d+) dni, zmeczenie (\d+) \((.*?)\) "
+TT312_DAY = re.compile(r"^Wojny o tron \(312c\): doba \| dzien (\d+) \| klucz (TAK|NIE), flaga testu (TAK|NIE), kanon skonczony (TAK|NIE), Polnoc po Bekartach (TAK|NIE)"
+                       r"(?: \(BastardsSiegeEvent -?\d+, BastardsEvent -?\d+\))? \| tron: (.*?) \| limity: max wojen (\d+), sila ([\d.]+)-([\d.]+), przerwa (\d+) dni, zmeczenie (\d+) \((.*?)\) "
                        r"\| wywolania postfiksu dzis (\d+), z ocena pary (\d+), z czlonem (\d+) \(srednia przed (\S+), po (\S+)\), czlon zmienil znak (\d+) "
                        r"\| ocen par (\d+) \| czlon > 0: (\d+) par(?: \[(.*?)\])? \| zero przez bramke: (.*?) "
                        r"\| wojny o tron dzis (\d+)(?: \[(.*?)\])?, od wczytania (\d+), trwajace (\d+), pokoje w nich dzis (\d+), od wczytania (\d+), w dawnej parze zatargu od wczytania (\d+) "
                        r"\| dolaczenia dzis (\d+)(?: \[(.*?)\])?, od wczytania (\d+) \| inne wypowiedzenia w Westeros \(decyzja krolestwa, bez czlonu\) dzis (\d+), od wczytania (\d+) "
                        r"\| przerwa do dnia (\S+) \| od wczytania: wywolan (\d+), z czlonem (\d+) \(srednia przed (\S+), po (\S+)\) \| potkniecia dzis (\d+) \(razem (\d+)\)\.$")
 TT312_ITEM = re.compile(r"^(\S+)>(\S+) w=([\d.]+) R=([\d.]+) T=([\d.]+) wojny=(\d+) czlon=(\d+) \((.+)\)$")
-TT312_WAR = re.compile(r"^Wojny o tron \(312c\): dzien (\d+) \| WOJNA O TRON (\S+) \(.*\): powod (.+?), droga (.+?), czlon (\d+), dawna para zatargu (TAK|NIE), przerwa do dnia (\d+)\.$")
+# grupy: 1 dzien, 2 para, 3 powod, 4 droga, 5 czlon, 6 zatarg, 7 przerwa do dnia, 8 kanon skonczony, 9 Polnoc po Bekartach, 10 flaga testu (8-10 od recenzji)
+TT312_WAR = re.compile(r"^Wojny o tron \(312c\): dzien (\d+) \| WOJNA O TRON (\S+) \(.*\): powod (.+?), droga (.+?), czlon (\d+), dawna para zatargu (TAK|NIE), przerwa do dnia (\d+)"
+                       r"(?:, kanon skonczony (TAK|NIE), Polnoc po Bekartach (TAK|NIE), flaga testu (TAK|NIE))?\.$")
+TT312_ORDER = re.compile(r"^Wojny o tron \(312c\): kolejnosc latek \(pierwsza doba\) \| (.*)\.$")
+TT312_WEST = {"vlandia", "dragonstone", "stormlands", "empire_w", "empire", "sturgia", "aserai", "riverlands", "battania", "valyrian", "empire_s"}
 
 TT312_SAMPLE_START = ("Wojny o tron (312c): start sesji | latka GetScoreOfDeclaringWar TAK | kolejnosc: przed PovertyPeace TAK (postfiksy: PovertyPeace/400, CanonThroneWars/600) "
                       "| klucze: Ambition for the Iron Throne TAK, Score 4000, Max Wars 2, Strength 1.00-1.50, War Gap Days 14, Weary At 50, Spare Five Kings TAK, "
                       "North After Bastards TAK, North Reclaims TAK, Targets Player TAK | flaga testu armoury-tron312-porw.flag NIE | kanon skonczony NIE, Polnoc po Bekartach NIE, "
                       "najazd Aegona NIE, najazd Daenerys NIE | tron: Westerlands (vlandia) | zmeczenie: odczyt Diplomacy | z zapisu: ostatnia wojna o tron -, trwajace wojny o tron 0 "
                       "| potkniecia 0.")
-TT312_SAMPLE_DAY_PRE = ("Wojny o tron (312c): doba | dzien 108900 | klucz TAK, flaga testu NIE, kanon skonczony NIE, Polnoc po Bekartach NIE | tron: Westerlands (vlandia) "
-                        "| limity: max wojen 2, sila 1.00-1.50, przerwa 14 dni, zmeczenie 50 (odczyt Diplomacy) | wywolania postfiksu dzis 120, z ocena pary 80, z czlonem 0 "
+TT312_SAMPLE_DAY_PRE = ("Wojny o tron (312c): doba | dzien 108900 | klucz TAK, flaga testu NIE, kanon skonczony NIE, Polnoc po Bekartach NIE (BastardsSiegeEvent 0, BastardsEvent 0) "
+                        "| tron: Westerlands (vlandia) | limity: max wojen 2, sila 1.00-1.50, przerwa 14 dni, zmeczenie 50 (odczyt Diplomacy) | wywolania postfiksu dzis 120, z ocena pary 80, z czlonem 0 "
                         "(srednia przed -, po -), czlon zmienil znak 0 | ocen par 40 | czlon > 0: 0 par | zero przez bramke: kanon 25, Polnoc-przed-Bekartami 0, limit 0, sila 0, "
                         "przerwa 0, zmeczenie 0, bieda 0, gracz 0, Essos/poza Westeros 12, prolog 0, brak tronu 0, bez celu 3 | wojny o tron dzis 0, od wczytania 0, trwajace 0, "
                         "pokoje w nich dzis 0, od wczytania 0, w dawnej parze zatargu od wczytania 0 | dolaczenia dzis 0, od wczytania 0 | inne wypowiedzenia w Westeros "
                         "(decyzja krolestwa, bez czlonu) dzis 0, od wczytania 0 | przerwa do dnia - | od wczytania: wywolan 120, z czlonem 0 (srednia przed -, po -) "
                         "| potkniecia dzis 0 (razem 0).")
-TT312_SAMPLE_DAY_POST = ("Wojny o tron (312c): doba | dzien 108920 | klucz TAK, flaga testu TAK, kanon skonczony TAK, Polnoc po Bekartach TAK | tron: Westerlands (vlandia) "
-                         "| limity: max wojen 2, sila 1.00-1.50, przerwa 14 dni, zmeczenie 50 (odczyt Diplomacy) | wywolania postfiksu dzis 150, z ocena pary 90, z czlonem 12 "
+TT312_SAMPLE_DAY_POST = ("Wojny o tron (312c): doba | dzien 108920 | klucz TAK, flaga testu TAK, kanon skonczony TAK, Polnoc po Bekartach TAK (BastardsSiegeEvent 2, BastardsEvent 2) "
+                         "| tron: Westerlands (vlandia) | limity: max wojen 2, sila 1.00-1.50, przerwa 14 dni, zmeczenie 50 (odczyt Diplomacy) | wywolania postfiksu dzis 150, z ocena pary 90, z czlonem 12 "
                          "(srednia przed -1200, po 1500), czlon zmienil znak 4 | ocen par 45 | czlon > 0: 2 par [empire_w>vlandia w=1.00 R=0.80 T=0.10 wojny=1 czlon=2880 (tron); "
                          "vlandia>battania w=1.00 R=1.00 T=0.00 wojny=0 czlon=4000 (Polnoc)] | zero przez bramke: kanon 0, Polnoc-przed-Bekartami 0, limit 5, sila 10, przerwa 0, "
                          "zmeczenie 1, bieda 2, gracz 0, Essos/poza Westeros 12, prolog 0, brak tronu 0, bez celu 3 | wojny o tron dzis 1 [empire_w>vlandia (tron)], od wczytania 2, "
@@ -88337,9 +88344,10 @@ TT312_SAMPLE_DAY_POST = ("Wojny o tron (312c): doba | dzien 108920 | klucz TAK, 
                          "| inne wypowiedzenia w Westeros (decyzja krolestwa, bez czlonu) dzis 0, od wczytania 0 | przerwa do dnia 108934 | od wczytania: wywolan 300, z czlonem 12 "
                          "(srednia przed -1200, po 1500) | potkniecia dzis 0 (razem 0).")
 TT312_SAMPLE_WAR1 = ("Wojny o tron (312c): dzien 108905 | WOJNA O TRON stormlands>vlandia (Stormlands -> Westerlands): powod tron, droga decyzja krolestwa, czlon 3000, "
-                     "dawna para zatargu NIE, przerwa do dnia 108919.")
+                     "dawna para zatargu NIE, przerwa do dnia 108919, kanon skonczony TAK, Polnoc po Bekartach NIE, flaga testu TAK.")
 TT312_SAMPLE_WAR2 = ("Wojny o tron (312c): dzien 108920 | WOJNA O TRON empire_w>vlandia (The Reach -> Westerlands): powod tron, droga BK uzasadnienie (BKDeclareWarDecision), "
-                     "czlon 2880, dawna para zatargu NIE, przerwa do dnia 108934.")
+                     "czlon 2880, dawna para zatargu NIE, przerwa do dnia 108934.")   # bez stanu (DLL sprzed recenzji) - tez pasuje
+TT312_SAMPLE_ORDER = "Wojny o tron (312c): kolejnosc latek (pierwsza doba) | przed PovertyPeace TAK (postfiksy: PovertyPeace/400, CanonThroneWars/600)." 
 
 
 def tt312_strip(line):
@@ -88355,7 +88363,15 @@ def tt312_items(m):
     return out
 
 
-def tt312_rows(rep, starts, days, wars, errors):
+def tt312_rows(rep, starts, days, wars, errors, orders=None):
+    orders = orders or []
+    bad_ord = []
+    for l in orders:
+        mo = TT312_ORDER.search(l)
+        if not mo:
+            bad_ord.append("format kolejnosci: " + l[:120])
+        elif "przed PovertyPeace NIE" in mo.group(1):
+            bad_ord.append("pierwsza doba: " + mo.group(1)[:120])
     # TR-0
     if not starts:
         rep.add("TR-0: linia startu - latka GetScoreOfDeclaringWar", "NIEPOKRYTY (brak linii startu 312c)", "kazda linia startu: TAK, przed PovertyPeace (albo PovertyPeace brak)", None)
@@ -88369,8 +88385,9 @@ def tt312_rows(rep, starts, days, wars, errors):
                 bad.append("latka " + m.group(1))
             elif "przed PovertyPeace NIE" in m.group(2):
                 bad.append("kolejnosc: " + m.group(2)[:120])
+        bad += bad_ord
         ml = TT312_START.search(starts[-1])
-        rep.add("TR-0: linia startu - latka GetScoreOfDeclaringWar", f"linii {len(starts)}, zlych {len(bad)}" + (f" ({bad[0]})" if bad else "")
+        rep.add("TR-0: linia startu - latka GetScoreOfDeclaringWar", f"linii {len(starts)} (+ kolejnosc pierwszej doby {len(orders)}), zlych {len(bad)}" + (f" ({bad[0]})" if bad else "")
                 + (f" | {ml.group(2)[:160]}" if ml else ""), "kazda linia startu: TAK, przed PovertyPeace (albo PovertyPeace brak)", not bad)
     parsed, bad1 = [], []
     for l in days:
@@ -88402,13 +88419,14 @@ def tt312_rows(rep, starts, days, wars, errors):
             bad4.append(f"dzien {m.group(1)}: wojny o tron {m.group(23)}")
     for l in wars:
         mw = TT312_WAR.search(l)
-        if mw and int(mw.group(1)) in pre_days:
+        if mw and (int(mw.group(1)) in pre_days or (mw.group(8) == "NIE" and mw.group(10) == "NIE")):
             bad4.append(f"WOJNA O TRON dzien {mw.group(1)} {mw.group(2)} (doba bez flagi, przed Godami)")
+    pre_war = sum(1 for l in wars if (TT312_WAR.search(l) and TT312_WAR.search(l).group(8) == "NIE" and TT312_WAR.search(l).group(10) == "NIE"))
     rep.add("TR-4: przed Krwawymi Godami (bez flagi) - 0 czlonow > 0 i 0 wojen o tron",
-            (f"dob przed Godami bez flagi {len(pre)}, naruszen {len(bad4)}" + (f" ({bad4[0]})" if bad4 else "")) if pre else "NIEPOKRYTY (brak dob bez flagi przed Godami)",
-            "0", None if not pre else not bad4)
+            (f"dob przed Godami bez flagi {len(pre)}, wojen o tron przed Godami bez flagi (z linii wojny) {pre_war}, naruszen {len(bad4)}" + (f" ({bad4[0]})" if bad4 else "")) if pre or pre_war else "NIEPOKRYTY (brak dob bez flagi przed Godami)",
+            "0", None if not pre and not pre_war else not bad4)
     # TR-5, TR-8, TR-9
-    n_items, n8, bad5, bad8, bad9 = 0, 0, [], [], []
+    n_items, n8, bad5, bad8, bad9, bad10 = 0, 0, [], [], [], []
     for m in parsed:
         mx = int(m.group(7))
         north_ok = m.group(5) == "TAK" or m.group(3) == "TAK"
@@ -88424,9 +88442,30 @@ def tt312_rows(rep, starts, days, wars, errors):
                 n8 += 1
                 if not north_ok:
                     bad8.append(f"dzien {m.group(1)}: {it.group(1)}>{it.group(2)} (Polnoc po Bekartach NIE, flaga NIE)")
+                if it.group(1) == "battania" and it.group(8) != "ziemie Polnocy":
+                    bad8.append(f"dzien {m.group(1)}: {it.group(1)}>{it.group(2)} powod {it.group(8)} (Polnoc nigdy o tron)")
+            for side in (it.group(1), it.group(2)):
+                if side not in TT312_WEST:
+                    bad10.append(f"dzien {m.group(1)}: {it.group(1)}>{it.group(2)} ({side} poza Westeros)")
             if float(it.group(5)) >= 0.5:
                 bad9.append(f"dzien {m.group(1)}: {it.group(1)}>{it.group(2)} T={it.group(5)}")
+    n_w8 = 0
+    for l in wars:
+        mw = TT312_WAR.search(l)
+        if not mw:
+            continue
+        a, _, t = mw.group(2).partition(">")
+        for side in (a, t):
+            if side not in TT312_WEST:
+                bad10.append(f"WOJNA O TRON dzien {mw.group(1)} {mw.group(2)} ({side} poza Westeros)")
+        if "battania" in (a, t):
+            n_w8 += 1
+            if mw.group(9) == "NIE" and mw.group(10) == "NIE":
+                bad8.append(f"WOJNA O TRON dzien {mw.group(1)} {mw.group(2)} (Polnoc po Bekartach NIE, flaga NIE)")
+            if a == "battania" and mw.group(3) != "ziemie Polnocy":
+                bad8.append(f"WOJNA O TRON dzien {mw.group(1)} {mw.group(2)} powod {mw.group(3)} (Polnoc nigdy o tron)")
     cov = bool(parsed)
+    cov_w = bool(parsed) or bool(wars)
     rep.add("TR-5: zadne krolestwo z czlonem przy >= max wojen", (f"par z czlonem (suma dob) {n_items}, naruszen {len(bad5)}" + (f" ({bad5[0]})" if bad5 else ""))
             if cov else "NIEPOKRYTY (brak linii doby 312c)", "0", None if not cov else not bad5)
     # TR-7
@@ -88443,10 +88482,13 @@ def tt312_rows(rep, starts, days, wars, errors):
             bad7.append(f"{wdays[i - 1][1]}@{wdays[i - 1][0]} -> {wdays[i][1]}@{wdays[i][0]} < {gap}")
     rep.add("TR-7: odstep wojen o tron >= przerwa", (f"wojen o tron {len(wdays)}, naruszen {len(bad7)}" + (f" ({bad7[0]})" if bad7 else ""))
             if len(wdays) >= 2 else f"NIEPOKRYTY (wojen o tron {len(wdays)})", f">= {gap} dni", None if len(wdays) < 2 else not bad7)
-    rep.add("TR-8: czlon z udzialem battania tylko po Bekartach (albo z flaga)", (f"par z battania {n8}, naruszen {len(bad8)}" + (f" ({bad8[0]})" if bad8 else ""))
-            if cov else "NIEPOKRYTY (brak linii doby 312c)", "0", None if not cov else not bad8)
+    rep.add("TR-8: czlon z udzialem battania tylko po Bekartach (albo z flaga), Polnoc tylko o ziemie Polnocy",
+            (f"par z battania {n8}, wojen o tron z battania {n_w8}, naruszen {len(bad8)}" + (f" ({bad8[0]})" if bad8 else ""))
+            if cov_w else "NIEPOKRYTY (brak linii doby 312c)", "0", None if not cov_w else not bad8)
     rep.add("TR-9: krolestwo z bieda T >= 0.5 bez czlonu", (f"par z czlonem {n_items}, naruszen {len(bad9)}" + (f" ({bad9[0]})" if bad9 else ""))
             if cov else "NIEPOKRYTY (brak linii doby 312c)", "0", None if not cov else not bad9)
+    rep.add("TR-10: czlon i wojny o tron tylko w Westeros (bez Essos)", (f"pozycji {n_items}, wojen o tron {len(wars)}, naruszen {len(bad10)}" + (f" ({bad10[0]})" if bad10 else ""))
+            if cov_w else "NIEPOKRYTY (brak linii doby 312c)", "0", None if not cov_w else not bad10)
     # INFO
     if parsed:
         last = parsed[-1]
@@ -88459,7 +88501,8 @@ def tt312_rows(rep, starts, days, wars, errors):
                     gates[k] = gates.get(k, 0) + int(v)
         rep.add("TR-I1: wojny o tron / dolaczenia / pokoje (od wczytania, ostatnia doba)",
                 f"dzien {last.group(1)}: wojny o tron {last.group(25)} (trwajace {last.group(26)}, w dawnej parze zatargu {last.group(29)}), dolaczenia {last.group(32)}, "
-                f"pokoje w wojnach o tron {last.group(28)}, inne wypowiedzenia w Westeros {last.group(34)} | linie WOJNA O TRON w pliku {len(wdays)}", "INFO", None)
+                f"pokoje w wojnach o tron {last.group(28)}, inne wypowiedzenia w Westeros {last.group(34)} | linie WOJNA O TRON w pliku {len(wdays)}"
+                + (f", tempo ~{len(wdays) * 364.0 / max(1, int(last.group(1)) - wdays[0][0]):.1f} na rok 364 dni (od pierwszej do ostatniej doby)" if wdays else ""), "INFO", None)
         rep.add("TR-I2: ocena wojny przed/po czlonie (od wczytania)",
                 f"wywolan {last.group(36)}, z czlonem {last.group(37)}, srednia przed {last.group(38)}, po {last.group(39)}", "INFO", None)
         rep.add("TR-I3: bramki (suma ocen par) i wywolania postfiksu na dobe",
@@ -88478,22 +88521,32 @@ def tron312c_selftest():
         return "pozycje 'czlon > 0' nie rozpoznane"
     # dobry bieg
     rep = Report()
-    tt312_rows(rep, [TT312_SAMPLE_START], [TT312_SAMPLE_DAY_PRE, TT312_SAMPLE_DAY_POST], [TT312_SAMPLE_WAR1, TT312_SAMPLE_WAR2], [])
+    tt312_rows(rep, [TT312_SAMPLE_START], [TT312_SAMPLE_DAY_PRE, TT312_SAMPLE_DAY_POST], [TT312_SAMPLE_WAR1, TT312_SAMPLE_WAR2], [], [TT312_SAMPLE_ORDER])
     v = {r[0].split(":")[0]: r[3] for r in rep.rows}
-    bad = [k for k in ("TR-0", "TR-1", "TR-4", "TR-5", "TR-7", "TR-8", "TR-9") if v.get(k) != "TAK"]
+    bad = [k for k in ("TR-0", "TR-1", "TR-4", "TR-5", "TR-7", "TR-8", "TR-9", "TR-10") if v.get(k) != "TAK"]
     if bad:
         return f"dobry bieg - nie TAK: {bad}"
     # zly bieg: latka BRAK, ERROR + potkniecia, czlon i wojna przed Godami bez flagi, battania przed Bekartami, bieda 0.6, wojny=2 przy limicie 2, odstep 5 dni
-    d_pre_bad = (TT312_SAMPLE_DAY_PRE.replace("czlon > 0: 0 par", "czlon > 0: 1 par [battania>vlandia w=0.80 R=0.50 T=0.60 wojny=2 czlon=900 (ziemie Polnocy)]")
+    d_pre_bad = (TT312_SAMPLE_DAY_PRE.replace("czlon > 0: 0 par", "czlon > 0: 2 par [battania>vlandia w=0.80 R=0.50 T=0.60 wojny=2 czlon=900 (ziemie Polnocy); "
+                                                                    "ghiscari>vlandia w=0.50 R=1.00 T=0.00 wojny=0 czlon=2000 (rywal)]")
                  .replace("wojny o tron dzis 0, od wczytania 0", "wojny o tron dzis 1 [stormlands>vlandia (tron)], od wczytania 1")
                  .replace("potkniecia dzis 0 (razem 0)", "potkniecia dzis 1 (razem 1)"))
     rep = Report()
     tt312_rows(rep, [TT312_SAMPLE_START.replace("latka GetScoreOfDeclaringWar TAK", "latka GetScoreOfDeclaringWar BRAK")], [d_pre_bad],
                [TT312_SAMPLE_WAR1, TT312_SAMPLE_WAR1.replace("dzien 108905", "dzien 108910")], ["ERROR in CanonThroneWars.WarScorePostfix (potkniecie 1): x"])
     v = {r[0].split(":")[0]: r[3] for r in rep.rows}
-    miss = [k for k in ("TR-0", "TR-1", "TR-4", "TR-5", "TR-7", "TR-8", "TR-9") if v.get(k) != "NIE"]
+    miss = [k for k in ("TR-0", "TR-1", "TR-4", "TR-5", "TR-7", "TR-8", "TR-9", "TR-10") if v.get(k) != "NIE"]
     if miss:
         return f"zly bieg nie wykryty: {miss}"
+    # recenzja: wojna w ostatniej dobie (bez linii doby) przed Godami bez flagi - TR-4 NIE; Polnoc o tron - TR-8 NIE; kolejnosc pierwszej doby NIE - TR-0 NIE
+    w_pre = TT312_SAMPLE_WAR1.replace("kanon skonczony TAK, Polnoc po Bekartach NIE, flaga testu TAK", "kanon skonczony NIE, Polnoc po Bekartach NIE, flaga testu NIE")
+    w_north = TT312_SAMPLE_WAR2.replace("empire_w>vlandia", "battania>vlandia")
+    rep = Report()
+    tt312_rows(rep, [TT312_SAMPLE_START], [TT312_SAMPLE_DAY_POST], [w_pre, w_north], [], [TT312_SAMPLE_ORDER.replace("przed PovertyPeace TAK", "przed PovertyPeace NIE")])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("TR-0", "TR-4", "TR-8") if v.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg (wojna w ostatniej dobie / Polnoc o tron / kolejnosc) nie wykryty: {miss}"
     # kolejnosc po PovertyPeace - TR-0 NIE
     rep = Report()
     tt312_rows(rep, [TT312_SAMPLE_START.replace("przed PovertyPeace TAK", "przed PovertyPeace NIE")], [], [], [])
@@ -88522,7 +88575,7 @@ def tron312c_main(logp):
         rep.add("TR-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    starts, days, wars, errors = [], [], [], []
+    starts, days, wars, errors, orders = [], [], [], [], []
     n_arm = 0
     with open(logp, encoding="utf-8", errors="replace") as f:
         for line in f:
@@ -88535,13 +88588,15 @@ def tron312c_main(logp):
                     days.append(s)
                 elif "| WOJNA O TRON " in s:
                     wars.append(s)
+                elif s.startswith("Wojny o tron (312c): kolejnosc latek"):
+                    orders.append(s)
             elif s.startswith("ERROR in CanonThroneWars."):
                 errors.append(s)
     print(f"plik: {logp}")
     if n_arm == 0:
         rep.add("TR-L: log Armoury", "w pliku nie ma zadnej linii 'Wojny o tron (312c)' - zly plik (np. session-*.log) albo DLL sprzed 312c?",
                 "log Armoury z liniami 312c", False)
-    tt312_rows(rep, starts, days, wars, errors)
+    tt312_rows(rep, starts, days, wars, errors, orders)
     rep.show()
     return 0
 

@@ -373,6 +373,7 @@ namespace Armoury
             CampaignEvents.MakePeace.AddNonSerializedListener(this, Prologue.FeudOnPeace);    // 312b: pokoj w zwolnionym zatargu (droga)
             CampaignEvents.WarDeclared.AddNonSerializedListener(this, CanonThroneWars.OnWar);   // 312c: wojna o tron / dolaczenie (klasyfikacja, przerwa)
             CampaignEvents.MakePeace.AddNonSerializedListener(this, CanonThroneWars.OnPeace);   // 312c: pokoj w wojnie o tron
+            CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, CanonThroneWars.OnOwnerChanged);   // 312c recenzja: nowy pan King's Landing - pamiec doby od nowa
         }
 
         public override void SyncData(IDataStore dataStore)

@@ -1354,6 +1354,7 @@ namespace Armoury
         {
             try
             {
+                CanonThroneWars.ShiftHistory(k, delta);   // 312c recenzja: ta sama miara biedy po stronie Armoury (ambicja tronu) - przesuniecie razem z E1
                 if (!_e1Tried)
                 {
                     _e1Tried = true;

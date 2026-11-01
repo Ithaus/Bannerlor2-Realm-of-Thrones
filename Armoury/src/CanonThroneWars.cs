@@ -26,10 +26,10 @@ namespace Armoury
     ///     glosy rodow (takze BKDeclareWarDecision/BKWarBarterable), podpowiedz i BK WillJoinWar. Czlon = liczba plaska dodana po ocenie BK (nie mnozy kar BK).
     /// WYJSCIA (bez licznika bramek): klucz NIE; __2 == __0 (wywolanie z GetScoreOfDeclaringPeace - wynik pokoju bez zmian, jak PovertyPeace.cs:381); wynik <= -50000
     ///     (zakaz BK / zgody gry); strona nie krolestwo; A == T; A juz w wojnie z T.
-    /// CZLON (pamiec doby na pare A->T, kasowana przy WarDeclared/MakePeace - limity wojen i przerwa zmieniaja sie w srodku doby):
+    /// CZLON (pamiec doby na pare A->T, kasowana przy WarDeclared/MakePeace i zmianie pana King's Landing - limity wojen i przerwa zmieniaja sie w srodku doby):
     ///     = IronThroneAmbitionScore x w x R x (1 - T_biedy); bramki (zero, liczone na pare w tej kolejnosci): prolog (dzien opowiesci &lt; 1), brak tronu (town_EW4),
     ///     gracz (A = krolestwo gracza - wladca, wasal albo najemnik: "Never pushes your own realm into a war"; T = krolestwo gracza przy kluczu IronThroneTargetsPlayer NIE), Essos/poza Westeros (A albo T poza W), bez celu (brak wagi), kanon (przed
-    ///     CanonWarClock.OverNow - cisza do Krwawych Godow w calym Westeros, decyzja Jeffa 1), Polnoc-przed-Bekartami (para z battania przed ROT BastardsSiegeEvent = 2,
+    ///     CanonWarClock.OverNow - cisza do Krwawych Godow w calym Westeros, decyzja Jeffa 1), Polnoc-przed-Bekartami (para z battania albo z sojusznikiem Polnocy - projekt C.3 - przed ROT BastardsSiegeEvent = 2,
     ///     decyzja Jeffa 2), limit (A ma &gt;= IronThroneMaxWars wrogow-krolestw bez Nocnej Strazy i Wolnych Ludzi), zmeczenie (Diplomacy A w ktorejkolwiek wojnie
     ///     &gt;= IronThroneWearyAt), sila (R = 0), przerwa (wojna o tron gdziekolwiek &lt; IronThroneWarGapDays dni temu), bieda (T_biedy &gt;= 0.5).
     /// W (Westeros): vlandia, dragonstone, stormlands, empire_w, empire, sturgia, aserai, riverlands, battania; najezdzcy valyrian (Aegon) i empire_s (Daenerys) dopiero
@@ -44,7 +44,8 @@ namespace Armoury
     /// BIEDA T_biedy (krytyk POPRAWKI 6; jedna regula na zjawisko): ta sama miara co CrashScribe PovertyPeace (domyslne ustawienia CS: zapas skarbca, bez jednorazowych
     ///     odplywow) - Armoury nie zalezy od CrashScribe, wiec liczy ja sama: historia skarbca krolestwa z 7 dob (od wczytania), ubytek/d bez skokow jednej doby (port
     ///     DrainNoOneOff), zapas = skarbiec / max(ubytek, 1000); &lt;= 28 dob - 1, &gt;= 91 - 0, liniowo; przed pierwsza doba - skarbiec / 1000 (jak PovertyPeace.Poverty).
-    ///     Czlon x (1 - T), 0 przy T &gt;= 0.5 (prog wniosku z biedy E1b). PovertyPeace (po nas) dalej odejmuje swoj czlon od calej oceny - nie liczymy zlota drugi raz.
+    ///     Czlon x (1 - T), 0 przy T &gt;= 0.5 (prog wniosku z biedy E1b). PovertyPeace (po nas) dalej odejmuje swoj czlon od calej oceny (z naszym czlonem) - bieda
+    ///     dziala na czlon dwa razy (x(1-T) tu i kara E1 od calosci; decyzja Jeffa 3, recenzja). Historia skarbca przesuwana razem z CS (ShiftHistory z BookHoldings.E1Shift).
     /// KLASYFIKACJA (CampaignEvents.WarDeclared): "wojna o tron" = detail CausedByKingdomDecision i para (A,T) miala dzis czlon &gt; 0 (droga: BK uzasadnienie, gdy
     ///     BKDeclareWarDecision na stosie, inaczej decyzja krolestwa) - ustawia przerwe (zapis arm_t312). "Dolaczenie" = CausedByCallToWarAgreement albo AddAlly/CallToWar/
     ///     WillJoinWar na stosie (168, AllianceCampaignBehavior, BK War.AddAlly), strona w W - tylko licznik. Pokoj w wojnie o tron - licznik.
@@ -102,13 +103,16 @@ namespace Armoury
         private static int _memDay = int.MinValue;
         private static readonly Dictionary<string, string> _posToday = new Dictionary<string, string>(StringComparer.Ordinal);   // A>T z czlonem > 0 dzis -> opis
         private static readonly Dictionary<string, string> _posWhy = new Dictionary<string, string>(StringComparer.Ordinal);     // A>T -> powod (tron / bunt / ...)
-        private static readonly Dictionary<string, float> _posTerm = new Dictionary<string, float>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, float> _posTerm = new Dictionary<string, float>(StringComparer.Ordinal);   // A>T -> czlon ostatniej oceny
+        private static readonly Dictionary<string, float> _posMax = new Dictionary<string, float>(StringComparer.Ordinal);    // A>T -> najwyzszy czlon dzis (linia doby)
         private static readonly Dictionary<string, int> _gatesDay = new Dictionary<string, int>(StringComparer.Ordinal);
         private static int _dCalls, _dCallsPair, _dCallsTerm, _dFlip, _dPairs, _tCalls;
         private static double _dSumBefore, _dSumAfter, _tSumBefore, _tSumAfter; private static int _tCallsTerm;
 
         // dzien (odswiezane przy zmianie doby albo kasowaniu pamieci)
         private static bool _flag, _canonOver, _northOpen, _aegonIn, _danyIn;
+        private static int _bsState = -9, _bEvState = -9;   // recenzja: stan ROT BastardsSiegeEvent i BastardsEvent do linii (decyzja Jeffa, gdy oblezenie nie ruszy)
+        private static bool _orderLogged;                  // recenzja: kolejnosc postfiksow raz w pierwszej dobie (po wpieciu PovertyPeace)
         private static Kingdom _holder; private static bool _throneExists;
         private static int _flagDay = int.MinValue;
 
@@ -136,7 +140,7 @@ namespace Armoury
         {
             lock (_lock)
             {
-                _mem.Clear(); _memDay = int.MinValue; _posToday.Clear(); _posWhy.Clear(); _posTerm.Clear(); _gatesDay.Clear();
+                _mem.Clear(); _memDay = int.MinValue; _posToday.Clear(); _posWhy.Clear(); _posTerm.Clear(); _posMax.Clear(); _gatesDay.Clear();
                 _dCalls = _dCallsPair = _dCallsTerm = _dFlip = _dPairs = _tCalls = _tCallsTerm = 0;
                 _dSumBefore = _dSumAfter = _tSumBefore = _tSumAfter = 0.0;
                 _flagDay = int.MinValue; _holder = null; _throneExists = false;
@@ -145,6 +149,7 @@ namespace Armoury
                 _dWarList.Clear(); _dJoinList.Clear();
                 _stumblesDay = 0;
                 _pov.Clear();
+                _bsState = _bEvState = -9; _orderLogged = false;
             }
         }
 
@@ -274,6 +279,7 @@ namespace Armoury
             try { over = CanonWarClock.OverNow(); } catch { over = false; }
             _canonOver = _flag || !SpareKey || over;
             int bs = SafeRot("BastardsSiegeEvent");
+            _bsState = bs; _bEvState = SafeRot("BastardsEvent");   // tylko do linii: BastardsEvent rusza dopiero po koncu oblezenia (ROT MainCheck)
             _northOpen = _flag || (NorthWaitKey ? bs == 2 : _canonOver);
             Settlement kl = null;
             try { kl = Settlement.Find(ThroneTownId); } catch { kl = null; }
@@ -347,6 +353,14 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>Recenzja (projekt C.3): krolestwo w sojuszu gry z Polnoca - wojna z nim wciagnelaby Polnoc wezwaniem przed Bitwa Bekartow.</summary>
+        private static bool NorthAlly(Kingdom k)
+        {
+            if (k == null || k.StringId == NorthId) return false;
+            var n = FindK(NorthId);
+            try { return n != null && !n.IsEliminated && k.IsAllyWith(n); } catch { return false; }
+        }
+
         private static bool PlayerRealm(Kingdom k)
         {
             try { return k != null && Clan.PlayerClan != null && Clan.PlayerClan.Kingdom == k; } catch { return false; }
@@ -385,7 +399,9 @@ namespace Armoury
             foreach (var e in FactionHelper.GetEnemyKingdoms(a))
             {
                 if (e == null || e == a || e.IsEliminated) continue;
-                float v = (float)_mWe.Invoke(wem, new object[] { a, e });
+                float v;
+                try { v = (float)_mWe.Invoke(wem, new object[] { a, e }); }
+                catch (Exception ex) { Stumble("MaxWeariness", ex); return -1f; }   // recenzja: jak brak odczytu; para trafia do pamieci doby (jedno potkniecie na pare/dobe)
                 if (v > mx) mx = v;
             }
             return mx;
@@ -427,6 +443,29 @@ namespace Armoury
                 }
                 catch (Exception e) { _pov.Remove(k.StringId); Stumble("PovertyDaily", e); }
             }
+        }
+
+        /// <summary>Recenzja: kopia CrashScribe PovertyPeace.ShiftHistory - przelew miedzy skarbcami (BookHoldings.E1Shift: zwrot skarbca L5b-1, okup Neda) przesuwa
+        /// cala historie krolestwa o delta, zeby przelew nie liczyl sie jako ubytek/doplyw w mierze biedy. Zwraca liczbe dob (-1 bez stanu). Nie rzuca.</summary>
+        internal static int ShiftHistory(Kingdom k, long delta)
+        {
+            try
+            {
+                if (k == null) return -1;
+                lock (_lock)
+                {
+                    PState s;
+                    if (!_pov.TryGetValue(k.StringId, out s) || s == null) return -1;
+                    if (delta == 0) return s.Hist.Count;
+                    for (int i = 0; i < s.Hist.Count; i++)
+                    {
+                        long v = (long)s.Hist[i].Value + delta;
+                        s.Hist[i] = new KeyValuePair<int, int>(s.Hist[i].Key, (int)Math.Max(0L, Math.Min((long)int.MaxValue, v)));
+                    }
+                    return s.Hist.Count;
+                }
+            }
+            catch (Exception e) { Stumble("ShiftHistory", e); return -1; }
         }
 
         /// <summary>Kopia CrashScribe PovertyPeace.DrainNoOneOff (f19-kanon-a 5): ubytek na dobe bez skokow jednej doby w dol, nigdy wiekszy niz wzor prosty.</summary>
@@ -497,7 +536,7 @@ namespace Armoury
             if (w <= 0f) { Gate(m, GNoAim); return m; }
             m.W = w; m.Why = why; m.Label = label;
             if (!_canonOver) { Gate(m, GCanon); return m; }
-            if ((a.StringId == NorthId || t.StringId == NorthId) && !_northOpen) { Gate(m, GNorth); return m; }
+            if (!_northOpen && (a.StringId == NorthId || t.StringId == NorthId || NorthAlly(a) || NorthAlly(t))) { Gate(m, GNorth); return m; }
             // limit wojen A
             int wars = 0, mx = MaxWars;
             float otherEnemies = 0f;
@@ -556,15 +595,15 @@ namespace Armoury
                     _dCallsPair++;
                     string key = PairKey(a, t);
                     if (!_mem.TryGetValue(key, out m)) { m = Compute(a, t, day); _mem[key] = m; }
-                    if (m.Term <= 0f || m.Text == null) return;
+                    if (m.Term <= 0f || m.Text == null) { _posWhy.Remove(key); _posTerm.Remove(key); return; }   // recenzja: klasyfikacja tylko przy czlonie w chwili glosu
                     _dCallsTerm++; _tCallsTerm++;
                     _dSumBefore += s; _dSumAfter += s + m.Term; _tSumBefore += s; _tSumAfter += s + m.Term;
                     if (s < 0f && s + m.Term >= 0f) _dFlip++;
+                    _posTerm[key] = m.Term; _posWhy[key] = m.Why;   // recenzja: stan z OSTATNIEJ oceny (klasyfikacja), linia doby - najwyzszy czlon dnia
                     float prev;
-                    if (!_posTerm.TryGetValue(key, out prev) || m.Term > prev)
+                    if (!_posMax.TryGetValue(key, out prev) || m.Term > prev)
                     {
-                        _posTerm[key] = m.Term;
-                        _posWhy[key] = m.Why;
+                        _posMax[key] = m.Term;
                         _posToday[key] = key + " w=" + m.W.ToString("0.00", Inv) + " R=" + m.R.ToString("0.00", Inv) + " T=" + m.Pov.ToString("0.00", Inv)
                                          + " wojny=" + m.Wars + " czlon=" + m.Term.ToString("0", Inv) + " (" + m.Why + ")";
                     }
@@ -582,7 +621,7 @@ namespace Armoury
         {
             try
             {
-                var st = new StackTrace(2, false);
+                var st = new StackTrace(3, false);   // StackHas, OnWarLocked, OnWar
                 for (int i = 0; i < st.FrameCount && i < 50; i++)
                 {
                     var mm = st.GetFrame(i)?.GetMethod();
@@ -607,9 +646,21 @@ namespace Armoury
                 {
                     RefreshDay(day);
                     string key = PairKey(a, t);
-                    string why;
                     bool inW = InW(a) || InW(t);
                     _mem.Clear();   // limity wojen i przerwa zmieniaja sie teraz
+                    // recenzja: po klasyfikacji zdejmujemy tylko TE pare (wezwania sojusznikow AllianceCampaignBehavior/168/BK rozstrzygaja sie w zdarzeniu WarDeclared
+                    // PRZED naszym sluchaczem - czyszczenie calego _posWhy zgubiloby zewnetrzna wojne o tron); inne pary bez czlonu zdejmuje postfiks przy nowej ocenie
+                    try { OnWarLocked(a, t, detail, day, key, inW); }
+                    finally { _posWhy.Remove(key); _posTerm.Remove(key); }
+                }
+            }
+            catch (Exception e) { Stumble("OnWar", e); }
+        }
+
+        /// <summary>Klasyfikacja wypowiedzenia (pod _lock, z OnWar).</summary>
+        private static void OnWarLocked(Kingdom a, Kingdom t, DeclareWarAction.DeclareWarDetail detail, int day, string key, bool inW)
+        {
+                    string why;
                     if (detail == DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision && _posWhy.TryGetValue(key, out why))
                     {
                         float term; _posTerm.TryGetValue(key, out term);
@@ -621,7 +672,8 @@ namespace Armoury
                         _dWars++; _tWars++;
                         if (_dWarList.Count < 10) _dWarList.Add(key + " (" + why + ")");
                         Log.Info(Tag + "dzien " + day + " | WOJNA O TRON " + key + " (" + KName(a) + " -> " + KName(t) + "): powod " + why + ", droga " + path
-                                 + ", czlon " + term.ToString("0", Inv) + ", dawna para zatargu " + (feud ? "TAK" : "NIE") + ", przerwa do dnia " + (day + GapDays) + ".");
+                                 + ", czlon " + term.ToString("0", Inv) + ", dawna para zatargu " + (feud ? "TAK" : "NIE") + ", przerwa do dnia " + (day + GapDays)
+                                 + ", kanon skonczony " + T(_canonOver) + ", Polnoc po Bekartach " + T(_northOpen) + ", flaga testu " + T(_flag) + ".");
                         return;
                     }
                     if (!inW) return;
@@ -633,9 +685,6 @@ namespace Armoury
                         return;
                     }
                     if (detail == DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision) { _dOther++; _tOther++; }
-                }
-            }
-            catch (Exception e) { Stumble("OnWar", e); }
         }
 
         /// <summary>CampaignEvents.MakePeace: pokoj w wojnie o tron (licznik). Kasuje pamiec doby.</summary>
@@ -662,6 +711,40 @@ namespace Armoury
             catch (Exception e) { Stumble("OnPeace", e); }
         }
 
+        /// <summary>Recenzja: OnSettlementOwnerChanged - zmiana pana King's Landing odswieza posiadacza tronu i pamiec doby od razu (wojna/pokoj tego nie robia).</summary>
+        internal static void OnOwnerChanged(Settlement st, bool openToClaim, Hero newOwner, Hero oldOwner, Hero capturer,
+                                            ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+        {
+            try
+            {
+                if (st == null || st.StringId != ThroneTownId) return;
+                lock (_lock) { _memDay = int.MinValue; }   // _posWhy/_posTerm odswieza postfiks przy nastepnej ocenie
+            }
+            catch (Exception e) { Stumble("OnOwnerChanged", e); }
+        }
+
+        /// <summary>Recenzja: wojny o tron bez pokoju (krolestwo zniszczone - DestroyKingdomAction nie wola MakePeace - albo wojny juz nie ma) zdejmowane z zapisu. Pod _lock.</summary>
+        private static void PruneThroneWars(int day)
+        {
+            if (_throneWars.Count == 0) return;
+            var gone = new List<string>();
+            var txt = new List<string>();
+            foreach (var kv in _throneWars)
+            {
+                int gt = kv.Key.IndexOf('>');
+                var a = gt > 0 ? FindK(kv.Key.Substring(0, gt)) : null;
+                var t = gt > 0 ? FindK(kv.Key.Substring(gt + 1)) : null;
+                bool dead = a == null || t == null || a.IsEliminated || t.IsEliminated;
+                if (dead || !FactionManager.IsAtWarAgainstFaction(a, t))
+                {
+                    gone.Add(kv.Key);
+                    txt.Add(kv.Key + "@" + kv.Value.ToString(Inv) + (dead ? " (krolestwo zniszczone)" : " (bez wojny)"));
+                }
+            }
+            foreach (var g in gone) _throneWars.Remove(g);
+            if (gone.Count > 0) Log.Info(Tag + "dzien " + day + " | SPRZATNIETE wojny o tron bez pokoju: " + string.Join(", ", txt.ToArray()) + ".");
+        }
+
         // ---------------------------------------------------------------- doba i linie
 
         /// <summary>CanonWarsBehavior.OnDaily: bieda skarbca (historia doby), linia doby, zerowanie licznikow doby.</summary>
@@ -672,10 +755,16 @@ namespace Armoury
             lock (_lock)
             {
                 try { PovertyDaily(day); } catch (Exception e) { Stumble("PovertyDaily", e); }
+                try { PruneThroneWars(day); } catch (Exception e) { Stumble("PruneThroneWars", e); }
+                if (!_orderLogged)
+                {
+                    _orderLogged = true;
+                    try { Log.Info(Tag + "kolejnosc latek (pierwsza doba) | " + OrderText() + "."); } catch (Exception e) { Stumble("OrderText", e); }
+                }
                 try { RefreshWorld(day); } catch (Exception e) { Stumble("RefreshWorld", e); }
                 line = DayLine(day);
                 _mem.Clear(); _memDay = int.MinValue;
-                _posToday.Clear(); _posWhy.Clear(); _posTerm.Clear(); _gatesDay.Clear();
+                _posToday.Clear(); _posWhy.Clear(); _posTerm.Clear(); _posMax.Clear(); _gatesDay.Clear();
                 _dCalls = _dCallsPair = _dCallsTerm = _dFlip = _dPairs = 0;
                 _dSumBefore = _dSumAfter = 0.0;
                 _dWars = _dPeace = _dJoin = _dOther = 0; _dWarList.Clear(); _dJoinList.Clear();
@@ -699,7 +788,7 @@ namespace Armoury
             var sb = new StringBuilder(1200);
             sb.Append(Tag).Append("doba | dzien ").Append(day)
               .Append(" | klucz ").Append(T(Key)).Append(", flaga testu ").Append(T(_flag)).Append(", kanon skonczony ").Append(T(_canonOver))
-              .Append(", Polnoc po Bekartach ").Append(T(_northOpen))
+              .Append(", Polnoc po Bekartach ").Append(T(_northOpen)).Append(" (BastardsSiegeEvent ").Append(_bsState).Append(", BastardsEvent ").Append(_bEvState).Append(')')
               .Append(" | tron: ").Append(HolderText())
               .Append(" | limity: max wojen ").Append(MaxWars).Append(", sila ").Append(StrMin.ToString("0.00", Inv)).Append('-').Append(StrFull.ToString("0.00", Inv))
               .Append(", przerwa ").Append(GapDays).Append(" dni, zmeczenie ").Append(WearyAt.ToString("0", Inv)).Append(" (").Append(WearyText()).Append(')')
@@ -760,6 +849,7 @@ namespace Armoury
                   .Append(", North Reclaims ").Append(T(ReclaimKey)).Append(", Targets Player ").Append(T(TargetsPlayerKey))
                   .Append(" | flaga testu ").Append(FlagName).Append(' ').Append(T(_flag)).Append(LogGate.Mode == 1 || LogGate.Mode == 2 ? "" : " (gra - flaga nieczytana)")
                   .Append(" | kanon skonczony ").Append(T(_canonOver)).Append(", Polnoc po Bekartach ").Append(T(_northOpen))
+                  .Append(" (BastardsSiegeEvent ").Append(_bsState).Append(", BastardsEvent ").Append(_bEvState).Append(')')
                   .Append(", najazd Aegona ").Append(T(_aegonIn)).Append(", najazd Daenerys ").Append(T(_danyIn))
                   .Append(" | tron: ").Append(HolderText())
                   .Append(" | zmeczenie: ").Append(WearyText())

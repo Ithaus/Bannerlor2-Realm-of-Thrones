@@ -10200,7 +10200,7 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool IronThroneSpareFiveKings { get; set; } = true;
 
-        [SettingPropertyBool("The North Waits for the Bastards", HintText = "no war for the throne against or by the North until the Battle of the Bastards is over, so the story of the North runs as in Realm of Thrones; after it, the realm on the Iron Throne and the strong claimants may march north (off = from the Red Wedding)", RequireRestart = false)]
+        [SettingPropertyBool("The North Waits for the Bastards", HintText = "no war for the throne against or by the North (or a realm allied with it) until the Battle of the Bastards is over, so the story of the North runs as in Realm of Thrones; after it, the realm on the Iron Throne and the strong claimants may march north (off = from the Red Wedding)", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool IronThroneNorthAfterBastards { get; set; } = true;
 
