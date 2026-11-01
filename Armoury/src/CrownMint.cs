@@ -34,6 +34,8 @@ namespace Armoury
     ///  - ZUZYCIE: CoinWearPerYear / dni roku na dobe z kies ludu (TownFolk.CoinWear) i kas miast i zamkow, ulamki przechodza na jutro. Domyslnie 0 (recenzja 311b):
     ///    na liczbach 31.10 polki maja 3-4 szt. srebra i <1 szt. rudy zlota na miasto - mennica bije prawie nic, a zuzycie od pierwszej doby zmniejszaloby pieniadz
     ///    swiata (odwrotnie niz chcial Jeff); wlaczyc dopiero, gdy linia "Mennica (311b)" pokaze realna monete (decyzja Jeffa).
+    ///    312a (Jeff 01.11 "wlacz mennice"): domyslnie 0.003 - autotest 311x: mennica bila 86573 w 90 dob (ok. 0.16%/rok calego pieniadza), zuzycie
+    ///    0.3%/rok liczy sie tylko od kies ludu i kas miast/zamkow (ok. 1/6 pieniadza), wiec netto swiata zostaje dodatnie.
     ///  - Wsie, sakiewki panow, skarbce i Bank sie nie zuzywaja (moneta tam lezy, nie krazy na targu).
     ///  - KONTROLA: zloto swiata przed i po (MoneyLedger.WorldNow) - roznica musi byc rowna moneta - zuzycie (rozjazd 0), linia "Mennica (311b)".
     ///  - Potkniecia liczone na miasto, pierwszy wyjatek z miejsca do logu; nic nie gasi funkcji. Raz na dobe, wlasna pozycja MMint ksiegi pieniadza (po Bloomery.Daily,
