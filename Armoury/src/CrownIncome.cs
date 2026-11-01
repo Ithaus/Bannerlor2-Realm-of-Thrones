@@ -76,6 +76,7 @@ namespace Armoury
             // z okien 184/P1/M9 wplacone po Begin (przed End; zamkniete z oknem - w zadnych wplywach dnia) i splaty pozyczek koron u miast (korona2, KlRepay)
             public int Day = -1;
             public long OwnLate, TownRepaid;
+            public long Reward178;   // 312e (recenzja): nagrody 178 za wielkiego jenca ze skarbca tej doby (Ransom178.CrownStep) - tylko licznik
         }
 
         private static readonly Dictionary<Kingdom, KDay> _day = new Dictionary<Kingdom, KDay>();
@@ -163,7 +164,7 @@ namespace Armoury
             _shiftWin.Clear();                    // 312e: przesuniecia migawki w oknie linii "Skarbce:" (pamiec sesji)
             _dNewKing = 0; _dNewKingN = 0;        // L1 (recenzja): nowe dlugi okupow krolow - licznik linii 165 czyszczony miedzy kampaniami
             ZeroLast(); _dDebtRepaid = _dNewDebt = _dDropped = 0; _dNewDebtN = _dDroppedN = 0; _dAdvRepaid = _dAdvNew = 0;
-            _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0;
+            _stumbles = 0; Stumbles312 = 0; _err.Clear(); _importN = -1; _importBad = 0;
             KingdomTreasury.WarTaxReset();   // E5/B2 (184): stawki podatku wojennego ludu - zapisane w szostym polu tego klucza, czyszczone razem z nim
         }
 
@@ -172,6 +173,14 @@ namespace Armoury
             LastMeasured = LastOwn = LastOther = LastRelease = LastSpend = LastGiftOut = LastRepOut = LastRepIn = LastContract = LastRefund = LastLeft = 0;
             LastRent = LastRentHeld = 0; LastCallToWar = 0; LastLoanIn = LastLoanOut = 0;
             LastDebtRepaid = LastOwnCut = LastNewDebt = 0; LastNewDebtN = 0; LastAdvanceRepaid = LastAdvanceNew = 0;
+        }
+
+        // 312e (recenzja): potkniecia samego pomiaru 312e - osobny licznik (linia "Skarbce:"), zeby nie podnosic "potkniecia" linii 165 (stare progi)
+        internal static int Stumbles312;
+        private static void Stumble312(string where, Exception e)
+        {
+            Stumbles312++;
+            try { if (_err.Add(where)) Log.Error("CrownIncome." + where, e); } catch { }
         }
 
         private static void Stumble(string where, Exception e)
@@ -443,7 +452,7 @@ namespace Armoury
                 if (!_shiftWin.TryGetValue(k, out r)) { r = new long[3]; _shiftWin[k] = r; }
                 r[tag == 'k' ? 0 : tag == 'm' ? 1 : 2] += delta;
             }
-            catch (Exception e) { Stumble("ShiftSnapshot(312e)", e); }
+            catch (Exception e) { Stumble312("ShiftSnapshot(312e)", e); }
         }
 
         // 312e: przesuniecia migawki na krolestwo od ostatniej linii "Skarbce:" ([0] korona-korona, [1] m105 rachunki, [2] inne do zapasu) - zloto przeszlo przez skarbiec
@@ -488,7 +497,7 @@ namespace Armoury
                         if (k == null || d == null) continue;
                         d.OwnLate = KingdomTreasury.FolkWarTaxWindow(k) + KingdomTreasury.FolkWarAidWindow(k) + DsSeason.MovWindow(k) - d.WarTax - d.WarAid - d.DsMov;
                     }
-                    catch (Exception e) { Stumble("End(312e)", e); }
+                    catch (Exception e) { Stumble312("End(312e)", e); }
                 }
                 KingdomTreasury.FolkWarTaxWindowClear();   // E5/B2 (184): okno wplywow dnia zamkniete razem z migawka (pobor po Begin jest juz w migawce - zapas)
                 DsSeason.WindowClear();                    // DS F3 (M9): okno dziesiatej zamkniete razem z oknem 184
@@ -614,7 +623,7 @@ namespace Armoury
                 long hb = KingdomTreasury.HoardUsedToday(k), hr = -ShiftWindowOf(k)[1];
                 return (d.Court > 0 ? " dwor -" + d.Court : "") + (hb > 0 ? " m105 chleb -" + hb : "") + (hr != 0 ? " m105 rachunki wczoraj -" + hr : "");
             }
-            catch (Exception e) { Stumble("K312", e); return ""; }
+            catch (Exception e) { Stumble312("K312", e); return ""; }
         }
 
         // ------------------------------------------------------------ Diplomacy: odszkodowania jako dlug korona -> korona
