@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-01 WGRANIE 148 - noc/312x-integracja (147 + 312a zuzycie monety, 312b konce zatargow ROT, 312c ambicja Zelaznego Tronu, 312d przezbrojenia notabli z rynku miasta, 312e pomiar skarbcow, 312f linia strat bitwy); Armoury.dll ef080a64a09b09787dddc7e8f7c6a977 (CrashScribe bez zmian aa32d04e); kopia 147: Armoury.dll.bak-2026-11-01-przed-wgranie148 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie148-przed
+
+**Problem:** decyzje Jeffa 01.11 (1 konce zatargow "kazdy chce zostac krolem i zdobyc zelazny tron", 2 czemu traca korony, 3 napraw notabli, 4 rozbij straty, 5 wlacz mennice, 6 nowe wojny o Westeros bez psucia Wojny Pieciu Kroli; odpowiedzi: cisza do Krwawych Godow, na Polnoc po Bitwie Bekartow).
+**Testy:** autotest 312x (C:/Users/GAME/bannerlord-autotest - narzedzia przeniesione z Temp, sprzatanie Temp skasowalo safe-mode-guard.ps1 i n112b): bitwaN 9 bitew kod 0, ERROR 0; probyN 120 dob "KONIEC OK 350/350" (gra zamknieta recznie na zyczenie Jeffa przy zapisie po koncu dob - kod 1 = wywrotka-po-koncu, nie blad), ERROR 0, pliki gry przywrocone, Armoury.json Jeffa c7055052 nietkniety.
+- 312b: wszystkie 10 zatargow zwolnione (Essos 108878, Reach-Dorne/Qarth/Dothrakowie 108949, Vale-Iron Islands 108970), 9 pokojow przez glos rady, ROT nie wznowil zadnego; zatargi312b 0 NIE.
+- 312c: 120/120 dob "czlon > 0: 0 par" (cisza do Krwawych Godow); tron312c 0 NIE. Bieg z flaga armoury-tron312-porw.flag (po Godach) NIE wykonany - Jeff zakonczyl test.
+- 312a: mennica 111872 / zuzycie 34874 w 120 dob, netto +0.106%/rok; mennica311b 0 NIE.
+- 312d: nwar 0 NIE; N312D-4 NIE (mlode typy przy zmianie 4 - opisany falszywy alarm: kampania Jeffa od 30.10, kazdy rachunek < 180 dob).
+- 312e: korony312e 0 NIE. 312f: S312F-2 1 rozjazd bilansu na 125 bitew (b78 AI +240) - tylko licznik logu, do poprawy.
+**Ryzyko / co sprawdzic:** wojny o tron po Krwawych Godach niesprawdzone w grze (bieg z flaga do zrobienia); w grze Jeffa: pokoje w Essos i Reach-Dorne, MCM "Old Feuds Can End", "Ambition for the Iron Throne", "Coin Wear Per Year" 0.003, "Workshop Retool Own Market".
+**Status:** WGRANE 148
+
 ## 2026-11-01 312c wojny - ambicja Zelaznego Tronu (nowe wojny o Westeros po Krwawych Godach, Polnoc po Bitwie Bekartow)
 
 **Problem:** Jeff 01.11 pkt 6: "wlacz nowe wojny byle nie zepsuc wojny 5 kroli ... wszyscy chca wladac westeros poza polnoca ktora chce by odzielnym krolestwem ... poludniowi wladcy ... beda zawsze dazyli jak znajda sily aby westeros bylo jednym krolestwem"; odpowiedzi: "Cisza do Krwawych Godow", Polnoc "Po Bitwie Bekartow". Dzis zadne krolestwo AI nie wypowiada wojny.
