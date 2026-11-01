@@ -256,6 +256,9 @@ namespace Armoury
         private static void PostSpeed(Agent agent, float desiredSpeed, bool limitIsMultiplier)
         {
             if (agent == null) return;
+            // 313d (klucz WoundedLimp): pieszy z capem kustykania (Bleed313 - odwrot rannego 143 albo HP <= WoundedLimpBelowHp, takze w panice) - limit nie wyzej
+            // niz kustykanie, przed innymi capami; tu wchodzi tez OnRetreating (AdjustSpeedLimit(-1)) natywnego odwrotu i ucieczki. Cap 0 = bez zmian ponizej
+            if (Bleed313.PostSpeedLimp(agent, desiredSpeed, limitIsMultiplier)) return;
             // poprawka 132b: nekajacy autotestu (HorsePursuit.TestRunAnyThread - tylko LogGate.Mode 1, klucz HuntHarasserInAutotest) - bez limitu tempa szyku.
             // Gra wpisuje tu limit czlowieka w szyku z Formation.CachedMovementSpeed (latka 1 obniza ja do tempa marszu) - samo pominiecie capu (283a) zostawialo
             // tempo szyku: autotest 132b A 2.0 m/s przy swoim szyku, B 1.0-1.2 m/s przez 170 s. -1 = bez limitu (jak OnRetreating gry), takze kon.

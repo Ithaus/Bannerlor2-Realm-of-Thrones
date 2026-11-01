@@ -63,6 +63,7 @@ namespace Armoury
             public float NextEval;
             public float LastSend = -100f;    // ostatni natywny Agent.Retreat (-100 = jeszcze nie)
             public float FirstSend = -100f;   // pierwszy natywny Agent.Retreat (poczatek drogi)
+            public float Dist0;               // recenzja 313d: dystans do celu przy pierwszym wyslaniu (limit drogi kustykajacego - Bleed313.WalkLimit)
             public Vec2 Target = Vec2.Invalid;
             public WorldPosition Wp = WorldPosition.Invalid;
         }
@@ -98,6 +99,13 @@ namespace Armoury
         {
             Wd w;
             return a != null && _wd.TryGetValue(a, out w) && !w.Done;
+        }
+
+        /// <summary>Recenzja 313d: ranny w odwrocie kustyka (Bleed313) - w drodze i na postoju, ale nie ten, kto wrocil do walki (Returned). Glowny watek.</summary>
+        internal bool LimpingWithdraw(Agent a)
+        {
+            Wd w;
+            return a != null && _wd.TryGetValue(a, out w) && !w.Done && !w.Returned;
         }
 
         // ------------------------------------------------------------ wejscie (BrokenMen)
@@ -168,8 +176,16 @@ namespace Armoury
         private static bool Pain(Agent a)
         {
             var c = Settings.Current;
+            // 313d (klucz PainBreakByChance): "z bolu" = przegrany rzut bolu FieldCraft (zlamany przez kompanie przy HP ponizej progu to nie bol)
+            if (c != null && c.PainBreakByChance) return FieldCraft.PainBrokeNow(a);
             float max = a.HealthLimit;
             return c != null && max > 0f && a.Health / max < c.AiFleeBelowPercent / 100f;
+        }
+
+        /// <summary>313d: czlowiek mial juz odwrot rannego w tej bitwie (w toku albo zakonczony - Withdraw raz na bitwe). Glowny watek.</summary>
+        internal bool WithdrawSeen(Agent a)
+        {
+            return a != null && _wd.ContainsKey(a);
         }
 
         /// <summary>Postoj zdjety (DisableScriptedMovement), gdy byl. Natywnego odwrotu w drodze nie ruszamy - nadpisze go cudzy odwrot albo handler paniki.</summary>
@@ -334,7 +350,13 @@ namespace Armoury
                 }
                 catch { }
                 if (w.LastSend > -50f && w.Target.IsValid && pos.IsValid && pos.DistanceSquared(w.Target) <= r2) { Arrive(w, now, false); return; }
-                if (w.FirstSend > -50f && now - w.FirstSend > WoundedWithdraw.WalkMax) { Arrive(w, now, true); return; }
+                // recenzja 313d: kustykajacy (ok. 1.1 m/s) - limit drogi wedlug dystansu do celu (Bleed313.WalkLimit, najwyzej 90 s), nie stale 30 s
+                if (w.FirstSend > -50f && now - w.FirstSend > Bleed313.WalkLimit(a, w.Dist0, WoundedWithdraw.WalkMax))
+                {
+                    if (Bleed313.LimpCapOf(a) > 0f) Bleed313.LimpHoldInPlace++;
+                    Arrive(w, now, true);
+                    return;
+                }
             }
             if (now < w.NextEval) return;
             Evaluate(w, m, now);
@@ -478,7 +500,13 @@ namespace Armoury
             {
                 var send = w.Wp;
                 a.Retreat(send);                                          // natywne SetRetreatMode - bez Panic, bez OnAgentFleeing, bez okrzyku
-                if (first) { WoundedWithdraw.Sends++; w.FirstSend = now; } else WoundedWithdraw.Turns++;
+                if (first)
+                {
+                    WoundedWithdraw.Sends++;
+                    w.FirstSend = now;
+                    w.Dist0 = my.IsValid && w.Target.IsValid ? my.Distance(w.Target) : 0f;   // recenzja 313d: limit drogi kustykajacego
+                }
+                else WoundedWithdraw.Turns++;
                 w.LastSend = now;
                 return;
             }

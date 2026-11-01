@@ -38,9 +38,49 @@ namespace Armoury
         private readonly Dictionary<Agent, int> _tries = new Dictionary<Agent, int>();
         private float _accum;
 
+        // 313d (klucz WoundedFleeByChance): rzut odwrotu 143 raz na swieza rane (licznik ran FieldCraft.HitsOf przy ostatnim rzucie) i wygrani rzutu
+        // (czekaja, az Withdraw przyjmie - cudzy odwrot)
+        private readonly Dictionary<Agent, int> _rolledAt = new Dictionary<Agent, int>();
+        private readonly HashSet<Agent> _rollWon = new HashSet<Agent>();
+
         public override void OnAgentDeleted(Agent affectedAgent)
         {
-            try { _nextTry.Remove(affectedAgent); _tries.Remove(affectedAgent); } catch { }
+            try { _nextTry.Remove(affectedAgent); _tries.Remove(affectedAgent); _rolledAt.Remove(affectedAgent); _rollWon.Remove(affectedAgent); } catch { }
+        }
+
+        /// <summary>313d: czy ranny ponizej WoundedFleePercent wycofuje sie (143). Ponizej WoundedLimpBelowHp - zawsze (Jeff: "jest po prostu ranny ... wolno
+        /// wycofuje sie"). Inaczej rzut raz na swieza rane: WoundedFleeChance x (krwawi ? 2 : 1) x (1.5 - morale/100) x kondycja z Atletyki, obciete 5..95%.
+        /// Kto juz mial odwrot w tej bitwie albo jest zlamany - bez rzutu (Withdraw sam odmowi).</summary>
+        private bool WithdrawRoll(Agent a, Settings c)
+        {
+            var k = RoutHold.Live;
+            if (k == null) return true;
+            if (k.WithdrawSeen(a) || k.Knows(a) || _rollWon.Contains(a)) return true;
+            if (c.WoundedLimpBelowHp > 0 && a.Health <= c.WoundedLimpBelowHp)
+            {
+                _rollWon.Add(a);
+                Bleed313.WdForced++;
+                return true;
+            }
+            int hits = FieldCraft.HitsOf(a);
+            int last;
+            if (_rolledAt.TryGetValue(a, out last) && last == hits) return false;   // ta rana juz rzucona - zostaje
+            _rolledAt[a] = hits;
+            float morale = 50f;
+            try { morale = a.GetMorale(); } catch { morale = 50f; }
+            bool bleeding = FieldCraft.BleedingNow(a);
+            float p = Bleed313.Clamp(c.WoundedFleeChance, 0f, 1f) * (bleeding ? Bleed313.WithdrawBleedFactor : 1f) * Bleed313.MoraleMul(morale)
+                      * Bleed313.Cond(FieldCraft.AthOf(a), c);
+            p = Bleed313.Clamp(p, 0.05f, 0.95f);
+            Bleed313.WdRolls++;
+            if (TaleWorlds.Core.MBRandom.RandomFloat < p)
+            {
+                Bleed313.WdYes++;
+                _rollWon.Add(a);
+                return true;
+            }
+            Bleed313.WdNo++;
+            return false;
         }
 
         // NM: liczniki misji od poczatku misji; jedna linia "Druzyny w misji (NM)" po misji
@@ -77,6 +117,10 @@ namespace Armoury
                 var mission = Mission.Current;
                 if (mission == null || mission.Agents == null) return;
                 if (mission.MainAgent == null && !c.WoundedFleeWithoutPlayer) return;
+
+                // recenzja 313d: kolejka trafien zdjeta przed rzutami odwrotu 143 - licznik ran (HitsOf) juz po ciosie, ktory zbil rannego ponizej progu
+                // (inaczej ta sama rana dostawala drugi rzut po ProcessHits FieldCraft)
+                if (c.WoundedFleeByChance) FieldCraft.DrainHits(c);
 
                 float cut = c.WoundedFleePercent / 100f;
                 if (cut <= 0f) return;
@@ -126,7 +170,12 @@ namespace Armoury
                         // zalamaniu kompanii, panice gry albo rozbitym szyku - wtedy RoutHold.Break jak kazdy zlamany. Oblezenie, kryjowka, morze - jak dotad.
                         if (RoutHold.On(mission))
                         {
-                            if (RoutHold.WithdrawHere(mission)) RoutHold.Withdraw(a);
+                            if (RoutHold.WithdrawHere(mission))
+                            {
+                                // 313d (klucz WoundedFleeByChance): odwrot 143 z rzutu, nie zawsze - kto zostal, walczy ostroznie (145)
+                                if (c.WoundedFleeByChance && !WithdrawRoll(a, c)) continue;
+                                RoutHold.Withdraw(a);
+                            }
                             else RoutHold.Break(a, MissionTeams.Broken);
                             continue;
                         }

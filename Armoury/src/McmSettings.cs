@@ -1476,7 +1476,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float WoundedMaxSlow { get; set; } = 0.3f;
 
-        [SettingPropertyInteger("Bleed Below Hp", 0, 40, "0", HintText = "bleeding starts at this many hit points or fewer", RequireRestart = false)]
+        [SettingPropertyInteger("Bleed Below Hp", 0, 40, "0", HintText = "old rule (Bleed From Wounds off): bleeding starts at this many hit points or fewer", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public int BleedBelowHp { get; set; } = 10;
 
@@ -1484,13 +1484,93 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public int AiFleeBelowPercent { get; set; } = 10;
 
-        [SettingPropertyFloatingInteger("Bleed Per Second", 0.00f, 2.00f, "0.00", HintText = "health lost per second while bleeding out", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Bleed Per Second", 0.00f, 2.00f, "0.00", HintText = "old rule (Bleed From Wounds off): health lost per second while bleeding out", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float BleedPerSecond { get; set; } = 0.5f;
 
-        [SettingPropertyBool("Ai Flee When Near Death", HintText = "AI soldiers below the bleeding threshold break and run for their lives", RequireRestart = false)]
+        [SettingPropertyBool("Ai Flee When Near Death", HintText = "AI soldiers below AI Flee Below Percent of health break and run for their lives (with Pain Break By Chance on: only those who fail the pain roll)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool AiFleeWhenNearDeath { get; set; } = true;
+
+        [SettingPropertyBool("Bleed Death Log", HintText = "write a bleeding summary line to the Armoury log after each battle: wounds that bled, how many stopped, deaths from bleeding (killed / knocked out), rolls to withdraw and to break from pain, limping men. Log only, no change in play", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool BleedDeathLog { get; set; } = true;
+
+        [SettingPropertyBool("Bleed From Wounds", HintText = "bleeding comes from the wound, not from the health bar: a deep cut may bleed, a scratch never does, and the bleeding slows down and stops as the blood clots (about a minute). The chance grows with the depth of the wound; cuts bleed most, stabs and arrows less, crushing blows hardly at all; armour that took part of the blow makes it shallower; Athletics makes a man bleed less. Only in battles on the map, not in tournaments or the arena. Off = old rule (Bleed Below Hp, Bleed Per Second)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool BleedFromWounds { get; set; } = true;
+
+        [SettingPropertyBool("Bleed Affects Player", HintText = "with Bleed From Wounds on: you can bleed from a deep wound too (a message tells you). Off = only the AI bleeds", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool BleedAffectsPlayer { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Bleed Chance Deep Wound", 0.00f, 1.00f, "0.00", HintText = "chance that a deep unarmoured cut (a wound of Bleed Full Wound Share of health or more) starts bleeding, for a man of Athletics 100", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BleedChanceDeepWound { get; set; } = 0.60f;
+
+        [SettingPropertyFloatingInteger("Bleed Min Wound Share", 0.00f, 0.50f, "0.00", HintText = "wounds smaller than this share of a man's full health never bleed", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BleedMinWoundShare { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Bleed Full Wound Share", 0.20f, 1.00f, "0.00", HintText = "wound depth (share of full health) at which the full bleeding chance applies; in between it grows evenly", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BleedFullWoundShare { get; set; } = 0.50f;
+
+        [SettingPropertyFloatingInteger("Bleed Pierce Factor", 0.00f, 1.50f, "0.00", HintText = "bleeding chance of stabs and arrows compared with cuts", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BleedPierceFactor { get; set; } = 0.8f;
+
+        [SettingPropertyFloatingInteger("Bleed Blunt Factor", 0.00f, 1.00f, "0.00", HintText = "bleeding chance of crushing blows compared with cuts", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BleedBluntFactor { get; set; } = 0.15f;
+
+        [SettingPropertyFloatingInteger("Bleed Armour Factor", 0.00f, 1.00f, "0.00", HintText = "how much armour that absorbed part of the blow lowers the bleeding chance (0 = not at all, 1 = a blow mostly stopped by armour hardly ever bleeds)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BleedArmourFactor { get; set; } = 0.3f;
+
+        [SettingPropertyFloatingInteger("Bleed Loss Share", 0.00f, 1.50f, "0.00", HintText = "blood a bleeding wound costs in all, as a share of the blow's damage (a 40 damage wound bleeds away about 20 more health)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BleedLossShare { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Bleed Clot Seconds", 5.00f, 120.00f, "0", HintText = "how fast bleeding slows down: after this many seconds it is down to about a third, and it stops after a minute or two", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BleedClotSeconds { get; set; } = 30f;
+
+        [SettingPropertyFloatingInteger("Bleed Athletics Per100", 0.00f, 0.50f, "0.00", HintText = "each 100 Athletics above 100 cuts the bleeding chance and the blood lost by this share; below 100 it grows (at most x1.25, at least x0.5)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float BleedAthleticsPer100 { get; set; } = 0.25f;
+
+        [SettingPropertyBool("Wounded Flee By Chance", HintText = "an AI man below Wounded Flee Percent does not always withdraw: each fresh wound gives a roll from his morale, his Athletics and whether he bleeds; who stays fights on carefully. At or below Wounded Limp Below Hp he always withdraws. Field battles only: in sieges a man below the threshold still breaks, as before. Off = everyone below the threshold withdraws, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool WoundedFleeByChance { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Wounded Flee Chance", 0.00f, 1.00f, "0.00", HintText = "base chance that a fresh wound below Wounded Flee Percent makes a man withdraw (doubled when he bleeds, higher with low morale, lower with high Athletics; 5% to 95%)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float WoundedFleeChance { get; set; } = 0.35f;
+
+        [SettingPropertyBool("Pain Break By Chance", HintText = "an AI man below AI Flee Below Percent does not always break from pain: each fresh wound (and the first time he drops below the threshold without a blow, e.g. from bleeding) gives a roll from his morale, his Athletics and whether he bleeds. Off = everyone below the threshold breaks, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool PainBreakByChance { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Pain Break Chance", 0.00f, 1.00f, "0.00", HintText = "base chance that a fresh wound below AI Flee Below Percent breaks a man (5% to 95%)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float PainBreakChance { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Pain Break Bleeding Factor", 1.00f, 3.00f, "0.00", HintText = "a bleeding man breaks from pain this many times more easily", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float PainBreakBleedingFactor { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Wounded Limp", HintText = "a badly wounded AI man on foot does not sprint: a man withdrawing with his wounds behind his own line (unless he goes back into the fight), and any man at Wounded Limp Below Hp or fewer (also when he breaks and flees), goes no faster than a limping walk. Battles on the map only. Off = they run, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool WoundedLimp { get; set; } = true;
+
+        [SettingPropertyInteger("Wounded Limp Below Hp", 0, 40, "0", HintText = "at this many hit points or fewer an AI man on foot only limps and always withdraws (0 = only men already withdrawing limp)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public int WoundedLimpBelowHp { get; set; } = 10;
+
+        [SettingPropertyFloatingInteger("Wounded Limp Walk Share", 0.30f, 1.00f, "0.00", HintText = "limping pace as a share of the walking pace", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float WoundedLimpWalkShare { get; set; } = 0.7f;
 
         [SettingPropertyBool("Arrow Unstick Enabled", HintText = "arrows the armour stopped do not stay stuck in a man (shields keep theirs)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
@@ -11356,6 +11436,26 @@ namespace Armoury
             s.AiFleeBelowPercent = AiFleeBelowPercent;
             s.BleedPerSecond = BleedPerSecond;
             s.AiFleeWhenNearDeath = AiFleeWhenNearDeath;
+            s.BleedDeathLog = BleedDeathLog;
+            s.BleedFromWounds = BleedFromWounds;
+            s.BleedAffectsPlayer = BleedAffectsPlayer;
+            s.BleedChanceDeepWound = BleedChanceDeepWound;
+            s.BleedMinWoundShare = BleedMinWoundShare;
+            s.BleedFullWoundShare = BleedFullWoundShare;
+            s.BleedPierceFactor = BleedPierceFactor;
+            s.BleedBluntFactor = BleedBluntFactor;
+            s.BleedArmourFactor = BleedArmourFactor;
+            s.BleedLossShare = BleedLossShare;
+            s.BleedClotSeconds = BleedClotSeconds;
+            s.BleedAthleticsPer100 = BleedAthleticsPer100;
+            s.WoundedFleeByChance = WoundedFleeByChance;
+            s.WoundedFleeChance = WoundedFleeChance;
+            s.PainBreakByChance = PainBreakByChance;
+            s.PainBreakChance = PainBreakChance;
+            s.PainBreakBleedingFactor = PainBreakBleedingFactor;
+            s.WoundedLimp = WoundedLimp;
+            s.WoundedLimpBelowHp = WoundedLimpBelowHp;
+            s.WoundedLimpWalkShare = WoundedLimpWalkShare;
             s.ArrowUnstickEnabled = ArrowUnstickEnabled;
             s.ArrowStickMinDamage = ArrowStickMinDamage;
             s.JavelinStickMinDamage = JavelinStickMinDamage;
