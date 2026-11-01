@@ -36,6 +36,12 @@ namespace Armoury
             return _indebted;
         }
 
+        /// <summary>Autotest 314x: Equals z DefaultStartOptions.Instance.IndebtedLord nie trafial ("inny start") - BK porownuje StartOption po StringId
+        /// (StartOption.Equals), wiec porownujemy wprost: "start_lord" (DefaultStartOptions: IndebtedLord = new StartOption("start_lord")).</summary>
+        private static bool IsIndebted(object opt) { return IdOf(opt) == "start_lord"; }
+
+        private static string IdOf(object opt) { return (opt as TaleWorlds.ObjectSystem.MBObjectBase)?.StringId ?? "-"; }
+
         internal static void EnsureHooks()
         {
             var h = _harmony;
@@ -86,7 +92,7 @@ namespace Armoury
                 if (beh == null) return "brak zachowania startu BK";
                 var opt = _fOption.GetValue(beh);
                 if (opt == null) return "brak startu BK";
-                if (!Equals(opt, Indebted())) return "inny start niz Indebted Lord";
+                if (!IsIndebted(opt)) return "inny start niz Indebted Lord (" + IdOf(opt) + ")";
                 var st = (CampaignTime)_fStart.GetValue(beh);
                 float d = (float)st.ElapsedDaysUntilNow;
                 return "start Indebted Lord " + d.ToString("0") + " dob temu, kara " + (d < VanillaDays ? "trwa jeszcze " + (VanillaDays - d).ToString("0") + " dob" : "skonczona")
@@ -101,7 +107,7 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                if (c == null || !c.IndebtedLordVanillaYears || !Equals(option, Indebted())) return;
+                if (c == null || !c.IndebtedLordVanillaYears || !IsIndebted(option)) return;
                 var st = (CampaignTime)_fStart.GetValue(__instance);
                 if (st.ElapsedDaysUntilNow >= VanillaDays) __result = false;
             }
