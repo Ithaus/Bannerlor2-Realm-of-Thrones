@@ -1,5 +1,150 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-01 WGRANIE 153 - noc/315b-noc-21-3 (152 + 315b noc obozu 21-3 bez musztry, 315c sen 6 h wystarczy, bez dosypiania, zapas 0.5 h); Armoury.dll f7f61c4811a8c215e4266fbf26b8c107 (CrashScribe aa32d04e); kopia 152: Armoury.dll.bak-2026-11-01-przed-wgranie153 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie153-przed
+
+**Problem:** Jeff 01.11: "trening moze trwac poza nocna czyli od 21 do 3 w noc nie ma treningu"; "sen wystarczy 6 godzin snu nic nie dosypiaja"; "wgrywaj" / "nie testuj ja bede gral".
+**Zmiana:** wpisy 315b i 315c ponizej (n315b-changelog.md): musztra 3:00-20:59 (CampDrill.DayHour = !BedNight), trening przed snem do 21:00 i sen do switu 3:00; potrzeba snu = baza 6 h przy kazdym dlugu, sen nocny konczy sie o swicie, jedna regula pelnej nocy FullNight (zapas 0.5 h) dla gracza, AI, karczm i marszu forsownego; AI z dlugiem spi w godzinach obozu (bez obozu od 17:00, bez snu ciaglego); podpowiedz noclegu mowi o krotkiej nocy.
+**Testy:** recenzje 315b (4 drobne, poprawione) i 315c (3 bledy + 2 drobne, poprawione df543de2). Autotest 315b PRZERWANY na polecenie Jeffa ("nie testuj ja bede gral") - gra testowa zamknieta w dobie 0; Jeff uruchomil gre zanim skrypt przywrocil pliki (gra chodzila na CrashScribe-at eed1c2a1) - skrypt i guard zatrzymane, CrashScribe przywrocony recznie z autotest-kopie/2026-11-01_21-24-51 (aa32d04e), Configs zgodne z kopia, Armoury.json c7055052 nietkniety, w-toku.json przemianowany (.przerwany-...). WGRANE BEZ AUTOTESTU (polecenie Jeffa). W tej sesji Jeffa (Armoury-2026-11-01_21-27-02.log) ERROR 0, "Trening przed snem (311e): koniec o 21:00" i "Sen do switu (315a): sen w menu od 21:01 ... pobudka nie przed switem 3:00".
+**Ryzyko / co sprawdzic:** pobudka o 3:00 i dlug 0 po nocy; AI z dlugiem 2-3 maszeruje za dnia z kara (dlug 3: -90% predkosci); Jeff zglosil 01.11 ok. 21:35 "nie da sie wejsc do wiosek glownych, pojawia sie tylko popup" - przyczyna NIEZNANA (log bez bledow), czekamy na tresc okienka.
+**Status:** WGRANE 153 (bez autotestu)
+
+## 315c (01.11) - sen 6 h wystarczy, nikt nie dosypia: pelna noc zeruje dlug, sen nocny konczy sie o swicie (Armoury, gracz i AI) - DO SPRAWDZENIA
+
+**Problem.** Jeff 01.11 (o pobudce ok. 8:00 po nocy z dlugiem w 315b): "boze kurwa nie dosypiaja sen wystarczy 6 godzin snu nic nie dosypiaja".
+W 315a/315b sen w menu zaczety w nocy z dlugiem 1 trwal po swicie do celu 9 h (6 h nocy + 3 / 0.6 = 5 h dnia -> 8:00); dlug 2 = 15 h, dlug 3 = 21 h.
+AI: oboz splaty dlugu 1 od 17:00 (log Jeffa `Armoury-2026-11-01_20-28-19.log`: "oboz splaty od 17:00 partii 2"), dlug 2-3 sen ciagly na miejscu o kazdej porze.
+
+**Przyczyna.** Odsetki dlugu w potrzebie snu: `NightRest.NeededHours` / `NeededHoursFresh` = baza + 3*(2*dlug-1) (NightRest.cs:207/217 przed zmiana),
+`NightMarch.NeededAi` to samo (232); `SleepTick` po swicie spal dalej do celu (315a); AI: `DebtCampHour = CampEnd - max(10, CampLen)` (17:00),
+`want = ed >= 2 || (ed == 1 && evening)` + Kind 2 (sen ciagly przez swit) + R6 passive (sen ciagly na miejscu).
+
+**Zmiana.**
+- NightRest.cs:201-218 - `NeededHours` / `NeededHoursFresh` = baza (6 h) bez odsetek; kufle (InnDrink.ExtraSleepH) zostaja (osobne zjawisko - pijany).
+- NightRest.cs:2699-2709 `SleepTick` - sen z czekaniem do switu (315a) i nocleg karczmy/wioski/zajazdu czekajacy do switu (`TownInns.DawnPassed`, TownInns.cs:711)
+  konczy sie o swicie zawsze (powod "swit gracza"), takze bez pelnego paska. Sen za dnia - do wyspania jak dotad.
+- TownInns.cs:392 `PredictWake` - nocleg do switu: pobudka = swit (podpowiedz menu noclegu zgodna z SleepTick).
+- NightMarch.cs:232 `NeededAi` = baza; 66-75 `DebtCampHour` = CampEnd - max(min(10, ceil(baza)), CampLen) - przy 21-3 i bazie 6: 21:00 (jak oboz swiata);
+  1508 `want = ed >= 1 && evening` (kazdy dluznik spi w godzinach obozu, za dnia nie); 1589 `Kind = 1` zawsze, 1551 bez awansu na Kind 2; 1056 R6 passive = false;
+  1738 (koniec alarmu dluznika) jak AiDebtCamp. Kara za noc bez snu bez zmian (SettleNight / SettleAi: doba bez bazy = dlug +1, maks. 3; kary predkosci/morale, musztra).
+- Teksty w grze: komunikaty dlugu "one full night's sleep (6 hours) sets it right", "... need a full night's sleep (6 hours).", "slept, but not a full night - the
+  weariness lingers until a night of 6 hours' sleep.", "The weariness lingers until a full night's sleep (6h)." (pobudka), DrillNote "sleep a full night before
+  the next dawn". MCM (Settings.cs + gen_mcm.py): Sleep Hours Needed, Ai Sleep Debt, Max Forced Nights, Sleep Until Dawn, Anvil Shift Enabled, Sleepers Hold Orders.
+- tools/sprawdz_logi.py grupa sen315b: S315B-3 pelna noc zeruje dlug przy kazdym dlugu, S315B-4 sen nocny konczy sie o swicie (do :30), S315B-6 potrzeba z dlugiem
+  rozna od starej reguly, S315B-7 AI "oboz splaty od <poczatek obozu>" i "sen ciagly 0".
+
+**Decyzja: wczesny oboz splaty AI od 17:00 niepotrzebny.** Byl po to, zeby dlug 1 (9 h) zmiescil sie w nocy (10 tikow pelnej stawki). Teraz potrzeba = baza 6 h,
+a oboz swiata 21-3 daje tiki 22..3 = 6 h pelnej stawki (LedgerNight) - dluznik spi z calym swiatem; sen dlugu (wymuszony, bez pominiecia obozu i nocnego marszu
+poza powodem/ucieczka) zostaje tylko w godzinach obozu. Gdy oboz swiata krotszy niz baza (np. 0-3), oboz splaty zaczyna sie wczesniej (do 10 h przed switem).
+
+**Rachunek.** Gracz: noc 21:00-3:00 = 6 tikow (22..3) x 1.0 = 6.0 >= NeededHours 6.0 -> CreditRest od reki: dlug (kazdy) -> 0, pobudka o 3:00. Sen nocny krotszy
+(np. od 1:00) konczy sie o swicie z 2 h -> doba bez bazy -> dlug +1 (kara jak dotad). AI: oboz splaty 21-3 -> Rest 6.0 >= NeededAi 6 -> dlug 0 o 3:00 (Credited).
+
+**Ryzyko / co sprawdzic.**
+- Regresje (kontrola w kodzie): NeededHours czytaja CreditRest, ZB-6 (NightPromptSkipWhenRested), SleepInit (_menuTarget), SleepCapHours (min 14 h), TownInns.PredictWake,
+  SmithMenu.AnvilShift (NeededHoursFresh), komunikaty dlugu - wszystkie dostaja 6 h. NeededAi tylko w splacie od reki AI. DebtCampHour: AiDebtCamp, koniec alarmu
+  dluznika, linia konfiguracji i linia switu AI. Kind 2 czytaja SleepsWithLeader (AI wodz nigdy nie spi juz snem ciaglym - doczepieni licza zwykly postoj) i poprawka
+  315a (Acc = 0 o swicie dla doczepionych do gracza) - bez zmian zachowania dla gracza.
+- Zachowanie AI: dlug 2-3 nie kladzie juz lorda spac za dnia - idzie z karami (dlug 3: -90% predkosci) do nocy; R4 (obowiazkowy odpoczynek) dalej zabrania
+  nocnego marszu poza ucieczka przed miazdzaca sila. Zapasc (dlug 3) u AI nie zatrzymuje partii od reki. Liczniki "sen ciagly" i "partio-godziny snu ciaglego" = 0.
+- Nocleg w karczmie zaczety po polnocy konczy sie o swicie bez pelnego paska -> bez premii "wypoczeci" (jak kazdy krotki sen). PlayerSleepGuard: sen przez swit
+  (tick switu przed tikiem menu) - dalej osadzany przy pobudce, tuz po swicie.
+- Kufle (InnDrink): pijany nadal potrzebuje +1 h na kufel ponad prog - to nie dosypianie dlugu, ale Jeff moze chciec i to zdjac (do decyzji).
+- Wczytany zapis z AI w snie dlugu / snie ciaglym: wpisy Acc konczy AiDebtCamp (LeaveAcc) w pierwszym ticku; dluznicy za dnia zwalniani (ReleaseDebt).
+- POPRAWKI RECENZJI 315c (commit po 6ea40c2e):
+  (1) Zapas pelnej nocy: noc 21-3 to rowno 6 h, wiec polozenie sie o 21:14 (log `Armoury-2026-11-01_20-45-53.log` ok. linii 4033: "pobudka o 3:02 (od 21:14,
+  zegara 5.8 h") dawalo 5.8 h < 6 i w 315c - bez dosypiania po swicie - dlug +1 (w tym logu dlugu nie bylo, bo doba miala 9.45 h odpoczynku z dnia, ale
+  regula byla zla). Teraz JEDNA regula `NightRest.FullNight(rest, need)` = round(rest, 0.1) + `NightFullSlackH` (0.5 h) >= need (NightRest.cs ok. 221-233),
+  ta sama zaokraglona liczba co w komunikatach i logu ("0.0"): SettleNightCore (sleptBase, brak odlozony = baza - 0.5 - przespane), CreditRest, CreditWholeSleep
+  (pelny pasek), pelny pasek w linii pobudki i premia karczmy (innFull, TownInns.Wake), ZB-6, ostrzezenie marszu nocnego, linia switu gracza (wzor), AI:
+  splata od reki i SettleAi, ForcedMarch (doba wypoczynku). Sen nadal konczy sie o swicie.
+  (2) Podpowiedz noclegu (karczma TownInns.cs, zajazd TownInns.Road.cs) - wspolne `WakeLine`: `PredictWake` liczy pasek tylko do switu; gdy noc za krotka
+  (pasek < cel i nie FullNight) - "The night is too short to sleep your fill (about X h of 6 h): you sleep until dawn (H:MM) and nobody wakes rested",
+  bez zdania o premii i cenach; martwa galaz "You sleep past dawn" usunieta. Tylko tekst.
+  (3) Pijany: przespana noc i splata dlugu wobec samej bazy (`BaseHours`; `_menuNeeded` = baza) - kufle (ExtraSleepH) tylko wydluzaja sen za dnia i odsypianie
+  (InnDrink.OnWake bez zmian); komunikaty switu z baza; komentarz InnDrink.cs:21-24, MCM Drink Drunk Hangover (gen_mcm.py).
+  (4) Checker: sen315b S315B-3 - pelna noc wedlug tej samej reguly z zapasem (pasek w menu), nie "kazdy sen od 21:xx"; noboz NO-10 - decyzja "pelny pasek"
+  z zapasem 0.5 h (strefa zaokraglenia +-0.06 h). Self-test: sen315b dobry 8 x TAK (z przypadkiem 21:14 -> 5.8 h, dlug 1 -> 0), zly 8 x NIE (5.8 h z dlugiem po 1);
+  NO-10 na logu syntetycznym (5.2 h "pelny tak" = NIE), na logu Jeffa 20-45-53 TAK.
+  (5) Martwy kod od 315c (zawsze 0): galezie Kind == 2, R6 passive, liczniki ContSleeps / PassiveHours / PassivePaid - zostawione, opisane w komentarzach
+  i w linii switu AI "(martwe od 315c, zawsze 0)"; usuniecie osobnym krokiem.
+  Ryzyko: zapas 0.5 h znaczy, ze 5.5 h snu to pelna noc (takze za dnia i u AI) - lagodniej niz dotad o pol godziny; przy bazie z MCM innej niz 6 zapas ten sam.
+- Testy: build 0 bledow, gen_mcm (zmienione tylko 6 opisow Armoury), sen315b dobry 8 x TAK / zly 8 x NIE; na logu Jeffa 20-28-19 (przed 315c) S315B-7 NIE
+  (oboz splaty od 17:00) - zgodnie z oczekiwaniem. Autotest w grze - nie.
+
+**Status:** DO SPRAWDZENIA
+
+## 315b (01.11) - noc obozu gracza 21-3: trening do 21:00, sen do switu 3:00 (Armoury) - DO SPRAWDZENIA
+
+**Problem.** Jeff 01.11 na pytanie "ludzie klada sie spac o 18:00, choc swiat rozbija obozy o 21:00 - przesunac poczatek nocnego snu na 21:00, a trening trwalby do 21:00?":
+"tak trening moze trwac poza nocna czyli od 21 do 3 w noc nie ma treningu a poza tymi godzinami jest okienko aby przeprowadzic trening"; doprecyzowanie:
+"noc snu liczyla sie 6 godzin w sensie 6 godzin spali a 9 jak byla nieprzespana noc".
+Log `Armoury-2026-11-01_19-39-31.log`: 9 x `Trening przed snem (311e): koniec o 18:00 ... powod: noc ... dalej: sen w menu`; konfiguracja
+`NightRest: oboz swiata 21:00-3:00 ... noc snu (pelna stawka) 18:00-3:00` (Armoury.json Jeffa: CampStartHour 21, CampEndHour 3).
+
+**Przyczyna.** Granica "nocy" musztry i treningu 311e to byla `NightRest.MenuNight` / `SleepNightStart = PlayerDawn - 9` (NightRest.cs:508, SleepNightTicks 10) -
+okno pelnej stawki snu zakotwiczone o swicie (m97-oboz), przy obozie 21-3 = 18:00-2:59. `CampDrill.DayHour = !MenuNight` (CampDrill.cs:110), `TbsHour`
+liczyl godziny do `SleepNightStart` (NightRest.TrainBeforeSleep.cs:95), `TbsEnd` prog "pelny dzien" tez (linia 207). Wiec cwiczenia konczyly sie o 18:00, 3 h przed obozem swiata.
+
+**Zmiana.**
+- NightRest.cs:513-521 - nowe `BedNight(h)` (noc obozu gracza = godziny obozu swiata `InCamp`, przy rownych godzinach obozu `MenuNight` jak dotad)
+  i `BedNightStart` (`CampStart`; przy rownych godzinach `SleepNightStart`).
+- CampDrill.cs:111 - `DayHour = !BedNight` (cwiczenia gracza 3:00-20:59, musztra AI Drill.DayRestHours / DayDrillHours / maski TownStay - te same godziny,
+  jedna zasada); teksty "The drill runs by day, from 3:00 to 21:00." (482), "at nightfall (21:00) the men bed down" (513), linia startu sesji
+  `godziny cwiczen 3:00-20:59 (noc obozu 21:00-2:59 - ludzie spia, 315b; pelna stawka snu od 18:00)` (421-422).
+- NightRest.TrainBeforeSleep.cs:95/188/207/271/306 - trening przed snem liczy do `BedNightStart` (21:00): start N h przed 21:00, koniec "noc" o 21:00,
+  "pelny dzien" 20:45-20:59 = zmierzch; podpowiedz menu "before nightfall (21:00)"; linie logu "noc snu od 21:00".
+- NightRest.cs:167-176 `SleepNightNow` - noc snu (czekanie do switu 315a) = MenuNight albo BedNight albo <= 0.25 h przed SleepNightStart / BedNightStart
+  (sen wieczorny od 18:00 dalej czeka do switu jak w 315a; sen po treningu od 20:45-21:00 tez).
+- NightRest.cs:654 linia konfiguracji: `, noc obozu gracza (bez musztry, trening 311e do zmierzchu, 315b) 21:00-3:00`; SleepInit (2633-2634): "noc obozu 21:00-3:00,
+  pelna stawka od 18:00".
+- Poprawki recenzji: komentarz NightRest.cs:347 (BedNightStart), komentarz TownStay.cs:18 (godziny cwiczen 3:00-20:59); sen315b - S315B_END lapie tez
+  "koniec snu" (bez "z celu") i zamyka biezacy sen przerwany (pozniejsza pobudka nie jest przypisana do starego startu).
+- tools/sprawdz_logi.py: grupa **sen315b** (S315B-0..5); naprawa T311_END (grupa trening311e) - od 315a linia konca 311e ma dopisek
+  "(arm_sleep_wait, do switu 3:00 - linia 'Sen do switu (315a)')" i regex jej nie lapal (T311-3 "starty = konce" dalby NIE w kazdym logu 152).
+
+**Decyzja: ksiega snu (stawka) BEZ ZMIAN - takze AI.** Pelna stawka snu dalej od swit-9 (LedgerNight gracza OnHourly i AI NightMarch, MenuNight paska snu
+i karczmy). Powod: (1) na tym oknie stoi splata dlugu AI - oboz splaty dlugu 1 od DebtCampHour 17:00 daje 10 tikow pelnej stawki >= NeededHours(1) = 9
+(m97-oboz, recenzja: przy nocy "od 21" bylo 8.8 h - wrocilby ten blad: 6 x 1 + 4 x 0.6 = 8.4 < 9); (2) jedna zasada na jedno zjawisko: stawka snu
+gracza i AI zostaje jedna; zmienia sie inne zjawisko - godziny, w ktorych ludzie nie cwicza (i tu gracz i AI ida razem przez CampDrill.DayHour);
+(3) pelna noc 21-3 i tak lezy cala w pelnej stawce.
+
+**Rachunek snu (Jeff: 6 h normalnie, 9 h po nieprzespanej nocy).**
+- Bez dlugu: trening do 21:00 (godzina 20-21 to praca - DrilledLastHour, bez odpoczynku), sen 21:00-3:00: tiki ksiegi 22,23,0,1,2,3 = 6 x 1.0 = 6.0 h = baza 6.0
+  (tik switu 3:00 liczy godzine 2-3 jako noc - LedgerNight; rozliczenie switu po nim). Pasek w menu 21:00-3:00 = 6.0 h pelnej stawki (MenuNight 18-3) -
+  zadnych minut dziennej stawki; trening skonczony "pelnym dniem" o 20:45-20:59 - tez pelna stawka (MenuNight(20)). CreditRest: 6.0 >= 6.0 (sumy 1f dokladne).
+- Z dlugiem 1 (NeededHours 9): trening i tak nie rusza (DrillLaw - "after a dawn short of sleep"); sen 21:00 -> o 3:00 6 h, po swicie dalej do wyspania
+  (315a) stawka dzienna DayRestFactor 0.6: 3 / 0.6 = 5 h -> pobudka ok. 8:00 (pasek 9.0 z celu 9.0). Polozenie sie o 18:00 - 9 h do 3:00 jak dotad.
+  DECYZJA DLA JEFFA: jesli "9 h po nieprzespanej nocy" ma znaczyc 21:00 -> 6:00, sen ciagly po swicie musialby liczyc sie pelna stawka - osobna zmiana.
+
+**Ryzyko / co sprawdzic.**
+- Regresje (kontrola w kodzie): CampDrill.DayHour czytaja CampDrill (menu Train the men, Leave("noc"), tick godzin gracza linia 170), Drill.cs 431/461/490/507
+  (maski AI i TownStay - postoj 18-21 liczy sie teraz jako godziny musztry AI, limit 8 h/dobe bez zmian), TownStay.cs:894 (6-12, bez zmian). Partie AI stojace
+  18-21 dostaja do 3 h musztry wiecej w dobie (pod limitem 8) - w modelu AI godzina musztry i tak nie odbiera odpoczynku (jak za dnia dotad).
+- Recenzja (1) - nakladka musztra/stawka snu: godziny 18:00-20:59 sa teraz godzinami cwiczen (CampDrill.DayHour) i jednoczesnie pelna stawka snu w ksiedze
+  (LedgerNight 18..3; tiki 18-21). Nakladka urosla z 1 h (tik 18 liczyl godzine 17-18) do 4 h (tiki 18-21). Gracz z menu cwiczen nie liczy podwojnie
+  (DrilledLastHour = praca, bez odpoczynku), ale samoczynna musztra gracza w osadzie (m109) i musztra AI z godzin postoju (Drill.DayDrillHours) daja w tych
+  godzinach i XP musztry, i pelny odpoczynek. Swiadomie NIE zmienione (wariant minimalny): wyciecie godzin musztry z pelnej stawki ruszyloby ksiege gracza
+  i AI, a pelna stawka obozu splaty dlugu AI od 17:00 musi zostac (10 tikow >= NeededHours(1) = 9). Do decyzji, jesli Jeff uzna to za "nic z niczego".
+- Recenzja (2) - TownStay: wejscie do osady 18:00-20:59 jest teraz w godzinach cwiczen, wiec otwiera dobe postoju (limit porannej musztry liczy od niej) -
+  zgodne z oknem musztry Jeffa, przyjete; komentarz TownStay.cs:18 poprawiony.
+- OTWARTA DECYZJA JEFFA (zapytany, nie zmieniane): sen z dlugiem po swicie liczy sie stawka dzienna 0.6 - pobudka ok. 8:00 zamiast 6:00 ("9 h po
+  nieprzespanej nocy" = 21:00-6:00 wymagaloby pelnej stawki snu ciaglego po swicie).
+- MenuNight / LedgerNight / SleepNightStart bez zmian: ksiega gracza i AI, DebtCampHour, TownInns (stawka i HoldFrom), SleepTick - bez zmian.
+  ArmyRestDay i TownStay czytaja tylko PlayerDawn - bez zmian. Karczma: zmierzch premii DuskHour 18 - osobna stala, bez zmian.
+- O 21:00 koniec treningu zbiega sie z pierwsza godzina obozu: pytanie o nocleg nie padnie (postoj, movedH = false); oboz automatyczny (OnHourly) moze
+  postawic namiot i dac komunikat "The column halts for the night..." jesli tick 21:00 przyjdzie przed wyjsciem z menu cwiczen (bez _sleeping) - kosmetyka,
+  raz na noc.
+- Rowne godziny obozu (swiat nie obozuje): BedNight = MenuNight, BedNightStart = SleepNightStart - dokladnie jak dotad. Oboz dluzszy niz 9 h (np. 18-6):
+  noc obozu dluzsza niz pelna stawka - musztra krotsza, sen do switu najwyzej CampLen h (bezpiecznik >= 14 h).
+- MCM bez zmian (Sleep Until Dawn: "from nightfall of the sleep night - 18:00 ... until dawn" - nadal prawda; Camp Train Before Sleep Hours bez godziny).
+- W grze: linie `Trening przed snem (311e): start o 18:00 ... (noc snu od 21:00` (przy 3 h), `koniec o 21:00 | ... powod: noc`, `Sen do switu (315a): sen w menu od 21:00 ...
+  pobudka nie przed switem 3:00 (za 6.0 h zegara, noc obozu 21:00-3:00, pelna stawka od 18:00)`, pobudka o 3:00 "swit gracza", linia switu
+  `odpoczynek doby 6.0 h (baza 6.0 ... dlug przed 0, po 0 ... marsz w godzinach obozu 0 h`. Checker: `--grupa sen315b`, `sen315a`, `trening311e`.
+- Testy: build 0 bledow; checker sen315b na logu syntetycznym dobrym (6 x TAK) i zlym (6 x NIE), trening311e i sen315a na syntetycznym 315b (0 NIE),
+  trening311e na Armoury-2026-11-01_19-39-31.log (0 NIE). Autotest w grze - nie (do zrobienia przed wgraniem).
+
+**Status:** DO SPRAWDZENIA
+
 ## 2026-11-01 WGRANIE 152 - noc/315a-sen-do-switu (151 + 315a sen nocny do switu); Armoury.dll 8fe156f7cd48a69acf904d64231616e8 (CrashScribe bez zmian aa32d04e); kopia 151: Armoury.dll.bak-2026-11-01-przed-wgranie152 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie152-przed
 
 **Problem:** Jeff 01.11: "czemu koncze wypoczynek o 00.00 ... wypoczynek powinien byc wtedy jak jest noc a konczyc sie jak wstaje slonce". Log Armoury-2026-11-01_19-39-31.log: codziennie "Trening przed snem (311e): koniec o 18:00 ... dalej: sen w menu", pobudka po 6 h o 0:00, potem "The column marched 4h through the night".
