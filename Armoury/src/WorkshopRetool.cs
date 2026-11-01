@@ -31,11 +31,15 @@ namespace Armoury
     /// wynik warsztatu (srednia roku >= 60 dob + utrzymanie), nowy typ = WorkshopFairScore (cena sprawiedliwa cyklu, cykle z wsadu regionu dzielonego miedzy warsztaty,
     /// typ obecny w regionie - najwyzej jego zmierzony wynik), kara x0.8 za dubel w regionie rynku; progi (x1.3, +10 d, kiesa, limity) bez zmian. Tydzien pomiaru wsadu
     /// po starym zapisie - zmiany odlozone (licznik "odlozone (pomiar w toku)"). Linia dnia: spodziewany vs rzeczywisty po 30 dobach i liczby typow swiata.
+    /// 312d (01.11, Jeff "ok napraw"; rozp312 notable-raport/krytyk): krok (b) z kluczem WorkshopRetoolOwnMarket liczy nowy typ z rynku WLASNEGO miasta (gra puszcza cykl
+    /// tylko z polki miasta) z bramka pelnego cyklu; bankructwo (a) i N10 - region jak dotad. Krok 0 (tylko log): probki odrzuconych kandydatow, licznik "stoja, ale rok
+    /// na plusie" (srednia < 0, rok >= 0 - warunek kandydata ich nie wpuszcza) i ponowne zmiany tego samego warsztatu w sesji.
     /// </summary>
     internal static class WorkshopRetool
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const int MinDays = 60, TownGapDays = 30, ShopGapDays = 120, PerDay = 3, PurseFloor = 4500;
+        private const int YoungDays = 180;   // recenzja 312d: zmiana warsztatu, ktorego obecny typ ma < 180 dob rachunku (ponowna zmiana widoczna takze po wczytaniu - tylko log)
         private const float GainShare = 1.3f, GainMin = 10f, BankruptGain = 1.25f;
 
         private static readonly Dictionary<Town, int> _townLast = new Dictionary<Town, int>();
@@ -44,6 +48,10 @@ namespace Armoury
         private static readonly List<string> _dDone = new List<string>(), _dBankSamples = new List<string>();
         private static int _dShops, _dCands, _dChanged, _dNoInput, _dNoGain, _dNoPurse, _dLimit, _dBankPicks, _dBankSwaps, _dStumbles, _sessStumbles, _sessChanged;
         private static int _dBankWarm;   // F4: bankructwa w tygodniu pomiaru wsadu (wybor gry/BK zostal)
+        // 312d krok 0 (tylko log): probki odrzuconych kandydatow, warsztaty "stoja, ale rok na plusie" (warunek kandydata slow < 0 ich nie wpuszcza), ponowne zmiany warsztatu w sesji
+        private static readonly List<string> _dRejSamples = new List<string>(), _dYearPlusSamples = new List<string>();
+        private static int _dYearPlus, _dRe, _sessRe;
+        private static int _dYoung, _sessYoung;   // recenzja 312d: zmiany warsztatu z typem mlodszym niz YoungDays (rachunek obecnego typu)
         private static long _dGear;
         private static bool _startDone;
 
@@ -51,13 +59,13 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _townLast.Clear(); _shopLast.Clear(); _err.Clear(); _sessStumbles = 0; _sessChanged = 0; _startDone = false;
+            _townLast.Clear(); _shopLast.Clear(); _err.Clear(); _sessStumbles = 0; _sessChanged = 0; _sessRe = 0; _sessYoung = 0; _startDone = false;
             ZeroDay();
         }
 
         private static void ZeroDay()
         {
-            _dDone.Clear(); _dBankSamples.Clear();
+            _dDone.Clear(); _dBankSamples.Clear(); _dRejSamples.Clear(); _dYearPlusSamples.Clear(); _dYearPlus = 0; _dRe = 0; _dYoung = 0;
             _dShops = _dCands = _dChanged = _dNoInput = _dNoGain = _dNoPurse = _dLimit = _dBankPicks = _dBankSwaps = _dStumbles = 0;
             _dBankWarm = 0;
             _dGear = 0;
@@ -111,7 +119,22 @@ namespace Armoury
             catch (Exception e) { Stumble("BankruptStep", e); }
         }
 
-        private sealed class Cand { public Workshop W; public Town T; public float Slow, Avg; }
+        private sealed class Cand { public Workshop W; public Town T; public float Slow, Avg; public int Days; }
+
+        /// <summary>312d krok 0: probka odrzuconego kandydata (do 4 na dobe) - miasto, typ obecny i jego wynik, najlepszy typ, wynik przed i po karze za dubel, powod.</summary>
+        private static void Rej(Cand c, WorkshopType cur, float sc, WorkshopType best, WorkshopFairScore.Quote fq, float sb, string why)
+        {
+            try
+            {
+                if (_dRejSamples.Count >= 4) return;
+                float raw = fq != null ? fq.Score : sb;
+                // recenzja 312d: typ z najwyzszym wynikiem PRZED kara x0.8 (F4) - checker liczy "padl na karze" (bez kary >= potrzeba > po karze)
+                string rb = fq != null && fq.RawBest != null ? ", najlepszy bez kary " + fq.RawBest.StringId + " " + F1(fq.RawBestScore) : "";
+                _dRejSamples.Add(Name(c.T.Settlement) + " " + (cur != null ? cur.StringId : "?") + " (obecny " + F1(sc) + ", srednia " + c.Avg.ToString("0.0", Inv) + " / rok " + c.Slow.ToString("0.0", Inv)
+                                 + ") -> " + (best != null ? best.StringId + " (przed kara " + F1(raw) + ", po karze " + F1(sb) + rb + ")" : "-") + ": " + why);
+            }
+            catch { }
+        }
 
         /// <summary>Raz na dobe (WorkshopTradeBehavior, DailyTickEvent): krok (b) i linia "Warsztaty za cena (E3-D3): dzien N".</summary>
         internal static void Daily()
@@ -144,8 +167,16 @@ namespace Armoury
                                 if (w.WorkshopType.StringId == "mines" || HasArmsLine(w.WorkshopType)) continue;
                                 _dShops++;
                                 float avg, slow; int days;
-                                if (!WorkshopTrade.RecOf(w, out avg, out slow, out days) || days < MinDays || !(avg < 0f) || !(slow < 0f)) continue;
-                                cands.Add(new Cand { W = w, T = t, Slow = slow, Avg = avg });
+                                if (!WorkshopTrade.RecOf(w, out avg, out slow, out days) || days < MinDays || !(avg < 0f)) continue;
+                                if (!(slow < 0f))
+                                {
+                                    // 312d krok 0: miesiac na minusie, rok na plusie - poza kandydatami (sam licznik i probki, decyzja bez zmian)
+                                    _dYearPlus++;
+                                    if (_dYearPlusSamples.Count < 3) _dYearPlusSamples.Add(Name(t.Settlement) + " " + (w.WorkshopType.StringId ?? "?") + " (srednia " + avg.ToString("0.0", Inv)
+                                                                                         + " / rok " + slow.ToString("0.0", Inv) + ", dob " + days + ")");
+                                    continue;
+                                }
+                                cands.Add(new Cand { W = w, T = t, Slow = slow, Avg = avg, Days = days });
                             }
                             catch (Exception e) { Stumble("Daily(kandydat)", e); }
                         }
@@ -170,32 +201,38 @@ namespace Armoury
                             WorkshopFairScore.Quote fq = null;
                             if (f4)
                             {
-                                // F4: obecny typ - wlasny zmierzony wynik (>= 60 dob, jak warunek kandydata); nowy - cena sprawiedliwa, wsad regionu, zmierzony wynik regionu
+                                // F4: obecny typ - wlasny zmierzony wynik (>= 60 dob, jak warunek kandydata); nowy - cena sprawiedliwa, wsad regionu, zmierzony wynik regionu;
+                                // 312d (klucz WorkshopRetoolOwnMarket): wsad i zmierzony wynik z rynku WLASNEGO miasta, bramka pelnego cyklu (kara x0.8 w regionie bez zmian)
                                 sc = WorkshopFairScore.OwnScore(c.W);
-                                best = WorkshopFairScore.Best(c.T, cur, dict, c.W, out sb, out fq);
+                                best = WorkshopFairScore.Best(c.T, cur, dict, c.W, WorkshopFairScore.OwnMarket, out sb, out fq);
                             }
                             else
                             {
                                 sc = NoTownMines.MarketScore(c.T, cur, true);
                                 best = NoTownMines.BestByPrice(c.T, cur, dict, out sb);
                             }
-                            if (best == null) { _dNoInput++; continue; }
+                            if (best == null) { _dNoInput++; Rej(c, cur, sc, null, null, sb, "bez typu z wsadem i zyskiem"); continue; }
                             float need = sc > -1e8f ? Math.Max(sc + GainMin, sc * GainShare) : GainMin;
-                            if (!(sb > 0f) || sb < need) { _dNoGain++; continue; }
+                            if (!(sb > 0f) || sb < need) { _dNoGain++; Rej(c, cur, sc, best, fq, sb, "za maly zysk (potrzeba " + need.ToString("0.0", Inv) + ")"); continue; }
                             int cost = Math.Max(0, Campaign.Current.Models.WorkshopModel.GetConvertProductionCost(best));
                             var o = c.W.Owner;
-                            if (o.Gold - cost < PurseFloor) { _dNoPurse++; continue; }
+                            if (o.Gold - cost < PurseFloor) { _dNoPurse++; Rej(c, cur, sc, best, fq, sb, "bez kiesy (zloto " + o.Gold + ", sprzet " + cost + ")"); continue; }
                             int g0 = o.Gold;
                             string from = cur.StringId ?? "?";
                             ChangeProductionTypeOfWorkshopAction.Apply(c.W, best, false);   // koszt sprzetu: wlasciciel -> kasa miasta (WorkshopTrade.ConvertPrefix/Postfix)
                             if (c.W.WorkshopType != best) continue;
                             done++; _dChanged++; _sessChanged++;
                             _dGear += Math.Max(0, g0 - o.Gold);
+                            if (_shopLast.ContainsKey(c.W)) { _dRe++; _sessRe++; }   // 312d krok 0: ten sam warsztat zmieniony drugi raz w tej sesji (pamiec sesji, jak blokada 120 dob)
+                            if (c.Days < YoungDays) { _dYoung++; _sessYoung++; }      // recenzja 312d: obecny typ mlodszy niz 180 dob rachunku (widac takze po wczytaniu zapisu)
+                            int nr = -1;
+                            try { var ws = c.T.Workshops; if (ws != null) for (int k = 0; k < ws.Length; k++) if (ws[k] == c.W) { nr = k; break; } } catch { nr = -1; }
                             _townLast[c.T] = today; _shopLast[c.W] = today;
                             float raw = fq != null ? fq.Score : sb;
                             if (f4) WorkshopFairScore.NoteRetool(c.W, best, raw, today);   // F4: spodziewany wynik (przed kara za dubel) do porownania po 30 dobach
                             if (_dDone.Count < 8) _dDone.Add(Name(c.T.Settlement) + " " + from + " -> " + best.StringId + " (wynik " + F1(sc) + " -> " + F1(sb) + " d/d, srednia " + c.Avg.ToString("0.0", Inv)
-                                                         + " / rok " + c.Slow.ToString("0.0", Inv) + ", sprzet " + Math.Max(0, g0 - o.Gold) + (f4 ? ", " + WorkshopFairScore.QuoteText(fq, raw) : "") + ")");
+                                                         + " / rok " + c.Slow.ToString("0.0", Inv) + ", sprzet " + Math.Max(0, g0 - o.Gold) + ", warsztat nr " + nr + ", dob w typie " + c.Days
+                                                         + (f4 ? ", " + WorkshopFairScore.QuoteText(fq, raw) : "") + ")");
                         }
                         catch (Exception e) { Stumble("Daily(zmiana)", e); }
                     }
@@ -224,6 +261,12 @@ namespace Armoury
                    .Append(" | bankructwa i warsztaty odebrane graczowi: wyborow ").Append(_dBankPicks).Append(", typ z cen zamiast wyboru gry ").Append(_dBankSwaps)
                    .Append(_dBankSamples.Count > 0 ? " [" + string.Join("; ", _dBankSamples.ToArray()) + "]" : "")
                    .Append(" | zmian w sesji ").Append(_sessChanged)
+                   // 312d krok 0 (tylko log): ponowne zmiany, probki odrzuconych kandydatow, "stoja, ale rok na plusie"
+                   .Append(" | ponowne zmiany tego samego warsztatu dzis ").Append(_dRe).Append(" (sesja ").Append(_sessRe).Append(')')
+                   .Append(" | mlode typy przy zmianie (< ").Append(YoungDays).Append(" dob rachunku obecnego typu) dzis ").Append(_dYoung).Append(" (sesja ").Append(_sessYoung).Append(')')
+                   .Append(" | odrzuceni kandydaci (probki ").Append(_dRejSamples.Count).Append(')').Append(_dRejSamples.Count > 0 ? " [" + string.Join("; ", _dRejSamples.ToArray()) + "]" : "")
+                   .Append(" | stoja, ale rok na plusie (>= ").Append(MinDays).Append(" dob, srednia < 0, rok >= 0 - poza kandydatami) ").Append(_dYearPlus)
+                   .Append(_dYearPlusSamples.Count > 0 ? " [" + string.Join("; ", _dYearPlusSamples.ToArray()) + "]" : "")
                    .Append(f4 ? " | kara za typ juz obecny w regionie rynku x0.8 na warsztat (F4); miast z 3+ warsztatami jednego typu " : " | kara za typ juz obecny w miescie x0.8 na warsztat; miast z 3+ warsztatami jednego typu ").Append(dupTowns)
                    .Append(" | wplyw na skrzynie: notable -> kasy miast (sprzet)");
                 if (f4)

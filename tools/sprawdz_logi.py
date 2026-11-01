@@ -88275,6 +88275,290 @@ def zatargi312b_main(logp):
     return 0
 
 
+# ---------------------------------------------------------------- paczka 312d (01.11, Jeff "ok napraw"): przezbrojenia notabli z rynku wlasnego miasta - grupa notable312d
+# Log Armoury (Armoury-*.log; strumieniowo). Uzycie: --grupa notable312d <Armoury-*.log>. Linie jak w C# WorkshopRetool.Daily / WorkshopFairScore.DayText, StartText, QuoteText.
+# N312D-S self-test wyrazen i wierszy;
+# N312D-0 linia startu E3-D3: "prognoza z rynku wlasnego miasta (Workshop Retool Own Market) tak";
+# N312D-1 linie doby E3-D3 z F4: nowe pola kroku 0 i 1 (ponowne zmiany, odrzuceni kandydaci, "stoja, ale rok na plusie", prognoza z rynku miasta) w kazdej linii nowego formatu;
+# N312D-2 INFO: spodziewany vs rzeczywisty (ostatnia linia z K > 0) - stosunek rzeczywisty / spodziewany, cel >= 0.5 (autotest 311x 0.12, gra Jeffa 0.28; male K - niepewne);
+# N312D-3 zmiany na silversmithy / velvet_weavery: kazda z "rynek miasta" i PRODUKCJA miasta najciasniejszego wsadu > 0 i x 30 dob >= sztuk na cykl (0 przejsc bez wlasnego
+#   surowca; recenzja 312d: polka miasta jest w probce osobno i sie nie liczy - zgodnosc logu z regula "tylko produkcja", dowod: produkcja miasta w probce);
+# N312D-4 brak ponownych zmian: licznik sesji "ponowne zmiany tego samego warsztatu" = 0 i "mlode typy przy zmianie (< 180 dob rachunku)" w sesji = 0 (widac takze po wczytaniu);
+#   lancuchy w probkach (to samo miasto i ten sam numer warsztatu, X -> Y, potem Y -> Z) - INFO;
+# N312D-5..7 INFO: odrzuceni kandydaci (powody, "padl na karze": najlepszy bez kary >= potrzeba > po karze), "stoja, ale rok na plusie", linie-oceny bez pelnego cyklu.
+N312D_START = "Warsztaty za cena (E3-D3): start sesji"
+N312D_DAYP = "Warsztaty za cena (E3-D3): dzien "
+N312D_DAY = re.compile(r"^Warsztaty za cena \(E3-D3\): dzien (\d+) ")
+N312D_KEY_ON = "prognoza z rynku wlasnego miasta (Workshop Retool Own Market) tak"
+N312D_KEY_OFF = "prognoza z rynku wlasnego miasta (Workshop Retool Own Market) nie"
+N312D_RE = re.compile(r"\| ponowne zmiany tego samego warsztatu dzis (\d+) \(sesja (\d+)\)")
+N312D_REJ = re.compile(r"\| odrzuceni kandydaci \(probki (\d+)\)(?: \[([^\]]*)\])?")
+N312D_YP = re.compile(r"\| stoja, ale rok na plusie \(>= \d+ dob, srednia < 0, rok >= 0 - poza kandydatami\) (\d+)(?: \[([^\]]*)\])?")
+N312D_OWN = re.compile(r"\| prognoza z rynku wlasnego miasta \(Workshop Retool Own Market\) (tak|nie): oceny dzis (\d+), linii-ocen bez pelnego cyklu \(produkcja miasta \d+ dob "
+                       r"< sztuk na cykl, linia inaczej by ruszyla\) (\d+)")
+N312D_YOUNG = re.compile(r"\| mlode typy przy zmianie \(< (\d+) dob rachunku obecnego typu\) dzis (\d+) \(sesja (\d+)\)")
+N312D_NR = re.compile(r", warsztat nr (-?\d+), dob w typie (\d+)")
+N312D_RAWB = re.compile(r", po karze (-|-?[\d.]+), najlepszy bez kary (\S+) (-|-?[\d.]+)\): za maly zysk \(potrzeba (-?[\d.]+)\)")
+N312D_CH = re.compile(r"\| zmiany (\d+)(?: \[([^\]]*)\])?")
+N312D_ONE = re.compile(r"^(.*) (\S+) -> (\S+) \(wynik")
+N312D_TIGHT = re.compile(r"rynek miasta: najciasniejszy wsad (\S+) produkcja miasta ([\d.]+)/d x (\d+) = ([\d.]+) na cykl (\d+), polka (\d+) szt\., budzet ([\d.]+)/d na warsztat")
+N312D_EXP = re.compile(r"\| spodziewany vs rzeczywisty: przezbrojone w sesji (\d+), po >= (\d+) dobach (\d+): spodziewany srednio (-|-?[\d.]+) d/d, rzeczywisty srednio (-|-?[\d.]+) d/d"
+                       r" \(srednia miesiaca \+ utrzymanie\), pracuje (\d+) z (\d+), typ juz inny (\d+)")
+N312D_REJWHY = re.compile(r"(?:\)|-): (bez typu z wsadem i zyskiem|za maly zysk|bez kiesy)")
+N312D_BAD = ("silversmithy", "velvet_weavery")
+
+N312D_SAMPLE_START = ("Warsztaty za cena (E3-D3): start sesji | klucz Workshop Retool By Price tak | paczka warsztatow towarowych czynna, latka zmiany produkcji (sprzet do kasy miasta) wpieta, "
+                      "wybor typu przy bankructwie (NoTownMines.Postfix) wpiete | regula: tracacy od 60 dob warsztat notabla -> typ z najlepszym wynikiem po placach z cen targu (x1.3 i +10 d), "
+                      "3 na dobe, miasto co 30 dob, warsztat co 120 dob; bankructwo - typ z cen przy > x1.25 wyboru gry | ocena F4 (Workshop Retool Fair Score) tak: cena sprawiedliwa cyklu, "
+                      "cykle z wsadu regionu (promien 150), zmierzony wynik >= 60 dob, kara x0.8 w regionie; pomiar wsadu z zapisu 227 dob, miast 97 | prognoza z rynku wlasnego miasta "
+                      "(Workshop Retool Own Market) tak: przezbrojenie notabla - budzet wsadu i zmierzony wynik z miasta, bramka pelnego cyklu (produkcja miasta 30 dob >= sztuk na cykl, polka sie nie liczy); kara w regionie, "
+                      "progi, kiesa, limity bez zmian; bankructwo i N10 - region | potkniecia 0.")
+N312D_SAMPLE_CH = ("Dragonstone linen_weavery -> bakery (wynik 4.8 -> 50.0 d/d, srednia -1.1 / rok -0.3, sprzet 600, warsztat nr 2, dob w typie 300, ocena F4: szacunek 50.0 "
+                   "(3.50 cyk/d, wsad grain 2.00/d na warsztat, rynek miasta: najciasniejszy wsad grain produkcja miasta 1.50/d x 30 = 45.0 na cykl 1, polka 40 szt., budzet 2.00/d na warsztat), "
+                   "przed kara 50.0); "
+                   "Lys pottery_shop -> silversmithy (wynik 1.0 -> 40.0 d/d, srednia -2.0 / rok -1.0, sprzet 800, warsztat nr 0, dob w typie 250, ocena F4: szacunek 40.0 (1.00 cyk/d, "
+                   "rynek miasta: najciasniejszy wsad silver produkcja miasta 0.40/d x 30 = 12.0 na cykl 1, polka 3 szt., budzet 0.50/d na warsztat, linii bez pelnego cyklu 1), przed kara 40.0)")
+
+
+def n312d_day_sample(day, ch, re_d=0, re_s=0, exp="przezbrojone w sesji 4, po >= 30 dobach 3: spodziewany srednio 60.0 d/d, rzeczywisty srednio 33.0 d/d", yg_d=0, yg_s=0):
+    return ("Warsztaty za cena (E3-D3): dzien " + str(day) + " | CZYNNE | warsztatow notabli pod regula 161, kandydaci (tracace od 60 dob w obu pamieciach) 4 | zmiany "
+            + (f"2 [{ch}]" if ch else "0") + " | odlozone: bez typu z wsadem i zyskiem 0, za maly zysk (< obecny + 10 d i x1.3) 2, bez kiesy (po sprzecie < 4500) 0, "
+            "limit (3 na dobe, miasto 30 dob, warsztat 120 dob) 0 | sprzet do kas miast 1400 | bankructwa i warsztaty odebrane graczowi: wyborow 0, typ z cen zamiast wyboru gry 0 "
+            f"| zmian w sesji 4 | ponowne zmiany tego samego warsztatu dzis {re_d} (sesja {re_s}) | mlode typy przy zmianie (< 180 dob rachunku obecnego typu) dzis {yg_d} (sesja {yg_s}) "
+            "| odrzuceni kandydaci (probki 2) [Astapor meadery (obecny 4.3, srednia -2.2 / rok -1.4) -> "
+            "bakery (przed kara 53.5, po karze 21.9, najlepszy bez kary bakery 53.5): za maly zysk (potrzeba 24.3); Yunkai brewery (obecny -, srednia -1.0 / rok -0.5) -> -: bez typu z wsadem i zyskiem] "
+            "| stoja, ale rok na plusie (>= 60 dob, srednia < 0, rok >= 0 - poza kandydatami) 21 [Duskendale wool_weavery (srednia -3.1 / rok 6.2, dob 300); "
+            "Qarth linen_weavery (srednia -1.0 / rok 2.0, dob 200)] | kara za typ juz obecny w regionie rynku x0.8 na warsztat (F4); miast z 3+ warsztatami jednego typu 0 "
+            "| wplyw na skrzynie: notable -> kasy miast (sprzet) | ocena F4 (Workshop Retool Fair Score): cena sprawiedliwa cyklu ... | kopalnie BK w miastach (N10): wyborow z ocena F4 0, "
+            "bez typu z wynikiem F4 -> ocena z cen 0 | prognoza z rynku wlasnego miasta (Workshop Retool Own Market) tak: oceny dzis 30, linii-ocen bez pelnego cyklu "
+            "(produkcja miasta 30 dob < sztuk na cykl, linia inaczej by ruszyla) 7 "
+            f"| spodziewany vs rzeczywisty: {exp} (srednia miesiaca + utrzymanie), pracuje 2 z 3, typ juz inny 0 | typy (swiat): bakery 76 | czas F4 0.75 ms "
+            "(pomiar, oceny i wybory od ostatniej linii, ta linia; caly krok E3-D3 z akcja gry 0.84 ms) | obieg bez zmian: zmienia sie tylko wybor typu (sprzet notable -> kasa miasta jak dotad) "
+            "| potkniecia F4 0 (sesja 0) | potkniecia 0 (sesja 0).")
+
+
+def n312d_samples(s):
+    return [x for x in s.split("; ")] if s else []
+
+
+def n312d_rows(rep, starts, days):
+    # N312D-0
+    if not starts:
+        rep.add("N312D-0: linia startu E3-D3 - klucz Workshop Retool Own Market", "NIEPOKRYTY (brak linii startu E3-D3)", "'... Own Market) tak' w kazdej linii startu", None)
+    else:
+        on = [l for l in starts if N312D_KEY_ON in l]
+        off = [l for l in starts if N312D_KEY_OFF in l]
+        if not on and not off:
+            rep.add("N312D-0: linia startu E3-D3 - klucz Workshop Retool Own Market", f"NIEPOKRYTY (linii startu {len(starts)}, zadna z polem 312d - log sprzed paczki)",
+                    "'... Own Market) tak' w kazdej linii startu", None)
+        else:
+            rep.add("N312D-0: linia startu E3-D3 - klucz Workshop Retool Own Market", f"linii startu {len(starts)}, tak {len(on)}, nie {len(off)}",
+                    "'... Own Market) tak' w kazdej linii startu", len(on) == len(starts))
+    new = {d: s for d, s in days.items() if N312D_OWN.search(s)}
+    f4 = {d: s for d, s in days.items() if "| ocena F4 (Workshop Retool Fair Score):" in s}
+    # N312D-1
+    if not new:
+        rep.add("N312D-1: linie doby E3-D3 - nowe pola 312d (krok 0 i 1)", f"NIEPOKRYTY (linii doby {len(days)}, z F4 {len(f4)}, z polem 312d 0 - log sprzed paczki)",
+                "kazda linia doby z F4 ma 5 nowych pol", None)
+        for k in ("N312D-2: spodziewany vs rzeczywisty (stosunek)", "N312D-3: zmiany na silversmithy / velvet_weavery - wsad miasta na pelny cykl",
+                  "N312D-4: brak ponownych zmian tego samego warsztatu", "N312D-5: odrzuceni kandydaci (krok 0)", "N312D-6: stoja, ale rok na plusie (krok 0)",
+                  "N312D-7: prognoza z rynku miasta - oceny i linie bez pelnego cyklu"):
+            rep.add(k, "NIEPOKRYTY (brak linii nowego formatu)", "-", None)
+        return
+    bad1 = []
+    for d in sorted(f4):
+        s = f4[d]
+        miss = [n for n, rx in (("ponowne", N312D_RE), ("mlode typy", N312D_YOUNG), ("odrzuceni", N312D_REJ), ("rok na plusie", N312D_YP), ("rynek miasta", N312D_OWN))
+                if not rx.search(s)]
+        if miss:
+            bad1.append(f"dzien {d}: brak {', '.join(miss)}")
+    rep.add("N312D-1: linie doby E3-D3 - nowe pola 312d (krok 0 i 1)", f"linii z F4 {len(f4)}, z polem 312d {len(new)}, zlych {len(bad1)}" + (f" ({bad1[0]})" if bad1 else ""),
+            "zlych 0", not bad1)
+    # N312D-2
+    last = None
+    for d in sorted(new):
+        m = N312D_EXP.search(new[d])
+        if m and int(m.group(3)) > 0 and m.group(4) != "-" and m.group(5) != "-":
+            last = (d, m)
+    if last is None:
+        rep.add("N312D-2: spodziewany vs rzeczywisty (stosunek)", "brak przezbrojonych po >= 30 dobach", "INFO, cel >= 0.5", None)
+    else:
+        d, m = last
+        se, sa = float(m.group(4)), float(m.group(5))
+        r = sa / se if se > 0 else None
+        rep.add("N312D-2: spodziewany vs rzeczywisty (stosunek)", f"dzien {d}: po >= 30 dobach {m.group(3)}, spodziewany {se:.1f}, rzeczywisty {sa:.1f} d/d"
+                + (f", stosunek {r:.2f}" if r is not None else "") + f", pracuje {m.group(6)} z {m.group(7)}, typ juz inny {m.group(8)}",
+                "INFO, cel >= 0.5 (311x 0.12, gra Jeffa 0.28; K < 10 - niepewne)" + ("" if r is None else (" - CEL OSIAGNIETY" if r >= 0.5 else " - PONIZEJ CELU")), None)
+    # N312D-3 i lancuchy z probek
+    bad3, n3, chains, by_town = [], 0, [], {}
+    for d in sorted(new):
+        s = new[d]
+        own_on = "(Workshop Retool Own Market) tak" in s
+        m = N312D_CH.search(s)
+        for one in n312d_samples(m.group(2) if m else ""):
+            mo = N312D_ONE.match(one)
+            if not mo:
+                continue
+            town, fr, to = mo.group(1), mo.group(2), mo.group(3)
+            mn = N312D_NR.search(one)
+            key = (town, mn.group(1) if mn else "?")   # recenzja 312d: lancuch = ten sam warsztat (miasto i numer), nie drugi warsztat tego typu
+            for (d0, f0, t0) in by_town.get(key, []):
+                if t0 == fr:
+                    chains.append(f"{town} nr {key[1]}: {f0} -> {t0} (dzien {d0}) -> {to} (dzien {d})")
+            by_town.setdefault(key, []).append((d, fr, to))
+            if to not in N312D_BAD:
+                continue
+            n3 += 1
+            mt = N312D_TIGHT.search(one)
+            if not own_on:
+                bad3.append(f"dzien {d} {town} -> {to}: klucz Own Market nie"); continue
+            if not mt:
+                bad3.append(f"dzien {d} {town} -> {to}: brak produkcji miasta w probce"); continue
+            if not float(mt.group(2)) > 0:
+                bad3.append(f"dzien {d} {town} -> {to}: {mt.group(1)} - produkcja miasta 0 (polka {mt.group(6)} szt.)"); continue
+            if float(mt.group(4)) + 0.05 < int(mt.group(5)):
+                bad3.append(f"dzien {d} {town} -> {to}: {mt.group(1)} produkcja {mt.group(4)} na 30 dob < {mt.group(5)} na cykl")
+    rep.add("N312D-3: zmiany na silversmithy / velvet_weavery - wsad miasta na pelny cykl", f"takich zmian {n3}, bez wlasnego surowca {len(bad3)}" + (f" ({bad3[0]})" if bad3 else ""),
+            "0 przejsc bez wlasnego surowca (produkcja miasta > 0 i x 30 dob >= sztuk na cykl; polka sie nie liczy)", not bad3)
+    # N312D-4
+    re_s, yg_s = 0, 0
+    for d in sorted(new):
+        mr = N312D_RE.search(new[d])
+        if mr:
+            re_s = max(re_s, int(mr.group(2)))
+        my = N312D_YOUNG.search(new[d])
+        if my:
+            yg_s = max(yg_s, int(my.group(3)))
+    rep.add("N312D-4: brak ponownych zmian tego samego warsztatu", f"ponowne zmiany w sesji {re_s}, mlode typy przy zmianie (< 180 dob rachunku) w sesji {yg_s}; INFO: lancuchy w probkach "
+            f"(miasto i nr warsztatu, X -> Y, potem Y -> Z) {len(chains)}" + (f" ({chains[0]})" if chains else ""),
+            "0 i 0 (mlody typ widac takze po wczytaniu; falszywy alarm: pierwsze 180 dob nowej kampanii albo typ z bankructwa - sprawdzic probke 'dob w typie')",
+            re_s == 0 and yg_s == 0)
+    # N312D-5..7 INFO
+    why, rejs, nrej, pen = {}, [], 0, 0
+    yp, ypmax, ysm, gated, owns = [], 0, [], 0, 0
+    for d in sorted(new):
+        s = new[d]
+        mj = N312D_REJ.search(s)
+        if mj:
+            for one in n312d_samples(mj.group(2) or ""):
+                nrej += 1
+                mw = N312D_REJWHY.search(one)
+                k = mw.group(1) if mw else "?"
+                why[k] = why.get(k, 0) + 1
+                mb = N312D_RAWB.search(one)
+                if mb and mb.group(3) != "-" and mb.group(1) != "-":
+                    need = float(mb.group(4))
+                    if float(mb.group(3)) >= need > float(mb.group(1)):
+                        pen += 1
+                if len(rejs) < 4:
+                    rejs.append(f"d{d} {one}")
+        my = N312D_YP.search(s)
+        if my:
+            v = int(my.group(1)); yp.append(v); ypmax = max(ypmax, v)
+            if my.group(2):
+                ysm = [f"d{d} {x}" for x in n312d_samples(my.group(2))]
+        mo = N312D_OWN.search(s)
+        gated += int(mo.group(3)); owns += int(mo.group(2))
+    rep.add("N312D-5: odrzuceni kandydaci (krok 0)", f"probek {nrej}; powody: " + (", ".join(f"{k} {v}" for k, v in sorted(why.items())) or "-")
+            + f"; padl na karze (najlepszy bez kary >= potrzeba > po karze) {pen}" + (" | " + " || ".join(rejs) if rejs else ""),
+            "INFO (kara x0.8 czy zysk - krok 2 tylko gdy padaja na karze)", None)
+    rep.add("N312D-6: stoja, ale rok na plusie (krok 0)", (f"srednio {sum(yp) / len(yp):.1f}, najwiecej {ypmax} na dobe" if yp else "-") + (" | " + " || ".join(ysm) if ysm else ""),
+            "INFO (duzo = blokada w warunku kandydata 'rok < 0' - krok 3, decyzja Jeffa)", None)
+    rep.add("N312D-7: prognoza z rynku miasta - oceny i linie bez pelnego cyklu", f"oceny z rynku miasta {owns}, linii-ocen odcietych bramka pelnego cyklu {gated} (dob {len(new)})",
+            "INFO (linia-ocena: linia jednego typu w jednej ocenie kandydata, ktora bez bramki by ruszyla - jedna linia liczy sie w kazdej ocenie)", None)
+
+
+def notable312d_selftest():
+    for name, rx, s in (("RE", N312D_RE, n312d_day_sample(1, N312D_SAMPLE_CH)), ("REJ", N312D_REJ, n312d_day_sample(1, N312D_SAMPLE_CH)),
+                        ("YP", N312D_YP, n312d_day_sample(1, N312D_SAMPLE_CH)), ("OWN", N312D_OWN, n312d_day_sample(1, N312D_SAMPLE_CH)),
+                        ("EXP", N312D_EXP, n312d_day_sample(1, N312D_SAMPLE_CH)), ("TIGHT", N312D_TIGHT, N312D_SAMPLE_CH), ("DAY", N312D_DAY, n312d_day_sample(1, None)),
+                        ("YOUNG", N312D_YOUNG, n312d_day_sample(1, None)), ("NR", N312D_NR, N312D_SAMPLE_CH), ("RAWB", N312D_RAWB, n312d_day_sample(1, None))):
+        if not rx.search(s):
+            return "wyrazenie " + name + " nie pasuje do probki"
+    m = N312D_CH.search(n312d_day_sample(1, N312D_SAMPLE_CH))
+    if not m or len(n312d_samples(m.group(2))) != 2:
+        return "probki zmian (NWAR_CH) - nowe pola rozbijaja nawias zmian"
+    if NWAR_CH.search(n312d_day_sample(1, N312D_SAMPLE_CH)).group(1) != "2" or not NWAR_EXP.search(n312d_day_sample(1, N312D_SAMPLE_CH)):
+        return "nwar (NWAR_CH / NWAR_EXP) nie czyta linii z polami 312d"
+    # recenzja 312d: powody probek odrzuconych (Yunkai "-> -: bez typu") i "padl na karze"
+    mj = N312D_REJ.search(n312d_day_sample(1, None))
+    whys = [(N312D_REJWHY.search(x).group(1) if N312D_REJWHY.search(x) else "?") for x in n312d_samples(mj.group(2))]
+    if whys != ["za maly zysk", "bez typu z wsadem i zyskiem"]:
+        return f"powody odrzuconych zle czytane: {whys}"
+    if NWAR_ONE.match(N312D_SAMPLE_CH.split("; ")[0]) is None or N3E_D3_ONE.match(N312D_SAMPLE_CH.split("; ")[1]) is None:
+        return "NWAR_ONE / N3E_D3_ONE nie czytaja probki zmiany z polami 312d"
+    rep = Report()
+    n312d_rows(rep, [N312D_SAMPLE_START], {1: n312d_day_sample(1, N312D_SAMPLE_CH), 2: n312d_day_sample(2, None)})
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    bad = [k for k in ("N312D-0", "N312D-1", "N312D-3", "N312D-4") if v.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad}"
+    r5 = [r[1] for r in rep.rows if r[0].startswith("N312D-5")]
+    if not r5 or "padl na karze (najlepszy bez kary >= potrzeba > po karze) 2" not in r5[0] or "bez typu z wsadem i zyskiem 2" not in r5[0]:
+        return f"N312D-5 zle liczy: {r5[:1]}"
+    badch = N312D_SAMPLE_CH.replace("silver produkcja miasta 0.40/d x 30 = 12.0 na cykl 1", "silver produkcja miasta 0.00/d x 30 = 0.0 na cykl 1")
+    chain = N312D_SAMPLE_CH.replace("Lys pottery_shop -> silversmithy", "Dragonstone bakery -> silversmithy").replace("warsztat nr 0,", "warsztat nr 2,")
+    other = N312D_SAMPLE_CH.replace("Lys pottery_shop -> silversmithy", "Dragonstone bakery -> silversmithy")   # drugi warsztat (nr 0) tego typu - nie lancuch
+    rep = Report()
+    n312d_rows(rep, [N312D_SAMPLE_START.replace("Own Market) tak", "Own Market) nie")],
+               {1: n312d_day_sample(1, badch, 1, 1), 2: n312d_day_sample(2, None).replace("| prognoza z rynku wlasnego miasta (Workshop Retool Own Market) tak: oceny", "| oceny")})
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("N312D-0", "N312D-1", "N312D-4") if v.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss}"
+    rep = Report()
+    n312d_rows(rep, [N312D_SAMPLE_START], {1: n312d_day_sample(1, badch)})
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if v.get("N312D-3") != "NIE":
+        return "srebrnik bez produkcji srebra w miescie (sama polka) nie wykryty"
+    rep = Report()
+    n312d_rows(rep, [N312D_SAMPLE_START], {1: n312d_day_sample(1, N312D_SAMPLE_CH, yg_d=1, yg_s=1)})
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if v.get("N312D-4") != "NIE":
+        return "mlody typ przy zmianie (po wczytaniu) nie wykryty"
+    rep = Report()
+    n312d_rows(rep, [N312D_SAMPLE_START], {1: n312d_day_sample(1, chain)})
+    r4 = [r for r in rep.rows if r[0].startswith("N312D-4")]
+    if not r4 or r4[0][3] != "TAK" or "lancuchy w probkach (miasto i nr warsztatu, X -> Y, potem Y -> Z) 1" not in r4[0][1]:
+        return f"lancuch w probkach (ten sam warsztat) nie pokazany jako INFO: {r4[:1]}"
+    rep = Report()
+    n312d_rows(rep, [N312D_SAMPLE_START], {1: n312d_day_sample(1, other)})
+    r4 = [r for r in rep.rows if r[0].startswith("N312D-4")]
+    if not r4 or "Y -> Z) 0" not in r4[0][1]:
+        return f"drugi warsztat tego typu policzony jako lancuch: {r4[:1]}"
+    rep = Report()
+    n312d_rows(rep, [], {})
+    if any(r[3] != "INFO" for r in rep.rows):
+        return "pusty log - nie wszystko NIEPOKRYTY/INFO"
+    return None
+
+
+def notable312d_main(logp):
+    """notable312d (01.11, paczka 312d): N312D-S, N312D-0..7 - opis nad N312D_*. Strumieniowo, tylko odczyt logu."""
+    rep = Report()
+    s1 = notable312d_selftest()
+    rep.add("N312D-S: self-test wyrazen i wierszy (linie 312d jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("N312D-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days = [], {}
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(N312D_START):
+                starts.append(s)
+            elif s.startswith(N312D_DAYP):
+                md = N312D_DAY.match(s)
+                if md:
+                    days[int(md.group(1))] = s
+    print(f"plik: {logp}")
+    n312d_rows(rep, starts, days)
+    rep.show()
+    return 0
+
+
 _zatargi312b_main_prev = main
 
 
@@ -88287,6 +88571,20 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return zatargi312b_main(rest[0] if rest else None)
     return _zatargi312b_main_prev(argv)
+_notable312d_main_prev = main
+
+
+def main(argv):
+    # paczka 312d: grupa notable312d - opakowanie main jak bitwa310
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "notable312d":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return notable312d_main(rest[0] if rest else None)
+    return _notable312d_main_prev(argv)
+
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
