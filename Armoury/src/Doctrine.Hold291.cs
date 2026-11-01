@@ -62,7 +62,9 @@ namespace Armoury
     /// nie podchodzi 0'). Krytyka 313: gra ma wlasny bilans ognia (CheckIsDefenseApplicable :215-247 - nasze straty i trafieni od pociskow wobec wroga do potegi
     /// 3 x udzial strzelcow wroga) i to 291d go wylaczyl. Zmiana zasady 291d (decyzja D3): w DhDefPost, gdy gra sama mowi obrona NIE, a druzyna ma co najmniej
     /// FireDead (2, decyzja D1) zabitych od pociskow (TeamQuerySystem.DeathByRangedCount, rejestrowane w Agent.Die przy pocisku) - bez wymuszenia, druzyna
-    /// puszczona do konca bitwy (_dhOff 3; licznik gry tylko rosnie - bez wahadla), takze slabsza (D2 - bez osobnego wycofania). Wtedy RBM daje atak 100 piechocie
+    /// puszczona do konca bitwy (_dhOff 3; DeathByRangedCount tylko rosnie, wiec NASZE wymuszenie juz nie wraca - ale gra sama moze znow wybrac obrone, gdy
+    /// ogien ustanie: CheckIsDefenseApplicable liczy biezacy ostrzal; wtedy 313b krok 2 nie biegnie - wymaga BehaviorAdvance / Charge, recenzja 313b (3)),
+    /// takze slabsza (D2 - bez osobnego wycofania). Wtedy RBM daje atak 100 piechocie
     /// ponad 90%, inaczej FullScaleAttack z wagi gry. 283 R4 / R5 nie zatrzymuja takiej druzyny (FireReleased, jak S2). Klucz NIE: wymuszenie jak w 291d,
     /// licznik 'bylby puszczony' (raz na druzyne).
     /// Postfiksy czytaja tylko tablice pisane z glownego watku (tick druzyn nie biegnie rownolegle z OnMissionTick - jak _mul / _s2Live); wagi obrony pisze

@@ -41,7 +41,7 @@ namespace Armoury
             public Vec2 FaceDir;
         }
 
-        private const int LEnd = 0, LTime = 1, LNear = 2, LCharge = 3, LPlayer = 4, LTactic = 5, LRetreat = 6, LS4 = 7, LKey = 8, LBattle = 9, LKinds = 10;
+        private const int LEnd = 0, LTime = 1, LNear = 2, LCharge = 3, LPlayer = 4, LTactic = 5, LRetreat = 6, LS4 = 7, LKey = 8, LBattle = 9, LFire = 10, LKinds = 11;   // LFire: 313b - druzyna puszczona 291e albo bieg pod ostrzalem
         private static readonly int[] LRel = new int[LKinds];
         private static readonly Dictionary<Formation, Halt> Halts = new Dictionary<Formation, Halt>();
         private static readonly List<Halt> HaltList = new List<Halt>(), HaltTmp = new List<Halt>();
@@ -63,9 +63,12 @@ namespace Armoury
         // postoje strzelcow (R4 dalej), ludzie R2 ze smycza od miejsca wyslania i ich powroty ze smyczy
         private static readonly HashSet<int> H291Who = new HashSet<int>();
         private static int _l291NoArmy, _l291Go, _l291GoMen, _l291Arch, _l291Anchor, _l291LeashBack;
-        // 313b 291e: druzyna puszczona bilansem ognia gry (Doctrine.FireReleased) nie staje - jak S2 (szyki, raz na pass i szyk; segment E linii 'Bitwa (291)')
-        private static int _lNoFire;
+        // 313b 291e: druzyna puszczona bilansem ognia gry (Doctrine.FireReleased) nie staje - jak S2; recenzja 313b (1): takze druzyna, ktora idzie pod ostrzalem
+        // (OutshotRush.Live - np. banda w FullScaleAttack bez 291e). Raz na szyk (LNo 6 / 7, recenzja 313b (8)); segment E linii 'Bitwa (291)'
+        private static int _lNoFire, _lNoRush;
         internal static int NoHaltFire { get { return _lNoFire; } }
+        internal static int NoHaltRush { get { return _lNoRush; } }
+        internal static int HaltFireRel { get { return LRel[LFire]; } }
 
         private static void HaltClear()
         {
@@ -78,7 +81,7 @@ namespace Armoury
             _lFace = _lR5Sum = 0;
             H291Who.Clear();
             _l291NoArmy = _l291Go = _l291GoMen = _l291Arch = _l291Anchor = _l291LeashBack = 0;
-            _lNoFire = 0;   // 313b
+            _lNoFire = _lNoRush = 0;   // 313b
         }
 
         /// <summary>291: segment A linii 'Bitwa (291)' (HorsePursuit.End, przed Clear).</summary>
@@ -177,8 +180,10 @@ namespace Armoury
             // i zwiera szereg - to wlasnie odpowiedz. Bez postoju tylko strona ofiary w poscigu (lamie strone nekajacego - szyki w szarzy 148, CanHalt i tak).
             if (Broke(t.Side, t.SSide)) { _lNoBroke++; return 0; }
             if (Doctrine.S2On(team)) { _lNoS2++; return 0; }
-            // 313b 291e (krytyka 313 luka 2): obronca puszczony bilansem ognia idzie na strzelca - postoj 283 (wrog dalej niz 110 m) zatrzymalby go pod ostrzalem
-            if (Doctrine.FireReleased(team)) { _lNoFire++; return 0; }
+            // 313b 291e (krytyka 313 luka 2): obronca puszczony bilansem ognia idzie na strzelca - postoj 283 (wrog dalej niz 110 m) zatrzymalby go pod ostrzalem;
+            // recenzja 313b (1): tak samo druzyna, ktora idzie pod ostrzalem (OutshotRush.Live) - Jeff "nie stoj"
+            if (Doctrine.FireReleased(team)) { if (LNo(vf, 6)) _lNoFire++; return 0; }
+            if (OutshotRush.Live(team)) { if (LNo(vf, 7)) _lNoRush++; return 0; }
             // recenzja 283 (4): pieszy przy swoim nietknietym szyku (gracz w swojej linii) - zwykla bitwa; nekajacy przed czolem szyku ofiary - szyk idzie dalej
             // (pod pociskami z przodu sie zwiera, nie staje - S2/141)
             if (!t.Lone && t.S.MountAgent == null) { if (LNo(vf, 3)) _lNoFootNear++; return 0; }
@@ -400,6 +405,7 @@ namespace Armoury
             if (FormRetreat(f)) return LRetreat;
             if (Charging(f)) return LCharge;
             if (Doctrine.S4Held(f)) return LS4;
+            if (Doctrine.FireReleased(f.Team) || OutshotRush.Live(f.Team)) return LFire;   // recenzja 313b (1): postoj sprzed puszczenia 291e / biegu pod ostrzalem
             if (now - h.Start >= MaxSeconds) return LTime;
             if (FootGapOf(f) <= HuntClose) return LNear;   // poprawka 132b: pieszy szyk wroga (jak CanHalt)
             var t = h.T;

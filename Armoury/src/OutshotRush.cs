@@ -21,14 +21,22 @@ namespace Armoury
     /// zabitych od pociskow (TeamQuerySystem.DeathByRangedCount), nie trzyma pozycji 291, a jest puszczona (291e bilans ognia albo S2 141) albo ma biezaca
     /// taktyke ataku. Jej szyki piechoty AI pod ostrzalem (miara gry UnderRangedAttackRatio >= 0.33 albo sygnal S4 140):
     ///  - MarchToContact: bieg do zwarcia takze z tarczami (ta sama droga co 291 C - bez capu marszu, AiBreath z zapasem pod ostrzalem 25% przez Rushing,
-    ///    koniec przy zwarciu / szarzy / zmianie rozkazu; odwrot FallBack, szyki gracza, smoki - nigdy);
+    ///    koniec przy zwarciu / szarzy / zmianie rozkazu; odwrot FallBack, szyki gracza, smoki - nigdy). Recenzja 313b (3): tylko przy aktywnym BehaviorAdvance
+    ///    albo BehaviorCharge (Defend / Regroup / PullBack z rozkazem Move do pozycji - krok jak dotad; gra moze sama wrocic do obrony po ustaniu ognia);
+    ///  - 283 R4 / R5 (HorsePursuit.ReactHalt, recenzja 313b (1)): druzyna Live nie staje, postoj zalozony wczesniej puszczony (powod 'ostrzal');
     ///  - CloseRanks (146 / 310): w Advance i Charge Loose zamiast ShieldWall (mur tarcz ma limit biegu 0.3), chyba ze szyk konnicy uderzeniowej wroga jest
     ///    w 90 m (K11 - luzny szyk pod szarza to rzez; konni strzelcy sie nie licza) - wtedy decyzja jak dotad;
-    ///  - cel (postfiks Formation.CacheClosestEnemyFormation, tick druzyn): gdy najblizszy szyk wroga to konny strzelec (szyk IsRangedCavalryFormation albo szyk
-    ///    gracza na koniu z bronia dystansowa w reku), najblizszy szyk ma byc jego pieszy szyk (piechota albo lucznicy pieszo) - BehaviorCharge gry (bandy:
-    ///    RBM oddaje bitwy z bandytami grze) i BehaviorAdvance licza cel z CachedClosestEnemyFormation; RBM poza bandami bierze cel z FindSignificantEnemy bez
-    ///    konnicy (bez zmian). Brak pieszego szyku wroga - cel jak dotad (bieg na konnego strzelca, ale nie stoi).
-    /// Klucz NIE: nic (bez pomiaru na sucho - te same liczniki 291 C pokazuja krok z tarczami). Linia: segment E linii 'Bitwa (291)' (Battle291.Write).
+    ///  - cel (postfiks Formation.CacheClosestEnemyFormation, tick druzyn): gdy najblizszy szyk wroga to szyk konnych lucznikow AI (IsRangedCavalryFormation
+    ///    bez gracza), najblizszy szyk ma byc jego pieszy szyk (piechota albo lucznicy pieszo). Recenzja 313b (WYSOKA 1): szyk z GRACZEM nie jest przekierowany -
+    ///    Jeff: "to ta NA MNIE biegnie" - banda biegnie na gracza-konnego lucznika, nie na jego piechote. Cel zmienia BehaviorCharge gry (bandy: RBM oddaje
+    ///    bitwy z bandytami grze, ChargeToTarget(CachedClosestEnemyFormation)); BehaviorAdvance bierze go tylko przy jednym szyku wroga (przy >= 2 -
+    ///    Team.MedianTargetFormation, recenzja 313b (5)); RBM poza bandami bierze cel z FindSignificantEnemy bez konnicy (bez zmian). Dystansu
+    ///    CachedClosestEnemyFormationDistanceSquared NIE zmieniamy (recenzja 313b (4)) - ShieldsUp.Near (zakaz zmiany broni w 8 m) liczy dalej do konnego
+    ///    strzelca. Pozostali czytelnicy samego celu (MarchToContact.EnemyGap - zwarcie i prog szarzy, AiBreath d_szyk, HorsePursuit.PullWhy) widza pieszy szyk.
+    ///    Brak pieszego szyku wroga - cel jak dotad (bieg na konnego strzelca, ale nie stoi).
+    /// Klucz NIE: nic (bez pomiaru na sucho - te same liczniki 291 C pokazuja krok z tarczami). Linia: segment E linii 'Bitwa (291)' (Battle291.Write); recenzja
+    /// 313b (4): szyk w biegu wedlug faktycznego szyku (Loose / ShieldWall / inny) i srednia predkosc srodka szyku w biegu i w szarzy pod ostrzalem (sedno skargi:
+    /// biegnie czy idzie - takze czy 140 DefendDown pierwszego szeregu nie hamuje biegu).
     /// Watki: Tick i liczniki biegu / szyku na glownym watku; postfiks w ticku druzyn (nie biegnie rownolegle z OnMissionTick - Mission.cs:3770) czyta tylko
     /// tablice z Ticku, liczniki Interlocked, bez alokacji. Potkniecia liczone (bez globalnego wylacznika).
     /// </summary>
@@ -50,15 +58,18 @@ namespace Armoury
         private static bool _tried;
         private static string _patch = "bez latki";
         private static AccessTools.FieldRef<Formation, Formation> _fClosest;
-        private static Action<Formation, float> _setD2;
 
         // ---- liczniki misji (Reset w Battle291.Begin)
         private static int _teams, _byFire, _byS2, _byAtk, _stum;
         private static int _rushIn, _rushOut;
         private static float _rushSec;
-        private static readonly HashSet<Formation> _rushForms = new HashSet<Formation>(), _looseForms = new HashSet<Formation>(), _horseForms = new HashSet<Formation>();
+        // recenzja 313b (6): klucz int (TeamIndex x 16 + FormationIndex) - bez referencji do szykow (i Mission) po bitwie
+        private static readonly HashSet<int> _rushForms = new HashSet<int>(), _looseForms = new HashSet<int>(), _horseForms = new HashSet<int>();
         private static int _looseN, _wallWouldN;
-        private static int _redir, _redirNoFoot, _postErr;   // Interlocked (tick druzyn)
+        // recenzja 313b (4): szyko-sekundy biegu wedlug faktycznego szyku, droga i czas srodka szyku (bieg 313b, szarza bez capu pod ostrzalem)
+        private static float _secLoose, _secWall, _secOther, _chargeSec;
+        private static double _runDist, _runTime, _chgDist, _chgTime;
+        private static int _redir, _redirCharge, _redirNoFoot, _postErr;   // Interlocked (tick druzyn)
 
         /// <summary>Doctrine.ApplyMissionPatches (pierwsza bitwa, raz na proces): postfiks Formation.CacheClosestEnemyFormation (DeclaredMethod - pulapka 15.10).</summary>
         internal static string ApplyPatch(Harmony h)
@@ -68,20 +79,18 @@ namespace Armoury
             try
             {
                 var t = AccessTools.DeclaredMethod(typeof(Formation), "CacheClosestEnemyFormation");
-                var set = AccessTools.PropertySetter(typeof(Formation), "CachedClosestEnemyFormationDistanceSquared");
-                if (t == null || set == null) { _patch = "NIE (brak " + (t == null ? "metody" : "settera") + ")"; return _patch; }
+                if (t == null) { _patch = "NIE (brak metody)"; return _patch; }
                 _fClosest = AccessTools.FieldRefAccess<Formation, Formation>("_cachedClosestEnemyFormation");
-                _setD2 = AccessTools.MethodDelegate<Action<Formation, float>>(set);
                 h.Patch(t, postfix: new HarmonyMethod(typeof(OutshotRush), nameof(ClosestPost)) { priority = Priority.Last });
                 bool ok = false;
                 var info = Harmony.GetPatchInfo(t);
                 if (info != null) foreach (var p in info.Postfixes) if (p != null && p.PatchMethod != null && p.PatchMethod.DeclaringType == typeof(OutshotRush)) ok = true;
-                if (!ok) { _fClosest = null; _setD2 = null; }
+                if (!ok) _fClosest = null;
                 _patch = ok ? "TAK" : "NIEWPIETA";
             }
             catch (Exception e)
             {
-                _fClosest = null; _setD2 = null;
+                _fClosest = null;
                 _patch = "NIE (" + e.GetType().Name + ")";
                 RoutHold.Stumble(RoutHold.SiteDoctrine, "OutshotRush.Latka", e);
             }
@@ -97,7 +106,9 @@ namespace Armoury
             _rushSec = 0f;
             _rushForms.Clear(); _looseForms.Clear(); _horseForms.Clear();
             _looseN = _wallWouldN = 0;
-            Interlocked.Exchange(ref _redir, 0); Interlocked.Exchange(ref _redirNoFoot, 0); Interlocked.Exchange(ref _postErr, 0);
+            _secLoose = _secWall = _secOther = _chargeSec = 0f;
+            _runDist = _runTime = _chgDist = _chgTime = 0.0;
+            Interlocked.Exchange(ref _redir, 0); Interlocked.Exchange(ref _redirCharge, 0); Interlocked.Exchange(ref _redirNoFoot, 0); Interlocked.Exchange(ref _postErr, 0);
         }
 
         private static void ClearState()
@@ -173,11 +184,28 @@ namespace Armoury
 
         // ------------------------------------------------------------ bieg (MarchToContact.MarchCap, glowny watek)
 
-        /// <summary>MarchToContact: szyk z tarczami w biegu 313b w tym takcie (wejscie = pierwszy takt biegu).</summary>
+        private static int Key(Formation f) { var t = f.Team; return (t != null ? t.TeamIndex : 15) * 16 + ((int)f.FormationIndex & 15); }
+
+        /// <summary>MarchToContact: szyk z tarczami w biegu 313b w tym takcie (wejscie = pierwszy takt biegu); szyko-sekundy wedlug faktycznego szyku (recenzja 4).</summary>
         internal static void NoteRush(Formation f, bool entered, float sec)
         {
-            if (entered) { _rushIn++; if (f != null) _rushForms.Add(f); }
+            if (entered) { _rushIn++; if (f != null) _rushForms.Add(Key(f)); }
             _rushSec += sec;
+            if (f == null) return;
+            var ae = f.ArrangementOrder.OrderEnum;
+            if (ae == ArrangementOrder.ArrangementOrderEnum.Loose) _secLoose += sec;
+            else if (ae == ArrangementOrder.ArrangementOrderEnum.ShieldWall) _secWall += sec;
+            else _secOther += sec;
+        }
+
+        /// <summary>MarchToContact: szarza (bez capu, blizej niz prog biegu) szyku piechoty AI druzyny Live pod ostrzalem - takt (recenzja 313b (4)).</summary>
+        internal static void NoteCharge(float sec) { _chargeSec += sec; }
+
+        /// <summary>MarchToContact: droga srodka szyku miedzy kolejnymi taktami biegu 313b (charge false) albo szarzy pod ostrzalem (charge true).</summary>
+        internal static void NoteMove(bool charge, float dist, float dt)
+        {
+            if (!(dt > 0f) || float.IsNaN(dist) || float.IsInfinity(dist)) return;
+            if (charge) { _chgDist += dist; _chgTime += dt; } else { _runDist += dist; _runTime += dt; }
         }
 
         /// <summary>MarchToContact: bieg 313b skonczony (zwarcie, szarza, rozkaz, koniec ostrzalu).</summary>
@@ -192,10 +220,10 @@ namespace Armoury
         internal static bool WantLoose(Mission m, Formation f, bool wall)
         {
             if (f == null || !Live(f.Team)) return false;
-            if (ShockCavNear(m, f)) { _horseForms.Add(f); return false; }
+            if (ShockCavNear(m, f)) { _horseForms.Add(Key(f)); return false; }
             _looseN++;
             if (wall) _wallWouldN++;
-            _looseForms.Add(f);
+            _looseForms.Add(Key(f));
             return true;
         }
 
@@ -225,7 +253,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ cel (postfiks, tick druzyn)
 
-        /// <summary>Konny strzelec: szyk konnych lucznikow (IsRangedCavalryFormation) albo szyk z graczem na koniu z bronia dystansowa w reku.</summary>
+        /// <summary>ShockCavNear: konny strzelec - szyk konnych lucznikow (IsRangedCavalryFormation) albo szyk z graczem na koniu z bronia dystansowa w reku,
+        /// ale tylko gdy gracz jest w nim sam albo szyk nie ma rodzaju (recenzja 313b (2): gracz z lukiem w szyku kopijnikow - to dalej konnica uderzeniowa, K11).</summary>
         private static bool MountedShooter(Formation ef)
         {
             var q = ef.QuerySystem;
@@ -233,14 +262,25 @@ namespace Armoury
             if (q.IsRangedCavalryFormation) return true;
             var a = Agent.Main;
             if (a == null || !a.IsActive() || a.MountAgent == null || !ReferenceEquals(a.Formation, ef)) return false;
+            if (ef.CountOfUnits > 1 && (q.IsCavalryFormation || q.IsInfantryFormation || q.IsRangedFormation)) return false;
             var wi = a.GetPrimaryWieldedItemIndex();
             if (wi == EquipmentIndex.None) return false;
             var u = a.Equipment[wi].CurrentUsageItem;
             return u != null && u.IsRangedWeapon;
         }
 
-        /// <summary>Po Formation.CacheClosestEnemyFormation (tick druzyn): szyk piechoty AI druzyny pod ostrzalem - konny strzelec jako najblizszy wrog zamieniony
-        /// na najblizszy pieszy szyk wroga (ta sama miara co gra). Bez alokacji.</summary>
+        /// <summary>Cel do przekierowania: szyk konnych lucznikow AI - bez gracza (recenzja 313b WYSOKA 1: Jeff "to ta na mnie biegnie").</summary>
+        private static bool AiHorseArchers(Formation ef)
+        {
+            var q = ef.QuerySystem;
+            if (q == null || !q.IsRangedCavalryFormation) return false;
+            var a = Agent.Main;
+            return a == null || !ReferenceEquals(a.Formation, ef);
+        }
+
+        /// <summary>Po Formation.CacheClosestEnemyFormation (tick druzyn): szyk piechoty AI druzyny pod ostrzalem - szyk konnych lucznikow AI jako najblizszy wrog
+        /// zamieniony na najblizszy pieszy szyk wroga (ta sama miara co gra). Dystans gry (CachedClosestEnemyFormationDistanceSquared) zostaje - recenzja 313b (4).
+        /// Bez alokacji.</summary>
         public static void ClosestPost(Formation __instance)
         {
             if (!_on || __instance == null) return;
@@ -248,14 +288,13 @@ namespace Armoury
             {
                 var f = __instance;
                 var fc = _fClosest;
-                var sd = _setD2;
-                if (fc == null || sd == null || !f.IsAIControlled || f.CountOfUnits <= 0) return;
+                if (fc == null || !f.IsAIControlled || f.CountOfUnits <= 0) return;
                 var team = f.Team;
                 if (!Live(team)) return;
                 var fq = f.QuerySystem;
                 if (fq == null || !fq.IsInfantryFormation) return;
                 var cur = fc(f);
-                if (cur == null || !MountedShooter(cur)) return;
+                if (cur == null || !AiHorseArchers(cur)) return;
                 var m = Mission.Current;
                 if (m == null) return;
                 var me = new Vec3(f.CachedAveragePosition, f.CachedMedianPosition.GetNavMeshZ());
@@ -270,17 +309,18 @@ namespace Armoury
                     for (int j = 0; j < fl.Count; j++)
                     {
                         var ef = fl[j];
-                        if (ef == null || ef.CountOfUnits <= 0) continue;
+                        if (ef == null || ef.CountOfUnits <= 0 || ReferenceEquals(ef, cur)) continue;
                         var eq = ef.QuerySystem;
-                        if (eq == null || !(eq.IsInfantryFormation || eq.IsRangedFormation)) continue;
+                        if (eq == null || eq.IsRangedCavalryFormation || !(eq.IsInfantryFormation || eq.IsRangedFormation)) continue;
                         float d = ef.CachedMedianPosition.GetNavMeshVec3().DistanceSquared(me);
                         if (d < bd) { bd = d; best = ef; }
                     }
                 }
                 if (best == null) { Interlocked.Increment(ref _redirNoFoot); return; }
                 fc(f) = best;
-                sd(f, bd);
                 Interlocked.Increment(ref _redir);
+                var ai = f.AI;
+                if (ai != null && ai.ActiveBehavior is BehaviorCharge) Interlocked.Increment(ref _redirCharge);   // recenzja 313b (5): tylko tu cel na pewno dziala
             }
             catch { Interlocked.Increment(ref _postErr); }
         }
@@ -288,20 +328,27 @@ namespace Armoury
         // ------------------------------------------------------------ linia
 
         /// <summary>Segment E linii 'Bitwa (291)' (Battle291.Write - HorsePursuit.End, po Doctrine.End i End; liczniki do Reset).</summary>
+        private static string Mps(double dist, double time) { return time >= 1.0 ? (dist / time).ToString("0.0", Inv) : "-"; }
+
         internal static string Segment()
         {
             var c = Settings.Current;
             var sb = new StringBuilder(600);
             sb.Append("E 313b obronca atakuje przy przegranym ostrzale ").Append(c != null && c.DefendersChargeWhenOutshot ? "TAK" : "NIE").Append(": ")
               .Append(Doctrine.FireSegment())
-              .Append("; 283 bez postoju (bilans ognia) ").Append(HorsePursuit.NoHaltFire)
+              .Append("; 283 bez postoju: bilans ognia ").Append(HorsePursuit.NoHaltFire).Append(", bieg pod ostrzalem ").Append(HorsePursuit.NoHaltRush)
+              .Append(", postoj puszczony ostrzalem ").Append(HorsePursuit.HaltFireRel)
               .Append("; bieg z tarczami pod ostrzalem ").Append(c != null && c.OutshotRushWithShields ? "TAK" : "NIE")
               .Append(": druzyn ").Append(_teams).Append(" (291e ").Append(_byFire).Append(", S2 ").Append(_byS2).Append(", taktyka ataku ").Append(_byAtk)
               .Append("), szykow w biegu ").Append(_rushForms.Count).Append(", wejsc w bieg ").Append(_rushIn).Append(", koncow biegu ").Append(_rushOut)
-              .Append(", szyko-sekund biegu ").Append(_rushSec.ToString("0", Inv))
+              .Append(", szyko-sekund biegu ").Append(_rushSec.ToString("0", Inv)).Append(" (Loose ").Append(_secLoose.ToString("0", Inv))
+              .Append(", ShieldWall ").Append(_secWall.ToString("0", Inv)).Append(", inny ").Append(_secOther.ToString("0", Inv)).Append("), sr. predkosc w biegu ")
+              .Append(Mps(_runDist, _runTime)).Append(" m/s; szarza pod ostrzalem bez capu: szyko-sekund ").Append(_chargeSec.ToString("0", Inv))
+              .Append(", sr. predkosc ").Append(Mps(_chgDist, _chgTime)).Append(" m/s")
               .Append("; Loose zamiast muru tarcz: szykow ").Append(_looseForms.Count).Append(" (decyzji ").Append(_looseN).Append(", w tym zamiast ShieldWall ")
               .Append(_wallWouldN).Append("), bez Loose przy konnicy w 90 m ").Append(_horseForms.Count)
-              .Append("; cel pieszy zamiast konnego strzelca ").Append(Volatile.Read(ref _redir)).Append(" (bez pieszego szyku wroga ")
+              .Append("; cel pieszy zamiast konnych lucznikow AI ").Append(Volatile.Read(ref _redir)).Append(" (w BehaviorCharge ").Append(Volatile.Read(ref _redirCharge))
+              .Append(", bez pieszego szyku wroga ")
               .Append(Volatile.Read(ref _redirNoFoot)).Append("), latka celu ").Append(_patch)
               .Append("; potkniecia ").Append(_stum + Volatile.Read(ref _postErr));
             return sb.ToString();

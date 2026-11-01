@@ -10392,11 +10392,11 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefendersAdvanceUnderFire { get; set; } = true;
 
-        [SettingPropertyBool("Defenders Hold Their Ground", HintText = "an AI army that was attacked in a field battle holds its position and lets the attacker come: it does not march out to meet you, even as a bandit rabble, unless it is being shot down without an answer (Defenders Advance Under Fire), or the attacker has not come on for 90 seconds; once its main infantry is in close combat it fights as usual. Its horse archers may still ride out and skirmish. When you are the one attacked, the AI attacks you as before. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Defenders Hold Their Ground", HintText = "an AI army that was attacked in a field battle holds its position and lets the attacker come: it does not march out to meet you, even as a bandit rabble, unless it is being shot down without an answer (Defenders Advance Under Fire), it is losing the archery exchange (Defenders Charge When Outshot), or the attacker has not come on for 90 seconds; once its main infantry is in close combat it fights as usual. Its horse archers may still ride out and skirmish. When you are the one attacked, the AI attacks you as before. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefendersHoldTheirGround { get; set; } = true;
 
-        [SettingPropertyBool("Unshielded Rush Under Fire", HintText = "AI infantry with few shields (fewer than 60% of the men, the shield wall threshold) that comes under arrows or bolts while advancing stops marching at a walk and runs at the enemy to close the distance as fast as its breath allows (keeping a quarter of it for the fight), until it reaches them; infantry with shields keeps walking behind its shield wall. Field battles only, AI formations only. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Unshielded Rush Under Fire", HintText = "AI infantry with few shields (fewer than 60% of the men, the shield wall threshold) that comes under arrows or bolts while advancing stops marching at a walk and runs at the enemy to close the distance as fast as its breath allows (keeping a quarter of it for the fight), until it reaches them; infantry with shields keeps walking behind its shield wall, unless its side is already losing men to missiles while advancing (Outshot Rush With Shields). Field battles only, AI formations only. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool UnshieldedRushUnderFire { get; set; } = true;
 
@@ -10404,7 +10404,7 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefendersChargeWhenOutshot { get; set; } = true;
 
-        [SettingPropertyBool("Outshot Rush With Shields", HintText = "AI infantry that is advancing and losing men to arrows or bolts (at least two killed) runs to close the distance even when it carries shields, in loose order instead of a slow shield wall, as fast as its breath allows (keeping a quarter of it for the fight). When the shooter is a horse archer it goes for his foot troops instead of chasing the horse (if he has none, it still runs at him). Field battles only, AI formations only. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Outshot Rush With Shields", HintText = "Once an AI side has lost at least two men killed by missiles (arrows, bolts or thrown weapons), its infantry that is advancing or charging under fire runs to close the distance even when it carries shields, in loose order instead of a slow shield wall, as fast as its breath allows (keeping a quarter of it for the fight); it no longer halts to face a harasser. If you shoot at it from horseback it runs at you; when the shooters are a body of AI horse archers it goes for their foot troops instead of chasing the horses (if they have none, it still runs at them). Field battles only, AI formations only. Off = shielded infantry walks behind its shield wall as before", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool OutshotRushWithShields { get; set; } = true;
 
@@ -10932,7 +10932,7 @@ namespace Armoury
         [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
         public bool ArchersAvoidOwnMen { get; set; } = true;
 
-        [SettingPropertyBool("Shield Wall Under Fire Any Order", HintText = "With AI Formations Under Fire: every AI infantry formation of 8 men or more that stands under arrows before it closes - holding a hill, guarding a flank, regrouping or defending, or a company under 30 on the move - closes into a shield wall when six in ten hold a shield (open order when fewer do), and keeps the wall while the shooting lasts instead of being pulled back into a line. A body of 30 or more advancing or charging is left to the RBM decision as before. Formations under your command are never touched. Off = only formations RBM itself asks about, as before", RequireRestart = false)]
+        [SettingPropertyBool("Shield Wall Under Fire Any Order", HintText = "With AI Formations Under Fire: every AI infantry formation of 8 men or more that stands under arrows before it closes - holding a hill, guarding a flank, regrouping or defending, or a company under 30 on the move - closes into a shield wall when six in ten hold a shield (open order when fewer do), and keeps the wall while the shooting lasts instead of being pulled back into a line. An advancing or charging formation whose side has already lost two men to missiles goes in open order instead and runs (Outshot Rush With Shields). A body of 30 or more advancing or charging is left to the RBM decision as before. Formations under your command are never touched. Off = only formations RBM itself asks about, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
         public bool ShieldWallUnderFireAnyOrder { get; set; } = true;
 

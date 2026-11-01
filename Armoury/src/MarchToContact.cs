@@ -102,6 +102,11 @@ namespace Armoury
         private static readonly float[] _shield = new float[Slots];
         private static readonly bool[] _rushNow = new bool[Slots];
         private static readonly bool[] _rush313 = new bool[Slots];      // 313b: biezacy bieg to bieg z tarczami (OutshotRush) - koniec liczony tam
+        // recenzja 313b (4): pomiar predkosci srodka szyku - ostatnia probka (pozycja, chwila, rodzaj 1 bieg 313b / 2 szarza pod ostrzalem; 0 brak)
+        private static readonly Vec2[] _spPos = new Vec2[Slots];
+        private static readonly float[] _spAt = new float[Slots];
+        private static readonly byte[] _spKind = new byte[Slots];
+        private static float _evalNow;
 
         private static WeakReference _m;
         private static float _acc, _sampleAcc;
@@ -376,7 +381,7 @@ namespace Armoury
                 _dragon[i] = false; _player[i] = false; _wasCharge[i] = false; _signal[i] = false; _chargeAt[i] = -1000f; _everMarched[i] = false;
                 _chargeHeld[i] = false; _rest[i] = false; _capRest[i] = false; _freshUntil[i] = 0f;
                 _shield[i] = -1f; _rushNow[i] = false;   // 291
-                _rush313[i] = false;   // 313b
+                _rush313[i] = false; _spKind[i] = 0;   // 313b
             }
             _any = false;
         }
@@ -513,7 +518,7 @@ namespace Armoury
                 _dragon[idx] = false; _wasCharge[idx] = false; _signal[idx] = false; _chargeAt[idx] = -1000f; _everMarched[idx] = false;
                 _chargeHeld[idx] = false; _rest[idx] = false; _capRest[idx] = false; _freshUntil[idx] = 0f;
                 _shield[idx] = -1f; _rushNow[idx] = false;   // 291
-                _rush313[idx] = false;   // 313b
+                _rush313[idx] = false; _spKind[idx] = 0;   // 313b
                 _who[idx] = f;
             }
             // 291: bieg pod ostrzalem trwa tylko przez MarchCap tego taktu (zwarcie, szarza, inny rozkaz - koniec biegu, zwykla sciezka)
@@ -543,6 +548,7 @@ namespace Armoury
             _player[idx] = player;
             var oe = f.GetReadonlyMovementOrderReference().OrderEnum;
             _evalOe = oe;   // 291
+            _evalNow = now;   // 313b (recenzja 4): pomiar predkosci w MarchCap
             bool charge = oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget;
             bool orderWalk;
             if (player) orderWalk = oe == MovementOrder.MovementOrderEnum.Advance || (oe == MovementOrder.MovementOrderEnum.Move && _playerMove);
@@ -590,6 +596,13 @@ namespace Armoury
 
             if (kind == KNone || kind == KHorseArch || _dragon[idx] || charge || gap == float.MaxValue)
             {
+                // recenzja 313b (4): szarza blizej niz prog biegu (bez capu) szyku piechoty AI druzyny idacej pod ostrzalem - pomiar (szyko-sekundy, predkosc)
+                if (charge && kind == KInf && _rushShielded && !player && !_dragon[idx] && gap > ContactGap && gap != float.MaxValue && OutshotRush.Live(f.Team))
+                {
+                    bool fireC = false;
+                    try { fireC = q.UnderRangedAttackRatio >= 0.33f; } catch { fireC = false; }
+                    if (fireC || ShieldsUp.FormFire(f)) { OutshotRush.NoteCharge(TickEvery); SpeedSample(f, idx, 2); }
+                }
                 Set(f, idx, 0f, 0f, false);
                 return;
             }
@@ -748,12 +761,16 @@ namespace Armoury
                     Set(f, idx, 0f, 0f, false);
                     return;
                 }
-                bool shielded = !bare && _rushShielded && _shield[idx] >= 0f && OutshotRush.Live(f.Team);
+                // recenzja 313b (3): tylko przy aktywnym BehaviorAdvance / BehaviorCharge (jak CloseRanks beh 0 / 1) - po ustaniu ognia gra moze sama wrocic do
+                // obrony (DefensiveEngagement -> BehaviorDefend, rozkaz Move do pozycji), Regroup / PullBack tez daja Move: tam krok jak dotad, nie bieg bez capu.
+                // Recenzja 313b (7) / (6): tylko szyk z tarczami (>= 60% ludzi, prog muru tarcz 146) - szyk bez tarcz to 291 C (klucz UnshieldedRushUnderFire)
+                bool shielded = !bare && _rushShielded && _shield[idx] >= CloseRanks.WallFrom && OutshotRush.Live(f.Team) && AdvanceOrCharge(f);
                 if (shielded && (fire || (_evalWasRush && _evalWas313)))
                 {
                     bool cont = _evalWasRush && _evalWas313;
                     if (cont) OutshotRush.NoteRushEndUndo();   // dalej biegnie (zdjecie na poczatku Eval nie bylo koncem)
                     OutshotRush.NoteRush(f, !cont, TickEvery);
+                    SpeedSample(f, idx, 1);
                     _rushNow[idx] = true;
                     _rush313[idx] = true;
                     Set(f, idx, 0f, 0f, false);
@@ -762,6 +779,26 @@ namespace Armoury
                 if (_rush && fire && !bare && _shield[idx] >= 0f && _rushKeptForms.Add(idx)) { _rushShieldKept++; _rushKeptShareSum += _shield[idx]; }
             }
             Set(f, idx, pace, underFire ? 0f : pace, false);
+        }
+
+        /// <summary>313b recenzja (3): aktywne zachowanie szyku to BehaviorAdvance albo BehaviorCharge (takze pochodne RBM).</summary>
+        private static bool AdvanceOrCharge(Formation f)
+        {
+            var ai = f.AI;
+            var b = ai != null ? ai.ActiveBehavior : null;
+            return b is BehaviorAdvance || b is BehaviorCharge;
+        }
+
+        /// <summary>313b recenzja (4): droga srodka szyku od poprzedniej probki tego samego rodzaju (kolejne takty, do 1.5 s) - OutshotRush.NoteMove.</summary>
+        private static void SpeedSample(Formation f, int idx, byte kind)
+        {
+            Vec2 p = f.CachedAveragePosition;
+            if (!p.IsValid) { _spKind[idx] = 0; return; }
+            float dt = _evalNow - _spAt[idx];
+            if (_spKind[idx] == kind && dt > 0.1f && dt <= 1.5f) OutshotRush.NoteMove(kind == 2, p.Distance(_spPos[idx]), dt);
+            _spPos[idx] = p;
+            _spAt[idx] = _evalNow;
+            _spKind[idx] = kind;
         }
 
         private static void NoteChargeDistance(byte kind, float gap)

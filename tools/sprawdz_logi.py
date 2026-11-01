@@ -1324,8 +1324,9 @@ Uzycie (Python 3, tylko odczyt):
 --grupa ostrzal313b : (01.11, paczka 313b - Jeff "Jak strzelam z luku na koniu do piechoty to ta na mnie biegnie a nie wolno idzie"; Armoury/src/Doctrine.Hold291.cs
                     291e, OutshotRush.cs, MarchToContact.cs, CloseRanks.cs, HorsePursuit.ReactHalt.cs, Battle291.cs; klucze DefendersChargeWhenOutshot, OutshotRushWithShields)
                     python -I tools/sprawdz_logi.py --grupa ostrzal313b <Armoury-*.log> (strumieniowo). Segment E linii 'Bitwa (291)'. O313-S self-test, O313-S2 test
-                    syntetyczny; O313-0 segment E w kazdej linii, klucze TAK; O313-1 291e: 'bylby puszczony' 0, puszczenie <= 10 s po 2. zabitym (ponad - DECYZJA);
-                    O313-2 bieg z tarczami spojny; O313-3 Loose i cel pieszy tylko przy druzynie pod ostrzalem, latka celu TAK; O313-4 regresja; O313-5 INFO.
+                    syntetyczny; O313-0 segment E w kazdej linii, klucze TAK; O313-1 291e: puszczenie <= 10 s po 2. zabitym (ponad - DECYZJA), klucz NIE INFO;
+                    O313-2 bieg z tarczami spojny; O313-3 Loose i cel pieszy tylko przy druzynie pod ostrzalem, latka celu TAK; O313-4 regresja; O313-5 INFO;
+                    O313-6 283 R4/R5 0 przy druzynie puszczonej (DECYZJA); O313-7 bieg 313b > 2.0 m/s i Loose >= ShieldWall (DECYZJA).
 --grupa trening311e : (31.10, 311e trening przed snem; Armoury/src/NightRest.TrainBeforeSleep.cs, CampDrill.cs; klucz CampTrainBeforeSleepHours i "Train before sleep" w menu obozu)
                     python -I tools/sprawdz_logi.py --grupa trening311e <Armoury-*.log> (strumieniowo). T311-S self-test, T311-0 linie (INFO), T311-1 start (W <= N, W <= 8 - dzis,
                     start + W = noc snu), T311-2 koniec (godziny <= zamierzone, zmierzch -> sen w menu), T311-3 starty = konce, T311-4 godziny 311e <= godziny ticku m97,
@@ -89691,33 +89692,52 @@ def main(argv):
 # lucznikow to powinni zaatakowac". Armoury/src/Doctrine.Hold291.cs (291e, klucz DefendersChargeWhenOutshot), OutshotRush.cs + MarchToContact.cs + CloseRanks.cs
 # (klucz OutshotRushWithShields), HorsePursuit.ReactHalt.cs (283 bez postoju), Battle291.cs (segment E linii 'Bitwa (291)' miedzy B i C).
 # Uzycie: python -I tools/sprawdz_logi.py --grupa ostrzal313b <Armoury-*.log> (strumieniowo, tylko odczyt).
-#  O313-S  self-test wyrazen wobec linii kontrolnych jak w C# (OutshotRush.Segment, Doctrine.FireSegment), O313-S2 test syntetyczny (dobry, zly, pusty)
+#  O313-S  self-test wyrazen wobec linii kontrolnych jak w C# (OutshotRush.Segment, Doctrine.FireSegment), O313-S2 test syntetyczny (dobry, zly, pusty, wolny bieg)
 #  O313-0  segment E w kazdej linii 'Bitwa (291)', klucze TAK, rozpoznany
-#  O313-1  291e: klucz TAK -> 'bylby puszczony' 0; puszczenie najpozniej 10 s (srednio) po 2. zabitym od pociskow (ponad - DECYZJA: gra liczy bilans sama)
-#  O313-2  bieg z tarczami: wejsc tylko przy druzynie pod ostrzalem, koncow <= wejsc, szykow <= wejsc
+#  O313-1  291e: puszczenie najpozniej 10 s (srednio) po 2. zabitym od pociskow (ponad - DECYZJA: gra liczy bilans sama); klucz NIE - 'bylby puszczony' (INFO).
+#          'Wymuszona tylko przed zwolnieniem' i '80% puszczonych' sa z budowy kodu (DhDefPost wraca przy _dhOff != 0; puszcza kazda trzymajaca druzyne z >= 2
+#          zabitymi przy obronie gry NIE) - log ich nie rozroznia per druzyna
+#  O313-2  bieg z tarczami: wejsc tylko przy druzynie pod ostrzalem, koncow <= wejsc, szykow <= wejsc, szyk w biegu (Loose + ShieldWall + inny) = szyko-s
 #  O313-3  Loose i cel pieszy tylko przy druzynie pod ostrzalem; latka celu TAK
 #  O313-4  regresja: potkniecia E 0, 'ERROR in OutshotRush' 0, wyrazenia B / C bitwa291 dalej rozpoznaja linie z E
-#  O313-5  INFO: sumy (puszczone, bieg, Loose, cel, 283 bez postoju, bitwy z 291e)
+#  O313-5  INFO: sumy (puszczone, bieg, szarza, Loose, cel, 283 bez postoju)
+#  O313-6  283 przy puszczonej druzynie: R4 0 i R5 0 w linii 'Nekanie (283)' tej bitwy (ponad 0 - DECYZJA: postoj sprzed puszczenia, zob. 'postoj puszczony
+#          ostrzalem' w E)
+#  O313-7  sedno skargi Jeffa: szyk w biegu 313b szybszy niz krok (sr. > 2.0 m/s; krok 134c ok. 1.6) i czesciej Loose niz ShieldWall (inaczej DECYZJA -
+#          np. 140 DefendDown pierwszego szeregu hamuje bieg)
 O313_RX = re.compile(
     r"\| E 313b obronca atakuje przy przegranym ostrzale (TAK|NIE): puszczone: bilans ognia (\d+) \(sr\. (\S+) s od (\d+)\. zabitego od pociskow, "
-    r"sila przy zwolnieniu (\S+)\), bylby puszczony \(klucz NIE\) (\d+), obrona gry NIE ponizej \d+ zabitych od pociskow (\d+); 283 bez postoju "
-    r"\(bilans ognia\) (\d+); bieg z tarczami pod ostrzalem (TAK|NIE): druzyn (\d+) \(291e (\d+), S2 (\d+), taktyka ataku (\d+)\), szykow w biegu (\d+), "
-    r"wejsc w bieg (\d+), koncow biegu (\d+), szyko-sekund biegu (\d+); Loose zamiast muru tarcz: szykow (\d+) \(decyzji (\d+), w tym zamiast ShieldWall "
-    r"(\d+)\), bez Loose przy konnicy w 90 m (\d+); cel pieszy zamiast konnego strzelca (\d+) \(bez pieszego szyku wroga (\d+)\), latka celu (.+?); "
+    r"sila przy zwolnieniu (\S+)\), bylby puszczony \(klucz NIE\) (\d+), obrona gry NIE ponizej \d+ zabitych od pociskow (\d+); 283 bez postoju: "
+    r"bilans ognia (\d+), bieg pod ostrzalem (\d+), postoj puszczony ostrzalem (\d+); bieg z tarczami pod ostrzalem (TAK|NIE): druzyn (\d+) "
+    r"\(291e (\d+), S2 (\d+), taktyka ataku (\d+)\), szykow w biegu (\d+), wejsc w bieg (\d+), koncow biegu (\d+), szyko-sekund biegu (\d+) "
+    r"\(Loose (\d+), ShieldWall (\d+), inny (\d+)\), sr\. predkosc w biegu (\S+) m/s; szarza pod ostrzalem bez capu: szyko-sekund (\d+), "
+    r"sr\. predkosc (\S+) m/s; Loose zamiast muru tarcz: szykow (\d+) \(decyzji (\d+), w tym zamiast ShieldWall (\d+)\), bez Loose przy konnicy w 90 m "
+    r"(\d+); cel pieszy zamiast konnych lucznikow AI (\d+) \(w BehaviorCharge (\d+), bez pieszego szyku wroga (\d+)\), latka celu (.+?); "
     r"potkniecia (\d+) \|")
+# grupy O313_RX po nazwie (kolejnosc jak w OutshotRush.Segment)
+O313_G = {k: i + 1 for i, k in enumerate((
+    "key1", "rel", "sec", "dead", "pow", "dry", "nodead", "nhfire", "nhrush", "hrel", "key2", "teams", "b291e", "bs2", "batk", "forms", "rin", "rout",
+    "rsec", "sloose", "swall", "sother", "vrun", "csec", "vchg", "lforms", "ldec", "lwall", "lhorse", "redir", "redirc", "nofoot", "patch", "stum"))}
 O313_ERR = re.compile(r"^ERROR in OutshotRush\b")
+O313_283 = re.compile(r", R4 szyk staje (\d+), R5 armia staje (\d+)")
 O313_SEC_MAX = 10.0
+O313_WALK_MAX = 2.0     # m/s: krok 134c/144 ok. 1.6 (1.75 z utrzymaniem linii) - bieg ma byc szybszy
+O313_RUN_MIN_SEC = 10   # szyko-sekund biegu, od ktorych predkosc jest miarodajna
 # linia kontrolna - BITWA291_TEST["line"] z segmentem E miedzy B i C (Battle291.Write), napisy jak w OutshotRush.Segment / Doctrine.FireSegment
 O313_E = ("E 313b obronca atakuje przy przegranym ostrzale TAK: puszczone: bilans ognia 1 (sr. 4 s od 2. zabitego od pociskow, sila przy zwolnieniu 0.85), "
-          "bylby puszczony (klucz NIE) 0, obrona gry NIE ponizej 2 zabitych od pociskow 3; 283 bez postoju (bilans ognia) 2; bieg z tarczami pod ostrzalem TAK: "
-          "druzyn 1 (291e 1, S2 0, taktyka ataku 0), szykow w biegu 1, wejsc w bieg 2, koncow biegu 2, szyko-sekund biegu 18; Loose zamiast muru tarcz: szykow 1 "
-          "(decyzji 30, w tym zamiast ShieldWall 28), bez Loose przy konnicy w 90 m 0; cel pieszy zamiast konnego strzelca 5 (bez pieszego szyku wroga 0), "
-          "latka celu TAK; potkniecia 0")
+          "bylby puszczony (klucz NIE) 0, obrona gry NIE ponizej 2 zabitych od pociskow 3; 283 bez postoju: bilans ognia 2, bieg pod ostrzalem 1, "
+          "postoj puszczony ostrzalem 1; bieg z tarczami pod ostrzalem TAK: druzyn 1 (291e 1, S2 0, taktyka ataku 0), szykow w biegu 1, wejsc w bieg 2, "
+          "koncow biegu 2, szyko-sekund biegu 18 (Loose 14, ShieldWall 2, inny 2), sr. predkosc w biegu 3.1 m/s; szarza pod ostrzalem bez capu: "
+          "szyko-sekund 6, sr. predkosc 3.8 m/s; Loose zamiast muru tarcz: szykow 1 (decyzji 30, w tym zamiast ShieldWall 28), bez Loose przy konnicy w 90 m 0; "
+          "cel pieszy zamiast konnych lucznikow AI 5 (w BehaviorCharge 3, bez pieszego szyku wroga 0), latka celu TAK; potkniecia 0")
 O313_E0 = ("E 313b obronca atakuje przy przegranym ostrzale TAK: puszczone: bilans ognia 0 (sr. - s od 2. zabitego od pociskow, sila przy zwolnieniu -), "
-           "bylby puszczony (klucz NIE) 0, obrona gry NIE ponizej 2 zabitych od pociskow 0; 283 bez postoju (bilans ognia) 0; bieg z tarczami pod ostrzalem TAK: "
-           "druzyn 0 (291e 0, S2 0, taktyka ataku 0), szykow w biegu 0, wejsc w bieg 0, koncow biegu 0, szyko-sekund biegu 0; Loose zamiast muru tarcz: szykow 0 "
-           "(decyzji 0, w tym zamiast ShieldWall 0), bez Loose przy konnicy w 90 m 0; cel pieszy zamiast konnego strzelca 0 (bez pieszego szyku wroga 0), "
-           "latka celu TAK; potkniecia 0")
+           "bylby puszczony (klucz NIE) 0, obrona gry NIE ponizej 2 zabitych od pociskow 0; 283 bez postoju: bilans ognia 0, bieg pod ostrzalem 0, "
+           "postoj puszczony ostrzalem 0; bieg z tarczami pod ostrzalem TAK: druzyn 0 (291e 0, S2 0, taktyka ataku 0), szykow w biegu 0, wejsc w bieg 0, "
+           "koncow biegu 0, szyko-sekund biegu 0 (Loose 0, ShieldWall 0, inny 0), sr. predkosc w biegu - m/s; szarza pod ostrzalem bez capu: "
+           "szyko-sekund 0, sr. predkosc - m/s; Loose zamiast muru tarcz: szykow 0 (decyzji 0, w tym zamiast ShieldWall 0), bez Loose przy konnicy w 90 m 0; "
+           "cel pieszy zamiast konnych lucznikow AI 0 (w BehaviorCharge 0, bez pieszego szyku wroga 0), latka celu TAK; potkniecia 0")
+O313_283L = ("Nekanie (283): misja bitwa, klucz TAK, postoj TAK | R2 piechota wyslani 0 (szykow 0), R3 jazda wolnej 0 / wyslanej 0 / w zwarciu zostala 0"
+             " / wyciagnieta 0 (wodz 0, wartosc szyku 0, lucznicy strony 0) / oslona przed jazda 0, R4 szyk staje {r4}, R5 armia staje {r5} (szykow 0), R6 oslon wodza 0")
 
 
 def o313_line(e):
@@ -89731,11 +89751,15 @@ def ostrzal313b_selftest():
     """O313-S: wyrazenie E i wyrazenia bitwa291 wobec linii kontrolnych. None = OK."""
     s = o313_line(O313_E)
     m = O313_RX.search(s)
-    want = ("TAK", "1", "4", "2", "0.85", "0", "3", "2", "TAK", "1", "1", "0", "0", "1", "2", "2", "18", "1", "30", "28", "0", "5", "0", "TAK", "0")
+    want = ("TAK", "1", "4", "2", "0.85", "0", "3", "2", "1", "1", "TAK", "1", "1", "0", "0", "1", "2", "2", "18", "14", "2", "2", "3.1", "6", "3.8",
+            "1", "30", "28", "0", "5", "3", "0", "TAK", "0")
     if not m or m.groups() != want:
         return f"E: {m.groups() if m else 'brak'}"
+    if len(O313_G) != len(want) or O313_G["stum"] != len(want):
+        return "O313_G niezgodne z wyrazeniem"
     m = O313_RX.search(o313_line(O313_E0))
-    if not m or (m.group(3), m.group(5)) != ("-", "-"):
+    G = O313_G
+    if not m or (m.group(G["sec"]), m.group(G["pow"]), m.group(G["vrun"]), m.group(G["vchg"])) != ("-", "-", "-", "-"):
         return f"E0: {m.groups() if m else 'brak'}"
     RX = BITWA291_RX
     if not (RX["line"].match(s) and RX["a"].search(s) and RX["b"].search(s) and RX["c"].search(s) and RX["d"].search(s)):
@@ -89744,11 +89768,15 @@ def ostrzal313b_selftest():
         return "bitwa291 b inne grupy z E"
     if O313_RX.search(BITWA291_TEST["line"]):
         return "E w linii bez E"
+    m = O313_283.search(O313_283L.format(r4=3, r5=1))
+    if not m or m.groups() != ("3", "1"):
+        return "283: R4 / R5 nie rozpoznane"
     return None
 
 
 def ostrzal313b_collect(logp):
     D = {"lines": [], "noe": 0, "err": []}
+    last283 = None
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             mt = TS.match(ln.rstrip("\n"))
@@ -89756,68 +89784,82 @@ def ostrzal313b_collect(logp):
             if s.startswith("ERROR in ") and O313_ERR.match(s):
                 D["err"].append(s[:200])
                 continue
+            if s.startswith("Nekanie (283): misja"):
+                m2 = O313_283.search(s)
+                last283 = (int(m2.group(1)), int(m2.group(2))) if m2 else None
+                continue
             if not s.startswith("Bitwa (291)"):
                 continue
             m = O313_RX.search(s)
             if not m:
                 D["noe"] += 1
+                last283 = None
                 continue
-            D["lines"].append((m, s))
+            # HorsePursuit.End: linia 'Nekanie (283)' tuz przed 'Bitwa (291)' tej samej bitwy
+            D["lines"].append((m, s, last283))
+            last283 = None
     return D
 
 
 def ostrzal313b_rows(rep, D):
-    L = [m for m, _ in D["lines"]]
-    g = lambda m, k: int(m.group(k))
+    L = [m for m, _, _ in D["lines"]]
+    G = O313_G
+    g = lambda m, k: int(m.group(G[k]))
+    gs = lambda m, k: m.group(G[k])
     if not L and not D["noe"]:
         rep.add("O313-0: segment E w kazdej linii 'Bitwa (291)', klucze TAK", "brak linii 'Bitwa (291)' (bez bitew polowych)", "INFO", None)
     else:
-        koff = sum(1 for m in L if m.group(1) != "TAK" or m.group(9) != "TAK")
+        koff = sum(1 for m in L if gs(m, "key1") != "TAK" or gs(m, "key2") != "TAK")
         rep.add("O313-0: segment E w kazdej linii 'Bitwa (291)', klucze TAK",
                 f"linii z E {len(L)}, bez E {D['noe']}, z kluczem NIE {koff}", "bez E 0 (log sprzed 313b - NIE), klucze TAK", D["noe"] == 0 and koff == 0)
     # O313-1 291e
-    lk = [m for m in L if m.group(1) == "TAK"]
+    n1 = "O313-1: 291e - puszczenie <= 10 s po 2. zabitym od pociskow (klucz NIE: 'bylby puszczony' INFO)"
+    lk = [m for m in L if gs(m, "key1") == "TAK"]
+    ln = [m for m in L if gs(m, "key1") == "NIE"]
     if lk:
-        dry = sum(g(m, 6) for m in lk)
-        rel = [m for m in lk if g(m, 2) > 0]
-        late = [m for m in rel if m.group(3) != "-" and float(m.group(3)) > O313_SEC_MAX]
-        txt = (f"bitew z kluczem {len(lk)}, z puszczeniem {len(rel)} (puszczonych {sum(g(m, 2) for m in lk)}; sr. s od 2. zabitego: "
-               + (", ".join(m.group(3) for m in rel[:6]) or "-") + "; sila: " + (", ".join(m.group(5) for m in rel[:6]) or "-")
-               + f"), bylby puszczony {dry}, obrona gry NIE ponizej 2 zabitych {sum(g(m, 7) for m in lk)}")
-        if dry:
-            rep.add("O313-1: 291e - klucz TAK nie liczy 'bylby puszczony'; puszczenie <= 10 s po 2. zabitym od pociskow", txt, "bylby puszczony 0", False)
+        rel = [m for m in lk if g(m, "rel") > 0]
+        late = [m for m in rel if gs(m, "sec") != "-" and float(gs(m, "sec")) > O313_SEC_MAX]
+        bad = [m for m in lk if g(m, "dry") > 0]   # klucz TAK nigdy nie liczy 'bylby puszczony' (Doctrine.DhDefPost)
+        txt = (f"bitew z kluczem {len(lk)}, z puszczeniem {len(rel)} (puszczonych {sum(g(m, 'rel') for m in lk)}; sr. s od 2. zabitego: "
+               + (", ".join(gs(m, "sec") for m in rel[:6]) or "-") + "; sila: " + (", ".join(gs(m, "pow") for m in rel[:6]) or "-")
+               + f"), obrona gry NIE ponizej 2 zabitych {sum(g(m, 'nodead') for m in lk)}"
+               + (f"; ponad {O313_SEC_MAX:.0f} s: {len(late)} (gra sama liczy bilans ognia - CheckIsDefenseApplicable; do decyzji)" if late else "")
+               + (f"; 'bylby puszczony' przy kluczu TAK w {len(bad)} bitwach (blad licznika)" if bad else ""))
+        if bad:
+            rep.add(n1, txt, "przy kluczu TAK 'bylby puszczony' 0", False)
         else:
-            rep.add("O313-1: 291e - klucz TAK nie liczy 'bylby puszczony'; puszczenie <= 10 s po 2. zabitym od pociskow",
-                    txt + (f"; ponad {O313_SEC_MAX:.0f} s: {len(late)} (gra sama liczy bilans ognia - CheckIsDefenseApplicable; do decyzji)" if late else ""),
-                    f"bylby puszczony 0, sr. <= {O313_SEC_MAX:.0f} s (ponad - DECYZJA)", None if not rel else (not late), decide=True)
+            rep.add(n1, txt, f"sr. <= {O313_SEC_MAX:.0f} s (ponad - DECYZJA)", None if not rel else (not late), decide=True)
+    elif ln:
+        rep.add(n1, f"klucz NIE: bitew {len(ln)}, bylby puszczony {sum(g(m, 'dry') for m in ln)}", "INFO (na sucho)", None)
     else:
-        rep.add("O313-1: 291e - klucz TAK nie liczy 'bylby puszczony'; puszczenie <= 10 s po 2. zabitym od pociskow",
-                "brak linii z kluczem DefendersChargeWhenOutshot TAK", "INFO", None)
-    # O313-2 bieg z tarczami (grupy: 10 druzyn, 11 291e, 12 S2, 13 taktyka ataku, 14 szykow, 15 wejsc, 16 koncow, 17 szyko-s)
-    lr = [m for m in L if m.group(9) == "TAK"]
+        rep.add(n1, "brak linii z segmentem E", "INFO", None)
+    # O313-2 bieg z tarczami
+    lr = [m for m in L if gs(m, "key2") == "TAK"]
+    n2 = "O313-2: bieg z tarczami - tylko druzyna pod ostrzalem, koncow <= wejsc, szykow <= wejsc, szyk w biegu = szyko-s"
     if lr:
-        bad = [m for m in lr if (g(m, 15) > 0 and g(m, 10) == 0) or g(m, 16) > g(m, 15) or g(m, 14) > g(m, 15)]
-        txt = (f"bitew {len(lr)}: druzyn pod ostrzalem {sum(g(m, 10) for m in lr)} (291e {sum(g(m, 11) for m in lr)}, S2 {sum(g(m, 12) for m in lr)}, "
-               f"taktyka ataku {sum(g(m, 13) for m in lr)}), szykow w biegu {sum(g(m, 14) for m in lr)}, wejsc {sum(g(m, 15) for m in lr)}, koncow "
-               f"{sum(g(m, 16) for m in lr)}, szyko-sekund {sum(g(m, 17) for m in lr)}; bitew niespojnych {len(bad)}")
-        rep.add("O313-2: bieg z tarczami - tylko druzyna pod ostrzalem, koncow <= wejsc, szykow <= wejsc", txt, "0 bitew niespojnych", not bad)
+        bad = [m for m in lr if (g(m, "rin") > 0 and g(m, "teams") == 0) or g(m, "rout") > g(m, "rin") or g(m, "forms") > g(m, "rin")
+               or abs(g(m, "sloose") + g(m, "swall") + g(m, "sother") - g(m, "rsec")) > 2]
+        txt = (f"bitew {len(lr)}: druzyn pod ostrzalem {sum(g(m, 'teams') for m in lr)} (291e {sum(g(m, 'b291e') for m in lr)}, S2 {sum(g(m, 'bs2') for m in lr)}, "
+               f"taktyka ataku {sum(g(m, 'batk') for m in lr)}), szykow w biegu {sum(g(m, 'forms') for m in lr)}, wejsc {sum(g(m, 'rin') for m in lr)}, koncow "
+               f"{sum(g(m, 'rout') for m in lr)}, szyko-sekund {sum(g(m, 'rsec') for m in lr)}; bitew niespojnych {len(bad)}")
+        rep.add(n2, txt, "0 bitew niespojnych", not bad)
     else:
-        rep.add("O313-2: bieg z tarczami - tylko druzyna pod ostrzalem, koncow <= wejsc, szykow <= wejsc", "brak linii z kluczem OutshotRushWithShields TAK",
-                "INFO", None)
-    # O313-3 Loose i cel (grupy: 18 Loose szykow, 19 decyzji, 20 zamiast ShieldWall, 21 bez Loose przy konnicy, 22 cel pieszy, 23 bez pieszego, 24 latka)
+        rep.add(n2, "brak linii z kluczem OutshotRushWithShields TAK", "INFO", None)
+    # O313-3 Loose i cel
+    n3 = "O313-3: Loose i cel pieszy tylko przy druzynie pod ostrzalem, latka celu TAK"
     if lr:
-        bad = [m for m in lr if g(m, 10) == 0 and (g(m, 18) > 0 or g(m, 22) > 0)]
-        nop = [m for m in lr if m.group(24) != "TAK"]
-        txt = (f"Loose: szykow {sum(g(m, 18) for m in lr)} (decyzji {sum(g(m, 19) for m in lr)}, zamiast ShieldWall {sum(g(m, 20) for m in lr)}), "
-               f"bez Loose przy konnicy w 90 m {sum(g(m, 21) for m in lr)}; cel pieszy zamiast konnego strzelca {sum(g(m, 22) for m in lr)} "
-               f"(bez pieszego szyku wroga {sum(g(m, 23) for m in lr)}); latka celu: " + ", ".join(sorted(set(m.group(24) for m in lr)))
-               + f"; bitew niespojnych {len(bad)}, bez latki {len(nop)}")
-        rep.add("O313-3: Loose i cel pieszy tylko przy druzynie pod ostrzalem, latka celu TAK", txt, "niespojnych 0, latka TAK", not bad and not nop)
+        bad = [m for m in lr if g(m, "teams") == 0 and (g(m, "lforms") > 0 or g(m, "redir") > 0)]
+        nop = [m for m in lr if gs(m, "patch") != "TAK"]
+        txt = (f"Loose: szykow {sum(g(m, 'lforms') for m in lr)} (decyzji {sum(g(m, 'ldec') for m in lr)}, zamiast ShieldWall {sum(g(m, 'lwall') for m in lr)}), "
+               f"bez Loose przy konnicy w 90 m {sum(g(m, 'lhorse') for m in lr)}; cel pieszy zamiast konnych lucznikow AI {sum(g(m, 'redir') for m in lr)} "
+               f"(w BehaviorCharge {sum(g(m, 'redirc') for m in lr)}, bez pieszego szyku wroga {sum(g(m, 'nofoot') for m in lr)}); latka celu: "
+               + ", ".join(sorted(set(gs(m, "patch") for m in lr))) + f"; bitew niespojnych {len(bad)}, bez latki {len(nop)}")
+        rep.add(n3, txt, "niespojnych 0, latka TAK", not bad and not nop)
     else:
-        rep.add("O313-3: Loose i cel pieszy tylko przy druzynie pod ostrzalem, latka celu TAK", "brak linii z kluczem", "INFO", None)
-    # O313-4 regresja (25 potkniecia)
-    stum = sum(g(m, 25) for m in L)
-    seen = [s for _, s in D["lines"]]
+        rep.add(n3, "brak linii z kluczem", "INFO", None)
+    # O313-4 regresja
+    stum = sum(g(m, "stum") for m in L)
+    seen = [s for _, s, _ in D["lines"]]
     nb = sum(1 for s in seen if not (BITWA291_RX["b"].search(s) and BITWA291_RX["c"].search(s)))
     known = bool(L or D["err"])
     rep.add("O313-4: regresja - potkniecia E, 'ERROR in OutshotRush', wyrazenia bitwa291 B / C na liniach z E",
@@ -89825,13 +89867,39 @@ def ostrzal313b_rows(rep, D):
             None if not known else (stum == 0 and not D["err"] and nb == 0))
     # O313-5 INFO
     rep.add("O313-5: sumy (INFO)",
-            f"linii {len(L)}; puszczone bilansem ognia {sum(g(m, 2) for m in L)}, 283 bez postoju {sum(g(m, 8) for m in L)}; bieg z tarczami wejsc "
-            f"{sum(g(m, 15) for m in L)}, szyko-s {sum(g(m, 17) for m in L)}; Loose szykow {sum(g(m, 18) for m in L)}; cel pieszy {sum(g(m, 22) for m in L)}",
+            f"linii {len(L)}; puszczone bilansem ognia {sum(g(m, 'rel') for m in L)}, 283 bez postoju {sum(g(m, 'nhfire') + g(m, 'nhrush') for m in L)} "
+            f"(postoj puszczony ostrzalem {sum(g(m, 'hrel') for m in L)}); bieg z tarczami wejsc {sum(g(m, 'rin') for m in L)}, szyko-s {sum(g(m, 'rsec') for m in L)}; "
+            f"szarza pod ostrzalem szyko-s {sum(g(m, 'csec') for m in L)}; Loose szykow {sum(g(m, 'lforms') for m in L)}; cel pieszy {sum(g(m, 'redir') for m in L)}",
             "INFO", None)
+    # O313-6 283 przy puszczonej druzynie
+    n6 = "O313-6: 283 - R4 0 i R5 0 w bitwach z druzyna puszczona (291e) albo w biegu pod ostrzalem"
+    hit = [(m, h) for m, _, h in D["lines"] if g(m, "rel") > 0 or g(m, "teams") > 0]
+    if hit:
+        no283 = sum(1 for _, h in hit if h is None)
+        halts = [(m, h) for m, h in hit if h is not None and (h[0] + h[1]) > 0]
+        txt = (f"bitew {len(hit)} (bez linii 283 {no283}); z postojem R4/R5 {len(halts)}: "
+               + (", ".join(f"R4 {h[0]} R5 {h[1]} (puszczony ostrzalem {g(m, 'hrel')})" for m, h in halts[:6]) or "-"))
+        rep.add(n6, txt, "R4 0, R5 0 (ponad 0 - DECYZJA: postoj sprzed puszczenia / sprzed 2. zabitego)",
+                None if no283 == len(hit) else not halts, decide=True)
+    else:
+        rep.add(n6, "brak bitew z druzyna puszczona albo w biegu", "INFO", None)
+    # O313-7 bieg szybszy niz krok i w Loose
+    n7 = f"O313-7: bieg 313b szybszy niz krok (sr. > {O313_WALK_MAX:.1f} m/s) i czesciej Loose niz ShieldWall"
+    rr = [m for m in lr if g(m, "rsec") >= O313_RUN_MIN_SEC and gs(m, "vrun") != "-"]
+    if rr:
+        slow = [m for m in rr if float(gs(m, "vrun")) <= O313_WALK_MAX]
+        wall = [m for m in rr if g(m, "swall") > g(m, "sloose")]
+        txt = (f"bitew z biegiem >= {O313_RUN_MIN_SEC} szyko-s {len(rr)}: sr. predkosc w biegu " + ", ".join(gs(m, "vrun") for m in rr[:8])
+               + "; szarza pod ostrzalem: " + (", ".join(gs(m, "vchg") for m in rr[:8] if gs(m, "vchg") != "-") or "-")
+               + f"; Loose / ShieldWall szyko-s {sum(g(m, 'sloose') for m in rr)} / {sum(g(m, 'swall') for m in rr)}; wolnych {len(slow)}, w murze {len(wall)}"
+               + ("; wolny bieg - sprawdzic 140 DefendDown pierwszego szeregu w Loose, AiBreath zapas 25%" if slow else ""))
+        rep.add(n7, txt, f"sr. > {O313_WALK_MAX:.1f} m/s, Loose >= ShieldWall (inaczej DECYZJA)", not slow and not wall, decide=True)
+    else:
+        rep.add(n7, f"brak bitew z biegiem 313b >= {O313_RUN_MIN_SEC} szyko-s", "INFO", None)
 
 
 def ostrzal313b_synth():
-    """O313-S2: dobry, zly, pusty bieg przez te same funkcje. None = OK."""
+    """O313-S2: dobry, zly, pusty, wolny bieg przez te same funkcje. None = OK."""
     import tempfile
     import shutil
     good = o313_line(O313_E)
@@ -89839,17 +89907,20 @@ def ostrzal313b_synth():
                     .replace("druzyn 1 (291e 1", "druzyn 0 (291e 0").replace("latka celu TAK", "latka celu NIE (brak metody)")
                     .replace("; potkniecia 0", "; potkniecia 3"))
     late = o313_line(O313_E.replace("(sr. 4 s od", "(sr. 25 s od"))
+    slow = o313_line(O313_E.replace("sr. predkosc w biegu 3.1 m/s", "sr. predkosc w biegu 1.6 m/s").replace("(Loose 14, ShieldWall 2", "(Loose 2, ShieldWall 14"))
     runs = {
-        "good": [good, o313_line(O313_E0)],
+        "good": [O313_283L.format(r4=0, r5=0), good, o313_line(O313_E0)],
         "bad": [bad, BITWA291_TEST["line"], "ERROR in OutshotRush.Druzyna: NullReferenceException"],
-        "late": [late],
+        "late": [O313_283L.format(r4=2, r5=0), late],
+        "slow": [slow],
         "empty": ["Armoury: inna linia"],
     }
     exp = {
-        "good": {"O313-0": "TAK", "O313-1": "TAK", "O313-2": "TAK", "O313-3": "TAK", "O313-4": "TAK", "O313-5": "INFO"},
+        "good": {"O313-0": "TAK", "O313-1": "TAK", "O313-2": "TAK", "O313-3": "TAK", "O313-4": "TAK", "O313-5": "INFO", "O313-6": "TAK", "O313-7": "TAK"},
         "bad": {"O313-0": "NIE", "O313-1": "NIE", "O313-2": "NIE", "O313-3": "NIE", "O313-4": "NIE"},
-        "late": {"O313-0": "TAK", "O313-1": "DECYZJA", "O313-2": "TAK", "O313-4": "TAK"},
-        "empty": {"O313-0": "INFO", "O313-1": "INFO", "O313-2": "INFO", "O313-3": "INFO", "O313-4": "INFO"},
+        "late": {"O313-0": "TAK", "O313-1": "DECYZJA", "O313-2": "TAK", "O313-4": "TAK", "O313-6": "DECYZJA"},
+        "slow": {"O313-2": "TAK", "O313-6": "INFO", "O313-7": "DECYZJA"},
+        "empty": {"O313-0": "INFO", "O313-1": "INFO", "O313-2": "INFO", "O313-3": "INFO", "O313-4": "INFO", "O313-6": "INFO", "O313-7": "INFO"},
     }
     tmp = tempfile.mkdtemp(prefix="o313_")
     diff = []
@@ -89867,7 +89938,7 @@ def ostrzal313b_synth():
 
 
 def ostrzal313b_main(logp):
-    """ostrzal313b (01.11, paczka 313b): O313-S, O313-S2, O313-0..5 - opis nad O313_RX. Strumieniowo, tylko odczyt logu."""
+    """ostrzal313b (01.11, paczka 313b): O313-S, O313-S2, O313-0..7 - opis nad O313_RX. Strumieniowo, tylko odczyt logu."""
     rep = Report()
     s1 = ostrzal313b_selftest()
     rep.add("O313-S: self-test wyrazen (OutshotRush.Segment, Doctrine.FireSegment; bitwa291 na linii z E)", s1 or "OK", "OK", s1 is None)
@@ -89875,7 +89946,7 @@ def ostrzal313b_main(logp):
         s2 = ostrzal313b_synth()
     except Exception as e:
         s2 = f"wyjatek {type(e).__name__}: {e}"
-    rep.add("O313-S2: test syntetyczny (dobry, zly, pozne puszczenie, pusty)", s2 or "OK", "OK", s2 is None)
+    rep.add("O313-S2: test syntetyczny (dobry, zly, pozne puszczenie, wolny bieg, pusty)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("O313-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
