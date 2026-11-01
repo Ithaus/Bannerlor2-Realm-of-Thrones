@@ -118,6 +118,10 @@ namespace Armoury
                 if (mission == null || mission.Agents == null) return;
                 if (mission.MainAgent == null && !c.WoundedFleeWithoutPlayer) return;
 
+                // recenzja 313d: kolejka trafien zdjeta przed rzutami odwrotu 143 - licznik ran (HitsOf) juz po ciosie, ktory zbil rannego ponizej progu
+                // (inaczej ta sama rana dostawala drugi rzut po ProcessHits FieldCraft)
+                if (c.WoundedFleeByChance) FieldCraft.DrainHits(c);
+
                 float cut = c.WoundedFleePercent / 100f;
                 if (cut <= 0f) return;
                 if (cut > 0.9f) cut = 0.9f;

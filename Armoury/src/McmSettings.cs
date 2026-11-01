@@ -1472,11 +1472,11 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float BleedPerSecond { get; set; } = 0.5f;
 
-        [SettingPropertyBool("Ai Flee When Near Death", HintText = "AI soldiers below the bleeding threshold break and run for their lives", RequireRestart = false)]
+        [SettingPropertyBool("Ai Flee When Near Death", HintText = "AI soldiers below AI Flee Below Percent of health break and run for their lives (with Pain Break By Chance on: only those who fail the pain roll)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool AiFleeWhenNearDeath { get; set; } = true;
 
-        [SettingPropertyBool("Bleed Death Log", HintText = "write a 'Krwawienie (313d)' line to the Armoury log after each battle: wounds that bled, how many stopped, deaths from bleeding (killed / knocked out), rolls to withdraw and to break from pain, limping men. Log only, no change in play", RequireRestart = false)]
+        [SettingPropertyBool("Bleed Death Log", HintText = "write a bleeding summary line to the Armoury log after each battle: wounds that bled, how many stopped, deaths from bleeding (killed / knocked out), rolls to withdraw and to break from pain, limping men. Log only, no change in play", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool BleedDeathLog { get; set; } = true;
 
@@ -1524,7 +1524,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float BleedAthleticsPer100 { get; set; } = 0.25f;
 
-        [SettingPropertyBool("Wounded Flee By Chance", HintText = "an AI man below Wounded Flee Percent does not always withdraw: each fresh wound gives a roll from his morale, his Athletics and whether he bleeds; who stays fights on carefully. Below Wounded Limp Below Hp he always withdraws. Off = everyone below the threshold withdraws, as before", RequireRestart = false)]
+        [SettingPropertyBool("Wounded Flee By Chance", HintText = "an AI man below Wounded Flee Percent does not always withdraw: each fresh wound gives a roll from his morale, his Athletics and whether he bleeds; who stays fights on carefully. At or below Wounded Limp Below Hp he always withdraws. Field battles only: in sieges a man below the threshold still breaks, as before. Off = everyone below the threshold withdraws, as before", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool WoundedFleeByChance { get; set; } = true;
 
@@ -1532,7 +1532,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float WoundedFleeChance { get; set; } = 0.35f;
 
-        [SettingPropertyBool("Pain Break By Chance", HintText = "an AI man below AI Flee Below Percent does not always break from pain: each fresh wound (and the start of bleeding) gives a roll from his morale, his Athletics and whether he bleeds. Off = everyone below the threshold breaks, as before", RequireRestart = false)]
+        [SettingPropertyBool("Pain Break By Chance", HintText = "an AI man below AI Flee Below Percent does not always break from pain: each fresh wound (and the first time he drops below the threshold without a blow, e.g. from bleeding) gives a roll from his morale, his Athletics and whether he bleeds. Off = everyone below the threshold breaks, as before", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool PainBreakByChance { get; set; } = true;
 
@@ -1544,7 +1544,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float PainBreakBleedingFactor { get; set; } = 1.5f;
 
-        [SettingPropertyBool("Wounded Limp", HintText = "a badly wounded AI man on foot does not sprint: a man withdrawing with his wounds behind his own line, and any man at Wounded Limp Below Hp or fewer (also when he breaks and flees), goes no faster than a limping walk. Battles on the map only. Off = they run, as before", RequireRestart = false)]
+        [SettingPropertyBool("Wounded Limp", HintText = "a badly wounded AI man on foot does not sprint: a man withdrawing with his wounds behind his own line (unless he goes back into the fight), and any man at Wounded Limp Below Hp or fewer (also when he breaks and flees), goes no faster than a limping walk. Battles on the map only. Off = they run, as before", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool WoundedLimp { get; set; } = true;
 

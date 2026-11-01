@@ -40,6 +40,7 @@ namespace Armoury
         {
             public Agent V;
             public int By;              // indeks zadajacego (-1 = nikt)
+            public Agent ByA;           // recenzja 313d: zadajacy (affectorAgent z OnAgentHit, gdy jego Index == OwnerId) - kredyt za zgon tylko temu samemu czlowiekowi
             public float Dmg, Abs;      // obrazenia po pancerzu, pochloniete przez pancerz
             public DamageTypes Type;
             public BoneBodyPartType Part;
@@ -69,6 +70,12 @@ namespace Armoury
                 _spare = t;
                 return t;
             }
+        }
+
+        /// <summary>Recenzja 313d: kolejka oprozniona pod zamkiem (koniec misji - bez referencji do ludzi miedzy misjami).</summary>
+        internal static void ClearQueue()
+        {
+            lock (_q) { _in.Clear(); _spare.Clear(); }
         }
 
         // ------------------------------------------------------------ wzory
@@ -228,8 +235,15 @@ namespace Armoury
         internal static int WdRolls, WdYes, WdNo, WdForced;
         internal static int PainRolls, PainBroke, PainBrokeBleeding, PainResist;
         internal static double PainMoraleSum;
-        internal static readonly HashSet<int> LimpMen = new HashSet<int>(), LimpWithdraw = new HashSet<int>(), LimpPanic = new HashSet<int>();
+        // recenzja 313d: zbiory po Agent (nie po Index - indeksy wracaja do posilkow), czyszczone w Begin i po linii (EndMission)
+        internal static readonly HashSet<Agent> LimpMen = new HashSet<Agent>(), LimpWithdraw = new HashSet<Agent>(), LimpPanic = new HashSet<Agent>();
         internal static int LimpWrites;
+        // recenzja 313d (pomiar): predkosc kustykajacych (agent.Velocity) po co najmniej LimpSettle s z capem - czy limit naprawde trzyma; postoj w miejscu po
+        // limicie drogi 143 u kustykajacego (RoutKeeper)
+        internal const float LimpSettle = 1f;
+        internal static int LimpSpeedN, LimpFast, LimpHoldInPlace;
+        internal static double LimpSpeedSum;
+        internal static float LimpSpeedMax;
         private static int _limpPost, _limpPostErr;
         private static int _stum, _stumSession;
         private static bool _battle;
@@ -247,6 +261,9 @@ namespace Armoury
             PainMoraleSum = 0.0;
             LimpMen.Clear(); LimpWithdraw.Clear(); LimpPanic.Clear();
             LimpWrites = 0;
+            LimpSpeedN = LimpFast = LimpHoldInPlace = 0;
+            LimpSpeedSum = 0.0;
+            LimpSpeedMax = 0f;
             Interlocked.Exchange(ref _limpPost, 0);
             Interlocked.Exchange(ref _limpPostErr, 0);
             _stum = 0;
@@ -256,6 +273,23 @@ namespace Armoury
         }
 
         internal static void NoteBattle() { _battle = true; }
+
+        /// <summary>Recenzja 313d: koniec misji (po linii) - kolejka i zbiory ludzi oproznione, bez referencji do agentow do nastepnej misji.</summary>
+        internal static void EndMission()
+        {
+            ClearQueue();
+            LimpMen.Clear(); LimpWithdraw.Clear(); LimpPanic.Clear();
+        }
+
+        /// <summary>Recenzja 313d: limit drogi odwrotu 143 (s) - kustykajacy idzie ok. 1.1 m/s, wiec 30 s (WalkMax) to ok. 33 m, a cel bywa do 80 m (sztandar).
+        /// Przy capie kustykania: dystans do celu przy pierwszym wyslaniu / cap x 1.3, nie mniej niz walkMax, najwyzej LimpWalkMaxCap.</summary>
+        internal const float LimpWalkMaxCap = 90f;
+        internal static float WalkLimit(Agent a, float dist0, float walkMax)
+        {
+            float lc = LimpCapOf(a);
+            if (lc <= 0f || !(dist0 > 0f)) return walkMax;
+            return Clamp(dist0 / lc * 1.3f, walkMax, Math.Max(walkMax, LimpWalkMaxCap));
+        }
 
         /// <summary>Wyjatek na czlowieka: licznik misji i sesji, pelny slad tylko 3 razy w sesji. Funkcja zostaje wlaczona.</summary>
         internal static void Stumble(string where, Exception e)
@@ -304,6 +338,10 @@ namespace Armoury
               .Append(PainRolls > 0 ? (PainMoraleSum / PainRolls).ToString("0", Inv) : "-")
               .Append(" | kustykanie: ludzi ").Append(LimpMen.Count).Append(" (w odwrocie ").Append(LimpWithdraw.Count).Append(", w panice ").Append(LimpPanic.Count)
               .Append("), zapisow limitu ").Append(LimpWrites).Append(", w latce ").Append(Volatile.Read(ref _limpPost))
+              .Append(", pomiarow predkosci ").Append(LimpSpeedN).Append(" (sr. ")
+              .Append(LimpSpeedN > 0 ? (LimpSpeedSum / LimpSpeedN).ToString("0.00", Inv) : "-").Append(" m/s, maks ")
+              .Append(LimpSpeedN > 0 ? LimpSpeedMax.ToString("0.00", Inv) : "-").Append(", szybciej niz limit ").Append(LimpFast)
+              .Append("), postoj po limicie drogi ").Append(LimpHoldInPlace)
               .Append(" | gracz krwawil ").Append(PlayerBleeds)
               .Append(" | kolejka: zgubione ").Append(lost)
               .Append(" | potkniecia ").Append(_stum + Volatile.Read(ref _limpPostErr)).Append('.');

@@ -89693,6 +89693,7 @@ def main(argv):
 # KW-4 krwawienie ustaje: przy Bleed From Wounds TAK zgony z krwawienia (bez starej reguly) <= krwawien w kazdej linii, a w sumie bitew (>= 20 krwawien)
 #      zgony najwyzej polowa krwawien (krytyk 313: rana zabija tylko ciezko poranionego); mniej krwawien - INFO;
 # KW-5 kustykanie dziala: przy Wounded Limp TAK i odwrotach w bitwach (wycofal sie + pewny > 0) kustykajacych > 0 i zapisow limitu > 0 (suma); bez odwrotow - INFO;
+#      recenzja 313d: pomiar predkosci kustykajacych (agent.Velocity po 1 s z capem) - przy >= 50 pomiarach szybciej niz limit (cap x 1.25 + 0.2 m/s) najwyzej 10%;
 # INFO: sumy (krwawienia wedlug typu, ustalo, zgony, rzuty, sr. szansa).
 KW313_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
 KW313_LINE = re.compile(
@@ -89706,7 +89707,8 @@ KW313_LINE = re.compile(
     r"stara regula (?P<dold>\d+); sr\. HP na starcie krwawienia (?P<hp0>-|[\d.]+)\) "
     r"\| odwrot 143: rzutow (?P<wr>\d+) \(wycofal sie (?P<wy>\d+) / zostal (?P<wn>\d+)\), pewny od (?P<lhp>\d+) HP (?P<wf>\d+) "
     r"\| bol: rzutow (?P<pr>\d+) \(zlamani (?P<pb>\d+): krwawiacy (?P<pbb>\d+) / nie (?P<pbn>-?\d+); oparli sie (?P<po>\d+)\), sr\. morale (?P<mor>-|\d+) "
-    r"\| kustykanie: ludzi (?P<lm>\d+) \(w odwrocie (?P<lw>\d+), w panice (?P<lp>\d+)\), zapisow limitu (?P<lwr>\d+), w latce (?P<lpost>\d+) "
+    r"\| kustykanie: ludzi (?P<lm>\d+) \(w odwrocie (?P<lw>\d+), w panice (?P<lp>\d+)\), zapisow limitu (?P<lwr>\d+), w latce (?P<lpost>\d+), "
+    r"pomiarow predkosci (?P<lsn>\d+) \(sr\. (?P<lsa>-|[\d.]+) m/s, maks (?P<lsm>-|[\d.]+), szybciej niz limit (?P<lsf>\d+)\), postoj po limicie drogi (?P<lhold>\d+) "
     r"\| gracz krwawil (?P<pl>\d+) \| kolejka: zgubione (?P<lost>\d+) \| potkniecia (?P<stum>\d+)\.$")
 KW313_KEYS = ("kA", "kP", "kW", "kB", "kL")
 
@@ -89715,13 +89717,15 @@ KW313_SAMPLE = ("Krwawienie (313d): misja bitwa | klucze: Bleed From Wounds TAK,
                 "rece 25 / nogi 25), sr. szansa 31%, sr. utrata 14.2 HP, sr. Atletyka 74 | ustalo 101, na koniec krwawi 6 | zgony z krwawienia 21 (zabici 15 / "
                 "nieprzytomni 6; z kredytem 17; w panice 5, w odwrocie 7; stara regula 0; sr. HP na starcie krwawienia 18.4) | odwrot 143: rzutow 90 (wycofal sie 33 / "
                 "zostal 57), pewny od 10 HP 12 | bol: rzutow 40 (zlamani 19: krwawiacy 9 / nie 10; oparli sie 21), sr. morale 44 | kustykanie: ludzi 51 (w odwrocie 45, "
-                "w panice 4), zapisow limitu 2210, w latce 3120 | gracz krwawil 1 | kolejka: zgubione 0 | potkniecia 0.")
+                "w panice 4), zapisow limitu 2210, w latce 3120, pomiarow predkosci 900 (sr. 0.95 m/s, maks 1.62, szybciej niz limit 14), postoj po limicie drogi 2 "
+                "| gracz krwawil 1 | kolejka: zgubione 0 | potkniecia 0.")
 KW313_SAMPLE_TOURNEY = ("Krwawienie (313d): misja poza bitwa | klucze: Bleed From Wounds TAK, Bleed Affects Player TAK, Wounded Flee By Chance TAK, Pain Break By Chance TAK, "
                         "Wounded Limp TAK | trafien ocenionych 0 (plytszych niz prog 0) | krwawien 0 (ciete 0 / klute i strzaly 0 / obuch 0; glowa 0 / tulow 0 / rece 0 / "
                         "nogi 0), sr. szansa -, sr. utrata -, sr. Atletyka - | ustalo 0, na koniec krwawi 0 | zgony z krwawienia 0 (zabici 0 / nieprzytomni 0; z kredytem 0; "
                         "w panice 0, w odwrocie 0; stara regula 0; sr. HP na starcie krwawienia -) | odwrot 143: rzutow 0 (wycofal sie 0 / zostal 0), pewny od 10 HP 0 "
                         "| bol: rzutow 0 (zlamani 0: krwawiacy 0 / nie 0; oparli sie 0), sr. morale - | kustykanie: ludzi 0 (w odwrocie 0, w panice 0), zapisow limitu 0, "
-                        "w latce 0 | gracz krwawil 0 | kolejka: zgubione 0 | potkniecia 3.")
+                        "w latce 0, pomiarow predkosci 0 (sr. - m/s, maks -, szybciej niz limit 0), postoj po limicie drogi 0 | gracz krwawil 0 | kolejka: zgubione 0 "
+                        "| potkniecia 3.")
 
 
 def kw313_strip(line):
@@ -89752,6 +89756,10 @@ def kw313_bad_line(m):
         bad.append("krwawiacy zlamani > zlamani")
     if g("lw") + g("lp") > g("lm"):
         bad.append("kustykajacy w odwrocie + w panice > ludzi")
+    if g("lsf") > g("lsn"):
+        bad.append("szybciej niz limit > pomiarow predkosci")
+    if g("lsn") > 0 and (m.group("lsa") == "-" or m.group("lsm") == "-"):
+        bad.append("pomiary predkosci bez sredniej")
     if g("shallow") > g("hits") or g("bl") > g("hits"):
         bad.append("plytszych/krwawien > trafien")
     return bad
@@ -89804,8 +89812,18 @@ def kw313_rows(rep, lines, errors):
     wd = sum(kw313_int(m, "wy") + kw313_int(m, "wf") for m in lim)
     lm = sum(kw313_int(m, "lm") for m in lim)
     lwr = sum(kw313_int(m, "lwr") for m in lim)
-    val5 = f"bitew {len(lim)}, odwrotow (wycofal sie + pewny) {wd}, kustykajacych {lm}, zapisow limitu {lwr}"
-    rep.add("KW-5: kustykanie przy odwrotach", val5, "ludzi > 0 i zapisow > 0", (lm > 0 and lwr > 0) if wd > 0 else None)
+    lsn = sum(kw313_int(m, "lsn") for m in lim)
+    lsf = sum(kw313_int(m, "lsf") for m in lim)
+    lmax = max([float(m.group("lsm")) for m in lim if m.group("lsm") != "-"] or [0.0])
+    lhold = sum(kw313_int(m, "lhold") for m in lim)
+    val5 = (f"bitew {len(lim)}, odwrotow (wycofal sie + pewny) {wd}, kustykajacych {lm}, zapisow limitu {lwr}, pomiarow predkosci {lsn} "
+            f"(szybciej niz limit {lsf}, maks {lmax:.2f} m/s), postoj po limicie drogi {lhold}")
+    ok5 = None
+    if wd > 0:
+        ok5 = lm > 0 and lwr > 0
+        if ok5 and lsn >= 50:
+            ok5 = lsf * 10 <= lsn
+    rep.add("KW-5: kustykanie przy odwrotach", val5, "ludzi > 0, zapisow > 0, szybciej niz limit <= 10% (>= 50 pomiarow)", ok5)
     tot = lambda k: sum(kw313_int(m, k) for m in ms)
     rep.add("KW-I: sumy (INFO)", f"krwawien {tot('bl')} (ciete {tot('t0')} / klute i strzaly {tot('t1')} / obuch {tot('t2')}), ustalo {tot('stop')}, zgony {tot('dead')} "
             f"(z kredytem {tot('dc')}, w panice {tot('dp')}, w odwrocie {tot('dw')}), odwrot: rzutow {tot('wr')} (wycofal sie {tot('wy')}), pewny {tot('wf')}, bol: rzutow "
@@ -89838,6 +89856,12 @@ def krwawienie313d_selftest():
     rep5 = Report()
     kw313_rows(rep5, [b5], [])
     v["KW-5"] = {r[0].split(":")[0]: r[3] for r in rep5.rows}.get("KW-5")
+    # recenzja 313d: kustykajacy biegna (pomiar predkosci) - KW-5 NIE
+    b5f = KW313_SAMPLE.replace("szybciej niz limit 14)", "szybciej niz limit 300)")
+    rep5f = Report()
+    kw313_rows(rep5f, [b5f], [])
+    if {r[0].split(":")[0]: r[3] for r in rep5f.rows}.get("KW-5") != "NIE":
+        return "zly bieg nie wykryty: KW-5 (kustykajacy szybciej niz limit)"
     miss = [k for k in ("KW-0", "KW-1", "KW-2", "KW-3", "KW-4", "KW-5") if v.get(k) != "NIE"]
     if miss:
         return f"zly bieg nie wykryty: {miss}"

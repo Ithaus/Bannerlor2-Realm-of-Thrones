@@ -62,6 +62,7 @@ namespace Armoury
             // 313d (Bleed313): krwawienie z rany, rzut paniki z bolu, kustykanie
             public float BleedRate;          // HP/s z ran (suma), maleje wykladniczo (BleedClotSeconds); 0 = nie krwawi (regula BleedFromWounds)
             public int BleedBy = -1;         // indeks ostatniego, kto zadal krwawiaca rane (kredyt za zgon z krwawienia)
+            public Agent BleedByA;           // recenzja 313d: ten sam czlowiek (indeks moze przejac posilek) - kredyt tylko, gdy to wciaz on
             public float BleedHp0;           // HP na starcie krwawienia (pomiar BleedDeathLog)
             public float Ath = -1f;          // Atletyka (raz na czlowieka)
             public int Hits;                 // trafienia z obrazeniami w bitwie (kolejka Bleed313) - rzut odwrotu 143 raz na swieza rane (BrokenMen)
@@ -69,6 +70,7 @@ namespace Armoury
             public bool PainRolled;          // byl juz rzut z bolu (pierwsze zejscie ponizej progu bez ciosu - np. krwawieniem - tez rzuca raz)
             public bool PainBroken;          // rzut z bolu wygrany - lamie sie jak dotad (RoutHold.Break)
             public float LimpCap;            // cap kustykania wpisany do Bleed313 (m/s, 0 = brak)
+            public float LimpSince = -1f;    // recenzja 313d (pomiar): czas misji wpisania capu (predkosc mierzona po Bleed313.LimpSettle s)
         }
 
         // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
@@ -292,6 +294,16 @@ namespace Armoury
         }
 
         // ---- 313d: odczyty dla BrokenMen (rzut odwrotu 143) i RoutKeeper (powod "z bolu") - glowny watek
+
+        /// <summary>Recenzja 313d: BrokenMen przed rzutami odwrotu 143 zdejmuje kolejke trafien (glowny watek) - licznik ran (HitsOf) jest juz po ciosie, ktory
+        /// zbil rannego ponizej progu; inaczej ta sama rana dostawala drugi rzut po ProcessHits (co 0.2 s). Kilka wywolan na klatke - bez szkody (kolejka pusta).</summary>
+        internal static void DrainHits(Settings c)
+        {
+            var f = _live;
+            if (f == null || c == null) return;
+            try { f.ProcessHits(c); }
+            catch (Exception e) { Bleed313.Stumble("Drain", e); }
+        }
         internal static int HitsOf(Agent a)
         {
             var f = _live;
@@ -569,6 +581,7 @@ namespace Armoury
             }
             catch (Exception e) { Bleed313.Stumble("Line", e); }
             try { Bleed313.ClearLimp(); } catch { }
+            try { Bleed313.EndMission(); } catch { }          // recenzja 313d: kolejka trafien i zbiory ludzi oproznione (bez referencji do agentow)
             ResetRunStats();
             try { BattleWind.BreathFlush(); } catch { }      // 137: linia "Oddech (137)" raz na misje
             try { MissionTeams.Flush(Mission); } catch { }   // NM: linia "Druzyny w misji (NM)" raz na misje
@@ -676,14 +689,18 @@ namespace Armoury
 
                 // 313d: rana do kolejki (pod zamkiem - OnAgentHit bywa wolany z ticku asynchronicznego); rzut krwawienia i liczniki ran w ticku na glownym watku.
                 // Tylko czlowiek, cios z obrazeniami, nie blok tarcza, tylko bitwa na mapie (turniej, arena, bojka - bez krwawienia i rzutow)
+                // Recenzja 313d: bez ciosu od siebie bez energii - Artem (KnockBackAnimation) wola RegisterBlow z Blow(agent.Index), InflictedDamage 1, BaseMagnitude 0
                 if ((c.BleedFromWounds || c.PainBreakByChance || c.WoundedFleeByChance) && affectedAgent != null && affectedAgent.IsHuman
-                    && blow.InflictedDamage > 0 && !attackCollisionData.AttackBlockedWithShield && InBattle())
+                    && blow.InflictedDamage > 0 && !attackCollisionData.AttackBlockedWithShield
+                    && !(blow.OwnerId == affectedAgent.Index && blow.BaseMagnitude <= 0f) && InBattle())
                 {
                     try
                     {
                         Bleed313.Enqueue(new Bleed313.Hit
                         {
-                            V = affectedAgent, By = blow.OwnerId, Dmg = blow.InflictedDamage, Abs = Math.Max(0, attackCollisionData.AbsorbedByArmor),
+                            V = affectedAgent, By = blow.OwnerId,
+                            ByA = affectorAgent != null && affectorAgent.Index == blow.OwnerId ? affectorAgent : null,
+                            Dmg = blow.InflictedDamage, Abs = Math.Max(0, attackCollisionData.AbsorbedByArmor),
                             Type = blow.DamageType, Part = blow.VictimBodyPart, Missile = blow.IsMissile
                         });
                     }
@@ -880,7 +897,28 @@ namespace Armoury
                     {
                         try { limpCap = c.WoundedLimp ? LimpNow(agent, c) : 0f; }
                         catch (Exception e) { limpCap = 0f; Bleed313.Stumble("Limp", e); }
-                        if (Math.Abs(limpCap - st.LimpCap) > 0.001f) { Bleed313.SetLimp(agent, limpCap); st.LimpCap = limpCap; }
+                        // recenzja 313d (pomiar): predkosc czlowieka, ktory ma cap od co najmniej LimpSettle s (limit z poprzednich taktow juz dziala)
+                        if (limpCap > 0f && st.LimpCap > 0f && st.LimpSince >= 0f && now - st.LimpSince >= Bleed313.LimpSettle)
+                        {
+                            try
+                            {
+                                float v = agent.Velocity.AsVec2.Length;
+                                if (v >= 0f && v < 50f)
+                                {
+                                    Bleed313.LimpSpeedN++;
+                                    Bleed313.LimpSpeedSum += v;
+                                    if (v > Bleed313.LimpSpeedMax) Bleed313.LimpSpeedMax = v;
+                                    if (v > st.LimpCap * 1.25f + 0.2f) Bleed313.LimpFast++;
+                                }
+                            }
+                            catch (Exception e) { Bleed313.Stumble("LimpSpeed", e); }
+                        }
+                        if (Math.Abs(limpCap - st.LimpCap) > 0.001f)
+                        {
+                            if (st.LimpCap <= 0f && limpCap > 0f) st.LimpSince = now;
+                            Bleed313.SetLimp(agent, limpCap);
+                            st.LimpCap = limpCap;
+                        }
                     }
 
                     // --- zadyszka (tylko piechota, sprint) - MODEL PUNKTOWY:
@@ -1358,6 +1396,7 @@ namespace Armoury
                         bool was = st.BleedRate > 0f;
                         st.BleedRate += loss / clot;
                         st.BleedBy = h.By;
+                        st.BleedByA = h.ByA;
                         Bleed313.Bleeds++;
                         Bleed313.ByType[Bleed313.TypeGroup(h)]++;
                         Bleed313.ByPart[Bleed313.PartGroup(h.Part)]++;
@@ -1413,11 +1452,12 @@ namespace Armoury
             }
             var b = new Blow(agent.Index);
             bool credit = false;
-            if (c.BleedFromWounds && st.BleedBy >= 0 && st.BleedBy != agent.Index)
+            // recenzja 313d: kredyt tylko temu samemu czlowiekowi (zapamietany Agent, nie sam indeks - indeks usunietego przejmuje posilek)
+            if (c.BleedFromWounds && st.BleedBy >= 0 && st.BleedBy != agent.Index && st.BleedByA != null)
             {
                 Agent by = null;
                 try { by = Mission.FindAgentWithIndex(st.BleedBy); } catch { by = null; }
-                if (by != null && by.IsActive()) { b.OwnerId = st.BleedBy; credit = true; }
+                if (by != null && ReferenceEquals(by, st.BleedByA) && by.IsActive()) { b.OwnerId = st.BleedBy; credit = true; }
             }
             b.DamageType = DamageTypes.Cut;
             b.InflictedDamage = (int)agent.Health + 1;
@@ -1444,13 +1484,13 @@ namespace Armoury
             bool low = c.WoundedLimpBelowHp > 0 && agent.Health <= c.WoundedLimpBelowHp;
             bool wd = false;
             var k = RoutHold.Live;
-            if (k != null && ReferenceEquals(k.Mission, Mission)) wd = k.Withdrawing(agent);
+            // recenzja 313d: w odwrocie 143 kustyka do konca odwrotu, ale nie ten, kto wrocil do walki (na postoju znow w przedniej polowie szyku)
+            if (k != null && ReferenceEquals(k.Mission, Mission)) wd = k.LimpingWithdraw(agent);
             if (!low && !wd) return 0f;
             if (HorsePursuit.TestRunAnyThread(agent)) return 0f;   // nekajacy autotestu - test bez zmian
-            int id = agent.Index;
-            Bleed313.LimpMen.Add(id);
-            if (wd) Bleed313.LimpWithdraw.Add(id);
-            else if (SurvivalMode.InPanic(agent)) Bleed313.LimpPanic.Add(id);
+            Bleed313.LimpMen.Add(agent);
+            if (wd) Bleed313.LimpWithdraw.Add(agent);
+            else if (SurvivalMode.InPanic(agent)) Bleed313.LimpPanic.Add(agent);
             return Bleed313.LimpSpeed(agent, c);
         }
 
