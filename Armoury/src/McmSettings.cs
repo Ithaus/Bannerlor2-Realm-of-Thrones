@@ -10400,6 +10400,14 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool UnshieldedRushUnderFire { get; set; } = true;
 
+        [SettingPropertyBool("Defenders Charge When Outshot", HintText = "an AI army holding its ground that is losing the archery exchange - its men falling to arrows faster than the enemy's (at least two killed by missiles) - stops holding and goes forward to close with the enemy, as the base game would, even if it is the weaker side. Off = it keeps holding (until the under-fire rule or the 90-second rule releases it)", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool DefendersChargeWhenOutshot { get; set; } = true;
+
+        [SettingPropertyBool("Outshot Rush With Shields", HintText = "AI infantry that is advancing and losing men to arrows or bolts (at least two killed) runs to close the distance even when it carries shields, in loose order instead of a slow shield wall, as fast as its breath allows (keeping a quarter of it for the fight). When the shooter is a horse archer it goes for his foot troops instead of chasing the horse (if he has none, it still runs at him). Field battles only, AI formations only. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool OutshotRushWithShields { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -13547,6 +13555,8 @@ namespace Armoury
             s.DefendersAdvanceUnderFire = DefendersAdvanceUnderFire;
             s.DefendersHoldTheirGround = DefendersHoldTheirGround;
             s.UnshieldedRushUnderFire = UnshieldedRushUnderFire;
+            s.DefendersChargeWhenOutshot = DefendersChargeWhenOutshot;
+            s.OutshotRushWithShields = OutshotRushWithShields;
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

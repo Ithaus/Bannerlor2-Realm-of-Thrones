@@ -63,6 +63,9 @@ namespace Armoury
         // postoje strzelcow (R4 dalej), ludzie R2 ze smycza od miejsca wyslania i ich powroty ze smyczy
         private static readonly HashSet<int> H291Who = new HashSet<int>();
         private static int _l291NoArmy, _l291Go, _l291GoMen, _l291Arch, _l291Anchor, _l291LeashBack;
+        // 313b 291e: druzyna puszczona bilansem ognia gry (Doctrine.FireReleased) nie staje - jak S2 (szyki, raz na pass i szyk; segment E linii 'Bitwa (291)')
+        private static int _lNoFire;
+        internal static int NoHaltFire { get { return _lNoFire; } }
 
         private static void HaltClear()
         {
@@ -75,6 +78,7 @@ namespace Armoury
             _lFace = _lR5Sum = 0;
             H291Who.Clear();
             _l291NoArmy = _l291Go = _l291GoMen = _l291Arch = _l291Anchor = _l291LeashBack = 0;
+            _lNoFire = 0;   // 313b
         }
 
         /// <summary>291: segment A linii 'Bitwa (291)' (HorsePursuit.End, przed Clear).</summary>
@@ -173,6 +177,8 @@ namespace Armoury
             // i zwiera szereg - to wlasnie odpowiedz. Bez postoju tylko strona ofiary w poscigu (lamie strone nekajacego - szyki w szarzy 148, CanHalt i tak).
             if (Broke(t.Side, t.SSide)) { _lNoBroke++; return 0; }
             if (Doctrine.S2On(team)) { _lNoS2++; return 0; }
+            // 313b 291e (krytyka 313 luka 2): obronca puszczony bilansem ognia idzie na strzelca - postoj 283 (wrog dalej niz 110 m) zatrzymalby go pod ostrzalem
+            if (Doctrine.FireReleased(team)) { _lNoFire++; return 0; }
             // recenzja 283 (4): pieszy przy swoim nietknietym szyku (gracz w swojej linii) - zwykla bitwa; nekajacy przed czolem szyku ofiary - szyk idzie dalej
             // (pod pociskami z przodu sie zwiera, nie staje - S2/141)
             if (!t.Lone && t.S.MountAgent == null) { if (LNo(vf, 3)) _lNoFootNear++; return 0; }

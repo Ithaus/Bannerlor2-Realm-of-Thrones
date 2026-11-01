@@ -57,6 +57,14 @@ namespace Armoury
     ///    DeploymentMissionController AllowAiTicking = false - wiec pierwsza taktyka z ResetTactic AfterStart stoi do konca rozstawienia).
     ///  - klucz NIE: pomiar bez ciecia (te same liczniki - porownanie przed / po).
     /// Stan per druzyna czyszczony w Clear (Begin / End), liczniki misji w Dh291Reset (Battle291.Begin) - linia "Bitwa (291)" pisze HorsePursuit.End po Doctrine.End.
+    /// 313b 291e (01.11, klucz DefendersChargeWhenOutshot; Jeff: "jak nie maja lucznikow to powinni zaatakowac", "piechota pod ostrzalem ma BIEC do zwarcia"; log
+    /// 15:08-15:12 bitwa 1: banda 16 ludzi bez tarcz trzymana 110 s pod lukami gracza z 78 m - 'wymuszona 5', 4 zabitych od strzal, 'puszczone: S2 0, napastnik
+    /// nie podchodzi 0'). Krytyka 313: gra ma wlasny bilans ognia (CheckIsDefenseApplicable :215-247 - nasze straty i trafieni od pociskow wobec wroga do potegi
+    /// 3 x udzial strzelcow wroga) i to 291d go wylaczyl. Zmiana zasady 291d (decyzja D3): w DhDefPost, gdy gra sama mowi obrona NIE, a druzyna ma co najmniej
+    /// FireDead (2, decyzja D1) zabitych od pociskow (TeamQuerySystem.DeathByRangedCount, rejestrowane w Agent.Die przy pocisku) - bez wymuszenia, druzyna
+    /// puszczona do konca bitwy (_dhOff 3; licznik gry tylko rosnie - bez wahadla), takze slabsza (D2 - bez osobnego wycofania). Wtedy RBM daje atak 100 piechocie
+    /// ponad 90%, inaczej FullScaleAttack z wagi gry. 283 R4 / R5 nie zatrzymuja takiej druzyny (FireReleased, jak S2). Klucz NIE: wymuszenie jak w 291d,
+    /// licznik 'bylby puszczony' (raz na druzyne).
     /// Postfiksy czytaja tylko tablice pisane z glownego watku (tick druzyn nie biegnie rownolegle z OnMissionTick - jak _mul / _s2Live); wagi obrony pisze
     /// postfiks obrony (ten sam tick druzyn, ta sama decyzja albo poprzednia). Potkniecia liczone (_dhStum), bez globalnego wylacznika.
     /// </summary>
@@ -70,7 +78,7 @@ namespace Armoury
         private static readonly Team[] _dhRef = new Team[MaxTeams];
         private static readonly bool[] _dhOn = new bool[MaxTeams];
         private static readonly float[] _dhW = new float[MaxTeams * DhK];
-        private static readonly byte[] _dhOff = new byte[MaxTeams];          // 0 trzyma, 1 napastnik nie podchodzi, 2 zwarcie
+        private static readonly byte[] _dhOff = new byte[MaxTeams];          // 0 trzyma, 1 napastnik nie podchodzi, 2 zwarcie, 3 bilans ognia (313b 291e)
         private static readonly bool[] _dhStarted = new bool[MaxTeams];
         private static readonly float[] _dhBest = new float[MaxTeams];
         private static readonly float[] _dhBestAt = new float[MaxTeams];
@@ -80,6 +88,19 @@ namespace Armoury
         private static readonly bool[] _dhHasDE = new bool[MaxTeams];        // 291d: DefensiveEngagement na liscie (przewidywanie wagi w DhMul)
         private static readonly bool[] _dhS2Was = new bool[MaxTeams];        // 291d recenzja: druzyna byla w S2 - obrona gry bez wymuszenia (gra decyduje jak przed 291d)
         private static readonly byte[] _dhS2Cnt = new byte[MaxTeams];        // 291d recenzja: puszczen S2 tej druzyny (powrot do trzymania i znow S2 = 'ponownie')
+        // 313b 291e: chwila FireDead-tego zabitego od pociskow (glowny watek, DhTick; -1 = jeszcze nie), puszczenie bilansem ognia (pisze DhDefPost - tick druzyn),
+        // klucz NIE - 'bylby puszczony' policzony (raz na druzyne)
+        private static readonly float[] _dhDead2At = new float[MaxTeams];
+        private static readonly float[] _dhFireAt = new float[MaxTeams];
+        private static readonly float[] _dhFireP = new float[MaxTeams];
+        private static readonly bool[] _dhFireSeen = new bool[MaxTeams];
+        private static readonly bool[] _dhFireDry = new bool[MaxTeams];
+        internal const int FireDead = 2;   // 313b D1: zabitych od pociskow, od ktorych bilans ognia gry puszcza trzymanie
+        private static volatile bool _dhFireKey = true;   // kopia DefendersChargeWhenOutshot z glownego watku (DhTick) - postfiks nie czyta Settings
+        // 313b 291e: liczniki misji (Interlocked - tick druzyn; glowny watek: suma sekund i sily)
+        private static int _dhFireN, _dhFireDryN, _dhFireNoDead;
+        private static float _dhFireSecSum, _dhFirePSum;
+        private static int _dhFireSecN;
 
         // ---- liczniki misji (glowny watek; postfiksy - Interlocked)
         private static int _dhTeams, _dhS2N, _dhStallN, _dhContactN, _dhStum;
@@ -107,6 +128,8 @@ namespace Armoury
             Interlocked.Exchange(ref _dhDec, 0); Interlocked.Exchange(ref _dhGameNo, 0); Interlocked.Exchange(ref _dhForced, 0); Interlocked.Exchange(ref _dhPred, 0);
             Interlocked.Exchange(ref _dhNoDep, 0); Interlocked.Exchange(ref _dhNoInf, 0); Interlocked.Exchange(ref _dhNoGame, 0); Interlocked.Exchange(ref _dhNoOther, 0);
             Interlocked.Exchange(ref _dhPostS2, 0); Interlocked.Exchange(ref _dhNoPostS2, 0);
+            Interlocked.Exchange(ref _dhFireN, 0); Interlocked.Exchange(ref _dhFireDryN, 0); Interlocked.Exchange(ref _dhFireNoDead, 0);   // 313b 291e
+            _dhFireSecSum = _dhFirePSum = 0f; _dhFireSecN = 0;
             _dhS2Again = 0;
             _dhAtkNoInf = _dhAtkNoInfFoot = _dhEngSec = 0f;
             _dhSample = null;
@@ -118,6 +141,7 @@ namespace Armoury
         {
             _dhRef[i] = null; _dhOn[i] = false; _dhOff[i] = 0; _dhStarted[i] = false; _dhBest[i] = 0f; _dhBestAt[i] = 0f; _dhOnAt[i] = -1f;
             _dhTac[i] = null; _dhTac0[i] = null; _dhHasDE[i] = false; _dhS2Was[i] = false; _dhS2Cnt[i] = 0;
+            _dhDead2At[i] = -1f; _dhFireAt[i] = -1f; _dhFireP[i] = 0f; _dhFireSeen[i] = false; _dhFireDry[i] = false;   // 313b 291e
             for (int k = 0; k < DhK; k++) _dhW[i * DhK + k] = 0f;
         }
 
@@ -258,6 +282,28 @@ namespace Armoury
                 if (__instance.IsDefenseApplicable) return;
                 Interlocked.Increment(ref _dhGameNo);
                 if (_dhS2Was[ti]) { Interlocked.Increment(ref _dhPostS2); return; }
+                // 313b 291e: gra sama mowi obrona NIE (bilans ognia), a druzyna ma >= FireDead zabitych od pociskow - bez wymuszenia, puszczona do konca bitwy
+                // (wagi ataku tej decyzji juz nie ciete: _dhOn i wagi obrony zerowane tu, przed MaxBy wag). Ponizej progu - wymuszenie jak w 291d (licznik)
+                var tq = team.QuerySystem;
+                int byRanged = tq != null ? tq.DeathByRangedCount : 0;
+                if (byRanged >= FireDead && _dhOn[ti])   // tylko druzyna, ktora naprawde trzyma (klucz 291 NIE - gra decyduje sama, nic do puszczenia)
+                {
+                    if (_dhFireKey)
+                    {
+                        _dhOff[ti] = 3;
+                        _dhOn[ti] = false;
+                        for (int k = 0; k < DhK; k++) _dhW[ti * DhK + k] = 0f;
+                        var mm = team.Mission;
+                        _dhFireAt[ti] = mm != null ? mm.CurrentTime : 0f;
+                        float rp = 0f;
+                        try { rp = tq.RemainingPowerRatio; } catch { rp = 0f; }
+                        _dhFireP[ti] = float.IsNaN(rp) || float.IsInfinity(rp) ? 0f : rp;
+                        Interlocked.Increment(ref _dhFireN);
+                        return;
+                    }
+                    if (!_dhFireDry[ti]) { _dhFireDry[ti] = true; Interlocked.Increment(ref _dhFireDryN); }
+                }
+                else if (_dhOn[ti]) Interlocked.Increment(ref _dhFireNoDead);
                 var set = _setDefApp;
                 if (!_dhOn[ti] || set == null) return;
                 set(__instance, true);
@@ -288,10 +334,21 @@ namespace Armoury
         private static void DhTick(Mission m, Team t, int ti, Settings c, float now)
         {
             bool key = c.DefendersHoldTheirGround;
+            _dhFireKey = c.DefendersChargeWhenOutshot;   // 313b 291e
             var q = t.QuerySystem;
             if (q == null) return;
             float rp = 1f;
             try { rp = q.RemainingPowerRatio; } catch { rp = 1f; }
+            // 313b 291e: chwila FireDead-tego zabitego od pociskow (dokladnosc taktu doktryny) i sredni czas do puszczenia bilansem ognia (raz na druzyne)
+            if (_dhDead2At[ti] < 0f && q.DeathByRangedCount >= FireDead) _dhDead2At[ti] = now;
+            if (_dhOff[ti] == 3 && !_dhFireSeen[ti])
+            {
+                _dhFireSeen[ti] = true;
+                float d2 = _dhDead2At[ti] >= 0f ? _dhDead2At[ti] : _dhFireAt[ti];
+                _dhFireSecSum += Math.Max(0f, _dhFireAt[ti] - d2);
+                _dhFirePSum += _dhFireP[ti];
+                _dhFireSecN++;
+            }
             if (m.IsDeploymentFinished && _dhOff[ti] == 0)
             {
                 var inf = MainInfantry(t);
@@ -353,6 +410,45 @@ namespace Armoury
                 _dhSampleTi = ti;
                 _dhSample = "T" + _tacOf[ti].ToString(DhInv) + "/" + (_culOf[ti] ?? "?") + " sila x" + rp.ToString("0.00", DhInv) + (on ? " trzyma" : " nie trzyma");
             }
+        }
+
+        /// <summary>313b 291e (glowny watek; HorsePursuit.ReactHalt - wyjatek 283 R4 / R5, OutshotRush - bieg i szyk): druzyna puszczona bilansem ognia gry.</summary>
+        internal static bool FireReleased(Team t)
+        {
+            if (t == null) return false;
+            int ti = t.TeamIndex;
+            return ti >= 0 && ti < MaxTeams && ReferenceEquals(_dhRef[ti], t) && _dhOff[ti] == 3;
+        }
+
+        /// <summary>313b krok 2 (OutshotRush.Tick, glowny watek): druzyna idzie pod ostrzalem - co najmniej FireDead zabitych od pociskow, nie trzyma pozycji 291,
+        /// a jest puszczona (291e albo S2 141) albo ma biezaca taktyke ataku (FullScaleAttack, Charge, RangedHarrassmentOffensive, FrontalCavalryCharge).
+        /// Ostrzal szyku (miara gry albo sygnal S4) sprawdzaja wolajacy. why: 1 291e, 2 S2, 3 taktyka ataku, 4 trzyma (291).</summary>
+        internal static bool OutshotAdvancing(Team t, out byte why)
+        {
+            why = 0;
+            if (t == null) return false;
+            int ti = t.TeamIndex;
+            if (ti < 0 || ti >= MaxTeams) return false;
+            var q = t.QuerySystem;
+            if (q == null || q.DeathByRangedCount < FireDead) return false;
+            if (ReferenceEquals(_dhRef[ti], t) && _dhOn[ti]) { why = 4; return false; }   // trzyma pozycje (291) - nie idzie
+            if (FireReleased(t)) { why = 1; return true; }
+            if (S2On(t) || (ReferenceEquals(_dhRef[ti], t) && _dhS2Was[ti])) { why = 2; return true; }
+            if (Offensive(CurTactic(t))) { why = 3; return true; }
+            return false;
+        }
+
+        /// <summary>313b: czlon 291e segmentu E linii "Bitwa (291)" (OutshotRush.Segment; liczniki od Dh291Reset).</summary>
+        internal static string FireSegment()
+        {
+            var sb = new StringBuilder(200);
+            int n = Volatile.Read(ref _dhFireN);
+            sb.Append("puszczone: bilans ognia ").Append(n).Append(" (sr. ")
+              .Append(_dhFireSecN > 0 ? (_dhFireSecSum / _dhFireSecN).ToString("0", DhInv) : "-").Append(" s od ").Append(FireDead)
+              .Append(". zabitego od pociskow, sila przy zwolnieniu ").Append(_dhFireSecN > 0 ? (_dhFirePSum / _dhFireSecN).ToString("0.00", DhInv) : "-")
+              .Append("), bylby puszczony (klucz NIE) ").Append(Volatile.Read(ref _dhFireDryN))
+              .Append(", obrona gry NIE ponizej ").Append(FireDead).Append(" zabitych od pociskow ").Append(Volatile.Read(ref _dhFireNoDead));
+            return sb.ToString();
         }
 
         /// <summary>Segment B linii "Bitwa (291)" (HorsePursuit.End po Doctrine.End - stan druzyn wyczyszczony; probka i liczniki zostaja).</summary>
