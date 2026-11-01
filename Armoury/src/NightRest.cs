@@ -198,13 +198,13 @@ namespace Armoury
             return "night";
         }
 
-        /// <summary>Ile godzin snu zamyka rachunek przy biezacym dlugu:
-        /// baza + 3*(2*dlug-1) odsetek (dlug 1: +3h, dlug 2: +9h, dlug 3: +15h).</summary>
+        /// <summary>Ile godzin snu zamyka rachunek: baza (SleepHoursNeeded, 6 h) bez wzgledu na dlug. 315c (Jeff 01.11 "sen wystarczy 6 godzin snu nic nie dosypiaja"):
+        /// jedna pelna noc (21-3 = 6 h) wysypia i zeruje dlug - bez odsetek (bylo baza + 3*(2*dlug-1): dlug 1 9 h, 2 15 h, 3 21 h). Kara za noc bez snu zostaje (SettleNight).</summary>
         internal static float NeededHours()
         {
             var s = Settings.Current;
             float baza = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
-            float need = baza + (Debt > 0 ? 3f * (2 * Debt - 1) : 0f);
+            float need = baza;   // 315c: bez odsetek dlugu
             return need + InnDrink.ExtraSleepH(need, _restTonight);   // m98-plotki: pijany gracz dosypia (baza + 1 h na kufel ponad prog od ostatniego kufla); trzezwy - 0
         }
 
@@ -214,7 +214,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             float baza = s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f;
-            float need = baza + (Debt > 0 ? 3f * (2 * Debt - 1) : 0f);
+            float need = baza;   // 315c: bez odsetek dlugu (jak NeededHours)
             return need + InnDrink.ExtraSleepH(need, 0f);
         }
 
@@ -482,7 +482,7 @@ namespace Armoury
         private static string DrillNote(Settings s)
         {
             // m110-sam: bez zolnierzy nie ma musztry (towarzysze nie cwicza) - bez zdania o musztrze
-            return Debt > 0 && s != null && s.DrillLaw && !PartyWords.NoTroops ? " No drill today - sleep the debt off before the next dawn, or tomorrow's drill is lost too." : "";
+            return Debt > 0 && s != null && s.DrillLaw && !PartyWords.NoTroops ? " No drill today - sleep a full night before the next dawn, or tomorrow's drill is lost too." : "";
         }
 
         // ------------------------------------------------------------ swiat tez spi
@@ -1803,8 +1803,8 @@ namespace Armoury
                         MsgLog("The night gave " + PartyWords.Men() + " about " + shown.ToString("0.#", CultureInfo.InvariantCulture) + "h of sleep.", Colors.White);
                 }
                 if (Debt > 0 && !paidInFull)
-                    MsgLog(PartyWords.MenCap() + " slept, but old weariness lingers - a full rest takes "
-                        + (int)Math.Ceiling(NeededHours()) + " hours." + DrillNote(s), Colors.Yellow);
+                    MsgLog(PartyWords.MenCap() + " slept, but not a full night - the weariness lingers until a night of "
+                        + (int)Math.Ceiling(NeededHours()) + " hours' sleep." + DrillNote(s), Colors.Yellow);   // 315c: bez dosypiania - jedna pelna noc
                 return;
             }
 
@@ -1815,17 +1815,17 @@ namespace Armoury
             if (Debt == 1)
                 MsgLog(PartyWords.Pick("The men marched through the night.", "You went without sleep last night.", "You and your companions went without sleep last night.")
                     + " One sleepless night - speed -" + SpdPenalty[1] + "%, morale -"
-                    + MorPenalty[1] + "%; paying it back will take " + (int)Math.Ceiling(NeededHours()) + " hours of rest." + rested + DrillNote(s), Colors.Yellow);
+                    + MorPenalty[1] + "%; one full night's sleep (" + (int)Math.Ceiling(NeededHours()) + " hours) sets it right." + rested + DrillNote(s), Colors.Yellow);
             else if (Debt == 2)
                 MsgLog("Second night without sleep - " + PartyWords.Pick("the column staggers", "you stagger on, half asleep", "you and your companions stagger on")
                     + " (speed -" + SpdPenalty[2] + "%, morale -"
-                    + MorPenalty[2] + "%). A full rest now takes " + (int)Math.Ceiling(NeededHours()) + " hours." + rested + DrillNote(s), Colors.Red);
+                    + MorPenalty[2] + "%). One full night's sleep (" + (int)Math.Ceiling(NeededHours()) + " hours) sets it right." + rested + DrillNote(s), Colors.Red);
             else
             {
                 MsgLog("Third sleepless night - " + PartyWords.Pick("the company collapses where it stands", "you collapse where you stand",
                         "you and your companions collapse where you stand") + " (speed -" + SpdPenalty[3]
-                    + "%, morale -" + MorPenalty[3] + "%). " + (PartyWords.NoTroops ? "You" : "They") + " need " + (int)Math.Ceiling(NeededHours())
-                    + " hours of rest." + rested + DrillNote(s), Colors.Red);
+                    + "%, morale -" + MorPenalty[3] + "%). " + (PartyWords.NoTroops ? "You" : "They") + " need a full night's sleep (" + (int)Math.Ceiling(NeededHours())
+                    + " hours)." + rested + DrillNote(s), Colors.Red);
                 // wojsko ZASYPIA: kolumna staje w miejscu (raz, przy zapasci -
                 // jesli gracz mimo to pogna dalej, powlecze sie na 10% predkosci)
                 try
@@ -2525,7 +2525,7 @@ namespace Armoury
                             line = when + "You slept " + clockH.ToString("0.#") + "h of fitful daylight sleep - it counted for "
                                  + effH.ToString("0.#") + "h.";
                         if (Debt > 0)
-                            line += " Old weariness lingers - a full rest takes " + (int)Math.Ceiling(NeededHours()) + "h.";
+                            line += " The weariness lingers until a full night's sleep (" + (int)Math.Ceiling(NeededHours()) + "h).";   // 315c
                         Msg(line, Debt > 0 ? Colors.Yellow : Colors.White);
                     }
                 }
@@ -2696,13 +2696,16 @@ namespace Armoury
                 // KA: w lozku karczmy sen idzie szybciej (wazone liczba ludzi w porzadnej karczmie i dobrym domu, x1.25); poza karczma 1 - jak dotad
                 _menuRest += (float)dt.ToHours * (night ? 1f : day) * TownInns.SleepFactor();
                 // KA: oplacony nocleg - pobudka nie przed switem (TownInns.HoldAbed; bezpiecznik _sleepUntil bez zmian)
-                // 315a: sen zaczety w nocy snu - tez nie przed switem gracza (_dawnHoldH); po swicie dalej do wyspania (dlug), jak karczma
+                // 315a: sen zaczety w nocy snu - tez nie przed switem gracza (_dawnHoldH); 315c: i nie po nim (bez dosypiania)
                 double nowH = CampaignTime.Now.ToHours;
                 bool dawnHold = _dawnHoldH >= 0 && nowH < _dawnHoldH;
                 bool cap = (float)(_sleepUntil - CampaignTime.Now).ToHours <= 0.02f;
-                if ((_menuRest >= _menuTarget && !TownInns.HoldAbed() && !dawnHold) || cap)
+                // 315c (Jeff 01.11 "sen wystarczy 6 godzin snu nic nie dosypiaja"): sen nocny (czekanie do switu 315a albo nocleg karczmy czekajacy do switu) konczy sie o swicie ZAWSZE -
+                // bez dosypiania dlugu po swicie (dotad po swicie dalej do celu snu, przy dlugu 1 pobudka ok. 8:00). Sen za dnia - do wyspania jak dotad
+                bool dawnEnd = (_dawnHoldH >= 0 && nowH >= _dawnHoldH) || TownInns.DawnPassed();
+                if ((_menuRest >= _menuTarget && !TownInns.HoldAbed() && !dawnHold) || cap || dawnEnd)
                 {
-                    _wakeWhy = cap ? "bezpiecznik zegara snu" : _dawnHoldH >= 0 && nowH - _dawnHoldH < 0.5 ? "swit gracza" : "wyspani (cel snu)";
+                    _wakeWhy = cap ? "bezpiecznik zegara snu" : dawnEnd || (_dawnHoldH >= 0 && nowH - _dawnHoldH < 0.5) ? "swit gracza" : "wyspani (cel snu)";
                     LeaveSleep();
                     return;
                 }

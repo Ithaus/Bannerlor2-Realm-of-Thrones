@@ -27,8 +27,9 @@ namespace Armoury
     ///   +DayRestFactor (dzien), gdy partia stoi (< 0.35 jedn./h), jest w osadzie, na morzu (SleepAtSeaFree) albo lezy w obozie;
     ///   o swicie doba bez bazy = dlug +1 (maks. 3); splata calej sumy od reki = dlug 0. Kary te same tablice co gracz
     ///   (SpeedPostfix / MoralePostfix w NightRest.cs).
-    /// R3 - SPLATA JAK U GRACZA: dlug 1 = oboz od DebtCampHour (0-6: 20:00, 21-3: 17:00) do konca obozu swiata (10 h pelnej stawki, NeededHours(1) = 9), dlug 2-3
-    ///   = sen ciagly tam, gdzie stoi (licznik jak pasek snu gracza, swit nie dolicza dlugu spiacemu). Osobny slownik _debtSleep -
+    /// R3 - SPLATA JAK U GRACZA: 315c (Jeff 01.11 "sen wystarczy 6 godzin snu nic nie dosypiaja") - potrzeba snu = baza (NeededAi), jedna pelna noc zeruje dlug kazdego stopnia; dluznik
+    ///   (dlug >= 1) spi snem dlugu w godzinach obozu swiata (DebtCampHour = poczatek obozu, gdy oboz ma co najmniej baze godzin) i budzi sie o swicie;
+    ///   bez snu ciaglego za dnia (dotad: dlug 1 oboz od 17:00, dlug 2-3 sen ciagly na miejscu do odsetek 15/21 h). Osobny slownik _debtSleep -
     ///   galaz switu obozu swiata go nie rusza. Ucieczka i alarm przerywaja sen.
     /// Pomiar: linie "AiNightCamp: marsz" (co godzine obozu), "AiNightCamp: ruch" (niezalezny pomiar z pozycji: kto przesunal sie
     /// > 0.35 jedn. w godzinie obozu i co T10 o nim wiedzial), "NocnyMarsz: swit" i "NocnyMarsz: kara - probka" (glowny log).
@@ -46,7 +47,7 @@ namespace Armoury
     ///   tez tylko od takiego wroga.
     ///   R5 - ARMIA ODPOCZYWA RAZEM: wodz decyduje wedlug najbardziej zmeczonej partii (dlug i odpoczynek obowiazkowy z wodza i doczepionych):
     ///   oboz splaty od 20:00 albo sen ciagly calej armii; doczepieni spia z wodzem (SleepsWithLeader).
-    ///   R6 - SEN CIAGLY NA MIEJSCU: partia z dlugiem >= 2, ktorej nie wolno polozyc snem dlugu (oboz oblezenia, oblezona osada, morze, doczepiona
+    ///   R6 (315c: WYLACZONE - passive = false, nikt nie dosypia) - SEN CIAGLY NA MIEJSCU: partia z dlugiem >= 2, ktorej nie wolno polozyc snem dlugu (oboz oblezenia, oblezona osada, morze, doczepiona
     ///   do armii, AI trzyma inny mod), a ktora w tej godzinie odpoczywa - licznik snu ciaglego (Acc) biegnie jak w snie dlugu; ruch go konczy.
     ///   R7 - KAZDY TICK GODZINOWY TO JEDNA GODZINA (jak ksiega gracza): numer godziny ksiegi z licznika wywolan, nie z czasu; tick nadrabiany
     ///   w tej samej klatce (dwie godziny naraz) powtarza stan odpoczynku poprzedniej godziny, a swit liczy sie raz.
@@ -62,7 +63,17 @@ namespace Armoury
         // DebtCampLen h pelnej stawki (1 h zapasu nad 9 h) konczy sie o CampEnd; dluzszy oboz swiata - splata od jego poczatku. 0-6 -> 20:00 jak dotad, 21-3 -> 17:00.
         // Pelna stawka od DebtCampHour+1 do switu, bo noc snu (LedgerNight) jest zakotwiczona o swicie: przy 21-3 ticki 18..3 = 10 h (recenzja: przy nocy "od 21" bylo 8.8 h).
         private const int DebtCampLen = 10;
-        private static int DebtCampHour { get { return Mod24(CampEnd - Math.Max(DebtCampLen, CampLen())); } }
+        // 315c: potrzeba = baza (6 h), wiec oboz splaty to zwykly oboz swiata (21-3: tiki 22..3 = 6 h pelnej stawki); wczesniej tylko, gdy oboz krotszy niz baza
+        // (najwyzej DebtCampLen h - okno pelnej stawki LedgerNight). Bylo: max(10, CampLen) -> 17:00 przy 21-3.
+        private static int DebtCampHour
+        {
+            get
+            {
+                var s = Settings.Current;
+                int need = Math.Min(DebtCampLen, (int)Math.Ceiling(s != null ? Math.Max(1f, s.SleepHoursNeeded) : 6f));
+                return Mod24(CampEnd - Math.Max(need, CampLen()));
+            }
+        }
         private const float RestMoveLimit = Drill.RestStep;   // jak gracz (OnHourly) i musztra (grupa11: jedna stala 0.35): ponizej - partia stoi
         private const double AlarmGraceHours = 0.5;   // AI sprawdza inicjatywe co ok. 0.15-0.18 h (AiCheckInterval 0.25 x 0.6-0.7)
         private const int AiSaveCap = 1500;           // wpisow ksiegi w zapisie (lordow ROT ok. 500-700)
@@ -218,7 +229,7 @@ namespace Armoury
         private static bool IsLeader(MobileParty mp) { return mp.Army != null && mp.Army.LeaderParty == mp; }
         private static string F1(float v) { return v.ToString("0.0", CultureInfo.InvariantCulture); }
         private static string F0(float v) { return v.ToString("0", CultureInfo.InvariantCulture); }
-        private static float NeededAi(float baza, int debt) { return baza + (debt > 0 ? 3f * (2 * debt - 1) : 0f); }
+        private static float NeededAi(float baza, int debt) { return baza; }   // 315c: bez odsetek dlugu - pelna noc zeruje dlug (jak NeededHours gracza)
 
         /// <summary>Okno obozu splaty dlugu 1: od DebtCampHour do konca obozu swiata (przez polnoc).</summary>
         private static bool InDebtEvening(int h)
@@ -1042,7 +1053,8 @@ namespace Armoury
                         // (oboz oblezenia, oblezona osada, morze, czlonek armii, AI trzyma inny mod); licznik biegnie jak w snie dlugu, ruch go konczy.
                         // Doczepieni do gracza - jak dotad (o snie decyduje gracz).
                         bool inDebtSleep = _debtSleep.ContainsKey(mp);
-                        bool passive = on && resting && e.Debt >= 2 && !withLead && !inDebtSleep && mp.AttachedTo != main;
+                        // 315c: bez snu ciaglego na miejscu (R6) - nikt nie dosypia; dlug zeruje pelna noc w ksiedze (Rest), wpis z zapisu/poprzedniego ticku konczy LeaveAcc
+                        bool passive = false;
                         if (passive) { if (e.Acc < 0f) e.Acc = e.Rest; _day.PassiveHours++; }
                         else if (e.Passive && !withLead && !inDebtSleep) LeaveAcc(e);
                         e.Passive = passive;
@@ -1150,7 +1162,7 @@ namespace Armoury
                 if (e.Debt > before)
                 {
                     _day.NewDebt[e.Debt]++;
-                    if (e.Debt == 3) _day.Collapses++;   // zapasc: sen ciagly od reki (AiDebtCamp w tym samym ticku)
+                    if (e.Debt == 3) _day.Collapses++;   // zapasc (315c: bez snu ciaglego - kary dlugu 3 do pelnej nocy w obozie splaty)
                     ch = true;
                 }
                 else _day.StillCollapsed++;
@@ -1493,7 +1505,7 @@ namespace Armoury
                         _day.DebtForeign++;
                         continue;
                     }
-                    bool want = ed >= 2 || (ed == 1 && evening);
+                    bool want = ed >= 1 && evening;   // 315c: kazdy dluznik spi w godzinach obozu (oboz splaty), za dnia nie - bez dosypiania (bylo: dlug 2-3 sen ciagly o kazdej porze)
                     var st = mp.CurrentSettlement;
                     bool can = mp.AttachedTo == null && mp.MapEvent == null && mp.BesiegerCamp == null && !mp.IsCurrentlyAtSea
                                && (st == null || st.SiegeEvent == null);
@@ -1536,7 +1548,7 @@ namespace Armoury
                     if (!inDebt) EnterDebt(mp, e, null, ed);
                     else
                     {
-                        if (ed >= 2 && ds.Kind != 2) { ds.Kind = 2; if (e.Acc < 0f) e.Acc = e.Rest; _day.ContSleeps++; }
+                        // 315c: bez awansu na sen ciagly (Kind 2) - sen dlugu to zawsze oboz splaty do switu
                         mp.Ai.DisableForHours(1);
                         if (st == null && mp.DefaultBehavior != AiBehavior.Hold)
                         {
@@ -1574,7 +1586,7 @@ namespace Armoury
         {
             // w osadzie wystarczy wstrzymac AI (gra nie wypusci partii z wylaczonym AI) - rozkaz zostaje nietkniety
             bool inTown = mp.CurrentSettlement != null;
-            var ds = new DebtSleeper { Bed = mp.GetPosition2D, Kind = ed >= 2 ? 2 : 1, Order = given ?? (inTown ? null : TakeOrder(mp)) };
+            var ds = new DebtSleeper { Bed = mp.GetPosition2D, Kind = 1, Order = given ?? (inTown ? null : TakeOrder(mp)) };   // 315c: zawsze oboz splaty (bez snu ciaglego Kind 2)
             // E8/S (246, rozpoznanie C poz. 17): w osadzie rozkaz zostaje przy partii (Order == null), wiec TakeOrder nie biegnie i wpis obozu swiata
             // w _orders (rozkaz sprzed snu w polu, zanim partia weszla do osady) zostawal martwy: gdy dluznik wyszedl z osady cudzym rozkazem i spal
             // dalej w polu, galaz switu oddawala mu ten stary rozkaz i budzila go o 6:00 (licznik E7/O1 "dluznicy obudzeni o 6:00"). Zdejmujemy wpis tutaj;
@@ -1723,7 +1735,7 @@ namespace Armoury
                 // T10-R (R5): wodz armii wedlug najgorszego dlugu armii
                 bool must;
                 int ed = e != null ? EffDebt(mp, e, MaxForced(s), out must) : 0;
-                if (s != null && DebtOn(s) && e != null && (ed >= 2 || (ed == 1 && InDebtEvening(h)))) { EnterDebt(mp, e, a.Order, ed); return; }
+                if (s != null && DebtOn(s) && e != null && ed >= 1 && InDebtEvening(h)) { EnterDebt(mp, e, a.Order, ed); return; }   // 315c: jak AiDebtCamp
                 ApplyOrder(mp, a.Order, false);   // dlug splacony albo koniec okna - rozkaz sprzed snu
                 return;
             }

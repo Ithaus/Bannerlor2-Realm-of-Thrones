@@ -389,7 +389,7 @@ namespace Armoury
                 acc += 0.25f * (NightRest.MenuNight((int)h) ? 1f : day) * f;   // m97-oboz: noc snu do switu gracza (swit-9), jak sen w menu
                 t += 15;
             }
-            if (atDawn && t < dawn) t = dawn;
+            if (atDawn) t = dawn;   // 315c: nocleg do switu konczy sie o swicie zawsze (bylo: po swicie dalej do celu snu)
             return Math.Min(t, cap);
         }
 
@@ -706,6 +706,13 @@ namespace Armoury
         {
             var r = InnSleep();
             return r != null && r.WakeMin > 0 && NowMin() < r.WakeMin;
+        }
+
+        /// <summary>315c (sen do 6 h, bez dosypiania): nocleg czekajacy do switu (WakeMin) - swit minal, pobudka (NightRest.SleepTick), nawet bez pelnego paska.</summary>
+        internal static bool DawnPassed()
+        {
+            var r = InnSleep();
+            return r != null && r.WakeMin > 0 && NowMin() >= r.WakeMin;
         }
 
         /// <summary>NightRest.SleepTick: pasek snu przy czekaniu do switu - mniejsze z paska snu i zegara do switu.</summary>

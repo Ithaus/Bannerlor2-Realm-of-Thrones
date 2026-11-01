@@ -5396,7 +5396,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public float FastForwardMultiplier { get; set; } = 8f;
 
-        [SettingPropertyFloatingInteger("Sleep Hours Needed", 0.00f, 24.00f, "0.00", HintText = "base hours of sleep per day; sleep debt adds interest on top (1 night owed: +3h, 2: +9h, 3: +15h) and only the full sum clears it", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Sleep Hours Needed", 0.00f, 24.00f, "0.00", HintText = "hours of sleep per day - a full night of them (21:00-3:00 with the camp hours 21-3) clears any sleep debt; nobody sleeps longer to make up lost nights", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public float SleepHoursNeeded { get; set; } = 6f;
 
@@ -5464,7 +5464,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool AiNightMarchByReason { get; set; } = true;
 
-        [SettingPropertyBool("Ai Sleep Debt", HintText = "AI lord parties keep the same sleep ledger as you: a day without the base hours of rest (Sleep Hours Needed) costs speed and morale (-25/-40/-90% and -25/-40/-95%) until slept off, and a dawn met with that debt costs their men's drill until the next dawn (Drill Penalty Ai, Drill Law Ai); one night owed means making camp at 20:00 until the world breaks camp, two or more means sleeping where they stand until paid; off = the ledger is only counted in the log", RequireRestart = false)]
+        [SettingPropertyBool("Ai Sleep Debt", HintText = "AI lord parties keep the same sleep ledger as you: a day without the base hours of rest (Sleep Hours Needed) costs speed and morale (-25/-40/-90% and -25/-40/-95%) until slept off, and a dawn met with that debt costs their men's drill until the next dawn (Drill Penalty Ai, Drill Law Ai); a lord who owes sleep makes camp with the world at nightfall and sleeps until dawn, and one full night clears the debt; off = the ledger is only counted in the log", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool AiSleepDebt { get; set; } = true;
 
@@ -5472,7 +5472,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool AiNightReliefWider { get; set; } = false;
 
-        [SettingPropertyInteger("Max Forced Nights", 0, 5, "0", HintText = "AI lords march through at most this many sleepless nights in a row: after that - or once they owe this many nights - they must make camp and rest until the debt is fully slept off, with no night chase, relief or flight; only a foe at least twice as strong (who would destroy them) still sends them running. A host rests as one: its leader decides by the most tired party in the army. 0 = no limit (old rules)", RequireRestart = false)]
+        [SettingPropertyInteger("Max Forced Nights", 0, 5, "0", HintText = "AI lords march through at most this many sleepless nights in a row: after that - or once they owe this many nights - they must make camp at night and rest until a full night's sleep clears the debt, with no night chase, relief or flight; only a foe at least twice as strong (who would destroy them) still sends them running. A host rests as one: its leader decides by the most tired party in the army. 0 = no limit (old rules)", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public int MaxForcedNights { get; set; } = 2;
 
@@ -5496,7 +5496,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool PlayerSleepGuard { get; set; } = true;
 
-        [SettingPropertyBool("Sleep Until Dawn", HintText = "when you bed down in camp in the evening or at night (from nightfall of the sleep night - 18:00 with the camp hours 21-3 - until dawn), you and your men sleep until dawn (the end of the camp hours) instead of rising once the hours you need are slept - the column no longer wakes at midnight and marches through the rest of the night. A sleep begun by day still ends when you have slept enough; an inn keeps its own rule. Off = as before (you rise once the needed hours are slept)", RequireRestart = false)]
+        [SettingPropertyBool("Sleep Until Dawn", HintText = "when you bed down in camp in the evening or at night (from nightfall of the sleep night - 18:00 with the camp hours 21-3 - until dawn), you and your men sleep until dawn (the end of the camp hours) instead of rising once the hours you need are slept - the column no longer wakes at midnight and marches through the rest of the night - and everyone rises at dawn: nobody sleeps on past it to make up lost sleep. A sleep begun by day still ends when you have slept enough; a night at an inn also ends at dawn. Off = as before (you rise once the needed hours are slept)", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool SleepUntilDawn { get; set; } = true;
 
@@ -5608,7 +5608,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool RavenNeverEmpty { get; set; } = true;
 
-        [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer", RequireRestart = false)]
+        [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h), then returns to the hammer", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool AnvilShiftEnabled { get; set; } = true;
 
@@ -7676,7 +7676,7 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool Stage7MeasureLog { get; set; } = true;
 
-        [SettingPropertyBool("Sleepers Hold Orders", HintText = "a party asleep in camp takes no marching orders until dawn - the last order it was given waits and is carried out at first light; its own thinking sleeps till dawn too (a lord sleeping off a sleep debt: until he wakes). Off = sleepers are only put back to bed after someone has moved them, as before", RequireRestart = false)]
+        [SettingPropertyBool("Sleepers Hold Orders", HintText = "a party asleep in camp takes no marching orders until dawn - the last order it was given waits and is carried out at first light; its own thinking sleeps till dawn too. Off = sleepers are only put back to bed after someone has moved them, as before", RequireRestart = false)]
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool SleepersHoldOrders { get; set; } = true;
 
