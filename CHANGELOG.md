@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-01 WGRANIE 150 - noc/313x-integracja (149 + 312h oboz na suchym gruncie i spiacy w namiotach + 313a arakhy tylko u Dothrakow); Armoury.dll d2d14d21a30451641eeaa79071a371d0; kopia 149: Armoury.dll.bak-2026-11-01-przed-wgranie150 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie150-przed
+
+**Problem:** Jeff 01.11: oboz na bagnie stawiany w wodzie, ludzie spia poza namiotami; "czemu tyle wojska biega z arakhami ... wywal arakhi z Westeros".
+**Testy:** autotest 313x: bitwaN 3 bitwy, ERROR 0, wywrotka w 4. bitwie = AccessViolationException w obcym modzie ImmersiveBattlefields (to samo 25.10 przed tym kodem, autotest-skrypt-2026-10-25_12-03-10.log) - nie nasz kod; probyN 3 doby kod 0, ERROR 0, Armoury.json Jeffa nietkniety. Bron Dothrakow w bitwie: wszyscy z arakhami to Dothrakowie (steppe_bandits/khuzait z Essos, wystawieni przez test), inni 0. Spaceru po obozie test nie sprawdza - Jeff w grze (linia "Spacer po obozie ... wejscie": grunt, spiacy w namiotach).
+**Poza DLL:** Artem (ArtemsLivelyAnimations.json Jeffa) HPThreshold 20 -> 10 na prosbe Jeffa ("animacja jak ma ponizej 10 hp"); kopia .bak-2026-11-01 obok i D:/Backup-Bannerlord/ustawienia/ArtemsLivelyAnimations.json.2026-11-01-przed.
+**Status:** WGRANE 150
+
 ## 2026-11-01 312h oboz na bagnie i spiacy w namiotach (spacer po obozie); Armoury.dll d9445e4e63ad0528d1c34cb12473a736 (po recenzji) (galaz/worktree n312h)
 
 **Problem:** Jeff 01.11: "jak jest mapa na bagnach to oboz jest na bagnie rozstawiany a ludzie zamiast spac w namiocie spia poza namiotami". Dowodu z logu nie ma: w 12 zachowanych logach Armoury brak linii "Spacer po obozie (m97): wejscie" i "probki terenu" (rozpoznanie scratchpad/rozp312/oboz-bagno.md, pkt 0).
