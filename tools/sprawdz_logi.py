@@ -87303,7 +87303,7 @@ def warsztaty311c_selftest():
 T311_START = re.compile(r"Trening przed snem \(311e\): start o (\d+):00 \| ustawienie (\d+) h (z menu obozu|z MCM \(Camp Train Before Sleep Hours \d+\)), cwiczen do nocy snu (\d+) h"
                         r" \(noc snu od (\d+):00, dzis od switu juz ([\d.]+) h z 8\) \| ludzi zdolnych (\d+)")
 T311_END = re.compile(r"Trening przed snem \(311e\): koniec o (\d+):00 \| cwiczen ([\d.]+) h \(zegara ([\d.]+) h, zamierzone (\d+) h\) \| powod: ([^|]+?) \| dzis od switu ([\d.]+) h z 8"
-                      r".*?\| dalej: (sen w menu \(arm_sleep_wait\)|menu obozu)\.")
+                      r".*?\| dalej: (sen w menu \(arm_sleep_wait(?:, do switu \d+:00 - linia 'Sen do switu \(315a\)')?\)|menu obozu)\.")   # 315b: dopisek 315a (klucz SleepUntilDawn)
 T311_SKIP = re.compile(r"Trening przed snem \(311e\): pominiety o (\d+):00 \(doba switu (-?\d+), ustawienie (\d+) h .*?\) \| powod: (.+?) \| kolejne")
 T311_DAWN = re.compile(r"Trening przed snem \(311e\): doba switu (-?\d+) \| ustawienie (\d+) h .*?\| startow (\d+), koncow (\d+) \(prosto do snu (\d+)\), godzin cwiczen ([\d.]+)"
                        r" \| tick musztry: godzin 311e ([\d.]+), XP ok\. (\d+) .*?\| potkniecia (\d+)\.")
@@ -90754,7 +90754,7 @@ def main(argv):
 
 # ---------------------------------------------------------------- paczka 315a (01.11): sen w menu do switu - grupa sen315a
 # Jeff 01.11: "czemu koncze wypoczynek o 00.00 przeciez to bez sensu, wypoczynek powinien byc wtedy jak jest noc a konczyc sie jak wstaje slonce".
-# Sen w menu zaczety w nocy snu (18:00-2:59 przy obozie 21-3) poza karczma trwa do switu gracza (koniec obozu). Armoury/src/NightRest.cs (SleepInit,
+# Sen w menu zaczety w nocy snu (18:00-2:59 przy obozie 21-3; 315b: zmierzch treningu 311e 21:00, sen od niego tez do switu) poza karczma trwa do switu gracza (koniec obozu). Armoury/src/NightRest.cs (SleepInit,
 # SleepTick, LeaveSleep, EndSleepQuiet), klucz SleepUntilDawn.
 # Uzycie: python -I tools/sprawdz_logi.py --grupa sen315a <Armoury-*.log>
 #  S315-0  linie "Sen do switu (315a): sen w menu od" sa (INFO bez snu w menu)
@@ -90855,6 +90855,131 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return sen315a_main(rest[0] if rest else None)
     return _sen315a_main_prev(argv)
+
+# ---------------------------------------------------------------- paczka 315b (01.11): noc obozu gracza 21-3 - grupa sen315b
+# Jeff 01.11: "trening moze trwac poza nocna czyli od 21 do 3 w noc nie ma treningu a poza tymi godzinami jest okienko aby przeprowadzic trening";
+# "noc snu liczyla sie 6 godzin w sensie 6 godzin spali a 9 jak byla nieprzespana noc". Noc obozu gracza (bez musztry, zmierzch treningu 311e) = godziny
+# obozu swiata (NightRest.BedNight / BedNightStart); stawka snu (pelna od swit-9, LedgerNight / MenuNight) bez zmian. Pelna noc 21-3 = 6 tikow 22..3 = baza 6.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa sen315b <Armoury-*.log>
+#  S315B-0  linia NightRest "noc obozu gracza (...) X:00-Y:00": X = poczatek obozu, Y = koniec obozu (INFO bez linii)
+#  S315B-1  start treningu 311e: "noc snu od X:00" = poczatek obozu, godzina startu + zamierzone h = poczatek obozu
+#  S315B-2  koniec treningu 311e z powodem "noc": o poczatku obozu (albo "pelny dzien" najwyzej 0.25 h przed nim - godzina startu obozu - 1)
+#  S315B-3  pelna noc bez dlugu: sen do switu zaczety bez dlugu o poczatku obozu (albo :45-:59 godzine wczesniej), pobudka o swicie -> linia gracza
+#           o swicie: odpoczynek doby >= baza i dlug po 0 (6 h nocy 21-3 wystarcza na baze)
+#  S315B-4  sen z dlugiem zakonczony "wyspani": pasek w menu >= cel snu - 0.05 (dlug odsypiany po swicie; INFO godzina pobudki)
+#  S315B-5  linia startu sesji musztry: "godziny cwiczen D:00-(X-1):59 (noc obozu X:00-" - X = poczatek obozu
+S315B_CFG = re.compile(r"^NightRest: oboz swiata (\d+):00-(\d+):00.*?noc obozu gracza \([^)]*\) (\d+):00-(\d+):00")
+S315B_TSTART = re.compile(r"^Trening przed snem \(311e\): start o (\d+):00 \| .*?cwiczen do nocy snu (\d+) h \(noc snu od (\d+):00")
+S315B_TEND = re.compile(r"^Trening przed snem \(311e\): koniec o (\d+):00 \| .*?\| powod: (.+?) \| dzis od switu")
+S315B_START = re.compile(r"^Sen do switu \(315a\): sen w menu od (\d+):(\d\d) .*?\| cel snu ([\d.]+) h \(potrzeba ([\d.]+) h, odpoczynek doby ([\d.]+) h, dlug (\d+)\) \| (pobudka nie przed switem (\d+):00)?")
+S315B_END = re.compile(r"^Sen do switu \(315a\): (pobudka|koniec snu) o (\d+):(\d\d) \(od (\d+):(\d\d), zegara ([\d.]+) h, w menu ([\d.]+) h z celu ([\d.]+) h\) \| powod: (.+?) \|")
+S315B_DAWN = re.compile(r"^NocnyMarsz: gracz o swicie - odpoczynek doby ([\d.]+) h \(baza ([\d.]+),.*?dlug przed (\d+), po (\d+)")
+S315B_DRILL = re.compile(r"^Szkolenie w obozie \(m97\): start sesji .*?godziny cwiczen (\d+):00-(\d+):59 \(noc obozu (\d+):00-")
+
+
+def sen315b_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("S315B-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    camp_st, camp_e = 21, 3
+    cfg, bad0 = 0, []
+    ts, bad1, te, bad2 = 0, [], 0, []
+    full_n, bad3, pend_full = 0, [], None
+    debt_n, bad4, debt_info = 0, [], []
+    dr, bad5 = 0, []
+    cur = None
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            m = S315_CAMP.match(s)
+            if m:
+                camp_st, camp_e = int(m.group(1)), int(m.group(2))
+                m2 = S315B_CFG.match(s)
+                if m2:
+                    cfg += 1
+                    if camp_st != camp_e and (int(m2.group(3)) != camp_st or int(m2.group(4)) != camp_e):
+                        bad0.append(s[:200])
+                continue
+            m = S315B_TSTART.match(s)
+            if m:
+                ts += 1
+                h, want, night = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                if camp_st != camp_e and (night != camp_st or (h + want) % 24 != camp_st):
+                    bad1.append(s[:200])
+                continue
+            m = S315B_TEND.match(s)
+            if m:
+                h, why = int(m.group(1)), m.group(2)
+                if why.startswith("noc"):
+                    te += 1
+                    ok = h == camp_st or ("pelny dzien" in why and h == (camp_st - 1) % 24)
+                    if camp_st != camp_e and not ok:
+                        bad2.append(s[:200])
+                continue
+            m = S315B_START.match(s)
+            if m:
+                cur = {"h": int(m.group(1)), "mm": int(m.group(2)), "target": float(m.group(3)), "need": float(m.group(4)),
+                       "debt": int(m.group(6)), "hold": m.group(7) is not None}
+                continue
+            m = S315B_END.match(s)
+            if m and cur is not None:
+                wh, wm, why = int(m.group(2)), int(m.group(3)), m.group(9)
+                menu, target = float(m.group(7)), float(m.group(8))
+                late = cur["h"] == (camp_st - 1) % 24 and cur["mm"] >= 45
+                if cur["hold"] and cur["debt"] == 0 and (cur["h"] == camp_st or late) and why.startswith("swit gracza"):
+                    pend_full = s[:160]
+                if cur["debt"] > 0 and why.startswith("wyspani"):
+                    debt_n += 1
+                    debt_info.append(f"{cur['h']}:{cur['mm']:02d}->{wh}:{wm:02d} (dlug {cur['debt']}, cel {target:.1f}, w menu {menu:.1f})")
+                    if menu < target - 0.05:
+                        bad4.append(s[:200])
+                cur = None
+                continue
+            m = S315B_DAWN.match(s)
+            if m and pend_full is not None:
+                full_n += 1
+                rest, baza, before, after = float(m.group(1)), float(m.group(2)), int(m.group(3)), int(m.group(4))
+                if before == 0 and (rest < baza - 0.01 or after != 0):
+                    bad3.append(f"{pend_full} -> odpoczynek {rest} h z bazy {baza}, dlug po {after}")
+                pend_full = None
+                continue
+            m = S315B_DRILL.match(s)
+            if m:
+                dr += 1
+                if camp_st != camp_e and (int(m.group(3)) != camp_st or (int(m.group(2)) + 1) % 24 != camp_st):
+                    bad5.append(s[:200])
+                continue
+    print(f"plik: {logp}")
+    rep.add("S315B-0: noc obozu gracza = oboz swiata", f"linii {cfg}, zlych {len(bad0)}" + (f" (pierwsza: {bad0[0]})" if bad0 else ""),
+            "zle 0", (len(bad0) == 0) if cfg else None)
+    rep.add("S315B-1: start 311e liczony do poczatku obozu", f"startow {ts}, zlych {len(bad1)}" + (f" (pierwszy: {bad1[0]})" if bad1 else ""),
+            "zle 0", (len(bad1) == 0) if ts else None)
+    rep.add("S315B-2: koniec 311e o poczatku obozu", f"koncow 'noc' {te}, zlych {len(bad2)}" + (f" (pierwszy: {bad2[0]})" if bad2 else ""),
+            "zle 0", (len(bad2) == 0) if te else None)
+    rep.add("S315B-3: pelna noc obozu bez dlugu = baza", f"nocy {full_n}, z brakiem {len(bad3)}" + (f" (pierwsza: {bad3[0]})" if bad3 else ""),
+            "odpoczynek doby >= baza, dlug po 0", (len(bad3) == 0) if full_n else None)
+    rep.add("S315B-4: sen z dlugiem do wyspania po swicie", f"snow {debt_n}, pasek ponizej celu {len(bad4)}" + (f"; {', '.join(debt_info[:4])}" if debt_info else ""),
+            "pasek >= cel snu", (len(bad4) == 0) if debt_n else None)
+    rep.add("S315B-5: godziny cwiczen do poczatku obozu", f"linii {dr}, zlych {len(bad5)}" + (f" (pierwsza: {bad5[0]})" if bad5 else ""),
+            "zle 0", (len(bad5) == 0) if dr else None)
+    rep.show()
+    return 0
+
+
+_sen315b_main_prev = main
+
+
+def main(argv):
+    # paczka 315b: grupa sen315b - opakowanie main jak sen315a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "sen315b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return sen315b_main(rest[0] if rest else None)
+    return _sen315b_main_prev(argv)
 
 
 if __name__ == "__main__":

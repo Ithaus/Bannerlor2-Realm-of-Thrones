@@ -151,7 +151,7 @@ namespace Armoury
         private static double DawnHoldFromNow(Settings s)
         {
             if (s == null || !s.SleepUntilDawn) return -1;
-            if (!SleepNightNow()) return -1;   // 315a poprawka recenzji (1): ten sam prog co TbsEnd - trening konczy sie "pelnym dniem" o 17:45-17:59
+            if (!SleepNightNow()) return -1;   // 315a poprawka recenzji (1): ten sam prog co TbsEnd - trening konczy sie "pelnym dniem" o 17:45-17:59 (315b: 20:45-20:59)
             double hd = CampaignTime.Now.CurrentHourInDay;
             double d = ((PlayerDawn - hd) % 24.0 + 24.0) % 24.0;
             if (d < 0.01) return -1;
@@ -162,13 +162,17 @@ namespace Armoury
         /// zmierzch snu (TbsEnd), a sen zaczety wtedy czeka do switu (DawnHoldFromNow). Jedna stala dla obu miejsc.</summary>
         internal const double SleepNightEdgeH = 0.25;
 
-        /// <summary>315a poprawka recenzji (1): teraz jest noc snu - godzina w MenuNight albo do SleepNightStart zostalo najwyzej SleepNightEdgeH h zegara.</summary>
+        /// <summary>315a poprawka recenzji (1): teraz jest noc snu - godzina w MenuNight albo do SleepNightStart zostalo najwyzej SleepNightEdgeH h zegara.
+        /// 315b: takze noc obozu gracza (BedNight) i zapas SleepNightEdgeH przed BedNightStart - trening 311e konczy sie teraz o poczatku obozu (21:00,
+        /// "pelnym dniem" 20:45-20:59); sen wieczorny od 18:00 dalej czeka do switu jak w 315a.</summary>
         internal static bool SleepNightNow()
         {
-            if (MenuNight(CampaignTime.Now.GetHourOfDay)) return true;
+            int h = CampaignTime.Now.GetHourOfDay;
+            if (MenuNight(h) || BedNight(h)) return true;
             double hd = CampaignTime.Now.CurrentHourInDay;
             double toNight = ((SleepNightStart - hd) % 24.0 + 24.0) % 24.0;
-            return toNight <= SleepNightEdgeH;
+            double toBed = ((BedNightStart - hd) % 24.0 + 24.0) % 24.0;
+            return toNight <= SleepNightEdgeH || toBed <= SleepNightEdgeH;
         }
 
         /// <summary>315a: godzina zegara H:MM (do linii logu snu).</summary>
@@ -506,6 +510,15 @@ namespace Armoury
         internal static bool MenuNight(int h) { return Mod24(h - (PlayerDawn - (SleepNightTicks - 1))) < SleepNightTicks - 1; }
         /// <summary>Pierwsza godzina nocy snu (do logu): swit-9.</summary>
         internal static int SleepNightStart { get { return Mod24(PlayerDawn - (SleepNightTicks - 1)); } }
+        // 315b (Jeff 01.11: "trening moze trwac poza nocna czyli od 21 do 3 w noc nie ma treningu a poza tymi godzinami jest okienko aby przeprowadzic trening"):
+        // NOC OBOZU GRACZA = godziny obozu swiata (CampStart..CampEnd, przy 21-3 godziny 21:00-2:59) - wtedy ludzie leza i nie cwicza (CampDrill.DayHour,
+        // musztra AI Drill.DayRestHours/DayDrillHours), trening przed snem 311e konczy sie o jej poczatku. Dotad ta granica byla MenuNight (swit-9 = 18:00).
+        // Stawka snu (pelna od swit-9: LedgerNight ksiegi gracza i AI, MenuNight paska snu i karczmy) BEZ ZMIAN - na niej stoi splata dlugu AI (oboz splaty
+        // od DebtCampHour, m97-oboz) i gracza; pelna noc 21-3 to 6 tikow ksiegi 22..3 = 6.0 h = baza. Rowne godziny obozu (swiat nie obozuje) - jak dotad MenuNight.
+        /// <summary>315b: noc obozu gracza (godzina zegara) - bez musztry, lozko: godziny obozu swiata; rowne godziny obozu - MenuNight (swit 6: 21:00-5:59).</summary>
+        internal static bool BedNight(int h) { return CampStart == CampEnd ? MenuNight(h) : InCamp(h); }
+        /// <summary>315b: pierwsza godzina nocy obozu gracza (zmierzch musztry i treningu przed snem): CampStart; rowne godziny obozu - SleepNightStart.</summary>
+        internal static int BedNightStart { get { return CampStart == CampEnd ? SleepNightStart : CampStart; } }
         private static int Mod24(int h) { return ((h % 24) + 24) % 24; }
         /// <summary>Swit rachunku snu gracza: koniec obozu, a przy rownych godzinach (swiat nie obozuje) stary swit 6:00.</summary>
         internal static int PlayerDawn { get { int st = CampStart, e = CampEnd; return st == e ? 6 : e; } }
@@ -638,6 +651,7 @@ namespace Armoury
                      + s.AiNightsAwakeInChase.ToString("0.##", CultureInfo.InvariantCulture) + ", promien alarmu "
                      + s.AiCampDangerRadius.ToString("0.#", CultureInfo.InvariantCulture) + " jedn., poscig do " + CampLen()
                      + " h marszu, odsiecz do " + (2 * CampLen()) + " h, oboz splaty dlugu 1 od " + DebtCampHour + ":00, noc snu (pelna stawka) " + SleepNightStart + ":00-" + PlayerDawn + ":00"
+                     + ", noc obozu gracza (bez musztry, trening 311e do zmierzchu, 315b) " + BedNightStart + ":00-" + PlayerDawn + ":00"
                      + "; T10-R: MaxForcedNights=" + s.MaxForcedNights + (s.MaxForcedNights > 0 ? " (potem obowiazkowy odpoczynek do dlugu 0, ucieczka tylko przed wrogiem >= "
                         + CrushRatio.ToString("0.#", CultureInfo.InvariantCulture) + " x silniejszym; armia wedlug najbardziej zmeczonej partii)" : " (bez limitu - stare reguly)")
                      + (DryBuild ? " - DLL NA SUCHO (T10_DRY): tylko log, zachowanie i kary jak w T1" : "")
@@ -2597,7 +2611,7 @@ namespace Armoury
                 // godziny i NIE cofa sie, gdy swit wyzeruje rachunek doby
                 _menuTarget = Math.Max(0.5f, needed - _restTonight);
                 int h = CampaignTime.Now.GetHourOfDay;
-                bool night = SleepNightNow();   // m97-oboz: 9 h zegara do switu gracza (swit 3 -> 18-2); 315a poprawka recenzji (1): z zapasem SleepNightEdgeH przed 18:00, jak czekanie do switu
+                bool night = SleepNightNow();   // m97-oboz: 9 h zegara do switu gracza (swit 3 -> 18-2); 315a poprawka recenzji (1): z zapasem SleepNightEdgeH przed 18:00, jak czekanie do switu; 315b: i przed 21:00 (BedNightStart)
                 _rouseAsked = false;
                 // KA (karczmy): sen w osadzie po oplaconym noclegu - pobudka nie przed switem (gdy swit w 12 h), tlo miasta, wlasny tekst (null = jak dotad)
                 string inn = TownInns.OnSleepInit(args);
@@ -2616,8 +2630,8 @@ namespace Armoury
                     Log.Info("Sen do switu (315a): sen w menu od " + Hm(CampaignTime.Now.CurrentHourInDay) + " (powrot: " + (_sleepReturn ?? "?") + (again ? ", ponowne wejscie w ten sam sen" : "")
                              + ") | cel snu " + F1(_menuTarget) + " h (potrzeba " + F1(needed) + " h, odpoczynek doby " + F1(_restTonight) + " h, dlug " + Debt + ") | "
                              + (inn != null ? "nocleg w karczmie - pobudke trzyma karczma"
-                                : _dawnHoldH >= 0 ? "pobudka nie przed switem " + PlayerDawn + ":00 (za " + F1((float)(_dawnHoldH - CampaignTime.Now.ToHours)) + " h zegara, noc snu " + SleepNightStart + ":00-" + PlayerDawn + ":00)"
-                                : (s != null && !s.SleepUntilDawn ? "klucz Sleep Until Dawn wylaczony" : "sen za dnia (poza noca snu " + SleepNightStart + ":00-" + PlayerDawn + ":00)") + " - do wyspania")
+                                : _dawnHoldH >= 0 ? "pobudka nie przed switem " + PlayerDawn + ":00 (za " + F1((float)(_dawnHoldH - CampaignTime.Now.ToHours)) + " h zegara, noc obozu " + BedNightStart + ":00-" + PlayerDawn + ":00, pelna stawka od " + SleepNightStart + ":00)"
+                                : (s != null && !s.SleepUntilDawn ? "klucz Sleep Until Dawn wylaczony" : "sen za dnia (poza noca snu " + SleepNightStart + ":00-" + PlayerDawn + ":00 i noca obozu " + BedNightStart + ":00-" + PlayerDawn + ":00)") + " - do wyspania")
                              + ".");
                 }
                 catch { }

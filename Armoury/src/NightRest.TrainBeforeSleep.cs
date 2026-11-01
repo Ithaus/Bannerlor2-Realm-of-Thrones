@@ -15,8 +15,8 @@ namespace Armoury
     /// 311e TRENING PRZED SNEM (Jeff 31.10: "w menu obozu dodaj opcje, ile godzin przed snem armia ma sie zatrzymywac na trening od 1 godziny do 8 godzin.
     /// Wtedy automatycznie sie zatrzymuje wczesniej i trenuje").
     /// ZASADA: ustawienie N (0 = wylaczone, 1-8 h). Kazdej doby (od switu gracza) druzyna gracza - i armia, ktora gracz prowadzi (doczepieni stoja z wodzem) -
-    /// staje N godzin przed noca snu (NightRest.SleepNightStart = swit - 9, przy obozie 21-3 godzina 18:00; to ta sama granica, od ktorej cwiczen juz nie ma -
-    /// CampDrill.DayHour), wchodzi w to samo menu cwiczen co "Train the men" (arm_camp_drill_wait) i o zmierzchu snu idzie prosto do snu w menu (arm_sleep_wait,
+    /// staje N godzin przed noca snu (315b: NightRest.BedNightStart = poczatek obozu swiata, przy obozie 21-3 godzina 21:00 - dotad SleepNightStart = swit - 9,
+    /// 18:00; to ta sama granica, od ktorej cwiczen juz nie ma - CampDrill.DayHour), wchodzi w to samo menu cwiczen co "Train the men" (arm_camp_drill_wait) i o zmierzchu snu idzie prosto do snu w menu (arm_sleep_wait,
     /// powrot snu = oboz, jak "Bed down and sleep" z menu obozu).
     ///  - JEDNO zrodlo XP: godziny ida przez CampDrill.DrillTick do _dayHours / _owed - ten sam wzor musztry (Drill.Shape: D = godziny / 8 x 2.25, Przywodztwo,
     ///    zapas broni, uzbrojeni, perki), ten sam limit 8 h od switu, ta sama kara (glod, dlug snu o swicie). Zadnego wlasnego XP. Lordowie armii gracza - jak
@@ -92,7 +92,7 @@ namespace Armoury
                 if (n <= 0 || mp == null || !CampDrill.PlayerRuleOn) return;
                 if (s.NightLedgerClock && NightClock.CatchUp) return;   // tick nadrabiany w tej samej klatce - menu nie otwieramy (nastepna godzina okna)
                 int hc = CampaignTime.Now.GetHourOfDay;
-                int left = Mod24(SleepNightStart - hc);                 // pelnych godzin do nocy snu (0 = juz noc snu)
+                int left = Mod24(BedNightStart - hc);                   // pelnych godzin do nocy snu (0 = juz noc snu); 315b: poczatek obozu (21:00)
                 if (left < 1 || left > n || !CampDrill.DayHour(hc)) return;
                 long day = TbsDawnIdx();
                 if (_tbsDay == day) return;
@@ -185,7 +185,7 @@ namespace Armoury
             Msg(PartyWords.Pick("The column halts " + want + "h before nightfall to drill in camp; at nightfall the men bed down" + dawnTxt + ".",
                                 "You halt " + want + "h before nightfall to train; at nightfall you bed down" + dawnTxt + ".",
                                 "You and your companions halt " + want + "h before nightfall to train; at nightfall you bed down" + dawnTxt + "."), Colors.White);
-            Log.Info(TbsP + "start o " + hc + ":00 | ustawienie " + n + " h " + TbsSource() + ", cwiczen do nocy snu " + want + " h (noc snu od " + SleepNightStart
+            Log.Info(TbsP + "start o " + hc + ":00 | ustawienie " + n + " h " + TbsSource() + ", cwiczen do nocy snu " + want + " h (noc snu od " + BedNightStart
                      + ":00, dzis od switu juz " + F2(CampDrill.PlayerDayHours) + " h z 8) | ludzi zdolnych " + men
                      + (armyParties > 0 ? ", armia gracza: druzyn doczepionych " + armyParties + ", ludzi " + armyMen + " (cwicza z godzin postoju za dnia - Drill.RestHour)" : "")
                      + " | dlug snu " + Debt + ", odpoczynek doby " + F2(_restTonight) + " h.");
@@ -204,7 +204,7 @@ namespace Armoury
                 if (why == "pelny dzien")
                 {
                     double hd = CampaignTime.Now.CurrentHourInDay;
-                    double toNight = ((SleepNightStart - hd) % 24.0 + 24.0) % 24.0;
+                    double toNight = ((BedNightStart - hd) % 24.0 + 24.0) % 24.0;   // 315b: zmierzch musztry = poczatek obozu
                     if (toNight <= SleepNightEdgeH) why = "noc (pelny dzien " + F2((float)toNight) + " h przed noca snu)";
                 }
                 sleep = why.StartsWith("noc", StringComparison.Ordinal) && s != null && s.NightRestEnabled && !_sleeping && MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == null;
@@ -268,7 +268,7 @@ namespace Armoury
                         int n = TbsHours;
                         if (a.Text != null) a.Text.SetTextVariable("ARM_TBS", "Train before sleep: " + TbsLabel(n));
                         a.Tooltip = new TextObject("{=!}Each day on the march your party - and the army you lead - halts this many hours before nightfall ("
-                            + SleepNightStart + ":00), drills in camp like Train the men and at nightfall beds down" + TbsUntilDawn() + ". Off, or 1 to 8 hours (a day holds at most 8 hours of drill)."
+                            + BedNightStart + ":00), drills in camp like Train the men and at nightfall beds down" + TbsUntilDawn() + ". Off, or 1 to 8 hours (a day holds at most 8 hours of drill)."
                             + " Only on open land, by day and with no enemy near. "
                             + (_tbsSet >= 0 ? "Chosen here for this campaign." : "Now following the MCM setting (" + TbsLabel(TbsMcm) + ")."));
                         return true;
@@ -303,7 +303,7 @@ namespace Armoury
                             _tbsSet = (int)sel[0].Identifier;
                             int n = TbsHours;
                             Msg(n <= 0 ? "Train before sleep: off." : "Train before sleep: the column will halt " + n + "h before nightfall to drill.", Colors.White);
-                            Log.Info(TbsP + "ustawienie z menu obozu: " + before + " h (" + srcBefore + ") -> " + n + " h (" + TbsSource() + ") | noc snu od " + SleepNightStart
+                            Log.Info(TbsP + "ustawienie z menu obozu: " + before + " h (" + srcBefore + ") -> " + n + " h (" + TbsSource() + ") | noc snu od " + BedNightStart
                                      + ":00, dzis od switu " + F2(CampDrill.PlayerDayHours) + " h cwiczen.");
                             if (MenuIdNow() == "arm_camp_wait") GameMenu.SwitchToMenu("arm_camp_wait");   // napis opcji od nowa (zwykle menu)
                         }

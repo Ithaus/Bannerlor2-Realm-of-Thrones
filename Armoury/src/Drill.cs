@@ -476,8 +476,8 @@ namespace Armoury
             catch (Exception e) { TownStay.Stumble("StayHour", e); }
         }
 
-        /// <summary>m97-szkolenie: godziny postoju ZA DNIA w oknie 24 h maski (bit k = godzina od Stamp-k-1 do Stamp-k; noc snu NightRest.MenuNight
-        /// sie nie liczy - ludzie spia). Bez obserwacji - 0 (jak MovedHours = 24).</summary>
+        /// <summary>m97-szkolenie: godziny postoju ZA DNIA w oknie 24 h maski (bit k = godzina od Stamp-k-1 do Stamp-k; noc obozu CampDrill.DayHour /
+        /// NightRest.BedNight - 315b: godziny obozu swiata - sie nie liczy, ludzie spia). Bez obserwacji - 0 (jak MovedHours = 24).</summary>
         internal static int DayRestHours(MobileParty mp)
         {
             Track t;

@@ -19,8 +19,8 @@ namespace Armoury
     /// zobacz, czy mozna przerobic perki leadership, aby pasowaly".
     /// ZASADA (klucz DrillCampOnly, domyslnie TAK; wzor musztry Drill.cs bez zmian poza D, L i P):
     ///  - marsz nie uczy: D liczy tylko godziny cwiczen, godzina ruchu = 0;
-    ///  - gracz cwiczy TYLKO z menu obozu (arm_camp_wait -> "Train the men", menu oczekiwania arm_camp_drill_wait), tylko za dnia (poza noca snu
-    ///    NightRest.MenuNight - przy obozie 21-3 cwiczenia 3:00-17:59), najwyzej FullHours (8) godzin na dobe od switu do switu; godziny czekaja na
+    ///  - gracz cwiczy TYLKO z menu obozu (arm_camp_wait -> "Train the men", menu oczekiwania arm_camp_drill_wait), tylko za dnia (poza noca obozu
+    ///    NightRest.BedNight - 315b: przy obozie 21-3 cwiczenia 3:00-20:59; dotad noc snu MenuNight, 3:00-17:59), najwyzej FullHours (8) godzin na dobe od switu do switu; godziny czekaja na
     ///    najblizszy tick treningu druzyny gracza (tam liczy je Drill.Shape) - wzor jest liniowy w godzinach, wiec chwila ticku nie zmienia sumy;
     ///  - strona gracza (rod gracza, lordowie w armii gracza - Z14a) i AI przy DrillCampOnlyAi: godziny postoju za dnia z masek Drill (RestHour:
     ///    osada, oboz oblezenia, postoj), najwyzej 8 w oknie 24 h ticku;
@@ -106,8 +106,9 @@ namespace Armoury
 
         private static bool PlayerOn(Settings s) { return s != null && s.DrillCampOnly && s.DrillLaw; }
 
-        /// <summary>Godzina cwiczen: poza noca snu gracza (ta sama noc co sen w menu i karczma - NightRest.MenuNight).</summary>
-        internal static bool DayHour(int h) { return !NightRest.MenuNight(h); }
+        /// <summary>Godzina cwiczen: poza noca obozu gracza (315b: NightRest.BedNight = godziny obozu swiata, przy 21-3 noc 21:00-2:59; dotad MenuNight 18:00-2:59).
+        /// Ta sama granica dla gracza, treningu przed snem 311e i musztry AI (Drill.DayRestHours / DayDrillHours / maski TownStay).</summary>
+        internal static bool DayHour(int h) { return !NightRest.BedNight(h); }
 
         private static long DawnIdx()
         {
@@ -417,8 +418,8 @@ namespace Armoury
                          + (s.DrillCampOnly ? "TAK" : "nie") + ", Drill Law " + (s.DrillLaw ? "TAK" : "nie") + "), strona gracza (rod, armia gracza) godziny postoju za dnia "
                          + (PlayerOn(s) ? "TAK" : "NIE") + ", AI " + (RuleFor(false, false, s) ? "TAK" : "NIE") + " (Drill Camp Only Ai " + (s.DrillCampOnlyAi ? "TAK" : "nie")
                          + ", Drill Law Ai " + (s.DrillLawAi ? "TAK" : "nie") + ") | tempo: pelny dzien " + (int)FullHours + " h = x" + F2(DayFull) + " (dawny postoj x1.50 x " + F2(Boost)
-                         + "), godzina x" + F2(DayFull / FullHours) + ", dawny marsz x0.90 -> 0 | godziny cwiczen " + NightRest.PlayerDawn + ":00-" + Mod24(NightRest.SleepNightStart - 1)
-                         + ":59 (noc snu " + NightRest.SleepNightStart + ":00-" + Mod24(NightRest.PlayerDawn - 1) + ":59 - ludzie spia) | mistrz musztry " + (s.DrillMaster ? "TAK" : "nie")
+                         + "), godzina x" + F2(DayFull / FullHours) + ", dawny marsz x0.90 -> 0 | godziny cwiczen " + NightRest.PlayerDawn + ":00-" + Mod24(NightRest.BedNightStart - 1)
+                         + ":59 (noc obozu " + NightRest.BedNightStart + ":00-" + Mod24(NightRest.PlayerDawn - 1) + ":59 - ludzie spia, 315b; pelna stawka snu od " + NightRest.SleepNightStart + ":00) | mistrz musztry " + (s.DrillMaster ? "TAK" : "nie")
                          + " (polowa Przywodztwa najlepszego innego bohatera druzyny) | gracz w obozie oblezenia albo w cudzej armii - cwiczy sam w godzinach postoju za dnia "
                          + (s.DrillSiegeArmy ? "TAK" : "nie") + " (Drill Siege Army) | kara gracza w chwili cwiczen (godziny zrobione nie przepadaja) | godzina cwiczen z menu"
                          + " to nie odpoczynek w ksiedze snu | perki przerobione " + n + "/" + Rules.Length + ": " + perks
@@ -478,7 +479,7 @@ namespace Armoury
                 if (mp.MemberRoster == null || mp.MemberRoster.TotalRegulars <= 0) return "You have no men to drill.";
                 Roll();
                 if (!DayHour(CampaignTime.Now.GetHourOfDay))
-                    return "The men are asleep. The drill runs by day, from " + NightRest.PlayerDawn + ":00 to " + NightRest.SleepNightStart + ":00.";
+                    return "The men are asleep. The drill runs by day, from " + NightRest.PlayerDawn + ":00 to " + NightRest.BedNightStart + ":00.";
                 if (mp.Party != null && mp.Party.IsStarving) return "The men are too hungry to drill.";
                 if (NightRest.DawnDebtOf(mp) >= 1) return "The men met the dawn short of sleep - no drill until the next dawn.";
                 if (_dayHours >= FullHours - 0.01f) return "The men have drilled a full day (8 hours) - they can learn no more today.";
@@ -509,7 +510,7 @@ namespace Armoury
         {
             MBTextManager.SetTextVariable("ARM_DRILL_TEXT", "The men drill in camp - sword and shield, the spear wall, volleys at the butts, marching in step. Today: "
                 + F1(_dayHours) + " of " + (int)FullHours + " hours. What they learn is counted with their daily drill."
-                + (_pre ? " The column halted to drill before sleep; at nightfall (" + NightRest.SleepNightStart + ":00) the men bed down" + NightRest.TbsUntilDawn() + "." : ""));   // 311e; 315a: do switu (klucz SleepUntilDawn)
+                + (_pre ? " The column halted to drill before sleep; at nightfall (" + NightRest.BedNightStart + ":00) the men bed down" + NightRest.TbsUntilDawn() + "." : ""));   // 311e; 315a: do switu (klucz SleepUntilDawn)
         }
 
         /// <summary>311e: postoj na trening przed snem - wejscie w menu cwiczen z czystej mapy (NightRest.TbsHour z ticku godzinowego, po wszystkich warunkach).
