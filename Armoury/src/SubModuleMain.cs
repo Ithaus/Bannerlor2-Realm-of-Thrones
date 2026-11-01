@@ -341,6 +341,8 @@ namespace Armoury
                 try { DuelGuard.ApplyAll(_harmony); } catch (Exception e) { Log.Error("DuelGuard.ApplyAll", e); }
                 // 313c (01.11): wprawa w broni bialej a koszt staminy RBM (postfiksy calculateAttacker/DefenderStaminaLoss; pomiar takze przy kluczu NIE); wlasny try
                 try { WeaponEase.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WeaponEase.ApplyAll", e); }
+                // 314a (01.11): bez leczenia RBM w bitwie (transpiler StanceLogic.OnMissionTick - set_Health tylko w dol); wlasny try
+                try { RbmNoRegen.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RbmNoRegen.ApplyAll", e); }
                 BkSupplyTemper.ApplyAll(_harmony);
                 try { BkSupplyMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSupplyMarket.ApplyAll", e); }   // 3.4: zakupy zaopatrzenia BK wedlug zapasu partii, zaplata do kasy osady (PRZED ksiega towarow)
                 try { BkSeal34.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSeal34.ApplyAll", e); }               // 3.4: rynek wsi BK, sprzedaz niewolnikow, wyposazenie rycerza BKROT - bez zlota z niczego (PRZED oknami ksiegi obiegu)
@@ -392,6 +394,7 @@ namespace Armoury
                 FiefGrants.SetHarmony(_harmony);     // PROJEKT-LENNA (14.10): tylko zapamietanie - latki modelu BK / BKROT i decyzji "Owner of X" w kampanii
                 BkrotChains.SetHarmony(_harmony);    // P4 audytu (AM-13, AM-09, AM-19): tylko zapamietanie - lancuchy modeli pod BKROT wpina EnsureHooks w kampanii (BKROTPatch laduje sie po Armoury)
                 SideVillageFief.SetHarmony(_harmony);   // n20-wioska: tylko zapamietanie - latki (BK start, podpowiedz zlota) w kampanii
+                IndebtedSpan.SetHarmony(_harmony);      // 314b: kara startu BK Indebted Lord w latach gry (84 dni) - latka w kampanii
                 EstateIncome187.SetHarmony(_harmony); // 3.1/3.3 (31b) E3/2: tylko zapamietanie - latki majatkow BK w kampanii
                 Seal31B.SetHarmony(_harmony);        // 3.1/3.3 (31b) E3/4, E3/8, E3/9: tylko zapamietanie - latki gry i BK w kampanii
                 CaravanSettle.SetHarmony(_harmony);  // 259: tylko zapamietanie - latki rozliczenia karawan rodow (gra i BK) w kampanii

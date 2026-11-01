@@ -729,6 +729,8 @@ LABELS = {
     'LektorGossipLive': 'Narrator Gossip Live',
     'LektorGossipDailyChars': 'Narrator Gossip Daily Chars',
     'LektorGossipReserveChars': 'Narrator Gossip Reserve Chars',
+    'RbmBattleRegenOff': 'No Healing In Battle',   # 314a
+    'IndebtedLordVanillaYears': 'Indebted Lord Penalty In Game Years',   # 314b
     'MapMusicOurs': 'Our Map Music',   # paczka 165: nazwa z polecenia Jeffa
     # p9: "AI" wielkimi literami (regula ogolna dalaby "Ai Strength Counts Gear")
     'AiStrengthCountsGear': 'AI Strength Counts Gear',

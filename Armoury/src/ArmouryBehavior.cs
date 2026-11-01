@@ -2502,6 +2502,7 @@ namespace Armoury
             try { EstateIncome187.EnsureHooks(); } catch (Exception e) { Log.Error("EstateIncome187.EnsureHooks", e); }
             try { CanonWarBalance.EnsureHooks(); } catch (Exception e) { Log.Error("CanonWarBalance.EnsureHooks", e); }   // 274: rownowaga wojny kanonu - mysl AI (podbicia 250, weta 50), BK cel armii, odbicia metod gry (raz na proces), linia startu sesji
             try { CanonHouses277.SessionStart(); } catch (Exception e) { Log.Error("CanonHouses277.SessionStart", e); }   // 277: rody z zapisu po id, linia "Rody kanonu (277): start sesji"
+            try { IndebtedSpan.EnsureHooks(); } catch (Exception e) { Log.Error("IndebtedSpan.EnsureHooks", e); }   // 314b: kara Indebted Lord 5 x 84 dob, nie 5 lat po 364 dni
             try { SideVillageFief.EnsureHooks(); } catch (Exception e) { Log.Error("SideVillageFief.EnsureHooks", e); }   // n20-wioska: start BK "Indebted Lord" (TitleManager.GiveLordshipOnKingdomJoin) i linia podpowiedzi zlota - latki w kampanii (CLAUDE.md 7)   // 3.1/3.3 (31b) E3/2: majatki BK bez dochodu z produkcji (latki w kampanii), srednie i liczniki od zera
             try { Seal31B.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31B.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
             try { CaravanSettle.EnsureHooks(); } catch (Exception e) { Log.Error("CaravanSettle.EnsureHooks", e); }   // 259: rozliczenie karawan rodow - latki gry i BK w kampanii (raz na proces), PO Seal31B (E3/9 ProfitPre czyta Settled)

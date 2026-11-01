@@ -90454,5 +90454,65 @@ def main(argv):
     return _krwawienie313d_main_prev(argv)
 
 
+
+# ---------------------------------------------------------------- paczka 314a/314b (01.11): bez leczenia RBM w bitwie, kara Indebted Lord - grupa leczenie314a
+# Jeff 01.11: "zdrowia sie nie odzyskuje w walce ... wojsko regeneruje hp podczas bitwy" (RBMAI.StanceLogic.OnMissionTick +0.9 HP / 10 s przy staminie > 85%)
+# i "CZEMU TRACE INFLUENCE" (BK start Indebted Lord -2/dobe przez 5 lat; rok Armoury 364 dni). Armoury/src/RbmNoRegen.cs, IndebtedSpan.cs.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa leczenie314a <Armoury-*.log>
+#  L314-0  linia wpiecia 314a: latka TAK (dopasowan set_Health 1/1)
+#  L314-1  misje z proba RBM: odrzucone > 0 przy kluczu TAK (inaczej RBM nie leczyl w tej misji - INFO), potkniecia 0
+#  L314-2  linia 314b: postfiks TAK (kampania); stan gracza wypisany
+#  L314-3  zero linii ERROR w RbmNoRegen / IndebtedSpan
+def leczenie314a_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("L314-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    wired, missions, kara, errors = [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            if s.startswith("Bez leczenia w bitwie (314a): latka"):
+                wired.append(s)
+            elif s.startswith("Bez leczenia w bitwie (314a): misja"):
+                missions.append(s)
+            elif s.startswith("Kara Indebted Lord (314b):"):
+                kara.append(s)
+            elif "RbmNoRegen" in s or "IndebtedSpan" in s:
+                if "ERROR" in s:
+                    errors.append(s)
+    print(f"plik: {logp}")
+    ok0 = bool(wired) and all(" TAK (dopasowan set_Health 1/1)" in w for w in wired)
+    rep.add("L314-0: latka RBMAI.StanceLogic.OnMissionTick", wired[-1][:220] if wired else "brak linii", "TAK (dopasowan set_Health 1/1)", ok0)
+    blocked = 0
+    stum = 0
+    for m in missions:
+        mm = re.search(r"odrzucone (\d+)", m)
+        blocked += int(mm.group(1)) if mm else 0
+        ms = re.search(r"potkniecia (\d+)", m)
+        stum += int(ms.group(1)) if ms else 0
+    rep.add("L314-1: misje z proba leczenia RBM", f"misji {len(missions)}, odrzucone razem {blocked}, potkniecia {stum}",
+            "odrzucone > 0 przy misjach, potkniecia 0", (stum == 0 and (blocked > 0 or not missions)) if missions else None)
+    ok2 = bool(kara) and any("postfiks BKCampaignStartBehavior.HasDebuff TAK" in k for k in kara)
+    rep.add("L314-2: kara Indebted Lord - postfiks w kampanii", kara[-1][:260] if kara else "brak linii", "postfiks TAK", ok2 if kara else None)
+    rep.add("L314-3: bledy RbmNoRegen / IndebtedSpan", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
+_leczenie314a_main_prev = main
+
+
+def main(argv):
+    # paczka 314a: grupa leczenie314a - opakowanie main jak arakh313a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "leczenie314a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return leczenie314a_main(rest[0] if rest else None)
+    return _leczenie314a_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
