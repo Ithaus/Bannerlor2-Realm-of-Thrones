@@ -1384,6 +1384,10 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool WeaponSkillEasesStamina { get; set; } = true;
 
+        [SettingPropertyBool("No Healing In Battle", HintText = "no healing during battle: Realistic Battle Mod gives every fighter whose stamina is above 85% one hit point back every ten seconds for the whole battle; with this on a wound stays a wound until the battle is over. Healing items and story events are not affected. Off = Realistic Battle Mod heals as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool RbmBattleRegenOff { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Weapon Skill Stamina Untrained", 1.00f, 1.50f, "0.00", HintText = "with Weapon Skill Eases Stamina: what a blow or block costs a man with weapon skill 0, as a share of Realistic Battle Mod's cost (1.2 = a fifth more)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float WeaponSkillStaminaUntrained { get; set; } = 1.2f;
@@ -9476,6 +9480,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefStart { get; set; } = true;
 
+        [SettingPropertyBool("Indebted Lord Penalty In Game Years", HintText = "Banner Kings start 'Indebted Lord' costs you 2 influence a day for 5 years. Banner Kings counts those years as 84-day game years (420 days); with the longer Armoury year it would last 1820 days. On = the penalty ends 420 days after the start, as Banner Kings meant. Off = 5 full Armoury years", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool IndebtedLordVanillaYears { get; set; } = true;
+
         [SettingPropertyBool("Side Village Fief Income", HintText = "with a side village of your own: every day the lord's tax on what your side village makes (its goods at market prices, taxed at the lord's rate) is paid to you instead of the lord - out of the lord's tax on the district, or his purse when that is empty. Nothing at war with the lord's realm or while the district lies raided. Shown as a line in your daily gold tooltip and in the clan screen. Off = the lord keeps it all", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageFiefIncome { get; set; } = true;
@@ -11409,6 +11417,7 @@ namespace Armoury
             s.BreathShotFightSeconds = BreathShotFightSeconds;
             s.WindedExitBar = WindedExitBar;
             s.WeaponSkillEasesStamina = WeaponSkillEasesStamina;
+            s.RbmBattleRegenOff = RbmBattleRegenOff;
             s.WeaponSkillStaminaUntrained = WeaponSkillStaminaUntrained;
             s.WeaponSkillStaminaSavingPer100 = WeaponSkillStaminaSavingPer100;
             s.WeaponSkillStaminaFloor = WeaponSkillStaminaFloor;
@@ -13432,6 +13441,7 @@ namespace Armoury
             s.DistrictWorksAiWorldPace = DistrictWorksAiWorldPace;
             s.WorksPayMarketShare = WorksPayMarketShare;
             s.SideVillageFiefStart = SideVillageFiefStart;
+            s.IndebtedLordVanillaYears = IndebtedLordVanillaYears;
             s.SideVillageFiefIncome = SideVillageFiefIncome;
             s.SideVillageFiefMenu = SideVillageFiefMenu;
             s.SideVillageFiefLodging = SideVillageFiefLodging;

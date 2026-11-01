@@ -783,6 +783,7 @@ namespace Armoury
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRun, "PanicRun.Line", e); }
             Line313(Settings.Current);                        // 313c: linia "Bieg gracza (313c)"
             try { WeaponEase.Flush(Mission); } catch { }      // 313c: linia "Wprawa (WeaponEase)" raz na misje
+            try { RbmNoRegen.Flush(Mission); } catch { }      // 314a: linia "Bez leczenia w bitwie" raz na misje
             // 313d: linia "Krwawienie (313d)" raz na misje - kto jeszcze krwawi, potem capy kustykania zdjete
             try
             {
