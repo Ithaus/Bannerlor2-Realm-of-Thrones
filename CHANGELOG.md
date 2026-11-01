@@ -1,5 +1,71 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-01 WGRANIE 152 - noc/315a-sen-do-switu (151 + 315a sen nocny do switu); Armoury.dll 8fe156f7cd48a69acf904d64231616e8 (CrashScribe bez zmian aa32d04e); kopia 151: Armoury.dll.bak-2026-11-01-przed-wgranie152 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie152-przed
+
+**Problem:** Jeff 01.11: "czemu koncze wypoczynek o 00.00 ... wypoczynek powinien byc wtedy jak jest noc a konczyc sie jak wstaje slonce". Log Armoury-2026-11-01_19-39-31.log: codziennie "Trening przed snem (311e): koniec o 18:00 ... dalej: sen w menu", pobudka po 6 h o 0:00, potem "The column marched 4h through the night".
+**Przyczyna / Zmiana:** szczegoly we wpisie 315a ponizej (sen w menu konczyl sie po NeededHours bez wzgledu na pore; teraz sen zaczety w nocy snu - takze trening 311e konczony 17:45-17:59, wspolny prog SleepNightEdgeH - trwa do switu gracza PlayerDawn = CampEndHour; Acc lordow doczepionych do spiacego gracza zerowany o swicie). Klucz SleepUntilDawn (MCM "Sleep Until Dawn", TAK). Linie "Sen do switu (315a)", grupa sen315a.
+**Testy:** recenzja 2 wymiary, 2 potwierdzone bledy poprawione (916e5045); autotest 315a probyN 3 doby kod 0, ERROR 0, sen315a 0 NIE (snu w menu autotest nie wywoluje - INFO), Armoury.json Jeffa c7055052 nietkniety.
+**Ryzyko / co sprawdzic:** w grze Jeffa po treningu przed snem: linia "Sen do switu (315a): ... pobudka nie przed switem 3:00", pobudka o 3:00, w linii switu "marsz w godzinach obozu 0 h". Decyzje dla Jeffa: ZB-6 przy "always make camp" i odpoczynku zebranym za dnia dalej puszcza kolumne noca; noc snu musztry 18-3 a oboz swiata od 21.
+**Status:** WGRANE 152
+
+## 315a (01.11) - sen w menu do switu (Armoury) - DO SPRAWDZENIA
+
+**Problem.** Jeff 01.11: "czemu koncze wypoczynek o 00.00 przeciez to bez sensu, wypoczynek powinien byc wtedy jak jest noc a konczyc sie jak wstaje slonce".
+Log `Armoury-2026-11-01_19-39-31.log` co dobe: `Trening przed snem (311e): koniec o 18:00 ... powod: noc ... dalej: sen w menu (arm_sleep_wait)`,
+`Nocleg: pobudka - pasek 6.00 h z celu 6.00 h ... zegara 6.0 h` (pobudka o 0:00), `Nocleg: gracz - zmierzch o 0:00, kolumna w marszu, ale odpoczynek
+doby 6.0 h >= potrzeba 6.0 h - bez pytania o nocleg (ZB-6)`, o swicie `The column marched 4h through the night, but the men rested 6h today`.
+Oboz swiata 21:00-3:00 (Armoury.json Jeffa: CampStartHour 21, CampEndHour 3), noc ROT 22-2 (ROTCampaignTimeModel SunSet 22, SunRise 2).
+
+**Przyczyna.**
+- `NightRest.SleepTick` (NightRest.cs, przed zmiana linia 2607): pobudka, gdy `_menuRest >= _menuTarget` (`_menuTarget = NeededHours() - _restTonight`,
+  6 h) - pora dnia nie gra roli; tylko nocleg w karczmie czekal do switu (`TownInns.HoldAbed`). Sen od 18:00 -> 6 h nocnej stawki -> 0:00.
+- "Nightfall" treningu 311e to `SleepNightStart = PlayerDawn - (SleepNightTicks - 1)` (NightRest.cs:468, `SleepNightTicks = 10` linia 462) = 3 - 9 = 18:00,
+  a nie poczatek obozu 21:00. To ta sama granica, od ktorej cwiczen nie ma (`CampDrill.DayHour = !MenuNight`, CampDrill.cs:110; `Leave("noc")` CampDrill.cs:566):
+  noc snu ksiegi (pelna stawka) jest zakotwiczona o swicie, stalej dlugosci (m97-oboz) - przy obozie 21-3 wypada 18:00-3:00. Trening konczy sie wiec o 18:00
+  zgodnie z regula musztry; zle bylo to, ze sen po nim konczyl sie po 6 h, w srodku nocy.
+- Po pobudce o 0:00 zostaly 3 h obozu (0-3); ZB-6 (`NightPromptSkipWhenRested`) nie pytal o nocleg, bo doba miala juz 6 h odpoczynku - kolumna szla noca.
+
+**Zmiana.**
+- Klucz MCM **Sleep Until Dawn** (`SleepUntilDawn`, domyslnie TAK, grupa "A night's rest"; tools/gen_mcm.py uruchomiony). Sen w menu zaczety w nocy snu
+  (`MenuNight`: 18:00-2:59 przy obozie 21-3) poza noclegiem w karczmie (karczma ma wlasne czekanie) trwa do switu gracza `PlayerDawn` (= CampEndHour, 3:00):
+  `_dawnHoldH` ustawiane w `SleepInit` (`DawnHoldFromNow`), `SleepTick` nie budzi przed tym switem; po swicie dalej do wyspania (dlug), bezpiecznik zegara
+  bez zmian (>= 14 h, a czekanie najwyzej 9 h). Sen za dnia - jak dotad (do wyspania). Klucz wylaczony - jak dotad.
+- Swit gracza, nie SunRise gry (2:00): PlayerDawn to koniec obozu swiata, swit ksiegi snu (SettleNight), pobudka karczmy i poczatek dnia musztry;
+  pobudka o 2:00 zostawilaby godzine obozu 2-3 (marsz liczony jako nocny, NocnyMarsz).
+- Pasek snu przy czekaniu: mniejsze z paska snu i zegara do switu (jak karczma). Tekst menu snu: "... bed down and sleep until dawn (3:00)."; komunikat pobudki
+  "It is 3:00, dawn." (DayPart dawal "night"). Napisy 311e (komunikat startu, podpowiedz "Train before sleep", menu cwiczen) dopisuja "until dawn (3:00)"
+  przy kluczu. Trening nadal konczy sie o 18:00 (granica dnia musztry) i od razu idzie do snu do switu.
+- Log: `Sen do switu (315a): sen w menu od H:MM (powrot: ...) | cel snu ... | pobudka nie przed switem 3:00 (za X h zegara, ...)` albo
+  `... sen za dnia ... - do wyspania` / `nocleg w karczmie ...` / `klucz Sleep Until Dawn wylaczony`; `Sen do switu (315a): pobudka o H:MM (od H:MM, zegara X h,
+  w menu Y h z celu Z h) | powod: swit gracza / wyspani (cel snu) / bezpiecznik zegara snu / gracz (Rouse the men early) | ...`; przerwany -
+  `Sen do switu (315a): koniec snu o ... | powod: przerwany (menu '...')`. Linia 311e konca: `dalej: sen w menu (arm_sleep_wait, do switu 3:00 - ...)`.
+  Linie "Nocleg: pobudka - pasek ..." bez zmian (regex NO-10).
+- tools/sprawdz_logi.py: grupa **sen315a** (S315-0..4).
+
+**Ryzyko / co sprawdzic.**
+- Regresje (kontrola w kodzie): `_sleeping` czytaja NightMarch.SleepsWithLeader (lordowie armii gracza spia z nim - teraz do switu, jak oboz swiata),
+  ForcedMarch (sen = brak marszu), InnDrink (dluzszy pasek = szybciej trzezwy - ta sama zasada), TownInns (karczma - `inn != null`, czekanie 315a wylaczone,
+  `TownInns.PredictWake` bez zmian). ArmyRestDay i CampDrill nie czytaja stanu snu. Ksiega doby: sen przez swit obsluguje juz PlayerSleepGuard
+  (_menuDawnCut / _dawnOwed - ta sama droga co nocleg w karczmie do switu); 9 h nocy >= baza 6 h - bez dlugu odlozonego.
+- Poprawka recenzji (1): trening 311e zwykle konczy sie `Leave("pelny dzien")` o 17:45-17:59 (TbsEnd zamienia to na "noc" przy <= 0.25 h do nocy snu),
+  a sen zaczynal sie wtedy poza MenuNight(17) - bez czekania do switu, pobudka znow ok. 0:00 mimo napisu "until dawn". Teraz jedna stala
+  `NightRest.SleepNightEdgeH = 0.25` i `SleepNightNow()` (MenuNight albo <= 0.25 h do SleepNightStart) - uzywa jej TbsEnd, DawnHoldFromNow i tekst/log
+  SleepInit; sen od 17:50 czeka 9.2 h do 3:00 (bezpiecznik >= 14 h; pasek: min(pasek, zegar do switu); splata dlugu: 0.1 h dziennej stawki + 9 h >= 9 h przy dlugu 1).
+  Stawka snu w SleepTick dalej wg MenuNight (10 min przed 18:00 - stawka dzienna).
+- Poprawka recenzji (2): lordowie doczepieni do gracza spiacego w menu przez swit (SleepsWithLeader) - SettleAi zerowal Rest, ale nie Acc, i LeaveAcc
+  po pobudce wpisywal cala noc (~9 h) do nowej doby (lord bez dlugu nastepnej nocy, gracz z dlugiem - _menuDawnCut). Teraz w NightMarch.cs zaraz po SettleAi
+  o swicie: doczepiony do gracza, gracz _sleeping, PlayerSleepGuard TAK, a lord nie w swoim snie dlugu Kind 2 -> e.Acc = 0 (sen trwa, nowa doba od zera).
+- Kolejnosc o swicie: tick godzinowy 3:00 przed albo po ticku menu - obie drogi znane z karczmy ("przez swit tak/nie" w linii pobudki).
+- Sen 18-3 to 9 h nocnej stawki (dotad 6 h) - odpoczynek doby wiekszy, wplyw tylko na ForcedMarch.Dawn (szybszy zanik zmeczenia) - zgodne z zasada.
+- Bez czekania: sen zaczety za dnia (np. 16:00) dalej konczy sie po wyspaniu i moze wypasc w godzinach obozu (21-3) - wtedy jak dotad (ZB-6 / pytanie).
+- DO DECYZJI JEFFA: ZB-6 (`NightPromptSkipWhenRested`) przy trybie "always make camp" i odpoczynku zebranym za dnia (log: 21:00, 11.4 h) dalej puszcza
+  kolumne noca 21-3 - 315a tego nie zmienia (osobna zasada). Druga decyzja: noc snu ksiegi/musztry 18:00-3:00 (stala dlugosc m97) vs oboz 21:00 -
+  przesuniecie konca treningu na 21:00 wymaga zmiany CampDrill.DayHour / MenuNight dla calej ksiegi (AI tez) - nie robione.
+- Sprawdz w logu: `python -I tools/sprawdz_logi.py --grupa sen315a <Armoury-*.log>`; po treningu 311e: start snu 18:00 z "pobudka nie przed switem 3:00",
+  pobudka "o 3:00 ... powod: swit gracza", linia gracza o swicie "marsz w godzinach obozu 0 h", brak "zmierzch o 0:00 ... bez pytania".
+
+**Status.** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane).
+
 ## 2026-11-01 WGRANIE 151 - noc/314x-integracja (150 + 313b ostrzal, 313c stamina, 313d krwawienie z poprawkami 313y/313z, 314a bez leczenia RBM w bitwie, 314b kara Indebted Lord 420 dob, 314c zold krolewski i nagroda krola); Armoury.dll 0cf99a2a0c7c55e32ca1877cbaf0de8a (CrashScribe bez zmian aa32d04e); kopia 150: Armoury.dll.bak-2026-11-01-przed-wgranie151 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie151-przed
 
 **Problem:** Jeff 01.11: (1) "zdrowia sie nie odzyskuje w walce, a zauwazylem ze jakis blad jest ze sie wojsko regeneruje hp podczas bitwy"; (2) "CZEMU TRACE INFLUENCE, to jakis blad" (podpowiedz: Lawspeakers -1, Indebted Lord -2); (3) "tak zrob a i b" - zold krolewski po 40 dniach sluzby i nagroda za zwyciestwo; (4) "zawiesla sie gra w bitwie crash" - autotest 313y bitwa armii 8/9: AccessViolationException w Agent.Die z FieldCraft.BleedDeath (session-2026-11-01_18-20-11.log 18:27:45), 10 s pozniej NRE SandboxAgentStatCalculateModel.UpdateHumanStats <- RBMAI.StanceLogic.OnMissionTick (crash-original-2026-11-01_18-27-55.log), CTD.
