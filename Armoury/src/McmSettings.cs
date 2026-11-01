@@ -4500,6 +4500,42 @@ namespace Armoury
         [SettingPropertyGroup("The soldier's pay")]
         public bool CrownWageRefundGarrisons { get; set; } = true;
 
+        [SettingPropertyBool("Royal War Wage Enabled", HintText = "royal war wages: a house whose men serve in an army of its own kingdom at war serves the first Royal War Wage Free Days of the year without pay; after that the crown pays its head every day a share of the wages of every soldier in those parties - out of the day's crown income and then the treasury above its war reserve, only while there is gold in it (shared out pro rata when it runs short). Wages the crown paid this way are not repaid a second time by the war wage refund. No pay to mercenaries or to the king's own house; AI lords and you alike", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool RoyalWarWageEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Royal War Wage Free Days", 0, 364, "0", HintText = "days of army service each year a house owes the crown for free before the royal war wages start (counted per house, every day any of its parties is in an army of its kingdom at war; a new year starts the count again)", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public int RoyalWarWageFreeDays { get; set; } = 40;
+
+        [SettingPropertyFloatingInteger("Royal War Wage Percent", 0.00f, 100.00f, "0", HintText = "share of each soldier's daily wage the crown pays a serving house after its free days (0-100)", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public float RoyalWarWagePercent { get; set; } = 50f;
+
+        [SettingPropertyBool("Royal Victory Reward Enabled", HintText = "the king's reward for a great victory: beating a lord's party or an army of a kingdom you are at war with earns the houses of your kingdom that fought a gift from the treasury (by their share in the battle) and influence; bandits and looters earn nothing. The gift is paid at the next crown settlement and only while the treasury has gold above its war reserve; the king's own house and mercenaries get no gift. AI lords and you alike", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool RoyalVictoryRewardEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Royal Victory Gold Per Enemy", 0.00f, 40.00f, "0.00", HintText = "gold of the king's reward for every healthy man the beaten enemy lords had at the start of the battle", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public float RoyalVictoryGoldPerEnemy { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Royal Victory Army Multiplier", 1.00f, 4.00f, "0.00", HintText = "the reward (gold and influence) is this much larger when two or more enemy lords' parties - an army - were beaten together", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public float RoyalVictoryArmyMultiplier { get; set; } = 1.5f;
+
+        [SettingPropertyInteger("Royal Victory Gold Cap", 0, 100000, "0", HintText = "most gold the king gives for one battle (before it is shared among the kingdoms on the winning side)", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public int RoyalVictoryGoldCap { get; set; } = 25000;
+
+        [SettingPropertyFloatingInteger("Royal Victory Influence Per Lord", 0.00f, 20.00f, "0.00", HintText = "influence of the king's reward for every enemy lord's party beaten, shared among the houses by their part in the battle", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public float RoyalVictoryInfluencePerLord { get; set; } = 5f;
+
+        [SettingPropertyInteger("Royal Victory Wait Days", 1, 120, "0", HintText = "how many days a gift waits for gold in the treasury before what is still unpaid is forfeit", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public int RoyalVictoryWaitDays { get; set; } = 30;
+
         [SettingPropertyBool("Town Wage Shield", HintText = "wages spent in a town (garrison pay, the men's spending on leaving) are kept out of reach of the game's daily town-purse regulator, which otherwise deletes a quarter of everything above its target each day: they stay until the lord's rents and the war subsidy draw them out, and what is still there after about two weeks the regulator may take; castles unchanged. Mind the side effect: with it a garrison in one's own town costs its lord next to nothing, for the pay comes back to him in rents. Not needed and idle with Town Purse Regulator on - nothing deletes town coin any more", RequireRestart = false)]
         [SettingPropertyGroup("The soldier's pay")]
         public bool TownWageShield { get; set; } = true;
@@ -12188,6 +12224,15 @@ namespace Armoury
             s.CrownWageRefundPercent = CrownWageRefundPercent;
             s.CrownRefundByNeed = CrownRefundByNeed;
             s.CrownWageRefundGarrisons = CrownWageRefundGarrisons;
+            s.RoyalWarWageEnabled = RoyalWarWageEnabled;
+            s.RoyalWarWageFreeDays = RoyalWarWageFreeDays;
+            s.RoyalWarWagePercent = RoyalWarWagePercent;
+            s.RoyalVictoryRewardEnabled = RoyalVictoryRewardEnabled;
+            s.RoyalVictoryGoldPerEnemy = RoyalVictoryGoldPerEnemy;
+            s.RoyalVictoryArmyMultiplier = RoyalVictoryArmyMultiplier;
+            s.RoyalVictoryGoldCap = RoyalVictoryGoldCap;
+            s.RoyalVictoryInfluencePerLord = RoyalVictoryInfluencePerLord;
+            s.RoyalVictoryWaitDays = RoyalVictoryWaitDays;
             s.TownWageShield = TownWageShield;
             s.CastlePurseEnabled = CastlePurseEnabled;
             s.CastlePurseFloorGold = CastlePurseFloorGold;

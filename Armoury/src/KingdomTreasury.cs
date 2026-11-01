@@ -290,6 +290,8 @@ namespace Armoury
                     // 277 (recenzja): zold oplacony wczorajsza gotowka pana lennego rodom panow 277 (CanonHouses277.Pay) tez nie jest podstawa zwrotu - korona nie zwraca
                     // zoldu, ktory juz oplacil Lannister / Joffrey (jak W5 i W7; bez wczorajszej gotowki 277 - 0)
                     { long cut277 = CanonHouses277.RefundCut(c, v); if (cut277 > 0) { v -= (int)cut277; if (v <= 0) continue; } }
+                    // 314c: zold oplacony wczoraj zoldem krolewskim (CrownWar314 - po 40 dniach sluzby w armii) tez nie jest podstawa zwrotu - jeden zloty korona oddaje raz
+                    { long cut314 = CrownWar314.RefundCut(c, v); if (cut314 > 0) { v -= (int)cut314; if (v <= 0) continue; } }
                     long own;
                     // E5/A1 (E5K1-08b): przy czynnym zaworze kas miast do pana wraca tylko jego udzial (TownPurse.LordShare: TownRentLordShare, z wyrownaniem
                     // E5/B3 TownRentLordShareWithFolk) - tyle tniemy; korona swojej czesci nie oddaje drugi raz

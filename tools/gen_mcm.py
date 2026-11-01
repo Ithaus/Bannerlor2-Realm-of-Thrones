@@ -4,6 +4,11 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 314c: zold krolewski i nagroda krola - kod przycina dni do 0..364, procent do 0..100, czekanie do 1..120 (CrownWar314)
+    'RoyalWarWageFreeDays': (0, 364, "0"),
+    'RoyalWarWagePercent': (0, 100, "0"),
+    'RoyalVictoryArmyMultiplier': (1.0, 4.0, "0.00"),
+    'RoyalVictoryWaitDays': (1, 120, "0"),
     # 313d: krwawienie z rany, rzuty odwrotu i bolu, kustykanie - kod przycina do tych zakresow (FieldCraft.Bleed313 / BrokenMen / WoundedLimp)
     'BleedChanceDeepWound': (0.0, 1.0, "0.00"),
     'BleedMinWoundShare': (0.0, 0.5, "0.00"),
