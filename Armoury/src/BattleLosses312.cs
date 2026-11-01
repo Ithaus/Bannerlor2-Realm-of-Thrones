@@ -36,7 +36,11 @@ namespace Armoury
     ///  3. MapEventEnded: koniec OutlawLaw.OnMapEventEnded (po RoutedReturn307e - tylko zwyciezcy, DoomedPartyMen.Before i podziale rozbitych RoutedH3Body):
     ///     A17 (DoomedPartyMen) - jency z partii kasowanych (NoteDoomed) i znacznik "gra skasuje" (DoomedNow); rozbici przegranych wedlug RoutedH3Body
     ///     (NoteRouted na partie: pod choragiew N7 / do domu / do lasu / do karczmy / w nicosc / Inni); zabici i zbiegli koncowi (po H3 i A17), zostali
-    ///     w skladzie, los wodza (niewola / u gracza / zginal / zbiegl / wolny), zwyciezcy zabici / nieprzytomni.
+    ///     w skladzie, los wodza (niewola - takze u gracza: PlayerEncounter.DoCaptureHeroes wyjmuje bohaterow z rostera lupu, a
+    ///     OnPlayerLootMembersAndPrisonerEnd czysci go PRZED FinalizeEvent - PlayerEncounter.cs:1611/1723/1910; zginal / zbiegl / wolny), zwyciezcy zabici / nieprzytomni.
+    ///  2b. EKRAN LUPU GRACZA (recenzja 312f): PrisonerLaw.LootEndPrefix (prefiks OnPlayerLootMembersAndPrisonerEnd, wpiety zawsze) wola NoteLootEnd PRZED
+    ///     MapEventEnded (stany LootParty -> LootInventory -> End; DoEnd -> Finish -> FinalizeEvent, PlayerEncounter.cs:1142-1151/1697/1715-1745/1910).
+    ///     Szeregowi w lewej liscie jencow = zostawieni (w tym wypuszczeni tam jency gracza), wzieci = jency u gracza - zostawieni (od dolu 0).
     /// Kontrola: wystawieni + ranni sprzed bitwy - zabici - zbiegli - jency (gracz + AI + A17) - bez odbiorcy - zostali w skladzie = 0 (H3 i A17 tylko
     /// przesuwaja ludzi). Rozjazd != 0 = ktos poza tymi drogami zmienil sklad pobitych (do sprawdzenia w kodzie).
     /// Koszt: migawka tylko bitew gracza i AI od 100 na strone (filtr z HealthyManCountAtStart, bez petli po skladzie); reszta - slownik slaby (bitwa bez
@@ -57,9 +61,11 @@ namespace Armoury
             // po walce (przed H3)
             public int Died0, Wnd0, Routed0, Healthy0, WoundedBefore, WinMen;
             // okno pojmania
-            public bool CapSeen; public string H3 = "-";
+            public bool CapSeen, CapRetreat; public string H3 = "-";
             public int CapStart, CapEnd, PlG, PlGW, AiG, AiGW, Cap;
             public List<Recv> Rx;
+            // ekran lupu gracza (PrisonerLaw.LootEndPrefix)
+            public bool LootSeen; public int LootLeft;
             // MapEventEnded
             public int DoomCapt, DoomCaptW;
             public int RRouted, RRally, RHome, RWoods, RTavern, RVanished, RUndead, RParties;
@@ -132,7 +138,8 @@ namespace Armoury
                 bool player = me.IsPlayerMapEvent;
                 if (!player && (StartOf(lose) < MinSide || StartOf(win) < MinSide)) return;
                 var r = new Rec { Id = ++_seq, Day = (int)CampaignTime.Now.ToDays, LoseSide = me.DefeatedSide };
-                r.Mode = !player ? "AI" : LosersFlee.PlayerAuto(me) ? "symulacja" : "misja";
+                // bitwa mieszana (walka w polu, potem "wyslij wojsko") = misja - jak H3 (LosersFlee.FieldFought)
+                r.Mode = !player ? "AI" : LosersFlee.FieldFought(me) ? "misja" : LosersFlee.PlayerAuto(me) ? "symulacja" : "misja";
                 try { r.Type = me.EventType.ToString(); } catch { r.Type = "?"; }
                 try { r.Where = me.MapEventSettlement != null && me.MapEventSettlement.Name != null ? me.MapEventSettlement.Name.ToString() : "-"; } catch { r.Where = "-"; }
                 try
@@ -180,6 +187,7 @@ namespace Armoury
                 Rec r;
                 if (me == null || !_recs.TryGetValue(me, out r) || r.CapSeen) return;
                 r.CapSeen = true;
+                r.CapRetreat = me.RetreatingSide != BattleSideEnum.None;   // gra wychodzi wtedy od razu (MapEvent.cs:1957) - nikogo nie pojmano
                 try { r.H3 = LosersFlee.A17NoteOf(me); } catch { r.H3 = "?"; }
                 int start = 0;
                 foreach (var mep in r.Lose) { try { start += RegsOf(mep.Party.MemberRoster); } catch (Exception e) { Stumble("CaptureOpen(sklad)", e); } }
@@ -251,6 +259,22 @@ namespace Armoury
             catch (Exception e) { Stumble("CaptureClose", e); }
         }
 
+        // ------------------------------------------------------------ 2b. ekran lupu gracza (PrisonerLaw.LootEndPrefix - przed Clear i przed MapEventEnded)
+        /// <summary>Lewa lista jencow przy zamknieciu ekranu Aftermath: szeregowi = zostawieni przez gracza. Tylko odczyt, nie rzuca.</summary>
+        internal static void NoteLootEnd(TroopRoster leftPrison)
+        {
+            try
+            {
+                if (!On) return;
+                var me = PlayerEncounter.Battle;
+                Rec r;
+                if (me == null || !_recs.TryGetValue(me, out r)) return;
+                r.LootSeen = true;
+                r.LootLeft += RegsOf(leftPrison);
+            }
+            catch (Exception e) { Stumble("NoteLootEnd", e); }
+        }
+
         // ------------------------------------------------------------ 3. MapEventEnded (OutlawLaw.OnMapEventEnded)
         /// <summary>DoomedPartyMen.One: jency z partii pobitej strony, ktora gra skasuje (A17) - przy MapEventEnded, po oknie pojmania.</summary>
         internal static void NoteDoomed(MapEvent me, int capt, int captWounded)
@@ -284,9 +308,7 @@ namespace Armoury
             if (h == null) return "brak wodza";
             try
             {
-                if (h.IsPrisoner) return "niewola";
-                var pr = PlayerRoster();
-                if (pr != null && h.CharacterObject != null && pr.FindIndexOfTroop(h.CharacterObject) >= 0) return "niewola u gracza";
+                if (h.IsPrisoner) return "niewola";              // takze u gracza (roster lupu jest juz pusty - opis klasy pkt 3)
                 if (h.IsDead || h.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInBattle) return "zginal";
                 if (h.HeroState == Hero.CharacterStates.Fugitive) return "zbiegl";
                 return "wolny";
@@ -325,6 +347,8 @@ namespace Armoury
                 int noRecv = r.CapSeen ? Math.Max(0, r.CapStart - r.CapEnd - r.Cap) : 0;
                 int capt = r.Cap + r.DoomCapt;
                 int ctl = fought + r.WoundedBefore - died - routed - capt - noRecv - left;
+                int all = fought + r.WoundedBefore;                      // mianownik "wyniku" - wszyscy szeregowi pobitych (jak checker S312F-4)
+                int lootTaken = Math.Max(0, r.PlG - r.LootLeft);
                 var sb = new StringBuilder(900);
                 sb.Append("Straty bitwy (312f): bitwa ").Append(r.Id).Append(" dzien ").Append(r.Day).Append(" [").Append(r.Mode).Append("] typ ").Append(r.Type)
                   .Append(" pod ").Append(r.Where)
@@ -334,11 +358,13 @@ namespace Armoury
                   .Append(" | po walce (przed H3): zabici ").Append(r.Died0).Append(" (").Append(Pct(r.Died0, fought)).Append(") / nieprzytomni ").Append(r.Wnd0)
                   .Append(" (").Append(Pct(r.Wnd0, fought)).Append(") / zbiegli z pola ").Append(r.Routed0).Append(" (").Append(Pct(r.Routed0, fought))
                   .Append(") / zdrowi na polu ").Append(r.Healthy0).Append(" (").Append(Pct(r.Healthy0, fought)).Append(')')
-                  .Append(" | pojmanie ").Append(r.CapSeen ? "TAK" : "NIE").Append(": u gracza ").Append(r.PlG).Append(" (ranni ").Append(r.PlGW).Append(", zdrowi ").Append(r.PlG - r.PlGW)
+                  .Append(" | pojmanie ").Append(!r.CapSeen ? "NIE" : r.CapRetreat ? "NIE (odwrot)" : "TAK").Append(": u gracza ").Append(r.PlG).Append(" (ranni ").Append(r.PlGW).Append(", zdrowi ").Append(r.PlG - r.PlGW)
                   .Append("), u AI ").Append(r.AiG).Append(" (ranni ").Append(r.AiGW).Append(", zdrowi ").Append(r.AiG - r.AiGW).Append("), A17 ").Append(r.DoomCapt)
                   .Append(" (ranni ").Append(r.DoomCaptW).Append("), bez odbiorcy ").Append(noRecv)
-                  .Append(" | wynik: zabici ").Append(died).Append(" (").Append(Pct(died, fought)).Append(") / jency ").Append(capt).Append(" (").Append(Pct(capt, fought))
-                  .Append(") / zbiegli ").Append(routed).Append(" (").Append(Pct(routed, fought)).Append(") / bez odbiorcy ").Append(noRecv).Append(" / zostali w skladzie ").Append(left)
+                  .Append(" | ekran lupu ").Append(r.Mode == "AI" ? "-" : r.LootSeen ? "TAK" : "NIE").Append(": gracz wzial ").Append(r.LootSeen ? lootTaken : 0)
+                  .Append(", zostawil ").Append(r.LootLeft)
+                  .Append(" | wynik (z wystawionych i rannych sprzed bitwy): zabici ").Append(died).Append(" (").Append(Pct(died, all)).Append(") / jency ").Append(capt).Append(" (").Append(Pct(capt, all))
+                  .Append(") / zbiegli ").Append(routed).Append(" (").Append(Pct(routed, all)).Append(") / bez odbiorcy ").Append(noRecv).Append(" / zostali w skladzie ").Append(left)
                   .Append(" | zbiegli wedlug H3 (").Append(r.RParties).Append(" partii): rozbici ").Append(r.RRouted).Append(", pod choragiew ").Append(r.RRally).Append(", do domu ")
                   .Append(r.RHome).Append(", do lasu ").Append(r.RWoods).Append(", do karczmy ").Append(r.RTavern).Append(", w nicosc ").Append(r.RVanished).Append(", Inni ").Append(r.RUndead)
                   .Append(" | wodz: ").Append(Fate(r))

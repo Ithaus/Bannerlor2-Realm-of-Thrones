@@ -86452,7 +86452,8 @@ def main(argv):
 # upadkow); B309-3 'poscig (148)' segment '309 poscig': format, wejscia i przydzialy (INFO, cel przydzialy > 0 w bitwach armii; 144a: 0); B309-4 'straty 309': przegrani
 # padli (zabici + nieprzytomni) i zwyciezca poza walka - INFO bez celu historycznego (312f: napis "(cel 15-40%)" w HorsePursuit.cs:1206 to pomylka definicji - cel
 # 15-40% dotyczy ZABITYCH; napisu nie zmieniamy, bo B309_ST go wymaga); B309-4b segment 'straty (z wystawionych)' (HorsePursuit.cs:1177): przegrani ZABICI
-# - wlasciwa kontrola celu historycznego 15-40% (do 60-65% przy poscigu konnicy) w bitwach od 100 przegranych, mniejsze INFO; B309-5 'Koszt klatki Armoury (309)': format, potkniecia pomiaru 0, suma naszych na klatke (INFO: p99,
+# - wlasciwa kontrola celu historycznego w bitwach od 100 przegranych: TAK 15-40%, INFO 40-65% (poscig konnicy - do sprawdzenia), NIE poza 15-65%,
+# mniejsze INFO; "przegrani" to tu strona z najwiekszym udzialem strat (HorsePursuit.cs:1156-1163), nie DefeatedSide bitwy; B309-5 'Koszt klatki Armoury (309)': format, potkniecia pomiaru 0, suma naszych na klatke (INFO: p99,
 # najwiecej, klatki ponad 5 ms, najdrozsze moduly); B309-6 zamach FieldCraft: zapisy / pominiete (INFO, przy kluczu TAK pominiete > 0 w bitwie z rannymi).
 B309_CH = re.compile(r"\| wczesne zalamanie \(309\) (TAK|NIE): rzutow przy 1/6 (\d+) \(sr\. szansa (\S+), zalaman (\d+)\), rozbite bez rzutu (\d+), poza szeregiem przy "
                      r"rzutach: panika (\d+), ranni w odwrocie (\d+), rzutow udzialu bez rzutu \(klucz NIE\) (\d+) \| rzuty zdarzen wedlug strat \(309\) (TAK|NIE): rzutow (\d+) "
@@ -86519,7 +86520,7 @@ def b309_rows(rep, ch, ps, fc):
     rep.add("B309-2: rzuty zdarzen (sztandar, dowodca) wedlug strat bez bramki morale", f"rzutow {ev}, zalaman {evb}", "INFO (144a: 0 zalaman z 11-12 upadkow; zwyciezcy rzadko)", None)
     # B309-3 / B309-4
     bad3, n3, ent, asg, loss = [], 0, 0, 0, []
-    k4, k4big, k4bad = [], 0, []      # 312f B309-4b: przegrani zabici (segment 'straty (z wystawionych)')
+    k4, k4big, k4bad, k4mid = [], 0, [], []      # 312f B309-4b: przegrani zabici (segment 'straty (z wystawionych)')
     for l in ps:
         kl = B309_KL.search(l)
         if kl:
@@ -86532,6 +86533,8 @@ def b309_rows(rep, ch, ps, fc):
                 k4big += 1
                 if pk < 15.0 or pk > 65.0:
                     k4bad.append(f"{kl.group(1)} {kl.group(2)} z {nl}")
+                elif pk > 40.0:
+                    k4mid.append(f"{kl.group(1)} {kl.group(2)} z {nl}")
         m = B309_PS.search(l)
         if not m:
             bad3.append("format: " + l[:120]); continue
@@ -86550,9 +86553,11 @@ def b309_rows(rep, ch, ps, fc):
     rep.add("B309-4: straty stron (padli = zabici + nieprzytomni / poza walka)", "; ".join(loss[:9]) or "-",
             "INFO, bez celu historycznego (napis '(cel 15-40%)' w linii to pomylka definicji - cel dotyczy zabitych, B309-4b; 144a b9: 82% / 42% poza walka)", None)
     rep.add("B309-4b: przegrani ZABICI (segment 'straty (z wystawionych)', cel historyczny)",
-            f"bitew {len(k4)}, od 100 przegranych {k4big}, poza 15-65% {len(k4bad)}" + (f" ({'; '.join(k4bad[:4])})" if k4bad else "") + (" | " + "; ".join(k4[:9]) if k4 else ""),
-            "przegrani zabici 15-40% (do 60-65% przy poscigu konnicy) w bitwach od 100 przegranych; mniejsze INFO (brak takich bitew - INFO)",
-            None if k4big == 0 else not k4bad)
+            f"bitew {len(k4)}, od 100 przegranych {k4big}, poza 15-65% {len(k4bad)}" + (f" ({'; '.join(k4bad[:4])})" if k4bad else "")
+            + f", 40-65% {len(k4mid)}" + (f" ({'; '.join(k4mid[:4])})" if k4mid else "") + (" | " + "; ".join(k4[:9]) if k4 else ""),
+            "TAK: przegrani (strona o najwiekszym udziale strat) zabici 15-40% w bitwach od 100 przegranych; 40-65% - INFO (poscig konnicy, sprawdzic); "
+            "poza 15-65% - NIE; mniejsze bitwy INFO (brak takich bitew - INFO)",
+            None if k4big == 0 or (k4mid and not k4bad) else not k4bad)
     # B309-5 / B309-6
     bad5, n5, stum, worst, over5, frames, tops, sw, ss, srw = [], 0, 0, 0.0, 0, 0, [], 0, 0, 0
     for l in fc:
@@ -86591,7 +86596,8 @@ def bitwa309_selftest():
     # 312f B309-4b: probka z segmentem 'straty (z wystawionych)' (jak HorsePursuit.cs:1164-1178) - w oknie TAK, poza oknem NIE, mala bitwa INFO
     seg = ("| straty (z wystawionych): atakujacy zabici 12 / nieprzytomni 6 / uszli 0 / na polu 182 z 200 (zabici 6.0%); obroncy zabici 61 / nieprzytomni 116 / uszli 25 "
            "/ na polu 38 z 240 (zabici 25.4%); przegrani (obroncy) zabici 25.4% - cel historyczny 15-40%, do 60-65% przy poscigu konnicy na pieszych; zwyciezca 6.0% - cel 1-5% |")
-    for txt, want in ((seg, "TAK"), (seg.replace("zabici 25.4% - cel", "zabici 72.0% - cel"), "NIE"), (seg.replace(" z 240 (", " z 44 ("), "INFO")):
+    for txt, want in ((seg, "TAK"), (seg.replace("zabici 25.4% - cel", "zabici 72.0% - cel"), "NIE"), (seg.replace(" z 240 (", " z 44 ("), "INFO"),
+                      (seg.replace("zabici 25.4% - cel", "zabici 55.0% - cel"), "INFO")):
         rep = Report()
         b309_rows(rep, [B309_SAMPLE_CH], [B309_SAMPLE_PS.replace("| ... |", txt)], [B309_SAMPLE_FC])
         v = {r[0].split(":")[0]: r[3] for r in rep.rows}
@@ -88014,33 +88020,39 @@ def main(argv):
 
 # ---------------------------------------------------------------- paczka 312f (01.11): straty przegranych - zabici / nieprzytomni / jency / zbiegli - grupa straty312f
 # Linia C# "Straty bitwy (312f)" (Armoury/src/BattleLosses312.cs, OnEnded): jedna na bitwe z wynikiem - gracza (misja / symulacja) i AI-AI od 100 na strone.
-# S312F-S self-test wyrazen i wierszy; S312F-0 linie czytelne (format); S312F-1 obecnosc linii (gracz / AI; brak - NIEPOKRYTY, INFO); S312F-2 kontrola bilansu
+# S312F-S self-test wyrazen i wierszy; S312F-0 linie czytelne (format); S312F-1 obecnosc linii (gracz / AI; recenzja: NIE, gdy w logu sa bitwy w polu gracza
+# "Bitwa (NB2): misja bitwa (pole bitwy TAK" a linii [misja] 0 - DLL bez 312f / nie wpieta migawka / wyjatek przed zapisem; brak obu - INFO); S312F-2 kontrola bilansu
 # (wystawieni + ranni sprzed bitwy - zabici - zbiegli - jency - bez odbiorcy - zostali = 0) - liczba rozjazdow; S312F-2b spojnosc pol (wystawieni = suma czterech
-# pol po walce; jency = gracz + AI + A17; ranni <= jency; podzial H3: rozbici = choragiew + dom + las + karczma + nicosc + Inni, rozbici <= zbiegli); S312F-3
-# potkniecia 0; S312F-4 / S312F-4b INFO rozklad przegranych (zabici / nieprzytomni po walce / jency / zbiegli / bez odbiorcy / zostali w skladzie, % wystawionych)
+# pol po walce i "bez odbiorcy" w dwoch miejscach - KONTROLA FORMATU: C# liczy je z tych samych zmiennych, na prawdziwym logu NIE tylko przy zmianie napisu;
+# merytoryczne: jency = gracz + AI + A17; ranni <= jency; podzial H3: rozbici = choragiew + dom + las + karczma + nicosc + Inni, rozbici <= zbiegli; ekran lupu
+# '-' tylko w AI-AI, wzial + zostawil >= jency u gracza); S312F-3
+# potkniecia 0; S312F-4 / S312F-4b INFO rozklad przegranych (zabici / jency / zbiegli / bez odbiorcy / zostali w skladzie - te sumuja sie do 100%; mianownik
+# wystawieni + ranni sprzed bitwy, ten sam co "wynik" w linii C#; osobno nieprzytomni po walce - pole przed pojmaniem, zawieraja sie w jencach i zbieglych H3)
 # osobno bitwy gracza i AI-AI (historia: zabici 10-30%, jency kilka-kilkanascie %, zbiegli wiekszosc); S312F-5 INFO kto bral jencow (gracz / AI / A17,
-# ranni / zdrowi), partie skasowane, los wodzow, zwyciezcy zabici. Uzycie: --grupa straty312f <Armoury-*.log>. Strumieniowo, tylko odczyt.
+# ranni / zdrowi; ekran lupu gracza - wzial / zostawil), partie skasowane, los wodzow, zwyciezcy zabici. Uzycie: --grupa straty312f <Armoury-*.log>.
+# Strumieniowo, tylko odczyt.
 S312F_RX = re.compile(
     r"Straty bitwy \(312f\): bitwa (?P<id>\d+) dzien (?P<day>\d+) \[(?P<mode>misja|symulacja|AI)\] typ (?P<typ>\S+) pod (?P<pod>.*?) \| przegrani (?P<side>atakujacy|obroncy) "
     r"\((?P<lname>.*?), wodz (?P<lead>.*?), partii (?P<np>\d+), skasowanych (?P<doom>\d+)\): wystawieni (?P<w>\d+), ranni sprzed bitwy (?P<rb>\d+) "
     r"\| po walce \(przed H3\): zabici (?P<d0>\d+) \(\S+\) / nieprzytomni (?P<n0>\d+) \(\S+\) / zbiegli z pola (?P<r0>\d+) \(\S+\) / zdrowi na polu (?P<h0>\d+) \(\S+\) "
-    r"\| pojmanie (?P<cap>TAK|NIE): u gracza (?P<pg>\d+) \(ranni (?P<pgw>\d+), zdrowi (?P<pgh>-?\d+)\), u AI (?P<ag>\d+) \(ranni (?P<agw>\d+), zdrowi (?P<agh>-?\d+)\), "
+    r"\| pojmanie (?P<cap>TAK|NIE \(odwrot\)|NIE): u gracza (?P<pg>\d+) \(ranni (?P<pgw>\d+), zdrowi (?P<pgh>-?\d+)\), u AI (?P<ag>\d+) \(ranni (?P<agw>\d+), zdrowi (?P<agh>-?\d+)\), "
     r"A17 (?P<dg>\d+) \(ranni (?P<dgw>\d+)\), bez odbiorcy (?P<nr0>\d+) "
-    r"\| wynik: zabici (?P<d>\d+) \(\S+\) / jency (?P<j>\d+) \(\S+\) / zbiegli (?P<f>\d+) \(\S+\) / bez odbiorcy (?P<nr>\d+) / zostali w skladzie (?P<z>\d+) "
+    r"\| ekran lupu (?P<loot>TAK|NIE|-): gracz wzial (?P<lw>\d+), zostawil (?P<lz>\d+) "
+    r"\| wynik \(z wystawionych i rannych sprzed bitwy\): zabici (?P<d>\d+) \(\S+\) / jency (?P<j>\d+) \(\S+\) / zbiegli (?P<f>\d+) \(\S+\) / bez odbiorcy (?P<nr>\d+) / zostali w skladzie (?P<z>\d+) "
     r"\| zbiegli wedlug H3 \((?P<hp>\d+) partii\): rozbici (?P<hr>\d+), pod choragiew (?P<hc>\d+), do domu (?P<hd>\d+), do lasu (?P<hl>-?\d+), do karczmy (?P<hk>\d+), "
     r"w nicosc (?P<hn>\d+), Inni (?P<hi>\d+) \| wodz: (?P<fate>.*?) \| zwyciezcy \(wystawieni (?P<ww>\d+)\): zabici (?P<wd>\d+) \(\S+\) / nieprzytomni (?P<wn>\d+) \(\S+\) "
     r"\| H3: (?P<h3>.*?) \| kontrola: wystawieni \+ ranni sprzed bitwy - zabici - zbiegli - jency - bez odbiorcy - zostali = (?P<ctl>-?\d+) \| potkniecia (?P<st>\d+)\.")
-S312F_TXT = ("mode", "typ", "pod", "side", "lname", "lead", "cap", "fate", "h3")
+S312F_TXT = ("mode", "typ", "pod", "side", "lname", "lead", "cap", "fate", "h3", "loot")
 S312F_SAMPLE = ("[01:06:54] Straty bitwy (312f): bitwa 4 dzien 108879 [misja] typ FieldBattle pod - | przegrani obroncy (Joffrey Baratheon's Party, wodz Joffrey Baratheon, "
                 "partii 1, skasowanych 1): wystawieni 240, ranni sprzed bitwy 0 | po walce (przed H3): zabici 61 (25.4%) / nieprzytomni 116 (48.3%) / zbiegli z pola 25 (10.4%) "
-                "/ zdrowi na polu 38 (15.8%) | pojmanie TAK: u gracza 150 (ranni 112, zdrowi 38), u AI 0 (ranni 0, zdrowi 0), A17 0 (ranni 0), bez odbiorcy 4 | wynik: zabici 61 "
-                "(25.4%) / jency 150 (62.5%) / zbiegli 25 (10.4%) / bez odbiorcy 4 / zostali w skladzie 0 | zbiegli wedlug H3 (1 partii): rozbici 25, pod choragiew 14, do domu 6, "
+                "/ zdrowi na polu 38 (15.8%) | pojmanie TAK: u gracza 150 (ranni 112, zdrowi 38), u AI 0 (ranni 0, zdrowi 0), A17 0 (ranni 0), bez odbiorcy 4 | ekran lupu TAK: gracz "
+                "wzial 140, zostawil 10 | wynik (z wystawionych i rannych sprzed bitwy): zabici 61 (25.4%) / jency 150 (62.5%) / zbiegli 25 (10.4%) / bez odbiorcy 4 / zostali w skladzie 0 | zbiegli wedlug H3 (1 partii): rozbici 25, pod choragiew 14, do domu 6, "
                 "do lasu 3, do karczmy 2, w nicosc 0, Inni 0 | wodz: zbiegl | zwyciezcy (wystawieni 200): zabici 10 (5.0%) / nieprzytomni 2 (1.0%) | H3: pominal (gracz - walka "
                 "w polu) | kontrola: wystawieni + ranni sprzed bitwy - zabici - zbiegli - jency - bez odbiorcy - zostali = 0 | potkniecia 0.")
 S312F_SAMPLE_AI = ("Straty bitwy (312f): bitwa 5 dzien 108880 [AI] typ FieldBattle pod Riverrun | przegrani atakujacy (Lefford (armia), wodz Leo Lefford, partii 3, skasowanych 2): "
                    "wystawieni 300, ranni sprzed bitwy 10 | po walce (przed H3): zabici 120 (40.0%) / nieprzytomni 100 (33.3%) / zbiegli z pola 30 (10.0%) / zdrowi na polu 50 "
-                   "(16.7%) | pojmanie TAK: u gracza 0 (ranni 0, zdrowi 0), u AI 20 (ranni 15, zdrowi 5), A17 2 (ranni 1), bez odbiorcy 0 | wynik: zabici 70 (23.3%) / jency 22 "
-                   "(7.3%) / zbiegli 218 (72.7%) / bez odbiorcy 0 / zostali w skladzie 0 | zbiegli wedlug H3 (3 partii): rozbici 218, pod choragiew 100, do domu 80, do lasu 30, "
+                   "(16.7%) | pojmanie TAK: u gracza 0 (ranni 0, zdrowi 0), u AI 20 (ranni 15, zdrowi 5), A17 2 (ranni 1), bez odbiorcy 0 | ekran lupu -: gracz wzial 0, "
+                   "zostawil 0 | wynik (z wystawionych i rannych sprzed bitwy): zabici 70 (22.6%) / jency 22 (7.1%) / zbiegli 218 (70.3%) / bez odbiorcy 0 / zostali w skladzie 0 | zbiegli wedlug H3 (3 partii): rozbici 218, pod choragiew 100, do domu 80, do lasu 30, "
                    "do karczmy 8, w nicosc 0, Inni 0 | wodz: niewola | zwyciezcy (wystawieni 400): zabici 8 (2.0%) / nieprzytomni 20 (5.0%) | H3: objal | kontrola: wystawieni "
                    "+ ranni sprzed bitwy - zabici - zbiegli - jency - bez odbiorcy - zostali = 0 | potkniecia 0.")
 
@@ -88061,19 +88073,28 @@ def s312f_dist(rs):
 
     def pc(k):
         return f"{100.0 * sum(r[k] for r in rs) / w:.1f}%"
-    return (f"bitew {len(rs)}, wystawionych {sum(r['w'] for r in rs)} (+ ranni sprzed bitwy {sum(r['rb'] for r in rs)}): zabici {pc('d')} / nieprzytomni po walce "
-            f"{pc('n0')} / jency {pc('j')} / zbiegli {pc('f')} / bez odbiorcy {pc('nr')} / zostali w skladzie {pc('z')}")
+    txt = (f"bitew {len(rs)}, wystawionych {sum(r['w'] for r in rs)} (+ ranni sprzed bitwy {sum(r['rb'] for r in rs)}): zabici {pc('d')} / jency {pc('j')} / "
+           f"zbiegli {pc('f')} / bez odbiorcy {pc('nr')} / zostali w skladzie {pc('z')} (razem 100%); nieprzytomni po walce {pc('n0')} (przed pojmaniem - w jencach "
+           f"i zbieglych H3)")
+    lt = [r for r in rs if r["loot"] == "TAK"]
+    if lt:
+        pg = sum(r["pg"] for r in lt)
+        txt += (f"; ekran lupu gracza ({len(lt)} bitew): wzial {sum(r['lw'] for r in lt)}, zostawil {sum(r['lz'] for r in lt)} z jencow po walce {pg}"
+                + (f" (wzial {100.0 * sum(r['lw'] for r in lt) / pg:.1f}%)" if pg else ""))
+    return txt
 
 
-def s312f_rows(rep, rows, raw):
+def s312f_rows(rep, rows, raw, nb2=0):
     rep.add("S312F-0: linie 'Straty bitwy (312f)' czytelne", f"{len(rows)} z {raw}", "wszystkie (brak linii - INFO; mniej - zmieniony format w C#?)",
             None if raw == 0 else len(rows) == raw)
     pl = [r for r in rows if r["mode"] != "AI"]
     ai = [r for r in rows if r["mode"] == "AI"]
     rep.add("S312F-1: obecnosc linii strat bitwy (gracz / AI-AI od 100 na strone)",
-            (f"linii {len(rows)}: gracza {len(pl)} (misja {sum(1 for r in pl if r['mode'] == 'misja')}, symulacja {sum(1 for r in pl if r['mode'] == 'symulacja')}), "
-             f"AI-AI {len(ai)}") if rows else "NIEPOKRYTY (brak linii - DLL sprzed 312f albo klucz Battle Losses Log NIE)",
-            "> 0 przy bitwie gracza z wynikiem albo bitwie AI od 100 na strone (brak - INFO)", None if not rows else True)
+            ((f"linii {len(rows)}: gracza {len(pl)} (misja {sum(1 for r in pl if r['mode'] == 'misja')}, symulacja {sum(1 for r in pl if r['mode'] == 'symulacja')}), "
+             f"AI-AI {len(ai)}") if rows else "NIEPOKRYTY (brak linii - DLL sprzed 312f albo klucz Battle Losses Log NIE)")
+            + f" | bitew w polu gracza wedlug 'Bitwa (NB2): misja bitwa' {nb2}",
+            "> 0; NIE gdy bitwy w polu gracza (NB2) > 0, a linii [misja] 0 (wyjatek: same odwroty albo klucz Battle Losses Log NIE - sprawdzic); brak obu - INFO",
+            (False if nb2 > 0 and not any(r["mode"] == "misja" for r in rows) else (None if not rows else True)))
     bad = [r for r in rows if r["ctl"] != 0]
     rep.add("S312F-2: kontrola bilansu (wystawieni + ranni sprzed bitwy = zabici + zbiegli + jency + bez odbiorcy + zostali)",
             f"rozjazdow {len(bad)} z {len(rows)}" + (" (" + "; ".join(f"b{r['id']} {r['mode']} {r['ctl']:+d}" for r in bad[:6]) + ")" if bad else ""),
@@ -88082,22 +88103,26 @@ def s312f_rows(rep, rows, raw):
     for r in rows:
         why = []
         if r["w"] != r["d0"] + r["n0"] + r["r0"] + r["h0"]:
-            why.append("wystawieni != suma po walce")
+            why.append("format: wystawieni != suma po walce")
         if r["j"] != r["pg"] + r["ag"] + r["dg"]:
             why.append("jency != gracz + AI + A17")
         if r["pgw"] > r["pg"] or r["agw"] > r["ag"] or r["dgw"] > r["dg"] or r["pgh"] < 0 or r["agh"] < 0:
             why.append("ranni > jency")
         if r["nr"] != r["nr0"]:
-            why.append("bez odbiorcy w dwoch miejscach rozne")
+            why.append("format: bez odbiorcy w dwoch miejscach rozne")
         if r["hr"] != r["hc"] + r["hd"] + r["hl"] + r["hk"] + r["hn"] + r["hi"] or r["hl"] < 0:
             why.append("podzial H3 != rozbici")
         if r["hr"] > r["f"]:
             why.append("rozbici H3 > zbiegli")
         if r["doom"] > r["np"]:
             why.append("skasowanych > partii")
+        if (r["loot"] == "-") != (r["mode"] == "AI"):
+            why.append("ekran lupu '-' poza AI-AI albo AI-AI z ekranem")
+        if r["loot"] == "TAK" and r["lw"] + r["lz"] < r["pg"]:
+            why.append("ekran lupu: wzial + zostawil < jency u gracza")
         if why:
             inc.append(f"b{r['id']}: " + ", ".join(why))
-    rep.add("S312F-2b: spojnosc pol linii (sumy czastkowe)", f"zlych {len(inc)} z {len(rows)}" + (f" ({'; '.join(inc[:4])})" if inc else ""),
+    rep.add("S312F-2b: spojnosc pol linii (sumy czastkowe; 'format:' - kontrola napisu, nie gry)", f"zlych {len(inc)} z {len(rows)}" + (f" ({'; '.join(inc[:4])})" if inc else ""),
             "zlych 0 (brak linii - INFO)", None if not rows else not inc)
     st = max([r["st"] for r in rows] or [0])
     rep.add("S312F-3: potkniecia pomiaru 312f (narastajaco w sesji)", f"{st}", "0 (brak linii - INFO)", None if not rows else st == 0)
@@ -88112,7 +88137,7 @@ def s312f_rows(rep, rows, raw):
         for r in rows:
             fates[r["fate"]] = fates.get(r["fate"], 0) + 1
         ww = tot("ww")
-        txt = (f"jency u gracza {tot('pg')} (ranni {tot('pgw')}), u AI {tot('ag')} (ranni {tot('agw')}), A17 {tot('dg')} (ranni {tot('dgw')}); partie skasowane "
+        txt = (f"jency u gracza {tot('pg')} (ranni {tot('pgw')}; ekran lupu: wzial {tot('lw')}, zostawil {tot('lz')}), u AI {tot('ag')} (ranni {tot('agw')}), A17 {tot('dg')} (ranni {tot('dgw')}); partie skasowane "
                f"{tot('doom')} z {tot('np')}; wodzowie: " + ", ".join(f"{k} {v}" for k, v in sorted(fates.items()))
                + f"; zbiegli H3: choragiew {tot('hc')}, dom {tot('hd')}, las {tot('hl')}, karczma {tot('hk')}, nicosc {tot('hn')}; zwyciezcy zabici "
                f"{(100.0 * tot('wd') / ww) if ww else 0:.1f}% / nieprzytomni {(100.0 * tot('wn') / ww) if ww else 0:.1f}%")
@@ -88133,7 +88158,7 @@ def straty312f_selftest():
     bad = [k for k in ("S312F-0", "S312F-1", "S312F-2", "S312F-2b", "S312F-3") if v.get(k, ("", "", "", ""))[3] != "TAK"]
     if bad:
         return f"dobry bieg - nie TAK: {bad}"
-    if "zabici 25.4%" not in v["S312F-4"][1] or "zabici 22.6%" not in v["S312F-4b"][1]:
+    if "zabici 25.4%" not in v["S312F-4"][1] or "zabici 22.6%" not in v["S312F-4b"][1] or "wzial 140, zostawil 10" not in v["S312F-4"][1]:
         return f"rozklad: {v['S312F-4'][1][:80]} / {v['S312F-4b'][1][:80]}"
     b1 = s312f_parse(S312F_SAMPLE.replace("zostali = 0 |", "zostali = 3 |"))
     b2 = s312f_parse(S312F_SAMPLE.replace("do karczmy 2, w nicosc 0", "do karczmy 5, w nicosc 0"))
@@ -88149,6 +88174,19 @@ def straty312f_selftest():
     v = {r[0].split(":")[0]: r[3] for r in rep.rows}
     if any(v.get(k) != "INFO" for k in ("S312F-0", "S312F-1", "S312F-2", "S312F-2b", "S312F-3")):
         return f"brak linii - nie INFO: {v}"
+    rep = Report()
+    s312f_rows(rep, [b], 1, nb2=2)                          # bitwy w polu gracza (NB2), a linii [misja] brak - NIE
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if v.get("S312F-1") != "NIE":
+        return f"S312F-1 bez linii misji przy NB2 > 0 - nie NIE: {v.get('S312F-1')}"
+    rep = Report()
+    s312f_rows(rep, [a, b], 2, nb2=1)
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    if v.get("S312F-1") != "TAK":
+        return f"S312F-1 z linia misji - nie TAK: {v.get('S312F-1')}"
+    c = s312f_parse(S312F_SAMPLE.replace("pojmanie TAK", "pojmanie NIE (odwrot)"))
+    if not c or c["cap"] != "NIE (odwrot)":
+        return "pojmanie NIE (odwrot) - wyrazenie nie pasuje"
     return None
 
 
@@ -88161,17 +88199,20 @@ def straty312f_main(logp):
         rep.add("S312F-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    rows, raw = [], 0
+    rows, raw, nb2 = [], 0, 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
+            if "Bitwa (NB2): misja bitwa (pole bitwy TAK" in ln:
+                nb2 += 1
+                continue
             if "Straty bitwy (312f):" not in ln:
                 continue
             raw += 1
             d = s312f_parse(ln.rstrip("\r\n"))
             if d:
                 rows.append(d)
-    print(f"plik: {logp} | linii 312f {raw} (czytelnych {len(rows)})")
-    s312f_rows(rep, rows, raw)
+    print(f"plik: {logp} | linii 312f {raw} (czytelnych {len(rows)}), bitew w polu gracza (NB2) {nb2}")
+    s312f_rows(rep, rows, raw, nb2)
     rep.show()
     return 0
 
