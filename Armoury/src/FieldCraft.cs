@@ -1670,6 +1670,8 @@ namespace Armoury
         /// gra sama bierze ostatni cios z 5 s - Agent.Die, CanOverrideBlow). Pomiar BleedDeathLog: stan (zabity / nieprzytomny), kredyt, panika, odwrot 143.</summary>
         private void BleedDeath(Agent agent, State st, Settings c)
         {
+            // 313z: tylko czynny, zywy agent (Die na agencie w trakcie usuwania / juz martwym = pamiec silnika); przed licznikami i zgonem od pocisku
+            if (agent == null || !agent.IsActive() || agent.State != AgentState.Active || agent.Health <= 0f) return;
             bool log = c.BleedDeathLog, panic = false, wd = false;
             if (log)
             {
@@ -1686,8 +1688,15 @@ namespace Armoury
                 if (by != null && ReferenceEquals(by, st.BleedByA) && by.IsActive()) { b.OwnerId = st.BleedBy; credit = true; }
             }
             b.DamageType = DamageTypes.Cut;
+            // 313z (01.11, autotest 313y bitwa 8/9: AccessViolationException w Agent.Die z BleedDeath, potem NRE RBM UpdateAgentStats i CTD): Blow jak w grze
+            // (Mission.KillAgentCheat / MissionBoundaryCrossingHandler.HandleAgentPunishmentsServer) - WeaponRecord wypelniony jako cios bez broni (bez tego
+            // przy kredycie innemu agentowi silnik czyta pusty zapis broni zadajacego), pelne obrazenia, pozycja na wysokosci oczu
+            b.WeaponRecord.FillAsMeleeBlow(null, null, -1, -1);
+            b.BaseMagnitude = agent.Health + 1f;
             b.InflictedDamage = (int)agent.Health + 1;
+            b.DamagedPercentage = 1f;
             b.GlobalPosition = agent.Position;
+            b.GlobalPosition.z += agent.GetEyeGlobalHeight();
             float hp0 = st.BleedHp0;
             // 313y (recenzja integracji, WAZNA): Agent.Die liczy zgon od pocisku tylko przy b.IsMissile (WeaponRecord) - nasz Blow go nie ma, wiec smierc
             // z krwawienia po strzale nie podnosila TeamQuerySystem.DeathByRangedCount (prog 291e FireDead, OutshotRush.Live, bilans ognia gry). Liczymy sami
