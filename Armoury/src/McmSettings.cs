@@ -1380,6 +1380,22 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float WindedExitBar { get; set; } = 0.30f;
 
+        [SettingPropertyBool("Weapon Skill Eases Stamina", HintText = "the better you know the weapon in your hand, the less a blow that lands, a blocked blow and a block take out of your stamina: a raw recruit tires about a fifth faster than before, an average soldier (skill 100) pays what he paid for a block, a master (300) about half; the same rule for you, lords and soldiers of both sides. One-handed, two-handed and polearm skill count for the weapon you hold. A blow taken on the body, fighting barehanded and missiles are unchanged; bows, crossbows and throwing weapons already work this way in Realistic Battle Mod and are left to it. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool WeaponSkillEasesStamina { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Weapon Skill Stamina Untrained", 1.00f, 1.50f, "0.00", HintText = "with Weapon Skill Eases Stamina: what a blow or block costs a man with weapon skill 0, as a share of Realistic Battle Mod's cost (1.2 = a fifth more)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float WeaponSkillStaminaUntrained { get; set; } = 1.2f;
+
+        [SettingPropertyFloatingInteger("Weapon Skill Stamina Saving Per100", 0.00f, 40.00f, "0", HintText = "with Weapon Skill Eases Stamina: by how many percent the cost drops with every 100 points of weapon skill (25: skill 100 pays 0.90, 200 pays 0.68, 300 pays 0.51)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float WeaponSkillStaminaSavingPer100 { get; set; } = 25f;
+
+        [SettingPropertyFloatingInteger("Weapon Skill Stamina Floor", 0.25f, 1.00f, "0.00", HintText = "with Weapon Skill Eases Stamina: the lowest share of the cost even the greatest master pays", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float WeaponSkillStaminaFloor { get; set; } = 0.4f;
+
         [SettingPropertyBool("Winded Shows It", HintText = "winded men near you show it (within 35 m): a tired face and, when they stand still with no enemy within 8 m and no arrows coming, a short weary pose of the upper body for a few seconds, repeated now and then while they get their wind back. At most 12 men at a time; men with a bow, crossbow or javelin in hand, on ladders or engines, in water or in panic are left alone. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool WindedShowsIt { get; set; } = true;
@@ -1495,6 +1511,18 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Walk Speed Share", 0.00f, 1.68f, "0.00", HintText = "walking pace as a share of full speed", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public float WalkSpeedShare { get; set; } = 0.42f;
+
+        [SettingPropertyBool("Stamina Slows Running", HintText = "on foot your run slows down smoothly as your stamina runs low instead of staying at full speed until the bar is empty: from Stamina Slow From Bar down to walking pace at an empty bar. When the bar is empty you drop to a walk (the game's own walk, as with Caps Lock) and cannot run again until it has refilled to Stamina Walk Until Bar. You only, on foot; your horse has its own stamina. Off = as before (full speed down to the last tenth, half speed when winded)", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool StaminaSlowsRunning { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Stamina Slow From Bar", 0.20f, 0.90f, "0.00", HintText = "with Stamina Slows Running: below this share of your stamina bar your running pace starts to drop, evenly, down to walking pace (Walk Speed Share) at an empty bar", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float StaminaSlowFromBar { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Stamina Walk Until Bar", 0.05f, 0.50f, "0.00", HintText = "with Stamina Slows Running: after your bar ran empty you walk until it has refilled to this share; then you can run again at the pace the bar allows", RequireRestart = false)]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float StaminaWalkUntilBar { get; set; } = 0.15f;
 
         [SettingPropertyBool("Horse Death Permanent", HintText = "your mount killed in a real battle is truly gone - the slot empties, only the harness comes off the corpse", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
@@ -11292,6 +11320,10 @@ namespace Armoury
             s.BreathFightShare = BreathFightShare;
             s.BreathShotFightSeconds = BreathShotFightSeconds;
             s.WindedExitBar = WindedExitBar;
+            s.WeaponSkillEasesStamina = WeaponSkillEasesStamina;
+            s.WeaponSkillStaminaUntrained = WeaponSkillStaminaUntrained;
+            s.WeaponSkillStaminaSavingPer100 = WeaponSkillStaminaSavingPer100;
+            s.WeaponSkillStaminaFloor = WeaponSkillStaminaFloor;
             s.WindedShowsIt = WindedShowsIt;
             s.WindedPose = WindedPose;
             s.WindedBreathSound = WindedBreathSound;
@@ -11321,6 +11353,9 @@ namespace Armoury
             s.JavelinStickMinDamage = JavelinStickMinDamage;
             s.WalkKeyEnabled = WalkKeyEnabled;
             s.WalkSpeedShare = WalkSpeedShare;
+            s.StaminaSlowsRunning = StaminaSlowsRunning;
+            s.StaminaSlowFromBar = StaminaSlowFromBar;
+            s.StaminaWalkUntilBar = StaminaWalkUntilBar;
             s.HorseDeathPermanent = HorseDeathPermanent;
             s.ThrownWobbleEnabled = ThrownWobbleEnabled;
             s.ThrownInaccuracyFactor = ThrownInaccuracyFactor;

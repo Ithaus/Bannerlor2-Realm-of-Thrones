@@ -59,6 +59,8 @@ namespace Armoury
             public float RunSeconds0 = -1f;  // 292: pelny bieg do zera z reguly 127/203 PRZED mnoznikiem staminy ludzi (pomiar biegu w linii "Bieg (127)")
             public float Run292Prev = -1f;   // 292: pasek na koniec poprzedniego taktu ciaglego biegu (-1 = poprzedni takt bez biegu)
             public float Run292Max;          // 292: maxStamina RBM przy Run292Prev (zmiana puli w biegu - takt pominiety)
+            public bool Walk313;             // 313c: gracz po pustym pasku idzie (histereza do StaminaWalkUntilBar) - takze przy kluczu NIE (pomiar "bylby")
+            public bool Walk313Forced;       // 313c: MY przelaczylismy gracza w tryb chodu gry (tylko wtedy oddajemy mu bieg)
         }
 
         // ---- noc 25.10 P1 (M0, klucz SpeedCapOnlyWhenWinded): liczniki zapisow limitu predkosci (glowny watek; segment 'marsz' linii NB2,
@@ -96,8 +98,125 @@ namespace Armoury
 
         internal static void NoteRegenSkipped() { _regenSkipped++; }
 
+        // ---- 313c (01.11, Jeff: "jak biegalem i spadla mi stamina do 0 to nadal biegne zamiast caly czas stopniowo zwalniac, az jak dojdzie do 0 po prostu
+        // powinienem przejsc w tryb marszu"). Dotad: pelna predkosc do 10% paska, w ostatnich 10% do 0.5, przy zerze zadyszka 0.5 x pelnej predkosci (dalej
+        // animacja biegu) do WindedExitBar. Teraz u GRACZA pieszo: mnoznik ruchu z paska - od StaminaSlowFromBar liniowo do WalkSpeedShare przy 0
+        // (ta sama sciezka zapisu co kara zadyszki: SetMaximumSpeedLimit; Agent.Controller przy przejeciu przez gracza zdejmuje limit - silnik czyta go
+        // i u gracza), a przy pustym pasku wymuszony tryb chodu gry (EventControlFlag.Walk - to samo, co wysyla CapsLock, MissionMainAgentController:811)
+        // do StaminaWalkUntilBar. Zadyszka (st.Winded) dalej rzadzi zamachem (st.Pace), ruchem gracza juz krzywa. Konno - nic (i zdjety nasz chod).
+        // AI bez zmian (AiBreath 144). Pomiar takze przy kluczu NIE ("bylby"). Linia "Bieg gracza (313c)" na koniec misji.
+        private static float _p3Foot, _p3Low, _p3LowRun, _p3Min = 1f, _p3WalkSec, _p3SpdSum, _p3LimSum;
+        private static int _p3WalkIn, _p3Reforce, _p3Out, _p3Samples, _p3Stumbles, _p3StumblesSession;
+
+        private static void Reset313()
+        {
+            _p3Foot = _p3Low = _p3LowRun = _p3WalkSec = _p3SpdSum = _p3LimSum = 0f; _p3Min = 1f;
+            _p3WalkIn = _p3Reforce = _p3Out = _p3Samples = _p3Stumbles = 0;
+        }
+
+        // zakresy jak RANGES w tools/gen_mcm.py
+        private static float SlowFrom313(Settings c) { return Math.Max(0.2f, Math.Min(0.9f, c.StaminaSlowFromBar)); }
+        private static float WalkUntil313(Settings c) { return Math.Max(0.05f, Math.Min(0.5f, c.StaminaWalkUntilBar)); }
+        private static float WalkShare313(Settings c) { return Math.Max(0.2f, Math.Min(1f, c.WalkSpeedShare)); }
+
+        /// <summary>313c: mnoznik ruchu z paska - 1 od progu w gore, liniowo do tempa chodu przy 0.</summary>
+        internal static float RunCurve313(float ratio, Settings c)
+        {
+            float from = SlowFrom313(c), walk = WalkShare313(c);
+            if (ratio >= from) return 1f;
+            if (ratio <= 0f) return walk;
+            return walk + (1f - walk) * ratio / from;
+        }
+
+        private static void Release313(Agent agent, State st)
+        {
+            st.Walk313Forced = false;
+            _p3Out++;
+            if (agent.WalkMode) agent.EventControlFlags |= Agent.EventControlFlag.Run;
+        }
+
+        /// <summary>313c: tempo ruchu gracza (zamiast st.Pace) - przy kluczu NIE, konno albo bez Sprint Fatigue zwraca st.Pace (jak dotad).</summary>
+        private static float Run313(Agent agent, State st, Settings c, float step, float speedNow, bool sprintNow)
+        {
+            float pace = st.Pace;
+            try
+            {
+                bool on = c.StaminaSlowsRunning;
+                if (agent.MountAgent != null || !c.SprintFatigueEnabled)
+                {
+                    if (st.Walk313Forced) Release313(agent, st);   // w siodle nasz chod szedlby na konia
+                    st.Walk313 = false;
+                    return pace;
+                }
+                float r = st.Ratio;
+                if (r <= 0.005f) { if (!st.Walk313) _p3WalkIn++; st.Walk313 = true; }   // ten sam prog pustego paska co zadyszka
+                else if (st.Walk313 && r >= WalkUntil313(c)) st.Walk313 = false;
+                float f = RunCurve313(r, c);
+                _p3Foot += step;
+                if (f < 0.999f || st.Walk313)
+                {
+                    _p3Low += step;
+                    if (sprintNow) _p3LowRun += step;
+                    if (f < _p3Min) _p3Min = f;
+                }
+                if (st.Walk313) _p3WalkSec += step;
+                if (!on)
+                {
+                    if (st.Walk313Forced) Release313(agent, st);   // klucz zdjety w trakcie misji
+                    return pace;
+                }
+                // pomiar: czy limit trzyma gracza (predkosc / pelna predkosc wobec mnoznika) - w ruchu, poza chodem
+                if (f < 0.999f && !st.Walk313 && speedNow > 0.5f)
+                {
+                    float full = agent.GetMaximumForwardUnlimitedSpeed();
+                    if (full > 0.8f) { _p3SpdSum += speedNow / full; _p3LimSum += f; _p3Samples++; }
+                }
+                if (st.Walk313)
+                {
+                    if (!agent.WalkMode)
+                    {
+                        if (st.Walk313Forced) _p3Reforce++;   // gracz wlaczyl bieg (CapsLock) albo flaga nie weszla - znow chod
+                        agent.EventControlFlags |= Agent.EventControlFlag.Walk;
+                        st.Walk313Forced = true;
+                    }
+                }
+                else if (st.Walk313Forced) Release313(agent, st);
+                pace = f;
+            }
+            catch (Exception e)
+            {
+                _p3Stumbles++; _p3StumblesSession++;
+                if (_p3StumblesSession <= 3) Log.Error("FieldCraft.Run313 (potkniecie " + _p3StumblesSession + ")", e);
+            }
+            return pace;
+        }
+
+        private void Line313(Settings c)
+        {
+            try
+            {
+                if (c == null || _p3Foot <= 0f) return;
+                bool battle = false;
+                try { battle = Mission != null && Mission.Mode == MissionMode.Battle; } catch { }
+                if (!battle && _p3Low <= 0f) return;
+                var ic = System.Globalization.CultureInfo.InvariantCulture;
+                bool on = c.StaminaSlowsRunning;
+                Log.Info("Bieg gracza (313c): klucz Stamina Slows Running " + (on ? "TAK" : "NIE (pomiar: bylby)")
+                         + " | regula: od " + (SlowFrom313(c) * 100f).ToString("0", ic) + "% paska plynnie do chodu (" + WalkShare313(c).ToString("0.00", ic)
+                         + " pelnej) przy 0, po pustym pasku chod do " + (WalkUntil313(c) * 100f).ToString("0", ic) + "%"
+                         + " | gracz pieszo " + _p3Foot.ToString("0", ic) + " s, ponizej progu " + _p3Low.ToString("0", ic) + " s (w biegu " + _p3LowRun.ToString("0", ic)
+                         + " s), najnizszy mnoznik " + _p3Min.ToString("0.00", ic)
+                         + " | chod po pustym pasku: wejsc " + _p3WalkIn + ", sekund " + _p3WalkSec.ToString("0", ic) + ", ponowien " + _p3Reforce + ", oddan biegu " + _p3Out
+                         + " | pomiar limitu: probek " + _p3Samples + (_p3Samples > 0 ? ", sr. predkosc " + (_p3SpdSum / _p3Samples * 100f).ToString("0", ic)
+                            + "% pelnej przy mnozniku sr. " + (_p3LimSum / _p3Samples * 100f).ToString("0", ic) + "%" : "")
+                         + " | potkniecia " + _p3Stumbles + " (sesja " + _p3StumblesSession + ")");
+            }
+            catch (Exception e) { Log.Error("FieldCraft.Line313", e); }
+        }
+
         private static void ResetRunStats()
         {
+            Reset313();                         // 313c: liczniki linii "Bieg gracza (313c)"
             _runningStances.Clear();
             _runN = 0; _regenSkipped = 0;
             _runKgSum = 0f; _runKgMax = 0f; _runTSum = 0f; _runTMin = float.MaxValue;
@@ -504,6 +623,8 @@ namespace Armoury
                 PanicRun.Line(Mission, Settings.Current);
             }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteRun, "PanicRun.Line", e); }
+            Line313(Settings.Current);                        // 313c: linia "Bieg gracza (313c)"
+            try { WeaponEase.Flush(Mission); } catch { }      // 313c: linia "Wprawa (WeaponEase)" raz na misje
             ResetRunStats();
             try { BattleWind.BreathFlush(); } catch { }      // 137: linia "Oddech (137)" raz na misje
             try { MissionTeams.Flush(Mission); } catch { }   // NM: linia "Druzyny w misji (NM)" raz na misje
@@ -993,8 +1114,9 @@ namespace Armoury
                     if (c.WoundedPenaltiesEnabled && hpr < thr && thr > 0.01f)
                         woundSlow = c.WoundedMaxSlow * (thr - hpr) / thr;
 
-                    // ruch: zadyszka (ostatnie 10% puli -> do -50%) i rany licza sie razem
-                    float limit = st.Pace;
+                    // ruch: zadyszka (ostatnie 10% puli -> do -50%) i rany licza sie razem; 313c: gracz pieszo - krzywa paska i chod po pustym pasku
+                    float movePace = agent.IsMainAgent ? Run313(agent, st, c, step, speedNow, sprintNow) : st.Pace;
+                    float limit = movePace;
                     limit = Math.Min(limit, 1f - woundSlow);
                     if (limit < 0.4f) limit = 0.4f;
 
@@ -1043,8 +1165,8 @@ namespace Armoury
                             // przyczyna wiazaca: klawisz chodu, rany albo zadyszka / strefa 10% (najnizszy skladnik limitu)
                             int cause = AiBreath.PenWind;
                             float woundLim = 1f - woundSlow;
-                            if (agent.IsMainAgent && c.WalkKeyEnabled && limit <= Math.Max(0.2f, c.WalkSpeedShare) + 0.001f && limit < Math.Min(st.Pace, woundLim) - 0.001f) cause = AiBreath.PenKey;
-                            else if (woundLim < st.Pace) cause = AiBreath.PenWound;
+                            if (agent.IsMainAgent && c.WalkKeyEnabled && limit <= Math.Max(0.2f, c.WalkSpeedShare) + 0.001f && limit < Math.Min(movePace, woundLim) - 0.001f) cause = AiBreath.PenKey;
+                            else if (woundLim < movePace) cause = AiBreath.PenWound;
                             AiBreath.NotePenalty(cause, capBreath && cap > 0f && run > 0.5f);
                         }
                     }

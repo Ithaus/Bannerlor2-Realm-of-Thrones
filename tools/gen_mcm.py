@@ -683,6 +683,13 @@ RANGES = {
     # 137 recenzja: okno walki po strzale 0..5 s (0 = strzal nie otwiera okna)
     'BreathShotFightSeconds': (0.0, 5.0, "0.0"),
     'WindedExitBar': (0.10, 0.50, "0.00"),
+    # 313c wprawa w broni (WeaponEase przycina do tych samych zakresow): koszt przy skillu 0 x1.0..1.5, oszczednosc 0..40 %/100 pkt, dno 0.25..1.0
+    'WeaponSkillStaminaUntrained': (1.0, 1.5, "0.00"),
+    'WeaponSkillStaminaSavingPer100': (0.0, 40.0, "0"),
+    'WeaponSkillStaminaFloor': (0.25, 1.0, "0.00"),
+    # 313c bieg gracza od staminy (FieldCraft.Run313 przycina do tych samych zakresow): prog zwalniania 0.2..0.9 paska, marsz do 0.05..0.5 paska
+    'StaminaSlowFromBar': (0.2, 0.9, "0.00"),
+    'StaminaWalkUntilBar': (0.05, 0.5, "0.00"),
     # 140 tarcza pod ostrzalem (ShieldsUp.Begin przycina do tych samych zakresow): trzymanie 2..30 s, szyk pod ostrzalem od 1..20 pociskow w 5 s
     'ShieldsUpHoldSeconds': (2.0, 30.0, "0.0"),
     'ShieldsUpFormationShots': (1, 20, "0"),
