@@ -9960,6 +9960,14 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int CampWalkMenPerTent { get; set; } = 6;
 
+        [SettingPropertyBool("Camp Walk Dry Ground", HintText = "camp scene on dry, level ground: tents, fires and bedrolls are never put in water, in shallow mud or on steep slopes (water is checked across each tent's whole footprint), and in a swampy scene your camp walk is moved to the driest flat spot inside the walk area (off = as before: water checked only at one point, the camp stays at the middle of the scene)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampWalkDryGround { get; set; } = true;
+
+        [SettingPropertyBool("Camp Sleep In Tents", HintText = "at night in the camp scene your men sleep inside the soldiers' tents (two on the bedrolls of each tent) with one man keeping watch at each fire; by day the rest lie about beside the tents as before (off = as before: half the men round the fires and the rest beside the tents sleep on the bare ground)", RequireRestart = false)]
+        [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
+        public bool CampSleepInTents { get; set; } = true;
+
         [SettingPropertyBool("Camp Sutlers Row", HintText = "'Visit the sutlers' row' in your camp menu - only in a big camp (your party or the whole army with at least Sutler Row Min Men): barber-surgeons tend your wounded for a fee, an ale tent with dice and a minstrel lifts your men's morale once a day, and the sutlers sell food, ale, wine, tools, arrows and bolts brought from the nearest friendly town's market at its prices plus their cut (and buy from you for less). What they sell leaves that town's market; what you pay goes to that town and a nearby village (off = no option)", RequireRestart = false)]
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public bool CampSutlersRow { get; set; } = true;
@@ -13425,6 +13433,8 @@ namespace Armoury
             s.CampWalkEnabled = CampWalkEnabled;
             s.CampWalkMaxMen = CampWalkMaxMen;
             s.CampWalkMenPerTent = CampWalkMenPerTent;
+            s.CampWalkDryGround = CampWalkDryGround;
+            s.CampSleepInTents = CampSleepInTents;
             s.CampSutlersRow = CampSutlersRow;
             s.SutlerRowMinMen = SutlerRowMinMen;
             s.SutlerRowMenPerStall = SutlerRowMenPerStall;

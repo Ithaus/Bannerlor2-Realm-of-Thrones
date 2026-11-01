@@ -287,6 +287,7 @@ namespace Armoury
         private bool _built, _test;
         private float _poseT, _t;
         private int _men, _sleep, _bearer, _parties;
+        private int _inTent, _watch;          // 312h: spiacy na poslaniach w namiotach, czuwajacy przy ogniskach (noc, CampSleepInTents)
         private System.Diagnostics.Stopwatch _testClock;   // m109-oboz (test): wyjscie po 8 s rzeczywistych
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
@@ -361,7 +362,12 @@ namespace Armoury
 
             var up = new Vec2(0f, 1f);
             var right = new Vec2(1f, 0f);
-            _lay = new CampLayout(m, Centre(m), up, CampWalk.P, CampWalk.Stumble, _rng);
+            // 312h (A2): na bagnie srodek obozu w najsuchszym i plaskim miejscu w granicach spaceru (CampWalkDryGround; bitwa w obozie - srodek bez zmian)
+            var c0 = Centre(m);
+            var pick = new CampLayout.DryPick();
+            bool dry = s == null || s.CampWalkDryGround;
+            var cc = dry ? CampLayout.DryCentre(m, c0, pick, CampWalk.Stumble) : c0;
+            _lay = new CampLayout(m, cc, up, CampWalk.P, CampWalk.Stumble, _rng);
             _lay.Probe();
 
             // zdrowi ludzie kolumny (bez bohaterow) - najpierw druzyna gracza (kazda partia osobno przetasowana), jezdzcy do koni na postoju
@@ -410,20 +416,40 @@ namespace Armoury
                     if (SpawnSitter(m, team, troops[ti], p, fires[0] - p, SitPose, 0.4f)) _men++;
                 }
             }
+            // 312h (B, Jeff 01.11 "ludzie zamiast spac w namiocie spia poza namiotami"): noca najpierw po 2 spiacych na poslaniach kazdego Tent_Small
+            // (bed_ground_j prefabu ROT w (0.016, +0.779) i (0.016, -0.830) ukladu prefabu; os y prefabu = -Up, wiec w swiecie q - Up*0.78 i q + Up*0.83),
+            // prefab bez poslan (namiot Native) - jeden spiacy w srodku namiotu; potem jeden czuwajacy przy kazdym ognisku; reszta noca "w namiotach" (niewidoczna).
+            // Liczba agentow nadal najwyzej men (limit CampWalkMaxMen). Off (CampSleepInTents) - jak dotad.
+            bool inTents = night && tents > 0 && (s == null || s.CampSleepInTents);
+            if (inTents)
+            {
+                bool beds2 = CampWalkPrefabs.First(CampLayout.TentSmall) == "Tent_Small";
+                for (int k = 0; k < tentSpots.Count && ti < men; k++)
+                {
+                    Vec2 q = tentSpots[k];
+                    int nb = beds2 ? 2 : 1;
+                    for (int b = 0; b < nb && ti < men; b++)
+                    {
+                        Vec2 p = beds2 ? q + up * (b == 0 ? -0.78f : 0.83f) : q;
+                        if (SpawnInTent(m, team, troops[ti], p, right)) { _men++; _sleep++; _inTent++; ti++; }
+                    }
+                }
+            }
             for (int fi = 0; tents > 0 && fi < fires.Count && ti < men; fi++)
             {
-                int around = Math.Min(4, men - ti);
+                int around = Math.Min(inTents ? 1 : 4, men - ti);
                 for (int k = 0; k < around && ti < men; k++)
                 {
                     double ang = (k * Math.PI * 2.0 / 4.0) + _rng.NextDouble() * 0.5 + (fi == 0 ? Math.PI : 0.0);
                     Vec2 p = fires[fi] + new Vec2((float)Math.Cos(ang), (float)Math.Sin(ang)) * 1.9f;
-                    bool sleep = night && _rng.NextDouble() < 0.5;
-                    if (SpawnSitter(m, team, troops[ti], p, fires[fi] - p, sleep ? SleepPose : SitPose, 0.4f)) { _men++; if (sleep) _sleep++; }
+                    bool sleep = !inTents && night && _rng.NextDouble() < 0.5;
+                    if (SpawnSitter(m, team, troops[ti], p, fires[fi] - p, sleep ? SleepPose : SitPose, 0.4f)) { _men++; if (sleep) _sleep++; if (inTents) _watch++; }
                     ti++;
                 }
             }
             // reszta limitu - lezy obok namiotow zolnierskich, w przerwach miedzy namiotami (noc: spi, dzien: odpoczywa); miejsce zajete - nastepne
-            for (int i = 0; ti < men && i < tentSpots.Count * 4; i++)
+            // 312h: przy CampSleepInTents noca nikt nie lezy obok namiotow (spia w srodku)
+            for (int i = 0; !inTents && ti < men && i < tentSpots.Count * 4; i++)
             {
                 Vec2 t = tentSpots[i / 4];
                 int k = i % 4;
@@ -441,7 +467,13 @@ namespace Armoury
                      + " | konie " + _lay.Horses + " (jezdzcow " + _lay.RiderHorsesN + " z " + mounted + " jezdzcow, uwiazane " + _lay.TiedHorses.Count + ")"
                      + " | elementy " + _lay.Props + " (przesuniete przez drzewa/skaly/wode/obrysy " + _lay.Moved + ", pominiete " + _lay.BlockedN + ", nakladanie obrysow " + _lay.Overlap + ")"
                      + (_lay.Failed > 0 ? ", nieudane " + _lay.Failed : "") + " | gracz " + (player != null ? "tak" : "NIE")
-                     + " | srodek " + c.x.ToString("0", CultureInfo.InvariantCulture) + "," + c.y.ToString("0", CultureInfo.InvariantCulture) + ".");
+                     + " | srodek " + c.x.ToString("0", CultureInfo.InvariantCulture) + "," + c.y.ToString("0", CultureInfo.InvariantCulture)
+                     + " | " + (dry ? "grunt: srodek przesuniety o " + pick.Shift.ToString("0", CultureInfo.InvariantCulture) + " m (suche probki " + pick.Dry + "/" + pick.All
+                                + ", w srodku sceny " + pick.Dry0 + "/" + pick.All + (pick.Note != null ? ", " + pick.Note : "") + "), pominiete przez wode " + _lay.SkipWet
+                                + ", przez stromizne " + _lay.SkipSteep : "grunt: wylaczony (Camp Walk Dry Ground)")
+                     + " | " + (inTents ? "spiacy w namiotach " + _inTent + ", przy ognisku " + _watch + " czuwajacych"
+                                : night && tents > 0 ? "spanie w namiotach wylaczone (Camp Sleep In Tents)" : "spanie w namiotach: -")
+                     + " | potkniecia " + (CampWalk.Stumbles - st0) + ".");
             if (_test)
             {
                 // m109-oboz (test): uklad wobec regul (te same liczby co linia bitwy w obozie); wyjscie po 8 s rzeczywistych od poczatku Build
@@ -500,12 +532,19 @@ namespace Armoury
             catch (Exception e) { CampWalk.Stumble("SpawnPlayer", e); return null; }
         }
 
-        /// <summary>Czlowiek w pozie (siedzi, lezy, spi) w miejscu at; r - jego obrys (miejsce zajete przez kogos albo przez namiot/ognisko/woz - bez niego).</summary>
-        private bool SpawnSitter(Mission m, Team team, CharacterObject ch, Vec2 at, Vec2 facing, string pose, float r)
+        /// <summary>312h (B): spiacy na poslaniu wewnatrz postawionego namiotu - bez testu obrysow (to wnetrze naszego namiotu), z testem terenu (Blocked).</summary>
+        private bool SpawnInTent(Mission m, Team team, CharacterObject ch, Vec2 at, Vec2 facing)
         {
-            if (ch == null || !m.IsPositionInsideBoundaries(at) || _lay.Blocked(at, 0.5f)) return false;
+            return SpawnSitter(m, team, ch, at, facing, SleepPose, 0.3f, true);
+        }
+
+        /// <summary>Czlowiek w pozie (siedzi, lezy, spi) w miejscu at; r - jego obrys (miejsce zajete przez kogos albo przez namiot/ognisko/woz - bez niego).
+        /// inTent (312h) - w namiocie: bez testu i bez zajmowania obrysow.</summary>
+        private bool SpawnSitter(Mission m, Team team, CharacterObject ch, Vec2 at, Vec2 facing, string pose, float r, bool inTent = false)
+        {
+            if (ch == null || !m.IsPositionInsideBoundaries(at) || _lay.Blocked(at, inTent ? r : 0.5f)) return false;
             var box = _lay.Sq(at, r);
-            if (_lay.Hits(box)) return false;
+            if (!inTent && _lay.Hits(box)) return false;
             try
             {
                 var pos = _lay.Ground(at);
@@ -517,7 +556,7 @@ namespace Armoury
                     .ClothingColor1(team.Color).ClothingColor2(team.Color2);
                 var a = m.SpawnAgent(abd, false);
                 if (a == null) return false;
-                _lay.Occupy(box);
+                if (!inTent) _lay.Occupy(box);
                 Ready(a);
                 var sit = new Sitter { Agent = a, Spot = pos, Facing = facing, Pose = pose, Speed = 0.8f + (float)_rng.NextDouble() * 0.4f };
                 _sitters.Add(sit);
@@ -669,6 +708,13 @@ namespace Armoury
         private readonly List<Box> _occ = new List<Box>();     // zajete obrysy (uklad lokalny): namioty, ogniska, wozy, konie, ludzie, gracz (poslania sa plaskie - nie licza sie)
         private readonly List<Vec2> _troops = new List<Vec2>(); // bitwa: migawka agentow w ukladzie lokalnym (SetTroops)
         private bool _waterOff, _topOff;   // jak PD: odczyt wody albo cial, ktory "zalewa" prawie cala scene (ponad 90% probek), jest dla tej sceny pomijany
+                                           // 312h (DryOn): _waterOff tylko dla odczytu bez sensu (NaN albo woda ponad BadWaterAbove m nad terenem na ponad 90% probek)
+        private int _lastWhy;              // 312h: przyczyna ostatniego Blocked = true: 1 drzewo/skala, 2 woda/bloto, 3 stromizna
+        internal readonly bool DryOn;      // 312h: CampWalkDryGround - woda przez renderer w kazdej probce (+ narozniki obrysow), stromizna; off - jak dotad
+        internal int SkipWet, SkipSteep;   // 312h: elementy/miejsca nieudane w FreeSpot (i konie taboru), gdy teren odrzucila woda albo stromizna
+        internal const float WetMargin = 0.3f;      // 312h: teren nizej niz woda + 0.3 m = woda, plycizna, bloto
+        internal const float MinNormalZ = 0.94f;    // 312h: normalna terenu z < 0.94 (ok. 20 stopni) = za stromo na namiot, ognisko, poslanie
+        internal const float BadWaterAbove = 50f;   // 312h: poziom wody ponad 50 m nad terenem - odczyt bez sensu
         private int _why;                  // przyczyna ostatniej porazki FreeSpot: 0 granica, 1 teren, 2 obrysy, 3 wojsko
         private bool _limRead, _limOk;     // bitwa: granice sceny silnika (GetSceneLimits) odczytane raz na uklad, pomniejszone o SceneMargin
         private Vec2 _limMin, _limMax;
@@ -705,6 +751,8 @@ namespace Armoury
             _p = prefix;
             _stumble = stumble;
             _rng = rng ?? new Random();
+            var st = Settings.Current;
+            DryOn = st == null || st.CampWalkDryGround;
         }
 
         internal void Reset()
@@ -1024,6 +1072,7 @@ namespace Armoury
         /// <summary>Czy w promieniu r wokol punktu cos stoi (drzewo, skala - cialo wyzej niz 0.8 m nad terenem) albo jest woda. Tylko odczyt sceny.</summary>
         internal bool Blocked(Vec2 at, float r)
         {
+            if (DryOn) return BlockedDry(at, r);
             try
             {
                 var sc = M.Scene;
@@ -1044,9 +1093,160 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>Probki 7 x 7 co 10 m wokol srodka: gdy woda albo "cos stoi" na ponad 90% probek - ten odczyt jest dla tej sceny pomijany (wzor PD).</summary>
+        /// <summary>312h (A1, A3): jak Blocked, ale woda przez renderer wody (Mission.GetWaterLevelAtPosition(p, true) - wzor SpawnedItemEntity.cs:317,
+        /// BloodPools.cs:628; globalna woda sceny bagiennej, water_exists w scene.xscene) we WSZYSTKICH 5 probkach z zapasem WetMargin oraz stromizna
+        /// (GetTerrainHeightAndNormal, normalna z &lt; MinNormalZ). Wyjatek - potkniecie (Stumble, liczone), miejsce traktowane jak wolne jak dotad
+        /// (jeden blad sceny nie gasi calego obozu - CLAUDE.md 7).</summary>
+        private bool BlockedDry(Vec2 at, float r)
+        {
+            _lastWhy = 0;
+            try
+            {
+                var sc = M.Scene;
+                for (int i = 0; i < 5; i++)
+                {
+                    Vec2 p = i == 0 ? at : at + new Vec2(i == 1 ? r : i == 2 ? -r : 0f, i == 3 ? r : i == 4 ? -r : 0f) * 0.7f;
+                    float g = sc.GetTerrainHeight(p, true);
+                    float top = sc.GetGroundHeightAtPosition(new Vec3(p.x, p.y, 1000f, -1f), TopMask);
+                    if (!_topOff && top > g + 0.8f && top < g + 200f) { _lastWhy = 1; return true; }
+                    int why = Soil(M, p, !_waterOff, true);
+                    if (why != 0) { _lastWhy = why; return true; }
+                }
+            }
+            catch (Exception e) { _stumble("BlockedDry", e); }
+            return false;
+        }
+
+        /// <summary>312h: grunt w punkcie p - 0 suchy i plaski, 2 woda (renderer wody; teren nizej niz woda + WetMargin), 3 za stromo. Rzuca wyjatki silnika
+        /// (lapie wolajacy). Odczyt wody bez sensu (NaN, poza +-5000, ponad BadWaterAbove nad terenem) - nie woda.</summary>
+        internal static int Soil(Mission m, Vec2 p, bool water, bool slope)
+        {
+            float h;
+            Vec3 n;
+            m.Scene.GetTerrainHeightAndNormal(p, out h, out n);
+            if (water)
+            {
+                float w = m.GetWaterLevelAtPosition(p, true);
+                if (Fin(w) && Fin(h) && w > -5000f && w < 5000f && w < h + BadWaterAbove && w > h - WetMargin) return 2;
+            }
+            if (slope)
+            {
+                float len = n.Length;
+                if (Fin(len) && len > 0.0001f && n.z / len < MinNormalZ) return 3;
+            }
+            return 0;
+        }
+
+        /// <summary>312h (A1): woda w naroznikach obrysu prefabu z tabeli Footprints (namiot wodza 15 x 12 m - sam srodek z promieniem nie wystarcza).</summary>
+        private bool WetCorners(string name, Vec2 p, Vec2 facing)
+        {
+            float[] fp;
+            if (!DryOn || _waterOff || name == null || !Footprints.TryGetValue(name, out fp)) return false;
+            try
+            {
+                var sx = new Vec2(facing.y, -facing.x);
+                for (int i = 0; i < 4; i++)
+                {
+                    float lx = (i & 1) == 0 ? fp[0] : fp[2], ly = (i & 2) == 0 ? fp[1] : fp[3];
+                    if (Soil(M, p + sx * lx + facing * ly, true, false) == 2) { _lastWhy = 2; return true; }
+                }
+            }
+            catch (Exception e) { _stumble("WetCorners", e); }
+            return false;
+        }
+
+        /// <summary>312h (A2): wynik DryCentre - przesuniecie srodka (m), suche i plaskie probki w promieniu DryRadius wokol wybranego srodka i wokol srodka sceny.</summary>
+        internal sealed class DryPick { public float Shift; public int Dry, Dry0, All, Bad, Grid; public string Note; }
+
+        internal const float DryStep = 10f, DryRadius = 35f;
+        private const int DryMaxCells = 20;   // siatka najwyzej +-20 krokow (200 m) od srodka sceny
+
+        /// <summary>312h (A2): suchy srodek spaceru. Siatka co DryStep w granicach misji (prostokat granic, najwyzej +-200 m od c0), w kazdym wezle Soil
+        /// (woda przez renderer + stromizna); wezel poza granicami = mokry. Wynik: wezel suchy z najwieksza liczba suchych wezlow w promieniu DryRadius
+        /// (remis - blizej c0). c0 zostaje, gdy jest co najmniej tak dobry albo ma 90% suchych probek. Odczyt wody bez sensu na ponad 90% wezlow - c0 bez
+        /// zmian (Note). Wywrotka - potkniecie i c0. Tylko odczyt sceny, raz przy wejsciu.</summary>
+        internal static Vec2 DryCentre(Mission m, Vec2 c0, DryPick info, Action<string, Exception> stumble)
+        {
+            int rc = (int)Math.Ceiling(DryRadius / DryStep);
+            var offs = new List<int[]>();
+            for (int a = -rc; a <= rc; a++)
+                for (int b = -rc; b <= rc; b++)
+                    if ((a * a + b * b) * DryStep * DryStep <= DryRadius * DryRadius) offs.Add(new[] { a, b });
+            info.All = offs.Count;
+            try
+            {
+                // prostokat granic misji w krokach siatki od c0
+                int i0 = -7, i1 = 7, j0 = -7, j1 = 7;
+                float mnx = float.MaxValue, mny = float.MaxValue, mxx = float.MinValue, mxy = float.MinValue;
+                foreach (var kv in m.Boundaries)
+                {
+                    if (kv.Value == null) continue;
+                    foreach (var q in kv.Value) { mnx = Math.Min(mnx, q.x); mny = Math.Min(mny, q.y); mxx = Math.Max(mxx, q.x); mxy = Math.Max(mxy, q.y); }
+                }
+                if (mnx < mxx && mny < mxy)
+                {
+                    i0 = (int)Math.Floor((mnx - c0.x) / DryStep); i1 = (int)Math.Ceiling((mxx - c0.x) / DryStep);
+                    j0 = (int)Math.Floor((mny - c0.y) / DryStep); j1 = (int)Math.Ceiling((mxy - c0.y) / DryStep);
+                }
+                i0 = Math.Max(-DryMaxCells, Math.Min(0, i0)); j0 = Math.Max(-DryMaxCells, Math.Min(0, j0));
+                i1 = Math.Min(DryMaxCells, Math.Max(0, i1)); j1 = Math.Min(DryMaxCells, Math.Max(0, j1));
+                int ni = i1 - i0 + 1, nj = j1 - j0 + 1;
+                var dry = new bool[ni, nj];
+                int inside = 0, bad = 0;
+                for (int i = 0; i < ni; i++)
+                    for (int j = 0; j < nj; j++)
+                    {
+                        var p = c0 + new Vec2((i + i0) * DryStep, (j + j0) * DryStep);
+                        if (!m.IsPositionInsideBoundaries(p)) continue;
+                        inside++;
+                        float h; Vec3 n;
+                        m.Scene.GetTerrainHeightAndNormal(p, out h, out n);
+                        float w = m.GetWaterLevelAtPosition(p, true);
+                        if (!Fin(w) || !Fin(h) || (w > -5000f && w < 5000f && w >= h + BadWaterAbove)) bad++;
+                        dry[i, j] = Soil(m, p, true, true) == 0;
+                    }
+                info.Grid = inside;
+                info.Bad = bad;
+                Func<int, int, int> score = delegate (int ci, int cj)
+                {
+                    int k = 0;
+                    foreach (var o in offs)
+                    {
+                        int a = ci + o[0], b = cj + o[1];
+                        if (a >= 0 && b >= 0 && a < ni && b < nj && dry[a, b]) k++;
+                    }
+                    return k;
+                };
+                int s0 = score(-i0, -j0);
+                info.Dry0 = s0;
+                info.Dry = s0;
+                if (inside == 0) { info.Note = "brak wezlow w granicach"; return c0; }
+                if (bad > inside * 0.9f) { info.Note = "odczyt wody bez sensu w " + bad + "/" + inside + " wezlach - srodek bez zmian"; return c0; }
+                if (s0 >= info.All * 0.9f) return c0;
+                int bi = -i0, bj = -j0, bs = s0;
+                float bd = 0f;
+                for (int i = 0; i < ni; i++)
+                    for (int j = 0; j < nj; j++)
+                    {
+                        if (!dry[i, j]) continue;
+                        int sc = score(i, j);
+                        float d = (float)Math.Sqrt((double)((i + i0) * (i + i0) + (j + j0) * (j + j0))) * DryStep;
+                        if (sc > bs || (sc == bs && bs > s0 && d < bd)) { bs = sc; bi = i; bj = j; bd = d; }
+                    }
+                if (bs <= s0) return c0;
+                var c = c0 + new Vec2((bi + i0) * DryStep, (bj + j0) * DryStep);
+                info.Dry = bs;
+                info.Shift = (c - c0).Length;
+                return c;
+            }
+            catch (Exception e) { if (stumble != null) stumble("DryCentre", e); info.Note = "blad odczytu"; return c0; }
+        }
+
+        /// <summary>Probki 7 x 7 co 10 m wokol srodka: gdy woda albo "cos stoi" na ponad 90% probek - ten odczyt jest dla tej sceny pomijany (wzor PD).
+        /// 312h (DryOn): woda przez renderer i stromizna liczone osobno, odczyt wody pomijany tylko gdy bez sensu (nie gdy scena jest mokra).</summary>
         internal void Probe()
         {
+            if (DryOn) { ProbeDry(); return; }
             int all = 0, wet = 0, top = 0;
             try
             {
@@ -1071,6 +1271,37 @@ namespace Armoury
                      + (_topOff ? " (odczyt cial pomijany)" : "") + ".");
         }
 
+        /// <summary>312h: Probe przy CampWalkDryGround - te same probki 7 x 7 co 10 m; woda przez renderer z zapasem WetMargin, stromizna, odczyty bez sensu.</summary>
+        private void ProbeDry()
+        {
+            int all = 0, wet = 0, steep = 0, top = 0, bad = 0;
+            try
+            {
+                var sc = M.Scene;
+                for (int ix = -3; ix <= 3; ix++)
+                    for (int iy = -3; iy <= 3; iy++)
+                    {
+                        Vec2 p = C + new Vec2(ix * 10f, iy * 10f);
+                        if (!Inside(p, true)) continue;
+                        all++;
+                        float g = sc.GetTerrainHeight(p, true);
+                        float t = sc.GetGroundHeightAtPosition(new Vec3(p.x, p.y, 1000f, -1f), TopMask);
+                        if (t > g + 0.8f && t < g + 200f) top++;
+                        float w = M.GetWaterLevelAtPosition(p, true);
+                        if (!Fin(w) || !Fin(g) || (w > -5000f && w < 5000f && w >= g + BadWaterAbove)) bad++;
+                        int why = Soil(M, p, true, true);
+                        if (why == 2) wet++;
+                        else if (why == 3) steep++;
+                    }
+            }
+            catch (Exception e) { _stumble("ProbeDry", e); }
+            _waterOff = all > 0 && bad > all * 0.9f;
+            _topOff = all > 0 && top > all * 0.9f;
+            Log.Info(_p + "probki terenu " + all + " (grunt: woda przez renderer, zapas " + WetMargin.ToString("0.0", CultureInfo.InvariantCulture) + " m, stromizna) | woda "
+                     + wet + " | stromo " + steep + " | odczyt wody bez sensu " + bad + (_waterOff ? " (odczyt wody pomijany)" : "") + " | drzewa/skaly " + top
+                     + (_topOff ? " (odczyt cial pomijany)" : "") + ".");
+        }
+
         /// <summary>Wolne miejsce najblizej at (przesuniecia jak PD): w granicach sceny, bez drzew/skal/wody, bez wejscia obrysem (name - prefab z tabeli
         /// Footprints, null - kwadrat 2r) w obrys juz postawionego elementu, w bitwie nie blizej niz Clear od wojska. false - nic wolnego (przyczyna w _why:
         /// wojsko, potem obrysy, teren, granica).</summary>
@@ -1079,12 +1310,12 @@ namespace Armoury
             if (facing.LengthSquared < 0.0001f) facing = new Vec2(0f, 1f);
             facing.Normalize();
             var side = new Vec2(facing.y, -facing.x);
-            bool overlap = false, troops = false, terrain = false;
+            bool overlap = false, troops = false, terrain = false, wet = false, steep = false;
             for (int i = 0; i < Shifts.GetLength(0); i++)
             {
                 Vec2 p = at + side * Shifts[i, 0] + facing * Shifts[i, 1];
                 if (!Inside(p, true)) continue;
-                if (Blocked(p, r)) { terrain = true; continue; }
+                if (Blocked(p, r) || WetCorners(name, p, facing)) { terrain = true; if (_lastWhy == 2) wet = true; else if (_lastWhy == 3) steep = true; continue; }
                 var box = Rect(name, r, p, facing);
                 if (Hits(box)) { overlap = true; continue; }
                 if (Clear > 0f && NearTroops(box)) { troops = true; continue; }
@@ -1095,6 +1326,8 @@ namespace Armoury
             BlockedN++;
             if (overlap) Overlap++;
             _why = troops ? 3 : overlap ? 2 : terrain ? 1 : 0;
+            if (_why == 1 && wet) SkipWet++;
+            else if (_why == 1 && steep) SkipSteep++;
             return false;
         }
 
@@ -1168,7 +1401,7 @@ namespace Armoury
                     n++;
                     var box = Sq(p, 1f);
                     if (!Inside(p, false)) { SkipBorder++; done++; continue; }   // konie tylko w polu bitwy (agenci)
-                    if (Blocked(p, 1f)) { SkipTerrain++; done++; continue; }
+                    if (Blocked(p, 1f)) { SkipTerrain++; if (DryOn && _lastWhy == 2) SkipWet++; else if (DryOn && _lastWhy == 3) SkipSteep++; done++; continue; }
                     if (Hits(box)) { SkipOverlap++; done++; continue; }
                     if (NearTroops(box)) { SkipTroops++; done++; continue; }
                     if (Tether(train[i], default(EquipmentElement), p, side)) { Occupy(box); Placed.Add(box); Horses++; TrainHorses++; }
