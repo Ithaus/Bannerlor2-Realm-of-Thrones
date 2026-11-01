@@ -564,9 +564,10 @@ namespace Armoury
             return __exception;
         }
 
-        public static void CapturePre(MBReadOnlyList<MapEventParty> __0, out LState __state)
+        public static void CapturePre(MapEvent __instance, MBReadOnlyList<MapEventParty> __0, out LState __state)
         {
             __state = null;
+            BattleLosses312.CaptureOpen(__instance, __0);   // 312f: okno pojmania tej bitwy (gracz i AI, ranni / zdrowi) - wlasny klucz, nie rzuca
             try
             {
                 if (!On || __0 == null) return;
@@ -577,8 +578,9 @@ namespace Armoury
             catch (Exception e) { __state = null; Stumble("CapturePre", e); }
         }
 
-        public static Exception CaptureFin(Exception __exception, LState __state)
+        public static Exception CaptureFin(MapEvent __instance, Exception __exception, LState __state)
         {
+            BattleLosses312.CaptureClose(__instance);       // 312f: koniec okna pojmania (przed wyjsciem przy __state == null)
             try
             {
                 if (__state == null) return __exception;

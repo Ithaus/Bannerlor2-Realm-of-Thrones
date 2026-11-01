@@ -143,6 +143,7 @@ namespace Armoury
         /// <summary>Prefiks CalculateAndCommitMapEventResults (Priority 801 - przed H3 i przed jencami): migawka skladu stron.</summary>
         public static void ResultsPrefix(MapEvent __instance)
         {
+            BattleLosses312.Snap(__instance);   // 312f: migawka strat po walce (przed H3) - wlasny klucz BattleLossesLog, nie rzuca
             try
             {
                 if (!On || __instance == null) return;
