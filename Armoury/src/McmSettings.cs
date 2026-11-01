@@ -10176,6 +10176,50 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public int CanonFeudWarMinDays { get; set; } = 91;
 
+        [SettingPropertyBool("Ambition for the Iron Throne", HintText = "every realm of Westeros but the North wants to rule all of Westeros. When it is strong enough and its treasury can pay for it, it is eager to go to war with whoever holds King's Landing, and the realm on the Iron Throne is eager to bring the rebels - and the North above all - back under its rule. The North wants only to stay a kingdom of its own: it fights to win back northern lands, never for the throne. Aegon and Daenerys join in only after they have landed in Westeros; the realms of Essos feel no such ambition. Truces, pacts and alliances still hold. Never pushes your own realm into a war (off = wars as Banner Kings judges them)", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool IronThroneAmbition { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Iron Throne Ambition Score", 0.00f, 20000.00f, "0", HintText = "how much the ambition adds to a realm's will to declare war at full strength (Banner Kings scale - a war justification is worth 2500 to 8000)", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public float IronThroneAmbitionScore { get; set; } = 4000f;
+
+        [SettingPropertyInteger("Iron Throne Max Wars", 1, 10, "0", HintText = "a realm already at war with this many realms (not counting the Night's Watch and the Free Folk) feels no ambition for another war", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public int IronThroneMaxWars { get; set; } = 2;
+
+        [SettingPropertyFloatingInteger("Iron Throne Strength Min", 0.50f, 3.00f, "0.00", HintText = "the ambition wakes only when a realm is at least this many times as strong as its target, the target's allies and its own other enemies (allies and other enemies counted at half)", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public float IronThroneStrengthMin { get; set; } = 1.0f;
+
+        [SettingPropertyFloatingInteger("Iron Throne Strength Full", 0.60f, 5.00f, "0.00", HintText = "at this many times the target's strength the ambition is at its full score", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public float IronThroneStrengthFull { get; set; } = 1.5f;
+
+        [SettingPropertyInteger("Iron Throne War Gap Days", 0, 364, "0", HintText = "after a war for the throne is declared anywhere, no other realm feels the ambition for this many days", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public int IronThroneWarGapDays { get; set; } = 14;
+
+        [SettingPropertyFloatingInteger("Iron Throne Weary At", 1.00f, 100.00f, "0", HintText = "a realm whose war weariness (Diplomacy) in any of its wars has reached this level feels no ambition (100 = forced peace)", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public float IronThroneWearyAt { get; set; } = 50f;
+
+        [SettingPropertyBool("Spare the War of the Five Kings", HintText = "no ambition for the Iron Throne anywhere in Westeros until the Red Wedding (or Robb Stark's death), so the War of the Five Kings goes on as in the books (off = the ambition may start new wars in Westeros at once)", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool IronThroneSpareFiveKings { get; set; } = true;
+
+        [SettingPropertyBool("The North Waits for the Bastards", HintText = "no war for the throne against or by the North (or a realm allied with it) until the Battle of the Bastards is over, so the story of the North runs as in Realm of Thrones; after it, the realm on the Iron Throne and the strong claimants may march north (off = from the Red Wedding)", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool IronThroneNorthAfterBastards { get; set; } = true;
+
+        [SettingPropertyBool("The North Reclaims Its Lands", HintText = "the North is eager to go to war with a realm of Westeros that holds castles or towns of the North - only for those lands, never for the Iron Throne", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool IronThroneNorthReclaims { get; set; } = true;
+
+        [SettingPropertyBool("Iron Throne Targets Your Realm", HintText = "AI realms may go to war with your realm for the throne (off = the ambition never makes a realm declare war on yours)", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool IronThroneTargetsPlayer { get; set; } = true;
+
         [SettingPropertyBool("Daenerys Dragons Grow", HintText = "Daenerys' dragons grow up with the story: in the prologue they are still eggs, and while they grow none of them can carry her, so Daenerys rides a horse from her own train. Drogon first carries her when he is full-grown, as in the books (about the time of Daznak's Pit, before her invasion of Westeros). Only in Prologue 298 campaigns and in campaigns started after this update. Off = Drogon is full-grown from the first day, as in Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool DaenerysDragonsGrow { get; set; } = true;
@@ -13435,6 +13479,17 @@ namespace Armoury
             s.CanonWarNoPeaceUntilRedWedding = CanonWarNoPeaceUntilRedWedding;
             s.CanonFeudWarsEnd = CanonFeudWarsEnd;
             s.CanonFeudWarMinDays = CanonFeudWarMinDays;
+            s.IronThroneAmbition = IronThroneAmbition;
+            s.IronThroneAmbitionScore = IronThroneAmbitionScore;
+            s.IronThroneMaxWars = IronThroneMaxWars;
+            s.IronThroneStrengthMin = IronThroneStrengthMin;
+            s.IronThroneStrengthFull = IronThroneStrengthFull;
+            s.IronThroneWarGapDays = IronThroneWarGapDays;
+            s.IronThroneWearyAt = IronThroneWearyAt;
+            s.IronThroneSpareFiveKings = IronThroneSpareFiveKings;
+            s.IronThroneNorthAfterBastards = IronThroneNorthAfterBastards;
+            s.IronThroneNorthReclaims = IronThroneNorthReclaims;
+            s.IronThroneTargetsPlayer = IronThroneTargetsPlayer;
             s.DaenerysDragonsGrow = DaenerysDragonsGrow;
             s.CanonNorthRiverlandsUnion = CanonNorthRiverlandsUnion;
             s.CanonWarBalance = CanonWarBalance;

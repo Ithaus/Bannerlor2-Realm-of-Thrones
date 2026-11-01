@@ -371,6 +371,9 @@ namespace Armoury
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => Prologue.WarsOnNewGame());   // R1: zakres (2) i (3) - znacznik nowej kampanii
             CampaignEvents.WarDeclared.AddNonSerializedListener(this, Prologue.FeudOnWar);    // 312b: wojna w zwolnionym zatargu (ROT wznowil - ma byc 0)
             CampaignEvents.MakePeace.AddNonSerializedListener(this, Prologue.FeudOnPeace);    // 312b: pokoj w zwolnionym zatargu (droga)
+            CampaignEvents.WarDeclared.AddNonSerializedListener(this, CanonThroneWars.OnWar);   // 312c: wojna o tron / dolaczenie (klasyfikacja, przerwa)
+            CampaignEvents.MakePeace.AddNonSerializedListener(this, CanonThroneWars.OnPeace);   // 312c: pokoj w wojnie o tron
+            CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, CanonThroneWars.OnOwnerChanged);   // 312c recenzja: nowy pan King's Landing - pamiec doby od nowa
         }
 
         public override void SyncData(IDataStore dataStore)
@@ -379,6 +382,7 @@ namespace Armoury
             try { if (dataStore.IsSaving) v = Prologue.PackWars(); } catch (Exception e) { Prologue.CwStumble("PackWars", e); v = ""; }
             SaveText.Sync(dataStore, "arm_m104", ref v);
             if (dataStore.IsLoading) { try { Prologue.UnpackWars(v); } catch (Exception e) { Prologue.CwStumble("UnpackWars", e); } }
+            CanonThroneWars.Sync(dataStore);   // 312c: arm_t312 (przerwa po wojnie o tron, trwajace wojny o tron); zapis bez klucza = stan pusty
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)
@@ -387,6 +391,8 @@ namespace Armoury
             try { Prologue.WarsStartLine(); } catch (Exception e) { Prologue.CwStumble("WarsStartLine", e); }
             try { Prologue.InstallFeuds(); } catch (Exception e) { Prologue.FzStumble("InstallFeuds", e); }   // 312b: raz na proces, kazda kampania
             try { Prologue.FeudStartLine(); } catch (Exception e) { Prologue.FzStumble("FeudStartLine", e); }
+            try { CanonThroneWars.EnsureHooks(); } catch (Exception e) { CanonThroneWars.Stumble("EnsureHooks", e); }   // 312c: raz na proces, w kampanii (nigdy SubModuleMain)
+            try { CanonThroneWars.StartLine(); } catch (Exception e) { CanonThroneWars.Stumble("StartLine", e); }
         }
 
         private void OnHeroReleased(Hero prisoner, PartyBase party, IFaction capturer, EndCaptivityDetail detail, bool notify)
@@ -397,6 +403,7 @@ namespace Armoury
         private void OnDaily()
         {
             try { Prologue.WarsDaily(); } catch (Exception e) { Prologue.CwStumble("WarsDaily", e); }
+            try { CanonThroneWars.Daily(); } catch (Exception e) { CanonThroneWars.Stumble("Daily", e); }   // 312c: bieda skarbca (historia doby) i linia doby
         }
     }
 }
