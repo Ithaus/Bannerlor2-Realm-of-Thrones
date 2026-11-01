@@ -609,7 +609,10 @@ namespace Armoury
                     float r = (float)hand / men;
                     st.Ratio = r;
                     float thr = st.Ours && st.Applied == ArrangementOrder.ArrangementOrderEnum.ShieldWall ? WallKeep : WallFrom;
-                    if (r >= thr) want = WWall;
+                    // 313b (OutshotRushWithShields): szyk w Advance / Charge druzyny, ktora idzie pod ostrzalem (>= 2 zabitych od pociskow) - Loose zamiast muru
+                    // tarcz (ShieldWall ma limit biegu 0.3 - spacer pod strzalami); konnica uderzeniowa wroga w 90 m - decyzja jak dotad (K11)
+                    if ((beh == 0 || beh == 1) && OutshotRush.WantLoose(m, f, r >= thr)) want = WLoose;
+                    else if (r >= thr) want = WWall;
                     else if ((float)has / men >= WallFrom && st.FireStart >= 0f && _now - st.FireStart < WaitShields) want = WHold;
                     else if (horse) why = YHorse;
                     else want = WLoose;

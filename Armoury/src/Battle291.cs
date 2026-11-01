@@ -17,6 +17,7 @@ namespace Armoury
         {
             Doctrine.Dh291Reset();
             MarchToContact.Rush291Reset();
+            OutshotRush.Reset();   // 313b: segment E
         }
 
         internal static void Write(Mission m, string kind, string segA)
@@ -29,6 +30,7 @@ namespace Armoury
               .Append(", bieg bez tarcz ").Append(c != null && c.UnshieldedRushUnderFire ? "TAK" : "NIE")
               .Append(" | ").Append(segA ?? "A -")
               .Append(" | ").Append(Doctrine.Dh291Segment())
+              .Append(" | ").Append(OutshotRush.Segment())   // 313b: 291e bilans ognia i bieg z tarczami (miedzy B i C - wyrazenia B i C bitwa291 bez zmian)
               .Append(" | ").Append(MarchToContact.Rush291Segment())
               .Append('.');
             Log.Info(sb.ToString());

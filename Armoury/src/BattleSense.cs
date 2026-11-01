@@ -223,6 +223,7 @@ namespace Armoury
                 FrameCost309.Add(FrameCost309.MMarch, t309);
                 t309 = FrameCost309.T();
                 try { Doctrine.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Tick", e); }
+                try { OutshotRush.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "OutshotRush.Tick", e); }   // 313b: po 291e / S2 tego taktu
                 FrameCost309.Add(FrameCost309.MDoctrine, t309);
                 t309 = FrameCost309.T();
                 try { BattleSound.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Tick", e); }
@@ -398,6 +399,7 @@ namespace Armoury
             // noc 25.10 P0: koniec misji paczek nocy - bez bramki (End bezpieczne wielokrotnie i poza bitwa; dzwiek: Release wszystkich, linia misji)
             try { MarchToContact.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteMarch, "MarchToContact.End", e); }
             try { Doctrine.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.End", e); }
+            try { OutshotRush.End(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "OutshotRush.End", e); }   // 313b: postfiks celu wylaczony
             try { BattleSound.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.End", e); }
             // 140: linia "Bitwa (140 tarcze)" raz na bitwe, flagi postfiksow zgaszone (End bezpieczne wielokrotnie i poza bitwa)
             try { ShieldsUp.End(Mission); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.End", e); }
