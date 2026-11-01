@@ -9960,11 +9960,11 @@ namespace Armoury
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public int CampWalkMenPerTent { get; set; } = 6;
 
-        [SettingPropertyBool("Camp Walk Dry Ground", HintText = "camp scene on dry, level ground: tents, fires and bedrolls are never put in water, in shallow mud or on steep slopes (water is checked across each tent's whole footprint), and in a swampy scene your camp walk is moved to the driest flat spot inside the walk area (off = as before: water checked only at one point, the camp stays at the middle of the scene)", RequireRestart = false)]
+        [SettingPropertyBool("Camp Walk Dry Ground", HintText = "camp scene on dry, level ground: tents, fires, bedrolls and sleepers are not put in water or shallow mud (water checked around each spot and at the corners of the larger tents) or on steep ground; if the middle of the walk scene is wet (swamp, shore), your camp walk is moved to the driest spot inside the walk area - on dry hilly maps the camp stays where it was (off = as before: water checked only at one point, the camp stays at the middle of the scene)", RequireRestart = false)]
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public bool CampWalkDryGround { get; set; } = true;
 
-        [SettingPropertyBool("Camp Sleep In Tents", HintText = "at night in the camp scene your men sleep inside the soldiers' tents (two on the bedrolls of each tent) with one man keeping watch at each fire; by day the rest lie about beside the tents as before (off = as before: half the men round the fires and the rest beside the tents sleep on the bare ground)", RequireRestart = false)]
+        [SettingPropertyBool("Camp Sleep In Tents", HintText = "at night in the camp walk your men sleep inside the soldiers' tents (on the bedrolls, up to two per tent) and one man keeps watch at each fire; the rest of the column is out of sight in the tents; by day the men lie about beside the tents as before (off = as before: half the men round the fires and the rest beside the tents sleep on the bare ground)", RequireRestart = false)]
         [SettingPropertyGroup("Camp and baggage (night 20/21.10)")]
         public bool CampSleepInTents { get; set; } = true;
 
