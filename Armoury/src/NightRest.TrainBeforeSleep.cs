@@ -205,7 +205,7 @@ namespace Armoury
                 {
                     double hd = CampaignTime.Now.CurrentHourInDay;
                     double toNight = ((SleepNightStart - hd) % 24.0 + 24.0) % 24.0;
-                    if (toNight <= 0.25) why = "noc (pelny dzien " + F2((float)toNight) + " h przed noca snu)";
+                    if (toNight <= SleepNightEdgeH) why = "noc (pelny dzien " + F2((float)toNight) + " h przed noca snu)";
                 }
                 sleep = why.StartsWith("noc", StringComparison.Ordinal) && s != null && s.NightRestEnabled && !_sleeping && MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == null;
                 if (sleep) _tbsSleeps++;

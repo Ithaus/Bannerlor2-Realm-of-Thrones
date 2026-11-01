@@ -151,11 +151,24 @@ namespace Armoury
         private static double DawnHoldFromNow(Settings s)
         {
             if (s == null || !s.SleepUntilDawn) return -1;
-            if (!MenuNight(CampaignTime.Now.GetHourOfDay)) return -1;
+            if (!SleepNightNow()) return -1;   // 315a poprawka recenzji (1): ten sam prog co TbsEnd - trening konczy sie "pelnym dniem" o 17:45-17:59
             double hd = CampaignTime.Now.CurrentHourInDay;
             double d = ((PlayerDawn - hd) % 24.0 + 24.0) % 24.0;
             if (d < 0.01) return -1;
             return CampaignTime.Now.ToHours + d;
+        }
+
+        /// <summary>315a poprawka recenzji (1): zapas przed noca snu (godziny zegara) - koniec treningu 311e "pelnym dniem" na tyle przed SleepNightStart to juz
+        /// zmierzch snu (TbsEnd), a sen zaczety wtedy czeka do switu (DawnHoldFromNow). Jedna stala dla obu miejsc.</summary>
+        internal const double SleepNightEdgeH = 0.25;
+
+        /// <summary>315a poprawka recenzji (1): teraz jest noc snu - godzina w MenuNight albo do SleepNightStart zostalo najwyzej SleepNightEdgeH h zegara.</summary>
+        internal static bool SleepNightNow()
+        {
+            if (MenuNight(CampaignTime.Now.GetHourOfDay)) return true;
+            double hd = CampaignTime.Now.CurrentHourInDay;
+            double toNight = ((SleepNightStart - hd) % 24.0 + 24.0) % 24.0;
+            return toNight <= SleepNightEdgeH;
         }
 
         /// <summary>315a: godzina zegara H:MM (do linii logu snu).</summary>
@@ -2584,7 +2597,7 @@ namespace Armoury
                 // godziny i NIE cofa sie, gdy swit wyzeruje rachunek doby
                 _menuTarget = Math.Max(0.5f, needed - _restTonight);
                 int h = CampaignTime.Now.GetHourOfDay;
-                bool night = MenuNight(h);   // m97-oboz: 9 h zegara do switu gracza (swit 6 -> 21-5 jak dotad, swit 3 -> 18-2)
+                bool night = SleepNightNow();   // m97-oboz: 9 h zegara do switu gracza (swit 3 -> 18-2); 315a poprawka recenzji (1): z zapasem SleepNightEdgeH przed 18:00, jak czekanie do switu
                 _rouseAsked = false;
                 // KA (karczmy): sen w osadzie po oplaconym noclegu - pobudka nie przed switem (gdy swit w 12 h), tlo miasta, wlasny tekst (null = jak dotad)
                 string inn = TownInns.OnSleepInit(args);

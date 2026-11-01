@@ -1088,6 +1088,14 @@ namespace Armoury
                             }
                         }
                         if (isDawn && SettleAi(e, baza, nowH, maxF)) changed = true;
+                        // 315a poprawka recenzji (2): doczepiony do gracza, ktory spi w menu przez swit (sen do switu) - licznik snu ciaglego od zera dla nowej
+                        // doby, jak _menuDawnCut gracza; inaczej LeaveAcc po pobudce wpisywal cala noc (~9 h) do nowej doby i lord nie dostawal dlugu nastepnej
+                        // nocy, a gracz tak. Nie dotyczy wlasnego snu dlugu lorda (Kind 2 - sen ciagly przez swit z zasady)
+                        if (isDawn && e.Acc >= 0f && main != null && mp.AttachedTo == main && _sleeping && s.PlayerSleepGuard)
+                        {
+                            DebtSleeper dsOwn;
+                            if (!(_debtSleep.TryGetValue(mp, out dsOwn) && dsOwn.Kind == 2)) e.Acc = 0f;
+                        }
                     }
                     catch (Exception ex) { AiStumble("AiSleepLedger", mp, ex); }
                 }
