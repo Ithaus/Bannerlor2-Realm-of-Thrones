@@ -132,20 +132,20 @@ namespace Armoury
                 }
 
                 var slots = new List<ItemObject>();
-                AddWeaponFor(slots, main, SkillFor(ch, main), capT);
+                AddWeaponFor(slots, main, SkillFor(ch, main), capT, ch.Culture);
                 // AMUNICJA WEDLE SKILLA (Jeff 02.09: "strzal t6 bandyci nie moga
                 // miec"): Prawo Tieru daje strzalom/beltom wymog Bow/Crossbow,
                 // wiec wzorzec amunicji dobieramy po skillu strzelca, nie po zerze
                 // (zero = "najlepsza w grze", stad t6 u kazdego lucznika)
-                if (main == "bow") { AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT); AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT); }
-                else if (main == "xbow") { AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT); AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT); }
-                else if (main == "thr") AddWeaponFor(slots, "thr", sThr, capT);   // drugi pek oszczepow
+                if (main == "bow") { AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT, ch.Culture); AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT, ch.Culture); }
+                else if (main == "xbow") { AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT, ch.Culture); AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT, ch.Culture); }
+                else if (main == "thr") AddWeaponFor(slots, "thr", sThr, capT, ch.Culture);   // drugi pek oszczepow
                 if (shield != null && main != "two" && main != "pole" && slots.Count < 4) slots.Add(shield);
                 if (second != null && slots.Count < 4)
                 {
-                    AddWeaponFor(slots, second, SkillFor(ch, second), capT);
-                    if (second == "bow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT);
-                    else if (second == "xbow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT);
+                    AddWeaponFor(slots, second, SkillFor(ch, second), capT, ch.Culture);
+                    if (second == "bow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT, ch.Culture);
+                    else if (second == "xbow" && slots.Count < 4) AddPattern(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT, ch.Culture);
                 }
 
                 // KSIEGA MUSZTRY: reczne przypisania gracza maja pierwszenstwo
@@ -200,8 +200,8 @@ namespace Armoury
                     else if (it0.ItemType == ItemObject.ItemTypeEnum.Bolts) nBolts++;
                 }
                 int wantAmmo = anyPin ? 2 : 1;
-                for (int k = nArrows; hasBow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT);
-                for (int k = nBolts; hasXbow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT);
+                for (int k = nArrows; hasBow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Arrows, SkillFor(ch, "bow"), capT, ch.Culture);
+                for (int k = nBolts; hasXbow && k < wantAmmo; k++) FillFree(slots, ItemObject.ItemTypeEnum.Bolts, SkillFor(ch, "xbow"), capT, ch.Culture);
                 // wolny slot po rozkazie: bron boczna wzorca (miecz lucznika), gdy zadnej nie ma
                 if (anyPin && second != null && slots.Contains(null))
                 {
@@ -213,7 +213,7 @@ namespace Armoury
                     if (!melee)
                     {
                         var tmp = new List<ItemObject>();
-                        AddWeaponFor(tmp, second, SkillFor(ch, second), capT);
+                        AddWeaponFor(tmp, second, SkillFor(ch, second), capT, ch.Culture);
                         int free = slots.IndexOf(null);
                         if (tmp.Count > 0 && tmp[0] != null && free >= 0) slots[free] = tmp[0];
                     }
@@ -304,7 +304,7 @@ namespace Armoury
             }
         }
 
-        private static void AddWeaponFor(List<ItemObject> slots, string cls, int skill, int maxTier = 0)
+        private static void AddWeaponFor(List<ItemObject> slots, string cls, int skill, int maxTier = 0, CultureObject cult = null)
         {
             ItemObject.ItemTypeEnum type;
             switch (cls)
@@ -316,7 +316,7 @@ namespace Armoury
                 case "xbow": type = ItemObject.ItemTypeEnum.Crossbow; break;
                 default: type = ItemObject.ItemTypeEnum.Thrown; break;
             }
-            AddPattern(slots, type, skill, maxTier);
+            AddPattern(slots, type, skill, maxTier, cult);
         }
 
         /// <summary>Najlepsza bron danego typu W RAMACH skilla - do podmian
@@ -328,13 +328,20 @@ namespace Armoury
             return tmp.Count > 0 ? tmp[0] : null;
         }
 
-        private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo, int skill, int maxTier = 0)
+        /// <summary>313a: to samo dla konkretnego zolnierza - przy Skills Decide Culture Pattern wzorzec wedlug jego kultury (bez broni Dothrakow u nie-Dothraka);
+        /// klucz wylaczony albo bez zolnierza - jak PatternFor(type, skill). Bez licznika przydzialow (zamienniki DragonUnmount, podglad okna armii).</summary>
+        internal static ItemObject PatternFor(ItemObject.ItemTypeEnum type, int skill, CharacterObject who)
+        {
+            return BestPattern(type, skill, 0, who != null ? who.Culture : null, false);
+        }
+
+        private static void FillFree(List<ItemObject> slots, ItemObject.ItemTypeEnum ammo, int skill, int maxTier = 0, CultureObject cult = null)
         {
             for (int i = 0; i < 4 && i < slots.Count; i++)
                 if (slots[i] == null)
                 {
                     var tmp = new List<ItemObject>();
-                    AddPattern(tmp, ammo, skill, maxTier);
+                    AddPattern(tmp, ammo, skill, maxTier, cult);
                     if (tmp.Count > 0) slots[i] = tmp[0];
                     return;
                 }
@@ -456,15 +463,68 @@ namespace Armoury
         /// <summary>Wzorzec klasy: najlepsza bron (Effectiveness), ktorej
         /// WYMAGANIA jednostka spelnia (Difficulty <= skill; kubelki co 25 pkt,
         /// zeby cache nie pecznial). Legendy poza wzorcami.</summary>
-        private static void AddPattern(List<ItemObject> slots, ItemObject.ItemTypeEnum type, int skill, int maxTier = 0)
+        private static void AddPattern(List<ItemObject> slots, ItemObject.ItemTypeEnum type, int skill, int maxTier = 0, CultureObject cult = null)
         {
             if (slots.Count >= 4) return;
+            var best = BestPattern(type, skill, maxTier, cult, true);
+            if (best != null) slots.Add(best);
+        }
+
+        // ================================================================ 313a (Jeff 01.11: "te arakhi wywal ... pozamieniaj im to ... daj dobre miecze buzdygany")
+        // ZRODLO ARAKHOW: wzorzec klasy (bez kultury) to najlepsza bron typu w CALYM swiecie w granicy umiejetnosci i tieru - dla OneHandedWeapon przy
+        // umiejetnosci od 70 i tierze 3 jest nim arakh (wymog 70, mocny, tani). RearmBySkill wklada wzorzec do referencji DTE Assignment, a DTE dla partii, ktorych
+        // nie obsluguje zbrojownia (bandy, karawany, wiesniacy, milicje, patrole - SpawnAgentPatch.IsPartyValidForProcessing false, RandomizeNonHeroLedAiPartiesArmor
+        // TAK u Jeffa) robi new Assignment(...) + FillEmptySlots, czyli bron = wzorzec wprost (log 01.11 15:21:50: clegane_footman i mallister_footman bandy looters
+        // z arakhem i tarcza wzorca - "tarcza z szablonu zostaje"). Przy kluczu SkillsDecideCulturePattern: wzorzec wedlug kultury zolnierza - (0) jego kultura albo
+        // bez kultury, (1) ta sama strona Waskiego Morza, (2) reszta; w poziomie najlepsza jak dotad (RangedRank.Key). Bron Dothrakow (GearFit.DothOnly - nie nosi
+        // jej w ROT zaden zolnierz innej kultury) nigdy dla nie-Dothraka. Klucz wylaczony albo bez kultury = dokladnie stary wybor i stary klucz pamieci.
+        private static readonly Dictionary<string, bool> PatternDoth = new Dictionary<string, bool>();   // klucz wzorca kultury -> stara regula dalaby bron Dothrakow
+        private static readonly object PatternLock = new object();
+
+        internal static bool CultOn { get { var s = Settings.Current; return s != null && s.SkillsDecideCulturePattern; } }
+
+        /// <summary>313a: wzorce wedlug kultury od nowa (GearFit.Reset przez DothrakiArms.Reset - nowa sesja, nowy spis broni Dothrakow). Stare klucze (bez kultury) zostaja.</summary>
+        internal static void ResetCulturePatterns()
+        {
+            lock (PatternLock)
+            {
+                var drop = new List<string>(PatternDoth.Keys);
+                foreach (var k in drop) Pattern.Remove(k);
+                PatternDoth.Clear();
+            }
+        }
+
+        private static int CultLevel(string tc, ItemObject it)
+        {
+            string ic = it.Culture != null ? it.Culture.StringId : null;
+            if (string.IsNullOrEmpty(ic) || ic == "neutral_culture" || string.IsNullOrEmpty(tc) || ic == tc) return 0;
+            return GearFit.IsEssos(ic) == GearFit.IsEssos(tc) ? 1 : 2;
+        }
+
+        /// <summary>Wzorzec klasy (pamiec na klucz). cult == null albo klucz 313a wylaczony - stary wybor; inaczej wedlug kultury (opis wyzej). count - licznik
+        /// przydzialow z poprawionym wzorcem (RearmBySkill) do linii "Arakhy (313a)". Spis broni Dothrakow jeszcze niegotowy (przed startem gry) - wynik bez zapisu
+        /// w pamieci (inaczej arakh zostalby wzorcem na cala sesje). Pamiec pod zamkiem (ctor Assignment bywa na watku DTE).</summary>
+        internal static ItemObject BestPattern(ItemObject.ItemTypeEnum type, int skill, int maxTier, CultureObject cult, bool count)
+        {
             if (skill < 0) skill = 0;
+            string tc = cult != null && CultOn ? (cult.StringId ?? "") : null;
             string key = type + "|" + skill + "|" + maxTier;   // prog dokladny, jak przy pancerzu; przeglad 175: sufit tieru (0 = bez)
+            if (tc != null) key += "|c=" + tc;
             ItemObject best;
-            if (!Pattern.TryGetValue(key, out best))
+            bool hit, fixedDoth = false;
+            lock (PatternLock)
+            {
+                hit = Pattern.TryGetValue(key, out best);
+                if (hit && tc != null) PatternDoth.TryGetValue(key, out fixedDoth);
+            }
+            if (!hit)
             {
                 bool ok = true;
+                ItemObject old = null;
+                var lv = new ItemObject[3];
+                bool dothTroop = tc != null && GearFit.IsDoth(tc);
+                bool kinReady = tc == null || GearFit.KinReady;
+                int skipped = 0;
                 try
                 {
                     var all = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
@@ -486,13 +546,36 @@ namespace Armoury
                         if (it.NotMerchandise) continue;                         // unikaty imienne i itemy testowe
                         if (it.StringId != null && it.StringId.StartsWith("dragon_")) continue;
                         // 16.09: luki/kusze wg RangedRank (pod RBM naciag), reszta jak dawniej
-                        if (best == null || RangedRank.Key(it) > RangedRank.Key(best)) best = it;
+                        if (old == null || RangedRank.Key(it) > RangedRank.Key(old)) old = it;
+                        if (tc == null) continue;
+                        if (!dothTroop && GearFit.DothOnly(it)) { skipped++; continue; }   // 313a: bron Dothrakow nigdy dla nie-Dothraka
+                        int l = CultLevel(tc, it);
+                        if (lv[l] == null || RangedRank.Key(it) > RangedRank.Key(lv[l])) lv[l] = it;
                     }
                 }
                 catch (Exception e) { ok = false; Log.Error("SkillsDecide.AddPattern", e); }
-                if (ok) Pattern[key] = best;
+                int level = 3;
+                if (tc == null) best = old;
+                else
+                {
+                    best = null;
+                    for (int l = 0; l < 3 && best == null; l++) if (lv[l] != null) { best = lv[l]; level = l; }
+                    fixedDoth = old != null && best != old && !dothTroop && GearFit.DothOnly(old);
+                }
+                if (ok && kinReady)
+                {
+                    bool fresh;
+                    lock (PatternLock)
+                    {
+                        fresh = !Pattern.ContainsKey(key);
+                        Pattern[key] = best;
+                        if (tc != null) PatternDoth[key] = fixedDoth;
+                    }
+                    if (fresh && tc != null) DothrakiArms.NotePatternKey(level, skipped > 0, fixedDoth);
+                }
             }
-            if (best != null) slots.Add(best);
+            if (count && fixedDoth) DothrakiArms.NotePatternFixed();
+            return best;
         }
     }
 }

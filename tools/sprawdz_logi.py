@@ -89471,6 +89471,184 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return tron312c_main(rest[0] if rest else None)
     return _tron312c_main_prev(argv)
+# ---------------------------------------------------------------- paczka 313a (01.11): arakhy w Westeros - grupa arakh313a
+# Log Armoury (Armoury-*.log; linie z "[hh:mm:ss] " albo bez). Uzycie: --grupa arakh313a <Armoury-*.log>. Linie jak w C# DothrakiArms.Line313 i DothrakiArmsMission.Report.
+# Zrodlo arakhow (rozpoznanie 313a): wzorzec broni SkillsDecide bez kultury; partie bez zbrojowni DTE (bandy, karawany, wiesniacy, milicje, patrole) walcza nim wprost.
+# AR-S self-test wyrazen i wierszy (dobry i zly bieg na probkach);
+# AR-L w pliku jest linia "Arakhy (313a): dzien" (inaczej zly plik albo DLL sprzed 313a) - NIE;
+# AR-0 klucze Skills Decide Culture Pattern i Gear Fit Dothraki Only "tak" w kazdej linii doby (domyslne; "nie" = Jeff wylaczyl - NIE z opisem);
+# AR-1 zero "ERROR in DothrakiArms313a." i "ERROR in SkillsDecide." oraz potkniecia dzis 0 w kazdej linii doby;
+# AR-2 bitwy gracza: bron Dothrakow u nie-Dothrakow w partiach bez zbrojowni DTE dzis 0 w kazdej linii doby (pomiar po strazach - ma byc 0);
+# AR-3 straz przy spawnie: bez zamiennika zostawione dzis 0 w kazdej linii doby;
+# AR-4 spojnosc linii: nowych kluczy wzorca = wlasna + ta sama strona morza + inna + bez broni, poprawionych <= z pominieta bronia Dothrakow;
+# AR-5 linie "Bron Dothrakow w bitwie (pomiar)" po pierwszej linii 313a: w "najczesciej" zero pozycji nie-Dothrakow (kultura poza khuzait/steppe_bandits)
+#      w bandach albo karawanach (partie bez zbrojowni DTE; "najczesciej" pokazuje do 6 pozycji - INFO, gdy linia ich nie wymienia);
+# INFO: wzorce poprawione (przydzialy, sesja), wymienione przy spawnie (sesja), wszystkie bitwy z bronia Dothrakow u nie-Dothrakow (z ostatnia deska podlogi).
+AR313_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
+AR313_DAY = re.compile(r"^Arakhy \(313a\): dzien (\d+) \| Skills Decide Culture Pattern (tak|nie), Gear Fit Dothraki Only (tak|nie) \| zrodlo: .*? "
+                       r"\| wzorce: przydzialow z wzorcem poprawionym \(stara regula dalaby bron Dothrakow\) dzis (\d+) \(sesja (\d+)\), nowych kluczy wzorca (\d+) "
+                       r"\(wlasna kultura (\d+), ta sama strona morza (\d+), inna (\d+), bez broni (\d+); z pominieta bronia Dothrakow (\d+), poprawionych (\d+)\) "
+                       r"\| straz przy spawnie \(partie bez zbrojowni DTE\): wymienione dzis (\d+) \(sesja (\d+)\), bez zamiennika zostawione dzis (\d+) \(sesja (\d+)\) "
+                       r"\| bitwy gracza \(pomiar, Dothraki Arms Census Log (tak|nie)\): bron Dothrakow u nie-Dothrakow po strazach dzis (\d+) \(sesja (\d+)\), "
+                       r"w partiach bez zbrojowni DTE dzis (\d+) \(sesja (\d+); ma byc 0\) \| potkniecia dzis (\d+) \(sesja (\d+)\)\.$")
+# grupy: 1 dzien, 2 klucz 313a, 3 Dothraki Only, 4-5 poprawione dzis/sesja, 6 kluczy, 7-10 poziomy 0/1/2/bez, 11 z pominieta, 12 poprawionych,
+# 13-14 wymienione dzis/sesja, 15-16 zostawione dzis/sesja, 17 pomiar, 18-19 w bitwach dzis/sesja, 20-21 bez zbrojowni dzis/sesja, 22-23 potkniecia
+AR313_BATTLE = re.compile(r"^Bron Dothrakow w bitwie \(pomiar\): dzien (\d+) \| .*? \| najczesciej: (.*?) \| zbrojownie DTE")
+AR313_ITEM = re.compile(r"^(\S+) \((\S+), (\S+(?: i milicje)?) (\S+), (Westeros|Essos), (Twoi|sojusznik|wrog)\) x(\d+)$")
+AR313_DOTH = {"khuzait", "steppe_bandits"}
+
+AR313_SAMPLE_DAY = ("Arakhy (313a): dzien 108890 | Skills Decide Culture Pattern tak, Gear Fit Dothraki Only tak | zrodlo: wzorzec broni SkillsDecide (postfiks ctora DTE "
+                    "Assignment; dotad bez kultury - najlepsza bron klasy w swiecie, przy umiejetnosci od 70 i tierze 3 arakh) - partie bez zbrojowni DTE (bandy, karawany, "
+                    "wiesniacy, milicje, patrole: DTE RandomizeNonHeroLed daje im bron wprost ze wzorca) | wzorce: przydzialow z wzorcem poprawionym (stara regula dalaby bron "
+                    "Dothrakow) dzis 412 (sesja 412), nowych kluczy wzorca 37 (wlasna kultura 30, ta sama strona morza 5, inna 1, bez broni 1; z pominieta bronia Dothrakow 9, "
+                    "poprawionych 6) | straz przy spawnie (partie bez zbrojowni DTE): wymienione dzis 0 (sesja 0), bez zamiennika zostawione dzis 0 (sesja 0) | bitwy gracza "
+                    "(pomiar, Dothraki Arms Census Log tak): bron Dothrakow u nie-Dothrakow po strazach dzis 0 (sesja 0), w partiach bez zbrojowni DTE dzis 0 (sesja 0; ma byc 0) "
+                    "| potkniecia dzis 0 (sesja 0).")
+AR313_SAMPLE_BATTLE = ("Bron Dothrakow w bitwie (pomiar): dzien 108890 | ludzi w bitwie (bez bohaterow) 36, z bronia Dothrakow 2 (bohaterowie z nia 0 - bez zmian) | kultura "
+                       "zolnierza: Dothrakowie 2 (w bandach w Westeros 2), inni 0 (ma byc 0 poza ostatnia deska podlogi) | strona: Twoi 0, sojusznicy 0, wrog 2 | partie: bandy 2, "
+                       "lordowie 0, zalogi i milicje 0, karawany 0, inne 0 | strona morza partii: Westeros 2, Essos 0 | najczesciej: khuzait_horseman (khuzait, bandy sea_raiders, "
+                       "Westeros, wrog) x2 | zbrojownie DTE partii wroga (po bitwie DTE kopiuje je zwyciezcy): partii z bronia Dothrakow 0 z 1, szt. 0 (bandy 0, szt. 0) | potkniecia 0.")
+AR313_SAMPLE_BATTLE_BAD = AR313_SAMPLE_BATTLE.replace("najczesciej: khuzait_horseman (khuzait, bandy sea_raiders, Westeros, wrog) x2",
+                                                      "najczesciej: clegane_footman (vlandia, bandy looters, Westeros, wrog) x7; mallister_footman (river, bandy looters, Westeros, wrog) x3")
+
+
+def ar313_strip(line):
+    return AR313_TS.sub("", line.rstrip("\r\n"))
+
+
+def ar313_bad_items(battle_line):
+    """Pozycje "najczesciej" nie-Dothrakow w bandach albo karawanach; None - linia nie pasuje."""
+    m = AR313_BATTLE.search(battle_line)
+    if not m:
+        return None
+    bad = []
+    if m.group(2) == "-":
+        return bad
+    for part in m.group(2).split("; "):
+        a = AR313_ITEM.match(part.strip())
+        if not a:
+            continue
+        cult, kind = a.group(2), a.group(3)
+        if cult not in AR313_DOTH and kind in ("bandy", "karawany"):
+            bad.append(f"{a.group(1)} ({cult}, {kind} {a.group(4)}) x{a.group(7)}")
+    return bad
+
+
+def ar313_rows(rep, days, errors, battles):
+    """days: linie doby 313a, errors: linie ERROR, battles: linie pomiaru bitwy po pierwszej linii 313a."""
+    ms = [AR313_DAY.search(d) for d in days]
+    unparsed = sum(1 for m in ms if m is None)
+    ms = [m for m in ms if m]
+    if not ms:
+        rep.add("AR-0: klucze 313a tak", "brak linii doby 313a", "kazda doba tak", None)
+        rep.add("AR-1: bez bledow i potkniec", f"bledow {len(errors)}", "0", None if not errors else False)
+        rep.add("AR-2: bron Dothrakow u nie-Dothrakow (partie bez zbrojowni DTE) w bitwach gracza", "brak linii", "0 kazdej doby", None)
+        rep.add("AR-3: straz przy spawnie bez zamiennika", "brak linii", "0 kazdej doby", None)
+        rep.add("AR-4: spojnosc linii doby", "brak linii", "kluczy = suma poziomow", None)
+    else:
+        off = [m.group(1) for m in ms if m.group(2) != "tak" or m.group(3) != "tak"]
+        rep.add("AR-0: klucze 313a tak", f"dob {len(ms)}, z kluczem wylaczonym {len(off)}" + (f" (np. dzien {off[0]})" if off else ""), "kazda doba tak", not off)
+        st = [m.group(1) for m in ms if int(m.group(22)) != 0]
+        rep.add("AR-1: bez bledow i potkniec", f"bledow {len(errors)}" + (f" ({errors[0][:120]})" if errors else "") + f", dob z potknieciami {len(st)}"
+                + (f", linii doby nieczytelnych {unparsed}" if unparsed else ""), "0 i 0", not errors and not st and unparsed == 0)
+        bad2 = [(m.group(1), m.group(20)) for m in ms if int(m.group(20)) != 0]
+        rep.add("AR-2: bron Dothrakow u nie-Dothrakow (partie bez zbrojowni DTE) w bitwach gracza",
+                f"dob {len(ms)}, z wynikiem > 0 {len(bad2)}" + (f" (np. dzien {bad2[0][0]}: {bad2[0][1]})" if bad2 else "")
+                + ("" if all(m.group(17) == "tak" for m in ms) else " - pomiar wylaczony w czesci dob"), "0 kazdej doby", not bad2)
+        bad3 = [(m.group(1), m.group(15)) for m in ms if int(m.group(15)) != 0]
+        rep.add("AR-3: straz przy spawnie bez zamiennika", f"dob z zostawionymi {len(bad3)}" + (f" (np. dzien {bad3[0][0]}: {bad3[0][1]})" if bad3 else ""),
+                "0 kazdej doby", not bad3)
+        bad4 = [m.group(1) for m in ms
+                if int(m.group(6)) != int(m.group(7)) + int(m.group(8)) + int(m.group(9)) + int(m.group(10)) or int(m.group(12)) > int(m.group(11))]
+        rep.add("AR-4: spojnosc linii doby", f"dob niespojnych {len(bad4)}" + (f" (np. dzien {bad4[0]})" if bad4 else ""),
+                "kluczy = suma poziomow, poprawionych <= z pominieta bronia Dothrakow", not bad4)
+        last = ms[-1]
+        rep.add("AR-I: wzorce i straz (INFO)", f"przydzialow z wzorcem poprawionym (sesja) {last.group(5)}, wymienione przy spawnie (sesja) {last.group(14)}, "
+                f"wszystkie bitwy gracza - bron Dothrakow u nie-Dothrakow (sesja, z ostatnia deska podlogi) {last.group(19)}", "-", None)
+    if not battles:
+        rep.add("AR-5: pomiar bitew - nie-Dothrakowie w bandach/karawanach", "brak linii pomiaru bitwy po 313a", "0 pozycji", None)
+    else:
+        bad5, unp = [], 0
+        for b in battles:
+            r = ar313_bad_items(b)
+            if r is None:
+                unp += 1
+            else:
+                bad5.extend(r)
+        rep.add("AR-5: pomiar bitew - nie-Dothrakowie w bandach/karawanach", f"bitew {len(battles)}, pozycji {len(bad5)}" + (f" (np. {bad5[0]})" if bad5 else "")
+                + (f", linii nieczytelnych {unp}" if unp else ""), "0 pozycji", not bad5 and unp == 0)
+
+
+def arakh313a_selftest():
+    if not AR313_DAY.search(AR313_SAMPLE_DAY):
+        return "wyrazenie DAY nie pasuje do probki"
+    if ar313_bad_items(AR313_SAMPLE_BATTLE) != [] or len(ar313_bad_items(AR313_SAMPLE_BATTLE_BAD) or []) != 2:
+        return "pozycje 'najczesciej' nie rozpoznane"
+    rep = Report()
+    ar313_rows(rep, [AR313_SAMPLE_DAY], [], [AR313_SAMPLE_BATTLE])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    bad = [k for k in ("AR-0", "AR-1", "AR-2", "AR-3", "AR-4", "AR-5") if v.get(k) != "TAK"]
+    if bad:
+        return f"dobry bieg - nie TAK: {bad}"
+    d_bad = (AR313_SAMPLE_DAY.replace("Skills Decide Culture Pattern tak", "Skills Decide Culture Pattern nie")
+             .replace("w partiach bez zbrojowni DTE dzis 0 (sesja 0", "w partiach bez zbrojowni DTE dzis 10 (sesja 10")
+             .replace("bez zamiennika zostawione dzis 0", "bez zamiennika zostawione dzis 2")
+             .replace("nowych kluczy wzorca 37", "nowych kluczy wzorca 38")
+             .replace("potkniecia dzis 0 (sesja 0)", "potkniecia dzis 1 (sesja 1)"))
+    rep = Report()
+    ar313_rows(rep, [d_bad], ["ERROR in DothrakiArms313a.SpawnGuard: x"], [AR313_SAMPLE_BATTLE_BAD])
+    v = {r[0].split(":")[0]: r[3] for r in rep.rows}
+    miss = [k for k in ("AR-0", "AR-1", "AR-2", "AR-3", "AR-4", "AR-5") if v.get(k) != "NIE"]
+    if miss:
+        return f"zly bieg nie wykryty: {miss}"
+    rep = Report()
+    ar313_rows(rep, [], [], [])
+    if any(r[3] != "INFO" for r in rep.rows):
+        return "pusty log - werdykt inny niz INFO"
+    return None
+
+
+def arakh313a_main(logp):
+    """arakh313a (01.11, paczka 313a): AR-S, AR-L, AR-0..5 - opis nad AR313_*. Strumieniowo, tylko odczyt logu Armoury."""
+    rep = Report()
+    s1 = arakh313a_selftest()
+    rep.add("AR-S: self-test wyrazen i wierszy (linie 313a jak w C#)", s1 or "OK", "OK", s1 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("AR-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    days, errors, battles = [], [], []
+    seen = False
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = ar313_strip(line)
+            if s.startswith("Arakhy (313a): dzien"):
+                days.append(s)
+                seen = True
+            elif s.startswith("ERROR in DothrakiArms313a.") or s.startswith("ERROR in SkillsDecide."):
+                errors.append(s)
+            elif seen and s.startswith("Bron Dothrakow w bitwie (pomiar)"):
+                battles.append(s)
+    print(f"plik: {logp}")
+    rep.add("AR-L: log Armoury z liniami 313a", f"linii doby {len(days)}", ">= 1 (inaczej zly plik albo DLL sprzed 313a)", len(days) > 0)
+    ar313_rows(rep, days, errors, battles)
+    rep.show()
+    return 0
+
+
+_arakh313a_main_prev = main
+
+
+def main(argv):
+    # paczka 313a: grupa arakh313a - opakowanie main jak tron312c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "arakh313a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return arakh313a_main(rest[0] if rest else None)
+    return _arakh313a_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

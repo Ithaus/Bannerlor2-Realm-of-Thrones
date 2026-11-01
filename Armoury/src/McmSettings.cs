@@ -6356,6 +6356,10 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitKinItemLevel { get; set; } = true;
 
+        [SettingPropertyBool("Skills Decide Culture Pattern", HintText = "the weapons a soldier is matched to by his skills come from his own people first, then from his side of the Narrow Sea - never an arakh or other Dothraki-only weapon for a man who is not Dothraki; bands, caravans, militia and villagers, who carry that pattern outright, now get good swords, maces and axes of their own land, and such a man who still turns up in battle with a Dothraki weapon gets one of the same kind from his people instead (off = as before: the best weapon of its class in the whole world, often an arakh)", RequireRestart = false)]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool SkillsDecideCulturePattern { get; set; } = true;
+
         [SettingPropertyBool("Gear Fit Dothraki Only", HintText = "the arakh and the other Dothraki weapons no other people's troops carry in Realm of Thrones are for Dothraki soldiers only: Free Cities, Ghis, Yi Ti and every army of Westeros no longer buy or wear them, battle takes them off such men and gives them a weapon from the stores instead, and a bare-handed man gets one only when the stores hold no other weapon he can wield; lords, wanderers and named items are not touched (off = as before: anyone from the Essos side may carry an arakh)", RequireRestart = false)]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitDothrakiOnly { get; set; } = true;
@@ -12524,6 +12528,7 @@ namespace Armoury
             s.GearFitKits = GearFitKits;
             s.GearFitCulture = GearFitCulture;
             s.GearFitKinItemLevel = GearFitKinItemLevel;
+            s.SkillsDecideCulturePattern = SkillsDecideCulturePattern;
             s.GearFitDothrakiOnly = GearFitDothrakiOnly;
             s.DothrakiArmsCensusLog = DothrakiArmsCensusLog;
             s.GearFitWeaponFloor = GearFitWeaponFloor;

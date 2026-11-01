@@ -375,6 +375,10 @@ namespace Armoury
             return o == Occupation.Soldier || o == Occupation.Mercenary || o == Occupation.Bandit || o == Occupation.CaravanGuard || o == Occupation.Guard || o == Occupation.PrisonGuard;
         }
 
+        /// <summary>313a: spis broni Dothrakow (migawka KinSnap) gotowy - przed startem gry DothOnly zwraca false dla wszystkiego (SkillsDecide.BestPattern nie zapisuje
+        /// wtedy wzorca w pamieci).</summary>
+        internal static bool KinReady { get { EnsureKin(); return _kin != null; } }
+
         private static void EnsureKin()
         {
             if (_kin != null) return;
