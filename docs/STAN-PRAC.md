@@ -1,6 +1,17 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
-## STAN 01.11.2026 ok. 01:55 CET (najnowszy - sekcja 31.10 nizej juz historyczna)
+## W TOKU 01.11.2026 popoludnie: seria 312 (decyzje Jeffa 01.11 na liste z raportu 147)
+- Jeff: 1 konce zatargow ROT tak ("kazdy chce zostac krolem i zdobyc zelazny tron"), 2 sprawdz czemu traca korony, 3 napraw przezbrojenia notabli,
+  4 rozbij straty przegranych, 5 wlacz mennice (zuzycie monety), 6 nowe wojny o Westeros bez psucia Wojny Pieciu Kroli (Polnoc chce byc osobna, poludnie
+  nie odda korony; wojna z rozejmami az ktos zjednoczy Westeros). Odpowiedzi na pytania: CISZA w Westeros do Krwawych Godow; na Polnoc dopiero po Bitwie Bekartow.
+  Odplywu srebra na Wschod Jeff nie zatwierdzil - nie robic.
+- Rozpoznania: scratchpad d16b0e41 rozp312 (korony: spadek skarbcow z zalozenia 19.10 8a "najpierw skarbiec", bledu brak; notable: prognoza z regionu, warsztat
+  pracuje z polki miasta; straty: 67-76% = padli, zabitych 22-32%; wojny-projekt + krytyk).
+- Galezie (wypchniete): 312a zuzycie monety 0.003, 312b konce zatargow (CanonFeudWarsEnd), 312d notable z rynku miasta (WorkshopRetoolOwnMarket) + log,
+  312e pomiar skarbcow (dopisek w "Skarbce:"), 312f linia strat bitwy (BattleLosses312) - scalone w noc/312x-integracja (Armoury 5d8b143c). 312c ambicja
+  tronu (IronThrone*, galaz noc/312c-tron) w kodzie. Potem: scalenie 312c, autotest zbiorczy (z flaga armoury-tron312-porw.flag dla 312c), wgranie 148.
+
+## STAN 01.11.2026 ok. 01:55 CET (sekcja 31.10 nizej juz historyczna)
 - W GRZE: Armoury.dll 92d0dd9294fd57055f6d509bdf5cfd3f + CrashScribe.dll aa32d04e399a2f54501d410e253b4f07 = WGRANIE 147 (galaz noc/311x-integracja2, wypchnieta;
   worktree scratchpad sesji d16b0e41 zb n311x). Kopie 146/146cs: *.bak-2026-11-01-przed-wgranie147 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie147-przed.
 - 147 = 311a AI obchodzi strzelca za oslona (AiFlankHiddenShooter), 311b mennica korony + 311b-2 (bez srebra w miastach ze zlotnikiem), 311c stala wycena warsztatow
