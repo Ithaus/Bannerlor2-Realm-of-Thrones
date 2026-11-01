@@ -1,5 +1,17 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 01.11.2026 ok. 01:55 CET (najnowszy - sekcja 31.10 nizej juz historyczna)
+- W GRZE: Armoury.dll 92d0dd9294fd57055f6d509bdf5cfd3f + CrashScribe.dll aa32d04e399a2f54501d410e253b4f07 = WGRANIE 147 (galaz noc/311x-integracja2, wypchnieta;
+  worktree scratchpad sesji d16b0e41 zb n311x). Kopie 146/146cs: *.bak-2026-11-01-przed-wgranie147 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie147-przed.
+- 147 = 311a AI obchodzi strzelca za oslona (AiFlankHiddenShooter), 311b mennica korony + 311b-2 (bez srebra w miastach ze zlotnikiem), 311c stala wycena warsztatow
+  + ranking "Warsztaty ranking (311c)", 311d/311d2 konie a tempo (zbrojownia niesie piechure, jakosc konia, jezdzcy bez konia pieszo, piechur na luzaku tempem jazdy,
+  garstka na drugiego), 311e trening przed snem (menu obozu, domyslnie 0 h), 311f CrashScribe: wnioski pokoju niedopuszczone przez ROT pomijane + pomiar E1w.
+- Test 311x (calosc): kod 0, ERROR 0, ARYTMETYKA 89/89, 0 NIE poza H311-6 (koszt 21 ms/dobe, przyjete). 311a i 311e NIE sprawdzone w tescie (bohater testowy
+  pod SI nie rusza sie - silnik ignoruje ruch skryptowy glownego agenta; CrashScribe-at-n311g w scratchpad d16b0e41 cs-at308) - Jeff sprawdza w grze.
+- DECYZJE JEFFA: (1) konce wojen-zatargow ROT spoza Wojny Pieciu Kroli (rozp311e/wojny-krytyk.md krok 3); (2) nowe wojny AI: 1593 losowan, 0 wnioskow - zawsze
+  "wartosc wojny < prog" (kary BK za trwajaca wojne / brak uzasadnienia) - zlagodzic? (3) zuzycie monety CoinWearPerYear domyslnie 0 - wlaczyc 0.003?
+- Rozpoznania z raportami: scratchpad d16b0e41 rozp311 (mennica, ai, polnoc), rozp311w (warsztaty, seagard), rozp311k (konie), rozp311e (wojny).
+
 ## STAN 31.10.2026 ok. 18:00 CET (najnowszy - starsze sekcje nizej sa historyczne; pelny dziennik dnia w docs/PRZEKAZANIE-2026-10-24-wieczor.md, wpisy 31.10)
 - W GRZE: Armoury.dll ed0199b997bebb13c90e4106d94e1dfe = WGRANIE 146 (galaz noc/310-strzaly-tarcze, wypchnieta; worktree scratchpad sesji d16b0e41 zb n310).
   CrashScribe 535aa8cd = WGRANIE 146cs (bef9db58 + latka smokow ROT 305c; zrodlo bef9db58 = 6888ffa3 potwierdzone dekompilacja). Kampania Jeffa: Ironman0gXONzURi8yO.sav (rod KARDA, Przemyslaw), nowa od 30.10.
