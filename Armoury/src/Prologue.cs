@@ -205,6 +205,7 @@ namespace Armoury
             ResetScenes();   // m103-sceny: maska scen prologu
             ResetWorld();    // m104-e5: sceny zmieniajace swiat
             ResetWars();     // m104-wojny: stan wojen kanonu (zapis arm_m104 - CanonWarsBehavior)
+            CanonThroneWars.Reset();   // 312c: ambicja Zelaznego Tronu (zapis arm_t312 - CanonWarsBehavior)
         }
 
         // ---------------------------------------------------------------- zapis

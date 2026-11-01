@@ -27,6 +27,13 @@ RANGES = {
     'CoinWearPerYear': (0.0, 0.2, "0.0000"),
     # 312b: konce zatargow ROT - kod przycina do 1..364 dni (Prologue.FeudMinDays)
     'CanonFeudWarMinDays': (1, 364, "0"),
+    # 312c: ambicja Zelaznego Tronu - kod przycina (CanonThroneWars.Score / MaxWars / StrMin / StrFull / GapDays / WearyAt)
+    'IronThroneAmbitionScore': (0, 20000, "0"),
+    'IronThroneMaxWars': (1, 10, "0"),
+    'IronThroneStrengthMin': (0.5, 3.0, "0.00"),
+    'IronThroneStrengthFull': (0.6, 5.0, "0.00"),
+    'IronThroneWarGapDays': (0, 364, "0"),
+    'IronThroneWearyAt': (1, 100, "0"),
     # 307c: oblezenia i cena warsztatu - kod przycina (SiegeWalls2.TimeFloor / SiegeWalls.RepelGrowth / RetryAfter / RetryRatio, WorkshopTrade.StockDays)
     'SiegeGameTimeTermFloor': (0.0, 0.8, "0.00"),
     'SiegeRepelPauseGrowth': (0.0, 2.0, "0.00"),
@@ -733,6 +740,18 @@ LABELS = {
     # 312b: nazwy z projektu (regula ogolna dalaby "Canon Feud Wars End")
     'CanonFeudWarsEnd': 'Old Feuds Can End',
     'CanonFeudWarMinDays': 'Feud War Min Days',
+    # 312c: nazwy z projektu (rozp312/wojny-projekt.md, klucze IronThrone*)
+    'IronThroneAmbition': 'Ambition for the Iron Throne',
+    'IronThroneAmbitionScore': 'Iron Throne Ambition Score',
+    'IronThroneMaxWars': 'Iron Throne Max Wars',
+    'IronThroneStrengthMin': 'Iron Throne Strength Min',
+    'IronThroneStrengthFull': 'Iron Throne Strength Full',
+    'IronThroneWarGapDays': 'Iron Throne War Gap Days',
+    'IronThroneWearyAt': 'Iron Throne Weary At',
+    'IronThroneSpareFiveKings': 'Spare the War of the Five Kings',
+    'IronThroneNorthAfterBastards': 'The North Waits for the Bastards',
+    'IronThroneNorthReclaims': 'The North Reclaims Its Lands',
+    'IronThroneTargetsPlayer': 'Iron Throne Targets Your Realm',
     'CanonHouses277Rename': 'Canon Houses of the West - Book Names',
     'CanonHouses277LiegePay': 'Canon Houses of the West - Liege Pays the Host',
     # 282: nazwy opisowe (regula ogolna dalaby "Caravan Bulk Flow Gate", "Town Material Order Ore Equal Cover")
