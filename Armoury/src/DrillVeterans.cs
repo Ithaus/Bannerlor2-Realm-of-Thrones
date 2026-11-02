@@ -55,6 +55,7 @@ namespace Armoury
                 {
                     d.Pool[c] += Pool[c]; d.Taught[c] += Taught[c]; d.Cap[c] += Cap[c]; d.U1[c] += U1[c]; d.U2[c] += U2[c]; d.U3[c] += U3[c];
                     d.Vets[c] += Vets[c]; d.Learn[c] += Learn[c]; d.Got[c] += Got[c];
+                    if (Cover[c] > d.Cover[c]) d.Cover[c] = Cover[c];   // recenzja 319b: linia gracza pokazywala pokrycie 0.00 (jedna partia - jej pokrycie; zbiorczo - najwyzsze)
                 }
                 d.DeadXp += DeadXp; d.DeadMen += DeadMen;
                 if (PoolAll > 0) d.Parties++;
