@@ -1,5 +1,37 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-02 WGRANIE 155 - noc/317a-klute-przed-cietymi (154 + 317a strzaly klute przed cietymi pod RBM); Armoury.dll 26ff5b5a040fd57ece443832d364fa07, CrashScribe.dll 25eafa5b6cc9605d5702d858dbea5933 (zrodlo = 147 aa32d04e + 317a Mends.RangedKey); kopie 154: *.bak-2026-11-02-przed-wgranie155 i D:/Backup-Bannerlord/wgrane/2026-11-02-wgranie155-przed
+
+**Problem:** Jeff 02.11: "czemu nie biora Ravens Teeth strzal" -> po wyliczeniu RBM (Pierce liczy pol pancerza tkaniny/skory/kolczugi, prog 2 zamiast 2.6): "klute przed cietymi tak"; "bez testu moja gra to bedzie test".
+**Zmiana:** wpis 317a ponizej (szkic zb/n317a-changelog.md): RangedRank.Key i CrashScribe Mends.RangedKey - amunicja pod RBM wedlug typu obrazen (P>C>B), potem obrazen, predkosci; papier QM dmg/typ/speed; grupa klute317a.
+**Testy:** BEZ AUTOTESTU i bez recenzji (polecenie Jeffa); build 0 bledow; grupa klute317a na logu syntetycznym TAK (podrzucony zly porzadek - NIE).
+**Ryzyko / co sprawdzic:** w grze Jeffa papier Arrows: ravens_teeth_arrows dmg=120P przed GRE dmg=135C, uzyte > 0 (--grupa klute317a); oba DLL musza byc razem (Mends.RangedKey = RangedRank.Key); CrashScribe zbudowany z repo (nie bajt w bajt z 147 - inna kompilacja), zmiana zrodla tylko RangedKey.
+**Status:** WGRANE 155 (bez autotestu)
+
+## 317a - klute strzaly przed cietymi (kwatermistrz, druzyna, dozbrajanie, wzorce, straz bitewna) (02.11)
+
+**Problem:** Jeff zapytal, ktore strzaly sa lepsze: 120 Pierce (Ravens' Teeth) czy 135 Cut (steel hardened barbed). Pod RBM klute wygrywaja z kolczuga/skora - Jeff: "klute przed cietymi tak". Papier kwatermistrza (Armoury-2026-11-01_22-56-32.log ok. 02:19:55 / 02:20:35): `GRE_hardened_100_gr_arrows wymog=175 skut=2327 t6 uzyte=6/6`, `ravens_teeth_arrows wymog=175 skut=146 t6 uzyte=0/24` - klute lezaly na polce, najlepsi lucznicy dostawali ciete.
+
+**Przyczyna:** `RangedRank.Key` (Armoury/src/RangedRank.cs) dla strzal i beltow bralo `ItemObject.Effectiveness * 100` - liczone przez gre raz z XML, ZANIM ROT pod RBM (ROTRBMCompatibility.ModifyBowsAndArrows) podmienia w locie dmg/predkosc/nazwe amunicji (ravens_teeth_arrows -> 120 Pierce speed 120 "Ravens' Teeth Arrows 100 gram"). Ten sam blad co luki 16.09, tylko luki/kusze dostaly wtedy klucz z runtime, amunicja nie. RBM (RBMCombat.RBMComputeDamage) dla Pierce ze strzaly/beltu polowi skutecznosc zbroi metalowej (material > 0 i != 4). To samo w CrashScribe `Mends.RangedKey` (straz bitewna SkillLawWard rozdziela noszone + polke wedlug tego klucza - bez zmiany bitwa oddalaby ciete z powrotem najlepszym).
+
+**Zmiana:**
+- Armoury/src/RangedRank.cs: `IsAmmo`, `AmmoTypeRank`; `Key` pod RBM dla Arrows/Bolts = typ obrazen (Pierce 3, Cut 2, Blunt 1, inny 0) x 1e9 + ThrustDamage x 1e6 + MissileSpeed x 1e3 + skutecznosc (0..999). Bez RBM - jak dotad. Luki/kusze bez zmian. `Describe` dla amunicji pod RBM: `dmg=120P speed=120` zamiast `skut=`.
+- Armoury/src/QuartermasterLaw.cs:915 naglowek papieru Arrows/Bolts: "(wymog malejaco, potem 317a typ obrazen P>C>B, dmg, speed RBM)".
+- CrashScribe/src/Mends.cs RangedKey: ta sama regula (trzymac w zgodzie, komentarz w kodzie).
+- Armoury/src/SwapMath.cs: komentarz pola Power.
+- tools/sprawdz_logi.py: grupa `klute317a` (K317-1 papier w nowym formacie, K317-2 P>C>B przy rownym wymogu, K317-3 ravens_teeth_arrows uzyte > 0, K317-4 bledy FitFor). Test: log syntetyczny (zly porzadek belt wylapany), stary log 01.11 - K317-1 NIE (stary DLL), reszta INFO.
+- Wymog (FitOrder: Req malejaco, potem Power) bez zmian.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Wolajacy RangedRank.Key: QuartermasterLaw.PieceOf (papier i rozdzial - cel zmiany), CompanionGear (druzyna: wymiana tylko na wyzszy tier i wyzsza sila - towarzysz z klutymi t4 NIE wezmie cietych t6; z cietymi wezmie klute wyzszego tieru), MenUpgrade.Wares/Pick (dozbrajanie ludzi, lordow, zalog: przy MenUpgradeAmmoNeedsSurplus=true u Jeffa - tylko wyzszy tier i Power wieksza; tak samo jak u towarzyszy), SkillsDecide.BestPattern (wzorzec amunicji dla DTE/band: najlepsze KLUTE w granicy skilla i tieru zamiast najwyzszej starej skutecznosci; ogniste dalej wykluczone). Jedna regula wszedzie.
+- MenUpgrade przy WYLACZONYM MenUpgradeAmmoNeedsSurplus: prog zysku (MenUpgradeMinGainPercent) liczony od Power - przy kluczu z baza typu 1e9 wymiana w tym samym typie i tym samym tierze praktycznie nie przejdzie (wczesniej: +10% skutecznosci). U Jeffa klucz wlaczony, wiec bez skutku.
+- Klute przed cietymi takze na plyte (material 4: RBM nie polowi) i na nieopancerzonych (tam 135 Cut bije 120 Pierce) - swiadoma decyzja Jeffa, jedna regula.
+- NIE zmienione (do decyzji): GearFit.Best (podloga pustych slotow) dalej rozstrzyga remis stara skutecznoscia; AiGear/MenPurse zakupy amunicji licza skutecznosc/cene (stara skutecznosc).
+- Dwa DLL (Armoury + CrashScribe) - jedno zjawisko; wgrac oba razem.
+- Do zobaczenia w logu: `Kwatermistrz: papier Arrows po kolei wyboru (... 317a typ obrazen P>C>B ...)`, wpis `ravens_teeth_arrows wymog=175 dmg=120P speed=120 t6 uzyte=N/24` z N > 0 i przed `GRE_hardened_100_gr_arrows ... dmg=135C`; `python -I tools/sprawdz_logi.py --grupa klute317a <Armoury-*.log>`.
+
+**Status:** DO SPRAWDZENIA (Armoury md5 26ff5b5a040fd57ece443832d364fa07, CrashScribe md5 25eafa5b6cc9605d5702d858dbea5933)
+
 ## 2026-11-02 WGRANIE 154 - noc/316x-integracja (153 + 316a zapas musztry bez strat, 316b swit i zmierzch bez falszywego marszu, 316c nagroda krola raz na dobe, 316d kwatermistrz bez zalewu komunikatow, 316e diagnostyka wjazdu do wsi gry i prolog bez falszywych tokenow); Armoury.dll 093080cecf8fd6fdd00d97502687793a (CrashScribe aa32d04e); kopia 153: Armoury.dll.bak-2026-11-02-przed-wgranie154 i D:/Backup-Bannerlord/wgrane/2026-11-02-wgranie154-przed
 
 **Problem:** Jeff 02.11: "jak wrzucam bron aby szybciej sie szkolili to daj ze moge tylko wrzucic tyle ile potrzebuja a nie ze mam potem komunikat ze jest lost. Sprawdz logi i savy czy cos warto poprawic. Wgraj i ide spac". Audyt logow 01.11 (Armoury-2026-11-01_22-56-32.log): 72 sztuki broni/zbroi zniszczone przez Discard (bez miejsca 16 i 56); falszywe "The column marched 1h through the night" przy 73 z 75 switow; tryb "always make camp" - sen od 21:42, noc 5.3 h, dlug i czerwone "Second night without sleep"; ta sama armia nagrodzona 2x w 11 s (25000 + 11160 zl, wplywy 130.8 + 124.5); 105 czerwonych "QM: no man can use" i 177 "kit slots empty"; first-chance "Token ... not valid in ROT.dll" przy kazdym wczytaniu; Jeff 01.11 "nie da sie wejsc do wiosek glownych ... tylko popup" - brak sladu w logu.
