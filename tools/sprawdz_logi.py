@@ -91791,135 +91791,79 @@ def main(argv):
     return _panika318c_main_prev(argv)
 
 
-# ---------------------------------------------------------------- paczka 319b (02.11): weterani ucza swoja bron - grupa weterani319b
-# Linie 'Weterani ucza (319b): dzien N gracz | ...' i '... AI | ...' (Drill.VetLines, DrillVeterans.cs). XP tylko przesuwane: przekazane <= pula.
-# Uzycie: python -I tools/sprawdz_logi.py --grupa weterani319b <Armoury-*.log>
-#  W319-S  self-test wyrazen na wzorach linii
-#  W319-1  gracz: kazda bron - przekazane <= pula, przekazane + przepadlo = pula, bez ucznia + limit ucznia + limit awansu = przepadlo, pokrycie 0..1
-#  W319-2  gracz: razem = suma broni, kontrola musztry ZGODNE (przyjete + uciete = wyliczone, nauka w przyjetych)
-#  W319-3  AI: przekazane <= pula, straty = pula - przekazane, przekazane w broniach = razem
-#  W319-4  AI: koszt nauki < 5 ms na dobe
-#  W319-5  potkniecia 0 (gracz i AI)
-#  W319-6  INFO: srednio na dobe - gracz pula/przekazane, AI pula/przekazane, martwe konce ponizej progu
-W319_HEAD = re.compile(r"Weterani ucza \(319b\): dzien (\d+) (gracz|AI) \| (CZYNNA|WYLACZONA) \(prog tier (\d+), uczniow na weterana (\d+), limit ucznia x([\d.]+)\)")
-W319_ARM = re.compile(r"\| (jazda|lucznicy|piechota) pula (\d+) \(weteranow (\d+), uczniow (\d+), dostalo (\d+), pokrycie ([\d.]+), limit uczniow (\d+)\) -> przekazane (\d+), "
-                      r"przepadlo (-?\d+) \(bez ucznia (\d+), limit ucznia (\d+), limit awansu (\d+)\)")
-W319_PSUM = re.compile(r"\| razem pula (\d+), przekazane (\d+), przepadlo (-?\d+), przekazane <= pula (TAK|NIE) \| martwe konce ponizej progu: ludzi (\d+), XP (\d+) "
-                       r"\| musztra: wyliczone (-?\d+), przyjete (-?\d+) \(w tym od weteranow (\d+)\), uciete (-?\d+) -> (ZGODNE|NIEZGODNE[^|]*)")
-W319_AI = re.compile(r"\| partii z weteranami (\d+) \(z (\d+) partii pod musztra\), weteranow (\d+) \(jazda (\d+), lucznicy (\d+), piechota (\d+)\), pula (\d+) \((\d+)/(\d+)/(\d+)\), "
-                     r"przekazane (\d+) \((\d+)/(\d+)/(\d+)\), uczniow \(ludzi\) (\d+), dostalo (\d+), przepadlo bez ucznia (\d+) / limit ucznia (\d+) / limit awansu (\d+), "
-                     r"przekazane <= pula (TAK|NIE) \| martwe konce ponizej progu: ludzi (\d+), XP (\d+) \| koszt ([\d.]+) ms")
-W319_STUMB = re.compile(r"\| potkniecia (\d+)\.\s*$")
-W319_SAMPLE_P = ("[21:00:00] Weterani ucza (319b): dzien 109190 gracz | CZYNNA (prog tier 6, uczniow na weterana 4, limit ucznia x1.00) | jazda pula 585 (weteranow 22, "
-                 "uczniow 18, dostalo 18, pokrycie 1.00, limit uczniow 497) -> przekazane 497, przepadlo 88 (bez ucznia 0, limit ucznia 0, limit awansu 88) | lucznicy pula 237 "
-                 "(weteranow 7, uczniow 12, dostalo 12, pokrycie 1.00, limit uczniow 300) -> przekazane 237, przepadlo 0 (bez ucznia 0, limit ucznia 0, limit awansu 0) "
-                 "| razem pula 822, przekazane 734, przepadlo 88, przekazane <= pula TAK | martwe konce ponizej progu: ludzi 0, XP 0 | musztra: wyliczone 2623, "
-                 "przyjete 2501 (w tym od weteranow 734), uciete 122 -> ZGODNE | potkniecia 0.")
-W319_SAMPLE_A = ("[21:00:00] Weterani ucza (319b): dzien 109190 AI | CZYNNA (prog tier 6, uczniow na weterana 4, limit ucznia x1.00) | partii z weteranami 120 (z 411 partii "
-                 "pod musztra), weteranow 3000 (jazda 1000, lucznicy 500, piechota 1500), pula 200000 (80000/40000/80000), przekazane 150000 (60000/30000/60000), uczniow "
-                 "(ludzi) 20000, dostalo 15000, przepadlo bez ucznia 20000 / limit ucznia 20000 / limit awansu 10000, przekazane <= pula TAK | martwe konce ponizej progu: "
-                 "ludzi 800, XP 30000 | koszt 1.20 ms | potkniecia 0.")
+# ---- paczka 319c: grupa groty319c - groty strzal i beltow wedlug tieru (Jeff 02.11) ----
+G319_LINE = re.compile(r"Groty strzal \(319c\): regula (.*?) \| strzal i beltow (\d+), balista (\d+), niezgodnych z regula (\d+)(?: \[(.*?)\])? \(ma byc 0\) \| tier -> metal: (.*?) \| przyklady: (.*)$")
+G319_ROW = re.compile(r"t(\d) ([A-Za-z0-9+ ]+?)( \(balista\))? x(\d+)")
+G319_SAMPLE = ("[20:59:52] Groty strzal (319c): regula wedlug tieru jak bron (t1-2 Iron2, t3 Iron3, t4 Iron4, t5 Iron5, t6 Iron6; balista S2) | strzal i beltow 71, "
+               "balista 2, niezgodnych z regula 0 (ma byc 0) | tier -> metal: t1 Iron2 x10, t4 Iron4 x8, t6 Iron3 (balista) x2, t6 Iron6 x9 | przyklady: "
+               "hardened_125_gr_arrows t6: 5x ironIngot6 = 30 d (wartosc kolczana 21).")
 
 
-def w319_rows(rep, plines, alines):
-    bad1, bad2, n_arm = [], [], 0
-    sp = st = 0
-    for l in plines:
-        arms = list(W319_ARM.finditer(l))
-        sm = W319_PSUM.search(l)
-        if not arms and not sm:
-            continue   # brak treningu / brak weteranow
-        sp_ = st_ = 0
-        for m in arms:
-            n_arm += 1
-            name = m.group(1)
-            pool, vets, learn, got = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))
-            cov, cap, taught, lost = float(m.group(6)), int(m.group(7)), int(m.group(8)), int(m.group(9))
-            u1, u2, u3 = int(m.group(10)), int(m.group(11)), int(m.group(12))
-            sp_ += pool; st_ += taught
-            if not (taught <= pool and taught <= cap and taught + lost == pool and u1 + u2 + u3 == lost and 0.0 <= cov <= 1.0001 and got <= learn):
-                bad1.append(f"{name} pula {pool} przek. {taught} przep. {lost} u {u1}/{u2}/{u3} pokr. {cov}")
-        if sm is None:
-            bad2.append("brak segmentu 'razem'")
-            continue
-        P, T, U = int(sm.group(1)), int(sm.group(2)), int(sm.group(3))
-        if not (P == sp_ and T == st_ and P - T == U and sm.group(4) == "TAK" and sm.group(11) == "ZGODNE" and int(sm.group(9)) == T):
-            bad2.append(f"razem {P}/{T}/{U} wobec broni {sp_}/{st_}, {sm.group(11)}")
-        sp += P; st += T
-    rep.add("W319-1: gracz - w kazdej broni przekazane <= pula, przekazane + przepadlo = pula, straty w 3 powodach, pokrycie 0..1",
-            f"linii {len(plines)}, broni {n_arm}, zlych {len(bad1)}" + (f" ({bad1[0]})" if bad1 else ""), "zlych 0", (not bad1) if n_arm else None)
-    rep.add("W319-2: gracz - razem = suma broni, musztra ZGODNE (nauka w przyjetych)", f"zlych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else ""), "zlych 0",
-            (not bad2) if n_arm else None)
-    bad3, bad4, ap = [], [], []
-    for l in alines:
-        m = W319_AI.search(l)
-        if not m:
-            bad3.append("format: " + l[:120])
-            continue
-        v = [int(x) if x not in ("TAK", "NIE") and "." not in x else x for x in m.groups()]
-        pool, taught = v[6], v[10]
-        if not (taught <= pool and v[7] + v[8] + v[9] == pool and v[11] + v[12] + v[13] == taught and v[16] + v[17] + v[18] == pool - taught and v[19] == "TAK"
-                and v[3] + v[4] + v[5] == v[2]):
-            bad3.append(f"pula {pool} przek. {taught} straty {v[16]}/{v[17]}/{v[18]}")
-        c = float(m.group(23))
-        if c >= 5.0:
-            bad4.append(c)
-        ap.append((pool, taught, v[20], v[21]))
-    rep.add("W319-3: AI - przekazane <= pula, bronie = razem, straty = pula - przekazane", f"linii {len(alines)}, zlych {len(bad3)}" + (f" ({bad3[0]})" if bad3 else ""),
-            "zlych 0", (not bad3) if alines else None)
-    rep.add("W319-4: AI - koszt nauki < 5 ms na dobe", f"dob ponad progiem {len(bad4)}" + (f" (max {max(bad4):.2f} ms)" if bad4 else ""), "0", (not bad4) if alines else None)
-    stb = 0
-    for l in plines + alines:
-        m = W319_STUMB.search(l)
-        if m:
-            stb += int(m.group(1))
-    rep.add("W319-5: potkniecia nauki weteranow (gracz + AI)", str(stb), "0", (stb == 0) if (plines or alines) else None)
-    np_ = len([l for l in plines if W319_PSUM.search(l)])
-    info = (f"gracz: dob z nauka {np_}, sr. pula {sp / np_:.0f}, sr. przekazane {st / np_:.0f}" if np_ else "gracz: brak dob z weteranami")
-    if ap:
-        n = len(ap)
-        info += (f"; AI: sr. pula {sum(a[0] for a in ap) / n:.0f}, sr. przekazane {sum(a[1] for a in ap) / n:.0f}, "
-                 f"martwe konce ponizej progu sr. ludzi {sum(a[2] for a in ap) / n:.0f}, XP {sum(a[3] for a in ap) / n:.0f}")
-    rep.add("W319-6: srednio na dobe", info, "INFO", None)
+def g319_rows(rep, lines, s1):
+    if not lines:
+        rep.add("G319-L: linia 'Groty strzal (319c)'", "brak", ">= 1 (start sesji)", False)
+        return
+    rep.add("G319-L: linia 'Groty strzal (319c)'", str(len(lines)), ">= 1 (start sesji)", True)
+    m = G319_LINE.search(lines[-1])
+    if not m:
+        rep.add("G319-P: odczyt ostatniej linii", "nie czyta", "TAK", False)
+        return
+    rule, n, siege, bad, badids, rows, _ = m.groups()
+    by_tier = rule.startswith("wedlug tieru")
+    rep.add("G319-1: regula grotow", "wedlug tieru" if by_tier else "S2 (wylaczone AmmoHeadsByTier)", "wedlug tieru", by_tier)
+    rep.add("G319-2: kwity niezgodne z regula", bad + (f" [{badids}]" if badids else ""), "0", int(bad) == 0)
+    t6want = "Iron6" if "t6 Iron6" in rule else "Iron5"
+    want = {1: "Iron2", 2: "Iron2", 3: "Iron3", 4: "Iron4", 5: "Iron5", 6: t6want}
+    wrong, per = [], {}
+    for r in G319_ROW.finditer(rows):
+        t, metal, sg, cnt = int(r.group(1)), r.group(2).strip(), bool(r.group(3)), int(r.group(4))
+        per.setdefault(t, []).append(f"{metal}{' bal.' if sg else ''} x{cnt}")
+        if by_tier and not sg and metal != want.get(t):
+            wrong.append(f"t{t} {metal} x{cnt}")
+    rep.add("G319-3: tier -> metal (bez balisty) jak bron", "; ".join(wrong) if wrong else "zgodne",
+            "t1-2 Iron2, t3 Iron3, t4 Iron4, t5 Iron5, t6 " + t6want, (not wrong) if by_tier else None)
+    rep.add("G319-4: zestawienie", " | ".join(f"t{t}: " + ", ".join(v) for t, v in sorted(per.items())) or "-", "INFO", None)
+    rep.add("G319-5: strzal i beltow / balista", f"{n} / {siege}", "INFO (balista z grotem S2)", None)
+    if s1:
+        mo = re.search(r"starym przepisem z wagi \(bez receptury\) (\d+)", s1[-1])
+        rep.add("G319-6: kwity amunicji starym przepisem (S1)", mo.group(1) if mo else "?", "0", (mo.group(1) == "0") if mo else None)
 
 
-def weterani319b_main(logp):
+def groty319c_main(logp):
     rep = Report()
-    st_ok = bool(W319_HEAD.search(W319_SAMPLE_P) and len(list(W319_ARM.finditer(W319_SAMPLE_P))) == 2 and W319_PSUM.search(W319_SAMPLE_P)
-                 and W319_STUMB.search(W319_SAMPLE_P) and W319_HEAD.search(W319_SAMPLE_A) and W319_AI.search(W319_SAMPLE_A) and W319_STUMB.search(W319_SAMPLE_A))
-    rep.add("W319-S: self-test wyrazen (wzory linii gracza i AI)", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
+    st = G319_LINE.search(G319_SAMPLE)
+    st_ok = bool(st) and len(list(G319_ROW.finditer(st.group(6)))) == 4
+    rep.add("G319-S: self-test wyrazen na wzorze linii", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
     if not logp or not os.path.isfile(logp):
-        rep.add("W319-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.add("G319-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    plines, alines = [], []
+    lines, s1 = [], []
     with open(logp, encoding="utf-8", errors="replace") as f:
         for line in f:
-            if "Weterani ucza (319b): dzien" not in line:
-                continue
             s = line.rstrip("\r\n")
-            h = W319_HEAD.search(s)
-            if not h:
-                continue
-            (plines if h.group(2) == "gracz" else alines).append(s)
+            if "Groty strzal (319c):" in s:
+                lines.append(s)
+            elif "Kuznia: amunicja (S1)" in s:
+                s1.append(s)
     print(f"plik: {logp}")
-    w319_rows(rep, plines, alines)
+    g319_rows(rep, lines, s1)
     rep.show()
     return 0
 
 
-_weterani319b_main_prev = main
+_groty319c_main_prev = main
 
 
 def main(argv):
-    # paczka 319b: grupa weterani319b - opakowanie main jak panika318c
+    # paczka 319c: grupa groty319c - opakowanie main jak panika318c
     a = argv[1:]
     if "--grupa" in a:
         i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "weterani319b":
+        if i + 1 < len(a) and a[i + 1] == "groty319c":
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return weterani319b_main(rest[0] if rest else None)
-    return _weterani319b_main_prev(argv)
+            return groty319c_main(rest[0] if rest else None)
+    return _groty319c_main_prev(argv)
 
 
 if __name__ == "__main__":

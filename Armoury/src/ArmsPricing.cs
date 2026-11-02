@@ -108,9 +108,19 @@ namespace Armoury
         /// jakosc" - Starley i Cubitt, Historical Metallurgy 48), t5-6 grot stalowany = zelazo ze stalowym ostrzem (70% zelaza x 2.5 d/kg + 30% stali
         /// x 6 d/kg = ok. 3.5 d/kg = Iron3). Dotad jak bron i zbroja (t4 Iron4, t5-6 Iron5 - stal szlachetna: 2x rudy). Tylko Arrows/Bolts;
         /// bron miotana (Thrown), bron i zbroja - GradeFor bez zmian.</summary>
-        private static CraftingMaterials AmmoGrade(int tier)
+        private static CraftingMaterials AmmoGrade(ItemObject it, int tier)
         {
+            // 319c (Jeff 02.11 "6 tier strzal powinien castle-forged miec groty, 5 tier poziom nizej etc."): grot wedlug tieru jak bron (GradeFor):
+            // t1-2 Iron2, t3 Iron3, t4 Iron4, t5 Iron5, t6 Iron6 (z Tier6CastleSteel). Pociski balisty (ballista_c_projectile*) zostaja przy S2 -
+            // 17 sztab stali zamkowej na serie bez potrzeby. Wylaczone AmmoHeadsByTier = regula S2 (t1-4 Iron2, t5-6 Iron3). Cache CostOf - po wczytaniu.
+            var s = Settings.Current;
+            if (s != null && s.AmmoHeadsByTier && !IsSiegeAmmo(it)) return GradeFor(tier);
             return tier <= 4 ? CraftingMaterials.Iron2 : CraftingMaterials.Iron3;
+        }
+
+        internal static bool IsSiegeAmmo(ItemObject it)
+        {
+            try { return it != null && it.StringId != null && it.StringId.IndexOf("ballista", StringComparison.OrdinalIgnoreCase) >= 0; } catch { return false; }
         }
 
         private static bool ArrowsOrBolts(ItemObject it)
@@ -290,7 +300,7 @@ namespace Armoury
                 int t = TierOf(it);
                 float w = Math.Max(0.01f, CostWeight(it));   // E8/C: uprzaz z wagi prawdziwej, reszta - waga gry
                 bool ammo = ArrowsOrBolts(it);
-                var grade = ammo ? AmmoGrade(t) : GradeFor(t);   // sklad8-s S2: grot strzaly z zelaza (t5-6 stalowany), reszta jak dotad
+                var grade = ammo ? AmmoGrade(it, t) : GradeFor(t);   // 319c: grot strzaly wedlug tieru jak bron (balista i wylaczone AmmoHeadsByTier - S2), reszta jak dotad
                 var metalItem = Recipes.MaterialItem(grade);
                 var charItem = Recipes.MaterialItem(CraftingMaterials.Charcoal);
                 float metalKg = 0f, leatherKg = 0f, linenKg = 0f, woodKg = 0f, days = 0f, special = 0f;

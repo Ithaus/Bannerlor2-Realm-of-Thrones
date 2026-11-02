@@ -2512,6 +2512,10 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public int TravellerTradePerHead { get; set; } = 10;
 
+        [SettingPropertyBool("Ammo Heads By Tier", HintText = "arrow and bolt heads are forged from the metal of their tier, like other arms - tiers 1-2 wrought iron, tier 3 iron, tier 4 steel, tier 5 fine steel, tier 6 castle-forged steel (with Tier6 Castle Steel on) - in your forge, town fletchers, repairs and their worth; ballista bolts keep iron heads (off = iron heads for every tier: wrought iron up to tier 4, iron for tiers 5-6, as before; takes effect after reloading the game)", RequireRestart = false)]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool AmmoHeadsByTier { get; set; } = true;
+
         [SettingPropertyBool("Tier6 Castle Steel", HintText = "tier 6 arms and armour count castle-forged steel as their metal everywhere - your forge, town workshops, repairs and their worth (one rule for tier 6; off = workshops and prices count fine steel for tier 6 as before; takes effect after reloading the game)", RequireRestart = false)]
         [SettingPropertyGroup("Smithing materials")]
         public bool Tier6CastleSteel { get; set; } = true;
@@ -11787,6 +11791,7 @@ namespace Armoury
             s.TravellersNoGoods = TravellersNoGoods;
             s.TravellersRealGoods = TravellersRealGoods;
             s.TravellerTradePerHead = TravellerTradePerHead;
+            s.AmmoHeadsByTier = AmmoHeadsByTier;
             s.Tier6CastleSteel = Tier6CastleSteel;
             s.MineralsCountedOnce = MineralsCountedOnce;
             s.MineOutputMultiplier = MineOutputMultiplier;

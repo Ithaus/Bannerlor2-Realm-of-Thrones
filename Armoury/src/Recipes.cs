@@ -216,6 +216,12 @@ namespace Armoury
                 int n = 0, legends = 0, oldRule = 0, steelN = 0;
                 var all = new List<KeyValuePair<float, string>>();
                 var samples = new List<string>(); var steelIds = new List<string>();
+                // 319c: groty wedlug tieru - zestawienie tier -> metal z kwitu i liczba niezgodnych z regula
+                bool byTier = s.AmmoHeadsByTier, castle6 = s.Tier6CastleSteel;
+                var ingot = new Dictionary<ItemObject, CraftingMaterials>();
+                foreach (var g in new[] { CraftingMaterials.Iron1, CraftingMaterials.Iron2, CraftingMaterials.Iron3, CraftingMaterials.Iron4, CraftingMaterials.Iron5, CraftingMaterials.Iron6 }) { var m = MaterialItem(g); if (m != null) ingot[m] = g; }
+                var byGrade = new SortedDictionary<string, int>(StringComparer.Ordinal);
+                int bad = 0, siege = 0; var badIds = new List<string>(); var headSamples = new List<string>();
                 foreach (var it in mgr.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null || (it.ItemType != ItemObject.ItemTypeEnum.Arrows && it.ItemType != ItemObject.ItemTypeEnum.Bolts)) continue;
@@ -236,6 +242,23 @@ namespace Armoury
                     string desc = it.StringId + " t" + Grade(it) + ": " + string.Join(" + ", parts.ToArray()) + " = "
                                   + cost.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " d (wartosc kolczana " + it.Value + ")";
                     if (hasSteel) { steelN++; if (steelIds.Count < 10) steelIds.Add(it.StringId); }
+                    // 319c: oczekiwany gatunek grotu (niezaleznie od ArmsPricing) i metal z kwitu
+                    int tg = Grade(it);
+                    bool sg = ArmsPricing.IsSiegeAmmo(it); if (sg) siege++;
+                    CraftingMaterials want = (!byTier || sg) ? (tg <= 4 ? CraftingMaterials.Iron2 : CraftingMaterials.Iron3)
+                                           : (tg >= 6 && !castle6 ? CraftingMaterials.Iron5 : IronForTier(tg));
+                    var got = new List<string>(); bool okHead = false, otherMetal = false;
+                    foreach (var p in r.Parts)
+                    {
+                        CraftingMaterials pg;
+                        if (p.Item == null || p.Count <= 0 || !ingot.TryGetValue(p.Item, out pg)) continue;
+                        got.Add(pg.ToString());
+                        if (pg == want) okHead = true; else otherMetal = true;
+                    }
+                    string key = "t" + tg + " " + (got.Count > 0 ? string.Join("+", got.ToArray()) : "bez metalu") + (sg ? " (balista)" : "");
+                    int kc; byGrade.TryGetValue(key, out kc); byGrade[key] = kc + 1;
+                    if (!okHead || otherMetal) { bad++; if (badIds.Count < 10) badIds.Add(it.StringId + " t" + tg + " chce " + want + " ma " + (got.Count > 0 ? string.Join("+", got.ToArray()) : "-")); }
+                    if (it.StringId == "default_arrows" || it.StringId == "hardened_125_gr_arrows" || it.StringId == "bolt_a" || it.StringId == "ballista_c_projectile") headSamples.Add(desc);
                     if (it.StringId == "default_arrows" || it.StringId == "hardened_125_gr_arrows") samples.Add(desc);
                     all.Add(new KeyValuePair<float, string>(cost, desc));
                 }
@@ -244,8 +267,14 @@ namespace Armoury
                 for (int i = 0; i < all.Count && i < 5; i++) top.Add(all[i].Value);
                 Log.Info("Kuznia: amunicja (S1) - kwit serii " + Math.Max(1, s.AmmoBatchStacks) + " kolczanow: zelazo na groty z receptury wartosci (metal grotu x seria / waga sztabki, gatunek grotu) + 1 drewno; "
                          + n + " strzal i beltow (legendy osobno: " + legends + "), starym przepisem z wagi (bez receptury) " + oldRule + ", ze stali Iron4-Iron6 " + steelN
-                         + (steelIds.Count > 0 ? " [" + string.Join(", ", steelIds.ToArray()) + "]" : "") + " (ma byc 0); przyklady: " + (samples.Count > 0 ? string.Join("; ", samples.ToArray()) : "-")
+                         + (steelIds.Count > 0 ? " [" + string.Join(", ", steelIds.ToArray()) + "]" : "") + (byTier ? " (319c: t4-6 ze stali - patrz linia Groty strzal)" : " (ma byc 0)") + "; przyklady: " + (samples.Count > 0 ? string.Join("; ", samples.ToArray()) : "-")
                          + "; najdrozsze: " + (top.Count > 0 ? string.Join("; ", top.ToArray()) : "-") + ".");
+                var rows = new List<string>();
+                foreach (var kv in byGrade) rows.Add(kv.Key + " x" + kv.Value);
+                Log.Info("Groty strzal (319c): regula " + (byTier ? "wedlug tieru jak bron (t1-2 Iron2, t3 Iron3, t4 Iron4, t5 Iron5, t6 " + (castle6 ? "Iron6" : "Iron5") + "; balista S2)" : "S2 (t1-4 Iron2, t5-6 Iron3)")
+                         + " | strzal i beltow " + n + ", balista " + siege + ", niezgodnych z regula " + bad + (badIds.Count > 0 ? " [" + string.Join("; ", badIds.ToArray()) + "]" : "") + " (ma byc 0)"
+                         + " | tier -> metal: " + (rows.Count > 0 ? string.Join(", ", rows.ToArray()) : "-")
+                         + " | przyklady: " + (headSamples.Count > 0 ? string.Join("; ", headSamples.ToArray()) : "-") + ".");
             }
             catch (Exception e) { Log.Error("Recipes.AmmoStartLine", e); }
         }
