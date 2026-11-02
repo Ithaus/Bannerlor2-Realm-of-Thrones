@@ -611,7 +611,9 @@ namespace Armoury
                     float thr = st.Ours && st.Applied == ArrangementOrder.ArrangementOrderEnum.ShieldWall ? WallKeep : WallFrom;
                     // 313b (OutshotRushWithShields): szyk w Advance / Charge druzyny, ktora idzie pod ostrzalem (>= 2 zabitych od pociskow) - Loose zamiast muru
                     // tarcz (ShieldWall ma limit biegu 0.3 - spacer pod strzalami); konnica uderzeniowa wroga w 90 m - decyzja jak dotad (K11)
-                    if ((beh == 0 || beh == 1) && OutshotRush.WantLoose(m, f, r >= thr)) want = WLoose;
+                    // 320d: takze szyk w biegu 313b w innym natarciu (CautiousAdvance, TacticalCharge, Move na wroga - MarchToContact.Advancing); poza Advance /
+                    // Charge RBM nie pyta o szyk, wiec Loose daje sciezka 310 (scope beh >= 2, po StaleCall)
+                    if ((beh == 0 || beh == 1 || MarchToContact.Rush313(f)) && OutshotRush.WantLoose(m, f, r >= thr)) want = WLoose;
                     else if (r >= thr) want = WWall;
                     else if ((float)has / men >= WallFrom && st.FireStart >= 0f && _now - st.FireStart < WaitShields) want = WHold;
                     else if (horse) why = YHorse;

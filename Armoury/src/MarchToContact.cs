@@ -770,14 +770,22 @@ namespace Armoury
                     Set(f, idx, 0f, 0f, false);
                     return;
                 }
-                // recenzja 313b (3): tylko przy aktywnym BehaviorAdvance / BehaviorCharge (jak CloseRanks beh 0 / 1) - po ustaniu ognia gra moze sama wrocic do
-                // obrony (DefensiveEngagement -> BehaviorDefend, rozkaz Move do pozycji), Regroup / PullBack tez daja Move: tam krok jak dotad, nie bieg bez capu.
+                // recenzja 313b (3): po ustaniu ognia gra moze sama wrocic do obrony (DefensiveEngagement -> rozkaz Move do pozycji), Regroup / PullBack tez daja
+                // Move: tam krok jak dotad, nie bieg bez capu. 320d (Jeff 02.11 "1. tak"; log 22:28-22:35: 'z tarczami pod ostrzalem zostal krok 1 (sr. tarcz 0.62)',
+                // 'wejsc w bieg 0' - RangedHarrassmentOffensive daje piechocie BehaviorCautiousAdvance, DefensiveEngagement BehaviorHoldHighGround / TacticalCharge,
+                // a 313b bral tylko BehaviorAdvance / BehaviorCharge): kazde natarcie - Advance / Charge albo rozkaz Advance albo Move, ktory prowadzi NA wroga
+                // (Advancing); odwrot, Regroup, postoj na pozycji i ruch nie na wroga - krok jak dotad.
                 // Recenzja 313b (7) / (6): tylko szyk z tarczami (>= 60% ludzi, prog muru tarcz 146) - szyk bez tarcz to 291 C (klucz UnshieldedRushUnderFire)
-                bool shielded = !bare && _rushShielded && _shield[idx] >= CloseRanks.WallFrom && OutshotRush.Live(f.Team) && AdvanceOrCharge(f);
+                bool pre = !bare && _rushShielded && _shield[idx] >= CloseRanks.WallFrom && OutshotRush.Live(f.Team);
+                byte adv = pre ? Advancing(f) : AdvNo;
+                bool shielded = pre && (adv == AdvBeh || adv == AdvMove);
+                if (pre && !shielded && fire) { if (adv == AdvBack) _r320Back++; else if (adv == AdvStay) _r320Stay++; else _r320Away++; }   // szyko-takty
                 if (shielded && (fire || (_evalWasRush && _evalWas313)))
                 {
                     bool cont = _evalWasRush && _evalWas313;
                     if (cont) OutshotRush.NoteRushEndUndo();   // dalej biegnie (zdjecie na poczatku Eval nie bylo koncem)
+                    else if (adv == AdvBeh) _r320Beh++;
+                    else { _r320Move++; NoteBeh(f); }
                     OutshotRush.NoteRush(f, !cont, TickEvery);
                     SpeedSample(f, idx, 1);
                     _rushNow[idx] = true;
@@ -790,12 +798,78 @@ namespace Armoury
             Set(f, idx, pace, underFire ? 0f : pace, false);
         }
 
-        /// <summary>313b recenzja (3): aktywne zachowanie szyku to BehaviorAdvance albo BehaviorCharge (takze pochodne RBM).</summary>
-        private static bool AdvanceOrCharge(Formation f)
+        // ---- 320d: natarcie w kazdym zachowaniu (glowny watek; liczniki od Rush291Reset)
+        private const byte AdvNo = 0, AdvBeh = 1, AdvMove = 2, AdvBack = 3, AdvStay = 4, AdvAway = 5;
+        private const float AdvMinMove = 8f;   // m: cel rozkazu Move blizej niz to - szyk stoi na pozycji (CautiousAdvance strzela, HoldHighGround na wzgorzu)
+        private const float AdvMinGain = 5f;   // m: cel rozkazu Move co najmniej o tyle blizej wroga niz srodek szyku
+        private static int _r320Beh, _r320Move, _r320Back, _r320Stay, _r320Away, _r320Err;
+        private static readonly HashSet<string> _r320Names = new HashSet<string>();
+
+        /// <summary>313b recenzja (3) / 320d: czy szyk AI idzie NA wroga. AdvBeh - BehaviorAdvance / BehaviorCharge (takze pochodne RBM); AdvMove - rozkaz Advance
+        /// albo Move, ktorego cel jest o AdvMinGain blizej najblizszego szyku wroga (albo mediany celow druzyny - gracz-konny lucznik bywa najblizszy) niz srodek
+        /// szyku i dalej niz AdvMinMove; AdvBack - odwrot (Retreat, PullBack, Regroup, Stop, Retreat w twierdzy) albo inny rozkaz; AdvStay - postoj na
+        /// pozycji; AdvAway - ruch nie na wroga. Bez alokacji (poza MovementOrder.GetPosition gry).</summary>
+        private static byte Advancing(Formation f)
         {
+            try
+            {
+                var ai = f.AI;
+                var b = ai != null ? ai.ActiveBehavior : null;
+                if (b is BehaviorAdvance || b is BehaviorCharge) return AdvBeh;
+                if (b is BehaviorRetreat || b is BehaviorPullBack || b is BehaviorRegroup || b is BehaviorStop || b is BehaviorRetreatToKeep || b is BehaviorRetreatToCastle)
+                    return AdvBack;
+                // rozkaz Advance, a takze Charge / ChargeToTarget przytrzymany marszem 128 (HoldCharge -> MarchCap; TacticalCharge daje Charge z daleka)
+                if (_evalOe == MovementOrder.MovementOrderEnum.Advance || _evalOe == MovementOrder.MovementOrderEnum.Charge
+                    || _evalOe == MovementOrder.MovementOrderEnum.ChargeToTarget) return AdvMove;
+                if (_evalOe != MovementOrder.MovementOrderEnum.Move) return AdvBack;
+                Vec2 me = f.CachedAveragePosition;
+                Vec2 to = f.GetReadonlyMovementOrderReference().GetPosition(f);
+                if (!me.IsValid || !to.IsValid) return AdvAway;
+                if (me.DistanceSquared(to) < AdvMinMove * AdvMinMove) return AdvStay;
+                var eq = f.CachedClosestEnemyFormation;
+                var ef = eq != null ? eq.Formation : null;
+                if (ef != null && ef.CountOfUnits > 0)
+                {
+                    Vec2 e = ef.CachedMedianPosition.AsVec2;
+                    if (e.IsValid && to.Distance(e) <= me.Distance(e) - AdvMinGain) return AdvMove;
+                }
+                var tq = f.QuerySystem != null ? f.QuerySystem.Team : null;
+                if (tq != null)
+                {
+                    Vec2 e = tq.MedianTargetFormationPosition.AsVec2;
+                    if (e.IsValid && to.Distance(e) <= me.Distance(e) - AdvMinGain) return AdvMove;
+                }
+                return AdvAway;
+            }
+            catch { _r320Err++; return AdvNo; }   // potkniecie liczone - ten szyk w tym takcie krokiem, bez wylacznika
+        }
+
+        private static void NoteBeh(Formation f)
+        {
+            if (_r320Names.Count >= 8) return;
             var ai = f.AI;
             var b = ai != null ? ai.ActiveBehavior : null;
-            return b is BehaviorAdvance || b is BehaviorCharge;
+            _r320Names.Add(b != null ? b.GetType().Name : "-");
+        }
+
+        /// <summary>320d: CloseRanks (glowny watek) - szyk jest teraz w biegu 313b (Loose zamiast muru tarcz takze poza Advance / Charge).</summary>
+        internal static bool Rush313(Formation f)
+        {
+            if (!_on || f == null) return false;
+            int idx = Idx(f);
+            return idx >= 0 && ReferenceEquals(_who[idx], f) && _rush313[idx];
+        }
+
+        /// <summary>320d: czlon MarchToContact segmentu F linii 'Bitwa (291)'.</summary>
+        internal static string Rush320Part()
+        {
+            var sb = new System.Text.StringBuilder(260);
+            sb.Append("wejsc w bieg z tarczami: Advance/Charge ").Append(_r320Beh).Append(", inne natarcie ").Append(_r320Move).Append(" [");
+            bool first = true;
+            foreach (var s in _r320Names) { if (!first) sb.Append(", "); sb.Append(s); first = false; }
+            sb.Append("]; pod ostrzalem bez biegu (szyko-takty 0.5 s): odwrot ").Append(_r320Back).Append(", postoj na pozycji ").Append(_r320Stay)
+              .Append(", ruch nie na wroga ").Append(_r320Away).Append("; potkniecia ").Append(_r320Err);
+            return sb.ToString();
         }
 
         /// <summary>313b recenzja (4): droga srodka szyku od poprzedniej probki tego samego rodzaju (kolejne takty, do 1.5 s) - OutshotRush.NoteMove.</summary>
@@ -940,6 +1014,8 @@ namespace Armoury
             _rushIn = _rushOut = _rushShieldKept = 0;
             _rushSec = _rushShareSum = _rushKeptShareSum = 0f;
             _rushForms.Clear(); _rushKeptForms.Clear();
+            _r320Beh = _r320Move = _r320Back = _r320Stay = _r320Away = _r320Err = 0;   // 320d
+            _r320Names.Clear();
         }
 
         /// <summary>291: segment C linii 'Bitwa (291)' (HorsePursuit.End - po MarchToContact.End; liczniki zostaja do Rush291Reset).</summary>

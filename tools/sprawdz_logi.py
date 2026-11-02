@@ -92064,5 +92064,184 @@ def main(argv):
     return _groty319c_main_prev(argv)
 
 
+# ---- paczka 320d: grupa bieg320d - bieg pod ostrzalem w kazdym natarciu i 291e naszym licznikiem (Jeff 02.11 "1. tak") ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa bieg320d <Armoury-*.log>. Segment F linii 'Bitwa (291)' (OutshotRush.Segment320 - po E, przed C).
+# Dowod: log 2026-11-02_22-06-40, bitwa 22:28-22:35 vs Irmgard: 'z tarczami pod ostrzalem zostal krok 1 (sr. tarcz 0.62)', E 'wejsc w bieg 0', 'puszczone:
+# bilans ognia 0' przy 35 strzelcach gracza na 3 (bilans gry ma podloge 0.05 - 2 zabitych z 77 nie puszcza), puscilo 'napastnik nie podchodzi 90 s'.
+# B320-S  self-test wyrazen: F, a E (O313_RX) i B / C (BITWA291_RX) dalej czytaja linie z F;
+# B320-0  segment F w kazdej linii 'Bitwa (291)' z segmentem E (bez F - DLL sprzed 320d - NIE);
+# B320-1  potkniecia F 0;
+# B320-2  sedno: bitwa z druzyna pod ostrzalem (E druzyn > 0) i krokiem z tarczami (C 'zostal krok' > 0) bez zadnego biegu z tarczami (E wejsc 0) - DECYZJA
+#         (szyk nie szedl na wroga: odwrot / postoj / ruch nie na wroga w F - wypisane); bieg > 0 - TAK;
+# B320-3  291e licznikiem: puszczone naszym licznikiem <= puszczone bilansem ognia (E), przy kluczu TAK 'bylby puszczony licznikiem' 0,
+#         'obrona gry NIE po puszczeniu' tylko przy puszczeniu licznikiem;
+# B320-4  sumy (INFO): wejscia Advance/Charge vs inne natarcie z nazwami zachowan, druzyny przestrzelane bez taktyki ataku.
+B320_RX = re.compile(
+    r"\| F 320d bieg pod ostrzalem w kazdym natarciu (TAK|NIE): druzyn przestrzelanych bez taktyki ataku (\d+); wejsc w bieg z tarczami: Advance/Charge (\d+), "
+    r"inne natarcie (\d+) \[(.*?)\]; pod ostrzalem bez biegu \(szyko-takty 0\.5 s\): odwrot (\d+), postoj na pozycji (\d+), ruch nie na wroga (\d+); "
+    r"potkniecia (\d+); 291e puszczone naszym licznikiem \(gra obrona TAK, strzelcy x3 < wroga, >= \d+ zabitych od pociskow\) (\d+), bylby puszczony "
+    r"licznikiem \(klucz NIE\) (\d+), obrona gry NIE po puszczeniu licznikiem (\d+) decyzji \|")
+B320_G = {k: i + 1 for i, k in enumerate(("key", "out", "beh", "mov", "names", "back", "stay", "away", "stum", "ours", "dry", "keep"))}
+B320_F = ("F 320d bieg pod ostrzalem w kazdym natarciu TAK: druzyn przestrzelanych bez taktyki ataku 1; wejsc w bieg z tarczami: Advance/Charge 1, inne natarcie 2 "
+          "[BehaviorCautiousAdvance, BehaviorTacticalCharge]; pod ostrzalem bez biegu (szyko-takty 0.5 s): odwrot 0, postoj na pozycji 4, ruch nie na wroga 1; "
+          "potkniecia 0; 291e puszczone naszym licznikiem (gra obrona TAK, strzelcy x3 < wroga, >= 2 zabitych od pociskow) 1, bylby puszczony licznikiem "
+          "(klucz NIE) 0, obrona gry NIE po puszczeniu licznikiem 5 decyzji")
+
+
+def b320_line(e, f, kept=None):
+    """Linia 'Bitwa (291)' z E i F (jak Battle291.Write: B | E | F | C); kept - liczba 'zostal krok' w C."""
+    s = o313_line(e)
+    i = s.index("| C piechota")
+    s = s[:i] + "| " + f + " " + s[i:]
+    if kept is not None:
+        s = s.replace("z tarczami pod ostrzalem zostal krok 0.", f"z tarczami pod ostrzalem zostal krok {kept} (sr. tarcz 0.62).")
+    return s
+
+
+def bieg320d_selftest():
+    s = b320_line(O313_E, B320_F)
+    m = B320_RX.search(s)
+    want = ("TAK", "1", "1", "2", "BehaviorCautiousAdvance, BehaviorTacticalCharge", "0", "4", "1", "0", "1", "0", "5")
+    if not m or m.groups() != want:
+        return f"F: {m.groups() if m else 'brak'}"
+    if not O313_RX.search(s):
+        return "E nie czytane na linii z F"
+    RX = BITWA291_RX
+    if not (RX["line"].match(s) and RX["b"].search(s) and RX["c"].search(s)):
+        return "bitwa291 nie czyta linii z F"
+    if B320_RX.search(o313_line(O313_E)):
+        return "F w linii bez F"
+    m = RX["c"].search(b320_line(O313_E, B320_F, kept=1))
+    if not m or m.group(8) != "1":
+        return "C 'zostal krok' nie czytane"
+    return None
+
+
+def bieg320d_collect(logp):
+    D = {"f": [], "nof": 0, "noe": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            s = ln.rstrip("\r\n")
+            mt = TS.match(s)
+            s = mt.group(2) if mt else s
+            if not s.startswith("Bitwa (291)"):
+                continue
+            e = O313_RX.search(s)
+            if not e:
+                D["noe"] += 1
+                continue
+            f = B320_RX.search(s)
+            if not f:
+                D["nof"] += 1
+                continue
+            c = BITWA291_RX["c"].search(s)
+            D["f"].append((f, e, int(c.group(8)) if c else 0))
+    return D
+
+
+def bieg320d_rows(rep, D):
+    L = D["f"]
+    G, E = B320_G, O313_G
+    g = lambda m, k: int(m.group(G[k]))
+    ge = lambda m, k: int(m.group(E[k]))
+    if not L and not D["nof"]:
+        rep.add("B320-0: segment F w kazdej linii 'Bitwa (291)' z E", f"brak linii z E (bez E {D['noe']})", "INFO", None)
+    else:
+        rep.add("B320-0: segment F w kazdej linii 'Bitwa (291)' z E", f"z F {len(L)}, bez F {D['nof']}", "bez F 0 (DLL sprzed 320d - NIE)", D["nof"] == 0)
+    stum = sum(g(f, "stum") for f, _, _ in L)
+    rep.add("B320-1: potkniecia F", str(stum), "0", None if not L else stum == 0)
+    n2 = "B320-2: druzyna pod ostrzalem i krok z tarczami - bieg z tarczami > 0"
+    hit = [(f, e, k) for f, e, k in L if ge(e, "teams") > 0 and k > 0]
+    if hit:
+        dry = [(f, e, k) for f, e, k in hit if ge(e, "rin") == 0]
+        txt = (f"bitew {len(hit)}, bez biegu {len(dry)}"
+               + "".join(f"; [krok {k}, odwrot {g(f, 'back')}, postoj {g(f, 'stay')}, nie na wroga {g(f, 'away')}, druzyn {ge(e, 'teams')}]" for f, e, k in dry[:4]))
+        rep.add(n2, txt, "bez biegu 0 (inaczej DECYZJA - szyk nie szedl na wroga albo druzyna jeszcze nie pod ostrzalem)", not dry, decide=True)
+    else:
+        rep.add(n2, "brak bitew z druzyna pod ostrzalem i krokiem z tarczami", "INFO", None)
+    n3 = "B320-3: 291e licznikiem - spojne z E"
+    if L:
+        bad = [(f, e) for f, e, _ in L if g(f, "ours") > ge(e, "rel") or (e.group(E["key1"]) == "TAK" and g(f, "dry") > 0)
+               or (g(f, "keep") > 0 and g(f, "ours") == 0)]
+        txt = (f"puszczone naszym licznikiem {sum(g(f, 'ours') for f, _, _ in L)} z bilansem ognia {sum(ge(e, 'rel') for _, e, _ in L)}, bylby (klucz NIE) "
+               f"{sum(g(f, 'dry') for f, _, _ in L)}, obrona NIE po puszczeniu {sum(g(f, 'keep') for f, _, _ in L)} decyzji; bitew niespojnych {len(bad)}")
+        rep.add(n3, txt, "niespojnych 0", not bad)
+    else:
+        rep.add(n3, "brak linii z F", "INFO", None)
+    names = sorted(set(x.strip() for f, _, _ in L for x in f.group(G["names"]).split(",") if x.strip()))
+    rep.add("B320-4: sumy (INFO)",
+            f"linii {len(L)}; wejsc w bieg Advance/Charge {sum(g(f, 'beh') for f, _, _ in L)}, inne natarcie {sum(g(f, 'mov') for f, _, _ in L)} "
+            f"[{', '.join(names) or '-'}]; druzyn przestrzelanych bez taktyki ataku {sum(g(f, 'out') for f, _, _ in L)}", "INFO", None)
+
+
+def bieg320d_synth():
+    """B320-S2: dobry, zly (krok bez biegu), niespojny, stary DLL, pusty. None = OK."""
+    import tempfile
+    import shutil
+    e0 = O313_E.replace("druzyn 1 (291e 1", "druzyn 1 (291e 1").replace("wejsc w bieg 2", "wejsc w bieg 0")
+    runs = {
+        "good": [b320_line(O313_E, B320_F, kept=1)],
+        "walk": [b320_line(e0, B320_F, kept=1)],
+        "bad": [b320_line(O313_E, B320_F.replace("bylby puszczony licznikiem (klucz NIE) 0", "bylby puszczony licznikiem (klucz NIE) 1")
+                          .replace("potkniecia 0; 291e", "potkniecia 2; 291e"))],
+        "old": [o313_line(O313_E)],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"B320-0": "TAK", "B320-1": "TAK", "B320-2": "TAK", "B320-3": "TAK", "B320-4": "INFO"},
+        "walk": {"B320-0": "TAK", "B320-2": "DECYZJA", "B320-3": "TAK"},
+        "bad": {"B320-1": "NIE", "B320-3": "NIE"},
+        "old": {"B320-0": "NIE", "B320-1": "INFO", "B320-2": "INFO", "B320-3": "INFO"},
+        "empty": {"B320-0": "INFO", "B320-1": "INFO", "B320-2": "INFO", "B320-3": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="b320_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            bieg320d_rows(rep, bieg320d_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def bieg320d_main(logp):
+    rep = Report()
+    s1 = bieg320d_selftest()
+    rep.add("B320-S: self-test wyrazen (F; E i B / C na linii z F)", s1 or "OK", "OK", s1 is None)
+    try:
+        s2 = bieg320d_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("B320-S2: test syntetyczny (dobry, krok bez biegu, niespojny, stary DLL, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("B320-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = bieg320d_collect(logp)
+    print(f"plik: {logp} | linii 291 z F {len(D['f'])}, z E bez F {D['nof']}, bez E {D['noe']}")
+    bieg320d_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_bieg320d_main_prev = main
+
+
+def main(argv):
+    # paczka 320d: grupa bieg320d - opakowanie main jak groty319c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "bieg320d":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return bieg320d_main(rest[0] if rest else None)
+    return _bieg320d_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
