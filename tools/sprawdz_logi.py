@@ -89189,7 +89189,7 @@ TT312_START = re.compile(r"^Wojny o tron \(312c\): start sesji \| latka GetScore
 # 15 z czlonem, 16-17 srednia, 18 zmienil znak, 19 ocen par, 20 czlon>0 par, 21 pozycje, 22 bramki, 23 wojny o tron dzis, 24 lista, 25 od wczytania, 26 trwajace,
 # 27-28 pokoje, 29 dawna para zatargu, 30-32 dolaczenia, 33-34 inne, 35 przerwa do dnia, 36 wywolan, 37 z czlonem, 38-39 srednia, 40 potkniecia dzis, 41 razem
 TT312_DAY = re.compile(r"^Wojny o tron \(312c\): doba \| dzien (\d+) \| klucz (TAK|NIE), flaga testu (TAK|NIE), kanon skonczony (TAK|NIE), Polnoc po Bekartach (TAK|NIE)"
-                       r"(?: \(BastardsSiegeEvent -?\d+, BastardsEvent -?\d+\))? \| tron: (.*?) \| limity: max wojen (\d+), sila ([\d.]+)-([\d.]+), przerwa (\d+) dni, zmeczenie (\d+) \((.*?)\) "
+                       r"(?: \(BastardsSiegeEvent -?\d+, BastardsEvent -?\d+\))?(?: \[wyjscie 320a: [^\]]*\])? \| tron: (.*?) \| limity: max wojen (\d+), sila ([\d.]+)-([\d.]+), przerwa (\d+) dni, zmeczenie (\d+) \((.*?)\) "
                        r"\| wywolania postfiksu dzis (\d+), z ocena pary (\d+), z czlonem (\d+) \(srednia przed (\S+), po (\S+)\), czlon zmienil znak (\d+) "
                        r"\| ocen par (\d+) \| czlon > 0: (\d+) par(?: \[(.*?)\])? \| zero przez bramke: (.*?) "
                        r"\| wojny o tron dzis (\d+)(?: \[(.*?)\])?, od wczytania (\d+), trwajace (\d+), pokoje w nich dzis (\d+), od wczytania (\d+), w dawnej parze zatargu od wczytania (\d+) "
@@ -92062,6 +92062,397 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return groty319c_main(rest[0] if rest else None)
     return _groty319c_main_prev(argv)
+
+
+
+
+# ---------------------------------------------------------------- 320a (Fabula + Krwawe Gody): Harrenhal i hold Dorzecza (CrashScribe Fabula), Krwawe Gody bez pokoju (Armoury)
+# uzycie: python tools/sprawdz_logi.py --grupa fabula320a <CrashScribe session-*.log> [<Armoury-*.log>]
+F320_HH = re.compile(r"Fabula \(320a\): lancuch Harrenhal zamkniety - (.+?): pominiete HarrenhalEvent (\S+(?: \([^)]*\))?), HarrenhalSiegeEvent (\S+(?: \([^)]*\))?), "
+                     r"HarrenhalSiegeNotificationEvent (.+?) \(ROT SkipEvent.*\| dzien (-?\d+)\.")
+F320_RL = re.compile(r"Fabula \(320a\): RiverlandsDeclareWarEvent pominiete (\S+(?: \([^)]*\))?) - .*\| dzien (-?\d+)\.")
+F320_DIAG = re.compile(r"FABULA: dzien (-?\d+) \| zaleglych na osi: (\d+) \| czolo kolejki: (\S+)")
+F320_RW = re.compile(r"Krwawe Gody bez pokoju \(320\): ExecuteRobb - pokoj (\S+) (POMINIETY|ZAWARTY \(jak ROT\)) \((.*?), podmian (\d+)\) \| wojna (TAK|NIE) \| Roose zyje (\S+)")
+F320_DAY = re.compile(r"Pokoj kanonu \(264\): dzien (\d+) \| blokada .*?\| Polnoc-korona: (CZYNNA \(Polnoc walczy po Krwawych Godach[^)]*\)|CZYNNA \(ROT wymusza\)|CZYNNA|KONIEC), wojna (TAK|NIE)")
+F320_MARK = re.compile(r"Krwawe Gody \(320a\): zaszly \((.*?)\) \| dzien kampanii")
+F320_RET = re.compile(r"Krwawe Gody \(320a\): zwrot (.+?) \[(\S+)\] od (.+?) \((\S+)\) do (.+?) \((\S+), (.*?); pierwotnie (\S+)\) (TAK|NIE) \|")
+F320_RETSUM = re.compile(r"Krwawe Gody \(320a\): zwrot zamkow korony \| rodow, ktore przeszly (\d+) .*?\| zwroconych (\d+), zostaje \(nie korony z poczatku\) (\d+)")
+F320_EXIT = re.compile(r"Krwawe Gody \(320a\): faza 2 blokady Polnoc-korona i bramka 312c Polnoc po Bekartach - WYJSCIE: (.+?) \| Krwawe Gody (zaszly|nie zaszly)")
+F320_SAMPLES = [
+    "[21:01:32] Fabula (320a): lancuch Harrenhal zamkniety - Harrenhal trzyma House Paege (ROTclan_1, The North / battania), nie Clegane: pominiete HarrenhalEvent TAK, HarrenhalSiegeEvent TAK, HarrenhalSiegeNotificationEvent TAK (ROT SkipEvent, w zapisie ROT; Harrenhal bez zmiany pana) | dzien 368.",
+    "[21:01:32] Fabula (320a): RiverlandsDeclareWarEvent pominiete TAK - krolestwa Dorzecza nie ma (wyeliminowane - unia 272 albo podboj); po Krwawych Godach nie odpali z tekstem holdu | dzien 368.",
+    "[21:01:32] FABULA: dzien 368 | zaleglych na osi: 0 | czolo kolejki: brak | przyszlych: 18 | ostatni start: zaden | pominietych: 0",
+    "[10:00:00] Krwawe Gody bez pokoju (320): ExecuteRobb - pokoj battania-vlandia POMINIETY (blokada 264 faza 2, podmian 1) | wojna TAK | Roose zyje NIE | wywolanie 1 | dzien opowiesci 953.2.",
+    "[10:00:01] Pokoj kanonu (264): dzien 109900 | blokada CZYNNA (Robb nie zyje, RedWeddingEvent 2 - Polnoc walczy dalej po Krwawych Godach, BastardsSiegeEvent 0) | Polnoc-korona: CZYNNA (Polnoc walczy po Krwawych Godach, BastardsSiegeEvent 0), wojna TAK od dnia 9.0 | Dorzecze-korona: KONIEC, wojna TAK | zablokowane dzis 0, sesja 0 | gracz rzadzi: nie | potkniecia 0 (sesja 0).",
+    "[10:00:00] Krwawe Gody (320a): zaszly (ExecuteRobb) | dzien kampanii 1120.4, dzien opowiesci 953.2 | rody Polnoc w chwili Godow 31 | faza 2 blokady Polnoc-korona do Bitwy Bekartow albo do wyjscia (Bekarci niemozliwi: Snow / Jon / Winterfell nie u Boltonow 120 dob; limit 723.1 dob).",
+    "[10:00:00] Krwawe Gody (320a): zwrot Crakehall [castle_V2] od House Bolton (clan_empire_south_3) do House Crakehall (clan_vlandia_4, rod pierwotny; pierwotnie clan_vlandia_4) TAK | wiosek 2 | zaloga 140.",
+    "[10:00:00] Krwawe Gody (320a): zwrot zamkow korony | rodow, ktore przeszly 10 (migawka Polnocy): House Bolton, House Frey | zwroconych 1, zostaje (nie korony z poczatku) 6 [Winterfell (pierwotnie clan_battania_1)], bez danych ROT 0, bez odbiorcy 0 | dane: osad 228, rodow 260 | twierdze korony u lordow Polnocy, ktorzy zostali - korona musi je odbic.",
+    "[11:00:00] Krwawe Gody (320a): faza 2 blokady Polnoc-korona i bramka 312c Polnoc po Bekartach - WYJSCIE: Winterfell u House Stark (clan_battania_1) od 120 dob, nie u Boltonow - Bekarci niemozliwi | Krwawe Gody zaszly (ExecuteRobb) | dzien kampanii 1300.0, dzien opowiesci 1133.0.",
+    "[11:00:01] Pokoj kanonu (264): dzien 110100 | blokada KONIEC (Robb nie zyje, RedWeddingEvent 2 - faza 2 koniec: limit 723.1 dob po Krwawych Godach bez Bitwy Bekartow (BastardsSiegeEvent 0) - ROT nie wymusza tej wojny) | Polnoc-korona: KONIEC, wojna TAK od dnia 9.0 [faza 2 koniec: limit 723.1 dob po Krwawych Godach bez Bitwy Bekartow (BastardsSiegeEvent 0) - ROT nie wymusza tej wojny] | Dorzecze-korona: KONIEC, wojna TAK | zablokowane dzis 0, sesja 0 | gracz rzadzi: nie | potkniecia 0 (sesja 0).",
+]
+
+
+def f320_selftest():
+    a = F320_HH.search(F320_SAMPLES[0]); b = F320_RL.search(F320_SAMPLES[1]); c = F320_DIAG.search(F320_SAMPLES[2])
+    d = F320_RW.search(F320_SAMPLES[3]); e = F320_DAY.search(F320_SAMPLES[4])
+    g = F320_MARK.search(F320_SAMPLES[5]); h = F320_RET.search(F320_SAMPLES[6]); k = F320_RETSUM.search(F320_SAMPLES[7]); x = F320_EXIT.search(F320_SAMPLES[8])
+    y = F320_DAY.search(F320_SAMPLES[9])
+    return bool(a and a.group(2) == "TAK" and a.group(5) == "368" and b and b.group(1) == "TAK" and c and c.group(3) == "brak"
+                and d and d.group(2) == "POMINIETY" and d.group(4) == "1" and e and e.group(2).startswith("CZYNNA (Polnoc walczy")
+                and g and g.group(1) == "ExecuteRobb" and h and h.group(2) == "castle_V2" and h.group(9) == "TAK" and h.group(8) == "clan_vlandia_4"
+                and k and k.group(2) == "1" and x and "Winterfell" in x.group(1) and x.group(2) == "zaszly"
+                and y and y.group(2) == "KONIEC" and "[faza 2 koniec:" in F320_SAMPLES[9])
+
+
+def f320_cs_rows(rep, lines):
+    hh = [m for m in (F320_HH.search(x) for x in lines) if m]
+    rl = [m for m in (F320_RL.search(x) for x in lines) if m]
+    diag = [m for m in (F320_DIAG.search(x) for x in lines) if m]
+    bad = [x for x in lines if "Fabula (320a):" in x and (" NIE (" in x or "potkniecie" in x)]
+    stuck = [x for x in lines if re.search(r"FABULA: (HarrenhalSiegeNotificationEvent|HarrenhalSiegeEvent|HarrenhalEvent|RiverlandsDeclareWarEvent) nie moze odpalic", x)]
+    starts = [x for x in lines if re.search(r"FABULA: wydarzenie (HarrenhalSiegeNotificationEvent|HarrenhalSiegeEvent|HarrenhalEvent|RiverlandsDeclareWarEvent) WYSTARTOWALO", x)]
+    if hh:
+        ok = all(m.group(2) == "TAK" and m.group(3) == "TAK" for m in hh)
+        rep.add("F320-1: lancuch Harrenhal zamkniety (HarrenhalEvent, Siege TAK)", f"{len(hh)} | {hh[-1].group(1)} | dzien {hh[-1].group(5)} | Notification {hh[-1].group(4)}", "1 linia, TAK/TAK", ok and len(hh) == 1)
+    else:
+        rep.add("F320-1: lancuch Harrenhal zamkniety", "brak linii", "1 (zapis Jeffa: Harrenhal u Paege) - INFO w innym zapisie", None)
+    if rl:
+        rep.add("F320-2: RiverlandsDeclareWarEvent pominiete", f"{len(rl)} | {rl[-1].group(1)} | dzien {rl[-1].group(2)}", "1 linia, TAK", len(rl) == 1 and rl[-1].group(1) == "TAK")
+    else:
+        rep.add("F320-2: RiverlandsDeclareWarEvent pominiete", "brak linii", "1 (zapis Jeffa: Dorzecze zniszczone unia) - INFO w innym zapisie", None)
+    if diag:
+        last = diag[-1]
+        dead = last.group(3).startswith("Harrenhal") or last.group(3).startswith("RiverlandsDeclareWar")
+        rep.add("F320-3: ostatnia linia kolejki (czolo, zaleglych)", f"dzien {last.group(1)} | zaleglych {last.group(2)} | czolo {last.group(3)}", "czolo bez Harrenhal/Riverlands", not dead)
+    else:
+        rep.add("F320-3: linia kolejki FABULA", "brak", ">= 1 (raz na dobe)", False)
+    rep.add("F320-4: potkniecia / NIE 320a", str(len(bad)) + (" | " + bad[0][:160] if bad else ""), "0", len(bad) == 0)
+    rep.add("F320-5: stare omijanie 6-dniowe tych wydarzen", str(len(stuck)), "0 (pominiete od razu)", len(stuck) == 0 if (hh or rl) else None)
+    rep.add("F320-6: start martwego wydarzenia (Harrenhal / hold Dorzecza)", str(len(starts)), "0", len(starts) == 0)
+
+
+def f320_arm_rows(rep, lines):
+    start = [x for x in lines if "Krol Polnocy (272): start sesji" in x]
+    if start:
+        s = start[-1]
+        ok = "bez pokoju 320 TAK (podmian 1)" in s
+        zap = "bez pokoju 320 ZAPAS" in s
+        rep.add("F320-7: latka Krwawych Godow (transpiler)", "TAK (podmian 1)" if ok else ("ZAPAS" if zap else "brak dopisku 320"), "TAK (podmian 1)", True if ok else (None if zap else False))
+    else:
+        rep.add("F320-7: linia startu 272", "brak", ">= 1", False)
+    rw = [m for m in (F320_RW.search(x) for x in lines) if m]
+    if rw:
+        m = rw[0]
+        rep.add("F320-8: ExecuteRobb - pokoj Polnoc-korona", f"{m.group(2)} ({m.group(3)}) | wojna {m.group(5)} | Roose zyje {m.group(6)}", "POMINIETY, wojna TAK", m.group(2) == "POMINIETY" and m.group(5) == "TAK")
+    else:
+        rep.add("F320-8: ExecuteRobb (Krwawe Gody)", "nie bylo w tym logu", "INFO (T2: flaga armoury-krwawe-gody320.flag)", None)
+    zap = [x for x in lines if "Krwawe Gody bez pokoju (320): zapas" in x]
+    if zap:
+        rep.add("F320-9: zapas (wojna wznowiona po pokoju ROT)", zap[-1][:200], "INFO - transpiler nie podmienil", None)
+    days = [m for m in (F320_DAY.search(x) for x in lines) if m]
+    fo = [m for m in days if m.group(2).startswith("CZYNNA (Polnoc walczy")]
+    if rw:
+        # od pierwszej linii fazy 2: zadnej doby Polnoc-korona KONIEC ani bez wojny
+        idx = next((i for i, m in enumerate(days) if m.group(2).startswith("CZYNNA (Polnoc walczy")), None)
+        tail = days[idx:] if idx is not None else []
+        # 320a: po wyjsciu fazy 2 (linia doby "[faza 2 koniec: ...]") KONIEC jest zgodny z regula
+        off = [m for m in tail if (m.group(2) == "KONIEC" or m.group(3) == "NIE") and "[faza 2 koniec" not in m.string]
+        rep.add("F320-10: doby po Godach - Polnoc-korona CZYNNA (Polnoc walczy) i wojna TAK", f"dob fazy 2 {len(fo)}, bez blokady albo bez wojny {len(off)}", ">= 1, 0", len(fo) >= 1 and not off)
+    peace = [x for x in lines if re.search(r"Wojna i pokoj \(E7/0\): dzien \d+ \| (The North - House Baratheon of King's Landing|House Baratheon of King's Landing - The North): POKOJ \(", x)]
+    rep.add("F320-11: pokoje Polnoc-korona (linie POKOJ)", str(len(peace)) + (" | " + peace[0][:160] if peace else ""), "0 po Godach (INFO przed)", None if not rw else len(peace) == 0)
+    # 320a recenzja: faza 2 tylko po prawdziwych Godach (flaga), wyjscie bez Bekartow, zwrot zamkow korony (Jeff 02.11)
+    mark = [m for m in (F320_MARK.search(x) for x in lines) if m]
+    if rw or mark:
+        rep.add("F320-12: Krwawe Gody zaszly (flaga 320a)", f"{len(mark)}" + (f" | {mark[0].group(1)}" if mark else ""), "1 przy ExecuteRobb", len(mark) == 1 if rw else None)
+    ret = [m for m in (F320_RET.search(x) for x in lines) if m]
+    rsum = [m for m in (F320_RETSUM.search(x) for x in lines) if m]
+    if rsum or ret:
+        bad = [m for m in ret if m.group(9) != "TAK"]
+        rep.add("F320-13: zwrot zamkow korony (linia zbiorcza, raz)", f"linii {len(rsum)} | zwroconych {rsum[-1].group(2) if rsum else '?'}, zostaje {rsum[-1].group(3) if rsum else '?'} | zwrotow NIE {len(bad)}",
+                "1 linia, 0 NIE", len(rsum) == 1 and not bad)
+        own = [m for m in ret if m.group(4) == m.group(6)]
+        rep.add("F320-14: zwrot do tego samego rodu", str(len(own)), "0", len(own) == 0)
+    elif rw:
+        rep.add("F320-13: zwrot zamkow korony", "brak linii", "1 linia zbiorcza po ExecuteRobb", False)
+    ex = [m for m in (F320_EXIT.search(x) for x in lines) if m]
+    if ex:
+        rep.add("F320-15: wyjscie fazy 2 / bramki 312c (zatrzask)", f"{len(ex)} | {ex[0].group(1)[:120]}", "najwyzej 1 na kampanie (INFO)", None if len(ex) == 1 else False)
+    pot = [x for x in lines if "KingInTheNorth.ReturnStolen" in x or "KingInTheNorth.Rw320Daily" in x or "KingInTheNorth.RwMark" in x]
+    rep.add("F320-16: potkniecia 320a (ReturnStolen / Rw320Daily / RwMark)", str(len(pot)), "0", len(pot) == 0)
+
+
+def fabula320a_main(cslog, armlog=None):
+    rep = Report()
+    st = f320_selftest()
+    rep.add("F320-S: self-test wyrazen na wzorach linii", "TAK" if st else "wyrazenie nie czyta wzoru", "TAK", st)
+    if not cslog or not os.path.isfile(cslog):
+        rep.add("F320-F: log CrashScribe", f"brak pliku {cslog}", "podaj <session-*.log> [<Armoury-*.log>]", None)
+        rep.show()
+        return 0
+    lines = []
+    with open(cslog, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if "FABULA" in s or "Fabula (320a)" in s:
+                lines.append(s)
+    print(f"plik: {cslog}")
+    f320_cs_rows(rep, lines)
+    if armlog and os.path.isfile(armlog):
+        al = []
+        with open(armlog, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                s = line.rstrip("\r\n")
+                if "Krol Polnocy (272)" in s or "(320)" in s or "(320a)" in s or "KingInTheNorth." in s or "Pokoj kanonu (264): dzien" in s or "Wojna i pokoj (E7/0)" in s:
+                    al.append(s)
+        print(f"plik: {armlog}")
+        f320_arm_rows(rep, al)
+    rep.show()
+    return 0
+
+
+_fabula320a_main_prev = main
+
+
+def main(argv):
+    # paczka 320a (Fabula + Krwawe Gody): grupa fabula320a - opakowanie main jak groty319c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "fabula320a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return fabula320a_main(rest[0] if rest else None, rest[1] if len(rest) > 1 else None)
+    return _fabula320a_main_prev(argv)
+
+# ---- paczka 320b: grupa sca320b - SCA liczy wroga bez band, Innych i wyjetych spod prawa (Jeff 02.11) ----
+# 320e: ta sama grupa czyta tez zagrozone twierdze (SCA -> nasze) i cel / chce pokoju przy zablokowanym pokoju (264); stare linie 320b czyta dalej.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa sca320b <Armoury-*.log>
+S320_START = re.compile(r"SCA bez band \(320b\): start sesji - latka (.*?), klucz Strategic AI Ignores Bandits (wlaczony|WYLACZONY)")
+S320E_START = re.compile(r"\| 320e pokoj zablokowany: latki (.*?), klucz Strategic AI Fights On When Peace Blocked (wlaczony|WYLACZONY)")
+S320_DAY = re.compile(r"SCA bez band \(320b\): dzien (\d+) \| klucz (tak|nie), latka (wpieta|BRAK), ocen doby (\d+) \(zmienionych (\d+)\), potkniecia doby (\d+) \(sesja (\d+)\)"
+                      r"(?: \| 320e klucz (?P<ek>tak|nie), latki (?P<el>wpiete|BRAK), zamian celu (?P<es>\d+)(?: \(w ticku (?P<el2>\d+)\))?, pokoj wyczyszczony (?P<ep>\d+), zagrozone zmienione (?P<et>\d+))?"
+                      r"(?: \| (?P<k>.*))?\.$")
+S320_K = re.compile(r"(?:^|; )(?P<n>[^:;]+): wrog (?P<b>-?\d+) -> (?P<a>-?\d+) \(pominiete: bandy (?P<pb>\d+) z (\d+), Inni (?P<po>\d+) z (\d+), wyjeci spod prawa (?P<pw>\d+) z (\d+); liczeni (\d+)\), "
+                    r"swoi (?P<sw>\S+), twierdze (?P<tf>\S+) zagrozone (?P<tz>\S+)(?: \(SCA (?P<tzs>-?\d+|\?)\))?, wojen (?P<wo>\S+), "
+                    r"cel (?P<g>\w+|\?)(?: \(SCA (?P<gs>\w+|\?), (?P<why>[^()]*)\))?, wyczerpane (?P<ex>tak|nie), chce pokoju (?P<cp>tak|nie)(?: \(SCA (?P<cps>tak|nie)\))?")
+S320_SAMPLE_START = ("[21:00:01] SCA bez band (320b): start sesji - latka wpieta (StrategicCampaignAI145.StrategicCampaignAI145Behavior.CalculateFactionStatus(Kingdom)), "
+                     "klucz Strategic AI Ignores Bandits wlaczony | wrog SCA i zagrozone twierdze bez band (IsBanditFaction), Innych (kultura whitewalker) i frakcji wyjetych spod prawa (IsOutlaw); "
+                     "liczba wojen i wioski bez zmian | 320e pokoj zablokowany: latki UpdateWarGoal wpieta, OnDailyTick wpieta, OnHourlyTick wpieta, klucz Strategic AI Fights On When Peace Blocked "
+                     "wlaczony - bez ForcePeace i WantsPeace, gdy wszystkie wojny z krolestwami maja pokoj zablokowany (264).")
+S320_SAMPLE_DAY = ("[21:56:58] SCA bez band (320b): dzien 120 | klucz tak, latka wpieta, ocen doby 140 (zmienionych 120), potkniecia doby 0 (sesja 0) | 320e klucz tak, latki wpiete, "
+                   "zamian celu 1 (w ticku 0), pokoj wyczyszczony 7, zagrozone zmienione 3 | "
+                   "Kings Landing: wrog 58819 -> 41262 (pominiete: bandy 12 z 11, Inni 16000 z 1, wyjeci spod prawa 1545 z 1; liczeni 4), swoi 19741, twierdze 15 zagrozone 4 (SCA 6), "
+                   "wojen 17, cel BorderWar (SCA ForcePeace, pokoj zablokowany 264 - krolestwa 2 z 2), wyczerpane tak, chce pokoju nie (SCA tak); "
+                   "The North: wrog 37371 -> 19800 (pominiete: bandy 0 z 11, Inni 16000 z 1, wyjeci spod prawa 1571 z 1; "
+                   "liczeni 3), swoi 41276, twierdze 42 zagrozone 7 (SCA 9), wojen 16, cel ReclaimLostFief (SCA ReclaimLostFief, pokoj zablokowany 264 - krolestwa 1 z 1), "
+                   "wyczerpane nie, chce pokoju nie (SCA nie).")
+
+
+def s320_rows(rep, starts, days):
+    if not starts:
+        rep.add("S320-1: latka 320b (start sesji)", "brak linii startu", "linia 'SCA bez band (320b): start sesji' (nowy DLL)", None)
+    else:
+        m = S320_START.search(starts[-1])
+        ok = bool(m) and m.group(1).startswith("wpieta")
+        rep.add("S320-1: latka 320b (ostatni start sesji)", (m.group(1)[:200] + ", klucz " + m.group(2)) if m else starts[-1][:200], "wpieta, klucz wlaczony",
+                ok and m.group(2) == "wlaczony" if m else False)
+        e = S320E_START.search(starts[-1])
+        rep.add("S320-7: latki 320e (ostatni start sesji)", (e.group(1)[:200] + ", klucz " + e.group(2)) if e else "brak czesci 320e (DLL sprzed 320e)",
+                "UpdateWarGoal, OnDailyTick, OnHourlyTick wpieta; klucz wlaczony",
+                (e.group(1).count("wpieta") == 3 and "BRAK" not in e.group(1) and e.group(2) == "wlaczony") if e else None)
+    if not days:
+        rep.add("S320-2: linie doby 'SCA bez band (320b): dzien'", "0", ">= 1 (po pierwszej dobie z LogEnabled)", None)
+        return
+    rep.add("S320-2: linie doby 'SCA bez band (320b): dzien'", str(len(days)), ">= 1", True)
+    st = sum(int(S320_DAY.search(d).group(6)) for d in days if S320_DAY.search(d))
+    rep.add("S320-3: potkniecia (suma dob)", str(st), "0", st == 0)
+    m = S320_DAY.search(days[-1])
+    if not m:
+        rep.add("S320-P: odczyt ostatniej linii doby", "nie czyta", "TAK", False)
+        return
+    rep.add("S320-4: ostatnia doba - klucz / latka / ocen (zmienionych)", f"{m.group(2)} / {m.group(3)} / {m.group(4)} ({m.group(5)})", "tak / wpieta / > 0",
+            m.group(2) == "tak" and m.group(3) == "wpieta" and int(m.group(4)) > 0)
+    bad, rows, tbad, gbad, ginfo = [], [], [], [], []
+    for k in S320_K.finditer(m.group("k") or ""):
+        name, b, a = k.group("n").strip(), int(k.group("b")), int(k.group("a"))
+        skipped = int(k.group("pb")) + int(k.group("po")) + int(k.group("pw"))
+        if m.group(2) == "tak" and (a > b + 1 or abs((b - skipped) - a) > 2 + 0.001 * b):
+            bad.append(f"{name}: {b} - {skipped} != {a}")
+        tz, tzs = k.group("tz"), k.group("tzs")
+        if tzs not in (None, "?") and tz != "?" and float(tz) > int(tzs):
+            tbad.append(f"{name}: {tz} > SCA {tzs}")
+        why, g, gs, cp, cps = k.group("why") or "", k.group("g"), k.group("gs"), k.group("cp"), k.group("cps")
+        if why.startswith("pokoj zablokowany"):
+            if m.group("ek") == "tak" and (g == "ForcePeace" or cp == "tak"):
+                gbad.append(f"{name}: cel {g}, chce pokoju {cp} mimo blokady")
+            ginfo.append(f"{name}: {gs} -> {g}, pokoj SCA {cps} -> {cp}")
+        elif gs is not None and gs != "?" and g != gs:
+            gbad.append(f"{name}: cel {g} != SCA {gs} bez blokady ({why})")
+        rows.append(f"{name} {b}->{a} cel {g} wycz. {k.group('ex')} (swoi {k.group('sw')}, zagr. {tz}/{k.group('tf')})")
+    rep.add("S320-5: wrog po = wrog przed - pominiete (kazde krolestwo)", "; ".join(bad) if bad else f"zgodne ({len(rows)} krolestw)", "zgodne", (not bad) if rows else None)
+    rep.add("S320-6: krolestwa (ostatnia doba)", " | ".join(rows)[:1500] or "-", "INFO", None)
+    if m.group("ek") is None:
+        rep.add("S320-8: 320e w linii doby", "brak (DLL sprzed 320e)", "czesc '| 320e klucz'", None)
+        return
+    rep.add("S320-8: 320e ostatnia doba - klucz / latki",
+            f"{m.group('ek')} / {m.group('el')} (zamian celu {m.group('es')} - w ticku {m.group('el2')}, pokoj wyczyszczony {m.group('ep')}, zagrozone zmienione {m.group('et')})",
+            "tak / wpiete", m.group("ek") == "tak" and m.group("el") == "wpiete")
+    rep.add("S320-9: zagrozone twierdze nasze <= SCA", "; ".join(tbad) if tbad else "zgodne", "kazde krolestwo", (not tbad) if rows else None)
+    rep.add("S320-10: pokoj zablokowany -> bez ForcePeace i WantsPeace; bez blokady cel = SCA", "; ".join(gbad) if gbad else "zgodne", "zgodne", (not gbad) if rows else None)
+    rep.add("S320-11: krolestwa z blokada pokoju (cel SCA -> nasz)", " | ".join(ginfo)[:1200] or "brak", "INFO (korona, Polnoc, Dorzecze do Krwawych Godow)", None)
+
+
+def sca320b_main(logp):
+    rep = Report()
+    ok = bool(S320_START.search(S320_SAMPLE_START)) and bool(S320E_START.search(S320_SAMPLE_START))
+    d = S320_DAY.search(S320_SAMPLE_DAY)
+    ks = list(S320_K.finditer(d.group("k") or "")) if d else []
+    ok = ok and bool(d) and d.group("ek") == "tak" and len(ks) == 2 and ks[0].group("gs") == "ForcePeace" and ks[0].group("tzs") == "6" and ks[0].group("cps") == "tak"
+    rep.add("S320-S: self-test wyrazen na wzorze linii", "TAK" if ok else "wyrazenie nie czyta wzoru", "TAK", ok)
+    if not logp or not os.path.isfile(logp):
+        rep.add("S320-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days = [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if "SCA bez band (320b): start sesji" in s:
+                starts.append(s)
+            elif "SCA bez band (320b): dzien" in s:
+                days.append(s)
+    print(f"plik: {logp}")
+    s320_rows(rep, starts, days)
+    rep.show()
+    return 0
+
+
+_sca320b_main_prev = main
+
+
+def main(argv):
+    # paczka 320b: grupa sca320b - opakowanie main jak groty319c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "sca320b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return sca320b_main(rest[0] if rest else None)
+    return _sca320b_main_prev(argv)
+
+
+# ---- paczka 320c: grupa mury320c - przewaga obroncow wedlug poziomu murow (Jeff 02.11) ----
+M320_LINE = re.compile(r"Mury \(320c\): dzien (\d+) \| osada (\S+) \((.*?), (miasto|zamek)\) \| poziom murow (\d+) \| czynnik x([\d.]+)(?: \(bez czynnika: (.*?)\))? \| "
+                       r"przewaga ([\d.]+) \(bez czynnika ([\d.]+)\), W ([\d.]+) \| obroncow (\d+), atakujacych (\d+) \| straty atak (\d+)%, obrona (\d+)%, wymiana ([\d.]+) \| "
+                       r"gracz (tak|nie) \| wynik (.*?)\.$")
+M320_DAY = re.compile(r"Mury \(320c doba\): dzien (\d+) \| klucz (tak|nie) \(L1 x([\d.]+), L2 x([\d.]+), L3 x([\d.]+)\) \| przewaga z czynnikiem \(wywolan\): "
+                      r"L1 (\d+), L2 (\d+), L3 (\d+), bez czynnika \(fabula, Inni, skrypt\) (\d+) \|.*\| szturmy bez czynnika (\d+) \| potkniecia (\d+)\.$")
+M320_STORY = {"town_EW4", "ROT_castle61", "town_B2", "ROT_town32", "ROT_castle60", "town_B5"}   # SiegeRansom.StoryIds
+M320_SAMPLE = ("[12:00:01] Mury (320c): dzien 109160 | osada castle_W3 (Banefort, zamek) | poziom murow 2 | czynnik x1.20 | przewaga 4.80 (bez czynnika 4.00), W 7.52 | "
+               "obroncow 615, atakujacych 5998 | straty atak 21%, obrona 64%, wymiana 1.62 | gracz nie | wynik odparty (OB2).")
+M320_SAMPLE2 = ("[12:00:01] Mury (320c): dzien 109161 | osada town_B2 (Winterfell, miasto) | poziom murow 3 | czynnik x1.00 (bez czynnika: osada fabuly) | przewaga 4.40 "
+                "(bez czynnika 4.40), W 6.00 | obroncow 300, atakujacych 3000 | straty atak 15%, obrona 100%, wymiana 1.10 | gracz nie | wynik zdobyte.")
+M320_DSAMPLE = ("[00:00:02] Mury (320c doba): dzien 109161 | klucz tak (L1 x1.10, L2 x1.20, L3 x1.35) | przewaga z czynnikiem (wywolan): L1 3, L2 140, L3 0, "
+                "bez czynnika (fabula, Inni, skrypt) 12 | szturmy L1: bitew 0 (zdobyte 0, odparte 0, inne 0), straty atak / obrona 0 / 0 | szturmy L2: bitew 1 (zdobyte 0, "
+                "odparte 1, inne 0), straty atak / obrona 1260 / 394 | szturmy L3: bitew 0 (zdobyte 0, odparte 0, inne 0), straty atak / obrona 0 / 0 | szturmy bez czynnika 1 | potkniecia 0.")
+
+
+def m320_rows(rep, sz, days, ob):
+    if not days:
+        rep.add("M320-L: linia 'Mury (320c doba)'", "brak", ">= 1 (doba z SiegeWallsLog)", False)
+        return
+    rep.add("M320-L: linia 'Mury (320c doba)'", str(len(days)), ">= 1", True)
+    d = [M320_DAY.search(x) for x in days]
+    bad = sum(1 for x in d if not x)
+    rep.add("M320-P: odczyt linii doby", f"nie czyta {bad}" if bad else "wszystkie", "wszystkie", bad == 0)
+    d = [x for x in d if x]
+    if not d:
+        return
+    on, f1, f2, f3 = d[-1].group(2) == "tak", float(d[-1].group(3)), float(d[-1].group(4)), float(d[-1].group(5))
+    want = {1: f1, 2: f2, 3: f3}
+    rep.add("M320-1: klucz Siege Walls Favour Defenders", f"{'tak' if on else 'nie'} (L1 x{f1:.2f}, L2 x{f2:.2f}, L3 x{f3:.2f})", "tak (1.10 / 1.20 / 1.35)", on)
+    calls = [sum(int(x.group(i)) for x in d) for i in (6, 7, 8)]
+    excl = sum(int(x.group(9)) for x in d)
+    rep.add("M320-2: przewaga z czynnikiem (wywolan L1 / L2 / L3; bez czynnika)", f"{calls[0]} / {calls[1]} / {calls[2]}; {excl}", "INFO (L2 > 0, gdy trwaja oblezenia AI)", None)
+    stum = sum(int(x.group(11)) for x in d)
+    rep.add("M320-3: potkniecia SiegeWalls w dobach z linia 320c", str(stum), "0", stum == 0)
+    if not sz:
+        rep.add("M320-4: linie 'Mury (320c)' (szturmy)", "brak", "INFO (potrzebny szturm AI w logu)", None)
+    else:
+        rows = [M320_LINE.search(x) for x in sz]
+        nb = sum(1 for r in rows if not r)
+        rep.add("M320-4: linie 'Mury (320c)' (szturmy)", f"{len(sz)} (nie czyta {nb})", ">= 1, wszystkie czytelne", nb == 0)
+        rows = [r for r in rows if r]
+        wrongf, story, ratio = [], [], []
+        per = {}
+        for r in rows:
+            sid, lvl, f, why = r.group(2), int(r.group(5)), float(r.group(6)), r.group(7)
+            adv, adv0 = float(r.group(8)), float(r.group(9))
+            li = 1 if lvl <= 1 else 3 if lvl >= 3 else 2
+            if sid in M320_STORY and f > 1.0:
+                story.append(f"{sid} x{f:.2f}")
+            if why is None and on and abs(f - want[li]) > 0.006:
+                wrongf.append(f"{sid} L{lvl} x{f:.2f} (klucz x{want[li]:.2f})")
+            if adv0 > 0 and abs(adv / adv0 - f) > 0.02 * f + 0.01:
+                ratio.append(f"{sid} {adv:.2f}/{adv0:.2f} vs x{f:.2f}")
+            if why is None:
+                p = per.setdefault(li, [0, 0, 0, 0.0, 0.0])
+                p[0] += 1
+                res = r.group(17)
+                if res == "zdobyte":
+                    p[1] += 1
+                elif res.startswith("odparty"):
+                    p[2] += 1
+                p[3] += int(r.group(13))
+                p[4] += float(r.group(15))
+        rep.add("M320-5: czynnik w szturmie = klucz dla poziomu", "; ".join(wrongf[:6]) or "zgodny", "zgodny", not wrongf)
+        rep.add("M320-6: osady fabuly ROT bez czynnika", "; ".join(story) or "zadna z czynnikiem", "zadna z czynnikiem", not story)
+        rep.add("M320-7: przewaga / bez czynnika = czynnik", "; ".join(ratio[:6]) or "zgodne", "zgodne", not ratio)
+        summ = []
+        for li, p in sorted(per.items()):
+            summ.append(f"L{li}: szturmow {p[0]}, zdobyte {p[1]} ({p[1] * 100.0 / p[0]:.0f}%), odparte {p[2]}, straty atak sr. {p[3] / p[0]:.0f}%, wymiana sr. {p[4] / p[0]:.2f}")
+        rep.add("M320-8: szturmy wedlug poziomu (z czynnikiem)", " | ".join(summ) or "-", "INFO (przed 320c L2: zdobyte 63%, wymiana ok. 1.3)", None)
+    if ob:
+        lack = sum(1 for x in ob if "x poziom murow (320c)" not in x)
+        rep.add("M320-9: linie OB1/O0 z polem 'x poziom murow (320c)'", f"{len(ob) - lack} z {len(ob)}", "wszystkie", lack == 0)
+
+
+def mury320c_main(logp):
+    rep = Report()
+    a, b, c = M320_LINE.search(M320_SAMPLE), M320_LINE.search(M320_SAMPLE2), M320_DAY.search(M320_DSAMPLE)
+    st_ok = bool(a) and bool(b) and bool(c) and a.group(7) is None and b.group(7) == "osada fabuly" and c.group(4) == "1.20" and c.group(11) == "0"
+    rep.add("M320-S: self-test wyrazen na wzorze linii", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
+    if not logp or not os.path.isfile(logp):
+        rep.add("M320-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sz, days, ob = [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if "Mury (320c doba):" in s:
+                days.append(s)
+            elif "Mury (320c):" in s:
+                sz.append(s)
+            elif "przewaga " in s and " = mury poziom " in s:
+                ob.append(s)
+    print(f"plik: {logp}")
+    m320_rows(rep, sz, days, ob)
+    rep.show()
+    return 0
+
+
+_mury320c_main_prev = main
+
+
+def main(argv):
+    # paczka 320c: grupa mury320c - opakowanie main jak groty319c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "mury320c":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return mury320c_main(rest[0] if rest else None)
+    return _mury320c_main_prev(argv)
 
 
 # ---- paczka 320d: grupa bieg320d - bieg pod ostrzalem w kazdym natarciu i 291e naszym licznikiem (Jeff 02.11 "1. tak") ----
