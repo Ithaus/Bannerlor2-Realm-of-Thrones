@@ -1430,7 +1430,7 @@ namespace Armoury
         /// Noc 15/16.10: do linii stan nocy gracza - godziny marszu w godzinach obozu, oboz automatyczny, tryb zmierzchu, sny przerwane poza menu,
         /// dlug odlozony do pobudki (sen przez swit, PlayerSleepGuard) i tresc komunikatow switu (MsgLog); wzor uwzglednia dlug odlozony z poprzedniego
         /// switu w tym samym snie (_dawnDeferredUp).</summary>
-        private static void LogPlayerDawn(Settings s, float rest, int before, bool sleeping, bool credited, int marchH, int autoCamps, int cuts)
+        private static void LogPlayerDawn(Settings s, float rest, int before, bool sleeping, bool credited, int marchH, int autoCamps, int cuts, bool sleptMenu)
         {
             try
             {
@@ -1438,7 +1438,7 @@ namespace Armoury
                 bool enlisted = RotEnlisted();
                 int expect = enlisted ? 0 : ((sleeping || FullNight(rest, baza)) ? Math.Min(3, before + _dawnDeferredUp) : Math.Min(3, before + 1));
                 Log.Info("NocnyMarsz: gracz o swicie - odpoczynek doby " + F1(rest) + " h (baza " + F1(baza) + ", sen w menu "
-                         + (sleeping ? "tak" : "nie") + ", splata od reki w tej dobie " + (credited ? "tak" : "nie")
+                         + (sleeping ? "tak" : "nie") + ", spal w menu tej doby " + (sleptMenu ? "tak" : "nie") + ", splata od reki w tej dobie " + (credited ? "tak" : "nie")
                          + (enlisted ? ", w sluzbie ROT" : "") + "), dlug przed " + before + ", po " + Debt
                          + " - wzor (dlug +1, gdy < baza i nie spi; maks. 3): " + (expect == Debt ? "zgodny" : "NIEZGODNY, oczekiwany " + expect)
                          + "; dlug o swicie (musztra) " + DawnDebt + (DawnDebt == Debt ? "" : " - NIEZGODNY z dlugiem po")

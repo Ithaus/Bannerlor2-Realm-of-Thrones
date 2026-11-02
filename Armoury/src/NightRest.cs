@@ -90,6 +90,17 @@ namespace Armoury
         // w snie wola SleepInit od nowa i liczy czekanie od nowa.
         private static double _dawnHoldH = -1;
         private static string _wakeWhy;
+        // 316b (Jeff 01.11 "wypoczynek powinien byc wtedy jak jest noc a konczyc sie jak wstaje slonce"; log 01.11 22:56: 66 x "The column marched 1h through
+        // the night, but the men rested 6h"): pobudka 315a o 3:00 zegara, a tick switu ksiegi (faza terminu, np. :38) o ok. 3:40 - godzina ksiegi 2:38-3:38
+        // miala ruch od pobudki i szla do "marszu w godzinach obozu". _menuSleptHour: w godzinie ksiegi, ktora wlasnie mija, gracz spal w menu (SleepInit,
+        // SleepTick) - taka godzina nie jest godzina marszu; zerowana w ticku godzinowym na stan snu. _menuSleptDay: spal w menu od ostatniego switu
+        // ksiegi (do linii switu gracza). Tylko pamiec.
+        private static bool _menuSleptHour, _menuSleptDay;
+        /// <summary>316b: zmierzch o czasie - tick ksiegi tuz przed poczatkiem obozu (do CampStart najwyzej tyle godzin zegara) robi juz zmierzch (pytanie
+        /// albo oboz z rozkazu "always make camp"), zamiast nastepnego ticku do godziny po zmierzchu. Przy fazie :38 oboz z rozkazu stawal o ok. 21:40
+        /// i noc 21:42-3:00 dawala 5.3 h (dlug +1, log 01.11 01:17:43). 0.6 h: najblizszy tick zmierzchu z zapasem 0.1 h na opoznienie ticku (spoznienie
+        /// najwyzej 0.4 h, w zapasie pelnej nocy NightFullSlackH 0.5 h).</summary>
+        internal const double DuskLeadH = 0.6;
 
         /// <summary>KA: gracz spi w menu snu (arm_sleep_wait) - odczyt dla karczm (gojenie w dobrym domu tylko tej nocy).</summary>
         internal static bool SleepingNow { get { return _sleeping; } }
@@ -375,6 +386,23 @@ namespace Armoury
                     : h == CampStart && _promptDay != (int)CampaignTime.Now.ToDays;
                 if (forced) promptHour = false;   // R3-08c: marsz forsowny - bez pytania o nocleg i bez obozu z rozkazu "always make camp"
                 bool promptNow = false;
+                // 316b: zmierzch o czasie - tick ksiegi tuz przed poczatkiem obozu (zegar najwyzej DuskLeadH h przed CampStart) robi zmierzch juz teraz, noc
+                // pytania = nadchodzaca noc obozu (NightIdAhead - ten sam numer, co tick o CampStart, wiec nie pyta drugi raz). Tylko w nocy snu menu
+                // (MenuNight - sen zaczety teraz czeka do switu jak od 21:00), bez otwartego menu (trening 311e w tej godzinie ma pierwszenstwo).
+                long promptNightId = nightId;
+                string duskEarly = null;
+                if (s.NightMarchNotice && !promptHour && !forced && CampStart != CampEnd && !InCamp(h) && Mod24(CampStart - h) == 1)
+                {
+                    double hdNow = CampaignTime.Now.CurrentHourInDay;
+                    double toDusk = ((CampStart - hdNow) % 24.0 + 24.0) % 24.0;
+                    long ahead = NightClock.NightIdAhead(CampStart);
+                    if (toDusk <= DuskLeadH && _promptNight != ahead && MenuNight(CampaignTime.Now.GetHourOfDay)
+                        && Campaign.Current != null && Campaign.Current.CurrentMenuContext == null)
+                    {
+                        promptHour = true; promptNightId = ahead;
+                        duskEarly = " [316b: tick ksiegi przed zmierzchem - zegar " + Hm(hdNow) + ", do poczatku obozu " + CampStart + ":00 " + F1((float)toDusk) + " h]";
+                    }
+                }
                 // ZB-6 (przeglad 16.10, klucz NightPromptSkipWhenRested): ludzie juz sie wyspali tej doby (np. sen w menu skonczony w godzinach obozu - pobudka
                 // o 3:00 i ruch kolumny dawaly zaraz "Night Falls - make camp?"): odpoczynek doby bez braku odlozonego >= NeededHours (baza + odsetki dlugu - ten sam
                 // prog co splata od reki CreditRest), wiec marsz nie zrobi dlugu o swicie (SettleNight) i nie ma czego odsypiac - ani pytania, ani obozu z rozkazu
@@ -385,11 +413,11 @@ namespace Armoury
                     && PlayerEncounter.Current == null && !enl && !raidNow)
                 {
                     _promptDay = (int)CampaignTime.Now.ToDays;
-                    _promptNight = nightId;
+                    _promptNight = promptNightId;   // 316b: noc zmierzchu (tick przed poczatkiem obozu - nadchodzaca)
                     promptHour = false;
                     ArmouryZb.NotePromptSkip();
                     Log.Info("Nocleg: gracz - zmierzch o " + h + ":00, kolumna w marszu, ale odpoczynek doby " + F1(_restTonight) + " h (bez braku " + F1(Math.Max(0f, _dawnOwed))
-                             + " h) >= potrzeba " + F1(BaseHours()) + " h - zapas " + F1(NightFullSlackH) + " h (dlug " + Debt + ") - bez pytania o nocleg (ZB-6, Night Prompt Skip When Rested), noc " + nightId + ".");
+                             + " h) >= potrzeba " + F1(BaseHours()) + " h - zapas " + F1(NightFullSlackH) + " h (dlug " + Debt + ")" + duskEarly + " - bez pytania o nocleg (ZB-6, Night Prompt Skip When Rested), noc " + promptNightId + ".");
                 }
                 if (promptHour && CampStart != CampEnd && movedH
                     && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped
@@ -399,11 +427,11 @@ namespace Armoury
                     && PlayerEncounter.Current == null && !RotEnlisted() && !raidNow)
                 {
                     _promptDay = (int)CampaignTime.Now.ToDays;
-                    _promptNight = nightId;
+                    _promptNight = promptNightId;   // 316b
                     promptNow = true;
                     // noc 15/16.10: tryb zmierzchu w logu (zyl tylko w zapisie)
                     Log.Info("Nocleg: gracz - zmierzch o " + h + ":00, kolumna w marszu: tryb zmierzchu " + CampPromptMode
-                             + (CampPromptMode == 1 ? " (always make camp - oboz z rozkazu)" : " (ask - pytanie Night Falls)") + ", noc " + nightId + ".");
+                             + (CampPromptMode == 1 ? " (always make camp - oboz z rozkazu)" : " (ask - pytanie Night Falls)") + duskEarly + ", noc " + promptNightId + ".");
                     if (CampPromptMode == 1)
                     {
                         Msg(PartyWords.Pick("Night falls - the column makes camp.", "Night falls - you make camp.",
@@ -418,13 +446,16 @@ namespace Armoury
                         }
                         else MakeCampNow();
                     }
-                    else { NightfallAsk(); _warnNight = nightId; }   // gracz zapytany - tej nocy bez osobnego ostrzezenia
+                    else { NightfallAsk(); _warnNight = promptNightId; }   // gracz zapytany - tej nocy bez osobnego ostrzezenia
                 }
 
                 // noc 15/16.10 (NightMarchNotice): marsz w godzinach obozu - licznik do linii switu (godzina, ktora wlasnie minela, jak pomiar ruchu AI:
                 // InCamp(h - 1), wiec tick switu liczy jeszcze godzine 5-6) i ostrzezenie raz na noc (kolumna w ruchu w godzinie obozu, tylko gdy doba nie ma
                 // jeszcze bazy - z baza dlugu o swicie nie bedzie); poza osada, morzem, armia cudzego wodza (doczepiony), niewola, spotkaniem i sluzba ROT
-                bool marchField = CampStart != CampEnd && movedH && !resting && !PlayerCamped && !_sleeping
+                // 316b: godzina ksiegi, w ktorej gracz spal w menu (takze sen skonczony pobudka o swicie przed tickiem switu), nie jest godzina marszu
+                bool sleptHour = _sleeping || _menuSleptHour;
+                _menuSleptHour = _sleeping;
+                bool marchField = CampStart != CampEnd && movedH && !resting && !PlayerCamped && !sleptHour
                     && mp.CurrentSettlement == null && mp.MapEvent == null && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
                     && PlayerEncounter.Current == null && !captive && !enl && !raidNow;
                 if (marchField && InCamp(h - 1)) _marchHoursDay++;
@@ -460,7 +491,8 @@ namespace Armoury
                     _lastDawnMsg = null;
                     ForcedMarch.Dawn(s, restBefore, sleepingNow);   // R3-08c recenzja: zanik zmeczenia z odpoczynkiem doby PO godzinie 5-6, przed zerowaniem doby
                     SettleNight(s);
-                    LogPlayerDawn(s, restBefore, debtBefore, sleepingNow, creditedBefore, marchH, autoCamps, cuts);
+                    LogPlayerDawn(s, restBefore, debtBefore, sleepingNow, creditedBefore, marchH, autoCamps, cuts, _menuSleptDay || sleepingNow);
+                    _menuSleptDay = _sleeping;   // 316b: nowa doba - sen trwajacy przez swit liczy sie tez do niej
                     TbsDawnLine();   // 311e: linia doby treningu przed snem (wlasny try)
                     _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _raidWorkHoursDay = 0;
                 }
@@ -594,6 +626,7 @@ namespace Armoury
                 _menuDawnCut = 0f; _dawnOwed = 0f; _dawnDeferredUp = 0;
                 _menuNeeded = -1f; _menuDebt0 = 0; _menuDawns = 0;
                 _dawnHoldH = -1; _wakeWhy = null;   // 315a: czekanie do switu z poprzedniej kampanii nie przechodzi
+                _menuSleptHour = false; _menuSleptDay = false;   // 316b
                 _promptNight = -1; _warnNight = -1; _campMsgNight = -1; _raidNight = -1;
                 _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _lastDawnMsg = null;
                 _lastRaidAt = -1e9; _raidWorkHoursDay = 0; _raidWorkLogDay = long.MinValue;   // m103-drobne: rabunek gracza z poprzedniej kampanii nie jest praca tej godziny
@@ -2611,6 +2644,7 @@ namespace Armoury
                 _sleepUntil = CampaignTime.HoursFromNow(SleepCapHours());   // max(14, needed x 1.8 + 2) - wzor w SleepCapHours (KA: przewidywana pobudka)
                 bool again = _sleeping;   // noc 15/16.10: ponowne wejscie w menu snu w trakcie tego samego snu (wczytanie zapisu z menu, powrot do menu)
                 _sleeping = true;
+                _menuSleptHour = true; _menuSleptDay = true;   // 316b
                 _sleepStart = CampaignTime.Now;
                 _menuRest = 0f;
                 _menuBase = _restTonight;
@@ -2709,6 +2743,7 @@ namespace Armoury
                 float day = s != null ? MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f) : 0.5f;
                 // KA: w lozku karczmy sen idzie szybciej (wazone liczba ludzi w porzadnej karczmie i dobrym domu, x1.25); poza karczma 1 - jak dotad
                 _menuRest += (float)dt.ToHours * (night ? 1f : day) * TownInns.SleepFactor();
+                _menuSleptHour = true; _menuSleptDay = true;   // 316b: ta godzina ksiegi nie jest godzina marszu
                 // KA: oplacony nocleg - pobudka nie przed switem (TownInns.HoldAbed; bezpiecznik _sleepUntil bez zmian)
                 // 315a: sen zaczety w nocy snu - tez nie przed switem gracza (_dawnHoldH); 315c: i nie po nim (bez dosypiania)
                 double nowH = CampaignTime.Now.ToHours;
