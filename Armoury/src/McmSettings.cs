@@ -11112,7 +11112,7 @@ namespace Armoury
         [SettingPropertyGroup("Battle: a lone shooter behind cover is flanked, not waited for (311a)")]
         public float CoverHiddenSeconds { get; set; } = 2.5f;
 
-        [SettingPropertyBool("Banner Tier Steadiness", HintText = "With Banner Companies: how steady a company is depends on its average tier by one table - tier 1 x0.9, tier 2 x0.75, tier 3 x0.55, tier 4 x0.35, tier 5 x0.18, tier 6 x0.06, tier 7 x0.04 of the chance to break - so elite companies almost never run. Off = the chance is divided by the morale resistance of the tier, as before", RequireRestart = false)]
+        [SettingPropertyBool("Banner Tier Steadiness", HintText = "With Banner Companies: how steady a company is depends on its average tier by one table - tier 1 x0.8, tier 2 x0.67, tier 3 x0.55, tier 4 x0.35, tier 5 x0.18, tier 6 x0.06, tier 7 x0.04 of the chance to break - so elite companies almost never run. Off = the chance is divided by the morale resistance of the tier, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: living commanders and veteran troops hold a shaken company (318c)")]
         public bool BannerTierSteadiness { get; set; } = true;
 
@@ -11124,7 +11124,7 @@ namespace Armoury
         [SettingPropertyGroup("Battle: living commanders and veteran troops hold a shaken company (318c)")]
         public bool BannerRanksIgnoreKnockback { get; set; } = true;
 
-        [SettingPropertyBool("Pain Break Tier Steadiness", HintText = "With Pain Break By Chance: a wounded soldier below AI Flee Below Percent breaks from pain by the same tier table as the companies (tier 1 x0.9 ... tier 6 x0.06), so veterans almost never run from their wounds. Lords are not changed. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Pain Break Tier Steadiness", HintText = "With Pain Break By Chance: a wounded soldier below AI Flee Below Percent breaks from pain by the same tier table as the companies (tier 1 x0.8 ... tier 6 x0.06), so veterans almost never run from their wounds. Lords are not changed. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: living commanders and veteran troops hold a shaken company (318c)")]
         public bool PainBreakTierSteadiness { get; set; } = true;
 

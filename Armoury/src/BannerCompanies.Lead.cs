@@ -12,13 +12,13 @@ namespace Armoury
     /// ... panika moze sie nasilac, ale tez im wyzszy tier tym rzadziej panikuje - elitarne jednostki prawie nigdy, t6"). Bitwa 24 (19:33-19:40): 7 zalaman
     /// wroga wylacznie z udzialu strat (B=1.5 caly czas), T6 1/2, sr. szansa rzutu 307b 0.696; do tego odskok szarzy RBM (26 ludzi, 261 s) liczony jako strata.
     /// Jedna regula w BannerCompaniesMission.Roll: p = szansa x F x M x B x T(tier) x L(dowodztwo), limit 0.9 - zadnych innych mnoznikow tieru w rzucie.
-    ///  T (klucz BannerTierSteadiness): tabela TierTable (T1 0.9 .. T7 0.04) zamiast odpornosci R = 0.25T+1 / 0.5T+1, liniowo miedzy tierami sredniego tieru;
+    ///  T (klucz BannerTierSteadiness): tabela TierTable (T1 0.8, T2 0.667 .. T7 0.04; nie wyzej niz stare 1/(0.25T+1)) zamiast odpornosci R = 0.25T+1 / 0.5T+1, liniowo miedzy tierami sredniego tieru;
     ///    ta sama tabela dla paniki z bolu szeregowych (FieldCraft.RollPain, klucz PainBreakTierSteadiness) - bohaterowie bez mnoznika.
-    ///  L (klucz BannerLeaderHold): czynny bohater strony (Team.Side) - zyje, nie nieprzytomny, nie ucieka (IsRunningAway / IsPanicked / zbior RoutHold),
+    ///  L (klucz BannerLeaderHold): czynny bohater strony (Team.Side) - zyje, nie nieprzytomny, nie zlamany (IsPanicked / zbior RoutHold; samo IsRunningAway nie - odskok RBM),
     ///    nie w odwrocie rannego 143 ani w wycofaniu rannego bohatera 149 (HeroCaution.WoundedWithdrawing); chwilowe wycofanie samotnego 149 i odskok RBM nie
     ///    odbieraja dowodztwa. Wlasny dowodca-bohater kompanii 0.5; bohater w tym samym szyku albo w 60 m od srodka kompanii 0.65; gdzie indziej 0.8; zaden 1.0.
     ///    x1.3 tylko przy faktycznym upadku sztandaru (LastFall i !StandardUp - nie brak chorazego, nie chorazy przeniesiony z szykiem), poza samym rzutem upadku.
-    ///  Zdarzenie strony: wodz druzyny (Team.GeneralAgent) zabity albo nieprzytomny - kompanie jego druzyny; ostatni czynny bohater strony zszedl - kompanie strony;
+    ///  Zdarzenie strony: wodz druzyny (Team.GeneralAgent) zabity albo nieprzytomny - kompanie jego druzyny; ostatni bohater strony zszedl z pola (kazdy w _heroDown) - kompanie strony;
     ///    raz wstrzas BannerShockCommanderLost i raz rzut F 1.5 (zrodlo 6) w kazdej niezlamanej kompanii (bez kompanii, ktora dostala juz rzut CommanderLost
     ///    za tego samego czlowieka). Kazde zdarzenie raz na bitwe (wodz - raz na druzyne, ostatni bohater - raz na strone; w 2 s po zdarzeniu wodza bez drugiego).
     ///  Szereg (klucz BannerRanksIgnoreKnockback): InRanksLive nie liczy chwilowego odwrotu komponentu (szarza RBM bez IsPanicked i bez RoutHold) jako straty -
@@ -29,7 +29,8 @@ namespace Armoury
     internal static partial class BannerCompanies
     {
         // indeks = tier (0 nieuzywany - tier 0 liczony jak 1)
-        internal static readonly float[] TierTable = { 0.9f, 0.9f, 0.75f, 0.55f, 0.35f, 0.18f, 0.06f, 0.04f };
+        // poprawka recenzji 318c: niski tier nie wyzej niz stary wzor 309 1/(0.25T+1) (T1 0.8, T2 0.667, T3 0.571) - tabela Jeffa od T4
+        internal static readonly float[] TierTable = { 0.8f, 0.8f, 0.667f, 0.55f, 0.35f, 0.18f, 0.06f, 0.04f };
         internal const float LeadOwn = 0.5f, LeadNear = 0.65f, LeadFar = 0.8f, LeadNone = 1f, LeadFallMul = 1.3f, LeadNearRange = 60f, SideEventF = 1.5f;
         internal const int BreakLinesMax = 80;
         internal static readonly string[] LeadNames = { "wlasny dowodca-bohater", "bohater strony w szyku lub w 60 m", "bohater strony dalej", "brak bohatera strony" };
@@ -41,7 +42,9 @@ namespace Armoury
             if (t >= 7f) return TierTable[7];
             int i = (int)Math.Floor(t);
             float f = t - i;
-            return TierTable[i] + (TierTable[i + 1] - TierTable[i]) * f;
+            float v = TierTable[i] + (TierTable[i + 1] - TierTable[i]) * f;
+            float old = 1f / (0.25f * t + 1f);   // miedzy T1 a T2 linia jest nad krzywa starego wzoru (T1.5: 0.733 > 0.727) - nie wyzej niz dawniej
+            return v < old ? v : old;
         }
 
         // ---- liczniki 318c (zerowane w ResetCounters)
@@ -95,6 +98,7 @@ namespace Armoury
     {
         // 318c: bohaterowie misji (spis przy rozstawieniu i co 3 s w przegladzie), zeszli z pola (OnAgentRemoved - kazdy stan), wodzowie druzyn (co takt)
         private readonly List<Agent> _heroes = new List<Agent>();
+        private readonly List<int> _heroSide = new List<int>();   // strona bohatera przy spisie (SideIx) - rownolegle do _heroes
         private readonly HashSet<Agent> _heroSet = new HashSet<Agent>();
         private readonly HashSet<Agent> _heroDown = new HashSet<Agent>();
         private readonly Dictionary<Team, Agent> _gen = new Dictionary<Team, Agent>();
@@ -105,7 +109,7 @@ namespace Armoury
 
         private void LeadClear()
         {
-            _heroes.Clear(); _heroSet.Clear(); _heroDown.Clear(); _gen.Clear(); _genDone.Clear();
+            _heroes.Clear(); _heroSide.Clear(); _heroSet.Clear(); _heroDown.Clear(); _gen.Clear(); _genDone.Clear();
             for (int i = 0; i < 2; i++) { _sideHad[i] = false; _sideLastDone[i] = false; _sideEvtAt[i] = -100f; _sideLastName[i] = null; }
         }
 
@@ -126,18 +130,20 @@ namespace Armoury
             {
                 var a = agents[i];
                 if (a == null || !a.IsHuman || !a.IsHero || !a.IsActive() || _heroDown.Contains(a)) continue;
-                if (_heroSet.Add(a)) _heroes.Add(a);
+                if (_heroSet.Add(a)) { _heroes.Add(a); _heroSide.Add(SideIx(a.Team)); }
             }
         }
 
-        /// <summary>318c: bohater dowodzi - czynny, nie zszedl, nie ucieka, nie zlamany (RoutHold), nie w odwrocie rannego 143 ani w wycofaniu rannego 149.
+        /// <summary>318c: bohater dowodzi - czynny, nie zszedl, nie zlamany (IsPanicked) (RoutHold), nie w odwrocie rannego 143 ani w wycofaniu rannego 149.
         /// Chwilowy odwrot komponentu (szarza RBM) i wycofanie samotnego 149 dowodztwa nie odbieraja. Wyjatek = nie dowodzi.</summary>
         private bool Leads(Agent h)
         {
             if (h == null || _heroDown.Contains(h)) return false;
             try
             {
-                if (!h.IsActive() || h.IsRunningAway) return false;
+                // poprawka recenzji 318c: samo IsRunningAway (odskok RBM, natywny Retreat) nie odbiera dowodztwa - zlamanie to IsPanicked / RoutHold,
+                // ranny w odwrocie to 143 (k.Withdrawing) i 149 (HeroCaution.WoundedWithdrawing)
+                if (!h.IsActive()) return false;
                 var cai = h.CommonAIComponent;
                 if (cai != null && cai.IsPanicked) return false;
                 var k = RoutHold.Live;
@@ -206,6 +212,12 @@ namespace Armoury
                     continue;
                 }
                 if (!_sideHad[s]) continue;
+                // poprawka recenzji 318c: zdarzenie tylko gdy kazdy bohater tej strony naprawde zszedl (_heroDown: zdjety z pola, nieprzytomny, zabity),
+                // nie przy chwilowym cnt == 0 (odwrot rannego 143/149, chwilowa panika)
+                bool allDown = true;
+                for (int i = 0; i < _heroes.Count; i++)
+                    if (_heroSide[i] == s && !_heroDown.Contains(_heroes[i])) { allDown = false; break; }
+                if (!allDown) continue;
                 _sideLastDone[s] = true;
                 if (now - _sideEvtAt[s] <= 2f) continue;   // ostatni byl wodzem - zdarzenie wodza juz bylo
                 BannerCompanies.SideEvtLast++;

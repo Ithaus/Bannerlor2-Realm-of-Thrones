@@ -91492,12 +91492,12 @@ def main(argv):
 # strat, T6 1/2, sr. szansa 307b 0.696. Armoury/src/BannerCompanies.Lead.cs (T, L, zdarzenie strony), BannerCompanies.cs Roll / InRanksLive, FieldCraft.RollPain.
 # Uzycie: python -I tools/sprawdz_logi.py --grupa panika318c <Armoury-*.log>
 #  P318-S  self-test wyrazen na wzorach linii
-#  P318-1  segment 'dowodztwo i tier (318c)' linii 'Choragwie (CH) koniec': format, zalaman <= rzutow w kazdym koszyku dowodztwa, sr. T w 0.04..0.9
+#  P318-1  segment 'dowodztwo i tier (318c)' linii 'Choragwie (CH) koniec': format, zalaman <= rzutow w kazdym koszyku dowodztwa, sr. T w 0.04..0.8
 #  P318-2  stare segmenty 305c/307b/309 tej samej linii dalej czytelne (B305_CH, B307_CH, B309_CH) i koniec '| potkniecia 0.'
 #  P318-3  linie 'Choragwie (318c): zalamanie': format, p <= 0.9 (INFO: zalamania wedlug tieru, wedlug dowodztwa, sr. strata przy zalamaniu)
 #  P318-4  zalamania kompanii od tieru 5 przy zywym dowodcy strony (INFO, cel: rzadko - Jeff "elitarne prawie nigdy")
 #  P318-5  linie 'Choragwie (318c): upadek dowodztwa strony': zalaman <= rzutow <= kompanii
-#  P318-6  bol wedlug tieru: sr. mnoznik w 0.04..0.9; zlamani T5-T7 / rzutow (INFO)
+#  P318-6  bol wedlug tieru: sr. mnoznik w 0.04..0.8; zlamani T5-T7 / rzutow (INFO)
 P318_SEG = re.compile(r"\| dowodztwo i tier \(318c\): tier (TAK|NIE), dowodztwo (TAK|NIE), odskok RBM w szeregu (TAK|NIE), bol wedlug tieru (TAK|NIE); rzutow (\d+) "
                       r"\(sr\. T (\S+), sr\. L (\S+)\); zalaman/rzutow wedlug dowodztwa: wlasny bohater (\d+)/(\d+), bohater blisko (\d+)/(\d+), bohater dalej (\d+)/(\d+), "
                       r"bez bohatera (\d+)/(\d+); sztandar upadly x1\.3 w rzutach (\d+); zdarzenia strony (\d+) \(wodz (\d+), ostatni bohater (\d+); kompanii (\d+), "
@@ -91538,11 +91538,11 @@ def p318_rows(rep, ends, brks, evts):
         g = m.groups()
         pairs = [(int(g[7]), int(g[8])), (int(g[9]), int(g[10])), (int(g[11]), int(g[12])), (int(g[13]), int(g[14]))]
         tavg = float(g[5]) if g[5] != "-" else None
-        if any(b > r for b, r in pairs) or (tavg is not None and not (0.039 <= tavg <= 0.901)) or int(g[21]) > int(g[20]) or int(g[20]) > int(g[19]):
+        if any(b > r for b, r in pairs) or (tavg is not None and not (0.039 <= tavg <= 0.801)) or int(g[21]) > int(g[20]) or int(g[20]) > int(g[19]):
             bad1.append(l[-260:])
         if not (B305_CH.search(l) and B307_CH.search(l) and B309_CH.search(l)) or not re.search(r"\| potkniecia 0\.$", l):
             bad2.append(l[:200])
-    rep.add("P318-1: segment 'dowodztwo i tier (318c)' - format, zalaman <= rzutow wedlug dowodztwa, sr. T 0.04-0.9",
+    rep.add("P318-1: segment 'dowodztwo i tier (318c)' - format, zalaman <= rzutow wedlug dowodztwa, sr. T 0.04-0.8",
             f"linii {len(segs)}, zlych {len(bad1)}" + (f" ({bad1[0]})" if bad1 else ""), "zlych 0 (brak linii - INFO)",
             None if not segs and not bad1 else not bad1)
     rep.add("P318-2: stare segmenty 305c/307b/309 czytelne, '| potkniecia 0.' na koncu", f"linii {len(segs)}, zlych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else ""),
@@ -91599,12 +91599,12 @@ def p318_rows(rep, ends, brks, evts):
             if g[26] != "-":
                 v = float(g[26])
                 ps += v * n
-                if not (0.039 <= v <= 0.901):
+                if not (0.039 <= v <= 0.801):
                     bad6.append(g[26])
             for tm in re.finditer(r"T(\d):(\d+)/(\d+)", g[28]):
                 if int(tm.group(1)) >= 5:
                     br5 += int(tm.group(2)); n5 += int(tm.group(3))
-        rep.add("P318-6: bol wedlug tieru - sr. mnoznik 0.04-0.9 (zlamani T5-T7 / rzutow INFO)",
+        rep.add("P318-6: bol wedlug tieru - sr. mnoznik 0.04-0.8 (zlamani T5-T7 / rzutow INFO)",
                 f"rzutow szeregowych {pr}, sr. mnoznik {(ps / pr):.3f}" if pr else "rzutow szeregowych 0", "zlych 0", (not bad6) if pr else None)
         rep.add("P318-6b: bol T5-T7 zlamani/rzutow", f"{br5}/{n5}", "INFO (cel: rzadko)", None)
 

@@ -814,7 +814,9 @@ namespace Armoury
                         try
                         {
                             var cai = a.CommonAIComponent;
-                            fled = a.IsRunningAway || (cai != null && cai.IsPanicked) || (k != null && k.Knows(a));
+                            // poprawka recenzji 318c: bez a.IsRunningAway - odskok RBM tez je ustawia (natywny Retreat), wiec klucz byl martwy; ranni 143 (tez IsRunningAway)
+                            // odpadaja nizej przez k.Withdrawing
+                            fled = (cai != null && cai.IsPanicked) || (k != null && k.Knows(a));
                         }
                         catch { fled = true; }
                     }
