@@ -91791,5 +91791,80 @@ def main(argv):
     return _panika318c_main_prev(argv)
 
 
+# ---- paczka 319c: grupa groty319c - groty strzal i beltow wedlug tieru (Jeff 02.11) ----
+G319_LINE = re.compile(r"Groty strzal \(319c\): regula (.*?) \| strzal i beltow (\d+), balista (\d+), niezgodnych z regula (\d+)(?: \[(.*?)\])? \(ma byc 0\) \| tier -> metal: (.*?) \| przyklady: (.*)$")
+G319_ROW = re.compile(r"t(\d) ([A-Za-z0-9+ ]+?)( \(balista\))? x(\d+)")
+G319_SAMPLE = ("[20:59:52] Groty strzal (319c): regula wedlug tieru jak bron (t1-2 Iron2, t3 Iron3, t4 Iron4, t5 Iron5, t6 Iron6; balista S2) | strzal i beltow 71, "
+               "balista 2, niezgodnych z regula 0 (ma byc 0) | tier -> metal: t1 Iron2 x10, t4 Iron4 x8, t6 Iron3 (balista) x2, t6 Iron6 x9 | przyklady: "
+               "hardened_125_gr_arrows t6: 5x ironIngot6 = 30 d (wartosc kolczana 21).")
+
+
+def g319_rows(rep, lines, s1):
+    if not lines:
+        rep.add("G319-L: linia 'Groty strzal (319c)'", "brak", ">= 1 (start sesji)", False)
+        return
+    rep.add("G319-L: linia 'Groty strzal (319c)'", str(len(lines)), ">= 1 (start sesji)", True)
+    m = G319_LINE.search(lines[-1])
+    if not m:
+        rep.add("G319-P: odczyt ostatniej linii", "nie czyta", "TAK", False)
+        return
+    rule, n, siege, bad, badids, rows, _ = m.groups()
+    by_tier = rule.startswith("wedlug tieru")
+    rep.add("G319-1: regula grotow", "wedlug tieru" if by_tier else "S2 (wylaczone AmmoHeadsByTier)", "wedlug tieru", by_tier)
+    rep.add("G319-2: kwity niezgodne z regula", bad + (f" [{badids}]" if badids else ""), "0", int(bad) == 0)
+    t6want = "Iron6" if "t6 Iron6" in rule else "Iron5"
+    want = {1: "Iron2", 2: "Iron2", 3: "Iron3", 4: "Iron4", 5: "Iron5", 6: t6want}
+    wrong, per = [], {}
+    for r in G319_ROW.finditer(rows):
+        t, metal, sg, cnt = int(r.group(1)), r.group(2).strip(), bool(r.group(3)), int(r.group(4))
+        per.setdefault(t, []).append(f"{metal}{' bal.' if sg else ''} x{cnt}")
+        if by_tier and not sg and metal != want.get(t):
+            wrong.append(f"t{t} {metal} x{cnt}")
+    rep.add("G319-3: tier -> metal (bez balisty) jak bron", "; ".join(wrong) if wrong else "zgodne",
+            "t1-2 Iron2, t3 Iron3, t4 Iron4, t5 Iron5, t6 " + t6want, (not wrong) if by_tier else None)
+    rep.add("G319-4: zestawienie", " | ".join(f"t{t}: " + ", ".join(v) for t, v in sorted(per.items())) or "-", "INFO", None)
+    rep.add("G319-5: strzal i beltow / balista", f"{n} / {siege}", "INFO (balista z grotem S2)", None)
+    if s1:
+        mo = re.search(r"starym przepisem z wagi \(bez receptury\) (\d+)", s1[-1])
+        rep.add("G319-6: kwity amunicji starym przepisem (S1)", mo.group(1) if mo else "?", "0", (mo.group(1) == "0") if mo else None)
+
+
+def groty319c_main(logp):
+    rep = Report()
+    st = G319_LINE.search(G319_SAMPLE)
+    st_ok = bool(st) and len(list(G319_ROW.finditer(st.group(6)))) == 4
+    rep.add("G319-S: self-test wyrazen na wzorze linii", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
+    if not logp or not os.path.isfile(logp):
+        rep.add("G319-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    lines, s1 = [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if "Groty strzal (319c):" in s:
+                lines.append(s)
+            elif "Kuznia: amunicja (S1)" in s:
+                s1.append(s)
+    print(f"plik: {logp}")
+    g319_rows(rep, lines, s1)
+    rep.show()
+    return 0
+
+
+_groty319c_main_prev = main
+
+
+def main(argv):
+    # paczka 319c: grupa groty319c - opakowanie main jak panika318c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "groty319c":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return groty319c_main(rest[0] if rest else None)
+    return _groty319c_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

@@ -251,7 +251,7 @@ namespace Armoury
             else if (tp == ItemObject.ItemTypeEnum.Arrows || tp == ItemObject.ItemTypeEnum.Bolts)
             {
                 int batch = Math.Max(1, s.AmmoBatchStacks);
-                // groty: kg z receptury wartosci (15% masy strzaly x strata 1.2, gatunek grotu S2), drzewca: 85% x 1.5 - cala seria
+                // groty: kg z receptury wartosci (15% masy strzaly x strata 1.2, gatunek grotu 319c: wedlug tieru jak bron), drzewca: 85% x 1.5 - cala seria
                 float heads = c.MetalKg * batch;
                 AddMetal(l, c.Grade, heads, heads / 1.2f, LossHeads, "heads", legend);
                 AddKg(l, _wood, -1, c.WoodKg * batch, c.WoodKg * batch / WoodWaste, 0f, "shafts");
