@@ -92065,17 +92065,27 @@ def main(argv):
 
 
 # ---- paczka 320b: grupa sca320b - SCA liczy wroga bez band, Innych i wyjetych spod prawa (Jeff 02.11) ----
+# 320e: ta sama grupa czyta tez zagrozone twierdze (SCA -> nasze) i cel / chce pokoju przy zablokowanym pokoju (264); stare linie 320b czyta dalej.
 # Uzycie: python -I tools/sprawdz_logi.py --grupa sca320b <Armoury-*.log>
 S320_START = re.compile(r"SCA bez band \(320b\): start sesji - latka (.*?), klucz Strategic AI Ignores Bandits (wlaczony|WYLACZONY)")
-S320_DAY = re.compile(r"SCA bez band \(320b\): dzien (\d+) \| klucz (tak|nie), latka (wpieta|BRAK), ocen doby (\d+) \(zmienionych (\d+)\), potkniecia doby (\d+) \(sesja (\d+)\)(?: \| (.*))?\.$")
-S320_K = re.compile(r"(?:^|; )([^:;]+): wrog (-?\d+) -> (\d+) \(pominiete: bandy (\d+) z (\d+), Inni (\d+) z (\d+), wyjeci spod prawa (\d+) z (\d+); liczeni (\d+)\), swoi (\S+), twierdze (\S+) zagrozone (\S+), wojen (\S+), cel (\w+|\?), wyczerpane (tak|nie), chce pokoju (tak|nie)")
+S320E_START = re.compile(r"\| 320e pokoj zablokowany: latki (.*?), klucz Strategic AI Fights On When Peace Blocked (wlaczony|WYLACZONY)")
+S320_DAY = re.compile(r"SCA bez band \(320b\): dzien (\d+) \| klucz (tak|nie), latka (wpieta|BRAK), ocen doby (\d+) \(zmienionych (\d+)\), potkniecia doby (\d+) \(sesja (\d+)\)"
+                      r"(?: \| 320e klucz (?P<ek>tak|nie), latki (?P<el>wpiete|BRAK), zamian celu (?P<es>\d+)(?: \(w ticku (?P<el2>\d+)\))?, pokoj wyczyszczony (?P<ep>\d+), zagrozone zmienione (?P<et>\d+))?"
+                      r"(?: \| (?P<k>.*))?\.$")
+S320_K = re.compile(r"(?:^|; )(?P<n>[^:;]+): wrog (?P<b>-?\d+) -> (?P<a>-?\d+) \(pominiete: bandy (?P<pb>\d+) z (\d+), Inni (?P<po>\d+) z (\d+), wyjeci spod prawa (?P<pw>\d+) z (\d+); liczeni (\d+)\), "
+                    r"swoi (?P<sw>\S+), twierdze (?P<tf>\S+) zagrozone (?P<tz>\S+)(?: \(SCA (?P<tzs>-?\d+|\?)\))?, wojen (?P<wo>\S+), "
+                    r"cel (?P<g>\w+|\?)(?: \(SCA (?P<gs>\w+|\?), (?P<why>[^()]*)\))?, wyczerpane (?P<ex>tak|nie), chce pokoju (?P<cp>tak|nie)(?: \(SCA (?P<cps>tak|nie)\))?")
 S320_SAMPLE_START = ("[21:00:01] SCA bez band (320b): start sesji - latka wpieta (StrategicCampaignAI145.StrategicCampaignAI145Behavior.CalculateFactionStatus(Kingdom)), "
-                     "klucz Strategic AI Ignores Bandits wlaczony | wrog SCA bez band (IsBanditFaction), Innych (kultura whitewalker) i frakcji wyjetych spod prawa (IsOutlaw); "
-                     "liczba wojen, zagrozone twierdze i wioski bez zmian.")
-S320_SAMPLE_DAY = ("[21:56:58] SCA bez band (320b): dzien 120 | klucz tak, latka wpieta, ocen doby 140 (zmienionych 120), potkniecia doby 0 (sesja 0) | "
-                   "Kings Landing: wrog 58819 -> 41262 (pominiete: bandy 12 z 11, Inni 16000 z 1, wyjeci spod prawa 1545 z 1; liczeni 4), swoi 19741, twierdze 15 zagrozone 6, "
-                   "wojen 17, cel ForcePeace, wyczerpane tak, chce pokoju tak; The North: wrog 37371 -> 19800 (pominiete: bandy 0 z 11, Inni 16000 z 1, wyjeci spod prawa 1571 z 1; "
-                   "liczeni 3), swoi 41276, twierdze 42 zagrozone 9, wojen 16, cel ReclaimLostFief, wyczerpane nie, chce pokoju nie.")
+                     "klucz Strategic AI Ignores Bandits wlaczony | wrog SCA i zagrozone twierdze bez band (IsBanditFaction), Innych (kultura whitewalker) i frakcji wyjetych spod prawa (IsOutlaw); "
+                     "liczba wojen i wioski bez zmian | 320e pokoj zablokowany: latki UpdateWarGoal wpieta, OnDailyTick wpieta, OnHourlyTick wpieta, klucz Strategic AI Fights On When Peace Blocked "
+                     "wlaczony - bez ForcePeace i WantsPeace, gdy wszystkie wojny z krolestwami maja pokoj zablokowany (264).")
+S320_SAMPLE_DAY = ("[21:56:58] SCA bez band (320b): dzien 120 | klucz tak, latka wpieta, ocen doby 140 (zmienionych 120), potkniecia doby 0 (sesja 0) | 320e klucz tak, latki wpiete, "
+                   "zamian celu 1 (w ticku 0), pokoj wyczyszczony 7, zagrozone zmienione 3 | "
+                   "Kings Landing: wrog 58819 -> 41262 (pominiete: bandy 12 z 11, Inni 16000 z 1, wyjeci spod prawa 1545 z 1; liczeni 4), swoi 19741, twierdze 15 zagrozone 4 (SCA 6), "
+                   "wojen 17, cel BorderWar (SCA ForcePeace, pokoj zablokowany 264 - krolestwa 2 z 2), wyczerpane tak, chce pokoju nie (SCA tak); "
+                   "The North: wrog 37371 -> 19800 (pominiete: bandy 0 z 11, Inni 16000 z 1, wyjeci spod prawa 1571 z 1; "
+                   "liczeni 3), swoi 41276, twierdze 42 zagrozone 7 (SCA 9), wojen 16, cel ReclaimLostFief (SCA ReclaimLostFief, pokoj zablokowany 264 - krolestwa 1 z 1), "
+                   "wyczerpane nie, chce pokoju nie (SCA nie).")
 
 
 def s320_rows(rep, starts, days):
@@ -92086,6 +92096,10 @@ def s320_rows(rep, starts, days):
         ok = bool(m) and m.group(1).startswith("wpieta")
         rep.add("S320-1: latka 320b (ostatni start sesji)", (m.group(1)[:200] + ", klucz " + m.group(2)) if m else starts[-1][:200], "wpieta, klucz wlaczony",
                 ok and m.group(2) == "wlaczony" if m else False)
+        e = S320E_START.search(starts[-1])
+        rep.add("S320-7: latki 320e (ostatni start sesji)", (e.group(1)[:200] + ", klucz " + e.group(2)) if e else "brak czesci 320e (DLL sprzed 320e)",
+                "UpdateWarGoal, OnDailyTick, OnHourlyTick wpieta; klucz wlaczony",
+                (e.group(1).count("wpieta") == 3 and "BRAK" not in e.group(1) and e.group(2) == "wlaczony") if e else None)
     if not days:
         rep.add("S320-2: linie doby 'SCA bez band (320b): dzien'", "0", ">= 1 (po pierwszej dobie z LogEnabled)", None)
         return
@@ -92098,22 +92112,42 @@ def s320_rows(rep, starts, days):
         return
     rep.add("S320-4: ostatnia doba - klucz / latka / ocen (zmienionych)", f"{m.group(2)} / {m.group(3)} / {m.group(4)} ({m.group(5)})", "tak / wpieta / > 0",
             m.group(2) == "tak" and m.group(3) == "wpieta" and int(m.group(4)) > 0)
-    bad, rows = [], []
-    for k in S320_K.finditer(m.group(8) or ""):
-        name, b, a = k.group(1).strip(), int(k.group(2)), int(k.group(3))
-        skipped = int(k.group(4)) + int(k.group(6)) + int(k.group(8))
-        if a > b + 1 or abs((b - skipped) - a) > 2 + 0.001 * b:
+    bad, rows, tbad, gbad, ginfo = [], [], [], [], []
+    for k in S320_K.finditer(m.group("k") or ""):
+        name, b, a = k.group("n").strip(), int(k.group("b")), int(k.group("a"))
+        skipped = int(k.group("pb")) + int(k.group("po")) + int(k.group("pw"))
+        if m.group(2) == "tak" and (a > b + 1 or abs((b - skipped) - a) > 2 + 0.001 * b):
             bad.append(f"{name}: {b} - {skipped} != {a}")
-        rows.append(f"{name} {b}->{a} cel {k.group(15)} wycz. {k.group(16)} (swoi {k.group(11)}, zagr. {k.group(13)}/{k.group(12)})")
+        tz, tzs = k.group("tz"), k.group("tzs")
+        if tzs not in (None, "?") and tz != "?" and float(tz) > int(tzs):
+            tbad.append(f"{name}: {tz} > SCA {tzs}")
+        why, g, gs, cp, cps = k.group("why") or "", k.group("g"), k.group("gs"), k.group("cp"), k.group("cps")
+        if why.startswith("pokoj zablokowany"):
+            if m.group("ek") == "tak" and (g == "ForcePeace" or cp == "tak"):
+                gbad.append(f"{name}: cel {g}, chce pokoju {cp} mimo blokady")
+            ginfo.append(f"{name}: {gs} -> {g}, pokoj SCA {cps} -> {cp}")
+        elif gs is not None and gs != "?" and g != gs:
+            gbad.append(f"{name}: cel {g} != SCA {gs} bez blokady ({why})")
+        rows.append(f"{name} {b}->{a} cel {g} wycz. {k.group('ex')} (swoi {k.group('sw')}, zagr. {tz}/{k.group('tf')})")
     rep.add("S320-5: wrog po = wrog przed - pominiete (kazde krolestwo)", "; ".join(bad) if bad else f"zgodne ({len(rows)} krolestw)", "zgodne", (not bad) if rows else None)
-    rep.add("S320-6: krolestwa (ostatnia doba)", " | ".join(rows)[:1500] or "-", "INFO (korona: przewaga Polnocy i zagrozone twierdze moga dalej trzymac ForcePeace)", None)
+    rep.add("S320-6: krolestwa (ostatnia doba)", " | ".join(rows)[:1500] or "-", "INFO", None)
+    if m.group("ek") is None:
+        rep.add("S320-8: 320e w linii doby", "brak (DLL sprzed 320e)", "czesc '| 320e klucz'", None)
+        return
+    rep.add("S320-8: 320e ostatnia doba - klucz / latki",
+            f"{m.group('ek')} / {m.group('el')} (zamian celu {m.group('es')} - w ticku {m.group('el2')}, pokoj wyczyszczony {m.group('ep')}, zagrozone zmienione {m.group('et')})",
+            "tak / wpiete", m.group("ek") == "tak" and m.group("el") == "wpiete")
+    rep.add("S320-9: zagrozone twierdze nasze <= SCA", "; ".join(tbad) if tbad else "zgodne", "kazde krolestwo", (not tbad) if rows else None)
+    rep.add("S320-10: pokoj zablokowany -> bez ForcePeace i WantsPeace; bez blokady cel = SCA", "; ".join(gbad) if gbad else "zgodne", "zgodne", (not gbad) if rows else None)
+    rep.add("S320-11: krolestwa z blokada pokoju (cel SCA -> nasz)", " | ".join(ginfo)[:1200] or "brak", "INFO (korona, Polnoc, Dorzecze do Krwawych Godow)", None)
 
 
 def sca320b_main(logp):
     rep = Report()
-    ok = bool(S320_START.search(S320_SAMPLE_START))
+    ok = bool(S320_START.search(S320_SAMPLE_START)) and bool(S320E_START.search(S320_SAMPLE_START))
     d = S320_DAY.search(S320_SAMPLE_DAY)
-    ok = ok and bool(d) and len(list(S320_K.finditer(d.group(8) or ""))) == 2
+    ks = list(S320_K.finditer(d.group("k") or "")) if d else []
+    ok = ok and bool(d) and d.group("ek") == "tak" and len(ks) == 2 and ks[0].group("gs") == "ForcePeace" and ks[0].group("tzs") == "6" and ks[0].group("cps") == "tak"
     rep.add("S320-S: self-test wyrazen na wzorze linii", "TAK" if ok else "wyrazenie nie czyta wzoru", "TAK", ok)
     if not logp or not os.path.isfile(logp):
         rep.add("S320-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
