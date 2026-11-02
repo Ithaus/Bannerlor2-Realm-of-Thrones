@@ -6608,6 +6608,22 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public int CampTrainBeforeSleepHours { get; set; } = 0;
 
+        [SettingPropertyBool("Veterans Teach Their Own", HintText = "men at the top of their line (no further upgrade, tier at least Veteran Teacher Min Tier) no longer waste the drill experience they cannot use: they pass it on to men of their own arm in the party who can still rise - riders teach riders, archers teach archers, foot teach foot. The more veterans, the more pupils they reach each day; a pupil learns from them at most as much again as his own drill that day (Veteran Teach Max Ratio) and never more than his next upgrade can hold. Nothing is created: experience only moves from veterans to pupils, what nobody can take is lost as before. The same rule for your party and every lord's, only on a day the men drill (off = as before: their drill experience is lost)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool VeteransTeachTheirOwn { get; set; } = true;
+
+        [SettingPropertyInteger("Veteran Teacher Min Tier", 1, 6, "0", HintText = "with Veterans Teach Their Own: lowest tier of a man at the top of his line who teaches (1-6; 6 = only the finest troops of each line; lower lets dead-end lines teach too)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public int VeteranTeacherMinTier { get; set; } = 6;
+
+        [SettingPropertyInteger("Veteran Pupils Each", 1, 20, "0", HintText = "with Veterans Teach Their Own: how many pupils one veteran can teach each day (1-20); with fewer veterans than pupils need, each pupil gets only a share", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public int VeteranPupilsEach { get; set; } = 4;
+
+        [SettingPropertyFloatingInteger("Veteran Teach Max Ratio", 0.00f, 3.00f, "0.00", HintText = "with Veterans Teach Their Own: the most a pupil learns from veterans in a day, as a share of his own drill that day (0-3; 1 = his drill at most doubles)", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public float VeteranTeachMaxRatio { get; set; } = 1.0f;
+
         [SettingPropertyBool("Arms Not Household Goods", HintText = "townsfolk do not use up arms, armour, shields and harness: these lie on the stalls until a soldier, a notable or a trader buys them (everyday clothing is still worn out by the townsfolk)", RequireRestart = false)]
         [SettingPropertyGroup("Arms production")]
         public bool ArmsNotHouseholdGoods { get; set; } = true;
@@ -12795,6 +12811,10 @@ namespace Armoury
             s.DrillSiegeArmy = DrillSiegeArmy;
             s.DrillTownStay = DrillTownStay;
             s.CampTrainBeforeSleepHours = CampTrainBeforeSleepHours;
+            s.VeteransTeachTheirOwn = VeteransTeachTheirOwn;
+            s.VeteranTeacherMinTier = VeteranTeacherMinTier;
+            s.VeteranPupilsEach = VeteranPupilsEach;
+            s.VeteranTeachMaxRatio = VeteranTeachMaxRatio;
             s.ArmsNotHouseholdGoods = ArmsNotHouseholdGoods;
             s.ArmsNoStallDecay = ArmsNoStallDecay;
             s.ArmsStallUpkeepManDaysPerPiece = ArmsStallUpkeepManDaysPerPiece;

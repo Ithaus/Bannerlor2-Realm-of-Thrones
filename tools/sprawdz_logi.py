@@ -91791,71 +91791,135 @@ def main(argv):
     return _panika318c_main_prev(argv)
 
 
-# ---------------------------------------------------------------- paczka 319a (02.11): jency zdrowieja jak swoi - grupa jency319a
-# Jeff 02.11: "tak szybciej tak jak przy moich zolnierzach". Armoury/src/PrisonerCare.cs LikePrefix: dodatek (swoi - jency)/tick do akumulatora gry
-# _overflowedHealingForPrisonerRegulars partii gracza; XP liczy haczyk 318b.
-# Uzycie: python -I tools/sprawdz_logi.py --grupa jency319a <Armoury-*.log>
-#  J319-1  "Jency jak swoi (319a): start sesji" z "latka 1/1" i "slownik gry tak"
-#  J319-2  doby z rannymi jencami (klucz tak): wyleczonych / min(rannych przed, tempo swoich) >= 0.7 (gra losuje; przed 319a ~1/dobe)
-#  J319-3  dodatek 319a <= wyleczonych w kazdej dobie
-#  J319-4  doby z wyleczonymi: XP Medicine > 0 (przy Prisoner Care Xp Percent > 0)
-#  J319-5  zero linii ERROR z PrisonerCare.LikePrefix / HookLike
-def jency319a_main(logp):
+# ---------------------------------------------------------------- paczka 319b (02.11): weterani ucza swoja bron - grupa weterani319b
+# Linie 'Weterani ucza (319b): dzien N gracz | ...' i '... AI | ...' (Drill.VetLines, DrillVeterans.cs). XP tylko przesuwane: przekazane <= pula.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa weterani319b <Armoury-*.log>
+#  W319-S  self-test wyrazen na wzorach linii
+#  W319-1  gracz: kazda bron - przekazane <= pula, przekazane + przepadlo = pula, bez ucznia + limit ucznia + limit awansu = przepadlo, pokrycie 0..1
+#  W319-2  gracz: razem = suma broni, kontrola musztry ZGODNE (przyjete + uciete = wyliczone, nauka w przyjetych)
+#  W319-3  AI: przekazane <= pula, straty = pula - przekazane, przekazane w broniach = razem
+#  W319-4  AI: koszt nauki < 5 ms na dobe
+#  W319-5  potkniecia 0 (gracz i AI)
+#  W319-6  INFO: srednio na dobe - gracz pula/przekazane, AI pula/przekazane, martwe konce ponizej progu
+W319_HEAD = re.compile(r"Weterani ucza \(319b\): dzien (\d+) (gracz|AI) \| (CZYNNA|WYLACZONA) \(prog tier (\d+), uczniow na weterana (\d+), limit ucznia x([\d.]+)\)")
+W319_ARM = re.compile(r"\| (jazda|lucznicy|piechota) pula (\d+) \(weteranow (\d+), uczniow (\d+), dostalo (\d+), pokrycie ([\d.]+), limit uczniow (\d+)\) -> przekazane (\d+), "
+                      r"przepadlo (-?\d+) \(bez ucznia (\d+), limit ucznia (\d+), limit awansu (\d+)\)")
+W319_PSUM = re.compile(r"\| razem pula (\d+), przekazane (\d+), przepadlo (-?\d+), przekazane <= pula (TAK|NIE) \| martwe konce ponizej progu: ludzi (\d+), XP (\d+) "
+                       r"\| musztra: wyliczone (-?\d+), przyjete (-?\d+) \(w tym od weteranow (\d+)\), uciete (-?\d+) -> (ZGODNE|NIEZGODNE[^|]*)")
+W319_AI = re.compile(r"\| partii z weteranami (\d+) \(z (\d+) partii pod musztra\), weteranow (\d+) \(jazda (\d+), lucznicy (\d+), piechota (\d+)\), pula (\d+) \((\d+)/(\d+)/(\d+)\), "
+                     r"przekazane (\d+) \((\d+)/(\d+)/(\d+)\), uczniow \(ludzi\) (\d+), dostalo (\d+), przepadlo bez ucznia (\d+) / limit ucznia (\d+) / limit awansu (\d+), "
+                     r"przekazane <= pula (TAK|NIE) \| martwe konce ponizej progu: ludzi (\d+), XP (\d+) \| koszt ([\d.]+) ms")
+W319_STUMB = re.compile(r"\| potkniecia (\d+)\.\s*$")
+W319_SAMPLE_P = ("[21:00:00] Weterani ucza (319b): dzien 109190 gracz | CZYNNA (prog tier 6, uczniow na weterana 4, limit ucznia x1.00) | jazda pula 585 (weteranow 22, "
+                 "uczniow 18, dostalo 18, pokrycie 1.00, limit uczniow 497) -> przekazane 497, przepadlo 88 (bez ucznia 0, limit ucznia 0, limit awansu 88) | lucznicy pula 237 "
+                 "(weteranow 7, uczniow 12, dostalo 12, pokrycie 1.00, limit uczniow 300) -> przekazane 237, przepadlo 0 (bez ucznia 0, limit ucznia 0, limit awansu 0) "
+                 "| razem pula 822, przekazane 734, przepadlo 88, przekazane <= pula TAK | martwe konce ponizej progu: ludzi 0, XP 0 | musztra: wyliczone 2623, "
+                 "przyjete 2501 (w tym od weteranow 734), uciete 122 -> ZGODNE | potkniecia 0.")
+W319_SAMPLE_A = ("[21:00:00] Weterani ucza (319b): dzien 109190 AI | CZYNNA (prog tier 6, uczniow na weterana 4, limit ucznia x1.00) | partii z weteranami 120 (z 411 partii "
+                 "pod musztra), weteranow 3000 (jazda 1000, lucznicy 500, piechota 1500), pula 200000 (80000/40000/80000), przekazane 150000 (60000/30000/60000), uczniow "
+                 "(ludzi) 20000, dostalo 15000, przepadlo bez ucznia 20000 / limit ucznia 20000 / limit awansu 10000, przekazane <= pula TAK | martwe konce ponizej progu: "
+                 "ludzi 800, XP 30000 | koszt 1.20 ms | potkniecia 0.")
+
+
+def w319_rows(rep, plines, alines):
+    bad1, bad2, n_arm = [], [], 0
+    sp = st = 0
+    for l in plines:
+        arms = list(W319_ARM.finditer(l))
+        sm = W319_PSUM.search(l)
+        if not arms and not sm:
+            continue   # brak treningu / brak weteranow
+        sp_ = st_ = 0
+        for m in arms:
+            n_arm += 1
+            name = m.group(1)
+            pool, vets, learn, got = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))
+            cov, cap, taught, lost = float(m.group(6)), int(m.group(7)), int(m.group(8)), int(m.group(9))
+            u1, u2, u3 = int(m.group(10)), int(m.group(11)), int(m.group(12))
+            sp_ += pool; st_ += taught
+            if not (taught <= pool and taught <= cap and taught + lost == pool and u1 + u2 + u3 == lost and 0.0 <= cov <= 1.0001 and got <= learn):
+                bad1.append(f"{name} pula {pool} przek. {taught} przep. {lost} u {u1}/{u2}/{u3} pokr. {cov}")
+        if sm is None:
+            bad2.append("brak segmentu 'razem'")
+            continue
+        P, T, U = int(sm.group(1)), int(sm.group(2)), int(sm.group(3))
+        if not (P == sp_ and T == st_ and P - T == U and sm.group(4) == "TAK" and sm.group(11) == "ZGODNE" and int(sm.group(9)) == T):
+            bad2.append(f"razem {P}/{T}/{U} wobec broni {sp_}/{st_}, {sm.group(11)}")
+        sp += P; st += T
+    rep.add("W319-1: gracz - w kazdej broni przekazane <= pula, przekazane + przepadlo = pula, straty w 3 powodach, pokrycie 0..1",
+            f"linii {len(plines)}, broni {n_arm}, zlych {len(bad1)}" + (f" ({bad1[0]})" if bad1 else ""), "zlych 0", (not bad1) if n_arm else None)
+    rep.add("W319-2: gracz - razem = suma broni, musztra ZGODNE (nauka w przyjetych)", f"zlych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else ""), "zlych 0",
+            (not bad2) if n_arm else None)
+    bad3, bad4, ap = [], [], []
+    for l in alines:
+        m = W319_AI.search(l)
+        if not m:
+            bad3.append("format: " + l[:120])
+            continue
+        v = [int(x) if x not in ("TAK", "NIE") and "." not in x else x for x in m.groups()]
+        pool, taught = v[6], v[10]
+        if not (taught <= pool and v[7] + v[8] + v[9] == pool and v[11] + v[12] + v[13] == taught and v[16] + v[17] + v[18] == pool - taught and v[19] == "TAK"
+                and v[3] + v[4] + v[5] == v[2]):
+            bad3.append(f"pula {pool} przek. {taught} straty {v[16]}/{v[17]}/{v[18]}")
+        c = float(m.group(23))
+        if c >= 5.0:
+            bad4.append(c)
+        ap.append((pool, taught, v[20], v[21]))
+    rep.add("W319-3: AI - przekazane <= pula, bronie = razem, straty = pula - przekazane", f"linii {len(alines)}, zlych {len(bad3)}" + (f" ({bad3[0]})" if bad3 else ""),
+            "zlych 0", (not bad3) if alines else None)
+    rep.add("W319-4: AI - koszt nauki < 5 ms na dobe", f"dob ponad progiem {len(bad4)}" + (f" (max {max(bad4):.2f} ms)" if bad4 else ""), "0", (not bad4) if alines else None)
+    stb = 0
+    for l in plines + alines:
+        m = W319_STUMB.search(l)
+        if m:
+            stb += int(m.group(1))
+    rep.add("W319-5: potkniecia nauki weteranow (gracz + AI)", str(stb), "0", (stb == 0) if (plines or alines) else None)
+    np_ = len([l for l in plines if W319_PSUM.search(l)])
+    info = (f"gracz: dob z nauka {np_}, sr. pula {sp / np_:.0f}, sr. przekazane {st / np_:.0f}" if np_ else "gracz: brak dob z weteranami")
+    if ap:
+        n = len(ap)
+        info += (f"; AI: sr. pula {sum(a[0] for a in ap) / n:.0f}, sr. przekazane {sum(a[1] for a in ap) / n:.0f}, "
+                 f"martwe konce ponizej progu sr. ludzi {sum(a[2] for a in ap) / n:.0f}, XP {sum(a[3] for a in ap) / n:.0f}")
+    rep.add("W319-6: srednio na dobe", info, "INFO", None)
+
+
+def weterani319b_main(logp):
     rep = Report()
+    st_ok = bool(W319_HEAD.search(W319_SAMPLE_P) and len(list(W319_ARM.finditer(W319_SAMPLE_P))) == 2 and W319_PSUM.search(W319_SAMPLE_P)
+                 and W319_STUMB.search(W319_SAMPLE_P) and W319_HEAD.search(W319_SAMPLE_A) and W319_AI.search(W319_SAMPLE_A) and W319_STUMB.search(W319_SAMPLE_A))
+    rep.add("W319-S: self-test wyrazen (wzory linii gracza i AI)", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
     if not logp or not os.path.isfile(logp):
-        rep.add("J319-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.add("W319-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    starts, days, errors = [], [], []
-    pct0 = False
-    day = re.compile(r"Opieka nad jencami \(318b\): wyleczonych (\d+) \(wywolan \d+\), XP Medicine ([\d.]+) .*?rannych jencow przed/po (\d+)/(\d+)"
-                     r" \| z tego dodatek 319a (\d+) \| tempo/dobe: swoi ([-\d.]+), jency gra ([-\d.]+)")
+    plines, alines = [], []
     with open(logp, encoding="utf-8", errors="replace") as f:
         for line in f:
-            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
-            if s.startswith("Jency jak swoi (319a): start sesji"):
-                starts.append(s)
-            elif s.startswith("Opieka nad jencami (318b): start sesji") and "Prisoner Care Xp Percent 0 " in s:
-                pct0 = True
-            elif s.startswith("Opieka nad jencami (318b): wyleczonych"):
-                m = day.search(s)
-                if m:
-                    days.append((int(m.group(1)), float(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5)), (None if m.group(6) == "-" else float(m.group(6))), (None if m.group(7) == "-" else float(m.group(7)))))
-            if "ERROR" in s and ("PrisonerCare.LikePrefix" in s or "PrisonerCare.HookLike" in s):
-                errors.append(s)
+            if "Weterani ucza (319b): dzien" not in line:
+                continue
+            s = line.rstrip("\r\n")
+            h = W319_HEAD.search(s)
+            if not h:
+                continue
+            (plines if h.group(2) == "gracz" else alines).append(s)
     print(f"plik: {logp}")
-    ok1 = [s for s in starts if "latka 1/1" in s and "slownik gry tak" in s]
-    rep.add("J319-1: latka TryToHealOrWoundPrisoners i slownik gry", f"startow {len(starts)}, poprawnych {len(ok1)}" + (f" ({starts[-1][:200]})" if starts else ""),
-            "wszystkie 1/1 + slownik tak", (len(ok1) == len(starts)) if starts else None)
-    wd = [d for d in days if d[2] > 0 and d[5] is not None and d[5] > 0]   # recenzja 319a: "-" w tempie = brak pomiaru
-    healed = sum(d[0] for d in wd)
-    expect = sum(min(d[2], d[5]) for d in wd)
-    ratio = healed / expect if expect > 0 else 0.0
-    rep.add("J319-2: tempo jencow jak swoich (doby z rannymi)", f"dob {len(wd)}, wyleczonych {healed}, oczekiwanych {expect:.1f} (min(ranni, swoi/dobe)), stosunek {ratio:.2f}",
-            ">= 0.7", (ratio >= 0.7) if len(wd) >= 3 else None)
-    bad3 = [d for d in days if d[4] > d[0]]
-    rep.add("J319-3: dodatek <= wyleczonych", f"dob {len(days)}, z dodatkiem > wyleczonych {len(bad3)}", "0", (len(bad3) == 0) if days else None)
-    hd = [d for d in days if d[0] > 0]
-    noxp = [d for d in hd if d[1] <= 0]
-    rep.add("J319-4: Medicine XP za wyleczonych jencow", f"dob z wyleczonymi {len(hd)}, bez XP {len(noxp)}, XP lacznie {sum(d[1] for d in hd):.0f}",
-            "bez XP 0", (len(noxp) == 0) if hd and not pct0 else None)
-    rep.add("J319-5: bledy 319a", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    w319_rows(rep, plines, alines)
     rep.show()
     return 0
 
 
-_jency319a_main_prev = main
+_weterani319b_main_prev = main
 
 
 def main(argv):
-    # paczka 319a: grupa jency319a - opakowanie main jak jency318b
+    # paczka 319b: grupa weterani319b - opakowanie main jak panika318c
     a = argv[1:]
     if "--grupa" in a:
         i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "jency319a":
+        if i + 1 < len(a) and a[i + 1] == "weterani319b":
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return jency319a_main(rest[0] if rest else None)
-    return _jency319a_main_prev(argv)
+            return weterani319b_main(rest[0] if rest else None)
+    return _weterani319b_main_prev(argv)
 
 
 if __name__ == "__main__":

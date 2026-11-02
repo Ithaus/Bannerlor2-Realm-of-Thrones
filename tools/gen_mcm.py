@@ -4,6 +4,10 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 319b: weterani ucza swoja bron - kod przycina tier do 1..6, uczniow do 1..20, limit ucznia do 0..3 (DrillVeterans.cs)
+    'VeteranTeacherMinTier': (1, 6, "0"),
+    'VeteranPupilsEach': (1, 20, "0"),
+    'VeteranTeachMaxRatio': (0.0, 3.0, "0.00"),
     # 318b: Medicine XP za jencow - kod przycina do 0..200 (PrisonerCare.HealPostfix)
     'PrisonerCareXpPercent': (0, 200, "0"),
     # 314c: zold krolewski i nagroda krola - kod przycina dni do 0..364, procent do 0..100, czekanie do 1..120 (CrownWar314)
