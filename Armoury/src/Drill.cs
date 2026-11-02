@@ -55,7 +55,7 @@ namespace Armoury
     /// kupcom - musztra nie zuzywa sztuk, ktore K1 uznaje za potrzebne, wiec zakupy brakow ich nie odkupuja (bez petli kupna i zuzycia na koszt lordow).
     /// Autotest po scaleniu: zakupy AI ("ZakupyAI") wobec zuzycia musztry ("Musztra AI: zuzyto").
     /// </summary>
-    internal static class Drill
+    internal static partial class Drill
     {
         // ------------------------------------------------------------ stale (projekt rozdz. 2)
         private const float RestDay = 1.5f, MarchDay = 0.9f, LeadNorm = 170f, LeadMin = 0.5f, LeadMax = 1.5f;
@@ -166,6 +166,7 @@ namespace Armoury
             internal double B, P, Pre, Fin, ShN, N; internal long Computed, Accepted = -1, Cut;   // ShN, N - udzial uzbrojonych wazony liczba ludzi (A niezaleznie)
             // m114-musztra: uciete XP i ludzie wedlug powodu (CutTop..CutSaddle), nazwa brakujacego przedmiotu, opis oddzialow do logu
             internal readonly long[] CutBy = new long[CutKinds]; internal readonly int[] MenBy = new int[CutKinds]; internal string ItemName, CutLog;
+            internal VetRec V;                             // 319b: nauka weteranow w tiku gracza (DrillVeterans.cs)
         }
         private static PlayerRec _pr, _prLast;
         private static int _msgDay = -1;                   // MUSZTRA-m: doba ostatniej linii musztry gracza w grze (raz na dobe)
@@ -206,6 +207,7 @@ namespace Armoury
             _pr = null; _prLast = null; _msgDay = -1; _givenYday = -1; ClearDay(); _k.Clear(); _stumbles = 0; _errDay = -1; _errWhere.Clear(); _clk = 0; Array.Clear(_prof, 0, _prof.Length); _profReads = 0;   // E8/0: czasy wedlug wejscia zeruje tez DayProfile przy odczycie
             _ore = null;   // przedmioty gry sa tworzone na nowo przy kazdej grze - nie trzymac obiektu z poprzedniej kampanii
             CampDrill.Reset();   // m97-szkolenie
+            VetReset();          // 319b
         }
 
         private static void ClearDay()
@@ -217,6 +219,7 @@ namespace Armoury
             _aW = _aWL = _aWD = _aWS = _aWLD = _aWLDS = _aWRest = _aWMarch = _aWHungry = _aWSleep = _aGame = _aRule = _aPenalty = _aWn = _aWLDn = 0;
             _aRuleBase = _aHeadBase = _aPerks = _aXpGame = _aXpNow = _aManN = 0; _aNoModel = _aSleepDawn = _aSleepPaid = _sleepNowAbove = 0;
             Array.Clear(_aWT, 0, _aWT.Length); Array.Clear(_aWTn, 0, _aWTn.Length); Array.Clear(_hb, 0, _hb.Length); _leads.Clear(); _ticks = 0;
+            VetClearDay();   // 319b: liczniki doby AI nauki weteranow
         }
 
         /// <summary>Zegar kosztu musztry (T1): Clk na wejsciu kazdej metody wolanej z zewnatrz (godzina, model treningu, tick partii, ekrany, miasto,
@@ -918,6 +921,7 @@ namespace Armoury
         public static void TickPrefix(MobileParty mobileParty)
         {
             _tick = mobileParty;
+            VetBegin();   // 319b: pula weteranow i x uczniow - czyste na kazdy tik partii
             if (mobileParty == null || mobileParty != MobileParty.MainParty) return;
             Clk(PTrain);
             try
@@ -956,6 +960,8 @@ namespace Armoury
                 if (mobileParty == null || s == null) return;
                 var c = _ctx;
                 bool mine = c != null && c.Party == mobileParty && Math.Abs(c.At - CampaignTime.Now.ToHours) < 1e-6;
+                // 319b: weterani ucza swoja bron - po dodaniu XP przez gre, przed pomiarem "przyjete" gracza (nauka wchodzi do przyjetych)
+                long taught = VetTeach(mobileParty, s);
                 if (mobileParty == MobileParty.MainParty && _pr != null)
                 {
                     long after = 0;
@@ -963,6 +969,9 @@ namespace Armoury
                     for (int i = 0; i < r.Count; i++) { var el = r.GetElementCopyAtIndex(i); if (el.Character != null && !el.Character.IsHero) after += el.Xp; }
                     _pr.Accepted = after - _xpBefore;
                     if (_pr.Cut > 0) CutSplit(_pr, mobileParty);   // m114-musztra: uciete XP wedlug powodu (szczyt linii / gotowi / brak konia, zlota, perka)
+                    // 319b: XP weteranow (wyliczone, uciete "szczyt linii" w Done/CutSplit) przekazane uczniom jest juz w przyjetych - zdjete z ucietych,
+                    // wiec przyjete + uciete = wyliczone dalej sie zgadza (kontrola ZGODNE linii "Musztra (gracz)")
+                    if (taught > 0) { _pr.Cut -= taught; _pr.CutBy[CutTop] = Math.Max(0L, _pr.CutBy[CutTop] - taught); }
                     var pc = _pr.C;
                     if (pc != null && pc.Counted)
                     {
@@ -978,7 +987,7 @@ namespace Armoury
                         else if (!pc.Off && pc.Men > 0 && s.DrillDailyMessage) DayMessage(_pr, pc);   // MUSZTRA-m: dzien cwiczen - wynik i czynniki wzoru
                     }
                     // m97-szkolenie: godziny z menu obozu zuzyte tym tickiem (takze w dniu kary) i linia doby gracza
-                    if (pc != null && pc.Camp) CampDrill.AfterPlayerTick(pc, _pr.Accepted, _pr.N > 0 ? _pr.N : pc.Men, _pr.P, _pr.N > 0 ? _pr.ShN / _pr.N : 1.0);
+                    if (pc != null && pc.Camp) CampDrill.AfterPlayerTick(pc, _pr.Accepted - taught, _pr.N > 0 ? _pr.N : pc.Men, _pr.P, _pr.N > 0 ? _pr.ShN / _pr.N : 1.0);
                     _pr = null;
                 }
                 if (!Active(s) && _acc.Count == 0) return;           // musztra wylaczona i nic nie czeka - bez zuzycia i bez kowali
@@ -1029,6 +1038,7 @@ namespace Armoury
                 else sb.Append(c.Rest ? ", at rest x" : ", marching x").Append(F2(c.D));
                 sb.Append(", drill kit x").Append(F2(sk))
                     .Append(", armed ").Append(Pct(armed, 1.0)).Append(", perks +").Append(F1(perks)).Append(" per man");
+                if (r.V != null) VetMessage(sb, r.V);   // 319b: "N XP passed on - V veterans taught L riders, ..."
                 if (r.Cut > 0) CutMessage(sb, r);   // m114-musztra: dotad zawsze "men are waiting to be upgraded" - takze dla ludzi bez dalszego awansu
                 Log.Player(sb.Append('.').ToString());
             }
@@ -1049,6 +1059,9 @@ namespace Armoury
             if (r.CutBy[CutTop] > 0)
             {
                 int n = r.MenBy[CutTop];
+                if (r.V != null && r.V.TaughtAll > 0)   // 319b: czesc puli weteranow poszla do uczniow - reszta bez ucznia tej broni albo ponad limit ucznia
+                    sb.Append("; ").Append(r.CutBy[CutTop]).Append(" XP wasted - no more pupils of their arm could take it from the men at the top of their line");
+                else
                 sb.Append("; ").Append(r.CutBy[CutTop]).Append(" XP wasted - ").Append(n == 1
                     ? "1 man is at the top of his line and learns nothing more from drill"
                     : n + " men are at the top of their line and learn nothing more from drill");
@@ -1156,7 +1169,7 @@ namespace Armoury
             return n;
         }
 
-        public static Exception TickFinalizer(Exception __exception) { _tick = null; _room.Clear(); return __exception; }
+        public static Exception TickFinalizer(Exception __exception) { _tick = null; _room.Clear(); VetBegin(); return __exception; }
 
         // ------------------------------------------------------------ zuzycie i zlom
         private static void Wear(Ctx c, Settings s)
@@ -1852,6 +1865,7 @@ namespace Armoury
                 {
                     PlayerLine(day, s, w, a, bal);
                     AiLine(day, s);
+                    try { VetLines(day, s); } catch (Exception e) { Stumble("VetLines", e); }   // 319b
                     if (day % 5 == 0) KingdomLine(day, s);
                 }
                 CampDrill.Daily();   // m97-szkolenie: linia AI i strony gracza (zasada obozu wobec dawnej reguly; wlasny try, zeruje liczniki)

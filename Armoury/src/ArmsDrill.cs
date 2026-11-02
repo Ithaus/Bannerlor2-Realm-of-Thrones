@@ -275,6 +275,7 @@ namespace Armoury
                                                             // m97-szkolenie (recenzja 6): AI pod zasada obozu bez godziny postoju za dnia - udzial do pomiaru dawnej reguly
                 if (share < 1f) __result = new ExplainedNumber(__result.ResultNumber * share);   // opisy gubimy swiadomie - treningu nikt nie oglada
                 if (how != 0) Drill.Done(__0, __result.ResultNumber, share);
+                if (how != 0) Drill.VetPool(__0, __1, ref __result);   // 319b: weteran (szczyt linii, tier >= progu) - XP do puli swojej broni, wynik 0 (po Done - liczniki bez zmian)
             }
             catch (Exception e) { Stumble("TrainingPostfix", e); }
         }
