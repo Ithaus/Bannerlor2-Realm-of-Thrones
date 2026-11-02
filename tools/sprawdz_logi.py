@@ -91820,14 +91820,14 @@ def jency319a_main(logp):
             elif s.startswith("Opieka nad jencami (318b): wyleczonych"):
                 m = day.search(s)
                 if m:
-                    days.append((int(m.group(1)), float(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5)), float(m.group(6)), float(m.group(7))))
+                    days.append((int(m.group(1)), float(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5)), (None if m.group(6) == "-" else float(m.group(6))), (None if m.group(7) == "-" else float(m.group(7)))))
             if "ERROR" in s and ("PrisonerCare.LikePrefix" in s or "PrisonerCare.HookLike" in s):
                 errors.append(s)
     print(f"plik: {logp}")
     ok1 = [s for s in starts if "latka 1/1" in s and "slownik gry tak" in s]
     rep.add("J319-1: latka TryToHealOrWoundPrisoners i slownik gry", f"startow {len(starts)}, poprawnych {len(ok1)}" + (f" ({starts[-1][:200]})" if starts else ""),
             "wszystkie 1/1 + slownik tak", (len(ok1) == len(starts)) if starts else None)
-    wd = [d for d in days if d[2] > 0 and d[5] > 0]
+    wd = [d for d in days if d[2] > 0 and d[5] is not None and d[5] > 0]   # recenzja 319a: "-" w tempie = brak pomiaru
     healed = sum(d[0] for d in wd)
     expect = sum(min(d[2], d[5]) for d in wd)
     ratio = healed / expect if expect > 0 else 0.0
