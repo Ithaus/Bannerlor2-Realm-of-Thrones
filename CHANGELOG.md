@@ -1,5 +1,238 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-03 WGRANIE 158 - noc/320x-integracja (157 + 320a fabula: Harrenhal/Dorzecze pominiete, Krwawe Gody bez pokoju, zdrada rodow rzecznych, zwrot zamkow korony; 320b/320e SCA bez band i Innych, bez ForcePeace przy zablokowanym pokoju; 320c mury sprzyjaja obroncom; 320d piechota z tarczami biegnie pod ostrzalem); Armoury.dll a845da99f21160530f7d14ce34704ee4, CrashScribe.dll 55ccc004bd0607c39d46b4ec7cbf7ae7, CrashScribe.settings.xml +FabulaHarrenhalResolve; kopie 157: *.bak-2026-11-03-przed-wgranie158 i D:/Backup-Bannerlord/wgrane/2026-11-03-wgranie158-przed
+
+**Problem:** Jeff 02.11: "po zjednoczeniu Polnocy strasznie Polnoc leje Lannisterow"; "Polnoc nie zawiera pokoju z korona, dalej walczy, ale polowa krolestwa przechodzi na strone Lannisterow ... popraw, bo gra jest niegrywalna fabularnie"; "niech korona przestanie liczyc bandytow i Innych jako wroga"; "oblezenia - zwieksz przewage obroncow w zaleznosci od poziomu muru"; "ziemie i zamki, ktore stracili Lannisterowie, sa oddawane pierwotnym wlascicielom"; decyzje "1. tak 2. tak" (tarczownicy biegna pod ostrzalem, korona przy zablokowanym pokoju walczy); "i zrob test potem". Analiza: scratchpad/bal/raport.md (fabula ROT stala od dnia 77 na HarrenhalSiegeNotification - Harrenhal u Paege w Polnocy; korona w SCA ForcePeace).
+**Zmiana:** wpisy 320a, 320b(+320e), 320c, 320d ponizej (szkice zb/n320a..d-changelog.md). Drzewo autotestu CrashScribe (scratchpad/cs-at308, galaz at-320x): port 317a RangedKey + 320a Fabula - CrashScribe-at-n320x.dll eb1918c4.
+**Testy:** recenzje: 320a (3+1 potwierdzone, poprawione 8212b772 / 1d7b2034), 320b (1 potwierdzone -> 320e), 320c i 320d/320e bez potwierdzonych; scalenie bez brakujacych hunkow, sprawdz_logi.py zlozony (320a + bloki 320b-d), build 0 bledow. Autotest 320x (pierwsze podejscie STOP: CrashScribe-at bez trybu autotestu - zbudowany z drzewa autotestu): bitwaN 9 bitew kod 0, ERROR 0; probyN 5 dob KONIEC OK (kod 1 = gra zamknieta po koncu); grupy bieg320d, ostrzal313b, panika318c, sca320b, mury320c, zold314c, groty319c, weterani319b, fabula320a 0 NIE (F320-1 Harrenhal zamkniety dzien 374 "Harrenhal trzyma Paege", F320-2 Dorzecze pominiete, F320-7 transpiler Godow podmian 1, czolo kolejki brak); jency319a J319-2 NIE (stosunek 0.64 < 0.7 - jency goja sie wolniej niz swoi o ~1/3 w 3 dobach, do obserwacji). Armoury.json Jeffa c7055052 nietkniety.
+**Ryzyko / co sprawdzic:** fabula: nastepne Renly dzien ~520, Krwawe Gody ~953 (os x4.33); po Godach linie "Krwawe Gody (320a): zwrot" i faza 2 blokady 264; korona w SCA - linia "SCA bez band (320b)" cel bez ForcePeace, oblezenia korony > 0; mury - linie "Mury (320c)", odsetek zdobytych szturmow nizszy; tarczownicy - segment F "Bitwa (291)"; J319-2 (tempo jencow).
+**Status:** WGRANE 158
+
+## 320d - piechota z tarczami pod ostrzalem biegnie w kazdym natarciu + 291e puszcza obronce naszym licznikiem (Jeff 02.11 "1. tak")
+
+**Problem:** Jeff 02.11, na pytanie "Piechota z tarczami pod ostrzalem tez ma biec do zwarcia?" - "1. tak" (wczesniej: "Jak strzelam z luku ... to ta na mnie biegnie a nie wolno idzie").
+Log Armoury-2026-11-02_22-06-40, bitwa 22:28-22:35 z Irmgard (obronca T107/vlandia, 76 ludzi, 3 strzelcow na 35 u gracza): linia "Bitwa (291)" -
+C "z tarczami pod ostrzalem zostal krok 1 (sr. tarcz 0.62)", E 313b "bieg z tarczami ... druzyn 1 (291e 0, S2 0, taktyka ataku 1), szykow w biegu 0, wejsc w bieg 0",
+E "puszczone: bilans ognia 0", B "decyzji trzymania 21, obrona gry NIE 0", "puszczone: ... napastnik nie podchodzi 90 s 1"; S2 "pod ostrzalem bez zwarcia do konca:
+druzyn 1 (padli od pociskow 43)"; doktryna "DefensiveEngagement s. 2 ... FullScaleAttack s. 168, RangedHarrassmentOffensive s. 372".
+
+**Przyczyna:**
+- 313b (MarchToContact.MarchCap) dawal bieg szykowi z tarczami tylko przy aktywnym BehaviorAdvance / BehaviorCharge (AdvanceOrCharge, recenzja 313b (3)).
+  Gra (TaleWorlds.MountAndBlade 1.4.8): TacticRangedHarrassmentOffensive daje glownej piechocie BehaviorCautiousAdvance (Approaching = rozkaz Move na szyk wroga,
+  BehaviorCautiousAdvance.cs:145-176) i BehaviorTacticalCharge; TacticDefensiveEngagement - BehaviorHoldHighGround + BehaviorTacticalCharge (TacticalCharge z daleka daje
+  Move / Charge). Zaden nie jest BehaviorAdvance ani BehaviorCharge (klasy osobne, : BehaviorComponent) - szyk szedl krokiem.
+- OutshotRush.Live (Doctrine.OutshotAdvancing) wymagal taktyki ataku albo puszczenia 291e / S2 - druzyna przestrzelana w DefensiveEngagement po "napastnik nie podchodzi"
+  nie byla "pod ostrzalem".
+- 291e (DhDefPost) puszczal tylko, gdy gra sama mowi obrona NIE. TeamAIComponent.CheckIsDefenseApplicable:227 ma podloge 0.05 dla obu stron: 2 zabitych od pociskow
+  z 77 = 0.026 -> 0.05, wrog 0.05 -> stosunek 1 <= 1.5 -> obrona TAK; przy 35 strzelcach gracza (wykladnik 3 x 0.38) gra puscilaby dopiero od ok. 6 zabitych.
+
+**Zmiana (Armoury):**
+- `Doctrine.Hold291.cs`: `CannotAnswerFire(Team)` - strzelcy strony x3 < strzelcy wroga (ta sama miara co S2 141), liczone w DhTick do `_dhOut` (glowny watek).
+  DhDefPost: gdy gra mowi obrona TAK, a druzyna trzymana przez 291 nie odpowie ogniem i ma >= FireDead (2) zabitych od pociskow - puszczona naszym licznikiem
+  (`FireRelease` - ta sama droga co 291e: _dhOff 3, FireReleased, czas i sila w E), obrona gry NIE w tej decyzji; dopoki strona nie odpowie ogniem - obrona gry NIE
+  w kolejnych decyzjach (inaczej gra wraca do DefensiveEngagement). Klucz DefendersChargeWhenOutshot NIE - tylko "bylby puszczony licznikiem". Po S2 bez zmian (gra decyduje).
+  `OutshotAdvancing`: nowy powod 5 - druzyna przestrzelana (CannotAnswerFire) bez taktyki ataku, nigdy druzyna gracza.
+- `MarchToContact.cs`: `Advancing(f)` zamiast AdvanceOrCharge - BehaviorAdvance / BehaviorCharge, rozkaz Advance / Charge / ChargeToTarget (przytrzymany marszem 128),
+  albo Move, ktorego cel jest >= 5 m blizej najblizszego szyku wroga (albo mediany celow druzyny) niz srodek szyku i dalej niz 8 m; odwrot (Retreat, PullBack, Regroup,
+  Stop, RetreatToKeep/Castle), postoj na pozycji (< 8 m) i ruch nie na wroga - krok jak dotad. Reszta biegu 313b bez zmian (bez capu marszu, AiBreath zapas 25% przez
+  Rushing, koniec przy zwarciu / szarzy / zmianie rozkazu; FallBack, szyki gracza, smoki - nigdy). `Rush313(f)` dla CloseRanks.
+- `CloseRanks.cs`: Loose zamiast muru tarcz (OutshotRush.WantLoose) takze dla szyku w biegu 313b poza Advance / Charge (sciezka 310; konnica uderzeniowa w 90 m - jak dotad).
+- `OutshotRush.cs` / `Battle291.cs`: segment F linii "Bitwa (291)" po E (wyrazenia E / B / C w sprawdz_logi bez zmian): druzyn przestrzelanych bez taktyki ataku,
+  wejsc w bieg Advance/Charge vs inne natarcie [nazwy zachowan], szyko-takty pod ostrzalem bez biegu (odwrot / postoj / nie na wroga), potkniecia, 291e licznikiem.
+- `tools/sprawdz_logi.py`: grupa `bieg320d` (B320-S, S2, 0-4), test tylko syntetyczny.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Szerszy OutshotRush.Live (powod 5) zmienia tez czytelnikow Live: 283 R4/R5 (OutshotPushes - szyk piechoty druzyny przestrzelanej nie staje na nekajacego), ClosestPost
+  (cel pieszy zamiast konnych lucznikow AI takze dla obroncy w DefensiveEngagement), szarza 313y z zapasem 25%. Druzyna gracza poza (IsPlayerTeam), szyki gracza poza.
+- 291e licznikiem: slabszy obronca bez strzelcow tez rusza (jak 291e D2); obrona gry NIE trzymana tylko dopoki strona przestrzelana (posilki strzelcow - gra sama).
+  "bilans ognia" w E liczy teraz oba puszczenia (F mowi, ile naszym licznikiem). S2 141 nie zmieniony (osobna formula w S2Tick - ta sama miara, nie wspolny helper).
+- Advancing: Move CautiousAdvance w stanie Shooting (5 m) = postoj, bez biegu; HoldHighGround do wzgorza blizej wroga = bieg (natarcie). Koszt: GetPosition raz na 0.5 s na szyk
+  z tarczami druzyny Live.
+- Gra: linia F - "inne natarcie" > 0 przy RangedHarrassmentOffensive / DefensiveEngagement, E "wejsc w bieg" > 0, C "zostal krok" maleje; E "puszczone: bilans ognia" >= 1
+  wkrotce po 2. zabitym przy przewadze strzelcow gracza; --grupa bieg320d i ostrzal313b.
+
+**Status:** DO SPRAWDZENIA (zbudowane, bez autotestu)
+
+## 320c - mury sprzyjaja obroncom: przewaga osady wedlug poziomu murow (Jeff 02.11) - Armoury
+
+**Problem:** Jeff 02.11: "Oblezenia - zwieksz przewage obroncow w zaleznosci od poziomu muru, aby nieco trudniej bylo zdobyc twierdze". Logi Armoury-2026-11-0*.log,
+16 unikalnych linii "Bitwa szturmu (SZ)": wszystkie na murach poziomu 2 z taranem i wieza; zdobyte 10 (63%), odparte (OB2) 5, bez rozstrzygniecia 1; wymiana
+(straty atak / obrona) 0.65-2.88, srednio ok. 1.3 (np. Goldentooth 577 vs 4848: atakujacy -18%, obroncy -101%). Mury daja dzis malo.
+**Przyczyna:** `DefaultCombatSimulationModel.GetSettlementAdvantage` liczy poziom murow tylko w bazie (5 / 6 / 7 dla L1 / L2 / L3) - roznica miedzy poziomami
++17-20%, a nasz `SiegeWalls.AdvPost` dopisywal tylko stolice, machiny obroncow i wyrwe z jednego odcinka. Misja gracza adv nie czyta (mury fizyczne w scenie).
+**Zmiana:**
+- `Settings.cs:840-845`: `SiegeWallsFavourDefenders` (tak), `SiegeWallLevel1Factor` 1.10, `SiegeWallLevel2Factor` 1.20, `SiegeWallLevel3Factor` 1.35 (MCM 1.0-2.0,
+  opisy po angielsku; `gen_mcm.py` RANGES + regeneracja McmSettings.cs). W Armoury.json Jeffa tych kluczy nie ma - wejda domyslne.
+- `SiegeWalls.cs`: `LevelFactorOf` / `LevelFactor` (klucz, przyciecie 1..2, NaN = 1); `AdvPost` mnozy przewage x czynnik poziomu - ten sam cel latki
+  (klasa deklarujaca, bez nowej latki Harmony). Bez czynnika: osady fabuly ROT (`SiegeRansom.IsStory`: KL, Red Keep, Winterfell, Harrenhal, Mur, Castle Black),
+  Inni po ktorejkolwiek stronie (`Und(camp.LeaderParty, st)`), wodz obozu ze skryptu fabuly (`Scripted`). Wyjatek - istniejacy `Stumble("AdvPost")`, bez wylacznika.
+- `Measure()` dzieli przewage tez przez czynnik poziomu (pole `LvlF` w `Meas`) - linie OB1/O0 nie pokaza czynnika jako "perki"; `AdvText` ma pole
+  "x poziom murow (320c) F (powod)".
+- Log: per szturm (z `SzEnd`, czynnik zapisany w `BatOf` na starcie - przed zmiana pana osady) linia `Mury (320c): ... poziom murow L | czynnik xF | przewaga A
+  (bez czynnika B), W | obroncow, atakujacych | straty, wymiana | gracz | wynik`; doba `Mury (320c doba): klucz, wywolania przewagi z czynnikiem L1/L2/L3,
+  bez czynnika, szturmy wedlug poziomu (zdobyte / odparte / inne, straty), potkniecia`; linia startu OB dopisuje klucze 320c. Naglowek SiegeWalls: trzecia
+  zaleznosc od poziomu murow swiadomie (decyzja Jeffa), zamiast "bez dopisku".
+- `tools/sprawdz_logi.py --grupa mury320c` (self-test na wzorach linii; czynnik = klucz dla poziomu, osady fabuly bez czynnika, przewaga / bez czynnika = czynnik,
+  zestawienie szturmow wedlug poziomu, pole 320c w liniach OB1/O0, potkniecia 0).
+**Oczekiwany skutek (szacunek ze wzoru, nie z gry):** baza wzgledem dzis L1 5 -> 5.5, L2 6 -> 7.2, L3 7 -> 9.45. Szturm L2 z taranem i wieza: ciosy obrony z murow
+x1.2 (W ok. 6.3 -> 7.5, sufit 20 daleko), czesc "w polu" x1.2, ciosy ataku bez zmian; straty atakujacych przy zdobyciu 14-18% -> ok. 17-22% wobec progu OB2 17-27% -
+szturm L2 zdobyty ok. 45-50% zamiast 63%, wymiana ok. 1.3 -> 1.6. L3 (Dragonstone, Storm's End, Casterly Rock; KL / Red Keep / Winterfell wykluczone jako fabula)
+bez wyrwy w wiekszosci odparty, chyba ze ok. 10:1 albo trebusz rozbije odcinek. OB1: S / f^W (taran i wieza: /1.16 L2, /1.27 L3; bez machin /1.33 L2) - AI czeka
+dluzej, czesciej przechodzi na trebusze (SiegeAiBreachWhenWallsHold). Okup: RatioWalls spada - obronca rzadziej placi. Autobitwa gracza - ta sama regula w obie
+strony. Slawa za szturm x1.1-1.35 (gra mnozy przez adv). Ocena dolaczenia AI do ataku na szturmujacych (sqrt(adv)) lekko rosnie.
+**Ryzyko / co sprawdzic (regula 0):**
+- Regresja: klucz wylaczony albo wszystkie czynniki 1.0 = zachowanie 9ad63483 (AdvPost nie mnozy; Measure dzieli przez 1).
+- Wszyscy czytelnicy adv (OB1 Measure/Veto, BesiegerCamp szansa gry, SiegeRansom :245, SzTicks, OB3 TicksPost :740, slawa, dolaczanie AI) dostaja nowa liczbe -
+  zamierzone, jedna liczba jak dotad. Jedyny czytelnik rozkladajacy adv na skladniki (Measure) poprawiony. DefaultTargetScoreCalculatingModel adv nie czyta - AI
+  dalej wybiera cele po staremu (1 + 0.33 L): patrzec, czy nie odbija sie dlugo od L3.
+- Oblezenia bez konca: wiecej "OB1 wstrzymane: mury" i odparc OB2; bezpieczniki 307c, drabiny DR (miara bez adv), lamanie murow, glod GL, odsiecz OB5.
+  Patrzec w OB0 na "ponad 45 dob", w KO na dlugosc i odejscia z braku jedzenia, w Oblezenia 2 na kapitulacje z glodu.
+- CanonWarBalance / KRONIKA: wolniejsze zdobycia sprzyjaja broniacym sie - czy front nie staje.
+- Fabula ROT i Inni: wykluczenia obowiazkowe - w linii `Mury (320c)` osady fabuly maja "bez czynnika: osada fabuly" (checker M320-6).
+- Wydajnosc: AdvPost wola dodatkowo IsStory (HashSet), Und (kultura frakcji), Scripted - tylko dla osad w oblezeniu; bez zapisu stanu, bez SyncData.
+- Linie `Mury (320c)` powstaja tylko z bitew SZ (TicksPost, gdy ktorykolwiek klucz SZ wlaczony) - u Jeffa wlaczone.
+- Krok B (misja gracza: BannerCompanies.Roll, zaloga na murach lamie sie rzadziej) - NIE w tym kroku, osobno po tescie A.
+- Autotest bitwy armii (CrashScribe-at-n308) nie obejmuje szturmu - do oceny potrzebne oblezenie AI w logu: `--grupa mury320c` + linie SZ.
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane). Armoury.dll md5 63b93e74460f876815dca694ddde9840.
+
+## 320b - SCA nie liczy band, Innych i wyjetych spod prawa jako sily wroga (Jeff 02.11) - Armoury
+
+**Problem:** Jeff 02.11: "i niech korona przestanie liczyc bandytow i Innych jako wroga". Log Armoury-2026-11-02_20-57-50 [21:56:58]: korona (vlandia, Baratheonowie z Krolewskiej Przystani) w StrategicCampaignAI (SCA) cel ForcePeace, "wyczerpane tak (wrog 58819 / swoi 19741)"; hipoteza CanonWarWatch: krolestwa 41262, "bandy i inni" ok. 17.5k (Inni wedlug CrashScribe 22:24:57: 4 bandy, 3048 trupow).
+**Przyczyna:** `StrategicCampaignAI145Behavior.CalculateFactionStatus(Kingdom)` (StrategicCampaignAI145.dll, dekompilacja sca320/a :75-103) sumuje `EnemyStrength` z `CurrentTotalStrength` WSZYSTKICH `kingdom.FactionsAtWarWith` bez filtra: klany band (stala wojna, sila ~0), Inni (ROTclan_126, kultura whitewalker, is_outlaw) i mniejsze frakcje wyjete spod prawa (Bractwo bez Choragwi - stala wojna z krolestwem tej samej kultury). `IsExhausted` (wrog > swoi x 1.35, albo zagrozone >= fortece/3, albo >= 3 spladrowane wioski) -> ForcePeace/WantsPeace -> StrategicTargetScoreModel: cele oblezen x0.19, obrona x1.7.
+**Zmiana:** nowy `Armoury/src/ScaNoBandits320.cs`: postfiks na `CalculateFactionStatus` (AccessTools.DeclaredMethod na klasie deklarujacej, private static; sprawdzony `Harmony.GetPatchInfo` po wlascicielu `com.jeff.armoury.scanobandits320`) liczy `EnemyStrength` od nowa bez `IsBanditFaction`, kultury `whitewalker` i `IsOutlaw` (krolestwa, klany zbuntowane i inne klany z wojna zostaja). `ActiveWars`, `ThreatenedFortifications`, `RaidedVillages` bez zmian. WantsPeace / IsExhausted SCA przelicza sam (SetFactionStatus po postfiksie). Klucz MCM "Strategic AI Ignores Bandits" (`StrategicAiIgnoresBandits`, domyslnie tak, grupa Wars of the books, na zywo). Linie: "SCA bez band (320b): start sesji - latka wpieta (...)" i co dobe "SCA bez band (320b): dzien N | ... | <krolestwo>: wrog A -> B (pominiete: bandy, Inni, wyjeci spod prawa; liczeni), swoi, twierdze/zagrozone, wojen, cel, wyczerpane, chce pokoju". Wpiete w ArmouryBehavior (Reset w konstruktorze, EnsureHooks po CanonWarBalance, Daily po CanonPeaceLock.Daily). gen_mcm: etykieta 'Strategic AI Ignores Bandits' w LABELS. sprawdz_logi.py: grupa sca320b (S320-S..6).
+**Kontrola (zasada 0):** nikt w naszym kodzie nie pisze statusu SCA (grep EnemyStrength/IsExhausted/SetFactionStatus: tylko odczyt w CanonWarWatch.Sca/Enemy); jedyna inna latka na SCA (SiegeWalls2 TryRetreatFromBadSiege) innego celu. Metoda zadeklarowana w klasie i statyczna - pulapka metody dziedziczonej (sekcja 7) nie dotyczy; sprawdzenie GetPatchInfo w linii startu. Koszt: ok. 17 frakcji x krolestwa co 4 h + raz na dobe. Brak nowych pol zapisu; SCA SyncData stanu nie trzyma - po wczytaniu przelicza przy pierwszym ticku 4 h. Krytyka raportu: zgodny z kodem; ROT-owe `IsOutlaw` dla Kingdom kompiluje sie (IFaction).
+**Ryzyko / co sprawdzic:**
+- **Korona NIE zacznie oblegac od samej tej latki** (raport 320b): bez band/Innych 41262 > 19741 x 1.35 = 26650 i zagrozone 6 >= 15/3 - nadal ForcePeace, x0.19. Prawdziwa przyczyna to przewaga Polnocy 2:1. Ewentualne "dopoki CanonPeaceLock blokuje pokoj, SCA nie chce pokoju" - osobna decyzja Jeffa, nie dodane.
+- Decyzja Jeffa: czy `ActiveWars` tez bez band (wtedy krolestwa bez wojny z krolestwem nigdy nie wyczerpane, Nocna Straz nie wyczerpana od Innych). Domyslnie bez zmian.
+- Krolestwa w pokoju z innymi krolestwami (Nocna Straz, Wolni Ludzie, Skagos, Essos): wrog ~0; ForcePeace tylko z zagrozonych twierdz / wiosek -> mniej obrony x1.7, cele w twierdzach Innych/wyjetych spod prawa bez x0.19. Nocna Straz dalej moze byc wyczerpana przez partie Innych pod twierdzami (NearbyEnemyLordStrength nie latany).
+- Cel SCA zmienia sie co najwyzej co 7 dni - efekt w "cel" moze przyjsc z opoznieniem.
+- Log: --grupa sca320b (latka wpieta, potkniecia 0, wrog po = przed - pominiete); w linii CanonWarWatch "SCA: cel ..., wyczerpane (wrog N" ma teraz pokazac N bliskie "krolestwa" z hipotezy Enemy().
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane). Armoury.dll md5 77c61cd0037f05b92e29979af0738418.
+
+## 320e - SCA: przy zablokowanym pokoju bez ForcePeace/WantsPeace; zagrozone twierdze bez Innych i wyjetych spod prawa (Jeff 02.11 "1. tak 2. tak") - Armoury
+
+**Problem:** Jeff 02.11 na pytanie "(2) Korona przy zablokowanym pokoju ma normalnie walczyc i oblegac zamiast 'chciec pokoju'?" - "tak". Korona (vlandia) w SCA: cel ForcePeace i WantsPeace (log 2026-11-02 [21:56:58]), a pokoju z Polnoca i Dorzeczem zawrzec nie moze (CanonPeaceLock 264 do Krwawych Godow) - kara x0.35 x0.35 na cele oblezen bez zadnego sensu. Do tego ThreatenedFortifications liczy partie lordow Innych (NearbyEnemyLordStrength bez filtra) - zagrozone 6 >= 15/3 samo trzyma IsExhausted.
+**Przyczyna:** SCA (dekompilacja sca320/a): `StrategicAiState.SetFactionStatus` :179 `WantsPeace = IsExhausted && ActiveWars > 0`; `UpdateWarGoal` :105-113 `IsExhausted ? ForcePeace : ...` (cel trzymany 7 dni, `ShouldReevaluateWarGoal`); `CalculateFactionStatus` :87-101 `ThreatenedFortifications` = oblezona albo `NearbyEnemyLordStrength(80)` > EstimatedStrength twierdzy - wszystkie partie lordow frakcji w wojnie (takze Inni ROTclan_126 i wyjeci spod prawa). Kolejnosc ticku: Calculate -> SetFactionStatus -> UpdateWarGoal -> SetFactionStatus (OnDailyTick i co 4 h OnHourlyTick).
+**Zmiana:** `Armoury/src/ScaNoBandits320.cs`:
+- (b) klucz `StrategicAiIgnoresBandits`: postfiks `CalculateFactionStatus` liczy `ThreatenedFortifications` od nowa (`Threatened`, :199) - twierdza (miasto/zamek) zagrozona, gdy oblezona przez frakcje, ktorej `Skip` nie pomija (nie widac oblegajacego = jak SCA), albo gdy suma `GetTotalLandStrengthWithFollowers(false)` aktywnych partii lordow frakcji w wojnie z `Skip == 0` w promieniu 80 > `Party.EstimatedStrength`. Wspolny pomocnik SCA `NearbyEnemyLordStrength` bez latki.
+- (a) nowy klucz `StrategicAiFightsOnWhenPeaceBlocked` (MCM "Strategic AI Fights On When Peace Blocked", domyslnie tak, Wars of the books, na zywo): `PeaceLocked` (:232) - wszystkie wojny krolestwa z krolestwami (`IsKingdomFaction`, `Skip 0`; >= 1) maja `CanonPeaceLock.Blocks` = true (ta sama regula 264, co glosowania/zmeczenie wojna). Wtedy: postfiks `UpdateWarGoal` (`GoalPostfix`, :316) zamienia zapisany ForcePeace (nowy albo stary) na nastepny cel SCA bez wyczerpania (`NextGoal` :301 - DefendCapitalRegion gdy `NearbyEnemyLordStrength(stolica, 80) > 500`, ReclaimLostFief gdy `GetLostClaim`, WeakenEconomy gdy spladrowane wioski, inaczej BorderWar - pomocniki SCA refleksja, `SetWarGoal`); postfiksy `OnDailyTick`/`OnHourlyTick` (`TickPostfix`, :338) zeruja `WantsPeace` krolestw z blokada z tej rundy (bez latki na malej `SetFactionStatus` - ryzyko wkompilowania) i jako zapas zamieniaja zapisany ForcePeace, gdyby UpdateWarGoal zostal wkompilowany (licznik "w ticku"). IsExhausted bez zmian. Wszystkie latki: DeclaredMethod na klasie deklarujacej + GetPatchInfo po wlascicielu.
+- Linia startu: dopisek "| 320e pokoj zablokowany: latki UpdateWarGoal/OnDailyTick/OnHourlyTick wpieta, klucz ...". Linia doby: "| 320e klucz, latki, zamian celu N (w ticku M), pokoj wyczyszczony P, zagrozone zmienione T" i na krolestwo "zagrozone X (SCA Y)", "cel G (SCA G0, powod)", "chce pokoju x (SCA y)"; powod: "pokoj zablokowany 264 - krolestwa a z b" / "pokoj mozliwy - zablokowane a z b krolestw" / "bez wojen z krolestwami" / "klucz NIE".
+- Settings.cs/McmSettings.cs (gen_mcm.py; opis klucza 320b poprawiony - zagrozone twierdze juz bez Innych), gen_mcm.py LABELS. sprawdz_logi.py grupa sca320b przepisana (S320-7 latki 320e, S320-8 linia doby 320e, S320-9 zagrozone nasze <= SCA, S320-10 przy blokadzie bez ForcePeace i WantsPeace, bez blokady cel = SCA, S320-11 INFO); stare linie 320b czyta dalej. Test na syntetycznym logu: dobry 0 NIE, zly 3 NIE (potkniecia, zagrozone > SCA, ForcePeace przy blokadzie + cel != SCA bez blokady), stary 320b 0 NIE.
+**Kontrola (zasada 0):** nasz kod tylko czyta status SCA (CanonWarWatch: GetWarGoal/WantsPeace/ThreatenedFortifications - jego linia pokaze teraz nasze wartosci); jedyna inna latka na SCA (SiegeWalls2 TryRetreatFromBadSiege) innego celu; BookHoldings pisze roszczenia SCA (LostSettlementClaimByFaction) - NextGoal czyta je tak samo jak SCA. `CanonPeaceLock.Blocks` tylko odczyt (pamiec ROT na godzine), bez licznikow blokad i linii 264. Koszt: Threatened - partie lordow raz na krolestwo (ok. 15 x ~600) + twierdze x wrogie partie co 4 h; TickPostfix co godzine wychodzi od razu przy pustej liscie. Bez zapisu (SCA SyncData trzyma cel - zamieniony cel zostaje w zapisie jak kazdy cel SCA).
+**Ryzyko / co sprawdzic:**
+- IsExhausted zostaje: korona z blokada dalej ma cele oblezen x0.55 i obrone x1.7 (prawdziwa przewaga Polnocy) - kara spada z x0.55 x0.35 x0.35 (ok. x0.067) do x0.55. Decyzja Jeffa, czy i to zdjac.
+- Regula "wszystkie wojny z krolestwami zablokowane": korona w wojnie takze z krolestwem bez blokady (np. Dorne) dalej moze chciec pokoju (moze go zawrzec). Wojny z klanami nie licza sie. Gracz wladca strony - Blocks = false, cel jak SCA.
+- Polnoc/Dorzecze tez dostaja blokade (para 264) - ForcePeace u nich tez znika.
+- Zagrozone twierdze: mniej (bez Innych pod Murem/Polnoca) -> mniej IsExhausted takze dla Nocnej Strazy (Inni nie licza sie juz jako zagrozenie twierdz SCA - to tylko stan SCA, nie obrona gry).
+- Zamiana ForcePeace na nastepny cel resetuje zegar 7 dni SCA (SetWarGoal).
+- Log: --grupa sca320b (S320-7 i S320-8 TAK, S320-10 zgodne, "w ticku" ma byc 0 - inaczej UpdateWarGoal wkompilowany i dziala tylko zapas).
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane). Armoury.dll md5 5cfb4e524052747f1a3de19e444d35be.
+
+## 320a - fabula rusza (Harrenhal i hold Dorzecza pominiete) + Krwawe Gody bez pokoju Polnoc-korona (Jeff 02.11) - CrashScribe + Armoury
+
+**Problem:** Jeff 02.11 (po wyjasnieniu, ze kolejka ROT stoi na Harrenhal, a Krwawe Gody zawra pokoj Polnoc-Westerlands): "Polnoc nie zawiera pokoju z korona,
+dalej walczy, ale polowa krolestwa przechodzi na strone Lannisterow, ale Polnoc dalej walczy i tak - popraw, bo gra jest niegrywalna przez to fabularnie".
+Log CrashScribe session-2026-11-02_20-57-49: "FABULA: dzien 345 | zaleglych na osi: 20 | czolo kolejki: HarrenhalSiegeNotificationEvent (na dzien 77) | ostatni start: zaden";
+pominiecia dopiero :1885 dzien 351 (HarrenhalSiegeNotification), :2075 dzien 358 (RiverlandsDeclareWar), dzien 365 (HarrenhalSiege) - i od nowa po kazdym wczytaniu
+(Stuck tylko w pamieci). Armoury-2026-11-02_20-57-50: "Krol Polnocy (272): start sesji | ... stan zrobione | ROT RiverlandsDeclareWarEvent stan 0 | Dorzecze: zniszczone".
+
+**Przyczyna:**
+- ROT HarrenhalSiegeEvent.SiegeLeaderReadyToAttackTarget (rot313 HarrenhalSiegeEvent.cs) wymaga, zeby Harrenhal trzymal ROTClans.Clegane - trzyma Paege (Polnoc po unii 272);
+  Notification i Siege nigdy nie odpala. RiverlandsDeclareWarEvent.MainCheck = Dorzecze zywe - unia 272 je zniszczyla. Bramka Fabuli omija czolo po 6 dniach, ale tylko
+  w pamieci sesji; "zaleglych na osi" liczylo tez przyszle wydarzenia, a "czolo kolejki" nie pomijalo ominietych.
+- ROT RedWeddingQuest.ExecuteRobb (RedWeddingEvent.cs:111-113) wola MakePeaceAction.Apply(TheNorth, Westerlands); potem blokada 264 (CanonPeaceLock.Locked) puszczala
+  pokoj (stan 1 + Robb martwy = "ROT sam zawiera pokoj", stan 2 - ROT przestaje wymuszac FIVE_KINGS_NORTH_WESTERLANDS) - Diplomacy zawarlby pokoj w ciagu doby.
+- Postfiks 272 przenosil Frey/Mooton/Cox/Bracken do korony tylko, gdy rod byl zapisany w unii (_clanSet).
+
+**Zmiana:**
+- CrashScribe `Fabula.cs`: Diag (:241) wola Resolve (:331) raz na dobe. Lancuch Harrenhal: data zapowiedzi minela (18 x 4.33), HarrenhalEvent i HarrenhalSiegeEvent czekaja,
+  zapowiedz nie trwa, a Harrenhal ma pana innego niz Clegane (albo rod Boltonow wyeliminowany) -> ROT `ROTEventBehavior.SkipEvent(Type)` (AccessTools.DeclaredMethod,
+  droga rot.skip_event: TotalEvents++, bez StartEvent, w zapisie ROT) dla HarrenhalEvent NAJPIERW (inaczej HarrenhalEvent.MainCheck = "Siege skonczone" oddalby Harrenhal
+  Roose'owi, HarrenhalEvent.cs:72), potem Siege, potem Notification. RiverlandsDeclareWarEvent: data minela, czeka, krolestwa Dorzecza nie ma -> SkipEvent (po Krwawych Godach
+  SplitAtRedWedding wskrzesza Dorzecze - bez tego wydarzenie odpaliloby tekst holdu). Linie "Fabula (320a): ...", potkniecia liczone (bez wylacznika). Diag: zaleglych = tylko
+  z minela data i bez ominietych, osobno "przyszlych", lista ominietych. Klucz XML `FabulaHarrenhalResolve` (domyslnie true, Config.cs:44, opis EN w CrashScribe.settings.xml).
+- Armoury `KingInTheNorth.cs`: InstallRedWedding (:1018) - DeclaredMethod ExecuteRobb; osobna latka transpiler `RwTranspiler` (:1062) podmienia jedyne call
+  MakePeaceAction.Apply(IFaction, IFaction) na `RwPeace` (:1102); liczy podmiany i sprawdza Harmony.GetPatchInfo; przy 0 podmian zapas (prefiks RwFallbackPrefix + RwFallbackAfter
+  w postfiksie: wojna wznowiona Prologue.RotDeclareWar272, linia "zapas"). RwPeace: klucz `NorthFightsOnAfterRedWedding` i CanonPeaceLock.Blocks(pary) -> bez pokoju, inaczej
+  oryginal (blad odczytu = oryginal). Pokoje rodow przy ChangeKingdomAction (FactionHelper.AdjustFactionStancesForClanJoiningKingdom) nietkniete. Linia
+  "Krwawe Gody bez pokoju (320): ExecuteRobb - pokoj battania-vlandia POMINIETY ... | wojna TAK | Roose zyje TAK/NIE"; gracz: "The North does not bend the knee: the war
+  against the crown goes on." RedWeddingPostfix: bez wymogu _clanSet (kazdy z czterech rodow w Polnocy), klucz `RiverLordsDefectAtRedWedding`.
+- Armoury `CanonPeaceLock.cs`: wiersz Polnoc-korona z faza 2 (`Rule.FightsOn`); po koncu kanonu (takze stan 1 z martwym Robbem) blokada trwa, dopoki ROT BastardsSiegeEvent < 2
+  (ta sama granica co 312c IronThroneNorthAfterBastards; projekt mowil BastardsEvent - zmienione dla spojnosci z 312c). Linia doby "Polnoc-korona: CZYNNA (Polnoc walczy po Krwawych
+  Godach, BastardsSiegeEvent N)", fraza zablokowanej proby, komunikaty gracza (EN) dla fazy 2. Dorzecze-korona bez zmian. Test T4: tabela prawdy 320 (`Truth320Ok`).
+- Armoury `Settings.cs` (+ gen_mcm): `NorthFightsOnAfterRedWedding` = true, `RiverLordsDefectAtRedWedding` = true (MCM "Wars of the books", opisy EN).
+- Armoury `KingInTheNorth.Test320.cs` (nowy): autotest T2 - flaga `CrashScribe\armoury-krwawe-gody320.flag` + DLL autotestu (LogGate.Mode 1/2): 2. doba linia warunkow MainCheck,
+  migawka 10 rodow, ROT TriggerEvent(RedWeddingEvent); w chwili ExecuteRobb partie odchodzacych rodow w bitwie/oblezeniu; po Godach rody przed -> po.
+- `tools/sprawdz_logi.py`: grupa `--grupa fabula320a <session-*.log> [<Armoury-*.log>]` (F320-S..11), test na logu syntetycznym: 11/11 TAK.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Pomijane wydarzenia w zapisie ROT (TotalEvents=1): CanonCompanions :1745 lord_4_25/lord_4_25_1 (Amory Lorch, Polliver) przestaja byc chronieni (done:HarrenhalSiegeEvent) -
+  zamierzone; Kronika 008.2 (okno 120-300) minelo; canon_moves m22 Yoren (ev:HarrenhalSiegeNotificationEvent | rotday:120) - rotday i tak minal; Kronika 002.1/002.2
+  (ev:RiverlandsDeclareWarEvent) - okna dawno minely (sprawdzic, ze nie wyskakuja); Mends HarrenhalOldSaveFix po wczytaniu zobaczy "Siege skonczone" - tylko lista w logu.
+- KingInTheNorth Tick (stan 0) bierze RiverlandsDeclareWar = 2 jako znacznik unii, ale pomijamy je tylko bez krolestwa Dorzecza - Tick wczesniej konczy "nigdy (Dorzecze
+  zniszczone)". Zapis Jeffa: stan 1, bez wplywu.
+- Resolve biegnie tylko przy FabulaPacerEnabled (Diag z bramki). Harrenhal zostaje u obecnego pana (bez HarrenhalEvent.StartEvent).
+- Krwawe Gody: rody przechodzace w srodku bitwy/oblezenia - gra domyka (FinishAllRelatedHostileActions w ChangeKingdomAction) - T2 liczy; ExecuteRobb dwa razy (OnFailed +
+  DailyTickEvent) - RwPeace bez stanu poza linia/komunikatem raz; jesli w dniu bramki Blizniaki nie naleza do Freyow albo Roose/Walder nie zyja - ROT kasuje Gody na zawsze
+  (RedWeddingEvent.cs:217-219), to poza tym krokiem.
+- Gracz wladca Polnocy albo korony: Blocks = false -> pokoj ROT jak dawniej (jego wybor).
+- CanonWarClock.OverNow i CanonWarBalance dalej koncza sie na Godach (Polnoc bez wsparcia moze polec - wtedy BastardsSiegeEvent nie odpali, blokada konczy sie z krolestwem).
+  312c: nowe wojny z Polnoca dalej czekaja na BastardsSiegeEvent 2 - ta sama granica. Kronika 107.1 (Dragonpit, truce:vlandia:battania, dni 2100+) - bezposredni pokoj, poza H1/H2,
+  po Bekartach - zostaje.
+- ROT RedWeddingEvent.cs:104 `KillCharacterAction.ApplyByExecution(RooseBolton, GreatjonUmber)` - sygnatura gry (victim, executer): ROT prawdopodobnie zabija Roose'a; wtedy
+  RooseDeath/Ramsay/Bastards nie odpala i faza 2 trwa bez konca. Linia RwPeace "Roose zyje" to rozstrzygnie w T2 (osobny krok 320d).
+- Os po wczytaniu zapisu Jeffa (dzien opowiesci ~368, os x4.33, tempo 1/4 dni): pierwsza doba - linie "lancuch Harrenhal zamkniety" i "RiverlandsDeclareWarEvent pominiete",
+  "zaleglych 0 | czolo brak"; potem nic do RenlyDeath (520), Blackwater 736/766, Karstark 823, Jeor 866, Krwawe Gody 953, Joffrey 1083, Mur 1126/1156, Eastwatch 1212,
+  Ramsay 1299, Jon 1407, RooseDeath 1455, Bekarci 1515/1546, Aegon 1732, Dany 1948.
+- Decyzje Jeffa: blokada do Bekartow czy bez konca; Darry (ROTclan_49) do korony (domyslnie NIE); przedluzenie CanonWarBalance dla Polnoc-korona po Godach; naprawa Roose'a (320d).
+
+**Testy:** build Armoury i CrashScribe 0 bledow; sprawdz_logi --grupa fabula320a na logu syntetycznym 11/11 TAK. T1 (kopia zapisu Jeffa, -Speed 20, 3 doby) i T2 (flaga
+armoury-krwawe-gody320.flag, >= 18 dob) - NIE WYKONANE.
+**Recenzja (3 potwierdzone) + zwrot zamkow korony (Jeff 02.11, druga runda 320a):**
+- Problem (recenzja): faza 2 blokady 264 Polnoc-korona konczyla sie TYLKO na ROT BastardsSiegeEvent = 2. ROT BastardsSiegeEvent.SiegeLeaderReadyToAttackTarget (rot313 :51)
+  i zapowiedz (:42) wymagaja Winterfell u Boltonow, zywego rodu Snow i wolnego Jona - bez sciezki anulowania. Wojna, ktora 320a utrzymuje, pozwala Polnocy odbic Winterfell
+  (ExecuteRobb :92 daje go Roose'owi tylko, gdy Stark trzyma i bez oblezenia) -> Bekarci nigdy, blokada i bramka 312c (CanonThroneWars bs == 2) bez konca. Faza 2 ruszala
+  tez na kazda smierc Robba (heroDead), takze bez wesela (ROT kasuje Gody, nikt nie przechodzi) -> wieczna blokada bez sensu.
+  Jeff 02.11: "ziemie, ktore stracili Lannisterowie, i zamki sa oddawane pierwotnym wlascicielom u Lannisterow: jesli Bolton ma jakis zamek, ktory nalezal do Lannisterow,
+  to go oddaje; jesli w posiadaniu jest lord Polnocy, ktory nie przeszedl do Lannisterow, to normalnie Lannisterowie musza go odbic".
+- Zmiana:
+  - `Armoury/src/KingInTheNorth.Rw320.cs` (nowy, partial): zapis `arm_k320` (Export320/Import320 :57/:69; SyncData KingInTheNorth.cs:1335-1339) - Krwawe Gody zaszly
+    (dzien, jak), pierwsza doba konca kanonu, Winterfell-nie-u-Boltonow od, wyjscie fazy 2 (zatrzask), zwrot zrobiony. `RwMark` (:96) z RwPeace (KingInTheNorth.cs:1106,
+    PRZED FightsOnNow - faza 2 trzyma juz w chwili ExecuteRobb; migawka rodow Polnocy przed przejsciami ROT), z prefiksu zapasu (:1129) i z postfiksu (:1162, bez migawki).
+    `Rw320Daily` (:137, z Daily :284): odtworzenie dla starych zapisow (RedWeddingEvent >= 1, Robb martwy, Boltonowie w koronie albo z Winterfell); wyjscie, gdy
+    Bekarci niemozliwi - rod Snow wyeliminowany, Jon (lord_5_17) nie zyje, Winterfell (town_B2) nie u Boltonow 120 dob z rzedu - albo limit 167 dni osi ROT x skala
+    (~723 dob; Gody 220 -> oblezenie Bekartow 357 + 30) od Godow (bez wesela - od pierwszej doby konca kanonu). Linia "Krwawe Gody (320a): faza 2 ... - WYJSCIE: <powod>".
+    `ReturnStolen` (:247, z postfiksu po przejsciu Freyow i reszty): twierdze rodow, ktore przeszly (migawka Polnocy w chwili pokoju, teraz w koronie; bez migawki - lista
+    ROT 6 + nasze 4), ktorych pan z poczatku kampanii (ROT-Map ModuleData/settlements.xml owner=) byl rodem korony (dzis w koronie albo ROT-Content spclans.xml
+    super_faction Kingdom.vlandia) -> rod pierwotny (zyje, glowa zyje, w koronie), inaczej rod panujacy korony (domena krola, jak gra przy lennie bez pana).
+    ChangeOwnerOfSettlementAction.ApplyByKingDecision (wioski ida za twierdza). Linia na kazdy zwrot "Krwawe Gody (320a): zwrot <zamek> [id] od <rod> do <rod pierwotny>
+    (...) TAK" i zbiorcza; komunikat gracza EN raz. Twierdze korony u lordow Polnocy, ktorzy zostali - bez zmian (korona musi je odbic). Korona gracza - bez zwrotu.
+  - `Armoury/src/CanonPeaceLock.cs`: Locked z rwHappened i fightsOnEnd (:130-145), FightsOnPhase(fightsOn, bs, rwHappened, end) (:157), State czyta
+    KingInTheNorth.RwHappened/FightsOnEnd na zywo (:205); powod "faza 2 koniec: ..." / "faza 2 nie: Krwawe Gody nie zaszly" w why i w czesci Polnoc-korona linii doby (:506).
+  - `Armoury/src/CanonThroneWars.cs:283-287`: bramka 312c "Polnoc po Bekartach" otwiera sie tez przy tym samym wyjsciu (bs == 2 || FightsOnEnd); dopisek
+    "[wyjscie 320a: ...]" w liniach doby (:796, :858); reset :153.
+  - `Armoury/src/Settings.cs:4882` `RedWeddingReturnsStolenCastles` = true (MCM "Red Wedding Returns Stolen Castles", opis EN) + gen_mcm; opis NorthFightsOnAfterRedWedding
+    mowi o wyjsciu.
+  - `Armoury/src/CanonPeaceLock.Test.cs:195-217` T4: TruthX320 (Robb martwy bez wesela - otwarte, wesele odwolane - otwarte/ROT wymusza, wyjscie - otwarte, RW1 z flaga -
+    zablokowane). `KingInTheNorth.Test320.cs:99`: linia "po Godach" z panem Winterfell i stanem 320a.
+  - `tools/sprawdz_logi.py`: fabula320a F320-12..16 (flaga Godow, zwrot zamkow, zwrot do tego samego rodu, wyjscie, potkniecia), F320-10 dopuszcza KONIEC po wyjsciu;
+    TT312_DAY toleruje "[wyjscie 320a: ...]". Test syntetyczny 16/16 TAK; CRLF zachowane (92193 -> 92227 linii).
+- Ryzyko / co sprawdzic (kontrola calosci):
+  - Stare zapisy po Godach (sprzed 320a): pierwsza doba odtwarza flage -> faza 2 rusza (blokuje tylko pokoj; przy pokoju z ROT nic nie wypowiada). CrownCallToWar 168 pyta
+    Stops() - moze zablokowac ten pokoj, ktory dotad przechodzil. Zwrot zamkow NIE robi sie wstecz (tylko w chwili ExecuteRobb).
+  - Wyjscie fazy 2 zatrzaskuje sie; Winterfell odbity przez Boltonow po 120 dobach go nie cofa (Bekarci moga jeszcze odpalic - wtedy po prostu bez blokady).
+  - Bez wesela (Robb zginal inaczej / wesele odwolane): 312c otwiera Polnoc po 120 dobach (Winterfell u Starkow) - dawniej czekala na Bekartow bez konca (stary zastoj).
+  - Zwrot: ApplyByKingDecision - zaloga zostaje, namiestnik zdjety (gra), BK nie przenosi tytulu (tylko ByBarter/ByGift - BKTitleBehavior), nasze sluchacze
+    (FiefGrants, KingdomBalance, WarLedger, CapitalTreasury, Rumours, CitySack, SmallGold) licza tylko BySiege; VillageHolders czyta Bound.OwnerClan na zywo;
+    ROTOthersCampaignBehavior przenosi blizniaka Red Keep/Castle Black przy KL/Murze (jak zawsze). Twierdza w oblezeniu przez Polnoc - zmiana pana w tym samym obozie.
+  - "Pierwotny" = owner z ROT-Map settlements.xml (228 osad); osady spoza pliku - "bez danych ROT", zostaja. Rod korony wedlug spclans.xml super_faction albo dzisiejszej korony.
+  - Migawka rodow Polnocy tylko w pamieci sesji (ExecuteRobb biegnie w jednej klatce); bez wywolania pokoju ROT (Polnoc nie w wojnie) - lista ROT.
+  - Limit 723 dob przy innej skali osi (FabulaTimeScale) skaluje sie przez Prologue.StoryScale().
+- Testy: build Armoury i CrashScribe 0 bledow (CrashScribe bez zmian zrodla), gen_mcm (Armoury 2791 ustawien), sprawdz_logi --grupa fabula320a na logu syntetycznym
+  16/16 TAK, TT312_DAY na probce z dopiskiem TAK. Gra - NIE (T1/T2 jak wyzej; T2 dodatkowo: linie "zaszly (ExecuteRobb)", "zwrot zamkow korony", pan Winterfell).
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane). Armoury.dll md5 5cb030a14e14d28546e4ddb3b4777e0b, CrashScribe.dll md5 d49bf974d9a8c91319e04e5f7569fc62 (zrodlo CrashScribe bez zmian od bfd121c8).
+
 ## 2026-11-02 WGRANIE 157 - noc/319x-integracja (156 + 319a jency goja sie jak zolnierze gracza, 319b weterani ucza swoich, 319c groty strzal wedlug tieru); Armoury.dll 4123524526cacb7f1062231afbc32d05 (CrashScribe 25eafa5b bez zmian); kopia 156: Armoury.dll.bak-2026-11-02-przed-wgranie157 i D:/Backup-Bannerlord/wgrane/2026-11-02-wgranie157-przed
 
 **Problem:** Jeff 02.11: "tak szybciej tak jak przy moich zolnierzach" (jency); "jak sa jednostki ktore maja juz max tier 6 ... ich XP ktore mialo przepadac rozdziela sie na wojsko ktore szkola" (log 20-57-50: 856-1000 XP/dobe przepada, 33-38%); "6 tier strzal powinien castle-forge miec groty, 5 tier poziom nizej etc., a teraz wszystko ze zwyklego zelaza" (AmmoGrade S2: t1-4 Iron2, t5-6 Iron3); "wgrywaj".
