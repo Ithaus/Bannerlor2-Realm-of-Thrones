@@ -1219,6 +1219,7 @@ namespace Armoury
                 if (mp.Army != null && mp.Army.LeaderParty != mp) return;
                 _askedUid = near.Uid;
                 _dAsk++;
+                VillageEntryDiag.Popup("wioska gracza: " + near.Name);   // 316e
                 var pick = near;
                 InformationManager.ShowInquiry(new InquiryData(near.Name, "You draw rein by " + near.Name + ", your village. Ride in?", true, true, "Ride in", "Ride on",
                     delegate { try { if (!ConversationOn()) { _cur = pick; Open("pytanie przy postoju"); } } catch (Exception e) { Stumble("Ask.Yes", e); } }, null), true);

@@ -91079,5 +91079,86 @@ def main(argv):
     return _zapas316a_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 316e (02.11): wjazd do wsi gry (diagnostyka) i prolog bez falszywych tokenow - grupa wjazd316e
+# Jeff 01.11 ~21:35: "nie da sie wejsc do wiosek glownych, do pobocznych sie da, ale jak klikam w wioske glowna pojawia sie tylko popup i nie moge wejsc".
+# Armoury/src/VillageEntryDiag.cs: linie "Wjazd do wsi gry: ..." (proba / spotkanie / wjazd / menu / wyjazd / STOI U WSI / cel porzucony / popup).
+# Armoury/src/Prologue.Story.cs HasGetterCall: chodzenie po granicach instrukcji IL - bez first-chance "Token 0x... is not valid in the scope of module ROT.dll".
+# Uzycie: python -I tools/sprawdz_logi.py --grupa wjazd316e <Armoury-*.log> [<CrashScribe session-*.log>]
+#  W316-1  linie "Wjazd do wsi gry:" sa (INFO: liczby wedlug rodzaju)
+#  W316-2  zero "STOI U WSI" (partia przy bramie wsi gry bez spotkania i wjazdu - to jest blad Jeffa; pierwsza linia w wyniku)
+#  W316-3  proby (cel ruchu wies gry) zakonczone wjazdem albo spotkaniem; INFO: "cel porzucony bez wjazdu"
+#  W316-4  popup przy celu ruchu = wies gry (nasze okno w drodze do wsi gry) - 0
+#  W316-5  prolog: linia "latki opowiesci ROT" bez "nieznanym kodem IL", wpiete == znalezione; CrashScribe (jesli podany): zero "is not valid in the scope of module"
+#  W316-6  zero bledow VillageEntryDiag
+def wjazd316e_main(logp, csp=None):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("W316-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    lines, prol, errors = [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            if s.startswith("Wjazd do wsi gry: "):
+                lines.append(s)
+            elif s.startswith("Prolog (m101): latki opowiesci ROT"):
+                prol.append(s)
+            elif "VillageEntryDiag" in s:
+                errors.append(s)
+    print(f"plik: {logp}")
+    kinds = {}
+    for s in lines:
+        for k in ("proba (cel ruchu)", "spotkanie (bez wjazdu)", "| wjazd |", "| wyjazd |", "STOI U WSI", "cel porzucony bez wjazdu", "| popup '", "| menu "):
+            if k in s:
+                kinds[k] = kinds.get(k, 0) + 1
+                break
+    rep.add("W316-1: linie 'Wjazd do wsi gry'", f"{len(lines)} | " + ", ".join(f"{k.strip('| ')} {v}" for k, v in kinds.items()), "> 0 (gracz jechal do wsi gry)",
+            (len(lines) > 0) if lines else None)
+    stuck = [s for s in lines if "STOI U WSI" in s]
+    rep.add("W316-2: partia stoi u bramy wsi gry bez wjazdu", f"{len(stuck)}" + (f" (pierwsza: {stuck[0][:260]})" if stuck else ""), "0", len(stuck) == 0)
+    tries = [s for s in lines if "proba (cel ruchu)" in s]
+    ent = [s for s in lines if "| wjazd |" in s or "spotkanie (bez wjazdu)" in s]
+    gone = [s for s in lines if "cel porzucony bez wjazdu" in s]
+    rep.add("W316-3: proby wjazdu -> wjazd albo spotkanie", f"prob {len(tries)}, wjazdow/spotkan {len(ent)}, porzuconych bez wjazdu {len(gone)}"
+            + (f" (pierwsza porzucona: {gone[0][:220]})" if gone else ""), "wjazdy >= proby - porzucone", (len(ent) >= len(tries) - len(gone)) if tries else None)
+    pop = [s for s in lines if "| popup '" in s]
+    popv = [s for s in pop if not s.startswith("Wjazd do wsi gry: - |")]
+    rep.add("W316-4: nasze okno w drodze do wsi gry", f"okien {len(pop)}, z celem ruchu = wies gry {len(popv)}" + (f" (pierwsze: {popv[0][:260]})" if popv else ""), "0",
+            len(popv) == 0 if pop else None)
+    bad = []
+    for p in prol:
+        if "nieznanym kodem IL" in p:
+            bad.append(p)
+        for m in re.finditer(r"wpiete (\d+)/(\d+) metod", p):
+            if m.group(1) != m.group(2):
+                bad.append(p)
+    tok = 0
+    if csp and os.path.isfile(csp):
+        with open(csp, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if "is not valid in the scope of module" in line and ("ROT" in line or "HasGetterCall" in line):
+                    tok += 1
+    rep.add("W316-5: prolog - przeglad IL bez falszywych tokenow", f"linii prologu {len(prol)}, zlych {len(bad)}" + (f" (pierwsza: {bad[0][:220]})" if bad else "")
+            + (f" | CrashScribe 'Token ... not valid': {tok}" if csp else " | CrashScribe nie podany"), "0 i 0", (len(bad) == 0 and tok == 0) if prol else None)
+    rep.add("W316-6: bledy VillageEntryDiag", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
+_wjazd316e_main_prev = main
+
+
+def main(argv):
+    # paczka 316e: grupa wjazd316e - opakowanie main jak zapas316a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "wjazd316e":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return wjazd316e_main(rest[0] if rest else None, rest[1] if len(rest) > 1 else None)
+    return _wjazd316e_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

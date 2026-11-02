@@ -110,7 +110,7 @@ namespace Armoury
         /// <summary>Jeden zestaw: szukanie czytelnikow gettera (filtr bajtow IL + ReadMethodBody) i transpiler. Opis do linii logu.</summary>
         private static string ScanPatch(Assembly asm, Harmony h, HarmonyMethod tr)
         {
-            int found = 0, sites = 0, patched = 0, skipped = 0, failed = 0, age = 0, swapped0 = _storySwapped, rhythm0 = _storyRhythm;
+            int found = 0, sites = 0, patched = 0, skipped = 0, failed = 0, age = 0, swapped0 = _storySwapped, rhythm0 = _storyRhythm, fb0 = _opFallback;
             var getter = AccessTools.PropertyGetter(typeof(CampaignTimeModel), "CampaignStartTime");
             Type[] types;
             try { types = asm.GetTypes(); }
@@ -133,7 +133,7 @@ namespace Armoury
                         try { body = m.GetMethodBody(); } catch { body = null; }
                         if (body == null) continue;
                         var il = body.GetILAsByteArray();
-                        if (il == null || !HasGetterCall(m.Module, il, getter, tokCache)) continue;
+                        if (il == null || !HasGetterCall(m, il, getter, tokCache)) continue;
                         // potwierdzenie i liczba miejsc
                         int n = 0;
                         foreach (var kv in PatchProcessor.ReadMethodBody(m))
@@ -149,30 +149,115 @@ namespace Armoury
             }
             return "wpiete " + patched + "/" + found + " metod (miejsc odczytu " + sites + ", podmienionych " + (_storySwapped - swapped0)
                    + ", rytm na kalendarzu " + (_storyRhythm - rhythm0)
-                   + (skipped > 0 ? ", generycznych pominietych " + skipped : "") + ", wiek kampanii (zaciag) bez latki " + age + (failed > 0 ? ", NIEUDANYCH " + failed : "") + ")";
+                   + (skipped > 0 ? ", generycznych pominietych " + skipped : "") + ", wiek kampanii (zaciag) bez latki " + age + (_opFallback > fb0 ? ", metod z nieznanym kodem IL (przeglad bajtow) " + (_opFallback - fb0) : "") + (failed > 0 ? ", NIEUDANYCH " + failed : "") + ")";
         }
 
-        /// <summary>Czy w bajtach IL jest call/callvirt (0x28/0x6F) z tokenem, ktory rozwiazuje sie na getter CampaignStartTime (lub jego nadpisanie). Wynik tokenu w pamieci.</summary>
-        private static bool HasGetterCall(Module mod, byte[] il, MethodInfo getter, Dictionary<int, bool> cache)
+        /// <summary>Czy w bajtach IL jest call/callvirt (0x28/0x6F) z tokenem, ktory rozwiazuje sie na getter CampaignStartTime (lub jego nadpisanie). Wynik tokenu w pamieci.
+        /// 316e: chodzimy po granicach instrukcji (mapa kodow OpCodes, dlugosc operandu z OperandType) i rozwiazujemy tylko prawdziwe operandy call/callvirt -
+        /// dawniej kazdy bajt 0x28/0x6F w srodku operandu (np. w stalej) szedl do ResolveMethod i dawal first-chance ArgumentOutOfRangeException przy kazdym
+        /// wczytaniu ("Token 0x062c2811 is not valid in the scope of module ROT.dll", CrashScribe). Nieznany kod - stary przeglad bajtow (wynik jak dotad).</summary>
+        private static bool HasGetterCall(MethodBase m, byte[] il, MethodInfo getter, Dictionary<int, bool> cache)
         {
+            EnsureOpMap();
+            // 316e: kontekst generyczny metody (typ i metoda) - bez niego ResolveMethod rzuca dla odwolan wewnatrz typow generycznych (wynik i tak nie getter)
+            var mod = m.Module;
+            Type[] tArgs = null, mArgs = null;
+            try { if (m.DeclaringType != null && m.DeclaringType.IsGenericType) tArgs = m.DeclaringType.GetGenericArguments(); } catch { }
+            try { if (m.IsGenericMethod) mArgs = m.GetGenericArguments(); } catch { }
+            int i = 0;
+            while (i < il.Length)
+            {
+                OpCode oc;
+                int start = i;
+                byte b = il[i++];
+                if (b == 0xFE)
+                {
+                    if (i >= il.Length) return false;
+                    oc = _op2[il[i++]];
+                }
+                else oc = _op1[b];
+                if (oc.Size == 0) return HasGetterCallBytes(mod, il, cache, tArgs, mArgs);   // nieznany kod - przeglad bajtow jak dotad
+                int len = OperandLen(oc.OperandType, il, i);
+                if (len < 0 || i + len > il.Length) return HasGetterCallBytes(mod, il, cache, tArgs, mArgs);
+                if ((b == 0x28 || b == 0x6F) && start == i - 1 && len == 4)
+                {
+                    int tok = il[i] | (il[i + 1] << 8) | (il[i + 2] << 16) | (il[i + 3] << 24);
+                    if (TokHit(mod, tok, cache, tArgs, mArgs)) return true;
+                }
+                i += len;
+            }
+            return false;
+        }
+
+        /// <summary>Stary przeglad (przed 316e): kazdy bajt 0x28/0x6F jako poczatek call/callvirt. Tylko gdy chodzenie po instrukcjach napotka nieznany kod.</summary>
+        private static bool HasGetterCallBytes(Module mod, byte[] il, Dictionary<int, bool> cache, Type[] tArgs, Type[] mArgs)
+        {
+            _opFallback++;
             for (int i = 0; i + 4 < il.Length; i++)
             {
                 byte op = il[i];
                 if (op != 0x28 && op != 0x6F) continue;
                 int tok = il[i + 1] | (il[i + 2] << 8) | (il[i + 3] << 16) | (il[i + 4] << 24);
-                int table = (tok >> 24) & 0xFF;
-                if (table != 0x0A && table != 0x06) continue;   // MemberRef / MethodDef
-                bool hit;
-                int key = tok;   // jeden modul (ROT.dll)
-                if (!cache.TryGetValue(key, out hit))
-                {
-                    hit = false;
-                    try { var r = mod.ResolveMethod(tok); hit = r != null && IsStartGetter(r); } catch { hit = false; }
-                    cache[key] = hit;
-                }
-                if (hit) return true;
+                if (TokHit(mod, tok, cache, tArgs, mArgs)) return true;
             }
             return false;
+        }
+
+        private static bool TokHit(Module mod, int tok, Dictionary<int, bool> cache, Type[] tArgs, Type[] mArgs)
+        {
+            int table = (tok >> 24) & 0xFF;
+            if (table != 0x0A && table != 0x06) return false;   // MemberRef / MethodDef
+            bool hit;
+            // jeden modul na pamiec (ScanPatch - jeden zestaw); token w innym kontekscie generycznym to inna instancja tej samej metody - getter (niegeneryczny) albo nie
+            if (!cache.TryGetValue(tok, out hit))
+            {
+                hit = false;
+                try { var r = mod.ResolveMethod(tok, tArgs, mArgs); hit = r != null && IsStartGetter(r); } catch { hit = false; }
+                cache[tok] = hit;
+            }
+            return hit;
+        }
+
+        // 316e: mapa kodow IL (jednobajtowe i po 0xFE), raz na proces; Size == 0 - brak kodu
+        private static OpCode[] _op1, _op2;
+        private static int _opFallback;
+
+        private static void EnsureOpMap()
+        {
+            if (_op1 != null) return;
+            var a = new OpCode[256];
+            var c = new OpCode[256];
+            foreach (var f in typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static))
+            {
+                if (f.FieldType != typeof(OpCode)) continue;
+                var oc = (OpCode)f.GetValue(null);
+                ushort v = unchecked((ushort)oc.Value);
+                if (oc.Size == 1) a[v & 0xFF] = oc;
+                else if (oc.Size == 2 && (v >> 8) == 0xFE) c[v & 0xFF] = oc;
+            }
+            _op2 = c;
+            _op1 = a;
+        }
+
+        /// <summary>Dlugosc operandu w bajtach (od pozycji at); -1 - nie da sie ustalic.</summary>
+        private static int OperandLen(OperandType t, byte[] il, int at)
+        {
+            switch (t)
+            {
+                case OperandType.InlineNone: return 0;
+                case OperandType.ShortInlineBrTarget:
+                case OperandType.ShortInlineI:
+                case OperandType.ShortInlineVar: return 1;
+                case OperandType.InlineVar: return 2;
+                case OperandType.InlineI8:
+                case OperandType.InlineR: return 8;
+                case OperandType.InlineSwitch:
+                    if (at + 4 > il.Length) return -1;
+                    long n = (uint)(il[at] | (il[at + 1] << 8) | (il[at + 2] << 16) | (il[at + 3] << 24));
+                    long len = 4 + 4 * n;
+                    return len > il.Length ? -1 : (int)len;
+                default: return 4;   // InlineBrTarget, InlineField, InlineI, InlineMethod, InlineSig, InlineString, InlineTok, InlineType, ShortInlineR
+            }
         }
 
         internal static string StoryState { get { return _storyState; } }

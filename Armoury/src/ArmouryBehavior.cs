@@ -1626,6 +1626,8 @@ namespace Armoury
             // sw-zajazdy: dojazd do zajazdu przy szlaku (4 razy na sekunde, jedna partia - klucz RoadsideInns) i ksiega plotek (zdarzenia swiata - klucz InnGossip)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { RoadsideInns.Tick(); });
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SideVillageFief.Tick(); });
+            VillageEntryDiag.Reset();   // 316e: diagnostyka wjazdu do wsi gry (tylko log, Jeff 01.11 "klikam w wioske glowna - tylko popup")
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { VillageEntryDiag.Tick(); });
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { LandSale.Tick(); });   // m113-zakup: umowa z kolejki (bez rozmowy), okno ofert po rozmowie
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SideVillageVisit.Tick(); });   // m97-wioski: wjazd do wioski pobocznej po kliku, oboz po menu, straznik rabunku (4 razy na sekunde, tylko gdy cos czeka)   // n20-wioska: wjazd do wioski gracza po kliku / postoju (4 razy na sekunde, jedno porownanie odleglosci)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("SideVillageFief.Hourly", delegate { try { SideVillageFief.Hourly(); } catch (Exception e) { Log.Error("SideVillageFief.Hourly", e); } }));   // n20-wioska: oczekujace nadanie, furtka autotestu

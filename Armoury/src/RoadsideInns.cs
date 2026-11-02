@@ -485,6 +485,7 @@ namespace Armoury
         private static void Ask(Inn inn)
         {
             _dAsk++;
+            VillageEntryDiag.Popup("zajazd: " + inn.Name);   // 316e
             string body = "You draw rein by " + inn.Name + ", " + KindText(inn) + " on the lands of " + inn.Village.Name + ". " + BedsText(inn) + " Go in?";
             InformationManager.ShowInquiry(new InquiryData(inn.Name, body, true, true, "Go in", "Ride on",
                 delegate
