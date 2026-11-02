@@ -170,7 +170,7 @@ namespace Armoury
         private static PlayerRec _pr, _prLast;
         private static int _msgDay = -1;                   // MUSZTRA-m: doba ostatniej linii musztry gracza w grze (raz na dobe)
         private static readonly int[] _in = new int[4];
-        private static int _noRoom, _pWornW, _pWornA, _pWornGiven, _pNoMetal, _pSoldU, _pSoldGold, _givenYday = -1;
+        private static int _noRoom, _backBag, _pWornW, _pWornA, _pWornGiven, _pNoMetal, _pSoldU, _pSoldGold, _givenYday = -1;
         private static float _pOreAdd;
         private static int _cParties, _cMen, _cRest, _cOff; private static double _cXp, _cL;
         private static int _aParties, _aMen, _aNoLead, _aFullStock, _aNoStock, _aWornW, _aWornA, _aNoMetal, _aSoldU, _aSoldGold, _aSoldLord, _aSoldPurse, _aOff;
@@ -210,7 +210,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            Array.Clear(_in, 0, _in.Length); _noRoom = _pWornW = _pWornA = _pWornGiven = _pNoMetal = _pSoldU = _pSoldGold = 0; _pOreAdd = 0f;
+            Array.Clear(_in, 0, _in.Length); _noRoom = _backBag = _pWornW = _pWornA = _pWornGiven = _pNoMetal = _pSoldU = _pSoldGold = 0; _pOreAdd = 0f;
             _cParties = _cMen = _cRest = _cOff = 0; _cXp = _cL = 0;
             _aParties = _aMen = _aNoLead = _aFullStock = _aNoStock = _aWornW = _aWornA = _aNoMetal = _aSoldU = _aSoldGold = _aSoldLord = _aSoldPurse = _aOff = 0;
             _aOreAdd = 0f; _oreLost = 0f;
@@ -1348,7 +1348,12 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ przyjecie do zapasu (ekrany 1-3)
-        /// <summary>Przyjecie do zapasu gracza: bron i zbroje z listy, najtansze najpierw, do 2 x pelny na grupe; przyjete schodza z listy.</summary>
+        /// <summary>Przyjecie do zapasu gracza: bron i zbroje z listy, najtansze najpierw, do 2 x pelny na grupe; przyjete schodza z listy.
+        /// 316a (Jeff 02.11: "daj ze moge tylko wrzucic tyle ile potrzebuja, a nie ze mam potem komunikat ze jest lost"; log 01.11 01:04:28 przyjeto 35,
+        /// bez miejsca 56 - zniszczone): z ekranu Discard (SrcDiscard, przy zolnierzach) bron i zbroje bez miejsca schodza z listy i wracaja do taboru gracza
+        /// (lewa lista Discard to nowa ItemRoster gry, po DoneLogic przepada; prawa to MobileParty.MainParty.ItemRoster - przeniesienie, nie kopia).
+        /// Lup (SrcLoot) - bez zmian: lewa lista to lup, ktorego gracz nie wzial (setki sztuk po bitwie do taboru = przeciazenie wbrew wyborowi),
+        /// zostaje na polu jak w grze. Trofea Spoils (SrcTrophies) - reszta zostaje na polu (SpoilsSeal, jak dotad). Autotest - reszte zwraca wolajacy.</summary>
         internal static int Accept(ItemRoster from, int src)
         {
             Clk(PScreen);
@@ -1367,28 +1372,32 @@ namespace Armoury
                 int w, a; GivenCounts(out w, out a);
                 var cur = new[] { w, a };
                 cand.Sort((x, y) => x.EquipmentElement.ItemValue.CompareTo(y.EquipmentElement.ItemValue));
-                int taken = 0, noRoom = 0;
+                int taken = 0, noRoom = 0, back = 0;
+                bool toBag = src == SrcDiscard && men > 0 && main.ItemRoster != null && !ReferenceEquals(from, main.ItemRoster);   // 316a: nadmiar z Discard wraca do taboru
                 foreach (var el in cand)
                 {
                     int g = GroupOf(el.EquipmentElement.Item);
                     int t = Math.Min(Math.Max(0, cap - cur[g]), el.Amount);
                     if (t > 0) { from.AddToCounts(el.EquipmentElement, -t); _stock.AddToCounts(el.EquipmentElement, t); cur[g] += t; taken += t; }
-                    noRoom += el.Amount - t;
+                    int r = el.Amount - t;
+                    if (r > 0 && toBag) { from.AddToCounts(el.EquipmentElement, -r); main.ItemRoster.AddToCounts(el.EquipmentElement, r); back += r; }   // przeniesienie: z listy do taboru
+                    else noRoom += r;
                 }
                 if (src >= 0 && src < _in.Length) _in[src] += taken;
                 _noRoom += noRoom;
-                string rest = src == SrcTrophies ? "stay on the field" : (src == SrcAutotest ? "go back to the baggage" : "are lost");
+                _backBag += back;
+                string rest = src == SrcTrophies ? "stay on the field" : (src == SrcAutotest ? "go back to the baggage" : src == SrcLoot ? "stay with the loot you leave behind" : "are lost");
                 // stan laczny (od Ciebie + zapasowa bron ludzi w zbrojowni) wobec pelnego, osobno wolne miejsce na to, co dajesz
                 int surW = 0, surA = 0;
                 if (men > 0)
                     foreach (var kv in PlayerSurplus()) { int g = TypeGroup((int)kv.Key); if (g == GW) surW += kv.Value.Count; else if (g == GA) surA += kv.Value.Count; }
                 int roomW = Math.Max(0, cap - cur[GW]), roomA = Math.Max(0, cap - cur[GA]);
                 if (men > 0)   // m110-sam: bez zolnierzy (sam / sami bohaterowie) bez napisu - zapas nic nie przyjmuje (cap 0), rzeczy jak w grze
-                    Log.Player("Your men took " + taken + " pieces into their drill stock. They now drill with " + (cur[GW] + surW) + " weapons and " + (cur[GA] + surA)
+                    Log.Player("Your men took " + taken + " pieces into their drill stock" + (back > 0 ? "; " + back + " pieces they do not need went back to your baggage" : "") + ". They now drill with " + (cur[GW] + surW) + " weapons and " + (cur[GA] + surA)
                                + " pieces of armour, their spare kit in the armoury included (a full set is " + full + " of each - one per three men). They will take "
                                + roomW + " more weapons and " + roomA + " more pieces of armour from you." + (noRoom > 0 ? " " + noRoom + " pieces " + rest + " - no room." : ""),
                                noRoom > 0 && taken == 0);
-                Log.Info("Musztra: zapas - przyjeto " + taken + " szt. (" + SrcName[Math.Max(0, Math.Min(SrcName.Length - 1, src))] + "), bez miejsca " + noRoom
+                Log.Info("Musztra: zapas - przyjeto " + taken + " szt. (" + SrcName[Math.Max(0, Math.Min(SrcName.Length - 1, src))] + "), bez miejsca " + noRoom + ", wrocone do taborow " + back
                          + "; zapas od gracza: bron " + cur[GW] + ", zbroje " + cur[GA] + "; z nadwyzka ludzi: bron " + (cur[GW] + surW) + ", zbroje " + (cur[GA] + surA)
                          + " (pelny " + full + ", limit od gracza " + cap + " na grupe, wolne " + roomW + "/" + roomA + ").");
                 return taken;
@@ -1888,7 +1897,7 @@ namespace Armoury
             var main = MobileParty.MainParty;
             if (main != null && main.StringId != null && _acc.TryGetValue(main.StringId, out am)) ore = am.Ore;
             sb.Append("; przyjeto ").Append(_in[0] + _in[1] + _in[2] + _in[3]).Append(" (wyrzucone ").Append(_in[SrcDiscard]).Append(", lup ").Append(_in[SrcLoot])
-              .Append(", trofea ").Append(_in[SrcTrophies]).Append(", autotest ").Append(_in[SrcAutotest]).Append("), bez miejsca ").Append(_noRoom)
+              .Append(", trofea ").Append(_in[SrcTrophies]).Append(", autotest ").Append(_in[SrcAutotest]).Append("), bez miejsca ").Append(_noRoom).Append(", wrocone do taborow ").Append(_backBag)
               .Append("; zuzyto ").Append(_pWornW + _pWornA).Append(" (bron ").Append(_pWornW).Append(", zbroje ").Append(_pWornA).Append(", w tym od Ciebie ").Append(_pWornGiven)
               .Append("; bez metalu ").Append(_pNoMetal).Append("), zlom +").Append(F2(_pOreAdd)).Append(" rudy, czeka ").Append(F2(ore)).Append(", sprzedano ").Append(_pSoldU)
               .Append(" ladunkow za ").Append(_pSoldGold).Append(" d; ").Append(bal).Append("; zapas od Ciebie: bron ").Append(w).Append(", zbroje ").Append(a);

@@ -91018,5 +91018,66 @@ def main(argv):
     return _sen315b_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 316a (02.11): zapas musztry bez strat - grupa zapas316a
+# Jeff 02.11: "daj ze moge tylko wrzucic tyle ile potrzebuja, a nie ze mam potem komunikat ze jest lost" (log 01.11 01:04:28: przyjeto 35 (wyrzucone),
+# bez miejsca 56 - sztuki przepadaly). Armoury/src/Drill.cs Accept: nadmiar z Discard wraca do taboru gracza.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa zapas316a <Armoury-*.log>
+#  Z316-1  linie "Musztra: zapas - przyjeto" z Discard (wyrzucone): bez miejsca 0 (wszystko ponad limit wrocilo do taboru)
+#  Z316-2  linie z licznikiem "wrocone do taborow" (nowy DLL); INFO suma wroconych
+#  Z316-3  linia dnia "Musztra (gracz): dzien" ma licznik "wrocone do taborow"
+#  Z316-4  zero linii ERROR z Drill.Accept / Drill.OnDiscarded
+def zapas316a_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("Z316-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    acc, days, errors = [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            if s.startswith("Musztra: zapas - przyjeto"):
+                acc.append(s)
+            elif s.startswith("Musztra (gracz): dzien"):
+                days.append(s)
+            elif "ERROR" in s and ("Accept" in s or "OnDiscarded" in s):
+                errors.append(s)
+    print(f"plik: {logp}")
+    disc = [a for a in acc if "(wyrzucone)" in a]
+    lost, back, newl = [], 0, 0
+    for a in disc:
+        m = re.search(r"bez miejsca (\d+)", a)
+        if m and int(m.group(1)) > 0:   # stary DLL (bez licznika) z bez miejsca > 0 = blad 316a widoczny
+            lost.append(a)
+    for a in acc:
+        m = re.search(r"wrocone do taborow (\d+)", a)
+        if m:
+            newl += 1
+            back += int(m.group(1))
+    rep.add("Z316-1: Discard - bez miejsca 0 (nadmiar wraca do taboru)", f"linii z Discard {len(disc)}, ze stratami {len(lost)}" + (f" (pierwsza: {lost[0][:200]})" if lost else ""),
+            "straty 0", (len(lost) == 0) if disc else None)
+    rep.add("Z316-2: licznik wroconych w liniach przyjecia", f"linii z licznikiem {newl} z {len(acc)}, wrocone razem {back}", "licznik w kazdej linii nowego DLL",
+            (newl == len(acc)) if acc else None)
+    dn = [d for d in days if "wrocone do taborow" in d]
+    rep.add("Z316-3: linia dnia ma licznik wroconych", f"{len(dn)} z {len(days)}" + (f" (ostatnia: {dn[-1][:160]})" if dn else ""), "> 0", (len(dn) > 0) if days else None)
+    rep.add("Z316-4: bledy Drill.Accept / OnDiscarded", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
+_zapas316a_main_prev = main
+
+
+def main(argv):
+    # paczka 316a: grupa zapas316a - opakowanie main jak sen315b
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "zapas316a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return zapas316a_main(rest[0] if rest else None)
+    return _zapas316a_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
