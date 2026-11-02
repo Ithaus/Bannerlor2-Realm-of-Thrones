@@ -10692,7 +10692,7 @@ namespace Armoury
         [SettingPropertyGroup("Banner companies")]
         public float BannerShockCommanderLost { get; set; } = 12f;
 
-        [SettingPropertyFloatingInteger("Banner Break Chance", 0.00f, 1.00f, "0.00", HintText = "with Banner Companies: base chance that a shaken company breaks, divided by the morale resistance of its average tier (tier 1 x0.67, tier 3 x0.4, tier 6 x0.25)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Banner Break Chance", 0.00f, 1.00f, "0.00", HintText = "with Banner Companies: base chance that a shaken company breaks, divided by the morale resistance of its average tier (tier 1 x0.67, tier 3 x0.4, tier 6 x0.25); with Banner Tier Steadiness the tier table is used instead", RequireRestart = false)]
         [SettingPropertyGroup("Banner companies")]
         public float BannerBreakChance { get; set; } = 0.5f;
 
@@ -11072,11 +11072,11 @@ namespace Armoury
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public float CaravanSeaNearDays { get; set; } = 12f;
 
-        [SettingPropertyBool("Banner Break Early", HintText = "With Banner Companies: a company first rolls to break after losing a sixth of its men (half the chance), not a third, and veterans' steadiness counts half as much as before (tier 4 divides the chance by 2, not 3). Men who have already fled, men pushed back in a rout and wounded men walking to the rear no longer count as standing in the ranks. Real companies broke after losing a tenth to a fifth of their men; most of the dead then fell in the flight. Off = from a third on, as before", RequireRestart = false)]
+        [SettingPropertyBool("Banner Break Early", HintText = "With Banner Companies: a company first rolls to break after losing a sixth of its men (half the chance), not a third, and veterans' steadiness counts half as much as before (tier 4 divides the chance by 2, not 3; with Banner Tier Steadiness the tier table is used instead). Men who have already fled, men pushed back in a rout and wounded men walking to the rear no longer count as standing in the ranks. Real companies broke after losing a tenth to a fifth of their men; most of the dead then fell in the flight. Off = from a third on, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
         public bool BannerBreakEarly { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Banner Break Early Chance", 0.00f, 3.20f, "0.00", HintText = "With Banner Break Early: base chance a company breaks when it rolls for its losses (a tier 4 company that has lost half its men breaks about 6 times in 10 by then, if the battle stands even)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Banner Break Early Chance", 0.00f, 3.20f, "0.00", HintText = "With Banner Break Early: base chance a company breaks when it rolls for its losses (without Banner Tier Steadiness and Banner Leader Hold: a tier 4 company that has lost half its men breaks about 6 times in 10 by then, if the battle stands even)", RequireRestart = false)]
         [SettingPropertyGroup("Battle of armies: companies break sooner, cavalry rides down the fled (309)")]
         public float BannerBreakEarlyChance { get; set; } = 0.8f;
 
@@ -11123,6 +11123,22 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Cover Hidden Seconds", 1.00f, 10.00f, "0.0", HintText = "With AI Flank Hidden Shooter: how many seconds the shooter must stay out of their sight before the AI men start to go round his cover", RequireRestart = false)]
         [SettingPropertyGroup("Battle: a lone shooter behind cover is flanked, not waited for (311a)")]
         public float CoverHiddenSeconds { get; set; } = 2.5f;
+
+        [SettingPropertyBool("Banner Tier Steadiness", HintText = "With Banner Companies: how steady a company is depends on its average tier by one table - tier 1 x0.8, tier 2 x0.67, tier 3 x0.55, tier 4 x0.35, tier 5 x0.18, tier 6 x0.06, tier 7 x0.04 of the chance to break - so elite companies almost never run. Off = the chance is divided by the morale resistance of the tier, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: living commanders and veteran troops hold a shaken company (318c)")]
+        public bool BannerTierSteadiness { get; set; } = true;
+
+        [SettingPropertyBool("Banner Leader Hold", HintText = "With Banner Companies: a living lord keeps his men in the ranks. A company led by its own lord breaks half as often (x0.5), one with a lord of its side in the same formation or within 60 m x0.65, one whose side still has a lord fighting elsewhere x0.8; a lord who is down, fleeing or carried wounded to the rear leads no one. A company whose standard has fallen and not been raised again breaks x1.3 more easily. When an army's commander or the last lord of a side falls, every company still standing is shaken and rolls to break once. Both sides alike, your own companies too. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: living commanders and veteran troops hold a shaken company (318c)")]
+        public bool BannerLeaderHold { get; set; } = true;
+
+        [SettingPropertyBool("Banner Ranks Ignore Knockback", HintText = "With Banner Break Early: a man thrown back for a moment by a cavalry charge still counts as standing in his company's ranks, so a company does not roll to break for losses it has not suffered. Men who flee, broken men and wounded men walking to the rear still count as lost. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: living commanders and veteran troops hold a shaken company (318c)")]
+        public bool BannerRanksIgnoreKnockback { get; set; } = true;
+
+        [SettingPropertyBool("Pain Break Tier Steadiness", HintText = "With Pain Break By Chance: a wounded soldier below AI Flee Below Percent breaks from pain by the same tier table as the companies (tier 1 x0.8 ... tier 6 x0.06), so veterans almost never run from their wounds. Lords are not changed. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: living commanders and veteran troops hold a shaken company (318c)")]
+        public bool PainBreakTierSteadiness { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -13904,6 +13920,10 @@ namespace Armoury
             s.AiFlankHiddenShooter = AiFlankHiddenShooter;
             s.CoverHoldSeconds = CoverHoldSeconds;
             s.CoverHiddenSeconds = CoverHiddenSeconds;
+            s.BannerTierSteadiness = BannerTierSteadiness;
+            s.BannerLeaderHold = BannerLeaderHold;
+            s.BannerRanksIgnoreKnockback = BannerRanksIgnoreKnockback;
+            s.PainBreakTierSteadiness = PainBreakTierSteadiness;
         }
 
         internal static void Apply()

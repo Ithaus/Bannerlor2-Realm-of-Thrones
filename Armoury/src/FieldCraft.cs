@@ -1648,7 +1648,8 @@ namespace Armoury
             finally { list.Clear(); }
         }
 
-        /// <summary>313d: rzut paniki z bolu - PainBreakChance x (krwawi ? PainBreakBleedingFactor : 1) x (1.5 - morale/100) x kondycja, obciete 5..95%.</summary>
+        /// <summary>313d: rzut paniki z bolu - PainBreakChance x (krwawi ? PainBreakBleedingFactor : 1) x (1.5 - morale/100) x kondycja, obciete 5..95%.
+        /// 318c (klucz PainBreakTierSteadiness): szeregowy - potem x tabela tieru BannerCompanies.TierHold (ta sama co kompanie; T6 x0.06), bohater bez mnoznika.</summary>
         private static void RollPain(Agent agent, State st, bool bleeding, Settings c)
         {
             st.PainRolled = true;
@@ -1658,12 +1659,27 @@ namespace Armoury
             float p = Bleed313.Clamp(c.PainBreakChance, 0f, 1f) * (bleeding ? Bleed313.Clamp(c.PainBreakBleedingFactor, 1f, 3f) : 1f)
                       * Bleed313.MoraleMul(morale) * Bleed313.Cond(st.Ath, c);
             p = Bleed313.Clamp(p, 0.05f, 0.95f);
+            int tix = -1;
+            if (c.PainBreakTierSteadiness)
+            {
+                if (agent.IsHero) BannerCompanies.PainHeroRolls++;
+                else
+                {
+                    var ch = agent.Character as TaleWorlds.CampaignSystem.CharacterObject;
+                    int t = ch != null ? ch.Tier : 1;
+                    float tf = BannerCompanies.TierHold(t);
+                    p *= tf;
+                    tix = t < 1 ? 1 : t > 7 ? 7 : t;
+                    BannerCompanies.PainTierRolls++; BannerCompanies.PainTierSum += tf; BannerCompanies.PainTierN[tix]++;
+                }
+            }
             Bleed313.PainRolls++;
             Bleed313.PainMoraleSum += morale;
             if (MBRandom.RandomFloat < p)
             {
                 st.PainBroken = true;
                 Bleed313.PainBroke++;
+                if (tix > 0) BannerCompanies.PainTierBroke[tix]++;
                 if (bleeding) Bleed313.PainBrokeBleeding++;
             }
             else Bleed313.PainResist++;
