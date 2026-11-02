@@ -91486,5 +91486,168 @@ def main(argv):
     return _klute317a_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 318c (02.11): dowodztwo i tier trzymaja kompanie - grupa panika318c
+# Jeff 02.11: "panikowanie jednostek za szybkie: jesli dowodca zyje ... panika powinna byc obnizona, dopiero jak sztandary przepadna, dowodcy zgina ... panika
+# moze sie nasilac, ale tez im wyzszy tier tym rzadziej panikuje - elitarne jednostki prawie nigdy, t6". Bitwa 24 (19:33-19:40): 7 zalaman wroga tylko z udzialu
+# strat, T6 1/2, sr. szansa 307b 0.696. Armoury/src/BannerCompanies.Lead.cs (T, L, zdarzenie strony), BannerCompanies.cs Roll / InRanksLive, FieldCraft.RollPain.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa panika318c <Armoury-*.log>
+#  P318-S  self-test wyrazen na wzorach linii
+#  P318-1  segment 'dowodztwo i tier (318c)' linii 'Choragwie (CH) koniec': format, zalaman <= rzutow w kazdym koszyku dowodztwa, sr. T w 0.04..0.9
+#  P318-2  stare segmenty 305c/307b/309 tej samej linii dalej czytelne (B305_CH, B307_CH, B309_CH) i koniec '| potkniecia 0.'
+#  P318-3  linie 'Choragwie (318c): zalamanie': format, p <= 0.9 (INFO: zalamania wedlug tieru, wedlug dowodztwa, sr. strata przy zalamaniu)
+#  P318-4  zalamania kompanii od tieru 5 przy zywym dowodcy strony (INFO, cel: rzadko - Jeff "elitarne prawie nigdy")
+#  P318-5  linie 'Choragwie (318c): upadek dowodztwa strony': zalaman <= rzutow <= kompanii
+#  P318-6  bol wedlug tieru: sr. mnoznik w 0.04..0.9; zlamani T5-T7 / rzutow (INFO)
+P318_SEG = re.compile(r"\| dowodztwo i tier \(318c\): tier (TAK|NIE), dowodztwo (TAK|NIE), odskok RBM w szeregu (TAK|NIE), bol wedlug tieru (TAK|NIE); rzutow (\d+) "
+                      r"\(sr\. T (\S+), sr\. L (\S+)\); zalaman/rzutow wedlug dowodztwa: wlasny bohater (\d+)/(\d+), bohater blisko (\d+)/(\d+), bohater dalej (\d+)/(\d+), "
+                      r"bez bohatera (\d+)/(\d+); sztandar upadly x1\.3 w rzutach (\d+); zdarzenia strony (\d+) \(wodz (\d+), ostatni bohater (\d+); kompanii (\d+), "
+                      r"rzutow (\d+), zalaman (\d+)\); odskok RBM liczony w szeregu przy rzutach (\d+); linie zalaman (\d+) \(ponad limit (\d+)\); bol: rzutow szeregowych "
+                      r"(\d+) \(sr\. mnoznik tieru (\S+)\), bohaterow bez mnoznika (\d+), zlamani/rzutow wedlug tieru (T1:\d+/\d+(?:, T\d:\d+/\d+)*)")
+P318_BRK = re.compile(r"Choragwie \(318c\): zalamanie \| (.+?) \(szyk (\d+), kompania (\d+)\) \| strona (druzyna gracza|sojusznik gracza|wrog) \| (-?\d+) s po rozstawieniu "
+                      r"\| zrodlo ([^|]+?) \| strata (\S+) \| tier (\S+) \(T x(\S+)\) \| dowodztwo ([^|]+?) \(L x(\S+)\) \| sztandar upadl (TAK|NIE) "
+                      r"\| stan bitwy x(\S+) \| p (\S+)\.$")
+P318_EVT = re.compile(r"Choragwie \(318c\): upadek dowodztwa strony \| strona (obroncy|atakujacy) \((gracza|wroga)\) \| (.+?) \| (-?\d+) s po rozstawieniu "
+                      r"\| kompanii (\d+), rzutow (\d+), zalaman (\d+)\.$")
+P318_SAMPLE_END = ("[19:40:50] Choragwie (CH) koniec: kompanii 10 | sztandar padl 2 (...) | straty bez bramki morale (305c) TAK: trzecia czesc strat 3, rzutow strat 14 "
+                   "(morale od 50: 13, sr. morale 80.3, sr. szansa 0.400), zalaman ze strat 7 (ludzi 84) | straty wedlug udzialu (307b) TAK: rzutow 9 (przy 2/6 3, 3/6 3, "
+                   "4/6 2, 5/6 1; sr. utracona czesc 0.52, sr. szansa 0.696), zalaman wedlug udzialu 7 | stan bitwy w rzucie (307e) TAK: rzutow 14, mnoznik sr. 1.50 "
+                   "(najmniej 1.50, najwiecej 1.50) | zalamania wedlug rzutu: sztandar 0, dowodca 0, udzial strat 7, straty 305c / polowa 0, inne 0 | wczesne zalamanie "
+                   "(309) TAK: rzutow przy 1/6 5 (sr. szansa 0.167, zalaman 0), rozbite bez rzutu 0, poza szeregiem przy rzutach: panika 19, ranni w odwrocie 4, rzutow "
+                   "udzialu bez rzutu (klucz NIE) 0 | rzuty zdarzen wedlug strat (309) TAK: rzutow 2 (sr. udzial strat 0.40, sr. szansa 0.300), zalaman 0 | zalamania "
+                   "wedlug udzialu strat lacznie (309): 7 z 10 kompanii, sr. utracona czesc przy zalamaniu 0.52 | czekanie na rzut 1/6 (wszyscy chwilowo poza szeregiem, "
+                   "poprawka 309): taktow 0 | dowodztwo i tier (318c): tier TAK, dowodztwo TAK, odskok RBM w szeregu TAK, bol wedlug tieru TAK; rzutow 16 (sr. T 0.412, "
+                   "sr. L 0.81); zalaman/rzutow wedlug dowodztwa: wlasny bohater 0/2, bohater blisko 1/4, bohater dalej 2/6, bez bohatera 2/4; sztandar upadly x1.3 w "
+                   "rzutach 1; zdarzenia strony 1 (wodz 1, ostatni bohater 0; kompanii 5, rzutow 5, zalaman 1); odskok RBM liczony w szeregu przy rzutach 6; linie zalaman 5 "
+                   "(ponad limit 0); bol: rzutow szeregowych 29 (sr. mnoznik tieru 0.512), bohaterow bez mnoznika 1, zlamani/rzutow wedlug tieru T1:2/3, T2:4/6, T3:3/8, "
+                   "T4:1/6, T5:0/4, T6:0/2, T7:0/0 | potkniecia 0.")
+P318_SAMPLE_BRK = ("[19:37:10] Choragwie (318c): zalamanie | Allied Infantry (1) - company 2 (szyk 1, kompania 2) | strona wrog | 241 s po rozstawieniu | zrodlo udzial "
+                   "strat | strata 0.50 | tier 2.61 (T x0.628) | dowodztwo bohater strony dalej (L x0.80) | sztandar upadl NIE | stan bitwy x1.50 | p 0.603.")
+P318_SAMPLE_EVT = ("[19:38:04] Choragwie (318c): upadek dowodztwa strony | strona obroncy (wroga) | wodz Hudson Serrett nieprzytomny | 264 s po rozstawieniu "
+                   "| kompanii 5, rzutow 5, zalaman 1.")
+
+
+def p318_rows(rep, ends, brks, evts):
+    segs, bad1, bad2 = [], [], []
+    for l in ends:
+        m = P318_SEG.search(l)
+        if not m:
+            if "(318c)" in l:
+                bad1.append("format: " + l[-260:])
+            continue
+        segs.append(m)
+        g = m.groups()
+        pairs = [(int(g[7]), int(g[8])), (int(g[9]), int(g[10])), (int(g[11]), int(g[12])), (int(g[13]), int(g[14]))]
+        tavg = float(g[5]) if g[5] != "-" else None
+        if any(b > r for b, r in pairs) or (tavg is not None and not (0.039 <= tavg <= 0.901)) or int(g[21]) > int(g[20]) or int(g[20]) > int(g[19]):
+            bad1.append(l[-260:])
+        if not (B305_CH.search(l) and B307_CH.search(l) and B309_CH.search(l)) or not re.search(r"\| potkniecia 0\.$", l):
+            bad2.append(l[:200])
+    rep.add("P318-1: segment 'dowodztwo i tier (318c)' - format, zalaman <= rzutow wedlug dowodztwa, sr. T 0.04-0.9",
+            f"linii {len(segs)}, zlych {len(bad1)}" + (f" ({bad1[0]})" if bad1 else ""), "zlych 0 (brak linii - INFO)",
+            None if not segs and not bad1 else not bad1)
+    rep.add("P318-2: stare segmenty 305c/307b/309 czytelne, '| potkniecia 0.' na koncu", f"linii {len(segs)}, zlych {len(bad2)}" + (f" ({bad2[0]})" if bad2 else ""),
+            "zlych 0", None if not segs else not bad2)
+    if segs:
+        tot = [0] * 8
+        for m in segs:
+            g = m.groups()
+            for i in range(8):
+                tot[i] += int(g[7 + i])
+        rep.add("P318-1b: zalaman/rzutow wedlug dowodztwa (suma)", f"wlasny bohater {tot[0]}/{tot[1]}, blisko {tot[2]}/{tot[3]}, dalej {tot[4]}/{tot[5]}, "
+                f"bez bohatera {tot[6]}/{tot[7]}", "INFO (cel: wlasny/blisko rzadziej niz bez bohatera)", None)
+    pb, bt, bl, sh, hi = [], {}, {}, [], []
+    for l in brks:
+        m = P318_BRK.search(l)
+        if not m:
+            pb.append("format: " + l[:200]); continue
+        p = float(m.group(14))
+        if p > 0.9001 or p < 0:
+            pb.append(l[:200])
+        tier = float(m.group(8))
+        k = "T%d" % max(1, min(7, int(round(tier))))
+        bt[k] = bt.get(k, 0) + 1
+        lead = m.group(10)
+        bl[lead] = bl.get(lead, 0) + 1
+        if m.group(7) != "-":
+            sh.append(float(m.group(7)))
+        if tier >= 4.5 and lead != "brak bohatera strony":
+            hi.append(f"{m.group(1)} T{tier:.2f} {lead} p {p:.3f}")
+    rep.add("P318-3: linie 'Choragwie (318c): zalamanie' - format, p <= 0.9", f"linii {len(brks)}, zlych {len(pb)}" + (f" ({pb[0]})" if pb else "")
+            + " | wedlug tieru " + (", ".join(f"{k} {v}" for k, v in sorted(bt.items())) or "-") + " | wedlug dowodztwa "
+            + (", ".join(f"{k} {v}" for k, v in sorted(bl.items())) or "-") + " | sr. strata przy zalamaniu " + (f"{sum(sh) / len(sh):.2f}" if sh else "-"),
+            "zlych 0 (brak zalaman - INFO)", None if not brks else not pb)
+    rep.add("P318-4: zalamania od tieru 5 (sredni >= 4.5) przy zywym bohaterze strony", f"{len(hi)}" + (f" (pierwsze: {hi[0]})" if hi else ""),
+            "INFO (cel: rzadko - elitarne prawie nigdy)", None)
+    pe, ev = [], 0
+    for l in evts:
+        m = P318_EVT.search(l)
+        if not m:
+            pe.append("format: " + l[:200]); continue
+        ev += 1
+        c, r, b = int(m.group(5)), int(m.group(6)), int(m.group(7))
+        if b > r or r > c:
+            pe.append(l[:200])
+    rep.add("P318-5: 'upadek dowodztwa strony' - zalaman <= rzutow <= kompanii", f"linii {len(evts)}, zlych {len(pe)}" + (f" ({pe[0]})" if pe else ""),
+            "zlych 0 (brak zdarzen - INFO)", None if not evts else not pe)
+    if segs:
+        pr, ps, br5, n5 = 0, 0.0, 0, 0
+        bad6 = []
+        for m in segs:
+            g = m.groups()
+            n = int(g[25])
+            pr += n
+            if g[26] != "-":
+                v = float(g[26])
+                ps += v * n
+                if not (0.039 <= v <= 0.901):
+                    bad6.append(g[26])
+            for tm in re.finditer(r"T(\d):(\d+)/(\d+)", g[28]):
+                if int(tm.group(1)) >= 5:
+                    br5 += int(tm.group(2)); n5 += int(tm.group(3))
+        rep.add("P318-6: bol wedlug tieru - sr. mnoznik 0.04-0.9 (zlamani T5-T7 / rzutow INFO)",
+                f"rzutow szeregowych {pr}, sr. mnoznik {(ps / pr):.3f}" if pr else "rzutow szeregowych 0", "zlych 0", (not bad6) if pr else None)
+        rep.add("P318-6b: bol T5-T7 zlamani/rzutow", f"{br5}/{n5}", "INFO (cel: rzadko)", None)
+
+
+def panika318c_main(logp):
+    rep = Report()
+    # P318-S: self-test wyrazen na wzorach
+    st_ok = bool(P318_SEG.search(P318_SAMPLE_END) and B305_CH.search(P318_SAMPLE_END) and B307_CH.search(P318_SAMPLE_END)
+                 and B309_CH.search(P318_SAMPLE_END) and P318_BRK.search(P318_SAMPLE_BRK) and P318_EVT.search(P318_SAMPLE_EVT))
+    rep.add("P318-S: self-test wyrazen (318c i stare 305c/307b/309 na wzorze linii)", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
+    if not logp or not os.path.isfile(logp):
+        rep.add("P318-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    ends, brks, evts = [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if "Choragwie (CH) koniec:" in s and "(318c)" in s:
+                ends.append(s)
+            elif "Choragwie (318c): zalamanie |" in s:
+                brks.append(s)
+            elif "Choragwie (318c): upadek dowodztwa strony |" in s:
+                evts.append(s)
+    print(f"plik: {logp}")
+    p318_rows(rep, ends, brks, evts)
+    rep.show()
+    return 0
+
+
+_panika318c_main_prev = main
+
+
+def main(argv):
+    # paczka 318c: grupa panika318c - opakowanie main jak klute317a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "panika318c":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return panika318c_main(rest[0] if rest else None)
+    return _panika318c_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

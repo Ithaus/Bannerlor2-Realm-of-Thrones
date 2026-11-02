@@ -111,7 +111,7 @@ namespace Armoury
         // zalamania wedlug zrodla rzutu (0 inne, 1 sztandar, 2 dowodca, 3 udzial strat 307b, 4 straty 305c / polowa skladu)
         internal static int StateRolls; internal static float StateSum, StateMin = 9f, StateMax;
         // 309: indeks 5 = rzut przy 1/6 strat (klucz BannerBreakEarly) - poza licznikami 307b (B307-2: rzutow = suma 2/6..5/6)
-        internal static readonly int[] BreakBySrc = new int[6];
+        internal static readonly int[] BreakBySrc = new int[7];   // 318c: indeks 6 = zdarzenie strony (wodz / ostatni bohater)
         // 309 (klucz BannerBreakEarly): rzuty przy 1/6 strat (liczba, zalamania, suma p), kompanie bez nikogo zdolnego do rzutu (rozbite bez rzutu),
         // pominiete w szeregu (panika wedlug SurvivalMode.InPanic poza IsPanicked, ranni w odwrocie 143) - suma na przegladach InRanks z rzutem;
         // rzuty udzialu strat bez rzutu (n == 0) przy kluczu NIE (dawny brak spojnosci B307-2)
@@ -137,6 +137,7 @@ namespace Armoury
             StateRolls = 0; StateSum = 0f; StateMin = 9f; StateMax = 0f; Array.Clear(BreakBySrc, 0, BreakBySrc.Length);
             EarlyRolls = EarlyBreaks = EmptyBroken = RanksPanicSkip = RanksWithdrawSkip = ShareNoRoll = EmptyWait = BreakShareN = 0; EarlyPSum = BreakShareSum = 0f;
             EventRolls = EventBreaks = 0; EventShareSum = EventPSum = 0f;
+            Reset318();
         }
 
         internal static int Activity { get { return Companies + StdField + StdFell + CmdFell + Breaks + Stumbles; } }
@@ -265,6 +266,7 @@ namespace Armoury
         private void Clear()
         {
             _forms.Clear(); _all.Clear(); _mem.Clear(); _bearerOf.Clear(); _skip.Clear(); _buf.Clear(); _unpause.Clear(); _lazy.Clear(); _capCult.Clear();
+            LeadClear();  // 318c
             RunClear();   // 158
         }
 
@@ -304,6 +306,8 @@ namespace Armoury
                     }
                 }
             }
+            try { HeroScan(m); }   // 318c: spis bohaterow dla dowodztwa L
+            catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.HeroScan", e); }
             try { WriteStart(m, c); }
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.WriteStart", e); }
         }
@@ -632,6 +636,8 @@ namespace Armoury
             _bs.Clear(); _bsAt = now;   // poprawka recenzji 309: stan bitwy liczony raz na takt (na druzyne)
             var c = Settings.Current;
             if (c == null || !c.BannerCompaniesEnabled) return;
+            try { TickLead(now, c, m); }   // 318c: wodzowie druzyn, zdarzenie "ostatni bohater strony zszedl" (przed rzutami taktu)
+            catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.TickLead", e); }
             for (int i = 0; i < _all.Count; i++)
             {
                 var co = _all[i];
@@ -646,6 +652,8 @@ namespace Armoury
                 _accReview = 0f;
                 try { Review(m); }
                 catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.Review", e); }
+                try { HeroScan(m); }   // 318c: bohaterowie z posilkow
+                catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.HeroScan", e); }
             }
         }
 
@@ -790,11 +798,29 @@ namespace Armoury
         {
             int n = 0;
             var k = RoutHold.Live;
+            var c = Settings.Current;
+            bool rebound = c != null && c.BannerRanksIgnoreKnockback;
             for (int i = 0; i < co.Men.Count; i++)
             {
                 var a = co.Men[i];
                 if (a == null || !a.IsActive()) continue;
-                if (SurvivalMode.InPanic(a)) { if (count) BannerCompanies.RanksPanicSkip++; continue; }
+                if (SurvivalMode.InPanic(a))
+                {
+                    // 318c (klucz BannerRanksIgnoreKnockback): chwilowy odwrot komponentu (szarza RBM - bez IsPanicked, bez ucieczki, poza zbiorem RoutHold) to nie
+                    // strata - ta sama definicja co AnyAbleLater; bitwa 24: 26 ludzi przez 261 s podbijalo udzial strat
+                    bool fled = true;
+                    if (rebound)
+                    {
+                        try
+                        {
+                            var cai = a.CommonAIComponent;
+                            fled = a.IsRunningAway || (cai != null && cai.IsPanicked) || (k != null && k.Knows(a));
+                        }
+                        catch { fled = true; }
+                    }
+                    if (fled) { if (count) BannerCompanies.RanksPanicSkip++; continue; }
+                    if (count) BannerCompanies.ReboundKept++;
+                }
                 bool wd = false;
                 try { wd = k != null && k.Withdrawing(a); } catch { wd = false; }
                 if (wd) { if (count) BannerCompanies.RanksWithdrawSkip++; continue; }
@@ -906,15 +932,20 @@ namespace Armoury
             if (affectedAgent == null || _mem.Count == 0) return;
             try
             {
-                Company co;
-                if (!affectedAgent.IsHuman || !_mem.TryGetValue(affectedAgent, out co)) return;
+                if (!affectedAgent.IsHuman) return;
                 var m = Mission;
                 var c = Settings.Current;
                 if (m == null || c == null || !c.BannerCompaniesEnabled || m.MissionEnded) return;
                 float now = m.CurrentTime;
-                if (co.StandardUp && ReferenceEquals(co.Bearer, affectedAgent)) StandardLost(co, affectedAgent.Position, false, now, c);
-                if (ReferenceEquals(co.Commander, affectedAgent) && !co.CmdDown && (agentState == AgentState.Killed || agentState == AgentState.Unconscious))
-                    CommanderLost(co, affectedAgent.Position, now, c);
+                Company co;
+                if (_mem.TryGetValue(affectedAgent, out co))
+                {
+                    if (co.StandardUp && ReferenceEquals(co.Bearer, affectedAgent)) StandardLost(co, affectedAgent.Position, false, now, c);
+                    if (ReferenceEquals(co.Commander, affectedAgent) && !co.CmdDown && (agentState == AgentState.Killed || agentState == AgentState.Unconscious))
+                        CommanderLost(co, affectedAgent.Position, now, c);
+                }
+                // 318c: bohater zszedl (takze spoza kompanii - lord w szyku wodza RBM); wodz druzyny - zdarzenie strony po rzucie jego wlasnej kompanii
+                if (affectedAgent.IsHero) HeroRemoved(affectedAgent, agentState, now, c);
             }
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.OnAgentRemoved", e); }
         }
@@ -1007,13 +1038,15 @@ namespace Armoury
         /// 309: zwraca true, gdy rzut sie odbyl (takze bez zalamania); false = kompania zlamana, nikt zdolny do rzutu albo rzut pominiety bramka morale.
         /// Klucz BannerBreakEarly: rzut udzialu strat (src 3 i 5) z szansa BannerBreakEarlyChance i odpornoscia R = 0.25 x tier + 1, liczeni ludzie bez PANIKI
         /// (SurvivalMode.InPanic) i bez rannych w odwrocie 143 - ta sama definicja co InRanksLive. Klucz BannerEventRollByLoss: rzut zdarzenia (src 1 sztandar,
-        /// 2 dowodca) bez bramki morale gry, M = clamp(2 x udzial juz poniesionych strat, 0.4, 1.6), R = 0.25 x tier + 1; stan bitwy B (307e) bez zmian.</summary>
+        /// 2 dowodca) bez bramki morale gry, M = clamp(2 x udzial juz poniesionych strat, 0.4, 1.6), R = 0.25 x tier + 1; stan bitwy B (307e) bez zmian.
+        /// 318c: klucz BannerTierSteadiness - tabela tieru T zamiast R (jedyny mnoznik tieru), klucz BannerLeaderHold - dowodztwo L (BannerCompanies.Lead.cs);
+        /// zrodlo 6 = zdarzenie strony (wodz / ostatni bohater) - jak zdarzenie dowodcy. Linia 'Choragwie (318c): zalamanie' przy kazdym zalamaniu.</summary>
         private bool Roll(Company co, float factor, Settings c, float now, bool loss = false, float share = -1f, int src = 0)
         {
             if (co.Broken) return false;
             bool shareRoll = share >= 0f && (src == 3 || src == 5);
             bool early = c.BannerBreakEarly && shareRoll;
-            bool evt = c.BannerEventRollByLoss && (src == 1 || src == 2);
+            bool evt = c.BannerEventRollByLoss && (src == 1 || src == 2 || src == 6);   // 318c: zdarzenie strony (6) jak zdarzenie dowodcy
             bool live = early || evt;
             var rk = live ? RoutHold.Live : null;
             float sum = 0f, tsum = 0f;
@@ -1049,17 +1082,37 @@ namespace Armoury
                 if (!loss) { BannerCompanies.RollsSkipped++; return false; }
                 BannerCompanies.LossOverGate++;
             }
-            float r = (early || evt) ? 0.25f * tier + 1f : 0.5f * tier + 1f;
-            if (r < 1f) r = 1f;
+            // 318c (klucz BannerTierSteadiness): jedna tabela tieru T zamiast odpornosci R - jedyny mnoznik tieru w rzucie (klucz NIE: R jak dotad)
+            float tf;
+            if (c.BannerTierSteadiness) tf = BannerCompanies.TierHold(tier);
+            else
+            {
+                float r = (early || evt) ? 0.25f * tier + 1f : 0.5f * tier + 1f;
+                if (r < 1f) r = 1f;
+                tf = 1f / r;
+            }
             float mm = share >= 0f ? 2f * share : 2f - avg / 25f;   // 307b: przy rzucie wedlug udzialu strat M z udzialu, nie z morale gry
             if (mm < 0.4f) mm = 0.4f;
             if (mm > 1.6f) mm = 1.6f;
-            float p = (early ? c.BannerBreakEarlyChance : c.BannerBreakChance) * factor * mm / r;
+            float p = (early ? c.BannerBreakEarlyChance : c.BannerBreakChance) * factor * mm * tf;
+            // 318c (klucz BannerLeaderHold): dowodztwo L - zywy, czynny bohater strony trzyma kompanie; x1.3 tylko przy faktycznym upadku sztandaru (nie brak
+            // chorazego, nie chorazy przeniesiony z szykiem), poza samym rzutem upadku (src 1 - upadek liczony raz)
+            float lf = 1f;
+            int bucket = -1;
+            bool fell = co.LastFall && !co.StandardUp;
+            if (c.BannerLeaderHold)
+            {
+                lf = Leadership(co, out bucket);
+                if (fell && src != 1) { lf *= BannerCompanies.LeadFallMul; BannerCompanies.FallMulRolls++; }
+                p *= lf;
+            }
+            float bmul = 1f;
             // 307e (143a bitwa 4: kompania T5 Swordmasterow zalamala sie przy 32 zywych gracza na 7 wroga - rzut z upadku sierzanta): zywy czlowiek widzi, jak
             // idzie bitwa - p x B, B = clamp(sila walczacych wroga / sila walczacych naszych, 0.3, 1.5); jedna regula dla obu stron (klucz BannerBreakBattleState)
             if (c.BannerBreakBattleState)
             {
                 float b = BattleState(co);
+                bmul = b;
                 p *= b;
                 BannerCompanies.StateRolls++; BannerCompanies.StateSum += b;
                 if (b < BannerCompanies.StateMin) BannerCompanies.StateMin = b;
@@ -1069,6 +1122,8 @@ namespace Armoury
             if (p > BannerCompanies.PMax) p = BannerCompanies.PMax;
             BannerCompanies.Rolls++;
             BannerCompanies.TierRolls[ix]++;
+            BannerCompanies.TLRolls++; BannerCompanies.TSum += tf; BannerCompanies.LSum += lf;
+            if (bucket >= 0) BannerCompanies.LeadRolls[bucket]++;
             if (loss)
             {
                 BannerCompanies.LossRolls++;
@@ -1093,6 +1148,10 @@ namespace Armoury
                 if (evt) BannerCompanies.EventBreaks++;
                 if (loss) { co.LossBreak = true; BannerCompanies.LossBreaks++; }
                 BannerCompanies.BreakBySrc[src >= 0 && src < BannerCompanies.BreakBySrc.Length ? src : 0]++;
+                if (bucket >= 0) BannerCompanies.LeadBreaks[bucket]++;
+                float lostNow = share;
+                if (lostNow < 0f && co.Peak > 0) { lostNow = 1f - (float)InRanksLive(co, false) / co.Peak; if (lostNow < 0f) lostNow = 0f; }
+                BreakLine(co, now, src, lostNow, tier, p, tf, bucket, lf, fell, bmul);   // 318c: linia przed Break (stan kompanii sprzed fal)
                 Break(co, ix, c, now);
             }
             return true;
@@ -1365,6 +1424,7 @@ namespace Armoury
               .Append(" z ").Append(BannerCompanies.Companies).Append(" kompanii, sr. utracona czesc przy zalamaniu ")
               .Append(BannerCompanies.BreakShareN > 0 ? (BannerCompanies.BreakShareSum / BannerCompanies.BreakShareN).ToString("0.00", inv305) : "-");
             sb.Append(" | czekanie na rzut 1/6 (wszyscy chwilowo poza szeregiem, poprawka 309): taktow ").Append(BannerCompanies.EmptyWait);
+            BannerCompanies.Append318(sb, c305);   // 318c: przed potknieciami (CH-4 / B309 czytaja koniec linii)
             sb.Append(" | potkniecia ").Append(BannerCompanies.Stumbles).Append('.');
             Log.Info(sb.ToString());
         }
