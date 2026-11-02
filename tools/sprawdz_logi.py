@@ -90536,7 +90536,10 @@ Z314_DF = ("day", "on", "pct", "free", "wark", "svc", "fr", "paidc", "paidn", "m
            "keep", "short", "shortk", "cut", "c277", "pld", "plfree", "plw", "plg", "st")   # recenzja 314c: keep (wplywy zostawione dla W5), c277 - pola opcjonalne (brak = 0)
 Z314_GIFT = re.compile(r"^Nagroda krola \(314c\): dzien (\d+) \| (.+?) pokonal (.+?) \| pobitych partii lordow (\d+)( \(armia\))?, ich ludzi na starcie (\d+)"
                        r" \| udzial krolestwa w wkladzie (\d+)% \| dar (\d+) zl \(w kolejce do skarbca (\d+), czesc krola i najemnikow (\d+)\), wplywy ([\d.]+) dla (\d+) rodow"
-                       r"(?:; gracz: dar (\d+), wplywy ([\d.]+))?\.")
+                       r"(?:; gracz: dar (\d+), wplywy ([\d.]+))?(?:; partii juz nagrodzonych dzis (\d+))?\.")
+# 316c: partia lorda nagradzana raz na dobe - pole "partii juz nagrodzonych dzis N" (opcjonalne, linie sprzed 316c bez niego) i linia pominieta
+Z314_SKIP = re.compile(r"^Nagroda krola \(314c\) pominieta: dzien (\d+) \| (.+?) pokonal (.+?) \| partii juz nagrodzonych dzis (\d+) \(316c: partia lorda raz na dobe\), nowych 0\.")
+Z314_SSAMPLE = "Nagroda krola (314c) pominieta: dzien 109030 | Baratheon pokonal Flint | partii juz nagrodzonych dzis 20 (316c: partia lorda raz na dobe), nowych 0."
 Z314_SAMPLE = ("Zold krolewski (314c): dzien 109000 | zold tak (50% zoldu szeregowych, 40 dni w roku bez zaplaty) | krolestw w wojnie 18 | rody w armiach 12 (bez zaplaty 5,"
                " platnych 7, wyplacono 7), szeregowych platnych 900 | nalezne 4000, wyplacone 3500 | dary za zwyciestwo: wyplacone 1500, w kolejce 2000 (pozycji 3), przepadlo 0"
                " | ze skarbca razem 5000 (z wplywow dnia 3000, ponad zapas wojny 2000; wplywy dnia zostawione dla W5 700), niedoplata zoldu 500 w 1 krolestwach | ciecie zwrotu 70% (zold 314c z wczoraj) 1200, zold 314c mniej o gotowke pana 277 40"
@@ -90562,7 +90565,8 @@ def z314_gift(t):
         return None
     return {"day": int(m.group(1)), "k": m.group(2), "foe": m.group(3), "lords": int(m.group(4)), "army": bool(m.group(5)), "men": int(m.group(6)),
             "share": int(m.group(7)), "gold": int(m.group(8)), "queued": int(m.group(9)), "kept": int(m.group(10)), "infl": float(m.group(11)),
-            "clans": int(m.group(12)), "plg": int(m.group(13)) if m.group(13) else None}
+            "clans": int(m.group(12)), "plg": int(m.group(13)) if m.group(13) else None,
+            "dup": int(m.group(15)) if m.group(15) is not None else None}
 
 
 def z314_bad_day(d):
@@ -90604,6 +90608,17 @@ def zold314c_selftest():
     g2 = z314_gift(Z314_GSAMPLE.replace("; gracz: dar 2000, wplywy 10", "").replace(" (armia)", ""))
     if not g2 or g2["plg"] is not None or not z314_bad_gift(g2):
         return "probka nagrody bez gracza / armia przy 2 lordach bez znacznika - nie wykryto"
+    if g["dup"] is not None:
+        return "probka nagrody sprzed 316c ma pole dup"
+    g3 = z314_gift(Z314_GSAMPLE.replace("wplywy 10.", "wplywy 10; partii juz nagrodzonych dzis 3."))
+    if not g3 or g3["dup"] != 3 or g3["plg"] != 2000 or z314_bad_gift(g3):
+        return f"probka nagrody 316c: {g3}"
+    g4 = z314_gift(Z314_GSAMPLE.replace("; gracz: dar 2000, wplywy 10", "; partii juz nagrodzonych dzis 0"))
+    if not g4 or g4["dup"] != 0 or g4["plg"] is not None:
+        return f"probka nagrody 316c bez gracza: {g4}"
+    sm = Z314_SKIP.match(Z314_SSAMPLE)
+    if not sm or int(sm.group(4)) != 20:
+        return "probka linii pominietej 316c"
     sk = KR312_SAMPLE.replace("nagrody 178 0 +", "nagrody 178 0 (w tym zold krolewski 314c 0, dary za zwyciestwo 314c 0) +")
     r = kr312_parse(sk)
     if not r or r[5] is None or r[5]["w314"] != 0 or kr312_bad(r):
@@ -90624,6 +90639,7 @@ def zold314c_main(logp):
         rep.show()
         return 0
     days, bad_rows, gifts, errs = [], 0, [], 0
+    skips = []       # 316c: linie "Nagroda krola (314c) pominieta" - (dzien, krolestwo, wrog, juz nagrodzonych)
     loaded = set()   # id linii doby z dopiskiem "Wczytano z zapisu" (para z poprzednia doba pomijana w Z314-7)
     events = []      # kolejnosc w logu: ("d", dict) / ("g", dict)
     sk = {}          # dzien -> [suma w314, suma g314, linii z dopiskiem]
@@ -90648,6 +90664,12 @@ def zold314c_main(logp):
                     continue
                 gifts.append(g)
                 events.append(("g", g))
+            elif t.startswith("Nagroda krola (314c) pominieta: "):
+                sm = Z314_SKIP.match(t)
+                if sm is None:
+                    bad_rows += 1
+                    continue
+                skips.append((int(sm.group(1)), sm.group(2), sm.group(3), int(sm.group(4))))
             elif t.startswith("Skarbce: dzien "):
                 r = kr312_parse(t)
                 if r is None:
@@ -90735,6 +90757,23 @@ def zold314c_main(logp):
                 f" gracz: linii {sum(1 for g in gifts if g['plg'] is not None)}", "0 bledow", not b6)
     else:
         rep.add("Z314-6: linie nagrody krola", "NIEPOKRYTY (brak zwyciestw nad lordami wrogow w logu)", "-", None)
+    # Z314-10 (316c): partia lorda raz na dobe - linie z polem "juz nagrodzonych" i pominiete; heurystyka: dwie linie "(armia)" tego samego krolestwa nad
+    # tym samym wrogiem tej samej doby BEZ pola dup > 0 w drugiej = podejrzenie podwojnej nagrody (przed 316c tak wygladal poscig za resztkami armii Flinta)
+    g316 = [g for g in gifts if g["dup"] is not None]
+    if g316 or skips:
+        seen, b10 = set(), []
+        for g in g316:
+            kk = (g["day"], g["k"], g["foe"])
+            if g["army"] and kk in seen and g["dup"] == 0:
+                b10.append(f"{g['day']} {g['k']} nad {g['foe']}: druga armia tej doby bez juz nagrodzonych")
+            if g["army"]:
+                seen.add(kk)
+        b10 += [f"{d} {k}: pominieta z juz nagrodzonych {n}" for d, k, _, n in skips if n < 1]
+        rep.add("Z314-10: partia lorda nagradzana raz na dobe (316c)", f"linii nagrody 316c {len(g316)} (z juz nagrodzonymi {sum(1 for g in g316 if g['dup'])},"
+                f" partii pominietych {sum(g['dup'] for g in g316)}), linii pominietych {len(skips)} (partii {sum(x[3] for x in skips)}), bledow {len(b10)}"
+                + (f" (np. {b10[0]})" if b10 else ""), "0 bledow", not b10)
+    else:
+        rep.add("Z314-10: partia lorda raz na dobe (316c)", "NIEPOKRYTY (log sprzed 316c albo bez zwyciestw)", "-", None)
     st = max([d["st"] for d in days] + [0])
     rep.add("Z314-8: potkniecia i ERROR CrownWar314", f"potkniecia {st}, ERROR {errs}", "0 i 0", st == 0 and errs == 0)
     rep.show()
