@@ -22,7 +22,7 @@ namespace Armoury
     ///     (CanonThroneWars, "Polnoc po Bekartach"); po koncu kanonu bez wesela (Robb zginal inaczej) liczy sie od pierwszej doby konca kanonu.
     /// (2) ZWROT ZAMKOW (Jeff 02.11 "ziemie, ktore stracili Lannisterowie, i zamki sa oddawane pierwotnym wlascicielom"): po ExecuteRobb kazda twierdza (miasto/zamek
     ///     z wioskami - wioski ida za twierdza) rodu, ktory przeszedl do korony, a ktorej pan z poczatku kampanii (ROT-Map settlements.xml owner=) byl rodem
-    ///     korony (dzis w koronie albo w danych ROT super_faction Kingdom.vlandia), wraca: do rodu pierwotnego, gdy zyje i jest w koronie; inaczej do rodu
+    ///     korony (w danych ROT super_faction Kingdom.vlandia - recenzja 320a: tylko to; "dzis w koronie" wybiera jedynie odbiorce), wraca: do rodu pierwotnego, gdy zyje i jest w koronie; inaczej do rodu
     ///     panujacego korony (domena krola - jak gra, gdy lenno nie ma pana). ChangeOwnerOfSettlementAction.ApplyByKingDecision: zaloga zostaje (nie BySiege),
     ///     namiestnik zdjety (gra), BK bez przeniesienia tytulu (BK przenosi tylko ByBarter/ByGift - tytul de jure zostaje u dawnego pana), nasze sluchacze
     ///     (FiefGrants/KingdomBalance/WarLedger/CapitalTreasury/Rumours) licza tylko BySiege. Twierdze korony u lordow Polnocy, ktorzy nie przeszli - zostaja
@@ -287,9 +287,9 @@ namespace Armoury
                             string origK;
                             bool startCrown = _origKingdom != null && _origKingdom.TryGetValue(origId, out origK) && origK == CrownId;
                             bool nowCrown = orig != null && !orig.IsEliminated && orig.Kingdom == crown;
-                            if (!startCrown && !nowCrown) { kept++; if (keptL.Count < 12) keptL.Add(Nm(st) + " (pierwotnie " + origId + ")"); continue; }
+                            if (!startCrown) { kept++; if (keptL.Count < 12) keptL.Add(Nm(st) + " (pierwotnie " + origId + ")"); continue; }
                             Clan to; string why;
-                            if (nowCrown && orig != pc && orig.Leader != null && orig.Leader.IsAlive) { to = orig; why = "rod pierwotny"; }
+                            if (nowCrown && orig != pc && orig.Leader != null && orig.Leader.IsAlive && !defect.Contains(orig)) { to = orig; why = "rod pierwotny"; }   // recenzja 320a: bez zwrotu miedzy zdrajcami
                             else
                             {
                                 to = crown.RulingClan;
