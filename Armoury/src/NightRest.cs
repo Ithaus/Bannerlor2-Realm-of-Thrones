@@ -2312,6 +2312,7 @@ namespace Armoury
         {
             try
             {
+                VillageEntryDiag.Popup("Night Falls");   // 316e
                 bool noTroops = PartyWords.NoTroops;   // m110-sam: bez wojska nie ma kolumny - tekst do gracza
                 var opts = new System.Collections.Generic.List<InquiryElement>
                 {
