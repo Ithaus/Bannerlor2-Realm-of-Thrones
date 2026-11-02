@@ -31,6 +31,7 @@ namespace Armoury
               .Append(" | ").Append(segA ?? "A -")
               .Append(" | ").Append(Doctrine.Dh291Segment())
               .Append(" | ").Append(OutshotRush.Segment())   // 313b: 291e bilans ognia i bieg z tarczami (miedzy B i C - wyrazenia B i C bitwa291 bez zmian)
+              .Append(" | ").Append(OutshotRush.Segment320())   // 320d: segment F (po E - wyrazenie E konczy sie na 'potkniecia N |')
               .Append(" | ").Append(MarchToContact.Rush291Segment())
               .Append('.');
             Log.Info(sb.ToString());

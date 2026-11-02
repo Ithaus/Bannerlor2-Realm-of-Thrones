@@ -92064,119 +92064,183 @@ def main(argv):
     return _groty319c_main_prev(argv)
 
 
-# ---- paczka 320c: grupa mury320c - przewaga obroncow wedlug poziomu murow (Jeff 02.11) ----
-M320_LINE = re.compile(r"Mury \(320c\): dzien (\d+) \| osada (\S+) \((.*?), (miasto|zamek)\) \| poziom murow (\d+) \| czynnik x([\d.]+)(?: \(bez czynnika: (.*?)\))? \| "
-                       r"przewaga ([\d.]+) \(bez czynnika ([\d.]+)\), W ([\d.]+) \| obroncow (\d+), atakujacych (\d+) \| straty atak (\d+)%, obrona (\d+)%, wymiana ([\d.]+) \| "
-                       r"gracz (tak|nie) \| wynik (.*?)\.$")
-M320_DAY = re.compile(r"Mury \(320c doba\): dzien (\d+) \| klucz (tak|nie) \(L1 x([\d.]+), L2 x([\d.]+), L3 x([\d.]+)\) \| przewaga z czynnikiem \(wywolan\): "
-                      r"L1 (\d+), L2 (\d+), L3 (\d+), bez czynnika \(fabula, Inni, skrypt\) (\d+) \|.*\| szturmy bez czynnika (\d+) \| potkniecia (\d+)\.$")
-M320_STORY = {"town_EW4", "ROT_castle61", "town_B2", "ROT_town32", "ROT_castle60", "town_B5"}   # SiegeRansom.StoryIds
-M320_SAMPLE = ("[12:00:01] Mury (320c): dzien 109160 | osada castle_W3 (Banefort, zamek) | poziom murow 2 | czynnik x1.20 | przewaga 4.80 (bez czynnika 4.00), W 7.52 | "
-               "obroncow 615, atakujacych 5998 | straty atak 21%, obrona 64%, wymiana 1.62 | gracz nie | wynik odparty (OB2).")
-M320_SAMPLE2 = ("[12:00:01] Mury (320c): dzien 109161 | osada town_B2 (Winterfell, miasto) | poziom murow 3 | czynnik x1.00 (bez czynnika: osada fabuly) | przewaga 4.40 "
-                "(bez czynnika 4.40), W 6.00 | obroncow 300, atakujacych 3000 | straty atak 15%, obrona 100%, wymiana 1.10 | gracz nie | wynik zdobyte.")
-M320_DSAMPLE = ("[00:00:02] Mury (320c doba): dzien 109161 | klucz tak (L1 x1.10, L2 x1.20, L3 x1.35) | przewaga z czynnikiem (wywolan): L1 3, L2 140, L3 0, "
-                "bez czynnika (fabula, Inni, skrypt) 12 | szturmy L1: bitew 0 (zdobyte 0, odparte 0, inne 0), straty atak / obrona 0 / 0 | szturmy L2: bitew 1 (zdobyte 0, "
-                "odparte 1, inne 0), straty atak / obrona 1260 / 394 | szturmy L3: bitew 0 (zdobyte 0, odparte 0, inne 0), straty atak / obrona 0 / 0 | szturmy bez czynnika 1 | potkniecia 0.")
+# ---- paczka 320d: grupa bieg320d - bieg pod ostrzalem w kazdym natarciu i 291e naszym licznikiem (Jeff 02.11 "1. tak") ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa bieg320d <Armoury-*.log>. Segment F linii 'Bitwa (291)' (OutshotRush.Segment320 - po E, przed C).
+# Dowod: log 2026-11-02_22-06-40, bitwa 22:28-22:35 vs Irmgard: 'z tarczami pod ostrzalem zostal krok 1 (sr. tarcz 0.62)', E 'wejsc w bieg 0', 'puszczone:
+# bilans ognia 0' przy 35 strzelcach gracza na 3 (bilans gry ma podloge 0.05 - 2 zabitych z 77 nie puszcza), puscilo 'napastnik nie podchodzi 90 s'.
+# B320-S  self-test wyrazen: F, a E (O313_RX) i B / C (BITWA291_RX) dalej czytaja linie z F;
+# B320-0  segment F w kazdej linii 'Bitwa (291)' z segmentem E (bez F - DLL sprzed 320d - NIE);
+# B320-1  potkniecia F 0;
+# B320-2  sedno: bitwa z druzyna pod ostrzalem (E druzyn > 0) i krokiem z tarczami (C 'zostal krok' > 0) bez zadnego biegu z tarczami (E wejsc 0) - DECYZJA
+#         (szyk nie szedl na wroga: odwrot / postoj / ruch nie na wroga w F - wypisane); bieg > 0 - TAK;
+# B320-3  291e licznikiem: puszczone naszym licznikiem <= puszczone bilansem ognia (E), przy kluczu TAK 'bylby puszczony licznikiem' 0,
+#         'obrona gry NIE po puszczeniu' tylko przy puszczeniu licznikiem;
+# B320-4  sumy (INFO): wejscia Advance/Charge vs inne natarcie z nazwami zachowan, druzyny przestrzelane bez taktyki ataku.
+B320_RX = re.compile(
+    r"\| F 320d bieg pod ostrzalem w kazdym natarciu (TAK|NIE): druzyn przestrzelanych bez taktyki ataku (\d+); wejsc w bieg z tarczami: Advance/Charge (\d+), "
+    r"inne natarcie (\d+) \[(.*?)\]; pod ostrzalem bez biegu \(szyko-takty 0\.5 s\): odwrot (\d+), postoj na pozycji (\d+), ruch nie na wroga (\d+); "
+    r"potkniecia (\d+); 291e puszczone naszym licznikiem \(gra obrona TAK, strzelcy x3 < wroga, >= \d+ zabitych od pociskow\) (\d+), bylby puszczony "
+    r"licznikiem \(klucz NIE\) (\d+), obrona gry NIE po puszczeniu licznikiem (\d+) decyzji \|")
+B320_G = {k: i + 1 for i, k in enumerate(("key", "out", "beh", "mov", "names", "back", "stay", "away", "stum", "ours", "dry", "keep"))}
+B320_F = ("F 320d bieg pod ostrzalem w kazdym natarciu TAK: druzyn przestrzelanych bez taktyki ataku 1; wejsc w bieg z tarczami: Advance/Charge 1, inne natarcie 2 "
+          "[BehaviorCautiousAdvance, BehaviorTacticalCharge]; pod ostrzalem bez biegu (szyko-takty 0.5 s): odwrot 0, postoj na pozycji 4, ruch nie na wroga 1; "
+          "potkniecia 0; 291e puszczone naszym licznikiem (gra obrona TAK, strzelcy x3 < wroga, >= 2 zabitych od pociskow) 1, bylby puszczony licznikiem "
+          "(klucz NIE) 0, obrona gry NIE po puszczeniu licznikiem 5 decyzji")
 
 
-def m320_rows(rep, sz, days, ob):
-    if not days:
-        rep.add("M320-L: linia 'Mury (320c doba)'", "brak", ">= 1 (doba z SiegeWallsLog)", False)
-        return
-    rep.add("M320-L: linia 'Mury (320c doba)'", str(len(days)), ">= 1", True)
-    d = [M320_DAY.search(x) for x in days]
-    bad = sum(1 for x in d if not x)
-    rep.add("M320-P: odczyt linii doby", f"nie czyta {bad}" if bad else "wszystkie", "wszystkie", bad == 0)
-    d = [x for x in d if x]
-    if not d:
-        return
-    on, f1, f2, f3 = d[-1].group(2) == "tak", float(d[-1].group(3)), float(d[-1].group(4)), float(d[-1].group(5))
-    want = {1: f1, 2: f2, 3: f3}
-    rep.add("M320-1: klucz Siege Walls Favour Defenders", f"{'tak' if on else 'nie'} (L1 x{f1:.2f}, L2 x{f2:.2f}, L3 x{f3:.2f})", "tak (1.10 / 1.20 / 1.35)", on)
-    calls = [sum(int(x.group(i)) for x in d) for i in (6, 7, 8)]
-    excl = sum(int(x.group(9)) for x in d)
-    rep.add("M320-2: przewaga z czynnikiem (wywolan L1 / L2 / L3; bez czynnika)", f"{calls[0]} / {calls[1]} / {calls[2]}; {excl}", "INFO (L2 > 0, gdy trwaja oblezenia AI)", None)
-    stum = sum(int(x.group(11)) for x in d)
-    rep.add("M320-3: potkniecia SiegeWalls w dobach z linia 320c", str(stum), "0", stum == 0)
-    if not sz:
-        rep.add("M320-4: linie 'Mury (320c)' (szturmy)", "brak", "INFO (potrzebny szturm AI w logu)", None)
+def b320_line(e, f, kept=None):
+    """Linia 'Bitwa (291)' z E i F (jak Battle291.Write: B | E | F | C); kept - liczba 'zostal krok' w C."""
+    s = o313_line(e)
+    i = s.index("| C piechota")
+    s = s[:i] + "| " + f + " " + s[i:]
+    if kept is not None:
+        s = s.replace("z tarczami pod ostrzalem zostal krok 0.", f"z tarczami pod ostrzalem zostal krok {kept} (sr. tarcz 0.62).")
+    return s
+
+
+def bieg320d_selftest():
+    s = b320_line(O313_E, B320_F)
+    m = B320_RX.search(s)
+    want = ("TAK", "1", "1", "2", "BehaviorCautiousAdvance, BehaviorTacticalCharge", "0", "4", "1", "0", "1", "0", "5")
+    if not m or m.groups() != want:
+        return f"F: {m.groups() if m else 'brak'}"
+    if not O313_RX.search(s):
+        return "E nie czytane na linii z F"
+    RX = BITWA291_RX
+    if not (RX["line"].match(s) and RX["b"].search(s) and RX["c"].search(s)):
+        return "bitwa291 nie czyta linii z F"
+    if B320_RX.search(o313_line(O313_E)):
+        return "F w linii bez F"
+    m = RX["c"].search(b320_line(O313_E, B320_F, kept=1))
+    if not m or m.group(8) != "1":
+        return "C 'zostal krok' nie czytane"
+    return None
+
+
+def bieg320d_collect(logp):
+    D = {"f": [], "nof": 0, "noe": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            s = ln.rstrip("\r\n")
+            mt = TS.match(s)
+            s = mt.group(2) if mt else s
+            if not s.startswith("Bitwa (291)"):
+                continue
+            e = O313_RX.search(s)
+            if not e:
+                D["noe"] += 1
+                continue
+            f = B320_RX.search(s)
+            if not f:
+                D["nof"] += 1
+                continue
+            c = BITWA291_RX["c"].search(s)
+            D["f"].append((f, e, int(c.group(8)) if c else 0))
+    return D
+
+
+def bieg320d_rows(rep, D):
+    L = D["f"]
+    G, E = B320_G, O313_G
+    g = lambda m, k: int(m.group(G[k]))
+    ge = lambda m, k: int(m.group(E[k]))
+    if not L and not D["nof"]:
+        rep.add("B320-0: segment F w kazdej linii 'Bitwa (291)' z E", f"brak linii z E (bez E {D['noe']})", "INFO", None)
     else:
-        rows = [M320_LINE.search(x) for x in sz]
-        nb = sum(1 for r in rows if not r)
-        rep.add("M320-4: linie 'Mury (320c)' (szturmy)", f"{len(sz)} (nie czyta {nb})", ">= 1, wszystkie czytelne", nb == 0)
-        rows = [r for r in rows if r]
-        wrongf, story, ratio = [], [], []
-        per = {}
-        for r in rows:
-            sid, lvl, f, why = r.group(2), int(r.group(5)), float(r.group(6)), r.group(7)
-            adv, adv0 = float(r.group(8)), float(r.group(9))
-            li = 1 if lvl <= 1 else 3 if lvl >= 3 else 2
-            if sid in M320_STORY and f > 1.0:
-                story.append(f"{sid} x{f:.2f}")
-            if why is None and on and abs(f - want[li]) > 0.006:
-                wrongf.append(f"{sid} L{lvl} x{f:.2f} (klucz x{want[li]:.2f})")
-            if adv0 > 0 and abs(adv / adv0 - f) > 0.02 * f + 0.01:
-                ratio.append(f"{sid} {adv:.2f}/{adv0:.2f} vs x{f:.2f}")
-            if why is None:
-                p = per.setdefault(li, [0, 0, 0, 0.0, 0.0])
-                p[0] += 1
-                res = r.group(17)
-                if res == "zdobyte":
-                    p[1] += 1
-                elif res.startswith("odparty"):
-                    p[2] += 1
-                p[3] += int(r.group(13))
-                p[4] += float(r.group(15))
-        rep.add("M320-5: czynnik w szturmie = klucz dla poziomu", "; ".join(wrongf[:6]) or "zgodny", "zgodny", not wrongf)
-        rep.add("M320-6: osady fabuly ROT bez czynnika", "; ".join(story) or "zadna z czynnikiem", "zadna z czynnikiem", not story)
-        rep.add("M320-7: przewaga / bez czynnika = czynnik", "; ".join(ratio[:6]) or "zgodne", "zgodne", not ratio)
-        summ = []
-        for li, p in sorted(per.items()):
-            summ.append(f"L{li}: szturmow {p[0]}, zdobyte {p[1]} ({p[1] * 100.0 / p[0]:.0f}%), odparte {p[2]}, straty atak sr. {p[3] / p[0]:.0f}%, wymiana sr. {p[4] / p[0]:.2f}")
-        rep.add("M320-8: szturmy wedlug poziomu (z czynnikiem)", " | ".join(summ) or "-", "INFO (przed 320c L2: zdobyte 63%, wymiana ok. 1.3)", None)
-    if ob:
-        lack = sum(1 for x in ob if "x poziom murow (320c)" not in x)
-        rep.add("M320-9: linie OB1/O0 z polem 'x poziom murow (320c)'", f"{len(ob) - lack} z {len(ob)}", "wszystkie", lack == 0)
+        rep.add("B320-0: segment F w kazdej linii 'Bitwa (291)' z E", f"z F {len(L)}, bez F {D['nof']}", "bez F 0 (DLL sprzed 320d - NIE)", D["nof"] == 0)
+    stum = sum(g(f, "stum") for f, _, _ in L)
+    rep.add("B320-1: potkniecia F", str(stum), "0", None if not L else stum == 0)
+    n2 = "B320-2: druzyna pod ostrzalem i krok z tarczami - bieg z tarczami > 0"
+    hit = [(f, e, k) for f, e, k in L if ge(e, "teams") > 0 and k > 0]
+    if hit:
+        dry = [(f, e, k) for f, e, k in hit if ge(e, "rin") == 0]
+        txt = (f"bitew {len(hit)}, bez biegu {len(dry)}"
+               + "".join(f"; [krok {k}, odwrot {g(f, 'back')}, postoj {g(f, 'stay')}, nie na wroga {g(f, 'away')}, druzyn {ge(e, 'teams')}]" for f, e, k in dry[:4]))
+        rep.add(n2, txt, "bez biegu 0 (inaczej DECYZJA - szyk nie szedl na wroga albo druzyna jeszcze nie pod ostrzalem)", not dry, decide=True)
+    else:
+        rep.add(n2, "brak bitew z druzyna pod ostrzalem i krokiem z tarczami", "INFO", None)
+    n3 = "B320-3: 291e licznikiem - spojne z E"
+    if L:
+        bad = [(f, e) for f, e, _ in L if g(f, "ours") > ge(e, "rel") or (e.group(E["key1"]) == "TAK" and g(f, "dry") > 0)
+               or (g(f, "keep") > 0 and g(f, "ours") == 0)]
+        txt = (f"puszczone naszym licznikiem {sum(g(f, 'ours') for f, _, _ in L)} z bilansem ognia {sum(ge(e, 'rel') for _, e, _ in L)}, bylby (klucz NIE) "
+               f"{sum(g(f, 'dry') for f, _, _ in L)}, obrona NIE po puszczeniu {sum(g(f, 'keep') for f, _, _ in L)} decyzji; bitew niespojnych {len(bad)}")
+        rep.add(n3, txt, "niespojnych 0", not bad)
+    else:
+        rep.add(n3, "brak linii z F", "INFO", None)
+    names = sorted(set(x.strip() for f, _, _ in L for x in f.group(G["names"]).split(",") if x.strip()))
+    rep.add("B320-4: sumy (INFO)",
+            f"linii {len(L)}; wejsc w bieg Advance/Charge {sum(g(f, 'beh') for f, _, _ in L)}, inne natarcie {sum(g(f, 'mov') for f, _, _ in L)} "
+            f"[{', '.join(names) or '-'}]; druzyn przestrzelanych bez taktyki ataku {sum(g(f, 'out') for f, _, _ in L)}", "INFO", None)
 
 
-def mury320c_main(logp):
+def bieg320d_synth():
+    """B320-S2: dobry, zly (krok bez biegu), niespojny, stary DLL, pusty. None = OK."""
+    import tempfile
+    import shutil
+    e0 = O313_E.replace("druzyn 1 (291e 1", "druzyn 1 (291e 1").replace("wejsc w bieg 2", "wejsc w bieg 0")
+    runs = {
+        "good": [b320_line(O313_E, B320_F, kept=1)],
+        "walk": [b320_line(e0, B320_F, kept=1)],
+        "bad": [b320_line(O313_E, B320_F.replace("bylby puszczony licznikiem (klucz NIE) 0", "bylby puszczony licznikiem (klucz NIE) 1")
+                          .replace("potkniecia 0; 291e", "potkniecia 2; 291e"))],
+        "old": [o313_line(O313_E)],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"B320-0": "TAK", "B320-1": "TAK", "B320-2": "TAK", "B320-3": "TAK", "B320-4": "INFO"},
+        "walk": {"B320-0": "TAK", "B320-2": "DECYZJA", "B320-3": "TAK"},
+        "bad": {"B320-1": "NIE", "B320-3": "NIE"},
+        "old": {"B320-0": "NIE", "B320-1": "INFO", "B320-2": "INFO", "B320-3": "INFO"},
+        "empty": {"B320-0": "INFO", "B320-1": "INFO", "B320-2": "INFO", "B320-3": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="b320_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            bieg320d_rows(rep, bieg320d_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def bieg320d_main(logp):
     rep = Report()
-    a, b, c = M320_LINE.search(M320_SAMPLE), M320_LINE.search(M320_SAMPLE2), M320_DAY.search(M320_DSAMPLE)
-    st_ok = bool(a) and bool(b) and bool(c) and a.group(7) is None and b.group(7) == "osada fabuly" and c.group(4) == "1.20" and c.group(11) == "0"
-    rep.add("M320-S: self-test wyrazen na wzorze linii", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
+    s1 = bieg320d_selftest()
+    rep.add("B320-S: self-test wyrazen (F; E i B / C na linii z F)", s1 or "OK", "OK", s1 is None)
+    try:
+        s2 = bieg320d_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("B320-S2: test syntetyczny (dobry, krok bez biegu, niespojny, stary DLL, pusty)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
-        rep.add("M320-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.add("B320-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    sz, days, ob = [], [], []
-    with open(logp, encoding="utf-8", errors="replace") as f:
-        for line in f:
-            s = line.rstrip("\r\n")
-            if "Mury (320c doba):" in s:
-                days.append(s)
-            elif "Mury (320c):" in s:
-                sz.append(s)
-            elif "przewaga " in s and " = mury poziom " in s:
-                ob.append(s)
-    print(f"plik: {logp}")
-    m320_rows(rep, sz, days, ob)
+    D = bieg320d_collect(logp)
+    print(f"plik: {logp} | linii 291 z F {len(D['f'])}, z E bez F {D['nof']}, bez E {D['noe']}")
+    bieg320d_rows(rep, D)
     rep.show()
     return 0
 
 
-_mury320c_main_prev = main
+_bieg320d_main_prev = main
 
 
 def main(argv):
-    # paczka 320c: grupa mury320c - opakowanie main jak groty319c
+    # paczka 320d: grupa bieg320d - opakowanie main jak groty319c
     a = argv[1:]
     if "--grupa" in a:
         i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "mury320c":
+        if i + 1 < len(a) and a[i + 1] == "bieg320d":
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return mury320c_main(rest[0] if rest else None)
-    return _mury320c_main_prev(argv)
+            return bieg320d_main(rest[0] if rest else None)
+    return _bieg320d_main_prev(argv)
 
 
 if __name__ == "__main__":

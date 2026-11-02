@@ -61,6 +61,7 @@ namespace Armoury
 
         // ---- liczniki misji (Reset w Battle291.Begin)
         private static int _teams, _byFire, _byS2, _byAtk, _stum;
+        private static int _byOut;   // 320d: druzyna przestrzelana bez taktyki ataku (Doctrine.OutshotAdvancing why 5)
         private static int _rushIn, _rushOut;
         private static float _rushSec;
         // recenzja 313b (6): klucz int (TeamIndex x 16 + FormationIndex) - bez referencji do szykow (i Mission) po bitwie
@@ -102,6 +103,7 @@ namespace Armoury
         {
             ClearState();
             _teams = _byFire = _byS2 = _byAtk = _stum = 0;
+            _byOut = 0;   // 320d
             _rushIn = _rushOut = 0;
             _rushSec = 0f;
             _rushForms.Clear(); _looseForms.Clear(); _horseForms.Clear();
@@ -165,7 +167,7 @@ namespace Armoury
                     {
                         _ever[ti] = true;
                         _teams++;
-                        if (why == 1) _byFire++; else if (why == 2) _byS2++; else _byAtk++;
+                        if (why == 1) _byFire++; else if (why == 2) _byS2++; else if (why == 5) _byOut++; else _byAtk++;   // 320d: why 5 osobno (segment F)
                     }
                     _live[ti] = live;
                 }
@@ -326,6 +328,19 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ linia
+
+        /// <summary>320d: segment F linii 'Bitwa (291)' (Battle291.Write, po E - wyrazenia E / C sprawdz_logi bez zmian): bieg pod ostrzalem w kazdym natarciu
+        /// i 291e naszym licznikiem.</summary>
+        internal static string Segment320()
+        {
+            var c = Settings.Current;
+            var sb = new StringBuilder(500);
+            sb.Append("F 320d bieg pod ostrzalem w kazdym natarciu ").Append(c != null && c.OutshotRushWithShields ? "TAK" : "NIE")
+              .Append(": druzyn przestrzelanych bez taktyki ataku ").Append(_byOut)
+              .Append("; ").Append(MarchToContact.Rush320Part())
+              .Append("; ").Append(Doctrine.Fire320Part());
+            return sb.ToString();
+        }
 
         /// <summary>Segment E linii 'Bitwa (291)' (Battle291.Write - HorsePursuit.End, po Doctrine.End i End; liczniki do Reset).</summary>
         private static string Mps(double dist, double time) { return time >= 1.0 ? (dist / time).ToString("0.0", Inv) : "-"; }
