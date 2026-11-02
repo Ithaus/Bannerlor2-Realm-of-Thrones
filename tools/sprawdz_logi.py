@@ -85012,6 +85012,8 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return kowal305_main(rest[0] if rest else None)
     return _kowal305_main_prev(argv)
+
+
 _drobne305e_main_prev = main
 
 
@@ -85483,6 +85485,8 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return pasmo306a_main(rest[0] if rest else None)
     return _pasmo306a_main_prev(argv)
+
+
 _sondy306_main_prev = main
 
 
@@ -87957,6 +87961,8 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return bitwa311a_main(rest[0] if rest else None)
     return _bitwa311a_main_prev(argv)
+
+
 _mennica311b_main_prev = main
 
 
@@ -87969,6 +87975,8 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return mennica311b_main(rest[0] if rest else None)
     return _mennica311b_main_prev(argv)
+
+
 _warsztaty311c_main_prev = main
 
 
@@ -88618,6 +88626,8 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return zatargi312b_main(rest[0] if rest else None)
     return _zatargi312b_main_prev(argv)
+
+
 _notable312d_main_prev = main
 
 
@@ -89482,6 +89492,8 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return tron312c_main(rest[0] if rest else None)
     return _tron312c_main_prev(argv)
+
+
 # ---------------------------------------------------------------- paczka 313a (01.11): arakhy w Westeros - grupa arakh313a
 # Log Armoury (Armoury-*.log; linie z "[hh:mm:ss] " albo bez). Uzycie: --grupa arakh313a <Armoury-*.log>. Linie jak w C# DothrakiArms.Line313 i DothrakiArmsMission.Report.
 # Zrodlo arakhow (rozpoznanie 313a): wzorzec broni SkillsDecide bez kultury; partie bez zbrojowni DTE (bandy, karawany, wiesniacy, milicje, patrole) walcza nim wprost.
@@ -90433,6 +90445,8 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return ostrzal313b_main(rest[0] if rest else None)
     return _ostrzal313b_main_prev(argv)
+
+
 _stamina313c_main_prev = main
 
 
@@ -90445,6 +90459,8 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return stamina313c_main(rest[0] if rest else None)
     return _stamina313c_main_prev(argv)
+
+
 _krwawienie313d_main_prev = main
 
 
@@ -91221,6 +91237,76 @@ def sen316b_main(logp):
     return 0
 
 
+# ---------------------------------------------------------------- paczka 316d (02.11): kwatermistrz bez zalewu komunikatow - grupa qm316d
+# Audyt 02.11 (log 01.11 22:56): 105 czerwonych "QM: no man can use X (needs Bow N, best N) - stays yours." i 177 czerwonych "QM: N kit slots empty".
+# Armoury/src/QuartermasterLaw.cs ShoutNoUse: jedna linia zbiorcza na przeglad, ten sam przedmiot najwyzej raz na 7 dni; ShoutShortages: czerwony tylko przy wzroscie.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa qm316d <Armoury-*.log>
+#  Q316-1  zero linii starego formatu "QM: no man can use X (needs ...) - stays yours." (nowy DLL)
+#  Q316-2  najwyzej jedna linia zbiorcza "QM: no man can use N piece(s) in your baggage" w tej samej sekundzie (jeden przeglad)
+#  Q316-3  meldunek "QM: N kit slots empty ... for the next battle": czerwony tylko gdy liczby wzrosly od poprzedniego meldunku (albo po kompletnym)
+#  Q316-4  linie "Kwatermistrz (316d" sa (INFO: na ekranie / cicho)
+#  Q316-5  zero linii ERROR z Escrow.ShoutNoUse
+def qm316d_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("Q316-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    old, summ, info, errors, seq = [], [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            raw = line.rstrip("\r\n")
+            m = re.match(r"^\[(\d\d:\d\d:\d\d)\] ", raw)
+            ts = m.group(1) if m else ""
+            s = raw[m.end():] if m else raw
+            if "QM: no man can use " in s:
+                if re.search(r"QM: no man can use .*\(needs .*\) - stays yours\.", s):
+                    old.append(s)
+                elif re.search(r"QM: no man can use \d+ pieces? in your baggage", s):
+                    if "(powtorzenie)" not in s:
+                        summ.append((ts, s))
+            elif s.startswith("Kwatermistrz (316d"):
+                info.append(s)
+            elif "ERROR" in s and "Escrow.ShoutNoUse" in s:
+                errors.append(s)
+            if "for the next battle - see Review the army in camp." in s and "(powtorzenie)" not in s:
+                mm = re.search(r"QM: (?:(\d+) kit slots? empty)?(?: and )?(?:(\d+) riders? on foot)?", s)
+                if mm:
+                    seq.append(("line", int(mm.group(1) or 0), int(mm.group(2) or 0), ", red]" in s, s))
+            elif "nic do meldowania (podglad: komplet)" in s:
+                seq.append(("full", 0, 0, False, s))
+    print(f"plik: {logp}")
+    rep.add("Q316-1: stary format 'no man can use X (needs ...)'", f"{len(old)}" + (f" (pierwsza: {old[0][:160]})" if old else ""), "0 (nowy DLL)", len(old) == 0)
+    per = {}
+    for ts, s in summ:
+        per[ts] = per.get(ts, 0) + 1
+    many = [t for t, c in per.items() if c > 1]
+    rep.add("Q316-2: jedna linia zbiorcza na przeglad", f"linii zbiorczych {len(summ)}, sekund z wiecej niz jedna {len(many)}" + (f" (np. {many[0]})" if many else ""),
+            "0 sekund z powtorzeniem", (len(many) == 0) if summ else None)
+    bad, reds, plain = [], 0, 0
+    prev = None
+    for kind, mi, fo, red, s in seq:
+        if kind == "full":
+            prev = (0, 0)
+            continue
+        if red:
+            reds += 1
+            if prev is not None and mi <= prev[0] and fo <= prev[1]:
+                bad.append("czerwony bez wzrostu: " + s[:150])
+        else:
+            plain += 1
+            if prev is None or mi > prev[0] or fo > prev[1]:
+                if prev is not None:
+                    bad.append("zwykly mimo wzrostu: " + s[:150])
+        prev = (mi, fo)
+    rep.add("Q316-3: meldunek pustych slotow czerwony tylko przy wzroscie", f"meldunkow {reds + plain} (czerwonych {reds}, zwyklych {plain}), niezgodnych {len(bad)}" + (f" (pierwszy: {bad[0]})" if bad else ""),
+            "niezgodnych 0", (len(bad) == 0) if (reds + plain) else None)
+    rep.add("Q316-4: linie Kwatermistrz (316d)", f"{len(info)}" + (f" (ostatnia: {info[-1][:180]})" if info else ""), "> 0 (nowy DLL)", (len(info) > 0) if (summ or seq) else None)
+    rep.add("Q316-5: bledy Escrow.ShoutNoUse", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
 _sen316b_main_prev = main
 
 
@@ -91233,6 +91319,20 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return sen316b_main(rest[0] if rest else None)
     return _sen316b_main_prev(argv)
+
+
+_qm316d_main_prev = main
+
+
+def main(argv):
+    # paczka 316d: grupa qm316d - opakowanie main jak zapas316a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "qm316d":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return qm316d_main(rest[0] if rest else None)
+    return _qm316d_main_prev(argv)
 
 
 if __name__ == "__main__":

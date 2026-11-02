@@ -1844,7 +1844,7 @@ namespace Armoury
                 bool yours = OrderIsYours(new EquipmentElement(item), k);   // K1 (B4): zaplaciles - to Twoj wklad, rozliczy go wymiana 1:1 (ZB-1: egzemplarz bez stanu - tak lezy na regale)
                 Log.Player(k + " x " + item.Name + " delivered to the " + (yours ? "armoury as your pieces" : "men's racks") + " for " + pay + " gold" + (k < n ? " - the market had no more." : ".")
                            + (yours ? OrderYoursNote : ""));
-                if (yours) QuartermasterEscrow.ShoutIfNoUse(item);   // K1 (przeglad, B4): nikt nie udzwignie - mowimy od razu (zostaje Twoja)
+                if (yours) QuartermasterEscrow.ShoutIfNoUse(item, k);   // K1 (przeglad, B4): nikt nie udzwignie - mowimy od razu (zostaje Twoja)
                 Log.Info("Zamowienie dla wojska: " + k + "/" + n + "x " + item.StringId + " za " + pay + " (z targu " + (st != null ? st.Name.ToString() : "?") + ")");
             }
             catch (Exception e) { Log.Error("DoOrderKit", e); }
@@ -2146,8 +2146,9 @@ namespace Armoury
                            + (shortPurse ? " Your purse would stretch no further." : "") + (yours ? OrderYoursNote : ""));
                 if (yours)   // K1 (przeglad, B4): nikt nie udzwignie - mowimy od razu (zostaje Twoja), raz na przedmiot
                 {
-                    var told = new HashSet<ItemObject>();
-                    foreach (var p in picks) if (p.El.Item != null && told.Add(p.El.Item)) QuartermasterEscrow.ShoutIfNoUse(p.El.Item);
+                    var noUse = new List<KeyValuePair<ItemObject, int>>();   // 316d: jedna linia zbiorcza na dostawe (ShoutNoUse liczy sztuki per przedmiot)
+                    foreach (var p in picks) if (p.El.Item != null) noUse.Add(new KeyValuePair<ItemObject, int>(p.El.Item, 1));
+                    QuartermasterEscrow.ShoutNoUse(noUse, "dostawa");
                 }
                 LogShelfOrder(st, type, tier, n, picks, goods, fee, unmet, shortPurse);
             }
