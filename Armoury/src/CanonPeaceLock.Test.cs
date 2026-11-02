@@ -126,7 +126,7 @@ namespace Armoury
                 Line("T3 MakePeaceKingdomDecision Dorzecze -> korona IsAllowed " + T(allowed), !allowed);
             }
             // T4
-            Line("T4 tabela prawdy Locked i Blocks tej chwili: " + TruthLocked() + " | " + Truth320(), TruthLockedOk() && Truth320Ok() && (skip != null || (CanonPeaceLock.Blocks(_crown, _river) && !NonRuleBlocks())));
+            Line("T4 tabela prawdy Locked i Blocks tej chwili: " + TruthLocked() + " | " + Truth320() + " | " + TruthX320(), TruthLockedOk() && Truth320Ok() && TruthX320Ok() && (skip != null || (CanonPeaceLock.Blocks(_crown, _river) && !NonRuleBlocks())));
             // T5a
             bool dec = PeaceHold.Decide(23, false, true) == PeaceHold.ActWait && PeaceHold.Decide(24, true, true) == PeaceHold.ActKeep && PeaceHold.Decide(24, false, true) == PeaceHold.ActWaitRot
                        && PeaceHold.Decide(71, false, true) == PeaceHold.ActWaitRot && PeaceHold.Decide(72, false, true) == PeaceHold.ActRelease && PeaceHold.Decide(24, false, false) == PeaceHold.ActRelease
@@ -191,6 +191,27 @@ namespace Armoury
         // 320a-KG: wiersz Polnoc-korona z faza 2 (klucz NorthFightsOnAfterRedWedding), bs - stan ROT BastardsSiegeEvent
         private static bool LN(bool pr, int rw, bool dead, int bs, bool forced = false)
         { string w; return CanonPeaceLock.Locked(true, true, pr, false, rw, dead, forced, true, bs, out w); }
+
+        // 320a recenzja: Krwawe Gody zaszly (flaga ExecuteRobb) i wyjscie fazy 2 (Bekarci niemozliwi / limit)
+        private static bool LX(int rw, bool dead, int bs, bool rwHappened, string end, bool forced = false)
+        { string w; return CanonPeaceLock.Locked(true, true, false, false, rw, dead, forced, true, bs, rwHappened, end, out w); }
+
+        private static bool TruthX320Ok()
+        {
+            // Robb zginal bez wesela (rw 0) / wesele odwolane (rw 2) - bez fazy 2, stara regula; wyjscie fazy 2 - otwarte, chyba ze ROT wymusza
+            return !LX(0, true, 0, false, null) && !LX(2, true, 0, false, null) && LX(2, true, 0, false, null, true) && !LX(1, true, 0, false, null)
+                   && LX(2, true, 0, true, null) && !LX(2, true, 0, true, "Winterfell u X od 120 dob") && !LX(2, true, -1, true, "limit 723 dob")
+                   && LX(2, true, 0, true, "Jon Snow nie zyje", true) && LX(1, true, 0, true, null);
+        }
+
+        private static string TruthX320()
+        {
+            return "320a: Robb martwy bez wesela " + T(LX(0, true, 0, false, null)) + ", wesele odwolane " + T(LX(2, true, 0, false, null))
+                   + ", odwolane ROT wymusza " + T(LX(2, true, 0, false, null, true)) + ", RW1 bez flagi " + T(LX(1, true, 0, false, null))
+                   + ", Gody zaszly " + T(LX(2, true, 0, true, null)) + ", wyjscie Winterfell " + T(LX(2, true, 0, true, "Winterfell u X od 120 dob"))
+                   + ", wyjscie limit Bekarci -1 " + T(LX(2, true, -1, true, "limit 723 dob")) + ", wyjscie ROT wymusza " + T(LX(2, true, 0, true, "Jon Snow nie zyje", true))
+                   + ", RW1 ExecuteRobb z flaga " + T(LX(1, true, 0, true, null));
+        }
 
         private static bool Truth320Ok()
         {

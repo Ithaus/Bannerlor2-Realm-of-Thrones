@@ -111,6 +111,7 @@ namespace Armoury
             Moving = false; _sessionDays = 0; _stumbles = 0; _importBad = 0; _mergeCount = 0; _sessionChecked = false; _markerAtStart = false;
             _lastWait = ""; _lastWaitDay = int.MinValue; _err.Clear(); _detached.Clear();
             _rwWarBefore = false; _rwPeaceSaid = false; _rwPlayerTold = false; _rwPeaceCalls = 0;
+            Reset320();
             TestReset();
         }
 
@@ -271,7 +272,7 @@ namespace Armoury
             catch (Exception e) { Stumble("SessionStart", e); }
             Log.Info(P + "start sesji | klucz " + (On ? "TAK" : "NIE") + " | stan " + st + " | ROT " + RotEvent + " stan " + rs + ", Krwawe Gody stan " + SafeRot(RedWeddingEvent)
                      + " | Robb " + robb + " | Dorzecze: " + river + " | gracz: " + role + (_st == 1 ? " (w chwili unii: " + _player + ")" : "")
-                     + " | latki: Krwawe Gody " + _wireRw + ", armie " + _wireArmy + " | dzien opowiesci " + F1(StoryDay()) + (_importBad > 0 ? " | bledy zapisu " + _importBad : "") + ".");
+                     + " | latki: Krwawe Gody " + _wireRw + ", armie " + _wireArmy + " | " + Rw320Text() + " | dzien opowiesci " + F1(StoryDay()) + (_importBad > 0 ? " | bledy zapisu " + _importBad : "") + ".");
         }
 
         private static int SafeRot(string ev) { try { return Prologue.RotEventState(ev); } catch { return -9; } }
@@ -280,6 +281,7 @@ namespace Armoury
         {
             _sessionDays++;
             Test320Daily();   // 320: tylko autotest (flaga armoury-krwawe-gody320.flag)
+            Rw320Daily();     // 320a: odtworzenie Godow ze starego zapisu, wyjscie fazy 2 / bramki 312c
             if (_st != 3) return;
             try { SplitWar(); } catch (Exception e) { Stumble("SplitWar", e); }
         }
@@ -1101,6 +1103,7 @@ namespace Armoury
         /// inaczej oryginal. Idempotentne (ROT wola ExecuteRobb z OnFailed i z DailyTickEvent). Blad odczytu = oryginal (zachowanie ROT).</summary>
         public static void RwPeace(IFaction a, IFaction b)
         {
+            RwMark("ExecuteRobb", true);   // 320a recenzja: przed FightsOnNow - faza 2 trzyma juz w tej chwili; migawka rodow Polnocy przed przejsciami ROT
             bool skip = false; string why = "-";
             try { skip = FightsOnNow(a, b, out why); }
             catch (Exception e) { Stumble("RwPeace", e); skip = false; why = "blad odczytu - pokoj ROT"; }
@@ -1123,6 +1126,7 @@ namespace Armoury
         /// <summary>Zapas (transpiler nie podmienil): wojna Polnoc-korona przed ExecuteRobb. Nie rzuca.</summary>
         public static void RwFallbackPrefix()
         {
+            RwMark("ExecuteRobb (zapas)", true);
             try
             {
                 var west = K(CrownId); var north = K(NorthId);
@@ -1154,7 +1158,15 @@ namespace Armoury
         /// (RwPeace) przy kluczu NorthFightsOnAfterRedWedding - rody ida do korony w trwajacej wojnie. Nie rzuca.</summary>
         public static void RedWeddingPostfix()
         {
+            // 320a: Gody zaszly takze bez wywolania pokoju ROT (Polnoc nie byla w wojnie z korona); migawka tylko przed przejsciami - tu nie
+            try { var robb = HeroOf(RobbId); if (robb != null && !robb.IsAlive) RwMark("ExecuteRobb (postfiks)", false); } catch (Exception e) { Stumble("RwMark.Postfix", e); }
             RwFallbackAfter();
+            RedWeddingRiverLords();
+            ReturnStolen();   // 320a (Jeff 02.11): zamki korony u rodow, ktore przeszly - do panow pierwotnych (po przejsciu Freyow i reszty)
+        }
+
+        private static void RedWeddingRiverLords()
+        {
             try
             {
                 if (_st != 1 || _rw) return;
@@ -1320,6 +1332,11 @@ namespace Armoury
             try { if (dataStore.IsSaving) v = KingInTheNorth.Export(); } catch (Exception e) { KingInTheNorth.Stumble("Export", e); v = ""; }
             SaveText.Sync(dataStore, "arm_k272", ref v);
             if (dataStore.IsLoading) { try { KingInTheNorth.Import(v); } catch (Exception e) { KingInTheNorth.Stumble("Import", e); } }
+            // 320a: Krwawe Gody zaszly / wyjscie fazy 2 / zwrot zamkow (osobny klucz - stare zapisy bez niego = pusty, stan odtwarzany z ROT w Daily)
+            string v2 = "";
+            try { if (dataStore.IsSaving) v2 = KingInTheNorth.Export320(); } catch (Exception e) { KingInTheNorth.Stumble("Export320", e); v2 = ""; }
+            SaveText.Sync(dataStore, "arm_k320", ref v2);
+            if (dataStore.IsLoading) { try { KingInTheNorth.Import320(v2); } catch (Exception e) { KingInTheNorth.Stumble("Import320", e); } }
         }
     }
 }

@@ -111,7 +111,8 @@ namespace Armoury
 
         // dzien (odswiezane przy zmianie doby albo kasowaniu pamieci)
         private static bool _flag, _canonOver, _northOpen, _aegonIn, _danyIn;
-        private static int _bsState = -9, _bEvState = -9;   // recenzja: stan ROT BastardsSiegeEvent i BastardsEvent do linii (decyzja Jeffa, gdy oblezenie nie ruszy)
+        private static int _bsState = -9, _bEvState = -9;
+        private static string _northExit;   // 320a: wyjscie bramki Polnocy bez Bekartow (KingInTheNorth.FightsOnEnd) - tylko do linii   // recenzja: stan ROT BastardsSiegeEvent i BastardsEvent do linii (decyzja Jeffa, gdy oblezenie nie ruszy)
         private static bool _orderLogged;                  // recenzja: kolejnosc postfiksow raz w pierwszej dobie (po wpieciu PovertyPeace)
         private static Kingdom _holder; private static bool _throneExists;
         private static int _flagDay = int.MinValue;
@@ -149,7 +150,7 @@ namespace Armoury
                 _dWarList.Clear(); _dJoinList.Clear();
                 _stumblesDay = 0;
                 _pov.Clear();
-                _bsState = _bEvState = -9; _orderLogged = false;
+                _bsState = _bEvState = -9; _orderLogged = false; _northExit = null;
             }
         }
 
@@ -280,7 +281,10 @@ namespace Armoury
             _canonOver = _flag || !SpareKey || over;
             int bs = SafeRot("BastardsSiegeEvent");
             _bsState = bs; _bEvState = SafeRot("BastardsEvent");   // tylko do linii: BastardsEvent rusza dopiero po koncu oblezenia (ROT MainCheck)
-            _northOpen = _flag || (NorthWaitKey ? bs == 2 : _canonOver);
+            string ex = null;
+            try { ex = KingInTheNorth.FightsOnEnd; } catch { ex = null; }
+            _northExit = ex;   // 320a recenzja: to samo wyjscie co faza 2 blokady 264 (Bekarci niemozliwi albo limit dob) - bramka nie czeka bez konca
+            _northOpen = _flag || (NorthWaitKey ? (bs == 2 || ex != null) : _canonOver);
             Settlement kl = null;
             try { kl = Settlement.Find(ThroneTownId); } catch { kl = null; }
             _throneExists = kl != null;
@@ -789,6 +793,7 @@ namespace Armoury
             sb.Append(Tag).Append("doba | dzien ").Append(day)
               .Append(" | klucz ").Append(T(Key)).Append(", flaga testu ").Append(T(_flag)).Append(", kanon skonczony ").Append(T(_canonOver))
               .Append(", Polnoc po Bekartach ").Append(T(_northOpen)).Append(" (BastardsSiegeEvent ").Append(_bsState).Append(", BastardsEvent ").Append(_bEvState).Append(')')
+              .Append(_northExit != null && _bsState != 2 ? " [wyjscie 320a: " + _northExit + "]" : "")
               .Append(" | tron: ").Append(HolderText())
               .Append(" | limity: max wojen ").Append(MaxWars).Append(", sila ").Append(StrMin.ToString("0.00", Inv)).Append('-').Append(StrFull.ToString("0.00", Inv))
               .Append(", przerwa ").Append(GapDays).Append(" dni, zmeczenie ").Append(WearyAt.ToString("0", Inv)).Append(" (").Append(WearyText()).Append(')')
@@ -850,6 +855,7 @@ namespace Armoury
                   .Append(" | flaga testu ").Append(FlagName).Append(' ').Append(T(_flag)).Append(LogGate.Mode == 1 || LogGate.Mode == 2 ? "" : " (gra - flaga nieczytana)")
                   .Append(" | kanon skonczony ").Append(T(_canonOver)).Append(", Polnoc po Bekartach ").Append(T(_northOpen))
                   .Append(" (BastardsSiegeEvent ").Append(_bsState).Append(", BastardsEvent ").Append(_bEvState).Append(')')
+                  .Append(_northExit != null && _bsState != 2 ? " [wyjscie 320a: " + _northExit + "]" : "")
                   .Append(", najazd Aegona ").Append(T(_aegonIn)).Append(", najazd Daenerys ").Append(T(_danyIn))
                   .Append(" | tron: ").Append(HolderText())
                   .Append(" | zmeczenie: ").Append(WearyText())

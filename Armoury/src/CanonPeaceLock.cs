@@ -44,6 +44,9 @@ namespace Armoury
     /// 320a-KG (Jeff 02.11 "Polnoc nie zawiera pokoju z korona, dalej walczy"; klucz NorthFightsOnAfterRedWedding): wiersz Polnoc-korona ma faze 2 - po koncu kanonu
     /// (Krwawe Gody, takze stan 1 z martwym Robbem w chwili ExecuteRobb) blokada trwa, dopoki ROT BastardsSiegeEvent < 2 (ta sama granica co 312c
     /// IronThroneNorthAfterBastards). Pokoj ROT w ExecuteRobb usuwa KingInTheNorth.RwPeace (transpiler). Dorzecze-korona bez zmian.
+    /// 320a recenzja: faza 2 tylko, gdy Krwawe Gody NAPRAWDE zaszly (KingInTheNorth.RwHappened - flaga w zapisie arm_k320 z ExecuteRobb albo odtworzona ze stanu ROT);
+    /// smierc Robba bez wesela - stara regula (faza 0/1). Wyjscie fazy 2 poza Bekartami: KingInTheNorth.FightsOnEnd (Bekarci niemozliwi - Snow / Jon / Winterfell nie
+    /// u Boltonow WfDays dob - albo limit dob po Godach; zatrzask w zapisie) - powod w linii doby.
     /// </summary>
     internal static class CanonPeaceLock
     {
@@ -112,8 +115,16 @@ namespace Armoury
             return Locked(key, canon, playerChoice, eliminated, redWedding, heroDead, rotForced, false, -1, out why);
         }
 
-        /// <summary>320a-KG: fightsOn - wiersz z faza 2 i klucz NorthFightsOnAfterRedWedding; bastards - stan ROT BastardsSiegeEvent (-1 nie widac = faza trwa).</summary>
+        /// <summary>320a-KG: fightsOn - wiersz z faza 2 i klucz NorthFightsOnAfterRedWedding; bastards - stan ROT BastardsSiegeEvent (-1 nie widac = faza trwa, wyjscie
+        /// i tak przez fightsOnEnd). Bez rwHappened/fightsOnEnd - jak Krwawe Gody zaszly i bez wyjscia (stara sygnatura testow).</summary>
         internal static bool Locked(bool key, bool canon, bool playerChoice, bool eliminated, int redWedding, bool heroDead, bool rotForced, bool fightsOn, int bastards, out string why)
+        {
+            return Locked(key, canon, playerChoice, eliminated, redWedding, heroDead, rotForced, fightsOn, bastards, true, null, out why);
+        }
+
+        /// <summary>320a recenzja: rwHappened - Krwawe Gody zaszly (ExecuteRobb; inaczej faza 2 nie rusza); fightsOnEnd - wyjscie fazy 2 (null - brak).</summary>
+        internal static bool Locked(bool key, bool canon, bool playerChoice, bool eliminated, int redWedding, bool heroDead, bool rotForced, bool fightsOn, int bastards,
+                                    bool rwHappened, string fightsOnEnd, out string why)
         {
             if (!key) { why = "klucz NIE"; return false; }
             if (!canon) { why = "kampania klasyczna - nie dotyczy"; return false; }
@@ -126,7 +137,10 @@ namespace Armoury
                 return true;
             }
             string end = (heroDead ? "Robb nie zyje" : "Robb zyje") + ", RedWeddingEvent " + redWedding;
-            if (FightsOnPhase(fightsOn, bastards)) { why = end + " - Polnoc walczy dalej po Krwawych Godach, " + FightsOnEvent + " " + bastards; return true; }
+            if (FightsOnPhase(fightsOn, bastards, rwHappened, fightsOnEnd)) { why = end + " - Polnoc walczy dalej po Krwawych Godach, " + FightsOnEvent + " " + bastards; return true; }
+            if (fightsOn && bastards < 2)
+                end += rwHappened ? " - faza 2 koniec: " + fightsOnEnd : " - faza 2 nie: Krwawe Gody nie zaszly";   // 320a: powod w linii doby
+            else if (fightsOn) end += " - faza 2 koniec: Bitwa Bekartow, " + FightsOnEvent + " " + bastards;
             if (redWedding == 1) { why = end + " - wesele ROT w toku, ROT sam zawiera pokoj"; return false; }
             if (rotForced) { why = end + " - ROT wymusza te wojne, pokoj cofnalby nastepnej doby"; return true; }
             why = end + " - ROT nie wymusza tej wojny";
@@ -137,7 +151,10 @@ namespace Armoury
         internal static bool CanonOver(int redWedding, bool heroDead) { return redWedding >= 2 || heroDead; }
 
         /// <summary>320a-KG: faza 2 wiersza Polnoc-korona trwa, dopoki Bitwa Bekartow nie skonczona (stan BastardsSiegeEvent < 2).</summary>
-        internal static bool FightsOnPhase(bool fightsOn, int bastards) { return fightsOn && bastards < 2; }
+        internal static bool FightsOnPhase(bool fightsOn, int bastards) { return FightsOnPhase(fightsOn, bastards, true, null); }
+
+        /// <summary>320a recenzja: faza 2 tylko po prawdziwych Krwawych Godach i bez wyjscia (Bekarci niemozliwi albo limit dob).</summary>
+        internal static bool FightsOnPhase(bool fightsOn, int bastards, bool rwHappened, string fightsOnEnd) { return fightsOn && rwHappened && string.IsNullOrEmpty(fightsOnEnd) && bastards < 2; }
 
         /// <summary>Gracz wladca strony - pokoj jego wyborem, chyba ze droga nie daje mu wyboru (zmeczenie wojna Diplomacy: okno tylko OK albo odmowa wylaczona).</summary>
         internal static bool PlayerChoice(bool playerRules, bool noChoice) { return playerRules && !noChoice; }
@@ -185,9 +202,10 @@ namespace Armoury
             playerRules = Prologue.RulesRealm(a) || Prologue.RulesRealm(b);
             bool over = CanonOver(rw, heroDead);
             bool fightsOn = Rules[idx].FightsOn && FightsOnKey;
-            bool phase2 = over && FightsOnPhase(fightsOn, _cacheBs);
+            bool rwHappened = KingInTheNorth.RwHappened; string foEnd = KingInTheNorth.FightsOnEnd;   // 320a: na zywo (RwPeace ustawia flage w chwili ExecuteRobb)
+            bool phase2 = over && FightsOnPhase(fightsOn, _cacheBs, rwHappened, foEnd);
             bool rotForced = over && rw != 1 && !phase2 && Prologue.RotWarForced(a, b);   // odczyt ROT tylko po koncu kanonu (faza 2 i tak blokuje)
-            bool on = Locked(true, true, PlayerChoice(playerRules, noChoice), a.IsEliminated || b.IsEliminated, rw, heroDead, rotForced, fightsOn, _cacheBs, out why);
+            bool on = Locked(true, true, PlayerChoice(playerRules, noChoice), a.IsEliminated || b.IsEliminated, rw, heroDead, rotForced, fightsOn, _cacheBs, rwHappened, foEnd, out why);
             phase = !on || !over ? 0 : (phase2 ? 2 : 1);
             return on;
         }
@@ -485,8 +503,9 @@ namespace Armoury
                 if (global == null || on) global = why;
                 bool war = a != null && b != null && !a.IsEliminated && !b.IsEliminated && a.IsAtWarWith(b);
                 string since = war ? Prologue.WarSinceText(a, b, r.A == Prologue.RiverId || r.B == Prologue.RiverId ? Prologue.RiverFirstDay : Prologue.NoDayValue) : "";
+                int fz = r.FightsOn && rp != 2 && why != null ? why.IndexOf(" - faza 2 ", StringComparison.Ordinal) : -1;   // 320a: powod konca / braku fazy 2
                 parts.Add(r.Label + ": " + (on ? (rp == 2 ? "CZYNNA (Polnoc walczy po Krwawych Godach, " + FightsOnEvent + " " + _cacheBs + ")" : rp == 1 ? "CZYNNA (ROT wymusza)" : "CZYNNA") : "KONIEC")
-                          + ", wojna " + (war ? "TAK " + since : "NIE"));
+                          + ", wojna " + (war ? "TAK " + since : "NIE") + (fz >= 0 ? " [" + why.Substring(fz + 3) + "]" : ""));
             }
             if (!KeyOn) sb.Append("blokada WYLACZONA (klucz NIE)");
             else if (!Prologue.CanonHere) sb.Append("blokada NIE DOTYCZY (kampania klasyczna)");

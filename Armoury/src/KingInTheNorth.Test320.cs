@@ -95,10 +95,18 @@ namespace Armoury
                     var north = K(NorthId); var west = K(CrownId); var river = K(RiverId);
                     Log.Info(T320 + "po Godach: " + string.Join("; ", parts.ToArray()) + " | Polnoc lenna " + (Alive(north) ? north.Fiefs.Count.ToString() : "-") + ", korona lenna "
                              + (Alive(west) ? west.Fiefs.Count.ToString() : "-") + ", Dorzecze " + (Alive(river) ? "lenna " + river.Fiefs.Count : "brak") + " | Polnoc-korona w wojnie "
-                             + (Alive(north) && Alive(west) && north.IsAtWarWith(west) ? "TAK" : "NIE") + " | Roose zyje " + RooseAlive() + ".");
+                             + (Alive(north) && Alive(west) && north.IsAtWarWith(west) ? "TAK" : "NIE") + " | Roose zyje " + RooseAlive()
+                             + " | Winterfell " + WfOwner320() + " | " + Rw320Text() + ".");
                 }
             }
             catch (Exception e) { Stumble("Test320Daily", e); Log.Info(T320 + "wyjatek " + e.GetType().Name + " - NIE."); }
+        }
+
+        /// <summary>320a: pan Winterfell do linii testu (recenzja: Bekarci wymagaja Winterfell u Boltonow).</summary>
+        private static string WfOwner320()
+        {
+            try { var wf = TaleWorlds.CampaignSystem.Settlements.Settlement.Find(WinterfellId); var o = wf != null ? wf.OwnerClan : null; return o == null ? "-" : Nm(o) + " (" + o.StringId + ", " + (o.Kingdom != null ? o.Kingdom.StringId : "-") + ")"; }
+            catch { return "?"; }
         }
 
         /// <summary>Z RwPeace (przed przeniesieniem rodow przez ROT): partie odchodzacych rodow w bitwie albo oblezeniu.</summary>

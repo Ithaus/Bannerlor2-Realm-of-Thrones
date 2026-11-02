@@ -10372,7 +10372,7 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarNoPeaceUntilRedWedding { get; set; } = true;
 
-        [SettingPropertyBool("North Fights On After Red Wedding", HintText = "the Red Wedding no longer makes peace between the North and the crown: the Boltons and the lords who betray Robb Stark go over to the crown with their lands, and the rest of the North fights on. Peace by council vote, war weariness (Diplomacy) or Banner Kings pressure stays blocked until the Battle of the Bastards. If you rule one of these realms, peace is your choice. Off = the Red Wedding ends this war as in Realm of Thrones", RequireRestart = false)]
+        [SettingPropertyBool("North Fights On After Red Wedding", HintText = "the Red Wedding no longer makes peace between the North and the crown: the Boltons and the lords who betray Robb Stark go over to the crown with their lands, and the rest of the North fights on. Peace by council vote, war weariness (Diplomacy) or Banner Kings pressure stays blocked until the Battle of the Bastards, or until it can no longer happen (Jon Snow dead, or Winterfell out of Bolton hands for months) or about two years have passed since the wedding. If you rule one of these realms, peace is your choice. Off = the Red Wedding ends this war as in Realm of Thrones", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool NorthFightsOnAfterRedWedding { get; set; } = true;
 
@@ -10439,6 +10439,10 @@ namespace Armoury
         [SettingPropertyBool("River Lords Defect At Red Wedding", HintText = "after the river lords became vassals of the King in the North, at the Red Wedding the Freys and the river houses who side with them (Mooton, Cox, Bracken) go over to the crown with their lands, as Realm of Thrones does when the Riverlands are a realm of their own. Off = they stay with the North", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool RiverLordsDefectAtRedWedding { get; set; } = true;
+
+        [SettingPropertyBool("Red Wedding Returns Stolen Castles", HintText = "at the Red Wedding, the castles and towns that the lords now going over to the crown had taken from the Lannisters and their vassals are given back to the houses that held them when the campaign began (or to the royal house, if that house is gone). Castles of the crown held by northern lords who stay loyal to the North stay theirs: the crown must take them back by siege. Not if you rule the crown. Off = the turncloaks keep everything they hold", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool RedWeddingReturnsStolenCastles { get; set; } = true;
 
         [SettingPropertyBool("Canon War Balance", HintText = "War of the Five Kings stays an even fight until the Red Wedding: the North and the Riverlands on one side, the crown with the Westerlands on the other. When one side has been more than 1.5 times stronger for three days, the weaker side's lords recruit to full strength in their own lands (volunteers, and veterans hired from town taverns with their own gold) and houses at their party limit may raise one more party from their own idle lords and garrisons. No men or gold come from nothing. Nobody besieges Winterfell, Riverrun, the Twins, Casterly Rock or King's Landing before the Red Wedding. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
@@ -13781,6 +13785,7 @@ namespace Armoury
             s.DaenerysDragonsGrow = DaenerysDragonsGrow;
             s.CanonNorthRiverlandsUnion = CanonNorthRiverlandsUnion;
             s.RiverLordsDefectAtRedWedding = RiverLordsDefectAtRedWedding;
+            s.RedWeddingReturnsStolenCastles = RedWeddingReturnsStolenCastles;
             s.CanonWarBalance = CanonWarBalance;
             s.CanonWarBalanceRestraint = CanonWarBalanceRestraint;
             s.CanonWarBalanceMuster = CanonWarBalanceMuster;

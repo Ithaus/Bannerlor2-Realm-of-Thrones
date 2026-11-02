@@ -89189,7 +89189,7 @@ TT312_START = re.compile(r"^Wojny o tron \(312c\): start sesji \| latka GetScore
 # 15 z czlonem, 16-17 srednia, 18 zmienil znak, 19 ocen par, 20 czlon>0 par, 21 pozycje, 22 bramki, 23 wojny o tron dzis, 24 lista, 25 od wczytania, 26 trwajace,
 # 27-28 pokoje, 29 dawna para zatargu, 30-32 dolaczenia, 33-34 inne, 35 przerwa do dnia, 36 wywolan, 37 z czlonem, 38-39 srednia, 40 potkniecia dzis, 41 razem
 TT312_DAY = re.compile(r"^Wojny o tron \(312c\): doba \| dzien (\d+) \| klucz (TAK|NIE), flaga testu (TAK|NIE), kanon skonczony (TAK|NIE), Polnoc po Bekartach (TAK|NIE)"
-                       r"(?: \(BastardsSiegeEvent -?\d+, BastardsEvent -?\d+\))? \| tron: (.*?) \| limity: max wojen (\d+), sila ([\d.]+)-([\d.]+), przerwa (\d+) dni, zmeczenie (\d+) \((.*?)\) "
+                       r"(?: \(BastardsSiegeEvent -?\d+, BastardsEvent -?\d+\))?(?: \[wyjscie 320a: [^\]]*\])? \| tron: (.*?) \| limity: max wojen (\d+), sila ([\d.]+)-([\d.]+), przerwa (\d+) dni, zmeczenie (\d+) \((.*?)\) "
                        r"\| wywolania postfiksu dzis (\d+), z ocena pary (\d+), z czlonem (\d+) \(srednia przed (\S+), po (\S+)\), czlon zmienil znak (\d+) "
                        r"\| ocen par (\d+) \| czlon > 0: (\d+) par(?: \[(.*?)\])? \| zero przez bramke: (.*?) "
                        r"\| wojny o tron dzis (\d+)(?: \[(.*?)\])?, od wczytania (\d+), trwajace (\d+), pokoje w nich dzis (\d+), od wczytania (\d+), w dawnej parze zatargu od wczytania (\d+) "
@@ -92074,20 +92074,34 @@ F320_RL = re.compile(r"Fabula \(320a\): RiverlandsDeclareWarEvent pominiete (\S+
 F320_DIAG = re.compile(r"FABULA: dzien (-?\d+) \| zaleglych na osi: (\d+) \| czolo kolejki: (\S+)")
 F320_RW = re.compile(r"Krwawe Gody bez pokoju \(320\): ExecuteRobb - pokoj (\S+) (POMINIETY|ZAWARTY \(jak ROT\)) \((.*?), podmian (\d+)\) \| wojna (TAK|NIE) \| Roose zyje (\S+)")
 F320_DAY = re.compile(r"Pokoj kanonu \(264\): dzien (\d+) \| blokada .*?\| Polnoc-korona: (CZYNNA \(Polnoc walczy po Krwawych Godach[^)]*\)|CZYNNA \(ROT wymusza\)|CZYNNA|KONIEC), wojna (TAK|NIE)")
+F320_MARK = re.compile(r"Krwawe Gody \(320a\): zaszly \((.*?)\) \| dzien kampanii")
+F320_RET = re.compile(r"Krwawe Gody \(320a\): zwrot (.+?) \[(\S+)\] od (.+?) \((\S+)\) do (.+?) \((\S+), (.*?); pierwotnie (\S+)\) (TAK|NIE) \|")
+F320_RETSUM = re.compile(r"Krwawe Gody \(320a\): zwrot zamkow korony \| rodow, ktore przeszly (\d+) .*?\| zwroconych (\d+), zostaje \(nie korony z poczatku\) (\d+)")
+F320_EXIT = re.compile(r"Krwawe Gody \(320a\): faza 2 blokady Polnoc-korona i bramka 312c Polnoc po Bekartach - WYJSCIE: (.+?) \| Krwawe Gody (zaszly|nie zaszly)")
 F320_SAMPLES = [
     "[21:01:32] Fabula (320a): lancuch Harrenhal zamkniety - Harrenhal trzyma House Paege (ROTclan_1, The North / battania), nie Clegane: pominiete HarrenhalEvent TAK, HarrenhalSiegeEvent TAK, HarrenhalSiegeNotificationEvent TAK (ROT SkipEvent, w zapisie ROT; Harrenhal bez zmiany pana) | dzien 368.",
     "[21:01:32] Fabula (320a): RiverlandsDeclareWarEvent pominiete TAK - krolestwa Dorzecza nie ma (wyeliminowane - unia 272 albo podboj); po Krwawych Godach nie odpali z tekstem holdu | dzien 368.",
     "[21:01:32] FABULA: dzien 368 | zaleglych na osi: 0 | czolo kolejki: brak | przyszlych: 18 | ostatni start: zaden | pominietych: 0",
     "[10:00:00] Krwawe Gody bez pokoju (320): ExecuteRobb - pokoj battania-vlandia POMINIETY (blokada 264 faza 2, podmian 1) | wojna TAK | Roose zyje NIE | wywolanie 1 | dzien opowiesci 953.2.",
     "[10:00:01] Pokoj kanonu (264): dzien 109900 | blokada CZYNNA (Robb nie zyje, RedWeddingEvent 2 - Polnoc walczy dalej po Krwawych Godach, BastardsSiegeEvent 0) | Polnoc-korona: CZYNNA (Polnoc walczy po Krwawych Godach, BastardsSiegeEvent 0), wojna TAK od dnia 9.0 | Dorzecze-korona: KONIEC, wojna TAK | zablokowane dzis 0, sesja 0 | gracz rzadzi: nie | potkniecia 0 (sesja 0).",
+    "[10:00:00] Krwawe Gody (320a): zaszly (ExecuteRobb) | dzien kampanii 1120.4, dzien opowiesci 953.2 | rody Polnoc w chwili Godow 31 | faza 2 blokady Polnoc-korona do Bitwy Bekartow albo do wyjscia (Bekarci niemozliwi: Snow / Jon / Winterfell nie u Boltonow 120 dob; limit 723.1 dob).",
+    "[10:00:00] Krwawe Gody (320a): zwrot Crakehall [castle_V2] od House Bolton (clan_empire_south_3) do House Crakehall (clan_vlandia_4, rod pierwotny; pierwotnie clan_vlandia_4) TAK | wiosek 2 | zaloga 140.",
+    "[10:00:00] Krwawe Gody (320a): zwrot zamkow korony | rodow, ktore przeszly 10 (migawka Polnocy): House Bolton, House Frey | zwroconych 1, zostaje (nie korony z poczatku) 6 [Winterfell (pierwotnie clan_battania_1)], bez danych ROT 0, bez odbiorcy 0 | dane: osad 228, rodow 260 | twierdze korony u lordow Polnocy, ktorzy zostali - korona musi je odbic.",
+    "[11:00:00] Krwawe Gody (320a): faza 2 blokady Polnoc-korona i bramka 312c Polnoc po Bekartach - WYJSCIE: Winterfell u House Stark (clan_battania_1) od 120 dob, nie u Boltonow - Bekarci niemozliwi | Krwawe Gody zaszly (ExecuteRobb) | dzien kampanii 1300.0, dzien opowiesci 1133.0.",
+    "[11:00:01] Pokoj kanonu (264): dzien 110100 | blokada KONIEC (Robb nie zyje, RedWeddingEvent 2 - faza 2 koniec: limit 723.1 dob po Krwawych Godach bez Bitwy Bekartow (BastardsSiegeEvent 0) - ROT nie wymusza tej wojny) | Polnoc-korona: KONIEC, wojna TAK od dnia 9.0 [faza 2 koniec: limit 723.1 dob po Krwawych Godach bez Bitwy Bekartow (BastardsSiegeEvent 0) - ROT nie wymusza tej wojny] | Dorzecze-korona: KONIEC, wojna TAK | zablokowane dzis 0, sesja 0 | gracz rzadzi: nie | potkniecia 0 (sesja 0).",
 ]
 
 
 def f320_selftest():
     a = F320_HH.search(F320_SAMPLES[0]); b = F320_RL.search(F320_SAMPLES[1]); c = F320_DIAG.search(F320_SAMPLES[2])
     d = F320_RW.search(F320_SAMPLES[3]); e = F320_DAY.search(F320_SAMPLES[4])
+    g = F320_MARK.search(F320_SAMPLES[5]); h = F320_RET.search(F320_SAMPLES[6]); k = F320_RETSUM.search(F320_SAMPLES[7]); x = F320_EXIT.search(F320_SAMPLES[8])
+    y = F320_DAY.search(F320_SAMPLES[9])
     return bool(a and a.group(2) == "TAK" and a.group(5) == "368" and b and b.group(1) == "TAK" and c and c.group(3) == "brak"
-                and d and d.group(2) == "POMINIETY" and d.group(4) == "1" and e and e.group(2).startswith("CZYNNA (Polnoc walczy"))
+                and d and d.group(2) == "POMINIETY" and d.group(4) == "1" and e and e.group(2).startswith("CZYNNA (Polnoc walczy")
+                and g and g.group(1) == "ExecuteRobb" and h and h.group(2) == "castle_V2" and h.group(9) == "TAK" and h.group(8) == "clan_vlandia_4"
+                and k and k.group(2) == "1" and x and "Winterfell" in x.group(1) and x.group(2) == "zaszly"
+                and y and y.group(2) == "KONIEC" and "[faza 2 koniec:" in F320_SAMPLES[9])
 
 
 def f320_cs_rows(rep, lines):
@@ -92141,10 +92155,30 @@ def f320_arm_rows(rep, lines):
         # od pierwszej linii fazy 2: zadnej doby Polnoc-korona KONIEC ani bez wojny
         idx = next((i for i, m in enumerate(days) if m.group(2).startswith("CZYNNA (Polnoc walczy")), None)
         tail = days[idx:] if idx is not None else []
-        off = [m for m in tail if m.group(2) == "KONIEC" or m.group(3) == "NIE"]
+        # 320a: po wyjsciu fazy 2 (linia doby "[faza 2 koniec: ...]") KONIEC jest zgodny z regula
+        off = [m for m in tail if (m.group(2) == "KONIEC" or m.group(3) == "NIE") and "[faza 2 koniec" not in m.string]
         rep.add("F320-10: doby po Godach - Polnoc-korona CZYNNA (Polnoc walczy) i wojna TAK", f"dob fazy 2 {len(fo)}, bez blokady albo bez wojny {len(off)}", ">= 1, 0", len(fo) >= 1 and not off)
     peace = [x for x in lines if re.search(r"Wojna i pokoj \(E7/0\): dzien \d+ \| (The North - House Baratheon of King's Landing|House Baratheon of King's Landing - The North): POKOJ \(", x)]
     rep.add("F320-11: pokoje Polnoc-korona (linie POKOJ)", str(len(peace)) + (" | " + peace[0][:160] if peace else ""), "0 po Godach (INFO przed)", None if not rw else len(peace) == 0)
+    # 320a recenzja: faza 2 tylko po prawdziwych Godach (flaga), wyjscie bez Bekartow, zwrot zamkow korony (Jeff 02.11)
+    mark = [m for m in (F320_MARK.search(x) for x in lines) if m]
+    if rw or mark:
+        rep.add("F320-12: Krwawe Gody zaszly (flaga 320a)", f"{len(mark)}" + (f" | {mark[0].group(1)}" if mark else ""), "1 przy ExecuteRobb", len(mark) == 1 if rw else None)
+    ret = [m for m in (F320_RET.search(x) for x in lines) if m]
+    rsum = [m for m in (F320_RETSUM.search(x) for x in lines) if m]
+    if rsum or ret:
+        bad = [m for m in ret if m.group(9) != "TAK"]
+        rep.add("F320-13: zwrot zamkow korony (linia zbiorcza, raz)", f"linii {len(rsum)} | zwroconych {rsum[-1].group(2) if rsum else '?'}, zostaje {rsum[-1].group(3) if rsum else '?'} | zwrotow NIE {len(bad)}",
+                "1 linia, 0 NIE", len(rsum) == 1 and not bad)
+        own = [m for m in ret if m.group(4) == m.group(6)]
+        rep.add("F320-14: zwrot do tego samego rodu", str(len(own)), "0", len(own) == 0)
+    elif rw:
+        rep.add("F320-13: zwrot zamkow korony", "brak linii", "1 linia zbiorcza po ExecuteRobb", False)
+    ex = [m for m in (F320_EXIT.search(x) for x in lines) if m]
+    if ex:
+        rep.add("F320-15: wyjscie fazy 2 / bramki 312c (zatrzask)", f"{len(ex)} | {ex[0].group(1)[:120]}", "najwyzej 1 na kampanie (INFO)", None if len(ex) == 1 else False)
+    pot = [x for x in lines if "KingInTheNorth.ReturnStolen" in x or "KingInTheNorth.Rw320Daily" in x or "KingInTheNorth.RwMark" in x]
+    rep.add("F320-16: potkniecia 320a (ReturnStolen / Rw320Daily / RwMark)", str(len(pot)), "0", len(pot) == 0)
 
 
 def fabula320a_main(cslog, armlog=None):
@@ -92168,7 +92202,7 @@ def fabula320a_main(cslog, armlog=None):
         with open(armlog, encoding="utf-8", errors="replace") as f:
             for line in f:
                 s = line.rstrip("\r\n")
-                if "Krol Polnocy (272)" in s or "(320)" in s or "Pokoj kanonu (264): dzien" in s or "Wojna i pokoj (E7/0)" in s:
+                if "Krol Polnocy (272)" in s or "(320)" in s or "(320a)" in s or "KingInTheNorth." in s or "Pokoj kanonu (264): dzien" in s or "Wojna i pokoj (E7/0)" in s:
                     al.append(s)
         print(f"plik: {armlog}")
         f320_arm_rows(rep, al)
