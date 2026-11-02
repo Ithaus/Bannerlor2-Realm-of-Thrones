@@ -963,6 +963,9 @@ namespace Armoury
         /// papier ...") do porownania. Podglad niedostepny (bez DTE, TroopsFightWithOwnKitOnly wylaczone, otwarta zbrojownia, potkniecie) - jak dotad, z papieru.
         /// 133f (K13): komunikaty kwatermistrza w tym pliku ida przez Log.Player / PlayerNews.Show - znacznik pliku z listy wojska, wpis w "Recent messages" i Armoury.log.
         /// </summary>
+        private static Campaign _shoutCampaign;          // 316d: baza koloru meldunku - ostatnio meldowane puste sloty / jezdzcy pieszo (-1 = brak meldunku w tej kampanii)
+        private static int _shoutMiss = -1, _shoutFoot = -1;
+
         internal static bool ShoutShortages(string headline)
         {
             try
@@ -970,10 +973,19 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.QuartermasterShouts) return false;
                 var lines = ShortageLines();
-                string one; bool any;
-                if (KitPreview.ShoutLine(headline, lines.Count, out one, out any))
+                string one; bool any; int miss, foot;
+                if (KitPreview.ShoutLine(headline, lines.Count, out one, out any, out miss, out foot))
                 {
-                    if (any) Log.Player(one, true);
+                    // 316d (audyt 02.11: 177 czerwonych "QM: N kit slots empty ..." w jednej sesji, ta sama liczba co chwila): kolor zwykly,
+                    // czerwony tylko gdy pustych slotow albo jezdzcow pieszo przybylo od ostatniego meldunku (pierwszy w kampanii - czerwony)
+                    if (!ReferenceEquals(_shoutCampaign, Campaign.Current)) { _shoutCampaign = Campaign.Current; _shoutMiss = -1; _shoutFoot = -1; }
+                    bool grew = _shoutMiss < 0 || miss > _shoutMiss || foot > _shoutFoot;
+                    if (any)
+                    {
+                        Log.Player(one, grew);
+                        Log.Info("Kwatermistrz (316d): meldunek pustych " + miss + ", pieszo " + foot + " - " + (grew ? "czerwony (przybylo od " + _shoutMiss + "/" + _shoutFoot + ")" : "zwykly kolor (bez wzrostu od " + _shoutMiss + "/" + _shoutFoot + ")"));
+                    }
+                    _shoutMiss = miss; _shoutFoot = foot;   // komplet tez ustawia baze - kolejny brak bedzie wzrostem
                     return any;
                 }
                 if (lines.Count == 0) return false;
@@ -1752,15 +1764,70 @@ namespace Armoury
 
         /// <summary>K1 (przeglad, B4): dostawa od kowala to Twoj wklad poza ekranem - ten sam komunikat co przy wkladzie na ekranie, gdy nikt
         /// jej nie udzwignie (zostaje Twoja); reszte rozliczy najblizszy porzadek (wjazd do miasta, ekran zbrojowni).</summary>
-        internal static void ShoutIfNoUse(ItemObject it)
+        internal static void ShoutIfNoUse(ItemObject it) { ShoutIfNoUse(it, 1); }
+
+        internal static void ShoutIfNoUse(ItemObject it, int n)
+        {
+            if (it == null || n <= 0) return;
+            var one = new List<KeyValuePair<ItemObject, int>>();
+            one.Add(new KeyValuePair<ItemObject, int>(it, n));
+            ShoutNoUse(one, "dostawa");
+        }
+
+        // 316d (audyt 02.11: 105 czerwonych "QM: no man can use X ... - stays yours." w jednej sesji, ten sam luk 31 razy, ten sam wklad po kilka
+        // razy w jednym przegladzie): JEDNA linia zbiorcza na przeglad, ten sam przedmiot (StringId) na ekranie najwyzej raz na 7 dni kampanii.
+        // Tylko napis - logika (co zostaje gracza) bez zmian; szczegoly (skill, wymog, najlepszy) w jednej linii Log.Info na przeglad.
+        private const double NoUseQuietDays = 7.0;
+        private static readonly Dictionary<string, double> _noUseTold = new Dictionary<string, double>();   // StringId -> dzien kampanii ostatniego meldunku na ekranie
+        private static Campaign _noUseCampaign;   // stan czyszczony przy innej kampanii (wczytanie innego zapisu w tym samym procesie)
+        private const int NoUseNamesMax = 6;
+
+        internal static void ShoutNoUse(IEnumerable<KeyValuePair<ItemObject, int>> items, string where)
         {
             try
             {
-                int best; string sk;
-                if (it != null && !PartyWords.NoTroops && !AnyoneCanUse(it, out best, out sk))   // m110-sam: bez zolnierzy nie ma komu wydac - bez "no man can use"
-                    Log.Player("QM: no man can use " + it.Name + " (needs " + sk + " " + it.Difficulty + ", best " + best + ") - stays yours.", true);
+                if (items == null || PartyWords.NoTroops) return;   // m110-sam: bez zolnierzy nie ma komu wydac - bez "no man can use"
+                if (!ReferenceEquals(_noUseCampaign, Campaign.Current)) { _noUseTold.Clear(); _noUseCampaign = Campaign.Current; }
+                double now = CampaignTime.Now.ToDays;
+                var order = new List<string>();
+                var count = new Dictionary<string, int>();
+                var item = new Dictionary<string, ItemObject>();
+                foreach (var kv in items)
+                {
+                    var it = kv.Key;
+                    if (it == null || kv.Value <= 0) continue;
+                    string id = it.StringId ?? it.Name.ToString();
+                    int c;
+                    if (!count.TryGetValue(id, out c)) { order.Add(id); item[id] = it; c = 0; }
+                    count[id] = c + kv.Value;
+                }
+                var shown = new List<string>();
+                var detail = new List<string>();
+                int pieces = 0, quiet = 0;
+                foreach (var id in order)
+                {
+                    var it = item[id];
+                    int best; string sk;
+                    if (AnyoneCanUse(it, out best, out sk)) continue;
+                    int c = count[id];
+                    double t;
+                    bool told = _noUseTold.TryGetValue(id, out t) && now >= t && now - t < NoUseQuietDays;
+                    detail.Add(id + " x" + c + " (" + sk + " " + it.Difficulty + ", najlepszy " + best + (told ? ", na ekranie cicho - meldowane " + (now - t).ToString("0.0") + " dni temu" : "") + ")");
+                    if (told) { quiet += c; continue; }
+                    _noUseTold[id] = now;
+                    pieces += c;
+                    shown.Add(it.Name + (c > 1 ? " x" + c : ""));
+                }
+                if (detail.Count == 0) return;
+                Log.Info("Kwatermistrz (316d, " + where + "): nikt nie udzwignie - zostaje gracza: " + string.Join(", ", detail.ToArray())
+                         + " | na ekranie " + pieces + " szt. (" + shown.Count + " rodzajow), cicho " + quiet + " szt.");
+                if (shown.Count == 0) return;
+                string list = string.Join(", ", shown.GetRange(0, Math.Min(NoUseNamesMax, shown.Count)).ToArray())
+                              + (shown.Count > NoUseNamesMax ? " and " + (shown.Count - NoUseNamesMax) + " more" : "");
+                Log.Player("QM: no man can use " + pieces + (pieces == 1 ? " piece" : " pieces") + " in your baggage (" + list + ") - "
+                           + (pieces == 1 ? "it stays yours." : "they stay yours."), true);
             }
-            catch (Exception e) { Log.Error("Escrow.ShoutIfNoUse", e); }
+            catch (Exception e) { Log.Error("Escrow.ShoutNoUse", e); }
         }
 
         private static void ProcessSwaps(ItemRoster armory)
@@ -1778,15 +1845,11 @@ namespace Armoury
             try
             {
                 if (armory == null) { ClearPending(); return; }
+                // 316d: jedna linia zbiorcza zamiast linii na kazdy wpis wkladu (m110-sam: bez zolnierzy cisza - o wkladach mowi PurgeUnusable)
+                var noUse = new List<KeyValuePair<ItemObject, int>>();
                 foreach (var dep in _pendingSwaps)
-                {
-                    var it = dep.Key;
-                    if (it == null) continue;
-                    int bestSkill; string skillName;
-                    if (!PartyWords.NoTroops && !AnyoneCanUse(it, out bestSkill, out skillName))   // m110-sam: bez zolnierzy nie ma komu wydac - o wkladach mowi PurgeUnusable
-                        Log.Player("QM: no man can use " + it.Name + " (needs " + skillName + " " + it.Difficulty
-                                   + ", best " + bestSkill + ") - stays yours.", true);
-                }
+                    if (dep.Key != null) noUse.Add(new KeyValuePair<ItemObject, int>(dep.Key, Math.Max(1, dep.Value.Key)));
+                ShoutNoUse(noUse, "przeglad zbrojowni");
                 QuartermasterLaw.PurgeUnusable(armory, _pendingKeys.Count > 0 ? new Dictionary<string, int>(_pendingKeys) : null);   // K1 (Jeff 09.10 04:40): komunikat takze, gdy nic nie wzieli; K1c: tylko o wkladach tej sesji
             }
             catch (Exception e) { Log.Error("Escrow.ProcessSwaps", e); }

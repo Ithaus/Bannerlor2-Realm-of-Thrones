@@ -1295,9 +1295,9 @@ namespace Armoury
 
         /// <summary>Decyzja Jeffa (a) / K14: kwatermistrz (ShoutShortages - po bitwie, rano, przy otwarciu zbrojowni) na ekranie JEDNA linia z podgladu bitwy.
         /// false - podglad niedostepny (wolajacy zostaje przy papierze, jak dotad). any - czy jest co meldowac (puste sloty albo jezdzcy pieszo).</summary>
-        internal static bool ShoutLine(string headline, int paperShort, out string line, out bool any)
+        internal static bool ShoutLine(string headline, int paperShort, out string line, out bool any, out int missing, out int foot)
         {
-            line = null; any = false;
+            line = null; any = false; missing = 0; foot = 0;   // 316d: liczby dla koloru meldunku (QuartermasterLaw.ShoutShortages)
             if (!CsQuiet) return false;   // recenzja 133: CrashScribe sprzed 133a pisalby szum przy kazdym meldunku - papier jak przed 133
             Result r;
             var before = _last;
@@ -1306,6 +1306,7 @@ namespace Armoury
             if (r == null || !r.Ok) return false;
             bool fresh = !ReferenceEquals(r, before);
             any = r.Missing > 0 || r.Foot > 0;
+            missing = r.Missing; foot = r.Foot;
             if (any)
             {
                 var parts = new List<string>();
