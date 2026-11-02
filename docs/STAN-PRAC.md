@@ -1,6 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
-## STAN 01.11.2026 ok. 14:50 CET: WGRANIE 148 (najnowszy)
+## STAN 02.11.2026 ok. 03:30 CET: WGRANIE 154 (najnowszy)
+- W GRZE: Armoury.dll 093080cecf8fd6fdd00d97502687793a (galaz noc/316x-integracja, commit c54658c3, wypchnieta) + CrashScribe aa32d04e. Baza testu: bannerlord-autotest	est\prod154.
+- Lancuch od 148: 149 (312g/h) -> 150 (313a arakhy, 312h oboz) -> 151 (noc/314x: 313b-d ostrzal/stamina/krwawienie + 313z zgon z krwawienia bez AV, 314a bez leczenia RBM,
+  314b Indebted Lord 420 dob, 314c zold krolewski po 40 dniach + nagroda krola) -> 152 (315a sen do switu) -> 153 (315b noc 21-3, 315c 6 h snu bez dosypiania; WGRANE BEZ TESTU na polecenie Jeffa)
+  -> 154 (316a zapas musztry bez strat, 316b swit/zmierzch bez falszywego marszu, 316c nagroda raz na dobe, 316d QM bez zalewu, 316e diagnostyka wjazdu do wsi gry). Szczegoly: CHANGELOG na galezi noc/316x-integracja.
+- DO SPRAWDZENIA w grze Jeffa: linie "Wjazd do wsi gry:" (Jeff 01.11: do wsi glownej tylko popup - przyczyna nieznana, --grupa wjazd316e), sen315b/sen316b, zapas316a, zold314c.
+- DECYZJE JEFFA otwarte: ZB-6 (kolumna idzie noca po odpoczynku za dnia przy "always make camp"?), bandyci panikuja szybko (wczesne zalamanie 309 - zostawic?), Stormlands skarbiec -16 tys./dobe (obserwacja).
+
+## STAN 01.11.2026 ok. 14:50 CET: WGRANIE 148
 - W GRZE: Armoury.dll ef080a64a09b09787dddc7e8f7c6a977 (galaz noc/312x-integracja, wypchnieta, commit 2aec1664) + CrashScribe aa32d04e (bez zmian od 147).
   Kopia 147: Armoury.dll.bak-2026-11-01-przed-wgranie148 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie148-przed.
 - Test 312x: bitwy kod 0, 120 dob KONIEC OK, ERROR 0; szczegoly we wpisie CHANGELOG "WGRANIE 148". Jeff sprawdza w swojej grze.
