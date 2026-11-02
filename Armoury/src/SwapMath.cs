@@ -29,7 +29,7 @@ namespace Armoury
         {
             public string Id = "", Mod = "";
             public int Tier = 1;          // tier wyswietlany 1..6
-            public long Power;            // sila: RangedRank.Key (naciag RBM dla lukow i kusz, Effectiveness dla reszty)
+            public long Power;            // sila: RangedRank.Key (naciag RBM dla lukow i kusz, 317a typ obrazen/dmg/speed RBM dla strzal i beltow, Effectiveness dla reszty)
             public int Req;               // wymog (Difficulty) - porzadek dopasowania
             public float Quality = 1f;    // PriceMultiplier modyfikatora (brak = 1)
             public bool Wreck;            // wrak - zawsze najgorszy w swoim id

@@ -91416,5 +91416,75 @@ def main(argv):
     return _wjazd316e_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 317a (02.11): klute przed cietymi - grupa klute317a
+# Jeff 02.11: "klute przed cietymi tak" (papier 01.11 02:19:55: GRE_hardened_100 skut=2327 uzyte 6/6, ravens_teeth_arrows skut=146 uzyte 0/24 - stara
+# skutecznosc z XML sprzed podmiany ROT pod RBM). Armoury/src/RangedRank.cs Key: strzaly i belty pod RBM - typ obrazen (P>C>B), dmg, speed, skutecznosc;
+# CrashScribe/src/Mends.cs RangedKey (straz bitewna) tak samo.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa klute317a <Armoury-*.log>
+#  K317-1  papiery Arrows/Bolts w nowym formacie ("317a typ obrazen", wpisy dmg=..P speed=..); stary format (skut=) dla amunicji = stary DLL
+#  K317-2  porzadek: przy rownym wymogu klute (P) przed cietymi (C) przed obuchowymi (B), w typie dmg malejaco
+#  K317-3  ravens_teeth_arrows na ostatnim papierze Arrows: uzyte > 0 (lucznicy z najwyzszym skillem biora klute)
+#  K317-4  zero linii ERROR z QuartermasterLaw.FitFor
+def klute317a_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("K317-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    newp, oldp, errors = [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            if s.startswith("Kwatermistrz: papier Arrows po kolei") or s.startswith("Kwatermistrz: papier Bolts po kolei"):
+                if "317a typ obrazen" in s:
+                    newp.append(s)
+                elif "skut=" in s:
+                    oldp.append(s)
+            elif "ERROR" in s and "QuartermasterLaw.FitFor" in s:
+                errors.append(s)
+    print(f"plik: {logp}")
+    rep.add("K317-1: papiery amunicji w nowym formacie (dmg/typ/speed)", f"nowych {len(newp)}, starych (skut=) {len(oldp)}", "nowe > 0 (nowy DLL)",
+            (len(newp) > 0) if (newp or oldp) else None)
+    ent = re.compile(r"(\S+?) wymog=(\d+) dmg=(\d+)([PCB?]) speed=(\d+) t(\d) uzyte=(\d+)/(\d+)")
+    rank = {"P": 3, "C": 2, "B": 1, "?": 0}
+    bad, nent = [], 0
+    for s in newp:
+        prev = None
+        for m in ent.finditer(s):
+            nent += 1
+            req, dmg, typ = int(m.group(2)), int(m.group(3)), rank[m.group(4)]
+            if prev is not None and req == prev[0]:
+                if typ > prev[2] or (typ == prev[2] and dmg > prev[1]):
+                    bad.append(m.group(1) + " po " + prev[3] + " (wymog " + str(req) + ")")
+            prev = (req, dmg, typ, m.group(1))
+    rep.add("K317-2: przy rownym wymogu P>C>B, w typie dmg malejaco", f"wpisow {nent}, niezgodnych {len(bad)}" + (f" (pierwszy: {bad[0]})" if bad else ""),
+            "niezgodnych 0", (len(bad) == 0) if nent else None)
+    arrows = [s for s in newp if s.startswith("Kwatermistrz: papier Arrows")]
+    used, tot = 0, 0
+    if arrows:
+        for m in ent.finditer(arrows[-1]):
+            if m.group(1).startswith("ravens_teeth_arrows"):
+                used += int(m.group(7)); tot += int(m.group(8))
+    rep.add("K317-3: ravens_teeth_arrows wydane (ostatni papier Arrows)", f"uzyte {used}/{tot}" + (f" (papier: {arrows[-1][:220]})" if arrows else ""),
+            "uzyte > 0", (used > 0) if tot else None)
+    rep.add("K317-4: bledy QuartermasterLaw.FitFor", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
+_klute317a_main_prev = main
+
+
+def main(argv):
+    # paczka 317a: grupa klute317a - opakowanie main jak zapas316a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "klute317a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return klute317a_main(rest[0] if rest else None)
+    return _klute317a_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

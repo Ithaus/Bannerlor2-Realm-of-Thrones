@@ -912,7 +912,7 @@ namespace Armoury
                     if (fit.Detail.Count > 0)
                     {
                         var top = fit.Detail.Count > 14 ? fit.Detail.GetRange(0, 14) : fit.Detail;
-                        Log.Info("Kwatermistrz: papier " + type + " po kolei wyboru (wymog malejaco, potem " + (RangedRank.RbmLoaded ? "naciag RBM" : "skutecznosc") + "): "
+                        Log.Info("Kwatermistrz: papier " + type + " po kolei wyboru (wymog malejaco, potem " + (!RangedRank.RbmLoaded ? "skutecznosc" : (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) ? "317a typ obrazen P>C>B, dmg, speed RBM" : "naciag RBM") + "): "
                                  + string.Join(", ", top.ToArray()) + (fit.Detail.Count > 14 ? ", ... (" + fit.Detail.Count + " pozycji)" : "") + ".");
                     }
                     if (have < need)

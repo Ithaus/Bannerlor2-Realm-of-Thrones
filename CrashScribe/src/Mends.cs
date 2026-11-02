@@ -1713,9 +1713,19 @@ namespace CrashScribe
             {
                 if (_rbmLoaded < 0) { try { _rbmLoaded = AccessTools.TypeByName("RBM.SubModule") != null ? 1 : 0; } catch { _rbmLoaded = 0; } }
                 bool bowLike = it.ItemType == ItemObject.ItemTypeEnum.Bow || it.ItemType == ItemObject.ItemTypeEnum.Crossbow;
-                if (_rbmLoaded != 1 || !bowLike || it.PrimaryWeapon == null) return (long)(it.Effectiveness * 100f);
+                bool ammo = it.ItemType == ItemObject.ItemTypeEnum.Arrows || it.ItemType == ItemObject.ItemTypeEnum.Bolts;
+                if (_rbmLoaded != 1 || !(bowLike || ammo) || it.PrimaryWeapon == null) return (long)(it.Effectiveness * 100f);
                 var w = it.PrimaryWeapon;
                 float eff = it.Effectiveness; if (eff < 0f) eff = 0f; if (eff > 999f) eff = 999f;
+                if (ammo)
+                {
+                    // 317a (Jeff 02.11 "klute przed cietymi"): jak Armoury.RangedRank.Key - typ obrazen (Pierce 3, Cut 2, Blunt 1), dmg, predkosc, skutecznosc;
+                    // RBM polowi zbroje metalowa dla klutych strzal i beltow
+                    var dt = w.ThrustDamageType;
+                    long tr = dt == DamageTypes.Pierce ? 3 : dt == DamageTypes.Cut ? 2 : dt == DamageTypes.Blunt ? 1 : 0;
+                    long dmg = Math.Max(0, Math.Min(999, w.ThrustDamage)), spd = Math.Max(0, Math.Min(999, w.MissileSpeed));
+                    return tr * 1000000000L + dmg * 1000000L + spd * 1000L + (long)eff;
+                }
                 return (long)w.MissileSpeed * 1000000L + (long)w.ThrustDamage * 1000L + (long)eff;
             }
             catch { return 0; }
