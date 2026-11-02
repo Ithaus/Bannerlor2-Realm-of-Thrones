@@ -1373,20 +1373,26 @@ namespace Armoury
                 var cur = new[] { w, a };
                 cand.Sort((x, y) => x.EquipmentElement.ItemValue.CompareTo(y.EquipmentElement.ItemValue));
                 int taken = 0, noRoom = 0, back = 0;
-                bool toBag = src == SrcDiscard && men > 0 && main.ItemRoster != null && !ReferenceEquals(from, main.ItemRoster);   // 316a: nadmiar z Discard wraca do taboru
+                var left = new List<KeyValuePair<EquipmentElement, int>>();
                 foreach (var el in cand)
                 {
                     int g = GroupOf(el.EquipmentElement.Item);
                     int t = Math.Min(Math.Max(0, cap - cur[g]), el.Amount);
                     if (t > 0) { from.AddToCounts(el.EquipmentElement, -t); _stock.AddToCounts(el.EquipmentElement, t); cur[g] += t; taken += t; }
-                    int r = el.Amount - t;
-                    if (r > 0 && toBag) { from.AddToCounts(el.EquipmentElement, -r); main.ItemRoster.AddToCounts(el.EquipmentElement, r); back += r; }   // przeniesienie: z listy do taboru
-                    else noRoom += r;
+                    if (el.Amount - t > 0) left.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, el.Amount - t));
+                }
+                // 316a: nadmiar z Discard wraca do taboru, ale tylko gdy zapas cos przyjal (gracz dawal ludziom bron); zapas pelny (nic nie przyjal) - Discard wyrzuca
+                // jak w grze (recenzja 316a: inaczej przy pelnym zapasie nie da sie zrzucic broni ani zbroi, np. przy przeciazeniu)
+                bool toBag = src == SrcDiscard && taken > 0 && men > 0 && main.ItemRoster != null && !ReferenceEquals(from, main.ItemRoster);
+                foreach (var kv in left)
+                {
+                    if (toBag) { from.AddToCounts(kv.Key, -kv.Value); main.ItemRoster.AddToCounts(kv.Key, kv.Value); back += kv.Value; }   // przeniesienie: z listy do taboru
+                    else noRoom += kv.Value;
                 }
                 if (src >= 0 && src < _in.Length) _in[src] += taken;
                 _noRoom += noRoom;
                 _backBag += back;
-                string rest = src == SrcTrophies ? "stay on the field" : (src == SrcAutotest ? "go back to the baggage" : src == SrcLoot ? "stay with the loot you leave behind" : "are lost");
+                string rest = src == SrcTrophies ? "stay on the field" : (src == SrcAutotest ? "go back to the baggage" : src == SrcLoot ? "stay with the loot you leave behind" : "are thrown away");
                 // stan laczny (od Ciebie + zapasowa bron ludzi w zbrojowni) wobec pelnego, osobno wolne miejsce na to, co dajesz
                 int surW = 0, surA = 0;
                 if (men > 0)

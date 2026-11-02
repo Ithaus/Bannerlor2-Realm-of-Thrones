@@ -91022,7 +91022,7 @@ def main(argv):
 # Jeff 02.11: "daj ze moge tylko wrzucic tyle ile potrzebuja, a nie ze mam potem komunikat ze jest lost" (log 01.11 01:04:28: przyjeto 35 (wyrzucone),
 # bez miejsca 56 - sztuki przepadaly). Armoury/src/Drill.cs Accept: nadmiar z Discard wraca do taboru gracza.
 # Uzycie: python -I tools/sprawdz_logi.py --grupa zapas316a <Armoury-*.log>
-#  Z316-1  linie "Musztra: zapas - przyjeto" z Discard (wyrzucone): bez miejsca 0 (wszystko ponad limit wrocilo do taboru)
+#  Z316-1  linie "Musztra: zapas - przyjeto" z Discard (wyrzucone): przy przyjeto > 0 bez miejsca 0 (reszta wrocila do taboru); przyjeto 0 = zapas pelny, Discard jak w grze
 #  Z316-2  linie z licznikiem "wrocone do taborow" (nowy DLL); INFO suma wroconych
 #  Z316-3  linia dnia "Musztra (gracz): dzien" ma licznik "wrocone do taborow"
 #  Z316-4  zero linii ERROR z Drill.Accept / Drill.OnDiscarded
@@ -91047,7 +91047,9 @@ def zapas316a_main(logp):
     lost, back, newl = [], 0, 0
     for a in disc:
         m = re.search(r"bez miejsca (\d+)", a)
-        if m and int(m.group(1)) > 0:   # stary DLL (bez licznika) z bez miejsca > 0 = blad 316a widoczny
+        mt = re.search(r"przyjeto (\d+) szt", a)
+        # recenzja 316a: zapas pelny (przyjeto 0) - Discard wyrzuca jak w grze; strata tylko gdy cos przyjeto, a reszta przepadla
+        if m and int(m.group(1)) > 0 and mt and int(mt.group(1)) > 0:
             lost.append(a)
     for a in acc:
         m = re.search(r"wrocone do taborow (\d+)", a)
