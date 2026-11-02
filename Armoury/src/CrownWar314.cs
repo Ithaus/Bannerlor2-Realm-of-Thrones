@@ -42,6 +42,11 @@ namespace Armoury
     ///    (ChangeClanInfluenceAction - jak wplywy bitwy w grze; wplywy to nie zloto).
     ///  - zloto daru czeka w kolejce (zapis) do rozliczenia korony: ten sam skarbiec co zold (najpierw dary, potem zold), najdluzej RoyalVictoryWaitDays dni,
     ///    potem reszta przepada (linia). Zloto: skarbiec -> kiesa glowy rodu.
+    ///  - 316c RAZ NA DOBE (audyt 02.11: ta sama armia Flinta nagrodzona dwa razy w 11 s - poscig za jej resztkami, 20 lordow, 3448 i 744 ludzi, wplywy
+    ///    130.8 + 124.5): pobita partia lorda (StringId) liczy sie do nagrody krolestwa K najwyzej raz na dobe - drugi raz tej doby nie daje ani lorda
+    ///    (wplywy, prog armii), ani ludzi (zloto: jej ludzie na starcie byli juz w puli pierwszej bitwy - 744 z 3448). Klucz K|partia, bo dwa krolestwa
+    ///    sojusznikow w jednej bitwie dostaja kazde swoja nagrode. Zbior w pamieci, czyszczony przy zmianie doby (bez zapisu - wczytanie w polowie doby
+    ///    najwyzej pozwoli nagrodzic raz jeszcze; zgubienie gorsze nie jest). Bitwa z samymi juz nagrodzonymi - linia "Nagroda krola (314c) pominieta".
     ///
     /// Gracz i AI na tych samych zasadach. Liczniki KDay.Wage314 / Gift314 ida do rozkladu "Skarbce:" (312e, czesc "nagrody 178"). Linie "Zold krolewski (314c)"
     /// i "Nagroda krola (314c)". Wyjatek per krolestwo / rod / bitwa liczony (potkniecia w linii, pierwszy blad miejsca do logu) - bez globalnego wylacznika.
@@ -60,6 +65,8 @@ namespace Armoury
 
         private static int _stumbles, _importN = -1, _importBad;
         private static readonly HashSet<string> _err = new HashSet<string>();
+        private static readonly HashSet<string> _rewarded = new HashSet<string>();   // 316c: "krolestwo|partia" nagrodzone w dobie _rewardedDay
+        private static int _rewardedDay = -1;
 
         // liczniki doby (zerowane po linii)
         private static int _dWarK, _dSvc, _dFree, _dPaidN, _dMen, _dShortK, _dBattles, _dGiftClans;
@@ -71,7 +78,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _svc.Clear(); _paid.Clear(); _paidDay = -1; _gifts.Clear(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; ZeroDay();
+            _svc.Clear(); _paid.Clear(); _paidDay = -1; _gifts.Clear(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _rewarded.Clear(); _rewardedDay = -1; ZeroDay();
         }
 
         private static void ZeroDay()
@@ -345,6 +352,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ nagroda krola (MapEventEnded)
         private sealed class Win { public Clan C; public long Contrib; }
+        private sealed class Foe { public IFaction F; public int Men; public string Id; }   // 316c: Id - StringId partii (raz na dobe)
 
         internal static void OnMapEventEnded(MapEvent me)
         {
@@ -355,7 +363,7 @@ namespace Armoury
                 var lose = me.GetMapEventSide(me.DefeatedSide); var win = me.GetMapEventSide(me.WinningSide);
                 if (lose == null || win == null) return;
                 // pobite partie lordow (bez band - frakcja bandycka, bez karawan, milicji i zalog)
-                var foes = new List<KeyValuePair<IFaction, int>>();
+                var foes = new List<Foe>();
                 string foeLead = null;
                 foreach (var mep in lose.Parties)
                 {
@@ -363,7 +371,7 @@ namespace Armoury
                     if (mp == null || !mp.IsLordParty) continue;
                     var f = mp.MapFaction;
                     if (f == null || f.IsBanditFaction) continue;
-                    foes.Add(new KeyValuePair<IFaction, int>(f, Math.Max(0, mep.HealthyManCountAtStart)));
+                    foes.Add(new Foe { F = f, Men = Math.Max(0, mep.HealthyManCountAtStart), Id = mp.StringId });
                     if (foeLead == null) { var oc = mp.ActualClan; foeLead = Name(oc != null ? (IFaction)oc : f); }
                 }
                 if (foes.Count == 0) return;
@@ -404,19 +412,33 @@ namespace Armoury
             catch (Exception e) { Stumble("OnMapEventEnded", e); }
         }
 
-        private static void RewardKingdom(Settings s, Kingdom k, List<KeyValuePair<IFaction, int>> foes, List<Win> wins, long all, string foeLead)
+        private static void RewardKingdom(Settings s, Kingdom k, List<Foe> foes, List<Win> wins, long all, string foeLead)
         {
-            int lords = 0; long men = 0;
+            var day = (int)CampaignTime.Now.ToDays;
+            if (day != _rewardedDay) { _rewarded.Clear(); _rewardedDay = day; }   // 316c: nowa doba - partie znow do nagrody
+            int lords = 0, dup = 0; long men = 0;
+            var fresh = new List<string>();
             foreach (var f in foes)
             {
-                if (f.Key == null || f.Key == (IFaction)k || !k.IsAtWarWith(f.Key)) continue;
-                lords++; men += f.Value;
+                if (f.F == null || f.F == (IFaction)k || !k.IsAtWarWith(f.F)) continue;
+                string key = f.Id != null ? k.StringId + "|" + f.Id : null;
+                if (key != null && _rewarded.Contains(key)) { dup++; continue; }   // 316c: ta partia dala juz dzis nagrode temu krolestwu (poscig za resztkami)
+                lords++; men += f.Men;
+                if (key != null) fresh.Add(key);
             }
-            if (lords == 0) return;
+            if (lords == 0)
+            {
+                var sl = Settings.Current;
+                if (dup > 0 && sl != null && sl.LogEnabled)
+                    Log.Info("Nagroda krola (314c) pominieta: dzien " + day + " | " + Name(k) + " pokonal " + (foeLead ?? "-") + " | partii juz nagrodzonych dzis " + dup
+                             + " (316c: partia lorda raz na dobe), nowych 0.");
+                return;
+            }
             bool army = lords >= 2;
             double mult = army ? Math.Max(1f, s.RoyalVictoryArmyMultiplier) : 1.0;
             long kc = 0; foreach (var w in wins) if (w.C.Kingdom == k) kc += w.Contrib;
             if (kc <= 0) return;
+            foreach (var key in fresh) _rewarded.Add(key);   // 316c: dopiero gdy nagroda naprawde liczona (krolestwo ma wklad)
             double share = (double)kc / all;
             double gold = Math.Min(Math.Max(0, s.RoyalVictoryGoldCap), Math.Max(0f, s.RoyalVictoryGoldPerEnemy) * men * mult) * share;
             double infl = Math.Max(0f, s.RoyalVictoryInfluencePerLord) * lords * mult * share;
@@ -425,7 +447,6 @@ namespace Armoury
             foreach (var w in wins) { if (w.C.Kingdom != k) continue; long v; byClan.TryGetValue(w.C, out v); byClan[w.C] = v + w.Contrib; }
             long queued = 0; double gave = 0; int n = 0; long kept = 0;
             string pl = "";
-            var day = (int)CampaignTime.Now.ToDays;
             foreach (var kv in byClan)
             {
                 var c = kv.Key;
@@ -453,7 +474,7 @@ namespace Armoury
                 Log.Info("Nagroda krola (314c): dzien " + day + " | " + Name(k) + " pokonal " + (foeLead ?? "-") + " | pobitych partii lordow " + lords + (army ? " (armia)" : "")
                          + ", ich ludzi na starcie " + men + " | udzial krolestwa w wkladzie " + (100 * share).ToString("0", Inv) + "%"
                          + " | dar " + (long)Math.Floor(gold) + " zl (w kolejce do skarbca " + queued + ", czesc krola i najemnikow " + kept + "), wplywy " + gave.ToString("0.#", Inv)
-                         + " dla " + n + " rodow" + pl + ".");
+                         + " dla " + n + " rodow" + pl + "; partii juz nagrodzonych dzis " + dup + ".");
         }
 
         // ------------------------------------------------------------ zapis (SaveText, "arm_zold314")
