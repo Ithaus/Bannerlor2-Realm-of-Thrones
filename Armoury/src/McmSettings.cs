@@ -10372,6 +10372,10 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarNoPeaceUntilRedWedding { get; set; } = true;
 
+        [SettingPropertyBool("North Fights On After Red Wedding", HintText = "the Red Wedding no longer makes peace between the North and the crown: the Boltons and the lords who betray Robb Stark go over to the crown with their lands, and the rest of the North fights on. Peace by council vote, war weariness (Diplomacy) or Banner Kings pressure stays blocked until the Battle of the Bastards. If you rule one of these realms, peace is your choice. Off = the Red Wedding ends this war as in Realm of Thrones", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool NorthFightsOnAfterRedWedding { get; set; } = true;
+
         [SettingPropertyBool("Old Feuds Can End", HintText = "the old storyline feuds of Realm of Thrones (the Vale and the Iron Islands, the Reach and Dorne, the wars of the Free Cities, Qarth and the Dothraki against Daenerys) are no longer forced forever: once such a war has lasted Feud War Min Days, peace may be made by council vote, war weariness or poverty, and Realm of Thrones no longer declares it again. The War of the Five Kings, the Night's Watch and the Free Folk, and the Ironborn raid on the North are not affected (off = as Realm of Thrones decides)", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonFeudWarsEnd { get; set; } = true;
@@ -10431,6 +10435,10 @@ namespace Armoury
         [SettingPropertyBool("Canon North Riverlands Union", HintText = "as in the books, when House Tully pledges fealty to Robb Stark (Realm of Thrones' 'Riverlands Join the Fight', or a few days after its planned date) the Riverlands stop being a realm of their own: every river lord with his castles, villages, hosts and treasury becomes a vassal of the King in the North, and their sellswords (and your company, if you serve House Tully) keep their contract with King Robb. Once per campaign; if that moment has already passed in your game, it happens at the next session start. Never if you rule either realm. At the Red Wedding the Freys and their allies go over to the crown as in Realm of Thrones, and the other river lords stand under House Tully again as a realm of their own, at war with the crown. Only in Prologue 298 campaigns and in campaigns started after this update. Off = two allied realms, as before", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonNorthRiverlandsUnion { get; set; } = true;
+
+        [SettingPropertyBool("River Lords Defect At Red Wedding", HintText = "after the river lords became vassals of the King in the North, at the Red Wedding the Freys and the river houses who side with them (Mooton, Cox, Bracken) go over to the crown with their lands, as Realm of Thrones does when the Riverlands are a realm of their own. Off = they stay with the North", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool RiverLordsDefectAtRedWedding { get; set; } = true;
 
         [SettingPropertyBool("Canon War Balance", HintText = "War of the Five Kings stays an even fight until the Red Wedding: the North and the Riverlands on one side, the crown with the Westerlands on the other. When one side has been more than 1.5 times stronger for three days, the weaker side's lords recruit to full strength in their own lands (volunteers, and veterans hired from town taverns with their own gold) and houses at their party limit may raise one more party from their own idle lords and garrisons. No men or gold come from nothing. Nobody besieges Winterfell, Riverrun, the Twins, Casterly Rock or King's Landing before the Red Wedding. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
@@ -13756,6 +13764,7 @@ namespace Armoury
             s.CanonRiverlandsWarAtPrologueEnd = CanonRiverlandsWarAtPrologueEnd;
             s.CanonNorthRiverlandsAlliance = CanonNorthRiverlandsAlliance;
             s.CanonWarNoPeaceUntilRedWedding = CanonWarNoPeaceUntilRedWedding;
+            s.NorthFightsOnAfterRedWedding = NorthFightsOnAfterRedWedding;
             s.CanonFeudWarsEnd = CanonFeudWarsEnd;
             s.CanonFeudWarMinDays = CanonFeudWarMinDays;
             s.IronThroneAmbition = IronThroneAmbition;
@@ -13771,6 +13780,7 @@ namespace Armoury
             s.IronThroneTargetsPlayer = IronThroneTargetsPlayer;
             s.DaenerysDragonsGrow = DaenerysDragonsGrow;
             s.CanonNorthRiverlandsUnion = CanonNorthRiverlandsUnion;
+            s.RiverLordsDefectAtRedWedding = RiverLordsDefectAtRedWedding;
             s.CanonWarBalance = CanonWarBalance;
             s.CanonWarBalanceRestraint = CanonWarBalanceRestraint;
             s.CanonWarBalanceMuster = CanonWarBalanceMuster;

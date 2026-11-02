@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace CrashScribe
 {
@@ -237,6 +238,8 @@ namespace CrashScribe
         /// <summary>
         /// Raz na dzien kampanii: gdzie stoi kolejka fabuly. Bez tego nie widac,
         /// czy bramka trzyma wydarzenie, czy to ROT nie chce go odpalic.
+        /// 320a: najpierw Resolve (martwe wydarzenia ROT); "zaleglych" liczy tylko wydarzenia, ktorych data juz minela,
+        /// "czolo kolejki" pomija ominiete (Stuck) - jak bramka; osobno liczba wydarzen z data w przyszlosci.
         /// </summary>
         private static void Diag(double day)
         {
@@ -244,8 +247,9 @@ namespace CrashScribe
             {
                 if (day - _lastDiagDay < 1.0) return;
                 _lastDiagDay = day;
+                Resolve(day);
                 var list = Events();
-                string head = null; float headDay = float.MaxValue; int pend = 0;
+                string head = null; float headDay = float.MaxValue; int pend = 0, future = 0;
                 if (list != null)
                     foreach (var ev in list)
                     {
@@ -254,19 +258,138 @@ namespace CrashScribe
                         float dd;
                         if (!Timeline.TryGetValue(nm, out dd)) continue;
                         if (!Pending(ev)) continue;
-                        pend++;
                         dd = Scaled(dd);
+                        if (dd > day) { future++; continue; }
+                        if (Stuck.Contains(nm)) continue;
+                        pend++;
                         if (dd < headDay) { headDay = dd; head = nm; }
                     }
                 Scribe.Line("FABULA: dzien " + ((int)day)
                             + " | zaleglych na osi: " + pend
                             + " | czolo kolejki: " + (head ?? "brak")
                             + (head != null ? " (na dzien " + ((int)headDay) + ")" : "")
+                            + " | przyszlych: " + future
                             + " | ostatni start: " + (_lastStartDay < -9000 ? "zaden" : ((int)_lastStartDay).ToString())
-                            + " | pominietych: " + Stuck.Count
+                            + " | pominietych: " + Stuck.Count + (Stuck.Count > 0 ? " [" + string.Join(", ", new List<string>(Stuck).ToArray()) + "]" : "")
+                            + (_resolveStumbles > 0 ? " | potkniecia 320a " + _resolveStumbles : "")
                             + (list == null ? "  [UWAGA: nie widze listy wydarzen ROT]" : ""));
             }
             catch { }
+        }
+
+        // ---------------------------------------------------------- 320a: martwe wydarzenia ROT (Jeff 02.11)
+        // Lancuch Harrenhal (Notification -> Siege -> HarrenhalEvent) rusza tylko, gdy Harrenhal trzyma ROTClans.Clegane
+        // (HarrenhalSiegeEvent.SiegeLeaderReadyToAttackTarget), a hold Dorzecza (RiverlandsDeclareWarEvent.MainCheck) tylko przy zywym
+        // krolestwie Dorzecza. Gdy swiat odjechal: ROTEventBehavior.SkipEvent(Type) (droga komendy rot.skip_event: TotalEvents++,
+        // bez StartEvent, w zapisie ROT) - bez 6 dni zatoru po kazdym wczytaniu. HarrenhalEvent pierwsze: jego MainCheck to
+        // "Siege.TotalEvents > 0 && !IsActive" - samo pominiecie oblezenia oddaloby Harrenhal Roose'owi (HarrenhalEvent.cs:72).
+        private static System.Reflection.MethodInfo _mSkip;
+        private static bool _skipTried;
+        private static int _resolveStumbles;
+        private static readonly HashSet<string> _resolveSaid = new HashSet<string>();
+
+        private static void ResolveStumble(string where, Exception e)
+        {
+            _resolveStumbles++;
+            if (_resolveStumbles <= 5) Scribe.Line("Fabula (320a): " + where + " NIE (" + (e != null ? e.GetType().Name + ": " + e.Message : "?") + ", potkniecie " + _resolveStumbles + ").");
+        }
+
+        private static object FindEvent(System.Collections.IEnumerable list, string name)
+        {
+            foreach (var ev in list) if (ev != null && ev.GetType().Name == name) return ev;
+            return null;
+        }
+
+        private static bool Active(object ev)
+        {
+            return ev != null && Props(ev) && Convert.ToBoolean(_pActive.GetValue(ev, null));
+        }
+
+        private static object RotStatic(string type, string prop)
+        {
+            var t = Type.GetType("ROT.Misc." + type + ", ROT");
+            var pi = t != null ? AccessTools.Property(t, prop) : null;
+            return pi != null ? pi.GetValue(null, null) : null;
+        }
+
+        /// <summary>ROT SkipEvent dla wydarzenia (tylko gdy czeka). Zwraca "TAK" albo "NIE (powod)".</summary>
+        private static string Skip(object ev)
+        {
+            if (ev == null) return "brak";
+            if (!Pending(ev)) return "juz nie czeka";
+            if (!_skipTried)
+            {
+                _skipTried = true;
+                var tBeh = Type.GetType("ROT.CampaignBehaviors.ROTEventBehavior, ROT");
+                _mSkip = tBeh != null ? AccessTools.DeclaredMethod(tBeh, "SkipEvent", new[] { typeof(Type) }) : null;
+            }
+            if (_mSkip == null || _behavior == null) return "NIE (brak ROTEventBehavior.SkipEvent)";
+            object r = _mSkip.Invoke(_behavior, new object[] { ev.GetType() });
+            return r is bool && (bool)r && !Pending(ev) ? "TAK" : "NIE (SkipEvent false)";
+        }
+
+        private static void Resolve(double day)
+        {
+            if (!Config.FabulaHarrenhalResolve) return;
+            System.Collections.IEnumerable list;
+            try { list = Events(); } catch (Exception e) { ResolveStumble("lista wydarzen", e); return; }
+            if (list == null) return;
+            try
+            {
+                float dN;
+                if (Timeline.TryGetValue("HarrenhalSiegeNotificationEvent", out dN) && day >= Scaled(dN))
+                {
+                    var evH = FindEvent(list, "HarrenhalEvent");
+                    var evS = FindEvent(list, "HarrenhalSiegeEvent");
+                    var evN = FindEvent(list, "HarrenhalSiegeNotificationEvent");
+                    // tylko gdy ani oblezenie, ani koniec nie ruszyly (oblezenie skonczone -> HarrenhalEvent ROT odpala sam tej doby)
+                    if (evH != null && evS != null && Pending(evH) && Pending(evS) && !Active(evN))
+                    {
+                        var harrenhal = RotStatic("ROTSettlements", "Harrenhal") as Settlement;
+                        var clegane = RotStatic("ROTClans", "Clegane") as Clan;
+                        var bolton = RotStatic("ROTClans", "Bolton") as Clan;
+                        Clan owner = harrenhal != null ? harrenhal.OwnerClan : null;
+                        string why = null;
+                        if (harrenhal == null || clegane == null)
+                        {
+                            if (_resolveSaid.Add("hh-brak")) Scribe.Line("Fabula (320a): lancuch Harrenhal NIE (brak ROTSettlements.Harrenhal albo ROTClans.Clegane) | dzien " + (int)day + ".");
+                        }
+                        else if (owner != clegane)
+                            why = "Harrenhal trzyma " + (owner != null ? owner.Name + " (" + owner.StringId + ", " + (owner.Kingdom != null ? owner.Kingdom.Name + " / " + owner.Kingdom.StringId : "bez krolestwa") + ")" : "nikt") + ", nie Clegane";
+                        else if (bolton == null || bolton.IsEliminated)
+                            why = "rod Boltonow wyeliminowany - Roose nie poprowadzi oblezenia";
+                        if (why != null)
+                        {
+                            string rH = Skip(evH), rS = Skip(evS);
+                            string rN = evN == null ? "brak" : (Pending(evN) ? Skip(evN) : "juz bylo");
+                            Scribe.Line("Fabula (320a): lancuch Harrenhal zamkniety - " + why + ": pominiete HarrenhalEvent " + rH + ", HarrenhalSiegeEvent " + rS
+                                        + ", HarrenhalSiegeNotificationEvent " + rN + " (ROT SkipEvent, w zapisie ROT; Harrenhal bez zmiany pana) | dzien " + (int)day + ".");
+                            if (rH != "TAK" || rS != "TAK") _resolveStumbles++;
+                        }
+                    }
+                }
+            }
+            catch (Exception e) { ResolveStumble("lancuch Harrenhal", e); }
+            try
+            {
+                float dR;
+                if (Timeline.TryGetValue("RiverlandsDeclareWarEvent", out dR) && day >= Scaled(dR))
+                {
+                    var evR = FindEvent(list, "RiverlandsDeclareWarEvent");
+                    if (evR != null && Pending(evR))
+                    {
+                        var river = RotStatic("ROTKingdoms", "Riverlands") as Kingdom;
+                        if (river == null || river.IsEliminated)
+                        {
+                            string r = Skip(evR);
+                            Scribe.Line("Fabula (320a): RiverlandsDeclareWarEvent pominiete " + r + " - krolestwa Dorzecza nie ma (" + (river == null ? "brak riverlands" : "wyeliminowane - unia 272 albo podboj")
+                                        + "); po Krwawych Godach nie odpali z tekstem holdu | dzien " + (int)day + ".");
+                            if (r != "TAK") _resolveStumbles++;
+                        }
+                    }
+                }
+            }
+            catch (Exception e) { ResolveStumble("hold Dorzecza", e); }
         }
 
 

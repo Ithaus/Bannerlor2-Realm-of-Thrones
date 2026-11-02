@@ -126,7 +126,7 @@ namespace Armoury
                 Line("T3 MakePeaceKingdomDecision Dorzecze -> korona IsAllowed " + T(allowed), !allowed);
             }
             // T4
-            Line("T4 tabela prawdy Locked i Blocks tej chwili: " + TruthLocked(), TruthLockedOk() && (skip != null || (CanonPeaceLock.Blocks(_crown, _river) && !NonRuleBlocks())));
+            Line("T4 tabela prawdy Locked i Blocks tej chwili: " + TruthLocked() + " | " + Truth320(), TruthLockedOk() && Truth320Ok() && (skip != null || (CanonPeaceLock.Blocks(_crown, _river) && !NonRuleBlocks())));
             // T5a
             bool dec = PeaceHold.Decide(23, false, true) == PeaceHold.ActWait && PeaceHold.Decide(24, true, true) == PeaceHold.ActKeep && PeaceHold.Decide(24, false, true) == PeaceHold.ActWaitRot
                        && PeaceHold.Decide(71, false, true) == PeaceHold.ActWaitRot && PeaceHold.Decide(72, false, true) == PeaceHold.ActRelease && PeaceHold.Decide(24, false, false) == PeaceHold.ActRelease
@@ -187,6 +187,24 @@ namespace Armoury
 
         private static bool L(bool key, bool canon, bool pr, bool el, int rw, bool dead, bool forced = false)
         { string w; return CanonPeaceLock.Locked(key, canon, pr, el, rw, dead, forced, out w); }
+
+        // 320a-KG: wiersz Polnoc-korona z faza 2 (klucz NorthFightsOnAfterRedWedding), bs - stan ROT BastardsSiegeEvent
+        private static bool LN(bool pr, int rw, bool dead, int bs, bool forced = false)
+        { string w; return CanonPeaceLock.Locked(true, true, pr, false, rw, dead, forced, true, bs, out w); }
+
+        private static bool Truth320Ok()
+        {
+            // stan 1 + Robb martwy (chwila ExecuteRobb) - Polnoc dalej w wojnie; stan 2 do Bekartow; po Bekartach jak dawniej; gracz wladca - jego wybor
+            return LN(false, 1, true, 0) && LN(false, 2, true, 0) && LN(false, 2, true, -1) && LN(false, 2, false, 1) && !LN(false, 2, true, 2) && LN(false, 2, true, 2, true)
+                   && !LN(CanonPeaceLock.PlayerChoice(true, false), 2, true, 0) && LN(false, 0, false, 0) && !L(true, true, false, false, 1, true);
+        }
+
+        private static string Truth320()
+        {
+            return "320: RW1 Robb martwy Bekarci 0 " + T(LN(false, 1, true, 0)) + ", RW2 Bekarci 0 " + T(LN(false, 2, true, 0)) + ", RW2 Bekarci -1 " + T(LN(false, 2, true, -1))
+                   + ", RW2 Bekarci 2 " + T(LN(false, 2, true, 2)) + ", RW2 Bekarci 2 ROT wymusza " + T(LN(false, 2, true, 2, true))
+                   + ", gracz rzadzi " + T(LN(CanonPeaceLock.PlayerChoice(true, false), 2, true, 0)) + ", Dorzecze RW1 Robb martwy " + T(L(true, true, false, false, 1, true));
+        }
 
         // gracz rzadzi i droga bez wyboru (zmeczenie wojna Diplomacy - okno tylko OK / odmowa wylaczona) - jak w CanonPeaceLock.State
         private static bool LWeary(int rw, bool dead, bool forced) { return L(true, true, CanonPeaceLock.PlayerChoice(true, true), false, rw, dead, forced); }

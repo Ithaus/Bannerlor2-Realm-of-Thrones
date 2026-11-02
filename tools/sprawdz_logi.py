@@ -92064,5 +92064,130 @@ def main(argv):
     return _groty319c_main_prev(argv)
 
 
+
+
+# ---------------------------------------------------------------- 320a (Fabula + Krwawe Gody): Harrenhal i hold Dorzecza (CrashScribe Fabula), Krwawe Gody bez pokoju (Armoury)
+# uzycie: python tools/sprawdz_logi.py --grupa fabula320a <CrashScribe session-*.log> [<Armoury-*.log>]
+F320_HH = re.compile(r"Fabula \(320a\): lancuch Harrenhal zamkniety - (.+?): pominiete HarrenhalEvent (\S+(?: \([^)]*\))?), HarrenhalSiegeEvent (\S+(?: \([^)]*\))?), "
+                     r"HarrenhalSiegeNotificationEvent (.+?) \(ROT SkipEvent.*\| dzien (-?\d+)\.")
+F320_RL = re.compile(r"Fabula \(320a\): RiverlandsDeclareWarEvent pominiete (\S+(?: \([^)]*\))?) - .*\| dzien (-?\d+)\.")
+F320_DIAG = re.compile(r"FABULA: dzien (-?\d+) \| zaleglych na osi: (\d+) \| czolo kolejki: (\S+)")
+F320_RW = re.compile(r"Krwawe Gody bez pokoju \(320\): ExecuteRobb - pokoj (\S+) (POMINIETY|ZAWARTY \(jak ROT\)) \((.*?), podmian (\d+)\) \| wojna (TAK|NIE) \| Roose zyje (\S+)")
+F320_DAY = re.compile(r"Pokoj kanonu \(264\): dzien (\d+) \| blokada .*?\| Polnoc-korona: (CZYNNA \(Polnoc walczy po Krwawych Godach[^)]*\)|CZYNNA \(ROT wymusza\)|CZYNNA|KONIEC), wojna (TAK|NIE)")
+F320_SAMPLES = [
+    "[21:01:32] Fabula (320a): lancuch Harrenhal zamkniety - Harrenhal trzyma House Paege (ROTclan_1, The North / battania), nie Clegane: pominiete HarrenhalEvent TAK, HarrenhalSiegeEvent TAK, HarrenhalSiegeNotificationEvent TAK (ROT SkipEvent, w zapisie ROT; Harrenhal bez zmiany pana) | dzien 368.",
+    "[21:01:32] Fabula (320a): RiverlandsDeclareWarEvent pominiete TAK - krolestwa Dorzecza nie ma (wyeliminowane - unia 272 albo podboj); po Krwawych Godach nie odpali z tekstem holdu | dzien 368.",
+    "[21:01:32] FABULA: dzien 368 | zaleglych na osi: 0 | czolo kolejki: brak | przyszlych: 18 | ostatni start: zaden | pominietych: 0",
+    "[10:00:00] Krwawe Gody bez pokoju (320): ExecuteRobb - pokoj battania-vlandia POMINIETY (blokada 264 faza 2, podmian 1) | wojna TAK | Roose zyje NIE | wywolanie 1 | dzien opowiesci 953.2.",
+    "[10:00:01] Pokoj kanonu (264): dzien 109900 | blokada CZYNNA (Robb nie zyje, RedWeddingEvent 2 - Polnoc walczy dalej po Krwawych Godach, BastardsSiegeEvent 0) | Polnoc-korona: CZYNNA (Polnoc walczy po Krwawych Godach, BastardsSiegeEvent 0), wojna TAK od dnia 9.0 | Dorzecze-korona: KONIEC, wojna TAK | zablokowane dzis 0, sesja 0 | gracz rzadzi: nie | potkniecia 0 (sesja 0).",
+]
+
+
+def f320_selftest():
+    a = F320_HH.search(F320_SAMPLES[0]); b = F320_RL.search(F320_SAMPLES[1]); c = F320_DIAG.search(F320_SAMPLES[2])
+    d = F320_RW.search(F320_SAMPLES[3]); e = F320_DAY.search(F320_SAMPLES[4])
+    return bool(a and a.group(2) == "TAK" and a.group(5) == "368" and b and b.group(1) == "TAK" and c and c.group(3) == "brak"
+                and d and d.group(2) == "POMINIETY" and d.group(4) == "1" and e and e.group(2).startswith("CZYNNA (Polnoc walczy"))
+
+
+def f320_cs_rows(rep, lines):
+    hh = [m for m in (F320_HH.search(x) for x in lines) if m]
+    rl = [m for m in (F320_RL.search(x) for x in lines) if m]
+    diag = [m for m in (F320_DIAG.search(x) for x in lines) if m]
+    bad = [x for x in lines if "Fabula (320a):" in x and (" NIE (" in x or "potkniecie" in x)]
+    stuck = [x for x in lines if re.search(r"FABULA: (HarrenhalSiegeNotificationEvent|HarrenhalSiegeEvent|HarrenhalEvent|RiverlandsDeclareWarEvent) nie moze odpalic", x)]
+    starts = [x for x in lines if re.search(r"FABULA: wydarzenie (HarrenhalSiegeNotificationEvent|HarrenhalSiegeEvent|HarrenhalEvent|RiverlandsDeclareWarEvent) WYSTARTOWALO", x)]
+    if hh:
+        ok = all(m.group(2) == "TAK" and m.group(3) == "TAK" for m in hh)
+        rep.add("F320-1: lancuch Harrenhal zamkniety (HarrenhalEvent, Siege TAK)", f"{len(hh)} | {hh[-1].group(1)} | dzien {hh[-1].group(5)} | Notification {hh[-1].group(4)}", "1 linia, TAK/TAK", ok and len(hh) == 1)
+    else:
+        rep.add("F320-1: lancuch Harrenhal zamkniety", "brak linii", "1 (zapis Jeffa: Harrenhal u Paege) - INFO w innym zapisie", None)
+    if rl:
+        rep.add("F320-2: RiverlandsDeclareWarEvent pominiete", f"{len(rl)} | {rl[-1].group(1)} | dzien {rl[-1].group(2)}", "1 linia, TAK", len(rl) == 1 and rl[-1].group(1) == "TAK")
+    else:
+        rep.add("F320-2: RiverlandsDeclareWarEvent pominiete", "brak linii", "1 (zapis Jeffa: Dorzecze zniszczone unia) - INFO w innym zapisie", None)
+    if diag:
+        last = diag[-1]
+        dead = last.group(3).startswith("Harrenhal") or last.group(3).startswith("RiverlandsDeclareWar")
+        rep.add("F320-3: ostatnia linia kolejki (czolo, zaleglych)", f"dzien {last.group(1)} | zaleglych {last.group(2)} | czolo {last.group(3)}", "czolo bez Harrenhal/Riverlands", not dead)
+    else:
+        rep.add("F320-3: linia kolejki FABULA", "brak", ">= 1 (raz na dobe)", False)
+    rep.add("F320-4: potkniecia / NIE 320a", str(len(bad)) + (" | " + bad[0][:160] if bad else ""), "0", len(bad) == 0)
+    rep.add("F320-5: stare omijanie 6-dniowe tych wydarzen", str(len(stuck)), "0 (pominiete od razu)", len(stuck) == 0 if (hh or rl) else None)
+    rep.add("F320-6: start martwego wydarzenia (Harrenhal / hold Dorzecza)", str(len(starts)), "0", len(starts) == 0)
+
+
+def f320_arm_rows(rep, lines):
+    start = [x for x in lines if "Krol Polnocy (272): start sesji" in x]
+    if start:
+        s = start[-1]
+        ok = "bez pokoju 320 TAK (podmian 1)" in s
+        zap = "bez pokoju 320 ZAPAS" in s
+        rep.add("F320-7: latka Krwawych Godow (transpiler)", "TAK (podmian 1)" if ok else ("ZAPAS" if zap else "brak dopisku 320"), "TAK (podmian 1)", True if ok else (None if zap else False))
+    else:
+        rep.add("F320-7: linia startu 272", "brak", ">= 1", False)
+    rw = [m for m in (F320_RW.search(x) for x in lines) if m]
+    if rw:
+        m = rw[0]
+        rep.add("F320-8: ExecuteRobb - pokoj Polnoc-korona", f"{m.group(2)} ({m.group(3)}) | wojna {m.group(5)} | Roose zyje {m.group(6)}", "POMINIETY, wojna TAK", m.group(2) == "POMINIETY" and m.group(5) == "TAK")
+    else:
+        rep.add("F320-8: ExecuteRobb (Krwawe Gody)", "nie bylo w tym logu", "INFO (T2: flaga armoury-krwawe-gody320.flag)", None)
+    zap = [x for x in lines if "Krwawe Gody bez pokoju (320): zapas" in x]
+    if zap:
+        rep.add("F320-9: zapas (wojna wznowiona po pokoju ROT)", zap[-1][:200], "INFO - transpiler nie podmienil", None)
+    days = [m for m in (F320_DAY.search(x) for x in lines) if m]
+    fo = [m for m in days if m.group(2).startswith("CZYNNA (Polnoc walczy")]
+    if rw:
+        # od pierwszej linii fazy 2: zadnej doby Polnoc-korona KONIEC ani bez wojny
+        idx = next((i for i, m in enumerate(days) if m.group(2).startswith("CZYNNA (Polnoc walczy")), None)
+        tail = days[idx:] if idx is not None else []
+        off = [m for m in tail if m.group(2) == "KONIEC" or m.group(3) == "NIE"]
+        rep.add("F320-10: doby po Godach - Polnoc-korona CZYNNA (Polnoc walczy) i wojna TAK", f"dob fazy 2 {len(fo)}, bez blokady albo bez wojny {len(off)}", ">= 1, 0", len(fo) >= 1 and not off)
+    peace = [x for x in lines if re.search(r"Wojna i pokoj \(E7/0\): dzien \d+ \| (The North - House Baratheon of King's Landing|House Baratheon of King's Landing - The North): POKOJ \(", x)]
+    rep.add("F320-11: pokoje Polnoc-korona (linie POKOJ)", str(len(peace)) + (" | " + peace[0][:160] if peace else ""), "0 po Godach (INFO przed)", None if not rw else len(peace) == 0)
+
+
+def fabula320a_main(cslog, armlog=None):
+    rep = Report()
+    st = f320_selftest()
+    rep.add("F320-S: self-test wyrazen na wzorach linii", "TAK" if st else "wyrazenie nie czyta wzoru", "TAK", st)
+    if not cslog or not os.path.isfile(cslog):
+        rep.add("F320-F: log CrashScribe", f"brak pliku {cslog}", "podaj <session-*.log> [<Armoury-*.log>]", None)
+        rep.show()
+        return 0
+    lines = []
+    with open(cslog, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if "FABULA" in s or "Fabula (320a)" in s:
+                lines.append(s)
+    print(f"plik: {cslog}")
+    f320_cs_rows(rep, lines)
+    if armlog and os.path.isfile(armlog):
+        al = []
+        with open(armlog, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                s = line.rstrip("\r\n")
+                if "Krol Polnocy (272)" in s or "(320)" in s or "Pokoj kanonu (264): dzien" in s or "Wojna i pokoj (E7/0)" in s:
+                    al.append(s)
+        print(f"plik: {armlog}")
+        f320_arm_rows(rep, al)
+    rep.show()
+    return 0
+
+
+_fabula320a_main_prev = main
+
+
+def main(argv):
+    # paczka 320a (Fabula + Krwawe Gody): grupa fabula320a - opakowanie main jak groty319c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "fabula320a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return fabula320a_main(rest[0] if rest else None, rest[1] if len(rest) > 1 else None)
+    return _fabula320a_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

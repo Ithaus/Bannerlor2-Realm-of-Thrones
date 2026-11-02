@@ -21,7 +21,7 @@ namespace Armoury
         private static bool _testDone, _testFlag;
         private static int _testFlagDay = -1;
 
-        private static void TestReset() { _testDone = false; _testFlag = false; _testFlagDay = -1; }
+        private static void TestReset() { _testDone = false; _testFlag = false; _testFlagDay = -1; Test320Reset(); }
 
         private static void TLine(string t, string what, string res) { Log.Info(P + "test - " + t + " " + what + " - wynik " + res + "."); }
 

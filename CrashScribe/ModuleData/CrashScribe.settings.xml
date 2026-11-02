@@ -203,6 +203,15 @@
        Set HarrenhalOldSaveFix to false to switch the repair off. -->
   <HarrenhalOldSaveFix>true</HarrenhalOldSaveFix>
 
+  <!-- Dead story events (needs Realm of Thrones). Roose Bolton's siege of Harrenhal can only begin while the Mountain's
+       house (Clegane) holds Harrenhal, and the river lords' oath to Robb Stark only while the Riverlands are a realm.
+       When the world has moved past that (Harrenhal is held by another house, or the Riverlands are gone - for example
+       after the river lords became vassals of the King in the North), these events are skipped at once with Realm of
+       Thrones' own skip (the same as its rot.skip_event command), so the rest of the story can go on. The skip is kept
+       in the save. Harrenhal does not change hands.
+       Set FabulaHarrenhalResolve to false to let them wait at the head of the story queue as before. -->
+  <FabulaHarrenhalResolve>true</FabulaHarrenhalResolve>
+
   <!-- Releasing the commander of the Free Folk attack on the Wall (needs Realm of Thrones). The commander of the attack
        is held in place for the whole event (no decisions of his own). When the event ends, Realm of Thrones only
        disbands the army Mance Rayder is in and only releases Free Folk lords who are not in any army - a stand-in

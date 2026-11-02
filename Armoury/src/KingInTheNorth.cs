@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -84,6 +85,12 @@ namespace Armoury
         private static Harmony _harmony;
         private static string _wireRw = "nie wpieta", _wireArmy = "leniwie (przy unii)";
         private static bool _rwTried, _armyTried, _armyPatched;
+        // 320a-KG: transpiler ExecuteRobb (raz na proces - latka zostaje do konca procesu, jak postfiks)
+        private static int _rwSwapped;               // podmienione wywolania MakePeaceAction.Apply w ExecuteRobb (przy wpinaniu)
+        private static bool _rwFallback;             // transpiler nic nie podmienil - zapas: prefiks zapamietuje wojne, postfiks ja wznawia
+        private static bool _rwWarBefore;            // zapas: Polnoc-korona w wojnie przed ExecuteRobb
+        private static bool _rwPeaceSaid, _rwPlayerTold; // linia i komunikat raz na kampanie (Reset)
+        private static int _rwPeaceCalls;            // wywolania RwPeace w kampanii (ExecuteRobb potrafi biec dwa razy: OnFailed i DailyTickEvent)
         private static int _sessionDays, _stumbles, _importBad, _mergeCount;
         private static bool _sessionChecked, _markerAtStart;
         private static string _lastWait = "";
@@ -103,6 +110,7 @@ namespace Armoury
             _clans.Clear(); _forts.Clear(); _mercs.Clear(); _clanSet.Clear(); _fortSet.Clear();
             Moving = false; _sessionDays = 0; _stumbles = 0; _importBad = 0; _mergeCount = 0; _sessionChecked = false; _markerAtStart = false;
             _lastWait = ""; _lastWaitDay = int.MinValue; _err.Clear(); _detached.Clear();
+            _rwWarBefore = false; _rwPeaceSaid = false; _rwPlayerTold = false; _rwPeaceCalls = 0;
             TestReset();
         }
 
@@ -271,6 +279,7 @@ namespace Armoury
         internal static void Daily()
         {
             _sessionDays++;
+            Test320Daily();   // 320: tylko autotest (flaga armoury-krwawe-gody320.flag)
             if (_st != 3) return;
             try { SplitWar(); } catch (Exception e) { Stumble("SplitWar", e); }
         }
@@ -1010,23 +1019,142 @@ namespace Armoury
         {
             if (_rwTried) return;
             _rwTried = true;
+            MethodInfo m = null;
             try
             {
                 if (_harmony == null) { _wireRw = "BRAK (bez Harmony)"; return; }
                 var t = AccessTools.TypeByName("ROT.Events.RedWeddingEvent+RedWeddingQuest");
                 if (t == null) { var o = AccessTools.TypeByName("ROT.Events.RedWeddingEvent"); t = o != null ? AccessTools.Inner(o, "RedWeddingQuest") : null; }
-                var m = t != null ? AccessTools.Method(t, "ExecuteRobb") : null;
+                m = t != null ? AccessTools.DeclaredMethod(t, "ExecuteRobb") : null;
                 if (m == null) { _wireRw = "BRAK (ROT RedWeddingQuest.ExecuteRobb)"; return; }
                 _harmony.Patch(m, postfix: new HarmonyMethod(typeof(KingInTheNorth), nameof(RedWeddingPostfix)));
                 _wireRw = "TAK";
             }
-            catch (Exception e) { Stumble("InstallRedWedding", e); _wireRw = "BLAD (" + e.GetType().Name + ")"; }
+            catch (Exception e) { Stumble("InstallRedWedding", e); _wireRw = "BLAD (" + e.GetType().Name + ")"; return; }
+            // 320a-KG: osobna latka - blad transpilera nie zdejmuje postfiksu 272
+            try
+            {
+                _rwSwapped = 0;
+                _harmony.Patch(m, transpiler: new HarmonyMethod(typeof(KingInTheNorth), nameof(RwTranspiler)));
+                int swapped = _rwSwapped;
+                var info = Harmony.GetPatchInfo(m);
+                bool mine = info != null && info.Transpilers.Any(x => x.PatchMethod != null && x.PatchMethod.DeclaringType == typeof(KingInTheNorth));
+                if (swapped == 1 && mine) _wireRw += ", bez pokoju 320 TAK (podmian 1)";
+                else
+                {
+                    _rwFallback = true;
+                    _harmony.Patch(m, prefix: new HarmonyMethod(typeof(KingInTheNorth), nameof(RwFallbackPrefix)));
+                    _wireRw += ", bez pokoju 320 ZAPAS (podmian " + swapped + ", transpiler w GetPatchInfo " + (mine ? "TAK" : "NIE") + " - wojna wznawiana w postfiksie)";
+                }
+            }
+            catch (Exception e)
+            {
+                Stumble("InstallRedWedding.320", e);
+                _rwFallback = true;
+                try { _harmony.Patch(m, prefix: new HarmonyMethod(typeof(KingInTheNorth), nameof(RwFallbackPrefix))); _wireRw += ", bez pokoju 320 ZAPAS (transpiler BLAD " + e.GetType().Name + ")"; }
+                catch (Exception e2) { Stumble("InstallRedWedding.320zapas", e2); _wireRw += ", bez pokoju 320 BLAD (" + e2.GetType().Name + ")"; }
+            }
+        }
+
+        // ---------------------------------------------------------------- 320a-KG: Krwawe Gody bez pokoju Polnoc-korona (Jeff 02.11)
+        /// <summary>Transpiler ROT RedWeddingQuest.ExecuteRobb: jedyne "call MakePeaceAction.Apply(IFaction, IFaction)" (RedWeddingEvent.cs:113, pokoj Polnoc-korona)
+        /// -> RwPeace. Pokoje rodow przy ChangeKingdomAction (FactionHelper.AdjustFactionStancesForClanJoiningKingdom) ida inna droga i zostaja.</summary>
+        public static IEnumerable<CodeInstruction> RwTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var target = AccessTools.DeclaredMethod(typeof(MakePeaceAction), "Apply", new[] { typeof(IFaction), typeof(IFaction) });
+            var mine = AccessTools.DeclaredMethod(typeof(KingInTheNorth), nameof(RwPeace));
+            foreach (var ci in instructions)
+            {
+                if (target != null && mine != null && (ci.opcode == OpCodes.Call || ci.opcode == OpCodes.Callvirt) && Equals(ci.operand, target))
+                {
+                    ci.opcode = OpCodes.Call;
+                    ci.operand = mine;
+                    _rwSwapped++;
+                }
+                yield return ci;
+            }
+        }
+
+        private static bool FightsOnNow(IFaction a, IFaction b, out string why)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.NorthFightsOnAfterRedWedding) { why = "klucz North Fights On After Red Wedding NIE"; return false; }
+            // ta sama regula co blokada 264 faza 2 (klucz 264, kampania kanonu, gracz wladca strony - jego wybor, BastardsSiegeEvent < 2)
+            if (!CanonPeaceLock.Blocks(a, b)) { why = "blokada 264 nie trzyma pary (klucz 264, kampania klasyczna albo gracz wladca strony)"; return false; }
+            why = "blokada 264 faza 2";
+            return true;
+        }
+
+        private static string RooseAlive()
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("ROT.Misc.ROTLords");
+                var pi = t != null ? AccessTools.Property(t, "RooseBolton") : null;
+                var h = pi != null ? pi.GetValue(null, null) as Hero : null;
+                return h == null ? "?" : (h.IsAlive ? "TAK" : "NIE");
+            }
+            catch { return "?"; }
+        }
+
+        /// <summary>Zamiast MakePeaceAction.Apply(TheNorth, Westerlands) w ROT ExecuteRobb: przy kluczu i blokadzie 264 - bez pokoju (Polnoc walczy dalej),
+        /// inaczej oryginal. Idempotentne (ROT wola ExecuteRobb z OnFailed i z DailyTickEvent). Blad odczytu = oryginal (zachowanie ROT).</summary>
+        public static void RwPeace(IFaction a, IFaction b)
+        {
+            bool skip = false; string why = "-";
+            try { skip = FightsOnNow(a, b, out why); }
+            catch (Exception e) { Stumble("RwPeace", e); skip = false; why = "blad odczytu - pokoj ROT"; }
+            if (!skip) MakePeaceAction.Apply(a, b);
+            try
+            {
+                _rwPeaceCalls++;
+                if (_rwPeaceSaid) return;
+                _rwPeaceSaid = true;
+                Test320AtExecute();   // 320: tylko autotest
+                bool war = a != null && b != null && FactionManager.IsAtWarAgainstFaction(a, b);
+                Log.Info("Krwawe Gody bez pokoju (320): ExecuteRobb - pokoj " + (a != null ? a.StringId : "-") + "-" + (b != null ? b.StringId : "-") + " " + (skip ? "POMINIETY" : "ZAWARTY (jak ROT)")
+                         + " (" + why + ", podmian " + _rwSwapped + ") | wojna " + (war ? "TAK" : "NIE") + " | Roose zyje " + RooseAlive() + " | wywolanie " + _rwPeaceCalls
+                         + " | dzien opowiesci " + F1(StoryDay()) + ".");
+                if (skip && !_rwPlayerTold) { _rwPlayerTold = true; Log.Player("The North does not bend the knee: the war against the crown goes on."); }
+            }
+            catch (Exception e) { Stumble("RwPeace.Log", e); }
+        }
+
+        /// <summary>Zapas (transpiler nie podmienil): wojna Polnoc-korona przed ExecuteRobb. Nie rzuca.</summary>
+        public static void RwFallbackPrefix()
+        {
+            try
+            {
+                var west = K(CrownId); var north = K(NorthId);
+                _rwWarBefore = Alive(west) && Alive(north) && north.IsAtWarWith(west);
+            }
+            catch (Exception e) { Stumble("RwFallbackPrefix", e); _rwWarBefore = false; }
+        }
+
+        /// <summary>Zapas (transpiler nie podmienil): ROT zawarl pokoj - przy kluczu i blokadzie 264 wojna wznowiona (DeclareWarAction z flaga ROT). Nie rzuca.</summary>
+        private static void RwFallbackAfter()
+        {
+            if (!_rwFallback || !_rwWarBefore) return;
+            _rwWarBefore = false;
+            try
+            {
+                var west = K(CrownId); var north = K(NorthId);
+                if (!Alive(west) || !Alive(north) || north.IsAtWarWith(west)) return;
+                string why;
+                if (!FightsOnNow(north, west, out why)) { Log.Info("Krwawe Gody bez pokoju (320): zapas - pokoj ROT zostaje (" + why + ")."); return; }
+                bool war = Prologue.RotDeclareWar272(north, west);
+                Log.Info("Krwawe Gody bez pokoju (320): zapas - ROT zawarl pokoj (transpiler nie podmienil), wojna Polnoc-korona wznowiona " + (war ? "TAK" : "NIE") + " | Roose zyje " + RooseAlive() + ".");
+                if (war && !_rwPlayerTold) { _rwPlayerTold = true; Log.Player("The North does not bend the knee: the war against the crown goes on."); }
+            }
+            catch (Exception e) { Stumble("RwFallbackAfter", e); }
         }
 
         /// <summary>Postfiks ROT RedWeddingQuest.ExecuteRobb: ROT przenosi Freyow, Mootonow, Coxow i Brackenow do korony tylko z krolestwa Dorzecza - po unii robimy to
-        /// dla rodow z unii, ktore sa w Polnocy (ROT zawarl juz w tym wywolaniu pokoj Polnoc-korona). Nie rzuca.</summary>
+        /// dla tych z czterech, ktore sa w Polnocy (320a-RZ: bez wymogu rodu z unii; klucz RiverLordsDefectAtRedWedding). 320a-KG: pokoj Polnoc-korona ROT pominiety
+        /// (RwPeace) przy kluczu NorthFightsOnAfterRedWedding - rody ida do korony w trwajacej wojnie. Nie rzuca.</summary>
         public static void RedWeddingPostfix()
         {
+            RwFallbackAfter();
             try
             {
                 if (_st != 1 || _rw) return;
@@ -1034,13 +1162,16 @@ namespace Armoury
                 var t = AccessTools.TypeByName("ROT.Misc.ROTClans");
                 var res = new List<string>();
                 int n = 0;
+                var st = Settings.Current;
+                bool defect = st == null || st.RiverLordsDefectAtRedWedding;
                 foreach (var name in new[] { "Frey", "Mooton", "Cox", "Bracken" })
                 {
                     Clan c = null;
                     try { var pi = t != null ? AccessTools.Property(t, name) : null; c = pi != null ? pi.GetValue(null, null) as Clan : null; } catch { c = null; }
                     if (c == null) { res.Add(name + " brak"); continue; }
                     if (c.IsEliminated) { res.Add(name + " wyeliminowany"); continue; }
-                    if (!_clanSet.Contains(c.StringId)) { res.Add(name + " nie z unii"); continue; }
+                    // 320a-RZ: bez wymogu rodu z unii (_clanSet) - kazdy z czterech, ktory jest w Polnocy (dolaczyl i inna droga)
+                    if (!defect) { res.Add(name + " zostaje - klucz River Lords Defect At Red Wedding NIE"); continue; }
                     if (c.Kingdom != north) { res.Add(name + " poza Polnoca (" + (c.Kingdom != null ? c.Kingdom.StringId : "-") + ")"); continue; }
                     if (!Alive(west)) { res.Add(name + " - korony brak"); continue; }
                     ChangeKingdomAction.ApplyByJoinToKingdom(c, west, default(CampaignTime), true);
@@ -1049,7 +1180,7 @@ namespace Armoury
                     res.Add(name + " (" + c.StringId + ") -> " + west.StringId + " " + (ok ? "TAK" : "NIE"));
                 }
                 _rw = true;
-                Log.Info(P + "Krwawe Gody - rody Dorzecza ROT do korony (jak ROT dla krolestwa Dorzecza): " + string.Join(", ", res.ToArray()) + " | przeniesionych " + n + " | Polnoc-korona "
+                Log.Info(P + "Krwawe Gody - rody Dorzecza ROT do korony (jak ROT dla krolestwa Dorzecza; 320a-RZ bez wymogu unii): " + string.Join(", ", res.ToArray()) + " | przeniesionych " + n + " | Polnoc-korona "
                          + (Alive(west) && Alive(north) && north.IsAtWarWith(west) ? "w wojnie" : "pokoj") + ".");
                 try { SplitAtRedWedding(north, west); } catch (Exception e) { Stumble("SplitAtRedWedding", e); }
             }

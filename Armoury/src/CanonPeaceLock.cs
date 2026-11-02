@@ -41,12 +41,16 @@ namespace Armoury
     ///  (zerwane wezwanie) pyta Stops() obok swojego warunku RotWarForced.
     /// Linie "Pokoj kanonu (264)": start (latki, klucz), kazda zablokowana proba (najwyzej raz na pare, droge i dobe; liczniki wszystkich), doba.
     /// Zapis: brak (stan z gry). Bledy: potkniecia liczone (Stumble), bez globalnego wylacznika.
+    /// 320a-KG (Jeff 02.11 "Polnoc nie zawiera pokoju z korona, dalej walczy"; klucz NorthFightsOnAfterRedWedding): wiersz Polnoc-korona ma faze 2 - po koncu kanonu
+    /// (Krwawe Gody, takze stan 1 z martwym Robbem w chwili ExecuteRobb) blokada trwa, dopoki ROT BastardsSiegeEvent < 2 (ta sama granica co 312c
+    /// IronThroneNorthAfterBastards). Pokoj ROT w ExecuteRobb usuwa KingInTheNorth.RwPeace (transpiler). Dorzecze-korona bez zmian.
     /// </summary>
     internal static class CanonPeaceLock
     {
         internal const string Tag = "Pokoj kanonu (264): ";
         private const string PhraseCanon = "wojna kanonu trwa do Krwawych Godow";
         private const string PhraseRot = "ROT wymusza te wojne, pokoj trwalby dobe";   // recenzja 264 (3): po koncu kanonu
+        private const string PhraseFightsOn = "Polnoc walczy dalej po Krwawych Godach do Bitwy Bekartow";   // 320a-KG
         internal const string PathWeariness = "Diplomacy zmeczenie wojna";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -54,18 +58,21 @@ namespace Armoury
         private sealed class Rule
         {
             public string A, B, Label, EndEvent, EndHero, EndHeroName;
-            public Rule(string a, string b, string label, string endEvent, string endHero, string endHeroName) { A = a; B = b; Label = label; EndEvent = endEvent; EndHero = endHero; EndHeroName = endHeroName; }
+            public bool FightsOn;   // 320a-KG: po koncu kanonu wojna trwa do Bitwy Bekartow (klucz NorthFightsOnAfterRedWedding)
+            public Rule(string a, string b, string label, string endEvent, string endHero, string endHeroName, bool fightsOn = false) { A = a; B = b; Label = label; EndEvent = endEvent; EndHero = endHero; EndHeroName = endHeroName; FightsOn = fightsOn; }
         }
 
         // TABELA (przelacznik danych 264): Wojna Pieciu Krolow - Polnoc i Dorzecze przeciw koronie (vlandia = House Baratheon of King's Landing, Lannisterowie)
         // do Krwawych Godow. Reach i Dorne (Prologue.Crown) poza tabela - kolejny wiersz, gdy Jeff zechce.
         private static readonly Rule[] Rules =
         {
-            new Rule(Prologue.NorthId, Prologue.Crown, "Polnoc-korona", "RedWeddingEvent", Prologue.RobbId, "Robb"),
+            new Rule(Prologue.NorthId, Prologue.Crown, "Polnoc-korona", "RedWeddingEvent", Prologue.RobbId, "Robb", true),
             new Rule(Prologue.RiverId, Prologue.Crown, "Dorzecze-korona", "RedWeddingEvent", Prologue.RobbId, "Robb"),
         };
 
         internal static bool KeyOn { get { var s = Settings.Current; return s != null && s.CanonWarNoPeaceUntilRedWedding; } }
+        internal static bool FightsOnKey { get { var s = Settings.Current; return s != null && s.NorthFightsOnAfterRedWedding; } }
+        internal const string FightsOnEvent = "BastardsSiegeEvent";   // 320a-KG: koniec fazy 2 (stan 2) - jak 312c CanonThroneWars
 
         // ---- stan doby / sesji (bez zapisu)
         private static int _dBlocked, _sBlocked, _stumbles, _dStumbles;
@@ -75,7 +82,7 @@ namespace Armoury
         // pamiec konca blokady na godzine gry (IsAllowed pyta czesto - RotEventState i Hero.FindFirst raz na godzine)
         private static long _cacheHour = long.MinValue;
         private static string[] _cacheEnd = new string[Rules.Length];
-        private static int _cacheRw = -1;
+        private static int _cacheRw = -1, _cacheBs = -1;
         private static bool _cacheRobbMissing;
         private static Hero _cacheRobb;   // obiekt bohatera na godzine; IsAlive czytane na zywo (ROT ExecuteRobb zabija Robba tuz przed swoim pokojem)
 
@@ -83,7 +90,7 @@ namespace Armoury
         {
             _dBlocked = _sBlocked = _stumbles = _dStumbles = 0;
             _dPaths.Clear(); _dSaid.Clear(); _playerTold = _playerToldWeary = false;
-            _cacheHour = long.MinValue; _cacheEnd = new string[Rules.Length]; _cacheRw = -1; _cacheRobbMissing = false; _cacheRobb = null;
+            _cacheHour = long.MinValue; _cacheEnd = new string[Rules.Length]; _cacheRw = -1; _cacheBs = -1; _cacheRobbMissing = false; _cacheRobb = null;
             CanonWarWatch.Reset();
             CanonPeaceLockTest.Reset();
         }
@@ -102,6 +109,12 @@ namespace Armoury
         /// playerChoice - gracz rzadzi strona i pokoj jest jego wyborem (PlayerChoice); rotForced - ROT wymusza te wojne (liczone tylko po koncu kanonu).</summary>
         internal static bool Locked(bool key, bool canon, bool playerChoice, bool eliminated, int redWedding, bool heroDead, bool rotForced, out string why)
         {
+            return Locked(key, canon, playerChoice, eliminated, redWedding, heroDead, rotForced, false, -1, out why);
+        }
+
+        /// <summary>320a-KG: fightsOn - wiersz z faza 2 i klucz NorthFightsOnAfterRedWedding; bastards - stan ROT BastardsSiegeEvent (-1 nie widac = faza trwa).</summary>
+        internal static bool Locked(bool key, bool canon, bool playerChoice, bool eliminated, int redWedding, bool heroDead, bool rotForced, bool fightsOn, int bastards, out string why)
+        {
             if (!key) { why = "klucz NIE"; return false; }
             if (!canon) { why = "kampania klasyczna - nie dotyczy"; return false; }
             if (playerChoice) { why = "gracz rzadzi strona - pokoj to jego wybor"; return false; }
@@ -113,6 +126,7 @@ namespace Armoury
                 return true;
             }
             string end = (heroDead ? "Robb nie zyje" : "Robb zyje") + ", RedWeddingEvent " + redWedding;
+            if (FightsOnPhase(fightsOn, bastards)) { why = end + " - Polnoc walczy dalej po Krwawych Godach, " + FightsOnEvent + " " + bastards; return true; }
             if (redWedding == 1) { why = end + " - wesele ROT w toku, ROT sam zawiera pokoj"; return false; }
             if (rotForced) { why = end + " - ROT wymusza te wojne, pokoj cofnalby nastepnej doby"; return true; }
             why = end + " - ROT nie wymusza tej wojny";
@@ -121,6 +135,9 @@ namespace Armoury
 
         /// <summary>Koniec kanonu pary: RedWeddingEvent skonczone (stan 2 - CompleteEvent ROT) albo Robb nie zyje.</summary>
         internal static bool CanonOver(int redWedding, bool heroDead) { return redWedding >= 2 || heroDead; }
+
+        /// <summary>320a-KG: faza 2 wiersza Polnoc-korona trwa, dopoki Bitwa Bekartow nie skonczona (stan BastardsSiegeEvent < 2).</summary>
+        internal static bool FightsOnPhase(bool fightsOn, int bastards) { return fightsOn && bastards < 2; }
 
         /// <summary>Gracz wladca strony - pokoj jego wyborem, chyba ze droga nie daje mu wyboru (zmeczenie wojna Diplomacy: okno tylko OK albo odmowa wylaczona).</summary>
         internal static bool PlayerChoice(bool playerRules, bool noChoice) { return playerRules && !noChoice; }
@@ -131,6 +148,7 @@ namespace Armoury
             if (h == _cacheHour) return;
             _cacheHour = h;
             _cacheRw = Prologue.RotEventState("RedWeddingEvent");
+            _cacheBs = Prologue.RotEventState(FightsOnEvent);
             var robb = Prologue.HeroById(Prologue.RobbId);
             _cacheRobbMissing = robb == null;
             _cacheRobb = robb;
@@ -148,13 +166,13 @@ namespace Armoury
             return -1;
         }
 
-        /// <summary>Stan reguly i pary teraz (bez logu); idx - wiersz tabeli albo -1; noChoice - droga bez wyboru gracza (recenzja 264 (2)); rotPhase - blokada
+        /// <summary>Stan reguly i pary teraz (bez logu); idx - wiersz tabeli albo -1; noChoice - droga bez wyboru gracza (recenzja 264 (2)); phase - 0 kanon, 1 blokada
         /// po koncu kanonu (ROT wymusza); playerRules - gracz rzadzi strona.</summary>
-        private static bool State(IFaction a, IFaction b, bool noChoice, out int idx, out string why, out bool rotPhase, out bool playerRules)
+        private static bool State(IFaction a, IFaction b, bool noChoice, out int idx, out string why, out int phase, out bool playerRules)
         {
             why = "-";
             idx = -1;
-            rotPhase = playerRules = false;
+            phase = 0; playerRules = false;
             if (a == null || b == null || !a.IsKingdomFaction || !b.IsKingdomFaction) return false;
             idx = RuleIndex(a, b);
             if (idx < 0) return false;
@@ -166,22 +184,24 @@ namespace Armoury
             int rw = _cacheRw;
             playerRules = Prologue.RulesRealm(a) || Prologue.RulesRealm(b);
             bool over = CanonOver(rw, heroDead);
-            bool rotForced = over && rw != 1 && Prologue.RotWarForced(a, b);   // odczyt ROT tylko po koncu kanonu
-            bool on = Locked(true, true, PlayerChoice(playerRules, noChoice), a.IsEliminated || b.IsEliminated, rw, heroDead, rotForced, out why);
-            rotPhase = on && over;
+            bool fightsOn = Rules[idx].FightsOn && FightsOnKey;
+            bool phase2 = over && FightsOnPhase(fightsOn, _cacheBs);
+            bool rotForced = over && rw != 1 && !phase2 && Prologue.RotWarForced(a, b);   // odczyt ROT tylko po koncu kanonu (faza 2 i tak blokuje)
+            bool on = Locked(true, true, PlayerChoice(playerRules, noChoice), a.IsEliminated || b.IsEliminated, rw, heroDead, rotForced, fightsOn, _cacheBs, out why);
+            phase = !on || !over ? 0 : (phase2 ? 2 : 1);
             return on;
         }
 
-        private static bool State(IFaction a, IFaction b, out int idx, out string why, out bool rotPhase)
+        private static bool State(IFaction a, IFaction b, out int idx, out string why, out int phase)
         {
             bool pr;
-            return State(a, b, false, out idx, out why, out rotPhase, out pr);
+            return State(a, b, false, out idx, out why, out phase, out pr);
         }
 
         /// <summary>Pokoj pary jest teraz zablokowany (tylko odczyt, bez logu). WorldClock7 (linia POKOJ) i autotest.</summary>
         internal static bool Blocks(IFaction a, IFaction b)
         {
-            try { int i; string w; bool rp; return State(a, b, out i, out w, out rp); }
+            try { int i; string w; int rp; return State(a, b, out i, out w, out rp); }
             catch (Exception e) { Stumble("Blocks", e); return false; }
         }
 
@@ -190,7 +210,7 @@ namespace Armoury
         {
             try
             {
-                int i; string why; bool rp;
+                int i; string why; int rp;
                 if (!State(a, b, out i, out why, out rp)) return false;
                 Note(a, b, i, why, path, rp);
                 return true;
@@ -198,7 +218,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Stops", e); return false; }
         }
 
-        private static void Note(IFaction a, IFaction b, int idx, string why, string path, bool rotPhase)
+        private static void Note(IFaction a, IFaction b, int idx, string why, string path, int phase)
         {
             _dBlocked++; _sBlocked++;
             string pk = PathKey(path);
@@ -209,7 +229,7 @@ namespace Armoury
             string key = (a.StringId ?? "") + "|" + (b.StringId ?? "") + "|" + pk;
             if (!_dSaid.Add(key)) return;
             Log.Info(Tag + "dzien " + (int)CampaignTime.Now.ToDays + " | " + Name(a) + " -> " + Name(b) + ": pokoj ZABLOKOWANY (droga: " + path + ") - "
-                     + (rotPhase ? PhraseRot : PhraseCanon) + " (" + why + ", " + Rules[idx].Label + ").");
+                     + (phase == 2 ? PhraseFightsOn : phase == 1 ? PhraseRot : PhraseCanon) + " (" + why + ", " + Rules[idx].Label + ").");
         }
 
         /// <summary>Klucz drogi do licznikow: tekst do pierwszego nawiasu (wnioskodawca i wolajacy tylko w linii).</summary>
@@ -283,7 +303,9 @@ namespace Armoury
         private static string RulesText()
         {
             var l = new List<string>();
-            foreach (var r in Rules) l.Add(r.Label + " (" + r.A + "-" + r.B + ", do konca " + r.EndEvent + " albo smierci " + r.EndHero + ", potem gdy ROT wymusza wojne)");
+            foreach (var r in Rules) l.Add(r.Label + " (" + r.A + "-" + r.B + ", do konca " + r.EndEvent + " albo smierci " + r.EndHero
+                                         + (r.FightsOn ? ", potem do " + FightsOnEvent + " 2 - North Fights On After Red Wedding " + (FightsOnKey ? "tak" : "nie") + ", a dalej" : ", potem")
+                                         + " gdy ROT wymusza wojne)");
             return string.Join(", ", l.ToArray());
         }
 
@@ -316,7 +338,7 @@ namespace Armoury
         {
             try
             {
-                int i; string why; bool rp, pr;
+                int i; string why; int rp; bool pr;
                 if (State(__0, __1, false, out i, out why, out rp, out pr)) { Note(__0, __1, i, why, DipPath(), rp); return false; }
                 if (i < 0 || !pr) return true;
                 string path = DipPath();
@@ -393,7 +415,7 @@ namespace Armoury
                 if (d == null) return true;
                 var k = d.Kingdom ?? __instance;
                 var other = d.FactionToMakePeaceWith;
-                int i; string why; bool rp;
+                int i; string why; int rp;
                 if (!State(k, other, out i, out why, out rp)) return true;
                 var who = d.ProposerClan;
                 Note(k, other, i, why, "decyzja krolestwa (AddDecision, wnioskodawca " + (who != null && who.Name != null ? who.Name.ToString() : "-") + ")", rp);
@@ -401,7 +423,8 @@ namespace Armoury
                 {
                     _playerTold = true;
                     bool crownSide = k.StringId == Prologue.Crown;
-                    Log.Player(crownSide ? "The crown will hear no talk of peace with the rebels while Robb Stark lives." : "King Robb will hear no talk of peace with the crown while the war goes on.", true);
+                    if (rp == 2) Log.Player(crownSide ? "The crown will hear no talk of peace with the northern rebels." : "The North will hear no talk of peace with the crown after the Red Wedding: the war goes on.", true);
+                    else Log.Player(crownSide ? "The crown will hear no talk of peace with the rebels while Robb Stark lives." : "King Robb will hear no talk of peace with the crown while the war goes on.", true);
                 }
                 return false;
             }
@@ -414,7 +437,7 @@ namespace Armoury
             if (!__result || __instance == null) return;
             try
             {
-                int i; string why; bool rp;
+                int i; string why; int rp;
                 if (!State(__instance.Kingdom, __instance.FactionToMakePeaceWith, out i, out why, out rp)) return;
                 __result = false;
                 Note(__instance.Kingdom, __instance.FactionToMakePeaceWith, i, why, "decyzja w toku (IsAllowed)", rp);
@@ -450,7 +473,7 @@ namespace Armoury
                 var r = Rules[i];
                 var a = Prologue.KingdomById(r.A); var b = Prologue.KingdomById(r.B);
                 string why;
-                bool on, rp = false;
+                bool on; int rp = 0;
                 if (a == null || b == null) { on = false; why = "brak krolestwa (" + (a == null ? r.A : r.B) + ")"; }
                 else
                 {
@@ -462,7 +485,8 @@ namespace Armoury
                 if (global == null || on) global = why;
                 bool war = a != null && b != null && !a.IsEliminated && !b.IsEliminated && a.IsAtWarWith(b);
                 string since = war ? Prologue.WarSinceText(a, b, r.A == Prologue.RiverId || r.B == Prologue.RiverId ? Prologue.RiverFirstDay : Prologue.NoDayValue) : "";
-                parts.Add(r.Label + ": " + (on ? (rp ? "CZYNNA (ROT wymusza)" : "CZYNNA") : "KONIEC") + ", wojna " + (war ? "TAK " + since : "NIE"));
+                parts.Add(r.Label + ": " + (on ? (rp == 2 ? "CZYNNA (Polnoc walczy po Krwawych Godach, " + FightsOnEvent + " " + _cacheBs + ")" : rp == 1 ? "CZYNNA (ROT wymusza)" : "CZYNNA") : "KONIEC")
+                          + ", wojna " + (war ? "TAK " + since : "NIE"));
             }
             if (!KeyOn) sb.Append("blokada WYLACZONA (klucz NIE)");
             else if (!Prologue.CanonHere) sb.Append("blokada NIE DOTYCZY (kampania klasyczna)");

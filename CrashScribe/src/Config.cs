@@ -41,6 +41,7 @@ namespace CrashScribe
         public static bool FabulaPacerEnabled = true;  // fabula ROT idzie po kolei, wedle osi serialu
         public static int FabulaPaceDays = 4;          // najwyzej jedno wydarzenie fabularne na tyle dni
         public static float FabulaTimeScale = 4.33f;   // rozciagniecie calej osi fabuly: 1.0 = daty ROT bez zmian (rok 84 dni); 4.33 = rok 364 dni Armoury (Jeff 04.10: "rozciagniete") - lata zgadzaja sie z serialem
+        public static bool FabulaHarrenhalResolve = true;  // 320a: martwe wydarzenia ROT (lancuch Harrenhal bez Clegane, hold Dorzecza bez Dorzecza) pomijane od razu przez ROT SkipEvent (w zapisie ROT)
 
         // --- Zew Nocnego Krola (patrz NightKingCall.cs) ---
         public static bool NightKingCallEnabled = true;   // trupy z mniejszych band Innych ida do najsilniejszej, az ta dobije do progu oblezenia ROT
@@ -210,6 +211,7 @@ namespace CrashScribe
                         case "FabulaPacerEnabled": FabulaPacerEnabled = B(v); break;
                         case "FabulaPaceDays": FabulaPaceDays = I(v, FabulaPaceDays); break;
                         case "FabulaTimeScale": FabulaTimeScale = F(v, FabulaTimeScale); break;
+                        case "FabulaHarrenhalResolve": FabulaHarrenhalResolve = B(v); break;
                         case "NightKingCallEnabled": NightKingCallEnabled = B(v); break;
                         case "NightKingCallTarget": NightKingCallTarget = I(v, NightKingCallTarget); break;
                         case "NightKingCallKeep": NightKingCallKeep = I(v, NightKingCallKeep); break;
