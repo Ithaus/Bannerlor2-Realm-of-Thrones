@@ -91496,16 +91496,6 @@ def main(argv):
 #  J318-3  tamze: zaden ranny bohater nie wyszedl z leczenia zdrowy (HP po > HP przed przy "pominiete nie" i leczenie > 0) - leczenie tylko u zdrowych
 #  J318-4  zero linii ERROR z WoundedLords318
 def jency318a_main(logp):
-# ---------------------------------------------------------------- paczka 318b (02.11): opieka nad jencami - grupa jency318b
-# Jeff 02.11: "kto leczy jencow ... to tez powinno zwiekszac medicine tego, kto zajmuje sie rannymi ... moje medicine powinno rosnac".
-# Armoury/src/PrisonerCare.cs: Medicine XP za wyleczonych jencow gracza (latka ManageHealingOfPrisonerRegulars); SlowHealing.SlowPostfix nie tnie jencow.
-# Uzycie: python -I tools/sprawdz_logi.py --grupa jency318b <Armoury-*.log>
-#  J318-1  linia SlowHealing z "jency pomijani TAK" (nowy DLL, krok B)
-#  J318-2  "Opieka nad jencami (318b): start sesji" z "latki 1/1"
-#  J318-3  doby z rannymi jencami: wyleczonych srednio >= 0.8 na dobe (ryczalt gry 1/dobe; przed 318b 0.5)
-#  J318-4  doby z wyleczonymi: XP Medicine > 0 (przy Prisoner Care Xp Percent > 0)
-#  J318-5  zero linii ERROR z PrisonerCare
-def jency318b_main(logp):
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("J318-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -91552,6 +91542,90 @@ def jency318b_main(logp):
     rep.add("J318-4: bledy WoundedLords318", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
     rep.show()
     return 0
+
+
+_jency318a_main_prev = main
+
+
+def main(argv):
+    # paczka 318a: grupa jency318a - opakowanie main jak klute317a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "jency318a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return jency318a_main(rest[0] if rest else None)
+    return _jency318a_main_prev(argv)
+
+
+# ---------------------------------------------------------------- paczka 318b (02.11): opieka nad jencami - grupa jency318b
+# Jeff 02.11: "kto leczy jencow ... to tez powinno zwiekszac medicine tego, kto zajmuje sie rannymi ... moje medicine powinno rosnac".
+# Armoury/src/PrisonerCare.cs: Medicine XP za wyleczonych jencow gracza (latka ManageHealingOfPrisonerRegulars); SlowHealing.SlowPostfix nie tnie jencow.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa jency318b <Armoury-*.log>
+#  J318-1  linia SlowHealing z "jency pomijani TAK" (nowy DLL, krok B)
+#  J318-2  "Opieka nad jencami (318b): start sesji" z "latki 1/1"
+#  J318-3  doby z rannymi jencami: wyleczonych srednio >= 0.8 na dobe (ryczalt gry 1/dobe; przed 318b 0.5)
+#  J318-4  doby z wyleczonymi: XP Medicine > 0 (przy Prisoner Care Xp Percent > 0)
+#  J318-5  zero linii ERROR z PrisonerCare
+def jency318b_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("J318-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    slow, starts, days, errors = [], [], [], []
+    pct0 = False
+    day = re.compile(r"Opieka nad jencami \(318b\): wyleczonych (\d+) \(wywolan \d+\), XP Medicine ([\d.]+) .*? dla (.*?), rannych jencow przed/po (\d+)/(\d+)")
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            if s.startswith("SlowHealing: gojenie na mapie") or "patch spi" in s and s.startswith("SlowHealing:"):
+                slow.append(s)
+            elif s.startswith("Opieka nad jencami (318b): start sesji"):
+                starts.append(s)
+                if "Prisoner Care Xp Percent 0 " in s:
+                    pct0 = True
+            elif s.startswith("Opieka nad jencami (318b): wyleczonych"):
+                m = day.search(s)
+                if m:
+                    days.append((int(m.group(1)), float(m.group(2)), m.group(3), int(m.group(4)), int(m.group(5))))
+            if "ERROR" in s and "PrisonerCare." in s:
+                errors.append(s)
+    print(f"plik: {logp}")
+    okb = [s for s in slow if "jency pomijani TAK" in s]
+    rep.add("J318-1: SlowHealing pomija jencow", f"linii SlowHealing {len(slow)}, z 'jency pomijani TAK' {len(okb)}", "wszystkie z TAK",
+            (len(okb) == len(slow)) if slow else None)
+    ok2 = [s for s in starts if "latki 1/1" in s]
+    rep.add("J318-2: latka ManageHealingOfPrisonerRegulars wpieta", f"startow {len(starts)}, z 'latki 1/1' {len(ok2)}" + (f" ({starts[-1][:220]})" if starts else ""),
+            "wszystkie 1/1", (len(ok2) == len(starts)) if starts else None)
+    wd = [d for d in days if d[3] > 0]
+    healed = sum(d[0] for d in wd)
+    avg = healed / len(wd) if wd else 0.0
+    rep.add("J318-3: tempo leczenia jencow (doby z rannymi na poczatku)", f"dob {len(wd)}, wyleczonych {healed}, srednio {avg:.2f}/dobe", ">= 0.8 (gra 1/dobe, stary DLL 0.5)",
+            (avg >= 0.8) if len(wd) >= 3 else None)
+    hd = [d for d in days if d[0] > 0]
+    noxp = [d for d in hd if d[1] <= 0]
+    xp = sum(d[1] for d in hd)
+    who = sorted(set(d[2] for d in hd))
+    rep.add("J318-4: Medicine XP za wyleczonych jencow", f"dob z wyleczonymi {len(hd)}, bez XP {len(noxp)}, XP lacznie {xp:.0f}, chirurdzy: {', '.join(who) if who else '-'}",
+            "bez XP 0", (len(noxp) == 0) if hd and not pct0 else None)
+    rep.add("J318-5: bledy PrisonerCare", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
+_jency318b_main_prev = main
+
+
+def main(argv):
+    # paczka 318b: grupa jency318b - opakowanie main jak klute317a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "jency318b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return jency318b_main(rest[0] if rest else None)
+    return _jency318b_main_prev(argv)
 
 
 # ---------------------------------------------------------------- paczka 318c (02.11): dowodztwo i tier trzymaja kompanie - grupa panika318c
@@ -91701,75 +91775,6 @@ def panika318c_main(logp):
     p318_rows(rep, ends, brks, evts)
     rep.show()
     return 0
-
-
-    slow, starts, days, errors = [], [], [], []
-    pct0 = False
-    day = re.compile(r"Opieka nad jencami \(318b\): wyleczonych (\d+) \(wywolan \d+\), XP Medicine ([\d.]+) .*? dla (.*?), rannych jencow przed/po (\d+)/(\d+)")
-    with open(logp, encoding="utf-8", errors="replace") as f:
-        for line in f:
-            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
-            if s.startswith("SlowHealing: gojenie na mapie") or "patch spi" in s and s.startswith("SlowHealing:"):
-                slow.append(s)
-            elif s.startswith("Opieka nad jencami (318b): start sesji"):
-                starts.append(s)
-                if "Prisoner Care Xp Percent 0 " in s:
-                    pct0 = True
-            elif s.startswith("Opieka nad jencami (318b): wyleczonych"):
-                m = day.search(s)
-                if m:
-                    days.append((int(m.group(1)), float(m.group(2)), m.group(3), int(m.group(4)), int(m.group(5))))
-            if "ERROR" in s and "PrisonerCare." in s:
-                errors.append(s)
-    print(f"plik: {logp}")
-    okb = [s for s in slow if "jency pomijani TAK" in s]
-    rep.add("J318-1: SlowHealing pomija jencow", f"linii SlowHealing {len(slow)}, z 'jency pomijani TAK' {len(okb)}", "wszystkie z TAK",
-            (len(okb) == len(slow)) if slow else None)
-    ok2 = [s for s in starts if "latki 1/1" in s]
-    rep.add("J318-2: latka ManageHealingOfPrisonerRegulars wpieta", f"startow {len(starts)}, z 'latki 1/1' {len(ok2)}" + (f" ({starts[-1][:220]})" if starts else ""),
-            "wszystkie 1/1", (len(ok2) == len(starts)) if starts else None)
-    wd = [d for d in days if d[3] > 0]
-    healed = sum(d[0] for d in wd)
-    avg = healed / len(wd) if wd else 0.0
-    rep.add("J318-3: tempo leczenia jencow (doby z rannymi na poczatku)", f"dob {len(wd)}, wyleczonych {healed}, srednio {avg:.2f}/dobe", ">= 0.8 (gra 1/dobe, stary DLL 0.5)",
-            (avg >= 0.8) if len(wd) >= 3 else None)
-    hd = [d for d in days if d[0] > 0]
-    noxp = [d for d in hd if d[1] <= 0]
-    xp = sum(d[1] for d in hd)
-    who = sorted(set(d[2] for d in hd))
-    rep.add("J318-4: Medicine XP za wyleczonych jencow", f"dob z wyleczonymi {len(hd)}, bez XP {len(noxp)}, XP lacznie {xp:.0f}, chirurdzy: {', '.join(who) if who else '-'}",
-            "bez XP 0", (len(noxp) == 0) if hd and not pct0 else None)
-    rep.add("J318-5: bledy PrisonerCare", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
-    rep.show()
-    return 0
-
-
-_jency318a_main_prev = main
-
-
-def main(argv):
-    # paczka 318a: grupa jency318a - opakowanie main jak klute317a
-    a = argv[1:]
-    if "--grupa" in a:
-        i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "jency318a":
-            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return jency318a_main(rest[0] if rest else None)
-    return _jency318a_main_prev(argv)
-
-
-_jency318b_main_prev = main
-
-
-def main(argv):
-    # paczka 318b: grupa jency318b - opakowanie main jak klute317a
-    a = argv[1:]
-    if "--grupa" in a:
-        i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "jency318b":
-            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return jency318b_main(rest[0] if rest else None)
-    return _jency318b_main_prev(argv)
 
 
 _panika318c_main_prev = main
