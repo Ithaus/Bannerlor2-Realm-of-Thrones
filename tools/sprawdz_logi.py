@@ -91486,5 +91486,77 @@ def main(argv):
     return _klute317a_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 318a (02.11): ranni lordowie pokonanych do pojmania - grupa jency318a
+# Jeff 02.11: "wygralem ja i nie mam w prisoner dowodcow, z jednym stoczylem pojedynek i wygralem wiec tez powinien byc w jencach" (bitwa 24, 19:31-19:32:
+# Hudson Serrett po pojedynku ROT rannych 1, 312f "wodz: zbiegl", 117 "lordow 0"). Armoury/src/WoundedLords318.cs: w wygranej bitwie gracza ranny bohater
+# pokonanych nie jest leczony perkami (PM / Resilience) przed CaptureDefeatedPartyMembers - szansa rannego 1.0. Klucz DefeatedLordsStayWounded.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa jency318a <Armoury-*.log>
+#  J318-1  linia startu sesji: trzy latki "wpieta" (leczenie po bitwie, Hero.Heal, pojmanie), bez BRAK
+#  J318-2  wygrana gracza z kluczem wlaczonym i pojmaniem TAK: ranny bohater pokonanych (HP przed <= granica) nie "zbiegl" po pojmaniu
+#  J318-3  tamze: zaden ranny bohater nie wyszedl z leczenia zdrowy (HP po > HP przed przy "pominiete nie" i leczenie > 0) - leczenie tylko u zdrowych
+#  J318-4  zero linii ERROR z WoundedLords318
+def jency318a_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("J318-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, lines, errors = [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            if s.startswith("Ranni lordowie (318a): start sesji"):
+                starts.append(s)
+            elif s.startswith("Ranni lordowie (318a): bitwa gracza"):
+                lines.append(s)
+            elif "ERROR" in s and "WoundedLords318" in s:
+                errors.append(s)
+    print(f"plik: {logp}")
+    if starts:
+        last = starts[-1]
+        ok = last.count("wpieta") >= 3 and "BRAK" not in last
+        rep.add("J318-1: latki 318a wpiete (ostatni start sesji)", last[:260], "3 x wpieta, bez BRAK", ok)
+    else:
+        rep.add("J318-1: latki 318a wpiete (ostatni start sesji)", "brak linii startu", "linia 'Ranni lordowie (318a): start sesji' (nowy DLL)", None)
+    ent = re.compile(r"\[(.+?) \(([^()]*)\) HP (\d+)/(\d+) (ranny|zdrowy) -> (\S+), perki PM (tak|nie) WIO (tak|nie) Res (tak|nie), leczenie (\d+) "
+                     r"pominiete (TAK|nie), po pojmaniu: ([^,\]]*), na koniec: ([^\]]*)\]")
+    nwon, nwnd, fled, healed, taken = 0, 0, [], [], 0
+    for s in lines:
+        if "gracz wygral" not in s or "klucz wlaczony" not in s or "pojmanie TAK" not in s:
+            continue
+        nwon += 1
+        for m in ent.finditer(s):
+            if m.group(5) != "ranny":
+                continue
+            nwnd += 1
+            hp0, hp1 = int(m.group(3)), (int(m.group(6)) if m.group(6).isdigit() else None)
+            if m.group(12) == "zbiegl":
+                fled.append(m.group(1))
+            if m.group(13) == "jeniec gracza" or m.group(12) == "do lupu gracza":
+                taken += 1
+            if m.group(11) == "nie" and int(m.group(10)) > 0 and hp1 is not None and hp1 > hp0:
+                healed.append(m.group(1) + f" {hp0}->{hp1}")
+    rep.add("J318-2: ranni bohaterowie pokonanych po wygranej - zbiegli", f"bitew {nwon}, rannych {nwnd}, do lupu / jency gracza {taken}, zbiegli {len(fled)}"
+            + (f" (pierwszy: {fled[0]})" if fled else ""), "zbiegli 0", (len(fled) == 0) if nwnd else None)
+    rep.add("J318-3: ranni wyleczeni mimo klucza", f"{len(healed)}" + (f" (pierwszy: {healed[0]})" if healed else ""), "0", (len(healed) == 0) if nwnd else None)
+    rep.add("J318-4: bledy WoundedLords318", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
+_jency318a_main_prev = main
+
+
+def main(argv):
+    # paczka 318a: grupa jency318a - opakowanie main jak klute317a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "jency318a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return jency318a_main(rest[0] if rest else None)
+    return _jency318a_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
