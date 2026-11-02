@@ -29607,6 +29607,8 @@ def noboz_main(logp):
             elif s.startswith("Nocleg: sen w menu przerwany"):
                 ev["cut"] += 1
                 cut_pending = 1
+            elif s.startswith("Sen do switu (315a): sen w menu od"):
+                cut_pending = 0   # 316b: gracz zasnal ponownie przed switem - "sen w menu tak" o swicie jest prawidlowe
             elif s.startswith("NocnyMarsz: gracz - komunikat switu"):
                 ev["msg"] += 1
             elif s.startswith("Nocleg: swit we snie"):
@@ -90818,7 +90820,8 @@ def sen315a_main(logp):
                     elif good is False:
                         bad1.append(s[:220])
                     # sen zaczety najpozniej o poczatku obozu (godziny przed polnoca: od 12:00 do camp_start) i pobudka o swicie - noc bez marszu
-                    if why.startswith("swit gracza") and 12 <= cur["h"] <= camp_start:
+                    # 316b: "nie pozniej niz poczatek obozu" doslownie (do camp_start:05) - sen po zmierzchu o 21:40 (oboz z rozkazu po ruchu 21:00-21:40) mial prawdziwy marsz
+                    if why.startswith("swit gracza") and 12 * 60 <= cur["h"] * 60 + cur["mm"] <= camp_start * 60 + 5:
                         pend_dawn = s[:160]
                 cur = None
                 continue
@@ -91079,6 +91082,118 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return zapas316a_main(rest[0] if rest else None)
     return _zapas316a_main_prev(argv)
+
+
+# ---------------------------------------------------------------- paczka 316b (02.11): pobudka o swicie bez falszywego marszu, zmierzch o czasie - grupa sen316b
+# Jeff 01.11: "wypoczynek powinien byc wtedy jak jest noc a konczyc sie jak wstaje slonce", "sen wystarczy 6 godzin snu nic nie dosypiaja". Log 01.11 22:56:
+# 66 x "The column marched 1h through the night, but the men rested 6h" po snie do switu (tick switu ksiegi o ok. 3:40, pobudka 3:00) i oboz z rozkazu
+# "always make camp" o ok. 21:40 (tick ksiegi z faza :38) - noc 5.3 h, dlug +1, czerwone "Second night without sleep". Armoury/src/NightRest.cs (OnHourly:
+# _menuSleptHour, zmierzch o czasie DuskLeadH; SleepInit/SleepTick), NightMarch.cs LogPlayerDawn ("spal w menu tej doby").
+# Uzycie: python -I tools/sprawdz_logi.py --grupa sen316b <Armoury-*.log>
+#  B316-1  linia gracza o swicie ma pole "spal w menu tej doby" (nowy DLL)
+#  B316-2  swit po snie w menu z pobudka "swit gracza": "marsz w godzinach obozu 0 h"
+#  B316-3  zmierzch trybu 1 (always make camp) -> nastepny sen w menu zaczety najpozniej camp_start:24 (spoznienie zmierzchu <= 0.4 h)
+#  B316-4  noc po zmierzchu trybu 1 i snie do switu: dlug o swicie nie rosnie
+#  B316-5  (INFO) zmierzchy o czasie z ticku przed poczatkiem obozu ("[316b: tick ksiegi przed zmierzchem")
+#  B316-6  zero linii ERROR w NightRest.OnHourly / SleepInit / SleepTick / LeaveSleep
+B316_DAWN = re.compile(r"^NocnyMarsz: gracz o swicie .*?dlug przed (\d+), po (\d+) .*?marsz w godzinach obozu (\d+) h")
+B316_START = re.compile(r"^Sen do switu \(315a\): sen w menu od (\d+):(\d\d) ")
+B316_END = re.compile(r"^Sen do switu \(315a\): (pobudka|koniec snu) o (\d+):(\d\d) .*?\| powod: (.+?) \|")
+
+
+def sen316b_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("B316-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    camp_start = 21
+    dawns, newf = 0, 0
+    wake_dawn = False        # ostatni sen w menu skonczony pobudka o swicie - czeka na linie gracza o swicie
+    m1_pending = None        # zmierzch trybu 1 czeka na start snu
+    m1_night = None          # sen po zmierzchu trybu 1 (do switu) czeka na linie switu
+    m1_late, m1_ok, early, errors = [], 0, 0, []
+    march_bad, march_n = [], 0
+    debt_bad, debt_n = [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            m = S315_CAMP.match(s)
+            if m:
+                camp_start = int(m.group(1))
+                continue
+            if s.startswith("Nocleg: gracz - zmierzch o "):
+                if "[316b: tick ksiegi przed zmierzchem" in s:
+                    early += 1
+                mz = re.match(r"Nocleg: gracz - zmierzch o (\d+):00", s)
+                # tylko zmierzch wlasciwy (tick przed poczatkiem obozu albo pierwsza godzina obozu) - pozniejsza godzina obozu po marszu z osady to inna sprawa
+                if "tryb zmierzchu 1 " in s and mz and (int(mz.group(1)) - camp_start) % 24 in (0, 23):
+                    m1_pending = s[:200]
+                continue
+            m = B316_START.match(s)
+            if m:
+                if m1_pending is not None:
+                    mins = int(m.group(1)) * 60 + int(m.group(2))
+                    if 12 * 60 <= mins <= camp_start * 60 + 24:
+                        m1_ok += 1
+                        m1_night = s[:120]
+                    else:
+                        m1_late.append(f"{m1_pending[:90]} -> {s[:70]}")
+                        m1_night = None
+                    m1_pending = None
+                continue
+            m = B316_END.match(s)
+            if m:
+                wake_dawn = m.group(4).startswith("swit gracza")
+                if not wake_dawn:
+                    m1_night = None
+                continue
+            m = B316_DAWN.match(s)
+            if m:
+                dawns += 1
+                if "spal w menu tej doby" in s:
+                    newf += 1
+                before, after, march = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                if wake_dawn:
+                    march_n += 1
+                    if march != 0:
+                        march_bad.append(s[:200])
+                if m1_night is not None and wake_dawn:
+                    debt_n += 1
+                    if after > before:
+                        debt_bad.append(f"{m1_night} -> dlug {before} -> {after}")
+                wake_dawn = False
+                m1_night = None
+                m1_pending = None
+                continue
+            if "ERROR" in s and any(k in s for k in ("NightRest.OnHourly", "NightRest.SleepInit", "NightRest.SleepTick", "NightRest.LeaveSleep")):
+                errors.append(s)
+    print(f"plik: {logp}")
+    rep.add("B316-1: pole 'spal w menu tej doby' w linii switu gracza", f"{newf} z {dawns}", "w kazdej linii nowego DLL", (newf == dawns) if dawns else None)
+    rep.add("B316-2: swit po pobudce o swicie bez marszu", f"sprawdzonych {march_n}, z marszem {len(march_bad)}" + (f" (pierwszy: {march_bad[0]})" if march_bad else ""),
+            "marsz w godzinach obozu 0 h", (len(march_bad) == 0) if march_n else None)
+    rep.add("B316-3: zmierzch trybu 1 -> sen najpozniej " + str(camp_start) + ":24", f"na czas {m1_ok}, spoznione {len(m1_late)}" + (f" (pierwsze: {m1_late[0]})" if m1_late else ""),
+            "spoznione 0", (len(m1_late) == 0) if (m1_ok or m1_late) else None)
+    rep.add("B316-4: noc po zmierzchu trybu 1 - dlug nie rosnie", f"nocy {debt_n}, z dlugiem +1 {len(debt_bad)}" + (f" (pierwsza: {debt_bad[0]})" if debt_bad else ""),
+            "0", (len(debt_bad) == 0) if debt_n else None)
+    rep.add("B316-5: zmierzch o czasie (tick przed poczatkiem obozu)", f"{early}", "INFO", None)
+    rep.add("B316-6: bledy ksiegi i snu w menu", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
+_sen316b_main_prev = main
+
+
+def main(argv):
+    # paczka 316b: grupa sen316b - opakowanie main jak zapas316a
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "sen316b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return sen316b_main(rest[0] if rest else None)
+    return _sen316b_main_prev(argv)
 
 
 if __name__ == "__main__":

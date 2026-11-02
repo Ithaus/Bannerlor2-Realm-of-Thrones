@@ -128,6 +128,13 @@ namespace Armoury
             return (long)Math.Floor((Math.Floor(NomH) - campStart) / 24.0);
         }
 
+        /// <summary>316b: numer nocy obozu, ktora zaczyna sie z nastepna godzina ksiegi (tick tuz przed poczatkiem obozu - zmierzch o czasie); przy
+        /// godzinie ksiegi CampStart-1 rowny NightId z ticku o CampStart.</summary>
+        internal static long NightIdAhead(int campStart)
+        {
+            return (long)Math.Floor((Math.Floor(NomH) + 1.0 - campStart) / 24.0);
+        }
+
         /// <summary>Godzina:minuty z godzin kampanii (do linii).</summary>
         internal static string HM(double h)
         {
