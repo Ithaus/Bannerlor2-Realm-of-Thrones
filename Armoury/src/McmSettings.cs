@@ -2084,6 +2084,22 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SiegeDefenderEnginesOnWalls { get; set; } = true;
 
+        [SettingPropertyBool("Siege Walls Favour Defenders", HintText = "walls favour defenders: the higher a fortress's walls, the harder it is to storm - in AI lords' assaults, in their decision to storm and in your own auto-resolved assaults (attacking or defending), by Siege Wall Level 1/2/3 Factor. The Others' sieges and the story sieges of Realm of Thrones are left as they are. Off = walls count only as the game counts them", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeWallsFavourDefenders { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Wall Level1 Factor", 1.00f, 2.00f, "0.00", HintText = "with Siege Walls Favour Defenders: defenders' advantage behind level 1 walls is multiplied by this. 1 = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeWallLevel1Factor { get; set; } = 1.10f;
+
+        [SettingPropertyFloatingInteger("Siege Wall Level2 Factor", 1.00f, 2.00f, "0.00", HintText = "with Siege Walls Favour Defenders: defenders' advantage behind level 2 walls (most castles and towns) is multiplied by this. 1 = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeWallLevel2Factor { get; set; } = 1.20f;
+
+        [SettingPropertyFloatingInteger("Siege Wall Level3 Factor", 1.00f, 2.00f, "0.00", HintText = "with Siege Walls Favour Defenders: defenders' advantage behind level 3 walls (the great strongholds) is multiplied by this. 1 = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeWallLevel3Factor { get; set; } = 1.35f;
+
         [SettingPropertyBool("Siege Ai Breach When Walls Hold", HintText = "an AI siege camp that has its ram and siege tower ready and still cannot hope to take the walls turns to battering them down with trebuchets (with Realistic Battle Mod only trebuchets strike walls - catapults and onagers hit engines and men). Off = the AI keeps the plan it drew at the start of the siege", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeAiBreachWhenWallsHold { get; set; } = true;
@@ -11692,6 +11708,10 @@ namespace Armoury
             s.SiegeWallsHoldUntilBreached = SiegeWallsHoldUntilBreached;
             s.SiegeCapitalWallsFactor = SiegeCapitalWallsFactor;
             s.SiegeDefenderEnginesOnWalls = SiegeDefenderEnginesOnWalls;
+            s.SiegeWallsFavourDefenders = SiegeWallsFavourDefenders;
+            s.SiegeWallLevel1Factor = SiegeWallLevel1Factor;
+            s.SiegeWallLevel2Factor = SiegeWallLevel2Factor;
+            s.SiegeWallLevel3Factor = SiegeWallLevel3Factor;
             s.SiegeAiBreachWhenWallsHold = SiegeAiBreachWhenWallsHold;
             s.SiegeAssaultRepelLoss = SiegeAssaultRepelLoss;
             s.SiegeAssaultRepelSpread = SiegeAssaultRepelSpread;
