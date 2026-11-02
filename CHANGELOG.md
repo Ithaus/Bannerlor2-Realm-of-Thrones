@@ -1,5 +1,122 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-02 WGRANIE 157 - noc/319x-integracja (156 + 319a jency goja sie jak zolnierze gracza, 319b weterani ucza swoich, 319c groty strzal wedlug tieru); Armoury.dll 4123524526cacb7f1062231afbc32d05 (CrashScribe 25eafa5b bez zmian); kopia 156: Armoury.dll.bak-2026-11-02-przed-wgranie157 i D:/Backup-Bannerlord/wgrane/2026-11-02-wgranie157-przed
+
+**Problem:** Jeff 02.11: "tak szybciej tak jak przy moich zolnierzach" (jency); "jak sa jednostki ktore maja juz max tier 6 ... ich XP ktore mialo przepadac rozdziela sie na wojsko ktore szkola" (log 20-57-50: 856-1000 XP/dobe przepada, 33-38%); "6 tier strzal powinien castle-forge miec groty, 5 tier poziom nizej etc., a teraz wszystko ze zwyklego zelaza" (AmmoGrade S2: t1-4 Iron2, t5-6 Iron3); "wgrywaj".
+**Zmiana:** wpisy 319a, 319b, 319c ponizej (szkice zb/n319a..c-changelog.md). 319c: AmmoGrade = GradeFor(tier) jak bron (t6 Castle-forged, t5 Fine Steel, t4 Steel, t3 Iron, t1-2 Wrought Iron), balista i legendy bez zmian, klucz AmmoHeadsByTier.
+**Testy:** recenzje 319a (checker '-' poprawiony 5687a226), 319b (pokrycie w linii poprawione f728c301), 319c (bez potwierdzonych); scalenie: brakujacych hunkow 0, sprawdz_logi.py z blokow galezi, dispatch grup OK, MCM bez zmian po gen_mcm, build 0 bledow. BEZ AUTOTESTU (Jeff: "wgrywaj").
+**Ryzyko / co sprawdzic:** --grupa jency319a (tempo jencow = swoi, XP Medicine), weterani319b (przekazane XP, pokrycie, ZGODNE w linii musztry gracza), groty319c (niezgodnych 0; falszywe przy skrzynce resztek - znane drobne); strzelarze miast (172) - koszt rudy t4-t6 wyzej; ceny strzal t4-t6 wyzej.
+**Status:** WGRANE 157 (bez autotestu)
+
+## 319c - groty strzal i beltow wedlug tieru (Jeff 02.11)
+
+**Problem:** Jeff: "6 tier strzal powinien castle-forged miec groty, 5 tier poziom nizej etc., a teraz wszystko ze zwyklego zelaza". Log Armoury-2026-11-02_20-57-50: `hardened_125_gr_arrows t6: 4x ironIngot3`, `bolt_a t6 ... ironIngot3`, linia S1 "ze stali Iron4-Iron6 0 (ma byc 0)", `ballista_c_projectile t6: 17x ironIngot3`.
+**Przyczyna:** `ArmsPricing.AmmoGrade` (sklad8-s S2, 09.10) - jeden gatunek grotu dla calej amunicji: t1-4 Iron2, t5-6 Iron3. Wszystko (kuznia gracza, zakladka CRAFT BK, wartosc, strzelarze miast, naprawy) bierze `CostOf().Grade`.
+**Zmiana:** `AmmoGrade(it, tier)` = `GradeFor(tier)` jak bron: t1-2 Wrought Iron (Iron2), t3 Iron (Iron3), t4 Steel (Iron4), t5 Fine Steel (Iron5), t6 Castle-forged (Iron6; przy wylaczonym Tier6CastleSteel Iron5). Pociski balisty (id z "ballista") zostaja przy S2. Nowy wylacznik MCM "Ammo Heads By Tier" (`AmmoHeadsByTier`, domyslnie wlaczony; wylaczony = S2). Ilosc metalu bez zmian (z masy). Linia startu "Groty strzal (319c): ..." (tier -> metal z kwitu, niezgodnych z regula, ma byc 0); linia S1 nie wola juz "(ma byc 0)" przy stali, gdy regula wlaczona. Grupa `--grupa groty319c` w tools/sprawdz_logi.py (test na logu syntetycznym: dobry TAK, zly NIE x2).
+**Odczytanie polecenia:** prompt workflow proponowal "o jeden nizej" (t6 -> Fine Steel); doslowne polecenie Jeffa mowi t6 = castle-forged, t5 poziom nizej - czyli metal wlasnego tieru jak bron. Wdrozone wedlug Jeffa.
+**Ryzyko / co sprawdzic:**
+- Wartosc strzal t4-6 rosnie (HistMaterial: metal grotu za kg t4 2.5->6, t5 3.5->8, t6 3.5->12 d); kolczan t6 125 g (~0.68 kg grotu) ok. +6 d (dotad wartosc ~15). Ceny polek przeliczaja sie po wczytaniu - sprawdzic linie S1 (wartosc kolczana) i ceny strzal t6 na targu.
+- Kwit kuzni gracza: hardened_125 t6 seria 3 -> ok. 2 kg Iron6 + strata stali; potrzeba sztab stali zamkowej.
+- Strzelarze miast (WorkshopLaw.Needs): ruda x1.25^StepsOf - t4 x1.25, t5 x1.56, t6 x1.95 wzgledem dotad; bramka zysku przesunie sie (rosna koszt i wartosc) - sprawdzic linie "Strzelarze (172)" (zrobiono snopow t4-t6, AI bez towaru).
+- Naprawy (MendMaterial :112/:768) - wiecej metalu dla amunicji t4-6 tym samym przelicznikiem.
+- Przetop zlupionych strzal: jesli liczy z kwitu, oddaje stal zamiast zelaza (w limicie polowy kg kwitu) - nie sprawdzone w kodzie.
+- Trwajace zlecenia w kolejce kuzni moga zostac na starym kwicie; nowe - nowy. Brak nowych pol SyncData; cache CostOf od nowa co sesje.
+- Legendy bez zmian (Iron6 x LegendFactor).
+**Status:** DO SPRAWDZENIA (zbudowane 0 bledow, nie wgrane). Armoury.dll md5 3147483e3cb9c4eec86242bade69050b.
+
+## 319b - weterani ucza swoja bron (XP musztry szczytu linii przechodzi na uczniow tej samej broni) - Armoury
+
+**Problem.** Jeff 02.11: "jak sa jednostki, ktore maja juz max tier 6, to ich doswiadczenie nie przepada, tylko oni szkola swoich - lucznicy lucznikow,
+piechota piechote, kawaleria kawalerie; im wiecej doswiadczonych, tym wiecej nauczycieli ... ich XP, ktore mialo przepadac, rozdziela sie na wojsko, ktore szkola".
+Log `Armoury-2026-11-02_20-57-50.log`, linia "Musztra (gracz)":
+- dzien 109180: wyliczone 2623, przyjete 1767, uciete 856 (33%) - cale "szczyt linii": vlandian_banner_knight 20 (532), lannister_prideknight 2 (53),
+  ravens_teeth 7 (237), stark_swornsword 1 (34); gotowych / brak zlota / konia / perka / uprzezy 0;
+- dzien 109187: 2661 / 1661, uciete 1000 (38%) - banner_knight 21 (570), prideknight 2 (54), ravens_teeth 9 (308), swornsword 2 (68).
+- AI ("XP wojska (E8/P1)"): dodane - przyjete 160-370 tys. XP na dobe (16-25%), bez podzialu na szczyt linii i zablokowanych.
+
+**Przyczyna.** Gra (`MobilePartyTrainingBehavior.OnDailyTickParty`) dodaje kazdemu oddzialowi Round(wynik x Number); `PartyBase.OnXpChanged`
+(PartyBase.cs:1184-1194) przycina Xp do Number x najwyzszy koszt awansu - oddzial bez `UpgradeTargets` ma limit 0, wiec cale jego XP z musztry przepada.
+
+**Zmiana** (nowy plik `Armoury/src/DrillVeterans.cs`, `Drill` jest teraz `partial`; bez nowych latek Harmony):
+1. `ArmsDrill.TrainingPostfix` - po `Drill.Done` (liczniki musztry licza wynik PRZED zerowaniem), przy how != 0: `Drill.VetPool`. Tylko w prawdziwym
+   tiku doby tej partii (`_tick == mp`; podpowiedzi ekranu partii bez zmian) i przy `VeteransTeachTheirOwn`:
+   - weteran = nie-bohater, oddzial bez UpgradeTargets i `Tier >= VeteranTeacherMinTier` (6): x = Round(wynik x Number) do puli jego broni, wynik = 0
+     (gra doda 0 - i tak przycielaby do 0);
+   - bron wedlug `DefaultFormationClass` (jak MusterBook): jazda = Cavalry/HorseArcher/LightCavalry/HeavyCavalry, lucznicy = Ranged, piechota = reszta;
+   - oddzial z awansem zapisuje swoje x (uczen); martwy koniec ponizej progu - tylko pomiar (przepada jak dotad).
+2. `Drill.TickPostfix` - na poczatku (po dodaniu XP przez gre, przed pomiarem "przyjete" gracza): `VetTeach` -> `Teach`, tylko gdy byla pula:
+   - uczen: ta sama bron, Max (GetUpgradeXpCost jak TickPrefix) > 0, wlasne x > 0, room = Number x Max - Xp (biezace) > 0; w = min(room, floor(R x x)), R = `VeteranTeachMaxRatio` (1.0);
+   - pokrycie f = min(1, K x weteranow / ludzi-uczniow), K = `VeteranPupilsEach` (4); przekazane M = floor(min(pula, f x suma w)); t = floor(M x w / suma w),
+     reszta z zaokraglen po kolei do w; `AddXpToTroopAtIndex` miedzy `SkillLedger.Enter(SDrill)` a `Leave` (ksiega liczy to jako musztre);
+   - suma t <= M <= pula: XP tylko przesuwane, nigdy tworzone; reszta przepada jak dotad, z podzialem: bez ucznia / limit ucznia (K, R) / limit awansu (room).
+   - roznica wobec projektu: ludzie-uczniowie (L) licza tylko uczniow z w > 0 (uczen, ktory dzis sam nie cwiczy - x 0, np. bez broni - nie zajmuje miejsca u weterana).
+3. Gracz: po `CutSplit` `_pr.Cut` i `CutBy[CutTop]` pomniejszone o przekazane - kontrola "przyjete + uciete = wyliczone" (ZGODNE) dalej sie zgadza.
+   Wiadomosc w grze: "; 585 XP passed on - 22 veterans taught 18 riders, ..."; reszta szczytu linii przy nauce: "N XP wasted - no more pupils of their arm
+   could take it from the men at the top of their line" (bez nauki - zdanie jak dotad). "Drill today: N XP" obejmuje nauke.
+4. `CampDrill.AfterPlayerTick` dostaje `Accepted - przekazane` (wlasna musztra): linia "Szkolenie w obozie (m97)" "XP przyjete" i udzial 311e (TbsXp) bez nauki
+   - roznica wobec projektu (tam: przyjete z nauka); godziny obozu ucza wlasna musztre, nauka idzie od niej (w <= R x x), wiec linie m97/311e zostaja porownywalne.
+5. Ustawienia (Drill, `tools/gen_mcm.py` uruchomiony, RANGES dopisane): `VeteransTeachTheirOwn` (TAK, "Veterans Teach Their Own"), `VeteranTeacherMinTier` (6, 1-6),
+   `VeteranPupilsEach` (4, 1-20), `VeteranTeachMaxRatio` (1.0, 0-3). Klucze NOWE - w Armoury.json Jeffa ich nie ma, wchodza domyslne.
+6. Linie doby (przy DrillLog, po "Musztra AI"): `Weterani ucza (319b): dzien N gracz | ...` (bron: pula, weteranow, uczniow, dostalo, pokrycie, limit uczniow ->
+   przekazane, przepadlo (bez ucznia, limit ucznia, limit awansu); razem; martwe konce ponizej progu; musztra wyliczone/przyjete (w tym od weteranow)/uciete -> ZGODNE)
+   i `... AI | partii z weteranami, weteranow, pula (j/l/p), przekazane (j/l/p), uczniow, przepadlo bez ucznia / limit ucznia / limit awansu, martwe konce, koszt ms`.
+   Potkniecia per partia (`Stumble("VetPool"/"Teach")`), bez globalnego wylacznika.
+7. `tools/sprawdz_logi.py --grupa weterani319b` (W319-S self-test, W319-1..6), testowane na logu syntetycznym.
+
+**Ryzyko / co sprawdzic** (zasada 0):
+- Regresje: linia "Musztra (gracz)" - "przyjete przez roster" zawiera nauke, "uciete" i "szczyt linii" sa po odjeciu przekazanych (tekst linii bez zmian);
+  per-oddzial `CutLog` pokazuje dalej pule weterana jako "uciete" (przed nauka). "XP wojska (E8/P1)": "dodane" spada o pule weteranow (gra dodaje im 0,
+  wywolanie z 0 pomijane), "przyjete" rosnie o przekazane - roznica dodane-przyjete u AI spadnie (to nie blad ksiegi).
+- Kolizje: `_aXpNow`, `k.XpN`, `CampDrill.Count`, `r.Computed` licza wynik przed zerowaniem (Done przed VetPool) - wzor XP po broni i linie krolestw porownywalne;
+  171 (udzial broni) i kara glodu/snu dzialaja przed pula (dzien kary: x = 0 u wszystkich - ani puli, ani nauki).
+- AI: wiecej XP uczniow = wiecej prob awansu; gra pilnuje zlota i limitu zoldu, Stables konia, UpgradePurse oplat. Sprawdzic 2-3 doby: HorseCensus
+  ("odrzucone z braku konia") i oplaty UpgradePurse.
+- Wydajnosc: VetPool O(1) na element; Teach jeden przebieg po spisie tylko w partiach z pula. Koszt w linii AI ("koszt X ms", prog W319-4 < 5 ms).
+- Martwe konce nizszego tieru (bez awansu, tier < 6) nie ucza - mierzone w liniach ("martwe konce ponizej progu"); decyzja dla Jeffa (VeteranTeacherMinTier).
+- Poza zakresem: XP z bitwy dla t6, zalogi (`DailyTroopXpBonusModel`), Inni (Undead - how 0), partie spoza lordow. Stan tylko w tiku - zapis bez zmian.
+- Pierwsza linia po wgraniu: gracz - "razem pula" ok. 856-1000 (suma "szczyt linii" sprzed zmiany), przekazane <= pula, ZGODNE, potkniecia 0;
+  AI - koszt < 5 ms, przekazane <= pula. Podzialu druzyny gracza na bronie (uczniow) w logu nie ma - ile przejdzie, pokaze pierwsza linia.
+- Build 0 bledow; Armoury.dll md5 (patrz commit). Bez autotestu w grze.
+
+**Status:** DO SPRAWDZENIA (galaz noc/319b-weterani-ucza, niewgrane).
+
+## 319a - jency gracza zdrowieja jak jego zolnierze - Armoury
+
+**Problem.** Po 318b ranni jency gracza zdrowieja ryczaltem gry 1/dobe (z Medicine XP ok. 20-25/dobe). Jeff 02.11 na propozycje "jency goja sie jak
+Twoi zolnierze, zaleznie od Twojej Medicine": "tak szybciej tak jak przy moich zolnierzach". Analiza scratchpad/rozp317.md (krok C).
+
+**Przyczyna.** `DefaultPartyHealingModel.GetDailyHealingForRegulars(isPrisoners true)` = stale 1 (+0.8 za blogoslawienstwo BKROT, Naval na morzu);
+wlasni: 5 x (1 + Medicine/100 + perki - 0.5 SlowHealing), +10 bazy w twierdzy/miescie.
+
+**Zmiana** (`Armoury/src/PrisonerCare.cs`, klucz `PrisonersHealLikeYourMen`, MCM "Prisoners Heal Like Your Men", domyslnie TAK; gen_mcm.py uruchomiony):
+- Prefiks na prywatnej `PartyHealCampaignBehavior.TryToHealOrWoundPrisoners(PartyBase, float)` (DeclaredMethod + GetPatchInfo), tylko MainParty z rannymi
+  jencami szeregowymi. Gra wola ja w `TryHealOrWoundParty` po leczeniu wlasnych, tylko przy IsActive i MapEvent == null (warunek gry, nie kopia).
+- Dodatek do prywatnego slownika gry `_overflowedHealingForPrisonerRegulars[partia]` = max(0, swoi - jency)/healFrequencyPerDay (24 dla gracza);
+  swoi = `partyBase.HealingRateForMemberRegulars` (czynny model, ta sama wartosc co gra dla wlasnych w tym ticku), jency = model(isPrisoners true).
+  Dwa wywolania modelu z zewnatrz, nie zagniezdzone (straznik BKROT / BkrotChains.HealRegulars bez zmian). Glod swoich (<= 0) albo kara jencow (< 0): brak dodatku.
+- Leczy gra (losowanie wiersza, `ManageHealingOfPrisonerRegulars`), XP raz za kazdego wyleczonego przez haczyk 318b. Slownik zapisuje gra (SyncData).
+- Linia doby 318b rozszerzona: "| z tego dodatek 319a N | tempo/dobe: swoi X, jency gra Y, dodatek dopisany Z (godzin z pomiarem H)"; przy kluczu NIE
+  "| 319a wylaczone (ryczalt gry)". Start: "Jency jak swoi (319a): start sesji | klucz ... | latka 1/1 ... | slownik gry tak".
+- Linia doby pisana tez przy Prisoner Care Xp NIE, a 319a TAK (licznik wyleczonych bez XP).
+- Opisy MCM Healing Regen Percent i Prisoner Care Xp poprawione (nie "always the game's pace").
+- `tools/sprawdz_logi.py --grupa jency319a` (J319-1..5), test na logu syntetycznym: 5/5 TAK; jency318b nadal 5/5 na tym samym logu.
+
+**Liczby (Medicine M chirurga, SlowHealing 50%, bez perkow i blogoslawienstw):** swoi/dobe w polu = 5 x (0.5 + M/100), w twierdzy/miescie 15 x (0.5 + M/100).
+- M 0: pole 2.5/dobe (dotad 1), twierdza 7.5. M 50: pole 5, twierdza 15. M 100: pole 7.5, twierdza 22.5.
+- 50 rannych jencow, sr. tier 2.5, M 50, w polu: 5/dobe -> 10 dob (dotad 50 dob); XP surowe 5 x 5 x 2.5 = 62.5/dobe (dotad 12.5).
+  W miescie: 15/dobe x2 XP = 375/dobe przez ok. 3.3 dnia. XP lacznie za wszystkich jencow bez zmian (625 surowe, 1250 w miescie) - zmienia sie tylko tempo.
+
+**Ryzyko / co sprawdzic** (kontrola calosci):
+- AI bez zmian: Jeff prosil o swoich; haczyk XP 318b tylko gracz; jency AI wplywaja na PrisonerLaw/niewolnikow i przesluchania po odbiciu - bez pomiaru nie ruszac.
+- CampInterrogation: krotsze okno rannych jencow (WoundedBonus +0.05 mowienia, DeathWounded 0.30 vs 0.15) - mniej rannych do przesluchania, mniej zgonow.
+- Werbunek/sprzedaz jencow (H3): `DefaultPrisonerRecruitmentCalculationModel` nie patrzy na rannych (rozp317 krytyka pkt 5) - bez wplywu. PrisonerLaw: ranni tylko w statystyce.
+- RealisticCaptivity: praca jenca dotyczy gracza w niewoli, nie rosteru jencow - bez kolizji. 318a: bohaterowie-jency poza zmiana (tylko szeregowi).
+- Slownik gry: nasz dodatek tylko gdy sa ranni; bez rannych gra zeruje akumulator - nic sie nie odklada. Wylaczenie klucza/modu: w zapisie zostaje ulamek < 1.
+- Podzial "z tego dodatek 319a" jest przyblizeniem (proporcja dopisanego dodatku do ryczaltu) - gra ma jeden akumulator.
+- W logu: --grupa jency319a; tempo/dobe "swoi" powinno zgadzac sie z ekranem partii (tooltip leczenia), wyleczonych ~ min(ranni, swoi) na dobe.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane)
+
 ## 2026-11-02 WGRANIE 156 - noc/318x-integracja (155 + 318a ranni lordowie pokonanych do pojmania, 318b opieka nad jencami - Medicine XP i pelne tempo gojenia, 318c panika wedlug dowodcow i tieru); Armoury.dll 6120ab794665c4d47fd7803f9df4c25d (CrashScribe 25eafa5b bez zmian); kopia 155: Armoury.dll.bak-2026-11-02-przed-wgranie156 i D:/Backup-Bannerlord/wgrane/2026-11-02-wgranie156-przed
 
 **Problem:** Jeff 02.11 (bitwa 24 z Hudsonem Serrettem i Tyboltem Crakehallem): "wygralem ja i nie mam w prisoner dowodcow, z jednym stoczylem pojedynek"; "kto leczy jencow ... moje medicine powinno rosnac"; "panikowanie jednostek za szybkie ... im wyzszy tier tym rzadziej panikuje - elitarne prawie nigdy, t6"; "wgraj".
