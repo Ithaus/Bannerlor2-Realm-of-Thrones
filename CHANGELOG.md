@@ -1,5 +1,146 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-02 WGRANIE 156 - noc/318x-integracja (155 + 318a ranni lordowie pokonanych do pojmania, 318b opieka nad jencami - Medicine XP i pelne tempo gojenia, 318c panika wedlug dowodcow i tieru); Armoury.dll 6120ab794665c4d47fd7803f9df4c25d (CrashScribe 25eafa5b bez zmian); kopia 155: Armoury.dll.bak-2026-11-02-przed-wgranie156 i D:/Backup-Bannerlord/wgrane/2026-11-02-wgranie156-przed
+
+**Problem:** Jeff 02.11 (bitwa 24 z Hudsonem Serrettem i Tyboltem Crakehallem): "wygralem ja i nie mam w prisoner dowodcow, z jednym stoczylem pojedynek"; "kto leczy jencow ... moje medicine powinno rosnac"; "panikowanie jednostek za szybkie ... im wyzszy tier tym rzadziej panikuje - elitarne prawie nigdy, t6"; "wgraj".
+**Zmiana:** wpisy 318a, 318b, 318c ponizej (szkice zb/n318a..c-changelog.md, analiza scratchpad/rozp317.md).
+**Testy:** recenzja 3 wymiarow (4 potwierdzone: 318b opis MCM, 318c odrzut RBM, odrzut lorda, tabela tierow - poprawione 08c5c4f4 / 8d5031ff, weryfikacja OK); sprawdz_logi.py zlozony z blokow galezi (union pomieszal grupy), dispatch grup klute317a/jency318a/jency318b/panika318c/zapas316a OK; build 0 bledow. BEZ AUTOTESTU (Jeff: "wgraj").
+**Ryzyko / co sprawdzic:** w grze Jeffa: --grupa jency318a (ranni lordowie w jencach, "zbiegl" tylko zdrowi), jency318b (SlowHealing "jency pomijani TAK", Medicine XP), panika318c (linie zalaman z tierem i L, T6 rzadko); wiecej okupow i polowan "Odbicie (222)"; dluzsze bitwy (mniej zalaman) - sprawdzic czas rozstrzygniecia i 307e.
+**Status:** WGRANE 156 (bez autotestu)
+
+## 318c - dowodca i sztandar trzymaja kompanie, tier trzyma (panika wolniej) - Armoury
+
+**Problem.** Jeff 02.11: "panikowanie jednostek za szybkie: jesli dowodca zyje ... panika powinna byc obnizona, dopiero jak sztandary przepadna,
+dowodcy zgina ... panika moze sie nasilac, ale tez im wyzszy tier tym rzadziej panikuje - elitarne jednostki prawie nigdy, t6".
+Log bitwy 24 (misja 19:33:39-19:40:50, gracz 94 ludzi sr. tier 4.31 przeciw 171, sr. tier 2.61):
+- `Choragwie (CH) koniec`: zalaman 7, "zalamania wedlug rzutu: sztandar 0, dowodca 0, udzial strat 7"; tiery "T6 1/2"; 307b: 9 rzutow, sr. szansa 0.696;
+  stan bitwy B caly czas 1.50; "sr. utracona czesc przy zalamaniu 0.52";
+- "poza szeregiem przy rzutach: panika 19, ranni w odwrocie 4" oraz "sam odwrot komponentu - szarza RBM 26 ludzi, 261 s" - odskok RBM podbijal udzial strat;
+- `Krwawienie (313d)`: "bol: rzutow 29 (zlamani 20 ...)" - panika z bolu bez tieru;
+- jedyny lord wroga (lord_V9_u) nieprzytomny ok. 264 s po rozstawieniu (strzal gracza); w logu nie bylo czasu zalaman kompanii.
+Wzor dla wroga przy 1/2 strat i B=1.5 dawal: T2 0.80, T4 0.60, T6 0.48.
+
+**Przyczyna.**
+- `BannerCompanies.cs` Roll: tier dzialal tylko przez odpornosc R = 0.25T+1 (T6 tylko /2.5); dowodca zywy nie mial zadnego wplywu, dowodca spoza kompanii
+  (lord w szyku wodza RBM) - wcale ("bohater 0, wodz 0" mimo upadku lorda).
+- `InRanksLive` liczyl chwilowy odwrot komponentu (szarza RBM, `SurvivalMode.InPanic` = IsRetreating bez rozkazu) jako strate.
+- `FieldCraft.RollPain`: rzut bolu bez tieru (5..95%).
+
+**Zmiana** (jedna regula w Roll: p = szansa x F x M x B x T x L, limit 0.9; nowy plik `Armoury/src/BannerCompanies.Lead.cs`):
+1. `BannerTierSteadiness` (TAK): tabela tieru T1 0.8, T2 0.667, T3 0.55, T4 0.35, T5 0.18, T6 0.06, T7 0.04 (liniowo miedzy tierami sredniej, nigdy wyzej niz stare 309 1/(0.25T+1) - miedzy T1 a T2 linia byla nad krzywa) ZAMIAST R -
+   jedyny mnoznik tieru w rzucie (NIE = R jak dotad).
+2. `BannerLeaderHold` (TAK): L - czynny bohater strony (Team.Side; zyje, nie nieprzytomny, nie zlamany - IsPanicked; samo IsRunningAway nie odbiera, nie w RoutHold, nie w odwrocie 143, nie w
+   wycofaniu rannego 149; chwilowe wycofanie samotnego 149 i odskok RBM nie odbieraja dowodztwa): wlasny dowodca-bohater kompanii 0.5; bohater w tym samym
+   szyku albo w 60 m od srodka kompanii 0.65; gdzie indziej 0.8; zaden 1.0. x1.3 tylko przy faktycznym upadku sztandaru (LastFall && !StandardUp), poza
+   samym rzutem upadku (src 1 - upadek liczony raz). Zdarzenie strony (zrodlo 6, F 1.5, raz wstrzas BannerShockCommanderLost): wodz druzyny
+   (Team.GeneralAgent) zabity/nieprzytomny - kompanie jego druzyny (raz na druzyne); ostatni bohater strony zszedl - kazdy bohater, jakiego strona miala, w _heroDown (zdjety z pola, nieprzytomny, zabity), nie chwilowe 0 dowodzacych - kompanie strony (raz na strone,
+   bez drugiego w 2 s po zdarzeniu wodza); bez kompanii, ktora dostala juz CommanderLost za tego samego czlowieka. Komunikat po angielsku tylko strona gracza.
+3. `BannerRanksIgnoreKnockback` (TAK): `InRanksLive` - odskok RBM (InPanic bez IsPanicked, poza RoutHold; IsRunningAway nie
+   rozstrzyga - natywny Retreat odskoku tez je ustawia) zostaje w szeregu; ranni 143 dalej poza szeregiem (sprawdzenie k.Withdrawing).
+4. `PainBreakTierSteadiness` (TAK): `FieldCraft.RollPain` - szeregowy: p (po obcieciu 5..95%) x ta sama tabela T; bohater bez mnoznika.
+Szansa wroga przy 1/2 strat, B=1.5 (stara / nowa bez bohatera / bohater dalej / blisko / wlasny): T1 0.90 / 0.90 / 0.77 / 0.62 / 0.48; T2 0.80 / 0.80 / 0.64 / 0.52 / 0.40;
+T4 0.60 / 0.42 / 0.34 / 0.27 / 0.21; T6 0.48 / 0.072 / 0.058 / 0.047 / 0.036. Sztandar upadly bez bohatera: T4 0.55, T6 0.094.
+Opisy MCM BannerBreakChance / BannerBreakEarly / BannerBreakEarlyChance dopisane (tabela zamiast R); `python tools/gen_mcm.py` uruchomiony.
+Linie: "Choragwie (318c): zalamanie | <kompania> (szyk, kompania) | strona | N s po rozstawieniu | zrodlo | strata | tier (T x) | dowodztwo <powod> (L x) |
+sztandar upadl TAK/NIE | stan bitwy x | p" (najwyzej 80 na misje); "Choragwie (318c): upadek dowodztwa strony | strona | powod | s | kompanii, rzutow,
+zalaman"; segment "dowodztwo i tier (318c)" w "Choragwie (CH) koniec" przed "| potkniecia" (zalaman/rzutow wedlug dowodztwa, sr. T i L, zdarzenia strony,
+odskok RBM w szeregu, bol wedlug tieru "Tn:a/b" - nie wzor "T1 a/b", ktory sumuje CH-4). Grupa `--grupa panika318c` w tools/sprawdz_logi.py.
+
+**Ryzyko / co sprawdzic** (kontrola calosci):
+- Wywolania Roll: StandardLost (1), CommanderLost (2), TickOne (3/4/5), SideEvent (6) - wszystkie przez ten sam wzor; R usuniete tylko przy kluczu TAK.
+  Wstrzas Shock (model gry, tier w morale) zostaje - morale nie wchodzi do rzutow 309/307b (udzial strat), wiec tier nie liczy sie drugi raz.
+- Zdarzenia strony wchodza do licznikow 309 "rzuty zdarzen wedlug strat" (evt dla src 6) i do BreakBySrc[6] (nie wypisany w "zalamania wedlug rzutu",
+  jest w segmencie 318c).
+- Poprawki recenzji (3 potwierdzone): (a) `InRanksLive` - `fled` bez `a.IsRunningAway` (natywny Retreat odskoku RBM je ustawia, klucz
+  BannerRanksIgnoreKnockback byl martwy); ranni 143 (tez IsRunningAway) dalej odpadaja przez `k.Withdrawing`. (b) `Leads` - samo IsRunningAway (odskok RBM
+  lorda) nie odbiera dowodztwa; zostaja IsPanicked, RoutHold Knows/Withdrawing (143), HeroCaution.WoundedWithdrawing (149). `TickLead` - zdarzenie
+  "ostatni bohater" tylko gdy kazdy bohater strony (strona zapisana przy spisie, `_heroSide`) jest w `_heroDown`; chwilowe 0 dowodzacych (odwrot rannego,
+  panika lorda) go nie odpala ani nie zamyka na bitwe. (c) Tabela: zaden tier nie dostaje wyzszego mnoznika niz stary wzor 309 (T1 0.8, T2 0.667, T3 0.55
+  < 0.571; TierHold obciete do 1/(0.25T+1), bo miedzy T1 a T2 interpolacja byla o 0.006 wyzej). Przy kluczu 309 NIE (stare R = 0.5T+1: T1 0.67, T2 0.5)
+  tabela daje T1 0.8 / T2 0.667 - wyzej niz tamten wariant; domyslne 309 TAK. Bol (PainBreakTierSteadiness): T1-T2 teraz x0.8 / x0.667 zamiast x0.9 / x0.75
+  (dotad bez mnoznika - zawsze w dol). Checker: P318-1 / P318-6 zakres sr. T 0.04-0.8 (syntetyczny log: 9 progow TAK; zly wiersz sr. T 0.85 -> NIE).
+- Panika lorda bez IsPanicked (np. sam odwrot komponentu) liczy sie teraz jako dowodzenie - zamierzone (odskok); trwala ucieczka idzie przez IsPanicked/RoutHold.
+- Mniej zalaman = dluzsze bitwy: patrzec na zastoje 307e, czas do rozstrzygniecia, udzial poleglych w szeregu (144a: 61-71%), jency 312f.
+  Strona gracza prawie zawsze ma bohatera (gracz) - jej kompanie L <= 0.8.
+- Mniej paniki z bolu u T4+ -> mniej ludzi poza szeregiem -> mniej rzutow 307b (nakladanie z punktem 3).
+- Koszt: TickLead raz na takt 0.5 s (bohaterowie x 2 strony), HeroScan co 3 s (m.Agents, jak Review); Leadership tylko przy rzucie.
+- Stare grupy bitwa305c / bitwa307b / bitwa309 czytaja prawdziwa linie CH koniec z dopisanym segmentem (TAK); P318 na syntetycznym logu wykrywa zly wiersz.
+- Nowe klucze - nie ma ich w Armoury.json Jeffa, dzialaja domyslne TAK.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
+## 318b - Opieka nad jencami: Medicine XP za wyleczonych jencow + SlowHealing nie tnie jencow (Armoury)
+
+**Problem.** Jeff 02.11: "kto leczy jencow ... to tez powinno zwiekszac medicine tego, kto zajmuje sie rannymi ... moje medicine powinno rosnac".
+Log Armoury-2026-11-02_18-19-46.log: 19:41:40 "pojmanie TAK: u gracza 90 (ranni 90, zdrowi 0)", 19:42:28 "jency 38 (lordow 0)" - wszyscy jency ranni;
+18:21:08 "SlowHealing: gojenie na mapie - gracz 50%, AI 100% (2/2 metod)"; E8/P1 19:30:58 "zrodla gracza: ... leczenie 17/9" (gracz jest
+efektywnym chirurgiem). Ranni jency zdrowieli 0.5/dobe (38 jencow = ok. 76 dni) i nie dawali zadnego Medicine XP.
+
+**Przyczyna.**
+- Gra (PartyHealCampaignBehavior.ManageHealingOfPrisonerRegulars, dekompilacja 1.4.8 :213-241) zdejmuje rannych jencow (ryczalt modelu 1/dobe,
+  DefaultPartyHealingModel :125-128) bez wywolania SkillLevelingManager - XP nie ma nikt. Wlasni ranni (HealMemberRegulars :297-334) daja
+  OnRegularTroopHealedWhileWaiting (5 * n * sredni tier, x2 w miescie/wsi) dla EffectiveSurgeon.
+- Nasz SlowHealing.SlowPostfix (SlowHealing.cs:85-97) nie mial isPrisoners i dla MainParty cial takze jencow: 1 -> 0.5/dobe szeregowi, 20 -> 10 HP
+  bohaterowie-jency, a czynnik -0.5 polowil tez pozniejsze Add BKROT (blogoslawienstwa; ExplainedNumber: BaseNumber * (1 + SumOfFactors)).
+
+**Zmiana.**
+- A: nowy `Armoury/src/PrisonerCare.cs` - prefiks/postfiks na prywatnej `PartyHealCampaignBehavior.ManageHealingOfPrisonerRegulars(PartyBase, ref float)`
+  (AccessTools.DeclaredMethod, wlasna Harmony "com.jeff.armoury.prisonercare", wpiecie w OnSessionLaunched, weryfikacja Harmony.GetPatchInfo),
+  tylko partia gracza. Prefiks zapamietuje rannych per typ jenca, postfiks liczy wyleczonych i wazony tier, potem
+  `SkillLevelingManager.OnRegularTroopHealedWhileWaiting(mp, n, avgTier * PrisonerCareXpPercent/100)` - XP do chirurga partii (albo gracza),
+  x2 w osadzie (nie zamek), SkillLedger liczy to jako "leczenie". Sam krok A tempa leczenia jencow nie zmienia (krok C nie robiony);
+  tempo zmienia krok B (ponizej): z 0.5 wraca do ryczaltu gry 1/dobe.
+  Jency-bohaterowie bez XP: haczyk gry OnHeroHealedWhileWaiting liczy z hero.PartyBelongedTo (u jenca null), a leczenie do WoundedHealthLimit to
+  kilka-kilkanascie HP jednorazowo - wlasny wzor poza menedzerem (i poza SkillLedger) niewart ryzyka.
+- B: `SlowHealing.SlowPostfix(PartyBase party, bool __1, ...)` - przy `__1` (isPrisoners) return; jency wracaja do ryczaltu gry 1/dobe
+  (bohaterowie 20 HP do WoundedHealthLimit), premia BKROT dla jencow nie polowiona.
+- MCM (The slow mending): `PrisonerCareXp = true`, `PrisonerCareXpPercent = 100` (0..200; 100 = tyle co wlasny ranny tego samego tieru -
+  ta sama praca, ta sama nauka; przy ryczalcie 1 jenca/dobe to ok. 10-15 surowego XP na dobe w polu, wiec nie ma czego obcinac).
+  gen_mcm.py: zakres 0..200.
+  Podpowiedzi MCM (poprawka po przegladzie): HealingRegenPercent i PrisonerCareXp mowia teraz zgodnie z krokiem B - jency gracza zawsze
+  zdrowieja w tempie gry (1 ranny jeniec/dobe, jency-bohaterowie 20 HP/dobe), klucz Healing Regen Percent ich nie polowi
+  (wczesniej hint mowil "How fast prisoners recover does not change" - nieprawda przy kroku B).
+- Linie: start "SlowHealing: gojenie na mapie ... | jency pomijani TAK (318b)."; "Opieka nad jencami (318b): start sesji | klucz ... | latki 1/1 ...";
+  doba "Opieka nad jencami (318b): wyleczonych N (wywolan K), XP Medicine Z (surowe, przed nauka) dla <chirurg>, rannych jencow przed/po A/B".
+- Checker: `python -I tools/sprawdz_logi.py --grupa jency318b <Armoury-*.log>` (J318-1..5).
+
+**Ryzyko / co sprawdzic.**
+- Dwie zmiany w jednym DLL (A i B) - razem z krokiem A wbrew radzie krytyki (B osobno po tescie A) - B to poprawka niezamierzonego polowienia; cofniecie B wymaga revertu SlowHealing.cs i zdan w Settings.cs; w razie problemu: A wylacza klucz PrisonerCareXp, B wymaga cofniecia.
+- B podwaja tempo leczenia jencow gracza (0.5 -> 1/dobe) i jencow-bohaterow (10 -> 20 HP/dobe do WoundedHealthLimit): CampInterrogation
+  (:83 WoundedBonus, :87/:659 DeathWounded 0.30 vs 0.15) - krotsze okno "rannych" przy przesluchaniu (mniej mowi, mniej ginie).
+- XP tylko dla MainParty (AI bez zmian). Latka sprawdzana per typ jenca (FindIndexOfTroop), potkniecia liczone, bez globalnego wylacznika.
+- Kolejnosc postfiksow na modelu leczenia (BK, SlowHealing Low, TownInns VeryLow, StarvePostfix Last) bez zmian; TownInns juz pomijal jencow (__1).
+- Hint MCM vs kod: HealingRegenPercent/PrisonerCareXp opisuja pomijanie jencow (krok B); gdyby B cofnac - cofnac tez te zdania w Settings.cs + gen_mcm.py.
+- W logu: linia doby z XP > 0 i chirurgiem; E8/P1 "zrodla gracza: leczenie" powinno wzrosnac; J318-3 srednio >= 0.8 wyleczonych/dobe.
+
+**Status.** DO SPRAWDZENIA (nie wgrane; worktree n318b).
+
+## 318a - ranni lordowie pokonanych zostaja ranni do pojmania (Defeated Lords Stay Wounded) (02.11)
+
+**Problem:** Jeff 02.11: "wygralem ja i nie mam w prisoner dowodcow, z jednym stoczylem pojedynek i wygralem wiec tez powinien byc w jencach". Log `Modules/Armoury/Armoury-2026-11-02_18-19-46.log`: l. 29389 (19:31:47) spotkanie z "Hudson Serrett's Party" rannych 0; l. 29395/29417 `DuelMission` (pojedynek ROT); l. 29450 (19:32:44) start bitwy - Hudson "rannych 1" (ranny w pojedynku), dochodzi Tybolt Crakehall; l. 29721 (149) wycofany 1 bohater wroga HP 15%, nieprzytomny; l. 29769 (312f) "pojmanie TAK ... wodz: zbiegl"; l. 29817 (117) "jency 38 (lordow 0)"; brak "Odbicie (222): pojmanie" dla obu. Historia 01-02.11: bitwy gracza z lordem - w niewoli 5, zbiegli 5; wszystkie bitwy AI z lordem - "wodz: niewola".
+
+**Przyczyna:** kolejnosc w grze 1.4.8 (dekompilacja dec306b/cs_full): `PlayerEncounter.DoApplyMapEventResults` (PlayerEncounter.cs:1520-1523; ROT patch49 przy zaciagu - EnlistmentPatches.cs:871-874 - tak samo) wola NAJPIERW `OnPlayerBattleEnd` -> `PartyHealCampaignBehavior.OnBattleEndCheckPerkEffects` (PartyHealCampaignBehavior.cs:62-91: leczy perkami KAZDA partie bitwy, takze pokonane - Preventive Medicine 30% utraconego HP, DefaultPartyHealingModel.cs:304-307; Naval Resilience 30%, NavalDLCPartyHealingModel.cs:52-60; Walk It Off +10 sam rany nie leczy), a DOPIERO POTEM `CalculateAndCommitMapEventResults` -> `CaptureDefeatedPartyMembers` (MapEvent.cs:1955-2010): lista szans wedlug `IsWounded` (HP <= 20, Hero.cs:332) - ranny 1.0, zdrowy 0.25 (DefaultBattleRewardModel.cs:231-255), nietrafiony -> `MakeHeroFugitiveAction` ("zbiegl"). Ranny lord (HP 1 po MakeWounded, takze przegrany pojedynku ROT - ROTDuelsMissionController.cs:147) z PM/Resilience wychodzil z leczenia zdrowy i w 75% uciekal. W bitwach AI leczenie idzie z MapEventEnded - po pojmaniu. Pojedynek: Hudson atakowal, wiec Jeff nie mial opcji "Capture the enemy" (ROTDuelsBehavior.cs:620-628 tylko dla atakujacego gracza).
+
+**Zmiana (wersja z krytyki - nie leczyc, zamiast cofac HP):**
+- Armoury/src/WoundedLords318.cs (nowy): prefiks `Priority.First` + finalizer na `PartyHealCampaignBehavior.OnBattleEndCheckPerkEffects` (AccessTools.DeclaredMethod - prywatna, klasa deklarujaca). Tylko `me.IsPlayerMapEvent && me.HasWinner`; spis bohaterow strony pokonanej bez `Hero.MainHero` (HP, MaxHP, granica, perki PM/WIO/Resilience). Blokada tylko gdy gracz WYGRAL (`WinningSide == PartyBase.MainParty.Side`) i klucz wlaczony: znacznik `[ThreadStatic]`. Prefiks `Hero.Heal(int,bool)` (Priority.First): przy znaczniku zwraca false dla bohatera ze spisu, ktory JEST ranny (`HitPoints <= WoundedHealthLimit`). HP sie nie zmienia - zadnego OnHeroWounded ani przeskoku rostera. Finalizer zawsze gasi znacznik. Finalizer (Priority.Last) `MapEvent.CaptureDefeatedPartyMembers` zapisuje los kazdego bohatera po pojmaniu; MapEventEnded - jedna linia.
+- Latki raz na proces w OnSessionLaunched (ArmouryBehavior, po Ransom178.EnsureHooks), sprawdzane `Harmony.GetPatchInfo` (wpieta / BRAK + liczba cudzych latek); potkniecia liczone, pierwszy blad miejsca do logu, bez globalnego wylacznika.
+- Klucz MCM "Defeated Lords Stay Wounded" (`DefeatedLordsStayWounded`, domyslnie true, grupa "The master's parry"), McmSettings przez tools/gen_mcm.py.
+- Linie logu: `Ranni lordowie (318a): start sesji - latki leczenie po bitwie wpieta; Hero.Heal wpieta; pojmanie wpieta, klucz Defeated Lords Stay Wounded wlaczony.` oraz po kazdej bitwie gracza z bohaterem pokonanych: `Ranni lordowie (318a): bitwa gracza dzien N | gracz wygral | klucz wlaczony | pojmanie TAK | bohaterowie pokonanych K: [Imie (Partia) HP 1/104 ranny -> 1, perki PM tak WIO tak Res nie, leczenie 41 pominiete TAK, po pojmaniu: do lupu gracza, na koniec: jeniec gracza] ... | pominiete X, jency gracza Y, zbiegli Z | razem pominietych w sesji S, potkniecia P.`
+- tools/sprawdz_logi.py: grupa `jency318a` (J318-1 trzy latki wpiete, J318-2 ranny bohater pokonanych po wygranej nie "zbiegl", J318-3 zaden ranny nie wyleczony mimo klucza, J318-4 bledy WoundedLords318). Test na logu syntetycznym: dobry - 4 x TAK; podrzucony zbieg/wyleczony/ERROR - 3 x NIE.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Cele latek: w rot313, bkdec, nav313 i naszym repo nikt nie lata `OnBattleEndCheckPerkEffects` ani `Hero.Heal`; nasze repo nie wola `Hero.Heal` wcale. Linia startu poda liczbe cudzych latek na trzech celach (na CaptureDefeatedPartyMembers spodziewane nasze: A17Fix F4, Measure40, PeopleBook, LosersFlee, SmallGold - inny HarmonyId, liczone jako "cudze").
+- Hero.Heal to goraca metoda (godzinowe leczenie wszystkich) - prefiks poza oknem to jeden odczyt pola [ThreadStatic].
+- Czego nie rusza: zwyciezcy, gracz (Hero.MainHero), przegrana gracza, bitwy AI (IsPlayerMapEvent false), zdrowi lordowie, ktorzy dotrwali (dalej 0.25 - realny odwrot), odwrot strony (RetreatingSide - gra nie pojmuje, linia "pojmanie NIE (odwrot)").
+- ROT patch49 (zaciag): ta sama kolejnosc; gdy druzyna gracza jest w bitwie - dziala jak zwykle; gdy nie jest, `IsPlayerMapEvent` false i gra leczy i tak dopiero z MapEventEnded (po pojmaniu) - bez zmian. Do sprawdzenia w tescie przy zaciagu.
+- Ekonomia okupow (wiecej lordow u gracza): Ransom178 - okup placi rodzina jenca porywaczowi (gotowka do RansomCashShare, reszta dlug w ksiedze 168), posrednik: zloto gry rownowazone przez rod jenca - zamknieta; RansomFlows (2.14) - dotyczy okupu GRACZA i kuriera (bez dosypki) - zamknieta; RC FairRansom - szeregowi, lordowie w LordPrice; CaptiveArmory - tylko pojmanie gracza (nie dotyczy); CaptiveSpoils (rozbieranie jencow) pomija bohaterow. Skutek: wiecej okupow do gracza i wiecej lowow "Odbicie (222)" (AI scigajace gracza po swoich lordow) - zgodne z zamiarem, sprawdzic czestosc w logu.
+- Ranny lord w niewoli gracza goi sie zwyklym trybem godzinowym jencow (PartyHealCampaignBehavior, prisoner heroes).
+- Pojedynek ROT: przegrany pojedynku (HP 1) - pewny jeniec, jesli strona gracza wygra bitwe; opcja "Leave" pojedynku bez zmian.
+- Do decyzji Jeffa osobno (nie w tej zmianie): szansa > 25% dla zdrowego, ale pieszego lorda; pomiar 312f podwaja "wystawieni" w bitwach gracza i nie liczy rannego bohatera sprzed bitwy (osobna poprawka).
+- Testy: build 0 bledow, bez autotestu w grze; potwierdzi linia "Ranni lordowie (318a)" i `--grupa jency318a`.
+
+**Status:** DO SPRAWDZENIA
+
 ## 2026-11-02 WGRANIE 155 - noc/317a-klute-przed-cietymi (154 + 317a strzaly klute przed cietymi pod RBM); Armoury.dll 26ff5b5a040fd57ece443832d364fa07, CrashScribe.dll 25eafa5b6cc9605d5702d858dbea5933 (zrodlo = 147 aa32d04e + 317a Mends.RangedKey); kopie 154: *.bak-2026-11-02-przed-wgranie155 i D:/Backup-Bannerlord/wgrane/2026-11-02-wgranie155-przed
 
 **Problem:** Jeff 02.11: "czemu nie biora Ravens Teeth strzal" -> po wyliczeniu RBM (Pierce liczy pol pancerza tkaniny/skory/kolczugi, prog 2 zamiast 2.6): "klute przed cietymi tak"; "bez testu moja gra to bedzie test".
