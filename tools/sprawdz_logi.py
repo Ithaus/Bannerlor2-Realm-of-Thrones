@@ -92064,5 +92064,88 @@ def main(argv):
     return _groty319c_main_prev(argv)
 
 
+# ---- paczka 320b: grupa sca320b - SCA liczy wroga bez band, Innych i wyjetych spod prawa (Jeff 02.11) ----
+# Uzycie: python -I tools/sprawdz_logi.py --grupa sca320b <Armoury-*.log>
+S320_START = re.compile(r"SCA bez band \(320b\): start sesji - latka (.*?), klucz Strategic AI Ignores Bandits (wlaczony|WYLACZONY)")
+S320_DAY = re.compile(r"SCA bez band \(320b\): dzien (\d+) \| klucz (tak|nie), latka (wpieta|BRAK), ocen doby (\d+) \(zmienionych (\d+)\), potkniecia doby (\d+) \(sesja (\d+)\)(?: \| (.*))?\.$")
+S320_K = re.compile(r"(?:^|; )([^:;]+): wrog (-?\d+) -> (\d+) \(pominiete: bandy (\d+) z (\d+), Inni (\d+) z (\d+), wyjeci spod prawa (\d+) z (\d+); liczeni (\d+)\), swoi (\S+), twierdze (\S+) zagrozone (\S+), wojen (\S+), cel (\w+|\?), wyczerpane (tak|nie), chce pokoju (tak|nie)")
+S320_SAMPLE_START = ("[21:00:01] SCA bez band (320b): start sesji - latka wpieta (StrategicCampaignAI145.StrategicCampaignAI145Behavior.CalculateFactionStatus(Kingdom)), "
+                     "klucz Strategic AI Ignores Bandits wlaczony | wrog SCA bez band (IsBanditFaction), Innych (kultura whitewalker) i frakcji wyjetych spod prawa (IsOutlaw); "
+                     "liczba wojen, zagrozone twierdze i wioski bez zmian.")
+S320_SAMPLE_DAY = ("[21:56:58] SCA bez band (320b): dzien 120 | klucz tak, latka wpieta, ocen doby 140 (zmienionych 120), potkniecia doby 0 (sesja 0) | "
+                   "Kings Landing: wrog 58819 -> 41262 (pominiete: bandy 12 z 11, Inni 16000 z 1, wyjeci spod prawa 1545 z 1; liczeni 4), swoi 19741, twierdze 15 zagrozone 6, "
+                   "wojen 17, cel ForcePeace, wyczerpane tak, chce pokoju tak; The North: wrog 37371 -> 19800 (pominiete: bandy 0 z 11, Inni 16000 z 1, wyjeci spod prawa 1571 z 1; "
+                   "liczeni 3), swoi 41276, twierdze 42 zagrozone 9, wojen 16, cel ReclaimLostFief, wyczerpane nie, chce pokoju nie.")
+
+
+def s320_rows(rep, starts, days):
+    if not starts:
+        rep.add("S320-1: latka 320b (start sesji)", "brak linii startu", "linia 'SCA bez band (320b): start sesji' (nowy DLL)", None)
+    else:
+        m = S320_START.search(starts[-1])
+        ok = bool(m) and m.group(1).startswith("wpieta")
+        rep.add("S320-1: latka 320b (ostatni start sesji)", (m.group(1)[:200] + ", klucz " + m.group(2)) if m else starts[-1][:200], "wpieta, klucz wlaczony",
+                ok and m.group(2) == "wlaczony" if m else False)
+    if not days:
+        rep.add("S320-2: linie doby 'SCA bez band (320b): dzien'", "0", ">= 1 (po pierwszej dobie z LogEnabled)", None)
+        return
+    rep.add("S320-2: linie doby 'SCA bez band (320b): dzien'", str(len(days)), ">= 1", True)
+    st = sum(int(S320_DAY.search(d).group(6)) for d in days if S320_DAY.search(d))
+    rep.add("S320-3: potkniecia (suma dob)", str(st), "0", st == 0)
+    m = S320_DAY.search(days[-1])
+    if not m:
+        rep.add("S320-P: odczyt ostatniej linii doby", "nie czyta", "TAK", False)
+        return
+    rep.add("S320-4: ostatnia doba - klucz / latka / ocen (zmienionych)", f"{m.group(2)} / {m.group(3)} / {m.group(4)} ({m.group(5)})", "tak / wpieta / > 0",
+            m.group(2) == "tak" and m.group(3) == "wpieta" and int(m.group(4)) > 0)
+    bad, rows = [], []
+    for k in S320_K.finditer(m.group(8) or ""):
+        name, b, a = k.group(1).strip(), int(k.group(2)), int(k.group(3))
+        skipped = int(k.group(4)) + int(k.group(6)) + int(k.group(8))
+        if a > b + 1 or abs((b - skipped) - a) > 2 + 0.001 * b:
+            bad.append(f"{name}: {b} - {skipped} != {a}")
+        rows.append(f"{name} {b}->{a} cel {k.group(15)} wycz. {k.group(16)} (swoi {k.group(11)}, zagr. {k.group(13)}/{k.group(12)})")
+    rep.add("S320-5: wrog po = wrog przed - pominiete (kazde krolestwo)", "; ".join(bad) if bad else f"zgodne ({len(rows)} krolestw)", "zgodne", (not bad) if rows else None)
+    rep.add("S320-6: krolestwa (ostatnia doba)", " | ".join(rows)[:1500] or "-", "INFO (korona: przewaga Polnocy i zagrozone twierdze moga dalej trzymac ForcePeace)", None)
+
+
+def sca320b_main(logp):
+    rep = Report()
+    ok = bool(S320_START.search(S320_SAMPLE_START))
+    d = S320_DAY.search(S320_SAMPLE_DAY)
+    ok = ok and bool(d) and len(list(S320_K.finditer(d.group(8) or ""))) == 2
+    rep.add("S320-S: self-test wyrazen na wzorze linii", "TAK" if ok else "wyrazenie nie czyta wzoru", "TAK", ok)
+    if not logp or not os.path.isfile(logp):
+        rep.add("S320-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days = [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if "SCA bez band (320b): start sesji" in s:
+                starts.append(s)
+            elif "SCA bez band (320b): dzien" in s:
+                days.append(s)
+    print(f"plik: {logp}")
+    s320_rows(rep, starts, days)
+    rep.show()
+    return 0
+
+
+_sca320b_main_prev = main
+
+
+def main(argv):
+    # paczka 320b: grupa sca320b - opakowanie main jak groty319c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "sca320b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return sca320b_main(rest[0] if rest else None)
+    return _sca320b_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

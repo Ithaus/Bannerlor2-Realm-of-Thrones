@@ -10372,6 +10372,10 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarNoPeaceUntilRedWedding { get; set; } = true;
 
+        [SettingPropertyBool("Strategic AI Ignores Bandits", HintText = "the Strategic Campaign AI mod no longer counts bandits, the Others and outlaw bands as enemy strength when it judges whether a realm is worn out by war. Only realms and real rival clans count, so a realm is no longer pushed into a defensive, peace-seeking stance by bandit gangs or the dead beyond the Wall. Threatened castles and raided villages still count as before. Off = as the Strategic Campaign AI mod decides", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool StrategicAiIgnoresBandits { get; set; } = true;
+
         [SettingPropertyBool("Old Feuds Can End", HintText = "the old storyline feuds of Realm of Thrones (the Vale and the Iron Islands, the Reach and Dorne, the wars of the Free Cities, Qarth and the Dothraki against Daenerys) are no longer forced forever: once such a war has lasted Feud War Min Days, peace may be made by council vote, war weariness or poverty, and Realm of Thrones no longer declares it again. The War of the Five Kings, the Night's Watch and the Free Folk, and the Ironborn raid on the North are not affected (off = as Realm of Thrones decides)", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonFeudWarsEnd { get; set; } = true;
@@ -13756,6 +13760,7 @@ namespace Armoury
             s.CanonRiverlandsWarAtPrologueEnd = CanonRiverlandsWarAtPrologueEnd;
             s.CanonNorthRiverlandsAlliance = CanonNorthRiverlandsAlliance;
             s.CanonWarNoPeaceUntilRedWedding = CanonWarNoPeaceUntilRedWedding;
+            s.StrategicAiIgnoresBandits = StrategicAiIgnoresBandits;
             s.CanonFeudWarsEnd = CanonFeudWarsEnd;
             s.CanonFeudWarMinDays = CanonFeudWarMinDays;
             s.IronThroneAmbition = IronThroneAmbition;

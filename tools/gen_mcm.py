@@ -744,6 +744,7 @@ LABELS = {
     'IndebtedLordVanillaYears': 'Indebted Lord Penalty In Game Years',   # 314b
     'MapMusicOurs': 'Our Map Music',   # paczka 165: nazwa z polecenia Jeffa
     # p9: "AI" wielkimi literami (regula ogolna dalaby "Ai Strength Counts Gear")
+    'StrategicAiIgnoresBandits': 'Strategic AI Ignores Bandits',   # 320b
     'AiStrengthCountsGear': 'AI Strength Counts Gear',
     'AiAutobattleCountsGear': 'AI Autobattle Counts Gear',
     'AiStrengthFullKitPercent': 'AI Strength Full Kit Percent',
