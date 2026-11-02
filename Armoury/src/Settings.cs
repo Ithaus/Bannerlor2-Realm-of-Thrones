@@ -238,6 +238,10 @@ namespace Armoury
         // --- The slow mending ---
         public int HealingRegenPercent = 50;               // wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla)
         public int AiHealingRegenPercent = 100;            // AI parties heal at this percent of the normal daily rate (100 = vanilla, above 100 = faster) - vanilla tempo keeps lords' wounded from piling up for weeks after a famine or a battle
+        // 318b (Jeff 02.11 "moje medicine powinno rosnac"): Medicine XP za rannych jencow wyleczonych w partii gracza (PrisonerCare.cs), ta sama metoda gry co
+        // przy wlasnych rannych - XP dla chirurga partii (albo gracza bez chirurga). Tempo leczenia jencow bez zmian. Off = jak dotad (0 XP za jencow)
+        public bool PrisonerCareXp = true;                 // whoever tends your party's wounded also tends your wounded prisoners and learns Medicine from it: each prisoner who recovers gives your surgeon (or you, if no one holds the surgeon's post) Medicine experience the same way your own wounded men do - more for higher tier prisoners, double while resting in a town or village. How fast prisoners recover does not change. Off = no Medicine for prisoners, as before
+        public int PrisonerCareXpPercent = 100;            // how much Medicine experience a recovered prisoner gives, in percent of what one of your own recovered men of the same tier gives (100 = the same, 0 = none)
         public int StarvationWoundPercent = 5;            // a STARVING party in the field loses this share of its regulars to wounds per day (vanilla 25 - a whole army wounded in four days; 0 = off, 25 = vanilla). Player and AI alike
 
         // --- The tidy muster ---
