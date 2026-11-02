@@ -451,6 +451,9 @@ RANGES = {
     'SiegeRansomTruceDays': (0, 364, "0"),   # rozejm po okupie - kod przycina do 0..364 (SiegeRansom.TruceDays)
     # mury oblezen OB1-OB4 (SiegeWalls): zakresy zgodne z przycieciem w kodzie
     'SiegeCapitalWallsFactor': (1.0, 2.0, "0.00"),
+    'SiegeWallLevel1Factor': (1.0, 2.0, "0.00"),   # 320c: kod przycina do 1..2 (SiegeWalls.LevelFactorOf)
+    'SiegeWallLevel2Factor': (1.0, 2.0, "0.00"),
+    'SiegeWallLevel3Factor': (1.0, 2.0, "0.00"),
     'SiegeAssaultRepelLoss': (0.0, 0.5, "0.00"),
     'SiegeAssaultRepelSpread': (0.0, 0.1, "0.00"),
     'SiegeRepelPauseDays': (1.0, 28.0, "0.0"),

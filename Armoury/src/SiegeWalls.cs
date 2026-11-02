@@ -35,7 +35,8 @@ namespace Armoury
     ///   (BesiegerCamp.SetSiegeStrategy - ta sama droga, co zmiana strategii gracza w menu) - klucz SiegeAiBreachWhenWallsHold.
     /// Przewaga osady (postfiks DefaultCombatSimulationModel.GetSettlementAdvantage - jedna liczba dla decyzji, symulacji szturmu AI i gracza, slawy
     ///   i oceny dolaczenia do szturmu): gra liczy juz poziom murow (1 + 4 + poziom - 1: 5/6/7, wyrwa x0.25) i machiny oblegajacych (dzielnik), a poziom
-    ///   murow drugi raz przez wytrzymalosc (30/50/67 tys.) - bez dopisku. Dopisane: (a) samo miano stolicy x SiegeCapitalWallsFactor (1.25 - jeden
+    ///   murow drugi raz przez wytrzymalosc (30/50/67 tys.); 320c (Jeff 02.11 "zwieksz przewage obroncow w zaleznosci od poziomu muru") swiadomie dodaje
+    ///   trzecia zaleznosc: x SiegeWallLevel1/2/3Factor (1.10 / 1.20 / 1.35, klucz SiegeWallsFavourDefenders) - bez Innych, skryptu fabuly i osad fabuly ROT. Dopisane: (a) samo miano stolicy x SiegeCapitalWallsFactor (1.25 - jeden
     ///   stopien murow gry to +17-20%, stolica ma straz krola i zamek w murach); (b) machiny dystansowe OBRONCOW - lustro wag gry dla oblegajacych
     ///   (x(1 + 0.08 na zwykla + 0.12 na ogniowa)); to jest realny skutek warsztatu oblezniczego (balisty i katapulty na start oblezenia) i machin
     ///   zbudowanych w oblezeniu, znika, gdy oblegajacy je zbija. Koszary, place cwiczen, zbrojownia BK, oddzial przyboczny BK - dzialaja przez liczbe
@@ -97,6 +98,42 @@ namespace Armoury
         internal static bool Ob1On { get { var s = Settings.Current; return s != null && s.SiegeWallsHoldUntilBreached; } }
         internal static float CapitalFactor { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeCapitalWallsFactor) ? 1f : (float)Clamp(s.SiegeCapitalWallsFactor, 1.0, 3.0); } }
         private static bool EnginesOn { get { var s = Settings.Current; return s != null && s.SiegeDefenderEnginesOnWalls; } }
+        // 320c: przewaga obroncow wedlug poziomu murow (Jeff 02.11)
+        private static bool LvlOn { get { var s = Settings.Current; return s != null && s.SiegeWallsFavourDefenders; } }
+        /// <summary>320c: czynnik poziomu murow z klucza (1..2; NaN = 1); poziom ponizej 1 jak 1, powyzej 3 jak 3.</summary>
+        internal static double LevelFactorOf(int lvl)
+        {
+            var s = Settings.Current;
+            if (s == null) return 1.0;
+            float v = lvl <= 1 ? s.SiegeWallLevel1Factor : lvl == 2 ? s.SiegeWallLevel2Factor : s.SiegeWallLevel3Factor;
+            return float.IsNaN(v) ? 1.0 : Clamp(v, 1.0, 2.0);
+        }
+        /// <summary>320c: czynnik poziomu murow dla oblezonej osady; 1 i powod, gdy klucz wylaczony, osada fabuly ROT (SiegeRansom.IsStory - KL, Red Keep,
+        /// Winterfell, Harrenhal, Mur, Castle Black), Inni po ktorejkolwiek stronie (Und) albo wodz obozu ze skryptu fabuly. Wodz z BesiegerCamp.LeaderParty
+        /// (null = bez wykluczenia po wodzu, rod pana osady liczy sie dalej). Rzuca - lapie wolajacy (licznik potkniec).</summary>
+        internal static double LevelFactor(Settlement st, out int lvl, out string why)
+        {
+            lvl = 0; why = null;
+            if (st == null || st.Town == null) { why = "bez murow"; return 1.0; }
+            lvl = st.Town.GetWallLevel();
+            if (!LvlOn) { why = "klucz wylaczony"; return 1.0; }
+            if (lvl <= 0) { why = "bez murow"; return 1.0; }
+            if (SiegeRansom.IsStory(st)) { why = "osada fabuly"; return 1.0; }
+            var ev = st.SiegeEvent;
+            var lp = ev != null && ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null;
+            if (Und(lp, st)) { why = "Inni"; return 1.0; }
+            if (Scripted(lp)) { why = "skrypt fabuly"; return 1.0; }
+            return LevelFactorOf(lvl);
+        }
+        private static int LvlIdx(int lvl) { return lvl <= 1 ? 1 : lvl >= 3 ? 3 : 2; }
+        private static string LvlKeys()
+        {
+            return (LvlOn ? "tak" : "nie") + " (L1 x" + F(LevelFactorOf(1), "0.00") + ", L2 x" + F(LevelFactorOf(2), "0.00") + ", L3 x" + F(LevelFactorOf(3), "0.00") + ")";
+        }
+        // 320c: liczniki doby - wywolania przewagi z czynnikiem wedlug poziomu (indeks 1..3), wykluczone; bitwy szturmu wedlug poziomu
+        private static readonly int[] _dLvlCalls = new int[4], _dLvlBat = new int[4], _dLvlWon = new int[4], _dLvlRep = new int[4], _dLvlOther = new int[4];
+        private static readonly long[] _dLvlCasA = new long[4], _dLvlCasD = new long[4];
+        private static int _dLvlExcl, _dLvlBatExcl;
         private static bool BreachOn { get { var s = Settings.Current; return s != null && s.SiegeAiBreachWhenWallsHold; } }
         private static float RepelLoss { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultRepelLoss) || s.SiegeAssaultRepelLoss <= 0f ? 0f : (float)Clamp(s.SiegeAssaultRepelLoss, 0.01, 0.9); } }
         private static float RepelSpread { get { var s = Settings.Current; float l = RepelLoss; return s == null || float.IsNaN(s.SiegeAssaultRepelSpread) || s.SiegeAssaultRepelSpread <= 0f ? 0f : (float)Clamp(s.SiegeAssaultRepelSpread, 0.0, Math.Min(0.2, l * 0.9)); } }
@@ -231,6 +268,13 @@ namespace Armoury
                 if (cf > 1f && IsCapital(settlement)) f *= cf;
                 if (s.SiegeDefenderEnginesOnWalls) { int n, nf; f *= EnginesFactor(settlement, out n, out nf); }
                 if (s.SiegeBreachOneSection) f *= (float)BreachOneFactor(settlement);   // SZ2: jeden rozbity odcinek = wyrwa (gra: dopiero wszystkie)
+                if (s.SiegeWallsFavourDefenders)
+                {
+                    int lvl; string why;
+                    double lf = LevelFactor(settlement, out lvl, out why);   // 320c: poziom murow (bez Innych, skryptu i osad fabuly)
+                    if (why != null) _dLvlExcl++;
+                    else if (lf > 1.0) { f *= (float)lf; _dLvlCalls[LvlIdx(lvl)]++; }
+                }
                 if (f != 1f) { __result *= f; _dAdv++; }
             }
             catch (Exception e) { Stumble("AdvPost", e); }
@@ -239,7 +283,7 @@ namespace Armoury
         // ------------------------------------------------------------ miara OB1 (tylko odczyt)
         internal sealed class Meas
         {
-            public double Att, Def, Def0, Adv, Hp, HpMin, W, WGame, S, SGame, Pen, POurs, PGame, Div, Base, Perks, CapF, EngF;
+            public double Att, Def, Def0, Adv, Hp, HpMin, W, WGame, S, SGame, Pen, POurs, PGame, Div, Base, Perks, CapF, EngF, LvlF = 1.0; public string LvlWhy;
             public bool Ram, Tower, Empty, Breach, Gap, Half, Capital; public int Eq, Level, DefN, DefNf;
             /// <summary>Brama OB1: zbudowany taran i wieza albo wyrwa w murach (odcinek z HP 0).</summary>
             public bool Ready { get { return (Ram && Tower) || Gap; } }
@@ -300,7 +344,10 @@ namespace Armoury
                 int n = 0, nf = 0;
                 m.EngF = EnginesOn ? EnginesFactor(st, out n, out nf) : 1.0;
                 m.DefN = n; m.DefNf = nf;
-                double game = m.Adv / Math.Max(1e-6, m.CapF * m.EngF);
+                int lv; string why;
+                m.LvlF = LevelFactor(st, out lv, out why);                     // 320c: bez tego linie OB1/O0 pokazalyby czynnik poziomu jako "perki"
+                m.LvlWhy = why;
+                double game = m.Adv / Math.Max(1e-6, m.CapF * m.EngF * m.LvlF);
                 m.Perks = m.Base > 0 ? game / (m.Base / m.Div) : 1.0;
             }
             catch { }
@@ -320,7 +367,7 @@ namespace Armoury
         {
             return "przewaga " + F(m.Adv, "0.000") + " = mury poziom " + m.Level + " (baza " + F(m.Base, "0.00") + (m.Breach ? ", WYRWA x0.25" : "") + ") / machiny oblegajacych "
                  + F(m.Div, "0.00") + " x perki " + F(m.Perks, "0.00") + " x stolica " + F(m.CapF, "0.00") + " x machiny obroncow " + F(m.EngF, "0.00")
-                 + " (" + m.DefN + " zwykle, " + m.DefNf + " ogniowe)";
+                 + " (" + m.DefN + " zwykle, " + m.DefNf + " ogniowe) x poziom murow (320c) " + F(m.LvlF, "0.00") + (m.LvlWhy != null ? " (" + m.LvlWhy + ")" : "");
         }
 
         /// <summary>Obrona osady: zaloga, milicja, lordowie w murach (L7) i jedzenie.</summary>
@@ -687,6 +734,7 @@ namespace Armoury
             public double Md = 50, FD = 1, MFood, MLoy, MPay, MRelief, MWalls, Loy = -1, Unpaid, ReliefStr, BesStr, Hp = 1; public string FoodTxt = "-";
             public double Pm = 50, Ma = 50, FA = 1, AFood, ASick, ARep, CampDays = -1, WoundShare; public int Repels;
             public int Rounds, FieldRounds, Mode0 = -1, ModeL = -1; public long DefT, AttT, GDefT, GAttT; public double W0, K0, O0, Adv0, Mf0; public float Thr0 = -1f;
+            public int Lvl; public double LvlF = 1.0; public string LvlWhy;   // 320c: czynnik poziomu murow ze startu szturmu
         }
         private static readonly Dictionary<MapEvent, Bat> _bats = new Dictionary<MapEvent, Bat>();
         private static readonly string[] ModeName = { "drabiny", "jedna machina (taran albo wieza)", "taran i wieza", "wyrwa" };
@@ -833,6 +881,7 @@ namespace Armoury
                 b.Why = "-";
                 b.D0 = me.DefenderSide.NumRemainingSimulationTroops; b.A0 = me.AttackerSide.NumRemainingSimulationTroops;
                 b.Small = b.D0 <= (st.IsTown ? 100 : 30);
+                try { b.LvlF = LevelFactor(st, out b.Lvl, out b.LvlWhy); } catch (Exception e) { Stumble("BatOf.lvl", e); b.LvlWhy = "potkniecie"; }   // 320c: przed zdobyciem (pan osady sie zmieni)
                 DefMorale(b, me, st);
                 AttMorale(b, me, st);
                 Assault a;
@@ -979,6 +1028,9 @@ namespace Armoury
                     if (res == 0) _dSzWon[md]++; else if (res == 1) _dSzRep[md]++; else if (res == 2) _dSzDef[md]++; else _dSzNone[md]++;
                     _dSzCasA[md] += casA; _dSzCasD[md] += casD;
                     _dSzDefT += b.DefT; _dSzAttT += b.AttT; _dSzGDefT += b.GDefT; _dSzGAttT += b.GAttT;
+                    int li = LvlIdx(b.Lvl);                                       // 320c: wynik szturmu wedlug poziomu murow
+                    if (b.LvlWhy != null) _dLvlBatExcl++;
+                    else { _dLvlBat[li]++; if (res == 0) _dLvlWon[li]++; else if (res == 1) _dLvlRep[li]++; else _dLvlOther[li]++; _dLvlCasA[li] += casA; _dLvlCasD[li] += casD; }
                 }
                 if (b.Small && res != 0 && b.Rounds > 0) _dSzSmallHeld++;
                 if (!LogOn || b.Rounds <= 0) return;
@@ -1008,6 +1060,13 @@ namespace Armoury
                   .Append(" (").Append(F(b.D0 > 0 ? casD * 100.0 / b.D0 : 0.0, "0")).Append("%), wymiana ").Append(F(casA / (double)Math.Max(1, casD), "0.00"))
                   .Append(" | wynik ").Append(resTxt).Append('.');
                 Log.Info(sb.ToString());
+                // 320c: osobna linia czynnika poziomu murow (sprawdz_logi --grupa mury320c)
+                double advNo = b.LvlF > 0 ? b.Adv0 / b.LvlF : b.Adv0;
+                Log.Info("Mury (320c): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + (st.IsTown ? "miasto" : "zamek") + ") | poziom murow " + b.Lvl
+                         + " | czynnik x" + F(b.LvlF, "0.00") + (b.LvlWhy != null ? " (bez czynnika: " + b.LvlWhy + ")" : "") + " | przewaga " + F(b.Adv0, "0.00") + " (bez czynnika " + F(advNo, "0.00")
+                         + "), W " + F(b.W0, "0.00") + " | obroncow " + b.D0 + ", atakujacych " + b.A0 + " | straty atak " + F(b.A0 > 0 ? casA * 100.0 / b.A0 : 0.0, "0")
+                         + "%, obrona " + F(b.D0 > 0 ? casD * 100.0 / b.D0 : 0.0, "0") + "%, wymiana " + F(casA / (double)Math.Max(1, casD), "0.00") + " | gracz " + (b.Player ? "tak" : "nie")
+                         + " | wynik " + resTxt + ".");
             }
             catch (Exception e) { Stumble("SzEnd", e); }
         }
@@ -1261,13 +1320,34 @@ namespace Armoury
                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (od wczytania ").Append(_stumbles).Append(").");
                 Log.Info(sb.ToString());
                 SzDaily();                                                       // SZ: linia doby bitwy szturmu
+                LvlDaily();                                                      // 320c: linia doby czynnika poziomu murow
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ZeroDay(); }
         }
 
+        /// <summary>320c: linia doby - klucze, wywolania przewagi z czynnikiem wedlug poziomu, bitwy szturmu wedlug poziomu.</summary>
+        private static void LvlDaily()
+        {
+            try
+            {
+                var sb = new StringBuilder(600);
+                sb.Append("Mury (320c doba): dzien ").Append(Today).Append(" | klucz ").Append(LvlKeys())
+                  .Append(" | przewaga z czynnikiem (wywolan): L1 ").Append(_dLvlCalls[1]).Append(", L2 ").Append(_dLvlCalls[2]).Append(", L3 ").Append(_dLvlCalls[3])
+                  .Append(", bez czynnika (fabula, Inni, skrypt) ").Append(_dLvlExcl);
+                for (int i = 1; i <= 3; i++)
+                    sb.Append(" | szturmy L").Append(i).Append(": bitew ").Append(_dLvlBat[i]).Append(" (zdobyte ").Append(_dLvlWon[i]).Append(", odparte ").Append(_dLvlRep[i])
+                      .Append(", inne ").Append(_dLvlOther[i]).Append("), straty atak / obrona ").Append(_dLvlCasA[i]).Append(" / ").Append(_dLvlCasD[i]);
+                sb.Append(" | szturmy bez czynnika ").Append(_dLvlBatExcl).Append(" | potkniecia ").Append(_dStumbles).Append('.');
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Stumble("LvlDaily", e); }
+        }
+
         private static void ZeroDay()
         {
+            for (int i = 0; i < 4; i++) { _dLvlCalls[i] = _dLvlBat[i] = _dLvlWon[i] = _dLvlRep[i] = _dLvlOther[i] = 0; _dLvlCasA[i] = _dLvlCasD[i] = 0; }   // 320c
+            _dLvlExcl = _dLvlBatExcl = 0;
             _dTrue = _dPass = _dWalls = _dRoll = _dPause = _dExcl = _dBreach = _dEmpty = _dAdv = _dGate = 0;
             _dAssaults = _dWon = _dRepelled = _dDefWon = _dNone = _dOutside = _dFromWalls = _dFromWallsHeld = _dScripted = 0;
             _dLossSum = _dThrSum = _dPauseSum = 0;
@@ -1411,7 +1491,8 @@ namespace Armoury
                          + " | klucze: OB1 " + (Ob1On ? "tak" : "nie") + ", stolica x" + F(CapitalFactor, "0.00") + ", machiny obroncow " + (EnginesOn ? "tak" : "nie") + ", lamanie murow "
                          + (BreachOn ? "tak" : "nie") + ", OB2 prog " + F(RepelLoss, "0.00") + " +- " + F(RepelSpread, "0.00") + ", przerwa " + F(PauseDays, "0.0") + " dob, OB3 "
                          + (FromWallsOn ? "tak" : "nie") + " (udzial " + F(WallsShare, "0.00") + "), OB4 " + (s != null ? s.SiegeBesiegerPrepPercent : 100) + "% (miasto x"
-                         + (s != null ? F(s.SiegeTownPrepFactor, "0.00") : "-") + ", stolica x" + (s != null ? F(s.SiegeCapitalPrepFactor, "0.00") : "-") + "), log " + (LogOn ? "tak" : "nie") + ".");
+                         + (s != null ? F(s.SiegeTownPrepFactor, "0.00") : "-") + ", stolica x" + (s != null ? F(s.SiegeCapitalPrepFactor, "0.00") : "-") + "), poziom murow (320c) " + LvlKeys()
+                         + ", log " + (LogOn ? "tak" : "nie") + ".");
                 Log.Info("Bitwa szturmu (SZ start): latka tur rundy (GetSimulationTicksForBattleRound) " + _hookTicks + ", przewaga osady " + _hookAdv + " | klucze: " + SzKeys()
                          + " | regula: " + (SzAny ? "czynna - szturm AI i autobitwa gracza (bez Innych, skryptu fabuly, morza)" : "wylaczona - tury rundy gry") + ".");
                 SiegeWalls2.SessionStart();                                      // oblezenia 2: linia startowa (latki, modele, klucze)

@@ -92064,5 +92064,120 @@ def main(argv):
     return _groty319c_main_prev(argv)
 
 
+# ---- paczka 320c: grupa mury320c - przewaga obroncow wedlug poziomu murow (Jeff 02.11) ----
+M320_LINE = re.compile(r"Mury \(320c\): dzien (\d+) \| osada (\S+) \((.*?), (miasto|zamek)\) \| poziom murow (\d+) \| czynnik x([\d.]+)(?: \(bez czynnika: (.*?)\))? \| "
+                       r"przewaga ([\d.]+) \(bez czynnika ([\d.]+)\), W ([\d.]+) \| obroncow (\d+), atakujacych (\d+) \| straty atak (\d+)%, obrona (\d+)%, wymiana ([\d.]+) \| "
+                       r"gracz (tak|nie) \| wynik (.*?)\.$")
+M320_DAY = re.compile(r"Mury \(320c doba\): dzien (\d+) \| klucz (tak|nie) \(L1 x([\d.]+), L2 x([\d.]+), L3 x([\d.]+)\) \| przewaga z czynnikiem \(wywolan\): "
+                      r"L1 (\d+), L2 (\d+), L3 (\d+), bez czynnika \(fabula, Inni, skrypt\) (\d+) \|.*\| szturmy bez czynnika (\d+) \| potkniecia (\d+)\.$")
+M320_STORY = {"town_EW4", "ROT_castle61", "town_B2", "ROT_town32", "ROT_castle60", "town_B5"}   # SiegeRansom.StoryIds
+M320_SAMPLE = ("[12:00:01] Mury (320c): dzien 109160 | osada castle_W3 (Banefort, zamek) | poziom murow 2 | czynnik x1.20 | przewaga 4.80 (bez czynnika 4.00), W 7.52 | "
+               "obroncow 615, atakujacych 5998 | straty atak 21%, obrona 64%, wymiana 1.62 | gracz nie | wynik odparty (OB2).")
+M320_SAMPLE2 = ("[12:00:01] Mury (320c): dzien 109161 | osada town_B2 (Winterfell, miasto) | poziom murow 3 | czynnik x1.00 (bez czynnika: osada fabuly) | przewaga 4.40 "
+                "(bez czynnika 4.40), W 6.00 | obroncow 300, atakujacych 3000 | straty atak 15%, obrona 100%, wymiana 1.10 | gracz nie | wynik zdobyte.")
+M320_DSAMPLE = ("[00:00:02] Mury (320c doba): dzien 109161 | klucz tak (L1 x1.10, L2 x1.20, L3 x1.35) | przewaga z czynnikiem (wywolan): L1 3, L2 140, L3 0, "
+                "bez czynnika (fabula, Inni, skrypt) 12 | szturmy L1: bitew 0 (zdobyte 0, odparte 0, inne 0), straty atak / obrona 0 / 0 | szturmy L2: bitew 1 (zdobyte 0, "
+                "odparte 1, inne 0), straty atak / obrona 1260 / 394 | szturmy L3: bitew 0 (zdobyte 0, odparte 0, inne 0), straty atak / obrona 0 / 0 | szturmy bez czynnika 1 | potkniecia 0.")
+
+
+def m320_rows(rep, sz, days, ob):
+    if not days:
+        rep.add("M320-L: linia 'Mury (320c doba)'", "brak", ">= 1 (doba z SiegeWallsLog)", False)
+        return
+    rep.add("M320-L: linia 'Mury (320c doba)'", str(len(days)), ">= 1", True)
+    d = [M320_DAY.search(x) for x in days]
+    bad = sum(1 for x in d if not x)
+    rep.add("M320-P: odczyt linii doby", f"nie czyta {bad}" if bad else "wszystkie", "wszystkie", bad == 0)
+    d = [x for x in d if x]
+    if not d:
+        return
+    on, f1, f2, f3 = d[-1].group(2) == "tak", float(d[-1].group(3)), float(d[-1].group(4)), float(d[-1].group(5))
+    want = {1: f1, 2: f2, 3: f3}
+    rep.add("M320-1: klucz Siege Walls Favour Defenders", f"{'tak' if on else 'nie'} (L1 x{f1:.2f}, L2 x{f2:.2f}, L3 x{f3:.2f})", "tak (1.10 / 1.20 / 1.35)", on)
+    calls = [sum(int(x.group(i)) for x in d) for i in (6, 7, 8)]
+    excl = sum(int(x.group(9)) for x in d)
+    rep.add("M320-2: przewaga z czynnikiem (wywolan L1 / L2 / L3; bez czynnika)", f"{calls[0]} / {calls[1]} / {calls[2]}; {excl}", "INFO (L2 > 0, gdy trwaja oblezenia AI)", None)
+    stum = sum(int(x.group(11)) for x in d)
+    rep.add("M320-3: potkniecia SiegeWalls w dobach z linia 320c", str(stum), "0", stum == 0)
+    if not sz:
+        rep.add("M320-4: linie 'Mury (320c)' (szturmy)", "brak", "INFO (potrzebny szturm AI w logu)", None)
+    else:
+        rows = [M320_LINE.search(x) for x in sz]
+        nb = sum(1 for r in rows if not r)
+        rep.add("M320-4: linie 'Mury (320c)' (szturmy)", f"{len(sz)} (nie czyta {nb})", ">= 1, wszystkie czytelne", nb == 0)
+        rows = [r for r in rows if r]
+        wrongf, story, ratio = [], [], []
+        per = {}
+        for r in rows:
+            sid, lvl, f, why = r.group(2), int(r.group(5)), float(r.group(6)), r.group(7)
+            adv, adv0 = float(r.group(8)), float(r.group(9))
+            li = 1 if lvl <= 1 else 3 if lvl >= 3 else 2
+            if sid in M320_STORY and f > 1.0:
+                story.append(f"{sid} x{f:.2f}")
+            if why is None and on and abs(f - want[li]) > 0.006:
+                wrongf.append(f"{sid} L{lvl} x{f:.2f} (klucz x{want[li]:.2f})")
+            if adv0 > 0 and abs(adv / adv0 - f) > 0.02 * f + 0.01:
+                ratio.append(f"{sid} {adv:.2f}/{adv0:.2f} vs x{f:.2f}")
+            if why is None:
+                p = per.setdefault(li, [0, 0, 0, 0.0, 0.0])
+                p[0] += 1
+                res = r.group(17)
+                if res == "zdobyte":
+                    p[1] += 1
+                elif res.startswith("odparty"):
+                    p[2] += 1
+                p[3] += int(r.group(13))
+                p[4] += float(r.group(15))
+        rep.add("M320-5: czynnik w szturmie = klucz dla poziomu", "; ".join(wrongf[:6]) or "zgodny", "zgodny", not wrongf)
+        rep.add("M320-6: osady fabuly ROT bez czynnika", "; ".join(story) or "zadna z czynnikiem", "zadna z czynnikiem", not story)
+        rep.add("M320-7: przewaga / bez czynnika = czynnik", "; ".join(ratio[:6]) or "zgodne", "zgodne", not ratio)
+        summ = []
+        for li, p in sorted(per.items()):
+            summ.append(f"L{li}: szturmow {p[0]}, zdobyte {p[1]} ({p[1] * 100.0 / p[0]:.0f}%), odparte {p[2]}, straty atak sr. {p[3] / p[0]:.0f}%, wymiana sr. {p[4] / p[0]:.2f}")
+        rep.add("M320-8: szturmy wedlug poziomu (z czynnikiem)", " | ".join(summ) or "-", "INFO (przed 320c L2: zdobyte 63%, wymiana ok. 1.3)", None)
+    if ob:
+        lack = sum(1 for x in ob if "x poziom murow (320c)" not in x)
+        rep.add("M320-9: linie OB1/O0 z polem 'x poziom murow (320c)'", f"{len(ob) - lack} z {len(ob)}", "wszystkie", lack == 0)
+
+
+def mury320c_main(logp):
+    rep = Report()
+    a, b, c = M320_LINE.search(M320_SAMPLE), M320_LINE.search(M320_SAMPLE2), M320_DAY.search(M320_DSAMPLE)
+    st_ok = bool(a) and bool(b) and bool(c) and a.group(7) is None and b.group(7) == "osada fabuly" and c.group(4) == "1.20" and c.group(11) == "0"
+    rep.add("M320-S: self-test wyrazen na wzorze linii", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
+    if not logp or not os.path.isfile(logp):
+        rep.add("M320-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sz, days, ob = [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if "Mury (320c doba):" in s:
+                days.append(s)
+            elif "Mury (320c):" in s:
+                sz.append(s)
+            elif "przewaga " in s and " = mury poziom " in s:
+                ob.append(s)
+    print(f"plik: {logp}")
+    m320_rows(rep, sz, days, ob)
+    rep.show()
+    return 0
+
+
+_mury320c_main_prev = main
+
+
+def main(argv):
+    # paczka 320c: grupa mury320c - opakowanie main jak groty319c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "mury320c":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return mury320c_main(rest[0] if rest else None)
+    return _mury320c_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
