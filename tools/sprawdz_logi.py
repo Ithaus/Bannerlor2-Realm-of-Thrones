@@ -91791,5 +91791,72 @@ def main(argv):
     return _panika318c_main_prev(argv)
 
 
+# ---------------------------------------------------------------- paczka 319a (02.11): jency zdrowieja jak swoi - grupa jency319a
+# Jeff 02.11: "tak szybciej tak jak przy moich zolnierzach". Armoury/src/PrisonerCare.cs LikePrefix: dodatek (swoi - jency)/tick do akumulatora gry
+# _overflowedHealingForPrisonerRegulars partii gracza; XP liczy haczyk 318b.
+# Uzycie: python -I tools/sprawdz_logi.py --grupa jency319a <Armoury-*.log>
+#  J319-1  "Jency jak swoi (319a): start sesji" z "latka 1/1" i "slownik gry tak"
+#  J319-2  doby z rannymi jencami (klucz tak): wyleczonych / min(rannych przed, tempo swoich) >= 0.7 (gra losuje; przed 319a ~1/dobe)
+#  J319-3  dodatek 319a <= wyleczonych w kazdej dobie
+#  J319-4  doby z wyleczonymi: XP Medicine > 0 (przy Prisoner Care Xp Percent > 0)
+#  J319-5  zero linii ERROR z PrisonerCare.LikePrefix / HookLike
+def jency319a_main(logp):
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("J319-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, errors = [], [], []
+    pct0 = False
+    day = re.compile(r"Opieka nad jencami \(318b\): wyleczonych (\d+) \(wywolan \d+\), XP Medicine ([\d.]+) .*?rannych jencow przed/po (\d+)/(\d+)"
+                     r" \| z tego dodatek 319a (\d+) \| tempo/dobe: swoi ([-\d.]+), jency gra ([-\d.]+)")
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
+            if s.startswith("Jency jak swoi (319a): start sesji"):
+                starts.append(s)
+            elif s.startswith("Opieka nad jencami (318b): start sesji") and "Prisoner Care Xp Percent 0 " in s:
+                pct0 = True
+            elif s.startswith("Opieka nad jencami (318b): wyleczonych"):
+                m = day.search(s)
+                if m:
+                    days.append((int(m.group(1)), float(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5)), float(m.group(6)), float(m.group(7))))
+            if "ERROR" in s and ("PrisonerCare.LikePrefix" in s or "PrisonerCare.HookLike" in s):
+                errors.append(s)
+    print(f"plik: {logp}")
+    ok1 = [s for s in starts if "latka 1/1" in s and "slownik gry tak" in s]
+    rep.add("J319-1: latka TryToHealOrWoundPrisoners i slownik gry", f"startow {len(starts)}, poprawnych {len(ok1)}" + (f" ({starts[-1][:200]})" if starts else ""),
+            "wszystkie 1/1 + slownik tak", (len(ok1) == len(starts)) if starts else None)
+    wd = [d for d in days if d[2] > 0 and d[5] > 0]
+    healed = sum(d[0] for d in wd)
+    expect = sum(min(d[2], d[5]) for d in wd)
+    ratio = healed / expect if expect > 0 else 0.0
+    rep.add("J319-2: tempo jencow jak swoich (doby z rannymi)", f"dob {len(wd)}, wyleczonych {healed}, oczekiwanych {expect:.1f} (min(ranni, swoi/dobe)), stosunek {ratio:.2f}",
+            ">= 0.7", (ratio >= 0.7) if len(wd) >= 3 else None)
+    bad3 = [d for d in days if d[4] > d[0]]
+    rep.add("J319-3: dodatek <= wyleczonych", f"dob {len(days)}, z dodatkiem > wyleczonych {len(bad3)}", "0", (len(bad3) == 0) if days else None)
+    hd = [d for d in days if d[0] > 0]
+    noxp = [d for d in hd if d[1] <= 0]
+    rep.add("J319-4: Medicine XP za wyleczonych jencow", f"dob z wyleczonymi {len(hd)}, bez XP {len(noxp)}, XP lacznie {sum(d[1] for d in hd):.0f}",
+            "bez XP 0", (len(noxp) == 0) if hd and not pct0 else None)
+    rep.add("J319-5: bledy 319a", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    rep.show()
+    return 0
+
+
+_jency319a_main_prev = main
+
+
+def main(argv):
+    # paczka 319a: grupa jency319a - opakowanie main jak jency318b
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "jency319a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return jency319a_main(rest[0] if rest else None)
+    return _jency319a_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

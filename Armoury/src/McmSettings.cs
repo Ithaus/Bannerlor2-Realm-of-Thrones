@@ -672,7 +672,7 @@ namespace Armoury
         [SettingPropertyGroup("The slow muster")]
         public int VolunteerRegenPercent { get; set; } = 100;
 
-        [SettingPropertyInteger("Healing Regen Percent", 0, 200, "0", HintText = "wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla). Your prisoners are not slowed by this: they always heal at the game's own pace (1 wounded prisoner per day, prisoner heroes 20 HP per day)", RequireRestart = false)]
+        [SettingPropertyInteger("Healing Regen Percent", 0, 200, "0", HintText = "wounded men and heroes heal on the map at this percent of the normal daily rate - medicine perks still count on top (100 = vanilla). Your prisoners are not slowed by this: they heal at the game's own pace (1 wounded prisoner per day, prisoner heroes 20 HP per day), or as fast as your own men with Prisoners Heal Like Your Men", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public int HealingRegenPercent { get; set; } = 50;
 
@@ -680,9 +680,13 @@ namespace Armoury
         [SettingPropertyGroup("The slow mending")]
         public int AiHealingRegenPercent { get; set; } = 100;
 
-        [SettingPropertyBool("Prisoner Care Xp", HintText = "whoever tends your party's wounded also tends your wounded prisoners and learns Medicine from it: each prisoner who recovers gives your surgeon (or you, if no one holds the surgeon's post) Medicine experience the same way your own wounded men do - more for higher tier prisoners, double while resting in a town or village. Prisoners always heal at the game's own pace (1 wounded prisoner per day, prisoner heroes 20 HP per day), never halved by Healing Regen Percent. Off = no Medicine for prisoners, as before", RequireRestart = false)]
+        [SettingPropertyBool("Prisoner Care Xp", HintText = "whoever tends your party's wounded also tends your wounded prisoners and learns Medicine from it: each prisoner who recovers gives your surgeon (or you, if no one holds the surgeon's post) Medicine experience the same way your own wounded men do - more for higher tier prisoners, double while resting in a town or village. Prisoners heal at the game's own pace (1 wounded prisoner per day, prisoner heroes 20 HP per day), never halved by Healing Regen Percent - or as fast as your own men with Prisoners Heal Like Your Men. Off = no Medicine for prisoners, as before", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
         public bool PrisonerCareXp { get; set; } = true;
+
+        [SettingPropertyBool("Prisoners Heal Like Your Men", HintText = "your wounded prisoners (common soldiers, not lords) recover as fast as your own wounded men: the same daily rate shown for your troops, with your surgeon's Medicine, perks, Healing Regen Percent and the bonus for resting in a town or castle. With Prisoner Care Xp on, each of them still gives Medicine experience once when he recovers. Only prisoners held by your own party - AI lords' prisoners keep the game's pace. Off = the game's pace (1 wounded prisoner per day)", RequireRestart = false)]
+        [SettingPropertyGroup("The slow mending")]
+        public bool PrisonersHealLikeYourMen { get; set; } = true;
 
         [SettingPropertyInteger("Prisoner Care Xp Percent", 0, 200, "0", HintText = "how much Medicine experience a recovered prisoner gives, in percent of what one of your own recovered men of the same tier gives (100 = the same, 0 = none)", RequireRestart = false)]
         [SettingPropertyGroup("The slow mending")]
@@ -11310,6 +11314,7 @@ namespace Armoury
             s.HealingRegenPercent = HealingRegenPercent;
             s.AiHealingRegenPercent = AiHealingRegenPercent;
             s.PrisonerCareXp = PrisonerCareXp;
+            s.PrisonersHealLikeYourMen = PrisonersHealLikeYourMen;
             s.PrisonerCareXpPercent = PrisonerCareXpPercent;
             s.StarvationWoundPercent = StarvationWoundPercent;
             s.AutoSortParty = AutoSortParty;
