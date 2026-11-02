@@ -1,5 +1,159 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-02 WGRANIE 154 - noc/316x-integracja (153 + 316a zapas musztry bez strat, 316b swit i zmierzch bez falszywego marszu, 316c nagroda krola raz na dobe, 316d kwatermistrz bez zalewu komunikatow, 316e diagnostyka wjazdu do wsi gry i prolog bez falszywych tokenow); Armoury.dll 093080cecf8fd6fdd00d97502687793a (CrashScribe aa32d04e); kopia 153: Armoury.dll.bak-2026-11-02-przed-wgranie154 i D:/Backup-Bannerlord/wgrane/2026-11-02-wgranie154-przed
+
+**Problem:** Jeff 02.11: "jak wrzucam bron aby szybciej sie szkolili to daj ze moge tylko wrzucic tyle ile potrzebuja a nie ze mam potem komunikat ze jest lost. Sprawdz logi i savy czy cos warto poprawic. Wgraj i ide spac". Audyt logow 01.11 (Armoury-2026-11-01_22-56-32.log): 72 sztuki broni/zbroi zniszczone przez Discard (bez miejsca 16 i 56); falszywe "The column marched 1h through the night" przy 73 z 75 switow; tryb "always make camp" - sen od 21:42, noc 5.3 h, dlug i czerwone "Second night without sleep"; ta sama armia nagrodzona 2x w 11 s (25000 + 11160 zl, wplywy 130.8 + 124.5); 105 czerwonych "QM: no man can use" i 177 "kit slots empty"; first-chance "Token ... not valid in ROT.dll" przy kazdym wczytaniu; Jeff 01.11 "nie da sie wejsc do wiosek glownych ... tylko popup" - brak sladu w logu.
+**Zmiana:** wpisy 316a-316e ponizej (szkice zb/n316a..n316e-changelog.md). 316a po recenzji: nadmiar z Discard wraca do taboru tylko gdy zapas cos przyjal; pelny zapas - Discard jak w grze ("are thrown away").
+**Testy:** recenzja 316a-e (2 potwierdzone w 316a - poprawione 3727ca34), recenzja scalenia 316x bez bledow; autotest 316x: bitwaN 9 bitew kod 0, ERROR 0; probyN 5 dob kod 0; grupy leczenie314a, zold314c, sen316b, qm316d, zapas316a, sen315b, wjazd316e - 0 NIE (W316-5: prolog 0 falszywych tokenow, CrashScribe 0 "not valid"); krwawienie313d KW-2 NIE (tylko licznik linii, znane od 313y). Armoury.json Jeffa c7055052 nietkniety.
+**Ryzyko / co sprawdzic:** w grze Jeffa: linie "Wjazd do wsi gry:" przy probie wejscia do wsi glownej (W316-2 "STOI U WSI" = blad Jeffa); swit bez "marched 1h"; zmierzch trybu 1 ok. 20:40; Discard broni ponad potrzebe - "went back to your baggage"; QM - jedna linia zbiorcza. Skarbiec Stormlands (-16 tys./dobe) do obserwacji (audyt, bez zmian).
+**Status:** WGRANE 154
+
+## 316e (02.11) - wjazd do wsi gry: DIAGNOSTYKA + prolog bez falszywych tokenow IL (Armoury)
+
+**Problem**
+1. Jeff 01.11 ~21:35: "nie da sie wejsc do wiosek glownych, do pobocznych sie da, ale jak klikam w wioske glowna pojawia sie tylko popup i nie moge wejsc".
+   W logach brak sladu: Armoury-2026-11-01_21-27-02 / 21-46-00 / 22-56-32 maja tylko wejscia do wiosek pobocznych i zajazdow
+   (`[21:29:50] Wioski poboczne (WP): wjazd do Longhythe ... - klik na wioske`, `[21:53:54] Zajazdy (ZJ): wejscie do The Tired Oak ... - klik na zajazd`,
+   `[23:18:16] ... The Blind Owl ... - pytanie przy postoju`), "Postoj w osadzie (m109)" co dobe "wsie 0"; CrashScribe bez bledu z menu wsi.
+2. CrashScribe przy kazdym wczytaniu: session-2026-11-01_22-56-31.log:960-965 `ERROR CAUGHT FURTHER UP ... System.ArgumentOutOfRangeException
+   Token 0x062c2811 is not valid in the scope of module ROT.dll` (Armoury.Prologue.HasGetterCall <- ScanPatch <- InstallStory <- PrologueBehavior.SyncData),
+   :1006 `Token 0x0a060001 ... ROTBattleAtmosphere.dll`, powtorki #5 (7 linii w sesji); to samo w sesjach 21:27 i 21:45.
+
+**Przyczyna**
+1. Nieustalona (brak dowodu w logu). Sprawdzone w kodzie: klik w wies gry bierze SettlementVisualManager (Priority 40) przed MapVillagesView (100) i
+   RoadsideInnsView (101); RaidTribute.EncounterPrefix (RaidTribute.cs:364) pomija partie gracza; SideVillageFief.Tick (:1223) i RoadsideInns.Ask (:487)
+   pytaja tylko na postoju (pozycja = cel ruchu), a cel ruchu do wsi gry to jej brama - tam gra zaczyna spotkanie. Kandydaci na "popup": pytanie zajazdu /
+   wioski gracza przy postoju obok wsi gry albo okno Night Falls - bez linii logu nie do rozstrzygniecia.
+2. Prologue.Story.cs HasGetterCall (dawniej :156-176) bral KAZDY bajt 0x28/0x6F w IL (takze w srodku operandow, np. stalych) za call/callvirt i wolal
+   Module.ResolveMethod na przypadkowych 4 bajtach -> first-chance wyjatek (lapany, wynik poprawny, ale szum w CrashScribe przy kazdym wczytaniu).
+   Do tego ResolveMethod bez kontekstu generycznego rzucal dla odwolan w typach generycznych.
+
+**Zmiana**
+1. Nowy Armoury/src/VillageEntryDiag.cs (TYLKO log, zero zmian zachowania), tick 4 razy na sekunde z CampaignEvents.TickEvent (ArmouryBehavior.RegisterEvents,
+   za SideVillageFief.Tick) + Reset przy rejestracji. Linie `Wjazd do wsi gry: <nazwa> (<id>, wlasciciel, wojna z graczem, stan) | ... | godzina HH:MM.`:
+   proba (cel ruchu = wies gry, odleglosc od bramy, menu, ruch), spotkanie (bez wjazdu), wjazd | menu <id>, zmiany menu w srodku (najwyzej 6 na pobyt),
+   wyjazd, cel porzucony bez wjazdu, **STOI U WSI bez spotkania i wjazdu** (cel = wies gry, partia stoi <= 1.5 jedn. od bramy ~2 s zegara: okno, rozmowa, menu,
+   ruch, widocznosc, tryb czasu). Popup: `Wjazd do wsi gry: <cel albo -> | popup '<tytul>' | cel ruchu | najblizsza wies gry (odleglosc) | menu | ruch | godzina`
+   z SideVillageFief.Tick (pytanie wioski gracza), RoadsideInns.Ask (pytanie zajazdu), NightRest.NightfallAsk (Night Falls).
+2. HasGetterCall chodzi po granicach instrukcji (mapa OpCodes jedno- i dwubajtowych, dlugosc operandu z OperandType, switch 4+4n) i rozwiazuje tylko
+   prawdziwe operandy call/callvirt, z kontekstem generycznym typu i metody. Nieznany kod / zly operand -> stary przeglad bajtow (wynik jak dotad), licznik
+   w linii "latki opowiesci ROT" ("metod z nieznanym kodem IL (przeglad bajtow) N" tylko gdy > 0).
+3. tools/sprawdz_logi.py: grupa `wjazd316e` (`python -I tools/sprawdz_logi.py --grupa wjazd316e <Armoury-*.log> [<CrashScribe session-*.log>]`):
+   W316-1 linie sa, W316-2 zero STOI U WSI, W316-3 proby -> wjazd/spotkanie, W316-4 zero naszych okien w drodze do wsi gry, W316-5 prolog wpiete==znalezione
+   i zero "is not valid in the scope of module" w CrashScribe, W316-6 zero bledow VillageEntryDiag.
+
+**Ryzyko / co sprawdzic** (kontrola calosci, zasada 0)
+- Diagnostyka: tylko odczyty (TargetSettlement, CurrentSettlement, PlayerEncounter.EncounterSettlement, menu, IsAnyInquiryActive, rozmowa) i Log.Info;
+  zadnego SwitchToMenu / ActivateGameMenu / zmiany ruchu. Potkniecia liczone (Log.Error 3 pierwsze i co 500), nic nie gaszone. Popup: petla po Village.All
+  (~425 wsi) tylko przy pokazaniu okna (rzadko). Ilosc linii: kilka na wjazd; zmiany menu w wiosce ograniczone do 6 na pobyt.
+- Prolog: test poza gra (scratchpad/t316e, net472, prawdziwe ROT.dll i ROTBattleAtmosphere.dll): stary i nowy przeglad - trafien 31/31 i 1/1, ROZNIC 0,
+  bledow rozwiazania stary 7+1, nowy 0, fallback 0; BCL 32074 metod - fallback 0. Linia startu ma zostac "wpiete 30/30 ... | ROTBattleAtmosphere: wpiete 1/1".
+- W grze sprawdzic: CrashScribe bez "Token 0x... is not valid in the scope of module ROT.dll"; klik w wies gry -> linie "Wjazd do wsi gry: ... proba" i
+  "wjazd | menu village"; gdy Jeff znow zobaczy popup - linia "popup '...'" albo "STOI U WSI" powie, co to za okno i w jakim stanie stoi partia.
+- Checker przetestowany na logu syntetycznym (wszystkie W316 NIE/TAK zgodnie z wpisami) i na prawdziwym logu 22-56-32 + session-2026-11-01_22-56-31
+  (W316-5 NIE: 7 linii Token - stary DLL, oczekiwane).
+
+**Status**: DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane).
+
+## 316d (02.11) Armoury: kwatermistrz bez zalewu komunikatow - jedna linia "no man can use" na przeglad, "kit slots empty" czerwone tylko przy wzroscie
+
+**Problem:** Jeff 02.11: "SPRAWDZ LOGI I SAVY CZY COS WARTO POPRAWIC". Audyt logu `Modules/Armoury/Armoury-2026-11-01_22-56-32.log`:
+105 czerwonych linii "QM: no man can use X (needs Bow N, best N) - stays yours." (np. 23:23:59 osiem linii naraz, ten sam luk trzy razy:
+`[23:23:59] Wojsko (133f) [Quartermaster, red] (powtorzenie): QM: no man can use 166 Pound Composite War Bow (needs Bow 140, best 110) - stays yours.`;
+"200 Pound Ravens' Teeth Longbow (needs Bow 175, best 150)" 31 razy w sesji) oraz 177 czerwonych "QM: N kit slots empty ... for the next battle"
+(111 + 64 + 2), przewaznie ta sama liczba co pol minuty (`[23:06:30]`, `[23:07:03]`, `[23:07:41]` ... "QM: 39 kit slots empty and 1 rider on foot").
+
+**Przyczyna:** `Armoury/src/QuartermasterLaw.cs` QuartermasterEscrow.ProcessSwaps (dawne l. 1781-1789) - jedna linia Log.Player na KAZDY wpis
+`_pendingSwaps` (lista wkladow, ten sam przedmiot moze miec kilka wpisow), przy kazdym zamknieciu ekranu, bez pamieci co juz meldowano;
+ShoutIfNoUse (dawne l. 1755-1764, dostawy kowala) tak samo. QuartermasterLaw.ShoutShortages (l. ~976) - `Log.Player(one, true)` zawsze czerwono.
+
+**Zmiana (tylko napis, logika bez zmian):**
+- nowe `QuartermasterEscrow.ShoutNoUse(items, where)`: jedna linia zbiorcza na przeglad "QM: no man can use 5 pieces in your baggage (A x2, B, ...) - they stay yours."
+  (najwyzej 6 nazw, potem "and N more"); ten sam przedmiot (StringId) na ekranie najwyzej raz na 7 dni kampanii (`_noUseTold`, czyszczone przy innej
+  kampanii); szczegoly (skill, wymog, najlepszy, ile cicho) w jednej linii `Kwatermistrz (316d, <gdzie>): ...` w Armoury.log. ProcessSwaps, ShoutIfNoUse
+  (DoOrderKit - z liczba sztuk k) i DoOrderShelf (SmithMenu.cs - zbiorczo zamiast petli) ida przez nia.
+- `KitPreview.ShoutLine` oddaje tez liczby (missing, foot); ShoutShortages: zwykly kolor, czerwony tylko gdy pustych slotow albo jezdzcow pieszo
+  przybylo od ostatniego meldunku (pierwszy w kampanii czerwony; komplet zeruje baze). Linia `Kwatermistrz (316d): meldunek pustych X, pieszo Y - czerwony/zwykly kolor`.
+- tools/sprawdz_logi.py: grupa `qm316d` (Q316-1 stary format 0, Q316-2 jedna linia zbiorcza na sekunde, Q316-3 czerwony tylko przy wzroscie, Q316-4 linie 316d, Q316-5 bledy 0).
+  Test: syntetyczny log ok (5 TAK) i zly (3 NIE); log Jeffa z 01.11: Q316-1 NIE 105, Q316-3 NIE 126 z 177 (stary DLL - oczekiwane).
+
+**Ryzyko / co sprawdzic:** kontrola calosci - ShoutLine ma jednego wolajacego (ShoutShortages), ShoutIfNoUse dwoch (SmithMenu DoOrderKit, DoOrderShelf);
+co zostaje gracza i PurgeUnusable (wlasny komunikat "nobody who would gain from them can use them") bez zmian. Pamiec 7 dni jest w pamieci procesu,
+nie w zapisie - po ponownym uruchomieniu gry przedmiot moze byc zameldowany raz jeszcze. Dostawa przedmiotu meldowanego w ostatnich 7 dniach nie daje
+juz komunikatu na ekranie (tylko log). Linia startu bitwy "Your men's kit for this battle" zostaje czerwona (raz na bitwe). W grze: zamknac zbrojownie z
+lukiem ponad skill - jedna linia zbiorcza; zamknac drugi raz - cisza; "QM: N kit slots empty" zolta, czerwona gdy liczba wzrosnie;
+`python -I tools/sprawdz_logi.py --grupa qm316d <Armoury-*.log>`.
+
+**Status:** DO SPRAWDZENIA
+
+## 316c - nagroda krola raz na dobe za te sama partie lorda (CrownWar314) - DO SPRAWDZENIA
+
+**Problem.** Jeff 02.11: "SPRAWDZ LOGI I SAVY CZY COS WARTO POPRAWIC". Audyt logu `Armoury-2026-11-01_22-56-32.log`: ta sama armia wroga nagrodzona dwa razy w 11 s (poscig za jej resztkami):
+- `[00:10:51] Nagroda krola (314c): dzien 109030 | House Baratheon of King's Landing pokonal Flint | pobitych partii lordow 20 (armia), ich ludzi na starcie 3448 | ... dar 25000 zl ..., wplywy 130.8 dla 24 rodow.`
+- `[00:11:02] Nagroda krola (314c): dzien 109030 | House Baratheon of King's Landing pokonal Flint | pobitych partii lordow 20 (armia), ich ludzi na starcie 744 | ... dar 11160 zl ..., wplywy 124.5 dla 24 rodow.`
+Druga bitwa dala prawie pelne wplywy (20 lordow x mnoznik armii) i 11160 zl za 744 ludzi, ktorzy byli juz w 3448 pierwszej bitwy.
+
+**Przyczyna.** `Armoury/src/CrownWar314.cs` RewardKingdom (dawniej ok. linii 417-424): liczyl kazda pobita partie lorda w kazdej bitwie (MapEventEnded) - bez pamieci, ze ta partia dala juz dzis nagrode. Poscig za resztkami armii = druga bitwa z tymi samymi 20 partiami.
+
+**Zmiana.** Zbior `_rewarded` ("krolestwo|StringId partii") z doba `_rewardedDay` - czyszczony przy zmianie doby (sprawdzane w RewardKingdom, niezalezne od linii doby) i w Reset(). Partia juz nagrodzona dzis temu krolestwu nie daje ani lorda (wplywy, prog armii >= 2), ani ludzi (zloto - alternatywa wobec "zloto dalej od zdrowych na starcie": ludzie resztek byli juz policzeni na starcie pierwszej bitwy, jeden czlowiek raz). Klucz z krolestwem - dwa sojusznicze krolestwa w jednej bitwie dostaja kazde swoja nagrode. Partie zapisywane dopiero gdy krolestwo ma wklad (kc > 0). Bitwa z samymi juz nagrodzonymi: linia `Nagroda krola (314c) pominieta: dzien N | K pokonal X | partii juz nagrodzonych dzis N (316c: partia lorda raz na dobe), nowych 0.` Linia nagrody konczy sie `; partii juz nagrodzonych dzis N.` Bez zapisu w save (wczytanie w polowie doby najwyzej pozwoli nagrodzic raz jeszcze). Checker `--grupa zold314c`: regex Z314_GIFT z opcjonalnym polem (linie sprzed 316c dalej czytelne), Z314_SKIP, self-test probek 316c, nowy punkt Z314-10 (linie pominiete z N >= 1; podejrzenie: druga linia "(armia)" tego samego krolestwa nad tym samym wrogiem tej doby z dup 0).
+
+**Ryzyko / co sprawdzic.** Regresje: jedyny konsument linii to grupa zold314c (inne narzedzia jej nie parsuja); log Jeffa sprzed 316c: Z314-S/0/6 TAK, Z314-10 NIEPOKRYTY. Kolizje: liczniki doby (_dGiftQueued, _dInfl, _dBattles) i kolejka darow bez zmian - mniej darow, wiec Z314-1/7 dalej domkniete. Spojnosc: partia lorda pobita rano i znow wieczorem po zwerbowaniu nowych ludzi nie da drugiej nagrody tej doby (swiadomie, jedna zasada). StringId partii po zniszczeniu i odrodzeniu - nowa partia, nowa nagroda (prawidlowo). Heurystyka Z314-10 moze falszywie alarmowac, gdy jeden rod prowadzi dwie rozne armie tej samej doby (rzadkie). W logu: po poscigu za resztkami armii linia "pominieta" albo "partii juz nagrodzonych dzis N" > 0 i brak drugiej "(armia)" z pelnymi wplywami. Build 0 bledow.
+
+**Status.** DO SPRAWDZENIA.
+
+## 316b - pobudka o swicie bez falszywego "marszu noca", zmierzch "always make camp" o czasie (Armoury: NightRest.cs, NightClock.cs, NightMarch.cs; tools/sprawdz_logi.py)
+
+**Problem.** Jeff 01.11: "wypoczynek powinien byc wtedy jak jest noc a konczyc sie jak wstaje slonce", "sen wystarczy 6 godzin snu nic nie dosypiaja"; 02.11: "SPRAWDZ LOGI I SAVY CZY COS WARTO POPRAWIC".
+Log `Armoury-2026-11-01_22-56-32.log`:
+- (1) prawie kazdy swit po pelnym snie do switu: `[01:17:26] Sen do switu (315a): pobudka o 3:00 (od 21:01, zegara 6.0 h ...) | powod: swit gracza`, a zaraz `[01:17:28] Wojsko (133f) [Camp]: The column marched 1h through the night, but the men rested 6h today - no sleep debt.` i `NocnyMarsz: gracz o swicie - ... sen w menu nie ... marsz w godzinach obozu 1 h`. Komunikat 66 razy w sesji; checker sen315a S315-3 NIE (63 z 65).
+- (2) tryb zmierzchu 1 (always make camp): `[01:17:43] Nocleg: gracz - zmierzch o 21:00, kolumna w marszu: tryb zmierzchu 1`, `[01:17:44] Sen do switu (315a): sen w menu od 21:42 ... (za 5.3 h zegara)`, `[01:17:48] The men marched through the night. One sleepless night ... Rested 5.3h of the 6.0h needed`; nastepna noc to samo (sen od 21:39) -> `[01:18:09] [Camp, red] Second night without sleep`. Starty snu 21:39-21:42 po zmierzchu trybu 1: 9 razy w sesji.
+
+**Przyczyna.**
+- (1) Ksiega snu tyka z terminu ticku godzinowego gry (NightLedgerClock, `Nocleg (zegar ksiegi): ... termin 17:38`) - tick switu (godzina 3) przychodzi ok. 3:40 zegara i mierzy ruch z godziny 2:38-3:38. Pobudka 315a jest o 3:00 zegara (SleepTick, `_dawnHoldH`), wiec od 3:00 kolumna jedzie, `_sleeping` jest juz false, a `marchField && InCamp(h - 1)` (NightRest.cs, licznik `_marchHoursDay`) liczyl te godzine jako marsz w godzinach obozu. Linia switu dostawala stan chwili (`sen w menu nie`), nie "spal tej nocy".
+- (2) Zmierzch (pytanie / oboz z rozkazu) robi tick ksiegi o godzinie CampStart, czyli przy fazie :38 o ok. 21:40 zegara - kolumna szla 21:00-21:40 naprawde, oboz (arm_camp_wait to pauza) i sen od 21:42 do switu 3:00 = 5.3 h < baza 6 - zapas 0.5. Regula z audytu "godzina stania w obozie = sen" juz istnieje (postoj w ksiedze = odpoczynek, bez marszu), ale tu nie pomaga - stracony czas to prawdziwy marsz z powodu spoznionego zmierzchu.
+
+**Zmiana.**
+- (1) `_menuSleptHour` (NightRest.cs): ustawiany w SleepInit i co tick menu snu (SleepTick), zerowany w ticku godzinowym na stan snu; godzina ksiegi, w ktorej gracz spal w menu, nie jest godzina marszu (`marchField` wymaga `!sleptHour` zamiast `!_sleeping`). `_menuSleptDay` - spal w menu od ostatniego switu; linia `NocnyMarsz: gracz o swicie` ma nowe pole `spal w menu tej doby tak/nie` (pole `sen w menu` = stan chwili - bez zmian, czyta je wzor dlugu i checker NO-8). Bez zmian w rachunku odpoczynku, dlugu i pobudce.
+- (2) Zmierzch o czasie: tick ksiegi tuz przed poczatkiem obozu (godzina ksiegi CampStart-1, zegar najwyzej `DuskLeadH` = 0.6 h przed CampStart, w nocy snu menu MenuNight, bez otwartego menu - trening 311e ma pierwszenstwo, nie w marszu forsownym, tylko przy NightMarchNotice) robi zmierzch juz teraz: ten sam blok co dotad (ZB-6 bez pytania, oboz z rozkazu trybu 1, pytanie Night Falls trybu 0), noc pytania = nadchodzaca noc (`NightClock.NightIdAhead` - ten sam numer co tick o CampStart, wiec drugi raz nie pyta). Przy fazie :38 oboz staje ok. 20:40, sen do switu 3:00 = ok. 6.3 h. Linia zmierzchu ma dopisek `[316b: tick ksiegi przed zmierzchem - zegar HH:MM, do poczatku obozu 21:00 X h]` (przed `, noc N.` - regex NZB_ASK/NZB_SKIP bez zmian).
+- Checkery: nowa grupa `sen316b` (B316-1 pole w linii switu, B316-2 swit po pobudce o swicie bez marszu, B316-3 zmierzch trybu 1 -> sen najpozniej 21:24, B316-4 noc po zmierzchu trybu 1 bez wzrostu dlugu, B316-5 INFO zmierzchy o czasie, B316-6 bledy); S315-3 bierze tylko sen zaczety do camp_start:05 (sen po spoznionym zmierzchu mial prawdziwy marsz); NO-8 kasuje oczekiwanie, gdy przed switem zaczyna sie nowy sen w menu (falszywe NIE z audytu).
+
+**Ryzyko / co sprawdzic.** (kontrola calosci w kodzie)
+- Regresje: `_menuSleptHour` czyta tylko `marchField` (licznik marszu i ostrzezenie marszu nocnego) - godzina czesciowo przespana i potem marszu (pobudka "Rouse the men early" w nocy) nie liczy sie juz jako marsz, ostrzezenie przychodzi godzine pozniej. Odpoczynek doby, `FullNight`/`NightFullSlackH` 0.5 h, SettleNight, CreditRest, pasek snu - bez zmian. Pelna noc 21:01-3:00 dalej daje dokladnie baze 6.0 (bez zmian w SleepTick poza flaga).
+- Zmierzch o czasie: zmienia godzine pytania/obozu z rozkazu dla gracza z ok. 21:40 na ok. 20:40 (przy fazie :38); przy fazie :05-:23 bez zmian (tick o 21:05-21:23 - spoznienie <= 0.4 h, w zapasie). Wybor "Later"/"March on" w pytaniu o 20:4x - tej nocy bez drugiego pytania i bez ostrzezenia (jak dotad o 21:40). Trening przed snem 311e: przy otwartym menu treningu zmierzch czeka na swoja godzine (CurrentMenuContext). Ksiega AI nie czyta tych pol - bez zmian (oboz swiata i stawki AI z ticku, spojne same w sobie).
+- Kolizje: `_promptNight`/`_warnNight` dostaja numer nadchodzacej nocy tylko przy zmierzchu o czasie; NightId zwykly bez zmian. ZB-6 (NZB_SKIP), noboz NO-*, sen315a/sen315b - linie zachowuja format (dopisek przed `, noc N.`; nowe pole w linii switu po `sen w menu tak/nie`).
+- W grze sprawdzic: `python -I tools/sprawdz_logi.py --grupa sen316b <log>` (B316-1..4 TAK), `--grupa sen315a` (S315-3 TAK), `--grupa noboz` (NO-5, NO-8, NO-10). Po switach: brak "The column marched 1h through the night"; w trybie 1 linia zmierzchu z dopiskiem 316b i sen od ok. 20:4x.
+
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane).
+
+## 316a - zapas musztry bez strat: nadmiar z Discard wraca do taboru (Armoury)
+
+**Problem.** Jeff 02.11: "jak wrzucam bron aby szybciej sie szkolili, to daj ze moge tylko wrzucic tyle ile potrzebuja, a nie ze mam potem komunikat ze jest lost".
+Log `Armoury-2026-11-01_22-56-32.log` [01:04:28]: `Musztra: zapas - przyjeto 35 szt. (wyrzucone), bez miejsca 56` - 56 sztuk broni/zbroi zniszczonych
+(drugi taki wpis: przyjeto 39, bez miejsca 16). Napis gracza: "... N pieces are lost - no room."
+
+**Przyczyna.** `Armoury/src/Drill.cs` Accept (~1372-1380): zapas zdejmuje z listy tylko to, co miesci sie w limicie (2 x pelny na grupe), reszta zostaje
+na lewej liscie ekranu. Lewa lista Discard to nowa `ItemRoster` z `InventoryScreenHelper.OpenInventoryPresentation` (dekompilacja 1.4.8), ktora po
+`InventoryLogic.DoneLogic` (OnItemsDiscardedByPlayer) przepada - nadmiar gina.
+
+**Zmiana.** Accept: przy zrodle Discard (SrcDiscard) i zolnierzach (men > 0) bron i zbroje bez miejsca schodza z lewej listy i trafiaja do
+`MobileParty.MainParty.ItemRoster` (przeniesienie, nie kopia; prawa lista ekranu to ta sama ItemRoster taboru). Napis: "Your men took N pieces into their
+drill stock; M pieces they do not need went back to your baggage. ..." (dalej jak dotad: stan, "They will take X more ..."). Lup (SrcLoot): bez zmian
+w dzialaniu - lewa lista to lup, ktorego gracz nie wzial (po bitwie setki sztuk; do taboru = przeciazenie wbrew wyborowi gracza), napis zamiast "are lost"
+mowi "stay with the loot you leave behind". Trofea Spoils "Leave" - reszta zostaje na polu (SpoilsSeal, jak dotad). Autotest - reszte zwraca wolajacy (jak dotad).
+Licznik `wrocone do taborow` w linii `Musztra: zapas - przyjeto ...` i w linii dnia `Musztra (gracz): dzien` (obok `bez miejsca`).
+Checker: `python -I tools/sprawdz_logi.py --grupa zapas316a <Armoury-*.log>` (Z316-1 Discard bez strat, Z316-2 licznik w liniach, Z316-3 linia dnia, Z316-4 bledy).
+Podpowiedz "ile jeszcze przyjma" PRZED oddaniem - nie dodana (ekran Discard to zwykly ekwipunek "I": napis przy kazdym otwarciu = szum; wynik i tak mowi "They will take X more").
+
+**Ryzyko / co sprawdzic.**
+- Duplikacja: brak - kazda sztuka jest albo w zapasie (taken), albo z powrotem w taborze (back), albo (poza Discard) na liscie jak dotad; `from` nigdy nie jest taborem (ReferenceEquals).
+- Tryb oszustw: OnDiscarded wychodzi przed Accept (lewa strona 10 sztuk wszystkiego) - nic nie trafia do taboru.
+- Bez zolnierzy (m110-sam, cap 0): toBag wylaczone - wyrzucanie dziala jak w grze (inaczej nie dalo sie nic wyrzucic).
+- Skutek dla gracza: przy czynnym zapasie (DrillStock+DrillLaw+DonationXpOff) broni/zbroi ponad limit nie da sie juz zniszczyc przez Discard - wraca do taboru (sprzedaz dalej dziala). Jedzenie, konie, towary - wyrzucane jak dotad.
+- XP za discard: przy zapasie Z1 i tak 0 (DonationXpLaw) - zdjecie nadmiaru z listy niczego nie zmienia. Inni sluchacze OnItemsDiscardedByPlayer w repo: brak (QuartermasterLaw dziala na flage przy otwarciu).
+- W grze: wyrzucic wiecej broni niz limit -> napis "went back to your baggage", sztuki w taborze, waga taboru wzrasta; log `wrocone do taborow M`, `bez miejsca 0`.
+
+**Status.** DO SPRAWDZENIA
+
 ## 2026-11-01 WGRANIE 153 - noc/315b-noc-21-3 (152 + 315b noc obozu 21-3 bez musztry, 315c sen 6 h wystarczy, bez dosypiania, zapas 0.5 h); Armoury.dll f7f61c4811a8c215e4266fbf26b8c107 (CrashScribe aa32d04e); kopia 152: Armoury.dll.bak-2026-11-01-przed-wgranie153 i D:/Backup-Bannerlord/wgrane/2026-11-01-wgranie153-przed
 
 **Problem:** Jeff 01.11: "trening moze trwac poza nocna czyli od 21 do 3 w noc nie ma treningu"; "sen wystarczy 6 godzin snu nic nie dosypiaja"; "wgrywaj" / "nie testuj ja bede gral".
