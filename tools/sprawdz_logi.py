@@ -92653,6 +92653,919 @@ def main(argv):
     return _bieg320d_main_prev(argv)
 
 
+
+# ---- paczka 322a: grupa dworzanie322a - kiesy dworzan BK do kasy stolicy (audyt ekonomii 03.11, wyciek 1) i pojedyncze doby z ubytkiem ksiegi ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa dworzanie322a <Armoury-*.log>. Segment "| kiesy dworzan BK (322a)" linii "BK i Diplomacy (E5/A8): dzien N"
+# (BkDipGold 7) i reszta R linii "Pieniadz swiata (bilans - przyczyny)" (NKS_REST). Dowod: log 2026-11-03_00-19-16 - R 109215 -45 608 przy DrainGold 45 681,
+# 109222 -62 599 przy 62 347, 109229 -17 864, 109243 -22 412 - tygodniowe skoki chowaly sie w sredniej 28 dob.
+# D322-S  self-test wyrazen i test syntetyczny;
+# D322-0  segment 322a w liniach E5/A8 (bez segmentu - DLL sprzed 322a - INFO);
+# D322-1  BK zdjal = kasy stolic + skarbce krolestw + wrocilo dworzanom (+ zniklo przy kluczu wylaczonym) w kazdej dobie;
+# D322-2  doby z oproznionymi kiesami przy kluczu TAK: |R| <= 15 000 (dotad R = -zdjete);
+# D322-3  OSTRZEZENIE: pojedyncza doba z niewyjasnionym ubytkiem ksiegi (R < -15 000) - NIE z lista dob (srednia 28 dob tego nie pokazuje);
+# D322-4  zniklo przy kluczu wylaczonym (INFO).
+D322_RX = re.compile(r"\| kiesy dworzan BK \(322a\)(?P<off> WYLACZONE \([^)]*\))?: oproznionych (?P<n>\d+), BK zdjal (?P<paid>\d+) -> kasy stolic (?P<town>\d+) "
+                     r"\((?P<tn>\d+)\), skarbce krolestw (?P<crown>\d+) \((?P<cn>\d+)\), wrocilo dworzanom (?P<back>\d+) \((?P<bn>\d+)\)"
+                     r"(?:, zniklo \(klucz wylaczony\) (?P<gone>\d+) \((?P<gn>\d+)\))?")
+D322_DAY = re.compile(r"^BK i Diplomacy \(E5/A8\): dzien (?P<day>-?\d+) ")
+D322_LOSS = 15000
+
+
+def dworzanie322a_collect(logp):
+    D = {"a8": {}, "noseg": 0, "rest": {}}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            s = ln.rstrip("\r\n")
+            mt = TS.match(s)
+            s = mt.group(2) if mt else s
+            if s.startswith("Pieniadz swiata (bilans - przyczyny): dzien"):
+                m = NKS_REST.search(s)
+                if m:
+                    D["rest"][int(m.group("day"))] = int(m.group("r"))
+                continue
+            md = D322_DAY.match(s)
+            if not md:
+                continue
+            m = D322_RX.search(s)
+            if not m:
+                D["noseg"] += 1
+                continue
+            D["a8"][int(md.group("day"))] = m
+    return D
+
+
+def dworzanie322a_rows(rep, D):
+    A, R = D["a8"], D["rest"]
+    g = lambda m, k: int(m.group(k) or 0)
+    rep.add("D322-0: segment 'kiesy dworzan BK (322a)' w liniach E5/A8", f"z segmentem {len(A)}, bez {D['noseg']}",
+            "bez 0 (DLL sprzed 322a - INFO)", None if not A else D["noseg"] == 0)
+    if A:
+        bad = [d for d, m in sorted(A.items()) if g(m, "paid") != g(m, "town") + g(m, "crown") + g(m, "back") + g(m, "gone")]
+        rep.add("D322-1: BK zdjal = kasy stolic + skarbce krolestw + wrocilo + zniklo (kazda doba)",
+                f"zdjete {sum(g(m, 'paid') for m in A.values())} -> kasy stolic {sum(g(m, 'town') for m in A.values())}, skarbce {sum(g(m, 'crown') for m in A.values())}, "
+                f"wrocilo {sum(g(m, 'back') for m in A.values())}, zniklo {sum(g(m, 'gone') for m in A.values())}; dob niezgodnych {len(bad)}" + (f" ({bad[:6]})" if bad else ""),
+                "niezgodnych 0", not bad)
+        ev = [d for d, m in sorted(A.items()) if g(m, "n") > 0 and not m.group("off") and d in R]
+        if ev:
+            hi = [d for d in ev if abs(R[d]) > D322_LOSS]
+            rep.add("D322-2: reszta R w dobach z oproznionymi kiesami dworzan (klucz TAK)",
+                    f"dob {len(ev)}: " + ", ".join(f"{d} R {R[d]:+d} (zdjete {g(A[d], 'paid')})" for d in ev[:6]) + f"; |R| > {D322_LOSS}: {len(hi)}",
+                    f"|R| <= {D322_LOSS} (dotad R = -zdjete)", not hi)
+        else:
+            rep.add("D322-2: reszta R w dobach z oproznionymi kiesami dworzan", "brak takich dob (BK oproznia raz na tydzien)", "INFO", None)
+        gone = sum(g(m, "gone") for m in A.values())
+        rep.add("D322-4: zniklo przy kluczu wylaczonym", str(gone), "INFO (klucz Courtiers' Gold Stays In The Realm)", None)
+    else:
+        rep.add("D322-1: bilans kies dworzan", "brak segmentu 322a", "INFO", None)
+    if R:
+        big = [(d, r) for d, r in sorted(R.items()) if r < -D322_LOSS]
+        rep.add(f"D322-3: OSTRZEZENIE - pojedyncza doba z niewyjasnionym ubytkiem ksiegi > {D322_LOSS} (reszta R)",
+                f"dob {len(R)}, z ubytkiem > {D322_LOSS}: {len(big)}" + ("".join(f"; {d} R {r:+d}" + (f" (dworzanie BK {g(A[d], 'paid')})" if d in A and g(A[d], 'n') else "")
+                                                                                 for d, r in big[:8])),
+                f"0 (inaczej NIE - sprawdz zrodlo skoku; srednia 28 dob go nie pokaze)", not big)
+    else:
+        rep.add(f"D322-3: pojedyncza doba z ubytkiem ksiegi > {D322_LOSS}", "brak linii 'Pieniadz swiata (bilans - przyczyny)'", "INFO", None)
+
+
+def d322_a8(day, n, paid, town, crown=0, back=0, off=False, gone=0):
+    s = (f"BK i Diplomacy (E5/A8): dzien {day} | ugoda z grupa interesu BK (FinancialCompromise): 0, platnicy zaplacili 0 (gracz 0)"
+         f" | kiesy dworzan BK (322a){' WYLACZONE (Courtiers' + chr(39) + ' Gold Stays In The Realm)' if off else ''}: oproznionych {n}, BK zdjal {paid} -> kasy stolic {town} "
+         f"({1 if town else 0}), skarbce krolestw {crown} ({1 if crown else 0}), wrocilo dworzanom {back} ({1 if back else 0})")
+    if gone:
+        s += f", zniklo (klucz wylaczony) {gone} ({n})"
+    return s + " | kontrola (prog 0): stos paktow przepelniony 0, otwarte okna paktow 0."
+
+
+def d322_rest(day, r):
+    return f"Pieniadz swiata (bilans - przyczyny): dzien {day} | zmiana sumy {r:+d} [P] = zrodla +10 - ujscia 10 + netto +0 + reszta {r:+d} [R] | ZRODLA"
+
+
+def dworzanie322a_selftest():
+    m = D322_RX.search(d322_a8(5, 4, 45681, 45681))
+    if not m or m.group("paid") != "45681" or m.group("off"):
+        return "D322_RX nie czyta segmentu"
+    m = D322_RX.search(d322_a8(5, 2, 100, 0, off=True, gone=100))
+    if not m or not m.group("off") or m.group("gone") != "100":
+        return "D322_RX nie czyta segmentu WYLACZONE"
+    r = NKS_REST.search(d322_rest(7, -45608))
+    if not r or r.group("r") != "-45608":
+        return "NKS_REST nie czyta reszty"
+    return None
+
+
+def dworzanie322a_synth():
+    """D322-S2: dobry (dworzanie do kasy, R maly), stary DLL ze skokiem (bez segmentu, R -45 608), niezgodny, wylaczony, pusty. None = OK."""
+    import tempfile
+    import shutil
+    runs = {
+        "good": [d322_a8(1, 0, 0, 0), d322_rest(1, -300), d322_a8(2, 4, 45681, 45000, crown=681), d322_rest(2, 210)],
+        "old": [d322_rest(1, -273), d322_rest(2, -45608), "BK i Diplomacy (E5/A8): dzien 2 | ugoda z grupa interesu BK (FinancialCompromise): 0 | kontrola (prog 0): x."],
+        "bad": [d322_a8(2, 3, 62347, 60000), d322_rest(2, -2347)],
+        "off": [d322_a8(2, 2, 17519, 0, off=True, gone=17519), d322_rest(2, -17864)],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"D322-0": "TAK", "D322-1": "TAK", "D322-2": "TAK", "D322-3": "TAK", "D322-4": "INFO"},
+        "old": {"D322-0": "INFO", "D322-1": "INFO", "D322-3": "NIE"},
+        "bad": {"D322-0": "TAK", "D322-1": "NIE", "D322-3": "TAK"},
+        "off": {"D322-1": "TAK", "D322-2": "INFO", "D322-3": "NIE"},
+        "empty": {"D322-0": "INFO", "D322-1": "INFO", "D322-3": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="d322_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            dworzanie322a_rows(rep, dworzanie322a_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def dworzanie322a_main(logp):
+    rep = Report()
+    s1 = dworzanie322a_selftest()
+    rep.add("D322-S: self-test wyrazen (segment 322a, reszta R)", s1 or "OK", "OK", s1 is None)
+    try:
+        s2 = dworzanie322a_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("D322-S2: test syntetyczny (dobry, stary DLL ze skokiem, niezgodny, wylaczony, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("D322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = dworzanie322a_collect(logp)
+    print(f"plik: {logp} | linii E5/A8 z segmentem 322a {len(D['a8'])}, bez {D['noseg']}, dob z reszta R {len(D['rest'])}")
+    dworzanie322a_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_dworzanie322a_main_prev = main
+
+
+def main(argv):
+    # paczka 322a: grupa dworzanie322a - opakowanie main jak bieg320d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "dworzanie322a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return dworzanie322a_main(rest[0] if rest else None)
+    return _dworzanie322a_main_prev(argv)
+
+
+# ---- paczka 322b: grupa budowy322b - pomiar pieniadza w podkrokach TownFolk.DaWorksRun (audyt ekonomii 03.11, wyciek 5) ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa budowy322b <Armoury-*.log>. Linia 'Budowy - pomiar (322b): dzien N' (TownFolk.Pomiar322b.cs, zaraz po DaWorksRun)
+# i krok 'Mark budowy' linii 'Odcinki ticku - bisekcja (f19-e1): dzien N' tej samej doby. Sam pomiar - zadnej zmiany logiki.
+# Dowod: Armoury-2026-11-03_00-19-16.log - krok 'Mark budowy' bisekcji ujemny 41/41 dob (-180..-368), sesja -11613; kontrolki DaWorksRun 0.
+# P322-S  self-test wyrazen (linia 322b i krok 'Mark budowy' bisekcji);
+# P322-S2 test syntetyczny (zgodny, rozjazd z bisekcja, potkniecia, stary DLL, pusty);
+# P322-0  linia 322b przy kazdej linii bisekcji (bisekcja bez 322b - DLL sprzed 322b - NIE);
+# P322-1  potkniecia pomiaru 0;
+# P322-2  'DaWorksRun swiat' = krok 'Mark budowy' bisekcji tej doby (ten sam przeglad posiadaczy - pomiar mierzy wlasciwe miejsce);
+# P322-3  tozsamosc linii: swiat = zloto swiata - nazwane i suma reszt podkrokow + poza dotknietymi = swiat;
+# P322-4  WYNIK: gdzie reszta - suma sesji wedlug podkroku (reszta w dotknietych), poza dotknietymi z probkami swiata i posiadaczami; reszta 0 - TAK,
+#         inaczej DECYZJA (miejsce znalezione - poprawka osobnym krokiem);
+# P322-5  latki Harmony na zloto (INFO) i czas pomiaru (najwiecej 50 ms na dobe).
+P322_RX = re.compile(
+    r"^Budowy - pomiar \(322b\): dzien (\d+) \| DaWorksRun swiat ([+-]\d+) \(zloto swiata ([+-]\d+) - pozycje nazwane ([+-]\d+); = krok 'Mark budowy' bisekcji f19-e1\) "
+    r"\| reszta pojawia sie: (.*?) \| podkroki \(reszta = zmiana dotknietych w swiecie - pozycje nazwane\): (.*?) \| suma reszt podkrokow ([+-]\d+), poza dotknietymi ([+-]\d+) "
+    r"\| posiadacze \(swiat wobec zmierzonego w podkrokach\): (.*?) \| dotkniete poza swiatem ([+-]\d+): pan Dead/Disabled (\d+), pan zywy poza Hero\.AllAliveHeroes (\d+) "
+    r"\(([+-]\d+)\), kiesa ludu poza lista posiadaczy (\d+) \(([+-]\d+)\) \| sesja \((\d+) dob\): (.*?) \| latki na zloto: (.*) \| czas ([\d.]+) ms \| potkniecia (\d+) "
+    r"\(sesja (\d+)\)\.$")
+P322_G = {k: i + 1 for i, k in enumerate(("day", "world", "dw", "dn", "where", "steps", "ssum", "unexpl", "gaps", "outside", "gone", "heroOff", "heroOffG",
+                                            "folkOff", "folkOffG", "days", "sess", "patches", "ms", "stum", "stumS"))}
+P322_STEP_RX = re.compile(
+    r"(zakup materialu \(DsWorksBuy\)|zaplata wsi \(DaPayVillage\)|zaplata ludu miasta \(DaPayTown\)|danina od skarbca wsi \(DaVillageDue\)): wywolan (\d+) "
+    r"\(zloto ruszone (\d+)\), placacy -(\d+), kasy osad \+(\d+), kiesy ludu \+(\d+), bohaterowie \+(\d+), nazwane ([+-]\d+), reszta ([+-]\d+) "
+    r"\(wywolan z reszta (\d+)\), probki swiata (\d+) \(przegladow (\d+)\): swiat ([+-]\d+) / dotkniete ([+-]\d+) / poza ([+-]\d+)")
+P322_STEPS = ("zakup materialu (DsWorksBuy)", "zaplata wsi (DaPayVillage)", "zaplata ludu miasta (DaPayTown)", "danina od skarbca wsi (DaVillageDue)")
+P322_BIS_RX = re.compile(r"^Odcinki ticku - bisekcja \(f19-e1\): dzien (\d+) \| budowy \(od Mark renty do Mark budowy\) [+-]\d+: (.*?) \(zgodne z odcinkiem")
+P322_MB_RX = re.compile(r"(?:^|, )Mark budowy ([+-]\d+)")
+
+
+def p322_step(name, calls=10, moved=3, out=900, cset=600, folk=300, hero=0, named=0, res=0, resn=0, smp=3, pre=8, sw=0, sl=0):
+    return (f"{name}: wywolan {calls} (zloto ruszone {moved}), placacy -{out}, kasy osad +{cset}, kiesy ludu +{folk}, bohaterowie +{hero}, nazwane {named:+d}, "
+            f"reszta {res:+d} (wywolan z reszta {resn}), probki swiata {smp} (przegladow {pre}): swiat {sw:+d} / dotkniete {sl:+d} / poza {sw - sl:+d}")
+
+
+def p322_line(day, steps=None, world=None, dn=0, where="brak reszty", gaps="zgodne", stum=0, ms="3.2",
+              patches="Hero.ChangeHeroGold: bez latek; Hero.Gold (set): bez latek; SettlementComponent.ChangeGold: bez latek; SettlementComponent.Gold (set): bez latek"):
+    """Linia jak TownFolk.P2End; steps - lista 4 napisow p322_step; world - reszta DaWorksRun (domyslnie suma reszt podkrokow)."""
+    if steps is None:
+        steps = [p322_step(n) for n in P322_STEPS]
+    ssum = sum(int(P322_STEP_RX.search(s).group(9)) for s in steps)
+    if world is None:
+        world = ssum
+    unexpl = world - ssum
+    return (f"Budowy - pomiar (322b): dzien {day} | DaWorksRun swiat {world:+d} (zloto swiata {world + dn:+d} - pozycje nazwane {dn:+d}; = krok 'Mark budowy' bisekcji "
+            f"f19-e1) | reszta pojawia sie: {where} | podkroki (reszta = zmiana dotknietych w swiecie - pozycje nazwane): {'; '.join(steps)} | suma reszt podkrokow "
+            f"{ssum:+d}, poza dotknietymi {unexpl:+d} | posiadacze (swiat wobec zmierzonego w podkrokach): {gaps} | dotkniete poza swiatem +0: pan Dead/Disabled 0, "
+            f"pan zywy poza Hero.AllAliveHeroes 0 (+0), kiesa ludu poza lista posiadaczy 0 (+0) | sesja (1 dob): swiat {world:+d}, poza dotknietymi {unexpl:+d}, "
+            f"reszty: - | latki na zloto: {patches} | czas {ms} ms | potkniecia {stum} (sesja {stum}).")
+
+
+def p322_bis(day, mb):
+    return (f"Odcinki ticku - bisekcja (f19-e1): dzien {day} | budowy (od Mark renty do Mark budowy) {mb:+d}: Mark kiesa ludu +0, po WarFront.Daily +0, "
+            f"po BuildFunding.Daily +0, Mark budowy {mb:+d} (zgodne z odcinkiem linii przyczyn: tak) | po paserze (od Mark paser band do konca bloku) +0: "
+            f"koniec bloku (do MoneyLedger.Daily) +0 (zgodne z odcinkiem linii przyczyn: tak) | sesja (1 dob) - kroki o najwiekszej reszcie: brak | granic 9 "
+            f"(ponad limit 0), czas 1.0 ms.")
+
+
+def budowy322b_selftest():
+    st = [p322_step(P322_STEPS[0]), p322_step(P322_STEPS[1]), p322_step(P322_STEPS[2], res=-5, resn=2),
+          p322_step(P322_STEPS[3], res=-300, resn=40, sw=-2, sl=-1)]
+    s = p322_line(109250, st, world=-310, dn=-7, where="podkrok danina od skarbca wsi (DaVillageDue) (w dotknietych posiadaczach -300)")
+    m = P322_RX.match(s)
+    if not m:
+        return "linia 322b nie czytana"
+    g = lambda k: m.group(P322_G[k])
+    if (g("day"), g("world"), g("dw"), g("dn"), g("ssum"), g("unexpl"), g("stum")) != ("109250", "-310", "-317", "-7", "-305", "-5", "0"):
+        return f"pola: {m.groups()[:8]}"
+    ps = P322_STEP_RX.findall(g("steps"))
+    if len(ps) != 4 or ps[3][0] != P322_STEPS[3] or ps[3][8] != "-300" or ps[3][14] != "-1":
+        return f"podkroki: {ps}"
+    b = P322_BIS_RX.match(p322_bis(109250, -310))
+    if not b or P322_MB_RX.findall(b.group(2))[-1] != "-310":
+        return "bisekcja: krok 'Mark budowy' nie czytany"
+    return None
+
+
+def budowy322b_collect(logp):
+    D = {"p": {}, "b": {}, "bad": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            s = ln.rstrip("\r\n")
+            mt = TS.match(s)
+            s = mt.group(2) if mt else s
+            if s.startswith("Budowy - pomiar (322b)"):
+                m = P322_RX.match(s)
+                if not m:
+                    D["bad"] += 1
+                    continue
+                D["p"][int(m.group(1))] = m
+            elif s.startswith("Odcinki ticku - bisekcja (f19-e1)"):
+                b = P322_BIS_RX.match(s)
+                if b:
+                    mb = P322_MB_RX.findall(b.group(2))
+                    if mb:
+                        D["b"][int(b.group(1))] = int(mb[-1])
+    return D
+
+
+def budowy322b_rows(rep, D):
+    P, B = D["p"], D["b"]
+    G = P322_G
+    gi = lambda m, k: int(m.group(G[k]))
+    n0 = "P322-0: linia 322b przy kazdej linii bisekcji"
+    miss = sorted(d for d in B if d not in P)
+    if not P and not B:
+        rep.add(n0, f"brak linii 322b i bisekcji (zlych linii 322b {D['bad']})", "INFO (klucz Ledger Segment Bisect Log wylaczony albo log bez doby)", None if not D["bad"] else False)
+    else:
+        rep.add(n0, f"linii 322b {len(P)}, bisekcji {len(B)}, bisekcja bez 322b {len(miss)}{' ' + str(miss[:5]) if miss else ''}, zlych linii 322b {D['bad']}",
+                "bisekcja bez 322b 0, zlych 0 (DLL sprzed 322b - NIE)", not miss and D["bad"] == 0)
+    L = [P[d] for d in sorted(P)]
+    stum = sum(gi(m, "stum") for m in L)
+    rep.add("P322-1: potkniecia pomiaru", str(stum), "0", None if not L else stum == 0)
+    n2 = "P322-2: 'DaWorksRun swiat' = krok 'Mark budowy' bisekcji tej doby"
+    pair = [(d, gi(P[d], "world"), B[d]) for d in sorted(P) if d in B]
+    if pair:
+        bad = [x for x in pair if x[1] != x[2]]
+        rep.add(n2, f"dob w parze {len(pair)}, rozjazdow {len(bad)}" + "".join(f"; [dzien {d}: 322b {w:+d}, bisekcja {b:+d}]" for d, w, b in bad[:4]),
+                "rozjazdow 0", not bad)
+    else:
+        rep.add(n2, "brak dob w parze", "INFO", None)
+    n3 = "P322-3: tozsamosc linii (swiat = zloto - nazwane; podkroki + poza = swiat)"
+    if L:
+        bad = []
+        for m in L:
+            ps = P322_STEP_RX.findall(m.group(G["steps"]))
+            ss = sum(int(p[8]) for p in ps)
+            if (gi(m, "world") != gi(m, "dw") - gi(m, "dn") or gi(m, "ssum") + gi(m, "unexpl") != gi(m, "world") or ss != gi(m, "ssum") or len(ps) != 4):
+                bad.append(gi(m, "day"))
+        rep.add(n3, f"dob {len(L)}, niespojnych {len(bad)}{' ' + str(bad[:5]) if bad else ''}", "niespojnych 0", not bad)
+    else:
+        rep.add(n3, "brak linii 322b", "INFO", None)
+    n4 = "P322-4: WYNIK - gdzie reszta odcinka 'budowy'"
+    if L:
+        tot = sum(gi(m, "world") for m in L)
+        une = sum(gi(m, "unexpl") for m in L)
+        st = {n: [0, 0, 0, 0] for n in P322_STEPS}      # reszta w dotknietych, dob z reszta, probki, poza w probkach
+        for m in L:
+            for p in P322_STEP_RX.findall(m.group(G["steps"])):
+                a = st[p[0]]
+                a[0] += int(p[8]); a[1] += 1 if int(p[8]) != 0 else 0; a[2] += int(p[10]); a[3] += int(p[14])
+        neg = sum(1 for m in L if gi(m, "world") < 0)
+        pos = sum(1 for m in L if gi(m, "world") > 0)
+        gapn = {}
+        for m in L:
+            gs = m.group(G["gaps"])
+            if gs != "zgodne":
+                for part in re.findall(r"([^,(]+?) [+-]\d+ \(zmierzone [+-]\d+, poza ([+-]\d+)\)", gs):
+                    gapn[part[0].strip()] = gapn.get(part[0].strip(), 0) + int(part[1])
+        heroOff = sum(gi(m, "heroOffG") for m in L)
+        folkOff = sum(gi(m, "folkOffG") for m in L)
+        txt = (f"dob {len(L)} (swiat -: {neg}, +: {pos}), DaWorksRun razem {tot:+d}, w dotknietych {tot - une:+d}, poza dotknietymi {une:+d}; podkroki: "
+               + "; ".join(f"{n} {a[0]:+d} (dob z reszta {a[1]}, probki {a[2]}, poza w probkach {a[3]:+d})" for n, a in st.items())
+               + f"; posiadacze poza zmierzonym: {', '.join(f'{k} {v:+d}' for k, v in sorted(gapn.items(), key=lambda kv: -abs(kv[1]))) or 'brak'}"
+               + f"; pan zywy poza AllAliveHeroes {heroOff:+d}, kiesa ludu poza lista {folkOff:+d}; ostatnia doba: {L[-1].group(G['where'])}")
+        rep.add(n4, txt, "reszta 0 (inaczej DECYZJA - miejsce wskazane wyzej, poprawka osobnym krokiem)", tot == 0, decide=True)
+    else:
+        rep.add(n4, "brak linii 322b", "INFO", None)
+    if L:
+        mx = max(float(m.group(G["ms"])) for m in L)
+        rep.add("P322-5: latki na zloto (INFO) i czas pomiaru", f"czas najwiecej {mx:.1f} ms; latki: {L[-1].group(G['patches'])}", "czas <= 50 ms", mx <= 50.0)
+    else:
+        rep.add("P322-5: latki na zloto (INFO) i czas pomiaru", "brak linii 322b", "INFO", None)
+
+
+def budowy322b_synth():
+    """P322-S2: zgodny (reszta w danine), rozjazd z bisekcja, potkniecia, stary DLL, pusty. None = OK."""
+    import tempfile
+    import shutil
+    due = [p322_step(n) for n in P322_STEPS[:3]] + [p322_step(P322_STEPS[3], res=-300, resn=40)]
+    runs = {
+        "good": [p322_line(1, due, where="podkrok danina od skarbca wsi (DaVillageDue) (w dotknietych posiadaczach -300)"), p322_bis(1, -300),
+                 p322_line(2), p322_bis(2, 0)],
+        "zero": [p322_line(1), p322_bis(1, 0)],
+        "split": [p322_line(1, due), p322_bis(1, -250)],
+        "stum": [p322_line(1, stum=2), p322_bis(1, 0)],
+        "old": [p322_bis(1, -300)],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"P322-0": "TAK", "P322-1": "TAK", "P322-2": "TAK", "P322-3": "TAK", "P322-4": "DECYZJA", "P322-5": "TAK"},
+        "zero": {"P322-2": "TAK", "P322-4": "TAK"},
+        "split": {"P322-2": "NIE", "P322-3": "TAK"},
+        "stum": {"P322-1": "NIE"},
+        "old": {"P322-0": "NIE", "P322-1": "INFO", "P322-2": "INFO", "P322-4": "INFO"},
+        "empty": {"P322-0": "INFO", "P322-1": "INFO", "P322-2": "INFO", "P322-3": "INFO", "P322-4": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="p322_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            budowy322b_rows(rep, budowy322b_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def budowy322b_main(logp):
+    rep = Report()
+    s1 = budowy322b_selftest()
+    rep.add("P322-S: self-test wyrazen (linia 322b, krok 'Mark budowy' bisekcji)", s1 or "OK", "OK", s1 is None)
+    try:
+        s2 = budowy322b_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("P322-S2: test syntetyczny (zgodny, rozjazd, potkniecia, stary DLL, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("P322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = budowy322b_collect(logp)
+    print(f"plik: {logp} | linii 322b {len(D['p'])}, bisekcji {len(D['b'])}, zlych 322b {D['bad']}")
+    budowy322b_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_budowy322b_main_prev = main
+
+
+def main(argv):
+    # paczka 322b: grupa budowy322b - opakowanie main jak bieg320d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "budowy322b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return budowy322b_main(rest[0] if rest else None)
+    return _budowy322b_main_prev(argv)
+
+
+# ------------------------------------------------------------ zboze322c (322c, Jeff 03.11 "3 - ok": zboze zima - wsie sprzedaja zboze ze spichlerza na polke miasta; Armoury/src/TownGranary.Zima322.cs)
+Z322_RX = re.compile(
+    r"Zboze zima \(322c\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|[A-Z][^|]*?) \| zima (?P<win>TAK|NIE) \(do konca (?P<left>\d+) dni; wies rozklada zapas ponad rezerwe na (?P<spread>\d+) dni\)"
+    r" \| rezerwa wsi (?P<keep>\d+) dni .*?\| miast (?P<towns>\d+) \(oblezone \d+, Innych \d+, poza ZC4 (?P<noks>\d+)\)"
+    r" \| z sygnalem (?P<sig>\d+) \(.*?\) \| chcialy (?P<want>\d+) szt\. \| na polki dzis (?P<pcs>\d+) szt\. zboza \((?P<rat>[\d.]+) racji, racji na sztuke srednio (?P<rpp>[\d.]+|-);"
+    r".*? z (?P<vills>\d+) wsi do (?P<ftowns>\d+) miast \| zloto miasto->wies (?P<gold>\d+) zl \(cena srednio (?P<price>[\d.]+|-) zl/szt\. bez pulapu, sztuka po sztuce w dol krzywej polki;"
+    r" pierwsza sztuka srednio (?P<p0>[\d.]+|-) zl, ostatnia srednio (?P<p1>[\d.]+|-) zl; wartosc (?P<val>\d+) zl\)"
+    r".*?\| polka po dostawie \(dni popytu, z KS-H\): mediana (?P<shelf>[\d.]+|-)"
+    r" \| kontrola: racje zdjete (?P<rtk>[\d.]+) = ubytek stodol wsi (?P<rdrop>-?[\d.]+); polki \+(?P<shin>-?\d+) = sztuki (?P<pcs2>\d+)"
+    r"; zloto: kasy miast -(?P<tout>-?\d+), kiesy wsi \+(?P<vin>-?\d+), zaplata (?P<pay>\d+)"
+    r".*?\| potkniecia (?P<stum>\d+) \(razem (?P<stall>\d+)\) \| czas (?P<ms>[\d.]+) ms\.")
+
+
+def zboze322c_collect(logp):
+    D = {"L": [], "bad": 0, "off": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            s = ln.rstrip("\r\n")
+            mt = TS.match(s)
+            s = mt.group(2) if mt else s
+            if not s.startswith("Zboze zima (322c):"):
+                continue
+            if "WYLACZONE" in s:
+                D["off"] += 1
+                continue
+            m = Z322_RX.search(s)
+            if m:
+                D["L"].append(m)
+            else:
+                D["bad"] += 1
+    return D
+
+
+def zboze322c_rows(rep, D):
+    L = D["L"]
+    if not L and not D["bad"]:
+        rep.add("Z322-0: linie 'Zboze zima (322c)' co dobe", f"brak linii (wylaczone {D['off']})", "INFO (klucz Winter Grain To Market albo DLL sprzed 322c)", None)
+    else:
+        rep.add("Z322-0: linie 'Zboze zima (322c)' co dobe", f"linii {len(L)}, nieczytelnych {D['bad']}", "nieczytelnych 0", D["bad"] == 0)
+    if not L:
+        for n in ("Z322-1: potkniecia", "Z322-2: racje zdjete = ubytek stodol wsi", "Z322-3: polki + = sztuki", "Z322-4: zloto kasy miast = zaplata = kiesy wsi",
+                  "Z322-5: zima i CZYNNE - zboze trafia na polki", "Z322-6: czas doby"):
+            rep.add(n, "brak linii", "INFO", None)
+        return
+    st = max(int(m.group("stall")) for m in L)
+    rep.add("Z322-1: potkniecia", f"razem {st} (najwiecej w dobie {max(int(m.group('stum')) for m in L)})", "0", st == 0)
+    badr = [m for m in L if abs(float(m.group("rtk")) - float(m.group("rdrop"))) > max(1.0, 0.001 * float(m.group("rtk")))]
+    rep.add("Z322-2: racje zdjete = ubytek stodol wsi", f"dob niezgodnych {len(badr)}" + "".join(f"; [d{m.group('day')} {m.group('rtk')} / {m.group('rdrop')}]" for m in badr[:3]),
+            "0 (roznica <= 0.1% albo 1 racja)", not badr)
+    bads = [m for m in L if int(m.group("shin")) != int(m.group("pcs2")) or int(m.group("pcs2")) != int(m.group("pcs"))]
+    rep.add("Z322-3: polki + = sztuki", f"dob niezgodnych {len(bads)}" + "".join(f"; [d{m.group('day')} +{m.group('shin')} / {m.group('pcs2')}]" for m in bads[:3]),
+            "0 (towar nie z niczego i nie w nicosc)", not bads)
+    badg = [m for m in L if not (int(m.group("tout")) == int(m.group("pay")) == int(m.group("vin")) == int(m.group("gold")))]
+    rep.add("Z322-4: zloto kasy miast = zaplata = kiesy wsi", f"dob niezgodnych {len(badg)}" + "".join(f"; [d{m.group('day')} -{m.group('tout')} / {m.group('pay')} / +{m.group('vin')}]" for m in badg[:3]),
+            "0 (nic z niczego)", not badg)
+    act = [m for m in L if m.group("state") == "CZYNNE" and m.group("win") == "TAK" and int(m.group("sig")) > 0]
+    n5 = "Z322-5: zima i CZYNNE - zboze trafia na polki"
+    if act:
+        fed = [m for m in act if int(m.group("pcs")) > 0]
+        rep.add(n5, f"dob z sygnalem {len(act)}, z dostawa {len(fed)}; sztuk {sum(int(m.group('pcs')) for m in act)} z chcianych {sum(int(m.group('want')) for m in act)}",
+                ">= 1 doba z dostawa (inaczej DECYZJA - wsie na rezerwie albo bez nadwyzki kas)", len(fed) > 0, decide=True)
+    else:
+        rep.add(n5, "brak dob zimy z sygnalem przy CZYNNE", "INFO", None)
+    ms = sorted(float(m.group("ms")) for m in L)
+    med = ms[(len(ms) - 1) // 2]
+    rep.add("Z322-6: czas doby", f"mediana {med:.1f} ms, najwiecej {ms[-1]:.1f} ms", "mediana <= 10 ms", med <= 10.0)
+    # recenzja 322c: tylko zima - poza zima (zima NIE albo POZA ZIMA) ani sztuki, ani zlota
+    offs = [m for m in L if m.group("win") == "NIE" or m.group("state").startswith("POZA ZIMA")]
+    leak = [m for m in offs if int(m.group("pcs")) > 0 or int(m.group("gold")) > 0]
+    if offs:
+        rep.add("Z322-8: poza zima nic", f"dob poza zima {len(offs)}, z dostawa {len(leak)}" + "".join(f"; [d{m.group('day')} {m.group('pcs')} szt.]" for m in leak[:3]),
+                "0 (zboze ze spichlerzy tylko w zimie)", not leak)
+    else:
+        rep.add("Z322-8: poza zima nic", "brak dob poza zima", "INFO", None)
+    # recenzja 322c: cena od polki bez pulapu - sztuka po sztuce w dol krzywej (ostatnia sztuka nie drozsza od pierwszej), srednia miedzy nimi
+    pw = [m for m in L if m.group("p0") != "-" and m.group("p1") != "-" and m.group("price") != "-"]
+    badp = [m for m in pw if float(m.group("p1")) > float(m.group("p0")) + 0.05]
+    if pw:
+        rep.add("Z322-9: cena w dol krzywej polki (ostatnia <= pierwsza)", f"dob z dostawa {len(pw)}, niezgodnych {len(badp)}"
+                + "".join(f"; [d{m.group('day')} {m.group('p0')} -> {m.group('p1')}]" for m in badp[:3]), "0", not badp)
+    else:
+        rep.add("Z322-9: cena w dol krzywej polki (ostatnia <= pierwsza)", "brak dob z dostawa", "INFO", None)
+    pr = [float(m.group("price")) for m in L if m.group("price") != "-"]
+    sh = [float(m.group("shelf")) for m in L if m.group("shelf") != "-"]
+    rp = [float(m.group("rpp")) for m in L if m.group("rpp") != "-"]
+    last = L[-1]
+    rep.add("Z322-7: sumy (INFO)",
+            f"dob {len(L)}; sztuk {sum(int(m.group('pcs')) for m in L)}, racji {sum(float(m.group('rat')) for m in L):.0f}, zlota {sum(int(m.group('gold')) for m in L)}; "
+            f"cena srednio {(sum(pr) / len(pr)) if pr else 0:.1f} zl/szt. bez pulapu (wartosc {last.group('val')}); racji na sztuke {(sum(rp) / len(rp)) if rp else 0:.1f}; "
+            f"polka po dostawie mediana dni {(sorted(sh)[(len(sh) - 1) // 2]) if sh else 0:.2f}; ostatnia doba: z sygnalem {last.group('sig')}, wsi {last.group('vills')}, miast {last.group('ftowns')}, "
+            f"poza ZC4 {last.group('noks')}, rezerwa {last.group('keep')} dni, rozlozenie {last.group('spread')} dni", "INFO", None)
+
+
+def z322_line(pcs=120, rat="60000", drop="60000", shin=120, gold=3600, tout=3600, vin=3600, stum=0, stall=0, win="TAK", state="CZYNNE", sig=20, ms="2.5", p0="40", p1="22"):
+    return (f"Zboze zima (322c): dzien 109300 | {state} | zima {win} (do konca 1700 dni; wies rozklada zapas ponad rezerwe na 1700 dni) | rezerwa wsi 455 dni wlasnej potrzeby "
+            f"(klucz 455, bramka krainy 455) | miast 97 (oblezone 0, Innych 0, poza ZC4 48) | z sygnalem {sig} (polka < 0.5 dnia popytu 20, indeks >= 5.0 19; polka pelna do celu 0, "
+            f"bez kasy 1, bez wsi z zapasem 0, bez wyceny 0) | chcialy 900 szt. | na polki dzis {pcs} szt. zboza ({rat} racji, racji na sztuke srednio 500.0; sigma 37, kg sztuki 10) z 30 wsi do 12 miast "
+            f"| zloto miasto->wies {gold} zl (cena srednio 30.0 zl/szt. bez pulapu, sztuka po sztuce w dol krzywej polki; pierwsza sztuka srednio {p0} zl, ostatnia srednio {p1} zl; wartosc 10 zl) | wsie: na rezerwie 3, bez rachunku KS (kcal racji) 0, "
+            f"bez migawki doby/glod/bez spichlerza 2, ponizej sztuki dzis 0 | polka po dostawie (dni popytu, z KS-H): mediana 0.80 | kontrola: racje zdjete {rat} = ubytek stodol wsi {drop}; "
+            f"polki +{shin} = sztuki {pcs}; zloto: kasy miast -{tout}, kiesy wsi +{vin}, zaplata {gold}; od wczytania 120 szt., 60000 racji, 3600 zl | potkniecia {stum} (razem {stall}) "
+            f"| czas {ms} ms.")
+
+
+def zboze322c_synth():
+    """Z322-S: dobry, zly (kontrole, potkniecia, cena w gore), zima bez dostaw, poza zima (czysto / z dostawa), wylaczony, pusty. None = OK."""
+    import tempfile
+    import shutil
+    runs = {
+        "good": [z322_line(), z322_line(pcs=0, rat="0", drop="0", shin=0, gold=0, tout=0, vin=0)],
+        "bad": [z322_line(drop="59000", shin=119, tout=3700, stum=1, stall=1, ms="25.0", p0="22", p1="40")],
+        "summer": [z322_line(pcs=0, rat="0", drop="0", shin=0, gold=0, tout=0, vin=0, win="NIE", state="POZA ZIMA - nic", sig=0, p0="-", p1="-")],
+        "leak": [z322_line(win="NIE", state="POZA ZIMA - nic")],
+        "dry": [z322_line(pcs=0, rat="0", drop="0", shin=0, gold=0, tout=0, vin=0)],
+        "off": ["Zboze zima (322c): WYLACZONE (Winter Grain To Market w MCM) - spichlerze wsi tylko do zapasu jedzenia miasta (p6), jak dotad."],
+        "empty": ["Armoury: inna linia", "Zboze zima (322c): dzien 1 | zepsuta linia"],
+    }
+    exp = {
+        "good": {"Z322-0": "TAK", "Z322-1": "TAK", "Z322-2": "TAK", "Z322-3": "TAK", "Z322-4": "TAK", "Z322-5": "TAK", "Z322-6": "TAK", "Z322-7": "INFO", "Z322-8": "INFO", "Z322-9": "TAK"},
+        "bad": {"Z322-1": "NIE", "Z322-2": "NIE", "Z322-3": "NIE", "Z322-4": "NIE", "Z322-6": "NIE", "Z322-9": "NIE"},
+        "summer": {"Z322-0": "TAK", "Z322-5": "INFO", "Z322-8": "TAK", "Z322-9": "INFO"},
+        "leak": {"Z322-8": "NIE"},
+        "dry": {"Z322-5": "DECYZJA", "Z322-2": "TAK"},
+        "off": {"Z322-0": "INFO", "Z322-1": "INFO"},
+        "empty": {"Z322-0": "NIE", "Z322-1": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="z322_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            zboze322c_rows(rep, zboze322c_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def zboze322c_main(logp):
+    rep = Report()
+    try:
+        s2 = zboze322c_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("Z322-S: test syntetyczny (dobry, zly, zima bez dostaw, poza zima, wylaczony, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("Z322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = zboze322c_collect(logp)
+    print(f"plik: {logp} | linii 322c {len(D['L'])}, nieczytelnych {D['bad']}, wylaczone {D['off']}")
+    zboze322c_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_zboze322c_main_prev = main
+
+
+def main(argv):
+    # paczka 322c: grupa zboze322c - opakowanie main jak bieg320d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "zboze322c":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return zboze322c_main(rest[0] if rest else None)
+    return _zboze322c_main_prev(argv)
+
+
+# ---- paczka 322d: grupa dlug322d - szybsza obnizka firm DS przy duzym dlugu rady (Jeff 03.11, audyt propozycja 4 wariant A "4 - ok") ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa dlug322d <Armoury-*.log>. Segment '322d obnizki firm DS przy dlugu rady' w linii 'Dlugi miast (m96-dlugi)'.
+# Dowod przed zmiana (Armoury-2026-11-03_00-19-16.log): dlug rad 1.83 -> 3.26 mln w 70 dob, splaty z nadwyzki 0 w 0 miastach, niewyplacalne 9.
+# D322-S  self-test wyrazen na wzorze linii + test syntetyczny (dobry, za duzy krok, dwie obnizki w 7 dob, stary DLL);
+# D322-0  segment 322d w kazdej linii 'Dlugi miast' (bez - DLL sprzed 322d - NIE);
+# D322-1  kazda obnizka: rata po < rata przed i stosunek >= (1 - krok) (krok z segmentu), rata po ~ rata przed x stosunek;
+# D322-2  to samo miasto obnizone najwyzej raz na 7 dob;
+# D322-3  kontrola dlugu rady 0 i potkniecia TownDebt 0 w liniach z segmentem;
+# D322-5  licznik 'w tym splata z nadwyzki w 7 dobach' (recenzja: wstrzymanie po splacie RepDay) <= wszystkie wstrzymane;
+# D322-4  skutek (INFO z celem): dlug razem pierwsza -> ostatnia doba, splaty z nadwyzki kas w ostatnich 14 dobach (cel > 0 po ok. 5 tygodniach), niewyplacalne.
+D322D_DAY = re.compile(r"Dlugi miast \(m96-dlugi\): dzien (\d+) \| miasta z dlugiem (\d+) .*?dlug razem (\d+) .*?\| splaty z nadwyzki kas \(ponad zapas kupcow i najblizsza rate\) (\d+) w (\d+) miastach"
+                      r".*?\| niewyplacalne (\d+) .*?\| kontrola: dlug - \(.*?\) (-?\d+) \(oczekiwane 0\)")
+D322_STUM = re.compile(r"\| potkniecia (\d+) \(sesja \d+\)\.$")
+D322_SEG = re.compile(r"\| 322d obnizki firm DS przy dlugu rady \(Town Debt Farm Cut TAK, krok ([\d.]+)% co (\d+) dob, prog ([\d.]+) rat albo niewyplacalna, podloga ([\d.]+) x doplyw\): "
+                      r"(?:dzis bez przegladu[^|]*|miast mocno zadluzonych (\d+), dzis obnizone (\d+) \(-(\d+) zl/rok\), juz splaca \(bez obnizki\) (\d+)(?: \(w tym splata z nadwyzki w \d+ dobach \d+\))?, przy podlodze (\d+), "
+                      r"bez pomiaru doplywu (\d+); w sesji (\d+) \(-(\d+) zl/rok\)(.*?))(?= \| czas|$)")
+D322_OFF = "322d obnizki firm DS przy dlugu rady: WYLACZONE"
+D322_HREP = re.compile(r"juz splaca \(bez obnizki\) (\d+) \(w tym splata z nadwyzki w \d+ dobach (\d+)\)")   # 322d recenzja: wstrzymane po splacie z nadwyzki (RepDay)
+D322_TOWN = re.compile(r"; ([^;:]+?): dlug rady (\d+), zaleglosc z kasy (\d+), rata (\d+) -> (\d+) zl/tydz \(([\d.]+)%\), powod: (.*?) ([\d.]+) rat \(prog ([\d.]+)\), "
+                       r"doplyw (-?\d+)/d, podloga rata (\d+)( \(osiagnieta\))?")
+D322_BASE = ("[01:51:12] Dlugi miast (m96-dlugi): dzien {d} | miasta z dlugiem 20 (nowe 0, splacone do zera 0), dlug razem {debt} (limit razem 7005972) - wierzyciele: kupcy i patrycjat (P) 1, "
+             "rzemieslnicy (R) 1, notable 1 (18 miast), Bank 1 (12 miast); najwiekszy Oldtown 606269 wobec limitu 1875417 | zaleglosci firm DS z kasy przed pozyczka (bez czesci, ktora kasa "
+             "sama zaplaci w dzien raty): 1552296 u 9 miast | pozyczki dzis 0 w 0 miastach (P 0, R 0, notable 0, Bank 0 z puli 0) -> zaleglosci panom 0, koronie 0 (lacznie z podatku), "
+             "zostalo w kasie 0 | odsetki 1298 (Bank 820) | splaty z nadwyzki kas (ponad zapas kupcow i najblizsza rate) {rep} w {repn} miastach (Bank 0, notable 0, kiesy P/R 0; w tym "
+             "odsetki do kies i notabli 0) | niewyplacalne {ins} (zaleglosc bez kredytu 7 - zostalo 1510671; czeka na pule Banku, wyczerpana dzis 0), podatki nadzwyczajne 0 na 0 (W 0, R 0, "
+             "P 0, notable 0) -> wierzycielom 0, na zaleglosci 0, w kasie 0; miast z podatkiem w ostatnich 28 dobach 9 | skutki: dobrobyt -5.8 (dlug) -0.0 (podatek), lojalnosc -0.0, "
+             "relacje notabli z panem -2 x 0 | bez zywego pana 0, oblezone 0, po zdobyciu (28 dob bez rat DS) 0, dlug zmarlych notabli na kiese P 0 | zaleglosci firm DS miast z kasy na "
+             "koniec (panu + koronie, bez czesci z oszczednosci ludu) 1537018 zl u 25 miast | kontrola: dlug - (wczoraj + pozyczone + odsetki - splacone - zaokraglenia 0.00) {ctl} "
+             "(oczekiwane 0); podatek - (wierzycielom + na zaleglosci + w kasie) 0 (oczekiwane 0){seg} | czas 0.076 ms | potkniecia {stum} (sesja 0).")
+D322_SEGF = (" | 322d obnizki firm DS przy dlugu rady (Town Debt Farm Cut TAK, krok 15% co 7 dob, prog 4 rat albo niewyplacalna, podloga 0.5 x doplyw): miast mocno zadluzonych 9, "
+             "dzis obnizone {n} (-{amt} zl/rok), juz splaca (bez obnizki) {hold} (w tym splata z nadwyzki w 7 dobach {hrep}), przy podlodze 0, bez pomiaru doplywu 0; w sesji {n} (-{amt} zl/rok){towns}")
+D322_T1 = "; Vaith: dlug rady 412000, zaleglosc z kasy 555672, rata 35620 -> {after} zl/tydz ({pct}%), powod: niewyplacalna i dlug+zaleglosc 27.2 rat (prog 4), doplyw 5100/d, podloga rata 17850"
+
+
+def dlug322d_line(d, debt=3262034, rep=0, repn=0, ins=9, ctl=0, stum=0, seg=None):
+    return D322_BASE.format(d=d, debt=debt, rep=rep, repn=repn, ins=ins, ctl=ctl, stum=stum, seg="" if seg is None else seg)
+
+
+def dlug322d_seg(after=30277, pct="85", n=1, amt=278200, hold=0, hrep=0):
+    return D322_SEGF.format(n=n, amt=amt, hold=hold, hrep=hrep, towns=D322_T1.format(after=after, pct=pct))
+
+
+def dlug322d_collect(lines):
+    D = {"days": [], "noseg": 0, "off": 0, "bad": 0}
+    for s in lines:
+        if "Dlugi miast (m96-dlugi): dzien" not in s:
+            continue
+        m = D322D_DAY.search(s)
+        if not m:
+            D["bad"] += 1
+            continue
+        if D322_OFF in s:
+            D["off"] += 1
+            continue
+        g = D322_SEG.search(s)
+        if not g:
+            D["noseg"] += 1
+            continue
+        st = D322_STUM.search(s)
+        hr = D322_HREP.search(g.group(0))
+        towns = list(D322_TOWN.finditer(g.group(13) or "")) if g.group(5) is not None else []
+        D["days"].append({"d": int(m.group(1)), "debt": int(m.group(3)), "rep": int(m.group(4)), "repn": int(m.group(5)), "ins": int(m.group(6)), "ctl": int(m.group(7)),
+                          "stum": int(st.group(1)) if st else -1, "step": float(g.group(1)), "gap": int(g.group(2)),
+                          "cut": int(g.group(6)) if g.group(6) else 0, "hold": int(g.group(8)) if g.group(8) else 0,
+                          "hrep": int(hr.group(2)) if hr else -1, "towns": [(t.group(1), int(t.group(4)), int(t.group(5)), float(t.group(6))) for t in towns]})
+    return D
+
+
+def dlug322d_rows(rep, D):
+    days = D["days"]
+    if D["bad"]:
+        rep.add("D322-P: odczyt linii 'Dlugi miast'", f"nie czyta {D['bad']}", "wszystkie", False)
+    if not days and not D["noseg"]:
+        rep.add("D322-0: segment 322d w liniach 'Dlugi miast'", "brak linii" + (f" (WYLACZONE {D['off']})" if D["off"] else ""), ">= 1 linia z segmentem", False if not D["off"] else None)
+        return
+    rep.add("D322-0: segment 322d w liniach 'Dlugi miast'", f"{len(days)} z segmentem, {D['noseg']} bez", "wszystkie z segmentem (bez - DLL sprzed 322d)", D["noseg"] == 0 and len(days) > 0)
+    if not days:
+        return
+    badc, last, twice = [], {}, []
+    for x in days:
+        for (nm, a, b, pct) in x["towns"]:
+            r = pct / 100.0
+            if not (b < a) or r < 1 - x["step"] / 100.0 - 0.002 or abs(a * r - b) > max(2.0, 0.002 * a):
+                badc.append(f"d{x['d']} {nm} {a}->{b} ({pct}%)")
+            if nm in last and x["d"] - last[nm] < x["gap"]:
+                twice.append(f"{nm} d{last[nm]} i d{x['d']}")
+            last[nm] = x["d"]
+    ncut = sum(x["cut"] for x in days)
+    rep.add("D322-1: obnizki zgodne z krokiem (rata po < przed, stosunek >= 1 - krok)", "; ".join(badc[:6]) or f"zgodne ({ncut} obnizek)", "zgodne", not badc)
+    rep.add("D322-2: to samo miasto najwyzej raz na 7 dob", "; ".join(twice[:6]) or "tak", "tak", not twice)
+    ctl = [x for x in days if x["ctl"] != 0]
+    stum = sum(max(0, x["stum"]) for x in days)
+    hbad = [f"d{x['d']} {x['hrep']}>{x['hold']}" for x in days if x["hrep"] > x["hold"]]
+    hnew = [x for x in days if x["hrep"] >= 0]
+    rep.add("D322-5: wstrzymane po splacie z nadwyzki (RepDay, recenzja) <= wszystkie wstrzymane",
+            "; ".join(hbad[:6]) or (f"zgodne, suma {sum(x['hrep'] for x in hnew)} z {sum(x['hold'] for x in hnew)} wstrzymanych ({len(hnew)} dob z licznikiem, {len(days) - len(hnew)} bez - DLL sprzed poprawki)"),
+            "<=", not hbad)
+    rep.add("D322-3: kontrola dlugu rady 0 i potkniecia TownDebt", f"doby z kontrola != 0: {len(ctl)}, potkniecia {stum}", "0 i 0", not ctl and stum == 0)
+    a, z = days[0], days[-1]
+    tail = [x for x in days if x["d"] > z["d"] - 14]
+    rp = sum(x["rep"] for x in tail)
+    span = max(1, z["d"] - a["d"])
+    rep.add("D322-4: skutek - dlug razem, splaty z nadwyzki (ostatnie 14 dob), niewyplacalne",
+            f"dlug {a['debt']} -> {z['debt']} w {span} dob ({(z['debt'] - a['debt']) / span:+.0f}/d), splaty {rp} (miast max {max(x['repn'] for x in tail)}), niewyplacalne {a['ins']} -> {z['ins']}, obnizek {ncut}",
+            "INFO (przed 322d: +20 tys./d, splaty 0, niewyplacalne 9; cel po ok. 5 tyg.: splaty > 0, przyrost dlugu w dol)", None)
+
+
+def dlug322d_synth():
+    good = [dlug322d_line(100, seg=dlug322d_seg()), dlug322d_line(101, seg=dlug322d_seg(n=0, amt=0).replace(D322_T1.format(after=30277, pct="85"), "")),
+            dlug322d_line(107, debt=3200000, rep=500, repn=1, seg=dlug322d_seg())]
+    D = dlug322d_collect(good)
+    if len(D["days"]) != 3 or D["noseg"] or D["bad"]:
+        return f"dobry: odczyt {len(D['days'])}/{D['noseg']}/{D['bad']}"
+    if D["days"][0]["towns"] != [("Vaith", 35620, 30277, 85.0)] or D["days"][1]["towns"]:
+        return f"dobry: miasta {D['days'][0]['towns']} / {D['days'][1]['towns']}"
+    r = Report()
+    dlug322d_rows(r, D)
+    if any(x[3] == "NIE" for x in r.rows):
+        return "dobry: NIE w " + "; ".join(x[0] for x in r.rows if x[3] == "NIE")
+    r = Report()
+    dlug322d_rows(r, dlug322d_collect([dlug322d_line(100, seg=dlug322d_seg(after=20000, pct="56.1"))]))
+    if not any(x[0].startswith("D322-1") and x[3] == "NIE" for x in r.rows):
+        return "za duzy krok nie zlapany"
+    r = Report()
+    dlug322d_rows(r, dlug322d_collect([dlug322d_line(100, seg=dlug322d_seg()), dlug322d_line(103, seg=dlug322d_seg(after=30277))]))
+    if not any(x[0].startswith("D322-2") and x[3] == "NIE" for x in r.rows):
+        return "dwie obnizki w 7 dob nie zlapane"
+    r = Report()
+    dlug322d_rows(r, dlug322d_collect([dlug322d_line(100)]))
+    if not any(x[0].startswith("D322-0") and x[3] == "NIE" for x in r.rows):
+        return "stary DLL (bez segmentu) nie zlapany"
+    old = dlug322d_line(100, seg=dlug322d_seg().replace(" (w tym splata z nadwyzki w 7 dobach 0)", ""))
+    D = dlug322d_collect([old, dlug322d_line(107, seg=dlug322d_seg(hold=3, hrep=2))])
+    if len(D["days"]) != 2 or D["days"][0]["hrep"] != -1 or D["days"][1]["hold"] != 3 or D["days"][1]["hrep"] != 2 or D["days"][1]["towns"] != [("Vaith", 35620, 30277, 85.0)]:
+        return f"licznik splaty z nadwyzki: odczyt {[(x['hold'], x['hrep']) for x in D['days']]}"
+    r = Report()
+    dlug322d_rows(r, dlug322d_collect([dlug322d_line(100, seg=dlug322d_seg(hold=1, hrep=2))]))
+    if not any(x[0].startswith("D322-5") and x[3] == "NIE" for x in r.rows):
+        return "wstrzymane po splacie > wszystkie nie zlapane"
+    return None
+
+
+def dlug322d_main(logp):
+    rep = Report()
+    ok = bool(D322D_DAY.search(dlug322d_line(1, seg=dlug322d_seg()))) and bool(D322_SEG.search(dlug322d_line(1, seg=dlug322d_seg())))
+    rep.add("D322-S: self-test wyrazen na wzorze linii", "TAK" if ok else "wyrazenie nie czyta wzoru", "TAK", ok)
+    try:
+        s2 = dlug322d_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("D322-S2: test syntetyczny (dobry, za duzy krok, dwie obnizki w 7 dob, stary DLL, licznik splaty z nadwyzki)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("D322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    lines = []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Dlugi miast (m96-dlugi): dzien" in line:
+                lines.append(line.rstrip("\r\n"))
+    print(f"plik: {logp} | linii 'Dlugi miast' {len(lines)}")
+    dlug322d_rows(rep, dlug322d_collect(lines))
+    rep.show()
+    return 0
+
+
+_dlug322d_main_prev = main
+
+
+def main(argv):
+    # paczka 322d: grupa dlug322d - opakowanie main jak groty319c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "dlug322d":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return dlug322d_main(rest[0] if rest else None)
+    return _dlug322d_main_prev(argv)
+
+
+R322_SUM = re.compile(
+    r"Rachunki zywnosci - rata z zarobku \(322e\): dzien (?P<day>\d+) \| udzial (?P<share>[\d.]+), horyzont odblokowania (?P<hor>\d+) dob \| "
+    r"dluznikow (?P<deb>\d+), z rata (?P<withr>\d+), w terminie (?P<ontime>\d+), dowoz odblokowany (?P<rel>\d+), bez pomiaru zarobku (?P<nom>\d+) \| "
+    r"splacone z raty (?P<paid>\d+) zl .*?potkniecia kredytu (?P<stum>\d+)\.")
+R322_ROW = re.compile(
+    r"Rachunki zywnosci - dluznik \(322e\): dzien (?P<day>\d+) \| (?P<name>.+?): dlug (?P<owed>\d+) \(za jedzenie (?P<food0>\d+), najstarszy (?P<age>-|\d+) dni\), "
+    r"zarobek doby (?:(?P<inc>-?\d+) \(netto (?P<net>-?\d+) \+ splaty wczoraj (?P<prev>\d+)(?: \+ splaty panow wczoraj (?P<lprev>\d+))?\)|bez pomiaru), rata (?P<rate>\d+), "
+    r"splacone z nadwyzki (?P<ps>\d+) \+ z raty (?P<pr>\d+), kasa (?P<g0>-?\d+) -> (?P<g1>-?\d+), zostalo za jedzenie (?P<food1>\d+)(?: \((?P<days>\d+) dob raty\))?, "
+    r"w terminie (?P<ok>TAK|NIE), dowoz (?P<dz>-|ODBLOKOWANY|wedlug zwloki)\.")
+R322_KSH = re.compile(r"Kupcy zywnosci \(KS-H\) dzien (?P<day>\d+) .*?kredyt kupiecki TAK: otwarte (?P<open>\d+) zl")
+
+
+def rata322e_collect(logp):
+    D = {"sum": {}, "rows": {}, "ksh": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if "(322e)" in ln:
+                m = R322_SUM.search(ln)
+                if m:
+                    D["sum"][int(m.group("day"))] = m
+                    continue
+                m = R322_ROW.search(ln)
+                if m:
+                    D["rows"].setdefault(int(m.group("day")), []).append(m)
+            elif "kredyt kupiecki TAK" in ln:
+                m = R322_KSH.search(ln)
+                if m:
+                    D["ksh"].append((int(m.group("day")), int(m.group("open"))))
+    return D
+
+
+def rata322e_rows(rep, D):
+    S, R = D["sum"], D["rows"]
+    gi = lambda m, k: int(m.group(k)) if m.group(k) not in (None, "-") else 0
+    rep.add("R322-0: linia raty z zarobku (322e)", f"dob z linia {len(S)}, wierszy dluznikow {sum(len(v) for v in R.values())}",
+            "co najmniej 1 doba (bez linii: brak dluznikow albo udzial 0 - INFO)", True if S else None)
+    bad = []
+    for day, rows in sorted(R.items()):
+        for m in rows:
+            rate, ps, pr, owed, food1 = gi(m, "rate"), gi(m, "ps"), gi(m, "pr"), gi(m, "owed"), gi(m, "food1")
+            hor = int(S[day].group("hor")) if day in S else None
+            why = []
+            if gi(m, "g0") - gi(m, "g1") != ps + pr: why.append("kasa != splacone")
+            if pr > max(0, rate - ps): why.append("z raty ponad rate")
+            if ps + pr > owed: why.append("splacone ponad dlug")
+            if m.group("ok") == "TAK" and (rate <= 0 or ps + pr < min(rate, owed)): why.append("w terminie bez pelnej raty")
+            if m.group("dz") == "ODBLOKOWANY" and (m.group("ok") != "TAK" or hor is None or hor <= 0 or food1 > rate * hor):
+                why.append("odblokowany poza horyzontem")
+            if m.group("inc") is None and (rate or pr): why.append("rata bez pomiaru")
+            if m.group("inc") is not None and int(m.group("inc")) != int(m.group("net")) + gi(m, "prev") + gi(m, "lprev"):
+                why.append("zarobek != netto + splaty wczoraj + splaty panow")
+            if why:
+                bad.append(f"d{day} {m.group('name')}: {', '.join(why)}")
+    rep.add("R322-1: wiersze dluznikow spojne (kasa, rata, termin, odblokowanie)", f"niespojnych {len(bad)}" + ("; " + "; ".join(bad[:4]) if bad else ""),
+            "niespojnych 0", (not bad) if R else None)
+    bad2 = []
+    for day, m in sorted(S.items()):
+        rows = R.get(day, [])
+        if len(rows) != int(m.group("deb")) and len(rows) < 24:
+            bad2.append(f"d{day} wierszy {len(rows)} != dluznikow {m.group('deb')}")
+            continue
+        if len(rows) == int(m.group("deb")):
+            sr = sum(gi(r, "pr") for r in rows)
+            rel = sum(1 for r in rows if r.group("dz") == "ODBLOKOWANY")
+            ok = sum(1 for r in rows if r.group("ok") == "TAK")
+            if sr != int(m.group("paid")) or rel != int(m.group("rel")) or ok != int(m.group("ontime")):
+                bad2.append(f"d{day} suma z raty {sr}/{m.group('paid')}, odblok. {rel}/{m.group('rel')}, w terminie {ok}/{m.group('ontime')}")
+    rep.add("R322-2: suma doby = wiersze dluznikow", f"dob niespojnych {len(bad2)}" + ("; " + "; ".join(bad2[:3]) if bad2 else ""),
+            "0", (not bad2) if S else None)
+    st = sum(int(m.group("stum")) for m in S.values())
+    rep.add("R322-3: potkniecia kredytu w liniach 322e", f"{st}", "0", (st == 0) if S else None)
+    k = D["ksh"]
+    if len(k) >= 2:
+        (d0, o0), (d1, o1) = k[0], k[-1]
+        paid = sum(int(m.group("paid")) for m in S.values())
+        rep.add("R322-4: rachunki otwarte KS-H (pierwsza -> ostatnia doba)",
+                f"d{d0} {o0} -> d{d1} {o1} ({o1 - o0:+d}); splacone z raty razem {paid}",
+                "spadek (inaczej DECYZJA - zarobek dluznikow za maly albo nowe rachunki z odblokowanego dowozu)", o1 < o0, decide=True)
+    else:
+        rep.add("R322-4: rachunki otwarte KS-H (pierwsza -> ostatnia doba)", f"linii KS-H z kredytem {len(k)}", "INFO", None)
+    tops = {}
+    for day, rows in R.items():
+        for m in rows:
+            tops[m.group("name")] = m
+    top = sorted(tops.values(), key=lambda m: -gi(m, "owed"))[:5]
+    rep.add("R322-5: najwieksi dluznicy - ostatni wiersz (INFO)",
+            "; ".join(f"{m.group('name')} dlug {m.group('owed')}, rata {m.group('rate')}, z raty {m.group('pr')}, kasa {m.group('g1')}, {m.group('dz')}" for m in top) or "-",
+            "INFO", None)
+
+
+def rata322e_synth():
+    """R322-S: dobry, zly (kasa niespojna, odblokowany poza horyzontem), pusty. None = OK."""
+    import tempfile
+    import shutil
+    sm = ("Rachunki zywnosci - rata z zarobku (322e): dzien {d} | udzial 0.15, horyzont odblokowania 91 dob | dluznikow 2, z rata 1, w terminie {ot}, "
+          "dowoz odblokowany {rl}, bez pomiaru zarobku 0 | splacone z raty {p} zl (kasy dluznikow -> kasy wierzycieli), potkniecia kredytu 0.")
+    rq = ("Rachunki zywnosci - dluznik (322e): dzien {d} | Qarth: dlug 330630 (za jedzenie 330630, najstarszy 364 dni), zarobek doby 8000 (netto 7500 + splaty wczoraj 200 + splaty panow wczoraj 300), "
+          "rata 1200, splacone z nadwyzki 0 + z raty 1200, kasa 5000 -> {g1}, zostalo za jedzenie 329430 (275 dob raty), w terminie TAK, dowoz {dz}.")
+    rb = ("Rachunki zywnosci - dluznik (322e): dzien {d} | Bolozo: dlug 2000 (za jedzenie 2000, najstarszy 40 dni), zarobek doby 4000 (netto 4000 + splaty wczoraj 0), "
+          "rata 600, splacone z nadwyzki 0 + z raty 0, kasa 0 -> 0, zostalo za jedzenie 2000 (4 dob raty), w terminie NIE, dowoz wedlug zwloki.")
+    ksh = "Kupcy zywnosci (KS-H) dzien {d} | CZYNNE | kredyt kupiecki TAK: otwarte {o} zl (317 rachunkow)"
+    good = [ksh.format(d=10, o=332630), sm.format(d=10, ot=1, rl=0, p=1200), rq.format(d=10, g1=3800, dz="wedlug zwloki"), rb.format(d=10),
+            ksh.format(d=11, o=331430)]
+    bad = [ksh.format(d=10, o=332630), sm.format(d=10, ot=1, rl=1, p=1200), rq.format(d=10, g1=3000, dz="ODBLOKOWANY"), rb.format(d=10),
+           ksh.format(d=11, o=332630)]
+    runs = {"good": good, "bad": bad, "empty": ["Armoury: inna linia"]}
+    exp = {
+        "good": {"R322-0": "TAK", "R322-1": "TAK", "R322-2": "TAK", "R322-3": "TAK", "R322-4": "TAK", "R322-5": "INFO"},
+        "bad": {"R322-0": "TAK", "R322-1": "NIE", "R322-2": "TAK", "R322-4": "DECYZJA"},
+        "empty": {"R322-0": "INFO", "R322-1": "INFO", "R322-2": "INFO", "R322-3": "INFO", "R322-4": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="r322_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            rata322e_rows(rep, rata322e_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def rata322e_main(logp):
+    rep = Report()
+    try:
+        s2 = rata322e_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("R322-S: test syntetyczny (dobry, zly, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("R322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = rata322e_collect(logp)
+    print(f"plik: {logp} | dob z linia 322e {len(D['sum'])}, linii KS-H z kredytem {len(D['ksh'])}")
+    rata322e_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_rata322e_main_prev = main
+
+
+def main(argv):
+    # paczka 322e: grupa rata322e (rachunki zywnosci - rata z zarobku) - opakowanie main jak bieg320d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "rata322e":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return rata322e_main(rest[0] if rest else None)
+    return _rata322e_main_prev(argv)
+
+
 # ------------------------------------------------------------ paczka 322f: grupa chleb322f - chleb z zapasu wojny w dlugim pokoju (Peace Bread From War Reserve)
 # Linia "Chleb biedoty (M3): dzien N" - segment "| 322f chleb z zapasu wojny w dlugim pokoju (...)" na koncu linii (za segmentem m105). Sprawdza:
 #  C322-0 segment jest (nowy DLL, klucz TAK); C322-1 ponizej podlogi po wyplacie 0; C322-2 krolestwa z zapasu sa podzbiorem krolestw w dlugim pokoju,
