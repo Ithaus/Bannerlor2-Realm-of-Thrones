@@ -1,5 +1,67 @@
 # DZIENNIK ZMIAN
 
+## 324 - glod zimy: wies je najpierw ze swojej stodoly, 322c z bilansu zimy i dla calego swiata, bramka krainy zima (noc/324-glod od 323x 7e62e009; Armoury.dll 7fc4f2ce3febd7bef58c0e92be34c8ea - NIE WGRANE)
+
+**Problem:** Jeff 03.11 "na wsiach tez nie ma zboza, praktycznie nie ma produkcji tez innych surowcow, cos sie zesralo". Logi kampanii Ironman0gXONzURi8yO: zboze swiata
+304k szt. (108878) -> 38-40k od 109230 (miasta 71.5k -> 4.6k); rynki miast: brak jedzenia mediana 61% (109204) -> 83% (109253), 44 z 45 miast glodne; zuzycie zboza 109184
+= 22.7k/d, w tym "wsie (zakupy w miescie, E5/B1) 10205" przy produkcji swiata 3.9k/d; tymczasem "Spichlerze (E4/6)": 26 mld racji = 628 dni potrzeby we wsiach, a 322c
+dawal z tego 1413 szt. na 3 doby. Calkowita produkcja wsi 25.6k/d (108655) -> ok. 19k/d (109252): zboze, ryby, nabial, owoce i przetwory w dol, sol/ruda/drewno trzymaja.
+
+**Przyczyna:** rynki zbankrutowaly w pierwszej dobie zimy Westeros (109178, zima ok. 1794 dni) - nie przez wgranie. Trzy rzeczy w KS nie umialy wieloletniej zimy:
+1. koszyk ZC4 wsi = pelna potrzeba - Own (StartCalibration.Live.cs VillageBasket, KsBasket.VillageKg), Own = min(plon po zimie, potrzeba); spichlerz wsi E4/6 nie byl od
+   koszyka odejmowany (brak schodzil z niego dopiero po zakupach, GranaryFloor) - zima tnie plon o polowe, wies rusza po zboze do miast (10-11k szt./d), polki miast schodza
+   w ok. 15 dob, a stodoly stoja nietkniete;
+2. jedyny most ze stodol na polki - 322c - dawal zapas ponad STALA rezerwe 455 dni (LandGateFloorDays) / 1720 dni do konca zimy (ok. 0.08 dnia potrzeby wsi na dobe)
+   i tylko miastom z ZC4 ("poza ZC4 48");
+3. wies rolnicza zima zjada caly uciety plon (zasada "najpierw wlasny stol, na targ nadwyzka" - poprawna), wiec zboze, ryby, nabial, owoce i przetwory KS na targ spadaja
+   o 70-97% - to jest "nie ma produkcji innych surowcow". Zima zboze na targ moze isc tylko ze stodol.
+Do tego bramka krainy (StartCalibration.Arm.cs) liczy zaplanowane zejscie stodol zima jak strate z winy KS i prog zapasu 364 dni - z poprawka 1-2 zrzucilaby reszte krain na
+zasady gry. Poprawki do raportow (z kodu i logow): rampa lambda pelna od 108716 (nie przyczyna); zakupy wsi E5/B1 byly i latem (5-8.5k/d przy zuzyciu 26-30k/d); doba
+108878 z "zuzyciem 2.9k" to niepelna pierwsza doba autotestu.
+
+**Zmiana (Armoury)** - jeden BILANS ZIMY WSI bez nowych stalych (`StartCalibration.Glod324.cs`): left = dni do konca zimy (WesterosClimate.SeasonInfo, jak 322c);
+def = brak wlasnego stolu (racje/d): wies KS - kcal koszyka, ktorego dom nie robi (pelny koszyk x (1 - czesc robiona w domu z Planu)) / kcal racji okregu (KcalNeed /
+ludzie w domu), wies poza KS - max(0, potrzeba - plon Famine) (plon bez zakupow - bez petli zakupy-bilans); floor = prog racjonowania Famine (FamineRationDays x ludzie w domu).
+- **Winter Villages Eat Own Granary** (nowy, TAK; `StartCalibration.Live.cs` VillageBasket -> `Barn324`): zima kcal koszyka jedzenia wsi KS zmniejszone o pokrycie ze stodoly =
+  min(def, (zapas - floor) / left) racji (x kcal racji); zboze pierwsze, potem drabina koszyka (KsBasket.Rungs 0-3, tylko towary z kcal). Wies kupuje w miescie tylko reszte.
+  Nic nie jest zdejmowane recznie: racje KS (GranaryFloor) wychodza nizsze, Famine.Daily schodzi z zapasu o ten brak (ekonomia zamknieta). HomeKcal (jedzenie robione w domu)
+  przy pokryciu = pelny koszyk x min(czesc z Planu, 1 - kupione - pokrycie) - te same kcal nie licza sie dwa razy; bez pokrycia wzor co do bitu jak dotad. Sol i reszta bez zmian.
+- **Winter Grain From Winter Balance** (nowy, TAK; `TownGranary.Zima322.cs` W322Village): 322c sprzedaje na polke wolne = max(0, zapas - floor - left x def) / left racji na
+  dobe zamiast (zapas - max(Winter Grain Keep Days, 455) x potrzeba) / max(91, left). Sygnal miasta, cena od polki, kasa (SpendableTown), TributeTake/Give bez zmian.
+- **Winter Grain All Towns** (nowy, TAK; Zima322): miasto poza ZC4 (krainy wrocone) - popyt dobowy zboza z modelu jedzenia miasta w grze (TownGranary.Cons: dobrobyt / 40 +
+  zaloga / 20, jak p6), cel polki 2 doby (W322DayCapDays); wies bez rachunku KS - kcal racji sredni swiata (StartCalibration.KcalPerRationWorld324, wsie KS, raz na dobe).
+- **Winter Land Gate Planned Draw** (nowy, TAK; `StartCalibration.Arm.cs` LandGateDaily): zima pokrycie koszyka ze stodoly (BarnR324 wsi) odjete od spadku spichlerza (jak
+  SoldToday), a zamiast progu straty Ks Land Gate Loss Days / zapasu Ks Land Gate Reserve Days seria krainy liczy sie tylko przy zapasie krainy ponizej sumy floor + left x def
+  jej wsi (nie dotrwaja do wiosny). Glod wsi (warunek a) bez zmian. Poza zima - jak dotad.
+- `Settings.cs` + `McmSettings.cs` (gen_mcm: 2813 -> 2817 ustawien). Klucze NOWE - w Armoury.json Jeffa ich nie ma (domyslne TAK dzialaja od razu).
+- Kroku 5 projektu (wozy 322c zamiast dostawy bezposredniej) NIE ma: zostaje sprzedaz bezposrednia wsi swojemu miastu z ramka ksiegi towarow "zboze ze spichlerza wsi (322c)".
+
+**Linie logu:**
+- NOWA co dobe (stan zastosowany, LogEnabled): `Glod zimy (324): dzien N | zima TAK (do konca L dni) | klucze: ... | wsie KS n: koszyk (kcal/d) pelny W,
+  z targu (kupione, srednia 2 dob) B (x%), z wlasnej stodoly C (y%; R racji/d, zboza nie kupionego w miescie ok. P szt./d) | wsi z brakiem stolu: stodola pokrywa calosc a, czesc b,
+  nic c (w tym na progu racjonowania f) | bilans zimy (wsi ze spichlerzem n, z rachunkiem KS k): zapas S mln racji, brak do wiosny D mln, prog racjonowania F mln, wolne na targ
+  X racji/d (ok. Y szt. zboza/d; kcal racji swiata K) | dowoz ze spichlerzy na polki (322c) dzis p szt. (miasta poza ZC4 t, q szt.) | bramka krainy: zaplanowane zejscie stodol
+  odjete od spadku Z racji, krain z progiem bilansu zimy G | potkniecia 0.`
+- zmieniona `Zboze zima (322c)`: segment rezerwy "rezerwa wsi z bilansu zimy (324): ..." (klucz TAK) i nowy segment `| 324 caly swiat TAK: miasta poza ZC4 z popytem z modelu
+  gry n, zasilone m, s szt.; wsie z kcal racji swiata w (K kcal)`.
+
+**Ryzyko / co sprawdzic** (kontrola calosci w kodzie):
+- kontrola "nic z niczego": linia 322c "racje zdjete = ubytek stodol"; w 324 pokrycie NIE jest zdejmowane osobno - schodzi w Famine.Daily jako potrzeba - racje KS. Sprawdzic
+  w "Spichlerze (E4/6)", ze ubytek stodol rosnie o ok. "racji/d" z linii 324 (a nie dwa razy).
+- HomeKcal: przy pokryciu nie moze przekroczyc pelny koszyk - kupione - pokrycie (sprawdzone wzorem; R3 FloorDaily i licznik "wies je swoje" licza sie od mniejszego WantKcal).
+- okreg przeliczany co 7 dob (LiveEvery) - pokrycie tez: poczatek i koniec zimy dochodza do wsi najpozniej w 7 dob (na wiosne do 7 dob pokrycia z ostatniego przeliczenia zimy).
+- psucie spichlerzy (6%/rok) nie jest w bilansie: przy 5-letniej zimie stodoly zejda pod floor na koncu zimy szybciej niz plan (bilans liczony co dobe od biezacego zapasu -
+  sam sie poprawia, ale ostatnie miesiace moga byc z racjonowaniem 90%).
+- bramka krainy zima: kraina wraca tylko przy zapasie ponizej floor + left x def; do sprawdzenia, ze nie ma nowych powrotow krain ("KS: bramka krainy", "powroty dzis 0").
+- miasta poza ZC4: popyt z Cons (jednostki Food gry) - ryzyko zalania polek, gdy kcal racji swiata inny niz w okregu; limit 2 doby popytu na dobe i cel polki 2 doby.
+- 14 krain wroconych latem/jesienia (108817-109163) - przyczyna nieznana (brak logow tych dob); ta zmiana jej nie dotyka i nie wymusza powrotu krain.
+- cieciem zimy (WinterBite, liczone na zime 91 dni) przy 5-letniej zimie nawet pelny przeplyw ze stodol da miastom mniej niz latem - to decyzja o swiecie, nie ta zmiana.
+- NIE zrobione z projektu: wozy 322c (krok 5), sumy KS / modelu gry w linii "Towary" (krok 7 GoodsLedger), test na kopii zapisu (krok 8 - gra Jeffa wlaczona).
+
+**Test (dopiero gdy Jeff nie gra):** autotest na kopii zapisu Jeffa z doby ok. 109250, 60 dob, potem sprzatanie kopii. Kryteria: zakupy zboza wsi E5/B1 przy pelnej stodole ok. 0;
+dowoz 322c rzedu 10k+ szt./d na swiat; mediana braku na rynkach spada z 83%; stodoly schodza wedlug bilansu; bez nowych powrotow krain; "racje zdjete = ubytek stodol".
+**Status:** DO SPRAWDZENIA (zbudowane, kod wyjscia 0; nie wgrane, nie testowane)
+
 ## 2026-11-03 WGRANIE 161 - noc/323x-integracja (160 + inwestycje: 323a cena wolnego majatku BK do pana wsi, 323b odkup warsztatu gracza z doplata kasy miasta, 323c prace okregu placa tez za zjedzone w okregu, 323d dochod wioski pobocznej z prawdziwej sprzedazy); Armoury.dll da5a31022ce86f7f87403e031fe64198 (CrashScribe 55ccc004, ForgeView 8441ab0e bez zmian); kopia 160: Armoury.dll.bak-2026-11-03-przed-wgranie161 i D:/Backup-Bannerlord/wgrane/2026-11-03-wgranie161-przed
 
 **Problem:** Jeff 03.11 "majatek naprawa / kasa miasta / tak i prawdziwa sprzedaz" - decyzje do poradnika inwestycji (docs/PORADNIK-INWESTYCJE.md).

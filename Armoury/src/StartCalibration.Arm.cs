@@ -551,7 +551,7 @@ namespace Armoury
         }
 
         // f26-bramka: KsDrop - suma po wsiach min(spadek spichlerza wsi, wzor gry - racje KS) tej doby (racje; tylko wsie z pomiarem spadku, jak Drop)
-        private sealed class LandAgg { public int N, Skip, Hungry; public double F, K, Food, Need, Drop, NeedD, KsDrop; public string Example; }
+        private sealed class LandAgg { public int N, Skip, Hungry; public double F, K, Food, Need, Drop, NeedD, KsDrop, Plan; public int PlanN; public string Example; }   // 324: Plan - suma floor + left x def wsi (bilans zimy)
 
         /// <summary>Daily w stanie zastosowanym, PRZED LiveDaily (stawki jutra juz bez krainy wroconej): glod wsi z winy KS i spadek spichlerzy krain.</summary>
         private static void LandGateDaily(int today)
@@ -567,6 +567,8 @@ namespace Armoury
             var agg = new Dictionary<string, LandAgg>(StringComparer.Ordinal);
             var seen = new HashSet<Village>();
             int stum = 0, depSkip = 0;
+            // 324 (klucz Winter Land Gate Planned Draw): zima - zaplanowane zejscie stodoly (pokrycie koszyka) nie jest spadkiem, prog zapasu z bilansu zimy
+            int left324 = Sw324Gate ? WinterLeft324() : 0;
             foreach (var ld in _live.Values)
             {
                 if (ld == null || ld.TF || ld.V == null || ld.St == null) continue;
@@ -596,12 +598,19 @@ namespace Armoury
                             // recenzja n23 (p6-spichlerz): zboze sprzedane dzis miastu (TownGranary.Daily, ta sama doba przed bramka) to targ, nie spadek - spadek
                             // najwyzej do zera (sprzedaz nie udaje napelniania: bez niej nadwyzka ponad sufit i tak przepadala)
                             if (dv > 0) dv = Math.Max(0.0, dv - TownGranary.SoldToday(v, today));
+                            // 324: wies je zima ze stodoly to, czego nie kupila (pokrycie koszyka z jej przeliczenia) - to plan zimy, nie strata z winy KS
+                            if (dv > 0 && left324 > 0) { double pl = Math.Min(dv, GatePlanned324(ld, left324)); if (pl > 0) { dv -= pl; _w324GatePlan += pl; } }
                             a.Drop += dv; a.NeedD += need;
                             // f26-bramka (C): spadek tej wsi z winy KS = najwyzej tyle, ile KS dal jej dzis mniej niz wzor gry (psucie, zima, danina - reszta spadku
                             // bylaby i przy wzorze gry); wies bez plonu z Famine.Daily tej doby (hasH NIE) - 0
                             if (dv > 0 && hasH) { double gap = (double)hv[0] - hv[1]; if (gap > 0) a.KsDrop += Math.Min(dv, gap); }
                         }
                         _gPrev[v] = food;
+                        if (left324 > 0)
+                        {
+                            double f4, h4, d4, fl4;
+                            if (WinterBalance324(v, today, out f4, out h4, out d4, out fl4)) { a.Plan += fl4 + left324 * d4; a.PlanN++; }
+                        }
                     }
                     else _gPrev.Remove(v);
                     float u = famine ? Famine.HungerOf(v) : 0f;
@@ -649,7 +658,10 @@ namespace Armoury
                     // seria: klucz TAK - ta sama miara co strata (spadek z winy KS > 1% potrzeby/d, ksDay - tylko przy racjach KS krainy ponizej wzoru gry; spadek,
                     // ktory bylby i przy wzorze gry, powrotem sie nie cofnie); NIE - jak WGRANIE 85 (caly spadek > 1% przy racjach KS krainy ponizej wzoru gry)
                     bool fall = exact ? ksDay > LandDrawShare : draw > LandDrawShare && ksLess;
-                    bool count = fall && (test || reserve == 0 || lossKey == 0 || (exact ? lossC : loss) >= lossKey || days < reserve);
+                    // 324: zima (klucz) - seria tylko, gdy zapas krainy ponizej floor + left x def jej wsi (nie dotrwaja do wiosny); bez bilansu - jak dotad
+                    bool plan324 = left324 > 0 && a.PlanN > 0;
+                    if (plan324) _w324GateLands++;
+                    bool count = fall && (test || reserve == 0 || lossKey == 0 || (plan324 ? a.Food < a.Plan : ((exact ? lossC : loss) >= lossKey || days < reserve)));
                     st = count ? st + 1 : 0;      // doba bez pomiaru (pierwsza po wczytaniu, spichlerze wylaczone) - seria i strata bez zmian
                 }
                 if (loss > 1e-6) _landLoss[kv.Key] = loss; else _landLoss.Remove(kv.Key);

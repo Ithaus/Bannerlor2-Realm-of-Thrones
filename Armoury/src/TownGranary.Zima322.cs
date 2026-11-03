@@ -69,11 +69,21 @@ namespace Armoury
         private static double _w322SessPieces, _w322SessRations; private static long _w322SessGold;
         private static int _w322Stum, _w322StumAll;
         private static bool _w322OffLogged;
+        // 324: dowoz ostatniej doby do linii "Glod zimy (324)" (StartCalibration.Line324): sztuki na polki, w tym do miast poza ZC4 i ich liczba
+        private static int _w324Day = int.MinValue, _w324Pieces, _w324PiecesOut, _w324TownsOut;
+
+        /// <summary>324: dowoz 322c doby `today` (0 - inna doba albo nic). Tylko watek glowny. Nie rzuca.</summary>
+        internal static void Last324(int today, out int pieces, out int piecesOut, out int townsOut)
+        {
+            bool ok = _w324Day == today;
+            pieces = ok ? _w324Pieces : 0; piecesOut = ok ? _w324PiecesOut : 0; townsOut = ok ? _w324TownsOut : 0;
+        }
 
         private static void Reset322()
         {
             _w322SessPieces = _w322SessRations = 0.0; _w322SessGold = 0;
             _w322Stum = _w322StumAll = 0; _w322OffLogged = false;
+            _w324Day = int.MinValue; _w324Pieces = _w324PiecesOut = _w324TownsOut = 0;
         }
 
         private static void Stumble322(string where, Exception e)
@@ -83,8 +93,11 @@ namespace Armoury
         }
 
         /// <summary>Ile racji wies moze dzis sprzedac na polke (zapas ponad rezerwe rozlozony na reszte zimy) i ile racji to jedna sztuka; false - wies nie sprzedaje
-        /// (licznik przyczyny). Wyjatek leci do wolajacego.</summary>
-        private static bool W322Village(Village v, int today, double keepDays, double spread, double kgSigma, out double dayR, out double rpp, ref int atFloor, ref int noKcal, ref int notToday)
+        /// (licznik przyczyny). Wyjatek leci do wolajacego.
+        /// 324: `bal` (klucz Winter Grain From Winter Balance) - wolne z bilansu zimy: max(0, zapas - floor - left x def) / left racji na dobe
+        /// (StartCalibration.WinterBalance324) zamiast zapasu ponad stala rezerwe / spread; `kprWorld` (klucz Winter Grain All Towns, inaczej NaN) - kcal racji wsi bez
+        /// rachunku KS (licznik kw).</summary>
+        private static bool W322Village(Village v, int today, double keepDays, double spread, double kgSigma, bool bal, int left, double kprWorld, out double dayR, out double rpp, ref int atFloor, ref int noKcal, ref int notToday, ref int kw)
         {
             dayR = 0.0; rpp = 0.0;
             if (v == null || v.Settlement == null || v.VillageState != Village.VillageStates.Normal || v.Settlement.IsUnderRaid) return false;
@@ -92,13 +105,24 @@ namespace Armoury
             if (!Famine.DayOf(v, out home, out harv, out food0, out vcap, out u, out d) || d != today || u > 0f || !(home > 0.0)) { notToday++; return false; }
             double food;
             if (!Famine.FoodOf(v, out food)) { notToday++; return false; }   // zapas po p6 tej doby
-            double spare = food - keepDays * home;
+            double spare, sp;
+            if (bal && left > 0)
+            {
+                // 324: bilans zimy - zapas ponad prog racjonowania i ponad brak wlasnego stolu do wiosny (left x def), rozlozony na reszte zimy
+                double def = StartCalibration.WinterDeficit324(v);
+                if (double.IsNaN(def)) def = Math.Max(0.0, home - harv);           // wies poza KS: plon Famine bez zakupow
+                var s0 = Settings.Current;
+                double floor = Math.Max(0, s0 != null ? s0.FamineRationDays : 90) * home;
+                spare = food - floor - left * def; sp = left;
+            }
+            else { spare = food - keepDays * home; sp = spread; }
             if (!(spare > 0.0)) { atFloor++; return false; }
             double k = StartCalibration.KcalPerRation322(v);
+            if (double.IsNaN(k) && !double.IsNaN(kprWorld)) { k = kprWorld; kw++; }   // 324: wies bez rachunku KS - kcal racji sredni swiata
             if (double.IsNaN(k)) { noKcal++; return false; }
             rpp = W322KcalGrain * kgSigma / k;
             if (!(rpp > 0.0) || double.IsInfinity(rpp)) { noKcal++; return false; }
-            dayR = spare / spread;
+            dayR = spare / sp;
             return true;
         }
 
@@ -126,6 +150,9 @@ namespace Armoury
             { int season, sday, len; if (winter && WesterosClimate.SeasonInfo(out season, out sday, out len) && season == (int)CampaignTime.Seasons.Winter && len > 0) left = Math.Max(0, len - sday + 1); }
             double spread = Math.Max(W322SpreadMin, left);
             bool inWinter = winter && left > 0;   // recenzja 322c: tylko zima (poza zima nic - bez rozkladu 1/91 przez caly rok)
+            bool bal324 = s.WinterGrainFromWinterBalance, all324 = s.WinterGrainAllTowns;   // 324: wolne z bilansu zimy; miasta poza ZC4 i wsie bez rachunku KS
+            double kprW = all324 && applied ? StartCalibration.KcalPerRationWorld324(today) : double.NaN;
+            int outTowns = 0, outFed = 0, kwVills = 0; long outPieces = 0;
             var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
             var gcat = grain != null ? grain.ItemCategory : null;
             int wv = grain != null ? Math.Max(1, HistoricalPrices.ShelfWorth(grain)) : 1;   // paczka 121: jednostka polki = waga sztuki
@@ -147,7 +174,15 @@ namespace Armoury
                         if (OthersRise.IsWhiteWalkerClan(st.MapFaction as Clan)) { walkers++; continue; }
                         if (st.IsUnderSiege) { besieged++; continue; }
                         double dp, tstar;
-                        if (!StartCalibration.Grain322(town, out dp, out tstar) || dp < 0.5) { noKs++; continue; }
+                        bool outZ = false;
+                        if (!StartCalibration.Grain322(town, out dp, out tstar))
+                        {
+                            // 324 (Winter Grain All Towns): miasto poza ZC4 - popyt dobowy z modelu jedzenia miasta w grze (spozycie Food jak p6), cel polki 2 doby
+                            if (!all324) { noKs++; continue; }
+                            dp = Cons(town); tstar = W322DayCapDays; outZ = true;
+                        }
+                        if (dp < 0.5) { noKs++; continue; }
+                        if (outZ) outTowns++;
                         int shelf = st.ItemRoster.GetItemNumber(grain);
                         int inc = KsFoodCarts.Incoming(st, StartCalibration.ZGrain);
                         float ix = 1f;
@@ -181,7 +216,7 @@ namespace Armoury
                             for (int i = 0; i < bv.Count; i++)
                             {
                                 double r, rpp;
-                                if (!W322Village(bv[i], today, keepDays, spread, kgSigma, out r, out rpp, ref atFloor, ref noKcal, ref notToday)) continue;
+                                if (!W322Village(bv[i], today, keepDays, spread, kgSigma, bal324, left, kprW, out r, out rpp, ref atFloor, ref noKcal, ref notToday, ref kwVills)) continue;
                                 int a = (int)Math.Min(int.MaxValue, Math.Floor(r / rpp));
                                 if (a < 1) { tiny++; continue; }
                                 cand.Add(bv[i]); dayR.Add(a); rppL.Add(rpp); giveN.Add(0); avail += a;
@@ -223,7 +258,8 @@ namespace Armoury
                                 int vg0 = v.Gold;
                                 if (pay > 0) { town.ChangeGold(-(int)pay); v.ChangeGold((int)pay); }
                                 vilIn += v.Gold - vg0;
-                                if (!any) { fedTowns++; firstSum += pp[Math.Min(pp.Count - 1, kAt)]; any = true; }
+                                if (!any) { fedTowns++; firstSum += pp[Math.Min(pp.Count - 1, kAt)]; any = true; if (outZ) outFed++; }
+                                if (outZ) outPieces += got;
                                 kAt += got;
                                 pieces += got; gold += pay; fedVills++; rppSum += rpp; rppN++;
                             }
@@ -242,6 +278,7 @@ namespace Armoury
                 }
             }
             _w322SessPieces += pieces; _w322SessRations += rations; _w322SessGold += gold;
+            _w324Day = today; _w324Pieces = (int)Math.Min(int.MaxValue, pieces); _w324PiecesOut = (int)Math.Min(int.MaxValue, outPieces); _w324TownsOut = outFed;
             if (s.LogEnabled)
             {
                 after.Sort();
@@ -249,7 +286,10 @@ namespace Armoury
                 sb.Append("Zboze zima (322c): dzien ").Append(today)
                   .Append(!live ? " | SPICHLERZE WSI NIECZYNNE (Famine albo p6) - nic" : !applied ? " | KS NIE ZASTOSOWANY (brak popytu zaplaconego ZC4) - nic" : grain == null ? " | BRAK towaru grain - nic" : !inWinter ? " | POZA ZIMA - nic" : " | CZYNNE")
                   .Append(" | zima ").Append(winter ? "TAK" : "NIE").Append(" (do konca ").Append(left).Append(" dni; wies rozklada zapas ponad rezerwe na ").Append(F(spread, "0")).Append(" dni)")
-                  .Append(" | rezerwa wsi ").Append(F(keepDays, "0")).Append(" dni wlasnej potrzeby (klucz ").Append(keepKey).Append(", bramka krainy ").Append(StartCalibration.LandGateFloorDays).Append(')')
+                  .Append(bal324 ? " | rezerwa wsi z bilansu zimy (324): prog racjonowania Famine + brak wlasnego stolu x dni do konca zimy, wolne rozlozone na reszte zimy"
+                                 : " | rezerwa wsi " + F(keepDays, "0") + " dni wlasnej potrzeby (klucz " + keepKey + ", bramka krainy " + StartCalibration.LandGateFloorDays + ")")
+                  .Append(" | 324 caly swiat ").Append(all324 ? "TAK" : "NIE").Append(": miasta poza ZC4 z popytem z modelu gry ").Append(outTowns).Append(", zasilone ").Append(outFed).Append(", ").Append(outPieces)
+                  .Append(" szt.; wsie z kcal racji swiata ").Append(kwVills).Append(" (").Append(F(kprW, "0")).Append(" kcal)")
                   .Append(" | miast ").Append(towns).Append(" (oblezone ").Append(besieged).Append(", Innych ").Append(walkers).Append(", poza ZC4 ").Append(noKs).Append(')')
                   .Append(" | z sygnalem ").Append(sig).Append(" (polka < ").Append(F(W322ShelfLowDays, "0.0")).Append(" dnia popytu ").Append(sigShelf).Append(", indeks >= ").Append(F(trigIx, "0.0")).Append(' ').Append(sigIx)
                   .Append("; polka pelna do celu ").Append(full).Append(", bez kasy ").Append(noGold).Append(", bez wsi z zapasem ").Append(noVill).Append(", bez wyceny ").Append(noPrice).Append(')')

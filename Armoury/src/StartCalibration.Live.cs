@@ -70,6 +70,9 @@ namespace Armoury
             // indeks towaru dostawy (KsDeliver.ItemIds) i cel na targ w kg/d po k
             public int FachI = -1; public double FachKg;
             public bool FachLive;                              // m106 recenzja Z5: fach zywca (bydlo, swinie, owce) - regula A7 porownuje produkcje (na targ + zjedzone)
+            // 324 (glod zimy, StartCalibration.Glod324.cs; pamiec sesji, z ostatniego przeliczenia okregu): brak wlasnego stolu (racje/d - koszyk, ktorego dom nie robi; NaN - brak
+            // rachunku), koszyk jedzenia pokryty dzis ze stodoly wsi (racje/d i kcal/d) i kg zboza zdjete z koszyka (zboze, ktorego wies nie kupi w miescie)
+            public double DefR324 = double.NaN, BarnR324, BarnKcal324, BarnGrainKg324;
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed;
@@ -695,6 +698,7 @@ namespace Armoury
             try { FloorDaily(day); } catch (Exception e) { Stumble("FloorDaily", e); }
             if (today >= DDay) { try { ShelfLine(day); } catch (Exception e) { Stumble("ShelfLine", e); } try { GoodsCsv(day); } catch (Exception e) { Stumble("GoodsCsv", e); } }
             try { OwnLine(day); } catch (Exception e) { Stumble("OwnLine", e); }
+            try { Line324(day); } catch (Exception e) { Stumble("Line324", e); }   // 324: glod zimy - koszyk ze stodoly, bilans zimy, dowoz 322c, bramka zima
             // polki startu w dobie D (rozdz. 6) - raz; potem srednie cen od zera (A7 i regale od D na cenach po rampie)
             if (!_shelvesDone && today >= DDay) { try { StartShelves(today); } catch (Exception e) { Stumble("StartShelves", e); } _shelvesDone = true; RulePxReset(); }
             try { R4cPriceRestart(today); } catch (Exception e) { Stumble("R4cPriceRestart", e); }   // KS r4 P7 (r4-ceny, Ks Price Restart): srednie cen od nowa w D+14
@@ -877,6 +881,9 @@ namespace Armoury
             Zc4EnsureMap();
             var kg = new double[ZN];
             KsBasket.VillageKg(ld.FullNeed, ld.OwnNeed, res.Own, kg);
+            // 324 (klucz Winter Villages Eat Own Granary): zima - wies najpierw je ze swojej stodoly (kcal zdjete z koszyka jedzenia, zboze pierwsze); poza zima 0
+            double cover = 0.0;
+            try { cover = Barn324(ld, res, kg); } catch (Exception e) { cover = 0.0; ld.BarnR324 = ld.BarnKcal324 = ld.BarnGrainKg324 = 0.0; Stumble("Barn324", e); }
             double sigma = Math.Max(1, DailyLife.KsSigma);
             var q = new float[ZN]; var qp = new float[ZN];
             var pz = ld.PaidZ; double want = 0, paidK = 0;
@@ -893,7 +900,14 @@ namespace Armoury
             float bs;
             double bought = ld.V != null && _zvBought.TryGetValue(ld.V, out bs) && bs >= 0f ? bs : (want > 0 ? paidK / want : 1.0);
             double frac = Math.Max(0.0, Math.Min(1.0, ld.HomeKcalFrac));
-            ld.HomeKcal = want * Math.Max(0.0, Math.Min(frac, 1.0 - Math.Max(0.0, Math.Min(1.0, bought))));
+            if (cover > 0.0 && want + cover > 0.0)
+            {
+                // 324: jedzenie robione w domu najwyzej z czesci pelnego koszyka, ktorej nie kupiono i nie pokrywa stodola (bez liczenia tych samych kcal dwa razy -
+                // racje KS bez jedzenia z niczego; brak schodzi ze spichlerza w Famine.Daily); bez pokrycia - wzor co do bitu jak dotad
+                double wf = want + cover, bF = Math.Max(0.0, Math.Min(1.0, bought)) * want / wf;
+                ld.HomeKcal = wf * Math.Max(0.0, Math.Min(frac, 1.0 - bF - cover / wf));
+            }
+            else ld.HomeKcal = want * Math.Max(0.0, Math.Min(frac, 1.0 - Math.Max(0.0, Math.Min(1.0, bought))));
             ld.WantKcal = want; ld.PaidKcal = paidK;
             return q;
         }

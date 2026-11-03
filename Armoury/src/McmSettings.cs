@@ -4172,6 +4172,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float WinterGrainTriggerIndex { get; set; } = 5f;
 
+        [SettingPropertyBool("Winter Villages Eat Own Granary", HintText = "with Start Calibration applied: in winter a village first eats from its own granary what its fields and homes no longer give (spread over the rest of the winter, never below the rationing level) and buys in town only what the granary cannot cover; grain first, then the rest of its food. Off = villages buy their whole shortfall in town, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterVillagesEatOwnGranary { get; set; } = true;
+
+        [SettingPropertyBool("Winter Grain From Winter Balance", HintText = "with Winter Grain To Market: a village sells onto the stall what its granary holds above the rationing level and above its own shortfall until spring, spread over the rest of the winter, instead of only what lies above a fixed reserve (Winter Grain Keep Days). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterGrainFromWinterBalance { get; set; } = true;
+
+        [SettingPropertyBool("Winter Grain All Towns", HintText = "with Winter Grain To Market: towns without the market basket (lands returned to the game's rules) also get grain from their villages' granaries onto the stall, by the game's own food use of the town. Off = only towns with the market basket", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterGrainAllTowns { get; set; } = true;
+
+        [SettingPropertyBool("Winter Land Gate Planned Draw", HintText = "with Start Calibration applied: in winter the land gate does not count what villages eat from their granaries by plan as a loss, and returns a land to the game's rules only when its granaries will not last until spring. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterLandGatePlannedDraw { get; set; } = true;
+
         [SettingPropertyBool("Watch Law Enabled", HintText = "every man who joins the Night's Watch comes from the Seven Kingdoms: first the convicts sent to the Wall, then outlaws who take the black, then common folk of every land by its numbers. A brother never goes home: routed or disbanded he walks back to the Wall, and a deserter hides among the outlaws of the North", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool WatchLawEnabled { get; set; } = true;
@@ -12306,6 +12322,10 @@ namespace Armoury
             s.WinterGrainToMarket = WinterGrainToMarket;
             s.WinterGrainKeepDays = WinterGrainKeepDays;
             s.WinterGrainTriggerIndex = WinterGrainTriggerIndex;
+            s.WinterVillagesEatOwnGranary = WinterVillagesEatOwnGranary;
+            s.WinterGrainFromWinterBalance = WinterGrainFromWinterBalance;
+            s.WinterGrainAllTowns = WinterGrainAllTowns;
+            s.WinterLandGatePlannedDraw = WinterLandGatePlannedDraw;
             s.WatchLawEnabled = WatchLawEnabled;
             s.WatchPoolSharePercent = WatchPoolSharePercent;
             s.WatchDoesNotRaid = WatchDoesNotRaid;
