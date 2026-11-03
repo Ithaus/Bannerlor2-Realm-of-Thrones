@@ -62,7 +62,7 @@ namespace Armoury
     /// BE dziala. Stan bez zapisu: zakup dnia widac w bilansie do konca doby zakupu (po wczytaniu dymek bez zakupu do pierwszego Daily). Moze isc z watkow AI (postfiks): tylko
     /// odczyty, ksiega dnia (slownik + doba) podmieniana w calosci (bez blokad), liczniki Interlocked. Potkniecia liczone per miejsce (bez globalnych wylacznikow, CLAUDE.md 7).
     /// </summary>
-    internal static class TownGranary
+    internal static partial class TownGranary
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const double KeepShare = 0.98;        // wies trzyma do 98% sufitu spichlerza (2 lata potrzeby) - ponad to sprzedaje miastu (WallTribute CapFill)
@@ -128,6 +128,7 @@ namespace Armoury
             _stumbles = _stumblesAll = 0;
             lock (_errSites) _errSites.Clear();
             _offLogged = false;
+            Reset322();   // 322c: zboze zima - liczniki sesji
         }
 
         private static void Stumble(string where, Exception e)
@@ -542,6 +543,9 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Daily(miasto)", e); }
             }
+            // 322c (Jeff 03.11): zboze zima - wsie sprzedaja zboze ze spichlerza na polke targu miasta (pusta polka albo cena pod sufitem); sprzedaz tej doby
+            // w tej samej ksiedze racji (soldV) - bramka krainy KS liczy ja jako targ, nie spadek spichlerza (SoldToday). Po p6: czyta zapas po sprzedazy miastu.
+            try { Winter322(s, today, live, soldV); } catch (Exception e) { Stumble("Winter322", e); }
             _today = new DayBook(next, soldV, today);
             _sessUnits += units; _sessRations += rations; _sessGold += gold;
             if (!s.LogEnabled) { NewDay(); return; }
