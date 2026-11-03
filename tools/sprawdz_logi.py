@@ -93731,5 +93731,151 @@ def main(argv):
     return _chleb322f_main_prev(argv)
 
 
+# ------------------------------------------------------------ paczka 323b: grupa odsprzedaz323b - odkup warsztatu gracza z doplata kasy miasta (Workshop Resale Town Pays)
+# Linia "Odsprzedaz warsztatu gracza (323b): dzien N" (jedna na sprzedaz) i dopisek linii "Warsztaty towarowe" "(323b: odsprzedazy N, w tym kasa miasta M)". Sprawdza:
+#  O323B-0 linie sa (INFO bez sprzedazy); O323B-1 zaplacone = kupiec + kasa, zaplacone + zabraklo = cena; O323B-2 kasa <= nadwyzka przed, klucz NIE albo oblezone -> kasa 0;
+#  O323B-3 zabraklo > 0 tylko gdy kasa wydala cala nadwyzke (albo klucz NIE / oblezone); O323B-4 cena <= wycena bez przyciecia; O323B-5 suma dopiskow dnia = suma linii (INFO przy roznicy);
+#  O323B-6 sumy (INFO).
+O323B_RE = re.compile(r"Odsprzedaz warsztatu gracza \(323b\): dzien (-?\d+) \| (.*?) -> (.*?)( \(bankructwo\))? \| cena odkupu (\d+) \(wycena bez przyciecia do kies (-?\d+), udzial ([\d.]+)\) "
+                      r"\| kupiec z kiesy (\d+), kasa miasta (\d+) \(nadwyzka ponad zapas przed (\d+), Workshop Resale Town Pays (TAK|NIE)(, oblezone)?\), zaplacone (\d+), zabraklo (-?\d+) "
+                      r"\| kupiec agentem miasta: nadwyzka kiesy ponad 10500 do kasy miasta \(Notable Gold Real (TAK|NIE)\)\.")
+O323B_DAY = re.compile(r"Warsztaty towarowe: dzien (\d+) \|.*?\(323b: odsprzedazy (\d+), w tym kasa miasta (\d+)\)")
+
+
+def odsprzedaz323b_collect(logp):
+    D = {"rows": [], "days": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            m = O323B_RE.search(line)
+            if m:
+                D["rows"].append({"day": int(m.group(1)), "shop": m.group(2), "buyer": m.group(3), "fail": bool(m.group(4)), "price": int(m.group(5)),
+                                  "fair": int(m.group(6)), "share": float(m.group(7)), "buyerpaid": int(m.group(8)), "town": int(m.group(9)),
+                                  "spare": int(m.group(10)), "on": m.group(11) == "TAK", "siege": bool(m.group(12)), "paid": int(m.group(13)),
+                                  "short": int(m.group(14)), "ngr": m.group(15) == "TAK"})
+                continue
+            d = O323B_DAY.search(line)
+            if d:
+                D["days"].append((int(d.group(1)), int(d.group(2)), int(d.group(3))))
+    return D
+
+
+def odsprzedaz323b_rows(rep, D):
+    L = D["rows"]
+    if not L:
+        rep.add("O323B-0: linie odsprzedazy 323b", f"brak (dopiskow dnia 323b {len(D['days'])})", "sprzedaz warsztatu gracza w biegu", None)
+        for n in ("O323B-1", "O323B-2", "O323B-3", "O323B-4"):
+            rep.add(f"{n}: brak linii odsprzedazy", "-", "INFO", None)
+    else:
+        rep.add("O323B-0: linie odsprzedazy 323b", f"{len(L)} (z bankructwa {sum(1 for x in L if x['fail'])})", "> 0", True)
+        bad = [f"d{x['day']} {x['shop']}" for x in L if x["paid"] != x["buyerpaid"] + x["town"] or x["paid"] + x["short"] != x["price"] or x["short"] < 0]
+        rep.add("O323B-1: zaplacone = kupiec + kasa, zaplacone + zabraklo = cena", f"niespojnych {len(bad)}" + (f" [{'; '.join(bad[:5])}]" if bad else ""), "0", not bad)
+        bad = [f"d{x['day']} {x['shop']} kasa {x['town']}/{x['spare']}" for x in L
+               if x["town"] > x["spare"] or ((not x["on"] or x["siege"]) and x["town"] > 0)]
+        rep.add("O323B-2: kasa miasta najwyzej z nadwyzki, klucz NIE / oblezone - 0", f"naruszen {len(bad)}" + (f" [{'; '.join(bad[:5])}]" if bad else ""), "0", not bad)
+        bad = [f"d{x['day']} {x['shop']} zabraklo {x['short']}, kasa {x['town']}/{x['spare']}" for x in L
+               if x["short"] > 0 and x["on"] and not x["siege"] and x["town"] < x["spare"]]
+        rep.add("O323B-3: brak tylko przy wyczerpanej nadwyzce kasy", f"naruszen {len(bad)}" + (f" [{'; '.join(bad[:5])}]" if bad else ""), "0", not bad)
+        bad = [f"d{x['day']} {x['shop']} {x['price']}>{x['fair']}" for x in L if x["fair"] >= 0 and x["price"] > x["fair"]]
+        rep.add("O323B-4: cena odkupu <= wycena bez przyciecia", f"naruszen {len(bad)}" + (f" [{'; '.join(bad[:5])}]" if bad else ""), "0", not bad)
+    if D["days"]:
+        sd, sl = sum(x[2] for x in D["days"]), sum(x["town"] for x in L)
+        nd, nl = sum(x[1] for x in D["days"]), len(L)
+        ok = True if (sd == sl and nd == nl) else None
+        rep.add("O323B-5: dopiski dnia (odsprzedazy, kasa miasta) = linie odsprzedazy", f"dzien {nd}/{sd} zl, linie {nl}/{sl} zl",
+                "rowne (roznica na brzegu logu - INFO)", ok)
+    else:
+        rep.add("O323B-5: dopiski dnia 323b", "brak (stary DLL)", "INFO", None)
+    if L:
+        rep.add("O323B-6: sumy (INFO)",
+                f"cena razem {sum(x['price'] for x in L)}, kupcy {sum(x['buyerpaid'] for x in L)}, kasy miast {sum(x['town'] for x in L)}, zabraklo {sum(x['short'] for x in L)}; "
+                f"wycena bez przyciecia {sum(max(0, x['fair']) for x in L)}; Notable Gold Real {'TAK' if L[-1]['ngr'] else 'NIE'}", "INFO", None)
+
+
+def o323b_line(day=109300, price=60000, fair=60000, buyer=9000, town=51000, spare=80000, on="TAK", siege="", short=0, fail="", paid=None):
+    paid = buyer + town if paid is None else paid
+    return (f"Odsprzedaz warsztatu gracza (323b): dzien {day} | Fairmarket armorsmithy -> Jon Snow{fail} | cena odkupu {price} (wycena bez przyciecia do kies {fair}, udzial 0.80) "
+            f"| kupiec z kiesy {buyer}, kasa miasta {town} (nadwyzka ponad zapas przed {spare}, Workshop Resale Town Pays {on}{siege}), zaplacone {paid}, zabraklo {short} "
+            f"| kupiec agentem miasta: nadwyzka kiesy ponad 10500 do kasy miasta (Notable Gold Real TAK).")
+
+
+def o323b_dayline(day=109300, n=1, town=51000):
+    return (f"Warsztaty towarowe: dzien {day} | warsztatow 291 | bankructwa 0; sprzedaz gracza notablom: zaplacone 60000, zabraklo kupcowi 0 "
+            f"(323b: odsprzedazy {n}, w tym kasa miasta {town}) | cena kupna dla gracza: mediana 11002.")
+
+
+def odsprzedaz323b_synth():
+    """O323B-S: dobry, niespojny, ponad nadwyzke, brak przy wolnej kasie, ponad wycene, klucz NIE z kasa, oblezone, stary DLL, pusty. None = OK."""
+    import tempfile
+    import shutil
+    runs = {
+        "good": [o323b_line(), o323b_line(price=30000, fair=90000, buyer=5000, town=20000, spare=20000, short=5000, fail=" (bankructwo)"),
+                 o323b_line(on="NIE", town=0, buyer=8000, price=8000, spare=0), o323b_dayline(n=3, town=71000)],
+        "sum": [o323b_line(paid=59000, short=1000), o323b_dayline(town=51000)],
+        "over": [o323b_line(spare=50000), o323b_dayline()],
+        "short": [o323b_line(price=70000, short=10000), o323b_dayline()],
+        "fair": [o323b_line(fair=50000), o323b_dayline()],
+        "off": [o323b_line(on="NIE"), o323b_dayline()],
+        "siege": [o323b_line(siege=", oblezone"), o323b_dayline()],
+        "old": ["Warsztaty towarowe: dzien 109300 | sprzedaz gracza notablom: zaplacone 0, zabraklo kupcowi 0 | cena kupna"],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"O323B-0": "TAK", "O323B-1": "TAK", "O323B-2": "TAK", "O323B-3": "TAK", "O323B-4": "TAK", "O323B-5": "TAK", "O323B-6": "INFO"},
+        "sum": {"O323B-1": "NIE", "O323B-2": "TAK"},
+        "over": {"O323B-2": "NIE", "O323B-1": "TAK"},
+        "short": {"O323B-3": "NIE", "O323B-1": "TAK"},
+        "fair": {"O323B-4": "NIE", "O323B-3": "TAK"},
+        "off": {"O323B-2": "NIE"},
+        "siege": {"O323B-2": "NIE"},
+        "old": {"O323B-0": "INFO", "O323B-5": "INFO"},
+        "empty": {"O323B-0": "INFO", "O323B-1": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="o323b_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            odsprzedaz323b_rows(rep, odsprzedaz323b_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def odsprzedaz323b_main(logp):
+    rep = Report()
+    try:
+        s2 = odsprzedaz323b_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("O323B-S: test syntetyczny (dobry, niespojny, ponad nadwyzke, brak przy wolnej kasie, ponad wycene, klucz NIE, oblezone, stary DLL, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("O323B-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = odsprzedaz323b_collect(logp)
+    print(f"plik: {logp} | linii odsprzedazy 323b {len(D['rows'])}, dopiskow dnia {len(D['days'])}")
+    odsprzedaz323b_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_odsprzedaz323b_main_prev = main
+
+
+def main(argv):
+    # paczka 323b: grupa odsprzedaz323b - opakowanie main jak bieg320d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "odsprzedaz323b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return odsprzedaz323b_main(rest[0] if rest else None)
+    return _odsprzedaz323b_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
