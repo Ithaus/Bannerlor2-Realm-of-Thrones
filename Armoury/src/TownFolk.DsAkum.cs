@@ -69,6 +69,7 @@ namespace Armoury
         private static void DaReset()
         {
             _daQ.Clear(); DaZero(); _daStSess = 0; _daErr.Clear(); _daTiSept = 0; _daBtIds = null;
+            P2Reset();                                                       // 322b: pomiar pieniadza w podkrokach DaWorksRun (sesja od nowa)
             _daStart = -1; _dvStart = -1; _daM9F = null; _daM9C = -1; _daM9T = 0;   // zapis arm_dsakum wczytuje ImportDsAkum po konstruktorze
         }
 
@@ -285,6 +286,13 @@ namespace Armoury
         /// </summary>
         internal static void DaWorksRun()
         {
+            P2Begin();                                                       // 322b: pomiar pieniadza w podkrokach (tylko log, klucz bisekcji f19-e1)
+            try { DaWorksRunCore(); }
+            finally { P2End(); }
+        }
+
+        private static void DaWorksRunCore()
+        {
             if (_daQ.Count == 0) return;
             long t0 = Stopwatch.GetTimestamp();
             var q = new List<DaOrder>(_daQ);
@@ -303,7 +311,12 @@ namespace Armoury
                     catch (Exception e) { DaStumble("DaWorksRun(zlecenie)", e); }
                     // recenzja: danina od skarbca wsi (DsHoardDueVillages) PO zleceniu i tylko u wsi, ktora nie znalazla materialu na wiecej niz polowe zlecenia robot
                     // (zgodnie z opisem klucza; resztki z zaokraglen sztuk sie nie licza) - nie zmniejsza budzetu robot, ktore znalazly material
-                    if (!o.Sept && o.Vil != null && (o.Amount - used) * 2 > o.Amount && s.DsHoardDueVillages) DaVillageDue(o.Vil);
+                    if (!o.Sept && o.Vil != null && (o.Amount - used) * 2 > o.Amount && s.DsHoardDueVillages)
+                    {
+                        P2Open(P2Due); P2TouchDue(o.Vil);                    // 322b: pomiar (tylko odczyt)
+                        try { DaVillageDue(o.Vil); }
+                        finally { P2Close(); }
+                    }
                 }
             }
             catch (Exception e) { DaStumble("DaWorksRun", e); }
@@ -339,11 +352,12 @@ namespace Armoury
             if (matBudget >= 1 && !empty.Contains(mk))
             {
                 var pcs = new int[Math.Max(BuildFunding.DsWorksMatCount, 1)];
+                P2Open(P2Buy); P2TouchSt(mk); P2TouchFolk(mf); if (o.Vil != null) P2TouchSt(o.Vil.Settlement); P2TouchFolk(o.Payer);   // 322b: pomiar (tylko odczyt)
                 var gf = GoodsLedger.Begin(GoodsLedger.FBuild, mk);   // ksiega towarow: material budow na rynek osady targu
                 bool none = false;
                 int drop = 0;
                 try { spent = BuildFunding.DsWorksBuy(mk, matBudget, items, pcs, out cap, out none, out drop); }
-                finally { GoodsLedger.End(gf); }
+                finally { GoodsLedger.End(gf); P2Close(); }
                 int took = 0;
                 for (int i = 0; i < pcs.Length; i++) { took += pcs[i]; if (i < _dwPcs.Length) _dwPcs[i] += pcs[i]; }
                 if (drop >= 0) { _daShelf += drop; _daTook += took; if (drop != took) _daShelfBad++; }   // recenzja: sztuki zdjete wedlug zmiany polki targu (niezaleznie od ShelfBuy.Take)
@@ -353,8 +367,16 @@ namespace Armoury
             _dwCap += cap;
             if (spent <= 0) { if (o.Sept) { _dsNoMat += o.Amount; _dsNoMatN++; } else { _dwNoMat += o.Amount; _dwNoMatN++; } return 0; }
             long wage = Math.Max(0, Math.Min((long)Math.Floor(k * spent), budget - spent));
-            if (o.Vil != null) return DaPayVillage(o, mk, mf, spent, wage);
-            return DaPayTown(o, mk, mf, spent, wage);
+            // 322b: pomiar podkroku zaplaty (tylko odczyt; P2Close w finally - wynik i wyjatek jak dotad)
+            if (o.Vil != null)
+            {
+                P2Open(P2Vil); P2TouchSt(o.Vil.Settlement); P2TouchSt(mk); P2TouchFolk(mf);
+                try { return DaPayVillage(o, mk, mf, spent, wage); }
+                finally { P2Close(); }
+            }
+            P2Open(P2Town); P2TouchSt(mk); P2TouchFolk(mf); P2TouchFolk(o.Payer);
+            try { return DaPayTown(o, mk, mf, spent, wage); }
+            finally { P2Close(); }
         }
 
         /// <summary>Wies placi: kiesa wsi -> kasa targu (material) i lud targu (rzemieslnicy). Towar juz zdjety - material zaplacony zawsze w calosci, ile kiesa ma. Zwraca zloto,
