@@ -1,6 +1,15 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
-## STAN 02.11.2026 ok. 03:30 CET: WGRANIE 154 (najnowszy)
+## STAN 03.11.2026 ok. 16:20 CET: WGRANIE 161 (najnowszy)
+- W GRZE: Armoury.dll da5a31022ce86f7f87403e031fe64198 (galaz noc/323x-integracja, wypchnieta) + CrashScribe 55ccc004 + ForgeView 8441ab0e. Baza testu: bannerlord-autotest	est\prod161.
+- Lancuch od 154: 155 (317-318: strzaly klute przed cietymi, ranni lordowie do niewoli, medycyna za jencow, panika wg dowodcow i tieru) -> 156-157 (319: jency lecza sie jak wojsko, weterani ucza, groty strzal wg tieru)
+  -> 158 (320: fabula ROT - Harrenhal/Dorzecze, Krwawe Gody bez pokoju, zwrot zamkow, pokoj do Bitwy Bekartow; korona bez bandytow; mury dla obroncow; piechota biegnie pod ostrzalem)
+  -> 159 (321: Krucze Zeby z ostatniego tieru, lista CRAFT bez dubli) -> 160 (322a-f audyt ekonomii) -> 161 (323a-d inwestycje, wg docs/PORADNIK-INWESTYCJE.md). Szczegoly: CHANGELOG na noc/323x-integracja.
+- DO SPRAWDZENIA w grze Jeffa: --grupa eat323c / wies323d / majatek323a / odsprzedaz323b; J319-2 (jency lecza sie ok. 0.64 tempa wojska); reszta budowy322b (-273/-382 na dobe poza mierzonymi posiadaczami);
+  wjazd do wsi glownej (316e, czekamy na log Jeffa).
+- DECYZJE JEFFA otwarte: wykup dlugu miast przez korone (322d wariant B), ZB-6 marsz noca po odpoczynku, dodatkowy sen pijanych, wczesne zalamanie bandytow.
+
+## STAN 02.11.2026 ok. 03:30 CET: WGRANIE 154
 - W GRZE: Armoury.dll 093080cecf8fd6fdd00d97502687793a (galaz noc/316x-integracja, commit c54658c3, wypchnieta) + CrashScribe aa32d04e. Baza testu: bannerlord-autotest	est\prod154.
 - Lancuch od 148: 149 (312g/h) -> 150 (313a arakhy, 312h oboz) -> 151 (noc/314x: 313b-d ostrzal/stamina/krwawienie + 313z zgon z krwawienia bez AV, 314a bez leczenia RBM,
   314b Indebted Lord 420 dob, 314c zold krolewski po 40 dniach + nagroda krola) -> 152 (315a sen do switu) -> 153 (315b noc 21-3, 315c 6 h snu bez dosypiania; WGRANE BEZ TESTU na polecenie Jeffa)
