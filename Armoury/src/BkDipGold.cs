@@ -66,6 +66,14 @@ namespace Armoury
     ///    turniejowa). Teraz prefiks zapamietuje kiese, finalizer daje to, co zeszlo, KASIE STOLICY krolestwa rodu dworzan (CapitalTreasury.CapitalOfKingdom - BK
     ///    BKCapitalBehavior, ta sama, w ktorej BK trzyma dwor; Note169 "inne"), czesc, ktorej kasa nie przyjela, i calosc bez stolicy - SKARBCOWI KROLESTWA
     ///    (KingdomBudgetWallet, migawka korony przesunieta - zapas, nie wplyw dnia), bez zywego krolestwa - wraca dworzaninowi (nic nie znika).
+    /// 8. WOLNY MAJATEK BK (323a, VacantEstatePriceToLord; Jeff 03.11 "majatek naprawa"): BK EstateAction.TakeAction (Buy, Estate.Owner == null, GoldCost &gt; 0;
+    ///    cena BKEstatesModel.GetBuy = max(500, 10% EstateValue), tylko gracz z EstateVM.ExecuteBuy) robi ActionTaker.ChangeHeroGold(-GoldCost) - zloto w nicosc
+    ///    (tekst BK "no seller"). Wolna ziemia wsi w BK nalezy do PANA WSI: ten sam GetBuy daje rodowi pana wioski wolny majatek za 50 wplywow bez zlota, a pana
+    ///    BK liczy przez VillageExtensions.GetActualOwner (glowa rodu wlasciciela; posiadacz tytulu de jure, gdy jest w tej samej frakcji) - wiec on jest sprzedawca.
+    ///    Teraz prefiks zapamietuje kiese kupca, finalizer daje to, co zeszlo (najwyzej GoldCost) PANU WSI (ChangeHeroGold bez zdarzenia - kupiec zaplacil bez
+    ///    zdarzenia, swiat w tej metodzie ma zmiane 0, jak CompFin; cena ziemi nie jest dochodem rodu, jak w LandSale); bez zywego pana (albo pan = kupiec) -
+    ///    kasa miasta handlu wsi (TradeTownOf, Note169 "inne"); bez nikogo albo gdy majatek nie przeszedl na kupca - wraca kupcowi (nic nie znika). Linia na kazdy
+    ///    zakup "Wolny majatek BK (323a): dzien N" + segment doby w linii E5/A8.
     /// Wyjatek per zdarzenie - licznik potkniec, bez globalnego wylacznika. Nic do zapisu (stan doby od zera po wczytaniu).
     /// </summary>
     internal static class BkDipGold
@@ -79,6 +87,7 @@ namespace Armoury
         internal static bool CourtShopOn { get { var s = Settings.Current; return s != null && s.CourtShoppingPaysTown; } }       // f19-e1 (5)
         internal static bool CompromiseOn { get { var s = Settings.Current; return s != null && s.GroupCompromisePaysGroup; } }   // f19-e1 (6)
         internal static bool CourtierOn { get { var s = Settings.Current; return s != null && s.CourtierGoldStaysInRealm; } }     // 322a (7)
+        internal static bool VacantOn { get { var s = Settings.Current; return s != null && s.VacantEstatePriceToLord; } }        // 323a (8)
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
         private const int KGentryGift = 15000;      // BK BKGentryBehavior.cs:522
@@ -90,6 +99,7 @@ namespace Armoury
         internal sealed class FeastCtx { public Hero H; public Town T; public long H0, T0; public MercFeast.Snap G; }   // G - E8/G2 (261): stan rynku i spizarni sprzed zakupow
         internal sealed class ShopCtx { public Hero H; public Town T; public int G0; }        // f19-e1 (5): glowa rodu i miasto targu zakupu dworu BK
         internal sealed class CompCtx { public Hero H; public object D; public int G0; }      // f19-e1 (6): platnik ugody i zadanie BK (Demand)
+        internal sealed class VacCtx { public Hero H; public object E; public Settlement S; public int G0, Cost; }   // 323a (8): kupiec, majatek, osada, kiesa przed, cena
 
         private const double GroupLeaderShare = 2.0 / 3.0;   // f19-e1 (6): "mostly to the leader" (tekst BK) - 2/3 przywodcy, reszta czlonkom
 
@@ -102,6 +112,8 @@ namespace Armoury
         private static FieldInfo _elimOther;        // Diplomacy EliminationOnPeace.OtherKingdom (recenzja)
         private static Type _demandT;               // f19-e1 (6): BK Demand
         private static PropertyInfo _dGroup, _gLeader, _gMembers;   // f19-e1 (6): Demand.Group, DiplomacyGroup.Leader / Members
+        private static PropertyInfo _eaType, _eaEstate, _eaGold, _eaTaker, _estData, _edSettl;   // 323a (8): EstateAction.Type / Estate / GoldCost / ActionTaker, Estate.EstatesData, EstateData.Settlement
+        private static MethodInfo _actualOwner;                     // 323a (8): BK VillageExtensions.GetActualOwner(Village)
 
         // liczniki doby
         private static long _gDue, _gPaid, _gCost, _gOff, _gOwnedCost;
@@ -121,6 +133,8 @@ namespace Armoury
         private static int _cN, _cMembersN, _cSeatN, _cKeptN, _cOffN, _cNoLeaderN;
         private static long _dPaid, _dTown, _dCrown, _dBack, _dOff;                                    // 322a (7)
         private static int _dN, _dTownN, _dCrownN, _dBackN, _dOffN;
+        private static long _vPaid, _vLord, _vTown, _vBack, _vUndo, _vOff, _vPlayer;                    // 323a (8)
+        private static int _vN, _vLordN, _vTownN, _vBackN, _vUndoN, _vOffN;
         private static int _overflow, _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly List<string> _wired = new List<string>(), _missing = new List<string>();
@@ -146,6 +160,7 @@ namespace Armoury
             _sPaid = _sToTown = _sPlayer = _sOff = 0; _sCalls = _sN = _sOffN = _sBroke = 0; _sDrained = 0;
             _cPaid = _cPlayer = _cLeader = _cMembers = _cSeat = _cKept = _cOff = _cToPlayer = 0; _cN = _cMembersN = _cSeatN = _cKeptN = _cOffN = _cNoLeaderN = 0;
             _dPaid = _dTown = _dCrown = _dBack = _dOff = 0; _dN = _dTownN = _dCrownN = _dBackN = _dOffN = 0;
+            _vPaid = _vLord = _vTown = _vBack = _vUndo = _vOff = _vPlayer = 0; _vN = _vLordN = _vTownN = _vBackN = _vUndoN = _vOffN = 0;
             _overflow = 0;
         }
 
@@ -618,6 +633,100 @@ namespace Armoury
             catch (Exception e) { Stumble("CourtierFin", e); }
         }
 
+        // ------------------------------------------------------------ 8. wolny majatek BK: EstateAction.TakeAction(Hero receiver) - Buy bez wlasciciela
+        public static void VacantPre(object __instance, out VacCtx __state)
+        {
+            __state = null;
+            try
+            {
+                if (!Live || __instance == null || _eaType == null) return;
+                var t = _eaType.GetValue(__instance, null);
+                if (t == null || t.ToString() != "Buy") return;
+                var est = _eaEstate.GetValue(__instance, null);
+                if (est == null || OwnerOf(est) != null) return;            // majatek z wlascicielem - BK placi wlascicielowi (GiveGoldAction)
+                int cost = (int)_eaGold.GetValue(__instance, null);
+                var h = _eaTaker.GetValue(__instance, null) as Hero;
+                if (cost <= 0 || h == null) return;                          // wolny majatek we wsi wlasnego rodu - 50 wplywow, bez zlota
+                var data = _estData.GetValue(est, null);
+                var st = data != null ? _edSettl.GetValue(data, null) as Settlement : null;
+                __state = new VacCtx { H = h, E = est, S = st, G0 = h.Gold, Cost = cost };
+            }
+            catch (Exception e) { __state = null; Stumble("VacantPre", e); }
+        }
+
+        /// <summary>Pan wsi wedlug BK (GetActualOwner - ten, ktory wolny majatek bierze za wplyw); zapasowo glowa rodu wlasciciela osady.</summary>
+        private static Hero LordOf(Settlement st)
+        {
+            if (st == null) return null;
+            Hero h = null;
+            try { if (st.IsVillage && st.Village != null && _actualOwner != null) h = _actualOwner.Invoke(null, new object[] { st.Village }) as Hero; } catch { h = null; }
+            if (h == null) { try { h = st.IsVillage ? (st.OwnerClan != null ? st.OwnerClan.Leader : null) : st.Owner; } catch { h = null; } }
+            return h;
+        }
+
+        /// <summary>Finalizer: to, co BK zdjal kupcowi wolnego majatku (ChangeHeroGold(-GoldCost) bez odbiorcy) - panu wsi; bez pana - kasie miasta handlu wsi; inaczej zwrot.</summary>
+        public static void VacantFin(VacCtx __state)
+        {
+            if (__state == null) return;
+            try
+            {
+                var h = __state.H;
+                long paid = Math.Min((long)__state.Cost, (long)__state.G0 - h.Gold);
+                if (paid <= 0) return;
+                _vN++; _vPaid += paid;
+                if (h == Hero.MainHero) _vPlayer += paid;
+                int day = (int)CampaignTime.Now.ToDays;
+                string vname = __state.S != null ? __state.S.Name.ToString() : "the village";
+                string where = __state.S != null ? __state.S.Name.ToString() + " (" + __state.S.StringId + ")" : "?";
+                if (!VacantOn)
+                {
+                    _vOffN++; _vOff += paid;                                  // klucz wylaczony - jak dotad (zloto w nicosc)
+                    Log.Info("Wolny majatek BK (323a): dzien " + day + " | kupiec " + h.Name + " | " + where + " | cena " + paid + " | KLUCZ WYLACZONY (Vacant Estate Price To Lord) - zloto w nicosc jak dotad.");
+                    return;
+                }
+                int x = (int)Math.Min(int.MaxValue, paid);
+                if (OwnerOf(__state.E) != h)
+                {
+                    // majatek nie przeszedl na kupca (wyjatek w BK po zaplacie) - zwrot kupcowi, nic nie znika
+                    h.ChangeHeroGold(x);
+                    _vUndo += paid; _vUndoN++;
+                    Log.Info("Wolny majatek BK (323a): dzien " + day + " | kupiec " + h.Name + " | " + where + " | cena " + paid + " | majatek NIE przeszedl na kupca - zwrot " + paid + " kupcowi.");
+                    return;
+                }
+                var lord = LordOf(__state.S);
+                if (Takes(lord) && lord != h)
+                {
+                    lord.ChangeHeroGold(x);
+                    CirculationWindows.NoteHeroGold(lord, x);                // bohater w swiecie - nic (jak CompFin); poza swiatem nie trafia (Takes)
+                    _vLord += paid; _vLordN++;
+                    Log.Info("Wolny majatek BK (323a): dzien " + day + " | kupiec " + h.Name + " | " + where + " | cena " + paid + " -> pan wsi " + lord.Name
+                             + " (" + (lord.Clan != null ? lord.Clan.Name.ToString() : "-") + ") " + paid + " | kiesa kupca " + __state.G0 + " -> " + h.Gold + ".");
+                    if (h == Hero.MainHero)
+                        Log.Player("You paid " + paid + " denars for the vacant estate in " + vname + " to its lord, " + lord.Name + ".");
+                    return;
+                }
+                long rest = paid;
+                var tt = TradeTownOf(__state.S);
+                if (tt != null && tt.Town != null)
+                {
+                    int had = tt.Town.Gold;
+                    tt.Town.ChangeGold(x);
+                    long got = (long)tt.Town.Gold - had;
+                    if (got > 0)
+                    {
+                        MoneyLedger.Note169(MoneyLedger.N169Other, tt, (int)Math.Min(int.MaxValue, got));   // kasa osady poza tickiem - nazwane ("inne")
+                        _vTown += got; _vTownN++; rest -= got;
+                    }
+                }
+                if (rest > 0) { h.ChangeHeroGold((int)Math.Min(int.MaxValue, rest)); _vBack += rest; _vBackN++; }   // bez odbiorcy - wraca kupcowi (nic nie znika)
+                Log.Info("Wolny majatek BK (323a): dzien " + day + " | kupiec " + h.Name + " | " + where + " | cena " + paid + " | bez zywego pana wsi (" + (lord != null ? lord.Name.ToString() : "brak")
+                         + (lord == h ? " = kupiec" : "") + ") -> kasa miasta " + (tt != null ? tt.Name.ToString() : "brak") + " " + (paid - rest) + ", wrocilo kupcowi " + rest + ".");
+                if (h == Hero.MainHero && paid - rest > 0 && tt != null)
+                    Log.Player("You paid " + (paid - rest) + " denars for the vacant estate in " + vname + " to the treasury of " + tt.Name + ".");
+            }
+            catch (Exception e) { Stumble("VacantFin", e); }
+        }
+
         // ------------------------------------------------------------ wpiecia (SubModuleMain - po SmallGold)
         private static void Patch(Harmony h, string label, MethodBase m, string pre, string fin)
         {
@@ -686,6 +795,40 @@ namespace Armoury
             var drain = cbT != null ? AccessTools.DeclaredMethod(cbT, "DrainGold", new[] { typeof(Hero) }) : null;
             if (drain != null && (drain.IsStatic || drain.ReturnType != typeof(void))) drain = null;
             Patch(h, "zloto dworzan (BK BKCourtierBehavior.DrainGold)", drain, nameof(CourtierPre), nameof(CourtierFin));
+            // 323a (8): wolny majatek - TakeAction zadeklarowana (override) w EstateAction (DeclaredMethod; metoda bazowa jest abstrakcyjna)
+            var eaT = AccessTools.TypeByName("BannerKings.Managers.Populations.Estates.EstateAction");
+            var edT = AccessTools.TypeByName("BannerKings.Managers.Populations.Estates.EstateData");
+            var veT = AccessTools.TypeByName("BannerKings.Extensions.VillageExtensions");
+            _eaType = eaT != null ? AccessTools.Property(eaT, "Type") : null;
+            _eaEstate = eaT != null ? AccessTools.Property(eaT, "Estate") : null;
+            _eaGold = eaT != null ? AccessTools.Property(eaT, "GoldCost") : null;
+            _eaTaker = eaT != null ? AccessTools.Property(eaT, "ActionTaker") : null;
+            _estData = est != null ? AccessTools.Property(est, "EstatesData") : null;
+            _edSettl = edT != null ? AccessTools.Property(edT, "Settlement") : null;
+            _actualOwner = veT != null ? AccessTools.DeclaredMethod(veT, "GetActualOwner", new[] { typeof(Village) }) : null;
+            if (_actualOwner != null && _actualOwner.ReturnType != typeof(Hero)) _actualOwner = null;
+            var take = eaT != null ? AccessTools.DeclaredMethod(eaT, "TakeAction", new[] { typeof(Hero) }) : null;
+            bool vacOk = take != null && _eaType != null && _eaEstate != null && _eaGold != null && _eaGold.PropertyType == typeof(int) && _eaTaker != null
+                         && _eaTaker.PropertyType == typeof(Hero) && _estOwner != null && _estData != null && _edSettl != null && _edSettl.PropertyType == typeof(Settlement);
+            Patch(h, "wolny majatek (BK EstateAction.TakeAction)", vacOk ? take : null, nameof(VacantPre), nameof(VacantFin));
+            if (vacOk && _actualOwner == null) _missing.Add("pan wsi wedlug BK (VillageExtensions.GetActualOwner) - zapasowo glowa rodu wlasciciela");
+            if (vacOk && h != null)
+            {
+                try
+                {
+                    var pi = Harmony.GetPatchInfo(take);
+                    if (pi != null)
+                    {
+                        var own = new List<string>();
+                        foreach (var q in pi.Prefixes) if (q.owner != h.Id && !own.Contains(q.owner)) own.Add(q.owner);
+                        foreach (var q in pi.Postfixes) if (q.owner != h.Id && !own.Contains(q.owner)) own.Add(q.owner);
+                        foreach (var q in pi.Transpilers) if (q.owner != h.Id && !own.Contains(q.owner)) own.Add(q.owner);
+                        foreach (var q in pi.Finalizers) if (q.owner != h.Id && !own.Contains(q.owner)) own.Add(q.owner);
+                        if (own.Count > 0) Log.Info("BK i Diplomacy (E5/A8): wolny majatek (323a) - EstateAction.TakeAction latany tez przez: " + string.Join(", ", own.ToArray()) + ".");
+                    }
+                }
+                catch { }
+            }
             _wiredText = _wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-";
             _missingText = _missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-";
             Log.Info("BK i Diplomacy (E5/A8): latki przy starcie gry - wpiete: " + _wiredText + "; BRAK: " + _missingText + ".");
@@ -706,6 +849,7 @@ namespace Armoury
                              + ", Feast Town Gets Paid " + (FeastOn ? "tak" : "nie") + ", Pact Cost To Other Realm " + (PactOn ? "tak" : "nie")
                              + ", Court Shopping Pays Town " + (CourtShopOn ? "tak" : "nie") + ", Group Compromise Pays Group " + (CompromiseOn ? "tak" : "nie")   // f19-e1
                              + ", Courtiers' Gold Stays In The Realm " + (CourtierOn ? "tak" : "nie")   // 322a
+                             + ", Vacant Estate Price To Lord " + (VacantOn ? "tak" : "nie")   // 323a
                              + " | latki: " + _wiredText + "; BRAK: " + _missingText + ".");
                 }
                 var sb = new StringBuilder(900);
@@ -743,6 +887,12 @@ namespace Armoury
                   .Append(", BK zdjal ").Append(_dPaid).Append(" -> kasy stolic ").Append(_dTown).Append(" (").Append(_dTownN).Append("), skarbce krolestw ").Append(_dCrown)
                   .Append(" (").Append(_dCrownN).Append("), wrocilo dworzanom ").Append(_dBack).Append(" (").Append(_dBackN).Append(')');
                 if (_dOffN > 0) sb.Append(", zniklo (klucz wylaczony) ").Append(_dOff).Append(" (").Append(_dOffN).Append(')');
+                // 323a (8): po dworzanach, przed kontrola; frazy wlasne (sprawdzarka --grupa majatek323a)
+                sb.Append(" | wolne majatki BK (323a)").Append(VacantOn ? "" : " WYLACZONE (Vacant Estate Price To Lord)").Append(": kupionych ").Append(_vN)
+                  .Append(", kupcy zaplacili ").Append(_vPaid).Append(" (gracz ").Append(_vPlayer).Append(") -> panom wsi ").Append(_vLord).Append(" (").Append(_vLordN)
+                  .Append("), kasom miast handlu wsi ").Append(_vTown).Append(" (").Append(_vTownN).Append("), wrocilo kupcom ").Append(_vBack + _vUndo).Append(" (").Append(_vBackN + _vUndoN)
+                  .Append("; w tym majatek nie przeszedl ").Append(_vUndoN).Append(')');
+                if (_vOffN > 0) sb.Append(", przepadlo (klucz wylaczony) ").Append(_vOff).Append(" (").Append(_vOffN).Append(')');
                 sb.Append(" | kontrola (prog 0): stos paktow przepelniony ").Append(_overflow).Append(", otwarte okna paktow ").Append(_pactDepth);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
                 Stage8World.BkSegment(sb);   // E8/P3 (245): dopisek pomiaru - zywnosc BK dla band hersztow i ujscia BK bez odbiorcy (tylko log; klucz Stage8WorldLog wylaczony = linia jak dotad)
