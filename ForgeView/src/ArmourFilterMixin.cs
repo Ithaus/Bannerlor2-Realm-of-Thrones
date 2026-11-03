@@ -256,18 +256,27 @@ namespace ForgeView
             {
                 if (_rangedInjected || ViewModel == null) return;
                 _rangedInjected = true;
-                int added = 0;
+                // 321b (Jeff 03.11 "czemu tyle strzal jest zdublowanych"): BK sam wypisuje strzaly i belty na sprzedaz
+                // (ArmorCraftingVM.RefreshValues - amunicja nie jest IsRangedWeapon ani IsMeleeWeapon, GetItemType = Ammo);
+                // dokladamy tylko to, czego na liscie jeszcze nie ma - tozsamosc przedmiotu, nigdy nazwa (GRE_* i serie wagowe to inne wyroby)
+                var have = new HashSet<ItemObject>();
+                foreach (var vm in _all)
+                    if (vm != null && vm.Item != null) have.Add(vm.Item);
+                int added = 0, merged = 0;
                 foreach (var item in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                 {
                     if (!RangedType(item) || BannedRanged(item)) continue;
+                    if (have.Contains(item)) { merged++; continue; }
                     try
                     {
                         _all.Add(new ArmorItemVM(ViewModel, item, ArmorCraftingVM.ItemType.Ammo));
+                        have.Add(item);
                         added++;
                     }
                     catch { }
                 }
-                if (added > 0) Log.Info("Luczarnia na polce: dolozono " + added + " wyrobow strzeleckich.");
+                if (added > 0 || merged > 0)
+                    Log.Info("Luczarnia na polce: dolozono " + added + " wyrobow strzeleckich; juz na liscie BK (bez drugiego wiersza - 321b): " + merged + ".");
             }
             catch (Exception e) { Log.Error("InjectRanged", e); }
         }
