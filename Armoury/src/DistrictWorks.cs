@@ -117,6 +117,7 @@ namespace Armoury
                 if (PaidDays.Count > 32) { var old = new List<int>(); foreach (var k in PaidDays.Keys) if (k < day - 27) old.Add(k); foreach (var k in old) PaidDays.Remove(k); }
             }
             public double PaidSince(int fromDay) { double s = 0; foreach (var kv in PaidDays) if (kv.Key >= fromDay) s += kv.Value; return s; }
+            public double DMk, DEat, MkAll, EatAll;                // 323c: wyplacone od ostatniej linii i od wczytania - z targu (wozy) i za to, co okreg zjada sam (pamiec sesji)
             // pamiec sesji
             public double Eff(int today)
             {
@@ -150,6 +151,7 @@ namespace Armoury
             public double Mk, Em; public bool Mkt;                // m114-prace: wartosc dnia towaru okregu na targ i dodatku na targ (KS); Mkt - sa liczby targu
             public bool Inc;                                      // m114-prace (recenzja): prace byly w rachunku KS - udzial z targu (takze 0, gdy caly dodatek zjedzony w okregu)
             public readonly Dictionary<string, double> EmPart = new Dictionary<string, double>(StringComparer.Ordinal);   // dodatek na targ czesci (podzial puli)
+            public readonly Dictionary<string, double> EaPart = new Dictionary<string, double>(StringComparer.Ordinal);   // 323c: caly dodatek czesci po czynnikach (zjedzone = Ea - Em)
             public readonly Dictionary<string, double> EPart = new Dictionary<string, double>(StringComparer.Ordinal); public readonly Dictionary<string, double> VPart = new Dictionary<string, double>(StringComparer.Ordinal); }
         private static readonly Dictionary<string, DistVal> _val = new Dictionary<string, DistVal>(StringComparer.Ordinal);
         private static readonly Dictionary<Village, double[]> _ksExtra = new Dictionary<Village, double[]>();   // pod KS: sztuki dodatku na dobe (ostatni rachunek okregu)
@@ -193,6 +195,7 @@ namespace Armoury
             }
             ViewDirty(); _dVwBox = _dVwTip = _vwStumble = 0;   // m115: widok finansow od nowa
             MenuReset();
+            EatsReset();                                                   // 323c
             DistrictWorksAi.Reset();
         }
 
@@ -296,6 +299,7 @@ namespace Armoury
             // m114-prace (recenzja): Phi - czesc dodatku czesci, ktora idzie na targ (H = r x Phi): prace w rachunku KS - zmierzona (dodatek na targ / caly dodatek
             // czesci), inaczej z towarow zajecia (towar z nadwyzka na targ - caly, towar, ktorego okreg ma za malo - zjedzony); PhiKind 0 - brak (1), 1 - zmierzona, 2 - z towarow
             public double Phi = 1; public int PhiKind;
+            public double EatK;                                   // 323c (klucz Works Pay District Eats): 1 - czesc dodatku zjedzona w okregu tez placi (cena polki), 0 - nie
         }
 
         /// <summary>Wyceny wszystkich czesci okregu (do menu, opisu, dymka, AI). false - okreg nieznany.</summary>
@@ -349,7 +353,10 @@ namespace Armoury
                         double am, aa;
                         if (inc && q.UEff > 0 && pa.TryGetValue(part, out aa) && aa > 0) { pm.TryGetValue(part, out am); q.Phi = Math.Max(0, Math.Min(1, am / aa)); q.PhiKind = 1; }
                         else { double fr; if (StartCalibration.WorksPartFrac(v, pc.Main ? null : pc.Uid, q.Craft, out fr)) { q.Phi = fr; q.PhiKind = 2; } }
-                        q.H = H * q.Phi;
+                        // 323c (Jeff 03.11 "tak i prawdziwa sprzedaz"): to, co okreg zje z dodatku, wies kupuje od inwestora z kiesy po cenie polki (bez r wozow) -
+                        // H czesci = r x czesc na targ + 1 x czesc zjedzona; ten sam wzor co wyplata doby (PayEaten), "still 12%" (Sensible) liczy z tego H
+                        q.EatK = EatsOn ? 1.0 : 0.0;
+                        q.H = H * q.Phi + q.EatK * (1.0 - q.Phi);
                     }
                     q.V = q.Craft >= 0 && q.Craft < pc.CraftVal.Length ? pc.CraftVal[q.Craft] : 0;
                     if (q.Craft >= 0 && KsTab.Crafts[q.Craft] == "cattle_farm") q.V += pc.CraftVal[KsTab.CCattleB];
@@ -1009,7 +1016,7 @@ namespace Armoury
                         for (int k = 0; k < ord.Count && left > 0; k++, left--) whole[ord[k]]++;
                         for (int i = 0; i < whole.Length; i++)
                         {
-                            rows[i].Out += whole[i]; rows[i].Paid7 += sh[i];
+                            rows[i].Out += whole[i]; rows[i].Paid7 += sh[i]; rows[i].DMk += whole[i]; rows[i].MkAll += whole[i];   // 323c: czesc z targu (linia wedlug prac)
                             if (pid != null && rows[i].Clan == pid) rows[i].AddPaid(today, whole[i]);   // m112-inwest: doba wyplaty (Fiefs, komunikat dnia)
                         }
                     }
@@ -1047,8 +1054,8 @@ namespace Armoury
             if (MarketShareOn)
             {
                 double mk, em;                                                // m114-prace: towar okregu na targ i dodatek na targ (ten sam rachunek KS co stawki wozow)
-                bool inc; var pm = new Dictionary<string, double>(StringComparer.Ordinal);
-                if (MarketNow(v, out mk, out em, out inc, pm, null)) { d.Mk = mk; d.Em = em; d.Mkt = true; d.Inc = inc; foreach (var kv in pm) d.EmPart[kv.Key] = kv.Value; }
+                bool inc; var pm = new Dictionary<string, double>(StringComparer.Ordinal); var pa = new Dictionary<string, double>(StringComparer.Ordinal);
+                if (MarketNow(v, out mk, out em, out inc, pm, pa)) { d.Mk = mk; d.Em = em; d.Mkt = true; d.Inc = inc; foreach (var kv in pm) d.EmPart[kv.Key] = kv.Value; foreach (var kv in pa) d.EaPart[kv.Key] = kv.Value; }
             }
             lock (Gate)
             {
@@ -1158,6 +1165,8 @@ namespace Armoury
                     if (v == null) continue;
                     var dv = ValOf(v);
                     if (dv != null) lock (Gate) _dExpected += (long)Math.Round(OwnShareExpected(id, dv));
+                    if (dv != null) { double ee = EatenExpected(id, dv, Settings.Current != null ? Math.Max(0f, Math.Min(1f, Settings.Current.DistrictWorksShare)) : 0.5); lock (Gate) _eExp += ee; }   // 323c (recenzja NPO-5): oczekiwane ze zjedzonego osobno - "wyplacone" linii doby liczy tylko wozy
+                    PayEaten(v, today);                                      // 323c: udzial inwestora w tym, co okreg zjada z dodatku - z kiesy wsi (DistrictWorks.Eats.cs)
                 }
                 if (!_recalcDone) RecalcNote();                              // m114-prace: raz po wczytaniu - komunikat, gdy dochod prac gracza po nowym wzorze inny
                 SideHLine(today);                                            // m114-prace (ryzyko 3): H wiosek pobocznych stare vs nowe - pierwsza doba i co 7 dob
@@ -1168,6 +1177,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily", e); }
             if (!On) return;
             double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency + pre;   // z krokiem przed produkcja doby
+            EatsLine(today - 1);                                             // 323c: linia wedlug prac - z targu / ze zjedzonego w okregu (nie rzuca)
             DayLine(today - 1, ms);
         }
 

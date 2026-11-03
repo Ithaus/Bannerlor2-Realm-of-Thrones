@@ -268,6 +268,8 @@ namespace Armoury
                 sb.Append("Your money: ").Append(Math.Round(100 * (1 - KM[q.WKind]))).Append("% wages to the villagers of ").Append(Name(v)).Append(", ").Append(Math.Round(100 * KM[q.WKind]))
                   .Append(q.WKind == KHerd ? "% for animals bought at " : "% for timber, tools and other goods bought at ").Append(tname).Append(". Ready in ").Append(KReady[q.WKind]).Append(" days.\n");
                 sb.Append(q.Name).Append(" then makes more, and half of what the extra sells for is yours, paid whenever ").Append(Name(v)).Append("'s carts come back from market. The lord and the village share the other half as usual. The first coins earn the most.\n");
+                // 323c: zjedzone w okregu tez placi (kiesa wsi, cena polki) - opis tylko przy kluczu
+                if (q.EatK > 0) sb.Append("What the district eats of the extra itself, its villagers buy from you: every day the village purse pays you half of it at ").Append(tname).Append(" prices (while the purse holds more than its rainy-day chest).\n");
                 // m114-prace: wycena z tego samego wzoru co wyplata - towar okregu na targ i prawdziwy utarg wozow (bez 7 dob pomiaru - srednia swiata)
                 // recenzja: "caly dodatek na targ" tylko, gdy tak jest (Phi >= 0.9); inaczej ile dodatku okreg zje sam (wyplata liczy tylko czesc na targ - ta sama liczba w wycenie)
                 if (q.ByMkt && q.MkDay > 0)
@@ -277,16 +279,18 @@ namespace Armoury
                         sb.Append(Name(v)).Append(" eats what it ate before - the extra all goes to market, where the district's goods for sale are worth about ").Append(Math.Round(q.MkDay).ToString("N0", Inv))
                           .Append(" a day").Append(carts).Append(".\n");
                     else if (q.Phi > 0.005)
-                        sb.Append(Name(v)).Append(" grows less of these goods than it eats, so it eats part of the extra itself - only about ").Append(Math.Round(100 * q.Phi)).Append("% of it goes to market, and only that part earns you coins. The district's goods for sale are worth about ")
+                        sb.Append(Name(v)).Append(" grows less of these goods than it eats, so it eats part of the extra itself - only about ").Append(Math.Round(100 * q.Phi)).Append("% of it goes to market")
+                          .Append(q.EatK > 0 ? "; the villagers pay you for the rest out of the village purse" : ", and only that part earns you coins").Append(". The district's goods for sale are worth about ")
                           .Append(Math.Round(q.MkDay).ToString("N0", Inv)).Append(" a day").Append(carts).Append(".\n");
                     else
-                        sb.Append(Name(v)).Append(" grows less of these goods than it eats, so for now it eats all of the extra itself - nothing of it reaches market, and you are paid only once the district has more than it eats.\n");
+                        sb.Append(Name(v)).Append(" grows less of these goods than it eats, so for now it eats all of the extra itself - nothing of it reaches market")
+                          .Append(q.EatK > 0 ? "; the villagers pay you for it out of the village purse every day.\n" : ", and you are paid only once the district has more than it eats.\n");
                 }
                 sb.Append("If raiders empty homesteads of ").Append(q.Name).Append(", ").Append(q.WKind == KHerd ? "they drive off your animals there - that part is lost; when people return you can buy them again." : "your works there burn" + (KL[q.WKind] < 1 ? " in part" : "") + "; when people return you can rebuild them for " + Math.Round(100 * KR[q.WKind]) + "% of the price.")
                   .Append(" At war with ").Append(st.MapFaction != null && st.MapFaction.Name != null ? st.MapFaction.Name.ToString() : "this realm").Append(" you are paid nothing. Your gold: ").Append(gold.ToString("N0", Inv)).Append('.');
                 string about = sb.ToString();
                 string realm = st.MapFaction != null && st.MapFaction.Name != null ? st.MapFaction.Name.ToString() : "this realm";
-                string rules = "Ready in " + KReady[q.WKind] + " days; paid when " + Name(v) + "'s carts come back. "
+                string rules = "Ready in " + KReady[q.WKind] + " days; paid when " + Name(v) + "'s carts come back" + (q.EatK > 0 ? " and daily for what the district eats. " : ". ")
                                + (q.WKind == KHerd ? "Raiders drive off the animals" : "Raiders burn the works" + (KL[q.WKind] < 1 ? " in part" : "") + " (rebuild for " + Math.Round(100 * KR[q.WKind]) + "%)")
                                + "; at war with " + realm + " you are paid nothing.";
                 // krotki opis (m115-okno): co robi, pelny sprzet i ile stoi, dochod z wiersza "full kit" (q.Room liczy tez puste zagrody, wiec nie "reszta" pelnego sprzetu), targ i wozy, zloto
@@ -311,9 +315,9 @@ namespace Armoury
                     if (q.Phi >= 0.9)
                         top.Append("Market: goods about ").Append(Math.Round(q.MkDay).ToString("N0", Inv)).Append(" a day").Append(q.HdDay > 0 ? ", carts about " + Math.Round(q.HdDay).ToString("N0", Inv) + " a day" : "").Append(".\n");
                     else if (q.Phi > 0.005)
-                        top.Append("Only ").Append(Math.Round(100 * q.Phi)).Append("% of the extra reaches market; goods about ").Append(Math.Round(q.MkDay).ToString("N0", Inv)).Append(" a day.\n");
+                        top.Append("Only ").Append(Math.Round(100 * q.Phi)).Append("% of the extra reaches market").Append(q.EatK > 0 ? ", the village buys the rest" : "").Append("; goods about ").Append(Math.Round(q.MkDay).ToString("N0", Inv)).Append(" a day.\n");
                     else
-                        top.Append("The district eats all the extra for now - no coins yet.\n");
+                        top.Append(q.EatK > 0 ? "The district eats all the extra for now - the village purse pays you for it.\n" : "The district eats all the extra for now - no coins yet.\n");
                 }
                 top.Append("Your gold: ").Append(gold.ToString("N0", Inv)).Append(". Hover a row for more.");
                 var amounts = new List<KeyValuePair<int, string>>
