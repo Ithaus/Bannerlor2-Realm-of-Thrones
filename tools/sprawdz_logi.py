@@ -92653,5 +92653,241 @@ def main(argv):
     return _bieg320d_main_prev(argv)
 
 
+# ---- paczka 322b: grupa budowy322b - pomiar pieniadza w podkrokach TownFolk.DaWorksRun (audyt ekonomii 03.11, wyciek 5) ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa budowy322b <Armoury-*.log>. Linia 'Budowy - pomiar (322b): dzien N' (TownFolk.Pomiar322b.cs, zaraz po DaWorksRun)
+# i krok 'Mark budowy' linii 'Odcinki ticku - bisekcja (f19-e1): dzien N' tej samej doby. Sam pomiar - zadnej zmiany logiki.
+# Dowod: Armoury-2026-11-03_00-19-16.log - krok 'Mark budowy' bisekcji ujemny 41/41 dob (-180..-368), sesja -11613; kontrolki DaWorksRun 0.
+# P322-S  self-test wyrazen (linia 322b i krok 'Mark budowy' bisekcji);
+# P322-S2 test syntetyczny (zgodny, rozjazd z bisekcja, potkniecia, stary DLL, pusty);
+# P322-0  linia 322b przy kazdej linii bisekcji (bisekcja bez 322b - DLL sprzed 322b - NIE);
+# P322-1  potkniecia pomiaru 0;
+# P322-2  'DaWorksRun swiat' = krok 'Mark budowy' bisekcji tej doby (ten sam przeglad posiadaczy - pomiar mierzy wlasciwe miejsce);
+# P322-3  tozsamosc linii: swiat = zloto swiata - nazwane i suma reszt podkrokow + poza dotknietymi = swiat;
+# P322-4  WYNIK: gdzie reszta - suma sesji wedlug podkroku (reszta w dotknietych), poza dotknietymi z probkami swiata i posiadaczami; reszta 0 - TAK,
+#         inaczej DECYZJA (miejsce znalezione - poprawka osobnym krokiem);
+# P322-5  latki Harmony na zloto (INFO) i czas pomiaru (najwiecej 50 ms na dobe).
+P322_RX = re.compile(
+    r"^Budowy - pomiar \(322b\): dzien (\d+) \| DaWorksRun swiat ([+-]\d+) \(zloto swiata ([+-]\d+) - pozycje nazwane ([+-]\d+); = krok 'Mark budowy' bisekcji f19-e1\) "
+    r"\| reszta pojawia sie: (.*?) \| podkroki \(reszta = zmiana dotknietych w swiecie - pozycje nazwane\): (.*?) \| suma reszt podkrokow ([+-]\d+), poza dotknietymi ([+-]\d+) "
+    r"\| posiadacze \(swiat wobec zmierzonego w podkrokach\): (.*?) \| dotkniete poza swiatem ([+-]\d+): pan Dead/Disabled (\d+), pan zywy poza Hero\.AllAliveHeroes (\d+) "
+    r"\(([+-]\d+)\), kiesa ludu poza lista posiadaczy (\d+) \(([+-]\d+)\) \| sesja \((\d+) dob\): (.*?) \| latki na zloto: (.*) \| czas ([\d.]+) ms \| potkniecia (\d+) "
+    r"\(sesja (\d+)\)\.$")
+P322_G = {k: i + 1 for i, k in enumerate(("day", "world", "dw", "dn", "where", "steps", "ssum", "unexpl", "gaps", "outside", "gone", "heroOff", "heroOffG",
+                                            "folkOff", "folkOffG", "days", "sess", "patches", "ms", "stum", "stumS"))}
+P322_STEP_RX = re.compile(
+    r"(zakup materialu \(DsWorksBuy\)|zaplata wsi \(DaPayVillage\)|zaplata ludu miasta \(DaPayTown\)|danina od skarbca wsi \(DaVillageDue\)): wywolan (\d+) "
+    r"\(zloto ruszone (\d+)\), placacy -(\d+), kasy osad \+(\d+), kiesy ludu \+(\d+), bohaterowie \+(\d+), nazwane ([+-]\d+), reszta ([+-]\d+) "
+    r"\(wywolan z reszta (\d+)\), probki swiata (\d+) \(przegladow (\d+)\): swiat ([+-]\d+) / dotkniete ([+-]\d+) / poza ([+-]\d+)")
+P322_STEPS = ("zakup materialu (DsWorksBuy)", "zaplata wsi (DaPayVillage)", "zaplata ludu miasta (DaPayTown)", "danina od skarbca wsi (DaVillageDue)")
+P322_BIS_RX = re.compile(r"^Odcinki ticku - bisekcja \(f19-e1\): dzien (\d+) \| budowy \(od Mark renty do Mark budowy\) [+-]\d+: (.*?) \(zgodne z odcinkiem")
+P322_MB_RX = re.compile(r"(?:^|, )Mark budowy ([+-]\d+)")
+
+
+def p322_step(name, calls=10, moved=3, out=900, cset=600, folk=300, hero=0, named=0, res=0, resn=0, smp=3, pre=8, sw=0, sl=0):
+    return (f"{name}: wywolan {calls} (zloto ruszone {moved}), placacy -{out}, kasy osad +{cset}, kiesy ludu +{folk}, bohaterowie +{hero}, nazwane {named:+d}, "
+            f"reszta {res:+d} (wywolan z reszta {resn}), probki swiata {smp} (przegladow {pre}): swiat {sw:+d} / dotkniete {sl:+d} / poza {sw - sl:+d}")
+
+
+def p322_line(day, steps=None, world=None, dn=0, where="brak reszty", gaps="zgodne", stum=0, ms="3.2",
+              patches="Hero.ChangeHeroGold: bez latek; Hero.Gold (set): bez latek; SettlementComponent.ChangeGold: bez latek; SettlementComponent.Gold (set): bez latek"):
+    """Linia jak TownFolk.P2End; steps - lista 4 napisow p322_step; world - reszta DaWorksRun (domyslnie suma reszt podkrokow)."""
+    if steps is None:
+        steps = [p322_step(n) for n in P322_STEPS]
+    ssum = sum(int(P322_STEP_RX.search(s).group(9)) for s in steps)
+    if world is None:
+        world = ssum
+    unexpl = world - ssum
+    return (f"Budowy - pomiar (322b): dzien {day} | DaWorksRun swiat {world:+d} (zloto swiata {world + dn:+d} - pozycje nazwane {dn:+d}; = krok 'Mark budowy' bisekcji "
+            f"f19-e1) | reszta pojawia sie: {where} | podkroki (reszta = zmiana dotknietych w swiecie - pozycje nazwane): {'; '.join(steps)} | suma reszt podkrokow "
+            f"{ssum:+d}, poza dotknietymi {unexpl:+d} | posiadacze (swiat wobec zmierzonego w podkrokach): {gaps} | dotkniete poza swiatem +0: pan Dead/Disabled 0, "
+            f"pan zywy poza Hero.AllAliveHeroes 0 (+0), kiesa ludu poza lista posiadaczy 0 (+0) | sesja (1 dob): swiat {world:+d}, poza dotknietymi {unexpl:+d}, "
+            f"reszty: - | latki na zloto: {patches} | czas {ms} ms | potkniecia {stum} (sesja {stum}).")
+
+
+def p322_bis(day, mb):
+    return (f"Odcinki ticku - bisekcja (f19-e1): dzien {day} | budowy (od Mark renty do Mark budowy) {mb:+d}: Mark kiesa ludu +0, po WarFront.Daily +0, "
+            f"po BuildFunding.Daily +0, Mark budowy {mb:+d} (zgodne z odcinkiem linii przyczyn: tak) | po paserze (od Mark paser band do konca bloku) +0: "
+            f"koniec bloku (do MoneyLedger.Daily) +0 (zgodne z odcinkiem linii przyczyn: tak) | sesja (1 dob) - kroki o najwiekszej reszcie: brak | granic 9 "
+            f"(ponad limit 0), czas 1.0 ms.")
+
+
+def budowy322b_selftest():
+    st = [p322_step(P322_STEPS[0]), p322_step(P322_STEPS[1]), p322_step(P322_STEPS[2], res=-5, resn=2),
+          p322_step(P322_STEPS[3], res=-300, resn=40, sw=-2, sl=-1)]
+    s = p322_line(109250, st, world=-310, dn=-7, where="podkrok danina od skarbca wsi (DaVillageDue) (w dotknietych posiadaczach -300)")
+    m = P322_RX.match(s)
+    if not m:
+        return "linia 322b nie czytana"
+    g = lambda k: m.group(P322_G[k])
+    if (g("day"), g("world"), g("dw"), g("dn"), g("ssum"), g("unexpl"), g("stum")) != ("109250", "-310", "-317", "-7", "-305", "-5", "0"):
+        return f"pola: {m.groups()[:8]}"
+    ps = P322_STEP_RX.findall(g("steps"))
+    if len(ps) != 4 or ps[3][0] != P322_STEPS[3] or ps[3][8] != "-300" or ps[3][14] != "-1":
+        return f"podkroki: {ps}"
+    b = P322_BIS_RX.match(p322_bis(109250, -310))
+    if not b or P322_MB_RX.findall(b.group(2))[-1] != "-310":
+        return "bisekcja: krok 'Mark budowy' nie czytany"
+    return None
+
+
+def budowy322b_collect(logp):
+    D = {"p": {}, "b": {}, "bad": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            s = ln.rstrip("\r\n")
+            mt = TS.match(s)
+            s = mt.group(2) if mt else s
+            if s.startswith("Budowy - pomiar (322b)"):
+                m = P322_RX.match(s)
+                if not m:
+                    D["bad"] += 1
+                    continue
+                D["p"][int(m.group(1))] = m
+            elif s.startswith("Odcinki ticku - bisekcja (f19-e1)"):
+                b = P322_BIS_RX.match(s)
+                if b:
+                    mb = P322_MB_RX.findall(b.group(2))
+                    if mb:
+                        D["b"][int(b.group(1))] = int(mb[-1])
+    return D
+
+
+def budowy322b_rows(rep, D):
+    P, B = D["p"], D["b"]
+    G = P322_G
+    gi = lambda m, k: int(m.group(G[k]))
+    n0 = "P322-0: linia 322b przy kazdej linii bisekcji"
+    miss = sorted(d for d in B if d not in P)
+    if not P and not B:
+        rep.add(n0, f"brak linii 322b i bisekcji (zlych linii 322b {D['bad']})", "INFO (klucz Ledger Segment Bisect Log wylaczony albo log bez doby)", None if not D["bad"] else False)
+    else:
+        rep.add(n0, f"linii 322b {len(P)}, bisekcji {len(B)}, bisekcja bez 322b {len(miss)}{' ' + str(miss[:5]) if miss else ''}, zlych linii 322b {D['bad']}",
+                "bisekcja bez 322b 0, zlych 0 (DLL sprzed 322b - NIE)", not miss and D["bad"] == 0)
+    L = [P[d] for d in sorted(P)]
+    stum = sum(gi(m, "stum") for m in L)
+    rep.add("P322-1: potkniecia pomiaru", str(stum), "0", None if not L else stum == 0)
+    n2 = "P322-2: 'DaWorksRun swiat' = krok 'Mark budowy' bisekcji tej doby"
+    pair = [(d, gi(P[d], "world"), B[d]) for d in sorted(P) if d in B]
+    if pair:
+        bad = [x for x in pair if x[1] != x[2]]
+        rep.add(n2, f"dob w parze {len(pair)}, rozjazdow {len(bad)}" + "".join(f"; [dzien {d}: 322b {w:+d}, bisekcja {b:+d}]" for d, w, b in bad[:4]),
+                "rozjazdow 0", not bad)
+    else:
+        rep.add(n2, "brak dob w parze", "INFO", None)
+    n3 = "P322-3: tozsamosc linii (swiat = zloto - nazwane; podkroki + poza = swiat)"
+    if L:
+        bad = []
+        for m in L:
+            ps = P322_STEP_RX.findall(m.group(G["steps"]))
+            ss = sum(int(p[8]) for p in ps)
+            if (gi(m, "world") != gi(m, "dw") - gi(m, "dn") or gi(m, "ssum") + gi(m, "unexpl") != gi(m, "world") or ss != gi(m, "ssum") or len(ps) != 4):
+                bad.append(gi(m, "day"))
+        rep.add(n3, f"dob {len(L)}, niespojnych {len(bad)}{' ' + str(bad[:5]) if bad else ''}", "niespojnych 0", not bad)
+    else:
+        rep.add(n3, "brak linii 322b", "INFO", None)
+    n4 = "P322-4: WYNIK - gdzie reszta odcinka 'budowy'"
+    if L:
+        tot = sum(gi(m, "world") for m in L)
+        une = sum(gi(m, "unexpl") for m in L)
+        st = {n: [0, 0, 0, 0] for n in P322_STEPS}      # reszta w dotknietych, dob z reszta, probki, poza w probkach
+        for m in L:
+            for p in P322_STEP_RX.findall(m.group(G["steps"])):
+                a = st[p[0]]
+                a[0] += int(p[8]); a[1] += 1 if int(p[8]) != 0 else 0; a[2] += int(p[10]); a[3] += int(p[14])
+        neg = sum(1 for m in L if gi(m, "world") < 0)
+        pos = sum(1 for m in L if gi(m, "world") > 0)
+        gapn = {}
+        for m in L:
+            gs = m.group(G["gaps"])
+            if gs != "zgodne":
+                for part in re.findall(r"([^,(]+?) [+-]\d+ \(zmierzone [+-]\d+, poza ([+-]\d+)\)", gs):
+                    gapn[part[0].strip()] = gapn.get(part[0].strip(), 0) + int(part[1])
+        heroOff = sum(gi(m, "heroOffG") for m in L)
+        folkOff = sum(gi(m, "folkOffG") for m in L)
+        txt = (f"dob {len(L)} (swiat -: {neg}, +: {pos}), DaWorksRun razem {tot:+d}, w dotknietych {tot - une:+d}, poza dotknietymi {une:+d}; podkroki: "
+               + "; ".join(f"{n} {a[0]:+d} (dob z reszta {a[1]}, probki {a[2]}, poza w probkach {a[3]:+d})" for n, a in st.items())
+               + f"; posiadacze poza zmierzonym: {', '.join(f'{k} {v:+d}' for k, v in sorted(gapn.items(), key=lambda kv: -abs(kv[1]))) or 'brak'}"
+               + f"; pan zywy poza AllAliveHeroes {heroOff:+d}, kiesa ludu poza lista {folkOff:+d}; ostatnia doba: {L[-1].group(G['where'])}")
+        rep.add(n4, txt, "reszta 0 (inaczej DECYZJA - miejsce wskazane wyzej, poprawka osobnym krokiem)", tot == 0, decide=True)
+    else:
+        rep.add(n4, "brak linii 322b", "INFO", None)
+    if L:
+        mx = max(float(m.group(G["ms"])) for m in L)
+        rep.add("P322-5: latki na zloto (INFO) i czas pomiaru", f"czas najwiecej {mx:.1f} ms; latki: {L[-1].group(G['patches'])}", "czas <= 50 ms", mx <= 50.0)
+    else:
+        rep.add("P322-5: latki na zloto (INFO) i czas pomiaru", "brak linii 322b", "INFO", None)
+
+
+def budowy322b_synth():
+    """P322-S2: zgodny (reszta w danine), rozjazd z bisekcja, potkniecia, stary DLL, pusty. None = OK."""
+    import tempfile
+    import shutil
+    due = [p322_step(n) for n in P322_STEPS[:3]] + [p322_step(P322_STEPS[3], res=-300, resn=40)]
+    runs = {
+        "good": [p322_line(1, due, where="podkrok danina od skarbca wsi (DaVillageDue) (w dotknietych posiadaczach -300)"), p322_bis(1, -300),
+                 p322_line(2), p322_bis(2, 0)],
+        "zero": [p322_line(1), p322_bis(1, 0)],
+        "split": [p322_line(1, due), p322_bis(1, -250)],
+        "stum": [p322_line(1, stum=2), p322_bis(1, 0)],
+        "old": [p322_bis(1, -300)],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"P322-0": "TAK", "P322-1": "TAK", "P322-2": "TAK", "P322-3": "TAK", "P322-4": "DECYZJA", "P322-5": "TAK"},
+        "zero": {"P322-2": "TAK", "P322-4": "TAK"},
+        "split": {"P322-2": "NIE", "P322-3": "TAK"},
+        "stum": {"P322-1": "NIE"},
+        "old": {"P322-0": "NIE", "P322-1": "INFO", "P322-2": "INFO", "P322-4": "INFO"},
+        "empty": {"P322-0": "INFO", "P322-1": "INFO", "P322-2": "INFO", "P322-3": "INFO", "P322-4": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="p322_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            budowy322b_rows(rep, budowy322b_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def budowy322b_main(logp):
+    rep = Report()
+    s1 = budowy322b_selftest()
+    rep.add("P322-S: self-test wyrazen (linia 322b, krok 'Mark budowy' bisekcji)", s1 or "OK", "OK", s1 is None)
+    try:
+        s2 = budowy322b_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("P322-S2: test syntetyczny (zgodny, rozjazd, potkniecia, stary DLL, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("P322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = budowy322b_collect(logp)
+    print(f"plik: {logp} | linii 322b {len(D['p'])}, bisekcji {len(D['b'])}, zlych 322b {D['bad']}")
+    budowy322b_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_budowy322b_main_prev = main
+
+
+def main(argv):
+    # paczka 322b: grupa budowy322b - opakowanie main jak bieg320d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "budowy322b":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return budowy322b_main(rest[0] if rest else None)
+    return _budowy322b_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
