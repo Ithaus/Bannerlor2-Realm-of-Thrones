@@ -93731,136 +93731,137 @@ def main(argv):
     return _chleb322f_main_prev(argv)
 
 
-# ======================================================================= paczka 323c: grupa eat323c - prace okregu: udzial w tym, co okreg zjada z dodatku
-# Linia "Prace okregu (PO): zjedzone w okregu (323c, ...)" (DistrictWorks.Eats.cs). Wszystkie nazwy modulu z przedrostkiem e323c_ / E323C_ (kolizje miedzy grupami).
-E323C_RE = re.compile(r"Prace okregu \(PO\): zjedzone w okregu \(323c, klucz Works Pay District Eats (TAK|NIE)\) dzien (-?\d+) \| okregow z wycena (\d+), "
-                      r"dodatek zjedzony ([\d.]+) zl/d \(cena polki\), pula \(udzial\) ([\d.]+)(?:, oczekiwane ze zjedzonego [\d.]+)?, wyplacone z kiesy wsi (\d+), brak w wolnej kiesie \(ponad skrzynie\) (\d+)"
-                      r" \| bez wyplaty: wojna (\d+), bez swiezego rachunku KS z pracami (\d+), wies zlupiona (\d+), bez drogi produkcji (\d+), rod bez glowy (\d+)"
-                      r" \| wedlug prac \(z targu / ze zjedzonego, doba; od wczytania; pokazanych (\d+) z (\d+)\): (.*?) \| potkniecia (\d+) \(od wczytania (\d+)\)\.")
-E323C_ROW = re.compile(r"^(.+?) \[([^\]]+)\] targ (\d+) / zjedzone (\d+) \(od wczytania (\d+) / (\d+)\)$")
+# ------------------------------------------------------------ paczka 323d: grupa wies323d - dochod wioski pobocznej za prawdziwym utargiem (Side Village Income Real Sales)
+# Linia "Wioska gracza (n20): dzien N" - klucz "prawdziwa sprzedaz (323d) WL/WYL" i rachunek "dochod dnia (r4): nalezne X (...)". Sprawdza:
+#  W323D-0 klucz w linii (nowy DLL); W323D-1 nalezne = sprzedane wioski x stawka pana (+-1 / 3%), H = utarg / wartosc dnia; W323D-2 "nic z niczego":
+#  nalezne <= sprzedane wioski i do gracza <= nalezne; W323D-3 wozy nic nie sprzedaly -> nalezne 0; W323D-4 sumy (INFO): nowe vs dawny H z progiem.
+W323D_RE = re.compile(r"Wioska gracza \(n20\): dzien (\d+)")
+W323D_KEY = re.compile(r"prawdziwa sprzedaz \(323d\) (WL|WYL)")
+W323D_DUE = re.compile(r"\| dochod dnia \(r4\): nalezne (\d+) \((.*?)\), do gracza (\d+) \(razem")
+W323D_CALC = re.compile(r"wartosc wioski (\d+) x H ([\d.]+) x stawka pana (\d+)%; prawdziwa sprzedaz \(323d\): utarg wozow okregu ([\d.]+)/d \(okno (\d+) dob\) "
+                        r"z wartosci dnia (\d+), udzial wioski ([\d.]+)% = sprzedane wioski ([\d.]+)/d, dawny H z progiem ([\d.]+) dalby ([\d.]+)")
 
 
-def e323c_rows_of(txt):
-    out = []
-    if txt.strip() == "-":
-        return out, 0
-    bad = 0
-    for part in txt.split("; "):
-        m = E323C_ROW.match(part.strip())
-        if not m:
-            bad += 1
-            continue
-        out.append({"name": m.group(1), "clan": m.group(2), "mk": int(m.group(3)), "eat": int(m.group(4)), "mkAll": int(m.group(5)), "eatAll": int(m.group(6))})
-    return out, bad
-
-
-def e323c_collect(logp):
-    L = []
+def wies323d_collect(logp):
+    D = {"rows": [], "nokey": 0, "off": 0}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for line in fh:
-            if "zjedzone w okregu (323c" not in line:
-                continue
-            m = E323C_RE.search(line)
+            m = W323D_RE.search(line)
             if not m:
-                L.append({"broken": True})
                 continue
-            rows, bad = e323c_rows_of(m.group(15))
-            L.append({"broken": False, "on": m.group(1) == "TAK", "day": int(m.group(2)), "dist": int(m.group(3)), "val": float(m.group(4)),
-                      "pool": float(m.group(5)), "paid": int(m.group(6)), "short": int(m.group(7)), "war": int(m.group(8)), "noks": int(m.group(9)),
-                      "loot": int(m.group(10)), "nopath": int(m.group(11)), "nohead": int(m.group(12)), "shown": int(m.group(13)), "n": int(m.group(14)),
-                      "rows": rows, "badrows": bad, "st": int(m.group(16)), "stAll": int(m.group(17))})
-    return L
+            k = W323D_KEY.search(line)
+            if not k:
+                D["nokey"] += 1
+                continue
+            if k.group(1) == "WYL":
+                D["off"] += 1
+            d = W323D_DUE.search(line)
+            if not d:
+                continue
+            why = d.group(2)
+            c = W323D_CALC.search(why)
+            r = {"day": int(m.group(1)), "due": int(d.group(1)), "paid": int(d.group(3)), "why": why, "zero": why.startswith("wozy okregu nic nie sprzedaly"),
+                 "real": c is not None}
+            if c:
+                r.update({"val": int(c.group(1)), "h": float(c.group(2)), "rate": int(c.group(3)) / 100.0, "sold": float(c.group(4)), "win": int(c.group(5)),
+                          "all": int(c.group(6)), "sh": float(c.group(7)), "vs": float(c.group(8)), "hold": float(c.group(9)), "old": float(c.group(10))})
+            D["rows"].append(r)
+    return D
 
 
-def e323c_report(rep, L):
-    broken = [x for x in L if x["broken"]]
-    G = [x for x in L if not x["broken"]]
-    if not L:
-        rep.add("E323C-0: linie 'zjedzone w okregu' (323c)", "brak linii", "stary DLL, brak prac albo klucz Works Pay Market Share NIE", None)
-        for n in ("E323C-1", "E323C-2", "E323C-3"):
-            rep.add(f"{n}: brak linii", "brak linii 323c", "INFO", None)
+def wies323d_rows(rep, D):
+    L = D["rows"]
+    if not L and not D["off"]:
+        what = f"linii bez klucza {D['nokey']}" if D["nokey"] else "brak linii wioski gracza"
+        rep.add("W323D-0: klucz 323d w linii wioski gracza", what, "stary DLL / brak wioski", None)
+        for n in ("W323D-1", "W323D-2", "W323D-3"):
+            rep.add(f"{n}: brak linii 323d", "brak", "INFO", None)
         return
-    rep.add("E323C-0: linie 'zjedzone w okregu' (323c)", f"linii {len(G)}, nieczytelnych {len(broken)} (d{G[0]['day'] if G else '-'}-d{G[-1]['day'] if G else '-'})",
-            "nieczytelnych 0", not broken)
-    st = sum(x["st"] for x in G)
-    rep.add("E323C-1: potkniecia PayEaten / EatsLine", f"{st}", "0", st == 0)
-    # wyplacone <= pula + 1 na okreg (ulamek monety przeniesiony z doby wczesniej), wyplacone + brak <= pula + okregi; klucz NIE - nic nie wyplaca
+    rep.add("W323D-0: klucz 323d w linii wioski gracza", f"linii z kluczem {len(L)}, WYL {D['off']}, bez klucza {D['nokey']}", "klucz WL", D["off"] == 0)
+    R = [x for x in L if x["real"] and not x["zero"]]
     bad = []
-    for x in G:
-        lim = x["pool"] + max(1, x["dist"]) + 1e-6
-        if x["paid"] > lim or x["paid"] + x["short"] > lim:
-            bad.append(f"d{x['day']} wyplacone {x['paid']} + brak {x['short']} > pula {x['pool']:.1f}")
-        elif not x["on"] and x["paid"] > 0:
-            bad.append(f"d{x['day']} klucz NIE, a wyplacone {x['paid']}")
-        elif x["pool"] > x["val"] + 1e-6:
-            bad.append(f"d{x['day']} pula {x['pool']:.1f} > wartosc zjedzonego {x['val']:.1f}")
-    rep.add("E323C-2: wyplata ze zjedzonego w granicach puli (udzial x wartosc, kiesa wsi)", f"niespojnych dob {len(bad)}" + (f" [{'; '.join(bad[:5])}]" if bad else ""),
-            "0", not bad)
-    # suma wedlug prac (zjedzone, doba) == wyplacone - gdy pokazane wszystkie prace
-    bad3, seen = [], 0
-    for x in G:
-        if x["badrows"]:
-            bad3.append(f"d{x['day']} nieczytelnych wierszy prac {x['badrows']}")
-            continue
-        if x["shown"] < x["n"]:
-            continue
-        seen += 1
-        se = sum(r["eat"] for r in x["rows"])
-        if abs(se - x["paid"]) > max(1, len(x["rows"])):
-            bad3.append(f"d{x['day']} wedlug prac {se} != wyplacone {x['paid']}")
-    rep.add("E323C-3: wedlug prac - suma 'zjedzone' doby = wyplacone z kiesy wsi", f"niespojnych dob {len(bad3)} z {seen}" + (f" [{'; '.join(bad3[:5])}]" if bad3 else ""),
-            "0", not bad3)
-    last = {}
-    for x in G:
-        for r in x["rows"]:
-            last[r["name"] + " [" + r["clan"] + "]"] = r
-    per = ", ".join(f"{k} targ {v['mkAll']} / zjedzone {v['eatAll']}" for k, v in list(last.items())[:10]) or "-"
-    rep.add("E323C-4: sumy (INFO)",
-            f"wyplacone ze zjedzonego {sum(x['paid'] for x in G)} zl, brak w wolnej kiesie {sum(x['short'] for x in G)}, wartosc zjedzonego srednio "
-            f"{sum(x['val'] for x in G) / max(1, len(G)):.1f} zl/d, bez wyplaty (wojna/bez KS/zlupiona/bez drogi/bez glowy) {sum(x['war'] for x in G)}/{sum(x['noks'] for x in G)}/"
-            f"{sum(x['loot'] for x in G)}/{sum(x['nopath'] for x in G)}/{sum(x['nohead'] for x in G)} | od wczytania wedlug prac: {per}", "INFO", None)
+    for x in R:
+        exp = x["vs"] * x["rate"]
+        tol = max(1.0, 0.03 * exp)
+        hx = x["sold"] / x["all"] if x["all"] > 0 else 0.0
+        if x["due"] > 0 and abs(x["due"] - exp) > tol:
+            bad.append(f"d{x['day']} nalezne {x['due']} != {exp:.1f}")
+        elif x["due"] == 0 and exp >= 1.0:
+            bad.append(f"d{x['day']} nalezne 0 przy {exp:.1f}")
+        elif abs(x["h"] - hx) > 0.0015 + 0.01 * hx:
+            bad.append(f"d{x['day']} H {x['h']} != utarg/wartosc {hx:.4f}")
+    if R:
+        rep.add("W323D-1: nalezne = sprzedane wioski x stawka pana, H = utarg / wartosc dnia", f"dob z rachunkiem 323d {len(R)}, zlych {len(bad)}" + (f" [{'; '.join(bad[:5])}]" if bad else ""),
+                "0", not bad)
+    else:
+        rep.add("W323D-1: nalezne = sprzedane wioski x stawka pana", "brak dob z rachunkiem 323d (bez pomiaru utargu albo klucz WYL)", "INFO", None)
+    over = [f"d{x['day']} nalezne {x['due']} > sprzedane {x['vs']}" for x in R if x["due"] > x["vs"] + 1]
+    over += [f"d{x['day']} do gracza {x['paid']} > nalezne {x['due']}" for x in L if x["paid"] > x["due"]]
+    rep.add("W323D-2: nic z niczego (nalezne <= sprzedane wioski, do gracza <= nalezne)", f"naruszen {len(over)}" + (f" [{'; '.join(over[:5])}]" if over else ""), "0", not over)
+    Z = [x for x in L if x["zero"]]
+    zb = [f"d{x['day']} nalezne {x['due']}" for x in Z if x["due"] != 0]
+    if Z:
+        rep.add("W323D-3: wozy nic nie sprzedaly -> nalezne 0", f"dob {len(Z)}, z naleznoscia {len(zb)}" + (f" [{'; '.join(zb[:5])}]" if zb else ""), "0", not zb)
+    else:
+        rep.add("W323D-3: wozy nic nie sprzedaly -> nalezne 0", "brak takich dob", "INFO", None)
+    if R:
+        nd = sum(x["due"] for x in R)
+        od = sum(x["old"] for x in R)
+        lowh = sum(1 for x in R if x["h"] < 0.2)
+        rep.add("W323D-4: sumy (INFO)", f"dob {len(R)} (d{R[0]['day']}-d{R[-1]['day']}), nalezne razem {nd} (dawny H z progiem dalby {od:.0f}), dob z H < 0.2 {lowh}, "
+                f"utarg okregu srednio {sum(x['sold'] for x in R) / len(R):.1f}/d, okno {R[-1]['win']} dob", "INFO", None)
+    else:
+        rep.add("W323D-4: sumy (INFO)", f"dob z linia {len(L)}, z rachunkiem 323d 0, bez sprzedazy {len(Z)}", "INFO", None)
 
 
-E323C_ROWS1 = "Heatherstone (Shady Glen) [gracz] targ 0 / zjedzone 12 (od wczytania 25 / 140); Falconstead (Shady Glen) [gracz] targ 3 / zjedzone 20 (od wczytania 50 / 300)"
+W323D_HEAD = ("Wioska gracza (n20): dzien {day} | klucze: start WL, dochod WL, menu WL, nocleg pod dachem WL, platnik = posiadacz podatku WL, prawdziwa sprzedaz (323d) {key} "
+              "| latki: BK GiveLordshipOnKingdomJoin wpieta | wioska Seven Elms (village_B1_2#183f3aba, okreg village_B1_2, od doby 108648) | wozy okregow 0, podatek pana w oknach 0, "
+              "udzial 1.7% (wartosc dnia 53 z 3052 (KS))")
+W323D_REAL = ("wartosc wioski {val} x H {h} x stawka pana {rate}%; prawdziwa sprzedaz (323d): utarg wozow okregu {sold}/d (okno 28 dob) z wartosci dnia {all}, "
+              "udzial wioski {sh}% = sprzedane wioski {vs}/d, dawny H z progiem 0.20 dalby {old}")
 
 
-def e323c_line(day=109300, on="TAK", dist=2, val=70.0, pool=35.0, paid=32, short=0, shown=2, n=2, rows=E323C_ROWS1, st=0):
-    return (f"Prace okregu (PO): zjedzone w okregu (323c, klucz Works Pay District Eats {on}) dzien {day} | okregow z wycena {dist}, dodatek zjedzony {val:.1f} zl/d "
-            f"(cena polki), pula (udzial) {pool:.1f}, oczekiwane ze zjedzonego {pool:.1f}, wyplacone z kiesy wsi {paid}, brak w wolnej kiesie (ponad skrzynie) {short} | bez wyplaty: wojna 0, "
-            f"bez swiezego rachunku KS z pracami 0, wies zlupiona 0, bez drogi produkcji 0, rod bez glowy 0 | wedlug prac (z targu / ze zjedzonego, doba; od wczytania; "
-            f"pokazanych {shown} z {n}): {rows} | potkniecia {st} (od wczytania {st}).")
+def w323d_line(day=109300, key="WL", due=1, paid=None, why=None, val=53, h="0.021", rate=45, sold="63.0", all_=3052, sh="1.7", vs="1.1", old="4.8"):
+    if why is None:
+        why = W323D_REAL.format(val=val, h=h, rate=rate, sold=sold, all=all_, sh=sh, vs=vs, old=old)
+    if paid is None:
+        paid = due
+    return (W323D_HEAD.format(day=day, key=key) + f" | dochod dnia (r4): nalezne {due} ({why}), do gracza {paid} (razem 2870), srednia 7 dob 1.0"
+            " | razem wszystkie wioski: z licznika podatku wsi 1 | potkniecia doby 0, sesji 0.")
 
 
-def e323c_synth():
-    """E323C-S: dobry, wyplata ponad pule, suma prac niezgodna, potkniecie, zepsuta linia, pusty. None = OK."""
+def wies323d_synth():
+    """W323D-S: dobry, zla kwota, nadplata, wozy bez sprzedazy z naleznoscia, klucz WYL, stary DLL, pusty. None = OK."""
     import tempfile
     import shutil
+    zero_ok = "wozy okregu nic nie sprzedaly w oknie (" + W323D_REAL.format(val=53, h="0.000", rate=45, sold="0.0", all=3052, sh="1.7", vs="0.0", old="4.8") + ")"
+    big = W323D_REAL.format(val=500, h="0.300", rate=45, sold="1000.0", all=3333, sh="15.0", vs="150.0", old="67.5")
     runs = {
-        "good": [e323c_line(), e323c_line(day=109301, paid=0, short=0, val=0.0, pool=0.0, dist=0, rows=E323C_ROWS1.replace("zjedzone 12", "zjedzone 0").replace("zjedzone 20", "zjedzone 0"))],
-        "over": [e323c_line(paid=60, rows=E323C_ROWS1.replace("zjedzone 20", "zjedzone 48"))],
-        "sum": [e323c_line(paid=20)],
-        "trunc": [e323c_line(paid=20, shown=2, n=14)],
-        "stumble": [e323c_line(st=1)],
-        "broken": ["Prace okregu (PO): zjedzone w okregu (323c, klucz cos innego"],
+        "good": [w323d_line(), w323d_line(day=109301, due=68, why=big), w323d_line(day=109302, due=0, why=zero_ok)],
+        "wrong": [w323d_line(due=5)],
+        "over": [w323d_line(due=1, paid=3)],
+        "zero": [w323d_line(due=2, why=zero_ok)],
+        "off": [w323d_line(key="WYL", due=5, why="wartosc wioski 53 x H 0.20 x stawka pana 45%; H bez pomiaru utargu (klucz SideVillageIncomeRealSales WYL) (323d)")],
+        "old": [W323D_HEAD.format(day=1, key="WL").replace(", prawdziwa sprzedaz (323d) WL", "") + " | dochod dnia (r4): nalezne 5 (x), do gracza 5 (razem 1)"],
         "empty": ["Armoury: inna linia"],
     }
     exp = {
-        "good": {"E323C-0": "TAK", "E323C-1": "TAK", "E323C-2": "TAK", "E323C-3": "TAK", "E323C-4": "INFO"},
-        "over": {"E323C-2": "NIE", "E323C-3": "TAK"},
-        "sum": {"E323C-2": "TAK", "E323C-3": "NIE"},
-        "trunc": {"E323C-3": "TAK"},
-        "stumble": {"E323C-1": "NIE"},
-        "broken": {"E323C-0": "NIE"},
-        "empty": {"E323C-0": "INFO", "E323C-2": "INFO"},
+        "good": {"W323D-0": "TAK", "W323D-1": "TAK", "W323D-2": "TAK", "W323D-3": "TAK", "W323D-4": "INFO"},
+        "wrong": {"W323D-1": "NIE", "W323D-2": "NIE"},
+        "over": {"W323D-1": "TAK", "W323D-2": "NIE"},
+        "zero": {"W323D-3": "NIE"},
+        "off": {"W323D-0": "NIE", "W323D-1": "INFO"},
+        "old": {"W323D-0": "INFO", "W323D-1": "INFO"},
+        "empty": {"W323D-0": "INFO", "W323D-2": "INFO"},
     }
-    tmp = tempfile.mkdtemp(prefix="e323c_")
+    tmp = tempfile.mkdtemp(prefix="w323d_")
     diff = []
     try:
         for kind, Ls in runs.items():
             logp = os.path.join(tmp, f"Armoury-{kind}.log")
             open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
             rep = Report()
-            e323c_report(rep, e323c_collect(logp))
+            wies323d_rows(rep, wies323d_collect(logp))
             got = {r[0].split(":")[0]: r[3] for r in rep.rows}
             diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
     finally:
@@ -93868,36 +93869,37 @@ def e323c_synth():
     return "; ".join(diff) if diff else None
 
 
-def e323c_main(logp):
+def wies323d_main(logp):
     rep = Report()
     try:
-        s2 = e323c_synth()
+        s2 = wies323d_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("E323C-S: test syntetyczny (dobry, ponad pule, suma prac, obciete, potkniecie, zepsuta, pusty)", s2 or "OK", "OK", s2 is None)
+    rep.add("W323D-S: test syntetyczny (dobry, zla kwota, nadplata, bez sprzedazy, klucz WYL, stary DLL, pusty)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
-        rep.add("E323C-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.add("W323D-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    L = e323c_collect(logp)
-    print(f"plik: {logp} | linii 323c {len(L)}")
-    e323c_report(rep, L)
+    D = wies323d_collect(logp)
+    print(f"plik: {logp} | linii wioski gracza z 323d {len(D['rows'])}, bez klucza {D['nokey']}")
+    wies323d_rows(rep, D)
     rep.show()
     return 0
 
 
-_e323c_main_prev = main
+_wies323d_main_prev = main
 
 
 def main(argv):
-    # paczka 323c: grupa eat323c - opakowanie main jak chleb322f
+    # paczka 323d: grupa wies323d - opakowanie main jak chleb322f
     a = argv[1:]
     if "--grupa" in a:
         i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "eat323c":
+        if i + 1 < len(a) and a[i + 1] == "wies323d":
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return e323c_main(rest[0] if rest else None)
-    return _e323c_main_prev(argv)
+            return wies323d_main(rest[0] if rest else None)
+    return _wies323d_main_prev(argv)
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
