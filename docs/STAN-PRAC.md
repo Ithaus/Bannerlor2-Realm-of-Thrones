@@ -1,6 +1,7 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
 ## STAN 03.11.2026 ok. 16:20 CET: WGRANIE 161 (najnowszy)
+- 03.11 23:45: test 324a (noc/324-glod 7613cea7, DLL 7fc4f2ce, 60 dob, kod 0, ERROR 0): brak rynkow 77% -> 52-67%, zakupy wsi 10k -> 0.1-0.5k/d; wolne ze stodol 12.2k szt./d, na polki 2.0k - BLOKADA: kasy miast (bez kasy 32). Runda 2 wf_5f77c330-d77 (kredyt/region, bramka krainy, NaN 1. doby). NIE wgrane.
 - 03.11 ok. 22:40: GLOD - dowod z logow: wsie kupuja w miastach ok. 10k zboza/d (koszyk ZC4, E5/B1; w 108878 tej pozycji nie bylo), zboze swiata 273k (109179) -> 38k (109230), produkcja zima 4-5k/d (lato 9.5k). Jedzenie gracza nie zniklo - zjedzone 31/d od 109237. Workflow wf_6f1f578f-ee2: diagnoza + naprawa na galezi noc/324-glod (worktree scratchpad bcfbb3b7 zb/n324), NIE wgrane - gra Jeffa dziala.
 - PILNE 03.11 22:30: Jeff "zniknela zywnosc z gry, ja tez nie mam zywnosci" - patrz docs/PRZEKAZANIE-2026-11-03-glod.md (puste rynki miast rosna od doby 109204, nie od 161).
 - W GRZE: Armoury.dll da5a31022ce86f7f87403e031fe64198 (galaz noc/323x-integracja, wypchnieta) + CrashScribe 55ccc004 + ForgeView 8441ab0e. Baza testu: bannerlord-autotest\test\prod161.
