@@ -1,5 +1,75 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-03 WGRANIE 159 - noc/321x-integracja (158 + 321a groty strzal wedlug tieru ostatecznego - Ravens' Teeth t6 stal zamkowa, 321b strzaly i belty raz na liscie CRAFT); Armoury.dll 20823774ab812fdf308bd170a8876ad4, ForgeView.dll 8441ab0ec1e232271491793bc8541b72 (CrashScribe 55ccc004 bez zmian); kopie 158: *.bak-2026-11-03-przed-wgranie159 i D:/Backup-Bannerlord/wgrane/2026-11-03-wgranie159-przed
+
+**Problem:** Jeff 03.11: "jest blad w smithing: Ravens Teeth strzaly biora zwykle zelazo a inne strzaly forged steel"; "czemu tyle strzal jest zdublowanych do wykucia"; "wgrywaj te strzaly".
+**Zmiana:** wpisy 321a i 321b ponizej (szkice zb/n321a, n321b-changelog.md): rachunek kosztu przeliczany po zmianie statystyk przez ROT (RefreshAfterFinalStats w OnAfterSessionLaunched, TierOf przez Recipes.Grade); ForgeView InjectRanged pomija przedmioty juz na liscie BK.
+**Testy:** recenzje bez potwierdzonych bledow (321a drobne: dni pracy z Effectiveness); build 0 bledow; BEZ AUTOTESTU (Jeff: "wgrywaj").
+**Ryzyko / co sprawdzic:** linia "Groty strzal (319c)" z segmentem 321a: "rachunek kosztu z innego tieru 0", odswiezone "ravens_teeth_arrows t1->t6 Iron2->Iron6"; ForgeView.log "juz na liscie BK (bez drugiego wiersza - 321b): ~58"; CRAFT Arrows 41, Bolts 26.
+**Status:** WGRANE 159 (bez autotestu)
+
+## 321b - CRAFT: kazda strzala i belt raz na liscie (ForgeView, Jeff 03.11 "czemu tyle strzal jest zdublowanych do wykucia")
+
+**Problem:** Jeff 03.11: "i czemu tyle strzal jest zdublowanych do wykucia, po co dublowac je na liscie". Log Modules/ForgeView/ForgeView.log: "Zapamietano pelna
+liste zbroi: 2142", "Luczarnia na polce: dolozono 103", "kategoria 10 -> pozycji: 78", "poziom 6, kategoria 10 -> pozycji: 23". items-dump.csv: 45 strzal,
+39 na sprzedaz (merchandise=1); 39 (BK) + 39 (InjectRanged: 45 - 4 Ballista Arrows - 2 turniejowe) = 78; tier 6: 11 x 2 + giant_arrows = 23.
+
+**Przyczyna:** dwa niezalezne zrodla tej samej pozycji.
+- BannerKings `ArmorCraftingVM.RefreshValues` (BannerKings.UI.Crafting/ArmorCraftingVM.cs:95-99) bierze kazdy przedmiot na sprzedaz, ktory nie jest
+  IsRangedWeapon ani IsMeleeWeapon - amunicja przechodzi, `GetItemType` (106-123) daje jej Ammo.
+- ForgeView `InjectRanged` (ArmourFilterMixin.cs) dokladal KAZDY luk/kusze/strzale/belt (poza BannedRanged) bez sprawdzenia, czy przedmiot jest juz w `_all`
+  po `Snapshot()`. Luki i kusze BK odrzuca (IsRangedWeapon) - te slusznie wchodza tylko stad; amunicja na sprzedaz wchodzila drugi raz.
+- Nie modyfikatory, nie kultury, nie warianty nazw: nazwy w spisie unikalne (poza 4 balistami, i tak odrzucanymi).
+
+**Zmiana (ForgeView):** `ForgeView/src/ArmourFilterMixin.cs` `InjectRanged`: przed petla `HashSet<ItemObject>` z `_all` (lista BK po Snapshot);
+przedmiot juz obecny jest pomijany (licznik `merged`), dodany trafia do zbioru. Tozsamosc przedmiotu, nie nazwa: GRE_* (RBM Greased, inne obrazenia)
+i serie wagowe zostaja osobno. Zostaje wiersz BK (identyczny: ten sam ItemObject, typ Ammo). Linia logu:
+"Luczarnia na polce: dolozono N wyrobow strzeleckich; juz na liscie BK (bez drugiego wiersza - 321b): M." - oczekiwane N = 45 (40 lukow/kusz + 2 strzaly
+i 3 belty nie na sprzedaz), M = 58 (37 strzal + 21 beltow). Bez nowego ustawienia MCM (poprawka bledu, nie opcja).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Snapshot: `_all` po dolozeniu 2187 (bylo 2245) > 2142 z BK - warunek `list.Count <= _all.Count` dalej nie nadpisuje listy przy nastepnym odswiezeniu.
+- InjectMasterworks: pomija wyroby strzeleckie po `_rangedInjected` - nadal pokryte (z BK albo z InjectRanged).
+- ForgeBillRow.cs:251 bierze pierwsza pasujaca pozycje - bez zmian (jedna zamiast dwoch identycznych).
+- Licznik kategorii w "What Will You Make?" spadnie: Arrows 78 -> 41 (tier 6: 23 -> 12), Bolts 47 -> 26.
+- Poza zakresem (zasada 3, decyzja Jeffa): 4 przedmioty turniejowe (tournament_arrows/bolts, GRE_tournament_*) sa na liscie raz, z BK - BannedRanged
+  dziala tylko w InjectRanged.
+- Armoury nietkniety.
+
+**Status:** DO SPRAWDZENIA (ForgeView.dll 74ea6bfd7fa6514cf537a30c6147a69b; wgrany f8c2796ee98055e956323e55744083be)
+
+## 2026-11-03 321a - groty Ravens' Teeth: pamiec kosztu z tieru ostatecznego (po ROT-RBM) - DO SPRAWDZENIA (noc/321a-groty-ravens)
+
+**Problem:** Jeff 03.11: "jest blad w smithing: Ravens Teeth strzaly biora zwykle zelazo a inne strzaly forged steel". Log Armoury-2026-11-03_00-19-16.log:
+[00:21:24] "Groty strzal (319c): ... niezgodnych z regula 0 ... t1 Iron2 x20" drukowane PRZED "Wiedza (m96-wzory): ... tiery zmienione od migawki 23
+(t1->wyzej 4: ravens_teeth_longbow t1->t6, ravens_teeth_arrows t1->t6, giant_bow t1->t6, goldenheart_longbow t1->t6)"; papier kwatermistrza liczy
+ravens_teeth_arrows jako t6 (wymog 175). "Przepisy z masy": ravens_teeth_arrows 5.91/9.9 kg - waga sprzed zmiany ROT (0.1 kg).
+**Przyczyna:** ItemObject.Tier gra liczy NA ZYWO z obecnych statystyk (ItemObject.Tierf -> ItemValueModel.CalculateTier, dekompilacja dec311g/item.cs:164-186).
+ROT (ROTRBMCompatibility.ModifyBowsAndArrows, OnSessionLaunched po nas) przepisuje statystyki i wage ravens_teeth_arrows, giant_arrows i 5 lukow ROT.
+ArmsPricing.CostOf (Armoury/src/ArmsPricing.cs, CostOf/Compute: `int t = TierOf(it)` -> AmmoGrade(it, t) -> c.Grade) zapamietuje rachunek na cala
+sesje (_cost), a pamiec napelnia sie w NASZYM OnSessionLaunched (ArmouryBehavior.cs:2402 HistoricalPrices.Apply/StartStock/ColdStart, 2534
+Recipes.AmmoStartLine) - przed zmiana ROT. Rachunek ravens_teeth_arrows zostal z t1: grot Iron2, waga 0.12. Kwit kuzni (Recipes.Mass.cs MassKg:
+`AddMetal(l, c.Grade, ...)`) bierze gatunek z tej pamieci - Iron2 zamiast Iron6. Linia 319c tez biegla w OnSessionLaunched, gdy Grade(it) bylo
+jeszcze 1, wiec "niezgodnych 0" nie mogla tego zlapac. HistExoticBows (ravens_teeth_arrows=60) zmienia tylko WARTOSC, nie kwit - nie omija receptury.
+**Zmiana:** (1) ArmsPricing.Cost pamieta Tier i Kg, z ktorych policzono rachunek; TierOf = Recipes.Grade (jedna regula). (2) Nowe
+ArmsPricing.RefreshAfterFinalStats - w OnAfterSessionLaunched (sluchacz dopisany OSTATNI, gra wola od ostatniego, wiec biegnie przed ForgeBill,
+MassStartLine, RareMaterials i LoreSeedFix) zdejmuje z pamieci kazdy rachunek, ktorego tier albo waga do kosztu nie zgadza sie z dzisiejszymi, i liczy
+go od nowa. (3) Recipes.AmmoStartLine (linie "Kuznia: amunicja (S1)" i "Groty strzal (319c)") przeniesione z OnSessionLaunched za odswiezenie;
+linia 319c dostaje segment "321a tier ostateczny (po OnSessionLaunched modow): rachunek kosztu z innego tieru N [...] (ma byc 0), odswiezone
+rachunki R z C [id tX->tY IronA->IronB kgA->kgB kg]"; "niezgodnych" liczy teraz z tieru ostatecznego. (4) sprawdz_logi.py --grupa groty319c:
+G319-7 linia po statystykach ostatecznych, G319-8 rachunek z innego tieru = 0, G319-9 lista odswiezonych (INFO); wyrazenie czyta stary i nowy format.
+**Testy:** build 0 bledow (Armoury.dll md5 7cc82fd3b613e67315576a5695a5b5df). Checker: self-test TAK (stary i nowy wzor); syntetyczny log dobry
+0 NIE, syntetyczny zly (ravens_teeth_arrows/giant_arrows t6 Iron2) 3 NIE (G319-2, G319-3, G319-8); log Jeffa 00-19-16 - G319-7 NIE (linia sprzed 321a).
+**Ryzyko / co sprawdzic:** w logu: linia 319c PO "HistoricalPrices: ROT-RBM ... przywracam" i przed "Kuznia wymagania (m109)"; G319-8 = 0;
+"odswiezone rachunki" ma zawierac ravens_teeth_arrows t1->t6 Iron2->Iron6 i giant_arrows (Iron6). W CRAFT: Ravens' Teeth Arrows chca Castle-forged
+Steel (Iron6) jak inne t6. Kontrola calosci: regresja - rachunki, ktorych tier/waga sie nie zmienily, zostaja w pamieci bez zmian (te same liczby);
+CostOf/Compute bez nowej pracy na goracej sciezce (porownanie tylko raz na sesje). Kolizje: ClearCostCache (wpis 87) i Forget (zlecenia) bez zmian;
+TownFletchers liczy potrzeby raz na dobe (odswiezy sie sam), WorkshopLaw/MendMaterial/GuildMend/ForgeClock/NightEcon czytaja CostOf na zywo - od
+teraz z rachunku ostatecznego. NIE ZMIENIONE (osobny krok, jesli Jeff zechce): wartosci HistoricalPrices policzone w OnSessionLaunched ze starego
+tieru dla przedmiotow spoza HistExoticBows (np. giant_arrows 43 d z t1) - Recheck je przywraca; spis CraftRealm (koszyk tieru, ColdStart) i mediany
+skutecznosci _effMedian z tierow sprzed ROT (4 przedmioty w innym koszyku). ravens_teeth/giant_ sa w WorkshopForbiddenIds - warsztaty ich nie robia.
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 2026-11-03 WGRANIE 158 - noc/320x-integracja (157 + 320a fabula: Harrenhal/Dorzecze pominiete, Krwawe Gody bez pokoju, zdrada rodow rzecznych, zwrot zamkow korony; 320b/320e SCA bez band i Innych, bez ForcePeace przy zablokowanym pokoju; 320c mury sprzyjaja obroncom; 320d piechota z tarczami biegnie pod ostrzalem); Armoury.dll a845da99f21160530f7d14ce34704ee4, CrashScribe.dll 55ccc004bd0607c39d46b4ec7cbf7ae7, CrashScribe.settings.xml +FabulaHarrenhalResolve; kopie 157: *.bak-2026-11-03-przed-wgranie158 i D:/Backup-Bannerlord/wgrane/2026-11-03-wgranie158-przed
 
 **Problem:** Jeff 02.11: "po zjednoczeniu Polnocy strasznie Polnoc leje Lannisterow"; "Polnoc nie zawiera pokoju z korona, dalej walczy, ale polowa krolestwa przechodzi na strone Lannisterow ... popraw, bo gra jest niegrywalna fabularnie"; "niech korona przestanie liczyc bandytow i Innych jako wroga"; "oblezenia - zwieksz przewage obroncow w zaleznosci od poziomu muru"; "ziemie i zamki, ktore stracili Lannisterowie, sa oddawane pierwotnym wlascicielom"; decyzje "1. tak 2. tak" (tarczownicy biegna pod ostrzalem, korona przy zablokowanym pokoju walczy); "i zrob test potem". Analiza: scratchpad/bal/raport.md (fabula ROT stala od dnia 77 na HarrenhalSiegeNotification - Harrenhal u Paege w Polnocy; korona w SCA ForcePeace).
