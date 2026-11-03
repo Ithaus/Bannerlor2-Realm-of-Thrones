@@ -91990,11 +91990,19 @@ def main(argv):
 
 
 # ---- paczka 319c: grupa groty319c - groty strzal i beltow wedlug tieru (Jeff 02.11) ----
-G319_LINE = re.compile(r"Groty strzal \(319c\): regula (.*?) \| strzal i beltow (\d+), balista (\d+), niezgodnych z regula (\d+)(?: \[(.*?)\])? \(ma byc 0\) \| tier -> metal: (.*?) \| przyklady: (.*)$")
+G319_LINE = re.compile(r"Groty strzal \(319c\): regula (.*?) \| strzal i beltow (\d+), balista (\d+), niezgodnych z regula (\d+)(?: \[(.*?)\])? \(ma byc 0\)"
+                       r"(?: \| 321a tier ostateczny \(po OnSessionLaunched modow\): rachunek kosztu z innego tieru (?P<stale>\d+)(?: \[(?P<staleids>.*?)\])? \(ma byc 0\), "
+                       r"odswiezone rachunki (?P<rf>\d+) z (?P<ck>\d+)(?: \[(?P<rfids>.*?)\])?)?"
+                       r" \| tier -> metal: (?P<rows>.*?) \| przyklady: (.*)$")
 G319_ROW = re.compile(r"t(\d) ([A-Za-z0-9+ ]+?)( \(balista\))? x(\d+)")
 G319_SAMPLE = ("[20:59:52] Groty strzal (319c): regula wedlug tieru jak bron (t1-2 Iron2, t3 Iron3, t4 Iron4, t5 Iron5, t6 Iron6; balista S2) | strzal i beltow 71, "
                "balista 2, niezgodnych z regula 0 (ma byc 0) | tier -> metal: t1 Iron2 x10, t4 Iron4 x8, t6 Iron3 (balista) x2, t6 Iron6 x9 | przyklady: "
                "hardened_125_gr_arrows t6: 5x ironIngot6 = 30 d (wartosc kolczana 21).")
+# 321a: linia po OnSessionLaunched wszystkich modow (tier ostateczny, odswiezona pamiec kosztu)
+G319_SAMPLE_321A = ("[00:21:24] Groty strzal (319c): regula wedlug tieru jak bron (t1-2 Iron2, t3 Iron3, t4 Iron4, t5 Iron5, t6 Iron6; balista S2) | strzal i beltow 71, "
+                    "balista 4, niezgodnych z regula 0 (ma byc 0) | 321a tier ostateczny (po OnSessionLaunched modow): rachunek kosztu z innego tieru 0 (ma byc 0), "
+                    "odswiezone rachunki 2 z 2900 [ravens_teeth_arrows t1->t6 Iron2->Iron6 0.12->0.1 kg; giant_arrows t1->t6 Iron2->Iron6 0.5->0.3 kg] | tier -> metal: "
+                    "t1 Iron2 x18, t6 Iron3 (balista) x4, t6 Iron6 x21 | przyklady: bolt_a t6: 5x ironIngot6 + 1x hardwood = 34 d (wartosc kolczana 22).")
 
 
 def g319_rows(rep, lines, s1):
@@ -92006,7 +92014,8 @@ def g319_rows(rep, lines, s1):
     if not m:
         rep.add("G319-P: odczyt ostatniej linii", "nie czyta", "TAK", False)
         return
-    rule, n, siege, bad, badids, rows, _ = m.groups()
+    rule, n, siege, bad, badids = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
+    rows = m.group("rows")
     by_tier = rule.startswith("wedlug tieru")
     rep.add("G319-1: regula grotow", "wedlug tieru" if by_tier else "S2 (wylaczone AmmoHeadsByTier)", "wedlug tieru", by_tier)
     rep.add("G319-2: kwity niezgodne z regula", bad + (f" [{badids}]" if badids else ""), "0", int(bad) == 0)
@@ -92025,12 +92034,22 @@ def g319_rows(rep, lines, s1):
     if s1:
         mo = re.search(r"starym przepisem z wagi \(bez receptury\) (\d+)", s1[-1])
         rep.add("G319-6: kwity amunicji starym przepisem (S1)", mo.group(1) if mo else "?", "0", (mo.group(1) == "0") if mo else None)
+    # 321a: linia liczona po zmianach statystyk ROT-RBM (OnAfterSessionLaunched) - bez segmentu 321a liczyla tier sprzed zmian i nie widziala Ravens' Teeth t6 z Iron2
+    final = m.group("stale") is not None
+    rep.add("G319-7: linia po statystykach ostatecznych (321a)", "TAK" if final else "NIE - linia sprzed 321a (OnSessionLaunched, przed ROT-RBM)", "TAK", final)
+    if final:
+        st = int(m.group("stale"))
+        rep.add("G319-8: rachunek kosztu z innego tieru niz ostateczny", m.group("stale") + (f" [{m.group('staleids')}]" if m.group("staleids") else ""), "0", st == 0)
+        rep.add("G319-9: odswiezone rachunki (tier/waga zmienione po OnSessionLaunched)",
+                f"{m.group('rf')} z {m.group('ck')}" + (f" [{m.group('rfids')}]" if m.group("rfids") else ""), "INFO (ROT-RBM: ravens_teeth_arrows, giant_arrows, luki ROT)", None)
 
 
 def groty319c_main(logp):
     rep = Report()
     st = G319_LINE.search(G319_SAMPLE)
-    st_ok = bool(st) and len(list(G319_ROW.finditer(st.group(6)))) == 4
+    st_ok = bool(st) and len(list(G319_ROW.finditer(st.group("rows")))) == 4 and st.group("stale") is None
+    st2 = G319_LINE.search(G319_SAMPLE_321A)
+    st_ok = st_ok and bool(st2) and st2.group("stale") == "0" and st2.group("rf") == "2" and len(list(G319_ROW.finditer(st2.group("rows")))) == 3
     rep.add("G319-S: self-test wyrazen na wzorze linii", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
     if not logp or not os.path.isfile(logp):
         rep.add("G319-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)

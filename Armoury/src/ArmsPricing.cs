@@ -48,6 +48,8 @@ namespace Armoury
             public float Metal, Charcoal, Leather, Linen, Wood, Special, Labor, Total;
             // ilosci fizyczne - dla warsztatow (WorkshopLaw): kg metalu danego gatunku, skory, lnu, drewna, dni pracy (z jakoscia)
             public float MetalKg, LeatherKg, LinenKg, WoodKg, Days; public CraftingMaterials Grade;
+            // 321a: tier (Recipes.Grade) i waga do kosztu, z ktorych policzono ten rachunek - RefreshAfterFinalStats porownuje je z ostatecznymi
+            public int Tier; public float Kg;
         }
 
         private static readonly Dictionary<ItemObject, Cost> _cost = new Dictionary<ItemObject, Cost>();
@@ -81,10 +83,8 @@ namespace Armoury
 
         internal static bool PricingOn { get { var s = Settings.Current; return s != null && s.ArmsCostPricingEnabled; } }
 
-        private static int TierOf(ItemObject it)
-        {
-            try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; }
-        }
+        // 321a: jedna regula tieru wyrobu - Recipes.Grade (1..6, ItemTiers.Tier1 == 0), ta sama co kwit kuzni i linia 319c
+        private static int TierOf(ItemObject it) { return Recipes.Grade(it); }
 
         private static readonly Dictionary<ItemObject, bool> _unique = new Dictionary<ItemObject, bool>();
         internal static bool IsUnique(ItemObject it)
@@ -281,6 +281,49 @@ namespace Armoury
             catch (Exception e) { Log.Error("ArmsPricing.Build", e); }
         }
 
+        /// <summary>321a (Jeff 03.11: "Ravens Teeth strzaly biora zwykle zelazo a inne strzaly forged steel"): pamiec kosztu napelnia sie w NASZYM
+        /// OnSessionLaunched (HistoricalPrices.Apply, StartStock, ColdStart, linie startu), a ROT przy RBM (ROTRBMCompatibility.ModifyBowsAndArrows,
+        /// tez OnSessionLaunched, po nas) przepisuje potem statystyki i wage swoich lukow i strzal - ItemObject.Tier gra liczy NA ZYWO z tych statystyk
+        /// (ItemValueModel.CalculateTier), wiec ravens_teeth_arrows ma t6, a rachunek w pamieci zostal z t1 (grot Iron2, waga sprzed zmiany) do konca
+        /// sesji: kwit kuzni (Recipes.MassKg - c.Grade), warsztaty (WorkshopLaw.Needs), naprawy (MendMaterial). Jedna regula: rachunek liczony z tieru
+        /// i wagi OSTATECZNYCH - w OnAfterSessionLaunched (po OnSessionLaunched wszystkich modow) zdejmujemy z pamieci kazdy rachunek, ktorego tier
+        /// albo waga do kosztu nie zgadza sie z dzisiejszymi; nastepne CostOf liczy go od nowa. Zwraca opis zdjetych (do linii startu).</summary>
+        internal static List<string> RefreshAfterFinalStats(out int checkedN)
+        {
+            var res = new List<string>();
+            checkedN = 0;
+            try
+            {
+                var stale = new List<KeyValuePair<ItemObject, Cost>>();
+                foreach (var kv in _cost)
+                {
+                    if (kv.Key == null || kv.Value == null) continue;
+                    checkedN++;
+                    int t = TierOf(kv.Key);
+                    float w = Math.Max(0.01f, CostWeight(kv.Key));
+                    if (t != kv.Value.Tier || Math.Abs(w - kv.Value.Kg) > 0.0005f) stale.Add(kv);
+                }
+                foreach (var kv in stale)
+                {
+                    _cost.Remove(kv.Key);
+                    var n = CostOf(kv.Key);
+                    res.Add(kv.Key.StringId + " t" + kv.Value.Tier + "->t" + (n != null ? n.Tier : TierOf(kv.Key))
+                            + (kv.Value.MetalKg > 0f || (n != null && n.MetalKg > 0f) ? " " + kv.Value.Grade + "->" + (n != null ? n.Grade.ToString() : "-") : "")
+                            + " " + kv.Value.Kg.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "->"
+                            + (n != null ? n.Kg.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "-") + " kg");
+                }
+            }
+            catch (Exception e) { Log.Error("ArmsPricing.RefreshAfterFinalStats", e); }
+            return res;
+        }
+
+        /// <summary>321a: rachunek w pamieci kosztu liczony z innego tieru niz dzisiejszy (Recipes.Grade); brak rachunku - false. Tylko do linii startu.</summary>
+        internal static bool CachedTierDiffers(ItemObject it)
+        {
+            Cost c;
+            return it != null && _cost.TryGetValue(it, out c) && c != null && c.Tier != TierOf(it);
+        }
+
         internal static Cost CostOf(ItemObject it)
         {
             if (it == null) return null;
@@ -364,6 +407,7 @@ namespace Armoury
                 c.Wood = woodKg * KgPrice(_wood);
                 c.Special = special;
                 c.MetalKg = metalKg; c.LeatherKg = leatherKg; c.LinenKg = linenKg; c.WoodKg = woodKg; c.Days = days * q; c.Grade = grade;
+                c.Tier = t; c.Kg = w;   // 321a
                 c.Labor = days * q * Math.Max(0f, s.SmithDayWage);
                 float raw = c.Metal + c.Charcoal + c.Leather + c.Linen + c.Wood + c.Special + c.Labor;
                 c.Total = raw * (1f + Math.Max(0f, s.SmithProfitPercent) / 100f);

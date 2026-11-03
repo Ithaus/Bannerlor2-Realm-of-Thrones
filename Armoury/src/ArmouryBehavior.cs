@@ -1712,6 +1712,10 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => RareMaterials.StartLine());   // m97-surowce: czardrzewo i smocza kosc - surowce, zrodla, doplyw (po cenach HistoricalPrices)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => Recipes.MassStartLine());   // m96-receptury: przepisy z masy po ostatecznych statystykach (ROT-RBM)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { ForgeBill.SessionStart(); } catch (Exception e) { Log.Error("ForgeBill.SessionStart", e); } });   // (dopisany po MassStartLine i RareMaterials.StartLine - biegnie PRZED nimi; probki same robia Resolve surowcow) m109-kuznia: rachunek kuzni - latka przycisku broni, linia startu z probkami (po przepisach z masy)
+            // 321a (Jeff 03.11 "Ravens Teeth strzaly biora zwykle zelazo"): pamiec kosztu (ArmsPricing.CostOf) z tieru i wagi OSTATECZNYCH - rachunki policzone
+            // w OnSessionLaunched przed zmiana statystyk ROT-RBM zdjete i policzone od nowa, potem linie amunicji (S1, 319c). Dopisany OSTATNI - biegnie PRZED
+            // ForgeBill, MassStartLine, RareMaterials i LoreSeedFix (gra wola od ostatnio dopisanego), wiec wszystkie juz czytaja odswiezona pamiec
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { int ck; var rf = ArmsPricing.RefreshAfterFinalStats(out ck); Recipes.AmmoStartLine(rf, ck); } catch (Exception e) { Log.Error("ArmsPricing.RefreshAfterFinalStats/AmmoStartLine", e); } });
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => LoreSeedFix.OnNewGame());
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
             // mury oblezen OB1-OB4 (SiegeWalls.cs): rejestr szturmow AI (prog odparcia OB2, bitwa z murow OB3), wynik szturmu, koniec oblezenia (przerwy, OB4),
@@ -2531,7 +2535,7 @@ namespace Armoury
             try { WorkshopLaw.HandsStartLine(); } catch (Exception e) { Log.Error("WorkshopLaw.HandsStartLine", e); }   // 174.3: linia "Rece (174)" - po ColdStart (ten liczy dawnymi rekami)
             try { TownFletchers.SessionStart(); } catch (Exception e) { Log.Error("TownFletchers.SessionStart", e); }   // paczka 172: kandydaci strzelarzy, koszyki wzorcow, linia startowa - PO HistoricalPrices.Apply i ColdStart
             try { PriceList8.StartLine(); } catch (Exception e) { Log.Error("PriceList8.StartLine", e); }   // E8/C (253): linie startu cennika (tylko log) - PO HistoricalPrices.Apply i ClearCostCache
-            try { Recipes.AmmoStartLine(); } catch (Exception e) { Log.Error("Recipes.AmmoStartLine", e); }   // sklad8-s S1: kwity amunicji kuzni gracza (tylko log) - PO HistoricalPrices.Apply (wartosci sztabek w pensach)
+            // 321a: Recipes.AmmoStartLine przeniesione do OnAfterSessionLaunched (za ArmsPricing.RefreshAfterFinalStats) - tu bieglo PRZED zmiana statystyk ROT-RBM
             // 124: kapital startowy warsztatow w nowej monecie - TU, po HistoricalPrices.Apply. Gra wola sluchaczy zdarzenia od ostatnio
             // dopisanego (MbEvent: lista z wstawianiem na poczatek), wiec WorkshopTradeBehavior (dodany po nas) szedl PRZED przeliczeniem cen
             try { var seed = WorkshopTrade.SeedNewCampaign(); if (seed != null) Log.Info("WorkshopTrade: " + seed); } catch (Exception e) { Log.Error("WorkshopTrade.SeedNewCampaign", e); }

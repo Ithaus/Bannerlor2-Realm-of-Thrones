@@ -203,8 +203,11 @@ namespace Armoury
         /// sklad8-s S1: linia startowa "Kuznia: amunicja (S1)" (tylko log, raz na sesje - po cenach historycznych): kwity serii amunicji
         /// z Recipes.For - ile sztuk z receptury wartosci, ile starym przepisem z wagi, ile kwitow ze stali Iron4-Iron6 (poza legendami ma byc 0),
         /// przyklady (default_arrows, hardened_125_gr_arrows) i 5 najdrozszych kwitow wedlug wartosci materialow.
+        /// 321a: wolane w OnAfterSessionLaunched (po zmianach statystyk ROT-RBM) zaraz po ArmsPricing.RefreshAfterFinalStats - refreshed: rachunki
+        /// zdjete z pamieci kosztu (tier albo waga inne niz ostateczne), checkedN: ile rachunkow sprawdzono. Linia 319c liczy "niezgodnych" z tieru
+        /// ostatecznego (Recipes.Grade) i dopisuje rachunki w pamieci z innego tieru (ma byc 0).
         /// </summary>
-        internal static void AmmoStartLine()
+        internal static void AmmoStartLine(List<string> refreshed, int checkedN)
         {
             try
             {
@@ -222,6 +225,7 @@ namespace Armoury
                 foreach (var g in new[] { CraftingMaterials.Iron1, CraftingMaterials.Iron2, CraftingMaterials.Iron3, CraftingMaterials.Iron4, CraftingMaterials.Iron5, CraftingMaterials.Iron6 }) { var m = MaterialItem(g); if (m != null) ingot[m] = g; }
                 var byGrade = new SortedDictionary<string, int>(StringComparer.Ordinal);
                 int bad = 0, siege = 0; var badIds = new List<string>(); var headSamples = new List<string>();
+                int staleTier = 0; var staleIds = new List<string>();   // 321a: rachunek kosztu z innego tieru niz ostateczny
                 foreach (var it in mgr.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null || (it.ItemType != ItemObject.ItemTypeEnum.Arrows && it.ItemType != ItemObject.ItemTypeEnum.Bolts)) continue;
@@ -258,6 +262,7 @@ namespace Armoury
                     string key = "t" + tg + " " + (got.Count > 0 ? string.Join("+", got.ToArray()) : "bez metalu") + (sg ? " (balista)" : "");
                     int kc; byGrade.TryGetValue(key, out kc); byGrade[key] = kc + 1;
                     if (!okHead || otherMetal) { bad++; if (badIds.Count < 10) badIds.Add(it.StringId + " t" + tg + " chce " + want + " ma " + (got.Count > 0 ? string.Join("+", got.ToArray()) : "-")); }
+                    if (ArmsPricing.CachedTierDiffers(it)) { staleTier++; if (staleIds.Count < 10) staleIds.Add(it.StringId + " t" + tg); }   // 321a
                     if (it.StringId == "default_arrows" || it.StringId == "hardened_125_gr_arrows" || it.StringId == "bolt_a" || it.StringId == "ballista_c_projectile") headSamples.Add(desc);
                     if (it.StringId == "default_arrows" || it.StringId == "hardened_125_gr_arrows") samples.Add(desc);
                     all.Add(new KeyValuePair<float, string>(cost, desc));
@@ -273,6 +278,9 @@ namespace Armoury
                 foreach (var kv in byGrade) rows.Add(kv.Key + " x" + kv.Value);
                 Log.Info("Groty strzal (319c): regula " + (byTier ? "wedlug tieru jak bron (t1-2 Iron2, t3 Iron3, t4 Iron4, t5 Iron5, t6 " + (castle6 ? "Iron6" : "Iron5") + "; balista S2)" : "S2 (t1-4 Iron2, t5-6 Iron3)")
                          + " | strzal i beltow " + n + ", balista " + siege + ", niezgodnych z regula " + bad + (badIds.Count > 0 ? " [" + string.Join("; ", badIds.ToArray()) + "]" : "") + " (ma byc 0)"
+                         + " | 321a tier ostateczny (po OnSessionLaunched modow): rachunek kosztu z innego tieru " + staleTier + (staleIds.Count > 0 ? " [" + string.Join("; ", staleIds.ToArray()) + "]" : "") + " (ma byc 0)"
+                         + ", odswiezone rachunki " + (refreshed != null ? refreshed.Count : 0) + " z " + checkedN
+                         + (refreshed != null && refreshed.Count > 0 ? " [" + string.Join("; ", (refreshed.Count > 30 ? refreshed.GetRange(0, 30) : refreshed).ToArray()) + (refreshed.Count > 30 ? "; ..." : "") + "]" : "")
                          + " | tier -> metal: " + (rows.Count > 0 ? string.Join(", ", rows.ToArray()) : "-")
                          + " | przyklady: " + (headSamples.Count > 0 ? string.Join("; ", headSamples.ToArray()) : "-") + ".");
             }
