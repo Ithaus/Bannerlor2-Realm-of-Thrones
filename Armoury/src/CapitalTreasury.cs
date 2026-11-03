@@ -155,6 +155,13 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ stolica krolestwa
+        /// <summary>322a (BkDipGold 7 - zloto dworzan BK): ta sama stolica co L5b-1 (BK, bez BK poczatkowa siedziba-twierdza); brak - null. Tylko odczyt; wyjatek = null.</summary>
+        internal static Settlement CapitalOfKingdom(Kingdom k)
+        {
+            try { string src; return k != null && !k.IsEliminated ? CapitalOf(k, out src) : null; }
+            catch (Exception e) { Stumble("CapitalOfKingdom", e); return null; }
+        }
+
         /// <summary>Stolica krolestwa: BK (BKCapitalBehavior.GetCapital) albo - bez BK lub bez wpisu BK - Kingdom.InitialHomeSettlement. src: "BK" / "siedziba" / "-".</summary>
         private static Settlement CapitalOf(Kingdom k, out string src)
         {

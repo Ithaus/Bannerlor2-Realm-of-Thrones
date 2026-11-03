@@ -92653,5 +92653,172 @@ def main(argv):
     return _bieg320d_main_prev(argv)
 
 
+
+# ---- paczka 322a: grupa dworzanie322a - kiesy dworzan BK do kasy stolicy (audyt ekonomii 03.11, wyciek 1) i pojedyncze doby z ubytkiem ksiegi ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa dworzanie322a <Armoury-*.log>. Segment "| kiesy dworzan BK (322a)" linii "BK i Diplomacy (E5/A8): dzien N"
+# (BkDipGold 7) i reszta R linii "Pieniadz swiata (bilans - przyczyny)" (NKS_REST). Dowod: log 2026-11-03_00-19-16 - R 109215 -45 608 przy DrainGold 45 681,
+# 109222 -62 599 przy 62 347, 109229 -17 864, 109243 -22 412 - tygodniowe skoki chowaly sie w sredniej 28 dob.
+# D322-S  self-test wyrazen i test syntetyczny;
+# D322-0  segment 322a w liniach E5/A8 (bez segmentu - DLL sprzed 322a - INFO);
+# D322-1  BK zdjal = kasy stolic + skarbce krolestw + wrocilo dworzanom (+ zniklo przy kluczu wylaczonym) w kazdej dobie;
+# D322-2  doby z oproznionymi kiesami przy kluczu TAK: |R| <= 15 000 (dotad R = -zdjete);
+# D322-3  OSTRZEZENIE: pojedyncza doba z niewyjasnionym ubytkiem ksiegi (R < -15 000) - NIE z lista dob (srednia 28 dob tego nie pokazuje);
+# D322-4  zniklo przy kluczu wylaczonym (INFO).
+D322_RX = re.compile(r"\| kiesy dworzan BK \(322a\)(?P<off> WYLACZONE \([^)]*\))?: oproznionych (?P<n>\d+), BK zdjal (?P<paid>\d+) -> kasy stolic (?P<town>\d+) "
+                     r"\((?P<tn>\d+)\), skarbce krolestw (?P<crown>\d+) \((?P<cn>\d+)\), wrocilo dworzanom (?P<back>\d+) \((?P<bn>\d+)\)"
+                     r"(?:, zniklo \(klucz wylaczony\) (?P<gone>\d+) \((?P<gn>\d+)\))?")
+D322_DAY = re.compile(r"^BK i Diplomacy \(E5/A8\): dzien (?P<day>-?\d+) ")
+D322_LOSS = 15000
+
+
+def dworzanie322a_collect(logp):
+    D = {"a8": {}, "noseg": 0, "rest": {}}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            s = ln.rstrip("\r\n")
+            mt = TS.match(s)
+            s = mt.group(2) if mt else s
+            if s.startswith("Pieniadz swiata (bilans - przyczyny): dzien"):
+                m = NKS_REST.search(s)
+                if m:
+                    D["rest"][int(m.group("day"))] = int(m.group("r"))
+                continue
+            md = D322_DAY.match(s)
+            if not md:
+                continue
+            m = D322_RX.search(s)
+            if not m:
+                D["noseg"] += 1
+                continue
+            D["a8"][int(md.group("day"))] = m
+    return D
+
+
+def dworzanie322a_rows(rep, D):
+    A, R = D["a8"], D["rest"]
+    g = lambda m, k: int(m.group(k) or 0)
+    rep.add("D322-0: segment 'kiesy dworzan BK (322a)' w liniach E5/A8", f"z segmentem {len(A)}, bez {D['noseg']}",
+            "bez 0 (DLL sprzed 322a - INFO)", None if not A else D["noseg"] == 0)
+    if A:
+        bad = [d for d, m in sorted(A.items()) if g(m, "paid") != g(m, "town") + g(m, "crown") + g(m, "back") + g(m, "gone")]
+        rep.add("D322-1: BK zdjal = kasy stolic + skarbce krolestw + wrocilo + zniklo (kazda doba)",
+                f"zdjete {sum(g(m, 'paid') for m in A.values())} -> kasy stolic {sum(g(m, 'town') for m in A.values())}, skarbce {sum(g(m, 'crown') for m in A.values())}, "
+                f"wrocilo {sum(g(m, 'back') for m in A.values())}, zniklo {sum(g(m, 'gone') for m in A.values())}; dob niezgodnych {len(bad)}" + (f" ({bad[:6]})" if bad else ""),
+                "niezgodnych 0", not bad)
+        ev = [d for d, m in sorted(A.items()) if g(m, "n") > 0 and not m.group("off") and d in R]
+        if ev:
+            hi = [d for d in ev if abs(R[d]) > D322_LOSS]
+            rep.add("D322-2: reszta R w dobach z oproznionymi kiesami dworzan (klucz TAK)",
+                    f"dob {len(ev)}: " + ", ".join(f"{d} R {R[d]:+d} (zdjete {g(A[d], 'paid')})" for d in ev[:6]) + f"; |R| > {D322_LOSS}: {len(hi)}",
+                    f"|R| <= {D322_LOSS} (dotad R = -zdjete)", not hi)
+        else:
+            rep.add("D322-2: reszta R w dobach z oproznionymi kiesami dworzan", "brak takich dob (BK oproznia raz na tydzien)", "INFO", None)
+        gone = sum(g(m, "gone") for m in A.values())
+        rep.add("D322-4: zniklo przy kluczu wylaczonym", str(gone), "INFO (klucz Courtiers' Gold Stays In The Realm)", None)
+    else:
+        rep.add("D322-1: bilans kies dworzan", "brak segmentu 322a", "INFO", None)
+    if R:
+        big = [(d, r) for d, r in sorted(R.items()) if r < -D322_LOSS]
+        rep.add(f"D322-3: OSTRZEZENIE - pojedyncza doba z niewyjasnionym ubytkiem ksiegi > {D322_LOSS} (reszta R)",
+                f"dob {len(R)}, z ubytkiem > {D322_LOSS}: {len(big)}" + ("".join(f"; {d} R {r:+d}" + (f" (dworzanie BK {g(A[d], 'paid')})" if d in A and g(A[d], 'n') else "")
+                                                                                 for d, r in big[:8])),
+                f"0 (inaczej NIE - sprawdz zrodlo skoku; srednia 28 dob go nie pokaze)", not big)
+    else:
+        rep.add(f"D322-3: pojedyncza doba z ubytkiem ksiegi > {D322_LOSS}", "brak linii 'Pieniadz swiata (bilans - przyczyny)'", "INFO", None)
+
+
+def d322_a8(day, n, paid, town, crown=0, back=0, off=False, gone=0):
+    s = (f"BK i Diplomacy (E5/A8): dzien {day} | ugoda z grupa interesu BK (FinancialCompromise): 0, platnicy zaplacili 0 (gracz 0)"
+         f" | kiesy dworzan BK (322a){' WYLACZONE (Courtiers' + chr(39) + ' Gold Stays In The Realm)' if off else ''}: oproznionych {n}, BK zdjal {paid} -> kasy stolic {town} "
+         f"({1 if town else 0}), skarbce krolestw {crown} ({1 if crown else 0}), wrocilo dworzanom {back} ({1 if back else 0})")
+    if gone:
+        s += f", zniklo (klucz wylaczony) {gone} ({n})"
+    return s + " | kontrola (prog 0): stos paktow przepelniony 0, otwarte okna paktow 0."
+
+
+def d322_rest(day, r):
+    return f"Pieniadz swiata (bilans - przyczyny): dzien {day} | zmiana sumy {r:+d} [P] = zrodla +10 - ujscia 10 + netto +0 + reszta {r:+d} [R] | ZRODLA"
+
+
+def dworzanie322a_selftest():
+    m = D322_RX.search(d322_a8(5, 4, 45681, 45681))
+    if not m or m.group("paid") != "45681" or m.group("off"):
+        return "D322_RX nie czyta segmentu"
+    m = D322_RX.search(d322_a8(5, 2, 100, 0, off=True, gone=100))
+    if not m or not m.group("off") or m.group("gone") != "100":
+        return "D322_RX nie czyta segmentu WYLACZONE"
+    r = NKS_REST.search(d322_rest(7, -45608))
+    if not r or r.group("r") != "-45608":
+        return "NKS_REST nie czyta reszty"
+    return None
+
+
+def dworzanie322a_synth():
+    """D322-S2: dobry (dworzanie do kasy, R maly), stary DLL ze skokiem (bez segmentu, R -45 608), niezgodny, wylaczony, pusty. None = OK."""
+    import tempfile
+    import shutil
+    runs = {
+        "good": [d322_a8(1, 0, 0, 0), d322_rest(1, -300), d322_a8(2, 4, 45681, 45000, crown=681), d322_rest(2, 210)],
+        "old": [d322_rest(1, -273), d322_rest(2, -45608), "BK i Diplomacy (E5/A8): dzien 2 | ugoda z grupa interesu BK (FinancialCompromise): 0 | kontrola (prog 0): x."],
+        "bad": [d322_a8(2, 3, 62347, 60000), d322_rest(2, -2347)],
+        "off": [d322_a8(2, 2, 17519, 0, off=True, gone=17519), d322_rest(2, -17864)],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"D322-0": "TAK", "D322-1": "TAK", "D322-2": "TAK", "D322-3": "TAK", "D322-4": "INFO"},
+        "old": {"D322-0": "INFO", "D322-1": "INFO", "D322-3": "NIE"},
+        "bad": {"D322-0": "TAK", "D322-1": "NIE", "D322-3": "TAK"},
+        "off": {"D322-1": "TAK", "D322-2": "INFO", "D322-3": "NIE"},
+        "empty": {"D322-0": "INFO", "D322-1": "INFO", "D322-3": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="d322_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            dworzanie322a_rows(rep, dworzanie322a_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def dworzanie322a_main(logp):
+    rep = Report()
+    s1 = dworzanie322a_selftest()
+    rep.add("D322-S: self-test wyrazen (segment 322a, reszta R)", s1 or "OK", "OK", s1 is None)
+    try:
+        s2 = dworzanie322a_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("D322-S2: test syntetyczny (dobry, stary DLL ze skokiem, niezgodny, wylaczony, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("D322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = dworzanie322a_collect(logp)
+    print(f"plik: {logp} | linii E5/A8 z segmentem 322a {len(D['a8'])}, bez {D['noseg']}, dob z reszta R {len(D['rest'])}")
+    dworzanie322a_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_dworzanie322a_main_prev = main
+
+
+def main(argv):
+    # paczka 322a: grupa dworzanie322a - opakowanie main jak bieg320d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "dworzanie322a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return dworzanie322a_main(rest[0] if rest else None)
+    return _dworzanie322a_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

@@ -59,6 +59,13 @@ namespace Armoury
     ///    bierze reszte z dzielenia); bez czlonkow - calosc przywodcy; bez zywego przywodcy - calosc czlonkom; bez nikogo - kasa siedziby rodu platnika (ClanBudget.Seat,
     ///    Note169 "inne"), bez siedziby - wraca platnikowi (nic nie znika). Bezposrednio ChangeHeroGold (+ CirculationWindows.NoteHeroGold - jak DsTowns), bez zdarzenia
     ///    gry: platnik juz zaplacil bez zdarzenia, wiec swiat w tej metodzie ma zmiane 0.
+    /// 7. ZLOTO DWORZAN BK (322a, CourtierGoldStaysInRealm; audyt ekonomii 03.11 wyciek 1): BK BKCourtierBehavior.OnWeeklyTick -> MaintainKingdom wola dla kazdego
+    ///    zywego, doroslego, nieozenionego lorda rodu "Courtiers of X" (bk_courtiers_*) prywatna DrainGold(Hero) = ChangeHeroGold(-Gold) - cale zloto w nicosc
+    ///    (log Jeffa 2026-11-03_00-19-16: reszta R ksiegi 109215 -45 608 przy DrainGold 45 681, 109222 -62 599 przy 62 347, 109229 -17 864, 109243 -22 412).
+    ///    Nowi dworzanie (HeroCreator.CreateSpecialHero, ClanActions.CreateNewClan bez removeGold) maja 0 - zloto dworzan to zawsze zloto swiata (np. sakiewka
+    ///    turniejowa). Teraz prefiks zapamietuje kiese, finalizer daje to, co zeszlo, KASIE STOLICY krolestwa rodu dworzan (CapitalTreasury.CapitalOfKingdom - BK
+    ///    BKCapitalBehavior, ta sama, w ktorej BK trzyma dwor; Note169 "inne"), czesc, ktorej kasa nie przyjela, i calosc bez stolicy - SKARBCOWI KROLESTWA
+    ///    (KingdomBudgetWallet, migawka korony przesunieta - zapas, nie wplyw dnia), bez zywego krolestwa - wraca dworzaninowi (nic nie znika).
     /// Wyjatek per zdarzenie - licznik potkniec, bez globalnego wylacznika. Nic do zapisu (stan doby od zera po wczytaniu).
     /// </summary>
     internal static class BkDipGold
@@ -71,6 +78,7 @@ namespace Armoury
         internal static bool PactOn { get { var s = Settings.Current; return s != null && s.PactCostToOtherRealm; } }
         internal static bool CourtShopOn { get { var s = Settings.Current; return s != null && s.CourtShoppingPaysTown; } }       // f19-e1 (5)
         internal static bool CompromiseOn { get { var s = Settings.Current; return s != null && s.GroupCompromisePaysGroup; } }   // f19-e1 (6)
+        internal static bool CourtierOn { get { var s = Settings.Current; return s != null && s.CourtierGoldStaysInRealm; } }     // 322a (7)
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
         private const int KGentryGift = 15000;      // BK BKGentryBehavior.cs:522
@@ -111,6 +119,8 @@ namespace Armoury
         private static int _sDrained;                                          // recenzja calosci 18/19.10: budzet BK doszedl do 0 (kiesa glowy wyczerpana) - dalsze pozycje BK bez limitu
         private static long _cPaid, _cPlayer, _cLeader, _cMembers, _cSeat, _cKept, _cOff, _cToPlayer;   // f19-e1 (6)
         private static int _cN, _cMembersN, _cSeatN, _cKeptN, _cOffN, _cNoLeaderN;
+        private static long _dPaid, _dTown, _dCrown, _dBack, _dOff;                                    // 322a (7)
+        private static int _dN, _dTownN, _dCrownN, _dBackN, _dOffN;
         private static int _overflow, _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly List<string> _wired = new List<string>(), _missing = new List<string>();
@@ -135,6 +145,7 @@ namespace Armoury
             _kDue = _kPaid = _kPlayer = _kNoRecv = _kOff = 0; _kN = _kNoRecvN = _kOffN = _kFallsN = 0;
             _sPaid = _sToTown = _sPlayer = _sOff = 0; _sCalls = _sN = _sOffN = _sBroke = 0; _sDrained = 0;
             _cPaid = _cPlayer = _cLeader = _cMembers = _cSeat = _cKept = _cOff = _cToPlayer = 0; _cN = _cMembersN = _cSeatN = _cKeptN = _cOffN = _cNoLeaderN = 0;
+            _dPaid = _dTown = _dCrown = _dBack = _dOff = 0; _dN = _dTownN = _dCrownN = _dBackN = _dOffN = 0;
             _overflow = 0;
         }
 
@@ -550,6 +561,63 @@ namespace Armoury
             catch (Exception e) { Stumble("CompFin", e); }
         }
 
+        // ------------------------------------------------------------ 7. zloto dworzan BK: BKCourtierBehavior.DrainGold(Hero) (prywatna, instancyjna)
+        public static void CourtierPre(Hero __0, out HeroCtx __state)
+        {
+            __state = null;
+            try
+            {
+                if (!Live || __0 == null || __0.Gold <= 0) return;
+                __state = new HeroCtx { H = __0, G0 = __0.Gold };
+            }
+            catch (Exception e) { __state = null; Stumble("CourtierPre", e); }
+        }
+
+        /// <summary>Finalizer: to, co BK zdjal dworzaninowi (ChangeHeroGold(-Gold) bez odbiorcy) - do kasy stolicy jego krolestwa, reszta i bez stolicy - do skarbca krolestwa.</summary>
+        public static void CourtierFin(HeroCtx __state)
+        {
+            if (__state == null) return;
+            try
+            {
+                var h = __state.H;
+                long paid = (long)__state.G0 - h.Gold;
+                if (paid <= 0) return;
+                _dN++; _dPaid += paid;
+                if (!CourtierOn) { _dOffN++; _dOff += paid; return; }     // klucz wylaczony - jak dotad (zloto w nicosc)
+                Kingdom k = null;
+                try { k = h.Clan != null ? h.Clan.Kingdom : null; if (k == null) k = h.MapFaction as Kingdom; } catch { k = null; }
+                if (k != null && k.IsEliminated) k = null;
+                long rest = paid;
+                var cap = k != null ? CapitalTreasury.CapitalOfKingdom(k) : null;
+                if (cap != null && cap.Town != null)
+                {
+                    var t = cap.Town;
+                    int had = t.Gold;
+                    t.ChangeGold((int)Math.Min(int.MaxValue, rest));
+                    long got = (long)t.Gold - had;
+                    if (got > 0)
+                    {
+                        int g = (int)Math.Min(int.MaxValue, got);
+                        MoneyLedger.Note169(MoneyLedger.N169Other, cap, g);   // "Przeplywy osad (przyczyny)": kasa osady poza tickiem - nazwane ("inne")
+                        _dTown += got; _dTownN++; rest -= got;
+                    }
+                }
+                if (rest > 0 && k != null)
+                {
+                    int x = (int)Math.Min(int.MaxValue, rest);
+                    k.KingdomBudgetWallet += x;
+                    CrownIncome.ShiftSnapshot(k, x);                          // 165: zapas korony, nie wplyw dnia (jak TownToll)
+                    _dCrown += x; _dCrownN++; rest -= x;
+                }
+                if (rest > 0)
+                {
+                    h.ChangeHeroGold((int)Math.Min(int.MaxValue, rest));       // bez zywego krolestwa - zostaje u dworzanina (nic nie znika)
+                    _dBack += rest; _dBackN++;
+                }
+            }
+            catch (Exception e) { Stumble("CourtierFin", e); }
+        }
+
         // ------------------------------------------------------------ wpiecia (SubModuleMain - po SmallGold)
         private static void Patch(Harmony h, string label, MethodBase m, string pre, string fin)
         {
@@ -613,6 +681,11 @@ namespace Armoury
             MethodBase comp = null;
             if (_dGroup != null && _gLeader != null && _gMembers != null) { try { comp = Stage8World.FindCompromise(); } catch { comp = null; } }
             Patch(h, "ugoda z grupa interesu (BK lambda Demand.FinancialCompromise)", comp, nameof(CompPre), nameof(CompFin));
+            // 322a (7): zloto dworzan - prywatna DrainGold(Hero) zadeklarowana w BKCourtierBehavior (DeclaredMethod; ta sama metoda co pomiar E8/P3 Stage8World.DrainPre)
+            var cbT = AccessTools.TypeByName("BannerKings.Behaviours.BKCourtierBehavior");
+            var drain = cbT != null ? AccessTools.DeclaredMethod(cbT, "DrainGold", new[] { typeof(Hero) }) : null;
+            if (drain != null && (drain.IsStatic || drain.ReturnType != typeof(void))) drain = null;
+            Patch(h, "zloto dworzan (BK BKCourtierBehavior.DrainGold)", drain, nameof(CourtierPre), nameof(CourtierFin));
             _wiredText = _wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-";
             _missingText = _missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-";
             Log.Info("BK i Diplomacy (E5/A8): latki przy starcie gry - wpiete: " + _wiredText + "; BRAK: " + _missingText + ".");
@@ -632,6 +705,7 @@ namespace Armoury
                     Log.Info("BK i Diplomacy (E5/A8): start | wylaczniki: Gentry Purse From Town " + (GentryOn ? "tak" : "nie") + " (start rodu: " + (GentryTownPays ? "z kasy miasta" : "0") + ")" + ", Bandit Hero Purse From Hideout " + (BanditOn ? "tak" : "nie")
                              + ", Feast Town Gets Paid " + (FeastOn ? "tak" : "nie") + ", Pact Cost To Other Realm " + (PactOn ? "tak" : "nie")
                              + ", Court Shopping Pays Town " + (CourtShopOn ? "tak" : "nie") + ", Group Compromise Pays Group " + (CompromiseOn ? "tak" : "nie")   // f19-e1
+                             + ", Courtiers' Gold Stays In The Realm " + (CourtierOn ? "tak" : "nie")   // 322a
                              + " | latki: " + _wiredText + "; BRAK: " + _missingText + ".");
                 }
                 var sb = new StringBuilder(900);
@@ -664,6 +738,11 @@ namespace Armoury
                   .Append(" (").Append(_cMembersN).Append(" wyplat; gracz dostal ").Append(_cToPlayer).Append("), kasom siedzib platnika ").Append(_cSeat).Append(" (").Append(_cSeatN)
                   .Append("), zostalo u platnika ").Append(_cKept).Append(" (").Append(_cKeptN).Append("); grup bez przywodcy-odbiorcy (martwy, brak albo sam platnik) ").Append(_cNoLeaderN);
                 if (_cOffN > 0) sb.Append(", bez odbiorcy (klucz wylaczony) ").Append(_cOff).Append(" (").Append(_cOffN).Append(')');
+                // 322a (7): po ugodzie, przed kontrola; frazy inne niz w pomiarze E8/P3 ("(DrainGold) N razy / N zl") i w wierszach E5/A8 sprawdzarki
+                sb.Append(" | kiesy dworzan BK (322a)").Append(CourtierOn ? "" : " WYLACZONE (Courtiers' Gold Stays In The Realm)").Append(": oproznionych ").Append(_dN)
+                  .Append(", BK zdjal ").Append(_dPaid).Append(" -> kasy stolic ").Append(_dTown).Append(" (").Append(_dTownN).Append("), skarbce krolestw ").Append(_dCrown)
+                  .Append(" (").Append(_dCrownN).Append("), wrocilo dworzanom ").Append(_dBack).Append(" (").Append(_dBackN).Append(')');
+                if (_dOffN > 0) sb.Append(", zniklo (klucz wylaczony) ").Append(_dOff).Append(" (").Append(_dOffN).Append(')');
                 sb.Append(" | kontrola (prog 0): stos paktow przepelniony ").Append(_overflow).Append(", otwarte okna paktow ").Append(_pactDepth);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (pierwszy wyjatek z miejsca w logu jako ERROR)");
                 Stage8World.BkSegment(sb);   // E8/P3 (245): dopisek pomiaru - zywnosc BK dla band hersztow i ujscia BK bez odbiorcy (tylko log; klucz Stage8WorldLog wylaczony = linia jak dotad)
