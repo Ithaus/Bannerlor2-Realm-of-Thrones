@@ -7336,6 +7336,22 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int TownDebtNotableKeep { get; set; } = 5000;
 
+        [SettingPropertyBool("Town Debt Farm Cut", HintText = "with Town Debt: when a town council is deep in debt (its debt and the dues its coffer still owes reach Town Debt Farm Cut Weeks weekly instalments, or it is out of credit), the yearly due its lord and the crown take from the town's coffer drops by Town Debt Farm Cut Step every week, down to Town Debt Farm Cut Floor of what the merchants really earn, until the town can pay its dues and start paying its creditors back. Once the debt is paid, the usual reviews raise the due again. No coin is made or lost - the lord and the crown simply take less while the town pays its debts. Off = only the slow cuts, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownDebtFarmCut { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Debt Farm Cut Step", 0.00f, 0.50f, "0.00", HintText = "with Town Debt Farm Cut: how much of the town's yearly due to its lord and the crown is cut each week while its council is deep in debt (0.15 = fifteen parts in a hundred)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtFarmCutStep { get; set; } = 0.15f;
+
+        [SettingPropertyFloatingInteger("Town Debt Farm Cut Weeks", 1.00f, 52.00f, "0.0", HintText = "with Town Debt Farm Cut: a council counts as deep in debt when its debt and the dues its coffer still owes reach this many weekly instalments of the town's due", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtFarmCutWeeks { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Town Debt Farm Cut Floor", 0.00f, 1.00f, "0.00", HintText = "with Town Debt Farm Cut: the weekly cuts never take the town's yearly due below this part of what its merchants earned over the last weeks (0.5 = half; the rest pays the dues owed and the creditors)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownDebtFarmCutFloor { get; set; } = 0.5f;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -13049,6 +13065,10 @@ namespace Armoury
             s.TownDebtLevyProsperity = TownDebtLevyProsperity;
             s.TownDebtLevyRelation = TownDebtLevyRelation;
             s.TownDebtNotableKeep = TownDebtNotableKeep;
+            s.TownDebtFarmCut = TownDebtFarmCut;
+            s.TownDebtFarmCutStep = TownDebtFarmCutStep;
+            s.TownDebtFarmCutWeeks = TownDebtFarmCutWeeks;
+            s.TownDebtFarmCutFloor = TownDebtFarmCutFloor;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;

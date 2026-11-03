@@ -76,6 +76,7 @@ namespace Armoury
             public long CLeft, CPer;                               // f7-kasy: reszta gersumy do zaplaty i czesc na dobe (rozlozona na okno przegladu; placi TownDay; sesja)
             public int SLow = -1;                                  // m103 P3 (e, Ks Farm Surplus Cap Net): doba startu cyklu obnizki z dochodu (kasa po naleznosciach do 1.5 x zapas albo zaleglosci; sesja)
             public int FastDay = -1;                               // m105 G1 (Ds Farm Cut Below Reserve): doba ostatniej szybkiej obnizki (najwyzej raz na FastGapDays; sesja)
+            public int DebtCutDay = -1;                            // 322d (Town Debt Farm Cut): doba ostatniej obnizki firmy przy duzym dlugu rady (najwyzej raz na FastGapDays; sesja)
             public int NImpN; public double NImpAvg;               // m107 K3 (poprawka R2): pamiec doplywu zamku z zapisu (liczba dob, srednia) - do pierwszej probki sesji (CastleSample)
         }
 
@@ -147,6 +148,7 @@ namespace Armoury
             _wlDay = int.MinValue; _wl = 1.0;                        // m103 P3 (f)
             _ccNS = _ccShareS = 0; _ccAmtS = 0;                      // m105 gosp4 G6 (sesja)
             _lfFreeS = 0; _lfFreeOld = 0; _lfFreeSet.Clear(); _cfNS = 0; _cfAmtS = 0; _ccArrFreeS = 0;   // m107 K2 / K3 (sesja)
+            DebtCutReset();                                          // 322d (sesja i doba)
             ClearCounters();
         }
 
@@ -358,6 +360,7 @@ namespace Armoury
                     if (today % Quarter == 0) Terms();
                     Renew(today, s);
                     SurplusReview(today, s);                      // f5-lud (Ks Farm Follows Surplus): firma miasta z KS w gore o przyrost kasy ponad 1.5 x zapas kupcow
+                    DebtCut(today, s);                            // 322d (Town Debt Farm Cut): firma miasta z duzym dlugiem rady w dol co 7 dob (DsTowns.DebtCut.cs)
                 }
             }
             catch (Exception e) { Stumble("DayStart", e); }

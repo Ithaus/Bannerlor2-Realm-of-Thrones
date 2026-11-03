@@ -92653,176 +92653,184 @@ def main(argv):
     return _bieg320d_main_prev(argv)
 
 
-# ------------------------------------------------------------ zboze322c (322c, Jeff 03.11 "3 - ok": zboze zima - wsie sprzedaja zboze ze spichlerza na polke miasta; Armoury/src/TownGranary.Zima322.cs)
-Z322_RX = re.compile(
-    r"Zboze zima \(322c\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|[A-Z][^|]*?) \| zima (?P<win>TAK|NIE) \(do konca (?P<left>\d+) dni; wies rozklada zapas ponad rezerwe na (?P<spread>\d+) dni\)"
-    r" \| rezerwa wsi (?P<keep>\d+) dni .*?\| miast (?P<towns>\d+) \(oblezone \d+, Innych \d+, poza ZC4 (?P<noks>\d+)\)"
-    r" \| z sygnalem (?P<sig>\d+) \(.*?\) \| chcialy (?P<want>\d+) szt\. \| na polki dzis (?P<pcs>\d+) szt\. zboza \((?P<rat>[\d.]+) racji, racji na sztuke srednio (?P<rpp>[\d.]+|-);"
-    r".*? z (?P<vills>\d+) wsi do (?P<ftowns>\d+) miast \| zloto miasto->wies (?P<gold>\d+) zl \(cena srednio (?P<price>[\d.]+|-) zl/szt\. bez pulapu, sztuka po sztuce w dol krzywej polki;"
-    r" pierwsza sztuka srednio (?P<p0>[\d.]+|-) zl, ostatnia srednio (?P<p1>[\d.]+|-) zl; wartosc (?P<val>\d+) zl\)"
-    r".*?\| polka po dostawie \(dni popytu, z KS-H\): mediana (?P<shelf>[\d.]+|-)"
-    r" \| kontrola: racje zdjete (?P<rtk>[\d.]+) = ubytek stodol wsi (?P<rdrop>-?[\d.]+); polki \+(?P<shin>-?\d+) = sztuki (?P<pcs2>\d+)"
-    r"; zloto: kasy miast -(?P<tout>-?\d+), kiesy wsi \+(?P<vin>-?\d+), zaplata (?P<pay>\d+)"
-    r".*?\| potkniecia (?P<stum>\d+) \(razem (?P<stall>\d+)\) \| czas (?P<ms>[\d.]+) ms\.")
+# ---- paczka 322d: grupa dlug322d - szybsza obnizka firm DS przy duzym dlugu rady (Jeff 03.11, audyt propozycja 4 wariant A "4 - ok") ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa dlug322d <Armoury-*.log>. Segment '322d obnizki firm DS przy dlugu rady' w linii 'Dlugi miast (m96-dlugi)'.
+# Dowod przed zmiana (Armoury-2026-11-03_00-19-16.log): dlug rad 1.83 -> 3.26 mln w 70 dob, splaty z nadwyzki 0 w 0 miastach, niewyplacalne 9.
+# D322-S  self-test wyrazen na wzorze linii + test syntetyczny (dobry, za duzy krok, dwie obnizki w 7 dob, stary DLL);
+# D322-0  segment 322d w kazdej linii 'Dlugi miast' (bez - DLL sprzed 322d - NIE);
+# D322-1  kazda obnizka: rata po < rata przed i stosunek >= (1 - krok) (krok z segmentu), rata po ~ rata przed x stosunek;
+# D322-2  to samo miasto obnizone najwyzej raz na 7 dob;
+# D322-3  kontrola dlugu rady 0 i potkniecia TownDebt 0 w liniach z segmentem;
+# D322-5  licznik 'w tym splata z nadwyzki w 7 dobach' (recenzja: wstrzymanie po splacie RepDay) <= wszystkie wstrzymane;
+# D322-4  skutek (INFO z celem): dlug razem pierwsza -> ostatnia doba, splaty z nadwyzki kas w ostatnich 14 dobach (cel > 0 po ok. 5 tygodniach), niewyplacalne.
+D322_DAY = re.compile(r"Dlugi miast \(m96-dlugi\): dzien (\d+) \| miasta z dlugiem (\d+) .*?dlug razem (\d+) .*?\| splaty z nadwyzki kas \(ponad zapas kupcow i najblizsza rate\) (\d+) w (\d+) miastach"
+                      r".*?\| niewyplacalne (\d+) .*?\| kontrola: dlug - \(.*?\) (-?\d+) \(oczekiwane 0\)")
+D322_STUM = re.compile(r"\| potkniecia (\d+) \(sesja \d+\)\.$")
+D322_SEG = re.compile(r"\| 322d obnizki firm DS przy dlugu rady \(Town Debt Farm Cut TAK, krok ([\d.]+)% co (\d+) dob, prog ([\d.]+) rat albo niewyplacalna, podloga ([\d.]+) x doplyw\): "
+                      r"(?:dzis bez przegladu[^|]*|miast mocno zadluzonych (\d+), dzis obnizone (\d+) \(-(\d+) zl/rok\), juz splaca \(bez obnizki\) (\d+)(?: \(w tym splata z nadwyzki w \d+ dobach \d+\))?, przy podlodze (\d+), "
+                      r"bez pomiaru doplywu (\d+); w sesji (\d+) \(-(\d+) zl/rok\)(.*?))(?= \| czas|$)")
+D322_OFF = "322d obnizki firm DS przy dlugu rady: WYLACZONE"
+D322_HREP = re.compile(r"juz splaca \(bez obnizki\) (\d+) \(w tym splata z nadwyzki w \d+ dobach (\d+)\)")   # 322d recenzja: wstrzymane po splacie z nadwyzki (RepDay)
+D322_TOWN = re.compile(r"; ([^;:]+?): dlug rady (\d+), zaleglosc z kasy (\d+), rata (\d+) -> (\d+) zl/tydz \(([\d.]+)%\), powod: (.*?) ([\d.]+) rat \(prog ([\d.]+)\), "
+                       r"doplyw (-?\d+)/d, podloga rata (\d+)( \(osiagnieta\))?")
+D322_BASE = ("[01:51:12] Dlugi miast (m96-dlugi): dzien {d} | miasta z dlugiem 20 (nowe 0, splacone do zera 0), dlug razem {debt} (limit razem 7005972) - wierzyciele: kupcy i patrycjat (P) 1, "
+             "rzemieslnicy (R) 1, notable 1 (18 miast), Bank 1 (12 miast); najwiekszy Oldtown 606269 wobec limitu 1875417 | zaleglosci firm DS z kasy przed pozyczka (bez czesci, ktora kasa "
+             "sama zaplaci w dzien raty): 1552296 u 9 miast | pozyczki dzis 0 w 0 miastach (P 0, R 0, notable 0, Bank 0 z puli 0) -> zaleglosci panom 0, koronie 0 (lacznie z podatku), "
+             "zostalo w kasie 0 | odsetki 1298 (Bank 820) | splaty z nadwyzki kas (ponad zapas kupcow i najblizsza rate) {rep} w {repn} miastach (Bank 0, notable 0, kiesy P/R 0; w tym "
+             "odsetki do kies i notabli 0) | niewyplacalne {ins} (zaleglosc bez kredytu 7 - zostalo 1510671; czeka na pule Banku, wyczerpana dzis 0), podatki nadzwyczajne 0 na 0 (W 0, R 0, "
+             "P 0, notable 0) -> wierzycielom 0, na zaleglosci 0, w kasie 0; miast z podatkiem w ostatnich 28 dobach 9 | skutki: dobrobyt -5.8 (dlug) -0.0 (podatek), lojalnosc -0.0, "
+             "relacje notabli z panem -2 x 0 | bez zywego pana 0, oblezone 0, po zdobyciu (28 dob bez rat DS) 0, dlug zmarlych notabli na kiese P 0 | zaleglosci firm DS miast z kasy na "
+             "koniec (panu + koronie, bez czesci z oszczednosci ludu) 1537018 zl u 25 miast | kontrola: dlug - (wczoraj + pozyczone + odsetki - splacone - zaokraglenia 0.00) {ctl} "
+             "(oczekiwane 0); podatek - (wierzycielom + na zaleglosci + w kasie) 0 (oczekiwane 0){seg} | czas 0.076 ms | potkniecia {stum} (sesja 0).")
+D322_SEGF = (" | 322d obnizki firm DS przy dlugu rady (Town Debt Farm Cut TAK, krok 15% co 7 dob, prog 4 rat albo niewyplacalna, podloga 0.5 x doplyw): miast mocno zadluzonych 9, "
+             "dzis obnizone {n} (-{amt} zl/rok), juz splaca (bez obnizki) {hold} (w tym splata z nadwyzki w 7 dobach {hrep}), przy podlodze 0, bez pomiaru doplywu 0; w sesji {n} (-{amt} zl/rok){towns}")
+D322_T1 = "; Vaith: dlug rady 412000, zaleglosc z kasy 555672, rata 35620 -> {after} zl/tydz ({pct}%), powod: niewyplacalna i dlug+zaleglosc 27.2 rat (prog 4), doplyw 5100/d, podloga rata 17850"
 
 
-def zboze322c_collect(logp):
-    D = {"L": [], "bad": 0, "off": 0}
-    with open(logp, encoding="utf-8", errors="replace") as fh:
-        for ln in fh:
-            s = ln.rstrip("\r\n")
-            mt = TS.match(s)
-            s = mt.group(2) if mt else s
-            if not s.startswith("Zboze zima (322c):"):
-                continue
-            if "WYLACZONE" in s:
-                D["off"] += 1
-                continue
-            m = Z322_RX.search(s)
-            if m:
-                D["L"].append(m)
-            else:
-                D["bad"] += 1
+def dlug322d_line(d, debt=3262034, rep=0, repn=0, ins=9, ctl=0, stum=0, seg=None):
+    return D322_BASE.format(d=d, debt=debt, rep=rep, repn=repn, ins=ins, ctl=ctl, stum=stum, seg="" if seg is None else seg)
+
+
+def dlug322d_seg(after=30277, pct="85", n=1, amt=278200, hold=0, hrep=0):
+    return D322_SEGF.format(n=n, amt=amt, hold=hold, hrep=hrep, towns=D322_T1.format(after=after, pct=pct))
+
+
+def dlug322d_collect(lines):
+    D = {"days": [], "noseg": 0, "off": 0, "bad": 0}
+    for s in lines:
+        if "Dlugi miast (m96-dlugi): dzien" not in s:
+            continue
+        m = D322_DAY.search(s)
+        if not m:
+            D["bad"] += 1
+            continue
+        if D322_OFF in s:
+            D["off"] += 1
+            continue
+        g = D322_SEG.search(s)
+        if not g:
+            D["noseg"] += 1
+            continue
+        st = D322_STUM.search(s)
+        hr = D322_HREP.search(g.group(0))
+        towns = list(D322_TOWN.finditer(g.group(13) or "")) if g.group(5) is not None else []
+        D["days"].append({"d": int(m.group(1)), "debt": int(m.group(3)), "rep": int(m.group(4)), "repn": int(m.group(5)), "ins": int(m.group(6)), "ctl": int(m.group(7)),
+                          "stum": int(st.group(1)) if st else -1, "step": float(g.group(1)), "gap": int(g.group(2)),
+                          "cut": int(g.group(6)) if g.group(6) else 0, "hold": int(g.group(8)) if g.group(8) else 0,
+                          "hrep": int(hr.group(2)) if hr else -1, "towns": [(t.group(1), int(t.group(4)), int(t.group(5)), float(t.group(6))) for t in towns]})
     return D
 
 
-def zboze322c_rows(rep, D):
-    L = D["L"]
-    if not L and not D["bad"]:
-        rep.add("Z322-0: linie 'Zboze zima (322c)' co dobe", f"brak linii (wylaczone {D['off']})", "INFO (klucz Winter Grain To Market albo DLL sprzed 322c)", None)
-    else:
-        rep.add("Z322-0: linie 'Zboze zima (322c)' co dobe", f"linii {len(L)}, nieczytelnych {D['bad']}", "nieczytelnych 0", D["bad"] == 0)
-    if not L:
-        for n in ("Z322-1: potkniecia", "Z322-2: racje zdjete = ubytek stodol wsi", "Z322-3: polki + = sztuki", "Z322-4: zloto kasy miast = zaplata = kiesy wsi",
-                  "Z322-5: zima i CZYNNE - zboze trafia na polki", "Z322-6: czas doby"):
-            rep.add(n, "brak linii", "INFO", None)
+def dlug322d_rows(rep, D):
+    days = D["days"]
+    if D["bad"]:
+        rep.add("D322-P: odczyt linii 'Dlugi miast'", f"nie czyta {D['bad']}", "wszystkie", False)
+    if not days and not D["noseg"]:
+        rep.add("D322-0: segment 322d w liniach 'Dlugi miast'", "brak linii" + (f" (WYLACZONE {D['off']})" if D["off"] else ""), ">= 1 linia z segmentem", False if not D["off"] else None)
         return
-    st = max(int(m.group("stall")) for m in L)
-    rep.add("Z322-1: potkniecia", f"razem {st} (najwiecej w dobie {max(int(m.group('stum')) for m in L)})", "0", st == 0)
-    badr = [m for m in L if abs(float(m.group("rtk")) - float(m.group("rdrop"))) > max(1.0, 0.001 * float(m.group("rtk")))]
-    rep.add("Z322-2: racje zdjete = ubytek stodol wsi", f"dob niezgodnych {len(badr)}" + "".join(f"; [d{m.group('day')} {m.group('rtk')} / {m.group('rdrop')}]" for m in badr[:3]),
-            "0 (roznica <= 0.1% albo 1 racja)", not badr)
-    bads = [m for m in L if int(m.group("shin")) != int(m.group("pcs2")) or int(m.group("pcs2")) != int(m.group("pcs"))]
-    rep.add("Z322-3: polki + = sztuki", f"dob niezgodnych {len(bads)}" + "".join(f"; [d{m.group('day')} +{m.group('shin')} / {m.group('pcs2')}]" for m in bads[:3]),
-            "0 (towar nie z niczego i nie w nicosc)", not bads)
-    badg = [m for m in L if not (int(m.group("tout")) == int(m.group("pay")) == int(m.group("vin")) == int(m.group("gold")))]
-    rep.add("Z322-4: zloto kasy miast = zaplata = kiesy wsi", f"dob niezgodnych {len(badg)}" + "".join(f"; [d{m.group('day')} -{m.group('tout')} / {m.group('pay')} / +{m.group('vin')}]" for m in badg[:3]),
-            "0 (nic z niczego)", not badg)
-    act = [m for m in L if m.group("state") == "CZYNNE" and m.group("win") == "TAK" and int(m.group("sig")) > 0]
-    n5 = "Z322-5: zima i CZYNNE - zboze trafia na polki"
-    if act:
-        fed = [m for m in act if int(m.group("pcs")) > 0]
-        rep.add(n5, f"dob z sygnalem {len(act)}, z dostawa {len(fed)}; sztuk {sum(int(m.group('pcs')) for m in act)} z chcianych {sum(int(m.group('want')) for m in act)}",
-                ">= 1 doba z dostawa (inaczej DECYZJA - wsie na rezerwie albo bez nadwyzki kas)", len(fed) > 0, decide=True)
-    else:
-        rep.add(n5, "brak dob zimy z sygnalem przy CZYNNE", "INFO", None)
-    ms = sorted(float(m.group("ms")) for m in L)
-    med = ms[(len(ms) - 1) // 2]
-    rep.add("Z322-6: czas doby", f"mediana {med:.1f} ms, najwiecej {ms[-1]:.1f} ms", "mediana <= 10 ms", med <= 10.0)
-    # recenzja 322c: tylko zima - poza zima (zima NIE albo POZA ZIMA) ani sztuki, ani zlota
-    offs = [m for m in L if m.group("win") == "NIE" or m.group("state").startswith("POZA ZIMA")]
-    leak = [m for m in offs if int(m.group("pcs")) > 0 or int(m.group("gold")) > 0]
-    if offs:
-        rep.add("Z322-8: poza zima nic", f"dob poza zima {len(offs)}, z dostawa {len(leak)}" + "".join(f"; [d{m.group('day')} {m.group('pcs')} szt.]" for m in leak[:3]),
-                "0 (zboze ze spichlerzy tylko w zimie)", not leak)
-    else:
-        rep.add("Z322-8: poza zima nic", "brak dob poza zima", "INFO", None)
-    # recenzja 322c: cena od polki bez pulapu - sztuka po sztuce w dol krzywej (ostatnia sztuka nie drozsza od pierwszej), srednia miedzy nimi
-    pw = [m for m in L if m.group("p0") != "-" and m.group("p1") != "-" and m.group("price") != "-"]
-    badp = [m for m in pw if float(m.group("p1")) > float(m.group("p0")) + 0.05]
-    if pw:
-        rep.add("Z322-9: cena w dol krzywej polki (ostatnia <= pierwsza)", f"dob z dostawa {len(pw)}, niezgodnych {len(badp)}"
-                + "".join(f"; [d{m.group('day')} {m.group('p0')} -> {m.group('p1')}]" for m in badp[:3]), "0", not badp)
-    else:
-        rep.add("Z322-9: cena w dol krzywej polki (ostatnia <= pierwsza)", "brak dob z dostawa", "INFO", None)
-    pr = [float(m.group("price")) for m in L if m.group("price") != "-"]
-    sh = [float(m.group("shelf")) for m in L if m.group("shelf") != "-"]
-    rp = [float(m.group("rpp")) for m in L if m.group("rpp") != "-"]
-    last = L[-1]
-    rep.add("Z322-7: sumy (INFO)",
-            f"dob {len(L)}; sztuk {sum(int(m.group('pcs')) for m in L)}, racji {sum(float(m.group('rat')) for m in L):.0f}, zlota {sum(int(m.group('gold')) for m in L)}; "
-            f"cena srednio {(sum(pr) / len(pr)) if pr else 0:.1f} zl/szt. bez pulapu (wartosc {last.group('val')}); racji na sztuke {(sum(rp) / len(rp)) if rp else 0:.1f}; "
-            f"polka po dostawie mediana dni {(sorted(sh)[(len(sh) - 1) // 2]) if sh else 0:.2f}; ostatnia doba: z sygnalem {last.group('sig')}, wsi {last.group('vills')}, miast {last.group('ftowns')}, "
-            f"poza ZC4 {last.group('noks')}, rezerwa {last.group('keep')} dni, rozlozenie {last.group('spread')} dni", "INFO", None)
+    rep.add("D322-0: segment 322d w liniach 'Dlugi miast'", f"{len(days)} z segmentem, {D['noseg']} bez", "wszystkie z segmentem (bez - DLL sprzed 322d)", D["noseg"] == 0 and len(days) > 0)
+    if not days:
+        return
+    badc, last, twice = [], {}, []
+    for x in days:
+        for (nm, a, b, pct) in x["towns"]:
+            r = pct / 100.0
+            if not (b < a) or r < 1 - x["step"] / 100.0 - 0.002 or abs(a * r - b) > max(2.0, 0.002 * a):
+                badc.append(f"d{x['d']} {nm} {a}->{b} ({pct}%)")
+            if nm in last and x["d"] - last[nm] < x["gap"]:
+                twice.append(f"{nm} d{last[nm]} i d{x['d']}")
+            last[nm] = x["d"]
+    ncut = sum(x["cut"] for x in days)
+    rep.add("D322-1: obnizki zgodne z krokiem (rata po < przed, stosunek >= 1 - krok)", "; ".join(badc[:6]) or f"zgodne ({ncut} obnizek)", "zgodne", not badc)
+    rep.add("D322-2: to samo miasto najwyzej raz na 7 dob", "; ".join(twice[:6]) or "tak", "tak", not twice)
+    ctl = [x for x in days if x["ctl"] != 0]
+    stum = sum(max(0, x["stum"]) for x in days)
+    hbad = [f"d{x['d']} {x['hrep']}>{x['hold']}" for x in days if x["hrep"] > x["hold"]]
+    hnew = [x for x in days if x["hrep"] >= 0]
+    rep.add("D322-5: wstrzymane po splacie z nadwyzki (RepDay, recenzja) <= wszystkie wstrzymane",
+            "; ".join(hbad[:6]) or (f"zgodne, suma {sum(x['hrep'] for x in hnew)} z {sum(x['hold'] for x in hnew)} wstrzymanych ({len(hnew)} dob z licznikiem, {len(days) - len(hnew)} bez - DLL sprzed poprawki)"),
+            "<=", not hbad)
+    rep.add("D322-3: kontrola dlugu rady 0 i potkniecia TownDebt", f"doby z kontrola != 0: {len(ctl)}, potkniecia {stum}", "0 i 0", not ctl and stum == 0)
+    a, z = days[0], days[-1]
+    tail = [x for x in days if x["d"] > z["d"] - 14]
+    rp = sum(x["rep"] for x in tail)
+    span = max(1, z["d"] - a["d"])
+    rep.add("D322-4: skutek - dlug razem, splaty z nadwyzki (ostatnie 14 dob), niewyplacalne",
+            f"dlug {a['debt']} -> {z['debt']} w {span} dob ({(z['debt'] - a['debt']) / span:+.0f}/d), splaty {rp} (miast max {max(x['repn'] for x in tail)}), niewyplacalne {a['ins']} -> {z['ins']}, obnizek {ncut}",
+            "INFO (przed 322d: +20 tys./d, splaty 0, niewyplacalne 9; cel po ok. 5 tyg.: splaty > 0, przyrost dlugu w dol)", None)
 
 
-def z322_line(pcs=120, rat="60000", drop="60000", shin=120, gold=3600, tout=3600, vin=3600, stum=0, stall=0, win="TAK", state="CZYNNE", sig=20, ms="2.5", p0="40", p1="22"):
-    return (f"Zboze zima (322c): dzien 109300 | {state} | zima {win} (do konca 1700 dni; wies rozklada zapas ponad rezerwe na 1700 dni) | rezerwa wsi 455 dni wlasnej potrzeby "
-            f"(klucz 455, bramka krainy 455) | miast 97 (oblezone 0, Innych 0, poza ZC4 48) | z sygnalem {sig} (polka < 0.5 dnia popytu 20, indeks >= 5.0 19; polka pelna do celu 0, "
-            f"bez kasy 1, bez wsi z zapasem 0, bez wyceny 0) | chcialy 900 szt. | na polki dzis {pcs} szt. zboza ({rat} racji, racji na sztuke srednio 500.0; sigma 37, kg sztuki 10) z 30 wsi do 12 miast "
-            f"| zloto miasto->wies {gold} zl (cena srednio 30.0 zl/szt. bez pulapu, sztuka po sztuce w dol krzywej polki; pierwsza sztuka srednio {p0} zl, ostatnia srednio {p1} zl; wartosc 10 zl) | wsie: na rezerwie 3, bez rachunku KS (kcal racji) 0, "
-            f"bez migawki doby/glod/bez spichlerza 2, ponizej sztuki dzis 0 | polka po dostawie (dni popytu, z KS-H): mediana 0.80 | kontrola: racje zdjete {rat} = ubytek stodol wsi {drop}; "
-            f"polki +{shin} = sztuki {pcs}; zloto: kasy miast -{tout}, kiesy wsi +{vin}, zaplata {gold}; od wczytania 120 szt., 60000 racji, 3600 zl | potkniecia {stum} (razem {stall}) "
-            f"| czas {ms} ms.")
+def dlug322d_synth():
+    good = [dlug322d_line(100, seg=dlug322d_seg()), dlug322d_line(101, seg=dlug322d_seg(n=0, amt=0).replace(D322_T1.format(after=30277, pct="85"), "")),
+            dlug322d_line(107, debt=3200000, rep=500, repn=1, seg=dlug322d_seg())]
+    D = dlug322d_collect(good)
+    if len(D["days"]) != 3 or D["noseg"] or D["bad"]:
+        return f"dobry: odczyt {len(D['days'])}/{D['noseg']}/{D['bad']}"
+    if D["days"][0]["towns"] != [("Vaith", 35620, 30277, 85.0)] or D["days"][1]["towns"]:
+        return f"dobry: miasta {D['days'][0]['towns']} / {D['days'][1]['towns']}"
+    r = Report()
+    dlug322d_rows(r, D)
+    if any(x[3] == "NIE" for x in r.rows):
+        return "dobry: NIE w " + "; ".join(x[0] for x in r.rows if x[3] == "NIE")
+    r = Report()
+    dlug322d_rows(r, dlug322d_collect([dlug322d_line(100, seg=dlug322d_seg(after=20000, pct="56.1"))]))
+    if not any(x[0].startswith("D322-1") and x[3] == "NIE" for x in r.rows):
+        return "za duzy krok nie zlapany"
+    r = Report()
+    dlug322d_rows(r, dlug322d_collect([dlug322d_line(100, seg=dlug322d_seg()), dlug322d_line(103, seg=dlug322d_seg(after=30277))]))
+    if not any(x[0].startswith("D322-2") and x[3] == "NIE" for x in r.rows):
+        return "dwie obnizki w 7 dob nie zlapane"
+    r = Report()
+    dlug322d_rows(r, dlug322d_collect([dlug322d_line(100)]))
+    if not any(x[0].startswith("D322-0") and x[3] == "NIE" for x in r.rows):
+        return "stary DLL (bez segmentu) nie zlapany"
+    old = dlug322d_line(100, seg=dlug322d_seg().replace(" (w tym splata z nadwyzki w 7 dobach 0)", ""))
+    D = dlug322d_collect([old, dlug322d_line(107, seg=dlug322d_seg(hold=3, hrep=2))])
+    if len(D["days"]) != 2 or D["days"][0]["hrep"] != -1 or D["days"][1]["hold"] != 3 or D["days"][1]["hrep"] != 2 or D["days"][1]["towns"] != [("Vaith", 35620, 30277, 85.0)]:
+        return f"licznik splaty z nadwyzki: odczyt {[(x['hold'], x['hrep']) for x in D['days']]}"
+    r = Report()
+    dlug322d_rows(r, dlug322d_collect([dlug322d_line(100, seg=dlug322d_seg(hold=1, hrep=2))]))
+    if not any(x[0].startswith("D322-5") and x[3] == "NIE" for x in r.rows):
+        return "wstrzymane po splacie > wszystkie nie zlapane"
+    return None
 
 
-def zboze322c_synth():
-    """Z322-S: dobry, zly (kontrole, potkniecia, cena w gore), zima bez dostaw, poza zima (czysto / z dostawa), wylaczony, pusty. None = OK."""
-    import tempfile
-    import shutil
-    runs = {
-        "good": [z322_line(), z322_line(pcs=0, rat="0", drop="0", shin=0, gold=0, tout=0, vin=0)],
-        "bad": [z322_line(drop="59000", shin=119, tout=3700, stum=1, stall=1, ms="25.0", p0="22", p1="40")],
-        "summer": [z322_line(pcs=0, rat="0", drop="0", shin=0, gold=0, tout=0, vin=0, win="NIE", state="POZA ZIMA - nic", sig=0, p0="-", p1="-")],
-        "leak": [z322_line(win="NIE", state="POZA ZIMA - nic")],
-        "dry": [z322_line(pcs=0, rat="0", drop="0", shin=0, gold=0, tout=0, vin=0)],
-        "off": ["Zboze zima (322c): WYLACZONE (Winter Grain To Market w MCM) - spichlerze wsi tylko do zapasu jedzenia miasta (p6), jak dotad."],
-        "empty": ["Armoury: inna linia", "Zboze zima (322c): dzien 1 | zepsuta linia"],
-    }
-    exp = {
-        "good": {"Z322-0": "TAK", "Z322-1": "TAK", "Z322-2": "TAK", "Z322-3": "TAK", "Z322-4": "TAK", "Z322-5": "TAK", "Z322-6": "TAK", "Z322-7": "INFO", "Z322-8": "INFO", "Z322-9": "TAK"},
-        "bad": {"Z322-1": "NIE", "Z322-2": "NIE", "Z322-3": "NIE", "Z322-4": "NIE", "Z322-6": "NIE", "Z322-9": "NIE"},
-        "summer": {"Z322-0": "TAK", "Z322-5": "INFO", "Z322-8": "TAK", "Z322-9": "INFO"},
-        "leak": {"Z322-8": "NIE"},
-        "dry": {"Z322-5": "DECYZJA", "Z322-2": "TAK"},
-        "off": {"Z322-0": "INFO", "Z322-1": "INFO"},
-        "empty": {"Z322-0": "NIE", "Z322-1": "INFO"},
-    }
-    tmp = tempfile.mkdtemp(prefix="z322_")
-    diff = []
-    try:
-        for kind, Ls in runs.items():
-            logp = os.path.join(tmp, f"Armoury-{kind}.log")
-            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
-            rep = Report()
-            zboze322c_rows(rep, zboze322c_collect(logp))
-            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
-            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-    return "; ".join(diff) if diff else None
-
-
-def zboze322c_main(logp):
+def dlug322d_main(logp):
     rep = Report()
+    ok = bool(D322_DAY.search(dlug322d_line(1, seg=dlug322d_seg()))) and bool(D322_SEG.search(dlug322d_line(1, seg=dlug322d_seg())))
+    rep.add("D322-S: self-test wyrazen na wzorze linii", "TAK" if ok else "wyrazenie nie czyta wzoru", "TAK", ok)
     try:
-        s2 = zboze322c_synth()
+        s2 = dlug322d_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("Z322-S: test syntetyczny (dobry, zly, zima bez dostaw, poza zima, wylaczony, pusty)", s2 or "OK", "OK", s2 is None)
+    rep.add("D322-S2: test syntetyczny (dobry, za duzy krok, dwie obnizki w 7 dob, stary DLL, licznik splaty z nadwyzki)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
-        rep.add("Z322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.add("D322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    D = zboze322c_collect(logp)
-    print(f"plik: {logp} | linii 322c {len(D['L'])}, nieczytelnych {D['bad']}, wylaczone {D['off']}")
-    zboze322c_rows(rep, D)
+    lines = []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if "Dlugi miast (m96-dlugi): dzien" in line:
+                lines.append(line.rstrip("\r\n"))
+    print(f"plik: {logp} | linii 'Dlugi miast' {len(lines)}")
+    dlug322d_rows(rep, dlug322d_collect(lines))
     rep.show()
     return 0
 
 
-_zboze322c_main_prev = main
+_dlug322d_main_prev = main
 
 
 def main(argv):
-    # paczka 322c: grupa zboze322c - opakowanie main jak bieg320d
+    # paczka 322d: grupa dlug322d - opakowanie main jak groty319c
     a = argv[1:]
     if "--grupa" in a:
         i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "zboze322c":
+        if i + 1 < len(a) and a[i + 1] == "dlug322d":
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return zboze322c_main(rest[0] if rest else None)
-    return _zboze322c_main_prev(argv)
+            return dlug322d_main(rest[0] if rest else None)
+    return _dlug322d_main_prev(argv)
 
 
 if __name__ == "__main__":
