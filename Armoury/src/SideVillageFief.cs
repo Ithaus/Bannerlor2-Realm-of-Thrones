@@ -52,6 +52,8 @@ namespace Armoury
     ///    glowa rodu pana zamku) - najpierw licznik podatku wsi gry, potem jego kiesa. Wylaczony - glowa rodu pana zamku (jak dotad).
     ///  - F3: gracz (albo czlonek jego rodu) jest posiadaczem podatku okregu - wioska nie placi ("its whole tax is yours already").
     ///  - F4 (SideVillageIncomeSeizable): PaidAvg28 - srednia 28 dob wyplat wiosek gracza do ClanIncomeBook.VillageIncomeOf(rod gracza) (zajecie 168 bierze ja jak dochod wsi).
+    ///  - 323d (SideVillageIncomeRealSales, Jeff 03.11 "tak i prawdziwa sprzedaz"): H w DueFor = utarg wozow okregu na dobe (DistrictWorks.HandedMeasured, okno 28 dob)
+    ///    / wartosc dnia okregu, bez progu 0.2 i sufitu 1.5 - naleznosc = udzial wioski x prawdziwy utarg okregu x stawka pana; utarg 0 = 0 (kod 7). Bez pomiaru - H jak dotad.
     ///  - F6 (SideVillageDuesInLordD): DrawnAvg28(rod) - srednia 28 dob tego, co platnik dal Z KIESY (nie z licznika) - ziemia D stalego platnika mniejsza o tyle.
     /// </summary>
     internal static class SideVillageFief
@@ -734,6 +736,18 @@ namespace Armoury
                 }
                 double hand = DistrictWorks.HandedRatio(v, all);
                 if (double.IsNaN(hand) || double.IsInfinity(hand) || hand <= 0) hand = 0.868;
+                // 323d (klucz SideVillageIncomeRealSales; Jeff 03.11 "tak i prawdziwa sprzedaz"): H z prawdziwego utargu wozow okregu (srednia 28 dob) / wartosc dnia
+                // okregu - BEZ progu 0.2 i sufitu 1.5 (prog dawal Seven Elms w zimie ok. 10x tego, co okreg sprzedal). Naleznosc = udzial wioski x utarg okregu x stawka
+                // pana; utarg 0 przy pomiarze = naleznosc 0 (kod 7). Brak pomiaru (mniej niz 7 dob okna) - H jak dotad (HandedRatio).
+                var sv = Settings.Current;
+                double sold; int sDays; bool real = false; double hFloor = hand;
+                if (sv != null && sv.SideVillageIncomeRealSales && DistrictWorks.HandedMeasured(v, out sold, out sDays))
+                {
+                    real = true;
+                    hand = all > 0 ? sold / all : 0;
+                    if (double.IsNaN(hand) || double.IsInfinity(hand) || hand < 0) hand = 0;
+                }
+                else { sold = 0; sDays = 0; }
                 double rate; bool rateOk = LordRate(v, out rate);
                 foreach (var p in parts)
                 {
@@ -746,10 +760,15 @@ namespace Armoury
                     else c.Note = "wioska bez produkcji i ludzi w ksiedze";
                     c.Val = val;
                     double d = val * hand * rate;
-                    string calc = "wartosc wioski " + val.ToString("0", Inv) + " x H " + hand.ToString("0.00", Inv) + " x stawka pana " + (100 * rate).ToString("0", Inv) + "%";
+                    string calc = "wartosc wioski " + val.ToString("0", Inv) + " x H " + hand.ToString(real ? "0.000" : "0.00", Inv) + " x stawka pana " + (100 * rate).ToString("0", Inv) + "%"
+                                + (real ? "; prawdziwa sprzedaz (323d): utarg wozow okregu " + sold.ToString("0.0", Inv) + "/d (okno " + sDays + " dob) z wartosci dnia " + all.ToString("0", Inv)
+                                          + ", udzial wioski " + (all > 0 ? (100 * val / all).ToString("0.0", Inv) : "0") + "% = sprzedane wioski " + (all > 0 ? (val / all * sold).ToString("0.0", Inv) : "0")
+                                          + "/d, dawny H z progiem " + hFloor.ToString("0.00", Inv) + " dalby " + (val * hFloor * rate).ToString("0.0", Inv)
+                                        : "; H bez pomiaru utargu" + (sv != null && sv.SideVillageIncomeRealSales ? "" : " (klucz SideVillageIncomeRealSales WYL)") + " (323d)");
                     if (!rateOk) { c.Code = 3; c.Why = "stawka pana nieznana (model podatku wsi)"; }
                     else if (!(val > 0)) { c.Code = 4; c.Why = "brak wartosci produkcji (" + c.Note + ")"; }
                     else if (!(rate > 0)) { c.Code = 5; c.Why = "stawka pana 0"; }
+                    else if (real && !(sold > 0)) { c.Code = 7; c.Why = "wozy okregu nic nie sprzedaly w oknie (" + calc + ")"; }
                     else if (!(d >= 0.5) || double.IsInfinity(d)) { c.Code = 6; c.Why = "za mala wartosc dnia (" + calc + ")"; }
                     else { c.Due = (long)Math.Round(Math.Min(d, 1e6)); c.Why = calc; }
                     _dueFor[p.Uid] = c;
@@ -870,7 +889,9 @@ namespace Armoury
                             {
                                 o.DueCode = 3;
                                 o.DueWhy = c.Code == 3 ? "Its lord's tax is not known today." : c.Code == 4 ? "What your village makes is not known yet."
-                                         : c.Code == 5 ? "The lord takes no tax from this district." : "Your village makes too little today to owe the lord anything.";
+                                         : c.Code == 5 ? "The lord takes no tax from this district."
+                                         : c.Code == 7 ? "The district's carts have sold nothing of late - no tax is owed on your village's goods."
+                                         : "Your village makes too little today to owe the lord anything.";
                             }
                         }
                     }
@@ -1705,6 +1726,7 @@ namespace Armoury
                   .Append(" | klucze: start ").Append(s.SideVillageFiefStart ? "WL" : "WYL").Append(", dochod ").Append(s.SideVillageFiefIncome ? "WL" : "WYL").Append(", menu ").Append(s.SideVillageFiefMenu ? "WL" : "WYL")
                   .Append(", nocleg pod dachem ").Append(s.SideVillageFiefLodging ? (TownInns.On ? "WL" : "WL (karczmy WYL)") : "WYL")
                   .Append(", platnik = posiadacz podatku ").Append(s.SideVillagePayerIsTaxHolder ? "WL" : "WYL")
+                  .Append(", prawdziwa sprzedaz (323d) ").Append(s.SideVillageIncomeRealSales ? "WL" : "WYL")
                   .Append(" | latki: BK GiveLordshipOnKingdomJoin ").Append(_bkWired ? "wpieta" : "BRAK").Append(", podpowiedz zlota ").Append(_finWired ? "wpieta (" + (_finDecl != null ? _finDecl.Name : "?") + ")" : "BRAK")
                   .Append(", przychod rodu (CalculateClanIncome) ").Append(_incWired ? "wpiety (" + (_incDecl != null ? _incDecl.Name : "?") + ")" : "BRAK").Append(", panel Finance (m115) ").Append(FinanceBox.State)
                   .Append(", opis startu BK (StartOptionVM.ShortDescription) ").Append(_startTxtWired ? "wpiety" : "BRAK")

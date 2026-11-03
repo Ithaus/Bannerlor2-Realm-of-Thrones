@@ -409,6 +409,32 @@ namespace Armoury
             return DefaultH;
         }
 
+        /// <summary>323d (Jeff 03.11 "tak i prawdziwa sprzedaz": dochod wioski pobocznej za prawdziwym utargiem, bez progu 0.2): utarg oddany przy wozach okregu v na dobe
+        /// (srednia okna ok. 28 dob) - ta sama liczba co H (HOf), ale BEZ progu 0.2 i sufitu 1.5; utarg 0 przy pomiarze to tez pomiar (perDay 0). false - brak pomiaru
+        /// (mniej niz 7 dob okna albo okreg nie mierzony: klucz Works Pay Market Share wylaczony i okreg bez prac). Nie rzuca.</summary>
+        internal static bool HandedMeasured(Village v, out double perDay, out int days)
+        {
+            perDay = 0; days = 0;
+            try
+            {
+                if (v == null || v.Settlement == null) return false;
+                string id = v.Settlement.StringId;
+                bool mk = MarketShareOn;
+                lock (Gate)
+                {
+                    if (!mk && !HasRowsIn(id)) return false;
+                    double s; int d;
+                    if (!_handedDays.TryGetValue(id, out d) || d < 7) { days = d; return false; }
+                    _handed.TryGetValue(id, out s);
+                    days = d;
+                    perDay = Math.Max(0, s / d);
+                    if (double.IsNaN(perDay) || double.IsInfinity(perDay)) { perDay = 0; return false; }
+                    return true;
+                }
+            }
+            catch { perDay = 0; return false; }
+        }
+
         private static bool HasRowsIn(string id) { foreach (var r in _rows) if (r.Dist == id) return true; return false; }   // pod Gate
 
         /// <summary>m114-prace: liczby targu okregu (StartCalibration.WorksMarketOf - ostatni rachunek KS), a gdy rachunek chwilowo skasowany (KsDirty) - ostatnie znane

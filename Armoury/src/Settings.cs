@@ -4391,6 +4391,7 @@ namespace Armoury
         public bool SideVillagePayerIsTaxHolder = true;    // with a side village of your own: its share of the tax is paid by the lord who takes the district's tax (Banner Kings lordship holder of the main village, else the castle lord) - first from the district's tax counter, then from his purse. Off = always the castle lord, as before
         public bool SideVillageIncomeSeizable = true;      // with Player Same Ladder: if your house is ever seized for debt, the creditors take the income of your side villages too, like any village income. Off = side villages are not counted as village income
         public bool SideVillageDuesInLordD = true;         // with a side village of your own: what its lord pays you from his purse is taken off his steady income in the books (his budget, his credit and his dues see the smaller income). Off = his books do not see it
+        public bool SideVillageIncomeRealSales = true;     // with a side village of your own: its daily income follows what the district's carts really sold (the last 4 weeks of takings, your village's part of them, taxed at the lord's rate) - a winter with little sold pays little or nothing. Off = the old reckoning, which never counted the district as selling less than a fifth of what it makes
 
         // --- District crafts: neutral start and icon (18.10) ---
         // Paczka f4b-inwest (noc 17/18.10, fin87: NZW-1 bawelna +27.6% w dobie wlaczenia, NZW-3 362 ikony pod KS). VillageCrafts.cs (neutralny start na towarach, poprawka

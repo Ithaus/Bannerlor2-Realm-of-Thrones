@@ -9808,6 +9808,10 @@ namespace Armoury
         [SettingPropertyGroup("Land sales (m113)")]
         public bool SideVillageDuesInLordD { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Income Real Sales", HintText = "with a side village of your own: its daily income follows what the district's carts really sold (the last 4 weeks of takings, your village's part of them, taxed at the lord's rate) - a winter with little sold pays little or nothing. Off = the old reckoning, which never counted the district as selling less than a fifth of what it makes", RequireRestart = false)]
+        [SettingPropertyGroup("Land sales (m113)")]
+        public bool SideVillageIncomeRealSales { get; set; } = true;
+
         [SettingPropertyBool("Side Village Craft Neutral Goods", HintText = "with Side Village Crafts: on the first day the balance that keeps every good's world output unchanged is worked out on the goods themselves - each village's own output with its buildings, perks, people, hands and prices, and what each side village adds in its own district - instead of on head counts alone (head counts missed up to a quarter on raw silk). Off = by head counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool SideVillageCraftNeutralGoods { get; set; } = true;
@@ -13699,6 +13703,7 @@ namespace Armoury
             s.SideVillagePayerIsTaxHolder = SideVillagePayerIsTaxHolder;
             s.SideVillageIncomeSeizable = SideVillageIncomeSeizable;
             s.SideVillageDuesInLordD = SideVillageDuesInLordD;
+            s.SideVillageIncomeRealSales = SideVillageIncomeRealSales;
             s.SideVillageCraftNeutralGoods = SideVillageCraftNeutralGoods;
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;
