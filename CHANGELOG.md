@@ -1,5 +1,328 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-03 WGRANIE 160 - noc/322x-integracja (159 + audyt ekonomii: 322a zloto dworzan BK do kasy stolicy, 322b pomiar budow, 322c zboze zima ze spichlerzy wsi na targ, 322d szybsza obnizka DS u zadluzonych rad, 322e rata rachunkow zywnosci z dochodu, 322f chleb dla glodnych z czesci zapasu wojny w dlugim pokoju); Armoury.dll ca7f92ffd8bc52801cd788cc134f0c29 (CrashScribe 55ccc004, ForgeView 8441ab0e bez zmian); kopia 159: Armoury.dll.bak-2026-11-03-przed-wgranie160 i D:/Backup-Bannerlord/wgrane/2026-11-03-wgranie160-przed
+
+**Problem:** Jeff 03.11: "zrob audyt ekonomii na moim savie czy wszystko dziala prawidlowo" (raport scratchpad/audyt-ekonomii.md: wyciek BK DrainGold dworzan ~3.5 tys./dobe, ubytek budow ~300/dobe, puste polki zboza zima przy spichlerzach 632 dni, dlugi rad 1.83->3.26 mln, rachunki zywnosci 1.06 mln, chleb glodnych nieplacony przy zapasach wojny w pokoju); decyzje "3 - ok, 4 - ok, 5 - tak, 6 - tak".
+**Zmiana:** wpisy 322a-322f ponizej (szkice zb/n322a..f-changelog.md); 322d wariant A (szybsza obnizka DS), wykup dlugow przez korone NIE.
+**Testy:** recenzje: 322a/322b bez potwierdzonych; 322c (2 potwierdzone - tylko zima, cena z polki krzywa bez pulapu; poprawione 10cfbdfb), 322d (warunek stopu; 60a8f427), 322e (splaty panow do podstawy raty; 56edd963), 322f bez; weryfikacje OK. Scalenie: brak hunkow 0, sprawdz_logi.py z blokow (kolizja nazwy D322_DAY 322a/322d - w 322d D322D_DAY). Autotest 322x: bitwaN 9 bitew kod 0, ERROR 0; probyN 6 dob kod 0; grupy dworzanie322a, budowy322b, zboze322c, dlug322d, rata322e, chleb322f, zold314c, korony312e - 0 NIE (budowy322b DECYZJA: reszta -273/-382 "poza dotknietymi posiadaczami" - przyczyna poza podkrokami DaWorksRun, do dalszego pomiaru). 322c dzien 109256: 1451 szt. zboza z 121 wsi do 38 miast, 41308 zl miasto->wies (sr. 28.5 zl/szt.). Armoury.json Jeffa c7055052 nietkniety.
+**Ryzyko / co sprawdzic:** w grze Jeffa: "Pieniadz swiata" w dobie taktu tygodnia R ~0 (322a); polki zboza Westeros > 0 zima; dlug rad i pula Banku (322d); rachunki zywnosci Qarth/Braavos malejace (322e); "Chleb" (322f) przy pokoju >= 90 dni; budowy322b - wskazac posiadacza reszty (nastepny krok pomiaru).
+**Status:** WGRANE 160
+
+## 322f - chleb dla glodnych z zapasu wojny w dlugim pokoju (audyt ekonomii 03.11, propozycja 6; Jeff "6 - tak"; klucze "Peace Bread From War Reserve", "Peace Bread Reserve Floor")
+
+**Problem:** audyt ekonomii na savie Jeffa (03.11). Log Modules/Armoury/Armoury-2026-11-03_00-19-16.log [01:51:13], linia "Chleb biedoty (M3)": "nie stac nikogo
+112016 zl w 9 osadach"; na krolestwo (korona/pan/nie stac nikogo): Qarth 422/2915/65291, Pentos 756/137/25506, Braavos 740/781/11837, Norvos 875/525/9382.
+"Danina pokoju (M4)": Pentos pokoj 248 dob, Braavos 324, Norvos 279. Skarbce przez cala sesje przy samej podlodze: Pentos 503977, Braavos 506675, Norvos 510972
+przy zapasie wojny 500000 - limit m105 (1/30 nadwyzki) daje im 130-360 zl na dobe.
+
+**Przyczyna:** m105 G2 (Crown Hoard Feeds Hungry, KingdomTreasury.HoardRoom) bierze tylko ponad pelny zapas wojny (WarReserveOf = max(500000, 60 dob naleznego zwrotu)).
+Zapas wojny nie ma wyjatku na dlugi pokoj ani na glod.
+
+**Zmiana (Armoury):**
+- `KingdomTreasury.CrownSurplus.cs`: wiersz limitu doby `_hf` ma trzecie pole (r[2]) - 1/CrownSurplusAidDays nadwyzki ponad NIZSZA podloge chleba (`HfRow`, wspolny
+  dla HoardRoom i nowego HoardRoomBread; r[0] i r[1] jak dotad). `PeaceBreadFloor(k)` = PeaceBreadReserveFloor x zapas wojny, tylko gdy klucz TAK, podloga < 1, krolestwo
+  nie w wojnie (WtAtWar) i w pokoju >= 91 dob (ta sama miara co danina pokoju M4: `PtPeaceDays` / `PtMinPeaceDays`; krolestwo nowe w sesji - nie). `HoardRoomBread`
+  (tylko dla chleba M3) = min(r[2] - uzyte, skarbiec ponad nizsza podloge - reszta wplywow dnia - dlug w Banku - dlug u miast); bez dlugiego pokoju co do zlotowki HoardRoom.
+  `HoardBelowBread` - kontrola po wyplacie wobec nizszej podlogi. HoardRoom (rachunki KS-H), TreasurySurplusFor, WarReserveOf - bez zmian.
+- `TownFolk.Bread.cs` (BreadRest, krok m105): HoardRoom -> HoardRoomBread; czesc wyplaty ponizej pelnego zapasu wojny liczona osobno (na krolestwo); kontrola
+  "ponizej zapasu wojny po wyplacie" m105 dla krolestw bez dlugiego pokoju jak dotad, dla dlugiego pokoju - wobec nizszej podlogi (nowy licznik).
+- Linia "Chleb biedoty (M3): dzien N" - segment na koncu (za m105): "| 322f chleb z zapasu wojny w dlugim pokoju (Peace Bread From War Reserve TAK, pokoj >= 91 dob,
+  podloga 0.50 zapasu): z zapasu wojny X zl (osad N, krolestw K: Pentos x, ...), krolestw w dlugim pokoju z luka po panie M (...), ponizej podlogi po wyplacie B
+  (oczekiwane 0)". Klucz NIE albo Crown Hoard Feeds Hungry NIE - segmentu nie ma.
+- `Settings.cs` / `McmSettings.cs` (gen_mcm.py, RANGES PeaceBreadReserveFloor 0..1): `PeaceBreadFromWarReserve = true`, `PeaceBreadReserveFloor = 0.5`
+  (grupa "The townsfolk's purse", obok Crown Hoard Feeds Hungry). Klucze NOWE - w Armoury.json Jeffa ich nie ma, dzialaja domyslne.
+- `tools/sprawdz_logi.py`: grupa `--grupa chleb322f`: C322-0 segment, C322-1 ponizej nizszej podlogi 0, C322-2 spojnosc (suma na krolestwo = z zapasu, krolestwa
+  z zapasu w dlugim pokoju), C322-3 kontrola m105 skarbiec - kiesy ludu = 0, C322-4 sumy (INFO); test syntetyczny (dobry, ponizej podlogi, niespojny x2, m105,
+  stary DLL, pusty) TAK.
+
+**Oczekiwany skutek (liczby z logu Jeffa, gdy luka sie utrzyma):** Pentos podloga 250000, limit doby ~ (503977 - 250000)/30 = ~8466 zl (dotad ~132) wobec luki 25506;
+Braavos ~8556 wobec 11837; Norvos ~8699 wobec 9382 - razem ~25.7 tys. zl/d z 112 tys. "nie stac nikogo" (Qarth 65291 - nie ma go w M4, czyli brak dowodu dlugiego
+pokoju - bez zmian). Limit maleje z nadwyzka (1/30 dziennie): po 30 dobach pelnej luki skarbiec Pentos ~ 342 tys., nigdy ponizej 250000.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Obieg zamkniety: skarbiec -> kiesy ludu (BreadCredit, ta sama droga i kontrola m105 "skarbiec -X + kiesy ludu X = 0"); lud kupuje chleb z polki (cena od polki).
+  Nic nowego nie powstaje - zloto zapasu idzie do sprzedawcow jedzenia przez kiesy ludu.
+- Tylko chleb M3 schodzi ponizej zapasu: rachunki KS-H (KsLordFood.HoardBills -> HoardRoom) dalej min(r[0] - uzyte, nadwyzka ponad pelny zapas); bo chleb idzie
+  pierwszy, KS-H dostaje mniej tylko gdy chleb i tak wzialby caly dawny limit (wtedy KS-H mial 0 i dotad). W5b/W5c (tylko wojna), DS, K5, f24, korona2 widza
+  TreasurySurplusFor (pelny zapas) - przy skarbcu ponizej zapasu po prostu 0 (jak dotad przy skarbcu na podlodze).
+- Pamiec doby M4: PeaceBreadFloor nie wola PtPeaceDays dla krolestwa w wojnie ani nowego w sesji (to one zmieniaja _ptSince w PeaceTributeDay pozniej tej doby),
+  wiec stawka M4 i linia "Danina pokoju" bez zmian. WtAtWar wypelnia pamiec _wtWar wczesniej - WarTaxDaily czysci ja na starcie i liczy od nowa (ta sama wartosc).
+- Skutek uboczny zamierzony: krolestwo, ktore po dlugim pokoju wejdzie w wojne ze skarbcem ponizej zapasu, ma flage 184 "S" (skarbiec < zapas) -> stawka 184 rosnie,
+  korona2 (pozyczki od miast w wojnie) widzi luke. Chleb z zapasu nie jest odkladany M4 (KDay.Bread go nie liczy - jak m105 dotad).
+- Krolestwa w dlugim pokoju z duza nadwyzka dostaja limit chleba r[2] nieco wyzszy niz r[0] (+ zapas x (1 - podloga)/30, ~8.3 tys.) - zloto nadal ponad zapasem.
+- Krolestwo gracza-wladcy - nigdy (jak m105). Wyjatki - licznik potkniec CrownSurplus (CsStumble), bez globalnych wylacznikow.
+- Co sprawdzic w logu: segment 322f (`python tools/sprawdz_logi.py --grupa chleb322f <log>`), "nie stac nikogo" Pentos/Braavos/Norvos maleje, skarbce tych krolestw
+  w "Skarbce:" schodza powoli i nie ponizej 250000; "ponizej podlogi po wyplacie 0"; m105 "kontrola ... = 0".
+
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane)
+
+## 322e - rachunki zywnosci: rata z zarobku dluznika, takze ponizej rezerwy (audyt ekonomii 03.11, p. 5; klucze "Ks Consign Rate Share", "Ks Consign Rate Release Days")
+
+**Problem:** audyt ekonomii na savie Jeffa (03.11; Jeff: "5 - tak"). Log Modules/Armoury/Armoury-2026-11-03_00-19-16.log, linia "Kupcy zywnosci (KS-H)"
+dzien 109249: "kredyt kupiecki TAK: otwarte 1068301 zl (317 rachunkow, 8 miast; najwiecej: Qarth 330630, Braavos 247653, Qarkash 205087, Rhyos 130287,
+Bolozo 79440) ... splacone 0 zl, starsze niz 30 dni 1063465 zl (6 miast)". Najstarszy rachunek 364 dni; przez 70 dob dlug spadl tylko o ok. 72 tys.
+Dluznicy z rachunkiem starszym niz zwloka (30 dni) nie dostaja dowozu jedzenia, a wierzyciele trzymaja roszczenia, ktorych nikt nie placi.
+
+**Przyczyna:** `KsFoodCredit.PayDaily` - dluznik splaca tylko z kasy ponad `KsConsignFloorShare` (0.5) x zapas kupcow (`Free`). Qarth / Braavos maja
+w kasie 1-20 tys. przy zapasie ok. 340 tys. (podloga ok. 170 tys.), wiec splata = 0 na zawsze.
+
+**Zmiana (Armoury, `KsFoodCredit.cs`):**
+- `PayDaily`: po splacie z nadwyzki (bez zmian) dluznik doplaca do RATY = `Ks Consign Rate Share` (0.15) x zarobek doby kupcow miasta. Zarobek =
+  `TownPurse.NetOf` (doplyw netto okna blok-blok - zmiana kasy + pobrane przez pana i korone; ta sama miara co firmy DS) + splaty rachunkow tego miasta
+  z poprzedniej doby (okno zamkniete dzis rano zawiera wczorajsza PayDaily - splata starego dlugu to nie koszt dnia; bez tego rata zjadalaby sama siebie).
+  Rata z zywej kasy (najwyzej cala kasa), od najstarszego rachunku, takze ponizej podlogi. Zloto: kasa dluznika -> kasa wierzyciela przez `Transfer`
+  (pomiar obu stron; liczy sie do DRepaid / GDstPaid / GSrcGot, wiec kontrola rachunkow i zlota linii KS-H bez zmian). Brak pomiaru (TownPurse wylaczony,
+  pierwsza doba po wczytaniu) albo zarobek <= 0 - bez raty (jak dotad).
+- Odblokowanie dowozu (`OverdueDst`): dluznik, ktory DZIS zaplacil pelna rate (rata > 0, splacone >= min(rata, dlug)) i ktorego CALY dlug za jedzenie po splacie
+  <= rata x `Ks Consign Rate Release Days` (91), dostaje dowoz tej doby mimo zaleglego rachunku. Uzasadnienie: blokada chroni wierzycieli przed dluznikiem,
+  ktory nie placi; placacego w terminie, ktorego dlug splaci sie w horyzoncie, glodzenie nie chroni nikogo. Warunek liczy caly dlug za jedzenie, wiec nowe
+  rachunki z odblokowanego dowozu nie wyniosa dlugu ponad rata x horyzont (narazenie wierzycieli ograniczone). Roszczenia z zadatkow (Claim) - jak dotad
+  (nie blokuja, ale tez placi je rata, bo to dlug miasta).
+- Linie doby: "Rachunki zywnosci - rata z zarobku (322e): dzien D | udzial, horyzont | dluznikow, z rata, w terminie, dowoz odblokowany, bez pomiaru zarobku |
+  splacone z raty X zl, potkniecia kredytu" + do 24 linii "Rachunki zywnosci - dluznik (322e): dzien D | <miasto>: dlug, za jedzenie, najstarszy, zarobek doby
+  (netto + splaty wczoraj), rata, splacone z nadwyzki + z raty, kasa przed -> po, zostalo za jedzenie (dob raty), w terminie TAK/NIE, dowoz ODBLOKOWANY/wedlug zwloki".
+- Recenzja 322e (splaty panow w podstawie raty): pan / skarbiec korony splacajacy rachunki dluznika (KsLordFood RACHUNKI - FoodBillsPay, BeforeEarly -
+  PayByLordAge, HoardBills) placi prosto do kas wierzycieli, a `TownPurse.NoteLordFood` zdejmuje te kwote z doplywu netto DLUZNIKA (CloseWindow), choc jego kasa
+  sie nie ruszyla - rata dluznika malalaby o 15% splaty pana (przy duzej splacie rata 0, "w terminie NIE", brak odblokowania: karane bylyby wlasnie miasta,
+  ktorym pan pomaga). Teraz `KsFoodCredit.NoteLordBills(dst, x)` - wolane obok NoteLordFood w tych trzech miejscach z ta sama kwota (po zwrotach do pana /
+  skarbca) - zapisuje `_lordPaidToday`, obracane razem z `_paidToday` (`RotatePay`, ta sama doba `_payDay`); jutro zarobek doby = netto + splaty wczoraj +
+  splaty panow wczoraj. NIE dla doplaty DOPLATA (`Settle`, KsLordFood.cs:481 - zloto zostaje w kasie miasta, odjecie w CloseWindow jest tam poprawne).
+  Wiersz dluznika: "(netto N + splaty wczoraj P + splaty panow wczoraj L)"; R322_ROW przyjmuje stary i nowy wiersz, R322-1 sprawdza zarobek = N + P + L.
+- `Settings.cs` / `McmSettings.cs` (gen_mcm.py RANGES): `KsConsignRateShare = 0.15f` (0..0.5), `KsConsignRateReleaseDays = 91` (0..364), grupa "Start calibration (KS)".
+  Udzial 0 = splaty jak przed 322e (bez linii); Release Days 0 = blokada jak dotad.
+- `tools/sprawdz_logi.py --grupa rata322e`: R322-0 linia, R322-1 spojnosc wierszy (kasa przed - po = splacone, z raty <= rata, w terminie = pelna rata,
+  odblokowany tylko w horyzoncie), R322-2 suma doby = wiersze, R322-3 potkniecia 0, R322-4 otwarte KS-H pierwsza -> ostatnia doba maleje (DECYZJA), R322-5 INFO.
+  Test syntetyczny (dobry / zly / pusty) - OK.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Zamknieta ekonomia: tylko przelew kasa -> kasa (`Transfer`), nic z niczego; kontrola linii KS-H "otwarte wczoraj + nowe - splacone - przepadle = otwarte dzis"
+  obejmuje rate (DRepaid). Brak nowego klucza zapisu (splaty wczoraj - pamiec sesji; pierwsza doba po wczytaniu rata liczona od samego netto).
+- Kasa dluznika schodzi ponizej zapasu kupcow naszym przelewem (to jest decyzja Jeffa) - mniej zakupow kupcow miasta (BuyFloor) i mniej zaplaty przy dostawie
+  (ta i tak tylko z nadwyzki). Przelew nie idzie przez MoneyLedger.Note, wiec diagnoza C-4b nie sypie liniami.
+- Doplyw netto (NetOf) dluznika maleje o rate, wierzyciela rosnie - firmy DS / gersuma (NetAvg 28 dob) dluznikow lekko w dol, wierzycieli w gore
+  (tak samo dzialala dotad splata z nadwyzki). Do sprawdzenia w liniach firm DS przy przegladzie.
+- KsLordFood (pan placi zalegle rachunki glodnego miasta) czyta OverdueOf, nie OverdueDst - bez zmian; mniej zaleglych = mniej placi pan.
+- Odblokowany dowoz tworzy nowe rachunki (dluznik bez nadwyzki placi przy dostawie 0) - ograniczone warunkiem horyzontu; R322-4 pokaze, czy dlug spada.
+- Kolejnosc doby: TownPurse.BeforeRents (okno NetOf) -> ... -> SupplyDemand.DailyTrade -> PayDaily (rata, zbior odblokowanych) -> KsFoodCarts.Daily ->
+  OverdueDst (ta sama doba - zbior wazny tylko dla `_relDay == today`).
+- Kolizje z 322a-d: inne pliki (BkDipGold, DS firmy, spichlerze); KsFoodCredit.cs zmienia tylko 322e.
+- Oczekiwany efekt: zarobek netto kas miast swiata 205-606 tys./dobe na 49 miast (linia "udzial zysku kupcow": "pobrano 204176 z doplywu netto 605974",
+  "509789 z 258651") - srednio 5-12 tys./miasto/dobe; dluznicy sa biedniejsi, zarobku per miasto log nie podaje (dopiero linie 322e). Przy 15% i 8 dluznikach
+  rzad 0.5-1.5 tys./dobe na dluznika, razem ok. 4-12 tys./dobe wobec 1.07 mln - dlug splaca sie w miesiace, nie od razu; Qarth (330 tys.) do odblokowania
+  potrzebuje raty >= 3.6 tys./dobe (zarobek >= 24 tys./dobe) - pewnie zostanie zablokowany, male dlugi (Bolozo 79 tys. i mniejsze) maja szanse.
+
+- Recenzja 322e (splaty panow): kolejnosc doby - CloseWindow (BeforeRents) -> PayDaily (RotatePay, rata) -> KsLordFood.Before / BeforeEarly / HoardBills
+  (NoteLordBills -> _lordPaidToday) -> jutro okno zawiera splate pana (NoteLordFood) i dodajemy ja z powrotem: odjecie i dodanie tej samej kwoty, raz.
+  NoteLordBills sam obraca dobe (RotatePay), gdyby PayDaily tej doby nie bieglo. Bez klucza zapisu (pierwsza doba po wczytaniu - bez splat wczoraj, jak P).
+  Przy 0 zl splat panow i korony (log Jeffa 03.11) - bit w bit jak przed poprawka, poza dopiskiem " + splaty panow wczoraj 0" w wierszu.
+  NetOf / firmy DS / udzial zysku kupcow - bez zmian (NoteLordFood zostaje); zmienia sie tylko podstawa raty 322e.
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; test syntetyczny checkera OK; nie wgrane).
+
+## 322d - dlugi rad: szybsza obnizka firmy DS pana i korony przy duzym dlugu rady (Jeff 03.11 "4 - ok", audyt ekonomii propozycja 4 wariant A)
+
+**Problem:** rady miast pozyczaja bez konca. Armoury-2026-11-03_00-19-16.log: dlug rad wzrosl z 1.83 do 3.26 mln w 70 dob (doba 109250: "dlug razem 3262034",
+Bank 1515795 u 12 miast). "Splaty z nadwyzki kas 0 w 0 miastach", "niewyplacalne 9 (zaleglosc bez kredytu 7 - zostalo 1510671)". Bank Zelazny spadl z 4.14
+do 3.29 mln, a pula dla miast skonczy sie za okolo 60 dob. Linia DS doby 109249: Vaith 555672 = 15.6 rat, Pebbleton 555436 = 14.6 rat, Tyrosh 317965 = 9.5 rat,
+kasy przy podlodze; "udzial firm w doplywie netto ... miasta 0.951".
+
+**Przyczyna:** TownDebt.cs TownDay krok 2: splata tylko przy `al + ac < 1` (bez zaleglosci firmy). Firma pana i korony schodzi najwyzej do biezacego doplywu
+netto (DsTowns FastCut i IncomeCut, sufit doplyw x 364) albo o 15% raz na kwartal (Review wymuszony). Firma rowna doplywowi nie zostawia nic na zaleglosc ani
+na dlug, wiec miasto co tydzien pozycza od nowa (krok 3 -> DsTowns.TdPayArrears).
+
+**Zmiana (Armoury):**
+- Nowy `Armoury/src/DsTowns.DebtCut.cs`: `DebtCut` (wolany w `DsTowns.DayStart` po `SurplusReview`, DsTowns.cs:363). Dotyczy miasta z dlugiem rady
+  (`TownDebt.ArrearsLike >= 1`), ktore jest mocno zadluzone: dlug rady + zaleglosc z kasy (AL + AC) >= Town Debt Farm Cut Weeks x rata tygodniowa z kasy
+  albo rada niewyplacalna (`TownDebt.TdInsolvent`: dlug >= 90% limitu albo wczorajsza zaleglosc bez kredytu). Takiemu miastu firma z kasy (FL, FC) spada
+  o Town Debt Farm Cut Step co 7 dob, ale nie nizej niz Town Debt Farm Cut Floor x doplyw netto x 364 (pamiec doplywu co najmniej 7 dob).
+  Obnizki staja, gdy miasto moze juz splacac (bez zaleglosci, kasa ponad max(zapas kupcow, TdKeep) - te same warunki co krok 2)
+  ALBO gdy bez zaleglosci z kasy rada splacala z nadwyzki w ostatnich 7 dobach (poprawka po recenzji, ponizej).
+  Bez zmian: FLf (placi lud), zaleglosci AL/AC i Share. Jedna zmiana firmy na dobe: bez obnizki, gdy tej doby byl przeglad (Fixed), FastCut albo
+  IncomeCut (SLow). Oblezenie i zdobycie (RemitOf) - nic. Bez obnizek z innych powodow - stara wolna regula bez zmian.
+- `TownDebt.cs`: `Book.InsDay` (sesja, ustawiany w kroku 4 przy niewyplacalnosci), `TdInsolvent` oraz segment linii `DsTowns.DebtCutNote` w "Dlugi miast (m96-dlugi)".
+- MCM (Settings.cs:2923-2926, gen_mcm.py zakresy): Town Debt Farm Cut (TAK), Town Debt Farm Cut Step 0.15 (0..0.5), Town Debt Farm Cut Weeks 4 (1..52),
+  Town Debt Farm Cut Floor 0.5 (0..1). Klucze NOWE - w Armoury.json Jeffa ich nie ma.
+- Linia: "| 322d obnizki firm DS przy dlugu rady (Town Debt Farm Cut TAK, krok 15% co 7 dob, prog 4 rat albo niewyplacalna, podloga 0.5 x doplyw): miast mocno
+  zadluzonych H, dzis obnizone N (-X zl/rok), juz splaca (bez obnizki) P, przy podlodze F, bez pomiaru doplywu B; w sesji ...; Vaith: dlug rady D, zaleglosc
+  z kasy A, rata R0 -> R1 zl/tydz (85%), powod: niewyplacalna i dlug+zaleglosc 27.2 rat (prog 4), doplyw N/d, podloga rata R" (najwyzej 12 miast z nazwy).
+- tools/sprawdz_logi.py: grupa `--grupa dlug322d` (D322-S/S2 self-test i test syntetyczny, D322-0 segment w kazdej linii, D322-1 krok, D322-2 raz na 7 dob,
+  D322-3 kontrola dlugu 0 i potkniecia 0, D322-4 skutek INFO).
+
+**Oczekiwany skutek (liczby z logu, kalendarz 364 dni):** Vaith ma rate 35620/tydz (555672 / 15.6), doplyw netto okolo 5350/d (udzial 0.951). Rata spadnie do
+30277 po 1. tygodniu, potem 25735, 21875 i 18594, a po okolo 4-5 tygodniach dojdzie do podlogi okolo 18.7 tys./tydz. Zostaje wtedy okolo 17-18 tys./tydz
+na zaleglosc 555 tys. (okolo 30 tygodni), a potem na dlug rady. Pan i korona dostaja przez ten czas mniej (zamknieta ekonomia: zloto zostaje w kasie miasta
+i idzie do nich jako splata zaleglosci, potem do wierzycieli). Cel: nowe zaleglosci miast ("nowe 23116"/d w linii DS) bliskie 0 po okolo 5 tygodniach,
+splaty z nadwyzki > 0, przyrost dlugu rad (+20 tys./d) w dol, mniej pozyczek z puli Banku.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Poprawka po recenzji (322d, potwierdzona): sam stan kasy w DayStart nie wystarczal do zatrzymania obnizek. Krok 2 TownDay splaca 50% kasy ponad TdKeep,
+  a TdKeep zawiera cala najblizsza rate. Po dniu raty kasa jest wiec ponizej TdKeep, warunek "juz splaca" nie przechodzil, a hold nie ustawial DebtCutDay.
+  Miasto, ktore splacalo dlug, i tak schodzilo co tydzien o 15% do podlogi 0.5 x doplyw (pan i korona tracili do polowy raty przez cala splate).
+  Zmiana: `TownDebt.Book.RepDay` (sesja), ustawiany w kroku 2, gdy Repay oddal > 0. Nowe `TownDebt.TdRepaidWithin(st, today, 7)`. DebtCut wstrzymuje
+  obnizke przy `arr < 1` i (kasa ponad keep ALBO splata z nadwyzki w ostatnich 7 dobach: today - RepDay <= 7, bo DayStart idzie przed TownDay tej doby).
+  W linii: "juz splaca (bez obnizki) P (w tym splata z nadwyzki w 7 dobach R)". Checker: D322-5 (R <= P), wyrazenie czyta takze stary format.
+  Nie wybrano wariantu "sam arr < 1": miasto bez zaleglosci, ale bez nadwyzki na splate (dlug rosnie z odsetek), dalej ma byc obnizane.
+  Po wczytaniu RepDay = -1 do pierwszej splaty. Nie szkodzi: pierwsza obnizka i tak przychodzi najwczesniej po 7 dobach pomiaru doplywu, a splacajace
+  miasto do tego czasu ustawi RepDay. RepDay pisze tylko krok 2 (splata z podatku, Levy, go nie ustawia). Zloto bez zmian - tylko licznik i warunek.
+- Podwyzki: SurplusReview (`arrears` liczy ArrearsLike) i Review (przy zaleglosci `hi = F`) nie podnosza firmy, dopoki trwa dlug rady, wiec nie ma pily.
+  Po splacie dlugu firma wraca w gore zwyklymi przegladami (Share bez zmian; +25%/14 dob do doplywu, +15%/kwartal).
+- Zbiega sie z FastCut i IncomeCut (oba tylko w dol, do doplywu) oraz z wymuszonym -15% na kwartal. Jedna zmiana na dobe; tydzien liczony osobno
+  (DebtCutDay). Obnizki sie skladaja, ale podloga 0.5 x doplyw jest wspolna.
+- Zaleglosci AL/AC nie maleja z firma (inaczej niz zamki K3). To prawdziwy dlug kasy - placi go nadwyzka. Licznik "rat zaleglosci" w linii DS wzrosnie, bo rata jest mniejsza.
+- Zajecie z kiesy gminy (ATerms) i pozyczki rad bez zmian. Stara zaleglosc dalej moze brac pozyczki do limitu, ale nowe zaleglosci przestaja rosnac.
+- Pamiec sesji: DebtCutDay, InsDay i doplyw Net nie sa zapisywane. Przez 7 dob po wczytaniu nie ma obnizek ("bez pomiaru doplywu"), a potem co 7 dob.
+  Bez dodatkowej obnizki po wczytaniu.
+- Miasto gracza ma te same reguly. Gracz nie dostaje powiadomienia o nizszej racie (nie dodawane, zasada 3).
+- Koszt: petla po _farm raz na dobe tylko dla miast z dlugiem rady. Linia "Dlugi miast" rosnie o okolo 3 KB/d przy 12 miastach.
+
+**Testy:** build 0 bledow; `sprawdz_logi.py --grupa dlug322d` na logu syntetycznym: S/S2 TAK, D322-0..3 TAK, zepsuta linia zlapana (D322-P NIE). Po poprawce
+(RepDay): build 0 bledow, n322d-synth2.log - S/S2 TAK (w tym licznik splaty i stary format), D322-0..3 i D322-5 TAK. BEZ AUTOTESTU w grze.
+
+**Status:** DO SPRAWDZENIA (Armoury.dll b2dd47f942264f6132bced4c3eb06e7b po poprawce RepDay, nie wgrane)
+
+## 322c - Zboze zima: wsie sprzedaja zboze ze spichlerza na polke targu miasta (Jeff 03.11 "3 - ok")
+
+**Problem:** audyt ekonomii 03.11, pkt 2 (log Armoury-2026-11-03_00-19-16.log):
+- "KS: polki miast dzien 109249": Westeros grain 0.00/0.00/0.01 dnia, "< 0.5 d 100%, sufit/podloga 97/0%". "KS: ceny chwilowe": Westeros grain 10.00.
+- "Spichlerze (E4/6)": spichlerze swiata 26188.421 mln racji = 629 dni potrzeby (Westeros 632 dni wg "KS: podloga spichlerza"); zima tnie plon 566 wsi (srednio 40.8%), do konca zimy 1723 dni.
+- "Spichlerz miejski (p6) dzien 109250": "zboze ze wsi do miast dzis 0 szt./d", "wsi z nadwyzka 0", "miasta w niedoborze 0".
+- "Lordowie a drogie jedzenie (B3)": 3304 wyborow zostawionych (brak tanszego na polce).
+
+**Przyczyna:** TownGranary (p6) sprzedaje zapas wsi tylko do Town.FoodStocks i tylko ponad 98% sufitu spichlerza albo przy niedoborze Food miasta (ShortDays 30 /
+ShortCapShare 0.30). Pusta polka targu i cena na suficie nie uruchamiaja zadnego przeplywu - zapas lezy we wsiach (632 dni = 87% sufitu 728, ponizej KeepShare 98%).
+
+**Zmiana (Armoury):**
+- Nowy plik `Armoury/src/TownGranary.Zima322.cs` (TownGranary zrobiony `partial`): `Winter322` wolany w `TownGranary.Daily` po p6, przed zapisem ksiegi dnia.
+  - Sygnal miasta (jedna regula dla wszystkich): polka zboza + KS-H w drodze < 0.5 doby popytu zaplaconego KS (ZDp) albo indeks ceny zboza >= Winter Grain Trigger Index (5).
+    Miasto chce najwyzej do celu polki T* (ZTstar) i najwyzej 2 doby popytu na dobe. Oblezone, Innych, poza ZC4 - nic.
+  - Wies (warunki p6: Normal, bez najazdu, migawka Famine tej doby, u = 0) sprzedaje tylko zapas ponad rezerwe max(Winter Grain Keep Days 455, bramka krainy 364 + 91)
+    dni wlasnej potrzeby, rozlozony na reszte zimy: na dobe (zapas - rezerwa) / max(91, dni do konca zimy). Kilka wsi - podzial wedlug mozliwosci.
+  - TYLKO ZIMA (recenzja 322c): poza zima (WinterBite.WinterNow() = NIE albo 0 dni do konca zimy) nic - linia "| POZA ZIMA - nic", licznik potkniec doby zerowany.
+    Bez tego poza zima wies rozkladala nadwyzke na 91 dni (1/91 dziennie, ~19x szybciej niz w zimie) i spichlerze wchodzilyby w zime przy rezerwie.
+  - Zamiana miara KS: racji na sztuke = 3300 kcal/kg x sigma x kg sztuki zboza / kcal racji (pelna potrzeba kcal ludzi w domu z rachunku okregu KS,
+    `StartCalibration.KcalPerRation322`). Wies bez rachunku KS - nic.
+  - Zamknieta ekonomia: Famine.TributeTake (ulamek ponad cale sztuki wraca TributeGive) -> ItemRoster miasta (ramka GoodsLedger FZc1 "zboze ze spichlerza wsi (322c)");
+    zaplata: cena polki BEZ PULAPU (recenzja 322c), sztuka po sztuce w dol krzywej polki jak tabory wsi (MarketCarts.SellPostfixCore): sztuka k =
+    TradeItemPriceFactorModel.GetPrice(strona sprzedajacego, InStoreValue z chwili przed dostawa + k x ShelfWorth, Supply, Demand); kolejne wsie tego samego miasta
+    ida dalej w dol tej samej krzywej (kAt). Liczba sztuk ograniczona tak, by suma cen zmiescila sie w nadwyzce kasy ponad zapas kupcow (TownPurse.SpendableTown - jak p6; inaczej zaleglosci DS i pozyczki rady w Banku), ChangeGold para kasa miasta -> kiesa wsi w pozycji MFolk.
+    Racje dopisane do ksiegi dnia p6 (soldV) - bramka krainy KS (LandGateDaily, SoldToday) liczy je jako targ, nie spadek spichlerza.
+- MCM (Iron Bank): Winter Grain To Market (TAK), Winter Grain Keep Days (455, 0..728), Winter Grain Trigger Index (5.0, 1..10).
+  Winter Grain Price Cap USUNIETY (recenzja 322c: pulap 3x lamal "cena od polki"); Settings.cs:1603-1605, gen_mcm.py RANGES, McmSettings.cs wygenerowany.
+  Klucz nie byl nigdy wgrany - Armoury.json Jeffa go nie ma.
+- Linia co dobe: "Zboze zima (322c): dzien N | CZYNNE | zima TAK (do konca X dni; ...) | rezerwa wsi ... | z sygnalem ... | na polki dzis P szt. zboza (R racji, racji na sztuke
+  srednio Q; sigma, kg sztuki) ... | zloto miasto->wies G zl (cena srednio G/P zl/szt. bez pulapu, sztuka po sztuce w dol krzywej polki; pierwsza sztuka srednio A zl,
+  ostatnia srednio B zl; wartosc V zl) | ... | kontrola: racje zdjete = ubytek stodol wsi; polki + = sztuki; zloto: kasy miast -, kiesy wsi +, zaplata | potkniecia | czas".
+- tools/sprawdz_logi.py: grupa `--grupa zboze322c` (Z322-0..9 + test syntetyczny Z322-S: OK). Z322-8: poza zima 0 sztuk i 0 zlota; Z322-9: ostatnia sztuka nie drozsza
+  od pierwszej (cena w dol krzywej polki).
+- Plan KS bez zimy: NIE ruszany (Plan celowo liczy bez czynnikow - StartCalibration.Koszt.cs:72; zmiana przestawilaby ceny cienia, A7 i rece - nie mala ani bezpieczna).
+
+**Oczekiwany skutek (liczby z logu 00-19-16; racji na sztuke policzy gra - linia 322c):** srednia wies 46 mln racji (73 tys. ludzi x 629 dni); ponad rezerwe 455 dni
+~174 dni = ~12.7 mln racji; na dobe / 1723 dni zimy = ~7.4 tys. racji/wies/dobe (~0.1 dnia potrzeby; razem ~4.2 mln racji/dobe ~ 10% potrzeby wsi). Przy kg sztuki 10
+i ~2400 kcal/racje: ~510 racji na sztuke -> ~14 szt./wies/dobe, ~85 szt./miasto/dobe. Polki Westeros (37 miast z sygnalem) dostana czesc popytu (zaleznie od nadwyzek
+kas: 60 z 97 kas ponad zapasem, nadwyzka 5.6 mln); wies dostaje cene polki (od ~x10 przy pustej polce w dol z kazda sztuka) - przy tej samej nadwyzce kasy
+miasto kupi mniej sztuk niz przy pulapie 3x (do ~3x mniej przy polce na suficie). Spichlerze spadaja szybciej: zima ~0.13 dnia/dobe + sprzedaz ~0.1
+dnia/dobe; koniec zimy okolo 230 dni zapasu (dzis bez zmiany ~400).
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Bramka krainy KS: sprzedaz w SoldToday (nie spadek). Ale spichlerze zejda ponizej 364 dni (rezerwa bramki) wczesniej niz bez 322c - wtedy kazdy spadek z winy KS liczy sie
+  do serii (LandGateDaily: days < reserve). Dzis KS daje ponad wzor w 289 z 308 wsi, wiec ksDay ~0; sprawdzic linie "KS: bramka krainy" / "KS: powrot krainy".
+- p6 bez zmian (ta sama ksiega soldV, czyta zapas po p6). WallTribute bierze z tych samych spichlerzy - swoja regula.
+- Wsie KS kupuja zboze na polce miasta (ZC4 QV) - czesc sprzedanego wraca do wsi za kiesy (zamkniety obieg zlota i towaru).
+- KS-H moze wywozic to zboze do glodnych miast (targ). A7 widzi nizsza cene zboza (pasmo +-15%).
+- Ksiega towarow: zrodlo w grupie "drogi towarow (ZC1)" z opisem; KS Plan nie czyta tej grupy (KsVil = tylko "wsie"); linia "KS: rynki" pokaze wieksza produkcje grain.
+  sprawdz_logi nzc1 ZC1-15 (zboze wobec bazy) moze sie zmienic w biegu porownawczym.
+- Kasy miast: tylko SpendableTown (licznik zapytan BuyFloor w "Kasy miast (169c)" +1 na miasto z sygnalem).
+- Wymaga Town Granary From Villages (p6 wylaczony = 322c nie biegnie) i KS zastosowanego (inaczej linia "KS NIE ZASTOSOWANY - nic").
+- Poprawki recenzji 322c: (1) tylko zima - poza zima linia "POZA ZIMA - nic", 0 sztuk (Z322-8); (2) bez pulapu ceny - wies dostaje cene polki sztuka po sztuce
+  (ta sama regula co tabory wsi MarketCarts i p6 bez pulapu), wiec kasa miasta nie ma marzy x3..x10 na tym samym zboze. Skutek: wiecej zlota do kies wsi, mniej sztuk
+  na dobe przy tej samej nadwyzce kasy (SpendableTown zostaje). Krzywa liczona od migawki polki sprzed dostawy (InStoreValue, Supply, Demand) - gra po AddToCounts
+  dopisuje polke sama, my liczymy wlasny przesuniecie k (jak MarketCarts), wiec nic nie liczone dwa razy. Linia "pierwsza / ostatnia sztuka" pokazuje spadek ceny.
+- BetterEconomy (recenzja 322c, drobne): zboze na polkach przechodzi straznik glodu BE (TownGranary.HasFood liczy sztuki polki wobec Food na dobe, nic nie zjada)
+  w wielu wiecej miastach - kary glodu BE (ludnosc, gospodarka) beda tlumione czesciej, choc FoodStocks dalej niskie. Porownac liczniki _beGuard / _beEcoGuard
+  w linii p6 przed i po. Nie zmieniane w tym kroku (osobna decyzja: przeliczenie sztuk polki na jednostki Food w HasFood).
+- sprawdz: `python tools/sprawdz_logi.py --grupa zboze322c <Armoury-*.log>`; Z322-2..4 kontrole = 0 niezgodnych; Z322-5 dostawy w zimie; "KS: polki miast" grain mediana > 0,
+  "sufit/podloga" < 97%; B3 "zostawionych" spada; "Spichlerze (E4/6)" dni spadaja o ~0.2/dobe.
+
+**Status:** DO SPRAWDZENIA (Armoury.dll b7cc7c2623eebdae382d7a6a294128d3 po poprawkach recenzji, build 0 bledow; bez autotestu)
+
+## 322b - pomiar pieniadza w podkrokach DaWorksRun (wyciek 5 audytu ekonomii 03.11, TYLKO LOG)
+
+**Problem:** audyt ekonomii 03.11 (Jeff: "zrob audyt ekonomii na moim savie czy wszystko dziala prawidlowo"), punkt 5: odcinek "budowy" (Mark renty -> Mark budowy)
+gubi zloto KAZDEJ doby. Armoury-2026-11-03_00-19-16.log: krok "Mark budowy" linii "Odcinki ticku - bisekcja (f19-e1)" ujemny 41/41 dob (-180..-368), sesja -11613;
+poprzednia sesja (20-57-50) 24/24 dob, -209..-301. Jedyny modul miedzy Probe169("BuildFunding.Daily") a Mark(MBuild) to TownFolk.DaWorksRun, a jego kontrolki
+(linia "Akumulator kies") pokazuja 0. Przeglad kodu nie znalazl miejsca (wszystkie przelewy DaPayVillage / PayVillageWage / DaPayTown / DaVillageDue bilansuja sie
+w zrodle); reszta koreluje z danina od skarbca wsi (corr -0.64 z czescia pana, ok. -1.1 na wies opodatkowana).
+
+**Przyczyna:** nieznana - ten wpis jej NIE naprawia, tylko mierzy.
+
+**Zmiana (sam pomiar, logika bez zmian):**
+- `Armoury/src/TownFolk.Pomiar322b.cs` (nowy): pomiar w podkrokach DaWorksRun - zakup materialu (DsWorksBuy), zaplata wsi (DaPayVillage), zaplata ludu miasta
+  (DaPayTown), danina od skarbca wsi (DaVillageDue). Kazdy podkrok czyta zloto dotknietych posiadaczy przed i po (kiesa wsi, kasa targu, kasa osady macierzystej,
+  kiesy ludu W/R/P / podzamcza i gmina targu i placacego, kiesa glowy rodu) i CW.BlockNamed: placacy, odbiorcy (kasy osad / kiesy ludu / bohaterowie), nazwane,
+  reszta podkroku. Na wejsciu i wyjsciu DaWorksRun posiadacze swiata (ReadHolders) - roznica "swiat - zmierzone w podkrokach" wedlug posiadacza (zloto ruszone poza
+  dotknietymi, z nazwa posiadacza). Probki swiata: do 6 wywolan z ruchem zlota na podkrok i dobe (najwyzej 12 przegladow) - pelny przeglad przed i po (reszta poza
+  dotknietymi w tym podkroku). Liczniki: pan Dead/Disabled, pan zywy poza Hero.AllAliveHeroes, kiesa ludu poza lista posiadaczy (_fk). Raz na sesje: latki Harmony
+  wszystkich modow na Hero.ChangeHeroGold / Hero.Gold (set) / SettlementComponent.ChangeGold / Gold (set) (DeclaredMethod + GetPatchInfo).
+  Linia doby "Budowy - pomiar (322b): dzien N" (numer doby jak linie ksiegi, Now - 1) z "reszta pojawia sie: <podkrok albo poza dotknietymi + posiadacz>"
+  i suma sesji wedlug podkroku.
+- `Armoury/src/TownFolk.DsAkum.cs`: DaWorksRun -> P2Begin / DaWorksRunCore / P2End (finally); w DaRunOne P2Open/P2Close wokol DsWorksBuy i zaplaty (finally, wynik
+  i wyjatek jak dotad); w petli DaWorksRunCore P2Open/P2Close wokol DaVillageDue; DaReset wola P2Reset.
+- `Armoury/src/MoneyLedger.P322b.cs` (nowy): klasyfikacja posiadacza osady i bohatera - ta sama co ReadHolders (jedna definicja).
+- `tools/sprawdz_logi.py`: grupa `budowy322b` (P322-S, S2, 0-5): linia 322b przy kazdej bisekcji, potkniecia 0, "DaWorksRun swiat" = krok "Mark budowy" bisekcji
+  tej doby, tozsamosc linii, WYNIK (gdzie reszta; reszta != 0 -> DECYZJA), latki i czas <= 50 ms. Testowane tylko na logach syntetycznych.
+- Bez nowego ustawienia MCM: klucz ten sam co bisekcja (LedgerSegmentBisectLog przy wlaczonej ksiedze obiegu) - wylaczony = zero dodatkowych odczytow.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Regresje: DaWorksRun / DaRunOne / petla daniny wolaja te same metody w tej samej kolejnosci z tymi samymi argumentami; P2* tylko czytaja (Gold, KW/KR/KP/KG,
+  CW.BlockNamed, HoldersNow, GetPatchInfo) i nie rzucaja (try + licznik potkniec, bez globalnego wylacznika). Zadnego zapisu w grze ani w zapisie gry.
+- Kolizje: HoldersNow = ten sam przeglad co bisekcja f19-e1 (ok. 50 na dobe juz dzis); 322b dodaje 2 + najwyzej 4 x 12 x 2 = ok. 50-100 przegladow na dobe
+  (ok. 0.1 ms kazdy - linia podaje czas, prog checkera 50 ms). TotalTown wola EnsureImported - w bloku doby juz zaimportowane (tak samo jak przy Mark).
+- Linia 322b idzie do glownego logu (nie zaczyna sie od "Budowa:").
+- Co sprawdzic w grze: `python tools/sprawdz_logi.py --grupa budowy322b <Armoury-*.log>` - P322-2 TAK (pomiar mierzy wlasciwe miejsce), P322-3 TAK, P322-4 nazywa
+  podkrok albo posiadacza; jesli "poza dotknietymi" - patrz "latki na zloto" i "posiadacze (swiat wobec zmierzonego)". Poprawka - osobnym krokiem po wyniku.
+- Poza zakresem: "po TownFolk.Daily" w odcinku (9 dob -, razem -617) - bez pomiaru w tym kroku.
+
+**Status:** DO SPRAWDZENIA (build 0 bledow; Armoury.dll md5 w opisie commita; nie wgrane)
+
+## 322a - kiesy dworzan BK zostaja w krolestwie (audyt ekonomii 03.11, wyciek 1; klucz "Courtiers' Gold Stays In The Realm")
+
+**Problem:** audyt ekonomii na savie Jeffa (03.11, "zrob audyt ekonomii na moim savie czy wszystko dziala prawidlowo"): ksiega pieniadza gubi raz na tydzien
+dokladnie tyle, ile mieli dworzanie BK. Log Modules/Armoury/Armoury-2026-11-03_00-19-16.log, linia "Pieniadz swiata (bilans - przyczyny)" reszta R vs pomiar
+E8/P3 "zloto dworzan zerowane (DrainGold)": 109215 R -45 608 / 45 681 (4 razy), 109222 R -62 599 / 62 347 (3 razy), 109229 R -17 864, 109243 R -22 412;
+pozostale doby R w granicach -700..+2 500. Srednia 28 dob to chowala.
+
+**Przyczyna:** BannerKings BKCourtierBehavior.OnWeeklyTick -> MaintainKingdom(kingdom) wola dla kazdego zywego, doroslego, nieozenionego lorda rodu
+"Courtiers of X" (bk_courtiers_*) prywatna `DrainGold(Hero)` = `hero.ChangeHeroGold(-hero.Gold)` - bez odbiorcy (dekompilacja infl/bk
+BannerKings.Behaviours/BKCourtierBehavior.cs:82-87 wywolanie, 131-143 DrainGold; tez 126 i 153 przy nowych - wtedy kiesa 0). Nowi dworzanie (HeroCreator.CreateSpecialHero, ClanActions.CreateNewClan bez removeGold) maja 0,
+wiec kasowane zloto to zawsze zloto zarobione w swiecie (m.in. sakiewka turniejowa).
+
+**Zmiana (Armoury):**
+- `BkDipGold.cs` punkt 7: prefiks `CourtierPre` (kiesa przed) + finalizer `CourtierFin` na `BKCourtierBehavior.DrainGold(Hero)` (AccessTools.DeclaredMethod,
+  instancyjna, void). To, co zeszlo: kasa stolicy krolestwa rodu dworzan (`CapitalTreasury.CapitalOfKingdom` - BK BKCapitalBehavior, ta sama stolica, w ktorej
+  BK trzyma dwor; bez BK poczatkowa siedziba) + `MoneyLedger.Note169(N169Other)`; czego kasa nie przyjela i calosc bez stolicy - `KingdomBudgetWallet`
+  + `CrownIncome.ShiftSnapshot` (zapas, nie wplyw dnia 165); bez zywego krolestwa - wraca dworzaninowi (nic nie znika). Klucz wylaczony - jak dotad (licznik).
+- Linia doby "BK i Diplomacy (E5/A8)" - segment "| kiesy dworzan BK (322a): oproznionych N, BK zdjal X -> kasy stolic T (n), skarbce krolestw K (n),
+  wrocilo dworzanom B (n)"; linia startu - stan klucza; wpiecie "zloto dworzan (BK BKCourtierBehavior.DrainGold)" w "latki przy starcie gry".
+- `CapitalTreasury.cs`: `internal static Settlement CapitalOfKingdom(Kingdom)` - opakowanie prywatnej CapitalOf (tylko odczyt).
+- `Settings.cs` / `McmSettings.cs` (gen_mcm.py, LABELS): `CourtierGoldStaysInRealm = true`, MCM "Courtiers' Gold Stays In The Realm" (grupa "The law of the
+  battlefield", obok Court Shopping Pays Town). Klucz NOWY - w Armoury.json Jeffa go nie ma, dziala domyslna.
+- `Stage8World.cs`: tylko tekst (pomiar E8/P3 "DrainGold" dalej liczy, co BK zdjal; dopisek, ze odbiorce daje E5/A8). Format "(DrainGold) N razy / N zl" bez zmian.
+- `tools/sprawdz_logi.py`: grupa `--grupa dworzanie322a`: D322-0 segment, D322-1 zdjete = kasy + skarbce + wrocilo + zniklo, D322-2 |R| <= 15 000 w dobach
+  z oproznieniem, D322-3 OSTRZEZENIE: kazda pojedyncza doba z reszta R < -15 000 (NIE z lista dob), D322-4 zniklo przy kluczu wylaczonym; self-test
+  i test syntetyczny (dobry, stary DLL ze skokiem, niezgodny, wylaczony, pusty) TAK. Na logu Jeffa (stary DLL) D322-3 NIE: 109215, 109222, 109229, 109243.
+
+**Ryzyko / co sprawdzic (kontrola calosci):**
+- Ta sama metoda ma prefiks pomiaru Stage8World.DrainPre (tylko odczyt) - oba prefiksy czytaja kiese przed BK; wynik BK bez zmian (BK dalej zeruje kiese).
+- Obieg zamkniety: kiesa dworzanina -> kasa stolicy / skarbiec w tej samej chwili; "Pieniadz swiata" bez zmiany sumy, reszta R w dobie taktu tygodnia
+  ~0 zamiast -18..-63 tys. Kasa stolicy: pozycja "inne" w "Przeplywy osad (przyczyny)" (bez niej reszta kas miast skoczylaby o te kwote).
+- Skarbiec bez stolicy: migawka 165 przesunieta - nie wraca jako renty 180 tego dnia (jak TownToll).
+- Sakiewka turniejowa dla dworzan BK - NIE wylaczona (opcja z polecenia pominieta, zasada 3): zloto juz nie znika, wiec nagroda dworzanina wraca do kasy stolicy
+  po tygodniu; wylaczenie zmienialoby gre turniejow - do decyzji Jeffa.
+- Rody dworzan sa wylaczone z darow, rent, dywidend i budzetu rodow (bez zmian); pobor ze stolicy - nie dotyczy.
+- Po wgraniu: linia "BK i Diplomacy (E5/A8): latki przy starcie gry" BRAK: -; w dobie taktu tygodnia segment 322a z "BK zdjal" = pomiar E8/P3 DrainGold i R ~0;
+  `python tools/sprawdz_logi.py --grupa dworzanie322a <log>` - D322-1..3 TAK.
+
+**Status:** DO SPRAWDZENIA (Armoury.dll 6b6151cd894b5da22e75bb8b461312e9, nie wgrany)
+
 ## 2026-11-03 WGRANIE 159 - noc/321x-integracja (158 + 321a groty strzal wedlug tieru ostatecznego - Ravens' Teeth t6 stal zamkowa, 321b strzaly i belty raz na liscie CRAFT); Armoury.dll 20823774ab812fdf308bd170a8876ad4, ForgeView.dll 8441ab0ec1e232271491793bc8541b72 (CrashScribe 55ccc004 bez zmian); kopie 158: *.bak-2026-11-03-przed-wgranie159 i D:/Backup-Bannerlord/wgrane/2026-11-03-wgranie159-przed
 
 **Problem:** Jeff 03.11: "jest blad w smithing: Ravens Teeth strzaly biora zwykle zelazo a inne strzaly forged steel"; "czemu tyle strzal jest zdublowanych do wykucia"; "wgrywaj te strzaly".
