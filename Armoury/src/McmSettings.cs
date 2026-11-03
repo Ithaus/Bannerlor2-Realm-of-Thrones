@@ -4148,17 +4148,13 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool TownGranaryFromVillages { get; set; } = true;
 
-        [SettingPropertyBool("Winter Grain To Market", HintText = "with Town Granary From Villages: when a town's grain stall is almost empty or grain is near the top price, the town's villages sell grain from their granaries onto the stall, paid from the town's money above its merchants' reserve at the stall price but no more than Winter Grain Price Cap; a village spreads what it holds above its reserve over the rest of the winter. Off = granaries feed only the town's food store, as before", RequireRestart = false)]
+        [SettingPropertyBool("Winter Grain To Market", HintText = "with Town Granary From Villages: when a town's grain stall is almost empty or grain is near the top price, the town's villages sell grain from their granaries onto the stall, paid from the town's money above its merchants' reserve at the stall price, piece by piece down the price curve as the stall fills (no cap); a village spreads what it holds above its reserve over the rest of the winter. Only in winter. Off = granaries feed only the town's food store, as before", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool WinterGrainToMarket { get; set; } = true;
 
         [SettingPropertyInteger("Winter Grain Keep Days", 0, 728, "0", HintText = "with Winter Grain To Market: a village never sells its granary below this many days of its own food (never below the famine gate's reserve and loss allowance either)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public int WinterGrainKeepDays { get; set; } = 455;
-
-        [SettingPropertyFloatingInteger("Winter Grain Price Cap", 1.00f, 10.00f, "0.00", HintText = "with Winter Grain To Market: the most a town pays a village for one grain, in times the grain's base value", RequireRestart = false)]
-        [SettingPropertyGroup("Iron Bank")]
-        public float WinterGrainPriceCap { get; set; } = 3f;
 
         [SettingPropertyFloatingInteger("Winter Grain Trigger Index", 1.00f, 10.00f, "0.00", HintText = "with Winter Grain To Market: villages sell onto the stall when the town's grain price index reaches this (the top price is 10) or the stall holds less than half a day of the town's grain", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
@@ -12254,7 +12250,6 @@ namespace Armoury
             s.TownGranaryFromVillages = TownGranaryFromVillages;
             s.WinterGrainToMarket = WinterGrainToMarket;
             s.WinterGrainKeepDays = WinterGrainKeepDays;
-            s.WinterGrainPriceCap = WinterGrainPriceCap;
             s.WinterGrainTriggerIndex = WinterGrainTriggerIndex;
             s.WatchLawEnabled = WatchLawEnabled;
             s.WatchPoolSharePercent = WatchPoolSharePercent;

@@ -92658,7 +92658,8 @@ Z322_RX = re.compile(
     r"Zboze zima \(322c\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|[A-Z][^|]*?) \| zima (?P<win>TAK|NIE) \(do konca (?P<left>\d+) dni; wies rozklada zapas ponad rezerwe na (?P<spread>\d+) dni\)"
     r" \| rezerwa wsi (?P<keep>\d+) dni .*?\| miast (?P<towns>\d+) \(oblezone \d+, Innych \d+, poza ZC4 (?P<noks>\d+)\)"
     r" \| z sygnalem (?P<sig>\d+) \(.*?\) \| chcialy (?P<want>\d+) szt\. \| na polki dzis (?P<pcs>\d+) szt\. zboza \((?P<rat>[\d.]+) racji, racji na sztuke srednio (?P<rpp>[\d.]+|-);"
-    r".*? z (?P<vills>\d+) wsi do (?P<ftowns>\d+) miast \| zloto miasto->wies (?P<gold>\d+) zl \(cena srednio (?P<price>[\d.]+|-) zl/szt\., pulap (?P<cap>\d+) zl"
+    r".*? z (?P<vills>\d+) wsi do (?P<ftowns>\d+) miast \| zloto miasto->wies (?P<gold>\d+) zl \(cena srednio (?P<price>[\d.]+|-) zl/szt\. bez pulapu, sztuka po sztuce w dol krzywej polki;"
+    r" pierwsza sztuka srednio (?P<p0>[\d.]+|-) zl, ostatnia srednio (?P<p1>[\d.]+|-) zl; wartosc (?P<val>\d+) zl\)"
     r".*?\| polka po dostawie \(dni popytu, z KS-H\): mediana (?P<shelf>[\d.]+|-)"
     r" \| kontrola: racje zdjete (?P<rtk>[\d.]+) = ubytek stodol wsi (?P<rdrop>-?[\d.]+); polki \+(?P<shin>-?\d+) = sztuki (?P<pcs2>\d+)"
     r"; zloto: kasy miast -(?P<tout>-?\d+), kiesy wsi \+(?P<vin>-?\d+), zaplata (?P<pay>\d+)"
@@ -92718,41 +92719,61 @@ def zboze322c_rows(rep, D):
     ms = sorted(float(m.group("ms")) for m in L)
     med = ms[(len(ms) - 1) // 2]
     rep.add("Z322-6: czas doby", f"mediana {med:.1f} ms, najwiecej {ms[-1]:.1f} ms", "mediana <= 10 ms", med <= 10.0)
+    # recenzja 322c: tylko zima - poza zima (zima NIE albo POZA ZIMA) ani sztuki, ani zlota
+    offs = [m for m in L if m.group("win") == "NIE" or m.group("state").startswith("POZA ZIMA")]
+    leak = [m for m in offs if int(m.group("pcs")) > 0 or int(m.group("gold")) > 0]
+    if offs:
+        rep.add("Z322-8: poza zima nic", f"dob poza zima {len(offs)}, z dostawa {len(leak)}" + "".join(f"; [d{m.group('day')} {m.group('pcs')} szt.]" for m in leak[:3]),
+                "0 (zboze ze spichlerzy tylko w zimie)", not leak)
+    else:
+        rep.add("Z322-8: poza zima nic", "brak dob poza zima", "INFO", None)
+    # recenzja 322c: cena od polki bez pulapu - sztuka po sztuce w dol krzywej (ostatnia sztuka nie drozsza od pierwszej), srednia miedzy nimi
+    pw = [m for m in L if m.group("p0") != "-" and m.group("p1") != "-" and m.group("price") != "-"]
+    badp = [m for m in pw if float(m.group("p1")) > float(m.group("p0")) + 0.05]
+    if pw:
+        rep.add("Z322-9: cena w dol krzywej polki (ostatnia <= pierwsza)", f"dob z dostawa {len(pw)}, niezgodnych {len(badp)}"
+                + "".join(f"; [d{m.group('day')} {m.group('p0')} -> {m.group('p1')}]" for m in badp[:3]), "0", not badp)
+    else:
+        rep.add("Z322-9: cena w dol krzywej polki (ostatnia <= pierwsza)", "brak dob z dostawa", "INFO", None)
     pr = [float(m.group("price")) for m in L if m.group("price") != "-"]
     sh = [float(m.group("shelf")) for m in L if m.group("shelf") != "-"]
     rp = [float(m.group("rpp")) for m in L if m.group("rpp") != "-"]
     last = L[-1]
     rep.add("Z322-7: sumy (INFO)",
             f"dob {len(L)}; sztuk {sum(int(m.group('pcs')) for m in L)}, racji {sum(float(m.group('rat')) for m in L):.0f}, zlota {sum(int(m.group('gold')) for m in L)}; "
-            f"cena srednio {(sum(pr) / len(pr)) if pr else 0:.1f} zl/szt. (pulap {last.group('cap')}); racji na sztuke {(sum(rp) / len(rp)) if rp else 0:.1f}; "
+            f"cena srednio {(sum(pr) / len(pr)) if pr else 0:.1f} zl/szt. bez pulapu (wartosc {last.group('val')}); racji na sztuke {(sum(rp) / len(rp)) if rp else 0:.1f}; "
             f"polka po dostawie mediana dni {(sorted(sh)[(len(sh) - 1) // 2]) if sh else 0:.2f}; ostatnia doba: z sygnalem {last.group('sig')}, wsi {last.group('vills')}, miast {last.group('ftowns')}, "
             f"poza ZC4 {last.group('noks')}, rezerwa {last.group('keep')} dni, rozlozenie {last.group('spread')} dni", "INFO", None)
 
 
-def z322_line(pcs=120, rat="60000", drop="60000", shin=120, gold=3600, tout=3600, vin=3600, stum=0, stall=0, win="TAK", state="CZYNNE", sig=20, ms="2.5"):
+def z322_line(pcs=120, rat="60000", drop="60000", shin=120, gold=3600, tout=3600, vin=3600, stum=0, stall=0, win="TAK", state="CZYNNE", sig=20, ms="2.5", p0="40", p1="22"):
     return (f"Zboze zima (322c): dzien 109300 | {state} | zima {win} (do konca 1700 dni; wies rozklada zapas ponad rezerwe na 1700 dni) | rezerwa wsi 455 dni wlasnej potrzeby "
             f"(klucz 455, bramka krainy 455) | miast 97 (oblezone 0, Innych 0, poza ZC4 48) | z sygnalem {sig} (polka < 0.5 dnia popytu 20, indeks >= 5.0 19; polka pelna do celu 0, "
-            f"bez kasy 1, bez wsi z zapasem 0) | chcialy 900 szt. | na polki dzis {pcs} szt. zboza ({rat} racji, racji na sztuke srednio 500.0; sigma 37, kg sztuki 10) z 30 wsi do 12 miast "
-            f"| zloto miasto->wies {gold} zl (cena srednio 30.0 zl/szt., pulap 30 zl = x3.0 wartosci; na pulapie 12 miast) | wsie: na rezerwie 3, bez rachunku KS (kcal racji) 0, "
+            f"bez kasy 1, bez wsi z zapasem 0, bez wyceny 0) | chcialy 900 szt. | na polki dzis {pcs} szt. zboza ({rat} racji, racji na sztuke srednio 500.0; sigma 37, kg sztuki 10) z 30 wsi do 12 miast "
+            f"| zloto miasto->wies {gold} zl (cena srednio 30.0 zl/szt. bez pulapu, sztuka po sztuce w dol krzywej polki; pierwsza sztuka srednio {p0} zl, ostatnia srednio {p1} zl; wartosc 10 zl) | wsie: na rezerwie 3, bez rachunku KS (kcal racji) 0, "
             f"bez migawki doby/glod/bez spichlerza 2, ponizej sztuki dzis 0 | polka po dostawie (dni popytu, z KS-H): mediana 0.80 | kontrola: racje zdjete {rat} = ubytek stodol wsi {drop}; "
             f"polki +{shin} = sztuki {pcs}; zloto: kasy miast -{tout}, kiesy wsi +{vin}, zaplata {gold}; od wczytania 120 szt., 60000 racji, 3600 zl | potkniecia {stum} (razem {stall}) "
             f"| czas {ms} ms.")
 
 
 def zboze322c_synth():
-    """Z322-S: dobry, zly (kontrole i potkniecia), zima bez dostaw, wylaczony, pusty. None = OK."""
+    """Z322-S: dobry, zly (kontrole, potkniecia, cena w gore), zima bez dostaw, poza zima (czysto / z dostawa), wylaczony, pusty. None = OK."""
     import tempfile
     import shutil
     runs = {
         "good": [z322_line(), z322_line(pcs=0, rat="0", drop="0", shin=0, gold=0, tout=0, vin=0)],
-        "bad": [z322_line(drop="59000", shin=119, tout=3700, stum=1, stall=1, ms="25.0")],
+        "bad": [z322_line(drop="59000", shin=119, tout=3700, stum=1, stall=1, ms="25.0", p0="22", p1="40")],
+        "summer": [z322_line(pcs=0, rat="0", drop="0", shin=0, gold=0, tout=0, vin=0, win="NIE", state="POZA ZIMA - nic", sig=0, p0="-", p1="-")],
+        "leak": [z322_line(win="NIE", state="POZA ZIMA - nic")],
         "dry": [z322_line(pcs=0, rat="0", drop="0", shin=0, gold=0, tout=0, vin=0)],
         "off": ["Zboze zima (322c): WYLACZONE (Winter Grain To Market w MCM) - spichlerze wsi tylko do zapasu jedzenia miasta (p6), jak dotad."],
         "empty": ["Armoury: inna linia", "Zboze zima (322c): dzien 1 | zepsuta linia"],
     }
     exp = {
-        "good": {"Z322-0": "TAK", "Z322-1": "TAK", "Z322-2": "TAK", "Z322-3": "TAK", "Z322-4": "TAK", "Z322-5": "TAK", "Z322-6": "TAK", "Z322-7": "INFO"},
-        "bad": {"Z322-1": "NIE", "Z322-2": "NIE", "Z322-3": "NIE", "Z322-4": "NIE", "Z322-6": "NIE"},
+        "good": {"Z322-0": "TAK", "Z322-1": "TAK", "Z322-2": "TAK", "Z322-3": "TAK", "Z322-4": "TAK", "Z322-5": "TAK", "Z322-6": "TAK", "Z322-7": "INFO", "Z322-8": "INFO", "Z322-9": "TAK"},
+        "bad": {"Z322-1": "NIE", "Z322-2": "NIE", "Z322-3": "NIE", "Z322-4": "NIE", "Z322-6": "NIE", "Z322-9": "NIE"},
+        "summer": {"Z322-0": "TAK", "Z322-5": "INFO", "Z322-8": "TAK", "Z322-9": "INFO"},
+        "leak": {"Z322-8": "NIE"},
         "dry": {"Z322-5": "DECYZJA", "Z322-2": "TAK"},
         "off": {"Z322-0": "INFO", "Z322-1": "INFO"},
         "empty": {"Z322-0": "NIE", "Z322-1": "INFO"},
@@ -92778,7 +92799,7 @@ def zboze322c_main(logp):
         s2 = zboze322c_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("Z322-S: test syntetyczny (dobry, zly, zima bez dostaw, wylaczony, pusty)", s2 or "OK", "OK", s2 is None)
+    rep.add("Z322-S: test syntetyczny (dobry, zly, zima bez dostaw, poza zima, wylaczony, pusty)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("Z322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()

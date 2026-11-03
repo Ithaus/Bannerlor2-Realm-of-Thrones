@@ -52,9 +52,12 @@ namespace Armoury
     ///  3. ZAMIANA (miara KS): sztuka zboza na targu = sigma x kg sztuki zboza (KS: szt. gry = kg / (sigma x kg sztuki)), 3300 kcal/kg; racja = kcal potrzeby
     ///     czlowieka w domu z rachunku okregu KS (StartCalibration.KcalPerRation322). Racji na sztuke = 3300 x sigma x kg / kcal racji. Wies bez rachunku KS - nic.
     ///  4. ZAMKNIETA EKONOMIA: racje schodza ze spichlerza wsi (Famine.TributeTake; ulamek ponad cale sztuki wraca TributeGive), cale sztuki zboza wchodza na polke
-    ///     miasta (ItemRoster, ramka ksiegi towarow ZC1 "zboze ze spichlerza wsi (322c)"); kasa miasta placi kiesie wsi cene polki (Town.MarketData.GetPrice,
-    ///     strona sprzedajacego - jak pola mieszczan KS i tabory wsi), ale najwyzej WinterGrainPriceCap x wartosc zboza, tylko z nadwyzki kasy ponad zapas
+    ///     miasta (ItemRoster, ramka ksiegi towarow ZC1 "zboze ze spichlerza wsi (322c)"); kasa miasta placi kiesie wsi cene polki BEZ PULAPU (recenzja 322c:
+    ///     pulap 3x wartosci dawal kasie miasta marze do x10 - wbrew "cena od polki"), sztuka po sztuce w dol krzywej polki jak tabory wsi (MarketCarts
+    ///     SellPostfixCore): sztuka k = TradeItemPriceFactorModel.GetPrice(strona sprzedajacego, polka z chwili przed dostawa + k x ShelfWorth), tylko z nadwyzki kasy ponad zapas
     ///     kupcow (TownPurse.SpendableTown - jak p6 i inne nasze zakupy; z calej kasy miasto wpadaloby w zaleglosci firmy DS i pozyczki rady w Banku - TownDebt). Zloto: ChangeGold para w pozycji MFolk ksiegi pieniadza (jak p6). Racje w ksiedze dnia p6 (soldV) - bramka krainy KS liczy je jako targ.
+    ///  5. TYLKO ZIMA (recenzja 322c): poza zima (albo bez dni do konca zimy) nic - linia "POZA ZIMA - nic"; poza zima reszta 1/91 dziennie
+    ///     wysuszylaby spichlerze przed zima.
     /// Klucz wylaczony - nic (p6 bez zmian). Stan bez zapisu. Potkniecia liczone per miejsce (bez globalnych wylacznikow, CLAUDE.md 7).
     /// </summary>
     internal static partial class TownGranary
@@ -117,21 +120,23 @@ namespace Armoury
             double kgSigma = kg * sigma;
             int keepKey = Math.Max(0, Math.Min(728, s.WinterGrainKeepDays));
             double keepDays = Math.Max(keepKey, StartCalibration.LandGateFloorDays);
-            float capIx = Math.Max(1f, Math.Min(10f, s.WinterGrainPriceCap));
             float trigIx = Math.Max(1f, Math.Min(10f, s.WinterGrainTriggerIndex));
             bool winter = WinterBite.WinterNow();
             int left = 0;
             { int season, sday, len; if (winter && WesterosClimate.SeasonInfo(out season, out sday, out len) && season == (int)CampaignTime.Seasons.Winter && len > 0) left = Math.Max(0, len - sday + 1); }
             double spread = Math.Max(W322SpreadMin, left);
-            int capPrice = grain != null ? Math.Max(1, (int)Math.Round(capIx * Math.Max(1, grain.Value))) : 1;
+            bool inWinter = winter && left > 0;   // recenzja 322c: tylko zima (poza zima nic - bez rozkladu 1/91 przez caly rok)
+            var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
+            var gcat = grain != null ? grain.ItemCategory : null;
+            int wv = grain != null ? Math.Max(1, HistoricalPrices.ShelfWorth(grain)) : 1;   // paczka 121: jednostka polki = waga sztuki
 
-            int towns = 0, besieged = 0, walkers = 0, noKs = 0, sig = 0, sigShelf = 0, sigIx = 0, full = 0, noGold = 0, fedTowns = 0, fedVills = 0, capped = 0, noVill = 0;
+            int towns = 0, besieged = 0, walkers = 0, noKs = 0, sig = 0, sigShelf = 0, sigIx = 0, full = 0, noGold = 0, fedTowns = 0, fedVills = 0, noPrice = 0, noVill = 0;
             int atFloor = 0, noKcal = 0, notToday = 0, tiny = 0;
-            long pieces = 0, gold = 0, townOut = 0, vilIn = 0, shelfIn = 0; double rations = 0.0, barnDrop = 0.0, priceSum = 0.0, rppSum = 0.0, wantSum = 0.0; int rppN = 0;
+            long pieces = 0, gold = 0, townOut = 0, vilIn = 0, shelfIn = 0; double rations = 0.0, barnDrop = 0.0, firstSum = 0.0, lastSum = 0.0, rppSum = 0.0, wantSum = 0.0; int rppN = 0;
             var after = new List<double>();
-            if (live && applied && grain != null)
+            if (live && applied && grain != null && inWinter)
             {
-                var cand = new List<Village>(); var dayR = new List<double>(); var rppL = new List<double>(); var giveN = new List<int>();
+                var cand = new List<Village>(); var dayR = new List<double>(); var rppL = new List<double>(); var giveN = new List<int>(); var pp = new List<int>();
                 foreach (var town in Town.AllTowns)
                 {
                     try
@@ -152,13 +157,20 @@ namespace Armoury
                         sig++; if (lowShelf) sigShelf++; if (hiIx) sigIx++;
                         double want = Math.Min(tstar * dp - shelf - inc, W322DayCapDays * dp);
                         if (want < 1.0) { full++; continue; }
-                        int price = 0;
-                        try { price = town.MarketData.GetPrice(grain, null, true, null); } catch { price = Math.Max(1, grain.Value); }
-                        if (price < 1) price = 1;
-                        if (price > capPrice) { price = capPrice; capped++; }
+                        if (model == null || gcat == null || town.MarketData == null) { noPrice++; continue; }
                         long spend = Math.Max(0, TownPurse.SpendableTown(town));   // tylko nadwyzka ponad zapas kupcow (jak p6) - bez zaleglosci firmy DS i pozyczek rady
-                        long afford = spend / price;
-                        long wantN = (long)Math.Min(Math.Floor(want), afford);
+                        // cena od polki bez pulapu: sztuka k po cenie sprzedajacego przy polce powiekszonej o k sztuk (jak tabory wsi - MarketCarts); polka z chwili przed dostawa
+                        var md = town.MarketData.GetCategoryData(gcat);
+                        var el = new EquipmentElement(grain);
+                        pp.Clear();
+                        long cum = 0; int maxN = (int)Math.Min(100000.0, Math.Floor(want));
+                        for (int k = 0; k < maxN; k++)
+                        {
+                            int p = Math.Max(1, model.GetPrice(el, null, null, true, md.InStoreValue + (float)k * wv, md.Supply, md.Demand));
+                            if (cum + p > spend) break;
+                            cum += p; pp.Add(p);
+                        }
+                        long wantN = pp.Count;
                         if (wantN < 1) { noGold++; continue; }
                         wantSum += wantN;
                         // wsie miasta: ile kazda moze dac dzis (cale sztuki)
@@ -178,7 +190,7 @@ namespace Armoury
                         long need = Math.Min(wantN, avail), given = 0;
                         for (int i = 0; i < cand.Count; i++) { int g = (int)Math.Min(dayR[i], Math.Floor(need * dayR[i] / avail)); giveN[i] = g; given += g; }
                         for (int i = 0; i < cand.Count && given < need; i++) { int g = (int)Math.Min(dayR[i] - giveN[i], need - given); if (g > 0) { giveN[i] += g; given += g; } }
-                        bool any = false;
+                        bool any = false; int kAt = 0;   // kAt - ile sztuk miasto juz dzis przyjelo (nastepna sztuka idzie dalej w dol krzywej)
                         int tg0 = town.Gold, sh0 = st.ItemRoster.GetItemNumber(grain);
                         for (int i = 0; i < cand.Count; i++)
                         {
@@ -204,20 +216,23 @@ namespace Armoury
                                 if (gf != null) gf.Info = "zboze ze spichlerza wsi (322c)";
                                 try { st.ItemRoster.AddToCounts(grain, got); }
                                 finally { GoodsLedger.End(gf); }
-                                long pay = (long)got * price;
+                                long pay = 0;
+                                for (int k = 0; k < got; k++) pay += pp[Math.Min(pp.Count - 1, kAt + k)];
                                 long left0 = spend - (tg0 - town.Gold);
                                 if (pay > left0) pay = Math.Max(0, left0);
                                 int vg0 = v.Gold;
                                 if (pay > 0) { town.ChangeGold(-(int)pay); v.ChangeGold((int)pay); }
                                 vilIn += v.Gold - vg0;
+                                if (!any) { fedTowns++; firstSum += pp[Math.Min(pp.Count - 1, kAt)]; any = true; }
+                                kAt += got;
                                 pieces += got; gold += pay; fedVills++; rppSum += rpp; rppN++;
-                                if (!any) { fedTowns++; priceSum += price; any = true; }
                             }
                             catch (Exception e) { Stumble322("Winter322(wies)", e); }
                         }
                         if (any)
                         {
                             townOut += tg0 - town.Gold;
+                            lastSum += pp[Math.Max(0, Math.Min(pp.Count - 1, kAt - 1))];
                             int sh1 = st.ItemRoster.GetItemNumber(grain);
                             shelfIn += sh1 - sh0;
                             after.Add((sh1 + inc) / dp);
@@ -232,16 +247,16 @@ namespace Armoury
                 after.Sort();
                 var sb = new StringBuilder(1400);
                 sb.Append("Zboze zima (322c): dzien ").Append(today)
-                  .Append(!live ? " | SPICHLERZE WSI NIECZYNNE (Famine albo p6) - nic" : !applied ? " | KS NIE ZASTOSOWANY (brak popytu zaplaconego ZC4) - nic" : grain == null ? " | BRAK towaru grain - nic" : " | CZYNNE")
+                  .Append(!live ? " | SPICHLERZE WSI NIECZYNNE (Famine albo p6) - nic" : !applied ? " | KS NIE ZASTOSOWANY (brak popytu zaplaconego ZC4) - nic" : grain == null ? " | BRAK towaru grain - nic" : !inWinter ? " | POZA ZIMA - nic" : " | CZYNNE")
                   .Append(" | zima ").Append(winter ? "TAK" : "NIE").Append(" (do konca ").Append(left).Append(" dni; wies rozklada zapas ponad rezerwe na ").Append(F(spread, "0")).Append(" dni)")
                   .Append(" | rezerwa wsi ").Append(F(keepDays, "0")).Append(" dni wlasnej potrzeby (klucz ").Append(keepKey).Append(", bramka krainy ").Append(StartCalibration.LandGateFloorDays).Append(')')
                   .Append(" | miast ").Append(towns).Append(" (oblezone ").Append(besieged).Append(", Innych ").Append(walkers).Append(", poza ZC4 ").Append(noKs).Append(')')
                   .Append(" | z sygnalem ").Append(sig).Append(" (polka < ").Append(F(W322ShelfLowDays, "0.0")).Append(" dnia popytu ").Append(sigShelf).Append(", indeks >= ").Append(F(trigIx, "0.0")).Append(' ').Append(sigIx)
-                  .Append("; polka pelna do celu ").Append(full).Append(", bez kasy ").Append(noGold).Append(", bez wsi z zapasem ").Append(noVill).Append(')')
+                  .Append("; polka pelna do celu ").Append(full).Append(", bez kasy ").Append(noGold).Append(", bez wsi z zapasem ").Append(noVill).Append(", bez wyceny ").Append(noPrice).Append(')')
                   .Append(" | chcialy ").Append(F(wantSum, "0")).Append(" szt. | na polki dzis ").Append(pieces).Append(" szt. zboza (").Append(F(rations, "0")).Append(" racji, racji na sztuke srednio ")
                   .Append(rppN > 0 ? F(rppSum / rppN, "0.0") : "-").Append("; sigma ").Append(sigma).Append(", kg sztuki ").Append(F(kg, "0.##")).Append(") z ").Append(fedVills).Append(" wsi do ").Append(fedTowns).Append(" miast")
-                  .Append(" | zloto miasto->wies ").Append(gold).Append(" zl (cena srednio ").Append(fedTowns > 0 ? F(priceSum / fedTowns, "0.#") : "-").Append(" zl/szt., pulap ").Append(capPrice).Append(" zl = x").Append(F(capIx, "0.0"))
-                  .Append(" wartosci; na pulapie ").Append(capped).Append(" miast)")
+                  .Append(" | zloto miasto->wies ").Append(gold).Append(" zl (cena srednio ").Append(pieces > 0 ? F(gold / (double)pieces, "0.#") : "-").Append(" zl/szt. bez pulapu, sztuka po sztuce w dol krzywej polki; pierwsza sztuka srednio ")
+                  .Append(fedTowns > 0 ? F(firstSum / fedTowns, "0.#") : "-").Append(" zl, ostatnia srednio ").Append(fedTowns > 0 ? F(lastSum / fedTowns, "0.#") : "-").Append(" zl; wartosc ").Append(grain != null ? grain.Value : 0).Append(" zl)")
                   .Append(" | wsie: na rezerwie ").Append(atFloor).Append(", bez rachunku KS (kcal racji) ").Append(noKcal).Append(", bez migawki doby/glod/bez spichlerza ").Append(notToday).Append(", ponizej sztuki dzis ").Append(tiny)
                   .Append(" | polka po dostawie (dni popytu, z KS-H): mediana ").Append(after.Count > 0 ? F(after[(after.Count - 1) / 2], "0.00") : "-")
                   .Append(" | kontrola: racje zdjete ").Append(F(rations, "0.##")).Append(" = ubytek stodol wsi ").Append(F(barnDrop, "0.##"))
