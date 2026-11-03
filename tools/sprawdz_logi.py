@@ -92661,14 +92661,16 @@ def main(argv):
 # D322-1  kazda obnizka: rata po < rata przed i stosunek >= (1 - krok) (krok z segmentu), rata po ~ rata przed x stosunek;
 # D322-2  to samo miasto obnizone najwyzej raz na 7 dob;
 # D322-3  kontrola dlugu rady 0 i potkniecia TownDebt 0 w liniach z segmentem;
+# D322-5  licznik 'w tym splata z nadwyzki w 7 dobach' (recenzja: wstrzymanie po splacie RepDay) <= wszystkie wstrzymane;
 # D322-4  skutek (INFO z celem): dlug razem pierwsza -> ostatnia doba, splaty z nadwyzki kas w ostatnich 14 dobach (cel > 0 po ok. 5 tygodniach), niewyplacalne.
 D322_DAY = re.compile(r"Dlugi miast \(m96-dlugi\): dzien (\d+) \| miasta z dlugiem (\d+) .*?dlug razem (\d+) .*?\| splaty z nadwyzki kas \(ponad zapas kupcow i najblizsza rate\) (\d+) w (\d+) miastach"
                       r".*?\| niewyplacalne (\d+) .*?\| kontrola: dlug - \(.*?\) (-?\d+) \(oczekiwane 0\)")
 D322_STUM = re.compile(r"\| potkniecia (\d+) \(sesja \d+\)\.$")
 D322_SEG = re.compile(r"\| 322d obnizki firm DS przy dlugu rady \(Town Debt Farm Cut TAK, krok ([\d.]+)% co (\d+) dob, prog ([\d.]+) rat albo niewyplacalna, podloga ([\d.]+) x doplyw\): "
-                      r"(?:dzis bez przegladu[^|]*|miast mocno zadluzonych (\d+), dzis obnizone (\d+) \(-(\d+) zl/rok\), juz splaca \(bez obnizki\) (\d+), przy podlodze (\d+), "
+                      r"(?:dzis bez przegladu[^|]*|miast mocno zadluzonych (\d+), dzis obnizone (\d+) \(-(\d+) zl/rok\), juz splaca \(bez obnizki\) (\d+)(?: \(w tym splata z nadwyzki w \d+ dobach \d+\))?, przy podlodze (\d+), "
                       r"bez pomiaru doplywu (\d+); w sesji (\d+) \(-(\d+) zl/rok\)(.*?))(?= \| czas|$)")
 D322_OFF = "322d obnizki firm DS przy dlugu rady: WYLACZONE"
+D322_HREP = re.compile(r"juz splaca \(bez obnizki\) (\d+) \(w tym splata z nadwyzki w \d+ dobach (\d+)\)")   # 322d recenzja: wstrzymane po splacie z nadwyzki (RepDay)
 D322_TOWN = re.compile(r"; ([^;:]+?): dlug rady (\d+), zaleglosc z kasy (\d+), rata (\d+) -> (\d+) zl/tydz \(([\d.]+)%\), powod: (.*?) ([\d.]+) rat \(prog ([\d.]+)\), "
                        r"doplyw (-?\d+)/d, podloga rata (\d+)( \(osiagnieta\))?")
 D322_BASE = ("[01:51:12] Dlugi miast (m96-dlugi): dzien {d} | miasta z dlugiem 20 (nowe 0, splacone do zera 0), dlug razem {debt} (limit razem 7005972) - wierzyciele: kupcy i patrycjat (P) 1, "
@@ -92681,7 +92683,7 @@ D322_BASE = ("[01:51:12] Dlugi miast (m96-dlugi): dzien {d} | miasta z dlugiem 2
              "koniec (panu + koronie, bez czesci z oszczednosci ludu) 1537018 zl u 25 miast | kontrola: dlug - (wczoraj + pozyczone + odsetki - splacone - zaokraglenia 0.00) {ctl} "
              "(oczekiwane 0); podatek - (wierzycielom + na zaleglosci + w kasie) 0 (oczekiwane 0){seg} | czas 0.076 ms | potkniecia {stum} (sesja 0).")
 D322_SEGF = (" | 322d obnizki firm DS przy dlugu rady (Town Debt Farm Cut TAK, krok 15% co 7 dob, prog 4 rat albo niewyplacalna, podloga 0.5 x doplyw): miast mocno zadluzonych 9, "
-             "dzis obnizone {n} (-{amt} zl/rok), juz splaca (bez obnizki) 0, przy podlodze 0, bez pomiaru doplywu 0; w sesji {n} (-{amt} zl/rok){towns}")
+             "dzis obnizone {n} (-{amt} zl/rok), juz splaca (bez obnizki) {hold} (w tym splata z nadwyzki w 7 dobach {hrep}), przy podlodze 0, bez pomiaru doplywu 0; w sesji {n} (-{amt} zl/rok){towns}")
 D322_T1 = "; Vaith: dlug rady 412000, zaleglosc z kasy 555672, rata 35620 -> {after} zl/tydz ({pct}%), powod: niewyplacalna i dlug+zaleglosc 27.2 rat (prog 4), doplyw 5100/d, podloga rata 17850"
 
 
@@ -92689,8 +92691,8 @@ def dlug322d_line(d, debt=3262034, rep=0, repn=0, ins=9, ctl=0, stum=0, seg=None
     return D322_BASE.format(d=d, debt=debt, rep=rep, repn=repn, ins=ins, ctl=ctl, stum=stum, seg="" if seg is None else seg)
 
 
-def dlug322d_seg(after=30277, pct="85", n=1, amt=278200):
-    return D322_SEGF.format(n=n, amt=amt, towns=D322_T1.format(after=after, pct=pct))
+def dlug322d_seg(after=30277, pct="85", n=1, amt=278200, hold=0, hrep=0):
+    return D322_SEGF.format(n=n, amt=amt, hold=hold, hrep=hrep, towns=D322_T1.format(after=after, pct=pct))
 
 
 def dlug322d_collect(lines):
@@ -92710,10 +92712,12 @@ def dlug322d_collect(lines):
             D["noseg"] += 1
             continue
         st = D322_STUM.search(s)
+        hr = D322_HREP.search(g.group(0))
         towns = list(D322_TOWN.finditer(g.group(13) or "")) if g.group(5) is not None else []
         D["days"].append({"d": int(m.group(1)), "debt": int(m.group(3)), "rep": int(m.group(4)), "repn": int(m.group(5)), "ins": int(m.group(6)), "ctl": int(m.group(7)),
                           "stum": int(st.group(1)) if st else -1, "step": float(g.group(1)), "gap": int(g.group(2)),
-                          "cut": int(g.group(6)) if g.group(6) else 0, "towns": [(t.group(1), int(t.group(4)), int(t.group(5)), float(t.group(6))) for t in towns]})
+                          "cut": int(g.group(6)) if g.group(6) else 0, "hold": int(g.group(8)) if g.group(8) else 0,
+                          "hrep": int(hr.group(2)) if hr else -1, "towns": [(t.group(1), int(t.group(4)), int(t.group(5)), float(t.group(6))) for t in towns]})
     return D
 
 
@@ -92741,6 +92745,11 @@ def dlug322d_rows(rep, D):
     rep.add("D322-2: to samo miasto najwyzej raz na 7 dob", "; ".join(twice[:6]) or "tak", "tak", not twice)
     ctl = [x for x in days if x["ctl"] != 0]
     stum = sum(max(0, x["stum"]) for x in days)
+    hbad = [f"d{x['d']} {x['hrep']}>{x['hold']}" for x in days if x["hrep"] > x["hold"]]
+    hnew = [x for x in days if x["hrep"] >= 0]
+    rep.add("D322-5: wstrzymane po splacie z nadwyzki (RepDay, recenzja) <= wszystkie wstrzymane",
+            "; ".join(hbad[:6]) or (f"zgodne, suma {sum(x['hrep'] for x in hnew)} z {sum(x['hold'] for x in hnew)} wstrzymanych ({len(hnew)} dob z licznikiem, {len(days) - len(hnew)} bez - DLL sprzed poprawki)"),
+            "<=", not hbad)
     rep.add("D322-3: kontrola dlugu rady 0 i potkniecia TownDebt", f"doby z kontrola != 0: {len(ctl)}, potkniecia {stum}", "0 i 0", not ctl and stum == 0)
     a, z = days[0], days[-1]
     tail = [x for x in days if x["d"] > z["d"] - 14]
@@ -92775,6 +92784,14 @@ def dlug322d_synth():
     dlug322d_rows(r, dlug322d_collect([dlug322d_line(100)]))
     if not any(x[0].startswith("D322-0") and x[3] == "NIE" for x in r.rows):
         return "stary DLL (bez segmentu) nie zlapany"
+    old = dlug322d_line(100, seg=dlug322d_seg().replace(" (w tym splata z nadwyzki w 7 dobach 0)", ""))
+    D = dlug322d_collect([old, dlug322d_line(107, seg=dlug322d_seg(hold=3, hrep=2))])
+    if len(D["days"]) != 2 or D["days"][0]["hrep"] != -1 or D["days"][1]["hold"] != 3 or D["days"][1]["hrep"] != 2 or D["days"][1]["towns"] != [("Vaith", 35620, 30277, 85.0)]:
+        return f"licznik splaty z nadwyzki: odczyt {[(x['hold'], x['hrep']) for x in D['days']]}"
+    r = Report()
+    dlug322d_rows(r, dlug322d_collect([dlug322d_line(100, seg=dlug322d_seg(hold=1, hrep=2))]))
+    if not any(x[0].startswith("D322-5") and x[3] == "NIE" for x in r.rows):
+        return "wstrzymane po splacie > wszystkie nie zlapane"
     return None
 
 
@@ -92786,7 +92803,7 @@ def dlug322d_main(logp):
         s2 = dlug322d_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("D322-S2: test syntetyczny (dobry, za duzy krok, dwie obnizki w 7 dob, stary DLL)", s2 or "OK", "OK", s2 is None)
+    rep.add("D322-S2: test syntetyczny (dobry, za duzy krok, dwie obnizki w 7 dob, stary DLL, licznik splaty z nadwyzki)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("D322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()

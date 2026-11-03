@@ -69,6 +69,7 @@ namespace Armoury
             public int LevyDay = int.MinValue, Since = -1;
             public int DTerms;                                           // recenzja: dni kwartalu DS z rzedu z (zaleglosc + dlug rady) >= raty - tylko przeglad wymuszony DS
             public int InsDay = -1;                                      // 322d: ostatnia doba niewyplacalnosci (krok 4 TownDay) - DsTowns.DebtCut (sesja)
+            public int RepDay = -1;                                      // 322d (recenzja): ostatnia doba splaty z nadwyzki (krok 2 TownDay, got > 0) - DsTowns.DebtCut (sesja)
             public long LastLevy;
             public double Total { get { double n = 0; foreach (var v in N.Values) n += v[0]; return P + R + B + n; } }
         }
@@ -183,6 +184,20 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>322d (recenzja): DsTowns.DebtCut (DayStart, przed TownDebt.Daily tej doby) - rada splacala z nadwyzki kasy (krok 2 TownDay) w ostatnich days dobach
+        /// (RepDay od today - days do today). Pamiec sesji - po wczytaniu false do pierwszej splaty. Klucz wylaczony / brak ksiegi - false. Nie rzuca.</summary>
+        internal static bool TdRepaidWithin(Settlement st, int today, int days)
+        {
+            try
+            {
+                if (st == null || st.StringId == null || _b.Count == 0 || !On) return false;
+                Book b;
+                if (!_b.TryGetValue(st.StringId, out b) || b == null) return false;
+                return b.RepDay >= 0 && b.RepDay <= today && today - b.RepDay <= days;
+            }
+            catch { return false; }
+        }
+
         /// <summary>IronBank.Dividends DvDay: dlugi rad wobec Banku (z odsetkami) pod id "td:&lt;miasto&gt;" - koszt pozyczek (NoteCrownLent) rozliczany jak kredyt korony.
         /// Zawsze (takze przy kluczu wylaczonym - dlug w Banku stoi, a koszt nie moze zniknac jako strata).</summary>
         internal static void BankInto(Dictionary<string, double> into)
@@ -289,7 +304,7 @@ namespace Armoury
                 if (spare >= 1 && share > 0)
                 {
                     long pay = (long)Math.Floor(Math.Min(b.Total, share * spare));
-                    if (pay > 0) { long got = Repay(st, t, b, pay, false); if (got > 0) _dRepN2++; }
+                    if (pay > 0) { long got = Repay(st, t, b, pay, false); if (got > 0) { _dRepN2++; b.RepDay = today; } }   // 322d: RepDay - DsTowns.DebtCut
                 }
             }
             // 3. pozyczka na zaleglosc firmy
