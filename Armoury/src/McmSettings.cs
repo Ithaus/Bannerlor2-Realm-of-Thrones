@@ -1316,6 +1316,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public bool CourtierGoldStaysInRealm { get; set; } = true;
 
+        [SettingPropertyBool("Vacant Estate Price To Lord", HintText = "when you buy a vacant Banner Kings estate in someone else's village, the price (at least 500) goes to the village's lord, who holds its unowned land - before, it vanished. Without a living lord it goes to the treasury of the town the village trades with. Off = the gold vanishes, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool VacantEstatePriceToLord { get; set; } = true;
+
         [SettingPropertyBool("Merc Clans Real Soldiers", HintText = "the sellsword clans of the world keep their captains and get no men out of thin air from Banner Kings: every day Banner Kings threw each hero of a hired mercenary clan out of his own warband and put a soldier made from nothing in his place, and it would hand a clan without a contract 3 to 5 free men per warband. With this on the heroes stay, hired men of other stock are still turned one for one into the clan's own troops as Banner Kings does, and Banner Kings adds nobody from nothing. The few recruits a clan without a contract picks up and pays for on the road are the game's own rule and are left as they are. Your Spoils of War company has its own switch. Off = as Banner Kings does", RequireRestart = false)]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool MercClansRealSoldiers { get; set; } = true;
@@ -11576,6 +11580,7 @@ namespace Armoury
             s.CourtShoppingPaysTown = CourtShoppingPaysTown;
             s.GroupCompromisePaysGroup = GroupCompromisePaysGroup;
             s.CourtierGoldStaysInRealm = CourtierGoldStaysInRealm;
+            s.VacantEstatePriceToLord = VacantEstatePriceToLord;
             s.MercClansRealSoldiers = MercClansRealSoldiers;
             s.FeastNoFreeGoods = FeastNoFreeGoods;
             s.FieldCraftEnabled = FieldCraftEnabled;

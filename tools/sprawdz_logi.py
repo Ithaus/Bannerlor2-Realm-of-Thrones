@@ -93731,5 +93731,169 @@ def main(argv):
     return _chleb322f_main_prev(argv)
 
 
+# ---- paczka 323a: grupa majatek323a - cena wolnego majatku BK do pana wsi (Jeff 03.11 "majatek naprawa") ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa majatek323a <Armoury-*.log>. Linie "Wolny majatek BK (323a): dzien N" (kazdy zakup) i segment
+# "| wolne majatki BK (323a)" linii "BK i Diplomacy (E5/A8): dzien N" (BkDipGold 8). Dowod: BK EstateAction.TakeAction (Buy, Owner == null) robil
+# ChangeHeroGold(-GoldCost) bez odbiorcy (min. 500 w nicosc).
+# M323-S  self-test wyrazen i test syntetyczny;
+# M323-0  segment 323a w liniach E5/A8 (bez segmentu - DLL sprzed 323a - INFO);
+# M323-1  kupcy zaplacili = panom wsi + kasom miast + wrocilo kupcom + przepadlo (klucz wylaczony) w kazdej dobie;
+# M323-2  suma cen z linii zakupu = suma "kupcy zaplacili" segmentow (zakupy do ostatniej doby z segmentem);
+# M323-3  zakupy, w ktorych majatek nie przeszedl na kupca (zwrot) - INFO; M323-4 przepadlo przy kluczu wylaczonym - INFO.
+M323A_SEG = re.compile(r"\| wolne majatki BK \(323a\)(?P<off> WYLACZONE \([^)]*\))?: kupionych (?P<n>\d+), kupcy zaplacili (?P<paid>\d+) \(gracz (?P<pl>\d+)\) "
+                       r"-> panom wsi (?P<lord>\d+) \((?P<ln>\d+)\), kasom miast handlu wsi (?P<town>\d+) \((?P<tn>\d+)\), wrocilo kupcom (?P<back>\d+) "
+                       r"\((?P<bn>\d+); w tym majatek nie przeszedl (?P<un>\d+)\)(?:, przepadlo \(klucz wylaczony\) (?P<gone>\d+) \((?P<gn>\d+)\))?")
+M323A_DAY = re.compile(r"^BK i Diplomacy \(E5/A8\): dzien (?P<day>-?\d+) ")
+M323A_BUY = re.compile(r"^Wolny majatek BK \(323a\): dzien (?P<day>-?\d+) \| kupiec (?P<who>.*?) \| (?P<where>.*?) \| cena (?P<paid>\d+)(?P<tail>.*)$")
+
+
+def majatek323a_collect(logp):
+    D = {"a8": {}, "noseg": 0, "buys": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            s = ln.rstrip("\r\n")
+            mt = TS.match(s)
+            s = mt.group(2) if mt else s
+            mb = M323A_BUY.match(s)
+            if mb:
+                D["buys"].append(mb)
+                continue
+            md = M323A_DAY.match(s)
+            if not md:
+                continue
+            m = M323A_SEG.search(s)
+            if not m:
+                D["noseg"] += 1
+                continue
+            D["a8"][int(md.group("day"))] = m
+    return D
+
+
+def majatek323a_rows(rep, D):
+    A, B = D["a8"], D["buys"]
+    g = lambda m, k: int(m.group(k) or 0)
+    rep.add("M323-0: segment 'wolne majatki BK (323a)' w liniach E5/A8", f"z segmentem {len(A)}, bez {D['noseg']}",
+            "bez 0 (DLL sprzed 323a - INFO)", None if not A else D["noseg"] == 0)
+    if A:
+        bad = [d for d, m in sorted(A.items()) if g(m, "paid") != g(m, "lord") + g(m, "town") + g(m, "back") + g(m, "gone")]
+        rep.add("M323-1: kupcy zaplacili = panom wsi + kasom miast + wrocilo + przepadlo (kazda doba)",
+                f"zaplacone {sum(g(m, 'paid') for m in A.values())} -> panom {sum(g(m, 'lord') for m in A.values())}, kasom miast {sum(g(m, 'town') for m in A.values())}, "
+                f"wrocilo {sum(g(m, 'back') for m in A.values())}, przepadlo {sum(g(m, 'gone') for m in A.values())}; dob niezgodnych {len(bad)}" + (f" ({bad[:6]})" if bad else ""),
+                "niezgodnych 0", not bad)
+        last = max(A)
+        bsum = sum(int(b.group("paid")) for b in B if int(b.group("day")) <= last)
+        asum = sum(g(m, "paid") for m in A.values())
+        an = sum(g(m, "n") for m in A.values())
+        bn = sum(1 for b in B if int(b.group("day")) <= last)
+        rep.add("M323-2: linie zakupu (323a) = segmenty doby (do ostatniej doby z segmentem)",
+                f"linii zakupu {bn} za {bsum}; segmenty: kupionych {an} za {asum}", "rowne", None if not an and not bn else (bsum == asum and bn == an))
+        gone = sum(g(m, "gone") for m in A.values())
+        rep.add("M323-4: przepadlo przy kluczu wylaczonym", str(gone), "INFO (klucz Vacant Estate Price To Lord)", None)
+    else:
+        rep.add("M323-1: bilans cen wolnych majatkow", "brak segmentu 323a", "INFO", None)
+    und = [b for b in B if "NIE przeszedl" in b.group("tail")]
+    rep.add("M323-3: zakupy, w ktorych majatek nie przeszedl na kupca (zwrot)", f"{len(und)} z {len(B)} linii zakupu" + "".join(f"; {b.group('day')} {b.group('where')}" for b in und[:4]),
+            "INFO (wyjatek w BK po zaplacie - zwrot)", None)
+    for b in B[:8]:
+        print(f"  zakup: dzien {b.group('day')} | {b.group('who')} | {b.group('where')} | cena {b.group('paid')}{b.group('tail')}")
+
+
+def m323a_seg(day, n, paid, lord, town=0, back=0, un=0, off=False, gone=0, pl=None):
+    s = (f"BK i Diplomacy (E5/A8): dzien {day} | kiesy dworzan BK (322a): oproznionych 0, BK zdjal 0 -> kasy stolic 0 (0), skarbce krolestw 0 (0), wrocilo dworzanom 0 (0)"
+         f" | wolne majatki BK (323a){' WYLACZONE (Vacant Estate Price To Lord)' if off else ''}: kupionych {n}, kupcy zaplacili {paid} (gracz {paid if pl is None else pl}) -> panom wsi {lord} "
+         f"({1 if lord else 0}), kasom miast handlu wsi {town} ({1 if town else 0}), wrocilo kupcom {back} ({1 if back else 0}; w tym majatek nie przeszedl {un})")
+    if gone:
+        s += f", przepadlo (klucz wylaczony) {gone} ({n})"
+    return s + " | kontrola (prog 0): stos paktow przepelniony 0, otwarte okna paktow 0."
+
+
+def m323a_buy(day, paid, tail=" -> pan wsi Walder Frey (Frey) {p} | kiesa kupca 9000 -> 8500."):
+    return f"Wolny majatek BK (323a): dzien {day} | kupiec Przemyslaw | Seven Elms (village_x) | cena {paid}" + tail.replace("{p}", str(paid))
+
+
+def majatek323a_selftest():
+    m = M323A_SEG.search(m323a_seg(5, 1, 500, 500))
+    if not m or m.group("paid") != "500" or m.group("lord") != "500" or m.group("off"):
+        return "M323A_SEG nie czyta segmentu"
+    m = M323A_SEG.search(m323a_seg(5, 1, 700, 0, off=True, gone=700))
+    if not m or not m.group("off") or m.group("gone") != "700":
+        return "M323A_SEG nie czyta segmentu WYLACZONE"
+    b = M323A_BUY.match(m323a_buy(5, 500))
+    if not b or b.group("paid") != "500" or b.group("where") != "Seven Elms (village_x)":
+        return "M323A_BUY nie czyta linii zakupu"
+    if M323A_SEG.search("BK i Diplomacy (E5/A8): dzien 5 | kiesy dworzan BK (322a): oproznionych 0 | kontrola (prog 0): x."):
+        return "M323A_SEG czyta linie bez segmentu"
+    return None
+
+
+def majatek323a_synth():
+    """M323-S2: dobry (pan wsi), kasa miasta, niezgodny, wylaczony, stary DLL, pusty. None = OK."""
+    import tempfile
+    import shutil
+    runs = {
+        "good": [m323a_seg(1, 0, 0, 0), m323a_buy(2, 500), m323a_seg(2, 1, 500, 500), m323a_buy(3, 612)],
+        "town": [m323a_buy(2, 800, " | bez zywego pana wsi (brak) -> kasa miasta Lannisport 800, wrocilo kupcowi 0."), m323a_seg(2, 1, 800, 0, town=800)],
+        "bad": [m323a_buy(2, 500), m323a_seg(2, 1, 500, 300)],
+        "off": [m323a_buy(2, 500, " | KLUCZ WYLACZONY (Vacant Estate Price To Lord) - zloto w nicosc jak dotad."), m323a_seg(2, 1, 500, 0, off=True, gone=500)],
+        "old": ["BK i Diplomacy (E5/A8): dzien 2 | ugoda z grupa interesu BK (FinancialCompromise): 0 | kontrola (prog 0): x."],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"M323-0": "TAK", "M323-1": "TAK", "M323-2": "TAK", "M323-3": "INFO", "M323-4": "INFO"},
+        "town": {"M323-0": "TAK", "M323-1": "TAK", "M323-2": "TAK"},
+        "bad": {"M323-0": "TAK", "M323-1": "NIE", "M323-2": "TAK"},
+        "off": {"M323-1": "TAK", "M323-2": "TAK", "M323-4": "INFO"},
+        "old": {"M323-0": "INFO", "M323-1": "INFO"},
+        "empty": {"M323-0": "INFO", "M323-1": "INFO", "M323-3": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="m323a_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            majatek323a_rows(rep, majatek323a_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def majatek323a_main(logp):
+    rep = Report()
+    s1 = majatek323a_selftest()
+    rep.add("M323-S: self-test wyrazen (segment 323a, linia zakupu)", s1 or "OK", "OK", s1 is None)
+    try:
+        s2 = majatek323a_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("M323-S2: test syntetyczny (pan wsi, kasa miasta, niezgodny, wylaczony, stary DLL, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("M323-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = majatek323a_collect(logp)
+    print(f"plik: {logp} | linii E5/A8 z segmentem 323a {len(D['a8'])}, bez {D['noseg']}, linii zakupu {len(D['buys'])}")
+    majatek323a_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_majatek323a_main_prev = main
+
+
+def main(argv):
+    # paczka 323a: grupa majatek323a - opakowanie main jak bieg320d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "majatek323a":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return majatek323a_main(rest[0] if rest else None)
+    return _majatek323a_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
