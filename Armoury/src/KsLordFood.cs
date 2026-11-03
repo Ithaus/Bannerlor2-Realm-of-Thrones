@@ -187,6 +187,7 @@ namespace Armoury
             {
                 _hfTowns++; _hfK.Add(k);
                 TownPurse.NoteLordFood(st, paid);                                   // jak splata pana: w doplywie netto miasta jak wydatek kasy (przeglad firm DS)
+                KsFoodCredit.NoteLordBills(st, paid);                               // recenzja 322e: jutro z powrotem do podstawy raty dluznika (kasa sie nie ruszyla)
                 if (KingdomTreasury.HoardBelow(k)) _hfBelow++;
             }
         }
@@ -349,6 +350,7 @@ namespace Armoury
                             _dLords -= paidB; _billsPaid += paidB; _lordPaid += paidB; _billsRecv += recv;
                             if (paidB > 0) { _nPay++; NotePaid(c, paidB); if (ClanIncomeBook.FamilyGoldOf(c) < R) _nBelow++; if (paidB > cap) _nOver++; }
                             if (paidB > 0) TownPurse.NoteLordFood(st, paidB);         // recenzja calosci 18.10: w doplywie netto miasta jak wydatek kasy (przeglad firm DS)
+                            if (paidB > 0) KsFoodCredit.NoteLordBills(st, paidB);     // recenzja 322e: jutro z powrotem do podstawy raty dluznika
                             HoardBills(t, st, KsFoodCredit.OverdueDays);              // m105 G2: reszta zaleglych rachunkow ze skarbca krolestwa ponad zapas wojny
                             continue;
                         }
@@ -433,6 +435,7 @@ namespace Armoury
                     if (back > 0) { int h1 = h.Gold; h.ChangeHeroGold((int)back); long got = h.Gold - h1; CirculationWindows.NoteHeroGold(h, got); paidB = took - got; }
                     _dLords -= paidB; _billsPaid += paidB; _lordPaid += paidB; _billsRecv += recv; _ePaid += paidB;
                     if (paidB > 0) TownPurse.NoteLordFood(st, paidB);                 // recenzja calosci 18.10: w doplywie netto miasta jak wydatek kasy (przeglad firm DS)
+                    if (paidB > 0) KsFoodCredit.NoteLordBills(st, paidB);             // recenzja 322e: jutro z powrotem do podstawy raty dluznika
                     if (paidB > 0)
                     {
                         _nPay++; NotePaid(c, paidB);

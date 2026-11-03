@@ -49,9 +49,36 @@ namespace Armoury
         private static long _openPrev = -1;
         private static int _stum; private static readonly HashSet<string> _err = new HashSet<string>();
 
+        // 322e (Jeff 03.11, audyt ekonomii p. 5 "rachunki zywnosci: dluznik splaca rata z biezacego zarobku, nawet gdy jest ponizej rezerwy"): RATA Z ZAROBKU.
+        // Dotad dluznik splacal tylko z kasy ponad KsConsignFloorShare x zapas kupcow - Qarth i Braavos (kasa 1-20 tys., zapas ok. 340 tys.) nie splacaly nigdy
+        // (1.06 mln otwartych, najstarszy 364 dni). Teraz po splacie z nadwyzki dluznik doklada do raty: Ks Consign Rate Share x zarobek doby kupcow miasta
+        // (TownPurse.NetOf - doplyw netto okna blok-blok, czyli zarobek PRZED poborem pana i korony) + to, co miasto splacilo w poprzedniej dobie (splata
+        // starego dlugu to nie koszt dnia - inaczej rata zjadalaby sama siebie). Rata placona z zywej kasy (najwyzej cala kasa), od najstarszego, takze ponizej
+        // podlogi. Zloto: kasa dluznika -> kasa wierzyciela (Transfer z pomiarem obu stron), nic z niczego. Brak pomiaru (TownPurse wylaczony, pierwsza doba) albo
+        // zarobek <= 0 - bez raty (jak dotad). Udzial 0 - bit w bit jak przed 322e (poza linia).
+        // ODBLOKOWANIE DOWOZU: dluznik, ktory dzis zaplacil pelna rate (rata > 0) i ktorego rachunki za jedzenie po splacie <= rata x Ks Consign Rate Release Days,
+        // dostaje znow dowoz (OverdueDst go pomija tej doby). Uzasadnienie: blokada ma chronic wierzycieli przed dluznikiem, ktory nie placi; dluznik placacy
+        // w terminie, ktorego dlug jego rata splaci w tym horyzoncie, jest wiarygodny - glodzenie go nie pomaga nikomu (nowy rachunek tez zmiesci sie w horyzoncie,
+        // bo warunek liczy CALY dlug za jedzenie, wiec dlug nie urosnie ponad rata x horyzont). Release Days 0 - blokada jak dotad.
+        private static int _payDay = int.MinValue, _relDay = int.MinValue;
+        private static Dictionary<Settlement, long> _paidToday = new Dictionary<Settlement, long>(), _paidPrev = new Dictionary<Settlement, long>();
+        // recenzja 322e: splaty rachunkow dluznika przez pana / skarbiec korony (KsLordFood RACHUNKI, BeforeEarly, HoardBills - ta sama kwota co TownPurse.NoteLordFood,
+        // po zwrotach). Kasa dluznika sie nie rusza, a CloseWindow zdejmuje ja z jego doplywu netto - bez dodania z powrotem rata malalaby o 15% splaty pana
+        // (miasto, ktoremu pan pomaga, placiloby mniej albo wcale i nie dostawalo odblokowania). Doba jak _paidToday (pan placi po PayDaily -> okno jutra).
+        // Doplata DOPLATA (Settle) zostaje w kasie miasta - tej nie liczymy.
+        private static Dictionary<Settlement, long> _lordPaidToday = new Dictionary<Settlement, long>(), _lordPaidPrev = new Dictionary<Settlement, long>();
+        private static readonly HashSet<Settlement> _released = new HashSet<Settlement>();
+        // linia doby 322e: dluznicy, z rata, w terminie, odblokowani, bez pomiaru, splacone z raty
+        internal static long DRateRepaid; internal static int DRateN, DRateDebtors, DRateOnTime, DRateReleased, DRateNoMeasure;
+
+        internal static double RateShare { get { var s = Settings.Current; return s == null ? 0.15 : Math.Max(0.0, Math.Min(0.5, s.KsConsignRateShare)); } }
+        internal static int RateReleaseDays { get { var s = Settings.Current; return s == null ? 91 : Math.Max(0, Math.Min(364, s.KsConsignRateReleaseDays)); } }
+
         internal static void Reset()
         {
             _acc.Clear(); _pending = null; _openPrev = -1; ForfeitTotal = 0; ForfeitTotalN = 0; _stum = 0; _err.Clear();
+            _payDay = int.MinValue; _relDay = int.MinValue; _paidToday.Clear(); _paidPrev.Clear(); _released.Clear();
+            _lordPaidToday.Clear(); _lordPaidPrev.Clear();
             ClearDay();
         }
 
@@ -61,6 +88,7 @@ namespace Armoury
             DLordRepaid = GLordPaid = 0; DLordN = 0;
             DLordEarly = 0; DLordEarlyN = 0;
             DClaimNew = 0; DClaimN = 0;
+            DRateRepaid = 0; DRateN = DRateDebtors = DRateOnTime = DRateReleased = DRateNoMeasure = 0;
         }
 
         internal static int TakeStumbles() { int n = _stum; _stum = 0; return n; }
@@ -153,6 +181,25 @@ namespace Armoury
             DNew += x; DNewN++;
         }
 
+        /// <summary>322e: nowa doba splat - dzisiejsze splaty (wlasne i panow) przechodza na "wczoraj"; przerwa (pierwsza doba po wczytaniu) - wczorajszych nie znamy.</summary>
+        private static void RotatePay(int today)
+        {
+            if (_payDay == today) return;
+            var t0 = _paidPrev; _paidPrev = _paidToday; _paidToday = t0; _paidToday.Clear();
+            var t1 = _lordPaidPrev; _lordPaidPrev = _lordPaidToday; _lordPaidToday = t1; _lordPaidToday.Clear();
+            if (_payDay != today - 1) { _paidPrev.Clear(); _lordPaidPrev.Clear(); }
+            _payDay = today;
+        }
+
+        /// <summary>Recenzja 322e: KsLordFood (RACHUNKI, BeforeEarly, HoardBills) - pan / skarbiec splacil rachunki dluznika `dst` kwota `x` (ta sama, co TownPurse.NoteLordFood,
+        /// po zwrotach). Jutro dodana do zarobku doby dluznika (podstawa raty). Nie dla doplaty DOPLATA (zostaje w kasie miasta). Nie rzuca.</summary>
+        internal static void NoteLordBills(Settlement dst, long x)
+        {
+            if (dst == null || x <= 0) return;
+            try { RotatePay(Today()); long v; _lordPaidToday.TryGetValue(dst, out v); _lordPaidToday[dst] = v + x; }
+            catch (Exception e) { Stumble("NoteLordBills", e); }
+        }
+
         /// <summary>Splata doby (SupplyDemand.DailyTrade, przed wozami): wojna - rachunek przepada; potem kazdy cel od najstarszego z kasy ponad podloge. Dziala zawsze,
         /// gdy sa rachunki (takze przy wylaczonym kluczu - dlugi trzeba splacac).</summary>
         internal static void PayDaily()
@@ -185,27 +232,87 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("PayDaily.war", e); }
                 }
+                // 322e: doba splat - wczorajsze splaty dluznikow (dodawane do zarobku doby: okno TownPurse zamkniete dzis rano zawiera wczorajsza PayDaily)
+                RotatePay(today);
+                _released.Clear(); _relDay = today;
+                double share = RateShare; int relDays = RateReleaseDays;
+                var rows = new List<string>();
                 foreach (var kv in byDst)
                 {
                     try
                     {
                         var l = kv.Value; if (l.Count == 0) continue;
                         l.Sort((x, y) => x.Value.Day != y.Value.Day ? x.Value.Day.CompareTo(y.Value.Day) : string.CompareOrdinal(x.Key.Src.StringId, y.Key.Src.StringId));
-                        var dt = l[0].Key.Dst.Town;
-                        long free = Free(dt);
+                        var dst = l[0].Key.Dst; var dt = dst.Town;
+                        long gold0 = dt.Gold, owed0 = 0, food0 = 0;
+                        foreach (var p in l) { if (p.Value.Left <= 0) continue; owed0 += p.Value.Left; if (!p.Key.Claim) food0 += p.Value.Left; }
+                        long free = Free(dt), paidS = 0, paidR = 0;
                         foreach (var p in l)
                         {
                             if (free <= 0) break;
                             var b = p.Value; if (b.Left <= 0) continue;
                             long got = Transfer(dt, p.Key.Src.Town, Math.Min(free, b.Left));
                             if (got <= 0) break;
-                            b.Left -= got; free -= got; DRepaid += got;
+                            b.Left -= got; free -= got; DRepaid += got; paidS += got;
+                        }
+                        // 322e: rata z zarobku doby - dopelnienie splaty z nadwyzki do raty, z zywej kasy (takze ponizej podlogi), od najstarszego
+                        long inc = 0, net = 0, prev = 0, lprev = 0, rate = 0; bool meas = false;
+                        if (share > 0 && owed0 > 0)
+                        {
+                            DRateDebtors++;
+                            _paidPrev.TryGetValue(dst, out prev);
+                            _lordPaidPrev.TryGetValue(dst, out lprev);     // recenzja 322e: splaty panow / korony wczoraj (CloseWindow zdjal je z netto, kasa sie nie ruszyla)
+                            meas = TownPurse.NetOf(dt, out net);
+                            if (!meas) DRateNoMeasure++;
+                            else
+                            {
+                                inc = net + prev + lprev;
+                                rate = inc > 0 ? (long)Math.Ceiling(share * inc) : 0;
+                                long due = Math.Min(owed0 - paidS, Math.Max(0L, rate - paidS));
+                                foreach (var p in l)
+                                {
+                                    if (due <= 0) break;
+                                    var b = p.Value; if (b.Left <= 0) continue;
+                                    long got = Transfer(dt, p.Key.Src.Town, Math.Min(due, b.Left));
+                                    if (got <= 0) break;
+                                    b.Left -= got; due -= got; DRepaid += got; paidR += got; DRateRepaid += got;
+                                }
+                                if (paidR > 0) DRateN++;
+                            }
+                        }
+                        long paid = paidS + paidR;
+                        if (paid > 0) { long v; _paidToday.TryGetValue(dst, out v); _paidToday[dst] = v + paid; }
+                        if (share > 0 && owed0 > 0)
+                        {
+                            long food1 = 0; int oldest = int.MaxValue;
+                            foreach (var p in l) if (!p.Key.Claim && p.Value.Left > 0) { food1 += p.Value.Left; oldest = Math.Min(oldest, p.Value.Day); }
+                            bool onTime = meas && rate > 0 && paid >= Math.Min(rate, owed0);
+                            if (onTime) DRateOnTime++;
+                            bool rel = onTime && relDays > 0 && food1 > 0 && food1 <= rate * (long)relDays;
+                            if (rel) { _released.Add(dst); DRateReleased++; }
+                            if (rows.Count < 24)
+                                rows.Add((dst.Name != null ? dst.Name.ToString() : dst.StringId) + ": dlug " + owed0 + " (za jedzenie " + food0 + ", najstarszy " + (oldest == int.MaxValue ? "-" : (today - oldest).ToString(CultureInfo.InvariantCulture)) + " dni)"
+                                         + ", zarobek doby " + (meas ? inc.ToString(CultureInfo.InvariantCulture) + " (netto " + net + " + splaty wczoraj " + prev + " + splaty panow wczoraj " + lprev + ")" : "bez pomiaru")
+                                         + ", rata " + rate + ", splacone z nadwyzki " + paidS + " + z raty " + paidR + ", kasa " + gold0 + " -> " + dt.Gold
+                                         + ", zostalo za jedzenie " + food1 + (rate > 0 ? " (" + ((food1 + rate - 1) / rate) + " dob raty)" : "")
+                                         + ", w terminie " + (onTime ? "TAK" : "NIE") + ", dowoz " + (food1 <= 0 ? "-" : rel ? "ODBLOKOWANY" : "wedlug zwloki"));
                         }
                     }
                     catch (Exception e) { Stumble("PayDaily.pay", e); }
                 }
                 foreach (var kv in _acc) { kv.Value.B.RemoveAll(b => b.Left <= 0); if (kv.Value.B.Count == 0) gone.Add(kv.Key); }
                 foreach (var k in gone) _acc.Remove(k);
+                if (share > 0 && DRateDebtors > 0)
+                {
+                    try
+                    {
+                        Log.Info("Rachunki zywnosci - rata z zarobku (322e): dzien " + today + " | udzial " + share.ToString("0.00", CultureInfo.InvariantCulture) + ", horyzont odblokowania "
+                                 + relDays + " dob | dluznikow " + DRateDebtors + ", z rata " + DRateN + ", w terminie " + DRateOnTime + ", dowoz odblokowany " + DRateReleased
+                                 + ", bez pomiaru zarobku " + DRateNoMeasure + " | splacone z raty " + DRateRepaid + " zl (kasy dluznikow -> kasy wierzycieli), potkniecia kredytu " + _stum + ".");
+                        foreach (var r in rows) Log.Info("Rachunki zywnosci - dluznik (322e): dzien " + today + " | " + r + ".");
+                    }
+                    catch { }
+                }
             }
             catch (Exception e) { Stumble("PayDaily", e); }
         }
@@ -338,9 +445,11 @@ namespace Armoury
         {
             Resolve();
             var h = new HashSet<Settlement>(); int od = OverdueDays;
+            bool relNow = _relDay == today && _released.Count > 0;      // 322e: dluznik w terminie z dlugiem w horyzoncie raty - dowoz tej doby odblokowany
             foreach (var a in _acc.Values)
             {
                 if (a.Dst == null || a.Claim) continue;                 // recenzja ceny-r5: roszczenie z zadatku nie blokuje dowozu do dluznika
+                if (relNow && _released.Contains(a.Dst)) continue;
                 foreach (var b in a.B) if (b.Left > 0 && today - b.Day > od) { h.Add(a.Dst); break; }
             }
             return h;

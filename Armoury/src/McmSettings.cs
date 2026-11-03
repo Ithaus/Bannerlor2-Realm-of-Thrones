@@ -8752,6 +8752,14 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public int KsConsignOverdueDays { get; set; } = 30;
 
+        [SettingPropertyFloatingInteger("Ks Consign Rate Share", 0.00f, 0.50f, "0.00", HintText = "with Ks Food Carts Consign: a town that owes food bills pays at least this share of its merchants' daily earnings towards them every day, oldest first, even when its gold is below half of its merchants' reserve; the gold goes to the towns it owes. 0 = only from gold above that floor, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public float KsConsignRateShare { get; set; } = 0.15f;
+
+        [SettingPropertyInteger("Ks Consign Rate Release Days", 0, 364, "0", HintText = "with Ks Consign Rate Share: a town that paid its full daily share today and whose food bills that share would pay off within this many days gets food carts again even with an overdue bill. 0 = an overdue bill always stops food carts, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public int KsConsignRateReleaseDays { get; set; } = 91;
+
         [SettingPropertyBool("Ks Ship By Days", HintText = "with Ks Food Carts: a food cart goes by ship whenever the ship arrives sooner in days (the sea route counted at ship speed plus a day in port), not only when the sea route is shorter; the weekly plan reads the same days; off = by ship only when the land road is much longer, as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsShipByDays { get; set; } = true;
@@ -13419,6 +13427,8 @@ namespace Armoury
             s.KsConsignFloorShare = KsConsignFloorShare;
             s.KsConsignSourceExposure = KsConsignSourceExposure;
             s.KsConsignOverdueDays = KsConsignOverdueDays;
+            s.KsConsignRateShare = KsConsignRateShare;
+            s.KsConsignRateReleaseDays = KsConsignRateReleaseDays;
             s.KsShipByDays = KsShipByDays;
             s.KsFarAlways = KsFarAlways;
             s.KsRelKeep = KsRelKeep;
