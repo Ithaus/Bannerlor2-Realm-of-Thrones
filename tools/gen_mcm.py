@@ -4,6 +4,10 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 322c: zboze zima - kod przycina dni do 0..728, pulap ceny do 1..10, prog indeksu do 1..10 (TownGranary.Zima322.cs)
+    'WinterGrainKeepDays': (0, 728, "0"),
+    'WinterGrainPriceCap': (1.0, 10.0, "0.00"),
+    'WinterGrainTriggerIndex': (1.0, 10.0, "0.00"),
     # 319b: weterani ucza swoja bron - kod przycina tier do 1..6, uczniow do 1..20, limit ucznia do 0..3 (DrillVeterans.cs)
     'VeteranTeacherMinTier': (1, 6, "0"),
     'VeteranPupilsEach': (1, 20, "0"),
