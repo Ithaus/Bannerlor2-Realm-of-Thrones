@@ -92653,125 +92653,132 @@ def main(argv):
     return _bieg320d_main_prev(argv)
 
 
-R322_SUM = re.compile(
-    r"Rachunki zywnosci - rata z zarobku \(322e\): dzien (?P<day>\d+) \| udzial (?P<share>[\d.]+), horyzont odblokowania (?P<hor>\d+) dob \| "
-    r"dluznikow (?P<deb>\d+), z rata (?P<withr>\d+), w terminie (?P<ontime>\d+), dowoz odblokowany (?P<rel>\d+), bez pomiaru zarobku (?P<nom>\d+) \| "
-    r"splacone z raty (?P<paid>\d+) zl .*?potkniecia kredytu (?P<stum>\d+)\.")
-R322_ROW = re.compile(
-    r"Rachunki zywnosci - dluznik \(322e\): dzien (?P<day>\d+) \| (?P<name>.+?): dlug (?P<owed>\d+) \(za jedzenie (?P<food0>\d+), najstarszy (?P<age>-|\d+) dni\), "
-    r"zarobek doby (?:(?P<inc>-?\d+) \(netto (?P<net>-?\d+) \+ splaty wczoraj (?P<prev>\d+)(?: \+ splaty panow wczoraj (?P<lprev>\d+))?\)|bez pomiaru), rata (?P<rate>\d+), "
-    r"splacone z nadwyzki (?P<ps>\d+) \+ z raty (?P<pr>\d+), kasa (?P<g0>-?\d+) -> (?P<g1>-?\d+), zostalo za jedzenie (?P<food1>\d+)(?: \((?P<days>\d+) dob raty\))?, "
-    r"w terminie (?P<ok>TAK|NIE), dowoz (?P<dz>-|ODBLOKOWANY|wedlug zwloki)\.")
-R322_KSH = re.compile(r"Kupcy zywnosci \(KS-H\) dzien (?P<day>\d+) .*?kredyt kupiecki TAK: otwarte (?P<open>\d+) zl")
+# ------------------------------------------------------------ paczka 322f: grupa chleb322f - chleb z zapasu wojny w dlugim pokoju (Peace Bread From War Reserve)
+# Linia "Chleb biedoty (M3): dzien N" - segment "| 322f chleb z zapasu wojny w dlugim pokoju (...)" na koncu linii (za segmentem m105). Sprawdza:
+#  C322-0 segment jest (nowy DLL, klucz TAK); C322-1 ponizej podlogi po wyplacie 0; C322-2 krolestwa z zapasu sa podzbiorem krolestw w dlugim pokoju,
+#  suma na krolestwo = z zapasu wojny; C322-3 kontrola m105 "skarbiec -X + kiesy ludu X = 0" na tych samych liniach; C322-4 sumy (INFO).
+C322_RE = re.compile(r"Chleb biedoty \(M3\): dzien (\d+) \|")
+C322_SEG = re.compile(r"\| 322f chleb z zapasu wojny w dlugim pokoju \(Peace Bread From War Reserve TAK, pokoj >= (\d+) dob, podloga ([\d.]+) zapasu\): "
+                      r"z zapasu wojny (\d+) zl \(osad (\d+), krolestw (\d+): ([^)]*)\), krolestw w dlugim pokoju z luka po panie (\d+) \(([^)]*)\), "
+                      r"ponizej podlogi po wyplacie (\d+) \(oczekiwane 0\)")
+C322_M105 = re.compile(r"kontrola skarbiec -(\d+) \+ kiesy ludu (\d+) = (-?\d+)")
+C322_NONE = re.compile(r"nie stac nikogo (\d+) zl w (\d+) osadach")
 
 
-def rata322e_collect(logp):
-    D = {"sum": {}, "rows": {}, "ksh": []}
+def c322_split(txt):
+    """'A 10, B C 5' -> {'A': 10, 'B C': 5}; '-' -> {}."""
+    out = {}
+    if txt.strip() in ("", "-"):
+        return out
+    for part in txt.split(", "):
+        m = re.match(r"^(.*) (\d+)$", part.strip())
+        if m:
+            out[m.group(1)] = int(m.group(2))
+    return out
+
+
+def chleb322f_collect(logp):
+    D = {"seg": [], "noseg": 0}
     with open(logp, encoding="utf-8", errors="replace") as fh:
-        for ln in fh:
-            if "(322e)" in ln:
-                m = R322_SUM.search(ln)
-                if m:
-                    D["sum"][int(m.group("day"))] = m
-                    continue
-                m = R322_ROW.search(ln)
-                if m:
-                    D["rows"].setdefault(int(m.group("day")), []).append(m)
-            elif "kredyt kupiecki TAK" in ln:
-                m = R322_KSH.search(ln)
-                if m:
-                    D["ksh"].append((int(m.group("day")), int(m.group("open"))))
+        for line in fh:
+            m = C322_RE.search(line)
+            if not m:
+                continue
+            sg = C322_SEG.search(line)
+            if not sg:
+                D["noseg"] += 1
+                continue
+            mm = C322_M105.search(line)
+            nn = C322_NONE.search(line)
+            D["seg"].append({"day": int(m.group(1)), "days": int(sg.group(1)), "floor": float(sg.group(2)), "res": int(sg.group(3)),
+                             "n": int(sg.group(4)), "kn": int(sg.group(5)), "k": c322_split(sg.group(6)), "onn": int(sg.group(7)),
+                             "on": set(x.strip() for x in sg.group(8).split(", ") if x.strip() and x.strip() != "-"), "below": int(sg.group(9)),
+                             "m105": (int(mm.group(1)), int(mm.group(2)), int(mm.group(3))) if mm else None,
+                             "none": int(nn.group(1)) if nn else None})
     return D
 
 
-def rata322e_rows(rep, D):
-    S, R = D["sum"], D["rows"]
-    gi = lambda m, k: int(m.group(k)) if m.group(k) not in (None, "-") else 0
-    rep.add("R322-0: linia raty z zarobku (322e)", f"dob z linia {len(S)}, wierszy dluznikow {sum(len(v) for v in R.values())}",
-            "co najmniej 1 doba (bez linii: brak dluznikow albo udzial 0 - INFO)", True if S else None)
+def chleb322f_rows(rep, D):
+    L = D["seg"]
+    if not L:
+        rep.add("C322-0: segment 322f w linii chleba", f"linii chleba bez segmentu {D['noseg']}", "stary DLL albo klucz NIE", None)
+        for n in ("C322-1", "C322-2", "C322-3"):
+            rep.add(f"{n}: brak segmentu", "brak linii z 322f", "INFO", None)
+        return
+    rep.add("C322-0: segment 322f w linii chleba", f"linii z segmentem {len(L)}, bez {D['noseg']}", "linie z segmentem > 0", True)
+    below = sum(x["below"] for x in L)
+    rep.add("C322-1: skarbiec ponizej nizszej podlogi po wyplacie", f"{below} (w {sum(1 for x in L if x['below'])} dobach)", "0", below == 0)
     bad = []
-    for day, rows in sorted(R.items()):
-        for m in rows:
-            rate, ps, pr, owed, food1 = gi(m, "rate"), gi(m, "ps"), gi(m, "pr"), gi(m, "owed"), gi(m, "food1")
-            hor = int(S[day].group("hor")) if day in S else None
-            why = []
-            if gi(m, "g0") - gi(m, "g1") != ps + pr: why.append("kasa != splacone")
-            if pr > max(0, rate - ps): why.append("z raty ponad rate")
-            if ps + pr > owed: why.append("splacone ponad dlug")
-            if m.group("ok") == "TAK" and (rate <= 0 or ps + pr < min(rate, owed)): why.append("w terminie bez pelnej raty")
-            if m.group("dz") == "ODBLOKOWANY" and (m.group("ok") != "TAK" or hor is None or hor <= 0 or food1 > rate * hor):
-                why.append("odblokowany poza horyzontem")
-            if m.group("inc") is None and (rate or pr): why.append("rata bez pomiaru")
-            if m.group("inc") is not None and int(m.group("inc")) != int(m.group("net")) + gi(m, "prev") + gi(m, "lprev"):
-                why.append("zarobek != netto + splaty wczoraj + splaty panow")
-            if why:
-                bad.append(f"d{day} {m.group('name')}: {', '.join(why)}")
-    rep.add("R322-1: wiersze dluznikow spojne (kasa, rata, termin, odblokowanie)", f"niespojnych {len(bad)}" + ("; " + "; ".join(bad[:4]) if bad else ""),
-            "niespojnych 0", (not bad) if R else None)
-    bad2 = []
-    for day, m in sorted(S.items()):
-        rows = R.get(day, [])
-        if len(rows) != int(m.group("deb")) and len(rows) < 24:
-            bad2.append(f"d{day} wierszy {len(rows)} != dluznikow {m.group('deb')}")
-            continue
-        if len(rows) == int(m.group("deb")):
-            sr = sum(gi(r, "pr") for r in rows)
-            rel = sum(1 for r in rows if r.group("dz") == "ODBLOKOWANY")
-            ok = sum(1 for r in rows if r.group("ok") == "TAK")
-            if sr != int(m.group("paid")) or rel != int(m.group("rel")) or ok != int(m.group("ontime")):
-                bad2.append(f"d{day} suma z raty {sr}/{m.group('paid')}, odblok. {rel}/{m.group('rel')}, w terminie {ok}/{m.group('ontime')}")
-    rep.add("R322-2: suma doby = wiersze dluznikow", f"dob niespojnych {len(bad2)}" + ("; " + "; ".join(bad2[:3]) if bad2 else ""),
-            "0", (not bad2) if S else None)
-    st = sum(int(m.group("stum")) for m in S.values())
-    rep.add("R322-3: potkniecia kredytu w liniach 322e", f"{st}", "0", (st == 0) if S else None)
-    k = D["ksh"]
-    if len(k) >= 2:
-        (d0, o0), (d1, o1) = k[0], k[-1]
-        paid = sum(int(m.group("paid")) for m in S.values())
-        rep.add("R322-4: rachunki otwarte KS-H (pierwsza -> ostatnia doba)",
-                f"d{d0} {o0} -> d{d1} {o1} ({o1 - o0:+d}); splacone z raty razem {paid}",
-                "spadek (inaczej DECYZJA - zarobek dluznikow za maly albo nowe rachunki z odblokowanego dowozu)", o1 < o0, decide=True)
+    for x in L:
+        if sum(x["k"].values()) != x["res"] or len(x["k"]) != x["kn"]:
+            bad.append(f"d{x['day']} suma {sum(x['k'].values())}/{x['res']}")
+        elif not set(x["k"]).issubset(x["on"]) or len(x["on"]) != x["onn"]:
+            bad.append(f"d{x['day']} krolestwa spoza dlugiego pokoju {sorted(set(x['k']) - x['on'])}")
+        elif x["res"] > 0 and x["n"] <= 0:
+            bad.append(f"d{x['day']} zloto bez osad")
+    rep.add("C322-2: spojnosc segmentu (suma na krolestwo, krolestwa w dlugim pokoju)", f"niespojnych dob {len(bad)}" + (f" [{'; '.join(bad[:5])}]" if bad else ""),
+            "0", not bad)
+    mb = [x for x in L if x["m105"] is not None and x["m105"][2] != 0]
+    seen = sum(1 for x in L if x["m105"] is not None)
+    if seen:
+        rep.add("C322-3: kontrola m105 skarbiec - kiesy ludu na liniach z 322f", f"dob z roznica {len(mb)} z {seen}", "0", not mb)
     else:
-        rep.add("R322-4: rachunki otwarte KS-H (pierwsza -> ostatnia doba)", f"linii KS-H z kredytem {len(k)}", "INFO", None)
-    tops = {}
-    for day, rows in R.items():
-        for m in rows:
-            tops[m.group("name")] = m
-    top = sorted(tops.values(), key=lambda m: -gi(m, "owed"))[:5]
-    rep.add("R322-5: najwieksi dluznicy - ostatni wiersz (INFO)",
-            "; ".join(f"{m.group('name')} dlug {m.group('owed')}, rata {m.group('rate')}, z raty {m.group('pr')}, kasa {m.group('g1')}, {m.group('dz')}" for m in top) or "-",
-            "INFO", None)
+        rep.add("C322-3: kontrola m105 skarbiec - kiesy ludu na liniach z 322f", "brak segmentu m105", "INFO", None)
+    tot = {}
+    for x in L:
+        for k, v in x["k"].items():
+            tot[k] = tot.get(k, 0) + v
+    top = ", ".join(f"{k} {v}" for k, v in sorted(tot.items(), key=lambda kv: -kv[1])[:8]) or "-"
+    nonek = [x["none"] for x in L if x["none"] is not None]
+    rep.add("C322-4: sumy (INFO)",
+            f"dob {len(L)} (d{L[0]['day']}-d{L[-1]['day']}), z zapasu wojny razem {sum(x['res'] for x in L)} zl, srednio {sum(x['res'] for x in L) // len(L)}/d "
+            f"[{top}]; podloga {L[-1]['floor']:.2f}, pokoj >= {L[-1]['days']} dob; krolestw w dlugim pokoju z luka (ostatnia doba) {L[-1]['onn']}; "
+            f"nie stac nikogo srednio {(sum(nonek) // len(nonek)) if nonek else '-'} zl/d", "INFO", None)
 
 
-def rata322e_synth():
-    """R322-S: dobry, zly (kasa niespojna, odblokowany poza horyzontem), pusty. None = OK."""
+C322_BASE = ("Chleb biedoty (M3): dzien 109300 | Bread For The Poor tak; luka 1000 zl w 3 osadach | zaplacono 900: korona 700 (krolestw 2, z reszty wplywow dnia przed rentami; "
+             "w tym ze skarbca ponad zapas wojny 500), pan zastepczo 200 (panow 1; najnizsze G/R placacego pana 1.20), nie stac nikogo 100 zl w 1 osadach"
+             " | na krolestwo (korona/pan/nie stac nikogo): Pentos 500/0/100 | m105 skarbiec korony (Crown Hoard Feeds Hungry TAK): ze skarbca 500 zl (krolestw 1, osad 2), "
+             "nie stac nikogo po skarbcu 100 zl (w tym przy wolnym limicie skarbca 0 zl - oczekiwane 0), kontrola skarbiec -500 + kiesy ludu 500 = 0, ponizej zapasu wojny "
+             "po wyplacie 0, limit doby 1/30 nadwyzki skarbca (wspolny z rachunkami KS-H)")
+C322_SEGT = (" | 322f chleb z zapasu wojny w dlugim pokoju (Peace Bread From War Reserve TAK, pokoj >= 91 dob, podloga 0.50 zapasu): z zapasu wojny {res} zl "
+             "(osad {n}, krolestw {kn}: {k}), krolestw w dlugim pokoju z luka po panie {onn} ({on}), ponizej podlogi po wyplacie {below} (oczekiwane 0).")
+
+
+def c322_line(res=450, n=2, kn=1, k="Pentos 450", onn=2, on="Braavos, Pentos", below=0, base=C322_BASE):
+    return base + C322_SEGT.format(res=res, n=n, kn=kn, k=k, onn=onn, on=on, below=below)
+
+
+def chleb322f_synth():
+    """C322-S: dobry, ponizej podlogi, niespojny (suma / krolestwo spoza pokoju), stary DLL, pusty. None = OK."""
     import tempfile
     import shutil
-    sm = ("Rachunki zywnosci - rata z zarobku (322e): dzien {d} | udzial 0.15, horyzont odblokowania 91 dob | dluznikow 2, z rata 1, w terminie {ot}, "
-          "dowoz odblokowany {rl}, bez pomiaru zarobku 0 | splacone z raty {p} zl (kasy dluznikow -> kasy wierzycieli), potkniecia kredytu 0.")
-    rq = ("Rachunki zywnosci - dluznik (322e): dzien {d} | Qarth: dlug 330630 (za jedzenie 330630, najstarszy 364 dni), zarobek doby 8000 (netto 7500 + splaty wczoraj 200 + splaty panow wczoraj 300), "
-          "rata 1200, splacone z nadwyzki 0 + z raty 1200, kasa 5000 -> {g1}, zostalo za jedzenie 329430 (275 dob raty), w terminie TAK, dowoz {dz}.")
-    rb = ("Rachunki zywnosci - dluznik (322e): dzien {d} | Bolozo: dlug 2000 (za jedzenie 2000, najstarszy 40 dni), zarobek doby 4000 (netto 4000 + splaty wczoraj 0), "
-          "rata 600, splacone z nadwyzki 0 + z raty 0, kasa 0 -> 0, zostalo za jedzenie 2000 (4 dob raty), w terminie NIE, dowoz wedlug zwloki.")
-    ksh = "Kupcy zywnosci (KS-H) dzien {d} | CZYNNE | kredyt kupiecki TAK: otwarte {o} zl (317 rachunkow)"
-    good = [ksh.format(d=10, o=332630), sm.format(d=10, ot=1, rl=0, p=1200), rq.format(d=10, g1=3800, dz="wedlug zwloki"), rb.format(d=10),
-            ksh.format(d=11, o=331430)]
-    bad = [ksh.format(d=10, o=332630), sm.format(d=10, ot=1, rl=1, p=1200), rq.format(d=10, g1=3000, dz="ODBLOKOWANY"), rb.format(d=10),
-           ksh.format(d=11, o=332630)]
-    runs = {"good": good, "bad": bad, "empty": ["Armoury: inna linia"]}
-    exp = {
-        "good": {"R322-0": "TAK", "R322-1": "TAK", "R322-2": "TAK", "R322-3": "TAK", "R322-4": "TAK", "R322-5": "INFO"},
-        "bad": {"R322-0": "TAK", "R322-1": "NIE", "R322-2": "TAK", "R322-4": "DECYZJA"},
-        "empty": {"R322-0": "INFO", "R322-1": "INFO", "R322-2": "INFO", "R322-3": "INFO", "R322-4": "INFO"},
+    runs = {
+        "good": [c322_line(), c322_line(res=0, n=0, kn=0, k="-", onn=1, on="Pentos")],
+        "below": [c322_line(below=1)],
+        "sum": [c322_line(res=500)],
+        "out": [c322_line(k="Norvos 450")],
+        "m105": [c322_line(base=C322_BASE.replace("kiesy ludu 500 = 0", "kiesy ludu 400 = -100"))],
+        "old": [C322_BASE + "."],
+        "empty": ["Armoury: inna linia"],
     }
-    tmp = tempfile.mkdtemp(prefix="r322_")
+    exp = {
+        "good": {"C322-0": "TAK", "C322-1": "TAK", "C322-2": "TAK", "C322-3": "TAK", "C322-4": "INFO"},
+        "below": {"C322-1": "NIE", "C322-2": "TAK"},
+        "sum": {"C322-2": "NIE"},
+        "out": {"C322-2": "NIE"},
+        "m105": {"C322-3": "NIE", "C322-2": "TAK"},
+        "old": {"C322-0": "INFO", "C322-1": "INFO"},
+        "empty": {"C322-0": "INFO", "C322-2": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="c322_")
     diff = []
     try:
         for kind, Ls in runs.items():
             logp = os.path.join(tmp, f"Armoury-{kind}.log")
             open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
             rep = Report()
-            rata322e_rows(rep, rata322e_collect(logp))
+            chleb322f_rows(rep, chleb322f_collect(logp))
             got = {r[0].split(":")[0]: r[3] for r in rep.rows}
             diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
     finally:
@@ -92779,36 +92786,36 @@ def rata322e_synth():
     return "; ".join(diff) if diff else None
 
 
-def rata322e_main(logp):
+def chleb322f_main(logp):
     rep = Report()
     try:
-        s2 = rata322e_synth()
+        s2 = chleb322f_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("R322-S: test syntetyczny (dobry, zly, pusty)", s2 or "OK", "OK", s2 is None)
+    rep.add("C322-S: test syntetyczny (dobry, ponizej podlogi, niespojny, m105, stary DLL, pusty)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
-        rep.add("R322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.add("C322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    D = rata322e_collect(logp)
-    print(f"plik: {logp} | dob z linia 322e {len(D['sum'])}, linii KS-H z kredytem {len(D['ksh'])}")
-    rata322e_rows(rep, D)
+    D = chleb322f_collect(logp)
+    print(f"plik: {logp} | linii chleba z 322f {len(D['seg'])}, bez {D['noseg']}")
+    chleb322f_rows(rep, D)
     rep.show()
     return 0
 
 
-_rata322e_main_prev = main
+_chleb322f_main_prev = main
 
 
 def main(argv):
-    # paczka 322e: grupa rata322e (rachunki zywnosci - rata z zarobku) - opakowanie main jak bieg320d
+    # paczka 322f: grupa chleb322f - opakowanie main jak bieg320d
     a = argv[1:]
     if "--grupa" in a:
         i = a.index("--grupa")
-        if i + 1 < len(a) and a[i + 1] == "rata322e":
+        if i + 1 < len(a) and a[i + 1] == "chleb322f":
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
-            return rata322e_main(rest[0] if rest else None)
-    return _rata322e_main_prev(argv)
+            return chleb322f_main(rest[0] if rest else None)
+    return _chleb322f_main_prev(argv)
 
 
 if __name__ == "__main__":

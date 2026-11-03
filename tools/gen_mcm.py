@@ -743,6 +743,8 @@ RANGES = {
     'BreathAthleticsDoubling': (50.0, 300.0, "0"),
     # 152 mistrzowie ponad 300 Atletyki: punkty na podwojenie puli 0..100 (0 = wylaczone)
     'AthleticsMasteryDoubling': (0.0, 100.0, "0"),
+    # 322f: chleb z zapasu wojny w dlugim pokoju - podloga skarbca jako czesc zapasu wojny (kod przycina do 0..1; 1 = jak dotad)
+    'PeaceBreadReserveFloor': (0.0, 1.0, "0.00"),
 }
 
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze

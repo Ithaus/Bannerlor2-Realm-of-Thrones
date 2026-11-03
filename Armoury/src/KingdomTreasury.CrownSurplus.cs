@@ -50,7 +50,7 @@ namespace Armoury
         // Jeden limit dzienny na krolestwo dla chleba M3 (TownFolk.BreadRest) i rachunkow zywnosci KS-H (KsLordFood): 1/CrownSurplusAidDays nadwyzki skarbca (TreasurySurplusFor -
         // ta sama miara co W5b) z pierwszego uzycia doby; kazda wyplata najwyzej biezaca nadwyzka (skarbiec nigdy ponizej zapasu wojny, nigdy z kredytu). Krolestwo gracza - 0.
         private static int _hfDay = int.MinValue;
-        private static readonly Dictionary<Kingdom, long[]> _hf = new Dictionary<Kingdom, long[]>();   // krolestwo -> [limit doby, uzyte dzis]
+        private static readonly Dictionary<Kingdom, long[]> _hf = new Dictionary<Kingdom, long[]>();   // krolestwo -> [limit doby, uzyte dzis, limit doby chleba 322f]
 
         internal static bool HoardFeedsOn { get { var s = Settings.Current; return s != null && s.CrownHoardFeedsHungry; } }
 
@@ -67,12 +67,96 @@ namespace Armoury
                 if (d != _hfDay) { _hf.Clear(); _hfDay = d; }
                 long res;
                 double sur = TreasurySurplusFor(k, out res);
-                long[] r;
-                if (!_hf.TryGetValue(k, out r)) { r = new long[2]; r[0] = (long)Math.Floor(sur / CsDays(s)); _hf[k] = r; }
+                long[] r = HfRow(k, s, sur, res);
                 long room = Math.Min(r[0] - r[1], (long)Math.Floor(sur));
                 return room > 0 ? room : 0;
             }
             catch (Exception e) { CsStumble("HoardRoom", e); return 0; }
+        }
+
+        /// <summary>m105 G2 + 322f: wiersz limitu doby krolestwa (tworzony przy pierwszym uzyciu doby): [0] = 1/CsDays nadwyzki ponad pelny zapas wojny (jak dotad),
+        /// [1] uzyte dzis (chleb + rachunki KS-H), [2] = 1/CsDays nadwyzki ponad nizsza podloge chleba w dlugim pokoju (322f; bez dlugiego pokoju albo klucz wylaczony = [0]).
+        /// sur / res - nadwyzka i zapas z TreasurySurplusFor tej chwili.</summary>
+        private static long[] HfRow(Kingdom k, Settings s, double sur, long res)
+        {
+            long[] r;
+            if (_hf.TryGetValue(k, out r)) return r;
+            r = new long[3];
+            r[0] = (long)Math.Floor(sur / CsDays(s));
+            long low = PeaceBreadFloor(k, s, res);
+            r[2] = low >= 0 ? (long)Math.Floor(BreadSurplus(k, low) / CsDays(s)) : r[0];
+            if (r[2] < r[0]) r[2] = r[0];
+            _hf[k] = r;
+            return r;
+        }
+
+        // ------------------------------------------------------------ 322f (audyt 03.11, propozycja 6, Jeff "6 - tak"): chleb z zapasu wojny w dlugim pokoju
+        // Tylko chleb M3 kroku m105 (TownFolk.BreadRest) moze zejsc ze skarbcem ponizej zapasu wojny - do PeaceBreadReserveFloor x zapas - i tylko w dlugim pokoju (ta sama
+        // miara co danina pokoju M4: PtPeaceDays >= PtMinPeaceDays 91). Rachunki KS-H, W5b/W5c, DS, K5, f24 dalej widza pelny zapas (HoardRoom / TreasurySurplusFor bez zmian).
+
+        /// <summary>322f: nizsza podloga skarbca dla chleba krolestwa `k` (zl) albo -1 - nie dotyczy (klucz wylaczony, podloga >= 1, wojna, pokoj krotszy niz 91 dob,
+        /// krolestwo nowe w tej sesji - jeszcze bez daty pokoju M4). Pamieci doby M4 nie psuje: krolestwo w wojnie i nowe nie wolaja PtPeaceDays (to one zmieniaja
+        /// _ptSince w kroku M4 pozniej tej doby). Nie rzuca.</summary>
+        private static long PeaceBreadFloor(Kingdom k, Settings s, long res)
+        {
+            try
+            {
+                if (s == null || k == null || !s.PeaceBreadFromWarReserve || res < 0) return -1;
+                float f = s.PeaceBreadReserveFloor;
+                if (float.IsNaN(f) || f >= 1f) return -1;
+                if (f < 0f) f = 0f;
+                if (WtAtWar(k)) return -1;
+                if (_ptKnownInit && !_ptKnown.Contains(k)) return -1;   // krolestwo powstale w tej sesji - M4 da mu date pokoju dopiero w swoim kroku
+                if (PtPeaceDays(k) < PtMinPeaceDays) return -1;
+                return (long)Math.Floor(res * (double)f);
+            }
+            catch (Exception e) { CsStumble("PeaceBreadFloor", e); return -1; }
+        }
+
+        /// <summary>322f: skarbiec ponad podloge `floor` - ta sama miara co TreasurySurplusFor (bez reszty wplywow dnia, dlugu w Banku i u miast; nigdy z kredytu). >= 0.</summary>
+        private static double BreadSurplus(Kingdom k, long floor)
+        {
+            double sur = Math.Floor((double)k.KingdomBudgetWallet - CrownIncome.LeftFor(k) - floor - CrownBorrow.DebtOf(k) - TownFolk.CrownTownDebt(k));
+            return sur >= 1 ? sur : 0;
+        }
+
+        /// <summary>322f (TownFolk.BreadRest, krok m105 chleba): ile skarbiec `k` moze dzis jeszcze dac na chleb glodnych osad. W dlugim pokoju - do nizszej podlogi
+        /// (limit doby r[2]); inaczej co do zlotowki HoardRoom. aboveRes - ile z tego jest ponad PELNYM zapasem wojny (czesc wyplaty ponad to = z zapasu wojny, do linii);
+        /// floor - nizsza podloga (-1 - nie dotyczy). Nie rzuca.</summary>
+        internal static long HoardRoomBread(Kingdom k, out long aboveRes, out long floor)
+        {
+            aboveRes = 0; floor = -1;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.CrownHoardFeedsHungry || k == null || k.IsEliminated || Campaign.Current == null) return 0;
+                if (k.RulingClan == null || k.RulingClan == Clan.PlayerClan) return 0;   // skarbiec krolestwa gracza nigdy
+                int d = (int)CampaignTime.Now.ToDays;
+                if (d != _hfDay) { _hf.Clear(); _hfDay = d; }
+                long res;
+                double sur = TreasurySurplusFor(k, out res);
+                long[] r = HfRow(k, s, sur, res);
+                aboveRes = Math.Max(0, (long)Math.Floor(sur));
+                floor = PeaceBreadFloor(k, s, res);
+                if (floor < 0) { long room0 = Math.Min(r[0] - r[1], aboveRes); return room0 > 0 ? room0 : 0; }   // jak HoardRoom
+                long room = Math.Min(r[2] - r[1], (long)Math.Floor(BreadSurplus(k, floor)));
+                return room > 0 ? room : 0;
+            }
+            catch (Exception e) { CsStumble("HoardRoomBread", e); aboveRes = 0; floor = -1; return 0; }
+        }
+
+        /// <summary>322f (kontrola linii chleba, oczekiwane false): skarbiec `k` po wyplacie chleba ponizej podlogi `floor` (zapas wojny albo nizsza podloga dlugiego
+        /// pokoju) + reszty wplywow dnia + dlugow. floor &lt; 0 - pelny zapas (HoardBelow).</summary>
+        internal static bool HoardBelowBread(Kingdom k, long floor)
+        {
+            if (floor < 0) return HoardBelow(k);
+            try
+            {
+                if (k == null) return false;
+                double free = (double)k.KingdomBudgetWallet - CrownIncome.LeftFor(k) - floor - CrownBorrow.DebtOf(k) - TownFolk.CrownTownDebt(k);
+                return free < -0.5;
+            }
+            catch (Exception e) { CsStumble("HoardBelowBread", e); return false; }
         }
 
         /// <summary>312e (tylko odczyt, linie "Skarbce:" i 165): ile skarbiec `k` wydal dzis na glodne miasta z limitu m105 (chleb M3 w BreadRest; rachunki KS-H

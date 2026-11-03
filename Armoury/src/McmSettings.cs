@@ -7400,6 +7400,14 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownHoardFeedsHungry { get; set; } = true;
 
+        [SettingPropertyBool("Peace Bread From War Reserve", HintText = "in a long peace - no war with any realm for at least a season (91 days) - the crown may also take bread for its hungry towns (Crown Hoard Feeds Hungry) out of the war reserve itself, down to Peace Bread Reserve Floor of it. Only bread for the poor may go below the reserve; every other payment still keeps the whole reserve. The same daily pace as before: at most one part in Crown Surplus Aid Days of what the treasury holds above that lower floor. Never from loans, never the treasury of a realm you rule. Off = bread only from the treasure above the full war reserve, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool PeaceBreadFromWarReserve { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Peace Bread Reserve Floor", 0.00f, 1.00f, "0.00", HintText = "with Peace Bread From War Reserve: how much of the war reserve the treasury keeps even when it buys bread for the hungry in a long peace (0.5 = half; 1 = the whole reserve, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float PeaceBreadReserveFloor { get; set; } = 0.5f;
+
         [SettingPropertyBool("Crown War Aid Middle", HintText = "in war the realm's treasury also helps the houses of modest means, not only the poor: above the crown's war aid by need (which keeps companies up to Crown War Aid Fill Target of their size), the treasury pays a share of the wages a house still lacks for its companies up to their full size - the whole lack while the house's gold is below its war reserve, a smaller share the richer the house, and nothing above twice the reserve (the same measure of need as the wage refund and the fief rents). Paid only from what the treasury holds above its war reserve and its debts, together with Crown Surplus Feeds Need Aid never more in a day than one part in Crown Surplus Aid Days of that surplus; coin only for men already in the companies, and room in the wage ceiling to recruit a step more. Never in peace, never to a house with spare room under its own ceiling or that paid scutage that day, and these wages are not repaid by the crown a second time. Your house the same way. Needs Crown Surplus Feeds Need Aid. Off = the crown helps only up to Crown War Aid Fill Target, as before", RequireRestart = false)]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidMiddle { get; set; } = true;
@@ -13089,6 +13097,8 @@ namespace Armoury
             s.CrownSurplusFeedsNeedAid = CrownSurplusFeedsNeedAid;
             s.CrownSurplusAidDays = CrownSurplusAidDays;
             s.CrownHoardFeedsHungry = CrownHoardFeedsHungry;
+            s.PeaceBreadFromWarReserve = PeaceBreadFromWarReserve;
+            s.PeaceBreadReserveFloor = PeaceBreadReserveFloor;
             s.CrownWarAidMiddle = CrownWarAidMiddle;
             s.CrownWarAidCashByNeed = CrownWarAidCashByNeed;
             s.ScutageByNeed = ScutageByNeed;
