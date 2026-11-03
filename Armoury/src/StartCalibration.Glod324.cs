@@ -30,7 +30,7 @@ namespace Armoury
     /// RUNDA 2 (recenzja: 322c realnie 1.45k szt./d przy popycie miast 8-9k; podaz, nie kasa, byla korkiem):
     ///  R2-1/2 bilans z PSUCIEM f23 (rho = -ln(1 - ulamek doby Famine), E = e^{rho x left}): wolne wsi x = zapas - floor x E - def x (E - 1) / rho, na dobe x x rho / (E - 1)
     ///     (rho 0: x / left) - ten sam wzor w 322c, w pokryciu ze stodoly (Barn324) i w progu bramki krainy; 322c z REGIONU miasta targowego (Village.TradeBound -
-    ///     wsie miasta i zamkow), wspolny bilans regionu (klucz Winter Grain Trade Region; TownGranary.Zima322.cs);
+    ///     wsie miasta i zamkow; runda 3: region tylko wybiera zrodla, kazda wies sprzedaje swoja nadwyzke) (klucz Winter Grain Trade Region; TownGranary.Zima322.cs);
     ///  R2-3/4/5 kraina (Winter Grain Land Tier), sygnal ponizej celu T* (Winter Grain Fill To Target), kredyt wsi (Winter Grain Village Credit, KsFoodCredit konto "w");
     ///  R2-6 bramka krainy: zapas FoodP z tych samych wsi co Plan, budzet straty LossDays wraca (bilans zastepuje tylko prog Reserve);
     ///  R2-7 wies KS bez rachunku okregu (pierwsza doba po wczytaniu: DefR324 NaN) - bez bilansu (nie sprzedaje, nie liczy sie do Planu); reset sesji pol 324 (LiveReset);
@@ -194,9 +194,11 @@ namespace Armoury
         {
             ld.BarnR324 = ld.BarnKcal324 = ld.BarnGrainKg324 = 0.0;
             ld.DefR324 = double.NaN;
-            if (ld.V == null || res == null || !(res.KcalNeed > 0) || !(ld.PeopleHome > 0)) return 0.0;
+            if (ld.V == null || res == null) return 0.0;
+            // 324 runda 3 (R3-7): rachunek okregu jest, ale bez potrzeby kcal albo bez ludzi w domu - wies bez potrzeby nie ma braku (def 0, nie NaN na stale)
+            if (!(res.KcalNeed > 0) || !(ld.PeopleHome > 0)) { ld.DefR324 = 0.0; return 0.0; }
             double kpr = res.KcalNeed / ld.PeopleHome;                                    // kcal racji okregu (jak KcalPerRation322)
-            if (!(kpr > 0) || double.IsInfinity(kpr)) return 0.0;
+            if (!(kpr > 0) || double.IsInfinity(kpr)) { ld.DefR324 = 0.0; return 0.0; }
             double wantF = 0.0;
             for (int z = 0; z < kg.Length && z < KsBasket.Kcal.Length; z++) if (kg[z] > 0) wantF += kg[z] * KsBasket.Kcal[z];
             double frac = Math.Max(0.0, Math.Min(1.0, ld.HomeKcalFrac));

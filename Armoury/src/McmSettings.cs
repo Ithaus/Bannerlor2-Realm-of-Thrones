@@ -4188,7 +4188,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool WinterLandGatePlannedDraw { get; set; } = true;
 
-        [SettingPropertyBool("Winter Grain Trade Region", HintText = "with Winter Grain From Winter Balance: a town's grain comes from every village that trades in it (the game's trade town of the village - its own villages and those of nearby castles), and the region keeps its common winter balance (spoilage counted): villages with grain to spare sell, the shortfall of the poorer ones stays in the region. Off = only the town's own villages, each on its own", RequireRestart = false)]
+        [SettingPropertyBool("Winter Grain Trade Region", HintText = "with Winter Grain From Winter Balance: a town's grain comes from every village that trades in it (the game's trade town of the village - its own villages and those of nearby castles), each village selling only its own spare above its own winter balance (spoilage counted; villages do not feed one another, so the shortfall of a poorer village does not cut what its neighbours sell). Off = only the town's own villages", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool WinterGrainTradeRegion { get; set; } = true;
 
@@ -4196,9 +4196,13 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool WinterGrainLandTier { get; set; } = true;
 
-        [SettingPropertyBool("Winter Grain Village Credit", HintText = "with Winter Grain To Market: a town without money above its merchants' reserve pays from all its cash, and what it still owes stays as a food bill to the village, repaid from the town's daily earnings like other food bills (never more than its daily repayment can clear within Ks Consign Rate Release Days). Off = a town buys only with money above its merchants' reserve", RequireRestart = false)]
+        [SettingPropertyBool("Winter Grain Village Credit", HintText = "with Winter Grain To Market: (when Winter Grain Consign is off) a town pays with money above its merchants' reserve, and what it still owes stays as a food bill to the village, repaid from the town's daily earnings like other food bills (never more than its daily repayment can clear within Ks Consign Rate Release Days, counting its food bills; without a measure of its earnings - no bill). Off = a town buys only with money above its merchants' reserve", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool WinterGrainVillageCredit { get; set; } = true;
+
+        [SettingPropertyBool("Winter Grain Consign", HintText = "with Winter Grain To Market: grain the town cannot pay for at once with money above its merchants' reserve goes onto its stall on consignment - the town gives the village the delivery price of every consigned piece it sells, out of the takings; pieces still unsold after Ks Consign Rate Release Days go back to the village barn (or, if no longer on the stall, become a food bill to the village). An old food debt of the town does not stop it; the amount is bounded by the stall target and two days of demand. Consignment does not stop food carts. Off = Winter Grain Village Credit as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterGrainConsign { get; set; } = true;
 
         [SettingPropertyBool("Winter Grain Fill To Target", HintText = "with Winter Grain To Market: villages bring grain whenever the town's stall is below its market target (days of demand), not only when it is almost empty. Off = only below half a day of demand or at the price trigger", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
@@ -12345,6 +12349,7 @@ namespace Armoury
             s.WinterGrainTradeRegion = WinterGrainTradeRegion;
             s.WinterGrainLandTier = WinterGrainLandTier;
             s.WinterGrainVillageCredit = WinterGrainVillageCredit;
+            s.WinterGrainConsign = WinterGrainConsign;
             s.WinterGrainFillToTarget = WinterGrainFillToTarget;
             s.WatchLawEnabled = WatchLawEnabled;
             s.WatchPoolSharePercent = WatchPoolSharePercent;

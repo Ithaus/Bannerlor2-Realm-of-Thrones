@@ -26,8 +26,8 @@ namespace Armoury
     /// </summary>
     internal static class KsFoodCredit
     {
-        private sealed class Bill { internal long Left; internal int Day; }
-        private sealed class Acct { internal Settlement Src, Dst; internal bool Claim, Vil; internal readonly List<Bill> B = new List<Bill>(8); }   // recenzja ceny-r5: Claim - roszczenie z zadatku (osobne konto pary); 324: Vil - wies wierzycielem (zboze zima 322c)
+        private sealed class Bill { internal long Left; internal int Day; internal int Pcs; }   // 324 runda 3: Pcs - sztuki zboza w komisie (tylko konto Kom)
+        private sealed class Acct { internal Settlement Src, Dst; internal bool Claim, Vil, Kom; internal readonly List<Bill> B = new List<Bill>(8); }   // 324 runda 3: Kom - komis zboza wsi na polce miasta   // recenzja ceny-r5: Claim - roszczenie z zadatku (osobne konto pary); 324: Vil - wies wierzycielem (zboze zima 322c)
 
         private const int MaxEntries = 8, SaveCapChars = 64 * 1024;
         private const string Ver = "kk1";
@@ -53,6 +53,14 @@ namespace Armoury
         // Starsza DLL czyta wpis "w" jak rachunek miasta z wierzycielem bez miasta - przepada w PayDaily (bez zlota; licznik przepadkow).
         internal static long DVilNew, DVilRepaid; internal static int DVilNewN;
         private static long _vilRepaidLast; private static int _vilRepaidDay = int.MinValue;   // splacone wsiom w ostatniej PayDaily (linia 322c nastepnej doby)
+        // 324 runda 3 (klucz Winter Grain Consign): KOMIS WSI - zboze ze spichlerza wsi na polce miasta, za ktore miasto nie zaplacilo przy dostawie nadwyzka kasy:
+        // konto Kom (wierzyciel = wies, dluznik = miasto, wpis zapisu z 5. polem "k" i 6. - sztuki). Wartosc = cena dostawy sztuka po sztuce (cennik 322c), NIE dlug:
+        // miasto oddaje wsi cene dostawy kazdej sprzedanej sztuki z utargu (zywa kasa; czego kasa nie ma - rachunek wsi Vil, splacany jak rachunki), sztuki niesprzedane
+        // po Ks Consign Rate Release Days wracaja do stodoly wsi (z polki), a czego na polce juz nie ma - rachunek wsi (rozliczenie). Jak Claim i Vil: NIE blokuje dowozu
+        // KS-H (OverdueDst), pan nie placi (OverdueOf / PayByLord), nie wchodzi do FoodDebtOf ani narazenia zrodla; PayDaily go nie splaca (splaca go sprzedaz), wojna -
+        // przepada jak rachunek wsi. Doba: nowe (DKomNew), splacone z utargu (DKomPaid), na rachunek wsi (DKomBilled), zwrocone do stodol (DKomBack) - w kontroli EndDay.
+        // Starsza DLL czyta wpis "k" jak rachunek miasta z wierzycielem bez miasta - przepada w PayDaily (bez zlota).
+        internal static long DKomNew, DKomPaid, DKomBilled, DKomBack, DKomSoldVal, DKomSoldBilled; internal static int DKomNewPcs, DKomSoldPcs, DKomBackPcs, DKomBilledPcs;
         private static long _openPrev = -1;
         private static int _stum; private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -97,6 +105,7 @@ namespace Armoury
             DLordEarly = 0; DLordEarlyN = 0;
             DClaimNew = 0; DClaimN = 0;
             DVilNew = DVilRepaid = 0; DVilNewN = 0;
+            DKomNew = DKomPaid = DKomBilled = DKomBack = DKomSoldVal = DKomSoldBilled = 0; DKomNewPcs = DKomSoldPcs = DKomBackPcs = DKomBilledPcs = 0;
             DRateRepaid = 0; DRateN = DRateDebtors = DRateOnTime = DRateReleased = DRateNoMeasure = 0;
         }
 
@@ -115,7 +124,9 @@ namespace Armoury
         /// <summary>324 runda 2: konto rachunku wsi (wierzyciel = wies, dluznik = miasto) - osobne od rachunkow miast.</summary>
         private static string VilKey(Settlement vil, Settlement town) { return "w|" + vil.StringId + "|" + town.StringId; }
         /// <summary>324 runda 2: rachunek, ktory blokuje dowoz / placi pan (za jedzenie dowiezione wozem KS-H) - bez roszczen z zadatkow i rachunkow wsi.</summary>
-        private static bool Blocking(Acct a) { return !a.Claim && !a.Vil; }
+        private static bool Blocking(Acct a) { return !a.Claim && !a.Vil && !a.Kom; }
+        /// <summary>324 runda 3: konto komisu wsi (wierzyciel = wies, dluznik = miasto) - osobne od rachunku wsi.</summary>
+        private static string KomKey(Settlement vil, Settlement town) { return "k|" + vil.StringId + "|" + town.StringId; }
 
         internal static bool Any { get { Resolve(); return _acc.Count > 0; } }
 
@@ -183,7 +194,7 @@ namespace Armoury
         }
 
         /// <summary>324 runda 2: wierzyciel konta istnieje (miasto; rachunek wsi - wies).</summary>
-        private static bool SrcOk(Acct a) { return a.Src != null && (a.Src.Town != null || (a.Vil && a.Src.Village != null)); }
+        private static bool SrcOk(Acct a) { return a.Src != null && (a.Src.Town != null || ((a.Vil || a.Kom) && a.Src.Village != null)); }
 
         private static bool AtWar(Settlement a, Settlement b)
         {
@@ -258,6 +269,7 @@ namespace Armoury
                             foreach (var b in a.B) { DForfeit += b.Left; DForfeitN++; ForfeitTotal += b.Left; ForfeitTotalN++; }
                             a.B.Clear(); gone.Add(kv.Key); continue;
                         }
+                        if (a.Kom) continue;   // 324 runda 3: komis splaca sprzedaz (TownGranary 322c), nie PayDaily
                         List<KeyValuePair<Acct, Bill>> l;
                         if (!byDst.TryGetValue(a.Dst.StringId, out l)) { l = new List<KeyValuePair<Acct, Bill>>(); byDst[a.Dst.StringId] = l; }
                         foreach (var b in a.B) l.Add(new KeyValuePair<Acct, Bill>(a, b));
@@ -379,7 +391,7 @@ namespace Armoury
             {
                 Resolve();
                 if (dst == null || _acc.Count == 0) return 0;
-                foreach (var a in _acc.Values) { if (a.Claim || a.Dst != dst) continue; foreach (var b in a.B) if (b.Left > 0) s += b.Left; }
+                foreach (var a in _acc.Values) { if (a.Claim || a.Kom || a.Dst != dst) continue; foreach (var b in a.B) if (b.Left > 0) s += b.Left; }
             }
             catch (Exception e) { Stumble("FoodDebtOf", e); }
             return s;
@@ -418,6 +430,110 @@ namespace Armoury
                 towns = h.Count;
             }
             catch (Exception e) { Stumble("VillageStats", e); }
+        }
+
+        /// <summary>324 runda 3 (TownGranary 322c, klucz Winter Grain Consign): `pcs` sztuk zboza wsi `vil` na polce miasta `town` w komisie, wartosc `value` zl (cena
+        /// dostawy). Zloto sie nie rusza. false - komis nie powstal (wtedy wolajacy nie oddaje tych sztuk). Nie rzuca.</summary>
+        internal static bool OpenConsign(Settlement vil, Settlement town, int pcs, long value, int today)
+        {
+            try
+            {
+                Resolve();
+                if (pcs <= 0 || value <= 0 || vil == null || town == null || vil.Village == null || town.Town == null || vil.StringId == null || town.StringId == null) return false;
+                Acct a; string k = KomKey(vil, town);
+                if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = vil, Dst = town, Kom = true }; _acc[k] = a; }
+                var last = a.B.Count > 0 ? a.B[a.B.Count - 1] : null;
+                if (last != null && (last.Day == today || a.B.Count >= MaxEntries)) { last.Left += value; last.Pcs += pcs; }
+                else a.B.Add(new Bill { Left = value, Day = today, Pcs = pcs });
+                DKomNew += value; DKomNewPcs += pcs;
+                return true;
+            }
+            catch (Exception e) { Stumble("OpenConsign", e); return false; }
+        }
+
+        /// <summary>324 runda 3: sztuki w komisie wedlug miasta (dluznika) - konta Kom z sztukami. Nie rzuca.</summary>
+        internal static Dictionary<Settlement, int> ConsignByTown()
+        {
+            var d = new Dictionary<Settlement, int>();
+            try
+            {
+                Resolve();
+                foreach (var a in _acc.Values)
+                {
+                    if (!a.Kom || a.Dst == null) continue;
+                    long n = 0; foreach (var b in a.B) if (b.Left > 0 && b.Pcs > 0) n += b.Pcs;
+                    if (n > 0) { int v; d.TryGetValue(a.Dst, out v); d[a.Dst] = (int)Math.Min(int.MaxValue, v + n); }
+                }
+            }
+            catch (Exception e) { Stumble("ConsignByTown", e); }
+            return d;
+        }
+
+        private static void KomLost(long x) { if (x <= 0) return; DForfeit += x; DForfeitN++; ForfeitTotal += x; ForfeitTotalN++; }
+
+        /// <summary>324 runda 3: komis miasta `town` tej doby. (1) `sold` sztuk sprzedanych z polki - od najstarszej partii (doba, potem StringId wsi): miasto oddaje wsi
+        /// cene dostawy tych sztuk z zywej kasy (utarg; przelew z pomiarem), czego kasa nie ma - rachunek wsi (OpenVillage, splacany w PayDaily). (2) partie starsze niz
+        /// `relDays` dni: `giveBack(wies, sztuki)` zdejmuje z polki i oddaje do stodoly wsi, zwraca oddane sztuki (wartosc ich czesci - DKomBack, bez zlota); reszta partii
+        /// (sztuk na polce juz nie ma - sprzedane bez pomiaru) - rachunek wsi (rozliczenie). Zwraca sztuki zdjete z komisu. Wyjatek per partia liczony.</summary>
+        internal static int ConsignSettle(Settlement town, int sold, int today, int relDays, Func<Settlement, int, int> giveBack)
+        {
+            Resolve();
+            if (town == null || town.Town == null || _acc.Count == 0) return 0;
+            var l = new List<KeyValuePair<Acct, Bill>>();
+            foreach (var a in _acc.Values) { if (!a.Kom || a.Dst != town || !SrcOk(a)) continue; foreach (var b in a.B) if (b.Left > 0 && b.Pcs > 0) l.Add(new KeyValuePair<Acct, Bill>(a, b)); }
+            if (l.Count == 0) return 0;
+            l.Sort((x, y) => x.Value.Day != y.Value.Day ? x.Value.Day.CompareTo(y.Value.Day) : string.CompareOrdinal(x.Key.Src.StringId, y.Key.Src.StringId));
+            int outPcs = 0;
+            foreach (var p in l)
+            {
+                try
+                {
+                    var b = p.Value; var vil = p.Key.Src;
+                    // (1) sprzedane - cena dostawy z utargu (zywa kasa miasta -> kiesa wsi), reszta rachunek wsi
+                    if (sold > 0)
+                    {
+                        int q = Math.Min(sold, b.Pcs);
+                        long val = q >= b.Pcs ? b.Left : (long)Math.Floor(b.Left * (double)q / b.Pcs);
+                        long got = TransferTo(town.Town, vil, val);
+                        long unpaid = val - got;
+                        if (unpaid > 0) { if (OpenVillage(vil, town, unpaid, today)) { DKomBilled += unpaid; DKomSoldBilled += unpaid; } else KomLost(unpaid); }
+                        b.Left -= val; b.Pcs -= q; sold -= q; outPcs += q;
+                        DKomSoldPcs += q; DKomSoldVal += val; DKomPaid += got;
+                    }
+                    // (2) termin komisu - zwrot z polki do stodoly, reszta rozliczenie (rachunek wsi)
+                    if (b.Pcs > 0 && b.Left > 0 && today - b.Day > relDays)
+                    {
+                        int r = 0;
+                        if (giveBack != null) { try { r = Math.Max(0, Math.Min(b.Pcs, giveBack(vil, b.Pcs))); } catch (Exception e) { Stumble("ConsignSettle.back", e); r = 0; } }
+                        long valBack = r >= b.Pcs ? b.Left : (long)Math.Floor(b.Left * (double)r / b.Pcs);
+                        long rest = b.Left - valBack;
+                        DKomBack += valBack; DKomBackPcs += r;
+                        if (rest > 0) { if (OpenVillage(vil, town, rest, today)) { DKomBilled += rest; DKomBilledPcs += b.Pcs - r; } else KomLost(rest); }
+                        outPcs += b.Pcs;
+                        b.Left = 0; b.Pcs = 0;
+                    }
+                    if (b.Pcs <= 0 && b.Left > 0) { KomLost(b.Left); b.Left = 0; }   // zaokraglenie - nie powinno sie zdarzyc (ostatnia sztuka bierze reszte wartosci)
+                }
+                catch (Exception e) { Stumble("ConsignSettle", e); }
+            }
+            var gone = new List<string>();
+            foreach (var kv in _acc) { if (!kv.Value.Kom || kv.Value.Dst != town) continue; kv.Value.B.RemoveAll(b => b.Left <= 0 || b.Pcs <= 0); if (kv.Value.B.Count == 0) gone.Add(kv.Key); }
+            foreach (var k in gone) _acc.Remove(k);
+            return outPcs;
+        }
+
+        /// <summary>324 runda 3 (linia 322c): komis otwarty - sztuki, wartosc (zl) i miasta. Nie rzuca.</summary>
+        internal static void ConsignStats(out long pcs, out long value, out int towns)
+        {
+            pcs = 0; value = 0; towns = 0;
+            try
+            {
+                Resolve();
+                var h = new HashSet<Settlement>();
+                foreach (var a in _acc.Values) { if (!a.Kom) continue; foreach (var b in a.B) if (b.Left > 0) { pcs += b.Pcs; value += b.Left; h.Add(a.Dst); } }
+                towns = h.Count;
+            }
+            catch (Exception e) { Stumble("ConsignStats", e); }
         }
 
         // ------------------------------------------------------------ scalenie r4-glodbunt + r4-kupcy (noc 17/18.10): pan glodnego miasta splaca zalegle rachunki
@@ -536,7 +652,7 @@ namespace Armoury
             var d = new Dictionary<Settlement, long>();
             foreach (var a in _acc.Values)
             {
-                if (a.Src == null || a.Vil) continue;   // 324: rachunki wsi - nie narazenie miasta zrodla KS-H
+                if (a.Src == null || a.Vil || a.Kom) continue;   // 324: rachunki i komis wsi - nie narazenie miasta zrodla KS-H
                 long s = 0; foreach (var b in a.B) s += Math.Max(0, b.Left);
                 long v; d.TryGetValue(a.Src, out v); d[a.Src] = v + s;
             }
@@ -592,7 +708,8 @@ namespace Armoury
             openNow = 0;
             foreach (var a in _acc.Values) foreach (var b in a.B) if (b.Left > 0) openNow += b.Left;
             // KS-R5 ceny-r5: roszczenia z zadatkow (DClaimNew) - nowe rachunki odwrotne; bez zadatkow 0 (bit w bit)
-            string s = _openPrev < 0 ? "-" : (_openPrev + DNew + DClaimNew + DVilNew - DRepaid - DForfeit - openNow).ToString(CultureInfo.InvariantCulture);
+            // 324 runda 3: komis - nowe (DKomNew), wyszle z komisu: splacone z utargu, na rachunek wsi (ten trafia tez do DVilNew), zwrocone do stodol
+            string s = _openPrev < 0 ? "-" : (_openPrev + DNew + DClaimNew + DVilNew + DKomNew - DRepaid - DForfeit - DKomPaid - DKomBilled - DKomBack - openNow).ToString(CultureInfo.InvariantCulture);
             _openPrev = openNow;
             return s;
         }
@@ -625,14 +742,14 @@ namespace Armoury
                 var a = _acc[k]; if (a.Src == null || a.Dst == null) continue;
                 if (merge)
                 {
-                    long sum = 0; int day = int.MaxValue;
-                    foreach (var b in a.B) { if (b.Left <= 0) continue; sum += b.Left; day = Math.Min(day, b.Day); }
-                    if (sum > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(sum).Append('~').Append(day); if (a.Claim) sb.Append("~z"); else if (a.Vil) sb.Append("~w"); }
+                    long sum = 0; int day = int.MaxValue; long pcs = 0;
+                    foreach (var b in a.B) { if (b.Left <= 0) continue; sum += b.Left; pcs += b.Pcs; day = Math.Min(day, b.Day); }
+                    if (sum > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(sum).Append('~').Append(day); if (a.Claim) sb.Append("~z"); else if (a.Vil) sb.Append("~w"); else if (a.Kom) sb.Append("~k~").Append(Math.Min(int.MaxValue, pcs)); }
                     continue;
                 }
                 // recenzja ceny-r5: roszczenie z zadatku - 5. pole "z" (starsza DLL czyta 4 pola i bierze je za zwykly rachunek pary - tak jak przed recenzja)
                 foreach (var b in a.B)
-                    if (b.Left > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(b.Left).Append('~').Append(b.Day); if (a.Claim) sb.Append("~z"); else if (a.Vil) sb.Append("~w"); }
+                    if (b.Left > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(b.Left).Append('~').Append(b.Day); if (a.Claim) sb.Append("~z"); else if (a.Vil) sb.Append("~w"); else if (a.Kom) sb.Append("~k~").Append(b.Pcs); }
             }
             return sb.ToString();
         }
@@ -662,9 +779,12 @@ namespace Armoury
                         bool claim = q.Length >= 5 && q[4] == "z";     // recenzja ceny-r5: roszczenie z zadatku (brak pola - rachunek za jedzenie, stary zapis)
                         bool vil = q.Length >= 5 && q[4] == "w";       // 324 runda 2: rachunek wsi (wierzyciel - wies)
                         if (vil && src.Village == null) { bad++; continue; }
-                        Acct a; string k = claim ? ClaimKey(src, dst) : vil ? VilKey(src, dst) : Key(src, dst);
-                        if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = src, Dst = dst, Claim = claim, Vil = vil }; _acc[k] = a; }
-                        if (a.B.Count >= MaxEntries) a.B[a.B.Count - 1].Left += left; else a.B.Add(new Bill { Left = left, Day = day });
+                        bool kom = q.Length >= 5 && q[4] == "k";       // 324 runda 3: komis wsi (6. pole - sztuki)
+                        int pcs = 0;
+                        if (kom && (src.Village == null || q.Length < 6 || !int.TryParse(q[5], out pcs) || pcs <= 0)) { bad++; continue; }
+                        Acct a; string k = claim ? ClaimKey(src, dst) : vil ? VilKey(src, dst) : kom ? KomKey(src, dst) : Key(src, dst);
+                        if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = src, Dst = dst, Claim = claim, Vil = vil, Kom = kom }; _acc[k] = a; }
+                        if (a.B.Count >= MaxEntries) { a.B[a.B.Count - 1].Left += left; a.B[a.B.Count - 1].Pcs += pcs; } else a.B.Add(new Bill { Left = left, Day = day, Pcs = pcs });
                         ok++; sum += left;
                     }
                     catch (Exception e) { Stumble("Resolve.rec", e); bad++; }

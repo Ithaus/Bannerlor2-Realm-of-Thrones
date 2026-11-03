@@ -551,7 +551,7 @@ namespace Armoury
         }
 
         // f26-bramka: KsDrop - suma po wsiach min(spadek spichlerza wsi, wzor gry - racje KS) tej doby (racje; tylko wsie z pomiarem spadku, jak Drop)
-        private sealed class LandAgg { public int N, Skip, Hungry; public double F, K, Food, Need, Drop, NeedD, KsDrop, Plan, FoodP; public int PlanN; public string Example; }   // 324: Plan - zapas potrzebny do wiosny (floor x E + def / k) wsi z bilansem, FoodP - ich zapas
+        private sealed class LandAgg { public int N, Skip, Hungry; public double F, K, Food, Need, Drop, NeedD, KsDrop, Plan, FoodP; public int PlanN, MeasN; public string Example; }   // 324: Plan - zapas potrzebny do wiosny (floor x E + def / k) wsi z bilansem, FoodP - ich zapas
 
         /// <summary>Daily w stanie zastosowanym, PRZED LiveDaily (stawki jutra juz bez krainy wroconej): glod wsi z winy KS i spadek spichlerzy krain.</summary>
         private static void LandGateDaily(int today)
@@ -591,7 +591,7 @@ namespace Armoury
                     double need = (k > 0f && !float.IsInfinity(k) ? Math.Max(0f, v.Hearth) * (double)k : 0.0) + Math.Max(0.0, PeopleBook.RefugeesOf(v));
                     if (hasF && need > 0)
                     {
-                        a.Food += food; a.Need += need;
+                        a.Food += food; a.Need += need; a.MeasN++;   // 324 runda 3 (R3-6): wsie krainy z pomiarem zapasu
                         double prev;
                         if (_gPrev.TryGetValue(v, out prev))
                         {
@@ -662,7 +662,8 @@ namespace Armoury
                     bool fall = exact ? ksDay > LandDrawShare : draw > LandDrawShare && ksLess;
                     // 324: zima (klucz) - zamiast progu zapasu Reserve: zapas wsi z bilansem ponizej ich planu do wiosny (floor x E + def / k; nie dotrwaja);
                     // runda 2 (R2-6): budzet straty LossDays zostaje jak dotad (strata z winy KS bez zaplanowanego zejscia), ten sam zbior wsi po obu stronach
-                    bool plan324 = left324 > 0 && a.PlanN > 0;
+                    // runda 3 (R3-6): plan tylko, gdy bilans ma co najmniej polowa wsi krainy z pomiarem - inaczej prog zapasu Reserve (Plan z kilku wsi nie mowi o krainie)
+                    bool plan324 = left324 > 0 && a.PlanN > 0 && 2 * a.PlanN >= a.MeasN;
                     if (plan324) _w324GateLands++;
                     bool count = fall && (test || reserve == 0 || lossKey == 0 || (exact ? lossC : loss) >= lossKey || (plan324 ? a.FoodP < a.Plan : days < reserve));
                     st = count ? st + 1 : 0;      // doba bez pomiaru (pierwsza po wczytaniu, spichlerze wylaczone) - seria i strata bez zmian
