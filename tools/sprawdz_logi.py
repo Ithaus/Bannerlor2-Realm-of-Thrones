@@ -92653,5 +92653,170 @@ def main(argv):
     return _bieg320d_main_prev(argv)
 
 
+# ------------------------------------------------------------ paczka 322f: grupa chleb322f - chleb z zapasu wojny w dlugim pokoju (Peace Bread From War Reserve)
+# Linia "Chleb biedoty (M3): dzien N" - segment "| 322f chleb z zapasu wojny w dlugim pokoju (...)" na koncu linii (za segmentem m105). Sprawdza:
+#  C322-0 segment jest (nowy DLL, klucz TAK); C322-1 ponizej podlogi po wyplacie 0; C322-2 krolestwa z zapasu sa podzbiorem krolestw w dlugim pokoju,
+#  suma na krolestwo = z zapasu wojny; C322-3 kontrola m105 "skarbiec -X + kiesy ludu X = 0" na tych samych liniach; C322-4 sumy (INFO).
+C322_RE = re.compile(r"Chleb biedoty \(M3\): dzien (\d+) \|")
+C322_SEG = re.compile(r"\| 322f chleb z zapasu wojny w dlugim pokoju \(Peace Bread From War Reserve TAK, pokoj >= (\d+) dob, podloga ([\d.]+) zapasu\): "
+                      r"z zapasu wojny (\d+) zl \(osad (\d+), krolestw (\d+): ([^)]*)\), krolestw w dlugim pokoju z luka po panie (\d+) \(([^)]*)\), "
+                      r"ponizej podlogi po wyplacie (\d+) \(oczekiwane 0\)")
+C322_M105 = re.compile(r"kontrola skarbiec -(\d+) \+ kiesy ludu (\d+) = (-?\d+)")
+C322_NONE = re.compile(r"nie stac nikogo (\d+) zl w (\d+) osadach")
+
+
+def c322_split(txt):
+    """'A 10, B C 5' -> {'A': 10, 'B C': 5}; '-' -> {}."""
+    out = {}
+    if txt.strip() in ("", "-"):
+        return out
+    for part in txt.split(", "):
+        m = re.match(r"^(.*) (\d+)$", part.strip())
+        if m:
+            out[m.group(1)] = int(m.group(2))
+    return out
+
+
+def chleb322f_collect(logp):
+    D = {"seg": [], "noseg": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            m = C322_RE.search(line)
+            if not m:
+                continue
+            sg = C322_SEG.search(line)
+            if not sg:
+                D["noseg"] += 1
+                continue
+            mm = C322_M105.search(line)
+            nn = C322_NONE.search(line)
+            D["seg"].append({"day": int(m.group(1)), "days": int(sg.group(1)), "floor": float(sg.group(2)), "res": int(sg.group(3)),
+                             "n": int(sg.group(4)), "kn": int(sg.group(5)), "k": c322_split(sg.group(6)), "onn": int(sg.group(7)),
+                             "on": set(x.strip() for x in sg.group(8).split(", ") if x.strip() and x.strip() != "-"), "below": int(sg.group(9)),
+                             "m105": (int(mm.group(1)), int(mm.group(2)), int(mm.group(3))) if mm else None,
+                             "none": int(nn.group(1)) if nn else None})
+    return D
+
+
+def chleb322f_rows(rep, D):
+    L = D["seg"]
+    if not L:
+        rep.add("C322-0: segment 322f w linii chleba", f"linii chleba bez segmentu {D['noseg']}", "stary DLL albo klucz NIE", None)
+        for n in ("C322-1", "C322-2", "C322-3"):
+            rep.add(f"{n}: brak segmentu", "brak linii z 322f", "INFO", None)
+        return
+    rep.add("C322-0: segment 322f w linii chleba", f"linii z segmentem {len(L)}, bez {D['noseg']}", "linie z segmentem > 0", True)
+    below = sum(x["below"] for x in L)
+    rep.add("C322-1: skarbiec ponizej nizszej podlogi po wyplacie", f"{below} (w {sum(1 for x in L if x['below'])} dobach)", "0", below == 0)
+    bad = []
+    for x in L:
+        if sum(x["k"].values()) != x["res"] or len(x["k"]) != x["kn"]:
+            bad.append(f"d{x['day']} suma {sum(x['k'].values())}/{x['res']}")
+        elif not set(x["k"]).issubset(x["on"]) or len(x["on"]) != x["onn"]:
+            bad.append(f"d{x['day']} krolestwa spoza dlugiego pokoju {sorted(set(x['k']) - x['on'])}")
+        elif x["res"] > 0 and x["n"] <= 0:
+            bad.append(f"d{x['day']} zloto bez osad")
+    rep.add("C322-2: spojnosc segmentu (suma na krolestwo, krolestwa w dlugim pokoju)", f"niespojnych dob {len(bad)}" + (f" [{'; '.join(bad[:5])}]" if bad else ""),
+            "0", not bad)
+    mb = [x for x in L if x["m105"] is not None and x["m105"][2] != 0]
+    seen = sum(1 for x in L if x["m105"] is not None)
+    if seen:
+        rep.add("C322-3: kontrola m105 skarbiec - kiesy ludu na liniach z 322f", f"dob z roznica {len(mb)} z {seen}", "0", not mb)
+    else:
+        rep.add("C322-3: kontrola m105 skarbiec - kiesy ludu na liniach z 322f", "brak segmentu m105", "INFO", None)
+    tot = {}
+    for x in L:
+        for k, v in x["k"].items():
+            tot[k] = tot.get(k, 0) + v
+    top = ", ".join(f"{k} {v}" for k, v in sorted(tot.items(), key=lambda kv: -kv[1])[:8]) or "-"
+    nonek = [x["none"] for x in L if x["none"] is not None]
+    rep.add("C322-4: sumy (INFO)",
+            f"dob {len(L)} (d{L[0]['day']}-d{L[-1]['day']}), z zapasu wojny razem {sum(x['res'] for x in L)} zl, srednio {sum(x['res'] for x in L) // len(L)}/d "
+            f"[{top}]; podloga {L[-1]['floor']:.2f}, pokoj >= {L[-1]['days']} dob; krolestw w dlugim pokoju z luka (ostatnia doba) {L[-1]['onn']}; "
+            f"nie stac nikogo srednio {(sum(nonek) // len(nonek)) if nonek else '-'} zl/d", "INFO", None)
+
+
+C322_BASE = ("Chleb biedoty (M3): dzien 109300 | Bread For The Poor tak; luka 1000 zl w 3 osadach | zaplacono 900: korona 700 (krolestw 2, z reszty wplywow dnia przed rentami; "
+             "w tym ze skarbca ponad zapas wojny 500), pan zastepczo 200 (panow 1; najnizsze G/R placacego pana 1.20), nie stac nikogo 100 zl w 1 osadach"
+             " | na krolestwo (korona/pan/nie stac nikogo): Pentos 500/0/100 | m105 skarbiec korony (Crown Hoard Feeds Hungry TAK): ze skarbca 500 zl (krolestw 1, osad 2), "
+             "nie stac nikogo po skarbcu 100 zl (w tym przy wolnym limicie skarbca 0 zl - oczekiwane 0), kontrola skarbiec -500 + kiesy ludu 500 = 0, ponizej zapasu wojny "
+             "po wyplacie 0, limit doby 1/30 nadwyzki skarbca (wspolny z rachunkami KS-H)")
+C322_SEGT = (" | 322f chleb z zapasu wojny w dlugim pokoju (Peace Bread From War Reserve TAK, pokoj >= 91 dob, podloga 0.50 zapasu): z zapasu wojny {res} zl "
+             "(osad {n}, krolestw {kn}: {k}), krolestw w dlugim pokoju z luka po panie {onn} ({on}), ponizej podlogi po wyplacie {below} (oczekiwane 0).")
+
+
+def c322_line(res=450, n=2, kn=1, k="Pentos 450", onn=2, on="Braavos, Pentos", below=0, base=C322_BASE):
+    return base + C322_SEGT.format(res=res, n=n, kn=kn, k=k, onn=onn, on=on, below=below)
+
+
+def chleb322f_synth():
+    """C322-S: dobry, ponizej podlogi, niespojny (suma / krolestwo spoza pokoju), stary DLL, pusty. None = OK."""
+    import tempfile
+    import shutil
+    runs = {
+        "good": [c322_line(), c322_line(res=0, n=0, kn=0, k="-", onn=1, on="Pentos")],
+        "below": [c322_line(below=1)],
+        "sum": [c322_line(res=500)],
+        "out": [c322_line(k="Norvos 450")],
+        "m105": [c322_line(base=C322_BASE.replace("kiesy ludu 500 = 0", "kiesy ludu 400 = -100"))],
+        "old": [C322_BASE + "."],
+        "empty": ["Armoury: inna linia"],
+    }
+    exp = {
+        "good": {"C322-0": "TAK", "C322-1": "TAK", "C322-2": "TAK", "C322-3": "TAK", "C322-4": "INFO"},
+        "below": {"C322-1": "NIE", "C322-2": "TAK"},
+        "sum": {"C322-2": "NIE"},
+        "out": {"C322-2": "NIE"},
+        "m105": {"C322-3": "NIE", "C322-2": "TAK"},
+        "old": {"C322-0": "INFO", "C322-1": "INFO"},
+        "empty": {"C322-0": "INFO", "C322-2": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="c322_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            chleb322f_rows(rep, chleb322f_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def chleb322f_main(logp):
+    rep = Report()
+    try:
+        s2 = chleb322f_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("C322-S: test syntetyczny (dobry, ponizej podlogi, niespojny, m105, stary DLL, pusty)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("C322-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = chleb322f_collect(logp)
+    print(f"plik: {logp} | linii chleba z 322f {len(D['seg'])}, bez {D['noseg']}")
+    chleb322f_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_chleb322f_main_prev = main
+
+
+def main(argv):
+    # paczka 322f: grupa chleb322f - opakowanie main jak bieg320d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "chleb322f":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return chleb322f_main(rest[0] if rest else None)
+    return _chleb322f_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

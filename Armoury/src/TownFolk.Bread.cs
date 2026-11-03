@@ -58,6 +58,11 @@ namespace Armoury
         // (oczekiwane 0), skarbiec ponizej zapasu wojny po wyplacie (oczekiwane 0), kontrola skarbiec - kiesy ludu (zmierzone)
         private static long _brHoard, _brHoardLeft, _brHoardTook; private static int _brHoardN, _brHoardBelow;
         private static readonly HashSet<Kingdom> _brHoardK = new HashSet<Kingdom>();
+        // 322f (Peace Bread From War Reserve): czesc chleba m105 wzieta PONIZEJ pelnego zapasu wojny w dlugim pokoju (w _brHoard), na krolestwo; osady; skarbiec ponizej
+        // nizszej podlogi po wyplacie (oczekiwane 0); krolestwa w dlugim pokoju z luka chleba po panie (nizsza podloga czynna)
+        private static long _brPeaceRes; private static int _brPeaceN, _brPeaceBelow;
+        private static readonly Dictionary<Kingdom, long> _brPeaceK = new Dictionary<Kingdom, long>();
+        private static readonly HashSet<Kingdom> _brPeaceOn = new HashSet<Kingdom>();
         private static double _brMinGR = double.NaN;
         internal static long LastBreadCrown, LastBreadLord;
         // komunikat gracza raz na 7 dob (pamiec sesji)
@@ -82,6 +87,7 @@ namespace Armoury
             _brClanToday.Clear(); _brClanDay = int.MinValue; _brLordWar = _brLordPeace = 0;
             _brIn = _brOutN = _brLordN = _brNoneN = _brBelowR = _brPlayerPurse = _brCrownK = 0; _brCrown = _brLord = _brNone = 0; _brMinGR = double.NaN;
             _brHoard = _brHoardLeft = _brHoardTook = 0; _brHoardN = _brHoardBelow = 0; _brHoardK.Clear();   // m105 G2
+            _brPeaceRes = 0; _brPeaceN = _brPeaceBelow = 0; _brPeaceK.Clear(); _brPeaceOn.Clear();         // 322f
             LastBreadCrown = LastBreadLord = 0;
             _brPlWeek = -1; _brPlFief = _brPlFiefCrown = _brPlKingBread = _brPlKingRent = 0; _brPlNames.Clear();
             _brPending.Clear(); _brLoadN = -1; _brLoadBad = 0; _brRestored = 0; _brSaveSaid = false;   // m116-fabula (ImportBread po konstruktorze)
@@ -237,6 +243,7 @@ namespace Armoury
             _brIdx.Clear(); _brNoK.Clear(); _brDone.Clear(); _brLordToday.Clear(); _brByK.Clear();
             _brLordN = _brNoneN = _brBelowR = _brPlayerPurse = _brCrownK = 0; _brCrown = _brLord = _brNone = 0; _brMinGR = double.NaN; _brLordWar = _brLordPeace = 0;
             _brHoard = _brHoardLeft = _brHoardTook = 0; _brHoardN = _brHoardBelow = 0; _brHoardK.Clear();   // m105 G2: doba
+            _brPeaceRes = 0; _brPeaceN = _brPeaceBelow = 0; _brPeaceK.Clear(); _brPeaceOn.Clear();         // 322f: doba
             if (!BreadKey || !Live) return;
             foreach (var f in _f.Values)
             {
@@ -367,10 +374,14 @@ namespace Armoury
                         if (h == Hero.MainHero && f.BreadLord > 0) _brPlayerPurse++;    // kontrola: kiesa gracza nigdy (oczekiwane 0)
                         // m105 G2 (Crown Hoard Feeds Hungry): reszta luki PO koronie z wplywow dnia i PO panie - skarbiec krolestwa osady ponad zapas wojny (limit doby wspolny
                         // z rachunkami KS-H, KingdomTreasury.HoardRoom); najpierw skarbiec, potem kiesa ludu. Krolestwo gracza, rod bez krolestwa - nie
+                        // 322f (Peace Bread From War Reserve): w dlugim pokoju (>= 91 dob bez wojny, miara M4) ten krok chleba schodzi az do nizszej podlogi
+                        // (Peace Bread Reserve Floor x zapas wojny; HoardRoomBread - limit doby 1/N nadwyzki ponad nia, wspolny z KS-H); poza tym co do zlotowki HoardRoom
                         if (need > 0 && s.CrownHoardFeedsHungry && c != null && c.Kingdom != null && !c.Kingdom.IsEliminated)
                         {
                             var k = c.Kingdom;
-                            long room = KingdomTreasury.HoardRoom(k);
+                            long aboveRes, floor;
+                            long room = KingdomTreasury.HoardRoomBread(k, out aboveRes, out floor);
+                            if (floor >= 0) _brPeaceOn.Add(k);
                             long x = Math.Min(need, room);
                             if (x > 0)
                             {
@@ -382,9 +393,12 @@ namespace Armoury
                                 KingdomTreasury.HoardUse(k, ix);
                                 _brCrown += ix; _brHoard += ix; _brHoardTook += took; _brHoardN++; _brHoardK.Add(k);
                                 f.BreadCrown += ix; BreadRow(k)[0] += ix; need -= ix;
-                                if (KingdomTreasury.HoardBelow(k)) _brHoardBelow++;
+                                long fromRes = floor >= 0 ? Math.Max(0, ix - aboveRes) : 0;   // 322f: czesc ponizej pelnego zapasu wojny
+                                if (fromRes > 0) { _brPeaceRes += fromRes; _brPeaceN++; long pk; _brPeaceK.TryGetValue(k, out pk); _brPeaceK[k] = pk + fromRes; }
+                                if (floor >= 0) { if (KingdomTreasury.HoardBelowBread(k, floor)) _brPeaceBelow++; }
+                                else if (KingdomTreasury.HoardBelow(k)) _brHoardBelow++;
                             }
-                            if (need > 0 && KingdomTreasury.HoardRoom(k) > 0) _brHoardLeft += need;   // kontrola: luka zostala mimo wolnego limitu skarbca (oczekiwane 0)
+                            if (need > 0 && KingdomTreasury.HoardRoomBread(k, out aboveRes, out floor) > 0) _brHoardLeft += need;   // kontrola: luka zostala mimo wolnego limitu skarbca (oczekiwane 0)
                         }
                         if (need > 0) { _brNone += need; _brNoneN++; if (c != null && c.Kingdom != null) BreadRow(c.Kingdom)[2] += need; }
                     }
@@ -482,6 +496,21 @@ namespace Armoury
                   .Append(" zl - oczekiwane 0), kontrola skarbiec -").Append(_brHoardTook).Append(" + kiesy ludu ").Append(_brHoard).Append(" = ").Append(_brHoard - _brHoardTook)
                   .Append(", ponizej zapasu wojny po wyplacie ").Append(_brHoardBelow).Append(", limit doby 1/")
                   .Append(KingdomTreasury.CsDays(s).ToString("0", BrInv)).Append(" nadwyzki skarbca (wspolny z rachunkami KS-H)");
+            // 322f: segment na koncu linii (regexy R2_M3 / R2_M3L i m105 bez zmian); klucz wylaczony - linia jak w WGRANIU 159
+            if (s.CrownHoardFeedsHungry && s.PeaceBreadFromWarReserve)
+            {
+                var pr = new List<KeyValuePair<long, string>>();
+                foreach (var kv in _brPeaceK) pr.Add(new KeyValuePair<long, string>(kv.Value, (kv.Key.Name != null ? kv.Key.Name.ToString() : kv.Key.StringId) + " " + kv.Value.ToString(BrInv)));
+                pr.Sort((a, b) => b.Key.CompareTo(a.Key));
+                var pt = new List<string>(); foreach (var r in pr) pt.Add(r.Value);
+                var pon = new List<string>(); foreach (var k in _brPeaceOn) pon.Add(k.Name != null ? k.Name.ToString() : k.StringId);
+                pon.Sort(StringComparer.Ordinal);
+                sb.Append(" | 322f chleb z zapasu wojny w dlugim pokoju (Peace Bread From War Reserve TAK, pokoj >= 91 dob, podloga ")
+                  .Append(Math.Max(0f, Math.Min(1f, s.PeaceBreadReserveFloor)).ToString("0.00", BrInv)).Append(" zapasu): z zapasu wojny ").Append(_brPeaceRes)
+                  .Append(" zl (osad ").Append(_brPeaceN).Append(", krolestw ").Append(_brPeaceK.Count).Append(": ").Append(pt.Count > 0 ? string.Join(", ", pt.ToArray()) : "-")
+                  .Append("), krolestw w dlugim pokoju z luka po panie ").Append(_brPeaceOn.Count).Append(" (").Append(pon.Count > 0 ? string.Join(", ", pon.ToArray()) : "-")
+                  .Append("), ponizej podlogi po wyplacie ").Append(_brPeaceBelow).Append(" (oczekiwane 0)");
+            }
             sb.Append('.');
             Log.Info(sb.ToString());
         }
