@@ -62,6 +62,11 @@ namespace Armoury
         // bo warunek liczy CALY dlug za jedzenie, wiec dlug nie urosnie ponad rata x horyzont). Release Days 0 - blokada jak dotad.
         private static int _payDay = int.MinValue, _relDay = int.MinValue;
         private static Dictionary<Settlement, long> _paidToday = new Dictionary<Settlement, long>(), _paidPrev = new Dictionary<Settlement, long>();
+        // recenzja 322e: splaty rachunkow dluznika przez pana / skarbiec korony (KsLordFood RACHUNKI, BeforeEarly, HoardBills - ta sama kwota co TownPurse.NoteLordFood,
+        // po zwrotach). Kasa dluznika sie nie rusza, a CloseWindow zdejmuje ja z jego doplywu netto - bez dodania z powrotem rata malalaby o 15% splaty pana
+        // (miasto, ktoremu pan pomaga, placiloby mniej albo wcale i nie dostawalo odblokowania). Doba jak _paidToday (pan placi po PayDaily -> okno jutra).
+        // Doplata DOPLATA (Settle) zostaje w kasie miasta - tej nie liczymy.
+        private static Dictionary<Settlement, long> _lordPaidToday = new Dictionary<Settlement, long>(), _lordPaidPrev = new Dictionary<Settlement, long>();
         private static readonly HashSet<Settlement> _released = new HashSet<Settlement>();
         // linia doby 322e: dluznicy, z rata, w terminie, odblokowani, bez pomiaru, splacone z raty
         internal static long DRateRepaid; internal static int DRateN, DRateDebtors, DRateOnTime, DRateReleased, DRateNoMeasure;
@@ -73,6 +78,7 @@ namespace Armoury
         {
             _acc.Clear(); _pending = null; _openPrev = -1; ForfeitTotal = 0; ForfeitTotalN = 0; _stum = 0; _err.Clear();
             _payDay = int.MinValue; _relDay = int.MinValue; _paidToday.Clear(); _paidPrev.Clear(); _released.Clear();
+            _lordPaidToday.Clear(); _lordPaidPrev.Clear();
             ClearDay();
         }
 
@@ -175,6 +181,25 @@ namespace Armoury
             DNew += x; DNewN++;
         }
 
+        /// <summary>322e: nowa doba splat - dzisiejsze splaty (wlasne i panow) przechodza na "wczoraj"; przerwa (pierwsza doba po wczytaniu) - wczorajszych nie znamy.</summary>
+        private static void RotatePay(int today)
+        {
+            if (_payDay == today) return;
+            var t0 = _paidPrev; _paidPrev = _paidToday; _paidToday = t0; _paidToday.Clear();
+            var t1 = _lordPaidPrev; _lordPaidPrev = _lordPaidToday; _lordPaidToday = t1; _lordPaidToday.Clear();
+            if (_payDay != today - 1) { _paidPrev.Clear(); _lordPaidPrev.Clear(); }
+            _payDay = today;
+        }
+
+        /// <summary>Recenzja 322e: KsLordFood (RACHUNKI, BeforeEarly, HoardBills) - pan / skarbiec splacil rachunki dluznika `dst` kwota `x` (ta sama, co TownPurse.NoteLordFood,
+        /// po zwrotach). Jutro dodana do zarobku doby dluznika (podstawa raty). Nie dla doplaty DOPLATA (zostaje w kasie miasta). Nie rzuca.</summary>
+        internal static void NoteLordBills(Settlement dst, long x)
+        {
+            if (dst == null || x <= 0) return;
+            try { RotatePay(Today()); long v; _lordPaidToday.TryGetValue(dst, out v); _lordPaidToday[dst] = v + x; }
+            catch (Exception e) { Stumble("NoteLordBills", e); }
+        }
+
         /// <summary>Splata doby (SupplyDemand.DailyTrade, przed wozami): wojna - rachunek przepada; potem kazdy cel od najstarszego z kasy ponad podloge. Dziala zawsze,
         /// gdy sa rachunki (takze przy wylaczonym kluczu - dlugi trzeba splacac).</summary>
         internal static void PayDaily()
@@ -208,12 +233,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("PayDaily.war", e); }
                 }
                 // 322e: doba splat - wczorajsze splaty dluznikow (dodawane do zarobku doby: okno TownPurse zamkniete dzis rano zawiera wczorajsza PayDaily)
-                if (_payDay != today)
-                {
-                    var t0 = _paidPrev; _paidPrev = _paidToday; _paidToday = t0; _paidToday.Clear();
-                    if (_payDay != today - 1) _paidPrev.Clear();     // przerwa (pierwsza doba po wczytaniu) - wczorajszych splat nie znamy
-                    _payDay = today;
-                }
+                RotatePay(today);
                 _released.Clear(); _relDay = today;
                 double share = RateShare; int relDays = RateReleaseDays;
                 var rows = new List<string>();
@@ -236,16 +256,17 @@ namespace Armoury
                             b.Left -= got; free -= got; DRepaid += got; paidS += got;
                         }
                         // 322e: rata z zarobku doby - dopelnienie splaty z nadwyzki do raty, z zywej kasy (takze ponizej podlogi), od najstarszego
-                        long inc = 0, net = 0, prev = 0, rate = 0; bool meas = false;
+                        long inc = 0, net = 0, prev = 0, lprev = 0, rate = 0; bool meas = false;
                         if (share > 0 && owed0 > 0)
                         {
                             DRateDebtors++;
                             _paidPrev.TryGetValue(dst, out prev);
+                            _lordPaidPrev.TryGetValue(dst, out lprev);     // recenzja 322e: splaty panow / korony wczoraj (CloseWindow zdjal je z netto, kasa sie nie ruszyla)
                             meas = TownPurse.NetOf(dt, out net);
                             if (!meas) DRateNoMeasure++;
                             else
                             {
-                                inc = net + prev;
+                                inc = net + prev + lprev;
                                 rate = inc > 0 ? (long)Math.Ceiling(share * inc) : 0;
                                 long due = Math.Min(owed0 - paidS, Math.Max(0L, rate - paidS));
                                 foreach (var p in l)
@@ -271,7 +292,7 @@ namespace Armoury
                             if (rel) { _released.Add(dst); DRateReleased++; }
                             if (rows.Count < 24)
                                 rows.Add((dst.Name != null ? dst.Name.ToString() : dst.StringId) + ": dlug " + owed0 + " (za jedzenie " + food0 + ", najstarszy " + (oldest == int.MaxValue ? "-" : (today - oldest).ToString(CultureInfo.InvariantCulture)) + " dni)"
-                                         + ", zarobek doby " + (meas ? inc.ToString(CultureInfo.InvariantCulture) + " (netto " + net + " + splaty wczoraj " + prev + ")" : "bez pomiaru")
+                                         + ", zarobek doby " + (meas ? inc.ToString(CultureInfo.InvariantCulture) + " (netto " + net + " + splaty wczoraj " + prev + " + splaty panow wczoraj " + lprev + ")" : "bez pomiaru")
                                          + ", rata " + rate + ", splacone z nadwyzki " + paidS + " + z raty " + paidR + ", kasa " + gold0 + " -> " + dt.Gold
                                          + ", zostalo za jedzenie " + food1 + (rate > 0 ? " (" + ((food1 + rate - 1) / rate) + " dob raty)" : "")
                                          + ", w terminie " + (onTime ? "TAK" : "NIE") + ", dowoz " + (food1 <= 0 ? "-" : rel ? "ODBLOKOWANY" : "wedlug zwloki"));

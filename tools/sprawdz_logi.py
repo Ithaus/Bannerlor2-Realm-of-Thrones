@@ -92659,7 +92659,7 @@ R322_SUM = re.compile(
     r"splacone z raty (?P<paid>\d+) zl .*?potkniecia kredytu (?P<stum>\d+)\.")
 R322_ROW = re.compile(
     r"Rachunki zywnosci - dluznik \(322e\): dzien (?P<day>\d+) \| (?P<name>.+?): dlug (?P<owed>\d+) \(za jedzenie (?P<food0>\d+), najstarszy (?P<age>-|\d+) dni\), "
-    r"zarobek doby (?:(?P<inc>-?\d+) \(netto (?P<net>-?\d+) \+ splaty wczoraj (?P<prev>\d+)\)|bez pomiaru), rata (?P<rate>\d+), "
+    r"zarobek doby (?:(?P<inc>-?\d+) \(netto (?P<net>-?\d+) \+ splaty wczoraj (?P<prev>\d+)(?: \+ splaty panow wczoraj (?P<lprev>\d+))?\)|bez pomiaru), rata (?P<rate>\d+), "
     r"splacone z nadwyzki (?P<ps>\d+) \+ z raty (?P<pr>\d+), kasa (?P<g0>-?\d+) -> (?P<g1>-?\d+), zostalo za jedzenie (?P<food1>\d+)(?: \((?P<days>\d+) dob raty\))?, "
     r"w terminie (?P<ok>TAK|NIE), dowoz (?P<dz>-|ODBLOKOWANY|wedlug zwloki)\.")
 R322_KSH = re.compile(r"Kupcy zywnosci \(KS-H\) dzien (?P<day>\d+) .*?kredyt kupiecki TAK: otwarte (?P<open>\d+) zl")
@@ -92702,6 +92702,8 @@ def rata322e_rows(rep, D):
             if m.group("dz") == "ODBLOKOWANY" and (m.group("ok") != "TAK" or hor is None or hor <= 0 or food1 > rate * hor):
                 why.append("odblokowany poza horyzontem")
             if m.group("inc") is None and (rate or pr): why.append("rata bez pomiaru")
+            if m.group("inc") is not None and int(m.group("inc")) != int(m.group("net")) + gi(m, "prev") + gi(m, "lprev"):
+                why.append("zarobek != netto + splaty wczoraj + splaty panow")
             if why:
                 bad.append(f"d{day} {m.group('name')}: {', '.join(why)}")
     rep.add("R322-1: wiersze dluznikow spojne (kasa, rata, termin, odblokowanie)", f"niespojnych {len(bad)}" + ("; " + "; ".join(bad[:4]) if bad else ""),
@@ -92747,7 +92749,7 @@ def rata322e_synth():
     import shutil
     sm = ("Rachunki zywnosci - rata z zarobku (322e): dzien {d} | udzial 0.15, horyzont odblokowania 91 dob | dluznikow 2, z rata 1, w terminie {ot}, "
           "dowoz odblokowany {rl}, bez pomiaru zarobku 0 | splacone z raty {p} zl (kasy dluznikow -> kasy wierzycieli), potkniecia kredytu 0.")
-    rq = ("Rachunki zywnosci - dluznik (322e): dzien {d} | Qarth: dlug 330630 (za jedzenie 330630, najstarszy 364 dni), zarobek doby 8000 (netto 7800 + splaty wczoraj 200), "
+    rq = ("Rachunki zywnosci - dluznik (322e): dzien {d} | Qarth: dlug 330630 (za jedzenie 330630, najstarszy 364 dni), zarobek doby 8000 (netto 7500 + splaty wczoraj 200 + splaty panow wczoraj 300), "
           "rata 1200, splacone z nadwyzki 0 + z raty 1200, kasa 5000 -> {g1}, zostalo za jedzenie 329430 (275 dob raty), w terminie TAK, dowoz {dz}.")
     rb = ("Rachunki zywnosci - dluznik (322e): dzien {d} | Bolozo: dlug 2000 (za jedzenie 2000, najstarszy 40 dni), zarobek doby 4000 (netto 4000 + splaty wczoraj 0), "
           "rata 600, splacone z nadwyzki 0 + z raty 0, kasa 0 -> 0, zostalo za jedzenie 2000 (4 dob raty), w terminie NIE, dowoz wedlug zwloki.")
