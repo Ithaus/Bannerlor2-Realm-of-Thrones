@@ -1,5 +1,214 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-03 WGRANIE 161 - noc/323x-integracja (160 + inwestycje: 323a cena wolnego majatku BK do pana wsi, 323b odkup warsztatu gracza z doplata kasy miasta, 323c prace okregu placa tez za zjedzone w okregu, 323d dochod wioski pobocznej z prawdziwej sprzedazy); Armoury.dll da5a31022ce86f7f87403e031fe64198 (CrashScribe 55ccc004, ForgeView 8441ab0e bez zmian); kopia 160: Armoury.dll.bak-2026-11-03-przed-wgranie161 i D:/Backup-Bannerlord/wgrane/2026-11-03-wgranie161-przed
+
+**Problem:** Jeff 03.11 "majatek naprawa / kasa miasta / tak i prawdziwa sprzedaz" - decyzje do poradnika inwestycji (docs/PORADNIK-INWESTYCJE.md).
+**Zmiana:** cztery wpisy ponizej (323a-d). Recenzja: 1 potwierdzony blad (323c NPO-5: "oczekiwane" liczylo zjedzone, "wyplacone" tylko wozy) - poprawiony
+(69c376e9, oczekiwane ze zjedzonego osobno w linii 323c); przy okazji regex checkera 323c niezgodny z szykiem linii z kodu - poprawiony. 323d "H skacze z pora roku" - obalone.
+Scalenie: sprawdz_logi.py z blokow 323a-d (join_checker2, bez kolizji nazw), McmSettings z gen_mcm (2813 ustawien, bez zmian po scaleniu), kontrola hunkow 0 brakow.
+**Test 323x** (kopia zapisu Jeffa, 7 bitew + 6 dob prob): kod 0 oba biegi, ERROR 0, Armoury.json Jeffa nietkniety. Grupy na logu probyN: majatek323a TAK (segment 6/6,
+zakupow 0), odsprzedaz323b TAK/INFO (odsprzedazy 0), eat323c TAK (6 linii, wyplacone ze zjedzonego 519 zl, brak w kiesie 91, potkniecia 0), wies323d TAK (6 dob,
+nalezne 0 - utarg okregu wioski maly, dawny H z progiem dalby 29), npo TAK (NPO-5 INFO - okno 3 doby).
+**Ryzyko / co sprawdzic:** wioska poboczna (323d) moze teraz dawac 0, gdy wozy okregu malo sprzedaja - to zamierzone ("prawdziwa sprzedaz"); 323c - kiesy wsi
+w okregach, ktore zjadaja prawie wszystko, moga zejsc do skrzyni ("brak w wolnej kiesie"); 323a/323b sprawdza dopiero zakup majatku / sprzedaz warsztatu w grze.
+**Status:** WGRANE
+
+## 323a - cena wolnego majatku BK do pana wsi (Jeff 03.11 "majatek naprawa"; klucz "Vacant Estate Price To Lord")
+
+**Problem:** poradnik inwestycji (docs/PORADNIK-INWESTYCJE.md, sprawdzenie journal wf_0afe029c-35f): kupno WOLNEGO majatku BK (bez wlasciciela) w cudzej wsi
+zabiera kupcowi max(500, 10% wartosci majatku) i nikt tego zlota nie dostaje - lamie zasade "nic z niczego" (kazda moneta ma platnika i odbiorce).
+Tekst BK sam to mowi: "Buy this vacant estate for {GOLD} gold (registration + setup; no seller)". Skala mala (zwykle 500 na zakup, tylko gracz), ale to
+czyste ujscie w nicosc. W logu Jeffa (Armoury-2026-11-03_00-19-16.log) brak linii o tym zakupie - BK go nie loguje; widac by go tylko jako ubytek w reszcie R.
+
+**Przyczyna:** BannerKings EstateAction.TakeAction (dekompilacja infl/bk BannerKings.Managers.Populations.Estates/EstateAction.cs:26-60): dla ActionType.Buy
+przy `Estate.Owner != null` placi wlascicielowi (GiveGoldAction), a przy `Owner == null` robi tylko `ActionTaker.ChangeHeroGold(-GoldCost)`. Cena:
+BKEstatesModel.GetBuy (BannerKings.Models.BKModels/BKEstatesModel.cs:155-207): `num2 = MathF.Max(500, EstateValue * 0.1f)`; we wsi WLASNEGO rodu ten sam
+wolny majatek kosztuje 50 wplywow bez zlota. Jedyny wolajacy Buy: EstateVM.ExecuteBuy (gracz, Hero.MainHero). Zadnej latki na TakeAction w Armoury, BKROTPatch
+ani innych modach (BetterEconomy ma tylko wlasny enum EstateActionType, warstwa feudalna BEE wylaczona przy BK).
+
+**Kto jest odbiorca:** w BK wolna ziemia wsi nalezy do PANA WSI - GetBuy liczy go przez `VillageExtensions.GetActualOwner` (glowa rodu wlasciciela wsi,
+a posiadacz tytulu de jure, gdy jest w tej samej frakcji) i wlasnie jego rodowi daje wolny majatek bez zlota (za wplyw). Kupno od lorda (majatek z
+wlascicielem) tez wymaga, by pan byl de jure. Pan wsi jest wiec sprzedawca wolnej ziemi.
+
+**Zmiana (Armoury):**
+- `Armoury/src/BkDipGold.cs` punkt 8 (opis w naglowku klasy): prefiks `VacantPre` + finalizer `VacantFin` na `EstateAction.TakeAction(Hero)`
+  (AccessTools.DeclaredMethod - override w EstateAction; bazowa BannerKingsAction.TakeAction jest abstrakcyjna). Prefiks lapie tylko Buy, Owner == null,
+  GoldCost > 0 i zapamietuje kiese kupca. Finalizer: zaplacone = min(GoldCost, kiesa przed - kiesa po):
+  - majatek nie przeszedl na kupca (wyjatek BK po zaplacie) - zwrot kupcowi;
+  - zywy pan wsi (GetActualOwner przez refleksje, zapasowo OwnerClan.Leader), inny niz kupiec - `lord.ChangeHeroGold(+cena)` (bez zdarzenia gry, bo kupiec
+    zaplacil bez zdarzenia - swiat w tej metodzie ma zmiane 0, jak ugoda grupy CompFin; cena ziemi nie wchodzi w dochod rodu D/ClanIncomeBook);
+  - bez zywego pana - kasa miasta handlu wsi (TradeTownOf, `MoneyLedger.Note169(N169Other)`); czego kasa nie przyjela / bez miasta - wraca kupcowi.
+  - Klucz wylaczony - jak dotad (zloto w nicosc), licznik "przepadlo".
+  - Wpiecie loguje wlascicieli innych latek na TakeAction (Harmony.GetPatchInfo) - linia tylko gdy sa.
+- `Armoury/src/Settings.cs:492` + `McmSettings.cs` (gen_mcm.py): `VacantEstatePriceToLord = true` - MCM "Vacant Estate Price To Lord". Klucz NOWY - w Armoury.json Jeffa go nie ma.
+- Komunikat dla gracza (EN): "You paid N denars for the vacant estate in X to its lord, Y." (albo "... to the treasury of Z.").
+
+**Linie logu:**
+- kazdy zakup: `Wolny majatek BK (323a): dzien N | kupiec <imie> | <wies> (<id>) | cena C -> pan wsi <imie> (<rod>) C | kiesa kupca A -> B.`
+  (warianty: "| bez zywego pana wsi (...) -> kasa miasta <miasto> X, wrocilo kupcowi Y.", "| majatek NIE przeszedl na kupca - zwrot C kupcowi.",
+  "| KLUCZ WYLACZONY (Vacant Estate Price To Lord) - zloto w nicosc jak dotad.")
+- segment doby w linii "BK i Diplomacy (E5/A8): dzien N" po dworzanach (322a): `| wolne majatki BK (323a): kupionych n, kupcy zaplacili P (gracz G) -> panom wsi L (nl),
+  kasom miast handlu wsi T (nt), wrocilo kupcom B (nb; w tym majatek nie przeszedl u)[, przepadlo (klucz wylaczony) X (nx)]`
+- linia startu E5/A8: "..., Vacant Estate Price To Lord tak"; linia wpiec: "wolny majatek (BK EstateAction.TakeAction)" w "wpiete".
+
+**Sprawdzarka:** `tools/sprawdz_logi.py --grupa majatek323a <Armoury-*.log>` (nazwy M323A_*/majatek323a_*/m323a_*): M323-S self-test, M323-S2 synteza
+(pan wsi, kasa miasta, niezgodny, wylaczony, stary DLL, pusty), M323-0 segment w liniach E5/A8, M323-1 zaplacone = panom + kasom + wrocilo + przepadlo,
+M323-2 suma linii zakupu = suma segmentow, M323-3 zwroty (INFO), M323-4 przepadlo (INFO). Testy syntetyczne 0 NIE; dworzanie322a i chleb322f nadal 0 NIE.
+Frazy segmentu nie pasuja do wyrazen starszych grup E5/A8 ("z kas miast handlu wsi" vs "kasom miast handlu wsi").
+
+**Ryzyko / co sprawdzic (zasada 0):**
+- Regresje: TakeAction latamy tylko my; filtr Buy + Owner == null + GoldCost > 0 - nadania (Grant: rycerze, rody szlachty BKGentryBehavior:658, tytuly) i
+  Reclaim nietkniete; kupno od lorda (Owner != null) BK juz placi - bez zmian; wolny majatek we wlasnej wsi (50 wplywow) - GoldCost 0, bez zmian.
+- Kolizje: BkDipGold 1 (CreateGentryClan) zeruje cene wolnego majatku dla nowego rodu szlachty - inna sciezka (GiveGoldAction do null, nie TakeAction Buy),
+  nie liczy drugi raz. Ksiega: wczesniej kupno = reszta R -cena (ChangeHeroGold bez zdarzenia), teraz kupiec -C i pan +C bez zdarzenia - R 0; kasa miasta przez Note169.
+  ClanIncomeBook nie widzi ceny (brak zdarzenia) - zgodnie z LandSale (cena ziemi nie jest dochodem).
+- Spojnosc: jedna zasada - ziemia wsi sprzedawana przez pana wsi (jak LandSale: zloto do glowy rodu sprzedawcy). Cena zostaje BK (max(500, 10%)) - inna wycena
+  niz LandSale (14-20 lat dochodu), ale wolny majatek startuje jako zagroda 10 ludzi bez dochodu; nie ruszane (jedna zmiana naraz).
+- Tekst BK w podpowiedzi przycisku dalej mowi "no seller" (string BK) - kosmetyka, nie zmieniana.
+- W grze: kupic wolny majatek w cudzej wsi -> komunikat "You paid ... to its lord, ...", linia "Wolny majatek BK (323a)", segment doby z kupionych 1,
+  reszta R tej doby bez -500.
+**Status:** WGRANE 161 (03.11, w integracji noc/323x-integracja, Armoury da5a3102)
+
+## 323b - odkup warsztatu gracza: czego notabl nie ma, doplaca kasa miasta (Jeff 03.11 "kasa miasta"; klucz "Workshop Resale Town Pays")
+
+**Problem:** poradnik inwestycji (docs/PORADNIK-INWESTYCJE.md) i weryfikacja: warsztat kupuje sie za ~3 lata zysku, a odkupuje go tylko notabl i najwyzej za
+to, co ma w kiesie. Log Armoury-2026-11-03_00-19-16.log (dzien 109249): notabli 3415, w kiesach 21 625 320 (srednio ~6.3 tys.), ponad 10500 tylko 90;
+linia "Majatek gracza (259)": sam kapital w kasie Armorsmithy Jeffa w Fairmarket 10174, Smithy 10538 - odsprzedaz zwracala mniej wiecej sam kapital,
+zero za wartosc warsztatu (Armorsmithy kosztowal ~55.7 tys.). Rozmowa kupna o tym nie ostrzegala.
+
+**Przyczyna:** `WorkshopTrade.CostNotablePostfix` przycinal cene odkupu do `RichestBuyerPurse` (najbogatsza kiesa notabla miasta), a `SalePostfix` placil tylko
+z kiesy kupca (audyt 120 - "nic z niczego"; kies notabli pilnuje pasmo 4500-10500, NotableGold).
+
+**Zmiana (Armoury):**
+- `WorkshopTrade.cs` `CostNotablePostfix` (ok. l.1534): rachuba wydzielona do `ResaleFair` (l.1550, bez zmian: udzial WorkshopTradeResaleShare 0.8 wartosci dla notabla,
+  nie wiecej niz udzial ceny gracza, + kapital + robota w toku); pulap = najbogatsza kiesa + `ResaleTownSpare` (l.1114: nadwyzka kasy miasta ponad zapas kupcow,
+  `TownPurse.BuyFloorPeek` - bez licznika 169c; przy wylaczonym A1/TownPaysFromSurplus cala kasa jak SpendableTown; oblezone miasto i klucz NIE - 0).
+- `SalePostfix` (l.1070, nowy parametr Workshop __0): kupiec placi z kiesy najwyzej tyle, ile ma (jak dotad), reszte do uzgodnionej ceny kasa miasta
+  (`GiveGoldAction.ApplyForSettlementToCharacter`, kwota nigdy ponad nadwyzke - G24 nie dotyczy). Warsztat dostaje kupiec wylosowany przez gre
+  (GetNotableOwnerForWorkshop) jako AGENT MIASTA: bez dlugu do zapisu - jego kiesa ponad 10500 i tak co dobe idzie do kasy tego miasta (E5/A3 NotableGold,
+  NotableGoldReal TAK u Jeffa), wiec dochod warsztatu wraca do miasta, ktore za niego zaplacilo. Kazda moneta: platnik (kupiec / kasa miasta) i odbiorca (gracz).
+  Komunikat gracza: "from X and the treasury of <town>"; brak: "The buyer and the town's treasury could raise only ...".
+- Linia na kazda odsprzedaz: "Odsprzedaz warsztatu gracza (323b): dzien D | <miasto> <typ> -> <kupiec>[ (bankructwo)] | cena odkupu X (wycena bez przyciecia
+  do kies F, udzial 0.80) | kupiec z kiesy B, kasa miasta T (nadwyzka ponad zapas przed S, Workshop Resale Town Pays TAK[, oblezone]), zaplacone P, zabraklo Q
+  | kupiec agentem miasta: nadwyzka kiesy ponad 10500 do kasy miasta (Notable Gold Real TAK)." Dopisek w linii "Warsztaty towarowe": "(323b: odsprzedazy N,
+  w tym kasa miasta M)". `Fail` ustawia `_inFail` (tylko napis "(bankructwo)").
+- Rozmowa kupna (`OfferCondition` l.1745, `ResaleWarning` l.1765, po angielsku) przed "Are you willing to pay?": "Mind you: should you sell it back, buyers here
+  pay only 80% of what a shop is worth, plus its till - today that would be at most about N denars, P% of my price[, because the richest notable here has only A
+  and the town's treasury could add B more]." Wlasny try (blad = rozmowa jak dotad).
+- `Probes306.cs` BuyResell (sonda 307c): zaplata = kiesa kupca + kasa miasta (kasa przed/po), nigdy ponad odkup; napis "w tym kasa miasta N".
+- `Settings.cs` / `McmSettings.cs` (gen_mcm.py): `WorkshopResaleTownPays = true` (NOWY - w Armoury.json Jeffa go nie ma, dziala domyslny); opis
+  WorkshopTradeResaleShare uzupelniony.
+- `tools/sprawdz_logi.py`: grupa `--grupa odsprzedaz323b` (nazwy O323B_*, odsprzedaz323b_*, o323b_*): O323B-1 zaplacone = kupiec + kasa i + zabraklo = cena,
+  O323B-2 kasa <= nadwyzka (klucz NIE / oblezone - 0), O323B-3 brak tylko przy wyczerpanej nadwyzce, O323B-4 cena <= wycena bez przyciecia, O323B-5 dopiski dnia =
+  linie (INFO na brzegu logu), O323B-6 sumy; test syntetyczny 9 przypadkow TAK; log Jeffa 00-19-16 - same INFO (brak sprzedazy, stary DLL).
+
+**Ryzyko / co sprawdzic (kontrola calosci, zasada 0):**
+- regresje: GetCostForNotable wola tez `Fail` (bankructwo kazdego warsztatu) i CanPlayerSellWorkshop - wyzszy pulap liczy sie tylko, gdy sprzedaje gracz (SalePrefix
+  dalej tylko przy wlascicielu-graczu; gra placi cene tylko graczowi). Bankructwo warsztatu gracza: kasa miasta tez doplaca (ta sama cena odkupu, jedna regula);
+  kupiec wydaje cala kiese, wiec `fund` kapitalu jak dotad 0. Smierc/wojna - cena 0, bez zmian.
+- petla zysku: kupno P = lata zysku gracza + kapital; odkup <= 0.8 x min(wartosc notabla, wartosc gracza) + kapital < P (305b/311c bez zmian). Cena kupna trafia do
+  sprzedawcy-notabla, a jego nadwyzka ponad 10500 do kasy miasta - kasa odzyskuje to, co potem doplaci.
+- kolizje: G24 (TownPurse) - kwota przycieta do nadwyzki; licznik 169c nie rusza (BuyFloorPeek); zawor/renta kasy miasta licza od tej samej nadwyzki (kasa po odkupie mniejsza
+  - mniejsza renta panu tego dnia, zamierzone). OnGold (pomiar kies notabli) - przelew kasa -> gracz nie jest notablem, nie liczy sie.
+- przy NotableGoldReal NIE pasmo gry kasuje kiese notabla ponad 10500 w nicosc - kasa miasta wtedy nie odzyskuje dochodu warsztatu (zloto dalej nie powstaje z niczego).
+- w grze: sprzedac warsztat w miescie z bogata kasa - linia 323b, kasa miasta > 0, zloto gracza +cena; rozmowa kupna z nowym zdaniem; `--grupa odsprzedaz323b` bez NIE.
+
+**Status:** WGRANE 161 (03.11, w integracji noc/323x-integracja, Armoury da5a3102)
+
+## 323c - prace okregu: udzial inwestora takze w tym, co okreg zjada z dodatku (Jeff 03.11 "tak i prawdziwa sprzedaz"; klucz "Works Pay District Eats")
+
+**Problem:** prace okregu w Shady Glen (Heatherstone + Falconstead, 65 248 zl) daja ok. 2-4%/rok, a od doby 109213 do 109255 (42 doby) nic. Log
+Armoury-2026-11-03_00-19-16.log, linia PO doby 109249: "powrotow 0, utarg 0, pula 0, wyplacone 0 (oczekiwane 3)", "nowy dodatek na targ / targ okregu 0.0%",
+"dodatek zjedzony w okregu (0 na targ, pula 0) 1", a dodatek dalej produkuje "4792.8 kg/d przed zima". Przeliczenie po wczytaniu: "Shady Glen: 13.4 -> 6.9/dobe",
+targ 51/dobe z produkcji 3168. Przy kluczu Works Pay Market Share inwestor dostaje tylko udzial w tym, co wozy sprzedaja; to, co okreg zjada z dodatku, nie placi nic.
+
+**Przyczyna:** pod KS okreg zjada Own = min(produkcja, potrzeba) (KsDeliver.Own, StartCalibration.Live.cs ComputeDistrict). Gdy okreg ma tego towaru mniej, niz
+zjada, dodatek prac idzie na stol okregu (WorksAll - WorksMkt), a OnCartReturn placi tylko z dodatku na targ (dv.Em / dv.Mk x utarg). Kto jest wlascicielem
+gospodarczym zjedzonego dodatku: domy okregu. Reszte potrzeby (koszyk ZC4) wies kupuje w miescie z kiesy wsi (VillageBasket: koszyk = pelna potrzeba - Own),
+wiec zjedzony dodatek to jedzenie, ktore domy inaczej musialyby kupic albo go nie miec. Placi ich kiesa, czyli kiesa wsi.
+
+**Zmiana (Armoury):**
+- NOWY `Armoury/src/DistrictWorks.Eats.cs`: `PayEaten(v, today)` raz na dobe (DistrictWorks.Daily, po KS doby). Bierze swiezy rachunek KS okregu
+  (StartCalibration.WorksMarketOf; bez pamieci 28 dob, prace w rachunku - inc). Zjedzone czesci = dodatek po czynnikach - dodatek na targ (wartosc dnia po cenie
+  polki miasta targowego, VillageCrafts.Price - ta sama cena co dodatek na targ i V). Pula wiersza = udzial (District Works Share 0.5) x zjedzone czesci x jednostki
+  wiersza / jednostki czesci. Bez r wozow, bo zjedzone nie jedzie na targ. Placi kiesa wsi gry okregu, najwyzej wolna kiesa ponad skrzynie (DsVillage.Chest - jak
+  listy soltysow). Brak w kiesie nie przechodzi jako dlug, tylko jest liczony w linii. Przelew zdarzeniem gry (GiveGoldAction kiesa -> glowa rodu), nazwany w ksiedze
+  (MoneyLedger.Note169 "inne", jak wyplata z kiesy przy wozie). Bez wyplaty przy wojnie rodu z krolestwem okregu (B9), wsi zlupionej / najezdzanej, bez drogi
+  produkcji (PathOf), dla wsi albo rodu bez glowy. Ulamki monety przechodza na okreg i rod (pamiec sesji, < 1 zl). Kwota idzie na wiersze rodu metoda najwiekszej
+  reszty (Out, Paid7, AddPaid gracza - Fiefs i widok finansow licza to same).
+  `EatenExpected` dopisuje oczekiwane (OwnShareExpected, Exp7 do CSV). `EatsLine` - linia doby.
+- `DistrictWorks.cs`: Row.DMk/DEat/MkAll/EatAll (liczniki sesji z targu / ze zjedzonego; OnCartReturn dopisuje czesc z targu); Quote.EatK; QuotesOf:
+  H czesci = r x Phi + EatK x (1 - Phi) (dotad r x Phi). Ten sam wzor co wyplata, wiec "up to X% a year", dochod wierszy kwot i "still 12% on the last coin"
+  (Sensible) licza ze zjedzonym. DistVal.EaPart (ValOf), PayEaten w petli Daily po ValOf, EatsLine przed DayLine, EatsReset w Reset.
+- `DistrictWorks.Menu.cs`: napisy (EN) przy kluczu: "What the district eats of the extra itself, its villagers buy from you: every day the village purse pays you
+  half of it at <town> prices (while the purse holds more than its rainy-day chest)."; przy Phi < 0.9 "the villagers pay you for the rest out of the village purse";
+  zasady "paid when ... carts come back and daily for what the district eats". Klucz NIE - napisy jak dotad.
+- `Settings.cs` / `McmSettings.cs` (gen_mcm.py): `WorksPayDistrictEats = true` (grupa "District works and side-village crafts (18.10)"). Dziala tylko razem
+  z Works Pay Market Share. Klucz NOWY - w Armoury.json Jeffa go nie ma, dziala domyslny TAK.
+- Linia logu (co dobe, gdy sa prace): "Prace okregu (PO): zjedzone w okregu (323c, klucz Works Pay District Eats TAK) dzien N | okregow z wycena K, dodatek zjedzony
+  X zl/d (cena polki), pula (udzial) Y, wyplacone Z z kiesy wsi, brak w wolnej kiesie (ponad skrzynie) W | bez wyplaty: wojna a, bez swiezego rachunku KS z pracami b,
+  wies zlupiona c, bez drogi produkcji d, rod bez glowy e | wedlug prac (z targu / ze zjedzonego, doba; od wczytania; pokazanych K z N): Heatherstone (Shady Glen)
+  [gracz] targ 0 / zjedzone 12 (od wczytania 25 / 140); ... | potkniecia s (od wczytania t)."
+- `tools/sprawdz_logi.py`: grupa `--grupa eat323c` (nazwy e323c_/E323C_): E323C-0 linie czytelne, E323C-1 potkniecia 0, E323C-2 wyplacone (+ brak) <= pula
+  + 1 na okreg, pula <= wartosc zjedzonego, klucz NIE - 0, E323C-3 suma "zjedzone" wedlug prac = wyplacone (gdy pokazane wszystkie prace), E323C-4 sumy (INFO);
+  test syntetyczny (dobry, ponad pule, suma prac, obciete, potkniecie, zepsuta, pusty) TAK; chleb322f dalej TAK.
+
+**Oczekiwany skutek:** zwrot z zakupu prac ok. 0.5 x B x (2 - x) rocznie (wioska poboczna 30% przy pierwszych monetach, 15% przy pelnym sprzecie; wies gry 20%/10%),
+niezaleznie od tego, czy dodatek jedzie na targ, czy jest zjadany. Shady Glen powinno placic co dobe (takze zima, mniej o ciecie zimy).
+
+**Ryzyko / co sprawdzic (kontrola calosci, zasada 0):**
+- Zamknieta ekonomia: platnik to kiesa wsi gry okregu (realne zloto), odbiorca to glowa rodu, kwota najwyzej udzial x wartosc zjedzonego, najwyzej wolna kiesa ponad
+  skrzynie. Nic z niczego. Targ (Em) i zjedzone (Ea - Em) sie nie nakladaja, wiec nic nie jest liczone podwojnie z OnCartReturn.
+- Kiesa wsi: w KS wsie kupuja ok. 6% koszyka (log ZC4: "chciane 120652, kupione 7643", "bez towaru 21173"), kiesy sa nad skrzynia ("najmniejszy zapas ponad skrzynie
+  9670 zl"). W okregu, ktory zjada prawie wszystko (Shady Glen: targ 51/dobe), wyplata moze przewyzszyc wplywy kiesy z wozow. Wtedy kiesa zejdzie do skrzyni
+  i wyplata spadnie do tego, co ponad nia wplywa. Patrz "brak w wolnej kiesie" w linii 323c. Skrzynia chroni koszyk ZC4 i rente.
+- Cena: cena polki miasta targowego (pelna, bez r wozow ~0.98). Wies placi inwestorowi polowe wartosci jedzenia, ktore zjada.
+- Wycena okna rosnie (H czesci z ~0 do ~1 dla czesci zjadanej). "still 12% on the last coin" pozwala na wieksze kwoty. Wierszy kwot nie ruszalem.
+- Nie ruszane: SideVillageFief (Seven Elms - dochod z H, prog 0.2), LandSale (DueFor), DistrictWorksAi (wylaczone; czyta q.H, wiec po wlaczeniu wezmie nowe H).
+- Rachunek KS ld.Res: wyplata z ostatniego rachunku (WorksMarketOf). Jesli KS nie przeliczyl okregu w dobie, placi wedlug poprzedniego rachunku.
+- Recenzja (NPO-5, potwierdzone): "oczekiwane" w linii PO liczylo tez zjedzone, a "wyplacone" tej samej linii tylko wozy - kontrola NPO-5 (15%) wypadlaby NIE.
+  Poprawka (69c376e9): EatenExpected wolane osobno w Daily (Exp7 wierszy jak bylo), oczekiwane ze zjedzonego w linii 323c ("oczekiwane ze zjedzonego X");
+  linia PO bez zmian. Przy okazji regex checkera 323c poprawiony na szyk z kodu ("wyplacone z kiesy wsi N" - wczesniej kazda prawdziwa linia bylaby nieczytelna).
+- Do sprawdzenia w logu: linia 323c co dobe; "wyplacone" > 0 dla Shady Glen; "brak w wolnej kiesie" maleje albo 0; potkniecia 0; "oczekiwane ze zjedzonego"
+  ~ pula; m112 Fiefs i widok finansow pokazuja wyplaty dzienne; `python tools/sprawdz_logi.py --grupa eat323c <Armoury-*.log>`.
+
+**Status:** WGRANE 161 (03.11, w integracji noc/323x-integracja, Armoury da5a3102)
+
+## 323d - dochod wioski pobocznej za prawdziwa sprzedaza, bez progu 0.2 (Jeff 03.11 "tak i prawdziwa sprzedaz", poradnik inwestycji problem 7)
+
+**Problem:** Seven Elms (okreg Mudgrave) w zimie dostaje okolo 10 razy wiecej, niz okreg naprawde sprzedal. Armoury-2026-11-03_00-19-16.log, doba 109249:
+"dochod dnia (r4): nalezne 5 (wartosc wioski 53 x H 0.20 x stawka pana 45%)". Ta sama sesja, linia PO po wczytaniu: "Mudgrave: ... H 0.20 -> r 0.76 ...
+(targ 63/dobe z produkcji 3301)". Wozy okregu oddaja okolo 48/dobe z wartosci dnia ok. 3000, czyli prawdziwe H to ok. 0.016, a nie 0.20.
+
+**Przyczyna:** SideVillageFief.FillDistrict liczy naleznosc jako wartosc dnia wioski x H x stawka pana. H bierze z DistrictWorks.HandedRatio -> HOf, gdzie
+`Math.Max(0.2, Math.Min(1.5, utarg / wartosc dnia))`. Prog 0.2 zawyza dochod, kiedy wozy malo sprzedaja (zima). Przy braku utargu (h == 0) HOf oddaje nawet
+srednia swiata 0.868.
+
+**Zmiana (Armoury):**
+- `DistrictWorks.cs:412-436` nowa `HandedMeasured(v, out perDay, out days)`: utarg wozow okregu na dobe (okno ok. 28 dob, od 7 dob) bez progu i sufitu.
+  Utarg 0 przy pomiarze tez jest pomiarem. Warunek pomiaru jest ten sam co w HOf (klucz Works Pay Market Share albo okreg z pracami). Liczy pod Gate i nie rzuca.
+- `SideVillageFief.cs:739-750` (FillDistrict): przy kluczu `SideVillageIncomeRealSales` i pomiarze H = utarg / wartosc dnia okregu, bez progu 0.2 i sufitu 1.5.
+  Naleznosc to udzial wioski x prawdziwy utarg okregu x stawka pana. Utarg 0 daje nowy kod 7 i naleznosc 0. Po angielsku w menu i w Fiefs:
+  "The district's carts have sold nothing of late - no tax is owed on your village's goods." Bez pomiaru (mniej niz 7 dob) liczy jak dotad.
+  HandedRatio jest dalej wolany, zeby NoteSideH zostal bez zmian. Platnik bez zmian: posiadacz podatku okregu, najpierw licznik podatku wsi, potem kiesa.
+- Log: w linii "Wioska gracza (n20): dzien N" klucze maja "prawdziwa sprzedaz (323d) WL/WYL". Rachunek: "wartosc wioski V x H h x stawka pana R%;
+  prawdziwa sprzedaz (323d): utarg wozow okregu S/d (okno D dob) z wartosci dnia A, udzial wioski P% = sprzedane wioski Q/d, dawny H z progiem F dalby G".
+  Bez pomiaru: "; H bez pomiaru utargu (323d)".
+- MCM (Settings.cs:4394, gen_mcm.py): Side Village Income Real Sales (TAK), grupa "Land sales (m113)". Wylaczony = stary rachunek z progiem.
+- tools/sprawdz_logi.py: grupa `wies323d` (W323D-0..4 + test syntetyczny W323D-S). Sprawdza: nalezne = sprzedane wioski x stawka, H = utarg / wartosc,
+  nalezne <= sprzedane, do gracza <= nalezne, bez sprzedazy -> 0.
+
+**Ryzyko / co sprawdzic:**
+- Spodziewany skutek u Jeffa: Seven Elms w zimie 0-1 zl/dobe zamiast 5 (53 x 0.016 x 45% = 0.4, czyli ponizej 0.5 i kod 6 "makes too little").
+  Latem wiecej, wedlug utargu. W Fiefs i w podpowiedzi zlota naleznosc mniejsza.
+- Kolizja: LandSale liczy cene wioski z DueFor (BuildSide :425, oferta :926, na sucho :1055, wlasne dochody platnika :179). Ceny wiosek pobocznych ida teraz
+  za utargiem, wiec w zimie sa nizsze. Poprawka pory roku SideYearFix liczy sie z wartosci produkcji, nie z utargu, dlatego moze nie wyrownac calego spadku
+  sprzedazy zimowej. Sprawdzic linie "Ziemia (m113): na sucho" (mediana ceny).
+- F4/F6 (PaidAvg28, DrawnAvg28) biora mniejsze wyplaty, a zajecie i ziemia D platnika widza mniej. To spojne z wyplata.
+- Prace okregu (QuotesOf, wycena F13, linia PO) bez zmian: dalej H z progiem z HOf. Jedna zmiana naraz.
+- Ekonomia zamknieta: platnik i odbiorca bez zmian, zloto tylko mniejsze. Nic z niczego.
+- Status: WGRANE 161 (03.11, Armoury da5a3102)
+
 ## 2026-11-03 WGRANIE 160 - noc/322x-integracja (159 + audyt ekonomii: 322a zloto dworzan BK do kasy stolicy, 322b pomiar budow, 322c zboze zima ze spichlerzy wsi na targ, 322d szybsza obnizka DS u zadluzonych rad, 322e rata rachunkow zywnosci z dochodu, 322f chleb dla glodnych z czesci zapasu wojny w dlugim pokoju); Armoury.dll ca7f92ffd8bc52801cd788cc134f0c29 (CrashScribe 55ccc004, ForgeView 8441ab0e bez zmian); kopia 159: Armoury.dll.bak-2026-11-03-przed-wgranie160 i D:/Backup-Bannerlord/wgrane/2026-11-03-wgranie160-przed
 
 **Problem:** Jeff 03.11: "zrob audyt ekonomii na moim savie czy wszystko dziala prawidlowo" (raport scratchpad/audyt-ekonomii.md: wyciek BK DrainGold dworzan ~3.5 tys./dobe, ubytek budow ~300/dobe, puste polki zboza zima przy spichlerzach 632 dni, dlugi rad 1.83->3.26 mln, rachunki zywnosci 1.06 mln, chleb glodnych nieplacony przy zapasach wojny w pokoju); decyzje "3 - ok, 4 - ok, 5 - tak, 6 - tak".
