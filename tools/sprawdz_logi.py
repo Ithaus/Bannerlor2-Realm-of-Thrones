@@ -93059,7 +93059,7 @@ def main(argv):
 # ------------------------------------------------------------ zboze322c (322c, Jeff 03.11 "3 - ok": zboze zima - wsie sprzedaja zboze ze spichlerza na polke miasta; Armoury/src/TownGranary.Zima322.cs)
 Z322_RX = re.compile(
     r"Zboze zima \(322c\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|[A-Z][^|]*?) \| zima (?P<win>TAK|NIE) \(do konca (?P<left>\d+) dni; wies rozklada zapas ponad rezerwe na (?P<spread>\d+) dni\)"
-    r" \| rezerwa wsi (?P<keep>\d+) dni .*?\| miast (?P<towns>\d+) \(oblezone \d+, Innych \d+, poza ZC4 (?P<noks>\d+)\)"
+    r" \| rezerwa wsi (?:(?P<keep>\d+) dni |z bilansu zimy).*?\| miast (?P<towns>\d+) \(oblezone \d+, Innych \d+, poza ZC4 (?P<noks>\d+)\)"
     r" \| z sygnalem (?P<sig>\d+) \(.*?\) \| chcialy (?P<want>\d+) szt\. \| na polki dzis (?P<pcs>\d+) szt\. zboza \((?P<rat>[\d.]+) racji, racji na sztuke srednio (?P<rpp>[\d.]+|-);"
     r".*? z (?P<vills>\d+) wsi do (?P<ftowns>\d+) miast \| zloto miasto->wies (?P<gold>\d+) zl \(cena srednio (?P<price>[\d.]+|-) zl/szt\. bez pulapu, sztuka po sztuce w dol krzywej polki;"
     r" pierwsza sztuka srednio (?P<p0>[\d.]+|-) zl, ostatnia srednio (?P<p1>[\d.]+|-) zl; wartosc (?P<val>\d+) zl\)"
@@ -93146,7 +93146,7 @@ def zboze322c_rows(rep, D):
             f"dob {len(L)}; sztuk {sum(int(m.group('pcs')) for m in L)}, racji {sum(float(m.group('rat')) for m in L):.0f}, zlota {sum(int(m.group('gold')) for m in L)}; "
             f"cena srednio {(sum(pr) / len(pr)) if pr else 0:.1f} zl/szt. bez pulapu (wartosc {last.group('val')}); racji na sztuke {(sum(rp) / len(rp)) if rp else 0:.1f}; "
             f"polka po dostawie mediana dni {(sorted(sh)[(len(sh) - 1) // 2]) if sh else 0:.2f}; ostatnia doba: z sygnalem {last.group('sig')}, wsi {last.group('vills')}, miast {last.group('ftowns')}, "
-            f"poza ZC4 {last.group('noks')}, rezerwa {last.group('keep')} dni, rozlozenie {last.group('spread')} dni", "INFO", None)
+            f"poza ZC4 {last.group('noks')}, rezerwa {last.group('keep') or 'z bilansu zimy (324)'} dni, rozlozenie {last.group('spread')} dni", "INFO", None)
 
 
 def z322_line(pcs=120, rat="60000", drop="60000", shin=120, gold=3600, tout=3600, vin=3600, stum=0, stall=0, win="TAK", state="CZYNNE", sig=20, ms="2.5", p0="40", p1="22"):

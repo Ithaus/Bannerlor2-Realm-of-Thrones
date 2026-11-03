@@ -27,6 +27,14 @@ namespace Armoury
     ///  4. BRAMKA KRAINY ZIMA (klucz Winter Land Gate Planned Draw, StartCalibration.Arm.cs): zaplanowane zejscie stodoly (pokrycie koszyka z pkt 1) nie jest spadkiem,
     ///     a zamiast progu zapasu Ks Land Gate Reserve Days i budzetu straty kraina liczy serie tylko przy zapasie ponizej sumy floor + left x def (wsie nie dotrwaja
     ///     do wiosny). Poza zima - jak dotad.
+    /// RUNDA 2 (recenzja: 322c realnie 1.45k szt./d przy popycie miast 8-9k; podaz, nie kasa, byla korkiem):
+    ///  R2-1/2 bilans z PSUCIEM f23 (rho = -ln(1 - ulamek doby Famine), E = e^{rho x left}): wolne wsi x = zapas - floor x E - def x (E - 1) / rho, na dobe x x rho / (E - 1)
+    ///     (rho 0: x / left) - ten sam wzor w 322c, w pokryciu ze stodoly (Barn324) i w progu bramki krainy; 322c z REGIONU miasta targowego (Village.TradeBound -
+    ///     wsie miasta i zamkow), wspolny bilans regionu (klucz Winter Grain Trade Region; TownGranary.Zima322.cs);
+    ///  R2-3/4/5 kraina (Winter Grain Land Tier), sygnal ponizej celu T* (Winter Grain Fill To Target), kredyt wsi (Winter Grain Village Credit, KsFoodCredit konto "w");
+    ///  R2-6 bramka krainy: zapas FoodP z tych samych wsi co Plan, budzet straty LossDays wraca (bilans zastepuje tylko prog Reserve);
+    ///  R2-7 wies KS bez rachunku okregu (pierwsza doba po wczytaniu: DefR324 NaN) - bez bilansu (nie sprzedaje, nie liczy sie do Planu); reset sesji pol 324 (LiveReset);
+    ///  R2-8 przelom pory (zima <-> poza zima): nastepne LiveDaily przelicza wszystkie okregi (_liveFull) - pokrycie ze stodoly znika / pojawia sie tej samej doby.
     /// Linia "Glod zimy (324): dzien N" (co dobe przy LogEnabled): koszyk wsi z targu i ze stodoly, bilans zimy, dowoz 322c na polki, bramka. Klucze wylaczone - jak dotad.
     /// Stan bez zapisu (pola okregu LiveDist z przeliczenia). Wyjatki per wies liczone (bez globalnych wylacznikow, CLAUDE.md 7).
     /// </summary>
@@ -38,6 +46,72 @@ namespace Armoury
         private static int _w324GateLands;     // krainy, w ktorych dzis zamiast progu zapasu liczyl bilans zimy
         private static int _w324Stum;
         private static int _w324KprDay = int.MinValue; private static double _w324Kpr = double.NaN;
+        private static int _w324WinterPrev = -1;   // R2-8: zima w poprzedniej LiveDaily (1/0; -1 - brak pomiaru w sesji)
+        private static int _w324Flips;             // R2-8: przelomy pory w sesji (przeliczenie wszystkich okregow)
+
+        /// <summary>R2-7: reset sesji pol 324 (LiveReset - nowa sesja / kampania).</summary>
+        private static void Reset324()
+        {
+            _w324KprDay = int.MinValue; _w324Kpr = double.NaN;
+            _w324GatePlan = 0.0; _w324GateLands = 0; _w324Stum = 0;
+            _w324WinterPrev = -1; _w324Flips = 0;
+        }
+
+        /// <summary>R2-8 (LiveDaily, przed decyzja o przeliczeniu): przelom pory w dowolna strone - wszystkie okregi dzis (pokrycie koszyka ze stodoly znika po zimie
+        /// tej samej doby, a nie do 7 dob pozniej; na poczatku zimy pojawia sie w 1 dobe). Tylko przy kluczu Winter Villages Eat Own Granary.</summary>
+        private static void Flip324()
+        {
+            int w = WinterLeft324() > 0 ? 1 : 0;
+            if (_w324WinterPrev >= 0 && w != _w324WinterPrev && Sw324Barn)
+            {
+                _liveFull = true; _w324Flips++;
+                var s = Settings.Current;
+                if (s != null && s.LogEnabled) Log.Info("Glod zimy (324): przelom pory - " + (w == 1 ? "poczatek zimy" : "koniec zimy") + ", wszystkie okregi przeliczone dzis (pokrycie koszyka ze stodoly " + (w == 1 ? "od dzis" : "znika dzis") + "; przelomow w sesji " + _w324Flips + ").");
+            }
+            _w324WinterPrev = w;
+        }
+
+        /// <summary>R2-2: ciagla stopa psucia zapasu spichlerza (na dobe) z ulamka doby f23 (Famine.SpoilPerDay); 0 - bez psucia. Nie rzuca.</summary>
+        internal static double Rho324()
+        {
+            double sd = Famine.SpoilPerDay();
+            return sd > 0.0 && sd < 1.0 ? -Math.Log(1.0 - sd) : 0.0;
+        }
+
+        /// <summary>R2-2: mnoznik dobowy k = rho / (E - 1), E = e^{rho x left} (rho 0: 1 / left) - stala dobowa sprzedaz (albo zjadanie) z nadwyzki x, przy ktorej zapas
+        /// dochodzi do planu na koniec zimy. left <= 0 - 0 (E = 1).</summary>
+        internal static double WinterK324(int left, double rho, out double e)
+        {
+            e = 1.0;
+            if (left <= 0) return 0.0;
+            if (!(rho > 1e-12)) return 1.0 / left;
+            e = Math.Exp(rho * left);
+            return e > 1.0 ? rho / (e - 1.0) : 1.0 / left;
+        }
+
+        /// <summary>R2-2: wolne zapasu wsi do wiosny (racje; ujemne - wies nie dotrwa): zapas - floor x E - def / k (def / k = def x (E - 1) / rho). k <= 0 - 0.</summary>
+        internal static double WinterFree324(double food, double floor, double def, double e, double k)
+        {
+            return k > 0.0 ? food - floor * e - def / k : 0.0;
+        }
+
+        /// <summary>R2-6: zapas potrzebny dzis, by dotrwac do wiosny na progu racjonowania (racje): floor x E + def / k.</summary>
+        internal static double WinterNeed324(double floor, double def, double e, double k)
+        {
+            return k > 0.0 ? floor * e + def / k : floor;
+        }
+
+        /// <summary>R2-7: wies liczona w KS (stan zastosowany, okreg w _live, nie pola mieszczan, kraina nie wrocona) - jej brak stolu bierzemy tylko z rachunku okregu.</summary>
+        private static bool KsVillage324(Village v)
+        {
+            try
+            {
+                if (v == null || v.Settlement == null || v.Settlement.StringId == null || !Applied || LandBackOf(v.Settlement)) return false;
+                LiveDist ld;
+                return _live.TryGetValue(v.Settlement.StringId, out ld) && ld != null && !ld.TF;
+            }
+            catch { return false; }
+        }
 
         /// <summary>324: dni do konca zimy Westeros (jak 322c); 0 - poza zima albo klimat bez stanu. Nie rzuca.</summary>
         internal static int WinterLeft324()
@@ -71,13 +145,20 @@ namespace Armoury
         /// potrzeba - plon Famine), floor (prog racjonowania Famine). false - spichlerz nieczynny albo bez migawki doby `today`. Nie rzuca.</summary>
         internal static bool WinterBalance324(Village v, int today, out double food, out double home, out double def, out double floor)
         {
-            food = home = def = floor = 0.0;
+            bool nb; return WinterBalance324(v, today, out food, out home, out def, out floor, out nb);
+        }
+
+        /// <summary>WinterBalance324; `noBal` - false, bo wies KS nie ma jeszcze rachunku okregu (R2-7: pierwsza doba po wczytaniu - bez zgadywania z plonu z zakupami).</summary>
+        internal static bool WinterBalance324(Village v, int today, out double food, out double home, out double def, out double floor, out bool noBal)
+        {
+            food = home = def = floor = 0.0; noBal = false;
             try
             {
                 double harv, f0, cap; float u; int d;
                 if (!Famine.DayOf(v, out home, out harv, out f0, out cap, out u, out d) || d != today || !(home > 0.0)) return false;
                 if (!Famine.FoodOf(v, out food)) return false;
                 double k = WinterDeficit324(v);
+                if (double.IsNaN(k) && KsVillage324(v)) { noBal = true; return false; }   // R2-7: wies KS bez rachunku okregu - plon KS zawiera racje kupione, def bylby za maly
                 def = double.IsNaN(k) ? Math.Max(0.0, home - harv) : k;
                 var s = Settings.Current;
                 floor = Math.Max(0, s != null ? s.FamineRationDays : 90) * home;
@@ -127,7 +208,9 @@ namespace Armoury
             if (ld.V.VillageState != Village.VillageStates.Normal) return 0.0;              // spladrowana - jak dotad (najazd i odbudowa)
             double food, home, def, floor;
             if (!WinterBalance324(ld.V, Today(), out food, out home, out def, out floor)) return 0.0;
-            double availK = kpr * Math.Max(0.0, food - floor) / left;
+            // R2-2: pokrycie z nadwyzki ponad prog racjonowania na koniec zimy z psuciem (floor x E), rozlozone do wiosny (k)
+            double e4; double k4 = WinterK324(left, Rho324(), out e4);
+            double availK = kpr * Math.Max(0.0, food - floor * e4) * k4;
             double cover = Math.Min(defK, availK);
             if (!(cover > 1e-6)) return 0.0;
             // zdejmowanie: zboze pierwsze, potem drabina koszyka (napoj, bialko, reszta jedzenia) - tylko towary z kcal
@@ -191,17 +274,19 @@ namespace Armoury
                 catch (Exception e) { if (++_w324Stum <= 3) Stumble("Line324(wies)", e); }
             }
             // bilans zimy wszystkich wsi ze spichlerzem (KS i poza KS)
-            int bn = 0, bKs = 0; double bFood = 0, bDef = 0, bFloor = 0, bFree = 0;
+            int bn = 0, bKs = 0, bNoBal = 0; double bFood = 0, bDef = 0, bFloor = 0, bFree = 0, bNet = 0;
+            double rho = Rho324(), eL; double kL = WinterK324(left, rho, out eL);
             if (left > 0)
                 foreach (var v in Village.All)
                 {
                     try
                     {
-                        double food, home, def, floor;
-                        if (v == null || !WinterBalance324(v, today, out food, out home, out def, out floor)) continue;
+                        double food, home, def, floor; bool nb = false;
+                        if (v == null || !WinterBalance324(v, today, out food, out home, out def, out floor, out nb)) { if (nb) bNoBal++; continue; }
                         bn++; if (!double.IsNaN(WinterDeficit324(v))) bKs++;
-                        bFood += food; bDef += left * def; bFloor += floor;
-                        bFree += Math.Max(0.0, food - floor - left * def) / left;
+                        bFood += food; bDef += kL > 0 ? def / kL : 0.0; bFloor += floor * eL;
+                        double x = WinterFree324(food, floor, def, eL, kL);
+                        bFree += Math.Max(0.0, x) * kL; bNet += x;
                     }
                     catch (Exception e) { if (++_w324Stum <= 3) Stumble("Line324(bilans)", e); }
                 }
@@ -210,6 +295,8 @@ namespace Armoury
             double kprW = KcalPerRationWorld324(today);
             double freePcs = !double.IsNaN(kprW) && gk > 0 ? bFree * kprW / (3300.0 * sigma * gk) : double.NaN;
             int p322, p322Out, t322Out; TownGranary.Last324(today, out p322, out p322Out, out t322Out);
+            int p322L, p322C; long c322; TownGranary.Last324b(today, out p322L, out p322C, out c322);
+            double netPcs = !double.IsNaN(kprW) && gk > 0 ? Math.Max(0.0, bNet) * kL * kprW / (3300.0 * sigma * gk) : double.NaN;
             var sb = new StringBuilder(1200);
             sb.Append("Glod zimy (324): dzien ").Append(day)
               .Append(" | zima ").Append(left > 0 ? "TAK (do konca " + left + " dni)" : "NIE - koszyk wsi pelny, 322c nic")
@@ -220,11 +307,14 @@ namespace Armoury
               .Append(" (").Append(wantK > 0 ? (100.0 * coverK / wantK).ToString("0.0", Inv) : "-").Append("%; ").Append(coverR.ToString("0", Inv)).Append(" racji/d, zboza nie kupionego w miescie ok. ")
               .Append(gk > 0 ? (grainKg / (sigma * gk)).ToString("0", Inv) : "-").Append(" szt./d)")
               .Append(" | wsi z brakiem stolu: stodola pokrywa calosc ").Append(full).Append(", czesc ").Append(part).Append(", nic ").Append(none).Append(" (w tym na progu racjonowania ").Append(atFloor).Append(')')
-              .Append(" | bilans zimy (wsi ze spichlerzem ").Append(bn).Append(", z rachunkiem KS ").Append(bKs).Append("): zapas ").Append((bFood / 1e6).ToString("0.00", Inv)).Append(" mln racji, brak do wiosny ")
-              .Append((bDef / 1e6).ToString("0.00", Inv)).Append(" mln, prog racjonowania ").Append((bFloor / 1e6).ToString("0.00", Inv)).Append(" mln, wolne na targ ").Append(bFree.ToString("0", Inv)).Append(" racji/d (ok. ")
-              .Append(double.IsNaN(freePcs) ? "-" : freePcs.ToString("0", Inv)).Append(" szt. zboza/d; kcal racji swiata ").Append(double.IsNaN(kprW) ? "-" : kprW.ToString("0", Inv)).Append(')')
-              .Append(" | dowoz ze spichlerzy na polki (322c) dzis ").Append(p322).Append(" szt. (miasta poza ZC4 ").Append(t322Out).Append(", ").Append(p322Out).Append(" szt.)")
+              .Append(" | bilans zimy z psuciem (rho ").Append(rho.ToString("0.0000000", Inv)).Append("/d, e^(rho x dni) ").Append(eL.ToString("0.000", Inv)).Append(", efektywnie ").Append(kL > 0 ? (1.0 / kL).ToString("0", Inv) : "-")
+              .Append(" dni; wsi ze spichlerzem ").Append(bn).Append(", z rachunkiem KS ").Append(bKs).Append(", bez bilansu po wczytaniu ").Append(bNoBal).Append("): zapas ").Append((bFood / 1e6).ToString("0.00", Inv)).Append(" mln racji, brak do wiosny ")
+              .Append((bDef / 1e6).ToString("0.00", Inv)).Append(" mln, prog racjonowania na koniec (z psuciem) ").Append((bFloor / 1e6).ToString("0.00", Inv)).Append(" mln, wolne na targ (suma wsi) ").Append(bFree.ToString("0", Inv)).Append(" racji/d (ok. ")
+              .Append(double.IsNaN(freePcs) ? "-" : freePcs.ToString("0", Inv)).Append(" szt. zboza/d), netto swiata ").Append((Math.Max(0.0, bNet) * kL).ToString("0", Inv)).Append(" racji/d (ok. ").Append(double.IsNaN(netPcs) ? "-" : netPcs.ToString("0", Inv))
+              .Append(" szt./d").Append(bNet < 0 ? "; SWIAT NIE MA ZBOZA DLA MIAST DO WIOSNY - brak " + ((-bNet) / 1e6).ToString("0.00", Inv) + " mln racji" : "").Append("; kcal racji swiata ").Append(double.IsNaN(kprW) ? "-" : kprW.ToString("0", Inv)).Append(')')
+              .Append(" | dowoz ze spichlerzy na polki (322c) dzis ").Append(p322).Append(" szt. (miasta poza ZC4 ").Append(t322Out).Append(", ").Append(p322Out).Append(" szt.; z wsi zamkow ").Append(p322C).Append(", z krainy ").Append(p322L).Append(", na rachunek wsi ").Append(c322).Append(" zl)")
               .Append(" | bramka krainy: zaplanowane zejscie stodol odjete od spadku ").Append(_w324GatePlan.ToString("0", Inv)).Append(" racji, krain z progiem bilansu zimy ").Append(_w324GateLands)
+              .Append(" | przelomy pory w sesji ").Append(_w324Flips)
               .Append(" | potkniecia ").Append(_w324Stum).Append('.');
             Log.Info(sb.ToString());
             _w324GatePlan = 0.0; _w324GateLands = 0; _w324Stum = 0;

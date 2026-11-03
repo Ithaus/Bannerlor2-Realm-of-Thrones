@@ -27,7 +27,7 @@ namespace Armoury
     internal static class KsFoodCredit
     {
         private sealed class Bill { internal long Left; internal int Day; }
-        private sealed class Acct { internal Settlement Src, Dst; internal bool Claim; internal readonly List<Bill> B = new List<Bill>(8); }   // recenzja ceny-r5: Claim - roszczenie z zadatku (osobne konto pary)
+        private sealed class Acct { internal Settlement Src, Dst; internal bool Claim, Vil; internal readonly List<Bill> B = new List<Bill>(8); }   // recenzja ceny-r5: Claim - roszczenie z zadatku (osobne konto pary); 324: Vil - wies wierzycielem (zboze zima 322c)
 
         private const int MaxEntries = 8, SaveCapChars = 64 * 1024;
         private const string Ver = "kk1";
@@ -46,6 +46,13 @@ namespace Armoury
         // KS-R5 ceny-r5 (zadatek kupcow celu): roszczenia celu wobec zrodla (nadplacony albo niezwrocony zadatek, ktorego kasa zrodla nie oddala od razu) - rachunek
         // odwrotny (wierzyciel = miasto celu, dluznik = miasto zrodla), splacany jak kazdy rachunek; w kontroli rachunkow obok "nowe" (nie w "u celu")
         internal static long DClaimNew; internal static int DClaimN;
+        // 324 runda 2 (klucz Winter Grain Village Credit): RACHUNEK WSI - zboze ze spichlerza wsi na polke miasta (TownGranary 322c), ktorego kasa miasta nie zaplacila
+        // od razu: wierzyciel = wies (Settlement wsi, osobne konto Vil, wpis zapisu z 5. polem "w"), dluznik = miasto. Splacany w PayDaily razem z rachunkami miasta
+        // (od najstarszego, z nadwyzki i z raty 322e - zloto kasa miasta -> kiesa wsi). Jak Claim: NIE blokuje dowozu KS-H (OverdueDst), nie wchodzi do zaleglych
+        // (OverdueOf / PayByLord - pan nie placi), ani do odblokowania 322e (food1). Doba: nowe (DVilNew, w kontroli rachunkow EndDay), splacone (DVilRepaid).
+        // Starsza DLL czyta wpis "w" jak rachunek miasta z wierzycielem bez miasta - przepada w PayDaily (bez zlota; licznik przepadkow).
+        internal static long DVilNew, DVilRepaid; internal static int DVilNewN;
+        private static long _vilRepaidLast; private static int _vilRepaidDay = int.MinValue;   // splacone wsiom w ostatniej PayDaily (linia 322c nastepnej doby)
         private static long _openPrev = -1;
         private static int _stum; private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -79,6 +86,7 @@ namespace Armoury
             _acc.Clear(); _pending = null; _openPrev = -1; ForfeitTotal = 0; ForfeitTotalN = 0; _stum = 0; _err.Clear();
             _payDay = int.MinValue; _relDay = int.MinValue; _paidToday.Clear(); _paidPrev.Clear(); _released.Clear();
             _lordPaidToday.Clear(); _lordPaidPrev.Clear();
+            _vilRepaidLast = 0; _vilRepaidDay = int.MinValue;
             ClearDay();
         }
 
@@ -88,6 +96,7 @@ namespace Armoury
             DLordRepaid = GLordPaid = 0; DLordN = 0;
             DLordEarly = 0; DLordEarlyN = 0;
             DClaimNew = 0; DClaimN = 0;
+            DVilNew = DVilRepaid = 0; DVilNewN = 0;
             DRateRepaid = 0; DRateN = DRateDebtors = DRateOnTime = DRateReleased = DRateNoMeasure = 0;
         }
 
@@ -103,6 +112,10 @@ namespace Armoury
         private static string Key(Settlement s, Settlement d) { return s.StringId + "|" + d.StringId; }
         /// <summary>Recenzja ceny-r5: konto roszczen z zadatkow (wierzyciel = cel, ktory zaplacil zadatek, dluznik = zrodlo) - osobne od rachunkow za jedzenie tej pary.</summary>
         private static string ClaimKey(Settlement creditor, Settlement debtor) { return "z|" + creditor.StringId + "|" + debtor.StringId; }
+        /// <summary>324 runda 2: konto rachunku wsi (wierzyciel = wies, dluznik = miasto) - osobne od rachunkow miast.</summary>
+        private static string VilKey(Settlement vil, Settlement town) { return "w|" + vil.StringId + "|" + town.StringId; }
+        /// <summary>324 runda 2: rachunek, ktory blokuje dowoz / placi pan (za jedzenie dowiezione wozem KS-H) - bez roszczen z zadatkow i rachunkow wsi.</summary>
+        private static bool Blocking(Acct a) { return !a.Claim && !a.Vil; }
 
         internal static bool Any { get { Resolve(); return _acc.Count > 0; } }
 
@@ -152,6 +165,25 @@ namespace Armoury
             GDstPaid += got; GSrcGot += rec;
             return got;
         }
+
+        /// <summary>324 runda 2: przelew cel -> wierzyciel (miasto albo wies - rachunek wsi) z pomiarem obu stron; zwraca to, co zeszlo z kasy celu.</summary>
+        private static long TransferTo(Town dst, Settlement src, long x)
+        {
+            if (src == null) return 0;
+            if (src.Town != null) return Transfer(dst, src.Town, x);
+            var v = src.Village;
+            if (x <= 0 || dst == null || v == null) return 0;
+            int ask = (int)Math.Min(int.MaxValue, Math.Min(x, Math.Max(0, dst.Gold)));
+            if (ask <= 0) return 0;
+            int d0 = dst.Gold; dst.ChangeGold(-ask); long got = d0 - dst.Gold;
+            if (got <= 0) return 0;
+            int s0 = v.Gold; v.ChangeGold((int)got); long rec = v.Gold - s0;
+            GDstPaid += got; GSrcGot += rec;
+            return got;
+        }
+
+        /// <summary>324 runda 2: wierzyciel konta istnieje (miasto; rachunek wsi - wies).</summary>
+        private static bool SrcOk(Acct a) { return a.Src != null && (a.Src.Town != null || (a.Vil && a.Src.Village != null)); }
 
         private static bool AtWar(Settlement a, Settlement b)
         {
@@ -220,7 +252,7 @@ namespace Armoury
                         // recenzja calosci (noc 17/18.10): roszczenie z zadatku (Claim) przy wojnie CZEKA do pokoju (bez splaty i bez przepadku) - zrodlo wozu zawroconego wojna
                         // odebralo caly towar, wiec przepadek roszczenia zostawialby mu tez zadatek (cel placilby za nic); rachunki za dowiezione jedzenie - jak dotad
                         if (a.Claim && a.Src != null && a.Dst != null && a.Src.Town != null && a.Dst.Town != null && AtWar(a.Src, a.Dst)) continue;
-                        if (a.Src == null || a.Dst == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst))
+                        if (!SrcOk(a) || a.Dst == null || a.Dst.Town == null || AtWar(a.Src, a.Dst))
                         {
                             // kupcy stracili - roszczenie znika (bez zlota)
                             foreach (var b in a.B) { DForfeit += b.Left; DForfeitN++; ForfeitTotal += b.Left; ForfeitTotalN++; }
@@ -245,15 +277,16 @@ namespace Armoury
                         l.Sort((x, y) => x.Value.Day != y.Value.Day ? x.Value.Day.CompareTo(y.Value.Day) : string.CompareOrdinal(x.Key.Src.StringId, y.Key.Src.StringId));
                         var dst = l[0].Key.Dst; var dt = dst.Town;
                         long gold0 = dt.Gold, owed0 = 0, food0 = 0;
-                        foreach (var p in l) { if (p.Value.Left <= 0) continue; owed0 += p.Value.Left; if (!p.Key.Claim) food0 += p.Value.Left; }
+                        foreach (var p in l) { if (p.Value.Left <= 0) continue; owed0 += p.Value.Left; if (Blocking(p.Key)) food0 += p.Value.Left; }
                         long free = Free(dt), paidS = 0, paidR = 0;
                         foreach (var p in l)
                         {
                             if (free <= 0) break;
                             var b = p.Value; if (b.Left <= 0) continue;
-                            long got = Transfer(dt, p.Key.Src.Town, Math.Min(free, b.Left));
+                            long got = TransferTo(dt, p.Key.Src, Math.Min(free, b.Left));
                             if (got <= 0) break;
                             b.Left -= got; free -= got; DRepaid += got; paidS += got;
+                            if (p.Key.Vil) DVilRepaid += got;
                         }
                         // 322e: rata z zarobku doby - dopelnienie splaty z nadwyzki do raty, z zywej kasy (takze ponizej podlogi), od najstarszego
                         long inc = 0, net = 0, prev = 0, lprev = 0, rate = 0; bool meas = false;
@@ -273,9 +306,10 @@ namespace Armoury
                                 {
                                     if (due <= 0) break;
                                     var b = p.Value; if (b.Left <= 0) continue;
-                                    long got = Transfer(dt, p.Key.Src.Town, Math.Min(due, b.Left));
+                                    long got = TransferTo(dt, p.Key.Src, Math.Min(due, b.Left));
                                     if (got <= 0) break;
                                     b.Left -= got; due -= got; DRepaid += got; paidR += got; DRateRepaid += got;
+                                    if (p.Key.Vil) DVilRepaid += got;
                                 }
                                 if (paidR > 0) DRateN++;
                             }
@@ -285,7 +319,7 @@ namespace Armoury
                         if (share > 0 && owed0 > 0)
                         {
                             long food1 = 0; int oldest = int.MaxValue;
-                            foreach (var p in l) if (!p.Key.Claim && p.Value.Left > 0) { food1 += p.Value.Left; oldest = Math.Min(oldest, p.Value.Day); }
+                            foreach (var p in l) if (Blocking(p.Key) && p.Value.Left > 0) { food1 += p.Value.Left; oldest = Math.Min(oldest, p.Value.Day); }
                             bool onTime = meas && rate > 0 && paid >= Math.Min(rate, owed0);
                             if (onTime) DRateOnTime++;
                             bool rel = onTime && relDays > 0 && food1 > 0 && food1 <= rate * (long)relDays;
@@ -302,6 +336,7 @@ namespace Armoury
                 }
                 foreach (var kv in _acc) { kv.Value.B.RemoveAll(b => b.Left <= 0); if (kv.Value.B.Count == 0) gone.Add(kv.Key); }
                 foreach (var k in gone) _acc.Remove(k);
+                _vilRepaidLast = DVilRepaid; _vilRepaidDay = today;
                 if (share > 0 && DRateDebtors > 0)
                 {
                     try
@@ -315,6 +350,74 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("PayDaily", e); }
+        }
+
+        /// <summary>324 runda 2 (TownGranary 322c, klucz Winter Grain Village Credit): nowy rachunek wsi `vil` wobec miasta `town` (zboze na polce niezaplacone od razu).
+        /// Zloto sie nie rusza. false - rachunek nie powstal (wtedy wolajacy nie oddaje towaru na kredyt). Nie rzuca.</summary>
+        internal static bool OpenVillage(Settlement vil, Settlement town, long x, int today)
+        {
+            try
+            {
+                Resolve();
+                if (x <= 0 || vil == null || town == null || vil.Village == null || town.Town == null || vil.StringId == null || town.StringId == null) return false;
+                Acct a; string k = VilKey(vil, town);
+                if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = vil, Dst = town, Vil = true }; _acc[k] = a; }
+                var last = a.B.Count > 0 ? a.B[a.B.Count - 1] : null;
+                if (last != null && (last.Day == today || a.B.Count >= MaxEntries)) last.Left += x;
+                else a.B.Add(new Bill { Left = x, Day = today });
+                DVilNew += x; DVilNewN++;
+                return true;
+            }
+            catch (Exception e) { Stumble("OpenVillage", e); return false; }
+        }
+
+        /// <summary>324 runda 2: dlug miasta `dst` za jedzenie (rachunki KS-H i rachunki wsi, bez roszczen z zadatkow; zl) - pulap kredytu wsi. Nie rzuca.</summary>
+        internal static long FoodDebtOf(Settlement dst)
+        {
+            long s = 0;
+            try
+            {
+                Resolve();
+                if (dst == null || _acc.Count == 0) return 0;
+                foreach (var a in _acc.Values) { if (a.Claim || a.Dst != dst) continue; foreach (var b in a.B) if (b.Left > 0) s += b.Left; }
+            }
+            catch (Exception e) { Stumble("FoodDebtOf", e); }
+            return s;
+        }
+
+        /// <summary>324 runda 2: rata 322e miasta `dst` z biezacego zarobku (ten sam wzor co PayDaily: udzial x (netto okna TownPurse + splaty wczoraj + splaty panow
+        /// wczoraj)); false - bez pomiaru zarobku (TownPurse wylaczony, pierwsza doba) albo udzial 0. Nie rzuca.</summary>
+        internal static bool RateOf(Settlement dst, out long rate)
+        {
+            rate = 0;
+            try
+            {
+                double share = RateShare;
+                if (dst == null || dst.Town == null || !(share > 0)) return false;
+                long net; if (!TownPurse.NetOf(dst.Town, out net)) return false;
+                int today = Today(); long prev = 0, lprev = 0;
+                // splaty "wczoraj": PayDaily dzis juz byla - _paidPrev; ostatnia byla wczoraj - jeszcze w _paidToday
+                if (_payDay == today) { _paidPrev.TryGetValue(dst, out prev); _lordPaidPrev.TryGetValue(dst, out lprev); }
+                else if (_payDay == today - 1) { _paidToday.TryGetValue(dst, out prev); _lordPaidToday.TryGetValue(dst, out lprev); }
+                long inc = net + prev + lprev;
+                rate = inc > 0 ? (long)Math.Ceiling(share * inc) : 0;
+                return true;
+            }
+            catch (Exception e) { Stumble("RateOf", e); rate = 0; return false; }
+        }
+
+        /// <summary>324 runda 2 (linia 322c): rachunki wsi otwarte (zl, miast dluznikow) i splacone wsiom w ostatniej PayDaily (doba `paidDay`). Nie rzuca.</summary>
+        internal static void VillageStats(out long open, out int towns, out long paidLast, out int paidDay)
+        {
+            open = 0; towns = 0; paidLast = _vilRepaidLast; paidDay = _vilRepaidDay;
+            try
+            {
+                Resolve();
+                var h = new HashSet<Settlement>();
+                foreach (var a in _acc.Values) { if (!a.Vil) continue; long s = 0; foreach (var b in a.B) if (b.Left > 0) s += b.Left; if (s > 0) { open += s; h.Add(a.Dst); } }
+                towns = h.Count;
+            }
+            catch (Exception e) { Stumble("VillageStats", e); }
         }
 
         // ------------------------------------------------------------ scalenie r4-glodbunt + r4-kupcy (noc 17/18.10): pan glodnego miasta splaca zalegle rachunki
@@ -336,7 +439,7 @@ namespace Armoury
             int today = Today(); long s = 0;
             foreach (var a in _acc.Values)
             {
-                if (a.Claim || a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;   // recenzja ceny-r5: bez roszczen z zadatkow
+                if (!Blocking(a) || a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;   // recenzja ceny-r5: bez roszczen z zadatkow (324: i rachunkow wsi)
                 foreach (var b in a.B) if (b.Left > 0 && today - b.Day > age) s += b.Left;
             }
             return s;
@@ -352,7 +455,7 @@ namespace Armoury
             int today = Today();
             foreach (var a in _acc.Values)
             {
-                if (a.Claim || a.Dst == null || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;
+                if (!Blocking(a) || a.Dst == null || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;
                 foreach (var b in a.B)
                 {
                     if (b.Left <= 0 || today - b.Day <= age) continue;
@@ -369,7 +472,7 @@ namespace Armoury
             oldestAge = -1; older = 0;
             foreach (var a in _acc.Values)
             {
-                if (a.Claim) continue;
+                if (!Blocking(a)) continue;
                 foreach (var b in a.B)
                 {
                     if (b.Left <= 0) continue;
@@ -398,7 +501,7 @@ namespace Armoury
                 var l = new List<KeyValuePair<Acct, Bill>>();
                 foreach (var a in _acc.Values)
                 {
-                    if (a.Claim || a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;   // recenzja ceny-r5: bez roszczen z zadatkow
+                    if (!Blocking(a) || a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;   // recenzja ceny-r5: bez roszczen z zadatkow (324: i rachunkow wsi)
                     foreach (var b in a.B) if (b.Left > 0 && today - b.Day > age) l.Add(new KeyValuePair<Acct, Bill>(a, b));
                 }
                 if (l.Count == 0) return 0;
@@ -433,7 +536,7 @@ namespace Armoury
             var d = new Dictionary<Settlement, long>();
             foreach (var a in _acc.Values)
             {
-                if (a.Src == null) continue;
+                if (a.Src == null || a.Vil) continue;   // 324: rachunki wsi - nie narazenie miasta zrodla KS-H
                 long s = 0; foreach (var b in a.B) s += Math.Max(0, b.Left);
                 long v; d.TryGetValue(a.Src, out v); d[a.Src] = v + s;
             }
@@ -448,7 +551,7 @@ namespace Armoury
             bool relNow = _relDay == today && _released.Count > 0;      // 322e: dluznik w terminie z dlugiem w horyzoncie raty - dowoz tej doby odblokowany
             foreach (var a in _acc.Values)
             {
-                if (a.Dst == null || a.Claim) continue;                 // recenzja ceny-r5: roszczenie z zadatku nie blokuje dowozu do dluznika
+                if (a.Dst == null || !Blocking(a)) continue;            // recenzja ceny-r5: roszczenie z zadatku (324: i rachunek wsi) nie blokuje dowozu do dluznika
                 if (relNow && _released.Contains(a.Dst)) continue;
                 foreach (var b in a.B) if (b.Left > 0 && today - b.Day > od) { h.Add(a.Dst); break; }
             }
@@ -467,7 +570,7 @@ namespace Armoury
                     if (b.Left <= 0) continue;
                     open += b.Left; bills++;
                     long v; dsts.TryGetValue(a.Dst, out v); dsts[a.Dst] = v + b.Left;
-                    if (today - b.Day > odd && !a.Claim) { overdue += b.Left; od.Add(a.Dst); }   // recenzja ceny-r5: zalegle = blokujace dowoz (bez roszczen z zadatkow)
+                    if (today - b.Day > odd && Blocking(a)) { overdue += b.Left; od.Add(a.Dst); }   // recenzja ceny-r5: zalegle = blokujace dowoz (bez roszczen z zadatkow)
                 }
             towns = dsts.Count; overdueTowns = od.Count;
             var top = new List<KeyValuePair<Settlement, long>>(dsts);
@@ -489,7 +592,7 @@ namespace Armoury
             openNow = 0;
             foreach (var a in _acc.Values) foreach (var b in a.B) if (b.Left > 0) openNow += b.Left;
             // KS-R5 ceny-r5: roszczenia z zadatkow (DClaimNew) - nowe rachunki odwrotne; bez zadatkow 0 (bit w bit)
-            string s = _openPrev < 0 ? "-" : (_openPrev + DNew + DClaimNew - DRepaid - DForfeit - openNow).ToString(CultureInfo.InvariantCulture);
+            string s = _openPrev < 0 ? "-" : (_openPrev + DNew + DClaimNew + DVilNew - DRepaid - DForfeit - openNow).ToString(CultureInfo.InvariantCulture);
             _openPrev = openNow;
             return s;
         }
@@ -524,12 +627,12 @@ namespace Armoury
                 {
                     long sum = 0; int day = int.MaxValue;
                     foreach (var b in a.B) { if (b.Left <= 0) continue; sum += b.Left; day = Math.Min(day, b.Day); }
-                    if (sum > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(sum).Append('~').Append(day); if (a.Claim) sb.Append("~z"); }
+                    if (sum > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(sum).Append('~').Append(day); if (a.Claim) sb.Append("~z"); else if (a.Vil) sb.Append("~w"); }
                     continue;
                 }
                 // recenzja ceny-r5: roszczenie z zadatku - 5. pole "z" (starsza DLL czyta 4 pola i bierze je za zwykly rachunek pary - tak jak przed recenzja)
                 foreach (var b in a.B)
-                    if (b.Left > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(b.Left).Append('~').Append(b.Day); if (a.Claim) sb.Append("~z"); }
+                    if (b.Left > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(b.Left).Append('~').Append(b.Day); if (a.Claim) sb.Append("~z"); else if (a.Vil) sb.Append("~w"); }
             }
             return sb.ToString();
         }
@@ -557,8 +660,10 @@ namespace Armoury
                         try { src = om.GetObject<Settlement>(q[0]); dst = om.GetObject<Settlement>(q[1]); } catch { }
                         if (src == null || dst == null) { bad++; continue; }
                         bool claim = q.Length >= 5 && q[4] == "z";     // recenzja ceny-r5: roszczenie z zadatku (brak pola - rachunek za jedzenie, stary zapis)
-                        Acct a; string k = claim ? ClaimKey(src, dst) : Key(src, dst);
-                        if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = src, Dst = dst, Claim = claim }; _acc[k] = a; }
+                        bool vil = q.Length >= 5 && q[4] == "w";       // 324 runda 2: rachunek wsi (wierzyciel - wies)
+                        if (vil && src.Village == null) { bad++; continue; }
+                        Acct a; string k = claim ? ClaimKey(src, dst) : vil ? VilKey(src, dst) : Key(src, dst);
+                        if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = src, Dst = dst, Claim = claim, Vil = vil }; _acc[k] = a; }
                         if (a.B.Count >= MaxEntries) a.B[a.B.Count - 1].Left += left; else a.B.Add(new Bill { Left = left, Day = day });
                         ok++; sum += left;
                     }

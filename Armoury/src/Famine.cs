@@ -136,6 +136,20 @@ namespace Armoury
 
         private static double Clamp01(double x) { return double.IsNaN(x) ? 0.0 : (x < 0.0 ? 0.0 : (x > 1.0 ? 1.0 : x)); }
         private static int YearDays() { return Math.Max(28, CampaignTime.DaysInYear); }
+
+        /// <summary>324 runda 2 (bilans zimy z psuciem): ulamek doby psucia zapasu spichlerza (f23 - ta sama liczba co spoilD w Daily: GranarySpoilagePercentPerYear
+        /// rozlozone na doby roku gry); klucz wylaczony albo 0% - 0. Nie rzuca.</summary>
+        internal static double SpoilPerDay()
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.GranarySpoilage) return 0.0;
+                double p = Math.Max(0.0, Math.Min(0.5, s.GranarySpoilagePercentPerYear / 100.0));
+                return p > 0.0 ? 1.0 - Math.Pow(1.0 - p, 1.0 / YearDays()) : 0.0;
+            }
+            catch { return 0.0; }
+        }
         private static bool BadId(string id) { return string.IsNullOrEmpty(id) || id.IndexOf('|') >= 0 || id.IndexOf('=') >= 0 || id.IndexOf(',') >= 0 || id.IndexOf(';') >= 0; }
 
         /// <summary>Zgony rocznie (ulamek) przy braku u: Dmax x ((u - T) / (1 - T))^2 ponad prog T (GL 2.5).</summary>

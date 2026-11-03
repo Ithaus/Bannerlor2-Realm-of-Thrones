@@ -4188,6 +4188,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool WinterLandGatePlannedDraw { get; set; } = true;
 
+        [SettingPropertyBool("Winter Grain Trade Region", HintText = "with Winter Grain From Winter Balance: a town's grain comes from every village that trades in it (the game's trade town of the village - its own villages and those of nearby castles), and the region keeps its common winter balance (spoilage counted): villages with grain to spare sell, the shortfall of the poorer ones stays in the region. Off = only the town's own villages, each on its own", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterGrainTradeRegion { get; set; } = true;
+
+        [SettingPropertyBool("Winter Grain Land Tier", HintText = "with Winter Grain To Market: when its own region gives less than the town wants, a hungry town takes grain from the spare of other towns' regions of the same land (not at war), hungriest town first. Off = only its own villages", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterGrainLandTier { get; set; } = true;
+
+        [SettingPropertyBool("Winter Grain Village Credit", HintText = "with Winter Grain To Market: a town without money above its merchants' reserve pays from all its cash, and what it still owes stays as a food bill to the village, repaid from the town's daily earnings like other food bills (never more than its daily repayment can clear within Ks Consign Rate Release Days). Off = a town buys only with money above its merchants' reserve", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterGrainVillageCredit { get; set; } = true;
+
+        [SettingPropertyBool("Winter Grain Fill To Target", HintText = "with Winter Grain To Market: villages bring grain whenever the town's stall is below its market target (days of demand), not only when it is almost empty. Off = only below half a day of demand or at the price trigger", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterGrainFillToTarget { get; set; } = true;
+
         [SettingPropertyBool("Watch Law Enabled", HintText = "every man who joins the Night's Watch comes from the Seven Kingdoms: first the convicts sent to the Wall, then outlaws who take the black, then common folk of every land by its numbers. A brother never goes home: routed or disbanded he walks back to the Wall, and a deserter hides among the outlaws of the North", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool WatchLawEnabled { get; set; } = true;
@@ -12326,6 +12342,10 @@ namespace Armoury
             s.WinterGrainFromWinterBalance = WinterGrainFromWinterBalance;
             s.WinterGrainAllTowns = WinterGrainAllTowns;
             s.WinterLandGatePlannedDraw = WinterLandGatePlannedDraw;
+            s.WinterGrainTradeRegion = WinterGrainTradeRegion;
+            s.WinterGrainLandTier = WinterGrainLandTier;
+            s.WinterGrainVillageCredit = WinterGrainVillageCredit;
+            s.WinterGrainFillToTarget = WinterGrainFillToTarget;
             s.WatchLawEnabled = WatchLawEnabled;
             s.WatchPoolSharePercent = WatchPoolSharePercent;
             s.WatchDoesNotRaid = WatchDoesNotRaid;

@@ -551,7 +551,7 @@ namespace Armoury
         }
 
         // f26-bramka: KsDrop - suma po wsiach min(spadek spichlerza wsi, wzor gry - racje KS) tej doby (racje; tylko wsie z pomiarem spadku, jak Drop)
-        private sealed class LandAgg { public int N, Skip, Hungry; public double F, K, Food, Need, Drop, NeedD, KsDrop, Plan; public int PlanN; public string Example; }   // 324: Plan - suma floor + left x def wsi (bilans zimy)
+        private sealed class LandAgg { public int N, Skip, Hungry; public double F, K, Food, Need, Drop, NeedD, KsDrop, Plan, FoodP; public int PlanN; public string Example; }   // 324: Plan - zapas potrzebny do wiosny (floor x E + def / k) wsi z bilansem, FoodP - ich zapas
 
         /// <summary>Daily w stanie zastosowanym, PRZED LiveDaily (stawki jutra juz bez krainy wroconej): glod wsi z winy KS i spadek spichlerzy krain.</summary>
         private static void LandGateDaily(int today)
@@ -569,6 +569,7 @@ namespace Armoury
             int stum = 0, depSkip = 0;
             // 324 (klucz Winter Land Gate Planned Draw): zima - zaplanowane zejscie stodoly (pokrycie koszyka) nie jest spadkiem, prog zapasu z bilansu zimy
             int left324 = Sw324Gate ? WinterLeft324() : 0;
+            double e324 = 1.0, k324 = left324 > 0 ? WinterK324(left324, Rho324(), out e324) : 0.0;   // 324 runda 2: psucie f23 w bilansie
             foreach (var ld in _live.Values)
             {
                 if (ld == null || ld.TF || ld.V == null || ld.St == null) continue;
@@ -609,7 +610,8 @@ namespace Armoury
                         if (left324 > 0)
                         {
                             double f4, h4, d4, fl4;
-                            if (WinterBalance324(v, today, out f4, out h4, out d4, out fl4)) { a.Plan += fl4 + left324 * d4; a.PlanN++; }
+                            // 324 runda 2 (R2-6): Plan i jego zapas FoodP z tych samych wsi (wies KS bez rachunku okregu - poza bilansem); plan z psuciem
+                            if (WinterBalance324(v, today, out f4, out h4, out d4, out fl4)) { a.Plan += WinterNeed324(fl4, d4, e324, k324); a.FoodP += f4; a.PlanN++; }
                         }
                     }
                     else _gPrev.Remove(v);
@@ -658,10 +660,11 @@ namespace Armoury
                     // seria: klucz TAK - ta sama miara co strata (spadek z winy KS > 1% potrzeby/d, ksDay - tylko przy racjach KS krainy ponizej wzoru gry; spadek,
                     // ktory bylby i przy wzorze gry, powrotem sie nie cofnie); NIE - jak WGRANIE 85 (caly spadek > 1% przy racjach KS krainy ponizej wzoru gry)
                     bool fall = exact ? ksDay > LandDrawShare : draw > LandDrawShare && ksLess;
-                    // 324: zima (klucz) - seria tylko, gdy zapas krainy ponizej floor + left x def jej wsi (nie dotrwaja do wiosny); bez bilansu - jak dotad
+                    // 324: zima (klucz) - zamiast progu zapasu Reserve: zapas wsi z bilansem ponizej ich planu do wiosny (floor x E + def / k; nie dotrwaja);
+                    // runda 2 (R2-6): budzet straty LossDays zostaje jak dotad (strata z winy KS bez zaplanowanego zejscia), ten sam zbior wsi po obu stronach
                     bool plan324 = left324 > 0 && a.PlanN > 0;
                     if (plan324) _w324GateLands++;
-                    bool count = fall && (test || reserve == 0 || lossKey == 0 || (plan324 ? a.Food < a.Plan : ((exact ? lossC : loss) >= lossKey || days < reserve)));
+                    bool count = fall && (test || reserve == 0 || lossKey == 0 || (exact ? lossC : loss) >= lossKey || (plan324 ? a.FoodP < a.Plan : days < reserve));
                     st = count ? st + 1 : 0;      // doba bez pomiaru (pierwsza po wczytaniu, spichlerze wylaczone) - seria i strata bez zmian
                 }
                 if (loss > 1e-6) _landLoss[kv.Key] = loss; else _landLoss.Remove(kv.Key);

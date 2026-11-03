@@ -99,6 +99,7 @@ namespace Armoury
             _live = new Dictionary<string, LiveDist>(StringComparer.Ordinal);
             _rates = new Dictionary<Village, VRate>();
             _itemIx = null; _items = null; _itemKg = null; _liveStumbles = 0; _liveFull = true; _liveRedone = 0;
+            Reset324();   // 324 runda 2 (R2-7): pola glodu zimy od nowa w sesji
             _t13Seen = false; _t13Loaded = 0; _t13Saved = -1; _t13SaveOver = 0;   // ks-koszt T13 (recenzja): zapis ulamkow plonu pol mieszczan - od nowa w sesji
             RuleReset();
         }
@@ -562,6 +563,7 @@ namespace Armoury
             GranDayClose(granUp, granAbove, granRel);      // r4-bkwies: liczniki spichlerza doby do linii podlogi (FloorDaily); bez podlogi i awaryjne zerowane co dobe
             var regionHands = new Dictionary<string, double>(StringComparer.Ordinal);
             var tfList = new List<KeyValuePair<LiveDist, DistResult>>();
+            try { Flip324(); } catch (Exception e) { Stumble("Flip324", e); }   // 324 runda 2 (R2-8): przelom pory - wszystkie okregi dzis
             bool full = _liveFull; _liveFull = false;
             int redone = 0, backSkip = 0;
             tq = T0Lap(T0Snap, tq); long tRedo = 0;

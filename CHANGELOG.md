@@ -1,6 +1,6 @@
 # DZIENNIK ZMIAN
 
-## 324 - glod zimy: wies je najpierw ze swojej stodoly, 322c z bilansu zimy i dla calego swiata, bramka krainy zima (noc/324-glod od 323x 7e62e009; Armoury.dll 7fc4f2ce3febd7bef58c0e92be34c8ea - NIE WGRANE)
+## 324 - glod zimy: wies je najpierw ze swojej stodoly, 322c z bilansu zimy i dla calego swiata, bramka krainy zima (noc/324-glod od 323x 7e62e009; runda 1 Armoury.dll 7fc4f2ce3febd7bef58c0e92be34c8ea, runda 2 Armoury.dll e9ad625c32ea3b5a9822da0e80962243 - NIE WGRANE)
 
 **Problem:** Jeff 03.11 "na wsiach tez nie ma zboza, praktycznie nie ma produkcji tez innych surowcow, cos sie zesralo". Logi kampanii Ironman0gXONzURi8yO: zboze swiata
 304k szt. (108878) -> 38-40k od 109230 (miasta 71.5k -> 4.6k); rynki miast: brak jedzenia mediana 61% (109204) -> 83% (109253), 44 z 45 miast glodne; zuzycie zboza 109184
@@ -60,7 +60,72 @@ ludzie w domu), wies poza KS - max(0, potrzeba - plon Famine) (plon bez zakupow 
 
 **Test (dopiero gdy Jeff nie gra):** autotest na kopii zapisu Jeffa z doby ok. 109250, 60 dob, potem sprzatanie kopii. Kryteria: zakupy zboza wsi E5/B1 przy pelnej stodole ok. 0;
 dowoz 322c rzedu 10k+ szt./d na swiat; mediana braku na rynkach spada z 83%; stodoly schodza wedlug bilansu; bez nowych powrotow krain; "racje zdjete = ubytek stodol".
-**Status:** DO SPRAWDZENIA (zbudowane, kod wyjscia 0; nie wgrane, nie testowane)
+### 324 runda 2 (po recenzji rundy 1) - podaz ze wszystkich wsi regionu, kraina, sygnal ponizej celu, kredyt wsi, psucie w bilansie
+
+**Problem (recenzja rundy 1):** 322c z bilansu dalby realnie 2.5-5k szt./d przy zuzyciu miast 8-9k/d. Log 109254: 48 miast z sygnalem "chcialy 20875 szt." juz PO limicie
+kasy, a dostaly 1452 szt. ze 118 wsi - korkiem jest PODAZ, nie kasa ("bez kasy 11" z 48). Do tego: bilans bez psucia f23 (6%/rok) przeszacowuje wolne o ok. 40-50%;
+bramka krainy zima zgubila budzet straty LossDays i porownywala zapas wszystkich wsi z planem tylko wsi z migawka; pierwsza doba po wczytaniu DefR324 = NaN (wies KS brala
+def = potrzeba - plon z zakupami - za maly); pola _w324* bez resetu sesji; pokrycie ze stodoly zylo do 7 dob po koncu zimy.
+
+**Przyczyna (kod):** `TownGranary.Zima322.cs` - zrodla tylko `st.BoundVillages` (wsie zamkow, ok. 330 z 569, nigdy nie sprzedawaly; w grze Village.TradeBound = miasto
+targowe), bez drugiego poziomu; sygnal dopiero przy polce < 0.5 doby (KsHunger przy polce 0.5 doby = brak ok. 50%, hustawka); petla cen przerywana na `cum + p > spend`
+(SpendableTown) - dluznicy z Essos (Qarth 329k, Braavos 245k ...) 0; `KsFoodCredit` tylko miasto -> miasto.
+
+**Zmiana (Armoury)** - klucze NOWE (domyslnie TAK; w Armoury.json Jeffa ich nie ma; gen_mcm 2817 -> 2821 ustawien), bez nowych stalych:
+- **R2-2 psucie w bilansie** (bez klucza - poprawka rachunku rundy 1, `Famine.SpoilPerDay()` = ta sama liczba co spoilD f23): rho = -ln(1 - ulamek doby), E = e^{rho x left};
+  wolne wsi x = zapas - floor x E - def x (E - 1) / rho, na dobe x x k, k = rho / (E - 1) (rho 0: 1 / left). Ten sam wzor w 322c (`W324Row`), w pokryciu ze stodoly
+  (`Barn324`: min(def, max(0, zapas - floor x E) x k)), w planie bramki (`WinterNeed324` = floor x E + def / k) i w linii 324.
+- **Winter Grain Trade Region** (R2-1/R2-2; z Winter Grain From Winter Balance): zrodla miasta = wszystkie wsie z `Village.TradeBound` = miasto (brak - Bound, gdy miasto),
+  bez wojny z miastem targowym; lista z Village.All raz na dobe (tylko gdy jest miasto z sygnalem). Wspolny bilans regionu: sprzedaz regionu = max(0, suma x) x k, dzielona
+  miedzy wsie z x > 0 wedlug x (wies z x < 0 nie sprzedaje, jej brak zostaje w regionie). Klucz NIE - wsie miasta, kazda max(0, x) x k.
+- **Winter Grain Land Tier** (R2-3): po wlasnym regionie wszystkich miast (przebieg 1) miasto z niedoborem bierze z tego, co zostalo w regionach innych miast tej samej
+  krainy (StartCalibration.TownLandOf; wies nie w wojnie z miastem odbiorcy) - przebieg 2; miasta w kolejnosci najwiekszego braku (1 - polka / (T* x popyt)), nie Town.AllTowns.
+  Dostawa bezposrednia jak 322c, ramka ksiegi towarow "zboze ze spichlerza wsi krainy (324)".
+- **Winter Grain Fill To Target** (R2-4): sygnal = polka + KS-H w drodze < T* x popyt (cel KS; poza ZC4 2 doby) zamiast < 0.5 doby; limit dobowy 2 x popyt i krzywa ceny bez zmian.
+- **Winter Grain Village Credit** (R2-5): kasa nie blokuje - gotowka najpierw z nadwyzki (SpendableTown), dalej z zywej kasy do 0 (jak rata 322e), reszta na RACHUNEK WSI
+  (`KsFoodCredit` konto Vil, wierzyciel = Settlement wsi, `OpenVillage`). Pulap kredytu z modelu 322e: dlug miasta za jedzenie (rachunki KS-H + wsi, `FoodDebtOf`) <= rata
+  dobowa 322e (`RateOf` - ten sam wzor co PayDaily) x Ks Consign Rate Release Days; bez pomiaru zarobku - najwyzej tyle, ile miasto zaplacilo gotowka. Cennik sztuka po sztuce
+  liczony z budzetem gotowka + pulap; wies oddaje najwyzej tyle sztuk, ile miasto zaplaci albo zapisze. Splata w PayDaily razem z rachunkami miasta (od najstarszego,
+  nadwyzka i rata 322e; zloto kasa miasta -> kiesa wsi, `TransferTo` z pomiarem). Jak Claim: rachunek wsi NIE blokuje dowozu (OverdueDst), nie wchodzi do OverdueOf /
+  OlderThanByDst / PayByLord / AgeStats / zaleglych w Census ani do warunku odblokowania 322e (food1); OwedBySource go pomija. Kontrola rachunkow EndDay: + DVilNew.
+  Zapis: wpis kk1 z 5. polem "w" (starsza DLL czyta go jak rachunek miasta z wierzycielem bez miasta - przepada w PayDaily, bez zlota).
+- **R2-6 bramka krainy** (Winter Land Gate Planned Draw): a.FoodP = zapas tych samych wsi, ktore sa w a.Plan (WinterBalance324 TAK); warunek serii
+  `fall && (test || reserve == 0 || lossKey == 0 || strata >= LossDays || (plan324 ? FoodP < Plan : dni < Reserve))` - budzet straty wraca, bilans zastepuje tylko prog Reserve.
+- **R2-7 pierwsza doba i reset:** wies KS (w _live, nie TF, kraina nie wrocona) bez rachunku okregu (DefR324 NaN) - WinterBalance324 false z `noBal` (nie sprzedaje w 322c,
+  nie wchodzi do planu bramki; licznik "bez bilansu po wczytaniu"); fallback potrzeba - plon tylko dla wsi naprawde poza KS. `Reset324()` w LiveReset: _w324KprDay/_w324Kpr,
+  _w324GatePlan/_w324GateLands/_w324Stum, pamiec pory.
+- **R2-8 przelom pory** (z kluczem Winter Villages Eat Own Granary): `Flip324()` na poczatku LiveDaily - zima wczoraj != dzis -> `_liveFull = true` (wszystkie okregi tej
+  doby): pokrycie ze stodoly znika w dniu konca zimy i pojawia sie w 1 dobe na poczatku (GatePlanned324 i tak tylko w zimie). Linia "Glod zimy (324): przelom pory ...".
+- NIE zrobione: R2-9 (lordowie sprzedaja zboze zima - osobny krok po pomiarze); wariant "podzial wedlug zapasu ponad floor" (dosyl Jeffa) - nie wdrozony, podzial wedlug x.
+- `tools/sprawdz_logi.py`: regex 322c czyta tez segment "rezerwa wsi z bilansu zimy" (od rundy 1 linia byla nieczytelna).
+
+**Linie logu:**
+- `Zboze zima (322c)`: rezerwa z bilansu z psuciem (rho, e^(rho x dni), efektywnie N dni); sygnal "polka < cel T*"; "bez kasy i kredytu"; nowe segmenty (po "zloto"):
+  `| 324 region TAK (...): regionow R, wsi z bilansem V (bez nadwyzki n), wolne regionow X racji/d (suma nadwyzek wsi Y); sztuki z wsi miasta a, z wsi zamkow b | 324 kraina TAK:
+  c szt. z regionow innych miast krainy do m miast | 324 kredyt wsi TAK: na rachunek wsi dzis Z zl (t miast; pulap z raty 322e razem P, nieudane 0), z kasy ponizej zapasu kupcow
+  Q zl; rachunki wsi otwarte O zl (k miast), splacone wsiom w PayDaily doby d S zl`; wsie "bez bilansu po wczytaniu"; kontrola "wartosc dostaw = gotowka + rachunki wsi".
+  Cena srednio = (gotowka + rachunki) / sztuki. Format pol czytanych przez sprawdz_logi bez zmian.
+- `Glod zimy (324)`: bilans z psuciem (prog na koniec x E, brak do wiosny def / k), "netto swiata X racji/d (ok. Y szt./d)" i wprost "SWIAT NIE MA ZBOZA DLA MIAST DO WIOSNY"
+  przy ujemnym bilansie, "bez bilansu po wczytaniu", dowoz z wsi zamkow / z krainy / na rachunek wsi, "przelomy pory w sesji".
+
+**Ryzyko / co sprawdzic (runda 2):**
+- wspolny bilans regionu oddaje mniej niz suma nadwyzek wsi (suma max(0, x) >= max(0, suma x)): zapas zatrzymany dla wsi z x < 0 lezy w stodolach wsi z nadwyzka (nie ma
+  dowozu wies -> wies), a wies z brakiem kupuje z polki miasta. Linia 322c pokazuje obie liczby ("wolne regionow" i "suma nadwyzek wsi") - jesli roznica duza, a stodoly
+  wsi z nadwyzka na wiosne wysoko, wylaczyc Winter Grain Trade Region albo zmienic podzial.
+- kredyt wsi: kasa miasta moze zejsc do 0 (gotowka z zywej kasy, jak rata 322e) - sprawdzic zaleglosci firm DS i pozyczki rad (TownDebt) w miastach z dostawa; rachunki wsi
+  rosna tylko do raty x 91 dni; "rachunki wsi otwarte" w linii 322c i kontrola rachunkow KS-H (EndDay) = 0.
+- kontrola zlota sprawdz_logi Z322-4 (kasy miast = zaplata = kiesy wsi) dotyczy tylko gotowki; rachunki osobno.
+- sygnal ponizej T* = wiecej miast z sygnalem i wiecej sztuk na dobe (limit 2 x popyt) - stodoly schodza szybciej, ale bilans liczy wolne codziennie od biezacego zapasu.
+- kraina: pobor z regionu miasta bez sygnalu nie liczy jego jutrzejszego popytu (bilans zimy wsi juz chroni jej wlasny stol).
+- pierwsza doba po wczytaniu: wszystkie wsie KS bez bilansu - 322c tej doby da prawie nic (licznik "bez bilansu po wczytaniu").
+- przelom pory: doba z przeliczeniem wszystkich okregow (koszt jak pierwsza doba sesji) - raz na pore.
+- regiony budowane z Village.All tylko w doby z sygnalem; czas linii 322c ("czas X ms", Z322-6 mediana <= 10 ms).
+
+**Test runda 2 (dopiero po zakonczeniu biezacego autotestu, na kopii, 120 dob zimy):** linie "Glod zimy (324)", "Zboze zima (322c)", "Glod miast (KS)". Oczekiwanie: na polki
+5-8.5k szt./d (srodek ok. 6.5k; teraz 1.45k), mediana braku na rynkach miast z 77-83% do ok. 25-40%; stodoly kazdego regionu >= floor na koniec zimy; kontrole 322c (racje,
+polki, zloto, wartosc dostaw) i KS-H (rachunki) zgodne; bez nowych powrotow krain.
+
+**Status:** DO SPRAWDZENIA (runda 1 i runda 2 zbudowane, kod wyjscia 0; nie wgrane, nie testowane - autotest dopiero po zakonczeniu biezacego testu na starym DLL)
 
 ## 2026-11-03 WGRANIE 161 - noc/323x-integracja (160 + inwestycje: 323a cena wolnego majatku BK do pana wsi, 323b odkup warsztatu gracza z doplata kasy miasta, 323c prace okregu placa tez za zjedzone w okregu, 323d dochod wioski pobocznej z prawdziwej sprzedazy); Armoury.dll da5a31022ce86f7f87403e031fe64198 (CrashScribe 55ccc004, ForgeView 8441ab0e bez zmian); kopia 160: Armoury.dll.bak-2026-11-03-przed-wgranie161 i D:/Backup-Bannerlord/wgrane/2026-11-03-wgranie161-przed
 
