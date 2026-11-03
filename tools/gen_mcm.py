@@ -388,6 +388,10 @@ RANGES = {
     # m96-dlugi (20.10): dlugi rad miast - zakresy zgodne z przycieciem w kodzie (TownDebt.cs: Clamp stopy 0..0.5 / 0..1, limit 0..20, splata 0..1, dobrobyt 0..10,
     # podatek 0..0.5, przerwa 7..364, lojalnosc 0..50, dobrobyt podatku 0..0.5, relacja 0..20)
     'TownDebtRate': (0.0, 0.5, "0.00"),
+    # 322d: szybsza obnizka firm DS przy duzym dlugu rady - kod przycina krok 0..0.5, prog 1..52 rat, podloge 0..1 (DsTowns.DebtCut)
+    'TownDebtFarmCutStep': (0.0, 0.5, "0.00"),
+    'TownDebtFarmCutWeeks': (1.0, 52.0, "0.0"),
+    'TownDebtFarmCutFloor': (0.0, 1.0, "0.00"),
     'TownDebtBankRate': (0.0, 1.0, "0.00"),
     'TownDebtLimitReserve': (0.0, 20.0, "0.0"),
     'TownDebtRepayShare': (0.0, 1.0, "0.00"),

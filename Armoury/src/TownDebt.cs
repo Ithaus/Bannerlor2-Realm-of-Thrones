@@ -68,6 +68,7 @@ namespace Armoury
             public readonly Dictionary<string, double[]> N = new Dictionary<string, double[]>();   // notabl -> [dlug, niezaplacone odsetki]
             public int LevyDay = int.MinValue, Since = -1;
             public int DTerms;                                           // recenzja: dni kwartalu DS z rzedu z (zaleglosc + dlug rady) >= raty - tylko przeglad wymuszony DS
+            public int InsDay = -1;                                      // 322d: ostatnia doba niewyplacalnosci (krok 4 TownDay) - DsTowns.DebtCut (sesja)
             public long LastLevy;
             public double Total { get { double n = 0; foreach (var v in N.Values) n += v[0]; return P + R + B + n; } }
         }
@@ -162,6 +163,24 @@ namespace Armoury
                 return _b.TryGetValue(st.StringId, out b) && b != null ? Math.Max(aTerms, b.DTerms) : aTerms;
             }
             catch { return aTerms; }
+        }
+
+        /// <summary>322d (Town Debt Farm Cut): DsTowns.DebtCut (DayStart, przed TownDebt.Daily tej doby) - rada niewyplacalna: dlug >= 90% limitu albo wczoraj (albo dzis)
+        /// zaleglosc firmy bez kredytu (InsDay z kroku 4 TownDay; pamiec sesji - po wczytaniu tylko miara limitu). Klucz wylaczony / brak ksiegi - false. Nie rzuca.</summary>
+        internal static bool TdInsolvent(Settlement st, int today)
+        {
+            try
+            {
+                if (st == null || st.StringId == null || st.Town == null || _b.Count == 0 || !On) return false;
+                Book b;
+                if (!_b.TryGetValue(st.StringId, out b) || b == null) return false;
+                if (b.InsDay >= 0 && b.InsDay <= today && today - b.InsDay <= 1) return true;
+                var s = Settings.Current;
+                if (s == null) return false;
+                double tot = b.Total, lim = Limit(st.Town, s);
+                return tot >= 1 && lim > 0 && tot >= InsolventShare * lim;
+            }
+            catch { return false; }
         }
 
         /// <summary>IronBank.Dividends DvDay: dlugi rad wobec Banku (z odsetkami) pod id "td:&lt;miasto&gt;" - koszt pozyczek (NoteCrownLent) rozliczany jak kredyt korony.
@@ -320,6 +339,7 @@ namespace Armoury
             {
                 _dInsolvent++;
                 if (b == null) b = BookOf(st, true);
+                b.InsDay = today;                                               // 322d: DsTowns.DebtCut (jutro w DayStart)
                 if (b.LevyDay == int.MinValue || today - b.LevyDay >= GapDays(s)) Levy(st, t, b, s, today, lordOk ? arr : 0, lord);
             }
             // 5. dobrobyt przy dlugu
@@ -682,6 +702,7 @@ namespace Armoury
                   .Append(" | kontrola: dlug - (wczoraj + pozyczone + odsetki - splacone - zaokraglenia ").Append(_dAdj.ToString("0.00", Inv)).Append(") ").Append(N0(ctl))
                   .Append(" (oczekiwane 0); podatek - (wierzycielom + na zaleglosci + w kasie) ")
                   .Append(levy - levyUse).Append(" (oczekiwane 0)")
+                  .Append(DsTowns.DebtCutNote(s))                                // 322d: obnizki firm DS przy duzym dlugu rady (DayStart tej doby), miasto po miescie
                   .Append(" | czas ").Append(ms.ToString("0.000", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumblesSess).Append(").");
                 Log.Info(sb.ToString());
                 _debtPrev = debt;
