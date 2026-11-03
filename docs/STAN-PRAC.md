@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 04.11.2026 ok. 00:25 CET: WGRANIE 162 (najnowszy) - glod zimy 324
+- W GRZE: Armoury.dll 4c5e4f93c9198f243f8e4b0b29d467e2 (galaz noc/324-glod a78b1898, wypchnieta; od noc/323x-integracja). CrashScribe/ForgeView bez zmian.
+  Kopia 161: Armoury.dll.bak-2026-11-04-przed-wgranie162 i D:/Backup-Bannerlord/wgrane/2026-11-04-wgranie162-przed. Worktree: scratchpad bcfbb3b7 zb/n324.
+- Przyczyna glodu: zima Westeros od 109178 (1720 dni) - wsie zjadaly uciety plon, koszyk ZC4 wykupil polki miast (10-11k zboza/d), stodoly (628 dni) nie plynely na polki (322c 1.4k/d, kasy miast).
+- 324 r1-r3: wies zima je ze stodoly, 322c z bilansu zimy z psuciem, zrodla region miasta targowego (wsie zamkow) + kraina, sygnal ponizej T*, gotowka z nadwyzki kasy, KOMIS zboza wsi (Winter Grain Consign), bramka krainy z planowanym zejsciem. Klucze MCM Winter* domyslnie TAK.
+- Test 324c (60 dob na zapisie Jeffa 109249, kod 0, ERROR 0): mediana braku rynkow 77% -> 34% (doba 60, spada), zboze miast 4k -> 15k, dowoz 5.6k szt./d z 334 wsi do 65 miast, bez kasy 0; kontrola komisu domknieta.
+- Otwarte: ryby/nabial/owoce zima dalej niskie (wsie zjadaja - zgodne z projektem); lordowie trzymaja ok. 15k zboza (R2-9 niezrobione); uwagi niskie recenzji r3 (ConsignSettle z calej kasy, termin partii po scaleniu zapisu); zapis Jeffa z 01:52 (sesja 22:00 bez zapisu).
+
 ## STAN 03.11.2026 ok. 16:20 CET: WGRANIE 161 (najnowszy)
 - 03.11 23:45: test 324a (noc/324-glod 7613cea7, DLL 7fc4f2ce, 60 dob, kod 0, ERROR 0): brak rynkow 77% -> 52-67%, zakupy wsi 10k -> 0.1-0.5k/d; wolne ze stodol 12.2k szt./d, na polki 2.0k - BLOKADA: kasy miast (bez kasy 32). Runda 2 wf_5f77c330-d77 (kredyt/region, bramka krainy, NaN 1. doby). NIE wgrane.
 - 03.11 ok. 22:40: GLOD - dowod z logow: wsie kupuja w miastach ok. 10k zboza/d (koszyk ZC4, E5/B1; w 108878 tej pozycji nie bylo), zboze swiata 273k (109179) -> 38k (109230), produkcja zima 4-5k/d (lato 9.5k). Jedzenie gracza nie zniklo - zjedzone 31/d od 109237. Workflow wf_6f1f578f-ee2: diagnoza + naprawa na galezi noc/324-glod (worktree scratchpad bcfbb3b7 zb/n324), NIE wgrane - gra Jeffa dziala.
