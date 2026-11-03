@@ -520,6 +520,9 @@ RANGES = {
     'KsConsignFloorShare': (0.0, 1.0, "0.00"),
     'KsConsignSourceExposure': (0.0, 1.0, "0.00"),
     'KsConsignOverdueDays': (1, 364, "0"),
+    # 322e (03.11): rata z zarobku - kod przycina udzial do 0..0.5, horyzont do 0..364 dob (KsFoodCredit.RateShare / RateReleaseDays)
+    'KsConsignRateShare': (0.0, 0.5, "0.00"),
+    'KsConsignRateReleaseDays': (0, 364, "0"),
     # KS-R5 ceny-r5 (noc 17/18.10): zadatek kupcow celu - udzial przycinany w kodzie do 0..1 (KsFoodCarts.DepositShare)
     'KsConsignDepositShare': (0.0, 1.0, "0.00"),
     # KS (16.10): premia mapy - kod przycina do 1.0..2.0 (StartCalibration.BuildInput)
