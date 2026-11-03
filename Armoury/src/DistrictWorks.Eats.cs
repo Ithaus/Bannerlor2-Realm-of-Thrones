@@ -29,10 +29,10 @@ namespace Armoury
 
         private static readonly Dictionary<string, double> _eCarry = new Dictionary<string, double>(StringComparer.Ordinal);   // okreg|rod -> ulamek monety (sesja)
         private static int _eDist, _eWar, _eNoKs, _eLooted, _eNoPath, _eNoHead, _eStumble, _eStAll;
-        private static double _eVal, _ePool;
+        private static double _eVal, _ePool, _eExp;
         private static long _ePaid, _eShort;
 
-        private static void EatsZero() { _eDist = _eWar = _eNoKs = _eLooted = _eNoPath = _eNoHead = _eStumble = 0; _eVal = _ePool = 0; _ePaid = _eShort = 0; }
+        private static void EatsZero() { _eDist = _eWar = _eNoKs = _eLooted = _eNoPath = _eNoHead = _eStumble = 0; _eVal = _ePool = _eExp = 0; _ePaid = _eShort = 0; }
 
         internal static void EatsReset() { lock (Gate) { _eCarry.Clear(); EatsZero(); _eStAll = 0; } }
 
@@ -174,7 +174,7 @@ namespace Armoury
                     if (any)
                         sb.Append(P).Append("zjedzone w okregu (323c, klucz Works Pay District Eats ").Append(EatsOn ? "TAK" : "NIE").Append(") dzien ").Append(day)
                           .Append(" | okregow z wycena ").Append(_eDist).Append(", dodatek zjedzony ").Append(_eVal.ToString("0.0", Inv)).Append(" zl/d (cena polki), pula (udzial) ")
-                          .Append(_ePool.ToString("0.0", Inv)).Append(", wyplacone z kiesy wsi ").Append(_ePaid).Append(", brak w wolnej kiesie (ponad skrzynie) ").Append(_eShort)
+                          .Append(_ePool.ToString("0.0", Inv)).Append(", oczekiwane ze zjedzonego ").Append(_eExp.ToString("0.0", Inv)).Append(", wyplacone z kiesy wsi ").Append(_ePaid).Append(", brak w wolnej kiesie (ponad skrzynie) ").Append(_eShort)
                           .Append(" | bez wyplaty: wojna ").Append(_eWar).Append(", bez swiezego rachunku KS z pracami ").Append(_eNoKs).Append(", wies zlupiona ").Append(_eLooted)
                           .Append(", bez drogi produkcji ").Append(_eNoPath).Append(", rod bez glowy ").Append(_eNoHead)
                           .Append(" | wedlug prac (z targu / ze zjedzonego, doba; od wczytania; pokazanych ").Append(shown).Append(" z ").Append(_rows.Count).Append("): ").Append(per.Length > 0 ? per.ToString() : "-")

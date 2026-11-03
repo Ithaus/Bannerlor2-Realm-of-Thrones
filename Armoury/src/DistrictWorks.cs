@@ -1165,6 +1165,7 @@ namespace Armoury
                     if (v == null) continue;
                     var dv = ValOf(v);
                     if (dv != null) lock (Gate) _dExpected += (long)Math.Round(OwnShareExpected(id, dv));
+                    if (dv != null) { double ee = EatenExpected(id, dv, Settings.Current != null ? Math.Max(0f, Math.Min(1f, Settings.Current.DistrictWorksShare)) : 0.5); lock (Gate) _eExp += ee; }   // 323c (recenzja NPO-5): oczekiwane ze zjedzonego osobno - "wyplacone" linii doby liczy tylko wozy
                     PayEaten(v, today);                                      // 323c: udzial inwestora w tym, co okreg zjada z dodatku - z kiesy wsi (DistrictWorks.Eats.cs)
                 }
                 if (!_recalcDone) RecalcNote();                              // m114-prace: raz po wczytaniu - komunikat, gdy dochod prac gracza po nowym wzorze inny
@@ -1197,7 +1198,6 @@ namespace Armoury
                 if (sm > 0) { wPart = dv.EmPart; wAll = sm; }                  // jak podzial puli przy wozie
             }
             lock (Gate) foreach (var r in _rows) if (r.Dist == id) { double ep; if (wPart.TryGetValue(r.Part, out ep) && dv.EPart.ContainsKey(r.Part)) r.Exp7 += e > 0 && wAll > 0 ? e * Math.Max(0, ep) / wAll / Math.Max(1, CountPart(id, r.Part)) : 0; }
-            e += EatenExpected(id, dv, share);                              // 323c: i udzial w tym, co okreg zjada z dodatku (ta sama liczba co PayEaten przed kiesa)
             return e;
         }
 

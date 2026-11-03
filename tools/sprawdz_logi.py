@@ -93734,7 +93734,7 @@ def main(argv):
 # ======================================================================= paczka 323c: grupa eat323c - prace okregu: udzial w tym, co okreg zjada z dodatku
 # Linia "Prace okregu (PO): zjedzone w okregu (323c, ...)" (DistrictWorks.Eats.cs). Wszystkie nazwy modulu z przedrostkiem e323c_ / E323C_ (kolizje miedzy grupami).
 E323C_RE = re.compile(r"Prace okregu \(PO\): zjedzone w okregu \(323c, klucz Works Pay District Eats (TAK|NIE)\) dzien (-?\d+) \| okregow z wycena (\d+), "
-                      r"dodatek zjedzony ([\d.]+) zl/d \(cena polki\), pula \(udzial\) ([\d.]+), wyplacone (\d+) z kiesy wsi, brak w wolnej kiesie \(ponad skrzynie\) (\d+)"
+                      r"dodatek zjedzony ([\d.]+) zl/d \(cena polki\), pula \(udzial\) ([\d.]+)(?:, oczekiwane ze zjedzonego [\d.]+)?, wyplacone z kiesy wsi (\d+), brak w wolnej kiesie \(ponad skrzynie\) (\d+)"
                       r" \| bez wyplaty: wojna (\d+), bez swiezego rachunku KS z pracami (\d+), wies zlupiona (\d+), bez drogi produkcji (\d+), rod bez glowy (\d+)"
                       r" \| wedlug prac \(z targu / ze zjedzonego, doba; od wczytania; pokazanych (\d+) z (\d+)\): (.*?) \| potkniecia (\d+) \(od wczytania (\d+)\)\.")
 E323C_ROW = re.compile(r"^(.+?) \[([^\]]+)\] targ (\d+) / zjedzone (\d+) \(od wczytania (\d+) / (\d+)\)$")
@@ -93826,7 +93826,7 @@ E323C_ROWS1 = "Heatherstone (Shady Glen) [gracz] targ 0 / zjedzone 12 (od wczyta
 
 def e323c_line(day=109300, on="TAK", dist=2, val=70.0, pool=35.0, paid=32, short=0, shown=2, n=2, rows=E323C_ROWS1, st=0):
     return (f"Prace okregu (PO): zjedzone w okregu (323c, klucz Works Pay District Eats {on}) dzien {day} | okregow z wycena {dist}, dodatek zjedzony {val:.1f} zl/d "
-            f"(cena polki), pula (udzial) {pool:.1f}, wyplacone {paid} z kiesy wsi, brak w wolnej kiesie (ponad skrzynie) {short} | bez wyplaty: wojna 0, "
+            f"(cena polki), pula (udzial) {pool:.1f}, oczekiwane ze zjedzonego {pool:.1f}, wyplacone z kiesy wsi {paid}, brak w wolnej kiesie (ponad skrzynie) {short} | bez wyplaty: wojna 0, "
             f"bez swiezego rachunku KS z pracami 0, wies zlupiona 0, bez drogi produkcji 0, rod bez glowy 0 | wedlug prac (z targu / ze zjedzonego, doba; od wczytania; "
             f"pokazanych {shown} z {n}): {rows} | potkniecia {st} (od wczytania {st}).")
 
