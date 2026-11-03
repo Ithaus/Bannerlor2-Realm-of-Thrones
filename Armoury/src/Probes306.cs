@@ -655,7 +655,7 @@ namespace Armoury
             int g1 = hero.Gold, s1 = seller.Gold, cap1 = pick.Capital;
             bool own = pick.Owner == hero;
             bool buyOk = own && g0 - g1 == price && s1 - s0 == price && cap1 == cap0;
-            int back = -1, paid = -1, b0 = -1, b1 = -1, g2 = g1, g3 = g1, cap2 = cap1; string buyerName = "-"; bool sold = false;
+            int back = -1, paid = -1, b0 = -1, b1 = -1, g2 = g1, g3 = g1, cap2 = cap1, tg0 = -1, tg1 = -1; string buyerName = "-"; bool sold = false;   // 323b: tg0/tg1 - kasa miasta przed i po odkupie
             if (own)
             {
                 back = wm.GetCostForNotable(pick);
@@ -663,9 +663,9 @@ namespace Armoury
                 if (buyer != null)
                 {
                     buyerName = buyer.Name.ToString();
-                    b0 = buyer.Gold; g2 = hero.Gold;
+                    b0 = buyer.Gold; g2 = hero.Gold; tg0 = town.Town != null ? town.Town.Gold : -1;
                     ChangeOwnerOfWorkshopAction.ApplyByPlayerSelling(pick, buyer, pick.WorkshopType);
-                    b1 = buyer.Gold; g3 = hero.Gold; cap2 = pick.Capital;
+                    b1 = buyer.Gold; g3 = hero.Gold; cap2 = pick.Capital; tg1 = town.Town != null ? town.Town.Gold : -1;
                     sold = pick.Owner == buyer;
                     paid = g3 - g2;
                 }
@@ -682,13 +682,15 @@ namespace Armoury
                 catch (Exception e) { left = " | odsprzedaz sprzedawcy: wyjatek " + e.GetType().Name + " - warsztat zostal u gracza"; }
             }
             bool noLoop = back >= 0 && back <= price;
-            bool payOk = sold && paid == Math.Min(back, Math.Max(0, b0)) && b0 - b1 == paid;
+            // 323b (WorkshopResaleTownPays): kupiec placi z kiesy najwyzej tyle, ile ma, reszte kasa miasta - zaplata = kiesa kupca + kasa miasta, nigdy ponad odkup
+            int fromTown = tg0 >= 0 && tg1 >= 0 ? tg0 - tg1 : 0;
+            bool payOk = sold && b0 - b1 == Math.Min(back, Math.Max(0, b0)) && paid == (b0 - b1) + fromTown && fromTown >= 0 && paid <= back;
             bool capOk = cap2 == cap0;
             bool ok = buyOk && sold && noLoop && payOk && capOk;
             Log.Info(P + "warsztat - kupno i odsprzedaz doba " + day + " | " + town.Name + " " + type + " od " + seller.Name + " | cena kupna (GetCostForPlayer) " + price
                      + " | zloto gracza " + g0 + " -> " + g1 + ", kiesa sprzedawcy " + s0 + " -> " + s1 + ", kapital " + cap0 + " -> " + cap1 + " (" + Tn(buyOk) + ")"
                      + " | odkup (GetCostForNotable) " + back + " <= cena kupna " + Tn(noLoop) + " | kupiec " + buyerName + ": kiesa " + b0 + " -> " + b1 + ", zloto gracza " + g2 + " -> " + g3
-                     + " (zaplata " + paid + ", " + Tn(payOk) + "), kapital po odsprzedazy " + cap2 + " (" + Tn(capOk) + ") | strata gracza na obrocie " + (g0 - g3) + left
+                     + " (zaplata " + paid + ", w tym kasa miasta " + fromTown + ", " + Tn(payOk) + "), kapital po odsprzedazy " + cap2 + " (" + Tn(capOk) + ") | strata gracza na obrocie " + (g0 - g3) + left
                      + " -> wynik " + (ok ? "TAK" : "NIE") + ".");
         }
     }

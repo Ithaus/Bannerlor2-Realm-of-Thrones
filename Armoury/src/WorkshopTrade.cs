@@ -93,7 +93,7 @@ namespace Armoury
         private static readonly Dictionary<ItemCategory, ItemObject> _sample = new Dictionary<ItemCategory, ItemObject>();
         private static readonly Dictionary<string, TypeStat> _dType = new Dictionary<string, TypeStat>();
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
-        private static long _dWageCap, _dWagePurse, _dKeepCap, _dKeepPurse, _dUnpaid, _dPayNotable, _dPayLord, _dPayPlayer, _dFunded, _dSalePaid, _dSaleShort, _dGear;
+        private static long _dWageCap, _dWagePurse, _dKeepCap, _dKeepPurse, _dUnpaid, _dPayNotable, _dPayLord, _dPayPlayer, _dFunded, _dSalePaid, _dSaleShort, _dGear, _dSaleTown; private static int _dSaleN;   // 323b: _dSaleTown, _dSaleN - doplata kasy miasta do odkupu i liczba odsprzedazy
         private static int _dFail, _dNoTaker, _dStumbles;
         // 305b: zmiana produkcji gracza z wyrownaniem kapitalu (WorkshopRetoolSettlesCapital) - zwrot do kiesy, doplata z kiesy, brak (gracza nie stac), zmian;
         // wyceny dla gracza (WorkshopTradeBuyerMemory) - z pamieci pol na pol, z cen targu w calosci (krotka historia), z polowa cen targu, z korekta tempa, bez linii broni
@@ -147,7 +147,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _dType.Clear(); _dFair.Clear();
-            _dWageCap = _dWagePurse = _dKeepCap = _dKeepPurse = _dUnpaid = _dPayNotable = _dPayLord = _dPayPlayer = _dFunded = _dSalePaid = _dSaleShort = _dGear = 0;
+            _dWageCap = _dWagePurse = _dKeepCap = _dKeepPurse = _dUnpaid = _dPayNotable = _dPayLord = _dPayPlayer = _dFunded = _dSalePaid = _dSaleShort = _dGear = _dSaleTown = 0; _dSaleN = 0;
             _dNotFrom = _dNotTo = 0;
             _dFail = _dNoTaker = _dStumbles = 0;
             _dRetBack = _dRetAdd = _dRetShort = 0; _dRetN = _dQBlend = _dQExpFull = _dQExpHalf = _dQPace = _dQArms = _dQResaleCap = _dMemPace = _dQStock = 0;   // 305b (307c: _dQStock)
@@ -874,7 +874,9 @@ namespace Armoury
             catch (Exception e) { Stumble("WorkshopTrade.Fail(DecideBestWorkshopType)", e); }
             if (type == null) type = shop.WorkshopType;
             int cost = model.GetCostForNotable(shop);
-            ChangeOwnerOfWorkshopAction.ApplyByBankruptcy(shop, buyer, type, cost);   // kapital zostaje (OwnerPrefix), graczowi placi kupiec (SalePrefix / SalePostfix)
+            _inFail = true;   // 323b: tylko napis linii odsprzedazy
+            try { ChangeOwnerOfWorkshopAction.ApplyByBankruptcy(shop, buyer, type, cost); }   // kapital zostaje (OwnerPrefix), graczowi placi kupiec (SalePrefix / SalePostfix)
+            finally { _inFail = false; }
             _dFail++;
             int fund = Math.Min(Math.Max(0, shop.InitialCapital - Math.Max(0, shop.Capital)), Math.Max(0, buyer.Gold) / 2);
             if (fund > 0) { buyer.ChangeHeroGold(-fund); shop.ChangeGold(fund); _dFunded += fund; }
@@ -1050,27 +1052,76 @@ namespace Armoury
                 if (!On || __0 == null || __1 == null || __4 <= 0) return;
                 if (__0.Owner != Hero.MainHero || __1 == Hero.MainHero) return;
                 __state = __4; __4 = 0;
+                // 323b: wycena bez przyciecia do kies (sam log) - wlasciciel to jeszcze gracz, wiec ta sama miara co w GetCostForNotable przed chwila
+                try { int worth; Quote q; _saleFair = ResaleFair(__0, false, out worth, out q); }
+                catch (Exception e) { _saleFair = -1; Stumble("WorkshopTrade.SalePrefix(323b)", e); }
             }
             catch (Exception e) { Stumble("WorkshopTrade.SalePrefix", e); }
         }
 
-        public static void SalePostfix(Hero __1, int __state)
+        private static int _saleFair = -1;      // 323b: cena odkupu przed przycieciem do kies (z SalePrefix, do linii odsprzedazy)
+        private static bool _inFail;            // 323b: odsprzedaz z bankructwa warsztatu gracza (Fail) - tylko napis linii
+
+        /// <summary>
+        /// 323b (Jeff 03.11 "kasa miasta"): placi kupiec-notabl z wlasnej kiesy (najwyzej tyle, ile ma - jak dotad), a reszte uzgodnionej ceny kasa miasta warsztatu,
+        /// tylko z nadwyzki ponad zapas kupcow (ResaleTownSpare; oblezone miasto - nic). Warsztat dostaje kupiec jako agent miasta: jego zysk ponad gorna granice pasma
+        /// kiesy notabla (10 500) wraca do kasy tego miasta regula E5/A3 (NotableGold, NotableGoldReal) - zloto ma platnika i odbiorce, bez dlugu do zapisu.
+        /// </summary>
+        public static void SalePostfix(Workshop __0, Hero __1, int __state)
         {
             try
             {
                 if (__state <= 0 || __1 == null) return;
-                int pay = Math.Min(__state, Math.Max(0, __1.Gold));
+                int fromBuyer = Math.Min(__state, Math.Max(0, __1.Gold));
                 bool pn = PayNotes.On;   // m96-wies: jeden komunikat z powodem zamiast "You received N" gry
-                if (pay > 0) GiveGoldAction.ApplyBetweenCharacters(__1, Hero.MainHero, pay, pn);
-                if (pn) PayNotes.Got("workshop", pay, " from " + __1.Name + " for your workshop.");
-                _dSalePaid += pay;
+                if (fromBuyer > 0) GiveGoldAction.ApplyBetweenCharacters(__1, Hero.MainHero, fromBuyer, pn);
+                int fromTown = 0, spare = 0;
+                Settlement st = __0 != null ? __0.Settlement : null;
+                if (__state > fromBuyer && ResaleTownOn && st != null && st.Town != null)
+                {
+                    spare = ResaleTownSpare(__0);
+                    fromTown = Math.Min(__state - fromBuyer, spare);
+                    if (fromTown > 0) GiveGoldAction.ApplyForSettlementToCharacter(st, Hero.MainHero, fromTown, pn);   // kasa miasta -> gracz (kwota nigdy ponad nadwyzke)
+                }
+                int pay = fromBuyer + fromTown;
+                if (pn) PayNotes.Got("workshop", pay, " from " + __1.Name + (fromTown > 0 ? " and the treasury of " + st.Name : "") + " for your workshop.");
+                _dSalePaid += pay; _dSaleTown += fromTown; _dSaleN++;
                 if (pay < __state)
                 {
                     _dSaleShort += __state - pay;
-                    Log.Player("The buyer could raise only " + pay + " of the " + __state + " denars agreed for your workshop.", true);
+                    Log.Player((fromTown > 0 ? "The buyer and the town's treasury could raise only " : "The buyer could raise only ") + pay + " of the " + __state + " denars agreed for your workshop.", true);
                 }
+                try
+                {
+                    var s = Settings.Current;
+                    Log.Info("Odsprzedaz warsztatu gracza (323b): dzien " + (int)CampaignTime.Now.ToDays + " | " + (st != null ? st.Name.ToString() : "?") + " " + (__0 != null ? TypeId(__0) : "?")
+                             + " -> " + __1.Name + (_inFail ? " (bankructwo)" : "") + " | cena odkupu " + __state + " (wycena bez przyciecia do kies " + _saleFair + ", udzial "
+                             + MBMath.ClampFloat(s.WorkshopTradeResaleShare, 0f, 1f).ToString("0.00", CultureInfo.InvariantCulture) + ") | kupiec z kiesy " + fromBuyer
+                             + ", kasa miasta " + fromTown + " (nadwyzka ponad zapas przed " + spare + ", Workshop Resale Town Pays " + (ResaleTownOn ? "TAK" : "NIE")
+                             + (st != null && st.IsUnderSiege ? ", oblezone" : "") + "), zaplacone " + pay + ", zabraklo " + (__state - pay)
+                             + " | kupiec agentem miasta: nadwyzka kiesy ponad 10500 do kasy miasta (Notable Gold Real " + (s.NotableGoldReal ? "TAK" : "NIE") + ").");
+                }
+                catch (Exception e) { Stumble("WorkshopTrade.SalePostfix(log323b)", e); }
             }
             catch (Exception e) { Stumble("WorkshopTrade.SalePostfix", e); }
+            finally { _saleFair = -1; }
+        }
+
+        private static bool ResaleTownOn { get { var s = Settings.Current; return s != null && s.WorkshopResaleTownPays; } }
+
+        /// <summary>323b: ile kasa miasta warsztatu moze dolozyc do odkupu - nadwyzka ponad zapas kupcow (ten sam prog co nasze zakupy kasa miasta, TownPurse.BuyFloorPeek -
+        /// bez licznika 169c, bo wolane tez z warunku rozmowy); przy wylaczonym A1 albo TownPaysFromSurplus cala kasa (jak SpendableTown). Oblezone miasto i klucz NIE - 0.</summary>
+        private static int ResaleTownSpare(Workshop w)
+        {
+            try
+            {
+                if (!ResaleTownOn || w == null || w.Settlement == null || w.Settlement.IsUnderSiege) return 0;
+                var t = w.Settlement.Town;
+                if (t == null) return 0;
+                long v = (long)t.Gold - TownPurse.BuyFloorPeek(t, 0);
+                return v <= 0 ? 0 : (v >= t.Gold ? Math.Max(0, t.Gold) : (int)v);
+            }
+            catch (Exception e) { Stumble("WorkshopTrade.ResaleTownSpare", e); return 0; }
         }
 
         /// <summary>
@@ -1478,28 +1529,38 @@ namespace Armoury
 
         /// <summary>DefaultWorkshopModel.GetCostForNotable - tyle notabl daje graczowi: czesc wartosci DLA NIEGO (jego podatek, gorsza pamiec) plus kapital w kasie.
         /// Audyt 120: nie wiecej niz ma w sakiewce najbogatszy notabl miasta, ktory moze kupic - te liczbe gracz widzi w rozmowie
-        /// ("you can get {PRICE}") PRZED sprzedaza; kupca losuje gra dopiero w konsekwencji, wiec biedniejszy kupiec dalej placi tyle, ile ma.</summary>
+        /// ("you can get {PRICE}") PRZED sprzedaza; kupca losuje gra dopiero w konsekwencji, wiec biedniejszy kupiec dalej placi tyle, ile ma.
+        /// 323b (WorkshopResaleTownPays): pulap = ta sakiewka + nadwyzka kasy miasta ponad zapas kupcow; czego kupiec nie ma, doplaca kasa (SalePostfix).</summary>
         public static void CostNotablePostfix(Workshop __0, ref int __result)
         {
             try
             {
                 if (!On || !Live || __0 == null || __0.WorkshopType == null || __0.WorkshopType.IsHidden) return;
-                var q = QuoteForNotable(__0);
-                float share = MBMath.ClampFloat(Settings.Current.WorkshopTradeResaleShare, 0f, 1f);
-                int worth = Math.Max(q.Going, q.Equip);
-                // 305b (WorkshopTradeBuyerMemory): ta sama miara co przy kupnie (pol na pol pamieci) - i nigdy wiecej niz udzial tego, co za ten warsztat zaplacilby
-                // dzis gracz (inny podatek notabla nie robi z kupna i odsprzedazy zysku)
-                if (q.Blend || q.ArmsIdle || (SteadyOn && __0.Owner == Hero.MainHero))   // 311c: przy wycenie stalej zawsze przy odkupie od gracza (krok doby moze trzymac cene gracza ponizej pamieci notabla; recenzja: tylko warsztat gracza - cudzych sprzedazy i kosztu wyceny nie rusza); 305f: takze cena z linii towarowych (ArmsIdle) - w rozruchu rynku (bez Blend) podatek notabla nizszy od gracza nie da zysku
-                {
-                    var qp = QuoteFor(__0, Hero.MainHero);
-                    int wp = Math.Max(qp.Going, qp.Equip);
-                    if (wp < worth) { worth = wp; _dQResaleCap++; }
-                }
-                __result = (int)Math.Round(worth * share) + q.Capital + q.Wip;   // 305f: surowiec robot w toku w calosci (jak kapital) - ta sama kwota co przy kupnie
+                int worth; Quote q;
+                __result = ResaleFair(__0, true, out worth, out q);
                 int purse = RichestBuyerPurse(__0);
-                if (purse >= 0 && __result > purse) __result = purse;
+                // 323b (WorkshopResaleTownPays): czego najbogatszy notabl nie ma, doplaca kasa miasta z nadwyzki ponad zapas kupcow (SalePostfix) - przyciecie do sumy
+                if (purse >= 0) { long cap = (long)purse + ResaleTownSpare(__0); if (__result > cap) __result = (int)cap; }
             }
             catch (Exception e) { Stumble("WorkshopTrade.CostNotablePostfix", e); }
+        }
+
+        /// <summary>Cena odkupu warsztatu przed przycieciem do kies (udzial WorkshopTradeResaleShare wartosci dla notabla, nie wiecej niz udzial ceny gracza, plus kapital
+        /// i robota w toku). 323b: wydzielone z CostNotablePostfix (ta sama rachuba) - liczy ja tez SalePrefix do linii odsprzedazy (count = false: bez licznika 305b).</summary>
+        private static int ResaleFair(Workshop w, bool count, out int worth, out Quote q)
+        {
+            q = QuoteForNotable(w);
+            float share = MBMath.ClampFloat(Settings.Current.WorkshopTradeResaleShare, 0f, 1f);
+            worth = Math.Max(q.Going, q.Equip);
+            // 305b (WorkshopTradeBuyerMemory): ta sama miara co przy kupnie (pol na pol pamieci) - i nigdy wiecej niz udzial tego, co za ten warsztat zaplacilby
+            // dzis gracz (inny podatek notabla nie robi z kupna i odsprzedazy zysku)
+            if (q.Blend || q.ArmsIdle || (SteadyOn && w.Owner == Hero.MainHero))   // 311c: przy wycenie stalej zawsze przy odkupie od gracza (krok doby moze trzymac cene gracza ponizej pamieci notabla; recenzja: tylko warsztat gracza - cudzych sprzedazy i kosztu wyceny nie rusza); 305f: takze cena z linii towarowych (ArmsIdle) - w rozruchu rynku (bez Blend) podatek notabla nizszy od gracza nie da zysku
+            {
+                var qp = QuoteFor(w, Hero.MainHero);
+                int wp = Math.Max(qp.Going, qp.Equip);
+                if (wp < worth) { worth = wp; if (count) _dQResaleCap++; }
+            }
+            return (int)Math.Round(worth * share) + q.Capital + q.Wip;   // 305f: surowiec robot w toku w calosci (jak kapital) - ta sama kwota co przy kupnie
         }
 
         /// <summary>Sakiewka najbogatszego notabla, ktory moze odkupic warsztat: zywy notabl osady poza obecnym wlascicielem (z tych
@@ -1681,10 +1742,45 @@ namespace Armoury
                 if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden) return false;
                 var q = QuoteFor(w, Hero.MainHero);
                 int price = Campaign.Current.Models.WorkshopModel.GetCostForPlayer(w);   // ta sama liczba, ktora sprawdza przycisk "Yes"
-                MBTextManager.SetTextVariable("ARM_WS_OFFER", OfferText(q, price), false);
+                string text = OfferText(q, price);
+                // 323b: ostrzezenie o cenie odsprzedazy (wlasny try - bez niego rozmowa jak dotad)
+                try
+                {
+                    const string ask = " Are you willing to pay?";
+                    string warn = ResaleWarning(w, q, price);
+                    if (warn != null && text.EndsWith(ask, StringComparison.Ordinal)) text = text.Substring(0, text.Length - ask.Length) + " " + warn + ask;
+                }
+                catch (Exception e) { Stumble("WorkshopTrade.ResaleWarning", e); }
+                MBTextManager.SetTextVariable("ARM_WS_OFFER", text, false);
                 return true;
             }
             catch (Exception e) { Stumble("WorkshopTrade.OfferCondition", e); return false; }
+        }
+
+        /// <summary>
+        /// 323b: zdanie rozmowy kupna (po angielsku) - ile warsztat dalby dzis przy odsprzedazy: udzial WorkshopTradeResaleShare jego wartosci dla gracza (gorna granica
+        /// odkupu - ResaleFair nigdy nie daje wiecej niz udzial ceny gracza) plus kapital i robota w toku, nie wiecej niz najbogatszy notabl miasta (wszyscy zywi - po kupnie
+        /// sprzedawca tez moze odkupic) i nadwyzka kasy miasta (WorkshopResaleTownPays). Szacunek z dzisiejszych liczb; null = nie da sie policzyc.
+        /// </summary>
+        private static string ResaleWarning(Workshop w, Quote q, int price)
+        {
+            if (w == null || q == null || price <= 0) return null;
+            float share = MBMath.ClampFloat(Settings.Current.WorkshopTradeResaleShare, 0f, 1f);
+            long est = (long)Math.Round(Math.Max(q.Going, q.Equip) * (double)share) + q.Capital + q.Wip;
+            int purse = -1;
+            var list = w.Settlement != null ? w.Settlement.Notables : null;
+            if (list != null) foreach (var h in list) if (h != null && h.IsAlive) purse = Math.Max(purse, Math.Max(0, h.Gold));
+            if (purse < 0) return null;
+            int town = ResaleTownSpare(w);
+            long cap = (long)purse + town;
+            long back = Math.Min(est, cap);
+            var sb = new StringBuilder("Mind you: should you sell it back, buyers here pay only ");
+            sb.Append(Math.Round(share * 100f).ToString("0", CultureInfo.InvariantCulture)).Append("% of what a shop is worth, plus its till - today that would be at most about ")
+              .Append(back).Append(" denars, ").Append((back * 100L / price).ToString(CultureInfo.InvariantCulture)).Append("% of my price");
+            if (est > cap)
+                sb.Append(", because the richest notable here has only ").Append(purse).Append(ResaleTownOn ? (town > 0 ? " and the town's treasury could add " + town + " more" : " and the town's treasury has nothing to spare") : "");
+            sb.Append('.');
+            return sb.ToString();
         }
 
         internal static string OfferText(Quote q, int price)
@@ -1809,7 +1905,7 @@ namespace Armoury
                   .Append("), sprzet przy zmianie produkcji ").Append(_dGear).Append("; niezaplacone (pusty kapital) ").Append(_dUnpaid)
                   .Append(" | zeszlo z kapitalu miedzy tickami miast (wyplata zysku wlascicielom, monopol korony): notable ").Append(_dPayNotable).Append(", lordowie ").Append(_dPayLord).Append(", gracz ").Append(_dPayPlayer)
                   .Append(" | bankructwa ").Append(_dFail).Append(" (nowi wlasciciele wlozyli z wlasnych kies ").Append(_dFunded).Append("), bez chetnego z pieniedzmi ").Append(_dNoTaker)
-                  .Append("; sprzedaz gracza notablom: zaplacone ").Append(_dSalePaid).Append(", zabraklo kupcowi ").Append(_dSaleShort)
+                  .Append("; sprzedaz gracza notablom: zaplacone ").Append(_dSalePaid).Append(", zabraklo kupcowi ").Append(_dSaleShort).Append(" (323b: odsprzedazy ").Append(_dSaleN).Append(", w tym kasa miasta ").Append(_dSaleTown).Append(")")
                   .Append(" | ").Append(FairText()).Append(" | ").Append(NotablesText())
                   .Append(" | cena kupna dla gracza: mediana ").Append(med).Append(", od ").Append(min).Append(" do ").Append(max).Append(" (").Append(prices.Count).Append(" warsztatow)");
                 if (topQ != null && topW != null) sb.Append("; ").Append(TopText(topQ, topW, stockCut));
