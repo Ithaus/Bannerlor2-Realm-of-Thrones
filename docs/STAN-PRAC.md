@@ -1,7 +1,7 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
 ## STAN 03.11.2026 ok. 16:20 CET: WGRANIE 161 (najnowszy)
-- W GRZE: Armoury.dll da5a31022ce86f7f87403e031fe64198 (galaz noc/323x-integracja, wypchnieta) + CrashScribe 55ccc004 + ForgeView 8441ab0e. Baza testu: bannerlord-autotest	est\prod161.
+- W GRZE: Armoury.dll da5a31022ce86f7f87403e031fe64198 (galaz noc/323x-integracja, wypchnieta) + CrashScribe 55ccc004 + ForgeView 8441ab0e. Baza testu: bannerlord-autotest\test\prod161.
 - Lancuch od 154: 155 (317-318: strzaly klute przed cietymi, ranni lordowie do niewoli, medycyna za jencow, panika wg dowodcow i tieru) -> 156-157 (319: jency lecza sie jak wojsko, weterani ucza, groty strzal wg tieru)
   -> 158 (320: fabula ROT - Harrenhal/Dorzecze, Krwawe Gody bez pokoju, zwrot zamkow, pokoj do Bitwy Bekartow; korona bez bandytow; mury dla obroncow; piechota biegnie pod ostrzalem)
   -> 159 (321: Krucze Zeby z ostatniego tieru, lista CRAFT bez dubli) -> 160 (322a-f audyt ekonomii) -> 161 (323a-d inwestycje, wg docs/PORADNIK-INWESTYCJE.md). Szczegoly: CHANGELOG na noc/323x-integracja.
