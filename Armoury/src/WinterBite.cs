@@ -64,6 +64,14 @@ namespace Armoury
             return 1f + (n - 0.5f) * 2f * g;
         }
 
+        /// <summary>Najwiekszy mnoznik geografii (daleka polnoc) - dodatek jedzenia partii dzielony przez to, zeby klucz byl maksimum (325: Jeff +20%).</summary>
+        private static float NorthMax()
+        {
+            var s = Settings.Current;
+            float g = s != null ? Math.Max(0, Math.Min(60, s.NorthGradientPercent)) / 100f : 0.25f;
+            return 1f + g;
+        }
+
         internal static void OnDaily()
         {
             try
@@ -155,7 +163,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !WinterNow() || party == null) return 0f;
-                return Math.Max(0f, Math.Max(0, s.WinterPartyFoodExtraPercent) / 100f * Northness(party.GetPosition2D.Y) * WinterRealm.OfParty(party));
+                return Math.Max(0f, Math.Max(0, s.WinterPartyFoodExtraPercent) / 100f * Northness(party.GetPosition2D.Y) / NorthMax() * WinterRealm.OfParty(party));
             }
             catch { return 0f; }
         }
@@ -187,7 +195,7 @@ namespace Armoury
                 int why, riders, herd; float need, bk;
                 float horse = WinterRealm.HorseFeed(party, realm, out why, out need, out bk, out riders, out herd);   // na pustyni / w sniegu przy paszy BK - tylko roznica
                 if (horse > 0f) __result.Add(-horse, _txtHorses);
-                float bonus = Math.Max(0, s.WinterPartyFoodExtraPercent) / 100f * Northness(party.GetPosition2D.Y) * realm;
+                float bonus = Math.Max(0, s.WinterPartyFoodExtraPercent) / 100f * Northness(party.GetPosition2D.Y) / NorthMax() * realm;
                 if (bonus > 0f) __result.AddFactor(bonus, _txtWinter);
             }
             catch { }

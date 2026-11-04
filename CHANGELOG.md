@@ -13,7 +13,7 @@ najwyzej 2 doby popytu na dobe - przy pustej polce w pierwszej dobie zimy luka d
 **Zmiana (Armoury):**
 - **A** `Settings.cs` WinterPartyFoodBonusPercent (50) -> NOWY klucz **Winter Party Food Extra Percent = 20** (MCM 0-80). Stary klucz w Armoury.json Jeffa ("WinterPartyFoodBonusPercent": 50)
   nadpisalby zmiane domyslnej (CLAUDE.md 7) - nowa nazwa, wiec 20 dziala od razu bez ruszania pliku; stary wpis w json zostaje martwy. Wzor bez zmian: 20 x gradient x kraina -
-  najzimniejsza polnoc +20%, cieple krainy najwyzej +8%, Wyspy Letnie 0; gracz i AI (ten sam postfix na najglebszym modelu jedzenia). Pasza koni (E4/1 HorseFeed) BEZ zmian.
+  najzimniejsza polnoc +20% (dodatek dzielony przez najwiekszy mnoznik geografii NorthMax = 1 + gradient, po recenzji - bez tego polnoc +25%), srodek ok. +16%, cieple krainy ok. +5%, Wyspy Letnie 0, srednio ok. +13%; gracz i AI (ten sam postfix na najglebszym modelu jedzenia). Pasza koni (E4/1 HorseFeed) BEZ zmian.
   Czytaja: WinterBite.FoodPostfix, WinterBite.PartyFoodBonus (linia E4/1, Measure40), FoodChain (linia lancucha), log uzbrojenia WinterBite.
 - **B** nowy klucz **Winter Grain Fill Now** (TAK; `TownGranary.Zima322.cs`): (1) miasto chce cala luke do celu T* x dp - polka - KS-H w drodze (limit dobowy 2 x dp tylko przy NIE);
   (2) wies zrodlo moze oddac dzis caly wolny zapas: z bilansem zimy x_v (= zapas - floor x E - def / k), bez bilansu rata x dni rozkladu; najmniej dzisiejsza rata. Podzial miedzy
