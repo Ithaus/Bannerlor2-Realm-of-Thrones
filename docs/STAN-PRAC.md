@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 04.11.2026 ok. 15:40 CET: WGRANIE 163 (najnowszy) - zima 325
+- W GRZE: Armoury.dll f6ce9d5138637262480a0ae8ebd21de7 (galaz noc/325-zima 33d03a31 = 162 + 325, wypchnieta; worktree scratchpad bcfbb3b7 zb/n324).
+  Kopia 162: Armoury.dll.bak-2026-11-04-przed-wgranie163 i D:/Backup-Bannerlord/wgrane/2026-11-04-wgranie163-przed.
+- 325 (Jeff 04.11): dodatek zimowy jedzenia partii max +20% (nowy klucz WinterPartyFoodExtraPercent=20, stary 50 w json Jeffa martwy; / NorthMax) - srednio +13.3%;
+  Winter Grain Fill Now: wsie od razu napelniaja polke do T* z calego wolnego x_v; poprawki niskie r3 (ConsignSettle z Spendable, tryb 0, log).
+- Test 325a (30 dob, zapis Jeffa 109249, kod 0, ERROR 0): mediana braku 85% (d2) -> 38% (d4) -> 3% (d10) -> 0%; zboze miast 1.9k -> 87k (d1), potem 56-60k; spichlerze 26.1 -> 25.6 mld racji (prog 5.0 mld).
+- Do obserwacji: czy zima nie stala sie za lekka (0% braku) - ceny jedzenia; Duskendale/King's Landing ok. 35-42% w niektore doby.
+
 ## STAN 04.11.2026 ok. 00:25 CET: WGRANIE 162 (najnowszy) - glod zimy 324
 - W GRZE: Armoury.dll 4c5e4f93c9198f243f8e4b0b29d467e2 (galaz noc/324-glod a78b1898, wypchnieta; od noc/323x-integracja). CrashScribe/ForgeView bez zmian.
   Kopia 161: Armoury.dll.bak-2026-11-04-przed-wgranie162 i D:/Backup-Bannerlord/wgrane/2026-11-04-wgranie162-przed. Worktree: scratchpad bcfbb3b7 zb/n324.
