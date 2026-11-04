@@ -494,7 +494,9 @@ namespace Armoury
                     {
                         int q = Math.Min(sold, b.Pcs);
                         long val = q >= b.Pcs ? b.Left : (long)Math.Floor(b.Left * (double)q / b.Pcs);
-                        long got = TransferTo(town.Town, vil, val);
+                        // 325 (recenzja R3 pkt 1): z utargu tylko do nadwyzki kasy ponad zapas kupcow (TownPurse.SpendableTown - jak gotowka dostawy 322c i p6);
+                        // zapas kupcow placi zaleglosci firmy DS i raty TownDebt - reszta na rachunek wsi (OpenVillage, splacany w PayDaily)
+                        long got = TransferTo(town.Town, vil, Math.Min(val, Math.Max(0L, (long)TownPurse.SpendableTown(town.Town))));
                         long unpaid = val - got;
                         if (unpaid > 0) { if (OpenVillage(vil, town, unpaid, today)) { DKomBilled += unpaid; DKomSoldBilled += unpaid; } else KomLost(unpaid); }
                         b.Left -= val; b.Pcs -= q; sold -= q; outPcs += q;

@@ -1,5 +1,49 @@
 # DZIENNIK ZMIAN
 
+## 325 - zima: druzyny jedza najwyzej +20% (nie +50%), spichlerze wsi napelniaja polki od pierwszej doby, 3 uwagi niskie z recenzji 324 R3 (noc/325-zima od 162 = noc/324-glod a78b1898; Armoury.dll 337384b767f1b62dea21d28cde506408 - NIE WGRANE)
+
+**Problem:** Jeff 04.11 "i zima jemy o 20% wiecej a nie 40%". Log Armoury-2026-11-04_15-09-25 (doby 109250-109253): "Zima wedlug krain (E4/1): ... jedzenie partii zima:
+partii jedzacych 416, dodatek ludzi srednio +40.7%". Do tego 322c: polki zboza zostaja puste w pierwszych dobach zimy - "Zboze zima (322c)": chcialy 35-39k szt., na polki
+6-7k szt./d, polka po dostawie mediana 0.36-0.38 dnia popytu ("Glod miast (KS)" mediana 79.7%, Stoney Sept 100%).
+
+**Przyczyna:** (A) WinterBite.FoodPostfix: dodatek = Winter Party Food Bonus Percent (50, w Armoury.json Jeffa 50) x gradient polnocy x czynnik krainy (reszta 1.00, cieple
+0.40, Wyspy Letnie 0) - na polnocy +50%, srednio +40.7%. (B) 322c: wies daje na dobe tylko x_v x k (wolne z bilansu zimy rozlozone na ok. 2000 dni efektywnie) i miasto bierze
+najwyzej 2 doby popytu na dobe - przy pustej polce w pierwszej dobie zimy luka do celu T* zostaje na dlugie tygodnie.
+
+**Zmiana (Armoury):**
+- **A** `Settings.cs` WinterPartyFoodBonusPercent (50) -> NOWY klucz **Winter Party Food Extra Percent = 20** (MCM 0-80). Stary klucz w Armoury.json Jeffa ("WinterPartyFoodBonusPercent": 50)
+  nadpisalby zmiane domyslnej (CLAUDE.md 7) - nowa nazwa, wiec 20 dziala od razu bez ruszania pliku; stary wpis w json zostaje martwy. Wzor bez zmian: 20 x gradient x kraina -
+  najzimniejsza polnoc +20%, cieple krainy najwyzej +8%, Wyspy Letnie 0; gracz i AI (ten sam postfix na najglebszym modelu jedzenia). Pasza koni (E4/1 HorseFeed) BEZ zmian.
+  Czytaja: WinterBite.FoodPostfix, WinterBite.PartyFoodBonus (linia E4/1, Measure40), FoodChain (linia lancucha), log uzbrojenia WinterBite.
+- **B** nowy klucz **Winter Grain Fill Now** (TAK; `TownGranary.Zima322.cs`): (1) miasto chce cala luke do celu T* x dp - polka - KS-H w drodze (limit dobowy 2 x dp tylko przy NIE);
+  (2) wies zrodlo moze oddac dzis caly wolny zapas: z bilansem zimy x_v (= zapas - floor x E - def / k), bez bilansu rata x dni rozkladu; najmniej dzisiejsza rata. Podzial miedzy
+  wsie dalej proporcjonalny (W324Alloc; przy wspolnym k te same proporcje co rata), najglodniejsze miasto najpierw (bez zmian), cennik sztuka po sztuce, gotowka/komis/rachunek bez zmian.
+  Bilans liczy sie co dobe od nowa z biezacego zapasu - oddanie x_v zostawia w stodole dokladnie WinterNeed324 (floor x E + def / k), wiec stodoly nie schodza ponizej progu
+  racjonowania na koniec zimy (z psuciem), a pozniejsze raty same maleja.
+- **C1** `KsFoodCredit.cs` ConsignSettle: utarg sprzedanych sztuk komisu przelewany wsi tylko do max(0, TownPurse.SpendableTown) (nadwyzka ponad zapas kupcow - jak gotowka 322c);
+  reszta na rachunek wsi (OpenVillage, PayDaily) - zapas kupcow zostaje na zaleglosci DS i raty TownDebt.
+- **C2** `TownGranary.Zima322.cs` W324Give: zaplata gotowka przeniesiona PRZED zwrot do stodoly; niedobor gotowki w trybie 0 (tylko gotowka) albo przy nieotwartym rachunku -
+  nieoplacone sztuki wracaja do stodoly (TributeGive razem z ulamkiem), nadplata ponad cale oplacone sztuki wraca z kiesy wsi do kasy miasta. Tryb 1/2 - rachunek wsi jak dotad.
+- **C3** linia 322c: "324 kredyt wsi TAK (zastapiony komisem)" gdy komis wlaczony.
+- `McmSettings.cs` (gen_mcm: 2823 ustawien Armoury). Opis Winter Grain Consign: limit "two days of demand" tylko przy Fill Now NIE.
+
+**Linie logu:**
+- "Zima wedlug krain (E4/1)": "dodatek ludzi srednio +X%" - oczekiwane ok. +16% (40.7 x 20/50) przy tym samym rozkladzie partii; "FoodChain" i "WinterBite: zima uzbrojona" pokazuja +20.
+- "Zboze zima (322c)": NOWE pole "| 325 napelnienie do celu teraz TAK: napelnienie do celu dzis N szt. (z zapasu ponad rate M szt.; ponad dawny limit 2 dob popytu P szt.)" -
+  N - sztuki na polki doby, M - ponad dzisiejsza rate wsi (suma max(0, oddane - rata)), P - ponad 2 doby popytu miasta.
+
+**Ryzyko / co sprawdzic:**
+- Bramka krainy (StartCalibration.Arm.cs LandGateDaily): sprzedaz 322c idzie do soldV = TownGranary.SoldToday - odjeta od spadku stodol (targ, nie strata KS); prog planu krainy =
+  suma WinterNeed324 - po oddaniu calego x_v zapas wsi = dokladnie WinterNeed324, wiec seria krainy nie startuje z tego powodu. Sprawdzic w logu "Glod zimy (324)": "bramka krainy ...
+  krain z progiem bilansu zimy" i brak nowych serii KS krain w pierwszych dobach.
+- Pierwsza doba zimy: duzy jednorazowy dowoz (luka do T* x dp we wszystkich miastach) - komis dostanie duzo sztuk naraz (bez pulapu kwoty); zwrot po 91 dniach do stodol jak dotad.
+  Cennik sztuka po sztuce do 100000 szt. na miasto (jak dotad) - czas linii 322c moze wzrosnac w pierwszej dobie.
+- Poza 322c nic nie czyta Rate/Given/Cap2. Klucze nowe - w Armoury.json Jeffa ich nie ma (domyslne dzialaja od razu).
+- Dodatek jedzenia: Jeff zobaczy w partii nizsze zuzycie zima; pasza koni bez zmian (osobny skladnik).
+- NIE testowane w grze (zakaz uruchamiania gry w tym zadaniu) - tylko build.
+
+**Status:** DO SPRAWDZENIA (build kod 0, nie wgrane).
+
 ## 324 - glod zimy: wies je najpierw ze swojej stodoly, 322c z bilansu zimy i dla calego swiata, bramka krainy zima (noc/324-glod od 323x 7e62e009; runda 1 Armoury.dll 7fc4f2ce3febd7bef58c0e92be34c8ea, runda 2 Armoury.dll e9ad625c32ea3b5a9822da0e80962243, runda 3 Armoury.dll 4c5e4f93c9198f243f8e4b0b29d467e2 - NIE WGRANE)
 
 **Problem:** Jeff 03.11 "na wsiach tez nie ma zboza, praktycznie nie ma produkcji tez innych surowcow, cos sie zesralo". Logi kampanii Ironman0gXONzURi8yO: zboze swiata

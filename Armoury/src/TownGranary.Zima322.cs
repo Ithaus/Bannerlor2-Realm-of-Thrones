@@ -103,12 +103,12 @@ namespace Armoury
         }
 
         /// <summary>324 runda 2: wies - zrodlo zboza 322c tej doby (cale sztuki do oddania dzis, racji na sztuke, region miasta).</summary>
-        private sealed class W324Src { internal Village V; internal Town Home; internal int Avail; internal double Rpp; internal bool Castle; }
+        private sealed class W324Src { internal Village V; internal Town Home; internal int Avail, Rate, Given; internal double Rpp; internal bool Castle; }   // 325: Rate - dzisiejsza rata wsi (szt.), Given - oddane dzis
 
         /// <summary>324 runda 2: miasto z sygnalem tej doby - popyt (cennik sztuka po sztuce), kasa i kredyt, przyjete sztuki.</summary>
         private sealed class W324Req
         {
-            internal Town T; internal Settlement St; internal double Dp, Hunger; internal int Inc, Sh0, Tg0, KAt, Ord; internal bool OutZ, Any;
+            internal Town T; internal Settlement St; internal double Dp, Hunger; internal int Inc, Sh0, Tg0, KAt, Ord, Cap2; internal bool OutZ, Any;   // 325: Cap2 - dawny limit dobowy (2 doby popytu, szt.)
             internal readonly List<int> Pp = new List<int>(); internal long Spend, CashLeft, CredLeft, Cash, Cred, Kom; internal string Land;   // runda 3: Kom - wartosc oddana w komis
         }
 
@@ -196,6 +196,11 @@ namespace Armoury
             bool reg324 = s.WinterGrainTradeRegion && bal324, land324 = s.WinterGrainLandTier, fill324 = s.WinterGrainFillToTarget, cred324 = s.WinterGrainVillageCredit;
             // runda 3: reszta ponad gotowke - 2 komis (Winter Grain Consign), 1 rachunek wsi w pulapie (Winter Grain Village Credit), 0 tylko gotowka
             bool kom324 = s.WinterGrainConsign; int payMode = kom324 ? 2 : cred324 ? 1 : 0;
+            // 325 (Winter Grain Fill Now): polka ponizej celu T* - wsie zrodla moga dowiezc cala luke do celu z CALEGO wolnego zapasu (x_v), nie z dziennej raty x_v x k;
+            // ilosc dalej najwyzej cel polki T* x dp - polka (limit dobowy 2 x dp zdjety). Bilans liczy sie co dobe od nowa z biezacego zapasu - wczesniejsze napelnienie
+            // samo zmniejsza pozniejsze raty; zapas wsi po oddaniu calego x_v = prog racjonowania x E + def / k (WinterNeed324) - plan bramki krainy.
+            bool fillNow = s.WinterGrainFillNow;
+            long fillPcs = 0, fillOverRate = 0, fillOver2 = 0;
             double rho324 = bal324 ? StartCalibration.Rho324() : 0.0, e324 = 1.0;
             double k324 = bal324 && left > 0 ? StartCalibration.WinterK324(left, rho324, out e324) : 0.0;
             double kprW = all324 && applied ? StartCalibration.KcalPerRationWorld324(today) : double.NaN;
@@ -211,6 +216,7 @@ namespace Armoury
             int regions = 0, regVills = 0, regNeg = 0, landFedTowns = 0, credTowns = 0, credFail = 0, komTowns = 0; long pcsTown = 0, pcsCastle = 0, pcsLand = 0, credGold = 0, credCapSum = 0, komGold = 0, komPcs = 0;
             double regFreeR = 0.0, regNetR = 0.0;
             var after = new List<double>();
+            var srcOfAll = new Dictionary<Town, List<W324Src>>();   // 325: zrodla doby (do pomiaru 'z zapasu ponad rate')
             if (live && applied && grain != null && inWinter)
             {
                 // 1. miasta z sygnalem (popyt, cennik sztuka po sztuce, kasa i kredyt)
@@ -242,7 +248,8 @@ namespace Armoury
                         bool lowShelf = (shelf + inc) < (fill324 ? tstar : W322ShelfLowDays) * dp, hiIx = ix >= trigIx;
                         if (!lowShelf && !hiIx) continue;
                         sig++; if (lowShelf) sigShelf++; if (hiIx) sigIx++;
-                        double want = Math.Min(tstar * dp - shelf - inc, W322DayCapDays * dp);
+                        double gap = tstar * dp - shelf - inc;
+                        double want = fillNow ? gap : Math.Min(gap, W322DayCapDays * dp);   // 325: pelna luka do celu (dawny limit dobowy 2 doby popytu tylko przy NIE)
                         if (want < 1.0) { full++; continue; }
                         if (model == null || gcat == null || town.MarketData == null) { noPrice++; continue; }
                         long spend = Math.Max(0, TownPurse.SpendableTown(town));   // nadwyzka ponad zapas kupcow (jak p6) - bez zaleglosci firmy DS i pozyczek rady
@@ -259,7 +266,7 @@ namespace Armoury
                         // cena od polki bez pulapu: sztuka k po cenie sprzedajacego przy polce powiekszonej o k sztuk (jak tabory wsi - MarketCarts); polka z chwili przed dostawa
                         var md = town.MarketData.GetCategoryData(gcat);
                         var el = new EquipmentElement(grain);
-                        var rq = new W324Req { T = town, St = st, Dp = dp, Inc = inc, OutZ = outZ, Ord = reqs.Count, Spend = spend, CashLeft = cash, CredLeft = cap };
+                        var rq = new W324Req { T = town, St = st, Dp = dp, Inc = inc, OutZ = outZ, Ord = reqs.Count, Spend = spend, CashLeft = cash, CredLeft = cap, Cap2 = (int)Math.Min(int.MaxValue, Math.Floor(W322DayCapDays * dp)) };
                         long cum = 0, budget = cash + cap; int maxN = (int)Math.Min(100000.0, Math.Floor(want));
                         for (int k = 0; k < maxN; k++)
                         {
@@ -279,7 +286,7 @@ namespace Armoury
                 }
 
                 // 2. zrodla: region miasta (TradeBound - wsie miasta i zamkow; NIE - wsie miasta), wolne na dobe z bilansu zimy kazdej wsi osobno (runda 3)
-                var srcOf = new Dictionary<Town, List<W324Src>>();
+                var srcOf = srcOfAll;
                 if (reqs.Count > 0)
                 {
                     var members = new Dictionary<Town, List<Village>>();
@@ -347,9 +354,12 @@ namespace Armoury
                             for (int i = 0; i < rows.Count; i++)
                             {
                                 double r = xs[i] * perDayX;
-                                int a = (int)Math.Min(int.MaxValue, Math.Floor(r / rows[i].Rpp));
+                                int rate = (int)Math.Min(int.MaxValue, Math.Floor(r / rows[i].Rpp));
+                                // 325: caly wolny zapas wsi - z bilansem zimy x (racje ponad plan do wiosny), bez bilansu rata x dni rozkladu (zapas ponad stala rezerwe)
+                                double whole = bal324 && left > 0 ? xs[i] : xs[i] * spread;
+                                int a = fillNow ? (int)Math.Min(int.MaxValue, Math.Max(rate, Math.Floor(whole / rows[i].Rpp))) : rate;
                                 if (a < 1) { tiny++; continue; }
-                                rows[i].Avail = a; list.Add(rows[i]);
+                                rows[i].Avail = a; rows[i].Rate = rate; list.Add(rows[i]);
                             }
                             if (list.Count > 0) srcOf[town] = list;
                         }
@@ -391,6 +401,7 @@ namespace Armoury
                                     if (rq.OutZ) outPieces += got;
                                     if (pass == 1) { pcsLand += got; landAny = true; } else if (src[i].Castle) pcsCastle += got; else pcsTown += got;
                                     pieces += got; fedVills++; rppSum += src[i].Rpp; rppN++;
+                                    src[i].Given += got;
                                 }
                                 catch (Exception e) { Stumble322("Winter322(wies)", e); }
                             }
@@ -403,6 +414,7 @@ namespace Armoury
                     try
                     {
                         if (!rq.Any) { noVill++; continue; }
+                        if (fillNow) { fillPcs += rq.KAt; fillOver2 += Math.Max(0, rq.KAt - rq.Cap2); }
                         gold += rq.Cash; townOut += rq.Tg0 - rq.T.Gold;
                         if (rq.Cred > 0) credTowns++;
                         if (rq.Kom > 0) komTowns++;
@@ -414,6 +426,7 @@ namespace Armoury
                     catch (Exception e) { Stumble322("Winter322(miasto)", e); }
                 }
             }
+            if (fillNow) foreach (var kv in srcOfAll) foreach (var c in kv.Value) fillOverRate += Math.Max(0, c.Given - c.Rate);
             W324ShelfMark(today);   // runda 3: polka po dostawach - podstawa sprzedanych komisu jutro
             _w322SessPieces += pieces; _w322SessRations += rations; _w322SessGold += gold;
             _w324Day = today; _w324Pieces = (int)Math.Min(int.MaxValue, pieces); _w324PiecesOut = (int)Math.Min(int.MaxValue, outPieces); _w324TownsOut = outFed;
@@ -434,6 +447,8 @@ namespace Armoury
                   .Append(" | miast ").Append(towns).Append(" (oblezone ").Append(besieged).Append(", Innych ").Append(walkers).Append(", poza ZC4 ").Append(noKs).Append(')')
                   .Append(" | z sygnalem ").Append(sig).Append(" (polka < ").Append(fill324 ? "cel T*" : F(W322ShelfLowDays, "0.0") + " dnia").Append(" popytu ").Append(sigShelf).Append(", indeks >= ").Append(F(trigIx, "0.0")).Append(' ').Append(sigIx)
                   .Append("; polka pelna do celu ").Append(full).Append(", bez kasy i kredytu ").Append(noGold).Append(", bez wsi z zapasem ").Append(noVill).Append(", bez wyceny ").Append(noPrice).Append(')')
+                  .Append(" | 325 napelnienie do celu teraz ").Append(fillNow ? "TAK" : "NIE").Append(": napelnienie do celu dzis ").Append(fillPcs).Append(" szt. (z zapasu ponad rate ").Append(fillOverRate)
+                  .Append(" szt.; ponad dawny limit 2 dob popytu ").Append(fillOver2).Append(" szt.)")
                   .Append(" | chcialy ").Append(F(wantSum, "0")).Append(" szt. | na polki dzis ").Append(pieces).Append(" szt. zboza (").Append(F(rations, "0")).Append(" racji, racji na sztuke srednio ")
                   .Append(rppN > 0 ? F(rppSum / rppN, "0.0") : "-").Append("; sigma ").Append(sigma).Append(", kg sztuki ").Append(F(kg, "0.##")).Append(") z ").Append(fedVills).Append(" wsi do ").Append(fedTowns).Append(" miast")
                   .Append(" | zloto miasto->wies ").Append(gold).Append(" zl (cena srednio ").Append(pieces > 0 ? F((gold + credGold + komGold) / (double)pieces, "0.#") : "-").Append(" zl/szt. bez pulapu, sztuka po sztuce w dol krzywej polki; pierwsza sztuka srednio ")
@@ -441,7 +456,7 @@ namespace Armoury
                   .Append(" | 324 region ").Append(reg324 ? "TAK (wsie z miastem targowym; kazda wies sprzedaje swoja nadwyzke)" : "NIE (wsie miasta)").Append(": regionow ").Append(regions).Append(", wsi z bilansem ").Append(regVills).Append(" (bez nadwyzki ").Append(regNeg)
                   .Append("), wolne regionow ").Append(F(regFreeR, "0")).Append(" racji/d (suma nadwyzek wsi; netto z brakiem biedniejszych ").Append(F(regNetR, "0")).Append(" - nie liczy sie); sztuki z wsi miasta ").Append(pcsTown).Append(", z wsi zamkow ").Append(pcsCastle)
                   .Append(" | 324 kraina ").Append(land324 ? "TAK" : "NIE").Append(": ").Append(pcsLand).Append(" szt. z regionow innych miast krainy do ").Append(landFedTowns).Append(" miast")
-                  .Append(" | 324 kredyt wsi ").Append(cred324 ? "TAK" : "NIE").Append(": na rachunek wsi dzis ").Append(credGold).Append(" zl (").Append(credTowns).Append(" miast; pulap z raty 322e razem ").Append(credCapSum)
+                  .Append(" | 324 kredyt wsi ").Append(cred324 ? (kom324 ? "TAK (zastapiony komisem)" : "TAK") : "NIE").Append(": na rachunek wsi dzis ").Append(credGold).Append(" zl (").Append(credTowns).Append(" miast; pulap z raty 322e razem ").Append(credCapSum)
                   .Append(", nieudane ").Append(credFail).Append("); rachunki wsi otwarte ").Append(vOpen).Append(" zl (").Append(vTowns).Append(" miast), splacone wsiom w PayDaily doby ")
                   .Append(vPaidDay == int.MinValue ? "-" : vPaidDay.ToString(Inv)).Append(' ').Append(vPaid).Append(" zl")
                   .Append(" | 324 komis ").Append(kom324 ? "TAK" : "NIE").Append(": wydane w komis dzis ").Append(komPcs).Append(" szt. / ").Append(komGold).Append(" zl (").Append(komTowns).Append(" miast)")
@@ -505,6 +520,28 @@ namespace Armoury
                 }
                 else { credFail++; got = cashPcs; restPcs = 0; restPay = 0; }   // te sztuki wracaja do stodoly (ponizej, razem z ulamkiem)
             }
+            // gotowka: kasa miasta -> kiesa wsi (z pomiarem) - PRZED zwrotem do stodoly (325, recenzja R3 pkt 2: sztuki bez zaplaty wracaja do stodoly, nie na rachunek w trybie 0)
+            int vg0 = v.Gold, tg0 = town.Gold;
+            if (cashPay > 0 && cashPcs > 0) { town.ChangeGold(-(int)Math.Min(int.MaxValue, cashPay)); v.ChangeGold((int)(tg0 - town.Gold)); }
+            long paidCash = tg0 - town.Gold;
+            long shortfall = cashPcs > 0 ? cashPay - paidCash : 0;
+            if (shortfall > 0)
+            {
+                // czego kasa nie dala (nie powinno sie zdarzyc - nadwyzka <= kasa): tryb 1/2 - rachunek wsi; tryb 0 (tylko gotowka) albo rachunek sie nie otworzyl -
+                // nieoplacone sztuki wracaja do stodoly, a nadplata ponad cale oplacone sztuki wraca z kiesy wsi do kasy miasta
+                if (mode != 0 && v.Settlement != null && KsFoodCredit.OpenVillage(v.Settlement, st, shortfall, today)) { rq.Cred += shortfall; credGold += shortfall; }
+                else
+                {
+                    credFail++;
+                    int kp = 0; long pre = 0;
+                    while (kp < cashPcs && pre + rq.Pp[rq.KAt + kp] <= paidCash) { pre += rq.Pp[rq.KAt + kp]; kp++; }
+                    long refund = paidCash - pre;
+                    if (refund > 0) { int vb = v.Gold; v.ChangeGold(-(int)Math.Min(int.MaxValue, refund)); long r2 = vb - v.Gold; if (r2 > 0) town.ChangeGold((int)r2); paidCash -= r2; }
+                    got -= cashPcs - kp; cashPcs = kp;
+                }
+            }
+            vilIn += v.Gold - vg0;
+            rq.CashLeft -= paidCash; rq.Cash += paidCash;
             double back = took - got * rpp;
             if (back > 1e-6 && !Famine.TributeGive(v, back)) back = 0.0;   // ulamek i sztuki bez zaplaty wracaja do spichlerza (spichlerz jest - wlasnie z niego zdjeto)
             double net = took - back;
@@ -513,18 +550,6 @@ namespace Armoury
             if (net > 0.0) rations += net;
             c.Avail -= got;
             if (got < 1) return 0;
-            // gotowka: kasa miasta -> kiesa wsi (z pomiarem); czego kasa nie dala (nie powinno sie zdarzyc - nadwyzka <= kasa) - rachunek wsi
-            int vg0 = v.Gold, tg0 = town.Gold;
-            if (cashPay > 0) { town.ChangeGold(-(int)Math.Min(int.MaxValue, cashPay)); v.ChangeGold((int)(tg0 - town.Gold)); }
-            long paidCash = tg0 - town.Gold;
-            vilIn += v.Gold - vg0;
-            rq.CashLeft -= paidCash; rq.Cash += paidCash;
-            long shortfall = cashPay - paidCash;
-            if (shortfall > 0)
-            {
-                if (v.Settlement != null && KsFoodCredit.OpenVillage(v.Settlement, st, shortfall, today)) { rq.Cred += shortfall; credGold += shortfall; }
-                else credFail++;
-            }
             var gf = GoodsLedger.Begin(GoodsLedger.FZc1, st);
             if (gf != null) gf.Info = land ? "zboze ze spichlerza wsi krainy (324)" : "zboze ze spichlerza wsi (322c)";
             try { st.ItemRoster.AddToCounts(DefaultItems.Grain, got); }

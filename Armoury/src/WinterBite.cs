@@ -155,7 +155,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !WinterNow() || party == null) return 0f;
-                return Math.Max(0f, Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y) * WinterRealm.OfParty(party));
+                return Math.Max(0f, Math.Max(0, s.WinterPartyFoodExtraPercent) / 100f * Northness(party.GetPosition2D.Y) * WinterRealm.OfParty(party));
             }
             catch { return 0f; }
         }
@@ -187,7 +187,7 @@ namespace Armoury
                 int why, riders, herd; float need, bk;
                 float horse = WinterRealm.HorseFeed(party, realm, out why, out need, out bk, out riders, out herd);   // na pustyni / w sniegu przy paszy BK - tylko roznica
                 if (horse > 0f) __result.Add(-horse, _txtHorses);
-                float bonus = Math.Max(0, s.WinterPartyFoodBonusPercent) / 100f * Northness(party.GetPosition2D.Y) * realm;
+                float bonus = Math.Max(0, s.WinterPartyFoodExtraPercent) / 100f * Northness(party.GetPosition2D.Y) * realm;
                 if (bonus > 0f) __result.AddFactor(bonus, _txtWinter);
             }
             catch { }
@@ -268,7 +268,7 @@ namespace Armoury
                 if (mProd != null) h.Patch(mProd, postfix: new HarmonyMethod(typeof(WinterBite), "VillageProdPostfix"));
                 if (mVFood != null) h.Patch(mVFood, postfix: new HarmonyMethod(typeof(WinterBite), "VillageFoodPostfix"));
                 if (mTown != null) h.Patch(mTown, postfix: new HarmonyMethod(typeof(WinterBite), "TownFoodPostfix"));
-                Log.Info("WinterBite: zima uzbrojona (jedzenie +" + s.WinterPartyFoodBonusPercent
+                Log.Info("WinterBite: zima uzbrojona (jedzenie +" + s.WinterPartyFoodExtraPercent
                          + "%, wioski -" + s.WinterVillageOutputCutPercent + "%, gradient polnocy "
                          + s.NorthGradientPercent + "%; tylko zima z kalendarza - Dluga Noc usunieta wpisem 99; " + WinterRealm.StartText() + ").");
             }

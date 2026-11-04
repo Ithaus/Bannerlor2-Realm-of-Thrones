@@ -436,7 +436,7 @@ namespace Armoury
 
             bool bk = types.Exists(x => x.FullName == "BannerKings.Models.Vanilla.BKPartyConsumptionModel");
             var s = Settings.Current;
-            sb.Append(" | zima Armoury (WinterBite +").Append(s.WinterPartyFoodBonusPercent).Append("%, pasza koni E4/1): raz, w bazie najglebszego modelu");
+            sb.Append(" | zima Armoury (WinterBite +").Append(s.WinterPartyFoodExtraPercent).Append("%, pasza koni E4/1): raz, w bazie najglebszego modelu");
             sb.Append("; regula paszy BK ").Append(bk ? "w lancuchu - na pustyni i w sniegu (tam karmi BK) E4/1 doplaca w zimie tylko roznice ponad pasze BK" : "poza lancuchem - E4/1 doplaca pelna pasze takze na pustyni i w sniegu");
             try { sb.Append(" | ").Append(WinterRealm.BkFeedText()); } catch (Exception e) { Stumble("linia(pasza BK)", e); }
             sb.Append(" | Rations -").Append(Math.Max(0, Math.Min(90, s.FoodConsumptionCutPercent))).Append("% raz, na zewnatrz (licznik zagniezdzenia)");

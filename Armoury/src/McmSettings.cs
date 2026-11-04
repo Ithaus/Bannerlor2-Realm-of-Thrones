@@ -2244,9 +2244,9 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool WinterBiteEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Winter Party Food Bonus Percent", 0, 200, "0", HintText = "extra food a party consumes in winter (scaled by how far north it stands)", RequireRestart = false)]
+        [SettingPropertyInteger("Winter Party Food Extra Percent", 0, 80, "0", HintText = "extra food a party consumes in winter at most (in the coldest north; warmer realms and the south less) - horse fodder is counted on its own", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
-        public int WinterPartyFoodBonusPercent { get; set; } = 50;
+        public int WinterPartyFoodExtraPercent { get; set; } = 20;
 
         [SettingPropertyInteger("Winter Village Output Cut Percent", 0, 200, "0", HintText = "village production lost in winter - food prices rise on their own as supply dries up", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
@@ -4200,13 +4200,17 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool WinterGrainVillageCredit { get; set; } = true;
 
-        [SettingPropertyBool("Winter Grain Consign", HintText = "with Winter Grain To Market: grain the town cannot pay for at once with money above its merchants' reserve goes onto its stall on consignment - the town gives the village the delivery price of every consigned piece it sells, out of the takings; pieces still unsold after Ks Consign Rate Release Days go back to the village barn (or, if no longer on the stall, become a food bill to the village). An old food debt of the town does not stop it; the amount is bounded by the stall target and two days of demand. Consignment does not stop food carts. Off = Winter Grain Village Credit as before", RequireRestart = false)]
+        [SettingPropertyBool("Winter Grain Consign", HintText = "with Winter Grain To Market: grain the town cannot pay for at once with money above its merchants' reserve goes onto its stall on consignment - the town gives the village the delivery price of every consigned piece it sells, out of the takings; pieces still unsold after Ks Consign Rate Release Days go back to the village barn (or, if no longer on the stall, become a food bill to the village). An old food debt of the town does not stop it; the amount is bounded by the stall target (and by two days of demand when Winter Grain Fill Now is off). Consignment does not stop food carts. Off = Winter Grain Village Credit as before", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool WinterGrainConsign { get; set; } = true;
 
         [SettingPropertyBool("Winter Grain Fill To Target", HintText = "with Winter Grain To Market: villages bring grain whenever the town's stall is below its market target (days of demand), not only when it is almost empty. Off = only below half a day of demand or at the price trigger", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool WinterGrainFillToTarget { get; set; } = true;
+
+        [SettingPropertyBool("Winter Grain Fill Now", HintText = "with Winter Grain To Market: when a town's grain stall is below its market target, the villages that supply it may bring the whole shortfall at once out of all the grain they can spare until spring (above the famine threshold and their own table to the end of winter), not only today's share of it - stalls fill from the first day of winter, and later daily shares shrink on their own. The amount is bounded by the stall target. Off = at most today's share of each village and at most two days of demand a day, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool WinterGrainFillNow { get; set; } = true;
 
         [SettingPropertyBool("Watch Law Enabled", HintText = "every man who joins the Night's Watch comes from the Seven Kingdoms: first the convicts sent to the Wall, then outlaws who take the black, then common folk of every land by its numbers. A brother never goes home: routed or disbanded he walks back to the Wall, and a deserter hides among the outlaws of the North", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
@@ -11860,7 +11864,7 @@ namespace Armoury
             s.SiegeWallsLog = SiegeWallsLog;
             s.SingleWinterSource = SingleWinterSource;
             s.WinterBiteEnabled = WinterBiteEnabled;
-            s.WinterPartyFoodBonusPercent = WinterPartyFoodBonusPercent;
+            s.WinterPartyFoodExtraPercent = WinterPartyFoodExtraPercent;
             s.WinterVillageOutputCutPercent = WinterVillageOutputCutPercent;
             s.WinterTownAppetitePer1000 = WinterTownAppetitePer1000;
             s.AutumnStockMultiplier = AutumnStockMultiplier;
@@ -12351,6 +12355,7 @@ namespace Armoury
             s.WinterGrainVillageCredit = WinterGrainVillageCredit;
             s.WinterGrainConsign = WinterGrainConsign;
             s.WinterGrainFillToTarget = WinterGrainFillToTarget;
+            s.WinterGrainFillNow = WinterGrainFillNow;
             s.WatchLawEnabled = WatchLawEnabled;
             s.WatchPoolSharePercent = WatchPoolSharePercent;
             s.WatchDoesNotRaid = WatchDoesNotRaid;
