@@ -1,6 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
-## STAN 05.11.2026 ok. 15:35 CET: WGRANIE 164 (najnowszy) - 326x Polnoc
+## STAN 05.11.2026 ok. 21:55 CEST: WGRANIE 165 (najnowszy) - 330 wojna do kapitulacji + 331 wjazd do miast
+- W GRZE: Armoury.dll 41feeb443ba0e081161c7e9e1bc8a57e (galaz noc/330x-integracja 0e29f73a = 330 + 331; worktree scratchpad sesji 0a2a8b2b n326x). Kopia 164: Armoury.dll.bak-2026-11-05-przed-wgranie165 i D:/Backup-Bannerlord/wgrane/2026-11-05-przed-165. Logi i zapis Jeffa: D:/Backup-Bannerlord/logi-jeffa/2026-11-05-wieczor.
+- 330 (docs/PROJEKT-330-WOJNA-DO-KAPITULACJI.md, sekcja H): korona-Polnoc bez stalego pokoju; rozejm 42 doby tylko przy zmeczeniu >=100 po >=84 dobach wojny (takze barter gracza = rozejm); korona nigdy nie kapituluje; kapitulacja tylko Polnocy (K1-K3); staly pokoj tylko gdy wladca korony Bran/Jon; bez zimy. Karencja 7 dob po 1. wczytaniu.
+- 331: rozkaz gracza "jedz do osady" (<=3 h, nie wroga) nie jest przerywany przez trening przed snem/oboz o zmierzchu (Riverrun). Linia logu "Oboz (331)".
+- Testy (scratchpad at330x): A 60 dob z flaga (TB blad testu - poprawiony), B 7 bitew, C 62 doby bez flagi kod 0: ROZEJM d.109372-109414 (zmeczenie), wojna wraca d.109414; wojna330/pokoj264/wjazd316e/polnoc326/obl326c NIE 0.
+- DO SPRAWDZENIA w grze Jeffa: ok. 7 dni po wczytaniu rozejm z korona na 42 dni, potem wojna; wjazd do Riverrun jednym kliknieciem; drobne z recenzji w CHANGELOG 330 (linie krolgracz/krolnie co dobe, W330-10 przy 2 sesjach, W330-2 prog 42 sztywny).
+
+## STAN 05.11.2026 ok. 15:35 CET: WGRANIE 164 - 326x Polnoc
 - W GRZE: Armoury.dll 0229fc1710a699fdf3fb5f405297669c (galaz noc/326x-integracja 166fdb5f; worktree scratchpad sesji 0a2a8b2b n326x). Reszta modow bez zmian.
   Kopia 163: Armoury.dll.bak-2026-11-05-przed-wgranie164 i D:/Backup-Bannerlord/wgrane/2026-11-05-wgranie164-przed. Logi i zapis Jeffa sprzed testu: D:/Backup-Bannerlord/logi-jeffa/2026-11-05.
 - 326a floty wg krolestw (Polnoc 0, Manderly x0.5, Zelazne Wyspy x2), 326b zwrot zdobyczy Polnocy (8 twierdz spoza Polnocy, 3/dobe, weto 60 dob, BEZ obsady zalog - zaloga na ile stac pana),
