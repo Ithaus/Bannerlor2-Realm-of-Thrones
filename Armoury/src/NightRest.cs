@@ -407,6 +407,12 @@ namespace Armoury
                 // o 3:00 i ruch kolumny dawaly zaraz "Night Falls - make camp?"): odpoczynek doby bez braku odlozonego >= NeededHours (baza + odsetki dlugu - ten sam
                 // prog co splata od reki CreditRest), wiec marsz nie zrobi dlugu o swicie (SettleNight) i nie ma czego odsypiac - ani pytania, ani obozu z rozkazu
                 // "always make camp"; noc odhaczona (raz na noc, jak pytanie), linia logu i licznik ZB
+                // 331: kolumna jedzie do osady gry w zasiegu (PlayerSettlementOrderMaxHours) - bez pytania Night Falls i bez obozu z rozkazu "always make camp"; noc NIE
+                // odhaczona (w osadzie warunek CurrentSettlement i tak zamyka pytanie; nowy cel w polu - pytanie w nastepnej godzinie obozu)
+                if (promptHour && CampStart != CampEnd && movedH && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped && !captive
+                    && mp.CurrentSettlement == null && mp.MapEvent == null && PlayerEncounter.Current == null
+                    && SettlementOrder331.Beats(mp, CampPromptMode == 1 ? "oboz o zmierzchu (always make camp)" : "pytanie o nocleg o zmierzchu (Night Falls)"))
+                    promptHour = false;
                 if (promptHour && CampStart != CampEnd && movedH && s.NightPromptSkipWhenRested && FullNight(_restTonight - Math.Max(0f, _dawnOwed), BaseHours())
                     && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped && !captive
                     && mp.CurrentSettlement == null && mp.MapEvent == null && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
@@ -1878,7 +1884,8 @@ namespace Armoury
                 try
                 {
                     var mp = MobileParty.MainParty;
-                    if (mp != null && mp.CurrentSettlement == null && mp.MapEvent == null)
+                    if (mp != null && mp.CurrentSettlement == null && mp.MapEvent == null
+                        && !SettlementOrder331.Beats(mp, "zapasc po trzeciej nocy bez snu"))   // 331: do osady w zasiegu - dowlecze sie i spi w osadzie
                         mp.SetMoveModeHold();
                 }
                 catch { }

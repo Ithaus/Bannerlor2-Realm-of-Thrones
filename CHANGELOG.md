@@ -1,6 +1,6 @@
 # DZIENNIK ZMIAN
 
-## 331 - wjazd do osad gry: diagnostyka 316e bez falszywych alarmow, takze miasta i zamki (noc/331-wjazd od 326x = 166fdb5f; Armoury.dll f62ccd48d9432cd86a896e1468261400 - NIE WGRANE)
+## 331 - wjazd do osad gry: rozkaz gracza do osady wygrywa z automatycznym postojem; diagnostyka 316e bez falszywych alarmow, takze miasta i zamki (noc/331-wjazd od 326x = 166fdb5f; Armoury.dll cbf539806a6e16651b50419fc9a0d3f7 - NIE WGRANE)
 **Problem:** Jeff 05.11 ok. 19:27: "klikam, zeby wejsc do Riverrun, druzyna podjezdza pod miasto i staje, ale menu miasta sie nie otwiera; jak sie postaram, to w koncu wejde". Podobnie 01.11 przy wsiach gry.
 **Ustalenia (dowody):**
 (1) Klik NIE jest przejmowany przez nasze obiekty mapy. MapScreen.HandleMouse (dekompilat 1.4.8 :1406) pyta komponenty po kolei wedlug Priority i staje na pierwszym z wynikiem true;
@@ -17,6 +17,15 @@ dla rozkazu do osady), sen (NightRest SleepInit SetMoveModeHold) i oboz o zmierz
 **Zmiana (tylko diagnostyka, zero zmian zachowania):** VillageEntryDiag - takt z SubModuleMain.OnApplicationTick (4 razy na sekunde, tylko MapState: takze w menu i przy zatrzymanym czasie), linie
 "Wjazd do osady gry: <nazwa> (<id>, wies|miasto|zamek, ...)" dla wsi, miast i zamkow: proba / spotkanie / wjazd / menu / wyjazd / "STOI U OSADY" (z promieniem spotkania gry, krotkim celem, port/morze/przejscie,
 IsMainPartyWaiting, armia, bitwa, tryb czasu) / "cel porzucony" (z dopiskiem "kolumne zatrzymal oboz Armoury" przy menu arm_*) / popup. tools/sprawdz_logi.py --grupa wjazd316e czyta stare i nowe linie.
+**Zmiana zachowania (331b, decyzja koordynatora 05.11 - Jeff: "klikniecie i wjezdzam do miasta"):** nowy SettlementOrder331.cs. Partia gracza z rozkazem do osady gry (TargetSettlement wies/miasto/zamek,
+DefaultBehavior albo ShortTermBehavior GoToSettlement), poza osada, bitwa, obozem oblezenia i cudza armia, osada nie wroga, bez oblezenia i bez bitwy/rabunku przy niej, dojazd <= PlayerSettlementOrderMaxHours
+(3 h gry: trasa MapDistanceModel.GetDistance / (Speed / 1.2), jak NightMarch.HoursToSettlement) - automatyczny postoj NIE stawia kolumny (bez SetMoveModeHold), partia wjezdza; cwiczenia i sen w osadzie (m109, nocleg w miescie).
+Miejsca (wszystkie automatyczne Hold partii gracza): (a) NightRest.TrainBeforeSleep.cs TbsWhyNot - trening przed snem 311e (TbsStart -> SetMoveModeHold + menu cwiczen; CampDrill.DrillInit wchodzi tylko stad albo recznie);
+(b) NightRest.cs zmierzch - pytanie Night Falls i oboz z rozkazu "always make camp" (MakeCampNow / OwnCamp), noc nie odhaczona; (c) NightRest.cs zapasc po 3. nocy bez snu; (d) ForcedMarch.cs zapasc marszu forsownego (dlug 3).
+Bez zmian: oboz reczny (klawisz O / panel Camp, menu obozu, odpowiedz gracza na pytanie), SleepInit (sen tylko z menu obozu albo po cwiczeniach - kolumna juz stoi), NightMarch / ArmyRestDay / SiegeRansom / RaidTribute (tylko AI,
+partia gracza pominieta), RoadsideInns / SideVillageVisit / SideVillageFief (postoj po dojechaniu do kliknietego celu), TownStay (autotest). Linia przy kazdym pominieciu: "Oboz (331): gracz jedzie do X (id, rodzaj, h, trasa,
+od bramy) - postoj pominiety: <postoj> | ruch | limit | pominiec w sesji". Klucze NOWE: PlayerSettlementOrderBeatsCamp (TAK), PlayerSettlementOrderMaxHours (3, suwak 0.5-12) - gen_mcm. sprawdz_logi wjazd316e: W331-1 (INFO),
+W331-2 (zero "cel porzucony ... kolumne zatrzymal oboz Armoury" do 2 jedn. od bramy), W331-3 (zero bledow SettlementOrder331).
 **Ryzyko / co sprawdzic u Jeffa:** po wgraniu, przy nastepnym "staje pod miastem": linia "STOI U OSADY" (gra nie startuje spotkania) albo "cel porzucony ... kolumne zatrzymal oboz Armoury" (311e / sen / zmierzch).
 Jesli to drugie - decyzja: kolumna z rozkazem do osady, ktora zdazy dojechac przed noca, nie staje do cwiczen ani na noc (cwiczy w miescie - m109).
 

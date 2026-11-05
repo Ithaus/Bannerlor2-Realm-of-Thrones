@@ -6696,6 +6696,14 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public int CampTrainBeforeSleepHours { get; set; } = 0;
 
+        [SettingPropertyBool("Player Settlement Order Beats Camp", HintText = "when you have ordered your party into a town, castle or village and it can get there within Player Settlement Order Max Hours, the column does not halt on its own on the way (train before sleep, nightfall camp or question, collapse from sleeplessness or forced march) - it rides in, and drills and sleeps in the settlement. Making camp yourself (O key, camp menu) is unchanged", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool PlayerSettlementOrderBeatsCamp { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Player Settlement Order Max Hours", 0.50f, 12.00f, "0.0", HintText = "how many hours of march (by your party's current speed and the road) the settlement may be away for the order to beat the automatic halt; further away the column halts as before", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public float PlayerSettlementOrderMaxHours { get; set; } = 3f;
+
         [SettingPropertyBool("Veterans Teach Their Own", HintText = "men at the top of their line (no further upgrade, tier at least Veteran Teacher Min Tier) no longer waste the drill experience they cannot use: they pass it on to men of their own arm in the party who can still rise - riders teach riders, archers teach archers, foot teach foot. The more veterans, the more pupils they reach each day; a pupil learns from them at most as much again as his own drill that day (Veteran Teach Max Ratio) and never more than his next upgrade can hold. Nothing is created: experience only moves from veterans to pupils, what nobody can take is lost as before. The same rule for your party and every lord's, only on a day the men drill (off = as before: their drill experience is lost)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool VeteransTeachTheirOwn { get; set; } = true;
@@ -7008,9 +7016,9 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool LordPurseOnlyToVictor { get; set; } = true;
 
-        [SettingPropertyBool("Player Takes Third Of Beaten Purses", HintText = "326d: when your party destroys a beaten lord's party, you take a third of his men's purse into your own purse and your men keep the other two thirds - the same rule as for an AI lord (in war the crown takes its ninth of that purse out of your third, at dawn). Off = all of it goes to your men's purse, as before", RequireRestart = false)]
+        [SettingPropertyBool("Player Takes Third Of Beaten Purses", HintText = "326d (Jeff 05.11 'tak, 1/3 monet dla mnie jak lord AI'): when your party destroys a beaten lord's party, you take a third of his men's purse into your own purse and your men keep the other two thirds - the same rule as for an AI lord (in war the crown takes its ninth of that purse out of your third, at dawn). Off = all of it goes to your men's purse, as before", RequireRestart = false)]
         [SettingPropertyGroup("Defeats and payers (D11)")]
-        public bool PlayerTakesThirdOfBeatenPurses { get; set; } = true;   // 326d: Jeff 05.11 "tak"
+        public bool PlayerTakesThirdOfBeatenPurses { get; set; } = true;
 
         [SettingPropertyBool("Battle Plunder From Loser Only", HintText = "the coin the victors of a battle share out comes only from what the beaten really lose. A beaten lord - or you - hands over his share of it (the game's 5% of his coin, at most 10,000) even when he is taken captive or flees, and the victors never get more than the beaten pay; a beaten leader with no coin gives nothing. What a captor already took from a captive's purse when he was taken (Realistic Captivity going through your baggage) counts toward his share - he is not robbed twice. The Others take no coin (with Beaten Purse To Victor on). In war the crown takes its ninth of what a vassal wins from a beaten lord's purse, as of any plunder (Crown Thirds). The same for you and the AI. Sunk ships at sea are not changed here (off = as before: the victors get the beaten lord's share out of thin air and he keeps his coin)", RequireRestart = false)]
         [SettingPropertyGroup("Defeats and payers (D11)")]
@@ -10612,9 +10620,9 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarBalanceMusterWeakOnly { get; set; } = true;
 
-        [SettingPropertyBool("Canon War Balance Front Garrison", HintText = "With Canon War Balance: castles and towns of the weaker side on the front line, with an enemy army close by, recruit their garrison faster - volunteers from the town and its villages, paid by the owner's house as the game's own garrison recruitment - until the walls can hold against that army (its men divided by the strength of the walls, about 5.5 for a castle). Nobody comes from nothing. Off = garrisons recruit at the game's pace", RequireRestart = false)]
+        [SettingPropertyBool("Canon War Balance Front Garrison", HintText = "326x: WYLACZONE - Jeff 05.11 'niech ma takie zalogi, jakie ma / na jakie stac lorda'.     // With Canon War Balance: castles and towns of the weaker side on the front line, with an enemy army close by, recruit their garrison faster - volunteers from the town and its villages, paid by the owner's house as the game's own garrison recruitment - until the walls can hold against that army (its men divided by the strength of the walls, about 5.5 for a castle). Nobody comes from nothing. Off = garrisons recruit at the game's pace", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
-        public bool CanonWarBalanceFrontGarrison { get; set; } = false;   // 326x: Jeff 05.11 - wylaczone
+        public bool CanonWarBalanceFrontGarrison { get; set; } = false;
 
         [SettingPropertyBool("Canon Houses of the West", HintText = "As in the books, the lordly houses of the Westerlands and the Crownlands that Realm of Thrones leaves without a castle (Estren, Falwell, Jast, Moreland, Plumm, Prester, Stackspear, Buckwell, Chelsted, Hayford, Stokeworth; House Spicer stays a knightly house until the Red Wedding, as in the books) answer their liege's call with a host of their own: the Banner Kings gentry family that keeps an estate in their lands is raised to full peerage (exactly as a realm vote would grant it) and to clan tier 3, and its head leads a party raised the usual way from the villages. Once per campaign, at the first day after loading or at the start of a new game. No castles are taken from anyone. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
@@ -13017,6 +13025,8 @@ namespace Armoury
             s.DrillSiegeArmy = DrillSiegeArmy;
             s.DrillTownStay = DrillTownStay;
             s.CampTrainBeforeSleepHours = CampTrainBeforeSleepHours;
+            s.PlayerSettlementOrderBeatsCamp = PlayerSettlementOrderBeatsCamp;
+            s.PlayerSettlementOrderMaxHours = PlayerSettlementOrderMaxHours;
             s.VeteransTeachTheirOwn = VeteransTeachTheirOwn;
             s.VeteranTeacherMinTier = VeteranTeacherMinTier;
             s.VeteranPupilsEach = VeteranPupilsEach;

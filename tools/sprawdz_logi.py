@@ -91248,13 +91248,17 @@ def sen316b_main(logp):
 #  W316-4  popup przy celu ruchu = wies gry (nasze okno w drodze do wsi gry) - 0
 #  W316-5  prolog: linia "latki opowiesci ROT" bez "nieznanym kodem IL", wpiete == znalezione; CrashScribe (jesli podany): zero "is not valid in the scope of module"
 #  W316-6  zero bledow VillageEntryDiag
+#  331 (Oboz 331 - rozkaz gracza do osady wygrywa z automatycznym postojem, SettlementOrder331.cs):
+#  W331-1  INFO: linie "Oboz (331): gracz jedzie do ... - postoj pominiety" (wedlug rodzaju postoju)
+#  W331-2  zero "cel porzucony ... kolumne zatrzymal oboz Armoury" do 2.0 jedn. od bramy (postoj pod murami mimo rozkazu do osady)
+#  W331-3  zero bledow SettlementOrder331
 def wjazd316e_main(logp, csp=None):
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("W316-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    lines, prol, errors = [], [], []
+    lines, prol, errors, camp331, err331 = [], [], [], [], []
     with open(logp, encoding="utf-8", errors="replace") as f:
         for line in f:
             s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
@@ -91264,6 +91268,10 @@ def wjazd316e_main(logp, csp=None):
                 prol.append(s)
             elif "VillageEntryDiag" in s:
                 errors.append(s)
+            elif s.startswith("Oboz (331): "):
+                camp331.append(s)
+            elif "SettlementOrder331" in s:
+                err331.append(s)
     print(f"plik: {logp}")
     kinds = {}
     for s in lines:
@@ -91300,6 +91308,20 @@ def wjazd316e_main(logp, csp=None):
     rep.add("W316-5: prolog - przeglad IL bez falszywych tokenow", f"linii prologu {len(prol)}, zlych {len(bad)}" + (f" (pierwsza: {bad[0][:220]})" if bad else "")
             + (f" | CrashScribe 'Token ... not valid': {tok}" if csp else " | CrashScribe nie podany"), "0 i 0", (len(bad) == 0 and tok == 0) if prol else None)
     rep.add("W316-6: bledy VillageEntryDiag", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    kinds331 = {}
+    for s in camp331:
+        m = re.search(r"postoj pominiety: ([^(|]+)", s)
+        k = m.group(1).strip() if m else "?"
+        kinds331[k] = kinds331.get(k, 0) + 1
+    rep.add("W331-1: postoje pominiete (gracz jedzie do osady)", f"{len(camp331)}" + (" | " + ", ".join(f"{k} {v}" for k, v in kinds331.items()) if kinds331 else ""), "INFO", None)
+    held = []
+    for s in lines:
+        if "cel porzucony" in s and "kolumne zatrzymal oboz Armoury" in s:
+            m = re.search(r"odleglosc od bramy ([0-9.]+)", s)
+            if m and float(m.group(1)) <= 2.0:
+                held.append(s)
+    rep.add("W331-2: kolumna stanela pod brama w obozie Armoury", f"{len(held)}" + (f" (pierwsza: {held[0][:240]})" if held else ""), "0", len(held) == 0)
+    rep.add("W331-3: bledy SettlementOrder331", f"{len(err331)}" + (f" (pierwszy: {err331[0][:160]})" if err331 else ""), "0", len(err331) == 0)
     rep.show()
     return 0
 

@@ -148,6 +148,8 @@ namespace Armoury
                     if (ThreatHits(mp, mf, t, r)) return "wrog w promieniu " + Tf(r) + " (" + (t.Name != null ? t.Name.ToString() : t.StringId) + ")";
                 }
             }
+            // 331: gracz jedzie do osady gry w zasiegu (PlayerSettlementOrderMaxHours) - wjezdza, cwiczy w osadzie (m109); linia "Oboz (331)" przy kazdym pominieciu
+            if (SettlementOrder331.Beats(mp, "trening przed snem 311e (postoj " + TbsHours + " h przed noca)")) return "gracz jedzie do osady (331)";
             return null;
         }
 
