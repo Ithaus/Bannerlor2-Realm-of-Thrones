@@ -91243,7 +91243,7 @@ def sen316b_main(logp):
 # Armoury/src/Prologue.Story.cs HasGetterCall: chodzenie po granicach instrukcji IL - bez first-chance "Token 0x... is not valid in the scope of module ROT.dll".
 # Uzycie: python -I tools/sprawdz_logi.py --grupa wjazd316e <Armoury-*.log> [<CrashScribe session-*.log>]
 #  W316-1  linie "Wjazd do wsi gry:" sa (INFO: liczby wedlug rodzaju)
-#  W316-2  zero "STOI U WSI" (partia przy bramie wsi gry bez spotkania i wjazdu - to jest blad Jeffa; pierwsza linia w wyniku)
+#  W316-2  zero "STOI U WSI" / "STOI U OSADY" (331: takze miasta i zamki; partia przy bramie wsi gry bez spotkania i wjazdu - to jest blad Jeffa; pierwsza linia w wyniku)
 #  W316-3  proby (cel ruchu wies gry) zakonczone wjazdem albo spotkaniem; INFO: "cel porzucony bez wjazdu"
 #  W316-4  popup przy celu ruchu = wies gry (nasze okno w drodze do wsi gry) - 0
 #  W316-5  prolog: linia "latki opowiesci ROT" bez "nieznanym kodem IL", wpiete == znalezione; CrashScribe (jesli podany): zero "is not valid in the scope of module"
@@ -91258,7 +91258,7 @@ def wjazd316e_main(logp, csp=None):
     with open(logp, encoding="utf-8", errors="replace") as f:
         for line in f:
             s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
-            if s.startswith("Wjazd do wsi gry: "):
+            if s.startswith("Wjazd do wsi gry: ") or s.startswith("Wjazd do osady gry: "):   # 331: wies, miasto, zamek
                 lines.append(s)
             elif s.startswith("Prolog (m101): latki opowiesci ROT"):
                 prol.append(s)
@@ -91267,13 +91267,13 @@ def wjazd316e_main(logp, csp=None):
     print(f"plik: {logp}")
     kinds = {}
     for s in lines:
-        for k in ("proba (cel ruchu)", "spotkanie (bez wjazdu)", "| wjazd |", "| wyjazd |", "STOI U WSI", "cel porzucony bez wjazdu", "| popup '", "| menu "):
+        for k in ("proba (cel ruchu)", "spotkanie (bez wjazdu)", "| wjazd |", "| wyjazd |", "STOI U WSI", "STOI U OSADY", "cel porzucony bez wjazdu", "| popup '", "| menu "):
             if k in s:
                 kinds[k] = kinds.get(k, 0) + 1
                 break
     rep.add("W316-1: linie 'Wjazd do wsi gry'", f"{len(lines)} | " + ", ".join(f"{k.strip('| ')} {v}" for k, v in kinds.items()), "> 0 (gracz jechal do wsi gry)",
             (len(lines) > 0) if lines else None)
-    stuck = [s for s in lines if "STOI U WSI" in s]
+    stuck = [s for s in lines if "STOI U WSI" in s or "STOI U OSADY" in s]
     rep.add("W316-2: partia stoi u bramy wsi gry bez wjazdu", f"{len(stuck)}" + (f" (pierwsza: {stuck[0][:260]})" if stuck else ""), "0", len(stuck) == 0)
     tries = [s for s in lines if "proba (cel ruchu)" in s]
     ent = [s for s in lines if "| wjazd |" in s or "spotkanie (bez wjazdu)" in s]
@@ -91281,7 +91281,7 @@ def wjazd316e_main(logp, csp=None):
     rep.add("W316-3: proby wjazdu -> wjazd albo spotkanie", f"prob {len(tries)}, wjazdow/spotkan {len(ent)}, porzuconych bez wjazdu {len(gone)}"
             + (f" (pierwsza porzucona: {gone[0][:220]})" if gone else ""), "wjazdy >= proby - porzucone", (len(ent) >= len(tries) - len(gone)) if tries else None)
     pop = [s for s in lines if "| popup '" in s]
-    popv = [s for s in pop if not s.startswith("Wjazd do wsi gry: - |")]
+    popv = [s for s in pop if not (s.startswith("Wjazd do wsi gry: - |") or s.startswith("Wjazd do osady gry: - |"))]
     rep.add("W316-4: nasze okno w drodze do wsi gry", f"okien {len(pop)}, z celem ruchu = wies gry {len(popv)}" + (f" (pierwsze: {popv[0][:260]})" if popv else ""), "0",
             len(popv) == 0 if pop else None)
     bad = []
