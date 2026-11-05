@@ -100,6 +100,35 @@ back to war."; na koncu `Resume` wypowiada strona AI (nie gracz). Inne rozejmy p
 gracz wladca - pokoj zostaje (fabularny). BlocksWar bez zmian (gracz wladca - bez blokady, moze wypowiedziec wczesniej). DROBNE (InfoOnce co dobe "krolgracz"/"krolnie",
 stary zapis po kapitulacji korony - tylko zapisy autotestow, W330-10 miedzy sesjami, W330-2 prog 42 sztywny) - nie ruszane w tym kroku.
 
+## 331 - wjazd do osad gry: rozkaz gracza do osady wygrywa z automatycznym postojem; diagnostyka 316e bez falszywych alarmow, takze miasta i zamki (noc/331-wjazd od 326x = 166fdb5f; Armoury.dll cbf539806a6e16651b50419fc9a0d3f7 - NIE WGRANE)
+**Problem:** Jeff 05.11 ok. 19:27: "klikam, zeby wejsc do Riverrun, druzyna podjezdza pod miasto i staje, ale menu miasta sie nie otwiera; jak sie postaram, to w koncu wejde". Podobnie 01.11 przy wsiach gry.
+**Ustalenia (dowody):**
+(1) Klik NIE jest przejmowany przez nasze obiekty mapy. MapScreen.HandleMouse (dekompilat 1.4.8 :1406) pyta komponenty po kolei wedlug Priority i staje na pierwszym z wynikiem true;
+SandBoxViewVisualManager sortuje rosnaco (:14). SettlementVisualManager ma Priority 40 i zwraca true, gdy promien trafil osade (ustawia hoveredVisual i selectedVisual), MapVillagesView ma 100,
+RoadsideInnsView 101 i oba wychodza od razu przy hoveredVisual != null (MapVillagesView.cs:4844, RoadsideInnsView.cs:417). Klik w osade = SettlementVisual.OnMapClick -> SetMoveGoToSettlement (gra).
+Wokol Riverrun (town_V2, brama 333.36/501.65) nie ma w promieniu 12 jedn. zadnego zajazdu (arm_roadside_inns.tsv) ani wioski pobocznej (arm_map_villages.tsv). Zajazdy w logu: "kliki na zajazd 0" co dobe.
+(2) Wzor 316e "cel porzucony bez wjazdu | odleglosc od bramy 0.01 | ruch GoToPoint/GoToPoint" to FALSZYWY ALARM: takt 316e wisial na CampaignEvents.TickEvent, a gra wola go tylko przy _dt > 0
+(Campaign.Tick :956-958). W menu osady czas stoi, wiec 316e nie widzial wjazdu ani wyjazdu, a po wyjsciu widzial juz tylko nowy rozkaz przy bramie. Log 04/05.11: 23 linie "porzucony 0.01"
+i rgl_log_7580 "Player has entered castle_village_EN7_2: Tumblestone / EN7_1: Wendish Town" przy kazdej z nich (00:12:46, 00:13:18, 00:14:23 ... 00:35:51) - wjazdy byly. Zero linii "wjazd" w 316e = ten sam blad.
+(3) Prawdziwe zatrzymania kolumny przed osada gry robi nasz oboz: Trening przed snem 311e (NightRest.TrainBeforeSleep.cs TbsHour/TbsStart: SetMoveModeHold o 21:00 minus ustawione godziny, bez wyjatku
+dla rozkazu do osady), sen (NightRest SleepInit SetMoveModeHold) i oboz o zmierzchu. Log 04/05.11: "cel porzucony ... odleglosc od bramy 3.70 | menu arm_camp_drill_wait | ruch Hold/Hold | 18:38" zaraz po
+"The column halts 3h before nightfall"; podobnie 6.00 (13:55), 0.78 (13:35, drill) i 3.08 (20:28, arm_sleep_wait). W sesji 05.11 19:14 Jeff ma 8 h cwiczen - kolumna staje codziennie o 13:00
+(linie 311e "start o 13:00" 19:24:38, 19:25:00, 19:25:27, 19:25:55), wjazd do Riverrun 19:26:29 po switcie. Dla Riverrun brak linii (316e obejmowal tylko wsie) - zgodne z opisem Jeffa, ale NIE udowodnione.
+**Zmiana (tylko diagnostyka, zero zmian zachowania):** VillageEntryDiag - takt z SubModuleMain.OnApplicationTick (4 razy na sekunde, tylko MapState: takze w menu i przy zatrzymanym czasie), linie
+"Wjazd do osady gry: <nazwa> (<id>, wies|miasto|zamek, ...)" dla wsi, miast i zamkow: proba / spotkanie / wjazd / menu / wyjazd / "STOI U OSADY" (z promieniem spotkania gry, krotkim celem, port/morze/przejscie,
+IsMainPartyWaiting, armia, bitwa, tryb czasu) / "cel porzucony" (z dopiskiem "kolumne zatrzymal oboz Armoury" przy menu arm_*) / popup. tools/sprawdz_logi.py --grupa wjazd316e czyta stare i nowe linie.
+**Zmiana zachowania (331b, decyzja koordynatora 05.11 - Jeff: "klikniecie i wjezdzam do miasta"):** nowy SettlementOrder331.cs. Partia gracza z rozkazem do osady gry (TargetSettlement wies/miasto/zamek,
+DefaultBehavior albo ShortTermBehavior GoToSettlement), poza osada, bitwa, obozem oblezenia i cudza armia, osada nie wroga, bez oblezenia i bez bitwy/rabunku przy niej, dojazd <= PlayerSettlementOrderMaxHours
+(3 h gry: trasa MapDistanceModel.GetDistance / (Speed / 1.2), jak NightMarch.HoursToSettlement) - automatyczny postoj NIE stawia kolumny (bez SetMoveModeHold), partia wjezdza; cwiczenia i sen w osadzie (m109, nocleg w miescie).
+Miejsca (wszystkie automatyczne Hold partii gracza): (a) NightRest.TrainBeforeSleep.cs TbsWhyNot - trening przed snem 311e (TbsStart -> SetMoveModeHold + menu cwiczen; CampDrill.DrillInit wchodzi tylko stad albo recznie);
+(b) NightRest.cs zmierzch - pytanie Night Falls i oboz z rozkazu "always make camp" (MakeCampNow / OwnCamp), noc nie odhaczona; (c) NightRest.cs zapasc po 3. nocy bez snu; (d) ForcedMarch.cs zapasc marszu forsownego (dlug 3).
+Bez zmian: oboz reczny (klawisz O / panel Camp, menu obozu, odpowiedz gracza na pytanie), SleepInit (sen tylko z menu obozu albo po cwiczeniach - kolumna juz stoi), NightMarch / ArmyRestDay / SiegeRansom / RaidTribute (tylko AI,
+partia gracza pominieta), RoadsideInns / SideVillageVisit / SideVillageFief (postoj po dojechaniu do kliknietego celu), TownStay (autotest). Linia przy kazdym pominieciu: "Oboz (331): gracz jedzie do X (id, rodzaj, h, trasa,
+od bramy) - postoj pominiety: <postoj> | ruch | limit | pominiec w sesji". Klucze NOWE: PlayerSettlementOrderBeatsCamp (TAK), PlayerSettlementOrderMaxHours (3, suwak 0.5-12) - gen_mcm. sprawdz_logi wjazd316e: W331-1 (INFO),
+W331-2 (zero "cel porzucony ... kolumne zatrzymal oboz Armoury" do 2 jedn. od bramy), W331-3 (zero bledow SettlementOrder331).
+**Ryzyko / co sprawdzic u Jeffa:** po wgraniu, przy nastepnym "staje pod miastem": linia "STOI U OSADY" (gra nie startuje spotkania) albo "cel porzucony ... kolumne zatrzymal oboz Armoury" (311e / sen / zmierzch).
+Jesli to drugie - decyzja: kolumna z rozkazem do osady, ktora zdazy dojechac przed noca, nie staje do cwiczen ani na noc (cwiczy w miescie - m109).
+
 ## 2026-11-05 WGRANIE 164 - noc/326x-integracja (163 + 326a floty wg krolestw, 326b zwrot zdobyczy Polnocy, 326c odsiecz z przewaga, 326d okno lupu + 1/3 sakiewek pokonanych dla gracza)
 Armoury.dll 0229fc1710a699fdf3fb5f405297669c (reszta modow bez zmian: CrashScribe 55ccc004, RC 8528f098, ForgeView 8441ab0e, GrandTourney 900e32bc). Kopia 163: Armoury.dll.bak-2026-11-05-przed-wgranie164 i D:/Backup-Bannerlord/wgrane/2026-11-05-wgranie164-przed.
 **Testy:** bieg 30 dob na kopii zapisu Jeffa (dzien 109348) + 7 bitew: kod 0, KONIEC OK, ERROR 0 Armoury, CrashScribe 23 (jak 325a), polnoc326 0 NIE, obl326c 0 NIE; statki Polnocy 543 -> 229, sila Korony 10.8k -> 22k (Reach w koalicji).

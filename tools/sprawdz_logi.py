@@ -91245,37 +91245,45 @@ def sen316b_main(logp):
 # Armoury/src/Prologue.Story.cs HasGetterCall: chodzenie po granicach instrukcji IL - bez first-chance "Token 0x... is not valid in the scope of module ROT.dll".
 # Uzycie: python -I tools/sprawdz_logi.py --grupa wjazd316e <Armoury-*.log> [<CrashScribe session-*.log>]
 #  W316-1  linie "Wjazd do wsi gry:" sa (INFO: liczby wedlug rodzaju)
-#  W316-2  zero "STOI U WSI" (partia przy bramie wsi gry bez spotkania i wjazdu - to jest blad Jeffa; pierwsza linia w wyniku)
+#  W316-2  zero "STOI U WSI" / "STOI U OSADY" (331: takze miasta i zamki; partia przy bramie wsi gry bez spotkania i wjazdu - to jest blad Jeffa; pierwsza linia w wyniku)
 #  W316-3  proby (cel ruchu wies gry) zakonczone wjazdem albo spotkaniem; INFO: "cel porzucony bez wjazdu"
 #  W316-4  popup przy celu ruchu = wies gry (nasze okno w drodze do wsi gry) - 0
 #  W316-5  prolog: linia "latki opowiesci ROT" bez "nieznanym kodem IL", wpiete == znalezione; CrashScribe (jesli podany): zero "is not valid in the scope of module"
 #  W316-6  zero bledow VillageEntryDiag
+#  331 (Oboz 331 - rozkaz gracza do osady wygrywa z automatycznym postojem, SettlementOrder331.cs):
+#  W331-1  INFO: linie "Oboz (331): gracz jedzie do ... - postoj pominiety" (wedlug rodzaju postoju)
+#  W331-2  zero "cel porzucony ... kolumne zatrzymal oboz Armoury" do 2.0 jedn. od bramy (postoj pod murami mimo rozkazu do osady)
+#  W331-3  zero bledow SettlementOrder331
 def wjazd316e_main(logp, csp=None):
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("W316-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    lines, prol, errors = [], [], []
+    lines, prol, errors, camp331, err331 = [], [], [], [], []
     with open(logp, encoding="utf-8", errors="replace") as f:
         for line in f:
             s = re.sub(r"^\[\d\d:\d\d:\d\d\] ", "", line.rstrip("\r\n"))
-            if s.startswith("Wjazd do wsi gry: "):
+            if s.startswith("Wjazd do wsi gry: ") or s.startswith("Wjazd do osady gry: "):   # 331: wies, miasto, zamek
                 lines.append(s)
             elif s.startswith("Prolog (m101): latki opowiesci ROT"):
                 prol.append(s)
             elif "VillageEntryDiag" in s:
                 errors.append(s)
+            elif s.startswith("Oboz (331): "):
+                camp331.append(s)
+            elif "SettlementOrder331" in s:
+                err331.append(s)
     print(f"plik: {logp}")
     kinds = {}
     for s in lines:
-        for k in ("proba (cel ruchu)", "spotkanie (bez wjazdu)", "| wjazd |", "| wyjazd |", "STOI U WSI", "cel porzucony bez wjazdu", "| popup '", "| menu "):
+        for k in ("proba (cel ruchu)", "spotkanie (bez wjazdu)", "| wjazd |", "| wyjazd |", "STOI U WSI", "STOI U OSADY", "cel porzucony bez wjazdu", "| popup '", "| menu "):
             if k in s:
                 kinds[k] = kinds.get(k, 0) + 1
                 break
     rep.add("W316-1: linie 'Wjazd do wsi gry'", f"{len(lines)} | " + ", ".join(f"{k.strip('| ')} {v}" for k, v in kinds.items()), "> 0 (gracz jechal do wsi gry)",
             (len(lines) > 0) if lines else None)
-    stuck = [s for s in lines if "STOI U WSI" in s]
+    stuck = [s for s in lines if "STOI U WSI" in s or "STOI U OSADY" in s]
     rep.add("W316-2: partia stoi u bramy wsi gry bez wjazdu", f"{len(stuck)}" + (f" (pierwsza: {stuck[0][:260]})" if stuck else ""), "0", len(stuck) == 0)
     tries = [s for s in lines if "proba (cel ruchu)" in s]
     ent = [s for s in lines if "| wjazd |" in s or "spotkanie (bez wjazdu)" in s]
@@ -91283,7 +91291,7 @@ def wjazd316e_main(logp, csp=None):
     rep.add("W316-3: proby wjazdu -> wjazd albo spotkanie", f"prob {len(tries)}, wjazdow/spotkan {len(ent)}, porzuconych bez wjazdu {len(gone)}"
             + (f" (pierwsza porzucona: {gone[0][:220]})" if gone else ""), "wjazdy >= proby - porzucone", (len(ent) >= len(tries) - len(gone)) if tries else None)
     pop = [s for s in lines if "| popup '" in s]
-    popv = [s for s in pop if not s.startswith("Wjazd do wsi gry: - |")]
+    popv = [s for s in pop if not (s.startswith("Wjazd do wsi gry: - |") or s.startswith("Wjazd do osady gry: - |"))]
     rep.add("W316-4: nasze okno w drodze do wsi gry", f"okien {len(pop)}, z celem ruchu = wies gry {len(popv)}" + (f" (pierwsze: {popv[0][:260]})" if popv else ""), "0",
             len(popv) == 0 if pop else None)
     bad = []
@@ -91302,6 +91310,20 @@ def wjazd316e_main(logp, csp=None):
     rep.add("W316-5: prolog - przeglad IL bez falszywych tokenow", f"linii prologu {len(prol)}, zlych {len(bad)}" + (f" (pierwsza: {bad[0][:220]})" if bad else "")
             + (f" | CrashScribe 'Token ... not valid': {tok}" if csp else " | CrashScribe nie podany"), "0 i 0", (len(bad) == 0 and tok == 0) if prol else None)
     rep.add("W316-6: bledy VillageEntryDiag", f"{len(errors)}" + (f" (pierwszy: {errors[0][:160]})" if errors else ""), "0", len(errors) == 0)
+    kinds331 = {}
+    for s in camp331:
+        m = re.search(r"postoj pominiety: ([^(|]+)", s)
+        k = m.group(1).strip() if m else "?"
+        kinds331[k] = kinds331.get(k, 0) + 1
+    rep.add("W331-1: postoje pominiete (gracz jedzie do osady)", f"{len(camp331)}" + (" | " + ", ".join(f"{k} {v}" for k, v in kinds331.items()) if kinds331 else ""), "INFO", None)
+    held = []
+    for s in lines:
+        if "cel porzucony" in s and "kolumne zatrzymal oboz Armoury" in s:
+            m = re.search(r"odleglosc od bramy ([0-9.]+)", s)
+            if m and float(m.group(1)) <= 2.0:
+                held.append(s)
+    rep.add("W331-2: kolumna stanela pod brama w obozie Armoury", f"{len(held)}" + (f" (pierwsza: {held[0][:240]})" if held else ""), "0", len(held) == 0)
+    rep.add("W331-3: bledy SettlementOrder331", f"{len(err331)}" + (f" (pierwszy: {err331[0][:160]})" if err331 else ""), "0", len(err331) == 0)
     rep.show()
     return 0
 

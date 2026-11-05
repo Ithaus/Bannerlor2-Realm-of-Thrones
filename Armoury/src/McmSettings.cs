@@ -6696,6 +6696,14 @@ namespace Armoury
         [SettingPropertyGroup("Drill")]
         public int CampTrainBeforeSleepHours { get; set; } = 0;
 
+        [SettingPropertyBool("Player Settlement Order Beats Camp", HintText = "when you have ordered your party into a town, castle or village and it can get there within Player Settlement Order Max Hours, the column does not halt on its own on the way (train before sleep, nightfall camp or question, collapse from sleeplessness or forced march) - it rides in, and drills and sleeps in the settlement. Making camp yourself (O key, camp menu) is unchanged", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public bool PlayerSettlementOrderBeatsCamp { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Player Settlement Order Max Hours", 0.50f, 12.00f, "0.0", HintText = "how many hours of march (by your party's current speed and the road) the settlement may be away for the order to beat the automatic halt; further away the column halts as before", RequireRestart = false)]
+        [SettingPropertyGroup("Drill")]
+        public float PlayerSettlementOrderMaxHours { get; set; } = 3f;
+
         [SettingPropertyBool("Veterans Teach Their Own", HintText = "men at the top of their line (no further upgrade, tier at least Veteran Teacher Min Tier) no longer waste the drill experience they cannot use: they pass it on to men of their own arm in the party who can still rise - riders teach riders, archers teach archers, foot teach foot. The more veterans, the more pupils they reach each day; a pupil learns from them at most as much again as his own drill that day (Veteran Teach Max Ratio) and never more than his next upgrade can hold. Nothing is created: experience only moves from veterans to pupils, what nobody can take is lost as before. The same rule for your party and every lord's, only on a day the men drill (off = as before: their drill experience is lost)", RequireRestart = false)]
         [SettingPropertyGroup("Drill")]
         public bool VeteransTeachTheirOwn { get; set; } = true;
@@ -13065,6 +13073,8 @@ namespace Armoury
             s.DrillSiegeArmy = DrillSiegeArmy;
             s.DrillTownStay = DrillTownStay;
             s.CampTrainBeforeSleepHours = CampTrainBeforeSleepHours;
+            s.PlayerSettlementOrderBeatsCamp = PlayerSettlementOrderBeatsCamp;
+            s.PlayerSettlementOrderMaxHours = PlayerSettlementOrderMaxHours;
             s.VeteransTeachTheirOwn = VeteransTeachTheirOwn;
             s.VeteranTeacherMinTier = VeteranTeacherMinTier;
             s.VeteranPupilsEach = VeteranPupilsEach;

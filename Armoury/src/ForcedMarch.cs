@@ -193,7 +193,7 @@ namespace Armoury
                             Msg(PartyWords.Pick("The forced march breaks the men - they collapse where they stand.", "The forced march breaks you - you collapse where you stand.",
                                 "The forced march breaks you and your companions - you collapse where you stand."), Colors.Red);
                             Stop("dlug 3 (zapasc)", false);
-                            try { if (mp != null && mp.CurrentSettlement == null && mp.MapEvent == null) mp.SetMoveModeHold(); } catch { }
+                            try { if (mp != null && mp.CurrentSettlement == null && mp.MapEvent == null && !SettlementOrder331.Beats(mp, "zapasc marszu forsownego (dlug 3)")) mp.SetMoveModeHold(); } catch { }   // 331
                         }
                         else Msg("A whole day of forced march - " + PartyWords.Men() + " owe one more night's sleep (sleep debt " + d + ").", Colors.Yellow);
                     }
