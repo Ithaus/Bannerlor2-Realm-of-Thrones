@@ -27,7 +27,7 @@ namespace Armoury
     /// twierdze do kolejki, zwrot najwczesniej po MinDays dobach od zdobycia. Kolejka probowana co godzine, gdy gracz stoi na mapie (BookHoldings.PlayerOnMapFor);
     /// sama zmiana pana droga BookHoldings (TransferFor -> TryRow): warunki chwilowe (oblezenie, bitwa przy bramie), bohaterowie bez druzyny wyprowadzeni, zaloga Polnocy
     /// do partii Polnocy (bez ludzi z niczego), roszczenie SCA Polnocy jak przed zmiana, ApplyByDefault (nie BySiege - bez kar i bez naszych sluchaczy zdobycia),
-    /// jency swoi do zalogi, obsada zalogi ludzmi krolestwa nowego pana; po zmianie roszczenie SCA krolestwa odbiorcy na te osade zdjete. Polnoc zatrzymuje lup gry
+    /// jency swoi do zalogi, BEZ obsady zalogi (326x, Jeff 05.11: zaloga z werbunku nowego pana, na ile go stac); po zmianie roszczenie SCA krolestwa odbiorcy na te osade zdjete. Polnoc zatrzymuje lup gry
     /// z oblezenia (nic nie tworzymy). Gracz: twierdza gracza, odbiorca = rod gracza, Polnoc albo krolestwo odbiorcy pod rzadami gracza - pominiete z linia.
     /// Rw320 (zwrot po Krwawych Godach) dotyczy twierdz rodow, ktore przeszly do korony - te nie sa juz w Polnocy, wiec 326b ich nie rusza (bez zderzenia).
     /// Linie "Zwrot zdobyczy Polnocy (326b)": spis po wczytaniu, kazde zdobycie, kazdy zwrot (linia TryRow z tym znacznikiem), podsumowanie dobowe.
@@ -409,7 +409,7 @@ namespace Armoury
                         string pinfo;
                         if (!MovePrisoners(st, twin, north, to.Leader, out pinfo)) { waits.Add(Nm(st) + ": " + pinfo); continue; }
                         string wait;
-                        string res = BookHoldings.TransferFor(Tag, id, twin != null ? RedKeepId : null, to, day, out wait, here, DonorRadius);
+                        string res = BookHoldings.TransferFor(Tag, id, twin != null ? RedKeepId : null, to, day, out wait, here, DonorRadius, noFill: true);   // 326x: bez obsady (Jeff 05.11)
                         if (res == null) { waits.Add(Nm(st) + ": " + wait + (pinfo != null ? " (" + pinfo + ")" : "")); continue; }
                         _queue.Remove(id); _err.Remove(id);
                         if (res.StartsWith("ok", StringComparison.Ordinal))

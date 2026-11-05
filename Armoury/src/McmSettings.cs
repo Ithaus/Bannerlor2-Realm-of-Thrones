@@ -10614,7 +10614,7 @@ namespace Armoury
 
         [SettingPropertyBool("Canon War Balance Front Garrison", HintText = "With Canon War Balance: castles and towns of the weaker side on the front line, with an enemy army close by, recruit their garrison faster - volunteers from the town and its villages, paid by the owner's house as the game's own garrison recruitment - until the walls can hold against that army (its men divided by the strength of the walls, about 5.5 for a castle). Nobody comes from nothing. Off = garrisons recruit at the game's pace", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
-        public bool CanonWarBalanceFrontGarrison { get; set; } = true;
+        public bool CanonWarBalanceFrontGarrison { get; set; } = false;   // 326x: Jeff 05.11 - wylaczone
 
         [SettingPropertyBool("Canon Houses of the West", HintText = "As in the books, the lordly houses of the Westerlands and the Crownlands that Realm of Thrones leaves without a castle (Estren, Falwell, Jast, Moreland, Plumm, Prester, Stackspear, Buckwell, Chelsted, Hayford, Stokeworth; House Spicer stays a knightly house until the Red Wedding, as in the books) answer their liege's call with a host of their own: the Banner Kings gentry family that keeps an estate in their lands is raised to full peerage (exactly as a realm vote would grant it) and to clan tier 3, and its head leads a party raised the usual way from the villages. Once per campaign, at the first day after loading or at the start of a new game. No castles are taken from anyone. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]

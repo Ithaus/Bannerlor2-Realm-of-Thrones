@@ -593,7 +593,9 @@ namespace Armoury
             // zmiana, ktora nie weszla, czeka na ponowna probe (wtedy obsada razem z nia). Kazda twierdza we wlasnym try - potkniecie nie zatrzymuje reszty wiersza.
             // Po recenzji: samo "osada w krolestwie docelowym" nie wystarcza - stary pan z tego samego krolestwa (inny rod) jest w nim juz przed zmiana,
             // wiec nieudane ApplyByDefault obsadzaloby co godzine twierdze starego pana (dawcy liczeni wzgledem starego rodu)
-            bool fill = GarrisonOn;
+            // 326x (Jeff 05.11 "zalogi - liczba garnizonu niech jest taka, na jaka stac lorda"): zwrot zdobyczy Polnocy (TransferFor z noFill) bez obsady -
+            // zaloga Polnocy wychodzi do jej partii, nowy pan werbuje sam, na ile go stac (werbunek i budzet gry)
+            bool fill = GarrisonOn && !_noFill;
             if (fill)
                 foreach (var s in sites)
                 {
@@ -608,7 +610,7 @@ namespace Armoury
                 bool changed = s == st ? stOk : twinOk;
                 sb.Append(" | po zmianie ").Append(Nm(s)).Append(": pan ").Append(s.OwnerClan != null ? s.OwnerClan.Name.ToString() : "-")
                   .Append(", zaloga ").Append(Men(s.Town.GarrisonParty))
-                  .Append(!fill ? " (pusta zostaje werbunkowi pana - bez ludzi z niczego)"
+                  .Append(!fill ? " (bez obsady - zaloga z werbunku pana, na ile go stac; bez ludzi z niczego)"
                           : changed ? " (obsada z krolestwa nowego pana - przeniesieni, bez ludzi z niczego)"
                           : " (zmiana pana nie weszla - bez obsady, obsada razem z ponowna proba)")
                   .Append(", milicja ").Append((int)s.Militia);
@@ -655,7 +657,7 @@ namespace Armoury
         /// jego krolestwa, roszczenie SCA starego pana, ApplyByDefault, jency swoi do zalogi, obsada z krolestwa nowego pana). Linie z podanym znacznikiem.
         /// Wynik koncowy (ok:dzien / bez-zmian / gracz / brak-...) albo null i `wait`. Liczniki wiadomosci BookHoldings po wywolaniu czyszczone. Rzuca jak TryRow.
         /// </summary>
-        internal static string TransferFor(string tag, string stId, string twinId, Clan to, int day, out string wait, bool prisonerHereOk = false, float donorRadius = 0f)
+        internal static string TransferFor(string tag, string stId, string twinId, Clan to, int day, out string wait, bool prisonerHereOk = false, float donorRadius = 0f, bool noFill = false)
         {
             wait = null;
             if (to == null || to.Kingdom == null) { wait = "odbiorca bez krolestwa"; return null; }
@@ -664,10 +666,12 @@ namespace Armoury
             var old = Prefix;
             Prefix = tag;
             _donorRadius = donorRadius;
+            _noFill = noFill;
             try { return TryRow(row, day, out wait); }
-            finally { Prefix = old; _donorRadius = 0f; _batchDone.Clear(); _batchMoved.Clear(); }
+            finally { Prefix = old; _donorRadius = 0f; _noFill = false; _batchDone.Clear(); _batchMoved.Clear(); }
         }
 
+        private static bool _noFill;         // 326x: zwrot zdobyczy Polnocy bez obsady zalogi (zaloga z werbunku nowego pana)
         private static float _donorRadius;   // 326b po recenzji (R3-W4): obsada zalogi tylko od dawcow w tym promieniu od bramy (0 - bez limitu, wiersze tabeli)
 
         /// <summary>326b: roszczenie Strategic Campaign AI krolestwa `k` na te osade (cel ReclaimLostFief) - zdjete, gdy osada wlasnie do niego wrocila.</summary>

@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 326x - zmiany Jeffa przed testem (05.11 ok. 14:40)
+**Problem:** Jeff 05.11: "a czemu ma miec minimalne zalogi, niech ma takie jakie ma zalogi" oraz "chodzi mi, ze oddajemy zamki prawowitym wlascicielom, ale zalogi - liczba garnizonu niech jest taka, na jaka stac lorda".
+**Zmiana:** (1) 326c-E `CanonWarBalanceFrontGarrison` domyslnie NIE (kod zostaje, wylaczony). (2) 326b zwrot zdobyczy Polnocy bez obsady zalogi ludzmi krolestwa odbiorcy:
+`BookHoldings.TransferFor(..., noFill: true)` - zaloga Polnocy wychodzi do jej partii (jak dotad), nowy pan werbuje zaloge sam (werbunek i budzet gry); uwolnieni "swoi" jency z lochu
+nadal wracaja do zalogi (to jego ludzie). Tabela 18.10 (BookHoldings) bez zmian. Linia zwrotu: "(bez obsady - zaloga z werbunku pana, na ile go stac; ...)".
+**Ryzyko / co sprawdzic:** zwrocona twierdza moze stac prawie pusta - chroni ja weto 60 dob na oblezenia Polnocy; inni wrogowie moga ja wziac. Log "Zwrot zdobyczy Polnocy (326b)" - zaloga po zmianie.
+
 ## 326d - okno lupu: jasne wiersze zlota gracza, korona i dar krola o swicie; gracz bierze 1/3 sakiewek rozbitych druzyn jak lord AI (noc/326d-okno-lupu od 325 = 33d03a31; Armoury.dll 790c1d31ba90b2a0e13518bd5590216d po recenzji - NIE WGRANE)
 
 **Problem:** Jeff mysli, ze zloto z okna lupu (117) nie dochodzi do kiesy. Dochodzi (Hero.MainHero.Gold, log 716515 -> 723077 -> 727923), ale okno pokazywalo
