@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 2026-11-05 WGRANIE 164 - noc/326x-integracja (163 + 326a floty wg krolestw, 326b zwrot zdobyczy Polnocy, 326c odsiecz z przewaga, 326d okno lupu + 1/3 sakiewek pokonanych dla gracza)
+Armoury.dll 0229fc1710a699fdf3fb5f405297669c (reszta modow bez zmian: CrashScribe 55ccc004, RC 8528f098, ForgeView 8441ab0e, GrandTourney 900e32bc). Kopia 163: Armoury.dll.bak-2026-11-05-przed-wgranie164 i D:/Backup-Bannerlord/wgrane/2026-11-05-wgranie164-przed.
+**Testy:** bieg 30 dob na kopii zapisu Jeffa (dzien 109348) + 7 bitew: kod 0, KONIEC OK, ERROR 0 Armoury, CrashScribe 23 (jak 325a), polnoc326 0 NIE, obl326c 0 NIE; statki Polnocy 543 -> 229, sila Korony 10.8k -> 22k (Reach w koalicji).
+Bieg 12 dob z flaga armoury-wlosci-test.flag (gracz w The Eyrie): SPIS 8 twierdz, zwrocone 7 (Stoney Sept -> Swyft, Clegane's Keep -> Clegane, Goldentooth -> Lefford, Ten Towers -> Harlaw, Banefort -> Banefort, Ashemark -> Marbrand, Deep Den -> Lydden), Sarsfield czeka (glowa rodu w niewoli, do 15 dob), weta 7, zaden zwrocony nie zdobyty, bez potkniec.
+**Ryzyko / co sprawdzic u Jeffa:** zwrot rusza dopiero, gdy gracz wyjdzie z The Eyrie na mape (bez menu); zalogi zwroconych twierdz od 0 - werbunek pana (Goldentooth i Deep Den maja Polnoc obok, weto 60 dob); pierwsza bitwa z pokonanym z pelna sakiewka - linia "trzecia gracza" > 0; floty Polnocy dalej w dol.
+
 ## 326x-at - poprawki po autotescie 326x (05.11 ok. 15:10; Armoury.dll 0229fc1710a699fdf3fb5f405297669c - NIE WGRANE)
 **Problem:** autotest 326x (kod 0, ERROR 0): (a) 326a "model idealu NavalDLC: blad odczytu (NullReferenceException)" - `NavalRealms.ModelName` wolal `GetValue` na wyniku `AccessTools.Property` bez sprawdzenia null;
 (b) 326b co dobe "czeka ... gracz w osadzie (The Eyrie)" - CrashScribe-at sam stawia druzyne w najbezpieczniejszym miescie (The Eyrie) i czeka tam w town_wait_menus, wiec `BookHoldings.PlayerOnMapFor` nigdy nie przepuszczal.
