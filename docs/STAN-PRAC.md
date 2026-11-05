@@ -6,6 +6,10 @@
 - Przyczyna statkow: NavalDLC daje kazdemu rodowi AI ideal statkow = limit partii x3, kupno 0.5/dobe bez patrzenia na kulture/region; 286 partii ze statkami; brak patroli/blokad morskich w AI.
 - Jeff chce: floty wedlug krolestw (Polnoc bez floty), zwrot zdobyczy Polnocy prawowitym panom (teraz i po kazdym zdobyciu), sprawdzic czemu oblezenia krotkie/zamki padaja.
 - Galaz noc/326-polnoc (od 33d03a31), worktree scratchpad sesji 0a2a8b2b n326: 326a NavalRealms (floty), 326b NorthConquestReturn (zwrot) - agent w toku; dochodzenie oblezen - agent w toku.
+- Dochodzenie oblezen (05.11): oblezenia 10-20 dob, NIE glod. Przyczyny: armia odsieczy Joffreya 14 dob na zbiorce (blokada gry + NightRest/ArmyRestDay), male zalogi Korony (130-340 + milicja),
+  zbiorka 274 pcha silniejsza Polnoc (Levers.cs:101), OB5 liczy odsiecz "na papierze", unia 272 (Dorzecze w Polnocy) + pokoj zablokowany do Krwawych Godow.
+  Poprawki 326c (A zbiorka tylko slabszemu, B bez postojow odsieczy, C koniec zbiorki OB5 po 24 h, D realna odsiecz, E min. zaloga frontu, F dubel "zdobycie") - workflow wf_566de842-b24,
+  galaz noc/326c-oblezenia, worktree scratchpad 0a2a8b2b n326c. Po obu: scalenie 326 + 326c, autotest na kopii zapisu Jeffa (po wyjsciu Jeffa z gry), wgranie.
 
 ## STAN 04.11.2026 ok. 15:40 CET: WGRANIE 163 (najnowszy) - zima 325
 - W GRZE: Armoury.dll f6ce9d5138637262480a0ae8ebd21de7 (galaz noc/325-zima 33d03a31 = 162 + 325, wypchnieta; worktree scratchpad bcfbb3b7 zb/n324).
