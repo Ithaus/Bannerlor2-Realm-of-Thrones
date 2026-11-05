@@ -10,6 +10,9 @@
   zbiorka 274 pcha silniejsza Polnoc (Levers.cs:101), OB5 liczy odsiecz "na papierze", unia 272 (Dorzecze w Polnocy) + pokoj zablokowany do Krwawych Godow.
   Poprawki 326c (A zbiorka tylko slabszemu, B bez postojow odsieczy, C koniec zbiorki OB5 po 24 h, D realna odsiecz, E min. zaloga frontu, F dubel "zdobycie") - workflow wf_566de842-b24,
 - 326a/326b PO RECENZJI: noc/326-polnoc efa59fdc, DLL a977aee19f0ca5b1da79ec123ceb8205 (build 0), weto 60 dob na zwrocone twierdze; --grupa polnoc326 P326-1..7. NIEWGRANE.
+- 14:25 Jeff wyszedl z gry: "testuj i wgraj". Logi + zapis (md5 abc473ef) na D:/Backup-Bannerlord/logi-jeffa/2026-11-05. SCALONE noc/326x-integracja ff01161a
+  (326 efa59fdc + 326c b9bffbfd + 326d 82800cfd - 1/3 domyslnie TAK, recenzja blednie wylaczyla), Armoury 266e4502e235c7506d771b4e1bbbd45a, worktree scratchpad 0a2a8b2b n326x.
+  AUTOTEST w toku: wf_3907183a-103 (30 dob na kopii zapisu Jeffa + bitwy), logi do scratchpad at326x. Potem wgranie (kopia 163).
 - ZLOTO PO BITWIE (Jeff 05.11): dochodzi (kiesa 716515 -> 723077 -> 727923); okno mylace (sumuje sakiewki ludzi), korona 1/9 rano bez komunikatu.
   DECYZJA JEFFA 05.11 "tak, 1/3 monet dla mnie jak lord AI" - sakiewki pokonanych: 1/3 do kiesy gracza, 2/3 ludziom. Paczka 326d (okno + 1/3), galaz noc/326d-okno-lupu, wf_2e253829-09f.
 - 326c POPRAWIONE wg Jeffa 05.11: odpoczynek/noc ZOSTAJA; odsiecz nie czeka na 90% zbiorki przy przewadze ~1.2x i atakuje oboz (nowy bieg wf_9a40772d-507, stary przerwany).
