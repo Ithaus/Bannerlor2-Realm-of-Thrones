@@ -1,5 +1,68 @@
 # DZIENNIK ZMIAN
 
+## 326c - oblezenia: zbiorka tylko slabszej strony, odsiecz atakuje z przewaga (koniec zbiorki, atak pod murami), odsiecz liczona w czasie, zalogi frontu slabszej strony, linie zdobycia (noc/326c-oblezenia od 33d03a31; Armoury.dll 91b7fa86d889e73c2a06d3c5da40132e - NIE WGRANE)
+
+**Problem:** Jeff 05.11: oblezenia trwaja 10-20 dob, zamki Korony padaja mimo armii odsieczy ("nie musza czekac na 90% pokrycia skoro maja 7k zolnierzy a przeciwnik 3k -
+atakuja"; odpoczynek ma zostac). Log Armoury-2026-11-04_23-31-36 (doby 109280-109354): armia Joffreya (34 druzyny, ok. 8000 ludzi, sila z wezwanymi 10.7k) zalozona przez OB5
+109326 dla Deep Den (oboz 4.5-5.1k), zbiorka Silverhill - "Wojna kanonu - wladca (264)" 109327-109340 codziennie "AI: GoToPoint", mysl "1. DefendSettlement Deep Den 62.7-99.3";
+109341-109345 "DefendSettlement -> Deep Den, krotko GoToPoint -> Howland Reed" (pod obozem, bez ataku); Deep Den ZDOBYTE 109345 ("odsiecz w drodze 10743 / wymagana 5381").
+Clegane's Keep 109339-109345: "zebrane 3027 / wymagane 8834 (druzyn 24), zasieg krolestwa 13780" - zasieg liczyl armie zamknieta w zbiorce dla Deep Den; zdobyte 109349
+(zaloga 340 + milicja 235 wobec 5862). "Rownowaga wojny (274): zbiorka" 31 linii - wszystkie The North (strona A, "powsciagany A", B/A 0.557), w tym "wladca Robb Stark ->
+oblezenie Deep Den" 109326. Ten Towers: "Oblezenia 2 (zdobycie)" 109314 i 109315 "bitwa pod murami", 109316 "bitwa szturm"; "Mury (320c)" 109315 "obrona 1847%".
+
+**Przyczyna (sprawdzona w dekompilacji gry 1.4.8 i logu):**
+- A: CanonWarBalance.Levers BoostPostfix wolal Muster dla kazdej strony bez walki 7 dob - takze dla silniejszej i powsciaganej.
+- C: Army.IsWaitingForArmyMembers - zbiorka konczy sie przy 90% sily wezwanych, a zegar zbiorki rusza dopiero, gdy wodz z GoToPoint jest blisko punktu (Army.CheckAndSetArmyGatheringTime);
+  wodz czekajacej armii ma DoNotChangeBehavior (AiMilitaryBehavior.AiHourlyTick). Pod murami gra rusza na oboz, gdy druzyny z obrona osady w 9 jedn. od wodza obozu maja
+  EstimatedStrength > 1.2 x GetCustomStrength(Defender) obozu (MobilePartyAi.GetNearbyPartyDataWhileDefendingSettlement) - ta miara obozu bywa wyzsza od jego EstimatedStrength.
+- Hipoteza "odpoczynek odsyla wodza na zbiorke" NIEPOTWIERDZONA: NightRest.ApplyOrder oddaje DefendSettlement po nocy, ArmyRestDay nie staje przy DefendSettlement, w zbiorce
+  jedynym celem wodza jest punkt zbiorki (Army.MoveLeaderToGatheringLocationIfNeeded); zegar zbiorki raz ustawiony nie jest kasowany. Odpoczynku NIE ruszano (decyzja Jeffa B).
+- D: BesiegedRelief.Reach liczyl armie w zbiorce dla innej osady i druzyny daleko w drodze; Committed - druzyny bez wzgledu na czas dojscia.
+- F: SiegeWalls2.OnMapEventEnded liczyl SiegeOutside wygrane przez oblegajacych jako zdobycie (gra bierze twierdze tylko po szturmie / pobitym wypadzie); SZ/320c/OB3 pisaly "zdobyte";
+  procent strat obrony liczony od obroncow pierwszej rundy (96), a w bitwie zgineli tez lordowie odsieczy (1760).
+
+**Zmiana (Armoury), kazda czesc z wlasnym kluczem MCM (domyslnie TAK):**
+- **A** `CanonWarBalance.cs`, `CanonWarBalance.Levers.cs` (BoostPostfix): klucz **Canon War Balance Muster Weak Only** - strona powsciagana (_restrain) albo silniejsza przy
+  B/A poza pasmem 1.5 (_strongOut, StrongOut/MusterBlocked) nie dostaje zbiorki 274 (ani "wladca zbiera armie", ani "lordowie na front"). Zwykle armie i cele gry bez zmian.
+- **B** odpoczynek (NightRest, ArmyRestDay, m118) bez zmian.
+- **C1** `ReliefStrike326.cs` (nowy): klucz **Relief Ends Gathering On Advantage** - prefiks Army.Gather (osada odsieczy armii Defender), postfiks Army.IsWaitingForArmyMembers:
+  co godzine armia w zbiorce z celem odsieczy (Gather / OB5 / po wczytaniu najblizsza oblezona twierdza krolestwa), wodz w zasiegu obrony gry (8.02 doby), sila przy wodzu
+  (dolaczeni + wezwani w 9 jedn.) + odsiecz pod murami >= 1.2 x oboz (EstimatedStrength) -> koniec zbiorki na stale; mysl gry daje DefendSettlement (OB5 podbija), wezwani
+  doganiaja. Kazde krolestwo, armie gry/BK/OB5; armia gracza nie.
+- **C2** `ReliefStrike326.cs`: klucz **Relief Attacks On Advantage** - postfiks GetNearbyPartyDataWhileDefendingSettlement: osada z odsiecza pod murami (kryteria i promien gry)
+  >= 1.2 x oboz (EstimatedStrength) -> shouldEngage + strona ladowa; najsilniejsza rusza na oboz (EngageParty), reszta idzie do niej i wchodzi do bitwy (droga gry). Bez przewagi nic.
+- **C3** miejsce zbiorki: bez zmian - gra juz wybiera twierdze krolestwa najblizej celu (Army.FindBestGatheringSettlementAndMoveTheLeader: waga odleglosci do celu 10, do wodza 0.5).
+- **D** `BesiegedRelief.cs`: klucz **Besieged Relief Arrives In Time** - zebrana odsiecz (Committed), rezerwacja w mysli i zasieg f12 licza tylko druzyny, ktore dojda przed
+  szacowanym szturmem (10 dob od poczatku oblezenia - najwczesniejszy pierwszy szturm w logu; potem 1 doba; linia prosta / srednia predkosc lorda gry); zasieg bez armii w zbiorce
+  dla innej osady; armia Defender w zbiorce liczona dla osady z Army.Gather (nie miejsca zbiorki).
+- **E** `CanonWarBalance.FrontGarrison.cs` (nowy): klucz **Canon War Balance Front Garrison** - raz na dobe (przy dzwigniach) twierdze frontu slabszej strony z wrogiem w 55 jedn.:
+  prog zaloga + milicja = ludzie zagrozenia (najwieksza armia albo suma wolnych druzyn drugiej strony) / przewaga murow (zamek 5.5, miasto 3.91 - linie SZ); ponizej progu
+  dodatkowe wywolania werbunku zalogi gry (TickAutoRecruitmentGarrisonChange, odbiciem; warunek gry CanSettlementAutoRecruit) do progu albo do braku ochotnikow / zoldu / miejsca.
+  Ludzie ze slotow notabli miasta i wsi (ksiega ludzi A5), oplata z kasy rodu (AutoRecruitmentExpenses -> E5 do sprzedajacego), zold z limitu zalogi rodu.
+- **F** `SiegeWalls2.cs`, `SiegeWalls.cs`: klucz **Siege Capture Line Only On Capture** - SiegeOutside wygrana przez oblegajacych: osobna linia "Oblezenia 2 (pole pod murami, 326c)",
+  bez licznika zdobyc; SZ / 320c wynik "pole pod murami wygrane przez oblegajacych - twierdza stoi (326c)" (liczniki: inne), OB3 "pole wygrane ... twierdza stoi";
+  procent strat obrony od max(D0, straty + pozostali obroncy bitwy).
+- `SubModuleMain.cs` (ReliefStrike.ApplyAll), `ReliefBehavior` (godzina, doba, start sesji, rozwiazanie armii), `McmSettings.cs` (gen_mcm: 2829 ustawien Armoury),
+  `tools/sprawdz_logi.py` grupa **obl326c**.
+
+**Linie logu:** "Rownowaga wojny (274): zbiorka zatrzymana (326c)", w linii doby 274 "(326c tylko slabszej strony TAK: silniejsza poza pasmem X, zbiorek zatrzymanych N)",
+"Rownowaga wojny (274): zaloga frontu (326c)", "Odsiecz z przewaga (326c): start sesji / koniec zbiorki / atak pod murami / dzien N", w wierszach "Odsiecz (OB5): dzien"
+", 326c do szturmu X dob, pominiete: nie zdaza N, armia w zbiorce dla innej osady M", "Oblezenia 2 (pole pod murami, 326c)".
+`python -I tools/sprawdz_logi.py --grupa obl326c <Armoury-*.log>`.
+
+**Ryzyko / co sprawdzic:**
+- C1: po koncu zbiorki armia moze ruszyc z mniejsza liczba ludzi niz 90% wezwanych (z zalozenia); jesli mysl wodza nie da celu ponad prog (ocena <= 0.033), gra rozwiaze armie
+  (AiPartyThinkBehavior) - dlatego tylko w zasiegu obrony gry. Army.CheckInactivity liczy bezczynnosc dopiero po koncu zbiorki. Postfiks IsWaitingForArmyMembers czyta tylko zbior.
+- C2: atak przy 1.2 x EstimatedStrength obozu tam, gdzie gra (miara GetCustomStrength obozu jako obroncy) by czekala - mozliwe wiecej bitew pod murami i strat odsieczy;
+  OB5 "bitwy pod murami" i "wygrala strona krolestwa" pokaza wynik. Oboz na morzu bez zmian. Gracz w obozie moze zostac zaatakowany (jak w grze przy przewadze).
+- D: mniej druzyn w zebranej odsieczy -> OB5 podbija wiecej druzyn albo bramka f12 zwalnia je szybciej (zamierzone); linia prosta zaniza droge (liczy raczej za duzo).
+- E: wiele wywolan metody gry na dobe - wszystkie latki na niej (A5 PeopleBook, E5 GarrisonRecruitFee, RecruitCost, Measure169c, ClanBudget GarGate) dzialaja przy kazdym; liczniki
+  tych linii urosna o werbunek 326c. Limit zoldu zalogi rodu moze zablokowac werbunek ("bez nikogo do wziecia").
+- A: zbiorka silniejszej strony blokowana od razu przy B/A poza 1.5 (bez czekania na dzwignie). Klucze nowe - Armoury.json Jeffa ich nie ma (domyslne TAK dzialaja).
+- NIE testowane w grze (Jeff gra) - tylko build i test syntetyczny grupy obl326c.
+
+**Status:** DO SPRAWDZENIA (build kod 0, nie wgrane).
+
 ## 325 - zima: druzyny jedza najwyzej +20% (nie +50%), spichlerze wsi napelniaja polki od pierwszej doby, 3 uwagi niskie z recenzji 324 R3 (noc/325-zima od 162 = noc/324-glod a78b1898; Armoury.dll 337384b767f1b62dea21d28cde506408 - NIE WGRANE)
 
 **Problem:** Jeff 04.11 "i zima jemy o 20% wiecej a nie 40%". Log Armoury-2026-11-04_15-09-25 (doby 109250-109253): "Zima wedlug krain (E4/1): ... jedzenie partii zima:

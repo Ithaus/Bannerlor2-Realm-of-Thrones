@@ -81,6 +81,11 @@ namespace Armoury
         private const float GameEngage = 1.2f;                           // gra rzuca odsiecz na oboz twierdzy przy 1.2 x jego sile (MobilePartyAi, num15)
         private const double ReachWindowHours = 24.0;                    // ocena obrony od gry starsza niz doba - druzyna poza zasiegiem
         private const double ReachWarmupHours = 13.0;                    // 6 h zegara mysli AI + 6 h obozu swiata + 1 h zapasu: pierwsze godziny bez bramki
+        // 326c-D: szacowany szturm - najwczesniejszy pierwszy szturm w logu 04/05.11 (Clegane's Keep 10.4 doby, Deep Den 11.7, Ten Towers ok. 13); po tym czasie
+        // szturm moze przyjsc w kazdej dobie - liczy sie odsiecz, ktora dojdzie w dobe. Droga w linii prostej / srednia predkosc lorda gry (raczej za krotka - liczy wiecej)
+        private const float AssaultDays = 10f;
+        private const float AssaultMinLeftDays = 1f;
+        internal static bool InTimeOn { get { var s = S; return s != null && s.BesiegedReliefArrivesInTime; } }
 
         private sealed class Siege
         {
@@ -91,6 +96,8 @@ namespace Armoury
             public Track T;
             public float Reach, Floor;   // f12: zasieg krolestwa (zebrana + druzyny z ocena obrony od gry) i prog min(R, 1.2 x oboz) - przeliczane raz na godzine
             public bool Ready;           // f12: minelo ReachWarmupHours od wykrycia (zasieg policzony ze wszystkich druzyn w zasiegu)
+            public float Left = 99f;     // 326c-D: doby do szacowanego szturmu (najmniej 1)
+            public int Late, Locked;     // 326c-D: druzyny pominiete - nie dojda przed szturmem / armia w zbiorce dla innej osady (ta godzina)
         }
 
         private sealed class Track
@@ -235,6 +242,7 @@ namespace Armoury
                     float bes = 0f;
                     foreach (var pb in camp.GetInvolvedPartiesForEventType()) if (pb != null) bes += pb.EstimatedStrength;
                     var sg = new Siege { Ev = ev, St = st, K = k, Cls = cls, Besiegers = bes, Need = force * bes };
+                    try { sg.Left = Math.Max(AssaultMinLeftDays, AssaultDays - ev.SiegeStartTime.ElapsedDaysUntilNow); } catch { sg.Left = AssaultMinLeftDays; }
                     List<Siege> list;
                     if (!_byK.TryGetValue(k, out list)) { list = new List<Siege>(2); _byK[k] = list; }
                     list.Add(sg);
@@ -272,6 +280,7 @@ namespace Armoury
                 {
                     var k = kv.Key; var list = kv.Value;
                     var wpcs = k.WarPartyComponents;
+                    bool inTime = InTimeOn;
                     for (int i = 0; i < wpcs.Count; i++)
                     {
                         var mp = wpcs[i] != null ? wpcs[i].MobileParty : null;
@@ -283,7 +292,11 @@ namespace Armoury
                             if (a.LeaderParty != mp) continue;
                             var obj = a.AiBehaviorObject as Settlement;
                             Settlement mine;
-                            if (a.IsWaitingForArmyMembers()) tgt = _armyFor.TryGetValue(a, out mine) ? mine : obj;   // zbiorka armii OB5 - liczy sie dla osady odsieczy
+                            if (a.IsWaitingForArmyMembers())
+                            {
+                                tgt = _armyFor.TryGetValue(a, out mine) ? mine : obj;   // zbiorka armii OB5 - liczy sie dla osady odsieczy
+                                if (inTime && tgt == obj) { var gt = ReliefStrike.GatherTarget(a); if (gt != null) tgt = gt; }   // 326c-D: armia Defender gry / BK - osada z Army.Gather, nie miejsce zbiorki
+                            }
                             else if (mp.DefaultBehavior == AiBehavior.DefendSettlement) tgt = mp.TargetSettlement ?? obj;
                             army = true;
                         }
@@ -293,6 +306,7 @@ namespace Armoury
                         {
                             var sg = list[j];
                             if (!ReferenceEquals(sg.St, tgt)) continue;
+                            if (inTime && !InTime(mp, sg)) { sg.Late++; break; }   // 326c-D: nie dojdzie przed szacowanym szturmem - poza zebrana odsiecza
                             sg.Committed += Contrib(mp);
                             sg.In.Add(mp);
                             if (army) sg.ArmyOnWay = true;
@@ -348,6 +362,13 @@ namespace Armoury
                     if (sg.In.Contains(mp)) continue;                                  // juz w zebranej odsieczy (C)
                     if (mp.Army != null && mp.Army.LeaderParty != mp) continue;        // czlonek armii - w sile wodza albo idzie z armia gdzie indziej
                     if (sg.Cls == CCastle && mp.BesiegedSettlement != null) continue;  // recenzja 14.10: oblegajacy twierdze wroga nie idzie do zamku
+                    if (InTimeOn)
+                    {
+                        // 326c-D: armia zamknieta w zbiorce dla innej osady (log 05.11: armia Joffreya na zbiorce dla Deep Den liczona w zasiegu Clegane's Keep - 24 druzyny
+                        // trzymane 6 dob pod murami, ktore same nie mogly ruszyc) i druzyna, ktora nie dojdzie przed szacowanym szturmem - poza zasiegiem
+                        if (mp.Army != null && mp.Army.LeaderParty == mp && Waiting(mp.Army) && !ReferenceEquals(TargetOfArmy(mp.Army), sg.St)) { sg.Locked++; continue; }
+                        if (!InTime(mp, sg)) { sg.Late++; continue; }
+                    }
                     r += Contrib(mp);
                 }
                 for (int i = 0; i < _tmpGone.Count; i++) t.EligAt.Remove(_tmpGone[i]);
@@ -356,6 +377,39 @@ namespace Armoury
                 sg.Ready = _hour - t.Hour0 >= ReachWarmupHours;
             }
             catch (Exception e) { sg.Ready = false; Stumble("Reach", e); }
+        }
+
+        /// <summary>326c-D: druzyna (wodz armii - pozycja wodza) dojdzie do osady przed szacowanym szturmem: droga w linii prostej / (srednia predkosc lorda gry x 24 h)
+        /// najwyzej Left dob. Blad - true (jak przed 326c).</summary>
+        private static bool InTime(MobileParty mp, Siege sg)
+        {
+            try
+            {
+                float speed = Campaign.Current.EstimatedAverageLordPartySpeed;
+                if (speed <= 0f) return true;
+                float days = mp.GetPosition2D.Distance(sg.St.GetPosition2D) / (speed * CampaignTime.HoursInDay);
+                return days <= sg.Left;
+            }
+            catch { return true; }
+        }
+
+        /// <summary>326c-D: armia w zbiorce (stan po postfiksie 326c-C1 - armia z przewaga juz nie czeka).</summary>
+        private static bool Waiting(Army a) { try { return a.IsWaitingForArmyMembers(); } catch { return false; } }
+
+        /// <summary>326c-D: osada odsieczy armii - armia OB5, potem Army.Gather (typ Defender); bez wpisu - miejsce zbiorki (AiBehaviorObject).</summary>
+        private static Settlement TargetOfArmy(Army a)
+        {
+            Settlement st;
+            if (_armyFor.TryGetValue(a, out st)) return st;
+            st = ReliefStrike.GatherTarget(a);
+            return st ?? (a.AiBehaviorObject as Settlement);
+        }
+
+        /// <summary>326c-C1: osada odsieczy armii OB5 albo null. Tylko odczyt.</summary>
+        internal static Settlement ArmyFor(Army a)
+        {
+            Settlement st;
+            return a != null && _armyFor.TryGetValue(a, out st) ? st : null;
         }
 
         private static bool Active(SiegeEvent ev)
@@ -487,8 +541,8 @@ namespace Armoury
                     }
                     else _dKingNoCall++;
                 }
-                // rezerwacja na reszte godziny: inne druzyny tej godziny licza te druzyne jako idaca
-                if (!top.In.Contains(party)) { top.In.Add(party); top.Committed += Contrib(party); }
+                // rezerwacja na reszte godziny: inne druzyny tej godziny licza te druzyne jako idaca (326c-D: tylko gdy dojdzie przed szacowanym szturmem)
+                if (!top.In.Contains(party) && (!InTimeOn || InTime(party, top))) { top.In.Add(party); top.Committed += Contrib(party); }
             }
             catch (Exception e) { Stumble("ThinkPostfix", e); }
         }
@@ -655,6 +709,8 @@ namespace Armoury
                          + "; pierwszenstwo 1.5 / 1.3 / 1.1, podstawa >= 0.5; armia wladcy " + (s != null && s.BesiegedReliefKingsArmy ? "TAK" : "NIE")
                          + "; odsiecz bez szans zwalnia druzyny (f12: zasieg krolestwa < min(wymagana, 1.2 x oboz), od 13 h po wykryciu) "
                          + (s != null && s.BesiegedReliefOnlyWhenReachable ? "TAK" : "NIE")
+                         + "; 326c tylko odsiecz, ktora zdazy przed szturmem (" + AssaultDays.ToString("0", Inv) + " dob od poczatku oblezenia, potem doba) i bez armii w zbiorce dla innej osady "
+                         + (s != null && s.BesiegedReliefArrivesInTime ? "TAK" : "NIE")
                          + " | model oceny celu: " + tsm + ", model armii: " + amm + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -688,6 +744,8 @@ namespace Armoury
                                 if (!sg.Ready) rows.Append(" (rozruch - pierwsze 13 h)");
                                 else if (sg.Reach < sg.Floor) rows.Append(" BEZ SZANS - zwolnionych dzis ").Append(sg.T != null ? sg.T.DayRel.Count : 0);
                             }
+                            // 326c-D: druzyny pominiete w ostatniej godzinie (bez znakow ";" i "|")
+                            if (InTimeOn) rows.Append(", 326c do szturmu ").Append(sg.Left.ToString("0.0", Inv)).Append(" dob, pominiete: nie zdaza ").Append(sg.Late).Append(", armia w zbiorce dla innej osady ").Append(sg.Locked);
                             shown++;
                         }
                     }
@@ -723,7 +781,7 @@ namespace Armoury
     /// <summary>OB5 (odsiecz) i S11 (rody zmieniajace krolestwo z lennem) - nasluchy kampanii. Bez zapisu; stan sesji od zera przy kazdej nowej grze i wczytaniu.</summary>
     internal sealed class ReliefBehavior : CampaignBehaviorBase
     {
-        public ReliefBehavior() { BesiegedRelief.Reset(); }
+        public ReliefBehavior() { BesiegedRelief.Reset(); ReliefStrike.Reset(); }
 
         public override void RegisterEvents()
         {
@@ -731,6 +789,11 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, BesiegedRelief.Daily);
             CampaignEvents.ArmyCreated.AddNonSerializedListener(this, BesiegedRelief.OnArmyCreated);
             CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, BesiegedRelief.OnArmyDispersed);
+            // 326c (odsiecz z przewaga): ocena co godzine, linia doby, start sesji, sprzatanie armii
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, ReliefStrike.Hourly);
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, ReliefStrike.Daily);
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, delegate (CampaignGameStarter s2) { ReliefStrike.SessionStart(); });
+            CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, delegate (Army a, Army.ArmyDispersionReason r, bool p) { ReliefStrike.OnArmyDispersed(a); });
             CampaignEvents.OnSiegeEventEndedEvent.AddNonSerializedListener(this, BesiegedRelief.OnSiegeEnded);
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, BesiegedRelief.OnMapEventEnded);
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, BesiegedRelief.OnOwnerChanged);
