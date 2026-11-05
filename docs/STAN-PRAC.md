@@ -1,5 +1,15 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 05.11.2026 ok. 15:35 CET: WGRANIE 164 (najnowszy) - 326x Polnoc
+- W GRZE: Armoury.dll 0229fc1710a699fdf3fb5f405297669c (galaz noc/326x-integracja 166fdb5f; worktree scratchpad sesji 0a2a8b2b n326x). Reszta modow bez zmian.
+  Kopia 163: Armoury.dll.bak-2026-11-05-przed-wgranie164 i D:/Backup-Bannerlord/wgrane/2026-11-05-wgranie164-przed. Logi i zapis Jeffa sprzed testu: D:/Backup-Bannerlord/logi-jeffa/2026-11-05.
+- 326a floty wg krolestw (Polnoc 0, Manderly x0.5, Zelazne Wyspy x2), 326b zwrot zdobyczy Polnocy (8 twierdz spoza Polnocy, 3/dobe, weto 60 dob, BEZ obsady zalog - zaloga na ile stac pana),
+  326c zbiorka 274 tylko slabszej strony, odsiec bez czekania na 90% przy przewadze 1.2x / po dobie, atak pod murami, odsiecz liczona w czasie, linie zdobycia; zalogi frontu WYLACZONE (Jeff),
+  326d okno lupu (do kiesy / ludzie / korona / dar / okup) + 1/3 sakiewek pokonanych dla gracza (Jeff "tak").
+- Testy: 30 dob + 7 bitew kod 0, ERROR 0; 12 dob z flaga: 7/8 zwrotow (Sarsfield czeka - glowa w niewoli). Szczegoly: CHANGELOG "WGRANIE 164".
+- DO SPRAWDZENIA w grze Jeffa: SPIS i zwroty 326b po wyjsciu z The Eyrie; zalogi zwroconych twierdz; "trzecia gracza" > 0 w oknie lupu; floty Polnocy; linie (326c) koniec zbiorki/atak.
+- Otwarte: fabula stoi (dzien 700: RenlyDeath/Blackwater/Krwawe Gody czekaja, pokoj Korona-Polnoc zablokowany do Krwawych Godow, zmeczenie 100/100) - do rozpoznania; Ten Towers dubel "zdobycie" naprawiony (F).
+
 ## W TOKU 05.11.2026 ok. 13:30 CET: 326 POLNOC ZA SILNA (Jeff gra - nic nie wgrywac/testowac przy wlaczonej grze)
 - Jeff 05.11 (zapis Ironman0gXONzURi8yO.sav 13:18, dzien 109348): Polnoc bije Lannisterow, Greyjoyow, korone; ok. 18.3k w polu + 18.6k zalogi, twierdz 44 (start 14);
   Robb poplynal na Zelazne Wyspy (Ten Towers u Boltonow, Theon jencem). Clegane's Keep zdobyte mimo odsieczy 13.8k vs 7.4k (bitwy pod murami 0), potem Deep Den.
