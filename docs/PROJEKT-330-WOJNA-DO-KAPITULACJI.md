@@ -228,3 +228,4 @@ Jeff: „pokój może być tylko tak, jak było w fabule: jeśli Bran Stark lub 
 - Kapitulacja Polnocy (K1-K3) zostaje: to nie pokoj, tylko poddanie (cesja + danina + faza Z do nastepnego wydarzenia kanonu). Po Bekartach kapitulacja Polnocy jest ostateczna (Polnoc pod korona) - to nadal nie „pokoj rowny”.
 - Rozejmy czasowe (42 doby, zima do wiosny <= 63, min. 84 doby wojny) bez zmian.
 - Wszystkie inne drogi do stalego pokoju (Diplomacy, gra, BK, ROT RedWedding MakePeace, Kronika, barter gracza) -> rozejm czasowy (siatka H6).
+- Jeff 05.11: „zima w grze trwa kilka lat!” -> ZADNYCH regul zimowych w 330: brak rozejmu z powodu zimy (warunek „zima i oba >= 75” USUNIETY), brak przedluzania rozejmu do wiosny (WarTruceWinterMaxExtra i WarTruceWinterExhaustion usuniete). Rozejm = stale 42 doby, tylko z wyczerpania (zmeczenie >= 100) po >= 84 dobach wojny.
