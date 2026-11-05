@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## W TOKU 05.11.2026 ok. 13:30 CET: 326 POLNOC ZA SILNA (Jeff gra - nic nie wgrywac/testowac przy wlaczonej grze)
+- Jeff 05.11 (zapis Ironman0gXONzURi8yO.sav 13:18, dzien 109348): Polnoc bije Lannisterow, Greyjoyow, korone; ok. 18.3k w polu + 18.6k zalogi, twierdz 44 (start 14);
+  Robb poplynal na Zelazne Wyspy (Ten Towers u Boltonow, Theon jencem). Clegane's Keep zdobyte mimo odsieczy 13.8k vs 7.4k (bitwy pod murami 0), potem Deep Den.
+- Przyczyna statkow: NavalDLC daje kazdemu rodowi AI ideal statkow = limit partii x3, kupno 0.5/dobe bez patrzenia na kulture/region; 286 partii ze statkami; brak patroli/blokad morskich w AI.
+- Jeff chce: floty wedlug krolestw (Polnoc bez floty), zwrot zdobyczy Polnocy prawowitym panom (teraz i po kazdym zdobyciu), sprawdzic czemu oblezenia krotkie/zamki padaja.
+- Galaz noc/326-polnoc (od 33d03a31), worktree scratchpad sesji 0a2a8b2b n326: 326a NavalRealms (floty), 326b NorthConquestReturn (zwrot) - agent w toku; dochodzenie oblezen - agent w toku.
+
 ## STAN 04.11.2026 ok. 15:40 CET: WGRANIE 163 (najnowszy) - zima 325
 - W GRZE: Armoury.dll f6ce9d5138637262480a0ae8ebd21de7 (galaz noc/325-zima 33d03a31 = 162 + 325, wypchnieta; worktree scratchpad bcfbb3b7 zb/n324).
   Kopia 162: Armoury.dll.bak-2026-11-04-przed-wgranie163 i D:/Backup-Bannerlord/wgrane/2026-11-04-wgranie163-przed.
