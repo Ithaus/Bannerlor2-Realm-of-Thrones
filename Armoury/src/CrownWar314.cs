@@ -62,6 +62,18 @@ namespace Armoury
         private static readonly Dictionary<string, long> _paid = new Dictionary<string, long>();       // id rodu -> zold 314c wyplacony w dobie _paidDay (ciecie zwrotu nastepnej doby)
         private static int _paidDay = -1;
         private static readonly List<Gift> _gifts = new List<Gift>();
+        // 326d: dar gracza z ostatnich bitew (bitwa -> zloto w kolejce) - tylko odczyt dla okna lupu (SpoilsWindow); bez zapisu, najwyzej 16 pozycji
+        private static readonly List<KeyValuePair<MapEvent, long>> _plGiftBy = new List<KeyValuePair<MapEvent, long>>();
+        private static MapEvent _curMe;
+
+        /// <summary>326d: zloto daru krola dla rodu gracza wpisane do kolejki za te bitwe (0 - brak). Tylko odczyt.</summary>
+        internal static long PlayerGiftFor(MapEvent me)
+        {
+            if (me == null) return 0;
+            long v = 0;
+            foreach (var kv in _plGiftBy) if (ReferenceEquals(kv.Key, me)) v += kv.Value;
+            return v;
+        }
 
         private static int _stumbles, _importN = -1, _importBad;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -234,7 +246,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("PayGifts", e); }
             }
-            if (_dPlGift > 0) Log.Player("The crown pays your house " + _dPlGift + " denars as the king's reward for your victory.");
+            if (_dPlGift > 0) Log.Player("The king's reward for your victory was paid at dawn: " + _dPlGift + " denars into your purse.");   // 326d: wyrazniej, ze do kiesy gracza
         }
 
         private sealed class Row { public Clan C; public long Base; public int Men; }
@@ -405,8 +417,9 @@ namespace Armoury
                 _dBattles++;
                 foreach (var k in kingdoms)
                 {
-                    try { RewardKingdom(s, k, foes, wins, all, foeLead); }
+                    try { _curMe = me; RewardKingdom(s, k, foes, wins, all, foeLead); }
                     catch (Exception e) { Stumble("RewardKingdom(" + Name(k) + ")", e); }
+                    finally { _curMe = null; }
                 }
             }
             catch (Exception e) { Stumble("OnMapEventEnded", e); }
@@ -460,6 +473,7 @@ namespace Armoury
                 n++;
                 if (c == Clan.PlayerClan)
                 {
+                    if (g > 0 && _curMe != null) { _plGiftBy.Add(new KeyValuePair<MapEvent, long>(_curMe, g)); if (_plGiftBy.Count > 16) _plGiftBy.RemoveAt(0); }   // 326d: okno lupu
                     pl = "; gracz: dar " + g + ", wplywy " + applied.ToString("0.#", Inv);
                     // recenzja 314c: komunikat tylko o tym, co naprawde dano (wplywy ponizej 0.5 nie sa nadawane; dar 0 - bez wzmianki o zlocie)
                     string gTxt = g > 0 ? g + " denars from the treasury of " + Name(k) + " (paid at the next settlement, when there is gold in it)" : null;

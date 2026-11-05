@@ -94,6 +94,8 @@ namespace Armoury
             public readonly List<long> CoinAmounts = new List<long>();
             public long Men;                      // do sakiewek ludzi gracza (MenPurse)
             public long Crown;                    // korona upomni sie o (ramki: roznica Ransom178.PendingClaim; okup: liczby SiegeRansom - przypis)
+            public long CrownMen;                 // 326d: czesc Crown brana o swicie najpierw z sakiewki ludzi (roznica Ransom178.PendingMenClaim); reszta - z kiesy gracza
+            public readonly List<MapEvent> Mes = new List<MapEvent>();   // 326d: bitwy raportu (ramki A) - dar krola z CrownWar314.PlayerGiftFor
             public readonly Dictionary<string, Gain> Gear = new Dictionary<string, Gain>(StringComparer.Ordinal);
             public int LeftN; public long LeftW;
             public readonly Dictionary<CharacterObject, int> Troops = new Dictionary<CharacterObject, int>();
@@ -183,6 +185,7 @@ namespace Armoury
             public readonly List<string> Labels = new List<string>();
             public readonly List<long> Amounts = new List<long>();
             public long Crown0;                   // Ransom178.PendingClaim gracza przy otwarciu ramki (roznica = korona z tej ramki)
+            public long CrownMen0;                // 326d: Ransom178.PendingMenClaim gracza przy otwarciu ramki
             public long CrownEarly;               // ramka A: korona z czesci lupu z kies zapisana juz w MapEvent.OnBattleWon (BeatenPurse.SplitPostfix) - Crown0 o nia nizej
             public long CrownSaid;                // korona wedlug CitySack (NoteSack) - tylko kontrola w linii logu
             // kontekst ramki A
@@ -215,6 +218,7 @@ namespace Armoury
             s.Renown = cl != null ? cl.Renown : 0f;
             s.Influence = cl != null ? cl.Influence : 0f;
             s.Crown0 = Ransom178.PendingClaim(me);
+            s.CrownMen0 = Ransom178.PendingMenClaim(me);
             s.Day = CampaignTime.Now.ToDays;
             return s;
         }
@@ -329,6 +333,7 @@ namespace Armoury
             public float Renown, Influence;
             public bool TimeMoved;
             public long Crown;                    // przyrost podstawy korony gracza (Ransom178.PendingClaim); czas plynal - 0 (rozliczenie o swicie mogloby wejsc w srodek)
+            public long CrownMen;                 // 326d: z tego z sakiewki ludzi (Ransom178.PendingMenClaim)
         }
 
         private static Delta DiffOf(Snap s)
@@ -355,6 +360,7 @@ namespace Armoury
             d.Influence = now.Influence - s.Influence;
             d.TimeMoved = now.Day - s.Day > 0.0005;   // ok. 43 s kampanii
             d.Crown = d.TimeMoved ? 0 : Math.Max(0, now.Crown0 - s.Crown0);
+            d.CrownMen = d.TimeMoved ? 0 : Math.Min(d.Crown, Math.Max(0, now.CrownMen0 - s.CrownMen0));
             return d;
         }
 
@@ -383,6 +389,8 @@ namespace Armoury
             else if (d.TimeMoved) r.TimeMoved = true;
             r.Men += d.Men;
             r.Crown += d.Crown;
+            r.CrownMen += d.CrownMen;
+            if (f.Me != null && !r.Mes.Contains(f.Me)) r.Mes.Add(f.Me);
             int n = 0; long w = 0;
             foreach (var g in d.Gains)
             {

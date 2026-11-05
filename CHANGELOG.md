@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 326d - okno lupu: jasne wiersze zlota gracza, korona i dar krola o swicie (noc/326d-okno-lupu od 325 = 33d03a31; Armoury.dll fc3ebeba4effddaec59f2bbc628d8795 - NIE WGRANE)
+
+**Problem:** Jeff mysli, ze zloto z okna lupu (117) nie dochodzi do kiesy. Dochodzi (Hero.MainHero.Gold, log 716515 -> 723077 -> 727923), ale okno pokazywalo
+"Your men's purses" i stopke "In all: X denars in coin" = kiesa + sakiewka ludzi (Manderstone 34032 "w monecie", do kiesy weszlo 7471). Sakiewka ludzi (MenPurse) to zold
+zolnierzy, nie gracza. Korona 1/9 (Ransom178.ThirdsSettle) pobiera o swicie najpierw z sakiewki ludzi, reszte z kiesy gracza - bez komunikatu. Dar krola (CrownWar314)
+czeka w kolejce do switu - okno go nie pokazywalo. Okup to wycena, nie gotowka.
+
+**Zmiana (Armoury, tylko napisy i odczyt - przelewy i zasady ekonomii bez zmian):**
+- `SpoilsWindow.cs` Build (sekcja Coin): etykiety zlota (najwyzej 4, reszta "Other sums"), "Into your purse now", "Kept by your men (their pay, not yours)",
+  "Crown share (1/9), taken at dawn" + "from your purse / your men's purse" ~a / ~b (prognoza ta sama regula co ThirdsSettle: czesc z sakw z sakiewki ludzi, ile w niej jest,
+  reszta z kiesy), "King's reward, paid at dawn" (dar gracza wpisany do kolejki za bitwy raportu). Jency: "Ransom if bought out (estimate)" ~O. Stopka bez sumy kiesa + ludzie:
+  "Coin for you: X now (+R at dawn, -a crown); your men keep Y."
+- `SpoilsReport.cs`: Rep.CrownMen (roznica Ransom178.PendingMenClaim w ramce, jak Crown) i Rep.Mes (bitwy ramek A raportu).
+- `Ransom178.cs`: PendingMenClaim (odczyt); ThirdsSettle - komunikat dla gracza raz na swit: "The crown took its share (1/9) of your spoils at dawn: X denars from your purse,
+  Y from your men's purse; Z still owed."
+- `CrownWar314.cs`: PlayerGiftFor(MapEvent) - dar gracza za bitwe (ostatnie 16, bez zapisu); komunikat wyplaty: "The king's reward for your victory was paid at dawn: X denars into your purse."
+
+**Linie logu:** "Okno lupu (326d): raport N | do kiesy gracza teraz X | sakiewka ludzi (ich zold) Y | korona 1/9 o swicie Z (z kiesy gracza ~a, z sakiewki ludzi ~b, podstawa z sakw c)
+| dar krola o swicie R (bitew n) | okup ~O (wycena) | sprzet G | stopka: ...".
+
 ## 325 - zima: druzyny jedza najwyzej +20% (nie +50%), spichlerze wsi napelniaja polki od pierwszej doby, 3 uwagi niskie z recenzji 324 R3 (noc/325-zima od 162 = noc/324-glod a78b1898; Armoury.dll 337384b767f1b62dea21d28cde506408 - NIE WGRANE)
 
 **Problem:** Jeff 04.11 "i zima jemy o 20% wiecej a nie 40%". Log Armoury-2026-11-04_15-09-25 (doby 109250-109253): "Zima wedlug krain (E4/1): ... jedzenie partii zima:

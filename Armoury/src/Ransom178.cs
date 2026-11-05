@@ -672,6 +672,21 @@ namespace Armoury
             catch { return 0; }
         }
 
+        /// <summary>326d (okno lupu): czesc PendingClaim brana o swicie najpierw z sakiewki ludzi gracza (sakwa Purse x sh - ten sam wzor co ThirdsSettle). Tylko odczyt.</summary>
+        internal static long PendingMenClaim(Hero h)
+        {
+            try
+            {
+                Acc a;
+                if (h == null || h.StringId == null || !_acc.TryGetValue(h.StringId, out a)) return 0;
+                var s = Settings.Current;
+                if (s == null) return 0;
+                double sh = Math.Max(0f, Math.Min(1f, s.CrownThirdsShare));
+                return (long)(a.Purse * sh);
+            }
+            catch { return 0; }
+        }
+
         /// <summary>ClanIncomeBook.NoteInflow(KThird): trzecia lorda AI (nadwyzki ludzi, sakwy) - korona bierze jej 1/3.</summary>
         internal static void NoteThird(Hero h, long x) { try { if (x > 0 && Taxed(h)) { AccOf(h).Third += x; _dBaseThird += x; } } catch (Exception e) { Stumble("NoteThird", e); } }
 
@@ -755,10 +770,11 @@ namespace Armoury
                     long owed = a.Carry + (long)(a.Third * sh * 3.0 + a.Ninth * sh);
                     long purse = (long)(a.Purse * sh);
                     a.Third = a.Ninth = a.Purse = 0;
+                    int tookMen = 0;
                     if (purse > 0 && h == Hero.MainHero && MobileParty.MainParty != null)
                     {
                         int took = MenPurse.Take(MobileParty.MainParty, (int)Math.Min(int.MaxValue, purse));
-                        if (took > 0) { k.KingdomBudgetWallet += took; Add(k, took); _dThirdsPurse += took; }
+                        if (took > 0) { k.KingdomBudgetWallet += took; Add(k, took); _dThirdsPurse += took; tookMen = took; }
                         owed += purse - took;   // reszta z kiesy gracza
                     }
                     long got = Math.Min(owed, Math.Max(0, (long)h.Gold));
@@ -770,6 +786,10 @@ namespace Armoury
                         Add(k, got); _dThirdsGot += got;
                     }
                     a.Carry = owed - got;
+                    // 326d: gracz widzi, ile korona wziela o swicie i skad (raz na dobe - ThirdsSettle raz na swit); tylko komunikat, przelewy bez zmian
+                    if (h == Hero.MainHero && (got > 0 || tookMen > 0))
+                        Log.Player("The crown took its share (1/9) of your spoils at dawn: " + (got > 0 ? got + " denars from your purse" : "nothing from your purse")
+                                   + (tookMen > 0 ? ", " + tookMen + " from your men's purse" : "") + (a.Carry > 0 ? "; " + a.Carry + " still owed" : "") + ".");
                     _dThirdsCarry += a.Carry;
                     if (a.Carry <= 0) drop.Add(kv.Key);
                 }
