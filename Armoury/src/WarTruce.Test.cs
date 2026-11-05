@@ -10,8 +10,9 @@ namespace Armoury
     /// 330 - PROBA AUTOTESTU (wzor CanonPeaceLockTest: tylko DLL autotestu CrashScribe - LogGate.Mode 1/2 - i plik Documents\Mount and Blade II Bannerlord\CrashScribe\
     /// armoury-wojna330.flag; w zwyklej grze nic nie robi). Na kopii zapisu autotestu, nigdy na zapisach Jeffa. Od 2. godziny sesji poza bitwa:
     ///  TA tabela prawdy Locked330 (F3 blokuje zawsze, F2 / wesele w toku / gracz / klucz NIE - wynik 264) i Gate (faza 2, wojna &lt; 84, karencja, prog kapitulacji, gracz);
-    ///  TB liczniki i progi (Step, K1Cond, DueKind - korona bez K3 wg poprawki G, WhoSurrenders - nizszy stosunek);
-    ///  TC przedluzenie zimowe (WinterExtra: lato 0, zima 63 maks., zima krotsza - do wiosny);
+    ///  TB liczniki i progi (Step, K1Cond, DueKind, SurrenderSide - sekcja H: korona NIGDY nie kapituluje, nawet przy licznikach ponad prog; ResumeByNorth);
+    ///  TC sekcja H: pokoj staly tylko z Branem / Jonem (KingPeaceCond), brak regul zimowych (pola WarTruceWinterMaxExtra / WarTruceWinterExhaustion usuniete z Settings,
+    ///     zima 75/75 bez wyczerpania - Gate bez rozejmu, rozejm zawsze WarTruceDays);
     ///  TD zapis: Export -> Import -> Export identyczne (T11 bez zapisu gry); stan przywrocony;
     ///  T1 (bieg) para w wojnie, gracz nie rzadzi: StartTruce("test") - pokoj, ROT nie wymusza (H4), AddDecision(DeclareWarDecision) zablokowane (H5, T7),
     ///     potem koniec rozejmu ustawiony na dzis; T2 nastepne doby - wojna wraca, danina StanceLink 0; T6 MakePeaceAction.Apply z zewnatrz - rozejm H6, koniec na dzis,
@@ -107,33 +108,43 @@ namespace Armoury
             int r = WarTruce.Step(s, false);
             bool k1a = WarTruce.K1Cond(false, 3, 30, 3, 0.5, 0.67), k1b = WarTruce.K1Cond(false, 10, 30, 3, 0.5, 0.67), k1c = WarTruce.K1Cond(true, 1, 30, 3, 0.5, 0.67);
             bool k1d = WarTruce.K1Cond(false, 3, 6, 3, 0.7, 0.67), k1e = WarTruce.K1Cond(false, 9, 27, 3, 0.5, 0.67);
-            string dN3 = WarTruce.DueKind(0, 0, 30, true, 42, 21, 30), dC3 = WarTruce.DueKind(0, 0, 30, false, 42, 21, 30), dK1 = WarTruce.DueKind(42, 0, 0, false, 42, 21, 30);
-            string dK2 = WarTruce.DueKind(0, 21, 0, true, 42, 21, 30), dNo = WarTruce.DueKind(41, 20, 29, true, 42, 21, 30);
-            int both = WarTruce.WhoSurrenders(true, true, 0.4, 2.5), bothC = WarTruce.WhoSurrenders(true, true, 0.9, 0.8), onlyC = WarTruce.WhoSurrenders(false, true, 2, 0.5);
-            // recenzja 330: wznowienie - rozejm: odbiorca daniny (brak - korona); zatrzask Z: zwyciezca kapitulacji
-            bool rTn = WarTruce.ResumeByNorth(true, WarTruce.NorthId, ""), rTc = WarTruce.ResumeByNorth(true, "", "KAPITULACJA korony (K1 42/42)");
-            bool rZc = WarTruce.ResumeByNorth(false, "", "KAPITULACJA korony (K2 21/21)"), rZn = WarTruce.ResumeByNorth(false, "", "KAPITULACJA Polnocy (K3 30/30)");
+            string dN3 = WarTruce.DueKind(0, 0, 30, 42, 21, 30), dK1 = WarTruce.DueKind(42, 0, 0, 42, 21, 30);
+            string dK2 = WarTruce.DueKind(0, 21, 0, 42, 21, 30), dNo = WarTruce.DueKind(41, 20, 29, 42, 21, 30);
+            // sekcja H: korona nigdy L - liczniki korony (3..5) ponad progi nie daja kapitulacji; Polnoc z progiem - 1
+            string kA, kB, kC;
+            int crownMax = WarTruce.SurrenderSide(new[] { 0, 0, 0, 99, 99, 99 }, 42, 21, 30, out kA);
+            int northK1 = WarTruce.SurrenderSide(new[] { 42, 0, 0, 99, 99, 99 }, 42, 21, 30, out kB);
+            int none = WarTruce.SurrenderSide(new[] { 41, 20, 29, 0, 0, 0 }, 42, 21, 30, out kC);
+            // wznowienie: rozejm - odbiorca daniny (brak - korona); zatrzask Z (tylko po kapitulacji Polnocy) - korona
+            bool rTn = WarTruce.ResumeByNorth(true, WarTruce.NorthId), rTc = WarTruce.ResumeByNorth(true, ""), rZ = WarTruce.ResumeByNorth(false, WarTruce.NorthId);
             text = "Step 42 dob " + s + ", po peknieciu " + r + " | K1 3 tw./30 " + T(k1a) + ", 10 tw. " + T(k1b) + ", z siedziba " + T(k1c) + ", sila 0.7 " + T(k1d) + ", 9 tw./27 " + T(k1e)
-                   + " | Polnoc K3 " + (dN3 ?? "-") + ", korona K3 " + (dC3 ?? "-") + ", K1 " + (dK1 ?? "-") + ", K2 " + (dK2 ?? "-") + ", ponizej progow " + (dNo ?? "-")
-                   + " | obie strony 0.4/2.5 -> " + both + ", 0.9/0.8 -> " + bothC + ", tylko korona -> " + onlyC
-                   + " | wznowienie Polnoc: rozejm odbiorca Polnoc " + T(rTn) + ", rozejm bez daniny " + T(rTc) + ", Z po kapitulacji korony " + T(rZc) + ", Z po kapitulacji Polnocy " + T(rZn);
-            return s == 42 && r == 0 && k1a && !k1b && !k1c && !k1d && k1e && dN3 != null && dC3 == null && dK1 != null && dK2 != null && dNo == null && both == 1 && bothC == 2 && onlyC == 2
-                   && rTn && !rTc && rZc && !rZn;
+                   + " | Polnoc K3 " + (dN3 ?? "-") + ", K1 " + (dK1 ?? "-") + ", K2 " + (dK2 ?? "-") + ", ponizej progow " + (dNo ?? "-")
+                   + " | korona liczniki 99 -> " + crownMax + " (ma byc 0 - korona nigdy L), Polnoc K1 -> " + northK1 + " (" + (kB ?? "-") + "), ponizej -> " + none
+                   + " | wznowienie Polnoc: rozejm odbiorca Polnoc " + T(rTn) + ", rozejm bez daniny " + T(rTc) + ", koniec Z " + T(rZ);
+            return s == 42 && r == 0 && k1a && !k1b && !k1c && !k1d && k1e && dN3 != null && dK1 != null && dK2 != null && dNo == null
+                   && crownMax == 0 && kA == null && northK1 == 1 && kB != null && none == 0 && rTn && !rTc && !rZ;
         }
 
         private static bool TruthC(out string text)
         {
-            int summer = WarTruce.WinterExtra(false, 300, 21), longW = WarTruce.WinterExtra(true, 300, 21), shortW = WarTruce.WinterExtra(true, 5, 21), unk = WarTruce.WinterExtra(true, -1, 21), off = WarTruce.WinterExtra(true, 300, 0);
-            text = "lato +" + summer + ", zima dluga +" + longW + " (razem " + (42 + longW) + "), zima 5 dob +" + shortW + ", zima nie wiadomo +" + unk + ", limit 0 +" + off;
-            return summer == 0 && longW == 21 && 42 + longW <= 63 && shortW == 5 && unk == 21 && off == 0;
+            // pokoj staly (sekcja H): Bran albo Jon krolem korony, zywy, gracz nie rzadzi strona
+            bool bran = WarTruce.KingPeaceCond(true, false, true, false), jon = WarTruce.KingPeaceCond(false, true, true, false), other = WarTruce.KingPeaceCond(false, false, true, false);
+            bool dead = WarTruce.KingPeaceCond(true, false, false, false), pl = WarTruce.KingPeaceCond(false, true, true, true);
+            // brak zimy: pola zimowe usuniete z Settings; zima 75/75 bez zmeczenia 100 - Gate bez rozejmu (exhOk false)
+            bool noExtra = typeof(Settings).GetField("WarTruceWinterMaxExtra") == null, noExh = typeof(Settings).GetField("WarTruceWinterExhaustion") == null;
+            int winter7575 = G(3, true, false, false, 100, 50, 40, false);
+            int days = new Settings().WarTruceDays;
+            text = "pokoj staly: Bran " + T(bran) + ", Jon " + T(jon) + ", inny wladca " + T(other) + ", Bran martwy " + T(dead) + ", gracz rzadzi " + T(pl)
+                   + " | zima: pole WinterMaxExtra usuniete " + T(noExtra) + ", WinterExhaustion usuniete " + T(noExh) + ", Gate zima 75/75 " + winter7575 + ", rozejm domyslnie " + days + " dob";
+            return bran && jon && !other && !dead && !pl && noExtra && noExh && winter7575 == WarTruce.GateNone && days == 42;
         }
 
         private static void Run()
         {
             string t;
             bool a = TruthA(out t); Line("TA tabela prawdy Locked330 i Gate: " + t, a);
-            bool b = TruthB(out t); Line("TB liczniki i progi kapitulacji (korona bez K3 - poprawka G): " + t, b);
-            bool c = TruthC(out t); Line("TC przedluzenie zimowe: " + t, c);
+            bool b = TruthB(out t); Line("TB liczniki i progi kapitulacji (sekcja H: korona nigdy nie kapituluje): " + t, b);
+            bool c = TruthC(out t); Line("TC sekcja H: pokoj staly tylko Bran / Jon, bez regul zimowych: " + t, c);
             string e1 = WarTruce.Export();
             WarTruce.Import(e1);
             string e2 = WarTruce.Export();

@@ -17,22 +17,26 @@ namespace Armoury
 {
     /// <summary>
     /// 330 - WOJNA DO KAPITULACJI (Jeff 05.11: "pokoj moze byc tymczasowy, ale nie staly"; "korona bedzie prowadzila wojne az do zwyciestwa"). Klucz CanonWarUntilSurrender.
-    /// Projekt docs/PROJEKT-330-WOJNA-DO-KAPITULACJI.md (sekcje B-E, poprawka G: korona NIE kapituluje z samego stosunku sil - K3 tylko Polnoc).
+    /// Projekt docs/PROJEKT-330-WOJNA-DO-KAPITULACJI.md (sekcje B-E, poprawka G; sekcja H - decyzja Jeffa 05.11 wieczorem, NADRZEDNA).
+    /// H (Jeff: "pokoj moze byc tylko tak, jak bylo w fabule"): STALY POKOJ tylko, gdy wladca korony to Bran Stark albo Jon Snow (ROTLords, zywy) - pokoj bez daniny
+    ///  i bez cesji, para wypada z 330 na stale (KONIEC 330, linia "Krolowa Polnocy Sansa", gdy Sansa zyje w Polnocy; wladca Polnocy bez zmian). KORONA NIGDY NIE
+    ///  KAPITULUJE (K1-K3 tylko Polnoc). Zadnych regul zimowych ("zima w grze trwa kilka lat"). Kazda inna droga do stalego pokoju - rozejm (H6).
     /// PARA: Polnoc (battania) - korona (vlandia), wiersz CanonPeaceLock z UntilSurrender. Fazy: F0 przed Krwawymi Godami, F2 320a-KG (Krwawe Gody - Bekarci),
-    /// F3 reszta po kanonie (takze wczesne wyjscie 320a), Z po kapitulacji (zatrzask w zapisie). Gracz wladca strony - bez akcji, tylko linia.
-    /// ROZEJM (F0 i F3; w F2 nie - oblezenie Winterfell idzie jak w ROT): jedyne wejscie H1 (CanonPeaceLock.DipApplyPeacePrefix -> TryFromExhaustion, zmeczenie Diplomacy)
-    ///  oraz zima przy zmeczeniu obu stron >= WarTruceWinterExhaustion (doba - H1 Diplomacy rusza dopiero przy 100). Warunki: wojna >= WarTruceMinWarDays od
-    ///  StanceLink.WarStartDate, karencja WarTruceLoadGraceDays od pierwszego wczytania 330, zadna strona nie ma progu kapitulacji (wtedy kapitulacja).
-    ///  Wykonanie: MakePeaceAction.ApplyByKingdomDecision(platnik, odbiorca, danina z DiplomacyModel.GetDailyTributeToPay, doby rozejmu) - bez zwrotu twierdz,
-    ///  kosztow i SoftlyDestroy Diplomacy (H1 zwraca false). Dlugosc WarTruceDays; konczy sie zima - przedluzenie do wiosny, najwyzej WarTruceWinterMaxExtra.
+    /// F3 reszta po kanonie (takze wczesne wyjscie 320a), Z po kapitulacji Polnocy (zatrzask w zapisie). Gracz wladca strony - bez akcji, tylko linia.
+    /// ROZEJM (F0 i F3; w F2 nie - oblezenie Winterfell idzie jak w ROT): jedyne wejscie H1 (CanonPeaceLock.DipApplyPeacePrefix -> TryFromExhaustion, zmeczenie Diplomacy
+    ///  >= 100). Warunki: wojna >= WarTruceMinWarDays od StanceLink.WarStartDate, karencja WarTruceLoadGraceDays od pierwszego wczytania 330, Polnoc nie ma progu
+    ///  kapitulacji (wtedy kapitulacja). Wykonanie: MakePeaceAction.ApplyByKingdomDecision(platnik, odbiorca, danina z DiplomacyModel.GetDailyTributeToPay, doby
+    ///  rozejmu) - bez zwrotu twierdz, kosztow i SoftlyDestroy Diplomacy (H1 zwraca false). Dlugosc zawsze WarTruceDays (bez przedluzen).
     ///  W czasie rozejmu: H4 postfiks ROTStorylineWar.Enforced (Priority.Last) = false dla tej pary; H5 prefiks Kingdom.AddDecision(DeclareWarDecision) = false
     ///  i CanonThroneWars.WarScorePostfix -1e6 (BlocksWar). Koniec: kapitulacja, jesli prog; inaczej Prologue.RotDeclareWar272 (odbiorca daniny albo korona) -
     ///  gra zeruje danine (StanceLink.ResetStats), Diplomacy liczy zmeczenie od 0. Nieudane wznowienie - ponowienie co dobe (potkniecie).
     ///  Wojna wypowiedziana wczesniej (ROT, inny mod) - rozejm konczy sie od razu (linia).
     /// H6 (CampaignEvents.MakePeace, CanonWarsBehavior): kazdy pokoj tej pary bez naszej flagi - rozejm WarTruceDays (danina przycieta do tylu rat); w F2 rozejm 1 doby.
-    ///  Wyjatki: nasze pokoje (flaga), gracz wladca strony, pokoj ROT z Krwawych Godow przy kluczu NorthFightsOnAfterRedWedding NIE.
-    /// KAPITULACJA (WarTruce.Surrender.cs): liczniki K1-K3 w zapisie, co dobe wojny; F2 - odlozona. Zatrzask Z do nastepnego wydarzenia kanonu pary (Krwawe Gody,
-    ///  JonEvent, doba Revenge x skala) - wtedy wojna wraca; po Bitwie Bekartow (BastardsSiegeEvent 2) koniec 330 dla pary (staly pokoj).
+    ///  Wyjatki: nasze pokoje (flaga), gracz wladca strony, Bran / Jon krolem korony (pokoj staly - sekcja H). Sekcja H: pokoj ROT z Krwawych Godow przy kluczu
+    ///  NorthFightsOnAfterRedWedding NIE tez jest rozejmem (dawny wyjatek usuniety).
+    /// KAPITULACJA POLNOCY (WarTruce.Surrender.cs): liczniki K1-K3 w zapisie, co dobe wojny; F2 - odlozona. Zatrzask Z do nastepnego wydarzenia kanonu pary (Krwawe Gody,
+    ///  JonEvent, doba Revenge x skala) - wtedy wojna wraca; po Bitwie Bekartow (BastardsSiegeEvent 2) kapitulacja ostateczna - koniec 330 dla pary (Polnoc poddana).
+    ///  Zwykly pokoj po Bekartach bez kapitulacji i bez Brana/Jona = rozejm WarTruceDays (H1 / H6 jak w F3).
     /// Zapis "arm_k330" (SaveText.Sync; stara gra bez wpisu - stan pusty, karencja od pierwszej doby). Bledy: licznik potkniec, bez globalnego wylacznika, latki nie rzucaja.
     /// Linie "Wojna do kapitulacji (330): ...", progi tools/sprawdz_logi.py --grupa wojna330.
     /// </summary>
@@ -58,9 +62,7 @@ namespace Armoury
         /// <summary>Wlasnie trwa nasze MakePeaceAction (rozejm / kapitulacja 330) - WorldClock7 dopisuje "rozejm/kapitulacja 330" zamiast "MIMO BLOKADY".</summary>
         internal static bool OurPeaceNow { get { return _ourPeace; } }
         internal static int TruceDays { get { var s = S; int v = s != null ? s.WarTruceDays : 42; return v < 1 ? 1 : v > 364 ? 364 : v; } }
-        internal static int WinterMaxExtra { get { var s = S; int v = s != null ? s.WarTruceWinterMaxExtra : 21; return v < 0 ? 0 : v > 91 ? 91 : v; } }
         internal static int MinWarDays { get { var s = S; int v = s != null ? s.WarTruceMinWarDays : 84; return v < 0 ? 0 : v > 364 ? 364 : v; } }
-        internal static float WinterExh { get { var s = S; float v = s != null ? s.WarTruceWinterExhaustion : 75f; return v < 1f ? 1f : v > 100f ? 100f : v; } }
         internal static int GraceDays { get { var s = S; int v = s != null ? s.WarTruceLoadGraceDays : 7; return v < 0 ? 0 : v > 91 ? 91 : v; } }
         internal static float LoseRatio { get { var s = S; float v = s != null ? s.WarSurrenderLoseRatio : 0.67f; return v < 0.05f ? 0.05f : v > 1f ? 1f : v; } }
         internal static float LowRatio { get { var s = S; float v = s != null ? s.WarSurrenderRatio : 0.33f; return v < 0.05f ? 0.05f : v > 1f ? 1f : v; } }
@@ -77,18 +79,18 @@ namespace Armoury
         private static int _tFrom = -1, _tTo = -1;              // rozejm od / do (doba kampanii; -1 brak)
         private static string _tWhy = "";                       // powod rozejmu
         private static int _tCount;                             // rozejmow w kampanii
-        private static bool _tExt;                              // przedluzenie zimowe juz policzone
         private static string _tPayer = "", _tRecv = "";        // platnik i odbiorca daniny (id krolestw; pusty - bez daniny)
         private static int _tDaily;                             // danina / doba
-        // liczniki kapitulacji: 0..2 Polnoc K1 K2 K3, 3..5 korona K1 K2 (K3 korony zawsze 0 - poprawka G)
+        // liczniki kapitulacji: 0..2 Polnoc K1 K2 K3; 3..5 (dawniej korona) zawsze 0 - sekcja H: korona nigdy nie kapituluje (miejsca zostaja w zapisie)
         private static readonly int[] _k = new int[6];
-        private static int _fortsN0 = -1, _fortsC0 = -1;        // twierdze w dniu startu licznikow
-        private static string _leadN = "", _leadC = "";        // wladcy (zmiana - K2 od zera)
+        private static int _fortsN0 = -1, _fortsC0 = -1;        // twierdze w dniu startu licznikow (_fortsC0 zawsze -1 - sekcja H)
+        private static string _leadN = "", _leadC = "";        // wladca Polnocy (zmiana - K2 od zera); _leadC nieuzywany (sekcja H)
         private static bool _z;                                 // zatrzask Z (po kapitulacji)
         private static string _zWhy = "";
         private static int _zDay = -1, _zRw = -9, _zJon = -9;  // stan RedWeddingEvent / JonEvent w chwili zatrzasku
         private static bool _zRwDone, _zRev;                    // Krwawe Gody zaszly / doba Revenge minela w chwili zatrzasku
-        private static bool _final;                             // KONIEC 330 (Bekarci + kapitulacja) - para poza regula
+        private static bool _final;                             // KONIEC 330 (Bekarci + kapitulacja Polnocy albo pokoj krola Brana / Jona) - para poza regula
+        private static string _finalWhy = "";                   // powod KONCA 330 (pusty w starym zapisie z _final - Bekarci + kapitulacja)
         private static bool _resumePending;                     // wznowienie wojny nieudane - ponowienie co dobe
         private static string _resumeWhy = "";
         private static readonly List<string> _cession = new List<string>();   // "stId>clanId>dzien" - cesja czekajaca (gracz w osadzie, oblezenie)
@@ -122,13 +124,13 @@ namespace Armoury
             for (int i = 0; i < _k.Length; i++) _k[i] = 0;
             _fortsN0 = _fortsC0 = -1; _leadN = _leadC = "";
             _z = false; _zWhy = ""; _zDay = -1; _zRw = _zJon = -9; _zRwDone = _zRev = false;
-            _final = false; _resumePending = false; _resumeWhy = ""; _cession.Clear();
+            _final = false; _finalWhy = ""; _resumePending = false; _resumeWhy = ""; _cession.Clear();
         }
 
-        /// <summary>Autotest: koniec rozejmu na dzis (bez przedluzenia zimowego) - doba wznowi wojne.</summary>
-        internal static void TestEndTruceToday() { if (_tFrom >= 0) { _tTo = Today; _tExt = true; } }
+        /// <summary>Autotest: koniec rozejmu na dzis - doba wznowi wojne.</summary>
+        internal static void TestEndTruceToday() { if (_tFrom >= 0) _tTo = Today; }
 
-        private static void ClearTruceState() { _tFrom = _tTo = -1; _tWhy = ""; _tExt = false; _tPayer = _tRecv = ""; _tDaily = 0; }
+        private static void ClearTruceState() { _tFrom = _tTo = -1; _tWhy = ""; _tPayer = _tRecv = ""; _tDaily = 0; }
 
         internal static void Stumble(string where, Exception e)
         {
@@ -199,25 +201,6 @@ namespace Armoury
             catch (Exception e) { Stumble("Exh", e); return -1f; }
         }
 
-        /// <summary>Zima teraz (klimat Westeros, gdy czynny; inaczej pora kalendarza gry). Nie rzuca.</summary>
-        internal static bool IsWinter()
-        {
-            try { return WesterosClimate.Now() == CampaignTime.Seasons.Winter; }
-            catch { try { return CampaignTime.Now.GetSeasonOfYear == CampaignTime.Seasons.Winter; } catch { return false; } }
-        }
-
-        /// <summary>Doby zimy do wiosny (klimat Westeros); -1 nie wiadomo.</summary>
-        private static int WinterLeft()
-        {
-            try
-            {
-                int season, sday, len;
-                if (WesterosClimate.SeasonInfo(out season, out sday, out len) && season == (int)CampaignTime.Seasons.Winter && len > 0) return Math.Max(0, len - sday + 1);
-            }
-            catch { }
-            return -1;
-        }
-
         /// <summary>Doby wojny od StanceLink.WarStartDate; int.MaxValue - stance bez daty (stary zapis: liczone jak dluga wojna); -1 nie w wojnie.</summary>
         internal static int WarDays(Kingdom n, Kingdom c, out int startDay)
         {
@@ -271,12 +254,95 @@ namespace Armoury
             return GateTruce;
         }
 
-        /// <summary>Przedluzenie zimowe: koniec rozejmu w zimie - do wiosny (winterLeft dob; -1 nie wiadomo = pelne), najwyzej maxExtra. Czysta funkcja.</summary>
-        internal static int WinterExtra(bool winterAtEnd, int winterLeft, int maxExtra)
+        /// <summary>Sekcja H: warunek stalego pokoju - wladca korony zywy i jest Branem Starkiem albo Jonem Snow, gracz nie rzadzi strona. Czysta funkcja.</summary>
+        internal static bool KingPeaceCond(bool leaderIsBran, bool leaderIsJon, bool leaderAlive, bool player)
         {
-            if (!winterAtEnd || maxExtra <= 0) return 0;
-            if (winterLeft < 0) return maxExtra;
-            return Math.Max(0, Math.Min(maxExtra, winterLeft));
+            return !player && leaderAlive && (leaderIsBran || leaderIsJon);
+        }
+
+        // ---------------------------------------------------------------- sekcja H: staly pokoj tylko z Branem / Jonem na tronie korony
+
+        internal const string BranId = "lord_5_7", JonId = "lord_5_17", SansaId = "lord_5_13_1";   // ROT.Misc.ROTLords BranStark / JonSnow / SansaStark
+
+        /// <summary>Postac ROT: wlasciwosc ROTLords (rot313 ROT.Misc/ROTLords.cs), zapas - id lorda. Nie rzuca.</summary>
+        private static Hero RotHero(string prop, string id)
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("ROT.Misc.ROTLords");
+                var pi = t != null ? AccessTools.Property(t, prop) : null;
+                var h = pi != null ? pi.GetValue(null, null) as Hero : null;
+                if (h != null) return h;
+            }
+            catch { }
+            try { return Hero.FindFirst(x => x != null && x.StringId == id); } catch { return null; }
+        }
+
+        /// <summary>Wladca korony to zywy Bran Stark albo Jon Snow: imie do linii; null - nie.</summary>
+        internal static string CanonKing(Kingdom c)
+        {
+            try
+            {
+                var l = c != null ? c.Leader : null;
+                if (l == null) return null;
+                var bran = RotHero("BranStark", BranId); var jon = RotHero("JonSnow", JonId);
+                bool isB = bran != null ? l == bran : l.StringId == BranId;
+                bool isJ = jon != null ? l == jon : l.StringId == JonId;
+                if (!KingPeaceCond(isB, isJ, l.IsAlive, false)) return null;
+                return isB ? "Bran Stark" : "Jon Snow";
+            }
+            catch (Exception e) { Stumble("CanonKing", e); return null; }
+        }
+
+        /// <summary>Linia "Krolowa Polnocy Sansa", gdy Sansa zyje i jest w Polnocy (wladcy Polnocy nie zmieniamy - ROT nie ma tego wydarzenia).</summary>
+        private static string SansaText(Kingdom n)
+        {
+            try
+            {
+                var s = RotHero("SansaStark", SansaId);
+                if (s == null) return "Sansa: brak postaci";
+                if (!s.IsAlive) return "Sansa nie zyje";
+                bool inN = s.MapFaction == n || (s.Clan != null && s.Clan.Kingdom == n);
+                if (!inN) return "Sansa zyje poza Polnoca (" + (s.MapFaction != null ? s.MapFaction.StringId : "-") + ")";
+                return "Krolowa Polnocy Sansa (wladca Polnocy bez zmian: " + (n.Leader != null && n.Leader.Name != null ? n.Leader.Name.ToString() : "-") + ")";
+            }
+            catch (Exception e) { Stumble("SansaText", e); return "Sansa: blad odczytu"; }
+        }
+
+        /// <summary>Sekcja H: staly pokoj krola (Bran / Jon na tronie korony) - pokoj bez daniny i bez cesji, KONIEC 330. src - droga (doba, H1, H6).
+        /// true - pokoj trzyma. Gracz wladca strony - linia, bez akcji. Nie rzuca.</summary>
+        private static bool KingPeace(Kingdom n, Kingdom c, string king, string src)
+        {
+            try
+            {
+                if (PlayerRules(n, c)) { InfoOnce("krolgracz", king + " krolem korony - gracz rzadzi strona, bez akcji 330 (pokoj wyborem gracza)."); return false; }
+                if (n.IsAtWarWith(c))
+                {
+                    _ourPeace = true;
+                    try { MakePeaceAction.ApplyByKingdomDecision(c, n, 0, 0); }
+                    catch (Exception e) { Stumble("KingPeace.MakePeace", e); }
+                    finally { _ourPeace = false; }
+                    if (n.IsAtWarWith(c)) { _stumbles++; _dStumbles++; InfoOnce("krolnie", "POKOJ STALY (" + king + " krolem korony) NIE wszedl - pokoj gry odrzucony przez inny mod; ponowienie nastepnej doby."); return false; }
+                }
+                else
+                {
+                    // pokoj juz jest (rozejm, zatrzask Z, pokoj z zewnatrz): bez daniny
+                    var link = n.GetStanceWith(c);
+                    if (link != null) { link.TotalTributePaidFrom1To2 = 0; link.SetDailyTributePaid(c, 0, 0); }
+                }
+                int ces = _cession.Count;
+                ClearTruceState();
+                for (int i = 0; i < _k.Length; i++) _k[i] = 0;
+                _fortsN0 = _fortsC0 = -1;
+                _z = false; _resumePending = false; _resumeWhy = ""; _cession.Clear();
+                _final = true; _finalWhy = "pokoj krola " + king;
+                Info("POKOJ STALY: " + king + " krolem korony (" + Name(c) + ") - pokoj z Polnoca bez daniny i bez cesji, para wypada z regul 330 na stale | droga " + src
+                     + (ces > 0 ? " | cesja czekajaca porzucona (" + ces + ")" : "") + ".");
+                Info(SansaText(n) + ".");
+                try { Log.Player("King " + king + " has made peace with the North: no tribute, no lands given up. The war between the North and the crown is over.", false); } catch { }
+                return true;
+            }
+            catch (Exception e) { Stumble("KingPeace", e); return false; }
         }
 
         /// <summary>Pierwsza doba, od ktorej rozejm jest mozliwy (wojna >= min i koniec karencji).</summary>
@@ -299,6 +365,8 @@ namespace Armoury
                 Kingdom n, c;
                 if (!IsPair(k1, k2) || !Live(out n, out c)) return false;
                 if (_firstSeen < 0) _firstSeen = Today;
+                string king = CanonKing(c);
+                if (king != null && KingPeace(n, c, king, "H1 " + path)) return true;   // sekcja H: Bran / Jon krolem - staly pokoj
                 string pw;
                 int ph = CanonPeaceLock.Phase330(n, c, out pw);
                 bool war = n.IsAtWarWith(c);
@@ -368,7 +436,7 @@ namespace Armoury
                 ClearTruceState(); _resumePending = false;
                 return false;
             }
-            Kingdom a = ResumeByNorth(_tFrom >= 0, _tRecv, _zWhy) ? n : c;
+            Kingdom a = ResumeByNorth(_tFrom >= 0, _tRecv) ? n : c;
             Kingdom b = a == n ? c : n;
             _ourWar = true;
             try { Prologue.RotDeclareWar272(a, b); }
@@ -383,12 +451,11 @@ namespace Armoury
             return war;
         }
 
-        /// <summary>Kto wypowiada przy wznowieniu: koniec rozejmu - odbiorca daniny (brak - korona); koniec zatrzasku Z - zwyciezca kapitulacji (recenzja 330:
-        /// po kapitulacji korony wypowiada Polnoc). true - Polnoc. Czysta funkcja.</summary>
-        internal static bool ResumeByNorth(bool truce, string recv, string zWhy)
+        /// <summary>Kto wypowiada przy wznowieniu: koniec rozejmu - odbiorca daniny (brak - korona); koniec zatrzasku Z - korona (zatrzask tylko po kapitulacji
+        /// Polnocy - sekcja H: korona nigdy nie kapituluje). true - Polnoc. Czysta funkcja.</summary>
+        internal static bool ResumeByNorth(bool truce, string recv)
         {
-            if (truce) return recv == NorthId;
-            return zWhy != null && zWhy.StartsWith("KAPITULACJA korony", StringComparison.Ordinal);
+            return truce && recv == NorthId;
         }
 
         /// <summary>Liczniki K1-K3 od zera (seria "z rzedu": rozejm, faza F2). Linia, gdy cos bylo.</summary>
@@ -396,7 +463,7 @@ namespace Armoury
         {
             bool any = false;
             for (int i = 0; i < _k.Length; i++) if (_k[i] != 0) any = true;
-            if (any) Info("liczniki kapitulacji od zera (" + why + "): Polnoc " + _k[0] + "/" + _k[1] + "/" + _k[2] + ", korona " + _k[3] + "/" + _k[4] + ".");
+            if (any) Info("liczniki kapitulacji od zera (" + why + "): Polnoc " + _k[0] + "/" + _k[1] + "/" + _k[2] + ".");
             for (int i = 0; i < _k.Length; i++) _k[i] = 0;
         }
 
@@ -439,7 +506,8 @@ namespace Armoury
                 if (_firstSeen < 0) _firstSeen = Today;
                 string src = StackSource();
                 if (PlayerRules(n, c)) { Info("pokoj z zewnatrz (" + src + "): gracz rzadzi strona - bez rozejmu, pokoj zostaje."); return; }
-                if (src == "ROT Krwawe Gody" && !CanonPeaceLock.FightsOnKey) { Info("pokoj ROT Krwawych Godow przy kluczu North Fights On After Red Wedding NIE - bez rozejmu (wyjatek), pokoj zostaje."); return; }
+                string king = CanonKing(c);
+                if (king != null && KingPeace(n, c, king, "z zewnatrz:" + src)) return;   // sekcja H: Bran / Jon krolem - pokoj zostaje na stale (bez daniny)
                 string pw;
                 int ph = CanonPeaceLock.Phase330(n, c, out pw);
                 int days = ph == 2 || ph == 1 ? 1 : TruceDays;
@@ -552,7 +620,11 @@ namespace Armoury
             catch (Exception e) { Stumble("CallToWarPrefix", e); return true; }
         }
 
-        private static string BlockName() { return _final ? "KONCU 330" : _z ? "zatrzasku Z" : "rozejmie do d." + _tTo; }
+        private static string BlockName() { return _final ? "KONCU 330 (" + FinalWhyText + ")" : _z ? "zatrzasku Z" : "rozejmie do d." + _tTo; }
+
+        /// <summary>KONIEC 330 z pokoju krola Brana / Jona (sekcja H).</summary>
+        private static bool FinalByKing { get { return _finalWhy != null && _finalWhy.StartsWith("pokoj krola", StringComparison.Ordinal); } }
+        private static string FinalWhyText { get { return string.IsNullOrEmpty(_finalWhy) ? "Bekarci + kapitulacja Polnocy" : _finalWhy; } }
 
         /// <summary>H4: postfiks ROTStorylineWar.Enforced (Priority.Last) - para w rozejmie albo w zatrzasku Z: false z naszym powodem (po angielsku - okno ROT). Nie rzuca.</summary>
         public static void EnforcedPostfix(object __instance, ref bool __result, ref string disabledReason)
@@ -564,8 +636,8 @@ namespace Armoury
                 var n = North; var c = Crown;
                 if (n == null || c == null || PlayerRules(n, c)) return;
                 __result = false;
-                disabledReason = _final ? "The war ended with a surrender after the Battle of the Bastards; the peace holds."
-                               : _z ? "The war ended with a surrender; it flares up again with the next turn of the story." : "A truce holds until day " + _tTo + ".";
+                disabledReason = _final ? (FinalByKing ? "The king of the crown has made peace with the North; the peace holds." : "The North surrendered after the Battle of the Bastards; the peace holds.")
+                               : _z ? "The North has surrendered; the war flares up again with the next turn of the story." : "A truce holds until day " + _tTo + ".";
                 _dH4++; _sH4++;
             }
             catch (Exception e) { Stumble("EnforcedPostfix", e); }
@@ -594,7 +666,8 @@ namespace Armoury
                 if (who != null && who == Clan.PlayerClan && !_playerToldWar)
                 {
                     _playerToldWar = true;
-                    Log.Player(_z || _final ? "The surrender still holds: the council will not hear of a new war yet." : "The truce holds until day " + _tTo + ": the council will not hear of breaking it.", true);
+                    Log.Player(_final && FinalByKing ? "The king has made peace with the North: the council will not hear of a new war."
+                               : _z || _final ? "The North's surrender still holds: the council will not hear of a new war yet." : "The truce holds until day " + _tTo + ": the council will not hear of breaking it.", true);
                 }
                 return false;
             }
@@ -610,11 +683,13 @@ namespace Armoury
                 Kingdom n, c;
                 if (!IsPair(k1, k2) || !Live(out n, out c)) return 0;
                 if (_firstSeen < 0) _firstSeen = Today;
+                string king = CanonKing(c);
+                if (king != null && KingPeace(n, c, king, "kronika")) { detail = "pokoj staly 330: " + king + " krolem korony"; return 1; }
                 string pw;
                 int ph = CanonPeaceLock.Phase330(n, c, out pw);
                 int ws; int wd = WarDays(n, c, out ws);
                 float eN = Exh(n, c), eC = Exh(c, n);
-                bool exhOk = (eN < 0f && eC < 0f) || eN >= 100f || eC >= 100f || (IsWinter() && eN >= WinterExh && eC >= WinterExh);
+                bool exhOk = (eN < 0f && eC < 0f) || eN >= 100f || eC >= 100f;   // sekcja H: bez warunku zimowego
                 Kingdom loser; string kind;
                 bool due = SurrenderDue(n, c, out loser, out kind);
                 string why;
@@ -629,7 +704,8 @@ namespace Armoury
 
         // ---------------------------------------------------------------- doba
 
-        /// <summary>Doba (WarTruceBehavior): zatrzask Z, rozejm (koniec / zima), wojna (liczniki, kapitulacja, rozejm zimowy), cesja czekajaca, linia doby. Nie rzuca.</summary>
+        /// <summary>Doba (WarTruceBehavior): pokoj krola (Bran / Jon - sekcja H), zatrzask Z, rozejm (koniec), wojna (liczniki, kapitulacja Polnocy), cesja czekajaca,
+        /// linia doby. Nie rzuca.</summary>
         internal static void Daily()
         {
             try
@@ -642,7 +718,7 @@ namespace Armoury
                     // recenzja 330: cesja z kapitulacji ostatecznej dalej przetwarzana (kolejka konczy sie sama - twierdza oddana, juz nie Polnocy albo 30 dob)
                     var nf = North; var cf = Crown;
                     if (_cession.Count > 0 && nf != null && cf != null && !nf.IsEliminated && !cf.IsEliminated) CessionDaily(nf, cf);
-                    if (day % 7 == 0) Info("KONIEC 330 - para Polnoc-korona poza regula (kapitulacja po Bitwie Bekartow), pokoj staly | tlumienie wojny "
+                    if (day % 7 == 0) Info("KONIEC 330 - para Polnoc-korona poza regula (" + FinalWhyText + "), pokoj staly | tlumienie wojny "
                                            + (GuardOn ? "TAK" : "NIE (klucz 264 NIE / kampania klasyczna)") + ", ROT Enforced " + _dH4 + " (sesja " + _sH4 + "), blok AI wojna " + _dBlockAi + " (sesja " + _sBlockAi + ")"
                                            + (_cession.Count > 0 ? ", cesja czeka " + _cession.Count : "") + ".");
                     EndDay(); return;
@@ -658,6 +734,8 @@ namespace Armoury
                     }
                     EndDay(); return;
                 }
+                string king = CanonKing(c);
+                if (king != null && KingPeace(n, c, king, "doba")) { EndDay(); return; }   // sekcja H: Bran / Jon krolem korony - staly pokoj, KONIEC 330
                 string pw;
                 int ph = CanonPeaceLock.Phase330(n, c, out pw);
                 bool player = PlayerRules(n, c);
@@ -681,8 +759,8 @@ namespace Armoury
             int bs = CanonPeaceLock.BastardsState330;
             if (bs >= 2)
             {
-                _final = true; _z = false;
-                Info("KONIEC 330 (Bekarci + kapitulacja) - " + _zWhy + "; pokoj staly, para wypada z regul 330.");
+                _final = true; _z = false; _finalWhy = "Bekarci + kapitulacja Polnocy";
+                Info("KONIEC 330 (Bekarci + kapitulacja) - " + _zWhy + "; kapitulacja Polnocy ostateczna, para wypada z regul 330.");
                 return;
             }
             int rw = Prologue.RotEventState("RedWeddingEvent"), jon = Prologue.RotEventState("JonEvent");
@@ -702,20 +780,7 @@ namespace Armoury
         {
             int day = Today;
             if (n.IsAtWarWith(c)) { Info("ROZEJM koniec: wojna juz trwa (wypowiedziana poza zdarzeniem) | rozejm d." + _tFrom + "-d." + _tTo + "."); ClearTruceState(); return; }
-            if (!_tExt && day >= _tTo - 1 && day < _tTo + 1)
-            {
-                _tExt = true;
-                bool w = IsWinter();
-                int add = WinterExtra(w, WinterLeft(), WinterMaxExtra);
-                if (_tWhy.StartsWith("z zewnatrz", StringComparison.Ordinal) && _tTo - _tFrom <= 1) add = 0;   // rozejm 1 doby F2 bez przedluzenia
-                if (add > 0)
-                {
-                    _tTo += add;
-                    Info("ROZEJM przedluzony do wiosny: d." + _tTo + " (+" + add + ", zima" + (WinterLeft() >= 0 ? " jeszcze " + WinterLeft() + " dob" : "") + ").");
-                    return;
-                }
-            }
-            if (day < _tTo) return;
+            if (day < _tTo) return;   // sekcja H: bez przedluzenia zimowego
             Kingdom loser; string kind;
             if (!player && (ph == 0 || ph == 3) && SurrenderDue(n, c, out loser, out kind)) { Surrender(loser, loser == n ? c : n, kind, n, c, ph); return; }
             Resume(n, c, "ROZEJM koniec");
@@ -738,18 +803,10 @@ namespace Armoury
             bool due = SurrenderDue(n, c, out loser, out kind);
             if (due)
             {
-                if (player) { InfoOnce("kapgracz", "prog kapitulacji " + (loser == n ? "Polnocy" : "korony") + " (" + kind + ") - gracz rzadzi strona, bez akcji."); }
-                else { Surrender(loser, loser == n ? c : n, kind, n, c, ph); return; }
+                if (player) { InfoOnce("kapgracz", "prog kapitulacji Polnocy (" + kind + ") - gracz rzadzi strona, bez akcji."); }
+                else Surrender(loser, c, kind, n, c, ph);
             }
-            // rozejm zimowy (H1 Diplomacy rusza dopiero przy 100 - doba sprawdza 75/75 zima)
-            if (!IsWinter()) return;
-            float eN = _lastExhN, eC = _lastExhC;
-            if (eN < WinterExh || eC < WinterExh) return;
-            int ws; int wd = WarDays(n, c, out ws);
-            string why;
-            int g = Gate(ph, true, player, false, wd, MinWarDays, Today, GraceEnd, true, out why);
-            if (g == GateTruce) StartTruce(n, c, "zima", TruceDays);
-            else InfoOnce("zimablok", "blok: rozejm zimowy odrzucony (" + why + ") | zmeczenie " + F0(eN) + "/" + F0(eC) + ".");
+            // sekcja H: bez rozejmu zimowego - rozejm tylko z wyczerpania (H1, zmeczenie >= 100)
         }
 
         // ---------------------------------------------------------------- linia doby i start sesji
@@ -762,14 +819,15 @@ namespace Armoury
             if (wd < 0) sb.Append(" | wojna NIE");
             else if (wd == int.MaxValue) sb.Append(" | wojna TAK (bez daty)");
             else sb.Append(" | wojna od d.").Append(ws).Append(" (").Append(wd).Append(" dob)");
-            sb.Append(" | zmeczenie ").Append(F0(_lastExhN)).Append('/').Append(F0(_lastExhC)).Append(IsWinter() ? " (zima)" : "");
+            sb.Append(" | zmeczenie ").Append(F0(_lastExhN)).Append('/').Append(F0(_lastExhC));
             if (_tFrom >= 0) sb.Append(" | rozejm do d.").Append(_tTo).Append(" nr ").Append(_tCount).Append(" (").Append(_tWhy).Append(", danina ").Append(_tPayer.Length > 0 ? _tPayer + "->" + _tRecv + " " + _tDaily + "/doba" : "brak").Append(')');
             else sb.Append(" | rozejm NIE (nastepny od d.").Append(NextTruceDay(ws, GraceEnd)).Append(')');
             if (_z) sb.Append(" | zatrzask Z od d.").Append(_zDay).Append(" (").Append(_zWhy).Append(')');
             sb.Append(" | Polnoc K1 ").Append(_k[0]).Append('/').Append(HoldDays).Append(" K2 ").Append(_k[1]).Append('/').Append(CaptiveDays).Append(" K3 ").Append(_k[2]).Append('/').Append(RatioDays)
               .Append(", tw. ").Append(_lastFN).Append(" (start ").Append(_fortsN0).Append(')');
-            sb.Append(" | korona K1 ").Append(_k[3]).Append('/').Append(HoldDays).Append(" K2 ").Append(_k[4]).Append('/').Append(CaptiveDays).Append(" K3 -")
-              .Append(", tw. ").Append(_lastFC).Append(" (start ").Append(_fortsC0).Append(')');
+            sb.Append(" | korona nie kapituluje, tw. ").Append(_lastFC);
+            var cl = c.Leader;
+            sb.Append(" | wladca korony ").Append(cl != null && cl.Name != null ? cl.Name.ToString() : "-").Append(" (pokoj staly tylko z Branem / Jonem)");
             sb.Append(" | sila Polnoc ").Append(_lastSN.ToString("0", Inv)).Append(", korona ").Append(_lastSC.ToString("0", Inv)).Append(", Polnoc/korona ").Append(_lastRN.ToString("0.00", Inv));
             bool has, forced;
             RevengeInfo(out has, out forced);
@@ -814,9 +872,10 @@ namespace Armoury
                   .Append(", ocena BK (CanonThroneWars) ").Append(CanonThroneWars.WireText)
                   .Append(" | klucz Canon War Until Surrender ").Append(KeyOn ? "tak" : "nie").Append(_final ? " (KONIEC 330 - para poza regula)" : "")
                   .Append(" | zakres: ").Append(Prologue.CanonHere ? "kampania kanonu" : "kampania klasyczna - nie dotyczy")
-                  .Append(" | rozejm ").Append(TruceDays).Append(" dob (+").Append(WinterMaxExtra).Append(" zima), wojna >= ").Append(MinWarDays).Append(", karencja ").Append(GraceDays)
-                  .Append(", zima ").Append(WinterExh.ToString("0", Inv)).Append(" | kapitulacja K1 ").Append(HoldDays).Append(" K2 ").Append(CaptiveDays).Append(" K3 ").Append(RatioDays)
-                  .Append(" (tylko Polnoc), sila < ").Append(LoseRatio.ToString("0.00", Inv)).Append(" / ").Append(LowRatio.ToString("0.00", Inv))
+                  .Append(" | rozejm ").Append(TruceDays).Append(" dob (bez zimy), wojna >= ").Append(MinWarDays).Append(", karencja ").Append(GraceDays)
+                  .Append(" | kapitulacja tylko Polnocy K1 ").Append(HoldDays).Append(" K2 ").Append(CaptiveDays).Append(" K3 ").Append(RatioDays)
+                  .Append(", sila < ").Append(LoseRatio.ToString("0.00", Inv)).Append(" / ").Append(LowRatio.ToString("0.00", Inv))
+                  .Append(" | pokoj staly: Bran / Jon krolem korony").Append(_final ? " | KONIEC 330: " + FinalWhyText : "")
                   .Append(" | zapis: pierwsza doba ").Append(_firstSeen).Append(", rozejm ").Append(_tFrom >= 0 ? "d." + _tFrom + "-d." + _tTo + " (" + _tWhy + ")" : "NIE")
                   .Append(", zatrzask Z ").Append(_z ? "TAK (" + _zWhy + ")" : "NIE").Append(", zle wpisy ").Append(_importBad)
                   .Append(" | wpisy ROT pary: ").Append(RotEntriesText()).Append('.').Append(WarTruceTest.StartText());
@@ -847,12 +906,13 @@ namespace Armoury
         internal static string Export()
         {
             var sb = new StringBuilder(300);
-            sb.Append("v1|").Append(_firstSeen).Append('|').Append(_tFrom).Append('|').Append(_tTo).Append('|').Append(Clean(_tWhy)).Append('|').Append(_tCount).Append('|').Append(_tExt ? 1 : 0)
+            sb.Append("v1|").Append(_firstSeen).Append('|').Append(_tFrom).Append('|').Append(_tTo).Append('|').Append(Clean(_tWhy)).Append('|').Append(_tCount).Append('|').Append(0)   // pole 6: dawne przedluzenie zimowe (sekcja H) - zawsze 0
               .Append('|').Append(Clean(_tPayer)).Append('|').Append(Clean(_tRecv)).Append('|').Append(_tDaily).Append('|');
             for (int i = 0; i < _k.Length; i++) { if (i > 0) sb.Append(','); sb.Append(_k[i]); }
             sb.Append('|').Append(_fortsN0).Append('|').Append(_fortsC0).Append('|').Append(Clean(_leadN)).Append('|').Append(Clean(_leadC))
               .Append('|').Append(_z ? 1 : 0).Append('|').Append(Clean(_zWhy)).Append('|').Append(_zDay).Append('|').Append(_zRw).Append('|').Append(_zJon).Append('|').Append(_zRwDone ? 1 : 0).Append('|').Append(_zRev ? 1 : 0)
-              .Append('|').Append(_final ? 1 : 0).Append('|').Append(_resumePending ? 1 : 0).Append('|').Append(Clean(_resumeWhy)).Append('|').Append(string.Join(";", _cession.ToArray()));
+              .Append('|').Append(_final ? 1 : 0).Append('|').Append(_resumePending ? 1 : 0).Append('|').Append(Clean(_resumeWhy)).Append('|').Append(string.Join(";", _cession.ToArray()))
+              .Append('|').Append(Clean(_finalWhy));   // pole 26 (sekcja H): powod KONCA 330
             return sb.ToString();
         }
 
@@ -865,7 +925,7 @@ namespace Armoury
             if (string.IsNullOrEmpty(v)) return;
             var f = v.Split('|');
             if (f.Length < 26 || f[0] != "v1") { _importBad++; return; }
-            _firstSeen = I(f[1], -1); _tFrom = I(f[2], -1); _tTo = I(f[3], -1); _tWhy = f[4]; _tCount = I(f[5], 0); _tExt = f[6] == "1";
+            _firstSeen = I(f[1], -1); _tFrom = I(f[2], -1); _tTo = I(f[3], -1); _tWhy = f[4]; _tCount = I(f[5], 0);   // f[6] dawne przedluzenie zimowe - pomijane
             _tPayer = f[7]; _tRecv = f[8]; _tDaily = I(f[9], 0);
             var ks = f[10].Split(',');
             for (int i = 0; i < _k.Length && i < ks.Length; i++) _k[i] = I(ks[i], 0);
@@ -873,6 +933,11 @@ namespace Armoury
             _z = f[15] == "1"; _zWhy = f[16]; _zDay = I(f[17], -1); _zRw = I(f[18], -9); _zJon = I(f[19], -9); _zRwDone = f[20] == "1"; _zRev = f[21] == "1";
             _final = f[22] == "1"; _resumePending = f[23] == "1"; _resumeWhy = f[24];
             if (f[25].Length > 0) foreach (var x in f[25].Split(';')) if (x.Length > 0) _cession.Add(x);
+            if (f.Length >= 27) _finalWhy = f[26];
+            // sekcja H: korona nie kapituluje - liczniki korony i zatrzask po "kapitulacji korony" ze starego zapisu 330 nie trzymaja
+            for (int i = 3; i < _k.Length; i++) _k[i] = 0;
+            _fortsC0 = -1; _leadC = "";
+            if (_z && _zWhy.StartsWith("KAPITULACJA korony", StringComparison.Ordinal)) { _z = false; _zWhy = ""; }
             if (_tFrom >= 0 && _tTo < _tFrom) { ClearTruceState(); _importBad++; }
         }
     }

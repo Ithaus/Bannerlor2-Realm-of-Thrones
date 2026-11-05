@@ -9,18 +9,19 @@ using TaleWorlds.Library;
 namespace Armoury
 {
     /// <summary>
-    /// 330 - KAPITULACJA (projekt B.2 z poprawka G). L = przegrywajacy, W = zwyciezca; liczniki w zapisie, rosna co dobe wojny, warunek pekniety - 0; jeden prog wystarcza:
-    ///  K1 L nie trzyma swojej siedziby (Winterfell town_B2 / King's Landing town_EW4), ma &lt;= max(WarSurrenderStrongholds, 1/3 twierdz z dnia startu licznikow)
-    ///     i sila L/W &lt; WarSurrenderLoseRatio - WarSurrenderHoldDays dob;
-    ///  K2 wladca L w niewoli W i sila L/W &lt; WarSurrenderLoseRatio - WarSurrenderCaptiveDays dob (zmiana / smierc wladcy - licznik od zera);
-    ///  K3 TYLKO Polnoc (poprawka G: korona prowadzi wojne az do zwyciestwa): sila Polnoc/korona &lt; WarSurrenderRatio - WarSurrenderRatioDays dob;
-    ///  K4 L bez twierdz - gra niszczy krolestwo (koniec wojny, nie pokoj) - tylko linia.
+    /// 330 - KAPITULACJA POLNOCY (projekt B.2; sekcja H - decyzja Jeffa 05.11: KORONA NIGDY NIE KAPITULUJE, gdy przegrywa - wojna z rozejmami czasowymi trwa).
+    /// L = Polnoc, W = korona; liczniki w zapisie, rosna co dobe wojny, warunek pekniety - 0; jeden prog wystarcza:
+    ///  K1 Polnoc nie trzyma Winterfell (town_B2), ma &lt;= max(WarSurrenderStrongholds, 1/3 twierdz z dnia startu licznikow)
+    ///     i sila Polnoc/korona &lt; WarSurrenderLoseRatio - WarSurrenderHoldDays dob;
+    ///  K2 wladca Polnocy w niewoli korony i sila &lt; WarSurrenderLoseRatio - WarSurrenderCaptiveDays dob (zmiana / smierc wladcy - licznik od zera);
+    ///  K3 sila Polnoc/korona &lt; WarSurrenderRatio - WarSurrenderRatioDays dob;
+    ///  K4 strona bez twierdz - gra niszczy krolestwo (koniec wojny, nie pokoj) - tylko linia.
     /// SILA jak 274: suma PartyBase.EstimatedStrength druzyn lordow krolestwa i jego sojusznikow gry, ktore sa w wojnie z druga strona (z druzyna gracza).
-    /// Obie strony z progiem tej samej doby - kapituluje ta z nizszym stosunkiem. F2 - odlozona (linia). Gracz wladca strony - bez akcji.
+    /// F2 - odlozona (linia). Gracz wladca strony - bez akcji.
     /// POLNOC: pokoj ApplyByKingdomDecision z danina z modelu gry przez WarSurrenderTributeDays; twierdze Polnocy spoza ziem Polnocy (kultura nie battania i pan
     /// z danych ROT spoza Polnocy; ziemia Tridentu po unii 272 zostaje) - do korony droga 326b (BookHoldings.TransferFor bez obsady): dawny pan z korony, gdy zyje
     /// i jest w koronie, inaczej rod panujacy korony; gracz w osadzie / oblezenie - cesja czeka (ponowienie co dobe, najwyzej 30 dob). Rody do korony - klucz
-    /// WarSurrenderClansToCrown (domyslnie NIE; TAK - okno wyboru gracza). KORONA ("pokoj Krola Polnocy"): kazdy zatrzymuje swoje, korona placi danine; bez niszczenia.
+    /// WarSurrenderClansToCrown (domyslnie NIE; TAK - okno wyboru gracza). Kapitulacja korony ("pokoj Krola Polnocy") USUNIETA (sekcja H).
     /// Jency wracaja droga PeaceHold (M6a-3) - bez zmian. Potem zatrzask Z (WarTruce.cs).
     /// </summary>
     internal static partial class WarTruce
@@ -39,20 +40,20 @@ namespace Armoury
             return !holdsSeat && forts <= lim && ratio < lose;
         }
 
-        /// <summary>Prog strony: K1 / K2 / K3 (K3 tylko Polnoc - poprawka G). kind - "K1 a/42" itd.; null - brak progu.</summary>
-        internal static string DueKind(int k1, int k2, int k3, bool north, int hold, int captive, int ratioDays)
+        /// <summary>Prog Polnocy: K1 / K2 / K3. kind - "K1 a/42" itd.; null - brak progu.</summary>
+        internal static string DueKind(int k1, int k2, int k3, int hold, int captive, int ratioDays)
         {
             if (k1 >= hold) return "K1 " + k1 + "/" + hold;
             if (k2 >= captive) return "K2 " + k2 + "/" + captive;
-            if (north && k3 >= ratioDays) return "K3 " + k3 + "/" + ratioDays;
+            if (k3 >= ratioDays) return "K3 " + k3 + "/" + ratioDays;
             return null;
         }
 
-        /// <summary>Kto kapituluje przy progach obu stron: nizszy stosunek sil (remis - Polnoc). 1 Polnoc, 2 korona, 0 nikt.</summary>
-        internal static int WhoSurrenders(bool dueN, bool dueC, double rN, double rC)
+        /// <summary>Kto kapituluje wg licznikow k (0..2 Polnoc; 3..5 dawne korony - pomijane, sekcja H): 1 Polnoc, 0 nikt; korona NIGDY. Czysta funkcja.</summary>
+        internal static int SurrenderSide(int[] k, int hold, int captive, int ratioDays, out string kind)
         {
-            if (dueN && dueC) return rN <= rC ? 1 : 2;
-            return dueN ? 1 : dueC ? 2 : 0;
+            kind = k != null && k.Length >= 3 ? DueKind(k[0], k[1], k[2], hold, captive, ratioDays) : null;
+            return kind != null ? 1 : 0;
         }
 
         // ---------------------------------------------------------------- pomiar i liczniki
@@ -114,36 +115,29 @@ namespace Armoury
             catch (Exception e) { Stumble("Measure", e); }
         }
 
-        /// <summary>Doba wojny: liczniki K1-K3 (K3 tylko Polnoc). K4 - linia.</summary>
+        /// <summary>Doba wojny: liczniki K1-K3 Polnocy (korona nie ma licznikow - sekcja H). K4 - linia.</summary>
         private static void StepCounters(Kingdom n, Kingdom c)
         {
             if (_lastSN < 0 || _lastSC < 0) return;
             if (_fortsN0 < 0) _fortsN0 = _lastFN;
-            if (_fortsC0 < 0) _fortsC0 = _lastFC;
-            string ln = n.Leader != null ? n.Leader.StringId ?? "" : "", lc = c.Leader != null ? c.Leader.StringId ?? "" : "";
+            string ln = n.Leader != null ? n.Leader.StringId ?? "" : "";
             if (ln != _leadN) { if (_leadN.Length > 0 && _k[1] > 0) Info("wladca Polnocy zmieniony - licznik K2 od zera (" + _k[1] + ")."); _k[1] = 0; _leadN = ln; }
-            if (lc != _leadC) { if (_leadC.Length > 0 && _k[4] > 0) Info("wladca korony zmieniony - licznik K2 od zera (" + _k[4] + ")."); _k[4] = 0; _leadC = lc; }
             double lose = LoseRatio;
             _k[0] = Step(_k[0], K1Cond(HoldsSeat(WinterfellId, n), _lastFN, _fortsN0, Strongholds, _lastRN, lose));
             _k[1] = Step(_k[1], LeaderHeldBy(n, c) && _lastRN < lose);
             _k[2] = Step(_k[2], _lastRN < LowRatio);
-            _k[3] = Step(_k[3], K1Cond(HoldsSeat(KingsLandingId, c), _lastFC, _fortsC0, Strongholds, _lastRC, lose));
-            _k[4] = Step(_k[4], LeaderHeldBy(c, n) && _lastRC < lose);
-            _k[5] = 0;   // poprawka G: korona nie kapituluje z samego stosunku sil
+            _k[3] = _k[4] = _k[5] = 0;   // sekcja H: korona nigdy nie kapituluje
             if (_lastFN == 0) InfoOnce("k4n", "K4: Polnoc bez miast i zamkow - gra konczy krolestwo (koniec wojny, nie pokoj).");
             if (_lastFC == 0) InfoOnce("k4c", "K4: korona bez miast i zamkow - gra konczy krolestwo (koniec wojny, nie pokoj).");
         }
 
-        /// <summary>Prog kapitulacji ktorejs strony teraz (liczniki); loser - kto kapituluje, kind - "Kn a/b".</summary>
+        /// <summary>Prog kapitulacji Polnocy teraz (liczniki); loser - Polnoc albo null (korona nigdy - sekcja H), kind - "Kn a/b".</summary>
         internal static bool SurrenderDue(Kingdom n, Kingdom c, out Kingdom loser, out string kind)
         {
-            loser = null; kind = null;
-            string kn = DueKind(_k[0], _k[1], _k[2], true, HoldDays, CaptiveDays, RatioDays);
-            string kc = DueKind(_k[3], _k[4], 0, false, HoldDays, CaptiveDays, RatioDays);
-            int who = WhoSurrenders(kn != null, kc != null, _lastRN < 0 ? 1.0 : _lastRN, _lastRC < 0 ? 1.0 : _lastRC);
-            if (who == 1) { loser = n; kind = kn; return true; }
-            if (who == 2) { loser = c; kind = kc; return true; }
-            return false;
+            loser = null;
+            if (SurrenderSide(_k, HoldDays, CaptiveDays, RatioDays, out kind) != 1) return false;
+            loser = n;
+            return true;
         }
 
         // ---------------------------------------------------------------- kapitulacja
@@ -164,15 +158,16 @@ namespace Armoury
             return m;
         }
 
-        /// <summary>Kapitulacja L przed W (w wojnie albo z rozejmu). true - weszla. ph - faza (F2 i gracz - bez akcji, wolajacy pilnuje).</summary>
+        /// <summary>Kapitulacja Polnocy przed korona (w wojnie albo z rozejmu). true - weszla. ph - faza (F2 i gracz - bez akcji, wolajacy pilnuje).
+        /// loser inny niz Polnoc - odmowa (sekcja H: korona nigdy nie kapituluje).</summary>
         internal static bool Surrender(Kingdom loser, Kingdom winner, string kind, Kingdom n, Kingdom c, int ph)
         {
             try
             {
                 if (loser == null || winner == null) return false;
                 if (PlayerRules(n, c)) { InfoOnce("kapgracz", "prog kapitulacji (" + kind + ") - gracz rzadzi strona, bez akcji."); return false; }
-                if (ph == 1 || ph == 2) { InfoOnce("kapf2", "kapitulacja odlozona (F2) - " + (loser == n ? "Polnoc" : "korona") + " " + kind + "."); return false; }
-                bool north = loser == n;
+                if (loser != n) { InfoOnce("kapkorona", "kapitulacja korony odrzucona - korona nigdy nie kapituluje (sekcja H)."); return false; }
+                if (ph == 1 || ph == 2) { InfoOnce("kapf2", "kapitulacja odlozona (F2) - Polnoc " + kind + "."); return false; }
                 int daily = ModelTribute(loser, winner), days = TributeDays;
                 if (loser.IsAtWarWith(winner))
                 {
@@ -180,7 +175,7 @@ namespace Armoury
                     try { MakePeaceAction.ApplyByKingdomDecision(loser, winner, daily, daily > 0 && days > 0 ? days : 0); }
                     catch (Exception e) { Stumble("Surrender.MakePeace", e); }   // recenzja 330: wyjatek obcego sluchacza po SetNeutral - stan Z i cesja i tak
                     finally { _ourPeace = false; }
-                    if (loser.IsAtWarWith(winner)) { _stumbles++; _dStumbles++; Info("KAPITULACJA " + (north ? "Polnocy" : "korony") + " (" + kind + ") NIE weszla - pokoj gry odrzucony; wojna dalej."); return false; }
+                    if (loser.IsAtWarWith(winner)) { _stumbles++; _dStumbles++; Info("KAPITULACJA Polnocy (" + kind + ") NIE weszla - pokoj gry odrzucony; wojna dalej."); return false; }
                 }
                 else
                 {
@@ -196,27 +191,26 @@ namespace Armoury
                 int d = Today;
                 ClearTruceState();
                 int captives = CountCaptives(n, c);
-                string ces = north ? Cede(n, c, d) : "bez cesji (kazdy zatrzymuje swoje)";
+                string ces = Cede(n, c, d);
                 // zatrzask Z: do nastepnego wydarzenia kanonu pary
                 _z = true; _zDay = d;
-                _zWhy = "KAPITULACJA " + (north ? "Polnocy" : "korony") + " (" + (kind ?? "?") + ")";
+                _zWhy = "KAPITULACJA Polnocy (" + (kind ?? "?") + ")";
                 _zRw = Prologue.RotEventState("RedWeddingEvent"); _zJon = Prologue.RotEventState("JonEvent");
                 _zRwDone = KingInTheNorth.RwHappened || _zRw >= 2; _zRev = RevengeReached();
-                double ratio = north ? _lastRN : _lastRC;
+                double ratio = _lastRN;
                 for (int i = 0; i < _k.Length; i++) _k[i] = 0;
                 _fortsN0 = _fortsC0 = -1;
-                Info("KAPITULACJA " + (north ? "Polnocy" : "korony") + " (" + kind + ", sila " + (ratio < 0 ? "?" : ratio.ToString("0.00", Inv)) + "): " + ces
+                Info("KAPITULACJA Polnocy (" + kind + ", sila " + (ratio < 0 ? "?" : ratio.ToString("0.00", Inv)) + "): " + ces
                      + ", danina " + TributeText(loser, winner, daily, days) + ", jency " + captives + " (wracaja wg PeaceHold) | zatrzask Z do: "
                      + (_zRwDone ? "" : "Krwawe Gody, ") + (_zJon >= 1 ? "" : "JonEvent, ") + (_zRev ? "" : "Revenge (d. opowiesci " + (RevengeRotDay * Prologue.StoryScale()).ToString("0", Inv) + "), ")
                      + "Bekarci = koniec 330.");
                 try
                 {
-                    Log.Player(north ? Name(n) + " has surrendered to " + Name(c) + ": it gives up its lands outside the North and pays tribute. The peace holds until the story turns again."
-                                     : Name(c) + " has made peace with the King in the North: each side keeps what it holds and the crown pays tribute.", false);
+                    Log.Player(Name(n) + " has surrendered to " + Name(c) + ": it gives up its lands outside the North and pays tribute. The surrender holds until the story turns again.", false);
                 }
                 catch { }
-                if (CanonPeaceLock.BastardsState330 >= 2) { _final = true; _z = false; Info("KONIEC 330 (Bekarci + kapitulacja) - pokoj staly, para wypada z regul 330."); }
-                if (north && ClansKey) AskClans(n, c);
+                if (CanonPeaceLock.BastardsState330 >= 2) { _final = true; _z = false; _finalWhy = "Bekarci + kapitulacja Polnocy"; Info("KONIEC 330 (Bekarci + kapitulacja) - kapitulacja Polnocy ostateczna, para wypada z regul 330."); }
+                if (ClansKey) AskClans(n, c);
                 return true;
             }
             catch (Exception e) { Stumble("Surrender", e); return false; }

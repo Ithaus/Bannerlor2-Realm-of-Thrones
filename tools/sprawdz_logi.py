@@ -94722,10 +94722,12 @@ def main(argv):
 # ------------------------------------------------------------ paczka 330: grupa wojna330 - wojna do kapitulacji Polnoc-korona (WarTruce.cs, klucz CanonWarUntilSurrender)
 # Projekt docs/PROJEKT-330-WOJNA-DO-KAPITULACJI.md (z poprawka G: korona nie kapituluje z samego stosunku sil). Linie "Wojna do kapitulacji (330): ...". Sprawdza:
 #  W330-0 linia startu sesji z latkami H4 (ROT Enforced) i H5 (AddDecision) TAK (brak - stary DLL / INFO); W330-1 linia doby co dobe (luka > 1 doby po pierwszej - NIE);
-#  W330-2 kazdy "ROZEJM start" ma d.X-d.Y o dlugosci <= 63 (42 + 21 zima; rozejm 1 doby F2 - tylko "z zewnatrz"); W330-3 kazdy rozejm konczy sie linia "ROZEJM koniec"/
-#  "przerwany" najpozniej 2 doby po d.Y (wojna wraca) albo trwa na koncu logu; W330-4 rozejm "zmeczenie"/"zima"/"kronika" nie w fazie F2 (linia doby tej doby);
-#  W330-5 "KAPITULACJA korony (K3" = 0 (poprawka G); W330-6 bloki (rozejm odrzucony, AI wojna w rozejmie, kapitulacja odlozona - INFO); W330-7 linie testu autotestu
-#  "test - Tn ... wynik NIE" = 0; W330-8 ERROR in WarTruce = 0 i potkniecia w liniach doby (INFO > 0); W330-9 wpis ROT Revenge w linii startu (INFO: jest / BRAK).
+#  W330-2 kazdy "ROZEJM start" ma d.X-d.Y o dlugosci <= 42 (sekcja H: bez zimy - rozejm "zima" i linia "przedluzony do wiosny" = NIE; rozejm 1 doby F2 - tylko
+#  "z zewnatrz"); W330-3 kazdy rozejm konczy sie linia "ROZEJM koniec"/"przerwany" najpozniej 2 doby po d.Y (wojna wraca) albo trwa na koncu logu; W330-4 rozejm
+#  "zmeczenie"/"kronika" nie w fazie F2 (linia doby tej doby); W330-5 "KAPITULACJA korony" = 0 (sekcja H: korona nigdy nie kapituluje); W330-6 bloki (rozejm odrzucony,
+#  AI wojna w rozejmie, kapitulacja odlozona - INFO); W330-7 linie testu autotestu "test - Tn ... wynik NIE" = 0; W330-8 ERROR in WarTruce = 0 i potkniecia w liniach
+#  doby (INFO > 0); W330-9 wpis ROT Revenge w linii startu (INFO: jest / BRAK); W330-10 "POKOJ STALY" tylko z "Bran Stark"/"Jon Snow krolem korony" (sekcja H),
+#  "KONIEC 330 (Bekarci + kapitulacja)" tylko po "KAPITULACJA Polnocy" w logu. Po KONCU 330 linia doby nie biegnie (W330-1 liczy luki tylko przed nim).
 #   python -I tools/sprawdz_logi.py --grupa wojna330 <Armoury-*.log>
 W330_P = "Wojna do kapitulacji (330): "
 W330_START = re.compile(r"Wojna do kapitulacji \(330\): start sesji \| latki: ROT Enforced \(H4\) (\S+), AddDecision wojna \(H5\) (\S+),.*?\| klucz Canon War Until Surrender (tak|nie)"
@@ -94736,14 +94738,16 @@ W330_TEXT = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| ROZEJM prz
 W330_TEND = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| ROZEJM (koniec|przerwany)")
 W330_KAP = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| KAPITULACJA (Polnocy|korony) \((K\d)")
 W330_BLOCK = re.compile(r"Wojna do kapitulacji \(330\): dzien \d+ \| (blok: rozejm odrzucony|blok: AI wojna|kapitulacja odlozona|blok: rozejm zimowy odrzucony|blok: rozejm Kroniki odrzucony"
-                        r"|liczniki kapitulacji od zera|cesja czekajaca porzucona)")
+                        r"|liczniki kapitulacji od zera|cesja czekajaca porzucona|kapitulacja korony odrzucona)")
+W330_PEACE = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| POKOJ STALY: (.+?) krolem korony")
+W330_FINAL = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| KONIEC 330 \(Bekarci \+ kapitulacja\)")
 W330_H5B = re.compile(r"Wojna do kapitulacji \(330\): start sesji \|.*?call-to-war \(H5b\) (\S+?),")
 W330_TEST = re.compile(r"Wojna do kapitulacji \(330\): test - (T\w+) .*- wynik (TAK|NIE|POMINIETY)\.")
 W330_ERR = re.compile(r"ERROR in WarTruce\.")
 
 
 def wojna330_collect(logp):
-    D = {"start": [], "days": [], "phase": {}, "stum": 0, "tstart": [], "ext": {}, "tend": [], "kap": [], "block": {}, "tests": [], "err": 0}
+    D = {"start": [], "days": [], "phase": {}, "stum": 0, "tstart": [], "ext": {}, "tend": [], "kap": [], "block": {}, "tests": [], "err": 0, "peace": [], "final": []}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             if W330_P not in line and "ERROR in WarTruce" not in line:
@@ -94777,6 +94781,14 @@ def wojna330_collect(logp):
             if m:
                 D["kap"].append((int(m.group(1)), m.group(2), m.group(3)))
                 continue
+            m = W330_PEACE.search(line)
+            if m:
+                D["peace"].append((int(m.group(1)), m.group(2)))
+                continue
+            m = W330_FINAL.search(line)
+            if m:
+                D["final"].append(int(m.group(1)))
+                continue
             m = W330_BLOCK.search(line)
             if m:
                 D["block"][m.group(1)] = D["block"].get(m.group(1), 0) + 1
@@ -94802,22 +94814,22 @@ def wojna330_rows(rep, D):
                 + f", H5b {'/'.join(sorted(set(h5b))) or '-'}", "H4, H5 i H5b TAK", not bad and not bad5b)
     key_on = any(x[2] == "tak" for x in st)
     days = sorted(set(D["days"]))
-    gaps = [f"{a}->{b}" for a, b in zip(days, days[1:]) if b - a > 1]
+    endd = min([d for d, _ in D["peace"]] + D["final"]) if (D["peace"] or D["final"]) else None   # po KONCU 330 linia doby nie biegnie
+    gaps = [f"{a}->{b}" for a, b in zip(days, days[1:]) if b - a > 1 and (endd is None or a < endd)]
     rep.add("W330-1: linia doby co dobe", f"linii {len(days)}" + (f", luki {len(gaps)} [{', '.join(gaps[:5])}]" if gaps else ""), "bez luk",
             (not gaps) if days else (None if not key_on else False))
     longs, f2bad = [], []
     for d, why, a, b in D["tstart"]:
         ln = b - a
-        if ln > 63 or ln < 1 or (ln == 1 and not why.startswith("z zewnatrz")):
+        if ln > 42 or ln < 1 or (ln == 1 and not why.startswith("z zewnatrz")) or why == "zima":
             longs.append(f"d{d} {why} {a}-{b}")
         ph = D["phase"].get(d, D["phase"].get(d - 1, ""))
         if not why.startswith("z zewnatrz") and ph.startswith("F2"):
             f2bad.append(f"d{d} {why}")
     for d, (to, add) in D["ext"].items():
-        if add > 21:
-            longs.append(f"d{d} przedluzenie +{add}")
-    rep.add("W330-2: dlugosc rozejmu (<= 63 dob, 1 doba tylko z zewnatrz w F2)", f"rozejmow {len(D['tstart'])}, zlych {len(longs)}" + (f" [{'; '.join(longs[:4])}]" if longs else ""),
-            "0 zlych", (not longs) if D["tstart"] else None)
+        longs.append(f"d{d} przedluzenie zimowe +{add}")   # sekcja H: zadnych przedluzen
+    rep.add("W330-2: dlugosc rozejmu (<= 42 dob, bez zimy, 1 doba tylko z zewnatrz w F2)", f"rozejmow {len(D['tstart'])}, zlych {len(longs)}" + (f" [{'; '.join(longs[:4])}]" if longs else ""),
+            "0 zlych", (not longs) if (D["tstart"] or D["ext"]) else None)
     last = max(days) if days else None
     open_bad = []
     ends = sorted(D["tend"])
@@ -94834,10 +94846,10 @@ def wojna330_rows(rep, D):
             open_bad.append(f"d{d} bez konca (log do d{last}, rozejm do d{to})")
     rep.add("W330-3: wojna wraca po rozejmie (koniec <= d.Y+2)", f"rozejmow {len(D['tstart'])}, koncow {len(ends)}, bez powrotu {len(open_bad)}" + (f" [{'; '.join(open_bad[:4])}]" if open_bad else ""),
             "0 bez powrotu", (not open_bad) if D["tstart"] else None)
-    rep.add("W330-4: rozejm wlasny (zmeczenie / zima / kronika) nie w F2", f"w F2 {len(f2bad)}" + (f" [{'; '.join(f2bad[:4])}]" if f2bad else ""), "0", (not f2bad) if D["tstart"] else None)
-    k3c = [k for k in D["kap"] if k[1] == "korony" and k[2] == "K3"]
+    rep.add("W330-4: rozejm wlasny (zmeczenie / kronika) nie w F2", f"w F2 {len(f2bad)}" + (f" [{'; '.join(f2bad[:4])}]" if f2bad else ""), "0", (not f2bad) if D["tstart"] else None)
+    k3c = [k for k in D["kap"] if k[1] == "korony"]
     kap_txt = "; ".join(f"d{a} {b} {c}" for a, b, c in D["kap"][:4])
-    rep.add("W330-5: kapitulacje (korona bez K3 - poprawka G)", f"kapitulacji {len(D['kap'])}" + (f" [{kap_txt}]" if D["kap"] else "") + f", korony z K3 {len(k3c)}", "korona K3 = 0", not k3c)
+    rep.add("W330-5: kapitulacje (sekcja H: korona nigdy)", f"kapitulacji {len(D['kap'])}" + (f" [{kap_txt}]" if D["kap"] else "") + f", korony {len(k3c)}", "korona 0", not k3c)
     rep.add("W330-6: bloki i odlozenia (INFO)", ", ".join(f"{k} {v}" for k, v in sorted(D["block"].items())) or "brak", "INFO", None)
     tn = [t for t in D["tests"] if t[1] == "NIE"]
     if D["tests"]:
@@ -94847,15 +94859,22 @@ def wojna330_rows(rep, D):
     rep.add("W330-8: bledy WarTruce", f"ERROR in WarTruce {D['err']}, potkniecia w liniach doby {D['stum']}", "ERROR 0", D["err"] == 0)
     rev = [x[3] for x in st]
     rep.add("W330-9: wpis ROT Revenge (INFO)", ", ".join(sorted(set(rev))) if rev else "brak linii startu", "INFO", None)
+    badp = [f"d{d} {k}" for d, k in D["peace"] if k not in ("Bran Stark", "Jon Snow")]
+    kapn = [d for d, who, _ in D["kap"] if who == "Polnocy"]
+    badf = [f"d{d}" for d in D["final"] if not any(k <= d for k in kapn)]
+    rep.add("W330-10: pokoj staly tylko Bran / Jon, KONIEC po kapitulacji Polnocy", f"pokojow stalych {len(D['peace'])}" + (f" [{'; '.join(f'd{d} {k}' for d, k in D['peace'][:3])}]" if D["peace"] else "")
+            + f", KONIEC 330 (Bekarci) {len(D['final'])}, zlych {len(badp) + len(badf)}" + (f" [{'; '.join((badp + badf)[:4])}]" if badp or badf else ""),
+            "0 zlych", (not badp and not badf) if (D["peace"] or D["final"]) else None)
 
 
 def wojna330_synth():
-    """W330-S: dobry bieg, za dlugi rozejm, rozejm w F2, korona K3, test NIE, brak powrotu wojny. None = OK."""
+    """W330-S: dobry bieg, za dlugi rozejm, rozejm w F2, kapitulacja korony, test NIE, brak powrotu wojny, rozejm zimowy, przedluzenie, pokoj staly bez Brana/Jona,
+    KONIEC bez kapitulacji. None = OK."""
     import tempfile
     import shutil
     P = W330_P
     start = (P + "start sesji | latki: ROT Enforced (H4) TAK, AddDecision wojna (H5) TAK, call-to-war (H5b) TAK, ocena BK (CanonThroneWars) TAK | klucz Canon War Until Surrender tak | zakres: kampania kanonu"
-             " | rozejm 42 dob (+21 zima) | wpisy ROT pary: Revenge jest [Revenge (start 350, koniec 0, wyzwalacz nie, wlaczona tak)].")
+             " | rozejm 42 dob (bez zimy) | wpisy ROT pary: Revenge jest [Revenge (start 350, koniec 0, wyzwalacz nie, wlaczona tak)].")
 
     def day(d, ph="F0", st=0):
         return P + f"dzien {d} | faza {ph} (RedWeddingEvent 0, Robb zyje) | wojna od d.100 (9 dob) | zmeczenie 100/100 | rozejm NIE (nastepny od d.{d}) | potkniecia {st} (sesja {st})."
@@ -94867,16 +94886,26 @@ def wojna330_synth():
     good += [P + "dzien 250 | ROZEJM koniec: wojna wraca (nasza DeclareWar) | rozejm d.208-d.250 (zmeczenie)."]
     good += [P + "dzien 251 | KAPITULACJA Polnocy (K3 30/30, sila 0.30): cesja 0 [], danina brak (model gry 0), jency 0 (wracaja wg PeaceHold) | zatrzask Z do: Bekarci = koniec 330."]
     good += [P + "test - TA tabela prawdy Locked330 i Gate: x - wynik TAK."]
+    good += [P + "dzien 252 | POKOJ STALY: Bran Stark krolem korony (Westerlands) - pokoj z Polnoca bez daniny i bez cesji, para wypada z regul 330 na stale | droga doba."]
+    good += [P + "dzien 252 | Krolowa Polnocy Sansa (wladca Polnocy bez zmian: Jon Snow)."]
     runs = {
         "good": good,
         "long": [start, day(200), ts(200, "zmeczenie", 200, 270), day(201)],
         "f2": [start, day(300, "F2"), ts(300, "zmeczenie", 300, 342), day(301, "F2")],
-        "k3c": [start, day(300), P + "dzien 300 | KAPITULACJA korony (K3 30/30, sila 0.30): bez cesji."],
+        "k3c": [start, day(300), P + "dzien 300 | KAPITULACJA korony (K1 42/42, sila 0.30): bez cesji."],
+        "zima": [start, day(200), ts(200, "zima", 200, 242), day(201)],
+        "ext": [start, day(200), ts(200, "zmeczenie", 200, 242), P + "dzien 241 | ROZEJM przedluzony do wiosny: d.250 (+8, zima)."],
+        "staly": [start, day(200), P + "dzien 201 | POKOJ STALY: Tywin Lannister krolem korony (x)."],
+        "final": [start, day(200), P + "dzien 201 | KONIEC 330 (Bekarci + kapitulacja) - x."],
         "testno": [start, day(300), P + "test - T1 rozejm: pokoj NIE - wynik NIE."],
         "noend": [start, day(200), ts(200, "zmeczenie", 200, 242)] + [day(d) for d in range(201, 250)],
     }
     exp = {
-        "good": {"W330-0": "TAK", "W330-1": "TAK", "W330-2": "TAK", "W330-3": "TAK", "W330-4": "TAK", "W330-5": "TAK", "W330-7": "TAK", "W330-8": "TAK"},
+        "good": {"W330-0": "TAK", "W330-1": "TAK", "W330-2": "TAK", "W330-3": "TAK", "W330-4": "TAK", "W330-5": "TAK", "W330-7": "TAK", "W330-8": "TAK", "W330-10": "TAK"},
+        "zima": {"W330-2": "NIE"},
+        "ext": {"W330-2": "NIE"},
+        "staly": {"W330-10": "NIE"},
+        "final": {"W330-10": "NIE"},
         "long": {"W330-2": "NIE"},
         "f2": {"W330-4": "NIE"},
         "k3c": {"W330-5": "NIE"},
@@ -94904,7 +94933,7 @@ def wojna330_main(logp):
         s2 = wojna330_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("W330-S: test syntetyczny (dobry, za dlugi rozejm, rozejm w F2, korona K3, test NIE, bez powrotu wojny)", s2 or "OK", "OK", s2 is None)
+    rep.add("W330-S: test syntetyczny (dobry, za dlugi rozejm, rozejm w F2, kapitulacja korony, test NIE, bez powrotu wojny, zima, pokoj staly, KONIEC)", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("W330-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()

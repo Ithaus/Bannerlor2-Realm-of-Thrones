@@ -219,4 +219,13 @@ Liczniki są w zapisie. Rosną co dobę wojny, a gdy warunek pęka, wracają do 
 ## G. Poprawka Claude'a po syntezie (05.11, wg słów Jeffa „korona będzie prowadziła wojnę aż do zwycięstwa”)
 - Korona NIE kapituluje z samego stosunku sił (K3 tylko dla Północy). Kapitulacja korony wyłącznie z K1 (utrata King's Landing + progi twierdz) albo K2 (król w niewoli 21 dób).
 - Jeff 05.11: „pokój może być tymczasowy, ale nie stały”.
-- Po recenzji 330: w F2 liczniki kapitulacji nie rosną (F3 liczy od świeżej serii), liczniki od zera przy każdym rozejmie; po KOŃCU 330 tłumienie ROT/AI zostaje (pokój stały naprawdę stały); wezwanie sojusznika do wojny (call-to-war) też blokowane w rozejmie, Z i po KOŃCU.
+
+## H. Decyzja Jeffa 05.11 wieczorem (ZASTEPUJE sprzeczne punkty B-G)
+Jeff: „pokój może być tylko tak, jak było w fabule: jeśli Bran Stark lub Jon Snow zostaną królem, to zawierają pokój z Północą, Sansa, która jest królową Północy”.
+- STALY POKOJ korona-Polnoc tylko gdy wladca krolestwa korony (ROT Westerlands = Baratheon KL) to Bran Stark albo Jon Snow (ROTLords.BranStark / ROTLords.JonSnow, zywy). Wtedy: pokoj bez daniny i bez cesji, para wypada z 330 na stale. Jesli Sansa zyje i jest w Polnocy - linia logu "Krolowa Polnocy Sansa"; zmiany wladcy Polnocy NIE robimy (ROT nie ma tego wydarzenia).
+  ROT nie ma wydarzenia „Bran/Jon krolem Szesciu Krolestw” - regula czeka na taki stan swiata (sukcesja BK/gra/gracz).
+- KORONA NIGDY NIE KAPITULUJE (usunieta „kapitulacja korony” / „pokoj Krola Polnocy”, K1-K3 tylko dla Polnocy). Gdy korona przegrywa - dalej wojna z rozejmami czasowymi.
+- Kapitulacja Polnocy (K1-K3) zostaje: to nie pokoj, tylko poddanie (cesja + danina + faza Z do nastepnego wydarzenia kanonu). Po Bekartach kapitulacja Polnocy jest ostateczna (Polnoc pod korona) - to nadal nie „pokoj rowny”.
+- Rozejmy czasowe (42 doby, zima do wiosny <= 63, min. 84 doby wojny) bez zmian.
+- Wszystkie inne drogi do stalego pokoju (Diplomacy, gra, BK, ROT RedWedding MakePeace, Kronika, barter gracza) -> rozejm czasowy (siatka H6).
+- Jeff 05.11: „zima w grze trwa kilka lat!” -> ZADNYCH regul zimowych w 330: brak rozejmu z powodu zimy (warunek „zima i oba >= 75” USUNIETY), brak przedluzania rozejmu do wiosny (WarTruceWinterMaxExtra i WarTruceWinterExhaustion usuniete). Rozejm = stale 42 doby, tylko z wyczerpania (zmeczenie >= 100) po >= 84 dobach wojny.

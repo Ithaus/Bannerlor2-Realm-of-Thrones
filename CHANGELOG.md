@@ -66,6 +66,34 @@ wplyw na CrownCallToWar 168 i SCA 320e (Blocks): spojnie "wojna trwa"; (6) cesja
 - Swiadomie bez zmiany: danina kapitulacji korony moze wyjsc 0 (model gry daje 0 platnikowi z lepszym postepem wojny) - zgodnie z regula "liczby z modeli", linia KAPITULACJA pokazuje "brak (model gry 0)".
 
 
+### 330 sekcja H - decyzje Jeffa 05.11 (wieczorem; NADRZEDNE wobec B-G projektu)
+**Problem:** Jeff: "pokoj moze byc tylko tak, jak bylo w fabule: jesli Bran Stark lub Jon Snow zostana krolem, to zawieraja pokoj z Polnoca, Sansa, ktora jest krolowa Polnocy";
+"zima w grze trwa kilka lat!". Implementacja B-G miala kapitulacje korony ("pokoj Krola Polnocy") i reguly zimowe (rozejm 75/75 zima, przedluzenie do wiosny).
+**Zmiana (projekt docs/PROJEKT-330-WOJNA-DO-KAPITULACJI.md sekcja H):**
+- STALY POKOJ tylko, gdy wladca krolestwa korony (vlandia, ROT Westerlands) to zywy Bran Stark albo Jon Snow (`ROT.Misc.ROTLords.BranStark` lord_5_7 / `JonSnow` lord_5_17,
+  odczyt przez refleksje, zapas - id): `WarTruce.CanonKing` / `KingPeace` (doba, H1 zmeczenie, H6 pokoj z zewnatrz, Kronika) - w wojnie `MakePeaceAction.ApplyByKingdomDecision(korona,
+  Polnoc, 0, 0)`, w pokoju (rozejm / zatrzask Z) danina zerowana; bez cesji (kolejka cesji porzucona), KONIEC 330 na stale (`_finalWhy` "pokoj krola ...", pole 26 zapisu arm_k330;
+  stary zapis bez pola - "Bekarci + kapitulacja Polnocy"). Linia "POKOJ STALY: <krol> krolem korony ..." i "Krolowa Polnocy Sansa (wladca Polnocy bez zmian: X)", gdy Sansa
+  (`SansaStark` lord_5_13_1) zyje w Polnocy. Wladcy Polnocy nie zmieniamy. Gracz wladca strony - tylko linia. Okno ROT / rada: "The king of the crown has made peace with the North".
+- KORONA NIGDY NIE KAPITULUJE: usuniete K1/K2 korony, `WhoSurrenders`, kapitulacja korony i "pokoj Krola Polnocy"; `SurrenderSide` (czysta) zwraca tylko Polnoc,
+  `Surrender` odmawia innej strony ("kapitulacja korony odrzucona"). Liczniki 3..5 zostaja w zapisie jako 0 (wczytanie je zeruje; zatrzask Z po "KAPITULACJA korony" ze starego
+  zapisu 330 kasowany). Wznowienie po zatrzasku Z - zawsze korona (`ResumeByNorth(truce, recv)`). Linia doby: "korona nie kapituluje, tw. N | wladca korony X (pokoj staly tylko z Branem / Jonem)".
+- Kapitulacja Polnocy K1-K3 bez zmian (cesja + danina + zatrzask Z); po Bekartach ostateczna (KONIEC 330 "Bekarci + kapitulacja Polnocy").
+- ZERO REGUL ZIMOWYCH: usuniete `IsWinter`, `WinterLeft`, `WinterExtra`, rozejm zimowy z doby (75/75), przedluzenie do wiosny, warunek zimy w Kronice, pole `_tExt`
+  (pole 6 zapisu zostaje jako 0). Klucze `WarTruceWinterMaxExtra` i `WarTruceWinterExhaustion` usuniete z Settings, gen_mcm RANGES i McmSettings (gen_mcm.py uruchomiony; reczne
+  wpisy 326d PlayerTakesThirdOfBeatenPurses i 326x CanonWarBalanceFrontGarrison przywrocone jak w HEAD). Rozejm zawsze WarTruceDays (42), tylko z wyczerpania (>= 100) po >= 84 dobach.
+- Inne drogi do stalego pokoju -> rozejm (H6), sprawdzone: H1 zmeczenie (F0/F3), Kronika (F0/F3, bez zimy), pokoj z zewnatrz (barter, kody, BK, Diplomacy, inne mody) - rozejm 42
+  (F2 - 1 doba). Po Bekartach bez kapitulacji: faza F3, `Locked330` blokuje, H1/H6 daja rozejm 42 - pokoj staly po Bekartach tylko z kapitulacji Polnocy albo Brana/Jona.
+  Usuniety dawny wyjatek H6 "pokoj ROT z Krwawych Godow przy kluczu NorthFightsOnAfterRedWedding NIE" - teraz tez rozejm 42 (odstepstwo 5 nieaktualne).
+- `WarTruce.Test.cs`: TB - korona nigdy L (liczniki korony 99 -> 0, Polnoc K1 -> 1), `ResumeByNorth` bez Z korony; TC - `KingPeaceCond` (Bran TAK, Jon TAK, inny NIE, martwy NIE,
+  gracz NIE) i brak zimy (pola Settings usuniete, Gate zima 75/75 bez wyczerpania = brak rozejmu, rozejm domyslnie 42).
+- `tools/sprawdz_logi.py --grupa wojna330`: W330-2 prog 42 (bylo 63), rozejm "zima" i linia "przedluzony do wiosny" = NIE; W330-5 kazda "KAPITULACJA korony" = NIE; nowy W330-10
+  ("POKOJ STALY" tylko Bran Stark / Jon Snow, "KONIEC 330 (Bekarci + kapitulacja)" tylko po "KAPITULACJA Polnocy"); W330-1 bez luk po KONCU 330 (linia doby wtedy nie biegnie);
+  W330-S z nowymi przypadkami (zima, przedluzenie, pokoj staly innego krola, KONIEC bez kapitulacji) - OK.
+**Ryzyko / co sprawdzic:** ROT nie ma wydarzenia "Bran / Jon krolem Szesciu Krolestw" - regula czeka na taki stan swiata (sukcesja gry / BK / gracz); w kampanii Jeffa dzis nie zadziala.
+Korona przegrywajaca (u Jeffa sila 0.57 Polnocy) nie skapituluje nigdy - wojna z rozejmami co >= 84 doby trwa do kapitulacji Polnocy albo Brana/Jona.
+**Status:** DO SPRAWDZENIA (build 0 bledow; autotest nieuruchomiony; NIE WGRANE).
+
 ## 2026-11-05 WGRANIE 164 - noc/326x-integracja (163 + 326a floty wg krolestw, 326b zwrot zdobyczy Polnocy, 326c odsiecz z przewaga, 326d okno lupu + 1/3 sakiewek pokonanych dla gracza)
 Armoury.dll 0229fc1710a699fdf3fb5f405297669c (reszta modow bez zmian: CrashScribe 55ccc004, RC 8528f098, ForgeView 8441ab0e, GrandTourney 900e32bc). Kopia 163: Armoury.dll.bak-2026-11-05-przed-wgranie164 i D:/Backup-Bannerlord/wgrane/2026-11-05-wgranie164-przed.
 **Testy:** bieg 30 dob na kopii zapisu Jeffa (dzien 109348) + 7 bitew: kod 0, KONIEC OK, ERROR 0 Armoury, CrashScribe 23 (jak 325a), polnoc326 0 NIE, obl326c 0 NIE; statki Polnocy 543 -> 229, sila Korony 10.8k -> 22k (Reach w koalicji).

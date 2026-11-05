@@ -10520,7 +10520,7 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool NorthFightsOnAfterRedWedding { get; set; } = true;
 
-        [SettingPropertyBool("Canon War Until Surrender", HintText = "the war between the North and the crown no longer ends in a lasting peace by war weariness. When the realms are worn out, they make a truce instead: it lasts War Truce Days (if it would end in winter, it holds until spring, at most War Truce Winter Max Extra days more), the side that is losing pays tribute only for the truce, castles stay where they are, and afterwards the war resumes by itself. A truce comes at most once per War Truce Min War Days of fighting. A lasting peace comes only when one side surrenders: it lost its seat and most of its castles, its king sits in the enemy's prison, or (the North only) it has a third of the enemy's strength for a month. A surrendered North gives up its lands outside the North and pays tribute; a surrendered crown recognises the King in the North and pays him. Story events (the Red Wedding, Jon Snow, the Revenge of the King in the North) rekindle the war; after the Battle of the Bastards a surrender is final. Never if you rule either realm (off = as before)", RequireRestart = false)]
+        [SettingPropertyBool("Canon War Until Surrender", HintText = "the war between the North and the crown no longer ends in a lasting peace by war weariness. When the realms are worn out, they make a truce instead: it lasts War Truce Days, the side that is losing pays tribute only for the truce, castles stay where they are, and afterwards the war resumes by itself. A truce comes at most once per War Truce Min War Days of fighting; winter makes no difference. The crown never surrenders. A lasting peace comes only as in the story: when Bran Stark or Jon Snow becomes king of the crown, he makes peace with the North (no tribute, no lands given up). The North may still surrender: when it lost Winterfell and most of its castles, its king sits in the crown's prison, or it has a third of the crown's strength for a month - then it gives up its lands outside the North and pays tribute until the next turn of the story (the Red Wedding, Jon Snow, the Revenge of the King in the North); after the Battle of the Bastards its surrender is final. Never if you rule either realm (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarUntilSurrender { get; set; } = true;
 
@@ -10528,23 +10528,15 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public int WarTruceDays { get; set; } = 42;
 
-        [SettingPropertyInteger("War Truce Winter Max Extra", 0, 91, "0", HintText = "a truce that would end in winter holds until the first day of spring, at most this many days longer", RequireRestart = false)]
-        [SettingPropertyGroup("Wars of the books")]
-        public int WarTruceWinterMaxExtra { get; set; } = 21;
-
-        [SettingPropertyInteger("War Truce Min War Days", 0, 364, "0", HintText = "the war must have lasted this many days since it was (re)declared before a truce may be made (stops a truce after every battle)", RequireRestart = false)]
+        [SettingPropertyInteger("War Truce Min War Days", 0, 364, "0", HintText = "the war must have lasted this many days since it was (re)declared before a truce may be made (stops a truce after every battle); a truce comes only when a realm is fully worn out by the war (war weariness 100)", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public int WarTruceMinWarDays { get; set; } = 84;
-
-        [SettingPropertyFloatingInteger("War Truce Winter Exhaustion", 1.00f, 100.00f, "0", HintText = "in winter a truce may be made when both realms have at least this much war weariness (Diplomacy); otherwise one realm must reach 100", RequireRestart = false)]
-        [SettingPropertyGroup("Wars of the books")]
-        public float WarTruceWinterExhaustion { get; set; } = 75f;
 
         [SettingPropertyInteger("War Truce Load Grace Days", 0, 91, "0", HintText = "no truce in the first days after this rule is first loaded into a campaign", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public int WarTruceLoadGraceDays { get; set; } = 7;
 
-        [SettingPropertyFloatingInteger("War Surrender Lose Ratio", 0.05f, 1.00f, "0.00", HintText = "a realm that lost its seat and most castles, or whose king is held prisoner, surrenders only while its strength is below this share of the enemy's", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("War Surrender Lose Ratio", 0.05f, 1.00f, "0.00", HintText = "the North, when it lost Winterfell and most castles or its king is held prisoner, surrenders only while its strength is below this share of the crown's (the crown never surrenders)", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public float WarSurrenderLoseRatio { get; set; } = 0.67f;
 
@@ -10556,19 +10548,19 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public int WarSurrenderRatioDays { get; set; } = 30;
 
-        [SettingPropertyInteger("War Surrender Hold Days", 1, 364, "0", HintText = "days in a row without its seat (Winterfell / King's Landing) and with few castles left before a realm surrenders", RequireRestart = false)]
+        [SettingPropertyInteger("War Surrender Hold Days", 1, 364, "0", HintText = "days in a row without Winterfell and with few castles left before the North surrenders", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public int WarSurrenderHoldDays { get; set; } = 42;
 
-        [SettingPropertyInteger("War Surrender Captive Days", 1, 364, "0", HintText = "days in a row with its king held by the enemy before a realm surrenders", RequireRestart = false)]
+        [SettingPropertyInteger("War Surrender Captive Days", 1, 364, "0", HintText = "days in a row with its king held by the crown before the North surrenders", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public int WarSurrenderCaptiveDays { get; set; } = 21;
 
-        [SettingPropertyInteger("War Surrender Strongholds", 0, 20, "0", HintText = "a realm counts as having lost most castles when it holds at most this many, or a third of what it held when counting began, whichever is more", RequireRestart = false)]
+        [SettingPropertyInteger("War Surrender Strongholds", 0, 20, "0", HintText = "the North counts as having lost most castles when it holds at most this many, or a third of what it held when counting began, whichever is more", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public int WarSurrenderStrongholds { get; set; } = 3;
 
-        [SettingPropertyInteger("War Surrender Tribute Days", 0, 364, "0", HintText = "how many days the surrendered realm pays tribute", RequireRestart = false)]
+        [SettingPropertyInteger("War Surrender Tribute Days", 0, 364, "0", HintText = "how many days the surrendered North pays tribute", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public int WarSurrenderTributeDays { get; set; } = 84;
 
@@ -14031,9 +14023,7 @@ namespace Armoury
             s.NorthFightsOnAfterRedWedding = NorthFightsOnAfterRedWedding;
             s.CanonWarUntilSurrender = CanonWarUntilSurrender;
             s.WarTruceDays = WarTruceDays;
-            s.WarTruceWinterMaxExtra = WarTruceWinterMaxExtra;
             s.WarTruceMinWarDays = WarTruceMinWarDays;
-            s.WarTruceWinterExhaustion = WarTruceWinterExhaustion;
             s.WarTruceLoadGraceDays = WarTruceLoadGraceDays;
             s.WarSurrenderLoseRatio = WarSurrenderLoseRatio;
             s.WarSurrenderRatio = WarSurrenderRatio;
