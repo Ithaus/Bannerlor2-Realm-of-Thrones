@@ -326,7 +326,7 @@ namespace Armoury
                 bool reach = false, dorne = false;
                 try { reach = Prologue.CrownGuardHolds("reach", out nv); dorne = Prologue.CrownGuardHolds("dorne", out nv); } catch (Exception e) { Stumble("Actions.Alliance(straznik)", e); }
                 if (reach || dorne)
-                    detail = "straznik Prologue.Crown pilnuje " + (reach ? "sojuszu korona-Reach" : "") + (reach && dorne ? " i " : "") + (dorne ? "paktow Dorne" : "") + " - Kronika nie zawiera sojuszy (plan P5)";
+                    detail = "straznik Prologue.Crown pilnuje " + (reach ? (ReachJoinsCrown.Done ? "Reach w koronie (332)" : "sojuszu korona-Reach") : "") + (reach && dorne ? " i " : "") + (dorne ? "paktow Dorne" : "") + " - Kronika nie zawiera sojuszy (plan P5)";
                 else
                     detail = "Kronika nie wola StartAlliance - sojusz " + a[0] + "-" + a[1] + " spoza listy CanonAlliances (CrashScribe) zerwany przy wczytaniu; wylacznik straznika i wpis - decyzja K9/K10 (plan P5)";
                 return Res.Skip;

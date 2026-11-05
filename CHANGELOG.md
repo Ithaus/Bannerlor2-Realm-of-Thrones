@@ -22,6 +22,12 @@
 (korona ich nie prowadzi) - pokoj przed wstapieniem (Zelazny Tron nie bierze cudzych sporow; najazd Eurona na Reach w "Uczcie dla wron" to juz wojna korony). Gracz-wasal
 albo najemnik Reach przechodzi razem (jak 272). Tytuly BK bez zmian. Gdy zapas osi zadziala przed ROT BlackwaterEvent, ROT pozniej nie przeniesie rodow Stannisa do Reach
 (sprawdza IsEliminated) - zostaja przy Smoczej Skale.
+**Po recenzji (332r):** zapas osi nie rusza w trakcie ROT BlackwaterSiegeEvent (stan 1) ani BlackwaterEvent (stan 1); brak odczytu StannisWon nie liczy sie jak
+"Stannis przegral" - czeka do dnia zapasu (King's Landing w koronie pilnuje); wyjatek w srodku Fold - stan ZROBIONE, gdy choc jeden rod jest juz w koronie albo Reach
+zniszczone (inaczej proba w nastepnej dobie); gracz w osadzie Reach (menu) - czekamy az wyjdzie (bez limitu 7 dob); wojna domowa Diplomacy w koronie tez wstrzymuje;
+relk po aliasie empire_w pomija pary Reach-Reach (095.1 Wildfire under the Sept); NorthConquest - twierdza Reach bez rodu pierwotnego wraca do rodu panujacego korony;
+stan m104 (2) "w koronie" nie nadpisany przez "klucz NIE"; opis alliance po wstapieniu. Skutek uboczny (bez zmian): przy wojnie korona-Polnoc rody Reach ja przejmuja,
+wiec stosunek sil K3 (330) przesuwa sie na korzysc korony; wojny tylko Reach z Polnoca (przy rozejmie korony) koncza sie pokojem.
 **Autotest:** flaga `armoury-reach332.flag` (Documents\Mount and Blade II Bannerlord\CrashScribe, tylko DLL autotestu LogGate 1/2) wymusza znacznik Czarnego Nurtu od
 1. doby sesji; testy T1-T10 (T8 w nastepnej dobie: HoldReach 0 razy, stan "w koronie (332"), T0 POMINIETY po 10. dobie.
 **Ryzyko / co sprawdzic:** autotest na kopii zapisu po smierci Renly'ego (flaga) i sprawdz_logi --grupa reach332; zapis Jeffa (dzien opowiesci po Czarnym Nurcie) -

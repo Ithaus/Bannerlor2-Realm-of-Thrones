@@ -257,7 +257,7 @@ namespace Armoury
                            : orig.Kingdom == null ? "rod pierwotny bez krolestwa" : orig.IsUnderMercenaryService ? "rod pierwotny najemnikiem"
                            : orig.Leader == null || !orig.Leader.IsAlive ? "rod pierwotny bez zywej glowy" : "glowa rodu pierwotnego w niewoli ponad " + PrisonerKingDays + " dob";
             if (riverGone) { why = whyOrig + ", krolestwa riverlands brak (Dorzecze w Polnocy - unia 272) - zostaje"; return null; }
-            var k = K(origK);
+            var k = K(ReachJoinsCrown.AliasKingdom(origK));   // 332: Reach w koronie - rod panujacy korony
             if (k == null || k.IsEliminated) { why = whyOrig + ", krolestwa " + origK + " brak - zostaje"; return null; }
             if (k == north) { why = whyOrig + ", krolestwo pierwotne to Polnoc - zostaje"; return null; }
             var rc = k.RulingClan;

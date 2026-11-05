@@ -40,7 +40,7 @@ namespace Armoury
         internal const string P = "Reach do korony (332): ";
         internal const string ReachId = "empire_w", CrownId = "vlandia";
         private const string TyrellClanId = "clan_empire_west_1", DragonstoneId = "dragonstone", KingsLandingId = "town_EW4";
-        private const string BwEvent = "BlackwaterEvent";
+        private const string BwEvent = "BlackwaterEvent", SiegeEvent = "BlackwaterSiegeEvent";
         private const float BlackwaterSiegeRotDay = 177f;
         private const int SpareDays = 150, UnsafeMaxDays = 7;
         internal const string AutoFlagName = "armoury-reach332.flag";
@@ -131,6 +131,9 @@ namespace Armoury
             return l;
         }
 
+        /// <summary>Rod z listy wstapienia (relk - pary Reach-Reach pomijane po aliasie).</summary>
+        internal static bool IsReachClan(Clan c) { return _st == 1 && c != null && c.StringId != null && _clanSet.Contains(c.StringId); }
+
         /// <summary>Siedziba rodu panujacego Reach z chwili wstapienia (miejsce plotki "empire_w"); pusty - brak.</summary>
         internal static string SeatId { get { return _seat; } }
 
@@ -200,6 +203,21 @@ namespace Armoury
         }
 
         private static int BwState() { try { return Prologue.RotEventState(BwEvent); } catch { return -9; } }
+        private static int SiegeState() { try { return Prologue.RotEventState(SiegeEvent); } catch { return -9; } }
+
+        /// <summary>Osada krolestwa k, w ktorej stoi gracz (CurrentSettlement albo osada spotkania); null - na mapie / gdzie indziej.</summary>
+        private static string PlayerInSettlementOf(Kingdom k)
+        {
+            try
+            {
+                var mp = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty;
+                Settlement s = mp != null ? mp.CurrentSettlement : null;
+                if (s == null && TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Current != null) s = TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.EncounterSettlement;
+                if (s == null || s.MapFaction != k) return null;
+                return s.StringId;
+            }
+            catch { return null; }
+        }
 
         /// <summary>Zapas: dzien opowiesci oblezenia Czarnego Nurtu na osi Fabuli (177 x skala) + 150.</summary>
         private static double SpareDay() { return BlackwaterSiegeRotDay * Prologue.StoryScale() + SpareDays; }
@@ -273,15 +291,19 @@ namespace Armoury
             if (reach.IsEliminated) { Never("Reach zniszczone przed Czarnym Nurtem", sd); return; }
             if (!Alive(crown)) { Never("korona (" + CrownId + ") nie istnieje", sd); return; }
             // znacznik
-            int bw = BwState(), won = StannisWon();
+            // ROT: BlackwaterSiegeEvent (oblezenie Przystani) w toku (stan 1) - zapas nie rusza (Stannis moze jeszcze zdobyc miasto); StannisWon bez odczytu - nie liczy sie
+            // jak "przegral": czeka do dnia zapasu, potem jak zapas (King's Landing w koronie pilnuje, ze Stannis nie wygral).
+            int bw = BwState(), won = StannisWon(), sg = SiegeState();
             string kind = null;
             if (bw == 2 && won == 1) { Never("Stannis wygral pod Czarnym Nurtem (ROT StannisWon)", sd); return; }
-            if (bw == 2) kind = "rot";
-            else if (bw <= 0 && sd >= SpareDay()) kind = "plan";
+            if (bw == 2 && won == 0) kind = "rot";
+            else if (sg != 1 && bw != 1 && sd >= SpareDay()) kind = "plan";
             if (kind == null && TestForce()) kind = "test";
             if (kind == null)
             {
-                Wait("Czarny Nurt jeszcze nie rozstrzygniety (ROT " + BwEvent + " stan " + bw + ", zapas od dnia opowiesci " + ((int)SpareDay()).ToString(Inv) + ")", sd);
+                Wait(bw == 2 ? "brak odczytu ROT StannisWon (" + BwEvent + " zakonczone) - czeka do zapasu od dnia opowiesci " + ((int)SpareDay()).ToString(Inv) + " (" + SiegeEvent + " stan " + sg + ")"
+                     : "Czarny Nurt jeszcze nie rozstrzygniety (ROT " + BwEvent + " stan " + bw + ", " + SiegeEvent + " stan " + sg + ", zapas od dnia opowiesci " + ((int)SpareDay()).ToString(Inv)
+                       + (sg == 1 ? " - oblezenie w toku, zapas wstrzymany" : "") + ")", sd);
                 return;
             }
             // kanon
@@ -295,6 +317,7 @@ namespace Armoury
             else if (reach.IsAtWarWith(crown)) why = "Reach w wojnie z korona";
             else if (Alive(ds) && ab != null && ab.IsAllyWithKingdom(reach, ds)) why = "Reach w sojuszu ze Smocza Skala";
             else if (KingInTheNorth.CivilWarIn(reach)) why = "wojna domowa Diplomacy w Reach";
+            else if (KingInTheNorth.CivilWarIn(crown)) why = "wojna domowa Diplomacy w koronie";
             if (why != null) { _waitSince = -1.0; Wait(why, sd); return; }
             // bezpieczna chwila (najwyzej UnsafeMaxDays dob)
             double now = CampaignTime.Now.ToDays;
@@ -302,6 +325,9 @@ namespace Armoury
             bool cap = now - _waitSince >= UnsafeMaxDays;
             string unsafeWhy = KingInTheNorth.FoldUnsafeWhy(reach, "Reach");
             if (unsafeWhy != null && !cap) { Wait("bezpieczna chwila (" + unsafeWhy + "; najwyzej " + UnsafeMaxDays + " dob, minelo " + F1(now - _waitSince) + ")", sd); return; }
+            // gracz w osadzie Reach (menu miasta / zamku / wsi) - zmiana krolestwa osady przy otwartym GameMenu: czekamy az wyjdzie (bez limitu 7 dob)
+            string inSt = PlayerInSettlementOf(reach);
+            if (inSt != null) { Wait("bezpieczna chwila (gracz w osadzie Reach: " + inSt + " - wstapienie po wyjsciu na mape)", sd); return; }
             DoFold(reach, crown, kind, cap ? unsafeWhy : null, sd, bw, won);
         }
 
@@ -320,7 +346,37 @@ namespace Armoury
             // pakty Diplomacy Reach i stan m104 (2) - przed zniszczeniem
             try { _pactText = Prologue.ReachFoldPrep(reach); } catch (Exception e) { Stumble("ReachFoldPrep", e); _pactText = "BLAD"; }
             _holdCallsAtFold = Prologue.HoldReachCalls;
-            var r = KingInTheNorth.Fold(reach, crown, P, "Reach", "korona");
+            // migawka rodow i twierdz (wyjatek w srodku Fold - stan nie moze zostac "czeka", gdy rody sa juz w koronie)
+            var preClans = new List<string>(); var preForts = new List<string>(); string preSeat = "", preRuler = "";
+            try
+            {
+                preRuler = reach.RulingClan != null ? reach.RulingClan.StringId ?? "" : "";
+                preSeat = reach.RulingClan != null && reach.RulingClan.HomeSettlement != null ? reach.RulingClan.HomeSettlement.StringId ?? "" : "";
+                foreach (var c in reach.Clans)
+                {
+                    if (c == null || c.IsEliminated || c.StringId == null) continue;
+                    preClans.Add(c.StringId);
+                    foreach (var t in c.Fiefs) if (t != null && t.Settlement != null && !preForts.Contains(t.Settlement.StringId)) preForts.Add(t.Settlement.StringId);
+                }
+            }
+            catch (Exception e) { Stumble("DoFold(migawka)", e); }
+            KingInTheNorth.FoldResult r = null;
+            try { r = KingInTheNorth.Fold(reach, crown, P, "Reach", "korona"); }
+            catch (Exception e)
+            {
+                Stumble("Fold", e);
+                int moved = 0;
+                try { foreach (var id in preClans) { var c = FindClan(id); if (c != null && c.Kingdom == crown) moved++; } } catch { }
+                if (moved == 0 && !reach.IsEliminated)
+                {
+                    Log.Info(P + "BLAD w srodku wstapienia (" + e.GetType().Name + ") - zaden rod nie przeszedl, Reach istnieje: proba znowu w nastepnej dobie | potkniecia " + _stumbles + ".");
+                    return;
+                }
+                r = new KingInTheNorth.FoldResult { Clans = preClans.Count, Moved = moved, RulerId = preRuler, Seat = preSeat, SrcGone = reach.IsEliminated };
+                r.ClanIds.AddRange(preClans); r.FortIds.AddRange(preForts);
+                Log.Info(P + "BLAD w srodku wstapienia (" + e.GetType().Name + ") - rodow juz w koronie " + moved + "/" + preClans.Count + ", Reach zniszczone " + (reach.IsEliminated ? "TAK" : "NIE")
+                         + " - stan ZROBIONE (aliasy Kroniki i m104 (2) jak po wstapieniu) | potkniecia " + _stumbles + ".");
+            }
             _last = r;
             _st = 1; _day = (int)Math.Floor(sd); _dayC = dayC; _wy = kind; _player = r.Role; _waitSince = -1.0; _ruler = Clean(r.RulerId);
             _clans.Clear(); _clanSet.Clear(); _forts.Clear(); _fortSet.Clear();

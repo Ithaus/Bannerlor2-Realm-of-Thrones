@@ -291,7 +291,7 @@ namespace Armoury
                 Log.Info(CwTag + (offWhy ?? "klucz Canon Dorne Joins Crown NIE") + " - nasz pakt korona-Dorne wygaszony " + n + "."); }
             if (!here) { _reachState = _dorneState = ScopeNo; return; }
             if (ReachJoinsCrown.Done) _reachState = ReachInCrownText();
-            if (!rk && !dk) { _reachState = "klucz NIE"; _dorneState = "klucz NIE"; return; }
+            if (!rk && !dk) { _reachState = ReachJoinsCrown.Done ? ReachInCrownText() : "klucz NIE"; _dorneState = "klucz NIE"; return; }   // 332: stan "w koronie" nie nadpisany
             if (_crownEnded) { _dorneState = "zakonczone (najazd Daenerys, dzien opowiesci " + _crownEndDay.ToString(Inv) + ")"; _reachState = ReachJoinsCrown.Done ? ReachInCrownText() : _dorneState; return; }
             if (DanyInvaded()) { EndCrown("DanyInvasionEvent ruszyl", sd); return; }
             var crown = K(Crown); var reach = K(ReachId); var dorne = K(DorneId);

@@ -456,15 +456,19 @@ namespace Armoury
                 }
                 var g2 = Heads(a[1], c, out detail);
                 if (g2.Count == 0) return Res.Skip;
+                // 332: po wstapieniu Reach do korony grupa korony zawiera rody Reach - pary Reach z Reach pomijane (spor Reach z korona, nie z wlasnymi chorazymi)
+                bool rAlias = ReachJoinsCrown.IsAlias(a[0]) || ReachJoinsCrown.IsAlias(a[1]);
+                int rSkip = 0;
                 foreach (var x in g1)
                     foreach (var y in g2)
                     {
                         if (x == y || x == me || y == me) continue;
+                        if (rAlias && ReachJoinsCrown.IsReachClan(x.Clan) && ReachJoinsCrown.IsReachClan(y.Clan)) { rSkip++; continue; }
                         ChangeRelationAction.ApplyRelationChangeBetweenHeroes(x, y, d, false);
                         pairs++;
                     }
                 if (pairs == 0) { detail = "grupy " + a[0] + " i " + a[1] + " bez par (te same postacie albo gracz)"; return Res.Skip; }
-                detail = "glowy " + a[0] + " (" + g1.Count + ") <-> glowy " + a[1] + " (" + g2.Count + "): par " + pairs;
+                detail = "glowy " + a[0] + " (" + g1.Count + ") <-> glowy " + a[1] + " (" + g2.Count + "): par " + pairs + (rSkip > 0 ? " (pominietych par Reach-Reach 332: " + rSkip + ")" : "");
                 return Res.Done;
             }
 
