@@ -1,6 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
-## STAN 05.11.2026 ok. 21:55 CEST: WGRANIE 165 (najnowszy) - 330 wojna do kapitulacji + 331 wjazd do miast
+## STAN 05.11.2026 ok. 23:05 CEST: WGRANIE 166 (najnowszy) - 332 Reach do korony po Czarnym Nurcie
+- W GRZE: Armoury.dll d3db557ea69a63ddef3f146441bb2070 (galaz noc/332-reach e55aaa19 od noc/330x-integracja; worktree scratchpad sesji 0a2a8b2b n332). Kopia 165: Armoury.dll.bak-2026-11-05-przed-wgranie166 i D:/Backup-Bannerlord/wgrane/2026-11-05-przed-166. Logi i zapis Jeffa 22:44: D:/Backup-Bannerlord/logi-jeffa/2026-11-05-noc.
+- 332 (decyzja Jeffa 05.11): sojusz Reach-korona (m104) do Czarnego Nurtu; po ROT BlackwaterEvent (Stannis przegral, King's Landing w koronie; zapas dzien opowiesci 916) rody Reach z lennami do vlandia, empire_w zniszczone, bez konca sojuszu 900; Kronika alias empire_w; czeka, gdy gracz w osadzie Reach / wojna domowa korony.
+- Test at332 (14 dob, flaga armoury-reach332.flag): kod 0, rodow 43/43, lenna 17/17, partie i ludzie bez strat, armie zachowane, T1-T10 TAK, reach332/wojna330/polnoc326/pokoj264 NIE 0.
+- U Jeffa: rozejm 330 wszedl d.109372 (do d.109414). Dzien opowiesci ok. 553; Czarny Nurt ok. 767.
+
+## STAN 05.11.2026 ok. 21:55 CEST: WGRANIE 165 - 330 wojna do kapitulacji + 331 wjazd do miast
 - W GRZE: Armoury.dll 41feeb443ba0e081161c7e9e1bc8a57e (galaz noc/330x-integracja 0e29f73a = 330 + 331; worktree scratchpad sesji 0a2a8b2b n326x). Kopia 164: Armoury.dll.bak-2026-11-05-przed-wgranie165 i D:/Backup-Bannerlord/wgrane/2026-11-05-przed-165. Logi i zapis Jeffa: D:/Backup-Bannerlord/logi-jeffa/2026-11-05-wieczor.
 - 330 (docs/PROJEKT-330-WOJNA-DO-KAPITULACJI.md, sekcja H): korona-Polnoc bez stalego pokoju; rozejm 42 doby tylko przy zmeczeniu >=100 po >=84 dobach wojny (takze barter gracza = rozejm); korona nigdy nie kapituluje; kapitulacja tylko Polnocy (K1-K3); staly pokoj tylko gdy wladca korony Bran/Jon; bez zimy. Karencja 7 dob po 1. wczytaniu.
 - 331: rozkaz gracza "jedz do osady" (<=3 h, nie wroga) nie jest przerywany przez trening przed snem/oboz o zmierzchu (Riverrun). Linia logu "Oboz (331)".
