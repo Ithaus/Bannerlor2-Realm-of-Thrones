@@ -8,7 +8,7 @@
   326d okno lupu (do kiesy / ludzie / korona / dar / okup) + 1/3 sakiewek pokonanych dla gracza (Jeff "tak").
 - Testy: 30 dob + 7 bitew kod 0, ERROR 0; 12 dob z flaga: 7/8 zwrotow (Sarsfield czeka - glowa w niewoli). Szczegoly: CHANGELOG "WGRANIE 164".
 - DO SPRAWDZENIA w grze Jeffa: SPIS i zwroty 326b po wyjsciu z The Eyrie; zalogi zwroconych twierdz; "trzecia gracza" > 0 w oknie lupu; floty Polnocy; linie (326c) koniec zbiorki/atak.
-- Otwarte: fabula stoi (dzien 700: RenlyDeath/Blackwater/Krwawe Gody czekaja, pokoj Korona-Polnoc zablokowany do Krwawych Godow, zmeczenie 100/100) - do rozpoznania; Ten Towers dubel "zdobycie" naprawiony (F).
+- Fabula NIE stoi (sprawdzone 05.11 16:xx): dzien opowiesci = dzien kalendarza - 188 (prolog), u Jeffa kal. 706 = opowiesci 518. Os x4.33 (AUDYT-KALENDARZ 3.1): Melisandre 520, smierc Renly'ego 534 (test at326x/probyN: tak, Reach -> sojusz z korona d535), Blackwater 737/767 (kal. ok. 925/955), Karstark 823, Krwawe Gody 953 (kal. ok. 1141); warunki RW (Roose, Walder Frey, Robb zywi, Blizniaki u Freyow) spelnione. Pokoj Polnoc-korona zablokowany do RW = ok. 435 dob kalendarza - zgodnie z kanonem (Jeff 15.10 "jest dobrze"). Ten Towers dubel "zdobycie" naprawiony (F).
 
 ## W TOKU 05.11.2026 ok. 13:30 CET: 326 POLNOC ZA SILNA (Jeff gra - nic nie wgrywac/testowac przy wlaczonej grze)
 - Jeff 05.11 (zapis Ironman0gXONzURi8yO.sav 13:18, dzien 109348): Polnoc bije Lannisterow, Greyjoyow, korone; ok. 18.3k w polu + 18.6k zalogi, twierdz 44 (start 14);
