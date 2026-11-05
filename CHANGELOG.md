@@ -1,5 +1,50 @@
 # DZIENNIK ZMIAN
 
+## 326a/326b - floty wedlug krolestw (Polnoc bez floty) i zwrot zdobyczy Polnocy spoza jej ziem (noc/326-polnoc od 163 = noc/325-zima 33d03a31; Armoury.dll ad8b9f4c13e4ce0a2b8e714abb05ad71 - NIE WGRANE, gra Jeffa dziala)
+
+**Problem:** Jeff 05.11 (zapis Ironman0gXONzURi8yO 13:18): "polnoc jest za silna, bije lanisterow, greyjoyow, krolestwo, ma ponad 40k zolnierzy"; "jak to mozliwe, ze Rob Stark zebral flote
+i poplynal na wyspy i zdobyl port"; "oddaj greyjoyom zabrane ziemie"; "Clegane's Keep, Deep Den ... oddaj to po zdobyciu prawowitym wlascicielom". Log Armoury-2026-11-04_23-31-36 (dzien 109348):
+"Wojna kanonu - krolestwo (264)": The North partie lordow 102 (18 306 ludzi), "Rownowaga wojny (274)": zalogi A 18 557, twierdze A 44 (start 14), B 14 (start 21); OB5 "ZDOBYTE" przez Polnoc:
+Clegane's Keep (castle_V4, pierwotnie Clegane/vlandia), Deep Den (castle_B4, Lydden/vlandia), Ten Towers (ROT_town22, Harlaw/sturgia); "Rozkazy morskie (E8/P3)": 286 partii ze statkami.
+
+**Przyczyna:** (326a) NavalDLC ShipTradeCampaignBehavior.DailyTickClan - kazdy rod AI kupuje statek z szansa 0.5/dobe (ConsiderPurchasingShip bez patrzenia na ideal), ideal =
+limit partii x 3 (NavalDLCClanShipOwnershipModel, bez kultury/krainy), sprzedaz tylko statku, bez ktorego sklad ma wyzsza ocene - nadmiar zostaje; IslandRoads puszcza partie ze statkami
+"lad i morze". Polnoc kupila flote w White Harbor i poplynela na wyspy. (326b) brak reguly - Polnoc trzyma wszystko, co zdobyje; kanon (Robb wygrywa bitwy, nie trzyma Zachodu ani wysp).
+
+**Zmiana (Armoury):**
+- **326a** nowy `NavalRealms.cs` (klucz **Naval Realms**, TAK): postfiks GetIdealShipNumberForClan - ideal x mnoznik krolestwa (Zelazne Wyspy x2, Dragonstone / Braavos / Volantis /
+  Wyspy Letnie x1.5, Lys / Tyrosh x1.25, korona, Reach, Myr, Pentos, Lorath, Qarth, Ibben, Yi Ti, Aegon x1, Daenerys x0.75, Stormlands / Vale x0.6, Dorne x0.5, Skagos x0.4, Dorzecze /
+  Nocna Straz x0.2, Norvos / Qohor / Sarnor x0.1, Polnoc / Wolni Ludzie / Dothrakowie 0, Manderly (White Harbor) x0.5; rod bez krolestwa bez zmian); prefiks ConsiderPurchasingShip -
+  rod >= ideal nie kupuje; doba: nadmiar sprzedawany portom (ApplyByTrade - bramki i zaplata 181 z nadwyzki kasy portu), 1 statek na rod (bez floty do 3), partia na ladzie z droga
+  ladowa do siedziby rodu (na wyspie statki zostaja), porty wlasnego krolestwa najpierw, 3 porty na probe; bez kupca 10 dob (bez floty 3) i nadmiar z naszego mnoznika - statek
+  zlozony w porcie bez zaplaty (ApplyByTransferring, zloto sie nie pojawia). `ShipsToPort181.ShipyardLevelOf` (internal opakowanie). Behavior NavalRealmsBehavior (doba).
+- **326b** nowy `NorthConquest.cs` (klucz **North Conquest Return**, TAK; zapis arm_k326b): dopoki KingInTheNorth.FightsOnEnd == null, twierdza w Polnocy (battania), ktorej pan
+  z poczatku kampanii (ROT-Map settlements.xml) byl rodem spoza Polnocy (spclans super_faction) - wraca do rodu pierwotnego (zywy, wolna glowa, nie gracz; takze wewnatrz Polnocy po
+  unii 272), inaczej do rodu panujacego jego krolestwa z poczatku (zyje, nie Polnoc, nie gracz), inaczej zostaje. Wyjatki: Harrenhal (ROT_town32), Red Keep (blizniak, z KL).
+  (1) spis raz po wczytaniu, (2) kazde zdobycie BySiege przez Polnoc do kolejki - zwrot najwczesniej po 1 dobie. Zmiana pana droga BookHoldings (nowe `TransferFor` -> TryRow:
+  warunki chwilowe, bohaterowie, zaloga Polnocy do partii Polnocy, SCA Polnocy jak przed, ApplyByDefault, jency swoi, obsada zalogi z krolestwa odbiorcy) + `ScaDropClaim`
+  (roszczenie SCA odbiorcy na te osade zdjete). Gracz rzadzi Polnoca / osada gracza / krolestwo odbiorcy gracza - pominiete z linia. `BookHoldings.Prefix` z const na pole
+  (znacznik linii TryRow na czas 326b), `BookHoldings.PlayerOnMapFor`, `KingInTheNorth.OrigOwnerOf / OrigDataText / ClanByIdFor` (internal). Wiadomosc gracza po angielsku.
+- `Settings.cs` grupa "Fleets of the realms and the conquests of the North (326)", `McmSettings.cs` (gen_mcm 2825), `SubModuleMain.cs` (latki 326a po 181, dwa behaviory po BookHoldings).
+- `tools/sprawdz_logi.py` grupa **polnoc326** (P326-S self-test, L latki, 1 linie doby, 2 statki Polnocy nie rosna, 3 Zelazne Wyspy ideal >= gry, 4 spis i zwroty, 5 Harrenhal 0, 6 potkniecia).
+
+**Linie logu:** "Floty krolestw (326a): latki ...", "Floty krolestw (326a): start sesji | model idealu NavalDLC: ...", "Floty krolestw (326a): dzien N | ... | krolestwa (statki / ideal 326a /
+ideal gry / nadmiar): ..."; "Zwrot zdobyczy Polnocy (326b): start sesji ...", "... SPIS po wczytaniu ...", "... zdobyta przez ...", linia TryRow z tym znacznikiem, "... ZWROT X -> Y ...",
+"... doba N | zwrocone ...".
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci: GetIdealShipNumberForClan czyta tylko ShipTradeCampaignBehavior (sprzedaz gry > ideal) - zgodne; ConsiderPurchasingShip wolane tez przy nowej kampanii
+  (OnNewGameCreatedPartialFollowUp) - prefiks dziala tak samo. Sprzedaz idzie przez 181 TradePrefix (bramka portu bez nadwyzki / pelnego - statek zostaje, liczone "odmowy portow").
+  Inny model idealu (inny mod) - linia "model idealu NavalDLC" to pokaze; latka wtedy nie dziala na sprzedaz gry.
+- AI wyboru celu: partia bez statkow nie plynie (gra: HasNavalNavigationCapability; IslandRoads zmienia droge na "lad i morze" tylko partiom ze statkami). Partie Polnocy, ktore
+  dzis stoja na wyspach, zachowuja statki do powrotu na lad (inaczej utknelyby) - moga jeszcze plywac, az nadmiar zejdzie (do 3 statkow/rod/dobe).
+- 326b: Polnoc moze oblegac te same zamki znowu (zdobywa, lupi, zamek wraca) - petla oblezen zamiast trwalego podboju; obserwowac linie OB5 i "Rownowaga wojny (274)" twierdze A.
+  Zaloga Polnocy przenoszona do najblizszych partii Polnocy (MoveGarrison BookHoldings - przeniesienie rostera, takze przez morze z wysp). Obsada odbiorcy z partii jego krolestwa (f21).
+  Rw320 (Krwawe Gody) dotyczy rodow, ktore przeszly do korony - nie sa w Polnocy, 326b ich nie rusza.
+- Wymaga testu z zapisem Jeffa (spis 326b w pierwszej godzinie na mapie): --grupa polnoc326 i bookholdings-podobne linie TryRow; potem obserwacja floty Polnocy przez kilka dob.
+
+**Status:** DO SPRAWDZENIA (zbudowane, NIE wgrane - gra Jeffa dziala; autotest po wyjsciu Jeffa).
+
 ## 325 - zima: druzyny jedza najwyzej +20% (nie +50%), spichlerze wsi napelniaja polki od pierwszej doby, 3 uwagi niskie z recenzji 324 R3 (noc/325-zima od 162 = noc/324-glod a78b1898; Armoury.dll 337384b767f1b62dea21d28cde506408 - NIE WGRANE)
 
 **Problem:** Jeff 04.11 "i zima jemy o 20% wiecej a nie 40%". Log Armoury-2026-11-04_15-09-25 (doby 109250-109253): "Zima wedlug krain (E4/1): ... jedzenie partii zima:

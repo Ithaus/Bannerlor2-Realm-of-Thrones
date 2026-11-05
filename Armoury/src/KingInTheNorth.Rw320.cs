@@ -235,6 +235,21 @@ namespace Armoury
             catch (Exception e) { Stumble("LoadOrig.spclans", e); _origKingdom = new Dictionary<string, string>(StringComparer.Ordinal); _origErr += " spclans.xml " + e.GetType().Name; }
         }
 
+        /// <summary>326b (NorthConquest): pan osady z poczatku kampanii (ROT-Map settlements.xml) i krolestwo tego rodu w danych ROT (spclans.xml); null - brak danych.</summary>
+        internal static string OrigOwnerOf(string stId, out string origKingdom)
+        {
+            origKingdom = null;
+            LoadOrig();
+            string c;
+            if (_origOwner == null || stId == null || !_origOwner.TryGetValue(stId, out c)) return null;
+            if (_origKingdom != null) _origKingdom.TryGetValue(c, out origKingdom);
+            return c;
+        }
+
+        internal static string OrigDataText() { return "osad " + (_origOwner != null ? _origOwner.Count : 0) + ", rodow " + (_origKingdom != null ? _origKingdom.Count : 0) + (_origErr.Length > 0 ? " (" + _origErr.Trim() + ")" : ""); }
+
+        internal static Clan ClanByIdFor(string id) { return ClanById(id); }
+
         private static Clan ClanById(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;

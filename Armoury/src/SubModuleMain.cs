@@ -367,6 +367,7 @@ namespace Armoury
                 MusterOut.ApplyAll(_harmony);
                 CraftPopup.ApplyAll(_harmony);
                 try { ShipsToPort181.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ShipsToPort181.ApplyAll", e); }   // 3.1/3.3 (33) 181: statki do portu (NavalDLC, ChangeShipOwnerAction, MapEvent) - E5/B5: wylaczniki domyslnie WL (porty placa z nadwyzki D4); WYL w MCM = sam pomiar; PRZED oknami ksiegi obiegu (okna O07/O08 maja Priority.First)
+                try { NavalRealms.ApplyAll(_harmony); } catch (Exception e) { Log.Error("NavalRealms.ApplyAll", e); }   // 326a: floty wedlug krolestw (ideal rodu NavalDLC x mnoznik krolestwa, zakup do idealu)
                 // paczka 169: ksiega obiegu (tylko log) - okna pomiaru zlota; PO naszych latkach na te same metody (BuildFunding, WorkshopTrade,
                 // MoneyLedger), PRZED ksiega towarow, ktora musi byc ostatnia; kazde okno wpinane we wlasnym try
                 try { CirculationWindows.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CirculationWindows.ApplyAll", e); }
@@ -835,6 +836,8 @@ namespace Armoury
                 starter.AddBehavior(new A16Behavior());             // A16: linie dobrobytu, bohaterow i ludnosci BK; start sesji - wylacznik warstwy BK
                 starter.AddBehavior(new ReliefBehavior());          // OB5 odsiecz oblezonych twierdz (linie, stan oblezen) i S11 rody z lennem zmieniajace krolestwo (linia)
                 starter.AddBehavior(new BookHoldingsBehavior());    // f19-kanon-b: jednorazowe przywrocenie wlosci z ksiazki (flaga arm_book_holdings w zapisie)
+                starter.AddBehavior(new NavalRealmsBehavior());     // 326a: floty wedlug krolestw - nadmiar statkow do portow, linia "Floty krolestw (326a)"
+                starter.AddBehavior(new NorthConquestBehavior());   // 326b: zwrot zdobyczy Polnocy spoza jej ziem (zapis arm_k326b)
                 starter.AddBehavior(new CanonCompanionsBehavior()); // m101-postacie: postacie kanonu do rodow, usuniete, zmiany stron (flaga arm_canon_companions, tylko nowa kampania)
                 starter.AddBehavior(new PrologueBehavior());        // m101-prolog: wybor startu w zapisie (arm_prologue), zdarzenia prologu 298
                 starter.AddBehavior(new CanonWarsBehavior());       // m104-wojny: wojny wedlug ksiazki - Essos na kalendarzu, Reach i Dorne z korona, smoki Daenerys (zapis arm_m104)

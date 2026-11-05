@@ -319,6 +319,9 @@ namespace Armoury
             else { _ovN[path]++; _ovGold[path] += gold; }
         }
 
+        /// <summary>326a (NavalRealms): poziom stoczni NavalDLC miasta (0 = bez stoczni) - ta sama miara co wybor portu 181.</summary>
+        internal static int ShipyardLevelOf(Town t) { return ShipyardLevel(t); }
+
         private static int ShipyardLevel(Town t)
         {
             if (!_shipyardTried)

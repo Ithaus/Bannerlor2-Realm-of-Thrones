@@ -11304,6 +11304,14 @@ namespace Armoury
         [SettingPropertyGroup("Battle: living commanders and veteran troops hold a shaken company (318c)")]
         public bool PainBreakTierSteadiness { get; set; } = true;
 
+        [SettingPropertyBool("Naval Realms", HintText = "Each realm keeps the fleet it has in the books: the Iron Islands twice the usual number of ships, Dragonstone, Braavos, Volantis and the Summer Isles half again as many, the crown, the Reach and most Free Cities the usual number, the Stormlands and the Vale fewer, Dorne half, the Riverlands and the Night's Watch very few, and the North none at all except House Manderly of White Harbor. Lords no longer buy ships beyond their realm's number, and ships they have beyond it are sold to ports one a day, up to three a day in a realm with no fleet (paid from the port's own purse; if no port can pay for ten days - three in a realm with no fleet - the ship is laid up in port for nothing). A lord stranded on an island keeps his ships until he is back on the mainland. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Fleets of the realms and the conquests of the North (326)")]
+        public bool NavalRealms { get; set; } = true;
+
+        [SettingPropertyBool("North Conquest Return", HintText = "As in the books, the King in the North wins battles but does not keep the castles he takes beyond his own lands. Until the end of the North's story (after the Battle of the Bastards), every castle or town the North holds that belonged at the start of the campaign to a house outside the North goes back to that house, or to the king of its realm if the house is gone: once after loading, and a day after each new conquest, when no battle is near. The North keeps the plunder; its garrison marches to its own lords. Harrenhal stays with the Boltons. Not if you rule the North, the castle is yours or the rightful realm is yours. Off = the North keeps what it takes", RequireRestart = false)]
+        [SettingPropertyGroup("Fleets of the realms and the conquests of the North (326)")]
+        public bool NorthConquestReturn { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -14129,6 +14137,8 @@ namespace Armoury
             s.BannerLeaderHold = BannerLeaderHold;
             s.BannerRanksIgnoreKnockback = BannerRanksIgnoreKnockback;
             s.PainBreakTierSteadiness = PainBreakTierSteadiness;
+            s.NavalRealms = NavalRealms;
+            s.NorthConquestReturn = NorthConquestReturn;
         }
 
         internal static void Apply()

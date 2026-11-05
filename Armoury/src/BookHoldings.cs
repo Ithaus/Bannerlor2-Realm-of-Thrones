@@ -95,7 +95,8 @@ namespace Armoury
     internal static class BookHoldings
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        private const string Prefix = "Wlosci z kronik (f19-kanon-b): ";
+        private const string PrefixBase = "Wlosci z kronik (f19-kanon-b): ";
+        private static string Prefix = PrefixBase;   // 326b (NorthConquest.TransferFor): na czas zwrotu zdobyczy Polnocy - wlasny znacznik linii
         private const string Ver = "bh1";
         private const int GiveUpDays = 30;          // tyle dob czekania na warunki chwilowe - potem osada pominieta ("czekanie")
         private const int MaxRowErrors = 3;         // wyjatki na jednej osadzie - potem pominieta ("blad"); nic nie gasnie globalnie
@@ -234,6 +235,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ gotowosc: gracz na mapie
+        internal static bool PlayerOnMapFor(out string why) { return PlayerOnMap(out why); }   // 326b: ten sam warunek gotowosci (gracz na mapie)
+
         private static bool PlayerOnMap(out string why)
         {
             why = null;
@@ -639,6 +642,38 @@ namespace Armoury
             sb.Append('.');
             Log.Info(sb.ToString());
             return "ok:" + day.ToString(Inv);
+        }
+
+        /// <summary>
+        /// 326b (NorthConquest): jedna twierdza do rodu `to` ta sama droga co wiersz tabeli (TryRow: warunki chwilowe, bohaterowie, zaloga starego pana do partii
+        /// jego krolestwa, roszczenie SCA starego pana, ApplyByDefault, jency swoi do zalogi, obsada z krolestwa nowego pana). Linie z podanym znacznikiem.
+        /// Wynik koncowy (ok:dzien / bez-zmian / gracz / brak-...) albo null i `wait`. Liczniki wiadomosci BookHoldings po wywolaniu czyszczone. Rzuca jak TryRow.
+        /// </summary>
+        internal static string TransferFor(string tag, string stId, string twinId, Clan to, int day, out string wait)
+        {
+            wait = null;
+            if (to == null || to.Kingdom == null) { wait = "odbiorca bez krolestwa"; return null; }
+            var row = new Row(stId, to.StringId, to.Kingdom.StringId, twinId);
+            var old = Prefix;
+            Prefix = tag;
+            try { return TryRow(row, day, out wait); }
+            finally { Prefix = old; _batchDone.Clear(); _batchMoved.Clear(); }
+        }
+
+        /// <summary>326b: roszczenie Strategic Campaign AI krolestwa `k` na te osade (cel ReclaimLostFief) - zdjete, gdy osada wlasnie do niego wrocila.</summary>
+        internal static string ScaDropClaim(Kingdom k, string stId)
+        {
+            try
+            {
+                var d = ScaClaims();
+                if (d == null || k == null) return "SCA brak";
+                if (!d.Contains(k.StringId)) return "roszczenie " + k.StringId + ": brak";
+                string v = d[k.StringId] as string;
+                if (v != stId) return "roszczenie " + k.StringId + ": " + (v ?? "-") + " (inna osada - bez zmian)";
+                d.Remove(k.StringId);
+                return "roszczenie " + k.StringId + " na " + stId + " zdjete (osada wrocila)";
+            }
+            catch (Exception e) { Stumble("ScaDropClaim", e); return "roszczenie: blad"; }
         }
 
         private static void LogSkip(int day, Row row, Settlement st, string why)

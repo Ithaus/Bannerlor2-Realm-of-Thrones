@@ -94379,5 +94379,83 @@ def main(argv):
     return _wies323d_main_prev(argv)
 
 
+# ---- paczka 326: grupa polnoc326 - floty krolestw (326a) i zwrot zdobyczy Polnocy (326b) (Jeff 05.11) ----
+# Log Armoury (Armoury-*.log). Uzycie: --grupa polnoc326 <Armoury-*.log>.
+# P326-S  self-test wyrazen; P326-L latki 326a (ideal rodu, zakup rodu) wpiete; P326-1 linia dobowa 'Floty krolestw (326a)' i potkniecia 0;
+# P326-2  statki Polnocy (pierwsza -> ostatnia doba) nie rosna (krolestwo bez floty - nadmiar do portow); P326-3 Zelazne Wyspy maja ideal 326a >= ideal gry;
+# P326-4  spis 326b po wczytaniu (raz) i zwroty; P326-5 Harrenhal nigdy nie zwracany; P326-6 potkniecia 326b 0.
+P326_DAY = re.compile(r"Floty krolestw \(326a\): dzien (\d+) \| klucz (TAK|NIE)[^|]*\| dzis: zakupy zablokowane \(rod >= ideal\) (\d+), sprzedane portom (\d+) .*?, zlozone w porcie bez zaplaty (\d+),.*\| krolestwa \(statki / ideal 326a / ideal gry / nadmiar\): (.*?)(?: \| przyklady: .*)? \| potkniecia (\d+)\.$")
+P326_KROW = re.compile(r"(?:^|; )(.+?) (\d+)/(\d+)/(\d+)/(\d+)(?=;|$)")
+P326_SAMPLE = ("[00:00:01] Floty krolestw (326a): dzien 109350 | klucz TAK | dzis: zakupy zablokowane (rod >= ideal) 12, sprzedane portom 5 (zloto glow rodow +900 z kas portow 181), "
+               "zlozone w porcie bez zaplaty 1, odmowy portow 3, rody z nadmiarem odciete od domu (wyspa - statki zostaja) 2, bez portu w zasiegu ladu 0, wszystkie partie zajete 1 | "
+               "krolestwa (statki / ideal 326a / ideal gry / nadmiar): The North 40/4/360/36; Iron Islands 120/240/120/0 | przyklady: Stark (The North) -> White Harbor sprzedany | potkniecia 0.")
+
+
+def polnoc326_main(logp):
+    rep = Report()
+    m = P326_DAY.search(P326_SAMPLE)
+    rows = dict((r.group(1), [int(r.group(i)) for i in (2, 3, 4, 5)]) for r in P326_KROW.finditer(m.group(6))) if m else {}
+    st_ok = bool(m) and m.group(3) == "12" and rows.get("The North") == [40, 4, 360, 36] and rows.get("Iron Islands") == [120, 240, 120, 0]
+    rep.add("P326-S: self-test wyrazen na wzorze linii", "TAK" if st_ok else "wyrazenie nie czyta wzoru", "TAK", st_ok)
+    if not logp or not os.path.isfile(logp):
+        rep.add("P326-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    patch, days, spis, ret, harr, summ = [], [], [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if "Floty krolestw (326a): latki" in s:
+                patch.append(s)
+            elif "Floty krolestw (326a): dzien" in s:
+                days.append(s)
+            elif "Zwrot zdobyczy Polnocy (326b): SPIS" in s:
+                spis.append(s)
+            elif "Zwrot zdobyczy Polnocy (326b): dzien" in s and "| ZWROT " in s:
+                ret.append(s)
+                if "[ROT_town32]" in s:
+                    harr.append(s)
+            elif "Zwrot zdobyczy Polnocy (326b): doba" in s:
+                summ.append(s)
+    print(f"plik: {logp}")
+    ok_p = bool(patch) and "ideal rodu tak, zakup rodu tak" in patch[-1]
+    rep.add("P326-L: latki 326a (ideal rodu, zakup rodu)", patch[-1][patch[-1].find("latki"):][:120] if patch else "brak linii", "ideal rodu tak, zakup rodu tak", ok_p)
+    d = [P326_DAY.search(x) for x in days]
+    bad = sum(1 for x in d if not x)
+    d = [x for x in d if x]
+    rep.add("P326-1: linie dobowe 326a (czytelne)", f"{len(d)} (nie czyta {bad})", ">= 1, wszystkie czytelne", len(d) > 0 and bad == 0)
+    if d:
+        stum = max(int(x.group(7)) for x in d)
+        rep.add("P326-1b: potkniecia 326a", str(stum), "0", stum == 0)
+        first = dict((r.group(1), [int(r.group(i)) for i in (2, 3, 4, 5)]) for r in P326_KROW.finditer(d[0].group(6)))
+        last = dict((r.group(1), [int(r.group(i)) for i in (2, 3, 4, 5)]) for r in P326_KROW.finditer(d[-1].group(6)))
+        n0, n1 = first.get("The North", [0])[0], last.get("The North", [0])[0]
+        rep.add("P326-2: statki Polnocy (pierwsza -> ostatnia doba)", f"{n0} -> {n1} (ideal 326a {last.get('The North', [0, 0])[1]})", "nie rosna", n1 <= n0)
+        ii = last.get("Iron Islands")
+        rep.add("P326-3: Zelazne Wyspy - ideal 326a >= ideal gry", f"{ii[1]} / {ii[2]}" if ii else "brak w linii", "ideal 326a >= gry", bool(ii) and ii[1] >= ii[2])
+        sold = sum(int(x.group(4)) for x in d); laid = sum(int(x.group(5)) for x in d); blk = sum(int(x.group(3)) for x in d)
+        rep.add("P326-2b: sprzedane / zlozone / zakupy zablokowane (suma)", f"{sold} / {laid} / {blk}", "INFO", None)
+    rep.add("P326-4: spis 326b po wczytaniu", f"{len(spis)} linii; zwrotow {len(ret)}", "INFO (1 spis na zapis bez flagi; zwroty wg spisu)", None)
+    rep.add("P326-5: Harrenhal nie zwracany", str(len(harr)), "0", len(harr) == 0)
+    st = [int(re.search(r"potkniecia (\d+)\.$", x).group(1)) for x in summ if re.search(r"potkniecia (\d+)\.$", x)]
+    rep.add("P326-6: potkniecia 326b", str(max(st)) if st else "brak linii doby", "0", (max(st) == 0) if st else None)
+    rep.show()
+    return 0
+
+
+_polnoc326_main_prev = main
+
+
+def main(argv):
+    # paczka 326: grupa polnoc326 - opakowanie main jak wies323d
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "polnoc326":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return polnoc326_main(rest[0] if rest else None)
+    return _polnoc326_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
