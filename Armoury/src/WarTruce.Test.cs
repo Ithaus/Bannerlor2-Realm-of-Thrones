@@ -106,7 +106,7 @@ namespace Armoury
         {
             int s = 0; for (int i = 0; i < 42; i++) s = WarTruce.Step(s, true);
             int r = WarTruce.Step(s, false);
-            bool k1a = WarTruce.K1Cond(false, 3, 30, 3, 0.5, 0.67), k1b = WarTruce.K1Cond(false, 10, 30, 3, 0.5, 0.67), k1c = WarTruce.K1Cond(true, 1, 30, 3, 0.5, 0.67);
+            bool k1a = WarTruce.K1Cond(false, 3, 30, 3, 0.5, 0.67), k1b = WarTruce.K1Cond(false, 11, 30, 3, 0.5, 0.67), k1c = WarTruce.K1Cond(true, 1, 30, 3, 0.5, 0.67);
             bool k1d = WarTruce.K1Cond(false, 3, 6, 3, 0.7, 0.67), k1e = WarTruce.K1Cond(false, 9, 27, 3, 0.5, 0.67);
             string dN3 = WarTruce.DueKind(0, 0, 30, 42, 21, 30), dK1 = WarTruce.DueKind(42, 0, 0, 42, 21, 30);
             string dK2 = WarTruce.DueKind(0, 21, 0, 42, 21, 30), dNo = WarTruce.DueKind(41, 20, 29, 42, 21, 30);
@@ -117,7 +117,7 @@ namespace Armoury
             int none = WarTruce.SurrenderSide(new[] { 41, 20, 29, 0, 0, 0 }, 42, 21, 30, out kC);
             // wznowienie: rozejm - odbiorca daniny (brak - korona); zatrzask Z (tylko po kapitulacji Polnocy) - korona
             bool rTn = WarTruce.ResumeByNorth(true, WarTruce.NorthId), rTc = WarTruce.ResumeByNorth(true, ""), rZ = WarTruce.ResumeByNorth(false, WarTruce.NorthId);
-            text = "Step 42 dob " + s + ", po peknieciu " + r + " | K1 3 tw./30 " + T(k1a) + ", 10 tw. " + T(k1b) + ", z siedziba " + T(k1c) + ", sila 0.7 " + T(k1d) + ", 9 tw./27 " + T(k1e)
+            text = "Step 42 dob " + s + ", po peknieciu " + r + " | K1 3 tw./30 " + T(k1a) + ", 11 tw. " + T(k1b) + ", z siedziba " + T(k1c) + ", sila 0.7 " + T(k1d) + ", 9 tw./27 " + T(k1e)
                    + " | Polnoc K3 " + (dN3 ?? "-") + ", K1 " + (dK1 ?? "-") + ", K2 " + (dK2 ?? "-") + ", ponizej progow " + (dNo ?? "-")
                    + " | korona liczniki 99 -> " + crownMax + " (ma byc 0 - korona nigdy L), Polnoc K1 -> " + northK1 + " (" + (kB ?? "-") + "), ponizej -> " + none
                    + " | wznowienie Polnoc: rozejm odbiorca Polnoc " + T(rTn) + ", rozejm bez daniny " + T(rTc) + ", koniec Z " + T(rZ);

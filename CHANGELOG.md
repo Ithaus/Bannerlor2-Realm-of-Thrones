@@ -1,5 +1,8 @@
 # DZIENNIK ZMIAN
 
+## 330x-at - poprawka testu TB po biegu A (05.11): przypadek K1 '10 tw./30' oczekiwal NIE, a kod slusznie daje TAK (prog = max(3, 30/3) = 10, 10 <= 10);
+test sprawdza teraz 11 twierdz z 30 (ponad prog, oczekiwane NIE). Kod produkcyjny bez zmian (WarTruce.Test.cs, NIE WGRANE).
+
 ## 330 - wojna do kapitulacji Polnoc-korona: rozejm zamiast pokoju, kapitulacja K1-K3, zatrzask Z do nastepnego wydarzenia kanonu (noc/330-wojna od 326x = 166fdb5f - NIE WGRANE, bez autotestu)
 **Problem:** Jeff 05.11: "pokoj moze byc tymczasowy, ale nie staly"; "korona bedzie prowadzila wojne az do zwyciestwa". Dzis pokoj Polnoc-korona ze zmeczenia Diplomacy jest blokowany
 (264) do Krwawych Godow, a po kanonie przechodzi przez dziury: wczesne wyjscie 320a (Winterfell nie u Boltonow 120 dob), zapis bez wpisu ROT Revenge, klucz NorthFightsOn NIE,
