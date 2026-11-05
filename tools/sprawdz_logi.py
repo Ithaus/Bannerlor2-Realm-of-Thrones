@@ -94384,9 +94384,9 @@ def main(argv):
 # P326-S  self-test wyrazen; P326-L latki 326a (ideal rodu, zakup rodu) wpiete; P326-1 linia dobowa 'Floty krolestw (326a)' i potkniecia 0;
 # P326-2  statki Polnocy (pierwsza -> ostatnia doba) nie rosna (krolestwo bez floty - nadmiar do portow); P326-3 Zelazne Wyspy maja ideal 326a >= ideal gry;
 # P326-4  spis 326b po wczytaniu (raz) i zwroty; P326-5 Harrenhal nigdy nie zwracany; P326-6 potkniecia 326b 0.
-P326_DAY = re.compile(r"Floty krolestw \(326a\): dzien (\d+) \| klucz (TAK|NIE)[^|]*\| dzis: zakupy zablokowane \(rod >= ideal\) (\d+), sprzedane portom (\d+) .*?, zlozone w porcie bez zaplaty (\d+),.*\| krolestwa \(statki / ideal 326a / ideal gry / nadmiar\): (.*?)(?: \| przyklady: .*)? \| potkniecia (\d+)\.$")
+P326_DAY = re.compile(r"Floty krolestw \(326a\): dzien (\d+) \| klucz (TAK|NIE)[^|]*\| dzis: zakupy zablokowane \(rod >= ideal\) (\d+)(?:, zakupy dozwolone partii odcietej bez statkow \d+)?, sprzedane portom (\d+) .*?, zlozone w porcie bez zaplaty (\d+),.*\| krolestwa \(statki / ideal 326a / ideal gry / nadmiar\): (.*?)(?: \| przyklady: .*)? \| potkniecia (\d+)\.$")
 P326_KROW = re.compile(r"(?:^|; )(.+?) (\d+)/(\d+)/(\d+)/(\d+)(?=;|$)")
-P326_SAMPLE = ("[00:00:01] Floty krolestw (326a): dzien 109350 | klucz TAK | dzis: zakupy zablokowane (rod >= ideal) 12, sprzedane portom 5 (zloto glow rodow +900 z kas portow 181), "
+P326_SAMPLE = ("[00:00:01] Floty krolestw (326a): dzien 109350 | klucz TAK | dzis: zakupy zablokowane (rod >= ideal) 12, zakupy dozwolone partii odcietej bez statkow 1, sprzedane portom 5 (zloto glow rodow +900 z kas portow 181), "
                "zlozone w porcie bez zaplaty 1, odmowy portow 3, rody z nadmiarem odciete od domu (wyspa - statki zostaja) 2, bez portu w zasiegu ladu 0, wszystkie partie zajete 1 | "
                "krolestwa (statki / ideal 326a / ideal gry / nadmiar): The North 40/4/360/36; Iron Islands 120/240/120/0 | przyklady: Stark (The North) -> White Harbor sprzedany | potkniecia 0.")
 
@@ -94401,7 +94401,7 @@ def polnoc326_main(logp):
         rep.add("P326-F: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    patch, days, spis, ret, harr, summ = [], [], [], [], [], []
+    patch, days, spis, ret, harr, summ, veto = [], [], [], [], [], [], []
     with open(logp, encoding="utf-8", errors="replace") as f:
         for line in f:
             s = line.rstrip("\r\n")
@@ -94417,6 +94417,8 @@ def polnoc326_main(logp):
                     harr.append(s)
             elif "Zwrot zdobyczy Polnocy (326b): doba" in s:
                 summ.append(s)
+            elif "Zwrot zdobyczy Polnocy (326b): weto" in s or ("Zwrot zdobyczy Polnocy (326b): dzien" in s and "ZDOBYTA MIMO WETA" in s):
+                veto.append(s)
     print(f"plik: {logp}")
     ok_p = bool(patch) and "ideal rodu tak, zakup rodu tak" in patch[-1]
     rep.add("P326-L: latki 326a (ideal rodu, zakup rodu)", patch[-1][patch[-1].find("latki"):][:120] if patch else "brak linii", "ideal rodu tak, zakup rodu tak", ok_p)
@@ -94439,6 +94441,9 @@ def polnoc326_main(logp):
     rep.add("P326-5: Harrenhal nie zwracany", str(len(harr)), "0", len(harr) == 0)
     st = [int(re.search(r"potkniecia (\d+)\.$", x).group(1)) for x in summ if re.search(r"potkniecia (\d+)\.$", x)]
     rep.add("P326-6: potkniecia 326b", str(max(st)) if st else "brak linii doby", "0", (max(st) == 0) if st else None)
+    # po recenzji: weto 60 dob na zwrocone twierdze - zdjete oceny celow Polnocy (linie "weto") i zdobycia mimo weta (powinno byc 0)
+    mimo = [x for x in veto if "ZDOBYTA MIMO WETA" in x]
+    rep.add("P326-7: weta 326b (linie / zdobyte mimo weta)", f"{len(veto) - len(mimo)} / {len(mimo)}", "INFO / 0", (len(mimo) == 0) if ret else None)
     rep.show()
     return 0
 

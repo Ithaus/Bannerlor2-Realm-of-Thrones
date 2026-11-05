@@ -1,5 +1,53 @@
 # DZIENNIK ZMIAN
 
+## 326a/326b po recenzji (3 recenzje 05.11) - weto 60 dob na zwrocone twierdze, jency Polnocy, wyspy i statki (noc/326-polnoc; Armoury.dll a977aee19f0ca5b1da79ec123ceb8205 - NIE WGRANE, gra Jeffa dziala)
+
+**Problem:** recenzje 326a/326b (R1 stan gry, R2 NavalDLC, R3 logika i kanon). Najwazniejsze potwierdzone w kodzie: Polnoc moze krecic zdobycie-zwrot-zdobycie tej samej twierdzy
+(TransferFor bez korekty okolicy, OnOwnerChanged bez licznika - lup, wplywy i straty zalog co cykl); zwrot uwalnia jencow Polnocy (PrisonerReleaseCampaignBehavior.OnSettlementOwnerChanged
+wypuszcza bohaterow nie w wojnie z nowym panem - Theon w Ten Towers); po naturalnej Bitwie Bekartow regula dziala dalej (KingInTheNorth.Rw320: `if (bs >= 2) return;` przed `_foEnd`);
+Mormont (Mormont Keep - miasto bez drogi ladowej, "lad -" w logu 04.11) z idealem 0 traci statki na wyspie i nie moze kupic - rod uwieziony; lordowie Polnocy bez statkow przewiezieni
+armia Manderly'ego (HasNavalNavigationCapability armii) zostaja na wyspach bez zakupu.
+
+**Zmiana (Armoury):**
+- **326b weto (decyzja prowadzacego):** zwrocona twierdza (i blizniak Red Keep) przez **60 dob** nie jest celem oblezenia ani najazdu (jej wsie) dla partii lordow Polnocy: postfiks
+  CampaignEventDispatcher.AiHourlyTick (priorytet 45, ocena -1 jak weta 274) i postfiks BKArmyBehavior.FindArmyObjective (cel -> null); trwajace oblezenie Polnocy bez weta; gracz
+  rzadzi Polnoca - bez weta; twierdza znow u Polnocy - bez weta. Weta w zapisie (arm_k326b format **nc2**; nc1 czytany - doby x 24). Linie: "... | ZWROT ... | WETO oblezen i najazdow
+  Polnocy do dnia N (aktywnych wet K)", "... weto | dzien N | oblezenie/najazd/BK cel armii X ..." (raz na osade i doba), doba: "weta Polnocy: aktywne N [...], wygasle, zdjete oceny
+  celow: oblezenia / najazdy / BK cel armii"; zdobycie mimo weta - "ZDOBYTA MIMO WETA". Latki wpina SessionStart (NorthConquest.SetHarmony w SubModuleMain - tylko zapamietanie).
+- **326b czas (R1-W1):** kolejka liczy GODZINY - zwrot najwczesniej 24 h po zdobyciu (bylo: doba ucieta - zdobycie o 23:00 wracalo o polnocy).
+- **326b jency (R3-K2):** przed zmiana pana jency-bohaterowie w wojnie z Polnoca z lochu twierdzy (i blizniaka) -> loch najblizszej twierdzy Polnocy spoza reguly i spoza kolejki
+  (TransferPrisonerAction - droga gry z DisbandPartyCampaignBehavior); brak takiej twierdzy - czekamy. Glowa odbiorcy i gracz nie ruszani.
+- **326b niewola (R1-W3, R3-W1):** glowa rodu pierwotnego w niewoli - czekamy do 15 dob (potem rod panujacy); w lochu tej samej twierdzy - zwrot od razu (`TransferFor(..., prisonerHereOk)`
+  -> `Row.PrisonerHereOk` w TryRow; gra wypuszcza ja w tym samym zdarzeniu). Glowa rodu panujacego w niewoli - tez czekamy (TryRow i tak czekal - teraz z limitem).
+- **326b koniec (R3-K3):** regula konczy sie takze po BastardsSiegeEvent 2 (Prologue.RotEventState), nie tylko po FightsOnEnd; tylko kampania kanonu (Prologue.CanonHere, R3-N3).
+- **326b odbiorca:** najemnik = jak brak rodu (R1-N4); Dorzecze po unii 272 (brak krolestwa riverlands) - zwrot tylko rodowi, ktory dzis jest w Polnocy (R3-W2); Skagos (skagosi)
+  i Wolni Ludzie (freefolk) poza regula (R3-N1, N2).
+- **326b limity:** najwyzej 3 zwroty na dobe, najstarsze najpierw (spis rozlozony, R3-W4); obsada zalogi tylko od partii krolestwa odbiorcy w promieniu 80 od bramy
+  (`TransferFor(..., donorRadius)` -> `BookHoldings._donorRadius` w Donors, licznik "poza promieniem 80"; wiersze tabeli bez zmian); czekanie najwyzej 30 dob, potem z kolejki z linia (R1-N2);
+  klucz wlaczony ponownie w tej samej grze - spis jeszcze raz (R1-N1); po zwrocie KL zdjete tez roszczenie SCA na Red Keep (R1-N3).
+- **326a wyspy (R2-K1, R3-W3, R2-W2):** partia odcieta = brak drogi ladowej do siedziby rodu ALBO do siedziby rodu panujacego, ALBO siedziba rodu to miasto bez innego miasta w zasiegu
+  ladu (IslandRoads.LonelyTown - Mormont Keep) - statki zostaja; rod z odcieta partia bez statkow kupuje mimo idealu (BuyPrefix; gra daje statek partii o najslabszym skladzie) i do tego
+  czasu nie sprzedaje (bez kupna-sprzedazy w kolko). Licznik "zakupy dozwolone partii odcietej bez statkow".
+- **326a ruch (R2-W3):** bez sprzedazy partii w armii, z StartTransitionNextFrameToExitFromPort, IsTargetingPort albo DesiredAiNavigationType Naval/All.
+- **326a niskie:** mnoznik > 0 daje co najmniej 1 statek (R3-N4); 181 wylaczony - bez ApplyByTrade (zloto z niczego), nadmiar z naszego mnoznika od razu zlozony bez zaplaty (R2-N4);
+  doby bez kupca w zapisie arm_k326a (R2-N6).
+- Settings/MCM: opisy Naval Realms i North Conquest Return (weto 60 dob, 3 na dobe, jency, Skagos i za Murem; zakup na wyspie). gen_mcm 2825.
+- `tools/sprawdz_logi.py` polnoc326: wyrazenie linii doby 326a z nowym licznikiem (self-test TAK), P326-7 weta / zdobyte mimo weta.
+
+**Odrzucone:** R3-K1 "zwracac tylko w pokoju" - zastapione wetem 60 dob (decyzja prowadzacego; Jeff chce zwrotu po zdobyciu). R2-N5 darmowa naprawa statku w porcie -
+mechanizm NavalDLC (ShipProductionCampaignBehavior.OnShipOwnerChanged) przy kazdej zmianie wlasciciela, nie 326a; temat cen 181 osobno. R2-N7 wlasna kopia wzoru idealu - wzor
+identyczny z NavalDLC 1.4.8, linia startu "model idealu NavalDLC" pokazuje podmiane modelu. R2-W2 (a) latka wyboru celu armii - zastapione zakupem partii odcietej (b) i (c).
+
+**Ryzyko / co sprawdzic:**
+- Weto dziala tylko w mysli AI i BK (jak 274); inne drogi (gracz w armii Polnocy, inny mod) - linia "ZDOBYTA MIMO WETA" i ponowny zwrot po 24 h.
+- TransferPrisonerAction na bohatera w lochu twierdzy (gra robi to samo przy rozwiazaniu partii); RealisticCaptivity czyta stan jenca z gry - obserwowac linie RC dla przeniesionych.
+- ApplyByDefault z glowa-jencem jako nowym panem (tylko gdy siedzi w lochu tej twierdzy): gra wypuszcza ja w OnSettlementOwnerChanged; ROT/Diplomacy czytaja newOwner.Clan - jest.
+- Zakup partii odcietej: GetPartyToGiveShipTo moze dac statek innej partii rodu - wtedy rod nie sprzedaje, az odcieta partia dostanie statek albo wroci na lad.
+- Promien 80 dawcow: twierdze daleko od wojsk odbiorcy dostaja mniej obsady (werbunek pana, milicja) - linia "BRAK n do celu" i "poza promieniem 80".
+- Test z zapisem Jeffa: --grupa polnoc326 (P326-1..7), linie "weto", spis 3/dobe.
+
+**Status:** DO SPRAWDZENIA (zbudowane, kod wyjscia 0; NIE wgrane - gra Jeffa dziala).
+
 ## 326a/326b - floty wedlug krolestw (Polnoc bez floty) i zwrot zdobyczy Polnocy spoza jej ziem (noc/326-polnoc od 163 = noc/325-zima 33d03a31; Armoury.dll ad8b9f4c13e4ce0a2b8e714abb05ad71 - NIE WGRANE, gra Jeffa dziala)
 
 **Problem:** Jeff 05.11 (zapis Ironman0gXONzURi8yO 13:18): "polnoc jest za silna, bije lanisterow, greyjoyow, krolestwo, ma ponad 40k zolnierzy"; "jak to mozliwe, ze Rob Stark zebral flote

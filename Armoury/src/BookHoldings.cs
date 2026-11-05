@@ -113,6 +113,7 @@ namespace Armoury
             internal readonly string Id, Clan, Kingdom, Twin, RefundFrom;
             internal readonly float ClearRadius;
             internal readonly long Refund;
+            internal bool PrisonerHereOk;   // 326b po recenzji: glowa rodu docelowego jencem w lochu tej osady (albo blizniaka) - zmiana dozwolona, gra wypuszcza ja w tym samym zdarzeniu
             internal Row(string id, string clan, string kingdom, string twin = null, float clearRadius = 0f, string refundFrom = null, long refund = 0)
             { Id = id; Clan = clan; Kingdom = kingdom; Twin = twin; ClearRadius = clearRadius; RefundFrom = refundFrom; Refund = refund; }
         }
@@ -425,7 +426,12 @@ namespace Armoury
                 string b = SiteBusy(s);
                 if (b != null) { wait = b; return null; }
             }
-            if (leader.IsPrisoner) { wait = "glowa rodu " + Nm(leader) + " w niewoli"; return null; }
+            if (leader.IsPrisoner)
+            {
+                var pp = leader.PartyBelongedToAsPrisoner;
+                bool here = row.PrisonerHereOk && pp != null && (pp == st.Party || (twin != null && pp == twin.Party));
+                if (!here) { wait = "glowa rodu " + Nm(leader) + " w niewoli"; return null; }
+            }
             var main = stNeeds ? st : twin;
             IFaction oldF = main.MapFaction;
 
@@ -649,16 +655,20 @@ namespace Armoury
         /// jego krolestwa, roszczenie SCA starego pana, ApplyByDefault, jency swoi do zalogi, obsada z krolestwa nowego pana). Linie z podanym znacznikiem.
         /// Wynik koncowy (ok:dzien / bez-zmian / gracz / brak-...) albo null i `wait`. Liczniki wiadomosci BookHoldings po wywolaniu czyszczone. Rzuca jak TryRow.
         /// </summary>
-        internal static string TransferFor(string tag, string stId, string twinId, Clan to, int day, out string wait)
+        internal static string TransferFor(string tag, string stId, string twinId, Clan to, int day, out string wait, bool prisonerHereOk = false, float donorRadius = 0f)
         {
             wait = null;
             if (to == null || to.Kingdom == null) { wait = "odbiorca bez krolestwa"; return null; }
             var row = new Row(stId, to.StringId, to.Kingdom.StringId, twinId);
+            row.PrisonerHereOk = prisonerHereOk;
             var old = Prefix;
             Prefix = tag;
+            _donorRadius = donorRadius;
             try { return TryRow(row, day, out wait); }
-            finally { Prefix = old; _batchDone.Clear(); _batchMoved.Clear(); }
+            finally { Prefix = old; _donorRadius = 0f; _batchDone.Clear(); _batchMoved.Clear(); }
         }
+
+        private static float _donorRadius;   // 326b po recenzji (R3-W4): obsada zalogi tylko od dawcow w tym promieniu od bramy (0 - bez limitu, wiersze tabeli)
 
         /// <summary>326b: roszczenie Strategic Campaign AI krolestwa `k` na te osade (cel ReclaimLostFief) - zdjete, gdy osada wlasnie do niego wrocila.</summary>
         internal static string ScaDropClaim(Kingdom k, string stId)
@@ -918,7 +928,14 @@ namespace Armoury
                     if (why != "-") { int v; skipped.TryGetValue(why, out v); skipped[why] = v + 1; }
                     continue;
                 }
-                var kv = new KeyValuePair<float, MobileParty>(mp.Position.ToVec2().Distance(p), mp);
+                float dist = mp.Position.ToVec2().Distance(p);
+                if (_donorRadius > 0f && dist > _donorRadius)
+                {
+                    string rk = "poza promieniem " + _donorRadius.ToString("0", Inv);
+                    int v; skipped.TryGetValue(rk, out v); skipped[rk] = v + 1;
+                    continue;
+                }
+                var kv = new KeyValuePair<float, MobileParty>(dist, mp);
                 if (mp.ActualClan == owner) own.Add(kv); else rest.Add(kv);
             }
             own.Sort((a, b) => a.Key.CompareTo(b.Key));

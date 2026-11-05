@@ -35,6 +35,16 @@ namespace Armoury
     ///      mnoznika (ideal 326a < ideal gry) - statek zostaje zlozony w najblizszym porcie bez zaplaty (ApplyByTransferring - jak rozdzial statkow gry; zloto sie
     ///      nie pojawia, rod traci wartosc statku; stocznia NavalDLC skasuje nadmiar ponad swoja liczbe idealna - jak dzis).
     /// Linia dobowa "Floty krolestw (326a)". Wylaczony klucz - gra jak dotad, linia tylko mierzy. Kazdy wyjatek per obiekt liczony (Stumble), nic nie gasnie.
+    /// PO RECENZJI (05.11):
+    ///  - "wyspa" liczona wzgledem ladu stalego krolestwa, nie tylko siedziby: partia jest odcieta (statki zostaja), gdy nie ma drogi ladowej do siedziby rodu
+    ///    ALBO do siedziby rodu panujacego krolestwa, ALBO siedziba rodu to miasto bez innego miasta w zasiegu ladu (IslandRoads - Mormont Keep na Wyspie Niedzwiedziej);
+    ///  - zakup: rod z odcieta partia bez statkow kupuje mimo idealu (gra daje statek partii z najslabszym skladem - tej bez statkow); lord przewieziony armia
+    ///    Manderly'ego na wyspe i tam zostawiony moze wrocic;
+    ///  - partia nie sprzedaje statku w armii, przy wyplywaniu z portu (StartTransitionNextFrameToExitFromPort), w drodze do portu (IsTargetingPort) ani gdy jej trasa idzie
+    ///    morzem (DesiredAiNavigationType Naval / All);
+    ///  - mnoznik > 0 daje co najmniej 1 statek (Nocna Straz, rody Dorzecza - podloga 3 x 0.2 = 0);
+    ///  - Ship Trade Through Port (181) wylaczony: bez sprzedazy (ApplyByTrade placilby z niczego) - nadmiar z naszego mnoznika od razu zlozony w porcie bez zaplaty;
+    ///  - doby bez kupca w zapisie (arm_k326a) - wczytanie gry nie zeruje licznika.
     /// </summary>
     internal static class NavalRealms
     {
@@ -77,12 +87,37 @@ namespace Armoury
         private static int _blocked, _sold, _laid, _rejected, _cut, _noPort, _busy, _stumbles;
         private static long _soldGold;
         private static readonly List<string> _ex = new List<string>();
-        private static readonly Dictionary<Clan, int> _fail = new Dictionary<Clan, int>();   // doby z rzedu bez kupca (sesja)
+        private static readonly Dictionary<string, int> _fail = new Dictionary<string, int>(StringComparer.Ordinal);   // rod -> doby z rzedu bez kupca (zapis arm_k326a)
+        private static int _strandBuy;
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
 
         internal static void Reset()
         {
-            _blocked = _sold = _laid = _rejected = _cut = _noPort = _busy = _stumbles = 0; _soldGold = 0; _ex.Clear(); _fail.Clear(); _startLogged = false;
+            _blocked = _sold = _laid = _rejected = _cut = _noPort = _busy = _stumbles = _strandBuy = 0; _soldGold = 0; _ex.Clear(); _fail.Clear(); _startLogged = false;
+        }
+
+        internal static string Export()
+        {
+            var sb = new StringBuilder(64);
+            sb.Append("nr1|");
+            bool first = true;
+            foreach (var kv in _fail) { if (!first) sb.Append(';'); first = false; sb.Append(kv.Key).Append('=').Append(kv.Value.ToString(Inv)); }
+            return sb.ToString();
+        }
+
+        internal static void Import(string v)
+        {
+            _fail.Clear();
+            if (string.IsNullOrEmpty(v) || !v.StartsWith("nr1|", StringComparison.Ordinal)) return;
+            try
+            {
+                foreach (var e in v.Substring(4).Split(';'))
+                {
+                    int i = e.IndexOf('='); int x;
+                    if (i > 0 && int.TryParse(e.Substring(i + 1), NumberStyles.Integer, Inv, out x)) _fail[e.Substring(0, i)] = x;
+                }
+            }
+            catch (Exception e) { _fail.Clear(); Stumble("Import", e); }
         }
 
         private static void Stumble(string where, Exception e)
@@ -115,7 +150,9 @@ namespace Armoury
         {
             float f = FactorOf(c);
             if (f < 0f) return gameIdeal;
-            return Math.Max(0, (int)Math.Floor(gameIdeal * f + 1e-4f));
+            int v = Math.Max(0, (int)Math.Floor(gameIdeal * f + 1e-4f));
+            if (f > 0f && gameIdeal > 0 && v < 1) v = 1;   // po recenzji: mnoznik > 0 to co najmniej jeden statek
+            return v;
         }
 
         private static int GameIdeal(Clan c)
@@ -170,7 +207,11 @@ namespace Armoury
             {
                 if (!On || !Live || __0 == null || __0 == Clan.PlayerClan) return true;
                 if (FactorOf(__0) < 0f) return true;
-                if (ShipsOf(__0) >= IdealFor(__0, GameIdeal(__0))) { _blocked++; return false; }
+                if (ShipsOf(__0) >= IdealFor(__0, GameIdeal(__0)))
+                {
+                    if (HasStrandedEmpty(__0)) { _strandBuy++; return true; }   // po recenzji: partia odcieta od ladu stalego bez statkow - zakup dozwolony
+                    _blocked++; return false;
+                }
             }
             catch (Exception e) { Stumble("BuyPrefix", e); }
             return true;
@@ -181,7 +222,45 @@ namespace Armoury
         {
             return mp != null && mp.IsActive && !mp.IsDisbanding && !mp.IsMainParty && mp.LeaderHero != null && mp.MapEvent == null && mp.SiegeEvent == null
                    && mp.BesiegerCamp == null && !mp.IsCurrentlyAtSea && !mp.IsTransitionInProgress && !mp.IsInRaftState && !mp.IsCurrentlyUsedByAQuest
+                   && mp.Army == null && !mp.StartTransitionNextFrameToExitFromPort && !mp.IsTargetingPort
+                   && mp.DesiredAiNavigationType != MobileParty.NavigationType.Naval && mp.DesiredAiNavigationType != MobileParty.NavigationType.All
                    && mp.Ships != null && mp.Ships.Count > 0;
+        }
+
+        /// <summary>
+        /// Partia odcieta od ladu stalego krolestwa (wyspa): brak drogi ladowej do siedziby rodu albo do siedziby rodu panujacego, albo siedziba rodu to miasto
+        /// bez innego miasta w zasiegu ladu (IslandRoads). Bez statkow nie wrocilaby. Nie rzuca (blad - odcieta, statki zostaja).
+        /// </summary>
+        private static bool Stranded(MobileParty mp, Clan c)
+        {
+            try
+            {
+                var home = c.HomeSettlement;
+                if (home == null || LandDist(mp, home) < 0f) return true;
+                if (home.IsTown && IslandRoads.LonelyTown(home)) return true;
+                var k = c.Kingdom;
+                var core = k != null && k.RulingClan != null ? k.RulingClan.HomeSettlement : null;
+                if (core != null && core != home && LandDist(mp, core) < 0f) return true;
+                return false;
+            }
+            catch (Exception e) { Stumble("Stranded", e); return true; }
+        }
+
+        /// <summary>Rod ma partie wojenna bez statkow odcieta od ladu stalego (zakup mimo idealu). Nie rzuca.</summary>
+        private static bool HasStrandedEmpty(Clan c)
+        {
+            try
+            {
+                foreach (var w in c.WarPartyComponents)
+                {
+                    var mp = w != null ? w.MobileParty : null;
+                    if (mp == null || !mp.IsActive || mp.LeaderHero == null || mp.IsCurrentlyAtSea || mp.MapEvent != null || mp.Army != null) continue;
+                    if (mp.Ships != null && mp.Ships.Count > 0) continue;
+                    if (Stranded(mp, c)) return true;
+                }
+            }
+            catch (Exception e) { Stumble("HasStrandedEmpty", e); }
+            return false;
         }
 
         private static float LandDist(MobileParty p, Settlement s)
@@ -235,13 +314,14 @@ namespace Armoury
         {
             var home = c.HomeSettlement;
             if (home == null) { _cut++; return 0; }
+            if (HasStrandedEmpty(c)) { _cut++; return 0; }   // rod czeka na statek dla partii odcietej - bez sprzedazy (zakup gry moze trafic do innej partii; bez kupna-sprzedazy w kolko)
             MobileParty pick = null; int pickN = 0; bool anyCut = false, anyBusy = false;
             foreach (var w in c.WarPartyComponents)
             {
                 var mp = w != null ? w.MobileParty : null;
                 if (mp == null || mp.Ships == null || mp.Ships.Count == 0) continue;
                 if (!PartyOk(mp)) { anyBusy = true; continue; }
-                if (LandDist(mp, home) < 0f) { anyCut = true; continue; }   // na wyspie bez drogi ladowej do domu - statki zostaja
+                if (Stranded(mp, c)) { anyCut = true; continue; }   // na wyspie (bez drogi ladowej do domu albo do ladu stalego krolestwa) - statki zostaja
                 if (mp.Ships.Count > pickN) { pick = mp; pickN = mp.Ships.Count; }
             }
             if (pick == null) { if (anyCut) _cut++; else if (anyBusy) _busy++; return 0; }
@@ -249,7 +329,9 @@ namespace Armoury
             if (ship == null) { _busy++; return 0; }
             var ports = Ports(pick, c);
             if (ports.Count == 0) { _noPort++; return 0; }
-            int tries = Math.Min(3, ports.Count);
+            // po recenzji: bez 181 ApplyByTrade placi glowie rodu z niczego - nie sprzedajemy; nadmiar z naszego mnoznika od razu zlozony w porcie
+            bool trade = ShipsToPort181.TradeOn;
+            int tries = trade ? Math.Min(3, ports.Count) : 0;
             for (int i = 0; i < tries; i++)
             {
                 var pt = ports[i];
@@ -259,22 +341,23 @@ namespace Armoury
                 if (ship.Owner == pt.T.Settlement.Party)
                 {
                     long g1 = c.Leader != null ? c.Leader.Gold : 0;
-                    _sold++; _soldGold += Math.Max(0L, g1 - g0); _fail.Remove(c);
+                    _sold++; _soldGold += Math.Max(0L, g1 - g0); _fail.Remove(c.StringId);
                     if (_ex.Count < 8) _ex.Add(c.Name + " (" + Nm(c.Kingdom) + ") -> " + Nm(pt.T.Settlement) + " sprzedany");
                     return 1;
                 }
                 _rejected++;
             }
-            int f; _fail.TryGetValue(c, out f); _fail[c] = ++f;
-            if (f >= (fc <= 0f ? LayUpDaysNoFleet : LayUpDays) && ideal < gameIdeal)
+            int f = 0;
+            if (trade) { _fail.TryGetValue(c.StringId, out f); _fail[c.StringId] = ++f; }
+            if ((!trade || f >= (fc <= 0f ? LayUpDaysNoFleet : LayUpDays)) && ideal < gameIdeal)
             {
                 var pt = ports[0];
                 try { ChangeShipOwnerAction.ApplyByTransferring(pt.T.Settlement.Party, ship); }
                 catch (Exception e) { Stumble("LayUp", e); }
                 if (ship.Owner == pt.T.Settlement.Party)
                 {
-                    _laid++; _fail.Remove(c);
-                    if (_ex.Count < 8) _ex.Add(c.Name + " (" + Nm(c.Kingdom) + ") -> " + Nm(pt.T.Settlement) + " zlozony bez zaplaty po " + f + " dobach");
+                    _laid++; _fail.Remove(c.StringId);
+                    if (_ex.Count < 8) _ex.Add(c.Name + " (" + Nm(c.Kingdom) + ") -> " + Nm(pt.T.Settlement) + " zlozony bez zaplaty " + (trade ? "po " + f + " dobach" : "(181 wylaczony - bez sprzedazy)"));
                     return 2;
                 }
             }
@@ -322,7 +405,7 @@ namespace Armoury
                 l.Sort((a, b) => b.Ships.CompareTo(a.Ships));
                 var sb = new StringBuilder(1500);
                 sb.Append(Tag).Append("dzien ").Append((int)CampaignTime.Now.ToDays).Append(" | klucz ").Append(on ? "TAK" : "NIE (tylko pomiar)")
-                  .Append(" | dzis: zakupy zablokowane (rod >= ideal) ").Append(_blocked).Append(", sprzedane portom ").Append(_sold)
+                  .Append(" | dzis: zakupy zablokowane (rod >= ideal) ").Append(_blocked).Append(", zakupy dozwolone partii odcietej bez statkow ").Append(_strandBuy).Append(", sprzedane portom ").Append(_sold)
                   .Append(" (zloto glow rodow +").Append(_soldGold.ToString(Inv)).Append(" z kas portow 181), zlozone w porcie bez zaplaty ").Append(_laid)
                   .Append(", odmowy portow ").Append(_rejected).Append(", rody z nadmiarem odciete od domu (wyspa - statki zostaja) ").Append(_cut)
                   .Append(", bez portu w zasiegu ladu ").Append(_noPort).Append(", wszystkie partie zajete ").Append(_busy)
@@ -339,7 +422,7 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
-            _blocked = _sold = _laid = _rejected = _cut = _noPort = _busy = 0; _soldGold = 0; _ex.Clear();
+            _blocked = _sold = _laid = _rejected = _cut = _noPort = _busy = _strandBuy = 0; _soldGold = 0; _ex.Clear();
         }
 
         private static string ModelName()
@@ -356,11 +439,20 @@ namespace Armoury
         }
     }
 
-    /// <summary>326a: doba flot krolestw (bez zapisu - liczniki sesji).</summary>
+    /// <summary>326a: doba flot krolestw (zapis arm_k326a - doby bez kupca).</summary>
     internal sealed class NavalRealmsBehavior : CampaignBehaviorBase
     {
         public NavalRealmsBehavior() { NavalRealms.Reset(); }
         public override void RegisterEvents() { CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, NavalRealms.Daily); }
-        public override void SyncData(IDataStore dataStore) { }
+        public override void SyncData(IDataStore dataStore)
+        {
+            try
+            {
+                string v = dataStore.IsSaving ? NavalRealms.Export() : null;
+                SaveText.Sync(dataStore, "arm_k326a", ref v);
+                if (dataStore.IsLoading) NavalRealms.Import(v);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_k326a", e); }
+        }
     }
 }
