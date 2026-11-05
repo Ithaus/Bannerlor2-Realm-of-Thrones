@@ -7006,7 +7006,7 @@ namespace Armoury
 
         [SettingPropertyBool("Player Takes Third Of Beaten Purses", HintText = "326d: when your party destroys a beaten lord's party, you take a third of his men's purse into your own purse and your men keep the other two thirds - the same rule as for an AI lord (in war the crown takes its ninth of that purse out of your third, at dawn). Off = all of it goes to your men's purse, as before", RequireRestart = false)]
         [SettingPropertyGroup("Defeats and payers (D11)")]
-        public bool PlayerTakesThirdOfBeatenPurses { get; set; } = true;
+        public bool PlayerTakesThirdOfBeatenPurses { get; set; } = false;   // 326d: czeka na decyzje Jeffa
 
         [SettingPropertyBool("Battle Plunder From Loser Only", HintText = "the coin the victors of a battle share out comes only from what the beaten really lose. A beaten lord - or you - hands over his share of it (the game's 5% of his coin, at most 10,000) even when he is taken captive or flees, and the victors never get more than the beaten pay; a beaten leader with no coin gives nothing. What a captor already took from a captive's purse when he was taken (Realistic Captivity going through your baggage) counts toward his share - he is not robbed twice. The Others take no coin (with Beaten Purse To Victor on). In war the crown takes its ninth of what a vassal wins from a beaten lord's purse, as of any plunder (Crown Thirds). The same for you and the AI. Sunk ships at sea are not changed here (off = as before: the victors get the beaten lord's share out of thin air and he keeps his coin)", RequireRestart = false)]
         [SettingPropertyGroup("Defeats and payers (D11)")]

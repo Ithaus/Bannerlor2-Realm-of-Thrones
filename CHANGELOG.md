@@ -1,6 +1,6 @@
 # DZIENNIK ZMIAN
 
-## 326d - okno lupu: jasne wiersze zlota gracza, korona i dar krola o swicie; gracz bierze 1/3 sakiewek rozbitych druzyn jak lord AI (noc/326d-okno-lupu od 325 = 33d03a31; Armoury.dll 3ee38797b026a88a3d7c3aa43bd8a604 - NIE WGRANE)
+## 326d - okno lupu: jasne wiersze zlota gracza, korona i dar krola o swicie; gracz bierze 1/3 sakiewek rozbitych druzyn jak lord AI (noc/326d-okno-lupu od 325 = 33d03a31; Armoury.dll 790c1d31ba90b2a0e13518bd5590216d po recenzji - NIE WGRANE)
 
 **Problem:** Jeff mysli, ze zloto z okna lupu (117) nie dochodzi do kiesy. Dochodzi (Hero.MainHero.Gold, log 716515 -> 723077 -> 727923), ale okno pokazywalo
 "Your men's purses" i stopke "In all: X denars in coin" = kiesa + sakiewka ludzi (Manderstone 34032 "w monecie", do kiesy weszlo 7471). Sakiewka ludzi (MenPurse) to zold
@@ -17,7 +17,7 @@ czeka w kolejce do switu - okno go nie pokazywalo. Okup to wycena, nie gotowka.
   Y from your men's purse; Z still owed."
 - `CrownWar314.cs`: PlayerGiftFor(MapEvent) - dar gracza za bitwe (ostatnie 16, bez zapisu); komunikat wyplaty: "The king's reward for your victory was paid at dawn: X denars into your purse."
 
-**Druga czesc (decyzja Jeffa 05.11: "tak, 1/3 monet dla mnie jak lord AI"), wylacznik `PlayerTakesThirdOfBeatenPurses` (domyslnie TAK):**
+**Druga czesc (PROPOZYCJA - czeka na decyzje Jeffa; jedyna jego wypowiedz to uwaga "to mo ludzie sa mega bogaci w takim razie", nie zgoda), wylacznik `PlayerTakesThirdOfBeatenPurses` (domyslnie NIE - po recenzji):**
 - `MenPurse.cs` OnPartyDestroyed: sakiewka ludzi rozbitej druzyny, ktora bierze partia gracza - 1/3 do kiesy gracza (ChangeHeroGold), 2/3 do sakiewki jego ludzi;
   ta sama regula i to samo `purse / 3` co lord AI. Zamknieta ekonomia - tylko podzial tej samej kwoty. Korona jak u lorda AI: `Ransom178.NoteThird(gracz, 1/3)` -
   o swicie 1/3 trzeciej (= 1/9 sakwy, tyle samo co dotad) z kiesy gracza, z 2/3 ludzi nic (dotad `NotePlayerPurse` - 1/9 najpierw z sakiewki ludzi). Gracz nie ma ksiegi
@@ -29,6 +29,18 @@ czeka w kolejce do switu - okno go nie pokazywalo. Okup to wycena, nie gotowka.
 
 **Linie logu:** "Okno lupu (326d): raport N | do kiesy gracza teraz X | sakiewka ludzi (ich zold) Y | korona 1/9 o swicie Z (z kiesy gracza ~a, z sakiewki ludzi ~b, podstawa z sakw c)
 | dar krola o swicie R (bitew n) | okup ~O (wycena) | sprzet G | stopka: ...".
+
+**Po recenzji 326d:**
+- Wylacznik `PlayerTakesThirdOfBeatenPurses` domyslnie NIE (Settings.cs i McmSettings.cs): decyzja Jeffa niepotwierdzona; wlaczony = ludzie ok. -22% kazdej przejetej sakwy (89% -> 66.7%), gracz +22%.
+- `CrownWar314.cs`: wpis daru pamieta wyplacone (`Gift.Paid`, bez zapisu); `PlayerGiftFor(me, ref paid, ref owed, ref lapsed)` - okno pokazuje stan wpisu kolejki zamiast
+  pewnej wyplaty o swicie: "King's reward, paid at dawn" (juz wplynelo), "King's reward, owed by the treasury" ~X (skarbiec placi, gdy ma zloto, mozliwe raty),
+  "King's reward lost (empty treasury)". Stopka: "+X from the king, paid at dawn" / "+Y from the king when his treasury has gold".
+- `CrownWar314.PayGifts`: komunikat gracza mowi, ile darow (z wszystkich bitew) wplynelo tej doby, ile jeszcze czeka i ile przepadlo - bez "for your victory" jak za jedna bitwe.
+- `SpoilsReport.Rep.CrownDay` (doba przyrostu korony): okno pokazane po swicie (czekanie na sakwy) pisze "Crown share (1/9), taken at dawn" bez prognozy skad;
+  przed switem "Crown share (1/9), due at dawn" + prognoza ~kiesa / ~ludzie.
+- `SpoilsWindow.cs`: wiersz "Your third of the beaten purses" zawsze pierwszy w sekcji Coin (nie wpada w "Other sums").
+- `CrownWar314.Reset`: czysci `_plGiftBy` i `_curMe` (bez trzymania MapEvent starej kampanii).
+- `MenPurse.cs`: licznik trzeciej gracza tylko dla third > 0; linia dzienna mowi, ze stan sakiewki to chwila zmiany doby, a trzecia - zamknieta doba.
 
 ## 325 - zima: druzyny jedza najwyzej +20% (nie +50%), spichlerze wsi napelniaja polki od pierwszej doby, 3 uwagi niskie z recenzji 324 R3 (noc/325-zima od 162 = noc/324-glod a78b1898; Armoury.dll 337384b767f1b62dea21d28cde506408 - NIE WGRANE)
 

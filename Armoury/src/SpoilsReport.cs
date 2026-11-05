@@ -96,6 +96,7 @@ namespace Armoury
             public long Men;                      // do sakiewek ludzi gracza (MenPurse)
             public long Crown;                    // korona upomni sie o (ramki: roznica Ransom178.PendingClaim; okup: liczby SiegeRansom - przypis)
             public long CrownMen;                 // 326d: czesc Crown brana o swicie najpierw z sakiewki ludzi (roznica Ransom178.PendingMenClaim); reszta - z kiesy gracza
+            public int CrownDay = -1;             // 326d (recenzja): doba kampanii, w ktorej korona przybyla - okno po swicie pisze "taken at dawn" w czasie przeszlym
             public readonly List<MapEvent> Mes = new List<MapEvent>();   // 326d: bitwy raportu (ramki A) - dar krola z CrownWar314.PlayerGiftFor
             public readonly Dictionary<string, Gain> Gear = new Dictionary<string, Gain>(StringComparer.Ordinal);
             public int LeftN; public long LeftW;
@@ -391,6 +392,7 @@ namespace Armoury
             r.Men += d.Men;
             r.Crown += d.Crown;
             r.CrownMen += d.CrownMen;
+            if (d.Crown > 0) r.CrownDay = (int)CampaignTime.Now.ToDays;
             if (f.Me != null && !r.Mes.Contains(f.Me)) r.Mes.Add(f.Me);
             int n = 0; long w = 0;
             foreach (var g in d.Gains)
@@ -956,6 +958,7 @@ namespace Armoury
                 r.AddCoin(LRansom, lead);
                 r.Men = men;
                 r.Crown = crown;
+                if (crown > 0) r.CrownDay = (int)CampaignTime.Now.ToDays;   // 326d
                 r.Lines.Append(" | R okup ").Append(Nm(st)).Append(besieger ? " (gracz oblegal)" : " (gracz w obozie)").Append(": pula ").Append(pool.ToString(Inv))
                  .Append(", do kiesy ").Append(lead.ToString(Inv)).Append(", sakiewki ludzi ").Append(men.ToString(Inv)).Append(", korona ").Append(crown.ToString(Inv));
                 _reps.Add(r);

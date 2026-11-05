@@ -121,14 +121,14 @@ namespace Armoury
                     if (win.IsMainParty && !PlayerThirdOn) { Add(win, purse); Ransom178.NotePlayerPurse(purse); }   // wylacznik 326d: ludzie gracza - do ich sakiewki; 178: korona 1/9 sakwy (jutro z sakiewki)
                     else if (win.IsMainParty)
                     {
-                        // 326d (decyzja Jeffa 05.11 "1/3 monet dla mnie jak lord AI"): ta sama regula co lord AI nizej - 1/3 do kiesy gracza, 2/3 jego ludziom.
+                        // 326d (propozycja - CZEKA na decyzje Jeffa, domyslnie WYLACZONE): ta sama regula co lord AI nizej - 1/3 do kiesy gracza, 2/3 jego ludziom.
                         // Tylko podzial tej samej kwoty. Korona jak u lorda AI: 1/3 trzeciej (= 1/9 sakwy) z kiesy gracza o swicie (Ransom178.NoteThird - gracz
                         // nie ma ksiegi rodu ClanIncomeBook, wiec wprost), z 2/3 ludzi nic. Okno lupu: kiesa mierzona przed/po ramce, etykieta LBeatenThird.
                         int third = purse / 3;
                         win.LeaderHero.ChangeHeroGold(third); Add(win, purse - third);
                         Ransom178.NoteThird(win.LeaderHero, third);
                         SpoilsReport.NoteCoin(SpoilsReport.LBeatenThird, third);
-                        _dayPlThird += third; _dayPlThirdN++;
+                        if (third > 0) { _dayPlThird += third; _dayPlThirdN++; }
                     }
                     else { int third = purse / 3; win.LeaderHero.ChangeHeroGold(third); Add(win, purse - third); }
                     if (!win.IsMainParty) ClanIncomeBook.NoteInflow(win.LeaderHero, purse / 3, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
@@ -194,7 +194,7 @@ namespace Armoury
                          + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife + ", u markietanow w polu (E5/A3) " + _dayCamp + ", na odziez wojska (150) " + _dayCloth
                          + "; zold wplacony do sakiewek " + _dayWage + " (" + _dayWageN + " wyplat); ruch sakiewek: wplynelo " + _dayIn + " (zold, lup, przejete sakiewki, zaplata za najem i udzial w puli weteranow - E5/B6, konie lordow ponad zapas - E6/K2), wyszlo " + _dayOut
                          + " (sprzet, naprawy, odziez, zaopatrzenie BK - D11-4, zycie w miastach, markietani, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved
-                         + "; " + PlayerPurseNote() + ".");
+                         + "; " + PlayerPurseNote() + " (stan sakiewki - chwila zmiany doby, trzecia - zamknieta doba " + _dayStamp + ").");
             _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayPlThird = 0; _dayPlThirdN = 0; _dayStamp = d;
         }
 

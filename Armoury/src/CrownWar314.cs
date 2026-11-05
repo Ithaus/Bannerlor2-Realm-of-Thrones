@@ -56,23 +56,28 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private sealed class Svc { public int Year, Days; public string Kingdom; }   // recenzja 314c: krolestwo, ktoremu rod sluzy - zmiana krolestwa = dni od zera
-        private sealed class Gift { public string Clan, Kingdom; public long Left; public int Day; }
+        private sealed class Gift { public string Clan, Kingdom; public long Left; public int Day; public long Paid; }   // Paid - 326d recenzja: wyplacone dotad (pamiec, bez zapisu; tylko okno lupu)
 
         private static readonly Dictionary<string, Svc> _svc = new Dictionary<string, Svc>();          // id rodu -> rok i dni sluzby w tym roku
         private static readonly Dictionary<string, long> _paid = new Dictionary<string, long>();       // id rodu -> zold 314c wyplacony w dobie _paidDay (ciecie zwrotu nastepnej doby)
         private static int _paidDay = -1;
         private static readonly List<Gift> _gifts = new List<Gift>();
-        // 326d: dar gracza z ostatnich bitew (bitwa -> zloto w kolejce) - tylko odczyt dla okna lupu (SpoilsWindow); bez zapisu, najwyzej 16 pozycji
-        private static readonly List<KeyValuePair<MapEvent, long>> _plGiftBy = new List<KeyValuePair<MapEvent, long>>();
+        // 326d: dar gracza z ostatnich bitew (bitwa -> wpis kolejki) - tylko odczyt dla okna lupu (SpoilsWindow); bez zapisu, najwyzej 16 pozycji, czyszczone w Reset
+        private static readonly List<KeyValuePair<MapEvent, Gift>> _plGiftBy = new List<KeyValuePair<MapEvent, Gift>>();
         private static MapEvent _curMe;
 
-        /// <summary>326d: zloto daru krola dla rodu gracza wpisane do kolejki za te bitwe (0 - brak). Tylko odczyt.</summary>
-        internal static long PlayerGiftFor(MapEvent me)
+        /// <summary>326d (recenzja): dar krola dla rodu gracza za te bitwe - paid: juz wyplacone (o swicie, gdy skarbiec mial zloto), owed: jeszcze w kolejce,
+        /// lapsed: przepadlo (pusty skarbiec przez RoyalVictoryWaitDays dni albo rod poza krolestwem). Tylko odczyt.</summary>
+        internal static void PlayerGiftFor(MapEvent me, ref long paid, ref long owed, ref long lapsed)
         {
-            if (me == null) return 0;
-            long v = 0;
-            foreach (var kv in _plGiftBy) if (ReferenceEquals(kv.Key, me)) v += kv.Value;
-            return v;
+            if (me == null) return;
+            foreach (var kv in _plGiftBy)
+            {
+                if (!ReferenceEquals(kv.Key, me) || kv.Value == null) continue;
+                var g = kv.Value;
+                paid += g.Paid;
+                if (g.Left > 0) { if (_gifts.Contains(g)) owed += g.Left; else lapsed += g.Left; }
+            }
         }
 
         private static int _stumbles, _importN = -1, _importBad;
@@ -90,7 +95,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _svc.Clear(); _paid.Clear(); _paidDay = -1; _gifts.Clear(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _rewarded.Clear(); _rewardedDay = -1; ZeroDay();
+            _svc.Clear(); _paid.Clear(); _paidDay = -1; _gifts.Clear(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _rewarded.Clear(); _rewardedDay = -1; _plGiftBy.Clear(); _curMe = null; ZeroDay();
         }
 
         private static void ZeroDay()
@@ -109,6 +114,8 @@ namespace Armoury
         private static string Name(Clan c) { try { return c != null && c.Name != null ? c.Name.ToString() : "-"; } catch { return "?"; } }
         private static string Name(IFaction f) { try { return f != null && f.Name != null ? f.Name.ToString() : "-"; } catch { return "?"; } }
         private static string Name(Hero h) { try { return h != null && h.Name != null ? h.Name.ToString() : "-"; } catch { return "?"; } }
+
+        private static string PlayerClanId() { try { return Clan.PlayerClan != null ? Clan.PlayerClan.StringId : null; } catch { return null; } }
 
         private static Clan ClanById(string id)
         {
@@ -223,6 +230,7 @@ namespace Armoury
         {
             if (_gifts.Count == 0) return;
             int wait = Math.Max(1, Math.Min(120, s.RoyalVictoryWaitDays));
+            long plLapsed = 0;   // 326d: przepadle dary gracza tej doby - do komunikatu
             foreach (var g in _gifts.ToArray())
             {
                 try
@@ -231,6 +239,7 @@ namespace Armoury
                     var h = c != null && !c.IsEliminated ? c.Leader : null;
                     if (k == null || k.IsEliminated || c == null || c.Kingdom != k || c.IsUnderMercenaryService || c == k.RulingClan || h == null || !h.IsAlive)
                     {
+                        if (g.Clan == PlayerClanId()) plLapsed += g.Left;
                         // nikt nie odbierze (rod poza krolestwem, wymarly) albo rod zostal krolem / najemnikiem (recenzja 314c: ta sama zasada co przy wpisie i w zoldzie)
                         // - dar przepada, zloto zostaje w skarbcu
                         _dGiftLapsed += g.Left; _gifts.Remove(g); continue;
@@ -238,15 +247,21 @@ namespace Armoury
                     int got = Pay(k, PurseOf(k, cache), h, g.Left, false);
                     if (got > 0)
                     {
-                        g.Left -= got; _dGiftPaid += got;
+                        g.Left -= got; g.Paid += got; _dGiftPaid += got;
                         if (c == Clan.PlayerClan) _dPlGift += got;
                     }
                     if (g.Left <= 0) { _gifts.Remove(g); continue; }
-                    if (day - g.Day >= wait) { _dGiftLapsed += g.Left; _gifts.Remove(g); }   // skarbiec nie mial zlota przez RoyalVictoryWaitDays dni - reszta przepada
+                    if (day - g.Day >= wait) { _dGiftLapsed += g.Left; if (c == Clan.PlayerClan) plLapsed += g.Left; _gifts.Remove(g); }   // skarbiec nie mial zlota przez RoyalVictoryWaitDays dni - reszta przepada
                 }
                 catch (Exception e) { Stumble("PayGifts", e); }
             }
-            if (_dPlGift > 0) Log.Player("The king's reward for your victory was paid at dawn: " + _dPlGift + " denars into your purse.");   // 326d: wyrazniej, ze do kiesy gracza
+            // 326d (recenzja): dary moga isc ratami (skarbiec bez zlota) i z kilku bitew naraz - komunikat mowi, ile wplynelo, ile jeszcze czeka i ile przepadlo
+            long plOwed = 0;
+            try { string pid = PlayerClanId(); foreach (var g in _gifts) if (g.Clan == pid && g.Left > 0) plOwed += g.Left; } catch { }
+            if (_dPlGift > 0 || plLapsed > 0)
+                Log.Player((_dPlGift > 0 ? "The king's treasury paid " + _dPlGift + " denars of your victory rewards into your purse at dawn" : "The king's treasury paid nothing of your victory rewards at dawn")
+                           + (plOwed > 0 ? "; " + plOwed + " still owed, paid when there is gold in it" : "")
+                           + (plLapsed > 0 ? "; " + plLapsed + " lapsed (the treasury had no gold in time)" : "") + ".");
         }
 
         private sealed class Row { public Clan C; public long Base; public int Men; }
@@ -467,13 +482,14 @@ namespace Armoury
                 long g = (long)Math.Floor(gold * part);
                 float iv = (float)(infl * part);
                 if (c.IsEliminated || c.IsUnderMercenaryService || c == k.RulingClan || c.StringId == null) { kept += g; continue; }   // krol i najemnicy - czesc zostaje w skarbcu
-                if (g > 0) { _gifts.Add(new Gift { Clan = c.StringId, Kingdom = k.StringId, Left = g, Day = day }); queued += g; }
+                Gift gq = null;
+                if (g > 0) { gq = new Gift { Clan = c.StringId, Kingdom = k.StringId, Left = g, Day = day }; _gifts.Add(gq); queued += g; }
                 float applied = 0f;
                 if (iv >= 0.5f) { try { ChangeClanInfluenceAction.Apply(c, iv); applied = iv; gave += iv; } catch (Exception e) { Stumble("Influence", e); } }
                 n++;
                 if (c == Clan.PlayerClan)
                 {
-                    if (g > 0 && _curMe != null) { _plGiftBy.Add(new KeyValuePair<MapEvent, long>(_curMe, g)); if (_plGiftBy.Count > 16) _plGiftBy.RemoveAt(0); }   // 326d: okno lupu
+                    if (gq != null && _curMe != null) { _plGiftBy.Add(new KeyValuePair<MapEvent, Gift>(_curMe, gq)); if (_plGiftBy.Count > 16) _plGiftBy.RemoveAt(0); }   // 326d: okno lupu
                     pl = "; gracz: dar " + g + ", wplywy " + applied.ToString("0.#", Inv);
                     // recenzja 314c: komunikat tylko o tym, co naprawde dano (wplywy ponizej 0.5 nie sa nadawane; dar 0 - bez wzmianki o zlocie)
                     string gTxt = g > 0 ? g + " denars from the treasury of " + Name(k) + " (paid at the next settlement, when there is gold in it)" : null;
