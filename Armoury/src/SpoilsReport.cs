@@ -70,6 +70,7 @@ namespace Armoury
         internal const string LChest = "The broken garrison's chest";
         internal const string LRansom = "Your part of the ransom";
         internal const string LOther = "Other";
+        internal const string LBeatenThird = "Your third of the beaten purses";   // 326d: 1/3 sakiewki ludzi rozbitej druzyny lorda (MenPurse.OnPartyDestroyed)
 
         // ------------------------------------------------------------ model raportu
 

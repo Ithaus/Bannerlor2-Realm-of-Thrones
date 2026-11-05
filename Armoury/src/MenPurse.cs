@@ -44,8 +44,10 @@ namespace Armoury
         private static int _dayWageN;
         private static long _dayIn, _dayOut;   // ruch wszystkich sakiewek w dobie: kazda wplata i kazdy wydatek ida przez Add
         private static long _dayCamp;          // E5/A3 (163): markietani - wydane w polu (CampTake; odbiorcy w Sutlers)
+        private static long _dayPlThird; private static int _dayPlThirdN;   // 326d: trzecia gracza z sakiewek rozbitych druzyn (do kiesy gracza) - tylko licznik
+        internal static bool PlayerThirdOn { get { var s = Settings.Current; return s != null && s.PlayerTakesThirdOfBeatenPurses; } }
 
-        internal static void Reset() { _purse.Clear(); _saved.Clear(); _pending.Clear(); _sigStock = _sigArm = _sigRoster = int.MinValue; _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = -1; SavingsByNeed.Reset(); }
+        internal static void Reset() { _purse.Clear(); _saved.Clear(); _pending.Clear(); _sigStock = _sigArm = _sigRoster = int.MinValue; _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayPlThird = 0; _dayPlThirdN = 0; _dayStamp = -1; SavingsByNeed.Reset(); }
 
         internal static string Export()
         {
@@ -116,7 +118,18 @@ namespace Armoury
                 var win = destroyer != null ? destroyer.MobileParty : null;
                 if (win != null && win.LeaderHero != null && win.LeaderHero.IsAlive)
                 {
-                    if (win.IsMainParty) { Add(win, purse); Ransom178.NotePlayerPurse(purse); }   // ludzie gracza - do ich sakiewki; 178: korona 1/9 sakwy (jutro z sakiewki)
+                    if (win.IsMainParty && !PlayerThirdOn) { Add(win, purse); Ransom178.NotePlayerPurse(purse); }   // wylacznik 326d: ludzie gracza - do ich sakiewki; 178: korona 1/9 sakwy (jutro z sakiewki)
+                    else if (win.IsMainParty)
+                    {
+                        // 326d (decyzja Jeffa 05.11 "1/3 monet dla mnie jak lord AI"): ta sama regula co lord AI nizej - 1/3 do kiesy gracza, 2/3 jego ludziom.
+                        // Tylko podzial tej samej kwoty. Korona jak u lorda AI: 1/3 trzeciej (= 1/9 sakwy) z kiesy gracza o swicie (Ransom178.NoteThird - gracz
+                        // nie ma ksiegi rodu ClanIncomeBook, wiec wprost), z 2/3 ludzi nic. Okno lupu: kiesa mierzona przed/po ramce, etykieta LBeatenThird.
+                        int third = purse / 3;
+                        win.LeaderHero.ChangeHeroGold(third); Add(win, purse - third);
+                        Ransom178.NoteThird(win.LeaderHero, third);
+                        SpoilsReport.NoteCoin(SpoilsReport.LBeatenThird, third);
+                        _dayPlThird += third; _dayPlThirdN++;
+                    }
                     else { int third = purse / 3; win.LeaderHero.ChangeHeroGold(third); Add(win, purse - third); }
                     if (!win.IsMainParty) ClanIncomeBook.NoteInflow(win.LeaderHero, purse / 3, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik)
                     MoneyLedger.NotePurseGone(purse, false);                                                             // paczka 169: linia "Obieg" (tylko licznik)
@@ -180,8 +193,25 @@ namespace Armoury
                 Log.Info("Sakiewka ludzi: dzien " + _dayStamp + " - nadwyzki sprzedane " + _daySold + " szt. za " + _dayGold + " (w tym zalogi " + _dayGarSold + " za " + _dayGarGold + "; trzecia lordow AI i panow osad " + _dayLord + Drobne39.ThirdNote()
                          + "), ludzie wydali na sprzet " + _dayGear + ", na zycie w miastach " + _dayLife + ", u markietanow w polu (E5/A3) " + _dayCamp + ", na odziez wojska (150) " + _dayCloth
                          + "; zold wplacony do sakiewek " + _dayWage + " (" + _dayWageN + " wyplat); ruch sakiewek: wplynelo " + _dayIn + " (zold, lup, przejete sakiewki, zaplata za najem i udzial w puli weteranow - E5/B6, konie lordow ponad zapas - E6/K2), wyszlo " + _dayOut
-                         + " (sprzet, naprawy, odziez, zaopatrzenie BK - D11-4, zycie w miastach, markietani, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved + ".");
-            _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayStamp = d;
+                         + " (sprzet, naprawy, odziez, zaopatrzenie BK - D11-4, zycie w miastach, markietani, utracone sakiewki), w sakiewkach razem " + TotalNow() + "; odlozone na sprzet " + _daySaved
+                         + "; " + PlayerPurseNote() + ".");
+            _daySold = _dayGold = _dayLord = _dayLife = _dayGear = 0; _daySaved = _dayGarSold = _dayGarGold = 0; _dayCloth = 0; _dayWage = 0; _dayWageN = 0; _dayIn = _dayOut = 0; _dayCamp = 0; _dayPlThird = 0; _dayPlThirdN = 0; _dayStamp = d;
+        }
+
+        /// <summary>326d: sakiewka ludzi PARTII GRACZA do linii dziennej i okna lupu - stan, ludzie, na glowe, odlozone K1, trzecia gracza z sakiewek rozbitych dzis.
+        /// Tylko odczyt.</summary>
+        internal static string PlayerPurseNote()
+        {
+            try
+            {
+                var mp = MobileParty.MainParty;
+                if (mp == null) return "partia gracza: brak";
+                int have = Get(mp);
+                int men = mp.MemberRoster != null ? mp.MemberRoster.TotalManCount : 0;
+                return "partia gracza (326d): w sakiewce ludzi " + have + ", ludzi " + men + ", na glowe " + (men > 0 ? (have / men).ToString() : "-") + ", odlozone na sprzet " + SavedOf(mp)
+                       + ", trzecia gracza z sakiewek rozbitych " + _dayPlThird + " (" + _dayPlThirdN + ")";
+            }
+            catch { return "partia gracza: ?"; }
         }
 
         /// <summary>Cena skupu sztuki (w tym stanie) w miescie; poza miastem - najblizsze miasto.</summary>

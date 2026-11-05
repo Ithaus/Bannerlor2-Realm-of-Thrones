@@ -748,6 +748,8 @@ namespace Armoury
                 }
                 if (foldedN > 0) coin.Rows.Add(new Row { Label = "Other sums (" + N(foldedN) + ")", Value = Den(folded) });
                 long purse = r.CoinTotal;
+                long third = 0;   // 326d: 1/3 sakiewek rozbitych druzyn lordow do kiesy gracza (MenPurse.OnPartyDestroyed) - juz w purse (wiersz z etykieta wyzej); tu do logu
+                { int ti = r.CoinLabels.IndexOf(SpoilsReport.LBeatenThird); if (ti >= 0) third = r.CoinAmounts[ti]; }
                 if (coin.Rows.Count > 0 || purse != 0) coin.Rows.Add(new Row { Label = purse >= 0 ? "Into your purse now" : "Out of your purse now", Value = Den(purse) });
                 if (r.Men != 0) coin.Rows.Add(new Row { Label = "Kept by your men (their pay, not yours)", Value = Den(r.Men) });
                 long crownMen = 0, crownMe = 0;
@@ -829,7 +831,8 @@ namespace Armoury
                     Log.Info("Okno lupu (326d): raport " + r.Id + " | do kiesy gracza teraz " + purse.ToString(Inv) + " | sakiewka ludzi (ich zold) " + r.Men.ToString(Inv)
                              + " | korona 1/9 o swicie " + r.Crown.ToString(Inv) + " (z kiesy gracza ~" + crownMe.ToString(Inv) + ", z sakiewki ludzi ~" + crownMen.ToString(Inv)
                              + ", podstawa z sakw " + r.CrownMen.ToString(Inv) + ") | dar krola o swicie " + gift.ToString(Inv) + " (bitew " + r.Mes.Count + ")"
-                             + " | okup ~" + r.RansomWorth.ToString(Inv) + " (wycena) | sprzet " + r.GearWorth.ToString(Inv) + " | stopka: " + c.Total);
+                             + " | okup ~" + r.RansomWorth.ToString(Inv) + " (wycena) | sprzet " + r.GearWorth.ToString(Inv) + " | w tym trzecia gracza z sakiewek rozbitych " + third.ToString(Inv)
+                             + " | " + MenPurse.PlayerPurseNote() + " | stopka: " + c.Total);
             }
             catch (Exception e) { Stumble("Build", e); }
             return c;
