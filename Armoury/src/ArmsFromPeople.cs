@@ -300,9 +300,14 @@ namespace Armoury
 
         public static Exception A5MeasureFin(Exception __exception, Town __state) { _a5Town = __state; return __exception; }
 
+        /// <summary>326c-E (recenzja R1-5 / R2-5 / R3-8): dodatkowe wywolania werbunku zalogi z CanonWarBalance.FrontGarrisonDaily - limit K8 dziala, ale bez licznikow
+        /// A5/K8 doby (jedna twierdza liczylaby sie setki razy); E podaje wlasne sumy w linii "zaloga frontu (326c)".</summary>
+        [ThreadStatic] internal static bool FrontGarrisonCall;
+
         public static void A5LimitPostfix(Town __0, ExplainedNumber __result)
         {
             if (__0 == null || !ReferenceEquals(_a5Town, __0)) return;       // UI wola te sama metode - liczymy tylko z okna A5
+            if (FrontGarrisonCall) return;                                     // 326c-E: bez licznikow A5/K8
             try
             {
                 float bas = __result.BaseNumber, res = __result.ResultNumber;

@@ -131,7 +131,7 @@ namespace Armoury
         private static readonly HashSet<MobileParty> _dUnreadyParties = new HashSet<MobileParty>();   // recenzja p9: niegotowe (ArmsFirst) w mysli OB5 dzis
         private static readonly List<MobileParty> _tmpGone = new List<MobileParty>();
         private static double _hour = -1.0;
-        private static int _dRaised, _dStarve, _dKingOffer, _dKingNoCall, _dArmies, _dStarted, _dEnded, _dCaptured, _undeadNow, _offClassNow, _stumbles, _dStumbles, _dOwnSiege, _dRel, _dUnready;
+        private static int _dRaised, _dStarve, _dKingOffer, _dKingNoCall, _dArmies, _dStarted, _dEnded, _dCaptured, _undeadNow, _offClassNow, _stumbles, _dStumbles, _dOwnSiege, _dRel, _dUnready, _dLateNoCall;
         private static bool _patched; private static string _missing; private static MethodBase _target;
 
         private static Settings S { get { return Settings.Current; } }
@@ -142,7 +142,7 @@ namespace Armoury
         {
             _byK.Clear(); _tracks.Clear(); _armyFor.Clear(); _tmpIdx.Clear(); _tmpSg.Clear(); _dParties.Clear(); _hour = -1.0; _endedRelief.Clear();
             _dRelParties.Clear(); _tmpGone.Clear(); _tmpGated.Clear(); _dUnreadyParties.Clear();
-            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = _dRel = _dUnready = 0;
+            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = _dRel = _dUnready = _dLateNoCall = 0;
         }
 
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -242,7 +242,8 @@ namespace Armoury
                     float bes = 0f;
                     foreach (var pb in camp.GetInvolvedPartiesForEventType()) if (pb != null) bes += pb.EstimatedStrength;
                     var sg = new Siege { Ev = ev, St = st, K = k, Cls = cls, Besiegers = bes, Need = force * bes };
-                    try { sg.Left = Math.Max(AssaultMinLeftDays, AssaultDays - ev.SiegeStartTime.ElapsedDaysUntilNow); } catch { sg.Left = AssaultMinLeftDays; }
+                    // 326c-D (recenzja R3-1): najblizszy mozliwy szturm - 10 dob od poczatku albo koniec przerwy po odparciu (OB2), co pozniej; najmniej doba
+                    try { sg.Left = (float)Math.Max(AssaultMinLeftDays, Math.Max(AssaultDays - ev.SiegeStartTime.ElapsedDaysUntilNow, SiegeWalls.RepelPauseLeftDays(ev))); } catch { sg.Left = AssaultMinLeftDays; }
                     List<Siege> list;
                     if (!_byK.TryGetValue(k, out list)) { list = new List<Siege>(2); _byK[k] = list; }
                     list.Add(sg);
@@ -306,7 +307,7 @@ namespace Armoury
                         {
                             var sg = list[j];
                             if (!ReferenceEquals(sg.St, tgt)) continue;
-                            if (inTime && !InTime(mp, sg)) { sg.Late++; break; }   // 326c-D: nie dojdzie przed szacowanym szturmem - poza zebrana odsiecza
+                            if (inTime && !InTime(mp, sg)) { sg.Late++; if (army) sg.ArmyOnWay = true; break; }   // 326c-D: nie dojdzie przed szacowanym szturmem - poza zebrana odsiecza (armia dalej "w drodze" - bez drugiej armii wladcy)
                             sg.Committed += Contrib(mp);
                             sg.In.Add(mp);
                             if (army) sg.ArmyOnWay = true;
@@ -362,12 +363,13 @@ namespace Armoury
                     if (sg.In.Contains(mp)) continue;                                  // juz w zebranej odsieczy (C)
                     if (mp.Army != null && mp.Army.LeaderParty != mp) continue;        // czlonek armii - w sile wodza albo idzie z armia gdzie indziej
                     if (sg.Cls == CCastle && mp.BesiegedSettlement != null) continue;  // recenzja 14.10: oblegajacy twierdze wroga nie idzie do zamku
-                    if (InTimeOn)
+                    if (InTimeOn && mp.Army != null && mp.Army.LeaderParty == mp && Waiting(mp.Army))
                     {
-                        // 326c-D: armia zamknieta w zbiorce dla innej osady (log 05.11: armia Joffreya na zbiorce dla Deep Den liczona w zasiegu Clegane's Keep - 24 druzyny
-                        // trzymane 6 dob pod murami, ktore same nie mogly ruszyc) i druzyna, ktora nie dojdzie przed szacowanym szturmem - poza zasiegiem
-                        if (mp.Army != null && mp.Army.LeaderParty == mp && Waiting(mp.Army) && !ReferenceEquals(TargetOfArmy(mp.Army), sg.St)) { sg.Locked++; continue; }
-                        if (!InTime(mp, sg)) { sg.Late++; continue; }
+                        // 326c-D: armia zamknieta w zbiorce dla ZNANEJ innej osady (log 05.11: armia Joffreya na zbiorce dla Deep Den liczona w zasiegu Clegane's Keep - 24 druzyny
+                        // trzymane 6 dob pod murami, ktore same nie mogly ruszyc) - poza zasiegiem. Recenzja 326c R1-1: cel nieznany (po wczytaniu - bez wpisu) - liczy sie jak dotad.
+                        // Recenzja R1-3 / R3-1: "nie zdazy przed szturmem" NIE zdejmuje z zasiegu f12 (bramka "BEZ SZANS") - tylko z licznika zebranej odsieczy
+                        var ta = TargetOfArmy(mp.Army);
+                        if (ta != null && !ReferenceEquals(ta, sg.St)) { sg.Locked++; continue; }
                     }
                     r += Contrib(mp);
                 }
@@ -393,16 +395,27 @@ namespace Armoury
             catch { return true; }
         }
 
+        /// <summary>326c-D: druzyna (wodz armii) juz idzie na odsiecz tej osady - DefendSettlement tej osady albo armia z ta osada odsieczy (OB5 / Army.Gather).</summary>
+        private static bool OnWayTo(MobileParty mp, Settlement st)
+        {
+            try
+            {
+                if (mp.DefaultBehavior == AiBehavior.DefendSettlement && ReferenceEquals(mp.TargetSettlement, st)) return true;
+                return mp.Army != null && mp.Army.LeaderParty == mp && ReferenceEquals(TargetOfArmy(mp.Army), st);
+            }
+            catch { return false; }
+        }
+
         /// <summary>326c-D: armia w zbiorce (stan po postfiksie 326c-C1 - armia z przewaga juz nie czeka).</summary>
         private static bool Waiting(Army a) { try { return a.IsWaitingForArmyMembers(); } catch { return false; } }
 
-        /// <summary>326c-D: osada odsieczy armii - armia OB5, potem Army.Gather (typ Defender); bez wpisu - miejsce zbiorki (AiBehaviorObject).</summary>
+        /// <summary>326c-D: osada odsieczy armii - armia OB5, potem Army.Gather (typ Defender); bez wpisu (np. po wczytaniu) - null (cel nieznany; recenzja R1-1:
+        /// miejsce zbiorki gra wybiera zawsze poza oblezona osada, wiec nie moze sluzyc za cel).</summary>
         private static Settlement TargetOfArmy(Army a)
         {
             Settlement st;
             if (_armyFor.TryGetValue(a, out st)) return st;
-            st = ReliefStrike.GatherTarget(a);
-            return st ?? (a.AiBehaviorObject as Settlement);
+            return ReliefStrike.GatherTarget(a);
         }
 
         /// <summary>326c-C1: osada odsieczy armii OB5 albo null. Tylko odczyt.</summary>
@@ -499,6 +512,10 @@ namespace Armoury
                     if (ownSiege && sg.Cls == CCastle) { _dOwnSiege++; continue; }
                     float rest = sg.Committed - (sg.In.Contains(party) ? Contrib(party) : 0f);
                     if (rest >= sg.Need) continue;   // odsiecz wystarczy bez tej druzyny
+                    // 326c-D (recenzja R1-2): druzyna, ktora nie dojdzie przed szacowanym szturmem, nie jest wolana do tej odsieczy (inaczej - bo sama nigdy nie wejdzie do
+                    // zebranej - podbicie szloby do wszystkich druzyn krolestwa co godzine). Recenzja R3-1: kto juz idzie na te osade (DefendSettlement tej osady albo armia
+                    // z ta osada odsieczy) - podbicie zostaje, zeby gra nie odciagnela go tuz przed celem
+                    if (InTimeOn && !InTime(party, sg) && !OnWayTo(party, sg.St)) { _dLateNoCall++; continue; }
                     // f12: krolestwo nie zbierze odsieczy, ktora gra rzuci na oboz (zasieg < min(R, 1.2 x oboz)) - bez podbicia, wracaja oceny gry
                     if (gateOn && sg.Ready && sg.Reach < sg.Floor)
                     {
@@ -709,7 +726,7 @@ namespace Armoury
                          + "; pierwszenstwo 1.5 / 1.3 / 1.1, podstawa >= 0.5; armia wladcy " + (s != null && s.BesiegedReliefKingsArmy ? "TAK" : "NIE")
                          + "; odsiecz bez szans zwalnia druzyny (f12: zasieg krolestwa < min(wymagana, 1.2 x oboz), od 13 h po wykryciu) "
                          + (s != null && s.BesiegedReliefOnlyWhenReachable ? "TAK" : "NIE")
-                         + "; 326c tylko odsiecz, ktora zdazy przed szturmem (" + AssaultDays.ToString("0", Inv) + " dob od poczatku oblezenia, potem doba) i bez armii w zbiorce dla innej osady "
+                         + "; 326c licznik zebranej odsieczy i wolanie tylko druzyn, ktore zdaza przed szturmem (" + AssaultDays.ToString("0", Inv) + " dob od poczatku oblezenia albo koniec przerwy po odparciu, najmniej doba; kto juz idzie - zostaje), zasieg bez armii w zbiorce dla innej znanej osady "
                          + (s != null && s.BesiegedReliefArrivesInTime ? "TAK" : "NIE")
                          + " | model oceny celu: " + tsm + ", model armii: " + amm + ".");
             }
@@ -761,6 +778,7 @@ namespace Armoury
                   .Append(", odsiecz bez szans (zasieg krolestwa < min(wymagana, 1.2 x oboz)): zwolnione ").Append(_dRel).Append(" razy u ").Append(_dRelParties.Count).Append(" druzyn")
                   .Append(gateOn ? "" : " (Besieged Relief Only When Reachable NIE - bez zwalniania)")
                   .Append(", niegotowe (p9 - bez sprzetu, tylko odsiecz osady wlasnego rodu): pominiete odsiecze cudzych osad ").Append(_dUnready).Append(" razy u ").Append(_dUnreadyParties.Count).Append(" druzyn")
+                  .Append(", 326c nie wolane (nie zdaza przed szturmem, jeszcze nie w drodze) ").Append(_dLateNoCall)
                   .Append(" | trwajace oblezenia: podbite druzyny potem w odsieczy ").Append(redir)
                   .Append(" | ").Append(shown > 0 ? rows.ToString() : "-")
                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(").");
@@ -772,7 +790,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = _dRel = _dUnready = 0;
+            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = _dRel = _dUnready = _dLateNoCall = 0;
             _dParties.Clear(); _endedRelief.Clear(); _dRelParties.Clear(); _dUnreadyParties.Clear();
             foreach (var kv in _tracks) kv.Value.DayRel.Clear();
         }

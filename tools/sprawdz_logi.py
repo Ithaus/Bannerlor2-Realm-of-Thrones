@@ -94386,10 +94386,18 @@ def main(argv):
 #  O326-A2 zbiorki zatrzymane (INFO); O326-C1 koniec zbiorki: razem >= 1.2 x oboz; O326-C2 atak pod murami: odsiecz >= 1.2 x oboz; O326-C3 linie doby 326c i potkniecia 0;
 #  O326-D wiersze OB5 z polem 326c (INFO: nie zdaza / armia w zbiorce dla innej osady); O326-E zaloga frontu (INFO: dobrani, ponizej progu);
 #  O326-F "Oblezenia 2 (zdobycie)" z "bitwa pod murami" = 0 i "obrona" w "Mury (320c)" <= 100% po nowym DLL; O326-G ERROR ReliefStrike / FrontGarrison 0.
+#  Po recenzji (klucz ReliefEndsGatheringAfterDay - C3 czas): O326-C4 koniec zbiorki "czas" tylko po >= 24 h; O326-H1 wynik bitew pod murami (odsiecz rozbila oboz /
+#  pole wygrane przez oblegajacych, INFO); O326-H2 oblezenia z linii doby 326c dluzsze niz 40 dob (pat - NIE), 20-40 dob INFO; O326-H3 przerwania E (jedzenie, podloga,
+#  kasa, polowa ochotnikow - INFO); O326-H4 godziny z przewaga tylko poza promieniem gry (INFO - czy C2 trafia w przypadek Deep Den).
 O326_ZB = re.compile(r"Rownowaga wojny \(274\): zbiorka \| dzien (\d+) \| .*? bez walki \d+ dob \(strona ([AB]) ")
 O326_DAY274 = re.compile(r"Rownowaga wojny \(274\): dzien (\d+) \|.*?\(326c tylko slabszej strony (TAK|NIE): silniejsza poza pasmem ([AB-]), zbiorek zatrzymanych (\d+)\)")
 O326_STOP = re.compile(r"Rownowaga wojny \(274\): zbiorka zatrzymana \(326c\)")
 O326_END = re.compile(r"Odsiecz z przewaga \(326c\): koniec zbiorki \| dzien (\d+) \|.*?, razem (\d+) >= ([\d.]+) x oboz (\d+)")
+O326_ENDT = re.compile(r"Odsiecz z przewaga \(326c\): koniec zbiorki \| dzien (\d+) \|.*?\| powod czas - zbiorka ([\d.]+) h >= (\d+) h")
+O326_RELW = re.compile(r"Oblezenia 2 \(odsiecz rozbila oboz, 326c\)")
+O326_SIEGE = re.compile(r"([^;:|]+?) oboz \d+ \(miara gry -?\d+, ([\d.]+) dob\)")
+O326_EST = re.compile(r"przerwane: polowa ochotnikow dla lordow (\d+), jedzenie (\d+), podloga ludzi (\d+), kasa rodu (\d+)")
+O326_OUTH = re.compile(r"godzin z przewaga tylko z odsiecza poza promieniem gry (\d+)")
 O326_HIT = re.compile(r"Odsiecz z przewaga \(326c\): atak pod murami \| dzien (\d+) \| .*?odsiecz pod murami (\d+) \(druzyn \d+.*?\) >= ([\d.]+) x oboz (\d+)")
 O326_DLY = re.compile(r"Odsiecz z przewaga \(326c\): dzien (\d+) \|.*?\| potkniecia (\d+) \(sesja (\d+)\)")
 O326_START = re.compile(r"Odsiecz z przewaga \(326c\): start sesji \|.*?latki: Army\.Gather (\S+), Army\.IsWaitingForArmyMembers (\S+), GetNearbyPartyDataWhileDefendingSettlement (\S+)")
@@ -94403,7 +94411,7 @@ O326_ERR = re.compile(r"ERROR in (ReliefStrike|CanonWarBalance\.FrontGarrison|Ca
 
 def obl326c_collect(logp):
     D = {"new": False, "zb": [], "zb_bad": [], "stop": 0, "end": [], "hit": [], "dly": [], "start": [], "d": [], "e": [], "cap_field": 0, "cap": 0,
-         "field": 0, "mury_bad": [], "err": 0}
+         "field": 0, "mury_bad": [], "err": 0, "endt": [], "relw": 0, "sieges": {}, "est": [0, 0, 0, 0], "outh": 0}
     strong, key = "-", None
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -94422,9 +94430,16 @@ def obl326c_collect(logp):
             if O326_STOP.search(line):
                 D["stop"] += 1
                 continue
+            m = O326_ENDT.search(line)
+            if m:
+                D["endt"].append((int(m.group(1)), float(m.group(2)), int(m.group(3))))
+                continue
             m = O326_END.search(line)
             if m:
                 D["end"].append((int(m.group(1)), int(m.group(2)), float(m.group(3)), int(m.group(4))))
+                continue
+            if O326_RELW.search(line):
+                D["relw"] += 1
                 continue
             m = O326_HIT.search(line)
             if m:
@@ -94433,6 +94448,12 @@ def obl326c_collect(logp):
             m = O326_DLY.search(line)
             if m:
                 D["dly"].append((int(m.group(1)), int(m.group(2))))
+                for g in O326_SIEGE.finditer(line):
+                    nm = g.group(1).strip()
+                    D["sieges"][nm] = max(D["sieges"].get(nm, 0.0), float(g.group(2)))
+                mo = O326_OUTH.search(line)
+                if mo:
+                    D["outh"] += int(mo.group(1))
                 continue
             m = O326_START.search(line)
             if m:
@@ -94445,6 +94466,10 @@ def obl326c_collect(logp):
             m = O326_E.search(line)
             if m:
                 D["e"].append((int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))))
+                mo = O326_EST.search(line)
+                if mo:
+                    for k in range(4):
+                        D["est"][k] += int(mo.group(k + 1))
                 continue
             m = O326_CAP.search(line)
             if m:
@@ -94498,6 +94523,17 @@ def obl326c_rows(rep, D):
     rep.add("O326-F: 'zdobycie' tylko ze szturmu (bitwa pod murami 0)", f"zdobyc {D['cap']}, z bitwy pod murami {D['cap_field']}, linii 'pole pod murami' {D['field']}", "0", D["cap_field"] == 0)
     rep.add("O326-F2: straty obrony w 'Mury (320c)' <= 100%", f"ponad 100%: {len(D['mury_bad'])}" + (f" [{'; '.join(D['mury_bad'][:5])}]" if D["mury_bad"] else ""), "0", not D["mury_bad"])
     rep.add("O326-G: ERROR ReliefStrike / FrontGarrison", f"{D['err']}", "0", D["err"] == 0)
+    badt = [f"d{d} {h} h < {lim} h" for d, h, lim in D["endt"] if h + 0.05 < lim]
+    rep.add("O326-C4: koniec zbiorki 'czas' tylko po dobie zbiorki", f"po czasie {len(D['endt'])}, zlych {len(badt)}" + (f" [{'; '.join(badt[:5])}]" if badt else ""), "0",
+            not badt if D["endt"] else None)
+    rep.add("O326-H1: bitwy pod murami (INFO)", f"odsiecz rozbila oboz {D['relw']}, pole wygrane przez oblegajacych {D['field']}, zdobyc szturmem {D['cap'] - D['cap_field']}", "INFO", None)
+    long40 = sorted(((v, k) for k, v in D["sieges"].items() if v > 40.0), reverse=True)
+    long20 = sorted(((v, k) for k, v in D["sieges"].items() if 20.0 < v <= 40.0), reverse=True)
+    rep.add("O326-H2: oblezenia ponad 40 dob (pat odsieczy / zalogi)", f"oblezen w liniach doby {len(D['sieges'])}, ponad 40 dob {len(long40)}, 20-40 dob {len(long20)}"
+            + (f" [{'; '.join(f'{k} {v:.1f}' for v, k in (long40 + long20)[:5])}]" if long40 or long20 else ""), "0 ponad 40", (not long40) if D["sieges"] else None)
+    e = D["est"]
+    rep.add("O326-H3: przerwania zalogi frontu (INFO)", f"polowa ochotnikow {e[0]}, jedzenie {e[1]}, podloga ludzi {e[2]}, kasa rodu {e[3]}", "INFO", None)
+    rep.add("O326-H4: godziny z przewaga tylko poza promieniem gry (INFO)", f"{D['outh']}", "INFO", None)
 
 
 def o326_day274(day=109400, key="TAK", strong="A"):
@@ -94520,13 +94556,20 @@ def obl326c_synth():
               "(dolaczeni 20 druzyn, wezwani w promieniu 3), pod murami 0 (druzyn 0), razem 9000 >= 1.2 x oboz 5000 | wezwanych dalej 11 (doganiaja armie) | droga 1.5 doby.")
     hit_ok = ("Odsiecz z przewaga (326c): atak pod murami | dzien 109401 | Deep Den (castle_B4, House Baratheon) | odsiecz pod murami 7000 (druzyn 5, w 9 jedn. od wodza obozu) "
               ">= 1.2 x oboz 5000 (The North, wodz Howland Reed) - najsilniejsza prowadzi na oboz, reszta za nia.")
-    dly = ("Odsiecz z przewaga (326c): dzien 109401 | koniec zbiorki TAK, atak pod murami TAK | zbiorki zakonczone z przewagi dzis 1, godzin 0, armie 1 | osady 1, przelaczen 4 "
-           "| oblezenia teraz (bez Innych) 2 | potkniecia 0 (sesja 0).")
+    dly = ("Odsiecz z przewaga (326c): dzien 109401 | koniec zbiorki TAK, po dobie TAK, atak pod murami TAK | zbiorki zakonczone dzis 1 (w tym po dobie bez przewagi 0), godzin 0, armie 1 "
+           "| osady 1, przelaczen 4 (pominiete na morzu 0), godzin z przewaga tylko z odsiecza poza promieniem gry 2 | oblezenia teraz (bez Innych) 2: Deep Den oboz 5000 (miara gry 5200, 12.5 dob) "
+           "pod murami 0 (0); Ten Towers oboz 3000 (miara gry 3100, 3.0 dob) pod murami 0 (0) | potkniecia 0 (sesja 0).")
+    endt_ok = ("Odsiecz z przewaga (326c): koniec zbiorki | dzien 109402 | armia Joffrey Baratheon (House Baratheon, typ Defender) -> odsiecz Deep Den (castle_B4) | powod czas - zbiorka "
+               "25.0 h >= 24 h (bez przewagi: pod mury, na oboz tylko z przewaga) | przy wodzu 4000 (dolaczeni 10 druzyn, wezwani w promieniu 0), pod murami 0 (druzyn 0), razem 4000 < 1.2 x oboz 5000 "
+               "| wezwanych dalej 20 (doganiaja armie) | droga 2.0 doby w linii prostej - nie czeka na 90% wezwanych.")
+    dly_pat = dly.replace("12.5 dob", "45.0 dob")
     cap_ok = "Oblezenia 2 (zdobycie): dzien 109316 | osada ROT_town22 (Ten Towers, miasto) | oblegajacy battania, wodz Robb Stark | gracz nie | oblezenie 16.8 dob | bitwa szturm | po kapitulacji z glodu nie."
     cap_bad = cap_ok.replace("bitwa szturm", "bitwa pod murami")
     mury_bad = "Mury (320c): dzien 109315 | osada ROT_town22 (Ten Towers, miasto) | poziom murow 2 | obroncow 96, atakujacych 2613 | straty atak 18%, obrona 1847%, wymiana 0.26 | gracz nie | wynik zdobyte."
     runs = {
-        "good": [start, o326_day274(), o326_zb(side="B"), end_ok, hit_ok, dly, cap_ok],
+        "good": [start, o326_day274(), o326_zb(side="B"), end_ok, endt_ok, hit_ok, dly, cap_ok],
+        "badtime": [start, endt_ok.replace("25.0 h", "5.0 h")],
+        "pat": [start, dly_pat],
         "strong": [start, o326_day274(), o326_zb(side="A"), dly],
         "badend": [start, end_ok.replace("razem 9000", "razem 5000")],
         "badhit": [start, hit_ok.replace("pod murami 7000", "pod murami 5000")],
@@ -94534,7 +94577,9 @@ def obl326c_synth():
         "old": [o326_zb(side="A"), cap_bad],
     }
     exp = {
-        "good": {"O326-0": "TAK", "O326-A": "TAK", "O326-C1": "TAK", "O326-C2": "TAK", "O326-C3": "TAK", "O326-F": "TAK", "O326-F2": "TAK"},
+        "good": {"O326-0": "TAK", "O326-A": "TAK", "O326-C1": "TAK", "O326-C2": "TAK", "O326-C3": "TAK", "O326-C4": "TAK", "O326-F": "TAK", "O326-F2": "TAK", "O326-H2": "TAK"},
+        "badtime": {"O326-C4": "NIE"},
+        "pat": {"O326-H2": "NIE"},
         "strong": {"O326-A": "NIE"},
         "badend": {"O326-C1": "NIE"},
         "badhit": {"O326-C2": "NIE"},

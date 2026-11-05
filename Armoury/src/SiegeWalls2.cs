@@ -827,7 +827,22 @@ namespace Armoury
         // ============================================================ zdobycia (pomiar celu: miasta, stolice, zamki)
         private static int _dCaptTown, _dCaptCap, _dCaptCastle, _dCaptAfterSurr;
         private static int _dFieldWon;   // 326c-F: bitwy pod murami (SiegeOutside) wygrane przez oblegajacych - bez zdobycia
+        private static int _dReliefWon;  // 326c-F (recenzja R3-4): bitwy pod murami wygrane przez odsiecz, ktora uderzyla na oboz (atakujacy = odsiecz)
         internal static bool CaptureOnlyOn { get { var s = Settings.Current; return s != null && s.SiegeCaptureLineOnlyOnCapture; } }
+
+        /// <summary>326c-F (recenzja R3-4): w bitwie atakuja oblegajacy (frakcja strony ataku w wojnie z panem twierdzy). W SiegeOutside atakujacym bywa tez odsiecz
+        /// (StartBattleAction - odsiecz uderza na oboz): wtedy frakcja ataku = pan twierdzy albo sojusznik. Brak danych - true (jak przed 326c). Nie rzuca.</summary>
+        internal static bool BesiegersAttack(MapEvent me, Settlement st)
+        {
+            try
+            {
+                var lp = me != null && me.AttackerSide != null ? me.AttackerSide.LeaderParty : null;
+                var f = lp != null ? lp.MapFaction : null;
+                if (f == null || st == null || st.MapFaction == null) return true;
+                return f.IsAtWarWith(st.MapFaction);
+            }
+            catch { return true; }
+        }
 
         /// <summary>Nasluch MapEventEnded (z SiegeWalls.OnMapEventEnded, przed jego wyjsciem): szturm / bitwa pod murami wygrana przez oblegajacych = zdobycie
         /// (gra wola SiegeCompleted po tym zdarzeniu - FinalizeEventAux). Linia "Oblezenia 2 (zdobycie)". Nie rzuca.</summary>
@@ -846,13 +861,19 @@ namespace Armoury
                 // dwa falszywe "zdobycia" przed prawdziwym szturmem 109316. Linia osobna, licznik zdobyc bez niej
                 if (me.IsSiegeOutside && CaptureOnlyOn)
                 {
-                    _dFieldWon++;
+                    bool bes = BesiegersAttack(me, st);
+                    if (bes) _dFieldWon++; else _dReliefWon++;
                     if (!LogOn) return;
                     var lpf = me.AttackerSide != null && me.AttackerSide.LeaderParty != null && me.AttackerSide.LeaderParty.IsMobile ? me.AttackerSide.LeaderParty.MobileParty : null;
                     var evf = st.SiegeEvent;
-                    Log.Info("Oblezenia 2 (pole pod murami, 326c): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + Cls(st) + ") | oblegajacy "
-                             + (lpf != null && lpf.MapFaction != null ? lpf.MapFaction.StringId : "-") + ", wodz " + Hn(lpf) + " | gracz " + (me.IsPlayerMapEvent ? "tak" : "nie")
-                             + " | oblezenie " + (evf != null ? F(evf.SiegeStartTime.ElapsedDaysUntilNow, "0.0") : "-") + " dob | bitwa pod murami wygrana przez oblegajacych - twierdza nie zdobyta (zdobywa tylko szturm albo pobity wypad).");
+                    if (bes)
+                        Log.Info("Oblezenia 2 (pole pod murami, 326c): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + Cls(st) + ") | oblegajacy "
+                                 + (lpf != null && lpf.MapFaction != null ? lpf.MapFaction.StringId : "-") + ", wodz " + Hn(lpf) + " | gracz " + (me.IsPlayerMapEvent ? "tak" : "nie")
+                                 + " | oblezenie " + (evf != null ? F(evf.SiegeStartTime.ElapsedDaysUntilNow, "0.0") : "-") + " dob | bitwa pod murami wygrana przez oblegajacych - twierdza nie zdobyta (zdobywa tylko szturm albo pobity wypad).");
+                    else
+                        Log.Info("Oblezenia 2 (odsiecz rozbila oboz, 326c): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + Cls(st) + ") | odsiecz "
+                                 + (lpf != null && lpf.MapFaction != null ? lpf.MapFaction.StringId : "-") + ", wodz " + Hn(lpf) + " | gracz " + (me.IsPlayerMapEvent ? "tak" : "nie")
+                                 + " | oblezenie " + (evf != null ? F(evf.SiegeStartTime.ElapsedDaysUntilNow, "0.0") : "-") + " dob | odsiecz uderzyla na oboz i wygrala - twierdza zostaje przy panu.");
                     return;
                 }
                 string cls = Cls(st);
@@ -928,7 +949,7 @@ namespace Armoury
                   .Append(" | DR: przepuszczone ").Append(_dDrGate + _dDrWalls + _dDrRoll).Append(" (brama ").Append(_dDrGate).Append(", mury ").Append(_dDrWalls).Append(", losowanie ").Append(_dDrRoll).Append(')')
                   .Append(" | MB: ").Append(UnblockOn ? "tak" : "nie").Append(", szturmy bez czekania: machiny ").Append(_dUnEng).Append(", wyrwa ").Append(_dUnGap).Append(", drabiny ").Append(_dUnLad).Append(" (losowan ").Append(_dUnRolls).Append(')')
                   .Append(" | zdobyte dzis: miasta ").Append(_dCaptTown).Append(", stolice ").Append(_dCaptCap).Append(", zamki ").Append(_dCaptCastle).Append(" (po kapitulacji ").Append(_dCaptAfterSurr).Append(')')
-                  .Append(", bitwy pod murami wygrane przez oblegajacych bez zdobycia (326c) ").Append(_dFieldWon)
+                  .Append(", bitwy pod murami wygrane przez oblegajacych bez zdobycia (326c) ").Append(_dFieldWon).Append(", odsiecz rozbila oboz (326c) ").Append(_dReliefWon)
                   .Append(" | oblezenia trwajace ").Append(going).Append(", najdluzsze ").Append(F(longest, "0.0")).Append(" dob (").Append(longestSt).Append("), ponad 150 dob: ")
                   .Append(over.Count == 0 ? "-" : string.Join(", ", over.ToArray()))
                   .Append(" | w pamieci: obozy ").Append(_treb.Count).Append(", glod ").Append(_gl.Count)
@@ -964,7 +985,7 @@ namespace Armoury
             _dLongestHunger = 0; _dLongestHungerSt = "-"; _dSurSkip.Clear();
             _dDrGate = _dDrWalls = _dDrRoll = 0; _drLogged.Clear();
             _dUnEng = _dUnLad = _dUnRolls = 0; _unLogged.Clear();
-            _dCaptTown = _dCaptCap = _dCaptCastle = _dCaptAfterSurr = 0; _dFieldWon = 0;
+            _dCaptTown = _dCaptCap = _dCaptCastle = _dCaptAfterSurr = 0; _dFieldWon = 0; _dReliefWon = 0;
             lock (Gate) { _dClampSt.Clear(); _dRotSt.Clear(); _dClampSum = 0; _dStumbles = 0; _dTrebPace.Clear(); _dTrebPacePlayer.Clear(); }
         }
 

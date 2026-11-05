@@ -8424,6 +8424,10 @@ namespace Armoury
         [SettingPropertyGroup("Relief of besieged towns")]
         public bool ReliefEndsGatheringOnAdvantage { get; set; } = true;
 
+        [SettingPropertyBool("Relief Ends Gathering After Day", HintText = "A relief army that has stood gathering for a full day sets out for the besieged fortress anyway, with whoever has joined; the latecomers follow it. It attacks the siege camp only when strong enough. Rest at night and rest days stay as they are. Off = it waits for the gathering as before", RequireRestart = false)]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public bool ReliefEndsGatheringAfterDay { get; set; } = true;
+
         [SettingPropertyBool("Relief Attacks On Advantage", HintText = "Lords standing by a besieged fortress to relieve it attack the siege camp when together they are at least 1.2 times as strong as the besiegers: the strongest leads and the rest follow it into the battle. Without that advantage they wait, as before. Off = the game decides when they attack", RequireRestart = false)]
         [SettingPropertyGroup("Relief of besieged towns")]
         public bool ReliefAttacksOnAdvantage { get; set; } = true;
@@ -13433,6 +13437,7 @@ namespace Armoury
             s.BesiegedReliefOnlyWhenReachable = BesiegedReliefOnlyWhenReachable;
             s.BesiegedReliefArrivesInTime = BesiegedReliefArrivesInTime;
             s.ReliefEndsGatheringOnAdvantage = ReliefEndsGatheringOnAdvantage;
+            s.ReliefEndsGatheringAfterDay = ReliefEndsGatheringAfterDay;
             s.ReliefAttacksOnAdvantage = ReliefAttacksOnAdvantage;
             s.RescueHunt = RescueHunt;
             s.RescueHuntRealm = RescueHuntRealm;

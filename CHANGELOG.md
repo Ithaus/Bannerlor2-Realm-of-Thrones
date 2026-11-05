@@ -1,5 +1,58 @@
 # DZIENNIK ZMIAN
 
+## 326c po recenzji (3 recenzje: poprawnosc, ekonomia zalog, skutek dla gry) - C3 zbiorka najwyzej doba, D tylko licznik, E z jedzeniem / ludzmi / kasa / polowa ochotnikow, F odsiecz rozbila oboz (noc/326c-oblezenia; Armoury.dll 5045776eca0dc248238e5a47f09b0b2b - NIE WGRANE)
+
+**Problem:** recenzje 326c (a6e431bc): D po 10. dobie oblezenia zdejmowal z zasiegu f12 i z podbicia odsiecz dalej niz doba (w tym wypuszczona armie - "BEZ SZANS" w chwili
+rozstrzygniecia), a podbicie lecialo do wszystkich druzyn krolestwa, ktore nigdy nie wejda do licznika; po wczytaniu armia odsieczy liczona jako "w zbiorce dla innej
+osady" (cel = miejsce zbiorki); wypuszczona armia bez oblezenia mogla zostac rozwiazana przez gre; pkt 3 Jeffa ("stoi na zbiorce dluzej niz dobe - rusza") niezrobiony;
+E: jedzenie sprawdzane raz przed petla do 200 wywolan (mozna zaglodzic zamek), bez hamulca wolnych rak, ludzie "na podlodze" ksiegi (z niczego), bez kasy rodu,
+oproznianie wszystkich slotow notabli (odbiera ochotnikow lordom slabszej strony), liczniki A5/K8 liczone setki razy; F: odsiecz wygrywajaca pod murami (atakujacy =
+odsiecz) wpadala do linii "pole wygrane przez oblegajacych"; C2 bez sprawdzenia morza / blokady / tego samego oblezenia.
+
+**Zmiana (Armoury):**
+- **C3** `ReliefStrike326.cs`, nowy klucz **Relief Ends Gathering After Day** (TAK): armia odsieczy w zbiorce >= 24 h od zalozenia (Army._creationTime - pole gry w zapisie,
+  dziala po wczytaniu) konczy zbiorke bez warunku przewagi (oblezenie trwa, wojna, zasieg obrony gry 8.02 doby). Idzie pod mury droga gry; na oboz tylko z przewaga (C2 / gra).
+  Linia "koniec zbiorki" ma "powod przewaga" albo "powod czas - zbiorka X h >= 24 h".
+- **C1/C3** wypuszczenie trzyma tylko, dopoki osada celu jest oblegana (slownik armia -> osada; po koncu oblezenia wpis zdejmowany - armia czeka jak w grze, nie rozwiazuje sie).
+  Po wczytaniu cel armii bez wpisu: oblegana twierdza krolestwa najblizsza MIEJSCU ZBIORKI, najwyzej 2 x srednia odleglosc dwoch najblizszych miast gry; inaczej brak celu.
+- **C2** postfiks z `MobilePartyAi __instance` (_mobileParty odbiciem FieldRef): druzyna na morzu pomijana, osada z blokada morska pomijana, tylko to samo SiegeEvent co w ocenie godziny.
+  Diagnostyka (R3-3, teza "gra liczy oboz wyzej" niesprawdzona): "atak pod murami" i linia doby podaja miare gry obozu (GetCustomStrength Defender, pole), odsiecz poza
+  promieniem gry (do 3 x promien: sila, liczba, najblizszy dystans) i "godzin z przewaga tylko z odsiecza poza promieniem gry".
+- **D** `BesiegedRelief.cs`: "nie zdazy" zdejmuje TYLKO z licznika zebranej odsieczy (Committed; prosba Jeffa) - zasieg f12 jak przed 326c (bez "BEZ SZANS" z powodu czasu);
+  armia w drodze, choc spozniona, dalej "w drodze" (bez drugiej armii wladcy). Podbicie OB5 tylko dla druzyn, ktore zdaza, albo juz ida na te osade (DefendSettlement tej osady
+  / armia z ta osada odsieczy) - licznik "326c nie wolane" w linii doby OB5. Szturm szacowany: max(10 - doby oblezenia, koniec przerwy po odparciu OB2), najmniej doba
+  (`SiegeWalls.RepelPauseLeftDays`). "Armia w zbiorce dla innej osady" tylko przy znanym celu (OB5 / Army.Gather); po wczytaniu - liczy sie jak dotad.
+- **E** `CanonWarBalance.FrontGarrison.cs`: prog najwyzej pulap zalogi gry (PartySizeLimit); pomija krainy z hamulcem wolnych rak (FreeHands.Braked - jak K8) i rody z pusta
+  kiesa glowy; najwyzej POLOWA ochotnikow dostepnych zalodze tej doby (te same sloty co gra) - reszta dla druzyn lordow; przed kazdym wywolaniem warunek gry CanSettlementAutoRecruit
+  i jedzenie miasta >= +1/dobe; stop przy pierwszym rekrucie "na podlodze" ksiegi ludzi (`PeopleBook.FloorCallsNow`) i gdy kolejka oplat werbunku rodu + 7 dob zoldu nowych
+  ludzi > kiesa glowy. Zagrozenie: niedoczepieni czlonkowie armii nie licza sie jako wolne druzyny. Wywolania E poza licznikami A5/K8 (`ArmsFromPeople.FrontGarrisonCall`).
+  Linia "zaloga frontu (326c)": hamulec wolnych rak, pusta kiesa rodu, "przerwane: polowa ochotnikow dla lordow / jedzenie / podloga ludzi / kasa rodu", w przykladach "stop: X".
+- **F** `SiegeWalls2.cs` (`BesiegersAttack`: frakcja strony ataku w wojnie z panem twierdzy), `SiegeWalls.cs`: SiegeOutside wygrana przez odsiecz -> osobna linia
+  "Oblezenia 2 (odsiecz rozbila oboz, 326c)", licznik w linii doby "odsiecz rozbila oboz (326c) N"; SZ/320c wynik 5 "odsiecz rozbila oboz - twierdza stoi (326c)", OB3 tak samo.
+- `tools/sprawdz_logi.py` grupa obl326c: O326-C4 (czas tylko po >= 24 h), O326-H1 (bitwy pod murami: odsiecz / oblegajacy / szturmy), O326-H2 (oblezenia > 40 dob = NIE, pat),
+  O326-H3 (przerwania E), O326-H4 (przewaga poza promieniem gry); test syntetyczny OK. gen_mcm: 2830 ustawien Armoury.
+
+**Odrzucone / bez zmian:** R2 "odpoczynek" - armia w drodze z DefendSettlement nie ma dnia odpoczynku (ArmyRestDay Blocker) - stan sprzed 326c, Jeff kazal odpoczynek zostawic;
+noce dzialaja. R1-5 "dzienny limit K8" - E z zalozenia werbuje ponad tempo gry (prosba Jeffa), limit K8 dziala na kazde wywolanie. R3-7 (A slabe dowody) - kod poprawny, bez zmian.
+Pkt 1 Jeffa slowami gracza: "zbiorka" to rozkaz z reguly rownowagi wojny - gdy strona tydzien nie walczy, krol zbiera armie na zamek frontu, a lordowie z daleka jada na front;
+od 326c dostaje to tylko strona wyraznie slabsza (Korona), a silniejsza (Polnoc) walczy i oblega dalej tylko z wlasnych decyzji gry.
+
+**Jak zmierzyc w logu:** `python -I tools/sprawdz_logi.py --grupa obl326c <Armoury-*.log>`; linie: "Odsiecz z przewaga (326c): koniec zbiorki ... | powod czas",
+"Odsiecz z przewaga (326c): dzien N | ... zbiorki zakonczone dzis X (w tym po dobie bez przewagi Y) ... godzin z przewaga tylko z odsiecza poza promieniem gry Z | oblezenia
+teraz ...: <osada> oboz B (miara gry G, D dob) pod murami W (n) poza promieniem ...", "Oblezenia 2 (odsiecz rozbila oboz, 326c)", "Rownowaga wojny (274): zaloga frontu (326c)
+... przerwane: ...", w "Odsiecz (OB5): dzien" "326c nie wolane ...".
+
+**Ryzyko / co sprawdzic:**
+- C3: armia rusza po dobie z tym, co ma - bez przewagi stoi pod murami (droga gry) i moze dostac atak oblegajacych w polu; wezwani doganiaja. Armia bez celu po koncu oblezenia
+  znowu czeka (jak w grze). Odczyt _creationTime: przy BRAK w linii startu C3 nie dziala (tylko C1).
+- D: po 10. dobie wolane sa tylko druzyny w dobe drogi (albo juz idace) - mniej nowych lordow sciaganych z innych frontow (zamierzone); armia w drodze nie traci podbicia.
+- E: polowa ochotnikow i jedzenie +1 moga dac mniej ludzi niz prog (zamierzone - minimalna zaloga bez glodu i bez zabierania lordom). Kolejne wywolania gry: E5 oplata, A5 ksiega,
+  RecruitCost, Measure169c licza ludzi (poprawnie - to prawdziwi rekruci); liczniki A5/K8 bez E.
+- F: frakcja ataku bez wojny z panem twierdzy = odsiecz; brak danych - jak dotad (oblegajacy).
+- Gra NIE uruchamiana (Jeff gra) - build kod 0, test syntetyczny obl326c OK, log Jeffa (stary DLL) bez NIE.
+
+**Status:** DO SPRAWDZENIA (build kod 0, nie wgrane).
+
 ## 326c - oblezenia: zbiorka tylko slabszej strony, odsiecz atakuje z przewaga (koniec zbiorki, atak pod murami), odsiecz liczona w czasie, zalogi frontu slabszej strony, linie zdobycia (noc/326c-oblezenia od 33d03a31; Armoury.dll 91b7fa86d889e73c2a06d3c5da40132e - NIE WGRANE)
 
 **Problem:** Jeff 05.11: oblezenia trwaja 10-20 dob, zamki Korony padaja mimo armii odsieczy ("nie musza czekac na 90% pokrycia skoro maja 7k zolnierzy a przeciwnik 3k -
