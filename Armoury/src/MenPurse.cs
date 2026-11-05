@@ -121,7 +121,7 @@ namespace Armoury
                     if (win.IsMainParty && !PlayerThirdOn) { Add(win, purse); Ransom178.NotePlayerPurse(purse); }   // wylacznik 326d: ludzie gracza - do ich sakiewki; 178: korona 1/9 sakwy (jutro z sakiewki)
                     else if (win.IsMainParty)
                     {
-                        // 326d (propozycja - CZEKA na decyzje Jeffa, domyslnie WYLACZONE): ta sama regula co lord AI nizej - 1/3 do kiesy gracza, 2/3 jego ludziom.
+                        // 326d (DECYZJA Jeffa 05.11 "tak, 1/3 monet dla mnie jak lord AI", domyslnie TAK): ta sama regula co lord AI nizej - 1/3 do kiesy gracza, 2/3 jego ludziom.
                         // Tylko podzial tej samej kwoty. Korona jak u lorda AI: 1/3 trzeciej (= 1/9 sakwy) z kiesy gracza o swicie (Ransom178.NoteThird - gracz
                         // nie ma ksiegi rodu ClanIncomeBook, wiec wprost), z 2/3 ludzi nic. Okno lupu: kiesa mierzona przed/po ramce, etykieta LBeatenThird.
                         int third = purse / 3;

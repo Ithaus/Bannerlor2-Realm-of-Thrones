@@ -17,7 +17,7 @@ czeka w kolejce do switu - okno go nie pokazywalo. Okup to wycena, nie gotowka.
   Y from your men's purse; Z still owed."
 - `CrownWar314.cs`: PlayerGiftFor(MapEvent) - dar gracza za bitwe (ostatnie 16, bez zapisu); komunikat wyplaty: "The king's reward for your victory was paid at dawn: X denars into your purse."
 
-**Druga czesc (PROPOZYCJA - czeka na decyzje Jeffa; jedyna jego wypowiedz to uwaga "to mo ludzie sa mega bogaci w takim razie", nie zgoda), wylacznik `PlayerTakesThirdOfBeatenPurses` (domyslnie NIE - po recenzji):**
+**Druga czesc (DECYZJA JEFFA 05.11: "tak, 1/3 monet dla mnie jak lord AI"), wylacznik `PlayerTakesThirdOfBeatenPurses` (domyslnie TAK; recenzja przestawila na NIE z blednym zalozeniem, ze zgody nie bylo - przywrocone):**
 - `MenPurse.cs` OnPartyDestroyed: sakiewka ludzi rozbitej druzyny, ktora bierze partia gracza - 1/3 do kiesy gracza (ChangeHeroGold), 2/3 do sakiewki jego ludzi;
   ta sama regula i to samo `purse / 3` co lord AI. Zamknieta ekonomia - tylko podzial tej samej kwoty. Korona jak u lorda AI: `Ransom178.NoteThird(gracz, 1/3)` -
   o swicie 1/3 trzeciej (= 1/9 sakwy, tyle samo co dotad) z kiesy gracza, z 2/3 ludzi nic (dotad `NotePlayerPurse` - 1/9 najpierw z sakiewki ludzi). Gracz nie ma ksiegi
@@ -31,7 +31,7 @@ czeka w kolejce do switu - okno go nie pokazywalo. Okup to wycena, nie gotowka.
 | dar krola o swicie R (bitew n) | okup ~O (wycena) | sprzet G | stopka: ...".
 
 **Po recenzji 326d:**
-- Wylacznik `PlayerTakesThirdOfBeatenPurses` domyslnie NIE (Settings.cs i McmSettings.cs): decyzja Jeffa niepotwierdzona; wlaczony = ludzie ok. -22% kazdej przejetej sakwy (89% -> 66.7%), gracz +22%.
+- Wylacznik `PlayerTakesThirdOfBeatenPurses` domyslnie TAK (Settings.cs i McmSettings.cs; decyzja Jeffa 05.11); wlaczony = ludzie ok. -22% kazdej przejetej sakwy (89% -> 66.7%), gracz +22%.
 - `CrownWar314.cs`: wpis daru pamieta wyplacone (`Gift.Paid`, bez zapisu); `PlayerGiftFor(me, ref paid, ref owed, ref lapsed)` - okno pokazuje stan wpisu kolejki zamiast
   pewnej wyplaty o swicie: "King's reward, paid at dawn" (juz wplynelo), "King's reward, owed by the treasury" ~X (skarbiec placi, gdy ma zloto, mozliwe raty),
   "King's reward lost (empty treasury)". Stopka: "+X from the king, paid at dawn" / "+Y from the king when his treasury has gold".
