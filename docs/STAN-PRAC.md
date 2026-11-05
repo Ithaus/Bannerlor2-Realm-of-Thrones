@@ -12,6 +12,8 @@
 - 326a/326b PO RECENZJI: noc/326-polnoc efa59fdc, DLL a977aee19f0ca5b1da79ec123ceb8205 (build 0), weto 60 dob na zwrocone twierdze; --grupa polnoc326 P326-1..7. NIEWGRANE.
 - 14:25 Jeff wyszedl z gry: "testuj i wgraj". Logi + zapis (md5 abc473ef) na D:/Backup-Bannerlord/logi-jeffa/2026-11-05. SCALONE noc/326x-integracja ff01161a
   (326 efa59fdc + 326c b9bffbfd + 326d 82800cfd - 1/3 domyslnie TAK, recenzja blednie wylaczyla), Armoury 266e4502e235c7506d771b4e1bbbd45a, worktree scratchpad 0a2a8b2b n326x.
+  Jeff 14:40: zalogi "na ile stac lorda" - 326c-E WYLACZONE, zwrot zdobyczy bez obsady (14fa5902, Armoury 06408a8f). AUTOTEST 1 (wf_817b2378-c53): 30 dob + 7 bitew kod 0, ERROR 0,
+  Polnoc statki 543 -> 229, Korona sila 10.8k -> 22k (Reach w koalicji); ALE 326b nie ruszyl (gracz w The Eyrie - czeka na mape) + NRE ModelName 326a. Bieg 2 z wyjsciem gracza: wf_c4a84cd1-429.
   AUTOTEST w toku: wf_3907183a-103 (30 dob na kopii zapisu Jeffa + bitwy), logi do scratchpad at326x. Potem wgranie (kopia 163).
 - ZLOTO PO BITWIE (Jeff 05.11): dochodzi (kiesa 716515 -> 723077 -> 727923); okno mylace (sumuje sakiewki ludzi), korona 1/9 rano bez komunikatu.
   DECYZJA JEFFA 05.11 "tak, 1/3 monet dla mnie jak lord AI" - sakiewki pokonanych: 1/3 do kiesy gracza, 2/3 ludziom. Paczka 326d (okno + 1/3), galaz noc/326d-okno-lupu, wf_2e253829-09f.
