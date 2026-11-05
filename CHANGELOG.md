@@ -93,6 +93,12 @@ wplyw na CrownCallToWar 168 i SCA 320e (Blocks): spojnie "wojna trwa"; (6) cesja
 **Ryzyko / co sprawdzic:** ROT nie ma wydarzenia "Bran / Jon krolem Szesciu Krolestw" - regula czeka na taki stan swiata (sukcesja gry / BK / gracz); w kampanii Jeffa dzis nie zadziala.
 Korona przegrywajaca (u Jeffa sila 0.57 Polnocy) nie skapituluje nigdy - wojna z rozejmami co >= 84 doby trwa do kapitulacji Polnocy albo Brana/Jona.
 **Status:** DO SPRAWDZENIA (build 0 bledow; autotest nieuruchomiony; NIE WGRANE).
+**Recenzja H (05.11 wieczorem):** WAZNE poprawione - barter gracza (gracz wladca strony zawiera pokoj z para) dawal pokoj staly ("gracz rzadzi - bez rozejmu"), a sekcja H wprost
+wymienia "barter gracza" jako droge do rozejmu czasowego. Teraz H6 `OnPeace` przy graczu wladcy robi rozejm (WarTruceDays; F2 1 doba) z powodem "gracz:z zewnatrz:<droga>"
+(`PlayerTruceTag` / `IsPlayerTruce`, pole 4 zapisu arm_k330 - bez zmiany formatu), linia "ROZEJM start (pokoj gracza, ...)", graczowi "This peace is only a truce of N days; then X goes
+back to war."; na koncu `Resume` wypowiada strona AI (nie gracz). Inne rozejmy przy graczu wladcy (H1 AI, zatrzask Z) - jak dotad bez wznowienia. Bran / Jon krolem korony +
+gracz wladca - pokoj zostaje (fabularny). BlocksWar bez zmian (gracz wladca - bez blokady, moze wypowiedziec wczesniej). DROBNE (InfoOnce co dobe "krolgracz"/"krolnie",
+stary zapis po kapitulacji korony - tylko zapisy autotestow, W330-10 miedzy sesjami, W330-2 prog 42 sztywny) - nie ruszane w tym kroku.
 
 ## 2026-11-05 WGRANIE 164 - noc/326x-integracja (163 + 326a floty wg krolestw, 326b zwrot zdobyczy Polnocy, 326c odsiecz z przewaga, 326d okno lupu + 1/3 sakiewek pokonanych dla gracza)
 Armoury.dll 0229fc1710a699fdf3fb5f405297669c (reszta modow bez zmian: CrashScribe 55ccc004, RC 8528f098, ForgeView 8441ab0e, GrandTourney 900e32bc). Kopia 163: Armoury.dll.bak-2026-11-05-przed-wgranie164 i D:/Backup-Bannerlord/wgrane/2026-11-05-wgranie164-przed.

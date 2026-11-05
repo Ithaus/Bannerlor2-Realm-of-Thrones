@@ -32,7 +32,8 @@ namespace Armoury
     ///  gra zeruje danine (StanceLink.ResetStats), Diplomacy liczy zmeczenie od 0. Nieudane wznowienie - ponowienie co dobe (potkniecie).
     ///  Wojna wypowiedziana wczesniej (ROT, inny mod) - rozejm konczy sie od razu (linia).
     /// H6 (CampaignEvents.MakePeace, CanonWarsBehavior): kazdy pokoj tej pary bez naszej flagi - rozejm WarTruceDays (danina przycieta do tylu rat); w F2 rozejm 1 doby.
-    ///  Wyjatki: nasze pokoje (flaga), gracz wladca strony, Bran / Jon krolem korony (pokoj staly - sekcja H). Sekcja H: pokoj ROT z Krwawych Godow przy kluczu
+    ///  Wyjatki: nasze pokoje (flaga), Bran / Jon krolem korony (pokoj staly - sekcja H). Recenzja H: pokoj gracza wladcy strony (barter gracza) tez
+    ///  jest rozejmem (powod "gracz:...") - po nim wojne wypowiada strona AI; inne rozejmy przy graczu wladcy - bez wznowienia (linia). Sekcja H: pokoj ROT z Krwawych Godow przy kluczu
     ///  NorthFightsOnAfterRedWedding NIE tez jest rozejmem (dawny wyjatek usuniety).
     /// KAPITULACJA POLNOCY (WarTruce.Surrender.cs): liczniki K1-K3 w zapisie, co dobe wojny; F2 - odlozona. Zatrzask Z do nastepnego wydarzenia kanonu pary (Krwawe Gody,
     ///  JonEvent, doba Revenge x skala) - wtedy wojna wraca; po Bitwie Bekartow (BastardsSiegeEvent 2) kapitulacja ostateczna - koniec 330 dla pary (Polnoc poddana).
@@ -430,13 +431,20 @@ namespace Armoury
         /// <summary>Koniec rozejmu albo zatrzasku: wojna wraca (odbiorca daniny albo korona wypowiada; DeclareWar z flaga ROT CallingDeclareWar). true - w wojnie.</summary>
         private static bool Resume(Kingdom n, Kingdom c, string why)
         {
+            Kingdom a;
             if (PlayerRules(n, c))
             {
-                Info(why + ": gracz rzadzi strona - bez wznowienia (linia).");
-                ClearTruceState(); _resumePending = false;
-                return false;
+                // recenzja H: rozejm z pokoju gracza (barter / jego decyzja) jest czasowy - po nim wypowiada strona AI; reszta (rozejm AI, zatrzask Z) - bez wznowienia
+                if (!(_tFrom >= 0 && IsPlayerTruce(_tWhy)))
+                {
+                    Info(why + ": gracz rzadzi strona - bez wznowienia (linia).");
+                    ClearTruceState(); _resumePending = false;
+                    return false;
+                }
+                a = Prologue.RulesRealm(n) ? c : n;
+                Info(why + ": rozejm z pokoju gracza - wojne wypowiada strona AI " + a.StringId + " (sekcja H: barter gracza = rozejm czasowy).");
             }
-            Kingdom a = ResumeByNorth(_tFrom >= 0, _tRecv) ? n : c;
+            else a = ResumeByNorth(_tFrom >= 0, _tRecv) ? n : c;
             Kingdom b = a == n ? c : n;
             _ourWar = true;
             try { Prologue.RotDeclareWar272(a, b); }
@@ -450,6 +458,11 @@ namespace Armoury
             else { _resumePending = false; _resumeWhy = ""; }
             return war;
         }
+
+        /// <summary>Przedrostek powodu rozejmu z pokoju zawartego, gdy gracz rzadzil strona (zapisywany w _tWhy, arm_k330 pole 4).</summary>
+        internal const string PlayerTruceTag = "gracz:";
+        /// <summary>Rozejm z pokoju gracza wladcy (sekcja H: barter gracza = rozejm czasowy). Czysta funkcja.</summary>
+        internal static bool IsPlayerTruce(string why) { return why != null && why.StartsWith(PlayerTruceTag, StringComparison.Ordinal); }
 
         /// <summary>Kto wypowiada przy wznowieniu: koniec rozejmu - odbiorca daniny (brak - korona); koniec zatrzasku Z - korona (zatrzask tylko po kapitulacji
         /// Polnocy - sekcja H: korona nigdy nie kapituluje). true - Polnoc. Czysta funkcja.</summary>
@@ -505,9 +518,11 @@ namespace Armoury
                 if (!Live(out n, out c)) return;
                 if (_firstSeen < 0) _firstSeen = Today;
                 string src = StackSource();
-                if (PlayerRules(n, c)) { Info("pokoj z zewnatrz (" + src + "): gracz rzadzi strona - bez rozejmu, pokoj zostaje."); return; }
+                bool player = PlayerRules(n, c);
                 string king = CanonKing(c);
+                if (king != null && player) { Info("pokoj z zewnatrz (" + src + "): " + king + " krolem korony, gracz rzadzi strona - pokoj zostaje (sekcja H)."); return; }
                 if (king != null && KingPeace(n, c, king, "z zewnatrz:" + src)) return;   // sekcja H: Bran / Jon krolem - pokoj zostaje na stale (bez daniny)
+                // recenzja H: pokoj gracza wladcy (barter gracza) tez jest rozejmem czasowym - po nim wojne wypowiada strona AI (Resume)
                 string pw;
                 int ph = CanonPeaceLock.Phase330(n, c, out pw);
                 int days = ph == 2 || ph == 1 ? 1 : TruceDays;
@@ -522,12 +537,13 @@ namespace Armoury
                 }
                 int d = Today;
                 ClearTruceState();
-                _tFrom = d; _tTo = d + days; _tWhy = "z zewnatrz:" + src; _tCount++;
+                _tFrom = d; _tTo = d + days; _tWhy = (player ? PlayerTruceTag : "") + "z zewnatrz:" + src; _tCount++;
                 _tPayer = payer != null ? payer.StringId : ""; _tRecv = recv != null ? recv.StringId : ""; _tDaily = daily;
                 _z = false;
                 ZeroCounters("rozejm z zewnatrz");
-                Info("ROZEJM start (z zewnatrz:" + src + ") d." + _tFrom + "-d." + _tTo + ", danina " + TributeText(payer, recv, daily, days) + " | faza " + PhaseName(ph)
+                Info("ROZEJM start (" + (player ? "pokoj gracza, " : "") + "z zewnatrz:" + src + ") d." + _tFrom + "-d." + _tTo + ", danina " + TributeText(payer, recv, daily, days) + " | faza " + PhaseName(ph)
                      + (days == 1 ? " - rozejm 1 doby, wojna wraca jutro" : "") + " | rozejm nr " + _tCount + ".");
+                if (player) { try { Log.Player("This peace is only a truce of " + days + " days; then " + Name(Prologue.RulesRealm(n) ? c : n) + " goes back to war.", false); } catch { } }
             }
             catch (Exception e) { Stumble("OnPeace", e); }
         }
