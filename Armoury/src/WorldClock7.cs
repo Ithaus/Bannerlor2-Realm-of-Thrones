@@ -108,7 +108,8 @@ namespace Armoury
                 string kind = c168 ? Cause168 : detail.ToString();
                 // 264: lancuch wolajacych przy kazdym pokoju krolestw (rzadkie); pokoj pary kanonu mimo blokady - dopisek
                 string tail = null;
-                try { if (CanonPeaceLock.Blocks(a, b)) tail = CanonPeaceLock.TestDirect ? " | POKOJ KANONU (test 264)" : " | POKOJ KANONU MIMO BLOKADY"; } catch { }
+                // 330: nasz rozejm / kapitulacja wchodzi przy czynnej blokadzie z zalozenia - dopisek "rozejm/kapitulacja 330" (P264-1 INFO), nie "MIMO BLOKADY"
+                try { if (CanonPeaceLock.Blocks(a, b)) tail = CanonPeaceLock.TestDirect ? " | POKOJ KANONU (test 264)" : WarTruce.OurPeaceNow ? " | POKOJ KANONU (rozejm/kapitulacja 330)" : " | POKOJ KANONU MIMO BLOKADY"; } catch { }
                 Event(a, b, false, kind, c168 ? null : Chain(), tail);
             }
             catch (Exception e) { Stumble("OnMakePeace", e); }

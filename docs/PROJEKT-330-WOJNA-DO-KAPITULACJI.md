@@ -219,3 +219,4 @@ Liczniki są w zapisie. Rosną co dobę wojny, a gdy warunek pęka, wracają do 
 ## G. Poprawka Claude'a po syntezie (05.11, wg słów Jeffa „korona będzie prowadziła wojnę aż do zwycięstwa”)
 - Korona NIE kapituluje z samego stosunku sił (K3 tylko dla Północy). Kapitulacja korony wyłącznie z K1 (utrata King's Landing + progi twierdz) albo K2 (król w niewoli 21 dób).
 - Jeff 05.11: „pokój może być tymczasowy, ale nie stały”.
+- Po recenzji 330: w F2 liczniki kapitulacji nie rosną (F3 liczy od świeżej serii), liczniki od zera przy każdym rozejmie; po KOŃCU 330 tłumienie ROT/AI zostaje (pokój stały naprawdę stały); wezwanie sojusznika do wojny (call-to-war) też blokowane w rozejmie, Z i po KOŃCU.

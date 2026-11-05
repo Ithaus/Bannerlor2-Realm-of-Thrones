@@ -110,10 +110,15 @@ namespace Armoury
             string dN3 = WarTruce.DueKind(0, 0, 30, true, 42, 21, 30), dC3 = WarTruce.DueKind(0, 0, 30, false, 42, 21, 30), dK1 = WarTruce.DueKind(42, 0, 0, false, 42, 21, 30);
             string dK2 = WarTruce.DueKind(0, 21, 0, true, 42, 21, 30), dNo = WarTruce.DueKind(41, 20, 29, true, 42, 21, 30);
             int both = WarTruce.WhoSurrenders(true, true, 0.4, 2.5), bothC = WarTruce.WhoSurrenders(true, true, 0.9, 0.8), onlyC = WarTruce.WhoSurrenders(false, true, 2, 0.5);
+            // recenzja 330: wznowienie - rozejm: odbiorca daniny (brak - korona); zatrzask Z: zwyciezca kapitulacji
+            bool rTn = WarTruce.ResumeByNorth(true, WarTruce.NorthId, ""), rTc = WarTruce.ResumeByNorth(true, "", "KAPITULACJA korony (K1 42/42)");
+            bool rZc = WarTruce.ResumeByNorth(false, "", "KAPITULACJA korony (K2 21/21)"), rZn = WarTruce.ResumeByNorth(false, "", "KAPITULACJA Polnocy (K3 30/30)");
             text = "Step 42 dob " + s + ", po peknieciu " + r + " | K1 3 tw./30 " + T(k1a) + ", 10 tw. " + T(k1b) + ", z siedziba " + T(k1c) + ", sila 0.7 " + T(k1d) + ", 9 tw./27 " + T(k1e)
                    + " | Polnoc K3 " + (dN3 ?? "-") + ", korona K3 " + (dC3 ?? "-") + ", K1 " + (dK1 ?? "-") + ", K2 " + (dK2 ?? "-") + ", ponizej progow " + (dNo ?? "-")
-                   + " | obie strony 0.4/2.5 -> " + both + ", 0.9/0.8 -> " + bothC + ", tylko korona -> " + onlyC;
-            return s == 42 && r == 0 && k1a && !k1b && !k1c && !k1d && k1e && dN3 != null && dC3 == null && dK1 != null && dK2 != null && dNo == null && both == 1 && bothC == 2 && onlyC == 2;
+                   + " | obie strony 0.4/2.5 -> " + both + ", 0.9/0.8 -> " + bothC + ", tylko korona -> " + onlyC
+                   + " | wznowienie Polnoc: rozejm odbiorca Polnoc " + T(rTn) + ", rozejm bez daniny " + T(rTc) + ", Z po kapitulacji korony " + T(rZc) + ", Z po kapitulacji Polnocy " + T(rZn);
+            return s == 42 && r == 0 && k1a && !k1b && !k1c && !k1d && k1e && dN3 != null && dC3 == null && dK1 != null && dK2 != null && dNo == null && both == 1 && bothC == 2 && onlyC == 2
+                   && rTn && !rTc && rZc && !rZn;
         }
 
         private static bool TruthC(out string text)

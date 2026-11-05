@@ -178,13 +178,20 @@ namespace Armoury
                 {
                     _ourPeace = true;
                     try { MakePeaceAction.ApplyByKingdomDecision(loser, winner, daily, daily > 0 && days > 0 ? days : 0); }
+                    catch (Exception e) { Stumble("Surrender.MakePeace", e); }   // recenzja 330: wyjatek obcego sluchacza po SetNeutral - stan Z i cesja i tak
                     finally { _ourPeace = false; }
                     if (loser.IsAtWarWith(winner)) { _stumbles++; _dStumbles++; Info("KAPITULACJA " + (north ? "Polnocy" : "korony") + " (" + kind + ") NIE weszla - pokoj gry odrzucony; wojna dalej."); return false; }
                 }
                 else
                 {
                     var link = loser.GetStanceWith(winner);
-                    if (link != null) link.SetDailyTributePaid(loser, daily, daily > 0 && days > 0 ? days : 0);   // z rozejmu: danina kapitulacji zamiast daniny rozejmu
+                    if (link != null)
+                    {
+                        // z rozejmu: danina kapitulacji zamiast daniny rozejmu; recenzja 330: w pokoju gra nie zeruje sumy zaplaconej (ResetStats tylko przy zmianie stanu),
+                        // a raty licza sie (raty x dzienna - zaplacone) / dzienna - bez zera kapitulacja wychodzila bez daniny albo z ponad 84 ratami
+                        link.TotalTributePaidFrom1To2 = 0;
+                        link.SetDailyTributePaid(loser, daily, daily > 0 && days > 0 ? days : 0);
+                    }
                 }
                 int d = Today;
                 ClearTruceState();
@@ -287,6 +294,7 @@ namespace Armoury
         private static void CessionDaily(Kingdom n, Kingdom c)
         {
             if (_cession.Count == 0) return;
+            if (n.IsAtWarWith(c)) { Info("cesja czekajaca porzucona (" + _cession.Count + ") - Polnoc i korona znow w wojnie."); _cession.Clear(); return; }   // recenzja 330
             int day = Today;
             for (int i = _cession.Count - 1; i >= 0; i--)
             {

@@ -72714,6 +72714,8 @@ def pokoj264_collect(logp):
                     D["against"].append(s[:200])
                 elif "POKOJ KANONU (test 264)" in s:
                     D["test_peace"] += 1
+                elif "POKOJ KANONU (rozejm/kapitulacja 330)" in s:
+                    D["peace330"] = D.get("peace330", 0) + 1
                 continue
             if s.startswith("Pokoj a jency (M6a-3): dzien"):
                 mw = RX["rotwait"].match(s)
@@ -72783,7 +72785,7 @@ def pokoj264_rows(rep, D):
                     all(h == "TAK" for h in hooks))
     has = bool(starts)
     rep.add("P264-1: pokoj pary kanonu mimo czynnej blokady (E7/0 'POKOJ KANONU MIMO BLOKADY')",
-            f"{len(D['against'])}" + (f" ({D['against'][0][:140]})" if D["against"] else "") + f"; pokoje proby T6 (test 264) {D['test_peace']}",
+            f"{len(D['against'])}" + (f" ({D['against'][0][:140]})" if D["against"] else "") + f"; pokoje proby T6 (test 264) {D['test_peace']}; rozejmy/kapitulacje 330 (INFO) {D.get('peace330', 0)}",
             "0", (len(D["against"]) == 0) if has else None)
     bad_path = [m.group(4) for m in D["blocks"] if not m.group(4).startswith(P264_PATHS)]
     under = [f"doba {md.group(1)}: linii {n}, licznik {md.group(8)}" for md, n in D["days"] if int(md.group(8)) < n]
@@ -94733,7 +94735,9 @@ W330_TSTART = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| ROZEJM s
 W330_TEXT = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| ROZEJM przedluzony do wiosny: d\.(\d+) \(\+(\d+)")
 W330_TEND = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| ROZEJM (koniec|przerwany)")
 W330_KAP = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| KAPITULACJA (Polnocy|korony) \((K\d)")
-W330_BLOCK = re.compile(r"Wojna do kapitulacji \(330\): dzien \d+ \| (blok: rozejm odrzucony|blok: AI wojna|kapitulacja odlozona|blok: rozejm zimowy odrzucony|blok: rozejm Kroniki odrzucony)")
+W330_BLOCK = re.compile(r"Wojna do kapitulacji \(330\): dzien \d+ \| (blok: rozejm odrzucony|blok: AI wojna|kapitulacja odlozona|blok: rozejm zimowy odrzucony|blok: rozejm Kroniki odrzucony"
+                        r"|liczniki kapitulacji od zera|cesja czekajaca porzucona)")
+W330_H5B = re.compile(r"Wojna do kapitulacji \(330\): start sesji \|.*?call-to-war \(H5b\) (\S+?),")
 W330_TEST = re.compile(r"Wojna do kapitulacji \(330\): test - (T\w+) .*- wynik (TAK|NIE|POMINIETY)\.")
 W330_ERR = re.compile(r"ERROR in WarTruce\.")
 
@@ -94747,6 +94751,8 @@ def wojna330_collect(logp):
             m = W330_START.search(line)
             if m:
                 D["start"].append(m.groups())
+                mb = W330_H5B.search(line)
+                D.setdefault("h5b", []).append(mb.group(1) if mb else "-")
                 continue
             m = W330_DAY.search(line)
             if m:
@@ -94789,8 +94795,11 @@ def wojna330_rows(rep, D):
     if not st:
         rep.add("W330-0: linia startu sesji (latki H4, H5)", "brak linii startu 330", "INFO (stary DLL albo log bez startu sesji)", None)
     else:
+        h5b = D.get("h5b", [])
         bad = [x for x in st if x[0] != "TAK" or x[1] != "TAK"]
-        rep.add("W330-0: linia startu sesji (latki H4, H5)", f"startow {len(st)}, latki nie TAK {len(bad)}" + (f" [{bad[0][0]}/{bad[0][1]}]" if bad else ""), "H4 i H5 TAK", not bad)
+        bad5b = [x for x in h5b if x not in ("TAK", "-")]   # "-" - DLL sprzed poprawki recenzji (bez H5b)
+        rep.add("W330-0: linia startu sesji (latki H4, H5, H5b call-to-war)", f"startow {len(st)}, latki nie TAK {len(bad)}" + (f" [{bad[0][0]}/{bad[0][1]}]" if bad else "")
+                + f", H5b {'/'.join(sorted(set(h5b))) or '-'}", "H4, H5 i H5b TAK", not bad and not bad5b)
     key_on = any(x[2] == "tak" for x in st)
     days = sorted(set(D["days"]))
     gaps = [f"{a}->{b}" for a, b in zip(days, days[1:]) if b - a > 1]
@@ -94845,7 +94854,7 @@ def wojna330_synth():
     import tempfile
     import shutil
     P = W330_P
-    start = (P + "start sesji | latki: ROT Enforced (H4) TAK, AddDecision wojna (H5) TAK, ocena BK (CanonThroneWars) TAK | klucz Canon War Until Surrender tak | zakres: kampania kanonu"
+    start = (P + "start sesji | latki: ROT Enforced (H4) TAK, AddDecision wojna (H5) TAK, call-to-war (H5b) TAK, ocena BK (CanonThroneWars) TAK | klucz Canon War Until Surrender tak | zakres: kampania kanonu"
              " | rozejm 42 dob (+21 zima) | wpisy ROT pary: Revenge jest [Revenge (start 350, koniec 0, wyzwalacz nie, wlaczona tak)].")
 
     def day(d, ph="F0", st=0):

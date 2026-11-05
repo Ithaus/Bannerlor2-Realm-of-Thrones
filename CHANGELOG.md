@@ -50,6 +50,21 @@ dzwignie 274 i weta frontu stoja (dzialaja tylko w wojnie); (2) linia startu: "w
 wplyw na CrownCallToWar 168 i SCA 320e (Blocks): spojnie "wojna trwa"; (6) cesja zmienia panow - sprawdzic 272/320/326b i FrontGarrison przy pierwszej kapitulacji Polnocy;
 (7) kapitulacja korony tylko K1/K2 (poprawka G); linia doby pokazuje liczniki i stosunek sil.
 **Status:** DO SPRAWDZENIA (build 0 bledow; autotest nieuruchomiony - zakaz w tym kroku).
+**Poprawki po recenzji 330 (poprawnosc + bezpieczenstwo):**
+- KONIEC 330 (kapitulacja po Bekartach): H4/H5/ocena BK tlumia wojne pary dalej (`PeaceHeld` = rozejm, Z albo KONIEC) - wczesniej `On`=false wylaczal H4 i ROT Revenge (StartDay 350, EndDay 0) wypowiadal wojne nastepnej doby.
+- Tlumienie (H4, H5, H5b, BK) wymaga `GuardOn` = klucz 330 + klucz 264 + kampania kanonu (jak `Live`) - zatrzask Z nie trzyma juz wiecznie po wylaczeniu 264.
+- H5b: prefiks `AllianceCampaignBehavior.StartCallToWarAgreement` (wezwanie sojusznika do wojny, takze z okna gracza) i AddDecision dla `ProposeCallToWarAgreementDecision` /
+  `AcceptCallToWarAgreementDecision` - sojusz nie zrywa juz rozejmu / zatrzasku (ocena AllianceModel omijala -1e6). Linia startu: "call-to-war (H5b) TAK".
+- F2: liczniki K1-K3 nie rosna (zero, start twierdz od nowa) - seria z F2 dawala kapitulacje ostateczna Polnocy zaraz po Bekartach, wbrew kanonowi. Linia "kapitulacja odlozona (F2)" juz nie wystepuje.
+- Liczniki od zera przy kazdym rozejmie (StartTruce, H6) - seria "z rzedu" nie przechodzi przez rozejm. Linia "liczniki kapitulacji od zera (...)".
+- KONIEC 330: kolejka cesji przetwarzana dalej (wczesniej `Daily` konczyl przed `CessionDaily`). Wojna wraca (OnWar / doba) - kolejka cesji porzucona z linia.
+- WorldClock7 E7/0: nasz rozejm / kapitulacja ma dopisek "POKOJ KANONU (rozejm/kapitulacja 330)" zamiast "MIMO BLOKADY" (P264-1 liczy go jako INFO).
+- Wyjatek obcego sluchacza MakePeace (po SetNeutral) nie gubi stanu rozejmu / kapitulacji (catch + potkniecie, stan zapisany, gdy pokoj wszedl).
+- Kapitulacja z rozejmu: `TotalTributePaidFrom1To2 = 0` przed nowa danina (raty liczone bez sumy z rozejmu).
+- Wznowienie po zatrzasku Z: wypowiada zwyciezca kapitulacji (po kapitulacji korony - Polnoc), `ResumeByNorth` (test TB).
+- `OnWar` czysci rozejm / zatrzask takze przy kluczu 330 NIE.
+- Swiadomie bez zmiany: danina kapitulacji korony moze wyjsc 0 (model gry daje 0 platnikowi z lepszym postepem wojny) - zgodnie z regula "liczby z modeli", linia KAPITULACJA pokazuje "brak (model gry 0)".
+
 
 ## 2026-11-05 WGRANIE 164 - noc/326x-integracja (163 + 326a floty wg krolestw, 326b zwrot zdobyczy Polnocy, 326c odsiecz z przewaga, 326d okno lupu + 1/3 sakiewek pokonanych dla gracza)
 Armoury.dll 0229fc1710a699fdf3fb5f405297669c (reszta modow bez zmian: CrashScribe 55ccc004, RC 8528f098, ForgeView 8441ab0e, GrandTourney 900e32bc). Kopia 163: Armoury.dll.bak-2026-11-05-przed-wgranie164 i D:/Backup-Bannerlord/wgrane/2026-11-05-wgranie164-przed.

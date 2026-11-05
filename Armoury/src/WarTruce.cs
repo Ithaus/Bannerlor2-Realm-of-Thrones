@@ -50,6 +50,13 @@ namespace Armoury
         internal static bool KeyOn { get { var s = S; return s != null && s.CanonWarUntilSurrender; } }
         /// <summary>Regula 330 czynna: klucz TAK i para nie po ostatecznej kapitulacji (Bekarci).</summary>
         internal static bool On { get { return KeyOn && !_final; } }
+        /// <summary>Tlumienie wojny pary (H4, H5, H5b call-to-war, ocena BK) mozliwe: klucz 330 i te same warunki co Live (klucz 264, kampania kanonu). Recenzja 330:
+        /// bez tego zatrzask Z przy kluczu 264 NIE trzymal wiecznie (ZDaily nie biegnie przy !Live).</summary>
+        private static bool GuardOn { get { return KeyOn && CanonPeaceLock.KeyOn && Prologue.CanonHere; } }
+        /// <summary>Pokoj pary trzyma: rozejm, zatrzask Z albo KONIEC 330 (pokoj staly po Bekartach - recenzja 330: bez tego ROT Revenge wypowiadal wojne nastepnej doby).</summary>
+        private static bool PeaceHeld { get { return _final || _z || TruceHolds; } }
+        /// <summary>Wlasnie trwa nasze MakePeaceAction (rozejm / kapitulacja 330) - WorldClock7 dopisuje "rozejm/kapitulacja 330" zamiast "MIMO BLOKADY".</summary>
+        internal static bool OurPeaceNow { get { return _ourPeace; } }
         internal static int TruceDays { get { var s = S; int v = s != null ? s.WarTruceDays : 42; return v < 1 ? 1 : v > 364 ? 364 : v; } }
         internal static int WinterMaxExtra { get { var s = S; int v = s != null ? s.WarTruceWinterMaxExtra : 21; return v < 0 ? 0 : v > 91 ? 91 : v; } }
         internal static int MinWarDays { get { var s = S; int v = s != null ? s.WarTruceMinWarDays : 84; return v < 0 ? 0 : v > 364 ? 364 : v; } }
@@ -331,11 +338,14 @@ namespace Armoury
             if (tN > 0 && tN >= tC) { payer = n; recv = c; daily = tN; }
             else if (tC > 0) { payer = c; recv = n; daily = tC; }
             _ourPeace = true;
+            // recenzja 330: MakePeaceAction robi SetNeutral przed zdarzeniem MakePeace - wyjatek obcego sluchacza nie moze zostawic pokoju bez stanu rozejmu
             try { MakePeaceAction.ApplyByKingdomDecision(payer ?? c, recv ?? n, daily, daily > 0 ? days : 0); }
+            catch (Exception e) { Stumble("StartTruce.MakePeace", e); }
             finally { _ourPeace = false; }
             if (n.IsAtWarWith(c)) { _dStumbles++; _stumbles++; Info("ROZEJM nie wszedl (" + why + ") - pokoj gry odrzucony przez inny mod; wojna dalej."); return false; }
             int d = Today;
             ClearTruceState();
+            ZeroCounters("rozejm");
             _tFrom = d; _tTo = d + days; _tWhy = why; _tCount++;
             _tPayer = payer != null ? payer.StringId : ""; _tRecv = recv != null ? recv.StringId : ""; _tDaily = daily;
             Info("ROZEJM start (" + why + ") d." + _tFrom + "-d." + _tTo + ", danina " + TributeText(payer, recv, daily, days) + " | rozejm nr " + _tCount + ".");
@@ -358,7 +368,7 @@ namespace Armoury
                 ClearTruceState(); _resumePending = false;
                 return false;
             }
-            Kingdom a = _tRecv == NorthId ? n : c;
+            Kingdom a = ResumeByNorth(_tFrom >= 0, _tRecv, _zWhy) ? n : c;
             Kingdom b = a == n ? c : n;
             _ourWar = true;
             try { Prologue.RotDeclareWar272(a, b); }
@@ -371,6 +381,23 @@ namespace Armoury
             }
             else { _resumePending = false; _resumeWhy = ""; }
             return war;
+        }
+
+        /// <summary>Kto wypowiada przy wznowieniu: koniec rozejmu - odbiorca daniny (brak - korona); koniec zatrzasku Z - zwyciezca kapitulacji (recenzja 330:
+        /// po kapitulacji korony wypowiada Polnoc). true - Polnoc. Czysta funkcja.</summary>
+        internal static bool ResumeByNorth(bool truce, string recv, string zWhy)
+        {
+            if (truce) return recv == NorthId;
+            return zWhy != null && zWhy.StartsWith("KAPITULACJA korony", StringComparison.Ordinal);
+        }
+
+        /// <summary>Liczniki K1-K3 od zera (seria "z rzedu": rozejm, faza F2). Linia, gdy cos bylo.</summary>
+        private static void ZeroCounters(string why)
+        {
+            bool any = false;
+            for (int i = 0; i < _k.Length; i++) if (_k[i] != 0) any = true;
+            if (any) Info("liczniki kapitulacji od zera (" + why + "): Polnoc " + _k[0] + "/" + _k[1] + "/" + _k[2] + ", korona " + _k[3] + "/" + _k[4] + ".");
+            for (int i = 0; i < _k.Length; i++) _k[i] = 0;
         }
 
         // ---------------------------------------------------------------- H6 i wojna (CanonWarsBehavior.RegisterEvents)
@@ -430,6 +457,7 @@ namespace Armoury
                 _tFrom = d; _tTo = d + days; _tWhy = "z zewnatrz:" + src; _tCount++;
                 _tPayer = payer != null ? payer.StringId : ""; _tRecv = recv != null ? recv.StringId : ""; _tDaily = daily;
                 _z = false;
+                ZeroCounters("rozejm z zewnatrz");
                 Info("ROZEJM start (z zewnatrz:" + src + ") d." + _tFrom + "-d." + _tTo + ", danina " + TributeText(payer, recv, daily, days) + " | faza " + PhaseName(ph)
                      + (days == 1 ? " - rozejm 1 doby, wojna wraca jutro" : "") + " | rozejm nr " + _tCount + ".");
             }
@@ -441,7 +469,7 @@ namespace Armoury
         {
             try
             {
-                if (!IsPair(f1, f2) || !KeyOn) return;
+                if (!IsPair(f1, f2)) return;   // recenzja 330: czyszczenie takze przy kluczu NIE (inaczej nieaktualny zatrzask Z po wlaczeniu)
                 string src = _ourWar ? "nasza DeclareWar" : StackSource();
                 int d = Today;
                 if (_tFrom >= 0)
@@ -451,6 +479,7 @@ namespace Armoury
                     ClearTruceState();
                 }
                 if (_z && !_final) { Info("zatrzask Z przerwany (" + src + ") - wojna | " + _zWhy + "."); _z = false; }
+                if (_cession.Count > 0) { Info("cesja czekajaca porzucona (" + _cession.Count + ") - wojna wrocila (" + src + ")."); _cession.Clear(); }
                 _resumePending = false; _resumeWhy = "";
             }
             catch (Exception e) { Stumble("OnWar", e); }
@@ -463,7 +492,7 @@ namespace Armoury
         {
             try
             {
-                if (!IsPair(a, b) || !On || (!_z && !TruceHolds)) return false;
+                if (!IsPair(a, b) || !GuardOn || !PeaceHeld) return false;
                 return !(Prologue.RulesRealm(a) || Prologue.RulesRealm(b));
             }
             catch { return false; }
@@ -473,7 +502,7 @@ namespace Armoury
         internal static void NoteBkBlock() { Interlocked.Increment(ref _dBlockBk); Interlocked.Increment(ref _sBlockBk); }
 
         private static bool _hooksTried;
-        private static string _wH4 = "nie wpieta", _wH5 = "nie wpieta";
+        private static string _wH4 = "nie wpieta", _wH5 = "nie wpieta", _wH5b = "nie wpieta";
 
         /// <summary>Raz na proces (WarTruceBehavior.OnSessionLaunched, po CanonWarsBehavior - ROT wojny gotowe): H4 postfiks Last na ROTStorylineWar.Enforced, H5 prefiks
         /// First na Kingdom.AddDecision. Wpinane zawsze (klucz czytany w latkach - NIE = przepuszczaja).</summary>
@@ -496,20 +525,47 @@ namespace Armoury
                 else { h.Patch(m, prefix: new HarmonyMethod(typeof(WarTruce), nameof(AddDecisionPrefix)) { priority = Priority.First }); _wH5 = "TAK"; }
             }
             catch (Exception e) { _wH5 = "BLAD (" + e.GetType().Name + ")"; Stumble("EnsureHooks.H5", e); }
+            try
+            {
+                // recenzja 330: sojusz gry wzywa do wojny (ProposeCallToWarAgreementDecision / okno gracza) -> StartCallToWarAgreement -> DeclareWarAction.ApplyByCallToWarAgreement;
+                // ocena idzie przez AllianceModel, nie przez -1e6 BK - prefiks na samym starcie umowy (przed kosztem i premia)
+                var t = AccessTools.TypeByName("TaleWorlds.CampaignSystem.CampaignBehaviors.AllianceCampaignBehavior");
+                var m = t != null ? AccessTools.DeclaredMethod(t, "StartCallToWarAgreement") : null;
+                if (m == null || m.GetParameters().Length < 3) _wH5b = "BRAK";
+                else { h.Patch(m, prefix: new HarmonyMethod(typeof(WarTruce), nameof(CallToWarPrefix)) { priority = Priority.First }); _wH5b = "TAK"; }
+            }
+            catch (Exception e) { _wH5b = "BLAD (" + e.GetType().Name + ")"; Stumble("EnsureHooks.H5b", e); }
         }
+
+        /// <summary>H5b: prefiks AllianceCampaignBehavior.StartCallToWarAgreement(wzywajacy, wezwany, przeciw, ...) - wezwanie do wojny w parze w rozejmie / zatrzasku / KONCU 330:
+        /// false (bez kosztu, premii i DeclareWar). Nie rzuca.</summary>
+        public static bool CallToWarPrefix(object __1, object __2)
+        {
+            try
+            {
+                var k = __1 as IFaction; var t = __2 as IFaction;
+                if (!BlocksWar(k, t)) return true;
+                _dBlockAi++; _sBlockAi++;
+                InfoOnce("h5b|" + (k != null ? k.StringId : "?"), "blok: AI wojna w " + BlockName() + " (call-to-war sojuszu, wezwany " + Name(k) + " przeciw " + Name(t) + ").");
+                return false;
+            }
+            catch (Exception e) { Stumble("CallToWarPrefix", e); return true; }
+        }
+
+        private static string BlockName() { return _final ? "KONCU 330" : _z ? "zatrzasku Z" : "rozejmie do d." + _tTo; }
 
         /// <summary>H4: postfiks ROTStorylineWar.Enforced (Priority.Last) - para w rozejmie albo w zatrzasku Z: false z naszym powodem (po angielsku - okno ROT). Nie rzuca.</summary>
         public static void EnforcedPostfix(object __instance, ref bool __result, ref string disabledReason)
         {
             try
             {
-                if (!__result || _bypass || __instance == null || !On) return;
-                if (!_z && !TruceHolds) return;
+                if (!__result || _bypass || __instance == null || !GuardOn || !PeaceHeld) return;
                 if (!Prologue.War330Pair(__instance)) return;
                 var n = North; var c = Crown;
                 if (n == null || c == null || PlayerRules(n, c)) return;
                 __result = false;
-                disabledReason = _z ? "The war ended with a surrender; it flares up again with the next turn of the story." : "A truce holds until day " + _tTo + ".";
+                disabledReason = _final ? "The war ended with a surrender after the Battle of the Bastards; the peace holds."
+                               : _z ? "The war ended with a surrender; it flares up again with the next turn of the story." : "A truce holds until day " + _tTo + ".";
                 _dH4++; _sH4++;
             }
             catch (Exception e) { Stumble("EnforcedPostfix", e); }
@@ -520,20 +576,25 @@ namespace Armoury
         {
             try
             {
+                if (__0 == null) return true;
+                IFaction k, t; string kind;
                 var d = __0 as DeclareWarDecision;
-                if (d == null) return true;
-                var k = d.Kingdom ?? __instance;
-                var t = d.FactionToDeclareWarOn;
+                var pc = __0 as ProposeCallToWarAgreementDecision;
+                var ac = __0 as AcceptCallToWarAgreementDecision;
+                if (d != null) { k = d.Kingdom ?? __instance; t = d.FactionToDeclareWarOn; kind = "AddDecision"; }
+                else if (pc != null) { k = pc.CalledKingdom; t = pc.KingdomToCallToWarAgainst; kind = "AddDecision call-to-war"; }   // recenzja 330: wezwany do wojny z para
+                else if (ac != null) { k = ac.Kingdom ?? __instance; t = ac.KingdomToCallToWarAgainst; kind = "AddDecision przyjecie call-to-war"; }
+                else return true;
                 if (!BlocksWar(k, t)) return true;
                 _dBlockAi++; _sBlockAi++;
                 if (WarTruceTest.Armed) WarTruceTest.Hits++;
-                var who = d.ProposerClan;
-                InfoOnce("h5|" + (k != null ? k.StringId : "?"), "blok: AI wojna w " + (_z ? "zatrzasku Z" : "rozejmie do d." + _tTo) + " (AddDecision, wnioskodawca "
+                var who = __0.ProposerClan;
+                InfoOnce("h5|" + kind + "|" + (k != null ? k.StringId : "?"), "blok: AI wojna w " + BlockName() + " (" + kind + ", wnioskodawca "
                                                                 + (who != null && who.Name != null ? who.Name.ToString() : "-") + ").");
                 if (who != null && who == Clan.PlayerClan && !_playerToldWar)
                 {
                     _playerToldWar = true;
-                    Log.Player(_z ? "The surrender still holds: the council will not hear of a new war yet." : "The truce holds until day " + _tTo + ": the council will not hear of breaking it.", true);
+                    Log.Player(_z || _final ? "The surrender still holds: the council will not hear of a new war yet." : "The truce holds until day " + _tTo + ": the council will not hear of breaking it.", true);
                 }
                 return false;
             }
@@ -578,7 +639,12 @@ namespace Armoury
                 if (_firstSeen < 0) { _firstSeen = day; Info("pierwsza doba 330 w tej kampanii - karencja rozejmu do d." + (day + GraceDays) + "."); }
                 if (_final)
                 {
-                    if (day % 7 == 0) Info("KONIEC 330 - para Polnoc-korona poza regula (kapitulacja po Bitwie Bekartow), pokoj staly.");
+                    // recenzja 330: cesja z kapitulacji ostatecznej dalej przetwarzana (kolejka konczy sie sama - twierdza oddana, juz nie Polnocy albo 30 dob)
+                    var nf = North; var cf = Crown;
+                    if (_cession.Count > 0 && nf != null && cf != null && !nf.IsEliminated && !cf.IsEliminated) CessionDaily(nf, cf);
+                    if (day % 7 == 0) Info("KONIEC 330 - para Polnoc-korona poza regula (kapitulacja po Bitwie Bekartow), pokoj staly | tlumienie wojny "
+                                           + (GuardOn ? "TAK" : "NIE (klucz 264 NIE / kampania klasyczna)") + ", ROT Enforced " + _dH4 + " (sesja " + _sH4 + "), blok AI wojna " + _dBlockAi + " (sesja " + _sBlockAi + ")"
+                                           + (_cession.Count > 0 ? ", cesja czeka " + _cession.Count : "") + ".");
                     EndDay(); return;
                 }
                 Kingdom n, c;
@@ -596,7 +662,7 @@ namespace Armoury
                 int ph = CanonPeaceLock.Phase330(n, c, out pw);
                 bool player = PlayerRules(n, c);
                 if (_z) ZDaily(n, c, ph, player);
-                if (_final) { EndDay(); return; }
+                if (_final) { CessionDaily(n, c); EndDay(); return; }
                 if (_tFrom >= 0) TruceDaily(n, c, ph, player);
                 if (_resumePending && !n.IsAtWarWith(c) && _tFrom < 0 && !_z) Resume(n, c, "ponowienie (" + _resumeWhy + ")");
                 Measure(n, c);
@@ -659,13 +725,20 @@ namespace Armoury
         private static void WarDaily(Kingdom n, Kingdom c, int ph, bool player)
         {
             if (ph < 0) return;
+            if (ph == 1 || ph == 2)
+            {
+                // recenzja 330: w F2 liczniki nie rosna - seria z F2 dawala kapitulacje ostateczna zaraz po Bekartach (kanon: zwyciestwo Polnocy); F3 liczy od swiezej serii.
+                // W F2 nie ma tez rozejmu (Gate "faza 2").
+                ZeroCounters("faza F2");
+                _fortsN0 = _fortsC0 = -1;
+                return;
+            }
             StepCounters(n, c);
             Kingdom loser; string kind;
             bool due = SurrenderDue(n, c, out loser, out kind);
             if (due)
             {
                 if (player) { InfoOnce("kapgracz", "prog kapitulacji " + (loser == n ? "Polnocy" : "korony") + " (" + kind + ") - gracz rzadzi strona, bez akcji."); }
-                else if (ph == 1 || ph == 2) InfoOnce("kapf2", "kapitulacja odlozona (F2) - " + (loser == n ? "Polnoc" : "korona") + " " + kind + ".");
                 else { Surrender(loser, loser == n ? c : n, kind, n, c, ph); return; }
             }
             // rozejm zimowy (H1 Diplomacy rusza dopiero przy 100 - doba sprawdza 75/75 zima)
@@ -737,7 +810,7 @@ namespace Armoury
             try
             {
                 var sb = new StringBuilder(400);
-                sb.Append(Tag).Append("start sesji | latki: ROT Enforced (H4) ").Append(_wH4).Append(", AddDecision wojna (H5) ").Append(_wH5)
+                sb.Append(Tag).Append("start sesji | latki: ROT Enforced (H4) ").Append(_wH4).Append(", AddDecision wojna (H5) ").Append(_wH5).Append(", call-to-war (H5b) ").Append(_wH5b)
                   .Append(", ocena BK (CanonThroneWars) ").Append(CanonThroneWars.WireText)
                   .Append(" | klucz Canon War Until Surrender ").Append(KeyOn ? "tak" : "nie").Append(_final ? " (KONIEC 330 - para poza regula)" : "")
                   .Append(" | zakres: ").Append(Prologue.CanonHere ? "kampania kanonu" : "kampania klasyczna - nie dotyczy")
