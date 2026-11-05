@@ -200,6 +200,8 @@ namespace Armoury
         // ---------------------------------------------------------------- latka
         private static bool _tried;
         private static string _wire = "nie wpieta";
+        /// <summary>330: stan wpiecia postfiksu oceny wojny BK (linia startu WarTruce).</summary>
+        internal static string WireText { get { return _wire; } }
         private static MethodInfo _mWar;
 
         /// <summary>CanonWarsBehavior.OnSessionLaunched: raz na proces postfiks Priority.High na BKDiplomacyModel.GetScoreOfDeclaringWar (6 arg.).</summary>
@@ -583,8 +585,10 @@ namespace Armoury
         {
             try
             {
-                if (!Key) return;
                 if (__2 != null && ReferenceEquals(__2, __0)) return;   // wywolanie z GetScoreOfDeclaringPeace BK - wynik pokoju bez zmian
+                // 330 (H5): Polnoc-korona w rozejmie albo w zatrzasku Z - zakaz wojny niezaleznie od klucza 312c (klucz 330 NIE - BlocksWar false, nic sie nie zmienia)
+                if (WarTruce.BlocksWar(__0, __1)) { WarTruce.NoteBkBlock(); __result.Add(-1000000f, new TextObject("{=!}A truce or a surrender holds between these realms")); return; }
+                if (!Key) return;
                 var a = __0 as Kingdom; var t = __1 as Kingdom;
                 lock (_lock) { _dCalls++; _tCalls++; }
                 if (a == null || t == null || a == t || a.IsEliminated || t.IsEliminated) return;

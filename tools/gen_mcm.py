@@ -56,6 +56,19 @@ RANGES = {
     'CoinWearPerYear': (0.0, 0.2, "0.0000"),
     # 312b: konce zatargow ROT - kod przycina do 1..364 dni (Prologue.FeudMinDays)
     'CanonFeudWarMinDays': (1, 364, "0"),
+    # 330: wojna do kapitulacji - kod przycina (WarTruce.TruceDays / WinterMaxExtra / MinWarDays / WinterExh / GraceDays / LoseRatio / Ratio / *Days / Strongholds)
+    'WarTruceDays': (1, 364, "0"),
+    'WarTruceWinterMaxExtra': (0, 91, "0"),
+    'WarTruceMinWarDays': (0, 364, "0"),
+    'WarTruceWinterExhaustion': (1.0, 100.0, "0"),
+    'WarTruceLoadGraceDays': (0, 91, "0"),
+    'WarSurrenderLoseRatio': (0.05, 1.0, "0.00"),
+    'WarSurrenderRatio': (0.05, 1.0, "0.00"),
+    'WarSurrenderRatioDays': (1, 364, "0"),
+    'WarSurrenderHoldDays': (1, 364, "0"),
+    'WarSurrenderCaptiveDays': (1, 364, "0"),
+    'WarSurrenderStrongholds': (0, 20, "0"),
+    'WarSurrenderTributeDays': (0, 364, "0"),
     # 312c: ambicja Zelaznego Tronu - kod przycina (CanonThroneWars.Score / MaxWars / StrMin / StrFull / GapDays / WearyAt)
     'IronThroneAmbitionScore': (0, 20000, "0"),
     'IronThroneMaxWars': (1, 10, "0"),

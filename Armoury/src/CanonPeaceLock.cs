@@ -47,6 +47,9 @@ namespace Armoury
     /// 320a recenzja: faza 2 tylko, gdy Krwawe Gody NAPRAWDE zaszly (KingInTheNorth.RwHappened - flaga w zapisie arm_k320 z ExecuteRobb albo odtworzona ze stanu ROT);
     /// smierc Robba bez wesela - stara regula (faza 0/1). Wyjscie fazy 2 poza Bekartami: KingInTheNorth.FightsOnEnd (Bekarci niemozliwi - Snow / Jon / Winterfell nie
     /// u Boltonow WfDays dob - albo limit dob po Godach; zatrzask w zapisie) - powod w linii doby.
+    /// 330 (WarTruce.cs, klucz CanonWarUntilSurrender; Jeff 05.11 "pokoj moze byc tymczasowy, ale nie staly"): wiersz Polnoc-korona ma UntilSurrender - po koncu kanonu
+    /// i poza faza 2 (faza F3) blokada trwa zawsze (Locked330), takze gdy ROT tej wojny nie wymusza (wczesne wyjscie 320a, zapis bez wpisu Revenge). H1 tego wiersza
+    /// w fazie 0 i F3 pyta WarTruce.TryFromExhaustion (rozejm albo kapitulacja zamiast pokoju Diplomacy). Klucz NIE - wszystko jak w 326x.
     /// </summary>
     internal static class CanonPeaceLock
     {
@@ -54,6 +57,7 @@ namespace Armoury
         private const string PhraseCanon = "wojna kanonu trwa do Krwawych Godow";
         private const string PhraseRot = "ROT wymusza te wojne, pokoj trwalby dobe";   // recenzja 264 (3): po koncu kanonu
         private const string PhraseFightsOn = "Polnoc walczy dalej po Krwawych Godach do Bitwy Bekartow";   // 320a-KG
+        private const string PhraseUntil330 = "wojna do kapitulacji (330) - pokoj tylko jako rozejm albo kapitulacja";
         internal const string PathWeariness = "Diplomacy zmeczenie wojna";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -62,6 +66,7 @@ namespace Armoury
         {
             public string A, B, Label, EndEvent, EndHero, EndHeroName;
             public bool FightsOn;   // 320a-KG: po koncu kanonu wojna trwa do Bitwy Bekartow (klucz NorthFightsOnAfterRedWedding)
+            public bool UntilSurrender;   // 330: wojna do kapitulacji (klucz CanonWarUntilSurrender) - rozejm zamiast pokoju, staly pokoj tylko z kapitulacji
             public Rule(string a, string b, string label, string endEvent, string endHero, string endHeroName, bool fightsOn = false) { A = a; B = b; Label = label; EndEvent = endEvent; EndHero = endHero; EndHeroName = endHeroName; FightsOn = fightsOn; }
         }
 
@@ -69,7 +74,7 @@ namespace Armoury
         // do Krwawych Godow. Reach i Dorne (Prologue.Crown) poza tabela - kolejny wiersz, gdy Jeff zechce.
         private static readonly Rule[] Rules =
         {
-            new Rule(Prologue.NorthId, Prologue.Crown, "Polnoc-korona", "RedWeddingEvent", Prologue.RobbId, "Robb", true),
+            new Rule(Prologue.NorthId, Prologue.Crown, "Polnoc-korona", "RedWeddingEvent", Prologue.RobbId, "Robb", true) { UntilSurrender = true },
             new Rule(Prologue.RiverId, Prologue.Crown, "Dorzecze-korona", "RedWeddingEvent", Prologue.RobbId, "Robb"),
         };
 
@@ -156,6 +161,16 @@ namespace Armoury
         /// <summary>320a recenzja: faza 2 tylko po prawdziwych Krwawych Godach i bez wyjscia (Bekarci niemozliwi albo limit dob).</summary>
         internal static bool FightsOnPhase(bool fightsOn, int bastards, bool rwHappened, string fightsOnEnd) { return fightsOn && rwHappened && string.IsNullOrEmpty(fightsOnEnd) && bastards < 2; }
 
+        /// <summary>330: faza F3 wiersza z UntilSurrender - po koncu kanonu, poza faza 2 i poza weselem ROT w toku (stan 1) blokada trwa zawsze (key330 - klucz
+        /// CanonWarUntilSurrender i para nie po ostatecznej kapitulacji); phase = 3. Gracz wladca / krolestwo zniszczone / klucz NIE - wynik 264 bez zmian. Czysta funkcja.</summary>
+        internal static bool Locked330(bool on, bool key330, bool over, bool phase2, int redWedding, bool playerChoice, bool eliminated, ref string why, ref int phase)
+        {
+            if (!key330 || !over || phase2 || redWedding == 1 || playerChoice || eliminated) return on;
+            why = (why ?? "-") + (on ? " - wojna do kapitulacji (330)" : " - wojna do kapitulacji (330), choc ROT jej nie wymusza");
+            phase = 3;
+            return true;
+        }
+
         /// <summary>Gracz wladca strony - pokoj jego wyborem, chyba ze droga nie daje mu wyboru (zmeczenie wojna Diplomacy: okno tylko OK albo odmowa wylaczona).</summary>
         internal static bool PlayerChoice(bool playerRules, bool noChoice) { return playerRules && !noChoice; }
 
@@ -207,8 +222,39 @@ namespace Armoury
             bool rotForced = over && rw != 1 && !phase2 && Prologue.RotWarForced(a, b);   // odczyt ROT tylko po koncu kanonu (faza 2 i tak blokuje)
             bool on = Locked(true, true, PlayerChoice(playerRules, noChoice), a.IsEliminated || b.IsEliminated, rw, heroDead, rotForced, fightsOn, _cacheBs, rwHappened, foEnd, out why);
             phase = !on || !over ? 0 : (phase2 ? 2 : 1);
+            if (Rules[idx].UntilSurrender) on = Locked330(on, WarTruce.On, over, phase2, rw, PlayerChoice(playerRules, noChoice), a.IsEliminated || b.IsEliminated, ref why, ref phase);   // 330
             return on;
         }
+
+        /// <summary>330: para z wierszem UntilSurrender (Polnoc-korona, kolejnosc dowolna).</summary>
+        internal static bool UntilSurrenderPair(IFaction a, IFaction b)
+        {
+            int i = RuleIndex(a, b);
+            return i >= 0 && Rules[i].UntilSurrender;
+        }
+
+        /// <summary>330: faza pary teraz (bez logu): -1 nie dotyczy (klucz 264 NIE, kampania klasyczna), 0 kanon (F0, przed Krwawymi Godami), 1 wesele ROT w toku
+        /// (stan 1 po smierci Robba - przejscie), 2 faza 2 (320a-KG), 3 po kanonie (F3). why - tekst do linii.</summary>
+        internal static int Phase330(IFaction a, IFaction b, out string why)
+        {
+            why = "-";
+            if (!KeyOn) { why = "klucz 264 NIE"; return -1; }
+            if (!Prologue.CanonHere) { why = "kampania klasyczna"; return -1; }
+            RefreshCache();
+            bool heroDead = _cacheRobb != null && !_cacheRobb.IsAlive;
+            int rw = _cacheRw;
+            if (!CanonOver(rw, heroDead)) { why = "RedWeddingEvent " + rw + ", Robb " + (heroDead ? "nie zyje" : "zyje"); return 0; }
+            int i = RuleIndex(a, b);
+            bool fightsOn = i >= 0 && Rules[i].FightsOn && FightsOnKey;
+            if (FightsOnPhase(fightsOn, _cacheBs, KingInTheNorth.RwHappened, KingInTheNorth.FightsOnEnd)) { why = "Polnoc walczy po Krwawych Godach, " + FightsOnEvent + " " + _cacheBs; return 2; }
+            if (rw == 1) { why = "wesele ROT w toku (RedWeddingEvent 1)"; return 1; }
+            string end = KingInTheNorth.FightsOnEnd;
+            why = "po kanonie, " + FightsOnEvent + " " + _cacheBs + (end != null ? ", wyjscie fazy 2: " + end : "");
+            return 3;
+        }
+
+        /// <summary>330: stan ROT BastardsSiegeEvent z pamieci godziny (-1 nie widac).</summary>
+        internal static int BastardsState330 { get { RefreshCache(); return _cacheBs; } }
 
         private static bool State(IFaction a, IFaction b, out int idx, out string why, out int phase)
         {
@@ -247,7 +293,7 @@ namespace Armoury
             string key = (a.StringId ?? "") + "|" + (b.StringId ?? "") + "|" + pk;
             if (!_dSaid.Add(key)) return;
             Log.Info(Tag + "dzien " + (int)CampaignTime.Now.ToDays + " | " + Name(a) + " -> " + Name(b) + ": pokoj ZABLOKOWANY (droga: " + path + ") - "
-                     + (phase == 2 ? PhraseFightsOn : phase == 1 ? PhraseRot : PhraseCanon) + " (" + why + ", " + Rules[idx].Label + ").");
+                     + (phase == 3 ? PhraseUntil330 : phase == 2 ? PhraseFightsOn : phase == 1 ? PhraseRot : PhraseCanon) + " (" + why + ", " + Rules[idx].Label + ").");
         }
 
         /// <summary>Klucz drogi do licznikow: tekst do pierwszego nawiasu (wnioskodawca i wolajacy tylko w linii).</summary>
@@ -357,7 +403,14 @@ namespace Armoury
             try
             {
                 int i; string why; int rp; bool pr;
-                if (State(__0, __1, false, out i, out why, out rp, out pr)) { Note(__0, __1, i, why, DipPath(), rp); return false; }
+                if (State(__0, __1, false, out i, out why, out rp, out pr))
+                {
+                    string dp = DipPath();
+                    // 330: wiersz wojny do kapitulacji - rozejm albo kapitulacja zamiast pokoju Diplomacy (WarTruce sam pisze linie; false i tak - oryginal nie biegnie)
+                    if (Rules[i].UntilSurrender && WarTruce.On && WarTruce.TryFromExhaustion(__0, __1, dp)) return false;
+                    Note(__0, __1, i, why, dp, rp);
+                    return false;
+                }
                 if (i < 0 || !pr) return true;
                 string path = DipPath();
                 if (!path.StartsWith(PathWeariness, StringComparison.Ordinal)) return true;
@@ -441,7 +494,8 @@ namespace Armoury
                 {
                     _playerTold = true;
                     bool crownSide = k.StringId == Prologue.Crown;
-                    if (rp == 2) Log.Player(crownSide ? "The crown will hear no talk of peace with the northern rebels." : "The North will hear no talk of peace with the crown after the Red Wedding: the war goes on.", true);
+                    if (rp == 3) Log.Player(crownSide ? "The crown will make no lasting peace with the North until one side yields." : "The North will make no lasting peace with the crown until one side yields.", true);
+                    else if (rp == 2) Log.Player(crownSide ? "The crown will hear no talk of peace with the northern rebels." : "The North will hear no talk of peace with the crown after the Red Wedding: the war goes on.", true);
                     else Log.Player(crownSide ? "The crown will hear no talk of peace with the rebels while Robb Stark lives." : "King Robb will hear no talk of peace with the crown while the war goes on.", true);
                 }
                 return false;
@@ -504,7 +558,7 @@ namespace Armoury
                 bool war = a != null && b != null && !a.IsEliminated && !b.IsEliminated && a.IsAtWarWith(b);
                 string since = war ? Prologue.WarSinceText(a, b, r.A == Prologue.RiverId || r.B == Prologue.RiverId ? Prologue.RiverFirstDay : Prologue.NoDayValue) : "";
                 int fz = r.FightsOn && rp != 2 && why != null ? why.IndexOf(" - faza 2 ", StringComparison.Ordinal) : -1;   // 320a: powod konca / braku fazy 2
-                parts.Add(r.Label + ": " + (on ? (rp == 2 ? "CZYNNA (Polnoc walczy po Krwawych Godach, " + FightsOnEvent + " " + _cacheBs + ")" : rp == 1 ? "CZYNNA (ROT wymusza)" : "CZYNNA") : "KONIEC")
+                parts.Add(r.Label + ": " + (on ? (rp == 3 ? "CZYNNA (wojna do kapitulacji 330)" : rp == 2 ? "CZYNNA (Polnoc walczy po Krwawych Godach, " + FightsOnEvent + " " + _cacheBs + ")" : rp == 1 ? "CZYNNA (ROT wymusza)" : "CZYNNA") : "KONIEC")
                           + ", wojna " + (war ? "TAK " + since : "NIE") + (fz >= 0 ? " [" + why.Substring(fz + 3) + "]" : ""));
             }
             if (!KeyOn) sb.Append("blokada WYLACZONA (klucz NIE)");

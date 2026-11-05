@@ -94716,5 +94716,210 @@ def main(argv):
     return _obl326c_main_prev(argv)
 
 
+
+# ------------------------------------------------------------ paczka 330: grupa wojna330 - wojna do kapitulacji Polnoc-korona (WarTruce.cs, klucz CanonWarUntilSurrender)
+# Projekt docs/PROJEKT-330-WOJNA-DO-KAPITULACJI.md (z poprawka G: korona nie kapituluje z samego stosunku sil). Linie "Wojna do kapitulacji (330): ...". Sprawdza:
+#  W330-0 linia startu sesji z latkami H4 (ROT Enforced) i H5 (AddDecision) TAK (brak - stary DLL / INFO); W330-1 linia doby co dobe (luka > 1 doby po pierwszej - NIE);
+#  W330-2 kazdy "ROZEJM start" ma d.X-d.Y o dlugosci <= 63 (42 + 21 zima; rozejm 1 doby F2 - tylko "z zewnatrz"); W330-3 kazdy rozejm konczy sie linia "ROZEJM koniec"/
+#  "przerwany" najpozniej 2 doby po d.Y (wojna wraca) albo trwa na koncu logu; W330-4 rozejm "zmeczenie"/"zima"/"kronika" nie w fazie F2 (linia doby tej doby);
+#  W330-5 "KAPITULACJA korony (K3" = 0 (poprawka G); W330-6 bloki (rozejm odrzucony, AI wojna w rozejmie, kapitulacja odlozona - INFO); W330-7 linie testu autotestu
+#  "test - Tn ... wynik NIE" = 0; W330-8 ERROR in WarTruce = 0 i potkniecia w liniach doby (INFO > 0); W330-9 wpis ROT Revenge w linii startu (INFO: jest / BRAK).
+#   python -I tools/sprawdz_logi.py --grupa wojna330 <Armoury-*.log>
+W330_P = "Wojna do kapitulacji (330): "
+W330_START = re.compile(r"Wojna do kapitulacji \(330\): start sesji \| latki: ROT Enforced \(H4\) (\S+), AddDecision wojna \(H5\) (\S+),.*?\| klucz Canon War Until Surrender (tak|nie)"
+                        r".*?\| wpisy ROT pary: (Revenge jest|Revenge BRAK|BRAK)")
+W330_DAY = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| faza (F0|F2 \(wesele ROT w toku\)|F2|F3|Z|-) .*?\| potkniecia (\d+) \(sesja (\d+)\)\.")
+W330_TSTART = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| ROZEJM start \(([^)]*)\) d\.(-?\d+)-d\.(-?\d+)")
+W330_TEXT = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| ROZEJM przedluzony do wiosny: d\.(\d+) \(\+(\d+)")
+W330_TEND = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| ROZEJM (koniec|przerwany)")
+W330_KAP = re.compile(r"Wojna do kapitulacji \(330\): dzien (\d+) \| KAPITULACJA (Polnocy|korony) \((K\d)")
+W330_BLOCK = re.compile(r"Wojna do kapitulacji \(330\): dzien \d+ \| (blok: rozejm odrzucony|blok: AI wojna|kapitulacja odlozona|blok: rozejm zimowy odrzucony|blok: rozejm Kroniki odrzucony)")
+W330_TEST = re.compile(r"Wojna do kapitulacji \(330\): test - (T\w+) .*- wynik (TAK|NIE|POMINIETY)\.")
+W330_ERR = re.compile(r"ERROR in WarTruce\.")
+
+
+def wojna330_collect(logp):
+    D = {"start": [], "days": [], "phase": {}, "stum": 0, "tstart": [], "ext": {}, "tend": [], "kap": [], "block": {}, "tests": [], "err": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if W330_P not in line and "ERROR in WarTruce" not in line:
+                continue
+            m = W330_START.search(line)
+            if m:
+                D["start"].append(m.groups())
+                continue
+            m = W330_DAY.search(line)
+            if m:
+                d = int(m.group(1))
+                D["days"].append(d)
+                D["phase"][d] = m.group(2)
+                D["stum"] += int(m.group(3))
+                continue
+            m = W330_TSTART.search(line)
+            if m:
+                D["tstart"].append((int(m.group(1)), m.group(2), int(m.group(3)), int(m.group(4))))
+                continue
+            m = W330_TEXT.search(line)
+            if m:
+                D["ext"][int(m.group(1))] = (int(m.group(2)), int(m.group(3)))
+                continue
+            m = W330_TEND.search(line)
+            if m:
+                D["tend"].append((int(m.group(1)), m.group(2)))
+                continue
+            m = W330_KAP.search(line)
+            if m:
+                D["kap"].append((int(m.group(1)), m.group(2), m.group(3)))
+                continue
+            m = W330_BLOCK.search(line)
+            if m:
+                D["block"][m.group(1)] = D["block"].get(m.group(1), 0) + 1
+                continue
+            m = W330_TEST.search(line)
+            if m:
+                D["tests"].append((m.group(1), m.group(2)))
+                continue
+            if W330_ERR.search(line):
+                D["err"] += 1
+    return D
+
+
+def wojna330_rows(rep, D):
+    st = D["start"]
+    if not st:
+        rep.add("W330-0: linia startu sesji (latki H4, H5)", "brak linii startu 330", "INFO (stary DLL albo log bez startu sesji)", None)
+    else:
+        bad = [x for x in st if x[0] != "TAK" or x[1] != "TAK"]
+        rep.add("W330-0: linia startu sesji (latki H4, H5)", f"startow {len(st)}, latki nie TAK {len(bad)}" + (f" [{bad[0][0]}/{bad[0][1]}]" if bad else ""), "H4 i H5 TAK", not bad)
+    key_on = any(x[2] == "tak" for x in st)
+    days = sorted(set(D["days"]))
+    gaps = [f"{a}->{b}" for a, b in zip(days, days[1:]) if b - a > 1]
+    rep.add("W330-1: linia doby co dobe", f"linii {len(days)}" + (f", luki {len(gaps)} [{', '.join(gaps[:5])}]" if gaps else ""), "bez luk",
+            (not gaps) if days else (None if not key_on else False))
+    longs, f2bad = [], []
+    for d, why, a, b in D["tstart"]:
+        ln = b - a
+        if ln > 63 or ln < 1 or (ln == 1 and not why.startswith("z zewnatrz")):
+            longs.append(f"d{d} {why} {a}-{b}")
+        ph = D["phase"].get(d, D["phase"].get(d - 1, ""))
+        if not why.startswith("z zewnatrz") and ph.startswith("F2"):
+            f2bad.append(f"d{d} {why}")
+    for d, (to, add) in D["ext"].items():
+        if add > 21:
+            longs.append(f"d{d} przedluzenie +{add}")
+    rep.add("W330-2: dlugosc rozejmu (<= 63 dob, 1 doba tylko z zewnatrz w F2)", f"rozejmow {len(D['tstart'])}, zlych {len(longs)}" + (f" [{'; '.join(longs[:4])}]" if longs else ""),
+            "0 zlych", (not longs) if D["tstart"] else None)
+    last = max(days) if days else None
+    open_bad = []
+    ends = sorted(D["tend"])
+    for d, why, a, b in D["tstart"]:
+        to = b
+        for ed, (eto, add) in D["ext"].items():
+            if ed >= d and eto > to:
+                to = eto
+        fin = [e for e in ends if e[0] >= d]
+        if fin:
+            if fin[0][0] > to + 2:
+                open_bad.append(f"d{d} koniec d{fin[0][0]} > d{to}+2")
+        elif last is not None and last > to + 2:
+            open_bad.append(f"d{d} bez konca (log do d{last}, rozejm do d{to})")
+    rep.add("W330-3: wojna wraca po rozejmie (koniec <= d.Y+2)", f"rozejmow {len(D['tstart'])}, koncow {len(ends)}, bez powrotu {len(open_bad)}" + (f" [{'; '.join(open_bad[:4])}]" if open_bad else ""),
+            "0 bez powrotu", (not open_bad) if D["tstart"] else None)
+    rep.add("W330-4: rozejm wlasny (zmeczenie / zima / kronika) nie w F2", f"w F2 {len(f2bad)}" + (f" [{'; '.join(f2bad[:4])}]" if f2bad else ""), "0", (not f2bad) if D["tstart"] else None)
+    k3c = [k for k in D["kap"] if k[1] == "korony" and k[2] == "K3"]
+    kap_txt = "; ".join(f"d{a} {b} {c}" for a, b, c in D["kap"][:4])
+    rep.add("W330-5: kapitulacje (korona bez K3 - poprawka G)", f"kapitulacji {len(D['kap'])}" + (f" [{kap_txt}]" if D["kap"] else "") + f", korony z K3 {len(k3c)}", "korona K3 = 0", not k3c)
+    rep.add("W330-6: bloki i odlozenia (INFO)", ", ".join(f"{k} {v}" for k, v in sorted(D["block"].items())) or "brak", "INFO", None)
+    tn = [t for t in D["tests"] if t[1] == "NIE"]
+    if D["tests"]:
+        rep.add("W330-7: testy autotestu (TA-TD, T1, T2, T6)", f"linii {len(D['tests'])}, NIE {len(tn)}" + (f" [{', '.join(t[0] for t in tn)}]" if tn else ""), "0 NIE", not tn)
+    else:
+        rep.add("W330-7: testy autotestu (TA-TD, T1, T2, T6)", "brak linii testu", "INFO (bieg bez flagi armoury-wojna330.flag)", None)
+    rep.add("W330-8: bledy WarTruce", f"ERROR in WarTruce {D['err']}, potkniecia w liniach doby {D['stum']}", "ERROR 0", D["err"] == 0)
+    rev = [x[3] for x in st]
+    rep.add("W330-9: wpis ROT Revenge (INFO)", ", ".join(sorted(set(rev))) if rev else "brak linii startu", "INFO", None)
+
+
+def wojna330_synth():
+    """W330-S: dobry bieg, za dlugi rozejm, rozejm w F2, korona K3, test NIE, brak powrotu wojny. None = OK."""
+    import tempfile
+    import shutil
+    P = W330_P
+    start = (P + "start sesji | latki: ROT Enforced (H4) TAK, AddDecision wojna (H5) TAK, ocena BK (CanonThroneWars) TAK | klucz Canon War Until Surrender tak | zakres: kampania kanonu"
+             " | rozejm 42 dob (+21 zima) | wpisy ROT pary: Revenge jest [Revenge (start 350, koniec 0, wyzwalacz nie, wlaczona tak)].")
+
+    def day(d, ph="F0", st=0):
+        return P + f"dzien {d} | faza {ph} (RedWeddingEvent 0, Robb zyje) | wojna od d.100 (9 dob) | zmeczenie 100/100 | rozejm NIE (nastepny od d.{d}) | potkniecia {st} (sesja {st})."
+
+    def ts(d, why, a, b):
+        return P + f"dzien {d} | ROZEJM start ({why}) d.{a}-d.{b}, danina vlandia->battania 120/doba x {b - a} | rozejm nr 1."
+
+    good = [start] + [day(d) for d in range(200, 210)] + [ts(208, "zmeczenie", 208, 250)] + [day(d) for d in range(210, 252)]
+    good += [P + "dzien 250 | ROZEJM koniec: wojna wraca (nasza DeclareWar) | rozejm d.208-d.250 (zmeczenie)."]
+    good += [P + "dzien 251 | KAPITULACJA Polnocy (K3 30/30, sila 0.30): cesja 0 [], danina brak (model gry 0), jency 0 (wracaja wg PeaceHold) | zatrzask Z do: Bekarci = koniec 330."]
+    good += [P + "test - TA tabela prawdy Locked330 i Gate: x - wynik TAK."]
+    runs = {
+        "good": good,
+        "long": [start, day(200), ts(200, "zmeczenie", 200, 270), day(201)],
+        "f2": [start, day(300, "F2"), ts(300, "zmeczenie", 300, 342), day(301, "F2")],
+        "k3c": [start, day(300), P + "dzien 300 | KAPITULACJA korony (K3 30/30, sila 0.30): bez cesji."],
+        "testno": [start, day(300), P + "test - T1 rozejm: pokoj NIE - wynik NIE."],
+        "noend": [start, day(200), ts(200, "zmeczenie", 200, 242)] + [day(d) for d in range(201, 250)],
+    }
+    exp = {
+        "good": {"W330-0": "TAK", "W330-1": "TAK", "W330-2": "TAK", "W330-3": "TAK", "W330-4": "TAK", "W330-5": "TAK", "W330-7": "TAK", "W330-8": "TAK"},
+        "long": {"W330-2": "NIE"},
+        "f2": {"W330-4": "NIE"},
+        "k3c": {"W330-5": "NIE"},
+        "testno": {"W330-7": "NIE"},
+        "noend": {"W330-3": "NIE"},
+    }
+    tmp = tempfile.mkdtemp(prefix="w330_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            wojna330_rows(rep, wojna330_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def wojna330_main(logp):
+    rep = Report()
+    try:
+        s2 = wojna330_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("W330-S: test syntetyczny (dobry, za dlugi rozejm, rozejm w F2, korona K3, test NIE, bez powrotu wojny)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("W330-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = wojna330_collect(logp)
+    print(f"plik: {logp} | linii doby 330 {len(D['days'])}, rozejmow {len(D['tstart'])}, kapitulacji {len(D['kap'])}, testow {len(D['tests'])}")
+    wojna330_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_wojna330_main_prev = main
+
+
+def main(argv):
+    # paczka 330: grupa wojna330 - opakowanie main jak obl326c
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "wojna330":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return wojna330_main(rest[0] if rest else None)
+    return _wojna330_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

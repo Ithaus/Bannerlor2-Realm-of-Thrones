@@ -1,5 +1,56 @@
 # DZIENNIK ZMIAN
 
+## 330 - wojna do kapitulacji Polnoc-korona: rozejm zamiast pokoju, kapitulacja K1-K3, zatrzask Z do nastepnego wydarzenia kanonu (noc/330-wojna od 326x = 166fdb5f - NIE WGRANE, bez autotestu)
+**Problem:** Jeff 05.11: "pokoj moze byc tymczasowy, ale nie staly"; "korona bedzie prowadzila wojne az do zwyciestwa". Dzis pokoj Polnoc-korona ze zmeczenia Diplomacy jest blokowany
+(264) do Krwawych Godow, a po kanonie przechodzi przez dziury: wczesne wyjscie 320a (Winterfell nie u Boltonow 120 dob), zapis bez wpisu ROT Revenge, klucz NorthFightsOn NIE,
+Kronika "truce:" w fazie 2, gracz wladca - wtedy pokoj staly. U Jeffa zmeczenie 100/100 przez cala wojne (blokada co dobe).
+**Przyczyna:** 264 zna tylko "blokuj" albo "puszczaj"; po kanonie puszcza, gdy ROT tej wojny nie wymusza (CanonPeaceLock.Locked, `rotForced`).
+**Zmiana (projekt docs/PROJEKT-330-WOJNA-DO-KAPITULACJI.md, sekcje B-E z poprawka G; klucz CanonWarUntilSurrender, domyslnie TAK; NIE = zachowanie 326x):**
+- `WarTruce.cs` (nowy): stan i zapis `arm_k330` (SaveText.Sync; brak wpisu = stan pusty, karencja od pierwszej doby), rozejm (StartTruce, TruceDaily, Resume), H4 postfiks
+  `ROTStorylineWar.Enforced` (Priority.Last, harmony com.jeff.armoury.war330), H5 prefiks `Kingdom.AddDecision(DeclareWarDecision)` (First), H6 `OnPeace` i `OnWar`,
+  Kronika (`ChronicleTruce`), linia doby i startu sesji (wpisy ROT pary: Revenge i l.71), WarTruceBehavior (doba, godzina testu, zapis) - rejestracja w SubModuleMain po KingInTheNorthBehavior.
+- `WarTruce.Surrender.cs` (nowy): pomiar sily jak 274 (EstimatedStrength druzyn lordow krolestwa + sojusznikow w wojnie z druga strona), liczniki K1/K2/K3 (K3 tylko Polnoc - poprawka G),
+  kapitulacja Polnocy (pokoj z danina z modelu przez WarSurrenderTributeDays, cesja twierdz spoza Polnocy do korony, okno rodow przy kluczu WarSurrenderClansToCrown) i korony
+  ("pokoj Krola Polnocy" - kazdy zatrzymuje swoje, danina korony), zatrzask Z (kasuja: Krwawe Gody, JonEvent, doba Revenge x skala; Bekarci = KONIEC 330, pokoj staly).
+- `WarTruce.Test.cs` (nowy): pod flaga `armoury-wojna330.flag` i DLL autotestu (LogGate 1/2): TA tabela Locked330 + Gate, TB liczniki/progi (korona bez K3), TC zima (<= 63),
+  TD Export/Import, bieg T1 (rozejm, H4, H5/T7), T2 (wojna wraca, danina 0), T6 (pokoj z zewnatrz -> rozejm H6, wojna wraca).
+- `CanonPeaceLock.cs`: `Rule.UntilSurrender` (wiersz Polnoc-korona), czysta `Locked330` (faza F3 = blokada zawsze poza faza 2, weselem w toku, graczem, zniszczeniem), `Phase330`,
+  `UntilSurrenderPair`, `BastardsState330`; H1 `DipApplyPeacePrefix` dla tego wiersza woła `WarTruce.TryFromExhaustion` (rozejm / kapitulacja), potem false jak dotad;
+  linia "CZYNNA (wojna do kapitulacji 330)", komunikat gracza-wasala dla fazy 3.
+- `CanonThroneWars.cs`: `WarScorePostfix` -1e6 dla pary w rozejmie / zatrzasku (przed kluczem 312c; wywolanie z oceny pokoju dalej bez zmian), `WireText` do linii startu 330.
+- `Chronicle.Canon.cs` (`Truce`): z kluczem 330 - para Polnoc-korona tylko rozejmem 330 (warunki B.1), inne pary z blokada 264 - `CanonPeaceLock.Stops` = Skip.
+- `Prologue.Wars.cs`: nasluch `MakePeace` (H6) i `WarDeclared` 330 na liscie CanonWarsBehavior.
+- `Settings.cs` + `gen_mcm.py` (RANGES) + McmSettings: CanonWarUntilSurrender, WarTruceDays 42, WarTruceWinterMaxExtra 21, WarTruceMinWarDays 84, WarTruceWinterExhaustion 75,
+  WarTruceLoadGraceDays 7, WarSurrenderLoseRatio 0.67, WarSurrenderRatio 0.33, WarSurrenderRatioDays 30, WarSurrenderHoldDays 42, WarSurrenderCaptiveDays 21,
+  WarSurrenderStrongholds 3, WarSurrenderTributeDays 84, WarSurrenderClansToCrown NIE (grupa "Wars of the books"). Dwa recznie poprawione wpisy McmSettings (326d, 326x) zostawione jak byly - gen_mcm.py je nadpisuje (hint 326d dostaje polski dopisek z komentarza), po kazdym gen_mcm przywrocic z HEAD.
+- `tools/sprawdz_logi.py --grupa wojna330`: W330-S (test syntetyczny), W330-0..W330-9.
+**Sprawdzone w kodzie (API):** `MakePeaceAction.ApplyByKingdomDecision(IFaction, IFaction, int, int)` - SetNeutral, potem SetDailyTributePaid (dek 1.4.8); `DiplomacyModel.GetDailyTributeToPay(Clan, Clan, out int)` -
+domyslny model zwraca 0 dla strony z lepszym postepem wojny (BK go nie nadpisuje); `StanceLink.WarStartDate` i `ResetStats` przy zmianie StanceType (danina 0 po wznowieniu); Diplomacy
+`KingdomPeaceAction.ApplyPeace(Kingdom, Kingdom, int?, bool, bool, bool)`, `WarExhaustionManager.Instance.GetWarExhaustion(Kingdom, Kingdom)`, `GetWarResult` (Loss/Tie dopiero przy 100),
+`ClearWarExhaustion` na MakePeace; ROT `ROTStorylineWar.Enforced(out string)`, wpis Revenge (Polnoc-Westerlands, 350, 0, bez Id); `DeclareWarDecision.FactionToDeclareWarOn` (pole publiczne).
+**Odstepstwa od projektu:**
+1. Rozejm zimowy (75/75) wchodzi z doby 330, nie z H1: Diplomacy wola ApplyPeace dopiero przy 100 (`GetWarResult` < 100 = None), wiec H1 nigdy nie zobaczy 75/75.
+2. Wznowienie przez `Prologue.RotDeclareWar272` (DeclareWarAction.ApplyByDefault z flaga ROT CallingDeclareWar - wzor 272), nie gole ApplyByDefault.
+3. Cesja droga 326b `BookHoldings.TransferFor(..., noFill: true)` (ApplyByDefault + zaloga starego pana do jego partii + warunki chwilowe), nie `ApplyByBarter`; gracz w osadzie / oblezenie /
+   gracz nie na mapie - cesja czeka (ponowienie co dobe, najwyzej 30 dob). Zakres cesji: kultura nie battania ORAZ pan z danych ROT (settlements.xml) spoza Polnocy; ziemia Tridentu po unii 272
+   zostaje (inaczej korona zabralaby rodom rzecznym ich wlasne zamki); Red Keep idzie z King's Landing.
+4. H4/H5 nie blokuja juz w dobie konca rozejmu (TruceHolds = dzien < konca) - ROT moze wznowic wojne pierwszy (linia "koniec: wojna wraca (ROT)"), my jestesmy zapasem.
+   Przedluzenie zimowe liczone dobe przed koncem (jedno, WinterExtra).
+5. Pokoj ROT z Krwawych Godow przy kluczu NorthFightsOn NIE: pokoj zostaje bez rozejmu i bez zatrzasku (czysty wyjatek z H6); wojne wznowi ROT (Revenge) albo AI.
+6. Zatrzask Z kasuje tez kazda wojna wypowiedziana z zewnatrz (linia "zatrzask Z przerwany"), jak rozejm.
+7. Stance bez daty (WarStartDate == Zero, stary zapis) liczy sie jak dluga wojna (rozejm mozliwy) - linia "wojna TAK (bez daty)".
+8. 330 wymaga tez klucza 264 (CanonWarNoPeaceUntilRedWedding) - fazy i H1-H3 sa jego.
+9. Sila wlasna (ten sam wzor co 274, liczona co dobe): `CanonWarBalance.LastRatio` stoi po koncu kanonu (274 dziala do Krwawych Godow).
+10. Kronika z kluczem 330: `Stops` dziala dla wszystkich par 264 (tez Dorzecze-korona) - przy kluczu NIE stara droga.
+11. Brak Diplomacy (zmeczenie nieczytelne): H1 ufa drodze "Diplomacy zmeczenie wojna", Kronika - bez warunku zmeczenia.
+12. Testy T3-T5, T8-T10, T12, T13 nie maja biegu syntetycznego: progi K (T8/T9) i tabele (T5/T12/T13) sprawdzaja tabele prawdy TA/TB; reszta - bieg z zapisem w odpowiedniej fazie.
+**Ryzyko / co sprawdzic:** (1) u Jeffa pierwszy rozejm ok. 8 dob po wgraniu (karencja 7 dob, zmeczenie 100/100) - linia "ROZEJM start (zmeczenie)", potem 42 doby bez wojny Polnoc-korona,
+dzwignie 274 i weta frontu stoja (dzialaja tylko w wojnie); (2) linia startu: "wpisy ROT pary: Revenge jest/BRAK" - odpowiada na pytanie T1; (3) po 42 dobach "ROZEJM koniec: wojna wraca
+(ROT|nasza DeclareWar)", StanceLink danina 0; (4) PeaceHold zwalnia jencow po rozejmie (H4 - ROT nie wymusza); (5) F3 blokuje teraz takze pokoj AI (H2/H3), gdy ROT nie wymusza -
+wplyw na CrownCallToWar 168 i SCA 320e (Blocks): spojnie "wojna trwa"; (6) cesja zmienia panow - sprawdzic 272/320/326b i FrontGarrison przy pierwszej kapitulacji Polnocy;
+(7) kapitulacja korony tylko K1/K2 (poprawka G); linia doby pokazuje liczniki i stosunek sil.
+**Status:** DO SPRAWDZENIA (build 0 bledow; autotest nieuruchomiony - zakaz w tym kroku).
+
 ## 2026-11-05 WGRANIE 164 - noc/326x-integracja (163 + 326a floty wg krolestw, 326b zwrot zdobyczy Polnocy, 326c odsiecz z przewaga, 326d okno lupu + 1/3 sakiewek pokonanych dla gracza)
 Armoury.dll 0229fc1710a699fdf3fb5f405297669c (reszta modow bez zmian: CrashScribe 55ccc004, RC 8528f098, ForgeView 8441ab0e, GrandTourney 900e32bc). Kopia 163: Armoury.dll.bak-2026-11-05-przed-wgranie164 i D:/Backup-Bannerlord/wgrane/2026-11-05-wgranie164-przed.
 **Testy:** bieg 30 dob na kopii zapisu Jeffa (dzien 109348) + 7 bitew: kod 0, KONIEC OK, ERROR 0 Armoury, CrashScribe 23 (jak 325a), polnoc326 0 NIE, obl326c 0 NIE; statki Polnocy 543 -> 229, sila Korony 10.8k -> 22k (Reach w koalicji).

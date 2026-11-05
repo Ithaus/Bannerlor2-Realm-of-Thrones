@@ -346,6 +346,13 @@ namespace Armoury
                 if (!FactionManager.IsAtWarAgainstFaction(k1, k2)) { detail = k1.StringId + " i " + k2.StringId + " nie sa w wojnie - bez zmian"; return Res.Done; }
                 var pk = Clan.PlayerClan != null ? Clan.PlayerClan.Kingdom : null;
                 if (pk != null && (pk == k1 || pk == k2) && pk.RulingClan == Clan.PlayerClan) { detail = "gracz rzadzi " + pk.StringId + " - o pokoju decyduje gracz"; return Res.Skip; }
+                if (WarTruce.On)   // 330: wojna do kapitulacji - para Polnoc-korona tylko rozejmem 330; inne pary z blokada 264 - pominiete (klucz NIE - jak dotad)
+                {
+                    int w330 = WarTruce.ChronicleTruce(k1, k2, out detail);
+                    if (w330 == 1) return Res.Done;
+                    if (w330 == 2) return Res.Skip;
+                    if (CanonPeaceLock.Stops(k1, k2, "Kronika truce")) { detail = k1.StringId + " - " + k2.StringId + ": pokoj zablokowany (264) - Kronika pominieta"; return Res.Skip; }
+                }
                 bool forced = false;
                 try { forced = Prologue.RotWarForced(k1, k2); } catch (Exception e) { Stumble("Actions.Truce(ROT)", e); }
                 if (forced) { detail = "wojna fabularna ROT " + k1.StringId + "-" + k2.StringId + " wymuszona - Kronika nie zmienia wojen ROT (FORMAT 11)"; return Res.Skip; }
