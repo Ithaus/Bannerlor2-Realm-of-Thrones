@@ -553,6 +553,13 @@ namespace Armoury
             catch (Exception e) { Stumble("InRepelPause", e); return false; }
         }
 
+        /// <summary>326c-D (OB5): doby do konca przerwy po odparciu (OB2) albo 0. Tylko odczyt, nie rzuca.</summary>
+        internal static double RepelPauseLeftDays(SiegeEvent ev)
+        {
+            try { var pz = PauseOf(ev, false); return pz != null && Now < pz.Until ? pz.Until - Now : 0.0; }
+            catch (Exception e) { Stumble("RepelPauseLeftDays", e); return 0.0; }
+        }
+
         /// <summary>307c: liczba odparc szturmu w tym oblezeniu (OB2). 0 - brak przerwy w pamieci.</summary>
         internal static int RepelsOf(SiegeEvent ev)
         {
@@ -1020,6 +1027,12 @@ namespace Armoury
                 try { casA = me.AttackerSide.TroopCasualties; casD = me.DefenderSide.TroopCasualties; } catch { }
                 var w = me.WinningSide;
                 int res = a != null && a.Repelled ? 1 : w == BattleSideEnum.Attacker ? 0 : w == BattleSideEnum.Defender ? 2 : 3;
+                // 326c-F: bitwa pod murami (SiegeOutside) wygrana przez oblegajacych nie zdobywa twierdzy - wynik 4 (liczniki: "inne" / bez rozstrzygniecia), nie "zdobyte";
+                // obroncy liczeni od wszystkich w bitwie (D0 to obroncy pierwszej rundy - odsiecz dolaczona pozniej dawala "obrona 1847%", Ten Towers 109315)
+                bool f326 = SiegeWalls2.CaptureOnlyOn;
+                if (f326 && res == 0 && me.IsSiegeOutside) res = SiegeWalls2.BesiegersAttack(me, b.St) ? 4 : 5;   // recenzja R3-4: 5 - atakowala i wygrala odsiecz
+                int dAll = b.D0;
+                if (f326) { try { dAll = Math.Max(b.D0, casD + me.DefenderSide.TroopCount); } catch { dAll = b.D0; } }
                 int md = b.Mode0 >= 0 && b.Mode0 < 4 ? b.Mode0 : 0;
                 _dSzEnded++;
                 if (b.Rounds > 0)
@@ -1035,7 +1048,7 @@ namespace Armoury
                 if (b.Small && res != 0 && b.Rounds > 0) _dSzSmallHeld++;
                 if (!LogOn || b.Rounds <= 0) return;
                 var st = b.St;
-                string resTxt = res == 0 ? "zdobyte" : res == 1 ? "odparty (OB2)" : res == 2 ? "obronca wygral" : "bez rozstrzygniecia";
+                string resTxt = res == 0 ? "zdobyte" : res == 1 ? "odparty (OB2)" : res == 2 ? "obronca wygral" : res == 4 ? "pole pod murami wygrane przez oblegajacych - twierdza stoi (326c)" : res == 5 ? "odsiecz rozbila oboz - twierdza stoi (326c)" : "bez rozstrzygniecia";
                 var sb = new StringBuilder(1100);
                 sb.Append("Bitwa szturmu (SZ): dzien ").Append(Today).Append(" | osada ").Append(st.StringId).Append(" (").Append(Nm(st)).Append(", ").Append(st.IsTown ? "miasto" : "zamek")
                   .Append(", poziom murow ");
@@ -1057,7 +1070,7 @@ namespace Armoury
                   .Append(" | rund ").Append(b.Rounds).Append(b.FieldRounds > 0 ? " (w polu - prog gry " + b.FieldRounds + ")" : "")
                   .Append(", ciosy obrony / ataku ").Append(b.DefT).Append(" / ").Append(b.AttT).Append(" (gra ").Append(b.GDefT).Append(" / ").Append(b.GAttT).Append(')')
                   .Append(" | straty: atakujacy ").Append(casA).Append(" (").Append(F(b.A0 > 0 ? casA * 100.0 / b.A0 : 0.0, "0")).Append("%), obroncy ").Append(casD)
-                  .Append(" (").Append(F(b.D0 > 0 ? casD * 100.0 / b.D0 : 0.0, "0")).Append("%), wymiana ").Append(F(casA / (double)Math.Max(1, casD), "0.00"))
+                  .Append(" (").Append(F(dAll > 0 ? casD * 100.0 / dAll : 0.0, "0")).Append("%").Append(dAll > b.D0 ? " z " + dAll + " w bitwie" : "").Append("), wymiana ").Append(F(casA / (double)Math.Max(1, casD), "0.00"))
                   .Append(" | wynik ").Append(resTxt).Append('.');
                 Log.Info(sb.ToString());
                 // 320c: osobna linia czynnika poziomu murow (sprawdz_logi --grupa mury320c)
@@ -1065,7 +1078,7 @@ namespace Armoury
                 Log.Info("Mury (320c): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + (st.IsTown ? "miasto" : "zamek") + ") | poziom murow " + b.Lvl
                          + " | czynnik x" + F(b.LvlF, "0.00") + (b.LvlWhy != null ? " (bez czynnika: " + b.LvlWhy + ")" : "") + " | przewaga " + F(b.Adv0, "0.00") + " (bez czynnika " + F(advNo, "0.00")
                          + "), W " + F(b.W0, "0.00") + " | obroncow " + b.D0 + ", atakujacych " + b.A0 + " | straty atak " + F(b.A0 > 0 ? casA * 100.0 / b.A0 : 0.0, "0")
-                         + "%, obrona " + F(b.D0 > 0 ? casD * 100.0 / b.D0 : 0.0, "0") + "%, wymiana " + F(casA / (double)Math.Max(1, casD), "0.00") + " | gracz " + (b.Player ? "tak" : "nie")
+                         + "%, obrona " + F(dAll > 0 ? casD * 100.0 / dAll : 0.0, "0") + "%" + (dAll > b.D0 ? " (z " + dAll + " w bitwie)" : "") + ", wymiana " + F(casA / (double)Math.Max(1, casD), "0.00") + " | gracz " + (b.Player ? "tak" : "nie")
                          + " | wynik " + resTxt + ".");
             }
             catch (Exception e) { Stumble("SzEnd", e); }
@@ -1126,7 +1139,7 @@ namespace Armoury
                     Log.Info("Bitwa ze szturmu (OB3): dzien " + Today + " | osada " + (st != null ? st.StringId : "-") + " (" + Nm(st) + ", " + (st != null && st.IsTown ? "miasto" : "zamek")
                              + ") | frakcja " + a.Fac + ", wodz " + a.Leader + " | ludzie twierdzy " + (a.Fort < 0 ? "-" : a.Fort.ToString(Inv)) + " / strona obrony "
                              + (a.Side < 0 ? "-" : a.Side.ToString(Inv)) + " (udzial " + (a.Side > 0 ? F(a.Fort / (double)a.Side, "0.00") : "-") + ", prog " + F(WallsShare, "0.00")
-                             + ") | rundy z murow " + a.WallRounds + ", w polu " + a.FieldRounds + " | wynik " + (a.Repelled ? "odparty (OB2)" : w == BattleSideEnum.Attacker ? "zdobyte"
+                             + ") | rundy z murow " + a.WallRounds + ", w polu " + a.FieldRounds + " | wynik " + (a.Repelled ? "odparty (OB2)" : w == BattleSideEnum.Attacker ? (me.IsSiegeOutside && SiegeWalls2.CaptureOnlyOn ? (SiegeWalls2.BesiegersAttack(me, a.St) ? "pole wygrane przez oblegajacych - twierdza stoi (326c)" : "odsiecz rozbila oboz - twierdza stoi (326c)") : "zdobyte")
                              : w == BattleSideEnum.Defender ? "wygrala twierdza" : "bez rozstrzygniecia") + ", twierdza " + (held ? "utrzymana" : "nie") + ".");
                 }
             }

@@ -264,6 +264,9 @@ namespace Armoury
                 // OB5 (decyzja Jeffa 14.10, odsiecz z pierwszenstwem): postfiks Low na CampaignEventDispatcher.AiHourlyTick PO WatchLaw (widzi rabunek Strazy z wynikiem -1);
                 // wpiety zawsze, dziala przy kluczu BesiegedReliefFirst
                 try { BesiegedRelief.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BesiegedRelief.ApplyAll", e); }
+                // 326c (odsiecz z przewaga): prefiks Army.Gather (osada odsieczy), postfiks Army.IsWaitingForArmyMembers (koniec zbiorki), postfiks
+                // MobilePartyAi.GetNearbyPartyDataWhileDefendingSettlement (atak pod murami); wpiete zawsze, dzialaja przy kluczach
+                try { ReliefStrike.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ReliefStrike.ApplyAll", e); }
                 // 222 (odbicie lorda): postfiks 150 na tym samym AiHourlyTick - po OB5 / WatchLaw / ReaverLaw (200), przed ArmsFirst p9 i RaidTribute (100); wpiety zawsze, dziala przy kluczu RescueHunt
                 try { RescueHunt.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RescueHunt.ApplyAll", e); }
                 try { ThrallLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ThrallLaw.ApplyAll", e); }

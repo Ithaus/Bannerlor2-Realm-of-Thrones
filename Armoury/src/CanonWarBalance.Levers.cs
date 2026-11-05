@@ -98,7 +98,21 @@ namespace Armoury
                     if (Recruit(party, partyThinkParams)) return;
                 }
                 // recenzja 274 (3): bezczynnosc krolestwa partii (Polnoc stoi, gdy walczy tylko Dorzecze), nie calej koalicji
-                if (MusterOn && IdleK(party.MapFaction as Kingdom) && !_homeGuard.Contains(clan)) Muster(party, partyThinkParams, side, clan);
+                if (MusterOn && IdleK(party.MapFaction as Kingdom) && !_homeGuard.Contains(clan))
+                {
+                    // 326c-A: zbiorka ma pomagac slabszej stronie - log 04/05.11: 31 zbiorek, wszystkie dla Polnocy (silniejsza, powsciagana, B/A 0.56), w tym oblezenie
+                    // Deep Den 109326. Strona powsciagana albo silniejsza poza pasmem 1.5 - bez zbiorki (zwykle armie i cele gry bez zmian)
+                    if (MusterWeakOnly && MusterBlocked(side, _restrain, _strongOut))
+                    {
+                        _dMusterBlocked++;
+                        var mk = party.MapFaction as Kingdom;
+                        if (Say("zbiorka326|" + (mk != null ? mk.StringId : "-")))
+                            Log.Info(Tag + "zbiorka zatrzymana (326c) | dzien " + Today + " | " + Nm(party.MapFaction) + " (strona " + SideName(side) + ") bez walki " + IdleOfK(mk, Today)
+                                     + " dob, ale strona " + (side == _restrain ? "powsciagana" : "silniejsza") + " (stosunek B/A " + _ratio.ToString("0.000", Inv) + " poza pasmem " + F2(1.0 / Band) + "-" + F2(Band)
+                                     + ") - zbiorka 274 tylko dla slabszej strony; " + Nm(party) + " decyduje jak w grze.");
+                    }
+                    else Muster(party, partyThinkParams, side, clan);
+                }
             }
             catch (Exception e) { Stumble("BoostPostfix", e); }
         }

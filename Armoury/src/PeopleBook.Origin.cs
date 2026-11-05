@@ -228,6 +228,8 @@ namespace Armoury
         private static Shares _press;                                       // R1-5: pobrani przez pobor wymuszony gracza - czekaja na ekran lupu (do konca doby)
         private static Dictionary<Village, double> _pressVil;               // E4/7b: te same oczekujace wedlug wsi zdjecia (do powrotu niewzietych; bez zapisu)
         private static int _deduceCalls, _deduceOutside, _deduceNoWin, _floorCalls;
+        /// <summary>326c-E (recenzja R2-3): licznik poboru E4/7 "na podlodze" (rekrut bez zdjecia z ludnosci) - E przerywa werbunek przy pierwszym przyroscie. Odczyt.</summary>
+        internal static int FloorCallsNow { get { return _floorCalls; } }
         private static double _deduceMen, _floorMen;
         private static int _deduceVetCalls;                                 // E4/10 (Z8): najem z karczmy AI przy VetLive - BK DeduceManpower bez zdjecia z DOM (udzialy z puli)
         private static double _deduceVetMen, _vDestTake;                    // E4/10: ludzie tych najmow; udzialy zdjete ze SLUZBY (Take wolajacego) do puli WETERANI

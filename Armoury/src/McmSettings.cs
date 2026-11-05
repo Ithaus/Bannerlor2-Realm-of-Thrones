@@ -2220,6 +2220,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SiegeAiHoldsFreshSiege { get; set; } = true;
 
+        [SettingPropertyBool("Siege Capture Line Only On Capture", HintText = "Log only: a battle under the walls won by the besiegers is no longer written down as the capture of the fortress (only a storm or a beaten sally takes it), and the defenders' losses are counted against every defender of that battle. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeCaptureLineOnlyOnCapture { get; set; } = true;
+
         [SettingPropertyBool("Siege Ai Retry Cooldown", HintText = "when an AI host gives up a siege within a day, without a battle, its realm does not besiege the same town or castle again for three days. Off = it may come back at once", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeAiRetryCooldown { get; set; } = true;
@@ -8416,6 +8420,22 @@ namespace Armoury
         [SettingPropertyGroup("Relief of besieged towns")]
         public bool BesiegedReliefOnlyWhenReachable { get; set; } = true;
 
+        [SettingPropertyBool("Besieged Relief Arrives In Time", HintText = "With Besieged Relief First: only lords who can reach a besieged town or castle before it is likely stormed, and no army that is still gathering for another fortress, count as its relief - so lords are no longer held by the walls for a relief that cannot come in time. Off = every lord within the game's reach counts, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public bool BesiegedReliefArrivesInTime { get; set; } = true;
+
+        [SettingPropertyBool("Relief Ends Gathering On Advantage", HintText = "A relief army that is gathering to lift a siege marches at once when the lords already with its leader, together with the relief already by the walls, are at least 1.2 times as strong as the besiegers - it no longer waits for 90 percent of the summoned lords. Those still on the way follow the army. Every realm. Rest at night and rest days stay as they are. Off = armies gather as the game decides", RequireRestart = false)]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public bool ReliefEndsGatheringOnAdvantage { get; set; } = true;
+
+        [SettingPropertyBool("Relief Ends Gathering After Day", HintText = "A relief army that has stood gathering for a full day sets out for the besieged fortress anyway, with whoever has joined; the latecomers follow it. It attacks the siege camp only when strong enough. Rest at night and rest days stay as they are. Off = it waits for the gathering as before", RequireRestart = false)]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public bool ReliefEndsGatheringAfterDay { get; set; } = true;
+
+        [SettingPropertyBool("Relief Attacks On Advantage", HintText = "Lords standing by a besieged fortress to relieve it attack the siege camp when together they are at least 1.2 times as strong as the besiegers: the strongest leads and the rest follow it into the battle. Without that advantage they wait, as before. Off = the game decides when they attack", RequireRestart = false)]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public bool ReliefAttacksOnAdvantage { get; set; } = true;
+
         [SettingPropertyBool("Rescue Hunt", HintText = "when you take a lord of a realm captive (in your party, a party of your clan or the dungeon of your fief), his house learns of it only when the news reaches them - a rider to their nearest stronghold and a raven to their seat, about a day across a realm - and no ransom courier comes before that. Then the lords of his house ride out to free him: they search where you were last seen (a trail older than three days goes cold), gather enough strength first (half again your own; if they are too few, the head of the house calls a host) and only then close in, and besiege the fief whose dungeon holds him. The hunt ends when he is freed, ransomed, escapes or dies, or when there is peace. Off = nobody comes after you and the courier may come on the first day, as before", RequireRestart = false)]
         [SettingPropertyGroup("Rescue of captured lords")]
         public bool RescueHunt { get; set; } = true;
@@ -10588,6 +10608,14 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarBalanceMuster { get; set; } = true;
 
+        [SettingPropertyBool("Canon War Balance Muster Weak Only", HintText = "With Canon War Balance Muster: only the weaker side of the War of the Five Kings musters. A side that is clearly stronger (more than 1.5 times) no longer gathers its king's army for a new siege on the front just because it has not fought for a week - it still fights, besieges and defends as the game decides. Off = both sides muster as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonWarBalanceMusterWeakOnly { get; set; } = true;
+
+        [SettingPropertyBool("Canon War Balance Front Garrison", HintText = "With Canon War Balance: castles and towns of the weaker side on the front line, with an enemy army close by, recruit their garrison faster - volunteers from the town and its villages, paid by the owner's house as the game's own garrison recruitment - until the walls can hold against that army (its men divided by the strength of the walls, about 5.5 for a castle). Nobody comes from nothing. Off = garrisons recruit at the game's pace", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonWarBalanceFrontGarrison { get; set; } = true;
+
         [SettingPropertyBool("Canon Houses of the West", HintText = "As in the books, the lordly houses of the Westerlands and the Crownlands that Realm of Thrones leaves without a castle (Estren, Falwell, Jast, Moreland, Plumm, Prester, Stackspear, Buckwell, Chelsted, Hayford, Stokeworth; House Spicer stays a knightly house until the Red Wedding, as in the books) answer their liege's call with a host of their own: the Banner Kings gentry family that keeps an estate in their lands is raised to full peerage (exactly as a realm vote would grant it) and to clan tier 3, and its head leads a party raised the usual way from the villages. Once per campaign, at the first day after loading or at the start of a new game. No castles are taken from anyone. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonHouses277 { get; set; } = true;
@@ -11870,6 +11898,7 @@ namespace Armoury
             s.SiegeEnginesInProgressDontHold = SiegeEnginesInProgressDontHold;
             s.SiegeAssaultRunsToEnd = SiegeAssaultRunsToEnd;
             s.SiegeAiHoldsFreshSiege = SiegeAiHoldsFreshSiege;
+            s.SiegeCaptureLineOnlyOnCapture = SiegeCaptureLineOnlyOnCapture;
             s.SiegeAiRetryCooldown = SiegeAiRetryCooldown;
             s.SiegeAiTrebuchetsHitWalls = SiegeAiTrebuchetsHitWalls;
             s.SiegeTrebuchetEarly = SiegeTrebuchetEarly;
@@ -13419,6 +13448,10 @@ namespace Armoury
             s.BesiegedReliefCastleForce = BesiegedReliefCastleForce;
             s.BesiegedReliefKingsArmy = BesiegedReliefKingsArmy;
             s.BesiegedReliefOnlyWhenReachable = BesiegedReliefOnlyWhenReachable;
+            s.BesiegedReliefArrivesInTime = BesiegedReliefArrivesInTime;
+            s.ReliefEndsGatheringOnAdvantage = ReliefEndsGatheringOnAdvantage;
+            s.ReliefEndsGatheringAfterDay = ReliefEndsGatheringAfterDay;
+            s.ReliefAttacksOnAdvantage = ReliefAttacksOnAdvantage;
             s.RescueHunt = RescueHunt;
             s.RescueHuntRealm = RescueHuntRealm;
             s.RescueHuntTellPlayer = RescueHuntTellPlayer;
@@ -13962,6 +13995,8 @@ namespace Armoury
             s.CanonWarBalance = CanonWarBalance;
             s.CanonWarBalanceRestraint = CanonWarBalanceRestraint;
             s.CanonWarBalanceMuster = CanonWarBalanceMuster;
+            s.CanonWarBalanceMusterWeakOnly = CanonWarBalanceMusterWeakOnly;
+            s.CanonWarBalanceFrontGarrison = CanonWarBalanceFrontGarrison;
             s.CanonHouses277 = CanonHouses277;
             s.CanonHouses277Rename = CanonHouses277Rename;
             s.CanonHouses277LiegePay = CanonHouses277LiegePay;

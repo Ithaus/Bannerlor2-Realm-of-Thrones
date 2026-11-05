@@ -74,6 +74,8 @@ namespace Armoury
         internal static bool KeyOn { get { var s = Settings.Current; return s != null && s.CanonWarBalance; } }
         private static bool RestraintOn { get { var s = Settings.Current; return s != null && s.CanonWarBalance && s.CanonWarBalanceRestraint; } }
         private static bool MusterOn { get { var s = Settings.Current; return s != null && s.CanonWarBalance && s.CanonWarBalanceMuster; } }
+        // 326c-A: zbiorka tylko slabszej strony (klucz CanonWarBalanceMusterWeakOnly)
+        private static bool MusterWeakOnly { get { var s = Settings.Current; return s != null && s.CanonWarBalanceMusterWeakOnly; } }
 
         // ================================================================ stan zapisany (arm_cwb274)
         private static int _lastFightA = -1, _lastFightB = -1;   // doba ostatniej bitwy lordow albo oblezenia z druga strona
@@ -91,6 +93,7 @@ namespace Armoury
         // ================================================================ stan dnia (bez zapisu)
         private static bool _active;                              // regula czynna (doba; mysl AI pyta jeszcze CanonWarClock.OverNow)
         private static int _restrain;                             // strona powsciagana (silniejsza poza 1.5) albo 0
+        private static int _strongOut;                            // 326c-A: silniejsza strona przy stosunku poza pasmem 1.5 (bez wzgledu na dzwignie i klucz powsciagliwosci) albo 0
         private static float _target = 1f;                        // W1: cel wypelnienia slabszego
         private static double _ratio = 1.0;
         private static readonly Dictionary<Kingdom, int> _side = new Dictionary<Kingdom, int>();
@@ -103,6 +106,7 @@ namespace Armoury
         private static int _stumbles, _dStumbles;
         // liczniki doby (linia)
         private static int _dBoost, _dHireN, _dHireMen, _dVetoSeat, _dVetoFront, _dVetoBk, _dMusterKing, _dMusterLords, _dSpawnBlock;
+        private static int _dMusterBlocked;                       // 326c-A: mysli, w ktorych zbiorka silniejszej / powsciaganej strony nie poszla
         private static long _dHireGold;
         private static readonly int[] _dBattles = new int[3], _dSieges = new int[3];
         private static readonly List<string> _dSpawnNames = new List<string>();
@@ -117,7 +121,7 @@ namespace Armoury
             _lastFightA = _lastFightB = -1; _weak = 0; _streakOn = _streakOff = 0; _leverSince = -1; _spawned = _hired = 0; _fortsA0 = _fortsB0 = -1; _startDay = -1; _endDay = -1;
             _levers = false; _goldHired = 0; _clanSpawnDay.Clear(); _lastFightK.Clear();
             Array.Clear(_ring, 0, _ring.Length); for (int i = 0; i < Window; i++) _ringDay[i] = -1;
-            _active = false; _restrain = 0; _target = 1f; _ratio = 1.0;
+            _active = false; _restrain = 0; _strongOut = 0; _target = 1f; _ratio = 1.0;
             _side.Clear(); _seats.Clear(); _seatHome.Clear(); _coreNoWar.Clear(); _frontTargets.Clear(); for (int i = 0; i < 3; i++) _frontOwn[i].Clear(); _homeGuard.Clear();
             _stumbles = _dStumbles = 0;
             ZeroDay();
@@ -128,7 +132,7 @@ namespace Armoury
 
         private static void ZeroDay()
         {
-            _dBoost = _dHireN = _dHireMen = _dVetoSeat = _dVetoFront = _dVetoBk = _dMusterKing = _dMusterLords = _dSpawnBlock = 0; _dHireGold = 0;
+            _dBoost = _dHireN = _dHireMen = _dVetoSeat = _dVetoFront = _dVetoBk = _dMusterKing = _dMusterLords = _dSpawnBlock = 0; _dHireGold = 0; _dMusterBlocked = 0;
             for (int i = 0; i < 3; i++) { _dBattles[i] = 0; _dSieges[i] = 0; }
             _dSpawnNames.Clear(); _dSaid.Clear(); _musterKingNote = "-"; _dStumbles = 0;
         }
@@ -181,6 +185,17 @@ namespace Armoury
             else if (on && sOff >= SwitchDays) on = false;
             weak = on ? (r < 1.0 ? 2 : r > 1.0 ? 1 : 0) : 0;
         }
+
+        /// <summary>326c-A (autotest): silniejsza strona przy r = S_B / S_A poza pasmem 1.5 - 1 (A) albo 2 (B); w pasmie 0.</summary>
+        internal static int StrongOut(double r)
+        {
+            if (r > Band) return 2;
+            if (r < 1.0 / Band) return 1;
+            return 0;
+        }
+
+        /// <summary>326c-A: zbiorka zablokowana dla strony side - powsciagana albo silniejsza poza pasmem (klucz CanonWarBalanceMusterWeakOnly).</summary>
+        internal static bool MusterBlocked(int side, int restrain, int strongOut) { return side != 0 && (side == restrain || side == strongOut); }
 
         /// <summary>W1: cel wypelnienia slabszego = min(1, wypelnienie x (S_silny / 1.2) / S_slaby), nie mniej niz 60% (W5).</summary>
         internal static float TargetFill(double fillWeak, double sStrong, double sWeak)
@@ -558,7 +573,7 @@ namespace Armoury
                 _active = Active(s.CanonWarBalance, Prologue.CanonHere, sides, over);
                 if (!_active)
                 {
-                    _levers = false; _weak = 0; _restrain = 0;
+                    _levers = false; _weak = 0; _restrain = 0; _strongOut = 0;
                     if (s.LogEnabled) Log.Info(Tag + "dzien " + today + " | wylaczone (" + off + ") | potkniecia " + _dStumbles + " (sesja " + _stumbles + ").");
                     ZeroDay();
                     return;
@@ -578,10 +593,12 @@ namespace Armoury
                 if (!_levers) _leverSince = -1;
                 bool outside = _ratio < 1.0 / Band || _ratio > Band;
                 _restrain = _levers && outside && s.CanonWarBalanceRestraint ? (_weak == 1 ? 2 : _weak == 2 ? 1 : 0) : 0;
+                _strongOut = StrongOut(_ratio);
                 var W = _weak == 1 ? A : _weak == 2 ? B : null;
                 var X = _weak == 1 ? B : _weak == 2 ? A : null;
                 _target = W != null ? TargetFill(W.Fill, X.S, W.S) : 1f;
                 if (_levers && W != null && W.S < X.S / CalmBand) SpawnDaily(_weak, today);
+                try { FrontGarrisonDaily(today); } catch (Exception e) { Stumble("FrontGarrisonDaily", e); }   // 326c-E: zalogi frontu slabszej strony
                 DayLine(today, rw, robbDead, outside);
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -603,7 +620,7 @@ namespace Armoury
             _active = Active(s.CanonWarBalance, Prologue.CanonHere, sides, over);
             if (!_active)
             {
-                _restrain = 0;
+                _restrain = 0; _strongOut = 0;
                 Log.Info(Tag + "po wczytaniu | dzien " + today + " | regula NIE (" + (!s.CanonWarBalance ? "klucz NIE" : !Prologue.CanonHere ? "kampania klasyczna - nie dotyczy"
                          : !sides ? "strona nie istnieje" + NoWarText() : "Krwawe Gody") + ") - weta, dzwignie i zbiorka nieczynne.");
                 return;
@@ -614,6 +631,7 @@ namespace Armoury
             _ratio = A.S > 0 ? B.S / A.S : (B.S > 0 ? 99.0 : 1.0);
             bool outside = _ratio < 1.0 / Band || _ratio > Band;
             _restrain = _levers && outside && s.CanonWarBalanceRestraint ? (_weak == 1 ? 2 : _weak == 2 ? 1 : 0) : 0;
+            _strongOut = StrongOut(_ratio);
             var W = _weak == 1 ? A : _weak == 2 ? B : null;
             var X = _weak == 1 ? B : _weak == 2 ? A : null;
             _target = W != null ? TargetFill(W.Fill, X.S, W.S) : 1f;
@@ -654,6 +672,8 @@ namespace Armoury
               .Append(" (blokada 166 ").Append(_dSpawnBlock).Append(')')
               .Append(", weta oblezen: siedziby ").Append(_dVetoSeat).Append(" / za frontem ").Append(_dVetoFront).Append(", BK cel zdjety ").Append(_dVetoBk)
               .Append(", zbiorka: wladca ").Append(_dMusterKing).Append(' ').Append(_musterKingNote).Append(", lordow do frontu ").Append(_dMusterLords)
+              .Append(" (326c tylko slabszej strony ").Append(MusterWeakOnly ? "TAK" : "NIE").Append(": silniejsza poza pasmem ").Append(_strongOut == 0 ? "-" : SideName(_strongOut))
+              .Append(", zbiorek zatrzymanych ").Append(_dMusterBlocked).Append(')')
               .Append("; razem najetych ").Append(_hired).Append(" za ").Append(_goldHired).Append(" zl, nowych druzyn ").Append(_spawned);
             sb.Append(" | kredyt: A Bank ").Append(F0(A.Bank)).Append(" (rodow ").Append(A.BankClans).Append("), dluznicy 168 ").Append(A.Debtors).Append(", zloto rodow ").Append(A.Gold)
               .Append("; B Bank ").Append(F0(B.Bank)).Append(" (rodow ").Append(B.BankClans).Append("), dluznicy 168 ").Append(B.Debtors).Append(", zloto rodow ").Append(B.Gold)
