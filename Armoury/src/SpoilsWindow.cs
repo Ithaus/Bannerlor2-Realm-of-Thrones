@@ -735,14 +735,47 @@ namespace Armoury
                 else c.Place = (r.Place.Length > 0 && r.Place != "-" ? "Near " + r.Place : "In the field") + (r.Enemy.Length > 0 ? ", against " + r.Enemy : "") + ". " + r.Date + "."
                                + (r.Battles > 1 ? " " + r.Battles.ToString(Inv) + " battles before the spoils were counted." : "");
 
-                // COIN
+                // COIN - 326d: wiersze jasne dla gracza: co weszlo do JEGO kiesy teraz, co zostaje ludziom (ich zold, nie gracza), korona o swicie i skad,
+                // dar krola o swicie (kolejka CrownWar314). Tylko odczyt - przelewy bez zmian. Etykiety do 40 znakow (kolumna ok. 360 px pedzlem 20).
                 var coin = new Section { Title = "Coin" };
-                for (int i = 0; i < r.CoinLabels.Count && coin.Rows.Count < 5; i++)
-                    if (r.CoinAmounts[i] != 0) coin.Rows.Add(new Row { Label = r.CoinLabels[i], Value = Den(r.CoinAmounts[i]) });
+                long folded = 0; int foldedN = 0;
+                long third = 0;   // 326d: 1/3 sakiewek rozbitych druzyn lordow do kiesy gracza (MenPurse.OnPartyDestroyed) - juz w purse; wiersz zawsze pierwszy (recenzja: nie w "Other sums")
+                int ti = r.CoinLabels.IndexOf(SpoilsReport.LBeatenThird);
+                if (ti >= 0) third = r.CoinAmounts[ti];
+                if (third != 0) coin.Rows.Add(new Row { Label = Cut(SpoilsReport.LBeatenThird), Value = Den(third) });
+                for (int i = 0; i < r.CoinLabels.Count; i++)
+                {
+                    long v = r.CoinAmounts[i];
+                    if (v == 0 || i == ti) continue;
+                    if (coin.Rows.Count < 4) coin.Rows.Add(new Row { Label = Cut(r.CoinLabels[i]), Value = Den(v) });
+                    else { folded += v; foldedN++; }
+                }
+                if (foldedN > 0) coin.Rows.Add(new Row { Label = "Other sums (" + N(foldedN) + ")", Value = Den(folded) });
                 long purse = r.CoinTotal;
-                if (coin.Rows.Count > 0) coin.Rows.Add(new Row { Label = "To your purse", Value = Den(purse) });
-                if (r.Men != 0) coin.Rows.Add(new Row { Label = "Your men's purses", Value = Den(r.Men) });
-                if (r.Crown > 0) coin.Rows.Add(new Row { Label = "The crown will claim at dawn", Value = N(r.Crown) + " denars" });
+                if (coin.Rows.Count > 0 || purse != 0) coin.Rows.Add(new Row { Label = purse >= 0 ? "Into your purse now" : "Out of your purse now", Value = Den(purse) });
+                if (r.Men != 0) coin.Rows.Add(new Row { Label = "Kept by your men (their pay, not yours)", Value = Den(r.Men) });
+                long crownMen = 0, crownMe = 0;
+                // 326d (recenzja): okno moze wyjsc po swicie (czekanie na sakwy do 2.5 h) - wtedy korona juz pobrana (ThirdsSettle), prognoza skad bez sensu
+                bool crownDone = false;
+                try { crownDone = r.CrownDay >= 0 && (int)CampaignTime.Now.ToDays > r.CrownDay; } catch { }
+                if (r.Crown > 0 && crownDone)
+                    coin.Rows.Add(new Row { Label = "Crown share (1/9), taken at dawn", Value = "-" + N(r.Crown) + " denars" });
+                else if (r.Crown > 0)
+                {
+                    // ta sama regula co Ransom178.ThirdsSettle: czesc z sakw idzie najpierw z sakiewki ludzi (ile w niej jest), reszta z kiesy gracza - prognoza
+                    long menHave = 0;
+                    try { menHave = Math.Max(0, (long)MenPurse.Get(TaleWorlds.CampaignSystem.Party.MobileParty.MainParty)); } catch { }
+                    crownMen = Math.Max(0, Math.Min(Math.Min(r.CrownMen, r.Crown), menHave));
+                    crownMe = r.Crown - crownMen;
+                    coin.Rows.Add(new Row { Label = "Crown share (1/9), due at dawn", Value = "-" + N(r.Crown) + " denars" });
+                    coin.Rows.Add(new Row { Label = "  from your purse / your men's purse", Value = "~" + N(crownMe) + " / ~" + N(crownMen) });
+                }
+                // 326d (recenzja): dar krola - stan wpisu kolejki: juz wyplacony o swicie / jeszcze winien (skarbiec placi, gdy ma zloto, mozliwe raty) / przepadl
+                long giftPaid = 0, giftOwed = 0, giftLost = 0;
+                try { foreach (var me in r.Mes) CrownWar314.PlayerGiftFor(me, ref giftPaid, ref giftOwed, ref giftLost); } catch { }
+                if (giftPaid > 0) coin.Rows.Add(new Row { Label = "King's reward, paid at dawn", Value = Den(giftPaid) });
+                if (giftOwed > 0) coin.Rows.Add(new Row { Label = "King's reward, owed by the treasury", Value = "~" + Den(giftOwed) });
+                if (giftLost > 0) coin.Rows.Add(new Row { Label = "King's reward lost (empty treasury)", Value = N(giftLost) + " denars" });
                 if (coin.Rows.Count > 0) c.Sections.Add(coin);
 
                 // GEAR AND GOODS
@@ -766,7 +799,7 @@ namespace Armoury
                     if (r.Lords.Count > 3) names.Append(" and ").Append(r.Lords.Count - 3).Append(" more");
                     pris.Rows.Add(new Row { Label = "Lords: " + names, Value = "" });
                 }
-                if (r.RansomWorth > 0) pris.Rows.Add(new Row { Label = "Ransom worth about", Value = N(r.RansomWorth) + " denars" });
+                if (r.RansomWorth > 0) pris.Rows.Add(new Row { Label = "Ransom if bought out (estimate)", Value = "~" + N(r.RansomWorth) + " denars" });   // 326d: wycena, nie gotowka
                 if (pris.Rows.Count > 0) c.Sections.Add(pris);
 
                 // THE COST
@@ -797,7 +830,21 @@ namespace Armoury
                     c.Finest.Add(new Fine { E = g.E, N = g.N, Text = name + (g.N > 1 ? " x" + N(g.N) : "") + " - worth " + N(g.E.ItemValue) + (g.N > 1 ? " each" : "") });
                 }
 
-                c.Total = "In all: " + N(Math.Max(0, purse) + Math.Max(0, r.Men)) + " denars in coin, " + N(r.GearWorth) + " in gear" + (r.RansomWorth > 0 ? ", " + N(r.RansomWorth) + " in ransoms" : "") + ".";
+                // 326d: bez sumy kiesa + sakiewka ludzi (Jeff bral ja za swoje zloto) - podsumowanie tylko zlota gracza; ludzie osobno
+                var extra = new List<string>();
+                if (giftPaid > 0) extra.Add("+" + N(giftPaid) + " from the king, paid at dawn");
+                if (giftOwed > 0) extra.Add("+" + N(giftOwed) + " from the king when his treasury has gold");
+                if (crownDone && r.Crown > 0) extra.Add("-" + N(r.Crown) + " crown, taken at dawn");
+                else if (crownMe > 0) extra.Add("-" + N(crownMe) + " crown at dawn");
+                c.Total = "Coin for you: " + (purse < 0 ? "-" : "") + N(Math.Abs(purse)) + " now" + (extra.Count > 0 ? " (" + string.Join(", ", extra.ToArray()) + ")" : "")
+                          + (r.Men != 0 ? "; your men keep " + (r.Men < 0 ? "-" : "") + N(Math.Abs(r.Men)) : "") + ".";
+                var st = Settings.Current;
+                if (st != null && st.LogEnabled)
+                    Log.Info("Okno lupu (326d): raport " + r.Id + " | do kiesy gracza teraz " + purse.ToString(Inv) + " | sakiewka ludzi (ich zold) " + r.Men.ToString(Inv)
+                             + " | korona 1/9 o swicie " + r.Crown.ToString(Inv) + " (z kiesy gracza ~" + crownMe.ToString(Inv) + ", z sakiewki ludzi ~" + crownMen.ToString(Inv)
+                             + ", podstawa z sakw " + r.CrownMen.ToString(Inv) + (crownDone ? ", juz pobrana - okno po swicie" : "") + ") | dar krola: wyplacony " + giftPaid.ToString(Inv) + ", w kolejce " + giftOwed.ToString(Inv) + ", przepadl " + giftLost.ToString(Inv) + " (bitew " + r.Mes.Count + ")"
+                             + " | okup ~" + r.RansomWorth.ToString(Inv) + " (wycena) | sprzet " + r.GearWorth.ToString(Inv) + " | w tym trzecia gracza z sakiewek rozbitych " + third.ToString(Inv)
+                             + " | " + MenPurse.PlayerPurseNote() + " | stopka: " + c.Total);
             }
             catch (Exception e) { Stumble("Build", e); }
             return c;

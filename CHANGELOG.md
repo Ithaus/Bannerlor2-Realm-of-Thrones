@@ -1,5 +1,47 @@
 # DZIENNIK ZMIAN
 
+## 326d - okno lupu: jasne wiersze zlota gracza, korona i dar krola o swicie; gracz bierze 1/3 sakiewek rozbitych druzyn jak lord AI (noc/326d-okno-lupu od 325 = 33d03a31; Armoury.dll 790c1d31ba90b2a0e13518bd5590216d po recenzji - NIE WGRANE)
+
+**Problem:** Jeff mysli, ze zloto z okna lupu (117) nie dochodzi do kiesy. Dochodzi (Hero.MainHero.Gold, log 716515 -> 723077 -> 727923), ale okno pokazywalo
+"Your men's purses" i stopke "In all: X denars in coin" = kiesa + sakiewka ludzi (Manderstone 34032 "w monecie", do kiesy weszlo 7471). Sakiewka ludzi (MenPurse) to zold
+zolnierzy, nie gracza. Korona 1/9 (Ransom178.ThirdsSettle) pobiera o swicie najpierw z sakiewki ludzi, reszte z kiesy gracza - bez komunikatu. Dar krola (CrownWar314)
+czeka w kolejce do switu - okno go nie pokazywalo. Okup to wycena, nie gotowka.
+
+**Zmiana (Armoury, tylko napisy i odczyt - przelewy i zasady ekonomii bez zmian):**
+- `SpoilsWindow.cs` Build (sekcja Coin): etykiety zlota (najwyzej 4, reszta "Other sums"), "Into your purse now", "Kept by your men (their pay, not yours)",
+  "Crown share (1/9), taken at dawn" + "from your purse / your men's purse" ~a / ~b (prognoza ta sama regula co ThirdsSettle: czesc z sakw z sakiewki ludzi, ile w niej jest,
+  reszta z kiesy), "King's reward, paid at dawn" (dar gracza wpisany do kolejki za bitwy raportu). Jency: "Ransom if bought out (estimate)" ~O. Stopka bez sumy kiesa + ludzie:
+  "Coin for you: X now (+R at dawn, -a crown); your men keep Y."
+- `SpoilsReport.cs`: Rep.CrownMen (roznica Ransom178.PendingMenClaim w ramce, jak Crown) i Rep.Mes (bitwy ramek A raportu).
+- `Ransom178.cs`: PendingMenClaim (odczyt); ThirdsSettle - komunikat dla gracza raz na swit: "The crown took its share (1/9) of your spoils at dawn: X denars from your purse,
+  Y from your men's purse; Z still owed."
+- `CrownWar314.cs`: PlayerGiftFor(MapEvent) - dar gracza za bitwe (ostatnie 16, bez zapisu); komunikat wyplaty: "The king's reward for your victory was paid at dawn: X denars into your purse."
+
+**Druga czesc (DECYZJA JEFFA 05.11: "tak, 1/3 monet dla mnie jak lord AI"), wylacznik `PlayerTakesThirdOfBeatenPurses` (domyslnie TAK; recenzja przestawila na NIE z blednym zalozeniem, ze zgody nie bylo - przywrocone):**
+- `MenPurse.cs` OnPartyDestroyed: sakiewka ludzi rozbitej druzyny, ktora bierze partia gracza - 1/3 do kiesy gracza (ChangeHeroGold), 2/3 do sakiewki jego ludzi;
+  ta sama regula i to samo `purse / 3` co lord AI. Zamknieta ekonomia - tylko podzial tej samej kwoty. Korona jak u lorda AI: `Ransom178.NoteThird(gracz, 1/3)` -
+  o swicie 1/3 trzeciej (= 1/9 sakwy, tyle samo co dotad) z kiesy gracza, z 2/3 ludzi nic (dotad `NotePlayerPurse` - 1/9 najpierw z sakiewki ludzi). Gracz nie ma ksiegi
+  rodu ClanIncomeBook (jak w liniach 833/915/986), wiec NoteThird wprost. MoneyLedger.NotePurseGone jak dotad (pelna kwota, jak u AI). Wylaczone - jak dotad.
+- `SpoilsReport.cs`: etykieta `LBeatenThird` "Your third of the beaten purses" (NoteCoin) - wiersz w sekcji Coin okna; kiesa i tak mierzona przed/po ramce,
+  korona - roznica PendingClaim (czesc z sakiewki ludzi PendingMenClaim z tej drogi 0, wiec cala prognoza korony "from your purse").
+- `MenPurse.PlayerPurseNote()`: sakiewka ludzi PARTII GRACZA (stan, ludzi, na glowe, odlozone K1, trzecia gracza dzis) - na koncu dziennej linii "Sakiewka ludzi:"
+  i w linii "Okno lupu (326d)" (plus "w tym trzecia gracza z sakiewek rozbitych T"). Dotad log mial tylko sume swiata (4.04 mln).
+
+**Linie logu:** "Okno lupu (326d): raport N | do kiesy gracza teraz X | sakiewka ludzi (ich zold) Y | korona 1/9 o swicie Z (z kiesy gracza ~a, z sakiewki ludzi ~b, podstawa z sakw c)
+| dar krola o swicie R (bitew n) | okup ~O (wycena) | sprzet G | stopka: ...".
+
+**Po recenzji 326d:**
+- Wylacznik `PlayerTakesThirdOfBeatenPurses` domyslnie TAK (Settings.cs i McmSettings.cs; decyzja Jeffa 05.11); wlaczony = ludzie ok. -22% kazdej przejetej sakwy (89% -> 66.7%), gracz +22%.
+- `CrownWar314.cs`: wpis daru pamieta wyplacone (`Gift.Paid`, bez zapisu); `PlayerGiftFor(me, ref paid, ref owed, ref lapsed)` - okno pokazuje stan wpisu kolejki zamiast
+  pewnej wyplaty o swicie: "King's reward, paid at dawn" (juz wplynelo), "King's reward, owed by the treasury" ~X (skarbiec placi, gdy ma zloto, mozliwe raty),
+  "King's reward lost (empty treasury)". Stopka: "+X from the king, paid at dawn" / "+Y from the king when his treasury has gold".
+- `CrownWar314.PayGifts`: komunikat gracza mowi, ile darow (z wszystkich bitew) wplynelo tej doby, ile jeszcze czeka i ile przepadlo - bez "for your victory" jak za jedna bitwe.
+- `SpoilsReport.Rep.CrownDay` (doba przyrostu korony): okno pokazane po swicie (czekanie na sakwy) pisze "Crown share (1/9), taken at dawn" bez prognozy skad;
+  przed switem "Crown share (1/9), due at dawn" + prognoza ~kiesa / ~ludzie.
+- `SpoilsWindow.cs`: wiersz "Your third of the beaten purses" zawsze pierwszy w sekcji Coin (nie wpada w "Other sums").
+- `CrownWar314.Reset`: czysci `_plGiftBy` i `_curMe` (bez trzymania MapEvent starej kampanii).
+- `MenPurse.cs`: licznik trzeciej gracza tylko dla third > 0; linia dzienna mowi, ze stan sakiewki to chwila zmiany doby, a trzecia - zamknieta doba.
+
 ## 326a/326b po recenzji (3 recenzje 05.11) - weto 60 dob na zwrocone twierdze, jency Polnocy, wyspy i statki (noc/326-polnoc; Armoury.dll a977aee19f0ca5b1da79ec123ceb8205 - NIE WGRANE, gra Jeffa dziala)
 
 **Problem:** recenzje 326a/326b (R1 stan gry, R2 NavalDLC, R3 logika i kanon). Najwazniejsze potwierdzone w kodzie: Polnoc moze krecic zdobycie-zwrot-zdobycie tej samej twierdzy
