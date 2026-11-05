@@ -1141,6 +1141,7 @@ namespace Armoury
                         if (p.Length < 2) return false;
                         var st = Settlement.Find(p[0]);
                         if (KingInTheNorth.IsRiverAlias(p[1])) return KingInTheNorth.HeldAsRiverlands(st);   // 272: po unii - osada Polnocy na ziemi Tridentu
+                        if (ReachJoinsCrown.IsAlias(p[1])) return ReachJoinsCrown.HeldAsReach(st);   // 332: po wstapieniu - osada korony na ziemi Reach
                         return st != null && st.MapFaction != null && st.MapFaction.StringId == p[1];
                     }
                 case "kr": return Chronicle.Resolved(a, out never);   // A4: okno Kroniki rozstrzygniete (=x - wybor); Kronika wylaczona / okno pominiete - nigdy

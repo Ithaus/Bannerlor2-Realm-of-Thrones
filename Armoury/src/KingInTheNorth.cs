@@ -171,7 +171,7 @@ namespace Armoury
         // ---------------------------------------------------------------- Kronika (aliasy po unii)
 
         /// <summary>Warunek polityczny Kroniki: po unii "riverlands" = Polnoc (war, peace, kexists, leads, prisoner, p:vassal). Inaczej id bez zmian.</summary>
-        internal static string AliasKingdom(string id) { return _st == 1 && id == RiverId ? NorthId : id; }
+        internal static string AliasKingdom(string id) { return _st == 1 && id == RiverId ? NorthId : ReachJoinsCrown.AliasKingdom(id); }   // 332: po wstapieniu "empire_w" = korona
 
         /// <summary>Po unii id "riverlands" w warunku ziemi / grupie / miejscu plotki.</summary>
         internal static bool IsRiverAlias(string id) { return _st == 1 && id == RiverId; }

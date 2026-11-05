@@ -1,5 +1,32 @@
 # DZIENNIK ZMIAN
 
+## 332 - Reach do korony po Czarnym Nurcie (noc/332-reach od 330x-integracja 0e29f73a - NIE WGRANE, bez autotestu; Jeff gra)
+**Problem:** Jeff 05.11: "Reach do korony po Czarnym Nurcie". Dzis Reach zostaje osobnym krolestwem w sojuszu z korona (m104 (2)), sojusz odnawiany co 364 dni z napisem
+"do dnia opowiesci ~900" - w ksiazce po Czarnym Nurcie Tyrellowie sa wasalami Zelaznego Tronu (Mace w malej radzie, Margaery krolowa). ROT nie ma takiego przejscia.
+**Zmiana (klucz ReachJoinsCrownAfterBlackwater, domyslnie TAK; NIE = zachowanie 330x):**
+- `ReachJoinsCrown.cs` (nowy): wyzwalacz w dobie m104 (Prologue.CrownDaily, przed pilnowaniem sojuszu) - ROT BlackwaterEvent zakonczone (stan 2) i StannisWon NIE
+  (rody Stannisa z HandleDoneButton sa juz w Reach i wchodza razem); zapas: stan -1/0 i dzien opowiesci >= 177 x skala + 150 (jak straz Jaimego); StannisWon TAK - nigdy.
+  Warunki: kampania kanonu (CanonHere), Reach i korona istnieja, King's Landing w koronie, Reach nie w wojnie z korona i bez sojuszu ze Smocza Skala, gracz nie rzadzi
+  Reach ani korona (linia "poza regula"), bez wojny domowej Diplomacy w Reach; bezpieczna chwila (partia / twierdza Reach w bitwie) najwyzej 7 dob. Stan w zapisie
+  `arm_r332` (SaveText.Sync w CanonWarsBehavior; brak klucza = stan pusty), raz na kampanie. Linie "Reach do korony (332): ...", komunikat gracza (okno + Log.Player)
+  po angielsku. Aliasy Kroniki: empire_w w war/peace/kexists/leads/prisoner/p:vassal = korona (KingInTheNorth.AliasKingdom), region/p:region/own = twierdze Reach z listy
+  z chwili wstapienia w koronie, relk = glowy rodow Reach dalej w koronie, plotka = siedziba rodu panujacego (Highgarden).
+- `KingInTheNorth.Fold332.cs` (nowy): ogolne wstapienie krolestwa w inne wedlug szablonu unii 272 (ta sama latka armii, migawka, decyzje rady, pieniadze z kontrola,
+  kolejnosc rodow, kariera BK, oblezenia, ReKey 185/180/178, DestroyKingdomAction tylko bez rodow). Unia 272 bez zmian.
+- `Prologue.Crown.cs`: po wstapieniu (2) Reach = "w koronie (332...)" - bez HoldReach (bez odnawiania sojuszu, bez konca ~900, bez paktu Reach-Dorne); `ReachFoldPrep`
+  wygasza pakty Diplomacy Reach-X przed zniszczeniem; `cw:reach` w Kronice = prawda; licznik HoldReach dla testu T8. `Prologue.Wars.cs`: Reset, Sync, linia startu.
+- `Chronicle.Terms.cs`, `Chronicle.Actions.cs`, `CanonCompanions.cs`: galezie aliasu Reach obok aliasu Dorzecza 272.
+- `Settings.cs` + McmSettings (gen_mcm.py; wpisy 326d i 326x przywrocone z HEAD).
+- `tools/sprawdz_logi.py --grupa reach332`: R332-S (test syntetyczny), R332-0..R332-6.
+**Decyzje:** wojny korony rody Reach przejmuja (gra: AdjustFactionStancesForClanJoiningKingdom - w ksiazce Tyrellowie walcza potem za korone); wojny TYLKO Reach
+(korona ich nie prowadzi) - pokoj przed wstapieniem (Zelazny Tron nie bierze cudzych sporow; najazd Eurona na Reach w "Uczcie dla wron" to juz wojna korony). Gracz-wasal
+albo najemnik Reach przechodzi razem (jak 272). Tytuly BK bez zmian. Gdy zapas osi zadziala przed ROT BlackwaterEvent, ROT pozniej nie przeniesie rodow Stannisa do Reach
+(sprawdza IsEliminated) - zostaja przy Smoczej Skale.
+**Autotest:** flaga `armoury-reach332.flag` (Documents\Mount and Blade II Bannerlord\CrashScribe, tylko DLL autotestu LogGate 1/2) wymusza znacznik Czarnego Nurtu od
+1. doby sesji; testy T1-T10 (T8 w nastepnej dobie: HoldReach 0 razy, stan "w koronie (332"), T0 POMINIETY po 10. dobie.
+**Ryzyko / co sprawdzic:** autotest na kopii zapisu po smierci Renly'ego (flaga) i sprawdz_logi --grupa reach332; zapis Jeffa (dzien opowiesci po Czarnym Nurcie) -
+wstapienie w pierwszej dobie po wczytaniu; ShowInquiry w dobie (jak 272 co godzine).
+
 ## 330x-at - poprawka testu TB po biegu A (05.11): przypadek K1 '10 tw./30' oczekiwal NIE, a kod slusznie daje TAK (prog = max(3, 30/3) = 10, 10 <= 10);
 test sprawdza teraz 11 twierdz z 30 (ponad prog, oczekiwane NIE). Kod produkcyjny bez zmian (WarTruce.Test.cs, NIE WGRANE).
 

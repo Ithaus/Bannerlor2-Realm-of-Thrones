@@ -328,6 +328,13 @@ namespace Armoury
                     if (l.Count == 0) why = "grupa " + id + " (rody Dorzecza w Polnocy po unii 272) bez glow rodow";
                     return l;
                 }
+                if (ReachJoinsCrown.IsAlias(id))
+                {
+                    // 332: po wstapieniu grupa "empire_w" = glowy rodow Reach z chwili wstapienia, ktore sa dalej w koronie
+                    foreach (var x in ReachJoinsCrown.ReachLords()) if (x.Leader != null && x.Leader.IsAlive && !l.Contains(x.Leader)) l.Add(x.Leader);
+                    if (l.Count == 0) why = "grupa " + id + " (rody Reach w koronie po wstapieniu 332) bez glow rodow";
+                    return l;
+                }
                 var k = Terms.FindKingdom(id, c.Tok);
                 if (k == null) { why = "grupa " + id + " - ani rod, ani krolestwo w grze"; return l; }
                 if (k.IsEliminated) { why = "krolestwo " + id + " nie istnieje (wyeliminowane)"; return l; }
@@ -362,6 +369,7 @@ namespace Armoury
                 Settlement st = Terms.FindSettlement(a[1], c.Tok);
                 if (st != null) place = st.StringId;
                 else if (KingInTheNorth.IsRiverAlias(a[1]) && KingInTheNorth.SeatId.Length > 0) place = KingInTheNorth.SeatId;   // 272: po unii - siedziba Dorzecza z chwili unii
+                else if (ReachJoinsCrown.IsAlias(a[1]) && ReachJoinsCrown.SeatId.Length > 0) place = ReachJoinsCrown.SeatId;   // 332: po wstapieniu - siedziba Tyrellow z chwili wstapienia
                 else { var k = Terms.FindKingdom(a[1], c.Tok); if (k != null) place = k.StringId; }
                 if (place == null) { detail = "miejsce " + a[1] + " - ani osada, ani krolestwo w grze"; return Res.Skip; }
                 string why;

@@ -567,6 +567,7 @@ namespace Armoury
                             if (h.IsDead) { never = true; return false; }
                             var s = HeroRegion(h);
                             if (KingInTheNorth.IsRiverAlias(a[1])) return KingInTheNorth.HeldAsRiverlands(s);   // 272: po unii - ziemia Tridentu w Polnocy
+                            if (ReachJoinsCrown.IsAlias(a[1])) return ReachJoinsCrown.HeldAsReach(s);   // 332: po wstapieniu - ziemia Reach w koronie
                             return s != null && s.MapFaction != null && s.MapFaction.StringId == a[1];
                         }
                 }
@@ -700,6 +701,7 @@ namespace Armoury
                         {
                             var s = NearestSettlement();
                             if (KingInTheNorth.IsRiverAlias(a[1])) return KingInTheNorth.HeldAsRiverlands(s);   // 272: po unii - ziemia Tridentu w Polnocy
+                            if (ReachJoinsCrown.IsAlias(a[1])) return ReachJoinsCrown.HeldAsReach(s);   // 332: po wstapieniu - ziemia Reach w koronie
                             return s != null && s.MapFaction != null && s.MapFaction.StringId == a[1];
                         }
                     case "in":

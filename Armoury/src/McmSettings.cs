@@ -10508,6 +10508,10 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonReachJoinsCrown { get; set; } = true;
 
+        [SettingPropertyBool("Reach Joins Crown After Blackwater", HintText = "as in the books, after Stannis is beaten at the Blackwater House Tyrell and the lords of the Reach swear fealty to the Iron Throne: every lord of the Reach with his castles, towns, villages and hosts becomes a vassal of the crown in King's Landing, House Tyrell keeps its lands, and the Reach is no longer a realm of its own (so its alliance with the crown no longer runs out). Wars the crown does not fight are ended first. Once per campaign; if the battle is already past in your game, it happens at the next new day. Never if Stannis won or if you rule the Reach or the crown; if you serve the Reach, you go with it. Only in Prologue 298 campaigns and in campaigns started after the Wars of the books update. Off = the Reach stays a realm allied with the crown", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool ReachJoinsCrownAfterBlackwater { get; set; } = true;
+
         [SettingPropertyBool("Canon Dorne Joins Crown", HintText = "after Myrcella is betrothed to Prince Trystane (about day 300 of the story) Dorne stands with the crown by a non-aggression pact (Diplomacy): Dorne keeps out of the war, as in the books, until Daenerys invades. Never if you rule either realm. Only in Prologue 298 campaigns and in campaigns started after this update. Off = no pact", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonDorneJoinsCrown { get; set; } = true;
@@ -14026,6 +14030,7 @@ namespace Armoury
             s.PrologueBericHunt = PrologueBericHunt;
             s.PrologueEssosWarsCalendar = PrologueEssosWarsCalendar;
             s.CanonReachJoinsCrown = CanonReachJoinsCrown;
+            s.ReachJoinsCrownAfterBlackwater = ReachJoinsCrownAfterBlackwater;
             s.CanonDorneJoinsCrown = CanonDorneJoinsCrown;
             s.CanonRiverlandsWarAtPrologueEnd = CanonRiverlandsWarAtPrologueEnd;
             s.CanonNorthRiverlandsAlliance = CanonNorthRiverlandsAlliance;

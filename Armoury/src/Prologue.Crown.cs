@@ -119,6 +119,7 @@ namespace Armoury
         /// pakt korona-Dorne (dorne). never = juz nie bedzie: straznik zakonczony (najazd Daenerys) albo kampania poza zakresem (stary zapis bez znacznika).</summary>
         internal static bool CrownGuardHolds(string which, out bool never)
         {
+            if (which == "reach" && ReachJoinsCrown.Done) { never = false; return true; }   // 332: Reach w koronie - przy koronie na stale
             never = _crownEnded || !CanonHere;
             if (never) return false;
             return which == "reach" ? _rcHeld : which == "dorne" && _cdOurs;
@@ -277,6 +278,7 @@ namespace Armoury
         /// <summary>Doba (CanonWarsBehavior.OnDaily): Reach i Dorne z korona - zalozenie i pilnowanie, koniec przy najezdzie Daenerys, wylaczony klucz.</summary>
         private static void CrownDaily()
         {
+            try { ReachJoinsCrown.Daily(); } catch (Exception e) { ReachJoinsCrown.Stumble("Daily", e); }   // 332: Reach do korony po Czarnym Nurcie (przed pilnowaniem sojuszu)
             double sd = StoryDays();
             // R1: poza zakresem (stary zapis bez znacznika) - jak klucze wylaczone (nasze flagi i tak puste - nic nie zalozylismy)
             bool here = CanonHere;
@@ -288,8 +290,9 @@ namespace Armoury
             if (!dk && _cdOurs) { int n = 0; try { n = ExpireNap(K(Crown), K(DorneId)); } catch (Exception e) { CwStumble("ExpireNap Dorne", e); } _cdOurs = false; _warsEventDay = true;
                 Log.Info(CwTag + (offWhy ?? "klucz Canon Dorne Joins Crown NIE") + " - nasz pakt korona-Dorne wygaszony " + n + "."); }
             if (!here) { _reachState = _dorneState = ScopeNo; return; }
+            if (ReachJoinsCrown.Done) _reachState = ReachInCrownText();
             if (!rk && !dk) { _reachState = "klucz NIE"; _dorneState = "klucz NIE"; return; }
-            if (_crownEnded) { _reachState = _dorneState = "zakonczone (najazd Daenerys, dzien opowiesci " + _crownEndDay.ToString(Inv) + ")"; return; }
+            if (_crownEnded) { _dorneState = "zakonczone (najazd Daenerys, dzien opowiesci " + _crownEndDay.ToString(Inv) + ")"; _reachState = ReachJoinsCrown.Done ? ReachInCrownText() : _dorneState; return; }
             if (DanyInvaded()) { EndCrown("DanyInvasionEvent ruszyl", sd); return; }
             var crown = K(Crown); var reach = K(ReachId); var dorne = K(DorneId);
             var beh = Campaign.Current != null ? Campaign.Current.GetCampaignBehavior<IAllianceCampaignBehavior>() : null;
@@ -299,7 +302,8 @@ namespace Armoury
             // REACH
             try
             {
-                if (!rk) _reachState = "klucz NIE";
+                if (ReachJoinsCrown.Done) _reachState = ReachInCrownText();   // 332: bez sojuszu, odnawiania i konca sojuszu (dzien ~900) - Reach jest korona
+                else if (!rk) _reachState = "klucz NIE";
                 else if (!Alive(crown) || !Alive(reach)) _reachState = "brak krolestwa (korona " + (Alive(crown) ? "jest" : "BRAK") + ", Reach " + (Alive(reach) ? "jest" : "BRAK") + ")";
                 else if (!RenlyGone()) _reachState = "czeka (Renly zyje)";
                 else if (PlayerRules(crown) || PlayerRules(reach)) _reachState = "krolestwo gracza - poza regula";
@@ -347,6 +351,7 @@ namespace Armoury
 
         private static string HoldReach(Kingdom crown, Kingdom reach, Kingdom dorne, IAllianceCampaignBehavior beh, double sd)
         {
+            _holdReachCalls++;   // 332: test T8 (po wstapieniu Reach do korony HoldReach nie biegnie)
             var did = new List<string>();
             int day = (int)Math.Floor(sd);
             // R2: Dorne gracza - krokow 1 i 5 nie robimy (jego wojny z Reach nie konczymy, paktu w jego imieniu nie zakladamy)
@@ -483,8 +488,43 @@ namespace Armoury
             _cdOurs = false; _rnOurs = false; _rcHeld = false;
             _warsEventDay = true;
             _reachState = _dorneState = "zakonczone (najazd Daenerys, dzien opowiesci " + _crownEndDay.ToString(Inv) + ")";
+            if (ReachJoinsCrown.Done) _reachState = ReachInCrownText();
             Log.Info(CwTag + "NAJAZD DAENERYS (" + why + ", dzien opowiesci " + sd.ToString("0.0", Inv) + ") - nasze pakty Dorne wygaszone " + n
                      + ", sojusz Reach-korona bez pilnowania (trwa do swojego terminu, potem wedlug gry).");
+        }
+
+        // ---------------------------------------------------------------- 332: Reach do korony po Czarnym Nurcie
+
+        private static int _holdReachCalls;   // sesja procesu (tylko test T8 - roznica)
+
+        internal static int HoldReachCalls { get { return _holdReachCalls; } }
+
+        internal static string ReachStateText { get { return _reachState ?? "-"; } }
+
+        private static string ReachInCrownText()
+        {
+            return "w koronie (332, od dnia opowiesci " + (ReachJoinsCrown.DoneDay != int.MinValue ? ReachJoinsCrown.DoneDay.ToString(Inv) : "?") + ") - sojusz i pakt Reach-Dorne bez pilnowania";
+        }
+
+        /// <summary>332: przed wstapieniem Reach do korony - pakty Diplomacy Reach wygaszone (nasz Reach-Dorne i kazdy inny Reach-X; Diplomacy blokuje paktem
+        /// wypowiedzenie wojny, a rody Reach beda w koronie), stan (2) Reach: bez pilnowania sojuszu. Pakt korona-Dorne zostaje (chroni teraz rody Reach). Tekst do linii.</summary>
+        internal static string ReachFoldPrep(Kingdom reach)
+        {
+            int n = 0;
+            var l = new List<string>();
+            if (reach != null && DipReady())
+            {
+                foreach (var k in Kingdom.All)
+                {
+                    if (k == null || k == reach) continue;
+                    try { if (NapOf(reach, k) != null && ExpireNap(reach, k) > 0) { n++; l.Add(k.StringId); } }
+                    catch (Exception e) { CwStumble("ReachFoldPrep", e); }
+                }
+            }
+            bool ours = _rnOurs;
+            _rnOurs = false; _rcHeld = false; _warsEventDay = true;
+            return (DipReady() ? "wygaszone " + n + (l.Count > 0 ? " [Reach-" + string.Join(", Reach-", l.ToArray()) + "]" : "") : "brak moda Diplomacy")
+                   + (ours ? " (w tym nasz Reach-Dorne m104)" : "") + ", pakt korona-Dorne " + (_cdOurs ? "zostaje (nasz)" : "bez zmian");
         }
 
         private static string Wars(Kingdom k)
@@ -505,7 +545,7 @@ namespace Armoury
             string dip = DipReady() ? "TAK" : "BRAK";
             return "klucze Reach " + (ReachKey ? "TAK" : "NIE") + ", Dorne " + (DorneKey ? "TAK" : "NIE") + " | Diplomacy " + dip + " | koniec sojuszu (UpdateAllianceEndTime) "
                    + (UpdateEnd() != null ? "TAK" : "BRAK") + " | Renly " + (RenlyGone() ? "NIE ZYJE" : "zyje")
-                   + " | Reach z korona: " + (_crownEnded ? "zakonczone (dzien " + _crownEndDay.ToString(Inv) + ")" : _rcHeld ? "TAK od dnia " + _rcDay.ToString(Inv) : "czeka")
+                   + " | Reach z korona: " + (ReachJoinsCrown.Done ? ReachInCrownText() : _crownEnded ? "zakonczone (dzien " + _crownEndDay.ToString(Inv) + ")" : _rcHeld ? "TAK od dnia " + _rcDay.ToString(Inv) : "czeka")
                    + (_rnOurs ? ", nasz pakt Reach-Dorne" : "")
                    + " | Dorne z korona: " + (_crownEnded ? "zakonczone" : _cdOurs ? "PAKT od dnia " + _cdDay.ToString(Inv) : "czeka (zareczyny Myrcelli w dniu " + ((int)MyrcellaDay()).ToString(Inv) + ")")
                    + " | najazd Daenerys na osi dnia " + ((int)DanyInvasionDay()).ToString(Inv) + (DanyInvaded() ? " (RUSZYL)" : "")

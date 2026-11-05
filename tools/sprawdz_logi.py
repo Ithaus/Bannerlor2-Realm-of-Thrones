@@ -94981,5 +94981,167 @@ def main(argv):
     return _wojna330_main_prev(argv)
 
 
+# ------------------------------------------------------------ paczka 332: grupa reach332 - Reach do korony po Czarnym Nurcie (ReachJoinsCrown.cs, KingInTheNorth.Fold332.cs)
+#  R332-0 linia startu sesji (brak - INFO: stary DLL); R332-1 wstapienie najwyzej raz ("ZROBIONE" <= 1, po nim brak drugiego "WYZWALACZ"); R332-2 rody Reach po
+#  wstapieniu w koronie ("rodow w koronie X/Y, zniszczonych 0", kazda linia rodu "-> korona TAK"); R332-3 ERROR in ReachJoinsCrown / KingInTheNorth.Fold = 0;
+#  R332-4 brak wojny Reach-korona i Reach zniszczone w linii ZROBIONE; R332-5 linie testu autotestu "wynik NIE" = 0; R332-6 po wstapieniu brak linii m104
+#  "Reach z korona: sojusz ODNOWIONY" / "SOJUSZ korona-Reach ZALOZONY" (koniec sojuszu ~900 nie wraca).
+#   python -I tools/sprawdz_logi.py --grupa reach332 <Armoury-*.log>
+R332_P = "Reach do korony (332): "
+R332_START = re.compile(r"Reach do korony \(332\): start sesji \| klucz (TAK|NIE) \|.*?\| stan (zrobione|nigdy|czeka)")
+R332_TRIG = re.compile(r"Reach do korony \(332\): WYZWALACZ \| dzien opowiesci (-?[\d.]+)")
+R332_DONE = re.compile(r"Reach do korony \(332\): ZROBIONE \| Reach zniszczone (TAK|NIE) \| rodow w koronie (\d+)/(\d+), zniszczonych (\d+) .*?\| wojna Reach-korona (TAK|NIE) \|")
+R332_CLAN = re.compile(r"Reach do korony \(332\): rod .*? -> korona (TAK|NIE) \|")
+R332_TEST = re.compile(r"Reach do korony \(332\): test - (T\w+|T\?) .*- wynik (TAK|NIE|POMINIETY)\.")
+R332_ERR = re.compile(r"ERROR in (ReachJoinsCrown\.|KingInTheNorth\.Fold)")
+R332_RENEW = re.compile(r"Wojny kanonu \(m104\): (Reach z korona: sojusz ODNOWIONY|REACH Z KORONA .*SOJUSZ korona-Reach ZALOZONY)")
+
+
+def reach332_collect(logp):
+    D = {"start": [], "trig": [], "done": [], "clans": [], "tests": [], "err": 0, "renew_after": 0, "renew": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for n, line in enumerate(fh):
+            if R332_P not in line and "ERROR in" not in line and "Wojny kanonu (m104)" not in line:
+                continue
+            m = R332_START.search(line)
+            if m:
+                D["start"].append((m.group(1), m.group(2)))
+                continue
+            m = R332_TRIG.search(line)
+            if m:
+                D["trig"].append(n)
+                continue
+            m = R332_DONE.search(line)
+            if m:
+                D["done"].append((n, m.group(1), int(m.group(2)), int(m.group(3)), int(m.group(4)), m.group(5)))
+                continue
+            m = R332_CLAN.search(line)
+            if m:
+                D["clans"].append(m.group(1))
+                continue
+            m = R332_TEST.search(line)
+            if m:
+                D["tests"].append((m.group(1), m.group(2)))
+                continue
+            if R332_ERR.search(line):
+                D["err"] += 1
+                continue
+            if R332_RENEW.search(line):
+                D["renew"] += 1
+                if D["done"]:
+                    D["renew_after"] += 1
+    return D
+
+
+def reach332_rows(rep, D):
+    st = D["start"]
+    if not st:
+        rep.add("R332-0: linia startu sesji", "brak linii startu 332", "INFO (stary DLL albo log bez startu sesji)", None)
+    else:
+        rep.add("R332-0: linia startu sesji", f"startow {len(st)}, klucz {', '.join(sorted(set(x[0] for x in st)))}, stan {', '.join(sorted(set(x[1] for x in st)))}", "jest", True)
+    done = D["done"]
+    trig_after = [t for t in D["trig"] if done and t > done[0][0]]
+    if not done and not D["trig"]:
+        rep.add("R332-1: wstapienie najwyzej raz", "brak wstapienia w logu", "INFO (Czarny Nurt nie minal albo zrobione wczesniej)", None)
+    else:
+        ok1 = len(done) <= 1 and not trig_after and len(D["trig"]) == len(done)
+        rep.add("R332-1: wstapienie najwyzej raz", f"wyzwalaczy {len(D['trig'])}, ZROBIONE {len(done)}, wyzwalaczy po wstapieniu {len(trig_after)}", "1 i 1, 0 po", ok1)
+    if done:
+        _, gone, moved, total, destroyed, war = done[0]
+        bad = [c for c in D["clans"] if c != "TAK"]
+        rep.add("R332-2: rody Reach w koronie", f"rodow w koronie {moved}/{total}, zniszczonych {destroyed}, linie rodow NIE {len(bad)}", "wszystkie, 0 zniszczonych",
+                moved == total and total > 0 and destroyed == 0 and not bad)
+        rep.add("R332-4: brak wojny Reach-korona, Reach zniszczone", f"wojna Reach-korona {war}, Reach zniszczone {gone}", "NIE i TAK", war == "NIE" and gone == "TAK")
+    else:
+        rep.add("R332-2: rody Reach w koronie", "brak wstapienia w logu", "INFO", None)
+        rep.add("R332-4: brak wojny Reach-korona, Reach zniszczone", "brak wstapienia w logu", "INFO", None)
+    rep.add("R332-3: bledy ReachJoinsCrown / Fold", f"ERROR {D['err']}", "0", D["err"] == 0)
+    tn = [t for t in D["tests"] if t[1] == "NIE"]
+    if D["tests"]:
+        rep.add("R332-5: testy autotestu (T1-T10)", f"linii {len(D['tests'])}, NIE {len(tn)}" + (f" [{', '.join(t[0] for t in tn)}]" if tn else ""), "0 NIE", not tn)
+    else:
+        rep.add("R332-5: testy autotestu (T1-T10)", "brak linii testu", "INFO (bieg bez flagi armoury-reach332.flag)", None)
+    if done:
+        rep.add("R332-6: po wstapieniu bez odnowienia sojuszu m104", f"linii ODNOWIONY/ZALOZONY po wstapieniu {D['renew_after']}", "0", D["renew_after"] == 0)
+    else:
+        rep.add("R332-6: po wstapieniu bez odnowienia sojuszu m104", f"brak wstapienia (linii sojuszu m104 {D['renew']})", "INFO", None)
+
+
+def reach332_synth():
+    """R332-S: dobry bieg, dwa wstapienia, rod NIE, wojna po wstapieniu, ERROR, test NIE, odnowienie sojuszu po wstapieniu. None = OK."""
+    import tempfile
+    import shutil
+    P = R332_P
+    start = P + "start sesji | klucz TAK | zakres kampania kanonu | stan czeka | ROT BlackwaterEvent stan 2, StannisWon NIE, zapas od dnia opowiesci 916 | King's Landing vlandia."
+    trig = P + "WYZWALACZ | dzien opowiesci 780.0 (dzien kampanii 1000) | ROT BlackwaterEvent zakonczone, StannisWon NIE | korona w wojnie z: battania | Reach w wojnie z: nikim."
+    clan = P + "rod House Tyrell (clan_empire_west_1) wladca Reach -> korona TAK | lenna 3/3, wsie 6/6."
+    done = P + "ZROBIONE | Reach zniszczone TAK | rodow w koronie 20/20, zniszczonych 0 | lenna 30/30 | Tyrell w vlandia | pokoj z wrogami tylko Reach 0 | pakty Diplomacy: wygaszone 1 | wojna Reach-korona NIE | siedziba (plotka) town_R1 | komunikat gracza TAK | potkniecia 0."
+    renew = "Wojny kanonu (m104): Reach z korona: sojusz ODNOWIONY (dzien opowiesci 800.0, do dnia opowiesci 1164)."
+    test_ok = P + "test - T2 rody 20/20 - wynik TAK."
+    runs = {
+        "good": [start, renew, trig, clan, done, test_ok, P + "start sesji | klucz TAK | zakres kampania kanonu | stan zrobione (dzien opowiesci 780) | x."],
+        "twice": [start, trig, clan, done, trig, done],
+        "clanno": [start, trig, clan.replace("korona TAK", "korona NIE"), done.replace("20/20, zniszczonych 0", "19/20, zniszczonych 0")],
+        "war": [start, trig, clan, done.replace("wojna Reach-korona NIE", "wojna Reach-korona TAK")],
+        "err": [start, "ERROR in ReachJoinsCrown.Tick: System.NullReferenceException"],
+        "testno": [start, trig, clan, done, P + "test - T4 Reach zniszczone NIE - wynik NIE."],
+        "renew": [start, trig, clan, done, renew],
+    }
+    exp = {
+        "good": {"R332-0": "TAK", "R332-1": "TAK", "R332-2": "TAK", "R332-3": "TAK", "R332-4": "TAK", "R332-5": "TAK", "R332-6": "TAK"},
+        "twice": {"R332-1": "NIE"},
+        "clanno": {"R332-2": "NIE"},
+        "war": {"R332-4": "NIE"},
+        "err": {"R332-3": "NIE"},
+        "testno": {"R332-5": "NIE"},
+        "renew": {"R332-6": "NIE"},
+    }
+    tmp = tempfile.mkdtemp(prefix="r332_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            reach332_rows(rep, reach332_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def reach332_main(logp):
+    rep = Report()
+    try:
+        s2 = reach332_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("R332-S: test syntetyczny (dobry, dwa wstapienia, rod NIE, wojna, ERROR, test NIE, odnowienie sojuszu)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("R332-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = reach332_collect(logp)
+    print(f"plik: {logp} | startow 332 {len(D['start'])}, wyzwalaczy {len(D['trig'])}, wstapien {len(D['done'])}, testow {len(D['tests'])}")
+    reach332_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_reach332_main_prev = main
+
+
+def main(argv):
+    # paczka 332: grupa reach332 - opakowanie main jak wojna330
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "reach332":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return reach332_main(rest[0] if rest else None)
+    return _reach332_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

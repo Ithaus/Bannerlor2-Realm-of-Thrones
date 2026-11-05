@@ -291,6 +291,7 @@ namespace Armoury
             ResetDragons();
             ResetRiver();    // m116-fabula (4)
             ResetFeuds();    // 312b: zatrzaski zatargow ROT (fz=)
+            ReachJoinsCrown.Reset();   // 332: Reach do korony (arm_r332 - wczytanie po UnpackWars)
         }
 
         internal static string PackWars()
@@ -385,6 +386,7 @@ namespace Armoury
             SaveText.Sync(dataStore, "arm_m104", ref v);
             if (dataStore.IsLoading) { try { Prologue.UnpackWars(v); } catch (Exception e) { Prologue.CwStumble("UnpackWars", e); } }
             CanonThroneWars.Sync(dataStore);   // 312c: arm_t312 (przerwa po wojnie o tron, trwajace wojny o tron); zapis bez klucza = stan pusty
+            ReachJoinsCrown.Sync(dataStore);   // 332: arm_r332 (Reach do korony po Czarnym Nurcie); zapis bez klucza = stan pusty
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)
@@ -395,6 +397,7 @@ namespace Armoury
             try { Prologue.FeudStartLine(); } catch (Exception e) { Prologue.FzStumble("FeudStartLine", e); }
             try { CanonThroneWars.EnsureHooks(); } catch (Exception e) { CanonThroneWars.Stumble("EnsureHooks", e); }   // 312c: raz na proces, w kampanii (nigdy SubModuleMain)
             try { CanonThroneWars.StartLine(); } catch (Exception e) { CanonThroneWars.Stumble("StartLine", e); }
+            try { ReachJoinsCrown.StartLine(); } catch (Exception e) { ReachJoinsCrown.Stumble("StartLine", e); }   // 332
         }
 
         private void OnHeroReleased(Hero prisoner, PartyBase party, IFaction capturer, EndCaptivityDetail detail, bool notify)
