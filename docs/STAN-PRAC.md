@@ -9,6 +9,8 @@
 - Dochodzenie oblezen (05.11): oblezenia 10-20 dob, NIE glod. Przyczyny: armia odsieczy Joffreya 14 dob na zbiorce (blokada gry + NightRest/ArmyRestDay), male zalogi Korony (130-340 + milicja),
   zbiorka 274 pcha silniejsza Polnoc (Levers.cs:101), OB5 liczy odsiecz "na papierze", unia 272 (Dorzecze w Polnocy) + pokoj zablokowany do Krwawych Godow.
   Poprawki 326c (A zbiorka tylko slabszemu, B bez postojow odsieczy, C koniec zbiorki OB5 po 24 h, D realna odsiecz, E min. zaloga frontu, F dubel "zdobycie") - workflow wf_566de842-b24,
+- 326a/326b PO RECENZJI: noc/326-polnoc efa59fdc, DLL a977aee19f0ca5b1da79ec123ceb8205 (build 0), weto 60 dob na zwrocone twierdze; --grupa polnoc326 P326-1..7. NIEWGRANE.
+- 326c POPRAWIONE wg Jeffa 05.11: odpoczynek/noc ZOSTAJA; odsiecz nie czeka na 90% zbiorki przy przewadze ~1.2x i atakuje oboz (nowy bieg wf_9a40772d-507, stary przerwany).
   galaz noc/326c-oblezenia, worktree scratchpad 0a2a8b2b n326c. Po obu: scalenie 326 + 326c, autotest na kopii zapisu Jeffa (po wyjsciu Jeffa z gry), wgranie.
 
 ## STAN 04.11.2026 ok. 15:40 CET: WGRANIE 163 (najnowszy) - zima 325
