@@ -429,11 +429,21 @@ namespace Armoury
         {
             try
             {
+                // 326x: krok po kroku - brak typu/wlasciwosci albo null po drodze = czytelny napis zamiast NullReferenceException (tylko diagnostyka)
                 var t = AccessTools.TypeByName("NavalDLC.NavalDLCManager");
-                var inst = t != null ? AccessTools.Property(t, "Instance").GetValue(null, null) : null;
-                var gm = inst != null ? AccessTools.Property(inst.GetType(), "GameModels").GetValue(inst, null) : null;
-                var m = gm != null ? AccessTools.Property(gm.GetType(), "ClanShipOwnershipModel").GetValue(gm, null) : null;
-                return m != null ? m.GetType().FullName : "brak";
+                if (t == null) return "brak (typ NavalDLC.NavalDLCManager)";
+                var pi = AccessTools.Property(t, "Instance");
+                if (pi == null) return "brak (NavalDLCManager.Instance)";
+                var inst = pi.GetValue(null, null);
+                if (inst == null) return "brak (NavalDLCManager.Instance = null)";
+                var pg = AccessTools.Property(inst.GetType(), "GameModels");
+                if (pg == null) return "brak (NavalDLCManager.GameModels)";
+                var gm = pg.GetValue(inst, null);
+                if (gm == null) return "brak (GameModels = null)";
+                var pm = AccessTools.Property(gm.GetType(), "ClanShipOwnershipModel");
+                if (pm == null) return "brak (GameModels.ClanShipOwnershipModel w " + gm.GetType().FullName + ")";
+                var m = pm.GetValue(gm, null);
+                return m != null ? m.GetType().FullName : "brak (ClanShipOwnershipModel = null)";
             }
             catch (Exception e) { return "blad odczytu (" + e.GetType().Name + ")"; }
         }

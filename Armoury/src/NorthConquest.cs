@@ -47,6 +47,18 @@ namespace Armoury
     /// </summary>
     internal static class NorthConquest
     {
+        /// <summary>Gracz stoi w tej twierdzy, jej blizniaku albo jej wsi (autotest z armoury-wlosci-test.flag przepuszcza gracza w miescie - tu wtedy czekamy).</summary>
+        private static bool PlayerAt(Settlement st, Settlement twin)
+        {
+            var mp = MobileParty.MainParty;
+            var cs = mp != null ? mp.CurrentSettlement : null;
+            if (cs == null) return false;
+            if (cs == st || (twin != null && cs == twin)) return true;
+            var v = cs.Village;
+            var b = v != null ? v.Bound : null;
+            return b != null && (b == st || (twin != null && b == twin));
+        }
+
         internal const string Tag = "Zwrot zdobyczy Polnocy (326b): ";
         private const string NorthId = "battania", KingsLandingId = "town_EW4", RedKeepId = "ROT_castle61";
         internal const int MinDays = 1;
@@ -406,6 +418,7 @@ namespace Armoury
                         if (to == null && !stay) { waits.Add(Nm(st) + ": " + rwhy); continue; }
                         if (to == null) { _queue.Remove(id); _todaySkip.Add(Nm(st) + " (" + rwhy + ")"); Log.Info(Tag + "dzien " + day + " | " + Nm(st) + " [" + id + "] zostaje u " + Nm(st.OwnerClan) + ": " + rwhy + "."); continue; }
                         if (PlayerRules(to.Kingdom)) { _queue.Remove(id); _todaySkip.Add(Nm(st) + " (odbiorca w krolestwie gracza)"); Log.Info(Tag + "dzien " + day + " | " + Nm(st) + " [" + id + "] - odbiorca " + Nm(to) + " w krolestwie gracza - pominiete (decyzja gracza)."); continue; }
+                        if (PlayerAt(st, twin)) { waits.Add(Nm(st) + ": gracz w tej osadzie (albo jej wsi)"); continue; }   // autotest (armoury-wlosci-test.flag): gracz w miescie nie blokuje calej proby - nigdy zmiana pana z graczem w srodku
                         string pinfo;
                         if (!MovePrisoners(st, twin, north, to.Leader, out pinfo)) { waits.Add(Nm(st) + ": " + pinfo); continue; }
                         string wait;

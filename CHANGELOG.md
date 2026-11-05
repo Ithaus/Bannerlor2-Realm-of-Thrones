@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 326x-at - poprawki po autotescie 326x (05.11 ok. 15:10; Armoury.dll 0229fc1710a699fdf3fb5f405297669c - NIE WGRANE)
+**Problem:** autotest 326x (kod 0, ERROR 0): (a) 326a "model idealu NavalDLC: blad odczytu (NullReferenceException)" - `NavalRealms.ModelName` wolal `GetValue` na wyniku `AccessTools.Property` bez sprawdzenia null;
+(b) 326b co dobe "czeka ... gracz w osadzie (The Eyrie)" - CrashScribe-at sam stawia druzyne w najbezpieczniejszym miescie (The Eyrie) i czeka tam w town_wait_menus, wiec `BookHoldings.PlayerOnMapFor` nigdy nie przepuszczal.
+**Zmiana:** (1) `NavalRealms.ModelName` krok po kroku: brak typu/wlasciwosci albo null = napis "brak (...)" z miejscem przerwy (tylko diagnostyka, logika bez zmian).
+(2) Wyjscia z miasta NIE dodano: autotest i tak wraca do miasta (PlaceInTown -> znowu The Eyrie). Gotowa droga: plik `Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-wlosci-test.flag` (od f21; dziala tylko w trybie autotestu LogGate 1/2) - gracz w miescie spoza tabeli 18.10 nie blokuje proby,
+to samo dla 326b. Nowa ochrona 326b: `NorthConquest.PlayerAt` - gdy gracz stoi w oddawanej twierdzy, jej blizniaku albo jej wsi, ta twierdza czeka ("gracz w tej osadzie (albo jej wsi)") - nigdy zmiana pana z graczem w srodku. W grze Jeffa (bez pliku) bez zmian.
+**Ryzyko / co sprawdzic:** bieg z plikiem flagi: linia "AUTOTEST: plik armoury-wlosci-test.flag", 326b "SPIS po wczytaniu" i zwroty; plik flagi usunac po biegu.
+
 ## 326x - zmiany Jeffa przed testem (05.11 ok. 14:40)
 **Problem:** Jeff 05.11: "a czemu ma miec minimalne zalogi, niech ma takie jakie ma zalogi" oraz "chodzi mi, ze oddajemy zamki prawowitym wlascicielom, ale zalogi - liczba garnizonu niech jest taka, na jaka stac lorda".
 **Zmiana:** (1) 326c-E `CanonWarBalanceFrontGarrison` domyslnie NIE (kod zostaje, wylaczony). (2) 326b zwrot zdobyczy Polnocy bez obsady zalogi ludzmi krolestwa odbiorcy:
