@@ -101,7 +101,7 @@ namespace Armoury
         {
             public int Version, Nx, Ny, Land, BadRows;
             public float Cell = 2f, X0, Y0;
-            public long TerrainSize;
+            public long TerrainSize, TerrainSizeAlt;   // r343: terrain_size_alt - druga mapa z ta sama siatka (ROT 8.1.8 / 8.1.2)
             public string Md5 = "-";
             public byte[] Code;            // 0 = bez drogi ladem; 1 + klasa * 4 + stok
 
@@ -131,6 +131,7 @@ namespace Armoury
                     if (p[0] == "version:") int.TryParse(p[1], NumberStyles.Integer, Inv, out g.Version);
                     else if (p[0] == "terrain_md5:") g.Md5 = p[1];
                     else if (p[0] == "terrain_size:") long.TryParse(p[1], NumberStyles.Integer, Inv, out g.TerrainSize);
+                    else if (p[0] == "terrain_size_alt:") long.TryParse(p[1], NumberStyles.Integer, Inv, out g.TerrainSizeAlt);
                     else if (p[0] == "cell:") float.TryParse(p[1], NumberStyles.Float, Inv, out g.Cell);
                     else if (p[0] == "origin:" && p.Length >= 3) { float.TryParse(p[1], NumberStyles.Float, Inv, out g.X0); float.TryParse(p[2], NumberStyles.Float, Inv, out g.Y0); }
                     else if (p[0] == "size:" && p.Length >= 3) { int.TryParse(p[1], NumberStyles.Integer, Inv, out g.Nx); int.TryParse(p[2], NumberStyles.Integer, Inv, out g.Ny); }
@@ -173,7 +174,7 @@ namespace Armoury
             public float[] Ax, Ay, Dx, Dy, InvL2, Half;
             public int[] LineOf;             // f19: lamana odcinka (kolejne odcinki tej samej lamanej sa polaczone - chodzenie wzdluz traktu)
             public int Segments, Lines, Points, BadRows, Version;
-            public long TerrainSize;
+            public long TerrainSize, TerrainSizeAlt;   // r343: terrain_size_alt jak siatka
             public string Md5 = "-";
             public double Length;
             // kubelki 4 x 4 jedn. (CSR)
@@ -231,6 +232,7 @@ namespace Armoury
                     string h = raw.TrimStart('#').Trim();
                     if (h.StartsWith("version:", StringComparison.Ordinal)) int.TryParse(h.Substring(8).Trim(), NumberStyles.Integer, Inv, out m.Version);
                     else if (h.StartsWith("terrain_size:", StringComparison.Ordinal)) long.TryParse(h.Substring(13).Trim(), NumberStyles.Integer, Inv, out m.TerrainSize);
+                    else if (h.StartsWith("terrain_size_alt:", StringComparison.Ordinal)) long.TryParse(h.Substring(17).Trim().Split(' ')[0], NumberStyles.Integer, Inv, out m.TerrainSizeAlt);
                     else if (h.StartsWith("terrain_md5:", StringComparison.Ordinal)) m.Md5 = h.Substring(12).Trim();
                     else if (h.StartsWith("road\t", StringComparison.Ordinal)) { string[] hc = h.Split('\t'); for (int i = 0; i < hc.Length; i++) cols[hc[i].Trim()] = i; }
                     continue;

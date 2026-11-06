@@ -3,6 +3,7 @@
 # source: geo-siatka.tsv of the geo probe 2026-10-16 (ROT 8.1.8) with heights corrected to ROT 8.1.2 terrain.bin by tools/geo/rot812_dane.py (38 samples at Sharp Point, Riverrun, Gulltown); nav / terrain type from 8.1.8; generator tools/drogi/drogi_boczne_siatka.py
 # terrain_md5: 82fbc6999da5120b5c7d0fea43aabb4b
 # terrain_size: 50639409
+# terrain_size_alt: 50638996 (ROT 8.1.8 terrain.bin md5 2d15af95... - road paint identical, the same data serve both maps)
 # cell: 2
 # origin: 0 0
 # size: 800 701

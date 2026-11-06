@@ -127,9 +127,11 @@ def main():
             if l.startswith('# scene_xml_crc:'):
                 if l.strip() != '# scene_xml_crc: ' + OLD_CRC and not l.startswith('# scene_xml_crc: 0'):
                     sys.exit('BLAD %s: nieoczekiwany naglowek %s' % (fn, l))
-                out.append('# scene_xml_crc: 0')
-                out.append('# scene_terrain_size: %d (ROT 8.1.2: the mod takes this file when ROT-Map terrain.bin has this size - the game scene CRC is not known '
-                           'outside the game, 8.1.8 had %s; tools/geo/rot812_wioski.py, villages moved: %s)' % (TERRAIN_SIZE, OLD_CRC, ','.join(moved) or 'none'))
+                # r343 (recenzja): CRC 8.1.8 zostaje - te same dane sluza obu mapom (stara: po CRC sceny, 8.1.2: po terrain.bin), kolejnosc wgrania DLL / mapy obojetna
+                out.append('# scene_xml_crc: ' + OLD_CRC)
+                out.append('# scene_terrain_size: %d (ROT 8.1.2: the mod takes this file when ROT-Map terrain.bin has this size - scene_xml_crc above = ROT 8.1.8 scene - '
+                           'the same data serve both maps (8.1.2 game scene CRC not known outside the game); tools/geo/rot812_wioski.py, villages moved: %s)'
+                           % (TERRAIN_SIZE, ','.join(moved) or 'none'))
                 continue
             if l.startswith('# scene_terrain_size:'): continue
             out.append(l)

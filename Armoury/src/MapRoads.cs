@@ -684,7 +684,7 @@ namespace Armoury
                 var ws = new List<float>(11000);
                 var ids = new List<int>(11000);
                 int bad = 0, version = 0;
-                long tsize = 0;
+                long tsize = 0, tsizeAlt = 0;   // r343: terrain_size_alt - druga mapa, dla ktorej dane sa te same
                 string md5 = "-";
                 var cols = new Dictionary<string, int>(StringComparer.Ordinal);
                 foreach (string raw in File.ReadAllText(path, Encoding.UTF8).Replace("\r", "").Split('\n'))
@@ -695,6 +695,7 @@ namespace Armoury
                         string h = raw.TrimStart('#').Trim();
                         if (h.StartsWith("version:", StringComparison.Ordinal)) int.TryParse(h.Substring(8).Trim(), NumberStyles.Integer, Inv, out version);
                         else if (h.StartsWith("terrain_size:", StringComparison.Ordinal)) long.TryParse(h.Substring(13).Trim(), NumberStyles.Integer, Inv, out tsize);
+                        else if (h.StartsWith("terrain_size_alt:", StringComparison.Ordinal)) { long ta; if (long.TryParse(h.Substring(17).Trim().Split(' ')[0], NumberStyles.Integer, Inv, out ta) && ta > 0) tsizeAlt = ta; }   // r343: druga mapa z tymi samymi danymi (ROT 8.1.8)
                         else if (h.StartsWith("terrain_md5:", StringComparison.Ordinal)) md5 = h.Substring(12).Trim();
                         else if (h.StartsWith("road\t", StringComparison.Ordinal))
                         {
@@ -721,13 +722,13 @@ namespace Armoury
                 if (tsize > 0 && tb != null && File.Exists(tb))
                 {
                     long now = new FileInfo(tb).Length;
-                    if (now != tsize)
+                    if (now != tsize && now != tsizeAlt)
                     {
                         _note = "plik " + FileName + " v" + version + " z INNEJ MAPY: terrain.bin ROT-Map ma " + now + " B, dane z " + tsize + " B (terrain_md5 " + md5
                                 + ") - premia drog nieczynna (dane do odswiezenia: tools/geo/geo_drogi_rot.py + tools/drogi/drogi_plik_modu.py)";
                         return;
                     }
-                    tnote = "terrain.bin ROT-Map zgodny (" + now + " B)";
+                    tnote = "terrain.bin ROT-Map zgodny (" + now + " B" + (now != tsize ? " - terrain_size_alt" : "") + ")";
                 }
                 else tnote = tsize > 0 ? "terrain.bin ROT-Map nie znaleziony - bez straznika mapy" : "naglowek bez terrain_size - bez straznika mapy";
                 var g = Build(ids, xs, ys, ws, path);

@@ -30,6 +30,7 @@ def main():
     ap.add_argument('--wyj', default=os.path.join(here, '..', '..', 'Armoury', 'ModuleData', 'arm_map_side_roads_grid.tsv'))
     ap.add_argument('--teren', default=r'C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules\ROT-Map\SceneObj\Main_map\terrain.bin')
     ap.add_argument('--zrodlo', default='', help='rot812: opis zrodla do naglowka zamiast sondy 16.10 (np. dane z tools/geo/rot812_dane.py)')
+    ap.add_argument('--terrain-alt', dest='terrain_alt', type=int, default=0, help='r343: naglowek terrain_size_alt - druga mapa, dla ktorej dane sa te same (np. 50638996 = ROT 8.1.8 przy danych 8.1.2)')
     a = ap.parse_args()
     md5, size = MD5_1610, SIZE_1610
     if os.path.isfile(a.teren):
@@ -84,6 +85,8 @@ def main():
         o.write('# source: %s; generator tools/drogi/drogi_boczne_siatka.py\n' % (a.zrodlo or 'geo-siatka.tsv (geo probe MapGeoProbe G3 run 2026-10-16 13:59, branch w-toku/noc-geo 19e6f041)'))
         o.write('# terrain_md5: %s\n' % md5)
         o.write('# terrain_size: %d\n' % size)
+        if a.terrain_alt > 0 and a.terrain_alt != size:
+            o.write('# terrain_size_alt: %d (ROT 8.1.8 terrain.bin md5 2d15af95... - road paint identical, the same data serve both maps)\n' % a.terrain_alt)
         o.write('# cell: %d\n' % CELL)
         o.write('# origin: 0 0\n')
         o.write('# size: %d %d\n' % (nx, ny))

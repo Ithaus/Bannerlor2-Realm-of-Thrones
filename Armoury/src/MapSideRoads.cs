@@ -301,12 +301,12 @@ namespace Armoury
                 var m = SideRoadPlan.ParseMainRoads(File.ReadAllText(mainPath, Encoding.UTF8));
                 string guard;
                 long tsize = terrain != null && File.Exists(terrain) ? new FileInfo(terrain).Length : -1;
-                if (tsize > 0 && g.TerrainSize > 0 && tsize != g.TerrainSize)
+                if (tsize > 0 && g.TerrainSize > 0 && tsize != g.TerrainSize && tsize != g.TerrainSizeAlt)
                 {
                     job.Note = "siatka " + GridFile + " z INNEJ MAPY: terrain.bin ROT-Map ma " + tsize + " B, siatka z " + g.TerrainSize + " B - drog nie bedzie (dane do odswiezenia: tools/drogi/drogi_boczne_siatka.py)";
                     return;
                 }
-                if (tsize > 0 && m.TerrainSize > 0 && tsize != m.TerrainSize)
+                if (tsize > 0 && m.TerrainSize > 0 && tsize != m.TerrainSize && tsize != m.TerrainSizeAlt)
                 {
                     job.Note = "trakty " + MainFile + " z INNEJ MAPY (terrain.bin " + tsize + " B, plik " + m.TerrainSize + " B) - drog nie bedzie";
                     return;

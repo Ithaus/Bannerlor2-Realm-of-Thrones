@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 343r - recenzja 343: te same dane na obu mapach (NIE WGRANE, bez autotestu; build kontrolny Armoury.dll cd6629cf)
+**Problem (recenzja):** pliki 343 mialy "# scene_xml_crc: 0" i jeden terrain_size 8.1.2 - nowa DLL (i kazda pozniejsza paczka zbudowana na 343) na STAREJ mapie 8.1.8
+(DLL wgrana przed ROT-Map 8.1.2, Jeff zostaje przy kroku A albo cofniecie ROT-Map z kopii) wylaczylaby po cichu drogi +15%, drogi boczne, wioski, ksiege wiosek i zajazdy.
+Dane 343 sa poprawne dla obu map: farba drog 1:1 (warstwa road slot 13 bez zmian - sprawdzone niezaleznie), wioski bez zmian poza Sheepbrook (na starej mapie
+12.97 od White Harbor), zajazdy 1:1, 8 komorek stoku siatki przy Gulltown.
+**Zmiana:** wioski v4-v7, zajazdy, probnik: "# scene_xml_crc: 146201570" (8.1.8) wraca obok "# scene_terrain_size: 50639409" - stara mapa przyjmuje plik po CRC sceny, 8.1.2 po
+terrain.bin (MapVillageData.CheckScene / RoadsideInns / MapRoadsProbe bez zmian). arm_map_roads_geo.tsv i arm_map_side_roads_grid.tsv: nowy naglowek
+"# terrain_size_alt: 50638996"; MapRoads.Load i MapSideRoads (ParseGrid / ParseMainRoads) przyjmuja terrain.bin o rozmiarze terrain_size albo terrain_size_alt.
+Generatory: rot812_wioski.py i zajazdy_gen.py pisza CRC 8.1.8, drogi_plik_modu.py / drogi_boczne_siatka.py --terrain-alt.
+**Status:** kolejnosc wgrania DLL i ROT-Map 8.1.2 obojetna. Autotest na 8.1.2 jak w 343; na 8.1.8: wioski "zgodne (146201570)", drogi "terrain.bin ROT-Map zgodny
+(50638996 B - terrain_size_alt)".
+
 ## 343 - dane mapy Armoury dla ROT 8.1.2 na noc/343-rot812 (NIE WGRANE, bez autotestu; build Armoury.dll be9a917f tylko do sprawdzenia kompilacji)
 **Problem:** ROT 8.1.2 zmienia mape swiata (terrain.bin 50638996 -> 50639409 B, md5 82fbc699..., scene.xscene, settlements.xml, navmesh.bin). Dane Armoury maja straznik
 starej mapy (terrain_size / scene_xml_crc 146201570) - po wgraniu mapy wylaczylyby sie drogi +15%, drogi boczne, wioski, ksiega wiosek i zajazdy.

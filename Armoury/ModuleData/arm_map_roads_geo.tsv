@@ -3,6 +3,7 @@
 # source: arm_geo_drogi_rot.tsv (ROT 8.1.2 terrain.bin (md5 82fbc699...) via tools/geo/geo_drogi_rot.py --mapa, 06.11; road layer identical to 8.1.8 (same 311 polylines as the geo probe 2026-10-16); polylines from tools/geo/geo_drogi_rot.py: weight > 48/255, 1-sample closing, Zhang-Suen, Douglas-Peucker 0.2, spurs < 2 removed); generator tools/drogi/drogi_plik_modu.py
 # terrain_md5: 82fbc6999da5120b5c7d0fea43aabb4b
 # terrain_size: 50639409
+# terrain_size_alt: 50638996 (ROT 8.1.8 terrain.bin md5 2d15af95... - road paint identical, the same data serve both maps)
 # polylines: 311, points: 10876, segments: 10565, length: 10016.3
 # width: paint band width in map units per polyline (samples with weight > 48 within 1.6 of the skeleton x sample area / length); the mod takes half-width = width / 2 clamped to 0.15..1.5 and adds Map Road Margin
 #road	seq	x	y	width
