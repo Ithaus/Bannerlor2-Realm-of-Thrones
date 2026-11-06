@@ -774,6 +774,7 @@ LABELS = {
     'StrategicAiIgnoresBandits': 'Strategic AI Ignores Bandits',   # 320b
     'StrategicAiFightsOnWhenPeaceBlocked': 'Strategic AI Fights On When Peace Blocked',   # 320e
     'AiStrengthCountsGear': 'AI Strength Counts Gear',
+    'KingdomStrengthFieldOnly336': 'Kingdom Strength In Field Only',   # 336
     'AiAutobattleCountsGear': 'AI Autobattle Counts Gear',
     'AiStrengthFullKitPercent': 'AI Strength Full Kit Percent',
     'AiArmsBeforeBattle': 'AI Arms Before Battle',

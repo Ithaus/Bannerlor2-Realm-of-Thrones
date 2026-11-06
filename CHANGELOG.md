@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 336b - poprawki po recenzji sily w polu (noc/336-sila-w-polu; Armoury.dll 54201cc6363d7466e9614d00317f06d1 w test/m336 - NIE WGRANE, bez autotestu; Jeff gra)
+- `tools/gen_mcm.py`: etykieta `KingdomStrengthFieldOnly336` = "Kingdom Strength In Field Only" w LABELS (sprawdzone: wygenerowany wpis McmSettings = reczny; reszty generatora nie zapisano - cofa 326d/326x).
+- `tools/sprawdz_logi.py` S336-2: naruszenie tylko przy znaczacych garnizonach (> max(200, 2% starej)) - stara to cache godzinowy gry, pole liczone na biezaco; synteza + przypadek pole 9010 / stara 9000 / garnizony 30 = TAK.
+- `KingdomStrengthField336.cs`: `Daily` zeruje liczniki doby takze przy wylaczonym logu; podpis `{=!}` + tekst (lokalizacja nie szuka ID); wiersze doby sortowane po sile w polu (to, co widzi gracz).
+- Bez zmian (do decyzji/niesprawdzone): podpowiedz "Strength" w oknie buntu Diplomacy (`RebelFactionParticipantVM`) dalej z garnizonami; AIInfluence.dll (zaciemniony) moze mowic o starej sile; liczba to SILA, nie liczba ludzi.
+
 ## 336 - sila krolestw w UI bez garnizonow: liczy sie armia w polu (noc/336-sila-w-polu od 091ed773; Armoury.dll 78ba6d96429286cf465dc05dfcde59ee w test/m336 - NIE WGRANE, bez autotestu; Jeff gra)
 **Problem:** Jeff 06.11: "sile krolestw pokazuj bez garnizonow - Polnoc nie ma 44k zolnierzy w polu; garnizony, jak zostana wyjete z garnizonow do armii, to wtedy
 sa liczone. Liczy sie armia w polu." Log `Armoury-2026-11-06_11-51-21.log` (55 dob): The North pokazana 42 820-47 420 (doba 109522: 46 255 = SCA145 `OwnedStrength`

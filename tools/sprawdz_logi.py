@@ -95722,6 +95722,8 @@ S336_DAY = re.compile(r"Sila krolestw w polu \(336\): dzien (\d+) \| klucz (TAK|
                       r"nie mniej przy garnizonach (\d+) \| (.*) \| odczytow UI doby (\d+) \| potkniecia 336 (\d+) \(sesja (\d+)\)\.")
 S336_ROW = re.compile(r"^(.+?) pole (-?\d+) / stara (-?\d+) \(garnizony (-?\d+), reszta (-?\d+)\)$")
 S336_ERR = re.compile(r"ERROR in KingdomStrengthField336")
+# 336b: stara = cache godzinowy gry (HourlyTickClan), pole liczone na biezaco - przy malym garnizonie pole moze chwilowo przejsc stara; naruszenie tylko przy znaczacych garnizonach
+S336_GAR_SIG = lambda r: r["gar"] > max(200, 0.02 * r["old"])
 
 
 def sila336_collect(logp):
@@ -95773,10 +95775,10 @@ def sila336_rows(rep, D):
     else:
         rep.add("S336-1: linia doby", f"dob {len(Dy)}, nierozpoznanych {D['dayBad']}", "> 0 dob, 0 nierozpoznanych", len(Dy) > 0 and D["dayBad"] == 0)
     if Dy:
-        viol = [(d["day"], r["name"], r["field"], r["old"], r["gar"]) for d in Dy for r in d["rows"] if r["gar"] > 0 and not r["field"] < r["old"]]
-        nrow = sum(1 for d in Dy for r in d["rows"] if r["gar"] > 0)
+        viol = [(d["day"], r["name"], r["field"], r["old"], r["gar"]) for d in Dy for r in d["rows"] if S336_GAR_SIG(r) and not r["field"] < r["old"]]
+        nrow = sum(1 for d in Dy for r in d["rows"] if S336_GAR_SIG(r))
         ex = "; ".join(f"d{a} {b} pole {c} / stara {e} (garn. {g})" for a, b, c, e, g in viol[:3])
-        rep.add("S336-2: w polu < stara (krolestwa z garnizonami)", f"wierszy {nrow}, naruszen {len(viol)}" + (f" ({ex})" if ex else ""),
+        rep.add("S336-2: w polu < stara (krolestwa ze znaczacymi garnizonami > max(200, 2% starej))", f"wierszy {nrow}, naruszen {len(viol)}" + (f" ({ex})" if ex else ""),
                 "0 naruszen", nrow > 0 and not viol)
         rests = [abs(r["rest"]) / max(1, r["old"]) for d in Dy for r in d["rows"]]
         rep.add("S336-4: reszta (stara - pole - garnizony) / stara", f"max {max(rests) * 100:.1f}%, srednio {sum(rests) / len(rests) * 100:.2f}%" if rests else "-",
@@ -95801,7 +95803,7 @@ def sila336_synth():
                 f"The North pole {f} / stara {o} (garnizony {g}, reszta {o - f - g}) | Dorne pole 9000 / stara 9000 (garnizony 0, reszta 0) "
                 f"| odczytow UI doby 4 | potkniecia 336 {stum} (sesja {stum}).")
     runs = {
-        "good": [st, day(3), day(4)],
+        "good": [st, day(3), day(4), day(5, f=9010, o=9000, g=30)],
         "viol": [st, day(3), day(4, f=46300)],
         "miss": [st.replace("latki metod 16/16", "latki metod 15/16").replace("brak: -", "brak: KingSelectionDecisionItemVM 0/1"), day(3)],
         "stum": [st, day(3, stum=1)],

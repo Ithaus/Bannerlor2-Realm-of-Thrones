@@ -130,7 +130,7 @@ namespace Armoury
         public static TextObject Label(TextObject t)
         {
             if (t == null || !On) return t;
-            try { return new TextObject(t.ToString() + Suffix); }
+            try { return new TextObject("{=!}" + t.ToString() + Suffix); }
             catch (Exception e) { Stumble("Label", e); return t; }
         }
 
@@ -341,12 +341,12 @@ namespace Armoury
         {
             if (Campaign.Current == null) return;
             var s = Settings.Current;
-            if (s == null || !s.LogEnabled) return;
+            if (s == null || !s.LogEnabled) { _dCalls = 0; _dStumbles = 0; return; }
             try
             {
                 var rows = new List<string>();
                 int nk = 0, below = 0, notBelow = 0;
-                foreach (var k in Kingdom.All.Where(x => x != null && !x.IsEliminated && x.Clans.Count > 0).OrderByDescending(x => x.CurrentTotalStrength))
+                foreach (var k in Kingdom.All.Where(x => x != null && !x.IsEliminated && x.Clans.Count > 0).OrderByDescending(x => FieldRaw(x)))
                 {
                     float field = FieldRaw(k), old = k.CurrentTotalStrength, gar = GarrisonRaw(k);
                     nk++;
