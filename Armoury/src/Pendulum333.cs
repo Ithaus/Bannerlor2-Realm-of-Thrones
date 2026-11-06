@@ -44,6 +44,13 @@ namespace Armoury
     /// filtr zygzak z progiem max(3 m, pol glebokosci): nawrot = zmiana kierunku po odcinku >= progu; wynik na szyko-minute przed kontaktem i wedlug zachowania.
     /// Koszt: prefiks raz na rozkaz (co 0.5 s na szyk) - petla po szykach wroga (kilkanascie), pomiar co 0.5 s po szykach; bez zapytan o ludzi.
     /// Potkniecia licza sie (Stumbles), bez wylacznika.
+    /// DIAGNOSTYKA 333d (runda 2: nawroty 0.97/min mimo 106 zatrzymanych rozkazow wstecz - ruch ucieka inna droga): linia "AI bitwy (333) nawrot" (pierwsze
+    /// MaxRevLines na misje) - szyk, strona, zachowanie, odcinek i powrot mediany oraz srodka ciezkosci (srednia pozycji ludzi, CachedAveragePosition - ten sam
+    /// filtr), czy P zmienil sie od ekstremum i ktora regula go przyjela, ostatni cel gry wzgledem P, rozkaz ostatni / biezacy, s od wyjscia z kontaktu, zmiana
+    /// kierunku szyku, glebokosci i szerokosci od ekstremum, FacingOrder / ArrangementOrder; "droga" = pierwsza pasujaca przyczyna (artefakt mediany, nowy P,
+    /// rozkaz nie-Move, po kontakcie, przestrzelenie P, obrot / przestawienie szyku, P bez zmian). Linie "AI bitwy (333) rozkaz przed kontaktem" (zmiana rozkazu na
+    /// nie-Move) i "AI bitwy (333) ustawienie przed kontaktem" (FacingOrder / ArrangementOrder na poczatku i przy zmianie) - po MaxSetLines na misje.
+    /// Miara wahadla bez zmian (mediana) - srodek ciezkosci liczony obok, do porownania. Zachowanie latki bez zmian.
     /// </summary>
     internal static class Pendulum333
     {
@@ -51,7 +58,7 @@ namespace Armoury
         internal const float CavClose = 60f, CavNear = 120f, CavClosing = 3f, CavKeep = 4f;
         // 333b: martwa strefa rozkazu, zapadka kierunku (okno podwajane po kazdym nawrocie), trzymanie punktu
         internal const float DeadMove = 12f, Ratchet = 30f, RatchetMax = 240f, HoldMin = 10f;
-        private const int MaxBeh = 8;
+        private const int MaxBeh = 8, MaxRevLines = 30, MaxSetLines = 16, MaxWays = 10;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private sealed class PF
@@ -71,6 +78,26 @@ namespace Armoury
             public Vec2 Last = Vec2.Invalid;
             public float X, Lo, Hi, Ext;
             public sbyte Trend;
+            // 333d: diagnostyka
+            public float OutAt = -1000f;
+            public int AccN;
+            public char AccRule = '-';
+            public sbyte AccSg;
+            public float AccAt = -1000f;
+            public Vec2 T = Vec2.Invalid;
+            public float TAt = -1000f;
+            public MovementOrder.MovementOrderEnum Ord;
+            public float OrdAt = -1000f;
+            public int Fac = -1, Arr = -1;
+            // srodek ciezkosci (srednia pozycji ludzi) - ten sam zygzak co mediana
+            public Vec2 LastA = Vec2.Invalid;
+            public float XA, LoA, HiA, ExtA;
+            public sbyte TrendA;
+            // stan mediany w ekstremum i w poprzednim ekstremum
+            public float XALo, XAHi, LoAt, HiAt;
+            public float ExtAt, ExtPrev, ExtPrevAt, XAExt, XAPrevExt, DepthExt, WidthExt;
+            public Vec2 DirExt = Vec2.Invalid, PExt = Vec2.Invalid, CExt = Vec2.Invalid;
+            public int AccNExt, FacExt = -1, ArrExt = -1;
         }
 
         private static bool _live, _key, _tried;
@@ -85,6 +112,10 @@ namespace Armoury
         private static int _seen, _backHeld, _backS4, _backBeh, _fwdHeld, _rev, _revBack, _forms, _contactIn, _contactCav;
         private static int _first, _dead, _hold, _revOk, _accFwd, _accSide;
         private static float _preSec;
+        // 333d: diagnostyka
+        private static int _revLog, _ordLog, _setLog, _revA, _revABack, _revSmall, _ordChg, _facChg, _arrChg;
+        private static readonly Dictionary<string, int[]> RevWay = new Dictionary<string, int[]>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, int> NonMoveBy = new Dictionary<string, int>(StringComparer.Ordinal);
         private static int _stum, _stumPatch;   // recenzja 333 (7): potkniecie latki (przed pierwszym Begin) nie ginie w Clear
         internal static int Stumbles { get { return _stum + _stumPatch; } }
         private static string _patch = "nie wpieta";
@@ -138,6 +169,8 @@ namespace Armoury
             _first = _dead = _hold = _revOk = _accFwd = _accSide = 0;
             _preSec = 0f;
             _stum = 0;
+            _revLog = _ordLog = _setLog = _revA = _revABack = _revSmall = _ordChg = _facChg = _arrChg = 0;
+            RevWay.Clear(); NonMoveBy.Clear();
         }
 
         private static bool Here(Mission m)
@@ -216,16 +249,16 @@ namespace Armoury
             if (cav) pf.CavUntil = now + CavKeep;
             pf.Contact = pf.FootContact || now < pf.CavUntil;
             if (pf.Contact && !was) { _contactIn++; if (!pf.FootContact) _contactCav++; }
+            if (!pf.Contact && was) pf.OutAt = now;   // 333d
         }
 
         // ------------------------------------------------------------ prefiks Formation.SetMovementOrder
 
         private static void Pre(Formation __instance, ref MovementOrder input)
         {
-            if (!_live || !_key) return;
+            if (!_live) return;
             try
             {
-                if (input.OrderEnum != MovementOrder.MovementOrderEnum.Move) return;
                 if (Thread.CurrentThread.ManagedThreadId != _mainThread) return;
                 var m = Mission.Current;
                 if (!Here(m) || !m.IsDeploymentFinished) return;
@@ -234,12 +267,26 @@ namespace Armoury
                 float now = m.CurrentTime;
                 var pf = Get(f);
                 Refresh(pf, now);
-                if (pf.Contact || pf.Gap == float.MaxValue || !pf.Axis.IsValid) { Forget(pf); return; }
+                // 333d: kazdy rozkaz zapamietany (OrderEnum, czas); nie-Move przed kontaktem - licznik i linia przy zmianie
+                var oe = input.OrderEnum;
+                var prevOrd = pf.Ord;
+                pf.Ord = oe;
+                pf.OrdAt = now;
+                bool pre = !pf.Contact && pf.Gap != float.MaxValue && pf.Axis.IsValid;
+                if (oe != MovementOrder.MovementOrderEnum.Move)
+                {
+                    if (pre) NonMove(pf, oe, prevOrd, now);
+                    return;
+                }
+                if (!_key) return;
+                if (!pre) { Forget(pf); return; }
                 Vec2 c = f.CachedMedianPosition.AsVec2;
                 WorldPosition tw = input.CreateNewOrderWorldPositionMT(f, WorldPosition.WorldPositionEnforcedCache.None);
                 Vec2 tp = tw.AsVec2;
                 if (!c.IsValid || !tw.IsValid || !tp.IsValid) return;
                 _seen++;
+                pf.T = tp;   // 333d: ostatni cel gry
+                pf.TAt = now;
                 float dz = Math.Max(DeadMove, f.Depth);
                 Type beh = null;
                 try { var ai = f.AI; beh = ai != null && ai.ActiveBehavior != null ? ai.ActiveBehavior.GetType() : null; } catch { beh = null; }
@@ -247,12 +294,13 @@ namespace Armoury
                 if (!pf.P.IsValid)
                 {
                     _first++;
-                    Accept(pf, tw, tp, Sign((tp - c).DotProduct(pf.Axis), dz), now, beh);
+                    Accept(pf, tw, tp, Sign((tp - c).DotProduct(pf.Axis), dz), now, beh, '1');
                     return;
                 }
                 // 2. martwa strefa
                 if (tp.Distance(pf.P) < dz) { Keep(f, pf, ref input); _dead++; return; }
                 sbyte sg = Sign((tp - pf.P).DotProduct(pf.Axis), dz);
+                char rule = '5';
                 // 3. zapadka kierunku (okno 30 s, podwajane po kazdym przepuszczonym nawrocie)
                 if (sg != 0 && pf.Dir != 0 && sg != pf.Dir)
                 {
@@ -265,6 +313,7 @@ namespace Armoury
                     }
                     pf.Revs++;
                     _revOk++;
+                    rule = 'Z';   // zapadka przepuscila nawrot po oknie
                 }
                 // 4. trzymanie: szyk stoi na P - nowy punkt najwczesniej HoldMin s po przyjeciu P
                 else if (c.Distance(pf.P) < dz && now - pf.PAt < HoldMin)
@@ -274,7 +323,7 @@ namespace Armoury
                     return;
                 }
                 // 5. przyjety
-                Accept(pf, tw, tp, sg, now, beh);
+                Accept(pf, tw, tp, sg, now, beh, rule);
             }
             catch (Exception e)
             {
@@ -288,8 +337,12 @@ namespace Armoury
             return s > 0.5f * dz ? (sbyte)1 : s < -0.5f * dz ? (sbyte)-1 : (sbyte)0;
         }
 
-        private static void Accept(PF pf, WorldPosition tw, Vec2 tp, sbyte sg, float now, Type beh)
+        private static void Accept(PF pf, WorldPosition tw, Vec2 tp, sbyte sg, float now, Type beh, char rule)
         {
+            pf.AccN++;   // 333d
+            pf.AccRule = rule;
+            pf.AccSg = sg;
+            pf.AccAt = now;
             pf.P = tp;
             pf.PW = tw;
             pf.PAt = now;
@@ -356,56 +409,252 @@ namespace Armoury
             Refresh(pf, now);
             var f = pf.F;
             Vec2 c = f.CachedMedianPosition.AsVec2;
-            if (pf.Contact || pf.Gap == float.MaxValue || !pf.Axis.IsValid || !c.IsValid)
+            Vec2 a = f.CachedAveragePosition;
+            if (pf.Contact || pf.Gap == float.MaxValue || !pf.Axis.IsValid || !c.IsValid || !a.IsValid)
             {
                 pf.Last = Vec2.Invalid;
+                pf.LastA = Vec2.Invalid;
                 pf.Trend = 0;
+                pf.TrendA = 0;
                 if (pf.Contact) Forget(pf);
                 return;
             }
+            Poll(pf, now);   // 333d: FacingOrder / ArrangementOrder przed kontaktem
             _preSec += step;
-            if (!pf.Last.IsValid)
+            if (!pf.Last.IsValid || !pf.LastA.IsValid)
             {
                 pf.Last = c;
+                pf.LastA = a;
                 pf.X = pf.Lo = pf.Hi = pf.Ext = 0f;
                 pf.Trend = 0;
+                pf.XA = pf.LoA = pf.HiA = pf.ExtA = 0f;
+                pf.TrendA = 0;
+                pf.XALo = pf.XAHi = 0f;
+                pf.LoAt = pf.HiAt = now;
+                Snap(pf, c, now);
+                pf.ExtPrev = 0f; pf.XAPrevExt = 0f; pf.ExtPrevAt = now;
                 return;
             }
             pf.X += (c - pf.Last).DotProduct(pf.Axis);
             pf.Last = c;
+            pf.XA += (a - pf.LastA).DotProduct(pf.Axis);
+            pf.LastA = a;
             float thr = Math.Max(DeadMin, 0.5f * f.Depth);
+            ZigA(pf, thr);
             float x = pf.X;
             if (pf.Trend == 0)
             {
-                if (x < pf.Lo) pf.Lo = x;
-                if (x > pf.Hi) pf.Hi = x;
-                if (x - pf.Lo >= thr) { pf.Trend = 1; pf.Ext = x; }
-                else if (pf.Hi - x >= thr) { pf.Trend = -1; pf.Ext = x; }
+                if (x < pf.Lo) { pf.Lo = x; pf.XALo = pf.XA; pf.LoAt = now; }
+                if (x > pf.Hi) { pf.Hi = x; pf.XAHi = pf.XA; pf.HiAt = now; }
+                if (x - pf.Lo >= thr) { pf.Trend = 1; pf.ExtPrev = pf.Lo; pf.XAPrevExt = pf.XALo; pf.ExtPrevAt = pf.LoAt; pf.Ext = x; Snap(pf, c, now); }
+                else if (pf.Hi - x >= thr) { pf.Trend = -1; pf.ExtPrev = pf.Hi; pf.XAPrevExt = pf.XAHi; pf.ExtPrevAt = pf.HiAt; pf.Ext = x; Snap(pf, c, now); }
                 return;
             }
             if (pf.Trend > 0)
             {
-                if (x > pf.Ext) pf.Ext = x;
-                else if (pf.Ext - x >= thr) { Reversal(f, true); pf.Trend = -1; pf.Ext = x; }
+                if (x > pf.Ext) { pf.Ext = x; Snap(pf, c, now); }
+                else if (pf.Ext - x >= thr) { Reversal(pf, true, x, thr, c, a, now); pf.Trend = -1; Turn(pf, x, c, now); }
             }
             else
             {
-                if (x < pf.Ext) pf.Ext = x;
-                else if (x - pf.Ext >= thr) { Reversal(f, false); pf.Trend = 1; pf.Ext = x; }
+                if (x < pf.Ext) { pf.Ext = x; Snap(pf, c, now); }
+                else if (x - pf.Ext >= thr) { Reversal(pf, false, x, thr, c, a, now); pf.Trend = 1; Turn(pf, x, c, now); }
             }
         }
 
-        private static void Reversal(Formation f, bool back)
+        /// <summary>333d: stan szyku w chwili ekstremum mediany (do porownania przy nawrocie).</summary>
+        private static void Snap(PF pf, Vec2 c, float now)
         {
+            var f = pf.F;
+            pf.ExtAt = now;
+            pf.XAExt = pf.XA;
+            pf.DirExt = f.Direction;
+            pf.PExt = pf.P;
+            pf.CExt = c;
+            pf.DepthExt = f.Depth;
+            pf.WidthExt = f.Width;
+            pf.AccNExt = pf.AccN;
+            pf.FacExt = pf.Fac;
+            pf.ArrExt = pf.Arr;
+        }
+
+        private static void Turn(PF pf, float x, Vec2 c, float now)
+        {
+            pf.ExtPrev = pf.Ext;
+            pf.XAPrevExt = pf.XAExt;
+            pf.ExtPrevAt = pf.ExtAt;
+            pf.Ext = x;
+            Snap(pf, c, now);
+        }
+
+        /// <summary>333d: ten sam zygzak dla srodka ciezkosci (srednia pozycji ludzi) - do porownania z mediana, bez wplywu na miare.</summary>
+        private static void ZigA(PF pf, float thr)
+        {
+            float x = pf.XA;
+            if (pf.TrendA == 0)
+            {
+                if (x < pf.LoA) pf.LoA = x;
+                if (x > pf.HiA) pf.HiA = x;
+                if (x - pf.LoA >= thr) { pf.TrendA = 1; pf.ExtA = x; }
+                else if (pf.HiA - x >= thr) { pf.TrendA = -1; pf.ExtA = x; }
+                return;
+            }
+            if (pf.TrendA > 0)
+            {
+                if (x > pf.ExtA) pf.ExtA = x;
+                else if (pf.ExtA - x >= thr) { _revA++; _revABack++; pf.TrendA = -1; pf.ExtA = x; }
+            }
+            else
+            {
+                if (x < pf.ExtA) pf.ExtA = x;
+                else if (x - pf.ExtA >= thr) { _revA++; pf.TrendA = 1; pf.ExtA = x; }
+            }
+        }
+
+        private static string BehName(Formation f)
+        {
+            try { var ai = f.AI; return ai != null && ai.ActiveBehavior != null ? ai.ActiveBehavior.GetType().Name : "brak"; } catch { return "?"; }
+        }
+
+        private static string Who(Formation f)
+        {
+            var q = f.QuerySystem;
+            var t = f.Team;
+            return f.FormationIndex + " (" + f.CountOfUnits + " ludzi, " + (q != null && q.IsRangedFormation ? "lucznicy" : "piechota") + ", strona "
+                + (t != null ? t.Side.ToString() : "?") + ", " + (t != null && (t.IsPlayerTeam || t.IsPlayerAlly) ? "z graczem" : "wrog gracza") + ")";
+        }
+
+        private static string FacName(int v) { return v < 0 ? "-" : ((FacingOrder.FacingOrderEnum)v).ToString(); }
+        private static string ArrName(int v) { return v < 0 ? "-" : ((ArrangementOrder.ArrangementOrderEnum)v).ToString(); }
+        private static string S1(float v) { return v.ToString("0.0", Inv); }
+        private static string F0(float v) { return v.ToString("0", Inv); }
+
+        /// <summary>Kat miedzy kierunkami w stopniach (0-180).</summary>
+        private static float Ang(Vec2 a, Vec2 b)
+        {
+            if (!a.IsValid || !b.IsValid || a.Length < 1e-3f || b.Length < 1e-3f) return 0f;
+            double d = Math.Atan2(b.y, b.x) - Math.Atan2(a.y, a.x);
+            while (d > Math.PI) d -= 2.0 * Math.PI;
+            while (d < -Math.PI) d += 2.0 * Math.PI;
+            return (float)(Math.Abs(d) * 180.0 / Math.PI);
+        }
+
+        /// <summary>333d: FacingOrder / ArrangementOrder przed kontaktem - poczatek i kazda zmiana (linie najwyzej MaxSetLines na misje).</summary>
+        private static void Poll(PF pf, float now)
+        {
+            var f = pf.F;
+            int fac = (int)f.FacingOrder.OrderEnum, arr = (int)f.ArrangementOrder.OrderEnum;
+            if (pf.Fac < 0)
+            {
+                pf.Fac = fac;
+                pf.Arr = arr;
+                SetLine(pf, now, "poczatek FacingOrder " + FacName(fac) + ", ArrangementOrder " + ArrName(arr));
+                return;
+            }
+            if (fac != pf.Fac) { _facChg++; SetLine(pf, now, "FacingOrder " + FacName(pf.Fac) + " -> " + FacName(fac)); pf.Fac = fac; }
+            if (arr != pf.Arr) { _arrChg++; SetLine(pf, now, "ArrangementOrder " + ArrName(pf.Arr) + " -> " + ArrName(arr)); pf.Arr = arr; }
+        }
+
+        private static void SetLine(PF pf, float now, string what)
+        {
+            if (_setLog >= MaxSetLines) return;
+            _setLog++;
+            var f = pf.F;
+            Log.Info("AI bitwy (333) ustawienie przed kontaktem: " + S1(now) + " s | szyk " + Who(f) + " | zachowanie " + BehName(f) + " | " + what
+                + " | od wroga " + F0(pf.Gap) + " m, kierunek szyku do osi wroga " + F0(Ang(f.Direction, pf.Axis)) + " st, glebokosc " + S1(f.Depth) + " m, szerokosc "
+                + S1(f.Width) + " m.");
+        }
+
+        /// <summary>333d: rozkaz inny niz Move przed kontaktem (latka go nie pilnuje) - licznik wedlug rodzaju, linia przy zmianie na nie-Move.</summary>
+        private static void NonMove(PF pf, MovementOrder.MovementOrderEnum oe, MovementOrder.MovementOrderEnum prev, float now)
+        {
+            string k = oe.ToString();
+            int n;
+            NonMoveBy.TryGetValue(k, out n);
+            if (n == 0 && NonMoveBy.Count >= MaxBeh) k = "inne";
+            NonMoveBy.TryGetValue(k, out n);
+            NonMoveBy[k] = n + 1;
+            if (oe == prev) return;
+            _ordChg++;
+            if (_ordLog >= MaxSetLines) return;
+            _ordLog++;
+            var f = pf.F;
+            Log.Info("AI bitwy (333) rozkaz przed kontaktem: " + S1(now) + " s | szyk " + Who(f) + " | zachowanie " + BehName(f) + " | " + prev + " -> " + oe
+                + " | od wroga " + F0(pf.Gap) + " m, P " + (pf.P.IsValid ? "jest" : "brak") + ", s od wyjscia z kontaktu " + (pf.OutAt > -999f ? S1(now - pf.OutAt) : "-") + ".");
+        }
+
+        private static void Reversal(PF pf, bool back, float x, float thr, Vec2 c, Vec2 a, float now)
+        {
+            var f = pf.F;
             _rev++;
             if (back) _revBack++;
-            string n = "?";
-            try { var ai = f.AI; n = ai != null && ai.ActiveBehavior != null ? ai.ActiveBehavior.GetType().Name : "brak"; } catch { n = "?"; }
+            string n = BehName(f);
             int k;
             RevBy.TryGetValue(n, out k);
             if (k == 0 && RevBy.Count >= MaxBeh) n = "inne";
             RevBy.TryGetValue(n, out k);
             RevBy[n] = k + 1;
+            // 333d: droga nawrotu
+            try
+            {
+                float legM = pf.Ext - pf.ExtPrev, retM = x - pf.Ext, legA = pf.XAExt - pf.XAPrevExt, retA = pf.XA - pf.XAExt;
+                if (Math.Abs(legM) < 2f * thr) _revSmall++;
+                bool medArt = Math.Abs(retA) < 0.5f * thr || retA * retM < 0f;   // srodek ciezkosci nie wrocil (albo poszedl dalej)
+                int dP = pf.AccN - pf.AccNExt;
+                float dDir = Ang(pf.DirExt, f.Direction);
+                float dDepth = f.Depth - pf.DepthExt, dWidth = f.Width - pf.WidthExt;
+                var cur = f.GetReadonlyMovementOrderReference().OrderEnum;
+                Vec2 ax = pf.Axis;
+                float offExt = pf.PExt.IsValid && pf.CExt.IsValid ? (pf.CExt - pf.PExt).DotProduct(ax) : 0f;
+                string way;
+                if (medArt) way = "artefakt mediany";
+                else if (dP > 0) way = "nowy P regula " + pf.AccRule;
+                else if (cur != MovementOrder.MovementOrderEnum.Move) way = "rozkaz " + cur;
+                else if (pf.OrdAt >= pf.ExtPrevAt && pf.Ord != MovementOrder.MovementOrderEnum.Move) way = "rozkaz " + pf.Ord;
+                else if (pf.OutAt >= pf.ExtPrevAt) way = "po kontakcie";
+                else if (!pf.P.IsValid) way = "bez P";
+                else if (pf.PExt.IsValid && offExt * legM > 0f && Math.Abs(offExt) >= 0.5f * thr) way = "przestrzelenie P";
+                else if (dDir > 20f || Math.Abs(dDepth) > Math.Max(2f, 0.3f * pf.DepthExt) || Math.Abs(dWidth) > Math.Max(3f, 0.3f * pf.WidthExt)) way = "obrot / przestawienie szyku";
+                else way = "P bez zmian";
+                int[] w;
+                if (!RevWay.TryGetValue(way, out w))
+                {
+                    if (RevWay.Count >= MaxWays) way = "inne";
+                    if (!RevWay.TryGetValue(way, out w)) { w = new int[2]; RevWay[way] = w; }
+                }
+                w[0]++;
+                if (back) w[1]++;
+                if (_revLog >= MaxRevLines) return;
+                _revLog++;
+                var sb = new StringBuilder(640);
+                sb.Append("AI bitwy (333) nawrot: ").Append(S1(now)).Append(" s | szyk ").Append(Who(f)).Append(" | zachowanie ").Append(n)
+                  .Append(" | ").Append(back ? "w tyl" : "naprzod").Append(", droga ").Append(way)
+                  .Append(" | mediana: odcinek ").Append(S1(legM)).Append(" m w ").Append(S1(pf.ExtAt - pf.ExtPrevAt)).Append(" s, powrot ").Append(S1(retM))
+                  .Append(" m w ").Append(S1(now - pf.ExtAt)).Append(" s (prog ").Append(S1(thr)).Append(" m)")
+                  .Append(" | srodek ciezkosci: odcinek ").Append(S1(legA)).Append(" m, powrot ").Append(S1(retA)).Append(" m, mediana - srodek ").Append(S1(c.Distance(a))).Append(" m")
+                  .Append(" | P: ");
+                if (pf.P.IsValid)
+                    sb.Append("zmian od ekstremum ").Append(dP).Append(", przyjec razem ").Append(pf.AccN).Append(", ostatnia regula ").Append(pf.AccRule)
+                      .Append(pf.AccSg > 0 ? " naprzod" : pf.AccSg < 0 ? " wstecz" : " w bok").Append(' ').Append(S1(now - pf.AccAt)).Append(" s temu, mediana - P na osi teraz ")
+                      .Append(S1((c - pf.P).DotProduct(ax))).Append(" / w ekstremum ").Append(S1(offExt)).Append(" m");
+                else sb.Append("brak");
+                sb.Append("; cel gry - P na osi ")
+                  .Append(pf.T.IsValid && pf.P.IsValid ? S1((pf.T - pf.P).DotProduct(ax)) : "-").Append(" m (").Append(pf.TAt > -999f ? S1(now - pf.TAt) : "-").Append(" s temu)")
+                  .Append(" | rozkaz ostatni ").Append(pf.Ord).Append(' ').Append(pf.OrdAt > -999f ? S1(now - pf.OrdAt) : "-").Append(" s temu, teraz ").Append(cur)
+                  .Append(", pozycja rozkazu - mediana na osi ").Append(S1((f.OrderPosition - c).DotProduct(ax))).Append(" m")
+                  .Append(" | od wyjscia z kontaktu ").Append(pf.OutAt > -999f ? S1(now - pf.OutAt) : "-").Append(" s, od wroga ").Append(F0(pf.Gap)).Append(" m")
+                  .Append(" | kierunek szyku od ekstremum ").Append(F0(dDir)).Append(" st (do osi wroga ").Append(F0(Ang(f.Direction, ax))).Append(" st), FacingOrder ")
+                  .Append(FacName(pf.Fac)).Append(pf.FacExt != pf.Fac ? " (w ekstremum " + FacName(pf.FacExt) + ")" : "").Append(", ArrangementOrder ").Append(ArrName(pf.Arr))
+                  .Append(pf.ArrExt != pf.Arr ? " (w ekstremum " + ArrName(pf.ArrExt) + ")" : "")
+                  .Append(" | glebokosc ").Append(S1(pf.DepthExt)).Append(" -> ").Append(S1(f.Depth)).Append(" m, szerokosc ").Append(S1(pf.WidthExt)).Append(" -> ")
+                  .Append(S1(f.Width)).Append(" m.");
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e)
+            {
+                _stum++;
+                RoutHold.Stumble(RoutHold.SiteDoctrine, "Pendulum333.Nawrot", e);
+            }
         }
 
         // ------------------------------------------------------------ segment linii "AI bitwy (333)"
@@ -434,7 +683,34 @@ namespace Armoury
                     sb.Append(kv.Key).Append(' ').Append(kv.Value);
                 }
             }
-            sb.Append("), wejsc w kontakt ").Append(_contactIn).Append(" (w tym przez konnice wroga ").Append(_contactCav).Append(')')
+            sb.Append("), wejsc w kontakt ").Append(_contactIn).Append(" (w tym przez konnice wroga ").Append(_contactCav).Append(')');
+            // 333d: diagnostyka (bez '|' w srodku - wyrazenie A333 w sprawdz_logi)
+            sb.Append("; 333d: nawroty srodka ciezkosci ").Append(_revA).Append(" (w tyl ").Append(_revABack).Append("), nawrotow z odcinkiem < 2 progi ").Append(_revSmall)
+              .Append(", drogi ");
+            if (RevWay.Count == 0) sb.Append('-');
+            else
+            {
+                bool fw = true;
+                foreach (var kv in RevWay)
+                {
+                    if (!fw) sb.Append(", ");
+                    fw = false;
+                    sb.Append(kv.Key).Append(' ').Append(kv.Value[0]).Append(" (w tyl ").Append(kv.Value[1]).Append(')');
+                }
+            }
+            sb.Append(", rozkazy nie-Move przed kontaktem ");
+            if (NonMoveBy.Count == 0) sb.Append('-');
+            else
+            {
+                bool fn = true;
+                foreach (var kv in NonMoveBy)
+                {
+                    if (!fn) sb.Append(", ");
+                    fn = false;
+                    sb.Append(kv.Key).Append(' ').Append(kv.Value);
+                }
+            }
+            sb.Append(" (zmian na nie-Move ").Append(_ordChg).Append("), zmiany FacingOrder ").Append(_facChg).Append(", ArrangementOrder ").Append(_arrChg)
               .Append(" | rozkazy Move przed kontaktem ").Append(_seen).Append(": wstecz zatrzymane ").Append(_backHeld).Append(", wstecz dozwolone S4 ").Append(_backS4)
               .Append(", wstecz po zmianie zachowania ").Append(_backBeh).Append(", naprzod wstrzymane po cofnieciu ").Append(_fwdHeld).Append(", szykow zatrzymanych ")
               .Append(HeldForms.Count)

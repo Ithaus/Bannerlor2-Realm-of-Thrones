@@ -70604,6 +70604,8 @@ M204_RX = {
                        r"kontakt (-|[\d.]+ s), wynik (.+?) po ([\d.]+) s \| wolnej jazdy wroga (\d+) \(szykow (\d+)\)$"),
 }
 M204_ERR = re.compile(r"^ERROR in HorsePursuit\b")
+# 333 (J204-3): zerwanie poscigu 333 przy strefie armii strzelca (HorsePursuit.Bait333.cs) - epizod 204 konczy sie wtedy 'inne', a to poprawne zakonczenie
+M204_Z333 = re.compile(r"^AI bitwy \(333\) zerwanie: strzelec (\S+) \((?:AI|gracz)\) (\d+) m od strefy swojej armii")
 M204_TEND291 = re.compile(r"\(w tym pudla/przelot \d+, wrecz (\d+), pudel razem (\d+)\)")   # 291 (J204-1)
 # linie kontrolne - napisy jak w kodzie C# (HorsePursuit.Hunt.cs HuntWrite / StartEp / Contact / EndEp, HorsePursuit.HuntTest.cs TestPick / TestEnd / HuntTestStep)
 M204_TEST = {
@@ -70724,7 +70726,7 @@ def m204jazda_selftest():
 
 def m204jazda_collect(logp):
     """Strumieniowo: bitwy polowe NB2, linie 204 (bitwa, epizody, test), ERROR in HorsePursuit."""
-    D = {"field": 0, "lines": [], "starts": [], "contacts": [], "ends": [], "tstarts": [], "tnone": [], "tends": [], "err": [], "bad": []}
+    D = {"field": 0, "lines": [], "starts": [], "contacts": [], "ends": [], "tstarts": [], "tnone": [], "tends": [], "err": [], "bad": [], "z333": []}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             mt = TS.match(ln.rstrip("\n"))
@@ -70734,6 +70736,11 @@ def m204jazda_collect(logp):
                 continue
             if s.startswith("ERROR in ") and M204_ERR.match(s):
                 D["err"].append(s[:200])
+                continue
+            if s.startswith("AI bitwy (333) zerwanie: "):
+                mz = M204_Z333.match(s)
+                if mz:
+                    D["z333"].append(mz.group(1))
                 continue
             if not s.startswith("Jazda na strzelca (204)"):
                 continue
@@ -70778,6 +70785,7 @@ def m204jazda_rows(rep, D):
         cont = [m.group(6) for _, m in te if m.group(6) != "-"]
         ok_end = [m.group(1) for _, m in D["ends"] if m.group(3) in har and m.group(1) in ("padl od jezdzcow", "odpedzony")]
         cont_lines = [m for _, m in D["contacts"] if m.group(4) in har]
+        z333 = [w for w in D.get("z333", []) if w in har]   # 333: zerwanie przy strefie armii nekajacego = poprawny koniec epizodu (jazda wraca)
         base = f"nekajacych {len(ts)} ({', '.join(har[:3])}), linii konca testu {len(te)}, strzalow {sh}, wolnej jazdy wroga {free}"
         if not te:
             ok1 = ok2 = ok3 = False
@@ -70803,13 +70811,14 @@ def m204jazda_rows(rep, D):
             else:
                 ok1 = det >= 1 and mp >= 1
             ok2 = ep >= 1 and rid >= min(2, free)
-            ok3 = bool(cont) or bool(ok_end) or bool(cont_lines)
+            ok3 = bool(cont) or bool(ok_end) or bool(cont_lines) or bool(z333)
         rep.add("J204-1: wykrycie strzalow nekajacego (takze pudla / przelot)", f"{base}; wykryc {det}, w tym pudla/przelot {mp}",
                 ">= 1 wykrycie, w tym >= 1 pudlo albo przelot (przy >= 3 strzalach i wolnej jezdzie wroga); 291: >= 1 wykrycie pociskiem (bez ciosow), pudlo/przelot "
                 ">= 1 albo bez pudel", ok1)
         rep.add("J204-2: odpowiedz jazdy (epizod, jezdzcy)", f"epizodow {ep}, jezdzcow {rid}", f">= 1 epizod i jezdzcow >= min(2, wolnej jazdy {free})", ok2)
-        rep.add("J204-3: kontakt albo wynik padl / odpedzony", f"kontakt {', '.join(cont) or '-'}; koncow padl od jezdzcow / odpedzony {len(ok_end)}; linii kontaktu {len(cont_lines)}",
-                "kontakt albo epizod zakonczony 'padl od jezdzcow' / 'odpedzony'", ok3)
+        rep.add("J204-3: kontakt albo wynik padl / odpedzony", f"kontakt {', '.join(cont) or '-'}; koncow padl od jezdzcow / odpedzony {len(ok_end)}; linii kontaktu {len(cont_lines)}; "
+                f"zerwan 333 przy strefie armii nekajacego {len(z333)}",
+                "kontakt albo epizod zakonczony 'padl od jezdzcow' / 'odpedzony' albo zerwanie 333 przy strefie armii nekajacego", ok3)
     # J204-4: szyki gracza nigdy
     pl = [int(RX["player"].search(s).group(1)) for s in lines if RX["player"].search(s)]
     rep.add("J204-4: jezdzcy / lucznicy z szyku gracza", f"{sum(pl)} (linii {len(pl)})", "0", None if not pl else sum(pl) == 0)
@@ -70880,18 +70889,28 @@ def m204jazda_synth():
                 .replace("| potkniecia jazda 0 (wypadli 0).", "| potkniecia jazda 3 (wypadli 1).")
                 .replace("najwiecej z jednego szyku 2, limit 2", "najwiecej z jednego szyku 9, limit 2")
                 .replace("koszt passu sr. 0.150 / max 1.250 ms", "koszt passu sr. 0.150 / max 40.000 ms"))
+    # 333: epizod zerwany przy strefie armii nekajacego (koniec 'inne', bez kontaktu) - J204-3 TAK; zerwanie innego strzelca - NIE
+    end_inne = T["end1"].replace("koniec: padl od jezdzcow", "koniec: inne").replace("kontakt 6.5 s", "kontakt -")
+    z333_line = ("AI bitwy (333) zerwanie: strzelec vlandian_horse_archer#211 (AI) 5 m od strefy swojej armii (prog 10 m) | cala grupa wraca: jezdzcow 5 | "
+                 "zerwanie nr 1 tego strzelca | ponowny poscig dopiero 100 m od strefy przez 3 s, po 60 s.")
+    tend_z = ("Jazda na strzelca (204) TEST koniec: strzalow 10, wykryc 6 (w tym pudla/przelot 1), epizodow 2, jezdzcow 5, kontakt -, wynik zwolniony po 180 s "
+              "po 180.0 s | wolnej jazdy wroga 6 (szykow 1)")
     bad_tend = ("Jazda na strzelca (204) TEST koniec: strzalow 9, wykryc 2 (w tym pudla/przelot 0), epizodow 0, jezdzcow 0, kontakt -, wynik zwolniony po 120 s "
                 "po 120.0 s | wolnej jazdy wroga 6 (szykow 1)")
     runs = {
         "good": [nb2, T["tstart"], T["start"], T["contact1"], T["end1"], T["tend"], T["line"]],
         "bad": [nb2, T["tstart"], bad_tend, bad_line, "ERROR in HorsePursuit.JazdaCel: NullReferenceException"],
         "nohar": [nb2, T["tnone"], T["line"]],
+        "z333": [nb2, T["tstart"], T["start"], end_inne, z333_line, tend_z, T["line"]],
+        "z333inny": [nb2, T["tstart"], T["start"], end_inne, z333_line.replace("vlandian_horse_archer#211", "inny_jezdziec#1"), tend_z, T["line"]],
         "empty": ["Armoury: inna linia"],
     }
     exp = {
         "good": {"J204-0": "TAK", "J204-1": "TAK", "J204-2": "TAK", "J204-3": "TAK", "J204-4": "TAK", "J204-5": "TAK", "J204-6": "INFO", "J204-7": "TAK", "J204-8": "TAK"},
         "bad": {"J204-1": "NIE", "J204-2": "NIE", "J204-3": "NIE", "J204-4": "NIE", "J204-5": "NIE", "J204-7": "NIE", "J204-8": "NIE"},
         "nohar": {"J204-0": "TAK", "J204-1": "INFO", "J204-2": "INFO", "J204-3": "INFO", "J204-5": "TAK", "J204-7": "TAK", "J204-8": "TAK"},
+        "z333": {"J204-2": "TAK", "J204-3": "TAK"},
+        "z333inny": {"J204-3": "NIE"},
         "empty": {"J204-0": "INFO", "J204-1": "INFO", "J204-4": "INFO", "J204-5": "INFO", "J204-7": "INFO", "J204-8": "INFO"},
     }
     tmp = tempfile.mkdtemp(prefix="m204_")
