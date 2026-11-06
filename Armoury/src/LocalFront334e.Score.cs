@@ -120,6 +120,7 @@ namespace Armoury
             _dAsk.Clear(); _dM0.Clear();
             _dOpts.Clear(); _dScoreN = _dZero = _dUp = _dDown = _dScaUndo = _dDefLow = _dDefFort = _dHomeCap = _dNoSnap = _dArmyRaidOffers = _dArmyRaidLog = _dArmyRaidVeto = 0;
             _dArmyRaidSaid.Clear();
+            _dGather = _dGatherOk = 0; _dGatherRatio = 0;
         }
 
         // ================================================================ latki (SessionStart)
@@ -300,14 +301,20 @@ namespace Armoury
             float m = 1f, undo = 1f;
             try
             {
+                // 340 (b): q w jednej mierze - nasza sila jak sila wroga w ZFor (PartyBase.EstimatedStrength): druzyna, armia, przy zbiorce - z kandydatami gry
+                // (ThinkParamsCache.PossibleArmyMembersUponArmyCreation); gra podaje __3 w swojej mierze (GetTotalLandStrengthWithFollowers + GetCustomStrength oblezenia)
+                float o3 = __3;
+                bool gath = false;
                 long w0 = Ts();
                 double q = -1;
                 KAsk ka = null;
                 lock (_lk)
                 {
                     long t1 = Ts();
+                    int g0 = GcN();
                     _dWaitT += t1 - w0;   // 334f (Z0): czekanie na zamek poza kosztem
                     if (!SnapFresh) { _dNoSnap++; return; }   // bez migawki z dzis - stara gra (nie q = 0)
+                    if (__1 != Army.ArmyTypes.Defender && S != null && S.LocalOneMeasure340) o3 = OurO(p, __1, __3, out gath);   // 340 (b), w koszcie
                     _dScoreN++;
                     ka = KA(k);
                     if (__1 == Army.ArmyTypes.Besieger)
@@ -327,10 +334,11 @@ namespace Armoury
                                 {
                                     float first; double ally;
                                     double z = ZFor(t, k, p, our + SiegeDays, out first, out ally);
-                                    q = Ratio(z, __3 + ally);
+                                    q = Ratio(z, o3 + ally);
                                     m = SiegeMult(q, cur);
+                                    if (gath) { _dGather++; if (m > 0f) _dGatherOk++; if (__3 > 0f) _dGatherRatio += o3 / __3; }
                                     double qk;
-                                    if (m > 0f && KBlocked(k, t, p, __3, our, out qk)) { m = 0f; q = qk; ka.Blocked++; }   // 334g: po odstapieniu krolestwa - miara odwrotu
+                                    if (m > 0f && KBlocked(k, t, p, o3, our, out qk)) { m = 0f; q = qk; ka.Blocked++; }   // 334g: po odstapieniu krolestwa - miara odwrotu
                                     Asked(ka, t, q);
                                     if (m == 0f) { ka.QZero++; if (ka.MinQ < 0 || q < ka.MinQ) { ka.MinQ = q; ka.MinT = t.StringId; } }
                                 }
@@ -351,7 +359,7 @@ namespace Armoury
                                 int men; StrOf(p, out men);
                                 float first; double ally;
                                 double z = ZFor(t, k, p, our + RaidDays(t.SettlementHitPoints, men), out first, out ally);
-                                q = Ratio(z, __3 + ally);
+                                q = Ratio(z, o3 + ally);
                                 m = RaidMult(q);
                                 Asked(ka, t, q);
                             }
@@ -384,11 +392,67 @@ namespace Armoury
                         o[__1 == Army.ArmyTypes.Raider ? 0 : 1]++;
                     }
                     _dQ++;
-                    Cost(TMs(Ts() - t1));
+                    Cost(TMs(Ts() - t1), GcN() != g0, __1 == Army.ArmyTypes.Besieger ? PBes : __1 == Army.ArmyTypes.Raider ? PRaid : PDef);
                 }
                 __result *= m * undo;
             }
             catch (Exception e) { Stumble("ScorePost", e); }
+        }
+
+        private static int _dGather, _dGatherOk; private static double _dGatherRatio;
+
+        // 340 (a): pamiec OurO - ta sama druzyna ocenia w jednej mysli dziesiatki celow (klucz: druzyna, godzina, rodzaj - armia / sama / zbiorka)
+        [ThreadStatic] private static MobileParty _ooP;
+        [ThreadStatic] private static int _ooH, _ooK;
+        [ThreadStatic] private static float _ooV;
+        [ThreadStatic] private static bool _ooG;
+
+        /// <summary>340 (b): nasza sila w mierze ZFor (PartyBase.EstimatedStrength, jak wrog): wodz armii - wszystkie druzyny armii (czlonkowie w drodze tez - ZFor pomija
+        /// ich jako ta sama grupe); zbiorka (Besieger, WillGatherAnArmy w ThinkParamsCache) - druzyna + kandydaci gry z CanLordCreateArmy; inaczej druzyna. 0 albo wyjatek -
+        /// miara gry (game). gath - ocena z przyszla armia.</summary>
+        private static float OurO(MobileParty p, Army.ArmyTypes at, float game, out bool gath)
+        {
+            gath = false;
+            try
+            {
+                var a0 = p.Army;
+                int kind = a0 != null ? (a0.LeaderParty == p ? 1 : 2) : 3;
+                if (kind == 3 && at == Army.ArmyTypes.Besieger) { var pt0 = p.ThinkParamsCache; if (pt0 != null && pt0.WillGatherAnArmy) kind = 4; }
+                int hh = NowH;
+                if (ReferenceEquals(_ooP, p) && _ooH == hh && _ooK == kind) { gath = _ooG; return _ooV > 0f ? _ooV : game; }
+                float v = OurOCore(p, at, out gath);
+                _ooP = p; _ooH = hh; _ooK = kind; _ooV = v; _ooG = gath;
+                return v > 0f ? v : game;
+            }
+            catch { gath = false; return game; }
+        }
+
+        private static float OurOCore(MobileParty p, Army.ArmyTypes at, out bool gath)
+        {
+            gath = false;
+            {
+                var a = p.Army;
+                float o = 0f;
+                if (a != null && a.LeaderParty == p)
+                {
+                    foreach (var x in a.Parties) if (x != null && x.IsActive && x.Party != null) o += x.Party.EstimatedStrength;
+                }
+                else
+                {
+                    o = p.Party != null ? p.Party.EstimatedStrength : 0f;
+                    if (a == null && at == Army.ArmyTypes.Besieger)
+                    {
+                        var pt = p.ThinkParamsCache;
+                        if (pt != null && pt.WillGatherAnArmy)
+                        {
+                            var mm = pt.PossibleArmyMembersUponArmyCreation;
+                            if (mm != null)
+                                foreach (var x in mm) if (x != null && x != p && x.IsActive && x.Party != null) { o += x.Party.EstimatedStrength; gath = true; }
+                        }
+                    }
+                }
+                return o;
+            }
         }
 
         /// <summary>Cofniecie mnoznikow SCA zastapionych przez q - tylko w oknie (q &lt;= 0.8; warunki 1:1 z dekompilacji StrategicTargetScoreModel, te same pomocniki SCA;
@@ -461,6 +525,7 @@ namespace Armoury
                 {
                     if (!SnapFresh) return false;
                     long t1 = Ts();
+                    int g0 = GcN();
                     float our = OurDays(leader, st);
                     if (our < 0f) return false;
                     float first; double ally;
@@ -469,7 +534,7 @@ namespace Armoury
                     double qk = -1;
                     bool kb = q <= SiegeBanQ && KBlocked(k, st, leader, o, our, out qk);   // 334g: po odstapieniu krolestwa - miara odwrotu
                     if (kb) q = qk;
-                    Cost(TMs(Ts() - t1));
+                    Cost(TMs(Ts() - t1), GcN() != g0, PBk);
                     if (q > SiegeBanQ) { _dBkVeto++; if (src != "model") _dBkVetoFallback++; return true; }
                 }
             }
@@ -500,6 +565,7 @@ namespace Armoury
             var k = party.MapFaction as Kingdom;
             if (k == null) return;
             // jedzenie jak gra dla rabunku (srednia dni armii >= prog modelu)
+            long mf0 = Ts();   // 340 (a): wywolania gry (jedzenie, sila modelu) - "model gry (poza)", jak ocena celu
             try
             {
                 int days = party.GetNumDaysForFoodToLast(), n = 1;
@@ -507,6 +573,7 @@ namespace Armoury
                 if ((float)days / n < Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForRaid) return;
             }
             catch { return; }
+            finally { _modelT += Ts() - mf0; }
             if (_raidRange < 0f) _raidRange = 5f * Campaign.Current.GetAverageDistanceBetweenClosestTwoTownsWithNavigationType(MobileParty.NavigationType.Default);
             float range = _raidRange;
             var pos = party.GetPosition2D;
@@ -524,8 +591,10 @@ namespace Armoury
             }
             if (cand.Count == 0) return;
             cand.Sort((a, b) => a.Value.CompareTo(b.Value));
+            long ms0 = Ts();
             float strength = party.GetTotalLandStrengthWithFollowers(false);   // sila dla modelu gry (jego miara)
-            int men; lock (_lk) StrOf(party, out men);
+            _modelT += Ts() - ms0;
+            int men; { long w_ = Ts(); lock (_lk) { _tWait += Ts() - w_; StrOf(party, out men); } }
             // 334g: sila do q ta sama miara co wrog w ZFor (EstimatedStrength calej armii - czlonkowie w drodze tez: ZFor pomija ich jako ta sama grupe)
             float qStr = 0f;
             foreach (var ap in army.Parties) if (ap != null && ap.IsActive && ap.Party != null) qStr += PStr(ap.Party);
@@ -538,8 +607,10 @@ namespace Armoury
                 if (WarFront334.VetoedFor334e(k, v, out why)) { _dArmyRaidVeto++; continue; }   // teatr Polnocy / Wysp, 274, 326b - ThinkPost (Last) idzie po wetach
                 tried++;
                 double q;
+                long w1 = Ts();
                 lock (_lk)
                 {
+                    _tWait += Ts() - w1;
                     if (!SnapFresh || Blocked(party, v)) continue;
                     float our = OurDays(party, v);
                     if (our < 0f) continue;
@@ -563,8 +634,10 @@ namespace Armoury
             }
             if (bestV == null || !(bestS > 0f)) return;
             pt.AddBehaviorScore((new AIBehaviorData(bestV, AiBehavior.RaidSettlement, bestNav, false, bestPort, false), bestS));
+            long w2 = Ts();
             lock (_lk)
             {
+                _tWait += Ts() - w2;
                 _dArmyRaidOffers++;
                 if (bestS > best && _dArmyRaidSaid.Add(party.StringId + "|" + bestV.StringId) && _dArmyRaidLog < 30 && S != null && S.LogEnabled)
                 {

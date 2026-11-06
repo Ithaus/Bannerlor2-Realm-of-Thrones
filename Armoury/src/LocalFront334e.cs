@@ -113,7 +113,12 @@ namespace Armoury
             if (h == _hvH) return;
             _hvH = h;
             if (_fList.Count > 0) Array.Clear(_war, 0, _war.Length);
-            _fIdx.Clear(); _fList.Clear(); _agg.Clear();
+            _fIdx.Clear(); _fList.Clear();
+            // 340 (a): sumy i wpisy celu wracaja do puli (bez nowych obiektow co godzine - mniej smieci dla GC)
+            foreach (var g in _agg.Values) if (_aggPool.Count < 4096) _aggPool.Add(g);
+            _agg.Clear();
+            foreach (var x in _th.Values) if (_thPool.Count < 2048) _thPool.Add(x);
+            _th.Clear();
             if (_lv.Count > 6000) _lv.Clear();
         }
 
@@ -233,6 +238,20 @@ namespace Armoury
         // ================================================================ 334f: koszt - liczniki czasu (Stopwatch.GetTimestamp, bez obiektow)
         private static long Ts() { return System.Diagnostics.Stopwatch.GetTimestamp(); }
         private static double TMs(long ticks) { return ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency; }
+        /// <summary>340 (a): licznik odsmiecan GC (pokolenie 0 liczy tez 1 i 2) - okno pomiaru, w ktorym przeszlo GC, idzie do osobnego licznika (pauza GC
+        /// zatrzymuje wszystkie watki zarzadzane - takze nasze okno, choc to nie nasza praca).</summary>
+        private static int GcN() { return GC.CollectionCount(0); }
+        // 340 (a): sciezki kosztu (ms bez okien z GC): ocena Besieger, Raider, Defender, BK weto, sad oblezenia, mysl poza obozem (armie lupia, Zelazni, rabunek przerwany)
+        internal const int PBes = 0, PRaid = 1, PDef = 2, PBk = 3, PJudge = 4, PField = 5;
+        private static readonly string[] PathName = { "Besieger", "Raider", "Defender", "BK", "sad", "pole" };
+        private static readonly double[] _dPath = new double[6];
+        private static readonly int[] _dPathN = new int[6];
+        private static double _hMsGc, _dMsAllSum, _dMsAllMax, _dGcMs;
+        private static int _dGcWin;
+        [ThreadStatic] private static long _tWait;   // 340 (a): czekanie na zamek w mysli poza obozem (ThinkField) - poza kosztem, jak ScorePost
+        /// <summary>340 (a): zamek z pomiarem czekania (mysl poza obozem). Para z Ul().</summary>
+        private static void Lk() { long w = Ts(); System.Threading.Monitor.Enter(_lk); _tWait += Ts() - w; }
+        private static void Ul() { System.Threading.Monitor.Exit(_lk); }
         private static long _dWaitT, _dListT, _dAggT, _dScoutT, _dModelT, _dDailyT, _dAggN, _dAggHit, _dChk, _dDiv;
         private static string _dDivNote;
         [ThreadStatic] private static long _modelT;   // czas modelu gry w mysli poza obozem (ThinkField odejmuje)
@@ -269,6 +288,7 @@ namespace Armoury
                 _snap = new Snap(); _anch = new Settlement[0]; _ports = new Settlement[0];
                 _tl.Clear(); _live.Clear(); _scout.Clear(); _canonH = int.MinValue;
                 _lv.Clear(); _road.Clear(); _agg.Clear(); _fIdx.Clear(); _fList.Clear(); Array.Clear(_war, 0, _war.Length); _hvH = int.MinValue;
+                _th.Clear(); _thPool.Clear(); _aggPool.Clear(); _gA = null; _gP = null;
                 _dStum = _sStum = 0; _errSites.Clear();
                 ZeroCost();
                 ResetScore(); ResetSiege(); ResetDefence(); ResetLog();
@@ -279,18 +299,26 @@ namespace Armoury
         {
             _dDist = _dQ = _dLiveUsed = 0; _hMs = _dMsSum = _dMsMax = 0; _hHour = -1; _dHours = 0;
             _dRoadHit = _dWaitT = _dListT = _dAggT = _dScoutT = _dModelT = _dDailyT = _dAggN = _dAggHit = _dChk = _dDiv = 0; _dDivNote = null;
+            _hMsGc = _dMsAllSum = _dMsAllMax = _dGcMs = 0; _dGcWin = 0; _dThN = 0;
+            Array.Clear(_dPath, 0, _dPath.Length); Array.Clear(_dPathN, 0, _dPathN.Length);
         }
 
-        /// <summary>Czas zapytania miary do kosztu godziny (wolajacy trzyma _lk).</summary>
-        private static void Cost(double ms)
+        /// <summary>Czas zapytania miary do kosztu godziny (wolajacy trzyma _lk). 340 (a): gc - w oknie przeszlo odsmiecanie (licznik osobny: "z GC"), path - sciezka.</summary>
+        private static void Cost(double ms, bool gc, int path)
         {
             int h = NowH;
             if (h != _hHour)
             {
-                if (_hHour >= 0) { _dMsSum += _hMs; if (_hMs > _dMsMax) _dMsMax = _hMs; _dHours++; }
-                _hHour = h; _hMs = 0;
+                if (_hHour >= 0)
+                {
+                    _dMsSum += _hMs; if (_hMs > _dMsMax) _dMsMax = _hMs; _dHours++;
+                    double all = _hMs + _hMsGc; _dMsAllSum += all; if (all > _dMsAllMax) _dMsAllMax = all;
+                }
+                _hHour = h; _hMs = 0; _hMsGc = 0;
             }
-            _hMs += ms;
+            if (gc) { _hMsGc += ms; _dGcWin++; _dGcMs += ms; }
+            else _hMs += ms;
+            if (path >= 0 && path < _dPath.Length) { if (!gc) _dPath[path] += ms; _dPathN[path]++; }
         }
 
         private static float Spd(MobileParty mp)
@@ -345,15 +373,80 @@ namespace Armoury
             else
             {
                 var arr = u.AtSea && _ports.Length > 0 ? _ports : _anch;
+                var grid = u.AtSea && _ports.Length > 0 ? _gP : _gA;
                 Settlement best = null; float bd = float.MaxValue;
-                for (int i = 0; i < arr.Length; i++)
-                {
-                    float d = u.Pos.DistanceSquared(arr[i].GetPosition2D);
-                    if (d < bd) { bd = d; best = arr[i]; }
-                }
+                if (grid != null) best = Nearest(grid, u.Pos, out bd);   // 340 (a): siatka zamiast przegladu ~1000 osad przy kazdej jednostce na zywo
+                else
+                    for (int i = 0; i < arr.Length; i++)
+                    {
+                        float d = u.Pos.DistanceSquared(arr[i].GetPosition2D);
+                        if (d < bd) { bd = d; best = arr[i]; }
+                    }
                 u.Anchor = best; u.Off = best != null ? (float)Math.Sqrt(bd) : 0f; u.AnchorPort = u.AtSea && best != null && best.HasPort;
             }
             return u;
+        }
+
+        // ================================================================ 340 (a): siatka kotwic (najblizsza osada bez przegladu wszystkich)
+        private sealed class AGrid { public float X0, Y0, Cell; public int W, H; public Settlement[][] C; public Vec2[][] P; }
+        private static AGrid _gA, _gP;
+
+        private static AGrid MakeGrid(Settlement[] arr)
+        {
+            if (arr == null || arr.Length == 0) return null;
+            float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+            var pos = new Vec2[arr.Length];
+            for (int i = 0; i < arr.Length; i++)
+            {
+                var p = arr[i].GetPosition2D; pos[i] = p;
+                if (p.x < x0) x0 = p.x; if (p.y < y0) y0 = p.y; if (p.x > x1) x1 = p.x; if (p.y > y1) y1 = p.y;
+            }
+            float span = Math.Max(1f, Math.Max(x1 - x0, y1 - y0));
+            int n = 48;
+            var g = new AGrid { X0 = x0, Y0 = y0, Cell = span / n + 0.001f, W = n + 1, H = n + 1 };
+            var tmp = new List<int>[g.W * g.H];
+            for (int i = 0; i < arr.Length; i++)
+            {
+                int cx = Math.Min(g.W - 1, Math.Max(0, (int)((pos[i].x - x0) / g.Cell))), cy = Math.Min(g.H - 1, Math.Max(0, (int)((pos[i].y - y0) / g.Cell)));
+                int k = cy * g.W + cx;
+                if (tmp[k] == null) tmp[k] = new List<int>(4);
+                tmp[k].Add(i);
+            }
+            g.C = new Settlement[tmp.Length][]; g.P = new Vec2[tmp.Length][];
+            for (int k = 0; k < tmp.Length; k++)
+            {
+                if (tmp[k] == null) continue;
+                g.C[k] = new Settlement[tmp[k].Count]; g.P[k] = new Vec2[tmp[k].Count];
+                for (int j = 0; j < tmp[k].Count; j++) { g.C[k][j] = arr[tmp[k][j]]; g.P[k][j] = pos[tmp[k][j]]; }
+            }
+            return g;
+        }
+
+        /// <summary>Najblizsza osada siatki (pierscienie komorek; koniec, gdy najblizsza znaleziona jest blizej niz nastepny pierscien). d2 - kwadrat odleglosci.</summary>
+        private static Settlement Nearest(AGrid g, Vec2 p, out float d2)
+        {
+            d2 = float.MaxValue;
+            Settlement best = null;
+            int cx = (int)Math.Floor((p.x - g.X0) / g.Cell), cy = (int)Math.Floor((p.y - g.Y0) / g.Cell);
+            int maxR = Math.Max(g.W, g.H) + Math.Max(Math.Abs(cx), Math.Abs(cy)) + 1;
+            for (int r = 0; r <= maxR; r++)
+            {
+                for (int y = cy - r; y <= cy + r; y++)
+                {
+                    if (y < 0 || y >= g.H) continue;
+                    bool edge = y == cy - r || y == cy + r;
+                    for (int x = cx - r; x <= cx + r; x += (edge || r == 0) ? 1 : 2 * r)
+                    {
+                        if (x < 0 || x >= g.W) continue;
+                        var cs = g.C[y * g.W + x];
+                        if (cs == null) continue;
+                        var ps = g.P[y * g.W + x];
+                        for (int j = 0; j < cs.Length; j++) { float d = p.DistanceSquared(ps[j]); if (d < d2) { d2 = d; best = cs[j]; } }
+                    }
+                }
+                if (best != null) { float lim = r * g.Cell; if (d2 <= lim * lim) break; }
+            }
+            return best;
         }
 
         /// <summary>Doby drogi jednostki do osady (kotwica + droga gry miedzy osadami; czesc ladowa / morska wlasnymi predkosciami). -1 - brak drogi.</summary>
@@ -447,6 +540,7 @@ namespace Armoury
                     if (_avgLand <= 0.05f) _avgLand = 1f;
                     if (_avgSea <= 0.05f) _avgSea = _avgLand;
                     _anch = anch.ToArray(); _ports = ports.ToArray();
+                    try { _gA = MakeGrid(_anch); _gP = MakeGrid(_ports); } catch (Exception e) { _gA = _gP = null; Stumble("BuildSnap.grid", e); }
                     foreach (var mp in MobileParty.AllLordParties)
                     {
                         try { var u = MakeUnit(mp); if (u != null) { sn.Units.Add(u); sn.ByLead[mp] = u; } }
@@ -457,7 +551,7 @@ namespace Armoury
                     {
                         try { var u = MakeUnit(main); if (u != null) { sn.Units.Add(u); sn.ByLead[main] = u; } } catch (Exception e) { Stumble("BuildSnap.main", e); }
                     }
-                    _snap = sn; _tl.Clear(); _live.Clear(); _scout.Clear(); _agg.Clear();
+                    _snap = sn; _tl.Clear(); _live.Clear(); _scout.Clear(); _agg.Clear(); _th.Clear();
                     // 3.3: sila w polu krolestw (swoi + koalicja 274) w zasiegu 8.02 doby od wlasnych twierdz - lustro F334 dla SCA
                     if (ScaLocalOn)
                     foreach (var k in Kingdom.All)
@@ -572,8 +666,10 @@ namespace Armoury
         {
             int h = NowH;
             KeyValuePair<int, HashSet<MobileParty>> kv;
-            if (_scout.TryGetValue(p, out kv) && kv.Key == h) return kv.Value;
-            var set = new HashSet<MobileParty>();
+            bool had = _scout.TryGetValue(p, out kv);
+            if (had && kv.Key == h) return kv.Value;
+            var set = had && kv.Value != null ? kv.Value : new HashSet<MobileParty>();   // 340 (a): zbior z poprzedniej godziny uzyty ponownie
+            set.Clear();
             long st0 = Ts();
             try
             {
@@ -612,16 +708,65 @@ namespace Armoury
         }
 
         // ================================================================ 334f (Z2): sumy wrogow na godzine dla pary (cel, krolestwo)
+        // 340 (a): wspolne wpisy celu na godzine (TH: stan druzyny, zamiar, droga na zywo - liczone raz na cel, nie raz na pare (cel, krolestwo)) i pula obiektow sum
         private struct AE { public float D, S; public MobileParty L; public bool Live; }
         private sealed class Agg
         {
-            public float[] ED; public float[] ES; public double[] ECum;          // wrogowie po dobach (zamiar - zywa droga, plotka - 2 x doby), sumy narastajace
+            public float[] ED = new float[16]; public float[] ES = new float[16]; public double[] ECum = new double[16]; public int EN;   // wrogowie po dobach, sumy narastajace (EN - liczba)
             public readonly Dictionary<MobileParty, int> Rumor = new Dictionary<MobileParty, int>();   // wrog z plotki -> indeks (poprawka zwiadu)
             public readonly List<float> AD = new List<float>(), AS = new List<float>(); public readonly List<MobileParty> AL = new List<MobileParty>();   // nasi idacy na cel
             public HashSet<MobileParty> Leads; public IFaction Tf; public int Ti;
+            public void Reset() { EN = 0; Rumor.Clear(); AD.Clear(); AS.Clear(); AL.Clear(); Leads = null; Tf = null; Ti = -1; }
+            public void Cap(int n) { if (ED.Length < n) { int c = Math.Max(n, ED.Length * 2); ED = new float[c]; ES = new float[c]; ECum = new double[c]; } }
         }
         private static readonly Dictionary<SK, Agg> _agg = new Dictionary<SK, Agg>();
+        private static readonly List<Agg> _aggPool = new List<Agg>();
         private static readonly List<AE> _aeTmp = new List<AE>(512);
+        private static readonly Comparison<AE> AeByD = (x, y) => x.D.CompareTo(y.D);
+
+        /// <summary>Wpis celu na godzine: jednostka z listy celu, ktora jest aktywna, ma frakcje i nie stoi w celu. Tg - widoczny zamiar na cel, Go - idzie na cel
+        /// (oblega / marsz oblezenia); LiveOk - droga na zywo (LD, LS) policzona.</summary>
+        private struct TE { public MobileParty L; public IFaction F; public int Fi; public float RD, RS, LD, LS; public bool Tg, Go, LiveOk; }
+        private sealed class TH { public TE[] E = new TE[32]; public int N; public HashSet<MobileParty> Leads; }
+        private static readonly Dictionary<Settlement, TH> _th = new Dictionary<Settlement, TH>();
+        private static readonly List<TH> _thPool = new List<TH>();
+        private static long _dThN;
+
+        /// <summary>Wpisy celu z widoku godziny (raz na cel i godzine). Wolajacy trzyma _lk.</summary>
+        private static TH THOf(Settlement t, out bool keep)
+        {
+            HourView();
+            keep = SnapFresh;
+            TH x;
+            if (_th.TryGetValue(t, out x)) return x;
+            var l = ListOf(t);
+            int nPool = _thPool.Count;
+            if (nPool > 0) { x = _thPool[nPool - 1]; _thPool.RemoveAt(nPool - 1); } else x = new TH();
+            x.N = 0; x.Leads = l.Leads;
+            if (x.E.Length < l.E.Count) x.E = new TE[Math.Max(l.E.Count, x.E.Length * 2)];
+            for (int i = 0; i < l.E.Count; i++)
+            {
+                var e = l.E[i];
+                var lead = e.U.Lead;
+                if (lead == null) continue;
+                var v = LVOf(e.U);
+                if (!v.Active || v.F == null || v.Cur == t) continue;   // kazda galaz starego przegladu pomijala stojacych w celu
+                var te = new TE { L = lead, F = v.F, Fi = v.Fi, RD = e.D * 2f, RS = e.U.Str, Tg = TargetsV(v, t), Go = GoingToV(v, t) };   // plotka: wiesc + marsz
+                if (te.Tg || te.Go)
+                {
+                    var u = LiveUnit(lead);
+                    if (u != null)
+                    {
+                        float d = DaysTo(u, t);
+                        if (d >= 0f) { te.LiveOk = true; te.LD = d; te.LS = u.Str; }
+                    }
+                }
+                x.E[x.N++] = te;
+            }
+            if (keep) _th[t] = x;
+            _dThN++;
+            return x;
+        }
 
         /// <summary>Sumy (cel, krolestwo) z widoku godziny; pamiec do konca godziny. Wolajacy trzyma _lk.</summary>
         private static Agg AggOf(Settlement t, IFaction a)
@@ -630,53 +775,33 @@ namespace Armoury
             var key = new SK(t, a);
             Agg g;
             if (_agg.TryGetValue(key, out g)) { _dAggHit++; return g; }
-            var l = ListOf(t);
             long t0 = Ts();
-            g = new Agg { Leads = l.Leads };
-            bool keep = SnapFresh;   // bez migawki z dzis - lista pusta, sumy nie zapamietane (jak ListOf)
+            bool keep;
+            var th = THOf(t, out keep);   // bez migawki z dzis - lista pusta, sumy nie zapamietane (jak ListOf)
+            int nPool = _aggPool.Count;
+            if (nPool > 0 && keep) { g = _aggPool[nPool - 1]; _aggPool.RemoveAt(nPool - 1); } else g = new Agg();
+            g.Reset();
+            var en = _aeTmp; en.Clear();
             int ai = FI(a);
             var tf = t.MapFaction; int ti = FI(tf);
-            g.Tf = tf; g.Ti = ti;
-            var en = _aeTmp; en.Clear();
-            for (int i = 0; i < l.E.Count; i++)
+            for (int i = 0; i < th.N; i++)
             {
-                var e = l.E[i];
-                var lead = e.U.Lead;
-                if (lead == null) continue;
-                var v = LVOf(e.U);
-                if (!v.Active || v.F == null) continue;
-                bool enemy = FoeI(a, ai, v.F, v.Fi, tf, ti);
-                bool ours = !enemy && !War(a, ai, v.F, v.Fi) && Same(a, ai, v.F, v.Fi);
-                if (!enemy && !ours) continue;
+                var e = th.E[i];
+                bool enemy = FoeI(a, ai, e.F, e.Fi, tf, ti);
                 if (enemy)
                 {
-                    if (TargetsV(v, t))
-                    {
-                        var u = LiveUnit(lead);
-                        if (u == null || v.Cur == t) continue;
-                        float d = DaysTo(u, t);
-                        if (d < 0f) continue;
-                        en.Add(new AE { D = d, S = u.Str, L = lead, Live = true });
-                    }
-                    else
-                    {
-                        if (v.Cur == t) continue;
-                        en.Add(new AE { D = e.D * 2f, S = e.U.Str, L = lead, Live = false });   // wiesc + marsz
-                    }
+                    if (e.Tg) { if (e.LiveOk) en.Add(new AE { D = e.LD, S = e.LS, L = e.L, Live = true }); }
+                    else en.Add(new AE { D = e.RD, S = e.RS, L = e.L, Live = false });
+                    continue;
                 }
-                else
-                {
-                    if (!GoingToV(v, t)) continue;
-                    var u = LiveUnit(lead);
-                    if (u == null || v.Cur == t) continue;
-                    float d = DaysTo(u, t);
-                    if (d < 0f) continue;
-                    g.AD.Add(d); g.AS.Add(u.Str); g.AL.Add(lead);
-                }
+                if (!e.Go || !e.LiveOk) continue;
+                if (War(a, ai, e.F, e.Fi) || !Same(a, ai, e.F, e.Fi)) continue;
+                g.AD.Add(e.LD); g.AS.Add(e.LS); g.AL.Add(e.L);
             }
-            en.Sort((x, y) => x.D.CompareTo(y.D));
+            en.Sort(AeByD);
             int n = en.Count;
-            g.ED = new float[n]; g.ES = new float[n]; g.ECum = new double[n];
+            g.Cap(n);
+            g.Leads = th.Leads; g.Tf = tf; g.Ti = ti;
             double c = 0;
             for (int i = 0; i < n; i++)
             {
@@ -684,6 +809,7 @@ namespace Armoury
                 g.ED[i] = x.D; g.ES[i] = x.S; c += x.S; g.ECum[i] = c;
                 if (!x.Live) g.Rumor[x.L] = i;
             }
+            g.EN = n;
             en.Clear();
             if (keep) _agg[key] = g;
             _dAggN++;
@@ -691,9 +817,9 @@ namespace Armoury
             return g;
         }
 
-        private static int Upper(float[] a, float w)
+        private static int Upper(float[] a, int n, float w)
         {
-            int lo = 0, hi = a.Length;
+            int lo = 0, hi = n;
             while (lo < hi) { int m = (lo + hi) >> 1; if (a[m] <= w) lo = m + 1; else hi = m; }
             return lo;
         }
@@ -706,7 +832,7 @@ namespace Armoury
             var g = AggOf(t, a);
             HashSet<MobileParty> sc = p != null ? ScoutOf(p) : null;
             first = float.MaxValue; ally = 0;
-            int k = Upper(g.ED, w);
+            int k = Upper(g.ED, g.EN, w);
             double z = k > 0 ? g.ECum[k - 1] : 0;
             List<int> rem = null;
             if (sc != null && sc.Count > 0)

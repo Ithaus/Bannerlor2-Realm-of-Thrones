@@ -229,7 +229,7 @@ namespace Armoury
         /// <summary>Najblizszy przyjazny port (twierdza z portem, swoja frakcja albo nie w wojnie; nieoblezona; bez portow odwiedzonych przez te partie w ostatniej dobie).
         /// food > 0 - miasto, ktorego rynek ma co najmniej food jednostek jedzenia; gdy zadnego - najblizsze z jakimkolwiek jedzeniem. Bez pierwszenstwa wlasnych portow
         /// (po recenzji 334: Zelazni na ladzie Polnocy kupuja w najblizszym neutralnym porcie, nie wracaja na Pyke).</summary>
-        private static Settlement NearestPort(MobileParty party, float food, int hour)
+        internal static Settlement NearestPort(MobileParty party, float food, int hour)
         {
             var pos = party.GetPosition2D;
             var f = party.MapFaction;

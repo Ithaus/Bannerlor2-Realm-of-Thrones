@@ -78,6 +78,8 @@ namespace Armoury
         private sealed class Guard { public Agent A; public Man Of; public float Since; public Vec2 Set = Vec2.Invalid; public bool Reached; }
 
         private static bool _gKey;
+        private static bool _gCharge340;   // 340 (e): klucz CommanderGuardCharging340 - szyki w szarzy jako ostatnie wyjscie (cel wycofania i straz)
+        private static int _gAttacked340, _gChargeDest340, _gChargeGuard340;
         private static readonly List<Guard> Guards = new List<Guard>();
         private static readonly HashSet<Agent> GuardSet = new HashSet<Agent>();
         private static readonly List<KeyValuePair<float, Agent>> _gCand = new List<KeyValuePair<float, Agent>>();
@@ -122,6 +124,7 @@ namespace Armoury
         private static void GuardBegin(Settings c)
         {
             _gKey = _key && c != null && c.CommandersKeepCommandPost;
+            _gCharge340 = _gKey && c.CommanderGuardCharging340;
             HuntTestBegin(c);
         }
 
@@ -138,6 +141,7 @@ namespace Armoury
             Array.Clear(GKindSend, 0, GKindSend.Length);
             Array.Clear(GEnd, 0, GEnd.Length);
             _gGuardEps = _gGuardMen = _gGuardReached = _gGuardNone = 0;
+            _gAttacked340 = _gChargeDest340 = _gChargeGuard340 = 0;
             Array.Clear(GGuardEnd, 0, GGuardEnd.Length);
             _gLoneSum = _gPresentSum = _gLoneMax = 0f;
             _gLoneWho = "-";
@@ -242,7 +246,7 @@ namespace Armoury
             if (side < 0) return false;
             Vec2 c = a.Position.AsVec2;
             if (!c.IsValid) return false;
-            int allies5 = 0, allies10 = 0, foes10 = 0;
+            int allies5 = 0, allies10 = 0, foes10 = 0, onHim = 0;
             float best = float.MaxValue, fr2 = FoeRadius * FoeRadius, ar2 = AllyRadius * AllyRadius;
             try
             {
@@ -262,7 +266,11 @@ namespace Armoury
                     if (x.IsRunningAway || SurvivalMode.InPanic(x)) continue;
                     bool rider = x.MountAgent != null;
                     if (d2 > fr2) { if (!rider || !Coming(x, a, c)) continue; }   // jezdziec 10-20 m tylko, gdy jedzie na niego (nie przejazd obok)
-                    else foes10++;
+                    else
+                    {
+                        foes10++;
+                        try { if (ReferenceEquals(x.GetTargetAgent(), a)) onHim++; } catch { }
+                    }
                     foes++;
                     if (rider) riders++;
                     if (d2 < best) { best = d2; att = x; }
@@ -270,7 +278,10 @@ namespace Armoury
             }
             finally { _gNear.Clear(); }
             // recenzja 335: swoich liczymy w 10 m (dowodca 3 m za linia w zwarciu nie jest "zagrozony"); warunek samotnego 149 (0 swoich w 5 m, >= 2 wrogow w 10 m) zostaje
-            return foes > 0 && (allies10 < foes || (allies5 == 0 && foes10 >= 2));
+            if (foes > 0 && (allies10 < foes || (allies5 == 0 && foes10 >= 2))) return true;
+            // 340 (e): wrog w 10 m ma dowodce za cel, a swoich tylu co wrogow - remis go nie chroni (test lowcy 334f: kontakt 3 m przy swoim 5.6 m, bez reakcji)
+            if (_gCharge340 && onHim > 0 && allies10 <= foes) { _gAttacked340++; return true; }
+            return false;
         }
 
         /// <summary>Wrog jedzie na dowodce: ma go za cel albo predkosc > 2 m/s w 45 st. od kierunku na niego.</summary>
@@ -308,6 +319,17 @@ namespace Armoury
             }
             catch { }
             return false;
+        }
+
+        /// <summary>340 (e): czlowiek w walce wrecz (cel w 3 m) - bez warunku szarzy szyku.</summary>
+        private static bool InMelee(Agent x)
+        {
+            try
+            {
+                var tg = x.GetTargetAgent();
+                return tg != null && tg.IsActive() && tg.Position.AsVec2.DistanceSquared(x.Position.AsVec2) <= MeleeBusy * MeleeBusy;
+            }
+            catch { return false; }
         }
 
         /// <summary>PassOne przy kluczu TAK (bez rany): zagrozenie (start / trwa - krok jak samotny 149) albo stanowisko dowodcy. false = zwykla droga 149.</summary>
@@ -383,15 +405,19 @@ namespace Armoury
             float d1 = float.MaxValue, d2 = float.MaxValue;
             var fl = t.FormationsIncludingSpecialAndEmpty;
             int nf = fl != null ? fl.Count : 0;
-            for (int pass = 0; pass < 2 && f1 == null; pass++)
+            int passes = _gCharge340 ? 4 : 2;   // 340 (e): przejscia 2-3 - szyki w szarzy (cala druzyna w szarzy - 334f "bez miejsca")
+            bool chargeUsed = false;
+            for (int pass = 0; pass < passes && f1 == null; pass++)
             {
+                bool wantCharge = pass >= 2;
+                chargeUsed = wantCharge;
                 for (int j = 0; j < nf; j++)
                 {
                     var f = fl[j];
                     if (f == null || f.CountOfUnits < 3) continue;
                     try { if (f.GetReadonlyMovementOrderReference().OrderEnum == MovementOrder.MovementOrderEnum.Retreat) continue; } catch { }
-                    if (Charging(f) || !f.CurrentPosition.IsValid) continue;
-                    if (pass == 0 && !Foot(f)) continue;                      // najpierw piesi; jazda dopiero, gdy pieszego szyku brak
+                    if (Charging(f) != wantCharge || !f.CurrentPosition.IsValid) continue;
+                    if ((pass % 2) == 0 && !Foot(f)) continue;                // najpierw piesi; jazda dopiero, gdy pieszego szyku brak
                     float d = f.CurrentPosition.DistanceSquared(c);
                     if (d < d1) { f2 = f1; d2 = d1; f1 = f; d1 = d; }
                     else if (d < d2) { f2 = f; d2 = d; }
@@ -403,7 +429,7 @@ namespace Armoury
                 if (f == null) break;
                 Vec2 p = f.CurrentPosition;
                 int r;
-                if (!wounded)
+                if (!wounded && !chargeUsed)   // 340: szyk w szarzy - tylko tyl (srodek to zwarcie)
                 {
                     r = Check(a, m, p, out wp);
                     if (r == CheckLimit) { kind = KindLimit; return Vec2.Invalid; }
@@ -413,7 +439,7 @@ namespace Armoury
                 {
                     r = Check(a, m, p, out wp);
                     if (r == CheckLimit) { kind = KindLimit; return Vec2.Invalid; }
-                    if (r == CheckOk) { kind = KNear; return p; }
+                    if (r == CheckOk) { kind = KNear; if (chargeUsed) _gChargeDest340++; return p; }
                 }
             }
             wp = WorldPosition.Invalid;
@@ -559,14 +585,17 @@ namespace Armoury
 
         // ------------------------------------------------------------ straz
 
-        private static bool GuardOk(Agent x, Agent hero, Team t)
+        private static bool GuardOk(Agent x, Agent hero, Team t) { return GuardOk(x, hero, t, false); }
+
+        /// <summary>340 (e): charge - drugie przejscie strazy: czlowiek z szyku w szarzy dozwolony, walka wrecz (cel w 3 m) dalej wyklucza.</summary>
+        private static bool GuardOk(Agent x, Agent hero, Team t, bool charge)
         {
             if (x == null || ReferenceEquals(x, hero) || !x.IsHuman || x.IsHero || x.IsMainAgent || !x.IsAIControlled || !x.IsActive()) return false;
             if (!ReferenceEquals(x.Team, t) || x.IsRunningAway || SurvivalMode.InPanic(x) || SurvivalMode.OrderedRetreat(x, x.CommonAIComponent) || Withdrawing(x)) return false;
             if (GuardSet.Contains(x) || HorsePursuit.Banner(x) || HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x)) return false;
             var f = x.Formation;
             if (f == null || f.HasPlayerControlledTroop || HorsePursuit.PlayerForm(f)) return false;
-            if (Busy(x)) return false;                                                                                   // recenzja 335: nie z walki wrecz ani z szarzy
+            if (charge ? InMelee(x) : Busy(x)) return false;                                                           // recenzja 335: nie z walki wrecz ani z szarzy (340: szarza w 2. przejsciu)
             try { if ((x.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) != 0) return false; } catch { return false; }   // cudza pozycja skryptowa
             return true;
         }
@@ -586,13 +615,17 @@ namespace Armoury
             try
             {
                 m.GetNearbyAgents(c, GuardReach, _gNear);
-                for (int i = 0; i < _gNear.Count; i++)
+                for (int pass = 0; pass < (_gCharge340 ? 2 : 1) && _gCand.Count == 0; pass++)   // 340 (e): 2. przejscie - szyki w szarzy (bez walki wrecz)
                 {
-                    var x = _gNear[i];
-                    if (!GuardOk(x, a, t)) continue;
-                    float d = x.Position.AsVec2.Distance(c);
-                    if (x.MountAgent != null) d *= 0.5f;
-                    _gCand.Add(new KeyValuePair<float, Agent>(d, x));
+                    for (int i = 0; i < _gNear.Count; i++)
+                    {
+                        var x = _gNear[i];
+                        if (!GuardOk(x, a, t, pass == 1)) continue;
+                        float d = x.Position.AsVec2.Distance(c);
+                        if (x.MountAgent != null) d *= 0.5f;
+                        _gCand.Add(new KeyValuePair<float, Agent>(d, x));
+                    }
+                    if (pass == 1 && _gCand.Count > 0) _gChargeGuard340++;
                 }
             }
             finally { _gNear.Clear(); }
@@ -912,6 +945,7 @@ namespace Armoury
             sb.Append(" | los dowodcow i glow rodu: zabici ").Append(_gCmdKilled).Append(", nieprzytomni ").Append(_gCmdKo).Append(" (w zagrozeniu ").Append(_gFateThreat)
               .Append(", na stanowisku ").Append(_gFatePost).Append(", inaczej ").Append(_gFateOther).Append(')');
             sb.Append(" | test lowcy ").Append(_htOn ? "TAK" : "NIE (" + _htWhy + ")");
+            sb.Append(" | 340: atak na dowodce (remis swoich) ").Append(_gAttacked340).Append(", cel za szykiem w szarzy ").Append(_gChargeDest340).Append(", straz z szarzy ").Append(_gChargeGuard340);
             sb.Append(" | potkniecia 335 ").Append(_gStum).Append('.');
             Log.Info(sb.ToString());
         }

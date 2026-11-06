@@ -96013,10 +96013,12 @@ W335_TEST = re.compile(
     r"\| zblizenie 20 m (?:([\d.]+) s|-), zagrozenie wodza (?:([\d.]+) s|-), kontakt 3 m (?:([\d.]+) s|-), najblizszy swoj przy kontakcie (?:([\d.]+) m|-) "
     r"\| straz wezwana (\d+), dotarla (\d+) \| wodz (zyje|zabity|nieprzytomny|uszedl), samotnie \(bez swojego w \d+ m\) ([\d.]+) s\.")
 W335_ERR = re.compile(r"ERROR in (LordEscort\.Guard335|HeroCaution\.(Lowca335|Straz335|Linia335|Pass\b))")
+# 340 (e): segment bitwy - atak na dowodce przy remisie swoich, cel wycofania za szykiem w szarzy, straz z szarzy (wszystkie szyki w szarzy)
+W335_340 = re.compile(r"\| 340: atak na dowodce \(remis swoich\) (\d+), cel za szykiem w szarzy (\d+), straz z szarzy (\d+)")
 
 
 def wodz335_collect(logp):
-    D = {"bat": [], "batBad": 0, "day": [], "dayBad": 0, "start": [], "test": [], "testBad": 0, "testNone": 0, "err": 0}
+    D = {"bat": [], "batBad": 0, "day": [], "dayBad": 0, "start": [], "test": [], "testBad": 0, "testNone": 0, "err": 0, "s340": []}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             if "(335)" not in line and "ERROR in" not in line:
@@ -96033,6 +96035,9 @@ def wodz335_collect(logp):
                 for k, v in zip(W335_BK, m.groups()):
                     r[k] = v if k in ("kind", "key", "loneWho") else (float(v) if k in ("lone", "present", "loneMax") else int(v))
                 D["bat"].append(r)
+                m4 = W335_340.search(line)
+                if m4:
+                    D["s340"].append(tuple(int(x) for x in m4.groups()))
             elif "Ochrona wodza (335): mapa dzien " in line:
                 m = W335_DAY.search(line)
                 if not m:
@@ -96130,6 +96135,10 @@ def wodz335_rows(rep, D):
         rep.add("W335-7: test lowcy - wodz reaguje", f"zblizen {len(near)}, z zagrozeniem i straza {len(ok)} (straz dotarla {sum(t['reached'] for t in near)})",
                 "kazde zblizenie: zagrozenie i straz albo swoj <= 5 m przy kontakcie", len(ok) == len(near))
     rep.add("W335-8: test lowcy - los wodza", ", ".join(f"{t['fate']} ({t['why']}, {t['sec']:.0f} s)" for t in T), "INFO (Jeff: wodz chroniony - oczekiwane 'zyje')", None)
+    if D.get("s340"):
+        x = D["s340"]
+        rep.add("W335-9: 340 - atak na dowodce przy remisie, cel za szykiem w szarzy, straz z szarzy", f"bitew {len(x)}: {sum(a[0] for a in x)} / {sum(a[1] for a in x)} / {sum(a[2] for a in x)}",
+                "INFO", None)
 
 
 def wodz335_bat(key="TAK", thr=2, sends=2, geps=2, lone="10.0", present="300.0", stum=0, cmd=3):
@@ -96275,7 +96284,7 @@ L334E_TEST = re.compile(r"Sila lokalna \(334e\): test - (T\d+) (.*) - wynik (TAK
 L334E_SNAP = re.compile(r"Sila lokalna \(334e\): migawka \| dzien (\d+) \| jednostek (\d+) \| zalog (\d+) \| zwiad na zywo (\d+) \| celow w pamieci (\d+) \| ([\d.]+) ms")
 L334E_COST = re.compile(
     r"Sila lokalna \(334e\): koszt \| dzien (\d+) \| drog (\d+) \| zapytan (\d+) \(ocen (\d+), bez migawki (\d+)\) \| ms suma ([\d.]+) / godzin (\d+) = srednio ([\d.]+) "
-    r"/ maks godziny ([\d.]+) \| potkniecia (\d+) \(sesja (\d+)\) .*?, odstapienia (\d+).*? \| ping-pong: powrot w blokadzie (\d+), przydzial (\d+)\.")
+    r"/ maks godziny ([\d.]+) \| potkniecia (\d+) \(sesja (\d+)\) .*?, odstapienia (\d+).*? \| ping-pong: powrot w blokadzie (\d+), przydzial (\d+)(?:\.| \| )")
 L334E_KING = re.compile(
     r"Sila lokalna \(334e\): krolestwo \| dzien (\d+) \| (\S+) \(.*?\) \| pole: (\d+) jednostek, (\d+) ludzi, (\d+) sily \(zalogi 0\) \| wrog w polu (\d+) "
     r"\| cele \(pytane\): wsie (\d+) \(okno (\d+)\), twierdze (\d+) \(okno (\d+)\) \| opcje Raider/Besieger >0: (\d+)/(\d+) "
@@ -96294,15 +96303,26 @@ L334E_DIV = re.compile(r"kontrola ZFor (\d+), rozbieznosci (\d+)")
 # 334g: koszt razem z naszymi wywolaniami modelu gry (W1); pary (krolestwo, osada) odstapienie -> ponowne oblezenie
 L334E_TOT = re.compile(r"razem z modelem gry srednio ([\d.]+) ms/h")
 L334E_SPAIR = re.compile(r"Sila lokalna \(334e\): oblezenie start \| dzien (\d+) \| (\S+) \(.*?\) -> (\S+) \(")
+# 340: koszt bez okien z GC (srednio / maks w linii) + osobno z GC; sciezki; odsiecz w zasiegu po odstapieniu; zbiorka w naszej mierze; Zelazni - powody i dzwignie
+L334E_GC = re.compile(r"\| z GC \(340\): srednio ([\d.]+) / maks godziny ([\d.]+), okien z GC (\d+) \(([\d.]+) ms\)")
+L334E_PATH = re.compile(r"\| sciezki ms \(340\): (.*?) \| wpisy celu")
+L334E_KREL = re.compile(r"odsiecz w zasiegu po odstapieniu \(340\): weta (\d+), zwolnione (\d+), pamieci (\d+)")
+L334E_GATH = re.compile(r"zbiorka nasza miara \(340\): ocen (\d+), w oknie/srodku (\d+), nasza/gry (\d+\.\d+|-)")
+L334E_IRON340 = re.compile(r"\[340: bez zbiorki - (.*?); zbiorka w porcie (\d+), armia na morzu trzyma cel (\d+), pierwszenstwo kanonu (\d+)\]")
+L334E_OB5DEP = re.compile(r"Odsiecz \(OB5\): dzien (\d+) \|.*?\| zastepca wladcy \(340\): opcji (\d+)")
 L334E_RPAIR = re.compile(r"Sila lokalna \(334e\): odstapienie \| dzien (\d+) \| (\S+) \(.*?\) \| [^|]*\((\S+)\) \| oboz")
 
 
 def lokalna334e_collect(logp):
     D = {"start": [], "startBad": 0, "test": [], "snap": [], "cost": [], "costBad": 0, "king": [], "kingBad": 0, "ret": [], "stay": 0, "stum": 0,
-         "sstart": [], "rstart": [], "iron": [], "div": [], "ironLines": 0, "spair": [], "rpair": []}
+         "sstart": [], "rstart": [], "iron": [], "div": [], "ironLines": 0, "spair": [], "rpair": [], "musterLines": 0, "ob5dep": []}
     with open(logp, encoding="utf-8", errors="replace") as fh:
-        for line in fh:
+        for li, line in enumerate(fh):
             if L334E_P not in line:
+                if "zastepca wladcy (340)" in line:
+                    mo = L334E_OB5DEP.search(line)
+                    if mo:
+                        D["ob5dep"].append((int(mo.group(1)), int(mo.group(2))))
                 continue
             if L334E_P + "start |" in line:
                 m = L334E_START.search(line)
@@ -96325,11 +96345,22 @@ def lokalna334e_collect(logp):
                     continue
                 g = m.groups()
                 mt = L334E_TOT.search(line)
+                mg = L334E_GC.search(line)
+                mk = L334E_KREL.search(line)
+                mga = L334E_GATH.search(line)
+                mpa = L334E_PATH.search(line)
                 D["cost"].append({"day": int(g[0]), "avg": float(g[7]), "max": float(g[8]), "stum": int(g[9]), "ret": int(g[11]), "pp": int(g[12]), "sw": int(g[13]),
-                                  "tot": float(mt.group(1)) if mt else None})
+                                  "tot": float(mt.group(1)) if mt else None,
+                                  "gcAvg": float(mg.group(1)) if mg else None, "gcMax": float(mg.group(2)) if mg else None, "gcWin": int(mg.group(3)) if mg else 0,
+                                  "gcMs": float(mg.group(4)) if mg else 0.0, "paths": mpa.group(1) if mpa else None,
+                                  "krel": (int(mk.group(1)), int(mk.group(2)), int(mk.group(3))) if mk else None,
+                                  "gath": (int(mga.group(1)), int(mga.group(2)), mga.group(3)) if mga else None})
                 mi = L334E_IRON.search(line)
                 if mi:
-                    D["iron"].append({"day": int(g[0]), "off": int(mi.group(1)), "exits": mi.group(3), "minq": (float(mi.group(4)) if mi.group(4) and mi.group(4) != "-" else None)})
+                    m3 = L334E_IRON340.search(line)
+                    D["iron"].append({"day": int(g[0]), "off": int(mi.group(1)), "exits": mi.group(3), "minq": (float(mi.group(4)) if mi.group(4) and mi.group(4) != "-" else None),
+                                      "why": m3.group(1) if m3 else None, "muster": int(m3.group(2)) if m3 else 0, "keepSea": int(m3.group(3)) if m3 else 0,
+                                      "prio": int(m3.group(4)) if m3 else 0})
                 md = L334E_DIV.search(line)
                 if md:
                     D["div"].append((int(g[0]), int(md.group(1)), int(md.group(2))))
@@ -96346,20 +96377,22 @@ def lokalna334e_collect(logp):
                     D["ret"].append((int(m.group(1)), m.group(2), float(m.group(3)), float(m.group(5)) if m.group(5) else None))
                 mp = L334E_RPAIR.search(line)
                 if mp:
-                    D["rpair"].append((int(mp.group(1)), mp.group(3), mp.group(2)))
+                    D["rpair"].append((int(mp.group(1)), mp.group(3), mp.group(2), li))
             elif L334E_P + "oblezenie start |" in line:
                 m = L334E_SSTART.search(line)
                 if m:
                     D["sstart"].append((int(m.group(1)), m.group(2), float(m.group(3)), bool(m.group(5))))
                 mp = L334E_SPAIR.search(line)
                 if mp:
-                    D["spair"].append((int(mp.group(1)), mp.group(2), mp.group(3)))
+                    D["spair"].append((int(mp.group(1)), mp.group(2), mp.group(3), li))
             elif L334E_P + "rabunek start |" in line:
                 m = L334E_RSTART2.search(line)
                 if m:
                     D["rstart"].append((int(m.group(1)), m.group(2), m.group(3)))
             elif L334E_P + "Zelazni oblegaja |" in line:
                 D["ironLines"] += 1
+            elif L334E_P + "Zelazni zbiorka w porcie |" in line:
+                D["musterLines"] += 1
             elif L334E_P + "zostaje w obozie |" in line:
                 D["stay"] += 1
             elif L334E_P + "potkniecie " in line:
@@ -96411,6 +96444,14 @@ def lokalna334e_rows(rep, D):
         rep.add("L12: koszt - srednio < 5 ms / h, maks godziny < 50 ms, potkniecia 0 (od 2. doby; 1. doba INFO)", f"dob {len(cw)}, srednio maks {avg:.2f}, godzina maks {mx:.1f}, potkniecia {stum}, linii potkniec {D['stum']}"
                 + (f"; 1. doba srednio {c1[0]['avg']:.2f}, maks {c1[0]['max']:.1f}" if c1 and len(co) > 1 else "")
                 + (f", nierozpoznane {D['costBad']}" if D["costBad"] else ""), "< 5 / < 50 / 0", avg < 5.0 and mx < 50.0 and stum == 0 and D["stum"] == 0 and not D["costBad"])
+        gcw = [c for c in cw if c.get("gcAvg") is not None]
+        if gcw:
+            # 340 (a): srednio / maks w linii koszt sa bez okien, w ktorych przeszlo GC (pauza GC zatrzymuje wszystkie watki - takze nasze okno); z GC - osobno, INFO
+            rep.add("L12g: koszt z oknami GC (340; pauzy odsmiecania calego procesu)", f"srednio maks {max(c['gcAvg'] for c in gcw):.2f}, godzina maks {max(c['gcMax'] for c in gcw):.1f}, "
+                    f"okien z GC {sum(c['gcWin'] for c in gcw)} ({sum(c['gcMs'] for c in gcw):.0f} ms w {len(gcw)} dobach)", "INFO", None)
+            worst = max(gcw, key=lambda c: c["avg"])
+            if worst.get("paths"):
+                rep.add("L12p: sciezki kosztu w najdrozszej dobie (340)", f"d{worst['day']}: {worst['paths']}", "INFO", None)
         tt = [c["tot"] for c in cw if c.get("tot") is not None]
         if tt:
             srt = sorted(tt)
@@ -96425,13 +96466,21 @@ def lokalna334e_rows(rep, D):
         rep.add("L15: ping-pong - powrot w blokadzie i zmiany przydzialu obrony", f"powrotow {pp}, zmian przydzialu {sw}", "0 / 0", pp == 0 and sw == 0)
         # 334g: petla odstapienie -> ponowne oblezenie tej samej (krolestwo, osada) w 3 dobach; 1 powrot INFO (odsiecz mogla odejsc), >= 2 na te sama pare - petla
         back = {}
-        for d, k, stl in D["spair"]:
-            if any(rk == k and rs == stl and 0 <= d - rd <= 3 for rd, rk, rs in D["rpair"]):
+        for d, k, stl, si in D["spair"]:
+            # 340: start PRZED odstapieniem tej samej doby (start -> sad -> odwrot) to nie powrot - liczy sie kolejnosc linii
+            if any(rk == k and rs == stl and 0 <= d - rd <= 3 and si > ri for rd, rk, rs, ri in D["rpair"]):
                 back[(k, stl)] = back.get((k, stl), 0) + 1
         nb = sum(back.values())
         loop = [f"{k} {s_}" for (k, s_), n in back.items() if n >= 2]
         rep.add("L15b: ponowne oblezenie (krolestwo, osada) w 3 dobach po odstapieniu", f"odstapien {len(D['rpair'])}, powrotow {nb}, par z petla {len(loop)}" + (f" [{', '.join(loop[:3])}]" if loop else ""),
                 "0 (1 powrot - INFO, >= 2 na pare - NIE)", False if loop else (None if nb else True))
+        kr = [c["krel"] for c in co if c.get("krel")]
+        if kr:
+            rep.add("L15c: odsiecz w zasiegu po odstapieniu (340) - weta startu / zwolnione", f"weta {sum(x[0] for x in kr)}, zwolnione {sum(x[1] for x in kr)}, pamieci maks {max(x[2] for x in kr)}", "INFO", None)
+        ga = [c["gath"] for c in co if c.get("gath")]
+        if ga:
+            rr = [float(x[2]) for x in ga if x[2] != "-"]
+            rep.add("L2g: zbiorka armii - q w naszej mierze (340)", f"ocen {sum(x[0] for x in ga)}, w oknie/srodku {sum(x[1] for x in ga)}, nasza/gry mediana " + (f"{sorted(rr)[len(rr) // 2]:.2f}" if rr else "-"), "INFO", None)
     else:
         rep.add("L12: koszt", "brak linii koszt" + (f" (nierozpoznane {D['costBad']})" if D["costBad"] else ""), "INFO", False if D["costBad"] else None)
         rep.add("L15: ping-pong", "brak linii koszt", "INFO", None)
@@ -96490,13 +96539,25 @@ def lokalna334e_rows(rep, D):
                 if mm_:
                     xs[mm_.group(1)] = xs.get(mm_.group(1), 0) + int(mm_.group(2))
         qx = xs.get("q>1", 0)
-        other = xs.get("bez zbiorki", 0) + xs.get("bez kandydatow", 0) + xs.get("bez drogi", 0)
+        # 340 (d): "bez zbiorki" liczy tez czlonkow armii (mysl czlonka) - to nie brak zbiorki
+        ws = {}
+        for x in ir:
+            for part in (x.get("why") or "").split(","):
+                mm_ = re.match(r"\s*(.+?) (\d+)\s*$", part)
+                if mm_:
+                    ws[mm_.group(1)] = ws.get(mm_.group(1), 0) + int(mm_.group(2))
+        memb = ws.get("czlonek armii", 0)
+        other = max(0, xs.get("bez zbiorki", 0) - memb) + xs.get("bez kandydatow", 0) + xs.get("bez drogi", 0)
         allq = bool(qs) and min(qs) > 1.0 and off == 0 and qx > 0 and qx > other
         rep.add("L17: Zelazni - oferty oblezen wybrzeza (IronSiege)", f"dob {len(ir)}, ofert {off}, linii 'Zelazni oblegaja' {D['ironLines']}"
-                + (f", min q {min(qs):.2f}" if qs else ", min q -") + f"; wyjscia q>1 {qx}, bez zbiorki/kandydatow/drogi {other}" + (f"; ostatnie wyjscia: {ex[-1]}" if ex else ""),
+                + (f", min q {min(qs):.2f}" if qs else ", min q -") + f"; wyjscia q>1 {qx}, bez zbiorki/kandydatow/drogi {other}" + (f"; ostatnie wyjscia: {ex[-1]}" if ex else "")
+                + (f"; 340: powody {', '.join(f'{k_} {v_}' for k_, v_ in ws.items() if v_)}, zbiorka w porcie {sum(x['muster'] for x in ir)} (linii {D['musterLines']}), "
+                   f"armia na morzu trzyma cel {sum(x['keepSea'] for x in ir)}, pierwszenstwo kanonu {sum(x['prio'] for x in ir)}" if ws or any(x.get("why") is not None for x in ir) else ""),
                 ">= 1 w biegu >= 60 dob (0 przy q > 1 wszedzie - DECYZJA)", (None if len(ir) < 60 and off == 0 else off > 0), decide=allq)
     else:
         rep.add("L17: Zelazni - oferty oblezen wybrzeza", "brak linii koszt", "INFO", None)
+    if D["ob5dep"]:
+        rep.add("L2z: OB5 - armia odsieczy zastepcy wladcy (340; korona: Tywin)", f"dob {len(D['ob5dep'])}, opcji {sum(x[1] for x in D['ob5dep'])}", "INFO", None)
     # 334f (6): linia krolestwa Polnocy (battania) - takze gdy to krolestwo gracza (tylko log)
     if KA:
         kd = sorted(set(k["day"] for k in KA))
@@ -96530,23 +96591,30 @@ def lokalna334e_line_king(d, k, wv=2, wf=1, oR=5, oB=3, stance="Neutral", raids=
             + (f" | Besieger: ocen 40, model 0 10, q>prog 5 (min q 1.10 @castle_x), blokada 0, lustro 1" if diag else "") + (" | gracz (tylko log)" if player else "") + ".")
 
 
-def lokalna334e_line_cost(d, avg="1.20", mx="9.0", stum=0, ret=0, pp=0, sw=0, iron=1, ironq="0.70", div=0, ironbz=2, tot="1.40"):
+def lokalna334e_line_cost(d, avg="1.20", mx="9.0", stum=0, ret=0, pp=0, sw=0, iron=1, ironq="0.70", div=0, ironbz=2, tot="1.40", gc=None, memb=0):
     return (L334E_P + f"koszt | dzien {d} | drog 40000 | zapytan 9000 (ocen 8000, bez migawki 0) | ms suma 28.8 / godzin 24 = srednio {avg} / maks godziny {mx} | potkniecia {stum} (sesja {stum}) "
             f"| oceny: zero 10, w gore 50, w dol 20, cofniecia SCA 5, obrona nizej 1, obrona twierdzy 0, dom zagrozony 2, BK weto 0 (zapas 0) | oblezenia: sad 30 (KONTYNUUJ 20, SRODEK 8, "
             f"NIE-ZDAZY 1, ODSTAP 1, GLOD 0), trzymane 20, bez wskrzeszania 0, kandydaci odwrotu 1, odstapienia {ret}, zostaly w obozie 0, BK stick przepuscil 0, m116 przepuscil 0 "
             f"| rabunki przerwane 0 | armie rabunek opcji 3 (weta 0) | Zelazni oblezenia opcji {iron} (weta 0) [wyjscia: zajeci 1, bez zbiorki {ironbz}, odpoczynek 0, opcja gry kanonu 0, "
-            f"bez kandydatow 0, q>1 {0 if iron else 4}, bez drogi 0, model 0 0, weto 0; min q {ironq} @castle_n (sila 5000)] | obrona: przydzialy 1, bez obrony 0, zmiany przydzialu {sw} "
+            f"bez kandydatow 0, q>1 {0 if iron else 4}, bez drogi 0, model 0 0, weto 0; min q {ironq} @castle_n (sila 5000)]"
+            + ("" if gc is None else f" [340: bez zbiorki - czlonek armii {memb}, nie glowa rodu 0, wplyw<=100 0, jedzenie 0, maly oddzial 0, najem 0, kandydaci 0 0, inne 0; zbiorka w porcie 1, "
+               f"armia na morzu trzyma cel 0, pierwszenstwo kanonu 0]")
+            + f" | obrona: przydzialy 1, bez obrony 0, zmiany przydzialu {sw} "
             f"| postawa przegladem 0 | czasy ms (334f): czekanie 0.1, listy 1.0, sumy 2.0, zwiad 0.5, model gry (poza) 3.0, linie doby (poza) 0.2 | razem z modelem gry srednio {tot} ms/h "
             f"| blokada krolestwa po odstapieniu: weta 0, aktywnych 0 | pamiec drog trafien 900 "
             f"| sumy (cel, krolestwo) budow 300, trafien 800 | kontrola ZFor 9, rozbieznosci {div} | rabunek start powtorki 0, oblezenia fabuly ROT 0 "
-            f"| ping-pong: powrot w blokadzie {pp}, przydzial {sw}.")
+            f"| ping-pong: powrot w blokadzie {pp}, przydzial {sw}"
+            + ("" if gc is None else f" | z GC (340): srednio {gc[0]} / maks godziny {gc[1]}, okien z GC 3 (40.0 ms) | sciezki ms (340): Besieger 10.0 (900), Raider 5.0 (800), Defender 1.0 (10), "
+               f"BK 2.0 (100), sad 1.0 (20), pole 3.0 (50) | wpisy celu (340) budow 200 | odsiecz w zasiegu po odstapieniu (340): weta 2, zwolnione 1, pamieci 1 "
+               f"| zbiorka nasza miara (340): ocen 40, w oknie/srodku 6, nasza/gry 1.18")
+            + ".")
 
 
 def lokalna334e_synth():
     import tempfile
     import shutil
     def run(days=62, start=None, tests="TAK", zal=0, avg="1.20", stum=0, stance="Neutral", deadopt=False, open_=True, ban=0, ironr=1, crownarm=1, retq=1.6, pp=0, think="wpieta", fantom="TAK (2/2)",
-            iron=1, ironq="0.70", div=0, north=True, stance1=None, retold=False, sstart=None, ironbz=2, day1=False, loop=0, pdead=False):
+            iron=1, ironq="0.70", div=0, north=True, stance1=None, retold=False, sstart=None, ironbz=2, day1=False, loop=0, pdead=False, gc=None, memb=0, sameday=False):
         L = [start if start is not None else lokalna334e_line_start(think=think, fantom=fantom)]
         for t in range(1, 7):
             L.append(L334E_P + f"test - T{t} probny x - wynik {tests if t == 3 else 'TAK'}.")
@@ -96561,7 +96629,12 @@ def lokalna334e_synth():
                                                ro=(0 if not open_ else (ironr if k == "sturgia" else 1)), sieges=1 if i % 5 == 0 else 0, so=(1 if (i % 5 == 0 and open_) else 0),
                                                ban=(ban if i % 5 == 0 else 0), armies=(crownarm if k == "vlandia" else 1), player=(k == "battania")))
             L.append(lokalna334e_line_cost(d, avg=("30.00" if day1 and i == 0 else avg), mx=("200.0" if day1 and i == 0 else "9.0"), stum=stum, ret=1 if i == 10 else 0, pp=pp,
-                                           iron=iron, ironq=ironq, div=div, ironbz=ironbz))
+                                           iron=iron, ironq=ironq, div=div, ironbz=ironbz, gc=gc, memb=memb))
+            # 340: start -> odstapienie tej samej doby (dwa razy w odstepie > 3 dob) - to nie petla powrotu
+            if sameday and i in (30, 40):
+                L.append(L334E_P + f"oblezenie start | dzien {d} | vlandia (Lord, armia TAK) -> town_q (Q, dragonstone) | oboz 3000 | wrog w polu 2800 | q 0.95.")
+                L.append(L334E_P + f"odstapienie | dzien {d} | town_q (Q) | Lord (vlandia) | oboz 3000 vs odsiecz 6000+zaloga 500 (q_obl 2.10, przyjazd 4.00) | q_odw 2.10 "
+                         f"| dokad castle_y (Y, 1.50 doby) | ucieczka zdazy TAK | blokada do doby {d + 1}.00, krolestwa do {d + 5}.00.")
             if sstart and i < len(sstart):
                 L.append(L334E_P + f"oblezenie start | dzien {d} | vlandia (Lord, armia TAK) -> castle_s{i} (S, battania) | oboz 3000 | wrog w polu 4000 | q {sstart[i][0]:.2f}"
                          + (" | fabula ROT (skrypt) - poza regula" if sstart[i][1] else "") + ".")
@@ -96583,11 +96656,15 @@ def lokalna334e_synth():
             "iron0": run(iron=0, ironq="0.60"), "ironq": run(iron=0, ironq="1.45"), "div": run(div=1), "north": run(north=False), "first": run(stance1="inna"),
             "retold": run(retq=1.10, retold=True), "story": run(sstart=[(2.0, True), (0.5, False), (0.4, False), (0.7, False), (0.2, False), (1.1, False)]),
             "hiq": run(sstart=[(2.0, False), (0.5, False), (0.4, False), (0.7, False), (0.2, False), (1.6, False)]),
-            "ironbz": run(iron=0, ironq="1.45", ironbz=40), "day1": run(day1=True), "loop1": run(loop=1), "loop2": run(loop=2), "pdead": run(pdead=True)}
+            "ironbz": run(iron=0, ironq="1.45", ironbz=40), "day1": run(day1=True), "loop1": run(loop=1), "loop2": run(loop=2), "pdead": run(pdead=True),
+            "gc": run(gc=("40.00", "120.0")), "gcslow": run(avg="7.50", gc=("40.00", "120.0")), "sameday": run(sameday=True),
+            "ironmemb": run(iron=0, ironq="1.45", ironbz=40, gc=("1.50", "9.0"), memb=40)}
     exp = {
         "good": {"L0": "TAK", "L0b": "TAK", "LT": "TAK", "L10": "TAK", "L12": "TAK", "L12b": "TAK", "L15": "TAK", "L4": "TAK", "L3": "TAK", "L13": "TAK", "L7": "TAK", "L1z": "TAK",
                  "L2k": "TAK", "L14": "TAK", "L17": "TAK", "L18": "TAK", "L15b": "TAK", "L12m": "INFO"},
         "ironbz": {"L17": "NIE"}, "day1": {"L12": "TAK"}, "loop1": {"L15b": "INFO"}, "loop2": {"L15b": "NIE"}, "pdead": {"L3": "TAK", "L18": "TAK"},
+        "gc": {"L12": "TAK", "L12g": "INFO", "L12p": "INFO", "L15c": "INFO", "L2g": "INFO"}, "gcslow": {"L12": "NIE"}, "sameday": {"L15b": "TAK"},
+        "ironmemb": {"L17": "DECYZJA"},
         "iron0": {"L17": "NIE"}, "ironq": {"L17": "DECYZJA"}, "div": {"L12b": "NIE"}, "north": {"L18": "NIE"}, "first": {"L4": "TAK"}, "retold": {"L14": "NIE"},
         "story": {"L7": "TAK"}, "hiq": {"L7": "NIE"},
         "fantom": {"L0": "NIE"}, "test": {"LT": "NIE"}, "zal": {"L10": "NIE"}, "slow": {"L12": "NIE"}, "stum": {"L12": "NIE"}, "stance": {"L4": "NIE"},
@@ -96618,7 +96695,8 @@ def lokalna334e_main(logp):
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
     rep.add("L334E-S: test syntetyczny (dobry 62 doby; fantom, test NIE, zalogi, koszt, potkniecie, postawa, okno bez opcji, starty poza oknem, q>1.0, Zelazni, korona, "
             "odstapienie q<=1.25, ping-pong, ThinkPost BRAK / nie zakladana, krotki bieg, zly format, log sprzed 334e; 334f: Zelazni 0 ofert / q>1 DECYZJA, rozbieznosci ZFor, "
-            "brak linii Polnocy, 1. doba postawy, q_odw, fabula ROT, q>1.25; 334g: Zelazni bez zbiorki NIE, 1. doba kosztu, petla po odstapieniu, okno gracza)", s2 or "OK", "OK", s2 is None)
+            "brak linii Polnocy, 1. doba postawy, q_odw, fabula ROT, q>1.25; 334g: Zelazni bez zbiorki NIE, 1. doba kosztu, petla po odstapieniu, okno gracza; "
+            "340: koszt bez okien GC, start i odstapienie tej samej doby, czlonkowie armii poza 'bez zbiorki')", s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("L334E-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()

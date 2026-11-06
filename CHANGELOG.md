@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 340 - poprawki po tescie 334f (55 dob) na noc/340-razem (334e/f/g + 335 + 336 + 338 - NIE WGRANE, bez autotestu po zmianie; DLL test/m340, Armoury.dll 38914c5b)
+**Problem (log at334f Armoury-2026-11-06_20-10-38.log, test przerwany po 55 dobach):** (a) L12 koszt srednio maks 35 ms/h, godzina maks 101 ms (cel < 5 / < 50); (b) L2k / B334-6
+korona z armia 36% dob, w dobach wojny z Polnoca 4/12; (c) L15b "petla" korony pod town_EW5; (d) L17 Zelazni 0 ofert oblezen wybrzeza, "bez zbiorki 145"; (e) wodz335 W335-5
+(zagrozen 8, wyslan 3, straz "bez kandydatow 4") i W335-7 (kontakt 3 m bez zagrozenia).
+**Przyczyna:** (a) baza 10-14 ms/h (sumy 100-170 ms/dobe, zwiad 30-45, listy 20-27, reszta ~100); doby 109550-565 - reszta 450-670 ms przy niezmienionej pracy (pauzy GC
+w oknach pomiaru), czekanie na zamek i wywolania gry w ArmyRaid/IronSiege liczone jako nasz czas; (b) ScorePost liczyl q z __3 gry (GetTotalLandStrengthWithFollowers +
+GetCustomStrength oblezenia) wobec EstimatedStrength wroga (nasza sila zanizona 0-30%, min q zbiorki korony 1.05-1.30); OB5 "armia wladcy" tylko k.Leader - Joffrey bez druzyny,
+Tywin nie zbieral odsieczy; (c) sprawdzarka liczyla start PRZED odstapieniem tej samej doby jako powrot; realnie start widzi odsiecz jako plotke (2 x doby poza oknem), sad - na zywo,
+blokada czasowa wygasala przy odsieczy dalej w zasiegu; (d) "bez zbiorki" liczylo czlonkow armii; lordowie Wysp na morzu (CanLordCreateArmy wymaga ladu); armia na morzu konczyla
+mysl "zajeci" (gra daje 0 - brak sasiadow); opcja gry na cel kanonu konczyla ocene i przegrywala z rabunkami; (e) NIE regresja scalenia (diff 335..HEAD w kodzie bitwy 0) -
+wszystkie szyki wodza w szarzy (RBM), 335b wykluczal szarze z celu wycofania i strazy; remis 1:1 przy ataku na wodza nie byl zagrozeniem.
+**Zmiana:** LocalFront334e.cs - koszt: okno z GC (GC.CollectionCount) osobno ("z GC (340)"), sciezki kosztu (Besieger/Raider/Defender/BK/sad/pole), wpisy celu na godzine (TH)
+wspolne dla krolestw, pula sum/wpisow, zbiory zwiadu ponownie, siatka kotwic 48x48 (najblizsza osada bez przegladu ~1000). Score.cs - OurO: q w mierze EstimatedStrength (druzyna,
+armia, zbiorka z kandydatami gry z ThinkParamsCache), pamiec na mysl, licznik "zbiorka nasza miara"; ArmyRaid - czekanie i wywolania gry poza kosztem. Siege.cs - ThinkField/Judge
+z GC i sciezka; pamiec odsieczy po odwrocie (KRel): start zakazany, dopoki odsiecz z odwrotu (zywa droga) w oknie max(dojscie + 8.02, 12.03) ma z zaloga > 1.0 x my; IronSiege:
+powody "bez zbiorki" (odczyt warunkow gry), zbiorka w porcie (wodz Wysp na morzu spelniajacy warunki zbiorki poza morzem, Wyspy bez armii, wolne druzyny w zasiegu wezwania, cel
+kanonu q <= 1.0 -> najblizszy przyjazny port, 1.05 x max(najlepsza, 0.5)), armia na morzu trzyma cel kanonu (q <= 1.25), pierwszenstwo kanonu w oknie (q <= 0.8, model > 0)
+- nie przy obronie wlasnej oblezonej twierdzy. BesiegedRelief.cs - WarLeader: armia odsieczy zastepcy, gdy wladca bez druzyny w polu (glowa najsilniejszego rodu, Clan.CurrentTotalStrength;
+korona: Tywin), linia OB5 "zastepca wladcy (340)". HeroCaution.Guard335.cs - cel wycofania za szykiem w szarzy (ostatnie wyjscie), straz z szarzy bez walki wrecz, atak na wodza przy
+remisie swoich = zagrozenie; segment bitwy "340: ...". WarFront334.Iron.cs - NearestPort internal. Klucze (domyslnie TAK, NIE = 334g): LocalOneMeasure340, LocalReliefHold340,
+IronMuster340, RelievesWarLeader340, CommanderGuardCharging340 (Settings.cs + McmSettings.cs recznie, gen_mcm nie uruchamiany - 326d/326x nietkniete).
+sprawdz_logi.py: lokalna334e - L12 bez okien GC, L12g/L12p (INFO), L15b z kolejnoscia linii (na logu 334f: TAK), L15c, L2g, L2z (INFO), L17 bez czlonkow armii + powody 340, regex
+koszt toleruje segmenty po ping-pong, synteza +4; wodz335 - W335-9 (INFO). Synteza TAK: lokalna334e, wodz335, balans334, sila336, budynki338. docs/PROJEKT-334E-SILA-LOKALNA.md sekcja 16.
+**Status:** DO SPRAWDZENIA - test 45 dob (Jeff: "45 dni starczy"): L12 < 5 / < 50 bez GC i L12g, L2k/B334-6 >= 40-50%, L15b/L15c, L17 i zbiorka w porcie, W335-5/W335-9.
+
 ## 334g - poprawki dwoch recenzji 334f (noc/334e-lokalna-sila - NIE WGRANE, bez autotestu po zmianie; DLL m334e)
 **Problem (recenzje logiki i techniczna 334f):** petla odstapienie -> ponowne oblezenie (odwrot liczy zaloge i okno 12.03, start - nie; blokada tylko druzyny na 1 dobe);
 BadStep przesuwal godzine ODSTAP przy czestych myslach (licznik stal na 1); po odwrocie r.Bad zostawal 2 (nowy wodz odstepowal od 1 mysli); q Zelaznych i armii lupiacych

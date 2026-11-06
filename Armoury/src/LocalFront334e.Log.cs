@@ -78,7 +78,7 @@ namespace Armoury
                     blocked = Blocked(lp, st);
                     if (blocked) _dSiegePingPong++;
                     double kUntil;
-                    bool afterRet = _kblock.TryGetValue(new SK(lp.MapFaction, st), out kUntil) && kUntil > CampaignTime.Now.ToDays;
+                    bool afterRet = (_kblock.TryGetValue(new SK(lp.MapFaction, st), out kUntil) && kUntil > CampaignTime.Now.ToDays) || _krel.ContainsKey(new SK(lp.MapFaction, st));
                     if (noAi) _dSiegeNoAi++;
                     float first; double ally;
                     double z = ZFor(st, lp.MapFaction, lp, SiegeDays, out first, out ally);
@@ -189,6 +189,9 @@ namespace Armoury
         {
             double sum = _dMsSum + _hMs; int hrs = _dHours + (_hHour >= 0 ? 1 : 0);
             double max = Math.Max(_dMsMax, _hMs);
+            double allSum = _dMsAllSum + _hMs + _hMsGc, allMax = Math.Max(_dMsAllMax, _hMs + _hMsGc);
+            var ps = new StringBuilder(160);
+            for (int i = 0; i < PathName.Length; i++) ps.Append(i == 0 ? "" : ", ").Append(PathName[i]).Append(' ').Append(_dPath[i].ToString("0.0", Inv)).Append(" (").Append(_dPathN[i]).Append(')');
             Log.Info(Tag + "koszt | dzien " + today + " | drog " + _dDist + " | zapytan " + _dQ + " (ocen " + _dScoreN + ", bez migawki " + _dNoSnap + ") | ms suma " + sum.ToString("0.0", Inv) + " / godzin " + hrs
                      + " = srednio " + (hrs > 0 ? (sum / hrs).ToString("0.00", Inv) : "0") + " / maks godziny " + max.ToString("0.0", Inv)
                      + " | potkniecia " + _dStum + " (sesja " + _sStum + ")"
@@ -208,7 +211,11 @@ namespace Armoury
                      + " | pamiec drog trafien " + _dRoadHit + " | sumy (cel, krolestwo) budow " + _dAggN + ", trafien " + _dAggHit
                      + " | kontrola ZFor " + (_dChk >> 7) + ", rozbieznosci " + _dDiv + (_dDivNote != null ? " [" + _dDivNote + "]" : "")
                      + " | rabunek start powtorki " + _dRaidRep + ", oblezenia fabuly ROT " + _dSiegeStory + ", bez decyzji AI " + _dSiegeNoAi
-                     + " | ping-pong: powrot w blokadzie " + _dSiegePingPong + ", przydzial " + _dDefSwitch + ".");
+                     + " | ping-pong: powrot w blokadzie " + _dSiegePingPong + ", przydzial " + _dDefSwitch
+                     + " | z GC (340): srednio " + (hrs > 0 ? (allSum / hrs).ToString("0.00", Inv) : "0") + " / maks godziny " + allMax.ToString("0.0", Inv) + ", okien z GC " + _dGcWin + " (" + _dGcMs.ToString("0.0", Inv) + " ms)"
+                     + " | sciezki ms (340): " + ps.ToString() + " | wpisy celu (340) budow " + _dThN
+                     + " | odsiecz w zasiegu po odstapieniu (340): weta " + _dKRelHold + ", zwolnione " + _dKRelFree + ", pamieci " + _krel.Count
+                     + " | zbiorka nasza miara (340): ocen " + _dGather + ", w oknie/srodku " + _dGatherOk + ", nasza/gry " + (_dGather > 0 ? (_dGatherRatio / _dGather).ToString("0.00", Inv) : "-") + ".");
         }
 
         /// <summary>Linie krolestw. 334f (L3): cele pytane i okno z tej samej miary, ktora dostala mysl AI (ScorePost: q policzone / q &lt;= 0.8, krolestwo

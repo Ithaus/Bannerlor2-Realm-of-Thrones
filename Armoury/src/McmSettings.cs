@@ -10780,6 +10780,26 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool LocalDefence334e { get; set; } = true;
 
+        [SettingPropertyBool("One Measure For Both Sides", HintText = "When an AI lord weighs a siege or a raid against the enemy hosts that can reach the place in time, his own strength is counted the same way as the enemy's - his party, his whole army, or, when he would call an army, the lords the game would call with him. Off = the game's own figure for his side", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool LocalOneMeasure340 { get; set; } = true;
+
+        [SettingPropertyBool("No Return While The Relief Is Near", HintText = "After an AI realm marches off from a siege before a stronger relief, it does not come back to the same place while that relief can still reach it in time and still outmatches it. Off = only the short ban after the retreat", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool LocalReliefHold340 { get; set; } = true;
+
+        [SettingPropertyBool("Ironborn Muster Ashore", HintText = "A captain of the Iron Islands at sea who could call his banners ashore puts into the nearest friendly port to gather them when a northern stronghold of the books (Moat Cailin, Deepwood Motte, Torrhen's Square) can be taken against the hosts that can reach it; an Ironborn host at sea keeps sailing for its stronghold, and a stronghold within reach comes before raiding. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool IronMuster340 { get; set; } = true;
+
+        [SettingPropertyBool("The Hand Leads When The King Cannot", HintText = "When a realm's ruler has no host of his own in the field (Joffrey sits in King's Landing), the head of the realm's strongest house who rides with his host - Tywin Lannister for the crown - may call the banners to relieve a besieged town or castle in his stead. Off = only the ruler himself", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool RelievesWarLeader340 { get; set; } = true;
+
+        [SettingPropertyBool("Guards From A Charging Line", HintText = "When every formation of a threatened commander is charging, he still falls back behind the nearest of them and the men of his party who are not locked in melee still run to guard him. Off = only formations that hold their ground count", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CommanderGuardCharging340 { get; set; } = true;
+
         [SettingPropertyBool("Canon Houses of the West", HintText = "As in the books, the lordly houses of the Westerlands and the Crownlands that Realm of Thrones leaves without a castle (Estren, Falwell, Jast, Moreland, Plumm, Prester, Stackspear, Buckwell, Chelsted, Hayford, Stokeworth; House Spicer stays a knightly house until the Red Wedding, as in the books) answer their liege's call with a host of their own: the Banner Kings gentry family that keeps an estate in their lands is raised to full peerage (exactly as a realm vote would grant it) and to clan tier 3, and its head leads a party raised the usual way from the villages. Once per campaign, at the first day after loading or at the start of a new game. No castles are taken from anyone. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonHouses277 { get; set; } = true;
@@ -14270,6 +14290,11 @@ namespace Armoury
             s.BkSiegeStickYields334e = BkSiegeStickYields334e;
             s.LocalRaidBreakOff334e = LocalRaidBreakOff334e;
             s.LocalDefence334e = LocalDefence334e;
+            s.LocalOneMeasure340 = LocalOneMeasure340;
+            s.LocalReliefHold340 = LocalReliefHold340;
+            s.IronMuster340 = IronMuster340;
+            s.RelievesWarLeader340 = RelievesWarLeader340;
+            s.CommanderGuardCharging340 = CommanderGuardCharging340;
             s.CanonHouses277 = CanonHouses277;
             s.CanonHouses277Rename = CanonHouses277Rename;
             s.CanonHouses277LiegePay = CanonHouses277LiegePay;

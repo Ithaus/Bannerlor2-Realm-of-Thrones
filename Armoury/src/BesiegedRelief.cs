@@ -545,7 +545,7 @@ namespace Armoury
                 if (top == null) return;
 
                 // armia wladcy na odsiecz (gra zaklada ja sama w AiPartyThinkBehavior: WillGatherArmy + DefendSettlement -> Kingdom.CreateArmy, typ Defender)
-                if (s.BesiegedReliefKingsArmy && !top.ArmyOnWay && party.Army == null && party.LeaderHero != null && ReferenceEquals(party.LeaderHero, k.Leader)
+                if (s.BesiegedReliefKingsArmy && !top.ArmyOnWay && party.Army == null && party.LeaderHero != null && WarLeader(party.LeaderHero, k)
                     && party.LeaderHero.Clan != null && !party.LeaderHero.Clan.IsUnderMercenaryService)
                 {
                     var members = partyThinkParams.PossibleArmyMembersUponArmyCreation;
@@ -554,6 +554,7 @@ namespace Armoury
                         var a = new AIBehaviorData(top.St, AiBehavior.DefendSettlement, topData.NavigationType, true, topData.IsFromPort, topData.IsTargetingPort);
                         partyThinkParams.AddBehaviorScore((a, topScore * KingArmyEdge));
                         _dKingOffer++;
+                        if (!ReferenceEquals(party.LeaderHero, k.Leader)) _dDeputy++;   // 340 (b): zastepca wladcy (glowa najsilniejszego rodu)
                         if (top.T != null) top.T.KingOfferHour = CampaignTime.Now.ToHours;
                     }
                     else _dKingNoCall++;
@@ -564,6 +565,52 @@ namespace Armoury
             catch (Exception e) { Stumble("ThinkPostfix", e); }
         }
 
+        // ------------------------------------------------------------ 340 (b): wodz wojny krolestwa
+        private static readonly Dictionary<Kingdom, KeyValuePair<int, Hero>> _warLead = new Dictionary<Kingdom, KeyValuePair<int, Hero>>();
+        private static int _dDeputy;
+
+        /// <summary>Kto zbiera "armie wladcy" na odsiecz: wladca; 340 (klucz RelievesWarLeader340) - gdy wladca nie ma wlasnej druzyny w polu (Joffrey bez druzyny w
+        /// Krolewskiej Przystani), glowa najsilniejszego rodu krolestwa (Clan.CurrentTotalStrength - liczba gry) z wlasna aktywna druzyna, nie najemnik (korona: Tywin).
+        /// Pamiec na godzine na krolestwo.</summary>
+        internal static bool WarLeader(Hero h, Kingdom k)
+        {
+            if (h == null || k == null) return false;
+            if (ReferenceEquals(h, k.Leader)) return true;
+            var s = Settings.Current;
+            if (s == null || !s.RelievesWarLeader340) return false;
+            int hour = (int)CampaignTime.Now.ToHours;
+            Hero dep;
+            lock (_warLead)
+            {
+                KeyValuePair<int, Hero> kv;
+                if (_warLead.TryGetValue(k, out kv) && kv.Key == hour) dep = kv.Value;
+                else { dep = DeputyOf(k); _warLead[k] = new KeyValuePair<int, Hero>(hour, dep); }
+            }
+            return dep != null && ReferenceEquals(dep, h);
+        }
+
+        private static Hero DeputyOf(Kingdom k)
+        {
+            try
+            {
+                var r = k.Leader;
+                if (r != null && r.IsAlive && !r.IsPrisoner && r.PartyBelongedTo != null && r.PartyBelongedTo.IsActive && r.PartyBelongedTo.LeaderHero == r) return null;   // wladca w polu - tylko on
+                Hero best = null; float bs = -1f;
+                foreach (var c in k.Clans)
+                {
+                    if (c == null || c.IsEliminated || c.IsUnderMercenaryService) continue;
+                    var l = c.Leader;
+                    if (l == null || !l.IsAlive || l.IsPrisoner || ReferenceEquals(l, r)) continue;
+                    var p = l.PartyBelongedTo;
+                    if (p == null || !p.IsActive || p.LeaderHero != l || p.IsMainParty) continue;
+                    float st = c.CurrentTotalStrength;
+                    if (st > bs) { bs = st; best = l; }
+                }
+                return best;
+            }
+            catch { return null; }
+        }
+
         // ------------------------------------------------------------ zdarzenia
         internal static void OnArmyCreated(Army army)
         {
@@ -571,7 +618,7 @@ namespace Armoury
             {
                 if (!On || army == null || army.LeaderParty == null || army.Kingdom == null) return;
                 var lh = army.LeaderParty.LeaderHero;
-                if (lh == null || !ReferenceEquals(lh, army.Kingdom.Leader) || army.ArmyType != Army.ArmyTypes.Defender) return;
+                if (lh == null || !WarLeader(lh, army.Kingdom) || army.ArmyType != Army.ArmyTypes.Defender) return;
                 // AiBehaviorObject armii to tu miejsce zbiorki, nie osada odsieczy - przypisanie po ostatniej opcji OB5 tego krolestwa (najwyzej 2 h temu)
                 double now = CampaignTime.Now.ToHours;
                 Track best = null;
@@ -781,6 +828,7 @@ namespace Armoury
                   .Append(", 326c nie wolane (nie zdaza przed szturmem, jeszcze nie w drodze) ").Append(_dLateNoCall)
                   .Append(" | trwajace oblezenia: podbite druzyny potem w odsieczy ").Append(redir)
                   .Append(" | ").Append(shown > 0 ? rows.ToString() : "-")
+                  .Append(" | zastepca wladcy (340): opcji ").Append(_dDeputy)
                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(").");
                 Log.Info(sb.ToString());
             }
@@ -790,7 +838,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = _dRel = _dUnready = _dLateNoCall = 0;
+            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = _dRel = _dUnready = _dLateNoCall = _dDeputy = 0;
             _dParties.Clear(); _endedRelief.Clear(); _dRelParties.Clear(); _dUnreadyParties.Clear();
             foreach (var kv in _tracks) kv.Value.DayRel.Clear();
         }
