@@ -658,7 +658,7 @@ namespace Armoury
                     for (int i = 0; i < ItemCount; i++) a[i] = (float)res.Market[i];
                     Buildings338Village.ScaleRates(ld.V, a);   // 338 grupy 8 i 10: drogi warowni i budynki produkcji wsi BK - raz na przeliczenie okregu
                     // recenzja 338 W3: plan (mkByM - rampa i targ ZC4, mk) widzi to samo co stawka A - dopisek budynkow (0, gdy 338 nic nie skaluje)
-                    for (int i = 0; i < ItemCount; i++) { double x = res.Market[i] + (a[i] - (float)res.Market[i]); mkByM[m * ItemCount + i] += x; mk[i] += x; }
+                    for (int i = 0; i < ItemCount; i++) { double x = res.Market[i] + (a[i] - (float)res.Market[i]) + Buildings338Village.PlanBack(ld.V, i); mkByM[m * ItemCount + i] += x; mk[i] += x; }   // 338c: chleb i skora wsi wracaja do Planu jako surowiec
                     rates[ld.V] = new VRate { A = a, M = m };
                     try { ld.Basket = VillageBasket(ld, res); zv[ld.V] = ld.Basket; if (ld.BasketPaid != null) zvp[ld.V] = ld.BasketPaid; } catch (Exception e) { Stumble("VillageBasket", e); }
                     // racje spichlerza: kcal czesci domowej z wlasnego pola i domu + jedzenie robione w domu (krok 8 - koszyk, na ktory wsi nie stac)
@@ -809,7 +809,7 @@ namespace Armoury
             if (_ratesKeep.TryGetValue(ld.V, out old) && old != null) rates[ld.V] = old;
             else { var a = new float[ItemCount]; for (int i = 0; i < ItemCount; i++) a[i] = (float)res.Market[i]; Buildings338Village.ScaleRates(ld.V, a); rates[ld.V] = old = new VRate { A = a, M = m }; }   // 338: jak wyzej
             var aa = old.A;   // recenzja 338 W3: mkByM i mk z dopiskiem budynkow (jak stawka A)
-            for (int i = 0; i < ItemCount; i++) { double x = res.Market[i] + (aa != null && i < aa.Length ? aa[i] - (float)res.Market[i] : 0f); mkByM[m * ItemCount + i] += x; mk[i] += x; }
+            for (int i = 0; i < ItemCount; i++) { double x = res.Market[i] + (aa != null && i < aa.Length ? aa[i] - (float)res.Market[i] : 0f) + Buildings338Village.PlanBack(ld.V, i); mkByM[m * ItemCount + i] += x; mk[i] += x; }   // 338c: jak wyzej
             ownKcal += res.OwnKcal + ld.HomeKcal; kcalNeed += res.KcalNeed;
             if (ld.Basket != null) zv[ld.V] = ld.Basket;
             if (ld.BasketPaid != null) zvp[ld.V] = ld.BasketPaid;

@@ -131,6 +131,73 @@ namespace Armoury
 
         internal static object VillageDataOf(object pop) { return pop != null && _popVillageData != null ? _popVillageData.GetValue(pop, null) : null; }
 
+        // ------------------------------------------------------------ 338c: zloza, rece i stany ludnosci BK (kopalnie zamkow i wsi, plan ryb portow)
+        private static bool _mxInit;
+        private static PropertyInfo _popMineral, _mdRichness, _ldExcess;
+        private static MethodInfo _mdLocal, _popTypeCount;
+        private static Type _popTypeEnum;
+
+        private static void InitMx()
+        {
+            if (_mxInit) return;
+            _mxInit = true;
+            try
+            {
+                InitBk();
+                var tPd = _getPopData != null ? _getPopData.ReturnType : null;
+                _popMineral = tPd != null ? AccessTools.Property(tPd, "MineralData") : null;
+                _mdRichness = _popMineral != null ? AccessTools.Property(_popMineral.PropertyType, "Richness") : null;
+                _mdLocal = _popMineral != null ? AccessTools.Method(_popMineral.PropertyType, "GetLocalMinerals") : null;
+                _ldExcess = _popLandData != null ? AccessTools.Property(_popLandData.PropertyType, "WorkforceExcess") : null;
+                _popTypeEnum = AccessTools.TypeByName("BannerKings.Managers.PopulationManager+PopType");
+                _popTypeCount = tPd != null && _popTypeEnum != null ? AccessTools.Method(tPd, "GetTypeCount", new[] { _popTypeEnum }) : null;
+            }
+            catch (Exception e) { Stumble(GCore, "InitMx", e); }
+        }
+
+        /// <summary>BK MineralData.GetLocalMinerals() osady: (towar, udzial zloza); pusta lista - brak danych.</summary>
+        internal static List<KeyValuePair<TaleWorlds.Core.ItemObject, float>> Minerals(object pop, out int richness)
+        {
+            InitMx();
+            richness = 1;
+            var res = new List<KeyValuePair<TaleWorlds.Core.ItemObject, float>>();
+            if (pop == null || _popMineral == null || _mdLocal == null) return res;
+            var md = _popMineral.GetValue(pop, null);
+            if (md == null) return res;
+            if (_mdRichness != null) { try { richness = Convert.ToInt32(_mdRichness.GetValue(md, null), Inv); } catch { richness = 1; } }
+            var l = _mdLocal.Invoke(md, null) as System.Collections.IEnumerable;
+            if (l == null) return res;
+            foreach (var o in l)
+            {
+                if (o == null) continue;
+                var t = o.GetType();
+                var f1 = t.GetField("Item1"); var f2 = t.GetField("Item2");
+                var it = f1 != null ? f1.GetValue(o) as TaleWorlds.Core.ItemObject : null;
+                float w = f2 != null ? Convert.ToSingle(f2.GetValue(o), Inv) : 0f;
+                if (it != null && w > 0f) res.Add(new KeyValuePair<TaleWorlds.Core.ItemObject, float>(it, w));
+            }
+            return res;
+        }
+
+        /// <summary>BK LandData.WorkforceExcess - wolne rece osady ponad prace pol i pastwisk (int.MinValue - brak danych).</summary>
+        internal static int WorkforceExcess(object pop)
+        {
+            InitMx();
+            if (pop == null || _popLandData == null || _ldExcess == null) return int.MinValue;
+            var ld = _popLandData.GetValue(pop, null);
+            return ld != null ? Convert.ToInt32(_ldExcess.GetValue(ld, null), Inv) : int.MinValue;
+        }
+
+        /// <summary>BK PopulationData.GetTypeCount(PopType.&lt;name&gt;) (Tenants, Craftsmen, Serfs ...); 0 - brak.</summary>
+        internal static int TypeCount(object pop, string name)
+        {
+            InitMx();
+            if (pop == null || _popTypeCount == null || _popTypeEnum == null) return 0;
+            object e;
+            try { e = Enum.Parse(_popTypeEnum, name); } catch { return 0; }
+            return Convert.ToInt32(_popTypeCount.Invoke(pop, new[] { e }), Inv);
+        }
+
         internal static float Pasture(object pop)
         {
             if (pop == null || _popLandData == null || _landPasture == null) return 0f;

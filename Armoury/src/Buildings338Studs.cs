@@ -26,10 +26,12 @@ namespace Armoury
         private static bool _hooked;
         private static int _castles, _bred, _fromStash, _fromCastle, _fromVillage, _noSource, _full, _noType;
         private static List<ItemObject> _warHorses;
+        private static long _sumBred, _sumNoSource; private static int _sumDays;   // 338c: suma biegu (sesji) do linii doby
 
         internal static void SessionStart()
         {
             _warHorses = null;
+            _sumBred = _sumNoSource = 0; _sumDays = 0;
             var bkb = AccessTools.TypeByName("BannerKings.Behaviours.BKBuildingsBehavior");
             var m = bkb != null ? AccessTools.Method(bkb, "RunStuds", new[] { typeof(Town) }) : null;
             if (!_hooked && m != null)
@@ -150,8 +152,10 @@ namespace Armoury
 
         internal static void Daily(int day)
         {
+            _sumDays++; _sumBred += _bred; _sumNoSource += _noSource;
             Log.Info("Budynki (338) stadniny: dzien " + day + " | zamkow ze Studs " + _castles + " (pelnych " + _full + ") | konie bojowe +" + _bred + " (ze Stash " + _fromStash
-                     + ", z magazynu zamku " + _fromCastle + ", z wsi " + _fromVillage + "), bez zrodla " + _noSource + ", bez typu konia " + _noType + Buildings338.Tail(Buildings338.GStuds));
+                     + ", z magazynu zamku " + _fromCastle + ", z wsi " + _fromVillage + "), bez zrodla " + _noSource + ", bez typu konia " + _noType
+                     + " | w biegu: konie bojowe +" + _sumBred + ", bez zrodla " + _sumNoSource + " w " + _sumDays + " dobach" + Buildings338.Tail(Buildings338.GStuds));
         }
     }
 }

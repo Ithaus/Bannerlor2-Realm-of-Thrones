@@ -131,3 +131,19 @@ Skala strat znana z pomiaru: zold zalog - 213-214 twierdz, ok. 30 000-31 400 zl/
 | Mines (wies BK) | czesciowo | Pod KS (beta 1) stawka mineralow z rak i ziemi okregu, poziom Mines nie wplywa na nic - czyli raczej martwy; naprawa musialaby wejsc w stawke KS, gdzie grozi dubel z pracami okregu (`StartCalibration.Inwest.cs`). Osobny audyt. |
 | Projekty dzienne Farmland / Pastureland / Woodland (wies BK) | zamiana akrow | To ekspansja akrow (`LandData.Update:418-434` tylko dodaje), nie zamiana; nikt w czynnym lancuchu produkcji wsi nie czyta akrow. Kierunek "martwy" prawdopodobny, ale projekt naprawy byl bledny. Osobny audyt. |
 | Port (BK, zamek) - ryby | blokada A17 | Przyczyna inna: zamki nie dostaja `DailyTickTownEvent` - przeniesione do grupy 7 jako MARTWY z nowa przyczyna. |
+
+## 11. Po tescie 30 dob (at338, Armoury-2026-11-06_19-36-12.log) - paczka 338c
+
+Test 338b: kod 0, 23 bledy CS = baza. Dziala: zold zalog (-42 tys. zl/d w 214 warowniach), autowerbunek (565 ludzi), zapas jedzenia magazynu i spichlerza, murarz,
+urzad podatkowy miasta, targowisko, asymilacja, drogi, produkcja wsi BK, ule, stadniny.
+
+| Budynek | Stan po tescie 338b | 338c |
+|---|---|---|
+| Farmlands (zamek) / Warehouse (miasto) - premia BK 'Local farmland' | zdjecie (3b) = ok. 10 100 jedzenia/d mniej, osad z bilansem < 0: 82 -> 172 z 219 - GLOD | DECYZJA: premia BK zostaje (sposob kalibracji modelu jedzenia BK; efekt "jedzenie" zgodny z duchem opisu farm), +6/12/18 gry dla Farmlands tez; klucz `Buildings338FoodDouble` domyslnie NIE |
+| Port (BK, zamek) - ryby | tick 338 gotowy, ale w 30 dobach 0 zamkow z Portem zbudowanym ("nasz tick 0 zamkow" - linia mylaca) | linia podaje zamki z Portem na liscie budowy i zbudowane oraz sumy biegu; pod KS port lowi (wiersz nizej) |
+| Harbor (BK, miasto) i Port zamku pod KS - ryby | A17 PortsPre blokowal (`zablokowane w KS 48 miast`), Plan KS nie liczyl ryb portow | NAPRAWIONE: blokada zdjeta przy kluczu `Buildings338Ports` (ryby = praca dzierzawcow i rzemieslnikow wzorem BK, zaplata z kasy do kiesy ludu - zawsze, takze bez A17PortFishPaysFolk), ksiega - wlasna grupa "porty BK - praca rybakow (338)", Plan KS - podaz krainy (`PortFishExo`) tym samym wzorem i warunkiem kasy |
+| Castle Mines (BK, zamek) | MARTWY potwierdzony: 11 zamkow z kopalnia, tick BK dla zamkow 0 wywolan | NAPRAWIONE: wlasna produkcja z pracy (losowanie BK ze zloza i bogactwa gruntu, tylko z wolnych rak zamku `LandData.WorkforceExcess`, rece na sztuke z wydajnosci gornika KS); kasa zamku stac - place gornikom do kiesy podzamcza, ruda na targ zamku; inaczej - Stash (opis). Klucz `Buildings338CastleMines` domyslnie TAK |
+| Mill, Bakery (wies BK) - chleb | MARTWY (odlozone w 338) | NAPRAWIONE: udzial zboza wsi wedlug wagi BK idzie do piekarni (ziarno -> chleb 1:1 w kg); pod KS w stawce A i w Planie (zboze wraca do Planu - Plan liczy chleb ze zboza) |
+| Fur Tannery (wies BK) - skora | MARTWY (odlozone) | NAPRAWIONE: udzial skor i futer wsi idzie do garbarni (2.4 kg surowca na kg skory, KsTab.LeatherHide); wies bez skor i futer - nic (licznik "bez surowca") |
+| Mines (wies BK) - rudy | pod KS (beta 1) stawka KS bez kopalni - martwy | NAPRAWIONE: rudy z wagi BK (0.5 x poziom x udzial zloza), wartosc zdjeta z innych plonow wsi (inne najwyzej 15%, zboze i ryby 5%) - pod KS w stawce A (Plan widzi), poza KS baza + czynnik plonow |
+| Tax Office (wies BK), Courier Post | bez zmian (decyzja) | bez zmian |

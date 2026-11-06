@@ -21,6 +21,9 @@ namespace Armoury
     /// dziala; magazyn ma zapas z 3a). Postfiks na tej metodzie dodaje ten sam czynnik ze znakiem minus (czynniki ExplainedNumber sie sumuja, po nim BK dodaje tylko
     /// czynniki praw - skasowanie jest dokladne). 'Local farmland' (praca ludnosci) liczy sie dalej, tylko bez premii budynku.
     /// Linia doby mierzy, ile osad schodzi z bilansem jedzenia ponizej zera przez 3b (sprawdz_logi: najwyzej 5% osad z tymi budynkami).
+    /// 338c (DECYZJA po tescie 30 dob at338: zdjecie premii = ok. 10 100 jedzenia/d mniej, osad z bilansem &lt; 0 82 -&gt; 172 z 219 - glod): klucz Buildings338FoodDouble
+    /// domyslnie NIE. Premia BK 'Local farmland' za Farmlands i Warehouse to sposob, w jaki BK skalibrowal swoj model jedzenia (efekt "jedzenie" zgodny z duchem
+    /// opisu farm); +6/12/18 gry dla Farmlands i zapas magazynu/spichlerza (3a) zostaja. Przy kluczu NIE linia podaje tylko liczbe osad z budynkami.
     /// </summary>
     internal static class Buildings338Food
     {
@@ -135,7 +138,19 @@ namespace Armoury
                      + " | przyklad " + ex + Buildings338.Tail(Buildings338.GStock));
             // 3b
             int nF = 0, nM = 0, all = 0, negA = 0, negB = 0; double gone = 0;
-            if (Buildings338.FoodDoubleOn && _hookedDouble)
+            bool dbl = Buildings338.FoodDoubleOn && _hookedDouble;
+            if (!dbl)   // 338c: klucz domyslnie NIE - premia BK zostaje (tylko liczba osad z budynkami do linii)
+                foreach (var t in Town.AllFiefs)
+                {
+                    try
+                    {
+                        foreach (var b in t.Buildings)
+                            if (b != null && (b.BuildingType == DefaultBuildingTypes.CastleFarmlands || b.BuildingType == DefaultBuildingTypes.SettlementWarehouse))
+                            { if (b.CurrentLevel > 0) { if (t.IsCastle) nF++; else nM++; } break; }
+                    }
+                    catch (Exception e) { Buildings338.Stumble(Buildings338.GDouble, "Food.Daily(3b)", e); }
+                }
+            if (dbl)
             {
                 var fm = Campaign.Current.Models.SettlementFoodModel;
                 foreach (var t in Town.AllFiefs)
@@ -158,7 +173,7 @@ namespace Armoury
                     catch (Exception e) { Buildings338.Stumble(Buildings338.GDouble, "Food.Daily(3b)", e); }
                 }
             }
-            Log.Info("Budynki (338) dubel jedzenia BK: dzien " + day + " | zamkow z Farmlands " + nF + ", miast z Warehouse " + nM + " | zdjeta premia " + gone.ToString("0", Buildings338.Inv)
+            Log.Info("Budynki (338) dubel jedzenia BK: dzien " + day + " | klucz " + Buildings338.YN(dbl) + (dbl ? " (premia BK zdjeta)" : " (premia BK produkcji jedzenia zostaje - decyzja 338c)") + " | zamkow z Farmlands " + nF + ", miast z Warehouse " + nM + " | zdjeta premia " + gone.ToString("0", Buildings338.Inv)
                      + " jedzenia/d | osad z bilansem < 0: " + negA + " -> " + negB + " z " + all + " osad" + Buildings338.Tail(Buildings338.GDouble));
         }
     }

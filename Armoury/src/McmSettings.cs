@@ -11440,9 +11440,9 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338FoodStock { get; set; } = true;
 
-        [SettingPropertyBool("Buildings338 Food Double", HintText = "With Buildings338 and Buildings338FoodStock: castle farmlands and the town warehouse no longer give Banner Kings' extra +30-50% per level to the food grown by the people, a bonus their description does not have (farmlands keep their +6/12/18 food a day, the warehouse its food store). Off = the Banner Kings bonus stays", RequireRestart = false)]
+        [SettingPropertyBool("Buildings338 Food Double", HintText = "With Buildings338 and Buildings338FoodStock: castle farmlands and the town warehouse lose Banner Kings' extra +30-50% per level to the food grown by the people. Off (default, 338c) = the Banner Kings bonus stays - it is how Banner Kings balanced its food (a 30-day test without it left 172 of 219 towns and castles short of food); farmlands keep their +6/12/18 food a day either way", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
-        public bool Buildings338FoodDouble { get; set; } = true;
+        public bool Buildings338FoodDouble { get; set; } = false;
 
         [SettingPropertyBool("Buildings338 Mason", HintText = "With Buildings338: where the lord pays for the building work, the mason makes the paid builders work faster - his points (town 3/6/9, castle 2/4/6) raise the work done for the same money, at most double; with nothing paid he adds nothing. Off = the mason does nothing to paid building work, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
@@ -11464,7 +11464,7 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Roads { get; set; } = true;
 
-        [SettingPropertyBool("Buildings338 Ports", HintText = "With Buildings338: castles with a Banner Kings port get their daily catch of fish like towns do (castles never had the daily building tick); the castle pays the fishermen. Not in lands under start calibration (there town and castle ports wait for the fish plan). Off = castle ports catch nothing, as before", RequireRestart = false)]
+        [SettingPropertyBool("Buildings338 Ports", HintText = "With Buildings338: Banner Kings ports and harbours catch fish every day as their description says - castles too (castles never had the daily building tick) and also in lands under the start calibration (the catch is the work of the town's tenants and craftsmen, the town pays the fishermen, and the calibration plan counts this fish). Off = castle ports catch nothing and ports under the calibration stay idle, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Ports { get; set; } = true;
 
@@ -11476,7 +11476,7 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338VillageProject { get; set; } = true;
 
-        [SettingPropertyBool("Buildings338 Village Goods", HintText = "With Buildings338: bee skeps add honey to woodcutter and trapper villages, +1 weight per level as in Banner Kings. Off = as before (bread from bakeries and mills and leather from tanneries are not done yet)", RequireRestart = false)]
+        [SettingPropertyBool("Buildings338 Village Goods", HintText = "With Buildings338: Banner Kings village workshops make what their description says, from the village's own work: the bakery (with the mill) turns part of the village grain into bread, the fur tannery part of its hides and furs into leather, the mines dig ore from the local deposits with hands taken from the village's other work (at most 15% of other goods, 5% of grain and fish); bee skeps add honey. Off = as before (none of them produce)", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338VillageGoods { get; set; } = true;
 
@@ -11484,9 +11484,9 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Studs { get; set; } = true;
 
-        [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore like town mines (castles never had the daily building tick); the castle pays the miners. Off = castle mines dig nothing, as before (off until measured)", RequireRestart = false)]
+        [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
-        public bool Buildings338CastleMines { get; set; } = false;
+        public bool Buildings338CastleMines { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {

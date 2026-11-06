@@ -128,11 +128,12 @@ namespace Armoury
             var woodKg = 0.0; KsItem wi; if (inp.Items.TryGetValue("hardwood", out wi)) woodKg = wi.Kg * inp.Sigma;
             var seenV = new HashSet<Village>();   // ROT-Map: dwie osady na jednym Village (Kurbok/Guntak, Thupak/Volug) - okreg raz, pierwszy w Settlement.All (jak ksiega wiosek)
             var tst = new List<Settlement>(120); var distMk = new Dictionary<string, Settlement>(StringComparer.Ordinal);   // KS-R3 krok 5: miasta wejscia i miasto targowe okregu
+            try { Buildings338Ports.PlanBegin(); } catch { }   // 338c: suma ryb portow BK w tym Planie (linia doby 'Budynki (338) zamki')
             foreach (var r in recs)
             {
                 try
                 {
-                    if (r.Castle) continue;
+                    if (r.Castle) { PortFishExo(inp, r.St, r.Cul ?? "?"); continue; }   // 338c: port BK zamku - ryby z pracy rybakow (podaz spoza tabeli)
                     var bask = DailyLife.KsBasket(r.Cul, true);
                     bool oil = DailyLife.OilProf(r.ProfId), north = DailyLife.NorthFur(r.ProfId);
                     string land = r.Cul ?? "?";
@@ -146,6 +147,7 @@ namespace Armoury
                         var bud = TownBudget(r.St);
                         if (bud != null) { t.ClassNeed = ClassNeeds(r.N, bask, oil, north); t.Budget = bud; info.Budgets++; }
                         inp.Towns.Add(t); tst.Add(r.St);
+                        PortFishExo(inp, r.St, land);   // 338c: port BK miasta pod KS lowi dalej (Buildings338Ports.KsOpen) - Plan liczy te podaz
                         info.Towns++;
                         if (fields && hasLand)
                         {
@@ -296,6 +298,20 @@ namespace Armoury
                 kd.FachC = c; kd.FachG = g; kd.FachKg = rate * inp.Sigma * kg;
             }
             catch (Exception e) { Stumble("FachInput", e); }
+        }
+
+        /// <summary>338c: ryby portu BK osady (miasto albo zamek z Harbor/Port) - podaz spoza tabeli krainy: wzor BK RunPorts (Buildings338Ports.PlanFishPerDay) x kg x sigma,
+        /// jak lodzie rybackie wyzej. Klucz Buildings338Ports wylaczony albo kraina wrocona - 0 (Plan jak dotad).</summary>
+        private static void PortFishExo(KsInput inp, Settlement st, string land)
+        {
+            try
+            {
+                double n = Buildings338Ports.PlanFishPerDay(st);
+                if (!(n > 0)) return;
+                KsItem fi;
+                AddExo(inp, land, KsTab.GFish, n * (inp.Items.TryGetValue("fish", out fi) ? fi.Kg : 10.0) * inp.Sigma);
+            }
+            catch (Exception e) { Stumble("PortFishExo", e); }
         }
 
         private static void AddExo(KsInput inp, string land, int g, double kg)

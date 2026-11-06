@@ -32,15 +32,17 @@ Kolejnosc wdrozenia (tory pracy wedlug ryzyka): **etap A** (S/M, male ryzyko, du
 | `Buildings338Wage` | TAK | 1. zold zalog (koszary, biuro kasztelana, Slacken Garrison) |
 | `Buildings338AutoRecruit` | TAK | 2. autowerbunek (biuro kasztelana, Train Militia, Raise Troops) |
 | `Buildings338FoodStock` | TAK | 3a. zapas jedzenia (magazyn, spichlerz) |
-| `Buildings338FoodDouble` | TAK | 3b. dubel BK 'Local farmland' (Farmlands, magazyn) - tylko razem z 3a |
+| `Buildings338FoodDouble` | NIE (338c) | 3b. dubel BK 'Local farmland' (Farmlands, magazyn) - tylko razem z 3a; 338c: premia BK zostaje (p. 15 A) |
 | `Buildings338Mason` | TAK | 4. punkty budowy murarza w budowach oplaconych |
 | `Buildings338TaxOffice` | TAK | 5. urzad podatkowy miasta |
 | `Buildings338Caravans` | TAK | 6. targowisko - wizyty karawan |
 | `Buildings338Assimilation` | TAK | 7. asymilacja kulturowa (BK) |
 | `Buildings338Roads` | TAK | 8. drogi - produkcja wsi pod KS |
-| `Buildings338Ports` | TAK | 9. porty BK - ryby (miasta pod KS, zamki) |
+| `Buildings338Ports` | TAK | 9. porty BK - ryby (zamki; 338c: miasta i zamki pod KS + Plan KS) |
 | `Buildings338VillageProd` | TAK | 10. budynki produkcji wsi BK + projekt Production |
-| `Buildings338VillageGoods` | TAK | 11. chleb (Bakery, Mill), skora (Fur Tannery), miod (Bee Skeps) |
+| `Buildings338VillageGoods` | TAK | 11. chleb (Bakery, Mill), skora (Fur Tannery), miod (Bee Skeps); 338c: takze rudy kopalni wsi BK (Mines) |
+| `Buildings338VillageProject` | TAK | 10. projekt Production (338b) |
+| `Buildings338CastleMines` | TAK (338c) | 9. kopalnie zamkow - produkcja z pracy (p. 15 C) |
 | `Buildings338Studs` | TAK | 12. stadnina koni bojowych zamku |
 
 ---
@@ -300,3 +302,51 @@ Kolejnosc wdrozenia (tory pracy wedlug ryzyka): **etap A** (S/M, male ryzyko, du
   `StartCalibration.Plan.cs` (AddPlanFish; skladanie A - Drogi), `StartCalibration.Arm.cs` (BkPortPostfix - jedna nazwa), `MaterialLaw.cs` (ProdPostfix x2),
   `VillageFruit.cs` (WeightFor, CapPostfix), `ClanBudget` (kolejnosc z postfiksem limitu - tylko sprawdzic priorytet)
 - `Settings.cs`, `McmSettings.cs` (14 kluczy), `tools/sprawdz_logi.py` (grupa `budynki338`), `CHANGELOG.md`, `docs/STAN-PRAC.md`
+
+## 15. Paczka 338c - po tescie 30 dob (at338)
+
+Test 338b (`at338`, Armoury-2026-11-06_19-36-12.log): kod 0, 23 bledy CS = baza; problemy: B338-7 (glod po zdjeciu dubla BK), B338-5 (prog stala za ciasny), martwe dalej
+porty zamkow (0 zbudowanych), porty miast pod KS (blokada A17), kopalnie zamkow, chleb, skora, rudy kopalni wsi pod KS; linie zamkow i stadnin bez sum biegu.
+
+**A. Dubel jedzenia BK - DECYZJA (Claude projektuje ekonomie).** Zdjecie premii BK 'Local farmland' (Farmlands zamku x0.5/poziom, Warehouse miasta x0.3/poziom produkcji
+ludnosci) = ok. 10 100 jedzenia/d mniej i 172 zamiast 82 z 219 osad z ujemnym bilansem. Premia zostaje: to sposob, w jaki BK skalibrowal swoj model jedzenia, a efekt "jedzenie"
+jest zgodny z duchem opisu farm. +6/12/18 gry dla Farmlands zostaje, zapas magazynu/spichlerza (3a) zostaje. `Buildings338FoodDouble` domyslnie NIE (CHANGELOG). Linia 3b podaje
+klucz; przy NIE liczy tylko osady z budynkami. sprawdz_logi B338-7: przy kluczu NIE premia nietknieta kazdej doby (zdjeta 0, bilans bez zmiany); przy TAK - stary prog 5% osad.
+
+**B. B338-5 z liczby budynkow.** Prog = sredni zold twierdzy z linii (zold przed / twierdz) x suma obnizek z opisu dla policzonych budynkow (koszary miasta 5..15%, zamku
+10..30%, biuro 10..30%, Slacken 5%): dol = poziom 1 x 0.8, gora = poziom 3 x 2 x 1.2 (AddFactor obnizki sumuje sie z czynnikiem BK -50% zalog, wiec wzgledem zoldu po BK
+obnizka moze siegac 2x opisu), nie wiecej niz zold przed. at338: 21 866..196 570 zl/d, wynik 41 972 - TAK.
+
+**C. Martwe budynki - produkcja z pracy, liczby z opisu i modeli, nic z niczego.**
+- *Porty BK pod KS (miasta i zamki)* - `A17Fix.PortsPre` nie blokuje przy `Buildings338Ports.KsOpen` (= klucz Buildings338Ports). Ryby: wzor BK RunPorts z pracy ludzi
+  (poziom x max(dzierzawcy/300, rzemieslnicy/200)), za zloto kasy miasta/zamku, ktore idzie do kiesy ludu (place rybakow; pod KS zawsze - bez zlota w nicosc). Ksiega towarow:
+  ramka z grupa `porty BK - praca rybakow (338)|` (nie "ryby z niczego poza KS", nie grupa lodzi = podaz Planu). Plan KS: `StartCalibration.Plan.PortFishExo` (miasta i zamki)
+  dodaje do podazy krainy n x kg x sigma tym samym wzorem i warunkiem kasy (`Buildings338Ports.PlanFishPerDay`). Linia A17 F2: nowy segment `338c porty BK pod KS`.
+- *Port zamku* - tick 338 bez zmian (BK RunPorts dla zamku); w 30 dobach zaden zamek go nie zbudowal. Linia podaje "Port na liscie budowy" i sumy biegu.
+- *Kopalnie zamkow* - NIE BK RunMines. Losowanie BK z opisu (udzial zloza / (bogactwo + 0.5), poziom = sztuki), tylko z wolnych rak zamku (BK `LandData.WorkforceExcess`);
+  rece na sztuke = kg sztuki x sigma KS / kg gornika na dobe z KsTab.P0 (zelazo 2, srebro 15, sol 60, glina 800, wapien 300, marmur 150, zloto 0.3). Kasa zamku stac na cene
+  targu - placi gornikom (TownFolk.Earn KMine, reszta wraca do kasy), ruda na targ zamku; inaczej ruda do Stash (opis), bez zlota. Klucz `Buildings338CastleMines` domyslnie TAK.
+  Plan KS zamkow nie liczy (zamki poza Planem) - ruda zamku zostaje na targu/w Stash zamku.
+- *Chleb (Bakery, Mill), skora (Fur Tannery), rudy kopalni wsi BK (Mines)* - `Buildings338Village` (klucz Buildings338VillageGoods). Waga BK = udzial rak wsi (BK dzieli sile
+  robocza na pozycje listy waga / suma wag). Chleb: w = 0.15 x piekarnia x (1 + 0.5 x mlyn), s = w / (1 + w) zboza wsi -> chleb (kg za kg, receptura KS ziarno -> chleb 1.0);
+  bez piekarni nic. Skora: s = 0.5 x garbarnia / (wagi skor i futer typu (min 1) + 0.5 x garbarnia) skor i futer -> skora (2.4 kg surowca na kg skory); bez surowca nic. Rudy:
+  baza 0.5 x poziom x udzial zloza x (poziom ognisk + 1) x 0.5, wartosc (cena bazowa) zdjeta z innych plonow wsi (inne najwyzej 15%, zboze i ryby 5%; gdy prog wiaze - mniej rudy).
+  Pod KS (beta 1): w tablicy stawek A (`ScaleRates` -> `ScaleGoodsKs`, raz na przeliczenie okregu), chleb i skora - wlasna stawka (`KsGoods`, pierwszy krok MaterialLaw.ProdPostfix);
+  Plan (mk, mkByM) widzi A, a zboze i skory/futra zamienione na przetwor wracaja do Planu (`PlanBack` - Plan liczy przetwory z surowca). Poza KS: baza (`GoodsBase`) i czynnik
+  plonu-zrodla (`HostFactor`) w MaterialLaw, ruda / Times (MineralOnce). Magazyn wsi + 5 dob (`CapAdd` w VillageFruit.CapPostfix). Rampa KS (0 < beta < 1): obie strony z budynkami.
+
+**D. Log.** `Budynki (338) zamki`: zamki tykane przez 338 dzis i w biegu, porty zamkow (zbudowane, na liscie, pod KS, ryby dzis i w biegu), porty pod KS (miasta i zamki - z A17
+PortsFin) i Plan KS ryb portow, kopalnie zamkow (tykane, z urobkiem, ruda na targ / Stash, place, bez wolnych rak, w biegu). `stadniny`: suma biegu. `towary wsi`: chleb, skora,
+rudy kopalni wsi (KS / poza KS, wartosc dodana i zdjeta).
+
+**E. Bieg bazowy.** `Buildings338=false` (wszystkie grupy 338 i 338c wylaczone, linie doby dalej sa) - porownanie: B338-15 zalogi AI +-5%, B338-16 ceny zboza i drewna +-15%,
+B338-20 zbytki ludu (OB2-6a: miasta + podzamcza + wsie, srednia na wspolnych dobach) >= 95% bazy, B338-21 rachunki KS-H po zwloce (NKA-4) - dob z dlugiem po zwloce <= baza.
+Uzycie: `python -I tools/sprawdz_logi.py --grupa budynki338 <log> --baza <log z Buildings338 wyl.>`.
+
+**Nowe progi sprawdz_logi:** B338-13 (sumy biegu), B338-17 porty pod KS (zablokowane 0 w liniach A17; gdy Plan > 0 - ryby pod KS w biegu > 0), B338-17b Plan ryb portow wobec
+polowu (+-25%, 10 dob z Planem), B338-18 kopalnie zamkow (klucz TAK, kopalnie > 0, >= 10 dob - ruda w biegu > 0), B338-19 chleb/skora/rudy wsi (chleb z ziarna, skora > 0, wartosc
+rudy = zdjete z innych plonow +-10%), B338-20, B338-21; synteza B338-S z nowymi przypadkami.
+
+**Ryzyka 338c:** Plan KS liczy ryby portow od przebudowy Planu - do tego czasu podaz ponad Plan (ceny ryb w dol); chleb wsi zmniejsza zboze na targu (Plan widzi zboze
+jak dotad - PlanBack); ruda wsi zabiera do 15% wartosci innych plonow wsi z kopalnia; kopalnie zamkow zaleza od wolnych rak (WorkforceExcess) - zamki bez nadmiaru rak nie kopia
+(licznik "bez wolnych rak"); stawka KS chleba/skory/rud zmienia sie dopiero przy przeliczeniu okregu (jak drogi).
