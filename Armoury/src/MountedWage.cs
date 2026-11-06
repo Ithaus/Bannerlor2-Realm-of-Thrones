@@ -140,6 +140,7 @@ namespace Armoury
             if (_fullGold || (__state.T && __state.P == __0)) return;   // linia "przed" albo wywolanie wewnetrzne (base) tej samej partii
             try
             {
+                if (__0 != null && __0.IsGarrison) Buildings338Wage.Apply(__0, ref __result);   // 338 grupa 1: koszary, biuro kasztelana, Slacken Garrison (zold zalogi jak w grze)
                 if (__0 != null && __0.IsCaravan) { if (CaravanHalfOn) CaravanHalf(__0, ref __result); return; }   // 288: karawany (Wysp w IsIronbornCrew i tak nie ma)
                 EfficientCampaignerAlways(__0, ref __result);   // 289: perk kwatermistrza takze poza armia
                 if (!CrownGifts.IsIronbornCrew(__0)) return;

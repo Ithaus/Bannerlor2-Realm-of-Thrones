@@ -196,6 +196,7 @@ namespace Armoury
                 // inwest (noc 17/18.10): zajecia wiosek pobocznych bez KS - czynnik towarow typu okregu i baza towarow innych zajec PRZED mnoznikami (kopalnie, las, P1, rece,
                 // regulator towaru) - dopisany towar dostaje te same mnozniki co we wsi tego typu; wies pod KS, klucz wylaczony, wies bez planu - nic (wlasny try)
                 VillageCrafts.Base(village, item, ref __result);
+                Buildings338Village.ProdStep(village, item, ref __result);   // 338 grupa 10: budynki produkcji wsi BK i projekt Production (poza KS; pod KS - w stawce A)
                 var s = Settings.Current;
                 string id = item.StringId ?? "";
                 float m = 1f;

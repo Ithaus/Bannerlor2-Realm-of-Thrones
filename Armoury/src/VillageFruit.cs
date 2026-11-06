@@ -79,6 +79,7 @@ namespace Armoury
                 if (v.VillageState != Village.VillageStates.Normal || v.TradeBound == null || v.VillageType == null) return;
                 float w = WeightFor(v.VillageType.StringId, id);
                 if (!(w > 0f) || InTypeList(v.VillageType, item)) return;
+                if (id == "honey") w += Buildings338Village.Skeps(v);   // 338 grupa 11: ul BK (Skeps) +1 wagi miodu za poziom (jak BK GetProductions)
                 float x = w * (v.GetHearthLevel() + 1) * 0.5f * HandsF(v, id);   // E3-D1: rece wsi za cena (1 = bez przesuniecia)
                 if (!(x > 0f)) return;
                 r.Add(x, Txt);

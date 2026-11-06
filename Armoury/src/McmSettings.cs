@@ -11424,6 +11424,66 @@ namespace Armoury
         [SettingPropertyGroup("Fleets of the realms and the conquests of the North (326)")]
         public bool NorthConquestReturn { get; set; } = true;
 
+        [SettingPropertyBool("Buildings338", HintText = "Buildings do what their description says: barracks, the castellan's office, warehouses, granaries, masons, tax offices, marketplaces, roads, the Banner Kings village workshops, cultural assimilation, castle ports and warhorse studs had effects that never worked under Banner Kings and the economy of this mod. On = each of them works as its description says (each part has its own switch below). Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338 { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Wage", HintText = "With Buildings338: barracks (town 5/10/15%, castle 10/20/30%), the castellan's office (10/20/30%) and the Slacken Garrison project (5%) lower the garrison's wages as their description says. The AI lords' garrison gold limit is lowered by the same share, so their garrisons keep the same number of men and the lord keeps the saving. Your own limit is not changed. Off = the buildings do nothing to wages, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Wage { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Auto Recruit", HintText = "With Buildings338: the castellan's office (+1/+2/+3), the Train Militia project (+1) and the Raise Troops project (+2) let the garrison take more volunteers a day, as their description says - on top of the game's one a day and the Armoury daily bonus. Gold, room in the garrison and volunteers still limit it; not in lands without free hands. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338AutoRecruit { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Food Stock", HintText = "With Buildings338: the town warehouse raises the food store by 1000/3000/5000 and the castle granary by 1000/2000/3000 (the game's numbers at the Banner Kings scale, with the Battlements and Contractors perks). Off = under Banner Kings the warehouse adds no food store, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338FoodStock { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Food Double", HintText = "With Buildings338 and Buildings338FoodStock: castle farmlands and the town warehouse no longer give Banner Kings' extra +30-50% per level to the food grown by the people, a bonus their description does not have (farmlands keep their +6/12/18 food a day, the warehouse its food store). Off = the Banner Kings bonus stays", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338FoodDouble { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Mason", HintText = "With Buildings338: where the lord pays for the building work, the mason makes the paid builders work faster - his points (town 3/6/9, castle 2/4/6) raise the work done for the same money, at most double; with nothing paid he adds nothing. Off = the mason does nothing to paid building work, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Mason { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Tax Office", HintText = "With Buildings338: the town tax office raises what the lord and the crown take from the town's purse each week by 5/10/15%, as its description says - paid only from the town's money above its reserve, like the rest of the payment. Off = the tax office does nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338TaxOffice { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Caravans", HintText = "With Buildings338: the marketplace draws more caravans, as its description says - a town with a marketplace scores 2/4/6% higher when caravans choose where to go. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Caravans { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Assimilation", HintText = "With Buildings338: the Banner Kings Cultural Assimilation project of a town or castle really increases the presence of the lord's culture there (+15 culture weight, like a level 3 theater) while it is the current project. Off = the project does nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Assimilation { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Roads", HintText = "With Buildings338: roads and paths of a town or castle raise the production of its villages by 5/10/15% also where the villages produce by the hands and land of their district (start calibration), as their description says. Off = only outside the calibration, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Roads { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Ports", HintText = "With Buildings338: castles with a Banner Kings port get their daily catch of fish like towns do (castles never had the daily building tick); the castle pays the fishermen. Not in lands under start calibration (there town and castle ports wait for the fish plan). Off = castle ports catch nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Ports { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Village Prod", HintText = "With Buildings338: the Banner Kings village buildings (farming, mining, animal housing, sawmill, fish farm) raise the production of their kind by 5/10/15% and the daily Production project by 15%, as their description says (Banner Kings' own production model is not active with Better Economy). Off = they do nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338VillageProd { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Village Goods", HintText = "With Buildings338: bee skeps add honey to woodcutter and trapper villages, +1 weight per level as in Banner Kings. Off = as before (bread from bakeries and mills and leather from tanneries are not done yet)", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338VillageGoods { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Studs", HintText = "With Buildings338: castle warhorse studs breed warhorses into the castle stash (chance 2% a day, up to pastures / 10000 + 2 per level) - each from an ordinary horse of the castle or bought from its villages, never from nothing, and always a real warhorse of the castle's culture or the nearest one. Off = studs never breed, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Studs { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore like town mines (castles never had the daily building tick); the castle pays the miners. Off = castle mines dig nothing, as before (off until measured)", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338CastleMines { get; set; } = false;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -14279,6 +14339,21 @@ namespace Armoury
             s.PainBreakTierSteadiness = PainBreakTierSteadiness;
             s.NavalRealms = NavalRealms;
             s.NorthConquestReturn = NorthConquestReturn;
+            s.Buildings338 = Buildings338;
+            s.Buildings338Wage = Buildings338Wage;
+            s.Buildings338AutoRecruit = Buildings338AutoRecruit;
+            s.Buildings338FoodStock = Buildings338FoodStock;
+            s.Buildings338FoodDouble = Buildings338FoodDouble;
+            s.Buildings338Mason = Buildings338Mason;
+            s.Buildings338TaxOffice = Buildings338TaxOffice;
+            s.Buildings338Caravans = Buildings338Caravans;
+            s.Buildings338Assimilation = Buildings338Assimilation;
+            s.Buildings338Roads = Buildings338Roads;
+            s.Buildings338Ports = Buildings338Ports;
+            s.Buildings338VillageProd = Buildings338VillageProd;
+            s.Buildings338VillageGoods = Buildings338VillageGoods;
+            s.Buildings338Studs = Buildings338Studs;
+            s.Buildings338CastleMines = Buildings338CastleMines;
         }
 
         internal static void Apply()

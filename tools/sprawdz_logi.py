@@ -95710,5 +95710,293 @@ def main(argv):
     return _wodz335_main_prev(argv)
 
 
+# ------------------------------------------------------------ paczka 338: grupa budynki338 - budynki robia to, co pisze ich opis (Buildings338*.cs)
+#  B338-1 linia startu sesji (BK jest, latki bez BRAK); B338-2 linie doby kazdej grupy co dobe (0 luk, 0 nierozpoznanych); B338-3 bledy 0 i 'ERROR in Buildings338' 0;
+#  B338-4 zold: po <= przed, oszczednosc >= 0, pominiete (BK liczy) 0; B338-5 zold - oszczednosc ostatniej doby 20 000..40 000 zl/d przy >= 150 twierdzach z budynkiem
+#  (projekt 338 p. 1, at337); B338-6 autowerbunek: dobrano ponad K8 <= suma limitu w kazdej dobie; B338-7 dubel jedzenia BK: osad z bilansem < 0 po - przed <= 5% osad;
+#  B338-8 murarz: max k <= 1; B338-9 urzad podatkowy: droga firm TAK i rata > 0 w biegu (gdy sa miasta z urzedem, >= 8 dob); B338-10 karawany: podniesione > 0 (gdy sa
+#  targowiska); B338-11 asymilacja: latka TAK; B338-12 drogi / produkcja wsi / ule (model BK czynny NIE); B338-13 zamki: tick BK zamkow 0 (gra nie tyka - nasz tick bez
+#  dubla); B338-14 stadniny: bez typu konia 0; z --baza <log biegu z Buildings338 wyl.>: B338-15 ludzie w zalogach AI w ostatniej wspolnej dobie (>= 60 dob) w +-5% bazy.
+B338_START = re.compile(r"Budynki \(338\): start sesji \| glowny (TAK|NIE) \|.*\| BK (jest|BRAK) \| Courier Post na liscie budowy wsi BK: (\S+) \| latki: (.*)$")
+B338_DAY = re.compile(r"Budynki \(338\) ([a-zA-Z ]+?): dzien (\d+) \| (.*) \| bledy (\d+)\s*$")
+B338_GROUPS = ["zold", "autowerbunek", "zapas jedzenia", "dubel jedzenia BK", "murarz", "urzad podatkowy", "karawany", "asymilacja", "drogi", "produkcja wsi",
+               "towary wsi", "zamki", "stadniny"]
+B338_RX = {
+    "zold": re.compile(r"twierdz (\d+) z budynkiem .*\| zold przed (-?\d+) po (-?\d+) oszczednosc (-?\d+) zl/d \| limit AI x s: (\d+) twierdz, skalowan (\d+) \| pominiete \(BK liczy\) (\d+) \| wywolan (\d+) \| zalogi AI (\d+) ludzi$"),
+    "autowerbunek": re.compile(r"twierdz (\d+) z premia .*suma limitu \+(\d+)/d \| dobrano ponad K8 (\d+) ludzi$"),
+    "zapas jedzenia": re.compile(r"miast z Warehouse (\d+) \(sufit \+(-?\d+)\), zamkow z Granary (\d+) \(sufit \+(-?\d+), BK bylo \+(\d+)\)"),
+    "dubel jedzenia BK": re.compile(r"zamkow z Farmlands (\d+), miast z Warehouse (\d+) \| zdjeta premia (-?\d+) jedzenia/d \| osad z bilansem < 0: (\d+) -> (\d+) z (\d+) osad$"),
+    "murarz": re.compile(r"osad (\d+) z Masonem w budowach oplaconych \| punktow \+([\d.]+)/d \(sredni k ([\d.]+), max k ([\d.]+)\)$"),
+    "urzad podatkowy": re.compile(r"miast (\d+) z urzedem, droga firm (TAK|NIE) \| rata \+(-?\d+) zl \(pan (-?\d+), korona (-?\d+)\) w (\d+) ratach$"),
+    "karawany": re.compile(r"miast z Marketplace (\d+) \| wywolan (\d+), podniesionych (\d+), sredni mnoznik ([\d.]+)$"),
+    "asymilacja": re.compile(r"osad z projektem w liscie (\d+)/(\d+), wybrany w (\d+) \| latka (TAK|NIE), wywolan (\d+), dodano \+15 razy (\d+)$"),
+    "drogi": re.compile(r"wsi KS z drogami (\d+) \| dopisane ([\d.]+) szt\./d$"),
+    "produkcja wsi": re.compile(r"wsi z budynkami (\d+) \(.*\), projekt Production (\d+) \| KS wsi (\d+) dopisane ([\d.]+) szt\./d, poza KS ([\d.-]+) szt\. \| model BK czynny (TAK|NIE)$"),
+    "towary wsi": re.compile(r"wsi z ulami (\d+), miod \+([\d.]+) "),
+    "zamki": re.compile(r"tick BK dla zamkow (\d+) wywolan .*nasz tick (\d+) zamkow \| porty: klucz (TAK|NIE), zamkow z Portem (\d+) \(pod KS zablokowane (\d+)\), ryb \+(\d+) \| kopalnie: klucz (TAK|NIE), zamkow z kopalnia (\d+), wolanych (\d+)$"),
+    "stadniny": re.compile(r"zamkow ze Studs (\d+) \(pelnych (\d+)\) \| konie bojowe \+(\d+) \(ze Stash (\d+), z magazynu zamku (\d+), z wsi (\d+)\), bez zrodla (\d+), bez typu konia (\d+)$"),
+}
+B338_ERR = re.compile(r"ERROR in Buildings338")
+
+
+def budynki338_collect(logp):
+    D = {"start": [], "g": {g: [] for g in B338_GROUPS}, "bad": 0, "err": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if "338" not in line:
+                continue
+            if B338_ERR.search(line):
+                D["err"] += 1
+                continue
+            if "Budynki (338): start sesji" in line:
+                m = B338_START.search(line)
+                if m:
+                    D["start"].append({"main": m.group(1), "bk": m.group(2), "courier": m.group(3), "hooks": m.group(4)})
+                else:
+                    D["bad"] += 1
+                continue
+            if "Budynki (338) " not in line:
+                continue
+            m = B338_DAY.search(line)
+            if not m or m.group(1) not in D["g"]:
+                D["bad"] += 1
+                continue
+            g, day, body, err = m.group(1), int(m.group(2)), m.group(3), int(m.group(4))
+            rx = B338_RX[g].search(body)
+            if not rx:
+                D["bad"] += 1
+                continue
+            D["g"][g].append({"day": day, "err": err, "v": rx.groups()})
+    return D
+
+
+def budynki338_rows(rep, D, B=None):
+    anyg = any(D["g"].values())
+    if not D["start"]:
+        rep.add("B338-1: linia startu", f"brak (nierozpoznanych {D['bad']})", "linia 'Budynki (338): start sesji'", False if anyg else None)
+    else:
+        st = D["start"][-1]
+        miss = [h for h in st["hooks"].split("; ") if "BRAK" in h]
+        rep.add("B338-1: linia startu", f"startow {len(D['start'])}, glowny {st['main']}, BK {st['bk']}, Courier Post na liscie {st['courier']}, latki BRAK: {miss or '-'}",
+                "BK jest, 0 latek BRAK", st["bk"] == "jest" and not miss)
+    if not anyg:
+        rep.add("B338-2: linie doby grup", f"brak linii (nierozpoznanych {D['bad']})", "INFO (stary DLL albo < 1 doby)", None if D["bad"] == 0 else False)
+        return
+    probs = []
+    for g in B338_GROUPS:
+        days = sorted(set(r["day"] for r in D["g"][g]))
+        if not days:
+            probs.append(f"{g}: brak")
+            continue
+        gaps = sum(1 for a, b in zip(days, days[1:]) if b - a > 1)
+        if gaps:
+            probs.append(f"{g}: luk {gaps}")
+    nd = len(set(r["day"] for r in D["g"]["zold"]))
+    rep.add("B338-2: linie doby grup", f"dob {nd}, problemy: {probs or '-'}, nierozpoznanych {D['bad']}", "13 grup co dobe, 0 luk, 0 nierozpoznanych", not probs and D["bad"] == 0)
+    me = max((r["err"] for g in B338_GROUPS for r in D["g"][g]), default=0)
+    rep.add("B338-3: bledy 338", f"bledy max {me}, ERROR {D['err']}", "0 i 0", me == 0 and D["err"] == 0)
+    Z = D["g"]["zold"]
+    if Z:
+        bad = [r["day"] for r in Z if int(r["v"][2]) > int(r["v"][1]) or int(r["v"][3]) < 0]
+        bk = sum(int(r["v"][6]) for r in Z)
+        rep.add("B338-4: zold bez podwyzki, bez dubla BK", f"dob z po > przed {len(bad)}, pominiete (BK liczy) {bk}", "po <= przed, oszczednosc >= 0, pominiete 0", not bad and bk == 0)
+        last = Z[-1]["v"]
+        n, save = int(last[0]), int(last[3])
+        if int(last[1]) == 0 or n < 150:
+            rep.add("B338-5: oszczednosc zoldu", f"ostatnia doba: twierdz {n}, oszczednosc {save} zl/d (klucz wyl. albo < 150 twierdz)", "INFO", None)
+        else:
+            rep.add("B338-5: oszczednosc zoldu", f"ostatnia doba: twierdz {n}, oszczednosc {save} zl/d, limit AI skalowany {last[4]} twierdz", "20000..40000 zl/d", 20000 <= save <= 40000)
+    A = D["g"]["autowerbunek"]
+    if A:
+        bad = [r["day"] for r in A if int(r["v"][2]) > int(r["v"][1])]
+        tot = sum(int(r["v"][2]) for r in A)
+        rep.add("B338-6: autowerbunek w limicie", f"dob z dobranymi > sufit {len(bad)}; dobrano ponad K8 razem {tot} ludzi, ostatnio twierdz {A[-1]['v'][0]}", "dobrano <= suma limitu", not bad)
+    F = D["g"]["dubel jedzenia BK"]
+    if F:
+        v = F[-1]["v"]
+        a, b, n = int(v[3]), int(v[4]), int(v[5])
+        if n == 0:
+            rep.add("B338-7: dubel jedzenia BK - bilans", "0 osad z budynkami (klucz wyl.?)", "INFO", None)
+        else:
+            rep.add("B338-7: dubel jedzenia BK - bilans", f"ostatnia doba: osad z bilansem < 0 {a} -> {b} z {n}, zdjeta premia {v[2]} jedzenia/d", "po - przed <= 5% osad", b - a <= 0.05 * n)
+    M = D["g"]["murarz"]
+    if M:
+        mk = max(float(r["v"][3]) for r in M)
+        rep.add("B338-8: murarz k <= 1", f"max k {mk:.3f}, ostatnio osad {M[-1]['v'][0]}, punktow +{M[-1]['v'][1]}/d", "max k <= 1", mk <= 1.0001)
+    T = D["g"]["urzad podatkowy"]
+    if T:
+        n = max(int(r["v"][0]) for r in T)
+        tot = sum(int(r["v"][2]) for r in T)
+        road = T[-1]["v"][1]
+        if n == 0:
+            rep.add("B338-9: urzad podatkowy", "0 miast z urzedem", "INFO", None)
+        elif len(T) < 8:
+            rep.add("B338-9: urzad podatkowy", f"miast z urzedem {n}, droga firm {road}, rata +{tot} zl (dob {len(T)})", "INFO (< 8 dob - rata tygodniowa)", None)
+        else:
+            rep.add("B338-9: urzad podatkowy", f"miast z urzedem {n}, droga firm {road}, rata +{tot} zl w biegu", "droga firm TAK i rata > 0", road == "TAK" and tot > 0)
+    K = D["g"]["karawany"]
+    if K:
+        n = max(int(r["v"][0]) for r in K)
+        up = sum(int(r["v"][2]) for r in K)
+        rep.add("B338-10: karawany - targowisko", f"miast z Marketplace {n}, podniesionych ocen {up}", "> 0 gdy sa targowiska", (up > 0) if n > 0 else None)
+    S = D["g"]["asymilacja"]
+    if S:
+        v = S[-1]["v"]
+        rep.add("B338-11: asymilacja", f"projekt w liscie {v[0]}/{v[1]}, wybrany {v[2]}, latka {v[3]}, dodano {v[5]}", "latka TAK", v[3] == "TAK")
+    R, P, G = D["g"]["drogi"], D["g"]["produkcja wsi"], D["g"]["towary wsi"]
+    if R or P or G:
+        rv = R[-1]["v"] if R else ("?", "?")
+        pv = P[-1]["v"] if P else ("?",) * 6
+        gv = G[-1]["v"] if G else ("?", "?")
+        rep.add("B338-12: drogi / produkcja wsi / ule", f"drogi: wsi KS {rv[0]} +{rv[1]} szt./d | budynki BK: wsi {pv[0]}, Production {pv[1]}, KS +{pv[3]}, poza KS +{pv[4]}, model BK {pv[5]} | ule: wsi {gv[0]}, miod +{gv[1]}",
+                "model BK czynny NIE", (pv[5] == "NIE") if P else None)
+    C = D["g"]["zamki"]
+    if C:
+        bk = sum(int(r["v"][0]) for r in C)
+        v = C[-1]["v"]
+        rep.add("B338-13: tick zamkow", f"wywolan BK dla zamkow {bk}; ostatnio nasz tick {v[1]} zamkow, porty {v[3]} (pod KS {v[4]}), ryb +{v[5]}, kopalnie {v[7]} (klucz {v[6]})",
+                "BK nie tyka zamkow (0) - nasz tick bez dubla", bk == 0)
+    H = D["g"]["stadniny"]
+    if H:
+        nt = sum(int(r["v"][7]) for r in H)
+        bred = sum(int(r["v"][2]) for r in H)
+        rep.add("B338-14: stadniny", f"zamkow ze Studs {H[-1]['v'][0]}, konie bojowe +{bred} w biegu, bez zrodla {sum(int(r['v'][6]) for r in H)}, bez typu konia {nt}", "bez typu konia 0", nt == 0)
+    if B is None:
+        rep.add("B338-15: zalogi AI wobec bazy", "brak --baza", "INFO (podaj log biegu z Buildings338 wyl.)", None)
+        return
+    ta = {r["day"]: int(r["v"][8]) for r in Z}
+    tb = {r["day"]: int(r["v"][8]) for r in B["g"]["zold"]}
+    com = sorted(set(ta) & set(tb))
+    if not com:
+        rep.add("B338-15: zalogi AI wobec bazy", "brak wspolnych dob", "+-5%", False)
+        return
+    d = com[-1]
+    ma, mb = ta[d], tb[d]
+    if len(com) < 60:
+        rep.add("B338-15: zalogi AI wobec bazy", f"dzien {d}: test {ma}, baza {mb} (wspolnych dob {len(com)} < 60)", "INFO (< 60 dob)", None)
+    else:
+        rep.add("B338-15: zalogi AI wobec bazy", f"dzien {d}: test {ma}, baza {mb} ({100 * (ma / mb - 1) if mb else 0:+.1f}%)", "+-5% bazy", mb > 0 and abs(ma / mb - 1) <= 0.05)
+
+
+def budynki338_lines(day, save=30000, before=100000, bk=0, err=0, rec=(5, 10, 3), neg=(4, 5, 100), kmax="0.800", tax=120, road="TAK", up=50, assim="TAK", tick=0, notype=0,
+                     aimen=50000, model="NIE"):
+    L = {
+        "zold": f"Budynki (338) zold: dzien {day} | twierdz 200 z budynkiem (miasto Barracks 50, zamek Barracks 100, biuro 60, Slacken 2) | zold przed {before} po {before - save} oszczednosc {save} zl/d | limit AI x s: 150 twierdz, skalowan 150 | pominiete (BK liczy) {bk} | wywolan 900 | zalogi AI {aimen} ludzi | bledy {err}",
+        "autowerbunek": f"Budynki (338) autowerbunek: dzien {day} | twierdz {rec[0]} z premia (biuro 3, Train Militia 1, Raise Troops 1), suma limitu +{rec[1]}/d | dobrano ponad K8 {rec[2]} ludzi | bledy 0",
+        "zapas jedzenia": f"Budynki (338) zapas jedzenia: dzien {day} | miast z Warehouse 30 (sufit +60000), zamkow z Granary 20 (sufit +40000, BK bylo +40000) | przyklad King's Landing sufit 50000 -> 53000 | bledy 0",
+        "dubel jedzenia BK": f"Budynki (338) dubel jedzenia BK: dzien {day} | zamkow z Farmlands 40, miast z Warehouse 30 | zdjeta premia 900 jedzenia/d | osad z bilansem < 0: {neg[0]} -> {neg[1]} z {neg[2]} osad | bledy 0",
+        "murarz": f"Budynki (338) murarz: dzien {day} | osad 12 z Masonem w budowach oplaconych | punktow +30.5/d (sredni k 0.400, max k {kmax}) | bledy 0",
+        "urzad podatkowy": f"Budynki (338) urzad podatkowy: dzien {day} | miast 20 z urzedem, droga firm {road} | rata +{tax} zl (pan {tax // 2}, korona {tax - tax // 2}) w 3 ratach | bledy 0",
+        "karawany": f"Budynki (338) karawany: dzien {day} | miast z Marketplace 40 | wywolan 3000, podniesionych {up}, sredni mnoznik 1.040 | bledy 0",
+        "asymilacja": f"Budynki (338) asymilacja: dzien {day} | osad z projektem w liscie 200/210, wybrany w 3 | latka {assim}, wywolan 500, dodano +15 razy 30 | bledy 0",
+        "drogi": f"Budynki (338) drogi: dzien {day} | wsi KS z drogami 150 | dopisane 120.5 szt./d | bledy 0",
+        "produkcja wsi": f"Budynki (338) produkcja wsi: dzien {day} | wsi z budynkami 40 (Farming 10, Mining 5, AnimalHousing 10, Sawmill 10, FishFarm 5), projekt Production 600 | KS wsi 500 dopisane 900.0 szt./d, poza KS 50.0 szt. | model BK czynny {model} | bledy 0",
+        "towary wsi": f"Budynki (338) towary wsi: dzien {day} | wsi z ulami 3, miod +4.5 (baza przed mnoznikami) | chleb i skora: odlozone | bledy 0",
+        "zamki": f"Budynki (338) zamki: dzien {day} | tick BK dla zamkow {tick} wywolan (0 = gra nie tyka zamkow), nasz tick 5 zamkow | porty: klucz TAK, zamkow z Portem 5 (pod KS zablokowane 4), ryb +12 | kopalnie: klucz NIE, zamkow z kopalnia 7, wolanych 0 | bledy 0",
+        "stadniny": f"Budynki (338) stadniny: dzien {day} | zamkow ze Studs 4 (pelnych 1) | konie bojowe +1 (ze Stash 0, z magazynu zamku 0, z wsi 1), bez zrodla 0, bez typu konia {notype} | bledy 0",
+    }
+    return [L[g] for g in B338_GROUPS]
+
+
+def budynki338_synth():
+    """B338-S: dobry bieg, luka, BK liczy, podwyzka, zla oszczednosc, autowerbunek ponad sufit, dubel > 5%, k > 1, droga firm NIE, karawany 0, latka NIE, model BK, tick BK
+    zamkow, bez typu konia, blad, ERROR, zly format, brak startu, latka BRAK, stary log, baza +-5%. None = OK."""
+    import tempfile
+    import shutil
+    start = ("Budynki (338): start sesji | glowny TAK | zold TAK, autowerbunek TAK | BK jest | Courier Post na liscie budowy wsi BK: NIE | latki: zold: limit AI wpiety; "
+             "karawany: BKCaravansBehavior.GetTradeScoreForTown wpiety")
+
+    def days(n=10, **kw):
+        out = [start]
+        for d in range(1, n + 1):
+            out += budynki338_lines(d, **kw)
+        return out
+    runs = {
+        "good": (days(), {"B338-1": "TAK", "B338-2": "TAK", "B338-3": "TAK", "B338-4": "TAK", "B338-5": "TAK", "B338-6": "TAK", "B338-7": "TAK", "B338-8": "TAK",
+                          "B338-9": "TAK", "B338-10": "TAK", "B338-11": "TAK", "B338-12": "TAK", "B338-13": "TAK", "B338-14": "TAK", "B338-15": "INFO"}),
+        "gap": ([start] + budynki338_lines(1) + budynki338_lines(3), {"B338-2": "NIE"}),
+        "bk": (days(bk=3), {"B338-4": "NIE"}),
+        "raise": (days(save=-10), {"B338-4": "NIE"}),
+        "save": (days(save=5000), {"B338-5": "NIE"}),
+        "rec": (days(rec=(5, 10, 11)), {"B338-6": "NIE"}),
+        "neg": (days(neg=(4, 20, 100)), {"B338-7": "NIE"}),
+        "k": (days(kmax="1.200"), {"B338-8": "NIE"}),
+        "road": (days(road="NIE"), {"B338-9": "NIE"}),
+        "car": (days(up=0), {"B338-10": "NIE"}),
+        "assim": (days(assim="NIE"), {"B338-11": "NIE"}),
+        "model": (days(model="TAK"), {"B338-12": "NIE"}),
+        "tick": (days(tick=5), {"B338-13": "NIE"}),
+        "notype": (days(notype=1), {"B338-14": "NIE"}),
+        "err": (days(err=1), {"B338-3": "NIE"}),
+        "errline": (days() + ["ERROR in Buildings338.Wage.Apply (potkniecie 1)"], {"B338-3": "NIE"}),
+        "broken": (days() + [budynki338_lines(11)[0].replace("| zold przed", "| zold-przed")], {"B338-2": "NIE"}),
+        "nostart": (days()[1:], {"B338-1": "NIE"}),
+        "brak": ([start.replace("wpiety", "BRAK")] + budynki338_lines(1), {"B338-1": "NIE"}),
+        "old": (["Zold zalog (337): dzien 3 | ..."], {"B338-2": "INFO"}),
+    }
+    tmp = tempfile.mkdtemp(prefix="b338_")
+    diff = []
+    try:
+        def run(Ls, name):
+            logp = os.path.join(tmp, f"Armoury-{name}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {x}" for i, x in enumerate(Ls)) + "\n")
+            return budynki338_collect(logp)
+        for kind, (Ls, exp) in runs.items():
+            rep = Report()
+            budynki338_rows(rep, run(Ls, kind))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp.items() if got.get(k) != v]
+        base = run(days(61, aimen=50000), "baza")
+        for kind, men, e in (("bok", 51000, "TAK"), ("bbad", 56000, "NIE")):
+            rep = Report()
+            budynki338_rows(rep, run(days(61, aimen=men), kind), base)
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            if got.get("B338-15") != e:
+                diff.append(f"{kind} B338-15: {got.get('B338-15')} (oczekiwane {e})")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def budynki338_main(rest):
+    rep = Report()
+    try:
+        s2 = budynki338_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("B338-S: test syntetyczny (dobry, luka, BK liczy, podwyzka, oszczednosc, autowerbunek, dubel, k, droga firm, karawany, asymilacja, model BK, tick zamkow, "
+            "typ konia, blad, ERROR, zly format, brak startu, latka BRAK, stary log, baza)", s2 or "OK", "OK", s2 is None)
+    baza = None
+    if "--baza" in rest:
+        i = rest.index("--baza")
+        baza = rest[i + 1] if i + 1 < len(rest) else None
+        rest = [x for j, x in enumerate(rest) if j != i and j != i + 1]
+    logp = rest[0] if rest else None
+    if not logp or not os.path.isfile(logp):
+        rep.add("B338-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log> [--baza <log z Buildings338 wyl.>]", None)
+        rep.show()
+        return 0
+    D = budynki338_collect(logp)
+    B = budynki338_collect(baza) if baza and os.path.isfile(baza) else None
+    print(f"plik: {logp} | startow {len(D['start'])}, dob {len(D['g']['zold'])}, nierozpoznanych {D['bad']}, ERROR {D['err']}" + (f" | baza {baza}: dob {len(B['g']['zold'])}" if B else ""))
+    budynki338_rows(rep, D, B)
+    rep.show()
+    return 0
+
+
+_budynki338_main_prev = main
+
+
+def main(argv):
+    # paczka 338: grupa budynki338 - opakowanie main jak wodz335
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "budynki338":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return budynki338_main(rest)
+    return _budynki338_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

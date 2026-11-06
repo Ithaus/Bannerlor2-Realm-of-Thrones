@@ -323,6 +323,7 @@ namespace Armoury
                 else if (!(bas > 0f)) d.a5NoVol++;
                 else if (res >= daily && bas > res) d.a5Daily++;
                 else if (res < bas) d.a5Wage++;
+                Buildings338AutoRecruit.NoteA5(__0, res);   // 338 grupa 2: ludzie ponad limit bez budynkow (gra + K8)
                 // K8: wolanie wyzej przeszlo przez K8Postfix (zewnetrzny poziom) - stan tej twierdzy: limit gry i powod
                 if (ReferenceEquals(_k8Town, __0) && _k8Why != K8Off)
                 {
@@ -331,7 +332,7 @@ namespace Armoury
                     else if (_k8Why == K8Brake) { if (budget > 0 && bas > res && res >= g) d.k8Brake++; }   // hamulec zatrzymal ochotnika ponad limit gry
                     else
                     {
-                        long got = (long)Math.Ceiling(res);                    // gra bierze ceil(Result) ochotnikow (petla i < Result)
+                        long got = Math.Min((long)Math.Ceiling(res), Buildings338AutoRecruit.BaseCap(__0, long.MaxValue));   // gra bierze ceil(Result) ochotnikow (petla i < Result); 338: ludzie ponad limit bez budynkow licza sie budynkom
                         if (got > g) { d.k8Extra += got - g; d.k8Towns++; }
                         if (res < daily)
                         {
@@ -369,13 +370,16 @@ namespace Armoury
             try
             {
                 int game = __result, why = K8Off, lim = K8Limit;
-                if (lim > game && __0 != null && __0.Settlement != null && Campaign.Current != null)
+                bool add338 = Buildings338.AutoRecruitOn;   // 338: K8 dodaje premie do limitu gry (bylo max), budynki doliczane ponizej
+                if ((add338 ? lim > 1 : lim > game) && __0 != null && __0.Settlement != null && Campaign.Current != null)
                 {
                     var st = __0.Settlement;
                     if (!PeopleBook.LevyLive || CrownGifts.IsWatch(st.MapFaction) || OthersAt(st)) why = K8Out;
                     else if (FreeHands.Braked(st)) why = K8Brake;
-                    else { why = K8On; __result = lim; }
+                    else { why = K8On; __result = add338 ? game + (lim - 1) : lim; }
                 }
+                Buildings338AutoRecruit.NoteBase(__0, __result);   // 338: limit bez budynkow (licznik K8 / budynki w A5LimitPostfix)
+                if (add338 && why != K8Brake && __0 != null && __0.Settlement != null && !FreeHands.Braked(__0.Settlement)) __result += Buildings338AutoRecruit.Bonus(__0);   // 338 grupa 2: biuro kasztelana, Train Militia, Raise Troops (nie w krainie bez wolnych rak)
                 _k8Town = __0; _k8Game = game; _k8Why = why;
             }
             catch (Exception e) { Stumble("K8Postfix", e); }

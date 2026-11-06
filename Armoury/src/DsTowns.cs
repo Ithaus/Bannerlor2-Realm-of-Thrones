@@ -1453,6 +1453,7 @@ namespace Armoury
             double rn = NewShare;                                   // przejscie: raty firm x rampa (reszta - stary zawor u wolajacego)
             double iL = f.FL / Weeks * rn, iC = f.FC / Weeks * rn, iLf = f.FLf / Weeks * rn;
             if (k == null) { iL += iC; iC = 0; if (f.AC > 0) { f.AL += f.AC; f.AC = 0; } }   // rod bez krolestwa - calosc panu (jak zawor)
+            if (town) Buildings338Income.TaxOffice(t, ref iL, ref iC);   // 338 grupa 5: urzad podatkowy miasta +5/10/15% raty (z kasy miasta ponad zapas, jak rata)
             bool folkPays = s.DsFarmFolkFromSavings;
             if (!folkPays) { iL += iLf; iLf = 0; if (f.ALf > 0) { f.AL += f.ALf; f.ALf = 0; } }   // klucz wylaczony - cala firma pana z kasy
             int serial;

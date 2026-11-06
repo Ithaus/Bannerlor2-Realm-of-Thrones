@@ -1,5 +1,62 @@
 # DZIENNIK ZMIAN
 
+## 338 - budynki robia to, co pisze ich opis: zold zalog, autowerbunek, zapas jedzenia, murarz, urzad podatkowy, targowisko, asymilacja, drogi, budynki wsi BK, ule, porty i stadniny zamkow (noc/338-budynki od 091ed773 - NIE WGRANE, bez autotestu; Armoury.dll 38e2926c79b87ba08914c76400d27f8e, test/m338)
+**Problem:** Jeff 06.11: "zrob audyt budynkow, czy w ogole dzialaja, czy trzeba je przeprogramowac i naprawic, aby to, co robia, dzialalo". Dowod: at337 linia
+`Zold zalog (337)` - "budynki martwe (BK)", 213 twierdz, ok. 31 400 zl/d obnizki zoldu nieodebranej. Audyt `docs/AUDYT-338-BUDYNKI.md` (kazdy wniosek MARTWY/CZESCIOWO
+z druga proba obalenia), projekt `docs/PROJEKT-338-BUDYNKI.md`.
+**Przyczyny (z dekompilacji):** BK podmienia modele gry (zold, jedzenie, budowa, karawany, produkcja wsi) i liczy efekty budynkow zle albo wcale; Armoury zastepuje
+wyniki (budowy oplacone, podatek miast renta, stawki KS wsi) bez budynkow; gra odpala DailyTickTownEvent tylko dla miast, a BK wpial tam porty, kopalnie i stadniny zamkow.
+**Zmiana (nowe pliki `Armoury/src/Buildings338*.cs`, wylacznik `Buildings338` + klucz grupy, linie doby `Budynki (338) <grupa>: dzien N | ... | bledy n`):**
+- 1 `Buildings338Wage` (Buildings338Wage.cs; 1 linia w MountedWage.TotalPostfix): koszary miasta -5/10/15%, zamku -10/20/30%, biuro kasztelana -10/20/30%, Slacken
+  Garrison -5% - `town.AddEffectOfBuildings(GarrisonWageReduction)` w zewnetrznym GetTotalWage zalogi, jak DefaultPartyWageModel:147. Straznik: budynek z wartoscia
+  > 0 (BK poprawil znak) - pomijamy ("pominiete (BK liczy)"). Limit zlota zalog AI x (zold z budynkami / bez) z ostatniej doby (postfiks High na
+  UpdateClanSettlementsPaymentLimit, przed ClanBudget) - ta sama liczba ludzi, oszczednosc w kiesie pana; rod gracza bez skalowania.
+- 2 `Buildings338AutoRecruit` (Buildings338AutoRecruit.cs; ArmsFromPeople.K8Postfix + 2 linie w A5LimitPostfix): biuro +1/2/3, Train Militia +1, Raise Troops +2 ludzi/d.
+  Przy kluczu K8 z "max(gra, 2)" na "gra + (K8 - 1)" (przy grze = 1 to samo), budynki doliczane na zewnetrznym poziomie, nie w krainie z hamulcem wolnych rak.
+  Licznik K8 "dobrano" bez ludzi ponad limit bez budynkow (ci ida do linii 338).
+- 3a `Buildings338FoodStock` (Buildings338Food.cs): postfiks Last na Town.FoodStocksUpperLimit (gdy BK przejal wynik): czlon BK spichlerza zdjety, jedno
+  AddEffectOfBuildings(FoodStock) x 10 - magazyn miasta +1000/3000/5000 (dotad 0), spichlerz bez zmian + perki Battlements/Contractors.
+- 3b `Buildings338FoodDouble` (tylko z 3a): postfiks na BKFoodModel.GetPopulationFoodProduction - czynnik BK Farmlands/Warehouse (poziom x 0.5/0.3) skasowany
+  dokladnie (AddFactor z minusem; po nim BK dodaje tylko czynniki praw). Linia doby mierzy osady z bilansem < 0 przed/po.
+- 4 `Buildings338Mason` (Buildings338Mason.cs; BuildFunding.PowerPostfix/PowerIntPostfix/RawPower, BuildFunding.Engineering.EngPaidNeed): w budowach oplaconych
+  k = mason / max(5, surowa moc BK - mason), k <= 1, dopisek k x (punkty pana + robota ludu); dymek i postep ten sam k; planowanie doplat dzieli przez (1 + k).
+  Punkty kopalni BK (spoza opisu) nie wracaja.
+- 5 `Buildings338TaxOffice` (Buildings338Income.cs; 1 linia w DsTowns.Pay): rata pana i korony miasta x (1 + TaxPerDay) = +5/10/15%, z kasy ponad zapas jak rata.
+  Zawor PopulationLaw.ValveTowns (gdy droga firm nieczynna) - BEZ zmian (u Jeffa nieczynny).
+- 6 `Buildings338Caravans` (Buildings338Income.cs): postfiks Low na BKCaravansBehavior.GetTradeScoreForTown - ocena miasta x 1.02/1.04/1.06 (targowisko).
+- 7 `Buildings338Assimilation` (Buildings338Assimilation.cs): postfiks na CalculateCultureWeight czynnego modelu kultury BK (PatchTarget.OfActive) - +15 wagi
+  kultury pana przy biezacym projekcie "Cultural assimilation" (liczba Theater BK na poziomie 3).
+- 8 `Buildings338Roads` i 10 `Buildings338VillageProd` (Buildings338Village.cs; StartCalibration.Live - 2 linie przy skladaniu stawek A, MaterialLaw.ProdPostfix -
+  1 linia): pod KS stawka A wsi x drogi warowni (1.05/1.10/1.15) x czynnik BK budynku kategorii (ApplyProductionBuildingEffect BK, +0.05 x poziom) + projekt
+  Production +0.15 (VillageData.CurrentBuilding jak BK); poza KS ten sam czynnik BK w ProdPostfix (czynnik x suma). Gdy czynny bylby model BK - grupa 10 nic.
+- 11 `Buildings338VillageGoods`: ul BK (Skeps) +1 wagi miodu za poziom w VillageFruit.Base (1 linia; wies poza KS). Chleb (Bakery, Mill) i skora (Fur Tannery) -
+  ODLOZONE (wymagaja przesuniecia rak z plonu zrodlowego takze w stawce KS - inaczej towar z niczego).
+- 9 `Buildings338Ports` + `Buildings338CastleMines` (Buildings338Ports.cs): wlasny tick dobowy zamkow wola BK RunPorts (zamek z Portem) i RunMines (Castle Mines,
+  klucz domyslnie NIE - do pomiaru) - dzialaja wszystkie latki Armoury jak dla miast (A17 PortsPre z blokada KS, zaplata do kiesy ludu, place gornikow).
+  Straznik: licznik wywolan BK OnTownDailyTick dla zamkow - gdy > 0, nasz tick nie biegnie. Porty miast pod KS - BEZ zmian (plan ryb portow - osobny projekt).
+- 12 `Buildings338Studs` (Buildings338Studs.cs): wlasna hodowla zamkow ze Studs (liczby BK: limit pastwiska/10000 + 2 x poziom, 2%/d), typ konia nigdy pusty
+  (kultura zamku -> pana -> krolestwa -> dowolny kon bojowy), kon bojowy z zwyklego konia (Stash, magazyn zamku, wies zamku za cene z kasy zamku) - nic z niczego;
+  prefiks na BK RunStuds pomija zamki przy kluczu.
+- Linia startu `Budynki (338): start sesji` (klucze, BK, latki, Courier Post na liscie budowy wsi BK). Dekompilacja BK: Courier Post NIE jest w
+  DefaultVillageBuildings.All ani w VillageBuildings(village) - nie da sie go zbudowac (bez zmian).
+- Settings.cs / McmSettings.cs (15 kluczy, grupa MCM "Buildings do what their description says (338)" - wpisy z gen_mcm wstawione recznie, reszta pliku bez zmian),
+  ArmouryBehavior (SessionStart po MountedWage.EnsureContextHooks, Daily po MountedWage.Daily), `tools/sprawdz_logi.py --grupa budynki338` (B338-1..15, synteza B338-S TAK).
+**Ryzyko / co sprawdzic:**
+- Gospodarka (KS): grupa 10 + projekt Production (+15% gdy wies nic nie buduje - projekt domyslny BK) i drogi podnosza podaz wsi pod KS po przeliczeniu okregu;
+  Plan (mk, res.Market, kosz wsi) tego nie widzi w tej samej dobie - ceny i renta dostosuja sie. Sprawdzic w tescie 120 dob ceny zboza/drewna/rud i Obieg.
+- Zold: oszczednosc ok. 30 000 zl/d (B338-5); zalogi AI +-5% bazy (B338-15 z --baza, bieg z Buildings338=false). Scalanie z 337: opcja B `GarrisonBuildingWage337`
+  = ten sam efekt - usunac (albo Apply 338 pomija przy niej); skalowanie limitu 337 (b = FullTotalWage bez 337 i 338) i 338 nie moga oba mnozyc limitu tej samej
+  twierdzy - przy scalaniu zostawic jedno (337 liczy calosc, gdy b bez obu). Obie paczki wstawiaja linie w tym samym miejscu MountedWage.TotalPostfix (337 z return).
+- K8: przy kluczu 338 K8 dodaje premie do limitu gry zamiast max - gdy inny model podniesie limit gry > 1, limit rosnie o premie K8 (dotad max).
+- Murarz: K wola surowa moc lancucha (BuildFunding.RawPower - zagniezdzone wywolanie modelu) przy kazdym dymku i planie doplat - koszt maly, ale pomiar w profilu doby.
+- 3b: jesli B338-7 pokaze > 5% osad z bilansem < 0 - wylaczyc Buildings338FoodDouble i zapytac Jeffa (decyzja projektu).
+- Zamki: porty zamkow pod KS dalej zablokowane (A17) - dzialaja tylko w krainach wroconych i poza KS. Kopalnie zamkow wylaczone do pomiaru (rudy do magazynu zamku
+  za kase zamku - BK). Stadniny: konie z wsi zamku kosztuja kase zamku (wies dostaje cene).
+- Nie zrobione z projektu (osobno): chleb/skora wsi (11), porty miast pod KS + plan ryb + jedna nazwa w ksiedze (9), zawor ValveTowns (5), ul pod KS.
+- Decyzje Jeffa (bez zmian w kodzie): urzad podatkowy wsi (podpowiedz / oplata wsi / ukrycie), Courier Post (nie do zbudowania - nic), sila handlu Portu zamku.
+**Status:** DO SPRAWDZENIA - build Release kod 0, sprawdz_logi --grupa budynki338 synteza TAK; bez autotestu (gra nieuruchamiana). Test: autotest 120 dob z
+`C:\Users\GAME\bannerlord-autotest\test\m338` na kopii zapisu + bieg bazowy z Buildings338=false, `python -I tools/sprawdz_logi.py --grupa budynki338 <log> --baza <log bazy>`.
+
 ## 335b - poprawki po 2 recenzjach 335: obrona trwa w bitwie chronionego, przydzial obroncow bez podwojnego liczenia, straz nie z linii w zwarciu (noc/335-ochrona-wodza; Armoury.dll 6ffcced0ea53e5933dc5a8aed4ea0758 - NIE WGRANE, bez autotestu; Jeff gra)
 **Mapa (LordEscort.Guard335.cs):**
 - WAZNE 4 / R2-1: para nie znika w chwili starcia - P w bitwie polowej (bez osady, nie morze) z napastnikiem z poprzedniej migawki albo P po stronie broniacej, a X = wodz

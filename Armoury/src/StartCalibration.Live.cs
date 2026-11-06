@@ -657,6 +657,7 @@ namespace Armoury
                     nv++;
                     var a = new float[ItemCount];
                     for (int i = 0; i < ItemCount; i++) { a[i] = (float)res.Market[i]; mk[i] += res.Market[i]; }
+                    Buildings338Village.ScaleRates(ld.V, a);   // 338 grupy 8 i 10: drogi warowni i budynki produkcji wsi BK - raz na przeliczenie okregu
                     rates[ld.V] = new VRate { A = a, M = m };
                     try { ld.Basket = VillageBasket(ld, res); zv[ld.V] = ld.Basket; if (ld.BasketPaid != null) zvp[ld.V] = ld.BasketPaid; } catch (Exception e) { Stumble("VillageBasket", e); }
                     // racje spichlerza: kcal czesci domowej z wlasnego pola i domu + jedzenie robione w domu (krok 8 - koszyk, na ktory wsi nie stac)
@@ -806,7 +807,7 @@ namespace Armoury
             nv++;
             VRate old;
             if (_ratesKeep.TryGetValue(ld.V, out old) && old != null) rates[ld.V] = old;
-            else { var a = new float[ItemCount]; for (int i = 0; i < ItemCount; i++) a[i] = (float)res.Market[i]; rates[ld.V] = new VRate { A = a, M = m }; }
+            else { var a = new float[ItemCount]; for (int i = 0; i < ItemCount; i++) a[i] = (float)res.Market[i]; Buildings338Village.ScaleRates(ld.V, a); rates[ld.V] = new VRate { A = a, M = m }; }   // 338: jak wyzej
             for (int i = 0; i < ItemCount; i++) mk[i] += res.Market[i];
             ownKcal += res.OwnKcal + ld.HomeKcal; kcalNeed += res.KcalNeed;
             if (ld.Basket != null) zv[ld.V] = ld.Basket;
