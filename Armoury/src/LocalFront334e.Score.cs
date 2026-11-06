@@ -482,7 +482,6 @@ namespace Armoury
         [ThreadStatic] private static PartyThinkParams _svPt;
         [ThreadStatic] private static int _svStart;
         [ThreadStatic] private static Dictionary<Settlement, float> _svL;
-        [ThreadStatic] private static List<int> _svIdx;
         [ThreadStatic] private static long _svOm;
         private static long _dSvThink, _dSvEntries, _dSvEval, _dSvCut;
         private static string _wSieve = "nie wpieta";
@@ -507,8 +506,28 @@ namespace Armoury
         /// <summary>Finalizer: koniec odsiewu przy wyjatku gry (wyjatek idzie dalej bez zmian).</summary>
         public static Exception SieveFin(Exception __exception) { if (__exception != null) _svP = null; return __exception; }
 
-        /// <summary>Postfiks: wpisy RaidSettlement tej mysli malejaco po gornej granicy; dokladne q po kolei, dopoki granica nastepnego moze przebic najlepszy dokladny
-        /// (bez weta 334e); reszta 0 - ich dokladny wynik i tak jest ponizej najlepszego. Nie rzuca.</summary>
+        // 342r: pary (granica po mnozniku WW3, indeks wpisu) - lista watku i staly porownywacz (bez domkniecia w kazdej mysli)
+        [ThreadStatic] private static List<KeyValuePair<float, int>> _svOrd;
+        private sealed class SvDesc : IComparer<KeyValuePair<float, int>>
+        {
+            public int Compare(KeyValuePair<float, int> a, KeyValuePair<float, int> b) { int c = b.Key.CompareTo(a.Key); return c != 0 ? c : a.Value.CompareTo(b.Value); }
+        }
+        private static readonly SvDesc SvCmp = new SvDesc();
+
+        /// <summary>342r: wpis rabunku, ktory sluchacze mysli PO odsiewie (AiHourlyTick) i tak zablokuja (-1) - nie moze byc "najlepszym" odsiewu:
+        /// weta 334e (274, teatr, 326b), ochrona wsi (RaidTribute), blokada przeprawy (CrossingLaw).</summary>
+        private static bool SvLater(Kingdom k, MobileParty p, Settlement st)
+        {
+            string why;
+            if (WarFront334.VetoedFor334e(k, st, out why)) return true;
+            if (RaidTribute.SparedNow(st, p.MapFaction)) return true;
+            return CrossingLaw.AimBlocks(p, st);
+        }
+
+        /// <summary>Postfiks: wpisy RaidSettlement tej mysli malejaco po gornej granicy x mnoznik WW3 ReaverLaw (342r: Profit mnozy rabunki po tym postfiksie, do x3 -
+        /// porzadek musi byc ten sam, ktory zobaczy wybor gry); dokladne q po kolei, dopoki granica nastepnego moze przebic najlepszy dokladny (bez weta 334e, ochrony
+        /// RaidTribute i blokady CrossingLaw - te daja -1 pozniej); reszta 0 - ich dokladny wynik i tak jest ponizej najlepszego. Pozniejsze postfiksy oceny celu
+        /// (rozejm SiegeRansom - zerowanie) i AiHourlyTick (WW3 - mnozenie, weta - -1) zachowuja ten porzadek; mysl gry jest sekwencyjna (AiPartyThinkBehavior). Nie rzuca.</summary>
         public static void SievePost(Army.ArmyTypes __0, PartyThinkParams __1)
         {
             if (__0 != Army.ArmyTypes.Raider || _svP == null) return;
@@ -520,33 +539,40 @@ namespace Armoury
                 var k = p.MapFaction as Kingdom;
                 if (k == null || _svL == null || _svL.Count == 0) { if (_svOm > 0) lock (_lk) _dModelT += _svOm; return; }
                 var scores = __1.AIBehaviorScores;
-                if (_svIdx == null) _svIdx = new List<int>(); else _svIdx.Clear();
+                double rc;
+                bool boost = ReaverLaw.SieveBoostPrep(p, out rc);
+                if (_svOrd == null) _svOrd = new List<KeyValuePair<float, int>>(); else _svOrd.Clear();
                 for (int i = _svStart; i < scores.Count; i++)
                 {
                     var e = scores[i];
                     var st = e.Item1.Party as Settlement;
-                    if (e.Item1.AiBehavior == AiBehavior.RaidSettlement && st != null && _svL.ContainsKey(st)) _svIdx.Add(i);
+                    if (e.Item1.AiBehavior != AiBehavior.RaidSettlement || st == null || !_svL.ContainsKey(st)) continue;
+                    float up = e.Item2;
+                    if (!(up > 0f)) continue;
+                    float mw = boost ? (float)ReaverLaw.SieveBoost(st, e.Item1.NavigationType, rc) : 1f;
+                    _svOrd.Add(new KeyValuePair<float, int>(up * mw, i));
                 }
-                _svIdx.Sort((a, b) => scores[b].Item2.CompareTo(scores[a].Item2));
+                _svOrd.Sort(SvCmp);
                 float best = 0f;
                 int ev = 0, cut = 0;
                 bool done = false;
-                foreach (int i in _svIdx)
+                for (int j = 0; j < _svOrd.Count; j++)
                 {
+                    int i = _svOrd[j].Value;
+                    float bw = _svOrd[j].Key;
                     var e = scores[i];
                     float up = e.Item2;
-                    if (!(up > 0f)) continue;
                     var d = e.Item1;
-                    if (done || up <= best) { done = true; __1.SetBehaviorScore(in d, 0f); cut++; continue; }
+                    if (done || bw <= best) { done = true; __1.SetBehaviorScore(in d, 0f); cut++; continue; }
                     var st = (Settlement)d.Party;
                     float m = RaidCore(st, p, k, _svL[st], up / RaidUp, 0);
                     float v = up / RaidUp * m;
                     __1.SetBehaviorScore(in d, v);
                     ev++;
-                    string why;
-                    if (v > best && !WarFront334.VetoedFor334e(k, st, out why)) best = v;
+                    float vw = up > 0f ? v * (bw / up) : v;   // po mnozniku WW3
+                    if (vw > best && !SvLater(k, p, st)) best = vw;
                 }
-                lock (_lk) { _dSvThink++; _dSvEntries += _svIdx.Count; _dSvEval += ev; _dSvCut += cut; _dModelT += _svOm; }
+                lock (_lk) { _dSvThink++; _dSvEntries += _svOrd.Count; _dSvEval += ev; _dSvCut += cut; _dModelT += _svOm; }
             }
             catch (Exception e) { Stumble("SievePost", e); }
             finally { if (_svL != null) _svL.Clear(); _svPt = null; }

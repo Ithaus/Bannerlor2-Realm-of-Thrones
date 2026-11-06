@@ -734,7 +734,8 @@ namespace Armoury
                 if (party.Army != null) return 0;
                 var h = party.LeaderHero; var c = h != null ? h.Clan : null;
                 if (h == null || c == null) return 7;
-                if (!AnyLordArmy342.MayLead(party)) return AnyLordArmy342.On && c.Leader != h ? (c.Influence > 100f ? 11 : 2) : 1;
+                int lw;   // 342r (D2): powod z reguly 342 - najem 5, limit wplywu rodu 11 (wplyw <= 100 - 2), poza regula (rod / krolestwo gracza, nie druzyna lorda) 7
+                if (!AnyLordArmy342.MayLead(party, out lw)) return lw == 5 ? 5 : lw == 11 ? (c.Influence > 100f ? 11 : 2) : (AnyLordArmy342.On && c.Leader != h ? 7 : 1);
                 if (!(c.Influence > 100f)) return 2;
                 if (!AnyLordArmy342.LeadsNow(party)) return 12;
                 if (c.IsUnderMercenaryService) return 5;
@@ -788,6 +789,20 @@ namespace Armoury
             if (lim <= 0) return 9;
             if (lim < list.Count) list.RemoveRange(lim, list.Count - lim);
             if (list.Count == 0) return 6;
+            if (AnyLordArmy342.ByRule(party))
+            {
+                // 342r (D1): wodz z reguly 342 - gra przytnie czlonkow budzetem wplywu (0.7 x wplyw rodu) przed progiem 1000; ten sam szacunek tutaj
+                float bud = AnyLordArmy342.BudgetOf(party);
+                int sum = 0, keep = 0;
+                for (; keep < list.Count; keep++)
+                {
+                    int cost = am.CalculatePartyInfluenceCost(party, list[keep].Key);
+                    if (sum + cost > bud) break;
+                    sum += cost;
+                }
+                if (keep < list.Count) list.RemoveRange(keep, list.Count - keep);
+                if (list.Count == 0) return 11;
+            }
             if (k.Settlements.Count > 0)
             {
                 float cs = party.Party.GetCustomStrength(BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.Siege);
@@ -1160,7 +1175,10 @@ namespace Armoury
             float v = CanonWarBalance.Edge * Math.Max(best, CanonWarBalance.FloorBase);
             pt.AddBehaviorScore((new AIBehaviorData(port, AiBehavior.GoToSettlement, nav, false, fromPort, false), v));
             // 342: w porcie zbiorki ta druzyna ma pierwszenstwo kolejki rodu (regula "kazdy lord") do konca okna proby - gra da zbiorke w pierwszej mysli w porcie
-            AnyLordArmy342.Prefer(party, (MusterFailDays + 1) * 24);
+            // 342r (W4): pierwszenstwo tylko w drodze do tego portu i w nim (bez armii), okno = droga + 24 h (nie dluzej niz okno proby)
+            float spd = party.Speed;
+            int hrs = (int)Math.Ceiling(dist / Math.Max(0.5f, spd)) + 24;
+            AnyLordArmy342.Prefer(party, port, Math.Min((MusterFailDays + 1) * 24, Math.Max(24, hrs)));
             long wl = Ts();
             lock (_lk)
             {
@@ -1197,6 +1215,7 @@ namespace Armoury
                 if (!_musterTry.TryGetValue(party, out tr) || tr.Key != cs || Today - tr.Value > MusterFailDays) return;
                 _musterTry.Remove(party);
                 _musterFail[party] = Today;
+                AnyLordArmy342.Unprefer(party);   // 342r (W4): nieudana zbiorka - koniec pierwszenstwa rodu
                 _dIronMusterFail++;
                 if (S != null && S.LogEnabled)
                     Log.Info(Tag + "Zelazni zbiorka nieudana | dzien " + Today + " | " + Nm(party) + " w " + cs.StringId + " (" + Nm(cs) + ") | gra nie dala czlonkow (powod "

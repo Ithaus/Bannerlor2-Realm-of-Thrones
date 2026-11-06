@@ -97419,14 +97419,18 @@ def main(argv):
 #  A8 odsiew rabunkow - latka TAK, ocen dokladnych na mysl (INFO); A9 armie: maks armii rodu, krolestwa (INFO).
 #   python -I tools/sprawdz_logi.py --grupa armie342 <Armoury-*.log>
 A342_P = "Armie kazdego lorda (342): "
-A342_START = re.compile(r"Armie kazdego lorda \(342\): start \| klucz (TAK|NIE) \| wodz gry \(CanLordCreateArmy\) (.*?) \| budzet wplywu (.*?) \| BK CanCreateArmy (.*?) \| model armii (\S+)")
+A342_START = re.compile(r"Armie kazdego lorda \(342\): start \| klucz (TAK|NIE) \| wodz gry \(CanLordCreateArmy\) (.*?) \| budzet wplywu (.*?) \| (?:budzet po modelu czynnym (.*?) \| )?"
+                        r"BK CanCreateArmy (.*?)(?: \(wewnatrz kosztu/listy BK (.*?)\))? \| model armii (\S+)")
 A342_DAY = re.compile(
-    r"Armie kazdego lorda \(342\): dzien (\d+) \| klucz (TAK|NIE) \| latki: .*? \| zgody reguly (\d+), poza kolejka rodu (\d+), limit wplywu rodu (\d+) "
-    r"\| przyciete budzetem (\d+) \(puste (\d+), prog 1000 (\d+)\), BK przepuscil (\d+) \| zalozone dzis: glowy rodow (\d+), inni lordowie (\d+) "
+    r"Armie kazdego lorda \(342\): dzien (\d+) \| klucz (TAK|NIE) \| latki: .*? \| zgody reguly (\d+), poza kolejka rodu (\d+) \(ustapil czekajacemu (\d+)\), limit wplywu rodu (\d+), "
+    r"rodow z miejscem kolejki (\d+), druzyn obsluzonych 48 h (\d+) "
+    r"\| przyciete budzetem (\d+) \(po modelu czynnym (\d+), puste (\d+), prog 1000 (\d+)\), BK przepuscil (\d+) \(BK nie dla glowy rodu (\d+), bez zgody gry (\d+)\) "
+    r"\| zalozone dzis: glowy rodow (\d+), inni lordowie (\d+) \| rozwiazane dzis armie innych lordow (\d+) \(brak spojnosci (\d+)\) "
     r"\| teraz: armii (\d+) \(inni lordowie (\d+)\), krolestw z armia (\d+), maks armii krolestwa (\d+) \((\S+), druzyn (\d+), w armiach (\d+), limit gry (\d+)\), "
-    r"maks armii rodu (\d+) \((\S+)\), zalew (\d+) \| wplyw < 0 rodow wodzow: glowy (\d+), inni lordowie (\d+) \| potkniecia (\d+) \(sesja (\d+)\)\.")
-A342_DK = ["day", "key", "grant", "queue", "limit", "trim", "trimE", "trimF", "bk", "head", "other", "armies", "ruleNow", "kWith", "maxK", "maxKid", "maxKn", "maxKin", "maxKlim",
-           "maxC", "maxCid", "flood", "negHead", "negOther", "stum", "sstum"]
+    r"maks armii rodu (\d+) \((\S+)\), zalew (\d+) \| wplyw < 0 rodow wodzow: glowy (\d+), inni lordowie (\d+) \| pierwszenstwa zbiorki (\d+) "
+    r"\| potkniecia (\d+) \(sesja (\d+)\)\.")
+A342_DK = ["day", "key", "grant", "queue", "fair", "limit", "slots", "served", "trim", "trimA", "trimE", "trimF", "bk", "bkHead", "bkNoGrant", "head", "other", "disp", "coh",
+           "armies", "ruleNow", "kWith", "maxK", "maxKid", "maxKn", "maxKin", "maxKlim", "maxC", "maxCid", "flood", "negHead", "negOther", "pref", "stum", "sstum"]
 A342_IRONC = re.compile(r"Sila lokalna \(334e\): Zelazni cele \(342\) \| dzien (\d+) \| klucz (TAK|NIE)(.*)\.$")
 A342_IRONT = re.compile(r"(\S+): ocen (\d+), bez drogi (\d+), weta (\d+), blokada (\d+), q (\d+) \(min ([\d.]+|-), mediana ([\d.]+|-)\), q>1 (\d+), model 0 (\d+), najlepszy ([\d.]+), droga (\S+), oferty (\d+)")
 A342_SIEVE = re.compile(r"odsiew rabunkow \(342\): latka (.*?), mysli (\d+), wpisow (\d+), ocen dokladnych (\d+), odsiane (\d+), ocen na mysl (\S+)")
@@ -97496,10 +97500,16 @@ def _a342_sum(parts):
 def armie342_rows(rep, D):
     st = [x for x in D["start"] if x]
     if D["start"]:
-        bad = [x for x in st if x[0] != "TAK" or not x[1].startswith("TAK (kotwica 1/1)") or not (x[3] == "TAK" or x[3] == "bez BK")]
-        rep.add("A0: start 342 - klucz, wodz gry (transpiler 1/1), BK CanCreateArmy", f"startow {len(D['start'])} (rozpoznanych {len(st)})"
-                + (f", ostatni: klucz {st[-1][0]}, wodz {st[-1][1]}, budzet {st[-1][2]}, BK {st[-1][3]}, model {st[-1][4]}" if st else ""),
-                "klucz TAK, wodz 'TAK (kotwica 1/1)', BK TAK albo bez BK", len(st) == len(D["start"]) and not bad)
+        bad = [x for x in st if x[0] != "TAK" or not x[1].startswith("TAK (kotwica 1/1)") or not (x[4] == "TAK" or x[4] == "bez BK")
+               or (x[3] is not None and not (x[3].startswith("TAK") or x[3].startswith("model gry")))]
+        # 342r (D7): regula zywa - od 2. doby zgody + kolejka + limit > 0 (czynny model, ktory nie wola bazy CanLordCreateArmy, zostawilby ja martwa)
+        dd0 = D["day"][1:]
+        live = sum(x["grant"] + x["queue"] + x["limit"] for x in dd0) if dd0 else None
+        rep.add("A0: start 342 - klucz, wodz gry (transpiler 1/1), budzet po modelu czynnym, BK CanCreateArmy, regula zywa od 2. doby", f"startow {len(D['start'])} (rozpoznanych {len(st)})"
+                + (f", ostatni: klucz {st[-1][0]}, wodz {st[-1][1]}, budzet {st[-1][2]}, po modelu czynnym {st[-1][3]}, BK {st[-1][4]} (wewnatrz {st[-1][5]}), model {st[-1][6]}" if st else "")
+                + (f"; od 2. doby zgody + kolejka + limit {live}" if live is not None else ""),
+                "klucz TAK, wodz 'TAK (kotwica 1/1)', po modelu czynnym TAK / model gry, BK TAK albo bez BK, od 2. doby wywolan reguly > 0",
+                len(st) == len(D["start"]) and not bad and (live is None or live > 0))
     else:
         rep.add("A0: start 342", "brak linii startu 342", "INFO (log sprzed 342)", None)
     dd = D["day"]
@@ -97509,8 +97519,11 @@ def armie342_rows(rep, D):
         other = sum(x["other"] for x in dd); head = sum(x["head"] for x in dd)
         rep.add("A1: armie zalozone przez nie-glowy rodow (Jeff 06.11 'kazdy moze zalozyc armie')",
                 f"dob {len(dd)}, zalozone: glowy rodow {head}, inni lordowie {other} (linii 'armia' {D['armyLines']}); zgody reguly {sum(x['grant'] for x in dd)}, "
-                f"poza kolejka rodu {sum(x['queue'] for x in dd)}, limit wplywu {sum(x['limit'] for x in dd)}, przyciete budzetem {sum(x['trim'] for x in dd)} "
-                f"(puste {sum(x['trimE'] for x in dd)}, prog 1000 {sum(x['trimF'] for x in dd)}), BK przepuscil {sum(x['bk'] for x in dd)}"
+                f"poza kolejka rodu {sum(x['queue'] for x in dd)} (ustapil czekajacemu {sum(x['fair'] for x in dd)}), limit wplywu {sum(x['limit'] for x in dd)}, "
+                f"druzyn obsluzonych 48 h srednio {sum(x['served'] for x in dd) / len(dd):.1f}, przyciete budzetem {sum(x['trim'] for x in dd)} "
+                f"(po modelu czynnym {sum(x['trimA'] for x in dd)}, puste {sum(x['trimE'] for x in dd)}, prog 1000 {sum(x['trimF'] for x in dd)}), BK przepuscil {sum(x['bk'] for x in dd)} "
+                f"(BK nie dla glowy rodu {sum(x['bkHead'] for x in dd)}, bez zgody gry {sum(x['bkNoGrant'] for x in dd)}); rozwiazane armie innych lordow {sum(x['disp'] for x in dd)} "
+                f"(brak spojnosci {sum(x['coh'] for x in dd)})"
                 + (f"; nierozpoznane {D['dayBad']}" if D["dayBad"] else ""),
                 "> 0 przy >= 20 dobach (mniej - INFO)", (None if len(dd) < 20 and other == 0 else other > 0) if not D["dayBad"] else False)
         kd = sum(x["kWith"] for x in dd); fl = sum(x["flood"] for x in dd)
@@ -97567,10 +97580,12 @@ def armie342_rows(rep, D):
 
 
 def armie342_lines(d, other=1, head=1, flood=0, negO=0, stum=0, off=1, memb=0, avg="2.10", mx="20.0", key="TAK", sieve="TAK", kwith=6):
-    L = [A342_P + f"dzien {d} | klucz {key} | latki: wodz gry TAK (kotwica 1/1), budzet TAK, BK TAK | zgody reguly 40, poza kolejka rodu 300, limit wplywu rodu 20 "
-         f"| przyciete budzetem 2 (puste 0, prog 1000 1), BK przepuscil 3 | zalozone dzis: glowy rodow {head}, inni lordowie {other} "
+    L = [A342_P + f"dzien {d} | klucz {key} | latki: wodz gry TAK (kotwica 1/1), budzet TAK, budzet po modelu czynnym TAK (StrategicCampaignAI145.StrategicArmyManagementModel), "
+         f"BK TAK (wewnatrz BK TAK (2/2)) | zgody reguly 40, poza kolejka rodu 300 (ustapil czekajacemu 5), limit wplywu rodu 20, rodow z miejscem kolejki 12, druzyn obsluzonych 48 h 30 "
+         f"| przyciete budzetem 2 (po modelu czynnym 0, puste 0, prog 1000 1), BK przepuscil 3 (BK nie dla glowy rodu 1, bez zgody gry 4) | zalozone dzis: glowy rodow {head}, inni lordowie {other} "
+         f"| rozwiazane dzis armie innych lordow 1 (brak spojnosci 0) "
          f"| teraz: armii 8 (inni lordowie 3), krolestw z armia {kwith}, maks armii krolestwa 2 (vlandia, druzyn 40, w armiach 12, limit gry 28), maks armii rodu 1 (clan_x), zalew {flood} "
-         f"| wplyw < 0 rodow wodzow: glowy 1, inni lordowie {negO} | potkniecia {stum} (sesja {stum})."]
+         f"| wplyw < 0 rodow wodzow: glowy 1, inni lordowie {negO} | pierwszenstwa zbiorki 1 | potkniecia {stum} (sesja {stum})."]
     L.append(L334E_P + f"Zelazni cele (342) | dzien {d} | klucz TAK | castle_B1: ocen 20, bez drogi 0, weta 0, blokada 0, q 20 (min 0.70, mediana 1.10), q>1 10, model 0 0, najlepszy 0.200, "
              f"droga 420, oferty {off} | ROT_town2: ocen 20, bez drogi 0, weta 0, blokada 0, q 20 (min 0.90, mediana 1.30), q>1 15, model 0 0, najlepszy 0.100, droga 470, oferty 0 "
              f"| castle_S8: ocen 0, bez drogi 0, weta 0, blokada 0, q 0 (min -, mediana -), q>1 0, model 0 0, najlepszy 0.000, droga -, oferty 0 "
@@ -97585,7 +97600,8 @@ def armie342_lines(d, other=1, head=1, flood=0, negO=0, stum=0, off=1, memb=0, a
 def armie342_synth():
     import tempfile
     import shutil
-    start = A342_P + "start | klucz TAK | wodz gry (CanLordCreateArmy) TAK (kotwica 1/1) | budzet wplywu TAK | BK CanCreateArmy TAK | model armii StrategicCampaignAI145.StrategicArmyManagementModel."
+    start = (A342_P + "start | klucz TAK | wodz gry (CanLordCreateArmy) TAK (kotwica 1/1) | budzet wplywu TAK | budzet po modelu czynnym TAK (StrategicCampaignAI145.StrategicArmyManagementModel) "
+             "| BK CanCreateArmy TAK (wewnatrz kosztu/listy BK TAK (2/2)) | model armii StrategicCampaignAI145.StrategicArmyManagementModel.")
 
     def run(days=40, s=start, **kw):
         L = [s] if s else []
@@ -97605,6 +97621,7 @@ def armie342_synth():
         "peak": (run(mx="80.0"), {"A7": "NIE"}),
         "sieve": (run(sieve="BRAK (FindBestTargetAndItsValueForFaction)"), {"A8": "NIE"}),
         "anchor": (run(s=start.replace("TAK (kotwica 1/1)", "BRAK (kotwic 0/1)")), {"A0": "NIE"}),
+        "act": (run(s=start.replace("budzet po modelu czynnym TAK", "budzet po modelu czynnym BRAK")), {"A0": "NIE"}),
         "nostart": (run(s=None), {"A0": "INFO"}),
         "old": (["Sila lokalna (334e): migawka | dzien 1 | ..."], {"A0": "INFO", "A1": "INFO", "A5": "INFO", "A7": "INFO"}),
     }

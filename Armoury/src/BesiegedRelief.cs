@@ -868,6 +868,7 @@ namespace Armoury
             // 342 (AnyLordArmy342): kazdy lord krolestwa AI moze zalozyc armie - latki, armie zalozone, linia doby
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, delegate (CampaignGameStarter s3) { AnyLordArmy342.SessionStart(); });
             CampaignEvents.ArmyCreated.AddNonSerializedListener(this, AnyLordArmy342.OnArmyCreated);
+            CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, AnyLordArmy342.OnArmyDispersed);   // 342r (D5)
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, AnyLordArmy342.Daily);
         }
 

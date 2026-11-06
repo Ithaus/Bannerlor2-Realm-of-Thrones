@@ -391,6 +391,22 @@ namespace Armoury
 
         private static bool AimOn() { var s = Settings.Current; return s != null && s.CrossingLawAimBlock && ClockOn(s); }
 
+        /// <summary>342r (odsiew rabunkow LocalFront334e): czy AimPostfix da celowi tgt tej partii -1 w tej mysli (te same warunki). Tylko odczyt, nie rzuca.</summary>
+        internal static bool AimBlocks(MobileParty party, Settlement tgt)
+        {
+            try
+            {
+                if (!AimAny || party == null || tgt == null) return false;
+                AimBlockRec b;
+                if (!_aimBlock.TryGetValue(party, out b) || b.Until <= CampaignTime.Now || !AimOn()) return false;
+                var owner = b.At != null ? b.At.MapFaction : null;
+                var f = party.MapFaction;
+                if (owner == null || f == null || f == owner || !FactionManager.IsAtWarAgainstFaction(owner, f)) return false;
+                return b.Targets.Contains(tgt);
+            }
+            catch { return false; }
+        }
+
         /// <summary>Latka (wlasna instancja Harmony - bez SubModuleMain): postfiks CampaignEventDispatcher.AiHourlyTick(MobileParty, PartyThinkParams) - metoda zadeklarowana
         /// w tej klasie (override), cel przez DeclaredMethod (CLAUDE.md 7). Raz na proces; blad - zapamietany w linii doby, petla strazy dziala dalej bez zmiany celu.</summary>
         private static void EnsureAimHook()

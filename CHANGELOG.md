@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 342r - poprawki dwoch recenzji 342 na noc/342-armie-zelazni (NIE WGRANE, bez autotestu; DLL test/m342)
+**Problem (recenzje 342):** W1 kolejka rodu godzina % n z mysla co 6 h - czesc lordow nigdy na swojej godzinie; W2 BkPost zmienial BK takze dla czlonkow (koszt x2/x5, filtr ArmyLegion)
+i omijal prawa BK, ktore obowiazuja glowe rodu; W3 model czynny (BK) dokladal platnych czlonkow po przycieciu budzetem; W4 pierwszenstwo zbiorki blokowalo rod do 72 h; D1 szacunek
+zbiorki bez budzetu; D2 zly powod przy najmie; D3 odsiew rabunkow nie znal mnoznika WW3 ReaverLaw (do x3, po odsiewie) ani blokad RaidTribute / CrossingLaw; D4 zgoda watku po wyjatku.
+**Zmiana:** AnyLordArmy342.cs - kolejka "kto pierwszy w godzinie" z ustepowaniem czekajacym, zgoda gry na godzine (BkPost tylko dla niej i gdy BK zgadza sie dla glowy rodu, licznik
+wewnatrz BK koszt/lista), postfiks budzetu na nadpisaniu modelu czynnego (SCA/BK), finalizery, pierwszenstwo z portem i oknem droga + 24 h (koniec przy armii i nieudanej zbiorce),
+licznik armii innych lordow rozwiazanych (spojnosc). LocalFront334e.Siege.cs - IronCands z budzetem 342, powod z reguly, Prefer z portem, Unprefer przy nieudanej zbiorce.
+LocalFront334e.Score.cs - odsiew po mnozniku WW3 (ReaverLaw.SieveBoost*), najlepszy bez blokad pozniejszych (RaidTribute.SparedNow, CrossingLaw.AimBlocks), sort bez domkniecia.
+sprawdz_logi.py armie342 - nowe pola linii, A0 regula zywa i budzet po modelu czynnym (synteza TAK). docs/PROJEKT-334E-SILA-LOKALNA.md 17r.
+**Status:** DO SPRAWDZENIA - test 90 dob jak 342.
+
 ## 342 - kazdy lord zaklada armie, Zelazni na wybrzezu Polnocy, odsiew rabunkow na noc/342-armie-zelazni (od 340r ca43fd33 - NIE WGRANE, bez autotestu; DLL test/m342)
 **Problem (test at340, 45 dob, Armoury-2026-11-06_21-42-20.log; decyzje Jeffa 06.11):** (1) armie zakladaly tylko glowy rodow ("kazdy moze zalozyc armie, nie tylko glowa rodu, bo to
 bez sensu"); (2) "czlonek armii" jako powod braku zbiorki (wewnetrznie sprzeczne); (3) Zelazni - 48 ofert oblezen tylko The Rills, 0 na Moat Cailin / Deepwood Motte / Torrhen's Square,

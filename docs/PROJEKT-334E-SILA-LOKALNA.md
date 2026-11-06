@@ -424,3 +424,24 @@ Hipoteza GC (a) jest sprawdzalna dopiero w nowym logu: okna z GC wobec reszty ko
 Synteza: dobry bieg, bez armii innych lordów, krótki bieg, zalew, wpływ < 0, potknięcie, 0 ofert kanonu, członek armii, koszt średnio i w godzinie, odsiew BRAK, kotwica BRAK, bez startu, log sprzed 342 – TAK. Na logu at340: A6 i A7 dają NIE (stan przed 342), reszta INFO (brak linii 342).
 
 **Do sprawdzenia w teście 90 dób:** A1–A7 oraz L12/L17 z `lokalna334e`; liczba armii na królestwo i na ród; Raider – ms na dobę i „ocen na mysl” (oczekiwane 1–7 zamiast 10–25); Żelaźni – oferty i oblężenia na 4 celach.
+
+### 17r. Poprawki dwóch recenzji 342
+
+Sprawdzone w dekompilacji: `AiPartyThinkBehavior` (wolna drużyna myśli co 6 h, myśl sekwencyjna – bez wątków), `AiMilitaryBehavior.FindBestTargetAndItsValueForFaction` (wpis bez progu, wynik iloczynem), `BKArmyManagementModel`, oraz czynny model armii w at340 – `StrategicCampaignAI145.StrategicArmyManagementModel`: dziedziczy wprost po `DefaultArmyManagementCalculationModel` i woła bazę `CanLordCreateArmy`, więc transpiler 342 działa. Model BK nie jest wtedy czynny – BK działa przez `CanCreateArmy` (Kingdom.CreateArmy, BKArmyBehavior).
+
+| Punkt | Zmiana |
+|---|---|
+| W1 kolejka rodu | Zamiast `godzina % liczba drużyn` (z myślą co 6 h część lordów nie trafiała nigdy na swoją godzinę): „kto pierwszy w godzinie”. Pierwsza drużyna rodu, która w danej godzinie zapyta w prawdziwej myśli gry, zajmuje miejsce rodu na tę godzinę; inne dostają „poza kolejką”. Sprawiedliwość: drużyna obsłużona w ostatniej dobie ustępuje drużynie rodu, która czekała (odmowa w ostatnich 12 h) i była obsłużona dawniej. Odczyty (`LeadsNow`) nie zajmują miejsca. |
+| W2 BK | `BkPost` przepuszcza tylko drużynę z pełną zgodą gry w tej godzinie (`CanLordCreateArmy` true po przycięciu budżetem) i tylko gdy BK zgadza się dla głowy jej rodu (ArmyPrivate, LimitedArmyPrivilege, rada) – jedyna zniesiona różnica to „nie głowa rodu”. Wewnątrz BK `CalculatePartyInfluenceCost` (koszt ×2 / ×5) i `CanLordCreateArmy` (filtr ArmyLegion) `BkPost` nic nie zmienia (licznik wątku). BK nie założy sam armii lordowi z reguły 342 (BKArmyBehavior bez zgody gry). |
+| W3 budżet po modelu czynnym | Postfiks First na nadpisaniu `CanLordCreateArmy` czynnego modelu (SCA zdejmuje członków, BK dokłada płatnych `AddInfluenceBonusParties`): ten sam budżet 0,7 × wpływ od początku listy i próg 1000 – ród wodza nie schodzi pod 0. Linia startu: „budzet po modelu czynnym”. |
+| W4 pierwszeństwo zbiórki | Ważne tylko, dopóki drużyna płynie do tego portu albo w nim stoi, bez armii, w swoim rodzie; okno = droga do portu / prędkość + 24 h (najwyżej okno próby 3 doby). Koniec przy powstaniu armii rodu i przy nieudanej zbiórce. |
+| D1 szacunek zbiórki | `IronCands` przycina kandydatów tym samym budżetem wpływu dla wodza z reguły 342 przed progiem 1000 (pusta lista – powód „limit wplywu rodu”). |
+| D2 powód | Odmowa reguły zwraca powód: najem – „najem”, limit – „limit wplywu rodu” (wpływ ≤ 100 – „wplyw<=100”), poza regułą – „inne”. |
+| D3 odsiew rabunków | Porządek odsiewu liczony po mnożniku WW3 ReaverLaw (Profit mnoży rabunki po odsiewie, do ×3 – bez tego dalsza, bogata wieś mogła przegrać mimo wyższego wyniku końcowego). „Najlepszy” nie może być wpisem, który słuchacze myśli zablokują później: weta 334e, ochrona wsi RaidTribute, blokada przeprawy CrossingLaw. Pozostałe późniejsze zmiany to mnożenie (WW3) albo zerowanie (rozejm, ArmsFirst, weta) – porządek zostaje. Sortowanie bez domknięcia (lista wątku, stały porównywacz). |
+| D4 | Finalizer `CanLordCreateArmy` (baza i model czynny) czyści zgodę wątku przy wyjątku. |
+| D5 | Linia doby: armie innych lordów rozwiązane dziś (w tym brak spójności), drużyny obsłużone w 48 h, rody z miejscem kolejki, pierwszeństwa zbiórki. |
+| D6 | Winterfell świadomie poza listą celów kanonu 342 (decyzja Jeffa: wybrzeże Północy). W 340 był celem jako kultura battania. Po Krwawych Godach IronSiege bierze wszystkie twierdze w wojnie. |
+| D7 | Sprawdzarka A0: od 2. doby zgody + kolejka + limit > 0 (reguła żywa) i „budzet po modelu czynnym” TAK albo „model gry”. |
+| drobne | `_ruleArmies` usunięte; `k.Armies` po indeksie (bez „collection modified”). |
+
+Uwaga do progów 334e: wpisy odsiane nie trafiają do „cele pytane” ani do opcji rabunku królestwa (`Asked`, `_dOpts`) – liczby tych linii są niższe niż w at340 i nie są z nim porównywalne.
