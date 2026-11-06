@@ -44,6 +44,13 @@ namespace Armoury
     ///       bez eskorty Jeff kaze "blisko swoich" (3 m).
     ///  - RANNY (149, ponizej 45%): cel najpierw najblizszy wlasny szyk (dowodca i glowa rodu), straz biegnie dalej, dopoki jest w drodze.
     ///  - PANIKA, odwrot rannego 143, odwrot na rozkaz, gracz przejal, klucz NIE w trakcie - jak 149 (pozycja zdjeta).
+    /// Recenzja 335 (335b) - zmiany wzgledem opisu wyzej:
+    ///  - ZAGROZENIE: swoich liczymy w 10 m (nie 5 m) - dowodca 3 m za linia w zwarciu nie jest zagrozony; jezdziec 10-20 m tylko, gdy jedzie na dowodce (cel = on
+    ///    albo > 2 m/s w 45 st. od kierunku na niego); warunek samotnego 149 (0 swoich w 5 m i >= 2 wrogow w 10 m) zostaje;
+    ///  - STRAZ: 3 ludzi na napastnika (3..20), nie kandydaci / 10; nie z walki wrecz (cel w 3 m) ani z szyku w szarzy (Charge / ChargeToTarget); straznik wziety przez
+    ///    148/204/333 (lowca, jezdziec, test) - zwolniony bez ruszania jego pozycji;
+    ///  - STANOWISKO c): wlasny szyk glowny albo pieszy >= 8 - za WLASNYM szykiem (kapitan, ktory wyszedl z obrysu, wraca do swoich);
+    ///  - CEL WYCOFANIA: najblizszy szyk pieszy nie w szarzy (konny tylko bez pieszego); ranny - tyl szyku, nie srodek.
     /// Pomiar (zawsze, takze klucz NIE): samotnosc dowodcy = pass bez swojego czlowieka w 30 m (LoneGap - konny 3 s), sekundy obecnosci; na sucho zagrozenia.
     /// Linia "Ochrona wodza (335): bitwa ..." raz na bitwe po "bohaterowie (149)". Test autotestu (klucz CommanderHuntInAutotest, tylko LogGate.Mode 1, plan "slaba"):
     /// LOWCA - jezdziec (albo pieszy) druzyny gracza 8 s po rozstawieniu jedzie prosto na wodza wroga (jak Jeff na Tywina) - linia "Ochrona wodza (335) TEST".
@@ -56,6 +63,9 @@ namespace Armoury
         internal const int EscortMin = 10;          // GeneralsAndCaptainsAssignmentLogic: obstawa = kandydaci / 10 - pierwszy straznik od 10 jezdzcow
         internal const int GuardsMax = 20;          // ... najwyzej 20
         internal const int GuardsMin = 3;           // najmniej 3 (kilku ludzi na jednego napastnika)
+        internal const int GuardsPerFoe = 3;        // recenzja 335: straz wedlug napastnikow - 3 na wroga (3..20), nie kandydaci / 10
+        internal const float MeleeBusy = 3f;        // w walce wrecz: cel czlowieka w 3 m (HuntContact) - nie schodzi z linii na straz
+        internal const float ComingSpeed = 2f;      // jezdziec 10-20 m liczy sie, gdy jedzie na dowodce (> 2 m/s w 45 st. od kierunku na niego) albo ma go za cel
         internal const float GuardReach = BannerRange;
         internal const float GuardRepath = 2f;      // straz: nowa pozycja przy przesunieciu dowodcy o 2 m (jak TestRepath 283a)
         internal const float GuardReached = 5f;     // straz dotarla: w 5 m od dowodcy (AllyRadius)
@@ -86,7 +96,7 @@ namespace Armoury
         private static readonly int[] GKindSend = new int[KKinds];
         private static readonly int[] GEnd = new int[EKinds];
         private static int _gGuardEps, _gGuardMen, _gGuardReached, _gGuardNone;
-        private static readonly int[] GGuardEnd = new int[5];   // 0 koniec zagrozenia, 1 czas, 2 panika / odwrot, 3 czlowiek padl / dowodca padl, 4 koniec bitwy
+        private static readonly int[] GGuardEnd = new int[6];   // 0 koniec zagrozenia, 1 czas, 2 panika / odwrot, 3 czlowiek padl / dowodca padl, 4 koniec bitwy, 5 przejety (148/204/333)
         private static float _gLoneSum, _gPresentSum, _gLoneMax;
         private static string _gLoneWho = "-";
         private static int _gCmdKilled, _gCmdKo, _gFateThreat, _gFatePost, _gFateOther, _gStum;
@@ -232,7 +242,7 @@ namespace Armoury
             if (side < 0) return false;
             Vec2 c = a.Position.AsVec2;
             if (!c.IsValid) return false;
-            int allies = 0;
+            int allies5 = 0, allies10 = 0, foes10 = 0;
             float best = float.MaxValue, fr2 = FoeRadius * FoeRadius, ar2 = AllyRadius * AllyRadius;
             try
             {
@@ -246,19 +256,58 @@ namespace Armoury
                     float d2 = x.Position.AsVec2.DistanceSquared(c);
                     if (s == side)
                     {
-                        if (d2 <= ar2 && !SurvivalMode.InPanic(x) && !SurvivalMode.OrderedRetreat(x, x.CommonAIComponent)) allies++;
+                        if (d2 <= fr2 && !SurvivalMode.InPanic(x) && !SurvivalMode.OrderedRetreat(x, x.CommonAIComponent)) { allies10++; if (d2 <= ar2) allies5++; }
                         continue;
                     }
                     if (x.IsRunningAway || SurvivalMode.InPanic(x)) continue;
                     bool rider = x.MountAgent != null;
-                    if (d2 > fr2 && !rider) continue;
+                    if (d2 > fr2) { if (!rider || !Coming(x, a, c)) continue; }   // jezdziec 10-20 m tylko, gdy jedzie na niego (nie przejazd obok)
+                    else foes10++;
                     foes++;
                     if (rider) riders++;
                     if (d2 < best) { best = d2; att = x; }
                 }
             }
             finally { _gNear.Clear(); }
-            return foes > 0 && allies < foes;
+            // recenzja 335: swoich liczymy w 10 m (dowodca 3 m za linia w zwarciu nie jest "zagrozony"); warunek samotnego 149 (0 swoich w 5 m, >= 2 wrogow w 10 m) zostaje
+            return foes > 0 && (allies10 < foes || (allies5 == 0 && foes10 >= 2));
+        }
+
+        /// <summary>Wrog jedzie na dowodce: ma go za cel albo predkosc > 2 m/s w 45 st. od kierunku na niego.</summary>
+        private static bool Coming(Agent x, Agent a, Vec2 c)
+        {
+            try { if (ReferenceEquals(x.GetTargetAgent(), a)) return true; } catch { }
+            Vec2 v;
+            try { v = (x.MountAgent ?? x).GetRealGlobalVelocity().AsVec2; } catch { return false; }
+            Vec2 to = c - x.Position.AsVec2;
+            float vl = v.Length, tl = to.Length;
+            if (vl < ComingSpeed || tl < 0.01f) return false;
+            return Vec2.DotProduct(v, to) >= 0.7071f * vl * tl;
+        }
+
+        /// <summary>Szyk w szarzy (rozkaz Charge / ChargeToTarget).</summary>
+        private static bool Charging(Formation f)
+        {
+            if (f == null) return false;
+            try
+            {
+                var o = f.GetReadonlyMovementOrderReference().OrderEnum;
+                return o == MovementOrder.MovementOrderEnum.Charge || o == MovementOrder.MovementOrderEnum.ChargeToTarget;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Czlowiek w walce wrecz (cel w 3 m) albo w szyku w szarzy - nie schodzi na straz.</summary>
+        private static bool Busy(Agent x)
+        {
+            if (Charging(x.Formation)) return true;
+            try
+            {
+                var tg = x.GetTargetAgent();
+                if (tg != null && tg.IsActive() && tg.Position.AsVec2.DistanceSquared(x.Position.AsVec2) <= MeleeBusy * MeleeBusy) return true;
+            }
+            catch { }
+            return false;
         }
 
         /// <summary>PassOne przy kluczu TAK (bez rany): zagrozenie (start / trwa - krok jak samotny 149) albo stanowisko dowodcy. false = zwykla droga 149.</summary>
@@ -315,13 +364,14 @@ namespace Armoury
             _gThreatFoes += foes;
             _gThreatRiders += riders;
             if (ReferenceEquals(man, _htTM) && _htThr < 0f) _htThr = now;
-            Summon(man, m, now);
+            Summon(man, m, now, foes);
         }
 
         // ------------------------------------------------------------ najblizszy wlasny szyk
 
-        /// <summary>Cel wycofania dowodcy / glowy rodu: najblizszy wlasny szyk (>= 3 ludzi, nie w odwrocie): srodek, przy wrogu - tyl. Dwa najblizsze szyki.</summary>
-        private static Vec2 NearestOwn(Man man, Mission m, float back, out int kind, out WorldPosition wp)
+        /// <summary>Cel wycofania dowodcy / glowy rodu: najblizszy wlasny szyk (>= 3 ludzi, nie w odwrocie, nie w szarzy; pieszy przed konnym - konny tylko, gdy
+        /// pieszego brak): zagrozony - srodek, przy wrogu tyl; ranny (stoi do konca bitwy) - od razu tyl szyku. Dwa najblizsze szyki.</summary>
+        private static Vec2 NearestOwn(Man man, Mission m, float back, bool wounded, out int kind, out WorldPosition wp)
         {
             kind = -1;
             wp = WorldPosition.Invalid;
@@ -329,34 +379,43 @@ namespace Armoury
             var t = a.Team;
             if (!MissionTeams.Valid(t)) return Vec2.Invalid;
             Vec2 c = a.Position.AsVec2;
-            _gForms.Clear();
+            Formation f1 = null, f2 = null;
+            float d1 = float.MaxValue, d2 = float.MaxValue;
             var fl = t.FormationsIncludingSpecialAndEmpty;
             int nf = fl != null ? fl.Count : 0;
-            for (int j = 0; j < nf; j++)
+            for (int pass = 0; pass < 2 && f1 == null; pass++)
             {
-                var f = fl[j];
-                if (f == null || f.CountOfUnits < 3) continue;
-                try { if (f.GetReadonlyMovementOrderReference().OrderEnum == MovementOrder.MovementOrderEnum.Retreat) continue; } catch { }
-                if (!f.CurrentPosition.IsValid) continue;
-                _gForms.Add(f);
+                for (int j = 0; j < nf; j++)
+                {
+                    var f = fl[j];
+                    if (f == null || f.CountOfUnits < 3) continue;
+                    try { if (f.GetReadonlyMovementOrderReference().OrderEnum == MovementOrder.MovementOrderEnum.Retreat) continue; } catch { }
+                    if (Charging(f) || !f.CurrentPosition.IsValid) continue;
+                    if (pass == 0 && !Foot(f)) continue;                      // najpierw piesi; jazda dopiero, gdy pieszego szyku brak
+                    float d = f.CurrentPosition.DistanceSquared(c);
+                    if (d < d1) { f2 = f1; d2 = d1; f1 = f; d1 = d; }
+                    else if (d < d2) { f2 = f; d2 = d; }
+                }
             }
-            _gForms.Sort((x, y) => x.CurrentPosition.DistanceSquared(c).CompareTo(y.CurrentPosition.DistanceSquared(c)));
-            int tries = Math.Min(2, _gForms.Count);
-            for (int j = 0; j < tries; j++)
+            for (int j = 0; j < 2; j++)
             {
-                var f = _gForms[j];
+                var f = j == 0 ? f1 : f2;
+                if (f == null) break;
                 Vec2 p = f.CurrentPosition;
-                int r = Check(a, m, p, out wp);
-                if (r == CheckLimit) { kind = KindLimit; _gForms.Clear(); return Vec2.Invalid; }
-                if (r == CheckOk) { kind = KNear; _gForms.Clear(); return p; }
+                int r;
+                if (!wounded)
+                {
+                    r = Check(a, m, p, out wp);
+                    if (r == CheckLimit) { kind = KindLimit; return Vec2.Invalid; }
+                    if (r == CheckOk) { kind = KNear; return p; }
+                }
                 if (Rear(f, back, out p))
                 {
                     r = Check(a, m, p, out wp);
-                    if (r == CheckLimit) { kind = KindLimit; _gForms.Clear(); return Vec2.Invalid; }
-                    if (r == CheckOk) { kind = KNear; _gForms.Clear(); return p; }
+                    if (r == CheckLimit) { kind = KindLimit; return Vec2.Invalid; }
+                    if (r == CheckOk) { kind = KNear; return p; }
                 }
             }
-            _gForms.Clear();
             wp = WorldPosition.Invalid;
             return Vec2.Invalid;
         }
@@ -442,7 +501,14 @@ namespace Armoury
                 }
             }
             // c) stanowisko za glownym szykiem (BehaviorGeneral)
-            var main = MainForm(t, f);
+            // recenzja 335: wlasny szyk glowny albo pieszy >= 8 - stanowisko za WLASNYM szykiem (kapitan, ktory wyszedl z obrysu, wraca do swoich, nie za cudzy szyk)
+            bool ownMain = false;
+            if (f != null && f.CountOfUnits > 0)
+            {
+                try { ownMain = f.AI != null && f.AI.IsMainFormation; } catch { }
+                if (!ownMain && f.CountOfUnits >= MainMin && Foot(f)) ownMain = true;
+            }
+            var main = ownMain ? f : MainForm(t, f);
             if (main == null) { _gPostNoMain++; if (man.Mode == ModePost) { Release(man); PostOff(man); } return; }
             Vec2 med = main.CachedMedianPosition.AsVec2;
             Vec2 dir = Vec2.Invalid;
@@ -500,12 +566,14 @@ namespace Armoury
             if (GuardSet.Contains(x) || HorsePursuit.Banner(x) || HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x)) return false;
             var f = x.Formation;
             if (f == null || f.HasPlayerControlledTroop || HorsePursuit.PlayerForm(f)) return false;
+            if (Busy(x)) return false;                                                                                   // recenzja 335: nie z walki wrecz ani z szarzy
             try { if ((x.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) != 0) return false; } catch { return false; }   // cudza pozycja skryptowa
             return true;
         }
 
-        /// <summary>Straz: najblizsi ludzie druzyny w 80 m (jezdziec z polowa odleglosci) - kandydaci / 10 (gra), 3..20; pozycja skryptowa na dowodcy.</summary>
-        private static void Summon(Man man, Mission m, float now)
+        /// <summary>Straz: najblizsi wolni ludzie druzyny w 80 m (nie w walce wrecz, nie w szarzy; jezdziec z polowa odleglosci) - 3 na napastnika (3..20);
+        /// pozycja skryptowa na dowodcy.</summary>
+        private static void Summon(Man man, Mission m, float now, int foes)
         {
             if (!_gKey) return;
             var a = man.A;
@@ -528,7 +596,7 @@ namespace Armoury
                 }
             }
             finally { _gNear.Clear(); }
-            int want = Math.Max(GuardsMin, Math.Min(GuardsMax, (int)Math.Ceiling(_gCand.Count / 10f))) - have;
+            int want = Math.Max(GuardsMin, Math.Min(GuardsMax, GuardsPerFoe * Math.Max(1, foes))) - have;
             if (want <= 0) { _gCand.Clear(); return; }
             if (_gCand.Count == 0) { _gGuardNone++; return; }
             _gCand.Sort((x, y) => x.Key.CompareTo(y.Key));
@@ -561,12 +629,13 @@ namespace Armoury
                 if (x == null || !x.IsActive()) why = 3;
                 else if (o == null || o.Out || o.A == null || !o.A.IsActive()) why = 3;
                 else if (x.IsRunningAway || SurvivalMode.InPanic(x) || Withdrawing(x)) why = 2;
+                else if (HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x)) why = 5;   // inny mechanizm wzial czlowieka - jego pozycja
                 else if (!(o.Mode == ModeThreat || (o.Mode == ModeWounded && o.St == StTravel))) why = 0;
                 else if (now - g.Since > TravelMax) why = 1;
                 if (why >= 0)
                 {
                     GGuardEnd[why]++;
-                    ReleaseGuard(g, why != 2);
+                    ReleaseGuard(g, why != 2 && why != 5);
                     Guards.RemoveAt(i);
                     GuardSet.Remove(x);
                     continue;
@@ -815,9 +884,9 @@ namespace Armoury
             if (_htOn && _htState == 1) HuntEnd("koniec bitwy", _htLast);
             var sb = new StringBuilder(1600);
             sb.Append("Ochrona wodza (335): bitwa misja ").Append(_kind).Append(", klucz ").Append(_gKey ? "TAK" : (_key ? "NIE (tylko pomiar)" : "NIE (149 NIE)"))
-              .Append(" (dowodca = wodz / kapitan AI, glowa rodu = glowa rodu / wladca; zagrozenie: wrog w ").Append(F0(FoeRadius)).Append(" m albo jezdziec w ").Append(F0(ThreatRider))
-              .Append(" m, swoich w ").Append(F0(AllyRadius)).Append(" m mniej; eskorta konna od ").Append(EscortMin).Append(" jezdzcow; stanowisko glebokosc + ").Append(F0(CommandBack))
-              .Append(" m za glownym szykiem; straz kandydaci/10 (").Append(GuardsMin).Append("..").Append(GuardsMax).Append(") w ").Append(F0(GuardReach)).Append(" m)");
+              .Append(" (dowodca = wodz / kapitan AI, glowa rodu = glowa rodu / wladca; zagrozenie: wrog w ").Append(F0(FoeRadius)).Append(" m albo jezdziec nadjezdzajacy w ").Append(F0(ThreatRider))
+              .Append(" m, swoich w ").Append(F0(FoeRadius)).Append(" m mniej albo 0 w ").Append(F0(AllyRadius)).Append(" m; eskorta konna od ").Append(EscortMin).Append(" jezdzcow; stanowisko glebokosc + ").Append(F0(CommandBack))
+              .Append(" m za glownym / wlasnym szykiem; straz ").Append(GuardsPerFoe).Append(" na wroga (").Append(GuardsMin).Append("..").Append(GuardsMax).Append(") w ").Append(F0(GuardReach)).Append(" m)");
             sb.Append(" | dowodcow ").Append(_gCmd).Append(" (wodzowie ").Append(_gGen).Append(", kapitanowie ").Append(_gCap).Append("), glow rodu ").Append(_gBig)
               .Append(", konnych ").Append(_gMounted).Append(", z eskorta konna ").Append(_gEscortForms).Append(", w pieszym szyku ").Append(GCovPeople.Count);
             sb.Append(" | stanowisko: dowodcow ").Append(GPostPeople.Count).Append(" (za glownym szykiem ").Append(GPostSends[PKPost]).Append(", przy eskorcie ").Append(GPostSends[PKEscort])
@@ -835,7 +904,8 @@ namespace Armoury
               .Append(GEnd[EOrder]).Append(", gracz ").Append(GEnd[EPlayer]).Append(", klucz NIE ").Append(GEnd[EKey]);
             sb.Append(" | straz: wezwan ").Append(_gGuardEps).Append(" (ludzi ").Append(_gGuardMen).Append(", sr. ").Append(_gGuardEps > 0 ? F1(_gGuardMen / (float)_gGuardEps) : "-")
               .Append(", bez kandydatow ").Append(_gGuardNone).Append("), dotarlo do dowodcy ").Append(_gGuardReached).Append("; koniec: zagrozenie minelo ").Append(GGuardEnd[0])
-              .Append(", czas ").Append(GGuardEnd[1]).Append(", panika/odwrot ").Append(GGuardEnd[2]).Append(", padl ").Append(GGuardEnd[3]).Append(", koniec bitwy ").Append(GGuardEnd[4]);
+              .Append(", czas ").Append(GGuardEnd[1]).Append(", panika/odwrot ").Append(GGuardEnd[2]).Append(", padl ").Append(GGuardEnd[3]).Append(", koniec bitwy ").Append(GGuardEnd[4])
+              .Append(", przejety (148/204/333) ").Append(GGuardEnd[5]);
             float share = _gPresentSum > 0f ? _gLoneSum / _gPresentSum : 0f;
             sb.Append(" | samotnie (bez swojego w ").Append(F0(LoneGap)).Append(" m): ").Append(F1(_gLoneSum)).Append(" s z ").Append(F1(_gPresentSum)).Append(" s obecnosci dowodcow (")
               .Append(F0(share * 100f)).Append("%), najdluzej ").Append(F1(_gLoneMax)).Append(" s ").Append(_gLoneWho);

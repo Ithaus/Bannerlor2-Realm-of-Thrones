@@ -35,6 +35,15 @@ namespace Armoury
     ///    ponad prog GetBehaviors), chyba ze ucieka przed KIMS INNYM (inne zagrozenie - decyzja gry); P - EscortParty do najblizszego obroncy, a w R od niego
     ///    EngageParty na X razem z nimi; obronca przypisany do jednego P (najwyzsza ranga, potem najblizszy); zakaz zaczepiania 223 (LordEscort.AttackPostfix) i
     ///    p9 (ArmsFirst.AttackPostfix) nie obowiazuje wobec tego X - to samo przywraca liczenie tych partii jako sojusznikow w przewadze lokalnej gry (flag7).
+    /// Recenzja 335 (335b):
+    ///  - sila napastnika liczona z sojusznikami w 2R ZANIM odrzucimy pare ("P sam da rade" = P >= X z sojusznikami);
+    ///  - przydzial obroncow: najpierw wszystkie pary, potem obroncy do par (ranga, odleglosc; chroniony nigdy nie jest obronca), sila grupy tylko z przypisanych;
+    ///    para lacznie slabsza odpada (po jednej, najslabsza pierwsza) i jej obroncy wracaja do puli pozostalych par;
+    ///  - BITWA CHRONIONEGO: P w bitwie polowej (bez osady, nie na morzu) z napastnikiem z poprzedniej migawki albo P po stronie broniacej, a napastnik = wodz strony
+    ///    atakujacej - para trwa (sila stron bitwy), obroncy EngageParty na X = dolaczenie do bitwy po stronie P ("bronia go za wszelka cene" od chwili starcia);
+    ///  - P jedzie tylko do obroncy, do ktorego droga nie prowadzi przez X (kat P-obronca / P-X > 60 st.) - bez takiego decyzja gry (ucieczka), obroncy i tak ida;
+    ///  - obronca dalej niz 2R od P i dalej od X niz P najpierw EscortParty do P (zbieraja sie przy nim, nie wpadaja na X po jednym), blizej - EngageParty na X;
+    ///  - latka na typ czynnego modelu kazdej kampanii (inny model w nowej kampanii - nowa latka).
     /// Linie: "Ochrona wodza (335): mapa - ..." (przyklady, najwyzej 10 na dobe) i "Ochrona wodza (335): mapa dzien N ..." (doba).
     /// </summary>
     internal static partial class LordEscort
@@ -44,21 +53,38 @@ namespace Armoury
             internal int Kind;           // 1 chroniony, 2 obronca
             internal int Rank;
             internal MobileParty X, P, Near;
+            internal bool Battle;        // chroniony w bitwie polowej z napastnikiem - obroncy dolaczaja
         }
+
+        private sealed class Pair335
+        {
+            internal MobileParty P, X;
+            internal int Rank, RKind, Rk;
+            internal bool Big, Army, Battle, Dropped;
+            internal float Sp, Foe, Group;
+            internal string Key, Hid;
+            internal readonly List<KeyValuePair<MobileParty, float>> Cands = new List<KeyValuePair<MobileParty, float>>();
+            internal readonly List<MobileParty> Defs = new List<MobileParty>();
+        }
+
+        private struct Edge335 { internal int I; internal MobileParty D; internal float Dist; internal int Rk; }
 
         private static volatile Dictionary<MobileParty, G335> _g335 = new Dictionary<MobileParty, G335>();
         private static volatile bool _g335On;
         private static double _g335Last = -1;
         private static string _g335Patch = "nie wpieta";
         private static System.Reflection.MethodInfo _g335M;
+        private static readonly HashSet<System.Reflection.MethodBase> _g335Patched = new HashSet<System.Reflection.MethodBase>();
 
         // watki AI (Interlocked)
-        private static int _gvDef, _gvDefAlready, _gvProtEscort, _gvProtEngage, _gvOther, _gvAtk;
+        private static int _gvDef, _gvDefAlready, _gvProtEscort, _gvProtEngage, _gvOther, _gvAtk, _gvDefEscort, _gvProtNoSafe;
         // doba (watek glowny)
-        private static readonly HashSet<string> _gdPairs = new HashSet<string>(StringComparer.Ordinal), _gdWin = new HashSet<string>(StringComparer.Ordinal);
-        private static readonly HashSet<MBGUID> _gdBig = new HashSet<MBGUID>(), _gdArmyP = new HashSet<MBGUID>(), _gdDefenders = new HashSet<MBGUID>();
+        private static readonly HashSet<string> _gdPairs = new HashSet<string>(StringComparer.Ordinal), _gdWin = new HashSet<string>(StringComparer.Ordinal),
+                                                _gdBattle = new HashSet<string>(StringComparer.Ordinal);
+        private static readonly HashSet<MBGUID> _gdBig = new HashSet<MBGUID>(), _gdArmyP = new HashSet<MBGUID>(), _gdDefenders = new HashSet<MBGUID>(),
+                                                _gdToBattle = new HashSet<MBGUID>(), _gdJoined = new HashSet<MBGUID>();
         private static readonly HashSet<string> _gdProt = new HashSet<string>(StringComparer.Ordinal);   // bohaterowie chronieni grupa (id - pojmanie)
-        private static int _gdPlayer, _gdLose, _gdLoseBig, _gdNoDef, _gdSnaps, _gdEx, _gdStum, _gdCapt, _gdCaptProt;
+        private static int _gdPlayer, _gdLose, _gdLoseBig, _gdNoDef, _gdSnaps, _gdEx, _gdStum, _gdCapt, _gdCaptProt, _gdNoSafe;
         private static float _gdRatioSum;
         private static int _gdRatioN;
 
@@ -80,8 +106,9 @@ namespace Armoury
         {
             Interlocked.Exchange(ref _gvDef, 0); Interlocked.Exchange(ref _gvDefAlready, 0); Interlocked.Exchange(ref _gvProtEscort, 0);
             Interlocked.Exchange(ref _gvProtEngage, 0); Interlocked.Exchange(ref _gvOther, 0); Interlocked.Exchange(ref _gvAtk, 0);
-            _gdPairs.Clear(); _gdWin.Clear(); _gdBig.Clear(); _gdArmyP.Clear(); _gdDefenders.Clear(); _gdProt.Clear();
-            _gdPlayer = _gdLose = _gdLoseBig = _gdNoDef = _gdSnaps = _gdEx = _gdStum = _gdCapt = _gdCaptProt = 0;
+            Interlocked.Exchange(ref _gvDefEscort, 0); Interlocked.Exchange(ref _gvProtNoSafe, 0);
+            _gdPairs.Clear(); _gdWin.Clear(); _gdBattle.Clear(); _gdBig.Clear(); _gdArmyP.Clear(); _gdDefenders.Clear(); _gdProt.Clear(); _gdToBattle.Clear(); _gdJoined.Clear();
+            _gdPlayer = _gdLose = _gdLoseBig = _gdNoDef = _gdSnaps = _gdEx = _gdStum = _gdCapt = _gdCaptProt = _gdNoSafe = 0;
             _gdRatioSum = 0f; _gdRatioN = 0;
         }
 
@@ -106,10 +133,31 @@ namespace Armoury
             catch (Exception e) { G335Stumble("Guard335.Build", e); }
         }
 
-        private static bool Protectable(MobileParty p)
+        /// <summary>Bitwa polowa na mapie bez osady (nie oblezenie, nie morze, nie najazd).</summary>
+        private static bool FieldEvent(TaleWorlds.CampaignSystem.MapEvents.MapEvent me)
+        {
+            try { return me != null && me.IsFieldBattle && me.MapEventSettlement == null && !me.IsNavalMapEvent; }
+            catch { return false; }
+        }
+
+        /// <summary>Suma EstimatedStrength partii strony bitwy (armia - kazda partia osobno, bez podwojnego liczenia).</summary>
+        private static float StrSide(TaleWorlds.CampaignSystem.MapEvents.MapEventSide side)
+        {
+            float s = 0f;
+            if (side == null) return 0f;
+            var ps = side.Parties;
+            for (int i = 0; ps != null && i < ps.Count; i++)
+            {
+                try { var pb = ps[i].Party; if (pb != null) s += pb.EstimatedStrength; } catch { }
+            }
+            return s;
+        }
+
+        private static bool Protectable(MobileParty p, bool battle = false)
         {
             if (p == null || !p.IsActive || !p.IsLordParty || p.IsMainParty || p.IsDisbanding) return false;
-            if (p.MapEvent != null || p.CurrentSettlement != null || p.BesiegedSettlement != null || p.IsCurrentlyAtSea) return false;
+            if (p.CurrentSettlement != null || p.BesiegedSettlement != null || p.IsCurrentlyAtSea) return false;
+            if (p.MapEvent != null && !(battle && FieldEvent(p.MapEvent))) return false;
             if (p.AttachedTo != null || (p.Army != null && p.Army.LeaderParty != p)) return false;
             var h = p.LeaderHero;
             if (h == null || !h.IsAlive) return false;
@@ -163,106 +211,213 @@ namespace Armoury
             var aim = models.MobilePartyAIModel;
             float threatR = R * 6f, bigR = aim.FleeToNearbySettlementRadius, lowR = aim.FleeToNearbyPartyRadius;
             float maxH = MBMath.ClampFloat(s.DrMaxMarchHours, 0.25f, 24f);
-            var map = new Dictionary<MobileParty, G335>();
-            var defs = new List<MobileParty>();
+            var old = _g335;
             var lords = MobileParty.AllLordParties;
             _gdSnaps++;
+            // obroncy z poprzedniej migawki, ktorzy dolaczyli do bitwy chronionego
+            foreach (var kv in old)
+            {
+                try
+                {
+                    var g = kv.Value;
+                    if (g.Kind != 2 || g.P == null || kv.Key == null) continue;
+                    var me = g.P.MapEvent;
+                    if (me != null && kv.Key.MapEvent == me) _gdJoined.Add(kv.Key.Id);
+                }
+                catch { }
+            }
+            // 1) pary chroniony - napastnik, kandydaci na obroncow
+            var pairs = new List<Pair335>();
             for (int i = 0; i < lords.Count; i++)
             {
                 var p = lords[i];
                 try
                 {
-                    if (!Protectable(p)) continue;
+                    if (!Protectable(p, true)) continue;
                     Vec2 pp = p.GetPosition2D;
                     MobileParty x = null;
-                    float sx = 0f;
-                    var data = MobileParty.StartFindingLocatablesAroundPosition(pp, threatR);
-                    for (var t = MobileParty.FindNextLocatable(ref data); t != null; t = MobileParty.FindNextLocatable(ref data))
+                    float sp, foe;
+                    bool battle = p.MapEvent != null;
+                    if (battle)
                     {
-                        if (!Attacker(t, p) || pp.Distance(t.GetPosition2D) > threatR || !Chasing(t, p)) continue;
-                        float st = Str(t);
-                        if (st <= sx) continue;
-                        sx = st; x = t;
+                        // bitwa chronionego: napastnik z poprzedniej migawki w tej samej bitwie albo wodz strony atakujacej (P broni sie)
+                        var me = p.MapEvent;
+                        G335 prev;
+                        if (old.TryGetValue(p, out prev) && prev.Kind == 1 && prev.X != null && prev.X.MapEvent == me) x = prev.X;
+                        if (x == null && p.MapEventSide == me.DefenderSide)
+                        {
+                            var lp = me.AttackerSide != null ? me.AttackerSide.LeaderParty : null;
+                            var lm = lp != null ? lp.MobileParty : null;
+                            if (lm != null && lm.IsActive && (lm.IsLordParty || lm.IsMainParty) && !lm.IsBandit && Hostile(p.MapFaction, lm)) x = lm;
+                        }
+                        if (x == null || x.MapEventSide == null || p.MapEventSide == null || x.MapEventSide == p.MapEventSide) continue;
+                        sp = StrSide(p.MapEventSide);
+                        foe = StrSide(x.MapEventSide);
                     }
-                    if (x == null) continue;
-                    float sp = Str(p);                                             // sila P dopiero przy napastniku (EstimatedStrength nie dla kazdego lorda)
-                    if (sx <= sp) continue;                                        // sam da rade - decyduje gra
+                    else
+                    {
+                        float sx = 0f;
+                        var data = MobileParty.StartFindingLocatablesAroundPosition(pp, threatR);
+                        for (var t = MobileParty.FindNextLocatable(ref data); t != null; t = MobileParty.FindNextLocatable(ref data))
+                        {
+                            if (!Attacker(t, p) || pp.Distance(t.GetPosition2D) > threatR || !Chasing(t, p)) continue;
+                            float st = Str(t);
+                            if (st <= sx) continue;
+                            sx = st; x = t;
+                        }
+                        if (x == null) continue;
+                        // napastnik z sojusznikami w 2R (gra: num6 + num7 x 0.9 - liczymy w pelni, bez wagi odleglosci)
+                        foe = sx;
+                        Vec2 xp = x.GetPosition2D;
+                        data = MobileParty.StartFindingLocatablesAroundPosition(xp, 2f * R);
+                        for (var t = MobileParty.FindNextLocatable(ref data); t != null; t = MobileParty.FindNextLocatable(ref data))
+                        {
+                            if (t == x || (x.Army != null && t.Army == x.Army) || !Attacker(t, p) || xp.Distance(t.GetPosition2D) > 2f * R) continue;
+                            foe += Str(t);
+                        }
+                        sp = Str(p);                                               // sila P dopiero przy napastniku (EstimatedStrength nie dla kazdego lorda)
+                    }
+                    if (foe <= sp) continue;                                       // sam da rade (z sojusznikami napastnika) - decyduje gra
                     int kind;
                     int rank = RankOf(p.LeaderHero, p.ActualClan, out kind);
                     bool army = p.Army != null && p.Army.LeaderParty == p;
                     bool big = rank <= 3 || army;
-                    string hid = p.LeaderHero.StringId ?? "?";
-                    string key = hid + "|" + (x.StringId ?? "?");
-                    _gdPairs.Add(key);
+                    var pr = new Pair335 { P = p, X = x, Rank = rank, RKind = kind, Rk = big ? Math.Min(rank, 3) : 4, Big = big, Army = army, Battle = battle, Sp = sp, Foe = foe };
+                    pr.Hid = p.LeaderHero.StringId ?? "?";
+                    pr.Key = pr.Hid + "|" + (x.StringId ?? "?");
+                    _gdPairs.Add(pr.Key);
                     if (big) _gdBig.Add(p.Id);
                     if (army) _gdArmyP.Add(p.Id);
-                    // obroncy
-                    float defR = big ? bigR : lowR, group = sp, nd = float.MaxValue;
-                    MobileParty near = null;
-                    defs.Clear();
-                    data = MobileParty.StartFindingLocatablesAroundPosition(pp, defR);
-                    for (var d = MobileParty.FindNextLocatable(ref data); d != null; d = MobileParty.FindNextLocatable(ref data))
+                    if (x.IsMainParty) _gdPlayer++;
+                    float defR = big ? bigR : lowR;
+                    var dd = MobileParty.StartFindingLocatablesAroundPosition(pp, defR);
+                    for (var d = MobileParty.FindNextLocatable(ref dd); d != null; d = MobileParty.FindNextLocatable(ref dd))
                     {
                         if (d == p || d.MapFaction != p.MapFaction || !Protectable(d)) continue;
                         float dist = pp.Distance(d.GetPosition2D);
                         if (dist > defR || Hours(d, dist) > maxH) continue;
-                        group += Str(d);
-                        defs.Add(d);
-                        if (dist < nd) { nd = dist; near = d; }
+                        pr.Cands.Add(new KeyValuePair<MobileParty, float>(d, dist));
                     }
-                    // napastnik z sojusznikami w 2R (gra: num6 + num7 x 0.9 - liczymy w pelni, bez wagi odleglosci)
-                    float foe = sx;
-                    Vec2 xp = x.GetPosition2D;
-                    data = MobileParty.StartFindingLocatablesAroundPosition(xp, 2f * R);
-                    for (var t = MobileParty.FindNextLocatable(ref data); t != null; t = MobileParty.FindNextLocatable(ref data))
-                    {
-                        if (t == x || (x.Army != null && t.Army == x.Army) || !Attacker(t, p) || xp.Distance(t.GetPosition2D) > 2f * R) continue;
-                        foe += Str(t);
-                    }
-                    if (x.IsMainParty) _gdPlayer++;
-                    if (defs.Count == 0) { _gdNoDef++; continue; }
-                    _gdRatioSum += foe > 0f ? group / foe : 0f; _gdRatioN++;
-                    if (group < foe)
-                    {
-                        _gdLose++;
-                        if (big) _gdLoseBig++;
-                        continue;                                                  // lacznie slabsi - ucieczka jak gra
-                    }
-                    bool fresh = _gdWin.Add(key);
-                    _gdProt.Add(hid);
-                    G335 old;
-                    if (!map.TryGetValue(p, out old) || old.Kind != 1) map[p] = new G335 { Kind = 1, Rank = big ? Math.Min(rank, 3) : 4, X = x, P = p, Near = near };
-                    int rk = big ? Math.Min(rank, 3) : 4;
-                    for (int j = 0; j < defs.Count; j++)
-                    {
-                        var d = defs[j];
-                        if (map.TryGetValue(d, out old) && (old.Kind == 1 || old.Rank < rk || (old.Rank == rk && old.P != null && d.GetPosition2D.Distance(old.P.GetPosition2D) <= d.GetPosition2D.Distance(pp)))) continue;
-                        map[d] = new G335 { Kind = 2, Rank = rk, X = x, P = p };
-                        _gdDefenders.Add(d.Id);
-                    }
-                    if (fresh && _gdEx < MaxExamples) { _gdEx++; Example335(p, x, rank, kind, army, sp, foe, group, defs, near, nd); }
+                    pairs.Add(pr);
                 }
                 catch (Exception e) { G335Stumble("Guard335.Party", e); }
             }
-            // chroniony, ktory jest obronca innego - zostaje chronionym (Kind 1 wygrywa przy przypisaniu wyzej)
+            var map = new Dictionary<MobileParty, G335>();
+            if (pairs.Count > 0)
+            {
+                try { Assign335(pairs, map, R); }
+                catch (Exception e) { G335Stumble("Guard335.Assign", e); }
+            }
             _g335 = map;
         }
 
-        private static void Example335(MobileParty p, MobileParty x, int rank, int kind, bool army, float sp, float foe, float group, List<MobileParty> defs, MobileParty near, float nd)
+        /// <summary>2) Obroncy do par (ranga, odleglosc; chroniony nie jest obronca), sila grupy tylko z przypisanych; para lacznie slabsza odpada (najslabsza
+        /// pierwsza), jej obroncy wracaja do pozostalych. 3) Wpisy migawki, najblizszy bezpieczny obronca, liczniki doby, przyklady.</summary>
+        private static void Assign335(List<Pair335> pairs, Dictionary<MobileParty, G335> map, float R)
+        {
+            var prot = new HashSet<MobileParty>();
+            for (int i = 0; i < pairs.Count; i++) prot.Add(pairs[i].P);
+            var edges = new List<Edge335>();
+            var str = new Dictionary<MobileParty, float>();
+            for (int i = 0; i < pairs.Count; i++)
+            {
+                var c = pairs[i].Cands;
+                for (int j = 0; j < c.Count; j++)
+                {
+                    if (prot.Contains(c[j].Key)) continue;
+                    edges.Add(new Edge335 { I = i, D = c[j].Key, Dist = c[j].Value, Rk = pairs[i].Rk });
+                    if (!str.ContainsKey(c[j].Key)) str[c[j].Key] = Str(c[j].Key);
+                }
+            }
+            edges.Sort((a, b) => a.Rk != b.Rk ? a.Rk.CompareTo(b.Rk) : a.Dist.CompareTo(b.Dist));
+            var taken = new HashSet<MobileParty>();
+            for (int iter = 0; iter <= pairs.Count; iter++)
+            {
+                for (int i = 0; i < pairs.Count; i++) { if (pairs[i].Dropped) continue; pairs[i].Defs.Clear(); pairs[i].Group = pairs[i].Sp; }
+                taken.Clear();
+                for (int k = 0; k < edges.Count; k++)
+                {
+                    var e = edges[k];
+                    var pr = pairs[e.I];
+                    if (pr.Dropped || taken.Contains(e.D)) continue;
+                    taken.Add(e.D);
+                    pr.Defs.Add(e.D);
+                    pr.Group += str[e.D];
+                }
+                Pair335 worst = null;
+                float wr = float.MaxValue;
+                for (int i = 0; i < pairs.Count; i++)
+                {
+                    var pr = pairs[i];
+                    if (pr.Dropped) continue;
+                    if (pr.Defs.Count > 0 && pr.Group >= pr.Foe) continue;
+                    float r = pr.Defs.Count == 0 ? -1f : pr.Group / Math.Max(1f, pr.Foe);
+                    if (r < wr) { wr = r; worst = pr; }
+                }
+                if (worst == null) break;
+                worst.Dropped = true;                                              // jej obroncy wracaja do pozostalych par w nastepnym obiegu
+            }
+            for (int i = 0; i < pairs.Count; i++)
+            {
+                var pr = pairs[i];
+                try
+                {
+                    if (pr.Defs.Count == 0) { _gdNoDef++; continue; }
+                    _gdRatioSum += pr.Foe > 0f ? pr.Group / pr.Foe : 0f; _gdRatioN++;
+                    if (pr.Dropped)
+                    {
+                        _gdLose++;
+                        if (pr.Big) _gdLoseBig++;
+                        continue;                                                  // lacznie slabsi - ucieczka jak gra
+                    }
+                    var p = pr.P;
+                    var x = pr.X;
+                    Vec2 pp = p.GetPosition2D, toX = x.GetPosition2D - pp;
+                    float lx = toX.Length;
+                    // najblizszy obronca, do ktorego droga nie prowadzi przez X (kat > 60 st.; w R - juz razem)
+                    MobileParty near = null;
+                    float nd = float.MaxValue;
+                    for (int j = 0; j < pr.Defs.Count; j++)
+                    {
+                        var d = pr.Defs[j];
+                        Vec2 v = d.GetPosition2D - pp;
+                        float dist = v.Length;
+                        bool safe = dist <= R || lx < 0.01f || Vec2.DotProduct(v * (1f / dist), toX * (1f / lx)) < 0.5f;
+                        if (safe && dist < nd) { nd = dist; near = d; }
+                    }
+                    if (near == null && !pr.Battle) _gdNoSafe++;
+                    bool fresh = _gdWin.Add(pr.Key);
+                    _gdProt.Add(pr.Hid);
+                    if (pr.Battle) _gdBattle.Add(pr.Key);
+                    map[p] = new G335 { Kind = 1, Rank = pr.Rk, X = x, P = p, Near = near, Battle = pr.Battle };
+                    for (int j = 0; j < pr.Defs.Count; j++)
+                    {
+                        var d = pr.Defs[j];
+                        map[d] = new G335 { Kind = 2, Rank = pr.Rk, X = x, P = p, Battle = pr.Battle };
+                        _gdDefenders.Add(d.Id);
+                        if (pr.Battle) _gdToBattle.Add(d.Id);
+                    }
+                    if (fresh && _gdEx < MaxExamples) { _gdEx++; Example335(p, x, pr.Rank, pr.RKind, pr.Army, pr.Sp, pr.Foe, pr.Group, pr.Defs, near, near != null ? nd : -1f, pr.Battle); }
+                }
+                catch (Exception e) { G335Stumble("Guard335.Pair", e); }
+            }
+        }
+
+        private static void Example335(MobileParty p, MobileParty x, int rank, int kind, bool army, float sp, float foe, float group, List<MobileParty> defs, MobileParty near, float nd, bool battle)
         {
             try
             {
                 var sb = new StringBuilder(400);
                 sb.Append("Ochrona wodza (335): mapa - ").Append(Hn(p.LeaderHero)).Append(" (").Append(RankName(rank, kind)).Append(army ? ", wodz armii" : "").Append(", sila ").Append(F0(sp))
-                  .Append(") zagrozony przez ").Append(x.IsMainParty ? "gracza" : Nm(x)).Append(" (sila z sojusznikami w 2R ").Append(F0(foe)).Append(") | obroncow ").Append(defs.Count).Append(": ");
+                  .Append(battle ? ") w bitwie z " : ") zagrozony przez ").Append(x.IsMainParty ? "gracza" : Nm(x)).Append(battle ? " (sila strony " : " (sila z sojusznikami w 2R ").Append(F0(foe)).Append(") | obroncow ").Append(defs.Count).Append(": ");
                 for (int i = 0; i < defs.Count && i < 5; i++)
                 {
                     if (i > 0) sb.Append(", ");
                     sb.Append(Hn(defs[i].LeaderHero)).Append(" ").Append(F0(Str(defs[i])));
                 }
                 if (defs.Count > 5) sb.Append(", ...");
-                sb.Append(" | sila grupy ").Append(F0(group)).Append(" >= ").Append(F0(foe)).Append(" - bronia go razem, najblizszy ").Append(near != null ? Hn(near.LeaderHero) : "-")
-                  .Append(" w ").Append(F1(nd)).Append(" jedn.");
+                sb.Append(" | sila grupy ").Append(F0(group)).Append(" >= ").Append(F0(foe)).Append(battle ? " - obroncy dolaczaja do bitwy" : " - bronia go razem").Append(", najblizszy bezpieczny ")
+                  .Append(near != null ? Hn(near.LeaderHero) : "-").Append(" w ").Append(nd >= 0f ? F1(nd) : "-").Append(" jedn.");
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { G335Stumble("Guard335.Example", e); }
@@ -282,8 +437,26 @@ namespace Armoury
                 var x = g.X;
                 if (x == null || !x.IsActive || x.CurrentSettlement != null || x.IsCurrentlyAtSea != __0.IsCurrentlyAtSea) return;
                 if (__2 != null && __2 != x && __3 > 1f && MobileParty.IsFleeBehavior(__1)) { Interlocked.Increment(ref _gvOther); return; }   // inne zagrozenie - decyzja gry
+                float R = 3f;
+                try { R = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius; } catch { }
                 if (g.Kind == 2)
                 {
+                    // chroniony w bitwie - EngageParty na X = dolaczenie do bitwy po stronie P; poza bitwa obronca daleko za P (dalej niz 2R od P i dalej od X niz P)
+                    // najpierw do P - zbieraja sie przy nim, nie wpadaja na X po jednym
+                    var p = g.P;
+                    if (p != null && p.IsActive && p.MapEvent == null && !g.Battle)
+                    {
+                        Vec2 me = __0.GetPosition2D, pp = p.GetPosition2D, xp = x.GetPosition2D;
+                        if (me.Distance(pp) > 2f * R && me.Distance(xp) > pp.Distance(xp))
+                        {
+                            if (__1 == AiBehavior.EscortParty && __2 == p && __3 > 1f) { Interlocked.Increment(ref _gvDefAlready); return; }
+                            __1 = AiBehavior.EscortParty;
+                            __2 = p;
+                            __3 = Math.Max(__3, 1f) + 0.01f;
+                            Interlocked.Increment(ref _gvDefEscort);
+                            return;
+                        }
+                    }
                     if (__1 == AiBehavior.EngageParty && __2 == x && __3 > 1f) { Interlocked.Increment(ref _gvDefAlready); return; }
                     __1 = AiBehavior.EngageParty;
                     __2 = x;
@@ -292,9 +465,8 @@ namespace Armoury
                     return;
                 }
                 var near = g.Near;
-                if (near == null || !near.IsActive || near.CurrentSettlement != null || near.MapEvent != null) return;
-                float R = 3f;
-                try { R = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius; } catch { }
+                if (near == null) { Interlocked.Increment(ref _gvProtNoSafe); return; }   // brak obroncy z droga omijajaca X - decyzja gry (ucieczka)
+                if (!near.IsActive || near.CurrentSettlement != null || near.MapEvent != null) return;
                 if (__0.GetPosition2D.Distance(near.GetPosition2D) <= R)
                 {
                     __1 = AiBehavior.EngageParty;
@@ -354,8 +526,10 @@ namespace Armoury
                          + _gdBig.Count + ", wodzowie armii " + _gdArmyP.Count + ", napastnik gracz (migawki) " + _gdPlayer + ") | bez obroncow w zasiegu (migawki) " + _gdNoDef
                          + " | lacznie slabsi - ucieczka jak gra (migawki) " + _gdLose + " (w tym ranga wysoka " + _gdLoseBig + "), sr. sila grupy / napastnika "
                          + (_gdRatioN > 0 ? F2(_gdRatioSum / _gdRatioN) : "-") + " | bronia razem: par " + _gdWin.Count + ", chronionych " + _gdProt.Count + ", obroncow " + _gdDefenders.Count
-                         + " | decyzje AI: obronca atakuje napastnika " + Volatile.Read(ref _gvDef) + " (juz atakowal " + Volatile.Read(ref _gvDefAlready) + "), chroniony do obroncy "
-                         + Volatile.Read(ref _gvProtEscort) + ", chroniony atakuje z nimi " + Volatile.Read(ref _gvProtEngage) + ", inne zagrozenie (decyzja gry) " + Volatile.Read(ref _gvOther)
+                         + " | decyzje AI: obronca atakuje napastnika " + Volatile.Read(ref _gvDef) + " (juz atakowal " + Volatile.Read(ref _gvDefAlready) + "), obronca do chronionego " + Volatile.Read(ref _gvDefEscort)
+                         + ", chroniony do obroncy " + Volatile.Read(ref _gvProtEscort) + ", chroniony atakuje z nimi " + Volatile.Read(ref _gvProtEngage) + ", inne zagrozenie (decyzja gry) "
+                         + Volatile.Read(ref _gvOther) + ", chroniony bez bezpiecznej drogi do obroncy (decyzja gry) " + Volatile.Read(ref _gvProtNoSafe) + " (migawki " + _gdNoSafe + ")"
+                         + " | bitwa chronionego: par " + _gdBattle.Count + ", obroncow wezwanych " + _gdToBattle.Count + ", dolaczylo " + _gdJoined.Count
                          + " | wyjatki zakazu zaczepiania 223/p9 " + Volatile.Read(ref _gvAtk) + " | pojmani z par " + _gdCapt + " (chronieni grupa " + _gdCaptProt + ") | przykladow "
                          + _gdEx + " | potkniecia 335 " + _gdStum + ".");
             }
@@ -373,22 +547,21 @@ namespace Armoury
         {
             try
             {
-                if (_g335M == null)
+                // recenzja 335: latka na typ czynnego modelu KAZDEJ kampanii (inna kampania - inny model, np. bez NavalDLC)
+                var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.MobilePartyAIModel : null;
+                var m = PatchTarget.OfActive(model, "GetBestInitiativeBehavior",
+                    new[] { typeof(MobileParty), typeof(AiBehavior).MakeByRefType(), typeof(MobileParty).MakeByRefType(), typeof(float).MakeByRefType(), typeof(Vec2).MakeByRefType() },
+                    "ochrona wodza: decyzja chwili AI partii (335)");
+                if (m == null) { _g335M = null; _g335Patch = "BRAK (GetBestInitiativeBehavior)"; }
+                else if (_g335Patched.Contains(m)) { _g335M = m; _g335Patch = "TAK (juz wczesniej w tym procesie, " + (m.DeclaringType != null ? m.DeclaringType.Name : "?") + ")"; }
+                else
                 {
-                    var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.MobilePartyAIModel : null;
-                    var m = PatchTarget.OfActive(model, "GetBestInitiativeBehavior",
-                        new[] { typeof(MobileParty), typeof(AiBehavior).MakeByRefType(), typeof(MobileParty).MakeByRefType(), typeof(float).MakeByRefType(), typeof(Vec2).MakeByRefType() },
-                        "ochrona wodza: decyzja chwili AI partii (335)");
-                    if (m == null) _g335Patch = "BRAK (GetBestInitiativeBehavior)";
-                    else
-                    {
-                        if (_h == null) _h = new Harmony("com.jeff.armoury.lordescort223");
-                        _h.Patch(m, postfix: new HarmonyMethod(typeof(LordEscort), nameof(Init335Postfix)) { priority = Priority.Last });
-                        _g335M = m;
-                        _g335Patch = "TAK (" + (m.DeclaringType != null ? m.DeclaringType.Name : "?") + ")";
-                    }
+                    if (_h == null) _h = new Harmony("com.jeff.armoury.lordescort223");
+                    _h.Patch(m, postfix: new HarmonyMethod(typeof(LordEscort), nameof(Init335Postfix)) { priority = Priority.Last });
+                    _g335Patched.Add(m);
+                    _g335M = m;
+                    _g335Patch = "TAK (" + (m.DeclaringType != null ? m.DeclaringType.Name : "?") + ")";
                 }
-                else _g335Patch = "TAK (juz wczesniej w tym procesie, " + (_g335M.DeclaringType != null ? _g335M.DeclaringType.Name : "?") + ")";
             }
             catch (Exception e) { _g335Patch = "wyjatek " + e.GetType().Name; Stumble("Guard335.Patch", e); }
             try

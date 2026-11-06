@@ -755,7 +755,7 @@ namespace Armoury
             if (_gKey && man.Role > 0)
             {
                 // 335: dowodca / glowa rodu - najpierw do najblizszego wlasnego szyku (Jeff: "wycofuje sie do swoich wojsk"), nie przez pole do glownej sily
-                Vec2 q = NearestOwn(man, m, back, out kind, out wp);
+                Vec2 q = NearestOwn(man, m, back, man.Mode == ModeWounded, out kind, out wp);   // ranny - tyl szyku pieszego, nie srodek / jazda
                 if (kind == KindLimit || q.IsValid) return q;
                 kind = -1;
             }
