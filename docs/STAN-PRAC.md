@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 06.11.2026 ok. 16:10 CEST: WGRANIE 168 (najnowszy) - 335 ochrona wodza (Tywin)
+- W GRZE: Armoury.dll 6ffcced0ea53e5933dc5a8aed4ea0758 (galaz noc/335-ochrona-wodza 091ed773 od noc/333-ai-bitwy a7e623fb; worktree scratchpad sesji 0a2a8b2b n335; wypchnieta). Kopia 167: Armoury.dll.bak-2026-11-06-przed-wgranie168 i D:/Backup-Bannerlord/wgrane/2026-11-06-wgranie168.
+- Uwagi Jeffa: (mapa) partie przy Tywinie uciekaja zamiast bronic glowy rodu; (bitwa) Tywin bez jazdy jezdzi sam wokol wojsk. Mapa: LordEscort.Guard335.cs (pary chroniony-obroncy, obrona gdy razem >= napastnik, EngageParty w bitwie chronionego). Bitwa: HeroCaution.Guard335.cs (wodz za swoim szykiem, przy zagrozeniu wycofanie do szyku pieszego, straz 3 na napastnika). Grupa sprawdz_logi wodz335.
+- Testy: at335 (bandy, 0 dowodcow - nic bitewnego) i at335b (CrashScribe-at z -LordBattles 3, skrypt bieg-bitwa-335.ps1): kod 0, 11/11 bitew, wodz335 0 NIE (wodz sam 2.1%, 13 zagrozen, 11 wycofan, straz 58 ludzi), bledy CS 23 = baza; A333-4/4b NIE od skrzydel ProtectFlank w bitwach z lordami (nowa baza, nie od 335).
+- W TOKU: 334c (balans wojny + Zelazni; worktree n333 galaz noc/334-balans, workflow wf_b8894643): 334b test 90 dob WYWROTKA na dobie 78 (NavalDLC GetWeatherEventInPosition IndexOutOfRange), Zelazni 0 armii/oblezen/rabunkow, korona armia 7/79 dob. UWAGA: 334 jest od 333, nie zawiera 335 - przed wgraniem scalic z noc/335-ochrona-wodza i test laczony.
+
 ## STAN 06.11.2026 ok. 07:07 CEST: WGRANIE 167 (najnowszy) - 333 AI bitwy (poscig z glowa + wahadlo szykow)
 - W GRZE: Armoury.dll 3ab9113b7ad7f50d173f973fbf209153 (galaz noc/333-ai-bitwy a7e623fb od noc/332-reach; worktree scratchpad sesji 0a2a8b2b n333). Kopia 166: Armoury.dll.bak-2026-11-06-przed-wgranie167 i D:/Backup-Bannerlord/wgrane/2026-11-06-wgranie167. Logi Jeffa: D:/Backup-Bannerlord/logi-jeffa/2026-11-06-przed-at333*.
 - Uwagi Jeffa 06.11: (A) konnica AI goni jego konnego lucznika pod jego wojsko, zawraca, on strzela w plecy, ona wraca - ping-pong; (B) szyki przed kontaktem chodza przod-tyl.
