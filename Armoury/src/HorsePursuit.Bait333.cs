@@ -21,15 +21,19 @@ namespace Armoury
     /// + 0.8 x zasieg szyku (MissileRangeAdjusted gry, 60..120 m - dalej strzala w jezdzca jest juz loteria), konnica i konni lucznicy promien + 60 m (kontra jazdy).
     /// Odleglosc punktu od strefy g = najmniejsze (odleglosc od srodka szyku - promien strefy); g < 0 = w strefie.
     /// STANY strzelca (pamiec WEDLUG CZLOWIEKA - przezywa koniec zagrozenia, nowy strzal jej nie zeruje):
-    ///  - WOLNY (bez pamieci): 204 jak dotad; nowy poscig calosci tylko, gdy g >= 30 m (ZStartGap); strzelec przy swojej armii (g < 30 m) - jezdzcy nie ruszaja
-    ///    (lucznicy strony R1 dalej strzelaja).
+    ///  - WOLNY (bez pamieci): 204 jak dotad; nowy poscig calosci tylko, gdy g >= 30 m (ZStartGap); strzelec przy swojej armii (g < 10 m) - jezdzcy nie ruszaja
+    ///    (lucznicy strony R1 dalej strzelaja); g 10..30 m, a najblizszy szyk konnicy AI jest >= 40 m od strefy (ZLightFar - caly atak poza lukami) - lekkie
+    ///    odpedzenie: tylko oddzial L1 (recenzja 333 W3; punkt i tak przyciety do 10 m przed strefa, wejscie w g < 10 m = zerwanie).
     ///  - POSCIG: trwa, dopoki g >= 10 m (ZBreakGap; histereza 20 m wzgledem startu). Punkt kazdego jezdzca (przeciecie, odciecie, zaslona) przyciety do 10 m przed
     ///    strefa (ZClampGap) - nikt nie celuje w punkt pod lukami; jezdziec, ktory mimo to jest w strefie (armia strzelca podeszla) - wraca sam ("w strefie").
     ///    Kandydat w 10 m od strefy nie jest wysylany.
     ///  - ZERWANY (przyneta): strzelec wszedl w g < 10 m - CALA grupa wraca naraz (decyzja na poziomie zagrozenia, nie jezdzca), przerwa jezdzca tylko 5 s (moze
     ///    stanac w strazy), pamiec "przyneta" od tej chwili. Pelny poscig wraca dopiero, gdy strzelec jest naprawde daleko od swoich: g >= 100 m (ZReChaseGap, 10x
-    ///    margines zerwania) bez przerwy przez 3 s i po 60 s od zerwania (ZCalm - ochloniecie) - wtedy stan WOLNY.
-    ///  - TYLNA STRAZ (tylko w stanie ZERWANY): strzelec jedzie za wracajacymi i oddalil sie od swoich na g >= 40 m (ZGuardGap) - z najblizszego szyku konnicy AI
+    ///    margines zerwania) bez przerwy przez 3 s i po ochlonieciu od zerwania - wtedy stan WOLNY. Ochloniecie rosnie z liczba zerwan tego strzelca (recenzja 333 W4):
+    ///    60 / 120 / 240 s; po drugim zerwaniu ten strzelec dostaje juz najwyzej oddzial L1 (raz nabrani nie rzucaja calej jazdy po raz trzeci).
+    ///    Petla przynety = zerwanie tego samego strzelca w 120 s (ZLoopWin) po poprzednim - z konstrukcji najwyzej 1 na strzelca.
+    ///  - TYLNA STRAZ (tylko w stanie ZERWANY): strzelec jedzie za wracajacymi (nie zbliza sie do swoich, szyk konnicy w smyczy od niego) i oddalil sie od swoich
+    ///    na g >= 40 m (ZGuardGap) - z najblizszego szyku konnicy AI
     ///    odlacza sie straz: 12% szyku, 3..5 jezdzcow, najwyzej 1/3 szyku (najblizsi strzelcowi - tyl wracajacych); reszta dalej wraca. Straz zrywa cala naraz, gdy
     ///    strzelec wroci w g < 20 m (ZGuardBreakGap - ostrozniej niz calosc), po 40 s (ZGuardMax) albo jezdziec wjedzie w strefe; potem straz nie rusza 30 s
     ///    (ZGuardCool), jezdzcy po 30 s przerwy (CounterCool). Straz to rola przeciecia (bez odciecia za strzelcem).
@@ -42,16 +46,17 @@ namespace Armoury
         internal const float ZFootAdd = 50f, ZCavAdd = 60f, ZShotShare = 0.8f, ZShotMin = 60f, ZShotMax = 120f;
         internal const float ZBreakGap = 10f, ZStartGap = 30f, ZClampGap = 10f, ZGuardGap = 40f, ZGuardBreakGap = 20f, ZReChaseGap = 100f;
         internal const float ZCalm = 60f, ZReChaseHold = 3f, ZBreakCool = 5f, ZGuardMax = 40f, ZGuardCool = 30f, ZBackHitWindow = 20f;
-        internal const float ZGuardShare = 0.12f;
-        internal const int ZGuardMin = 3, ZGuardMaxN = 5;
+        internal const float ZGuardShare = 0.12f, ZLightFar = 40f, ZLoopWin = 120f, ZCalmMax = 240f;
+        internal const int ZGuardMin = 3, ZGuardMaxN = 5, ZLightAfter = 2;
         private const int ZMaxLines = 12;
-        private const int BFull = 0, BGuard = 1, BNone = 2;
+        private const int BFull = 0, BGuard = 1, BNone = 2, BLight = 3;   // BLight - jak BFull, ale najwyzej oddzial L1
 
         private sealed class Bait
         {
             public bool On;
-            public float BrokeAt = -1f, FarSince = -1f, GuardCool = -1f;
-            public int Breaks;
+            public float BrokeAt = -1f, FarSince = -1f, GuardCool = -1f, LastGap = float.MaxValue;
+            public int Breaks, Loops;
+            public float Calm { get { return Math.Min(ZCalmMax, ZCalm * (float)Math.Pow(2.0, Math.Max(0, Math.Min(Breaks, 3) - 1))); } }
         }
 
         private static bool _zOn;
@@ -64,7 +69,7 @@ namespace Armoury
         private static int _zFullBefore;
         // liczniki misji
         private static int _zBreaks, _zBreakRiders, _zEpBreakMax, _zShooterBreakMax, _zLoops, _zReChase, _zFull, _zNoStart, _zGuardEps, _zGuardRiders, _zGuardZone,
-                           _zGuardTime, _zRiderIn, _zClamp, _zBackHits, _zLines, _zStum, _zZoneMax;
+                           _zGuardTime, _zRiderIn, _zClamp, _zBackHits, _zLines, _zStum, _zZoneMax, _zLight, _zLightFull;
 
         private static void Bait333Clear()
         {
@@ -73,7 +78,7 @@ namespace Armoury
             ZTmp.Clear(); ZNoStartSeen.Clear();
             _zFullBefore = 0;
             _zBreaks = _zBreakRiders = _zEpBreakMax = _zShooterBreakMax = _zLoops = _zReChase = _zFull = _zNoStart = _zGuardEps = _zGuardRiders = _zGuardZone = 0;
-            _zGuardTime = _zRiderIn = _zClamp = _zBackHits = _zLines = _zStum = _zZoneMax = 0;
+            _zGuardTime = _zRiderIn = _zClamp = _zBackHits = _zLines = _zStum = _zZoneMax = _zLight = _zLightFull = 0;
         }
 
         // ------------------------------------------------------------ strefa (pass, po BuildHForms)
@@ -125,7 +130,7 @@ namespace Armoury
             return g;
         }
 
-        /// <summary>Punkt jezdzca odsuniety na ZClampGap przed strefe (najwyzej 2 przejscia - dwie nakladajace sie strefy).</summary>
+        /// <summary>Punkt jezdzca odsuniety na ZClampGap przed strefe (przejscia do braku ruchu, najwyzej liczba stref + 1 - nakladajace sie strefy).</summary>
         private static Vec2 ZoneClamp(Threat t, Vec2 p)
         {
             int side = t.SSide;
@@ -134,7 +139,8 @@ namespace Armoury
             var rs = ZR[side];
             var fs = ZF[side];
             bool moved = false;
-            for (int it = 0; it < 2; it++)
+            int its = cs.Count + 1;   // recenzja 333 D2: 3+ nakladajace sie strefy
+            for (int it = 0; it < its; it++)
             {
                 int bi = -1;
                 float bv = 0f;
@@ -158,11 +164,12 @@ namespace Armoury
 
         // ------------------------------------------------------------ brama zagrozenia (ThreatPass, przed wysylaniem jezdzcow)
 
-        /// <summary>Stan strzelca 333: BFull - 204 jak dotad, BGuard - tylko tylna straz, BNone - bez jezdzcow. Zrywa poscig calej grupy i straz.</summary>
+        /// <summary>Stan strzelca 333: BFull - 204 jak dotad, BLight - tylko oddzial L1, BGuard - tylko tylna straz, BNone - bez jezdzcow. Zrywa poscig calej grupy i straz.
+        /// Recenzja 333 W5: konny i pieszy strzelec (pieszy przed swoimi lucznikami tak samo wabi); poza 333 tylko nekajacy wrecz (283).</summary>
         private static int BaitGate(Mission m, Threat t, Vec2 sp, float now, bool mounted, bool rx)
         {
             _zFullBefore = 0;
-            t.Z333 = _zOn && _hKey && mounted && !(rx && MeleeKind(t));
+            t.Z333 = _zOn && _hKey && !(rx && MeleeKind(t));
             if (!t.Z333) return BFull;
             var s = t.S;
             Formation ex = null;
@@ -185,8 +192,10 @@ namespace Armoury
             {
                 if (b == null) { b = new Bait(); Baits[s] = b; }
                 b.On = true;
+                if (b.BrokeAt >= 0f && now - b.BrokeAt < ZLoopWin) { b.Loops++; if (b.Loops > _zLoops) _zLoops = b.Loops; }   // petla przynety (na strzelca)
                 b.BrokeAt = now;
                 b.FarSince = -1f;
+                b.LastGap = g;
                 b.Breaks++;
                 if (b.Breaks > _zShooterBreakMax) _zShooterBreakMax = b.Breaks;
                 t.EpBreaks++;
@@ -196,30 +205,60 @@ namespace Armoury
                 _zBreakRiders += n;
                 ZLine("zerwanie: strzelec " + Who(s) + " (" + (s.IsMainAgent ? "gracz" : "AI") + ") " + F0(g) + " m od strefy swojej armii (prog "
                       + F0(ZBreakGap) + " m) | cala grupa wraca: jezdzcow " + n + " | zerwanie nr " + b.Breaks + " tego strzelca | ponowny poscig dopiero " + F0(ZReChaseGap)
-                      + " m od strefy przez " + F0(ZReChaseHold) + " s, po " + F0(ZCalm) + " s");
+                      + " m od strefy przez " + F0(ZReChaseHold) + " s, po " + F0(b.Calm) + " s" + (b.Breaks >= ZLightAfter ? ", potem najwyzej oddzial L1" : ""));
                 return BNone;
             }
             if (b != null && b.On)
             {
                 if (g >= ZReChaseGap) { if (b.FarSince < 0f) b.FarSince = now; }
                 else b.FarSince = -1f;
-                if (now - b.BrokeAt >= ZCalm && b.FarSince >= 0f && now - b.FarSince >= ZReChaseHold)
+                if (now - b.BrokeAt >= b.Calm && b.FarSince >= 0f && now - b.FarSince >= ZReChaseHold)
                 {
                     b.On = false;
                     _zReChase++;
                     for (int i = 0; i < t.Hs.Count; i++) t.Hs[i].Guard = false;   // straz staje sie poscigiem calosci
                     ZLine("ponowny poscig: strzelec " + Who(s) + " " + F0(g) + " m od strefy swojej armii od " + (now - b.FarSince).ToString("0.0", Inv) + " s, "
-                          + (now - b.BrokeAt).ToString("0", Inv) + " s po zerwaniu");
-                    return BFull;
+                          + (now - b.BrokeAt).ToString("0", Inv) + " s po zerwaniu" + (b.Breaks >= ZLightAfter ? " (najwyzej oddzial L1)" : ""));
+                    return b.Breaks >= ZLightAfter ? BLight : BFull;
                 }
-                return GuardState(t, b, g, now, guard);
+                int gs = GuardState(t, b, g, now, guard);
+                b.LastGap = g;
+                return gs;
             }
+            bool light = b != null && b.Breaks >= ZLightAfter;   // W4: po drugim zerwaniu ten strzelec - najwyzej L1
             if (full == 0 && g < ZStartGap)
             {
+                // W3: strzelec 10..30 m od strefy, a jazda daleko od strefy - lekkie odpedzenie (caly atak poza lukami); blizej - bez jezdzcow
+                if (g >= ZBreakGap && CavFarFromZone(t, sp))
+                {
+                    _zLight++;
+                    return BLight;
+                }
                 if (ZNoStartSeen.Add(s.Index)) _zNoStart++;
                 return BNone;
             }
-            return BFull;
+            if (light && full == 0) _zLightFull++;
+            return light ? BLight : BFull;
+        }
+
+        /// <summary>W3: najblizszy strzelcowi szyk konnicy AI (bez gracza i odwrotu, w smyczy) ma krawedz >= ZLightFar od strefy armii strzelca.</summary>
+        private static bool CavFarFromZone(Threat t, Vec2 sp)
+        {
+            if (t.Side < 0 || t.Side > 1) return false;
+            var fl = HForms[t.Side];
+            int best = -1;
+            float bd = float.MaxValue;
+            for (int i = 0; i < fl.Count; i++)
+            {
+                var fi = fl[i];
+                if (!fi.Cav || fi.Player || fi.Retreat) continue;
+                float e = Math.Max(0f, sp.Distance(fi.C) - fi.R);
+                if (e > _maxFrom || e >= bd) continue;
+                bd = e;
+                best = i;
+            }
+            if (best < 0) return false;
+            return ZoneGap(t.SSide, fl[best].C, t.ZEx) - fl[best].R >= ZLightFar;
         }
 
         /// <summary>Tylna straz w stanie ZERWANY: trwa / zrywa / wolno odlaczyc.</summary>
@@ -242,7 +281,9 @@ namespace Armoury
                 }
                 return BGuard;
             }
-            return g >= ZGuardGap && now >= b.GuardCool ? BGuard : BNone;
+            // D1: strzelec jedzie za wracajacymi - nie wraca do swoich (g nie maleje); smycz szyku od strzelca sprawdza GuardTake (_maxFrom)
+            bool chasing = b.LastGap == float.MaxValue || g >= b.LastGap - 0.5f;
+            return g >= ZGuardGap && chasing && now >= b.GuardCool ? BGuard : BNone;
         }
 
         private static int GuardSize(int n)
@@ -320,14 +361,12 @@ namespace Armoury
             return n;
         }
 
-        /// <summary>ThreatPass po wysylce w stanie BFull: nowy poscig calosci (licznik), petla przynety (poscig w ZCalm po zerwaniu - oczekiwane 0).</summary>
+        /// <summary>ThreatPass po wysylce w stanie BFull / BLight: nowy poscig calosci (licznik). Petla przynety liczona przy zerwaniu (ZLoopWin).</summary>
         private static void BaitFullSent(Threat t, float now, int sent)
         {
             if (!t.Z333 || sent <= 0 || _zFullBefore > 0) return;
             _zFull++;
             t.EpBreaks = 0;
-            Bait b;
-            if (t.S != null && Baits.TryGetValue(t.S, out b) && b.BrokeAt >= 0f && now - b.BrokeAt < ZCalm) _zLoops++;
         }
 
         /// <summary>OnRiderShot (glowny watek): jezdziec AI trafiony przez strzelca w ZBackHitWindow s po zerwaniu poscigu za nim (strzaly w plecy wracajacych).</summary>
@@ -358,13 +397,17 @@ namespace Armoury
             sb.Append("AI bitwy (333): misja ").Append(_kind).Append(" | poscig z glowa klucz ").Append(keyA ? "TAK" : "NIE").Append(" (jazda 204 ").Append(_hKey ? "TAK" : "NIE")
               .Append("; strefa armii strzelca: piechota +").Append(F0(ZFootAdd)).Append(" m, lucznicy +").Append(ZShotShare.ToString("0.0", Inv)).Append(" zasiegu ")
               .Append(F0(ZShotMin)).Append('-').Append(F0(ZShotMax)).Append(" m, konnica +").Append(F0(ZCavAdd)).Append(" m; zerwanie < ").Append(F0(ZBreakGap))
-              .Append(" m, start >= ").Append(F0(ZStartGap)).Append(" m, straz >= ").Append(F0(ZGuardGap)).Append(" m (zrywa < ").Append(F0(ZGuardBreakGap)).Append(" m, ")
+              .Append(" m, start >= ").Append(F0(ZStartGap)).Append(" m (lekkie L1 od ").Append(F0(ZBreakGap)).Append(" m, gdy jazda >= ").Append(F0(ZLightFar))
+              .Append(" m od strefy), straz >= ").Append(F0(ZGuardGap)).Append(" m (zrywa < ").Append(F0(ZGuardBreakGap)).Append(" m, ")
               .Append(F0(ZGuardMax)).Append(" s, przerwa ").Append(F0(ZGuardCool)).Append(" s), ponowny poscig >= ").Append(F0(ZReChaseGap)).Append(" m przez ")
-              .Append(F0(ZReChaseHold)).Append(" s po ").Append(F0(ZCalm)).Append(" s)")
+              .Append(F0(ZReChaseHold)).Append(" s po ").Append(F0(ZCalm)).Append('/').Append(F0(2f * ZCalm)).Append('/').Append(F0(ZCalmMax))
+              .Append(" s, od ").Append(ZLightAfter).Append(". zerwania najwyzej L1)")
               .Append(" | poscigi calosci ").Append(_zFull).Append(", zerwania calosci ").Append(_zBreaks).Append(" (jezdzcow ").Append(_zBreakRiders)
               .Append("), zerwan na poscig najwiecej ").Append(_zEpBreakMax).Append(", zerwan na strzelca najwiecej ").Append(_zShooterBreakMax)
-              .Append(", nawroty po zerwaniu ").Append(_zLoops).Append(" (oczekiwane 0), ponowne poscigi po ochlonieciu ").Append(_zReChase)
-              .Append(", strzelcy przy swojej armii bez poscigu ").Append(_zNoStart)
+              .Append(", petla przynety ").Append(_zLoops).Append(" (zerwanie w ").Append(F0(ZLoopWin)).Append(" s po poprzednim, na strzelca; oczekiwane <= 1)")
+              .Append(", ponowne poscigi po ochlonieciu ").Append(_zReChase)
+              .Append(", strzelcy przy swojej armii bez poscigu ").Append(_zNoStart).Append(", lekkie odpedzenia L1 przy armii ").Append(_zLight)
+              .Append(", poscigi L1 po 2. zerwaniu ").Append(_zLightFull)
               .Append(" | tylna straz: odlaczen ").Append(_zGuardEps).Append(" (jezdzcow ").Append(_zGuardRiders).Append("), zerwana przy strefie ").Append(_zGuardZone)
               .Append(", po czasie ").Append(_zGuardTime)
               .Append(" | jezdzcy zawroceni w strefie ").Append(_zRiderIn).Append(", nie wyslani przy strefie ").Append(Nw[NwZone]).Append(", punktow przycietych do strefy ")

@@ -70588,7 +70588,7 @@ M204_RX = {
     "left": re.compile(r"\| pod sterowaniem 204 na koniec (\d+) \(oczekiwane 0\)"),
     "stum": re.compile(r"\| potkniecia jazda (\d+) \(wypadli (\d+)\)\.$"),
     "grp": re.compile(r"\| strzelcy w szyku (\d+) \(najwiecej z jednego szyku (\d+), limit (\d+), ucietych limitem (\d+); kontrola zwarcia ponad limit (\d+)\)"),
-    "ret": re.compile(r"\| powroty: .*?, zwarcie (\d+), przy szyku strzelca (\d+), bez sprawdzenia FF (\d+)(?:, nadwyzka po obnizeniu (\d+))?;"),
+    "ret": re.compile(r"\| powroty: .*?, zwarcie (\d+), przy szyku strzelca (\d+), bez sprawdzenia FF (\d+)(?:, nadwyzka po obnizeniu (\d+))?(?:, strefa armii strzelca 333 \d+)?;"),
     "cost": re.compile(r"\| koszt passu sr\. (\S+) / max (\S+) ms \(passow (\d+); ludzi przejrzanych najwiecej (\d+) na pass, limit (\d+), ciec przegladu (\d+); "
                        r"strzelcow naraz najwiecej (\d+), na pass (\d+), passow z odlozonymi (\d+); obnizen poziomu (\d+)(?:; FF poza kolejka (\d+))?\)"),
     "start": re.compile(r"^Jazda na strzelca \(204\) start: strzelec (\S+) \((gracz|AI), konno, (\S+)\) \| strona (atak|obrona) \| wykrycie (trafienie|pudlo|przelot|cel AI), "
@@ -95146,7 +95146,7 @@ def main(argv):
 
 # ------------------------------------------------------------ paczka 333: grupa ai333 - AI bitwy: poscig z glowa (HorsePursuit.Bait333.cs) i szyk bez wahadla (Pendulum333.cs)
 #  A333-0 linia 'AI bitwy (333): misja' (brak - INFO: stary DLL albo bez bitwy polowej); A333-1 zerwan na jeden poscig calosci najwyzej 1 (formacja nie zawraca
-#  w kolko); A333-2 nawroty po zerwaniu (pelny poscig w 60 s od zerwania - petla przynety) = 0; A333-3 tylna straz (odlaczenia, na odlaczenie najwyzej 2 x 5
+#  w kolko); A333-2 petla przynety (zerwanie tego samego strzelca w 120 s po poprzednim, najwiecej na strzelca; ochloniecie 60/120/240 s) <= 1 (poprawka 333r); A333-3 tylna straz (odlaczenia, na odlaczenie najwyzej 2 x 5
 #  jezdzcow z dobieraniem); A333-4 wahadlo przed kontaktem: przy kluczu TAK i >= 2 szyko-minutach nawroty <= 0.25 na szyko-minute, w tym w tyl <= 0.1
 #  (klucz NIE albo malo minut - INFO); A333-5 potkniecia 333 = 0 i 'ERROR in' miejsc 333 = 0; A333-6 latka wahadla TAK przy kluczu TAK.
 #   python -I tools/sprawdz_logi.py --grupa ai333 <Armoury-*.log>
@@ -95154,7 +95154,8 @@ A333_P = "AI bitwy (333): misja "
 A333_LINE = re.compile(
     r"AI bitwy \(333\): misja (.+?) \| poscig z glowa klucz (TAK|NIE) .*?"
     r"\| poscigi calosci (\d+), zerwania calosci (\d+) \(jezdzcow (\d+)\), zerwan na poscig najwiecej (\d+), zerwan na strzelca najwiecej (\d+), "
-    r"nawroty po zerwaniu (\d+) \(oczekiwane 0\), ponowne poscigi po ochlonieciu (\d+), strzelcy przy swojej armii bez poscigu (\d+) "
+    r"(?:nawroty po zerwaniu|petla przynety) (\d+) \([^)]*\), ponowne poscigi po ochlonieciu (\d+), strzelcy przy swojej armii bez poscigu (\d+)"
+    r"(?:, lekkie odpedzenia L1 przy armii (\d+), poscigi L1 po 2\. zerwaniu (\d+))? "
     r"\| tylna straz: odlaczen (\d+) \(jezdzcow (\d+)\), zerwana przy strefie (\d+), po czasie (\d+) "
     r"\| jezdzcy zawroceni w strefie (\d+), nie wyslani przy strefie (\d+), punktow przycietych do strefy (\d+), szykow w strefie najwiecej (\d+) "
     r"\| trafienia wracajacych w \d+ s po zerwaniu (\d+) "
@@ -95162,7 +95163,7 @@ A333_LINE = re.compile(
     r".*?\| rozkazy Move przed kontaktem (\d+): wstecz zatrzymane (\d+), wstecz dozwolone S4 (\d+), wstecz po zmianie zachowania (\d+), "
     r"naprzod wstrzymane po cofnieciu (\d+), szykow zatrzymanych (\d+) \| potkniecia 333 (\d+)\.")
 A333_ERR = re.compile(r"ERROR in (Pendulum333\.|HorsePursuit\.(Brama333|Strefa333|Poscig333|Plecy333|Linia333|Wahadlo333))")
-A333_K = ["kind", "keyA", "full", "breaks", "breakRiders", "epMax", "shMax", "loops", "rechase", "nostart", "gEps", "gRiders", "gZone", "gTime",
+A333_K = ["kind", "keyA", "full", "breaks", "breakRiders", "epMax", "shMax", "loops", "rechase", "nostart", "light", "lightFull", "gEps", "gRiders", "gZone", "gTime",
           "riderIn", "nwZone", "clamp", "zones", "backHits", "keyB", "patch", "forms", "minutes", "rev", "revBack", "seen", "backHeld", "backS4", "backBeh",
           "fwdHeld", "held", "stum"]
 
@@ -95188,6 +95189,8 @@ def ai333_collect(logp):
                     r[k] = v.strip()
                 elif k == "minutes":
                     r[k] = float(v)
+                elif v is None:   # linia sprzed 333r (bez lekkich odpedzen)
+                    r[k] = 0
                 else:
                     r[k] = int(v)
             D["lines"].append(r)
@@ -95206,9 +95209,10 @@ def ai333_rows(rep, D):
     ep = max(r["epMax"] for r in L)
     rep.add("A333-1: zawrocen formacji na jeden poscig", f"najwiecej {ep} (zerwan {sum(r['breaks'] for r in L)}, poscigow calosci {sum(r['full'] for r in L)}, "
             f"na strzelca najwiecej {max(r['shMax'] for r in L)})", "<= 1", ep <= 1)
-    lp = sum(r["loops"] for r in L)
-    rep.add("A333-2: petla przynety (poscig w 60 s po zerwaniu)", f"nawrotow {lp} (ponownych poscigow po ochlonieciu {sum(r['rechase'] for r in L)}, "
-            f"trafien wracajacych {sum(r['backHits'] for r in L)})", "0", lp == 0)
+    lp = max(r["loops"] for r in L)
+    rep.add("A333-2: petla przynety (zerwanie w 120 s po poprzednim, na strzelca)", f"najwiecej {lp} (ponownych poscigow po ochlonieciu {sum(r['rechase'] for r in L)}, "
+            f"lekkich odpedzen L1 {sum(r['light'] for r in L)}, poscigow L1 po 2. zerwaniu {sum(r['lightFull'] for r in L)}, "
+            f"trafien wracajacych {sum(r['backHits'] for r in L)})", "<= 1", lp <= 1)
     ge, gr = sum(r["gEps"] for r in L), sum(r["gRiders"] for r in L)
     if ge == 0:
         rep.add("A333-3: tylna straz", f"odlaczen 0 (zerwan {sum(r['breaks'] for r in L)})", "INFO (strzelec nie jechal za wracajacymi)", None)
@@ -95236,15 +95240,17 @@ def ai333_rows(rep, D):
 
 def ai333_line(full=3, breaks=1, ep=1, loops=0, gEps=1, gRiders=4, keyB="TAK", patch="TAK", mins="12.0", rev=1, rb=0, stum=0, keyA="TAK"):
     return (f"AI bitwy (333): misja bitwa polowa | poscig z glowa klucz {keyA} (jazda 204 TAK; strefa armii strzelca: piechota +50 m, lucznicy +0.8 zasiegu 60-120 m, "
-            f"konnica +60 m; zerwanie < 10 m, start >= 30 m, straz >= 40 m (zrywa < 20 m, 40 s, przerwa 30 s), ponowny poscig >= 100 m przez 3 s po 60 s) "
+            f"konnica +60 m; zerwanie < 10 m, start >= 30 m (lekkie L1 od 10 m, gdy jazda >= 40 m od strefy), straz >= 40 m (zrywa < 20 m, 40 s, przerwa 30 s), "
+            f"ponowny poscig >= 100 m przez 3 s po 60/120/240 s, od 2. zerwania najwyzej L1) "
             f"| poscigi calosci {full}, zerwania calosci {breaks} (jezdzcow 25), zerwan na poscig najwiecej {ep}, zerwan na strzelca najwiecej {breaks}, "
-            f"nawroty po zerwaniu {loops} (oczekiwane 0), ponowne poscigi po ochlonieciu 1, strzelcy przy swojej armii bez poscigu 2 "
+            f"petla przynety {loops} (zerwanie w 120 s po poprzednim, na strzelca; oczekiwane <= 1), ponowne poscigi po ochlonieciu 1, "
+            f"strzelcy przy swojej armii bez poscigu 2, lekkie odpedzenia L1 przy armii 1, poscigi L1 po 2. zerwaniu 0 "
             f"| tylna straz: odlaczen {gEps} (jezdzcow {gRiders}), zerwana przy strefie 1, po czasie 0 "
             f"| jezdzcy zawroceni w strefie 2, nie wyslani przy strefie 5, punktow przycietych do strefy 40, szykow w strefie najwiecej 6 "
             f"| trafienia wracajacych w 20 s po zerwaniu 3 "
             f"| wahadlo: klucz {keyB} (latka {patch}; przed kontaktem > 75 m miara RBM, wyjscie > 90 m; martwa strefa max(3 m, pol glebokosci); wstecz tylko S4 albo "
-            f"zmiana zachowania po 15 s) | szykow AI 9, szyko-minut przed kontaktem {mins}, nawroty {rev} (w tym w tyl {rb}; 0.08 na szyko-minute; wedlug zachowania "
-            f"BehaviorCautiousAdvance {rev}), wejsc w kontakt 6 | rozkazy Move przed kontaktem 300: wstecz zatrzymane 20, wstecz dozwolone S4 1, "
+            f"zachowanie stale 3 s bez ruchu naprzod 15 s; naprzod 15 s po wstecz; konnica wroga 60 m albo szarza w 120 m = kontakt) | szykow AI 9, szyko-minut przed kontaktem {mins}, nawroty {rev} (w tym w tyl {rb}; 0.08 na szyko-minute; wedlug zachowania "
+            f"BehaviorCautiousAdvance {rev}), wejsc w kontakt 6 (w tym przez konnice wroga 1) | rozkazy Move przed kontaktem 300: wstecz zatrzymane 20, wstecz dozwolone S4 1, "
             f"wstecz po zmianie zachowania 1, naprzod wstrzymane po cofnieciu 0, szykow zatrzymanych 3 | potkniecia 333 {stum}.")
 
 
@@ -95255,7 +95261,10 @@ def ai333_synth():
     runs = {
         "good": [ai333_line()],
         "ep2": [ai333_line(ep=2)],
-        "loop": [ai333_line(loops=1)],
+        "loop": [ai333_line(loops=2)],
+        "loop1": [ai333_line(loops=1)],
+        "old": [ai333_line().replace("petla przynety 0 (zerwanie w 120 s po poprzednim, na strzelca; oczekiwane <= 1)", "nawroty po zerwaniu 0 (oczekiwane 0)")
+                .replace(", lekkie odpedzenia L1 przy armii 1, poscigi L1 po 2. zerwaniu 0", "")],
         "guard": [ai333_line(gEps=1, gRiders=14)],
         "pend": [ai333_line(rev=30, rb=12)],
         "pendoff": [ai333_line(keyB="NIE", rev=30, rb=12)],
@@ -95269,6 +95278,8 @@ def ai333_synth():
         "good": {"A333-0": "TAK", "A333-1": "TAK", "A333-2": "TAK", "A333-3": "TAK", "A333-4": "TAK", "A333-5": "TAK", "A333-6": "TAK"},
         "ep2": {"A333-1": "NIE"},
         "loop": {"A333-2": "NIE"},
+        "loop1": {"A333-2": "TAK"},
+        "old": {"A333-0": "TAK", "A333-2": "TAK"},
         "guard": {"A333-3": "NIE"},
         "pend": {"A333-4": "NIE"},
         "pendoff": {"A333-4": "INFO"},

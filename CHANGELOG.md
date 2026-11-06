@@ -40,6 +40,24 @@ kontaktu i cofa sie dopiero w 75 m (jak gra); obronca 291 wraca na wzgorze tylko
 raz na rozkaz (0.5 s na szyk) + petla po szykach wroga; pomiar co 0.5 s po szykach; jezdziec - odleglosc strefy w kroku 0.25 s. Mod misji - wgrac dopiero po tescie
 z bitwa (bieg-bitwa-204.ps1 -Battles N -Harasser N), nie gdy Jeff gra.
 **Status:** DO SPRAWDZENIA (zbudowane Release, kod 0, 0 Error(s); nie wgrane, bez autotestu).
+**Poprawki po recenzji (333r):**
+- K1 (obie recenzje): szyk, ktorego pierwszy rozkaz po rozstawieniu kaze isc wstecz (obronca na wzgorze 291, DefensiveLine / HoldChokePoint za linia startu), stal do
+  kontaktu (pf.Beh ustawiane tylko przy naprzod / stoj). Teraz zachowanie liczone od pierwszego rozkazu; wstecz przechodzi, gdy zachowanie trwa >= 3 s, w nim szyk jeszcze
+  nie szedl naprzod i od ostatniego ruchu naprzod minelo >= 15 s.
+- W2 (zapadka w przod) i technika 2 (miganie zachowan): po kazdym rozkazie wstecz (zatrzymanym albo nie) naprzod stoi 15 s, chyba ze to inne zachowanie trwajace >= 3 s;
+  zachowanie migajace co 0.5 s (Regroup / CautiousAdvance) nigdy nie jest "zmiana".
+- W1 / technika 3: kontakt takze przez dowolny szyk wroga w 75 m miara RBM, konnice wroga w 60 m albo szarzujaca (>= 3 m/s) w 120 m - przez 4 s wszystko jak w grze
+  (lucznicy uciekaja przed szarza). Licznik "w tym przez konnice wroga".
+- W3: strzelec 10..30 m od strefy swojej armii, a najblizszy szyk konnicy AI >= 40 m od strefy - lekkie odpedzenie oddzialem L1 (punkt przyciety), zamiast zadnej reakcji.
+- W4: ochloniecie rosnie z liczba zerwan strzelca (60 / 120 / 240 s), od 2. zerwania tylko oddzial L1. Petla przynety = zerwanie tego samego strzelca w 120 s po poprzednim
+  (najwiecej na strzelca; A333-2 <= 1 - z konstrukcji najwyzej 1, wiecej = blad). A333-1 bez zmian.
+- W5: brama 333 takze dla pieszego strzelca (poza 333 tylko nekajacy wrecz 283).
+- D1: straz rusza tylko, gdy strzelec nie wraca do swoich (odleglosc od strefy nie maleje); D2: ZoneClamp do braku ruchu (najwyzej liczba stref + 1); D3: linia 204
+  "powroty" ma ", strefa armii strzelca 333 N" (regex "ret" w sprawdz_logi rozszerzony, m204jazda bez zmian); potkniecie latki wahadla nie ginie w Clear; HorsePursuit.End
+  bez misji i tak konczy Pendulum333.
+- Swiadomie bez zmian: szyki druzyny gracza-wodza (takze oddane AI przez F6) sa poza (B) - rozkaz gracza przechodzi przez SetMovementOrder przed zdjeciem AI i bylby
+  zamieniony na "stoj"; poscig 148 (FormSt) nie przechodzi przez brame - do obejrzenia w autotescie (wejscia 148 w strefe); A333-1 z konstrukcji <= 1 (straznik bledu).
+**Status 333r:** DO SPRAWDZENIA (zbudowane Release, kod 0, 0 Error(s); sprawdz_logi --grupa ai333 A333-S TAK; nie wgrane, bez autotestu z bitwa).
 
 ## 332 - Reach do korony po Czarnym Nurcie (noc/332-reach od 330x-integracja 0e29f73a - NIE WGRANE, bez autotestu; Jeff gra)
 **Problem:** Jeff 05.11: "Reach do korony po Czarnym Nurcie". Dzis Reach zostaje osobnym krolestwem w sojuszu z korona (m104 (2)), sojusz odnawiany co 364 dni z napisem

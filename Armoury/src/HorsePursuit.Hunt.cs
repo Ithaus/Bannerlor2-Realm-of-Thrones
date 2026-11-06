@@ -105,7 +105,7 @@ namespace Armoury
             public Formation VicF, LeaderF;
             public float LastHarm = -1f;   // 311a: ostatnie trafienie czlowieka strony pociskiem (zegar epizodu oslony)
             public CovEp Cov;              // 311a: epizod oslony (null - brak)
-            public bool Z333;              // 333: brama strefy armii strzelca dziala (konny strzelec, klucz)
+            public bool Z333;              // 333: brama strefy armii strzelca dziala (konny i pieszy strzelec, klucz; bez nekajacego wrecz 283)
             public Formation ZEx;          // 333: szyk samego strzelca (poza strefa)
             public float Gap333 = float.MaxValue;   // 333: odleglosc strzelca od strefy swojej armii (ostatni pass)
             public int EpBreaks;           // 333: zerwan w biezacym poscigu calosci (oczekiwane najwyzej 1)
@@ -938,7 +938,7 @@ namespace Armoury
             if (!_hKey) { }
             else if (bm == BNone) { }
             else if (bm == BGuard) GuardTake(m, t, fl, sp, now, ref sent, ref sentCharge);
-            else if (t.Level <= 1)
+            else if (t.Level <= 1 || bm == BLight)   // 333 BLight: najwyzej oddzial L1 (przy armii strzelca / po 2. zerwaniu)
             {
                 // najblizszy szyk konnicy AI bez szarzy (szarza wodza zostaje), w smyczy od strzelca
                 int best = -1;
@@ -971,7 +971,7 @@ namespace Armoury
                     Take(m, t, fi, int.MaxValue, now, ref sent, ref sentCharge);
                 }
             }
-            if (bm == BFull) BaitFullSent(t, now, sent);   // 333
+            if (bm == BFull || bm == BLight) BaitFullSent(t, now, sent);   // 333
             int foot = 0, halted = 0;
             if (rx)
             {
@@ -1735,6 +1735,7 @@ namespace Armoury
               .Append(", koniec bitwy ").Append(UEnd[UEnded]).Append(", koniec strzelca ").Append(UEnd[UThreat]).Append(", poza zasiegiem ").Append(UEnd[URange])
               .Append(", swoi przy strzelcu ").Append(UEnd[UFriend]).Append(", inne ").Append(UEnd[UOther]).Append(", zwarcie ").Append(UEnd[UMelee])
               .Append(", przy szyku strzelca ").Append(UEnd[UIntact]).Append(", bez sprawdzenia FF ").Append(UEnd[UNoCheck]).Append(", nadwyzka po obnizeniu ").Append(UEnd[UTrim])
+              .Append(", strefa armii strzelca 333 ").Append(UEnd[UZone])
               .Append("; najdalej od szyku ").Append(F0(_hMaxFar)).Append(" m")
               .Append("; jezdzcy padli ").Append(_hRidersLost)
               .Append(" | strzelcy w szyku ").Append(HGroupShooters.Count).Append(" (najwiecej z jednego szyku ").Append(_hGroupMax).Append(", limit ").Append(PerVictim)

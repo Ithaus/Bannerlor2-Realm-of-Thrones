@@ -22,12 +22,17 @@ namespace Armoury
     /// tylko szyk AI (nie szyk gracza - HorsePursuit.PlayerForm), pieszy (piechota albo lucznicy, nie konnica), od IntactMin ludzi, bitwa polowa po rozstawieniu,
     /// glowny watek, i tylko PRZED KONTAKTEM: najblizszy pieszy szyk wroga (od IntactMin ludzi; bez pieszego - jakikolwiek) dalej niz 75 m miara RBM (wejscie w kontakt
     /// <= 75 m, wyjscie > 90 m - histereza 15 m). Kierunek rozkazu = rzut (cel rozkazu - mediana szyku) na os do tego wroga; martwa strefa max(3 m, pol glebokosci szyku):
-    ///  - NAPRZOD (> martwej strefy): przechodzi; po dozwolonym cofnieciu przez 15 s (Dwell) bez zmiany zachowania - stoj (bez "tyl-przod");
+    ///  - NAPRZOD (> martwej strefy): przechodzi; przez 15 s (Dwell) od ostatniego rozkazu wstecz (zatrzymanego albo dozwolonego) - stoj, chyba ze to inne, stale
+    ///    (>= 3 s, BehStable) zachowanie niz to, ktore chcialo wstecz (bez "tyl-przod" i bez zapadki w przod krokami RBM +5/+10 / -10 m);
     ///  - STOJ (w martwej strefie): przechodzi;
     ///  - WSTECZ (< -martwej strefy): przed kontaktem zamieniony na "stoj w miejscu" (Move na kotwicy - mediana szyku z chwili pierwszego zatrzymania; ten sam punkt
-    ///    przy kolejnych rozkazach, wiec gra nie przestawia szyku co tick). Dozwolone tylko: lucznicy za piechote (BehaviorScreenedSkirmish - nasza S4 z wlasna histereza
-    ///    25 m) oraz realna zmiana sytuacji - inne zachowanie szyku niz przy ostatniej decyzji kierunku (zmiana taktyki druzyny, np. obronca wraca na wzgorze 291)
-    ///    i co najmniej 15 s od tej decyzji (Dwell - bez wahadla taktyk). Odwrot (rozkaz Retreat), szarza, Advance / FallBack - bez zmian (to nie Move).
+    ///    przy kolejnych rozkazach, wiec gra nie przestawia szyku co tick). Dozwolone: lucznicy za piechote (BehaviorScreenedSkirmish - nasza S4 z wlasna histereza
+    ///    25 m) oraz zachowanie, ktore od poczatku chce wstecz (recenzja 333 K1): stale od >= 3 s, w tym zachowaniu szyk jeszcze nie szedl naprzod i od ostatniego
+    ///    ruchu naprzod (dowolnym zachowaniem) minelo >= 15 s - obronca wraca na wzgorze 291 / linie obrony za soba, takze pierwszym rozkazem po rozstawieniu.
+    ///    Miganie zachowan (Regroup / CautiousAdvance co 0.5 s) nie jest "zmiana" - zadne nie trwa 3 s. Odwrot (Retreat), szarza, Advance / FallBack - bez zmian.
+    /// KONTAKT (recenzja 333 W1): takze dowolny szyk wroga (konnica) w 75 m miara RBM albo konnica wroga w 60 m, albo w 120 m i zbliza sie >= 3 m/s (szarza) -
+    /// wtedy przez 4 s od ostatniego takiego pomiaru wszystko jak w grze (lucznicy uciekaja przed szarza, piechota sie ustawia).
+    /// Szyki druzyny gracza-wodza (takze oddane AI przez F6) - poza 333: rozkaz gracza przechodzi przez SetMovementOrder przed zdjeciem AI i bylby zamieniony na "stoj".
     /// Kotwica znika, gdy szyk ruszy naprzod albo wejdzie w kontakt. Po kontakcie - wszystko jak w grze i RBM.
     /// POMIAR (linia, takze przy kluczu NIE - do porownania): co 0.5 s kazdy szyk AI jak wyzej przed kontaktem - przesuniecie mediany rzutowane na os do wroga,
     /// filtr zygzak z progiem max(3 m, pol glebokosci): nawrot = zmiana kierunku po odcinku >= progu; wynik na szyko-minute przed kontaktem i wedlug zachowania.
@@ -37,18 +42,19 @@ namespace Armoury
     internal static class Pendulum333
     {
         internal const float ContactIn = 75f, ContactOut = 90f, Dwell = 15f, SampleEvery = 0.5f, DeadMin = 3f, RefreshEvery = 0.5f;
-        private const byte DNone = 0, DFwd = 1, DHold = 2, DBack = 3;
+        internal const float BehStable = 3f, CavClose = 60f, CavNear = 120f, CavClosing = 3f, CavKeep = 4f;
         private const int MaxBeh = 8;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private sealed class PF
         {
             public Formation F;
-            public byte Dir;
-            public float DirSince;
-            public Type Beh;
+            public Type Beh, BackBeh;
+            public float BehSince = -1000f, BackAt = -1000f, FwdAt = -1000f;
+            public bool FwdInBeh, BehSeen;
             public Vec2 Anchor = Vec2.Invalid;
-            public bool Contact;
+            public bool Contact, FootContact;
+            public float CavGap = float.MaxValue, CavAt = -1000f, CavUntil = -1000f;
             public float Gap = float.MaxValue, GapAt = -1000f;
             public Vec2 Axis = Vec2.Invalid;
             // pomiar
@@ -65,10 +71,10 @@ namespace Armoury
         private static readonly Dictionary<string, int> RevBy = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly HashSet<Formation> HeldForms = new HashSet<Formation>();
         // liczniki misji
-        private static int _seen, _backHeld, _backS4, _backBeh, _fwdHeld, _rev, _revBack, _forms, _contactIn;
+        private static int _seen, _backHeld, _backS4, _backBeh, _fwdHeld, _rev, _revBack, _forms, _contactIn, _contactCav;
         private static float _preSec;
-        private static int _stum;
-        internal static int Stumbles { get { return _stum; } }
+        private static int _stum, _stumPatch;   // recenzja 333 (7): potkniecie latki (przed pierwszym Begin) nie ginie w Clear
+        internal static int Stumbles { get { return _stum + _stumPatch; } }
         private static string _patch = "nie wpieta";
 
         // ------------------------------------------------------------ latka (Doctrine.ApplyMissionPatches - pierwsza bitwa, raz na proces)
@@ -87,7 +93,7 @@ namespace Armoury
             catch (Exception e)
             {
                 _patch = "NIE (" + e.GetType().Name + ")";
-                _stum++;
+                _stumPatch++;
                 RoutHold.Stumble(RoutHold.SiteDoctrine, "Pendulum333.Latka", e);
             }
             return _patch;
@@ -116,7 +122,7 @@ namespace Armoury
         {
             Forms.Clear(); RevBy.Clear(); HeldForms.Clear();
             _acc = 0f;
-            _seen = _backHeld = _backS4 = _backBeh = _fwdHeld = _rev = _revBack = _forms = _contactIn = 0;
+            _seen = _backHeld = _backS4 = _backBeh = _fwdHeld = _rev = _revBack = _forms = _contactIn = _contactCav = 0;
             _preSec = 0f;
             _stum = 0;
         }
@@ -154,7 +160,7 @@ namespace Armoury
             var own = f.Team;
             var m = Mission.Current;
             Vec2 c = f.CachedMedianPosition.AsVec2;
-            float best = float.MaxValue, bestAny = float.MaxValue;
+            float best = float.MaxValue, bestAny = float.MaxValue, bestCav = float.MaxValue;
             Vec2 ax = Vec2.Invalid, axAny = Vec2.Invalid;
             var teams = m != null ? m.Teams : null;
             int nt = teams != null ? teams.Count : 0;
@@ -177,15 +183,26 @@ namespace Armoury
                     bool foot = !eq.IsCavalryFormation && !eq.IsRangedCavalryFormation;
                     if (foot && d < best) { best = d; ax = ec - c; }
                     if (d < bestAny) { bestAny = d; axAny = ec - c; }
+                    if (!foot && d < bestCav) bestCav = d;
                 }
             }
+            float near = bestAny;   // kontakt: pieszy wrog albo dowolny szyk (konnica) miara RBM - recenzja 333 W1
             if (best == float.MaxValue) { best = bestAny; ax = axAny; }
             pf.Gap = best;
             if (ax.IsValid && ax.Length > 0.1f) pf.Axis = ax.Normalized();
             bool was = pf.Contact;
-            if (best <= ContactIn) pf.Contact = true;
-            else if (best > ContactOut) pf.Contact = false;
-            if (pf.Contact && !was) _contactIn++;
+            if (near <= ContactIn) pf.FootContact = true;
+            else if (near > ContactOut) pf.FootContact = false;
+            // konnica wroga: bardzo blisko albo w 120 m i szarzuje (zbliza sie >= 3 m/s) - kontakt na CavKeep s od ostatniego takiego pomiaru
+            bool cav = false;
+            if (bestCav <= CavClose) cav = true;
+            else if (bestCav <= CavNear && pf.CavGap != float.MaxValue && now - pf.CavAt > 0.05f && now - pf.CavAt < 3f
+                     && (pf.CavGap - bestCav) / (now - pf.CavAt) >= CavClosing) cav = true;
+            pf.CavGap = bestCav;
+            pf.CavAt = now;
+            if (cav) pf.CavUntil = now + CavKeep;
+            pf.Contact = pf.FootContact || now < pf.CavUntil;
+            if (pf.Contact && !was) { _contactIn++; if (!pf.FootContact) _contactCav++; }
         }
 
         // ------------------------------------------------------------ prefiks Formation.SetMovementOrder
@@ -204,7 +221,7 @@ namespace Armoury
                 float now = m.CurrentTime;
                 var pf = Get(f);
                 Refresh(pf, now);
-                if (pf.Contact || pf.Gap == float.MaxValue || !pf.Axis.IsValid) { pf.Dir = DNone; pf.Anchor = Vec2.Invalid; return; }
+                if (pf.Contact || pf.Gap == float.MaxValue || !pf.Axis.IsValid) { pf.Anchor = Vec2.Invalid; return; }
                 Vec2 c = f.CachedMedianPosition.AsVec2;
                 Vec2 tp = input.GetPosition(f);
                 if (!c.IsValid || !tp.IsValid) return;
@@ -213,35 +230,39 @@ namespace Armoury
                 float dz = Math.Max(DeadMin, 0.5f * f.Depth);
                 Type beh = null;
                 try { var ai = f.AI; beh = ai != null && ai.ActiveBehavior != null ? ai.ActiveBehavior.GetType() : null; } catch { beh = null; }
+                // recenzja 333 K1 / W2 / technika 2: zachowanie liczone od pierwszego rozkazu (takze pierwszego po rozstawieniu), "stale" dopiero po BehStable s
+                if (!pf.BehSeen || beh != pf.Beh) { pf.BehSeen = true; pf.Beh = beh; pf.BehSince = now; pf.FwdInBeh = false; }
+                bool stable = beh != null && now - pf.BehSince >= BehStable;
                 if (s < -dz)
                 {
                     bool s4 = beh == typeof(BehaviorScreenedSkirmish);
-                    bool changed = pf.Beh != null && beh != null && beh != pf.Beh && (pf.Dir == DNone || now - pf.DirSince >= Dwell);
-                    if (s4 || changed)
+                    bool fresh = stable && !pf.FwdInBeh && now - pf.FwdAt >= Dwell;   // zachowanie, ktore od poczatku chce wstecz (wzgorze, linia obrony za soba)
+                    pf.BackAt = now;
+                    pf.BackBeh = beh;
+                    if (s4 || fresh)
                     {
                         if (s4) _backS4++; else _backBeh++;
-                        pf.Dir = DBack; pf.DirSince = now; pf.Beh = beh; pf.Anchor = Vec2.Invalid;
+                        pf.Anchor = Vec2.Invalid;
                         return;
                     }
-                    Hold(f, pf, c, now, ref input);
+                    Hold(f, pf, c, ref input);
                     _backHeld++;
                     return;
                 }
                 if (s > dz)
                 {
-                    if (pf.Dir == DBack && now - pf.DirSince < Dwell && beh == pf.Beh)
+                    // bez zapadki w przod: po kazdym rozkazie wstecz (zatrzymanym albo nie) Dwell s stoj - chyba ze to inne, stale zachowanie
+                    if (now - pf.BackAt < Dwell && (beh == pf.BackBeh || !stable))
                     {
-                        Hold(f, pf, c, now, ref input);
+                        Hold(f, pf, c, ref input);
                         _fwdHeld++;
                         return;
                     }
-                    if (pf.Dir != DFwd) { pf.Dir = DFwd; pf.DirSince = now; }
-                    pf.Beh = beh;
+                    pf.FwdAt = now;
+                    pf.FwdInBeh = true;
                     pf.Anchor = Vec2.Invalid;
                     return;
                 }
-                if (pf.Dir != DHold && pf.Dir != DBack) { pf.Dir = DHold; pf.DirSince = now; }
-                pf.Beh = beh;   // zmiana zachowania = pierwszy rozkaz kierunku nowego zachowania
             }
             catch (Exception e)
             {
@@ -251,10 +272,9 @@ namespace Armoury
         }
 
         /// <summary>Rozkaz zamieniony na "stoj w miejscu": Move na kotwicy (mediana szyku z pierwszego zatrzymania).</summary>
-        private static void Hold(Formation f, PF pf, Vec2 c, float now, ref MovementOrder input)
+        private static void Hold(Formation f, PF pf, Vec2 c, ref MovementOrder input)
         {
             if (!pf.Anchor.IsValid) pf.Anchor = c;
-            if (pf.Dir == DFwd || pf.Dir == DNone) { pf.Dir = DHold; pf.DirSince = now; }
             var wp = f.CachedMedianPosition;
             wp.SetVec2(pf.Anchor);
             input = MovementOrder.MovementOrderMove(wp);
@@ -360,7 +380,9 @@ namespace Armoury
             float min = _preSec / 60f;
             sb.Append("wahadlo: klucz ").Append(_key ? "TAK" : "NIE").Append(" (latka ").Append(_patch).Append("; przed kontaktem > ").Append(ContactIn.ToString("0", Inv))
               .Append(" m miara RBM, wyjscie > ").Append(ContactOut.ToString("0", Inv)).Append(" m; martwa strefa max(").Append(DeadMin.ToString("0", Inv))
-              .Append(" m, pol glebokosci); wstecz tylko S4 albo zmiana zachowania po ").Append(Dwell.ToString("0", Inv)).Append(" s)")
+              .Append(" m, pol glebokosci); wstecz tylko S4 albo zachowanie stale ").Append(BehStable.ToString("0", Inv)).Append(" s bez ruchu naprzod ")
+              .Append(Dwell.ToString("0", Inv)).Append(" s; naprzod ").Append(Dwell.ToString("0", Inv)).Append(" s po wstecz; konnica wroga ").Append(CavClose.ToString("0", Inv))
+              .Append(" m albo szarza w ").Append(CavNear.ToString("0", Inv)).Append(" m = kontakt)")
               .Append(" | szykow AI ").Append(_forms).Append(", szyko-minut przed kontaktem ").Append(min.ToString("0.0", Inv))
               .Append(", nawroty ").Append(_rev).Append(" (w tym w tyl ").Append(_revBack).Append("; ").Append(min > 0.01f ? (_rev / min).ToString("0.00", Inv) : "-")
               .Append(" na szyko-minute; wedlug zachowania ");
@@ -375,7 +397,7 @@ namespace Armoury
                     sb.Append(kv.Key).Append(' ').Append(kv.Value);
                 }
             }
-            sb.Append("), wejsc w kontakt ").Append(_contactIn)
+            sb.Append("), wejsc w kontakt ").Append(_contactIn).Append(" (w tym przez konnice wroga ").Append(_contactCav).Append(')')
               .Append(" | rozkazy Move przed kontaktem ").Append(_seen).Append(": wstecz zatrzymane ").Append(_backHeld).Append(", wstecz dozwolone S4 ").Append(_backS4)
               .Append(", wstecz po zmianie zachowania ").Append(_backBeh).Append(", naprzod wstrzymane po cofnieciu ").Append(_fwdHeld).Append(", szykow zatrzymanych ")
               .Append(HeldForms.Count);

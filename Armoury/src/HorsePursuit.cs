@@ -363,7 +363,7 @@ namespace Armoury
         internal static void End(Mission m)
         {
             var w = _m;
-            if (w == null) return;
+            if (w == null) { Pendulum333.End(); return; }   // recenzja 333 (8): bez misji HorsePursuit - wahadlo i tak puszcza szyki
             if (m != null && !ReferenceEquals(w.Target, m)) return;
             float now = 0f;
             try { if (m != null) now = m.CurrentTime; } catch { }
