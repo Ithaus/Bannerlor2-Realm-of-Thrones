@@ -1,6 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
-## STAN 05.11.2026 ok. 23:05 CEST: WGRANIE 166 (najnowszy) - 332 Reach do korony po Czarnym Nurcie
+## STAN 06.11.2026 ok. 07:07 CEST: WGRANIE 167 (najnowszy) - 333 AI bitwy (poscig z glowa + wahadlo szykow)
+- W GRZE: Armoury.dll 3ab9113b7ad7f50d173f973fbf209153 (galaz noc/333-ai-bitwy a7e623fb od noc/332-reach; worktree scratchpad sesji 0a2a8b2b n333). Kopia 166: Armoury.dll.bak-2026-11-06-przed-wgranie167 i D:/Backup-Bannerlord/wgrane/2026-11-06-wgranie167. Logi Jeffa: D:/Backup-Bannerlord/logi-jeffa/2026-11-06-przed-at333*.
+- Uwagi Jeffa 06.11: (A) konnica AI goni jego konnego lucznika pod jego wojsko, zawraca, on strzela w plecy, ona wraca - ping-pong; (B) szyki przed kontaktem chodza przod-tyl.
+- (A) klucz RidersBreakOffNearShootersArmy: strefa armii strzelca (piechota +50 m, lucznicy +0.8 zasiegu 60-120 m, konnica +60 m); zerwanie calej grupy na krawedzi strefy, pamiec na strzelca (ochloniecie 60/120/240 s, od 2. zerwania najwyzej oddzial L1), tylna straz 1-2 jezdzcow, lekkie odpedzenie L1 przy armii; HorsePursuit.Bait333.cs.
+- (B) Pendulum333.cs (prefiks Formation.SetMovementOrder, przed kontaktem 75 m RBM / konnica wroga): zapadka kierunku od pozycji szyku (CurrentPosition), martwa strefa, okno nawrotu 30/60/120/240 s, P przesuwany po minieciu; wyjatki kontaktu i powrot obroncy na wzgorze zostaja. Szyki gracza-wodza poza (B).
+- Testy (scratchpad at333): B i R2 NIE (wahadlo 0.55/0.97 na min); R3o2 i R3o3 (DLL 3ab9113b, 8 bitew kazdy, kod 0, bledy CrashScribe 23 = baza): wahadlo 0.19 i 0.16/min (prog 0.25), w tyl 0.09 i 0.04 (prog 0.10); petla przynety 0, cykli 0; grupy bitewne NIE 0, poza R3o3 m204jazda J204-2/3 (nekajacy strzelal spod swojej armii - poprawnie bez poscigu) i B309-4b (bitwa odwrot, 1 przypadek).
+- DO SPRAWDZENIA w grze Jeffa: linie "AI bitwy (333): misja" (petla przynety, zerwania, wahadlo nawroty/min), czy konnica nie przestala w ogole reagowac na strzelca daleko od armii.
+
+## STAN 05.11.2026 ok. 23:05 CEST: WGRANIE 166 - 332 Reach do korony po Czarnym Nurcie
 - W GRZE: Armoury.dll d3db557ea69a63ddef3f146441bb2070 (galaz noc/332-reach e55aaa19 od noc/330x-integracja; worktree scratchpad sesji 0a2a8b2b n332). Kopia 165: Armoury.dll.bak-2026-11-05-przed-wgranie166 i D:/Backup-Bannerlord/wgrane/2026-11-05-przed-166. Logi i zapis Jeffa 22:44: D:/Backup-Bannerlord/logi-jeffa/2026-11-05-noc.
 - 332 (decyzja Jeffa 05.11): sojusz Reach-korona (m104) do Czarnego Nurtu; po ROT BlackwaterEvent (Stannis przegral, King's Landing w koronie; zapas dzien opowiesci 916) rody Reach z lennami do vlandia, empire_w zniszczone, bez konca sojuszu 900; Kronika alias empire_w; czeka, gdy gracz w osadzie Reach / wojna domowa korony.
 - Test at332 (14 dob, flaga armoury-reach332.flag): kod 0, rodow 43/43, lenna 17/17, partie i ludzie bez strat, armie zachowane, T1-T10 TAK, reach332/wojna330/polnoc326/pokoj264 NIE 0.
