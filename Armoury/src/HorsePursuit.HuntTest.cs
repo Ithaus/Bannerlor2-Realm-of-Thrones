@@ -81,6 +81,7 @@ namespace Armoury
         {
             HuntTestClear();
             _tOn = false;
+            ArmyHoldBegin(c);   // 333t: armia gracza stoi (Strong / Weak)
             if (c == null || !c.HuntHarasserInAutotest) { _tWhy = "klucz NIE"; return; }
             int mode = LogGate.Mode;
             if (mode != 1) { _tWhy = "nie autotest"; return; }
@@ -91,6 +92,7 @@ namespace Armoury
             _tWhy = "czynny";
             _tSeq++;
             _tScen = _rKey ? (_tSeq - 1) % 3 : 0;   // 283: A, B, C po kolei (bez klucza 283 - zawsze A, jak 204)
+            _bOn = _tScen == 0 && c.RidersRunDownShooters && c.RidersBreakOffNearShootersArmy;   // 333t: A = przyneta jak u Jeffa (HorsePursuit.BaitTest333.cs)
         }
 
         private static void HuntTestClear()
@@ -110,17 +112,19 @@ namespace Armoury
             _tHarmed = false;
             _tGuardHp = _tGuardMor = _tMelee = _tMissAll = _tGuardWd = 0;   // 291
             _tMor0 = -1f;
+            BaitClear();   // 333t
         }
 
         /// <summary>291: nekajacy testu do pierwszego wykrycia - HP do pelna, morale nie nizej niz przy wyborze (jak gracz: bez odwrotu rannego 143 i paniki
         /// przed pierwsza szkoda). Tylko LogGate.Mode 1, klucz HuntHarasserInAutotest, plan Strong (_tOn).</summary>
         private static void TestGuard(Agent a)
         {
-            if (_tDet > 0 || a == null) return;
+            bool bait = _bOn && _tScen == 0;   // 333t: przyneta - morale jak gracz przez caly test, HP do pierwszego wykrycia
+            if ((_tDet > 0 && !bait) || a == null) return;
             try
             {
                 float lim = a.HealthLimit;
-                if (lim > 0f && a.Health < lim) { a.Health = lim; _tGuardHp++; }
+                if (_tDet == 0 && lim > 0f && a.Health < lim) { a.Health = lim; _tGuardHp++; }
                 if (_tMor0 >= 0f && a.GetMorale() < _tMor0) { a.SetMorale(_tMor0); _tGuardMor++; }
             }
             catch (Exception e) { HStumble("HorsePursuit.TestOslona", e); }
@@ -130,7 +134,7 @@ namespace Armoury
         /// odrzucone (wolajacy sprobuje w nastepnym takcie, po pierwszym wykryciu juz normalnie). Poza autotestem _tOn = false - zawsze false.</summary>
         internal static bool TestShielded(Agent a)
         {
-            if (!_tOn || _tState != 1 || _tDet > 0 || a == null || !ReferenceEquals(a, _tA)) return false;
+            if (!_tOn || _tState != 1 || (_tDet > 0 && !(_bOn && _tScen == 0)) || a == null || !ReferenceEquals(a, _tA)) return false;
             _tGuardWd++;
             return true;
         }
@@ -205,6 +209,7 @@ namespace Armoury
         /// <summary>Co 0.25 s (pass = co 1 s, po HForms tego passu).</summary>
         private static void HuntTestStep(Mission m, float now, bool pass)
         {
+            if (pass && _aState == 1 && m != null) ArmyHold(m, now);   // 333t: armia gracza stoi
             if (!_tOn || _tState == 2 || m == null) return;
             if (_tDeploy < 0f) _tDeploy = now;
             if (_tState == 0)
@@ -229,11 +234,11 @@ namespace Armoury
             TestGuard(a);   // 291: przed sprawdzeniem paniki / odwrotu
             if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) { TestEnd(m, "panika/odwrot", now); return; }
             if (m.MissionEnded) { TestEnd(m, "koniec bitwy", now); return; }
-            float lim = _tScen == 0 ? TestMaxSec : TestMaxFoot;   // 283a: B / C pieszo - dluzsza droga skrzydlem
+            float lim = _tScen == 0 ? (_bOn ? BaitMaxSec : TestMaxSec) : TestMaxFoot;   // 333t: przyneta 180 s   // 283a: B / C pieszo - dluzsza droga skrzydlem
             if (now - _tStart >= lim) { TestEnd(m, "zwolniony po " + F0(lim) + " s", now); return; }
             Threat t;
             bool active = Threats.TryGetValue(a, out t) && t.Active;
-            if (_tScen != 2 && _tEp >= TestMaxEp && !active) { TestEnd(m, TestMaxEp + " epizody", now); return; }
+            if (_tScen != 2 && !(_bOn && _tScen == 0) && _tEp >= TestMaxEp && !active) { TestEnd(m, TestMaxEp + " epizody", now); return; }
             // najblizszy jezdziec 204 (i piechota 283) na nim
             float hd = float.MaxValue;
             Vec2 hp = Vec2.Invalid;
@@ -248,6 +253,7 @@ namespace Armoury
                 }
             }
             if (pass && now >= _tStatAt) TestStat(a, now);   // 283a: stan drogi co 30 s
+            if (_bOn && _tScen == 0) { BaitStep(m, a, now, pass); return; }   // 333t: przyneta jak u Jeffa
             if (_tScen == 2)
             {
                 // C: wojownik wrecz walczy dalej (cel - najblizszy lucznik wroga, po jego upadku nastepny); 283a: droga skrzydlem, bez postoju
@@ -528,7 +534,7 @@ namespace Armoury
             }
             if (best == null) return false;
             _tA = best;
-            TestTarget(m, best);
+            if (_bOn && _tScen == 0) BaitTarget(m, best); else TestTarget(m, best);   // 333t
             if (_tF == null) { _tA = null; return false; }
             // wolna jazda / piechota / strzelcy wroga na starcie (szyki AI, nie gracza), czy wrog w marszu
             var fl = HForms[es];
@@ -549,7 +555,7 @@ namespace Armoury
             try { _tMor0 = best.GetMorale(); } catch { _tMor0 = -1f; }   // 291: morale z chwili wyboru (TestGuard)
             best.SetAutomaticTargetSelection(false);
             if (_tTgt != null) best.SetTargetAgent(_tTgt);
-            string where = _tBehind ? F0(_tScen == 1 ? TestBehindB : TestBehindA) + " m za szykiem" : F0(TestStandOff) + " m od krawedzi szyku";
+            string where = _bOn && _tScen == 0 ? F0(BaitFar) + " m od szyku konnicy wroga (przyneta 333)" : _tBehind ? F0(_tScen == 1 ? TestBehindB : TestBehindA) + " m za szykiem" : F0(TestStandOff) + " m od krawedzi szyku";
             string wtxt = (_tScen == 2 ? "na cel wrecz" : "podjazd na " + where);
             if (_tScen == 0)
                 Log.Info("Jazda na strzelca (204) TEST: nekajacy " + Who(best) + " (konno, " + Weapon(best) + ", amunicja TAK) | cel " + Who(_tTgt) + " szyku "
@@ -689,6 +695,7 @@ namespace Armoury
             if (_tScen == 0) Log.Info("Jazda na strzelca (204) TEST: nekajacy " + Who(_tA) + og);
             else Log.Info("Nekanie (283) TEST " + TestScenName[_tScen] + ": nekajacy " + Who(_tA) + og);
             var a = _tA;
+            BaitEndLine(a, why, now);   // 333t
             if (a != null && a.IsActive())
             {
                 try { a.SetAutomaticTargetSelection(true); a.InvalidateTargetAgent(); } catch { }

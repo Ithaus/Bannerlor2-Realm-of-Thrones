@@ -95161,7 +95161,13 @@ A333_LINE = re.compile(
     r"\| trafienia wracajacych w \d+ s po zerwaniu (\d+) "
     r"\| wahadlo: klucz (TAK|NIE) \(latka ([^;]+);.*?\) \| szykow AI (\d+), szyko-minut przed kontaktem ([\d.]+), nawroty (\d+) \(w tym w tyl (\d+);"
     r".*?\| rozkazy Move przed kontaktem (\d+): wstecz zatrzymane (\d+), wstecz dozwolone S4 (\d+), wstecz po zmianie zachowania (\d+), "
-    r"naprzod wstrzymane po cofnieciu (\d+), szykow zatrzymanych (\d+) \| potkniecia 333 (\d+)\.")
+    r"naprzod wstrzymane po cofnieciu (\d+), szykow zatrzymanych (\d+)(?:; 333b: [^|]*)? \| potkniecia 333 (\d+)\.")
+# 333t: linia proby przynety (HorsePursuit.BaitTest333.cs BaitEndLine) - strzaly nekajacego i nawroty calej jazdy po ucieczce
+A333_BAIT = re.compile(
+    r"AI bitwy \(333\) TEST przyneta koniec: nekajacy (\S+), wynik (.+?) po ([\d.]+) s \| strzalow (\d+) \(podjazd (\d+), strzal (\d+), ucieczka (\d+), "
+    r"pogon (\d+)\), dobyc luku (\d+), rozkazow strzelania (\d+) \| konnica ruszyla (\d+) razy, ucieczek (\d+), nawrotow konnicy po ucieczce (\d+) "
+    r"\(calej jazdy > \d+ jezdzcow w \d+ s (\d+), najwiecej jezdzcow naraz (\d+)\), cykli (\d+), faza na koniec (\S+) \| (.*)\.$")
+A333_BK = ["who", "why", "sec", "shots", "sh0", "sh1", "sh2", "sh3", "wield", "fire", "chase", "flee", "turn", "turnFull", "turnMax", "cycles", "ph", "army"]
 A333_ERR = re.compile(r"ERROR in (Pendulum333\.|HorsePursuit\.(Brama333|Strefa333|Poscig333|Plecy333|Linia333|Wahadlo333))")
 A333_K = ["kind", "keyA", "full", "breaks", "breakRiders", "epMax", "shMax", "loops", "rechase", "nostart", "light", "lightFull", "gEps", "gRiders", "gZone", "gTime",
           "riderIn", "nwZone", "clamp", "zones", "backHits", "keyB", "patch", "forms", "minutes", "rev", "revBack", "seen", "backHeld", "backS4", "backBeh",
@@ -95169,13 +95175,20 @@ A333_K = ["kind", "keyA", "full", "breaks", "breakRiders", "epMax", "shMax", "lo
 
 
 def ai333_collect(logp):
-    D = {"lines": [], "bad": 0, "err": 0}
+    D = {"lines": [], "bad": 0, "err": 0, "bait": [], "baitBad": 0}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             if "AI bitwy (333)" not in line and "ERROR in" not in line:
                 continue
             if A333_ERR.search(line):
                 D["err"] += 1
+                continue
+            if "AI bitwy (333) TEST przyneta koniec: " in line:
+                mb = A333_BAIT.search(line.rstrip())
+                if not mb:
+                    D["baitBad"] += 1
+                else:
+                    D["bait"].append({k: (v if k in ("who", "why", "ph", "army") else float(v) if k == "sec" else int(v)) for k, v in zip(A333_BK, mb.groups())})
                 continue
             if A333_P not in line:
                 continue
@@ -95236,6 +95249,27 @@ def ai333_rows(rep, D):
     badp = [r["patch"] for r in on if r["patch"] != "TAK"]
     rep.add("A333-6: latka wahadla", f"bitew z kluczem TAK {len(on)}, latka nie TAK {len(badp)}" + (f" [{badp[0]}]" if badp else ""), "TAK",
             (not badp) if on else None)
+    ai333_bait_rows(rep, D)
+
+
+def ai333_bait_rows(rep, D):
+    """333t: A333-7 nekajacy przynety strzela (do konnicy z 60-90 m, w plecy wracajacych); A333-8 nawroty calej jazdy (> 5) w 120 s po ucieczce <= 1 (jak A333-2)."""
+    B = D.get("bait", [])
+    if not B:
+        rep.add("A333-7: przyneta - strzaly nekajacego", f"brak linii 'TEST przyneta koniec' (nierozpoznanych {D.get('baitBad', 0)})",
+                "INFO (bieg bez -Harasser, gra Jeffa albo stary DLL)", None if D.get("baitBad", 0) == 0 else False)
+        return
+    sh = sum(b["shots"] for b in B)
+    rep.add("A333-7: przyneta - strzaly nekajacego", f"prob {len(B)}, nierozpoznanych {D.get('baitBad', 0)}, strzalow {sh} (strzal {sum(b['sh1'] for b in B)}, "
+            f"ucieczka {sum(b['sh2'] for b in B)}, w plecy {sum(b['sh3'] for b in B)}), konnica ruszyla {sum(b['chase'] for b in B)}, ucieczek "
+            f"{sum(b['flee'] for b in B)}, wynik {', '.join(b['why'] for b in B[:3])}", ">= 1 strzal na probe, 0 nierozpoznanych",
+            all(b["shots"] >= 1 for b in B) and D.get("baitBad", 0) == 0)
+    if sum(b["chase"] for b in B) == 0:
+        rep.add("A333-8: przyneta - nawroty calej jazdy", "konnica nie ruszyla na nekajacego", "INFO (bez poscigu nie ma czego sprawdzic)", None)
+        return
+    tf = max(b["turnFull"] for b in B)
+    rep.add("A333-8: przyneta - nawroty calej jazdy", f"najwiecej {tf} na probe (nawrotow razem {sum(b['turn'] for b in B)}, najwiecej jezdzcow naraz "
+            f"{max(b['turnMax'] for b in B)}, cykli {sum(b['cycles'] for b in B)})", "<= 1 (straz do 5 jezdzcow nie liczy sie)", tf <= 1)
 
 
 def ai333_line(full=3, breaks=1, ep=1, loops=0, gEps=1, gRiders=4, keyB="TAK", patch="TAK", mins="12.0", rev=1, rb=0, stum=0, keyA="TAK"):
@@ -95254,12 +95288,24 @@ def ai333_line(full=3, breaks=1, ep=1, loops=0, gEps=1, gRiders=4, keyB="TAK", p
             f"wstecz po zmianie zachowania 1, naprzod wstrzymane po cofnieciu 0, szykow zatrzymanych 3 | potkniecia 333 {stum}.")
 
 
+def ai333_bait_line(shots=14, sh3=5, chase=2, turn=1, turnFull=0, turnMax=3):
+    return (f"AI bitwy (333) TEST przyneta koniec: nekajacy frey_rider#329, wynik zwolniony po 180 s po 180.0 s | strzalow {shots} (podjazd 0, strzal {shots - sh3}, "
+            f"ucieczka 0, pogon {sh3}), dobyc luku 1, rozkazow strzelania 0 | konnica ruszyla {chase} razy, ucieczek {chase + turn}, nawrotow konnicy po ucieczce {turn} "
+            f"(calej jazdy > 5 jezdzcow w 120 s {turnFull}, najwiecej jezdzcow naraz {turnMax}), cykli 1, faza na koniec pogon | armia gracza stala 150.0 s (150 s), "
+            f"rozkazow stoj 4.")
+
+
 def ai333_synth():
     """A333-S: dobry bieg, dwa zerwania na poscig, petla przynety, straz za duza, wahadlo, wahadlo przy NIE, potkniecie, ERROR, latka NIE. None = OK."""
     import tempfile
     import shutil
+    tail333b = "; 333b: pierwszych 3, martwa strefa 120, trzymanie 40, nawroty przepuszczone po oknie 1, przyjete naprzod 12, w bok 2"
     runs = {
         "good": [ai333_line()],
+        "new333b": [ai333_line().replace(", szykow zatrzymanych 3 | potkniecia", ", szykow zatrzymanych 3" + tail333b + " | potkniecia"), ai333_bait_line()],
+        "bait0": [ai333_line(), ai333_bait_line(shots=0, sh3=0)],
+        "baitpp": [ai333_line(), ai333_bait_line(turn=3, turnFull=2, turnMax=18)],
+        "baitbad": [ai333_line(), ai333_bait_line().replace("dobyc luku", "dobyc broni")],
         "ep2": [ai333_line(ep=2)],
         "loop": [ai333_line(loops=2)],
         "loop1": [ai333_line(loops=1)],
@@ -95275,7 +95321,11 @@ def ai333_synth():
         "broken": [ai333_line().replace("zerwan na poscig najwiecej", "zerwan najwiecej")],
     }
     exp = {
-        "good": {"A333-0": "TAK", "A333-1": "TAK", "A333-2": "TAK", "A333-3": "TAK", "A333-4": "TAK", "A333-5": "TAK", "A333-6": "TAK"},
+        "good": {"A333-0": "TAK", "A333-1": "TAK", "A333-2": "TAK", "A333-3": "TAK", "A333-4": "TAK", "A333-5": "TAK", "A333-6": "TAK", "A333-7": "INFO"},
+        "new333b": {"A333-0": "TAK", "A333-4": "TAK", "A333-6": "TAK", "A333-7": "TAK", "A333-8": "TAK"},
+        "bait0": {"A333-7": "NIE"},
+        "baitpp": {"A333-7": "TAK", "A333-8": "NIE"},
+        "baitbad": {"A333-7": "NIE"},
         "ep2": {"A333-1": "NIE"},
         "loop": {"A333-2": "NIE"},
         "loop1": {"A333-2": "TAK"},

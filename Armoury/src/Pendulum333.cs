@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using HarmonyLib;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -12,28 +13,33 @@ namespace Armoury
     /// <summary>
     /// 333 (B) "Szyk stoi albo idzie - bez wahadla przed kontaktem" (06.11, Jeff po bitwie: "formacje dziwnie sie zachowuja, ida do przodu i do tylu, do przodu i do tylu
     /// zamiast stac w formacji; dopiero jak wrog jest blizej, jakby wychodza z trybu ping-pong i zaczynaja sie normalnie zachowywac"). Klucz FormationsSteadyBeforeContact.
-    /// Przyczyna (rozpoznanie 333, dekompilacja): przed zwarciem RBM (Utilities.HasBattleBeenJoined - 75 m, mediany + pol glebokosci obu szykow) piechota idzie
-    /// zachowaniami "fazy podejscia". BehaviorCautiousAdvance (piechota oslaniajaca lucznikow w RangedHarrassmentOffensive - nasza doktryna S1 daje jej Shot x2.5 i dodaje
-    /// ja do listy) krazy miedzy stanami Approaching / Shooting / PullingBack wedlug tego, czy NASI lucznicy strzelaja (MakingRangedAttackRatio), a postfiks RBM dokleja
-    /// do tego kroki +5 / +10 m naprzod i -10 m wstecz co 30-70 tickow; RBM BehaviorAdvance staje i rusza wedlug celu konnicy wroga, BehaviorRegroup (waga 1.5) stawia
-    /// szyk na jego medianie. Wszystko to sa rozkazy Move liczone od nowa co 0.5 s (FormationAI.TickOccasionally) bez histerezy kierunku - stad "przod, tyl, przod, tyl".
+    /// Przyczyna (rozpoznanie 333, dekompilacja dek333): przed zwarciem RBM (Utilities.HasBattleBeenJoined - 75 m, mediany + pol glebokosci obu szykow) szyki ida
+    /// zachowaniami "fazy podejscia", a kazde liczy rozkaz Move od nowa co 0.5 s (FormationAI.TickOccasionally -> BehaviorComponent.TickOccasionally ->
+    /// Formation.SetMovementOrder) bez histerezy kierunku:
+    ///  - BehaviorScreenedSkirmish (lucznicy, waga 1 w taktykach RBM): postfiks RBM CalculateCurrentOrder stawia punkt = mediana glownej piechoty - Direction piechoty x
+    ///    (pol glebokosci obu + 5 m), prefiks TickOccasionally co tick SetMovementOrder - lucznicy chodza za kazdym krokiem i obrotem piechoty (wahadlo piechoty x 1, obrot
+    ///    Direction przerzuca punkt przod / tyl);
+    ///  - BehaviorHoldHighGround (glowna piechota obroncy): vanilla - wzgorze HighGroundCloseToForeseenBattleGround (przesuwa sie z przewidywanym polem bitwy), postfiks RBM -
+    ///    wrog w 200 m: punkt z pamieci positionsStorage (zapisany, gdy wrog byl dalej: srednia szyku + Direction x 10 m), wrog dalej: znowu punkt vanilla; przejscie przez
+    ///    200 m w obie strony = skok punktu tam i z powrotem;
+    ///  - BehaviorCautiousAdvance / Advance / Regroup - kroki RBM +5 / +10 / -10 m i medianowe punkty (opis 333).
+    /// Pozycja szyku idzie tylko przez rozkaz ruchu: Formation.Tick bierze _movementOrder.CreateNewOrderWorldPositionMT (Move = staly punkt _position) -> SetPositioning;
+    /// RBM SetPositioningPatch zmienia tylko odstep (unitSpacing), a Stop nie ma punktu (szyk zostaje na ostatnim). Jedna droga = prefiks Formation.SetMovementOrder.
     ///
-    /// ZASADA (jedna na wszystkie zachowania, bez dotykania wag RBM): prefiks Formation.SetMovementOrder (Priority.Last, po prefiksie com.rbmai), tylko rozkaz Move,
-    /// tylko szyk AI (nie szyk gracza - HorsePursuit.PlayerForm), pieszy (piechota albo lucznicy, nie konnica), od IntactMin ludzi, bitwa polowa po rozstawieniu,
-    /// glowny watek, i tylko PRZED KONTAKTEM: najblizszy pieszy szyk wroga (od IntactMin ludzi; bez pieszego - jakikolwiek) dalej niz 75 m miara RBM (wejscie w kontakt
-    /// <= 75 m, wyjscie > 90 m - histereza 15 m). Kierunek rozkazu = rzut (cel rozkazu - mediana szyku) na os do tego wroga; martwa strefa max(3 m, pol glebokosci szyku):
-    ///  - NAPRZOD (> martwej strefy): przechodzi; przez 15 s (Dwell) od ostatniego rozkazu wstecz (zatrzymanego albo dozwolonego) - stoj, chyba ze to inne, stale
-    ///    (>= 3 s, BehStable) zachowanie niz to, ktore chcialo wstecz (bez "tyl-przod" i bez zapadki w przod krokami RBM +5/+10 / -10 m);
-    ///  - STOJ (w martwej strefie): przechodzi;
-    ///  - WSTECZ (< -martwej strefy): przed kontaktem zamieniony na "stoj w miejscu" (Move na kotwicy - mediana szyku z chwili pierwszego zatrzymania; ten sam punkt
-    ///    przy kolejnych rozkazach, wiec gra nie przestawia szyku co tick). Dozwolone: lucznicy za piechote (BehaviorScreenedSkirmish - nasza S4 z wlasna histereza
-    ///    25 m) oraz zachowanie, ktore od poczatku chce wstecz (recenzja 333 K1): stale od >= 3 s, w tym zachowaniu szyk jeszcze nie szedl naprzod i od ostatniego
-    ///    ruchu naprzod (dowolnym zachowaniem) minelo >= 15 s - obronca wraca na wzgorze 291 / linie obrony za soba, takze pierwszym rozkazem po rozstawieniu.
-    ///    Miganie zachowan (Regroup / CautiousAdvance co 0.5 s) nie jest "zmiana" - zadne nie trwa 3 s. Odwrot (Retreat), szarza, Advance / FallBack - bez zmian.
+    /// ZASADA (333b, jedna na wszystkie zachowania, bez dotykania wag RBM): prefiks Formation.SetMovementOrder (Priority.Last, po prefiksie com.rbmai), tylko rozkaz Move,
+    /// tylko szyk AI (nie szyk gracza - HorsePursuit.PlayerForm), pieszy (piechota albo lucznicy), od IntactMin ludzi, bitwa polowa po rozstawieniu, glowny watek,
+    /// i tylko PRZED KONTAKTEM (najblizszy pieszy szyk wroga - bez pieszego dowolny - dalej niz 75 m miara RBM; wyjscie z kontaktu > 90 m). Szyk ma PUNKT PRZYJETY P
+    /// (ostatni przepuszczony rozkaz). Nowy punkt T:
+    ///  1. pierwszy rozkaz przed kontaktem - przyjety (powrot obroncy na wzgorze, lucznicy za piechote, pierwszy marsz - w dowolna strone);
+    ///  2. MARTWA STREFA: |T - P| < max(12 m, glebokosc szyku) - zostaje P (kroki RBM +5 / +10 / -10 m, drganie mediany piechoty pod punktem lucznikow S4);
+    ///  3. ZAPADKA KIERUNKU: skladowa (T - P) na osi do wroga przeciwna do ostatniego przyjetego ruchu naprzod / wstecz (ponad pol martwej strefy) - zostaje P, dopoki od
+    ///     tamtego ruchu nie minie okno 30 s; kazdy przepuszczony nawrot podwaja okno tego szyku (30 / 60 / 120 / 240 s) - wahadlo z konstrukcji gasnie;
+    ///  4. TRZYMANIE: szyk stoi na P (mediana w martwej strefie od P) - nowy punkt najwczesniej 10 s po przyjeciu P (bez dreptania co 0.5 s);
+    ///  5. reszta (ruch w tym samym kierunku albo w bok, szyk jeszcze w drodze) - przyjety.
+    /// "Zostaje P" = rozkaz zamieniony na Move w punkt P (ta sama WorldPosition - gra uznaje rozkaz za praktycznie ten sam i nie przestawia szyku).
     /// KONTAKT (recenzja 333 W1): takze dowolny szyk wroga (konnica) w 75 m miara RBM albo konnica wroga w 60 m, albo w 120 m i zbliza sie >= 3 m/s (szarza) -
-    /// wtedy przez 4 s od ostatniego takiego pomiaru wszystko jak w grze (lucznicy uciekaja przed szarza, piechota sie ustawia).
-    /// Szyki druzyny gracza-wodza (takze oddane AI przez F6) - poza 333: rozkaz gracza przechodzi przez SetMovementOrder przed zdjeciem AI i bylby zamieniony na "stoj".
-    /// Kotwica znika, gdy szyk ruszy naprzod albo wejdzie w kontakt. Po kontakcie - wszystko jak w grze i RBM.
+    /// wtedy przez 4 s od ostatniego takiego pomiaru wszystko jak w grze (lucznicy uciekaja przed szarza, piechota sie ustawia); P i zapadka zapomniane.
+    /// Szyki druzyny gracza-wodza (takze oddane AI przez F6) - poza 333. Odwrot (Retreat), szarza, Advance / FallBack, Stop - bez zmian.
     /// POMIAR (linia, takze przy kluczu NIE - do porownania): co 0.5 s kazdy szyk AI jak wyzej przed kontaktem - przesuniecie mediany rzutowane na os do wroga,
     /// filtr zygzak z progiem max(3 m, pol glebokosci): nawrot = zmiana kierunku po odcinku >= progu; wynik na szyko-minute przed kontaktem i wedlug zachowania.
     /// Koszt: prefiks raz na rozkaz (co 0.5 s na szyk) - petla po szykach wroga (kilkanascie), pomiar co 0.5 s po szykach; bez zapytan o ludzi.
@@ -41,22 +47,26 @@ namespace Armoury
     /// </summary>
     internal static class Pendulum333
     {
-        internal const float ContactIn = 75f, ContactOut = 90f, Dwell = 15f, SampleEvery = 0.5f, DeadMin = 3f, RefreshEvery = 0.5f;
-        internal const float BehStable = 3f, CavClose = 60f, CavNear = 120f, CavClosing = 3f, CavKeep = 4f;
+        internal const float ContactIn = 75f, ContactOut = 90f, SampleEvery = 0.5f, DeadMin = 3f, RefreshEvery = 0.5f;
+        internal const float CavClose = 60f, CavNear = 120f, CavClosing = 3f, CavKeep = 4f;
+        // 333b: martwa strefa rozkazu, zapadka kierunku (okno podwajane po kazdym nawrocie), trzymanie punktu
+        internal const float DeadMove = 12f, Ratchet = 30f, RatchetMax = 240f, HoldMin = 10f;
         private const int MaxBeh = 8;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private sealed class PF
         {
             public Formation F;
-            public Type Beh, BackBeh;
-            public float BehSince = -1000f, BackAt = -1000f, FwdAt = -1000f;
-            public bool FwdInBeh, BehSeen;
-            public Vec2 Anchor = Vec2.Invalid;
             public bool Contact, FootContact;
             public float CavGap = float.MaxValue, CavAt = -1000f, CavUntil = -1000f;
             public float Gap = float.MaxValue, GapAt = -1000f;
             public Vec2 Axis = Vec2.Invalid;
+            // 333b: punkt przyjety, zapadka
+            public Vec2 P = Vec2.Invalid;
+            public WorldPosition PW;
+            public float PAt = -1000f, DirAt = -1000f;
+            public sbyte Dir;
+            public int Revs;
             // pomiar
             public Vec2 Last = Vec2.Invalid;
             public float X, Lo, Hi, Ext;
@@ -70,8 +80,10 @@ namespace Armoury
         private static readonly Dictionary<Formation, PF> Forms = new Dictionary<Formation, PF>();
         private static readonly Dictionary<string, int> RevBy = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly HashSet<Formation> HeldForms = new HashSet<Formation>();
-        // liczniki misji
+        // liczniki misji (nazwy segmentu jak w 333: wstecz zatrzymane = zapadka na ruchu wstecz, wstecz dozwolone S4 / po zmianie zachowania = przyjete ruchy wstecz
+        // lucznikow S4 / innych, naprzod wstrzymane po cofnieciu = zapadka na ruchu naprzod)
         private static int _seen, _backHeld, _backS4, _backBeh, _fwdHeld, _rev, _revBack, _forms, _contactIn, _contactCav;
+        private static int _first, _dead, _hold, _revOk, _accFwd, _accSide;
         private static float _preSec;
         private static int _stum, _stumPatch;   // recenzja 333 (7): potkniecie latki (przed pierwszym Begin) nie ginie w Clear
         internal static int Stumbles { get { return _stum + _stumPatch; } }
@@ -123,6 +135,7 @@ namespace Armoury
             Forms.Clear(); RevBy.Clear(); HeldForms.Clear();
             _acc = 0f;
             _seen = _backHeld = _backS4 = _backBeh = _fwdHeld = _rev = _revBack = _forms = _contactIn = _contactCav = 0;
+            _first = _dead = _hold = _revOk = _accFwd = _accSide = 0;
             _preSec = 0f;
             _stum = 0;
         }
@@ -221,48 +234,47 @@ namespace Armoury
                 float now = m.CurrentTime;
                 var pf = Get(f);
                 Refresh(pf, now);
-                if (pf.Contact || pf.Gap == float.MaxValue || !pf.Axis.IsValid) { pf.Anchor = Vec2.Invalid; return; }
+                if (pf.Contact || pf.Gap == float.MaxValue || !pf.Axis.IsValid) { Forget(pf); return; }
                 Vec2 c = f.CachedMedianPosition.AsVec2;
-                Vec2 tp = input.GetPosition(f);
-                if (!c.IsValid || !tp.IsValid) return;
+                WorldPosition tw = input.CreateNewOrderWorldPositionMT(f, WorldPosition.WorldPositionEnforcedCache.None);
+                Vec2 tp = tw.AsVec2;
+                if (!c.IsValid || !tw.IsValid || !tp.IsValid) return;
                 _seen++;
-                float s = (tp - c).DotProduct(pf.Axis);
-                float dz = Math.Max(DeadMin, 0.5f * f.Depth);
+                float dz = Math.Max(DeadMove, f.Depth);
                 Type beh = null;
                 try { var ai = f.AI; beh = ai != null && ai.ActiveBehavior != null ? ai.ActiveBehavior.GetType() : null; } catch { beh = null; }
-                // recenzja 333 K1 / W2 / technika 2: zachowanie liczone od pierwszego rozkazu (takze pierwszego po rozstawieniu), "stale" dopiero po BehStable s
-                if (!pf.BehSeen || beh != pf.Beh) { pf.BehSeen = true; pf.Beh = beh; pf.BehSince = now; pf.FwdInBeh = false; }
-                bool stable = beh != null && now - pf.BehSince >= BehStable;
-                if (s < -dz)
+                // 1. pierwszy rozkaz przed kontaktem - przyjety (kierunek wzgledem mediany szyku)
+                if (!pf.P.IsValid)
                 {
-                    bool s4 = beh == typeof(BehaviorScreenedSkirmish);
-                    bool fresh = stable && !pf.FwdInBeh && now - pf.FwdAt >= Dwell;   // zachowanie, ktore od poczatku chce wstecz (wzgorze, linia obrony za soba)
-                    pf.BackAt = now;
-                    pf.BackBeh = beh;
-                    if (s4 || fresh)
-                    {
-                        if (s4) _backS4++; else _backBeh++;
-                        pf.Anchor = Vec2.Invalid;
-                        return;
-                    }
-                    Hold(f, pf, c, ref input);
-                    _backHeld++;
+                    _first++;
+                    Accept(pf, tw, tp, Sign((tp - c).DotProduct(pf.Axis), dz), now, beh);
                     return;
                 }
-                if (s > dz)
+                // 2. martwa strefa
+                if (tp.Distance(pf.P) < dz) { Keep(f, pf, ref input); _dead++; return; }
+                sbyte sg = Sign((tp - pf.P).DotProduct(pf.Axis), dz);
+                // 3. zapadka kierunku (okno 30 s, podwajane po kazdym przepuszczonym nawrocie)
+                if (sg != 0 && pf.Dir != 0 && sg != pf.Dir)
                 {
-                    // bez zapadki w przod: po kazdym rozkazie wstecz (zatrzymanym albo nie) Dwell s stoj - chyba ze to inne, stale zachowanie
-                    if (now - pf.BackAt < Dwell && (beh == pf.BackBeh || !stable))
+                    float win = Math.Min(RatchetMax, Ratchet * (float)Math.Pow(2.0, Math.Min(pf.Revs, 3)));
+                    if (now - pf.DirAt < win)
                     {
-                        Hold(f, pf, c, ref input);
-                        _fwdHeld++;
+                        Keep(f, pf, ref input);
+                        if (sg < 0) _backHeld++; else _fwdHeld++;
                         return;
                     }
-                    pf.FwdAt = now;
-                    pf.FwdInBeh = true;
-                    pf.Anchor = Vec2.Invalid;
+                    pf.Revs++;
+                    _revOk++;
+                }
+                // 4. trzymanie: szyk stoi na P - nowy punkt najwczesniej HoldMin s po przyjeciu P
+                else if (c.Distance(pf.P) < dz && now - pf.PAt < HoldMin)
+                {
+                    Keep(f, pf, ref input);
+                    _hold++;
                     return;
                 }
+                // 5. przyjety
+                Accept(pf, tw, tp, sg, now, beh);
             }
             catch (Exception e)
             {
@@ -271,13 +283,34 @@ namespace Armoury
             }
         }
 
-        /// <summary>Rozkaz zamieniony na "stoj w miejscu": Move na kotwicy (mediana szyku z pierwszego zatrzymania).</summary>
-        private static void Hold(Formation f, PF pf, Vec2 c, ref MovementOrder input)
+        private static sbyte Sign(float s, float dz)
         {
-            if (!pf.Anchor.IsValid) pf.Anchor = c;
-            var wp = f.CachedMedianPosition;
-            wp.SetVec2(pf.Anchor);
-            input = MovementOrder.MovementOrderMove(wp);
+            return s > 0.5f * dz ? (sbyte)1 : s < -0.5f * dz ? (sbyte)-1 : (sbyte)0;
+        }
+
+        private static void Accept(PF pf, WorldPosition tw, Vec2 tp, sbyte sg, float now, Type beh)
+        {
+            pf.P = tp;
+            pf.PW = tw;
+            pf.PAt = now;
+            if (sg != 0) { pf.Dir = sg; pf.DirAt = now; }
+            if (sg > 0) _accFwd++;
+            else if (sg < 0) { if (beh == typeof(BehaviorScreenedSkirmish)) _backS4++; else _backBeh++; }
+            else _accSide++;
+        }
+
+        /// <summary>Kontakt: punkt przyjety i zapadka zapomniane (po wyjsciu z kontaktu - od nowa; licznik nawrotow okna zostaje).</summary>
+        private static void Forget(PF pf)
+        {
+            pf.P = Vec2.Invalid;
+            pf.Dir = 0;
+            pf.DirAt = -1000f;
+        }
+
+        /// <summary>Rozkaz zamieniony na Move w punkt przyjety P (ta sama WorldPosition).</summary>
+        private static void Keep(Formation f, PF pf, ref MovementOrder input)
+        {
+            input = MovementOrder.MovementOrderMove(pf.PW);
             HeldForms.Add(f);
         }
 
@@ -326,6 +359,7 @@ namespace Armoury
             {
                 pf.Last = Vec2.Invalid;
                 pf.Trend = 0;
+                if (pf.Contact) Forget(pf);
                 return;
             }
             _preSec += step;
@@ -379,9 +413,11 @@ namespace Armoury
         {
             float min = _preSec / 60f;
             sb.Append("wahadlo: klucz ").Append(_key ? "TAK" : "NIE").Append(" (latka ").Append(_patch).Append("; przed kontaktem > ").Append(ContactIn.ToString("0", Inv))
-              .Append(" m miara RBM, wyjscie > ").Append(ContactOut.ToString("0", Inv)).Append(" m; martwa strefa max(").Append(DeadMin.ToString("0", Inv))
-              .Append(" m, pol glebokosci); wstecz tylko S4 albo zachowanie stale ").Append(BehStable.ToString("0", Inv)).Append(" s bez ruchu naprzod ")
-              .Append(Dwell.ToString("0", Inv)).Append(" s; naprzod ").Append(Dwell.ToString("0", Inv)).Append(" s po wstecz; konnica wroga ").Append(CavClose.ToString("0", Inv))
+              .Append(" m miara RBM, wyjscie > ").Append(ContactOut.ToString("0", Inv)).Append(" m; 333b: punkt przyjety, martwa strefa rozkazu max(")
+              .Append(DeadMove.ToString("0", Inv)).Append(" m, glebokosc), zapadka kierunku ").Append(Ratchet.ToString("0", Inv)).Append('/')
+              .Append((2f * Ratchet).ToString("0", Inv)).Append('/').Append((4f * Ratchet).ToString("0", Inv)).Append('/').Append(RatchetMax.ToString("0", Inv))
+              .Append(" s, trzymanie ").Append(HoldMin.ToString("0", Inv)).Append(" s; pomiar martwa strefa max(").Append(DeadMin.ToString("0", Inv))
+              .Append(" m, pol glebokosci); konnica wroga ").Append(CavClose.ToString("0", Inv))
               .Append(" m albo szarza w ").Append(CavNear.ToString("0", Inv)).Append(" m = kontakt)")
               .Append(" | szykow AI ").Append(_forms).Append(", szyko-minut przed kontaktem ").Append(min.ToString("0.0", Inv))
               .Append(", nawroty ").Append(_rev).Append(" (w tym w tyl ").Append(_revBack).Append("; ").Append(min > 0.01f ? (_rev / min).ToString("0.00", Inv) : "-")
@@ -400,7 +436,9 @@ namespace Armoury
             sb.Append("), wejsc w kontakt ").Append(_contactIn).Append(" (w tym przez konnice wroga ").Append(_contactCav).Append(')')
               .Append(" | rozkazy Move przed kontaktem ").Append(_seen).Append(": wstecz zatrzymane ").Append(_backHeld).Append(", wstecz dozwolone S4 ").Append(_backS4)
               .Append(", wstecz po zmianie zachowania ").Append(_backBeh).Append(", naprzod wstrzymane po cofnieciu ").Append(_fwdHeld).Append(", szykow zatrzymanych ")
-              .Append(HeldForms.Count);
+              .Append(HeldForms.Count)
+              .Append("; 333b: pierwszych ").Append(_first).Append(", martwa strefa ").Append(_dead).Append(", trzymanie ").Append(_hold)
+              .Append(", nawroty przepuszczone po oknie ").Append(_revOk).Append(", przyjete naprzod ").Append(_accFwd).Append(", w bok ").Append(_accSide);
         }
     }
 }

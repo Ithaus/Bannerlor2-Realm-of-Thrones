@@ -321,7 +321,7 @@ namespace Armoury
                 if (k == 1)
                 {
                     if (mounted) _hShotsSeen++; else _rFootShots++;
-                    if (test) _tShots++;
+                    if (test) { _tShots++; BaitShot(); }   // 333t: strzaly przynety wedlug fazy
                     Agent tg = null;
                     if (s.IsAIControlled && !s.IsMainAgent) { try { tg = s.GetTargetAgent(); } catch { tg = null; } }
                     if (tg != null && tg.IsMount) tg = tg.RiderAgent;
