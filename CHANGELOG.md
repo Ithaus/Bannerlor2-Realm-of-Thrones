@@ -1,5 +1,23 @@
 # DZIENNIK ZMIAN
 
+## 342 - kazdy lord zaklada armie, Zelazni na wybrzezu Polnocy, odsiew rabunkow na noc/342-armie-zelazni (od 340r ca43fd33 - NIE WGRANE, bez autotestu; DLL test/m342)
+**Problem (test at340, 45 dob, Armoury-2026-11-06_21-42-20.log; decyzje Jeffa 06.11):** (1) armie zakladaly tylko glowy rodow ("kazdy moze zalozyc armie, nie tylko glowa rodu, bo to
+bez sensu"); (2) "czlonek armii" jako powod braku zbiorki (wewnetrznie sprzeczne); (3) Zelazni - 48 ofert oblezen tylko The Rills, 0 na Moat Cailin / Deepwood Motte / Torrhen's Square,
+zbiorka w porcie 0; (4) koszt L12 10-14 ms/h (cel < 5), Raider 190-270 ms/dobe.
+**Przyczyna:** (1) warunek wodza gry Clan.Leader == LeaderHero w DefaultArmyManagementCalculationModel.CanLordCreateArmy (+ BK CanCreateArmy); (2) IronSiege liczyl mysli czlonkow
+cudzej armii jako "bez zbiorki" (cel wybiera wodz - oferty nie ginely, zly licznik); (3) zasieg 5 x srednia odleglosc miast (411) odcinal cele kanonu (droga morzem 230-450), mnoznik
+odleglosci z dnem 0.1 zrownywal cele - wygrywal najslabszy zamek; zbiorka w porcie: kazda armia Wysp blokowala zbiorke, ~70% lordow Wysp nie glowa rodu; (4) sumy (cel, krolestwo)
+budowane co godzine dla kazdej ocenianej wsi - 85% ocen Raider konczylo sie zerem.
+**Zmiana:** AnyLordArmy342.cs (nowy) - transpiler warunku wodza CanLordCreateArmy (kotwica 1/1, sprawdzona poza gra): glowa rodu jak gra albo lord krolestwa AI (nie rod gracza,
+nie najem, nie w armii) przy wplywie rodu > 100 x (armie rodu + 1), kolejka rodu (jedna druzyna rodu na godzine, pierwszenstwo dla zbiorki w porcie); postfiks budzetu wplywu gry
+(0.7 x wplyw, prog 1000 od nowa); postfiks BK CanCreateArmy (tylko ten wodz, wolne miejsca BK); linie start / armia / doba. LocalFront334e.Siege.cs - czlonek armii -> "w armii -
+decyduje wodz", powody "limit wplywu rodu" / "kolejka rodu", IronCanon = lista kanonu (castle_B1, ROT_town2, castle_S8, castle_N7) bez limitu zasiegu, odleglosc wzgledna
+(najblizszy cel kanonu / ten), linia doby "Zelazni cele (342)", IronMuster bez blokady istniejaca armia (limit 0.7 i wplywu), wyjscia zbiorki liczone. LocalFront334e.Score.cs - odsiew
+rabunkow (AiMilitaryBehavior.FindBestTargetAndItsValueForFaction: gorna granica x1.2, dokladne q od najlepszego, reszta 0), RaidCore. BesiegedRelief.cs - zdarzenia 342.
+Klucze (domyslnie TAK): AnyLordArmy342, RaidSieve342, IronCanonCoast342 (Settings.cs + McmSettings.cs recznie). sprawdz_logi.py - grupa armie342 (A0-A9, synteza TAK; na logu
+at340: A6/A7 NIE - stan przed 342). docs/PROJEKT-334E-SILA-LOKALNA.md sekcja 17.
+**Status:** DO SPRAWDZENIA - test 90 dob: armie342 A1-A7, lokalna334e L12/L17, armie na krolestwo i rod, Raider ms/dobe i ocen na mysl, Zelazni na 4 celach.
+
 ## 340r - poprawki dwoch recenzji 340 na noc/340-razem (NIE WGRANE, bez autotestu po zmianie; DLL test/m340, Armoury.dll 6afad550)
 **Problem (recenzje 340):** (c) KBlocked gubil odsiecz, ktora weszla do armii (LiveUnit czlonka = null), widzial zapamietanego wroga na zywo bez zwiadu i bez konca (Since martwe),
 liczyl nasza sile bez sojusznikow, zwalnial pamiec po ocenie silniejszego lorda; IronKeepSea trzymal cel mimo blokady krolestwa; (d) zbiorka w porcie odtwarzala CanLordCreateArmy

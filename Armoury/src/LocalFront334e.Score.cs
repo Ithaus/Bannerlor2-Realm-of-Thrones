@@ -121,6 +121,7 @@ namespace Armoury
             _dOpts.Clear(); _dScoreN = _dZero = _dUp = _dDown = _dScaUndo = _dDefLow = _dDefFort = _dHomeCap = _dNoSnap = _dArmyRaidOffers = _dArmyRaidLog = _dArmyRaidVeto = 0;
             _dArmyRaidSaid.Clear();
             _dGather = _dGatherOk = 0; _dGatherRatio = 0;
+            _dSvThink = _dSvEntries = _dSvEval = _dSvCut = 0;
         }
 
         // ================================================================ latki (SessionStart)
@@ -155,6 +156,21 @@ namespace Armoury
                     else { _h.Patch(m, prefix: new HarmonyMethod(typeof(LocalFront334e), nameof(BkStickPre)) { priority = Priority.First }); _wStick = "TAK"; }
                 }
                 catch (Exception e) { _wStick = "BRAK (" + e.GetType().Name + ")"; Stumble("EnsureHooks.stick", e); }
+                // 342 (K1): odsiew rabunkow w mysli AI (klasa gry; zastapione zachowanie - latka bez skutku, ocena jak dotad)
+                try
+                {
+                    var t = AccessTools.TypeByName("TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors.AiMilitaryBehavior");
+                    var m = t != null ? AccessTools.DeclaredMethod(t, "FindBestTargetAndItsValueForFaction", new[] { typeof(Army.ArmyTypes), typeof(PartyThinkParams), typeof(float) }) : null;
+                    if (m == null) _wSieve = "BRAK (FindBestTargetAndItsValueForFaction)";
+                    else
+                    {
+                        _h.Patch(m, prefix: new HarmonyMethod(typeof(LocalFront334e), nameof(SievePre)) { priority = Priority.First },
+                                 postfix: new HarmonyMethod(typeof(LocalFront334e), nameof(SievePost)) { priority = Priority.Last },
+                                 finalizer: new HarmonyMethod(typeof(LocalFront334e), nameof(SieveFin)));
+                        _wSieve = "TAK";
+                    }
+                }
+                catch (Exception e) { _wSieve = "BRAK (" + e.GetType().Name + ")"; Stumble("EnsureHooks.sieve", e); }
             }
             // ocena celu: postfiks na czynnym modelu kazdej kampanii (inny model - nowa latka)
             try
@@ -309,6 +325,15 @@ namespace Armoury
                 long om0 = Ts();
                 if (__1 != Army.ArmyTypes.Defender && S != null && S.LocalOneMeasure340) o3 = OurO(p, __1, __3, out gath, out gd);   // 340 (b)
                 long om = Ts() - om0;
+                if (__1 == Army.ArmyTypes.Raider)
+                {
+                    // 342 (K1, klucz RaidSieve342): w mysli AI (AiMilitaryBehavior.FindBestTargetAndItsValueForFaction, Raider) tylko gorna granica (x max RaidMult) -
+                    // dokladne q w postfiksie mysli od najlepszego wpisu, dopoki nastepna granica moze wygrac (wynik gry jest iloczynem - liniowy w m)
+                    if (!t.IsVillage) return;
+                    if (ReferenceEquals(_svP, p) && _svL != null) { _svL[t] = o3; _svOm += om; __result *= RaidUp; return; }
+                    __result *= RaidCore(t, p, k, o3, __result, om);
+                    return;
+                }
                 long w0 = Ts();
                 double q = -1;
                 KAsk ka = null;
@@ -405,6 +430,133 @@ namespace Armoury
         }
 
         private static int _dGather, _dGatherOk; private static double _dGatherRatio;
+
+        /// <summary>342: mnoznik rabunku (q z ZFor) - ta sama ocena co galaz Raider ScorePost 340 (blokada, rabunek w toku, q, RaidMult, dom zagrozony, liczniki doby, koszt).
+        /// res - wynik gry (znak do licznika opcji). Bez migawki z dzis - 1 (stara gra).</summary>
+        private static float RaidCore(Settlement t, MobileParty p, Kingdom k, float o3, float res, long om)
+        {
+            float m = 1f;
+            long w0 = Ts();
+            lock (_lk)
+            {
+                long t1 = Ts();
+                int g0 = GcN();
+                _dWaitT += t1 - w0;
+                _dModelT += om;
+                if (!SnapFresh) { _dNoSnap++; return 1f; }
+                _dScoreN++;
+                var ka = KA(k);
+                var me = p.MapEvent;
+                bool raiding = me != null && me.IsRaid && me.MapEventSettlement == t;
+                if (Blocked(p, t)) m = 0f;
+                else if (!raiding)
+                {
+                    float our = OurDays(p, t);
+                    if (our >= 0f)
+                    {
+                        int men; StrOf(p, out men);
+                        float first; double ally;
+                        double z = ZFor(t, k, p, our + RaidDays(t.SettlementHitPoints, men), out first, out ally);
+                        double q = Ratio(z, o3 + ally);
+                        m = RaidMult(q);
+                        Asked(ka, t, q);
+                    }
+                }
+                if (m > 1f && HomeThreat(p)) { m = 1f; _dHomeCap++; }
+                if (m == 0f) _dZero++; else if (m > 1f) _dUp++; else if (m < 1f) _dDown++;
+                if (res * m > 0f)
+                {
+                    int[] o;
+                    if (!_dOpts.TryGetValue(k.StringId, out o)) { o = new int[2]; _dOpts[k.StringId] = o; }
+                    o[0]++;
+                }
+                _dQ++;
+                Cost(TMs(Ts() - t1), GcN() != g0, PRaid);
+            }
+            return m;
+        }
+
+        // ================================================================ 342 (K1): odsiew rabunkow w mysli AI
+        private static readonly float RaidUp = RaidMult(0);   // najwyzszy mnoznik rabunku (okno) - gorna granica
+        [ThreadStatic] private static MobileParty _svP;
+        [ThreadStatic] private static PartyThinkParams _svPt;
+        [ThreadStatic] private static int _svStart;
+        [ThreadStatic] private static Dictionary<Settlement, float> _svL;
+        [ThreadStatic] private static List<int> _svIdx;
+        [ThreadStatic] private static long _svOm;
+        private static long _dSvThink, _dSvEntries, _dSvEval, _dSvCut;
+        private static string _wSieve = "nie wpieta";
+
+        /// <summary>Prefiks AiMilitaryBehavior.FindBestTargetAndItsValueForFaction: Raider druzyny AI krolestwa - odsiew w tej mysli (ThreadStatic). Nie rzuca.</summary>
+        public static void SievePre(Army.ArmyTypes __0, PartyThinkParams __1)
+        {
+            if (__0 != Army.ArmyTypes.Raider) return;
+            _svP = null;
+            try
+            {
+                var s = S;
+                if (s == null || !s.RaidSieve342 || !PowerOn || __1 == null) return;
+                var mp = __1.MobilePartyOf;
+                if (mp == null || WithPlayer(mp) || !(mp.MapFaction is Kingdom)) return;
+                if (_svL == null) _svL = new Dictionary<Settlement, float>(); else _svL.Clear();
+                _svStart = __1.AIBehaviorScores.Count; _svPt = __1; _svOm = 0; _svP = mp;
+            }
+            catch (Exception e) { _svP = null; Stumble("SievePre", e); }
+        }
+
+        /// <summary>Finalizer: koniec odsiewu przy wyjatku gry (wyjatek idzie dalej bez zmian).</summary>
+        public static Exception SieveFin(Exception __exception) { if (__exception != null) _svP = null; return __exception; }
+
+        /// <summary>Postfiks: wpisy RaidSettlement tej mysli malejaco po gornej granicy; dokladne q po kolei, dopoki granica nastepnego moze przebic najlepszy dokladny
+        /// (bez weta 334e); reszta 0 - ich dokladny wynik i tak jest ponizej najlepszego. Nie rzuca.</summary>
+        public static void SievePost(Army.ArmyTypes __0, PartyThinkParams __1)
+        {
+            if (__0 != Army.ArmyTypes.Raider || _svP == null) return;
+            var p = _svP;
+            _svP = null;
+            if (!ReferenceEquals(_svPt, __1)) return;
+            try
+            {
+                var k = p.MapFaction as Kingdom;
+                if (k == null || _svL == null || _svL.Count == 0) { if (_svOm > 0) lock (_lk) _dModelT += _svOm; return; }
+                var scores = __1.AIBehaviorScores;
+                if (_svIdx == null) _svIdx = new List<int>(); else _svIdx.Clear();
+                for (int i = _svStart; i < scores.Count; i++)
+                {
+                    var e = scores[i];
+                    var st = e.Item1.Party as Settlement;
+                    if (e.Item1.AiBehavior == AiBehavior.RaidSettlement && st != null && _svL.ContainsKey(st)) _svIdx.Add(i);
+                }
+                _svIdx.Sort((a, b) => scores[b].Item2.CompareTo(scores[a].Item2));
+                float best = 0f;
+                int ev = 0, cut = 0;
+                bool done = false;
+                foreach (int i in _svIdx)
+                {
+                    var e = scores[i];
+                    float up = e.Item2;
+                    if (!(up > 0f)) continue;
+                    var d = e.Item1;
+                    if (done || up <= best) { done = true; __1.SetBehaviorScore(in d, 0f); cut++; continue; }
+                    var st = (Settlement)d.Party;
+                    float m = RaidCore(st, p, k, _svL[st], up / RaidUp, 0);
+                    float v = up / RaidUp * m;
+                    __1.SetBehaviorScore(in d, v);
+                    ev++;
+                    string why;
+                    if (v > best && !WarFront334.VetoedFor334e(k, st, out why)) best = v;
+                }
+                lock (_lk) { _dSvThink++; _dSvEntries += _svIdx.Count; _dSvEval += ev; _dSvCut += cut; _dModelT += _svOm; }
+            }
+            catch (Exception e) { Stumble("SievePost", e); }
+            finally { if (_svL != null) _svL.Clear(); _svPt = null; }
+        }
+
+        internal static string SieveText()
+        {
+            return " | odsiew rabunkow (342): latka " + _wSieve + ", mysli " + _dSvThink + ", wpisow " + _dSvEntries + ", ocen dokladnych " + _dSvEval + ", odsiane " + _dSvCut
+                   + ", ocen na mysl " + (_dSvThink > 0 ? ((double)_dSvEval / _dSvThink).ToString("0.0", Inv) : "-");
+        }
 
         // 340 (a): pamiec OurO - ta sama druzyna ocenia w jednej mysli dziesiatki celow (klucz: druzyna, godzina, rodzaj - armia / sama / zbiorka)
         [ThreadStatic] private static MobileParty _ooP;

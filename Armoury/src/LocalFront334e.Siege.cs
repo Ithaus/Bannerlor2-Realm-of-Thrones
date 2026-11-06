@@ -83,6 +83,26 @@ namespace Armoury
             _dKRelHold = _dKRelFree = 0; _dIronMuster = _dIronKeepSea = _dIronPrio = _dIronMusterLines = _dIronMusterFail = _dIronMusterBan = 0; Array.Clear(_dIronWhy, 0, _dIronWhy.Length);
             Array.Clear(_dStates, 0, _dStates.Length); _dRetreatNotes.Clear();
             Array.Clear(_dIronX, 0, _dIronX.Length); _dIronMinQ = -1; _dIronMinT = "-"; _dIronMinStr = 0;
+            Array.Clear(_dIronMx, 0, _dIronMx.Length); Array.Clear(_dIronC, 0, _dIronC.Length); Array.Clear(_dIronCBest, 0, _dIronCBest.Length);
+            for (int i = 0; i < _dIronCQ.Length; i++) { _dIronCQ[i].Clear(); _dIronCDist[i] = -1f; }
+        }
+
+        /// <summary>342 (Z4): linia doby "Zelazni cele (342)" - kazdy cel kanonu wybrzeza: oceny, odrzucenia, q (min / mediana), weta, model, oferty. Wolajacy trzyma _lk.</summary>
+        private static string IronCanonLine(int today)
+        {
+            var sb = new System.Text.StringBuilder(600);
+            sb.Append(Tag).Append("Zelazni cele (342) | dzien ").Append(today).Append(" | klucz ").Append(IronCoastOn ? "TAK" : "NIE");
+            for (int i = 0; i < IronCanonIds.Length; i++)
+            {
+                var ql = _dIronCQ[i];
+                double mn = -1, md = -1;
+                if (ql.Count > 0) { var c = new List<double>(ql); c.Sort(); mn = c[0]; md = c[c.Count / 2]; }
+                sb.Append(" | ").Append(IronCanonIds[i]).Append(": ocen ").Append(_dIronC[i, 0]).Append(", bez drogi ").Append(_dIronC[i, 2]).Append(", weta ").Append(_dIronC[i, 3])
+                  .Append(", blokada ").Append(_dIronC[i, 4]).Append(", q ").Append(ql.Count).Append(" (min ").Append(mn < 0 ? "-" : F2(mn)).Append(", mediana ").Append(md < 0 ? "-" : F2(md))
+                  .Append("), q>1 ").Append(_dIronC[i, 5]).Append(", model 0 ").Append(_dIronC[i, 6]).Append(", najlepszy ").Append(_dIronCBest[i].ToString("0.000", Inv))
+                  .Append(", droga ").Append(_dIronCDist[i] < 0 ? "-" : F0(_dIronCDist[i])).Append(", oferty ").Append(_dIronC[i, 7]);
+            }
+            return sb.Append('.').ToString();
         }
 
         /// <summary>Flaga odwrotu (BK stick, m116 Hold): druzyna albo wodz jej armii odstepuje od oblezenia.</summary>
@@ -684,8 +704,9 @@ namespace Armoury
         // ================================================================ Zelazni: oblezenia wybrzeza (dopisek testu 334c: 83 doby bez armii i bez opcji oblezenia)
         // 334f (B334-12): wyjscia liczone (linia koszt), cele kanonu Wysp (Polnoc wlasciwa - kultura battania) do Krwawych Godow, odleglosc skorygowana gry (morze)
         // zamiast linii prostej, limit 4 liczy tylko cele z q <= 1.0 (osobny limit 8 ocen q), opcja gry poza teatrem kanonu nie wylacza naszej oferty.
-        private static readonly int[] _dIronX = new int[10];   // 0 zajeci (bitwa/oboz/morze), 1 bez wodza i zbiorki, 2 odpoczynek, 3 opcja gry na cel kanonu, 4 bez kandydatow, 5 q > 1, 6 bez drogi / poza zasiegiem, 7 model 0, 8 oferta, 9 weto (334g)
-        internal static readonly string[] IronXName = { "zajeci", "bez zbiorki", "odpoczynek", "opcja gry kanonu", "bez kandydatow", "q>1", "bez drogi", "model 0", "oferta", "weto" };
+        // 342 (B1): 10 - czlonek cudzej armii (cel wybiera wodz armii - jego mysl ma galaz "wodz armii"); nie liczy sie jako "bez zbiorki"
+        private static readonly int[] _dIronX = new int[11];   // 0 zajeci (bitwa/oboz/morze), 1 bez wodza i zbiorki, 2 odpoczynek, 3 opcja gry na cel kanonu, 4 bez kandydatow, 5 q > 1, 6 bez drogi / poza zasiegiem, 7 model 0, 8 oferta, 9 weto (334g), 10 w armii (342)
+        internal static readonly string[] IronXName = { "zajeci", "bez zbiorki", "odpoczynek", "opcja gry kanonu", "bez kandydatow", "q>1", "bez drogi", "model 0", "oferta", "weto", "w armii - decyduje wodz" };
         private static double _dIronMinQ = -1; private static string _dIronMinT = "-"; private static double _dIronMinStr;
         private sealed class IronNav { public int Hour; public readonly Dictionary<Settlement, KeyValuePair<float, KeyValuePair<MobileParty.NavigationType, bool>>> D = new Dictionary<Settlement, KeyValuePair<float, KeyValuePair<MobileParty.NavigationType, bool>>>(); }
         private static readonly Dictionary<MobileParty, IronNav> _ironNav = new Dictionary<MobileParty, IronNav>();
@@ -693,8 +714,10 @@ namespace Armoury
         private static void IronX(int i) { long w = Ts(); lock (_lk) { _tWait += Ts() - w; _dIronX[i]++; } }
 
         // 340 (d): powody "bez zbiorki" (warunki CanLordCreateArmy gry, czytane - nic nie zmieniamy) i dzwignie kanonu Wysp
-        private static readonly int[] _dIronWhy = new int[11];
-        internal static readonly string[] IronWhyName = { "czlonek armii", "nie glowa rodu", "wplyw<=100", "jedzenie", "maly oddzial", "najem", "kandydaci 0", "inne", "prog 1000", "limit 0.7", "sito SCA" };
+        // 342: "czlonek armii" (0) zostaje tylko jako zabezpieczenie - czlonkowie wychodza wczesniej (IronX 10); "nie glowa rodu" (1) tylko przy wylaczonej regule 342
+        // (AnyLordArmy342), z regula: 11 - limit wplywu rodu (100 x armie rodu + 1), 12 - czeka na kolejke rodu (jedna druzyna rodu na godzine)
+        private static readonly int[] _dIronWhy = new int[13];
+        internal static readonly string[] IronWhyName = { "czlonek armii", "nie glowa rodu", "wplyw<=100", "jedzenie", "maly oddzial", "najem", "kandydaci 0", "inne", "prog 1000", "limit 0.7", "sito SCA", "limit wplywu rodu", "kolejka rodu" };
         private static int _dIronMuster, _dIronKeepSea, _dIronPrio, _dIronMusterLines, _dIronMusterFail, _dIronMusterBan;
         private static readonly Dictionary<MobileParty, int> _musterDay = new Dictionary<MobileParty, int>();
         // 340 (recenzja): zbiorka w porcie - (port, doba wyslania); w porcie bez czlonkow gry -> doba nieudanej proby (bez ponownej oferty przez 2 doby - bez petli port-morze-port)
@@ -711,8 +734,9 @@ namespace Armoury
                 if (party.Army != null) return 0;
                 var h = party.LeaderHero; var c = h != null ? h.Clan : null;
                 if (h == null || c == null) return 7;
-                if (!IronHead(party, h, c)) return 1;
+                if (!AnyLordArmy342.MayLead(party)) return AnyLordArmy342.On && c.Leader != h ? (c.Influence > 100f ? 11 : 2) : 1;
                 if (!(c.Influence > 100f)) return 2;
+                if (!AnyLordArmy342.LeadsNow(party)) return 12;
                 if (c.IsUnderMercenaryService) return 5;
                 if (!((float)party.GetNumDaysForFoodToLast() > Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege)) return 3;
                 if (!(party.PartySizeRatio > Campaign.Current.Models.ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy)) return 4;
@@ -726,11 +750,7 @@ namespace Armoury
             catch { return 7; }
         }
 
-        /// <summary>340 (recenzja): warunek wodza zbiorki gry (CanLordCreateArmy): glowa rodu albo pierwsza druzyna rodu, gdy glowa bez druzyny.</summary>
-        private static bool IronHead(MobileParty party, Hero h, Clan c)
-        {
-            return c.Leader == h || (c.Leader != null && c.Leader.PartyBelongedTo == null && c.WarPartyComponents != null && c.WarPartyComponents.Count > 0 && c.WarPartyComponents[0] == party.WarPartyComponent);
-        }
+        // 342: warunek wodza zbiorki - AnyLordArmy342.MayLead / LeadsNow (glowa rodu, pierwsza druzyna rodu bez glowy w polu, regula 342 "kazdy lord" z limitem wplywu i kolejka rodu)
 
         /// <summary>340 (recenzja): kandydaci zbiorki - te same sita co CanLordCreateArmy gry (DefaultArmyManagementCalculationModel: wolne druzyny lordow, nie wladca, mysl, oblezenie,
         /// jedzenie, liczebnosc, CanLeadParty, tratwa, droga gry &lt; MaximumDistanceToCallToArmy, kolejnosc gry, limit ceil(0.7 x druzyn - w armiach), prog sily oblezenia 1000),
@@ -787,8 +807,34 @@ namespace Armoury
             return -1;
         }
 
-        /// <summary>Cel kanonu Wysp: Polnoc wlasciwa (kultura battania - Moat Cailin, Deepwood Motte, Torrhen's Square; Settlement.Culture ROT-Map nie zmienia sie po zdobyciu).</summary>
-        private static bool IronCanon(Settlement st) { return WarFront334.CultureOf(st) == "battania"; }
+        /// <summary>342 (Z1, Jeff 06.11): cele kanonu Wysp na wybrzezu Polnocy - Moat Cailin (castle_B1), Deepwood Motte (ROT_town2), Torrhen's Square (castle_S8),
+        /// Stony Shore (castle_N7 The Rills - opis ROT-Map "Stony Shore, north of Blazewater Bay").</summary>
+        internal static readonly string[] IronCanonIds = { "castle_B1", "ROT_town2", "castle_S8", "castle_N7" };
+        private static int IronCanonIdx(Settlement st)
+        {
+            var id = st != null ? st.StringId : null;
+            if (id == null) return -1;
+            for (int i = 0; i < IronCanonIds.Length; i++) if (id == IronCanonIds[i]) return i;
+            return -1;
+        }
+        private static bool IronCoastOn { get { var s = S; return s != null && s.IronCanonCoast342; } }
+
+        /// <summary>Cel kanonu Wysp. 342 (klucz IronCanonCoast342): lista z ksiazki (IronCanonIds); wylaczony - jak 340: Polnoc wlasciwa (kultura battania;
+        /// Settlement.Culture ROT-Map nie zmienia sie po zdobyciu). Po Krwawych Godach IronSiege bierze i tak wszystkie twierdze w wojnie.</summary>
+        private static bool IronCanon(Settlement st) { return IronCoastOn ? IronCanonIdx(st) >= 0 : WarFront334.CultureOf(st) == "battania"; }
+
+        // 342 (Z4): diagnoza celow kanonu na dobe - [0] ocen, [1] (rezerwa), [2] bez drogi gry, [3] weta, [4] blokada / bez migawki, [5] q > 1, [6] model 0,
+        // [7] oferty (ten cel wybrany); q - lista q (min i mediana), best - najlepszy wynik modelu x odleglosc, dist - ostatnia droga gry
+        private static readonly int[,] _dIronC = new int[4, 8];
+        private static readonly List<double>[] _dIronCQ = { new List<double>(), new List<double>(), new List<double>(), new List<double>() };
+        private static readonly float[] _dIronCBest = new float[4];
+        private static readonly float[] _dIronCDist = { -1f, -1f, -1f, -1f };
+        private static void IronC(Settlement st, int what) { int i = IronCanonIdx(st); if (i < 0) return; long w = Ts(); lock (_lk) { _tWait += Ts() - w; _dIronC[i, what]++; } }
+        // 342 (C1): wyjscia zbiorki w porcie (IronMuster) - kazde wyjscie liczone
+        private static readonly int[] _dIronMx = new int[13];
+        internal static readonly string[] IronMxName = { "DoNotChange", "bez krolestwa", "nie wodz", "wplyw<=100", "najem", "wstrzymane", "jedzenie/liczebnosc", "brak wojny", "brak portu",
+                                                          "kandydaci (powod w 340)", "brak celu kanonu q<=1", "bez drogi do portu", "odsiecz wlasnej" };
+        private static void IronMx(int i) { long w = Ts(); lock (_lk) { _tWait += Ts() - w; _dIronMx[i]++; } }
 
         /// <summary>Gra daje opcje oblezenia tylko twierdzom sasiadujacym z wlasnymi (AiMilitaryBehavior.CalculateDistanceScoreForBesieging: udzial wlasnych sasiadow
         /// &lt; 0.1 -> 0); Wyspy nie maja sasiadow na ladzie Polnocy. Najezdzca z morza: wodz Wysp, ktory moze zebrac armie (gra dala czlonkow - CanLordCreateArmy,
@@ -802,6 +848,8 @@ namespace Armoury
         /// modelu &gt; 0 wygrywa z rabunkami (1.05 x max(najlepszy inny, 0.5)); opcja gry na cel kanonu nie konczy juz oceny. Weta, model 0 i rozejm zostaja.</summary>
         private static void IronSiege(MobileParty party, PartyThinkParams pt)
         {
+            // 342 (B1): czlonek cudzej armii nie decyduje - cel armii wybiera wodz (galaz "wodz armii" w jego mysli); to nie "bez zbiorki"
+            if (party.Army != null && party.Army.LeaderParty != party) { IronX(10); return; }
             if (party.MapEvent != null || party.BesiegerCamp != null) { IronX(0); return; }
             var s340 = S;
             bool on340 = s340 != null && s340.IronMuster340;
@@ -856,6 +904,8 @@ namespace Armoury
                 if (!_ironNav.TryGetValue(party, out nv) || nowH - nv.Hour >= 2) { nv = new IronNav { Hour = nowH }; _ironNav[party] = nv; }
             }
             var cand = new List<KeyValuePair<Settlement, float>>();
+            bool coast = IronCoastOn;
+            float canonMin = float.MaxValue;   // 342 (Z3): najblizszy cel kanonu tej oceny (droga gry)
             long m0 = Ts();
             foreach (var f in k.FactionsAtWarWith)
             {
@@ -864,7 +914,10 @@ namespace Armoury
                 {
                     if (st == null || !st.IsFortification || st.Town == null || st.IsUnderSiege || (st.Party != null && st.Party.MapEvent != null)) continue;
                     if (!afterRw && !IronCanon(st)) continue;
-                    if (pos.DistanceSquared(st.GetPosition2D) > range * range) continue;   // 334g (W2): droga nigdy krotsza niz linia prosta - bez modelu dla dalekich
+                    // 342 (Z2): cel kanonu wybrzeza - bez limitu zasiegu (sa 4, droga gry morzem z ladowaniem, pamiec 2 h w _ironNav)
+                    bool cc = coast && IronCanonIdx(st) >= 0;
+                    if (cc) IronC(st, 0);
+                    if (!cc && pos.DistanceSquared(st.GetPosition2D) > range * range) continue;   // 334g (W2): droga nigdy krotsza niz linia prosta - bez modelu dla dalekich
                     KeyValuePair<float, KeyValuePair<MobileParty.NavigationType, bool>> dv;
                     if (!nv.D.TryGetValue(st, out dv))
                     {
@@ -873,7 +926,8 @@ namespace Armoury
                         dv = new KeyValuePair<float, KeyValuePair<MobileParty.NavigationType, bool>>(nav == MobileParty.NavigationType.None ? -1f : dist, new KeyValuePair<MobileParty.NavigationType, bool>(nav, fromPort));
                         nv.D[st] = dv;
                     }
-                    if (dv.Key < 0f || dv.Key > range) continue;
+                    if (dv.Key < 0f || (!cc && dv.Key > range)) { if (cc) IronC(st, 2); continue; }
+                    if (cc && dv.Key < canonMin) canonMin = dv.Key;
                     cand.Add(new KeyValuePair<Settlement, float>(st, dv.Key));
                 }
             }
@@ -887,13 +941,14 @@ namespace Armoury
             {
                 var t = cand[i].Key;
                 string why;
-                if (WarFront334.VetoedFor334e(k, t, out why)) { vet++; long wv = Ts(); lock (_lk) { _tWait += Ts() - wv; _dIronVeto++; } continue; }
+                int ci = coast ? IronCanonIdx(t) : -1;
+                if (WarFront334.VetoedFor334e(k, t, out why)) { vet++; long wv = Ts(); lock (_lk) { _tWait += Ts() - wv; _dIronVeto++; if (ci >= 0) _dIronC[ci, 3]++; } continue; }
                 double q;
                 long wq = Ts();
                 lock (_lk)
                 {
                     _tWait += Ts() - wq;
-                    if (!SnapFresh || Blocked(party, t)) { vet++; continue; }
+                    if (!SnapFresh || Blocked(party, t)) { vet++; if (ci >= 0) _dIronC[ci, 4]++; continue; }
                     float our = OurDays(party, t);
                     if (our < 0f) continue;
                     float first; double ally;
@@ -903,16 +958,19 @@ namespace Armoury
                     if (q <= SiegeBanQ && KBlocked(k, t, party, qStr, our, out qk)) q = qk;   // 334g: po odstapieniu - miara odwrotu
                 }
                 qn++;
+                if (ci >= 0) { long wc = Ts(); lock (_lk) { _tWait += Ts() - wc; if (_dIronCQ[ci].Count < 2000) _dIronCQ[ci].Add(q); } }
                 if (minQ < 0 || q < minQ) { minQ = q; minT = t; }
-                if (q > SiegeBanQ) { qBad++; continue; }
+                if (q > SiegeBanQ) { qBad++; if (ci >= 0) IronC(t, 5); continue; }
                 tried++;   // limit 4 - tylko cele z q <= 1.0
                 var dv = nv.D[t];
-                float ds = MBMath.Map(0.75f - dv.Key / range, 0f, 1f, 0.1f, 1f);
+                // 342 (Z3): cel kanonu - odleglosc wzgledna (najblizszy cel kanonu / ten), nie wzor rabunku z dnem 0.1 (wszystkie cele kanonu leza 230-450 od wysp)
+                float ds = ci >= 0 && canonMin < float.MaxValue && dv.Key > 0f ? Math.Min(1f, canonMin / dv.Key) : MBMath.Map(0.75f - dv.Key / range, 0f, 1f, 0.1f, 1f);
                 float sc;
                 long m1 = Ts();
                 _inOwn = true;
                 try { sc = model.GetTargetScoreForFaction(t, Army.ArmyTypes.Besieger, party, strength) * ds; }
                 finally { _inOwn = false; _modelT += Ts() - m1; }
+                if (ci >= 0) { long wc = Ts(); lock (_lk) { _tWait += Ts() - wc; if (!(sc > 0f)) _dIronC[ci, 6]++; if (sc > _dIronCBest[ci]) _dIronCBest[ci] = sc; _dIronCDist[ci] = dv.Key; } }
                 if (sc > bestS) { bestS = sc; bestT = t; bestQ = q; bestNav = dv.Value.Key; bestPort = dv.Value.Value; }
             }
             long wm = Ts();
@@ -948,6 +1006,8 @@ namespace Armoury
                 _tWait += Ts() - wl;
                 _dIronOffers++; _dIronX[8]++;
                 if (prio) _dIronPrio++;
+                int bi = coast ? IronCanonIdx(bestT) : -1;
+                if (bi >= 0) _dIronC[bi, 7]++;
                 if (_dIronOffers <= 20 && S != null && S.LogEnabled)
                     Log.Info(Tag + "Zelazni oblegaja | dzien " + Today + " | " + Nm(party) + (gather ? " (zbiorka armii, czlonkow " + members.Count + ")" : " (wodz armii" + (atSea ? ", na morzu" : "") + ")") + " | " + bestT.StringId + " (" + Nm(bestT)
                              + ", " + Id(bestT.MapFaction) + ") | sila " + F0(qStr) + " (model " + F0(strength) + ") | q " + F2(bestQ) + " | wynik " + v.ToString("0.000", Inv)
@@ -1013,11 +1073,14 @@ namespace Armoury
         /// sa wolne druzyny Wysp w zasiegu wezwania gry (linia prosta - droga nie krotsza), a najblizszy cel kanonu ma q &lt;= 1.0 z ich sila (ZFor, jak oferta). true - wpis dodany.</summary>
         private static bool IronMuster(MobileParty party, PartyThinkParams pt)
         {
-            if (pt.DoNotChangeBehavior) return false;
+            if (pt.DoNotChangeBehavior) { IronMx(0); return false; }
             var k = party.MapFaction as Kingdom;
-            if (k == null || k.Armies.Count > 0) return false;
+            // 342 (C2): istniejaca armia Wysp nie blokuje juz zbiorki - limit z modelu gry (ceil(0.7 x druzyn - w armiach) w IronCands) i limit wplywu rodu (AnyLordArmy342)
+            if (k == null) { IronMx(1); return false; }
             var h = party.LeaderHero; var c = h != null ? h.Clan : null;
-            if (h == null || c == null || !IronHead(party, h, c) || !(c.Influence > 100f) || c.IsUnderMercenaryService) return false;
+            if (h == null || c == null || !AnyLordArmy342.MayLead(party)) { IronMx(2); return false; }
+            if (!(c.Influence > 100f)) { IronMx(3); return false; }
+            if (c.IsUnderMercenaryService) { IronMx(4); return false; }
             float sizeMin = Campaign.Current.Models.ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy;
             int today = Today;
             long wf0 = Ts();
@@ -1025,23 +1088,23 @@ namespace Armoury
             {
                 _tWait += Ts() - wf0;
                 int fd;
-                if (_musterFail.TryGetValue(party, out fd) && today - fd < MusterFailDays) { _dIronMusterBan++; return false; }   // 340: nieudana zbiorka w porcie - bez petli
+                if (_musterFail.TryGetValue(party, out fd) && today - fd < MusterFailDays) { _dIronMusterBan++; _dIronMx[5]++; return false; }   // 340: nieudana zbiorka w porcie - bez petli
             }
             long mf = Ts();
             bool ok = (float)party.GetNumDaysForFoodToLast() > Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege && party.PartySizeRatio > sizeMin;
             _modelT += Ts() - mf;
-            if (!ok) return false;
+            if (!ok) { IronMx(6); return false; }
             bool war = false;
             foreach (var f in k.FactionsAtWarWith) if (f != null && f.Fiefs != null && f.Fiefs.Count > 0) { war = true; break; }
-            if (!war) return false;
+            if (!war) { IronMx(7); return false; }
             // 340 (recenzja): port najpierw - kandydaci gry liczeni od portu zbiorki (droga gry, limit 0.7, prog 1000, sito SCA - IronCands)
             var port = WarFront334.NearestPort(party, 0f, NowH);
-            if (port == null) return false;
+            if (port == null) { IronMx(8); return false; }
             var pos = party.GetPosition2D;
             float o; int n, cw;
             long mc = Ts();
             try { cw = IronCands(party, k, port, out o, out n); } finally { _modelT += Ts() - mc; }
-            if (cw >= 0) { IronWhy(cw); return false; }
+            if (cw >= 0) { IronWhy(cw); IronMx(9); return false; }
             // najblizszy cel kanonu (linia prosta) z q <= 1.0 przy tej sile
             bool afterRw = false;
             try { afterRw = CanonWarClock.OverNow(); } catch { }
@@ -1056,7 +1119,7 @@ namespace Armoury
                     cand.Add(new KeyValuePair<Settlement, float>(st, pos.DistanceSquared(st.GetPosition2D)));
                 }
             }
-            if (cand.Count == 0) return false;
+            if (cand.Count == 0) { IronMx(10); return false; }
             cand.Sort((a, b) => a.Value.CompareTo(b.Value));
             Settlement tgt = null; double tq = -1;
             for (int i = 0; i < cand.Count && i < 4; i++)
@@ -1080,22 +1143,24 @@ namespace Armoury
                 }
                 if (q <= SiegeBanQ) { tgt = t; tq = q; break; }
             }
-            if (tgt == null) return false;
+            if (tgt == null) { IronMx(10); return false; }
             MobileParty.NavigationType nav; float dist; bool fromPort;
             long m0 = Ts();
             Helpers.AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, port, false, out nav, out dist, out fromPort);
             _modelT += Ts() - m0;
-            if (nav == MobileParty.NavigationType.None) return false;
+            if (nav == MobileParty.NavigationType.None) { IronMx(11); return false; }
             var scores = pt.AIBehaviorScores;
             float best = 0f;
             for (int i = 0; i < scores.Count; i++)
             {
                 var e = scores[i];
-                if (e.Item1.AiBehavior == AiBehavior.DefendSettlement && e.Item1.Party is Settlement ds && ds.MapFaction == party.MapFaction && ds.IsUnderSiege) return false;   // odsiecz wlasnej twierdzy wygrywa
+                if (e.Item1.AiBehavior == AiBehavior.DefendSettlement && e.Item1.Party is Settlement ds && ds.MapFaction == party.MapFaction && ds.IsUnderSiege) { IronMx(12); return false; }   // odsiecz wlasnej twierdzy wygrywa
                 if (e.Item2 > best) best = e.Item2;
             }
             float v = CanonWarBalance.Edge * Math.Max(best, CanonWarBalance.FloorBase);
             pt.AddBehaviorScore((new AIBehaviorData(port, AiBehavior.GoToSettlement, nav, false, fromPort, false), v));
+            // 342: w porcie zbiorki ta druzyna ma pierwszenstwo kolejki rodu (regula "kazdy lord") do konca okna proby - gra da zbiorke w pierwszej mysli w porcie
+            AnyLordArmy342.Prefer(party, (MusterFailDays + 1) * 24);
             long wl = Ts();
             lock (_lk)
             {
@@ -1123,6 +1188,7 @@ namespace Armoury
         {
             var cs = party.CurrentSettlement;
             if (cs == null || party.Army != null) return;
+            if (why == 12) return;   // 342: nie jego godzina w kolejce rodu - gra jeszcze nie pytala (Prefer daje pierwszenstwo, wiec rzadkie)
             long w = Ts();
             lock (_lk)
             {
@@ -1149,6 +1215,10 @@ namespace Armoury
             for (int i = 0; i < _dIronWhy.Length; i++) sb.Append(i == 0 ? " " : ", ").Append(IronWhyName[i]).Append(' ').Append(_dIronWhy[i]);
             sb.Append("; zbiorka w porcie ").Append(_dIronMuster).Append(", armia na morzu trzyma cel ").Append(_dIronKeepSea).Append(", pierwszenstwo kanonu ").Append(_dIronPrio)
               .Append(", w porcie bez armii ").Append(_dIronMusterFail).Append(" (wstrzymane ").Append(_dIronMusterBan).Append(")]");
+            // 342 (C1): wyjscia zbiorki w porcie
+            sb.Append(" [342 zbiorka w porcie - wyjscia:");
+            for (int i = 0; i < _dIronMx.Length; i++) sb.Append(i == 0 ? " " : ", ").Append(IronMxName[i]).Append(' ').Append(_dIronMx[i]);
+            sb.Append(']');
             return sb.ToString();
         }
 

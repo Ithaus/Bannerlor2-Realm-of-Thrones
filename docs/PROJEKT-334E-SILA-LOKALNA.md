@@ -384,3 +384,43 @@ Hipoteza GC (a) jest sprawdzalna dopiero w nowym logu: okna z GC wobec reszty ko
 **Sprawdzarka (340r):** L12 z GC przy częstych oknach GC; L15d – start i odstąpienie tej samej osady w ≤ 1 dobie (INFO, ≥ 3 na królestwo – NIE; na logu 334f: vlandia 2); L17m – zbiórka w porcie bez armii (INFO, bez armii > połowy zbiórek przy ≥ 4 – NIE). Synteza: gc → L12 NIE (średnio z GC 40), + gcok, gcfreq, gctrust, gcpeak, sameday3, mfail.
 
 **Do obserwacji w teście 45 dób:** W335-9 – jeśli „atak na dowódcę” > ok. 10 × liczba zagrożeń, zawęzić regułę remisu do `foes10 >= 1 && allies5 == 0`; `Rear(f, back)` dla szyku w szarży, który zawraca.
+
+## 17. 342 – każdy lord zakłada armię, Żelaźni na wybrzeżu Północy, koszt ścieżki Raider (test at340, decyzje Jeffa 06.11)
+
+**Co pokazał test at340 (45 dób):** Żelaźni mieli armię przez 41% dób, 29 rabunków, 48 ofert oblężenia tylko na The Rills (castle_N7) i 1 oblężenie. Moat Cailin, Deepwood Motte i Torrhen's Square nie dostały ani jednej oferty. Zbiórka „w porcie” z 340 nie zadziałała ani razu, a jako powody braku zbiórki log podawał „nie głowa rodu” i „członek armii”. Koszt L12 wynosił średnio 10–14 ms/h przy celu < 5; ścieżka Raider to ok. 190–270 ms na dobę przy ok. 21–27 tys. wywołań.
+
+**Decyzje Jeffa (06.11):**
+1. „Każdy może założyć armię, nie tylko głowa rodu, bo to bez sensu” – dotyczy wszystkich królestw AI.
+2. „Członek armii” jako powód braku zbiórki jest wewnętrznie sprzeczny – skoro lord jest w armii, armia się zebrała.
+3. Żelaźni mają celować w twierdze kanonu na wybrzeżu Północy.
+4. Koszt ma spaść do celu.
+
+| Punkt | Zmiana | Klucz |
+|---|---|---|
+| (1) wódz armii | Transpiler na `DefaultArmyManagementCalculationModel.CanLordCreateArmy` (klasa deklarująca, więc działa też pod SCA, BK i NavalDLC): warunek gry `Clan.Leader == LeaderHero` zamieniony na `AnyLordArmy342.CanLead`. Kotwica musi trafić dokładnie raz, inaczej „BRAK” i nic się nie zmienia; sprawdzone poza grą na libs: 1/1. **CanLead** = głowa rodu (jak w grze) ALBO lord królestwa AI z drużyną lordowską, gdy spełnia wszystkie warunki: nie gracz, nie ród gracza, nie najem, nie w armii, królestwo nie jest prowadzone przez gracza, wpływ rodu > 100 × (armie rodu + 1). Stała gry 100 (`MinimumInfluenceNeededToCreateArmy`) liczy się raz na każdą armię rodu, więc jeden ród ma tyle armii, na ile go stać. **Kolejka rodu:** w danej godzinie próbuje jedna drużyna rodu (`WarPartyComponents[godzina % liczba]`), po kolei. Dzięki temu nie ma fali prób i pętla kandydatów gry nie biegnie naraz dla wszystkich lordów. Drużyna wysłana na zbiórkę w porcie (Żelaźni) ma pierwszeństwo w kolejce przez okno próby (3 doby). Pozostałe warunki gry zostają bez zmian: morze, wpływ > 100, jedzenie, liczebność, wojna, kandydaci, limit ceil(0,7 × drużyn − w armiach), próg 1000, sito SCA, ArmsFirst. Wariant gry „pierwsza drużyna rodu, gdy głowa bez drużyny” też zostaje. | `AnyLordArmy342` |
+| (1) koszt wpływu | Postfiks First (przed ArmsFirst), tylko dla wodza z reguły 342. Członkowie idą w kolejności gry, dopóki suma `CalculatePartyInfluenceCost` (aktywny model) mieści się w budżecie gry `GetInfluenceBudgetWhileCreatingArmy` (0,7 × wpływ rodu; gra go liczy, ale wynik wyrzuca). Po przycięciu próg 1000 jest liczony od nowa. Pusta lista daje `false`. Płaci ród wodza (`Army.OnAddPartyInternal`, jak w grze). Ród nowego wodza nie schodzi pod 0. Głowy rodów – bez zmian względem gry. | `AnyLordArmy342` |
+| (1) BK | Postfiks `BKArmyManagementModel.CanCreateArmy` (blokada `Kingdom.CreateArmy` przez CreateArmyPatch i `BKArmyBehavior`). Gdy BK zwraca `false`, zmieniamy na `true` tylko dla wodza z reguły 342 w jego godzinie kolejki i tylko przy wolnych miejscach BK (ceil(0,7 × drużyn) − w armiach ≥ 2, jak BK). Inni lordowie rodu pozostają dla BK „nie mogę założyć”, więc BK JoinArmies nadal wysyła ich do armii. | `AnyLordArmy342` |
+| (1) gracz | Bez zmian w UI. Jeff jest głową swojego rodu, a BK przepuszcza `MainHero` zawsze. Ród gracza jest wyłączony z reguły, więc AI nie wydaje wpływu Jeffa. | – |
+| (2) „członek armii” | Na początku `IronSiege`: członek cudzej armii kończy z licznikiem „w armii - decyduje wodz” (`IronX` 10). Cel armii ocenia jej wódz (gałąź „wodz armii”), więc żadna oferta nie ginęła – zły był tylko licznik. Powód 0 „czlonek armii” zostaje wyłącznie jako zabezpieczenie (powinien dawać 0). Powody „bez zbiórki” po 342: „nie glowa rodu” tylko przy wyłączonej regule; z regułą „limit wplywu rodu” albo „kolejka rodu”. | – |
+| (3) cele kanonu | `IronCanon` = lista z książki: Moat Cailin `castle_B1`, Deepwood Motte `ROT_town2`, Torrhen's Square `castle_S8`, Stony Shore `castle_N7` (The Rills – opis ROT-Map: „Stony Shore, north of Blazewater Bay”). Wcześniej była to cała kultura battania. Po Krwawych Godach `IronSiege` bierze i tak wszystkie twierdze w wojnie. **Zasięg:** cele kanonu nie mają limitu 5 × średnia odległość miast, ani w linii prostej, ani na drodze. Są tylko 4, droga gry idzie morzem z lądowaniem (`GetBestNavigationTypeAndAdjustedDistance…`), z pamięcią 2 h. **Odległość:** cel kanonu dostaje `ds = najbliższy cel kanonu / ten cel` zamiast wzoru rabunku z dnem 0,1 (wszystkie cele leżą 230–450 od wysp, więc dno zrównywało odległość i wygrywał najsłabszy zamek). Dalszy, ale słabiej broniony cel może wygrać. Zasada lokalna zostaje bez zmian: q ≤ 1,0 siłą zbiórki, weta (teatr, 274, 326b), blokady, model 0, rozejm. | `IronCanonCoast342` |
+| (3) zbiórka w porcie | Istniejąca armia Wysp nie blokuje już zbiórki – zostają limit gry 0,7 (`IronCands`) i limit wpływu rodu. Warunek wodza: `AnyLordArmy342.MayLead`, czyli głowa rodu albo reguła 342. Każde wyjście `IronMuster` ma licznik „[342 zbiorka w porcie - wyjscia: …]”. Wódz w porcie poza swoją godziną kolejki nie jest liczony jako nieudana próba. | `IronMuster340` + `AnyLordArmy342` |
+| (3) diagnoza | Nowa linia doby „Zelazni cele (342)”: dla każdego z 4 celów oceny, bez drogi, weta, blokady, liczba q (min i mediana), q > 1, model 0, najlepszy wynik, droga gry, oferty. | – |
+| (4) koszt Raider | Odsiew rabunków. Prefiks, postfiks i finalizer na `AiMilitaryBehavior.FindBestTargetAndItsValueForFaction` (Raider, drużyna AI królestwa). W tej myśli `ScorePost` nie liczy q: zapisuje cel i zwraca górną granicę (× najwyższy mnożnik rabunku 1,2). W postfiksie myśli wpisy RaidSettlement są sortowane malejąco i liczone dokładnie po kolei. Wynik wpisu = granica / 1,2 × m (wynik gry jest iloczynem, więc liniowy w m). Liczenie kończy się, gdy następna granica nie przebije najlepszego wpisu bez weta 334e; reszta dostaje 0, bo ich dokładny wynik i tak jest niższy. Wybór (maksimum) zostaje ten sam. Ocena dokładna (`RaidCore`) to ta sama gałąź Raider co w 340: blokada, rabunek w toku, q z ZFor, RaidMult, dom zagrożony, liczniki, koszt. Wywołania spoza myśli (BK, SCA, armie łupią) liczą się jak dotąd. Linia koszt: „odsiew rabunkow (342): latka, mysli, wpisow, ocen dokladnych, odsiane, ocen na mysl”. | `RaidSieve342` |
+
+**Bez złota, wpływu ani ludzi z niczego:** wpływ płaci ród wodza według modelu gry; liczby pochodzą z modeli gry (100 na armię, 0,7 budżetu i miejsc, próg 1000, mnożnik 1,2 z RaidMult). Odpoczynek armii, nocne obozy, kanon (pokój korona–Północ, teatry) i weta zostają.
+
+**Sprawdzarka (`--grupa armie342`):**
+- A0: start (klucz, wódz gry „TAK (kotwica 1/1)”, BK).
+- A1: armie zakładane przez nie-głowy rodów > 0 (≥ 20 dób).
+- A2: bez zalewu – dni-królestw, w których w armiach jest więcej drużyn niż limit gry ceil(0,7 × drużyn) albo armie mają średnio < 3 drużyn, ≤ 5%.
+- A3: wpływ < 0 rodów wodzów, będących innymi lordami, = 0.
+- A4: potknięcia 0.
+- A5: Żelaźni – oferty celów kanonu > 0 (≥ 30 dób).
+- A6: „czlonek armii” = 0.
+- A7: koszt 334e średnio < 5 ms/h, godzina < 50 ms.
+- A8: odsiew – łatka TAK, oceny na myśl (INFO).
+- A9: maksimum armii rodu i królestwa (INFO).
+
+Synteza: dobry bieg, bez armii innych lordów, krótki bieg, zalew, wpływ < 0, potknięcie, 0 ofert kanonu, członek armii, koszt średnio i w godzinie, odsiew BRAK, kotwica BRAK, bez startu, log sprzed 342 – TAK. Na logu at340: A6 i A7 dają NIE (stan przed 342), reszta INFO (brak linii 342).
+
+**Do sprawdzenia w teście 90 dób:** A1–A7 oraz L12/L17 z `lokalna334e`; liczba armii na królestwo i na ród; Raider – ms na dobę i „ocen na mysl” (oczekiwane 1–7 zamiast 10–25); Żelaźni – oferty i oblężenia na 4 celach.

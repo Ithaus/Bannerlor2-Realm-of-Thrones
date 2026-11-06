@@ -848,7 +848,7 @@ namespace Armoury
     /// <summary>OB5 (odsiecz) i S11 (rody zmieniajace krolestwo z lennem) - nasluchy kampanii. Bez zapisu; stan sesji od zera przy kazdej nowej grze i wczytaniu.</summary>
     internal sealed class ReliefBehavior : CampaignBehaviorBase
     {
-        public ReliefBehavior() { BesiegedRelief.Reset(); ReliefStrike.Reset(); }
+        public ReliefBehavior() { BesiegedRelief.Reset(); ReliefStrike.Reset(); AnyLordArmy342.Reset(); }
 
         public override void RegisterEvents()
         {
@@ -865,6 +865,10 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, BesiegedRelief.OnMapEventEnded);
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, BesiegedRelief.OnOwnerChanged);
             CampaignEvents.OnClanChangedKingdomEvent.AddNonSerializedListener(this, KingdomBalance.OnClanChangedKingdom);   // S11 (tylko linia)
+            // 342 (AnyLordArmy342): kazdy lord krolestwa AI moze zalozyc armie - latki, armie zalozone, linia doby
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, delegate (CampaignGameStarter s3) { AnyLordArmy342.SessionStart(); });
+            CampaignEvents.ArmyCreated.AddNonSerializedListener(this, AnyLordArmy342.OnArmyCreated);
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, AnyLordArmy342.Daily);
         }
 
         public override void SyncData(IDataStore dataStore) { }
