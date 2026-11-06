@@ -273,7 +273,12 @@ namespace Armoury
         {
             if (party == null || partyThinkParams == null) return;
             var camp = party.BesiegerCamp;
-            if (camp == null) { if (_ban.Count > 0) ApplyBan(party, partyThinkParams); return; }   // m116: zakaz powtorki - druzyny poza obozem
+            if (camp == null)
+            {
+                if (_ban.Count > 0) ApplyBan(party, partyThinkParams);   // m116: zakaz powtorki - druzyny poza obozem
+                LocalFront334e.ThinkField(party, partyThinkParams);      // 334e: rabunek przerwany, obrona pustych ziem, armie lupia (nie rzuca)
+                return;
+            }
             try
             {
                 var ev = camp.SiegeEvent;
@@ -283,8 +288,10 @@ namespace Armoury
                 var me = party.MapEvent;
                 bool assault = me != null && me.IsSiegeAssault && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party && me.MapEventSettlement == st;
                 if (lead) NoteBesieger(ev, party);   // m116: frakcja oblegajaca (zakaz powtorki po zwinieciu obozu)
+                // 334e: sad oblezenia w toku (KONTYNUUJ / ODSTAP) przed F2 i m116; szturm (bitwa) - bez sadu; 4 = odwrot wykonany teraz (Fresh nie trzyma)
+                int judged = assault ? -1 : LocalFront334e.Judge(party, camp, ev, st, partyThinkParams, Scripted(party) || Und(party, st));
                 // m116-fabula: swieze oblezenie (Cape Wrath - oboz zwijany godzine po postawieniu)
-                bool fresh = !assault && FreshCandidate(party, camp, ev, st, partyThinkParams);
+                bool fresh = !assault && judged != 4 && FreshCandidate(party, camp, ev, st, partyThinkParams);
                 if (!lead && !assault && !fresh) return;
                 var scores = partyThinkParams.AIBehaviorScores;
                 if (scores == null) return;
@@ -519,6 +526,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ latki w kampanii (z SiegeWalls2.EnsureHooks, raz na proces)
         private static string _hookThink = "nie zakladana", _hookSca = "nie zakladana", _hookAim = "nie zakladana";
+        /// <summary>334e (linia startu sily lokalnej): stan wpiecia ThinkPost - cala mysl 334e (sad oblezen, rabunek przerwany, armie lupia, Zelazni) idzie przez nie.</summary>
+        internal static string HookThinkState { get { return _hookThink; } }
 
         private static void EnsureHooks3()
         {

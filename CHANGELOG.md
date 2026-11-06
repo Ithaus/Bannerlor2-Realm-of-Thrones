@@ -1,5 +1,43 @@
 # DZIENNIK ZMIAN
 
+## 334e - zasada sily lokalnej (Jeff 06.11) + poprawki trzech recenzji (noc/334e-lokalna-sila od 99a05f27 + scalenie 335 - NIE WGRANE, bez autotestu; DLL m334e)
+**Zasada Jeffa 06.11:** "liczy sie, gdzie armia jest w danej chwili, a nie ile ogolnie jest" - gdy armie Polnocy sa na poludniu, lupimy i oblegamy tam, gdzie ich nie ma,
+bo zanim wroca, zdazymy; oblegajacy, ktory widzi nadchodzaca odsiecz, odstepuje, gdy przegra, i zostaje, gdy wygra albo zdazy zdobyc. Projekt: docs/PROJEKT-334E-SILA-LOKALNA.md
+(warianty A/B jako material; rozdz. 13 - poprawki po recenzjach).
+**Co bylo globalne:** BK TickKingdoms - postawa Defensive calego krolestwa z CurrentTotalStrength x1.5 (odcina WSZYSTKIE opcje Besieger/Raider); gra - "fantom" num10
+(sila calego krolestwa celu z zalogami doliczana do kazdej osady); SCA - glebia x0.18/x0.55, lordowie w 95 x0.25, wyczerpanie x0.55 z sum; 274 - weto "za frontem"
+silniejszego i blokada zbiorki 326c-A; brak odstapienia od oblezenia przed odsiecza (odwrot SCA martwy, BK SIEGE-STICK trzyma).
+**Zmiany (nowe pliki `Armoury/src/LocalFront334e*.cs`, 10 kluczy w Settings/MCM, wszystkie TAK poza ScaLocal334e):**
+- Miara: jednostki w polu (armia = wodz z doczepionymi, samotny lord; bez zalog, milicji, karawan, band) z migawki dobowej (plotki, watek glowny: Daily po liniach
+  doby / Hourly po wczytaniu) + zwiad (zasieg wzroku z modelu gry) i widoczne zamiary na zywo. Czas dojscia z drogi gry (MapDistanceModel, lad / morze wlasna predkoscia
+  jednostki; wies dziedziczy droge swojej twierdzy). Z = wrogowie, ktorzy dojda do celu przed koncem akcji (nowe oblezenie: nasz dojazd + 8.02 doby gry; rabunek: wzor
+  DefaultRaidModel); daleki wrog z plotki liczy sie z czasem 2 x droga (wiesc + marsz - "zanim wroca, zdazymy"); trzecia strona (wrog naszego wroga w wojnie z panem
+  celu) nie broni celu. q = Z / O. Bez migawki z dzis miara milczy (mnoznik 1), nie liczy z pustej listy.
+- `LocalPower334e`: ocena celu na czynnym modelu (u Jeffa SCA) - oblezenie x1.2 / x0.8 / 0 (q 0.8 / 1.0, biezacy cel druzyny albo jej armii do 1.25), rabunek do 1.25;
+  pod SCA w oknie (q <= 0.8) cofniete glebia, lordowie w 95 i wyczerpanie (warunki 1:1 z dekompilacji StrategicTargetScoreModel); ForcePeace/WantsPeace, jedzenie,
+  osobowosc, pogoda zostaja. Lustro obrony: lord z wlasna twierdza w dobie drogi, na ktora idzie wrog, bez x1.2 i cofniec; Defender takiej twierdzy x1.2.
+  Blokada zbiorki 326c-A wylaczona (ocena oblezenia z WillGatherArmy ma juz q). B8 BK: q > 1.0 (O = wodz + kandydaci zbiorki z modelu armii gry) = weto, bez null.
+- `LocalPhantomOff334e`: transpiler num10 (2 kotwice CurrentTotalStrength) - 0 dla krolestw AI.
+- `LocalStance334e`: Neutral dla krolestw AI z > 1 twierdza (BK raz na dobe + przeglad co godzine); krolestwo z 1 twierdza - postawa BK.
+- `LocalRestraint334e`: 274 "za frontem" zdjete (q decyduje); weto siedzib zostaje; NOWY teatr korony - korona i jej strona do Krwawych Godow bez celow kultur Polnocy
+  (battania, skagosi, za Murem) - jedyny hamulec korony za Przesmykiem.
+- `LocalSiegeJudge334e`: sad oblezenia w SiegeWalls2.ThinkPost (jedno wpiecie, przed F2 i m116): odsiecz = wrogowie z zamiarem obrony albo zblizajacy sie w zasiegu
+  wzroku, horyzont 12.03 doby; zaloga do odwrotu najwyzej 0.8 x oboz (sama zaloga nie wywoluje odwrotu); nasi w drodze doliczeni; pozostaly czas z postepu oblezenia
+  (przygotowania, tempo burzenia murow). KONTYNUUJ (q <= 0.8 albo przewaga przyjdzie po zdobyciu) - bez wskrzeszania zawetowanego / rozejmu, OB5 i 335 pierwsze;
+  ODSTAP po 2 godzinach tylko, gdy ucieczka zdazy (wlasna twierdza dalej od odsieczy, droga krotsza niz przyjazd przewagi) - inaczej "zostaje w obozie".
+  `BkSiegeStickYields334e`: BK SIEGE-STICK i m116 Hold puszczaja odwrot.
+- `LocalRaidBreakOff334e`: rabunek przerwany przed silniejszym (q > 1.25), ktory zdazy. `ArmyRaid334e`: armia AI bez oblezenia, ze spojnoscia > 2 x prog rozwiazania,
+  rabuje wies w oknie (weta teatru / 274 / 326b sprawdzane - ThinkPost idzie po wetach). Zelazni: oblezenie wybrzeza z wetami. `LocalDefence334e`: obrona wsi - tylko
+  najblizsi ze strony wsi (z koalicja), ktorzy zdaza i razem >= 1.2 x napastnik; nikt nie zawraca po wies, ktorej nie uratuje.
+- `ScaLocal334e` (domyslnie NIE, recenzja W8): wyczerpanie SCA z sily w polu - wygrywajacy z armia daleko od domu prosilby o pokoj; wojna/pokoj zostaja na sumach.
+- Recenzje (logika, techniczna, adwokat diabla) - poprawione: mieszanka dwoch wersji (jedno API, jedno wpiecie), odsiecz w horyzoncie i stany 3/4, weta dla nowych
+  opcji, KONTYNUUJ bez wskrzeszania, zamek przy potknieciach, migawka z watku glownego, czyszczenie pamieci doby, prefiks BK po pozycji (__0), klucze bez
+  kolizji, bez podwojnego q przy naszym wywolaniu modelu, okno W (wiesc), petla zaloga-odwrot, trzecie strony, korona za Przesmyk, lustro obrony, B8 bez null,
+  ScaLocal NIE. Pominiete: pamiec Z per (cel, godzina) i liczenie drog poza zamkiem (wydajnosc - zmierzy L12), Z_dom > O_dom w lustrze obrony (tylko zamiar).
+- `tools/sprawdz_logi.py`: grupa `lokalna334e` (L0 start i latki, LT testy T1-T6, L10 migawka, L12 koszt, L15 ping-pong, L4 postawa, L3 okno bez opcji, L13 starty
+  w oknie, L7 oblezenia q > 1.0, L1z Zelazni, L2k korona, L14 odstapienia, L16 zostaje w obozie) z testem syntetycznym (19 przypadkow); R274-9 rozpoznaje linie
+  "zbiorka zatrzymana (326c)" (przy 334e jej brak jest poprawny).
+
 ## 334d - poprawki po recenzjach 334c (noc/334-balans od 0a096780 - NIE WGRANE, bez autotestu)
 - Straznik pozycji (`WarFront334.Guard.cs`): warunek siatki pogody dokladnie jak w grze; przeglad partii po trafieniu bez partii najwyzej raz na godzine gry; kolejka bez
   partii nieaktywnych; PREFIKS FinishNavigationTransitionInternal - koniec przejscia Invalid poza osada: partia bez wodza - przejscie anulowane, metoda gry pominieta;

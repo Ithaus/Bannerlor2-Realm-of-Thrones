@@ -73835,7 +73835,7 @@ R274_RX = {
                       r"B=\[(.*?)\] \| potkniecia (\d+) \(sesja (\d+)\)\.$"),
     "off": re.compile(r"^Rownowaga wojny \(274\): dzien (\d+) \| wylaczone \((.*)\) \| potkniecia (\d+) \(sesja (\d+)\)\.$"),
     "end": re.compile(r"^Rownowaga wojny \(274\): KONIEC - Krwawe Gody \| dzien (\d+) \| RedWeddingEvent (-?\d+), Robb (zyje|nie zyje) - "),
-    "event": re.compile(r"^Rownowaga wojny \(274\): (weto|zbiorka|najem z karczmy|nowa druzyna|OBLEZENIE SIEDZIBY|siedziba bez weta|rdzen bez wojny) \| dzien (\d+) \| "),
+    "event": re.compile(r"^Rownowaga wojny \(274\): (weto|zbiorka zatrzymana \(326c\)|zbiorka|najem z karczmy|nowa druzyna|OBLEZENIE SIEDZIBY|siedziba bez weta|rdzen bez wojny) \| dzien (\d+) \| "),
     "test": re.compile(r"^Rownowaga wojny \(274\): test - (T\d+) (.*) - wynik (TAK|NIE|POMINIETY)\.$"),
     "p264end": re.compile(r"^Pokoj kanonu \(264\): dzien (\d+) \| blokada .*?(?:CZYNNA \(ROT wymusza\)|ROT sam zawiera pokoj|ROT wymusza te wojne|ROT nie wymusza tej wojny)"),
     "load": re.compile(r"^Rownowaga wojny \(274\): po wczytaniu \| dzien (\d+) \| regula (TAK|NIE)"),
@@ -73891,6 +73891,8 @@ def rownowaga274_selftest():
              ("test", T["test"].format(t="T1", r="TAK")), ("p264end", T["p264end"].format(d=5)), ("money", T["money"].format(d=5, a="OK")),
              ("day", _r274_day(109002).replace("; krolestwa [Riverlands 2, The North 9]", "")), ("load", T["load"].format(d=5)),
              ("event", T["seatok"].format(d=1)), ("event", T["nowar"].format(d=1)),
+             # 334e (R274-9, test 334c d109578): linia zatrzymanej zbiorki 326c
+             ("event", "Rownowaga wojny (274): zbiorka zatrzymana (326c) | dzien 109578 | The North (strona A) bez walki 43 dob, ale strona silniejsza (stosunek B/A 0.547 poza pasmem 0.67-1.50) - zbiorka 274 tylko dla slabszej strony; Patrek Mallister's Party decyduje jak w grze."),
              # 334c (R274-9): nawias 326c po "lordow do frontu N" (paczka 326c, a6e431bc)
              ("day", _r274_day(109003).replace("lordow do frontu 3;", "lordow do frontu 3 (326c tylko slabszej strony TAK: silniejsza poza pasmem -, zbiorek zatrzymanych 0);")),
              ("p264end", "Pokoj kanonu (264): dzien 7 | blokada CZYNNA (Robb nie zyje, RedWeddingEvent 2 - ROT wymusza te wojne, pokoj cofnalby nastepnej doby) "
@@ -96231,6 +96233,256 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return wodz335_main(rest[0] if rest else None)
     return _wodz335_main_prev(argv)
+
+
+
+# ------------------------------------------------------------ paczka 334e: grupa lokalna334e - zasada sily lokalnej (LocalFront334e*.cs, docs/PROJEKT-334E-SILA-LOKALNA.md)
+#  Jeff 06.11: o ataku decyduje sila wroga w polu, ktora zdazy dojsc do celu, a nie suma krolestwa. Linie 'Sila lokalna (334e): '.
+#  L0 start: klucze, fantom TAK (2/2), cel OfActive TAK, ThinkPost wpieta (nie zakladana - INFO: kolejnosc startu); LT testy T1..T6 TAK;
+#  L10 migawka co dobe, zalog 0; L12 koszt: srednio < 5 ms / h, maks godziny < 50 ms, potkniecia 0; L4 postawa AI 'Neutral' albo 'BK (twierdz <= 1)' (0 'inna');
+#  L3 doby z oknem (cel z q <= 0.8 wsrod pytanych) bez zadnej opcji Raider/Besieger > 0 <= 10% dob okna; L13 nowe rabunki i oblezenia AI na celach q <= 0.8 >= 60%
+#  (>= 10 startow, mniej - INFO); L7 nowe oblezenia przy q > 1.0 <= 10% (>= 5 startow); L1z Zelazni (sturgia): rabunki > 0 przy >= 30 dobach linii (mniej - INFO);
+#  L2k korona (vlandia): armia w polu w >= 40% dob (>= 20 dob, mniej - INFO); L14 odstapienia: kazde z q_obl > 1.25, >= 1 w biegu >= 60 dob (mniej - INFO);
+#  L15 ping-pong: powrot w blokadzie 0 i zmiany przydzialu obrony 0; L16 'zostaje w obozie' - INFO.
+#   python -I tools/sprawdz_logi.py --grupa lokalna334e <Armoury-*.log>
+L334E_P = "Sila lokalna (334e): "
+L334E_START = re.compile(
+    r"Sila lokalna \(334e\): start \| klucze: sila (TAK|NIE), fantom (TAK|NIE), postawa (TAK|NIE), SCA (TAK|NIE), 274 (TAK|NIE), armie lupia (TAK|NIE), "
+    r"oblezenie (TAK|NIE), BK stick (TAK|NIE), rabunek przerwany (TAK|NIE), obrona (TAK|NIE) \| zakres: (.*?) \| fantom (.*?) \| cel OfActive (\S+) (.*?) "
+    r"\| SCA cofanie (.*?) \| BK stick (.*?) \| postawa BK (.*?) \| kolejka AiHourlyTick: SiegeWalls2\.ThinkPost \(Last\) (.*?) - ")
+L334E_TEST = re.compile(r"Sila lokalna \(334e\): test - (T\d+) (.*) - wynik (TAK|NIE)\.")
+L334E_SNAP = re.compile(r"Sila lokalna \(334e\): migawka \| dzien (\d+) \| jednostek (\d+) \| zalog (\d+) \| zwiad na zywo (\d+) \| celow w pamieci (\d+) \| ([\d.]+) ms")
+L334E_COST = re.compile(
+    r"Sila lokalna \(334e\): koszt \| dzien (\d+) \| drog (\d+) \| zapytan (\d+) \(ocen (\d+), bez migawki (\d+)\) \| ms suma ([\d.]+) / godzin (\d+) = srednio ([\d.]+) "
+    r"/ maks godziny ([\d.]+) \| potkniecia (\d+) \(sesja (\d+)\) .*?, odstapienia (\d+).*? \| ping-pong: powrot w blokadzie (\d+), przydzial (\d+)\.")
+L334E_KING = re.compile(
+    r"Sila lokalna \(334e\): krolestwo \| dzien (\d+) \| (\S+) \(.*?\) \| pole: (\d+) jednostek, (\d+) ludzi, (\d+) sily \(zalogi 0\) \| wrog w polu (\d+) "
+    r"\| cele \(pytane\): wsie (\d+) \(okno (\d+)\), twierdze (\d+) \(okno (\d+)\) \| opcje Raider/Besieger >0: (\d+)/(\d+) "
+    r"\| postawa (Neutral|BK \(twierdz <= 1\)|inna): obronnych (\d+), ofensywnych (\d+) z (\d+) .*? \| start: rabunki (\d+) \(puste (\d+), armia (\d+)\), "
+    r"oblezenia (\d+) \(puste (\d+), q>1\.0: (\d+)\) \| marsze na cel (\d+) \| armie w polu (\d+)\.")
+L334E_KK = ["day", "k", "units", "men", "str", "foe", "nv", "wv", "nf", "wf", "oR", "oB", "stance", "def", "agg", "parts", "raids", "raidsOpen", "raidsArmy",
+            "sieges", "siegesOpen", "siegesBan", "marches", "armies"]
+L334E_RET = re.compile(r"Sila lokalna \(334e\): odstapienie \| dzien (\d+) \| (\S+) .*?\(q_obl ([\d.]+), przyjazd ([\d.]+|-)\)")
+
+
+def lokalna334e_collect(logp):
+    D = {"start": [], "startBad": 0, "test": [], "snap": [], "cost": [], "costBad": 0, "king": [], "kingBad": 0, "ret": [], "stay": 0, "stum": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if L334E_P not in line:
+                continue
+            if L334E_P + "start |" in line:
+                m = L334E_START.search(line)
+                if not m:
+                    D["startBad"] += 1
+                else:
+                    D["start"].append(m.groups())
+            elif L334E_P + "test - " in line:
+                m = L334E_TEST.search(line)
+                if m:
+                    D["test"].append((m.group(1), m.group(3)))
+            elif L334E_P + "migawka |" in line:
+                m = L334E_SNAP.search(line)
+                if m:
+                    D["snap"].append((int(m.group(1)), int(m.group(2)), int(m.group(3)), float(m.group(6))))
+            elif L334E_P + "koszt |" in line:
+                m = L334E_COST.search(line)
+                if not m:
+                    D["costBad"] += 1
+                    continue
+                g = m.groups()
+                D["cost"].append({"day": int(g[0]), "avg": float(g[7]), "max": float(g[8]), "stum": int(g[9]), "ret": int(g[11]), "pp": int(g[12]), "sw": int(g[13])})
+            elif L334E_P + "krolestwo |" in line:
+                m = L334E_KING.search(line)
+                if not m:
+                    D["kingBad"] += 1
+                    continue
+                D["king"].append({k: (v if k in ("k", "stance") else int(v)) for k, v in zip(L334E_KK, m.groups())})
+            elif L334E_P + "odstapienie |" in line:
+                m = L334E_RET.search(line)
+                if m:
+                    D["ret"].append((int(m.group(1)), m.group(2), float(m.group(3))))
+            elif L334E_P + "zostaje w obozie |" in line:
+                D["stay"] += 1
+            elif L334E_P + "potkniecie " in line:
+                D["stum"] += 1
+    return D
+
+
+def lokalna334e_rows(rep, D):
+    st = D["start"]
+    if st:
+        bad = []
+        for g in st:
+            if any(x != "TAK" for i, x in enumerate(g[:10]) if i != 3):
+                bad.append("klucz NIE")
+            if not g[11].startswith("TAK (2/2)"):
+                bad.append("fantom " + g[11])
+            if not g[13].startswith("TAK ("):
+                bad.append("cel " + g[13])
+        think = [g[17] for g in st]
+        rep.add("L0: start sily lokalnej - klucze TAK (SCA dowolny), fantom TAK (2/2), cel OfActive TAK", f"startow {len(st)}, zle {len(bad)}" + (f" [{bad[0]}]" if bad else "")
+                + (f", nierozpoznane {D['startBad']}" if D["startBad"] else ""), "0 zlych", not bad and not D["startBad"])
+        tb = [t for t in think if t.startswith("BRAK")]
+        tn = [t for t in think if t != "wpieta" and not t.startswith("BRAK")]
+        rep.add("L0b: SiegeWalls2.ThinkPost wpieta (cala mysl 334e)", f"wpieta {sum(1 for t in think if t == 'wpieta')}, BRAK {len(tb)}, inne {len(tn)}" + (f" [{tn[0]}]" if tn else ""),
+                "wpieta", False if tb else (None if tn else True))
+    else:
+        rep.add("L0: start sily lokalnej", "brak linii startu" + (f" (nierozpoznane {D['startBad']})" if D["startBad"] else ""), "INFO (DLL sprzed 334e)", False if D["startBad"] else None)
+    if D["test"]:
+        tn = [t[0] for t in D["test"] if t[1] != "TAK"]
+        names = sorted(set(t[0] for t in D["test"]))
+        rep.add("LT: testy regul T1..T6", f"linii {len(D['test'])} ({', '.join(names)}), NIE {len(tn)}" + (f" [{', '.join(tn)}]" if tn else ""), "0 NIE, T1..T6", not tn and len(names) >= 6)
+    else:
+        rep.add("LT: testy regul T1..T6", "brak linii testu", "INFO", None)
+    sn = D["snap"]
+    if sn:
+        gar = [s for s in sn if s[2] != 0]
+        rep.add("L10: migawka co dobe, zalog 0", f"dob {len(sn)}, z zalogami {len(gar)}, jednostek sr. {sum(s[1] for s in sn) / len(sn):.0f}, ms maks {max(s[3] for s in sn):.1f}", "zalog 0", not gar)
+    else:
+        rep.add("L10: migawka co dobe, zalog 0", "brak linii", "INFO", None)
+    co = D["cost"]
+    if co:
+        avg = max(c["avg"] for c in co)
+        mx = max(c["max"] for c in co)
+        stum = sum(c["stum"] for c in co) + (D["stum"] if not co else 0)
+        rep.add("L12: koszt - srednio < 5 ms / h, maks godziny < 50 ms, potkniecia 0", f"dob {len(co)}, srednio maks {avg:.2f}, godzina maks {mx:.1f}, potkniecia {stum}, linii potkniec {D['stum']}"
+                + (f", nierozpoznane {D['costBad']}" if D["costBad"] else ""), "< 5 / < 50 / 0", avg < 5.0 and mx < 50.0 and stum == 0 and D["stum"] == 0 and not D["costBad"])
+        pp = sum(c["pp"] for c in co); sw = sum(c["sw"] for c in co)
+        rep.add("L15: ping-pong - powrot w blokadzie i zmiany przydzialu obrony", f"powrotow {pp}, zmian przydzialu {sw}", "0 / 0", pp == 0 and sw == 0)
+    else:
+        rep.add("L12: koszt", "brak linii koszt" + (f" (nierozpoznane {D['costBad']})" if D["costBad"] else ""), "INFO", False if D["costBad"] else None)
+        rep.add("L15: ping-pong", "brak linii koszt", "INFO", None)
+    K = D["king"]
+    if K:
+        inna = [f"d{k['day']} {k['k']}" for k in K if k["stance"] == "inna"]
+        rep.add("L4: postawa AI Neutral (krolestwo z 1 twierdza - BK)", f"linii {len(K)}, 'inna' {len(inna)}" + (f" [{', '.join(inna[:3])}]" if inna else "")
+                + (f", nierozpoznane {D['kingBad']}" if D["kingBad"] else ""), "0", not inna and not D["kingBad"])
+        win = [k for k in K if k["wv"] + k["wf"] > 0]
+        dead = [f"d{k['day']} {k['k']}" for k in win if k["oR"] + k["oB"] == 0]
+        rep.add("L3: doby z oknem bez opcji Raider/Besieger > 0", f"dob okna {len(win)}, bez opcji {len(dead)}" + (f" [{', '.join(dead[:3])}]" if dead else ""),
+                "<= 10% dob okna", None if not win else len(dead) <= 0.10 * len(win))
+        tot = sum(k["raids"] + k["sieges"] for k in K); op = sum(k["raidsOpen"] + k["siegesOpen"] for k in K)
+        rep.add("L13: nowe rabunki i oblezenia AI na celach q <= 0.8", f"startow {tot}, w oknie {op}" + (f" ({100.0 * op / tot:.0f}%)" if tot else ""), ">= 60% (>= 10 startow)",
+                None if tot < 10 else op >= 0.6 * tot)
+        sg = sum(k["sieges"] for k in K); ban = sum(k["siegesBan"] for k in K)
+        rep.add("L7: nowe oblezenia przy q > 1.0", f"oblezen {sg}, q>1.0 {ban}", "<= 10% (>= 5 oblezen)", None if sg < 5 else ban <= 0.10 * sg)
+        ir = [k for k in K if k["k"] == "sturgia"]
+        ira = sum(k["raids"] for k in ir)
+        rep.add("L1z: Zelazni (sturgia) rabuja", f"dob {len(ir)}, rabunkow {ira}, dob z opcja Raider {sum(1 for k in ir if k['oR'] > 0)}", "> 0 (>= 30 dob)",
+                None if len(ir) < 30 else ira > 0)
+        cr = [k for k in K if k["k"] == "vlandia"]
+        cra = sum(1 for k in cr if k["armies"] > 0)
+        rep.add("L2k: korona (vlandia) - armia w polu", f"dob {len(cr)}, z armia {cra}" + (f" ({100.0 * cra / len(cr):.0f}%)" if cr else ""), ">= 40% dob (>= 20 dob)",
+                None if len(cr) < 20 else cra >= 0.4 * len(cr))
+    else:
+        rep.add("L4: postawa AI Neutral", "brak linii krolestw" + (f" (nierozpoznane {D['kingBad']})" if D["kingBad"] else ""), "INFO", False if D["kingBad"] else None)
+    days = len(D["snap"]) or len(D["cost"])
+    low = [r for r in D["ret"] if r[2] <= 1.25]
+    rep.add("L14: odstapienia - kazde przy q_obl > 1.25, >= 1 w biegu >= 60 dob", f"odstapien {len(D['ret'])}, q_obl <= 1.25 {len(low)}, dob biegu {days}"
+            + (f" [{', '.join(r[1] for r in D['ret'][:4])}]" if D["ret"] else ""), "kazde > 1.25; >= 1 przy >= 60 dobach",
+            False if low else (True if D["ret"] else (None if days < 60 else False)))
+    rep.add("L16: zostaje w obozie (ucieczka nie zdazy)", f"linii {D['stay']}", "INFO", None)
+
+
+def lokalna334e_line_start(think="wpieta", fantom="TAK (2/2)", keys=None):
+    k = keys or ["TAK"] * 10
+    return (L334E_P + f"start | klucze: sila {k[0]}, fantom {k[1]}, postawa {k[2]}, SCA {k[3]}, 274 {k[4]}, armie lupia {k[5]}, oblezenie {k[6]}, BK stick {k[7]}, "
+            f"rabunek przerwany {k[8]}, obrona {k[9]} | zakres: kampania kanonu | fantom {fantom} | cel OfActive StrategicCampaignAI145.StrategicTargetScoreModel TAK (StrategicTargetScoreModel) "
+            f"| SCA cofanie TAK | BK stick TAK | postawa BK ok | kolejka AiHourlyTick: SiegeWalls2.ThinkPost (Last) {think} - oblezenie przed F2 i m116, rabunek / armie / Zelazni poza obozem "
+            f"(weta sprawdzane) | czas rabunku: wzor DefaultRaidModel, model gry DefaultRaidModel.")
+
+
+def lokalna334e_line_king(d, k, wv=2, wf=1, oR=5, oB=3, stance="Neutral", raids=1, ro=1, sieges=0, so=0, ban=0, armies=1):
+    return (L334E_P + f"krolestwo | dzien {d} | {k} ({k}) | pole: 12 jednostek, 3000 ludzi, 4000 sily (zalogi 0) | wrog w polu 9000 | cele (pytane): wsie 10 (okno {wv}), "
+            f"twierdze 4 (okno {wf}) | opcje Raider/Besieger >0: {oR}/{oB} | postawa {stance}: obronnych 0, ofensywnych 0 z 12 (BK chcial D) | SCA wyczerpane NIE, wrog/swoi 5000/- "
+            f"| start: rabunki {raids} (puste {ro}, armia 0), oblezenia {sieges} (puste {so}, q>1.0: {ban}) | marsze na cel 2 | armie w polu {armies}.")
+
+
+def lokalna334e_line_cost(d, avg="1.20", mx="9.0", stum=0, ret=0, pp=0, sw=0):
+    return (L334E_P + f"koszt | dzien {d} | drog 40000 | zapytan 9000 (ocen 8000, bez migawki 0) | ms suma 28.8 / godzin 24 = srednio {avg} / maks godziny {mx} | potkniecia {stum} (sesja {stum}) "
+            f"| oceny: zero 10, w gore 50, w dol 20, cofniecia SCA 5, obrona nizej 1, obrona twierdzy 0, dom zagrozony 2, BK weto 0 (zapas 0) | oblezenia: sad 30 (KONTYNUUJ 20, SRODEK 8, "
+            f"NIE-ZDAZY 1, ODSTAP 1, GLOD 0), trzymane 20, bez wskrzeszania 0, kandydaci odwrotu 1, odstapienia {ret}, zostaly w obozie 0, BK stick przepuscil 0, m116 przepuscil 0 "
+            f"| rabunki przerwane 0 | armie rabunek opcji 3 (weta 0) | Zelazni oblezenia opcji 0 (weta 0) | obrona: przydzialy 1, bez obrony 0, zmiany przydzialu {sw} "
+            f"| postawa przegladem 0 | ping-pong: powrot w blokadzie {pp}, przydzial {sw}.")
+
+
+def lokalna334e_synth():
+    import tempfile
+    import shutil
+    def run(days=62, start=None, tests="TAK", zal=0, avg="1.20", stum=0, stance="Neutral", deadopt=False, open_=True, ban=0, ironr=1, crownarm=1, retq=1.6, pp=0, think="wpieta", fantom="TAK (2/2)"):
+        L = [start if start is not None else lokalna334e_line_start(think=think, fantom=fantom)]
+        for t in range(1, 7):
+            L.append(L334E_P + f"test - T{t} probny x - wynik {tests if t == 3 else 'TAK'}.")
+        for i in range(days):
+            d = 109500 + i
+            L.append(L334E_P + f"migawka | dzien {d} | jednostek 300 | zalog {zal} | zwiad na zywo 40 | celow w pamieci 120 | 4.0 ms | doba migawki {d}.")
+            for k in ("vlandia", "sturgia", "battania"):
+                L.append(lokalna334e_line_king(d, k, oR=0 if deadopt else 5, oB=0 if deadopt else 3, stance=stance, raids=(ironr if k == "sturgia" else 1),
+                                               ro=(0 if not open_ else (ironr if k == "sturgia" else 1)), sieges=1 if i % 5 == 0 else 0, so=(1 if (i % 5 == 0 and open_) else 0),
+                                               ban=(ban if i % 5 == 0 else 0), armies=(crownarm if k == "vlandia" else 1)))
+            L.append(lokalna334e_line_cost(d, avg=avg, stum=stum, ret=1 if i == 10 else 0, pp=pp))
+            if i == 10:
+                L.append(L334E_P + f"odstapienie | dzien {d} | castle_x (X) | Lord (vlandia) | oboz 3000 vs odsiecz 4000+zaloga 600 (q_obl {retq:.2f}, przyjazd 1.20) | dokad castle_y (Y, 0.50 doby) "
+                         f"| ucieczka zdazy TAK | blokada do doby {d + 1}.00.")
+        return L
+    runs = {"good": run(), "fantom": run(fantom="BRAK (kotwic 1/2)"), "test": run(tests="NIE"), "zal": run(zal=3), "slow": run(avg="7.50"), "stum": run(stum=1),
+            "stance": run(stance="inna"), "deadopt": run(deadopt=True), "closed": run(open_=False), "ban": run(ban=1), "iron": run(ironr=0), "crown": run(crownarm=0),
+            "retq": run(retq=1.10), "pp": run(pp=1), "think": run(think="BRAK (CampaignEventDispatcher.AiHourlyTick)"), "thinkn": run(think="nie zakladana"),
+            "short": run(days=10), "broken": run(start=L334E_P + "start | klucze: sila TAK"), "old": ["Balans wojny (334): dzien 1 | ..."]}
+    exp = {
+        "good": {"L0": "TAK", "L0b": "TAK", "LT": "TAK", "L10": "TAK", "L12": "TAK", "L15": "TAK", "L4": "TAK", "L3": "TAK", "L13": "TAK", "L7": "TAK", "L1z": "TAK", "L2k": "TAK", "L14": "TAK"},
+        "fantom": {"L0": "NIE"}, "test": {"LT": "NIE"}, "zal": {"L10": "NIE"}, "slow": {"L12": "NIE"}, "stum": {"L12": "NIE"}, "stance": {"L4": "NIE"},
+        "deadopt": {"L3": "NIE"}, "closed": {"L13": "NIE"}, "ban": {"L7": "NIE"}, "iron": {"L1z": "NIE"}, "crown": {"L2k": "NIE"}, "retq": {"L14": "NIE"}, "pp": {"L15": "NIE"},
+        "think": {"L0b": "NIE"}, "thinkn": {"L0b": "INFO"}, "short": {"L1z": "INFO", "L2k": "INFO", "L14": "INFO"}, "broken": {"L0": "NIE"},
+        "old": {"L0": "INFO", "LT": "INFO", "L10": "INFO", "L12": "INFO", "L4": "INFO", "L14": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="l334e_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {x}" for i, x in enumerate(Ls)) + "\n")
+            rep = Report()
+            lokalna334e_rows(rep, lokalna334e_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def lokalna334e_main(logp):
+    rep = Report()
+    try:
+        s2 = lokalna334e_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("L334E-S: test syntetyczny (dobry 62 doby; fantom, test NIE, zalogi, koszt, potkniecie, postawa, okno bez opcji, starty poza oknem, q>1.0, Zelazni, korona, "
+            "odstapienie q<=1.25, ping-pong, ThinkPost BRAK / nie zakladana, krotki bieg, zly format, log sprzed 334e)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("L334E-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = lokalna334e_collect(logp)
+    print(f"plik: {logp} | startow {len(D['start'])}, migawek {len(D['snap'])}, linii krolestw {len(D['king'])}, koszt {len(D['cost'])}, odstapien {len(D['ret'])}")
+    lokalna334e_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_lokalna334e_main_prev = main
+
+
+def main(argv):
+    # paczka 334e: grupa lokalna334e - opakowanie main jak ai333
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "lokalna334e":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return lokalna334e_main(rest[0] if rest else None)
+    return _lokalna334e_main_prev(argv)
 
 
 if __name__ == "__main__":

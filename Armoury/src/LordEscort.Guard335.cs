@@ -94,6 +94,13 @@ namespace Armoury
             Stumble(where, e);
         }
 
+        /// <summary>334e (obrona pustych ziem): partia jest teraz chroniona albo obronca w migawce 335 - nie dostaje przydzialu obrony wsi.</summary>
+        internal static bool Guard335Busy(MobileParty mp)
+        {
+            var d = _g335;
+            return mp != null && _g335On && d != null && d.ContainsKey(mp);
+        }
+
         internal static void Guard335Reset()
         {
             _g335 = new Dictionary<MobileParty, G335>();

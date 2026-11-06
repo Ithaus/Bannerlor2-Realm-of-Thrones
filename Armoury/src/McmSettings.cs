@@ -10736,6 +10736,46 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool ScaCoalitionOwn334c { get; set; } = true;
 
+        [SettingPropertyBool("Local Strength Decides Attacks", HintText = "Lords choose raids and sieges by the enemy hosts in the field that can reach the place before they finish (the game's own siege time and march speed; a distant host must first hear of it and turn back), not by the whole strength of the enemy realm with all its garrisons. A lord whose own castle is about to be besieged stays cautious. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool LocalPower334e { get; set; } = true;
+
+        [SettingPropertyBool("No Phantom Realm Strength", HintText = "The game adds a share of the whole enemy realm's strength (all its garrisons and far-away hosts) to every single target it rates; with this on that phantom share is left out for realms ruled by the AI, so only the defenders at the place and the hosts that can reach it count. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool LocalPhantomOff334e { get; set; } = true;
+
+        [SettingPropertyBool("Neutral War Stance For AI Realms", HintText = "Banner Kings sets a whole realm defensive when its strongest foe is 1.5 times stronger, which forbids every raid and siege of all its lords wherever the foe stands. With this on AI realms keep the plain stance (a realm with a single castle keeps the Banner Kings stance) and caution comes from the strength near each target. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool LocalStance334e { get; set; } = true;
+
+        [SettingPropertyBool("Strategic AI Exhaustion From Field Hosts", HintText = "With the Strategic Campaign AI mod: a realm calls itself exhausted by the field hosts of both sides within reach of its castles instead of the sums of whole realms. Off (default) = as before: war and peace may still weigh whole realms, and the targets near which the foe is weak already drop the exhaustion penalty", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool ScaLocal334e { get; set; } = false;
+
+        [SettingPropertyBool("Local Strength Replaces Behind-The-Front Ban", HintText = "In the War of the Five Kings the stronger side no longer keeps its lords from every castle behind the front: the enemy hosts that can reach a castle decide instead. The seats of the great houses stay off limits until the Red Wedding, and the crown and its allies still do not march beyond the Neck before it. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool LocalRestraint334e { get; set; } = true;
+
+        [SettingPropertyBool("AI Armies Raid Undefended Lands", HintText = "The game never gives a gathered army the choice to raid. With this on an AI army with no siege to make, enough cohesion and food raids the best enemy village nearby that no enemy host can reach before the raid is done. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool ArmyRaid334e { get; set; } = true;
+
+        [SettingPropertyBool("Besiegers Weigh The Relief", HintText = "An AI besieger watches the enemy hosts coming to relieve the place: if they will win and arrive before the walls fall, the besiegers march off to a castle of their own they can reach first; if they are weaker or come too late, the siege goes on to the end. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool LocalSiegeJudge334e { get; set; } = true;
+
+        [SettingPropertyBool("Banner Kings Siege Hold Lets Go", HintText = "With Banner Kings: the rule that keeps an army at its siege lets go of an army that is marching off before a stronger relief. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool BkSiegeStickYields334e { get; set; } = true;
+
+        [SettingPropertyBool("Raiders Flee A Stronger Foe", HintText = "An AI raider breaks off the raid when an enemy host stronger by a quarter will reach the village before the raid is done. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool LocalRaidBreakOff334e { get; set; } = true;
+
+        [SettingPropertyBool("Only Those In Time Ride To Defend", HintText = "When a village is raided, only the nearest lords of its side who can reach it in time and together outmatch the raiders ride to its aid; the others keep to their own business, and nobody turns back for a village he cannot save. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool LocalDefence334e { get; set; } = true;
+
         [SettingPropertyBool("Canon Houses of the West", HintText = "As in the books, the lordly houses of the Westerlands and the Crownlands that Realm of Thrones leaves without a castle (Estren, Falwell, Jast, Moreland, Plumm, Prester, Stackspear, Buckwell, Chelsted, Hayford, Stokeworth; House Spicer stays a knightly house until the Red Wedding, as in the books) answer their liege's call with a host of their own: the Banner Kings gentry family that keeps an estate in their lands is raised to full peerage (exactly as a realm vote would grant it) and to clan tier 3, and its head leads a party raised the usual way from the villages. Once per campaign, at the first day after loading or at the start of a new game. No castles are taken from anyone. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonHouses277 { get; set; } = true;
@@ -14151,6 +14191,16 @@ namespace Armoury
             s.PartyPositionGuard334c = PartyPositionGuard334c;
             s.CanonWarStance334c = CanonWarStance334c;
             s.ScaCoalitionOwn334c = ScaCoalitionOwn334c;
+            s.LocalPower334e = LocalPower334e;
+            s.LocalPhantomOff334e = LocalPhantomOff334e;
+            s.LocalStance334e = LocalStance334e;
+            s.ScaLocal334e = ScaLocal334e;
+            s.LocalRestraint334e = LocalRestraint334e;
+            s.ArmyRaid334e = ArmyRaid334e;
+            s.LocalSiegeJudge334e = LocalSiegeJudge334e;
+            s.BkSiegeStickYields334e = BkSiegeStickYields334e;
+            s.LocalRaidBreakOff334e = LocalRaidBreakOff334e;
+            s.LocalDefence334e = LocalDefence334e;
             s.CanonHouses277 = CanonHouses277;
             s.CanonHouses277Rename = CanonHouses277Rename;
             s.CanonHouses277LiegePay = CanonHouses277LiegePay;

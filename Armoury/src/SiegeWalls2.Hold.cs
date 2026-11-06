@@ -72,6 +72,7 @@ namespace Armoury
         private static bool HoldFresh(MobileParty party, SiegeEvent ev, Settlement st, PartyThinkParams pt, int bi, AIBehaviorData bd, float b0, int si)
         {
             if (bi < 0) return false;
+            if (LocalFront334e.FreshYields(party)) return false;   // 334e: odwrot przed odsiecza, ktora zdazy - nie trzymac
             if (ReferenceEquals(bd.Party, st) && (bd.AiBehavior == AiBehavior.BesiegeSettlement || bd.AiBehavior == AiBehavior.AssaultSettlement)) return false;   // gra i tak zostaje
             if (bd.AiBehavior == AiBehavior.DefendSettlement)
             {

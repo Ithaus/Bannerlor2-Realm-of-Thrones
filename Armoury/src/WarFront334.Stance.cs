@@ -47,7 +47,17 @@ namespace Armoury
             return r;
         }
 
+        /// <summary>334e (linia startu): stan latki postawy BK.</summary>
+        internal static string StanceHookState { get { return _wStance; } }
+
         private static string StanceName(int o) { return o == 1 ? "D" : o == 2 ? "A" : "N"; }
+
+        /// <summary>334e (linia krolestwa): co chcial BK dla krolestwa (D / A / N) w ostatnim przebiegu; "-" - brak zapisu.</summary>
+        internal static string StanceBkOf(string kid)
+        {
+            StanceRec r;
+            return kid != null && _stance.TryGetValue(kid, out r) ? StanceName(r.Bk) : "-";
+        }
 
         private static void EnsureStanceHook()
         {
@@ -80,7 +90,8 @@ namespace Armoury
         internal static void StanceApply(string why)
         {
             var c = Campaign.Current;
-            if (c == null || !c.GameStarted || !StanceOn) return;
+            bool local = LocalFront334e.StanceOn;   // 334e (LocalStance334e): Neutral dla wszystkich krolestw AI - ostroznosc i smialosc z sily przy celu (q), nie z calego krolestwa
+            if (c == null || !c.GameStarted || (!StanceOn && !local)) return;
             _dStanceRuns++;
             IFaction player = null;
             try { player = Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null; } catch { }
@@ -92,6 +103,25 @@ namespace Armoury
                 try
                 {
                     if (k == player) continue;
+                    if (local)
+                    {
+                        var lr = new StanceRec { Fiefs = k.Fiefs != null ? k.Fiefs.Count : 0, Rule = "334e lokalnie", Ours = 0 };
+                        double lo = Cts(k), lm = 0;
+                        foreach (var ek in FactionHelper.GetEnemyKingdoms(k)) { if (ek == null) continue; double v = Cts(ek); if (v > lm) lm = v; }
+                        lr.Bk = StanceRule(lr.Fiefs, lo, lm); lr.Own = lo; lr.Enemy = lm;
+                        // po recenzji 334e (W6): krolestwo z jedna twierdza - zostaje postawa BK (obrona ostatniej siedziby), nie Neutral
+                        if (lr.Fiefs <= 1) { lr.Rule = "334e: twierdz <= 1 - BK"; lr.Ours = lr.Bk; _stance[k.StringId] = lr; continue; }
+                        if (k.WarPartyComponents != null)
+                            foreach (var wp in k.WarPartyComponents)
+                            {
+                                var mp = wp != null ? wp.MobileParty : null;
+                                if (mp == null) continue;
+                                lr.Parties++;
+                                if (mp.Objective != MobileParty.PartyObjective.Neutral) { mp.SetPartyObjective(MobileParty.PartyObjective.Neutral); _dStanceSet++; }
+                            }
+                        _stance[k.StringId] = lr;
+                        continue;
+                    }
                     int side = CanonWarBalance.SideOf(k);
                     bool iron = k.StringId == IronId && north != null && k.IsAtWarWith(north);
                     if (side == 0 && !iron) { _stance.Remove(k.StringId); continue; }
@@ -140,7 +170,8 @@ namespace Armoury
         private static void StanceLine(int today)
         {
             var sb = new StringBuilder(800);
-            sb.Append(Tag).Append("postawa (334c) | dzien ").Append(today).Append(" | klucz ").Append(Key01(StanceOn)).Append(", latka ").Append(_wStance)
+            sb.Append(Tag).Append("postawa (334c) | dzien ").Append(today).Append(" | klucz ").Append(Key01(StanceOn || LocalFront334e.StanceOn)).Append(", latka ").Append(_wStance)
+              .Append(LocalFront334e.StanceOn ? ", 334c: zastapione 334e (Neutral dla wszystkich krolestw AI)" : "")
               .Append(", przebiegow ").Append(_dStanceRuns).Append(", partii przestawionych ").Append(_dStanceSet);
             // po recenzji 334c: strony 274 jeszcze nie zbudowane (klucz 274 NIE albo przed pierwsza doba) - korona i Polnoc maja sam wynik BK
             try { var nk = FindKingdom(NorthId); if (nk != null && CanonWarBalance.SideOf(nk) == 0) sb.Append(", strony 274: brak (korona i Polnoc - postawa BK)"); } catch { }

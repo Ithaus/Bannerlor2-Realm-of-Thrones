@@ -58,7 +58,7 @@ namespace Armoury
         private static int _stumbles, _dStumbles;
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
         // SCA (B2): ostatnia ocena na krolestwo - surowy wrog SCA i F334 (linia 3)
-        private sealed class ScaRec { public float Raw, Front; public bool Used; public float OwnRaw = -1f, OwnCoal = -1f; }
+        private sealed class ScaRec { public float Raw, Front; public bool Used; public float OwnRaw = -1f, OwnCoal = -1f; public bool OwnField; }
         private static readonly Dictionary<string, ScaRec> _sca = new Dictionary<string, ScaRec>(StringComparer.Ordinal);
         private static int _dScaFront, _dScaRaw;   // oceny SCA z F334 / surowe (bez F334 - pierwsze godziny sesji)
 
@@ -68,6 +68,7 @@ namespace Armoury
             _sca.Clear(); _dScaFront = _dScaRaw = 0;
             ResetTheatre(); ResetIron(); ResetSaved(); ResetStance();
             WarFront334Test.Reset();
+            LocalFront334e.Reset(); LocalFront334eTest.Reset();   // 334e: sila lokalna
         }
 
         internal static void Stumble(string where, Exception e)
@@ -395,9 +396,10 @@ namespace Armoury
             ScaRec r;
             if (!_sca.TryGetValue(k.StringId ?? "", out r)) { r = new ScaRec(); _sca[k.StringId ?? ""] = r; }
             r.Raw = raw; r.Used = false;
-            if (!ScaFrontOn) { r.Front = -1f; return -1f; }
+            bool local = LocalFront334e.ScaLocalOn;   // 334e (ScaLocal334e): wrog w polu dla WSZYSTKICH krolestw AI
+            if (!ScaFrontOn && !local) { r.Front = -1f; return -1f; }
             // po recenzji 334 (W3): B2 tylko dla krolestw wojny kanonu (strony 274) i Wysp - Dorne, Dolina, Essos bez zmian (wyczerpanie SCA jak dotad)
-            if (CanonWarBalance.SideOf(k) == 0 && k.StringId != IronId) { r.Front = -1f; return -1f; }
+            if (!local && CanonWarBalance.SideOf(k) == 0 && k.StringId != IronId) { r.Front = -1f; return -1f; }
             double t = Threat(k);
             if (t < 0) { _dScaRaw++; r.Front = -1f; return -1f; }
             r.Front = (float)t; r.Used = true; _dScaFront++;
@@ -412,7 +414,13 @@ namespace Armoury
             if (k == null) return -1f;
             ScaRec r;
             if (!_sca.TryGetValue(k.StringId ?? "", out r)) { r = new ScaRec(); _sca[k.StringId ?? ""] = r; }
-            r.OwnRaw = raw; r.OwnCoal = -1f;
+            r.OwnRaw = raw; r.OwnCoal = -1f; r.OwnField = false;
+            // 334e (ScaLocal334e): swoi = sila w polu krolestwa i koalicji w zasiegu 8.02 doby od jego twierdz (lustro F334) - suma koalicji 334c nie dziala
+            if (LocalFront334e.ScaLocalOn)
+            {
+                double of = LocalFront334e.OwnField(k);
+                if (of >= 0) { r.OwnCoal = (float)of; r.OwnField = true; return (float)of; }
+            }
             if (!ScaAllyOn) return -1f;
             int side = CanonWarBalance.SideOf(k);
             if (side == 0) return -1f;
@@ -425,6 +433,15 @@ namespace Armoury
             if (!(sum > 0)) return -1f;
             r.OwnCoal = (float)sum;
             return (float)sum;
+        }
+
+        /// <summary>334e (linia krolestwa): ostatnie wartosci SCA - wrog surowy / z pola, swoi surowi / z pola (locUsed - swoi z pola 334e).</summary>
+        internal static void ScaVals(Kingdom k, out float raw, out float front, out float ownRaw, out float ownField, out bool locUsed)
+        {
+            raw = front = ownRaw = ownField = -1f; locUsed = false;
+            ScaRec r;
+            if (k == null || !_sca.TryGetValue(k.StringId ?? "", out r)) return;
+            raw = r.Raw; front = r.Used ? r.Front : -1f; ownRaw = r.OwnRaw; ownField = r.OwnCoal; locUsed = r.OwnField;
         }
 
         /// <summary>B3: pokoj z frakcja f zablokowany na stale w tej chwili - 264/330 (CanonPeaceLock.Blocks) albo wojna wymuszona przez ROT (Wyspy-Polnoc, zatargi).</summary>
@@ -472,6 +489,7 @@ namespace Armoury
             try { ScaNoBandits320.Wire(); } catch (Exception e) { Stumble("ScaWire", e); }   // 334c (B334-1): latki SCA przed linia startu (kolejnosc sluchaczy)
             try { EnsureHooks(); } catch (Exception e) { Stumble("EnsureHooks", e); }
             try { EnsureStanceHook(); } catch (Exception e) { Stumble("EnsureStanceHook", e); }
+            try { LocalFront334e.SessionStart(); } catch (Exception e) { Stumble("334e.SessionStart", e); }   // 334e: latki i linia startu sily lokalnej
             // po recenzji 334c: bez StanceApply przy starcie sesji (GameStarted bywa false - nic by nie zrobil); postawe ustawia postfiks BK TickKingdoms (co dobe i po wczytaniu)
             try { StartLine(); } catch (Exception e) { Stumble("StartLine", e); }
         }
@@ -533,6 +551,7 @@ namespace Armoury
                     try { StanceLine(today); } catch (Exception e) { Stumble("StanceLine", e); }
                 }
                 try { IronDaily(today, s.LogEnabled); } catch (Exception e) { Stumble("IronDaily", e); }
+                try { LocalFront334e.Daily(today); } catch (Exception e) { Stumble("334e.Daily", e); }   // 334e: linie sily lokalnej i zerowanie doby
                 if (s.LogEnabled)
                 {
                     try { ControlLine(today); } catch (Exception e) { Stumble("ControlLine", e); }
@@ -631,7 +650,8 @@ namespace Armoury
                 _sca.TryGetValue(id, out r);
                 sb.Append(" | [").Append(id).Append("] ").Append(Nm(k)).Append(": wrog ").Append(r != null ? F0(r.Raw) : "?").Append("->").Append(r != null && r.Used ? F0(r.Front) : "-")
                   .Append(", swoi krolestwa ").Append(r != null && r.OwnRaw >= 0f ? F0(r.OwnRaw) : "?").Append("->koalicja ").Append(r != null && r.OwnCoal >= 0f ? F0(r.OwnCoal) : "-")
-                  .Append(", ").Append(ScaNoBandits320.Brief(k));
+                  .Append(r != null && r.OwnField ? " (pole 334e)" : "")
+              .Append(", ").Append(ScaNoBandits320.Brief(k));
             }
             Log.Info(sb.Append('.').ToString());
         }
@@ -851,9 +871,12 @@ namespace Armoury
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, _ => WarFront334.SessionStart());
             CampaignEvents.VillageLooted.AddNonSerializedListener(this, WarFront334.OnVillageLooted);
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, WarFront334.OnSiegeStarted);
+            CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, LocalFront334e.OnSiegeStarted);   // 334e: q przy starcie oblezenia
+            CampaignEvents.MapEventStarted.AddNonSerializedListener(this, LocalFront334e.OnMapEventStarted);         // 334e: q przy starcie rabunku
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, WarFront334.OnSettlementEntered);
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarFront334.OnOwnerChanged);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, WarFront334Test.Hourly);
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, LocalFront334e.Hourly);   // 334e: migawka po wczytaniu (watek glowny), postawa nowych druzyn
             CampaignEvents.TickEvent.AddNonSerializedListener(this, NavGuard334.Tick);          // 334c: naprawa partii z kolejki straznika pogody (watek glowny; pusta kolejka - jedno porownanie)
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, NavGuard334.Daily);    // 334c: linia "Pozycje partii (334c)" (kazda kampania)
         }

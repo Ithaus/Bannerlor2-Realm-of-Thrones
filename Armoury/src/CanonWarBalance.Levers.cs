@@ -102,7 +102,8 @@ namespace Armoury
                 {
                     // 326c-A: zbiorka ma pomagac slabszej stronie - log 04/05.11: 31 zbiorek, wszystkie dla Polnocy (silniejsza, powsciagana, B/A 0.56), w tym oblezenie
                     // Deep Den 109326. Strona powsciagana albo silniejsza poza pasmem 1.5 - bez zbiorki (zwykle armie i cele gry bez zmian)
-                    if (MusterWeakOnly && MusterBlocked(side, _restrain, _strongOut))
+                    // 334e (LocalPower334e): blokada zbiorki wylaczona - ocena oblezenia z WillGatherArmy ma juz q z sila przyszlej armii
+                    if (MusterWeakOnly && !LocalFront334e.PowerOn && MusterBlocked(side, _restrain, _strongOut))
                     {
                         _dMusterBlocked++;
                         var mk = party.MapFaction as Kingdom;

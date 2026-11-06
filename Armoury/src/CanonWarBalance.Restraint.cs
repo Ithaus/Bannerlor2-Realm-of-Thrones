@@ -30,7 +30,7 @@ namespace Armoury
                 if (scores == null || scores.Count == 0) return;
                 if (CanonWarClock.OverNow()) return;
                 var k = party.MapFaction as Kingdom;
-                bool restrained = _restrain == side && RestraintOn;
+                bool restrained = _restrain == side && RestraintOn && !LocalFront334e.RestraintOff;   // 334e: "za frontem" zastapione q (sila przy celu); weto siedzib zostaje
                 Settlement own = party.BesiegedSettlement ?? (party.Army != null && party.Army.LeaderParty != null ? party.Army.LeaderParty.BesiegedSettlement : null);
                 for (int i = 0; i < scores.Count; i++)
                 {
@@ -77,7 +77,7 @@ namespace Armoury
             int side = SideOf(k);
             if (side == 0) return 0;
             int ts = SideOf(st.MapFaction);
-            int kind = VetoKind(ts != 0 && ts != side, RunningOwn(st, side), SeatHeld(st), _restrain == side && RestraintOn, IsFrontTarget(k, st), SeatHomeOf(st) == side);
+            int kind = VetoKind(ts != 0 && ts != side, RunningOwn(st, side), SeatHeld(st), _restrain == side && RestraintOn && !LocalFront334e.RestraintOff, IsFrontTarget(k, st), SeatHomeOf(st) == side);
             return kind == 1 && IronSeatFree(k) ? 0 : kind;
         }
 

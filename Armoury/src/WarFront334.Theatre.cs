@@ -32,6 +32,7 @@ namespace Armoury
         private static readonly string[] IronOutsideBeforeRw = { "reach", "stormlands", "dragonstone", "vale", "aserai" };
         private static readonly string[] IronOutsideAfterRw = { "stormlands", "dragonstone", "vale", "aserai" };
 
+        private static int _dVetoCrown;
         private static int _dVetoThink, _dVetoIron, _dVetoBk, _dBkNext, _dBkNone, _dBkNull, _dBkIron, _dOutSiegeAi, _dOutTaken, _sOutTaken;
         private static readonly HashSet<string> _dSaid = new HashSet<string>(StringComparer.Ordinal);
         private static readonly List<string> _dBkNotes = new List<string>();
@@ -42,6 +43,7 @@ namespace Armoury
 
         private static void ZeroTheatreDay()
         {
+            _dVetoCrown = 0;
             _dVetoThink = _dVetoIron = _dVetoBk = _dBkNext = _dBkNone = _dBkNull = _dBkIron = _dOutSiegeAi = _dOutTaken = 0;
             _dSaid.Clear(); _dBkNotes.Clear(); _dTakenNotes.Clear();
         }
@@ -78,11 +80,30 @@ namespace Armoury
             return b != null && b.StringId != null && _northHeld.Contains(b.StringId);
         }
 
-        /// <summary>Weto teatru dla frakcji f na osade st teraz: 0 brak, 1 teatr Polnocy, 2 teatr Wysp.</summary>
+        /// <summary>334e (recenzja W5): ziemie Polnocy - korona i jej strona nie szly za Przesmyk do Krwawych Godow (na Polnoc szli tylko Zelazni, potem Boltonowie).
+        /// Hamulcem bylo weto 274 "za frontem"; sila lokalna je zdejmuje, wiec przy kluczu LocalRestraint334e zostaje teatr korony.</summary>
+        private static readonly string[] CrownOutsideBeforeRw = { "battania", "skagosi", "freefolk", "wildlings", "nightswatch" };
+        private static int _crownSideDay = -1, _crownSide;
+
+        private static int CrownSide()
+        {
+            int d = Today;
+            if (_crownSideDay != d) { var c = FindKingdom(CrownId); _crownSide = c != null ? CanonWarBalance.SideOf(c) : 0; _crownSideDay = d; }
+            return _crownSide;
+        }
+
+        /// <summary>Weto teatru dla frakcji f na osade st teraz: 0 brak, 1 teatr Polnocy, 2 teatr Wysp, 3 teatr korony (334e).</summary>
         internal static int TheatreVeto(IFaction f, Settlement st)
         {
             if (f == null || st == null) return 0;
             string id = f.StringId;
+            if (id != NorthId && id != IronId)
+            {
+                if (!LocalFront334e.RestraintOff || CanonWarClock.OverNow()) return 0;
+                int cs = CrownSide();
+                if ((id == CrownId || (cs != 0 && CanonWarBalance.SideOf(f) == cs)) && Array.IndexOf(CrownOutsideBeforeRw, CultureOf(st)) >= 0 && !SameSideHolds(st, f)) return 3;
+                return 0;
+            }
             if (id == NorthId)
             {
                 if (!TheatreKey || CanonWarClock.OverNow()) return 0;
@@ -94,6 +115,16 @@ namespace Armoury
                 return TheatreVetoKind(IronId, CultureOf(st), false, CanonWarClock.OverNow()) ? 2 : 0;
             }
             return 0;
+        }
+
+        /// <summary>Osada w rekach strony f (obrona / odbicie wlasnej - bez weta teatru korony).</summary>
+        private static bool SameSideHolds(Settlement st, IFaction f)
+        {
+            var o = st.MapFaction;
+            if (o == null) return false;
+            if (o == f) return true;
+            int s = CanonWarBalance.SideOf(f);
+            return s != 0 && CanonWarBalance.SideOf(o) == s;
         }
 
         private static bool BesiegedBy(Settlement st, IFaction f)
@@ -152,8 +183,15 @@ namespace Armoury
                 var f = party.MapFaction;
                 if (f == null) return;
                 string id = f.StringId;
-                if (id != NorthId && id != IronId) return;
                 if (!Canon) return;
+                if (id != NorthId && id != IronId)
+                {
+                    // 334e: teatr korony (tylko przy zdjetym "za frontem" 274)
+                    if (!LocalFront334e.RestraintOff) return;
+                    var sc = partyThinkParams.AIBehaviorScores;
+                    if (sc != null && sc.Count > 0) TheatreThink(party, partyThinkParams, f);
+                    return;
+                }
                 var scores = partyThinkParams.AIBehaviorScores;
                 if (scores == null) return;
                 if (scores.Count > 0) TheatreThink(party, partyThinkParams, f);
@@ -186,11 +224,11 @@ namespace Armoury
                 if (siege && BesiegedBy(st, f)) continue;   // trwajace oblezenie swojej strony - dolaczenie bez weta
                 var d = e.Item1;
                 p.SetBehaviorScore(in d, -1f);
-                if (kind == 1) _dVetoThink++; else _dVetoIron++;
+                if (kind == 1) _dVetoThink++; else if (kind == 3) _dVetoCrown++; else _dVetoIron++;
                 if (Say("teatr|" + party.StringId + "|" + st.StringId))
                     Log.Info(Tag + "weto teatru | dzien " + Today + " | " + Nm(party) + " (" + Nm(f) + (party.Army != null ? ", wodz armii" + (ArmyHasPlayer(party.Army) ? " z graczem" : "") : "") + ") -> "
                              + (siege ? "oblezenie " : "najazd ") + Nm(st) + " (" + st.StringId + ", kultura " + (CultureOf(st) ?? "-") + ", " + Nm(st.MapFaction) + ", ocena gry " + F2(e.Item2) + ")"
-                             + (kind == 1 ? " - Polnoc do Krwawych Godow walczy na Polnocy, w Dorzeczu i na Zachodzie." : " - Wyspy: cel poza teatrem tej fazy."));
+                             + (kind == 1 ? " - Polnoc do Krwawych Godow walczy na Polnocy, w Dorzeczu i na Zachodzie." : kind == 3 ? " - korona do Krwawych Godow nie idzie za Przesmyk (334e)." : " - Wyspy: cel poza teatrem tej fazy."));
             }
         }
 
@@ -249,7 +287,7 @@ namespace Armoury
         private static void TheatreLine(int today)
         {
             Log.Info(Tag + "dzien " + today + " | teatr: klucz " + Key01(TheatreKey) + (CanonWarClock.OverNow() ? " (po Krwawych Godach - nieczynny)" : "") + ", weta mysli Polnocy " + _dVetoThink
-                     + ", Wysp " + _dVetoIron + ", weta BK " + _dVetoBk + ", oblezenia AI Polnocy poza teatrem " + _dOutSiegeAi
+                     + ", Wysp " + _dVetoIron + ", korony 334e " + _dVetoCrown + ", weta BK " + _dVetoBk + ", oblezenia AI Polnocy poza teatrem " + _dOutSiegeAi
                      + ", cele poza teatrem zdobyte przez AI Polnocy " + _dOutTaken + " (sesja " + _sOutTaken + ")" + (_dTakenNotes.Count > 0 ? " [" + string.Join(", ", _dTakenNotes.ToArray()) + "]" : "")
                      + ", osad na odbicie " + _northHeld.Count
                      + " | BK nastepny cel: klucz " + Key01(BkNextOn) + ", zamian " + _dBkNext + ", bez innego celu " + _dBkNone + ", BK null " + _dBkNull + ", cele Wysp (lad i morze) " + _dBkIron
@@ -257,16 +295,28 @@ namespace Armoury
         }
 
         // ================================================================ B8: BK
-        private static bool VetoedAny(Kingdom k, Settlement st, out string why)
+        private static bool VetoedAny(Kingdom k, Settlement st, out string why) { bool local; return VetoedAny(k, st, out why, null, out local); }
+
+        /// <summary>334e: weta celu (siedziba / za frontem 274, teatr Polnocy / Wysp / korony, zwrot 326b) - dla opcji dodawanych po wetach (SiegeWalls2.ThinkPost Last:
+        /// armie lupia, Zelazni, KONTYNUUJ bez wpisu oblezenia). Bez sily lokalnej BK.</summary>
+        internal static bool VetoedFor334e(Kingdom k, Settlement st, out string why) { bool local; return VetoedAny(k, st, out why, null, out local); }
+
+        /// <summary>334e (B8): z wodzem BK - cel z q > 1.0 (sila wroga, ktora zdazy, wobec wodza i kandydatow zbiorki z modelu armii) jak zawetowany (local = true).</summary>
+        private static bool VetoedAny(Kingdom k, Settlement st, out string why, MobileParty leader, out bool local)
         {
-            why = null;
+            why = null; local = false;
             int v = 0;
             try { v = CanonWarBalance.VetoFor(k, st); } catch { }
             if (v == 1) { why = "siedziba 274"; return true; }
             if (v == 2) { why = "za frontem 274"; return true; }
             int t = TheatreVeto(k, st);
-            if (t != 0) { why = t == 1 ? "teatr Polnocy" : "teatr Wysp"; return true; }
+            if (t != 0) { why = t == 1 ? "teatr Polnocy" : t == 3 ? "teatr korony" : "teatr Wysp"; return true; }
             try { if (NorthConquest.VetoedFor(k, st)) { why = "zwrot 326b"; return true; } } catch { }
+            if (leader != null)
+            {
+                double q;
+                if (LocalFront334e.BkBlocked(leader, k, st, out q)) { why = "sila lokalna 334e q " + q.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); local = true; return true; }
+            }
             return false;
         }
 
@@ -279,9 +329,10 @@ namespace Armoury
             {
                 var v = __result.Value;
                 if (v.Item2 != Army.ArmyTypes.Besieger || v.Item1 == null || !Canon) return;
-                string why;
-                if (!VetoedAny(__1, v.Item1, out why)) return;
+                string why; bool local;
+                if (!VetoedAny(__1, v.Item1, out why, __0, out local)) return;
                 if (TheatreVeto(__1, v.Item1) != 0) _dVetoBk++;
+                // po recenzji 334e (W9): sila lokalna nie daje null - bez nastepnego celu zostaje wybor BK, a cel wyzeruje ocena celu (ScorePost) w mysli armii
                 if (!BkNextOn) return;   // 167: 274 / 326b daja null jak dotad; teatr ponizej (BkLastPostfix)
                 var next = NextBkTarget(__0, __1);
                 if (next == null) { _dBkNone++; if (TheatreVeto(__1, v.Item1) != 0) __result = null; return; }
@@ -355,7 +406,8 @@ namespace Armoury
             foreach (var c in cand)
             {
                 string why;
-                if (VetoedAny(k, c.Key, out why)) continue;
+                bool loc;
+                if (VetoedAny(k, c.Key, out why, party, out loc)) continue;
                 float dist, lr;
                 try { dist = Campaign.Current.Models.MapDistanceModel.GetDistance(party, c.Key, false, nav, out lr); }
                 catch { continue; }

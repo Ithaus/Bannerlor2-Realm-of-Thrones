@@ -195,6 +195,19 @@ namespace Armoury
             catch (Exception e) { Stumble("StartLine", e); }
         }
 
+        /// <summary>334e: StrategicFactionStatus.IsExhausted frakcji (odczyt). null - brak SCA / statusu.</summary>
+        internal static bool? ExhaustedOf(IFaction f)
+        {
+            try
+            {
+                if (f == null || _mGetStatus == null || _pExh == null) return null;
+                object st = _mGetStatus.Invoke(null, new object[] { f });
+                if (st == null) return null;
+                return Get(_pExh, st) is bool b && b;
+            }
+            catch { return null; }
+        }
+
         /// <summary>334 linia startu: latka CalculateFactionStatus.</summary>
         internal static string WiredStatus { get { return _wired ? "ok" : "BRAK"; } }
         /// <summary>334 linia startu: latki celu (UpdateWarGoal + ticki).</summary>
@@ -306,7 +319,7 @@ namespace Armoury
         {
             if (kingdom == null || __result == null || _pEnemy == null) return;
             bool on = On, lockOn = LockOn;
-            if (!on && !lockOn && !WarFront334.ScaFrontOn) { _last.Remove(kingdom.StringId); return; }
+            if (!on && !lockOn && !WarFront334.ScaFrontOn && !LocalFront334e.ScaLocalOn) { _last.Remove(kingdom.StringId); return; }
             try
             {
                 var r = new Rec { Name = kingdom.Name != null ? kingdom.Name.ToString() : kingdom.StringId };
