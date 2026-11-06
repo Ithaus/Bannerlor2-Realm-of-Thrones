@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 06.11.2026 ok. 19:32 CEST: WGRANIE 169 (najnowszy) - 336 sila krolestw w polu (UI)
+- W GRZE: Armoury.dll 54201cc6363d7466e9614d00317f06d1 (galaz noc/336-sila-w-polu ac7a1a41 od 335 091ed773; worktree scratchpad n336). Kopia 168: Armoury.dll.bak-2026-11-06-przed-wgranie169 i D:/Backup-Bannerlord/wgrane/2026-11-06-wgranie169.
+- Jeff: "sile krolestw pokazuj bez garnizonow, liczy sie armia w polu". 16 metod VM (ekran Krolestwa, wojny, encyklopedia, Diplomacy DetailWarVM) - tylko UI, AI bez zmian. KingdomStrengthFieldOnly336. Test at336: Polnoc w polu 25.2k vs stara 46.5k. Okna nie ogladane w tescie - Jeff zobaczy w grze. Nie zrobione: Diplomacy RebelFaction, BK RadicalGroupVM.
+- W TOKU: 334f (n334e, sila lokalna - poprawki odwrotu/wydajnosci/Zelazni; wf_febfdafd), 338 (n338, audyt budynkow; wf_0fd470d3). 337 (zold zalog) ODLOZONE: zalogi juz ok. 0.5 pola < historyczne 0.8. Przy scalaniu: gen_mcm.py nadpisuje 326d/326x w McmSettings.cs - sprawdzac.
+
 ## STAN 06.11.2026 ok. 16:10 CEST: WGRANIE 168 (najnowszy) - 335 ochrona wodza (Tywin)
 - W GRZE: Armoury.dll 6ffcced0ea53e5933dc5a8aed4ea0758 (galaz noc/335-ochrona-wodza 091ed773 od noc/333-ai-bitwy a7e623fb; worktree scratchpad sesji 0a2a8b2b n335; wypchnieta). Kopia 167: Armoury.dll.bak-2026-11-06-przed-wgranie168 i D:/Backup-Bannerlord/wgrane/2026-11-06-wgranie168.
 - Uwagi Jeffa: (mapa) partie przy Tywinie uciekaja zamiast bronic glowy rodu; (bitwa) Tywin bez jazdy jezdzi sam wokol wojsk. Mapa: LordEscort.Guard335.cs (pary chroniony-obroncy, obrona gdy razem >= napastnik, EngageParty w bitwie chronionego). Bitwa: HeroCaution.Guard335.cs (wodz za swoim szykiem, przy zagrozeniu wycofanie do szyku pieszego, straz 3 na napastnika). Grupa sprawdz_logi wodz335.
