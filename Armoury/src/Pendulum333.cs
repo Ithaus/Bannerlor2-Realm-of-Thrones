@@ -308,6 +308,7 @@ namespace Armoury
         }
 
         /// <summary>Rozkaz zamieniony na Move w punkt przyjety P (ta sama WorldPosition).</summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]   // 333t2: MovementOrder tylko w misji (Pre: Here(m))
         private static void Keep(Formation f, PF pf, ref MovementOrder input)
         {
             input = MovementOrder.MovementOrderMove(pf.PW);

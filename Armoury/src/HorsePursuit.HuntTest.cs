@@ -209,7 +209,7 @@ namespace Armoury
         /// <summary>Co 0.25 s (pass = co 1 s, po HForms tego passu).</summary>
         private static void HuntTestStep(Mission m, float now, bool pass)
         {
-            if (pass && _aState == 1 && m != null) ArmyHold(m, now);   // 333t: armia gracza stoi
+            if (pass && _aState == 1 && m != null && ReferenceEquals(Mission.Current, m) && m.CurrentState == Mission.State.Continuing) ArmyHold(m, now);   // 333t2: tylko w trwajacej misji   // 333t: armia gracza stoi
             if (!_tOn || _tState == 2 || m == null) return;
             if (_tDeploy < 0f) _tDeploy = now;
             if (_tState == 0)

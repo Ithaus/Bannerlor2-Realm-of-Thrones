@@ -1,4 +1,6 @@
 using System;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -57,6 +59,7 @@ namespace Armoury
             _aState = _aStops = _aForms = 0;
             _aStart = -1f; _aRel = -1f;
             _aWhy = "-"; _aPlan = "-";
+            _aOrdTried = false;   // 333t2: kolejna bitwa probuje znowu (pola trzymane po udanym odczycie)
         }
 
         /// <summary>OnFire: strzal nekajacego testu wedlug fazy przynety.</summary>
@@ -77,8 +80,35 @@ namespace Armoury
             _aState = 1;
         }
 
+        // 333t2 (runda 2: TypeInitializationException MovementOrder przy wczytaniu bitwy 1): pola statyczne MovementOrder (Charge / Stop) tworza sie przez
+        // new Timer(Mission.Current.CurrentTime) - odczyt wprost w kodzie pozwala JIT odpalic konstruktor statyczny przy kompilacji metody (typ beforefieldinit),
+        // a bez misji typ zostaje zepsuty do konca procesu. Teraz oba rozkazy raz przez refleksje, dopiero w trwajacej misji, potem z pamieci.
+        private static object _aCharge, _aStop;
+        private static bool _aOrdTried;
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool ArmyOrders(Mission m)
+        {
+            if (_aCharge != null && _aStop != null) return true;
+            if (_aOrdTried || m == null || !ReferenceEquals(Mission.Current, m) || m.CurrentState != Mission.State.Continuing) return false;
+            _aOrdTried = true;
+            try
+            {
+                var t = typeof(MovementOrder);
+                var fc = t.GetField("MovementOrderCharge", BindingFlags.Public | BindingFlags.Static);
+                var fs = t.GetField("MovementOrderStop", BindingFlags.Public | BindingFlags.Static);
+                if (fc == null || fs == null) { Log.Info("AI bitwy (333) TEST armia gracza: brak pol MovementOrder (Charge / Stop) - armia bez postoju"); return false; }
+                _aCharge = fc.GetValue(null);
+                _aStop = fs.GetValue(null);
+            }
+            catch (Exception e) { HStumble("HorsePursuit.ArmiaRozkazy", e); _aCharge = _aStop = null; }
+            return _aCharge != null && _aStop != null;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ArmyHold(Mission m, float now)
         {
+            if (!ArmyOrders(m)) { if (_aOrdTried) { _aState = 0; _aWhy = "brak rozkazow"; } return; }
             var pt = m.PlayerTeam;
             int ps = SideOf(pt);
             if (ps < 0) return;
@@ -110,8 +140,8 @@ namespace Armoury
                 forms++;
                 try
                 {
-                    if (why != null) f.SetMovementOrder(MovementOrder.MovementOrderCharge);
-                    else if (f.GetReadonlyMovementOrderReference().OrderEnum != MovementOrder.MovementOrderEnum.Stop) { f.SetMovementOrder(MovementOrder.MovementOrderStop); _aStops++; }
+                    if (why != null) f.SetMovementOrder((MovementOrder)_aCharge);
+                    else if (f.GetReadonlyMovementOrderReference().OrderEnum != MovementOrder.MovementOrderEnum.Stop) { f.SetMovementOrder((MovementOrder)_aStop); _aStops++; }
                 }
                 catch (Exception e) { HStumble("HorsePursuit.ArmiaTest", e); }
             }
