@@ -10704,7 +10704,7 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool WarTruceArmed334 { get; set; } = true;
 
-        [SettingPropertyBool("North Canon Theatre", HintText = "Until the Red Wedding the North wages its war only in the North, the Riverlands and the Westerlands, as in the books: its AI lords and armies (also an AI marshal whose army you ride in) start no sieges or raids in the Crownlands, the Reach, the Stormlands or on the Iron Islands, except to take back what was theirs. Your own army is free. Off = the North besieges anything in reach, as before", RequireRestart = false)]
+        [SettingPropertyBool("North Canon Theatre", HintText = "Until the Red Wedding the North wages its war only in the North, the Riverlands and the Westerlands, as in the books: its AI lords and armies (also an AI marshal whose army you ride in) start no sieges or raids outside the North, the Riverlands, the Westerlands and the lands by the Wall - not in the Crownlands, the Reach, the Stormlands, on Dragonstone, in the Vale, in Dorne, on the Iron Islands or in Essos - except to take back what was theirs. Your own army is free. Off = the North besieges anything in reach, as before", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool NorthCanonTheatre334 { get; set; } = true;
 
@@ -10712,7 +10712,7 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool BkVetoNextTarget334 { get; set; } = true;
 
-        [SettingPropertyBool("Ironborn Reave The North", HintText = "The Iron Islands wage their war on the North as in the books: a host short of food or with ships too battered for the crossing first sails to a friendly port to buy food and mend its ships with its own gold at the game's prices, then raids and besieges the western shore of the North; the Reach becomes a target only after the Red Wedding. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Ironborn Reave The North", HintText = "The Iron Islands wage their war on the North as in the books: a host short of food or with ships too battered for the crossing first sails to the nearest friendly port that can feed it, or mends its ships there when that makes the crossing safe, with its own gold at the game's prices; a lord whose men no longer fit on his ships may buy one more the usual way; their marshals raise armies against the North across the sea; then they raid and besiege the western shore of the North; the Reach becomes a target only after the Red Wedding. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool IronbornCanonReave334 { get; set; } = true;
 

@@ -95431,7 +95431,7 @@ def main(argv):
 
 # ------------------------------------------------------------ paczka 334: grupa balans334 - balans wojny korona-Polnoc z Zelaznymi (WarFront334*.cs, projekt docs/PROJEKT-334-BALANS-WOJNY.md)
 #  B334-1 linia startu, latki ok x4; B334-2 potkniecia 334 (max z linii kontroli) 0 i ERROR in WarFront334 0; B334-3 rF (front korona/Polnoc) mediana ostatnich 30 dob 0.8-1.2
-#  (koalicja INFO); B334-4 trend rF: mediana ostatniej tercji - pierwszej |d| <= 0.15; B334-5 twierdze crownlands/reach/stormlands zdobyte przez AI Polnocy przed Krwawymi
+#  (koalicja INFO; doby bez wojny Polnoc-korona - rozejm 330 - bez linii frontu); B334-4 trend rF: mediana ostatniej tercji - pierwszej |d| <= 0.15; B334-5 twierdze spoza teatru Polnocy zdobyte przez AI Polnocy przed Krwawymi
 #  Godami 0 (gracz INFO); B334-6 korona: doby z >= 1 armia >= 50%; B334-7 korona: oblezenie (274 'B ... oblezenia') w kazdym oknie 28 dob; B334-8 Tywin w polu >= 70% dob;
 #  B334-9 bitwy polowe (bitwy.log) - INFO; B334-10 SCA korony: doby z celem ForcePeace <= 10%; B334-11 Wyspy: doby z armia >= 30%; B334-12 Wyspy: oblezenia osad
 #  kultury battania >= 1 na 60 dob; B334-13 Wyspy: rabunki z lupem >= 3 na 60 dob; B334-14 Wyspy: doby z opcja rabunku > 0 po 3. dobie >= 50%; B334-15 Wyspy: partie
@@ -95456,7 +95456,7 @@ B334_CROWN = re.compile(r"Balans wojny \(334\): korona pomiar \| dzien (\d+) \|"
 B334_TYWIN = re.compile(r" \| Tywin: w polu (TAK|NIE)")
 B334_CTRL = re.compile(r"Balans wojny \(334\): kontrola \| dzien (\d+) \| zloto utworzone (\d+), ludzie utworzeni (\d+) .*\| potkniecia (\d+) \(sesja (\d+)\)\.")
 B334_TEST = re.compile(r"Balans wojny \(334\): test - (T\w+) .*- wynik (TAK|NIE|POMINIETY)\.")
-B334_ERR = re.compile(r"ERROR in WarFront334\.")
+B334_ERR = re.compile(r"ERROR in (?:WarFront334\.|ScaNoBandits320\.(?:PeaceLocked\.334|CalcPostfix\.Front334)|CanonWarBalance\.(?:Hire334|BuildMap\.homeGuard334))")   # po recenzji 334: tez potkniecia 334 logowane w 320 / 274
 B334_274DAY = re.compile(r"Rownowaga wojny \(274\): dzien (\d+) \|.*?walka dzis: A bitwy \d+ oblezenia \d+, B bitwy \d+ oblezenia (\d+)")
 B334_SEAT = re.compile(r"Rownowaga wojny \(274\): OBLEZENIE SIEDZIBY \| dzien (\d+) \| (Winterfell)")
 
@@ -95577,7 +95577,7 @@ def balans334_rows(rep, D):
     pre_days = set(x[0] for x in pre)
     ai_taken = [t for t in D["taken"] if t[2] == "AI" and (not pre_days or t[0] in pre_days or t[0] - 1 in pre_days)]
     pl_taken = [t for t in D["taken"] if t[2] == "GRACZ"]
-    rep.add("B334-5: twierdze crownlands/reach/stormlands zdobyte przez AI Polnocy (przed KG)", f"{len(ai_taken)}" + (f" [{', '.join(t[1] for t in ai_taken[:4])}]" if ai_taken else "")
+    rep.add("B334-5: twierdze spoza teatru zdobyte przez AI Polnocy (przed KG)", f"{len(ai_taken)}" + (f" [{', '.join(t[1] for t in ai_taken[:4])}]" if ai_taken else "")
             + f", gracz {len(pl_taken)} (INFO)", "0", not ai_taken)
     cr = sorted(D["crown"])
     if cr:
@@ -95679,8 +95679,8 @@ def balans334_synth():
         L = [P + f"dzien {d} | faza F0 | front Polnoc->korona 20000 (partii 50, ludzi 9000) / korona->Polnoc {int(20000 * rF)} (partii 40, ludzi 8000, w tym sojusznik 0) | rF {rF:.3f} (koalicja 0.880) | 274: x | 330 sila F334 x | miara: x.",
              P + f"dzien {d} | SCA (front TAK, glowna wojna TAK; ocen z F334 6, bez F334 0) | [vlandia] House Baratheon: wrog 68277->20000, swoi 15175, wyczerpane nie, cel ForcePeace->{fp} (pokoj zablokowany 334 - x), chce pokoju nie"
              f" | [sturgia] Iron Islands: wrog 46255->1000, swoi 11452, wyczerpane nie, cel BorderWar->BorderWar (-), chce pokoju nie.",
-             P + f"dzien {d} | teatr: klucz TAK, weta mysli Polnocy 3, Wysp 0, weta BK 1, oblezenia AI Polnocy poza teatrem 0, cele poza teatrem zdobyte przez AI Polnocy 0 (sesja 0), osad na odbicie 90"
-             f" | BK nastepny cel: klucz TAK, zamian 1, bez innego celu 0, BK null {bkn}.",
+             P + f"dzien {d} | teatr: klucz TAK, weta mysli Polnocy 3, Wysp 0, weta BK 1, oblezenia AI Polnocy poza teatrem 0, cele poza teatrem zdobyte przez AI Polnocy 0 (sesja 0), osad na odbicie 2"
+             f" | BK nastepny cel: klucz TAK, zamian 1, bez innego celu 0, BK null {bkn}, cele Wysp (lad i morze) 1.",
              P + f"korona pomiar | dzien {d} | rody: razem rodow 17 | armie:{armies_crown} | Tywin: w polu {ty} (armia wodz).",
              P + f"Zelazni | dzien {d} | klucz TAK, wojna z Polnoca TAK | partii 50: wyspa 20, lad Polnocy 10, morze 20, inne 0 | sita: jedzenie 2, armia 5, stan wsi 0, zasieg 3 | z opcja rabunku {raid} (opcji 9), z opcja oblezenia 2"
              f" | mnoznik statkow med/max {amp}/1.25, kadlub min 0.40, safe-sail<rejs 0, zaloga>pojemnosc 1, ponizej progu jedzenia {hungry}/50 | Z1 do portu 1 (jedzenie 1, kadlub 0, safe-sail 0), Z2 naprawy 0 (0 zl), statki z puli 0 (Z2b nie wdrozony)"
@@ -95715,6 +95715,8 @@ def balans334_synth():
         "truce": run() + [P + "rozejm uzbrojony | dzien 1020 | klucz TAK | rody korony z lennem w budzecie wojny 0 z 17 | partie korony dzis 29 vs przed rozejmem 61 (d.1019, 48%), ludzie 2400 vs 9700."],
         "testno": run() + [P + "test - T2 udzial zablokowanego zagrozenia (B3) 5/10 - wynik NIE."],
         "nostart": [x for d in range(1000, 1062) for x in day(d)],
+        "err334": run() + ["[ERROR] ERROR in ScaNoBandits320.PeaceLocked.334 (potkniecie 1): System.NullReferenceException"],
+        "trucefront": run() + [P + f"dzien {d} | faza F0 | Polnoc i korona bez wojny (rozejm 330 albo pokoj) - front nie liczony | 274: miara F334." for d in range(1062, 1092)],
     }
     allg = {"B334-1": "TAK", "B334-2": "TAK", "B334-3": "TAK", "B334-4": "TAK", "B334-5": "TAK", "B334-6": "TAK", "B334-7": "TAK", "B334-8": "TAK", "B334-10": "TAK",
             "B334-11": "TAK", "B334-12": "TAK", "B334-13": "TAK", "B334-14": "TAK", "B334-15": "TAK", "B334-16": "TAK", "B334-17": "TAK", "B334-18": "TAK", "B334-19": "TAK",
@@ -95735,6 +95737,8 @@ def balans334_synth():
         "truce": {"B334-17": "NIE"},
         "testno": {"B334-T": "NIE"},
         "nostart": {"B334-1": "NIE"},
+        "err334": {"B334-2": "NIE"},
+        "trucefront": {"B334-3": "TAK", "B334-4": "TAK"},
     }
     tmp = tempfile.mkdtemp(prefix="b334_")
     diff = []

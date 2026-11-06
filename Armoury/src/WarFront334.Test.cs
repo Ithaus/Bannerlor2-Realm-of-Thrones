@@ -65,8 +65,9 @@ namespace Armoury
                           && !WarFront334.TheatreVetoKind("battania", "crownlands", true, false) && !WarFront334.TheatreVetoKind("battania", "crownlands", false, true)
                           && WarFront334.TheatreVetoKind("sturgia", "reach", false, false) && !WarFront334.TheatreVetoKind("sturgia", "reach", false, true)
                           && !WarFront334.TheatreVetoKind("sturgia", "battania", false, false) && !WarFront334.TheatreVetoKind("vlandia", "battania", false, false)
-                          && !WarFront334.TheatreVetoKind("battania", "freefolk", false, false);
-                Say("T1 tabela teatru (Polnoc / Wyspy, odbicie, Krwawe Gody)", t1, "13 przypadkow");
+                          && !WarFront334.TheatreVetoKind("battania", "freefolk", false, false) && WarFront334.TheatreVetoKind("battania", "ghiscari", false, false)
+                          && WarFront334.TheatreVetoKind("battania", "vale", false, false) && !WarFront334.TheatreVetoKind("battania", null, false, false);
+                Say("T1 tabela teatru (Polnoc / Wyspy, odbicie, Krwawe Gody)", t1, "16 przypadkow");
                 // T2
                 bool t2 = WarFront334.LockedShare(5, 10) == true && WarFront334.LockedShare(4.9, 10) == false && WarFront334.LockedShare(0, 0) == null;
                 Say("T2 udzial zablokowanego zagrozenia (B3)", t2, "5/10, 4.9/10, 0/0");

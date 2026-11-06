@@ -16,6 +16,9 @@ namespace Armoury
     ///  185 (MercContractFactor x dzienny zold kompanii) x MercReviewDays (okres przegladu 185) - skarbiec nie schodzi ponizej zapasu wojny przez caly okres.
     ///  Najem droga gry ChangeKingdomAction.ApplyByJoinFactionAsMercenary; umowe i wyplaty z wplywow dnia robi 185 od nastepnej doby (zadatek BK dla kompanii AI
     ///  wylaczony przez 185 W3-A). Najwyzej 1 kompania na 7 dob (SpawnEveryDays 274). Zloto ani ludzie nie powstaja - ludzie juz sa w kompanii.
+    ///  Po recenzji 334 (W4, W6): nadwyzka musi pokryc okres przegladu dla WSZYSTKICH kompanii juz w sluzbie krolestwa (MercContractFactor x ich dzisiejszy zold) plus
+    ///  nowej - kompanie nie kumuluja sie ponad skarbiec; mnoznik nagrody z modelu gry (MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom), sluzba co najmniej
+    ///  do konca oplaconego okresu (ShouldStayInKingdomUntil = najem + MercReviewDays). Zwolnienie po powrocie do pasma - jak w grze (koniec sluzby, niedoplata 185).
     ///  Linia 6 "najem kompanii" (zdarzenie) i segment linii doby.
     /// </summary>
     internal static partial class WarFront334
@@ -56,6 +59,16 @@ namespace Armoury
                 double sur = KingdomTreasury.TreasurySurplusFor(k, out reserve);
                 double factor = Math.Max(0.0, s.MercContractFactor);
                 int review = Math.Max(1, s.MercReviewDays);
+                // kontrakty juz zawarte: kompanie w sluzbie krolestwa (185 placi MercContractFactor x zold ludzi pod bronia)
+                long held = 0; int heldN = 0;
+                foreach (var c in Clan.All)
+                {
+                    if (c == null || c.IsEliminated || c.Kingdom != k || !c.IsUnderMercenaryService || c == Clan.PlayerClan) continue;
+                    var hw = c.WarPartyComponents; long w0 = 0;
+                    if (hw != null) foreach (var wp in hw) { var mp = wp != null ? wp.MobileParty : null; if (mp != null && mp.IsActive) w0 += Math.Max(0, mp.TotalWage); }
+                    held += (long)Math.Ceiling(factor * w0); heldN++;
+                }
+                double room = sur - (double)held * review;
                 Clan best = null; long bestK = 0; int bestMen = 0;
                 // kompania w zasiegu krolestwa: druzyna w 5 x sredniej odleglosci dwoch najblizszych miast (prog zasiegu gry AiMilitaryBehavior) od jego twierdzy - nie z Essos
                 float rng = 5f * Campaign.Current.GetAverageDistanceBetweenClosestTwoTownsWithNavigationType(MobileParty.NavigationType.All);
@@ -73,18 +86,21 @@ namespace Armoury
                     CompanyOf(c, forts, r2, out wage, out men, out parties, out near);
                     if (parties == 0 || men <= 0 || wage <= 0 || !near) continue;
                     long K = (long)Math.Ceiling(factor * wage);
-                    if (K * review > sur) continue;
+                    if (K * review > room) continue;
                     if (men > bestMen) { best = c; bestK = K; bestMen = men; }
                 }
-                if (best == null) { _dHireWhy = "brak kompanii na nadwyzke " + F0(sur) + " (zapas wojny " + reserve + ")"; return; }
+                if (best == null) { _dHireWhy = "brak kompanii na nadwyzke " + F0(sur) + " minus kontrakty w sluzbie " + heldN + " x " + review + " dob = " + F0(room) + " (zapas wojny " + reserve + ")"; return; }
                 long t0 = k.KingdomBudgetWallet;
-                ChangeKingdomAction.ApplyByJoinFactionAsMercenary(best, k, default(CampaignTime), 50, false);
+                int award = 0;
+                try { award = Campaign.Current.Models.MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom(best, k); } catch (Exception e) { Stumble("Hire.award", e); }
+                ChangeKingdomAction.ApplyByJoinFactionAsMercenary(best, k, CampaignTime.DaysFromNow(review), award, false);
                 if (best.Kingdom != k) { _dHireWhy = "gra nie przyjela " + Nm(best); return; }
                 _lastHireDay = today; _hiredN++; _dHireN++; _hireGoldK += bestK;
                 _dHireWhy = "najeto " + Nm(best);
                 long t1 = k.KingdomBudgetWallet;
                 Log.Info(Tag + "najem kompanii | dzien " + today + " | " + Nm(k) + " -> " + Nm(best) + " (ludzi " + bestMen + "), kontrakt 185 K " + bestK + "/doba x " + review
                          + " dob = " + (bestK * review) + " | skarbiec przed/po " + t0 + "/" + t1 + ", zapas wojny " + reserve + ", nadwyzka " + F0(sur)
+                         + ", kontrakty w sluzbie " + heldN + " (" + held + "/doba), mnoznik nagrody gry " + award
                          + " | razem najmow " + _hiredN + ", suma K " + _hireGoldK + " - ludzie juz byli w kompanii, place kontrakt 185 z wplywow dnia.");
             }
             catch (Exception e) { Stumble("HireDaily", e); _dHireWhy = "blad"; }

@@ -210,6 +210,7 @@ namespace Armoury
                 if (ShipsOf(__0) >= IdealFor(__0, GameIdeal(__0)))
                 {
                     if (HasStrandedEmpty(__0)) { _strandBuy++; return true; }   // po recenzji: partia odcieta od ladu stalego bez statkow - zakup dozwolony
+                    if (WarFront334.IronCrewOver(__0)) return true;   // 334 Z2b: rod Wysp w wojnie z Polnoca, zaloga ponad pojemnosc zdrowych statkow - zakup gry mimo idealu
                     _blocked++; return false;
                 }
             }

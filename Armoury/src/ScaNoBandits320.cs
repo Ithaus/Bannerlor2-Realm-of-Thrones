@@ -302,7 +302,6 @@ namespace Armoury
                     r.After = e;
                     _pEnemy.SetValue(__result, e, null);
                     _dEvals++;
-                    if (Math.Abs(r.Before - e) > 0.5f) _dChanged++;
                     // 320e (b)
                     if (_pThreat != null)
                     {
@@ -316,13 +315,16 @@ namespace Armoury
                         catch (Exception ex) { r.ThreatOurs = -1; Stumble("CalcPostfix.Threat", ex); }
                     }
                 }
-                // 334 B2 (klucz ScaFrontThreat334): wrog = suma F334 wrogow (druzyny w 8.02 doby od naszych twierdz), nie cala sila swiata; swoi bez zmian
+                // 334 B2 (klucz ScaFrontThreat334): wrog = suma F334 wrogow (druzyny w 8.02 doby od naszych twierdz), nie cala sila swiata; swoi bez zmian.
+                // Po recenzji 334: r.After zostaje wartoscia 320b (linia 320b i S320-5: po = przed - pominiete), F334 tylko w ocenie SCA i w linii 334; zmiana liczona raz.
+                float fin = r.After;
                 try
                 {
                     float fe = WarFront334.ScaEnemy(kingdom, r.After);
-                    if (fe >= 0f) { _pEnemy.SetValue(__result, fe, null); if (Math.Abs(r.After - fe) > 0.5f) _dChanged++; r.After = fe; }
+                    if (fe >= 0f) { _pEnemy.SetValue(__result, fe, null); fin = fe; }
                 }
                 catch (Exception ex) { Stumble("CalcPostfix.Front334", ex); }
+                if (Math.Abs(r.Before - fin) > 0.5f) _dChanged++;
                 // 320e (a)
                 try { r.Locked = PeaceLocked(kingdom, out r.Why); } catch (Exception ex) { r.Locked = false; r.Why = "blad"; Stumble("CalcPostfix.Lock", ex); }
                 if (r.Locked && _wiredTicks && !_pending.Contains(kingdom)) _pending.Add(kingdom);

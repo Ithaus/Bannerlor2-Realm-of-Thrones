@@ -342,8 +342,10 @@ namespace Armoury
                     _homeGuard.Add(clan); break;
                 }
             }
-            // 334 B4: realne zagrozenie trzeciego wroga - twierdze, do ktorych dochodza jego druzyny w 8.02 doby (F334, takze z morza), i twierdze strony w promieniu
-            // BorderGarrisonRadius od nich; ich rody zostaja w domu przy zbiorce (Glover, Tallhart, Flint przy Wyspach na Kamiennym Brzegu - jak ser Rodrik)
+            // 334 B4 (po recenzji 334 W2/W7): realne zagrozenie trzeciego wroga - twierdze, na ktore jego druzyny REALNIE ida (cel w krolestwie, oblezenie / najazd,
+            // druzyna na jego ziemi; F334 w 8.02 doby, takze z morza) silniejsze od zalogi, i twierdze strony w promieniu BorderGarrisonRadius od nich; ich rody zostaja
+            // w domu przy zbiorce. Reakcja na atak, nie na sama mozliwosc doplyniecia z Pyke: dopoki Zelazni nie ida na Polnoc, zachodnie rody ida z Robbem (kanon:
+            // Glover i Tallhart poszli na poludnie - dlatego Deepwood i Torrhen's Square upadly)
             if (WarFront334.FrontOn && WarFront334.Ensure())
             {
                 try
@@ -420,7 +422,7 @@ namespace Armoury
         private static void Measure()
         {
             for (int i = 0; i < 3; i++) _m[i] = new M();
-            bool front = WarFront334.FrontOn && WarFront334.Ensure();   // 334 B4: S = sila druzyn w zasiegu drugiej strony (F334), koalicja (SAll) tylko w linii
+            bool front = WarFront334.FrontOn && WarFront334.Ensure();   // 334 B4: S = sila druzyn w zasiegu drugiej strony (F334) albo w obronie wlasnej osady przed trzecim wrogiem (W1), koalicja (SAll) tylko w linii
             _frontUsed = front;
             foreach (var mp in MobileParty.AllLordParties)
             {
@@ -429,7 +431,7 @@ namespace Armoury
                 if (s == 0) continue;
                 var m = _m[s];
                 m.SAll += mp.Party.EstimatedStrength;
-                if (!front || WarFront334.ReachesSide(mp, s == 1 ? 2 : 1)) m.S += mp.Party.EstimatedStrength;
+                if (!front || WarFront334.Engaged(mp, s == 1 ? 2 : 1)) m.S += mp.Party.EstimatedStrength;
                 m.Men += mp.Party.NumberOfAllMembers;
                 m.Limit += mp.Party.PartySizeLimit;
                 m.Parties++;
@@ -441,7 +443,7 @@ namespace Armoury
                 if (s != 0)
                 {
                     var m = _m[s]; m.SAll += main.Party.EstimatedStrength;
-                    if (!front || WarFront334.ReachesSide(main, s == 1 ? 2 : 1)) m.S += main.Party.EstimatedStrength;
+                    if (!front || WarFront334.Engaged(main, s == 1 ? 2 : 1)) m.S += main.Party.EstimatedStrength;
                     m.Men += main.Party.NumberOfAllMembers; m.Limit += main.Party.PartySizeLimit; m.Parties++;
                 }
             }

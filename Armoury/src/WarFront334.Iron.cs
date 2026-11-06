@@ -25,25 +25,30 @@ namespace Armoury
     ///     powod postoju. Sita w kolejnosci gry: jedzenie -> armia -> stan wsi -> zasieg.
     ///  Z1 + Z2a (mysl AI, priorytet 48, klucz): partia Wysp poza armia (albo wodz), nie w bitwie ani oblezeniu, nie w porcie, gdy (1) jedzenie ponizej progu najazdu gry
     ///     a pan ma zloto ponad 5 000 (kiesa rodziny 166), (2) statek z kadlubem <= 20% (prog gry) a pan ma zloto na naprawe (ShipCostModel - cena gry), albo (3) safe-sail
-    ///     nie starcza na rejs do najblizszej wsi Polnocy (Z0) - idzie do najblizszego przyjaznego portu (twierdza z portem; dla jedzenia miasto z jedzeniem na rynku):
-    ///     GoToSettlement z ocena 1.05 x max(najlepsza inna, 0.5) (OB5 Edge / FloorBase - jak W1a 274). Jedzenie kupuje gra przy wejsciu do miasta, statki naprawia
-    ///     NavalDLC przy wejsciu do twierdzy z portem (RepairLordPartyShips: PartyTradeGold > koszt naprawy) - ceny gry, zloto pana; nic z niczego. Ten sam port nie
-    ///     wczesniej niz po dobie od ostatniej wizyty (bez petli, gdy gra nie naprawi z braku zlota).
-    ///  Z2b (przydzial statkow z floty 326a) - NIE wdrozony w tej paczce: statki rodu sa na jego partiach (zadnej puli w porcie), przeniesienie miedzy partiami w roznych
-    ///     miejscach bylo by teleportem. Z0 mierzy "zaloga > pojemnosc"; zakup statkow do idealu robi gra i 326a jak dotad.
+    ///     nie starcza na rejs do najblizszej wsi Polnocy (Z0), ALE tylko gdy kadlub nie jest caly, safe-sail przy pelnych kadlubach (ten sam wzor co NavalDLC) by starczyl
+    ///     i pan ma zloto na naprawe (po recenzji 334, K2: przy calych kadlubach naprawa nic nie zmienia - bez tego warunku partia krazyla co dobe do portu) - idzie do
+    ///     najblizszego przyjaznego portu (twierdza z portem, swoja albo neutralna - bez pierwszenstwa wlasnej, Zelazni na ladzie Polnocy nie wracaja przez pol mapy
+    ///     na Pyke; dla jedzenia miasto, ktorego rynek pokrywa prog dni dla zalogi partii, inaczej najblizsze z jakimkolwiek jedzeniem): GoToSettlement z ocena
+    ///     1.05 x max(najlepsza inna, 0.5) (OB5 Edge / FloorBase - jak W1a 274). Jedzenie kupuje gra przy wejsciu do miasta, statki naprawia NavalDLC przy wejsciu do
+    ///     twierdzy z portem (RepairLordPartyShips: PartyTradeGold > koszt naprawy) - ceny gry, zloto pana; nic z niczego. Ten sam port dla tej partii nie wczesniej niz
+    ///     po dobie od jej wizyty (blokada na port - inny port jest dozwolony). Wybor portu pamietany 6 h, typ drogi liczony co godzine (partia zmienia lad / morze).
+    ///  Z2b (po recenzji 334, K3): zaloga ponad pojemnosc zdrowych statkow (mnoznik gry x1.5-3.5 - cel poza progiem) - rod Wysp w wojnie z Polnoca z taka partia moze
+    ///     kupic statek mimo idealu 326a (NavalRealms.BuyPrefix): kupuje gra (ShipTradeCampaignBehavior, cena gry, kiesa rodu, bramka gry 20% kiesy). Bez przenoszenia
+    ///     statkow miedzy partiami (teleport) i bez statkow z niczego.
     ///  Z3 (przyczolek): bez nowej stalej - pierwsza twierdza na ladzie Polnocy daje baze, progi gry licza sie od niej.
     /// </summary>
     internal static partial class WarFront334
     {
         private sealed class IronThinkRec { public int Day, Raid, Siege; }
+        private static readonly object _ironLock = new object();
         private static readonly Dictionary<MobileParty, IronThinkRec> _ironThink = new Dictionary<MobileParty, IronThinkRec>();
-        private sealed class PortRec { public int Hour; public Settlement Port; public string Why; public MobileParty.NavigationType Nav; public bool FromPort, ToPort; }
+        private sealed class PortRec { public int Hour; public Settlement Port; public string Why; }
         private static readonly Dictionary<MobileParty, PortRec> _portCache = new Dictionary<MobileParty, PortRec>();
-        private static readonly Dictionary<MobileParty, int> _portVisit = new Dictionary<MobileParty, int>();            // godzina ostatniej wizyty w porcie
+        private static readonly Dictionary<MobileParty, Dictionary<Settlement, int>> _portVisit = new Dictionary<MobileParty, Dictionary<Settlement, int>>();   // partia -> port -> godzina wizyty
         private sealed class Hull { public float Hp; public int Gold; public int Day; }
         private static readonly Dictionary<MobileParty, Hull> _hullAtPort = new Dictionary<MobileParty, Hull>();
-        private static readonly HashSet<MobileParty> _safeBad = new HashSet<MobileParty>();                               // Z0: safe-sail < rejs (doba)
-        private static int _dToPort, _dToPortFood, _dToPortHull, _dToPortSafe, _dRepairs, _dIronSiegesN, _dLootN;
+        private static readonly Dictionary<MobileParty, float> _safeBad = new Dictionary<MobileParty, float>();             // Z0: safe-sail < rejs (doba) -> rejs w godzinach
+        private static int _dToPort, _dToPortFood, _dToPortHull, _dToPortSafe, _dRepairs, _dIronSiegesN, _dLootN, _dCrewBuy;
         private static long _dRepairGold;
         private static readonly List<string> _dIronSieges = new List<string>(), _dLoot = new List<string>();
         private static int _ironDetailDay = -1;
@@ -52,13 +57,14 @@ namespace Armoury
 
         private static void ResetIron()
         {
-            _ironThink.Clear(); _portCache.Clear(); _portVisit.Clear(); _hullAtPort.Clear(); _safeBad.Clear(); _ironDetailDay = -1;
+            lock (_ironLock) { _ironThink.Clear(); _portCache.Clear(); _portVisit.Clear(); _hullAtPort.Clear(); _safeBad.Clear(); }
+            _ironDetailDay = -1;
             ZeroIronDay();
         }
 
         private static void ZeroIronDay()
         {
-            _dToPort = _dToPortFood = _dToPortHull = _dToPortSafe = _dRepairs = _dIronSiegesN = _dLootN = 0; _dRepairGold = 0;
+            _dToPort = _dToPortFood = _dToPortHull = _dToPortSafe = _dRepairs = _dIronSiegesN = _dLootN = _dCrewBuy = 0; _dRepairGold = 0;
             _dIronSieges.Clear(); _dLoot.Clear();
         }
 
@@ -117,6 +123,45 @@ namespace Armoury
             return w;
         }
 
+        /// <summary>Safe-sail przy pelnych kadlubach (godziny) - ten sam wzor co NavalDLCCampaignShipDamageModel.GetEstimatedSafeSailDuration (srednia po statkach:
+        /// MaxHitPoints / (zuzycie na otwartym morzu x 0.27)). -1 - nie da sie policzyc (wolajacy zostaje przy "kadlub nie caly").</summary>
+        private static float SafeSailFull(MobileParty mp)
+        {
+            try
+            {
+                var ships = mp.Ships;
+                if (ships == null || ships.Count == 0) return -1f;
+                var pm = Campaign.Current.Models.CampaignShipParametersModel;
+                float sum = 0f; int n = 0;
+                foreach (var sh in ships)
+                {
+                    if (sh == null) continue;
+                    int sw = sh.SeaWorthiness;
+                    float dmg = MBMath.ClampFloat(pm.GetShipSizeWeatherFactor(sh.ShipHull) * (1f - sw / 400f) * ((100f - sw) / 100f), 1f, 10000f) * 0.27f;
+                    sum += sh.MaxHitPoints / dmg; n++;
+                }
+                return n > 0 ? sum / n : -1f;
+            }
+            catch { return -1f; }
+        }
+
+        /// <summary>Jednostki jedzenia, ktore partia musi miec na prog dni (dzienne zuzycie gry x prog - zapas). Co najmniej 1.</summary>
+        private static float FoodNeedUnits(MobileParty mp, float days)
+        {
+            try
+            {
+                float daily = Math.Max(0f, -mp.FoodChange);
+                return Math.Max(1f, daily * days - Math.Max(0f, mp.Food));
+            }
+            catch { return 1f; }
+        }
+
+        private static bool VisitedRecently(MobileParty party, Settlement st, int hour)
+        {
+            Dictionary<Settlement, int> d; int last;
+            return _portVisit.TryGetValue(party, out d) && d.TryGetValue(st, out last) && hour - last < 24;
+        }
+
         private static void IronPort(MobileParty party, PartyThinkParams p)
         {
             if (!IronOn || p.DoNotChangeBehavior) return;
@@ -138,34 +183,31 @@ namespace Armoury
                 try { need = Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForRaid; } catch { }
                 Ship worst;
                 float wh = WorstHull(party, out worst);
+                float cost = float.MaxValue;
+                if (worst != null && wh < 1f) { try { cost = Campaign.Current.Models.ShipCostModel.GetShipRepairCost(worst, party.Party); } catch { } }
+                bool canRepair = worst != null && wh < 1f && party.PartyTradeGold > cost;
+                float sail;
                 if (ReaverLaw.FoodDays(party, 0) < need && lead.Gold > CanonWarBalance.FamilyFloor) why = "jedzenie";
-                else if (worst != null && wh <= 0.2f)
+                else if (worst != null && wh <= 0.2f) { if (canRepair) why = "kadlub"; }
+                else if (canRepair && _safeBad.TryGetValue(party, out sail))
                 {
-                    float cost = float.MaxValue;
-                    try { cost = Campaign.Current.Models.ShipCostModel.GetShipRepairCost(worst, party.Party); } catch { }
-                    if (party.PartyTradeGold > cost) why = "kadlub";
+                    // K2: naprawa ma sens tylko, gdy pelne kadluby daja safe-sail dluzszy od rejsu (inaczej - port nic nie zmieni, partia zostaje przy swoim)
+                    float full = SafeSailFull(party);
+                    if (full < 0f || full > sail) why = "safe-sail";
                 }
-                else if (_safeBad.Contains(party)) why = "safe-sail";
                 if (why != null)
                 {
                     pr.Why = why;
-                    pr.Port = NearestPort(party, why == "jedzenie");
-                    if (pr.Port != null)
-                    {
-                        int last;
-                        if (_portVisit.TryGetValue(party, out last) && hour - last < 24) pr.Port = null;   // ten sam port nie wczesniej niz po dobie
-                    }
-                    if (pr.Port != null)
-                    {
-                        MobileParty.NavigationType nav; float dist; bool fromPort;
-                        AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, pr.Port, false, out nav, out dist, out fromPort);
-                        if (nav == MobileParty.NavigationType.None) pr.Port = null;
-                        else { pr.Nav = nav; pr.FromPort = fromPort; pr.ToPort = false; }
-                    }
+                    pr.Port = NearestPort(party, why == "jedzenie" ? FoodNeedUnits(party, need) : 0f, hour);
                 }
                 _portCache[party] = pr;
             }
             if (pr.Port == null) return;
+            if (VisitedRecently(party, pr.Port, hour)) { pr.Port = null; return; }
+            // typ drogi co godzine (partia przechodzi miedzy ladem a morzem) - zapamietany jest tylko wybor portu
+            MobileParty.NavigationType nav; float dist; bool fromPort;
+            AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, pr.Port, false, out nav, out dist, out fromPort);
+            if (nav == MobileParty.NavigationType.None) return;
             var scores = p.AIBehaviorScores;
             float best = 0f;
             for (int i = 0; i < scores.Count; i++)
@@ -175,7 +217,7 @@ namespace Armoury
                 if (e.Item2 > best) best = e.Item2;
             }
             float v = CanonWarBalance.Edge * Math.Max(best, CanonWarBalance.FloorBase);
-            var d = new AIBehaviorData(pr.Port, AiBehavior.GoToSettlement, pr.Nav, false, pr.FromPort, pr.ToPort);
+            var d = new AIBehaviorData(pr.Port, AiBehavior.GoToSettlement, nav, false, fromPort, false);
             p.AddBehaviorScore((d, v));
             _dToPort++;
             if (pr.Why == "jedzenie") _dToPortFood++; else if (pr.Why == "kadlub") _dToPortHull++; else _dToPortSafe++;
@@ -184,12 +226,14 @@ namespace Armoury
                          + " dni, zloto pana " + lead.Gold + ", ocena " + F2(v) + ") - jedzenie z rynku i naprawa statkow robi gra przy wejsciu, za zloto pana.");
         }
 
-        /// <summary>Najblizszy przyjazny port (twierdza z portem, swoja frakcja albo nie w wojnie; nieoblezona). food - tylko miasto z jedzeniem na rynku.</summary>
-        private static Settlement NearestPort(MobileParty party, bool food)
+        /// <summary>Najblizszy przyjazny port (twierdza z portem, swoja frakcja albo nie w wojnie; nieoblezona; bez portow odwiedzonych przez te partie w ostatniej dobie).
+        /// food > 0 - miasto, ktorego rynek ma co najmniej food jednostek jedzenia; gdy zadnego - najblizsze z jakimkolwiek jedzeniem. Bez pierwszenstwa wlasnych portow
+        /// (po recenzji 334: Zelazni na ladzie Polnocy kupuja w najblizszym neutralnym porcie, nie wracaja na Pyke).</summary>
+        private static Settlement NearestPort(MobileParty party, float food, int hour)
         {
             var pos = party.GetPosition2D;
             var f = party.MapFaction;
-            Settlement best = null; float bd = float.MaxValue; bool bestOwn = false;
+            Settlement best = null, any = null; float bd = float.MaxValue, ad = float.MaxValue;
             foreach (var t in Town.AllFiefs)
             {
                 var st = t != null ? t.Settlement : null;
@@ -198,12 +242,42 @@ namespace Armoury
                 bool war;
                 try { war = FactionManager.IsAtWarAgainstFaction(st.MapFaction, f); } catch { war = true; }
                 if (!own && war) continue;
-                if (food && (!st.IsTown || st.ItemRoster == null || st.ItemRoster.TotalFood <= 0)) continue;
+                if (VisitedRecently(party, st, hour)) continue;
                 float d = pos.DistanceSquared(st.GetPosition2D);
-                // najpierw porty wlasnego krolestwa, potem neutralne (Lannisport, Braavos...)
-                if (best == null || (own && !bestOwn) || (own == bestOwn && d < bd)) { best = st; bd = d; bestOwn = own; }
+                if (food > 0f)
+                {
+                    if (!st.IsTown || st.ItemRoster == null) continue;
+                    int tf = st.ItemRoster.TotalFood;
+                    if (tf <= 0) continue;
+                    if (d < ad) { ad = d; any = st; }
+                    if (tf < food) continue;
+                }
+                if (d < bd) { bd = d; best = st; }
             }
-            return best;
+            return best ?? any;
+        }
+
+        /// <summary>Z2b (NavalRealms.BuyPrefix): rod Wysp w wojnie z Polnoca ma partie wojenna ze statkami i zaloga ponad pojemnosc zdrowych statkow (kadlub > 20% - jak gra
+        /// w CalculateShipDistanceAmplifier) - zakup statku mimo idealu 326a (kupuje gra, za kiese rodu). Nie rzuca.</summary>
+        internal static bool IronCrewOver(Clan c)
+        {
+            try
+            {
+                if (c == null || !IronOn || c.Kingdom == null || c.Kingdom.StringId != IronId || !AtWarWithNorth(c.Kingdom)) return false;
+                var w = c.WarPartyComponents;
+                if (w == null) return false;
+                foreach (var wp in w)
+                {
+                    var mp = wp != null ? wp.MobileParty : null;
+                    if (mp == null || !mp.IsActive || mp.Ships == null || mp.Ships.Count == 0 || mp.MemberRoster == null) continue;
+                    int cap = 0, men = mp.MemberRoster.TotalManCount;
+                    foreach (var sh in mp.Ships) if (sh != null && sh.MaxHitPoints > 0f && sh.HitPoints / sh.MaxHitPoints > 0.2f) cap += sh.TotalCrewCapacity;
+                    if (mp.AttachedParties != null) foreach (var ap in mp.AttachedParties) if (ap != null && ap.MemberRoster != null) men += ap.MemberRoster.TotalManCount;
+                    if (cap < men) { lock (_ironLock) _dCrewBuy++; return true; }
+                }
+            }
+            catch (Exception e) { Stumble("IronCrewOver", e); }
+            return false;
         }
 
         // ================================================================ zdarzenia
@@ -213,11 +287,16 @@ namespace Armoury
             {
                 if (mp == null || st == null || !st.HasPort || !st.IsFortification || !mp.IsLordParty || mp.IsMainParty) return;
                 if (mp.MapFaction == null || mp.MapFaction.StringId != IronId) return;
-                _portVisit[mp] = (int)CampaignTime.Now.ToHours;
-                _portCache.Remove(mp);
                 float hp = 0;
                 if (mp.Ships != null) foreach (var sh in mp.Ships) if (sh != null) hp += sh.HitPoints;
-                _hullAtPort[mp] = new Hull { Hp = hp, Gold = mp.LeaderHero != null ? mp.LeaderHero.Gold : 0, Day = Today };
+                lock (_ironLock)
+                {
+                    Dictionary<Settlement, int> d;
+                    if (!_portVisit.TryGetValue(mp, out d)) { d = new Dictionary<Settlement, int>(); _portVisit[mp] = d; }
+                    d[st] = (int)CampaignTime.Now.ToHours;
+                    _portCache.Remove(mp);
+                    _hullAtPort[mp] = new Hull { Hp = hp, Gold = mp.LeaderHero != null ? mp.LeaderHero.Gold : 0, Day = Today };
+                }
             }
             catch (Exception e) { Stumble("OnSettlementEntered", e); }
         }
@@ -268,6 +347,11 @@ namespace Armoury
         }
 
         private static void IronDaily(int today, bool log)
+        {
+            lock (_ironLock) IronDailyLocked(today, log);
+        }
+
+        private static void IronDailyLocked(int today, bool log)
         {
             var iron = FindKingdom(IronId);
             if (iron == null) return;
@@ -351,7 +435,7 @@ namespace Armoury
                             if (amp >= 0f) amps.Add(amp);
                             try { safe = c.Models.CampaignShipDamageModel.GetEstimatedSafeSailDuration(mp); } catch { safe = -1f; }
                             sail = naval > 0f ? navalPart / naval : -1f;
-                            if (safe >= 0f && sail > 0f && safe <= sail) { safeBad++; _safeBad.Add(mp); }
+                            if (safe >= 0f && sail > 0f && safe <= sail) { safeBad++; _safeBad[mp] = sail; }
                         }
                         if (!foodBad && !follower && !villBad && (adj < 0f || adj > range)) sRange++;
                     }
@@ -392,7 +476,7 @@ namespace Armoury
               .Append(", kadlub min ").Append(hullMin <= 1f ? F2(hullMin) : "-").Append(", safe-sail<rejs ").Append(safeBad).Append(", zaloga>pojemnosc ").Append(crewOver)
               .Append(", ponizej progu jedzenia ").Append(hungry).Append('/').Append(P)
               .Append(" | Z1 do portu ").Append(_dToPort).Append(" (jedzenie ").Append(_dToPortFood).Append(", kadlub ").Append(_dToPortHull).Append(", safe-sail ").Append(_dToPortSafe).Append(')')
-              .Append(", Z2 naprawy ").Append(_dRepairs).Append(" (").Append(_dRepairGold).Append(" zl), statki z puli 0 (Z2b nie wdrozony)")
+              .Append(", Z2 naprawy ").Append(_dRepairs).Append(" (").Append(_dRepairGold).Append(" zl), Z2b zgody na zakup statku ponad ideal (zaloga>pojemnosc) ").Append(_dCrewBuy)
               .Append(" | armie ").Append(armies).Append(", oblezenia ").Append(sieges.Count).Append(sieges.Count > 0 ? " [" + string.Join(", ", sieges.ToArray()) + "]" : "")
               .Append(", nowe oblezenia dzis ").Append(_dIronSiegesN).Append(_dIronSieges.Count > 0 ? " [" + string.Join(", ", _dIronSieges.ToArray()) + "]" : "")
               .Append(", rabunki z lupem ").Append(_dLootN).Append(_dLoot.Count > 0 ? " [" + string.Join(", ", _dLoot.ToArray()) + "]" : "")

@@ -67,37 +67,41 @@ namespace Armoury
             try { return o.IsAllyWith(k) && o.IsAtWarWith(enemy); } catch { return false; }
         }
 
-        /// <summary>Sila strony k wobec enemy. 334 B4 (klucz CanonWarFront334): tylko druzyny, ktore dojda do enemy w 8.02 doby (F334); all - cala koalicja (linia).</summary>
-        private static double Strength(Kingdom k, Kingdom enemy, out double all)
+        /// <summary>Sila strony k wobec enemy - cala koalicja (druzyny lordow i armii, gracz poza druzyna lorda), jak przed 334: liczniki K1-K3 kapitulacji.
+        /// front - 334 (klucz CanonWarFront334): tylko druzyny, ktore dojda do enemy w 8.02 doby (F334) - TYLKO do linii. Po recenzji 334 (K1): kapitulacja z miary
+        /// frontu bylaby nowa droga do upadku Polnocy przed Krwawymi Godami (lordowie w domu przed Zelaznymi, na zime albo w odsieczy wypadaja z frontu, a korona
+        /// w Dorzeczu dalej sie liczy) - wbrew kanonowi; kapitulacja liczy sie wiec z calej sily stron.</summary>
+        private static double Strength(Kingdom k, Kingdom enemy, out double front)
         {
-            double s = 0; all = 0;
-            bool front = WarFront334.FrontOn && WarFront334.Ensure();
+            double s = 0; front = 0;
+            bool fr = WarFront334.FrontOn && WarFront334.Ensure();
             foreach (var mp in MobileParty.AllLordParties)
             {
                 if (mp == null || !mp.IsActive || mp.Party == null) continue;
                 if (!SideOf(mp.MapFaction, k, enemy)) continue;
-                all += mp.Party.EstimatedStrength;
-                if (!front || WarFront334.Reaches(mp, enemy)) s += mp.Party.EstimatedStrength;
+                s += mp.Party.EstimatedStrength;
+                if (fr && WarFront334.Reaches(mp, enemy)) front += mp.Party.EstimatedStrength;
             }
             var main = MobileParty.MainParty;
             if (main != null && main.IsActive && main.Party != null && !main.IsLordParty && SideOf(main.MapFaction, k, enemy))
             {
-                all += main.Party.EstimatedStrength;
-                if (!front || WarFront334.Reaches(main, enemy)) s += main.Party.EstimatedStrength;
+                s += main.Party.EstimatedStrength;
+                if (fr && WarFront334.Reaches(main, enemy)) front += main.Party.EstimatedStrength;
             }
-            _lastFront = front;
+            _lastFront = fr;
+            if (!fr) front = -1;
             return s;
         }
 
         private static bool _lastFront;
-        private static double _lastAllN = -1, _lastAllC = -1;
-        /// <summary>334 linia 2: sila 330 (F334 albo koalicja) i koalicja.</summary>
+        private static double _lastFrN = -1, _lastFrC = -1;
+        /// <summary>334 linia 2: sila 330 (koalicja - liczniki K) i front F334 (tylko linia).</summary>
         internal static string LastStrengthText
         {
             get
             {
-                return (_lastFront ? "F334" : "koalicja") + " Polnoc " + _lastSN.ToString("0", Inv) + " / korona " + _lastSC.ToString("0", Inv) + " (Polnoc/korona " + _lastRN.ToString("0.00", Inv)
-                       + "; koalicja " + _lastAllN.ToString("0", Inv) + " / " + _lastAllC.ToString("0", Inv) + ")";
+                return "koalicja (liczniki K) Polnoc " + _lastSN.ToString("0", Inv) + " / korona " + _lastSC.ToString("0", Inv) + " (Polnoc/korona " + _lastRN.ToString("0.00", Inv)
+                       + "; front F334 " + (_lastFront ? _lastFrN.ToString("0", Inv) + " / " + _lastFrC.ToString("0", Inv) : "nieczynny") + ")";
             }
         }
 
@@ -127,7 +131,7 @@ namespace Armoury
         {
             try
             {
-                _lastSN = Strength(n, c, out _lastAllN); _lastSC = Strength(c, n, out _lastAllC);
+                _lastSN = Strength(n, c, out _lastFrN); _lastSC = Strength(c, n, out _lastFrC);
                 _lastRN = _lastSC > 0 ? _lastSN / _lastSC : 10.0;
                 _lastRC = _lastSN > 0 ? _lastSC / _lastSN : 10.0;
                 _lastFN = Forts(n); _lastFC = Forts(c);

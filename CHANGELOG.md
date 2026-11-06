@@ -50,6 +50,29 @@ twierdzy (celowo); (7) regresja: --grupa wojna330, obl326c, polnoc326, rownowaga
 padac, gdy jest inny cel (B334-18).
 **Status:** NIE WGRANE - build Release kod 0 (0 nowych ostrzezen), bez autotestu (Jeff gra). Autotest dopiero po zamknieciu gry, na kopii autotest-przekierowany-*.
 
+### 334b - poprawki po dwoch recenzjach (K1-K3, W1-W5 i W1-W7, drobne)
+- K1 `WarTruce.Surrender.cs`: liczniki kapitulacji K1-K3 330 znowu z sily calej koalicji (jak przed 334); F334 tylko w linii ("koalicja (liczniki K) ... ; front F334 ...").
+  Lordowie Polnocy w domu przed Zelaznymi / na zime nie robia z Polnocy "przegranej" przed Krwawymi Godami.
+- K2 `WarFront334.Iron.cs`: "safe-sail" do portu tylko, gdy kadlub nie jest caly, pelne kadluby (wzor NavalDLC GetEstimatedSafeSailDuration - jednostki: godziny,
+  zgodne z rejsem) daja safe-sail dluzszy od rejsu i pan ma zloto na naprawe; port na jedzenie - rynek pokrywa prog dni dla zalogi, inaczej najblizszy z jedzeniem;
+  bez pierwszenstwa wlasnych portow (drobne 6); blokada 24 h na port, nie na partie; typ drogi co godzine, pamietany tylko wybor portu (W5 r2).
+- K3: Z2b - rod Wysp w wojnie z Polnoca z partia "zaloga > pojemnosc zdrowych statkow" moze kupic statek mimo idealu 326a (`NavalRealms.BuyPrefix` ->
+  `WarFront334.IronCrewOver`; kupuje gra za kiese rodu). BK: Wyspy bez celu BK (BK szuka droga ladem) -> cel oblezenia wedlug reguly BK z droga "lad i morze" i brama
+  max(280, prog najazdu gry) (`BkLastPostfix`, licznik "cele Wysp (lad i morze)"). Pomiar 20 dob nadal konieczny przed wgraniem.
+- W1: 274 Measure i rF linii licza druzyny "zajete wojna" (`WarFront334.Engaged`): front drugiej strony ALBO obrona wlasnej osady atakowanej przez dowolnego wroga
+  (twierdza oblegana, wies najezdzana) - najazd Wysp nie wlacza dzwigni dla Polnocy. Linia: "obrona przed trzecim wrogiem w sile".
+- W2/W7: homeGuard 274 tylko od REALNEGO zagrozenia (druzyna oblega / najezdza / ma cel w krolestwie / stoi na jego ziemi) silniejszego od zalogi twierdzy; opis bez
+  ser Rodrika (kanon: Glover i Tallhart poszli z Robbem).
+- W3: B2 (SCA wrog z frontu) tylko dla krolestw stron 274 i Wysp. W4/W6: najem - nadwyzka pokrywa okres przegladu wszystkich kompanii w sluzbie plus nowej; mnoznik
+  nagrody z MinorFactionsModel.GetMercenaryAwardFactorToJoinKingdom; ShouldStayInKingdomUntil = najem + MercReviewDays. W5: B3 przy zerowym froncie wojny bez
+  pokoju - null (stara regula 320e), nie false.
+- r2 W2: linia 320b ma wartosc 320b (S320-5), F334 tylko w ocenie SCA i linii 334; zmiana liczona raz. r2 W3: blad liczenia F334 nie powtarza sie w tej dobie.
+  r2 W4: druzyna bez statkow - filtr wstepny z predkosci ladowej.
+- Drobne: teatr Polnocy jako BIALA lista (battania, river, vlandia, freefolk, wildlings, nightswatch, skagosi); odbicie = osady spoza teatru z ziem Polnocy (dane
+  ROT), lista czyszczona; licznik B334-5 tak szeroki jak weto; etykieta fazy F1 tylko po 332; opcje rabunku Wysp liczone po wecie teatru; zamek na slownikach
+  Zelaznych (mysl AI); linia frontu w rozejmie 330 bez rF; B334_ERR tez potkniecia 334 w 320/274; opisy MCM; komentarze; `Ready` usuniete.
+- `sprawdz_logi --grupa balans334`: nowe przypadki syntetyczne err334 i trucefront - TAK; sca320b, wojna330, rownowaga274, polnoc326, obl326c - TAK.
+
 ## 333 - AI bitwy: poscig z glowa za nekajacym i szyk bez wahadla przed kontaktem (noc/333-ai-bitwy od noc/332-reach e55aaa19 - NIE WGRANE, bez autotestu; Jeff gra)
 **Problem:** Jeff 06.11 po bitwie: (A) "strzelam do kawalerii, oni jada za mna, wyciagam ich pod swoje wojsko pod lucznikow, jak widza moje wojsko zaczynaja sie
 odwracac plecami i jada do swoich, ja jade za nimi i strzelam w plecy, oni sie znowu wracaja ... trzeba to po prostu robic z glowa"; (B) "formacje ... ida do przodu

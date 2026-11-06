@@ -13,10 +13,12 @@ namespace Armoury
 {
     /// <summary>
     /// 334 B7 - TEATR KANONU POLNOCY DO KRWAWYCH GODOW (klucz NorthCanonTheatre334) i teatr Wysp (B9, klucz IronbornCanonReave334); B8 - BK nastepny cel (BkVetoNextTarget334).
-    ///  B7: AI Polnocy (druzyny, wodz armii - takze armii, w ktorej jedzie gracz; BK) nie zaczyna oblezenia ani najazdu osady, ktorej Settlement.Culture (ROT-Map, nie
-    ///      zmienia sie po zdobyciu) to crownlands, reach, stormlands, dragonstone, vale, aserai albo sturgia (rdzen Wysp) - Robb wygrywa w Dorzeczu i na Zachodzie,
-    ///      nie podbija ziem koronnych ani Reach i nie plynie na Pyke. Wyjatek: odbicie osady, ktora Polnoc trzymala w tej kampanii (lista z pierwszego liczenia 334 i
-    ///      kolejnych dob, bez zdobyczy spoza teatru - te zwraca 326b). Trwajace oblezenie Polnocy - dolaczenie bez weta. Obrona i odsiecz bez zmian.
+    ///  B7 (po recenzji 334 - BIALA lista jak w projekcie): AI Polnocy (druzyny, wodz armii - takze armii, w ktorej jedzie gracz; BK) nie zaczyna oblezenia ani najazdu
+    ///      osady, ktorej Settlement.Culture (ROT-Map, nie zmienia sie po zdobyciu) NIE jest z teatru: battania (Polnoc), river (Dorzecze), vlandia (Westerlands) i ziemie
+    ///      za Murem / przy Polnocy (freefolk, wildlings, nightswatch, skagosi). Poza teatrem m.in. crownlands, reach, stormlands, dragonstone, vale, aserai, sturgia
+    ///      (rdzen Wysp) i Essos - Robb wygrywa w Dorzeczu i na Zachodzie, nie podbija ziem koronnych ani Reach i nie plynie na Pyke. Wyjatek: odbicie osady spoza
+    ///      teatru, ktora z danych ROT nalezy do Polnocy i Polnoc ja trzymala (lista co dobe; zdobycze spoza ziem Polnocy zwraca 326b). Trwajace oblezenie Polnocy -
+    ///      dolaczenie bez weta. Obrona i odsiecz bez zmian.
     ///      Druzyna gracza nie ma weta (wybor gracza; jego zdobycz zostaje u niego - 326b pomija gracza). Faza: do Krwawych Godow (CanonWarClock - ta sama regula co 264/274).
     ///  B9 teatr Wysp: do Krwawych Godow bez celow kultury reach, stormlands, dragonstone, vale, aserai; po Krwawych Godach Reach dozwolony (wojna z nim to osobna paczka).
     ///  Mechanizm jak weto siedzib 274: postfiks (priorytet 48) CampaignEventDispatcher.AiHourlyTick - ocena -1 (ponizej startu wyboru gry), BK - ponizej.
@@ -26,11 +28,11 @@ namespace Armoury
     /// </summary>
     internal static partial class WarFront334
     {
-        private static readonly string[] NorthOutside = { "crownlands", "reach", "stormlands", "dragonstone", "vale", "aserai", "sturgia" };
+        private static readonly string[] NorthTheatreCultures = { "battania", "river", "vlandia", "freefolk", "wildlings", "nightswatch", "skagosi" };
         private static readonly string[] IronOutsideBeforeRw = { "reach", "stormlands", "dragonstone", "vale", "aserai" };
         private static readonly string[] IronOutsideAfterRw = { "stormlands", "dragonstone", "vale", "aserai" };
 
-        private static int _dVetoThink, _dVetoIron, _dVetoBk, _dBkNext, _dBkNone, _dBkNull, _dOutSiegeAi, _dOutTaken, _sOutTaken;
+        private static int _dVetoThink, _dVetoIron, _dVetoBk, _dBkNext, _dBkNone, _dBkNull, _dBkIron, _dOutSiegeAi, _dOutTaken, _sOutTaken;
         private static readonly HashSet<string> _dSaid = new HashSet<string>(StringComparer.Ordinal);
         private static readonly List<string> _dBkNotes = new List<string>();
         private static readonly List<string> _dTakenNotes = new List<string>();
@@ -40,7 +42,7 @@ namespace Armoury
 
         private static void ZeroTheatreDay()
         {
-            _dVetoThink = _dVetoIron = _dVetoBk = _dBkNext = _dBkNone = _dBkNull = _dOutSiegeAi = _dOutTaken = 0;
+            _dVetoThink = _dVetoIron = _dVetoBk = _dBkNext = _dBkNone = _dBkNull = _dBkIron = _dOutSiegeAi = _dOutTaken = 0;
             _dSaid.Clear(); _dBkNotes.Clear(); _dTakenNotes.Clear();
         }
 
@@ -51,13 +53,16 @@ namespace Armoury
             try { return st != null && st.Culture != null ? st.Culture.StringId : null; } catch { return null; }
         }
 
-        internal static bool OutsideNorthCulture(string cult) { return cult != null && Array.IndexOf(NorthOutside, cult) >= 0; }
+        /// <summary>Kultura w teatrze Polnocy (biala lista). null - brak kultury: w teatrze (bez weta).</summary>
+        internal static bool InNorthTheatre(string cult) { return cult == null || Array.IndexOf(NorthTheatreCultures, cult) >= 0; }
+
+        internal static bool OutsideNorthCulture(string cult) { return !InNorthTheatre(cult); }
 
         /// <summary>Czyste (autotest): weto teatru dla kultury osady. realm - "battania" / "sturgia"; retake - odbicie wlasnej osady Polnocy; afterRw - po Krwawych Godach.</summary>
         internal static bool TheatreVetoKind(string realm, string cult, bool retake, bool afterRw)
         {
             if (cult == null) return false;
-            if (realm == NorthId) return !afterRw && !retake && Array.IndexOf(NorthOutside, cult) >= 0;
+            if (realm == NorthId) return !afterRw && !retake && !InNorthTheatre(cult);
             if (realm == IronId) return Array.IndexOf(afterRw ? IronOutsideAfterRw : IronOutsideBeforeRw, cult) >= 0;
             return false;
         }
@@ -151,9 +156,16 @@ namespace Armoury
                 if (!Canon) return;
                 var scores = partyThinkParams.AIBehaviorScores;
                 if (scores == null) return;
-                if (id == IronId) IronOptions(party, partyThinkParams);
                 if (scores.Count > 0) TheatreThink(party, partyThinkParams, f);
-                if (id == IronId) IronPort(party, partyThinkParams);
+                if (id == IronId)
+                {
+                    // po recenzji 334: opcje liczone PO wecie teatru Wysp (cele w Reach -1 sie nie licza); slowniki Zelaznych pod zamkiem (mysl AI moze isc rownolegle)
+                    lock (_ironLock)
+                    {
+                        IronOptions(party, partyThinkParams);
+                        IronPort(party, partyThinkParams);
+                    }
+                }
             }
             catch (Exception e) { Stumble("ThinkPostfix", e); }
         }
@@ -212,7 +224,7 @@ namespace Armoury
             catch (Exception e) { Stumble("OnSiegeStarted", e); }
         }
 
-        /// <summary>Zmiana pana: twierdza kultury crownlands / reach / stormlands zdobyta przez AI Polnocy przed Krwawymi Godami (B334-5; zdobycz gracza - INFO). Nie rzuca.</summary>
+        /// <summary>Zmiana pana: twierdza spoza teatru Polnocy (te same kultury co weto, bez odbicia) zdobyta przez AI Polnocy przed Krwawymi Godami (B334-5; zdobycz gracza - INFO). Nie rzuca.</summary>
         internal static void OnOwnerChanged(Settlement st, bool openToClaim, Hero newOwner, Hero oldOwner, Hero capturer, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
         {
             try
@@ -221,7 +233,7 @@ namespace Armoury
                 var nk = newOwner != null && newOwner.Clan != null ? newOwner.Clan.Kingdom : null;
                 if (nk == null || nk.StringId != NorthId || CanonWarClock.OverNow()) return;
                 string cult = CultureOf(st);
-                if (cult != "crownlands" && cult != "reach" && cult != "stormlands") return;
+                if (!OutsideNorthCulture(cult) || Retake(st)) return;   // po recenzji 334: licznik tak szeroki jak weto (takze Dragonstone, Vale, Dorne, Wyspy)
                 bool player = capturer == Hero.MainHero || (capturer != null && capturer.Clan == Clan.PlayerClan);
                 if (!player) { _dOutTaken++; _sOutTaken++; }
                 _dTakenNotes.Add(Nm(st) + (player ? " (gracz)" : " (AI)"));
@@ -240,7 +252,7 @@ namespace Armoury
                      + ", Wysp " + _dVetoIron + ", weta BK " + _dVetoBk + ", oblezenia AI Polnocy poza teatrem " + _dOutSiegeAi
                      + ", cele poza teatrem zdobyte przez AI Polnocy " + _dOutTaken + " (sesja " + _sOutTaken + ")" + (_dTakenNotes.Count > 0 ? " [" + string.Join(", ", _dTakenNotes.ToArray()) + "]" : "")
                      + ", osad na odbicie " + _northHeld.Count
-                     + " | BK nastepny cel: klucz " + Key01(BkNextOn) + ", zamian " + _dBkNext + ", bez innego celu " + _dBkNone + ", BK null " + _dBkNull
+                     + " | BK nastepny cel: klucz " + Key01(BkNextOn) + ", zamian " + _dBkNext + ", bez innego celu " + _dBkNone + ", BK null " + _dBkNull + ", cele Wysp (lad i morze) " + _dBkIron
                      + (_dBkNotes.Count > 0 ? " [" + string.Join("; ", _dBkNotes.ToArray()) + "]" : "") + ".");
         }
 
@@ -284,13 +296,29 @@ namespace Armoury
             catch (Exception e) { Stumble("BkFirstPostfix", e); }
         }
 
-        /// <summary>Postfiks Last: BK null mimo zamiany (ktos dal null po nas) - licznik B334-18; teatr przy kluczu BK NIE - null (jak weto 274). Nie rzuca.</summary>
+        /// <summary>Postfiks Last: BK null mimo zamiany (ktos dal null po nas) - licznik B334-18; teatr przy kluczu BK NIE - null (jak weto 274).
+        /// Po recenzji 334 (K3): Zelazne Wyspy (klucz Zelaznych i BK nastepny cel) - BK szuka celu tylko z droga ladem, a z Pyke ladem nie ma zadnej twierdzy; gdy BK
+        /// nie dal celu, cel oblezenia wedlug tej samej reguly z droga "lad i morze" (statki), bez wetowanych - jedyna przyczyna "armii 0", ktorej 334 nie ruszalo. Nie rzuca.</summary>
         public static void BkLastPostfix(MobileParty __0, Kingdom __1, ref ValueTuple<Settlement, Army.ArmyTypes>? __result)
         {
             try
             {
                 if (_bkReplaced && !__result.HasValue) _dBkNull++;
                 _bkReplaced = false;
+                if (!__result.HasValue && __0 != null && __1 != null && __1.StringId == IronId && IronOn && BkNextOn && Canon)
+                {
+                    var t = NextBkTarget(__0, __1);
+                    if (t != null)
+                    {
+                        __result = new ValueTuple<Settlement, Army.ArmyTypes>(t, Army.ArmyTypes.Besieger);
+                        _dBkIron++;
+                        if (_dBkNotes.Count < 8) _dBkNotes.Add(Nm(__0) + ": BK bez celu -> " + Nm(t) + " (Wyspy, lad i morze)");
+                        if (Say("bkiron|" + t.StringId))
+                            Log.Info(Tag + "BK cel Wysp | dzien " + Today + " | " + Nm(__0) + " -> " + Nm(t) + " (" + t.StringId + ", kultura " + (CultureOf(t) ?? "-") + ", " + Nm(t.MapFaction)
+                                     + ") - BK szuka tylko droga ladem; cel wedlug reguly BK z droga lad i morze.");
+                    }
+                    return;
+                }
                 if (!__result.HasValue || BkNextOn) return;
                 var v = __result.Value;
                 if (v.Item2 != Army.ArmyTypes.Besieger || v.Item1 == null || __1 == null) return;
@@ -299,10 +327,19 @@ namespace Armoury
             catch (Exception e) { Stumble("BkLastPostfix", e); }
         }
 
-        /// <summary>BK FindArmyObjective (galaz oblezenia) bez wetowanych: wrogie krolestwa, twierdza z panem, nie oblegana, brama w 280, najblizsza z droga ladem (0, 50000).</summary>
+        /// <summary>BK FindArmyObjective (galaz oblezenia) bez wetowanych: wrogie krolestwa, twierdza z panem, nie oblegana, brama w 280, najblizsza z droga ladem (0, 50000).
+        /// Po recenzji 334 (K3, drobne 8): wodz ze statkami - droga "lad i morze" (NavigationType.All) i brama w max(280, prog najazdu gry 5 x srednia odleglosc dwoch
+        /// najblizszych miast) - z wyspy ladem nie ma celu.</summary>
         private static Settlement NextBkTarget(MobileParty party, Kingdom k)
         {
             var pos = party.GetPosition2D;
+            bool sea = party.Ships != null && party.Ships.Count > 0;
+            var nav = sea ? MobileParty.NavigationType.All : MobileParty.NavigationType.Default;
+            float gate2 = 78400f;
+            if (sea)
+            {
+                try { float r = 5f * Campaign.Current.GetAverageDistanceBetweenClosestTwoTownsWithNavigationType(MobileParty.NavigationType.All); if (r * r > gate2) gate2 = r * r; } catch { }
+            }
             var cand = new List<KeyValuePair<Settlement, float>>();
             foreach (var ek in FactionHelper.GetEnemyKingdoms(k))
             {
@@ -311,7 +348,7 @@ namespace Armoury
                 {
                     if (st == null || !st.IsFortification || st.OwnerClan == null || st.IsUnderSiege) continue;
                     float d2 = pos.DistanceSquared(st.GatePosition.ToVec2());
-                    if (d2 < 78400f) cand.Add(new KeyValuePair<Settlement, float>(st, d2));
+                    if (d2 < gate2) cand.Add(new KeyValuePair<Settlement, float>(st, d2));
                 }
             }
             cand.Sort((a, b) => a.Value.CompareTo(b.Value));
@@ -320,7 +357,7 @@ namespace Armoury
                 string why;
                 if (VetoedAny(k, c.Key, out why)) continue;
                 float dist, lr;
-                try { dist = Campaign.Current.Models.MapDistanceModel.GetDistance(party, c.Key, false, MobileParty.NavigationType.Default, out lr); }
+                try { dist = Campaign.Current.Models.MapDistanceModel.GetDistance(party, c.Key, false, nav, out lr); }
                 catch { continue; }
                 if (dist > 0f && dist < 50000f) return c.Key;
             }

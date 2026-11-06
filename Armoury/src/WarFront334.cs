@@ -16,7 +16,7 @@ namespace Armoury
     /// E linie, F progi sprawdz_logi --grupa balans334).
     /// WSPOLNY KORZEN P1-P3: miary liczyly sile "calego krolestwa" albo "calej koalicji", nie te, ktora stoi na froncie. Ten plik - B1 miara frontu F334 (wspolny
     /// pomocnik) i linie "Balans wojny (334): ". Reszta: WarFront334.Theatre.cs (B7 teatr, B8 BK nastepny cel), WarFront334.Iron.cs (B9 Zelazni Z0-Z4),
-    /// CanonWarBalance.Hire334.cs (B5 najem kompanii), latki w istniejacych miejscach: ScaNoBandits320 (B2, B3), CanonWarBalance.Measure/BuildMap (B4 274),
+    /// WarFront334.Hire.cs (B5 najem kompanii), latki w istniejacych miejscach: ScaNoBandits320 (B2, B3), CanonWarBalance.Measure/BuildMap (B4 274),
     /// WarTruce.Surrender.Strength (B4 330), ClanBudget.AtWar i KingdomTreasury.AtWar (B6).
     /// F334(X -> Y) = suma PartyBase.EstimatedStrength (p9 juz w niej) druzyn lordow i armii frakcji X (z druzyna gracza, gdy nalezy do X), ktore dojda do najblizszej
     /// twierdzy krolestwa Y albo do wlasnej twierdzy oblezonej przez Y w 8.02 doby (CanonWarBalance.DefendRangeDays - gra GetDistanceScoreForDefending). Droga
@@ -45,10 +45,14 @@ namespace Armoury
         internal static bool IronOn { get { var s = S; return s != null && s.IronbornCanonReave334 && Canon; } }
 
         // ================================================================ stan F334 (doba, bez zapisu)
-        private sealed class Pair { public double S; public int Parties, Men; public readonly HashSet<Settlement> Forts = new HashSet<Settlement>(); }
+        // Forts: twierdze, na ktore REALNIE ida druzyny (cel w krolestwie, oblezenie / najazd, druzyna na jego ziemi) - sila zagrozenia na twierdze (homeGuard 274)
+        private sealed class Pair { public double S; public int Parties, Men; public readonly Dictionary<Settlement, double> Forts = new Dictionary<Settlement, double>(); }
         private static readonly Dictionary<IFaction, Dictionary<Kingdom, Pair>> _front = new Dictionary<IFaction, Dictionary<Kingdom, Pair>>();
         private static readonly Dictionary<MobileParty, List<Kingdom>> _reach = new Dictionary<MobileParty, List<Kingdom>>();
+        // po recenzji 334 (W1): druzyny, ktore dojda do WLASNEJ osady atakowanej przez wroga (oblezona twierdza, najezdzana wies) - obrona przed trzecim wrogiem
+        private static readonly HashSet<MobileParty> _defend = new HashSet<MobileParty>();
         private static int _day = -1, _computeN, _calls, _partiesN, _ms;
+        private static bool _broken;   // po recenzji 334 (W3 r2): liczenie doby rzucilo - miara nieczynna do konca doby (bez powtarzania przy kazdym pytaniu)
         private static int _stumbles, _dStumbles;
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
         // SCA (B2): ostatnia ocena na krolestwo - surowy wrog SCA i F334 (linia 3)
@@ -58,7 +62,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _front.Clear(); _reach.Clear(); _day = -1; _computeN = _calls = _partiesN = _ms = 0; _stumbles = _dStumbles = 0; _errSites.Clear();
+            _front.Clear(); _reach.Clear(); _defend.Clear(); _day = -1; _broken = false; _computeN = _calls = _partiesN = _ms = 0; _stumbles = _dStumbles = 0; _errSites.Clear();
             _sca.Clear(); _dScaFront = _dScaRaw = 0;
             ResetTheatre(); ResetIron(); ResetSaved();
             WarFront334Test.Reset();
@@ -112,27 +116,29 @@ namespace Armoury
                 var c = Campaign.Current;
                 if (c == null || !c.GameStarted || !Canon) return false;
                 int d = Today;
-                if (_day == d) return true;
+                if (_day == d) return !_broken;
+                _day = d; _broken = true;   // ustawione przed liczeniem: wyjatek nie powtarza liczenia w tej dobie
                 Compute();
-                _day = d;
+                _broken = false;
                 return true;
             }
             catch (Exception e) { Stumble("Ensure", e); return false; }
         }
 
-        internal static bool Ready { get { return _day >= 0 && _day >= Today - 1; } }
-
         private static void Compute()
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            _front.Clear(); _reach.Clear(); _lastTarget.Clear(); _calls = 0; _partiesN = 0;
+            _front.Clear(); _reach.Clear(); _defend.Clear(); _lastTarget.Clear(); _calls = 0; _partiesN = 0;
             var c = Campaign.Current;
             float land = c.EstimatedAverageLordPartySpeed, naval = c.EstimatedAverageLordPartyNavalSpeed;
-            // najdluzsza mozliwa droga skorygowana: odcinek morski mnozony przez gre najmniej x0.35 (CalculateShipDistanceAmplifier) - prosta dalsza niz to = poza zasiegiem
+            // najdluzsza mozliwa droga skorygowana: odcinek morski mnozony przez gre najmniej x0.35 (CalculateShipDistanceAmplifier) - prosta dalsza niz to = poza zasiegiem.
+            // Po recenzji 334 (W4 r2): druzyna bez statkow idzie tylko ladem (droga >= prosta) - jej filtr z predkosci ladowej, bez /0.35.
             float maxSpeed = Math.Max(land, naval);
             float maxReach = maxSpeed * CampaignTime.HoursInDay * CanonWarBalance.DefendRangeDays / 0.35f;
             float maxReach2 = maxReach * maxReach;
-            // twierdze krolestw i twierdze oblezone (wlasciciel -> oblegajacy)
+            float landReach = land * CampaignTime.HoursInDay * CanonWarBalance.DefendRangeDays;
+            float landReach2 = landReach * landReach;
+            // twierdze krolestw i osady atakowane (twierdza oblezona, wies najezdzana: wlasciciel -> napastnik)
             var forts = new Dictionary<Kingdom, List<Settlement>>();
             var besieged = new List<KeyValuePair<Settlement, IFaction>>();
             foreach (var t in Town.AllFiefs)
@@ -152,6 +158,20 @@ namespace Armoury
                 }
                 catch { }
             }
+            // po recenzji 334 (W1): wsie najezdzane - obrona wlasnej wsi to tez druzyna zajeta wojna (Zelazni na Kamiennym Brzegu)
+            try
+            {
+                foreach (var v in Village.All)
+                {
+                    var vs = v != null ? v.Settlement : null;
+                    if (vs == null || v.VillageState != Village.VillageStates.BeingRaided) continue;
+                    var me = vs.Party != null ? vs.Party.MapEvent : null;
+                    var lp = me != null && me.AttackerSide != null ? me.AttackerSide.LeaderParty : null;
+                    var af = lp != null ? lp.MapFaction : (vs.LastAttackerParty != null ? vs.LastAttackerParty.MapFaction : null);
+                    if (af != null) besieged.Add(new KeyValuePair<Settlement, IFaction>(vs, af));
+                }
+            }
+            catch (Exception e) { Stumble("Compute.raids", e); }
             var parties = new List<MobileParty>(512);
             foreach (var mp in MobileParty.AllLordParties) if (mp != null && mp.IsActive && mp.Party != null) parties.Add(mp);
             var main = MobileParty.MainParty;
@@ -173,9 +193,10 @@ namespace Armoury
                         if (follower)
                         {
                             List<Kingdom> lead;
-                            if (_reach.TryGetValue(army.LeaderParty, out lead)) got = Filter(lead, F);
+                            if (_reach.TryGetValue(army.LeaderParty, out lead)) { got = Filter(lead, F); if (_defend.Contains(army.LeaderParty)) _defend.Add(mp); }
                         }
-                        if (got == null) got = ReachOf(mp, F, forts, besieged, land, naval, maxReach2);
+                        bool ships = mp.Ships != null && mp.Ships.Count > 0;
+                        if (got == null) got = ReachOf(mp, F, forts, besieged, land, naval, ships ? maxReach2 : landReach2);
                         _reach[mp] = got;
                         _partiesN++;
                         if (got.Count == 0) continue;
@@ -183,13 +204,17 @@ namespace Armoury
                         int men = mp.Party.NumberOfAllMembers;
                         Dictionary<Kingdom, Pair> row;
                         if (!_front.TryGetValue(F, out row)) { row = new Dictionary<Kingdom, Pair>(); _front[F] = row; }
+                        var lead2 = follower ? army.LeaderParty : mp;
                         for (int j = 0; j < got.Count; j++)
                         {
                             Pair p;
                             if (!row.TryGetValue(got[j], out p)) { p = new Pair(); row[got[j]] = p; }
                             p.S += s; p.Parties++; p.Men += men;
-                            var tf = TargetOf(follower ? army.LeaderParty : mp, got[j]);
-                            if (tf != null) p.Forts.Add(tf);
+                            var tf = TargetOf(lead2, got[j]);
+                            if (tf != null && tf.MapFaction == got[j] && RealThreat(lead2, got[j]))
+                            {
+                                double cur; p.Forts.TryGetValue(tf, out cur); p.Forts[tf] = cur + s;
+                            }
                         }
                     }
                     catch (Exception e) { Stumble("Compute.party", e); }
@@ -201,6 +226,24 @@ namespace Armoury
 
         // cel (twierdza) dojscia partii do krolestwa - dla homeGuard 274 (B4) i linii; tylko doba
         private static readonly Dictionary<MobileParty, Dictionary<Kingdom, Settlement>> _lastTarget = new Dictionary<MobileParty, Dictionary<Kingdom, Settlement>>();
+
+        /// <summary>Po recenzji 334 (W2/W7): druzyna REALNIE idzie na krolestwo k - oblega / najezdza jego osade, jej cel (TargetSettlement) jest jego, albo stoi na jego
+        /// ziemi (najblizsza twierdza nalezy do k). Partia stojaca na Pyke albo na morzu bez celu w k - nie (sama mozliwosc doplyniecia nie zatrzymuje rodow w domu).</summary>
+        private static bool RealThreat(MobileParty mp, Kingdom k)
+        {
+            try
+            {
+                if (mp == null || k == null) return false;
+                var bs = mp.BesiegedSettlement;
+                if (bs != null && bs.MapFaction == k) return true;
+                var ts = mp.TargetSettlement;
+                if (ts != null && ts.MapFaction == k) return true;
+                if (mp.IsCurrentlyAtSea) return false;
+                var ns = NearestAny(mp.GetPosition2D);
+                return ns != null && ns.MapFaction == k;
+            }
+            catch { return false; }
+        }
 
         private static Settlement TargetOf(MobileParty mp, Kingdom k)
         {
@@ -246,6 +289,7 @@ namespace Armoury
                 else if (b != null && db <= maxReach2 && InRange(mp, b, land, naval)) hit = b;
                 if (hit == null) continue;
                 got.Add(E);
+                if (hit.MapFaction == F) _defend.Add(mp);   // obrona wlasnej osady atakowanej przez E (W1)
                 Dictionary<Kingdom, Settlement> td;
                 if (!_lastTarget.TryGetValue(mp, out td)) { td = new Dictionary<Kingdom, Settlement>(); _lastTarget[mp] = td; }
                 td[E] = hit;
@@ -295,12 +339,27 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>274 homeGuard (B4): twierdze krolestwa k, do ktorych dochodza druzyny frakcji f (cele dojscia z liczenia doby).</summary>
+        /// <summary>274 (W1 po recenzji 334): druzyna zajeta wojna - dojdzie do strony `side` ALBO broni wlasnej osady atakowanej przez dowolnego wroga (trzeci wrog:
+        /// Zelazni na Kamiennym Brzegu). Obrona przed Wyspami nie jest "slaboscia frontu" - dzwignie 274 nie zjadaja kanonicznego hamulca Polnocy.</summary>
+        internal static bool Engaged(MobileParty mp, int side)
+        {
+            if (mp == null || !Ensure()) return false;
+            return ReachesSide(mp, side) || _defend.Contains(mp);
+        }
+
+        /// <summary>274 homeGuard (B4, po recenzji 334 W2/W7): twierdze krolestwa k, na ktore REALNIE ida druzyny frakcji f (RealThreat) i ktorych zaloga jest slabsza
+        /// od tego zagrozenia (PartyBase.EstimatedStrength - ta sama miara). Sama mozliwosc doplyniecia z Pyke nikogo nie zatrzymuje.</summary>
         internal static void ThreatenedForts(IFaction f, Kingdom k, List<Settlement> into)
         {
             if (f == null || k == null || !Ensure()) return;
             Dictionary<Kingdom, Pair> row; Pair p;
-            if (_front.TryGetValue(f, out row) && row.TryGetValue(k, out p)) into.AddRange(p.Forts);
+            if (!_front.TryGetValue(f, out row) || !row.TryGetValue(k, out p)) return;
+            foreach (var kv in p.Forts)
+            {
+                double gar = 0;
+                try { var gp = kv.Key.Town != null ? kv.Key.Town.GarrisonParty : null; gar = gp != null && gp.Party != null ? gp.Party.EstimatedStrength : 0; } catch { }
+                if (kv.Value > gar) into.Add(kv.Key);
+            }
         }
 
         /// <summary>Frakcje z druzynami w zasiegu krolestwa k (do homeGuard i linii).</summary>
@@ -335,6 +394,8 @@ namespace Armoury
             if (!_sca.TryGetValue(k.StringId ?? "", out r)) { r = new ScaRec(); _sca[k.StringId ?? ""] = r; }
             r.Raw = raw; r.Used = false;
             if (!ScaFrontOn) { r.Front = -1f; return -1f; }
+            // po recenzji 334 (W3): B2 tylko dla krolestw wojny kanonu (strony 274) i Wysp - Dorne, Dolina, Essos bez zmian (wyczerpanie SCA jak dotad)
+            if (CanonWarBalance.SideOf(k) == 0 && k.StringId != IronId) { r.Front = -1f; return -1f; }
             double t = Threat(k);
             if (t < 0) { _dScaRaw++; r.Front = -1f; return -1f; }
             r.Front = (float)t; r.Used = true; _dScaFront++;
@@ -366,6 +427,8 @@ namespace Armoury
                 n++;
                 if (PeaceImpossible(k, f)) { lk += v; nl++; }
             }
+            // po recenzji 334 (W5): front glownej wojny chwilowo pusty (Polnoc wrocila do domu), a obok mala wojna z zagrozeniem - stara regula 320e, nie "false"
+            if (nl > 0 && !(lk > 0.0)) return null;
             var r = LockedShare(lk, tot);
             if (r == null) return null;
             // bez nawiasow i srednikow - linia 320b (sprawdz_logi S320_K: powod [^()]*, krolestwa po '; '); zablokowany zaczyna sie od "pokoj zablokowany" (S320-10)
@@ -458,10 +521,11 @@ namespace Armoury
             try
             {
                 if (CanonWarClock.OverNow()) return "F2";
-                // Czarny Nurt: 332 (Reach w koronie) albo dzien opowiesci >= 767 - tylko etykieta linii
-                var reach = FindKingdom(ReachId);
-                if (reach == null) return "F1";
-                return "F0";
+                // Czarny Nurt: 332 (Reach w koronie) - tylko etykieta linii; Reach zniknal z innego powodu - F0 z dopiskiem
+                bool folded = false;
+                try { folded = ReachJoinsCrown.Done; } catch { }
+                if (folded) return "F1";
+                return FindKingdom(ReachId) == null ? "F0(bez-Reach)" : "F0";
             }
             catch { return "?"; }
         }
@@ -473,6 +537,15 @@ namespace Armoury
             var sb = new StringBuilder(700);
             sb.Append(Tag).Append("dzien ").Append(today).Append(" | faza ").Append(Phase());
             if (n == null || c == null) { sb.Append(" | brak krolestwa Polnocy albo korony - linia bez frontu."); Log.Info(sb.ToString()); return; }
+            bool war = false;
+            try { war = n.IsAtWarWith(c); } catch { }
+            if (!war)
+            {
+                // po recenzji 334: w rozejmie 330 F334 widzi tylko wojny - 0/0 dawalo bzdurne rF; linia bez frontu (B334-3 jej nie liczy)
+                sb.Append(" | Polnoc i korona bez wojny (rozejm 330 albo pokoj) - front nie liczony | 274: ").Append(CanonWarBalance.LeverText).Append('.');
+                Log.Info(sb.ToString());
+                return;
+            }
             // strona A (Polnoc z sojusznikami) -> strona B; strona B (korona z sojusznikami w zasiegu) -> strona A
             double fa = 0, fb = 0, fbAlly = 0; int pa = 0, ma = 0, pb = 0, mb = 0;
             foreach (var kv in _front)
@@ -487,22 +560,26 @@ namespace Armoury
                     else { fb += kv2.Value.S; pb += kv2.Value.Parties; mb += kv2.Value.Men; if (kv.Key != c) fbAlly += kv2.Value.S; }
                 }
             }
-            // partia moze dojsc do dwoch krolestw strony - liczona raz (ReachesSide), jak 274
-            double sa = 0, sbb = 0;
+            // partia moze dojsc do dwoch krolestw strony - liczona raz (Engaged), jak 274: front drugiej strony albo obrona wlasnej osady przed trzecim wrogiem (W1)
+            double sa = 0, sbb = 0, da = 0, db = 0;
             foreach (var kv in _reach)
             {
                 var mp = kv.Key;
                 int side = CanonWarBalance.SideOf(mp.MapFaction);
                 if (side == 0 || mp.Party == null) continue;
-                if (ReachesSide(mp, side == 1 ? 2 : 1)) { if (side == 1) sa += mp.Party.EstimatedStrength; else sbb += mp.Party.EstimatedStrength; }
+                bool fr = ReachesSide(mp, side == 1 ? 2 : 1);
+                if (!fr && !_defend.Contains(mp)) continue;
+                if (side == 1) { sa += mp.Party.EstimatedStrength; if (!fr) da += mp.Party.EstimatedStrength; }
+                else { sbb += mp.Party.EstimatedStrength; if (!fr) db += mp.Party.EstimatedStrength; }
             }
             double rF = sa > 0 ? sbb / sa : (sbb > 0 ? 99.0 : 1.0);
             double rC = CanonWarBalance.LastCoalitionRatio;
             sb.Append(" | front Polnoc->korona ").Append(F0(sa)).Append(" (partii ").Append(pa).Append(", ludzi ").Append(ma).Append(')')
               .Append(" / korona->Polnoc ").Append(F0(sbb)).Append(" (partii ").Append(pb).Append(", ludzi ").Append(mb).Append(", w tym sojusznik ").Append(F0(fbAlly)).Append(')')
               .Append(" | rF ").Append(rF.ToString("0.000", Inv)).Append(" (koalicja ").Append(rC >= 0 ? rC.ToString("0.000", Inv) : "-").Append(')')
+              .Append(" | obrona przed trzecim wrogiem w sile: Polnoc ").Append(F0(da)).Append(", korona ").Append(F0(db))
               .Append(" | 274: ").Append(CanonWarBalance.LeverText)
-              .Append(" | 330 sila F334 ").Append(WarTruce.LastStrengthText)
+              .Append(" | 330 sila ").Append(WarTruce.LastStrengthText)
               .Append(" | miara: partii ").Append(_partiesN).Append(", drog AiHelper ").Append(_calls).Append(", ").Append(_ms).Append(" ms, klucz ").Append(Key01(FrontOn)).Append('.');
             Log.Info(sb.ToString());
         }
@@ -693,18 +770,37 @@ namespace Armoury
                      + "), ludzie " + men + " vs " + _preTruceMen + ".");
         }
 
-        /// <summary>B7: osady Polnocy do odbicia - przy pierwszym liczeniu i co dobe: osady (twierdze i wsie) w rekach Polnocy o kulturze spoza listy "poza teatrem"
-        /// (zdobycze w Crownlands / Reach / Stormlands / na Wyspach sie nie licza - zwraca je 326b).</summary>
+        /// <summary>B7 (po recenzji 334): osady do odbicia - osady (twierdze i wsie) w rekach Polnocy o kulturze SPOZA teatru, ktore z danych ROT naleza do Polnocy
+        /// (KingInTheNorth.OrigOwnerOf - pan poczatkowy z Polnocy). Tylko takie maja weto teatru i tylko dla nich wyjatek "odbicie" cos zmienia; zdobyczy w Crownlands,
+        /// Reach, Stormlands i na Wyspach lista nie bierze (zwraca je 326b). Wpisy w teatrze albo spoza ziem Polnocy (stary zapis v1) - usuwane.</summary>
         private static void NorthHeldDaily()
         {
             var n = FindKingdom(NorthId);
             if (n == null) return;
+            if (_northHeld.Count > 0)
+            {
+                var drop = new List<string>();
+                foreach (var id in _northHeld) { var st = Settlement.Find(id); if (st == null || InNorthTheatre(CultureOf(st)) || !OrigNorth(st)) drop.Add(id); }
+                foreach (var id in drop) _northHeld.Remove(id);
+            }
             foreach (var st in n.Settlements)
             {
                 if (st == null || st.StringId == null || !(st.IsFortification || st.IsVillage)) continue;
-                if (OutsideNorthCulture(CultureOf(st))) continue;
+                if (InNorthTheatre(CultureOf(st)) || !OrigNorth(st)) continue;
                 _northHeld.Add(st.StringId);
             }
+        }
+
+        private static bool OrigNorth(Settlement st)
+        {
+            try
+            {
+                var b = st.IsVillage && st.Village != null && st.Village.Bound != null ? st.Village.Bound : st;
+                string ok;
+                KingInTheNorth.OrigOwnerOf(b.StringId, out ok);
+                return ok == NorthId;
+            }
+            catch { return false; }
         }
     }
 
