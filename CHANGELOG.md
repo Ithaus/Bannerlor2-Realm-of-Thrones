@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 343 - dane mapy Armoury dla ROT 8.1.2 na noc/343-rot812 (NIE WGRANE, bez autotestu; build Armoury.dll be9a917f tylko do sprawdzenia kompilacji)
+**Problem:** ROT 8.1.2 zmienia mape swiata (terrain.bin 50638996 -> 50639409 B, md5 82fbc699..., scene.xscene, settlements.xml, navmesh.bin). Dane Armoury maja straznik
+starej mapy (terrain_size / scene_xml_crc 146201570) - po wgraniu mapy wylaczylyby sie drogi +15%, drogi boczne, wioski, ksiega wiosek i zajazdy.
+**Roznice mapy (porownanie 06.11):** farba drog (warstwa road) bez zmian - te same 311 lamanych 1:1; wysokosc terenu tylko Sharp Point (648/422), Riverrun (331/503), Gulltown
+(657-678/550-566), max 0.5 jedn.; farba trawy przy Blueburn (355-435/231-282); rzeki (73 sciezki) bez zmian; White Harbor 459.14,767.82 -> 458.11,767.31 i Sharp Point
+644.80,427.05 -> 646.78,426.29 (z bramami); nowe modele riverrun_model / twins_model / gulltown_model (+ molo i skaly) w obrysie dawnych; Casterly Rock tylko scena bitwy/miasta.
+**Zmiana:** tools/geo/geo_drogi_rot.py (z w-toku/noc-geo 19e6f041, + --mapa) na nowym terrain.bin -> tools/geo/dane/arm_geo_drogi_rot.tsv -> arm_map_roads_geo.tsv (geometria
+bez zmian, nowy terrain_md5/size). tools/geo/rot812_dane.py -> D:/Backup-Bannerlord/rot812-dane (geo-siatka 16.10 z wysokoscia z nowego HGHT, 38 probek; osady.json z nowym WH/SP).
+arm_map_side_roads_grid.tsv: 8 komorek stoku przy Gulltown. tools/geo/rot812_wioski.py: uklad wiosek bez zmian (crc "uid:osady;" v7 5F9875B1, v6 F5456602, v5 68BB06AD,
+v4 5A8C2735 - zapis, arm_district i lore 1:1), Sheepbrook (village_B3_3#f7cc1521) 449.5,775.5 -> 449.5,776.5 (od nowego White Harbor 11.88 < 12 -> 12.59); kolizji z nowymi
+modelami brak (najmniejszy luz: Thatcher's Mill 1.3 od obrysu Blizniakow + 1). arm_roadside_inns.tsv: te same 135 zajazdow (zajazdy_gen krok 3 z nowymi osadami i wioskami).
+CRC sceny: IMapScene.GetSceneXmlCrc liczy silnik (nie CRC32/CRC32C/Adler/FNV pliku scene.xscene - sprawdzone na 8.1.8), wiec pliki maja "# scene_xml_crc: 0" i
+"# scene_terrain_size: 50639409"; MapVillageData.CheckScene / RoadsideInns / MapRoadsProbe przyjmuja plik, gdy terrain.bin ROT-Map ma ten rozmiar (MapRoads.TerrainPath),
+a log pisze "przyjete po terrain.bin ... CRC sceny gry N - do naglowka" (potem mozna wpisac N).
+**Status:** DO SPRAWDZENIA - wgrac RAZEM z ROT-Map 8.1.2 (stara mapa + nowe dane = wszystko wylaczone, i odwrotnie); autotest kopii zapisu: log wiosek/zajazdow "przyjete po terrain.bin",
+drogi "terrain.bin ROT-Map zgodny (50639409 B)", ksiega wiosek bez przydzialu zastepczego; potem dobrze puscic sonde geografii (MapGeoProbe) na 8.1.2 dla nowego navmesh.
+
 ## 340r - poprawki dwoch recenzji 340 na noc/340-razem (NIE WGRANE, bez autotestu po zmianie; DLL test/m340, Armoury.dll 6afad550)
 **Problem (recenzje 340):** (c) KBlocked gubil odsiecz, ktora weszla do armii (LiveUnit czlonka = null), widzial zapamietanego wroga na zywo bez zwiadu i bez konca (Since martwe),
 liczyl nasza sile bez sojusznikow, zwalnial pamiec po ocenie silniejszego lorda; IronKeepSea trzymal cel mimo blokady krolestwa; (d) zbiorka w porcie odtwarzala CanLordCreateArmy

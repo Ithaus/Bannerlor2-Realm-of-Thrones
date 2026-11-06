@@ -74,6 +74,7 @@ namespace Armoury
             public string Method = "auto";
             public float YawOffsetDeg;
             public string LayoutCrc = "", SceneCrc = "";
+            public long SceneTerrainSize;   // rot812: "# scene_terrain_size:" (MapVillageData.CheckScene)
             public int BadRows, OutsideWindows, OverCap, DataRows;
         }
 
@@ -132,6 +133,7 @@ namespace Armoury
                     }
                     else if (h.StartsWith("layout_crc32:", StringComparison.Ordinal)) f.LayoutCrc = h.Substring(13).Trim().Split(' ')[0];
                     else if (h.StartsWith("scene_xml_crc:", StringComparison.Ordinal)) f.SceneCrc = h.Substring(14).Trim();
+                    else if (h.StartsWith("scene_terrain_size:", StringComparison.Ordinal)) { long tv; if (long.TryParse(FirstWord(h.Substring(19)), NumberStyles.Integer, ci, out tv) && tv > 0) f.SceneTerrainSize = tv; }
                     else if (h.StartsWith("x\t", StringComparison.Ordinal))
                     {
                         string[] p = h.Split('\t');
@@ -295,7 +297,8 @@ namespace Armoury
             _file = MapRoadsProbe.Load(path);
             uint sceneCrc = 0;
             try { sceneCrc = Campaign.Current.MapSceneWrapper.GetSceneXmlCrc(); } catch { }
-            bool crcOk = _file.SceneCrc.Length == 0 || _file.SceneCrc == sceneCrc.ToString(CultureInfo.InvariantCulture);
+            bool crcOk = _file.SceneCrc.Length == 0 || _file.SceneCrc == sceneCrc.ToString(CultureInfo.InvariantCulture)
+                         || (_file.SceneTerrainSize > 0 && MapVillageData.TerrainAccepts(_file.SceneTerrainSize));   // rot812: przyjete po terrain.bin ROT-Map
             var sb = new StringBuilder("MapRoadsProbe: plik ").Append(MapRoadsProbe.FileName).Append(" - stempli ").Append(_file.Stamps.Count)
                 .Append(" w oknach ").Append(_file.Windows.Count).Append(" (");
             int[] per = new int[_file.Windows.Count];

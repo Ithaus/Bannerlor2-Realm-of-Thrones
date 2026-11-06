@@ -1,5 +1,6 @@
 # Armoury: named map villages (layout v7: villages spread over the whole land of their district - from layout v6, the same villages and people per district). One row = one map village
-# scene_xml_crc: 146201570
+# scene_xml_crc: 0
+# scene_terrain_size: 50639409 (ROT 8.1.2: the mod takes this file when ROT-Map terrain.bin has this size - the game scene CRC is not known outside the game, 8.1.8 had 146201570; tools/geo/rot812_wioski.py, villages moved: 1875)
 # (cluster of settlements of the district of village_id). road_deg = road / river / coast direction 0..180; order = default burn order
 # (0 = nearest to the game village by road); front_deg = model front (local +Y) yaw; half_len/half_wid = footprint.
 # kind = PLACE (bridge / ford / crossroad / road / river / lake / coast / field), unchanged; model (v4, last column) = PICTURE:
@@ -1532,7 +1533,7 @@
 1872	village_B3_3	Frostfield	480.64	751.65	164.0	8	1	field	village_B3_3#20ed8f09	F	0	1	15.9	-	village_B3_3#20ed9788,village_B3_3#23f8b17b,village_B3_3#f7cc1521	74.0	1.10	0.70	1725	farm	-	wheat_farm	trawa	field	farm	13.4	32.8	2.8	0	471.50	761.78	11	0	471.50	761.78	11
 1873	village_B3_3	Maiden's Fold	477.44	762.43	41.0	11	0	field	village_B3_3#20ed9788	F	0	1	11.9	-	village_B3_3#20ed8f09,village_B3_3#23f8b17b,village_B3_3#f7cc1521	131.0	1.10	0.70	1814	farm	-	wheat_farm	trawa	field	farm	15.6	25.2	11.9	1	472.00	769.00	15	1	472.00	769.00	15
 1874	village_B3_3	Ramwick	477.87	740.06	167.4	22	2	coast	village_B3_3#23f8b17b	R	1	2	28.6	-	village_B3_3#20ed9788,village_B3_3#20ed8f09,village_B3_3#f7cc1521	167.4	1.30	0.70	1692	fishing	-	-	-	-	-	-	-	-	2	477.87	740.06	22	2	477.87	740.06	22
-1875	village_B3_3	Sheepbrook	449.50	775.50	133.4	15	3	river	village_B3_3#f7cc1521	F	0	1	30.8	-	village_B3_3#20ed9788,village_B3_3#20ed8f09,village_B3_3#23f8b17b	-136.6	1.10	0.70	1791	farm	-	wheat_farm	trawa	river	farm	15.1	3.0	3.0	3	448.50	775.50	8	3	448.50	775.50	8
+1875	village_B3_3	Sheepbrook	449.50	776.50	133.4	15	3	river	village_B3_3#f7cc1521	F	0	1	30.8	-	village_B3_3#20ed9788,village_B3_3#20ed8f09,village_B3_3#23f8b17b	-136.6	1.10	0.70	1791	farm	-	wheat_farm	trawa	river	farm	15.1	3.0	3.0	3	448.50	775.50	8	3	448.50	775.50	8
 1876	village_B3_4	Stoneknoll	429.23	757.24	139.9	12	0	hills	village_B3_4#73b13524	F	0	1	13.7	-	village_B3_4#411ed63e,village_B3_4#0a28f12a,village_B3_4#f3162984,village_B3_4#a0d16006	-130.1	1.10	0.70	1470	farm	goatherds	sheep_farm	trawa	field	farm	15.4	19.3	14.4	0	435.46	754.04	26	0	435.46	754.04	26
 1877	village_B3_4	High Holt	430.61	771.60	111.8	23	3	field	village_B3_4#f3162984	F	0	2	26.7	-	village_B3_4#73b13524,village_B3_4#411ed63e,village_B3_4#0a28f12a,village_B3_4#a0d16006	-158.2	1.30	0.70	1780	granary	-	wheat_farm	trawa	field	granary	20.8	7.8	6.7	4	443.54	769.04	25	4	443.54	769.04	25
 1879	village_B3_4	Cragstone	432.69	737.69	55.2	20	1	field	village_B3_4#411ed63e	F	0	2	13.9	-	village_B3_4#73b13524,village_B3_4#0a28f12a,village_B3_4#f3162984,village_B3_4#a0d16006	-34.8	1.30	0.70	1383	village	-	wheat_farm	trawa	field	village	5.2	36.7	2.4	2	435.69	741.77	17	2	435.69	741.77	17

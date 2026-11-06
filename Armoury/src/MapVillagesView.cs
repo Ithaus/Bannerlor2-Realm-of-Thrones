@@ -109,6 +109,7 @@ namespace Armoury
         public string Title = "";         // pierwsza linia naglowka (wariant pliku, np. "6000 people per village")
         public bool HasSceneCrc;          // naglowek "# scene_xml_crc: <liczba>" (IMapScene.GetSceneXmlCrc)
         public uint SceneCrc;
+        public long SceneTerrainSize;     // rot812: naglowek "# scene_terrain_size: <B>" - rozmiar terrain.bin ROT-Map, dla ktorego liczono plik (CRC sceny gry nieznane poza gra)
         public uint FileCrc32;            // crc32 calego pliku (ktory plik jest w grze)
         public int DataLines;             // wiersze danych (bez komentarzy i pustych)
         public int BadRows;
@@ -280,6 +281,14 @@ namespace Armoury
                         foreach (var r in Required) if (!col.ContainsKey(r)) miss.Add(r);
                         if (miss.Count > 0) { f.MissingColumns = string.Join(",", miss.ToArray()); f.Records.Clear(); return f; }
                         f.HasModelColumn = col.ContainsKey("model");
+                        continue;
+                    }
+                    string tsb = body.Trim();
+                    if (tsb.StartsWith("scene_terrain_size:", StringComparison.Ordinal))
+                    {
+                        long tsv;
+                        string[] tsp = tsb.Substring(19).Trim().Split(' ');
+                        if (tsp.Length > 0 && long.TryParse(tsp[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out tsv) && tsv > 0) f.SceneTerrainSize = tsv;
                         continue;
                     }
                     var m = CrcRx.Match(body);
@@ -460,8 +469,38 @@ namespace Armoury
         /// <summary>CRC sceny: plik bez naglowka CRC - bez sprawdzenia; zgodny; niezgodny (wioski wylaczone).</summary>
         internal static int CheckScene(MapVillageFile f, uint sceneCrc)
         {
-            if (f == null || !f.HasSceneCrc) return CheckNoCrc;
-            return f.SceneCrc == sceneCrc ? CheckMatch : CheckMismatch;
+            if (f == null) return CheckNoCrc;
+            if (f.HasSceneCrc && f.SceneCrc == sceneCrc) return CheckMatch;
+            // rot812 (ROT 8.1.2): CRC sceny liczy silnik (IMapScene.GetSceneXmlCrc - nie CRC32 pliku scene.xscene), poza gra nieznane; plik z naglowkiem
+            // "# scene_terrain_size:" jest przyjety, gdy terrain.bin ROT-Map ma dokladnie ten rozmiar (ten sam straznik co drogi: MapRoads / MapSideRoads)
+            if (f.SceneTerrainSize > 0) return TerrainAccepts(f.SceneTerrainSize) ? CheckMatch : CheckMismatch;
+            return f.HasSceneCrc ? CheckMismatch : CheckNoCrc;
+        }
+
+        private static long _terrainNow = -2;   // rot812: rozmiar terrain.bin ROT-Map (-2 nie czytany, -1 brak pliku) - raz na proces (mapy nie podmienia sie przy wlaczonej grze)
+
+        /// <summary>rot812: rozmiar terrain.bin ROT-Map (MapRoads.TerrainPath), -1 gdy brak.</summary>
+        internal static long TerrainSizeNow()
+        {
+            if (_terrainNow != -2) return _terrainNow;
+            long v = -1;
+            try { string p = MapRoads.TerrainPath(); if (p != null && System.IO.File.Exists(p)) v = new System.IO.FileInfo(p).Length; }
+            catch { v = -1; }
+            _terrainNow = v;
+            return v;
+        }
+
+        /// <summary>rot812: plik liczony dla tego terrain.bin (rozmiar z naglowka "# scene_terrain_size:").</summary>
+        internal static bool TerrainAccepts(long fileTerrainSize) { return fileTerrainSize > 0 && TerrainSizeNow() == fileTerrainSize; }
+
+        /// <summary>rot812: opis zgodnosci sceny do logu - przy przyjeciu po terrain.bin podaje CRC sceny gry do wpisania w naglowek.</summary>
+        internal static string SceneNote(MapVillageFile f, uint sceneCrc)
+        {
+            if (f != null && f.HasSceneCrc && f.SceneCrc == sceneCrc) return "zgodne (" + sceneCrc + ")";
+            if (f != null && f.SceneTerrainSize > 0)
+                return "przyjete po terrain.bin ROT-Map (" + f.SceneTerrainSize + " B" + (TerrainAccepts(f.SceneTerrainSize) ? "" : " - NIEZGODNY, teraz " + TerrainSizeNow() + " B")
+                       + "); CRC sceny gry " + sceneCrc + " - do naglowka '# scene_xml_crc: " + sceneCrc + "'";
+            return f != null && f.HasSceneCrc ? "NIEZGODNE (plik " + f.SceneCrc + ", gra " + sceneCrc + ")" : "brak w pliku";
         }
 
         private static uint[] _crcTable;
@@ -1830,6 +1869,7 @@ namespace Armoury
             if (check == MapVillageData.CheckMismatch)
             {
                 Log.Info(head + " - CRC sceny w pliku " + file.SceneCrc + ", scena gry " + sceneCrc
+                         + (file.SceneTerrainSize > 0 ? " (terrain.bin pliku " + file.SceneTerrainSize + " B, ROT-Map " + MapVillageData.TerrainSizeNow() + " B)" : "")
                          + ": plik z innej wersji mapy ROT - wioski na mapie WYLACZONE (wsie gry bez zmian; potrzebny nowy przebieg generatora).");
                 return;
             }
@@ -1883,7 +1923,7 @@ namespace Armoury
                      + (file.LevelClamped > 0 ? "; poziom przyciety do 1-3: " + file.LevelClamped : "")
                      + "; obrazki (kolumna model" + (file.HasModelColumn ? "" : " - BRAK, kazda wioska village") + "): " + file.ModelsText()
                      + (file.ModelUnknown > 0 ? " (nieznana wartosc -> village: " + file.ModelUnknown + ")" : "")
-                     + "; CRC sceny: " + (check == MapVillageData.CheckMatch ? "zgodne (" + sceneCrc + ")"
+                     + "; CRC sceny: " + (check == MapVillageData.CheckMatch ? MapVillageData.SceneNote(file, sceneCrc)
                                           : "brak w pliku - sprawdzenie pominiete (scena gry " + sceneCrc + "; do naglowka: '# scene_xml_crc: " + sceneCrc + "')")
                      + "; pominiete od razu: brak wsi gry " + noMother + " (okregow " + noMotherDistricts + "), nie wies " + notVillage
                      + ", poza granica mapy " + outside + "; maski sceny civilian " + _maskCivil + ", level_1/2/3 " + _maskL1 + "/" + _maskL2 + "/" + _maskL3

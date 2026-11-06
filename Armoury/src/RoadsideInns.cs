@@ -192,6 +192,7 @@ namespace Armoury
             string text = Encoding.UTF8.GetString(bytes);
             string[] head = null;
             uint fileScene = 0; bool hasScene = false;
+            long fileTerrain = 0;   // rot812: "# scene_terrain_size:" (MapVillageData.CheckScene)
             var rows = new List<Inn>();
             int line = 0;
             foreach (string raw in text.Split('\n'))
@@ -204,6 +205,8 @@ namespace Armoury
                 {
                     int k = s.IndexOf("scene_xml_crc:", StringComparison.Ordinal);
                     if (k >= 0 && uint.TryParse(s.Substring(k + 14).Trim(), NumberStyles.Integer, Inv, out fileScene)) hasScene = true;
+                    int kt = s.IndexOf("scene_terrain_size:", StringComparison.Ordinal);
+                    if (kt >= 0) { string[] tp = s.Substring(kt + 19).Trim().Split(' '); long tv; if (tp.Length > 0 && long.TryParse(tp[0], NumberStyles.Integer, Inv, out tv) && tv > 0) fileTerrain = tv; }
                     continue;
                 }
                 if (head == null) { _bad++; continue; }
@@ -219,11 +222,14 @@ namespace Armoury
             try
             {
                 var ms = Campaign.Current.MapSceneWrapper;
-                if (hasScene && ms != null)
+                if ((hasScene || fileTerrain > 0) && ms != null)
                 {
                     uint sc = ms.GetSceneXmlCrc();
-                    if (sc != fileScene) { _sceneBad = rows.Count; _loadText = "plik " + _fileUsed + " (crc32 " + crc.ToString("X8") + ") z innej mapy (CRC sceny pliku " + fileScene + ", gry " + sc + ") - zajazdy WYLACZONE"; return; }
-                    sceneNote = "CRC sceny zgodne (" + sc + ")";
+                    bool byTerrain = !(hasScene && sc == fileScene) && fileTerrain > 0 && MapVillageData.TerrainAccepts(fileTerrain);   // rot812
+                    if (byTerrain) { sceneNote = "przyjete po terrain.bin ROT-Map (" + fileTerrain + " B); CRC sceny gry " + sc + " - do naglowka '# scene_xml_crc: " + sc + "'"; }
+                    else if (!(hasScene && sc == fileScene)) { _sceneBad = rows.Count; _loadText = "plik " + _fileUsed + " (crc32 " + crc.ToString("X8") + ") z innej mapy (CRC sceny pliku " + fileScene + ", gry " + sc
+                        + (fileTerrain > 0 ? "; terrain.bin pliku " + fileTerrain + " B, ROT-Map " + MapVillageData.TerrainSizeNow() + " B" : "") + ") - zajazdy WYLACZONE"; return; }
+                    else sceneNote = "CRC sceny zgodne (" + sc + ")";
                 }
             }
             catch { sceneNote = "CRC sceny nie odczytane"; }

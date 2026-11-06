@@ -29,6 +29,7 @@ def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap.add_argument('--wyj', default=os.path.join(here, '..', '..', 'Armoury', 'ModuleData', 'arm_map_side_roads_grid.tsv'))
     ap.add_argument('--teren', default=r'C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules\ROT-Map\SceneObj\Main_map\terrain.bin')
+    ap.add_argument('--zrodlo', default='', help='rot812: opis zrodla do naglowka zamiast sondy 16.10 (np. dane z tools/geo/rot812_dane.py)')
     a = ap.parse_args()
     md5, size = MD5_1610, SIZE_1610
     if os.path.isfile(a.teren):
@@ -80,7 +81,7 @@ def main():
     with open(a.wyj, 'w', encoding='utf-8', newline='\n') as o:
         o.write('# Armoury: passable land grid for the side roads to far villages (f11-drogi) - do not edit\n')
         o.write('# version: %d\n' % VERSION)
-        o.write('# source: geo-siatka.tsv (geo probe MapGeoProbe G3 run 2026-10-16 13:59, branch w-toku/noc-geo 19e6f041); generator tools/drogi/drogi_boczne_siatka.py\n')
+        o.write('# source: %s; generator tools/drogi/drogi_boczne_siatka.py\n' % (a.zrodlo or 'geo-siatka.tsv (geo probe MapGeoProbe G3 run 2026-10-16 13:59, branch w-toku/noc-geo 19e6f041)'))
         o.write('# terrain_md5: %s\n' % md5)
         o.write('# terrain_size: %d\n' % size)
         o.write('# cell: %d\n' % CELL)

@@ -745,7 +745,7 @@ namespace Armoury
             return cols.TryGetValue(name, out i) ? i : def;
         }
 
-        private static string TerrainPath()
+        internal static string TerrainPath()   // rot812: takze straznik sceny plikow wiosek / zajazdow (MapVillageData.TerrainAccepts)
         {
             try
             {

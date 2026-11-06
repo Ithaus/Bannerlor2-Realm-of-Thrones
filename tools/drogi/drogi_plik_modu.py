@@ -25,6 +25,7 @@ def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap.add_argument('--wyj', default=os.path.join(here, '..', '..', 'Armoury', 'ModuleData', 'arm_map_roads_geo.tsv'))
     ap.add_argument('--teren', default=r'C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules\ROT-Map\SceneObj\Main_map\terrain.bin')
+    ap.add_argument('--zrodlo', default='', help='rot812: opis zrodla do naglowka zamiast sondy 16.10')
     a = ap.parse_args()
     md5, size = MD5_1610, SIZE_1610
     if os.path.isfile(a.teren):
@@ -63,8 +64,9 @@ def main():
     with open(a.wyj, 'w', encoding='utf-8', newline='\n') as f:
         f.write('# Armoury: Realm of Thrones painted roads (terrain paint layer "road", slot 13, vtstt_ground_roads_e_d) as polylines in map units - do not edit\n')
         f.write('# version: %d\n' % VERSION)
-        f.write('# source: %s (geo probe MapGeoProbe G3 run 2026-10-16 13:59, branch w-toku/noc-geo 19e6f041; polylines from tools/geo/geo_drogi_rot.py: '
-                'weight > 48/255, 1-sample closing, Zhang-Suen, Douglas-Peucker 0.2, spurs < 2 removed); generator tools/drogi/drogi_plik_modu.py\n' % os.path.basename(a.wej))
+        f.write('# source: %s (%s; polylines from tools/geo/geo_drogi_rot.py: '
+                'weight > 48/255, 1-sample closing, Zhang-Suen, Douglas-Peucker 0.2, spurs < 2 removed); generator tools/drogi/drogi_plik_modu.py\n'
+                % (os.path.basename(a.wej), a.zrodlo or 'geo probe MapGeoProbe G3 run 2026-10-16 13:59, branch w-toku/noc-geo 19e6f041'))
         f.write('# terrain_md5: %s\n' % md5)
         f.write('# terrain_size: %d\n' % size)
         f.write('# polylines: %d, points: %d, segments: %d, length: %.1f\n' % (len(lines), len(rows), segs, tot))

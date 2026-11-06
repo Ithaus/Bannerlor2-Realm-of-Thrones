@@ -1,5 +1,6 @@
 # Armoury: named map villages (layout v5: 20% fewer, sizes by place; from population prototype v4: no ruler lines, picture model, ROT 8.1.8). One row = one map village
-# scene_xml_crc: 146201570
+# scene_xml_crc: 0
+# scene_terrain_size: 50639409 (ROT 8.1.2: the mod takes this file when ROT-Map terrain.bin has this size - the game scene CRC is not known outside the game, 8.1.8 had 146201570; tools/geo/rot812_wioski.py, villages moved: none)
 # (cluster of settlements of the district of village_id). road_deg = road / river / coast direction 0..180; order = default burn order
 # (0 = nearest to the game village by road); front_deg = model front (local +Y) yaw; half_len/half_wid = footprint.
 # kind = PLACE (bridge / ford / crossroad / road / river / lake / coast / field), unchanged; model (v4, last column) = PICTURE:
