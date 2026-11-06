@@ -152,6 +152,7 @@ namespace Armoury
                         try { KingdomLines(today); } catch (Exception e) { Stumble("KingdomLines", e); }
                         _dDailyT += Ts() - d0;
                         try { CostLine(today); } catch (Exception e) { Stumble("CostLine", e); }
+                        try { if (WarFront334.IronOn) Log.Info(IronCanonLine(today)); } catch (Exception e) { Stumble("IronCanonLine", e); }   // 342 (Z4)
                     }
                 }
             }
@@ -215,7 +216,7 @@ namespace Armoury
                      + " | z GC (340): srednio " + (hrs > 0 ? (allSum / hrs).ToString("0.00", Inv) : "0") + " / maks godziny " + allMax.ToString("0.0", Inv) + ", okien z GC " + _dGcWin + " / " + _dWin + " (" + _dGcMs.ToString("0.0", Inv) + " ms)"
                      + " | sciezki ms (340): " + ps.ToString() + " | wpisy celu (340) budow " + _dThN
                      + " | odsiecz w zasiegu po odstapieniu (340): weta " + _dKRelHold + ", zwolnione " + _dKRelFree + ", pamieci " + _krel.Count
-                     + " | zbiorka nasza miara (340): ocen " + _dGather + ", w oknie/srodku " + _dGatherOk + ", nasza/gry " + (_dGather > 0 ? (_dGatherRatio / _dGather).ToString("0.00", Inv) : "-") + ".");
+                     + " | zbiorka nasza miara (340): ocen " + _dGather + ", w oknie/srodku " + _dGatherOk + ", nasza/gry " + (_dGather > 0 ? (_dGatherRatio / _dGather).ToString("0.00", Inv) : "-") + SieveText() + ".");
         }
 
         /// <summary>Linie krolestw. 334f (L3): cele pytane i okno z tej samej miary, ktora dostala mysl AI (ScorePost: q policzone / q &lt;= 0.8, krolestwo

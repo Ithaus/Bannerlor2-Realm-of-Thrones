@@ -486,6 +486,34 @@ namespace Armoury
             return best == float.MinValue ? bestRaid : best;
         }
 
+        /// <summary>342r (odsiew rabunkow LocalFront334e): czy WW3 (Profit) pomnozy opcje rabunku tej partii w tej mysli; cost - C x T jak w Profit. Nie rzuca.</summary>
+        internal static bool SieveBoostPrep(MobileParty party, out double cost)
+        {
+            cost = 1.0;
+            try
+            {
+                if (party == null || !party.IsLordParty || party.IsMainParty) return false;
+                int g = GroupOf(party.MapFaction);
+                if (g < 0 || !ProfitOn || (g == GFree && !ProfitFreeOn)) return false;
+                cost = DayCost(party) * PayDays;
+                if (!(cost > 1.0)) cost = 1.0;
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>342r: mnoznik WW3 opcji rabunku wsi st (M = 1 + min(2, E / (C x T)), jak Profit). Nie rzuca.</summary>
+        internal static double SieveBoost(Settlement st, MobileParty.NavigationType nav, double cost)
+        {
+            try
+            {
+                bool burned;
+                double e = LootEstimate(st, nav, out burned);
+                return 1.0 + Math.Min(MaxExtra, Math.Max(0.0, e) / cost);
+            }
+            catch { return 1.0; }
+        }
+
         /// <summary>WW3: lup zelaznej ceny z wsi teraz (E). Kiesa i magazyn wsi - pamiec na godzine gry (wiele partii mysli o tych samych wsiach).
         /// Recenzja R2-7: okreg wypalony (DistrictRaid.BurnedOutNow - ta sama arytmetyka co Plan kroku: Z = 0 osad w zasiegu) - E = 0, bo krok nic nie spali (u = 0,
         /// lup 0). Recenzja R1-1: nabrzeze tylko dla opcji, ktora prowadzi morzem (NavigationType.Naval - partia dotrze i rabuje z morza), nie wedlug tego, czy

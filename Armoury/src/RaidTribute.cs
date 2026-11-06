@@ -266,6 +266,12 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>342r (odsiew rabunkow LocalFront334e): czy ThinkPostfix da rabunkowi st przez frakcje f wynik -1 teraz. Tylko odczyt, nie rzuca.</summary>
+        internal static bool SparedNow(Settlement st, IFaction f)
+        {
+            try { return On && Spared(st, f, Today); } catch { return false; }
+        }
+
         private static int SpareUntil(Settlement st, IFaction f)
         {
             if (st == null || f == null) return 0;

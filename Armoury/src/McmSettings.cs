@@ -10800,6 +10800,18 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CommanderGuardCharging340 { get; set; } = true;
 
+        [SettingPropertyBool("Any Lord May Call The Banners", HintText = "Any lord of an AI realm who leads a host may call the banners, not only the head of his house, on the game's own terms (influence, food, not at sea, not in another army); his house pays the influence, and a house may lead another army only while its influence covers one more, so armies do not flood the field. Off = only heads of houses, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool AnyLordArmy342 { get; set; } = true;
+
+        [SettingPropertyBool("Raid Choice Best First", HintText = "When an AI lord weighs which village to raid, the strength of the enemy that can reach each village is reckoned only for the most promising ones, best first, until no other can beat the best; the choice is the same, the work is far less. Off = every village reckoned", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool RaidSieve342 { get; set; } = true;
+
+        [SettingPropertyBool("Ironborn Sail For The Northern Coast", HintText = "The Ironborn weigh the strongholds the books give them on the northern coast - Moat Cailin, Deepwood Motte, Torrhen's Square and the Stony Shore - by sea and landing, however far the sail; a nearer one counts for more, a weaker one can still win. Off = only strongholds within the usual reach", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool IronCanonCoast342 { get; set; } = true;
+
         [SettingPropertyBool("Canon Houses of the West", HintText = "As in the books, the lordly houses of the Westerlands and the Crownlands that Realm of Thrones leaves without a castle (Estren, Falwell, Jast, Moreland, Plumm, Prester, Stackspear, Buckwell, Chelsted, Hayford, Stokeworth; House Spicer stays a knightly house until the Red Wedding, as in the books) answer their liege's call with a host of their own: the Banner Kings gentry family that keeps an estate in their lands is raised to full peerage (exactly as a realm vote would grant it) and to clan tier 3, and its head leads a party raised the usual way from the villages. Once per campaign, at the first day after loading or at the start of a new game. No castles are taken from anyone. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonHouses277 { get; set; } = true;
@@ -14295,6 +14307,9 @@ namespace Armoury
             s.IronMuster340 = IronMuster340;
             s.RelievesWarLeader340 = RelievesWarLeader340;
             s.CommanderGuardCharging340 = CommanderGuardCharging340;
+            s.AnyLordArmy342 = AnyLordArmy342;
+            s.RaidSieve342 = RaidSieve342;
+            s.IronCanonCoast342 = IronCanonCoast342;
             s.CanonHouses277 = CanonHouses277;
             s.CanonHouses277Rename = CanonHouses277Rename;
             s.CanonHouses277LiegePay = CanonHouses277LiegePay;
