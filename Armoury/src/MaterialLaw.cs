@@ -190,12 +190,15 @@ namespace Armoury
                 // KS (kalibracja startu, projekt rozdz. 11.2): wies zastosowana - towar KS = stawka z rak i ziemi okregu (sztuki/d na targ, z zima i rekami E4/5, E4/7),
                 // zastepuje caly lancuch nizej (typ, ludzie P1, stawki GL5, mnozniki kopalni i lasu, owoce, jaja, wielblady, regulator, hodowla, W2, ZC1); sufity kruszcow
                 // i ksiega rudy w ProdStep; wies poza KS i towar spoza KS - lancuch jak dotad
+                if (Buildings338Village.KsGoods(village, item, ref __result)) return;   // 338c: chleb i skora wsi KS (stawka z ScaleRates; zboze i skory juz zmniejszone w A)
                 if (StartCalibration.ProdStep(village, item, ref __result)) return;
                 CamelLaw.QarthBase(village, item, ref __result);   // E6/M2 (208): wielblad stadniny Qarthu - baza z udzialu konia-gospodarza (przed mnoznikami, jak kazdy towar)
                 VillageFruit.Base(village, item, ref __result);     // noc 15/16.10 (placek i marchew): owoce i miod wsi wedlug wag BK - baza przed mnoznikami (P1, rece, regulator, zima)
                 // inwest (noc 17/18.10): zajecia wiosek pobocznych bez KS - czynnik towarow typu okregu i baza towarow innych zajec PRZED mnoznikami (kopalnie, las, P1, rece,
                 // regulator towaru) - dopisany towar dostaje te same mnozniki co we wsi tego typu; wies pod KS, klucz wylaczony, wies bez planu - nic (wlasny try)
                 VillageCrafts.Base(village, item, ref __result);
+                Buildings338Village.GoodsBase(village, item, ref __result);   // 338c: chleb, skora, rudy kopalni wsi BK poza KS - baza przed mnoznikami
+                Buildings338Village.ProdStep(village, item, ref __result);   // 338 grupa 10: budynki produkcji wsi BK i projekt Production (poza KS; pod KS - w stawce A)
                 var s = Settings.Current;
                 string id = item.StringId ?? "";
                 float m = 1f;
@@ -210,6 +213,7 @@ namespace Armoury
                 // tyle razy, ile ich bylo (wydobycie bez zmian; niezalezne od wlacznika MaterialLaw i od suwakow)
                 m *= MineralOnce.Times(village, item);
                 m *= CamelLaw.HostFactor(village, item);    // E6/M2 (208): kon-gospodarz przejmuje wage wielbladow poza Qarthem / oddaje ja wielbladom Qarthu (ta sama suma sztuk)
+                m *= Buildings338Village.HostFactor(village, item);   // 338c: zboze na chleb, skory na skore, inne plony za rude kopalni wsi (te same rece)
                 m *= VillageFruit.HostFactor(village, item); // E3-D1 (noc-ekonomia3 czesc 2): inne plony wsi x c - rece przesuniete na drogie jaja, owoce i miod (ta sama wartosc bazowa)
                 if (Math.Abs(m - 1f) >= 0.001f)
                 {

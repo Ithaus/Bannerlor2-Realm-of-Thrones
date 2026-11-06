@@ -93,6 +93,7 @@ namespace Armoury
         // F2
         private static long _fNrAllV, _fNrAllN;   // 305e: z zablokowanych - wsie poza stawkami KS (kraina wrocona, wies bez stawek, pierwsza doba sesji przed stawkami)
         private static long _fNrBlockedV, _fNrBlockedN, _fNrPassV, _fNrPassN, _fPortBlocked, _fPortPass, _fPortPassFish, _fPortPassGold, _fCrew, _fCrewParties, _fPortPaid, _fPortFolk, _fPortBack;
+        private static long _fPortKs, _fPortKsFish, _fPortKsPaid, _fPortKsFolk;   // 338c: porty BK pod KS (Buildings338Ports) - praca rybakow, nie z niczego
         // F3
         private static long _uSkip, _uSkipAll;
         // F4
@@ -119,6 +120,7 @@ namespace Armoury
             _bkSkipped = _bkSkippedPack = _bkHorsesHome = _bkPartiesHome = _bkNoWhere = _bkTradingKept = 0;
             _fNrAllV = _fNrAllN = 0;
             _fNrBlockedV = _fNrBlockedN = _fNrPassV = _fNrPassN = _fPortBlocked = _fPortPass = _fPortPassFish = _fPortPassGold = _fCrew = _fCrewParties = _fPortPaid = _fPortFolk = _fPortBack = 0;
+            _fPortKs = _fPortKsFish = _fPortKsPaid = _fPortKsFolk = 0;
             _uSkip = 0;
             _cFail = _cFailSiege = _cFailOther = _cRescued = _cCommitFail = _cPassed = _cCapIn = _cCapDone = _cInCommit = 0; _cTypes.Clear();
             _sWant = _sBuilt = _sFull = _sNoWood = _sNoGold = _sWood = _sPlanks = _sWage = _sWageKept = _sNoHull = _sValue = 0;
@@ -277,7 +279,7 @@ namespace Armoury
             try { GoodsLedger.End(__state); } catch (Exception e) { Stumble("NavalVillageFin", e); }
         }
 
-        internal struct PortState { public bool On; public Town T; public int Fish0; public int Gold0; public GoodsLedger.Frame F; }
+        internal struct PortState { public bool On; public bool Ks; public Town T; public int Fish0; public int Gold0; public GoodsLedger.Frame F; }
 
         /// <summary>Prefiks BK BKBuildingsBehavior.RunPorts(Town): przy KS zastosowanym pominiety (ryby z niczego za kase w nicosc); poza KS - pomiar (ryby, zloto),
         /// ramka polowu ksiegi towarow z etykieta, a zloto zdjete przez BK w nicosc - do kiesy ludu (klucz A17PortFishPaysFolk; recenzja stare-a17 (3)).</summary>
@@ -288,12 +290,16 @@ namespace Armoury
             {
                 if (!FishOn || __0 == null) return true;
                 // recenzja calosci: miasto krainy wroconej przez bramke krainy (ks-arm) - porty BK jak dzis (pomiar, ramka, zloto do kiesy ludu), jak A17 wsi (AppliedFor)
-                if (StartCalibration.Applied && !StartCalibration.LandBackOf(__0.Settlement)) { _fPortBlocked++; return false; }
+                // 338c (Buildings338Ports.KsOpen): pod KS port lowi dalej - ryby z pracy rybakow (wzor BK z dzierzawcow i rzemieslnikow), zaplata z kasy do kiesy ludu,
+                // podaz w Planie KS (StartCalibration.Plan - PortFishExo), w ksiedze wlasna grupa (nie "ryby z niczego", nie lodzie Planu)
+                bool ks = StartCalibration.Applied && !StartCalibration.LandBackOf(__0.Settlement);
+                // 338d (recenzja): pod KS bez czynnej kiesy ludu (Live false) zaplata nie mialaby odbiorcy - port nie lowi (jak dotad blokada)
+                if (ks && (!Buildings338Ports.KsOpen || !Live)) { _fPortBlocked++; return false; }
                 var f = Fish;
                 if (f != null && __0.Settlement != null && __0.Settlement.ItemRoster != null)
                 {
-                    __state.On = true; __state.T = __0; __state.Fish0 = __0.Settlement.ItemRoster.GetItemNumber(f); __state.Gold0 = __0.Gold;
-                    __state.F = FishFrame(__0, LabPorts);
+                    __state.On = true; __state.Ks = ks; __state.T = __0; __state.Fish0 = __0.Settlement.ItemRoster.GetItemNumber(f); __state.Gold0 = __0.Gold;
+                    __state.F = FishFrame(__0, ks ? Buildings338Ports.LabKs : LabPorts);
                 }
                 return true;
             }
@@ -309,8 +315,9 @@ namespace Armoury
                 int paid = Math.Max(0, __state.Gold0 - __state.T.Gold);
                 if (df > 0)
                 {
-                    _fPortPass++; _fPortPassFish += df;
-                    if (paid > 0 && PortFolkOn && Live)
+                    if (__state.Ks) { _fPortKs++; _fPortKsFish += df; try { Buildings338Ports.NoteKsFish(df); } catch { } }
+                    else { _fPortPass++; _fPortPassFish += df; }
+                    if (paid > 0 && (PortFolkOn || __state.Ks) && Live)   // 338c: pod KS zaplata zawsze do kiesy ludu (bez zlota w nicosc)
                     {
                         // BK: town.ChangeGold(-cena x ryby) bez odbiorcy. Zloto zdjete z kasy laduje w kiesie ludu (place rybakow portu - dzierzawcy i rzemieslnicy
                         // z formuly BK; TownFolk.Earn KMine: wyrobnicy - sam zapis w kiesie), czesc nieprzyjeta wraca do kasy - ten sam wzor co place gornikow
@@ -319,7 +326,8 @@ namespace Armoury
                         int folk = Math.Max(0, Math.Min(paid, TownFolk.Earn(town.Settlement, paid, TownFolk.KMine)));
                         if (paid - folk > 0) town.ChangeGold(paid - folk);
                         try { CirculationWindows.NotePortsFolk(folk); } catch { }
-                        _fPortPaid += paid; _fPortFolk += folk; _fPortBack += paid - folk;
+                        if (__state.Ks) { _fPortKsPaid += paid; _fPortKsFolk += folk; }
+                        else { _fPortPaid += paid; _fPortFolk += folk; _fPortBack += paid - folk; }
                     }
                     else _fPortPassGold += paid;
                 }
@@ -730,7 +738,8 @@ namespace Armoury
                          + " (klucz A17PortFishPaysFolk " + YN(PortFolkOn) + ": zaplacone " + _fPortPaid + " zl = do kiesy ludu " + _fPortFolk + " + zostalo w kasie " + _fPortBack + ")"
                          + " | polow zalogi na morzu (Master Angler, ramka polowu ksiegi towarow - zrodlo nazwane) " + _fCrew + " szt. w " + _fCrewParties + " godzinach partii"
                          + " | razem ryby z niczego " + (_fNrPassN + _fPortPassFish)
-                         + " | 305e: Night Raider przy KS we wszystkich wsiach (klucz A17NightRaiderBlockAllKs " + YN(NrAllKsOn) + "): z zablokowanych poza stawkami KS " + _fNrAllN + " szt. w " + _fNrAllV + " wsiach" + pot);
+                         + " | 305e: Night Raider przy KS we wszystkich wsiach (klucz A17NightRaiderBlockAllKs " + YN(NrAllKsOn) + "): z zablokowanych poza stawkami KS " + _fNrAllN + " szt. w " + _fNrAllV + " wsiach"
+                         + " | 338c porty BK pod KS (praca rybakow, klucz Buildings338Ports " + YN(Buildings338Ports.KsOpen) + "): " + _fPortKsFish + " szt. w " + _fPortKs + " osadach, zaplacone " + _fPortKsPaid + " zl, do kiesy ludu " + _fPortKsFolk + pot);
                 Log.Info("Unikaty u band (A17 F3): dzien " + day + " | klucz A17UniquesNotOutlawKit " + YN(UniqOn) + " | unikaty pominiete przy awansie band (kandydaci u pasera i w jukach) "
                          + _uSkip + " (sesja " + _uSkipAll + ") - unikat zostaje na polce albo w jukach (lup), nie znika w zolnierzu bandy" + pot);
                 var tb = new StringBuilder();

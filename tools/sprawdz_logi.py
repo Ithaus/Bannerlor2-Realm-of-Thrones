@@ -96800,5 +96800,496 @@ def main(argv):
     return _sila336_main_prev(argv)
 
 
+# ------------------------------------------------------------ paczka 338: grupa budynki338 - budynki robia to, co pisze ich opis (Buildings338*.cs)
+#  B338-1 linia startu sesji (BK jest, latki bez BRAK); B338-2 linie doby kazdej grupy co dobe (0 luk, 0 nierozpoznanych); B338-3 bledy 0 i 'ERROR in Buildings338' 0;
+#  B338-4 zold: po <= przed, oszczednosc >= 0, pominiete (BK liczy) 0; B338-5 zold - oszczednosc ostatniej doby 20 000..40 000 zl/d przy >= 150 twierdzach z budynkiem
+#  (projekt 338 p. 1, at337); B338-6 autowerbunek: dobrano ponad K8 <= suma limitu w kazdej dobie; B338-7 dubel jedzenia BK: osad z bilansem < 0 po - przed <= 5% osad;
+#  B338-8 murarz: dopisek <= punkty Masona; B338-9 urzad podatkowy: droga firm TAK i rata > 0 w biegu (gdy sa miasta z urzedem, >= 8 dob); B338-10 karawany: podniesione > 0 (gdy sa
+#  targowiska); B338-11 asymilacja: latka TAK; B338-12 drogi / produkcja wsi / ule (model BK czynny NIE); B338-13 zamki: tick BK zamkow 0 (gra nie tyka - nasz tick bez
+#  dubla); B338-14 stadniny: bez typu konia 0; z --baza <log biegu z Buildings338 wyl.>: B338-15 ludzie w zalogach AI w ostatniej wspolnej dobie (>= 60 dob) w +-5% bazy;
+#  B338-16 srednie ceny miast zboza i drewna w ostatniej wspolnej dobie (>= 60 dob) w +-15% bazy (recenzja W4).
+#  338c: B338-5 prog z liczby budynkow i opisu (sredni zold twierdzy x suma obnizek: poziom 1 x0.8 .. poziom 3 x2 x1.2, nie stala 20-40 tys.); B338-7 przy kluczu
+#  Buildings338FoodDouble NIE (domyslnie - decyzja 338c: premia BK zostaje) - premia nietknieta kazdej doby; B338-13 sumy biegu; B338-17 porty BK pod KS (blokada A17 zdjeta,
+#  ryby z pracy > 0 gdy Plan > 0) i 17b Plan ryb portow wobec polowu +-25%; B338-18 kopalnie zamkow z pracy (rudy w biegu > 0); B338-19 chleb z ziarna, skora, rudy wsi
+#  (wartosc = zdjete z innych plonow +-10%); z --baza: B338-20 zbytki ludu (OB2-6a) >= 95% bazy, B338-21 rachunki KS-H po zwloce (NKA-4) dob <= baza.
+#  338d: linia dubla - klucz i latka osobno, przy NIE "nie mierzone" (B338-7: klucz TAK bez latki = NIE); zamki - ryby portow zamkow do jedzenia zamku (B338-13 opis),
+#  ruda zamkow na targ miasta handlowego okregu (bez kupca, bez placy - B338-18 opis); skora tylko ze skor; B338-19 wartosc zdjeta mierzona z tablicy (przed - po).
+B338_START = re.compile(r"Budynki \(338\): start sesji \| glowny (TAK|NIE) \|.*\| BK (jest|BRAK) \| Courier Post na liscie budowy wsi BK: (\S+) \| latki: (.*)$")
+B338_DAY = re.compile(r"Budynki \(338\) ([a-zA-Z ]+?): dzien (\d+) \| (.*) \| bledy (\d+)\s*$")
+B338_GROUPS = ["zold", "autowerbunek", "zapas jedzenia", "dubel jedzenia BK", "murarz", "urzad podatkowy", "karawany", "asymilacja", "drogi", "produkcja wsi",
+               "towary wsi", "zamki", "stadniny"]
+B338_RX = {
+    # 338c: liczby budynkow (B338-5 - prog z liczby budynkow i opisu)
+    "zold": re.compile(r"twierdz (\d+) z budynkiem \(miasto Barracks (\d+), zamek Barracks (\d+), biuro (\d+), Slacken (\d+)\) \| zold przed (-?\d+) po (-?\d+) oszczednosc (-?\d+) zl/d \| "
+                       r"limit AI x s: (\d+) twierdz, skalowan (\d+) \| pominiete \(BK liczy\) (\d+) \| wywolan (\d+) \| zalogi AI (\d+) ludzi$"),
+    "autowerbunek": re.compile(r"twierdz (\d+) z premia .*suma limitu \+(\d+)/d \| dobrano ponad K8 (\d+) ludzi$"),
+    "zapas jedzenia": re.compile(r"miast z Warehouse (\d+) \(sufit \+(-?\d+)\), zamkow z Granary (\d+) \(sufit \+(-?\d+), BK bylo \+(\d+)\)"),
+    # 338c: klucz (domyslnie NIE - decyzja: premia BK zostaje)
+    "dubel jedzenia BK": re.compile(r"(?:klucz (TAK|NIE) \([^)]*\)(?:, latka (TAK|NIE))? \| )?zamkow z Farmlands (\d+), miast z Warehouse (\d+) \| zdjeta premia (-?\d+) jedzenia/d \| "
+                                    r"osad z bilansem < 0: (?:(\d+) -> (\d+) z (\d+) osad|nie mierzone \(premia nietknieta\), osad z budynkami (\d+))$"),
+    "murarz": re.compile(r"osad (\d+) z Masonem w budowach oplaconych \| punktow \+([\d.]+)/d \(punkty Masona ([\d.]+), dopisek ponad punkty (\d+)\)$"),
+    "urzad podatkowy": re.compile(r"miast (\d+) z urzedem, droga firm (TAK|NIE) \| rata \+(-?\d+) zl \(pan (-?\d+), korona (-?\d+)\) w (\d+) ratach(?: \(nalezne (-?\d+) zl[^)]*\))?$"),
+    "karawany": re.compile(r"miast z Marketplace (\d+) \| wywolan (\d+), podniesionych (\d+), sredni mnoznik ([\d.]+)$"),
+    "asymilacja": re.compile(r"osad z projektem w liscie (\d+)/(\d+), wybrany w (\d+) \| latka (TAK|NIE), wywolan (\d+), dodano \+15 razy (\d+)$"),
+    "drogi": re.compile(r"wsi KS z drogami (\d+) \| dopisane ([\d.]+) szt\./d$"),
+    "produkcja wsi": re.compile(r"wsi z budynkami (\d+) \(.*\), projekt Production (\d+) \| KS wsi (\d+) dopisane ([\d.]+) szt\./d, poza KS ([\d.-]+) szt\. \| model BK czynny (TAK|NIE)(?: \| ceny miast: zboze ([\d.]+), drewno ([\d.]+))?$"),
+    # 338c: chleb, skora, rudy kopalni wsi BK (stary log: "chleb i skora: odlozone" - grupa opcjonalna pusta)
+    "towary wsi": re.compile(r"wsi z ulami (\d+), miod \+([\d.]+) \(baza przed mnoznikami\)(?: \| chleb: wsi KS (\d+) \(\+([\d.]+) szt\./d, zboza -([\d.]+)\), poza KS (\d+) \(baza \+([\d.]+)\) \| "
+                             r"skora: wsi KS (\d+) \(\+([\d.]+) szt\./d, skor(?: i futer)? -([\d.]+)\), poza KS (\d+) \(baza \+([\d.]+)\), bez surowca (\d+) \| "
+                             r"rudy kopalni wsi BK: wsi KS (\d+) \(\+([\d.]+) szt\./d, wartosc \+(\d+) zl, inne plony -(\d+) zl\), poza KS (\d+) \(wartosc (\d+) zl\))?"),
+    # 338c: sumy biegu, porty pod KS i Plan, kopalnie zamkow z pracy
+    "zamki": re.compile(r"tick BK dla zamkow (\d+) wywolan \(0 = gra nie tyka zamkow\) \| zamkow tykanych przez 338 dzis (\d+) \(w biegu (\d+) w (\d+) dobach\) \| "
+                        r"porty zamkow: klucz (TAK|NIE), zamkow z Portem zbudowanym (\d+) \(Port na liscie budowy (\d+), pod KS (\d+)\), ryb dzis \+(\d+), w biegu \+(\d+)"
+                        r"(?:, do jedzenia zamkow dzis (\d+) \(w biegu (\d+)\), czeka w magazynach (\d+))? \| "
+                        r"porty pod KS \(miasta i zamki\): osad (\d+), ryb dzis \+(\d+), w biegu \+(\d+), Plan KS ryb portow (\d+) szt\./d w (\d+) osadach \| "
+                        r"kopalnie zamkow: klucz (TAK|NIE), zamkow z kopalnia (\d+), tykanych (\d+), z urobkiem (\d+), rudy dzis \+(\d+) \(targ (?:zamku|miasta) (\d+), Stash (\d+)\), "
+                        r"place gornikow (\d+) zl, bez wolnych rak (\d+), w biegu rudy \+(\d+)(?:, bez kupca (\d+), bez placy (\d+))?$"),
+    "stadniny": re.compile(r"zamkow ze Studs (\d+) \(pelnych (\d+)\) \| konie bojowe \+(\d+) \(ze Stash (\d+), z magazynu zamku (\d+), z wsi (\d+)\), bez zrodla (\d+), bez typu konia (\d+)"
+                           r"(?: \| w biegu: konie bojowe \+(\d+), bez zrodla (\d+) w (\d+) dobach)?$"),
+}
+B338_ERR = re.compile(r"ERROR in Buildings338")
+# 338c: linie spoza grupy - blokada portow pod KS (A17 F2), zbytki ludu (OB2-6a) i rachunki KS-H (NKA-4) do porownania z biegiem bazowym
+B338_A17 = re.compile(r"Ryby z niczego \(A17 F2\): dzien (-?\d+) \|.*?porty BK \(RunPorts\): zablokowane w KS (\d+) miast"
+                      r"(?:.*?\| 338c porty BK pod KS \(praca rybakow, klucz Buildings338Ports (TAK|NIE)\): (\d+) szt\.)?")
+B338_ZB = re.compile(r"Zbytki ludu \(P3-P5\): dzien (-?\d+) \|")
+B338_KSH = re.compile(r"Kupcy zywnosci \(KS-H\) dzien (-?\d+) \|.*?, starsze niz (\d+) dni (-?\d+) zl \((\d+) miast\)")
+B338_WAGE_MIN = {"tb": 0.05, "cb": 0.10, "off": 0.10, "sl": 0.05}   # poziom 1 z opisu: koszary miasta 5%, zamku 10%, biuro 10%, Slacken 5%
+B338_WAGE_MAX = {"tb": 0.15, "cb": 0.30, "off": 0.30, "sl": 0.05}   # poziom 3
+
+
+def budynki338_collect(logp):
+    D = {"start": [], "g": {g: [] for g in B338_GROUPS}, "bad": 0, "err": 0, "a17": [], "zb": {}, "ksh": {}}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if "Ryby z niczego (A17 F2): dzien" in line:
+                m = B338_A17.search(line)
+                if m:
+                    D["a17"].append({"day": int(m.group(1)), "blocked": int(m.group(2)), "key": m.group(3), "ks": int(m.group(4)) if m.group(4) else None})
+                continue
+            if "Zbytki ludu (P3-P5): dzien" in line:
+                m = B338_ZB.search(line)
+                if m:
+                    a, c, v = O2_ZB.search(line), O2_ZBC.search(line), O2_ZBV.search(line)
+                    D["zb"][int(m.group(1))] = (int(a.group(1)) if a else 0) + (int(c.group(1)) if c else 0) + (int(v.group(1)) if v else 0)
+                continue
+            if "Kupcy zywnosci (KS-H) dzien" in line:
+                m = B338_KSH.search(line)
+                if m:
+                    D["ksh"][int(m.group(1))] = (int(m.group(3)), int(m.group(4)))
+                continue
+            if "338" not in line:
+                continue
+            if B338_ERR.search(line):
+                D["err"] += 1
+                continue
+            if "Budynki (338): start sesji" in line:
+                m = B338_START.search(line)
+                if m:
+                    D["start"].append({"main": m.group(1), "bk": m.group(2), "courier": m.group(3), "hooks": m.group(4)})
+                else:
+                    D["bad"] += 1
+                continue
+            if "Budynki (338) " not in line:
+                continue
+            m = B338_DAY.search(line)
+            if not m or m.group(1) not in D["g"]:
+                D["bad"] += 1
+                continue
+            g, day, body, err = m.group(1), int(m.group(2)), m.group(3), int(m.group(4))
+            rx = B338_RX[g].search(body)
+            if not rx:
+                D["bad"] += 1
+                continue
+            v = rx.groups()
+            if g == "zamki":   # 338d: nowe grupy (ryby do jedzenia zamkow) na koniec - stare indeksy bez zmian: 25-27 ryby zamkow, 28-29 bez kupca / bez placy
+                v = v[:10] + v[13:28] + v[10:13] + v[28:30]
+            elif g == "dubel jedzenia BK":   # 338d: latka (1) i "osad z budynkami" (8) na koniec: 0 klucz, 1-3, 4-6 bilans (None = nie mierzone), 7 latka, 8 osad
+                v = (v[0],) + v[2:8] + (v[1], v[8])
+            D["g"][g].append({"day": day, "err": err, "v": v})
+    return D
+
+
+def _b338i(x, d=0):
+    try:
+        return int(x)
+    except (TypeError, ValueError):
+        return d
+
+
+def budynki338_rows(rep, D, B=None):
+    anyg = any(D["g"].values())
+    if not D["start"]:
+        rep.add("B338-1: linia startu", f"brak (nierozpoznanych {D['bad']})", "linia 'Budynki (338): start sesji'", False if anyg else None)
+    else:
+        st = D["start"][-1]
+        miss = [h for h in st["hooks"].split("; ") if "BRAK" in h]
+        rep.add("B338-1: linia startu", f"startow {len(D['start'])}, glowny {st['main']}, BK {st['bk']}, Courier Post na liscie {st['courier']}, latki BRAK: {miss or '-'}",
+                "BK jest, 0 latek BRAK", st["bk"] == "jest" and not miss)
+    if not anyg:
+        rep.add("B338-2: linie doby grup", f"brak linii (nierozpoznanych {D['bad']})", "INFO (stary DLL albo < 1 doby)", None if D["bad"] == 0 else False)
+        return
+    probs = []
+    for g in B338_GROUPS:
+        days = sorted(set(r["day"] for r in D["g"][g]))
+        if not days:
+            probs.append(f"{g}: brak")
+            continue
+        gaps = sum(1 for a, b in zip(days, days[1:]) if b - a > 1)
+        if gaps:
+            probs.append(f"{g}: luk {gaps}")
+    nd = len(set(r["day"] for r in D["g"]["zold"]))
+    rep.add("B338-2: linie doby grup", f"dob {nd}, problemy: {probs or '-'}, nierozpoznanych {D['bad']}", "13 grup co dobe, 0 luk, 0 nierozpoznanych (stary format linii = nierozpoznana)",
+            not probs and D["bad"] == 0)
+    me = max((r["err"] for g in B338_GROUPS for r in D["g"][g]), default=0)
+    rep.add("B338-3: bledy 338", f"bledy max {me}, ERROR {D['err']}", "0 i 0", me == 0 and D["err"] == 0)
+    Z = D["g"]["zold"]
+    if Z:
+        bad = [r["day"] for r in Z if int(r["v"][6]) > int(r["v"][5]) or int(r["v"][7]) < 0]
+        bk = sum(int(r["v"][10]) for r in Z)
+        rep.add("B338-4: zold bez podwyzki, bez dubla BK", f"dob z po > przed {len(bad)}, pominiete (BK liczy) {bk}", "po <= przed, oszczednosc >= 0, pominiete 0", not bad and bk == 0)
+        v = Z[-1]["v"]
+        n, tb, cb, off, sl, przed, save = (int(x) for x in (v[0], v[1], v[2], v[3], v[4], v[5], v[7]))
+        if przed <= 0 or n == 0:
+            rep.add("B338-5: oszczednosc zoldu z liczby budynkow", f"ostatnia doba: twierdz {n}, zold przed {przed} (klucz wyl. albo brak budynkow)", "INFO", None)
+        else:
+            # 338c: prog z liczby budynkow i opisu (nie stala): sredni zold twierdzy x suma obnizek z opisu - poziom 1 (dol) / poziom 3 (gora); AddFactor sumuje sie z czynnikiem
+            # BK -50% zalog, wiec wzgledem zoldu po BK obnizka moze byc do 2x opisu; zapas 0.8 / 1.2 (perki, zold rozny w miastach i zamkach)
+            avg = przed / n
+            cnt = {"tb": tb, "cb": cb, "off": off, "sl": sl}
+            lo = 0.8 * avg * sum(cnt[k] * B338_WAGE_MIN[k] for k in cnt)
+            hi = min(przed, 1.2 * 2.0 * avg * sum(cnt[k] * B338_WAGE_MAX[k] for k in cnt))
+            rep.add("B338-5: oszczednosc zoldu z liczby budynkow",
+                    f"ostatnia doba: twierdz {n} (koszary miasta {tb}, zamku {cb}, biuro {off}, Slacken {sl}), zold przed {przed}, oszczednosc {save} zl/d ({100.0 * save / przed:.1f}%), "
+                    f"limit AI skalowany {v[8]} twierdz",
+                    f"{lo:.0f}..{hi:.0f} zl/d (sredni zold twierdzy {avg:.0f} x suma obnizek z opisu: poziom 1 x0.8 .. poziom 3 x2 (AddFactor po BK -50%) x1.2)", lo <= save <= hi)
+    A = D["g"]["autowerbunek"]
+    if A:
+        bad = [r["day"] for r in A if int(r["v"][2]) > int(r["v"][1])]
+        tot = sum(int(r["v"][2]) for r in A)
+        rep.add("B338-6: autowerbunek w limicie", f"dob z dobranymi > sufit {len(bad)}; dobrano ponad K8 razem {tot} ludzi, ostatnio twierdz {A[-1]['v'][0]}", "dobrano <= suma limitu", not bad)
+    F = D["g"]["dubel jedzenia BK"]
+    if F:
+        v = F[-1]["v"]
+        key, nF, nM, gone = v[0], int(v[1]), int(v[2]), int(v[3])
+        a, b, n = _b338i(v[4]), _b338i(v[5]), _b338i(v[6])
+        patch = v[7] if len(v) > 7 else None
+        if key == "TAK" and patch == "NIE":
+            rep.add("B338-7: dubel jedzenia BK - latka", "klucz TAK, latka NIE (BKFoodModel.GetPopulationFoodProduction nie wpiety)", "klucz TAK - latka TAK", False)
+        elif key == "NIE":
+            ok = all(int(r["v"][3]) == 0 and (r["v"][4] is None or r["v"][4] == r["v"][5]) for r in F)
+            rep.add("B338-7: dubel jedzenia BK - premia zostaje (decyzja 338c)",
+                    f"klucz NIE, zamkow z Farmlands {nF}, miast z Warehouse {nM}, zdjeta premia {gone} jedzenia/d, bilans " + ("nie mierzony" if v[4] is None else f"< 0 {a} -> {b}"),
+                    "klucz NIE: premia BK nietknieta (zdjeta 0, bez zmiany bilansu) kazdej doby", ok)
+        elif n == 0:
+            rep.add("B338-7: dubel jedzenia BK - bilans", "0 osad z budynkami", "INFO", None)
+        else:
+            rep.add("B338-7: dubel jedzenia BK - bilans", f"klucz {key or '?'}: osad z bilansem < 0 {a} -> {b} z {n}, zdjeta premia {gone} jedzenia/d",
+                    "po - przed <= 5% osad (inaczej klucz NIE - decyzja 338c)", b - a <= 0.05 * n)
+    M = D["g"]["murarz"]
+    if M:
+        ov = sum(int(r["v"][3]) for r in M)
+        rep.add("B338-8: murarz dopisek <= punkty Masona", f"dob x osad z dopiskiem ponad punkty {ov}, ostatnio osad {M[-1]['v'][0]}, punktow +{M[-1]['v'][1]}/d (punkty Masona {M[-1]['v'][2]})",
+                "dopisek <= punkty Masona (0 ponad)", ov == 0)
+    T = D["g"]["urzad podatkowy"]
+    if T:
+        n = max(int(r["v"][0]) for r in T)
+        tot = sum(int(r["v"][2]) for r in T)
+        road = T[-1]["v"][1]
+        if n == 0:
+            rep.add("B338-9: urzad podatkowy", "0 miast z urzedem", "INFO", None)
+        elif len(T) < 8:
+            rep.add("B338-9: urzad podatkowy", f"miast z urzedem {n}, droga firm {road}, rata +{tot} zl (dob {len(T)})", "INFO (< 8 dob - rata tygodniowa)", None)
+        else:
+            rep.add("B338-9: urzad podatkowy", f"miast z urzedem {n}, droga firm {road}, rata +{tot} zl w biegu", "droga firm TAK i rata > 0", road == "TAK" and tot > 0)
+    K = D["g"]["karawany"]
+    if K:
+        n = max(int(r["v"][0]) for r in K)
+        up = sum(int(r["v"][2]) for r in K)
+        rep.add("B338-10: karawany - targowisko", f"miast z Marketplace {n}, podniesionych ocen {up}", "> 0 gdy sa targowiska", (up > 0) if n > 0 else None)
+    S = D["g"]["asymilacja"]
+    if S:
+        v = S[-1]["v"]
+        rep.add("B338-11: asymilacja", f"projekt w liscie {v[0]}/{v[1]}, wybrany {v[2]}, latka {v[3]}, dodano {v[5]}", "latka TAK", v[3] == "TAK")
+    R, P, G = D["g"]["drogi"], D["g"]["produkcja wsi"], D["g"]["towary wsi"]
+    if R or P or G:
+        rv = R[-1]["v"] if R else ("?", "?")
+        pv = P[-1]["v"] if P else ("?",) * 6
+        gv = G[-1]["v"] if G else ("?", "?")
+        rep.add("B338-12: drogi / produkcja wsi / ule", f"drogi: wsi KS {rv[0]} +{rv[1]} szt./d | budynki BK: wsi {pv[0]}, Production {pv[1]}, KS +{pv[3]}, poza KS +{pv[4]}, model BK {pv[5]} | ule: wsi {gv[0]}, miod +{gv[1]}",
+                "model BK czynny NIE", (pv[5] == "NIE") if P else None)
+    C = D["g"]["zamki"]
+    if C:
+        bk = sum(int(r["v"][0]) for r in C)
+        v = C[-1]["v"]
+        rep.add("B338-13: tick zamkow", f"wywolan BK dla zamkow {bk}; zamkow tykanych przez 338 w biegu {v[2]} w {v[3]} dobach (ostatnio {v[1]}): porty zbudowane {v[5]} (na liscie {v[6]}), "
+                f"ryb w biegu +{v[9]}" + (f" (do jedzenia zamkow +{v[26]}, czeka w magazynach {v[27]})" if v[26] is not None else "") + f"; kopalnie {v[16]} (klucz {v[15]}), rudy w biegu +{v[24]}",
+                "BK nie tyka zamkow (0) - nasz tick bez dubla", bk == 0)
+        # B338-17 porty BK pod KS: blokada A17 zdjeta, ryby z pracy, Plan liczy
+        key = v[4]
+        blocked = sum(r["blocked"] for r in D["a17"])
+        sumks, plan_any = int(v[12]), any(int(r["v"][13]) > 0 for r in C)
+        if key != "TAK":
+            rep.add("B338-17: porty BK pod KS (blokada zdjeta, ryby z pracy)", f"klucz {key}", "INFO (klucz wyl.)", None)
+        elif not D["a17"]:
+            rep.add("B338-17: porty BK pod KS (blokada zdjeta, ryby z pracy)", f"brak linii 'Ryby z niczego (A17 F2)'; ryb pod KS w biegu {sumks}, Plan > 0: {plan_any}", "INFO (A17 wyl.?)", None)
+        else:
+            rep.add("B338-17: porty BK pod KS (blokada zdjeta, ryby z pracy)",
+                    f"zablokowane w KS (A17) razem {blocked} osad-dob; ryb pod KS w biegu +{sumks}; Plan KS ryb portow ostatnio {v[13]} szt./d w {v[14]} osadach",
+                    "zablokowane 0; gdy Plan > 0 - ryby pod KS > 0", blocked == 0 and (sumks > 0 if plan_any else True))
+            tail = [r for r in C if int(r["v"][13]) > 0][-10:]
+            if len(tail) >= 10:
+                pa = sum(int(r["v"][13]) for r in tail) / len(tail)
+                ta = sum(int(r["v"][11]) for r in tail) / len(tail)
+                rep.add("B338-17b: Plan ryb portow wobec polowu", f"ostatnie 10 dob z Planem: Plan {pa:.0f} szt./d, polow pod KS {ta:.0f} szt./d ({100 * (ta / pa - 1) if pa else 0:+.0f}%)",
+                        "+-25% (Plan i tick tym samym wzorem BK i warunkiem kasy)", pa > 0 and abs(ta / pa - 1) <= 0.25)
+            else:
+                rep.add("B338-17b: Plan ryb portow wobec polowu", f"dob z Planem > 0: {len([r for r in C if int(r['v'][13]) > 0])}", "INFO (< 10 dob z Planem portow)", None)
+        # B338-18 kopalnie zamkow z pracy
+        mkey, withm, sumore = v[15], int(v[16]), int(v[24])
+        nohands = sum(int(r["v"][23]) for r in C)
+        stash = sum(int(r["v"][21]) for r in C)
+        market = sum(int(r["v"][20]) for r in C)
+        wage = sum(int(r["v"][22]) for r in C)
+        nobuy = sum(_b338i(r["v"][28]) for r in C)
+        nowage = sum(_b338i(r["v"][29]) for r in C)
+        if mkey != "TAK" or withm == 0 or len(C) < 10:
+            rep.add("B338-18: kopalnie zamkow z pracy", f"klucz {mkey}, zamkow z kopalnia {withm}, dob {len(C)}, rudy w biegu +{sumore}", "INFO (klucz wyl., brak kopalni albo < 10 dob)", None)
+        else:
+            rep.add("B338-18: kopalnie zamkow z pracy", f"zamkow z kopalnia {withm}, rudy w biegu +{sumore} (targ miasta {market}, Stash {stash}), place gornikow {wage} zl, zamko-dob bez wolnych rak {nohands}, bez kupca {nobuy}, bez placy {nowage}",
+                    "rudy w biegu > 0 (losowanie BK z rak zamku)", sumore > 0)
+    H = D["g"]["stadniny"]
+    if H:
+        nt = sum(int(r["v"][7]) for r in H)
+        bred = sum(int(r["v"][2]) for r in H)
+        run = H[-1]["v"][8]
+        rep.add("B338-14: stadniny", f"zamkow ze Studs {H[-1]['v'][0]}, konie bojowe +{bred} w biegu (suma linii sesji {run if run is not None else '-'}), bez zrodla {sum(int(r['v'][6]) for r in H)}, bez typu konia {nt}",
+                "bez typu konia 0", nt == 0)
+    if G:
+        v = G[-1]["v"]
+        if v[2] is None:
+            rep.add("B338-19: chleb, skora, rudy kopalni wsi BK", "stary format linii (chleb i skora odlozone)", "INFO (DLL sprzed 338c)", None)
+        else:
+            kb, kB, kG, kl, kL, ko, kV, kC = _b338i(v[2]), float(v[3]), float(v[4]), _b338i(v[7]), float(v[8]), _b338i(v[13]), _b338i(v[15]), _b338i(v[16])
+            probs = []
+            if kb > 0 and not (kB > 0 and kG > 0):
+                probs.append("chleb bez ziarna")
+            if kl > 0 and not kL > 0:
+                probs.append("skora 0")
+            if ko > 0 and (kV <= 0 or abs(kV - kC) > 0.1 * kV):
+                probs.append(f"ruda {kV} zl wobec zdjetych {kC} zl")
+            txt = (f"pod KS: chleb wsi {kb} (+{v[3]}, zboza -{v[4]}), skora {kl} (+{v[8]}, surowca -{v[9]}), bez surowca {v[12]}, rudy wsi {ko} (+{v[14]} szt./d, +{kV} zl / -{kC} zl); "
+                   f"poza KS: chleb {v[5]}, skora {v[10]}, rudy {v[17]}")
+            if kb + kl + ko + _b338i(v[5]) + _b338i(v[10]) + _b338i(v[17]) == 0:
+                rep.add("B338-19: chleb, skora, rudy kopalni wsi BK", txt, "INFO (zadna wies nie ma piekarni, garbarni ani kopalni)", None)
+            else:
+                rep.add("B338-19: chleb, skora, rudy kopalni wsi BK", txt + (f" | problemy: {probs}" if probs else ""),
+                        "chleb z ziarna (> 0 przy wsiach), skora > 0, wartosc rudy = zdjete z innych plonow +-10%", not probs)
+    if B is None:
+        for k, nm in (("B338-15", "zalogi AI wobec bazy"), ("B338-16", "ceny zboza i drewna wobec bazy"), ("B338-20", "zbytki ludu wobec bazy (OB2-6a)"),
+                      ("B338-21", "rachunki KS-H po zwloce wobec bazy (NKA-4)")):
+            rep.add(f"{k}: {nm}", "brak --baza", "INFO (podaj log biegu z Buildings338 wyl.)", None)
+        return
+    budynki338_prices(rep, D, B)
+    budynki338_econ(rep, D, B)
+    ta = {r["day"]: int(r["v"][12]) for r in Z}
+    tb = {r["day"]: int(r["v"][12]) for r in B["g"]["zold"]}
+    com = sorted(set(ta) & set(tb))
+    if not com:
+        rep.add("B338-15: zalogi AI wobec bazy", "brak wspolnych dob", "+-5%", False)
+        return
+    d = com[-1]
+    ma, mb = ta[d], tb[d]
+    if len(com) < 60:
+        rep.add("B338-15: zalogi AI wobec bazy", f"dzien {d}: test {ma}, baza {mb} (wspolnych dob {len(com)} < 60)", "INFO (< 60 dob)", None)
+    else:
+        rep.add("B338-15: zalogi AI wobec bazy", f"dzien {d}: test {ma}, baza {mb} ({100 * (ma / mb - 1) if mb else 0:+.1f}%)", "+-5% bazy", mb > 0 and abs(ma / mb - 1) <= 0.05)
+
+
+def budynki338_econ(rep, D, B):
+    """338c: grupy ekonomiczne wobec biegu bazowego (Buildings338=false) na wspolnych dobach: B338-20 zakupy zbytku ludu (OB2-6a - miasta + podzamcza + wsie) >= 95% bazy;
+    B338-21 rachunki zywnosci KS-H starsze niz zwloka (NKA-4) - dob z dlugiem po zwloce nie wiecej niz w bazie."""
+    com = sorted(set(D["zb"]) & set(B["zb"]))
+    if not com:
+        rep.add("B338-20: zbytki ludu wobec bazy (OB2-6a)", "brak wspolnych dob z linia 'Zbytki ludu (P3-P5)'", "INFO", None)
+    else:
+        a = sum(D["zb"][d] for d in com) / len(com)
+        b = sum(B["zb"][d] for d in com) / len(com)
+        txt = f"srednia na dobe test {a:.0f} zl, baza {b:.0f} zl ({100 * (a / b - 1) if b else 0:+.1f}%, wspolnych dob {len(com)})"
+        if len(com) < 20:
+            rep.add("B338-20: zbytki ludu wobec bazy (OB2-6a)", txt, "INFO (< 20 dob)", None)
+        else:
+            rep.add("B338-20: zbytki ludu wobec bazy (OB2-6a)", txt, ">= 95% bazy (budynki nie zabieraja ludowi na zbytek)", b <= 0 or a >= 0.95 * b)
+    com = sorted(set(D["ksh"]) & set(B["ksh"]))
+    if not com:
+        rep.add("B338-21: rachunki KS-H po zwloce wobec bazy (NKA-4)", "brak wspolnych dob z linia KS-H (kredyt kupcow)", "INFO", None)
+    else:
+        na = sum(1 for d in com if D["ksh"][d][0] > 0)
+        nb = sum(1 for d in com if B["ksh"][d][0] > 0)
+        ma = max(D["ksh"][d][0] for d in com)
+        mb = max(B["ksh"][d][0] for d in com)
+        rep.add("B338-21: rachunki KS-H po zwloce wobec bazy (NKA-4)", f"dob z rachunkami po zwloce: test {na}, baza {nb}; najwiecej test {ma} zl, baza {mb} zl (wspolnych dob {len(com)})",
+                "test nie gorzej niz baza (dob <= baza)", na <= nb)
+
+
+def budynki338_prices(rep, D, B):
+    """B338-16 (recenzja 338 W4): srednie ceny miast zboza i drewna w ostatniej wspolnej dobie (>= 60 dob) w +-15% biegu bazowego (drogi, budynki wsi BK, projekt Production)."""
+    pa = {r["day"]: (float(r["v"][6]), float(r["v"][7])) for r in D["g"]["produkcja wsi"] if r["v"][6] is not None}
+    pb = {r["day"]: (float(r["v"][6]), float(r["v"][7])) for r in B["g"]["produkcja wsi"] if r["v"][6] is not None}
+    com = sorted(set(pa) & set(pb))
+    if not com:
+        rep.add("B338-16: ceny zboza i drewna wobec bazy", "brak wspolnych dob z cenami", "INFO (stary DLL?)", None)
+        return
+    d = com[-1]
+    (ga, wa), (gb, wb) = pa[d], pb[d]
+    txt = f"dzien {d}: zboze {ga:.1f} (baza {gb:.1f}), drewno {wa:.1f} (baza {wb:.1f})"
+    if len(com) < 60:
+        rep.add("B338-16: ceny zboza i drewna wobec bazy", f"{txt} (wspolnych dob {len(com)} < 60)", "INFO (< 60 dob)", None)
+        return
+    ok = gb > 0 and wb > 0 and abs(ga / gb - 1) <= 0.15 and abs(wa / wb - 1) <= 0.15
+    rep.add("B338-16: ceny zboza i drewna wobec bazy", f"{txt} (zboze {100 * (ga / gb - 1) if gb else 0:+.1f}%, drewno {100 * (wa / wb - 1) if wb else 0:+.1f}%)",
+            "+-15% bazy (inaczej wylaczyc Buildings338VillageProject i sprawdzic Obieg)", ok)
+
+
+def budynki338_lines(day, save=30000, before=100000, bk=0, err=0, rec=(5, 10, 3), neg=(0, 0, 100), over=0, tax=120, road="TAK", up=50, assim="TAK", tick=0, notype=0,
+                     aimen=50000, model="NIE", grain=30.0, wood=40.0, fkey="NIE", fpatch="TAK", gone=0, blocked=0, ksfish=40, plan=40, ore=2, ksv=(500, 500), lux=50000, overdue=0):
+    L = {
+        "zold": f"Budynki (338) zold: dzien {day} | twierdz 200 z budynkiem (miasto Barracks 50, zamek Barracks 100, biuro 60, Slacken 2) | zold przed {before} po {before - save} oszczednosc {save} zl/d | limit AI x s: 150 twierdz, skalowan 150 | pominiete (BK liczy) {bk} | wywolan 900 | zalogi AI {aimen} ludzi | bledy {err}",
+        "autowerbunek": f"Budynki (338) autowerbunek: dzien {day} | twierdz {rec[0]} z premia (biuro 3, Train Militia 1, Raise Troops 1), suma limitu +{rec[1]}/d | dobrano ponad K8 {rec[2]} ludzi | bledy 0",
+        "zapas jedzenia": f"Budynki (338) zapas jedzenia: dzien {day} | miast z Warehouse 30 (sufit +60000), zamkow z Granary 20 (sufit +40000, BK bylo +40000) | przyklad King's Landing sufit 50000 -> 53000 | bledy 0",
+        "dubel jedzenia BK": f"Budynki (338) dubel jedzenia BK: dzien {day} | klucz {fkey} ({'premia BK zdjeta' if fkey == 'TAK' and fpatch == 'TAK' else 'latka BRAK - premia BK zostaje' if fkey == 'TAK' else 'premia BK produkcji jedzenia zostaje - decyzja 338c'}), latka {fpatch} | zamkow z Farmlands 40, miast z Warehouse 30 | zdjeta premia {gone} jedzenia/d | osad z bilansem < 0: "
+                             + (f"{neg[0]} -> {neg[1]} z {neg[2]} osad" if fkey == "TAK" and fpatch == "TAK" else "nie mierzone (premia nietknieta), osad z budynkami 70") + " | bledy 0",
+        "murarz": f"Budynki (338) murarz: dzien {day} | osad 12 z Masonem w budowach oplaconych | punktow +30.5/d (punkty Masona 70.0, dopisek ponad punkty {over}) | bledy 0",
+        "urzad podatkowy": f"Budynki (338) urzad podatkowy: dzien {day} | miast 20 z urzedem, droga firm {road} | rata +{tax} zl (pan {tax // 2}, korona {tax - tax // 2}) w 3 ratach (nalezne {tax} zl, z nadwyzki kasy - brak darowany) | bledy 0",
+        "karawany": f"Budynki (338) karawany: dzien {day} | miast z Marketplace 40 | wywolan 3000, podniesionych {up}, sredni mnoznik 1.040 | bledy 0",
+        "asymilacja": f"Budynki (338) asymilacja: dzien {day} | osad z projektem w liscie 200/210, wybrany w 3 | latka {assim}, wywolan 500, dodano +15 razy 30 | bledy 0",
+        "drogi": f"Budynki (338) drogi: dzien {day} | wsi KS z drogami 150 | dopisane 120.5 szt./d | bledy 0",
+        "produkcja wsi": f"Budynki (338) produkcja wsi: dzien {day} | wsi z budynkami 40 (Farming 10, Mining 5, AnimalHousing 10, Sawmill 10, FishFarm 5), projekt Production 600 | KS wsi 500 dopisane 900.0 szt./d, poza KS 50.0 szt. | model BK czynny {model} | ceny miast: zboze {grain:.1f}, drewno {wood:.1f} | bledy 0",
+        "towary wsi": f"Budynki (338) towary wsi: dzien {day} | wsi z ulami 3, miod +4.5 (baza przed mnoznikami) | chleb: wsi KS 4 (+12.0 szt./d, zboza -12.0), poza KS 1 (baza +2.0) | skora: wsi KS 2 (+0.5 szt./d, skor -1.2), poza KS 0 (baza +0.0), bez surowca 3 | rudy kopalni wsi BK: wsi KS 3 (+6.0 szt./d, wartosc +{ksv[0]} zl, inne plony -{ksv[1]} zl), poza KS 1 (wartosc 80 zl) | bledy 0",
+        "zamki": f"Budynki (338) zamki: dzien {day} | tick BK dla zamkow {tick} wywolan (0 = gra nie tyka zamkow) | zamkow tykanych przez 338 dzis 5 (w biegu {5 * day} w {day} dobach) | porty zamkow: klucz TAK, zamkow z Portem zbudowanym 2 (Port na liscie budowy 30, pod KS 2), ryb dzis +12, w biegu +{12 * day}, do jedzenia zamkow dzis 12 (w biegu {12 * day}), czeka w magazynach 0 | porty pod KS (miasta i zamki): osad 20, ryb dzis +{ksfish}, w biegu +{ksfish * day}, Plan KS ryb portow {plan} szt./d w 20 osadach | kopalnie zamkow: klucz TAK, zamkow z kopalnia 7, tykanych 7, z urobkiem 2, rudy dzis +{ore} (targ miasta {ore}, Stash 0), place gornikow 300 zl, bez wolnych rak 1, w biegu rudy +{ore * day}, bez kupca 1, bez placy 0 | bledy 0",
+        "stadniny": f"Budynki (338) stadniny: dzien {day} | zamkow ze Studs 4 (pelnych 1) | konie bojowe +1 (ze Stash 0, z magazynu zamku 0, z wsi 1), bez zrodla 0, bez typu konia {notype} | w biegu: konie bojowe +{day}, bez zrodla 0 w {day} dobach | bledy 0",
+    }
+    out = [L[g] for g in B338_GROUPS]
+    out.append(f"Ryby z niczego (A17 F2): dzien {day} | klucz A17FishFromHands TAK | KS zastosowany TAK | atut Night Raider: zablokowane w KS 0 szt. w 0 wsiach | porty BK (RunPorts): zablokowane w KS {blocked} miast, "
+               f"poza KS (z niczego) 0 szt. w 0 miastach za 0 zl w nicosc | razem ryby z niczego 0 | 338c porty BK pod KS (praca rybakow, klucz Buildings338Ports TAK): {ksfish} szt. w 20 osadach, zaplacone 900 zl, do kiesy ludu 900 | potkniecia dzis 0 (razem 0).")
+    out.append(f"Zbytki ludu (P3-P5): dzien {day} | miasta: oferta 70000 zl, kupione z oferty {lux} zl (40%) | podzamcza (P5): z nadwyzka 10, chciane 900 zl, kupione 800 zl | wsie (P5): z nadwyzka 50, chciane 9000 zl, kupione 7000 zl")
+    out.append(f"Kupcy zywnosci (KS-H) dzien {day} | CZYNNE | kredyt kupiecki TAK: otwarte 100 zl, splacone 50 zl, w tym przed zwloka (wczesna splata f4) 10 zl w 1 splatach; najstarszy rachunek 5 dni, starsze niz 30 dni {overdue} zl ({1 if overdue else 0} miast)")
+    return out
+
+
+def budynki338_synth():
+    """B338-S: dobry bieg, luka, BK liczy, podwyzka, zla oszczednosc, autowerbunek ponad sufit, dubel (klucz NIE z premia zdjeta, klucz TAK > 5%), murarz ponad punkty, droga firm NIE,
+    karawany 0, latka NIE, model BK, tick BK zamkow, porty pod KS zablokowane, kopalnie zamkow 0, ruda wsi bez pokrycia, bez typu konia, blad, ERROR, zly format, brak startu, latka BRAK,
+    stary log, baza (+-5% zalog, ceny, zbytki, KS-H). None = OK."""
+    import tempfile
+    import shutil
+    start = ("Budynki (338): start sesji | glowny TAK | zold TAK, autowerbunek TAK | BK jest | Courier Post na liscie budowy wsi BK: NIE | latki: zold: limit AI wpiety; "
+             "karawany: BKCaravansBehavior.GetTradeScoreForTown wpiety")
+
+    def days(n=10, **kw):
+        out = [start]
+        for d in range(1, n + 1):
+            out += budynki338_lines(d, **kw)
+        return out
+    runs = {
+        "good": (days(), {"B338-1": "TAK", "B338-2": "TAK", "B338-3": "TAK", "B338-4": "TAK", "B338-5": "TAK", "B338-6": "TAK", "B338-7": "TAK", "B338-8": "TAK",
+                          "B338-9": "TAK", "B338-10": "TAK", "B338-11": "TAK", "B338-12": "TAK", "B338-13": "TAK", "B338-14": "TAK", "B338-15": "INFO", "B338-17": "TAK",
+                          "B338-17b": "TAK", "B338-18": "TAK", "B338-19": "TAK", "B338-20": "INFO"}),
+        "gap": ([start] + budynki338_lines(1) + budynki338_lines(3), {"B338-2": "NIE"}),
+        "bk": (days(bk=3), {"B338-4": "NIE"}),
+        "raise": (days(save=-10), {"B338-4": "NIE"}),
+        "save": (days(save=2000), {"B338-5": "NIE"}),
+        "savehi": (days(save=99000), {"B338-5": "NIE"}),
+        "rec": (days(rec=(5, 10, 11)), {"B338-6": "NIE"}),
+        "negoff": (days(gone=500, neg=(4, 9, 100)), {"B338-7": "NIE"}),
+        "negon": (days(fkey="TAK", gone=900, neg=(4, 20, 100)), {"B338-7": "NIE"}),
+        "negonok": (days(fkey="TAK", gone=900, neg=(4, 6, 100)), {"B338-7": "TAK"}),
+        "nopatch": (days(fkey="TAK", fpatch="NIE"), {"B338-7": "NIE"}),
+        "k": (days(over=1), {"B338-8": "NIE"}),
+        "road": (days(road="NIE"), {"B338-9": "NIE"}),
+        "car": (days(up=0), {"B338-10": "NIE"}),
+        "assim": (days(assim="NIE"), {"B338-11": "NIE"}),
+        "model": (days(model="TAK"), {"B338-12": "NIE"}),
+        "tick": (days(tick=5), {"B338-13": "NIE"}),
+        "blocked": (days(blocked=3), {"B338-17": "NIE"}),
+        "noksfish": (days(ksfish=0), {"B338-17": "NIE", "B338-17b": "NIE"}),
+        "planfar": (days(ksfish=10, plan=40), {"B338-17": "TAK", "B338-17b": "NIE"}),
+        "noore": (days(ore=0), {"B338-18": "NIE"}),
+        "orev": (days(ksv=(500, 300)), {"B338-19": "NIE"}),
+        "notype": (days(notype=1), {"B338-14": "NIE"}),
+        "err": (days(err=1), {"B338-3": "NIE"}),
+        "errline": (days() + ["ERROR in Buildings338.Wage.Apply (potkniecie 1)"], {"B338-3": "NIE"}),
+        "broken": (days() + [budynki338_lines(11)[0].replace("| zold przed", "| zold-przed")], {"B338-2": "NIE"}),
+        "nostart": (days()[1:], {"B338-1": "NIE"}),
+        "brak": ([start.replace("wpiety", "BRAK")] + budynki338_lines(1), {"B338-1": "NIE"}),
+        "old": (["Zold zalog (337): dzien 3 | ..."], {"B338-2": "INFO"}),
+    }
+    tmp = tempfile.mkdtemp(prefix="b338_")
+    diff = []
+    try:
+        def run(Ls, name):
+            logp = os.path.join(tmp, f"Armoury-{name}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {x}" for i, x in enumerate(Ls)) + "\n")
+            return budynki338_collect(logp)
+        for kind, (Ls, exp) in runs.items():
+            rep = Report()
+            budynki338_rows(rep, run(Ls, kind))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp.items() if got.get(k) != v]
+        base = run(days(61, aimen=50000), "baza")
+        for kind, kw, exp in (("bok", {"aimen": 51000}, {"B338-15": "TAK", "B338-20": "TAK", "B338-21": "TAK"}),
+                              ("bbad", {"aimen": 56000}, {"B338-15": "NIE"}),
+                              ("pok", {"grain": 33.0}, {"B338-16": "TAK"}),
+                              ("pbad", {"grain": 24.0}, {"B338-16": "NIE"}),
+                              ("lux", {"lux": 30000}, {"B338-20": "NIE"}),
+                              ("ksh", {"overdue": 500}, {"B338-21": "NIE"})):
+            rep = Report()
+            budynki338_rows(rep, run(days(61, **kw), kind), base)
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp.items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def budynki338_main(rest):
+    rep = Report()
+    try:
+        s2 = budynki338_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("B338-S: test syntetyczny (dobry, luka, BK liczy, podwyzka, oszczednosc z liczby budynkow, autowerbunek, dubel klucz NIE/TAK, murarz, droga firm, karawany, asymilacja, "
+            "model BK, tick zamkow, porty pod KS, Plan ryb, kopalnie zamkow, ruda wsi, typ konia, blad, ERROR, zly format, brak startu, latka BRAK, stary log, baza, ceny, zbytki, KS-H)", s2 or "OK", "OK", s2 is None)
+    baza = None
+    if "--baza" in rest:
+        i = rest.index("--baza")
+        baza = rest[i + 1] if i + 1 < len(rest) else None
+        rest = [x for j, x in enumerate(rest) if j != i and j != i + 1]
+    logp = rest[0] if rest else None
+    if not logp or not os.path.isfile(logp):
+        rep.add("B338-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log> [--baza <log z Buildings338 wyl.>]", None)
+        rep.show()
+        return 0
+    D = budynki338_collect(logp)
+    B = budynki338_collect(baza) if baza and os.path.isfile(baza) else None
+    print(f"plik: {logp} | startow {len(D['start'])}, dob {len(D['g']['zold'])}, nierozpoznanych {D['bad']}, ERROR {D['err']}" + (f" | baza {baza}: dob {len(B['g']['zold'])}" if B else ""))
+    budynki338_rows(rep, D, B)
+    rep.show()
+    return 0
+
+
+_budynki338_main_prev = main
+
+
+def main(argv):
+    # paczka 338: grupa budynki338 - opakowanie main jak wodz335
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "budynki338":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return budynki338_main(rest)
+    return _budynki338_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

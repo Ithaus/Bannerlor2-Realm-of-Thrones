@@ -107,6 +107,8 @@ namespace Armoury
         [ThreadStatic] private static int _depth;
         public static void PowerPrefix() { _depth++; }
         public static Exception PowerFinalizer(Exception __exception) { if (_depth > 0) _depth--; return __exception; }
+        /// <summary>338 (Mason): surowa moc budowy lancucha modeli (BK) bez przyspieszenia - nasze postfiksy przepuszczaja wynik (licznik zagniezdzenia).</summary>
+        internal static int RawPower(Town t) { _depth++; try { return Campaign.Current.Models.BuildingConstructionModel.CalculateDailyConstructionPowerWithoutBoost(t); } finally { _depth--; } }
         // wpis 80 (audyt 05.10, pkt 2): nadpisujemy moc TYLKO osad objetych rozliczeniem. Lenna gracza przy wylaczonym
         // PaidConstructionPlayer ida po staremu (model gry/BK) - dotad dostawaly 0 i staly na zawsze.
         private static bool Covered(Town town)
@@ -147,16 +149,19 @@ namespace Armoury
                 if (b > 0f) r.Add(b, _boostTxt);
                 EngAdd(town, f, b, ref r);   // R3-10b (BuildFunding.Engineering.cs): premia zarzadcy z Inzynierii i perki budowy do punktow pana i przyspieszenia zlotem
                 if (fl > 0f) r.Add(fl, _folkTxt);
+                Buildings338Mason.Add(town, f + fl, ref r);   // 338 grupa 4: Mason - min(punkty Masona, oplacona praca)
                 __result = r;
             }
             catch { }
         }
+        /// <summary>338 (linia doby murarza): dopisek Masona tej doby w osadzie objetej rozliczeniem (0 - nieobjeta).</summary>
+        internal static float MasonDay(Town town) { if (!On || town == null || !Covered(town)) return 0f; float f; _funded.TryGetValue(town, out f); return Buildings338Mason.Extra(town, f + FolkHead(town)); }
         public static void PowerIntPostfix(Town town, ref int __result)
         {
             if (_depth > 1 || !On || town == null) return;
             float fl = FolkHead(town);   // P2: punkty robot ludu (jak wyzej; recenzja 6 - tylko na budowle, za ktora lud zaplacil)
             if (!Covered(town)) { if (fl > 0f) __result += (int)fl; return; }
-            float f; _funded.TryGetValue(town, out f); __result = (int)(f + fl + EngExtra(town, f, 0f, false));   // R3-10b: premia zarzadcy (bez przyspieszenia zlotem)
+            float f; _funded.TryGetValue(town, out f); __result = (int)(f + fl + EngExtra(town, f, 0f, false) + Buildings338Mason.Extra(town, f + fl));   // 338: Mason min(punkty, oplacona praca)   // R3-10b: premia zarzadcy (bez przyspieszenia zlotem)
         }
 
         // ------------------------------------------------------------ materialy BK wylaczone

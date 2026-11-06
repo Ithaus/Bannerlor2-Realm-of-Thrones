@@ -2483,6 +2483,7 @@ namespace Armoury
             try { KingdomBalance.SessionStart(); } catch (Exception e) { Log.Error("KingdomBalance.SessionStart", e); }   // 175.0: twierdze na starcie sesji (tylko log)
             try { HorseCensus.SessionStart(); ArmoryFit.Arm(); } catch (Exception e) { Log.Error("HorseCensus.SessionStart", e); }   // przeglad 175: stan wylacznikow 175 i znacznikow CS (B0); stare zbrojownie w 1. godzinie
             try { MountedWage.EnsureContextHooks(); } catch (Exception e) { Log.Error("MountedWage.EnsureContextHooks", e); }   // paczka 160: zold partii - karawany bez premii konnego (latka w kampanii)
+            try { Buildings338.SessionStart(); } catch (Exception e) { Log.Error("Buildings338.SessionStart", e); }   // 338: budynki robia to, co pisze ich opis - latki w kampanii (raz na proces), linia "Budynki (338): start sesji"
             try { CirculationWindows.EnsureModelHooks(); } catch (Exception e) { Log.Error("CirculationWindows.EnsureModelHooks", e); }   // paczka 169: linie modelu finansow i kapital nowych karawan (latki w kampanii, tylko log)
             try { Measure169c.EnsureHooks(); } catch (Exception e) { Log.Error("Measure169c.EnsureHooks", e); }
             try { CrownIncome.EnsureHooks(); } catch (Exception e) { Log.Error("CrownIncome.EnsureHooks", e); }
@@ -3219,6 +3220,7 @@ namespace Armoury
             try { MoneyLedger.Probe169("WorkshopLaw.DailyFast"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { Log.DailyO6((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Log.DailyO6", e); } DayProfile.Lap("Log.DailyO6");   // E8/O6 (270): linia "Log (E8/O6)" - pisarze logu, zapisy stracone, proba 3 dob: linie wyslane wobec linii w plikach (tylko log)
             try { MountedWage.Daily(); } catch (Exception e) { Log.Error("MountedWage.Daily", e); } DayProfile.Lap("MountedWage.Daily");   // paczka 160: linia "Zold konnych (160)" - sklad wojska i premia konnego (tylko log)
+            try { Buildings338.Daily(); } catch (Exception e) { Log.Error("Buildings338.Daily", e); } DayProfile.Lap("Buildings338.Daily");   // 338: tick zamkow (porty, kopalnie, stadniny) i linie "Budynki (338) <grupa>"
             try { CaravanEscort.Daily(); } catch (Exception e) { Log.Error("CaravanEscort.Daily", e); } DayProfile.Lap("CaravanEscort.Daily");   // 288: jedzenie karawan w drodze (z jukow) i linia "Karawany - zold eskorty i jedzenie w drodze (288)"
             try { CavalryTemplate.Daily(); } catch (Exception e) { Log.Error("CavalryTemplate.Daily", e); } DayProfile.Lap("CavalryTemplate.Daily");   // E6/K3 (219): linia "Rycerze i jazda (219)" - spis z petli MountedWage.Daily wyzej, PRZED HorseCensus.Daily (czyta jego stan "czeka" przed zerowaniem)
             try { HorseCensus.Daily(); } catch (Exception e) { Log.Error("HorseCensus.Daily", e); } DayProfile.Lap("HorseCensus.Daily");   // 175.0: linia "Konie AI (175)" + konie-krolestwa.csv (stan doby policzony w petli MountedWage.Daily wyzej)
