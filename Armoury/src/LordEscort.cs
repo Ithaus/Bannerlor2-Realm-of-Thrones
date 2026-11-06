@@ -146,6 +146,7 @@ namespace Armoury
             _st.Clear(); _saved.Clear(); _savedLoaded = 0; _savedH0 = -1; _savedRestored = _savedRestoredFree = 0; _savedDone = false; _thr.Clear(); _fortThr.Clear(); _noAtk = new HashSet<MBGUID>(); _joinQ.Clear(); _escQ.Clear(); _seen.Clear();
             _rebuiltH.Clear();
             ClearDay(); _stumbles = 0;
+            Guard335Reset();   // 335
         }
 
         private static void ClearDay()
@@ -427,6 +428,7 @@ namespace Armoury
                 if (set.Count == 0 || !set.Contains(__0.Id)) return;
                 if (__1.IsBandit) return;
                 if (ArmsFirst.DefendsOwn(__0, __1)) return;
+                if (GuardAllowsAttack(__0, __1)) return;   // 335: obronca / chroniony wobec swojego napastnika
                 __result = false;
                 lock (Gate) { _vAtkCalls++; _vAtk.Add(__0.Id); }
             }
@@ -1043,6 +1045,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             ClearDay();
+            Guard335Daily();   // 335: linia "Ochrona wodza (335): mapa dzien N"
         }
 
         // ------------------------------------------------------------ zapis
@@ -1097,6 +1100,7 @@ namespace Armoury
             CampaignEvents.SettlementEntered.AddNonSerializedListener(owner, DayProfile.Settle("LordEscort.OnEntered", OnEntered));
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(owner, OnPrisonerTaken);
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(owner, (mp, pb) => { try { ForgetSaved(mp); Drop(mp); if (mp != null) _rebuiltH.Remove(mp.Id); } catch { } });
+            Guard335Events(owner);   // 335: migawka ochrony wodza co AiCheckInterval
             _events = true;
         }
 
@@ -1179,6 +1183,7 @@ namespace Armoury
                          + " | stan z zapisu (arm_esc223): " + _savedLoaded + " partii.");
             }
             catch (Exception e) { Stumble("SessionStart.Line", e); }
+            Guard335SessionStart();   // 335: postfiks GetBestInitiativeBehavior, linia "Ochrona wodza (335): mapa start sesji"
         }
     }
 }

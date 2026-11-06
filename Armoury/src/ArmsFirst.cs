@@ -277,6 +277,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (__1.IsBandit && !s.AiArmsBlockBanditAttacks) return;
                 if (DefendsOwn(__0, __1)) return;
+                if (LordEscort.GuardAllowsAttack(__0, __1)) return;   // 335: obronca / chroniony lord wobec swojego napastnika
                 __result = false;
                 lock (Gate) { _vAttackCalls++; _vAttack.Add(__0.Id); }
             }

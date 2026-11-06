@@ -95951,5 +95951,287 @@ def main(argv):
             return balans334_main(rest[0] if rest else None, rest[1] if len(rest) > 1 else None)   # 334c: drugi plik - session-*.log (B334-23)
     return _balans334_main_prev(argv)
 
+
+# ------------------------------------------------------------ paczka 335: grupa wodz335 - ochrona wodza: bitwa (HeroCaution.Guard335.cs) i mapa (LordEscort.Guard335.cs)
+#  W335-0 start sesji mapy: latka GetBestInitiativeBehavior TAK przy kluczu TAK (brak linii - INFO: stary DLL); W335-1 linia doby mapy co dobe, 0 nierozpoznanych;
+#  W335-2 mapa: przy parach "bronia razem" > 0 decyzje AI (obronca atakuje + juz atakowal + chroniony do obroncy / z nimi) > 0 - migawka dociera do watkow AI;
+#  W335-3 linia bitwy 'Ochrona wodza (335): bitwa' w bitwie polowej, 0 nierozpoznanych; W335-4 samotnosc dowodcow przy kluczu TAK (>= 60 s obecnosci):
+#  udzial sekund bez swojego w 30 m <= 15% (klucz NIE albo malo - INFO; Jeff 06.11: Tywin jezdzil sam); W335-5 zagrozenia -> wycofania: wyslan >= polowa
+#  zagrozen i straz wezwana przy zagrozeniach (klucz TAK); W335-6 potkniecia 335 = 0 i 'ERROR in' miejsc 335 = 0; W335-7 test lowcy: wodz zareagowal
+#  (zagrozenie po zblizeniu) i straz wezwana; W335-8 test lowcy - los wodza (INFO).
+#  335b (recenzja): W335-2b bitwa chronionego - przy >= 3 parach w bitwie obroncy dolaczyli > 0; pojmani chronieni grupa (INFO); W335-6 liczy tez
+#  'ERROR in HeroCaution.Pass' (wyjatki GuardMeasure / GuardPass / PostPass); W335-7 OK takze, gdy najblizszy swoj przy kontakcie <= 5 m (wodz stal przy swoich).
+#   python -I tools/sprawdz_logi.py --grupa wodz335 <Armoury-*.log>
+W335_BAT = re.compile(
+    r"Ochrona wodza \(335\): bitwa misja (.+?), klucz (TAK|NIE \(tylko pomiar\)|NIE \(149 NIE\)) .*?"
+    r"\| dowodcow (\d+) \(wodzowie (\d+), kapitanowie (\d+)\), glow rodu (\d+), konnych (\d+), z eskorta konna (\d+), w pieszym szyku (\d+) "
+    r"\| stanowisko: dowodcow (\d+) \(za glownym szykiem (\d+), przy eskorcie (\d+), przesuniec (\d+), przywrocen (\d+), bez miejsca (\d+), bez glownego szyku (\d+), "
+    r"limit zapytan (\d+)\) \| zagrozenia (\d+) \(ludzi (\d+); dowodcy (\d+), glowy rodu (\d+), ze stanowiska (\d+); sr\. wrogow (?:[\d.]+|-), jezdzcow wsrod nich (\d+); "
+    r"na sucho (\d+)\) \| cel: najblizszy swoj szyk (\d+) / tyl wlasnego (\d+) / glowna sila (\d+) / sztandar (\d+), wyslan (\d+), dotarli (\d+) .*?"
+    r"\| straz: wezwan (\d+) \(ludzi (\d+), sr\. (?:[\d.]+|-), bez kandydatow (\d+)\), dotarlo do dowodcy (\d+);.*?"
+    r"\| samotnie \(bez swojego w \d+ m\): ([\d.]+) s z ([\d.]+) s obecnosci dowodcow \(\d+%\), najdluzej ([\d.]+) s (\S+) "
+    r"\| los dowodcow i glow rodu: zabici (\d+), nieprzytomni (\d+) .*?\| potkniecia 335 (\d+)\.")
+W335_BK = ["kind", "key", "cmd", "gen", "cap", "big", "mounted", "esc", "cov", "postP", "postA", "postE", "moves", "rest", "noSpot", "noMain", "lim",
+           "thr", "thrP", "thrC", "thrB", "fromPost", "riders", "dry", "kNear", "kRear", "kMain", "kBan", "sends", "arrived", "gEps", "gMen", "gNone", "gReach",
+           "lone", "present", "loneMax", "loneWho", "killed", "ko", "stum"]
+W335_DAY = re.compile(
+    r"Ochrona wodza \(335\): mapa dzien (\d+) \| klucz (TAK|NIE), latka (.+?) \| migawek (\d+) \| zagrozonych par \(.*?\) (\d+) \(.*? (\d+), wodzowie armii (\d+), "
+    r"napastnik gracz \(migawki\) (\d+)\) \| bez obroncow w zasiegu \(migawki\) (\d+) \| lacznie slabsi - ucieczka jak gra \(migawki\) (\d+) \(w tym ranga wysoka (\d+)\), "
+    r"sr\. sila grupy / napastnika (?:[\d.]+|-) \| bronia razem: par (\d+), chronionych (\d+), obroncow (\d+) \| decyzje AI: obronca atakuje napastnika (\d+) "
+    r"\(juz atakowal (\d+)\), (?:obronca do chronionego (\d+), )?chroniony do obroncy (\d+), chroniony atakuje z nimi (\d+), inne zagrozenie \(decyzja gry\) (\d+)"
+    r"(?:, chroniony bez bezpiecznej drogi do obroncy \(decyzja gry\) (\d+) \(migawki (\d+)\))?"
+    r"(?: \| bitwa chronionego: par (\d+), obroncow wezwanych (\d+), dolaczylo (\d+))? \| wyjatki zakazu zaczepiania 223/p9 (\d+) "
+    r"\| pojmani z par (\d+) \(chronieni grupa (\d+)\) \| przykladow (\d+) \| potkniecia 335 (\d+)\.")
+W335_DK = ["day", "key", "patch", "snaps", "pairs", "big", "army", "player", "noDef", "lose", "loseBig", "win", "prot", "defs", "dDef", "dAlr", "dEsc", "pEsc", "pEng", "other",
+           "noSafe", "noSafeS", "bPairs", "bCalled", "bJoined", "atk", "capt", "captProt", "ex", "stum"]
+W335_START = re.compile(r"Ochrona wodza \(335\): mapa start sesji \| klucz Lords Defend Threatened Lord (TAK|NIE) \| latka (.+?) \| migawka co")
+W335_TEST = re.compile(
+    r"Ochrona wodza \(335\) TEST koniec: lowca (\S+), wynik (.+?) po ([\d.]+) s \| wodz (\S+) \((wodz|kapitan), (konno|pieszo), eskorta konna (\d+), na starcie (.+?)\) "
+    r"\| zblizenie 20 m (?:([\d.]+) s|-), zagrozenie wodza (?:([\d.]+) s|-), kontakt 3 m (?:([\d.]+) s|-), najblizszy swoj przy kontakcie (?:([\d.]+) m|-) "
+    r"\| straz wezwana (\d+), dotarla (\d+) \| wodz (zyje|zabity|nieprzytomny|uszedl), samotnie \(bez swojego w \d+ m\) ([\d.]+) s\.")
+W335_ERR = re.compile(r"ERROR in (LordEscort\.Guard335|HeroCaution\.(Lowca335|Straz335|Linia335|Pass\b))")
+
+
+def wodz335_collect(logp):
+    D = {"bat": [], "batBad": 0, "day": [], "dayBad": 0, "start": [], "test": [], "testBad": 0, "testNone": 0, "err": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if "(335)" not in line and "ERROR in" not in line:
+                continue
+            if W335_ERR.search(line):
+                D["err"] += 1
+                continue
+            if "Ochrona wodza (335): bitwa misja " in line:
+                m = W335_BAT.search(line)
+                if not m:
+                    D["batBad"] += 1
+                    continue
+                r = {}
+                for k, v in zip(W335_BK, m.groups()):
+                    r[k] = v if k in ("kind", "key", "loneWho") else (float(v) if k in ("lone", "present", "loneMax") else int(v))
+                D["bat"].append(r)
+            elif "Ochrona wodza (335): mapa dzien " in line:
+                m = W335_DAY.search(line)
+                if not m:
+                    D["dayBad"] += 1
+                    continue
+                D["day"].append({k: (v if k in ("key", "patch") else int(v or 0)) for k, v in zip(W335_DK, m.groups())})
+            elif "Ochrona wodza (335): mapa start sesji" in line:
+                m = W335_START.search(line)
+                D["start"].append((m.group(1), m.group(2)) if m else ("?", "nierozpoznana"))
+            elif "Ochrona wodza (335) TEST koniec: lowca brak" in line:
+                D["testNone"] += 1
+            elif "Ochrona wodza (335) TEST koniec: " in line:
+                m = W335_TEST.search(line.rstrip())
+                if not m:
+                    D["testBad"] += 1
+                    continue
+                g = m.groups()
+                D["test"].append({"why": g[1], "sec": float(g[2]), "near": g[8], "thr": g[9], "contact": g[10], "gap": float(g[11]) if g[11] else None,
+                                  "guards": int(g[12]), "reached": int(g[13]), "fate": g[14]})
+    return D
+
+
+def wodz335_rows(rep, D):
+    S = D["start"]
+    if not S:
+        rep.add("W335-0: start sesji mapy (latka)", "brak linii", "INFO (stary DLL)", None)
+    else:
+        bad = [p for k, p in S if k == "TAK" and not p.startswith("TAK")]
+        rep.add("W335-0: start sesji mapy (latka)", f"sesji {len(S)}, klucz {', '.join(sorted(set(k for k, _ in S)))}, latka {S[-1][1]}", "TAK przy kluczu TAK", not bad)
+    Dy = D["day"]
+    if not Dy:
+        rep.add("W335-1: linia doby mapy", f"brak linii (nierozpoznanych {D['dayBad']})", "INFO (stary DLL albo < 1 doby)", None if D["dayBad"] == 0 else False)
+    else:
+        days = [d["day"] for d in Dy]
+        gaps = sum(1 for a, b in zip(days, days[1:]) if b - a > 1)
+        rep.add("W335-1: linia doby mapy", f"dob {len(Dy)} ({days[0]}..{days[-1]}), luk {gaps}, nierozpoznanych {D['dayBad']}", "co dobe, 0 nierozpoznanych",
+                D["dayBad"] == 0 and gaps == 0)
+        on = [d for d in Dy if d["key"] == "TAK"]
+        win = sum(d["win"] for d in on)
+        dec = sum(d["dDef"] + d["dAlr"] + d["dEsc"] + d["pEsc"] + d["pEng"] for d in on)
+        info = (f"par {sum(d['pairs'] for d in on)}, bronia razem {win} (chronionych {sum(d['prot'] for d in on)}, obroncow {sum(d['defs'] for d in on)}), lacznie slabsi "
+                f"{sum(d['lose'] for d in on)}, bez obroncow {sum(d['noDef'] for d in on)}; decyzje AI {dec} (atak {sum(d['dDef'] for d in on)}, juz {sum(d['dAlr'] for d in on)}, "
+                f"chroniony do obroncy {sum(d['pEsc'] for d in on)}, z nimi {sum(d['pEng'] for d in on)}, inne zagrozenie {sum(d['other'] for d in on)}), wyjatki zakazu "
+                f"{sum(d['atk'] for d in on)}, pojmani z par {sum(d['capt'] for d in on)} (chronieni {sum(d['captProt'] for d in on)})")
+        if win == 0:
+            rep.add("W335-2: mapa - obrona dociera do AI", info, "INFO (brak par 'bronia razem')", None)
+        else:
+            rep.add("W335-2: mapa - obrona dociera do AI", info, "decyzje AI > 0 przy parach 'bronia razem'", dec > 0)
+        bp, bj, bc = sum(d["bPairs"] for d in on), sum(d["bJoined"] for d in on), sum(d["bCalled"] for d in on)
+        cp = sum(d["captProt"] for d in on)
+        binfo = (f"par w bitwie {bp}, obroncow wezwanych {bc}, dolaczylo {bj}; chroniony bez bezpiecznej drogi (decyzje AI) {sum(d['noSafe'] for d in on)}, "
+                 f"obronca do chronionego {sum(d['dEsc'] for d in on)}; pojmani chronieni grupa {cp}")
+        if bp < 3:
+            rep.add("W335-2b: mapa - bitwa chronionego (obroncy dolaczaja)", binfo, "INFO (< 3 par w bitwie)", None)
+        else:
+            rep.add("W335-2b: mapa - bitwa chronionego (obroncy dolaczaja)", binfo, "dolaczylo > 0 przy >= 3 parach w bitwie", bj > 0)
+    B = D["bat"]
+    if not B:
+        rep.add("W335-3: linia bitwy", f"brak linii (nierozpoznanych {D['batBad']})", "INFO (bez bitwy polowej albo stary DLL)", None if D["batBad"] == 0 else False)
+    else:
+        rep.add("W335-3: linia bitwy", f"bitew {len(B)}, nierozpoznanych {D['batBad']}, dowodcow {sum(r['cmd'] for r in B)} (konnych {sum(r['mounted'] for r in B)}, "
+                f"z eskorta {sum(r['esc'] for r in B)}), klucz {', '.join(sorted(set(r['key'] for r in B)))}", "jest, 0 nierozpoznanych", D["batBad"] == 0)
+        on = [r for r in B if r["key"] == "TAK"]
+        pres = sum(r["present"] for r in on)
+        lone = sum(r["lone"] for r in on)
+        if not on or pres < 60.0:
+            offp = sum(r["present"] for r in B if r["key"] != "TAK")
+            offl = sum(r["lone"] for r in B if r["key"] != "TAK")
+            rep.add("W335-4: samotnosc dowodcow (klucz TAK)", f"obecnosci {pres:.0f} s przy TAK; przy NIE {offl:.0f} s z {offp:.0f} s", "INFO (klucz NIE albo < 60 s)", None)
+        else:
+            sh = lone / pres
+            worst = max(on, key=lambda r: r["loneMax"])
+            rep.add("W335-4: samotnosc dowodcow (klucz TAK)", f"{lone:.0f} s z {pres:.0f} s = {sh * 100:.1f}%, najdluzej {worst['loneMax']:.0f} s {worst['loneWho']}",
+                    "<= 15%", sh <= 0.15)
+        thr = sum(r["thr"] for r in on)
+        if thr == 0:
+            rep.add("W335-5: zagrozenia -> wycofania i straz", f"zagrozen 0 przy TAK (na sucho przy NIE {sum(r['dry'] for r in B)})", "INFO (nikt nie zaatakowal dowodcy)", None)
+        else:
+            sends, geps = sum(r["sends"] for r in on), sum(r["gEps"] for r in on)
+            rep.add("W335-5: zagrozenia -> wycofania i straz", f"zagrozen {thr}, wyslan {sends} (najblizszy szyk {sum(r['kNear'] for r in on)}), dotarli {sum(r['arrived'] for r in on)}; "
+                    f"straz wezwan {geps} (ludzi {sum(r['gMen'] for r in on)}, bez kandydatow {sum(r['gNone'] for r in on)}), dotarlo {sum(r['gReach'] for r in on)}",
+                    "wyslan >= polowa zagrozen, straz > 0", sends * 2 >= thr and (geps + sum(r["gNone"] for r in on)) > 0)
+    st = sum(r["stum"] for r in B) + sum(d["stum"] for d in Dy)
+    rep.add("W335-6: potkniecia i ERROR 335", f"potkniecia {st}, ERROR {D['err']}", "0 i 0", st == 0 and D["err"] == 0)
+    T = D["test"]
+    if not T:
+        rep.add("W335-7: test lowcy - wodz reaguje", f"brak linii (lowca brak {D['testNone']}, nierozpoznanych {D['testBad']})", "INFO (bieg bez bitwy slabej albo gra Jeffa)",
+                None if D["testBad"] == 0 else False)
+        return
+    near = [t for t in T if t["near"] is not None]
+    ok = [t for t in near if (t["thr"] is not None and t["guards"] > 0) or (t["gap"] is not None and t["gap"] <= 5.0)]
+    if not near:
+        rep.add("W335-7: test lowcy - wodz reaguje", f"testow {len(T)}, lowca nie dojechal na 20 m ({', '.join(t['why'] for t in T)})", "INFO (bez zblizenia)", None)
+    else:
+        rep.add("W335-7: test lowcy - wodz reaguje", f"zblizen {len(near)}, z zagrozeniem i straza {len(ok)} (straz dotarla {sum(t['reached'] for t in near)})",
+                "kazde zblizenie: zagrozenie i straz albo swoj <= 5 m przy kontakcie", len(ok) == len(near))
+    rep.add("W335-8: test lowcy - los wodza", ", ".join(f"{t['fate']} ({t['why']}, {t['sec']:.0f} s)" for t in T), "INFO (Jeff: wodz chroniony - oczekiwane 'zyje')", None)
+
+
+def wodz335_bat(key="TAK", thr=2, sends=2, geps=2, lone="10.0", present="300.0", stum=0, cmd=3):
+    return (f"Ochrona wodza (335): bitwa misja bitwa, klucz {key} (dowodca = wodz / kapitan AI, glowa rodu = glowa rodu / wladca; zagrozenie: wrog w 10 m albo jezdziec w 20 m, "
+            f"swoich w 5 m mniej; eskorta konna od 10 jezdzcow; stanowisko glebokosc + 3 m za glownym szykiem; straz kandydaci/10 (3..20) w 80 m) | dowodcow {cmd} (wodzowie 1, "
+            f"kapitanowie {cmd - 1}), glow rodu 1, konnych 2, z eskorta konna 0, w pieszym szyku 1 | stanowisko: dowodcow 1 (za glownym szykiem 1, przy eskorcie 0, przesuniec 4, "
+            f"przywrocen 0, bez miejsca 1, bez glownego szyku 0, limit zapytan 0) | zagrozenia {thr} (ludzi 1; dowodcy {thr}, glowy rodu 0, ze stanowiska 1; sr. wrogow 1.0, "
+            f"jezdzcow wsrod nich 1; na sucho 0) | cel: najblizszy swoj szyk {sends} / tyl wlasnego 0 / glowna sila 0 / sztandar 0, wyslan {sends}, dotarli 1 (sr. 4.0 s); "
+            f"powrot po postoju 1, w drodze ponad 25 s 0, bez miejsca 0 | przejeci: odwrot rannego 143 0, PANIKA 0, odwrot na rozkaz 0, gracz 0, klucz NIE 0 | straz: wezwan {geps} "
+            f"(ludzi {geps * 3}, sr. 3.0, bez kandydatow 0), dotarlo do dowodcy 2; koniec: zagrozenie minelo 6, czas 0, panika/odwrot 0, padl 0, koniec bitwy 0 | samotnie "
+            f"(bez swojego w 30 m): {lone} s z {present} s obecnosci dowodcow (3%), najdluzej 6.0 s lord_4_1#12 | los dowodcow i glow rodu: zabici 0, nieprzytomni 0 "
+            f"(w zagrozeniu 0, na stanowisku 0, inaczej 0) | test lowcy TAK | potkniecia 335 {stum}.")
+
+
+def wodz335_day(day=3, key="TAK", win=2, dDef=5, stum=0, patch="TAK (NavalDLCMobilePartyAIModel)", bp=1, bj=1):
+    return (f"Ochrona wodza (335): mapa dzien {day} | klucz {key}, latka {patch} | migawek 96 | zagrozonych par (lord - silniejszy napastnik w 6R) 4 (wladcy / glowy rodow / znani / "
+            f"wodzowie armii 2, wodzowie armii 0, napastnik gracz (migawki) 3) | bez obroncow w zasiegu (migawki) 5 | lacznie slabsi - ucieczka jak gra (migawki) 2 (w tym ranga "
+            f"wysoka 1), sr. sila grupy / napastnika 1.20 | bronia razem: par {win}, chronionych {win}, obroncow 3 | decyzje AI: obronca atakuje napastnika {dDef} (juz atakowal 1), "
+            f"obronca do chronionego 1, chroniony do obroncy 2, chroniony atakuje z nimi 0, inne zagrozenie (decyzja gry) 0, chroniony bez bezpiecznej drogi do obroncy (decyzja gry) 0 "
+            f"(migawki 0) | bitwa chronionego: par {bp}, obroncow wezwanych {bp * 2}, dolaczylo {bj} | wyjatki zakazu zaczepiania 223/p9 4 | pojmani z par 0 (chronieni grupa 0) "
+            f"| przykladow {win} | potkniecia 335 {stum}.")
+
+
+def wodz335_test(thr="12.5 s", guards=4, fate="zyje", gap="2.5"):
+    return (f"Ochrona wodza (335) TEST koniec: lowca imperial_cav#88, wynik czas 150 s po 150.0 s | wodz lord_4_1#12 (wodz, konno, eskorta konna 0, na starcie stanowisko) "
+            f"| zblizenie 20 m 12.0 s, zagrozenie wodza {thr}, kontakt 3 m 20.0 s, najblizszy swoj przy kontakcie {gap} m | straz wezwana {guards}, dotarla 2 | wodz {fate}, "
+            f"samotnie (bez swojego w 30 m) 0.0 s.")
+
+
+def wodz335_synth():
+    """W335-S: dobry bieg, samotny wodz, zagrozenia bez wycofan, mapa bez decyzji, potkniecie, ERROR, test bez reakcji, luka doby, zly format. None = OK."""
+    import tempfile
+    import shutil
+    st = "Ochrona wodza (335): mapa start sesji | klucz Lords Defend Threatened Lord TAK | latka TAK (NavalDLCMobilePartyAIModel) | migawka co 0.25 h | napastnik w 18.0 jedn."
+    runs = {
+        "good": [st, wodz335_day(3), wodz335_day(4), wodz335_bat(), wodz335_test()],
+        "lone": [st, wodz335_day(3), wodz335_bat(lone="120.0", present="300.0")],
+        "lonenie": [st, wodz335_day(3), wodz335_bat(key="NIE (tylko pomiar)", lone="200.0", present="300.0")],
+        "nosend": [st, wodz335_day(3), wodz335_bat(thr=4, sends=1)],
+        "noguard": [st, wodz335_day(3), wodz335_bat(geps=0)],
+        "mapdead": [st, wodz335_day(3, dDef=0).replace("(juz atakowal 1), obronca do chronionego 1, chroniony do obroncy 2", "(juz atakowal 0), obronca do chronionego 0, chroniony do obroncy 0")],
+        "nowin": [st, wodz335_day(3, win=0, dDef=0)],
+        "gap": [st, wodz335_day(3), wodz335_day(5)],
+        "stum": [st, wodz335_day(3), wodz335_bat(stum=1)],
+        "err": [st, wodz335_day(3), "ERROR in LordEscort.Guard335.Build (potkniecie 1)"],
+        "testbad": [st, wodz335_day(3), wodz335_bat(), wodz335_test(thr="-", guards=0, fate="zabity", gap="25.0")],
+        "testnear": [st, wodz335_day(3), wodz335_bat(), wodz335_test(thr="-", guards=0, gap="3.0")],
+        "bjoin": [st, wodz335_day(3, bp=2, bj=0), wodz335_day(4, bp=2, bj=0)],
+        "bjoinok": [st, wodz335_day(3, bp=2, bj=1), wodz335_day(4, bp=2, bj=0)],
+        "olday": [st, wodz335_day(3).replace("obronca do chronionego 1, ", "").replace(", chroniony bez bezpiecznej drogi do obroncy (decyzja gry) 0 (migawki 0)", "")
+                  .replace(" | bitwa chronionego: par 1, obroncow wezwanych 2, dolaczylo 1", "")],
+        "errpass": [st, wodz335_day(3), "ERROR in HeroCaution.Pass (potkniecie 1)"],
+        "patch": [st.replace("latka TAK (NavalDLCMobilePartyAIModel)", "latka BRAK (GetBestInitiativeBehavior)"), wodz335_day(3)],
+        "broken": [st, wodz335_day(3), wodz335_bat().replace("stanowisko: dowodcow", "stanowisko dowodcow")],
+        "old": ["Eskorta lordow (223): dzien 3 | ..."],
+    }
+    exp = {
+        "good": {"W335-0": "TAK", "W335-1": "TAK", "W335-2": "TAK", "W335-3": "TAK", "W335-4": "TAK", "W335-5": "TAK", "W335-6": "TAK", "W335-7": "TAK", "W335-8": "INFO"},
+        "lone": {"W335-4": "NIE"},
+        "lonenie": {"W335-4": "INFO"},
+        "nosend": {"W335-5": "NIE"},
+        "noguard": {"W335-5": "NIE"},
+        "mapdead": {"W335-2": "NIE"},
+        "nowin": {"W335-2": "INFO"},
+        "gap": {"W335-1": "NIE"},
+        "stum": {"W335-6": "NIE"},
+        "err": {"W335-6": "NIE"},
+        "testbad": {"W335-7": "NIE", "W335-8": "INFO"},
+        "testnear": {"W335-7": "TAK"},
+        "bjoin": {"W335-2b": "NIE"},
+        "bjoinok": {"W335-2b": "TAK"},
+        "olday": {"W335-1": "TAK", "W335-2": "TAK", "W335-2b": "INFO"},
+        "errpass": {"W335-6": "NIE"},
+        "patch": {"W335-0": "NIE"},
+        "broken": {"W335-3": "NIE"},
+        "old": {"W335-0": "INFO", "W335-1": "INFO", "W335-3": "INFO", "W335-7": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="w335_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {x}" for i, x in enumerate(Ls)) + "\n")
+            rep = Report()
+            wodz335_rows(rep, wodz335_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def wodz335_main(logp):
+    rep = Report()
+    try:
+        s2 = wodz335_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("W335-S: test syntetyczny (dobry, samotny wodz, bez wycofan, bez strazy, mapa martwa, luka doby, potkniecie, ERROR, test lowcy, latka, zly format, bitwa chronionego, "
+            "stara linia doby, ERROR Pass)", s2 or "OK", "OK",
+            s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("W335-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = wodz335_collect(logp)
+    print(f"plik: {logp} | bitew 335 {len(D['bat'])}, dob mapy {len(D['day'])}, testow lowcy {len(D['test'])}, ERROR {D['err']}")
+    wodz335_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_wodz335_main_prev = main
+
+
+def main(argv):
+    # paczka 335: grupa wodz335 - opakowanie main jak ai333
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "wodz335":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return wodz335_main(rest[0] if rest else None)
+    return _wodz335_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

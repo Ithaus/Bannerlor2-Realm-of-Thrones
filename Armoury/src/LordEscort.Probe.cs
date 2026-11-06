@@ -62,6 +62,7 @@ namespace Armoury
             try
             {
                 if (prisoner == null || !prisoner.IsLord) return;   // takze przy kluczu NIE - porownanie A/B (recenzja 223)
+                Guard335Captured(prisoner);   // 335: pojmany z pary zagrozenia / chroniony grupa
                 var clan = prisoner.Clan;
                 if (clan == null || clan == Clan.PlayerClan || clan.IsBanditFaction) return;
                 _cLords++;

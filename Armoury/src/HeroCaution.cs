@@ -46,7 +46,7 @@ namespace Armoury
     /// bitwe (BattleSense.Clean, po "poscig (148)"). Wyjatek na bohaterze = licznik (RoutHold.SiteHeroes); po FailsOut bohater wypada (pozycja zdjeta) - bez globalnego
     /// wylacznika. Nazwa klasy nie moze byc "Log", "Settings" ani "McmSettings".
     /// </summary>
-    internal static class HeroCaution
+    internal static partial class HeroCaution
     {
         // ------------------------------------------------------------ stale (karta syntezy 142 / D4)
         internal const float WoundedBelow = 0.45f;   // ranny bohater ponizej 45% HP
@@ -81,7 +81,7 @@ namespace Armoury
 
         private const int ModeNone = 0, ModeWounded = 1, ModeAlone = 2;
         private const int StIdle = 0, StTravel = 1, StHold = 2;
-        private const int KRear = 0, KMain = 1, KBanner = 2, KInPlace = 3, KKinds = 4, KindLimit = -2;
+        private const int KRear = 0, KMain = 1, KBanner = 2, KInPlace = 3, KNear = 4, KKinds = 5, KindLimit = -2;   // 335: KNear - najblizszy wlasny szyk (dowodca)
         private const int CheckOk = 0, CheckBad = 1, CheckLimit = 2;
         // koniec trybu (przejeci); recenzja 149: EOrder - odwrot na rozkaz szyku (ROZSADEK przelacznika od recenzji 139), EKey - klucz NIE w trakcie bitwy
         private const int EPain = 0, EGame = 1, EPanicOther = 2, E143 = 3, EPlayer = 4, EOrder = 5, EKey = 6, EKinds = 7;
@@ -94,6 +94,10 @@ namespace Armoury
             public int Mode, St, Kind = -1, Hits, Fails, Swaps;
             public bool EverWounded, EverAlone, EverWithdrawn, EpArrived, FateDone, Out, DryW;
             public float Since, NextEval, HoldUntil, CoolUntil = -1000f, TravelStart = -100f;
+            // 335 (HeroCaution.Guard335.cs): rola (0 zwykly, 1 glowa rodu / wladca, 2 wodz / kapitan AI), rodzaj stanowiska, pomiar samotnosci, na sucho
+            public int Role, PostKind, EverRole;
+            public bool Big, BigKnown, EverPost, EverThreat;
+            public float LoneSec, PresentSec, DryUntil = -1000f;
             public Vec2 Target = Vec2.Invalid;
             public WorldPosition Wp = WorldPosition.Invalid;
         }
@@ -164,6 +168,7 @@ namespace Armoury
             _key = c != null && c.HeroesKeepBehindTheirMen;
             _duelists = c != null && c.DuelistsInBattles;
             _live = _field;
+            GuardBegin(c);   // 335
         }
 
         /// <summary>BattleSense.OnMissionTick (blok Night, po HorsePursuit): spis co 2 s, ocena co 0.5 s, dotarcie / postoj co 0.25 s, szeregi co 3 s.</summary>
@@ -182,6 +187,7 @@ namespace Armoury
             }
             var c = Settings.Current;
             _key = c != null && c.HeroesKeepBehindTheirMen;
+            _gKey = _key && c.CommandersKeepCommandPost;   // 335
             float now = m.CurrentTime;
             _scanAcc += dt;
             _passAcc += dt;
@@ -208,6 +214,7 @@ namespace Armoury
                 _rankAcc = 0f;
                 Ranks(m);
             }
+            try { HuntTestTick(m, now); } catch (Exception e) { GStumble("HeroCaution.Lowca335", e); }   // 335: test lowcy (tylko autotest)
         }
 
         /// <summary>313y (FieldCraft.LimpNow, glowny watek): bohater AI w trybie rannym (ponizej WoundedBelow, w drodze albo na postoju za szykiem) -
@@ -238,7 +245,8 @@ namespace Armoury
                 else if (ko) _ko++;
                 else if (state == AgentState.Routed) _routed++;
                 else _otherFate++;
-                if (man.Mode != ModeNone && !_ended)
+                GuardRemoved(man, a, killed, ko);   // 335: los dowodcow, test lowcy
+                if ((man.Mode == ModeWounded || man.Mode == ModeAlone) && !_ended)
                 {
                     bool hold = man.St == StHold;
                     if (killed) { if (hold) _wdKilledHold++; else _wdKilledTravel++; }
@@ -323,6 +331,7 @@ namespace Armoury
             _wdKilledTravel = _wdKilledHold = _wdKoTravel = _wdKoHold = 0;
             _everWoundedKilled = _everWoundedKo = _everWounded = 0;
             _dropped = 0;
+            GuardClear();   // 335
         }
 
         // ------------------------------------------------------------ pomocnicze
@@ -386,6 +395,7 @@ namespace Armoury
         private static void Pass(Mission m, float now, bool full)
         {
             _pathLeft = PathPerStep;
+            try { GuardsStep(now); } catch (Exception e) { GStumble("HeroCaution.Straz335", e); }   // 335: straz biegnie do dowodcy
             for (int i = 0; i < List.Count; i++)
             {
                 var man = List[i];
@@ -444,6 +454,7 @@ namespace Armoury
                 return;
             }
             man.Mounted = a.MountAgent != null;
+            GuardMeasure(man, m, now);   // 335: rola, samotnosc dowodcy, na sucho
             float max = a.HealthLimit;
             float hp = max > 0f ? a.Health / max : 1f;
             bool wounded = hp < WoundedBelow;
@@ -467,7 +478,19 @@ namespace Armoury
 
             if (wounded)
             {
-                if (man.Mode != ModeWounded) Start(man, ModeWounded, now, hp, 0);
+                if (man.Mode != ModeWounded)
+                {
+                    if (man.Mode == ModePost) { Release(man); PostOff(man); }   // 335: ze stanowiska w rannego - nowa droga
+                    Start(man, ModeWounded, now, hp, 0);
+                }
+            }
+            else if (_gKey && GuardPass(man, m, now))
+            {
+                return;                                                   // 335: dowodca / glowa rodu - zagrozenie albo stanowisko (krok w GuardPass)
+            }
+            else if (man.Mode == ModePost || man.Mode == ModeThreat)
+            {
+                Release(man); PostOff(man);                               // 335: klucz NIE w trakcie
             }
             else if (man.Mode == ModeNone && now >= man.CoolUntil)
             {
@@ -515,7 +538,7 @@ namespace Armoury
 
         private static void Start(Man man, int mode, float now, float hp, int foes)
         {
-            bool conv = man.Mode == ModeAlone && mode == ModeWounded;
+            bool conv = (man.Mode == ModeAlone || man.Mode == ModeThreat) && mode == ModeWounded;   // 335: z zagrozenia w rannego - ten sam cel
             man.Mode = mode;
             man.Since = now;
             man.NextEval = now;
@@ -554,6 +577,8 @@ namespace Armoury
         {
             var a = man.A;
             if (a == null || !a.IsActive()) return;
+            if (man.Mode == ModePost) { PostPass(man, m, now); return; }   // 335: stanowisko dowodcy
+            bool lone = man.Mode == ModeAlone || man.Mode == ModeThreat;   // 335: zagrozony dowodca jak samotny (postoj, powrot)
             if (man.St == StTravel)
             {
                 if (man.Wp.IsValid && man.Target.IsValid)
@@ -563,21 +588,21 @@ namespace Armoury
                     if (pos.IsValid && pos.DistanceSquared(man.Target) <= r * r) { Arrive(man, now); return; }
                     if (man.TravelStart > -50f && now - man.TravelStart > TravelMax)
                     {
-                        if (man.Mode == ModeAlone) { _aloneTimeout++; Release(man); EndAlone(man, now); return; }
+                        if (lone) { if (man.Mode == ModeThreat) _gTimeout++; else _aloneTimeout++; Release(man); EndAlone(man, now); return; }
                         ArriveInPlace(man, now);
                         return;
                     }
                 }
-                else if (man.Mode == ModeAlone && now - man.Since > AloneGiveUp)
+                else if (lone && now - man.Since > AloneGiveUp)
                 {
-                    _aloneGaveUp++;                                       // nigdzie bezpiecznie - walczy dalej, nastepna proba po przerwie
+                    if (man.Mode == ModeThreat) _gGaveUp++; else _aloneGaveUp++;                                       // nigdzie bezpiecznie - walczy dalej, nastepna proba po przerwie
                     EndAlone(man, now);
                     return;
                 }
             }
-            else if (man.St == StHold && man.Mode == ModeAlone && now >= man.HoldUntil)
+            else if (man.St == StHold && lone && now >= man.HoldUntil)
             {
-                _aloneBack++;                                             // postal za szykiem - wraca do walki ze swoimi
+                if (man.Mode == ModeThreat) _gBack++; else _aloneBack++;                                             // postal za szykiem - wraca do walki ze swoimi
                 Release(man);
                 EndAlone(man, now);
                 return;
@@ -589,7 +614,7 @@ namespace Armoury
         private static void Evaluate(Man man, Mission m, float now)
         {
             var a = man.A;
-            man.NextEval = now + (man.Mode == ModeAlone ? RefreshAlone : RefreshWounded);
+            man.NextEval = now + (man.Mode == ModeWounded ? RefreshWounded : RefreshAlone);
             int kind;
             WorldPosition wp;
             Vec2 t = Pick(man, m, out kind, out wp);
@@ -615,8 +640,8 @@ namespace Armoury
             a.SetScriptedPosition(ref wp, false, Agent.AIScriptedFrameFlags.None);   // bez NoAttack (broni sie), bez DoNotRun
             if (first)
             {
-                _sends++;
-                if (kind >= 0 && kind < KKinds) KindSend[kind]++;
+                if (man.Mode == ModeThreat) { _gSends++; if (kind >= 0 && kind < KKinds) GKindSend[kind]++; }   // 335: osobne liczniki
+                else { _sends++; if (kind >= 0 && kind < KKinds) KindSend[kind]++; }
                 man.TravelStart = now;
             }
             else if (lost) _restored++;
@@ -629,12 +654,16 @@ namespace Armoury
             if (!man.EpArrived)
             {
                 man.EpArrived = true;
-                _arrived++;
                 float d = man.TravelStart > -50f ? now - man.TravelStart : 0f;
-                _travelSum += d;
-                if (d > _travelMax) _travelMax = d;
+                if (man.Mode == ModeThreat) { _gArrived++; _gTravelSum += d; }   // 335
+                else
+                {
+                    _arrived++;
+                    _travelSum += d;
+                    if (d > _travelMax) _travelMax = d;
+                }
             }
-            if (man.Mode == ModeAlone) man.HoldUntil = now + AloneHold;
+            if (man.Mode == ModeAlone || man.Mode == ModeThreat) man.HoldUntil = now + AloneHold;
         }
 
         /// <summary>Ranny po TravelMax w drodze: postoj tam, gdzie stoi (pozycja skryptowa na miejscu).</summary>
@@ -653,9 +682,10 @@ namespace Armoury
 
         private static void EndAlone(Man man, float now)
         {
+            man.CoolUntil = now + (man.Mode == ModeThreat ? ThreatCool : AloneCool);   // 335: dowodca reaguje znowu po 1 s (wrog przy nim = zagrozenie od nowa)
             man.Mode = ModeNone;
             man.St = StIdle;
-            man.CoolUntil = now + AloneCool;
+            man.PostKind = 0;
             man.Wp = WorldPosition.Invalid;
             man.Target = Vec2.Invalid;
             man.Hits = 0;
@@ -663,7 +693,9 @@ namespace Armoury
 
         private static void EndMode(Man man, int why)
         {
-            if (why >= 0 && why < EKinds) EndWhy[why]++;
+            if (man.Mode == ModeThreat || man.Mode == ModePost) GEnd[Math.Max(0, Math.Min(EKinds - 1, why))]++;   // 335: osobne liczniki
+            else if (why >= 0 && why < EKinds) EndWhy[why]++;
+            man.PostKind = 0;
             man.Mode = ModeNone;
             man.St = StIdle;
             man.Wp = WorldPosition.Invalid;
@@ -697,13 +729,15 @@ namespace Armoury
                 if (man.Mode == ModeNone) continue;
                 try
                 {
-                    if (man.A != null && man.A.IsActive()) { if (man.St == StHold) _atEndHold++; else _atEndTravel++; }
+                    if (man.A != null && man.A.IsActive() && (man.Mode == ModeWounded || man.Mode == ModeAlone)) { if (man.St == StHold) _atEndHold++; else _atEndTravel++; }
                     Release(man);
                 }
                 catch (Exception e) { Stumble("HeroCaution.EndOfBattle", e); }
                 man.Mode = ModeNone;
                 man.St = StIdle;
+                man.PostKind = 0;
             }
+            GuardsReleaseAll();   // 335: straz wraca do szykow
         }
 
         // ------------------------------------------------------------ cel wycofania
@@ -718,6 +752,13 @@ namespace Armoury
             float back = man.Mounted ? RearMounted : RearFoot;
             var f = a.Formation;
             Vec2 p;
+            if (_gKey && man.Role > 0)
+            {
+                // 335: dowodca / glowa rodu - najpierw do najblizszego wlasnego szyku (Jeff: "wycofuje sie do swoich wojsk"), nie przez pole do glownej sily
+                Vec2 q = NearestOwn(man, m, back, man.Mode == ModeWounded, out kind, out wp);   // ranny - tyl szyku pieszego, nie srodek / jazda
+                if (kind == KindLimit || q.IsValid) return q;
+                kind = -1;
+            }
             if (f != null && f.CountOfUnits >= 3 && Rear(f, back, out p))
             {
                 int r = Check(a, m, p, out wp);
@@ -1019,6 +1060,7 @@ namespace Armoury
               .Append(", nieprzytomni ").Append(_everWoundedKo).Append(')');
             sb.Append(" | potkniecia bohaterowie ").Append(stum).Append(" (wypadli ").Append(_dropped).Append(").");
             Log.Info(sb.ToString());
+            try { GuardWrite(c); } catch (Exception e) { GStumble("HeroCaution.Linia335", e); }   // 335: linia "Ochrona wodza (335): bitwa"
         }
     }
 }

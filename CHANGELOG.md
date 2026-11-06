@@ -133,6 +133,70 @@ padac, gdy jest inny cel (B334-18).
   Zelaznych (mysl AI); linia frontu w rozejmie 330 bez rF; B334_ERR tez potkniecia 334 w 320/274; opisy MCM; komentarze; `Ready` usuniete.
 - `sprawdz_logi --grupa balans334`: nowe przypadki syntetyczne err334 i trucefront - TAK; sca320b, wojna330, rownowaga274, polnoc326, obl326c - TAK.
 
+## 335b - poprawki po 2 recenzjach 335: obrona trwa w bitwie chronionego, przydzial obroncow bez podwojnego liczenia, straz nie z linii w zwarciu (noc/335-ochrona-wodza; Armoury.dll 6ffcced0ea53e5933dc5a8aed4ea0758 - NIE WGRANE, bez autotestu; Jeff gra)
+**Mapa (LordEscort.Guard335.cs):**
+- WAZNE 4 / R2-1: para nie znika w chwili starcia - P w bitwie polowej (bez osady, nie morze) z napastnikiem z poprzedniej migawki albo P po stronie broniacej, a X = wodz
+  strony atakujacej: para trwa (sila stron bitwy), obroncy EngageParty na X = dolaczenie do bitwy po stronie P; wyjatek zakazu zaczepiania 223/p9 dziala dalej.
+  Licznik doby "bitwa chronionego: par N, obroncow wezwanych N, dolaczylo N" (obronca z poprzedniej migawki w tej samej bitwie co P).
+- WAZNE 3: najpierw wszystkie pary, potem przydzial obroncow (ranga, odleglosc), sila grupy tylko z przypisanych, chroniony nigdy nie jest obronca; para lacznie
+  slabsza odpada po jednej (najslabsza pierwsza), jej obroncy wracaja do pozostalych.
+- WAZNE 5 / R2 drobne: P jedzie tylko do obroncy z droga nie przez X (kat > 60 st.) - bez takiego decyzja gry (licznik "chroniony bez bezpiecznej drogi do obroncy");
+  obronca dalej niz 2R od P i dalej od X niz P najpierw EscortParty do P (licznik "obronca do chronionego"), blizej - EngageParty na X.
+- DROBNE 1: "P sam da rade" porownuje z X razem z sojusznikami w 2R. DROBNE 8: latka na typ czynnego modelu kazdej kampanii.
+**Bitwa (HeroCaution.Guard335.cs):**
+- WAZNE 1 / R2-4: zagrozenie - swoich w 10 m (nie 5 m), jezdziec 10-20 m tylko nadjezdzajacy (cel = wodz albo > 2 m/s w 45 st.); warunek samotnego 149 zostaje.
+  Straz 3 na napastnika (3..20), nie z walki wrecz (cel w 3 m) ani z szyku w szarzy.
+- WAZNE 2 / R2-3: wlasny szyk glowny albo pieszy >= 8 - stanowisko za wlasnym szykiem.
+- R2-2 / DROBNE 5: cel wycofania - najblizszy szyk pieszy nie w szarzy (konny tylko bez pieszego); ranny - tyl szyku, nie srodek. Sortowanie bez lambdy.
+- DROBNE 4: straznik wziety przez 148/204/333 (lowca, jezdziec, test) - zwolniony bez ruszania jego pozycji (koniec straz "przejety").
+**sprawdz_logi wodz335:** nowa linia doby (stara tez czytana), W335-2b (>= 3 pary w bitwie -> dolaczylo > 0; pojmani chronieni INFO), W335-6 liczy "ERROR in
+HeroCaution.Pass", W335-7 OK takze przy swoim <= 5 m przy kontakcie; W335-S TAK (20 przypadkow).
+**Bez zmian (swiadomie):** DROBNE 2 (gracz przejezdzajacy w 2R), 3 (armia na odsiecz/oblezenie jako obronca - Jeff: bronic glowy rodu), 6, 7 - opis w CHANGELOG 335.
+**Test:** C:\Users\GAME\bannerlord-autotest\test\bieg-bitwa-204.ps1 -DllDir C:\Users\GAME\bannerlord-autotest\test\m335 -Battles 8 (tylko gdy gra Jeffa zamknieta), potem
+`python -I tools/sprawdz_logi.py --grupa wodz335 <Armoury-*.log>` + grupy 204/333 (liczebnosc jazdy).
+
+## 335 - ochrona wodza: lordowie bronia zagrozonego lorda na mapie, wodz w bitwie dowodzi zza swoich i ma straz (noc/335-ochrona-wodza od noc/333-ai-bitwy a7e623fb - NIE WGRANE, bez autotestu; Jeff gra)
+**Problem:** Jeff 06.11 (gra od 11:51, `Armoury-2026-11-06_11-51-21.log`): (1) MAPA "zblizam sie do Tywina, to inni wokol niego nie bronia glowy rodu, choc maja
+przewage" - 12:39:03 Tywin (lord_4_1, 200 z 686 ludzi, wypelnienie 0.29) uciekal sam (FleeToPoint), "postoj 223 (slaby wobec zagrozenia)"; najblizsi Lannisterowie
+Lancel 6.65 jedn., Matthew 11.9, Melwyn 12.7 - wszyscy w 223 "do twierdzy" albo z zakazem zaczepiania; razem ok. 550-710 sily wobec ok. 460 Jeffa, osobno zaden.
+(2) BITWA "Tywin jezdzil sam wokol wojsk jak idiota, dopadlem go i zabilem; nie mial kawalerii" - Sarswood 12:39, szyk Cavalry wroga 3-8 ludzi, 318c 12:41:27 "wodz
+Tywin Lannister ... nieprzytomny", linia 149: samotni 0, bez partnera 1, wycofanie rannego 1 do glownej sily - padl w drodze.
+**Przyczyna:** (1) gra nie zna obrony sojuszniczego lorda: `GetBestInitiativeBehavior` liczy przewage kazdej partii osobno, wolniejsza od gracza ma wynik ataku 0;
+sojusznik liczy sie do przewagi przy celu = gracz tylko z `ShouldConsiderAttacking` - a 223 / p9 daja slabym R1-R3 zakaz zaczepiania; ucieczka do sojusznika tylko do
+JEDNEGO silniejszego w 11.25 jedn. (2) RBM wylacza szyk wodza (`CanTeamHaveGeneralsFormationPatch`: brak `BehaviorGeneral` i obstawy) i wpycha konnego wodza do szyku
+konnicy (`ManageFormationCounts`) - 1-3 osobowy szyk z rozkazami calej jazdy krazy z dala od piechoty; 149 nie zna wodza i reaguje dopiero na 2 wrogow w 10 m.
+**Zmiana:** projekt `docs/PROJEKT-335-OCHRONA-WODZA.md` (macierz zagrozenie x eskorta x stan bitwy x rola, liczby z modeli gry i moda).
+- BITWA (klucz `CommandersKeepCommandPost`, domyslnie TAK, dziala z `HeroesKeepBehindTheirMen`): `HeroCaution.Guard335.cs` (nowy) + `HeroCaution.cs`. Dowodca = wodz /
+  kapitan AI, glowa rodu = glowa rodu / wladca / nastepca; gracz i szyki gracza (takze cala druzyna gracza-wodza) nigdy. Bez eskorty konnej (< 10 jezdzcow w szyku -
+  gra: obstawa = kandydaci / 10) STANOWISKO za glownym szykiem jak `BehaviorGeneral` (mediana - kierunek do wroga x (glebokosc + 3 m)), co 1.5 s; z eskorta - przy niej
+  (dalej niz polowa szyku + 10 m - za szyk eskorty); pieszy w swoim szyku >= 8 - zostaje (149 ostatnie szeregi). ZAGROZENIE (wrog w 10 m albo jezdziec w 20 m, swoich
+  w 5 m mniej - od 1 napastnika): do NAJBLIZSZEGO wlasnego szyku (srodek, przy wrogu tyl), postoj 6 s przedluzany, i STRAZ - najblizsi ludzie druzyny w 80 m
+  (kandydaci / 10, 3..20, jezdziec z polowa odleglosci) biegna do niego do konca zagrozenia (najwyzej 25 s). Ranny dowodca / glowa rodu - tez najpierw najblizszy szyk.
+  Linia "Ochrona wodza (335): bitwa ..." raz na bitwe (samotnosc dowodcow - sekundy bez swojego w 30 m - mierzona zawsze, takze klucz NIE).
+- MAPA (klucz `LordsDefendThreatenedLord`, domyslnie TAK): `LordEscort.Guard335.cs` (nowy) + wpiecia w `LordEscort.cs`, `LordEscort.Probe.cs`, `ArmsFirst.cs`. Migawka
+  co `AiCheckInterval` (0.25 h): lord AI z silniejszym napastnikiem w 6R (gracz jadacy w jego strone / klikniety, wrogi lord / armia goniacy go albo przed ktorym ucieka);
+  obroncy = partie lordow jego krolestwa w `FleeToNearbySettlementRadius` (wladca, nastepca, glowa rodu, znany lord, wodz armii) albo `FleeToNearbyPartyRadius` (reszta)
+  i w `DrMaxMarchHours` marszu (limit m97); grupa >= napastnik z sojusznikami w 2R (margines gry: atak przy przewadze > 1) - postfiks `GetBestInitiativeBehavior`
+  czynnego modelu: obroncy EngageParty na napastnika (chyba ze uciekaja przed kims innym), chroniony EscortParty do najblizszego obroncy, w R od niego atak razem;
+  zakaz zaczepiania 223 / p9 nie obowiazuje wobec tego napastnika. Lacznie slabsi - bez zmian (ucieczka jak gra). Linie "Ochrona wodza (335): mapa start sesji",
+  "... mapa - <przyklad>" (10 na dobe), "... mapa dzien N" (pary, obroncy, decyzje AI z watkow, wyjatki zakazu, pojmani z par).
+- TEST (klucz `CommanderHuntInAutotest`, tylko LogGate.Mode 1, plan bitwy "slaba"): LOWCA - czlowiek AI druzyny gracza (jezdziec najpierw) jedzie prosto na wodza
+  wroga, HP i morale jak gracz do kontaktu; `HorsePursuit.TestRunAnyThread` obejmuje lowce (bez capu marszu). Linie "Ochrona wodza (335) TEST start / koniec".
+- `tools/sprawdz_logi.py --grupa wodz335`: W335-S test syntetyczny (14 przebiegow), W335-0 latka, W335-1 linia doby, W335-2 decyzje AI przy parach "bronia razem",
+  W335-3 linia bitwy, W335-4 samotnosc dowodcow <= 15% przy TAK, W335-5 wycofania >= polowa zagrozen i straz, W335-6 potkniecia / ERROR 0, W335-7 test lowcy -
+  zagrozenie i straz przy kazdym zblizeniu, W335-8 los wodza (INFO). MCM wygenerowany (gen_mcm.py), reczne wpisy 326d i 326x przywrocone.
+**Ryzyko / co sprawdzic:** kontrola calosci w kodzie: (a) 149 - nowe tryby maja osobne liczniki (wyslania, dotarcia, przejecia, los w wycofaniu), linia 149 bez zmiany
+formatu; zamiany szeregow pomijaja bohatera na stanowisku jak w wycofaniu; WoundedWithdrawing (313y) tylko ModeWounded jak dotad; (b) pozycje skryptowe: stanowisko i
+straz przywracane co 0.25 s po zdjeciu (RBM StanceLogic) - licznik "przywrocen"; straz nie bierze ludzi z cudza pozycja skryptowa, jezdzcow 148/204, chorazych, szykow
+gracza, nekajacego testu; (c) zagrozenie od 1 napastnika i przerwa 1 s - mozliwe czeste krotkie epizody przy zwarciu (dowodca w zwarciu ma swoich w 5 m - brak
+zagrozenia); (d) mapa: postfiks w watkach AI czyta tylko opublikowany slownik (wzor _noAtk 223); obronca nie nadpisuje ucieczki przed innym wrogiem; gracz przejezdzajacy
+obok w strone lorda sciaga obroncow (znika po odjezdzie); obroncy dochodza w roznym czasie - m97 dociaga reszte w tym samym limicie 2 h; CartGuard / CartEscort297 wolaja
+ten sam model dla wozow - postfiks ich nie zna (brak w migawce); (e) bez latek na Agent w OnSubModuleLoad - tylko BattleSense po wczytaniu akcji; (f) nowe klucze nie
+sa w Armoury.json Jeffa - wchodza domyslne. Do sprawdzenia w autotescie: W335-4 (samotnosc), W335-5 (straz dociera), W335-7 (lowca), W335-2 (decyzje AI na mapie),
+linie 149 / 204 / 283 / 333 bez nowych potkniec.
+**Status:** DO SPRAWDZENIA (zbudowane Release, kod 0, 0 nowych ostrzezen; md5 Armoury.dll 0be296f67b4de49513f5de7e9c4314f7; nie wgrane, bez autotestu - Jeff gra;
+katalog testu C:\Users\GAME\bannerlord-autotest\test\m335).
+
 ## 333 - AI bitwy: poscig z glowa za nekajacym i szyk bez wahadla przed kontaktem (noc/333-ai-bitwy od noc/332-reach e55aaa19 - NIE WGRANE, bez autotestu; Jeff gra)
 **Problem:** Jeff 06.11 po bitwie: (A) "strzelam do kawalerii, oni jada za mna, wyciagam ich pod swoje wojsko pod lucznikow, jak widza moje wojsko zaczynaja sie
 odwracac plecami i jada do swoich, ja jade za nimi i strzelam w plecy, oni sie znowu wracaja ... trzeba to po prostu robic z glowa"; (B) "formacje ... ida do przodu
