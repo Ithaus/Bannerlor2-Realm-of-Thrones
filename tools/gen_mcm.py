@@ -770,6 +770,14 @@ LABELS = {
     'RbmBattleRegenOff': 'No Healing In Battle',   # 314a
     'IndebtedLordVanillaYears': 'Indebted Lord Penalty In Game Years',   # 314b
     'MapMusicOurs': 'Our Map Music',   # paczka 165: nazwa z polecenia Jeffa
+    'CanonWarFront334': 'Canon War Front Measure',   # paczka 334
+    'ScaFrontThreat334': 'Strategic AI Front Threat',
+    'ScaFightsOnMainWarLocked334': 'Strategic AI Fights On When Main War Locked',
+    'CanonWarBalanceHireCompanies': 'Weaker Side Hires Sellswords',
+    'WarTruceArmed334': 'Armed Truce',
+    'NorthCanonTheatre334': 'North Canon Theatre',
+    'BkVetoNextTarget334': 'Army Objective Skips Vetoed Seats',
+    'IronbornCanonReave334': 'Ironborn Reave The North',
     # p9: "AI" wielkimi literami (regula ogolna dalaby "Ai Strength Counts Gear")
     'StrategicAiIgnoresBandits': 'Strategic AI Ignores Bandits',   # 320b
     'StrategicAiFightsOnWhenPeaceBlocked': 'Strategic AI Fights On When Peace Blocked',   # 320e

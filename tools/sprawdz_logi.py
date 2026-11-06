@@ -95428,5 +95428,360 @@ def main(argv):
             return ai333_main(rest[0] if rest else None)
     return _ai333_main_prev(argv)
 
+
+# ------------------------------------------------------------ paczka 334: grupa balans334 - balans wojny korona-Polnoc z Zelaznymi (WarFront334*.cs, projekt docs/PROJEKT-334-BALANS-WOJNY.md)
+#  B334-1 linia startu, latki ok x4; B334-2 potkniecia 334 (max z linii kontroli) 0 i ERROR in WarFront334 0; B334-3 rF (front korona/Polnoc) mediana ostatnich 30 dob 0.8-1.2
+#  (koalicja INFO); B334-4 trend rF: mediana ostatniej tercji - pierwszej |d| <= 0.15; B334-5 twierdze crownlands/reach/stormlands zdobyte przez AI Polnocy przed Krwawymi
+#  Godami 0 (gracz INFO); B334-6 korona: doby z >= 1 armia >= 50%; B334-7 korona: oblezenie (274 'B ... oblezenia') w kazdym oknie 28 dob; B334-8 Tywin w polu >= 70% dob;
+#  B334-9 bitwy polowe (bitwy.log) - INFO; B334-10 SCA korony: doby z celem ForcePeace <= 10%; B334-11 Wyspy: doby z armia >= 30%; B334-12 Wyspy: oblezenia osad
+#  kultury battania >= 1 na 60 dob; B334-13 Wyspy: rabunki z lupem >= 3 na 60 dob; B334-14 Wyspy: doby z opcja rabunku > 0 po 3. dobie >= 50%; B334-15 Wyspy: partie
+#  ponizej progu jedzenia (mediana udzialu) <= 25%; B334-16 Wyspy: mnoznik statkow (mediana) <= 1.25; B334-17 rozejm: partie korony >= 80% stanu sprzed (bez rozejmu
+#  INFO); B334-18 BK null przy wecie 0; B334-19 zloto / ludzie z niczego 0 / 0; B334-20 Winterfell oblegany przez strone A/B (274 'OBLEZENIE SIEDZIBY') 0;
+#  B334-21 najem: skarbiec po >= zapas wojny 100%; B334-22 regresja - INFO (uruchom --grupa wojna330, obl326c, polnoc326, rownowaga274, sca320b); B334-T testy autotestu (flaga) bez NIE.
+#  Progi doby licza sie tylko od 3. doby linii (pierwsze doby po wczytaniu - macierz C16). Za krotki bieg (< 28 / 60 dob) - progi okien INFO.
+#   python -I tools/sprawdz_logi.py --grupa balans334 <Armoury-*.log>
+B334_P = "Balans wojny (334): "
+B334_START = re.compile(r"Balans wojny \(334\): start sesji \| klucze: (.*?) \| zakres: (.*?) \| latki: SCA status (\S+), SCA cel (\S+), BK (\S+?)(?: \(.*?\))?, mysl AI (\S+?)(?: \(.*?\))? \|")
+B334_FRONT = re.compile(r"Balans wojny \(334\): dzien (\d+) \| faza (\S+) \| front Polnoc->korona (\d+) .*? / korona->Polnoc (\d+) .*?\| rF ([\d.]+) \(koalicja ([\d.]+|-)\)")
+B334_SCA = re.compile(r"Balans wojny \(334\): dzien (\d+) \| SCA ")
+B334_SCA_K = re.compile(r"\| \[(\w+)\] [^|]*?: wrog [^|]*?, cel ([^|]*?)->([^ ,(|]+)")
+B334_THEATRE = re.compile(r"Balans wojny \(334\): dzien (\d+) \| teatr: .*?\| BK nastepny cel: klucz (\S+), zamian (\d+), bez innego celu (\d+), BK null (\d+)")
+B334_TAKEN = re.compile(r"Balans wojny \(334\): zdobycie poza teatrem \| dzien (\d+) \| (.*?) zdobyte .* - (AI|GRACZ)")
+B334_HIRE = re.compile(r"Balans wojny \(334\): najem kompanii \| dzien (\d+) \|.*?\| skarbiec przed/po (-?\d+)/(-?\d+), zapas wojny (-?\d+)")
+B334_TRUCE = re.compile(r"Balans wojny \(334\): rozejm uzbrojony \| dzien (\d+) \|.*?\| partie korony dzis (\d+) vs przed rozejmem (-?\d+)")
+B334_IRON = re.compile(r"Balans wojny \(334\): Zelazni \| dzien (\d+) \| klucz (\S+), wojna z Polnoca (\S+) \| partii (\d+):.*?\| z opcja rabunku (\d+) \(opcji (\d+)\), z opcja oblezenia (\d+)"
+                       r" \| mnoznik statkow med/max (\S+)/(\S+), kadlub min \S+, safe-sail<rejs \d+, zaloga>pojemnosc \d+, ponizej progu jedzenia (\d+)/(\d+)"
+                       r" \|.*?\| armie (\d+), oblezenia (\d+).*?, nowe oblezenia dzis (\d+)(?: \[(.*?)\])?, rabunki z lupem (\d+)")
+B334_CROWN = re.compile(r"Balans wojny \(334\): korona pomiar \| dzien (\d+) \|")
+B334_TYWIN = re.compile(r" \| Tywin: w polu (TAK|NIE)")
+B334_CTRL = re.compile(r"Balans wojny \(334\): kontrola \| dzien (\d+) \| zloto utworzone (\d+), ludzie utworzeni (\d+) .*\| potkniecia (\d+) \(sesja (\d+)\)\.")
+B334_TEST = re.compile(r"Balans wojny \(334\): test - (T\w+) .*- wynik (TAK|NIE|POMINIETY)\.")
+B334_ERR = re.compile(r"ERROR in WarFront334\.")
+B334_274DAY = re.compile(r"Rownowaga wojny \(274\): dzien (\d+) \|.*?walka dzis: A bitwy \d+ oblezenia \d+, B bitwy \d+ oblezenia (\d+)")
+B334_SEAT = re.compile(r"Rownowaga wojny \(274\): OBLEZENIE SIEDZIBY \| dzien (\d+) \| (Winterfell)")
+
+
+def balans334_collect(logp):
+    D = {"start": [], "front": [], "sca": {}, "theatre": [], "taken": [], "hire": [], "truce": [], "iron": [], "crown": [], "ctrl": [], "tests": [], "err": 0,
+         "sieges274": {}, "seat": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.rstrip("\r\n")
+            if "Rownowaga wojny (274): " in line:
+                m = B334_274DAY.search(line)
+                if m:
+                    D["sieges274"][int(m.group(1))] = int(m.group(2))
+                    continue
+                m = B334_SEAT.search(line)
+                if m:
+                    D["seat"].append(int(m.group(1)))
+                continue
+            if B334_P not in line:
+                if B334_ERR.search(line):
+                    D["err"] += 1
+                continue
+            m = B334_START.search(line)
+            if m:
+                D["start"].append(m.groups())
+                continue
+            m = B334_FRONT.search(line)
+            if m:
+                D["front"].append((int(m.group(1)), m.group(2), float(m.group(5)), float(m.group(6)) if m.group(6) != "-" else -1.0))
+                continue
+            m = B334_SCA.search(line)
+            if m:
+                d = int(m.group(1))
+                for k in B334_SCA_K.finditer(line):
+                    D["sca"].setdefault(k.group(1), []).append((d, k.group(3)))
+                continue
+            m = B334_THEATRE.search(line)
+            if m:
+                D["theatre"].append((int(m.group(1)), int(m.group(5))))
+                continue
+            m = B334_TAKEN.search(line)
+            if m:
+                D["taken"].append((int(m.group(1)), m.group(2), m.group(3)))
+                continue
+            m = B334_HIRE.search(line)
+            if m:
+                D["hire"].append((int(m.group(1)), int(m.group(3)), int(m.group(4))))
+                continue
+            m = B334_TRUCE.search(line)
+            if m:
+                D["truce"].append((int(m.group(1)), int(m.group(2)), int(m.group(3))))
+                continue
+            m = B334_IRON.search(line)
+            if m:
+                g = m.groups()
+                amp = None
+                try:
+                    amp = float(g[7])
+                except ValueError:
+                    amp = None
+                D["iron"].append({"d": int(g[0]), "war": g[2] == "TAK", "p": int(g[3]), "raid": int(g[4]), "siege_opt": int(g[6]), "amp": amp,
+                                  "hungry": int(g[9]), "pp": int(g[10]), "armies": int(g[11]), "new_sieges": int(g[13]), "siege_list": g[14] or "", "loot": int(g[15])})
+                continue
+            m = B334_CROWN.search(line)
+            if m:
+                i = line.find("| armie:")
+                j = line.find(" | Tywin:")
+                arm = line[i + 8:(j if j > i else len(line))].strip() if i >= 0 else ""
+                mt = B334_TYWIN.search(line)
+                D["crown"].append((int(m.group(1)), arm, mt.group(1) if mt else None))
+                continue
+            m = B334_CTRL.search(line)
+            if m:
+                D["ctrl"].append((int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))))
+                continue
+            m = B334_TEST.search(line)
+            if m:
+                D["tests"].append((m.group(1), m.group(2)))
+                continue
+    return D
+
+
+def _b334_med(xs):
+    xs = sorted(xs)
+    n = len(xs)
+    if n == 0:
+        return None
+    return xs[n // 2] if n % 2 else 0.5 * (xs[n // 2 - 1] + xs[n // 2])
+
+
+def balans334_rows(rep, D):
+    st = D["start"]
+    if not st:
+        rep.add("B334-1: linia startu, latki ok x4", "brak linii startu 334", "jest, ok x4", False)
+    else:
+        bad = [x for x in st if not (x[2] == "ok" and x[3] == "ok" and x[4] == "ok" and x[5] == "ok")]
+        rep.add("B334-1: linia startu, latki ok x4", f"startow {len(st)}, latek nie ok {len(bad)}" + (f" [SCA {bad[0][2]}/{bad[0][3]}, BK {bad[0][4]}, mysl {bad[0][5]}]" if bad else ""),
+                "jest, ok x4", not bad)
+    stum = max([c[3] for c in D["ctrl"]] + [0])
+    rep.add("B334-2: potkniecia 334 i ERROR", f"max potkniec doby {stum}, ERROR in WarFront334 {D['err']}", "0 / 0", stum == 0 and D["err"] == 0)
+    fr = sorted(D["front"])
+    if fr:
+        d0 = fr[0][0]
+        fr = [x for x in fr if x[0] >= d0 + 2]   # od 3. doby (C16)
+    if len(fr) >= 30:
+        last = fr[-30:]
+        mf = _b334_med([x[2] for x in last])
+        mc = _b334_med([x[3] for x in last if x[3] >= 0])
+        rep.add("B334-3: rF front korona/Polnoc, mediana 30 dob", f"rF {mf:.3f} (koalicja " + ("-" if mc is None else f"{mc:.3f}") + ", INFO)", "0.8-1.2", 0.8 <= mf <= 1.2)
+        t = max(1, len(fr) // 3)
+        dlt = _b334_med([x[2] for x in fr[-t:]]) - _b334_med([x[2] for x in fr[:t]])
+        rep.add("B334-4: trend rF (tercja ostatnia - pierwsza)", f"{dlt:+.3f}", "|d| <= 0.15", abs(dlt) <= 0.15)
+    else:
+        rep.add("B334-3: rF front korona/Polnoc, mediana 30 dob", f"dob {len(fr)}", "INFO (< 30 dob)", None)
+        rep.add("B334-4: trend rF (tercja ostatnia - pierwsza)", f"dob {len(fr)}", "INFO (< 30 dob)", None)
+    pre = [x for x in D["front"] if x[1] != "F2"]
+    pre_days = set(x[0] for x in pre)
+    ai_taken = [t for t in D["taken"] if t[2] == "AI" and (not pre_days or t[0] in pre_days or t[0] - 1 in pre_days)]
+    pl_taken = [t for t in D["taken"] if t[2] == "GRACZ"]
+    rep.add("B334-5: twierdze crownlands/reach/stormlands zdobyte przez AI Polnocy (przed KG)", f"{len(ai_taken)}" + (f" [{', '.join(t[1] for t in ai_taken[:4])}]" if ai_taken else "")
+            + f", gracz {len(pl_taken)} (INFO)", "0", not ai_taken)
+    cr = sorted(D["crown"])
+    if cr:
+        d0 = cr[0][0]
+        cr2 = [x for x in cr if x[0] >= d0 + 2] or cr
+        with_army = sum(1 for x in cr2 if x[1] and not x[1].startswith("brak"))
+        rep.add("B334-6: korona - doby z armia", f"{with_army}/{len(cr2)}", ">= 50%", with_army >= 0.5 * len(cr2))
+        ty = [x for x in cr2 if x[2] in ("TAK", "NIE")]
+        if ty:
+            n_ok = sum(1 for x in ty if x[2] == "TAK")
+            rep.add("B334-8: Tywin w polu", f"{n_ok}/{len(ty)}", ">= 70%", n_ok >= 0.7 * len(ty))
+        else:
+            rep.add("B334-8: Tywin w polu", "brak segmentu Tywin", "INFO", None)
+    else:
+        rep.add("B334-6: korona - doby z armia", "brak linii 'korona pomiar'", ">= 50%", False)
+        rep.add("B334-8: Tywin w polu", "brak linii 'korona pomiar'", ">= 70%", False)
+    sd = sorted(D["sieges274"].items())
+    if len(sd) >= 28:
+        days = [d for d, _ in sd]
+        empty = []
+        for i in range(0, len(days) - 27):
+            w = days[i:i + 28]
+            if sum(D["sieges274"][d] for d in w) == 0:
+                empty.append(f"d{w[0]}-d{w[-1]}")
+        rep.add("B334-7: korona - oblezenie w kazdym oknie 28 dob", f"okien bez oblezenia {len(empty)}" + (f" [{', '.join(empty[:3])}]" if empty else ""), "0", not empty)
+    else:
+        rep.add("B334-7: korona - oblezenie w kazdym oknie 28 dob", f"dob 274 {len(sd)}", "INFO (< 28 dob)", None)
+    rep.add("B334-9: bitwy polowe Polnoc-korona (bitwy.log)", "nie czytane w tej grupie", "INFO (35-65% przy >= 10 bitwach - recznie z bitwy.log)", None)
+    sc = D["sca"].get("vlandia", [])
+    if sc:
+        fp = sum(1 for _, g in sc if g == "ForcePeace")
+        rep.add("B334-10: SCA korony - doby z ForcePeace", f"{fp}/{len(sc)}", "<= 10%", fp <= 0.1 * len(sc))
+    else:
+        rep.add("B334-10: SCA korony - doby z ForcePeace", "brak oceny korony", "INFO", None)
+    ir = sorted(D["iron"], key=lambda x: x["d"])
+    irw = [x for x in ir if x["war"]]
+    if irw:
+        d0 = irw[0]["d"]
+        ir3 = [x for x in irw if x["d"] >= d0 + 2] or irw
+        n = len(ir3)
+        arm = sum(1 for x in ir3 if x["armies"] > 0)
+        rep.add("B334-11: Wyspy - doby z armia", f"{arm}/{n}", ">= 30%", arm >= 0.3 * n)
+        sieg = 0
+        for x in ir3:
+            sieg += sum(1 for part in x["siege_list"].split("), ") if "(battania," in part)
+        need12 = max(1, n // 60)
+        rep.add("B334-12: Wyspy - oblezenia osad Polnocy (battania)", f"{sieg} w {n} dobach", f">= {need12} (1 na 60 dob)", sieg >= need12 if n >= 60 else (True if sieg >= 1 else None))
+        loot = sum(x["loot"] for x in ir3)
+        need13 = 3 * max(1, n // 60)
+        rep.add("B334-13: Wyspy - rabunki z lupem", f"{loot} w {n} dobach", f">= {need13} (3 na 60 dob)", loot >= need13 if n >= 60 else (True if loot >= 3 else None))
+        ro = sum(1 for x in ir3 if x["raid"] > 0)
+        rep.add("B334-14: Wyspy - doby z opcja rabunku (od 3. doby)", f"{ro}/{n}", ">= 50%", ro >= 0.5 * n)
+        hs = [x["hungry"] / x["pp"] for x in ir3 if x["pp"] > 0]
+        mh = _b334_med(hs)
+        rep.add("B334-15: Wyspy - partie ponizej progu jedzenia (mediana udzialu)", "-" if mh is None else f"{mh:.2f}", "<= 0.25", None if mh is None else mh <= 0.25)
+        am = _b334_med([x["amp"] for x in ir3 if x["amp"] is not None])
+        rep.add("B334-16: Wyspy - mnoznik statkow (mediana)", "-" if am is None else f"{am:.2f}", "<= 1.25", None if am is None else am <= 1.25)
+    else:
+        for k, name in (("11", "doby z armia"), ("12", "oblezenia osad Polnocy"), ("13", "rabunki z lupem"), ("14", "doby z opcja rabunku"), ("15", "ponizej progu jedzenia"), ("16", "mnoznik statkow")):
+            rep.add(f"B334-{k}: Wyspy - {name}", "brak linii 'Zelazni' w wojnie z Polnoca" if not ir else "Wyspy bez wojny z Polnoca", "INFO", None)
+    if D["truce"]:
+        bad = [f"d{d} {p}/{q}" for d, p, q in D["truce"] if q > 0 and p < 0.8 * q]
+        rep.add("B334-17: rozejm - partie korony vs sprzed rozejmu", f"dob rozejmu {len(D['truce'])}, ponizej 80% {len(bad)}" + (f" [{', '.join(bad[:4])}]" if bad else ""), ">= 80%", not bad)
+    else:
+        rep.add("B334-17: rozejm - partie korony vs sprzed rozejmu", "bez rozejmu", "INFO", None)
+    bn = sum(x[1] for x in D["theatre"])
+    rep.add("B334-18: BK null przy wecie (cel byl)", f"{bn} w {len(D['theatre'])} dobach", "0", bn == 0 if D["theatre"] else None)
+    if D["ctrl"]:
+        g = sum(c[1] for c in D["ctrl"]); m = sum(c[2] for c in D["ctrl"])
+        rep.add("B334-19: zloto / ludzie z niczego", f"{g} / {m}", "0 / 0", g == 0 and m == 0)
+    else:
+        rep.add("B334-19: zloto / ludzie z niczego", "brak linii kontroli", "0 / 0", False)
+    pre_seat = [d for d in D["seat"] if not pre_days or d in pre_days or d - 1 in pre_days]
+    rep.add("B334-20: Winterfell oblegany przez strone A/B przed KG", f"{len(pre_seat)}", "0", not pre_seat)
+    if D["hire"]:
+        bad = [f"d{d} {a}<{r}" for d, a, r in D["hire"] if a < r]
+        rep.add("B334-21: najem - skarbiec po >= zapas wojny", f"najmow {len(D['hire'])}, ponizej {len(bad)}" + (f" [{', '.join(bad[:3])}]" if bad else ""), "100%", not bad)
+    else:
+        rep.add("B334-21: najem - skarbiec po >= zapas wojny", "bez najmu", "INFO", None)
+    rep.add("B334-22: regresja 326 / 330 / 274", "osobno: --grupa wojna330, obl326c, polnoc326, rownowaga274, sca320b", "INFO (bez nowych NIE wobec 167)", None)
+    tn = [t for t in D["tests"] if t[1] == "NIE"]
+    if D["tests"]:
+        rep.add("B334-T: testy autotestu (T1-T5)", f"linii {len(D['tests'])}, NIE {len(tn)}" + (f" [{', '.join(t[0] for t in tn)}]" if tn else ""), "0 NIE", not tn)
+    else:
+        rep.add("B334-T: testy autotestu (T1-T5)", "brak linii testu", "INFO (bieg bez flagi armoury-balans334.flag)", None)
+
+
+def balans334_synth():
+    """B334-S: dobry bieg 60 dob i zle biegi (latka, potkniecie, rF, zdobycie AI, Wyspy bez wojny w praktyce, BK null, zloto z niczego, Winterfell, najem ponizej
+    zapasu, rozejm rozbrajajacy, test NIE). None = OK."""
+    import tempfile
+    import shutil
+    P = B334_P
+    start = (P + "start sesji | klucze: front TAK, SCA front TAK, SCA glowna wojna TAK, najem kompanii TAK, rozejm uzbrojony TAK, teatr Polnocy TAK, BK nastepny cel TAK, Zelazni TAK"
+             " | zakres: kampania kanonu | latki: SCA status ok, SCA cel ok, BK ok, mysl AI ok | teatr Polnocy: osad w teatrze 500 / poza 900 | Wyspy: prog najazdu 411 | stan z zapisu: x.")
+
+    def day(d, rF=1.0, iron_army=1, loot=1, raid=3, sieg=" [Flint's Finger (battania, The North)]", fp="BorderWar", bkn=0, gold=0, st=0, seat=False, siege274=1, ty="TAK", amp="1.00",
+            hungry=2, armies_crown=" Tywin (partii 5, jedzenie 9.0 dni, -);"):
+        L = [P + f"dzien {d} | faza F0 | front Polnoc->korona 20000 (partii 50, ludzi 9000) / korona->Polnoc {int(20000 * rF)} (partii 40, ludzi 8000, w tym sojusznik 0) | rF {rF:.3f} (koalicja 0.880) | 274: x | 330 sila F334 x | miara: x.",
+             P + f"dzien {d} | SCA (front TAK, glowna wojna TAK; ocen z F334 6, bez F334 0) | [vlandia] House Baratheon: wrog 68277->20000, swoi 15175, wyczerpane nie, cel ForcePeace->{fp} (pokoj zablokowany 334 - x), chce pokoju nie"
+             f" | [sturgia] Iron Islands: wrog 46255->1000, swoi 11452, wyczerpane nie, cel BorderWar->BorderWar (-), chce pokoju nie.",
+             P + f"dzien {d} | teatr: klucz TAK, weta mysli Polnocy 3, Wysp 0, weta BK 1, oblezenia AI Polnocy poza teatrem 0, cele poza teatrem zdobyte przez AI Polnocy 0 (sesja 0), osad na odbicie 90"
+             f" | BK nastepny cel: klucz TAK, zamian 1, bez innego celu 0, BK null {bkn}.",
+             P + f"korona pomiar | dzien {d} | rody: razem rodow 17 | armie:{armies_crown} | Tywin: w polu {ty} (armia wodz).",
+             P + f"Zelazni | dzien {d} | klucz TAK, wojna z Polnoca TAK | partii 50: wyspa 20, lad Polnocy 10, morze 20, inne 0 | sita: jedzenie 2, armia 5, stan wsi 0, zasieg 3 | z opcja rabunku {raid} (opcji 9), z opcja oblezenia 2"
+             f" | mnoznik statkow med/max {amp}/1.25, kadlub min 0.40, safe-sail<rejs 0, zaloga>pojemnosc 1, ponizej progu jedzenia {hungry}/50 | Z1 do portu 1 (jedzenie 1, kadlub 0, safe-sail 0), Z2 naprawy 0 (0 zl), statki z puli 0 (Z2b nie wdrozony)"
+             f" | armie {iron_army}, oblezenia 1 [Flint's Finger], nowe oblezenia dzis {1 if sieg else 0}{sieg}, rabunki z lupem {loot}, wsi Polnocy 120.",
+             P + f"kontrola | dzien {d} | zloto utworzone {gold}, ludzie utworzeni 0 (przeplywy: x) | potkniecia {st} (sesja {st}).",
+             f"Rownowaga wojny (274): dzien {d} | A sila 1 | walka dzis: A bitwy 0 oblezenia 0, B bitwy 1 oblezenia {siege274}; 28 dob: x"]
+        if seat:
+            L.append(f"Rownowaga wojny (274): OBLEZENIE SIEDZIBY | dzien {d} | Winterfell (town_B2, The North) oblega x (y) - weto nie zadzialalo.")
+        return L
+
+    good = [start] + [x for d in range(1000, 1062) for x in day(d, sieg=" [Flint's Finger (battania, The North)]" if d % 20 == 0 else "")]
+    good += [P + "najem kompanii | dzien 1010 | korona -> Brave Companions (ludzi 300), kontrakt 185 K 400/doba x 28 dob = 11200 | skarbiec przed/po 900000/900000, zapas wojny 500000, nadwyzka 400000 | razem."]
+    good += [P + "rozejm uzbrojony | dzien 1020 | klucz TAK | rody korony z lennem w budzecie wojny 17 z 17 | partie korony dzis 60 vs przed rozejmem 61 (d.1019, 98%), ludzie 9000 vs 9100."]
+    good += [P + "test - T1 tabela teatru (Polnoc / Wyspy, odbicie, Krwawe Gody) 13 przypadkow - wynik TAK."]
+    good += [P + "zdobycie poza teatrem | dzien 1030 | Duskendale (town_EW5, kultura crownlands) zdobyte przez Jeff dla Polnocy - GRACZ (wolnosc gracza, zdobycz zostaje u niego)."]
+
+    def run(**kw):
+        return [start] + [x for d in range(1000, 1062) for x in day(d, **kw)]
+    runs = {
+        "good": good,
+        "patch": [start.replace("BK ok", "BK BRAK (FindArmyObjective)")] + [x for d in range(1000, 1062) for x in day(d)],
+        "stum": run(st=2),
+        "rf": run(rF=0.4),
+        "taken": run() + [P + "zdobycie poza teatrem | dzien 1030 | Duskendale (town_EW5, kultura crownlands) zdobyte przez Robb Stark dla Polnocy - AI (326b zwroci; weto teatru TAK)."],
+        "ironidle": run(iron_army=0, loot=0, raid=0, sieg="", amp="9.00", hungry=40),
+        "bknull": run(bkn=1),
+        "gold": run(gold=5),
+        "seat": run(seat=True),
+        "fp": run(fp="ForcePeace"),
+        "crown": run(siege274=0, ty="NIE", armies_crown=" brak"),
+        "hire": run() + [P + "najem kompanii | dzien 1010 | korona -> X (ludzi 300), kontrakt 185 K 400/doba x 28 dob = 11200 | skarbiec przed/po 400000/400000, zapas wojny 500000, nadwyzka 0 | razem."],
+        "truce": run() + [P + "rozejm uzbrojony | dzien 1020 | klucz TAK | rody korony z lennem w budzecie wojny 0 z 17 | partie korony dzis 29 vs przed rozejmem 61 (d.1019, 48%), ludzie 2400 vs 9700."],
+        "testno": run() + [P + "test - T2 udzial zablokowanego zagrozenia (B3) 5/10 - wynik NIE."],
+        "nostart": [x for d in range(1000, 1062) for x in day(d)],
+    }
+    allg = {"B334-1": "TAK", "B334-2": "TAK", "B334-3": "TAK", "B334-4": "TAK", "B334-5": "TAK", "B334-6": "TAK", "B334-7": "TAK", "B334-8": "TAK", "B334-10": "TAK",
+            "B334-11": "TAK", "B334-12": "TAK", "B334-13": "TAK", "B334-14": "TAK", "B334-15": "TAK", "B334-16": "TAK", "B334-17": "TAK", "B334-18": "TAK", "B334-19": "TAK",
+            "B334-20": "TAK", "B334-21": "TAK", "B334-T": "TAK"}
+    exp = {
+        "good": allg,
+        "patch": {"B334-1": "NIE"},
+        "stum": {"B334-2": "NIE"},
+        "rf": {"B334-3": "NIE", "B334-4": "TAK"},
+        "taken": {"B334-5": "NIE"},
+        "ironidle": {"B334-11": "NIE", "B334-12": "NIE", "B334-13": "NIE", "B334-14": "NIE", "B334-15": "NIE", "B334-16": "NIE"},
+        "bknull": {"B334-18": "NIE"},
+        "gold": {"B334-19": "NIE"},
+        "seat": {"B334-20": "NIE"},
+        "fp": {"B334-10": "NIE"},
+        "crown": {"B334-6": "NIE", "B334-7": "NIE", "B334-8": "NIE"},
+        "hire": {"B334-21": "NIE"},
+        "truce": {"B334-17": "NIE"},
+        "testno": {"B334-T": "NIE"},
+        "nostart": {"B334-1": "NIE"},
+    }
+    tmp = tempfile.mkdtemp(prefix="b334_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {s}" for i, s in enumerate(Ls)) + "\n")
+            rep = Report()
+            balans334_rows(rep, balans334_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def balans334_main(logp):
+    rep = Report()
+    try:
+        s2 = balans334_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("B334-S: test syntetyczny (dobry 62 doby; latka, potkniecie, rF, zdobycie AI, Wyspy bezczynne, BK null, zloto, Winterfell, ForcePeace, korona, najem, rozejm, test NIE, bez startu)",
+            s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("B334-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = balans334_collect(logp)
+    print(f"plik: {logp} | linii frontu {len(D['front'])}, Zelazni {len(D['iron'])}, korona {len(D['crown'])}, najmow {len(D['hire'])}, testow {len(D['tests'])}")
+    balans334_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_balans334_main_prev = main
+
+
+def main(argv):
+    # paczka 334: grupa balans334 - opakowanie main jak ai333
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "balans334":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return balans334_main(rest[0] if rest else None)
+    return _balans334_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

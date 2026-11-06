@@ -188,7 +188,7 @@ namespace Armoury
                 NaRoll(today);
                 if (!NeedAidOn) return 0;
                 var day = CrownIncome.DayOf(k);
-                if (day == null || !AtWar(k)) return 0;                  // pokoj = brak doplaty (resztka daniny z doby zawarcia pokoju idzie w renty jak dotad)
+                if (day == null || !(AtWar(k) || WarFront334.ArmedTruce(k))) return 0;   // 334 B6: rozejm 330 - doplata W5 / W5b jak w wojnie; pokoj = brak doplaty (resztka daniny z doby zawarcia pokoju idzie w renty jak dotad)
                 double target = NaTarget(s), step = NaStep(s);
                 // DS F3 (K3): garnek = wplywy wojenne dnia DS (dziesiata od ruchomosci, 184, pomoc od sprzedazy, W4) zamiast daniny P1
                 var row = new NaK { K = k, Name = k.Name != null ? k.Name.ToString() : k.StringId, Aid = Math.Max(0, DsTowns.FarmsLive ? DsSeason.WarPot(k, day) + Math.Max(0, day.WarAid) : day.WarAid) };   // przejscie F3: P1 x (1 - rampa) tez w garnku

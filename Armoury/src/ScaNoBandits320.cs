@@ -183,6 +183,27 @@ namespace Armoury
             catch (Exception e) { Stumble("StartLine", e); }
         }
 
+        /// <summary>334 linia startu: latka CalculateFactionStatus.</summary>
+        internal static string WiredStatus { get { return _wired ? "ok" : "BRAK"; } }
+        /// <summary>334 linia startu: latki celu (UpdateWarGoal + ticki).</summary>
+        internal static string WiredGoal { get { return _wiredGoal && _wiredTicks ? "ok" : "BRAK"; } }
+
+        /// <summary>334 linia 3: swoi, wyczerpane, cel (SCA -> nasz, powod 320e/334), chce pokoju - dla krolestwa (tylko odczyt).</summary>
+        internal static string Brief(Kingdom k)
+        {
+            try
+            {
+                if (k == null || !_wired) return "SCA brak";
+                object st = _mGetStatus != null ? _mGetStatus.Invoke(null, new object[] { k }) : null;
+                if (st == null) return "SCA brak oceny";
+                Rec r; _last.TryGetValue(k.StringId, out r);
+                bool exh = Get(_pExh, st) is bool b1 && b1, peace = Get(_pPeace, st) is bool b2 && b2;
+                return "swoi " + F0(Get(_pOwn, st)) + ", wyczerpane " + (exh ? "tak" : "nie") + ", cel " + (r != null ? (r.GoalSca ?? "?") : "?") + "->" + (Get(_pGoal, st) ?? "?")
+                       + " (" + (r != null ? r.Why : "-") + "), chce pokoju " + (peace ? "tak" : "nie");
+            }
+            catch (Exception e) { Stumble("Brief", e); return "SCA blad"; }
+        }
+
         /// <summary>Kto NIE jest wrogiem dla SCA: 1 = banda, 2 = Inni, 3 = wyjeci spod prawa, 0 = wrog.</summary>
         internal static int Skip(IFaction f)
         {
@@ -241,7 +262,13 @@ namespace Armoury
             }
             if (all == 0) { why = "bez wojen z krolestwami"; return false; }
             if (locked == all) { why = "pokoj zablokowany 264 - krolestwa " + locked + " z " + all; return true; }
-            why = "pokoj mozliwy - zablokowane " + locked + " z " + all + " krolestw";
+            // 334 B3 (klucz ScaFightsOnMainWarLocked334): wojny bez mozliwego pokoju (264 / 330 / wymuszone ROT - Wyspy-Polnoc) daja >= polowe zagrozenia F334 - bez
+            // ForcePeace, takze gdy obok trwa mala wojna z pokojem mozliwym (korona - Smocza Skala; Wyspy, Reach - Polnoc i inne). Nigdy nie zdejmuje blokady stara regula.
+            string w334 = null;
+            bool? m334 = null;
+            try { m334 = WarFront334.MainWarLocked(kingdom, out w334); } catch (Exception e) { Stumble("PeaceLocked.334", e); }
+            if (m334 == true) { why = w334; return true; }
+            why = "pokoj mozliwy - zablokowane " + locked + " z " + all + " krolestw" + (w334 != null ? ", " + w334 : "");
             return false;
         }
 
@@ -251,7 +278,7 @@ namespace Armoury
         {
             if (kingdom == null || __result == null || _pEnemy == null) return;
             bool on = On, lockOn = LockOn;
-            if (!on && !lockOn) { _last.Remove(kingdom.StringId); return; }
+            if (!on && !lockOn && !WarFront334.ScaFrontOn) { _last.Remove(kingdom.StringId); return; }
             try
             {
                 var r = new Rec { Name = kingdom.Name != null ? kingdom.Name.ToString() : kingdom.StringId };
@@ -289,6 +316,13 @@ namespace Armoury
                         catch (Exception ex) { r.ThreatOurs = -1; Stumble("CalcPostfix.Threat", ex); }
                     }
                 }
+                // 334 B2 (klucz ScaFrontThreat334): wrog = suma F334 wrogow (druzyny w 8.02 doby od naszych twierdz), nie cala sila swiata; swoi bez zmian
+                try
+                {
+                    float fe = WarFront334.ScaEnemy(kingdom, r.After);
+                    if (fe >= 0f) { _pEnemy.SetValue(__result, fe, null); if (Math.Abs(r.After - fe) > 0.5f) _dChanged++; r.After = fe; }
+                }
+                catch (Exception ex) { Stumble("CalcPostfix.Front334", ex); }
                 // 320e (a)
                 try { r.Locked = PeaceLocked(kingdom, out r.Why); } catch (Exception ex) { r.Locked = false; r.Why = "blad"; Stumble("CalcPostfix.Lock", ex); }
                 if (r.Locked && _wiredTicks && !_pending.Contains(kingdom)) _pending.Add(kingdom);

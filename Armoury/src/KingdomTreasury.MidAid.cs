@@ -112,7 +112,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (!MidAidOn || s == null || k == null || row == null || all == null || all.Count == 0) return 0;
-                if (!AtWar(k)) return 0;                                                   // pokoj - nic (krok W5 i tak biegnie tylko w wojnie)
+                if (!(AtWar(k) || WarFront334.ArmedTruce(k))) return 0;                    // pokoj - nic (krok W5 i tak biegnie tylko w wojnie); 334 B6: rozejm 330 jak wojna
                 mk = new McK { Name = row.Name, Sur = row.CrownSur, Res = row.CrownRes };
                 _mcRows.Add(mk);
                 // budzet: 1/30 nadwyzki sprzed zlota kroku W5 (W5b - CrownSurplusPlan) minus pula W5b tej doby - jedno tempo skarbca na W5b i W5c

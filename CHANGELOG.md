@@ -1,5 +1,55 @@
 # DZIENNIK ZMIAN
 
+## 334 - Balans wojny korona-Polnoc wedlug kanonu, z Zelaznymi Ludzmi (noc/334-balans od noc/333-ai-bitwy a7e623fb - NIE WGRANE, bez autotestu; Jeff gra)
+**Problem:** Jeff 06.11 13:45 "znowu Polnoc leje poludnie, to jest w ogole nie zbalansowana gra"; 13:50 "Zelazni ludzie w ogole atakuja Polnoc, pladruja ja, czy siedza
+na wyspie?". Log 13:44: sila Polnoc 25064 / korona 22472 (330), Polnoc zdobyla Duskendale (szturm 109519, zwrot 326b) i Sarsfield, oblega Stoney Sept i Hornvale; logi
+04-06.11 (243 doby): korona oblegala 0 dob, armie przez 69 z 243 dob, w rozejmie spadla z 61 partii / 9.7 tys. do 29 / 2.4 tys.; Wyspy: armia 0, oblezenie 0, rabunek
+z lupem 0, opcji rabunku prawie zawsze 0, jedzenie mediana 1-20 dni (prog gry 8). Odpowiedz Jeffowi: dzis Zelazni NIE atakuja Polnocy wcale.
+**Przyczyna (projekt docs/PROJEKT-334-BALANS-WOJNY.md, rozdz. A):** wspolny korzen - miary licza sile calego krolestwa albo calej koalicji, nie te na froncie. P1 SCA:
+wrog = cala sila wrogow z zalogami -> korona (68277/15175), Reach i Wyspy (46255/11452) "wyczerpane" i ForcePeace (cele oblezen ok. x0.19). P2 320e zdejmuje ForcePeace
+tylko, gdy WSZYSTKIE wojny maja pokoj zablokowany (korona ma tez Smocza Skale). P3 274 i 330 licza koalicje (bezczynny Reach) - B/A 0.88 bez dzwigni przy 1:2.7 w polu.
+P4 weto siedzib w BK daje null - korona tego dnia bez armii. P5 rozejm 330 rozbraja tylko korone (budzet pokoju 166). P6 brak teatru kanonu - Polnoc zdobywa w Crownlands.
+P7 Wyspy: ForcePeace (P1), jedzenie < 8 dni, mnoznik morski gry (safe-sail krotszy od rejsu = pol przekatnej mapy), zasieg 411. P8 W4 (najemnicy) tylko raport.
+**Zmiana (8 kluczy bool, domyslnie TAK, na zywo, wylaczony = stan 167; tylko kampania kanonu; nowych liczb brak - 8.02 doby gry, 1.35 SCA, 1.5/1.2/3/7 274, 280 BK,
+5 x srednia odleglosc gry, kadlub 20% NavalDLC, zapas wojny W5b, K = 1.3 x zold 185, okres przegladu 185):**
+- `WarFront334.cs` (nowy) B1 miara frontu F334(X->Y): sila druzyn lordow i armii X (z druzyna gracza), ktore dojda do najblizszej twierdzy Y (albo wlasnej oblezonej
+  przez Y) w 8.02 doby - droga AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty (jak mysl AI, morze ze statkami), predkosc srednia lorda;
+  raz na dobe leniwie, czlonkowie armii z wynikiem wodza, zalogi poza miara. Klucz `CanonWarFront334` (B4): 274 Measure S = tylko druzyny w zasiegu drugiej strony
+  (koalicja SAll w linii), homeGuard 274 dostaje rody z twierdzami, do ktorych dochodza druzyny trzeciego wroga (takze z morza) i ich sasiadow w BorderGarrisonRadius;
+  330 Strength (linia, K1/K3) - ta sama miara, koalicja w linii.
+- `ScaNoBandits320.cs`: B2 `ScaFrontThreat334` - EnemyStrength = suma F334 wrogow (Skip 0) do krolestwa (swoi bez zmian); B3 `ScaFightsOnMainWarLocked334` - 320e
+  zdejmuje ForcePeace takze, gdy wojny bez mozliwego pokoju (CanonPeaceLock.Blocks - 264/330, Prologue.RotWarForced - Wyspy-Polnoc) daja >= polowe zagrozenia F334;
+  stara regula "wszystkie wojny" nigdy nie jest zdejmowana. Powod w linii 320b bez nawiasow i srednikow (zgodny z S320_K / S320-10).
+- `WarFront334.Hire.cs` B5 `CanonWarBalanceHireCompanies` (z CanonWarBalance.Daily, gdy dzwignie i slabszy < silniejszy / 1.2): krolestwo rdzenia slabszej strony (korona
+  albo Polnoc, nie pod rzadami gracza, kontrakt 185 czynny) najmuje najwieksza wolna kompanie w zasiegu (druzyna w 5 x sredniej odleglosci dwoch najblizszych miast od
+  jego twierdzy), na ktora stac: nadwyzka skarbca ponad zapas wojny >= K x MercReviewDays; ChangeKingdomAction.ApplyByJoinFactionAsMercenary, najwyzej 1 na 7 dob.
+- B6 `WarTruceArmed334`: w rozejmie 330 (TruceHolds) Polnoc i korona licza sie jako w wojnie w ClanBudget.AtWar (pulap 166) oraz W5 (NeedAid) i W5c (MidAid).
+  KingdomTreasury.AtWar BEZ zmian (podatek wojenny ludu, danina pokoju, WarAid - jak w 167).
+- `WarFront334.Theatre.cs` B7 `NorthCanonTheatre334`: postfiks mysli AI (priorytet 48) - AI Polnocy (takze wodz armii z graczem) bez nowych oblezen i najazdow osad kultury
+  crownlands, reach, stormlands, dragonstone, vale, aserai, sturgia do Krwawych Godow; wyjatek odbicie (osady Polnocy z listy arm_f334 - spoza "poza teatrem"); dolaczenie
+  do trwajacego oblezenia bez weta; gracz bez weta. Teatr Wysp (klucz Zelaznych): przed Krwawymi Godami bez reach/stormlands/dragonstone/vale/aserai, po - Reach dozwolony.
+  B8 `BkVetoNextTarget334`: postfiks First na BKArmyBehavior.FindArmyObjective - cel oblezenia z wetem (274 siedziba / za frontem, teatr, 326b) -> nastepna twierdza wedlug
+  reguly BK (280, droga ladem 0..50000) bez weta; postfiks Last liczy "BK null" po zamianie. Przy kluczu NIE teatr i tak daje null (jak 274).
+- `WarFront334.Iron.cs` B9 `IronbornCanonReave334`: Z0 pomiar (bez klucza) na partie Wysp; Z1/Z2a - partia z jedzeniem ponizej progu najazdu gry (zloto pana > 5 000),
+  statkiem z kadlubem <= 20% (zloto na naprawe wedlug ShipCostModel) albo safe-sail < rejs do najblizszej wsi Polnocy idzie do najblizszego przyjaznego portu
+  (GoToSettlement 1.05 x max(najlepsza, 0.5)); jedzenie kupuje gra, statki naprawia NavalDLC przy wejsciu (ceny gry, zloto pana), ten sam port nie czesciej niz raz na dobe.
+  Z4: weto siedzib 274 nie dotyczy Wysp (Restraint: VetoPostfix i VetoFor). Z2b (przydzial statkow z puli 326a) NIE wdrozony - statki rodu sa na jego partiach, przeniesienie
+  bylo by teleportem; Z0 mierzy "zaloga > pojemnosc". Z3 bez kodu (progi gry od nowej bazy).
+- Linie "Balans wojny (334): " (11): start sesji (klucze, latki ok x4, teatr, prog Wysp, Pyke->Flint's Finger, strona 274 Wysp), front (rF i koalicja, 274, 330), SCA
+  ([id] wrog surowy->F334, swoi, wyczerpane, cel, chce pokoju), teatr i BK, weto teatru / oblezenie / zdobycie poza teatrem (zdarzenia), BK nastepny cel, najem kompanii,
+  rozejm uzbrojony, Zelazni (doba), Zelazni partia (pierwsza doba sesji i co 7 dob, <= 60), Zelazni do portu, korona pomiar (rody, armie, Tywin w polu), kontrola.
+- Zapis "arm_f334" (najmy, ostatni najem, partie korony sprzed rozejmu, osady Polnocy do odbicia). `WarFront334.Test.cs`: flaga `armoury-balans334.flag` (tylko DLL
+  autotestu) - T1-T5 czyste funkcje i odczyty, NIE rusza wojny, pokoju, rozejmu ani zapisu.
+- `Settings.cs` + McmSettings (gen_mcm.py z etykietami LABELS; wpisy 326d i 326x przywrocone z HEAD). `tools/sprawdz_logi.py --grupa balans334`: B334-S test syntetyczny
+  (dobry + 14 zlych biegow), B334-1..B334-22 i B334-T (progi z projektu rozdz. F; B334-9 i B334-22 INFO).
+**Ryzyko / co sprawdzic:** (1) koszt F334 - linia frontu "miara: partii, drog AiHelper, ms" i DayProfile "WarFront334.Daily" (pierwsze liczenie doby moze isc w ticku SCA);
+(2) 330 K3 liczy teraz F334 - Polnoc zajeta Wyspami daleko od korony ma mniejsza sile frontu (K3 wymaga 30 dob z rzedu < 0.33 - obserwowac liczniki K w linii 330);
+(3) B5 dziala dla obu stron symetrycznie - najmy tylko przy dzwigniach 274; (4) B2 dotyczy wszystkich krolestw kampanii kanonu (takze Essos) - SCA linia 320b pokazuje
+"wrog przed -> po"; (5) teatr: Wolni Ludzie, Skagos, Straz - poza lista "poza teatrem" (bez weta); (6) Z1 GoToSettlement do portu moze przegrac z obrona oblezonej
+twierdzy (celowo); (7) regresja: --grupa wojna330, obl326c, polnoc326, rownowaga274, sca320b na tym samym logu; (8) latki BK: First (334) przed 274 i 326b - ich null nie powinien juz
+padac, gdy jest inny cel (B334-18).
+**Status:** NIE WGRANE - build Release kod 0 (0 nowych ostrzezen), bez autotestu (Jeff gra). Autotest dopiero po zamknieciu gry, na kopii autotest-przekierowany-*.
+
 ## 333 - AI bitwy: poscig z glowa za nekajacym i szyk bez wahadla przed kontaktem (noc/333-ai-bitwy od noc/332-reach e55aaa19 - NIE WGRANE, bez autotestu; Jeff gra)
 **Problem:** Jeff 06.11 po bitwie: (A) "strzelam do kawalerii, oni jada za mna, wyciagam ich pod swoje wojsko pod lucznikow, jak widza moje wojsko zaczynaja sie
 odwracac plecami i jada do swoich, ja jade za nimi i strzelam w plecy, oni sie znowu wracaja ... trzeba to po prostu robic z glowa"; (B) "formacje ... ida do przodu

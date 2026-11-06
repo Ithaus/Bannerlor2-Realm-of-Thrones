@@ -10684,6 +10684,38 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonWarBalanceFrontGarrison { get; set; } = false;   // 326x: Jeff 05.11 - wylaczone
 
+        [SettingPropertyBool("Canon War Front Measure", HintText = "The balance of the War of the Five Kings and the truce rules count only the troops that can reach the front within the game's own defence horizon (about 8 days of march or sail), not whole alliances: an idle ally far away no longer props up a side, and lords whose castles a real enemy host can reach - also from the sea - stay home. Off = whole alliances are counted, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonWarFront334 { get; set; } = true;
+
+        [SettingPropertyBool("Strategic AI Front Threat", HintText = "With the Strategic Campaign AI mod: a realm fears only the enemy troops that can reach its lands within about 8 days, not every enemy soldier in the world, so a realm far from the main enemy host is no longer 'exhausted' and wishing for peace. Off = it counts the whole strength of every enemy, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool ScaFrontThreat334 { get; set; } = true;
+
+        [SettingPropertyBool("Strategic AI Fights On When Main War Locked", HintText = "With the Strategic Campaign AI mod: a realm gets no 'force peace' war goal and no wish for peace when the wars it cannot end by peace (the War of the Five Kings, the war to surrender, a war the story forces) bring at least half of the enemy troops that can reach it - even if it also fights a small war elsewhere. Off = only when every war of the realm is such a war, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool ScaFightsOnMainWarLocked334 { get; set; } = true;
+
+        [SettingPropertyBool("Weaker Side Hires Sellswords", HintText = "With Canon War Balance: the weaker side of the War of the Five Kings hires a free mercenary company with its treasury - only gold above its war reserve that can carry the company's contract for a whole review period, at most one company a week, until the sides are close again. The company is paid by the usual mercenary contract; nobody comes from nothing. Off = no such hiring, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonWarBalanceHireCompanies { get; set; } = true;
+
+        [SettingPropertyBool("Armed Truce", HintText = "During a truce between the North and the crown (it always ends and the war resumes) both realms keep their war budgets for their lords' hosts, so a truce no longer disbands one side while the other keeps its armies. Off = a truce counts as peace for the budgets, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool WarTruceArmed334 { get; set; } = true;
+
+        [SettingPropertyBool("North Canon Theatre", HintText = "Until the Red Wedding the North wages its war only in the North, the Riverlands and the Westerlands, as in the books: its AI lords and armies (also an AI marshal whose army you ride in) start no sieges or raids in the Crownlands, the Reach, the Stormlands or on the Iron Islands, except to take back what was theirs. Your own army is free. Off = the North besieges anything in reach, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool NorthCanonTheatre334 { get; set; } = true;
+
+        [SettingPropertyBool("Army Objective Skips Vetoed Seats", HintText = "When the army plan of Banner Kings picks a siege target that is forbidden (a great seat before the Red Wedding, a place outside the North's theatre of war, a castle just given back), it takes the next enemy stronghold in its usual range instead of raising no army that day. Off = no army that day, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool BkVetoNextTarget334 { get; set; } = true;
+
+        [SettingPropertyBool("Ironborn Reave The North", HintText = "The Iron Islands wage their war on the North as in the books: a host short of food or with ships too battered for the crossing first sails to a friendly port to buy food and mend its ships with its own gold at the game's prices, then raids and besieges the western shore of the North; the Reach becomes a target only after the Red Wedding. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool IronbornCanonReave334 { get; set; } = true;
+
         [SettingPropertyBool("Canon Houses of the West", HintText = "As in the books, the lordly houses of the Westerlands and the Crownlands that Realm of Thrones leaves without a castle (Estren, Falwell, Jast, Moreland, Plumm, Prester, Stackspear, Buckwell, Chelsted, Hayford, Stokeworth; House Spicer stays a knightly house until the Red Wedding, as in the books) answer their liege's call with a host of their own: the Banner Kings gentry family that keeps an estate in their lands is raised to full peerage (exactly as a realm vote would grant it) and to clan tier 3, and its head leads a party raised the usual way from the villages. Once per campaign, at the first day after loading or at the start of a new game. No castles are taken from anyone. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonHouses277 { get; set; } = true;
@@ -14082,6 +14114,14 @@ namespace Armoury
             s.CanonWarBalanceMuster = CanonWarBalanceMuster;
             s.CanonWarBalanceMusterWeakOnly = CanonWarBalanceMusterWeakOnly;
             s.CanonWarBalanceFrontGarrison = CanonWarBalanceFrontGarrison;
+            s.CanonWarFront334 = CanonWarFront334;
+            s.ScaFrontThreat334 = ScaFrontThreat334;
+            s.ScaFightsOnMainWarLocked334 = ScaFightsOnMainWarLocked334;
+            s.CanonWarBalanceHireCompanies = CanonWarBalanceHireCompanies;
+            s.WarTruceArmed334 = WarTruceArmed334;
+            s.NorthCanonTheatre334 = NorthCanonTheatre334;
+            s.BkVetoNextTarget334 = BkVetoNextTarget334;
+            s.IronbornCanonReave334 = IronbornCanonReave334;
             s.CanonHouses277 = CanonHouses277;
             s.CanonHouses277Rename = CanonHouses277Rename;
             s.CanonHouses277LiegePay = CanonHouses277LiegePay;

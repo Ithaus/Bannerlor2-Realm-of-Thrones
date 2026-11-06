@@ -243,10 +243,14 @@ namespace Armoury
             return mp.ActualClan;
         }
 
+        /// <summary>334 linia 7: rod liczony jako w wojnie (tylko odczyt).</summary>
+        internal static bool AtWarPublic(Clan c) { return c != null && AtWar(c); }
+
         private static bool AtWar(Clan c)
         {
             var f = c.MapFaction;
             if (f == null) return false;
+            if (WarFront334.ArmedTruce(f)) return true;   // 334 B6: rozejm 330 Polnoc-korona - budzet wojny obu stron (rozejm czasowy, wojna wraca sama)
             var list = f.FactionsAtWarWith;
             if (list != null) for (int i = 0; i < list.Count; i++) { var o = list[i]; if (o != null && o.IsKingdomFaction) return true; }
             return false;

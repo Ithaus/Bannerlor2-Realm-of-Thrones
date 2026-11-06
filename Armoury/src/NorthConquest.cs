@@ -495,6 +495,13 @@ namespace Armoury
             return oc == null || oc.Kingdom == null || oc.Kingdom.StringId != NorthId;
         }
 
+        /// <summary>334 B8: weto 326b dla krolestwa k na osade st teraz (te same warunki co BkObjectivePostfix). Tylko odczyt.</summary>
+        internal static bool VetoedFor(Kingdom k, Settlement st)
+        {
+            if (_veto.Count == 0 || k == null || st == null || k.StringId != NorthId || !On || PlayerRules(k)) return false;
+            return Vetoed(st, NowHour) && !NorthBesieging(st);
+        }
+
         private static bool NorthBesieging(Settlement st)
         {
             try

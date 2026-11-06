@@ -342,6 +342,37 @@ namespace Armoury
                     _homeGuard.Add(clan); break;
                 }
             }
+            // 334 B4: realne zagrozenie trzeciego wroga - twierdze, do ktorych dochodza jego druzyny w 8.02 doby (F334, takze z morza), i twierdze strony w promieniu
+            // BorderGarrisonRadius od nich; ich rody zostaja w domu przy zbiorce (Glover, Tallhart, Flint przy Wyspach na Kamiennym Brzegu - jak ser Rodrik)
+            if (WarFront334.FrontOn && WarFront334.Ensure())
+            {
+                try
+                {
+                    var hit = new List<Settlement>();
+                    foreach (var kv in _side)
+                    {
+                        hit.Clear();
+                        foreach (var f in WarFront334.AttackersOf(kv.Key))
+                        {
+                            if (f == null || SideOf(f) != 0 || ScaNoBandits320.Skip(f) != 0) continue;
+                            bool war; try { war = kv.Key.IsAtWarWith(f); } catch { war = false; }
+                            if (war) WarFront334.ThreatenedForts(f, kv.Key, hit);
+                        }
+                        foreach (var h in hit)
+                        {
+                            if (h == null) continue;
+                            var hp = h.GetPosition2D;
+                            for (int i = 0; i < n; i++)
+                            {
+                                if (side[i] != kv.Value || forts[i].OwnerClan == null || forts[i].MapFaction != kv.Key) continue;
+                                if (forts[i] != h && pos[i].DistanceSquared(hp) > b2) continue;
+                                _homeGuard.Add(forts[i].OwnerClan);
+                            }
+                        }
+                    }
+                }
+                catch (Exception e) { Stumble("BuildMap.homeGuard334", e); }
+            }
         }
 
         internal static bool IsSeat(Settlement st) { return st != null && _seats.Contains(st); }
@@ -356,6 +387,18 @@ namespace Armoury
         internal static bool IsActiveNow { get { return _active; } }
         /// <summary>277 (linia doby, tylko odczyt): stosunek S_B / S_A z ostatniego liczenia 274 (1.0 - jeszcze nie liczony).</summary>
         internal static double LastRatio { get { return _ratio; } }
+        /// <summary>334 linia 2: stosunek koalicji B/A (cale druzyny stron, jak w 167) z ostatniego liczenia; -1 - brak.</summary>
+        internal static double LastCoalitionRatio { get { var A = _m[1]; var B = _m[2]; return A != null && B != null && A.SAll > 0 ? B.SAll / A.SAll : -1; } }
+        private static bool _frontUsed;
+        /// <summary>334 linia 2: stan dzwigni 274.</summary>
+        internal static string LeverText
+        {
+            get
+            {
+                return "miara " + (_frontUsed ? "F334" : "koalicja") + ", B/A " + _ratio.ToString("0.000", Inv) + ", dzwignie " + (_levers ? "TAK od d." + _leverSince + ", slabszy " + SideName(_weak) : "NIE")
+                       + ", powsciagany " + (_restrain == 0 ? "-" : SideName(_restrain)) + ", rody w domu A " + HomeGuard(1) + " B " + HomeGuard(2);
+            }
+        }
 
         internal static bool IsFrontTarget(Kingdom k, Settlement st)
         {
@@ -366,7 +409,7 @@ namespace Armoury
         // ================================================================ miara
         private sealed class M
         {
-            public double S; public int Men, Parties, Armies, Limit, Gar, Idle, Forts, LandedClans;
+            public double S, SAll; public int Men, Parties, Armies, Limit, Gar, Idle, Forts, LandedClans;
             public double Fill { get { return Limit > 0 ? (double)Men / Limit : 0.0; } }
             public double Bank; public int BankClans, Debtors; public long Gold;
         }
@@ -377,13 +420,16 @@ namespace Armoury
         private static void Measure()
         {
             for (int i = 0; i < 3; i++) _m[i] = new M();
+            bool front = WarFront334.FrontOn && WarFront334.Ensure();   // 334 B4: S = sila druzyn w zasiegu drugiej strony (F334), koalicja (SAll) tylko w linii
+            _frontUsed = front;
             foreach (var mp in MobileParty.AllLordParties)
             {
                 if (mp == null || !mp.IsActive || mp.Party == null) continue;
                 int s = SideOf(mp.MapFaction);
                 if (s == 0) continue;
                 var m = _m[s];
-                m.S += mp.Party.EstimatedStrength;
+                m.SAll += mp.Party.EstimatedStrength;
+                if (!front || WarFront334.ReachesSide(mp, s == 1 ? 2 : 1)) m.S += mp.Party.EstimatedStrength;
                 m.Men += mp.Party.NumberOfAllMembers;
                 m.Limit += mp.Party.PartySizeLimit;
                 m.Parties++;
@@ -392,7 +438,12 @@ namespace Armoury
             if (main != null && main.IsActive && main.Party != null && !main.IsLordParty)
             {
                 int s = SideOf(main.MapFaction);
-                if (s != 0) { var m = _m[s]; m.S += main.Party.EstimatedStrength; m.Men += main.Party.NumberOfAllMembers; m.Limit += main.Party.PartySizeLimit; m.Parties++; }
+                if (s != 0)
+                {
+                    var m = _m[s]; m.SAll += main.Party.EstimatedStrength;
+                    if (!front || WarFront334.ReachesSide(main, s == 1 ? 2 : 1)) m.S += main.Party.EstimatedStrength;
+                    m.Men += main.Party.NumberOfAllMembers; m.Limit += main.Party.PartySizeLimit; m.Parties++;
+                }
             }
             int age = 18;
             try { age = Campaign.Current.Models.AgeModel.HeroComesOfAge; } catch { }
@@ -598,6 +649,7 @@ namespace Armoury
                 var X = _weak == 1 ? B : _weak == 2 ? A : null;
                 _target = W != null ? TargetFill(W.Fill, X.S, W.S) : 1f;
                 if (_levers && W != null && W.S < X.S / CalmBand) SpawnDaily(_weak, today);
+                if (_levers && W != null && W.S < X.S / CalmBand) { try { WarFront334.HireDaily(WarFront334.FindKingdom(_weak == 2 ? Prologue.Crown : Prologue.NorthId), today); } catch (Exception e) { Stumble("Hire334", e); } }   // 334 B5
                 try { FrontGarrisonDaily(today); } catch (Exception e) { Stumble("FrontGarrisonDaily", e); }   // 326c-E: zalogi frontu slabszej strony
                 DayLine(today, rw, robbDead, outside);
             }

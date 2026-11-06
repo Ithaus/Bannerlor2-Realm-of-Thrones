@@ -44,6 +44,7 @@ namespace Armoury
                     // recenzja 274 (1): weto siedziby tylko, gdy jest w rekach swojej strony domowej; strona domowa odbija swoja siedzibe bez weta
                     int kind = VetoKind(other, running, SeatHeld(st), restrained, IsFrontTarget(k, st), SeatHomeOf(st) == side);
                     if (kind == 0) continue;
+                    if (kind == 1 && IronSeatFree(k)) continue;   // 334 Z4: Wyspy (gdyby byly w koalicji 274) bez weta siedzib - Winterfell (Theon)
                     var d = e.Item1;
                     partyThinkParams.SetBehaviorScore(in d, -1f);
                     if (kind == 1) _dVetoSeat++; else _dVetoFront++;
@@ -76,8 +77,12 @@ namespace Armoury
             int side = SideOf(k);
             if (side == 0) return 0;
             int ts = SideOf(st.MapFaction);
-            return VetoKind(ts != 0 && ts != side, RunningOwn(st, side), SeatHeld(st), _restrain == side && RestraintOn, IsFrontTarget(k, st), SeatHomeOf(st) == side);
+            int kind = VetoKind(ts != 0 && ts != side, RunningOwn(st, side), SeatHeld(st), _restrain == side && RestraintOn, IsFrontTarget(k, st), SeatHomeOf(st) == side);
+            return kind == 1 && IronSeatFree(k) ? 0 : kind;
         }
+
+        /// <summary>334 Z4: Zelazne Wyspy (klucz IronbornCanonReave334) - weto siedzib 274 ich nie dotyczy (kanon: Theon bierze Winterfell). Weto i tak konczy sie z Krwawymi Godami.</summary>
+        private static bool IronSeatFree(Kingdom k) { return k != null && k.StringId == WarFront334.IronId && WarFront334.IronOn; }
 
         // ================================================================ BK: cel armii
         private static string HookBk(Harmony h)

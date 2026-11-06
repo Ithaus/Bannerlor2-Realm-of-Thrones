@@ -67,17 +67,38 @@ namespace Armoury
             try { return o.IsAllyWith(k) && o.IsAtWarWith(enemy); } catch { return false; }
         }
 
-        private static double Strength(Kingdom k, Kingdom enemy)
+        /// <summary>Sila strony k wobec enemy. 334 B4 (klucz CanonWarFront334): tylko druzyny, ktore dojda do enemy w 8.02 doby (F334); all - cala koalicja (linia).</summary>
+        private static double Strength(Kingdom k, Kingdom enemy, out double all)
         {
-            double s = 0;
+            double s = 0; all = 0;
+            bool front = WarFront334.FrontOn && WarFront334.Ensure();
             foreach (var mp in MobileParty.AllLordParties)
             {
                 if (mp == null || !mp.IsActive || mp.Party == null) continue;
-                if (SideOf(mp.MapFaction, k, enemy)) s += mp.Party.EstimatedStrength;
+                if (!SideOf(mp.MapFaction, k, enemy)) continue;
+                all += mp.Party.EstimatedStrength;
+                if (!front || WarFront334.Reaches(mp, enemy)) s += mp.Party.EstimatedStrength;
             }
             var main = MobileParty.MainParty;
-            if (main != null && main.IsActive && main.Party != null && !main.IsLordParty && SideOf(main.MapFaction, k, enemy)) s += main.Party.EstimatedStrength;
+            if (main != null && main.IsActive && main.Party != null && !main.IsLordParty && SideOf(main.MapFaction, k, enemy))
+            {
+                all += main.Party.EstimatedStrength;
+                if (!front || WarFront334.Reaches(main, enemy)) s += main.Party.EstimatedStrength;
+            }
+            _lastFront = front;
             return s;
+        }
+
+        private static bool _lastFront;
+        private static double _lastAllN = -1, _lastAllC = -1;
+        /// <summary>334 linia 2: sila 330 (F334 albo koalicja) i koalicja.</summary>
+        internal static string LastStrengthText
+        {
+            get
+            {
+                return (_lastFront ? "F334" : "koalicja") + " Polnoc " + _lastSN.ToString("0", Inv) + " / korona " + _lastSC.ToString("0", Inv) + " (Polnoc/korona " + _lastRN.ToString("0.00", Inv)
+                       + "; koalicja " + _lastAllN.ToString("0", Inv) + " / " + _lastAllC.ToString("0", Inv) + ")";
+            }
         }
 
         private static int Forts(Kingdom k)
@@ -106,7 +127,7 @@ namespace Armoury
         {
             try
             {
-                _lastSN = Strength(n, c); _lastSC = Strength(c, n);
+                _lastSN = Strength(n, c, out _lastAllN); _lastSC = Strength(c, n, out _lastAllC);
                 _lastRN = _lastSC > 0 ? _lastSN / _lastSC : 10.0;
                 _lastRC = _lastSN > 0 ? _lastSC / _lastSN : 10.0;
                 _lastFN = Forts(n); _lastFC = Forts(c);
