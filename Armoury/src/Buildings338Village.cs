@@ -21,7 +21,7 @@ namespace Armoury
     /// Naprawa: czynnik BK (ApplyProductionBuildingEffect - przypisanie kategorii z BK; projekt Production: VillageData.CurrentBuilding jak w BK) - (a) poza KS: krok
     /// w MaterialLaw.ProdPostfix (czynnik x suma - mnozy wynik), (b) pod KS: w tej samej tablicy A co drogi. Gdy czynny bylby model BK - nic (BK liczy sam).
     /// 11 (Buildings338VillageGoods) UL (Bee Skeps): waga miodu BK 0.5 + 1 x poziom ula (drwale i trapperzy) w VillageFruit.Base (wies poza KS). 338c: CHLEB (Bakery,
-    /// Mill) z ziarna wsi, SKORA (Fur Tannery) ze skor i futer wsi, RUDY kopalni wsi BK (Mines) z rak wsi (wartosc zdjeta z innych plonow) - pod KS w stawce A i w
+    /// Mill) z ziarna wsi, SKORA (Fur Tannery) ze skor wsi (338d: bez futer - opis "hides"), RUDY kopalni wsi BK (Mines) z rak wsi (wartosc zdjeta z innych plonow) - pod KS w stawce A i w
     /// Planie, poza KS baza + czynnik plonu-zrodla (opis przy GoodsInit).
     /// Nic z niczego: te same rece daja wiecej towaru z budynku, za ktory pan zaplacil (opis budynku); ludzi i zlota nie przybywa.
     /// </summary>
@@ -198,10 +198,13 @@ namespace Armoury
         // poziom piekarni x (1 + 0.5 x poziom mlyna) (bez piekarni - nic: BK-owe 0.1 x zboze bez piekarni jest spoza opisu), skora 0.5 x poziom garbarni, rudy 0.5 x
         // poziom kopalni x udzial zloza. Waga BK = udzial rak wsi (BK dzieli sile robocza na pozycje listy: waga / suma wag), wiec:
         //  - chleb: udzial s = w / (1 + w) ZBOZA tej wsi idzie do piekarni - zboze x (1 - s), chleb = s x zboze x kg zboza / kg chleba (receptura KS ziarno -> chleb 1.0);
-        //  - skora: udzial s = 0.5 L / (wagi skor i futer typu (min 1) + 0.5 L) SKOR i FUTER wsi idzie do garbarni - surowiec x (1 - s), skora = s x surowiec x kg /
-        //    (2.4 kg x kg skory) (KsTab.LeatherHide); wies bez skor i futer - nic (nie ma czego garbowac; licznik "bez surowca");
+        //  - skora: udzial s = 0.5 L / (waga skor typu (min 1) + 0.5 L) SKOR wsi idzie do garbarni - skory x (1 - s), skora = s x skory x kg / (2.4 kg x kg skory)
+        //    (KsTab.LeatherHide); 338d (recenzja): FUTRA NIE - opis BK mowi "tanning hides", a futro (400 zl) w skore (230 zl, 2.4 kg na kg) niszczyloby wartosc pracy
+        //    wsi; wies bez skor (takze z samym futrem) - nic (licznik "bez surowca");
         //  - rudy: baza = waga x (poziom ognisk + 1) x 0.5 (wzor modelu gry), wartosc rudy (cena bazowa) zdjeta z INNYCH plonow tej wsi (te same rece - jak E3-D1):
-        //    inne plony najwyzej -15%, zboze i ryby najwyzej -5%; gdy prog wiaze - mniej rudy (dodane = zdjete).
+        //    inne plony najwyzej -15%, JEDZENIE najwyzej -5% (338d: kazdy towar IsFood - zboze, ryby, mieso, ser, maslo, jaja, owoce, oliwki, daktyle, miod, wieloryb -
+        //    oraz zywiec cow/hog/sheep; jedna grupa jedzenia); gdy prog wiaze - mniej rudy (dodane = zdjete). Poza KS tniemy tylko plony z listy typu wsi (CutSet - te
+        //    same, z ktorych liczona jest wartosc zdjeta), nie bazy VillageFruit/VillageCrafts ani pozycje spoza listy.
         // Pod KS (wies zastosowana, beta 1) wszystko w tablicy stawek A (ScaleRates - raz na przeliczenie okregu; Plan widzi to samo, chleb i skora wracaja do Planu jako
         // zboze i skory/futra - PlanBack, bo Plan liczy przetwory z surowca), chleb i skora maja wlasna stawke (KsGoods - pierwszy krok MaterialLaw.ProdPostfix).
         // Poza KS - baza przed mnoznikami (GoodsBase, jak VillageFruit.Base) i czynnik plonu-zrodla (HostFactor) w MaterialLaw. Magazyn wsi + 5 dob nowych towarow (CapAdd).
@@ -209,14 +212,15 @@ namespace Armoury
         {
             public float BreadS, LeatherS, OreScale = 1f, OtherC = 1f, FoodC = 1f;         // udzialy i czynniki poza KS
             public Dictionary<ItemObject, float> Ore;                                        // baza rudy poza KS (przed mnoznikami, przed / Times)
+            public HashSet<ItemObject> CutSet;                                               // 338d: plony listy typu wsi, z ktorych zdjeto wartosc rudy (tylko je tnie HostFactor)
             public float BreadBase, LeatherBase, OreVal;                                    // poza KS - do linii doby
             public bool NoSrc;
         }
-        private sealed class KsGood { public float Bread, Leather, GrainBack, HidesBack, FurBack, OreAdd, OreVal, CutVal; public bool NoSrc; }
+        private sealed class KsGood { public float Bread, Leather, GrainBack, HidesBack, OreAdd, OreVal, CutVal; public bool NoSrc; }
         private static readonly Dictionary<Village, VGoods> _vg = new Dictionary<Village, VGoods>();   // poza KS - na dobe
         private static readonly Dictionary<Village, KsGood> _ksg = new Dictionary<Village, KsGood>();   // pod KS - z ostatniego skladania stawek A (trwa do przeliczenia)
         private static BuildingType _bakery, _mill, _tannery, _minesV;
-        private static ItemObject _bread, _leather, _grain, _fishI, _hides, _fur;
+        private static ItemObject _bread, _leather, _grain, _hides;
         private const float OtherCutMax = 0.15f, FoodCutMax = 0.05f, LeatherHideKg = 2.4f;
         private static TextObject _txtGoods;
 
@@ -225,12 +229,13 @@ namespace Armoury
             _bakery = Buildings338.VillageBuilding("Bakery"); _mill = Buildings338.VillageBuilding("Mill"); _tannery = Buildings338.VillageBuilding("Tannery"); _minesV = Buildings338.VillageBuilding("Mines");
             var om = MBObjectManager.Instance;
             _bread = om.GetObject<ItemObject>("bread"); _leather = om.GetObject<ItemObject>("leather"); _grain = om.GetObject<ItemObject>("grain");
-            _fishI = om.GetObject<ItemObject>("fish"); _hides = om.GetObject<ItemObject>("hides"); _fur = om.GetObject<ItemObject>("fur");
+            _hides = om.GetObject<ItemObject>("hides");
         }
 
         private static float Kg(ItemObject it) { return it != null && it.Weight > 0.05f ? it.Weight : 10f; }
         private static bool IsMineralId(string id) { return id == "iron" || id == "silver" || id == "salt" || id == "clay" || id == "limestone" || id == "marble" || id == "gold_ore"; }
-        private static bool IsFood(ItemObject it) { return it != null && (ReferenceEquals(it, _grain) || ReferenceEquals(it, _fishI)); }
+        /// <summary>338d (recenzja): jedzenie = kazdy towar IsFood (bilans miasta) i zywiec (cow/hog/sheep - KS liczy go jako mieso); prog 5% na cala grupe.</summary>
+        private static bool IsFood(ItemObject it) { return it != null && (it.IsFood || (it.HorseComponent != null && it.HorseComponent.IsLiveStock)); }
 
         private static float BreadShare(object vd)
         {
@@ -245,7 +250,8 @@ namespace Armoury
             int lt = Buildings338.VillageLevel(vd, _tannery);
             if (lt <= 0) return 0f;
             float ws = 0f;
-            if (vt != null) foreach (var p in vt.Productions) if (p.Item1 != null && (ReferenceEquals(p.Item1, _hides) || ReferenceEquals(p.Item1, _fur))) ws += p.Item2;
+            if (vt != null) foreach (var p in vt.Productions) if (p.Item1 != null && ReferenceEquals(p.Item1, _hides)) ws += p.Item2;   // 338d: tylko skory (opis "hides")
+            if (!(ws > 0f)) return -1f;   // 338d: wies bez skor - nie ma czego garbowac (NoSrc)
             float w = 0.5f * lt;
             return w / (Math.Max(1f, ws) + w);
         }
@@ -281,7 +287,7 @@ namespace Armoury
             object vd = VData(v);
             if (vd == null) { lock (Gate) _ksg.Remove(v); return; }
             var g = new KsGood();
-            int iG = KsDeliver.IGrain, iH = KsDeliver.IHides, iF = KsDeliver.IFur;
+            int iG = KsDeliver.IGrain, iH = KsDeliver.IHides;
             // rudy kopalni wsi: wartosc z innych plonow (przed chlebem i skora - te same rece)
             var ore = OreWeights(v, vd);
             if (ore.Count > 0)
@@ -307,14 +313,17 @@ namespace Armoury
                 if (cut > 0 && val > 0)
                 {
                     float sc = (float)(cut / val);
+                    double addV = 0, cutV = 0;   // 338d (recenzja B338-19): pomiar z tablicy - wartosc dodanej rudy i rzeczywisty spadek innych plonow (przed - po)
                     for (int j = 0; j < a.Length; j++)
                     {
-                        if (add[j] > 0f) { a[j] += add[j] * sc; g.OreAdd += add[j] * sc; continue; }
-                        if (!(a[j] > 0f)) continue;
-                        var it = KsItem(j); if (it == null) continue;
+                        var it = KsItem(j);
+                        if (add[j] > 0f) { a[j] += add[j] * sc; g.OreAdd += add[j] * sc; if (it != null) addV += add[j] * sc * Math.Max(1, it.Value); continue; }
+                        if (!(a[j] > 0f) || it == null) continue;
+                        float b0 = a[j];
                         a[j] *= IsFood(it) ? cF : cO;
+                        cutV += (b0 - a[j]) * (double)Math.Max(1, it.Value);
                     }
-                    g.OreVal = (float)cut; g.CutVal = (float)cut;
+                    g.OreVal = (float)addV; g.CutVal = (float)cutV;
                 }
             }
             // chleb z ziarna wsi
@@ -325,13 +334,13 @@ namespace Armoury
                 a[iG] -= conv; g.GrainBack = conv;
                 g.Bread = conv * Kg(_grain) / Kg(_bread);
             }
-            // skora ze skor i futer wsi
+            // skora ze skor wsi (338d: bez futer)
             float sl = LeatherShare(vd, v.VillageType);
-            if (sl > 0f && _leather != null)
+            if (sl < 0f) g.NoSrc = true;
+            else if (sl > 0f && _leather != null)
             {
                 float src = 0f;
-                if (iH < a.Length && a[iH] > 0f) { float c = sl * a[iH]; a[iH] -= c; g.HidesBack = c; src += c * Kg(_hides); }
-                if (iF < a.Length && a[iF] > 0f) { float c = sl * a[iF]; a[iF] -= c; g.FurBack = c; src += c * Kg(_fur); }
+                if (iH >= 0 && iH < a.Length && a[iH] > 0f) { float c = sl * a[iH]; a[iH] -= c; g.HidesBack = c; src += c * Kg(_hides); }
                 if (src > 0f) g.Leather = src / (LeatherHideKg * Kg(_leather)); else g.NoSrc = true;
             }
             lock (Gate) { if (g.Bread > 0f || g.Leather > 0f || g.OreAdd > 0f || g.NoSrc) _ksg[v] = g; else _ksg.Remove(v); }
@@ -345,8 +354,7 @@ namespace Armoury
             lock (Gate) { if (!_ksg.TryGetValue(v, out g)) return 0; }
             if (i == KsDeliver.IGrain) return g.GrainBack;
             if (i == KsDeliver.IHides) return g.HidesBack;
-            if (i == KsDeliver.IFur) return g.FurBack;
-            return 0;
+            return 0;   // 338d: futra nie ida do garbarni (Plan robi skore tylko ze skor)
         }
 
         /// <summary>MaterialLaw.ProdPostfix (pierwszy krok, przed StartCalibration.ProdStep): wies KS zastosowana (beta 1) - chleb i skora = stawka z ScaleRates
@@ -386,11 +394,11 @@ namespace Armoury
                 {
                     if (p.Item1 == null) continue;
                     if (ReferenceEquals(p.Item1, _grain)) wg += p.Item2;
-                    if (ReferenceEquals(p.Item1, _hides)) wsrc += p.Item2 * Kg(_hides);
-                    if (ReferenceEquals(p.Item1, _fur)) wsrc += p.Item2 * Kg(_fur);
+                    if (ReferenceEquals(p.Item1, _hides)) wsrc += p.Item2 * Kg(_hides);   // 338d: bez futer
                 }
                 if (g.BreadS > 0f && wg > 0f && _bread != null) g.BreadBase = g.BreadS * wg * hl * Kg(_grain) / Kg(_bread); else g.BreadS = 0f;
-                if (g.LeatherS > 0f && _leather != null)
+                if (g.LeatherS < 0f) { g.LeatherS = 0f; g.NoSrc = true; }
+                else if (g.LeatherS > 0f && _leather != null)
                 {
                     if (wsrc > 0f) g.LeatherBase = g.LeatherS * wsrc * hl / (LeatherHideKg * Kg(_leather));
                     else { g.LeatherS = 0f; g.NoSrc = true; }
@@ -400,18 +408,20 @@ namespace Armoury
                 {
                     double val = 0, vO = 0, vF = 0;
                     var dict = new Dictionary<ItemObject, float>();
+                    var cutSet = new HashSet<ItemObject>();
                     foreach (var kv in ore) { float q = kv.Value * hl; float o; dict.TryGetValue(kv.Key, out o); dict[kv.Key] = o + q; val += q * Math.Max(1, kv.Key.Value); }
                     foreach (var p in vt.Productions)
                     {
                         if (p.Item1 == null || dict.ContainsKey(p.Item1) || !(p.Item2 > 0f)) continue;
                         double x = p.Item2 * hl * Math.Max(1, p.Item1.Value);
                         if (IsFood(p.Item1)) vF += x; else vO += x;
+                        cutSet.Add(p.Item1);
                     }
                     float cO, cF;
                     double cut = Cut(val, vO, vF, out cO, out cF);
                     if (cut > 0 && val > 0)
                     {
-                        g.OreScale = (float)(cut / val); g.OtherC = cO; g.FoodC = cF; g.OreVal = (float)cut;
+                        g.OreScale = (float)(cut / val); g.OtherC = cO; g.FoodC = cF; g.OreVal = (float)cut; g.CutSet = cutSet;
                         g.Ore = new Dictionary<ItemObject, float>();
                         foreach (var kv in dict) g.Ore[kv.Key] = kv.Value * g.OreScale;
                     }
@@ -446,8 +456,8 @@ namespace Armoury
             catch (Exception e) { Buildings338.Stumble(Buildings338.GVGoods, "Village.GoodsBase", e); }
         }
 
-        /// <summary>MaterialLaw.ProdPostfix (mnozniki): czynnik plonu-zrodla poza KS - zboze x (1 - udzial chleba), skory i futra x (1 - udzial skory), inne plony x c
-        /// za rude kopalni (zboze i ryby x c jedzenia); 1 - nic.</summary>
+        /// <summary>MaterialLaw.ProdPostfix (mnozniki): czynnik plonu-zrodla poza KS - zboze x (1 - udzial chleba), skory x (1 - udzial skory), plony listy typu x c
+        /// za rude kopalni (jedzenie x c jedzenia); 1 - nic.</summary>
         internal static float HostFactor(Village v, ItemObject item)
         {
             if (item == null || !GoodsLive(v)) return 1f;
@@ -456,8 +466,9 @@ namespace Armoury
                 var g = GoodsOf(v);
                 float f = 1f;
                 if (ReferenceEquals(item, _grain) && g.BreadS > 0f) f *= 1f - g.BreadS;
-                if ((ReferenceEquals(item, _hides) || ReferenceEquals(item, _fur)) && g.LeatherS > 0f) f *= 1f - g.LeatherS;
-                if (g.Ore != null && !g.Ore.ContainsKey(item) && !ReferenceEquals(item, _bread) && !ReferenceEquals(item, _leather)) f *= IsFood(item) ? g.FoodC : g.OtherC;
+                if (ReferenceEquals(item, _hides) && g.LeatherS > 0f) f *= 1f - g.LeatherS;   // 338d: bez futer
+                // 338d (recenzja): ciecie za rude tylko w plonach listy typu (CutSet) - tych samych, z ktorych policzono zdjeta wartosc (dodane = zdjete)
+                if (g.Ore != null && g.CutSet != null && g.CutSet.Contains(item)) f *= IsFood(item) ? g.FoodC : g.OtherC;
                 return f > 0f && !float.IsNaN(f) ? f : 1f;
             }
             catch (Exception e) { Buildings338.Stumble(Buildings338.GVGoods, "Village.HostFactor", e); return 1f; }
@@ -498,10 +509,12 @@ namespace Armoury
             double kB = 0, kG = 0, kL = 0, kS = 0, kO = 0, kV = 0, kC = 0, oB = 0, oL = 0, oV = 0;
             lock (Gate)
             {
-                foreach (var g in _ksg.Values)
+                foreach (var kv in _ksg)
                 {
+                    if (!StartCalibration.FullFor(kv.Key)) continue;   // 338d (recenzja): wpisy wsi, ktore wypadly z KS (drop krainy) - poza linia
+                    var g = kv.Value;
                     if (g.Bread > 0f) { kb++; kB += g.Bread; kG += g.GrainBack; }
-                    if (g.Leather > 0f) { kl++; kL += g.Leather; kS += g.HidesBack + g.FurBack; }
+                    if (g.Leather > 0f) { kl++; kL += g.Leather; kS += g.HidesBack; }
                     if (g.OreAdd > 0f) { ko++; kO += g.OreAdd; kV += g.OreVal; kC += g.CutVal; }
                     if (g.NoSrc) kn++;
                 }
@@ -516,7 +529,7 @@ namespace Armoury
             }
             var inv = Buildings338.Inv;
             return " | chleb: wsi KS " + kb + " (+" + kB.ToString("0.0", inv) + " szt./d, zboza -" + kG.ToString("0.0", inv) + "), poza KS " + ob + " (baza +" + oB.ToString("0.0", inv) + ")"
-                   + " | skora: wsi KS " + kl + " (+" + kL.ToString("0.0", inv) + " szt./d, skor i futer -" + kS.ToString("0.0", inv) + "), poza KS " + ol + " (baza +" + oL.ToString("0.0", inv) + "), bez surowca " + (kn + on)
+                   + " | skora: wsi KS " + kl + " (+" + kL.ToString("0.0", inv) + " szt./d, skor -" + kS.ToString("0.0", inv) + "), poza KS " + ol + " (baza +" + oL.ToString("0.0", inv) + "), bez surowca " + (kn + on)
                    + " | rudy kopalni wsi BK: wsi KS " + ko + " (+" + kO.ToString("0.0", inv) + " szt./d, wartosc +" + kV.ToString("0", inv) + " zl, inne plony -" + kC.ToString("0", inv) + " zl), poza KS " + oo
                    + " (wartosc " + oV.ToString("0", inv) + " zl)";
         }

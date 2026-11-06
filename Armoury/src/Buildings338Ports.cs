@@ -26,6 +26,13 @@ namespace Armoury
     ///    tabeli KS (KsTab.P0: zelazo 2, srebro 15, sol 60, glina 800, wapien 300, marmur 150, zloto 0.3 kg/prac./d). Urobek: gdy kasa zamku stac na cene targu
     ///    (jak BK) - kasa placi gornikom (TownFolk.Earn KMine - kiesa podzamcza; czego kiesa nie przyjmie, wraca do kasy), ruda na targ zamku; inaczej - do Stash
     ///    zamku (opis: "stored in Stash otherwise"), bez zlota. Ksiega towarow - ramka FFish z wlasna grupa (LabMines). Bez zapisu w grze.
+    ///  - 338d (recenzja: zamek nie ma targu - ryby i ruda w Settlement.ItemRoster zamku nie mialy odbiorcy, a Plan liczyl ryby zamkow jako podaz krainy):
+    ///    RYBY portu zamku = JEDZENIE zamku (opis portu: polow dla osady): po RunPorts ryby z magazynu zamku ida do Town.FoodStocks (1 ryba = 1 jednostka, jak zboze
+    ///    w ArmsFromPeople) do sufitu zapasu; nadwyzka czeka w magazynie zamku i wchodzi do zapasu w kolejnych dobach (spizarnia). Plan KS NIE liczy ryb zamkow
+    ///    (StartCalibration.Plan - zamek: continue). RUDA kopalni zamku = SPRZEDAZ na targ miasta handlowego okregu (TradeBound wsi zamku): miasto placi cene
+    ///    sprzedazy ze swojej kasy - place gornikow (TownFolk.Earn KMine, kiesa podzamcza), czego kiesa nie przyjmie - do kasy zamku (zysk pana); ruda na polke
+    ///    miasta (kupcy, kowale). Gdy miasto nie ma kasy albo zamek nie ma wsi z targiem: zamek gracza - Stash (opis), zamek AI - gornicy nie kopia (brak kupca;
+    ///    Stash AI to martwy towar). Kasa zamku nie placi juz za rude, ktorej nikt nie kupi.
     /// Straznik dubla: prefiks-licznik na BK OnTownDailyTick - gdy BK kiedys zacznie tykac zamki (wywolania z zamkiem &gt; 0), nasz tick sie nie wykonuje.
     /// </summary>
     internal static class Buildings338Ports
@@ -38,12 +45,12 @@ namespace Armoury
         private static bool _hooked;
         private static int _bkCastleCalls, _bkCastleCallsDay;
         // doba
-        private static int _portCastles, _portListed, _portKsCastles, _ticks, _mineCastles, _mineOut, _mineNoHands;
-        private static long _fish, _oreMarket, _oreStash, _oreWage;
+        private static int _portCastles, _portListed, _portKsCastles, _ticks, _mineCastles, _mineOut, _mineNoHands, _mineNoBuyer, _mineNoWage;
+        private static long _fish, _oreMarket, _oreStash, _oreWage, _fishFood, _fishLeft;
         private static long _ksFish; private static int _ksFishN;      // porty pod KS (miasta i zamki) - z A17 PortsFin (NoteKsFish)
         private static double _planFish; private static int _planN;    // ostatni Plan KS: ryby portow szt./d (PortFishExo)
         // bieg (sesja)
-        private static long _sumTicks, _sumFish, _sumOre, _sumKsFish, _sumWage; private static int _sumDays;
+        private static long _sumTicks, _sumFish, _sumOre, _sumKsFish, _sumWage, _sumFishFood; private static int _sumDays;
         private static ItemObject _fishItem;
 
         /// <summary>Porty BK pod KS (miasta i zamki): lowia z pracy rybakow (A17 PortsPre nie blokuje).</summary>
@@ -53,7 +60,7 @@ namespace Armoury
         {
             _bkCastleCalls = _bkCastleCallsDay = 0;
             _fishItem = null; _getBeh = null;
-            _sumTicks = _sumFish = _sumOre = _sumKsFish = _sumWage = 0; _sumDays = 0;
+            _sumTicks = _sumFish = _sumOre = _sumKsFish = _sumWage = _sumFishFood = 0; _sumDays = 0;
             _ksFish = 0; _ksFishN = 0; _planFish = 0; _planN = 0;
             _bkb = AccessTools.TypeByName("BannerKings.Behaviours.BKBuildingsBehavior");
             _runPorts = _bkb != null ? AccessTools.Method(_bkb, "RunPorts", new[] { typeof(Town) }) : null;
@@ -84,12 +91,12 @@ namespace Armoury
         /// <summary>A17 PortsFin: ryby portu pod KS (miasto albo zamek) - do linii doby.</summary>
         internal static void NoteKsFish(int n) { if (n > 0) { Interlocked.Add(ref _ksFish, n); Interlocked.Increment(ref _ksFishN); } }
 
-        /// <summary>StartCalibration.Plan (PortFishExo): ryby portu BK osady na dobe - wzor BK RunPorts (pierwszy z Harbor/Port, poziom x max(dzierzawcy/300,
+        /// <summary>StartCalibration.Plan (PortFishExo): ryby portu BK MIASTA na dobe (338d: zamek 0 - ryby zamku do jego zapasu jedzenia) - wzor BK RunPorts (pierwszy z Harbor/Port, poziom x max(dzierzawcy/300,
         /// rzemieslnicy/200), tylko gdy kasa stac na cene targu) - ten sam, ktorym port lowi w ticku. 0 - brak portu, klucz wyl., kraina wrocona (tam port jak dzis -
         /// Plan krainy wroconej nie liczy) albo brak danych BK.</summary>
         internal static double PlanFishPerDay(Settlement st)
         {
-            if (st == null || st.Town == null || !KsOpen) return 0.0;
+            if (st == null || st.Town == null || !KsOpen || st.IsCastle) return 0.0;   // 338d: ryby zamku ida do jedzenia zamku - poza Planem
             try
             {
                 if (StartCalibration.LandBackOf(st)) return 0.0;
@@ -127,6 +134,35 @@ namespace Armoury
             return kg * Math.Max(1, DailyLife.KsSigma) / p0;
         }
 
+        /// <summary>338d: miasto handlowe okregu zamku - TradeBound pierwszej wsi zamku (jak wsie zamku sprzedaja plony); null - brak.</summary>
+        private static Town MarketTown(Town castle)
+        {
+            var st = castle != null ? castle.Settlement : null;
+            if (st == null || st.BoundVillages == null) return null;
+            foreach (var v in st.BoundVillages)
+            {
+                var tb = v != null ? v.TradeBound : null;
+                if (tb != null && tb.Town != null && !tb.IsUnderSiege) return tb.Town;
+            }
+            return null;
+        }
+
+        /// <summary>338d: ryby portu zamku (z magazynu zamku - takze zaleglosci z poprzednich dob) do zapasu jedzenia zamku, do sufitu; zwraca przeniesione.</summary>
+        private static int FishToFood(Town t)
+        {
+            var ro = t.Settlement != null ? t.Settlement.ItemRoster : null;
+            if (ro == null || _fishItem == null) return 0;
+            int have = ro.GetItemNumber(_fishItem);
+            if (have <= 0) return 0;
+            float room = t.FoodStocksUpperLimit() - t.FoodStocks;
+            int n = (int)Math.Min(have, Math.Floor(room));
+            if (n <= 0) return 0;
+            var fr = GoodsLedger.Begin(GoodsLedger.FCons, t.Settlement);   // ujscie: zaloga zamku je ryby (konsumpcja osad)
+            try { ro.AddToCounts(_fishItem, -n); t.FoodStocks += n; }
+            finally { if (fr != null) { try { GoodsLedger.End(fr); } catch { } } }
+            return n;
+        }
+
         private static void MineCastle(Town t, int lvl)
         {
             var st = t.Settlement;
@@ -142,7 +178,9 @@ namespace Armoury
             if (fr != null) fr.Info = LabMines;
             try
             {
-                bool any = false, noHands = false;
+                bool any = false, noHands = false, noBuyer = false;
+                var mk = MarketTown(t);
+                bool player = st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan;
                 foreach (var kv in mins)
                 {
                     if (!(MBRandom.RandomFloat * (rich + 0.5f) < kv.Value)) continue;   // losowanie BK RunMines (opis: zloza i bogactwo gruntu)
@@ -150,28 +188,30 @@ namespace Armoury
                     int n = lvl;                                                       // poziom = sztuki (BK)
                     if (hpu > 0) n = (int)Math.Min(n, Math.Floor(hands / hpu));
                     if (n <= 0) { noHands = true; continue; }
-                    hands -= n * hpu;
-                    int price = t.GetItemPrice(kv.Key, null, false);
+                    // 338d: sprzedaz na targ miasta handlowego okregu - miasto placi cene sprzedazy ze swojej kasy (zloto zostaje w swiecie, ruda trafia tam, gdzie ja kupia)
+                    int price = mk != null ? Math.Max(1, mk.GetItemPrice(kv.Key, null, true)) : 0;
                     long cost = (long)price * n;
-                    if (cost > 0 && t.Gold >= cost && st.ItemRoster != null)
+                    if (mk != null && cost > 0 && cost < int.MaxValue && mk.Gold >= cost && mk.Settlement != null && mk.Settlement.ItemRoster != null)
                     {
-                        // kasa zamku placi gornikom (kiesa podzamcza; czego nie przyjmie - wraca do kasy) - zloto zostaje w swiecie
-                        t.ChangeGold(-(int)cost);
-                        int folk = Math.Max(0, Math.Min((int)cost, TownFolk.Earn(st, (int)cost, TownFolk.KMine)));
-                        if ((int)cost - folk > 0) t.ChangeGold((int)cost - folk);
-                        st.ItemRoster.AddToCounts(kv.Key, n);
+                        mk.ChangeGold(-(int)cost);
+                        int folk = Math.Max(0, Math.Min((int)cost, TownFolk.Earn(st, (int)cost, TownFolk.KMine)));   // place gornikow (kiesa podzamcza)
+                        if ((int)cost - folk > 0) t.ChangeGold((int)cost - folk);                                   // reszta - zysk pana zamku
+                        if (folk == 0) _mineNoWage++;
+                        mk.Settlement.ItemRoster.AddToCounts(kv.Key, n);
                         _oreMarket += n; _oreWage += folk;
                     }
-                    else if (st.Stash != null)
+                    else if (player && st.Stash != null)
                     {
-                        st.Stash.AddToCounts(kv.Key, n);   // opis: "stored in Stash otherwise" - urobek rak zamku, bez zlota
+                        st.Stash.AddToCounts(kv.Key, n);   // opis: "stored in Stash otherwise" - urobek rak zamku gracza, bez zlota
                         _oreStash += n;
                     }
-                    else continue;
+                    else { noBuyer = true; continue; }   // zamek AI bez kupca - gornicy nie kopia (Stash AI to martwy towar)
+                    hands -= n * hpu;
                     any = true;
                 }
                 if (any) _mineOut++;
                 if (noHands) _mineNoHands++;
+                if (noBuyer) _mineNoBuyer++;
             }
             finally { if (fr != null) { try { GoodsLedger.End(fr); } catch { } } }
         }
@@ -180,7 +220,7 @@ namespace Armoury
         internal static void CastleTick()
         {
             _bkCastleCallsDay = Interlocked.Exchange(ref _bkCastleCalls, 0);
-            _portCastles = _portListed = _portKsCastles = _mineCastles = _ticks = _mineOut = _mineNoHands = 0; _fish = _oreMarket = _oreStash = _oreWage = 0;
+            _portCastles = _portListed = _portKsCastles = _mineCastles = _ticks = _mineOut = _mineNoHands = _mineNoBuyer = _mineNoWage = 0; _fish = _oreMarket = _oreStash = _oreWage = _fishFood = _fishLeft = 0;
             if (BkTicksCastles || Campaign.Current == null) return;
             bool ports = Buildings338.PortsOn && _runPorts != null, mines = Buildings338.CastleMinesOn;
             object beh = ports ? Behavior() : null;
@@ -202,6 +242,12 @@ namespace Armoury
                         int f1 = ro != null && _fishItem != null ? ro.GetItemNumber(_fishItem) : 0;
                         if (f1 > f0) _fish += f1 - f0;
                     }
+                    if (ports && PortLevel(t) > 0)
+                    {
+                        _fishFood += FishToFood(t);   // 338d: ryby zamku = jedzenie zamku (zamek nie ma targu)
+                        var r2 = t.Settlement.ItemRoster;
+                        if (r2 != null && _fishItem != null) _fishLeft += r2.GetItemNumber(_fishItem);
+                    }
                 }
                 catch (Exception e) { Buildings338.Stumble(Buildings338.GPorts, "Ports.RunPorts(" + t.Name + ")", e); }
                 try
@@ -220,15 +266,16 @@ namespace Armoury
             foreach (var t in Town.AllCastles) { try { if (Buildings338.Level(t, CastleMinesId) > 0) withMines++; } catch (Exception e) { Buildings338.Stumble(Buildings338.GPorts, "Ports.Daily", e); } }
             long ksFish = Interlocked.Exchange(ref _ksFish, 0); int ksN = Interlocked.Exchange(ref _ksFishN, 0);
             long ore = _oreMarket + _oreStash;
-            _sumDays++; _sumTicks += _ticks; _sumFish += _fish; _sumOre += ore; _sumKsFish += ksFish; _sumWage += _oreWage;
+            _sumDays++; _sumTicks += _ticks; _sumFish += _fish; _sumOre += ore; _sumKsFish += ksFish; _sumWage += _oreWage; _sumFishFood += _fishFood;
             var inv = Buildings338.Inv;
             Log.Info("Budynki (338) zamki: dzien " + day + " | tick BK dla zamkow " + _bkCastleCallsDay + " wywolan (0 = gra nie tyka zamkow) | zamkow tykanych przez 338 dzis " + _ticks
                      + " (w biegu " + _sumTicks + " w " + _sumDays + " dobach)"
                      + " | porty zamkow: klucz " + Buildings338.YN(Buildings338.PortsOn) + ", zamkow z Portem zbudowanym " + _portCastles + " (Port na liscie budowy " + _portListed + ", pod KS " + _portKsCastles
-                     + "), ryb dzis +" + _fish + ", w biegu +" + _sumFish
+                     + "), ryb dzis +" + _fish + ", w biegu +" + _sumFish + ", do jedzenia zamkow dzis " + _fishFood + " (w biegu " + _sumFishFood + "), czeka w magazynach " + _fishLeft
                      + " | porty pod KS (miasta i zamki): osad " + ksN + ", ryb dzis +" + ksFish + ", w biegu +" + _sumKsFish + ", Plan KS ryb portow " + _planFish.ToString("0", inv) + " szt./d w " + _planN + " osadach"
                      + " | kopalnie zamkow: klucz " + Buildings338.YN(Buildings338.CastleMinesOn) + ", zamkow z kopalnia " + withMines + ", tykanych " + _mineCastles + ", z urobkiem " + _mineOut
-                     + ", rudy dzis +" + ore + " (targ zamku " + _oreMarket + ", Stash " + _oreStash + "), place gornikow " + _oreWage + " zl, bez wolnych rak " + _mineNoHands + ", w biegu rudy +" + _sumOre
+                     + ", rudy dzis +" + ore + " (targ miasta " + _oreMarket + ", Stash " + _oreStash + "), place gornikow " + _oreWage + " zl, bez wolnych rak " + _mineNoHands + ", w biegu rudy +" + _sumOre
+                     + ", bez kupca " + _mineNoBuyer + ", bez placy " + _mineNoWage
                      + Buildings338.Tail(Buildings338.GPorts));
         }
     }

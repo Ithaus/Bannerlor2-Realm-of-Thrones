@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 338d - poprawki po 2 recenzjach 338c: skora tylko ze skor, ruda nie zjada jedzenia, ryby zamkow do jedzenia zamku, ruda zamkow na targ miasta (noc/338-budynki - NIE WGRANE, bez autotestu; Armoury.dll b9650d524818761562e889091468e340, test/m338)
+**Problem (recenzje 338c):** (1) garbarnia brala tez futra (400 zl) i robila z nich skore (230 zl, 2.4 kg na kg) - praca wsi na strate, a opis BK mowi "tanning hides";
+(2) ruda kopalni wsi zdejmowala do 15% z miesa, sera, masla, jaj, owocow, miodu itd. (jedzeniem bylo tylko zboze i ryby), a poza KS ciecie trafialo tez w bazy
+VillageFruit/VillageCrafts, ktorych nie liczono w zdjetej wartosci - towar w nicosc; (3) ryby portu zamku i ruda kopalni zamku szly do magazynu zamku, ktory nie ma targu
+(nikt ich nie kupi), a Plan KS liczyl ryby zamkow jako podaz krainy; pod KS przy nieczynnej kiesie ludu zaplata za ryby portu szla w nicosc.
+**Zmiana:**
+- Skora (Fur Tannery) tylko ze skor (`hides`); wies bez skor (takze z samym futrem) - nic, licznik "bez surowca". Plan nie dostaje juz futer z powrotem (PlanBack).
+- Ruda kopalni wsi: jedzenie = kazdy towar IsFood i zywiec (najwyzej -5% calej grupy), reszta najwyzej -15%; poza KS ciecie tylko w plonach listy typu wsi (te same,
+  z ktorych liczono zdjeta wartosc) - dodane = zdjete. Pod KS wartosc rudy i spadek innych plonow mierzone z tablicy stawek (B338-19 bez tautologii).
+- Ryby portu zamku = jedzenie zamku: po polowie (zaplata z kasy zamku do kiesy ludu jak dotad) ryby ida do zapasu jedzenia zamku do sufitu, nadwyzka czeka w magazynie
+  zamku i wchodzi w kolejnych dobach. Plan KS nie liczy ryb zamkow.
+- Ruda kopalni zamku = sprzedaz na targ miasta handlowego okregu (miasto wsi zamku): miasto placi cene sprzedazy - place gornikow do kiesy podzamcza, reszta do kasy zamku,
+  ruda na polke miasta. Bez kupca: zamek gracza - Stash (opis), zamek AI - gornicy nie kopia. Kasa zamku nie placi juz za rude bez odbiorcy.
+- A17: port pod KS bez czynnej kiesy ludu nie lowi (blokada), zamiast zaplaty w nicosc.
+- Drobne: linia dubla jedzenia - klucz i latka osobno, przy NIE "nie mierzone" (B338-7: klucz TAK bez latki = NIE); linia towarow wsi tylko dla wsi KS zastosowanych;
+  bufor FieldInfo/enum BK (Minerals, TypeCount); pusty catch w VillageFruit.CapAdd -> potkniecie 338. Linia zamkow: ryby do jedzenia zamkow, czeka w magazynach,
+  targ miasta, bez kupca, bez placy.
+- sprawdz_logi `budynki338`: nowe pola na koncu krotek (stare indeksy bez zmian), stary format dalej czytany; synteza B338-S TAK (+ przypadek "klucz TAK bez latki").
+**Wylaczenie:** klucze jak w 338c (`Buildings338Ports`, `Buildings338CastleMines`, `Buildings338VillageGoods`). Bieg bazowy (punkt E): `Buildings338` = false.
+
 ## 338c - budynki po tescie 30 dob: premia jedzenia BK zostaje, porty BK pod KS i w Planie, kopalnie zamkow, chleb, skora i rudy kopalni wsi z pracy, prog zoldu z liczby budynkow (noc/338-budynki - NIE WGRANE, bez autotestu; Armoury.dll f0ddc26f988f8951eacfc61264a2cb55, test/m338)
 **Problem (test 338b `at338`, Armoury-2026-11-06_19-36-12.log, 30 dob, kod 0, 23 bledy CS = baza):** B338-7 - zdjecie dubla BK (premia produkcji jedzenia 'Local farmland'
 za Farmlands zamku i Warehouse miasta, ok. 10 100 jedzenia/d) daje ujemny bilans jedzenia w 172 zamiast 82 z 219 osad - glod; B338-5 - prog stala 20-40 tys. za ciasny

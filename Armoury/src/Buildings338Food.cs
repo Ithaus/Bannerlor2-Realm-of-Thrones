@@ -173,8 +173,12 @@ namespace Armoury
                     catch (Exception e) { Buildings338.Stumble(Buildings338.GDouble, "Food.Daily(3b)", e); }
                 }
             }
-            Log.Info("Budynki (338) dubel jedzenia BK: dzien " + day + " | klucz " + Buildings338.YN(dbl) + (dbl ? " (premia BK zdjeta)" : " (premia BK produkcji jedzenia zostaje - decyzja 338c)") + " | zamkow z Farmlands " + nF + ", miast z Warehouse " + nM + " | zdjeta premia " + gone.ToString("0", Buildings338.Inv)
-                     + " jedzenia/d | osad z bilansem < 0: " + negA + " -> " + negB + " z " + all + " osad" + Buildings338.Tail(Buildings338.GDouble));
+            // 338d (recenzja): klucz i latka osobno; przy kluczu NIE bilans nie jest mierzony (zera nie sa pomiarem)
+            bool key = Buildings338.FoodDoubleOn;
+            Log.Info("Budynki (338) dubel jedzenia BK: dzien " + day + " | klucz " + Buildings338.YN(key) + (dbl ? " (premia BK zdjeta)" : key ? " (latka BRAK - premia BK zostaje)" : " (premia BK produkcji jedzenia zostaje - decyzja 338c)")
+                     + ", latka " + Buildings338.YN(_hookedDouble) + " | zamkow z Farmlands " + nF + ", miast z Warehouse " + nM + " | zdjeta premia " + gone.ToString("0", Buildings338.Inv)
+                     + " jedzenia/d | osad z bilansem < 0: " + (dbl ? negA + " -> " + negB + " z " + all + " osad" : "nie mierzone (premia nietknieta), osad z budynkami " + (nF + nM))
+                     + Buildings338.Tail(Buildings338.GDouble));
         }
     }
 }

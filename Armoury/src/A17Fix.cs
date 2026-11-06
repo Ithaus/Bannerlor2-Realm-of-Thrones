@@ -293,7 +293,8 @@ namespace Armoury
                 // 338c (Buildings338Ports.KsOpen): pod KS port lowi dalej - ryby z pracy rybakow (wzor BK z dzierzawcow i rzemieslnikow), zaplata z kasy do kiesy ludu,
                 // podaz w Planie KS (StartCalibration.Plan - PortFishExo), w ksiedze wlasna grupa (nie "ryby z niczego", nie lodzie Planu)
                 bool ks = StartCalibration.Applied && !StartCalibration.LandBackOf(__0.Settlement);
-                if (ks && !Buildings338Ports.KsOpen) { _fPortBlocked++; return false; }
+                // 338d (recenzja): pod KS bez czynnej kiesy ludu (Live false) zaplata nie mialaby odbiorcy - port nie lowi (jak dotad blokada)
+                if (ks && (!Buildings338Ports.KsOpen || !Live)) { _fPortBlocked++; return false; }
                 var f = Fish;
                 if (f != null && __0.Settlement != null && __0.Settlement.ItemRoster != null)
                 {

@@ -350,3 +350,16 @@ rudy = zdjete z innych plonow +-10%), B338-20, B338-21; synteza B338-S z nowymi 
 **Ryzyka 338c:** Plan KS liczy ryby portow od przebudowy Planu - do tego czasu podaz ponad Plan (ceny ryb w dol); chleb wsi zmniejsza zboze na targu (Plan widzi zboze
 jak dotad - PlanBack); ruda wsi zabiera do 15% wartosci innych plonow wsi z kopalnia; kopalnie zamkow zaleza od wolnych rak (WorkforceExcess) - zamki bez nadmiaru rak nie kopia
 (licznik "bez wolnych rak"); stawka KS chleba/skory/rud zmienia sie dopiero przy przeliczeniu okregu (jak drogi).
+
+## 16. Paczka 338d - po recenzjach 338c
+
+- Skora: zrodlo tylko skory (`hides`), udzial s = 0.5 L / (waga skor typu (min 1) + 0.5 L). Futra nie (opis "tanning hides"; futro drozsze od skory).
+- Ruda kopalni wsi: grupa jedzenia = kazdy towar IsFood + zywiec, najwyzej -5%; inne najwyzej -15%. Poza KS ciecie tylko w plonach listy typu (CutSet).
+- Port zamku: ryby -> zapas jedzenia zamku (1 ryba = 1 jednostka, do sufitu `FoodStocksUpperLimit`); nadwyzka w magazynie zamku, wchodzi w nastepnych dobach.
+  Ksiega towarow: ramka FCons (zaloga je). Plan KS: zamki bez ryb portow.
+- Kopalnia zamku: losowanie BK, wolne rece zamku (jak 338c); sprzedaz na targ miasta handlowego okregu (TradeBound pierwszej wsi zamku, miasto nie oblezone) po cenie
+  sprzedazy miasta; miasto placi: place gornikow (TownFolk.Earn KMine, kiesa podzamcza), reszta do kasy zamku. Bez kupca: gracz - Stash, AI - nie kopia.
+- A17: port pod KS, gdy kiesa ludu nieczynna (`!Live`) - blokada (bez zaplaty w nicosc).
+- Bieg bazowy (punkt E): `Buildings338` = false. Plik MCM Jeffa (`Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json`)
+  nie ma klucza `Buildings338` (338 nie byl wgrany), wiec dziala wartosc domyslna z DLL; autotest nie ma parametru do kluczy. Bieg bazowy = osobna DLL testowa
+  z domyslna `Buildings338 = false` (Settings.cs i McmSettings.cs), bez zmiany pliku ustawien Jeffa.

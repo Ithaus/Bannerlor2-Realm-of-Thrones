@@ -279,7 +279,7 @@ namespace Armoury
             try
             {
                 var v = __instance;
-                try { int g338 = Buildings338Village.CapAdd(v); if (g338 > 0) __result += g338; } catch { }   // 338c: + 5 dob chleba, skory i rud kopalni wsi BK
+                try { int g338 = Buildings338Village.CapAdd(v); if (g338 > 0) __result += g338; } catch (Exception e338) { Buildings338.Stumble(Buildings338.GVGoods, "Village.CapAdd", e338); }   // 338c: + 5 dob chleba, skory i rud kopalni wsi BK
                 if (StartCalibration.CapOverride(v, ref __result)) return;   // KS: wies zastosowana - 5 dob towarow KS spoza typu zamiast owocow i jaj BK
                 try { int ca = VillageCrafts.CapAdd(v); if (ca > 0) __result += ca; } catch { }   // inwest: + 5 dob towarow zajec innych wiosek okregu (droga bez KS)
                 if (v == null || v.VillageState != Village.VillageStates.Normal || v.TradeBound == null || v.VillageType == null) return;

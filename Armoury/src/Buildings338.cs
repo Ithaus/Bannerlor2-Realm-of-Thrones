@@ -155,6 +155,9 @@ namespace Armoury
             catch (Exception e) { Stumble(GCore, "InitMx", e); }
         }
 
+        private static Type _mxTupleType; private static System.Reflection.FieldInfo _mxF1, _mxF2;
+        private static readonly Dictionary<string, object> _popTypeVal = new Dictionary<string, object>(StringComparer.Ordinal);   // recenzja 338c: Enum.Parse raz na nazwe
+
         /// <summary>BK MineralData.GetLocalMinerals() osady: (towar, udzial zloza); pusta lista - brak danych.</summary>
         internal static List<KeyValuePair<TaleWorlds.Core.ItemObject, float>> Minerals(object pop, out int richness)
         {
@@ -171,7 +174,8 @@ namespace Armoury
             {
                 if (o == null) continue;
                 var t = o.GetType();
-                var f1 = t.GetField("Item1"); var f2 = t.GetField("Item2");
+                if (!ReferenceEquals(t, _mxTupleType)) { _mxF1 = t.GetField("Item1"); _mxF2 = t.GetField("Item2"); _mxTupleType = t; }   // recenzja 338c: FieldInfo raz (ValueTuple<ItemObject,float>)
+                var f1 = _mxF1; var f2 = _mxF2;
                 var it = f1 != null ? f1.GetValue(o) as TaleWorlds.Core.ItemObject : null;
                 float w = f2 != null ? Convert.ToSingle(f2.GetValue(o), Inv) : 0f;
                 if (it != null && w > 0f) res.Add(new KeyValuePair<TaleWorlds.Core.ItemObject, float>(it, w));
@@ -194,7 +198,15 @@ namespace Armoury
             InitMx();
             if (pop == null || _popTypeCount == null || _popTypeEnum == null) return 0;
             object e;
-            try { e = Enum.Parse(_popTypeEnum, name); } catch { return 0; }
+            lock (_popTypeVal)
+            {
+                if (!_popTypeVal.TryGetValue(name, out e))
+                {
+                    try { e = Enum.Parse(_popTypeEnum, name); } catch { e = null; }
+                    _popTypeVal[name] = e;
+                }
+            }
+            if (e == null || e.GetType() != _popTypeEnum) return 0;
             return Convert.ToInt32(_popTypeCount.Invoke(pop, new[] { e }), Inv);
         }
 

@@ -133,7 +133,7 @@ namespace Armoury
             {
                 try
                 {
-                    if (r.Castle) { PortFishExo(inp, r.St, r.Cul ?? "?"); continue; }   // 338c: port BK zamku - ryby z pracy rybakow (podaz spoza tabeli)
+                    if (r.Castle) continue;   // 338d (recenzja): ryby portu zamku ida do zapasu jedzenia zamku (zamek nie ma targu) - nie sa podaza krainy
                     var bask = DailyLife.KsBasket(r.Cul, true);
                     bool oil = DailyLife.OilProf(r.ProfId), north = DailyLife.NorthFur(r.ProfId);
                     string land = r.Cul ?? "?";

@@ -147,3 +147,25 @@ urzad podatkowy miasta, targowisko, asymilacja, drogi, produkcja wsi BK, ule, st
 | Fur Tannery (wies BK) - skora | MARTWY (odlozone) | NAPRAWIONE: udzial skor i futer wsi idzie do garbarni (2.4 kg surowca na kg skory, KsTab.LeatherHide); wies bez skor i futer - nic (licznik "bez surowca") |
 | Mines (wies BK) - rudy | pod KS (beta 1) stawka KS bez kopalni - martwy | NAPRAWIONE: rudy z wagi BK (0.5 x poziom x udzial zloza), wartosc zdjeta z innych plonow wsi (inne najwyzej 15%, zboze i ryby 5%) - pod KS w stawce A (Plan widzi), poza KS baza + czynnik plonow |
 | Tax Office (wies BK), Courier Post | bez zmian (decyzja) | bez zmian |
+
+## 12. Recenzje 338c - poprawki 338d
+
+| # | Recenzja | Stan 338d |
+|---|---|---|
+| 1 | Skora z futer niszczy wartosc (futro 400 zl -> skora 230 zl, 2.4 kg/kg) | NAPRAWIONE - tylko `hides` (LeatherShare, ScaleGoodsKs, GoodsOf, HostFactor, PlanBack); wies z samym futrem = NoSrc |
+| 2 | Ruda zjada jedzenie spoza zboza i ryb | NAPRAWIONE - `IsFood` = `ItemObject.IsFood` lub zywiec (HorseComponent.IsLiveStock); prog 5% na cala grupe |
+| 3 | Ryby i ruda zamkow bez odbiorcy, Plan liczy ryby zamkow | NAPRAWIONE - ryby zamku do `Town.FoodStocks` (sufit, nadwyzka czeka); ruda na targ miasta handlowego okregu za kase miasta; Plan: zamek `continue`, `PlanFishPerDay` zamek 0 |
+| T2 | HostFactor tnie wiecej niz liczono (bazy VillageFruit/VillageCrafts, pozycje BK) | NAPRAWIONE - `VGoods.CutSet` (plony listy typu, z ktorych liczono wartosc) |
+| T3 | Pod KS przy `!Live` zaplata w nicosc | NAPRAWIONE - A17 PortsPre blokuje port pod KS, gdy `!Live` |
+| 5 | Tautologia B338-19 | NAPRAWIONE - OreVal i CutVal mierzone z tablicy A (wartosc dodanej rudy; przed - po w innych plonach) |
+| D | GoodsLine liczy wsie wypadle z KS | NAPRAWIONE - tylko `StartCalibration.FullFor(v)` |
+| D | Linia dubla: YN(dbl), zera przy NIE | NAPRAWIONE - klucz i latka osobno, "nie mierzone" |
+| D | FieldInfo / Enum.Parse w petli | NAPRAWIONE - bufor w Buildings338 |
+| D | Pusty catch VillageFruit.CapAdd | NAPRAWIONE - Stumble GVGoods |
+| 4 | Rece rybakow liczone dwa razy (wzor BK nie zabiera ludzi z innej pracy) | ZOSTAJE (opis) - skala ok. 30 ryb/d na miasto poz. 3; wzor BK w RunPorts, nie nasz |
+| 7 | Plan sprawdza kase portu w chwili zrzutu | ZOSTAJE (opis) - zrodlo odchylki B338-17b (+-25%); tick sprawdza kase co dobe |
+| 8 | Ilosc rudy pod KS wzorem gry, nie z rak KS | ZOSTAJE (opis) - wartosc dodana = zdjeta, nic z niczego; ilosc w skali gry |
+| 9 | Chleb poza KS z wlasnymi mnoznikami | ZOSTAJE (opis) - przyblizenie masy; poza KS tylko krainy wrocone |
+| 10 | Wagi chleba i zboza | DO SPRAWDZENIA w logu biegu (kg w Kg()); wzor przelicza kg, wiec przy rownych wagach 1:1 |
+| 12 | `_ksg` a `_ratesKeep` | BEZ ZMIAN - oba czyszczone przy starcie sesji, `_ksg` wypelniane w ScaleRates na kazdej sciezce skladania stawek (takze reuse przez _ratesKeep w tej samej sesji) |
+| D | Te same wolne rece (kopalnie zamkow i Levy/autowerbunek) | ZOSTAJE (opis) - n <= poziom budynku, skala mala |

@@ -95722,6 +95722,8 @@ def main(argv):
 #  Buildings338FoodDouble NIE (domyslnie - decyzja 338c: premia BK zostaje) - premia nietknieta kazdej doby; B338-13 sumy biegu; B338-17 porty BK pod KS (blokada A17 zdjeta,
 #  ryby z pracy > 0 gdy Plan > 0) i 17b Plan ryb portow wobec polowu +-25%; B338-18 kopalnie zamkow z pracy (rudy w biegu > 0); B338-19 chleb z ziarna, skora, rudy wsi
 #  (wartosc = zdjete z innych plonow +-10%); z --baza: B338-20 zbytki ludu (OB2-6a) >= 95% bazy, B338-21 rachunki KS-H po zwloce (NKA-4) dob <= baza.
+#  338d: linia dubla - klucz i latka osobno, przy NIE "nie mierzone" (B338-7: klucz TAK bez latki = NIE); zamki - ryby portow zamkow do jedzenia zamku (B338-13 opis),
+#  ruda zamkow na targ miasta handlowego okregu (bez kupca, bez placy - B338-18 opis); skora tylko ze skor; B338-19 wartosc zdjeta mierzona z tablicy (przed - po).
 B338_START = re.compile(r"Budynki \(338\): start sesji \| glowny (TAK|NIE) \|.*\| BK (jest|BRAK) \| Courier Post na liscie budowy wsi BK: (\S+) \| latki: (.*)$")
 B338_DAY = re.compile(r"Budynki \(338\) ([a-zA-Z ]+?): dzien (\d+) \| (.*) \| bledy (\d+)\s*$")
 B338_GROUPS = ["zold", "autowerbunek", "zapas jedzenia", "dubel jedzenia BK", "murarz", "urzad podatkowy", "karawany", "asymilacja", "drogi", "produkcja wsi",
@@ -95733,7 +95735,8 @@ B338_RX = {
     "autowerbunek": re.compile(r"twierdz (\d+) z premia .*suma limitu \+(\d+)/d \| dobrano ponad K8 (\d+) ludzi$"),
     "zapas jedzenia": re.compile(r"miast z Warehouse (\d+) \(sufit \+(-?\d+)\), zamkow z Granary (\d+) \(sufit \+(-?\d+), BK bylo \+(\d+)\)"),
     # 338c: klucz (domyslnie NIE - decyzja: premia BK zostaje)
-    "dubel jedzenia BK": re.compile(r"(?:klucz (TAK|NIE) \([^)]*\) \| )?zamkow z Farmlands (\d+), miast z Warehouse (\d+) \| zdjeta premia (-?\d+) jedzenia/d \| osad z bilansem < 0: (\d+) -> (\d+) z (\d+) osad$"),
+    "dubel jedzenia BK": re.compile(r"(?:klucz (TAK|NIE) \([^)]*\)(?:, latka (TAK|NIE))? \| )?zamkow z Farmlands (\d+), miast z Warehouse (\d+) \| zdjeta premia (-?\d+) jedzenia/d \| "
+                                    r"osad z bilansem < 0: (?:(\d+) -> (\d+) z (\d+) osad|nie mierzone \(premia nietknieta\), osad z budynkami (\d+))$"),
     "murarz": re.compile(r"osad (\d+) z Masonem w budowach oplaconych \| punktow \+([\d.]+)/d \(punkty Masona ([\d.]+), dopisek ponad punkty (\d+)\)$"),
     "urzad podatkowy": re.compile(r"miast (\d+) z urzedem, droga firm (TAK|NIE) \| rata \+(-?\d+) zl \(pan (-?\d+), korona (-?\d+)\) w (\d+) ratach(?: \(nalezne (-?\d+) zl[^)]*\))?$"),
     "karawany": re.compile(r"miast z Marketplace (\d+) \| wywolan (\d+), podniesionych (\d+), sredni mnoznik ([\d.]+)$"),
@@ -95742,14 +95745,15 @@ B338_RX = {
     "produkcja wsi": re.compile(r"wsi z budynkami (\d+) \(.*\), projekt Production (\d+) \| KS wsi (\d+) dopisane ([\d.]+) szt\./d, poza KS ([\d.-]+) szt\. \| model BK czynny (TAK|NIE)(?: \| ceny miast: zboze ([\d.]+), drewno ([\d.]+))?$"),
     # 338c: chleb, skora, rudy kopalni wsi BK (stary log: "chleb i skora: odlozone" - grupa opcjonalna pusta)
     "towary wsi": re.compile(r"wsi z ulami (\d+), miod \+([\d.]+) \(baza przed mnoznikami\)(?: \| chleb: wsi KS (\d+) \(\+([\d.]+) szt\./d, zboza -([\d.]+)\), poza KS (\d+) \(baza \+([\d.]+)\) \| "
-                             r"skora: wsi KS (\d+) \(\+([\d.]+) szt\./d, skor i futer -([\d.]+)\), poza KS (\d+) \(baza \+([\d.]+)\), bez surowca (\d+) \| "
+                             r"skora: wsi KS (\d+) \(\+([\d.]+) szt\./d, skor(?: i futer)? -([\d.]+)\), poza KS (\d+) \(baza \+([\d.]+)\), bez surowca (\d+) \| "
                              r"rudy kopalni wsi BK: wsi KS (\d+) \(\+([\d.]+) szt\./d, wartosc \+(\d+) zl, inne plony -(\d+) zl\), poza KS (\d+) \(wartosc (\d+) zl\))?"),
     # 338c: sumy biegu, porty pod KS i Plan, kopalnie zamkow z pracy
     "zamki": re.compile(r"tick BK dla zamkow (\d+) wywolan \(0 = gra nie tyka zamkow\) \| zamkow tykanych przez 338 dzis (\d+) \(w biegu (\d+) w (\d+) dobach\) \| "
-                        r"porty zamkow: klucz (TAK|NIE), zamkow z Portem zbudowanym (\d+) \(Port na liscie budowy (\d+), pod KS (\d+)\), ryb dzis \+(\d+), w biegu \+(\d+) \| "
+                        r"porty zamkow: klucz (TAK|NIE), zamkow z Portem zbudowanym (\d+) \(Port na liscie budowy (\d+), pod KS (\d+)\), ryb dzis \+(\d+), w biegu \+(\d+)"
+                        r"(?:, do jedzenia zamkow dzis (\d+) \(w biegu (\d+)\), czeka w magazynach (\d+))? \| "
                         r"porty pod KS \(miasta i zamki\): osad (\d+), ryb dzis \+(\d+), w biegu \+(\d+), Plan KS ryb portow (\d+) szt\./d w (\d+) osadach \| "
-                        r"kopalnie zamkow: klucz (TAK|NIE), zamkow z kopalnia (\d+), tykanych (\d+), z urobkiem (\d+), rudy dzis \+(\d+) \(targ zamku (\d+), Stash (\d+)\), "
-                        r"place gornikow (\d+) zl, bez wolnych rak (\d+), w biegu rudy \+(\d+)$"),
+                        r"kopalnie zamkow: klucz (TAK|NIE), zamkow z kopalnia (\d+), tykanych (\d+), z urobkiem (\d+), rudy dzis \+(\d+) \(targ (?:zamku|miasta) (\d+), Stash (\d+)\), "
+                        r"place gornikow (\d+) zl, bez wolnych rak (\d+), w biegu rudy \+(\d+)(?:, bez kupca (\d+), bez placy (\d+))?$"),
     "stadniny": re.compile(r"zamkow ze Studs (\d+) \(pelnych (\d+)\) \| konie bojowe \+(\d+) \(ze Stash (\d+), z magazynu zamku (\d+), z wsi (\d+)\), bez zrodla (\d+), bez typu konia (\d+)"
                            r"(?: \| w biegu: konie bojowe \+(\d+), bez zrodla (\d+) w (\d+) dobach)?$"),
 }
@@ -95806,7 +95810,12 @@ def budynki338_collect(logp):
             if not rx:
                 D["bad"] += 1
                 continue
-            D["g"][g].append({"day": day, "err": err, "v": rx.groups()})
+            v = rx.groups()
+            if g == "zamki":   # 338d: nowe grupy (ryby do jedzenia zamkow) na koniec - stare indeksy bez zmian: 25-27 ryby zamkow, 28-29 bez kupca / bez placy
+                v = v[:10] + v[13:28] + v[10:13] + v[28:30]
+            elif g == "dubel jedzenia BK":   # 338d: latka (1) i "osad z budynkami" (8) na koniec: 0 klucz, 1-3, 4-6 bilans (None = nie mierzone), 7 latka, 8 osad
+                v = (v[0],) + v[2:8] + (v[1], v[8])
+            D["g"][g].append({"day": day, "err": err, "v": v})
     return D
 
 
@@ -95871,11 +95880,15 @@ def budynki338_rows(rep, D, B=None):
     F = D["g"]["dubel jedzenia BK"]
     if F:
         v = F[-1]["v"]
-        key, nF, nM, gone, a, b, n = v[0], int(v[1]), int(v[2]), int(v[3]), int(v[4]), int(v[5]), int(v[6])
-        if key == "NIE":
-            ok = all(int(r["v"][3]) == 0 and int(r["v"][4]) == int(r["v"][5]) for r in F)
+        key, nF, nM, gone = v[0], int(v[1]), int(v[2]), int(v[3])
+        a, b, n = _b338i(v[4]), _b338i(v[5]), _b338i(v[6])
+        patch = v[7] if len(v) > 7 else None
+        if key == "TAK" and patch == "NIE":
+            rep.add("B338-7: dubel jedzenia BK - latka", "klucz TAK, latka NIE (BKFoodModel.GetPopulationFoodProduction nie wpiety)", "klucz TAK - latka TAK", False)
+        elif key == "NIE":
+            ok = all(int(r["v"][3]) == 0 and (r["v"][4] is None or r["v"][4] == r["v"][5]) for r in F)
             rep.add("B338-7: dubel jedzenia BK - premia zostaje (decyzja 338c)",
-                    f"klucz NIE, zamkow z Farmlands {nF}, miast z Warehouse {nM}, zdjeta premia {gone} jedzenia/d, bilans < 0 {a} -> {b}",
+                    f"klucz NIE, zamkow z Farmlands {nF}, miast z Warehouse {nM}, zdjeta premia {gone} jedzenia/d, bilans " + ("nie mierzony" if v[4] is None else f"< 0 {a} -> {b}"),
                     "klucz NIE: premia BK nietknieta (zdjeta 0, bez zmiany bilansu) kazdej doby", ok)
         elif n == 0:
             rep.add("B338-7: dubel jedzenia BK - bilans", "0 osad z budynkami", "INFO", None)
@@ -95919,7 +95932,7 @@ def budynki338_rows(rep, D, B=None):
         bk = sum(int(r["v"][0]) for r in C)
         v = C[-1]["v"]
         rep.add("B338-13: tick zamkow", f"wywolan BK dla zamkow {bk}; zamkow tykanych przez 338 w biegu {v[2]} w {v[3]} dobach (ostatnio {v[1]}): porty zbudowane {v[5]} (na liscie {v[6]}), "
-                f"ryb w biegu +{v[9]}; kopalnie {v[16]} (klucz {v[15]}), rudy w biegu +{v[24]}",
+                f"ryb w biegu +{v[9]}" + (f" (do jedzenia zamkow +{v[26]}, czeka w magazynach {v[27]})" if v[26] is not None else "") + f"; kopalnie {v[16]} (klucz {v[15]}), rudy w biegu +{v[24]}",
                 "BK nie tyka zamkow (0) - nasz tick bez dubla", bk == 0)
         # B338-17 porty BK pod KS: blokada A17 zdjeta, ryby z pracy, Plan liczy
         key = v[4]
@@ -95947,10 +95960,12 @@ def budynki338_rows(rep, D, B=None):
         stash = sum(int(r["v"][21]) for r in C)
         market = sum(int(r["v"][20]) for r in C)
         wage = sum(int(r["v"][22]) for r in C)
+        nobuy = sum(_b338i(r["v"][28]) for r in C)
+        nowage = sum(_b338i(r["v"][29]) for r in C)
         if mkey != "TAK" or withm == 0 or len(C) < 10:
             rep.add("B338-18: kopalnie zamkow z pracy", f"klucz {mkey}, zamkow z kopalnia {withm}, dob {len(C)}, rudy w biegu +{sumore}", "INFO (klucz wyl., brak kopalni albo < 10 dob)", None)
         else:
-            rep.add("B338-18: kopalnie zamkow z pracy", f"zamkow z kopalnia {withm}, rudy w biegu +{sumore} (targ zamku {market}, Stash {stash}), place gornikow {wage} zl, zamko-dob bez wolnych rak {nohands}",
+            rep.add("B338-18: kopalnie zamkow z pracy", f"zamkow z kopalnia {withm}, rudy w biegu +{sumore} (targ miasta {market}, Stash {stash}), place gornikow {wage} zl, zamko-dob bez wolnych rak {nohands}, bez kupca {nobuy}, bez placy {nowage}",
                     "rudy w biegu > 0 (losowanie BK z rak zamku)", sumore > 0)
     H = D["g"]["stadniny"]
     if H:
@@ -96046,20 +96061,21 @@ def budynki338_prices(rep, D, B):
 
 
 def budynki338_lines(day, save=30000, before=100000, bk=0, err=0, rec=(5, 10, 3), neg=(0, 0, 100), over=0, tax=120, road="TAK", up=50, assim="TAK", tick=0, notype=0,
-                     aimen=50000, model="NIE", grain=30.0, wood=40.0, fkey="NIE", gone=0, blocked=0, ksfish=40, plan=40, ore=2, ksv=(500, 500), lux=50000, overdue=0):
+                     aimen=50000, model="NIE", grain=30.0, wood=40.0, fkey="NIE", fpatch="TAK", gone=0, blocked=0, ksfish=40, plan=40, ore=2, ksv=(500, 500), lux=50000, overdue=0):
     L = {
         "zold": f"Budynki (338) zold: dzien {day} | twierdz 200 z budynkiem (miasto Barracks 50, zamek Barracks 100, biuro 60, Slacken 2) | zold przed {before} po {before - save} oszczednosc {save} zl/d | limit AI x s: 150 twierdz, skalowan 150 | pominiete (BK liczy) {bk} | wywolan 900 | zalogi AI {aimen} ludzi | bledy {err}",
         "autowerbunek": f"Budynki (338) autowerbunek: dzien {day} | twierdz {rec[0]} z premia (biuro 3, Train Militia 1, Raise Troops 1), suma limitu +{rec[1]}/d | dobrano ponad K8 {rec[2]} ludzi | bledy 0",
         "zapas jedzenia": f"Budynki (338) zapas jedzenia: dzien {day} | miast z Warehouse 30 (sufit +60000), zamkow z Granary 20 (sufit +40000, BK bylo +40000) | przyklad King's Landing sufit 50000 -> 53000 | bledy 0",
-        "dubel jedzenia BK": f"Budynki (338) dubel jedzenia BK: dzien {day} | klucz {fkey} ({'premia BK zdjeta' if fkey == 'TAK' else 'premia BK produkcji jedzenia zostaje - decyzja 338c'}) | zamkow z Farmlands 40, miast z Warehouse 30 | zdjeta premia {gone} jedzenia/d | osad z bilansem < 0: {neg[0]} -> {neg[1]} z {neg[2]} osad | bledy 0",
+        "dubel jedzenia BK": f"Budynki (338) dubel jedzenia BK: dzien {day} | klucz {fkey} ({'premia BK zdjeta' if fkey == 'TAK' and fpatch == 'TAK' else 'latka BRAK - premia BK zostaje' if fkey == 'TAK' else 'premia BK produkcji jedzenia zostaje - decyzja 338c'}), latka {fpatch} | zamkow z Farmlands 40, miast z Warehouse 30 | zdjeta premia {gone} jedzenia/d | osad z bilansem < 0: "
+                             + (f"{neg[0]} -> {neg[1]} z {neg[2]} osad" if fkey == "TAK" and fpatch == "TAK" else "nie mierzone (premia nietknieta), osad z budynkami 70") + " | bledy 0",
         "murarz": f"Budynki (338) murarz: dzien {day} | osad 12 z Masonem w budowach oplaconych | punktow +30.5/d (punkty Masona 70.0, dopisek ponad punkty {over}) | bledy 0",
         "urzad podatkowy": f"Budynki (338) urzad podatkowy: dzien {day} | miast 20 z urzedem, droga firm {road} | rata +{tax} zl (pan {tax // 2}, korona {tax - tax // 2}) w 3 ratach (nalezne {tax} zl, z nadwyzki kasy - brak darowany) | bledy 0",
         "karawany": f"Budynki (338) karawany: dzien {day} | miast z Marketplace 40 | wywolan 3000, podniesionych {up}, sredni mnoznik 1.040 | bledy 0",
         "asymilacja": f"Budynki (338) asymilacja: dzien {day} | osad z projektem w liscie 200/210, wybrany w 3 | latka {assim}, wywolan 500, dodano +15 razy 30 | bledy 0",
         "drogi": f"Budynki (338) drogi: dzien {day} | wsi KS z drogami 150 | dopisane 120.5 szt./d | bledy 0",
         "produkcja wsi": f"Budynki (338) produkcja wsi: dzien {day} | wsi z budynkami 40 (Farming 10, Mining 5, AnimalHousing 10, Sawmill 10, FishFarm 5), projekt Production 600 | KS wsi 500 dopisane 900.0 szt./d, poza KS 50.0 szt. | model BK czynny {model} | ceny miast: zboze {grain:.1f}, drewno {wood:.1f} | bledy 0",
-        "towary wsi": f"Budynki (338) towary wsi: dzien {day} | wsi z ulami 3, miod +4.5 (baza przed mnoznikami) | chleb: wsi KS 4 (+12.0 szt./d, zboza -12.0), poza KS 1 (baza +2.0) | skora: wsi KS 2 (+0.5 szt./d, skor i futer -1.2), poza KS 0 (baza +0.0), bez surowca 3 | rudy kopalni wsi BK: wsi KS 3 (+6.0 szt./d, wartosc +{ksv[0]} zl, inne plony -{ksv[1]} zl), poza KS 1 (wartosc 80 zl) | bledy 0",
-        "zamki": f"Budynki (338) zamki: dzien {day} | tick BK dla zamkow {tick} wywolan (0 = gra nie tyka zamkow) | zamkow tykanych przez 338 dzis 5 (w biegu {5 * day} w {day} dobach) | porty zamkow: klucz TAK, zamkow z Portem zbudowanym 2 (Port na liscie budowy 30, pod KS 2), ryb dzis +12, w biegu +{12 * day} | porty pod KS (miasta i zamki): osad 20, ryb dzis +{ksfish}, w biegu +{ksfish * day}, Plan KS ryb portow {plan} szt./d w 20 osadach | kopalnie zamkow: klucz TAK, zamkow z kopalnia 7, tykanych 7, z urobkiem 2, rudy dzis +{ore} (targ zamku {ore}, Stash 0), place gornikow 300 zl, bez wolnych rak 1, w biegu rudy +{ore * day} | bledy 0",
+        "towary wsi": f"Budynki (338) towary wsi: dzien {day} | wsi z ulami 3, miod +4.5 (baza przed mnoznikami) | chleb: wsi KS 4 (+12.0 szt./d, zboza -12.0), poza KS 1 (baza +2.0) | skora: wsi KS 2 (+0.5 szt./d, skor -1.2), poza KS 0 (baza +0.0), bez surowca 3 | rudy kopalni wsi BK: wsi KS 3 (+6.0 szt./d, wartosc +{ksv[0]} zl, inne plony -{ksv[1]} zl), poza KS 1 (wartosc 80 zl) | bledy 0",
+        "zamki": f"Budynki (338) zamki: dzien {day} | tick BK dla zamkow {tick} wywolan (0 = gra nie tyka zamkow) | zamkow tykanych przez 338 dzis 5 (w biegu {5 * day} w {day} dobach) | porty zamkow: klucz TAK, zamkow z Portem zbudowanym 2 (Port na liscie budowy 30, pod KS 2), ryb dzis +12, w biegu +{12 * day}, do jedzenia zamkow dzis 12 (w biegu {12 * day}), czeka w magazynach 0 | porty pod KS (miasta i zamki): osad 20, ryb dzis +{ksfish}, w biegu +{ksfish * day}, Plan KS ryb portow {plan} szt./d w 20 osadach | kopalnie zamkow: klucz TAK, zamkow z kopalnia 7, tykanych 7, z urobkiem 2, rudy dzis +{ore} (targ miasta {ore}, Stash 0), place gornikow 300 zl, bez wolnych rak 1, w biegu rudy +{ore * day}, bez kupca 1, bez placy 0 | bledy 0",
         "stadniny": f"Budynki (338) stadniny: dzien {day} | zamkow ze Studs 4 (pelnych 1) | konie bojowe +1 (ze Stash 0, z magazynu zamku 0, z wsi 1), bez zrodla 0, bez typu konia {notype} | w biegu: konie bojowe +{day}, bez zrodla 0 w {day} dobach | bledy 0",
     }
     out = [L[g] for g in B338_GROUPS]
@@ -96097,6 +96113,7 @@ def budynki338_synth():
         "negoff": (days(gone=500, neg=(4, 9, 100)), {"B338-7": "NIE"}),
         "negon": (days(fkey="TAK", gone=900, neg=(4, 20, 100)), {"B338-7": "NIE"}),
         "negonok": (days(fkey="TAK", gone=900, neg=(4, 6, 100)), {"B338-7": "TAK"}),
+        "nopatch": (days(fkey="TAK", fpatch="NIE"), {"B338-7": "NIE"}),
         "k": (days(over=1), {"B338-8": "NIE"}),
         "road": (days(road="NIE"), {"B338-9": "NIE"}),
         "car": (days(up=0), {"B338-10": "NIE"}),
