@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 334d - poprawki po recenzjach 334c (noc/334-balans od 0a096780 - NIE WGRANE, bez autotestu)
+- Straznik pozycji (`WarFront334.Guard.cs`): warunek siatki pogody dokladnie jak w grze; przeglad partii po trafieniu bez partii najwyzej raz na godzine gry; kolejka bez
+  partii nieaktywnych; PREFIKS FinishNavigationTransitionInternal - koniec przejscia Invalid poza osada: partia bez wodza - przejscie anulowane, metoda gry pominieta;
+  przypiety - koniec wodza = pozycja wodza (gra nie liczy sciezki ani zdarzen od NaN); postfiks (zapas): Position przed IsCurrentlyAtSea, kotwica floty, nowa sciezka;
+  Blackwater: filtr partii jak ROT, nic gdy Stannis juz oblega KP, gracz w sluzbie, warunki ROT DefendSiegeTarget; T7 proba modelu pogody z NaN (poza licznikami).
+- Postawa (`WarFront334.Stance.cs`): regula w float jak BK, "strony 274: brak" w linii, bez StanceApply przy starcie sesji.
+- SCA (`ScaNoBandits320.cs`): linia SCA 334 - "furtki wyczerpania: sila, twierdze T/O, wsie N" (recenzja W3). W1/W2 recenzji logiki nie dotycza SCA145
+  (AssignArmyRoles / TryRunAssignedArmyRole martwe - recenzja czytala nieladowany StrategicCampaignAI.dll). W4 - swiadoma asymetria (opis ScaOwn).
+- `tools/sprawdz_logi.py`: B334-23 session = bloki z IndexOutOfRangeException I GetWeatherEventInPosition; B334-26 bez "BK bez zmian"; synteza +5 przypadkow.
+- Projekt: sekcja H7 w docs/PROJEKT-334-BALANS-WOJNY.md.
+
 ## 334c - wywrotka Blackwater (pozycja NaN), postawa BK Zelaznych i korony, SCA "swoi" koalicji, narzedzie (noc/334-balans od 11e1e2e5 - NIE WGRANE, bez autotestu)
 **Problem:** test 334b (90 dob z kopii zapisu Jeffa, logi scratchpad at334): (1) WYWROTKA na dobie 78 (dzien 109604, 15:37:43) - IndexOutOfRangeException w
 DefaultMapWeatherModel.GetWeatherEventInPosition <- NavalDLCMapWeatherModel.GetWeatherEffectOnTerrainForPosition <- MobileParty.IsBaseSpeedCacheInvalid

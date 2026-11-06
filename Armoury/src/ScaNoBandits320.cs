@@ -211,9 +211,25 @@ namespace Armoury
                 Rec r; _last.TryGetValue(k.StringId, out r);
                 bool exh = Get(_pExh, st) is bool b1 && b1, peace = Get(_pPeace, st) is bool b2 && b2;
                 return "swoi " + F0(Get(_pOwn, st)) + ", wyczerpane " + (exh ? "tak" : "nie") + ", cel " + (r != null ? (r.GoalSca ?? "?") : "?") + "->" + (Get(_pGoal, st) ?? "?")
-                       + " (" + (r != null ? r.Why : "-") + "), chce pokoju " + (peace ? "tak" : "nie");
+                       + " (" + (r != null ? r.Why : "-") + "), chce pokoju " + (peace ? "tak" : "nie") + ", " + Gates(st);
             }
             catch (Exception e) { Stumble("Brief", e); return "SCA blad"; }
+        }
+
+        /// <summary>334c (recenzja W3): ktora furtka StrategicFactionStatus.IsExhausted dziala (kod SCA145: wojny > 0 i (wrog > swoi x 1.35 albo zagrozone >= twierdze / 3
+        /// (dzielenie calkowite) albo wsie spladrowane >= 3)). Tekst bez nawiasow i '|' (regex B334_SCA_K).</summary>
+        private static string Gates(object st)
+        {
+            try
+            {
+                double en = Convert.ToDouble(Get(_pEnemy, st) ?? 0f, Inv), own = Convert.ToDouble(Get(_pOwn, st) ?? 0f, Inv);
+                int thr = Convert.ToInt32(Get(_pThreat, st) ?? 0, Inv), forts = Convert.ToInt32(Get(_pForts, st) ?? 0, Inv), raid = Convert.ToInt32(Get(_pRaided, st) ?? 0, Inv);
+                int wars = Convert.ToInt32(Get(_pWars, st) ?? 0, Inv);
+                bool gS = (float)en > (float)own * 1.35f, gT = thr >= forts / 3, gR = raid >= 3;
+                return "furtki wyczerpania: sila " + (gS ? "TAK" : "nie") + ", twierdze " + thr + "/" + forts + " " + (gT ? "TAK" : "nie") + ", wsie " + raid + " " + (gR ? "TAK" : "nie")
+                       + (wars > 0 ? "" : " - bez wojen");
+            }
+            catch { return "furtki wyczerpania: ?"; }
         }
 
         /// <summary>Kto NIE jest wrogiem dla SCA: 1 = banda, 2 = Inni, 3 = wyjeci spod prawa, 0 = wrog.</summary>

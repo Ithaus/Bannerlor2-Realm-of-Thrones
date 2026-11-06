@@ -405,7 +405,8 @@ namespace Armoury
         }
 
         /// <summary>334c (postfiks 320b CalculateFactionStatus, po ScaEnemy): OwnedStrength krolestwa strony 274 = suma CurrentTotalStrength krolestw tej strony (ta sama
-        /// miara, ktora SCA bierze dla jednego krolestwa). raw - wartosc SCA (do linii). Zwraca nowa wartosc albo -1 (bez zmiany: klucz NIE, krolestwo poza 274).</summary>
+        /// miara, ktora SCA bierze dla jednego krolestwa). Swiadoma asymetria (recenzja 334c W4): swoi = cala sila koalicji (rezerwy koalicji moga przyjsc - SCA tez
+        /// liczy swoich bez zasiegu), wrog = F334 (tylko ci, ktorzy dosiegna). Front(own, enemy) po stronie swoich zanizylby obrone stolicy daleko od frontu. raw - wartosc SCA (do linii). Zwraca nowa wartosc albo -1 (bez zmiany: klucz NIE, krolestwo poza 274).</summary>
         internal static float ScaOwn(Kingdom k, float raw)
         {
             if (k == null) return -1f;
@@ -471,7 +472,7 @@ namespace Armoury
             try { ScaNoBandits320.Wire(); } catch (Exception e) { Stumble("ScaWire", e); }   // 334c (B334-1): latki SCA przed linia startu (kolejnosc sluchaczy)
             try { EnsureHooks(); } catch (Exception e) { Stumble("EnsureHooks", e); }
             try { EnsureStanceHook(); } catch (Exception e) { Stumble("EnsureStanceHook", e); }
-            try { StanceApply("start sesji"); } catch (Exception e) { Stumble("StanceApply.start", e); }
+            // po recenzji 334c: bez StanceApply przy starcie sesji (GameStarted bywa false - nic by nie zrobil); postawe ustawia postfiks BK TickKingdoms (co dobe i po wczytaniu)
             try { StartLine(); } catch (Exception e) { Stumble("StartLine", e); }
         }
 

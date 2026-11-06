@@ -23,16 +23,19 @@ namespace Armoury
     /// "FABULA: BlackwaterSiegeEvent WYSTARTOWALO" (dzien 767). GetWeatherEventInPosition liczy indeks (int)(x / komorka) bez obciecia - wyjatek daje tylko (int)NaN
     /// = int.MinValue, czyli pozycja partii NaN.
     /// PRZYCZYNA (kod gry MobileParty.FinishNavigationTransitionInternal): po zejsciu na lad / wejsciu na statki _position = koniec przejscia (wlasny albo wodza armii
-    /// dla przypietych). Przejscie zaczete W OSADZIE (wyjscie z portu, InitializeNavigationTransitionParallel przy CurrentSettlement != null) nie zapisuje konca - zostaje
-    /// CampaignVec2.Invalid (NaN). Gdy ktos wyprowadzi partie z osady (LeaveSettlementAction) i przestawi ja setterem Position bez CancelNavigationTransition, gra
-    /// konczy przejscie poza osada i daje partii pozycje NaN. Tak robi ROT BlackwaterSiegeEvent.SetupSiegeAttackers (Stannis i lordowie Smoczej Skaly - wyspa,
+    /// dla przypietych), gdy partia nie stoi w osadzie. Setter MobileParty.CurrentSettlement = null (LeaveSettlementAction) ZAWSZE ustawia koniec przejscia na
+    /// CampaignVec2.Invalid (NaN), a przejscie zaczete w osadzie (InitializeNavigationTransitionParallel) konca w ogole nie zapisuje. Kazde wyjscie z osady w trakcie
+    /// przejscia bez CancelNavigationTransition konczy sie wiec pozycja NaN (po recenzji 334c: szersza klasa przypadkow niz "przejscie zaczete w osadzie"). Tak robi ROT BlackwaterSiegeEvent.SetupSiegeAttackers (Stannis i lordowie Smoczej Skaly - wyspa,
     /// czesto w trakcie wyplywania) i DefendSiegeTarget (Joffrey, Lancel).
     /// ZMIANA:
     ///  (1) zrodlo: prefiks ROT BlackwaterSiegeEvent.SetupSiegeAttackers - anuluje trwajace przejscia Stannisa i partii wojennych rodow Smoczej Skaly PRZED teleportem
     ///      (wzor BookHoldings.Teleport); postfiks - czlonkowie SiegeArmy: przejscie anulowane jeszcze raz, pozycja NaN naprawiona; prefiks DefendSiegeTarget - to samo
     ///      dla Joffreya i Lancela. Linia "Blackwater (334c)".
-    ///  (2) straznik ogolny: postfiks MobileParty.FinishNavigationTransitionInternal (watek glowny, RealTick) - pozycja NaN po przejsciu -> pozycja wodza (przypiety),
-    ///      brama osady, w ktorej stoi, brama osady domowej, pierwsza twierdza frakcji; morze jak u wodza (na bramie - lad); linia "NaN po przejsciu".
+    ///  (2) straznik ogolny (watek glowny, RealTick): PREFIKS MobileParty.FinishNavigationTransitionInternal (po recenzji 334c) - gra wzielaby zly koniec przejscia:
+    ///      partia bez wodza -> przejscie anulowane, metoda gry pominieta (partia zostaje na swojej, poprawnej pozycji i w swoim stanie lad/morze; gra wystartuje
+    ///      przejscie od nowa, gdy droga tego wymaga); przypiety w armii, wodz z poprawna pozycja -> koniec przejscia wodza = pozycja wodza (gra sama ustawi dobra
+    ///      _position przed ComputePath i zdarzeniem). POSTFIKS (zapas) - pozycja NaN po przejsciu -> pozycja wodza, brama osady, w ktorej stoi, brama osady domowej,
+    ///      pierwsza twierdza frakcji; potem nowa sciezka (ComputePath); linia "NaN po przejsciu".
     ///  (3) siatka bezpieczenstwa: prefiks DefaultMapWeatherModel.GetWeatherEventInPosition - pozycja poza siatka pogody (NaN, ujemna, za mapa) -> pogoda Clear zamiast
     ///      wyjatku (watek roboczy: tylko licznik Interlocked i kolejka; partia z MapRoads.CurrentWriter), naprawa partii w nastepnej klatce na watku glownym
     ///      (TickEvent) i linia "potkniecie 334c pogoda" z partia i pozycja. Partia nieznana (pogoda pytana spoza liczenia predkosci) - przeglad wszystkich partii.
@@ -67,6 +70,11 @@ namespace Armoury
         private static int _dNanFinish, _dNanFixed, _dQueueFixed, _dScanFixed, _dDeferred, _sNan, _stumbles, _dStumbles;
         private static int _dBwPre, _dBwPost, _dBwFixed, _dBwDefend;
         private static int _dLines;
+        private static int _dPreSkip, _dPreLead;          // prefiks konca przejscia: pominiete + anulowane / koniec wodza poprawiony
+        private static double _lastUnknownScanH = -1e9;   // przeglad partii po trafieniu pogody bez partii - najwyzej raz na godzine gry
+        private static MethodInfo _mComputePath, _mSetEnd;
+        [ThreadStatic] private static bool _probe;        // T7: proba siatki na watku glownym - bez licznikow i kolejki
+        private static int _probeHits;
         private const int LinesPerDay = 20;
         private static readonly List<string> _dNames = new List<string>();
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
@@ -82,6 +90,7 @@ namespace Armoury
 
         private static int Today { get { try { return (int)CampaignTime.Now.ToDays; } catch { return -1; } } }
 
+        /// <summary>TYLKO watek glowny (licznik i HashSet bez blokad) - nie wolac z WeatherPrefix ani innego kodu watkow roboczych.</summary>
         private static void Stumble(string where, Exception e)
         {
             _stumbles++; _dStumbles++;
@@ -130,6 +139,12 @@ namespace Armoury
             if (_hooksTried) return;
             _hooksTried = true;
             var h = new Harmony("com.jeff.armoury.navguard334c");
+            try
+            {
+                _mComputePath = AccessTools.DeclaredMethod(typeof(MobileParty), "ComputePath", new[] { typeof(CampaignVec2), typeof(MobileParty.NavigationType), typeof(bool) });
+                _mSetEnd = AccessTools.PropertySetter(typeof(MobileParty), "EndPositionForNavigationTransition");
+            }
+            catch (Exception e) { Stumble("EnsureHooks.methods", e); }
             try
             {
                 var m = AccessTools.Method(typeof(MobileParty), "FinishNavigationTransitionInternal", Type.EmptyTypes);
@@ -191,12 +206,12 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.PartyPositionGuard334c) return true;
                 float cx = _cellX, cy = _cellY; int dim = _dim;
-                if (!float.IsNaN(pos.x) && !float.IsNaN(pos.y) && pos.x >= 0f && pos.y >= 0f)
-                {
-                    float fx = pos.x / cx, fy = pos.y / cy;
-                    if (fx < dim && fy < dim) return true;     // (int)fx < dim i (int)fy < dim - indeks gry w siatce
-                }
+                // dokladnie warunek gry (po recenzji 334c): idx = (int)(y/c)*dim + (int)(x/c), wyjatek tylko przy idx < 0 albo idx >= dim*dim; (int)NaN / (int)Inf = int.MinValue
+                int ix = (int)(pos.x / cx), iy = (int)(pos.y / cy);
+                long idx = (long)iy * dim + ix;
+                if (idx >= 0 && idx < (long)dim * dim) return true;
                 __result = MapWeatherModel.WeatherEvent.Clear;
+                if (_probe) { _probeHits++; return false; }
                 Interlocked.Increment(ref _dWeather);
                 Interlocked.Increment(ref _sWeather);
                 var mp = MapRoads.CurrentWriter;
@@ -221,14 +236,17 @@ namespace Armoury
                 {
                     Interlocked.Decrement(ref _queued);
                     if (h.Party == null) { scan = true; continue; }
-                    if (!seen.Add(h.Party)) continue;
+                    if (!h.Party.IsActive || !seen.Add(h.Party)) continue;
                     string fix = Ok(h.Party) ? "pozycja juz poprawna (gra sama ja ustawila)" : Repair(h.Party);
                     if (!fix.StartsWith("pozycja juz", StringComparison.Ordinal)) _dQueueFixed++;
                     Note(h.Party);
                     Say("potkniecie 334c pogoda", h.Party, new Vec2(h.X, h.Y), fix);
                 }
-                if (scan)
+                double nowH = -1;
+                try { nowH = CampaignTime.Now.ToHours; } catch { }
+                if (scan && nowH - _lastUnknownScanH >= 1.0)
                 {
+                    _lastUnknownScanH = nowH;
                     int n = ScanAll("potkniecie 334c pogoda (partia nieznana)");
                     if (n == 0) Say("potkniecie 334c pogoda (partia nieznana)", null, new Vec2(float.NaN, float.NaN), "przeglad partii: zadnej z pozycja NaN (pozycja spoza partii - np. model wolany wprost)");
                 }
@@ -240,19 +258,41 @@ namespace Armoury
 
         public struct EndPair { public Vec2 Own, Lead; public bool Attached; }
 
-        public static void FinishPrefix(MobileParty __instance, out EndPair __state)
+        /// <summary>Prefiks MobileParty.FinishNavigationTransitionInternal (po recenzji 334c, naprawa przed gra): gdy gra wzielaby zly koniec przejscia (partia poza
+        /// osada, koniec Invalid) - partia bez wodza: przejscie anulowane i metoda gry pominieta (false); przypiety w armii: koniec przejscia wodza = pozycja wodza.
+        /// Nie rzuca; przy bledzie gra dziala jak dotad (postfiks naprawia).</summary>
+        public static bool FinishPrefix(MobileParty __instance, out EndPair __state)
         {
             __state = default(EndPair);
             try
             {
                 var mp = __instance;
-                if (mp == null) return;
+                if (mp == null) return true;
                 __state.Own = mp.EndPositionForNavigationTransition.ToVec2();
                 __state.Attached = mp.AttachedTo != null;
                 var a = mp.Army;
-                __state.Lead = a != null && a.LeaderParty != null ? a.LeaderParty.EndPositionForNavigationTransition.ToVec2() : new Vec2(float.NaN, float.NaN);
+                var lp = a != null ? a.LeaderParty : null;
+                __state.Lead = lp != null ? lp.EndPositionForNavigationTransition.ToVec2() : new Vec2(float.NaN, float.NaN);
+                if (!On || mp.CurrentSettlement != null) return true;
+                if (a != null && mp.AttachedTo != null)
+                {
+                    // gra wezmie koniec przejscia wodza (Army.LeaderParty); wodz konczy swoje przejscie przed przypietymi - jego pozycja juz ustawiona
+                    if (lp == null || lp.EndPositionForNavigationTransition.IsValid() || !Ok(lp) || _mSetEnd == null) return true;
+                    _mSetEnd.Invoke(lp, new object[] { lp.Position });
+                    _dPreLead++;
+                    Note(mp);
+                    Say("koniec przejscia wodza poprawiony", mp, lp.Position.ToVec2(), "przypiety dostanie pozycje wodza " + Nm(lp) + " (koniec przejscia wodza byl Invalid)");
+                    return true;
+                }
+                if (mp.EndPositionForNavigationTransition.IsValid() || !Ok(mp)) return true;
+                // koniec Invalid poza osada (wyjscie z osady w trakcie przejscia): przejscie anulowane, partia zostaje na swojej pozycji i w swoim stanie lad/morze
+                mp.CancelNavigationTransition();
+                _dPreSkip++;
+                Note(mp);
+                Say("przejscie bez konca anulowane", mp, mp.Position.ToVec2(), "metoda gry pominieta, partia zostaje na swojej pozycji (morze " + (mp.IsCurrentlyAtSea ? "TAK" : "NIE") + ")");
+                return false;
             }
-            catch { }
+            catch (Exception e) { Stumble("FinishPrefix", e); return true; }
         }
 
         /// <summary>Postfiks MobileParty.FinishNavigationTransitionInternal: pozycja NaN po przejsciu -> naprawa. Przypiety z wodzem bez pozycji - czeka na postfiks wodza
@@ -293,8 +333,8 @@ namespace Armoury
                 string how;
                 if (lead != null && Ok(lead))
                 {
+                    mp.Position = lead.Position;   // po recenzji 334c: najpierw pozycja - setter IsCurrentlyAtSea odpala zdarzenie gry
                     if (mp.IsCurrentlyAtSea != lead.IsCurrentlyAtSea) mp.IsCurrentlyAtSea = lead.IsCurrentlyAtSea;
-                    mp.Position = lead.Position;
                     how = "pozycja wodza " + Nm(lead) + " " + V(lead.Position.ToVec2()) + (lead.IsCurrentlyAtSea ? " (morze)" : "");
                 }
                 else
@@ -310,9 +350,19 @@ namespace Armoury
                     if (st == null) { st = FirstFort(mp.MapFaction); kind = "brama pierwszej twierdzy frakcji"; }
                     if (st == null) { st = FirstFort(null); kind = "brama pierwszego miasta"; }
                     if (st == null) return "BRAK celu naprawy (brak osad)";
-                    if (mp.IsCurrentlyAtSea) mp.IsCurrentlyAtSea = false;
                     mp.Position = st.GatePosition;
+                    if (mp.IsCurrentlyAtSea) mp.IsCurrentlyAtSea = false;
                     how = kind + " " + Nm(st) + " " + V(st.GatePosition.ToVec2());
+                    // po recenzji 334c: flota bez kotwicy (gra zresetowala ja przy wejsciu na statki) - kotwica w porcie osady albo przy bramie
+                    try
+                    {
+                        if (mp.Ships != null && mp.Ships.Count > 0 && mp.Anchor != null && !mp.Anchor.IsValid)
+                        {
+                            if (st.HasPort) mp.Anchor.SetSettlement(st); else mp.Anchor.SetPosition(mp.Position);
+                            how += ", kotwica " + (st.HasPort ? "w porcie" : "przy bramie");
+                        }
+                    }
+                    catch (Exception e) { Stumble("Repair.anchor", e); }
                 }
                 // przypieci (wodz naprawiany po swoich przypietych - FinishPostfix ich odlozyl)
                 try
@@ -324,13 +374,23 @@ namespace Armoury
                             var a = ap[i];
                             if (a == null || Ok(a)) continue;
                             if (a.IsTransitionInProgress) a.CancelNavigationTransition();
-                            if (a.IsCurrentlyAtSea != mp.IsCurrentlyAtSea) a.IsCurrentlyAtSea = mp.IsCurrentlyAtSea;
                             a.Position = mp.Position;
+                            if (a.IsCurrentlyAtSea != mp.IsCurrentlyAtSea) a.IsCurrentlyAtSea = mp.IsCurrentlyAtSea;
                             _dNanFixed++;
                             how += ", przypiety " + Nm(a) + " razem";
                         }
                 }
                 catch (Exception e) { Stumble("Repair.attached", e); }
+                // po recenzji 334c: sciezka liczona od NaN (ComputePath w Finish) - nowa od poprawnej pozycji
+                try
+                {
+                    if (_mComputePath != null && mp.MoveTargetPoint.IsValid())
+                    {
+                        _mComputePath.Invoke(mp, new object[] { mp.MoveTargetPoint, mp.NavigationCapability, true });
+                        how += ", nowa sciezka";
+                    }
+                }
+                catch (Exception e) { Stumble("Repair.path", e); }
                 return how;
             }
             catch (Exception e) { Stumble("Repair", e); return "BLAD naprawy (" + e.GetType().Name + ")"; }
@@ -417,6 +477,41 @@ namespace Armoury
             catch { return null; }
         }
 
+        private static Settlement KingsLanding()
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("ROT.Misc.ROTSettlements");
+                var pi = t != null ? AccessTools.Property(t, "KingsLanding") : null;
+                return pi != null ? pi.GetValue(null, null) as Settlement : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Druzyna lorda, u ktorego gracz sluzy w ROT (ROT przenosi wtedy tez MainParty); null - gracz nie sluzy albo brak pol ROT.</summary>
+        private static MobileParty EnlistedLordParty()
+        {
+            try
+            {
+                var sub = AccessTools.TypeByName("ROT.SubModule");
+                var fb = sub != null ? AccessTools.Field(sub, "EnlistmentBehavior") : null;
+                var beh = fb != null ? fb.GetValue(null) : null;
+                if (beh == null) return null;
+                var fi = AccessTools.Field(beh.GetType(), "IsEnlisted");
+                var fh = AccessTools.Field(beh.GetType(), "EnlistedHero");
+                if (fi == null || fh == null || !(fi.GetValue(beh) is bool b) || !b) return null;
+                var h = fh.GetValue(beh) as Hero;
+                return h != null ? h.PartyBelongedTo : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Ten sam filtr, ktorym ROT SetupSiegeAttackers wybiera partie Smoczej Skaly do przeniesienia.</summary>
+        private static bool RotMoves(MobileParty mp, MobileParty siegeLeader)
+        {
+            return mp != null && !mp.IsMainParty && mp != siegeLeader && mp.IsActive && mp.IsLordParty && mp.LeaderHero != null && mp.MapEvent == null && mp.SiegeEvent == null;
+        }
+
         private static bool CancelIf(MobileParty mp, List<string> names)
         {
             if (mp == null || !mp.IsTransitionInProgress) return false;
@@ -435,25 +530,34 @@ namespace Armoury
                 int n = 0, seen = 0;
                 var stannis = RotLord("StannisBaratheon");
                 var sp = stannis != null ? stannis.PartyBelongedTo : null;
-                if (CancelIf(sp, names)) n++;
+                var kl = KingsLanding();
+                // po recenzji 334c: warunek ROT (flag) - Stannis juz oblega Krolewska Przystan -> ROT nikogo nie przenosi, nic nie anulujemy
+                bool moves = sp != null && (sp.SiegeEvent == null || kl == null || sp.SiegeEvent != kl.SiegeEvent);
                 var k = Dragonstone();
-                if (k != null)
-                    foreach (var cl in k.Clans)
-                    {
-                        if (cl == null || cl.WarPartyComponents == null) continue;
-                        foreach (var wp in cl.WarPartyComponents)
+                var enl = EnlistedLordParty();
+                if (moves)
+                {
+                    if (CancelIf(sp, names)) n++;
+                    if (k != null)
+                        foreach (var cl in k.Clans)
                         {
-                            var mp = wp != null ? wp.MobileParty : null;
-                            if (mp == null || mp == sp) continue;
-                            seen++;
-                            if (CancelIf(mp, names)) n++;
+                            if (cl == null || cl.WarPartyComponents == null) continue;
+                            foreach (var wp in cl.WarPartyComponents)
+                            {
+                                var mp = wp != null ? wp.MobileParty : null;
+                                if (!RotMoves(mp, sp)) continue;   // ten sam filtr co ROT - partii, ktorych ROT nie przenosi, nie ruszamy
+                                seen++;
+                                if (CancelIf(mp, names)) n++;
+                                if (enl != null && mp == enl && CancelIf(MobileParty.MainParty, names)) n++;   // gracz w sluzbie - ROT przenosi tez MainParty
+                            }
                         }
-                    }
+                }
                 _dBwPre += n;
                 var s = Settings.Current;
                 if (s != null && s.LogEnabled)
                     Log.Info(P + "Blackwater (334c): anulowane przejscia przed teleportem " + n + (names.Count > 0 ? " (partie " + string.Join(", ", names.ToArray()) + ")" : "")
-                             + " | dzien " + Today + " | Stannis " + (sp != null ? Nm(sp) : "bez druzyny") + ", partii Smoczej Skaly " + seen + (k == null ? " (brak krolestwa dragonstone)" : "") + ".");
+                             + " | dzien " + Today + " | Stannis " + (sp != null ? Nm(sp) : "bez druzyny") + (moves ? "" : " (juz oblega - ROT bez teleportu)") + ", partii Smoczej Skaly " + seen
+                             + (k == null ? " (brak krolestwa dragonstone)" : "") + ".");
             }
             catch (Exception e) { Stumble("BwSetupPrefix", e); }
         }
@@ -493,8 +597,16 @@ namespace Armoury
             if (!On || hero == null) return;
             try
             {
+                // po recenzji 334c: warunki ROT DefendSiegeTarget / CanDefendSiegeTarget - gdy ROT wyjdzie od razu, rejsu nie przerywamy
+                var kl = KingsLanding();
+                var cs = hero.CurrentSettlement;
+                var pb = hero.PartyBelongedTo;
+                if (cs != null && (cs == kl || cs.IsUnderRaid || cs.IsUnderSiege)) return;
+                if (hero.IsPrisoner || pb == null || pb.MapEvent != null || pb.LeaderHero != hero || !(hero.MapFaction is Kingdom)) return;
                 var names = new List<string>();
-                if (CancelIf(hero.PartyBelongedTo, names))
+                var enl = EnlistedLordParty();
+                if (enl != null && enl == pb && CancelIf(MobileParty.MainParty, names)) _dBwDefend++;
+                if (CancelIf(pb, names))
                 {
                     _dBwDefend++;
                     var s = Settings.Current;
@@ -504,12 +616,39 @@ namespace Armoury
             catch (Exception e) { Stumble("BwDefendPrefix", e); }
         }
 
+        // ================================================================ T7 (autotest): proba siatki bezpieczenstwa
+
+        /// <summary>T7 (watek glowny, raz): model pogody gry (NavalDLC -> Default) z pozycja NaN - bez wyjatku i z trafieniem prefiksu. Trafienia proby nie wchodza do
+        /// licznikow doby (B334-23) ani do kolejki. ok - brak wyjatku i 2 trafienia; opis do linii testu.</summary>
+        internal static bool Probe(out string detail)
+        {
+            detail = "";
+            if (!On) { detail = "klucz NIE"; return false; }
+            if (!_gridOk) { detail = "siatka BRAK"; return false; }
+            int before = _probeHits;
+            string err = null;
+            _probe = true;
+            try
+            {
+                var m = Campaign.Current.Models.MapWeatherModel;
+                var nan = new Vec2(float.NaN, float.NaN);
+                m.GetWeatherEffectOnTerrainForPosition(nan);
+                m.GetWeatherEventInPosition(nan);
+            }
+            catch (Exception e) { err = e.GetType().Name; }
+            finally { _probe = false; }
+            int hits = _probeHits - before;
+            detail = "model " + Campaign.Current.Models.MapWeatherModel.GetType().Name + ", trafienia prefiksu " + hits + " z 2" + (err != null ? ", WYJATEK " + err : ", bez wyjatku");
+            return err == null && hits == 2;
+        }
+
         // ================================================================ linia doby
 
         private static void ZeroDay()
         {
             _dNanFinish = _dNanFixed = _dQueueFixed = _dScanFixed = _dDeferred = _dStumbles = 0;
             _dBwPre = _dBwPost = _dBwFixed = _dBwDefend = 0;
+            _dPreSkip = _dPreLead = 0;
             _dLines = 0;
             _dNames.Clear();
         }
@@ -533,6 +672,7 @@ namespace Armoury
                       .Append(", pogoda poza siatka ").Append(w).Append(" (bez partii ").Append(wu).Append(", naprawione z kolejki ").Append(_dQueueFixed).Append(')')
                       .Append(", przeglad NaN ").Append(scan)
                       .Append(" (partie: ").Append(_dNames.Count > 0 ? string.Join(", ", _dNames.ToArray()) : "-").Append(')')
+                      .Append(" | przed gra: przejscia bez konca anulowane ").Append(_dPreSkip).Append(", koniec wodza poprawiony ").Append(_dPreLead)
                       .Append(" | Blackwater: anulowane przed teleportem ").Append(_dBwPre).Append(", po ").Append(_dBwPost).Append(", obroncy ").Append(_dBwDefend).Append(", naprawione ").Append(_dBwFixed)
                       .Append(" | sesja: NaN ").Append(_sNan).Append(", pogoda ").Append(Volatile.Read(ref _sWeather)).Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(").");
                     Log.Info(sb.ToString());

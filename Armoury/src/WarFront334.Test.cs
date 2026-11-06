@@ -86,6 +86,10 @@ namespace Armoury
                           && WarFront334.StanceRule(5, 150, 100) == 2 && WarFront334.StanceRule(1, 300, 100) == 2 && WarFront334.StanceRule(5, 100, 0) == 2
                           && WarFront334.StanceRule(5, 400, 380) == 0;
                 Say("T6 regula postawy BK (334c)", t6, "7 przypadkow");
+                // T7 (po recenzji 334c): siatka bezpieczenstwa pogody naprawde dziala - model gry z pozycja NaN bez wyjatku (trafienia proby poza licznikami B334-23)
+                string d7;
+                bool t7 = NavGuard334.Probe(out d7);
+                Say("T7 pogoda poza siatka bez wyjatku (334c)", t7, d7);
                 // T5
                 if (!WarFront334.Canon) Log.Info(P + "T5 F334 policzone - kampania klasyczna - wynik POMINIETY.");
                 else

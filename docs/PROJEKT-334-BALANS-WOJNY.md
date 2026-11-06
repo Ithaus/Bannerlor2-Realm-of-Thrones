@@ -325,3 +325,22 @@ Zelaznych sprawdzają dalej B334-11 (armie ≥ 30% dób), B334-12 (oblężenia o
 - **Więcej rejsów:** po zmianie postawy na morzu będzie więcej ruchu. Strażnik pozycji obejmuje każdy koniec przejścia.
 - **Kampania Jeffa:** poprawkę Blackwater trzeba wgrać przed startem Blackwater w kampanii Jeffa, niezależnie od losów balansu.
 - **Test:** ta sama kopia zapisu, do doby ≥ 79. Szukać linii `Blackwater (334c): anulowane przejscia przed teleportem N`; N > 0 potwierdza hipotezę wprost.
+
+### H7. Poprawki po recenzjach 334c (ten sam klucz, bez nowych kluczy)
+**Recenzja logiki W1 i W2 nie dotyczy czynnego SCA.** Recenzja czytała `StrategicCampaignAI.dll` (stary plik, który leży w tym samym `bin` modułu, ale `SubModule.xml` ładuje `StrategicCampaignAI145.dll`). W SCA145 (świeża dekompilacja ilspycmd, `scratchpad/rec334d/sca145.cs`) `AssignArmyRoles` i `TryRunAssignedArmyRole` nie są nigdzie wołane: `OnHourlyTick` co 4 h liczy tylko status, cel, `TryRetreatFromBadSiege` i `TryReinforceFragileGarrison`, a `OnDailyTick` status, cel i licznik dób na ziemi wroga. SCA145 nie przejmuje więc ruchu armii (żadnego `NavigationType 1` dla armii Wysp poza odwrotem z przegranego oblężenia), a cel `DefendCapitalRegion` nie zmienia punktacji oblężeń (`StrategicTargetScoreModel` tłumi tylko `IsExhausted` ×0,55 i `WantsPeace`/`ForcePeace` ×0,35). Zdanie z H2 o armiach Wysp zostaje.
+
+**W3 (furtki `IsExhausted`):** linia SCA 334 pokazuje na królestwo „furtki wyczerpania: sila TAK|nie, twierdze T/O TAK|nie, wsie N TAK|nie” (warunek SCA145: wojny > 0 i (wróg > swoi × 1,35 albo zagrożone ≥ twierdze/3 albo wsie ≥ 3)). Reguły furtek nie zmieniamy, dopóki test nie pokaże, która działa.
+
+**W4:** świadoma asymetria (opis przy `ScaOwn`): swoi = cała siła koalicji, wróg = F334.
+
+**Strażnik pozycji (recenzja techniczna):**
+- warunek siatki pogody dokładnie jak w grze (`idx = (int)(y/c)*dim + (int)(x/c)`, poza tablicą tylko `idx < 0` albo `idx >= dim²`) – bez fałszywych alarmów na krawędzi; przegląd wszystkich partii po trafieniu bez partii najwyżej raz na godzinę gry; kolejka pomija partie nieaktywne;
+- **naprawa przed grą:** prefiks `FinishNavigationTransitionInternal` – partia poza osadą z końcem przejścia Invalid i bez wodza: przejście anulowane, metoda gry pominięta (partia zostaje na swojej poprawnej pozycji i w swoim stanie ląd/morze), więc `ComputePath`, zdarzenie stanu nawigacji i kotwica nie widzą NaN; przypięty w armii: koniec przejścia wodza = pozycja wodza. Postfiks zostaje jako zapas: najpierw `Position`, potem `IsCurrentlyAtSea`, kotwica floty przy bramie (port osady albo pozycja), nowa ścieżka `ComputePath`. Linia doby: „przed gra: przejscia bez konca anulowane N, koniec wodza poprawiony M”;
+- Blackwater: anulowanie tylko dla partii, które ROT naprawdę przenosi (ten sam filtr co ROT; nic, gdy Stannis już oblega King's Landing), gracz w służbie u przenoszonego lorda – też `MainParty`; `DefendSiegeTarget` – warunki ROT (już w KP, osada oblegana/rabowana, `MapEvent`, nie wódz, niewola);
+- **T7 (autotest):** model pogody gry (NavalDLC → Default) z pozycją NaN – bez wyjątku i 2 trafienia prefiksu; trafienia próby nie wchodzą do liczników (B334-23).
+
+**Postawa:** reguła liczona w `float` jak BK; linia postawy mówi „strony 274: brak”, gdy strony 274 jeszcze nie zbudowane; bez wywołania przy starcie sesji (nic nie robiło – `GameStarted` false; BK `TickKingdoms` i tak liczy po wczytaniu). Histerezy progu 1,5 nie dodajemy – BK ma ten sam próg bez histerezy, a reguła ma być regułą BK.
+
+**Narzędzie:** B334-23 w session liczy bloki błędu CrashScribe z `IndexOutOfRangeException` **i** `GetWeatherEventInPosition` w stosie (obcy wyjątek nie daje NIE; log 334b: 1 blok); B334-26 nie liczy „BK bez zmian” jako „korona obronna wbrew regule”. Synteza: 4 przypadki session i bieg „korona BK bez zmian”.
+
+**Pominięte:** histereza postawy (kosmetyka, poza BK); suma `ScaOwn` raz na przebieg (koszt mały – ocena co 4 h); odwrót SCA145 z przegranego oblężenia lądem (`TryRetreatFromBadSiege`, `NavigationType 1`) dla armii Wysp – do obejrzenia, jeśli test pokaże utknięte armie Wysp po odwrocie.

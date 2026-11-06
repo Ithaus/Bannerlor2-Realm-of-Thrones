@@ -95467,7 +95467,36 @@ B334_POS = re.compile(r"Pozycje partii \(334c\): dzien (-?\d+) \| klucz (\S+), l
 B334_BW = re.compile(r"Pozycje partii \(334c\): Blackwater \(334c\): anulowane przejscia przed teleportem (\d+)(?: \(partie (.*?)\))? \| dzien (-?\d+)")
 B334_STANCE = re.compile(r"Balans wojny \(334\): postawa \(334c\) \| dzien (\d+) \| klucz (\S+), latka (.*?), przebiegow")
 B334_STANCE_K = re.compile(r"\| \[(\w+)\] [^|]*?: (?:BK (\w) -> (\w) [^|]*?|BK bez zmian), partii (\d+) obronnych (\d+) ofensywnych (\d+)")
-B334_SESS_WX = re.compile(r"IndexOutOfRangeException|GetWeatherEventInPosition")
+B334_SESS_WX = re.compile(r"IndexOutOfRangeException|GetWeatherEventInPosition")   # (stary wzor - zostaje do importu; liczenie: balans334_sess_wx)
+B334_SESS_HDR = re.compile(r"^#{20,}")
+
+
+def balans334_sess_wx(lines):
+    """334c po recenzji: wywrotki pogody w session-*.log = bloki bledu CrashScribe (naglowek ####), w ktorych TYPE to IndexOutOfRangeException I stos ma
+    GetWeatherEventInPosition. Wyjatek innego modu (sam IndexOutOfRange) nie liczy sie. Blok konczy sie na nastepnym naglowku albo po 60 liniach."""
+    n, blk, left = 0, None, 0
+    def close(b):
+        return 1 if b is not None and b[0] and b[1] else 0
+    for ln in lines:
+        if B334_SESS_HDR.match(ln):
+            if blk is not None and left > 0 and not (blk[0] or blk[1]):
+                continue   # druga linia ramki naglowka (#### / ERROR CAUGHT / ####) - ten sam blok
+            n += close(blk)
+            blk, left = [False, False], 60
+            continue
+        if blk is None:
+            continue
+        if left <= 0:
+            n += close(blk)
+            blk = None
+            continue
+        left -= 1
+        if "IndexOutOfRangeException" in ln:
+            blk[0] = True
+        if "GetWeatherEventInPosition" in ln:
+            blk[1] = True
+    n += close(blk)
+    return n
 B334_CTRL = re.compile(r"Balans wojny \(334\): kontrola \| dzien (\d+) \| zloto utworzone (\d+), ludzie utworzeni (\d+) .*\| potkniecia (\d+) \(sesja (\d+)\)\.")
 B334_TEST = re.compile(r"Balans wojny \(334\): test - (T\w+) .*- wynik (TAK|NIE|POMINIETY)\.")
 B334_ERR = re.compile(r"ERROR in (?:WarFront334\.|NavGuard334\.|ScaNoBandits320\.(?:PeaceLocked\.334|CalcPostfix\.Front334|CalcPostfix\.Own334c)|CanonWarBalance\.(?:Hire334|BuildMap\.homeGuard334))")   # po recenzji 334: tez potkniecia 334 logowane w 320 / 274
@@ -95748,7 +95777,9 @@ def balans334_rows(rep, D):
         d0 = stc[0][0]
         stc = [x for x in stc if x[0] >= d0 + 1] or stc
         ird = [f"d{x[0]} {x[3]['sturgia'][3]}/{x[3]['sturgia'][2]}" for x in stc if "sturgia" in x[3] and x[3]["sturgia"][3] > 0]
-        crd = [f"d{x[0]} {x[3]['vlandia'][3]}/{x[3]['vlandia'][2]}" for x in stc if "vlandia" in x[3] and x[3]["vlandia"][1] != "D" and x[3]["vlandia"][3] > 0]
+        # po recenzji 334c: "BK bez zmian" (x[1] None) to nie nasza regula - nie liczy sie jako "obronna wbrew regule"
+        crd = [f"d{x[0]} {x[3]['vlandia'][3]}/{x[3]['vlandia'][2]}" for x in stc
+               if "vlandia" in x[3] and x[3]["vlandia"][1] is not None and x[3]["vlandia"][1] != "D" and x[3]["vlandia"][3] > 0]
         rep.add("B334-26: postawa - Wyspy bez partii obronnych, korona obronna tylko z reguly koalicji", f"dob {len(stc)}, Wyspy obronne {len(ird)}" + (f" [{', '.join(ird[:3])}]" if ird else "")
                 + f", korona obronne wbrew regule {len(crd)}" + (f" [{', '.join(crd[:3])}]" if crd else ""), "0 / 0", not ird and not crd)
     else:
@@ -95822,6 +95853,7 @@ def balans334_synth():
         "nanout": run(nan=1),
         "nanbw": [start] + [x for d in range(1000, 1062) for x in day(d, nan=1 if d == 1030 else 0)] + ["Pozycje partii (334c): Blackwater (334c): anulowane przejscia przed teleportem 3 (partie a, b, c) | dzien 1030 | Stannis x, partii Smoczej Skaly 9."],
         "stance": run(idef=50),
+        "stancebk": [x.replace("[vlandia] House Baratheon: BK D -> N (koalicja, sila 38000 / wrog 40000, twierdz 19)", "[vlandia] House Baratheon: BK bez zmian") for x in run(cdef=5)],
         "truce1": run() + [P + f"rozejm uzbrojony | dzien {d} | klucz TAK | rody korony z lennem w budzecie wojny 17 z 17 | partie korony dzis {29 if d == 1021 else 60} vs przed rozejmem 61 (d.1019, x), ludzie 1 vs 1."
                            for d in range(1020, 1026)],
         "trucegap": [start] + [x for d in list(range(1000, 1020)) + list(range(1040, 1062)) for x in day(d, siege274=0)]
@@ -95853,6 +95885,7 @@ def balans334_synth():
         "nanout": {"B334-24": "NIE", "B334-23": "TAK"},
         "nanbw": {"B334-24": "TAK"},
         "stance": {"B334-26": "NIE"},
+        "stancebk": {"B334-26": "TAK"},
         "truce1": {"B334-17": "TAK"},
         "trucegap": {"B334-7": "INFO"},
         "startold": {"B334-1": "TAK"},
@@ -95869,6 +95902,15 @@ def balans334_synth():
             diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    # 334c po recenzji: liczenie blokow session (wywrotka pogody tak, obcy IndexOutOfRange nie)
+    hdr = ["", "#" * 69, "# ERROR CAUGHT FURTHER UP   2026-11-06 15:37:43", "#" * 69, "WHERE   : FirstChanceException"]
+    wxb = hdr + ["TYPE    : System.IndexOutOfRangeException", "--- STACK ---",
+                 "  [Native ] TaleWorlds.CampaignSystem.GameComponents.DefaultMapWeatherModel.GetWeatherEventInPosition(Vec2)   IL+0x0000"]
+    other = hdr + ["TYPE    : System.IndexOutOfRangeException", "--- STACK ---", "  [SomeMod ] SomeMod.Foo.Bar()   IL+0x0010"]
+    for name, lines, want in (("sess-wx", wxb, 1), ("sess-obcy", other, 0), ("sess-oba", other + ["x"] * 3 + wxb + wxb, 2), ("sess-pusty", ["a", "b"], 0)):
+        got = balans334_sess_wx(lines)
+        if got != want:
+            diff.append(f"{name} B334-23 session: {got} (oczekiwane {want})")
     return "; ".join(diff) if diff else None
 
 
@@ -95888,7 +95930,7 @@ def balans334_main(logp, sessp=None):
     if sessp and os.path.isfile(sessp):
         # 334c (B334-23): wywrotka pogody w logu CrashScribe (session-*.log) - poza logiem Armoury
         with open(sessp, encoding="utf-8", errors="replace") as fh:
-            D["sess_wx"] = sum(1 for ln in fh if B334_SESS_WX.search(ln))
+            D["sess_wx"] = balans334_sess_wx(fh)
     print(f"plik: {logp} | linii frontu {len(D['front'])}, Zelazni {len(D['iron'])}, korona {len(D['crown'])}, najmow {len(D['hire'])}, testow {len(D['tests'])}, pozycji 334c {len(D['pos'])}"
           + ("" if not sessp else f", session {sessp}"))
     balans334_rows(rep, D)

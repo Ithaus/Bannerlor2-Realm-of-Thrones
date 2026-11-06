@@ -39,9 +39,11 @@ namespace Armoury
         /// <summary>Czysta regula BK (autotest): 0 Neutral, 1 Defensive, 2 Aggressive. fiefs - twierdze krolestwa; own / enemy - sila wlasna i wroga.</summary>
         internal static int StanceRule(int fiefs, double own, double enemy)
         {
+            // po recenzji 334c: BK liczy w float - ta sama arytmetyka, zeby wynik na samym progu 1.5 byl jak w BK
+            float o = (float)own, e = (float)enemy;
             int r = 0;
-            if (fiefs == 1 || enemy >= own * 1.5) r = 1;
-            if (own >= enemy * 1.5) r = 2;
+            if (fiefs == 1 || e >= o * 1.5f) r = 1;
+            if (o >= e * 1.5f) r = 2;
             return r;
         }
 
@@ -140,6 +142,8 @@ namespace Armoury
             var sb = new StringBuilder(800);
             sb.Append(Tag).Append("postawa (334c) | dzien ").Append(today).Append(" | klucz ").Append(Key01(StanceOn)).Append(", latka ").Append(_wStance)
               .Append(", przebiegow ").Append(_dStanceRuns).Append(", partii przestawionych ").Append(_dStanceSet);
+            // po recenzji 334c: strony 274 jeszcze nie zbudowane (klucz 274 NIE albo przed pierwsza doba) - korona i Polnoc maja sam wynik BK
+            try { var nk = FindKingdom(NorthId); if (nk != null && CanonWarBalance.SideOf(nk) == 0) sb.Append(", strony 274: brak (korona i Polnoc - postawa BK)"); } catch { }
             string[] ids = { NorthId, CrownId, ReachId, IronId, DragonstoneId };
             foreach (var id in ids)
             {
