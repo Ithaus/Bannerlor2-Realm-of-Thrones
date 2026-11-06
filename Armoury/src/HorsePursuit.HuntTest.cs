@@ -184,7 +184,7 @@ namespace Armoury
         {
             if (a == null) return false;
             var r = Volatile.Read(ref _tRun);
-            return r != null && ReferenceEquals(r, a);
+            return (r != null && ReferenceEquals(r, a)) || HeroCaution.HunterAnyThread(a);   // 335: lowca testu ochrony wodza - ta sama zasada (bez capu marszu i oddechu)
         }
 
         /// <summary>Segment linii bitwy 204.</summary>

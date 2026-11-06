@@ -1752,6 +1752,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool HeroesKeepBehindTheirMen { get; set; } = true;
 
+        [SettingPropertyBool("Commanders Keep Command Post", HintText = "With Heroes Keep Behind Their Men: an AI commander - the general of a side or the captain of a formation - is guarded like a real commander. Without a mounted escort (fewer than 10 riders in his formation) he no longer rides about on his own: he takes post just behind his main battle line, as the game's own general does, and moves with it. With a mounted escort he stays with his riders. The moment an enemy comes for him - a man within 10 m or a rider within 20 m, more of them than his own men at his side - he falls back into his nearest formation, and the nearest of his men (about one in ten of those within 80 m, at least 3, at most 20) run to cover him until the danger is past. The head of a house, a ruler and an heir are covered the same way when they come under attack. Your side, when you lead it, is untouched. Off = heroes behave as before (Heroes Keep Behind Their Men only)", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool CommandersKeepCommandPost { get; set; } = true;
+
         [SettingPropertyBool("Commander Tactics", HintText = "in field battles an AI army fights by its commander's Tactics skill, not only by its culture as RBM sets it: below 30 a mob that just charges, from 60 cavalry charges at the front and defenders may form a ring or hold a choke point, from 150 a side of 150 men or more also tries to outflank with its infantry. Your own team's AI is left as it is. Off = RBM's culture tactics only, as before", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool CommanderTactics { get; set; } = true;
@@ -1811,6 +1815,10 @@ namespace Armoury
         [SettingPropertyBool("Hunt Harasser In Autotest", HintText = "FOR THE AUTOTEST ONLY: in a strong-party battle of the CrashScribe automatic test one AI horse archer of your side rides up to 10 m from the enemy infantry, shoots at them and flees to your lines when their horsemen come for him, so the test can see whether the enemy cavalry rides him down (Riders Run Down Shooters). In a normal game it does nothing", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool HuntHarasserInAutotest { get; set; } = true;
+
+        [SettingPropertyBool("Commander Hunt In Autotest", HintText = "FOR THE AUTOTEST ONLY: in a weak-party battle of the CrashScribe automatic test one AI soldier of your side (a rider if there is one) goes straight for the enemy general, so the test can see whether the general falls back to his men and they come to cover him (Commanders Keep Command Post). In a normal game it does nothing", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool CommanderHuntInAutotest { get; set; } = true;
 
         [SettingPropertyBool("Riders Break Off Near Shooters Army", HintText = "with Riders Run Down Shooters: AI horsemen chase a horse archer with their heads. Around every whole formation of his own side there is a danger zone - 50 m beyond his infantry, 0.8 of their bow range (60-120 m) beyond his archers, 60 m beyond his cavalry. Close to that zone (within 30 m) they only send a small detachment, and only when their cavalry is well clear of the zone; within 10 m of it nobody goes. They never ride for a point inside it, and when he leads them to within 10 m of it the whole group turns back together - and stays turned: they chase him again only after a minute (two minutes after the second time, four after that), once he is a full 100 m clear of his army for 3 seconds, and a shooter who has led them on twice gets only a small detachment from then on. The same holds for a shooter on foot. If he follows the riders as they go back and gets 40 m clear of his army, 3 to 5 of the rearmost (about an eighth of the formation, at most a third) turn on him as a rear guard while the rest ride on; the rear guard gives up when he gets back within 20 m of his army or after 40 seconds and does not try again for 30 seconds. Off = riders turn back only 15 m from his infantry, each on his own, as before", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
@@ -11104,6 +11112,10 @@ namespace Armoury
         [SettingPropertyGroup("AI readiness before battle (25.10)")]
         public bool LordsJoinNearArmy { get; set; } = true;
 
+        [SettingPropertyBool("Lords Defend Threatened Lord", HintText = "When an enemy stronger than an AI lord comes for him - you, an enemy lord or an army - the lords of his realm who can reach him within a short march (Dr Max March Hours) and see him in danger stand by him instead of scattering: if together they are at least as strong as the attacker and his friends close by, they turn on the attacker together, and the threatened lord rides to the nearest of them rather than running off alone. The ruler, heirs, heads of houses, the famous lords and army leaders are looked after from farther away. If even all of them together are weaker, they keep away as before. Your clan is untouched. Off = every party decides on its own, as the game does", RequireRestart = false)]
+        [SettingPropertyGroup("AI readiness before battle (25.10)")]
+        public bool LordsDefendThreatenedLord { get; set; } = true;
+
         [SettingPropertyBool("Player Arms As Firm", HintText = "your workshop's weapon and armour lines that take iron, wood or hides work as a real business, by the same rule as a notable's: the shop buys the iron, wood, leather and linen from the town's market out of its till, pays its hands, and the town buys each finished piece - the profit stays in the till and is paid out to you as workshop income. Lines with no input stay idle. Off = as before: the game makes those weapons from the town's iron for free and your workshop earns nothing on them", RequireRestart = false)]
         [SettingPropertyGroup("Your workshops (305b)")]
         public bool PlayerArmsAsFirm { get; set; } = true;
@@ -11849,6 +11861,7 @@ namespace Armoury
             s.WoundedFightWarily = WoundedFightWarily;
             s.RoutedMenNeverRally = RoutedMenNeverRally;
             s.HeroesKeepBehindTheirMen = HeroesKeepBehindTheirMen;
+            s.CommandersKeepCommandPost = CommandersKeepCommandPost;
             s.CommanderTactics = CommanderTactics;
             s.VeteransByTier = VeteransByTier;
             s.AutoParryFullDiff = AutoParryFullDiff;
@@ -11864,6 +11877,7 @@ namespace Armoury
             s.RidersShieldsUpUnderFire = RidersShieldsUpUnderFire;
             s.RidersRunDownShooters = RidersRunDownShooters;
             s.HuntHarasserInAutotest = HuntHarasserInAutotest;
+            s.CommanderHuntInAutotest = CommanderHuntInAutotest;
             s.RidersBreakOffNearShootersArmy = RidersBreakOffNearShootersArmy;
             s.FormationsSteadyBeforeContact = FormationsSteadyBeforeContact;
             s.FormationsAnswerHarassers = FormationsAnswerHarassers;
@@ -14187,6 +14201,7 @@ namespace Armoury
             s.LordsAvoidDanger = LordsAvoidDanger;
             s.LordEscortFromGarrison = LordEscortFromGarrison;
             s.LordsJoinNearArmy = LordsJoinNearArmy;
+            s.LordsDefendThreatenedLord = LordsDefendThreatenedLord;
             s.PlayerArmsAsFirm = PlayerArmsAsFirm;
             s.WorkshopRetoolSettlesCapital = WorkshopRetoolSettlesCapital;
             s.WorkshopTradeBuyerMemory = WorkshopTradeBuyerMemory;
