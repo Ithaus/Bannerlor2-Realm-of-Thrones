@@ -78,10 +78,10 @@ namespace Armoury
         // recenzja 204: UMelee - wrog inny niz strzelec w RaiseNear (bron sie sam), UIntact - jezdziec w CounterFootGap od nietknietego szyku strony strzelca
         // (bez wjazdu w jego szyk, jak OIntact 148), UNoCheck - lucznicy bez sprawdzenia swoich przy strzelcu (limit zapytan) - cel zdjety
         private const int UGone = 0, UPanic = 1, UHorse = 2, ULeash = 3, URetreat = 4, UPlayer = 5, UKey = 6, UEnded = 7, UOther = 8, UThreat = 9, URange = 10, UFriend = 11,
-                          UMelee = 12, UIntact = 13, UNoCheck = 14, UTrim = 15, UTime = 16, UKinds = 17;   // UTrim - recenzja 204 (2): nadwyzka po obnizeniu poziomu; UTime - 283: piechota 60 s
+                          UMelee = 12, UIntact = 13, UNoCheck = 14, UTrim = 15, UTime = 16, UZone = 17, UKinds = 18;   // UTrim - recenzja 204 (2): nadwyzka po obnizeniu poziomu; UTime - 283: piechota 60 s
         // nie wyslani (rozni ludzie)
         private const int NwMelee = 0, NwPanic = 1, NwChase = 2, NwHero = 3, NwBanner = 4, NwHorse = 5, NwFar = 6, NwPlayer = 7, NwLosing = 8, NwBusy = 9, NwCool = 10,
-                          NwQuery = 11, NwOther = 12, NwIntact = 13, NwKinds = 14;
+                          NwQuery = 11, NwOther = 12, NwIntact = 13, NwZone = 14, NwKinds = 15;   // 333: UZone / NwZone - strefa armii strzelca (HorsePursuit.Bait333.cs)
         private static readonly string[] LName = { "-", "oddzial", "szyk", "cala jazda" };
 
         private sealed class Threat
@@ -105,6 +105,10 @@ namespace Armoury
             public Formation VicF, LeaderF;
             public float LastHarm = -1f;   // 311a: ostatnie trafienie czlowieka strony pociskiem (zegar epizodu oslony)
             public CovEp Cov;              // 311a: epizod oslony (null - brak)
+            public bool Z333;              // 333: brama strefy armii strzelca dziala (konny strzelec, klucz)
+            public Formation ZEx;          // 333: szyk samego strzelca (poza strefa)
+            public float Gap333 = float.MaxValue;   // 333: odleglosc strzelca od strefy swojej armii (ostatni pass)
+            public int EpBreaks;           // 333: zerwan w biezacym poscigu calosci (oczekiwane najwyzej 1)
         }
 
         private sealed class Hunter
@@ -128,6 +132,7 @@ namespace Armoury
             public int CovBlind;                  // 311a: kontroli z rzedu bez linii u stojacego obchodzacego
             public float Leash;                   // 311a: smycz szturmujacego (0 - InfRearm jak R2)
             public float CovAt;                   // 311a (recenzja 4): chwila wyslania obchodzacego na punkt (limit drogi CovMoveMax)
+            public bool Guard;                    // 333: tylna straz (stan ZERWANY - HorsePursuit.Bait333.cs)
         }
 
         private struct FI
@@ -242,6 +247,7 @@ namespace Armoury
             Interlocked.Exchange(ref _hBlows, 0); Interlocked.Exchange(ref _hFFMissile, 0); Interlocked.Exchange(ref _hFFMelee, 0);
             ReactClear();   // 283
             CoverClear();   // 311a
+            Bait333Clear(); // 333
             HuntTestClear();
         }
 
@@ -582,6 +588,7 @@ namespace Armoury
                 _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
                 _rMarchOn = _rKey && c.ArmyMarchesPastHarassers;             // 291
                 CoverKeys(c);                                                // 311a
+                _zOn = _hKey && c.RidersBreakOffNearShootersArmy;           // 333: poscig z glowa (strefa armii strzelca)
                 Volatile.Write(ref _rLive, _rKey ? 1 : 0);                   // OnHit: kolejka wrecz tylko po rozstawieniu (Tick wola pass po IsDeploymentFinished)
                 _hQPass = 0;
                 _hQChk = 0;
@@ -590,6 +597,7 @@ namespace Armoury
                 _hScan = 0;
                 _rRays = 0;
                 BuildHForms(m);
+                try { ZoneBuild(); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Strefa333", e); }   // 333
                 DrainBlows(m, now);
                 if (_rKey) DrainMelee(m, now);
                 HuntersPass(m, now);
@@ -797,6 +805,8 @@ namespace Armoury
             // 283: piechota tez nie wbiega w jego szyk
             bool rider = h.Role == RoleIntercept || h.Role == RoleCut;
             if (h.Role != RoleRanged && IntactNear(h.T.SSide, a.Position.AsVec2, CounterFootGap)) return UIntact;
+            // 333: jezdziec w strefie armii strzelca (jej szyk podszedl albo punkt poza siatka) - wraca sam
+            if (rider && _zOn && h.T.Z333 && ZoneGap(h.T.SSide, a.Position.AsVec2, h.T.ZEx) < 0f) { _zRiderIn++; return UZone; }
             // 305c (InfantryLeashLookahead): smycz piechoty takze w kroku sterowania (co 0.25 s), nie tylko w passie co 1 s
             if (!pass && _leashAhead && h.Role == RoleFoot && _rKey)
             {
@@ -922,7 +932,12 @@ namespace Armoury
             if (!_hKey && !rx) return;   // klucz NIE: tylko wykrycia (bez sterowania); 283 bez 204 - bez jazdy, reszta macierzy dziala
             int sent = 0, sentCharge = 0;
             HFormsTxt.Length = 0;
+            // 333: strefa armii strzelca - zerwanie calosci, pamiec przynety, tylna straz (HorsePursuit.Bait333.cs)
+            int bm = BFull;
+            try { bm = BaitGate(m, t, sp, now, mounted, rx); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Brama333", e); bm = BFull; }
             if (!_hKey) { }
+            else if (bm == BNone) { }
+            else if (bm == BGuard) GuardTake(m, t, fl, sp, now, ref sent, ref sentCharge);
             else if (t.Level <= 1)
             {
                 // najblizszy szyk konnicy AI bez szarzy (szarza wodza zostaje), w smyczy od strzelca
@@ -956,6 +971,7 @@ namespace Armoury
                     Take(m, t, fi, int.MaxValue, now, ref sent, ref sentCharge);
                 }
             }
+            if (bm == BFull) BaitFullSent(t, now, sent);   // 333
             int foot = 0, halted = 0;
             if (rx)
             {
@@ -1127,6 +1143,7 @@ namespace Armoury
             float mu;
             if (MeleeUntil.TryGetValue(a, out mu) && now < mu) return NwMelee;   // recenzja 204: zwarcie z ostatnich ShieldsUp.Window s - bez zapytania
             if (IntactNear(t.SSide, a.Position.AsVec2, CounterFootGap)) return NwIntact;   // recenzja 204: przy nietknietym szyku strony strzelca
+            if (_zOn && t.Z333 && ZoneGap(t.SSide, a.Position.AsVec2, t.ZEx) < ZClampGap) return NwZone;   // 333: kandydat przy strefie armii strzelca
             return -1;   // zapytanie o zwarcie w Take - tylko dla potrzebnych, najblizszych
         }
 
@@ -1521,6 +1538,7 @@ namespace Armoury
                     if (le > 0.1f) p = sp + e * (Math.Min(HuntScreen, d) / le);
                 }
             }
+            if (_zOn && t.Z333 && h.Role != RoleFoot) p = ZoneClamp(t, p);   // 333: punkt jezdzca nie pod lukami armii strzelca
             var wp = s.GetWorldPosition();
             if (!wp.IsValid) return;
             if (p.x != sp.x || p.y != sp.y)

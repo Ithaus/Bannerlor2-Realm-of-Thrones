@@ -1,5 +1,46 @@
 # DZIENNIK ZMIAN
 
+## 333 - AI bitwy: poscig z glowa za nekajacym i szyk bez wahadla przed kontaktem (noc/333-ai-bitwy od noc/332-reach e55aaa19 - NIE WGRANE, bez autotestu; Jeff gra)
+**Problem:** Jeff 06.11 po bitwie: (A) "strzelam do kawalerii, oni jada za mna, wyciagam ich pod swoje wojsko pod lucznikow, jak widza moje wojsko zaczynaja sie
+odwracac plecami i jada do swoich, ja jade za nimi i strzelam w plecy, oni sie znowu wracaja ... trzeba to po prostu robic z glowa"; (B) "formacje ... ida do przodu
+i do tylu, do przodu i do tylu zamiast stac w formacji; dopiero jak wrog jest blizej ... zaczynaja sie normalnie zachowywac". Log Jeffa `Armoury-2026-11-05_23-16-09.log`:
+bitwa 03:04 - jezdzcow 204 wyslanych 289, wejsc z szyku w szarzy 746 (ci sami wiele razy), powroty "przy szyku strzelca" 284, "smycz" 476; epizod na gracza 02:36:00-02:37:43,
+nowy 02:37:54 i po 9 s znow "cala jazda"; bitwa 01:14 - 6 epizodow na gracza w 6 minut, kazdy od razu "cala jazda".
+**Przyczyna:** (A) nasz 204 (nie RBM - RBM nie szarzuje na konnego strzelca): jezdziec zawracal sam 15 m od nietknietego szyku strony strzelca (CounterFootGap - prog
+"nie wjezdzaj we wlocznie", nie "nie wjezdzaj pod luki"), kazdy osobno co 0.25 s; po powrocie 30 s przerwy, nowy strzal = nowe wykrycie, EndEp zerowal poziom - nowy
+epizod od razu L2/L3; odciecie (RoleCut) celowalo 30 m ZA strzelcem, czyli w strone jego wojska. (B) przed zwarciem RBM (75 m) piechota w RangedHarrassment
+(BehaviorCautiousAdvance - S1 doktryny daje Shot x2.5) krazy Approaching/Shooting/PullingBack wedlug ognia NASZYCH lucznikow, a postfiks RBM dokleja kroki +5/+10 m
+i -10 m co 30-70 tickow; RBM BehaviorAdvance staje i rusza wedlug celu konnicy wroga. Rozkazy Move co 0.5 s bez histerezy kierunku. Przyczyna B z dekompilacji -
+logi nie mialy pozycji szykow (dlatego pomiar wahadla w linii).
+**Zmiana (A, klucz RidersBreakOffNearShootersArmy, domyslnie TAK, dziala z kluczem 204; NIE = jak 332):** `HorsePursuit.Bait333.cs` (nowy) + wpiecia w `HorsePursuit.Hunt.cs`
+(ThreatPass, HunterCheck, Elig, Steer, HuntPass, HuntClear), `HorsePursuit.Counter.cs` (strzaly w plecy), `HorsePursuit.cs` (linia).
+- Strefa armii strzelca co pass: kazdy nietkniety szyk (>= 8 ludzi, nie w odwrocie) jego strony poza jego wlasnym szykiem: piechota R + 50 m, lucznicy R + 0.8 x zasieg
+  szyku (60..120 m), konnica i konni lucznicy R + 60 m; g = odleglosc od krawedzi.
+- Stany (pamiec wedlug czlowieka - przezywa koniec zagrozenia): WOLNY - nowy poscig calosci tylko przy g >= 30 m; POSCIG - trwa do g < 10 m (histereza 20 m), punkt
+  kazdego jezdzca przyciety 10 m przed strefa, jezdziec w strefie wraca sam, kandydat w 10 m od strefy nie jest wysylany; ZERWANY - cala grupa wraca naraz (przerwa 5 s),
+  pelny poscig dopiero po 60 s i gdy strzelec jest >= 100 m od strefy przez 3 s; TYLNA STRAZ (tylko ZERWANY) - strzelec >= 40 m od strefy: z najblizszego szyku konnicy
+  12% (3..5, najwyzej 1/3 szyku) najblizszych mu jezdzcow, rola przeciecia; straz zrywa cala przy g < 20 m, po 40 s albo w strefie, potem 30 s przerwy. Lucznicy R1 strony
+  dalej strzelaja do strzelca (bez zmian 204).
+- Linie "AI bitwy (333) zerwanie / straz / ponowny poscig" (najwyzej 12 na bitwe).
+**Zmiana (B, klucz FormationsSteadyBeforeContact, domyslnie TAK; NIE = jak 332, pomiar dalej liczony):** `Pendulum333.cs` (nowy) - prefiks `Formation.SetMovementOrder`
+(Priority.Last po com.rbmai, wpiety w Doctrine.ApplyMissionPatches - nie latka na Agent): tylko Move, szyk AI pieszy (nie gracza), >= 8 ludzi, bitwa polowa, glowny watek,
+przed kontaktem (miara RBM > 75 m, wyjscie z kontaktu > 90 m). Kierunek = rzut celu na os do najblizszego pieszego szyku wroga, martwa strefa max(3 m, pol glebokosci).
+Naprzod i stoj - bez zmian; wstecz - "stoj w miejscu" (Move na kotwicy); wstecz wolno tylko lucznikom za piechote (BehaviorScreenedSkirmish S4) i po realnej zmianie
+(inne zachowanie szyku niz przy ostatniej decyzji kierunku i >= 15 s od niej); naprzod w 15 s po dozwolonym cofnieciu bez zmiany zachowania - stoj. Retreat / Charge /
+Advance / FallBack nietkniete. Pomiar co 0.5 s: zygzak przesuniecia mediany na osi do wroga (prog max(3 m, pol glebokosci)), nawroty na szyko-minute wedlug zachowania.
+- Linia "AI bitwy (333): misja ..." raz na bitwe polowa (segmenty: poscig z glowa, tylna straz, strefa, trafienia wracajacych, wahadlo, rozkazy Move, potkniecia).
+- `Settings.cs` + McmSettings (gen_mcm.py; wpisy 326d i 326x przywrocone z HEAD). `tools/sprawdz_logi.py --grupa ai333`: A333-S (test syntetyczny), A333-0..A333-6
+  (zerwan na poscig <= 1, petla przynety 0, straz <= 10 jezdzcow na odlaczenie, wahadlo <= 0.25 nawrotu na szyko-minute i w tyl <= 0.1 przy >= 2 szyko-minutach,
+  potkniecia i ERROR 333 = 0, latka TAK).
+**Ryzyko / co sprawdzic:** wspolne tablice 204/283/311a (_countering, HuntCool, Hunters) - zwalnianie tylko przez EndHunter (UZone, nowy powod; UKinds 18, NwKinds 15 -
+linia 204 wypisuje indeksy jawnie, m204jazda bez zmian formatu). Zerwanie konczy epizod 204 wynikiem "inne" (HOther) - J204-3 w autotescie z nekajacym moze widziec
+mniej "odpedzony"; nekajacy testu ucieka do swoich, wiec zerwanie powinno byc w linii 333. Strzelec stale przy swojej armii nie dostaje jezdzcow (tylko lucznikow) - to
+zgodne z uwaga Jeffa, ale mniej "odstraszania" (204) przy armii. (B) wymienia rozkaz zachowania RBM/gry tylko przed kontaktem; CautiousAdvance w PullingBack stoi do
+kontaktu i cofa sie dopiero w 75 m (jak gra); obronca 291 wraca na wzgorze tylko po zmianie zachowania. Szyk gracza i szyki pod rozkazami gracza - nigdy. Koszt: prefiks
+raz na rozkaz (0.5 s na szyk) + petla po szykach wroga; pomiar co 0.5 s po szykach; jezdziec - odleglosc strefy w kroku 0.25 s. Mod misji - wgrac dopiero po tescie
+z bitwa (bieg-bitwa-204.ps1 -Battles N -Harasser N), nie gdy Jeff gra.
+**Status:** DO SPRAWDZENIA (zbudowane Release, kod 0, 0 Error(s); nie wgrane, bez autotestu).
+
 ## 332 - Reach do korony po Czarnym Nurcie (noc/332-reach od 330x-integracja 0e29f73a - NIE WGRANE, bez autotestu; Jeff gra)
 **Problem:** Jeff 05.11: "Reach do korony po Czarnym Nurcie". Dzis Reach zostaje osobnym krolestwem w sojuszu z korona (m104 (2)), sojusz odnawiany co 364 dni z napisem
 "do dnia opowiesci ~900" - w ksiazce po Czarnym Nurcie Tyrellowie sa wasalami Zelaznego Tronu (Mace w malej radzie, Margaery krolowa). ROT nie ma takiego przejscia.

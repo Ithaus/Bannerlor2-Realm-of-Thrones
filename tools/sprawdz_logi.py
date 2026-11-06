@@ -95143,5 +95143,186 @@ def main(argv):
     return _reach332_main_prev(argv)
 
 
+
+# ------------------------------------------------------------ paczka 333: grupa ai333 - AI bitwy: poscig z glowa (HorsePursuit.Bait333.cs) i szyk bez wahadla (Pendulum333.cs)
+#  A333-0 linia 'AI bitwy (333): misja' (brak - INFO: stary DLL albo bez bitwy polowej); A333-1 zerwan na jeden poscig calosci najwyzej 1 (formacja nie zawraca
+#  w kolko); A333-2 nawroty po zerwaniu (pelny poscig w 60 s od zerwania - petla przynety) = 0; A333-3 tylna straz (odlaczenia, na odlaczenie najwyzej 2 x 5
+#  jezdzcow z dobieraniem); A333-4 wahadlo przed kontaktem: przy kluczu TAK i >= 2 szyko-minutach nawroty <= 0.25 na szyko-minute, w tym w tyl <= 0.1
+#  (klucz NIE albo malo minut - INFO); A333-5 potkniecia 333 = 0 i 'ERROR in' miejsc 333 = 0; A333-6 latka wahadla TAK przy kluczu TAK.
+#   python -I tools/sprawdz_logi.py --grupa ai333 <Armoury-*.log>
+A333_P = "AI bitwy (333): misja "
+A333_LINE = re.compile(
+    r"AI bitwy \(333\): misja (.+?) \| poscig z glowa klucz (TAK|NIE) .*?"
+    r"\| poscigi calosci (\d+), zerwania calosci (\d+) \(jezdzcow (\d+)\), zerwan na poscig najwiecej (\d+), zerwan na strzelca najwiecej (\d+), "
+    r"nawroty po zerwaniu (\d+) \(oczekiwane 0\), ponowne poscigi po ochlonieciu (\d+), strzelcy przy swojej armii bez poscigu (\d+) "
+    r"\| tylna straz: odlaczen (\d+) \(jezdzcow (\d+)\), zerwana przy strefie (\d+), po czasie (\d+) "
+    r"\| jezdzcy zawroceni w strefie (\d+), nie wyslani przy strefie (\d+), punktow przycietych do strefy (\d+), szykow w strefie najwiecej (\d+) "
+    r"\| trafienia wracajacych w \d+ s po zerwaniu (\d+) "
+    r"\| wahadlo: klucz (TAK|NIE) \(latka ([^;]+);.*?\) \| szykow AI (\d+), szyko-minut przed kontaktem ([\d.]+), nawroty (\d+) \(w tym w tyl (\d+);"
+    r".*?\| rozkazy Move przed kontaktem (\d+): wstecz zatrzymane (\d+), wstecz dozwolone S4 (\d+), wstecz po zmianie zachowania (\d+), "
+    r"naprzod wstrzymane po cofnieciu (\d+), szykow zatrzymanych (\d+) \| potkniecia 333 (\d+)\.")
+A333_ERR = re.compile(r"ERROR in (Pendulum333\.|HorsePursuit\.(Brama333|Strefa333|Poscig333|Plecy333|Linia333|Wahadlo333))")
+A333_K = ["kind", "keyA", "full", "breaks", "breakRiders", "epMax", "shMax", "loops", "rechase", "nostart", "gEps", "gRiders", "gZone", "gTime",
+          "riderIn", "nwZone", "clamp", "zones", "backHits", "keyB", "patch", "forms", "minutes", "rev", "revBack", "seen", "backHeld", "backS4", "backBeh",
+          "fwdHeld", "held", "stum"]
+
+
+def ai333_collect(logp):
+    D = {"lines": [], "bad": 0, "err": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if "AI bitwy (333)" not in line and "ERROR in" not in line:
+                continue
+            if A333_ERR.search(line):
+                D["err"] += 1
+                continue
+            if A333_P not in line:
+                continue
+            m = A333_LINE.search(line)
+            if not m:
+                D["bad"] += 1
+                continue
+            r = {}
+            for k, v in zip(A333_K, m.groups()):
+                if k in ("kind", "keyA", "keyB", "patch"):
+                    r[k] = v.strip()
+                elif k == "minutes":
+                    r[k] = float(v)
+                else:
+                    r[k] = int(v)
+            D["lines"].append(r)
+    return D
+
+
+def ai333_rows(rep, D):
+    L = D["lines"]
+    if not L:
+        rep.add("A333-0: linia 'AI bitwy (333): misja'", f"brak linii (nierozpoznanych {D['bad']})", "INFO (stary DLL albo bez bitwy polowej)",
+                None if D["bad"] == 0 else False)
+        rep.add("A333-5: potkniecia i ERROR 333", f"ERROR {D['err']}", "0", D["err"] == 0)
+        return
+    rep.add("A333-0: linia 'AI bitwy (333): misja'", f"bitew {len(L)}, nierozpoznanych {D['bad']}, klucz poscigu {', '.join(sorted(set(r['keyA'] for r in L)))}, "
+            f"klucz wahadla {', '.join(sorted(set(r['keyB'] for r in L)))}", "jest, 0 nierozpoznanych", D["bad"] == 0)
+    ep = max(r["epMax"] for r in L)
+    rep.add("A333-1: zawrocen formacji na jeden poscig", f"najwiecej {ep} (zerwan {sum(r['breaks'] for r in L)}, poscigow calosci {sum(r['full'] for r in L)}, "
+            f"na strzelca najwiecej {max(r['shMax'] for r in L)})", "<= 1", ep <= 1)
+    lp = sum(r["loops"] for r in L)
+    rep.add("A333-2: petla przynety (poscig w 60 s po zerwaniu)", f"nawrotow {lp} (ponownych poscigow po ochlonieciu {sum(r['rechase'] for r in L)}, "
+            f"trafien wracajacych {sum(r['backHits'] for r in L)})", "0", lp == 0)
+    ge, gr = sum(r["gEps"] for r in L), sum(r["gRiders"] for r in L)
+    if ge == 0:
+        rep.add("A333-3: tylna straz", f"odlaczen 0 (zerwan {sum(r['breaks'] for r in L)})", "INFO (strzelec nie jechal za wracajacymi)", None)
+    else:
+        rep.add("A333-3: tylna straz", f"odlaczen {ge}, jezdzcow {gr} ({gr / ge:.1f} na odlaczenie), zerwana przy strefie {sum(r['gZone'] for r in L)}, "
+                f"po czasie {sum(r['gTime'] for r in L)}", "<= 10 na odlaczenie (5 + dobieranie)", gr <= 10 * ge)
+    on = [r for r in L if r["keyB"] == "TAK"]
+    mins = sum(r["minutes"] for r in on)
+    rev, rb = sum(r["rev"] for r in on), sum(r["revBack"] for r in on)
+    held = sum(r["backHeld"] for r in on)
+    if not on or mins < 2.0:
+        rep.add("A333-4: wahadlo szykow przed kontaktem", f"szyko-minut {mins:.1f} przy kluczu TAK (bitew {len(on)}), nawrotow {rev}, wstecz zatrzymanych {held}",
+                "INFO (klucz NIE albo < 2 szyko-minut)", None)
+    else:
+        ra, rbb = rev / mins, rb / mins
+        rep.add("A333-4: wahadlo szykow przed kontaktem", f"nawroty {rev} na {mins:.1f} szyko-minut = {ra:.2f}/min, w tyl {rb} = {rbb:.2f}/min; wstecz zatrzymanych "
+                f"{held}, S4 {sum(r['backS4'] for r in on)}, zmiana zachowania {sum(r['backBeh'] for r in on)}", "<= 0.25/min, w tyl <= 0.10/min",
+                ra <= 0.25 and rbb <= 0.10)
+    st = sum(r["stum"] for r in L)
+    rep.add("A333-5: potkniecia i ERROR 333", f"potkniecia {st}, ERROR {D['err']}", "0 i 0", st == 0 and D["err"] == 0)
+    badp = [r["patch"] for r in on if r["patch"] != "TAK"]
+    rep.add("A333-6: latka wahadla", f"bitew z kluczem TAK {len(on)}, latka nie TAK {len(badp)}" + (f" [{badp[0]}]" if badp else ""), "TAK",
+            (not badp) if on else None)
+
+
+def ai333_line(full=3, breaks=1, ep=1, loops=0, gEps=1, gRiders=4, keyB="TAK", patch="TAK", mins="12.0", rev=1, rb=0, stum=0, keyA="TAK"):
+    return (f"AI bitwy (333): misja bitwa polowa | poscig z glowa klucz {keyA} (jazda 204 TAK; strefa armii strzelca: piechota +50 m, lucznicy +0.8 zasiegu 60-120 m, "
+            f"konnica +60 m; zerwanie < 10 m, start >= 30 m, straz >= 40 m (zrywa < 20 m, 40 s, przerwa 30 s), ponowny poscig >= 100 m przez 3 s po 60 s) "
+            f"| poscigi calosci {full}, zerwania calosci {breaks} (jezdzcow 25), zerwan na poscig najwiecej {ep}, zerwan na strzelca najwiecej {breaks}, "
+            f"nawroty po zerwaniu {loops} (oczekiwane 0), ponowne poscigi po ochlonieciu 1, strzelcy przy swojej armii bez poscigu 2 "
+            f"| tylna straz: odlaczen {gEps} (jezdzcow {gRiders}), zerwana przy strefie 1, po czasie 0 "
+            f"| jezdzcy zawroceni w strefie 2, nie wyslani przy strefie 5, punktow przycietych do strefy 40, szykow w strefie najwiecej 6 "
+            f"| trafienia wracajacych w 20 s po zerwaniu 3 "
+            f"| wahadlo: klucz {keyB} (latka {patch}; przed kontaktem > 75 m miara RBM, wyjscie > 90 m; martwa strefa max(3 m, pol glebokosci); wstecz tylko S4 albo "
+            f"zmiana zachowania po 15 s) | szykow AI 9, szyko-minut przed kontaktem {mins}, nawroty {rev} (w tym w tyl {rb}; 0.08 na szyko-minute; wedlug zachowania "
+            f"BehaviorCautiousAdvance {rev}), wejsc w kontakt 6 | rozkazy Move przed kontaktem 300: wstecz zatrzymane 20, wstecz dozwolone S4 1, "
+            f"wstecz po zmianie zachowania 1, naprzod wstrzymane po cofnieciu 0, szykow zatrzymanych 3 | potkniecia 333 {stum}.")
+
+
+def ai333_synth():
+    """A333-S: dobry bieg, dwa zerwania na poscig, petla przynety, straz za duza, wahadlo, wahadlo przy NIE, potkniecie, ERROR, latka NIE. None = OK."""
+    import tempfile
+    import shutil
+    runs = {
+        "good": [ai333_line()],
+        "ep2": [ai333_line(ep=2)],
+        "loop": [ai333_line(loops=1)],
+        "guard": [ai333_line(gEps=1, gRiders=14)],
+        "pend": [ai333_line(rev=30, rb=12)],
+        "pendoff": [ai333_line(keyB="NIE", rev=30, rb=12)],
+        "stum": [ai333_line(stum=1)],
+        "err": [ai333_line(), "ERROR in HorsePursuit.Brama333: System.NullReferenceException"],
+        "patch": [ai333_line(patch="NIE (brak Formation.SetMovementOrder)")],
+        "short": [ai333_line(mins="0.5", rev=5, rb=5)],
+        "broken": [ai333_line().replace("zerwan na poscig najwiecej", "zerwan najwiecej")],
+    }
+    exp = {
+        "good": {"A333-0": "TAK", "A333-1": "TAK", "A333-2": "TAK", "A333-3": "TAK", "A333-4": "TAK", "A333-5": "TAK", "A333-6": "TAK"},
+        "ep2": {"A333-1": "NIE"},
+        "loop": {"A333-2": "NIE"},
+        "guard": {"A333-3": "NIE"},
+        "pend": {"A333-4": "NIE"},
+        "pendoff": {"A333-4": "INFO"},
+        "stum": {"A333-5": "NIE"},
+        "err": {"A333-5": "NIE"},
+        "patch": {"A333-6": "NIE"},
+        "short": {"A333-4": "INFO"},
+        "broken": {"A333-0": "NIE"},
+    }
+    tmp = tempfile.mkdtemp(prefix="a333_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {x}" for i, x in enumerate(Ls)) + "\n")
+            rep = Report()
+            ai333_rows(rep, ai333_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def ai333_main(logp):
+    rep = Report()
+    try:
+        s2 = ai333_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("A333-S: test syntetyczny (dobry, 2 zerwania na poscig, petla, straz, wahadlo, NIE, potkniecie, ERROR, latka, zly format)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("A333-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = ai333_collect(logp)
+    print(f"plik: {logp} | linii 333 {len(D['lines'])}, nierozpoznanych {D['bad']}, ERROR {D['err']}")
+    ai333_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_ai333_main_prev = main
+
+
+def main(argv):
+    # paczka 333: grupa ai333 - opakowanie main jak reach332
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "ai333":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return ai333_main(rest[0] if rest else None)
+    return _ai333_main_prev(argv)
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

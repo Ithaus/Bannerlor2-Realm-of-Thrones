@@ -1812,6 +1812,14 @@ namespace Armoury
         [SettingPropertyGroup("Shields under fire")]
         public bool HuntHarasserInAutotest { get; set; } = true;
 
+        [SettingPropertyBool("Riders Break Off Near Shooters Army", HintText = "with Riders Run Down Shooters: AI horsemen chase a horse archer with their heads. Around every whole formation of his own side there is a danger zone - 50 m beyond his infantry, 0.8 of their bow range (60-120 m) beyond his archers, 60 m beyond his cavalry. They do not start after him when he is within 30 m of that zone, never ride for a point inside it, and when he leads them to within 10 m of it the whole group turns back together - and stays turned: they chase him again in strength only after a minute, once he is a full 100 m clear of his army for 3 seconds. If he follows the riders as they go back and gets 40 m clear of his army, 3 to 5 of the rearmost (about an eighth of the formation, at most a third) turn on him as a rear guard while the rest ride on; the rear guard gives up when he gets back within 20 m of his army or after 40 seconds and does not try again for 30 seconds. Off = riders turn back only 15 m from his infantry, each on his own, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool RidersBreakOffNearShootersArmy { get; set; } = true;
+
+        [SettingPropertyBool("Formations Steady Before Contact", HintText = "AI infantry and archer formations no longer walk forward and back, forward and back while the enemy is still more than 75 m away: a formation advances or stands its ground, and an order to step back before contact is turned into standing where it is. Archers falling back behind their infantry (Archers Fall Back Behind Infantry) and a real change of plan (a new tactic, e.g. defenders going back to their hill) still go back, but never twice within 15 seconds. Once the lines are close, everything is as in the game and RBM. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool FormationsSteadyBeforeContact { get; set; } = true;
+
         [SettingPropertyBool("Formations Answer Harassers", HintText = "AI formations answer a lone enemy who harasses them from the rear or flank - you above all, mounted or on foot, with a bow or a sword. Their archers turn and shoot at him when their line of fire is clear (a man with a friend in the way steps one or two files aside or back first; in a missile duel only the half nearer to him turns, and an archer he is cutting at fights with his side weapon or steps back to shoot). The nearest free infantry runs at a harasser on foot - two men for each one of his worth by rank and skill, one more for every man he has downed - while at least half of every formation stays in line, up to 50 m from their formation and for at most 60 seconds. Their cavalry rides him down as with Riders Run Down Shooters, and all of it that is free goes at once after a lone horseman who has downed a man, keeps shooting or strikes their archers. Horsemen locked in melee stay in their fight, unless he is going for their general, a party leader or a formation captain (always protected), or the formation he attacks is worth more than the enemy they fight or holds half of their archers. Field battles only; your own formations never do it. Off = as before (only the riders of Riders Run Down Shooters, and only against a mounted shooter)", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool FormationsAnswerHarassers { get; set; } = true;
@@ -11856,6 +11864,8 @@ namespace Armoury
             s.RidersShieldsUpUnderFire = RidersShieldsUpUnderFire;
             s.RidersRunDownShooters = RidersRunDownShooters;
             s.HuntHarasserInAutotest = HuntHarasserInAutotest;
+            s.RidersBreakOffNearShootersArmy = RidersBreakOffNearShootersArmy;
+            s.FormationsSteadyBeforeContact = FormationsSteadyBeforeContact;
             s.FormationsAnswerHarassers = FormationsAnswerHarassers;
             s.ArmyHaltsForHarassers = ArmyHaltsForHarassers;
             s.ArmyMarchesPastHarassers = ArmyMarchesPastHarassers;

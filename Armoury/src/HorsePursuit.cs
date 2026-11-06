@@ -241,6 +241,7 @@ namespace Armoury
             _noRiders = _gateOpenedByVictims = _playerSideEntries = 0;
             _restBelow = c != null && c.HorseStaminaEnabled ? Math.Max(0, Math.Min(80, c.HorseAiRestBelow)) : 0;   // 204: odpowiedz moze wejsc w pierwszym passie
             _live = _field;
+            try { Pendulum333.Begin(m, _field); } catch (Exception e) { Stumble("HorsePursuit.Wahadlo333", e); }   // 333 (B): szyki przed kontaktem
             HuntBegin(c);   // 204 (po _field - proba autotestu tylko w bitwie polowej)
         }
 
@@ -254,6 +255,7 @@ namespace Armoury
             try { deployed = m.IsDeploymentFinished; } catch { }
             if (!deployed) return;
             float now = m.CurrentTime;
+            Pendulum333.Tick(m, now, dt);   // 333 (B): pomiar wahadla co 0.5 s (wyjatki lapie sam)
             _passAcc += dt;
             _trackAcc += dt;
             if (_passAcc >= PassEvery)
@@ -381,10 +383,12 @@ namespace Armoury
                 try { HuntWrite(); } catch (Exception e) { Stumble("HorsePursuit.JazdaLinia", e); }   // 204: linia "Jazda na strzelca (204)" raz na bitwe polowa
                 try { ReactWrite(); } catch (Exception e) { Stumble("HorsePursuit.NekanieLinia", e); }   // 283: linia "Nekanie (283)" raz na bitwe polowa
                 try { CoverWrite(); } catch (Exception e) { Stumble("HorsePursuit.OslonaLinia", e); }    // 311a: linia "Oslona strzelca (311a)" raz na bitwe polowa
+                try { AiBattle333Write(); } catch (Exception e) { Stumble("HorsePursuit.Linia333", e); }   // 333: linia "AI bitwy (333)" raz na bitwe polowa
                 try { if (_field) Battle291.Write(m, _kind, Seg291A()); } catch (Exception e) { Stumble("HorsePursuit.Bitwa291", e); }   // 291: linia "Bitwa (291)"
             }
             _live = false;
             Clear();
+            Pendulum333.End();   // 333 (B)
             _m = null;
         }
 

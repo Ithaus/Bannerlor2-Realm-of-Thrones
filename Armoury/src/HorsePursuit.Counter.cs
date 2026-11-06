@@ -109,6 +109,7 @@ namespace Armoury
             if (w == null || !ReferenceEquals(w.Target, m)) return;
             _cShots++;
             if (charging) _cShotsCharge++;
+            try { Bait333Hit(m, s); } catch (Exception e) { _zStum++; Stumble("HorsePursuit.Plecy333", e); }   // 333: strzaly w plecy wracajacych
         }
 
         /// <summary>Miejsce szyku: punkt rozkazu (oslona skrzydla - punkt trzymania), bez niego srodek szyku.</summary>
