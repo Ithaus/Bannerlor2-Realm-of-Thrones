@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 340r - poprawki dwoch recenzji 340 na noc/340-razem (NIE WGRANE, bez autotestu po zmianie; DLL test/m340, Armoury.dll 6afad550)
+**Problem (recenzje 340):** (c) KBlocked gubil odsiecz, ktora weszla do armii (LiveUnit czlonka = null), widzial zapamietanego wroga na zywo bez zwiadu i bez konca (Since martwe),
+liczyl nasza sile bez sojusznikow, zwalnial pamiec po ocenie silniejszego lorda; IronKeepSea trzymal cel mimo blokady krolestwa; (d) zbiorka w porcie odtwarzala CanLordCreateArmy
+czesciowo (bez progu 1000, limitu 0.7, sit gry, droga w linii prostej) - mozliwa petla port-morze-port; (a) L12 bez okien GC moglo dac TAK przy zlym koszcie (synteza gc: TAK przy 40 ms/h
+z GC), _dPathN liczyl okna z GC; (b) start -> odstapienie tej samej doby (plotka x2 chowa odsiecz, zbiorka trwa dni) bez wiersza sprawdzarki; drobne: _warLead po wczytaniu,
+VisitedRecently bez zamka, Lk/Ul martwe, OurO pod zamkiem i ze stara flaga WillGatherAnArmy.
+**Zmiana:** LocalFront334e.Siege.cs - KBlocked/KRelEntries: czlonek armii -> wodz, zamiar teraz (zywo) / w MemHours (plotka x2) / zwiad (zywo), o + ally, zwolnienie przy braku
+odsieczy, twardy koniec Since + HorizonDays (tez dobowo); IronKeepSea - blokada konczy trzymanie; IronCands - sita CanLordCreateArmy gry + SCA, droga gry od portu, limit 0.7, prog
+1000; IronHead (warunek wodza gry); nieudana zbiorka w porcie -> 2 doby bez zbiorki, linia "Zelazni zbiorka nieudana", powody + prog 1000 / limit 0.7 / sito SCA. Score.cs - OurO
+przed zamkiem, flaga zbiorki tylko przy sile gry > samej druzyny, okno wroga + czas zbiorki. LocalFront334e.cs - okna wszystkie (_dWin), _dPathN bez GC, Lk/Ul usuniete.
+BesiegedRelief.cs - _warLead.Clear() w Reset. WarFront334.Iron.cs - VisitedRecently pod _ironLock. Bez nowych kluczy (zmiany pod LocalReliefHold340 / IronMuster340 / LocalOneMeasure340).
+sprawdz_logi.py lokalna334e: L12 z GC przy czestych oknach GC (> 5% okien albo >= 50% ms), L15d, L17m, regex GC / Iron340 zgodny wstecz; synteza +6 (gc teraz L12 NIE).
+docs/PROJEKT-334E-SILA-LOKALNA.md sekcja 16b.
+**Status:** DO SPRAWDZENIA - test 45 dob: L12 (z oceny GC), L2k/B334-6, L15b/L15c/L15d, L17/L17m, W335-5/W335-9.
+
 ## 340 - poprawki po tescie 334f (55 dob) na noc/340-razem (334e/f/g + 335 + 336 + 338 - NIE WGRANE, bez autotestu po zmianie; DLL test/m340, Armoury.dll 38914c5b)
 **Problem (log at334f Armoury-2026-11-06_20-10-38.log, test przerwany po 55 dobach):** (a) L12 koszt srednio maks 35 ms/h, godzina maks 101 ms (cel < 5 / < 50); (b) L2k / B334-6
 korona z armia 36% dob, w dobach wojny z Polnoca 4/12; (c) L15b "petla" korony pod town_EW5; (d) L17 Zelazni 0 ofert oblezen wybrzeza, "bez zbiorki 145"; (e) wodz335 W335-5

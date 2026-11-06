@@ -142,6 +142,7 @@ namespace Armoury
         {
             _byK.Clear(); _tracks.Clear(); _armyFor.Clear(); _tmpIdx.Clear(); _tmpSg.Clear(); _dParties.Clear(); _hour = -1.0; _endedRelief.Clear();
             _dRelParties.Clear(); _tmpGone.Clear(); _tmpGated.Clear(); _dUnreadyParties.Clear();
+            lock (_warLead) _warLead.Clear();   // 340: zastepca wladcy ze starej kampanii
             _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = _dRel = _dUnready = _dLateNoCall = 0;
         }
 

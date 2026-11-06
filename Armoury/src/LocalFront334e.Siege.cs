@@ -40,7 +40,16 @@ namespace Armoury
             public readonly List<MobileParty> RelLeads = new List<MobileParty>();   // 340 (c): odsiecz policzona w ostatnim sadzie (do pamieci po odwrocie)
         }
         /// <summary>340 (c): pamiec odsieczy po odwrocie krolestwa spod osady - druzyny, ktore wywolaly odwrot.</summary>
-        private sealed class KRel { public readonly List<MobileParty> L = new List<MobileParty>(); public double Since; }
+        /// <summary>340 (c): Since - doba odwrotu (twardy koniec Since + HorizonDays); Seen - druzyna -> godzina ostatnio widzianego zamiaru obrony celu (pamiec MemHours,
+        /// jak sad oblezenia); H/E - wpisy na godzine (zywa droga / plotka x2 z migawki), poprawka zwiadu - przy ocenie.</summary>
+        private sealed class KRel
+        {
+            public readonly List<MobileParty> L = new List<MobileParty>(); public double Since;
+            public readonly Dictionary<MobileParty, double> Seen = new Dictionary<MobileParty, double>();
+            public int H = int.MinValue; public readonly List<KE> E = new List<KE>();
+        }
+        /// <summary>340 (c): wpis odsieczy z pamieci - wodz (druzyna albo wodz armii), zamiar (teraz albo w MemHours), droga i sila na zywo, droga plotki (migawka x 2).</summary>
+        private struct KE { public MobileParty Lead; public bool Now, Mem; public float LD, LS, RD, RS; }
         private struct PS : IEquatable<PS>
         {
             public readonly MobileParty P; public readonly Settlement S;
@@ -67,11 +76,11 @@ namespace Armoury
         private static readonly List<string> _dRetreatNotes = new List<string>();
         private static int _sRetreat;
 
-        private static void ResetSiege() { _camps.Clear(); _retreat.Clear(); _block.Clear(); _kblock.Clear(); _krel.Clear(); _raidBad.Clear(); _ironNav.Clear(); _musterDay.Clear(); _sRetreat = 0; ZeroSiegeDay(); }
+        private static void ResetSiege() { _camps.Clear(); _retreat.Clear(); _block.Clear(); _kblock.Clear(); _krel.Clear(); _raidBad.Clear(); _ironNav.Clear(); _musterDay.Clear(); _musterTry.Clear(); _musterFail.Clear(); _sRetreat = 0; ZeroSiegeDay(); }
         private static void ZeroSiegeDay()
         {
             _dJudge = _dKeep = _dMid = _dRetreat = _dRetreatCand = _dStay = _dKeepVeto = _dBreak = _dStickYield = _dFreshYield = _dIronOffers = _dIronVeto = _dSiegeLines = _dKBlock = 0;
-            _dKRelHold = _dKRelFree = 0; _dIronMuster = _dIronKeepSea = _dIronPrio = _dIronMusterLines = 0; Array.Clear(_dIronWhy, 0, _dIronWhy.Length);
+            _dKRelHold = _dKRelFree = 0; _dIronMuster = _dIronKeepSea = _dIronPrio = _dIronMusterLines = _dIronMusterFail = _dIronMusterBan = 0; Array.Clear(_dIronWhy, 0, _dIronWhy.Length);
             Array.Clear(_dStates, 0, _dStates.Length); _dRetreatNotes.Clear();
             Array.Clear(_dIronX, 0, _dIronX.Length); _dIronMinQ = -1; _dIronMinT = "-"; _dIronMinStr = 0;
         }
@@ -102,52 +111,92 @@ namespace Armoury
         }
 
         /// <summary>334g: blokada (krolestwo, osada) po odwrocie - start oblezenia tylko, gdy miara odwrotu (wrog w polu w oknie max(dojscie + 8.02, 12.03) + zaloga
-        /// najwyzej 0.8 x my) / my &lt;= 1.0. 340 (c): po czasie blokady - dalej zakaz, dopoki odsiecz z odwrotu (zywa droga) jest w tym oknie i z zaloga ma &gt; 1.0 x my;
-        /// odsiecz poza zasiegiem albo slabsza - pamiec znika. o - nasza sila w mierze q. true - zakaz. Wolajacy trzyma _lk.</summary>
+        /// najwyzej 0.8 x my) / my &lt;= 1.0. 340 (c): po czasie blokady - dalej zakaz, dopoki odsiecz z odwrotu (czlonek armii - jej wodz; zamiar obrony celu teraz albo
+        /// w MemHours, albo zwiad; zywa droga przy zamiarze teraz / zwiadzie, plotka x2 przy pamietanym zamiarze) jest w tym oknie i z zaloga ma &gt; 1.0 x (my + sojusznicy);
+        /// odsieczy brak - pamiec znika; twardy koniec: doba odwrotu + HorizonDays. o - nasza sila w mierze q. true - zakaz. Wolajacy trzyma _lk.</summary>
         private static bool KBlocked(IFaction k, Settlement t, MobileParty p, double o, float our, out double qr)
         {
             qr = -1;
             if ((_kblock.Count == 0 && _krel.Count == 0) || k == null || t == null || p == null) return false;
             var key = new SK(k, t);
-            double until;
-            bool timed = _kblock.TryGetValue(key, out until) && until > CampaignTime.Now.ToDays;
+            double until, nowD = CampaignTime.Now.ToDays;
+            bool timed = _kblock.TryGetValue(key, out until) && until > nowD;
             KRel kr;
             bool rel = _krel.TryGetValue(key, out kr);
+            // 340 (recenzja): twardy koniec pamieci - doba odwrotu + HorizonDays (dalej odsiecz nie zdazy nigdy)
+            if (rel && nowD > kr.Since + HorizonDays) { _krel.Remove(key); _dKRelFree++; rel = false; }
             if (!timed && !rel) return false;
             float w = Math.Max(Math.Max(our, 0f) + SiegeDays, HorizonDays);
-            double gar = -1;
+            float first; double ally;
+            double z = ZFor(t, k, p, w, out first, out ally);
+            double oo = o + ally;   // 340 (recenzja): ta sama nasza sila (z sojusznikami w drodze) w obu galeziach
+            double gar = GarOf(t);
             if (timed)
             {
-                float first; double ally;
-                double z = ZFor(t, k, p, w, out first, out ally);
-                double oo = o + ally;
-                gar = GarOf(t);
                 qr = Ratio(z + GarCap(gar, oo), oo);
                 if (qr > SiegeBanQ) { _dKBlock++; return true; }
             }
             if (rel)
             {
-                // 340 (c): odsiecz z odwrotu na zywo (nie plotka x2) - ta sama droga co w sadzie oblezenia; w osadzie - liczy sie w zalodze (GarOf)
+                // 340 (c): odsiecz z odwrotu ta sama wiedza co reszta modelu - zamiar obrony celu (teraz albo widziany w MemHours) albo zwiad; zywa droga tylko przy
+                // zamiarze teraz / zwiadzie, pamietany zamiar - plotka (migawka x 2, jak ZFor); czlonek armii - jej wodz; w osadzie - w zalodze (GarOf)
+                var sc = ScoutOf(p);
+                var es = KRelEntries(kr, k, t);
                 double s = 0;
-                int ki = FI(k);
-                foreach (var m in kr.L)
+                for (int i = 0; i < es.Count; i++)
                 {
-                    if (m == null || !m.IsActive) continue;
-                    var v = LVOf(m);
-                    if (!v.Active || v.F == null || v.Cur == t || !War(k, ki, v.F, v.Fi)) continue;
-                    var u = LiveUnit(m);
-                    if (u == null) continue;
-                    float d = DaysTo(u, t);
+                    var e = es[i];
+                    float d, st;
+                    if (e.Now || sc.Contains(e.Lead)) { d = e.LD; st = e.LS; }   // zamiar teraz / zwiad - na zywo
+                    else if (e.Mem) { d = e.RD; st = e.RS; }                      // pamietany zamiar - plotka
+                    else continue;
                     if (d < 0f || d > w) continue;
-                    s += u.Str;
+                    s += st;
                 }
-                if (gar < 0) gar = GarOf(t);
-                double qrel = Ratio(s + GarCap(gar, o), o);
+                double qrel = Ratio(s + GarCap(gar, oo), oo);
                 if (s > 0 && qrel > SiegeBanQ) { _dKRelHold++; if (qrel > qr) qr = qrel; return true; }
-                if (!timed) { _krel.Remove(key); _dKRelFree++; }   // odsiecz poza zasiegiem albo slabsza - histereza zamknieta
+                // 340 (recenzja): zwolnienie tylko, gdy odsieczy nie ma (poza zasiegiem / bez zamiaru i niewidziana / martwa) - slabszy lord nie zdejmuje blokady silniejszym
+                if (s <= 0 && !timed) { _krel.Remove(key); _dKRelFree++; }
             }
             return false;
         }
+
+        /// <summary>340 (c): wpisy pamieci odsieczy na godzine (czlonkowie armii -> wodz, bez powtorzen; zamiar obrony celu teraz albo w MemHours). Wolajacy trzyma _lk.</summary>
+        private static List<KE> KRelEntries(KRel kr, IFaction k, Settlement t)
+        {
+            int h = NowH;
+            if (kr.H == h) return kr.E;
+            kr.H = h; kr.E.Clear();
+            double nowH = CampaignTime.Now.ToHours;
+            int ki = FI(k);
+            var seen = _kreSeen; seen.Clear();
+            foreach (var m0 in kr.L)
+            {
+                if (m0 == null || !m0.IsActive) continue;
+                var m = m0;
+                try { var a = m0.Army; if (a != null && a.LeaderParty != null) m = a.LeaderParty; } catch { }
+                if (m == null || !m.IsActive || !seen.Add(m)) continue;
+                var v = LVOf(m);
+                if (!v.Active || v.F == null || v.Cur == t || !War(k, ki, v.F, v.Fi)) continue;
+                bool now = RelievesV(v, t), mem = false;
+                double last;
+                if (now) kr.Seen[m] = nowH;
+                else mem = (kr.Seen.TryGetValue(m, out last) && nowH - last <= MemHours) || (m0 != m && kr.Seen.TryGetValue(m0, out last) && nowH - last <= MemHours);
+                var e = new KE { Lead = m, Now = now, Mem = mem, LD = -1f, RD = -1f };
+                var u = LiveUnit(m);
+                if (u != null) { e.LD = DaysTo(u, t); e.LS = u.Str; }
+                // pamietany zamiar (nie teraz) - plotka: migawka x 2; zamiar teraz - zywa droga (jak wpis Tg w ZFor)
+                Unit su;
+                if (mem && _snap.ByLead.TryGetValue(m, out su) && su != null)
+                {
+                    float d0 = DaysTo(su, t);
+                    if (d0 >= 0f) { e.RD = d0 * 2f; e.RS = su.Str; }
+                }
+                kr.E.Add(e);
+            }
+            return kr.E;
+        }
+        private static readonly HashSet<MobileParty> _kreSeen = new HashSet<MobileParty>();
 
         /// <summary>Zaloga + milicja + lordowie w osadzie (te same druzyny, co obrona oblezenia gry).</summary>
         private static double GarOf(Settlement t)
@@ -573,6 +622,7 @@ namespace Armoury
                 {
                     var krr = new KRel { Since = CampaignTime.Now.ToDays };
                     krr.L.AddRange(rr.RelLeads);
+                    foreach (var rl in rr.RelLeads) if (rl != null) krr.Seen[rl] = now;   // policzone w sadzie odwrotu - zamiar od teraz (pamiec MemHours)
                     _krel[kk] = krr;
                 }
                 _dRetreat++;
@@ -643,10 +693,14 @@ namespace Armoury
         private static void IronX(int i) { long w = Ts(); lock (_lk) { _tWait += Ts() - w; _dIronX[i]++; } }
 
         // 340 (d): powody "bez zbiorki" (warunki CanLordCreateArmy gry, czytane - nic nie zmieniamy) i dzwignie kanonu Wysp
-        private static readonly int[] _dIronWhy = new int[8];
-        internal static readonly string[] IronWhyName = { "czlonek armii", "nie glowa rodu", "wplyw<=100", "jedzenie", "maly oddzial", "najem", "kandydaci 0", "inne" };
-        private static int _dIronMuster, _dIronKeepSea, _dIronPrio, _dIronMusterLines;
+        private static readonly int[] _dIronWhy = new int[11];
+        internal static readonly string[] IronWhyName = { "czlonek armii", "nie glowa rodu", "wplyw<=100", "jedzenie", "maly oddzial", "najem", "kandydaci 0", "inne", "prog 1000", "limit 0.7", "sito SCA" };
+        private static int _dIronMuster, _dIronKeepSea, _dIronPrio, _dIronMusterLines, _dIronMusterFail, _dIronMusterBan;
         private static readonly Dictionary<MobileParty, int> _musterDay = new Dictionary<MobileParty, int>();
+        // 340 (recenzja): zbiorka w porcie - (port, doba wyslania); w porcie bez czlonkow gry -> doba nieudanej proby (bez ponownej oferty przez 2 doby - bez petli port-morze-port)
+        private static readonly Dictionary<MobileParty, KeyValuePair<Settlement, int>> _musterTry = new Dictionary<MobileParty, KeyValuePair<Settlement, int>>();
+        private static readonly Dictionary<MobileParty, int> _musterFail = new Dictionary<MobileParty, int>();
+        private const int MusterFailDays = 2;
         private static void IronWhy(int i) { long w = Ts(); lock (_lk) { _tWait += Ts() - w; _dIronWhy[i]++; } }
 
         /// <summary>340 (d): dlaczego gra nie dala zbiorki (CanLordCreateArmy - te same warunki, tylko odczyt; morze liczone osobno jako "zajeci").</summary>
@@ -657,14 +711,80 @@ namespace Armoury
                 if (party.Army != null) return 0;
                 var h = party.LeaderHero; var c = h != null ? h.Clan : null;
                 if (h == null || c == null) return 7;
-                if (!(c.Leader == h || (c.Leader != null && c.Leader.PartyBelongedTo == null && c.WarPartyComponents != null && c.WarPartyComponents.Count > 0 && c.WarPartyComponents[0] == party.WarPartyComponent))) return 1;
+                if (!IronHead(party, h, c)) return 1;
                 if (!(c.Influence > 100f)) return 2;
                 if (c.IsUnderMercenaryService) return 5;
                 if (!((float)party.GetNumDaysForFoodToLast() > Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege)) return 3;
                 if (!(party.PartySizeRatio > Campaign.Current.Models.ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy)) return 4;
-                return 6;
+                var k = party.MapFaction as Kingdom;
+                if (k == null) return 7;
+                float est; int n, why;
+                long m0 = Ts();
+                try { why = IronCands(party, k, null, out est, out n); } finally { _modelT += Ts() - m0; }
+                return why >= 0 ? why : 7;
             }
             catch { return 7; }
+        }
+
+        /// <summary>340 (recenzja): warunek wodza zbiorki gry (CanLordCreateArmy): glowa rodu albo pierwsza druzyna rodu, gdy glowa bez druzyny.</summary>
+        private static bool IronHead(MobileParty party, Hero h, Clan c)
+        {
+            return c.Leader == h || (c.Leader != null && c.Leader.PartyBelongedTo == null && c.WarPartyComponents != null && c.WarPartyComponents.Count > 0 && c.WarPartyComponents[0] == party.WarPartyComponent);
+        }
+
+        /// <summary>340 (recenzja): kandydaci zbiorki - te same sita co CanLordCreateArmy gry (DefaultArmyManagementCalculationModel: wolne druzyny lordow, nie wladca, mysl, oblezenie,
+        /// jedzenie, liczebnosc, CanLeadParty, tratwa, droga gry &lt; MaximumDistanceToCallToArmy, kolejnosc gry, limit ceil(0.7 x druzyn - w armiach), prog sily oblezenia 1000),
+        /// przy SCA - jego sito (wodz 22 zdrowych i 80 sily, czlonek 10 / 35, co najmniej 2, razem 260). from - port zbiorki (null - miejsce druzyny). Zwraca -1 (zbiorka
+        /// mozliwa) albo powod (IronWhyName); est / n - sila (miara ZFor) i liczba kandydatow.</summary>
+        private static int IronCands(MobileParty party, Kingdom k, Settlement from, out float est, out int n)
+        {
+            est = PStr(party.Party); n = 0;
+            var am = Campaign.Current.Models.ArmyManagementCalculationModel;
+            float sizeMin = am.AIMobilePartySizeRatioToCallToArmy, foodMin = am.MinimumNeededFoodInDaysToCallToArmy, reach = am.MaximumDistanceToCallToArmy;
+            var pos = from != null ? from.GetPosition2D : party.GetPosition2D;
+            var list = new List<KeyValuePair<MobileParty, float>>();
+            foreach (var wp in k.WarPartyComponents)
+            {
+                var m = wp != null ? wp.MobileParty : null;
+                if (m == null || m == party || !m.IsActive || !m.IsLordParty || m.Army != null || m.IsMainParty) continue;
+                var lh = m.LeaderHero;
+                if (lh == null || lh == lh.MapFaction.Leader) continue;
+                if (m.Ai.DoNotMakeNewDecisions || (m.CurrentSettlement != null && m.CurrentSettlement.SiegeEvent != null) || m.IsDisbanding) continue;
+                if (!((float)m.GetNumDaysForFoodToLast() > foodMin) || !(m.PartySizeRatio > sizeMin) || !lh.CanLeadParty() || m.IsInRaftState || m.MapEvent != null || m.BesiegedSettlement != null) continue;
+                if (m.GetPosition2D.DistanceSquared(pos) >= reach * reach) continue;   // droga gry nigdy krotsza niz linia prosta
+                float d;
+                if (from != null) d = Helpers.DistanceHelper.FindClosestDistanceFromMobilePartyToSettlement(m, from, m.NavigationCapability);
+                else { float lr; d = Helpers.DistanceHelper.GetDistanceBetweenMobilePartyToMobileParty(m, party, m.NavigationCapability, out lr); }
+                if (!(d < reach)) continue;
+                int cost = am.CalculatePartyInfluenceCost(party, m);
+                var ro = m.Party.MemberRoster;
+                float hr = ro.TotalManCount > 0 ? 1f - (float)ro.TotalWounded / ro.TotalManCount : 0f;
+                list.Add(new KeyValuePair<MobileParty, float>(m, m.Party.EstimatedStrength / (cost + 0.1f) * hr));
+            }
+            list.Sort((a, b) => a.Value.CompareTo(b.Value));   // kolejnosc gry (OrderByQ rosnaco)
+            int inArmies = 0;
+            foreach (var a in k.Armies) if (a != null) inArmies += a.Parties.Count;
+            int lim = (int)Math.Ceiling(k.WarPartyComponents.Count * 0.7f - inArmies);
+            if (lim <= 0) return 9;
+            if (lim < list.Count) list.RemoveRange(lim, list.Count - lim);
+            if (list.Count == 0) return 6;
+            if (k.Settlements.Count > 0)
+            {
+                float cs = party.Party.GetCustomStrength(BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.Siege);
+                foreach (var kv in list) cs += kv.Key.Party.GetCustomStrength(BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.Siege);
+                if (cs < 1000f) return 8;
+            }
+            if (_wSca == "TAK")
+            {
+                // SCA (StrategicArmyManagementModel): IsRecoveredEnoughToLeadArmy / ToJoinArmy, co najmniej 2 czlonkow, sila razem 260
+                if (party.MemberRoster.TotalHealthyCount < 22 || party.Party.EstimatedStrength < 80f) return 10;
+                list.RemoveAll(kv => kv.Key.MemberRoster.TotalHealthyCount < 10 || kv.Key.Party.EstimatedStrength < 35f);
+                float tot = party.Party.EstimatedStrength;
+                foreach (var kv in list) tot += kv.Key.Party.EstimatedStrength;
+                if (list.Count < 2 || tot < 260f) return 10;
+            }
+            foreach (var kv in list) { est += PStr(kv.Key.Party); n++; }
+            return -1;
         }
 
         /// <summary>Cel kanonu Wysp: Polnoc wlasciwa (kultura battania - Moat Cailin, Deepwood Motte, Torrhen's Square; Settlement.Culture ROT-Map nie zmienia sie po zdobyciu).</summary>
@@ -695,7 +815,7 @@ namespace Armoury
             if (atSea && !on340) { IronX(0); return; }
             var members = pt.PossibleArmyMembersUponArmyCreation;
             bool gather = !lead && party.Army == null && members != null && members.Count > 0;
-            if (!lead && !gather) { IronX(1); IronWhy(IronWhyOf(party)); return; }
+            if (!lead && !gather) { IronX(1); int iw = IronWhyOf(party); IronWhy(iw); if (on340) IronMusterFailed(party, iw); return; }
             if (lead) { try { if (ArmyRestDay.Resting(party.Army) || NightRest.FieldCampHolds(party)) { IronX(2); return; } } catch { } }
             var scores = pt.AIBehaviorScores;
             int gameCanon = -1;
@@ -863,7 +983,7 @@ namespace Armoury
                 double z = ZFor(t, k, party, our + SiegeDays, out first, out ally);
                 q = Ratio(z, qStr + ally);
                 double qk;
-                if (q <= AbandonQ && KBlocked(k, t, party, qStr, our, out qk)) q = qk;
+                if (KBlocked(k, t, party, qStr, our, out qk)) return false;   // 340 (recenzja): blokada krolestwa - armia na morzu nie trzyma celu
             }
             if (q > AbandonQ) return false;
             MobileParty.NavigationType nav; float dist; bool fromPort;
@@ -897,9 +1017,16 @@ namespace Armoury
             var k = party.MapFaction as Kingdom;
             if (k == null || k.Armies.Count > 0) return false;
             var h = party.LeaderHero; var c = h != null ? h.Clan : null;
-            if (h == null || c == null || c.Leader != h || !(c.Influence > 100f) || c.IsUnderMercenaryService) return false;
-            var am = Campaign.Current.Models.ArmyManagementCalculationModel;
-            float sizeMin = am.AIMobilePartySizeRatioToCallToArmy, foodMin = am.MinimumNeededFoodInDaysToCallToArmy, reach = am.MaximumDistanceToCallToArmy;
+            if (h == null || c == null || !IronHead(party, h, c) || !(c.Influence > 100f) || c.IsUnderMercenaryService) return false;
+            float sizeMin = Campaign.Current.Models.ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy;
+            int today = Today;
+            long wf0 = Ts();
+            lock (_lk)
+            {
+                _tWait += Ts() - wf0;
+                int fd;
+                if (_musterFail.TryGetValue(party, out fd) && today - fd < MusterFailDays) { _dIronMusterBan++; return false; }   // 340: nieudana zbiorka w porcie - bez petli
+            }
             long mf = Ts();
             bool ok = (float)party.GetNumDaysForFoodToLast() > Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege && party.PartySizeRatio > sizeMin;
             _modelT += Ts() - mf;
@@ -907,19 +1034,14 @@ namespace Armoury
             bool war = false;
             foreach (var f in k.FactionsAtWarWith) if (f != null && f.Fiefs != null && f.Fiefs.Count > 0) { war = true; break; }
             if (!war) return false;
-            // wolne druzyny Wysp w zasiegu wezwania (te same sita co gra: nie w armii, nie wladca, nie w bitwie / oblezeniu, jedzenie, liczebnosc)
+            // 340 (recenzja): port najpierw - kandydaci gry liczeni od portu zbiorki (droga gry, limit 0.7, prog 1000, sito SCA - IronCands)
+            var port = WarFront334.NearestPort(party, 0f, NowH);
+            if (port == null) return false;
             var pos = party.GetPosition2D;
-            float o = PStr(party.Party); int n = 0;
-            foreach (var wp in k.WarPartyComponents)
-            {
-                var m = wp != null ? wp.MobileParty : null;
-                if (m == null || m == party || !m.IsActive || !m.IsLordParty || m.Army != null || m.LeaderHero == null || m.LeaderHero == k.Leader) continue;
-                if (m.MapEvent != null || m.BesiegedSettlement != null || m.IsDisbanding) continue;
-                if (m.GetPosition2D.DistanceSquared(pos) >= reach * reach) continue;
-                if (!(m.PartySizeRatio > sizeMin) || !((float)m.GetNumDaysForFoodToLast() > foodMin)) continue;
-                o += PStr(m.Party); n++;
-            }
-            if (n == 0) return false;
+            float o; int n, cw;
+            long mc = Ts();
+            try { cw = IronCands(party, k, port, out o, out n); } finally { _modelT += Ts() - mc; }
+            if (cw >= 0) { IronWhy(cw); return false; }
             // najblizszy cel kanonu (linia prosta) z q <= 1.0 przy tej sile
             bool afterRw = false;
             try { afterRw = CanonWarClock.OverNow(); } catch { }
@@ -959,8 +1081,6 @@ namespace Armoury
                 if (q <= SiegeBanQ) { tgt = t; tq = q; break; }
             }
             if (tgt == null) return false;
-            var port = WarFront334.NearestPort(party, 0f, NowH);
-            if (port == null) return false;
             MobileParty.NavigationType nav; float dist; bool fromPort;
             long m0 = Ts();
             Helpers.AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, port, false, out nav, out dist, out fromPort);
@@ -976,11 +1096,11 @@ namespace Armoury
             }
             float v = CanonWarBalance.Edge * Math.Max(best, CanonWarBalance.FloorBase);
             pt.AddBehaviorScore((new AIBehaviorData(port, AiBehavior.GoToSettlement, nav, false, fromPort, false), v));
-            int today = Today;
             long wl = Ts();
             lock (_lk)
             {
                 _tWait += Ts() - wl;
+                _musterTry[party] = new KeyValuePair<Settlement, int>(port, today);
                 int last;
                 bool first = !_musterDay.TryGetValue(party, out last) || last != today;
                 _musterDay[party] = today;
@@ -998,6 +1118,26 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>340 (recenzja): wodz wyslany na zbiorke stoi w porcie, a gra nie dala czlonkow - nieudana proba (bez nowej oferty przez MusterFailDays), linia w logu.</summary>
+        private static void IronMusterFailed(MobileParty party, int why)
+        {
+            var cs = party.CurrentSettlement;
+            if (cs == null || party.Army != null) return;
+            long w = Ts();
+            lock (_lk)
+            {
+                _tWait += Ts() - w;
+                KeyValuePair<Settlement, int> tr;
+                if (!_musterTry.TryGetValue(party, out tr) || tr.Key != cs || Today - tr.Value > MusterFailDays) return;
+                _musterTry.Remove(party);
+                _musterFail[party] = Today;
+                _dIronMusterFail++;
+                if (S != null && S.LogEnabled)
+                    Log.Info(Tag + "Zelazni zbiorka nieudana | dzien " + Today + " | " + Nm(party) + " w " + cs.StringId + " (" + Nm(cs) + ") | gra nie dala czlonkow (powod "
+                             + IronWhyName[Math.Max(0, Math.Min(IronWhyName.Length - 1, why))] + ") | bez nowej zbiorki w porcie przez " + MusterFailDays + " doby.");
+            }
+        }
+
         /// <summary>Linia koszt: wyjscia IronSiege i najnizsze q doby.</summary>
         private static string IronXLine()
         {
@@ -1007,7 +1147,8 @@ namespace Armoury
             // 340 (d): powody braku zbiorki (odczyt warunkow gry) i dzwignie kanonu
             sb.Append(" [340: bez zbiorki -");
             for (int i = 0; i < _dIronWhy.Length; i++) sb.Append(i == 0 ? " " : ", ").Append(IronWhyName[i]).Append(' ').Append(_dIronWhy[i]);
-            sb.Append("; zbiorka w porcie ").Append(_dIronMuster).Append(", armia na morzu trzyma cel ").Append(_dIronKeepSea).Append(", pierwszenstwo kanonu ").Append(_dIronPrio).Append(']');
+            sb.Append("; zbiorka w porcie ").Append(_dIronMuster).Append(", armia na morzu trzyma cel ").Append(_dIronKeepSea).Append(", pierwszenstwo kanonu ").Append(_dIronPrio)
+              .Append(", w porcie bez armii ").Append(_dIronMusterFail).Append(" (wstrzymane ").Append(_dIronMusterBan).Append(")]");
             return sb.ToString();
         }
 
@@ -1039,7 +1180,7 @@ namespace Armoury
                     var mf = m.MapFaction;
                     try { if (mf != null && FactionManager.IsAtWarAgainstFaction(kf, mf)) { any = true; break; } } catch { }
                 }
-                if (!any) deadKr.Add(kv.Key);
+                if (!any || nowD > kv.Value.Since + HorizonDays) deadKr.Add(kv.Key);   // 340: twardy koniec pamieci
             }
             foreach (var s in deadKr) _krel.Remove(s);
             var deadM = new List<MapEvent>();
@@ -1051,6 +1192,12 @@ namespace Armoury
             var deadMu = new List<MobileParty>();
             foreach (var kv in _musterDay) if (kv.Key == null || !kv.Key.IsActive || kv.Value < Today - 1) deadMu.Add(kv.Key);
             foreach (var p in deadMu) _musterDay.Remove(p);
+            var deadTr = new List<MobileParty>();
+            foreach (var kv in _musterTry) if (kv.Key == null || !kv.Key.IsActive || kv.Value.Value < Today - MusterFailDays) deadTr.Add(kv.Key);
+            foreach (var p in deadTr) _musterTry.Remove(p);
+            var deadF = new List<MobileParty>();
+            foreach (var kv in _musterFail) if (kv.Key == null || !kv.Key.IsActive || Today - kv.Value >= MusterFailDays) deadF.Add(kv.Key);
+            foreach (var p in deadF) _musterFail.Remove(p);
             DefenceDayClean();
         }
     }

@@ -159,7 +159,7 @@ namespace Armoury
         private static bool VisitedRecently(MobileParty party, Settlement st, int hour)
         {
             Dictionary<Settlement, int> d; int last;
-            return _portVisit.TryGetValue(party, out d) && d.TryGetValue(st, out last) && hour - last < 24;
+            lock (_ironLock) return _portVisit.TryGetValue(party, out d) && d.TryGetValue(st, out last) && hour - last < 24;   // 340: zapis pod zamkiem (OnSettlementEntered)
         }
 
         private static void IronPort(MobileParty party, PartyThinkParams p)

@@ -303,8 +303,12 @@ namespace Armoury
             {
                 // 340 (b): q w jednej mierze - nasza sila jak sila wroga w ZFor (PartyBase.EstimatedStrength): druzyna, armia, przy zbiorce - z kandydatami gry
                 // (ThinkParamsCache.PossibleArmyMembersUponArmyCreation); gra podaje __3 w swojej mierze (GetTotalLandStrengthWithFollowers + GetCustomStrength oblezenia)
-                float o3 = __3;
+                float o3 = __3, gd = 0f;
                 bool gath = false;
+                // 340 (recenzja): nasza sila przed zamkiem (wywolania gry - EstimatedStrength, ThinkParamsCache; pamiec ThreadStatic nie potrzebuje zamka) - czas jak model gry
+                long om0 = Ts();
+                if (__1 != Army.ArmyTypes.Defender && S != null && S.LocalOneMeasure340) o3 = OurO(p, __1, __3, out gath, out gd);   // 340 (b)
+                long om = Ts() - om0;
                 long w0 = Ts();
                 double q = -1;
                 KAsk ka = null;
@@ -313,8 +317,8 @@ namespace Armoury
                     long t1 = Ts();
                     int g0 = GcN();
                     _dWaitT += t1 - w0;   // 334f (Z0): czekanie na zamek poza kosztem
+                    _dModelT += om;
                     if (!SnapFresh) { _dNoSnap++; return; }   // bez migawki z dzis - stara gra (nie q = 0)
-                    if (__1 != Army.ArmyTypes.Defender && S != null && S.LocalOneMeasure340) o3 = OurO(p, __1, __3, out gath);   // 340 (b), w koszcie
                     _dScoreN++;
                     ka = KA(k);
                     if (__1 == Army.ArmyTypes.Besieger)
@@ -333,7 +337,8 @@ namespace Armoury
                                 if (our >= 0f)
                                 {
                                     float first; double ally;
-                                    double z = ZFor(t, k, p, our + SiegeDays, out first, out ally);
+                                    // 340 (recenzja, L15d): przy zbiorce armia dochodzi do wodza gd dob - wrog, ktory dojdzie w tym czasie, tez sie liczy (okno + czas zbiorki)
+                                    double z = ZFor(t, k, p, our + SiegeDays + gd, out first, out ally);
                                     q = Ratio(z, o3 + ally);
                                     m = SiegeMult(q, cur);
                                     if (gath) { _dGather++; if (m > 0f) _dGatherOk++; if (__3 > 0f) _dGatherRatio += o3 / __3; }
@@ -404,32 +409,45 @@ namespace Armoury
         // 340 (a): pamiec OurO - ta sama druzyna ocenia w jednej mysli dziesiatki celow (klucz: druzyna, godzina, rodzaj - armia / sama / zbiorka)
         [ThreadStatic] private static MobileParty _ooP;
         [ThreadStatic] private static int _ooH, _ooK;
-        [ThreadStatic] private static float _ooV;
+        [ThreadStatic] private static float _ooV, _ooGd;
         [ThreadStatic] private static bool _ooG;
+        // 340 (recenzja): sila samej druzyny w mierze gry (GetTotalLandStrengthWithFollowers) na godzine - ThinkParamsCache.WillGatherAnArmy tylko, gdy gra podala wiecej (liczy kandydatow)
+        [ThreadStatic] private static MobileParty _obP;
+        [ThreadStatic] private static int _obH;
+        [ThreadStatic] private static float _obV;
 
         /// <summary>340 (b): nasza sila w mierze ZFor (PartyBase.EstimatedStrength, jak wrog): wodz armii - wszystkie druzyny armii (czlonkowie w drodze tez - ZFor pomija
         /// ich jako ta sama grupe); zbiorka (Besieger, WillGatherAnArmy w ThinkParamsCache) - druzyna + kandydaci gry z CanLordCreateArmy; inaczej druzyna. 0 albo wyjatek -
         /// miara gry (game). gath - ocena z przyszla armia.</summary>
-        private static float OurO(MobileParty p, Army.ArmyTypes at, float game, out bool gath)
+        private static float OurO(MobileParty p, Army.ArmyTypes at, float game, out bool gath, out float gd)
         {
-            gath = false;
+            gath = false; gd = 0f;
             try
             {
                 var a0 = p.Army;
                 int kind = a0 != null ? (a0.LeaderParty == p ? 1 : 2) : 3;
-                if (kind == 3 && at == Army.ArmyTypes.Besieger) { var pt0 = p.ThinkParamsCache; if (pt0 != null && pt0.WillGatherAnArmy) kind = 4; }
                 int hh = NowH;
-                if (ReferenceEquals(_ooP, p) && _ooH == hh && _ooK == kind) { gath = _ooG; return _ooV > 0f ? _ooV : game; }
-                float v = OurOCore(p, at, out gath);
-                _ooP = p; _ooH = hh; _ooK = kind; _ooV = v; _ooG = gath;
+                if (kind == 3 && at == Army.ArmyTypes.Besieger)
+                {
+                    var pt0 = p.ThinkParamsCache;
+                    if (pt0 != null && pt0.WillGatherAnArmy)
+                    {
+                        // flaga z biezacej mysli (zbiorka) tylko, gdy gra podala sile z kandydatami; inaczej (ocena spoza mysli) - stara flaga, sama druzyna
+                        if (!ReferenceEquals(_obP, p) || _obH != hh) { _obP = p; _obH = hh; _obV = p.GetTotalLandStrengthWithFollowers(false); }
+                        if (game > _obV * 1.001f + 0.5f) kind = 4;
+                    }
+                }
+                if (ReferenceEquals(_ooP, p) && _ooH == hh && _ooK == kind) { gath = _ooG; gd = _ooGd; return _ooV > 0f ? _ooV : game; }
+                float v = OurOCore(p, at, kind == 4, out gath, out gd);
+                _ooP = p; _ooH = hh; _ooK = kind; _ooV = v; _ooG = gath; _ooGd = gd;
                 return v > 0f ? v : game;
             }
-            catch { gath = false; return game; }
+            catch { gath = false; gd = 0f; return game; }
         }
 
-        private static float OurOCore(MobileParty p, Army.ArmyTypes at, out bool gath)
+        private static float OurOCore(MobileParty p, Army.ArmyTypes at, bool gather, out bool gath, out float gd)
         {
-            gath = false;
+            gath = false; gd = 0f;
             {
                 var a = p.Army;
                 float o = 0f;
@@ -440,14 +458,23 @@ namespace Armoury
                 else
                 {
                     o = p.Party != null ? p.Party.EstimatedStrength : 0f;
-                    if (a == null && at == Army.ArmyTypes.Besieger)
+                    if (a == null && at == Army.ArmyTypes.Besieger && gather)
                     {
                         var pt = p.ThinkParamsCache;
                         if (pt != null && pt.WillGatherAnArmy)
                         {
                             var mm = pt.PossibleArmyMembersUponArmyCreation;
+                            var pp = p.GetPosition2D;
                             if (mm != null)
-                                foreach (var x in mm) if (x != null && x != p && x.IsActive && x.Party != null) { o += x.Party.EstimatedStrength; gath = true; }
+                                foreach (var x in mm)
+                                {
+                                    if (x == null || x == p || !x.IsActive || x.Party == null) continue;
+                                    o += x.Party.EstimatedStrength; gath = true;
+                                    // czas zbiorki: kandydat dochodzi do wodza (linia prosta / wlasna predkosc - dolna granica drogi)
+                                    float sp = Spd(x);
+                                    if (sp > 0.05f) { float dd = pp.Distance(x.GetPosition2D) / sp / CampaignTime.HoursInDay; if (dd > gd) gd = dd; }
+                                }
+                            if (gd > HorizonDays) gd = HorizonDays;
                         }
                     }
                 }

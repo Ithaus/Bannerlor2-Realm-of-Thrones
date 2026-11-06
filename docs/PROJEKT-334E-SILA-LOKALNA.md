@@ -369,3 +369,18 @@ Gałąź `noc/340-razem` (334e/f/g + 335 + 336 + 338). Działa: odstąpienia 3 (
 - W335-5 i W335-9.
 
 Hipoteza GC (a) jest sprawdzalna dopiero w nowym logu: okna z GC wobec reszty kosztu.
+
+## 16b. 340r – poprawki dwóch recenzji 340 (logika, technika i wydajność)
+
+| Punkt | Zmiana | Klucz |
+|---|---|---|
+| (c) pamięć odsieczy (KBlocked) | Członek armii liczony jako wódz armii (bez powtórzeń) – połączenie odsieczy w armię nie gubi pamięci. Ta sama wiedza co reszta modelu: liczy się drużyna z zamiarem obrony celu teraz (żywa droga, jak wpis Tg w ZFor), z zamiarem widzianym w ostatnich 12 h (MemHours, jak sąd oblężenia; plotka – migawka × 2) albo widziana zwiadem oceniającego (żywa droga). Nasza siła z sojusznikami w drodze (`o + ally` z ZFor) w obu gałęziach. Zwolnienie tylko, gdy odsieczy brak (s = 0), nie przy pierwszej ocenie silniejszego lorda. Twardy koniec: doba odwrotu + 12,03 (HorizonDays), także w czyszczeniu dobowym. Wpisy na godzinę (zwiad – przy ocenie). | `LocalReliefHold340` |
+| (c) armia Wysp na morzu | IronKeepSea: blokada królestwa = koniec trzymania celu (było: trzymanie mimo blokady przy q w (1,0; 1,25]). | `IronMuster340` |
+| (d) zbiórka w porcie | Kandydaci jak `CanLordCreateArmy` gry (DefaultArmyManagementCalculationModel): wolne drużyny lordów, nie władca, `DoNotMakeNewDecisions`, oblężenie w osadzie, jedzenie, liczebność, `CanLeadParty`, tratwa, droga gry (DistanceHelper) od portu zbiórki < MaximumDistanceToCallToArmy, kolejność gry, limit ceil(0,7 × drużyn − w armiach), próg siły oblężenia 1000; przy SCA – jego sito (wódz 22 zdrowych / 80 siły, członek 10 / 35, co najmniej 2, razem 260). Warunek wodza jak gra (głowa rodu albo pierwsza drużyna rodu, gdy głowa bez drużyny). Nieudana próba (wódz w porcie zbiórki, gra nie dała członków) – bez nowej zbiórki w porcie przez 2 doby, linia „Zelazni zbiorka nieudana”, licznik „w porcie bez armii (wstrzymane)”. Powody „bez zbiórki”: + próg 1000, limit 0,7, sito SCA. | `IronMuster340` |
+| (b) start → odstąpienie tej samej doby | Przy zbiórce okno wroga wydłużone o czas zbiórki (najdalszy kandydat gry do wodza, linia prosta / własna prędkość, maks. 12,03 doby) – wróg, który dojdzie w czasie zbiórki, liczy się już przy starcie. Flaga zbiórki (`ThinkParamsCache.WillGatherAnArmy`) tylko, gdy gra podała siłę większą od samej drużyny (ocena spoza myśli – stara flaga, sama drużyna). Nasza siła liczona przed zamkiem (czas jak model gry). | `LocalOneMeasure340` |
+| (a) miara kosztu | Linia koszt: „okien z GC N / wszystkich M”; L12p – liczba wywołań tylko z okien bez GC (średnia na wywołanie nie zaniżona). L12: koszt bez GC wiarygodny tylko, gdy okna z GC ≤ 5% okien i mają < 50% ms okien bez GC (wtedy dodatkowo maks godziny z GC < 50); inaczej ocena Z GC (< 5 / < 50). | – |
+| drobne | `_warLead` czyszczony przy wczytaniu (BesiegedRelief.Reset); `VisitedRecently` pod `_ironLock`; usunięte nieużywane `Lk()/Ul()`. | – |
+
+**Sprawdzarka (340r):** L12 z GC przy częstych oknach GC; L15d – start i odstąpienie tej samej osady w ≤ 1 dobie (INFO, ≥ 3 na królestwo – NIE; na logu 334f: vlandia 2); L17m – zbiórka w porcie bez armii (INFO, bez armii > połowy zbiórek przy ≥ 4 – NIE). Synteza: gc → L12 NIE (średnio z GC 40), + gcok, gcfreq, gctrust, gcpeak, sameday3, mfail.
+
+**Do obserwacji w teście 45 dób:** W335-9 – jeśli „atak na dowódcę” > ok. 10 × liczba zagrożeń, zawęzić regułę remisu do `foes10 >= 1 && allies5 == 0`; `Rear(f, back)` dla szyku w szarży, który zawraca.

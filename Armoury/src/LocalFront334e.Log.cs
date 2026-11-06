@@ -212,7 +212,7 @@ namespace Armoury
                      + " | kontrola ZFor " + (_dChk >> 7) + ", rozbieznosci " + _dDiv + (_dDivNote != null ? " [" + _dDivNote + "]" : "")
                      + " | rabunek start powtorki " + _dRaidRep + ", oblezenia fabuly ROT " + _dSiegeStory + ", bez decyzji AI " + _dSiegeNoAi
                      + " | ping-pong: powrot w blokadzie " + _dSiegePingPong + ", przydzial " + _dDefSwitch
-                     + " | z GC (340): srednio " + (hrs > 0 ? (allSum / hrs).ToString("0.00", Inv) : "0") + " / maks godziny " + allMax.ToString("0.0", Inv) + ", okien z GC " + _dGcWin + " (" + _dGcMs.ToString("0.0", Inv) + " ms)"
+                     + " | z GC (340): srednio " + (hrs > 0 ? (allSum / hrs).ToString("0.00", Inv) : "0") + " / maks godziny " + allMax.ToString("0.0", Inv) + ", okien z GC " + _dGcWin + " / " + _dWin + " (" + _dGcMs.ToString("0.0", Inv) + " ms)"
                      + " | sciezki ms (340): " + ps.ToString() + " | wpisy celu (340) budow " + _dThN
                      + " | odsiecz w zasiegu po odstapieniu (340): weta " + _dKRelHold + ", zwolnione " + _dKRelFree + ", pamieci " + _krel.Count
                      + " | zbiorka nasza miara (340): ocen " + _dGather + ", w oknie/srodku " + _dGatherOk + ", nasza/gry " + (_dGather > 0 ? (_dGatherRatio / _dGather).ToString("0.00", Inv) : "-") + ".");

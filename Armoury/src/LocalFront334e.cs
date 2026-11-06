@@ -247,11 +247,8 @@ namespace Armoury
         private static readonly double[] _dPath = new double[6];
         private static readonly int[] _dPathN = new int[6];
         private static double _hMsGc, _dMsAllSum, _dMsAllMax, _dGcMs;
-        private static int _dGcWin;
+        private static int _dGcWin, _dWin;   // 340: okna z GC / wszystkie okna (udzial - wiarygodnosc kosztu bez GC)
         [ThreadStatic] private static long _tWait;   // 340 (a): czekanie na zamek w mysli poza obozem (ThinkField) - poza kosztem, jak ScorePost
-        /// <summary>340 (a): zamek z pomiarem czekania (mysl poza obozem). Para z Ul().</summary>
-        private static void Lk() { long w = Ts(); System.Threading.Monitor.Enter(_lk); _tWait += Ts() - w; }
-        private static void Ul() { System.Threading.Monitor.Exit(_lk); }
         private static long _dWaitT, _dListT, _dAggT, _dScoutT, _dModelT, _dDailyT, _dAggN, _dAggHit, _dChk, _dDiv;
         private static string _dDivNote;
         [ThreadStatic] private static long _modelT;   // czas modelu gry w mysli poza obozem (ThinkField odejmuje)
@@ -299,7 +296,7 @@ namespace Armoury
         {
             _dDist = _dQ = _dLiveUsed = 0; _hMs = _dMsSum = _dMsMax = 0; _hHour = -1; _dHours = 0;
             _dRoadHit = _dWaitT = _dListT = _dAggT = _dScoutT = _dModelT = _dDailyT = _dAggN = _dAggHit = _dChk = _dDiv = 0; _dDivNote = null;
-            _hMsGc = _dMsAllSum = _dMsAllMax = _dGcMs = 0; _dGcWin = 0; _dThN = 0;
+            _hMsGc = _dMsAllSum = _dMsAllMax = _dGcMs = 0; _dGcWin = 0; _dWin = 0; _dThN = 0;
             Array.Clear(_dPath, 0, _dPath.Length); Array.Clear(_dPathN, 0, _dPathN.Length);
         }
 
@@ -316,9 +313,10 @@ namespace Armoury
                 }
                 _hHour = h; _hMs = 0; _hMsGc = 0;
             }
+            _dWin++;
             if (gc) { _hMsGc += ms; _dGcWin++; _dGcMs += ms; }
             else _hMs += ms;
-            if (path >= 0 && path < _dPath.Length) { if (!gc) _dPath[path] += ms; _dPathN[path]++; }
+            if (path >= 0 && path < _dPath.Length && !gc) { _dPath[path] += ms; _dPathN[path]++; }   // 340: ms i liczba wywolan z tych samych okien
         }
 
         private static float Spd(MobileParty mp)
