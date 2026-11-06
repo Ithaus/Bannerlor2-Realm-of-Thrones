@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 335b - poprawki po 2 recenzjach 335: obrona trwa w bitwie chronionego, przydzial obroncow bez podwojnego liczenia, straz nie z linii w zwarciu (noc/335-ochrona-wodza; Armoury.dll 6ffcced0ea53e5933dc5a8aed4ea0758 - NIE WGRANE, bez autotestu; Jeff gra)
+**Mapa (LordEscort.Guard335.cs):**
+- WAZNE 4 / R2-1: para nie znika w chwili starcia - P w bitwie polowej (bez osady, nie morze) z napastnikiem z poprzedniej migawki albo P po stronie broniacej, a X = wodz
+  strony atakujacej: para trwa (sila stron bitwy), obroncy EngageParty na X = dolaczenie do bitwy po stronie P; wyjatek zakazu zaczepiania 223/p9 dziala dalej.
+  Licznik doby "bitwa chronionego: par N, obroncow wezwanych N, dolaczylo N" (obronca z poprzedniej migawki w tej samej bitwie co P).
+- WAZNE 3: najpierw wszystkie pary, potem przydzial obroncow (ranga, odleglosc), sila grupy tylko z przypisanych, chroniony nigdy nie jest obronca; para lacznie
+  slabsza odpada po jednej (najslabsza pierwsza), jej obroncy wracaja do pozostalych.
+- WAZNE 5 / R2 drobne: P jedzie tylko do obroncy z droga nie przez X (kat > 60 st.) - bez takiego decyzja gry (licznik "chroniony bez bezpiecznej drogi do obroncy");
+  obronca dalej niz 2R od P i dalej od X niz P najpierw EscortParty do P (licznik "obronca do chronionego"), blizej - EngageParty na X.
+- DROBNE 1: "P sam da rade" porownuje z X razem z sojusznikami w 2R. DROBNE 8: latka na typ czynnego modelu kazdej kampanii.
+**Bitwa (HeroCaution.Guard335.cs):**
+- WAZNE 1 / R2-4: zagrozenie - swoich w 10 m (nie 5 m), jezdziec 10-20 m tylko nadjezdzajacy (cel = wodz albo > 2 m/s w 45 st.); warunek samotnego 149 zostaje.
+  Straz 3 na napastnika (3..20), nie z walki wrecz (cel w 3 m) ani z szyku w szarzy.
+- WAZNE 2 / R2-3: wlasny szyk glowny albo pieszy >= 8 - stanowisko za wlasnym szykiem.
+- R2-2 / DROBNE 5: cel wycofania - najblizszy szyk pieszy nie w szarzy (konny tylko bez pieszego); ranny - tyl szyku, nie srodek. Sortowanie bez lambdy.
+- DROBNE 4: straznik wziety przez 148/204/333 (lowca, jezdziec, test) - zwolniony bez ruszania jego pozycji (koniec straz "przejety").
+**sprawdz_logi wodz335:** nowa linia doby (stara tez czytana), W335-2b (>= 3 pary w bitwie -> dolaczylo > 0; pojmani chronieni INFO), W335-6 liczy "ERROR in
+HeroCaution.Pass", W335-7 OK takze przy swoim <= 5 m przy kontakcie; W335-S TAK (20 przypadkow).
+**Bez zmian (swiadomie):** DROBNE 2 (gracz przejezdzajacy w 2R), 3 (armia na odsiecz/oblezenie jako obronca - Jeff: bronic glowy rodu), 6, 7 - opis w CHANGELOG 335.
+**Test:** C:\Users\GAME\bannerlord-autotest\test\bieg-bitwa-204.ps1 -DllDir C:\Users\GAME\bannerlord-autotest\test\m335 -Battles 8 (tylko gdy gra Jeffa zamknieta), potem
+`python -I tools/sprawdz_logi.py --grupa wodz335 <Armoury-*.log>` + grupy 204/333 (liczebnosc jazdy).
+
 ## 335 - ochrona wodza: lordowie bronia zagrozonego lorda na mapie, wodz w bitwie dowodzi zza swoich i ma straz (noc/335-ochrona-wodza od noc/333-ai-bitwy a7e623fb - NIE WGRANE, bez autotestu; Jeff gra)
 **Problem:** Jeff 06.11 (gra od 11:51, `Armoury-2026-11-06_11-51-21.log`): (1) MAPA "zblizam sie do Tywina, to inni wokol niego nie bronia glowy rodu, choc maja
 przewage" - 12:39:03 Tywin (lord_4_1, 200 z 686 ludzi, wypelnienie 0.29) uciekal sam (FleeToPoint), "postoj 223 (slaby wobec zagrozenia)"; najblizsi Lannisterowie
