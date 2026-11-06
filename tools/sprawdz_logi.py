@@ -95191,6 +95191,8 @@ A333_ERR = re.compile(r"ERROR in (Pendulum333\.|HorsePursuit\.(Brama333|Strefa33
 A333_K = ["kind", "keyA", "full", "breaks", "breakRiders", "epMax", "shMax", "loops", "rechase", "nostart", "light", "lightFull", "gEps", "gRiders", "gZone", "gTime",
           "riderIn", "nwZone", "clamp", "zones", "backHits", "keyB", "patch", "forms", "minutes", "rev", "revBack", "seen", "backHeld", "backS4", "backBeh",
           "fwdHeld", "held", "stum"]
+# 333e: segment 333d linii misji - nawroty srodka ciezkosci (ten sam zygzak) i nawroty razem z mediana (scisle; od 333e)
+A333_COG = re.compile(r"; 333d: nawroty srodka ciezkosci (\d+) \(w tyl (\d+)\)(?:, nawroty razem ze srodkiem ciezkosci (\d+) \(w tyl (\d+)\))?")
 
 
 def ai333_collect(logp):
@@ -95225,6 +95227,9 @@ def ai333_collect(logp):
                     r[k] = 0
                 else:
                     r[k] = int(v)
+            mc = A333_COG.search(line)
+            r["cog"] = (int(mc.group(1)), int(mc.group(2))) if mc else None
+            r["both"] = (int(mc.group(3)), int(mc.group(4))) if mc and mc.group(3) is not None else None
             D["lines"].append(r)
     return D
 
@@ -95263,6 +95268,21 @@ def ai333_rows(rep, D):
         rep.add("A333-4: wahadlo szykow przed kontaktem", f"nawroty {rev} na {mins:.1f} szyko-minut = {ra:.2f}/min, w tyl {rb} = {rbb:.2f}/min; wstecz zatrzymanych "
                 f"{held}, S4 {sum(r['backS4'] for r in on)}, zmiana zachowania {sum(r['backBeh'] for r in on)}", "<= 0.25/min, w tyl <= 0.10/min",
                 ra <= 0.25 and rbb <= 0.10)
+    # 333e: A333-4b ta sama miara na srodku ciezkosci (mediana przeskakuje miedzy ludzmi - 333d), A333-4c nawroty mediany ze srodkiem razem - INFO
+    onc = [r for r in on if r.get("cog") is not None]
+    minc = sum(r["minutes"] for r in onc)
+    if not onc or minc < 2.0:
+        rep.add("A333-4b: wahadlo - srodek ciezkosci", f"szyko-minut {minc:.1f} z segmentem 333d (bitew {len(onc)})", "INFO (brak segmentu 333d albo < 2 szyko-minut)", None)
+    else:
+        ca, cb = sum(r["cog"][0] for r in onc), sum(r["cog"][1] for r in onc)
+        rep.add("A333-4b: wahadlo - srodek ciezkosci", f"nawroty {ca} na {minc:.1f} szyko-minut = {ca / minc:.2f}/min, w tyl {cb} = {cb / minc:.2f}/min",
+                "<= 0.25/min, w tyl <= 0.10/min", ca / minc <= 0.25 and cb / minc <= 0.10)
+        onb = [r for r in onc if r.get("both") is not None]
+        minb = sum(r["minutes"] for r in onb)
+        if onb and minb >= 2.0:
+            ba, bb = sum(r["both"][0] for r in onb), sum(r["both"][1] for r in onb)
+            rep.add("A333-4c: wahadlo - mediana i srodek razem", f"nawroty {ba} na {minb:.1f} szyko-minut = {ba / minb:.2f}/min, w tyl {bb} = {bb / minb:.2f}/min",
+                    "INFO (scisle: srodek ciezkosci idzie i wraca z mediana)", None)
     st = sum(r["stum"] for r in L)
     rep.add("A333-5: potkniecia i ERROR 333", f"potkniecia {st}, ERROR {D['err']}", "0 i 0", st == 0 and D["err"] == 0)
     badp = [r["patch"] for r in on if r["patch"] != "TAK"]
@@ -95332,6 +95352,8 @@ def ai333_synth():
                 .replace(", lekkie odpedzenia L1 przy armii 1, poscigi L1 po 2. zerwaniu 0", "")],
         "guard": [ai333_line(gEps=1, gRiders=14)],
         "pend": [ai333_line(rev=30, rb=12)],
+        "cog": [ai333_line(rev=30, rb=12).replace(" | rozkazy Move przed kontaktem", "; 333d: nawroty srodka ciezkosci 2 (w tyl 0), nawroty razem ze srodkiem ciezkosci 1 (w tyl 0), drogi - | rozkazy Move przed kontaktem")],
+        "cogbad": [ai333_line(rev=30, rb=12).replace(" | rozkazy Move przed kontaktem", "; 333d: nawroty srodka ciezkosci 30 (w tyl 12), drogi - | rozkazy Move przed kontaktem")],
         "pendoff": [ai333_line(keyB="NIE", rev=30, rb=12)],
         "stum": [ai333_line(stum=1)],
         "err": [ai333_line(), "ERROR in HorsePursuit.Brama333: System.NullReferenceException"],
@@ -95350,7 +95372,9 @@ def ai333_synth():
         "loop1": {"A333-2": "TAK"},
         "old": {"A333-0": "TAK", "A333-2": "TAK"},
         "guard": {"A333-3": "NIE"},
-        "pend": {"A333-4": "NIE"},
+        "pend": {"A333-4": "NIE", "A333-4b": "INFO"},
+        "cog": {"A333-0": "TAK", "A333-4": "NIE", "A333-4b": "TAK", "A333-4c": "INFO"},
+        "cogbad": {"A333-0": "TAK", "A333-4": "NIE", "A333-4b": "NIE"},
         "pendoff": {"A333-4": "INFO"},
         "stum": {"A333-5": "NIE"},
         "err": {"A333-5": "NIE"},

@@ -51,6 +51,14 @@ namespace Armoury
     /// rozkaz nie-Move, po kontakcie, przestrzelenie P, obrot / przestawienie szyku, P bez zmian). Linie "AI bitwy (333) rozkaz przed kontaktem" (zmiana rozkazu na
     /// nie-Move) i "AI bitwy (333) ustawienie przed kontaktem" (FacingOrder / ArrangementOrder na poczatku i przy zmianie) - po MaxSetLines na misje.
     /// Miara wahadla bez zmian (mediana) - srodek ciezkosci liczony obok, do porownania. Zachowanie latki bez zmian.
+    /// 333e (wyniki 333d, bieg at-333-D3: 62 z 86 nawrotow mediany to skok mediany - CachedMedianPosition = czlowiek najblizej sredniej, przeskakuje miedzy ludzmi
+    /// szerokiego Loose; srodek ciezkosci stoi; prawdziwe nawroty 24 - nowy P regula 5 "w bok" ze schodkiem wstecz 9, regula Z 6, drgania przy dojsciu do P 7):
+    ///  - latka liczy pozycje szyku ze srodka ciezkosci (CachedAveragePosition; bez niego mediana) - regula 1 (kierunek) i 4 (trzymanie);
+    ///  - zapadka: przeciwna skladowa na osi do wroga juz od DeadMin (3 m), nie od pol martwej strefy - w oknie punkt OBCIETY do osi P (zostaje sam ruch w bok,
+    ///    gdy >= martwej strefy i na siatce nawigacji; inaczej zostaje P); po oknie nawrot tylko >= 2 martwe strefy na osi (mniejszy - obciety jak w oknie);
+    ///  - trzymanie liczone takze od dojscia do P (srodek ciezkosci w martwej strefie), nie tylko od przyjecia P.
+    /// Wyjatki kontaktu, regula 1 (powrot obroncy na wzgorze, lucznicy za piechote) i miara bez zmian; w linii: nawroty razem ze srodkiem ciezkosci (scisle),
+    /// punkty obciete do ruchu w bok, nawroty po oknie za male.
     /// </summary>
     internal static class Pendulum333
     {
@@ -71,7 +79,7 @@ namespace Armoury
             // 333b: punkt przyjety, zapadka
             public Vec2 P = Vec2.Invalid;
             public WorldPosition PW;
-            public float PAt = -1000f, DirAt = -1000f;
+            public float PAt = -1000f, DirAt = -1000f, ArrAt = -1000f;   // 333e: ArrAt - dojscie do P (srodek ciezkosci w martwej strefie)
             public sbyte Dir;
             public int Revs;
             // pomiar
@@ -114,6 +122,8 @@ namespace Armoury
         private static float _preSec;
         // 333d: diagnostyka
         private static int _revLog, _ordLog, _setLog, _revA, _revABack, _revSmall, _ordChg, _facChg, _arrChg;
+        // 333e: nawroty mediany, w ktorych srodek ciezkosci idzie i wraca razem (scisle), punkty obciete do ruchu w bok, nawroty po oknie za male
+        private static int _revBoth, _revBothBack, _clip, _zSmall;
         private static readonly Dictionary<string, int[]> RevWay = new Dictionary<string, int[]>(StringComparer.Ordinal);
         private static readonly Dictionary<string, int> NonMoveBy = new Dictionary<string, int>(StringComparer.Ordinal);
         private static int _stum, _stumPatch;   // recenzja 333 (7): potkniecie latki (przed pierwszym Begin) nie ginie w Clear
@@ -170,6 +180,7 @@ namespace Armoury
             _preSec = 0f;
             _stum = 0;
             _revLog = _ordLog = _setLog = _revA = _revABack = _revSmall = _ordChg = _facChg = _arrChg = 0;
+            _revBoth = _revBothBack = _clip = _zSmall = 0;
             RevWay.Clear(); NonMoveBy.Clear();
         }
 
@@ -280,7 +291,7 @@ namespace Armoury
                 }
                 if (!_key) return;
                 if (!pre) { Forget(pf); return; }
-                Vec2 c = f.CachedMedianPosition.AsVec2;
+                Vec2 c = Pos(f);   // 333e: srodek ciezkosci (mediana skacze miedzy ludzmi - 333d)
                 WorldPosition tw = input.CreateNewOrderWorldPositionMT(f, WorldPosition.WorldPositionEnforcedCache.None);
                 Vec2 tp = tw.AsVec2;
                 if (!c.IsValid || !tw.IsValid || !tp.IsValid) return;
@@ -299,28 +310,39 @@ namespace Armoury
                 }
                 // 2. martwa strefa
                 if (tp.Distance(pf.P) < dz) { Keep(f, pf, ref input); _dead++; return; }
-                sbyte sg = Sign((tp - pf.P).DotProduct(pf.Axis), dz);
+                float s = (tp - pf.P).DotProduct(pf.Axis);
+                sbyte sg = Sign(s, dz);
                 char rule = '5';
-                // 3. zapadka kierunku (okno 30 s, podwajane po kazdym przepuszczonym nawrocie)
-                if (sg != 0 && pf.Dir != 0 && sg != pf.Dir)
+                // 3. zapadka kierunku (okno 30 s, podwajane po kazdym przepuszczonym nawrocie). 333e: przeciwna skladowa juz od DeadMin (3 m), nie od pol martwej
+                // strefy - ruch "w bok" z cofnieciem nie omija zapadki (schodki wstecz po 5 m przy Dir naprzod); w oknie albo za maly nawrot po oknie (< 2 martwe
+                // strefy na osi) - punkt obciety do osi P (zostaje sam ruch w bok), a gdy reszta w martwej strefie - zostaje P
+                if (pf.Dir != 0 && s * pf.Dir < -DeadMin)
                 {
                     float win = Math.Min(RatchetMax, Ratchet * (float)Math.Pow(2.0, Math.Min(pf.Revs, 3)));
-                    if (now - pf.DirAt < win)
+                    bool inWin = now - pf.DirAt < win;
+                    if (inWin || sg == 0 || Math.Abs(s) < 2f * dz)
                     {
+                        if (!inWin) _zSmall++;
+                        Vec2 tc = tp - pf.Axis * s;
+                        if (tc.Distance(pf.P) >= dz && Side(f, pf, tw, tc, now, beh, ref input)) return;
                         Keep(f, pf, ref input);
-                        if (sg < 0) _backHeld++; else _fwdHeld++;
+                        if (s < 0f) _backHeld++; else _fwdHeld++;
                         return;
                     }
                     pf.Revs++;
                     _revOk++;
                     rule = 'Z';   // zapadka przepuscila nawrot po oknie
                 }
-                // 4. trzymanie: szyk stoi na P - nowy punkt najwczesniej HoldMin s po przyjeciu P
-                else if (c.Distance(pf.P) < dz && now - pf.PAt < HoldMin)
+                // 4. trzymanie: szyk stoi na P - nowy punkt najwczesniej HoldMin s po przyjeciu P; 333e: i HoldMin s od dojscia do P (bez drgan 3 m przy P)
+                else if (c.Distance(pf.P) < dz)
                 {
-                    Keep(f, pf, ref input);
-                    _hold++;
-                    return;
+                    if (pf.ArrAt < pf.PAt) pf.ArrAt = now;
+                    if (now - Math.Max(pf.PAt, pf.ArrAt) < HoldMin)
+                    {
+                        Keep(f, pf, ref input);
+                        _hold++;
+                        return;
+                    }
                 }
                 // 5. przyjety
                 Accept(pf, tw, tp, sg, now, beh, rule);
@@ -358,6 +380,27 @@ namespace Armoury
             pf.P = Vec2.Invalid;
             pf.Dir = 0;
             pf.DirAt = -1000f;
+        }
+
+        /// <summary>333e: pozycja szyku dla latki - srodek ciezkosci (srednia pozycji ludzi), bez niego mediana.</summary>
+        private static Vec2 Pos(Formation f)
+        {
+            Vec2 a = f.CachedAveragePosition;
+            return a.IsValid ? a : f.CachedMedianPosition.AsVec2;
+        }
+
+        /// <summary>333e: punkt obciety do osi P (sam ruch w bok) - przyjety bez zmiany kierunku zapadki, gdy lezy na siatce nawigacji; false - zostaje P.</summary>
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]   // 333t2: MovementOrder tylko w misji
+        private static bool Side(Formation f, PF pf, WorldPosition tw, Vec2 tc, float now, Type beh, ref MovementOrder input)
+        {
+            var w = tw;
+            w.SetVec2(tc);
+            if (!w.IsValid || w.GetNavMesh() == UIntPtr.Zero) return false;
+            input = MovementOrder.MovementOrderMove(w);
+            HeldForms.Add(f);
+            _clip++;
+            Accept(pf, w, tc, 0, now, beh, 'B');
+            return true;
         }
 
         /// <summary>Rozkaz zamieniony na Move w punkt przyjety P (ta sama WorldPosition).</summary>
@@ -420,6 +463,7 @@ namespace Armoury
                 return;
             }
             Poll(pf, now);   // 333d: FacingOrder / ArrangementOrder przed kontaktem
+            if (pf.P.IsValid && pf.ArrAt < pf.PAt && a.Distance(pf.P) < Math.Max(DeadMove, f.Depth)) pf.ArrAt = now;   // 333e: dojscie do P
             _preSec += step;
             if (!pf.Last.IsValid || !pf.LastA.IsValid)
             {
@@ -599,6 +643,7 @@ namespace Armoury
             {
                 float legM = pf.Ext - pf.ExtPrev, retM = x - pf.Ext, legA = pf.XAExt - pf.XAPrevExt, retA = pf.XA - pf.XAExt;
                 if (Math.Abs(legM) < 2f * thr) _revSmall++;
+                if (legA * legM > 0f && Math.Abs(legA) >= 0.5f * thr && retA * retM > 0f && Math.Abs(retA) >= 0.5f * thr) { _revBoth++; if (back) _revBothBack++; }
                 bool medArt = Math.Abs(retA) < 0.5f * thr || retA * retM < 0f;   // srodek ciezkosci nie wrocil (albo poszedl dalej)
                 int dP = pf.AccN - pf.AccNExt;
                 float dDir = Ang(pf.DirExt, f.Direction);
@@ -685,7 +730,8 @@ namespace Armoury
             }
             sb.Append("), wejsc w kontakt ").Append(_contactIn).Append(" (w tym przez konnice wroga ").Append(_contactCav).Append(')');
             // 333d: diagnostyka (bez '|' w srodku - wyrazenie A333 w sprawdz_logi)
-            sb.Append("; 333d: nawroty srodka ciezkosci ").Append(_revA).Append(" (w tyl ").Append(_revABack).Append("), nawrotow z odcinkiem < 2 progi ").Append(_revSmall)
+            sb.Append("; 333d: nawroty srodka ciezkosci ").Append(_revA).Append(" (w tyl ").Append(_revABack).Append("), nawroty razem ze srodkiem ciezkosci ").Append(_revBoth)
+              .Append(" (w tyl ").Append(_revBothBack).Append("), nawrotow z odcinkiem < 2 progi ").Append(_revSmall)
               .Append(", drogi ");
             if (RevWay.Count == 0) sb.Append('-');
             else
@@ -715,7 +761,8 @@ namespace Armoury
               .Append(", wstecz po zmianie zachowania ").Append(_backBeh).Append(", naprzod wstrzymane po cofnieciu ").Append(_fwdHeld).Append(", szykow zatrzymanych ")
               .Append(HeldForms.Count)
               .Append("; 333b: pierwszych ").Append(_first).Append(", martwa strefa ").Append(_dead).Append(", trzymanie ").Append(_hold)
-              .Append(", nawroty przepuszczone po oknie ").Append(_revOk).Append(", przyjete naprzod ").Append(_accFwd).Append(", w bok ").Append(_accSide);
+              .Append(", nawroty przepuszczone po oknie ").Append(_revOk).Append(", przyjete naprzod ").Append(_accFwd).Append(", w bok ").Append(_accSide)
+              .Append("; 333e: obciete do ruchu w bok ").Append(_clip).Append(", nawroty po oknie za male ").Append(_zSmall);
         }
     }
 }
