@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -22,15 +23,15 @@ namespace Armoury
     internal static class Buildings338Income
     {
         private static int _taxTowns, _taxCalls;
-        private static double _taxL, _taxC;
+        private static double _taxL, _taxC, _taxWantL, _taxWantC;
         private static readonly object Gate = new object();
         private static bool _hookedCar;
-        private static long _carCalls, _carUp;
-        private static double _carMul;
+        private static long _carCalls, _carUp, _carMulK;   // _carMulK - suma mnoznikow x 1000 (Interlocked)
+        private static Dictionary<Town, float> _carCache;   // recenzja 338 (wydajnosc): mnoznik targowiska na dobe (budowany w Daily, podmieniany w calosci)
 
         internal static void SessionStart()
         {
-            lock (Gate) { _taxTowns = _taxCalls = 0; _taxL = _taxC = 0; _carCalls = _carUp = 0; _carMul = 0; }
+            lock (Gate) { _taxTowns = _taxCalls = 0; _taxL = _taxC = _taxWantL = _taxWantC = 0; _carCalls = _carUp = _carMulK = 0; _carCache = null; }
             if (!_hookedCar)
             {
                 var t = AccessTools.TypeByName("BannerKings.Behaviours.BKCaravansBehavior");
@@ -46,9 +47,12 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ 5 urzad podatkowy (DsTowns.Pay)
-        /// <summary>DsTowns.Pay (miasto, po wyliczeniu raty pana iL i korony iC, przed zaplata): rata x (1 + efekt urzedu).</summary>
-        internal static void TaxOffice(Town t, ref double iL, ref double iC)
+        /// <summary>DsTowns.Pay (miasto, po wyliczeniu raty pana iL i korony iC): doplata urzedu xL, xC = rata x efekt urzedu (rata bez zmian).
+        /// Recenzja 338 W2: firma jest ustalona na ok. 96% doplywu, a przeglad firm i dlugi miast licza raty bez urzedu - dlatego doplata nie wchodzi do raty
+        /// (nie rodzi zaleglosci ani dlugu), tylko jest placona w kroku 2c z nadwyzki kasy ponad zapas po racie; brak - darowany.</summary>
+        internal static void TaxOffice(Town t, double iL, double iC, out double xL, out double xC)
         {
+            xL = xC = 0;
             if (t == null || !t.IsTown || !Buildings338.TaxOfficeOn || !(iL + iC > 0)) return;
             try
             {
@@ -56,11 +60,28 @@ namespace Armoury
                 t.AddEffectOfBuildings(BuildingEffectEnum.TaxPerDay, ref e);
                 double f = e.ResultNumber;
                 if (!(f > 1.0) || double.IsNaN(f) || double.IsInfinity(f)) return;
-                double dL = iL * (f - 1.0), dC = iC * (f - 1.0);
-                iL += dL; iC += dC;
-                lock (Gate) { _taxCalls++; _taxL += dL; _taxC += dC; }
+                xL = iL * (f - 1.0); xC = iC * (f - 1.0);
+                lock (Gate) { _taxCalls++; _taxWantL += xL; _taxWantC += xC; }
             }
             catch (Exception ex) { Buildings338.Stumble(Buildings338.GTax, "Income.TaxOffice", ex); }
+        }
+
+        /// <summary>DsTowns.Pay krok 2c: doplata z nadwyzki avail (pan i korona w stosunku doplat), ta sama droga przelewu co rata (ToLord / ToCrown).</summary>
+        internal static void TaxOfficePay(Settlement st, Town t, Hero lord, Kingdom k, double xL, double xC, long avail, out long gL, out long gC)
+        {
+            gL = gC = 0;
+            try
+            {
+                if (k == null) { xL += xC; xC = 0; }
+                double tot = xL + xC;
+                long pay = (long)Math.Floor(Math.Min(tot, avail));
+                if (pay <= 0) return;
+                long pL = (long)Math.Floor(pay * xL / tot), pC = pay - pL;
+                gL = pL > 0 && lord != null ? DsTowns.TaxOfficeToLord(st, t, lord, pL) : 0;
+                gC = pC > 0 && k != null ? DsTowns.TaxOfficeToCrown(t, k, pC) : 0;
+                lock (Gate) { _taxL += gL; _taxC += gC; }
+            }
+            catch (Exception ex) { Buildings338.Stumble(Buildings338.GTax, "Income.TaxOfficePay", ex); }
         }
 
         // ------------------------------------------------------------ 6 targowisko - wizyty karawan
@@ -70,10 +91,12 @@ namespace Armoury
             try
             {
                 Interlocked.Increment(ref _carCalls);
-                float m = Mult(__1);
+                float m;
+                var c = _carCache;
+                if (c == null || !c.TryGetValue(__1, out m)) m = Mult(__1);
                 if (!(m > 1f)) return;
                 __result *= m;
-                lock (Gate) { _carUp++; _carMul += m; }
+                Interlocked.Increment(ref _carUp); Interlocked.Add(ref _carMulK, (long)(m * 1000f));
             }
             catch (Exception ex) { Buildings338.Stumble(Buildings338.GCaravan, "Income.ScorePostfix", ex); }
         }
@@ -94,6 +117,7 @@ namespace Armoury
         internal static void Daily(int day)
         {
             int nTax = 0, nMk = 0;
+            var cache = new Dictionary<Town, float>();
             foreach (var t in Town.AllTowns)
             {
                 try
@@ -101,12 +125,15 @@ namespace Armoury
                     var e = new ExplainedNumber(1f);
                     t.AddEffectOfBuildings(BuildingEffectEnum.TaxPerDay, ref e);
                     if (e.ResultNumber > 1f) nTax++;
-                    if (Mult(t) > 1f) nMk++;
+                    float m = Mult(t); cache[t] = m;
+                    if (m > 1f) nMk++;
                 }
                 catch (Exception ex) { Buildings338.Stumble(Buildings338.GTax, "Income.Daily", ex); }
             }
-            int calls; double l, c; long cc, cu; double cm;
-            lock (Gate) { calls = _taxCalls; l = _taxL; c = _taxC; _taxCalls = 0; _taxL = _taxC = 0; cc = _carCalls; cu = _carUp; cm = _carMul; _carCalls = _carUp = 0; _carMul = 0; }
+            _carCache = cache;
+            int calls; double l, c, wl, wc; long cc, cu; double cm;
+            lock (Gate) { calls = _taxCalls; l = _taxL; c = _taxC; wl = _taxWantL; wc = _taxWantC; _taxCalls = 0; _taxL = _taxC = _taxWantL = _taxWantC = 0; }
+            cc = Interlocked.Exchange(ref _carCalls, 0); cu = Interlocked.Exchange(ref _carUp, 0); cm = Interlocked.Exchange(ref _carMulK, 0) / 1000.0;
             var inv = Buildings338.Inv;
             Log.Info("Budynki (338) urzad podatkowy: dzien " + day + " | miast " + nTax + " z urzedem, droga firm " + Buildings338.YN(DsTowns.FarmsLive)
                      + " | rata +" + (l + c).ToString("0", inv) + " zl (pan " + l.ToString("0", inv) + ", korona " + c.ToString("0", inv) + ") w " + calls + " ratach" + Buildings338.Tail(Buildings338.GTax));

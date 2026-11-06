@@ -11468,9 +11468,13 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Ports { get; set; } = true;
 
-        [SettingPropertyBool("Buildings338 Village Prod", HintText = "With Buildings338: the Banner Kings village buildings (farming, mining, animal housing, sawmill, fish farm) raise the production of their kind by 5/10/15% and the daily Production project by 15%, as their description says (Banner Kings' own production model is not active with Better Economy). Off = they do nothing, as before", RequireRestart = false)]
+        [SettingPropertyBool("Buildings338 Village Prod", HintText = "With Buildings338: the Banner Kings village buildings (farming, mining, animal housing, sawmill, fish farm) raise the production of their kind by 5/10/15% and the daily Production project by 15% (that one also under Buildings338 Village Project), as their description says (Banner Kings' own production model is not active with Better Economy). Off = they do nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338VillageProd { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Village Project", HintText = "With Buildings338 and Buildings338 Village Prod: the daily Production project of Banner Kings villages (the default project of every village that builds nothing) raises all its goods by 15%, as its description says. Off = only the village buildings count", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338VillageProject { get; set; } = true;
 
         [SettingPropertyBool("Buildings338 Village Goods", HintText = "With Buildings338: bee skeps add honey to woodcutter and trapper villages, +1 weight per level as in Banner Kings. Off = as before (bread from bakeries and mills and leather from tanneries are not done yet)", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
@@ -14351,6 +14355,7 @@ namespace Armoury
             s.Buildings338Roads = Buildings338Roads;
             s.Buildings338Ports = Buildings338Ports;
             s.Buildings338VillageProd = Buildings338VillageProd;
+            s.Buildings338VillageProject = Buildings338VillageProject;
             s.Buildings338VillageGoods = Buildings338VillageGoods;
             s.Buildings338Studs = Buildings338Studs;
             s.Buildings338CastleMines = Buildings338CastleMines;

@@ -40,7 +40,7 @@ namespace Armoury
             Buildings338.Hook("stadniny: BK RunStuds " + (_hooked ? "przejety dla zamkow" : "BRAK"));
         }
 
-        public static bool RunStudsPrefix(Town town) { return !(town != null && town.IsCastle && Buildings338.StudsOn); }
+        public static bool RunStudsPrefix(Town town) { return !(town != null && town.IsCastle && Buildings338.StudsOn && !Buildings338Ports.BkTicksCastles); }   // BK tyka zamki sam - nasz tick stoi, wiec BK hoduje (recenzja 338)
 
         private static List<ItemObject> WarHorses()
         {
@@ -66,7 +66,8 @@ namespace Armoury
             var it = Pick(t.Culture);
             if (it == null && st.Owner != null) it = Pick(st.Owner.Culture);
             if (it == null && st.MapFaction != null) it = Pick(st.MapFaction.Culture);
-            if (it == null) { var l = WarHorses(); if (l.Count > 0) it = l[0]; }
+            if (it == null)   // recenzja 338: najtanszy kon bojowy z handlu (nie przypadkowy pierwszy z listy)
+                foreach (var x in WarHorses()) if (it == null || x.Value < it.Value) it = x;
             return it;
         }
 
@@ -111,7 +112,9 @@ namespace Armoury
                     var war = HorseType(t);
                     if (war == null) { _noType++; continue; }
                     // zrodlo: zwykly kon (bez konia z niczego)
-                    ItemObject src = TakeHorse(stash);
+                    // recenzja 338: Stash zamku gracza to jego schowek - jego koni hodowla nie bierze (zaczyna od magazynu zamku)
+                    bool player = t.OwnerClan == Clan.PlayerClan;
+                    ItemObject src = player ? null : TakeHorse(stash);
                     if (src != null) _fromStash++;
                     else if ((src = TakeHorse(t.Settlement.ItemRoster)) != null) _fromCastle++;
                     else

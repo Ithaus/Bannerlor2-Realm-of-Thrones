@@ -1347,6 +1347,8 @@ namespace Armoury
         }
 
         // ============================================================ przelewy (mierzone u platnika i odbiorcy)
+        internal static long TaxOfficeToLord(Settlement st, Town t, Hero lord, long x) { return ToLord(st, t, lord, x); }   // 338 grupa 5 (Buildings338Income.TaxOfficePay)
+        internal static long TaxOfficeToCrown(Town t, Kingdom k, long x) { return ToCrown(t, k, x); }
         private static long ToLord(Settlement st, Town t, Hero lord, long x)
         {
             if (x <= 0 || lord == null || t == null) return 0;
@@ -1453,7 +1455,7 @@ namespace Armoury
             double rn = NewShare;                                   // przejscie: raty firm x rampa (reszta - stary zawor u wolajacego)
             double iL = f.FL / Weeks * rn, iC = f.FC / Weeks * rn, iLf = f.FLf / Weeks * rn;
             if (k == null) { iL += iC; iC = 0; if (f.AC > 0) { f.AL += f.AC; f.AC = 0; } }   // rod bez krolestwa - calosc panu (jak zawor)
-            if (town) Buildings338Income.TaxOffice(t, ref iL, ref iC);   // 338 grupa 5: urzad podatkowy miasta +5/10/15% raty (z kasy miasta ponad zapas, jak rata)
+            double xL = 0, xC = 0; if (town) Buildings338Income.TaxOffice(t, iL, iC, out xL, out xC);   // 338 grupa 5: urzad podatkowy miasta +5/10/15% raty - doplata tylko z nadwyzki po racie (krok 2c), brak darowany
             bool folkPays = s.DsFarmFolkFromSavings;
             if (!folkPays) { iL += iLf; iLf = 0; if (f.ALf > 0) { f.AL += f.ALf; f.ALf = 0; } }   // klucz wylaczony - cala firma pana z kasy
             int serial;
@@ -1515,6 +1517,7 @@ namespace Armoury
                 _paidL += gL; _paidC += gC;
             }
             else { f.AL = wantL; f.AC = wantC; }
+            if (xL + xC >= 1 && avail > 0) { long gxL, gxC; Buildings338Income.TaxOfficePay(st, t, lord, k, xL, xC, avail, out gxL, out gxC); avail -= gxL + gxC; lordPay += (int)gxL; crownFarm += (int)gxC; }   // 338 2c: doplata urzedu podatkowego z nadwyzki (bez zaleglosci, firma i dlugi bez zmian)
             // 2b. czesc pana z oszczednosci ludu (recenzja 17.10, "scot and lot"): to, co pan bral dotad z oszczednosci ludu tej osady (podatek od skarbca ludu, W7), placi lud
             //     z kies ponad zapas dni - nie kasa kupcow; brak - zaleglosc (splacana pierwsza, zajecie z kiesy gminy jak firma)
             double wantLf = f.ALf + iLf;

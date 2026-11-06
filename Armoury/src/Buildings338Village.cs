@@ -30,7 +30,9 @@ namespace Armoury
         private const float ProductionBonus = 0.15f;
         private static readonly object Gate = new object();
         private static readonly Dictionary<Village, double> _roadsAdd = new Dictionary<Village, double>(), _prodAddKs = new Dictionary<Village, double>(), _skeps = new Dictionary<Village, double>();
-        private static readonly Dictionary<long, double> _prodAdd = new Dictionary<long, double>();   // (wies, towar) -> dopisek z ostatniego pytania modelu (poza KS)
+        private static readonly Dictionary<Village, Dictionary<ItemObject, double>> _prodAdd = new Dictionary<Village, Dictionary<ItemObject, double>>();   // wies -> towar -> dopisek z ostatniego pytania modelu (poza KS)
+        // recenzja 338 (wydajnosc): czynnik BK (wies, towar) na dobe - bez refleksji przy kazdym pytaniu modelu; czyszczony w Daily i SessionStart
+        private static readonly Dictionary<Village, Dictionary<ItemObject, float>> _factor = new Dictionary<Village, Dictionary<ItemObject, float>>();
         private static ItemObject[] _ksItems;
         private static bool _bkModelActive;
         private static string _modelChain = "?";
@@ -39,7 +41,7 @@ namespace Armoury
 
         internal static void SessionStart()
         {
-            lock (Gate) { _roadsAdd.Clear(); _prodAddKs.Clear(); _skeps.Clear(); _prodAdd.Clear(); }
+            lock (Gate) { _roadsAdd.Clear(); _prodAddKs.Clear(); _skeps.Clear(); _prodAdd.Clear(); _factor.Clear(); }
             _ksItems = null;
             _skepsType = Buildings338.VillageBuilding("Skeps");
             _farming = Buildings338.VillageBuilding("Farming"); _mining = Buildings338.VillageBuilding("Mining"); _animal = Buildings338.VillageBuilding("AnimalHousing");
@@ -101,7 +103,17 @@ namespace Armoury
         {
             if (item == null || vd == null) return 1f;
             float f = Buildings338.VillageBuildingFactor(item, vd);
-            if (Buildings338.VillageCurrentId(vd) == ProductionId) f += ProductionBonus;
+            if (Buildings338.VillageProjectOn && Buildings338.VillageCurrentId(vd) == ProductionId) f += ProductionBonus;   // W4: osobny klucz projektu
+            return f;
+        }
+
+        /// <summary>BkFactor z pamiecia na dobe (ProdStep - pytania modelu produkcji wsi).</summary>
+        private static float BkFactorCached(Village v, ItemObject item)
+        {
+            Dictionary<ItemObject, float> d; float f;
+            lock (Gate) { if (_factor.TryGetValue(v, out d) && d.TryGetValue(item, out f)) return f; }
+            f = BkFactor(item, VData(v));
+            lock (Gate) { if (!_factor.TryGetValue(v, out d)) { d = new Dictionary<ItemObject, float>(); _factor[v] = d; } d[item] = f; }
             return f;
         }
 
@@ -144,7 +156,7 @@ namespace Armoury
             try
             {
                 if (v.VillageState != Village.VillageStates.Normal) return;
-                float f = BkFactor(item, VData(v));
+                float f = BkFactorCached(v, item);
                 if (!(f > 1f)) return;
                 float before = r.ResultNumber;
                 float sum = 1f + r.SumOfFactors;
@@ -152,8 +164,7 @@ namespace Armoury
                 if (_txt == null) _txt = new TextObject("{=!}Village buildings (Banner Kings)");
                 r.AddFactor((f - 1f) * sum, _txt);
                 double add = r.ResultNumber - before;
-                long key = ((long)v.GetHashCode() << 32) ^ (uint)item.GetHashCode();
-                lock (Gate) _prodAdd[key] = add;
+                lock (Gate) { Dictionary<ItemObject, double> d; if (!_prodAdd.TryGetValue(v, out d)) { d = new Dictionary<ItemObject, double>(); _prodAdd[v] = d; } d[item] = add; }
             }
             catch (Exception e) { Buildings338.Stumble(Buildings338.GVProd, "Village.ProdStep", e); }
         }
@@ -180,7 +191,7 @@ namespace Armoury
             {
                 nR = _roadsAdd.Count; r = 0; foreach (var x in _roadsAdd.Values) r += x;
                 nP = _prodAddKs.Count; pKs = 0; foreach (var x in _prodAddKs.Values) pKs += x;
-                pOut = 0; foreach (var x in _prodAdd.Values) pOut += x; _prodAdd.Clear();
+                pOut = 0; foreach (var d in _prodAdd.Values) foreach (var x in d.Values) pOut += x; _prodAdd.Clear(); _factor.Clear();
                 nS = _skeps.Count; s = 0; foreach (var x in _skeps.Values) s += x; _skeps.Clear();
             }
             int vb = 0, fa = 0, mi = 0, an = 0, sa = 0, fi = 0, pr = 0;
@@ -195,15 +206,30 @@ namespace Armoury
                             a4 = Buildings338.VillageLevel(vd, _sawmill), a5 = Buildings338.VillageLevel(vd, _fishFarm);
                         if (a1 > 0) fa++; if (a2 > 0) mi++; if (a3 > 0) an++; if (a4 > 0) sa++; if (a5 > 0) fi++;
                         if (a1 + a2 + a3 + a4 + a5 > 0) vb++;
-                        if (Buildings338.VillageCurrentId(vd) == ProductionId) pr++;
+                        if (Buildings338.VillageProjectOn && Buildings338.VillageCurrentId(vd) == ProductionId) pr++;
                     }
                     catch (Exception e) { Buildings338.Stumble(Buildings338.GVProd, "Village.Daily", e); }
                 }
             var inv = Buildings338.Inv;
+            // recenzja 338 W4: srednie ceny zboza i drewna na targach miast (porownanie z biegiem bazowym w sprawdz_logi B338-16)
+            double pg = 0, pw = 0; int ng = 0;
+            try
+            {
+                var grain = MBObjectManager.Instance.GetObject<ItemObject>("grain");
+                var wood = MBObjectManager.Instance.GetObject<ItemObject>("hardwood");
+                if (grain != null && wood != null)
+                    foreach (var t in Town.AllTowns)
+                    {
+                        if (t == null || t.MarketData == null) continue;
+                        pg += t.MarketData.GetPrice(grain); pw += t.MarketData.GetPrice(wood); ng++;
+                    }
+            }
+            catch (Exception e) { Buildings338.Stumble(Buildings338.GVProd, "Village.Prices", e); }
             Log.Info("Budynki (338) drogi: dzien " + day + " | wsi KS z drogami " + nR + " | dopisane " + r.ToString("0.0", inv) + " szt./d" + Buildings338.Tail(Buildings338.GRoads));
             Log.Info("Budynki (338) produkcja wsi: dzien " + day + " | wsi z budynkami " + vb + " (Farming " + fa + ", Mining " + mi + ", AnimalHousing " + an + ", Sawmill " + sa + ", FishFarm " + fi
                      + "), projekt Production " + pr + " | KS wsi " + nP + " dopisane " + pKs.ToString("0.0", inv) + " szt./d, poza KS " + pOut.ToString("0.0", inv) + " szt. | model BK czynny "
-                     + Buildings338.YN(_bkModelActive) + Buildings338.Tail(Buildings338.GVProd));
+                     + Buildings338.YN(_bkModelActive) + " | ceny miast: zboze " + (ng > 0 ? pg / ng : 0).ToString("0.0", inv) + ", drewno " + (ng > 0 ? pw / ng : 0).ToString("0.0", inv)
+                     + Buildings338.Tail(Buildings338.GVProd));
             Log.Info("Budynki (338) towary wsi: dzien " + day + " | wsi z ulami " + nS + ", miod +" + s.ToString("0.0", inv) + " (baza przed mnoznikami) | chleb i skora: odlozone"
                      + Buildings338.Tail(Buildings338.GVGoods));
         }

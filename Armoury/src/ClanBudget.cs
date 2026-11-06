@@ -1162,7 +1162,7 @@ namespace Armoury
                 var st = f != null ? f.Settlement : null;
                 if (st == null || st.StringId == null) continue;
                 var gp = f.GarrisonParty;
-                float cur = gp != null && gp.IsActive ? Math.Max(0, gp.TotalWage) : 0;
+                float cur = gp != null && gp.IsActive ? Math.Max(0, Buildings338Wage.RawWage(gp)) : 0;   // 338: zold bez budynkow - cel pokojowy w zlocie "bez budynkow", skale 338 (x s) naklada raz Buildings338Wage.LimitPostfix po GarLimitPostfix
                 float wr;
                 if (!_warGar.TryGetValue(st.StringId, out wr)) { wr = cur; _warGar[st.StringId] = wr; }   // przed pierwsza wojna - stan z pierwszej doby
                 else if (b.War) { wr += (cur - wr) / Days28; _warGar[st.StringId] = wr; }                 // srednia z dob wojny (28 dob)

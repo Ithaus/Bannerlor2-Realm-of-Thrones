@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -13,7 +14,7 @@ namespace Armoury
     /// 3a (Buildings338FoodStock) ZAPAS: jedyny czytnik FoodStock to Town.FoodStocksUpperLimit:467; BK SettlementPatches.FoodStockPatch (prefiks, return false przy
     /// danych BK) liczy 2 x ludnosc + 500/250 + 1000 x poziom TYLKO dla CastleGranary - magazyn miasta (Warehouse +100/300/500) nie podnosi sufitu wcale, a perki
     /// Battlements/Contractors gina. Naprawa: postfiks Last (biegnie mimo return false BK), tylko gdy BK przejal wynik (dane BK osady): czlon BK spichlerza zdjety
-    /// dokladnie (1000 x poziom), jedno AddEffectOfBuildings(FoodStock) dla obu budynkow x 10 (skala BK: spichlerz 1000/poziom = 10 x 100 gry; sufit BK to 2 x
+    /// dokladnie (1000 x poziom), efekt FoodStock obu budynkow x 10 (perka Battlements +100 bez skali, czynniki np. Contractors z baza; skala BK: spichlerz 1000/poziom = 10 x 100 gry; sufit BK to 2 x
     /// ludnosc, wiec +100..500 byloby niewidoczne). Magazyn 1-3: +1000/3000/5000, spichlerz bez zmian (+1000/2000/3000) + perki x10. Bez danych BK gra liczy sama.
     /// 3b (Buildings338FoodDouble, tylko razem z 3a) DUBEL BK 'Local farmland': BKFoodModel.GetPopulationFoodProduction:192-201 dodaje pierwszemu z CastleFarmlands /
     /// SettlementWarehouse czynnik poziom x 0.5 (zamek) / 0.3 (miasto) produkcji ludnosci - opis tego nie obiecuje (Farmlands ma swoje +6/12/18 w modelu gry, ktore
@@ -27,9 +28,12 @@ namespace Armoury
         [ThreadStatic] private static bool _skipStock, _skipDouble;
         private static bool _hookedStock, _hookedDouble;
         private static TextObject _txt;
+        private static readonly object Gate = new object();
+        private static readonly Dictionary<Town, int> _stock = new Dictionary<Town, int>();   // recenzja 338 (wydajnosc): zmiana sufitu na dobe (czyszczona w Daily)
 
         internal static void SessionStart()
         {
+            lock (Gate) _stock.Clear();
             if (!_hookedStock)
             {
                 var m = AccessTools.Method(typeof(Town), "FoodStocksUpperLimit");
@@ -59,23 +63,40 @@ namespace Armoury
             if (_skipStock || __instance == null || !Buildings338.FoodStockOn) return;
             try
             {
-                if (Buildings338.PopData(__instance.Settlement) == null) return;   // BK nie przejal - gra liczy budynki sama
-                int gran = 0;
-                foreach (var b in __instance.Buildings)
-                    if (b != null && b.CurrentLevel > 0 && b.BuildingType == DefaultBuildingTypes.CastleGranary) gran += 1000 * b.CurrentLevel;   // czlon BK (SettlementPatches:108-114)
-                var e = new ExplainedNumber(0f);
-                __instance.AddEffectOfBuildings(BuildingEffectEnum.FoodStock, ref e);
-                float add = StockScale * e.ResultNumber;
-                if (!(add > 0f) && gran == 0) return;
-                __result = __result - gran + (int)Math.Max(0f, add);
+                int d;
+                lock (Gate) { if (_stock.TryGetValue(__instance, out d)) { __result += d; return; } }
+                d = StockDelta(__instance);
+                lock (Gate) _stock[__instance] = d;
+                __result += d;
             }
             catch (Exception e) { Buildings338.Stumble(Buildings338.GStock, "Food.StockPostfix", e); }
+        }
+
+        /// <summary>Zmiana sufitu 338 (0 - BK nie przejal albo brak budynkow): - czlon BK spichlerza + budynki x10 (perka Battlements +100 bez skali - recenzja 338).</summary>
+        private static int StockDelta(Town t)
+        {
+            if (Buildings338.PopData(t.Settlement) == null) return 0;   // BK nie przejal - gra liczy budynki sama
+            int gran = 0;
+            double add = 0;
+            var model = Campaign.Current.Models.BuildingEffectModel;
+            foreach (var b in t.Buildings)
+            {
+                if (b == null || b.CurrentLevel <= 0 || b.BuildingType == null) continue;
+                if (b.BuildingType == DefaultBuildingTypes.CastleGranary) gran += 1000 * b.CurrentLevel;   // czlon BK (SettlementPatches:108-114)
+                if (!b.BuildingType.HasEffect(BuildingEffectEnum.FoodStock) || (b.BuildingType.IsDailyProject && t.CurrentDefaultBuilding != b)) continue;
+                var en = model.GetBuildingEffect(b, BuildingEffectEnum.FoodStock);
+                float bas = b.BuildingType.GetBaseBuildingEffectAmount(BuildingEffectEnum.FoodStock, b.CurrentLevel);
+                // efekt = (baza + Battlements) x (1 + czynniki, np. Contractors); skala BK x10 tylko dla bazy budynku (z jej czynnikami), dodatek perki bez skali
+                add += en.ResultNumber + (StockScale - 1f) * bas * (1f + en.SumOfFactors);
+            }
+            if (!(add > 0) && gran == 0) return 0;
+            return (int)Math.Max(0.0, add) - gran;
         }
 
         // ------------------------------------------------------------ 3b dubel BK
         public static void DoublePostfix(Town __1, ref ExplainedNumber __result)
         {
-            if (_skipDouble || __1 == null || !Buildings338.FoodDoubleOn) return;
+            if (_skipDouble || __1 == null || !Buildings338.FoodDoubleOn || __1.IsUnderSiege) return;   // BK dodaje czynnik tylko poza oblezeniem
             try
             {
                 Building val = null;
@@ -91,6 +112,7 @@ namespace Armoury
         internal static void Daily(int day)
         {
             // 3a
+            lock (Gate) _stock.Clear();
             int nW = 0, nG = 0; long addW = 0, addG = 0, bkG = 0;
             string ex = "-";
             if (Buildings338.FoodStockOn)
@@ -126,9 +148,9 @@ namespace Armoury
                         if (val == null || val.CurrentLevel <= 0 || Buildings338.PopData(t.Settlement) == null) continue;
                         all++;
                         if (t.IsCastle) nF++; else nM++;
-                        float a = fm.CalculateTownFoodStocksChange(t, true, false).ResultNumber, b0;
+                        float a = fm.CalculateTownFoodStocksChange(t, false, false).ResultNumber, b0;   // bez rynku - sam skutek zdjecia premii BK (recenzja 338)
                         bool was = _skipDouble; _skipDouble = true;
-                        try { b0 = fm.CalculateTownFoodStocksChange(t, true, false).ResultNumber; } finally { _skipDouble = was; }
+                        try { b0 = fm.CalculateTownFoodStocksChange(t, false, false).ResultNumber; } finally { _skipDouble = was; }
                         gone += b0 - a;
                         if (b0 < 0f) negA++;
                         if (a < 0f) negB++;

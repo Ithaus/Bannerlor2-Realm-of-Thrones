@@ -42,6 +42,7 @@ namespace Armoury
         internal static bool RoadsOn { get { var s = S; return s != null && s.Buildings338 && s.Buildings338Roads; } }
         internal static bool PortsOn { get { var s = S; return s != null && s.Buildings338 && s.Buildings338Ports; } }
         internal static bool VillageProdOn { get { var s = S; return s != null && s.Buildings338 && s.Buildings338VillageProd; } }
+        internal static bool VillageProjectOn { get { var s = S; return s != null && s.Buildings338 && s.Buildings338VillageProd && s.Buildings338VillageProject; } }   // recenzja 338 W4: osobny klucz projektu Production
         internal static bool VillageGoodsOn { get { var s = S; return s != null && s.Buildings338 && s.Buildings338VillageGoods; } }
         internal static bool StudsOn { get { var s = S; return s != null && s.Buildings338 && s.Buildings338Studs; } }
         internal static bool CastleMinesOn { get { var s = S; return s != null && s.Buildings338 && s.Buildings338CastleMines; } }
@@ -51,14 +52,13 @@ namespace Armoury
         // ------------------------------------------------------------ potkniecia grup (licznik, pierwszy wyjatek do logu)
         internal const int GWage = 0, GRecruit = 1, GStock = 2, GDouble = 3, GMason = 4, GTax = 5, GCaravan = 6, GAssim = 7, GRoads = 8, GPorts = 9, GVProd = 10, GVGoods = 11, GStuds = 12, GCore = 13, GN = 14;
         private static readonly int[] _err = new int[GN];
-        private static readonly bool[] _errLogged = new bool[GN];
+        private static readonly int[] _errLogged = new int[GN];   // recenzja 338: Interlocked - jeden pierwszy blad do logu takze przy wywolaniach rownoleglych
         internal static int Errors(int g) { return Volatile.Read(ref _err[g]); }
 
         internal static void Stumble(int g, string where, Exception e)
         {
             Interlocked.Increment(ref _err[g]);
-            if (_errLogged[g]) return;
-            _errLogged[g] = true;
+            if (Interlocked.CompareExchange(ref _errLogged[g], 1, 0) != 0) return;
             try { Log.Error("Buildings338." + where, e); } catch { }
         }
 
@@ -190,7 +190,7 @@ namespace Armoury
         internal static void SessionStart()
         {
             lock (_hooks) _hooks.Clear();
-            for (int i = 0; i < GN; i++) { _err[i] = 0; _errLogged[i] = false; }
+            for (int i = 0; i < GN; i++) { _err[i] = 0; _errLogged[i] = 0; }
             InitBk();
             try { Buildings338Wage.SessionStart(); } catch (Exception e) { Stumble(GWage, "Wage.SessionStart", e); }
             try { Buildings338AutoRecruit.SessionStart(); } catch (Exception e) { Stumble(GRecruit, "AutoRecruit.SessionStart", e); }
@@ -219,7 +219,7 @@ namespace Armoury
             lock (_hooks) hooks = _hooks.Count > 0 ? string.Join("; ", _hooks.ToArray()) : "-";
             Log.Info("Budynki (338): start sesji | glowny " + YN(Main) + " | zold " + YN(WageOn) + ", autowerbunek " + YN(AutoRecruitOn) + ", zapas jedzenia " + YN(FoodStockOn)
                      + ", dubel jedzenia BK " + YN(FoodDoubleOn) + ", murarz " + YN(MasonOn) + ", urzad podatkowy " + YN(TaxOfficeOn) + ", karawany " + YN(CaravansOn)
-                     + ", asymilacja " + YN(AssimilationOn) + ", drogi " + YN(RoadsOn) + ", porty zamkow " + YN(PortsOn) + ", produkcja wsi " + YN(VillageProdOn)
+                     + ", asymilacja " + YN(AssimilationOn) + ", drogi " + YN(RoadsOn) + ", porty zamkow " + YN(PortsOn) + ", produkcja wsi " + YN(VillageProdOn) + ", projekt Production " + YN(VillageProjectOn)
                      + ", towary wsi " + YN(VillageGoodsOn) + ", stadniny " + YN(StudsOn) + ", kopalnie zamkow " + YN(CastleMinesOn)
                      + " | BK " + (BkOk ? "jest" : "BRAK") + " | Courier Post na liscie budowy wsi BK: " + courier + " | latki: " + hooks);
         }

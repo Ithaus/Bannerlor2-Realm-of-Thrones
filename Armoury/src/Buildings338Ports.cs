@@ -27,14 +27,14 @@ namespace Armoury
         private static MethodInfo _runPorts, _runMines;
         private static bool _hooked;
         private static int _bkCastleCalls, _bkCastleCallsDay;
-        private static int _portCastles, _portKs, _mineCastles, _ticks;
+        private static int _portCastles, _portKs, _mineCastles, _ticks, _mineFree;
         private static long _fish;
         private static ItemObject _fishItem;
 
         internal static void SessionStart()
         {
             _bkCastleCalls = _bkCastleCallsDay = 0;
-            _fishItem = null;
+            _fishItem = null; _getBeh = null;
             _bkb = AccessTools.TypeByName("BannerKings.Behaviours.BKBuildingsBehavior");
             _runPorts = _bkb != null ? AccessTools.Method(_bkb, "RunPorts", new[] { typeof(Town) }) : null;
             _runMines = _bkb != null ? AccessTools.Method(_bkb, "RunMines", new[] { typeof(Town) }) : null;
@@ -52,18 +52,19 @@ namespace Armoury
         /// <summary>Czy BK tyka zamki sam (od poprzedniej doby) - wtedy nasz tick zamkow (porty, kopalnie, stadniny) nie biegnie.</summary>
         internal static bool BkTicksCastles { get { return _bkCastleCallsDay > 0; } }
 
+        private static MethodInfo _getBeh;   // recenzja 338: GetCampaignBehavior<BKBuildingsBehavior> raz na sesje (nie MakeGenericMethod co dobe)
         internal static object Behavior()
         {
             if (_bkb == null || Campaign.Current == null) return null;
-            var mi = typeof(Campaign).GetMethod("GetCampaignBehavior");
-            return mi != null ? mi.MakeGenericMethod(_bkb).Invoke(Campaign.Current, null) : null;
+            if (_getBeh == null) { var mi = typeof(Campaign).GetMethod("GetCampaignBehavior"); _getBeh = mi != null ? mi.MakeGenericMethod(_bkb) : null; }
+            return _getBeh != null ? _getBeh.Invoke(Campaign.Current, null) : null;
         }
 
         /// <summary>Z Buildings338.Daily: tick dobowy zamkow z Portem / Castle Mines - te same metody BK co dla miast.</summary>
         internal static void CastleTick()
         {
             _bkCastleCallsDay = Interlocked.Exchange(ref _bkCastleCalls, 0);
-            _portCastles = _portKs = _mineCastles = _ticks = 0; _fish = 0;
+            _portCastles = _portKs = _mineCastles = _ticks = _mineFree = 0; _fish = 0;
             if (BkTicksCastles || Campaign.Current == null) return;
             bool ports = Buildings338.PortsOn && _runPorts != null, mines = Buildings338.CastleMinesOn && _runMines != null;
             if (!ports && !mines) return;
@@ -93,7 +94,21 @@ namespace Armoury
                     if (mines && Buildings338.Level(t, CastleMinesId) > 0)
                     {
                         any = true; _mineCastles++;
+                        // recenzja 338: BK RunMines, gdy zamku nie stac, dodaje rude do Stash za darmo (galaz else) - wycofujemy przyrost Stash (ruda z niczego)
+                        var stash = t.Settlement.Stash;
+                        var before = new System.Collections.Generic.Dictionary<ItemObject, int>();
+                        if (stash != null) for (int i = 0; i < stash.Count; i++) { var el = stash.GetElementCopyAtIndex(i); var it = el.EquipmentElement.Item; if (it != null) { int n0; before.TryGetValue(it, out n0); before[it] = n0 + el.Amount; } }
                         _runMines.Invoke(beh, new object[] { t });
+                        if (stash != null)
+                        {
+                            var now = new System.Collections.Generic.Dictionary<ItemObject, int>();
+                            for (int i = 0; i < stash.Count; i++) { var el = stash.GetElementCopyAtIndex(i); var it = el.EquipmentElement.Item; if (it != null) { int n0; now.TryGetValue(it, out n0); now[it] = n0 + el.Amount; } }
+                            foreach (var kv in now)
+                            {
+                                int b0; before.TryGetValue(kv.Key, out b0);
+                                if (kv.Value > b0) { stash.AddToCounts(kv.Key, b0 - kv.Value); _mineFree += kv.Value - b0; }
+                            }
+                        }
                     }
                 }
                 catch (Exception e) { Buildings338.Stumble(Buildings338.GPorts, "Ports.RunMines(" + t.Name + ")", e); }
@@ -104,10 +119,10 @@ namespace Armoury
         internal static void Daily(int day)
         {
             int withMines = 0;
-            foreach (var t in Town.AllCastles) { try { if (Buildings338.Level(t, CastleMinesId) > 0) withMines++; } catch { } }
+            foreach (var t in Town.AllCastles) { try { if (Buildings338.Level(t, CastleMinesId) > 0) withMines++; } catch (Exception e) { Buildings338.Stumble(Buildings338.GPorts, "Ports.Daily", e); } }
             Log.Info("Budynki (338) zamki: dzien " + day + " | tick BK dla zamkow " + _bkCastleCallsDay + " wywolan (0 = gra nie tyka zamkow), nasz tick " + _ticks + " zamkow"
                      + " | porty: klucz " + Buildings338.YN(Buildings338.PortsOn) + ", zamkow z Portem " + _portCastles + " (pod KS zablokowane " + _portKs + "), ryb +" + _fish
-                     + " | kopalnie: klucz " + Buildings338.YN(Buildings338.CastleMinesOn) + ", zamkow z kopalnia " + withMines + ", wolanych " + _mineCastles + Buildings338.Tail(Buildings338.GPorts));
+                     + " | kopalnie: klucz " + Buildings338.YN(Buildings338.CastleMinesOn) + ", zamkow z kopalnia " + withMines + ", wolanych " + _mineCastles + ", darmowa ruda wycofana " + _mineFree + Buildings338.Tail(Buildings338.GPorts));
         }
     }
 }

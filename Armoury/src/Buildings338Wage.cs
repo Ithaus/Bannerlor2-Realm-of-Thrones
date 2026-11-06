@@ -25,7 +25,8 @@ namespace Armoury
     internal static class Buildings338Wage
     {
         [ThreadStatic] private static bool _skip;   // linia doby: zold bez budynkow 338
-        private static int _calls, _bkCounts;
+        private static int _calls, _bkCounts, _defCounts;
+        [ThreadStatic] private static MobileParty _defRan;   // partia, dla ktorej biegl DefaultPartyWageModel.GetTotalWage (gra liczy budynki sama :147) - straznik dubla
         private static int _limScaled;
         private static readonly Dictionary<Settlement, float> _scale = new Dictionary<Settlement, float>();
         private static readonly object Gate = new object();
@@ -34,12 +35,16 @@ namespace Armoury
         internal static void SessionStart()
         {
             lock (Gate) _scale.Clear();
-            _calls = _bkCounts = _limScaled = 0;
+            _calls = _bkCounts = _defCounts = _limScaled = 0;
             if (_hooked) { Buildings338.Hook("zold: limit AI wpiety"); return; }
             var m = AccessTools.Method(typeof(ClanVariablesCampaignBehavior), "UpdateClanSettlementsPaymentLimit", new[] { typeof(Clan) });
             if (m == null) { Buildings338.Hook("zold: BRAK UpdateClanSettlementsPaymentLimit"); return; }
-            // High: przed ClanBudget.GarLimitPostfix (Normal), ktory tylko obniza do celu pokojowego
-            Buildings338.H.Patch(m, postfix: new HarmonyMethod(typeof(Buildings338Wage), nameof(LimitPostfix)) { priority = Priority.High });
+            // recenzja 338 (techniczna W1): PO ClanBudget.GarLimitPostfix (com.jeff.armoury, Priority.Last) - skalujemy min(limit gry, cel pokojowy budzetu);
+            // cel pokojowy ClanBudget liczy zold zalogi bez 338 (RawWage), wiec obie skale sa w tym samym zlocie "bez budynkow" i x s dziala raz
+            Buildings338.H.Patch(m, postfix: new HarmonyMethod(typeof(Buildings338Wage), nameof(LimitPostfix)) { priority = Priority.Last, after = new[] { "com.jeff.armoury" } });
+            var d = AccessTools.Method(typeof(TaleWorlds.CampaignSystem.GameComponents.DefaultPartyWageModel), "GetTotalWage");
+            if (d != null && d.GetParameters().Length > 0 && d.GetParameters()[0].ParameterType == typeof(MobileParty))
+                Buildings338.H.Patch(d, prefix: new HarmonyMethod(typeof(Buildings338Wage), nameof(DefaultPrefix)));
             _hooked = true;
             Buildings338.Hook("zold: limit AI wpiety");
         }
@@ -55,12 +60,25 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>Straznik dubla (recenzja 338): gdy ktorys model lancucha zawola DefaultPartyWageModel.GetTotalWage, gra liczy budynki sama - Apply ich nie dolicza.</summary>
+        public static void DefaultPrefix(MobileParty __0) { _defRan = __0; }
+
+        /// <summary>Zold zalogi bez budynkow 338 (ClanBudget: cel pokojowy i srednia wojenna w zlocie "bez budynkow").</summary>
+        internal static int RawWage(MobileParty mp)
+        {
+            if (mp == null) return 0;
+            bool was = _skip; _skip = true;
+            try { return mp.TotalWage; } finally { _skip = was; }
+        }
+
         /// <summary>Z MountedWage.TotalPostfix - zewnetrzne GetTotalWage partii (nie linia "przed" WW-J, nie wywolanie wewnetrzne tej samej partii).</summary>
         internal static void Apply(MobileParty g, ref ExplainedNumber r)
         {
+            var def = _defRan; _defRan = null;
             if (_skip || g == null || !g.IsGarrison || !Buildings338.WageOn) return;
             try
             {
+                if (def == g) { Interlocked.Increment(ref _defCounts); return; }   // Default biegl wewnatrz tego wywolania - budynki juz policzone
                 if (CrownGifts.IsUnpaidParty(g)) return;   // Straz / Wolni Ludzie - zold 0
                 var st = g.CurrentSettlement;
                 var t = st != null ? st.Town : null;
@@ -136,7 +154,7 @@ namespace Armoury
             Log.Info("Budynki (338) zold: dzien " + day + " | twierdz " + n + " z budynkiem (miasto Barracks " + tb + ", zamek Barracks " + cb + ", biuro " + off + ", Slacken " + sl + ")"
                      + " | zold przed " + before + " po " + after + " oszczednosc " + (before - after) + " zl/d"
                      + " | limit AI x s: " + scale.Count + " twierdz, skalowan " + lim
-                     + " | pominiete (BK liczy) " + Interlocked.Exchange(ref _bkCounts, 0) + " | wywolan " + Interlocked.Exchange(ref _calls, 0)
+                     + " | pominiete (BK liczy) " + (Interlocked.Exchange(ref _bkCounts, 0) + Interlocked.Exchange(ref _defCounts, 0)) + " | wywolan " + Interlocked.Exchange(ref _calls, 0)
                      + " | zalogi AI " + aiMen + " ludzi" + Buildings338.Tail(Buildings338.GWage));
         }
     }

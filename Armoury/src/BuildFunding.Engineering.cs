@@ -112,7 +112,14 @@ namespace Armoury
             float b = town != null ? Boost(town) : 0f;
             double left = rem - b - EngExtra(town, 0f, b, false);
             if (!(left > 0)) return 0;
-            double f = 1.0 + EngExtra(town, 1f, 0f, false) + Buildings338Mason.K(town, -1);   // 338: Mason mnozy oplacona prace - pan nie przeplaca
+            double f = 1.0 + EngExtra(town, 1f, 0f, false);
+            double m = Buildings338Mason.Points(town);   // 338: Mason dopisuje min(punkty, oplacona praca) - pan nie przeplaca (praca ludu pominieta - lekkie zawyzenie)
+            if (m > 0)
+            {
+                double p = (left - m) / f;                // pan placi >= m: postep = p x f + m
+                if (p < m) p = left / (f + 1.0);          // pan placi < m: postep = p x f + p
+                return p > 0 ? p : 0;
+            }
             return f > 1.0 ? left / f : left;
         }
 

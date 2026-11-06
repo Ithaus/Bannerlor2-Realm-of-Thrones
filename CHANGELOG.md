@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 338b - poprawki po 2 recenzjach 338 (noc/338-budynki - NIE WGRANE, bez autotestu; Armoury.dll 6bac243399458d5da7d8ea901222c9be, test/m338)
+
+- **Murarz (W1):** dopisek = min(punkty Masona z opisu, oplacona praca doby) - bylo k x praca (do 10x opisu). Dymek i postep licza to samo bez surowej mocy BK; EngPaidNeed odejmuje dopisek od potrzeby (pan nie przeplaca). Linia doby: "punkty Masona X, dopisek ponad punkty N"; B338-8: N = 0.
+- **Urzad podatkowy (W2):** doplata +5/10/15% nie wchodzi juz do raty firmy - placona w nowym kroku 2c DsTowns.Pay z nadwyzki kasy ponad zapas po racie, brak darowany (bez zaleglosci i dlugu, firma 96% doplywu i dlugi miast bez zmian). Zaplata liczy sie do PaidWin (pomiar doplywu). Linia doby: "nalezne X zl".
+- **Plan KS (W3):** mkByM i mk (rampa, targ ZC4) dodaja te same sztuki co stawka A po drogach i budynkach wsi BK (dopisek = 0 przy wylaczonym 338 - liczby bez zmian); LiveReuse z zapamietanej A.
+- **Projekt Production (W4):** osobny klucz Buildings338VillageProject (domyslnie TAK, wylacznik po tescie). Linia "produkcja wsi" podaje srednie ceny miast zboza i drewna; nowy prog B338-16 (z --baza): ceny w +-15% bazy, inaczej wylaczyc klucz i sprawdzic Obieg.
+- **Zold zalog AI (techniczna W1):** ClanBudget liczy cel pokojowy i srednia wojenna zalogi z zoldu BEZ budynkow (Buildings338Wage.RawWage); skalowanie limitu x s biegnie PO ClanBudget.GarLimitPostfix (Priority.Last, after com.jeff.armoury) - jedna skala na min(limit gry, cel pokojowy). Straznik dubla: prefiks na DefaultPartyWageModel.GetTotalWage - gdy model gry liczyl budynki w tym wywolaniu, 338 nic nie dodaje ("pominiete").
+- **Stadniny (techniczna W2):** w zamku gracza hodowla nie bierze koni z jego schowka (Stash) - zaczyna od magazynu zamku i wsi. Kon zastepczy - najtanszy kon bojowy (nie pierwszy z listy). RunStudsPrefix przepuszcza BK, gdy BK sam tyka zamki.
+- **Kopalnie zamkow (techniczna W3):** darmowa ruda z galezi else BK RunMines (zamku nie stac) jest wycofywana ze Stash ("darmowa ruda wycofana N"). Klucz Buildings338CastleMines dalej domyslnie NIE.
+- **Drobne:** zapas jedzenia - skala x10 tylko bazy budynku (perka Battlements +100 bez skali), pamiec na dobe; 3b - bez czynnika przy oblezeniu, pomiar bilansu bez rynku; karawany - mnoznik targowiska z pamieci dobowej, liczniki Interlocked; wsie - czynnik BK z pamieci dobowej, klucz (wies, towar) bez hasha; porty - GetCampaignBehavior raz na sesje, wyjatek Daily do licznika; Stumble atomowy; K8 - Braked raz.
+- **Swiadomie bez zmian:** stadnina zamienia zwyklego konia na bojowego (roznica ceny ok. kilkuset-kilku tys. zl, 2-3 konie/d na swiat) - to wartosc pracy hodowli, nie zloto; autowerbunek przy K8Out (zgodnie z opisem); ProdStep (wzor czynnik x suma - kolejne kroki tez czynnik x suma, wiec mnoza sie); jednorazowy dubel ticku zamkow w 1. dobie po wczytaniu, gdyby BK tykal zamki (nie tyka).
+
 ## 338 - budynki robia to, co pisze ich opis: zold zalog, autowerbunek, zapas jedzenia, murarz, urzad podatkowy, targowisko, asymilacja, drogi, budynki wsi BK, ule, porty i stadniny zamkow (noc/338-budynki od 091ed773 - NIE WGRANE, bez autotestu; Armoury.dll 38e2926c79b87ba08914c76400d27f8e, test/m338)
 **Problem:** Jeff 06.11: "zrob audyt budynkow, czy w ogole dzialaja, czy trzeba je przeprogramowac i naprawic, aby to, co robia, dzialalo". Dowod: at337 linia
 `Zold zalog (337)` - "budynki martwe (BK)", 213 twierdz, ok. 31 400 zl/d obnizki zoldu nieodebranej. Audyt `docs/AUDYT-338-BUDYNKI.md` (kazdy wniosek MARTWY/CZESCIOWO

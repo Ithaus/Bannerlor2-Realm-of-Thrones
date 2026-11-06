@@ -379,7 +379,7 @@ namespace Armoury
                     else { why = K8On; __result = add338 ? game + (lim - 1) : lim; }
                 }
                 Buildings338AutoRecruit.NoteBase(__0, __result);   // 338: limit bez budynkow (licznik K8 / budynki w A5LimitPostfix)
-                if (add338 && why != K8Brake && __0 != null && __0.Settlement != null && !FreeHands.Braked(__0.Settlement)) __result += Buildings338AutoRecruit.Bonus(__0);   // 338 grupa 2: biuro kasztelana, Train Militia, Raise Troops (nie w krainie bez wolnych rak)
+                if (add338 && why != K8Brake && __0 != null && __0.Settlement != null && (why == K8On || !FreeHands.Braked(__0.Settlement))) __result += Buildings338AutoRecruit.Bonus(__0);   // 338 grupa 2: biuro kasztelana, Train Militia, Raise Troops (nie w krainie bez wolnych rak; K8On - Braked juz sprawdzone)
                 _k8Town = __0; _k8Game = game; _k8Why = why;
             }
             catch (Exception e) { Stumble("K8Postfix", e); }
