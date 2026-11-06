@@ -14,10 +14,10 @@ namespace Armoury
     {
         private sealed class KDay { public int Raids, RaidsOpen, RaidsArmy, Sieges, SiegesOpen, SiegesBan; }
         private static readonly Dictionary<string, KDay> _kd = new Dictionary<string, KDay>(StringComparer.Ordinal);
-        private static int _dStartLines, _dSiegePingPong, _dRaidRep, _dSiegeStory;
+        private static int _dStartLines, _dSiegePingPong, _dRaidRep, _dSiegeStory, _dSiegeNoAi;
         private static readonly Dictionary<SK, double> _raidSeen = new Dictionary<SK, double>();   // 334f: (strona, wies) -> godzina ostatniego startu rabunku
 
-        private static void ResetLog() { _kd.Clear(); _dStartLines = 0; _dSiegePingPong = 0; _dRaidRep = 0; _dSiegeStory = 0; _raidSeen.Clear(); }
+        private static void ResetLog() { _kd.Clear(); _dStartLines = 0; _dSiegePingPong = 0; _dRaidRep = 0; _dSiegeStory = 0; _dSiegeNoAi = 0; _raidSeen.Clear(); }
 
         private static string K01(bool b) { return b ? "TAK" : "NIE"; }
 
@@ -68,14 +68,18 @@ namespace Armoury
                 double o = 0;
                 foreach (var pb in ev.BesiegerCamp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) if (pb != null) o += pb.EstimatedStrength;
                 // 334f (L7): oblezenie z fabuly ROT (skrypt - np. Blackwater teleportuje Stannisa) - poza regula sily lokalnej, nie blokujemy i nie liczymy
-                bool story = false;
-                try { story = lp.Ai != null && lp.Ai.DoNotMakeNewDecisions; } catch { }
-                if (!story) { try { story = SiegePhantomLift.StoryOf(ev.BesiegerCamp) != null; } catch { } }
+                // 334g (D6): fabula = tylko skrypt ROT rozpoznany przez SiegePhantomLift; DoNotMakeNewDecisions (inne mody, ochrona 335) - osobno, liczy sie w L7
+                bool story = false, noAi = false;
+                try { story = SiegePhantomLift.StoryOf(ev.BesiegerCamp) != null; } catch { }
+                if (!story) { try { noAi = lp.Ai != null && lp.Ai.DoNotMakeNewDecisions; } catch { } }
                 lock (_lk)
                 {
                     if (!SnapFresh) return;
                     blocked = Blocked(lp, st);
                     if (blocked) _dSiegePingPong++;
+                    double kUntil;
+                    bool afterRet = _kblock.TryGetValue(new SK(lp.MapFaction, st), out kUntil) && kUntil > CampaignTime.Now.ToDays;
+                    if (noAi) _dSiegeNoAi++;
                     float first; double ally;
                     double z = ZFor(st, lp.MapFaction, lp, SiegeDays, out first, out ally);
                     q = Ratio(z, o + ally);
@@ -87,7 +91,8 @@ namespace Armoury
                         _dStartLines++;
                         Log.Info(Tag + "oblezenie start | dzien " + Today + " | " + Id(lp.MapFaction) + " (" + Nm(lp) + ", armia " + K01(lp.Army != null) + ") -> " + st.StringId + " (" + Nm(st) + ", "
                                  + Id(st.MapFaction) + ") | oboz " + F0(o) + " | wrog w polu " + F0(z) + " | q " + F2(q) + (blocked ? " | POWROT W BLOKADZIE" : "")
-                                 + (story ? " | fabula ROT (skrypt) - poza regula" : "") + ".");
+                                 + (story ? " | fabula ROT (skrypt) - poza regula" : "") + (noAi ? " | bez decyzji AI (skrypt/inne)" : "")
+                                 + (afterRet ? " | po odstapieniu krolestwa" : "") + ".");
                     }
                 }
             }
@@ -113,8 +118,8 @@ namespace Armoury
                     var rk = new SK(lp.MapFaction, v);
                     double nowH = CampaignTime.Now.ToHours, last;
                     bool rep = _raidSeen.TryGetValue(rk, out last) && nowH - last < 24.0;
-                    _raidSeen[rk] = nowH;
                     if (rep) { _dRaidRep++; return; }
+                    _raidSeen[rk] = nowH;   // 334g (D5): powtorka nie przesuwa okna 24 h - wznawiany co noc rabunek to nowy start po dobie
                     float first; double ally;
                     double z = ZFor(v, lp.MapFaction, lp, RaidDays(v.SettlementHitPoints, men), out first, out ally);
                     double q = Ratio(z, o + ally);
@@ -157,7 +162,7 @@ namespace Armoury
                 {
                     try { SiegeDayClean(); } catch (Exception e) { Stumble("SiegeDayClean", e); }
                     ZeroScoreDay(); ZeroSiegeDay(); ZeroDefenceDay(); _kd.Clear(); _dStartLines = 0; _dBkVeto = 0; _dBkVetoFallback = 0; _dSiegePingPong = 0; _dStanceSweep = 0;
-                    ZeroCost(); _dStum = 0; _dRaidRep = 0; _dSiegeStory = 0;
+                    ZeroCost(); _dStum = 0; _dRaidRep = 0; _dSiegeStory = 0; _dSiegeNoAi = 0;
                     var oldR = new List<SK>();
                     double nh = CampaignTime.Now.ToHours;
                     foreach (var kv in _raidSeen) if (nh - kv.Value > 48.0) oldR.Add(kv.Key);
@@ -198,9 +203,11 @@ namespace Armoury
                      + " | postawa przegladem " + _dStanceSweep
                      + " | czasy ms (334f): czekanie " + TMs(_dWaitT).ToString("0.0", Inv) + ", listy " + TMs(_dListT).ToString("0.0", Inv) + ", sumy " + TMs(_dAggT).ToString("0.0", Inv)
                      + ", zwiad " + TMs(_dScoutT).ToString("0.0", Inv) + ", model gry (poza) " + TMs(_dModelT).ToString("0.0", Inv) + ", linie doby (poza) " + TMs(_dDailyT).ToString("0.0", Inv)
+                     + " | razem z modelem gry srednio " + (hrs > 0 ? ((sum + TMs(_dModelT)) / hrs).ToString("0.00", Inv) : "0") + " ms/h"
+                     + " | blokada krolestwa po odstapieniu: weta " + _dKBlock + ", aktywnych " + _kblock.Count
                      + " | pamiec drog trafien " + _dRoadHit + " | sumy (cel, krolestwo) budow " + _dAggN + ", trafien " + _dAggHit
                      + " | kontrola ZFor " + (_dChk >> 7) + ", rozbieznosci " + _dDiv + (_dDivNote != null ? " [" + _dDivNote + "]" : "")
-                     + " | rabunek start powtorki " + _dRaidRep + ", oblezenia fabuly ROT " + _dSiegeStory
+                     + " | rabunek start powtorki " + _dRaidRep + ", oblezenia fabuly ROT " + _dSiegeStory + ", bez decyzji AI " + _dSiegeNoAi
                      + " | ping-pong: powrot w blokadzie " + _dSiegePingPong + ", przydzial " + _dDefSwitch + ".");
         }
 
@@ -260,7 +267,7 @@ namespace Armoury
                   .Append(" | start: rabunki ").Append(kd.Raids).Append(" (puste ").Append(kd.RaidsOpen).Append(", armia ").Append(kd.RaidsArmy).Append(')')
                   .Append(", oblezenia ").Append(kd.Sieges).Append(" (puste ").Append(kd.SiegesOpen).Append(", q>1.0: ").Append(kd.SiegesBan).Append(')')
                   .Append(" | marsze na cel ").Append(marches).Append(" | armie w polu ").Append(armies)
-                  .Append(" | Besieger: ocen ").Append(ka != null ? ka.Asked : 0).Append(", model 0 ").Append(ka != null ? ka.Model0 : 0).Append(", q>prog ").Append(ka != null ? ka.QZero : 0)
+                  .Append(" | Besieger: ocen ").Append(ka != null ? ka.Asked : 0).Append(", model 0 ").Append(Model0Of(k.StringId)).Append(", q>prog ").Append(ka != null ? ka.QZero : 0)
                   .Append(" (min q ").Append(ka != null && ka.MinQ >= 0 ? F2(ka.MinQ) : "-").Append(" @").Append(ka != null ? ka.MinT : "-").Append("), blokada ").Append(ka != null ? ka.Blocked : 0)
                   .Append(", lustro ").Append(ka != null ? ka.Mirror : 0)
                   .Append(isPlayer ? " | gracz (tylko log)" : "").Append('.');

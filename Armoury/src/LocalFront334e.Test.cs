@@ -83,7 +83,8 @@ namespace Armoury
             if (Seq(new[] { 4, 1, 4 }, new[] { 100.0, 103.0, 106.0 }) >= 2) t7.Add("KONTYNUUJ nie zeruje");
             if (Seq(new[] { 4, 4 }, new[] { 100.0, 113.0 }) >= 2) t7.Add("ODSTAP po 13 h liczony dalej");
             if (Seq(new[] { 4, 4 }, new[] { 100.0, 100.4 }) >= 2) t7.Add("ta sama godzina liczona 2 x");
-            Say("T7 histereza odwrotu (2 mysli w 12 h)", t7.Count == 0, "6 przypadkow" + (t7.Count > 0 ? " [" + string.Join("; ", t7.ToArray()) + "]" : ""));
+            if (Seq(new[] { 4, 4, 4 }, new[] { 100.0, 100.6, 101.2 }) < 2) t7.Add("czeste mysli przesuwaja badH");   // 334g
+            Say("T7 histereza odwrotu (2 mysli w 12 h)", t7.Count == 0, "7 przypadkow" + (t7.Count > 0 ? " [" + string.Join("; ", t7.ToArray()) + "]" : ""));
         }
     }
 }

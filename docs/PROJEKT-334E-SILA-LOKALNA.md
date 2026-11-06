@@ -335,3 +335,14 @@ Wynik 334e: kod 0, bez wywrotki, wódz 335 OK, rF 0.972, Rosby nie padło, Wyspy
 **Sprawdzarka `lokalna334e` (334f):** L12b kontrola ZFor – rozbieżności 0; L7 z linii startu: NIE przy q > 1.25 (AbandonQ) > 10% startów bez fabuły ROT, (1.0, 1.25] tylko INFO; L14 – ≥ 1 odstąpienie w biegu ≥ 60 dób i każde przy q odsieczy (`q_odw`: odsiecz + załoga do 0.8 × obóz; stara linia – q_obl) > 1.25; L17 Żelaźni – ≥ 1 oferta oblężenia wybrzeża w biegu ≥ 60 dób, 0 przy najniższym q > 1 wszędzie = DECYZJA; L18 linia Północy (battania) w ≥ 90% dób z liniami królestw; L13r INFO. `balans334` B334-7: okno bez opcji Besieger = DECYZJA. Testy syntetyczne obu grup: TAK.
 
 **Do sprawdzenia w teście 90 dób:** L12 średnio < 5 ms/h i godzina < 50 ms, L12b 0; L14 ≥ 1 odstąpienie (Rosby / Acorn Hall), żadne przy q_odw ≤ 1.25, „zostaje w obozie” sensowne; L17 oferty Żelaznych na Moat Cailin / Torrhen's Square / Deepwood (albo DECYZJA z q); O326-A 0 zbiórek silniejszej strony; L3 po nowej mierze; B334-7.
+
+## 15. 334g – poprawki recenzji 334f
+
+1. **Pętla odstąpienie → ponowne oblężenie.** Odwrót zapisuje blokadę (królestwo, osada) do przyjazdu odsieczy + 0,5 doby (co najmniej 1 doba, najwyżej 12,03 + 0,5). W tym czasie start oblężenia (ScorePost, BK, Żelaźni) przechodzi tylko przy tej samej mierze co odwrót: wróg w polu w oknie max(dojście + 8,02; 12,03) + załoga do 0,8 × my, podzielone przez naszą siłę, ≤ 1,0. Sprawdzarka: L15b (≥ 2 powroty na parę w 3 dobach = NIE).
+2. **Histereza:** ODSTAP w tej samej godzinie nie przesuwa godziny ostatniego ODSTAP; po odwrocie licznik zerowany (nowy wódz znów potrzebuje 2 myśli).
+3. **Jedna miara w q:** Żelaźni i armie łupiące liczą swoją siłę jak wroga (`PartyBase.EstimatedStrength`); model gry dalej dostaje swoją miarę.
+4. **Pozostały czas:** 12,03 doby tylko przy gotowych machinach / wyrwie i s ≤ 1. Przed gotowością: przygotowania + machiny (tempo budowy modelu gry) + szturm 12 h. Liczony raz na godzinę.
+5. **Świadoma tolerancja L7 (q 1,0–1,25 = INFO):** bieżący cel marszu ma histerezę do 1,25 (`SiegeMult(q, current)`), a linia startu liczy okno 8,02 od chwili startu (dojście 0), więc q przy starcie może legalnie wyjść między 1,0 a 1,25. NIE dopiero powyżej 1,25.
+6. **Koszt:** linia koszt podaje „razem z modelem gry” (nasze wywołania modelu: armie łupiące, Żelaźni) – L12m INFO; L12 od 2. doby (1. doba – zimna pamięć dróg – INFO). IronSiege: sito linii prostej przed drogą gry, pamięć dróg 2 h. Licznik „model 0” bez zamka. Czekanie na zamek w Judge poza kosztem.
+7. **Fabuła ROT** = tylko skrypt rozpoznany przez SiegePhantomLift; drużyny z `DoNotMakeNewDecisions` – osobny dopisek „bez decyzji AI”, liczą się w L7.
+8. **Sprawdzarka:** królestwo gracza tylko w L18; L17 DECYZJA tylko gdy wyjścia „q>1” przeważają nad „bez zbiórki/kandydatów/drogi”; rabunek – okno 24 h od pierwszego startu (jak DLL).

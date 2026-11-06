@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 334g - poprawki dwoch recenzji 334f (noc/334e-lokalna-sila - NIE WGRANE, bez autotestu po zmianie; DLL m334e)
+**Problem (recenzje logiki i techniczna 334f):** petla odstapienie -> ponowne oblezenie (odwrot liczy zaloge i okno 12.03, start - nie; blokada tylko druzyny na 1 dobe);
+BadStep przesuwal godzine ODSTAP przy czestych myslach (licznik stal na 1); po odwrocie r.Bad zostawal 2 (nowy wodz odstepowal od 1 mysli); q Zelaznych i armii lupiacych
+mieszal dwie miary (GetCustomStrength / GetTotalLandStrength vs EstimatedStrength wroga); TimeLeft = 12.03 przez cale przygotowania (s <= 1 przed machinami - nadmiar odwrotow);
+koszt: TimeLeft przy kazdym sadzie, IronSiege po Krwawych Godach liczyl droge gry do ~100 twierdz, BesModel0 bral zamek, Judge liczyl czekanie na zamek; fabula ROT = kazda
+druzyna z DoNotMakeNewDecisions; powtorka rabunku przesuwala okno 24 h; sprawdzarka: L12 bez kosztu modelu i z zimna 1. doba, L17 DECYZJA przy braku zbiorki, krolestwo gracza w L3/L7/L13.
+**Zmiana:** Siege.cs - blokada (krolestwo, osada) po odwrocie do przyjazdu odsieczy + 0.5 doby (min. 1): start (ScorePost, BK, Zelazni) tylko gdy miara odwrotu (wrog w oknie
+max(dojscie + 8.02, 12.03) + zaloga do 0.8 x my) / my <= 1.0 (KBlocked); BadStep - ODSTAP w tej samej godzinie nie przesuwa badH (T7 + przypadek 100/100.6/101.2); Retreat zeruje
+r.Bad; TimeLeft: HorizonDays tylko przy gotowych machinach / wyrwie i s <= 1, przed gotowoscia przygotowania + machiny + szturm 12 h; pozostaly czas raz na godzine (CampRec);
+Judge - czekanie na zamek poza kosztem; IronSiege: q z EstimatedStrength (armia / wodz + kandydaci), sito linii prostej przed droga gry, pamiec drog 2 h, wyjscie "weto".
+Score.cs: ArmyRaid q z EstimatedStrength armii; BesModel0 licznik atomowy bez zamka. Log.cs: fabula ROT tylko SiegePhantomLift.StoryOf, "bez decyzji AI" osobno (liczy sie w L7);
+start oblezenia "po odstapieniu krolestwa"; rabunek - okno 24 h od pierwszego startu; linia koszt: "razem z modelem gry srednio X ms/h", weta blokady krolestwa.
+sprawdz_logi.py: L12 od 2. doby (1. doba INFO), L12m koszt z modelem (INFO), L15b ponowne oblezenie w 3 dobach po odstapieniu (>= 2 na pare - NIE), L17 DECYZJA tylko gdy
+"q>1" przewaza nad "bez zbiorki/kandydatow/drogi", krolestwo gracza tylko w L18, L13r okno od pierwszego startu; synteza +5 przypadkow.
+**Status:** DO SPRAWDZENIA - test 90 dob (L12 < 5 ms/h, L12m, L14 >= 1 odstapienie bez "pozostalo 12.03 przy przyjezdzie > 5", L15b, L17).
+
 ## 334f - poprawki 334e po tescie 90 dob (noc/334e-lokalna-sila - NIE WGRANE, bez autotestu po zmianie; DLL m334e)
 **Problem (test 90 dob 334e, log at334e Armoury-2026-11-06_18-15-03.log):** kod 0, bez wywrotki, wodz 335 OK, rF 0.972, Rosby nie padlo; NIE: (1) L14 - 0 odstapien
 przy 129 stanach ODSTAP (Robb pod Rosby 2615 vs odsiecz ~5000, Acorn Hall 7.5k vs 21.6k "nie zdazy"); (2) L12 koszt mediana 90 ms/h, maks 301 ms; (3) L7 Stannis pod

@@ -80,7 +80,7 @@ namespace Armoury
         private sealed class KAsk
         {
             public readonly HashSet<Settlement> AV = new HashSet<Settlement>(), AF = new HashSet<Settlement>(), WV = new HashSet<Settlement>(), WF = new HashSet<Settlement>();
-            public int Asked, Model0, QZero, Blocked, Mirror; public double MinQ = -1; public string MinT = "-";
+            public int Asked, QZero, Blocked, Mirror; public double MinQ = -1; public string MinT = "-";   // model 0 - _dM0 (334g D1, bez zamka)
         }
         private static readonly Dictionary<string, KAsk> _dAsk = new Dictionary<string, KAsk>(StringComparer.Ordinal);
         private static KAsk KA(IFaction k)
@@ -105,15 +105,19 @@ namespace Armoury
             {
                 if (!PowerOn || WithPlayer(p)) return;
                 var k = p.MapFaction as Kingdom;
-                if (k == null) return;
-                lock (_lk) KA(k).Model0++;
+                if (k == null || k.StringId == null) return;
+                // 334g (D1): bez zamka na goracej sciezce (rownolegla mysl) - licznik atomowy
+                var arr = _dM0.GetOrAdd(k.StringId, _ => new int[1]);
+                System.Threading.Interlocked.Increment(ref arr[0]);
             }
             catch { }
         }
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, int[]> _dM0 = new System.Collections.Concurrent.ConcurrentDictionary<string, int[]>(StringComparer.Ordinal);
+        private static int Model0Of(string kid) { int[] a; return kid != null && _dM0.TryGetValue(kid, out a) ? System.Threading.Volatile.Read(ref a[0]) : 0; }
 
         private static void ZeroScoreDay()
         {
-            _dAsk.Clear();
+            _dAsk.Clear(); _dM0.Clear();
             _dOpts.Clear(); _dScoreN = _dZero = _dUp = _dDown = _dScaUndo = _dDefLow = _dDefFort = _dHomeCap = _dNoSnap = _dArmyRaidOffers = _dArmyRaidLog = _dArmyRaidVeto = 0;
             _dArmyRaidSaid.Clear();
         }
@@ -325,6 +329,8 @@ namespace Armoury
                                     double z = ZFor(t, k, p, our + SiegeDays, out first, out ally);
                                     q = Ratio(z, __3 + ally);
                                     m = SiegeMult(q, cur);
+                                    double qk;
+                                    if (m > 0f && KBlocked(k, t, p, __3, our, out qk)) { m = 0f; q = qk; ka.Blocked++; }   // 334g: po odstapieniu krolestwa - miara odwrotu
                                     Asked(ka, t, q);
                                     if (m == 0f) { ka.QZero++; if (ka.MinQ < 0 || q < ka.MinQ) { ka.MinQ = q; ka.MinT = t.StringId; } }
                                 }
@@ -460,6 +466,9 @@ namespace Armoury
                     float first; double ally;
                     double z = ZFor(st, k, leader, our + SiegeDays, out first, out ally);
                     q = Ratio(z, o + ally);
+                    double qk = -1;
+                    bool kb = q <= SiegeBanQ && KBlocked(k, st, leader, o, our, out qk);   // 334g: po odstapieniu krolestwa - miara odwrotu
+                    if (kb) q = qk;
                     Cost(TMs(Ts() - t1));
                     if (q > SiegeBanQ) { _dBkVeto++; if (src != "model") _dBkVetoFallback++; return true; }
                 }
@@ -515,8 +524,11 @@ namespace Armoury
             }
             if (cand.Count == 0) return;
             cand.Sort((a, b) => a.Value.CompareTo(b.Value));
-            float strength = party.GetTotalLandStrengthWithFollowers(false);
+            float strength = party.GetTotalLandStrengthWithFollowers(false);   // sila dla modelu gry (jego miara)
             int men; lock (_lk) StrOf(party, out men);
+            // 334g: sila do q ta sama miara co wrog w ZFor (EstimatedStrength calej armii - czlonkowie w drodze tez: ZFor pomija ich jako ta sama grupe)
+            float qStr = 0f;
+            foreach (var ap in army.Parties) if (ap != null && ap.IsActive && ap.Party != null) qStr += PStr(ap.Party);
             var model = Campaign.Current.Models.TargetScoreCalculatingModel;
             Settlement bestV = null; float bestS = 0f; double bestQ = -1; MobileParty.NavigationType bestNav = MobileParty.NavigationType.None; bool bestPort = false;
             for (int i = 0, tried = 0; i < cand.Count && tried < 6; i++)
@@ -533,7 +545,7 @@ namespace Armoury
                     if (our < 0f) continue;
                     float first; double ally;
                     double z = ZFor(v, k, party, our + RaidDays(v.SettlementHitPoints, men), out first, out ally);
-                    q = Ratio(z, strength + ally);
+                    q = Ratio(z, qStr + ally);
                 }
                 if (q > OpenQ) continue;
                 MobileParty.NavigationType nav; float dist; bool fromPort;
@@ -557,7 +569,7 @@ namespace Armoury
                 if (bestS > best && _dArmyRaidSaid.Add(party.StringId + "|" + bestV.StringId) && _dArmyRaidLog < 30 && S != null && S.LogEnabled)
                 {
                     _dArmyRaidLog++;
-                    Log.Info(Tag + "armia rabuje | dzien " + Today + " | " + Nm(party) + " (" + Id(k) + ", armia " + army.Parties.Count + " druzyn, sila " + F0(strength) + ") | " + bestV.StringId
+                    Log.Info(Tag + "armia rabuje | dzien " + Today + " | " + Nm(party) + " (" + Id(k) + ", armia " + army.Parties.Count + " druzyn, sila " + F0(qStr) + ", model " + F0(strength) + ") | " + bestV.StringId
                              + " (" + Nm(bestV) + ", " + Id(bestV.MapFaction) + ") | q " + F2(bestQ) + " | wynik " + bestS.ToString("0.000", Inv) + " (najlepszy inny " + best.ToString("0.000", Inv) + ").");
                 }
             }
