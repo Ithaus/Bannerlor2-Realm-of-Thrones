@@ -2,6 +2,7 @@
 
 Uzycie (Python 3, tylko odczyt):
     python -I tools/sprawdz_logi.py --grupa etap2 <Armoury-*.log> [--baza baza.json] [--zapisz-baze baza.json] [--csv budzet-rodow.csv] [--start-kampanii N]
+--grupa sila336   : (paczka 336) sila krolestw w UI bez garnizonow - latki UI, linia doby, w polu < stara, 0 bledow.
 --grupa etap2     : progi etapu 2.
 --grupa m96len    : (m96-len, 20.10) Plan KS liczy plotno i sukno kupowane przez wsie w miastach (KsVillageClothBuysInPlan); zapas lnu, plotna i sukna od D+28.
 --grupa etap3     : (3.1, E3/0) progi fali 1 etapu 3 (reszta ksiegi, RB3, linia "Szczelnosc (164a)") i kontrolki "prog 0" fali 2 tego drzewa.
@@ -95708,6 +95709,160 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return wodz335_main(rest[0] if rest else None)
     return _wodz335_main_prev(argv)
+
+
+# ------------------------------------------------------------ paczka 336: grupa sila336 - sila krolestw w UI bez garnizonow (KingdomStrengthField336.cs)
+#  S336-0 start sesji: latki metod N/M z N == M i brak '-' przy kluczu TAK (brak linii - INFO: stary DLL); S336-1 linia doby 'Sila krolestw w polu (336): dzien'
+#  obecna, 0 nierozpoznanych; S336-2 w polu < stara dla kazdego krolestwa z garnizonami > 0 (kazda doba); S336-3 potkniecia 336 = 0 i 'ERROR in
+#  KingdomStrengthField336' = 0; S336-4 reszta (stara - pole - garnizony: cache godzinowy gry, partie rozwiazywane) - INFO; S336-5 przyklad Polnocy - INFO.
+#   python -I tools/sprawdz_logi.py --grupa sila336 <Armoury-*.log>
+S336_START = re.compile(r"Sila krolestw w polu \(336\): start sesji \| klucz Kingdom Strength In Field Only (TAK|NIE) \| latki metod (\d+)/(\d+), podmian odczytu sily (\d+), "
+                        r"podpisow (\d+), (.+?) \| brak: (.+?) \| metody: ")
+S336_DAY = re.compile(r"Sila krolestw w polu \(336\): dzien (\d+) \| klucz (TAK|NIE), latki metod (\d+)/(\d+) \| krolestw (\d+), w polu < stara (\d+), "
+                      r"nie mniej przy garnizonach (\d+) \| (.*) \| odczytow UI doby (\d+) \| potkniecia 336 (\d+) \(sesja (\d+)\)\.")
+S336_ROW = re.compile(r"^(.+?) pole (-?\d+) / stara (-?\d+) \(garnizony (-?\d+), reszta (-?\d+)\)$")
+S336_ERR = re.compile(r"ERROR in KingdomStrengthField336")
+
+
+def sila336_collect(logp):
+    D = {"start": [], "day": [], "dayBad": 0, "err": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if "(336)" not in line and "ERROR in" not in line:
+                continue
+            if S336_ERR.search(line):
+                D["err"] += 1
+                continue
+            if "Sila krolestw w polu (336): start sesji" in line:
+                m = S336_START.search(line)
+                D["start"].append({"key": m.group(1), "ok": int(m.group(2)), "want": int(m.group(3)), "swaps": int(m.group(4)), "labels": int(m.group(5)),
+                                   "dip": m.group(6), "miss": m.group(7)} if m else None)
+            elif "Sila krolestw w polu (336): dzien " in line:
+                m = S336_DAY.search(line.rstrip())
+                if not m:
+                    D["dayBad"] += 1
+                    continue
+                rows, bad = [], 0
+                for part in m.group(8).split(" | "):
+                    r = S336_ROW.match(part.strip())
+                    if not r:
+                        bad += 1
+                        continue
+                    rows.append({"name": r.group(1), "field": int(r.group(2)), "old": int(r.group(3)), "gar": int(r.group(4)), "rest": int(r.group(5))})
+                if bad:
+                    D["dayBad"] += 1
+                    continue
+                D["day"].append({"day": int(m.group(1)), "key": m.group(2), "ok": int(m.group(3)), "want": int(m.group(4)), "n": int(m.group(5)),
+                                 "below": int(m.group(6)), "notBelow": int(m.group(7)), "rows": rows, "calls": int(m.group(9)), "stum": int(m.group(10))})
+    return D
+
+
+def sila336_rows(rep, D):
+    S = D["start"]
+    if not S:
+        rep.add("S336-0: start sesji (latki UI)", "brak linii", "INFO (stary DLL)", None)
+    else:
+        bad = [s for s in S if s is None or (s["key"] == "TAK" and (s["ok"] != s["want"] or s["want"] == 0 or s["miss"] != "-" or s["swaps"] < s["ok"] - 1))]
+        last = S[-1]
+        val = "nierozpoznana" if last is None else (f"sesji {len(S)}, klucz {last['key']}, latki metod {last['ok']}/{last['want']}, podmian {last['swaps']}, "
+                                                   f"podpisow {last['labels']}, {last['dip']}, brak: {last['miss']}")
+        rep.add("S336-0: start sesji (latki UI)", val, "wszystkie metody wpiete, brak '-' (klucz TAK)", not bad)
+    Dy = D["day"]
+    if not Dy and not D["dayBad"]:
+        rep.add("S336-1: linia doby", "brak linii", "INFO (stary DLL)", None)
+    else:
+        rep.add("S336-1: linia doby", f"dob {len(Dy)}, nierozpoznanych {D['dayBad']}", "> 0 dob, 0 nierozpoznanych", len(Dy) > 0 and D["dayBad"] == 0)
+    if Dy:
+        viol = [(d["day"], r["name"], r["field"], r["old"], r["gar"]) for d in Dy for r in d["rows"] if r["gar"] > 0 and not r["field"] < r["old"]]
+        nrow = sum(1 for d in Dy for r in d["rows"] if r["gar"] > 0)
+        ex = "; ".join(f"d{a} {b} pole {c} / stara {e} (garn. {g})" for a, b, c, e, g in viol[:3])
+        rep.add("S336-2: w polu < stara (krolestwa z garnizonami)", f"wierszy {nrow}, naruszen {len(viol)}" + (f" ({ex})" if ex else ""),
+                "0 naruszen", nrow > 0 and not viol)
+        rests = [abs(r["rest"]) / max(1, r["old"]) for d in Dy for r in d["rows"]]
+        rep.add("S336-4: reszta (stara - pole - garnizony) / stara", f"max {max(rests) * 100:.1f}%, srednio {sum(rests) / len(rests) * 100:.2f}%" if rests else "-",
+                "INFO (cache godzinowy gry, partie rozwiazywane)", None)
+        north = [(d["day"], r) for d in Dy for r in d["rows"] if r["name"] == "The North"]
+        if north:
+            dd, r = north[-1]
+            rep.add("S336-5: Polnoc (przyklad)", f"dzien {dd}: pole {r['field']} / stara {r['old']} (garnizony {r['gar']}, reszta {r['rest']}) = "
+                    f"{r['field'] * 100 // max(1, r['old'])}% pokazywanej dotad", "INFO", None)
+    stum = sum(d["stum"] for d in Dy)
+    rep.add("S336-3: bledy 336", f"potkniecia {stum}, ERROR in KingdomStrengthField336 {D['err']}", "0 i 0", stum == 0 and D["err"] == 0)
+
+
+def sila336_synth():
+    import tempfile
+    import shutil
+    st = ("Sila krolestw w polu (336): start sesji | klucz Kingdom Strength In Field Only TAK | latki metod 16/16, podmian odczytu sily 19, podpisow 12, "
+          "Diplomacy DetailWarVM wpieta | brak: - | metody: KingdomWarItemVM.UpdateDiplomacyProperties 2/1 | AI bez zmian (Clan/Kingdom.CurrentTotalStrength nietkniete).")
+
+    def day(d, f=25369, o=46255, g=20886, stum=0):
+        return (f"Sila krolestw w polu (336): dzien {d} | klucz TAK, latki metod 16/16 | krolestw 2, w polu < stara 2, nie mniej przy garnizonach 0 | "
+                f"The North pole {f} / stara {o} (garnizony {g}, reszta {o - f - g}) | Dorne pole 9000 / stara 9000 (garnizony 0, reszta 0) "
+                f"| odczytow UI doby 4 | potkniecia 336 {stum} (sesja {stum}).")
+    runs = {
+        "good": [st, day(3), day(4)],
+        "viol": [st, day(3), day(4, f=46300)],
+        "miss": [st.replace("latki metod 16/16", "latki metod 15/16").replace("brak: -", "brak: KingSelectionDecisionItemVM 0/1"), day(3)],
+        "stum": [st, day(3, stum=1)],
+        "err": [st, day(3), "ERROR in KingdomStrengthField336.Daily (potkniecie 1)"],
+        "broken": [st, day(3).replace(" pole 25369", " pole: 25369")],
+        "old": ["SCA bez band (320b): dzien 3 | ..."],
+    }
+    exp = {
+        "good": {"S336-0": "TAK", "S336-1": "TAK", "S336-2": "TAK", "S336-3": "TAK", "S336-5": "INFO"},
+        "viol": {"S336-2": "NIE"},
+        "miss": {"S336-0": "NIE"},
+        "stum": {"S336-3": "NIE"},
+        "err": {"S336-3": "NIE"},
+        "broken": {"S336-1": "NIE"},
+        "old": {"S336-0": "INFO", "S336-1": "INFO", "S336-3": "TAK"},
+    }
+    tmp = tempfile.mkdtemp(prefix="s336_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {x}" for i, x in enumerate(Ls)) + "\n")
+            rep = Report()
+            sila336_rows(rep, sila336_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def sila336_main(logp):
+    rep = Report()
+    try:
+        s2 = sila336_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("S336-S: test syntetyczny (dobry, naruszenie, brak metody, potkniecie, ERROR, zly format, stary DLL)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("S336-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = sila336_collect(logp)
+    print(f"plik: {logp} | startow 336 {len(D['start'])}, dob {len(D['day'])}, ERROR {D['err']}")
+    sila336_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_sila336_main_prev = main
+
+
+def main(argv):
+    # paczka 336: grupa sila336 - opakowanie main jak wodz335
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "sila336":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return sila336_main(rest[0] if rest else None)
+    return _sila336_main_prev(argv)
 
 
 if __name__ == "__main__":

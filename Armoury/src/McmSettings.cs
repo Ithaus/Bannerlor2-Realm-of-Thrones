@@ -10604,6 +10604,10 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool StrategicAiFightsOnWhenPeaceBlocked { get; set; } = true;
 
+        [SettingPropertyBool("Kingdom Strength In Field Only", HintText = "the strength of realms and houses shown to you - on the Kingdom screen (wars, truces, decisions), in the encyclopedia, in a house's map tooltip and in the war details of Diplomacy - counts only the armies and parties in the field, not the men sitting in garrisons. Men taken out of a garrison into a lord's party count again at once. Only what you see changes: AI realms still judge war and peace by their own full count. Off = strength shown with garrisons, as the game does", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool KingdomStrengthFieldOnly336 { get; set; } = true;
+
         [SettingPropertyBool("Old Feuds Can End", HintText = "the old storyline feuds of Realm of Thrones (the Vale and the Iron Islands, the Reach and Dorne, the wars of the Free Cities, Qarth and the Dothraki against Daenerys) are no longer forced forever: once such a war has lasted Feud War Min Days, peace may be made by council vote, war weariness or poverty, and Realm of Thrones no longer declares it again. The War of the Five Kings, the Night's Watch and the Free Folk, and the Ironborn raid on the North are not affected (off = as Realm of Thrones decides)", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonFeudWarsEnd { get; set; } = true;
@@ -14074,6 +14078,7 @@ namespace Armoury
             s.WarSurrenderClansToCrown = WarSurrenderClansToCrown;
             s.StrategicAiIgnoresBandits = StrategicAiIgnoresBandits;
             s.StrategicAiFightsOnWhenPeaceBlocked = StrategicAiFightsOnWhenPeaceBlocked;
+            s.KingdomStrengthFieldOnly336 = KingdomStrengthFieldOnly336;
             s.CanonFeudWarsEnd = CanonFeudWarsEnd;
             s.CanonFeudWarMinDays = CanonFeudWarMinDays;
             s.IronThroneAmbition = IronThroneAmbition;

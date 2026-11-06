@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 336 - sila krolestw w UI bez garnizonow: liczy sie armia w polu (noc/336-sila-w-polu od 091ed773; Armoury.dll 78ba6d96429286cf465dc05dfcde59ee w test/m336 - NIE WGRANE, bez autotestu; Jeff gra)
+**Problem:** Jeff 06.11: "sile krolestw pokazuj bez garnizonow - Polnoc nie ma 44k zolnierzy w polu; garnizony, jak zostana wyjete z garnizonow do armii, to wtedy
+sa liczone. Liczy sie armia w polu." Log `Armoury-2026-11-06_11-51-21.log` (55 dob): The North pokazana 42 820-47 420 (doba 109522: 46 255 = SCA145 `OwnedStrength`
+= `kingdom.CurrentTotalStrength`), a partie lordow Polnocy ("Rownowaga wojny (274)", A sila) 25 369 - roznica 19.8-21.0 tys. przez cala sesje = garnizony (~17.2 tys. ludzi).
+**Przyczyna:** `Clan.UpdateCurrentStrength` (co godzine) = suma `EstimatedStrength` partii wojennych rodu PLUS `GarrisonParty` jego twierdz; `Kingdom.CurrentTotalStrength`
+= suma po rodach (z najemnikami). Ta sama wlasnosc idzie do UI i do AI (dyplomacja gry i BK, cele oblezen, SCA145, Diplomacy, CanonThroneWars, ArmsPricing, 320b).
+**Zmiana (tylko to, co widzi gracz):** `Armoury/src/KingdomStrengthField336.cs` (nowy), klucz `KingdomStrengthFieldOnly336` (MCM "Kingdom Strength In Field Only",
+grupa "Wars of the books", domyslnie TAK, na zywo). Transpiler na metodach UI zamienia kazde `get_CurrentTotalStrength` (IFaction / Kingdom / Clan) na `FieldOf...`
+tego samego typu = suma `Party.EstimatedStrength` partii wojennych rodow (`WarPartyComponents`; bez garnizonow, milicja i tak nie jest partia; bez partii
+nieaktywnych i `IsDisbanding` - jak strona krolestwa w encyklopedii). Ludzie wyjeci z garnizonu do partii lorda licza sie od razu (sa w partii). Podpis paska dostaje
+dopisek " (in field)" (nowy TextObject - wspolny tekst GameTexts nietkniety). Miejsca (16 metod):
+- Krolestwo / Dyplomacja: `KingdomWarItemVM.UpdateDiplomacyProperties`, `KingdomTruceItemVM.UpdateDiplomacyProperties` ("Total Strength (in field)"; mixiny Diplomacy
+  wstawiaja na pozycje 1, kolejnosc Stats bez zmian).
+- Krolestwo / Decyzje (`InitValues`): DeclareWar, MakePeace, StartAlliance, TradeAgreement, AcceptingCallToWarAgreement, ProposeCallToWarAgreement ("Strength (in field)"),
+  KingSelection ("Total Strength (in field)"). Decyzje BK dziedzicza po grze - te same VM.
+- Encyklopedia: lista krolestw i lista rodow - `GetComparedValueText` i lambda sortowania (`<>c` komparatora); strona rodu `EncyclopediaClanPageVM.Refresh`
+  ("Clan Strength (in field)").
+- Mapa: podpowiedz rodu `TooltipRefresherCollection.RefreshClanTooltip` ("Clan Strength (in field)").
+- Diplomacy 1.4.7: okno szczegolow wojny - postfiks `DetailWarVM.RefreshValues` ustawia `Stats/OpponentStats.TotalStrength` i podpis (konstruktor DetailWarStatsVM
+  jest maly - JIT moglby go wkompilowac w wywolujacego, wiec latka na duzej metodzie).
+**AI bez zmian:** `Clan.UpdateCurrentStrength`, `Clan/Kingdom.CurrentTotalStrength` i modele nietkniete - podmiana tylko w IL metod UI.
+**Log:** "Sila krolestw w polu (336): start sesji | ... latki metod N/16, podmian odczytu sily, podpisow, Diplomacy DetailWarVM ... | brak: ... | metody: ..." i co dobe
+"Sila krolestw w polu (336): dzien N | ... | <krolestwo> pole X / stara Y (garnizony G, reszta R) | ... | odczytow UI doby | potkniecia 336". `python -I tools/sprawdz_logi.py
+--grupa sila336 <Armoury-*.log>`: S336-0 wszystkie metody wpiete, S336-1 linia doby, S336-2 w polu < stara przy garnizonach > 0, S336-3 0 bledow, S336-4/5 INFO; S336-S test
+syntetyczny TAK (7 przypadkow).
+**Ryzyko / co sprawdzic:** (1) regresje - metody docelowe wybierane po IL (tylko te z `get_CurrentTotalStrength`), licznik w linii startu; brak metody = "brak: ..." i S336-0 NIE.
+(2) kolizje - Diplomacy mixiny (pozycja 1 Stats), BK `KingdomWarItemVM` (czas, poparcie) nie czytaja sily; transpilery skladaja sie z cudzymi; AI czyta stara wartosc -
+gracz widzi mniej niz AI liczy (zamierzone: Jeff chce widziec pole). (3) nie zmienione: wojna domowa Diplomacy (`RebelFactionItemVM` / `RebelFactionParticipantVM` -
+przycisk buntu zalezy od tych samych liczb co AI), BK `RadicalGroupVM` (sila grupy interesu), naglowek sortowania listy "Total Strength" w encyklopedii (tylko wartosci
+i kolejnosc). (4) "reszta" w linii doby = cache godzinowy gry i partie rozwiazywane (oczekiwane blisko 0). (5) podpis to nowy TextObject bez id - po zmianie jezyka w
+trakcie gry odswiezy sie przy nastepnym otwarciu ekranu. Nic nie sprawdzone w grze - build kod 0, test syntetyczny sprawdz_logi.
+**Status:** DO SPRAWDZENIA (autotest: start sesji 16/16 i linia doby; w grze ekran Krolestwo / Dyplomacja - Polnoc ok. 25 tys. zamiast ok. 46 tys.).
+
 ## 335b - poprawki po 2 recenzjach 335: obrona trwa w bitwie chronionego, przydzial obroncow bez podwojnego liczenia, straz nie z linii w zwarciu (noc/335-ochrona-wodza; Armoury.dll 6ffcced0ea53e5933dc5a8aed4ea0758 - NIE WGRANE, bez autotestu; Jeff gra)
 **Mapa (LordEscort.Guard335.cs):**
 - WAZNE 4 / R2-1: para nie znika w chwili starcia - P w bitwie polowej (bez osady, nie morze) z napastnikiem z poprzedniej migawki albo P po stronie broniacej, a X = wodz
