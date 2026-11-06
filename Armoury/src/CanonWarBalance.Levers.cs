@@ -102,8 +102,9 @@ namespace Armoury
                 {
                     // 326c-A: zbiorka ma pomagac slabszej stronie - log 04/05.11: 31 zbiorek, wszystkie dla Polnocy (silniejsza, powsciagana, B/A 0.56), w tym oblezenie
                     // Deep Den 109326. Strona powsciagana albo silniejsza poza pasmem 1.5 - bez zbiorki (zwykle armie i cele gry bez zmian)
-                    // 334e (LocalPower334e): blokada zbiorki wylaczona - ocena oblezenia z WillGatherArmy ma juz q z sila przyszlej armii
-                    if (MusterWeakOnly && !LocalFront334e.PowerOn && MusterBlocked(side, _restrain, _strongOut))
+                    // 334f (O326-A): blokada 326c zostaje takze przy sile lokalnej - 334e ja zdejmowal (Polnoc 5 zbiorek po rozejmie przy B/A 0.52, 4 z 5 to patrol
+                    // na front, ktory nie przechodzi przez q)
+                    if (MusterWeakOnly && MusterBlocked(side, _restrain, _strongOut))
                     {
                         _dMusterBlocked++;
                         var mk = party.MapFaction as Kingdom;
@@ -189,8 +190,8 @@ namespace Armoury
                 {
                     var e = scores[i];
                     var st = e.Item1.Party as Settlement;
-                    bool cand = e.Item1.AiBehavior == AiBehavior.BesiegeSettlement && st != null && e.Item2 > -1f && SideOf(st.MapFaction) != 0 && SideOf(st.MapFaction) != side
-                                && !SeatHeld(st) && IsFrontTarget(k, st);   // recenzja 274 (1): wlasna siedziba w rekach wroga moze byc celem odbicia
+                    bool cand = e.Item1.AiBehavior == AiBehavior.BesiegeSettlement && st != null && e.Item2 > 0f && SideOf(st.MapFaction) != 0 && SideOf(st.MapFaction) != side
+                                && !SeatHeld(st) && IsFrontTarget(k, st);   // recenzja 274 (1): wlasna siedziba w rekach wroga moze byc celem odbicia; 334f (L7): wynik 0 (weto sily lokalnej, rozejm) - zbiorka go nie wskrzesza
                     if (cand)
                     {
                         // armia pierwsza, potem ocena

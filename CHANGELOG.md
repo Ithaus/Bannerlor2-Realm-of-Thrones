@@ -1,5 +1,36 @@
 # DZIENNIK ZMIAN
 
+## 334f - poprawki 334e po tescie 90 dob (noc/334e-lokalna-sila - NIE WGRANE, bez autotestu po zmianie; DLL m334e)
+**Problem (test 90 dob 334e, log at334e Armoury-2026-11-06_18-15-03.log):** kod 0, bez wywrotki, wodz 335 OK, rF 0.972, Rosby nie padlo; NIE: (1) L14 - 0 odstapien
+przy 129 stanach ODSTAP (Robb pod Rosby 2615 vs odsiecz ~5000, Acorn Hall 7.5k vs 21.6k "nie zdazy"); (2) L12 koszt mediana 90 ms/h, maks 301 ms; (3) L7 Stannis pod
+King's Landing q 6.02; (4) B334-12 Zelazni 0 oblezen Polnocy ("opcji 0 (weta 0)" 91 dob); (5) B334-7 korona bez oblezen w 6 oknach 28 dob; (6) brak linii Polnocy;
+(7) O326-A Polnoc 5 zbiorek po rozejmie; (8) L3 Wolni Ludzie 90 dob "okno bez opcji"; (9) sprawdzarka (L4 1. doba, nbitwa z logiem sesji, "rabunek start" z powtorkami).
+**Przyczyna:** (1) Siege.cs histereza "2 kolejne godziny zegara" przy sadzie co ~3 h (nigdy), zamiar odsieczy "miga" przy kazdej mysli lorda, TimeLeft z podloga
+1.0 (pozostalo 1.00 przez doby; brama OB1 wydluza oblezenia); (2) ZFor przegladal ~429 jednostek przy kazdej z ~1150 ocen na godzine, droga osada-osada od nowa;
+(3) wydarzenie ROT Blackwater (skrypt) + 274 zbiorka wladcy wskrzeszala cele wyzerowane przez 334e (e.Item2 > -1f); (4) IronSiege: tried++ przed q (4 najblizsze
+z q > 1 zuzywaly limit), sito linii prostej odcinalo rejs, jedna opcja gry na Zachodzie wylaczala oferte, wyjscia ciche; (5) sila lokalna (zgodnie z zasada) + petla
+274 z (3); (6) KingdomLines pomijal krolestwo gracza; (7) 334e zdjal blokade zbiorki 326c (!LocalFront334e.PowerOn); (8) miara okna: cele pytane przez dowolne
+krolestwo, sila najsilniejszej jednostki, bez czasu dojscia (zachowanie Wolnych Ludzi zgodne z regula); (9) sprawdz_logi: logp = ostatni argument, L4 z 1. doba.
+**Zmiana:** Siege.cs: BadStep - ODSTAP z 2 osobnych mysli w 12 h (KONTYNUUJ/GLOD zeruja, SRODEK/NIE-ZDAZY trzymaja); pamiec dowodcy - zamiar obrony 12 h (2 x mysl
+gry), liczy sie, dopoki sie nie oddala; TimeLeft z modelu gry (przygotowania, taran/wieza z GetConstructionProgressPerHour albo tempo murow, szturm z szansa OB1;
+s <= 1 / brak drogi - HorizonDays); linia odstapienia z q_odw. LocalFront334e.cs: widok godziny (LV, macierz wojen), pamiec drog osada-osada, sumy (cel, krolestwo)
+na godzine + poprawka zwiadu, kontrola co 128. oceny starym przegladem (rozbieznosci w linii koszt), liczniki czasu (czekanie, listy, sumy, zwiad, model gry poza,
+linie doby poza). Log.cs: start oblezenia fabuly ROT - poza regula (nie liczony); rabunek start raz na (strona, wies) w 24 h; linia krolestwa gracza "gracz (tylko
+log)"; okno z miary mysli AI (Score.cs: cele pytane / q <= 0.8 per krolestwo); diagnoza Besieger (ocen, model 0, q>prog z min q @cel, blokada, lustro). IronSiege:
+do Krwawych Godow tylko Polnoc wlasciwa (battania), odleglosc skorygowana gry (pamiec 6 h), limit 4 tylko z q <= 1 (8 ocen q), wyjscie tylko przy opcji gry na cel
+kanonu, wyjscia i min q w linii koszt. CanonWarBalance.Levers.cs: blokada 326c przywrocona; kandydat zbiorki wladcy tylko z wynikiem > 0. SiegePhantomLift.StoryOf
+(odczyt). Test T7 (histereza). sprawdz_logi: lokalna334e L12b (rozbieznosci 0), L7 z linii startu (NIE przy q > 1.25, fabula ROT poza), L14 z q_odw, L17 Zelazni
+(>= 1 oferta / 60 dob, przy q > 1 wszedzie DECYZJA), L18 linia Polnocy >= 90% dob, L13r rabunki unikalne, L4 bez 1. doby i linii gracza; balans334 B334-7 okno bez
+opcji Besieger = DECYZJA; nbitwa bierze log Armoury* (log sesji jako 2. argument). Testy syntetyczne lokalna334e i balans334 TAK. Projekt: rozdz. 14.
+**Ryzyko / co sprawdzic:** kontrola calosci w kodzie: ZFor ma tych samych wolajacych (ScorePost, Judge/RaidBreak, BkBlocked, ArmyRaid, IronSiege, Defence, start
+oblezen/rabunkow) - wynik ten sam co stary przeglad na widoku godziny (kontrola L12b); nowy stan godziny (LV) zamiast odczytu na zywo - zmiana zamiaru w srodku godziny
+widac od nastepnej godziny (jak LiveUnit); _agg czyszczone co godzine i przy nowej migawce, bez pamieci przy pustej migawce; pamiec drog czyszczona przy Reset (nowa
+kampania), limit 400 tys. wpisow. Odwrot czesciej niz w 334e (bylo 0) - Retreat bez zmian (ucieczka musi zdazyc, blokada celu 1 doba, ping-pong L15). Measure (OB1)
+tylko odczyt, wolany z sadu (co ~3 h na oboz). Zelazni: wiecej ofert oblezen Polnocy (kanon), weta teatru / 274 / 326b dalej sprawdzane; zbiorka wedlug gry. Blokada
+326c znowu dziala przy sile lokalnej (Polnoc silniejsza - bez zbiorek 274). Gracz nie sterowany (linia tylko log). Do testu 90 dob: L12 < 5 ms/h i < 50 ms,
+L12b 0, L14 >= 1 przy q_odw > 1.25, L17, O326-A, L3, B334-7. Build Release kod 0; DLL m334e md5 f414a1f037478352726ecedcfbf5a507.
+**Status:** DO SPRAWDZENIA (autotest 90 dob; nie wgrane).
+
 ## 334e - zasada sily lokalnej (Jeff 06.11) + poprawki trzech recenzji (noc/334e-lokalna-sila od 99a05f27 + scalenie 335 - NIE WGRANE, bez autotestu; DLL m334e)
 **Zasada Jeffa 06.11:** "liczy sie, gdzie armia jest w danej chwili, a nie ile ogolnie jest" - gdy armie Polnocy sa na poludniu, lupimy i oblegamy tam, gdzie ich nie ma,
 bo zanim wroca, zdazymy; oblegajacy, ktory widzi nadchodzaca odsiecz, odstepuje, gdy przegra, i zostaje, gdy wygra albo zdazy zdobyc. Projekt: docs/PROJEKT-334E-SILA-LOKALNA.md

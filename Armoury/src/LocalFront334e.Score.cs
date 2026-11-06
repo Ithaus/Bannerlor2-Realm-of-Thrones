@@ -76,8 +76,44 @@ namespace Armoury
             _scaGeo.Clear(); _scaNear.Clear(); _scaExh.Clear(); _thr.Clear(); _thrH = -1; _homeThr.Clear(); _raidRange = -1f; ZeroScoreDay();
         }
 
+        // 334f (L3, B334-7): cele pytane przez mysl AI krolestwa (q policzone) i w oknie (q <= 0.8) - ta sama miara, ktora dostala mysl; diagnoza Besieger
+        private sealed class KAsk
+        {
+            public readonly HashSet<Settlement> AV = new HashSet<Settlement>(), AF = new HashSet<Settlement>(), WV = new HashSet<Settlement>(), WF = new HashSet<Settlement>();
+            public int Asked, Model0, QZero, Blocked, Mirror; public double MinQ = -1; public string MinT = "-";
+        }
+        private static readonly Dictionary<string, KAsk> _dAsk = new Dictionary<string, KAsk>(StringComparer.Ordinal);
+        private static KAsk KA(IFaction k)
+        {
+            KAsk r;
+            string id = k != null ? k.StringId ?? "-" : "-";
+            if (!_dAsk.TryGetValue(id, out r)) { r = new KAsk(); _dAsk[id] = r; }
+            return r;
+        }
+        private static void Asked(KAsk ka, Settlement t, double q)
+        {
+            if (q < 0) return;
+            bool vil = t.IsVillage;
+            (vil ? ka.AV : ka.AF).Add(t);
+            if (q <= OpenQ) (vil ? ka.WV : ka.WF).Add(t);
+        }
+
+        /// <summary>Besieger z wynikiem modelu 0 (licznik diagnozy krolestwa). Nie rzuca.</summary>
+        private static void BesModel0(MobileParty p)
+        {
+            try
+            {
+                if (!PowerOn || WithPlayer(p)) return;
+                var k = p.MapFaction as Kingdom;
+                if (k == null) return;
+                lock (_lk) KA(k).Model0++;
+            }
+            catch { }
+        }
+
         private static void ZeroScoreDay()
         {
+            _dAsk.Clear();
             _dOpts.Clear(); _dScoreN = _dZero = _dUp = _dDown = _dScaUndo = _dDefLow = _dDefFort = _dHomeCap = _dNoSnap = _dArmyRaidOffers = _dArmyRaidLog = _dArmyRaidVeto = 0;
             _dArmyRaidSaid.Clear();
         }
@@ -248,7 +284,8 @@ namespace Armoury
         /// <summary>Postfiks czynnego modelu GetTargetScoreForFaction (HigherThanNormal, przed rozejmem). Nie rzuca.</summary>
         public static void ScorePost(Settlement __0, Army.ArmyTypes __1, MobileParty __2, float __3, ref float __result)
         {
-            if (_inOwn || __result <= 0f || __0 == null || __2 == null) return;
+            if (_inOwn || __0 == null || __2 == null) return;
+            if (__result <= 0f) { if (__1 == Army.ArmyTypes.Besieger) BesModel0(__2); return; }
             if (__1 != Army.ArmyTypes.Besieger && __1 != Army.ArmyTypes.Raider && __1 != Army.ArmyTypes.Defender) return;
             if (!PowerOn) return;
             var p = __2;
@@ -259,16 +296,21 @@ namespace Armoury
             float m = 1f, undo = 1f;
             try
             {
-                var sw = System.Diagnostics.Stopwatch.StartNew();
+                long w0 = Ts();
                 double q = -1;
+                KAsk ka = null;
                 lock (_lk)
                 {
+                    long t1 = Ts();
+                    _dWaitT += t1 - w0;   // 334f (Z0): czekanie na zamek poza kosztem
                     if (!SnapFresh) { _dNoSnap++; return; }   // bez migawki z dzis - stara gra (nie q = 0)
                     _dScoreN++;
+                    ka = KA(k);
                     if (__1 == Army.ArmyTypes.Besieger)
                     {
                         if (!t.IsFortification) return;
-                        if (Blocked(p, t)) m = 0f;
+                        ka.Asked++;
+                        if (Blocked(p, t)) { m = 0f; ka.Blocked++; }
                         else
                         {
                             var bs = p.BesiegedSettlement ?? (p.Army != null && p.Army.LeaderParty != null ? p.Army.LeaderParty.BesiegedSettlement : null);
@@ -283,6 +325,8 @@ namespace Armoury
                                     double z = ZFor(t, k, p, our + SiegeDays, out first, out ally);
                                     q = Ratio(z, __3 + ally);
                                     m = SiegeMult(q, cur);
+                                    Asked(ka, t, q);
+                                    if (m == 0f) { ka.QZero++; if (ka.MinQ < 0 || q < ka.MinQ) { ka.MinQ = q; ka.MinT = t.StringId; } }
                                 }
                             }
                         }
@@ -303,6 +347,7 @@ namespace Armoury
                                 double z = ZFor(t, k, p, our + RaidDays(t.SettlementHitPoints, men), out first, out ally);
                                 q = Ratio(z, __3 + ally);
                                 m = RaidMult(q);
+                                Asked(ka, t, q);
                             }
                         }
                     }
@@ -322,7 +367,7 @@ namespace Armoury
                         }
                         else return;
                     }
-                    if (__1 != Army.ArmyTypes.Defender && m > 1f && HomeThreat(p)) { m = 1f; _dHomeCap++; }
+                    if (__1 != Army.ArmyTypes.Defender && m > 1f && HomeThreat(p)) { m = 1f; _dHomeCap++; if (__1 == Army.ArmyTypes.Besieger) ka.Mirror++; }
                     if (__1 == Army.ArmyTypes.Besieger && m > 1f && q >= 0 && q <= OpenQ && _wSca == "TAK" && _scaModelType != null) undo = ScaUndo(t, p, __3);
                     if (m == 0f) _dZero++; else if (m > 1f) _dUp++; else if (m < 1f) _dDown++;
                     if (undo != 1f) _dScaUndo++;
@@ -333,7 +378,7 @@ namespace Armoury
                         o[__1 == Army.ArmyTypes.Raider ? 0 : 1]++;
                     }
                     _dQ++;
-                    Cost(sw.Elapsed.TotalMilliseconds);
+                    Cost(TMs(Ts() - t1));
                 }
                 __result *= m * undo;
             }
@@ -409,13 +454,13 @@ namespace Armoury
                 lock (_lk)
                 {
                     if (!SnapFresh) return false;
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    long t1 = Ts();
                     float our = OurDays(leader, st);
                     if (our < 0f) return false;
                     float first; double ally;
                     double z = ZFor(st, k, leader, our + SiegeDays, out first, out ally);
                     q = Ratio(z, o + ally);
-                    Cost(sw.Elapsed.TotalMilliseconds);
+                    Cost(TMs(Ts() - t1));
                     if (q > SiegeBanQ) { _dBkVeto++; if (src != "model") _dBkVetoFallback++; return true; }
                 }
             }
@@ -492,13 +537,16 @@ namespace Armoury
                 }
                 if (q > OpenQ) continue;
                 MobileParty.NavigationType nav; float dist; bool fromPort;
+                long m0 = Ts();
                 AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, v, false, out nav, out dist, out fromPort);
+                _modelT += Ts() - m0;
                 if (nav == MobileParty.NavigationType.None || dist > range) continue;
                 float ds = MBMath.Map(0.75f - dist / range, 0f, 1f, 0.1f, 1f);
                 float s;
+                long m1 = Ts();
                 _inOwn = true;
                 try { s = model.GetTargetScoreForFaction(v, Army.ArmyTypes.Raider, party, strength) * ds; }
-                finally { _inOwn = false; }
+                finally { _inOwn = false; _modelT += Ts() - m1; }
                 if (s > bestS) { bestS = s; bestV = v; bestQ = q; bestNav = nav; bestPort = fromPort; }
             }
             if (bestV == null || !(bestS > 0f)) return;

@@ -14,9 +14,10 @@ namespace Armoury
     {
         private sealed class KDay { public int Raids, RaidsOpen, RaidsArmy, Sieges, SiegesOpen, SiegesBan; }
         private static readonly Dictionary<string, KDay> _kd = new Dictionary<string, KDay>(StringComparer.Ordinal);
-        private static int _dStartLines, _dSiegePingPong;
+        private static int _dStartLines, _dSiegePingPong, _dRaidRep, _dSiegeStory;
+        private static readonly Dictionary<SK, double> _raidSeen = new Dictionary<SK, double>();   // 334f: (strona, wies) -> godzina ostatniego startu rabunku
 
-        private static void ResetLog() { _kd.Clear(); _dStartLines = 0; _dSiegePingPong = 0; }
+        private static void ResetLog() { _kd.Clear(); _dStartLines = 0; _dSiegePingPong = 0; _dRaidRep = 0; _dSiegeStory = 0; _raidSeen.Clear(); }
 
         private static string K01(bool b) { return b ? "TAK" : "NIE"; }
 
@@ -66,6 +67,10 @@ namespace Armoury
                 double q; bool blocked;
                 double o = 0;
                 foreach (var pb in ev.BesiegerCamp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) if (pb != null) o += pb.EstimatedStrength;
+                // 334f (L7): oblezenie z fabuly ROT (skrypt - np. Blackwater teleportuje Stannisa) - poza regula sily lokalnej, nie blokujemy i nie liczymy
+                bool story = false;
+                try { story = lp.Ai != null && lp.Ai.DoNotMakeNewDecisions; } catch { }
+                if (!story) { try { story = SiegePhantomLift.StoryOf(ev.BesiegerCamp) != null; } catch { } }
                 lock (_lk)
                 {
                     if (!SnapFresh) return;
@@ -75,12 +80,14 @@ namespace Armoury
                     double z = ZFor(st, lp.MapFaction, lp, SiegeDays, out first, out ally);
                     q = Ratio(z, o + ally);
                     var r = KD(lp.MapFaction);
-                    r.Sieges++; if (q <= OpenQ) r.SiegesOpen++; if (q > SiegeBanQ) r.SiegesBan++;
+                    if (story) _dSiegeStory++;
+                    else { r.Sieges++; if (q <= OpenQ) r.SiegesOpen++; if (q > SiegeBanQ) r.SiegesBan++; }
                     if (S != null && S.LogEnabled && _dStartLines < 200)
                     {
                         _dStartLines++;
                         Log.Info(Tag + "oblezenie start | dzien " + Today + " | " + Id(lp.MapFaction) + " (" + Nm(lp) + ", armia " + K01(lp.Army != null) + ") -> " + st.StringId + " (" + Nm(st) + ", "
-                                 + Id(st.MapFaction) + ") | oboz " + F0(o) + " | wrog w polu " + F0(z) + " | q " + F2(q) + (blocked ? " | POWROT W BLOKADZIE" : "") + ".");
+                                 + Id(st.MapFaction) + ") | oboz " + F0(o) + " | wrog w polu " + F0(z) + " | q " + F2(q) + (blocked ? " | POWROT W BLOKADZIE" : "")
+                                 + (story ? " | fabula ROT (skrypt) - poza regula" : "") + ".");
                     }
                 }
             }
@@ -102,6 +109,12 @@ namespace Armoury
                 lock (_lk)
                 {
                     if (!SnapFresh) return;
+                    // 334f (9): ten sam rabunek wznawiany (nocny oboz, powrot po bitwie) - jeden start na (strona, wies) w 24 h
+                    var rk = new SK(lp.MapFaction, v);
+                    double nowH = CampaignTime.Now.ToHours, last;
+                    bool rep = _raidSeen.TryGetValue(rk, out last) && nowH - last < 24.0;
+                    _raidSeen[rk] = nowH;
+                    if (rep) { _dRaidRep++; return; }
                     float first; double ally;
                     double z = ZFor(v, lp.MapFaction, lp, RaidDays(v.SettlementHitPoints, men), out first, out ally);
                     double q = Ratio(z, o + ally);
@@ -130,7 +143,9 @@ namespace Armoury
                     lock (_lk)
                     {
                         try { SnapLine(today); } catch (Exception e) { Stumble("SnapLine", e); }
+                        long d0 = Ts();
                         try { KingdomLines(today); } catch (Exception e) { Stumble("KingdomLines", e); }
+                        _dDailyT += Ts() - d0;
                         try { CostLine(today); } catch (Exception e) { Stumble("CostLine", e); }
                     }
                 }
@@ -142,7 +157,11 @@ namespace Armoury
                 {
                     try { SiegeDayClean(); } catch (Exception e) { Stumble("SiegeDayClean", e); }
                     ZeroScoreDay(); ZeroSiegeDay(); ZeroDefenceDay(); _kd.Clear(); _dStartLines = 0; _dBkVeto = 0; _dBkVetoFallback = 0; _dSiegePingPong = 0; _dStanceSweep = 0;
-                    _dDist = _dQ = _dLiveUsed = 0; _dMsSum = _dMsMax = 0; _dHours = 0; _hHour = -1; _hMs = 0; _dStum = 0;
+                    ZeroCost(); _dStum = 0; _dRaidRep = 0; _dSiegeStory = 0;
+                    var oldR = new List<SK>();
+                    double nh = CampaignTime.Now.ToHours;
+                    foreach (var kv in _raidSeen) if (nh - kv.Value > 48.0) oldR.Add(kv.Key);
+                    foreach (var key in oldR) _raidSeen.Remove(key);
                     _scaGeo.Clear(); _scaNear.Clear(); _scaExh.Clear(); _homeThr.Clear(); _thr.Clear(); _thrH = -1;
                 }
                 try
@@ -174,43 +193,38 @@ namespace Armoury
                      + ", trzymane " + _dKeep + ", bez wskrzeszania " + _dKeepVeto + ", kandydaci odwrotu " + _dRetreatCand + ", odstapienia " + _dRetreat
                      + (_dRetreatNotes.Count > 0 ? " [" + string.Join("; ", _dRetreatNotes.ToArray()) + "]" : "") + ", zostaly w obozie " + _dStay
                      + ", BK stick przepuscil " + _dStickYield + ", m116 przepuscil " + _dFreshYield
-                     + " | rabunki przerwane " + _dBreak + " | armie rabunek opcji " + _dArmyRaidOffers + " (weta " + _dArmyRaidVeto + ") | Zelazni oblezenia opcji " + _dIronOffers + " (weta " + _dIronVeto + ")"
+                     + " | rabunki przerwane " + _dBreak + " | armie rabunek opcji " + _dArmyRaidOffers + " (weta " + _dArmyRaidVeto + ") | Zelazni oblezenia opcji " + _dIronOffers + " (weta " + _dIronVeto + ")" + IronXLine()
                      + " | obrona: przydzialy " + _dDefAssign + ", bez obrony " + _dDefNone + ", zmiany przydzialu " + _dDefSwitch
                      + " | postawa przegladem " + _dStanceSweep
+                     + " | czasy ms (334f): czekanie " + TMs(_dWaitT).ToString("0.0", Inv) + ", listy " + TMs(_dListT).ToString("0.0", Inv) + ", sumy " + TMs(_dAggT).ToString("0.0", Inv)
+                     + ", zwiad " + TMs(_dScoutT).ToString("0.0", Inv) + ", model gry (poza) " + TMs(_dModelT).ToString("0.0", Inv) + ", linie doby (poza) " + TMs(_dDailyT).ToString("0.0", Inv)
+                     + " | pamiec drog trafien " + _dRoadHit + " | sumy (cel, krolestwo) budow " + _dAggN + ", trafien " + _dAggHit
+                     + " | kontrola ZFor " + (_dChk >> 7) + ", rozbieznosci " + _dDiv + (_dDivNote != null ? " [" + _dDivNote + "]" : "")
+                     + " | rabunek start powtorki " + _dRaidRep + ", oblezenia fabuly ROT " + _dSiegeStory
                      + " | ping-pong: powrot w blokadzie " + _dSiegePingPong + ", przydzial " + _dDefSwitch + ".");
         }
 
-        /// <summary>Linie krolestw: okno liczone tylko dla celow, o ktore pytala mysl AI tej doby (pamiec _tl) - bez nowych zapytan o droge na watku glownym.</summary>
+        /// <summary>Linie krolestw. 334f (L3): cele pytane i okno z tej samej miary, ktora dostala mysl AI (ScorePost: q policzone / q &lt;= 0.8, krolestwo
+        /// decydujace) - bez ZFor o polnocy. 334f (6): krolestwo gracza tez (tylko log - postawy i decyzji gracza nie sterujemy). Diagnoza Besieger (B334-7).</summary>
         private static void KingdomLines(int today)
         {
             IFaction player = null;
             try { player = Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null; } catch { }
-            var asked = new List<Settlement>(_tl.Keys);
             foreach (var k in Kingdom.All)
             {
-                if (k == null || k.IsEliminated || k == player) continue;
+                if (k == null || k.IsEliminated) continue;
+                bool isPlayer = k == player;
                 var enemies = new List<IFaction>();
                 foreach (var f in k.FactionsAtWarWith) if (f != null && f.IsKingdomFaction && ScaNoBandits320.Skip(f) == 0 && !f.IsEliminated) enemies.Add(f);
                 if (enemies.Count == 0) continue;
-                int n = 0, men = 0; double str = 0, foe = 0; Unit strong = null;
+                int n = 0, men = 0; double str = 0, foe = 0;
                 foreach (var u in _snap.Units)
                 {
-                    if (u.F == k) { n++; men += u.Men; str += u.Str; if (strong == null || u.Str > strong.Str) strong = u; }
+                    if (u.F == k) { n++; men += u.Men; str += u.Str; }
                     else if (FactionManager.IsAtWarAgainstFaction(k, u.F)) foe += u.Str;
                 }
-                int nv = 0, wv = 0, nf = 0, wf = 0;
-                if (strong != null)   // linie doby ida przed nowa migawka: listy celow z mijajacej doby sa w pamieci _tl
-                    foreach (var st in asked)
-                    {
-                        if (st == null || st.MapFaction == null || !enemies.Contains(st.MapFaction)) continue;
-                        bool vil = st.IsVillage && st.Village != null && st.Village.VillageState == Village.VillageStates.Normal;
-                        bool fort = st.IsFortification;
-                        if (!vil && !fort) continue;
-                        if (vil) nv++; else nf++;
-                        float first; double ally;
-                        double z = ZFor(st, k, null, vil ? RaidDays(st.SettlementHitPoints, strong.Men) : SiegeDays, out first, out ally);
-                        if (Ratio(z, strong.Str) <= OpenQ) { if (vil) wv++; else wf++; }
-                    }
+                KAsk ka; _dAsk.TryGetValue(k.StringId, out ka);
+                int nv = ka != null ? ka.AV.Count : 0, wv = ka != null ? ka.WV.Count : 0, nf = ka != null ? ka.AF.Count : 0, wf = ka != null ? ka.WF.Count : 0;
                 int[] o; _dOpts.TryGetValue(k.StringId, out o);
                 int def = 0, agg = 0, parts = 0, marches = 0, armies = 0;
                 foreach (var wp in k.WarPartyComponents)
@@ -245,7 +259,11 @@ namespace Armoury
                   .Append(front >= 0 ? F0(front) : "-").Append('/').Append(locUsed ? F0(ownF) + " (pole)" : ownRaw >= 0 ? F0(ownRaw) : "-")
                   .Append(" | start: rabunki ").Append(kd.Raids).Append(" (puste ").Append(kd.RaidsOpen).Append(", armia ").Append(kd.RaidsArmy).Append(')')
                   .Append(", oblezenia ").Append(kd.Sieges).Append(" (puste ").Append(kd.SiegesOpen).Append(", q>1.0: ").Append(kd.SiegesBan).Append(')')
-                  .Append(" | marsze na cel ").Append(marches).Append(" | armie w polu ").Append(armies).Append('.');
+                  .Append(" | marsze na cel ").Append(marches).Append(" | armie w polu ").Append(armies)
+                  .Append(" | Besieger: ocen ").Append(ka != null ? ka.Asked : 0).Append(", model 0 ").Append(ka != null ? ka.Model0 : 0).Append(", q>prog ").Append(ka != null ? ka.QZero : 0)
+                  .Append(" (min q ").Append(ka != null && ka.MinQ >= 0 ? F2(ka.MinQ) : "-").Append(" @").Append(ka != null ? ka.MinT : "-").Append("), blokada ").Append(ka != null ? ka.Blocked : 0)
+                  .Append(", lustro ").Append(ka != null ? ka.Mirror : 0)
+                  .Append(isPlayer ? " | gracz (tylko log)" : "").Append('.');
                 Log.Info(sb.ToString());
             }
         }

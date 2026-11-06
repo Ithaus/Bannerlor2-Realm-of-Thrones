@@ -152,6 +152,13 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>334f (L7): oblezenie fabuly ROT w tym obozie (nazwa wydarzenia) albo null - dla linii startu 334e (tylko odczyt).</summary>
+        internal static string StoryOf(BesiegerCamp camp)
+        {
+            if (camp == null) return null;
+            return Story(camp, Members(camp, "StoryOf"));
+        }
+
         private static bool PlayerIn(Settlement st, List<MobileParty> parties)
         {
             var main = MobileParty.MainParty;

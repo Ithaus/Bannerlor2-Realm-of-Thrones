@@ -88,7 +88,154 @@ namespace Armoury
             public MobileParty Lead; public IFaction F; public Vec2 Pos; public float Str; public int Men;
             public float Land, Sea; public bool Ships, AtSea, Player;
             public Settlement Anchor; public bool AnchorPort; public float Off;
+            public LV V;   // 334f: widok godziny tej druzyny (pamiec odwolania)
         }
+
+        // ================================================================ 334f: widok godziny (stan druzyn i wojen czytany raz na godzine - jedna miara dla wszystkich ocen godziny)
+        /// <summary>Stan druzyny w tej godzinie (zamiar, cel marszu, osada, armia, frakcja). Odswiezany przy pierwszym odczycie w godzinie.</summary>
+        internal sealed class LV
+        {
+            public int H = int.MinValue; public bool Active; public IFaction F; public int Fi = -1;
+            public Settlement Cur, Tgt, Besieged; public AiBehavior Beh; public Army Army; public bool ArmyLead; public object ArmyObj;
+        }
+        private static readonly Dictionary<MobileParty, LV> _lv = new Dictionary<MobileParty, LV>();
+        private static int _hvH = int.MinValue;
+        private const int FCap = 384;
+        private static readonly Dictionary<IFaction, int> _fIdx = new Dictionary<IFaction, int>();
+        private static readonly List<IFaction> _fList = new List<IFaction>();
+        private static readonly sbyte[] _war = new sbyte[FCap * FCap];   // 0 nie wiadomo, 1 wojna, 2 bez wojny (godzina)
+        private static readonly int[] _side = new int[FCap];
+
+        /// <summary>Nowa godzina: frakcje, macierz wojen, sumy (cel, krolestwo) od nowa. Wolajacy trzyma _lk.</summary>
+        private static void HourView()
+        {
+            int h = NowH;
+            if (h == _hvH) return;
+            _hvH = h;
+            if (_fList.Count > 0) Array.Clear(_war, 0, _war.Length);
+            _fIdx.Clear(); _fList.Clear(); _agg.Clear();
+            if (_lv.Count > 6000) _lv.Clear();
+        }
+
+        private static int FI(IFaction f)
+        {
+            if (f == null) return -1;
+            int i;
+            if (_fIdx.TryGetValue(f, out i)) return i;
+            if (_fList.Count >= FCap) return -1;
+            i = _fList.Count; _fList.Add(f); _fIdx[f] = i;
+            int sd = 0;
+            try { sd = CanonWarBalance.SideOf(f); } catch { }
+            _side[i] = sd;
+            return i;
+        }
+
+        private static bool War(IFaction a, int ai, IFaction b, int bi)
+        {
+            if (a == null || b == null) return false;
+            if (ai < 0 || bi < 0) return FactionManager.IsAtWarAgainstFaction(a, b);
+            int x = ai * FCap + bi;
+            sbyte v = _war[x];
+            if (v == 0) { v = FactionManager.IsAtWarAgainstFaction(a, b) ? (sbyte)1 : (sbyte)2; _war[x] = v; _war[bi * FCap + ai] = v; }
+            return v == 1;
+        }
+
+        private static bool Same(IFaction a, int ai, IFaction b, int bi)
+        {
+            if (a == null || b == null) return false;
+            if (a == b) return true;
+            int sa = ai >= 0 ? _side[ai] : CanonWarBalance.SideOf(a), sb = bi >= 0 ? _side[bi] : CanonWarBalance.SideOf(b);
+            return sa != 0 && sa == sb;
+        }
+
+        /// <summary>Foe z macierzy godziny (ta sama regula: wojna z a, trzecia strona nie broni celu).</summary>
+        private static bool FoeI(IFaction a, int ai, IFaction lf, int li, IFaction tf, int ti)
+        {
+            if (!War(a, ai, lf, li)) return false;
+            if (tf == null || Same(a, ai, tf, ti) || Same(lf, li, tf, ti)) return true;
+            return !War(lf, li, tf, ti);
+        }
+
+        private static LV LVOf(MobileParty mp)
+        {
+            HourView();
+            LV v;
+            if (!_lv.TryGetValue(mp, out v)) { v = new LV(); _lv[mp] = v; }
+            if (v.H != _hvH)
+            {
+                v.H = _hvH;
+                try
+                {
+                    v.Active = mp.IsActive; v.F = mp.MapFaction; v.Fi = FI(v.F); v.Cur = mp.CurrentSettlement; v.Tgt = mp.TargetSettlement; v.Beh = mp.DefaultBehavior;
+                    var a = mp.Army; v.Army = a; v.ArmyLead = a != null && a.LeaderParty == mp; v.ArmyObj = v.ArmyLead ? a.AiBehaviorObject : null;
+                    var bc = mp.BesiegerCamp; v.Besieged = bc != null && bc.SiegeEvent != null ? bc.SiegeEvent.BesiegedSettlement : null;
+                }
+                catch { v.Active = false; v.F = null; v.Fi = -1; }
+            }
+            return v;
+        }
+
+        private static LV LVOf(Unit u)
+        {
+            HourView();
+            var v = u.V;
+            if (v == null || v.H != _hvH) { v = LVOf(u.Lead); u.V = v; }
+            return v;
+        }
+
+        /// <summary>Widoczny zamiar na te osade (obrona, oblezenie, rabunek, cel armii).</summary>
+        private static bool TargetsV(LV v, Settlement t)
+        {
+            return (v.Tgt == t && (v.Beh == AiBehavior.DefendSettlement || v.Beh == AiBehavior.BesiegeSettlement || v.Beh == AiBehavior.RaidSettlement)) || (v.ArmyLead && ReferenceEquals(v.ArmyObj, t));
+        }
+
+        /// <summary>Odsiecz: zamiar OBRONY tej osady (DefendSettlement albo armia z tym celem, ktora jej nie oblega ani nie rabuje).</summary>
+        private static bool RelievesV(LV v, Settlement t)
+        {
+            return (v.Tgt == t && v.Beh == AiBehavior.DefendSettlement)
+                   || (v.ArmyLead && ReferenceEquals(v.ArmyObj, t) && v.Beh != AiBehavior.BesiegeSettlement && v.Beh != AiBehavior.RaidSettlement);
+        }
+
+        private static bool GoingToV(LV v, Settlement t) { return (v.Beh == AiBehavior.BesiegeSettlement && v.Tgt == t) || v.Besieged == t; }
+
+        private static bool SameGroupV(MobileParty lead, LV v, MobileParty p)
+        {
+            if (p == null || lead == null) return false;
+            if (lead == p) return true;
+            return v.Army != null && v.Army == p.Army;
+        }
+
+        // ================================================================ 334f: pamiec drog miedzy osadami (droga gry osada-osada sie nie zmienia)
+        private struct RK : IEquatable<RK>
+        {
+            public readonly Settlement A, T; public readonly int F;
+            public RK(Settlement a, Settlement t, int f) { A = a; T = t; F = f; }
+            public bool Equals(RK o) { return ReferenceEquals(A, o.A) && ReferenceEquals(T, o.T) && F == o.F; }
+            public override bool Equals(object o) { return o is RK && Equals((RK)o); }
+            public override int GetHashCode() { unchecked { return (((A != null ? A.GetHashCode() : 0) * 397) ^ (T != null ? T.GetHashCode() : 0)) * 31 + F; } }
+        }
+        private static readonly Dictionary<RK, KeyValuePair<float, float>> _road = new Dictionary<RK, KeyValuePair<float, float>>();
+        private static long _dRoadHit;
+
+        private static float Road(Settlement a, Settlement t, bool port, MobileParty.NavigationType nav, out float lr)
+        {
+            var key = new RK(a, t, (port ? 1 : 0) | ((int)nav << 1));
+            KeyValuePair<float, float> kv;
+            if (_road.TryGetValue(key, out kv)) { _dRoadHit++; lr = kv.Value; return kv.Key; }
+            _dDist++;
+            float d;
+            try { d = Campaign.Current.Models.MapDistanceModel.GetDistance(a, t, port, false, nav, out lr); } catch { d = -1f; lr = 1f; }
+            if (_road.Count > 400000) _road.Clear();
+            _road[key] = new KeyValuePair<float, float>(d, lr);
+            return d;
+        }
+
+        // ================================================================ 334f: koszt - liczniki czasu (Stopwatch.GetTimestamp, bez obiektow)
+        private static long Ts() { return System.Diagnostics.Stopwatch.GetTimestamp(); }
+        private static double TMs(long ticks) { return ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency; }
+        private static long _dWaitT, _dListT, _dAggT, _dScoutT, _dModelT, _dDailyT, _dAggN, _dAggHit, _dChk, _dDiv;
+        private static string _dDivNote;
+        [ThreadStatic] private static long _modelT;   // czas modelu gry w mysli poza obozem (ThinkField odejmuje)
 
         private struct Entry { public Unit U; public float D; }
 
@@ -121,13 +268,18 @@ namespace Armoury
             {
                 _snap = new Snap(); _anch = new Settlement[0]; _ports = new Settlement[0];
                 _tl.Clear(); _live.Clear(); _scout.Clear(); _canonH = int.MinValue;
+                _lv.Clear(); _road.Clear(); _agg.Clear(); _fIdx.Clear(); _fList.Clear(); Array.Clear(_war, 0, _war.Length); _hvH = int.MinValue;
                 _dStum = _sStum = 0; _errSites.Clear();
                 ZeroCost();
                 ResetScore(); ResetSiege(); ResetDefence(); ResetLog();
             }
         }
 
-        private static void ZeroCost() { _dDist = _dQ = _dLiveUsed = 0; _hMs = _dMsSum = _dMsMax = 0; _hHour = -1; _dHours = 0; }
+        private static void ZeroCost()
+        {
+            _dDist = _dQ = _dLiveUsed = 0; _hMs = _dMsSum = _dMsMax = 0; _hHour = -1; _dHours = 0;
+            _dRoadHit = _dWaitT = _dListT = _dAggT = _dScoutT = _dModelT = _dDailyT = _dAggN = _dAggHit = _dChk = _dDiv = 0; _dDivNote = null;
+        }
 
         /// <summary>Czas zapytania miary do kosztu godziny (wolajacy trzyma _lk).</summary>
         private static void Cost(double ms)
@@ -210,18 +362,15 @@ namespace Armoury
             if (u == null || u.Anchor == null || t == null) return -1f;
             float h0 = u.Off / (u.AtSea ? u.Sea : u.Land);
             if (u.Anchor == t) return h0 / CampaignTime.HoursInDay;
-            var model = Campaign.Current.Models.MapDistanceModel;
             var nav = (u.Ships || u.AtSea) ? MobileParty.NavigationType.All : MobileParty.NavigationType.Default;
             float lr = 1f, d;
-            _dDist++;
-            try { d = model.GetDistance(u.Anchor, t, u.AnchorPort, false, nav, out lr); }
-            catch { d = -1f; }
+            d = Road(u.Anchor, t, u.AnchorPort, nav, out lr);   // 334f: pamiec drog osada-osada (Z3)
             float lim = Campaign.MapDiagonal * 5f;
             if (!(d >= 0f) || d >= lim)
             {
                 if (nav == MobileParty.NavigationType.Default) return -1f;
-                nav = MobileParty.NavigationType.Default; _dDist++;
-                try { d = model.GetDistance(u.Anchor, t, false, false, nav, out lr); } catch { return -1f; }
+                nav = MobileParty.NavigationType.Default;
+                d = Road(u.Anchor, t, false, nav, out lr);
                 if (!(d >= 0f) || d >= lim) return -1f;
             }
             if (nav == MobileParty.NavigationType.Default || !(lr >= 0f) || lr > 1f) lr = 1f;
@@ -308,7 +457,7 @@ namespace Armoury
                     {
                         try { var u = MakeUnit(main); if (u != null) { sn.Units.Add(u); sn.ByLead[main] = u; } } catch (Exception e) { Stumble("BuildSnap.main", e); }
                     }
-                    _snap = sn; _tl.Clear(); _live.Clear(); _scout.Clear();
+                    _snap = sn; _tl.Clear(); _live.Clear(); _scout.Clear(); _agg.Clear();
                     // 3.3: sila w polu krolestw (swoi + koalicja 274) w zasiegu 8.02 doby od wlasnych twierdz - lustro F334 dla SCA
                     if (ScaLocalOn)
                     foreach (var k in Kingdom.All)
@@ -388,6 +537,7 @@ namespace Armoury
                 _tl[t] = l;
                 return l;
             }
+            long lt0 = Ts();
             foreach (var u in _snap.Units)
             {
                 // filtr linii prostej (droga nigdy krotsza): ladem predkosc ladowa; statki - z zapasem 0.35 na objazdy morzem
@@ -400,6 +550,7 @@ namespace Armoury
             }
             l.E.Sort((a, b) => a.D.CompareTo(b.D));
             _tl[t] = l;
+            _dListT += Ts() - lt0;
             return l;
         }
 
@@ -423,6 +574,7 @@ namespace Armoury
             KeyValuePair<int, HashSet<MobileParty>> kv;
             if (_scout.TryGetValue(p, out kv) && kv.Key == h) return kv.Value;
             var set = new HashSet<MobileParty>();
+            long st0 = Ts();
             try
             {
                 float r = Campaign.Current.Models.MapVisibilityModel.GetPartySpottingRange(p, false).ResultNumber;
@@ -439,56 +591,17 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("ScoutOf", e); }
+            _dScoutT += Ts() - st0;
             _scout[p] = new KeyValuePair<int, HashSet<MobileParty>>(h, set);
             return set;
-        }
-
-        /// <summary>Widoczny zamiar jednostki na te osade (wiadomosc poslancow - gra i tak ja zna): obrona, oblezenie, cel armii.</summary>
-        private static bool Targets(MobileParty lead, Settlement t)
-        {
-            try
-            {
-                if (lead.TargetSettlement == t && (lead.DefaultBehavior == AiBehavior.DefendSettlement || lead.DefaultBehavior == AiBehavior.BesiegeSettlement
-                                                   || lead.DefaultBehavior == AiBehavior.RaidSettlement)) return true;
-                var a = lead.Army;
-                if (a != null && a.LeaderParty == lead && ReferenceEquals(a.AiBehaviorObject, t)) return true;
-            }
-            catch { }
-            return false;
-        }
-
-        /// <summary>Odsiecz (sad oblezenia): zamiar OBRONY tej osady - DefendSettlement albo armia z tym celem, ktora jej nie oblega ani nie rabuje (konkurent, nie odsiecz).</summary>
-        private static bool Relieves(MobileParty lead, Settlement t)
-        {
-            try
-            {
-                if (lead.TargetSettlement == t && lead.DefaultBehavior == AiBehavior.DefendSettlement) return true;
-                var a = lead.Army;
-                if (a != null && a.LeaderParty == lead && ReferenceEquals(a.AiBehaviorObject, t) && lead.DefaultBehavior != AiBehavior.BesiegeSettlement
-                    && lead.DefaultBehavior != AiBehavior.RaidSettlement) return true;
-            }
-            catch { }
-            return false;
         }
 
         /// <summary>Wrog strony a przy celu t: w wojnie z a i nie trzecia strona (wrog naszego wroga, sam w wojnie z panem celu i spoza jego strony, nie broni celu).</summary>
         private static bool Foe(IFaction a, IFaction lf, Settlement t)
         {
-            if (a == null || lf == null || !FactionManager.IsAtWarAgainstFaction(a, lf)) return false;
+            HourView();
             var tf = t != null ? t.MapFaction : null;
-            if (tf == null || SameSide(a, tf) || SameSide(lf, tf)) return true;
-            return !FactionManager.IsAtWarAgainstFaction(lf, tf);
-        }
-
-        private static bool GoingTo(MobileParty lead, Settlement t)
-        {
-            try
-            {
-                if (lead.DefaultBehavior == AiBehavior.BesiegeSettlement && lead.TargetSettlement == t) return true;
-                var bc = lead.BesiegerCamp;
-                return bc != null && bc.SiegeEvent != null && bc.SiegeEvent.BesiegedSettlement == t;
-            }
-            catch { return false; }
+            return a != null && lf != null && FoeI(a, FI(a), lf, FI(lf), tf, FI(tf));
         }
 
         private static bool SameGroup(MobileParty a, MobileParty b)
@@ -498,38 +611,195 @@ namespace Armoury
             return a.Army != null && a.Army == b.Army;
         }
 
+        // ================================================================ 334f (Z2): sumy wrogow na godzine dla pary (cel, krolestwo)
+        private struct AE { public float D, S; public MobileParty L; public bool Live; }
+        private sealed class Agg
+        {
+            public float[] ED; public float[] ES; public double[] ECum;          // wrogowie po dobach (zamiar - zywa droga, plotka - 2 x doby), sumy narastajace
+            public readonly Dictionary<MobileParty, int> Rumor = new Dictionary<MobileParty, int>();   // wrog z plotki -> indeks (poprawka zwiadu)
+            public readonly List<float> AD = new List<float>(), AS = new List<float>(); public readonly List<MobileParty> AL = new List<MobileParty>();   // nasi idacy na cel
+            public HashSet<MobileParty> Leads; public IFaction Tf; public int Ti;
+        }
+        private static readonly Dictionary<SK, Agg> _agg = new Dictionary<SK, Agg>();
+        private static readonly List<AE> _aeTmp = new List<AE>(512);
+
+        /// <summary>Sumy (cel, krolestwo) z widoku godziny; pamiec do konca godziny. Wolajacy trzyma _lk.</summary>
+        private static Agg AggOf(Settlement t, IFaction a)
+        {
+            HourView();
+            var key = new SK(t, a);
+            Agg g;
+            if (_agg.TryGetValue(key, out g)) { _dAggHit++; return g; }
+            var l = ListOf(t);
+            long t0 = Ts();
+            g = new Agg { Leads = l.Leads };
+            bool keep = SnapFresh;   // bez migawki z dzis - lista pusta, sumy nie zapamietane (jak ListOf)
+            int ai = FI(a);
+            var tf = t.MapFaction; int ti = FI(tf);
+            g.Tf = tf; g.Ti = ti;
+            var en = _aeTmp; en.Clear();
+            for (int i = 0; i < l.E.Count; i++)
+            {
+                var e = l.E[i];
+                var lead = e.U.Lead;
+                if (lead == null) continue;
+                var v = LVOf(e.U);
+                if (!v.Active || v.F == null) continue;
+                bool enemy = FoeI(a, ai, v.F, v.Fi, tf, ti);
+                bool ours = !enemy && !War(a, ai, v.F, v.Fi) && Same(a, ai, v.F, v.Fi);
+                if (!enemy && !ours) continue;
+                if (enemy)
+                {
+                    if (TargetsV(v, t))
+                    {
+                        var u = LiveUnit(lead);
+                        if (u == null || v.Cur == t) continue;
+                        float d = DaysTo(u, t);
+                        if (d < 0f) continue;
+                        en.Add(new AE { D = d, S = u.Str, L = lead, Live = true });
+                    }
+                    else
+                    {
+                        if (v.Cur == t) continue;
+                        en.Add(new AE { D = e.D * 2f, S = e.U.Str, L = lead, Live = false });   // wiesc + marsz
+                    }
+                }
+                else
+                {
+                    if (!GoingToV(v, t)) continue;
+                    var u = LiveUnit(lead);
+                    if (u == null || v.Cur == t) continue;
+                    float d = DaysTo(u, t);
+                    if (d < 0f) continue;
+                    g.AD.Add(d); g.AS.Add(u.Str); g.AL.Add(lead);
+                }
+            }
+            en.Sort((x, y) => x.D.CompareTo(y.D));
+            int n = en.Count;
+            g.ED = new float[n]; g.ES = new float[n]; g.ECum = new double[n];
+            double c = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var x = en[i];
+                g.ED[i] = x.D; g.ES[i] = x.S; c += x.S; g.ECum[i] = c;
+                if (!x.Live) g.Rumor[x.L] = i;
+            }
+            en.Clear();
+            if (keep) _agg[key] = g;
+            _dAggN++;
+            _dAggT += Ts() - t0;
+            return g;
+        }
+
+        private static int Upper(float[] a, float w)
+        {
+            int lo = 0, hi = a.Length;
+            while (lo < hi) { int m = (lo + hi) >> 1; if (a[m] <= w) lo = m + 1; else hi = m; }
+            return lo;
+        }
+
         /// <summary>Z: sila wrogow strony a (jej wojny), ktorzy dojda do t w W dobach (plotki z migawki, zwiad i zamiar na zywo). first - pierwszy przyjazd wroga,
-        /// ally - sojusznicy juz idacy na t, ktorzy dojda przed pierwszym wrogiem (i w W). Wolajacy trzyma _lk.</summary>
+        /// ally - sojusznicy juz idacy na t, ktorzy dojda przed pierwszym wrogiem (i w W). 334f: z sum godziny (cel, krolestwo) + poprawka zwiadu druzyny p; co 128.
+        /// ocena - kontrola starym przegladem (ZForRef, ten sam widok godziny): rozbieznosci w linii koszt (ma byc 0). Wolajacy trzyma _lk.</summary>
         private static double ZFor(Settlement t, IFaction a, MobileParty p, float w, out float first, out double ally)
+        {
+            var g = AggOf(t, a);
+            HashSet<MobileParty> sc = p != null ? ScoutOf(p) : null;
+            first = float.MaxValue; ally = 0;
+            int k = Upper(g.ED, w);
+            double z = k > 0 ? g.ECum[k - 1] : 0;
+            List<int> rem = null;
+            if (sc != null && sc.Count > 0)
+            {
+                foreach (var m in sc)
+                {
+                    int idx;
+                    if (g.Rumor.TryGetValue(m, out idx))
+                    {
+                        // wrog z plotki widziany zwiadem: zamiast 2 x doby z migawki - zywa droga i sila
+                        if (rem == null) rem = new List<int>(4);
+                        rem.Add(idx);
+                        if (idx < k) z -= g.ES[idx];
+                        var u = LiveUnit(m);
+                        if (u == null) continue;
+                        float d = DaysTo(u, t);
+                        if (d < 0f || d > w) continue;
+                        z += u.Str; _dLiveUsed++;
+                        if (d < first) first = d;
+                    }
+                    else if (!g.Leads.Contains(m))
+                    {
+                        var v = LVOf(m);
+                        if (SameGroupV(m, v, p) || v.F == null) continue;
+                        if (!FoeI(a, FI(a), v.F, v.Fi, g.Tf, g.Ti)) continue;
+                        var u = LiveUnit(m);
+                        if (u == null || v.Cur == t) continue;
+                        float d = DaysTo(u, t);
+                        if (d < 0f || d > w) continue;
+                        z += u.Str; _dLiveUsed++;
+                        if (d < first) first = d;
+                    }
+                }
+            }
+            for (int i = 0; i < k; i++)
+            {
+                if (rem != null && rem.Contains(i)) continue;
+                if (g.ED[i] < first) first = g.ED[i];
+                break;
+            }
+            for (int i = 0; i < g.AD.Count; i++)
+            {
+                float d = g.AD[i];
+                if (d > w || d > first) continue;
+                var al = g.AL[i];
+                if (p != null && SameGroupV(al, LVOf(al), p)) continue;
+                ally += g.AS[i];
+            }
+            if (((++_dChk) & 127) == 0)
+            {
+                float f2; double a2;
+                double z2 = ZForRef(t, a, p, w, out f2, out a2);
+                bool fOk = (f2 == float.MaxValue && first == float.MaxValue) || Math.Abs(f2 - first) < 1e-3f;
+                if (Math.Abs(z2 - z) > 1e-3 * Math.Max(1.0, Math.Abs(z2)) || Math.Abs(a2 - ally) > 1e-3 * Math.Max(1.0, Math.Abs(a2)) || !fOk)
+                {
+                    _dDiv++;
+                    if (_dDivNote == null) _dDivNote = t.StringId + " z " + F0(z) + "/" + F0(z2) + " sojusznicy " + F0(ally) + "/" + F0(a2);
+                }
+            }
+            return z;
+        }
+
+        /// <summary>Wzorzec (stary przeglad listy, ten sam widok godziny) - do kontroli rozbieznosci ZFor. Wolajacy trzyma _lk.</summary>
+        private static double ZForRef(Settlement t, IFaction a, MobileParty p, float w, out float first, out double ally)
         {
             first = float.MaxValue; ally = 0;
             var l = ListOf(t);
             HashSet<MobileParty> sc = p != null ? ScoutOf(p) : null;
+            int ai = FI(a); var tf = t.MapFaction; int ti = FI(tf);
             double z = 0;
             List<KeyValuePair<float, float>> al = null;
             for (int i = 0; i < l.E.Count; i++)
             {
                 var e = l.E[i];
                 var lead = e.U.Lead;
-                if (lead == null || !lead.IsActive || SameGroup(lead, p)) continue;
-                var lf = lead.MapFaction;
-                if (lf == null) continue;
-                bool enemy = Foe(a, lf, t);
-                bool ours = !enemy && !FactionManager.IsAtWarAgainstFaction(a, lf) && SameSide(a, lf);
+                if (lead == null) continue;
+                var v = LVOf(e.U);
+                if (!v.Active || SameGroupV(lead, v, p) || v.F == null) continue;
+                bool enemy = FoeI(a, ai, v.F, v.Fi, tf, ti);
+                bool ours = !enemy && !War(a, ai, v.F, v.Fi) && Same(a, ai, v.F, v.Fi);
                 if (!enemy && !ours) continue;
-                bool live = (sc != null && sc.Contains(lead)) || Targets(lead, t);
+                bool live = enemy && ((sc != null && sc.Contains(lead)) || TargetsV(v, t));
                 Unit u = e.U; float d = e.D;
-                if (enemy && !live) d *= 2f;   // wiesc + marsz: daleki wrog (plotka) musi sie dowiedziec i zawrocic
+                if (enemy && !live) d *= 2f;
                 if (live || ours)
                 {
+                    if (ours && !GoingToV(v, t)) continue;
                     u = LiveUnit(lead);
                     if (u == null) continue;
-                    if (live) _dLiveUsed++;
-                    if (ours && !GoingTo(lead, t)) continue;
                     d = DaysTo(u, t);
                     if (d < 0f) continue;
                 }
-                try { if (lead.CurrentSettlement == t) continue; } catch { }
+                if (v.Cur == t) continue;
                 if (d > w) continue;
                 if (enemy) { z += u.Str; if (d < first) first = d; }
                 else { if (al == null) al = new List<KeyValuePair<float, float>>(); al.Add(new KeyValuePair<float, float>(d, u.Str)); }
@@ -537,15 +807,15 @@ namespace Armoury
             if (sc != null)
                 foreach (var m in sc)
                 {
-                    if (l.Leads.Contains(m) || SameGroup(m, p)) continue;
-                    var lf = m.MapFaction;
-                    if (lf == null || !Foe(a, lf, t)) continue;
+                    if (l.Leads.Contains(m)) continue;
+                    var v = LVOf(m);
+                    if (SameGroupV(m, v, p) || v.F == null) continue;
+                    if (!FoeI(a, ai, v.F, v.Fi, tf, ti)) continue;
                     var u = LiveUnit(m);
-                    if (u == null) continue;
-                    try { if (m.CurrentSettlement == t) continue; } catch { }
+                    if (u == null || v.Cur == t) continue;
                     float d = DaysTo(u, t);
                     if (d < 0f || d > w) continue;
-                    z += u.Str; _dLiveUsed++;
+                    z += u.Str;
                     if (d < first) first = d;
                 }
             if (al != null) foreach (var kv in al) if (kv.Key <= first) ally += kv.Value;

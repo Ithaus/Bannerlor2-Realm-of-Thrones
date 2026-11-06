@@ -5,6 +5,8 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Armoury
@@ -31,7 +33,9 @@ namespace Armoury
         private sealed class CampRec
         {
             public int Hour = -1, Bad, State = -1, SaidDay = -1, StaySaid = -1; public double Q; public double PrepH = -1, Wall0 = 1;
+            public double BadH = -1;   // 334f: godzina ostatniej oceny ODSTAP (histereza z mysli dowodcy, nie z godzin zegara)
             public readonly Dictionary<MobileParty, float> Dist = new Dictionary<MobileParty, float>();
+            public readonly Dictionary<MobileParty, KeyValuePair<double, float>> Mem = new Dictionary<MobileParty, KeyValuePair<double, float>>();   // 334f: odsiecz z zamiarem -> (godzina, odleglosc)
         }
         private struct PS : IEquatable<PS>
         {
@@ -50,11 +54,12 @@ namespace Armoury
         private static readonly List<string> _dRetreatNotes = new List<string>();
         private static int _sRetreat;
 
-        private static void ResetSiege() { _camps.Clear(); _retreat.Clear(); _block.Clear(); _raidBad.Clear(); _sRetreat = 0; ZeroSiegeDay(); }
+        private static void ResetSiege() { _camps.Clear(); _retreat.Clear(); _block.Clear(); _raidBad.Clear(); _ironNav.Clear(); _sRetreat = 0; ZeroSiegeDay(); }
         private static void ZeroSiegeDay()
         {
             _dJudge = _dKeep = _dMid = _dRetreat = _dRetreatCand = _dStay = _dKeepVeto = _dBreak = _dStickYield = _dFreshYield = _dIronOffers = _dIronVeto = _dSiegeLines = 0;
             Array.Clear(_dStates, 0, _dStates.Length); _dRetreatNotes.Clear();
+            Array.Clear(_dIronX, 0, _dIronX.Length); _dIronMinQ = -1; _dIronMinT = "-"; _dIronMinStr = 0;
         }
 
         /// <summary>Flaga odwrotu (BK stick, m116 Hold): druzyna albo wodz jej armii odstepuje od oblezenia.</summary>
@@ -113,7 +118,8 @@ namespace Armoury
                 if (!PowerOn && !BreakOn) return;
                 if (WithPlayer(party) || partyThinkParams.DoNotChangeBehavior) return;
                 if (party.BesiegerCamp != null) return;
-                var sw = System.Diagnostics.Stopwatch.StartNew();
+                long t0 = Ts();
+                _modelT = 0;
                 var me = party.MapEvent;
                 if (me != null) { if (BreakOn && me.IsRaid && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party) RaidBreak(party, me, partyThinkParams); }
                 else
@@ -121,8 +127,9 @@ namespace Armoury
                     if (ArmyRaidOn && party.Army != null && party.Army.LeaderParty == party) ArmyRaid(party, partyThinkParams);
                     if (PowerOn && WarFront334.IronOn && party.MapFaction.StringId == WarFront334.IronId) IronSiege(party, partyThinkParams);
                 }
-                double ms = sw.Elapsed.TotalMilliseconds;
-                if (ms > 0.05) lock (_lk) Cost(ms);
+                long mt = _modelT;
+                double ms = TMs(Ts() - t0 - mt);   // 334f: model gry (ocena celu, droga) poza kosztem 334e - osobny licznik
+                if (ms > 0.05 || mt > 0) lock (_lk) { if (ms > 0.05) Cost(ms); _dModelT += mt; }
             }
             catch (Exception e) { Stumble("ThinkField", e); }
         }
@@ -137,28 +144,92 @@ namespace Armoury
 
         private static float PStr(PartyBase pb) { try { return pb != null ? pb.EstimatedStrength : 0f; } catch { return 0f; } }
 
-        /// <summary>Pozostaly czas oblezenia (doby) z postepu w grze. Wolajacy trzyma _lk.</summary>
+        internal const double MemHours = 12.0;   // 334f: 2 x okres mysli gry (DefaultThinkingPeriodInHours 6, jak FarCacheHours 274)
+
+        /// <summary>334f (L14): licznik ODSTAP z ocen dowodcy. Nowe ODSTAP liczy sie, gdy od poprzedniego minela co najmniej godzina (osobna mysl); ostatnie ODSTAP
+        /// sprzed ponad 12 h - od nowa; KONTYNUUJ / GLOD (odsieczy brak albo glod) zeruja; SRODEK i NIE-ZDAZY (migotanie) - licznik zostaje, nie rosnie.</summary>
+        internal static int BadStep(int bad, double badH, int state, double nowH, out double newBadH)
+        {
+            newBadH = badH;
+            if (badH >= 0 && nowH - badH > MemHours) bad = 0;
+            if (state == 4) { if (bad == 0 || nowH - badH >= 1.0) bad++; newBadH = nowH; }
+            else if (state == 1 || state == 5) { bad = 0; newBadH = -1; }
+            return bad;
+        }
+
+        /// <summary>Pozostaly czas oblezenia (doby) z modelu gry i bramy OB1 (334f, L14): przygotowania (reszta / tempo budowy modelu gry), potem taran i wieza
+        /// (reszta / tempo budowy) albo droga murow (tempo burzenia), potem szturm z szansa OB1 na mysl (1 / szansa godzin, co najmniej pol doby). Szturm
+        /// niemozliwy (s &lt;= 1) albo brak mierzalnej drogi - HorizonDays: oblezenie sie nie konczy, liczy sie kazda odsiecz w horyzoncie. Bez podlogi 1.0 (334e
+        /// przyklejal "pozostalo 1.00" na wiele dob). Wyjatek modelu - stara srednia gry od startu. Wolajacy trzyma _lk.</summary>
         private static float TimeLeft(BesiegerCamp camp, SiegeEvent ev, Settlement st, CampRec r)
         {
             double el = ev.SiegeStartTime.ElapsedDaysUntilNow;
-            float avg = Math.Max(1f, SiegeDays - (float)el);
-            bool prepared = false;
-            try { prepared = camp.IsPreparationComplete; } catch { }
-            double wall = 1.0;
-            try { wall = SiegeWalls.WallHpMin(st); } catch { }
-            if (!prepared)
+            try
             {
-                float p = 0f;
-                try { var se = camp.SiegeEngines; if (se != null && se.SiegePreparations != null) p = se.SiegePreparations.Progress; } catch { }
-                if (p > 0.05f && el > 0.04) return (float)Math.Min(HorizonDays, Math.Max(avg, el * (1.0 - p) / p + 1.0));   // reszta przygotowan + mury (co najmniej doba)
-                return avg;
+                double wall = 1.0;
+                try { wall = SiegeWalls.WallHpMin(st); } catch { }
+                if (wall <= 0.0) return 0.5f;   // wyrwa - szturm najblizszy
+                var sem = Campaign.Current.Models.SiegeEventModel;
+                var se = camp.SiegeEngines;
+                double nowH = CampaignTime.Now.ToHours;
+                double prepH = 0;
+                bool prepared = camp.IsPreparationComplete;
+                if (!prepared)
+                {
+                    float p = 0f;
+                    if (se != null && se.SiegePreparations != null) p = se.SiegePreparations.Progress;
+                    float rate = sem.GetConstructionProgressPerHour(DefaultSiegeEngineTypes.Preparations, ev, camp);
+                    if (!(rate > 0f)) return HorizonDays;
+                    prepH = Math.Max(0.0, 1.0 - p) / rate;
+                }
+                var m = SiegeWalls.Measure(camp);
+                if (m == null) return HorizonDays;
+                if (!m.Empty && !(m.S > 1.0)) return HorizonDays;   // OB1: szturm dopiero przy przewadze s > 1 - teraz sie nie skonczy
+                double stageH = 0;
+                if (!m.Ready)
+                {
+                    // droga machin: brakujacy taran / wieza - reszta budowy w tempie modelu gry (budowane rownolegle - dluzsza z brakujacych)
+                    double eng = 0; bool engOk = true;
+                    if (!m.Ram) { double x = EngineHours(sem, ev, camp, se, DefaultSiegeEngineTypes.Ram, DefaultSiegeEngineTypes.ImprovedRam); if (x < 0) engOk = false; else eng = Math.Max(eng, x); }
+                    if (!m.Tower) { double x = EngineHours(sem, ev, camp, se, DefaultSiegeEngineTypes.SiegeTower, null); if (x < 0) engOk = false; else eng = Math.Max(eng, x); }
+                    // droga murow: tempo burzenia od konca przygotowan (ostrzal gry)
+                    double wallH = -1;
+                    if (prepared)
+                    {
+                        if (r.PrepH < 0) { r.PrepH = nowH; r.Wall0 = wall; }
+                        double wEl = nowH - r.PrepH, lost = r.Wall0 - wall;
+                        if (lost > 0.02 && wEl >= 6.0) wallH = wEl * wall / lost;
+                    }
+                    if (engOk && wallH >= 0) stageH = Math.Min(eng, wallH);
+                    else if (engOk) stageH = eng;
+                    else if (wallH >= 0) stageH = wallH;
+                    else return HorizonDays;
+                }
+                double assaultH = Math.Max(12.0, 1.0 / Math.Max(m.POurs, 0.01));   // szansa OB1 na mysl (godzina)
+                if (m.Empty) assaultH = 12.0;
+                double days = (prepH + stageH + assaultH) / CampaignTime.HoursInDay;
+                return (float)Math.Max(0.5, Math.Min(HorizonDays, days));
             }
-            if (wall <= 0.0) return 0.5f;   // wyrwa - szturm najblizszy
-            double nowH = CampaignTime.Now.ToHours;
-            if (r.PrepH < 0) { r.PrepH = nowH; r.Wall0 = wall; }
-            double wEl = (nowH - r.PrepH) / CampaignTime.HoursInDay, lost = r.Wall0 - wall;
-            if (lost > 0.02 && wEl >= 0.25) return (float)Math.Max(0.5, Math.Min(HorizonDays, wEl * wall / lost));   // tempo burzenia murow (ostrzal gry)
-            return avg;
+            catch (Exception e)
+            {
+                Stumble("TimeLeft", e);
+                return Math.Max(0.5f, SiegeDays - (float)el);
+            }
+        }
+
+        /// <summary>Godziny do konca budowy machiny typu a (albo b): reszta postepu rozstawionej / cala budowa nierozstawionej, tempo modelu gry. -1 - tempo 0.</summary>
+        private static double EngineHours(SiegeEventModel sem, SiegeEvent ev, BesiegerCamp camp, SiegeEvent.SiegeEnginesContainer se, SiegeEngineType a, SiegeEngineType b)
+        {
+            float prog = 0f; SiegeEngineType typ = a;
+            if (se != null && se.DeployedMeleeSiegeEngines != null)
+                foreach (var x in se.DeployedMeleeSiegeEngines)
+                {
+                    if (x == null || x.SiegeEngine == null || x.IsConstructed) continue;
+                    if (x.SiegeEngine == a || (b != null && x.SiegeEngine == b)) { if (x.Progress > prog) { prog = x.Progress; typ = x.SiegeEngine; } }
+                }
+            float rate = sem.GetConstructionProgressPerHour(typ, ev, camp);
+            if (!(rate > 0f)) return -1;
+            return Math.Max(0.0, 1.0 - prog) / rate;
         }
 
         /// <summary>Z SiegeWalls2.ThinkPost (Last): sad oblezenia w toku. Zwraca stan (JudgeRule) albo -1 (bez sadu); 4 - TYLKO gdy odwrot wykonany teraz
@@ -176,9 +247,9 @@ namespace Armoury
                 if (party.MapEvent != null || party.IsCurrentlyAtSea) return -1;
                 try { if (party.Ai != null && party.Ai.DoNotMakeNewDecisions) return -1; } catch { }
                 try { if (Undead.Party(party)) return -1; } catch { }
-                var sw = System.Diagnostics.Stopwatch.StartNew();
+                long t0 = Ts();
                 int res = JudgeCore(party, camp, ev, st, pt);
-                lock (_lk) Cost(sw.Elapsed.TotalMilliseconds);
+                lock (_lk) Cost(TMs(Ts() - t0));
                 return res;
             }
             catch (Exception e) { Stumble("Judge", e); return -1; }
@@ -192,7 +263,7 @@ namespace Armoury
             double gar = 0;
             foreach (var pb in st.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) gar += PStr(pb);
             float food = SiegeWalls2.FoodDays(party);
-            int state, bad; double q, relief = 0, campS = camp0, allyIn = 0; float arrival = float.MaxValue, tLeft; int nGo = 0, nScout = 0;
+            int state, bad; double q, qr = 0, relief = 0, campS = camp0, allyIn = 0; float arrival = float.MaxValue, tLeft; int nGo = 0, nScout = 0, nMem = 0;
             lock (_lk)
             {
                 if (!SnapFresh) return -1;
@@ -206,16 +277,18 @@ namespace Armoury
                 var allies = new List<KeyValuePair<float, float>>();
                 var seen = new HashSet<MobileParty>();
                 var newDist = new Dictionary<MobileParty, float>();
+                double nowH = CampaignTime.Now.ToHours;
                 Action<MobileParty> consider = lead =>
                 {
-                    if (lead == null || !seen.Add(lead) || !lead.IsActive || lead == party) return;
-                    if (lead.CurrentSettlement == st || lead.BesiegerCamp == camp) return;
-                    var lf = lead.MapFaction;
+                    if (lead == null || !seen.Add(lead) || lead == party) return;
+                    var v = LVOf(lead);
+                    if (!v.Active || v.Cur == st || lead.BesiegerCamp == camp) return;
+                    var lf = v.F;
                     if (lf == null) return;
                     if (!FactionManager.IsAtWarAgainstFaction(k, lf))
                     {
                         // nasi w drodze na te osade (dolacza do obozu)
-                        if (!SameSide(k, lf) || !GoingTo(lead, st)) return;
+                        if (!SameSide(k, lf) || !GoingToV(v, st)) return;
                         var ua = LiveUnit(lead);
                         if (ua == null) return;
                         float da = DaysTo(ua, st);
@@ -223,25 +296,49 @@ namespace Armoury
                         return;
                     }
                     if (!Foe(k, lf, st)) return;   // trzecia strona - nie odsiecz
-                    bool intent = Relieves(lead, st);
+                    bool intent = RelievesV(v, st);
                     bool spotted = sc.Contains(lead);
-                    if (!intent && !spotted) return;
+                    KeyValuePair<double, float> mv = default(KeyValuePair<double, float>);
+                    // 334f (L14): pamiec dowodcy - zamiar obrony zmienia sie przy kazdej mysli lorda ("miga"); widziany zamiar pamietamy 12 h (2 x okres mysli gry)
+                    bool mem = !intent && r.Mem.TryGetValue(lead, out mv) && nowH - mv.Key <= MemHours;
+                    if (!intent && !spotted && !mem) return;
                     var u = LiveUnit(lead);
                     if (u == null) return;
                     float dd = u.Pos.Distance(st.GetPosition2D);
                     newDist[lead] = dd;
-                    if (!intent)
+                    bool memUsed = false;
+                    if (intent) r.Mem[lead] = new KeyValuePair<double, float>(nowH, dd);
+                    else
                     {
-                        float prev;
-                        if (!r.Dist.TryGetValue(lead, out prev) || !(dd < prev - 0.01f)) return;   // stoi albo sie oddala - nie wywoluje odwrotu
+                        bool ok = false;
+                        if (mem && dd <= mv.Value + 0.5f * u.Land) { ok = true; memUsed = true; }   // pamietany zamiar: liczy sie, dopoki sie nie oddala (pol godziny drogi zapasu)
+                        if (!ok && spotted)
+                        {
+                            float prev;
+                            ok = r.Dist.TryGetValue(lead, out prev) && dd < prev - 0.01f;   // widziany zwiadem: tylko gdy sie zbliza (stoi albo sie oddala - nie wywoluje odwrotu)
+                        }
+                        if (!ok) return;
                     }
                     float d = DaysTo(u, st);
                     if (d < 0f || d > HorizonDays) return;
                     rel.Add(new KeyValuePair<float, float>(d, u.Str));
-                    if (intent) nGo++; else nScout++;
+                    if (intent) nGo++; else if (memUsed) nMem++; else nScout++;
                 };
                 for (int i = 0; i < l.E.Count; i++) consider(l.E[i].U.Lead);
                 foreach (var m in sc) consider(m);
+                if (r.Mem.Count > 0)
+                {
+                    var keys = new List<MobileParty>(r.Mem.Keys);
+                    foreach (var m in keys) consider(m);
+                    foreach (var m in keys)
+                    {
+                        KeyValuePair<double, float> mv;
+                        if (!r.Mem.TryGetValue(m, out mv)) continue;
+                        bool drop = m == null || !m.IsActive || nowH - mv.Key > MemHours;
+                        if (!drop) { var mf = m.MapFaction; drop = mf == null || !FactionManager.IsAtWarAgainstFaction(k, mf); }
+                        if (drop) r.Mem.Remove(m);
+                    }
+                }
                 r.Dist.Clear(); foreach (var kv in newDist) r.Dist[kv.Key] = kv.Value;
                 rel.Sort((a, b) => a.Key.CompareTo(b.Key));
                 foreach (var kv in rel) relief += kv.Value;
@@ -252,9 +349,10 @@ namespace Armoury
                 campS = camp0 + allyIn;
                 arrival = Arrival(rel, GarCap(gar, campS), campS);
                 state = JudgeRule(campS, relief, gar, arrival, tLeft, food, out q);
+                qr = Ratio(relief + GarCap(gar, campS), campS);
                 int h = NowH;
-                if (state == 4) { if (r.Hour == h - 1) r.Bad++; else if (r.Hour != h) r.Bad = 1; else if (r.Bad == 0) r.Bad = 1; }
-                else r.Bad = 0;
+                // 334f (L14): histereza z ocen dowodcy (mysl obozu co ok. 3 h), nie z dwoch kolejnych godzin zegara - ta nie spelniala sie nigdy
+                r.Bad = BadStep(r.Bad, r.BadH, state, nowH, out r.BadH);
                 bad = r.Bad;
                 r.Hour = h; r.Q = q;
                 if (state >= 0 && state < _dStates.Length) _dStates[state]++;
@@ -264,8 +362,8 @@ namespace Armoury
                 {
                     r.SaidDay = Today; _dSiegeLines++;
                     Log.Info(Tag + "oblezenie | dzien " + Today + " | " + st.StringId + " (" + Nm(st) + ") | " + Nm(party) + " (" + Id(k) + ") | oboz " + F0(campS) + (allyIn > 0 ? " (w drodze " + F0(allyIn) + ")" : "")
-                             + " | odsiecz " + F0(relief) + " (idzie " + nGo + ", zwiad " + nScout + ", zaloga " + F0(gar) + ") | q_obl " + F2(q) + " | przyjazd " + (arrival == float.MaxValue ? "-" : F2(arrival))
-                             + " | pozostalo " + F2(tLeft) + " | jedzenie " + (food >= 999f ? "-" : F2(food)) + " | stan " + StateName[state] + (state == 4 ? " (" + bad + "/2 h)" : "") + ".");
+                             + " | odsiecz " + F0(relief) + " (idzie " + nGo + ", pamiec " + nMem + ", zwiad " + nScout + ", zaloga " + F0(gar) + ") | q_obl " + F2(q) + " | q_odw " + F2(qr) + " | przyjazd " + (arrival == float.MaxValue ? "-" : F2(arrival))
+                             + " | pozostalo " + F2(tLeft) + " | jedzenie " + (food >= 999f ? "-" : F2(food)) + " | stan " + StateName[state] + (state == 4 ? " (" + bad + "/2 mysli)" : "") + ".");
                 }
             }
             var scores = pt.AIBehaviorScores;
@@ -303,12 +401,12 @@ namespace Armoury
             if (state == 2) { lock (_lk) _dMid++; return 2; }
             if (state != 4) return state;
             lock (_lk) _dRetreatCand++;
-            if (bad < 2) return 2;   // kandydat - 2 kolejne godziny
-            return Retreat(party, camp, st, pt, best, q, relief, gar, campS, arrival) ? 4 : 2;
+            if (bad < 2) return 2;   // kandydat - 2 osobne mysli w 12 h
+            return Retreat(party, camp, st, pt, best, q, qr, relief, gar, campS, arrival) ? 4 : 2;
         }
 
         /// <summary>Odstapienie: tylko gdy ucieczka zdazy przed przewaga. true - wykonane.</summary>
-        private static bool Retreat(MobileParty party, BesiegerCamp camp, Settlement st, PartyThinkParams pt, float best, double q, double relief, double gar, double campS, float arrival)
+        private static bool Retreat(MobileParty party, BesiegerCamp camp, Settlement st, PartyThinkParams pt, float best, double q, double qr, double relief, double gar, double campS, float arrival)
         {
             // dokad: wlasna nieoblegana twierdza dalej od odsieczy (najblizszy nadchodzacy wrog) niz oboz, do ktorej dojdziemy przed przyjazdem przewagi
             Vec2 cp = party.GetPosition2D;
@@ -383,7 +481,7 @@ namespace Armoury
                 if (_dRetreatNotes.Count < 6) _dRetreatNotes.Add(Nm(st) + " q " + F2(q));
                 if (S != null && S.LogEnabled)
                     Log.Info(Tag + "odstapienie | dzien " + Today + " | " + st.StringId + " (" + Nm(st) + ") | " + Nm(party) + " (" + Id(party.MapFaction) + ") | oboz " + F0(campS) + " vs odsiecz "
-                             + F0(relief) + "+zaloga " + F0(gar) + " (q_obl " + F2(q) + ", przyjazd " + (arrival == float.MaxValue ? "-" : F2(arrival)) + ") | dokad " + (dest != null ? dest.StringId + " (" + Nm(dest) + ", " + F2(destDays) + " doby)" : "- (223)")
+                             + F0(relief) + "+zaloga " + F0(gar) + " (q_obl " + F2(q) + ", przyjazd " + (arrival == float.MaxValue ? "-" : F2(arrival)) + ") | q_odw " + F2(qr) + " | dokad " + (dest != null ? dest.StringId + " (" + Nm(dest) + ", " + F2(destDays) + " doby)" : "- (223)")
                              + " | ucieczka zdazy " + (dest != null ? "TAK" : "pole") + " | blokada do doby " + F2(CampaignTime.Now.ToDays + 1.0) + ".");
             }
             return true;
@@ -432,48 +530,86 @@ namespace Armoury
         }
 
         // ================================================================ Zelazni: oblezenia wybrzeza (dopisek testu 334c: 83 doby bez armii i bez opcji oblezenia)
+        // 334f (B334-12): wyjscia liczone (linia koszt), cele kanonu Wysp (Polnoc wlasciwa - kultura battania) do Krwawych Godow, odleglosc skorygowana gry (morze)
+        // zamiast linii prostej, limit 4 liczy tylko cele z q <= 1.0 (osobny limit 8 ocen q), opcja gry poza teatrem kanonu nie wylacza naszej oferty.
+        private static readonly int[] _dIronX = new int[9];   // 0 zajeci (bitwa/oboz/morze), 1 bez wodza i zbiorki, 2 odpoczynek, 3 opcja gry na cel kanonu, 4 bez kandydatow, 5 q > 1, 6 bez drogi / poza zasiegiem, 7 model 0, 8 oferta
+        internal static readonly string[] IronXName = { "zajeci", "bez zbiorki", "odpoczynek", "opcja gry kanonu", "bez kandydatow", "q>1", "bez drogi", "model 0", "oferta" };
+        private static double _dIronMinQ = -1; private static string _dIronMinT = "-"; private static double _dIronMinStr;
+        private sealed class IronNav { public int Hour; public readonly Dictionary<Settlement, KeyValuePair<float, KeyValuePair<MobileParty.NavigationType, bool>>> D = new Dictionary<Settlement, KeyValuePair<float, KeyValuePair<MobileParty.NavigationType, bool>>>(); }
+        private static readonly Dictionary<MobileParty, IronNav> _ironNav = new Dictionary<MobileParty, IronNav>();
+
+        private static void IronX(int i) { lock (_lk) _dIronX[i]++; }
+
+        /// <summary>Cel kanonu Wysp: Polnoc wlasciwa (kultura battania - Moat Cailin, Deepwood Motte, Torrhen's Square; Settlement.Culture ROT-Map nie zmienia sie po zdobyciu).</summary>
+        private static bool IronCanon(Settlement st) { return WarFront334.CultureOf(st) == "battania"; }
+
         /// <summary>Gra daje opcje oblezenia tylko twierdzom sasiadujacym z wlasnymi (AiMilitaryBehavior.CalculateDistanceScoreForBesieging: udzial wlasnych sasiadow
-        /// &lt; 0.1 -> 0); Wyspy nie maja sasiadow na ladzie Polnocy, wiec przez 83 doby nie mialy ANI JEDNEJ opcji oblezenia, a zbiorka armii idzie tylko za opcja
-        /// oblezenia. Najezdzca z morza: wodz Wysp, ktory moze zebrac armie (gra dala czlonkow - CanLordCreateArmy, nie na morzu), albo wodz armii Wysp, bez zadnej
-        /// opcji oblezenia > 0 - dostaje oblezenie najlepszej z 4 najblizszych twierdz krolestw w wojnie z q &lt;= 1.0 (sila przyszlej armii) bez weta (teatr Wysp,
-        /// 274, 326b - jestesmy po wetach: ThinkPost Last), wynik = model gry (Besieger, ta sila) x odleglosc jak rabunek gry.</summary>
+        /// &lt; 0.1 -> 0); Wyspy nie maja sasiadow na ladzie Polnocy. Najezdzca z morza: wodz Wysp, ktory moze zebrac armie (gra dala czlonkow - CanLordCreateArmy,
+        /// nie na morzu), albo wodz armii Wysp - dostaje oblezenie najlepszej z 4 twierdz krolestw w wojnie z q &lt;= 1.0 (sila przyszlej armii) bez weta (teatr Wysp,
+        /// 274, 326b), do Krwawych Godow tylko Polnoc wlasciwa (kultura battania - cel kanonu); kandydaci po odleglosci skorygowanej gry (morze), wynik = model gry
+        /// (Besieger, ta sila) x odleglosc jak rabunek gry. Opcja gry > 0 na cel kanonu - zostaje gra; opcja gry na inny cel - oba wyniki rywalizuja.</summary>
         private static void IronSiege(MobileParty party, PartyThinkParams pt)
         {
-            if (party.MapEvent != null || party.BesiegerCamp != null || party.IsCurrentlyAtSea) return;
+            if (party.MapEvent != null || party.BesiegerCamp != null || party.IsCurrentlyAtSea) { IronX(0); return; }
             bool lead = party.Army != null && party.Army.LeaderParty == party;
             var members = pt.PossibleArmyMembersUponArmyCreation;
             bool gather = !lead && party.Army == null && members != null && members.Count > 0;
-            if (!lead && !gather) return;
-            if (lead) { try { if (ArmyRestDay.Resting(party.Army) || NightRest.FieldCampHolds(party)) return; } catch { } }
+            if (!lead && !gather) { IronX(1); return; }
+            if (lead) { try { if (ArmyRestDay.Resting(party.Army) || NightRest.FieldCampHolds(party)) { IronX(2); return; } } catch { } }
             var scores = pt.AIBehaviorScores;
-            for (int i = 0; i < scores.Count; i++) if (scores[i].Item1.AiBehavior == AiBehavior.BesiegeSettlement && scores[i].Item2 > 0f) return;
+            for (int i = 0; i < scores.Count; i++)
+            {
+                var e = scores[i];
+                if (e.Item1.AiBehavior != AiBehavior.BesiegeSettlement || !(e.Item2 > 0f)) continue;
+                var gs = e.Item1.Party as Settlement;
+                if (gs != null && IronCanon(gs)) { IronX(3); return; }   // gra sama daje cel kanonu
+            }
             var k = party.MapFaction as Kingdom;
-            if (k == null) return;
+            if (k == null) { IronX(1); return; }
+            bool afterRw = false;
+            try { afterRw = CanonWarClock.OverNow(); } catch { }
             float strength = party.GetTotalLandStrengthWithFollowers(false);
             if (gather) foreach (var m in members) if (m != null && m.Party != null) strength += m.Party.GetCustomStrength(TaleWorlds.Core.BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.Siege);
             float range = 5f * Campaign.Current.GetAverageDistanceBetweenClosestTwoTownsWithNavigationType(MobileParty.NavigationType.All);
-            var pos = party.GetPosition2D;
+            // odleglosc skorygowana gry (morze / lad) - raz na kandydata, pamiec 6 h na druzyne (jak _portCache Wysp); czas modelu poza kosztem 334e
+            IronNav nv;
+            int nowH = NowH;
+            lock (_lk)
+            {
+                if (!_ironNav.TryGetValue(party, out nv) || nowH - nv.Hour >= 6) { nv = new IronNav { Hour = nowH }; _ironNav[party] = nv; }
+            }
             var cand = new List<KeyValuePair<Settlement, float>>();
+            long m0 = Ts();
             foreach (var f in k.FactionsAtWarWith)
             {
                 if (f == null || !f.IsKingdomFaction || ScaNoBandits320.Skip(f) != 0) continue;
                 foreach (var st in f.Settlements)
                 {
                     if (st == null || !st.IsFortification || st.Town == null || st.IsUnderSiege || (st.Party != null && st.Party.MapEvent != null)) continue;
-                    float d2 = pos.DistanceSquared(st.GetPosition2D);
-                    if (d2 <= range * range) cand.Add(new KeyValuePair<Settlement, float>(st, d2));
+                    if (!afterRw && !IronCanon(st)) continue;
+                    KeyValuePair<float, KeyValuePair<MobileParty.NavigationType, bool>> dv;
+                    if (!nv.D.TryGetValue(st, out dv))
+                    {
+                        MobileParty.NavigationType nav; float dist; bool fromPort;
+                        Helpers.AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, st, false, out nav, out dist, out fromPort);
+                        dv = new KeyValuePair<float, KeyValuePair<MobileParty.NavigationType, bool>>(nav == MobileParty.NavigationType.None ? -1f : dist, new KeyValuePair<MobileParty.NavigationType, bool>(nav, fromPort));
+                        nv.D[st] = dv;
+                    }
+                    if (dv.Key < 0f || dv.Key > range) continue;
+                    cand.Add(new KeyValuePair<Settlement, float>(st, dv.Key));
                 }
             }
-            if (cand.Count == 0) return;
+            _modelT += Ts() - m0;
+            if (cand.Count == 0) { IronX(4); return; }
             cand.Sort((a, b) => a.Value.CompareTo(b.Value));
             var model = Campaign.Current.Models.TargetScoreCalculatingModel;
             Settlement bestT = null; float bestS = 0f; double bestQ = -1; MobileParty.NavigationType bestNav = MobileParty.NavigationType.None; bool bestPort = false;
-            for (int i = 0, tried = 0; i < cand.Count && tried < 4; i++)
+            double minQ = -1; Settlement minT = null; int qBad = 0;
+            for (int i = 0, tried = 0, qn = 0; i < cand.Count && tried < 4 && qn < 8; i++)
             {
                 var t = cand[i].Key;
                 string why;
                 if (WarFront334.VetoedFor334e(k, t, out why)) { lock (_lk) _dIronVeto++; continue; }
-                tried++;
                 double q;
                 lock (_lk)
                 {
@@ -484,26 +620,41 @@ namespace Armoury
                     double z = ZFor(t, k, party, our + SiegeDays, out first, out ally);
                     q = Ratio(z, strength + ally);
                 }
-                if (q > SiegeBanQ) continue;
-                MobileParty.NavigationType nav; float dist; bool fromPort;
-                Helpers.AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, t, false, out nav, out dist, out fromPort);
-                if (nav == MobileParty.NavigationType.None || dist > range) continue;
-                float ds = MBMath.Map(0.75f - dist / range, 0f, 1f, 0.1f, 1f);
+                qn++;
+                if (minQ < 0 || q < minQ) { minQ = q; minT = t; }
+                if (q > SiegeBanQ) { qBad++; continue; }
+                tried++;   // limit 4 - tylko cele z q <= 1.0
+                var dv = nv.D[t];
+                float ds = MBMath.Map(0.75f - dv.Key / range, 0f, 1f, 0.1f, 1f);
                 float s;
+                long m1 = Ts();
                 _inOwn = true;
                 try { s = model.GetTargetScoreForFaction(t, Army.ArmyTypes.Besieger, party, strength) * ds; }
-                finally { _inOwn = false; }
-                if (s > bestS) { bestS = s; bestT = t; bestQ = q; bestNav = nav; bestPort = fromPort; }
+                finally { _inOwn = false; _modelT += Ts() - m1; }
+                if (s > bestS) { bestS = s; bestT = t; bestQ = q; bestNav = dv.Value.Key; bestPort = dv.Value.Value; }
             }
-            if (bestT == null || !(bestS > 0f)) return;
+            lock (_lk)
+            {
+                if (minT != null && (_dIronMinQ < 0 || minQ < _dIronMinQ)) { _dIronMinQ = minQ; _dIronMinT = minT.StringId; _dIronMinStr = strength; }
+            }
+            if (bestT == null || !(bestS > 0f)) { IronX(qBad > 0 && minQ > SiegeBanQ ? 5 : (minT == null ? 6 : 7)); return; }
             pt.AddBehaviorScore((new AIBehaviorData(bestT, AiBehavior.BesiegeSettlement, bestNav, gather, bestPort, false), bestS));
             lock (_lk)
             {
-                _dIronOffers++;
+                _dIronOffers++; _dIronX[8]++;
                 if (_dIronOffers <= 20 && S != null && S.LogEnabled)
                     Log.Info(Tag + "Zelazni oblegaja | dzien " + Today + " | " + Nm(party) + (gather ? " (zbiorka armii, czlonkow " + members.Count + ")" : " (wodz armii)") + " | " + bestT.StringId + " (" + Nm(bestT)
                              + ", " + Id(bestT.MapFaction) + ") | sila " + F0(strength) + " | q " + F2(bestQ) + " | wynik " + bestS.ToString("0.000", Inv) + ".");
             }
+        }
+
+        /// <summary>Linia koszt: wyjscia IronSiege i najnizsze q doby.</summary>
+        private static string IronXLine()
+        {
+            var sb = new System.Text.StringBuilder(" [wyjscia:");
+            for (int i = 0; i < 8; i++) sb.Append(i == 0 ? " " : ", ").Append(IronXName[i]).Append(' ').Append(_dIronX[i]);
+            sb.Append("; min q ").Append(_dIronMinQ < 0 ? "-" : F2(_dIronMinQ)).Append(" @").Append(_dIronMinT).Append(" (sila ").Append(F0(_dIronMinStr)).Append(")]");
+            return sb.ToString();
         }
 
         /// <summary>Doba (Daily, pod _lk): porzadek pamieci obozow, flag, blokad, rabunkow i przydzialow obrony.</summary>
@@ -522,6 +673,9 @@ namespace Armoury
             var deadM = new List<MapEvent>();
             foreach (var kv in _raidBad) if (kv.Key == null || kv.Key.IsFinalized || kv.Value[0] < NowH - 2) deadM.Add(kv.Key);
             foreach (var m in deadM) _raidBad.Remove(m);
+            var deadI = new List<MobileParty>();
+            foreach (var kv in _ironNav) if (kv.Key == null || !kv.Key.IsActive || NowH - kv.Value.Hour >= 6) deadI.Add(kv.Key);
+            foreach (var p in deadI) _ironNav.Remove(p);
             DefenceDayClean();
         }
     }
