@@ -59,6 +59,14 @@ namespace Armoury
     ///  - trzymanie liczone takze od dojscia do P (srodek ciezkosci w martwej strefie), nie tylko od przyjecia P.
     /// Wyjatki kontaktu, regula 1 (powrot obroncy na wzgorze, lucznicy za piechote) i miara bez zmian; w linii: nawroty razem ze srodkiem ciezkosci (scisle),
     /// punkty obciete do ruchu w bok, nawroty po oknie za male.
+    /// 333f (bieg R3o1 z 333e: mediana 0.50/min, w tyl 0.28/min, srodek ciezkosci 0.31 / 0.22 - drogi: nowy P regula B 4, przestrzelenie P 4, regula Z 2, maly
+    /// szyk lucznikow regula 5 "w bok" 3, BehaviorStop artefakt mediany 3):
+    ///  - zapadka i obciecie liczone od miejsca, gdzie szyk JEST (Formation.CurrentPosition - srodek ciezkosci w ukladzie punktu rozkazu), nie od P:
+    ///    cel za szykiem wzgledem kierunku ruchu (kazda ilosc) obciety do linii szyku (ruch w bok), nawrot po oknie tylko >= 2 martwe strefy OD SZYKU;
+    ///  - kierunek ruchu (Dir) od DeadMin (3 m) celu wzgledem szyku, nie od pol martwej strefy;
+    ///  - szyk minal P wzdluz kierunku o > OverMin (2 m) - P przesuniety do linii szyku (bez powrotu do minietego punktu);
+    ///  - kontakt samej konnicy (4 s) kasuje P, ale nie kierunek zapadki (pierwszy rozkaz po nim przeciwny - obciety do linii szyku).
+    /// Wyjatki kontaktu, regula 1 (powrot obroncy na wzgorze, lucznicy za piechote) i miara bez zmian.
     /// </summary>
     internal static class Pendulum333
     {
@@ -66,6 +74,7 @@ namespace Armoury
         internal const float CavClose = 60f, CavNear = 120f, CavClosing = 3f, CavKeep = 4f;
         // 333b: martwa strefa rozkazu, zapadka kierunku (okno podwajane po kazdym nawrocie), trzymanie punktu
         internal const float DeadMove = 12f, Ratchet = 30f, RatchetMax = 240f, HoldMin = 10f;
+        internal const float OverMin = 2f;   // 333f: szyk minal P o wiecej - P przesuniety do linii szyku (powrot ponizej progu pomiaru 3 m)
         private const int MaxBeh = 8, MaxRevLines = 30, MaxSetLines = 16, MaxWays = 10;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -124,6 +133,8 @@ namespace Armoury
         private static int _revLog, _ordLog, _setLog, _revA, _revABack, _revSmall, _ordChg, _facChg, _arrChg;
         // 333e: nawroty mediany, w ktorych srodek ciezkosci idzie i wraca razem (scisle), punkty obciete do ruchu w bok, nawroty po oknie za male
         private static int _revBoth, _revBothBack, _clip, _zSmall;
+        // 333f: P przesuniete po minieciu, cele obciete o mniej niz DeadMin za szykiem
+        private static int _over, _clipSmall;
         private static readonly Dictionary<string, int[]> RevWay = new Dictionary<string, int[]>(StringComparer.Ordinal);
         private static readonly Dictionary<string, int> NonMoveBy = new Dictionary<string, int>(StringComparer.Ordinal);
         private static int _stum, _stumPatch;   // recenzja 333 (7): potkniecie latki (przed pierwszym Begin) nie ginie w Clear
@@ -181,6 +192,7 @@ namespace Armoury
             _stum = 0;
             _revLog = _ordLog = _setLog = _revA = _revABack = _revSmall = _ordChg = _facChg = _arrChg = 0;
             _revBoth = _revBothBack = _clip = _zSmall = 0;
+            _over = _clipSmall = 0;
             RevWay.Clear(); NonMoveBy.Clear();
         }
 
@@ -290,51 +302,73 @@ namespace Armoury
                     return;
                 }
                 if (!_key) return;
-                if (!pre) { Forget(pf); return; }
-                Vec2 c = Pos(f);   // 333e: srodek ciezkosci (mediana skacze miedzy ludzmi - 333d)
+                if (!pre) { Forget(pf, pf.Contact && !pf.FootContact); return; }
+                Vec2 q = Cur(f);   // 333f: pozycja szyku w ukladzie punktu rozkazu (srodek ciezkosci przesuniety o srednie miejsce w szyku - Formation.CurrentPosition)
                 WorldPosition tw = input.CreateNewOrderWorldPositionMT(f, WorldPosition.WorldPositionEnforcedCache.None);
                 Vec2 tp = tw.AsVec2;
-                if (!c.IsValid || !tw.IsValid || !tp.IsValid) return;
+                if (!q.IsValid || !tw.IsValid || !tp.IsValid) return;
                 _seen++;
                 pf.T = tp;   // 333d: ostatni cel gry
                 pf.TAt = now;
                 float dz = Math.Max(DeadMove, f.Depth);
                 Type beh = null;
                 try { var ai = f.AI; beh = ai != null && ai.ActiveBehavior != null ? ai.ActiveBehavior.GetType() : null; } catch { beh = null; }
-                // 1. pierwszy rozkaz przed kontaktem - przyjety (kierunek wzgledem mediany szyku)
+                // 333f: kierunek celu liczony od miejsca, w ktorym szyk JEST (q), nie od P - 333e liczyl zapadke i obciecie od P, wiec gdy P zostal za szykiem
+                // (szyk doszedl dalej albo P obciety "w bok" od starego P), punkt "w bok" albo "nawrot za maly" i tak cofal szyk (bieg R3o1: nowy P regula B 4,
+                // regula Z 2, przestrzelenie P 4)
+                float u = (tp - q).DotProduct(pf.Axis);
+                sbyte sg = SignD(u);
+                // 1. pierwszy rozkaz przed kontaktem - przyjety (powrot obroncy na wzgorze, lucznicy za piechote); po kontakcie samej konnicy (Dir zostal) - cel
+                // przeciwny do ruchu sprzed kontaktu obciety do linii szyku (bez nawrotu po 4 s szarzy)
                 if (!pf.P.IsValid)
                 {
                     _first++;
-                    Accept(pf, tw, tp, Sign((tp - c).DotProduct(pf.Axis), dz), now, beh, '1');
-                    return;
-                }
-                // 2. martwa strefa
-                if (tp.Distance(pf.P) < dz) { Keep(f, pf, ref input); _dead++; return; }
-                float s = (tp - pf.P).DotProduct(pf.Axis);
-                sbyte sg = Sign(s, dz);
-                char rule = '5';
-                // 3. zapadka kierunku (okno 30 s, podwajane po kazdym przepuszczonym nawrocie). 333e: przeciwna skladowa juz od DeadMin (3 m), nie od pol martwej
-                // strefy - ruch "w bok" z cofnieciem nie omija zapadki (schodki wstecz po 5 m przy Dir naprzod); w oknie albo za maly nawrot po oknie (< 2 martwe
-                // strefy na osi) - punkt obciety do osi P (zostaje sam ruch w bok), a gdy reszta w martwej strefie - zostaje P
-                if (pf.Dir != 0 && s * pf.Dir < -DeadMin)
-                {
-                    float win = Math.Min(RatchetMax, Ratchet * (float)Math.Pow(2.0, Math.Min(pf.Revs, 3)));
-                    bool inWin = now - pf.DirAt < win;
-                    if (inWin || sg == 0 || Math.Abs(s) < 2f * dz)
+                    if (pf.Dir != 0 && u * pf.Dir < 0f && !(u * pf.Dir < -DeadMin && now - pf.DirAt >= Win(pf) && Math.Abs(u) >= 2f * dz)
+                        && Side(f, pf, tw, tp - pf.Axis * u, now, beh, ref input))
                     {
-                        if (!inWin) _zSmall++;
-                        Vec2 tc = tp - pf.Axis * s;
-                        if (tc.Distance(pf.P) >= dz && Side(f, pf, tw, tc, now, beh, ref input)) return;
-                        Keep(f, pf, ref input);
-                        if (s < 0f) _backHeld++; else _fwdHeld++;
+                        pf.AccRule = '1';
                         return;
                     }
-                    pf.Revs++;
-                    _revOk++;
-                    rule = 'Z';   // zapadka przepuscila nawrot po oknie
+                    Accept(pf, tw, tp, sg, now, beh, '1');
+                    return;
                 }
-                // 4. trzymanie: szyk stoi na P - nowy punkt najwczesniej HoldMin s po przyjeciu P; 333e: i HoldMin s od dojscia do P (bez drgan 3 m przy P)
-                else if (c.Distance(pf.P) < dz)
+                // 0. 333f: szyk minal P wzdluz kierunku ruchu (o > OverMin) - P przesuniety na os do linii szyku: bez powrotu do punktu juz minietego
+                if (pf.Dir != 0)
+                {
+                    float o = (q - pf.P).DotProduct(pf.Axis);
+                    if (o * pf.Dir > OverMin) Over(pf, o, now);
+                }
+                char rule = '5';
+                Vec2 tt = tp;
+                bool clip = false;
+                // 3. zapadka kierunku (okno 30 s, podwajane po kazdym przepuszczonym nawrocie) - od pozycji szyku: kazda skladowa celu na osi za szykiem (wzgledem
+                // kierunku ruchu) obcieta do linii szyku (zostaje sam ruch w bok); nawrot tylko po oknie i >= 2 martwe strefy od szyku
+                if (pf.Dir != 0 && u * pf.Dir < 0f)
+                {
+                    bool big = u * pf.Dir < -DeadMin;
+                    bool inWin = now - pf.DirAt < Win(pf);
+                    if (big && !inWin && Math.Abs(u) >= 2f * dz)
+                    {
+                        pf.Revs++;
+                        _revOk++;
+                        rule = 'Z';   // zapadka przepuscila nawrot po oknie
+                    }
+                    else
+                    {
+                        if (big)
+                        {
+                            if (!inWin) _zSmall++;
+                            if (u < 0f) _backHeld++; else _fwdHeld++;
+                        }
+                        else _clipSmall++;
+                        tt = tp - pf.Axis * u;
+                        clip = true;
+                    }
+                }
+                // 2. martwa strefa (cel po obcieciu)
+                if (tt.Distance(pf.P) < dz) { Keep(f, pf, ref input); if (!clip) _dead++; return; }
+                // 4. trzymanie: szyk stoi na P - nowy punkt najwczesniej HoldMin s po przyjeciu P i od dojscia do P (333e)
+                if (rule != 'Z' && q.Distance(pf.P) < dz)
                 {
                     if (pf.ArrAt < pf.PAt) pf.ArrAt = now;
                     if (now - Math.Max(pf.PAt, pf.ArrAt) < HoldMin)
@@ -344,7 +378,12 @@ namespace Armoury
                         return;
                     }
                 }
-                // 5. przyjety
+                // 5. przyjety (obciety - ruch w bok bez zmiany kierunku zapadki; poza siatka nawigacji zostaje P)
+                if (clip)
+                {
+                    if (!Side(f, pf, tw, tt, now, beh, ref input)) Keep(f, pf, ref input);
+                    return;
+                }
                 Accept(pf, tw, tp, sg, now, beh, rule);
             }
             catch (Exception e)
@@ -354,9 +393,42 @@ namespace Armoury
             }
         }
 
-        private static sbyte Sign(float s, float dz)
+        /// <summary>333f: kierunek celu wzgledem szyku - od DeadMin (3 m; 333e: pol martwej strefy - cel 3-6 m za szykiem "w bok" nie ustawial kierunku).</summary>
+        private static sbyte SignD(float u)
         {
-            return s > 0.5f * dz ? (sbyte)1 : s < -0.5f * dz ? (sbyte)-1 : (sbyte)0;
+            return u > DeadMin ? (sbyte)1 : u < -DeadMin ? (sbyte)-1 : (sbyte)0;
+        }
+
+        /// <summary>Okno zapadki szyku: 30 / 60 / 120 / 240 s wedlug przepuszczonych nawrotow.</summary>
+        private static float Win(PF pf)
+        {
+            return Math.Min(RatchetMax, Ratchet * (float)Math.Pow(2.0, Math.Min(pf.Revs, 3)));
+        }
+
+        /// <summary>333f: pozycja szyku w ukladzie punktu rozkazu - Formation.CurrentPosition (srodek ciezkosci przesuniety o srednie miejsce ludzi w szyku;
+        /// Move w P stawia przod szyku w P, srodek ciezkosci stoi pol glebokosci za nim); bez niego srodek ciezkosci, potem mediana.</summary>
+        private static Vec2 Cur(Formation f)
+        {
+            Vec2 v;
+            try { v = f.CurrentPosition; } catch { v = Vec2.Invalid; }
+            return v.IsValid ? v : Pos(f);
+        }
+
+        /// <summary>333f: szyk minal P o o metrow wzdluz osi (w kierunku ruchu) - P przesuniety o o na osi (bok bez zmian), gdy na siatce nawigacji; trzymanie od teraz.</summary>
+        private static void Over(PF pf, float o, float now)
+        {
+            Vec2 np = pf.P + pf.Axis * o;
+            var w = pf.PW;
+            w.SetVec2(np);
+            if (!w.IsValid || w.GetNavMesh() == UIntPtr.Zero) return;
+            pf.P = np;
+            pf.PW = w;
+            pf.ArrAt = now;
+            pf.AccN++;
+            pf.AccRule = 'O';
+            pf.AccSg = 0;
+            pf.AccAt = now;
+            _over++;
         }
 
         private static void Accept(PF pf, WorldPosition tw, Vec2 tp, sbyte sg, float now, Type beh, char rule)
@@ -374,10 +446,12 @@ namespace Armoury
             else _accSide++;
         }
 
-        /// <summary>Kontakt: punkt przyjety i zapadka zapomniane (po wyjsciu z kontaktu - od nowa; licznik nawrotow okna zostaje).</summary>
-        private static void Forget(PF pf)
+        /// <summary>Kontakt: punkt przyjety i zapadka zapomniane (po wyjsciu z kontaktu - od nowa; licznik nawrotow okna zostaje). 333f: kontakt samej konnicy
+        /// (4 s od szarzy, bez pieszego wroga w 75 m) - kierunek zapadki zostaje (keepDir), znika tylko P.</summary>
+        private static void Forget(PF pf, bool keepDir)
         {
             pf.P = Vec2.Invalid;
+            if (keepDir) return;
             pf.Dir = 0;
             pf.DirAt = -1000f;
         }
@@ -459,11 +533,11 @@ namespace Armoury
                 pf.LastA = Vec2.Invalid;
                 pf.Trend = 0;
                 pf.TrendA = 0;
-                if (pf.Contact) Forget(pf);
+                if (pf.Contact) Forget(pf, !pf.FootContact);
                 return;
             }
             Poll(pf, now);   // 333d: FacingOrder / ArrangementOrder przed kontaktem
-            if (pf.P.IsValid && pf.ArrAt < pf.PAt && a.Distance(pf.P) < Math.Max(DeadMove, f.Depth)) pf.ArrAt = now;   // 333e: dojscie do P
+            if (pf.P.IsValid && pf.ArrAt < pf.PAt && Cur(f).Distance(pf.P) < Math.Max(DeadMove, f.Depth)) pf.ArrAt = now;   // 333e: dojscie do P (333f: pozycja szyku)
             _preSec += step;
             if (!pf.Last.IsValid || !pf.LastA.IsValid)
             {
@@ -762,7 +836,9 @@ namespace Armoury
               .Append(HeldForms.Count)
               .Append("; 333b: pierwszych ").Append(_first).Append(", martwa strefa ").Append(_dead).Append(", trzymanie ").Append(_hold)
               .Append(", nawroty przepuszczone po oknie ").Append(_revOk).Append(", przyjete naprzod ").Append(_accFwd).Append(", w bok ").Append(_accSide)
-              .Append("; 333e: obciete do ruchu w bok ").Append(_clip).Append(", nawroty po oknie za male ").Append(_zSmall);
+              .Append("; 333e: obciete do ruchu w bok ").Append(_clip).Append(", nawroty po oknie za male ").Append(_zSmall)
+              .Append("; 333f: zapadka od pozycji szyku, P przesuniete po minieciu ").Append(_over).Append(", cele obciete o mniej niz ").Append(DeadMin.ToString("0", Inv))
+              .Append(" m za szykiem ").Append(_clipSmall);
         }
     }
 }
