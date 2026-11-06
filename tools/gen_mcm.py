@@ -778,6 +778,9 @@ LABELS = {
     'NorthCanonTheatre334': 'North Canon Theatre',
     'BkVetoNextTarget334': 'Army Objective Skips Vetoed Seats',
     'IronbornCanonReave334': 'Ironborn Reave The North',
+    'PartyPositionGuard334c': 'Party Position Guard',   # paczka 334c
+    'CanonWarStance334c': 'Canon War Stance',
+    'ScaCoalitionOwn334c': 'Strategic AI Counts Allies',
     # p9: "AI" wielkimi literami (regula ogolna dalaby "Ai Strength Counts Gear")
     'StrategicAiIgnoresBandits': 'Strategic AI Ignores Bandits',   # 320b
     'StrategicAiFightsOnWhenPeaceBlocked': 'Strategic AI Fights On When Peace Blocked',   # 320e

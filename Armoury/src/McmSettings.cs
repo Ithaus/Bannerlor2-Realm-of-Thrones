@@ -10716,6 +10716,18 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool IronbornCanonReave334 { get; set; } = true;
 
+        [SettingPropertyBool("Party Position Guard", HintText = "Guards the campaign map against a party left with no valid position after boarding or leaving its ships (as happens when the Battle of the Blackwater moves Stannis's lords while they are embarking): the move is cancelled first, a party without a position is put back with its army leader or at the gate of its settlement, and the weather check never crashes the game on such a party. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool PartyPositionGuard334c { get; set; } = true;
+
+        [SettingPropertyBool("Canon War Stance", HintText = "In the War of the Five Kings the Banner Kings war stance of the North, the crown and their allies weighs the strength of the whole alliance on each side, not of one realm against its strongest foe, and the Iron Islands at war with the North keep the usual stance of a raider instead of hiding at home: a defensive stance forbids all raids and sieges. Off = Banner Kings decides alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool CanonWarStance334c { get; set; } = true;
+
+        [SettingPropertyBool("Strategic AI Counts Allies", HintText = "With the Strategic Campaign AI mod: a realm of either side of the War of the Five Kings counts its allies' strength next to its own before it calls itself exhausted, so the crown standing with the Reach no longer hides in its capital. Off = only its own strength, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool ScaCoalitionOwn334c { get; set; } = true;
+
         [SettingPropertyBool("Canon Houses of the West", HintText = "As in the books, the lordly houses of the Westerlands and the Crownlands that Realm of Thrones leaves without a castle (Estren, Falwell, Jast, Moreland, Plumm, Prester, Stackspear, Buckwell, Chelsted, Hayford, Stokeworth; House Spicer stays a knightly house until the Red Wedding, as in the books) answer their liege's call with a host of their own: the Banner Kings gentry family that keeps an estate in their lands is raised to full peerage (exactly as a realm vote would grant it) and to clan tier 3, and its head leads a party raised the usual way from the villages. Once per campaign, at the first day after loading or at the start of a new game. No castles are taken from anyone. Only in Prologue 298 (canon) campaigns", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool CanonHouses277 { get; set; } = true;
@@ -14122,6 +14134,9 @@ namespace Armoury
             s.NorthCanonTheatre334 = NorthCanonTheatre334;
             s.BkVetoNextTarget334 = BkVetoNextTarget334;
             s.IronbornCanonReave334 = IronbornCanonReave334;
+            s.PartyPositionGuard334c = PartyPositionGuard334c;
+            s.CanonWarStance334c = CanonWarStance334c;
+            s.ScaCoalitionOwn334c = ScaCoalitionOwn334c;
             s.CanonHouses277 = CanonHouses277;
             s.CanonHouses277Rename = CanonHouses277Rename;
             s.CanonHouses277LiegePay = CanonHouses277LiegePay;

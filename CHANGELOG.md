@@ -1,5 +1,54 @@
 # DZIENNIK ZMIAN
 
+## 334c - wywrotka Blackwater (pozycja NaN), postawa BK Zelaznych i korony, SCA "swoi" koalicji, narzedzie (noc/334-balans od 11e1e2e5 - NIE WGRANE, bez autotestu)
+**Problem:** test 334b (90 dob z kopii zapisu Jeffa, logi scratchpad at334): (1) WYWROTKA na dobie 78 (dzien 109604, 15:37:43) - IndexOutOfRangeException w
+DefaultMapWeatherModel.GetWeatherEventInPosition <- NavalDLCMapWeatherModel.GetWeatherEffectOnTerrainForPosition <- MobileParty.IsBaseSpeedCacheInvalid
+(ParallelTickMovingParties), 26 s po "FABULA: BlackwaterSiegeEvent WYSTARTOWALO (dzien 767)" i oknie "Continue..." (pierwszy bieg testow, ktory doszedl do Blackwater;
+w 2495 archiwalnych logach tylko ta sesja). (2) Zelazni: armia 0 dob, oblezen 0, rabunkow 0, "z opcja rabunku 0 (opcji 0)" od 2. doby (doba 109522 przed tickiem BK:
+opcji 152). (3) korona: armia 1 doba na 38 dob wojny, B334-7 13 okien bez oblezenia; SCA korony "wrog 69850->35590, swoi 16007, wyczerpane tak", Reach tak samo;
+152 ze 159 dob-lordow korony z wpisem "SCA: wyczerpane - cele oblezen x0.55". B334-1 "SCA BRAK/BRAK" mimo "latka wpieta" w linii 320b; R274-9 "linii bez wzoru 40".
+**Przyczyna:** (1) gra FinishNavigationTransitionInternal daje partii koniec przejscia lad/morze; przejscie zaczete W OSADZIE (wyjscie z portu) nie zapisuje konca
+(CampaignVec2.Invalid = NaN). ROT BlackwaterSiegeEvent.SetupSiegeAttackers / DefendSiegeTarget wyprowadza Stannisa i lordow Smoczej Skaly (wyspa - czesto w trakcie
+wyplywania) z osady i przestawia setterem Position bez CancelNavigationTransition -> gra konczy przejscie poza osada z pozycja NaN -> (int)NaN = int.MinValue w indeksie
+siatki pogody (bez obciecia) -> wyjatek na watku roboczym zamyka gre. Nie 334 (595 rejsow "do portu" przez 78 dob bez bledu; 334 nie ustawia pozycji). W kampanii Jeffa
+(167) przyjdzie tak samo przy starcie Blackwater. (2) BannerKings BKDiplomacyBehavior.TickKingdoms co dobe: najsilniejszy wrog >= 1.5 x sila krolestwa (albo 1 twierdza)
+-> wszystkie partie PartyObjective.Defensive; gra (AiMilitaryBehavior.FindBestTargetAndItsValueForFaction) przy Defensive nie podaje opcji oblezenia ani rabunku. Wyspy
+9.3 tys. wobec Polnocy 35 tys. - Defensive; korona 13 tys. - Defensive; Polnoc - Aggressive (x1.2 oblezenia, bez opcji obrony). Model armii gry to SCA
+StrategicArmyManagementModel (log "Mury oblezen": armie StrategicCampaignAI145...), droga czlonkow wedlug ich NavigationCapability - lad-only BK
+(BKArmyManagementModel.CanLordCreateArmy) dotyczy tylko celu BK CallBannersGoal; waniliowa sciezka armii Wysp byla zablokowana sama postawa. (3) 334 B2 zamienil wroga
+SCA na front F334 (z sojusznikiem Polnocy), a "swoi" zostali samym krolestwem (korona bez Reach) - wrog > swoi x 1.35. B334-1: linia startu 334 przed
+ScaNoBandits320.EnsureHooks (kolejnosc sluchaczy OnSessionLaunched). R274-9: nawias 326c po "lordow do frontu N" (a6e431bc) - wzor narzedzia go nie znal.
+**Zmiana (3 nowe klucze bool, domyslnie TAK, na zywo; liczby tylko z gry / BK / SCA - prog 1.5 BK, 1.35 SCA, CurrentTotalStrength):**
+- `WarFront334.Guard.cs` (nowy, `PartyPositionGuard334c`, kazda kampania): prefiks ROT BlackwaterSiegeEvent.SetupSiegeAttackers - CancelNavigationTransition Stannisa i
+  partii wojennych rodow Smoczej Skaly PRZED teleportem (wzor BookHoldings.Teleport); postfiks - czlonkowie SiegeArmy jeszcze raz, pozycja NaN naprawiona; prefiks
+  DefendSiegeTarget (Joffrey, Lancel). Postfiks MobileParty.FinishNavigationTransitionInternal: pozycja NaN -> pozycja wodza (przypiety / armia), brama osady, brama osady
+  domowej, pierwsza twierdza frakcji; przypieci razem z wodzem. Prefiks DefaultMapWeatherModel.GetWeatherEventInPosition: pozycja poza siatka -> WeatherEvent.Clear zamiast
+  wyjatku (watek roboczy: Interlocked + kolejka, partia z MapRoads.CurrentWriter), naprawa w nastepnej klatce (TickEvent) i linia "potkniecie 334c pogoda" z partia i pozycja;
+  trafienie bez partii - przeglad wszystkich partii. Raz na dobe przeglad NaN i linia "Pozycje partii (334c): dzien N".
+- `WarFront334.Stance.cs` (nowy, `CanonWarStance334c`, kanon): postfiks (Last) BKDiplomacyBehavior.TickKingdoms + start sesji - strony 274: regula BK z sila koalicji po obu
+  stronach (wrog = max(suma drugiej strony w wojnie, najsilniejszy inny wrog)); Zelazni w wojnie z Polnoca - Neutral (postawa gry bez BK). Inne krolestwa i krolestwo
+  gracza bez zmian. Linia "Balans wojny (334): postawa (334c)" (BK -> 334c, sila / wrog, partie obronne / ofensywne). Autotest T6 (regula, 7 przypadkow).
+- `ScaNoBandits320.cs` + `WarFront334.ScaOwn` (`ScaCoalitionOwn334c`, wymaga `ScaFrontThreat334`): OwnedStrength strony 274 = suma CurrentTotalStrength krolestw tej strony;
+  wrog dalej F334 do krolestwa. Linia SCA 334: "swoi krolestwa X->koalicja Y". EnsureHooks rozdzielone na Wire() + linia; WarFront334.SessionStart wola Wire() przed linia
+  startu (B334-1). Linia startu 334: klucze i latki 334c (postawa BK, straznik).
+- `WarFront334.cs` korona pomiar: "Tywin ... na wojnie TAK/NIE" (armia albo Reaches(Polnoc) - 8.02 doby drogi). `MapRoads.CurrentWriter` (tylko odczyt).
+- `tools/sprawdz_logi.py`: R274 wzor dnia z nawiasem 326c (+ self-test); balans334: B334-1 tez latki 334c, B334-6/-8 tylko doby wojny (B334-8 "na wojnie"), B334-7 okna w ciaglych
+  odcinkach wojny, B334-17 mediana 3 dob, nowe B334-23 wywrotki pogody 0 (linia 334c + opcjonalnie drugi plik session-*.log), B334-24 NaN tylko w dobie Blackwater +-1,
+  B334-25 linia straznika co dobe z latkami ok, B334-26 postawa (Wyspy bez obronnych, korona obronna tylko z reguly koalicji); synteza +7 biegow (OK). Na logu 334b:
+  B334-23 NIE (session 2), B334-17 TAK (mediana), B334-7 INFO (najdluzszy odcinek wojny 26 dob), R274-9 TAK.
+**Ryzyko / co sprawdzic:** (1) prefiks pogody na goracej sciezce watkow roboczych - tylko porownania i Interlocked; siatka liczona raz na sesje (InitGrid; bez siatki -
+oryginal). (2) postfiks FinishNavigationTransitionInternal - przy poprawnej pozycji nic nie robi; przypiety z wodzem NaN czeka na postfiks wodza (gra konczy przejscie
+wodza po przypietych). (3) Blackwater: anulowanie przejscia przed LeaveSettlementAction ROT - ROT i tak przestawia partie; po teleporcie gra liczy nowa droge. (4) postawa:
+Polnoc traci x1.2 Aggressive i dostaje opcje obrony; Wyspy dostaja opcje rabunku i oblezen (dalej sito gry: jedzenie, zasieg, CalculateDistanceScoreForBesieging - samotne
+partie najpierw rabuja wybrzeze); po zmianie wiecej rejsow - straznik pozycji obejmuje tez je. Wolni Ludzie dalej Defensive z reguly BK (osobna decyzja). (5) SCA: korona i
+Reach licza swoich razem - mniej "wyczerpane", wiecej celow oblezen; DefendCapitalRegion przy wrogu > 500 pod stolica zostaje (Stannis pod KL). (6) cel BK CallBannersGoal
+(lad-only) bez zmian - armie Wysp tylko droga gry (SCA model). Kontrola calosci: SetPartyObjective ustawia tylko BK (grep: Armoury, SCA, BKROTPatch, NavalDLC bez innych);
+OwnedStrength SCA czyta tylko IsExhausted; pozycje partii ustawia w Armoury BookHoldings (anuluje przejscie), ArmyCloseRanks (IsValid), KingInTheNorth/Fold332 (armia - ten
+sam straznik NaN). Do sprawdzenia w tescie (ta sama kopia zapisu do doby >= 79): `--grupa balans334 <Armoury> <session>` - B334-23 TAK, B334-24/25 TAK, B334-26 TAK,
+B334-11..14 (Wyspy armie / oblezenia / rabunki / opcje), B334-6/-7 (korona); linia "Blackwater (334c): anulowane przejscia przed teleportem N" (N > 0 = hipoteza wprost).
+**Status:** NIE WGRANE - build Release kod 0 (bez nowych ostrzezen), Armoury.dll -> C:\Users\GAME\bannerlord-autotest\test\m334 (DLL autotestu), bez autotestu (gra nie
+uruchamiana). Poprawke Blackwater wgrac przed tym dniem fabuly w kampanii Jeffa, niezaleznie od balansu.
+
 ## 334 - Balans wojny korona-Polnoc wedlug kanonu, z Zelaznymi Ludzmi (noc/334-balans od noc/333-ai-bitwy a7e623fb - NIE WGRANE, bez autotestu; Jeff gra)
 **Problem:** Jeff 06.11 13:45 "znowu Polnoc leje poludnie, to jest w ogole nie zbalansowana gra"; 13:50 "Zelazni ludzie w ogole atakuja Polnoc, pladruja ja, czy siedza
 na wyspie?". Log 13:44: sila Polnoc 25064 / korona 22472 (330), Polnoc zdobyla Duskendale (szturm 109519, zwrot 326b) i Sarsfield, oblega Stoney Sept i Hornvale; logi

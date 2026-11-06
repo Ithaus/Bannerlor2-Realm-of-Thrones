@@ -267,3 +267,61 @@ Dokładne liczby tej tabeli są wzorem do testu na kopii zapisu Jeffa: bieg 60�
 - **Łatka SCA.** Działa na tym samym postfiksie co 320b (DeclaredMethod), bez nowych latek na małych metodach (lekcja z GC).
 - **Pętla „Wyspy podbijają za dużo”.** Ogranicza ją sama Północ: homeGuard B4 i obrona gry w 8.02 doby. Kanon dopuszcza utratę Moat Cailin, Deepwood i Torrhen's Square do F2.
 - **Przy włączonej grze Jeffa** nic nie testować i nic nie wgrywać. Kopie zapisów sprzątać po serii.
+
+## H. Paczka 334c (po teście 334b: 81 dób z kopii zapisu Jeffa, wywrotka na dobie 78)
+
+### H1. Wywrotka pogody przy Blackwater (klucz `PartyPositionGuard334c`, plik `WarFront334.Guard.cs`, każda kampania)
+**Dowód:** `IndexOutOfRangeException` w `DefaultMapWeatherModel.GetWeatherEventInPosition` ← `NavalDLCMapWeatherModel.GetWeatherEffectOnTerrainForPosition` ← `MobileParty.IsBaseSpeedCacheInvalid` (wątek `ParallelTickMovingParties`), 26 s po `FABULA: BlackwaterSiegeEvent WYSTARTOWALO (dzien 767)`. Indeks siatki pogody to `(int)(x / komórka)` bez obcięcia, a osady leżą w x 12–1577, y 2–1245, więc wyjątek daje tylko `(int)NaN`. Pozycja partii to NaN. W 2495 archiwalnych logach ten błąd jest tylko w tej sesji. To pierwszy bieg, który doszedł do Blackwater. „BLAME NavalDLC” jest mylące: NavalDLC tylko przekazuje wywołanie.
+
+**Przyczyna:** `MobileParty.FinishNavigationTransitionInternal` ustawia pozycję końca przejścia ląd/morze. Gdy przejście zaczęło się w osadzie (wyjście z portu), gra nie zapisuje jego końca i zostaje `CampaignVec2.Invalid`. ROT `BlackwaterSiegeEvent.SetupSiegeAttackers` i `DefendSiegeTarget` wyprowadzają Stannisa i lordów Smoczej Skały z osady (`LeaveSettlementAction`), przestawiają ich setterem `Position` i nie wołają `CancelNavigationTransition`. Smocza Skała to wyspa, więc lordowie często są wtedy w trakcie wypływania. Po zakończeniu przejścia mają pozycję NaN, a przy następnym liczeniu prędkości gra się wywraca.
+
+**Zmiana (trzy warstwy):**
+1. **Źródło:** prefiks na `SetupSiegeAttackers` anuluje przejścia Stannisa i partii wojennych rodów Smoczej Skały przed teleportem (ten sam wzór co `BookHoldings.Teleport`). Postfiks robi to samo dla członków `SiegeArmy` i naprawia pozycję NaN. Prefiks na `DefendSiegeTarget` obejmuje Joffreya i Lancela.
+2. **Strażnik ogólny:** postfiks na `FinishNavigationTransitionInternal` (wątek główny). Gdy pozycja to NaN, partia dostaje kolejno: pozycję wodza (przypięty albo armia), bramę osady, w której stoi, bramę osady domowej, bramę pierwszej twierdzy frakcji. Flagę morza bierze od wodza, a na bramie zawsze ląd. Przypięci przechodzą razem z wodzem.
+3. **Siatka bezpieczeństwa:** prefiks na `GetWeatherEventInPosition`. Dla pozycji poza siatką zwraca `WeatherEvent.Clear` zamiast wyjątku. Na wątku roboczym tylko zwiększa licznik `Interlocked` i dodaje wpis do kolejki (partia z `MapRoads.CurrentWriter`). Naprawa i linia `potkniecie 334c pogoda` (partia, pozycja, naprawa) idą w następnej klatce na wątku głównym.
+4. Raz na dobę przegląd wszystkich partii i linia `Pozycje partii (334c): dzien N`.
+
+### H2. Żelaźni nie najeżdżają, bo BK ustawia postawę obronną (klucz `CanonWarStance334c`, plik `WarFront334.Stance.cs`)
+**Dowód:** linia „Zelazni” od 2. doby pokazuje „z opcja rabunku 0 (opcji 0)” przez 81 dób. Na dobie 109522, przed pierwszym tickiem BK, były 152 opcje. Pomiar Z0 liczy każdą opcję `RaidSettlement`, nawet z oceną 0, więc gra tej opcji w ogóle nie podała. Zasięg nie jest przyczyną: droga skorygowana wynosi 35–60 przy progu 411.
+
+**Przyczyna:** `BKDiplomacyBehavior.TickKingdoms` działa co dobę i po wczytaniu. Gdy krolestwo ma 1 twierdzę albo najsilniejszy wróg ma co najmniej 1,5 × jego `CurrentTotalStrength`, wszystkie jego partie dostają postawę Defensive. Gdy krolestwo ma co najmniej 1,5 × siłę wroga, dostają Aggressive. `AiMilitaryBehavior.FindBestTargetAndItsValueForFaction` przy Defensive przerywa liczenie dla oblężeń i rabunków, także z zebraniem armii. Wyniki z testu: Wyspy 9,3 tys. wobec Północy 35 tys. – Defensive; korona 13 tys. – Defensive; Północ – Aggressive (×1,2 do oblężeń, bez opcji obrony).
+
+Diagnoza wskazała też lądową bramkę `BKArmyManagementModel.CanLordCreateArmy`. Czynnym modelem armii jest jednak `StrategicCampaignAI145.StrategicArmyManagementModel` (wanilia: członkowie liczeni po swojej `NavigationCapability`, potem cooldown i siła ≥ 260; log „Mury oblezen (OB start)”). BK `CanLordCreateArmy` i `IsLandReachableForGather` dotyczą tylko celu BK `CallBannersGoal`, który prowadzi armię lądem (`NavigationType 1`). Tych metod nie zmieniamy, bo armia wysłana lądem przez morze by utknęła. Waniliowa ścieżka armii Wysp była zablokowana samą postawą.
+
+**Zmiana:** postfiks (priorytet Last) na `TickKingdoms` oraz jednorazowo przy starcie sesji, tylko w kampanii kanonu. Królestwo gracza zostaje bez zmian, tak jak w BK.
+- **Strony 274:** ta sama reguła BK (próg 1,5, wyjątek 1 twierdzy). Siła własna to suma `CurrentTotalStrength` królestw tej strony. Wróg to max(suma królestw drugiej strony w wojnie z tym królestwem, najsilniejszy inny wróg). Przy stosunku 0,9–0,95 obie strony wychodzą Neutral.
+- **Żelazne Wyspy w wojnie z Północą:** Neutral, czyli postawa gry bez BK. Najeźdźca jest słabszy, ale w kanonie rabuje i oblega wybrzeże. Neutral nie odcina żadnej opcji, także obrony.
+- **Pozostałe królestwa** (Dorne, Dolina, Essos, Wolni Ludzie) zostają przy wyniku BK. Wolni Ludzie mają ten sam objaw, ale to osobna decyzja.
+- **Linia** `Balans wojny (334): postawa (334c) | dzien N`: BK → 334c, siła i wróg, twierdze, partie obronne i ofensywne dla Północy, korony, Reach, Wysp i Smoczej Skały.
+- **Autotest:** T6, reguła na 7 przypadkach.
+
+### H3. Korona „wyczerpana” w SCA (klucz `ScaCoalitionOwn334c`, wymaga `ScaFrontThreat334`)
+**Dowód:** linia SCA 334 korony: „wrog 69850->35590, swoi 16007, wyczerpane tak”. Reach: „wrog 69127->34834, swoi 24098, wyczerpane tak”. 152 ze 159 dób-lordów korony ma wpis „SCA: wyczerpane - cele oblezen x0.55”.
+
+**Przyczyna:** 334 B2 zamienił wroga SCA na front F334, który obejmuje też sojuszników Północy. „Swoi” zostali jednak samym królestwem, bez Reach. Warunek SCA to wróg > swoi × 1,35.
+
+**Zmiana:** w postfiksie 320b `CalculateFactionStatus` `OwnedStrength` królestwa strony 274 to suma `CurrentTotalStrength` królestw tej strony, czyli ta sama miara SCA. Wróg zostaje F334 do tego królestwa, liczony raz. Według logu korona ma 16 + 24 ≈ 40 tys. wobec 35–39 tys. Cel `DefendCapitalRegion` przy wrogu > 500 pod stolicą zostaje (Stannis pod King's Landing). `OwnedStrength` czyta w SCA tylko `IsExhausted`. Linia SCA 334 pokazuje „swoi krolestwa X->koalicja Y”.
+
+### H4. Błędy raportu
+- **B334-1:** linia startu 334 była wypisywana przed `ScaNoBandits320.EnsureHooks`, bo zależało to od kolejności słuchaczy `OnSessionLaunched`. Teraz `EnsureHooks` = `Wire()` + linia, a `WarFront334.SessionStart` woła `Wire()` przed swoją linią. Linia startu 334 pokazuje też łatki 334c.
+- **R274-9:** wzór dnia 274 obejmuje teraz nawias 326c po „lordow do frontu N”, co dodano też do self-testu. Na logu 334b wzór rozpoznaje 40/40 linii zamiast 0/40.
+- **B334-6/-8:** liczone tylko w dobach wojny (z linią frontu). B334-8 liczy Tywina „na wojnie”, czyli w armii albo w zasięgu frontu Północy (`Reaches`, 8,02 doby drogi). Stara linia bez tego pola liczy „w polu”.
+- **B334-7:** okna 28 dób tylko w ciągłych odcinkach wojny. Odcinek krótszy niż 28 dób daje INFO.
+- **B334-17:** liczona mediana 3 kolejnych dób, więc jedna doba po przegranej bitwie nie rozstrzyga.
+
+### H5. Nowe progi `--grupa balans334 <Armoury-*.log> [<session-*.log>]`
+| Próg | Co | Warunek |
+|---|---|---|
+| B334-23 | wywrotki pogody: „pogoda poza siatka” z linii 334c, opcjonalnie `IndexOutOfRangeException` / `GetWeatherEventInPosition` w session | 0 / 0 |
+| B334-24 | NaN po przejściu (i przegląd doby) poza dobą Blackwater ±1 | 0 dób |
+| B334-25 | linia `Pozycje partii (334c)` co dobę, łatki ok (Blackwater ok albo „bez ROT”) | tak |
+| B334-26 | postawa w dobach wojny: Wyspy bez partii obronnych, korona obronna tylko z reguły koalicji | 0 / 0 |
+
+Zelaznych sprawdzają dalej B334-11 (armie ≥ 30% dób), B334-12 (oblężenia osad Północy ≥ 1 na 60 dób), B334-13 (rabunki z łupem ≥ 3 na 60 dób) i B334-14 (opcja rabunku ≥ 50% dób). Synteza obejmuje dodatkowo 7 biegów: pogoda, NaN poza Blackwater, NaN w dobie Blackwater, postawa, jedna doba spadku w rozejmie, luka rozejmu i stara linia startu.
+
+### H6. Ryzyka i co dalej
+- **Gorąca ścieżka pogody:** prefiks robi tylko porównania. Siatka jest liczona raz na sesję, a bez niej działa oryginał.
+- **Postawa zmienia przebieg wojny:** Północ traci premię ×1,2 do oblężeń i dostaje opcje obrony. Wyspy dostają rabunki i oblężenia, które dalej przechodzą sito gry: jedzenie, zasięg i `CalculateDistanceScoreForBesieging`. Samotne partie najpierw rabują wybrzeże, a twierdze w głębi biorą dopiero od przyczółka (Z3).
+- **Więcej rejsów:** po zmianie postawy na morzu będzie więcej ruchu. Strażnik pozycji obejmuje każdy koniec przejścia.
+- **Kampania Jeffa:** poprawkę Blackwater trzeba wgrać przed startem Blackwater w kampanii Jeffa, niezależnie od losów balansu.
+- **Test:** ta sama kopia zapisu, do doby ≥ 79. Szukać linii `Blackwater (334c): anulowane przejscia przed teleportem N`; N > 0 potwierdza hipotezę wprost.

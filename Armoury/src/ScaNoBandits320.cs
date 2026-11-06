@@ -97,6 +97,14 @@ namespace Armoury
         // ------------------------------------------------------------ latka (raz na proces, w kampanii)
         internal static void EnsureHooks()
         {
+            Wire();
+            StartLog();
+        }
+
+        /// <summary>334c (B334-1): samo wpiecie latek (raz na proces), bez linii startu - WarFront334.SessionStart wola je przed swoja linia startu, zeby stan latek
+        /// SCA w linii 334 nie zalezal od kolejnosci sluchaczy OnSessionLaunched. Ponowne wywolanie nic nie robi (_hookTried).</summary>
+        internal static void Wire()
+        {
             if (!_hookTried)
             {
                 _hookTried = true;
@@ -173,6 +181,10 @@ namespace Armoury
                 }
                 catch (Exception e) { _hookNoteE = "BRAK (" + e.GetType().Name + ": " + e.Message + ")"; Stumble("EnsureHooks.E", e); }
             }
+        }
+
+        private static void StartLog()
+        {
             try
             {
                 Log.Info(P + "start sesji - latka " + _hookNote + ", klucz Strategic AI Ignores Bandits " + (On ? "wlaczony" : "WYLACZONY")
@@ -324,6 +336,18 @@ namespace Armoury
                     if (fe >= 0f) { _pEnemy.SetValue(__result, fe, null); fin = fe; }
                 }
                 catch (Exception ex) { Stumble("CalcPostfix.Front334", ex); }
+                // 334c (klucz ScaCoalitionOwn334c): strona wojny kanonu (274) - "swoi" = suma tej samej miary SCA (CurrentTotalStrength) krolestw tej strony; wrog
+                // zostaje F334 do tego krolestwa (bez sumowania frontu koalicji - kazde krolestwo liczy swoich wrogow raz). Inne krolestwa - bez zmian.
+                if (_pOwn != null)
+                {
+                    try
+                    {
+                        float ownRaw = Convert.ToSingle(_pOwn.GetValue(__result, null), Inv);
+                        float fo = WarFront334.ScaOwn(kingdom, ownRaw);
+                        if (fo >= 0f) _pOwn.SetValue(__result, fo, null);
+                    }
+                    catch (Exception ex) { Stumble("CalcPostfix.Own334c", ex); }
+                }
                 if (Math.Abs(r.Before - fin) > 0.5f) _dChanged++;
                 // 320e (a)
                 try { r.Locked = PeaceLocked(kingdom, out r.Why); } catch (Exception ex) { r.Locked = false; r.Why = "blad"; Stumble("CalcPostfix.Lock", ex); }

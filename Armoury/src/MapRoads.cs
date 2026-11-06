@@ -282,6 +282,8 @@ namespace Armoury
         // [ThreadStatic] - kazdy watek roboczy gry ma swoja; poprzednia wartosc wraca w finalizerze (__state), takze przy wyjatku
         [ThreadStatic] private static MobileParty _writer;
         private static int _writerHooks;               // 0..2 wpietych latek straznika; 2 = straznik czynny, inaczej zapis jak przed recenzja
+        /// <summary>334c (straznik pogody): partia, ktorej predkosc ten watek wlasnie liczy (null - poza CalculateSpeedForPartyUnified albo latka niewpieta). Tylko odczyt.</summary>
+        internal static MobileParty CurrentWriter { get { return _writer; } }
         /// <summary>MarchPace.ApplyAll: liczba modeli predkosci z latka MarchPace.SpeedPostfix (niesie SpeedRoad); 0 = latka niewpieta przy starcie gry.</summary>
         internal static int SpeedModels;
 

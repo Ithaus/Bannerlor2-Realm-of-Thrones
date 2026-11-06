@@ -43,6 +43,8 @@ namespace Armoury
         internal static bool TheatreKey { get { var s = S; return s != null && s.NorthCanonTheatre334 && Canon; } }
         internal static bool BkNextOn { get { var s = S; return s != null && s.BkVetoNextTarget334 && Canon; } }
         internal static bool IronOn { get { var s = S; return s != null && s.IronbornCanonReave334 && Canon; } }
+        internal static bool StanceOn { get { var s = S; return s != null && s.CanonWarStance334c && Canon; } }
+        internal static bool ScaAllyOn { get { var s = S; return s != null && s.ScaCoalitionOwn334c && s.ScaFrontThreat334 && Canon; } }
 
         // ================================================================ stan F334 (doba, bez zapisu)
         // Forts: twierdze, na ktore REALNIE ida druzyny (cel w krolestwie, oblezenie / najazd, druzyna na jego ziemi) - sila zagrozenia na twierdze (homeGuard 274)
@@ -56,7 +58,7 @@ namespace Armoury
         private static int _stumbles, _dStumbles;
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
         // SCA (B2): ostatnia ocena na krolestwo - surowy wrog SCA i F334 (linia 3)
-        private sealed class ScaRec { public float Raw, Front; public bool Used; }
+        private sealed class ScaRec { public float Raw, Front; public bool Used; public float OwnRaw = -1f, OwnCoal = -1f; }
         private static readonly Dictionary<string, ScaRec> _sca = new Dictionary<string, ScaRec>(StringComparer.Ordinal);
         private static int _dScaFront, _dScaRaw;   // oceny SCA z F334 / surowe (bez F334 - pierwsze godziny sesji)
 
@@ -64,7 +66,7 @@ namespace Armoury
         {
             _front.Clear(); _reach.Clear(); _defend.Clear(); _day = -1; _broken = false; _computeN = _calls = _partiesN = _ms = 0; _stumbles = _dStumbles = 0; _errSites.Clear();
             _sca.Clear(); _dScaFront = _dScaRaw = 0;
-            ResetTheatre(); ResetIron(); ResetSaved();
+            ResetTheatre(); ResetIron(); ResetSaved(); ResetStance();
             WarFront334Test.Reset();
         }
 
@@ -402,6 +404,28 @@ namespace Armoury
             return (float)t;
         }
 
+        /// <summary>334c (postfiks 320b CalculateFactionStatus, po ScaEnemy): OwnedStrength krolestwa strony 274 = suma CurrentTotalStrength krolestw tej strony (ta sama
+        /// miara, ktora SCA bierze dla jednego krolestwa). raw - wartosc SCA (do linii). Zwraca nowa wartosc albo -1 (bez zmiany: klucz NIE, krolestwo poza 274).</summary>
+        internal static float ScaOwn(Kingdom k, float raw)
+        {
+            if (k == null) return -1f;
+            ScaRec r;
+            if (!_sca.TryGetValue(k.StringId ?? "", out r)) { r = new ScaRec(); _sca[k.StringId ?? ""] = r; }
+            r.OwnRaw = raw; r.OwnCoal = -1f;
+            if (!ScaAllyOn) return -1f;
+            int side = CanonWarBalance.SideOf(k);
+            if (side == 0) return -1f;
+            double sum = 0;
+            foreach (var o in Kingdom.All)
+            {
+                if (o == null || o.IsEliminated || CanonWarBalance.SideOf(o) != side) continue;
+                try { sum += Math.Max(0f, o.CurrentTotalStrength); } catch { }
+            }
+            if (!(sum > 0)) return -1f;
+            r.OwnCoal = (float)sum;
+            return (float)sum;
+        }
+
         /// <summary>B3: pokoj z frakcja f zablokowany na stale w tej chwili - 264/330 (CanonPeaceLock.Blocks) albo wojna wymuszona przez ROT (Wyspy-Polnoc, zatargi).</summary>
         internal static bool PeaceImpossible(Kingdom k, IFaction f)
         {
@@ -443,7 +467,11 @@ namespace Armoury
         internal static void SessionStart()
         {
             _startSaid = false;
+            try { NavGuard334.SessionStart(); } catch (Exception e) { Stumble("NavGuard334.SessionStart", e); }   // 334c: straznik pozycji - kazda kampania
+            try { ScaNoBandits320.Wire(); } catch (Exception e) { Stumble("ScaWire", e); }   // 334c (B334-1): latki SCA przed linia startu (kolejnosc sluchaczy)
             try { EnsureHooks(); } catch (Exception e) { Stumble("EnsureHooks", e); }
+            try { EnsureStanceHook(); } catch (Exception e) { Stumble("EnsureStanceHook", e); }
+            try { StanceApply("start sesji"); } catch (Exception e) { Stumble("StanceApply.start", e); }
             try { StartLine(); } catch (Exception e) { Stumble("StartLine", e); }
         }
 
@@ -466,8 +494,10 @@ namespace Armoury
             Log.Info(Tag + "start sesji | klucze: front " + Key01(s.CanonWarFront334) + ", SCA front " + Key01(s.ScaFrontThreat334) + ", SCA glowna wojna " + Key01(s.ScaFightsOnMainWarLocked334)
                      + ", najem kompanii " + Key01(s.CanonWarBalanceHireCompanies) + ", rozejm uzbrojony " + Key01(s.WarTruceArmed334) + ", teatr Polnocy " + Key01(s.NorthCanonTheatre334)
                      + ", BK nastepny cel " + Key01(s.BkVetoNextTarget334) + ", Zelazni " + Key01(s.IronbornCanonReave334)
+                     + ", postawa 334c " + Key01(s.CanonWarStance334c) + ", SCA swoi koalicji 334c " + Key01(s.ScaCoalitionOwn334c) + ", straznik pozycji 334c " + Key01(s.PartyPositionGuard334c)
                      + " | zakres: " + (Canon ? "kampania kanonu" : "kampania klasyczna - nie dotyczy")
                      + " | latki: SCA status " + ScaNoBandits320.WiredStatus + ", SCA cel " + ScaNoBandits320.WiredGoal + ", BK " + _wBk + ", mysl AI " + _wThink
+                     + ", postawa BK " + _wStance + ", straznik " + NavGuard334.WiredText
                      + " | teatr Polnocy: osad w teatrze " + inT + " / poza " + outT + " | Wyspy: " + RangeText()
                      + " | stan z zapisu: najmow " + _hiredN + " (ostatni d." + _lastHireDay + "), osad Polnocy na odbicie " + _northHeld.Count + ", przed rozejmem partii korony " + _preTruceParties
                      + WarFront334Test.StartText() + ".");
@@ -499,6 +529,7 @@ namespace Armoury
                     try { TheatreLine(today); } catch (Exception e) { Stumble("TheatreLine", e); }
                     try { HireLine(today); } catch (Exception e) { Stumble("HireLine", e); }
                     try { CrownLine(today); } catch (Exception e) { Stumble("CrownLine", e); }
+                    try { StanceLine(today); } catch (Exception e) { Stumble("StanceLine", e); }
                 }
                 try { IronDaily(today, s.LogEnabled); } catch (Exception e) { Stumble("IronDaily", e); }
                 if (s.LogEnabled)
@@ -513,7 +544,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _dScaFront = _dScaRaw = 0; _dStumbles = 0;
-            ZeroTheatreDay(); ZeroIronDay(); ZeroHireDay();
+            ZeroTheatreDay(); ZeroIronDay(); ZeroHireDay(); ZeroStanceDay();
         }
 
         private static string Phase()
@@ -589,7 +620,7 @@ namespace Armoury
         {
             var sb = new StringBuilder(900);
             sb.Append(Tag).Append("dzien ").Append(today).Append(" | SCA (front ").Append(Key01(ScaFrontOn)).Append(", glowna wojna ").Append(Key01(ScaLockOn))
-              .Append("; ocen z F334 ").Append(_dScaFront).Append(", bez F334 ").Append(_dScaRaw).Append(')');
+              .Append("; ocen z F334 ").Append(_dScaFront).Append(", bez F334 ").Append(_dScaRaw).Append(", swoi koalicji 334c ").Append(Key01(ScaAllyOn)).Append(')');
             string[] ids = { CrownId, ReachId, IronId, NorthId, DragonstoneId };
             foreach (var id in ids)
             {
@@ -598,6 +629,7 @@ namespace Armoury
                 ScaRec r;
                 _sca.TryGetValue(id, out r);
                 sb.Append(" | [").Append(id).Append("] ").Append(Nm(k)).Append(": wrog ").Append(r != null ? F0(r.Raw) : "?").Append("->").Append(r != null && r.Used ? F0(r.Front) : "-")
+                  .Append(", swoi krolestwa ").Append(r != null && r.OwnRaw >= 0f ? F0(r.OwnRaw) : "?").Append("->koalicja ").Append(r != null && r.OwnCoal >= 0f ? F0(r.OwnCoal) : "-")
                   .Append(", ").Append(ScaNoBandits320.Brief(k));
             }
             Log.Info(sb.Append('.').ToString());
@@ -668,6 +700,10 @@ namespace Armoury
                     bool field = ty.IsAlive && !ty.IsPrisoner && tp != null && tp.CurrentSettlement == null;
                     sb.Append(" | Tywin: w polu ").Append(field ? "TAK" : "NIE").Append(" (").Append(!ty.IsAlive ? "nie zyje" : ty.IsPrisoner ? "w niewoli" : tp == null ? "bez druzyny"
                       : tp.CurrentSettlement != null ? "w " + Nm(tp.CurrentSettlement) : (tp.Army != null ? "armia " + (tp.Army.LeaderParty == tp ? "wodz" : "czlonek") : "druzyna")).Append(')');
+                    // 334c (B334-8): "na wojnie" = zywy, wolny, z druzyna, w armii albo w zasiegu frontu Polnocy (F334: 8.02 doby drogi) - samo krazenie wokol Lannisportu nie
+                    var nk = FindKingdom(NorthId);
+                    bool war = ty.IsAlive && !ty.IsPrisoner && tp != null && (tp.Army != null || (nk != null && Reaches(tp, nk)));
+                    sb.Append(", na wojnie ").Append(war ? "TAK" : "NIE");
                 }
             }
             catch (Exception e) { Stumble("CrownLine.tywin", e); }
@@ -817,6 +853,8 @@ namespace Armoury
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, WarFront334.OnSettlementEntered);
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarFront334.OnOwnerChanged);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, WarFront334Test.Hourly);
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, NavGuard334.Tick);          // 334c: naprawa partii z kolejki straznika pogody (watek glowny; pusta kolejka - jedno porownanie)
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, NavGuard334.Daily);    // 334c: linia "Pozycje partii (334c)" (kazda kampania)
         }
 
         public override void SyncData(IDataStore dataStore)

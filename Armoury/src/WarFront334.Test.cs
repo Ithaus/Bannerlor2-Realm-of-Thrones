@@ -81,6 +81,11 @@ namespace Armoury
                 WarFront334.Import(a);
                 string b = WarFront334.Export();
                 Say("T4 zapis Export/Import", a == b, "dlugosc " + a.Length);
+                // T6 (334c): regula postawy BK - 1 twierdza obronna, wrog >= 1.5 x obronna, sila >= 1.5 x wroga ofensywna, pomiedzy zwykla
+                bool t6 = WarFront334.StanceRule(1, 100, 100) == 1 && WarFront334.StanceRule(5, 100, 150) == 1 && WarFront334.StanceRule(5, 100, 149) == 0
+                          && WarFront334.StanceRule(5, 150, 100) == 2 && WarFront334.StanceRule(1, 300, 100) == 2 && WarFront334.StanceRule(5, 100, 0) == 2
+                          && WarFront334.StanceRule(5, 400, 380) == 0;
+                Say("T6 regula postawy BK (334c)", t6, "7 przypadkow");
                 // T5
                 if (!WarFront334.Canon) Log.Info(P + "T5 F334 policzone - kampania klasyczna - wynik POMINIETY.");
                 else
