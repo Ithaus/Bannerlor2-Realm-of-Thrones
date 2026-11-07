@@ -226,6 +226,7 @@ namespace Armoury
                         try { k.KingdomBudgetWallet += ip; } catch { h.ChangeHeroGold(ip); throw; }   // wyjatek - zloto wraca platnikowi (nic w nicosc)
                         got += ip; p.Paid = ip; sc.PaidN++;
                         _scPaid[p.C] = ip;
+                        if (h == Hero.MainHero) GoldForecast.NoteSub("KingdomTreasury.ScutagePlayer", -ip);   // 355: pobor W6b gracza - wlasna pozycja ksiegi kiesy (nie odcinek CrownRents.Daily)
                         CirculationWindows.NoteHeroGold(h, -ip);          // paczka 169b: glowa poza swiatem (Disabled) - zloto weszlo do swiata (tylko licznik)
                         if (ClanIncomeBook.FamilyGoldOf(p.C) < p.Reserve) _scBelowReserve++;   // kontrola: po poborze kiesa rodziny nie ponizej rezerwy (oczekiwane 0)
                     }

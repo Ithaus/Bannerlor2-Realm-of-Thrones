@@ -146,6 +146,23 @@ namespace Armoury
             catch (Exception e) { Stumble("Lap", e); }
         }
 
+        /// <summary>355 (Jeff 07.11: tarczowe W6b, ktore gracz PLACI, stalo w podpowiedzi jako "Rent from the crown"): zmiana kiesy gracza d (ujemna - pobor) wewnatrz
+        /// odcinka innego modulu idzie na wlasny klucz k, a granica odcinka przesuwa sie o d - nastepny Lap (np. "CrownRents.Daily") jej juz nie widzi. Suma taktu
+        /// (Tick) bez zmian - ta sama moneta tylko pod inna nazwa, nic liczone dwa razy. Wolac TUZ PO zmianie kiesy, tylko dla Hero.MainHero. Poza taktem - nic
+        /// (zmiana kiesy idzie wtedy "poza obiegiem", jak kazda inna poza taktem). Nie rzuca.</summary>
+        internal static void NoteSub(string name, long d)
+        {
+            if (!_inTick || _cur == null || d == 0) return;
+            try
+            {
+                string k = Key(name);
+                long o; _cur.Laps.TryGetValue(k, out o); _cur.Laps[k] = o + d;
+                _cur.Tick += d;
+                _lapGold += d;
+            }
+            catch (Exception e) { Stumble("NoteSub", e); }
+        }
+
         /// <summary>Koniec naszego taktu doby: ostatni odcinek, potem prognoza na te dobe (model z poprawkami, tak jak podpowiedz zlota). Nie rzuca.</summary>
         internal static void TickEnd()
         {
@@ -252,7 +269,8 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _clanWired = false; _clanWhy = "blad latki"; Log.Error("GoldForecast.ApplyAll", e); }
-            Log.Info(P + "start | rozliczenie rodu gracza (DailyTickClan) " + (_clanWired ? "wpiete" : "BRAK (" + _clanWhy + ")") + ".");
+            Log.Info(P + "start | rozliczenie rodu gracza (DailyTickClan) " + (_clanWired ? "wpiete" : "BRAK (" + _clanWhy + ")")
+                     + " | tarczowe gracza osobna pozycja (355).");   // 355: znacznik dla sprawdzarki (G8 - pobor W6b gracza pod kluczem KingdomTreasury.ScutagePlayer)
         }
 
         public static void ClanTickPrefix(Clan __0, out TickState __state)
@@ -602,6 +620,7 @@ namespace Armoury
             new[] { "TownFolk.", "Dues from your people (surplus tax, lord's rights)" },
             new[] { "Seal31B.OwnerTaxDaily", "Workshop owner tax to the towns" },
             new[] { "KingdomTreasury.WageRefund", "Wage refund from the crown" },
+            new[] { "KingdomTreasury.ScutagePlayer", "Scutage (shield money) to the crown" },   // 355: pobor W6b z kiesy gracza (NoteSub w ScCollect) - nie "Rent from the crown"
             new[] { "KingdomTreasury.", "Dues to the crown" }, new[] { "CrownIncome.", "Dues to the crown" }, new[] { "CrownWar314.", "Dues to the crown" },
             new[] { "CrownCallToWar.", "Dues to the crown" },
             new[] { "CrownRents.", "Rent from the crown" }, new[] { "CrownGifts.", "Gifts from the crown" }, new[] { "CrownBorrow.", "Crown loans" },

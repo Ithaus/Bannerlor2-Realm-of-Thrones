@@ -98106,9 +98106,10 @@ def main(argv):
 #  G0 start: rozliczenie rodu gracza (DailyTickClan) wpiete; G1 rozjazd prognozy (zrobionej na poczatku doby) wobec prawdziwej zmiany obiegu tej doby (rozliczenie rodu +
 #  takt doby + wozy prac): srednio |rozjazd| < 300 zl albo < 10% sredniego |naprawde| (>= 3 dob z prognoza, mniej - INFO); G2 jedno rozliczenie rodu na dobe (INFO);
 #  G3 potkniecia 0; G4 wsie do posiadaczy tytulu i inne roznice przy wyplacie (INFO); G5 poza obiegiem - handel, lupy, okupy, zakupy gracza (INFO).
+#  G8 (355): tarczowe W6b gracza pod kluczem KingdomTreasury.ScutagePlayer = -"zaplacil" linii W6 tej doby, etykieta "Scutage (shield money) to the crown".
 #   python -I tools/sprawdz_logi.py --grupa prognoza345 <Armoury-*.log>
 G345_P = "Prognoza zlota gracza (345): "
-G345_START = re.compile(r"Prognoza zlota gracza \(345\): start \| rozliczenie rodu gracza \(DailyTickClan\) (wpiete|BRAK.*?)\.$")
+G345_START = re.compile(r"Prognoza zlota gracza \(345\): start \| rozliczenie rodu gracza \(DailyTickClan\) (wpiete|BRAK.*?)( \| tarczowe gracza osobna pozycja \(355\))?\.$")
 G345_DAY = re.compile(r"Prognoza zlota gracza \(345\): dzien (-?\d+) \| klucz (TAK|NIE) \| rozliczenie rodu (\S+).*? \| prognoza wczoraj (?:(-?\d+) \(model (-?\d+), poprawki 345 (-?\d+): (.*?)\)|brak.*?) "
                       r"\| naprawde dzis (-?\d+) = rozliczenie (-?\d+) \((\d+)\) \+ takt doby (-?\d+) \+ wozy prac (-?\d+) \| rozjazd (\S+)(?: \((\S+)%\))? "
                       r"\| kiesa naprawde (-?\d+) \(poza obiegiem (-?\d+):")
@@ -98119,19 +98120,32 @@ G345_STUM = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
 G345_HIST = re.compile(r"\| historia (\d+) dob \|")
 G345_IRR = re.compile(r"\| nieregularne poza prognoza ([+-]?\d+) \(")
 # 352: pozycje korony tylko z dob w tym samym krolestwie; rod bez krolestwa - zadnej (G7: krolestwo brak -> dob historii 0 i moduly korony w prognozie 0)
+# 355: pobor tarczowego W6b z kiesy gracza - wlasny klucz ksiegi (nie odcinek CrownRents.Daily "Rent from the crown"); G8: klucz = -"zaplacil" linii W6 tej doby
+G345_SC_KEY = "KingdomTreasury.ScutagePlayer"
+G345_SC_LAB = "Scutage (shield money) to the crown"
+G345_SC = re.compile(r"KingdomTreasury\.ScutagePlayer ([+-]\d+) \[([^\]]*)\]")
+G345_MODS_CUT = re.compile(r"\| takt doby wedlug modulow: .*?, \.\.\. \(\d+ wiecej\) \|")
+G345_W6 = re.compile(r"Tarczowe \(W6\): dzien (-?\d+) \|.*\| gracz: .*?, dostal (-?\d+), zaplacil (-?\d+) \| na krolestwo:")
 G345_KNG = re.compile(r"\| korona prognozy \(352\): krolestwo (\S+), dob historii w tym krolestwie (\d+), moduly korony w prognozie (\d+) \|")
 
 
 def prognoza345_collect(logp):
-    D = {"start": [], "day": [], "bad": 0}
+    D = {"start": [], "day": [], "bad": 0, "m355": 0, "w6": {}}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             line = line.rstrip("\n").rstrip("\r")
+            if "Tarczowe (W6): dzien " in line:
+                mw = G345_W6.search(line)
+                if mw:
+                    D["w6"][int(mw.group(1))] = int(mw.group(3))   # 355: tarczowe zaplacone przez gracza tej doby (segment W6b)
+                continue
             if G345_P not in line:
                 continue
             if G345_P + "start |" in line:
                 m = G345_START.search(line)
                 D["start"].append(m.group(1) if m else "?")
+                if m and m.group(2):
+                    D["m355"] += 1
                 continue
             if G345_P + "dzien " not in line:
                 continue
@@ -98153,6 +98167,9 @@ def prognoza345_collect(logp):
             r["hist"] = int(mh.group(1)) if mh else 99
             mk = G345_KNG.search(line)
             r["kng"] = (mk.group(1), int(mk.group(2)), int(mk.group(3))) if mk else None
+            msc = G345_SC.search(line)
+            r["sc"] = (int(msc.group(1)), msc.group(2)) if msc else None
+            r["cut"] = bool(G345_MODS_CUT.search(line))
             D["day"].append(r)
     return D
 
@@ -98208,16 +98225,34 @@ def prognoza345_rows(rep, D):
                 "0 (bez dob bez krolestwa - INFO)", (len(bad) == 0) if nk else None)
     else:
         rep.add("G7: rod bez krolestwa - prognoza bez pozycji korony (352)", "brak pola 'korona prognozy (352)'", "INFO (log sprzed 352)", None)
+    # 355: tarczowe W6b gracza osobna pozycja ksiegi (nie w "Rent from the crown"): w kazdej dobie z linia 345 i linia W6 klucz = -zaplacil (brak klucza = 0 zaplacone;
+    # lista modulow ucieta do 20 bez klucza - doba pominieta), etykieta G345_SC_LAB. Log bez znacznika 355 w starcie - INFO (tarczowe jeszcze w odcinku CrownRents.Daily)
+    if not D["m355"]:
+        rep.add("G8: tarczowe gracza (W6b) osobna pozycja ksiegi (355)", "brak znacznika 355 w linii startu" + (f"; dob W6 z poborem u gracza {sum(1 for v in D['w6'].values() if v > 0)}" if D["w6"] else ""),
+                "INFO (log sprzed 355 - tarczowe w 'Rent from the crown')", None)
+    else:
+        both = [x for x in dd if x["day"] in D["w6"] and not (x["cut"] and x["sc"] is None)]
+        bad = []
+        for x in both:
+            paid = D["w6"][x["day"]]
+            v, lab = x["sc"] if x["sc"] else (0, G345_SC_LAB)
+            if v != -paid or lab != G345_SC_LAB:
+                bad.append(f"dzien {x['day']}: klucz {v:+d} [{lab}], W6 zaplacil {paid}")
+        npaid = sum(1 for x in both if D["w6"][x["day"]] > 0)
+        rep.add("G8: tarczowe gracza (W6b) osobna pozycja ksiegi (355) - klucz KingdomTreasury.ScutagePlayer = -zaplacil linii W6",
+                f"dob z linia 345 i W6 {len(both)}, z poborem u gracza {npaid}, niezgodnych {len(bad)}" + (f" (pierwsza: {bad[0]})" if bad else ""),
+                "0 niezgodnych (bez poboru u gracza - INFO)", (len(bad) == 0) if (npaid or bad) else None)
     rep.add("G5: poza obiegiem (handel, lupy, okupy, zakupy gracza - bez prognozy)", f"srednio {sum(x['out'] for x in dd) / len(dd):.0f} zl/dobe, kiesa srednio "
             f"{sum(x['purse'] for x in dd) / len(dd):.0f}", "INFO", None)
 
 
-def prognoza345_line(d, fc=-2600, t=-2622, diff=None, stum=0, n=1, key="TAK", irr=None, hist=7, kng=None):
+def prognoza345_line(d, fc=-2600, t=-2622, diff=None, stum=0, n=1, key="TAK", irr=None, hist=7, kng=None, sc=None):
     diff = (t - (irr or 0) - fc) if diff is None else diff
     irs = "" if irr is None else f" | nieregularne poza prognoza {irr:+d} (RansomFlows.Daily {irr:+d} [Ransoms])"
     return (G345_P + f"dzien {d} | klucz {key} | rozliczenie rodu wpiete, wydatki panelu wpiete | prognoza wczoraj {fc} (model 5190, poprawki 345 {fc - 5190}: wsie do posiadaczy tytulu -8161) "
             f"| naprawde dzis {t} = rozliczenie {t - 700} ({n}) + takt doby 675 + wozy prac 25 | rozjazd {diff:+d} (1.0%) | kiesa naprawde {t + 900} (poza obiegiem 900: handel, lupy, okupy, zakupy gracza){irs} "
-            f"| takt doby wedlug modulow: TownFolk.Daily +1142 [Dues from your people (surplus tax, lord's rights)] | rozliczenie: zmiana kiesy -3322, podglad modelu tuz przed 4839 "
+            f"| takt doby wedlug modulow: TownFolk.Daily +1142 [Dues from your people (surplus tax, lord's rights)]"
+            + ("" if sc is None else f", {G345_SC_KEY} {sc[0]:+d} [{sc[1]}]") + f" | rozliczenie: zmiana kiesy -3322, podglad modelu tuz przed 4839 "
             f"(warsztaty 752, wsie do gracza 0, do posiadaczy tytulu 8161), inne roznice 0"
             + ("" if kng is None else f" | korona prognozy (352): krolestwo {kng[0]}, dob historii w tym krolestwie {kng[1]}, moduly korony w prognozie {kng[2]}")
             + f" | srednio z 3 dob (sesja): |rozjazd| 22, |naprawde| 2622 | historia {hist} dob | potkniecia {stum} (sesja {stum}).")
@@ -98231,10 +98266,19 @@ def prognoza345_synth():
              "| naprawde dzis -2622 = rozliczenie -3322 (1) + takt doby 675 + wozy prac 25 | rozjazd - | kiesa naprawde -1700 (poza obiegiem 922: handel, lupy, okupy, zakupy gracza) "
              "| takt doby wedlug modulow: - | rozliczenie: brak w tej dobie | srednio z 0 dob (sesja): |rozjazd| 0, |naprawde| 0 | historia 1 dob | potkniecia 0 (sesja 0).")
 
-    def run(days=10, s=start, **kw):
+    s355 = start[:-1] + " | tarczowe gracza osobna pozycja (355)."
+
+    def w6(d, paid):
+        return (f"Tarczowe (W6): dzien {d} | wylacznik Scutage tak | ... | gracz: klucz Scutage Player Clan tak, ziemia (miasto albo zamek) tak, wasal krolestwa (nie wladca, nie najemnik) tak, "
+                f"krolestwo w wojnie tak -> warunki tak, pulap wlasny bez dworu 9000, podstawa gracza 4000, nadwyzka kiesy rodziny ponad rezerwe 90000, nalezne gracza 1000, dostal 0, zaplacil {paid} "
+                f"| na krolestwo: - | potkniecia 0.")
+
+    def run(days=10, s=start, w6paid=None, **kw):
         L = [s] if s else []
         L.append(first)
         for i in range(days):
+            if w6paid is not None:
+                L.append(w6(109500 + i, w6paid))
             L.append(prognoza345_line(109500 + i, **kw))
         return L
     runs = {
@@ -98243,6 +98287,14 @@ def prognoza345_synth():
         "kng": (run(kng=("battania", 6, 3)), {"G1": "TAK", "G7": "INFO"}),
         "nokng": (run(kng=("brak", 0, 0)), {"G1": "TAK", "G7": "TAK"}),
         "nokngbad": (run(kng=("brak", 6, 2)), {"G7": "NIE"}),
+        # 355: tarczowe gracza pod wlasnym kluczem (TAK), kwota rozna od W6 (NIE), pobor W6 bez klucza - zostal w "Rent from the crown" (NIE), stara etykieta (NIE),
+        # bez poboru u gracza (INFO), log sprzed 355 (INFO); G1 bez zmian (suma taktu ta sama)
+        "sc": (run(s=s355, w6paid=1000, sc=(-1000, G345_SC_LAB)), {"G0": "TAK", "G1": "TAK", "G8": "TAK"}),
+        "scamt": (run(s=s355, w6paid=1000, sc=(-900, G345_SC_LAB)), {"G8": "NIE"}),
+        "scmiss": (run(s=s355, w6paid=1000), {"G8": "NIE"}),
+        "sclab": (run(s=s355, w6paid=1000, sc=(-1000, "Rent from the crown")), {"G8": "NIE"}),
+        "sczero": (run(s=s355, w6paid=0), {"G8": "INFO"}),
+        "scold": (run(w6paid=1000), {"G0": "TAK", "G8": "INFO"}),
         "far": (run(fc=5190), {"G1": "NIE"}),
         "pct": (run(fc=-20000, t=-24000), {"G1": "NIE"}),
         "bigok": (run(fc=-20000, t=-21000), {"G1": "TAK"}),
@@ -98276,7 +98328,7 @@ def prognoza345_main(logp):
         s2 = prognoza345_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("G345-S: test syntetyczny (dobry 10 dob; 347 nieregularne okupy poza prognoza / wliczone; prognoza z oknem +5190, rozjazd ponad 10%, duzy obieg w 10%, krotki bieg, potkniecia, rozliczenie BRAK, bez startu, log sprzed 345; 352 krolestwo / bez krolestwa / bez krolestwa z korona)",
+    rep.add("G345-S: test syntetyczny (dobry 10 dob; 347 nieregularne okupy poza prognoza / wliczone; prognoza z oknem +5190, rozjazd ponad 10%, duzy obieg w 10%, krotki bieg, potkniecia, rozliczenie BRAK, bez startu, log sprzed 345; 352 krolestwo / bez krolestwa / bez krolestwa z korona; 355 tarczowe gracza osobno / kwota / brak klucza / stara etykieta / bez poboru / log sprzed 355)",
             s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("G345-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
