@@ -525,7 +525,7 @@ namespace Armoury
                 var main = MobileParty.MainParty;
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.TradeItemPriceFactorModel : null;
                 if (s == null || main == null || model == null) return;
-                if (!LogGate.Lines)
+                if (!LogGate.ProbeLines)   // 358: sonda cen gracza (ok. 30 ms) co 28 dob zamiast co 7 (LogGate.ProbeLines); liczniki doby i tak zeruje finally
                 {
                     if (_dayErrors > 0) Log.Info("Targ gracza (300b): dzien " + day + " | potkniecia " + _dayErrors + ".");
                     return;

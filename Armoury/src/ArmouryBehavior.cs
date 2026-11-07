@@ -2992,10 +2992,13 @@ namespace Armoury
             {
                 try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); }
                 DayProfile.Lap("RawPrice.Daily");     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)
-                try { PriceWalk299.Daily(); } catch (Exception e) { Log.Error("PriceWalk299.Daily", e); }   // paczka 299: sonda kroku ceny na sztuke (gra vs 299, tylko odczyt)
-                DayProfile.Lap("PriceWalk299.Daily"); // recenzja 299: koszt sondy osobnym odcinkiem profilu doby
-                try { PriceWalk299b.Daily(); } catch (Exception e) { Log.Error("PriceWalk299b.Daily", e); }   // 299b: sonda pamieci podazy i ceny sprzetu na sztuke (tylko odczyt)
-                DayProfile.Lap("PriceWalk299b.Daily");
+                if (LogGate.ProbeLines)   // 358: sondy cen (ok. 230 ms, tylko log) w co czwartej dobie pomiaru (co 28 dob przy QuietLogEveryDays 7); autotest co dobe jak dotad
+                {
+                    try { PriceWalk299.Daily(); } catch (Exception e) { Log.Error("PriceWalk299.Daily", e); }   // paczka 299: sonda kroku ceny na sztuke (gra vs 299, tylko odczyt)
+                    DayProfile.Lap("PriceWalk299.Daily"); // recenzja 299: koszt sondy osobnym odcinkiem profilu doby
+                    try { PriceWalk299b.Daily(); } catch (Exception e) { Log.Error("PriceWalk299b.Daily", e); }   // 299b: sonda pamieci podazy i ceny sprzetu na sztuke (tylko odczyt)
+                    DayProfile.Lap("PriceWalk299b.Daily");
+                }
                 try { PriceBand306.Daily(); } catch (Exception e) { Log.Error("PriceBand306.Daily", e); }   // 306a: linia "Pasmo cen od przewozu (306a)" (tylko odczyt)
                 DayProfile.Lap("PriceBand306.Daily");
             }

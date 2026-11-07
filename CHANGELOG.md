@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## 358 - sondy cen (PriceWalk299, PriceWalk299b, PlayerHaggle) co 28 dob zamiast co 7 (LogGate.ProbeLines; Armoury.dll e36391fd, NIE WGRANE)
+**Problem:** co 7 dob szczyt zaciecia o polnocy ok. 1.2-1.3 s (analiza 07.11: sondy cen razem ok. 257 ms - PriceWalk299b ~165, PriceWalk299 ~62, PlayerHaggle ~30 ms w "Profil doby (E8/0)"); sondy tylko pisza do logu. Jeff 07.11: "tak rob punkt 1".
+**Zmiana:** LogGate.ProbeLines = doba pomiaru co N x ceil(28/N) (N = QuietLogEveryDays; u Jeffa 7 -> co 28 dob, podzbior dob Lines); PriceWalk299/299b w bloku LogGate.Lines dodatkowo pod ProbeLines; PlayerHaggle.Daily brama Lines -> ProbeLines (liczniki doby dalej zeruje finally co dobe, RebuyLedger.Expire przed brama bez zmian). RawPrice "Ceny surowcow" i PriceBand306 dalej co 7 dob. Ciche logi wylaczone albo co dobe (autotest) - jak dotad.
+**Ryzyko / co sprawdzic:** sondy bezstanowe (PriceWalk299._sample tylko pamiec probek); w logach Jeffa C299-1 ("linie 299 w >= 95% dob z Ceny surowcow") nie bedzie spelnione - sprawdzarke 299/300b liczyc tylko na autotescie. Test - czeka na zamkniecie gry.
+**Status:** NIE WGRANE (gra Jeffa wlaczona 08.11).
+
 ## 357 + WGRANIE 177 - poranny meldunek kwatermistrza 6 h po takcie doby (MorningLater357; Armoury.dll 65f9c35e, CrashScribe bez zmian)
 **Problem:** zaciecie mapy raz na dobe (Jeff 07.11: "monitoruj czy nie da sie zrobic gry max plynnej", zaciecie o polnocy - "tak"). Dowod: Armoury-2026-11-07_20-51-37.log (sesja Jeffa), "Profil doby (E8/0)" dzien 109602: takt doby 876.7 ms, najwieksza pozycja MorningReport 177.4 ms (dalej SupplyDemand 117.6, ClanIncomeBook 87.0, KingdomTreasury 67.5).
 **Przyczyna:** QuartermasterLaw.ShoutShortages("QM morning") na koncu OnDailyTickBodyInner liczy podglad bitwy (KitPreview) w tej samej klatce co caly takt doby.

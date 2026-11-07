@@ -77,6 +77,21 @@ namespace Armoury
         /// <summary>Linie w takcie doby - za wczoraj (takt doby S+1 pisze doba S).</summary>
         internal static bool Lines { get { return FullDay(DayNow() - 1); } }
 
+        /// <summary>358 (Jeff 07.11 "tak rob punkt 1"): drogie sondy cen tylko do logu (PriceWalk299, PriceWalk299b, PlayerHaggle - razem ok. 257 ms w takcie doby,
+        /// szczyt zaciecia co 7 dob ok. 1.2 s) w co czwartej dobie pomiaru: N x ceil(28/N) (przy N = 7 co 28 dob). Ciche logi wylaczone albo co dobe (autotest,
+        /// tryb nie rozpoznany) - jak Lines, czyli sprawdzarka C299/300b dostaje linie co dobe jak dotad.</summary>
+        internal static bool ProbeLines
+        {
+            get
+            {
+                if (!On) return true;
+                int n = Every;
+                if (n <= 1) return true;
+                int every = n * ((28 + n - 1) / n);
+                return (DayNow() - 1) % every == 0;
+            }
+        }
+
         private static int Detect()
         {
             try
