@@ -69,7 +69,10 @@ namespace Armoury
         private static readonly Dictionary<Clan, long> _ownCastleByClan = new Dictionary<Clan, long>();      // 110: "wlasne" dzis z zaworu zamkow
         private static readonly Dictionary<Clan, long> _gersByClan = new Dictionary<Clan, long>();           // f19-e3: gersuma f7-kasy dzis (czesc pana z miast rodu) - "jednorazowe", nie "ziemia"
         private static readonly Dictionary<Clan, List<Settlement>> _villagesOf = new Dictionary<Clan, List<Settlement>>();   // dzis: wsie wedlug posiadacza (BK)
-        private static readonly Dictionary<Clan, long> _vTaxOf = new Dictionary<Clan, long>();                // dzis: suma podatku wsi posiadacza (do porownania z linia modelu)
+        private static readonly Dictionary<Clan, long> _vTaxOf = new Dictionary<Clan, long>();
+        // 345 (klucz LandDuesFollowTitleHolder): podatek wsi wyjety z rodu (w jego linii modelu, BK placi gdzie indziej) i dodany rodowi posiadacza de iure (spoza jego linii) -
+        // porownanie linii modelu z suma podatku (ziemia bez osady) liczy je z powrotem, inaczej przeniesiony podatek wracalby do rodu jako "ziemia bez osady"
+        private static readonly Dictionary<Clan, long> _vMovedOut = new Dictionary<Clan, long>(), _vMovedIn = new Dictionary<Clan, long>();                // dzis: suma podatku wsi posiadacza (do porownania z linia modelu)
         private static readonly Dictionary<Clan, int> _cutToday = new Dictionary<Clan, int>();               // zold przyciety z braku w kiesie (SoldierPay) od ostatniego Daily
         private static readonly Dictionary<Clan, int> _bankrupt = new Dictionary<Clan, int>();               // doby z rzedu: kiesa glowy 0 i zold przyciety (K39)
         private static readonly HashSet<Clan> _cutBlind = new HashSet<Clan>();                                // dzis: zold przyciety "na slepo" (saldo nieznane, kiesa glowy 0 - SoldierPay)
@@ -89,6 +92,9 @@ namespace Armoury
         // wsie bez danych BK (pominiete, zeby nie wolac GetPopData -> InitializeSettlementPops); podatek wsi do posiadacza de iure innego niz glowa rodu
         private static int _dVNoPop, _dDeJureN, _dDeJureOtherN;
         private static long _dDeJureGold, _dDeJureOtherGold;
+        // 345 (klucz LandDuesFollowTitleHolder): podatek wsi przeniesiony do rodu posiadacza de iure z innego rodu / wies bez posiadacza de iure (BK pali podatek - bez ziemi)
+        private static int _dLandMovedN, _dLandLostN;
+        private static long _dLandMovedGold, _dLandLostGold;
         // koszt D stalego w tej dobie (Stopwatch; prog projektu: +3% czasu doby)
         private static long _ticksStableBegin, _ticksStableClans;
         internal static long LastTicksStableBegin, LastTicksStableClans, LastTicksStableLine;
@@ -109,7 +115,7 @@ namespace Armoury
             _gersByClan.Clear(); _dGers = 0; _dGersRent = 0;   // f19-e3; recenzja calosci 18/19.10
             _rNeedCut.Clear();   // recenzja calosci 18.10
             _stSaved.Clear(); _stImportN = -1; _stImportBad = 0;   // f19-e3
-            _villagesOf.Clear(); _vTaxOf.Clear(); _cutToday.Clear(); _cutBlind.Clear(); _bankrupt.Clear(); _bankruptBlind.Clear(); _unknown.Clear(); DayEstates = 0;
+            _villagesOf.Clear(); _vTaxOf.Clear(); _vMovedOut.Clear(); _vMovedIn.Clear(); _cutToday.Clear(); _cutBlind.Clear(); _bankrupt.Clear(); _bankruptBlind.Clear(); _unknown.Clear(); DayEstates = 0;
             ZeroStableDay();
             LastTicksStableBegin = LastTicksStableClans = LastTicksStableLine = 0;
             _namesDone = false; _bkDone = false; _mActual = null; _mVTax = null; _mPopulated = null; _mGetTitle = null;
@@ -123,6 +129,7 @@ namespace Armoury
             _dVdOff = _dLooseN = _dClans = 0;
             _dKnown = _dUnlisted = _dUnrec = _dUnrecAbs = 0;
             _dVNoPop = _dDeJureN = _dDeJureOtherN = 0; _dDeJureGold = _dDeJureOtherGold = 0;
+            _dLandMovedN = _dLandLostN = 0; _dLandMovedGold = _dLandLostGold = 0;   // 345
             _ticksStableBegin = _ticksStableClans = 0;
         }
 
@@ -270,7 +277,7 @@ namespace Armoury
 
         private static void StableBeginBody()
         {
-            _unknown.Clear(); _ownByClan.Clear(); _ownCastleByClan.Clear(); _villagesOf.Clear(); _vTaxOf.Clear(); _gersByClan.Clear();
+            _unknown.Clear(); _ownByClan.Clear(); _ownCastleByClan.Clear(); _villagesOf.Clear(); _vTaxOf.Clear(); _vMovedOut.Clear(); _vMovedIn.Clear(); _gersByClan.Clear();
             ResolveNames();
             ResolveBk();
             CdBegin();   // m105-optym (OptimStableDelegates, ClanIncomeBook.Optim105.cs): wywolania BK nizej przez delegaty (klucz NIE - odbicie jak dotad)
@@ -320,6 +327,9 @@ namespace Armoury
                     if (!actual) h = v.Settlement.OwnerClan;
                     RingOf(_rVTax, v.Settlement).Push(h != null ? t : 0);
                     if (h == null) continue;
+                    Clan hD = h;   // 345: rod, ktoremu BK przy wyplacie naprawde daje ten podatek (klucz LandDuesFollowTitleHolder; wylaczony - posiadacz faktyczny jak dotad)
+                    var s345 = Settings.Current;
+                    bool follow = s345 != null && s345.LandDuesFollowTitleHolder;
                     // przeglad 169c (tylko pomiar): przy prawdziwej wyplacie BK oddaje podatek wsi posiadaczowi de iure, gdy nie jest nim glowa rodu
                     // (BK `ClanFinancesPatches.VillageIncomePrefix`: title.deJure != clan.Leader -> ApplyWithdrawal(..., deJure)); linia modelu
                     // (applyWithdrawals = false), D169 i "ziemia" licza go posiadaczowi faktycznemu - 166 wezmie rod posiadacza de iure
@@ -332,15 +342,32 @@ namespace Armoury
                             if (dj != null && dj != h.Leader)
                             {
                                 _dDeJureN++; _dDeJureGold += t;
-                                if (dj.Clan != h) { _dDeJureOtherN++; _dDeJureOtherGold += t; }
+                                if (dj.Clan != h)
+                                {
+                                    _dDeJureOtherN++; _dDeJureOtherGold += t;
+                                    // 345: BK placi temu posiadaczowi (payTo.Gold += podatek) - ziemia (powinnosci, W5/W6, cena ziemi) u jego rodu, nie u posiadacza faktycznego
+                                    if (follow && dj.IsAlive && dj.Clan != null && !dj.Clan.IsEliminated && dj.Clan.Leader != null) { hD = dj.Clan; _dLandMovedN++; _dLandMovedGold += t; }
+                                    // 345r: zywy posiadacz bez rodu (albo rod wybity / bez glowy) - BK i tak placi jemu (payTo.Gold), nie rodowi posiadacza faktycznego; ziemi rod nie ma
+                                    else if (follow && dj.IsAlive) { hD = null; _dLandLostN++; _dLandLostGold += t; }
+                                }
+                                // 345: posiadacz de iure niezywy - BK dopisuje zloto zmarlemu (payTo.Gold), nikt go nie wyda; ziemi nikt z tego nie ma
+                                if (follow && !dj.IsAlive) { hD = null; _dLandLostN++; _dLandLostGold += t; }
+                            }
+                            else if (follow && title != null && dj == null)
+                            {
+                                // 345: tytul bez posiadacza de iure - BK przy wyplacie zdejmuje licznik i nie placi nikomu (ApplyWithdrawal(..., null)); ziemi nikt z tego nie ma
+                                hD = null; _dLandLostN++; _dLandLostGold += t;
                             }
                         }
                         catch (Exception e) { Stumble("StableBegin(tytul wsi)", e); }
                     }
+                    if (!ReferenceEquals(hD, h)) { long mo; _vMovedOut.TryGetValue(h, out mo); _vMovedOut[h] = mo + t; }
+                    if (hD != null && !ReferenceEquals(hD, h)) { long mi; _vMovedIn.TryGetValue(hD, out mi); _vMovedIn[hD] = mi + t; }
+                    if (hD == null) { _dVdCalc += t; continue; }   // 345: wies bez posiadacza de iure (BK pali podatek) - bez ziemi u nikogo
                     List<Settlement> l;
-                    if (!_villagesOf.TryGetValue(h, out l)) { l = new List<Settlement>(); _villagesOf[h] = l; }
+                    if (!_villagesOf.TryGetValue(hD, out l)) { l = new List<Settlement>(); _villagesOf[hD] = l; }
                     l.Add(v.Settlement);
-                    long s0; _vTaxOf.TryGetValue(h, out s0); _vTaxOf[h] = s0 + t;
+                    long s0; _vTaxOf.TryGetValue(hD, out s0); _vTaxOf[hD] = s0 + t;
                     _dVdCalc += t;
                 }
                 catch (Exception e) { Stumble("StableBegin(podatek wsi)", e); }
@@ -518,6 +545,8 @@ namespace Armoury
             else loose += wd;
             // podatek wsi: linia modelu wobec sumy podatku wsi posiadacza (ta sama funkcja BK) - nadwyzka linii idzie do ziemi bez osady
             long calc; _vTaxOf.TryGetValue(c, out calc);
+            long mOut345, mIn345; _vMovedOut.TryGetValue(c, out mOut345); _vMovedIn.TryGetValue(c, out mIn345);
+            calc += mOut345 - mIn345;   // 345: linia modelu rodu liczy wsie tak jak przed przeniesieniem (podglad BK) - przeniesiony podatek nie wraca jako ziemia bez osady
             if (vd > calc) loose += vd - calc;
             if (Math.Abs(vd - calc) > 1) _dVdOff++;
             RingOf(_rLoose, c).Push(loose);
@@ -900,6 +929,9 @@ namespace Armoury
               .Append("; bankruci Banku: ").Append(bankIb).Append("; oba: ").Append(bankBoth).Append(')')
               .Append(" | podatek wsi BK przy wyplacie do posiadacza de iure innego niz glowa rodu: ").Append(_dDeJureN).Append(" wsi, ").Append(_dDeJureGold)
               .Append(" zl dzis (z innego rodu ").Append(_dDeJureOtherN).Append(" wsi, ").Append(_dDeJureOtherGold).Append(" zl) - w D169 i ziemi u posiadacza faktycznego")
+              .Append(" | 345 ziemia za tytulem (klucz Land Dues Follow Title Holder ").Append(Settings.Current != null && Settings.Current.LandDuesFollowTitleHolder ? "TAK" : "NIE")
+              .Append("): przeniesione do rodu posiadacza de iure ").Append(_dLandMovedN).Append(" wsi, ").Append(_dLandMovedGold).Append(" zl, bez zywego posiadacza de iure (BK pali podatek albo daje zmarlemu) ")
+              .Append(_dLandLostN).Append(" wsi, ").Append(_dLandLostGold).Append(" zl")
               .Append(" | wsie bez danych BK (podatek pominiety): ").Append(_dVNoPop)
               .Append(" | czas D stalego (ms na dobe): poczatek doby ").Append(Ms(_ticksStableBegin)).Append(", rozbicie rodow ").Append(Ms(_ticksStableClans))
               .Append(", linia poprzedniej doby ").Append(Ms(LastTicksStableLine)).Append("; dochod modelu z opisami (caly) ").Append(Ms(LastTicksModel))

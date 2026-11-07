@@ -192,6 +192,7 @@ namespace Armoury
                 KingdomTreasury.ApplyAll(_harmony);
                 try { CrownIncome.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CrownIncome.ApplyAll", e); }   // 165: reparacje Diplomacy jako dlug korona-korona, splata dlugu wobec korony do skarbca
                 try { SoldierPay.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SoldierPay.ApplyAll", e); }   // zold do obiegu: sakiewki ludzi, kasy osad, zwrot ze skarbca
+                try { GoldForecast.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GoldForecast.ApplyAll", e); }   // 345: ksiega kiesy gracza - rozliczenie rodu gracza (po SoldierPay)
                 WearKeep.ApplyAll(_harmony);
                 HistoricalPrices.ApplyAll(_harmony);
                 try { SmithXpRule.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SmithXpRule.ApplyAll", e); }   // 305d: jedna zasada XP za prace kowala (stamina x 7 x tier x nauka) - wolne kucie, CRAFT BK, zlecenia; slowa zrodel do linii dobowej
