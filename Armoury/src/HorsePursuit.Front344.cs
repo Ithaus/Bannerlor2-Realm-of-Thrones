@@ -77,6 +77,7 @@ namespace Armoury
             public bool KFull, KContact, FOpen, LongNoted;
             public bool KPend, KPPs;   // 347b A344-3b: kontra bez jezdzcow na strzelcu czeka na KontraTake (KontraConfirm); KPPs - weszla z powrotu PS
             public bool KEmptyOn;   // 347b-r: pusta kontra juz policzona w tym epizodzie (do kontry z jezdzcami albo passu bez warunku kontry)
+            public float EvAt = -1000f, KPAt;   // 347d: chwila narodzin zdarzenia A344-2; At powrotu PS sprzed kontry czekajacej (przywracany przy pustej)
             public string KPWhy;
             public int FBack, Esc;
             public readonly List<float> FPend = new List<float>();   // 344r: trafienia w F czekajace na reakcje (A344-8)
@@ -259,9 +260,27 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>347d: szyk, ktorego Take nie ruszy - oslona / zwarcie 283 (CavBlock) albo bez wolnych w ostatnim przegladzie kontry (NoFreeF).</summary>
+        private static bool GBlocked(Threat t, FI fi, float now)
+        {
+            float u;
+            if (NoFreeF.TryGetValue(fi.F, out u) && now < u) return true;
+            return CavBlock(t, fi);
+        }
+
+        /// <summary>347d: wolni ludzie szyku (bez jezdzcow 204 z tego szyku na jakimkolwiek strzelcu).</summary>
+        private static int GFree(FI fi)
+        {
+            int r;
+            FormRiders.TryGetValue(fi.F, out r);
+            return Math.Max(0, fi.N - r);   // FormRiders po h.F ze startu - po TransferUnits moze sie rozjechac (clamp)
+        }
+
         /// <summary>Szyki G (jezdzcy 204 + szyki trafione w ZGKeep s) do GList; bez nich najblizszy szyk konnicy AI w smyczy. Zwraca d (strzelec - najblizszy jezdziec /
-        /// krawedz szyku G), gN - ludzi G.</summary>
-        private static float GNear(Threat t, Vec2 sp, float now, out int gN)
+        /// krawedz szyku G), gN - ludzi G, ktorych da sie wyslac (wolni szykow G + jezdzcy juz na strzelcu), gAll - ludzi szykow G bez filtra wolnych.
+        /// 347d (at347 'kontra bez wolnych jezdzcow': l.804 przerwa HuntCool 5/5, l.2113 jedyny wolny juz w poscigu, l.3813 / l.3858 oslona przed jazda 283): szyk,
+        /// ktorego Take nie ruszy (GBlocked) albo bez wolnych (GFree 0), nie wchodzi do G ani do przewagi; zapasowy wybor bierze najblizszy szyk z wolnymi.</summary>
+        private static float GNear(Threat t, Vec2 sp, float now, out int gN, out int gAll)
         {
             var q = t.Q;
             for (int i = 0; i < t.Hs.Count; i++)
@@ -275,6 +294,7 @@ namespace Armoury
             GTmp.Clear();
             GList.Clear();
             gN = 0;
+            gAll = 0;
             float d = float.MaxValue;
             var fl = HForms[t.Side];
             foreach (var kv in q.GF)
@@ -283,25 +303,31 @@ namespace Armoury
                 if (i < 0) continue;
                 var fi = fl[i];
                 if (!fi.Cav || fi.Ha || fi.Player || fi.Retreat) continue;   // recenzja 344 W4: konni lucznicy nie jada w K - bez nich w przewadze
+                gAll += fi.N;
+                int fr = GFree(fi);
+                if (fr <= 0 || GBlocked(t, fi, now)) continue;   // 347d
                 GList.Add(fi.F);
-                gN += fi.N;
+                gN += fr;
                 float e = Math.Max(0f, sp.Distance(fi.Rest) - fi.R);
                 if (e < d) d = e;
             }
             if (GList.Count == 0)
             {
-                int best = -1;
-                float bd = float.MaxValue;
+                int best = -1, bestRaw = -1;
+                float bd = float.MaxValue, bdRaw = float.MaxValue;
                 for (int i = 0; i < fl.Count; i++)
                 {
                     var fi = fl[i];
                     if (!fi.Cav || fi.Ha || fi.Player || fi.Retreat) continue;
                     float e = Math.Max(0f, sp.Distance(fi.C) - fi.R);
-                    if (e > _maxFrom || e >= bd) continue;
+                    if (e > _maxFrom) continue;
+                    if (e < bdRaw) { bdRaw = e; bestRaw = i; }
+                    if (e >= bd || GFree(fi) <= 0 || GBlocked(t, fi, now)) continue;   // 347d: najblizszy szyk, ktory ma wolnych
                     bd = e;
                     best = i;
                 }
-                if (best >= 0) { GList.Add(fl[best].F); gN = fl[best].N; d = bd; }
+                if (gAll == 0 && bestRaw >= 0) gAll = fl[bestRaw].N;
+                if (best >= 0) { GList.Add(fl[best].F); gN = GFree(fl[best]); d = bd; }
             }
             for (int i = 0; i < t.Hs.Count; i++)
             {
@@ -310,8 +336,10 @@ namespace Armoury
                 float e = h.A.Position.AsVec2.Distance(sp);
                 if (e < d) d = e;
             }
+            // 347d: jezdzcy juz na strzelcu (w FormRiders odjeci od wolnych swojego szyku) - dodani z powrotem
             int riders = RidersOf(t);
-            if (gN < riders) gN = riders;
+            gN += riders;
+            if (gAll < riders) gAll = riders;
             return d;
         }
 
@@ -403,13 +431,13 @@ namespace Armoury
             q.GPrev = g;
             int riders = RidersOf(t);
             _zFullBefore = riders;
-            int gN;
-            float d = GNear(t, sp, now, out gN);
+            int gN, gAll;
+            float d = GNear(t, sp, now, out gN, out gAll);
             bool closing = Closing(q, d, now);
             bool hitRw = now - q.HitAt <= ZHitRecent && q.HitD <= ZRw;
             bool hitRb = now - q.HitAt <= ZHitRecent && q.HitD <= ZRb;
             bool hitRs = now - q.HitAt <= ZHitRecent && q.HitD <= ZRs;   // recenzja 344 W2: strzelec poza oslona strzelajacy z 40-60 m - tez kontra
-            int esc = gN > 0 ? Escort(m, s, sp) : 0;
+            int esc = gAll > 0 ? Escort(m, s, sp) : 0;   // 347d: eskorta i 'bez przewagi' wedlug calej konnicy G (takze zablokowanej)
             q.Esc = esc;
             bool adv = gN > 0 && gN >= 2 * (1 + esc);
             bool faster = Faster(t, s);
@@ -420,9 +448,9 @@ namespace Armoury
             // A344-2: zdarzenie "strzelec poza oslona zbliza sie / trafia z Rw" przy przewadze - czeka na K / R
             bool ev = !t.Group && adv && outCover && (closing || hitRw) && d <= ZRw;
             // poczatek zdarzenia: trafienie z Rw poza oslona (OnRiderShot344) albo ten pass - reakcja liczona od trafienia (pass co 1 s)
-            if (ev && q.St != SK && q.CondAt < 0f) { q.CondAt = now - q.HitEvAt <= 1.5f ? q.HitEvAt : now; _z4Ev++; }
+            if (ev && q.St != SK && q.CondAt < 0f) { q.CondAt = now - q.HitEvAt <= 1.5f ? q.HitEvAt : now; q.EvAt = now; _z4Ev++; }
             else if (!ev && q.St != SK && q.CondAt >= 0f) { q.CondAt = -1f; _z4Miss++; }
-            if (!adv && gN > 0 && (closing || hitRw) && outCover) { _z4NoAdv++; q.NoAdvAt = now; }
+            if (!adv && gAll > 0 && (closing || hitRw) && outCover) { _z4NoAdv++; q.NoAdvAt = now; }
             PendCheck(q, now);
             FPendCheck(q, now);
             if (riders > 0 && q.St == SW) { q.St = SP; q.At = now; q.BestD = d; q.BestDAt = now; }
@@ -673,7 +701,6 @@ namespace Armoury
         /// <summary>K: caly G na strzelca (full) albo tylko obecni jezdzcy (odruch R); czas reakcji A344-2.</summary>
         private static void EnterK(Threat t, St344 q, float now, bool full, string why)
         {
-            FClose(q);
             int n = 0;
             for (int i = 0; i < t.Hs.Count; i++)
             {
@@ -685,6 +712,11 @@ namespace Armoury
             }
             bool was = q.St == SK;
             bool fromPs = q.St == SPS;
+            bool pend = !was && full && n == 0;
+            // 347d: kontra czekajaca z powrotu PS nie zamyka frontu i nie kasuje ludzi powrotu (pusta - powrot trwa dalej, KontraConfirm)
+            bool keepPs = pend && fromPs;
+            if (!keepPs) FClose(q);
+            float at0 = q.At;
             q.St = SK;
             q.At = now;
             q.KFull = full || q.KFull;
@@ -692,12 +724,13 @@ namespace Armoury
             q.BestD = float.MaxValue;
             q.BestDAt = now;
             q.PressAt = -1f;
-            q.Men.Clear();
+            if (!keepPs) q.Men.Clear();
             // 347b A344-3b: nowa kontra calego G bez nikogo na strzelcu liczy sie (odpowiedz, kontra, linia) dopiero, gdy KontraTake kogos wysle (KontraConfirm)
-            if (!was && full && n == 0)
+            if (pend)
             {
                 q.KPend = true;
                 q.KPPs = fromPs;
+                q.KPAt = at0;
                 q.KPWhy = why;
                 return;
             }
@@ -731,14 +764,39 @@ namespace Armoury
             if (!q.KPend) return;
             q.KPend = false;
             if (q.St != SK) return;
-            if (sent > 0 || RidersOf(t) > 0) { KCount(t, q, now, false, true, q.KPWhy, 0); return; }
+            if (sent > 0 || RidersOf(t) > 0)
+            {
+                if (q.KPPs) { FClose(q); q.Men.Clear(); }   // 347d: kontra z powrotu potwierdzona - jak dotad w EnterK
+                KCount(t, q, now, false, true, q.KPWhy, 0);
+                return;
+            }
             if (!q.KEmptyOn) { q.KEmptyOn = true; _z4KEmpty++; }   // 347b-r: raz na epizod (SW ponawia EnterK co pass, poki kc)
             if (q.KPPs && _z4PsK > 0) _z4PsK--;
             float cond = q.CondAt;
-            q.St = SW;
-            Leave(t, q, now, false);
-            q.CondAt = cond;
-            q.KFull = false;
+            // 347d (at347 l.970: 2 zdarzenia bez odpowiedzi = 2 puste kontry): zdarzenie A344-2 urodzone w tym passie z przewagi, ktorej Take nie potwierdzil -
+            // cofniete (jak brak przewagi: bez Miss, trafienia A344-4 zdjete przez NoAdvAt); zdarzenie starsze zostaje jak dotad
+            if (cond >= 0f && q.EvAt == now)
+            {
+                if (_z4Ev > 0) _z4Ev--;
+                cond = -1f;
+                _z4NoAdv++;
+            }
+            q.NoAdvAt = now;
+            if (q.KPPs)
+            {
+                // 347d: pusta kontra z powrotu - powrot PS trwa dalej (PsUntil, ludzie, szyki bez capu marszu), bez Leave
+                q.St = SPS;
+                q.At = q.KPAt;
+                q.CondAt = cond;
+                q.KFull = false;
+            }
+            else
+            {
+                q.St = SW;
+                Leave(t, q, now, false);
+                q.CondAt = cond;
+                q.KFull = false;
+            }
             if (t.S == null || !KEmptySeen.Add(t.S.Index)) return;
             var sb = new StringBuilder();
             for (int i = 0; i < NwKinds; i++) if (KtNo[i] > 0) sb.Append(sb.Length > 0 ? ", " : "").Append(i).Append(':').Append(KtNo[i]);

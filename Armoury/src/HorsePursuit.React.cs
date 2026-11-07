@@ -425,6 +425,15 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>347d (344 GNear): szyk, ktorego Take nie ruszy wedlug CavAllowed - te same warunki, bez licznikow RKeptF / RPfF (PullWhy bez skutkow ubocznych).
+        /// Zmiana warunkow w CavAllowed = ta sama zmiana tutaj.</summary>
+        private static bool CavBlock(Threat t, FI fi)
+        {
+            if (!_rKey) return false;
+            if (fi.Engaged) return PullWhy(t, fi) == 0;
+            return fi.Pf && !t.Leader && EnemyCavNear(t.SSide, fi.C, fi.R);
+        }
+
         private static void NotePull(int pull, int n)
         {
             if (pull <= 0 || n <= 0) return;

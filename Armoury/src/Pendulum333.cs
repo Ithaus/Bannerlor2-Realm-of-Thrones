@@ -215,6 +215,9 @@ namespace Armoury
         // 344r: czas w prefiksach w watku AI (czekanie na lock / praca, ticki Stopwatch), zgubione linie, krok naprzod w martwej strefie, szyki stojace, taktyki
         private static long _aiWait, _aiWaitMax, _aiWork, _aiWorkMax;
         private static int _aiN, _lost, _fwdStep, _still, _stuck, _tacBlink, _arrFireAcc;
+        // 347d (B344-6c / B344-1b, diagnostyka): linie szyku stojacego z celem naprzod i cofniecia srodka ciezkosci (najwyzej MaxDiagLines kazdej na misje)
+        private const int MaxDiagLines = 16;
+        private static int _stuckLog, _backALog;
         private static float _depAt = -1f, _contact1 = -1f;
         private static readonly Dictionary<Team, TS> TacBy = new Dictionary<Team, TS>();
 
@@ -295,6 +298,7 @@ namespace Armoury
             _ffSec = _rtSec = 0f;
             _aiWait = _aiWaitMax = _aiWork = _aiWorkMax = 0;
             _aiN = _lost = _fwdStep = _still = _stuck = _tacBlink = _arrFireAcc = 0;
+            _stuckLog = _backALog = 0;
             _depAt = _contact1 = -1f;
             TacBy.Clear();
             Forms.Clear(); RevBy.Clear(); HeldForms.Clear();
@@ -538,7 +542,10 @@ namespace Armoury
                 {
                     bool big = u * pf.Dir < -DeadMin;
                     bool inWin = now - pf.DirAt < Win(pf);
-                    if (big && !inWin && Math.Abs(u) >= 2f * dz)
+                    // 347d (B344-6, at347 l.790-834 Infantry 26 HoldHighGround ~100 s z celem gry naprzod, at346 10:53 Ranged 51 ScreenedSkirmish regula B 97 s):
+                    // przed kontaktem cel NAPRZOD do wroga (u > 0 przy Dir < 0) po oknie przechodzi bez wymogu 2 martwych stref (wystarczy poza martwa strefa P);
+                    // cofanie (u < 0) jak dotad
+                    if (big && !inWin && (Math.Abs(u) >= 2f * dz || (u > 0f && tp.Distance(pf.P) >= dz)))
                     {
                         pf.Revs++;
                         _revOk++;
@@ -1027,7 +1034,7 @@ namespace Armoury
             pf.XA += (a - pf.LastA).DotProduct(pf.Axis);
             pf.LastA = a;
             float thr = Math.Max(DeadMin, 0.5f * f.Depth);
-            ZigA(pf, thr);
+            ZigA(pf, thr, now);
             float x = pf.X;
             if (pf.Trend == 0)
             {
@@ -1060,7 +1067,22 @@ namespace Armoury
             if (!pf.StillPos.IsValid || cp.Distance(pf.StillPos) >= dz) { pf.StillPos = cp; pf.StillAt = now; pf.StillN = pf.StuckN = false; return; }
             if (now - pf.StillAt < Still) return;
             if (!pf.StillN) { pf.StillN = true; _still++; }
-            if (!pf.StuckN && _key && pf.T.IsValid && now - pf.TAt < 5f && (pf.T - cp).DotProduct(pf.Axis) >= dz) { pf.StuckN = true; _stuck++; }
+            if (!pf.StuckN && _key && pf.T.IsValid && now - pf.TAt < 5f && (pf.T - cp).DotProduct(pf.Axis) >= dz)
+            {
+                pf.StuckN = true;
+                _stuck++;
+                // 347d B344-6c: kto stoi i dlaczego (StillCheck nie mowil, ktory szyk) - tylko linia
+                if (_stuckLog < MaxDiagLines)
+                {
+                    _stuckLog++;
+                    Line("AI bitwy (333) stoi z celem naprzod: " + S1(now) + " s | szyk " + Who(f) + " | zachowanie " + BehName(f) + " | ostatnia regula " + pf.AccRule
+                         + (pf.AccSg > 0 ? " naprzod " : pf.AccSg < 0 ? " wstecz " : " w bok ") + (pf.AccAt > -999f ? S1(now - pf.AccAt) : "-") + " s temu | kierunek "
+                         + pf.Dir + " od " + (pf.DirAt > -999f ? S1(now - pf.DirAt) : "-") + " s, okno " + F0(Win(pf)) + " s, nawrotow " + pf.Revs + " | nastepca "
+                         + (pf.Succ ? "tak" : "nie") + " | cel gry - P na osi " + (pf.P.IsValid ? S1((pf.T - pf.P).DotProduct(pf.Axis)) : "-") + " m, cel gry - szyk "
+                         + S1((pf.T - cp).DotProduct(pf.Axis)) + " m, szyk - P " + (pf.P.IsValid ? S1((cp - pf.P).DotProduct(pf.Axis)) : "-") + " m (martwa strefa "
+                         + S1(dz) + " m) | od wroga " + F0(pf.Gap) + " m.");
+                }
+            }
         }
 
         /// <summary>333d: stan szyku w chwili ekstremum mediany (do porownania przy nawrocie).</summary>
@@ -1089,7 +1111,7 @@ namespace Armoury
         }
 
         /// <summary>333d: ten sam zygzak dla srodka ciezkosci (srednia pozycji ludzi) - do porownania z mediana, bez wplywu na miare.</summary>
-        private static void ZigA(PF pf, float thr)
+        private static void ZigA(PF pf, float thr, float now)
         {
             float x = pf.XA;
             if (pf.TrendA == 0)
@@ -1103,7 +1125,27 @@ namespace Armoury
             if (pf.TrendA > 0)
             {
                 if (x > pf.ExtA) pf.ExtA = x;
-                else if (pf.ExtA - x >= thr) { _revA++; _revABack++; pf.TrendA = -1; pf.ExtA = x; }
+                else if (pf.ExtA - x >= thr)
+                {
+                    _revA++;
+                    _revABack++;
+                    // 347d B344-1b: nawrot srodka ciezkosci w tyl nie mial linii (Reversal tylko przy medianie) - kto cofnal szyk
+                    if (_backALog < MaxDiagLines)
+                    {
+                        _backALog++;
+                        var f = pf.F;
+                        string cur;
+                        try { cur = f.GetReadonlyMovementOrderReference().OrderEnum.ToString(); } catch { cur = "?"; }
+                        Line("AI bitwy (333) cofniecie srodka ciezkosci: " + S1(now) + " s | szyk " + Who(f) + " | zachowanie " + BehName(f) + " | powrot "
+                             + S1(pf.ExtA - x) + " m (prog " + S1(thr) + " m) | ostatnia regula " + pf.AccRule
+                             + (pf.AccSg > 0 ? " naprzod " : pf.AccSg < 0 ? " wstecz " : " w bok ") + (pf.AccAt > -999f ? S1(now - pf.AccAt) : "-") + " s temu | rozkaz ostatni "
+                             + pf.Ord + " " + (pf.OrdAt > -999f ? S1(now - pf.OrdAt) : "-") + " s temu, teraz " + cur + " | cel gry - P na osi "
+                             + (pf.T.IsValid && pf.P.IsValid ? S1((pf.T - pf.P).DotProduct(pf.Axis)) : "-") + " m | kierunek " + pf.Dir + " | od wyjscia z kontaktu "
+                             + (pf.OutAt > -999f ? S1(now - pf.OutAt) : "-") + " s, od wroga " + F0(pf.Gap) + " m.");
+                    }
+                    pf.TrendA = -1;
+                    pf.ExtA = x;
+                }
             }
             else
             {

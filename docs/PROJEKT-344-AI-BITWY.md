@@ -205,7 +205,7 @@ Klucze: nowe `CavalryFaceShooterAtArmyEdge` (A) i `FormationOrderArbiter` (B), d
 | A344-0 | wywolania arbitra: glowny / AI watek; bieg bez przewijania | AI > 0 (bez tego NIE - blad 333) |
 | A344-1 | zawrocenie tylem pod ostrzalem: trafienia S w plecy jezdzcow G przy d <= Rs i g >= 10, na 1 wejscie w F | mediana <= 1, razem w tescie <= 2 na wejscie |
 | A344-2 | kontratak na strzelca poza oslona: zdarzenia "S g >= 20 i (zbliza sie lub trafia) przy d <= Rw" / K uruchomione, czas reakcji | 100%, mediana <= 1.5 s |
-| A344-3 | wynik K: kontakt (d <= RaiseNear 6 m) albo S wypchniety w g < 10 albo S padl | >= 80% K |
+| A344-3 | wynik K: kontakt (d <= RaiseNear 6 m) albo S wypchniety w g < 10 albo S padl albo S odpedzony (204 HAway przy epizodzie z jezdzcami, 347d) | >= 80% K |
 | A344-4 | trafienia bez odpowiedzi: S trafil jezdzca AI z d <= Rw, g >= 20, a w 2 s ani K ani R | 0 |
 | A344-5 | front: w F udzial jezdzcow z katem do S < 60 st. (probka co 1 s) | >= 80% |
 | A344-6 | klus przy strzelcu: szyk konnicy z capem 128, gdy S w 60 m | 0 s |
