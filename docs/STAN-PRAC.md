@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 07.11.2026 15:55 CEST: WGRANIE 173 (najnowszy) = noc/350-pomiar-spowolnienia (Armoury.dll ed0961d2) = 172 + 350
+- 350: linia "Pomiar sesji (350): dzien N | ..." co dobe (klatki mapy, sr./maks. ms klatki, GC 0/1/2, pamiec zarzadzana i procesu) + co 30 dob blok (sluchacze HourlyTick, najwieksze kolekcje). Klucz SessionPerfLog (TAK). Tylko log. Test at350: kod 0, pomiar350 P0-P2 TAK, koszt 2.5 ms/dobe; reszta jak at349 (prognoza345 G1 416 zl = rozrzut biegow na tym samym kodzie: at348 163, at349 215).
+- PO NASTEPNEJ DLUGIEJ SESJI JEFFA (>= 60 dob): --grupa pomiar350 na jego logu - P3 trend (ms klatki, GC, pamiec) i bloki P4 -> kto spowalnia w sesji (raport docs/RAPORT-SPOWOLNIENIE-2026-11-07.md, zadanie 1).
+- Kopia 172: Armoury.dll.bak-2026-11-07-przed-wgranie173 + D:/Backup-Bannerlord/wgrane/2026-11-07-wgranie173-przed (d78974ab).
+- W TOKU: noc/351-bitwy-pomiar (worktree n351, 9b32b503, DLL acd118c2) = 347 (344 + 347b/d/f/g) + 350 -> test at351 -> wgranie tylko gdy ai344 bez NIE (B344-1 = stare wahadlo 333, w bazie bez 344 tez NIE - do decyzji Jeffa).
+
 ## STAN 07.11.2026 15:10 CEST: WGRANIE 172 (najnowszy) = noc/349-zloto-murarz eb2d04f9+ (Armoury.dll d78974ab)
 - Zawiera: 343 (stan 171) + 345 (prognoza zlota = prawdziwy obieg, LandDuesFollowTitleHolder) + 347a/347c (poprawki prognozy po at346/at347) + 347e (Mason liczy przyspieszenie zlotem). BEZ 344 (AI bitew).
 - Test at349 (kopia zapisu Jeffa 02:31): kod 0, 13/13 bitew bez bledow, CS 23, Armoury 0 ERROR; prognoza345 G1 TAK (215 zl), budynki338 0 NIE (B338-8 TAK). NIE spoza zmiany: A333-4 wahadlo (bylo w at343), W335-7 (1 zblizenie lowcy) - kod bitew niezmieniony vs 171, losowosc bitew.
