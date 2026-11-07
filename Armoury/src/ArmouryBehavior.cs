@@ -754,6 +754,8 @@ namespace Armoury
         // f9-predkosc: liczniki linii "Predkosc mapy (f9)" od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _f9Reset = F9Reset();
         private static bool F9Reset() { try { MapSpeedProfile.Reset(); } catch (Exception e) { Log.Error("F9Reset", e); } return true; }
+        private readonly bool _p350Reset = P350Reset();   // 350: pomiar sesji od zera przy nowej grze / wczytaniu
+        private static bool P350Reset() { try { SessionPerf350.Reset(); } catch (Exception e) { Log.Error("P350Reset", e); } return true; }
         // p9 (25.10): gotowosc zbrojowni partii i wyjazdy po sprzet od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _p9Reset = P9Reset();
         private static bool P9Reset() { try { ArmedStrength.Reset(); } catch (Exception e) { Log.Error("P9Reset", e); } return true; }
@@ -2400,7 +2402,8 @@ namespace Armoury
             try { SmithXp.EnsureHooks(); } catch (Exception e) { Log.Error("SmithXp.EnsureHooks", e); }   // m109-kuznia: kowalstwo wolniej - prefiks Low na HeroDeveloper.AddSkillXp (po ROT patch30; poziom postaci bez ciecia) (raz na proces), linia "Kowalstwo wolniej (m109): start sesji"
             try { XpFair.EnsureHooks(); } catch (Exception e) { Log.Error("XpFair.EnsureHooks", e); }   // E8/X (248): doswiadczenie za skutek - latki w kampanii (raz na proces, tylko sprawy wlaczone), linia "FairXp (E8/X): start sesji"
             try { LogGate.SessionLine(); } catch (Exception e) { Log.Error("LogGate.SessionLine", e); }   // NW O4: linia "Ciche logi (NW)" - stan klucza i tryb (gra / autotest / profil)
-            try { DayProfile.EnsureHooks(); } catch (Exception e) { Log.Error("DayProfile.EnsureHooks", e); }   // Z.3 poz. 3: stopery wnetrza cudzych tikow (warsztaty gry, trening gry) - latki w kampanii (raz na proces, tylko przy Stage8ProfileLog), tylko log
+            try { DayProfile.EnsureHooks(); } catch (Exception e) { Log.Error("DayProfile.EnsureHooks", e); }
+            try { SessionPerf350.EnsureHooks(); } catch (Exception e) { Log.Error("SessionPerf350.EnsureHooks", e); }   // 350: sluchacze HourlyTick (prefiks First / postfiks Last na CampaignEventDispatcher.HourlyTick, raz na proces, tylko przy SessionPerfLog), linia startu   // Z.3 poz. 3: stopery wnetrza cudzych tikow (warsztaty gry, trening gry) - latki w kampanii (raz na proces, tylko przy Stage8ProfileLog), tylko log
             try { Drill.SessionStart(); } catch (Exception e) { Log.Error("Drill.SessionStart", e); }   // musztra: zapas z zapisu, opisy perkow kwatermistrza, linia startowa
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }   // wpis 87 (audyt pkt 11d): waga wegla PRZED wycena
             try { GearState.Prepare(); } catch (Exception e) { Log.Error("GearState.Prepare", e); }   // m110-stan: kopie oryginalow modyfikatorow (ten sam zestaw obiektow - powrot do XML) PRZED LootPrices
@@ -2812,6 +2815,7 @@ namespace Armoury
         private void OnDailyTick()
         {
             GoldForecast.TickBegin();   // 345: ksiega kiesy gracza - linia poprzedniej doby i nowa doba (przed wszystkim, co rusza kiese w takcie; wlasny try)
+            SessionPerf350.Daily();   // 350: linia "Pomiar sesji (350)" za okres od poprzedniej doby (tylko log, wlasny try) - przed f9 i E8/0 (DayProfile.TickBegin zeruje godzine)
             MapSpeedProfile.Daily();   // f9-predkosc: linia "Predkosc mapy (f9)" za okres od poprzedniego taktu (tylko log) - przed profilem doby, poza jego stoperem
             DayProfile.TickBegin();
             try { OnDailyTickBody(); }

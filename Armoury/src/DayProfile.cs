@@ -235,6 +235,9 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ godzina
+        /// <summary>350: suma czasu naszych sluchaczy godziny (opakowania Hr) w biezacym okresie - tylko odczyt (SessionPerf350, przed TickBegin).</summary>
+        internal static long HourTicksPeriod() { long t = 0; for (int i = 0; i < _hN; i++) t += _hTicks[i]; return t; }
+
         internal static Action Hr(string name, Action a)
         {
             if (a == null || !On) return a;

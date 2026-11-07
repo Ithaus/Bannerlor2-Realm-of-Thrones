@@ -1,5 +1,34 @@
 # DZIENNIK ZMIAN
 
+## 350 - pomiar spowolnienia w sesji (noc/350-pomiar-spowolnienia od WGRANIA 172; NIE WGRANE, TYLKO LOG)
+**Problem:** Jeff 07.11: "sprawdz czemu gra dziala coraz wolniej". Raport docs/RAPORT-SPOWOLNIENIE-2026-11-07.md: w sesji 06.11 18:15 doba gry na mapie rosnie 22.8 -> 36 s po ~45-60 dobach,
+po wczytaniu wraca; nasz takt doby stoi (2.1-2.6 s/d), partie stoja (~4700), GC gen0/s rosnie 45 -> 80. Linia f9 z tej sesji (Armoury-2026-11-06_18-15-03.log, kosz "szybko",
+bloki po 15 dob): s/dobe 23.8 / 24.8 / 27.4 / 25.8 / 32.5 / 34.3, klatek/dobe 769 / 691 / 661 / 632 / 673 / 822, sr. ms klatki 31.0 / 36.0 / 41.4 / 40.8 / 48.4 / 41.7 -
+liczba klatek stoi, rosnie koszt jednej klatki.
+**Przyczyna:** sprawca nieznany - ten wpis tylko mierzy (zadanie 1 raportu). f9 i E8/0 dzialaja tylko przy Stage8ProfileLog, nie maja pamieci procesu ani czasu sluchaczy godziny cudzych modow.
+**Zmiana (nowy klucz Session Perf Log, domyslnie TAK; gra bez zmian):**
+- Nowy SessionPerf350.cs. Linia doby "Pomiar sesji (350): dzien N | doba sesji K | czas rzeczywisty | klatki mapy: w biegu n (s, sr., maks., bez taktu doby, >100 ms), pauza, przerwy > 5 s |
+  GC 0/1/2 | pamiec zarzadzana, prywatna procesu (Process.Refresh raz na dobe) | koszt linii | potkniecia". Pierwsza doba po wczytaniu = baza (bez linii); dzien = doba poprzedniego taktu (jak f9 i E8/0).
+- Klatki: SessionPerf350.Frame w MapSpeed.TickPostfix (postfiks MapTimeControlVM.Tick, przed returnem przy Better Time) - ta sama regula co f9 (ujemny albo > 5 s = przerwa),
+  TimeFlowState 1-4 bieg, reszta pauza; same dodawania na polach statycznych, bez alokacji.
+- Co 30 dob sesji linia "Pomiar sesji (350) - 30 dob": czas WSZYSTKICH sluchaczy HourlyTickEvent (prefiks Priority.First / postfiks Priority.Last na CampaignEventDispatcher.HourlyTick,
+  dekompilacja: petla po odbiorcach -> CampaignEvents.HourlyTick; cel przez AccessTools.DeclaredMethod; Harmony "com.jeff.armoury.sessionperf350"; zakladane w OnSessionLaunched
+  raz na proces, tylko przy wlaczonym kluczu), GC gen0 w srodku sluchaczy, nasze z profilu (nowy akcesor DayProfile.HourTicksPeriod, tylko odczyt), kolekcje statyczne Armoury
+  (odbicie raz na 30 dob; lista pol raz na proces; tylko typy BeforeFieldInit albo bez inicjalizatora - jawne konstruktory statyczne pomijane i liczone; bez tablic i ThreadStatic;
+  ICollection.Count albo getter Count; try na kazde pole): 10 najwiekszych z przyrostem i 5 najszybciej rosnacych.
+- Linia startu "Pomiar sesji (350): start | klucz ... | sluchacze HourlyTick ... wpiete|BRAK (powod)" z dopiskiem, ze godzinowe tiki partii / osad / klanow i AI partii (rozlozone na klatki) nie wchodza.
+- ArmouryBehavior: SessionPerf350.Daily() na poczatku OnDailyTick po GoldForecast.TickBegin, przed f9 i DayProfile.TickBegin (ten zeruje godzine); EnsureHooks po DayProfile.EnsureHooks;
+  pole _p350Reset (wzor F9Reset). Settings.SessionPerfLog + McmSettings (wpis dopisany recznie wedlug wyjscia gen_mcm - gen_mcm nadpisalby reczne opisy 326d/326x).
+- tools/sprawdz_logi.py grupa pomiar350 (P0 start wpiete, P1 linia w kazdej dobie / kazda doba E8/0 ma linie 350 / nierozpoznanych 0, P2 potkniecia 0, P3 trend pierwsze 10 wobec ostatnich 10 dob INFO,
+  P4 bloki 30 dob INFO, P5 koszt INFO) z testem syntetycznym G350-S (dobry 35 dob, dziura, nierozpoznana, potkniecia, BRAK latki, bez startu, stary log, dwa wczytania).
+**Ryzyko / co sprawdzic:** jedyna nowa latka Harmony (CampaignEventDispatcher.HourlyTick; Armoury patchuje na tej klasie tylko AiHourlyTick - inna metoda); prefiks bez parametrow gry i bez bool
+(nie pomija oryginalu); sprawdzic linie startu "wpiete" i Modules/BKROTPatch/BKROTLog.txt. Odbicie po kolekcjach moze uruchomic inicjalizacje typu, ktora jeszcze nie biegla
+(tylko inicjalizatory pol; grep: zaden inicjalizator pola statycznego nie wola gry / Settings / Log; w 30. dobie sesji kampania zyje) - licznik potkniec w linii bloku. Koszt na klatke kilka dodawan;
+koszt linii doby (Process.Refresh) i bloku w logu - prog orientacyjny < 5 ms/dobe. Mapa: zero dotykania wizerunkow. Kolizje: f9 i E8/0 bez zmian (wlasne liczniki), DayProfile tylko akcesor.
+Wylaczenie klucza w grze: Frame/Daily/latka od razu nic nie licza; ponowne wlaczenie - pierwsza doba baza. Klucza nie ma w Armoury.json Jeffa - wezmie sie domyslne TAK.
+Granica: HourlyTick = tylko HourlyTickEvent; koszt cudzych modow na klatke dalej nierozbity (nastepny krok po pierwszym logu).
+**Status:** DO SPRAWDZENIA (build 0 bledow, G350-S TAK; gra nieuruchamiana, nic nie wgrane).
+
 ## 347e - murarz (Mason) pracuje tez z przyspieszeniem zlotem (NIE WGRANE)
 **Problem:** Jeff 07.11 ~14:20, Ashemark (zamek gracza): zbudowal Masona, a szybkosc budowy dalej 5 - "4 to daje moje przyspieszenie za kase".
 **Przyczyna:** 338 grupa 4 (Buildings338Mason): w osadach z oplacona budowa (gracz przy PaidConstructionPlayer = true u Jeffa) dopisek Masona = min(punkty Masona, punkty pana + robota ludu) - przyspieszenie zlotem ("Craftsmen services") nie liczylo sie jako praca, wiec przy budowie napedzanej zlotem Mason dawal ~0.

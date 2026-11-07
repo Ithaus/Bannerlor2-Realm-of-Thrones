@@ -8064,6 +8064,10 @@ namespace Armoury
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8ProfileLog { get; set; } = true;
 
+        [SettingPropertyBool("Session Perf Log", HintText = "Writes one daily line measuring how the game runs over a long session: map frames per day, average and longest frame, real time per day, garbage collections and memory; every 30 days also the time of all hourly listeners and the size of the mod's largest lists (diagnostics only; nothing in the game changes).", RequireRestart = false)]
+        [SettingPropertyGroup("Diagnostics (stage 8)")]
+        public bool SessionPerfLog { get; set; } = true;
+
         [SettingPropertyBool("Stage8 World Log", HintText = "Writes daily lines that measure the world for stage 8: the village production model, caravan stays in towns, mercenary clans, sheep villages, villages without a cart (diagnostics only).", RequireRestart = false)]
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8WorldLog { get; set; } = true;
@@ -13631,6 +13635,7 @@ namespace Armoury
             s.MidDayLoadKeepsDay = MidDayLoadKeepsDay;
             s.Stage8MeasureLog = Stage8MeasureLog;
             s.Stage8ProfileLog = Stage8ProfileLog;
+            s.SessionPerfLog = SessionPerfLog;
             s.Stage8WorldLog = Stage8WorldLog;
             s.A17BkPartyNoFreeMounts = A17BkPartyNoFreeMounts;
             s.A17FishFromHands = A17FishFromHands;
