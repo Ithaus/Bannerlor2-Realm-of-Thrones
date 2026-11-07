@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 176 - 354/354r (podatek wsi do pana ziemi, nie do wrogiego posiadacza tytulu BK) + 355/355r (tarczowe gracza osobna pozycja prognozy) + 356 (ScaNoBandits320.Threatened sila wroga raz na wywolanie) na 175 (Armoury.dll e0c915a7; CrashScribe bez zmian 3cab76a3)
+**Decyzja Jeffa 07.11 ~21:10:** "Jesli Marband chce kase niech odbije zamek! napis i punkt 2 rob".
+**Test at356 (kopia zapisu Jeffa 21:05, md5 2c3c1caf, 10 dob bez bitew):** kod 0, zapisy Jeffa nietkniete, 25.6 s/dobe, klatka 17.8-23.9 ms; linia 354: gracz 2 wsi 482 zl/dobe (wrogi posiadacz Damon Marbrand), AI 24 wsi 9591 zl (wrogi 20/8946, niezywy spoza frakcji 4/645), potkniecia 0; prognoza345 G8 TAK (tarczowe 9/10 dob, niezgodnych 0), G345-S TAK, pomiar350 P1/P2 TAK.
+**prognoza345 G1 NIE (|rozjazd| 2277 zl) - przejscie, nie blad:** zaleglosc licznika Ashemark Mines (27077 zl zebrane, gdy plynelo do Marbranda) splywa do gracza po 10000/dobe (limit BK) w dobach 109609-109611; prognoza tego nie przewiduje. Od 109614 rozjazd +292 (4.9%). Do sprawdzenia po kilku dobach u Jeffa.
+**Co sprawdzic w grze Jeffa:** podpowiedz zlota - brak "Village taxes paid to the title holders" dla Ashemark Mines/Tumblestone, "Scutage (shield money) to the crown" zamiast ujemnego "Rent from the crown" (pelnie po ok. 4 dobach - historia sprzed 355); linia "Wies dla trzymajacego (354)".
+**Otwarte (decyzja Jeffa):** posiadacz tytulu Z TEJ SAMEJ frakcji nadal dostaje podatek (rycerze BK, kupione Lordship LandSale); niezywy posiadacz z frakcji wsi - podatek nikomu jak w BK.
+**Status:** WGRANE 176 (07.11 ~21:55). Kopia 175: Armoury.dll.bak-2026-11-07-przed-wgranie176 + D:/Backup-Bannerlord/wgrane/2026-11-07-wgranie176-przed; zapis Jeffa przed testem D:/Backup-Bannerlord/zapisy-jeffa/2026-11-07-przed-356; kopia testowa usunieta z Game Saves (D:/Backup-Bannerlord/zapisy-testowe).
+
 ## 356 - ScaNoBandits320.Threatened: sila kazdego wroga liczona raz na wywolanie (pamiec w obrebie wywolania; noc/352-prognoza-bez-korony po 355; NIE WGRANE)
 **Problem (Jeff 07.11 ~21:10, "punkt 2"):** przyciecia na pelnej godzinie gry. Dowod: probki stosu ClrMD watku glownego - 6 z 81 probek tiku gry w "GetTotalLandStrengthWithFollowers <- Threatened_Patch1 <- CalcPostfix_Patch1 <- CalculateFactionStatus_Patch1 <- OnHourlyTick", wszystkie na pelnej godzinie.
 **Przyczyna:** postfiks 320e (b) na StrategicCampaignAI145 CalculateFactionStatus (co godzine, na krolestwo) w Threatened(Kingdom) dla KAZDEJ twierdzy krolestwa liczyl od nowa mp.GetTotalLandStrengthWithFollowers(false) kazdego wroga w promieniu 80 - ten sam wrog przy wielu twierdzach (front: kilka-kilkanascie zamkow w promieniu) liczony wiele razy w jednym wywolaniu.
