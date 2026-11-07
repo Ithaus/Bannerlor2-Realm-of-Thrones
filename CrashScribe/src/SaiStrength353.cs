@@ -28,7 +28,8 @@ namespace CrashScribe
     /// suma jak Enumerable.Sum(IEnumerable&lt;float&gt;) z System.Core .NET Framework 4.x (sprawdzone w dekompilacji System.Core.dll z GAC: akumulator double,
     /// na koncu (float)). IsEnemy SAI przez delegat zbudowany raz (bez Invoke na wolanie); bez delegatu latka nie jest wpinana.
     /// Sila partii: slownik partia -> GetTotalLandStrengthWithFollowers(false), czyszczony przy zmianie (int)CampaignTime.Now.ToHours (partie i ich pozycje zawsze biezace,
-    /// sila najwyzej sprzed godziny - zgoda Jeffa na pamiec godzinowa). Pamiec czyszczona tez przy nowej grze / wczytaniu (konstruktor MendsBehavior), przy OnSessionLaunched
+    /// sila najwyzej sprzed godziny - zgoda Jeffa na pamiec godzinowa). Wpis pamieta tez sklad sumy (partia liczona przy EscortParty, armia, liczba dolaczonych czlonkow u wodza):
+    /// powstanie / rozpad armii, dolaczenie czlonka albo eskorta w tej godzinie = sila liczona od nowa (przeglad 353b). Straty w bitwie w godzinie - dalej najwyzej godzina zwloki. Pamiec czyszczona tez przy nowej grze / wczytaniu (konstruktor MendsBehavior), przy OnSessionLaunched
     /// i przy wyjsciu z gry (OnGameEnd). Bez Campaign.Current albo z null w argumentach - oryginal. Wyjatek w naszej petli: potkniecie (licznik), oryginal liczy jak bez latki -
     /// bez globalnego wylacznika. Klucz SaiStrengthCache (settings.xml, domyslnie true); latka wpinana raz na proces przy pierwszym OnSessionLaunched, tylko gdy klucz true i mod jest.
     /// Linia doby: ile wolan, ile policzyla latka, ile oddane oryginalowi, czas naszego prefiksu (Stopwatch), sila partii liczona / z pamieci, 5 celow i 5 frakcji pytajacych.
@@ -54,7 +55,13 @@ namespace CrashScribe
         }
 
         private static readonly object _sync = new object();
-        private static readonly Dictionary<MobileParty, float> _str = new Dictionary<MobileParty, float>(new RefEq<MobileParty>());
+        // sila partii z pamieci godziny + stan, od ktorego zalezy sklad sumy GetTotalLandStrengthWithFollowers(false) (dekompilacja MobileParty):
+        // partia liczona (EscortParty -> TargetParty), jej armia, a gdy jest wodzem - ile czlonkow dolaczonych (AttachedTo != null). Inny stan = liczone od nowa.
+        private struct Snap
+        {
+            public float S; public MobileParty Eff; public Army A; public int N;
+        }
+        private static readonly Dictionary<MobileParty, Snap> _str = new Dictionary<MobileParty, Snap>(new RefEq<MobileParty>());
         private static readonly Dictionary<Pair, int> _dTargets = new Dictionary<Pair, int>();
         private static readonly Dictionary<IFaction, int> _dFactions = new Dictionary<IFaction, int>(new RefEq<IFaction>());
         private static int _hour = int.MinValue;
@@ -186,9 +193,11 @@ namespace CrashScribe
                         if (mf == null) continue;
                         if (!_isEnemy(__1, mf)) continue;
                         if (!(p.GetPosition2D.Distance(at) <= __2)) continue;
+                        Snap now = State(p);
+                        Snap old;
                         float s;
-                        if (_str.TryGetValue(p, out s)) hit++;
-                        else { s = p.GetTotalLandStrengthWithFollowers(false); _str[p] = s; calc++; }
+                        if (_str.TryGetValue(p, out old) && ReferenceEquals(old.Eff, now.Eff) && ReferenceEquals(old.A, now.A) && old.N == now.N) { s = old.S; hit++; }
+                        else { s = p.GetTotalLandStrengthWithFollowers(false); now.S = s; _str[p] = now; calc++; }
                         sum += (double)s;
                     }
                     __result = (float)sum;
@@ -199,6 +208,22 @@ namespace CrashScribe
                 return false;
             }
             catch (Exception e) { Stumble("prefiks", e); return true; }
+        }
+
+        /// <summary>Stan skladu sumy partii (bez GetPowerOfParty): te same warunki co GetTotalLandStrengthWithFollowers(false) w MobileParty 1.4.8.</summary>
+        private static Snap State(MobileParty p)
+        {
+            var r = new Snap { Eff = p.DefaultBehavior == AiBehavior.EscortParty ? p.TargetParty : p, N = -1 };
+            if (r.Eff == null) return r;   // oryginal rzuci przy liczeniu - ten sam wyjatek i potkniecie, jak bez pamieci
+            r.A = r.Eff.Army;
+            if (r.A != null && r.Eff == r.A.LeaderParty)
+            {
+                int n = 0;
+                foreach (MobileParty m in r.A.Parties)
+                    if (m != null && m.Army != null && m.Army.LeaderParty != m && m.AttachedTo != null) n++;
+                r.N = n;
+            }
+            return r;
         }
 
         /// <summary>DailyTickEvent: linia doby (tylko przy wpietej latce), liczniki doby od zera. Nie rzuca.</summary>

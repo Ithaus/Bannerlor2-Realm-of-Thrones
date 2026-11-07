@@ -12,18 +12,23 @@ GetPowerOfParty -> MobileParty.Morale -> postfiks morale BK), powtarzane dla teg
   .NET Framework 4.x (dekompilacja System.Core.dll z GAC: double num += (double)item, zwrot (float)num; Sum(selector) = Select(selector).Sum()).
 - IsEnemy: StrategicAiHelpers.IsEnemy SAI przez delegat Func<IFaction, IFaction, bool> zbudowany raz w Hook (Delegate.CreateDelegate); bez metody / delegatu latka NIE jest wpinana (linia startu z powodem).
 - Sila partii: slownik partia (po referencji) -> GetTotalLandStrengthWithFollowers(false), czyszczony przy zmianie (int)CampaignTime.Now.ToHours (jak w 353), w konstruktorze MendsBehavior, OnSessionLaunched, OnGameEnd.
+  Po przegladzie 353b wpis pamieta tez sklad sumy (dekompilacja MobileParty.GetTotalLandStrengthWithFollowers 1.4.8): partia liczona (DefaultBehavior == EscortParty -> TargetParty), jej Army, a gdy jest
+  Army.LeaderParty - liczba czlonkow != wodz z AttachedTo != null. Inny stan niz w pamieci = sila liczona od nowa (powstanie / rozpad armii, dolaczenie czlonka, eskorta w biegu godziny nie czekaja do pelnej godziny).
+  Sprawdzenie stanu bez GetPowerOfParty (petla po Army.Parties tylko u wodza).
 - Wyjatek w petli: potkniecie (licznik, 3 pierwsze z linia), return true - oryginal liczy jak bez latki; bez globalnego wylacznika. Null w argumentach / brak kampanii - oryginal.
-- Po Patch sprawdzany tylko prefiks w Harmony.GetPatchInfo (postfiksu juz nie ma); cudze latki na celu liczone (ich prefiksy o nizszym priorytecie nie biegna przy naszym false, postfiksy tak).
+- Po Patch sprawdzany tylko prefiks w Harmony.GetPatchInfo (postfiksu juz nie ma); cudze latki na celu liczone. Harmony 2.x: nasze false pomija tylko oryginal - cudze prefiksy (nizszy priorytet) i postfiksy BIEGNA dalej; nasz wynik jest ostateczny tylko, gdy szanuja __runOriginal i nie pisza __result.
 - Linia startu: "... - 353b: suma liczona przez latke (filtry i kolejnosc jak oryginal, IsEnemy SAI), sila partii z pamieci na godzine gry - wpieta TAK (<typ>.NearbyEnemyLordStrength, prefiks potwierdzony w
   Harmony.GetPatchInfo, IsEnemy jako delegat, cudzych latek na celu N); wyjatek w petli = oryginal | potkniecia od startu procesu P."
 - Linia doby: "dzien N (ostatnia doba) | wolan X, liczone przez latke Y, oddane oryginalowi Z, czas latki T ms (srednio U ms na wolanie) | sila partii: liczona A, z pamieci B (C%) | najczestsze cele ... |
   frakcje pytajace ... | od wczytania: wolan, liczone przez latke, oddane oryginalowi, czas latki ms, sila partii liczona, z pamieci (%) | potkniecia doby P, od wczytania Q." Srednia U porownywac z 4.0-8.9 ms z 353.
-**Ryzyko / co sprawdzic (zasada 0):** (a) wynik: pozycje partii zawsze biezace, sila partii najwyzej sprzed godziny (353 oddawal caly wynik sprzed godziny - 353b jest blizej oryginalu). Kolejnosc sumy i akumulator
+**Ryzyko / co sprawdzic (zasada 0):** (a) wynik: pozycje partii zawsze biezace, sklad sumy (armia, dolaczeni, eskorta) zawsze biezacy, wartosci sil partii najwyzej sprzed godziny - straty / uzupelnienia w biegu godziny
+widac dopiero po pelnej godzinie (353 oddawal caly wynik sprzed godziny - 353b jest blizej oryginalu). Kolejnosc sumy i akumulator
 double -> float jak oryginal, wiec przy tych samych silach wynik bit w bit ten sam. (b) kolizje: IsEnemy przez delegat do metody SAI - gdyby ktos ja patchowal, Harmony podmienia cialo, delegat idzie przez latke;
-nasze latki Armoury (p9 GetPowerOfParty, morale BK) dalej biegna przy liczeniu sily (raz na partie na godzine). Cudze prefiksy na NearbyEnemyLordStrength nie biegna (linia startu podaje ich liczbe; w 353 0).
+nasze latki Armoury (p9 GetPowerOfParty, morale BK) dalej biegna przy liczeniu sily (raz na partie na godzine). Cudze prefiksy i postfiksy na NearbyEnemyLordStrength biegna mimo naszego false (Harmony 2.x) - prefiks, ktory bez patrzenia na __runOriginal pisze __result, nadpisze nasza sume
+(linia startu podaje liczbe cudzych latek; w logu 353 0).
 (c) watki: wolanie na watku glownym (probnik 353); cala petla w lock (bez rywali, Monitor reentrant). (d) koszt: na wolanie petla po wszystkich lordach (IsActive, MapFaction, IsEnemy = FactionManager.IsAtWarAgainstFaction,
 odleglosc) bez liczenia sily dla trafien; slownik sily co najwyzej tyle wpisow co lordow. (e) w grze: "wpieta TAK", srednio ms na wolanie, sila partii z pamieci (oczekiwane > 90%), potkniecia 0, klatka mapy wobec 26-47 ms.
-**Status:** DO SPRAWDZENIA - NIE WGRANE (build CrashScribe --no-incremental 0 bledow, 0 ostrzezen; CrashScribe.dll md5 01aa0d3154db0a3edb802b9dcc6aba43; gra nieuruchamiana).
+**Status:** DO SPRAWDZENIA - NIE WGRANE (po poprawkach przegladu: build CrashScribe --no-incremental 0 bledow, 0 ostrzezen; CrashScribe.dll md5 3cab76a36beac59b99686c016c4ecba9; gra nieuruchamiana).
 
 ## 353 - CrashScribe: pamiec StrategicCampaignAI145 NearbyEnemyLordStrength na godzine gry (noc/352-prognoza-bez-korony po 352r; NIE WGRANE)
 **Problem:** Jeff 07.11 ~19:20: mapa coraz wolniejsza - srednia klatka mapy 92 ms wobec 16 ms wczesniej (Jeff: "to sie dopiero niedawno zaczelo, wczesniej tego nie bylo"). Probnik stosu ClrMD
