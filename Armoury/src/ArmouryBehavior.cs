@@ -1745,6 +1745,7 @@ namespace Armoury
             // E8/O5 (269): nadwyzki zalog po godzinach - kazda zaloga w swojej godzinie tygodnia (Id % 168) zamiast ok. 32 zalog w takcie doby; wylacznik GarrisonSellHourly
             // na zywo (wylaczony = sluchacz nic nie robi, kolejka w GarrisonArmory.Daily jak dotad). Rejestracja PRZED ArmoryFit.HourlyOnce = wolanie PO nim (gra dopisuje
             // sluchacza na poczatek listy - MbEvent): przeglad zbrojowni pierwszej godziny sesji widzi stan sprzed sprzedazy, jak dotad
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("MorningReport357.Hourly", delegate { try { MorningLater357.Hourly(); } catch (Exception e) { Log.Error("MorningReport357.Hourly", e); } }));   // 357: poranny meldunek kwatermistrza 6 h po takcie doby
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("GarrisonArmory.Hourly", delegate { try { GarrisonArmory.Hourly(); } catch (Exception e) { Log.Error("GarrisonArmory.Hourly", e); } }));
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CaravanFlow.WindHourly", delegate { try { CaravanFlow.WindHourly(); } catch (Exception e) { Log.Error("CaravanFlow.WindHourly", e); } }));   // 294: stratna karawana w zwijaniu - rozwiazanie w miescie, gdy gotowa
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("ArmoryFit.HourlyOnce", delegate { try { ArmoryFit.HourlyOnce(); } catch (Exception e) { Log.Error("ArmoryFit.HourlyOnce", e); } }));
@@ -2380,6 +2381,7 @@ namespace Armoury
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
+            MorningLater357.Reset();   // 357: oczekujacy poranny meldunek nie przechodzi miedzy kampaniami/wczytaniami
             SaveText.ReportAfterLoad();   // 161: ile dlugich napisow uratowal ratunek przy wczytaniu
             RawPrice.MemoryLive = true;   // 299b: od teraz wygladzanie podazy rynku w tempie PriceSupplyMemoryDaily (ticki startowe nowej kampanii byly przed - tempo gry)
             try { HideoutBossTalk.AddDialogs(starter); } catch (Exception e) { Log.Error("HideoutBossTalk.AddDialogs", e); }   // 293: rozmowa z hersztem kryjowki zawsze pyta o pojedynek (warunek w kluczu HideoutBossTalkFix)
@@ -3305,14 +3307,8 @@ namespace Armoury
             try { Devastation.DayLine(); } catch (Exception e) { Log.Error("Devastation.DayLine", e); } DayProfile.Lap("Devastation.DayLine");   // E4/5 (113n): linia "Ludzie (spustoszenie)" i zerowanie licznikow doby - PO ksiedze ludzi i linii Hearth, ktore je czytaja
             try { MarketGlut.DailyDigest(); }
             catch (Exception e) { Log.Error("GlutDigest", e); } DayProfile.Lap("MarketGlut.DailyDigest");
-            try
-            {
-                // poranny meldunek: braki wykrzyczane na glos, zeby Jeff WIEDZIAL
-                // bez otwierania zbrojowni ("czemu ja o tym nie wiem!")
-                QuartermasterLaw.ShoutShortages("QM morning: short (have/need):");
-            }
-            catch (Exception e) { Log.Error("MorningReport", e); }
-            DayProfile.Lap("MorningReport");   // recenzja 133: od 133c meldunek liczy podglad bitwy (KitPreview) - koszt we wlasnej linii profilu doby, nie w "reszta taktu"
+            try { MorningLater357.MarkDue(); } catch (Exception e) { Log.Error("MorningReport", e); }   // 357: poranny meldunek (ok. 180 ms podgladu bitwy) 6 godzin po takcie doby - MorningLater357.Hourly; dotad tu, na koncu taktu
+            DayProfile.Lap("MorningReport");
         }
 
         internal bool HasProjectsHere(Settlement here)
