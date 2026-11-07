@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 07.11.2026 ok. 14:50 CEST (to konto): w grze nadal WGRANIE 171; w toku test 349 + analiza spowolnienia
+- noc/347-bitwy-zloto-2 (worktree scratchpad tej sesji n347, HEAD c2a93c1f) = 346 + 347a/c (prognoza 345 naprawiona) + 347b/b-r/d/d-r (344 runda 1-2) + 347e (Mason).
+  Test at348 (DLL 67b20432 = 347d-r, bez 347e): prognoza345 G1 TAK (163 zl, 6.7%); ai344 NIE: A344-3 1/9, B344-1 0.78/min (gorzej niz at346 0.46 - podejrzany 347d Pendulum333 zapadka), B344-3 1 (z wejscia pod ostrzalem), B344-6 2. TAK: A344-1/2/4/5/6/7/8. 344 NIE do wgrania - runda 3 do zrobienia.
+- noc/349-zloto-murarz (worktree n349, eb2d04f9) = noc/345 (343 + 345) + 347a + 347c + 347e (cherry-pick; pliki GoldForecast/BuildFunding*/Buildings338Mason identyczne z n347). BEZ 344. DLL d78974ab (test/m349).
+  W TOKU test at-349 (te same parametry co at346). Jesli kod 0, prognoza345 bez NIE, budynki338 bez NIE, reszta bez nowych NIE vs at343 -> WGRANIE 172 = 349 (stala zgoda po tescie).
+- 347e (Jeff 14:20, Ashemark): Mason dawal 0, bo liczyl tylko oplaconych budowniczych, a u Jeffa 4 z 5 to przyspieszenie zlotem - teraz min(punkty Masona, pana + lud + zloto).
+- W TOKU workflow wf_38cae19d-8a6 "spowolnienie-gry" (Jeff: "czemu gra dziala coraz wolniej, przyspieszyc / zoptymalizowac") - tylko czytanie, raport.
+- Logi testow: D:/Backup-Bannerlord/logs/2026-11-07-at346, -at347, -at348.
+
 ## STAN 07.11.2026 11:15 CEST: test 346 zrobiony - NIE WGRANE (progi przekazania niespelnione); w grze nadal WGRANIE 171
 - noc/346-bitwy-zloto 5811e670 = 344 + 345 (scalenie dokonczone: CHANGELOG i sprawdz_logi unia, liczby linii zgodne; klucze 344/345 w Settings i McmSettings). Build Release kod 0, Armoury.dll e944ef25 (test/m346). Wypchnieta.
 - Test at-346 (kopia zapisu Jeffa 02:31 md5 ed2537da, -Days 10 -Battles 10 -BattleSec 300 -NoArena -Harasser 3 -LordBattles 3, CS at-n335): kod 0, 936/936, bitwy 13/13 bledy 0, CS 23 (baza), Armoury 0 ERROR. Logi: D:/Backup-Bannerlord/logs/2026-11-07-at346; zapis testowy w D:/Backup-Bannerlord/zapisy-testowe-archiwum/2026-11-07-at346.
