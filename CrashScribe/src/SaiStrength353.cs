@@ -5,12 +5,14 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace CrashScribe
 {
     /// <summary>
-    /// 353 (Jeff 07.11: "tak rob"): pamiec StrategicCampaignAI145.StrategicAiHelpers.NearbyEnemyLordStrength na godzine gry.
+    /// 353 / 353b (Jeff 07.11: "tak rob"): StrategicCampaignAI145.StrategicAiHelpers.NearbyEnemyLordStrength liczone przez nas, z pamiecia sily partii na godzine gry.
     ///
     /// DOWOD: probnik stosu ClrMD (300 migawek watku glownego, sesja Jeffa 07.11 ok. 19:20, mapa w biegu, sr. klatka 92 ms wobec 16 ms wczesniej):
     /// 52 ze 137 migawek taktu gry w NearbyEnemyLordStrength, wolanej z StrategicTargetScoreModel.GetTargetScoreForFaction
@@ -18,31 +20,22 @@ namespace CrashScribe
     /// <- CalculateMilitaryBehaviorForSettlement <- AiHourlyTick <- ROT AIThinkPatch.PartyHourlyAiTick <- TickPartialHourlyAi.
     /// Cialo (dekompilacja): suma GetTotalLandStrengthWithFollowers(false) po WSZYSTKICH MobileParty.AllLordParties wrogich frakcji w promieniu -
     /// kazda sila idzie przez GetPowerOfParty (NavalDLC, ROT, nasze Armoury p9) -> MobileParty.Morale -> postfiks morale BK (zaopatrzenie BK, MCM, TextObject).
-    /// Ta sama osada, ta sama frakcja i ten sam promien w jednej godzinie gry pytane sa wielokrotnie (kazda partia AI tej frakcji ocenia te same cele).
+    /// 353 (pamiec wyniku na klucz osada/frakcja/promien) w autoteste 10 dob: z pamieci tylko 11-28%, liczone wolanie 4.0 -> 8.9 ms, 8-16 s na dobe gry.
+    /// Ten sam lord liczony jest setki razy na godzine gry (kazdy cel, kazda frakcja pytajaca) - 353b pamieta sile PARTII, nie wynik celu.
     ///
-    /// REGULA: prefiks (Priority.First) + postfiks (Priority.Last) na celu; klucz (osada, frakcja, promien) -> wynik ORYGINALU z pierwszego wolania w tej
-    /// godzinie (int CampaignTime.Now.ToHours). Wartosci nie zmieniamy nigdy - przy trafieniu oddajemy liczbe policzona przez sam oryginal w tej godzinie
-    /// (partie poruszaja sie w ciagu godziny - to jedyna roznica, zgoda Jeffa). Pamiec czyszczona przy zmianie godziny, przy nowej grze / wczytaniu
-    /// (konstruktor MendsBehavior), przy OnSessionLaunched i przy wyjsciu z gry (OnGameEnd). Bez Campaign.Current - zawsze oryginal, bez liczenia.
-    /// Wyjatek w naszym kodzie: potkniecie (licznik), oryginal liczy jak bez latki - bez globalnego wylacznika.
-    /// Klucz SaiStrengthCache (settings.xml, domyslnie true); latki wpinane raz na proces przy pierwszym OnSessionLaunched, tylko gdy klucz true i mod jest.
-    /// Linia doby: ile wolan, ile z pamieci, czas liczenia (Stopwatch: prefiks -> postfiks, tylko liczone), 5 najczestszych celow i 5 frakcji pytajacych.
+    /// REGULA 353b: prefiks (Priority.First) liczy wynik sam i zwraca false. Te same filtry i kolejnosc co oryginal: MobileParty.AllLordParties w kolejnosci listy,
+    /// p.IsActive && p.MapFaction != null && StrategicAiHelpers.IsEnemy(faction, p.MapFaction) && p.GetPosition2D.Distance(settlement.GetPosition2D) <= radius;
+    /// suma jak Enumerable.Sum(IEnumerable&lt;float&gt;) z System.Core .NET Framework 4.x (sprawdzone w dekompilacji System.Core.dll z GAC: akumulator double,
+    /// na koncu (float)). IsEnemy SAI przez delegat zbudowany raz (bez Invoke na wolanie); bez delegatu latka nie jest wpinana.
+    /// Sila partii: slownik partia -> GetTotalLandStrengthWithFollowers(false), czyszczony przy zmianie (int)CampaignTime.Now.ToHours (partie i ich pozycje zawsze biezace,
+    /// sila najwyzej sprzed godziny - zgoda Jeffa na pamiec godzinowa). Pamiec czyszczona tez przy nowej grze / wczytaniu (konstruktor MendsBehavior), przy OnSessionLaunched
+    /// i przy wyjsciu z gry (OnGameEnd). Bez Campaign.Current albo z null w argumentach - oryginal. Wyjatek w naszej petli: potkniecie (licznik), oryginal liczy jak bez latki -
+    /// bez globalnego wylacznika. Klucz SaiStrengthCache (settings.xml, domyslnie true); latka wpinana raz na proces przy pierwszym OnSessionLaunched, tylko gdy klucz true i mod jest.
+    /// Linia doby: ile wolan, ile policzyla latka, ile oddane oryginalowi, czas naszego prefiksu (Stopwatch), sila partii liczona / z pamieci, 5 celow i 5 frakcji pytajacych.
     /// </summary>
     internal static class SaiStrength353
     {
         private const string P = "Mends: SAI sila wrogow (353) - ";
-
-        // klucz pamieci: osada, frakcja, promien (rownosc po referencji - obiekty gry sa jedyne w kampanii)
-        private struct Key : IEquatable<Key>
-        {
-            public Settlement S; public IFaction F; public float R;
-            public bool Equals(Key o) { return ReferenceEquals(S, o.S) && ReferenceEquals(F, o.F) && R == o.R; }
-            public override bool Equals(object o) { return o is Key && Equals((Key)o); }
-            public override int GetHashCode()
-            {
-                unchecked { return (RuntimeHelpers.GetHashCode(S) * 397) ^ (RuntimeHelpers.GetHashCode(F) * 31) ^ R.GetHashCode(); }
-            }
-        }
 
         // para do linii doby: cel i frakcja pytajaca
         private struct Pair : IEquatable<Pair>
@@ -53,24 +46,27 @@ namespace CrashScribe
             public override int GetHashCode() { unchecked { return (RuntimeHelpers.GetHashCode(S) * 397) ^ RuntimeHelpers.GetHashCode(F); } }
         }
 
-        private sealed class RefEq : IEqualityComparer<IFaction>
+        // rownosc po referencji (obiekty gry sa jedyne w kampanii; bez cudzych Equals/GetHashCode)
+        private sealed class RefEq<T> : IEqualityComparer<T> where T : class
         {
-            public bool Equals(IFaction a, IFaction b) { return ReferenceEquals(a, b); }
-            public int GetHashCode(IFaction f) { return RuntimeHelpers.GetHashCode(f); }
+            public bool Equals(T a, T b) { return ReferenceEquals(a, b); }
+            public int GetHashCode(T o) { return RuntimeHelpers.GetHashCode(o); }
         }
 
         private static readonly object _sync = new object();
-        private static readonly Dictionary<Key, float> _cache = new Dictionary<Key, float>();
+        private static readonly Dictionary<MobileParty, float> _str = new Dictionary<MobileParty, float>(new RefEq<MobileParty>());
         private static readonly Dictionary<Pair, int> _dTargets = new Dictionary<Pair, int>();
-        private static readonly Dictionary<IFaction, int> _dFactions = new Dictionary<IFaction, int>(new RefEq());
+        private static readonly Dictionary<IFaction, int> _dFactions = new Dictionary<IFaction, int>(new RefEq<IFaction>());
         private static int _hour = int.MinValue;
 
         private static bool _tried, _patched;
         private static string _state = "nie wpinane";
-        private static MethodInfo _target;   // ten sam MethodInfo do Patch i GetPatchInfo
+        private static MethodInfo _target;   // ten sam MethodInfo do Patch, GetPatchInfo i Unpatch
+        private static Func<IFaction, IFaction, bool> _isEnemy;   // StrategicAiHelpers.IsEnemy SAI, delegat zbudowany raz
 
-        // liczniki doby (d) i od wczytania (t)
-        private static long _dCalls, _dHits, _dMiss, _dTicks, _tCalls, _tHits, _tMiss, _tTicks;
+        // liczniki doby (d) i od wczytania (t): wolan, policzone przez latke, oddane oryginalowi, czas prefiksu (tylko policzone), sila partii liczona / z pamieci
+        private static long _dCalls, _dOurs, _dOrig, _dTicks, _dPCalc, _dPHit;
+        private static long _tCalls, _tOurs, _tOrig, _tTicks, _tPCalc, _tPHit;
         private static int _dStumbles, _tStumbles, _pStumbles;   // p = od startu procesu
 
         /// <summary>Nowa gra / wczytanie (konstruktor MendsBehavior) i wyjscie z gry: pamiec i liczniki od zera. Nie rzuca.</summary>
@@ -80,20 +76,21 @@ namespace CrashScribe
             {
                 lock (_sync)
                 {
-                    _cache.Clear(); _dTargets.Clear(); _dFactions.Clear(); _hour = int.MinValue;
-                    _dCalls = _dHits = _dMiss = _dTicks = 0; _tCalls = _tHits = _tMiss = _tTicks = 0;
+                    _str.Clear(); _dTargets.Clear(); _dFactions.Clear(); _hour = int.MinValue;
+                    _dCalls = _dOurs = _dOrig = _dTicks = _dPCalc = _dPHit = 0;
+                    _tCalls = _tOurs = _tOrig = _tTicks = _tPCalc = _tPHit = 0;
                     _dStumbles = _tStumbles = 0;
                 }
             }
             catch { }
         }
 
-        /// <summary>OnSessionLaunched: wpiecie latek (raz na proces) i linia startu. Nie rzuca.</summary>
+        /// <summary>OnSessionLaunched: wpiecie latki (raz na proces) i linia startu. Nie rzuca.</summary>
         internal static void Session()
         {
             try
             {
-                lock (_sync) { _cache.Clear(); _hour = int.MinValue; }
+                lock (_sync) { _str.Clear(); _hour = int.MinValue; }
                 if (!Config.SaiStrengthCache)
                 {
                     Scribe.Line(P + "wylaczone (SaiStrengthCache=false)" + (_patched ? ", ale latka wpieta wczesniej w tym procesie - dziala do restartu gry" : ", latka nie wpieta") + ".");
@@ -101,8 +98,8 @@ namespace CrashScribe
                 }
                 Hook();
                 if (!_patched) { Scribe.Line(P + _state + " - nic nie zmienione."); return; }
-                Scribe.Line(P + "pamiec wyniku na godzine gry wpieta TAK (" + _state + "); klucz osada / frakcja / promien, wartosc liczy zawsze oryginal"
-                            + " | potkniecia od startu procesu " + _pStumbles + ".");
+                Scribe.Line(P + "353b: suma liczona przez latke (filtry i kolejnosc jak oryginal, IsEnemy SAI), sila partii z pamieci na godzine gry - wpieta TAK (" + _state + ")"
+                            + "; wyjatek w petli = oryginal | potkniecia od startu procesu " + _pStumbles + ".");
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "SaiStrength353.Session", null); } catch { } }
         }
@@ -119,28 +116,30 @@ namespace CrashScribe
                 if (t == null) { _state = "StrategicCampaignAI145 nieobecny (brak typu StrategicCampaignAI145.StrategicAiHelpers)"; return; }
                 var m = AccessTools.DeclaredMethod(t, "NearbyEnemyLordStrength", new[] { typeof(Settlement), typeof(IFaction), typeof(float) });
                 if (m == null || !m.IsStatic || m.ReturnType != typeof(float)) { _state = "brak metody StrategicAiHelpers.NearbyEnemyLordStrength(Settlement, IFaction, float) -> float (inna wersja moda)"; return; }
+                // IsEnemy SAI: delegat raz; bez niego nie wpinamy (nie zgadujemy reguly wroga)
+                var ie = AccessTools.DeclaredMethod(t, "IsEnemy", new[] { typeof(IFaction), typeof(IFaction) });
+                if (ie == null || !ie.IsStatic || ie.ReturnType != typeof(bool)) { _state = "brak metody StrategicAiHelpers.IsEnemy(IFaction, IFaction) -> bool (inna wersja moda)"; return; }
+                try { _isEnemy = (Func<IFaction, IFaction, bool>)Delegate.CreateDelegate(typeof(Func<IFaction, IFaction, bool>), ie); }
+                catch (Exception e) { _state = "nie da sie zbudowac delegatu StrategicAiHelpers.IsEnemy (" + e.GetType().Name + ")"; return; }
+                if (_isEnemy == null) { _state = "nie da sie zbudowac delegatu StrategicAiHelpers.IsEnemy"; return; }
                 _target = m;
                 var pre = AccessTools.DeclaredMethod(typeof(SaiStrength353), nameof(Prefix));
-                var post = AccessTools.DeclaredMethod(typeof(SaiStrength353), nameof(Postfix));
-                h.Patch(_target, prefix: new HarmonyMethod(pre) { priority = Priority.First }, postfix: new HarmonyMethod(post) { priority = Priority.Last });
-                // pulapka CLAUDE.md (15.10): Patch potrafi nie wejsc po cichu - sprawdzamy w Harmony, ze oba sa na celu
+                h.Patch(_target, prefix: new HarmonyMethod(pre) { priority = Priority.First });
+                // pulapka CLAUDE.md (15.10): Patch potrafi nie wejsc po cichu - sprawdzamy w Harmony, ze prefiks jest na celu
                 var info = Harmony.GetPatchInfo(_target);
-                bool preOk = false, postOk = false; int others = 0;
+                bool preOk = false; int others = 0;
                 if (info != null)
                 {
                     foreach (var p in info.Prefixes) { if (p.owner == h.Id && p.PatchMethod == pre) preOk = true; else others++; }
-                    foreach (var p in info.Postfixes) { if (p.owner == h.Id && p.PatchMethod == post) postOk = true; else others++; }
-                    others += info.Transpilers.Count + info.Finalizers.Count;
+                    others += info.Postfixes.Count + info.Transpilers.Count + info.Finalizers.Count;
                 }
-                if (!preOk || !postOk)
+                if (!preOk)
                 {
-                    _state = "OSTRZEZENIE: Patch bez bledu, ale Harmony.GetPatchInfo nie widzi " + (!preOk ? "prefiksu" : "") + (!preOk && !postOk ? " i " : "") + (!postOk ? "postfiksu" : "")
-                             + " na StrategicAiHelpers.NearbyEnemyLordStrength";
-                    if (preOk || postOk) { try { h.Unpatch(_target, preOk ? pre : post); } catch { } }   // pol latki nie zostawiamy (ten sam MethodInfo)
+                    _state = "OSTRZEZENIE: Patch bez bledu, ale Harmony.GetPatchInfo nie widzi prefiksu na StrategicAiHelpers.NearbyEnemyLordStrength";
                     return;
                 }
                 _patched = true;
-                _state = m.DeclaringType.FullName + ".NearbyEnemyLordStrength, prefiks i postfiks potwierdzone w Harmony.GetPatchInfo, cudzych latek na celu " + others;
+                _state = m.DeclaringType.FullName + ".NearbyEnemyLordStrength, prefiks potwierdzony w Harmony.GetPatchInfo, IsEnemy jako delegat, cudzych latek na celu " + others;
             }
             catch (Exception e)
             {
@@ -152,53 +151,54 @@ namespace CrashScribe
         private static void Stumble(string where, Exception e)
         {
             int n;
-            lock (_sync) { _dStumbles++; _tStumbles++; n = ++_pStumbles; }
+            lock (_sync) { _dStumbles++; _tStumbles++; _dOrig++; _tOrig++; n = ++_pStumbles; }
             if (n <= 3) { try { Scribe.Line(P + where + ": wyjatek " + e.GetType().Name + " (" + e.Message + ") - oryginal liczy jak bez latki (potkniecie " + n + ")."); } catch { } }
         }
 
-        /// <summary>Prefiks: trafienie w pamieci tej godziny -> wynik oryginalu z pamieci (bez liczenia); inaczej oryginal (start Stopwatch w __state).</summary>
-        public static bool Prefix(Settlement __0, IFaction __1, float __2, ref float __result, out long __state)
+        /// <summary>Prefiks: liczy sume sam (false) - te same filtry, kolejnosc i akumulator co oryginal; sila partii z pamieci tej godziny. Wyjatek -> true (oryginal).</summary>
+        public static bool Prefix(Settlement __0, IFaction __1, float __2, ref float __result)
         {
-            __state = 0;
             try
             {
-                if (__0 == null || __1 == null || Campaign.Current == null) return true;
-                int hour = (int)CampaignTime.Now.ToHours;
-                var k = new Key { S = __0, F = __1, R = __2 };
-                var pr = new Pair { S = __0, F = __1 };
-                lock (_sync)
+                if (__0 == null || __1 == null || Campaign.Current == null || _isEnemy == null)
                 {
-                    if (hour != _hour) { _cache.Clear(); _hour = hour; }
+                    lock (_sync) { _dCalls++; _tCalls++; _dOrig++; _tOrig++; }
+                    return true;
+                }
+                long t0 = Stopwatch.GetTimestamp();
+                int hour = (int)CampaignTime.Now.ToHours;
+                var pr = new Pair { S = __0, F = __1 };
+                lock (_sync)   // wolanie tylko z watku glownego (probnik 353); lock bez rywali = tani; Monitor jest wielowejsciowy (reentrant), wiec ponowne wejscie z cudzego kodu w petli nie zakleszczy
+                {
+                    if (hour != _hour) { _str.Clear(); _hour = hour; }
                     _dCalls++; _tCalls++;
                     int c;
                     _dTargets.TryGetValue(pr, out c); _dTargets[pr] = c + 1;
                     _dFactions.TryGetValue(__1, out c); _dFactions[__1] = c + 1;
-                    float v;
-                    if (_cache.TryGetValue(k, out v)) { _dHits++; _tHits++; __result = v; return false; }
-                }
-                __state = Stopwatch.GetTimestamp();   // zawsze > 0
-                return true;
-            }
-            catch (Exception e) { __state = 0; Stumble("prefiks", e); return true; }
-        }
 
-        /// <summary>Postfiks: tylko po liczeniu oryginalu (__state > 0) - czas i zapis wyniku do pamieci tej godziny. Wyniku nie zmienia.</summary>
-        public static void Postfix(Settlement __0, IFaction __1, float __2, float __result, long __state)
-        {
-            if (__state == 0) return;
-            try
-            {
-                long dt = Stopwatch.GetTimestamp() - __state;
-                if (Campaign.Current == null) return;
-                int hour = (int)CampaignTime.Now.ToHours;
-                lock (_sync)
-                {
-                    _dMiss++; _tMiss++; _dTicks += dt; _tTicks += dt;
-                    if (hour != _hour) { _cache.Clear(); _hour = hour; }
-                    _cache[new Key { S = __0, F = __1, R = __2 }] = __result;
+                    Vec2 at = __0.GetPosition2D;   // wlasciwosc bez skutkow ubocznych - ta sama wartosc co w kazdym obrocie lambdy oryginalu
+                    double sum = 0.0;   // jak Enumerable.Sum(IEnumerable<float>) .NET Framework: double, na koncu (float)
+                    long calc = 0, hit = 0;
+                    foreach (MobileParty p in MobileParty.AllLordParties)
+                    {
+                        if (!p.IsActive) continue;
+                        IFaction mf = p.MapFaction;
+                        if (mf == null) continue;
+                        if (!_isEnemy(__1, mf)) continue;
+                        if (!(p.GetPosition2D.Distance(at) <= __2)) continue;
+                        float s;
+                        if (_str.TryGetValue(p, out s)) hit++;
+                        else { s = p.GetTotalLandStrengthWithFollowers(false); _str[p] = s; calc++; }
+                        sum += (double)s;
+                    }
+                    __result = (float)sum;
+                    long dt = Stopwatch.GetTimestamp() - t0;
+                    _dOurs++; _tOurs++; _dTicks += dt; _tTicks += dt;
+                    _dPCalc += calc; _tPCalc += calc; _dPHit += hit; _tPHit += hit;
                 }
+                return false;
             }
-            catch (Exception e) { Stumble("postfiks", e); }
+            catch (Exception e) { Stumble("prefiks", e); return true; }
         }
 
         /// <summary>DailyTickEvent: linia doby (tylko przy wpietej latce), liczniki doby od zera. Nie rzuca.</summary>
@@ -207,23 +207,25 @@ namespace CrashScribe
             if (!_patched) return;
             try
             {
-                long calls, hits, miss, ticks, tc, th, tm, tt; int st, tst;
+                long calls, ours, orig, ticks, pc, ph, tc, to, tor, tt, tpc, tph; int st, tst;
                 List<KeyValuePair<Pair, int>> targets; List<KeyValuePair<IFaction, int>> facs;
                 lock (_sync)
                 {
-                    calls = _dCalls; hits = _dHits; miss = _dMiss; ticks = _dTicks; st = _dStumbles;
-                    tc = _tCalls; th = _tHits; tm = _tMiss; tt = _tTicks; tst = _tStumbles;
+                    calls = _dCalls; ours = _dOurs; orig = _dOrig; ticks = _dTicks; pc = _dPCalc; ph = _dPHit; st = _dStumbles;
+                    tc = _tCalls; to = _tOurs; tor = _tOrig; tt = _tTicks; tpc = _tPCalc; tph = _tPHit; tst = _tStumbles;
                     targets = new List<KeyValuePair<Pair, int>>(_dTargets);
                     facs = new List<KeyValuePair<IFaction, int>>(_dFactions);
-                    _dCalls = _dHits = _dMiss = _dTicks = 0; _dStumbles = 0;
+                    _dCalls = _dOurs = _dOrig = _dTicks = _dPCalc = _dPHit = 0; _dStumbles = 0;
                     _dTargets.Clear(); _dFactions.Clear();
                 }
                 targets.Sort((a, b) => b.Value.CompareTo(a.Value));
                 facs.Sort((a, b) => b.Value.CompareTo(a.Value));
+                var ci = System.Globalization.CultureInfo.InvariantCulture;
                 var sb = new System.Text.StringBuilder(P);
                 sb.Append("dzien ").Append((int)CampaignTime.Now.ToDays).Append(" (ostatnia doba)");
-                sb.Append(" | wolan ").Append(calls).Append(", z pamieci ").Append(hits).Append(" (").Append(Pct(hits, calls)).Append("%), liczone ").Append(miss);
-                sb.Append(", czas liczenia ").Append(Ms(ticks)).Append(" ms (srednio ").Append(miss > 0 ? (Ms(ticks) / miss).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) : "0").Append(" ms)");
+                sb.Append(" | wolan ").Append(calls).Append(", liczone przez latke ").Append(ours).Append(", oddane oryginalowi ").Append(orig);
+                sb.Append(", czas latki ").Append(Ms(ticks)).Append(" ms (srednio ").Append(ours > 0 ? (ticks * 1000.0 / Stopwatch.Frequency / ours).ToString("0.####", ci) : "0").Append(" ms na wolanie)");
+                sb.Append(" | sila partii: liczona ").Append(pc).Append(", z pamieci ").Append(ph).Append(" (").Append(Pct(ph, pc + ph)).Append("%)");
                 sb.Append(" | najczestsze cele: ");
                 for (int i = 0; i < targets.Count && i < 5; i++)
                 {
@@ -240,8 +242,9 @@ namespace CrashScribe
                 }
                 if (facs.Count == 0) sb.Append("brak");
                 sb.Append(" (frakcji ").Append(facs.Count).Append(")");
-                sb.Append(" | od wczytania: wolan ").Append(tc).Append(", z pamieci ").Append(th).Append(" (").Append(Pct(th, tc)).Append("%), liczone ").Append(tm)
-                  .Append(", czas liczenia ").Append(Ms(tt)).Append(" ms | potkniecia doby ").Append(st).Append(", od wczytania ").Append(tst).Append(".");
+                sb.Append(" | od wczytania: wolan ").Append(tc).Append(", liczone przez latke ").Append(to).Append(", oddane oryginalowi ").Append(tor)
+                  .Append(", czas latki ").Append(Ms(tt)).Append(" ms, sila partii liczona ").Append(tpc).Append(", z pamieci ").Append(tph).Append(" (").Append(Pct(tph, tpc + tph)).Append("%)")
+                  .Append(" | potkniecia doby ").Append(st).Append(", od wczytania ").Append(tst).Append(".");
                 Scribe.Line(sb.ToString());
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "SaiStrength353.Daily", null); } catch { } }

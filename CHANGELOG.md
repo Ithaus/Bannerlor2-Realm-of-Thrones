@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 353b - CrashScribe: NearbyEnemyLordStrength liczone przez latke z pamiecia sily PARTII na godzine gry (zamiast pamieci wyniku celu z 353; noc/352-prognoza-bez-korony po 353; NIE WGRANE)
+**Problem:** autotest 353 (kopia biezacego zapisu Jeffa, 10 dob, CrashScribe session-2026-11-07_19-32-46.log, linie "Mends: SAI sila wrogow (353)"): ok. 1800-2700 wolan na dobe, z pamieci tylko 11-28%,
+liczone wolanie 4.0 -> 8.9 ms (rosnie w sesji), 8-16 s na dobe gry w tej funkcji. Najczesciej pytaja: House Baratheon of King's Landing ok. 400-990/d, The North ok. 400-560/d; cele: zamki Riverlands.
+Srednia klatka mapy 26 -> 47 ms w biegu. 353 za slabe.
+**Przyczyna:** pamiec 353 trzymala wynik na klucz (osada, frakcja, promien) - klucze rzadko sie powtarzaja w godzinie, a drogie jest liczenie sily kazdej partii (GetTotalLandStrengthWithFollowers ->
+GetPowerOfParty -> MobileParty.Morale -> postfiks morale BK), powtarzane dla tego samego lorda setki razy na godzine gry (kazdy cel, kazda frakcja pytajaca).
+**Zmiana (tylko CrashScribe/src/SaiStrength353.cs):**
+- Prefiks Priority.First liczy sume SAM i zwraca false; postfiks i pamiec wyniku celu z 353 usuniete. Filtry i kolejnosc jak oryginal (dekompilacja): MobileParty.AllLordParties w kolejnosci listy,
+  p.IsActive && p.MapFaction != null && IsEnemy(faction, p.MapFaction) && p.GetPosition2D.Distance(settlement.GetPosition2D) <= radius. Akumulator jak Enumerable.Sum(IEnumerable<float>) z System.Core
+  .NET Framework 4.x (dekompilacja System.Core.dll z GAC: double num += (double)item, zwrot (float)num; Sum(selector) = Select(selector).Sum()).
+- IsEnemy: StrategicAiHelpers.IsEnemy SAI przez delegat Func<IFaction, IFaction, bool> zbudowany raz w Hook (Delegate.CreateDelegate); bez metody / delegatu latka NIE jest wpinana (linia startu z powodem).
+- Sila partii: slownik partia (po referencji) -> GetTotalLandStrengthWithFollowers(false), czyszczony przy zmianie (int)CampaignTime.Now.ToHours (jak w 353), w konstruktorze MendsBehavior, OnSessionLaunched, OnGameEnd.
+- Wyjatek w petli: potkniecie (licznik, 3 pierwsze z linia), return true - oryginal liczy jak bez latki; bez globalnego wylacznika. Null w argumentach / brak kampanii - oryginal.
+- Po Patch sprawdzany tylko prefiks w Harmony.GetPatchInfo (postfiksu juz nie ma); cudze latki na celu liczone (ich prefiksy o nizszym priorytecie nie biegna przy naszym false, postfiksy tak).
+- Linia startu: "... - 353b: suma liczona przez latke (filtry i kolejnosc jak oryginal, IsEnemy SAI), sila partii z pamieci na godzine gry - wpieta TAK (<typ>.NearbyEnemyLordStrength, prefiks potwierdzony w
+  Harmony.GetPatchInfo, IsEnemy jako delegat, cudzych latek na celu N); wyjatek w petli = oryginal | potkniecia od startu procesu P."
+- Linia doby: "dzien N (ostatnia doba) | wolan X, liczone przez latke Y, oddane oryginalowi Z, czas latki T ms (srednio U ms na wolanie) | sila partii: liczona A, z pamieci B (C%) | najczestsze cele ... |
+  frakcje pytajace ... | od wczytania: wolan, liczone przez latke, oddane oryginalowi, czas latki ms, sila partii liczona, z pamieci (%) | potkniecia doby P, od wczytania Q." Srednia U porownywac z 4.0-8.9 ms z 353.
+**Ryzyko / co sprawdzic (zasada 0):** (a) wynik: pozycje partii zawsze biezace, sila partii najwyzej sprzed godziny (353 oddawal caly wynik sprzed godziny - 353b jest blizej oryginalu). Kolejnosc sumy i akumulator
+double -> float jak oryginal, wiec przy tych samych silach wynik bit w bit ten sam. (b) kolizje: IsEnemy przez delegat do metody SAI - gdyby ktos ja patchowal, Harmony podmienia cialo, delegat idzie przez latke;
+nasze latki Armoury (p9 GetPowerOfParty, morale BK) dalej biegna przy liczeniu sily (raz na partie na godzine). Cudze prefiksy na NearbyEnemyLordStrength nie biegna (linia startu podaje ich liczbe; w 353 0).
+(c) watki: wolanie na watku glownym (probnik 353); cala petla w lock (bez rywali, Monitor reentrant). (d) koszt: na wolanie petla po wszystkich lordach (IsActive, MapFaction, IsEnemy = FactionManager.IsAtWarAgainstFaction,
+odleglosc) bez liczenia sily dla trafien; slownik sily co najwyzej tyle wpisow co lordow. (e) w grze: "wpieta TAK", srednio ms na wolanie, sila partii z pamieci (oczekiwane > 90%), potkniecia 0, klatka mapy wobec 26-47 ms.
+**Status:** DO SPRAWDZENIA - NIE WGRANE (build CrashScribe --no-incremental 0 bledow, 0 ostrzezen; CrashScribe.dll md5 01aa0d3154db0a3edb802b9dcc6aba43; gra nieuruchamiana).
+
 ## 353 - CrashScribe: pamiec StrategicCampaignAI145 NearbyEnemyLordStrength na godzine gry (noc/352-prognoza-bez-korony po 352r; NIE WGRANE)
 **Problem:** Jeff 07.11 ~19:20: mapa coraz wolniejsza - srednia klatka mapy 92 ms wobec 16 ms wczesniej (Jeff: "to sie dopiero niedawno zaczelo, wczesniej tego nie bylo"). Probnik stosu ClrMD
 (300 migawek watku glownego zywej sesji, mapa w biegu): 52 ze 137 migawek taktu gry w StrategicCampaignAI145.StrategicAiHelpers.NearbyEnemyLordStrength(Settlement, IFaction, float),
@@ -31,7 +56,7 @@ nieaktualna o najwyzej 1 h ruchu (zgoda Jeffa na pamiec godzinowa). Wyjatek oryg
 klucz po referencji - stare obiekty nie trafiaja do nowej gry. (d) watki - wolanie na watku glownym (probnik); lock na wszelki wypadek, oryginal liczy poza lockiem. (e) koszt - na wolanie 3 wyszukania w slownikach;
 slowniki doby rosna z liczba par cel-frakcja (czyszczone co dobe). (f) Modules/BKROTPatch/BKROTLog.txt - finalizer BKROTPatch nie dotyczy (nasza Harmony, cel sprawdzany w GetPatchInfo).
 (g) W grze: linia startu "wpieta TAK", linia doby: odsetek z pamieci (oczekiwane > 80%), czas liczenia, czy Ashemark / Polnoc w najczestszych; srednia klatka mapy (Armoury 350 / f9) wobec 92 ms.
-**Status:** DO SPRAWDZENIA - NIE WGRANE (build CrashScribe 0 bledow, 0 ostrzezen; gra nieuruchamiana).
+**Status:** DO SPRAWDZENIA - NIE WGRANE (build CrashScribe 0 bledow, 0 ostrzezen; gra nieuruchamiana). Autotest 10 dob: za slabe (z pamieci 11-28%) - pamiec wyniku celu ZASTAPIONA przez 353b (wpis wyzej).
 
 ## 352 - prognoza zlota bez pozycji korony u rodu bez krolestwa (noc/352-prognoza-bez-korony od WGRANIA 174; NIE WGRANE)
 **Problem:** Jeff 07.11 (zrzut "Expected Change" po odejsciu rodu KARDA z Polnocy z lennami - Mend S9: rod bez krolestwa; economy CSV doba 109592: kolumna krolestwa pusta): podpowiedz dalej pokazuje
