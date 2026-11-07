@@ -30,7 +30,7 @@ namespace Armoury
     ///    Historia 7 dob w zapisie (arm_prog345; brak klucza - pusto, linie poza modelem od pierwszej pelnej doby).
     ///  - Poprawki (cache na godzine gry i po kazdej dobie ksiegi): wsie do posiadaczy tytulu (ta sama regula co BK, teraz), warsztaty i wsie gracza - reszta do wyplaty
     ///    (347: srednia wyplata x czesc doby do rozliczenia; tuz przed wyplata ~0), inne roznice przy wyplacie (srednia), pozycje taktu doby wedlug modulu (srednia z dob
-    ///    historii; 347: tylko regularne - etykieta w >= polowie dob historii; okupy, wojna i inne rzadkie poza prognoza, w linii dobowej osobno, rozjazd bez nich). Prace okregu i wioska poboczna
+    ///    historii; 347: tylko regularne - modul w >= polowie dob historii; okupy, wojna i inne rzadkie poza prognoza, w linii dobowej osobno, rozjazd bez nich). Prace okregu i wioska poboczna
     ///    maja juz wlasne linie (DistrictWorks.AddView, SideVillageFief.AddLines) - w poprawkach pominiete, w ksiedze liczone.
     ///  - Panel Finance: dodatnie poprawki do przychodu, ujemne do wydatkow (tylko przy FinanceBox.In - nasze ksiegi liczace przychod rodu ich nie widza).
     /// Linia dobowa "Prognoza zlota gracza (345): dzien N | ..." - prognoza zrobiona na poczatku doby (koniec naszego taktu) wobec prawdziwej zmiany obiegu tej doby.
@@ -69,8 +69,8 @@ namespace Armoury
         private static bool _fcHave;
         private static long _fcTotal, _fcModel, _fcCorr;
         private static string _fcParts;
-        // 347: etykiety taktu doby wliczone do prognozy (pozycje regularne) - reszta dzisiejszego taktu = nieregularne, poza prognoza
-        private static HashSet<string> _fcLabels, _corrLabels;
+        // 347: moduly taktu doby wliczone do prognozy (pozycje regularne) - reszta dzisiejszego taktu = nieregularne, poza prognoza
+        private static HashSet<string> _fcKeys, _corrKeys;
         // 347: godzina gry ostatniego rozliczenia rodu gracza (NaN - nieznana: od wczytania nie bylo wyplaty) - czesc doby do reszty warsztatow i wsi
         private static double _lastPayH = double.NaN;
         // srednie rozjazdu (sesja) - do linii
@@ -81,7 +81,7 @@ namespace Armoury
         {
             _hist.Clear(); _cur = null; _purse0 = 0; _lapGold = 0; _inTick = false; _stamp++;
             _fcHave = false; _fcTotal = _fcModel = _fcCorr = 0; _fcParts = null; _clanDiag = null;
-            _fcLabels = null; _corrLabels = null; _lastPayH = double.NaN;
+            _fcKeys = null; _corrKeys = null; _lastPayH = double.NaN;
             _cmpN = 0; _cmpAbs = _cmpAbsT = 0; _stumbles = 0;
             _cacheHour = int.MinValue; _corr = new List<Corr>();
         }
@@ -162,7 +162,7 @@ namespace Armoury
                     sb.Append(c.Log).Append(' ').Append(c.Amt >= 0 ? "+" : "").Append(c.Amt);
                 }
                 _fcTotal = all; _fcCorr = corr; _fcModel = all - corr; _fcParts = sb.Length > 0 ? sb.ToString() : "-";
-                _fcLabels = _corrLabels != null ? new HashSet<string>(_corrLabels, StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
+                _fcKeys = _corrKeys != null ? new HashSet<string>(_corrKeys, StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
                 _fcHave = true;
             }
             catch (Exception e) { _fcHave = false; Stumble("TickEnd", e); }
@@ -433,37 +433,39 @@ namespace Armoury
                 }
                 // 5. nasz takt doby wedlug pozycji (srednia z dob historii; dzien bez wpisu = 0)
                 // 347 (test at346: okupy +12081 / -5859, wojna +9040, skarbiec zamku +3051 raz na 9 dob - srednia przenosila je na kazda dobe): do prognozy tylko
-                // pozycje regularne - etykieta obecna w co najmniej polowie dob historii; rzadsze (okupy, wojna, sprzedaze) - nieregularne, poza prognoza (linia dobowa je wypisuje).
+                // pozycje regularne - MODUL (klucz taktu) obecny w co najmniej polowie dob historii; rzadsze (okupy, wojna, sprzedaze) - nieregularne, poza prognoza
+                // (linia dobowa je wypisuje). 347c (test at347): regula na etykiecie przepuszczala CrownWar314 +9040 jako regularne, bo pod ta sama etykieta
+                // "Dues to the crown" jest codzienny KingdomTreasury.Daily - dlatego licznik dob wedlug modulu, kwoty dalej sumowane wedlug etykiety.
                 int nd = _hist.Count;
-                var labs = new HashSet<string>(StringComparer.Ordinal);
+                var keys = new HashSet<string>(StringComparer.Ordinal);
                 if (nd > 0)
                 {
-                    var sum = new Dictionary<string, long>(StringComparer.Ordinal);
                     var days = new Dictionary<string, int>(StringComparer.Ordinal);
-                    var order = new List<string>();
                     foreach (var d in _hist)
-                    {
-                        var seen = new HashSet<string>(StringComparer.Ordinal);
-                        foreach (var kv in d.Laps)
+                        foreach (var kv in d.Laps) { int c0; days.TryGetValue(kv.Key, out c0); days[kv.Key] = c0 + 1; }   // Laps - jeden wpis na modul w dobie
+                    // 347c: regularny = w >= polowie dob historii i w co najmniej 2 dobach (przy 1 dobie historii nic nie jest "regularne" - prognoza = model);
+                    // kwota = srednia z ostatnich 3 dob (symulacja na at346/at347: 3 doby lapia skoki poziomu, np. TownFolk.Daily 30 -> 900, lepiej niz 7)
+                    foreach (var kv in days) if (kv.Value * 2 >= nd && kv.Value >= 2) keys.Add(kv.Key);
+                    int na = Math.Min(3, nd);
+                    var sum = new Dictionary<string, long>(StringComparer.Ordinal);
+                    var order = new List<string>();
+                    for (int hi = nd - na; hi < nd; hi++)
+                        foreach (var kv in _hist[hi].Laps)
                         {
+                            if (!keys.Contains(kv.Key)) continue;
                             bool shown; string lab = Label(kv.Key, out shown);
                             if (shown) continue;
                             long o; if (!sum.TryGetValue(lab, out o)) order.Add(lab);
                             sum[lab] = o + kv.Value;
-                            if (seen.Add(lab)) { int c0; days.TryGetValue(lab, out c0); days[lab] = c0 + 1; }
                         }
-                    }
                     foreach (var lab in order)
                     {
-                        int dn; days.TryGetValue(lab, out dn);
-                        if (dn * 2 < nd) continue;
-                        labs.Add(lab);
-                        int a = (int)Math.Round((double)sum[lab] / nd);
+                        int a = (int)Math.Round((double)sum[lab] / na);
                         if (a == 0) continue;
-                        res.Add(new Corr { Amt = a, Log = lab, Txt = new TextObject("{=!}" + lab + " (" + Avg(nd) + ")") });
+                        res.Add(new Corr { Amt = a, Log = lab, Txt = new TextObject("{=!}" + lab + " (" + Avg(na) + ")") });
                     }
                 }
-                _corrLabels = labs;
+                _corrKeys = keys;
             }
             catch (Exception e) { Stumble("Corrections", e); }
             _corr = res;
@@ -580,13 +582,13 @@ namespace Armoury
             try
             {
                 long t = d.Clan + d.Tick + d.Works;
-                // 347: pozycje taktu dzis spoza prognozy (etykieta nie weszla do prognozy jako regularna) - rozjazd liczony bez nich, wypisane osobno
+                // 347: pozycje taktu dzis spoza prognozy (modul nie wszedl do prognozy jako regularna) - rozjazd liczony bez nich, wypisane osobno
                 long irr = 0; var irrSb = new StringBuilder();
-                if (_fcHave && _fcLabels != null)
+                if (_fcHave && _fcKeys != null)
                     foreach (var kv in d.Laps)
                     {
                         bool sh; string lab = Label(kv.Key, out sh);
-                        if (sh || _fcLabels.Contains(lab)) continue;
+                        if (sh || _fcKeys.Contains(kv.Key)) continue;
                         irr += kv.Value;
                         if (irrSb.Length > 0) irrSb.Append(", ");
                         irrSb.Append(kv.Key).Append(' ').Append(kv.Value >= 0 ? "+" : "").Append(kv.Value).Append(" [").Append(lab).Append(']');

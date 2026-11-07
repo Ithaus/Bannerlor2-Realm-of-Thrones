@@ -98098,6 +98098,8 @@ G345_DAY = re.compile(r"Prognoza zlota gracza \(345\): dzien (-?\d+) \| klucz (T
 G345_CLAN = re.compile(r"rozliczenie: zmiana kiesy (-?\d+), podglad modelu tuz przed (-?\d+) \(warsztaty (-?\d+), wsie do gracza (-?\d+), do posiadaczy tytulu (-?\d+)\), inne roznice (-?\d+)")
 G345_STUM = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
 # 347: pozycje taktu spoza prognozy (nieregularne - okupy, wojna); rozjazd w linii juz bez nich
+# 347c: "historia N dob" w linii = historia po tej dobie; prognoza tej doby miala N-1 dob. G1 ocenia doby z prognoza z >= 3 dob historii (krotsza - INFO)
+G345_HIST = re.compile(r"\| historia (\d+) dob \|")
 G345_IRR = re.compile(r"\| nieregularne poza prognoza ([+-]?\d+) \(")
 
 
@@ -98128,6 +98130,8 @@ def prognoza345_collect(logp):
             r["stum"] = int(ms.group(1)) if ms else 0
             mi = G345_IRR.search(line)
             r["irr"] = int(mi.group(1)) if mi else 0
+            mh = G345_HIST.search(line)
+            r["hist"] = int(mh.group(1)) if mh else 99
             D["day"].append(r)
     return D
 
@@ -98142,7 +98146,10 @@ def prognoza345_rows(rep, D):
     if not dd:
         rep.add("G1: rozjazd prognozy", "brak linii doby 345" + (f" (nierozpoznane {D['bad']})" if D["bad"] else ""), "INFO", False if D["bad"] else None)
         return
-    fc = [x for x in dd if x["fc"] is not None and x["diff"] is not None and x["key"] == "TAK"]
+    fc0 = [x for x in dd if x["fc"] is not None and x["diff"] is not None and x["key"] == "TAK"]
+    fc = [x for x in fc0 if x["hist"] - 1 >= 3]
+    if fc0 and not fc:
+        rep.add("G1: rozjazd prognozy", f"dob z prognoza {len(fc0)}, wszystkie z historia < 3 dob (swieza ksiega - zapis sprzed 345)", "INFO", None)
     if fc:
         ma = sum(abs(x["diff"]) for x in fc) / len(fc)
         mt = sum(abs(x["t"] - x["irr"]) for x in fc) / len(fc)
@@ -98150,7 +98157,7 @@ def prognoza345_rows(rep, D):
         worst = max(fc, key=lambda x: abs(x["diff"]))
         ok = ma < 300 or (mt > 0 and ma < 0.10 * mt)
         rep.add("G1: rozjazd prognozy (poczatek doby) wobec prawdziwej zmiany obiegu (rozliczenie + takt doby + wozy prac)",
-                f"dob z prognoza {len(fc)}: srednio |rozjazd| {ma:.0f} zl, srednio rozjazd {ms:+.0f}, srednio |naprawde| {mt:.0f} ({(100.0 * ma / mt) if mt else 0:.1f}%); "
+                f"dob z prognoza {len(fc)} (z historia >= 3 dob; krotszych pominietych {len(fc0) - len(fc)}): srednio |rozjazd| {ma:.0f} zl, srednio rozjazd {ms:+.0f}, srednio |naprawde| {mt:.0f} ({(100.0 * ma / mt) if mt else 0:.1f}%); "
                 f"najgorsza doba {worst['day']}: prognoza {worst['fc']} (model {worst['model']}, poprawki {worst['corr']}), naprawde {worst['t']} (nieregularne {worst['irr']:+d}), rozjazd {worst['diff']:+d}"
                 + (f"; nierozpoznane {D['bad']}" if D["bad"] else ""),
                 "< 300 zl albo < 10% (>= 3 dob, mniej - INFO)", (None if len(fc) < 3 else ok) if not D["bad"] else False)
@@ -98173,13 +98180,13 @@ def prognoza345_rows(rep, D):
             f"{sum(x['purse'] for x in dd) / len(dd):.0f}", "INFO", None)
 
 
-def prognoza345_line(d, fc=-2600, t=-2622, diff=None, stum=0, n=1, key="TAK", irr=None):
+def prognoza345_line(d, fc=-2600, t=-2622, diff=None, stum=0, n=1, key="TAK", irr=None, hist=7):
     diff = (t - (irr or 0) - fc) if diff is None else diff
     irs = "" if irr is None else f" | nieregularne poza prognoza {irr:+d} (RansomFlows.Daily {irr:+d} [Ransoms])"
     return (G345_P + f"dzien {d} | klucz {key} | rozliczenie rodu wpiete, wydatki panelu wpiete | prognoza wczoraj {fc} (model 5190, poprawki 345 {fc - 5190}: wsie do posiadaczy tytulu -8161) "
             f"| naprawde dzis {t} = rozliczenie {t - 700} ({n}) + takt doby 675 + wozy prac 25 | rozjazd {diff:+d} (1.0%) | kiesa naprawde {t + 900} (poza obiegiem 900: handel, lupy, okupy, zakupy gracza){irs} "
             f"| takt doby wedlug modulow: TownFolk.Daily +1142 [Dues from your people (surplus tax, lord's rights)] | rozliczenie: zmiana kiesy -3322, podglad modelu tuz przed 4839 "
-            f"(warsztaty 752, wsie do gracza 0, do posiadaczy tytulu 8161), inne roznice 0 | srednio z 3 dob (sesja): |rozjazd| 22, |naprawde| 2622 | historia 3 dob | potkniecia {stum} (sesja {stum}).")
+            f"(warsztaty 752, wsie do gracza 0, do posiadaczy tytulu 8161), inne roznice 0 | srednio z 3 dob (sesja): |rozjazd| 22, |naprawde| 2622 | historia {hist} dob | potkniecia {stum} (sesja {stum}).")
 
 
 def prognoza345_synth():
@@ -98203,6 +98210,7 @@ def prognoza345_synth():
         "bigok": (run(fc=-20000, t=-21000), {"G1": "TAK"}),
         "irr": (run(t=9481, irr=12081), {"G1": "TAK", "G6": "INFO"}),
         "irrbad": (run(t=9481, irr=0), {"G1": "NIE"}),
+        "young": (run(fc=5190, hist=3), {"G1": "INFO"}),
         "short": (run(days=2, fc=5190), {"G1": "INFO"}),
         "stum": (run(stum=2), {"G3": "NIE"}),
         "nowire": (run(s=start.replace("wpiete.", "BRAK (brak DailyTickClan).")), {"G0": "NIE"}),
