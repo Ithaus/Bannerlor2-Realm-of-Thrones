@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 07.11.2026 15:10 CEST: WGRANIE 172 (najnowszy) = noc/349-zloto-murarz eb2d04f9+ (Armoury.dll d78974ab)
+- Zawiera: 343 (stan 171) + 345 (prognoza zlota = prawdziwy obieg, LandDuesFollowTitleHolder) + 347a/347c (poprawki prognozy po at346/at347) + 347e (Mason liczy przyspieszenie zlotem). BEZ 344 (AI bitew).
+- Test at349 (kopia zapisu Jeffa 02:31): kod 0, 13/13 bitew bez bledow, CS 23, Armoury 0 ERROR; prognoza345 G1 TAK (215 zl), budynki338 0 NIE (B338-8 TAK). NIE spoza zmiany: A333-4 wahadlo (bylo w at343), W335-7 (1 zblizenie lowcy) - kod bitew niezmieniony vs 171, losowosc bitew.
+- Kopia 171: Armoury.dll.bak-2026-11-07-przed-wgranie172 + D:/Backup-Bannerlord/wgrane/2026-11-07-wgranie172-przed (md5 9a33af56). Logi testow at346-at349 na D:/Backup-Bannerlord/logs/2026-11-07-at34*.
+- Po wgraniu sprawdzic w grze Jeffa: dymek budowy w Ashemark - linia "Mason (works with the paid builders)"; okno Expected Change wobec prawdziwej zmiany (linia "Prognoza zlota gracza (345)", --grupa prognoza345 po >= 4 dobach).
+- DALEJ: (1) 344 runda 3 na noc/347-bitwy-zloto-2 (n347): A344-3 wynik kontry 1/9 (kontra z jezdzcami nie dochodzi do strzelca), B344-1 0.78/min (podejrzany 347d-r zapadka Pendulum333), B344-6. (2) Spowolnienie: docs/RAPORT-SPOWOLNIENIE-2026-11-07.md - narastanie w sesji (doba 23 s -> 35 s po ~60 dobach) poza naszym taktem, sprawca nieznany; najpierw pomiar klatek mapy / GC (zadanie 1), potem sondy cen co 28 dob (2), swaty ROT (3). (3) Kolejka z PRZEKAZANIA 00:45 (BK z audytu 339 -> numery 350+).
+
 ## STAN 07.11.2026 ok. 14:50 CEST (to konto): w grze nadal WGRANIE 171; w toku test 349 + analiza spowolnienia
 - noc/347-bitwy-zloto-2 (worktree scratchpad tej sesji n347, HEAD c2a93c1f) = 346 + 347a/c (prognoza 345 naprawiona) + 347b/b-r/d/d-r (344 runda 1-2) + 347e (Mason).
   Test at348 (DLL 67b20432 = 347d-r, bez 347e): prognoza345 G1 TAK (163 zl, 6.7%); ai344 NIE: A344-3 1/9, B344-1 0.78/min (gorzej niz at346 0.46 - podejrzany 347d Pendulum333 zapadka), B344-3 1 (z wejscia pod ostrzalem), B344-6 2. TAK: A344-1/2/4/5/6/7/8. 344 NIE do wgrania - runda 3 do zrobienia.
