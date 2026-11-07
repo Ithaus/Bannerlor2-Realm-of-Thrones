@@ -97686,6 +97686,8 @@ G345_DAY = re.compile(r"Prognoza zlota gracza \(345\): dzien (-?\d+) \| klucz (T
                       r"\| kiesa naprawde (-?\d+) \(poza obiegiem (-?\d+):")
 G345_CLAN = re.compile(r"rozliczenie: zmiana kiesy (-?\d+), podglad modelu tuz przed (-?\d+) \(warsztaty (-?\d+), wsie do gracza (-?\d+), do posiadaczy tytulu (-?\d+)\), inne roznice (-?\d+)")
 G345_STUM = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
+# 347: pozycje taktu spoza prognozy (nieregularne - okupy, wojna); rozjazd w linii juz bez nich
+G345_IRR = re.compile(r"\| nieregularne poza prognoza ([+-]?\d+) \(")
 
 
 def prognoza345_collect(logp):
@@ -97713,6 +97715,8 @@ def prognoza345_collect(logp):
             r["cl"] = tuple(int(x) for x in mc.groups()) if mc else None
             ms = G345_STUM.search(line)
             r["stum"] = int(ms.group(1)) if ms else 0
+            mi = G345_IRR.search(line)
+            r["irr"] = int(mi.group(1)) if mi else 0
             D["day"].append(r)
     return D
 
@@ -97730,13 +97734,13 @@ def prognoza345_rows(rep, D):
     fc = [x for x in dd if x["fc"] is not None and x["diff"] is not None and x["key"] == "TAK"]
     if fc:
         ma = sum(abs(x["diff"]) for x in fc) / len(fc)
-        mt = sum(abs(x["t"]) for x in fc) / len(fc)
+        mt = sum(abs(x["t"] - x["irr"]) for x in fc) / len(fc)
         ms = sum(x["diff"] for x in fc) / len(fc)
         worst = max(fc, key=lambda x: abs(x["diff"]))
         ok = ma < 300 or (mt > 0 and ma < 0.10 * mt)
         rep.add("G1: rozjazd prognozy (poczatek doby) wobec prawdziwej zmiany obiegu (rozliczenie + takt doby + wozy prac)",
                 f"dob z prognoza {len(fc)}: srednio |rozjazd| {ma:.0f} zl, srednio rozjazd {ms:+.0f}, srednio |naprawde| {mt:.0f} ({(100.0 * ma / mt) if mt else 0:.1f}%); "
-                f"najgorsza doba {worst['day']}: prognoza {worst['fc']} (model {worst['model']}, poprawki {worst['corr']}), naprawde {worst['t']}, rozjazd {worst['diff']:+d}"
+                f"najgorsza doba {worst['day']}: prognoza {worst['fc']} (model {worst['model']}, poprawki {worst['corr']}), naprawde {worst['t']} (nieregularne {worst['irr']:+d}), rozjazd {worst['diff']:+d}"
                 + (f"; nierozpoznane {D['bad']}" if D["bad"] else ""),
                 "< 300 zl albo < 10% (>= 3 dob, mniej - INFO)", (None if len(fc) < 3 else ok) if not D["bad"] else False)
     else:
@@ -97751,14 +97755,18 @@ def prognoza345_rows(rep, D):
                 f"wyplat {len(cl)}: zmiana kiesy {sum(c[0] for c in cl) / len(cl):.0f}, podglad tuz przed {sum(c[1] for c in cl) / len(cl):.0f}, warsztaty {sum(c[2] for c in cl) / len(cl):.0f}, "
                 f"wsie do gracza {sum(c[3] for c in cl) / len(cl):.0f}, do posiadaczy tytulu {sum(c[4] for c in cl) / len(cl):.0f}, inne roznice {sum(c[5] for c in cl) / len(cl):.0f}",
                 "INFO", None)
+    irr = [x["irr"] for x in dd if x["fc"] is not None]
+    rep.add("G6: nieregularne pozycje taktu poza prognoza (347: okupy, wojna, rzadkie - rozjazd G1 bez nich)",
+            f"dob {len(irr)}, z nieregularnymi {sum(1 for v in irr if v)}, srednio |nieregularne| {(sum(abs(v) for v in irr) / len(irr)) if irr else 0:.0f} zl/dobe", "INFO", None)
     rep.add("G5: poza obiegiem (handel, lupy, okupy, zakupy gracza - bez prognozy)", f"srednio {sum(x['out'] for x in dd) / len(dd):.0f} zl/dobe, kiesa srednio "
             f"{sum(x['purse'] for x in dd) / len(dd):.0f}", "INFO", None)
 
 
-def prognoza345_line(d, fc=-2600, t=-2622, diff=None, stum=0, n=1, key="TAK"):
-    diff = (t - fc) if diff is None else diff
+def prognoza345_line(d, fc=-2600, t=-2622, diff=None, stum=0, n=1, key="TAK", irr=None):
+    diff = (t - (irr or 0) - fc) if diff is None else diff
+    irs = "" if irr is None else f" | nieregularne poza prognoza {irr:+d} (RansomFlows.Daily {irr:+d} [Ransoms])"
     return (G345_P + f"dzien {d} | klucz {key} | rozliczenie rodu wpiete, wydatki panelu wpiete | prognoza wczoraj {fc} (model 5190, poprawki 345 {fc - 5190}: wsie do posiadaczy tytulu -8161) "
-            f"| naprawde dzis {t} = rozliczenie {t - 700} ({n}) + takt doby 675 + wozy prac 25 | rozjazd {diff:+d} (1.0%) | kiesa naprawde {t + 900} (poza obiegiem 900: handel, lupy, okupy, zakupy gracza) "
+            f"| naprawde dzis {t} = rozliczenie {t - 700} ({n}) + takt doby 675 + wozy prac 25 | rozjazd {diff:+d} (1.0%) | kiesa naprawde {t + 900} (poza obiegiem 900: handel, lupy, okupy, zakupy gracza){irs} "
             f"| takt doby wedlug modulow: TownFolk.Daily +1142 [Dues from your people (surplus tax, lord's rights)] | rozliczenie: zmiana kiesy -3322, podglad modelu tuz przed 4839 "
             f"(warsztaty 752, wsie do gracza 0, do posiadaczy tytulu 8161), inne roznice 0 | srednio z 3 dob (sesja): |rozjazd| 22, |naprawde| 2622 | historia 3 dob | potkniecia {stum} (sesja {stum}).")
 
@@ -97782,6 +97790,8 @@ def prognoza345_synth():
         "far": (run(fc=5190), {"G1": "NIE"}),
         "pct": (run(fc=-20000, t=-24000), {"G1": "NIE"}),
         "bigok": (run(fc=-20000, t=-21000), {"G1": "TAK"}),
+        "irr": (run(t=9481, irr=12081), {"G1": "TAK", "G6": "INFO"}),
+        "irrbad": (run(t=9481, irr=0), {"G1": "NIE"}),
         "short": (run(days=2, fc=5190), {"G1": "INFO"}),
         "stum": (run(stum=2), {"G3": "NIE"}),
         "nowire": (run(s=start.replace("wpiete.", "BRAK (brak DailyTickClan).")), {"G0": "NIE"}),
@@ -97809,7 +97819,7 @@ def prognoza345_main(logp):
         s2 = prognoza345_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("G345-S: test syntetyczny (dobry 10 dob; prognoza z oknem +5190, rozjazd ponad 10%, duzy obieg w 10%, krotki bieg, potkniecia, rozliczenie BRAK, bez startu, log sprzed 345)",
+    rep.add("G345-S: test syntetyczny (dobry 10 dob; 347 nieregularne okupy poza prognoza / wliczone; prognoza z oknem +5190, rozjazd ponad 10%, duzy obieg w 10%, krotki bieg, potkniecia, rozliczenie BRAK, bez startu, log sprzed 345)",
             s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("G345-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)

@@ -29,7 +29,8 @@ namespace Armoury
     ///    (c) wyplata prac okregu przy powrocie wozu (DistrictWorks.OnCartReturn - NoteWorksCart); reszta zmiany kiesy (handel, lupy, okupy, zakupy gracza) - "poza obiegiem".
     ///    Historia 7 dob w zapisie (arm_prog345; brak klucza - pusto, linie poza modelem od pierwszej pelnej doby).
     ///  - Poprawki (cache na godzine gry i po kazdej dobie ksiegi): wsie do posiadaczy tytulu (ta sama regula co BK, teraz), warsztaty i wsie gracza - reszta do wyplaty
-    ///    (srednia z wyplat minus stan teraz), inne roznice przy wyplacie (srednia), pozycje taktu doby wedlug modulu (srednia z dob historii). Prace okregu i wioska poboczna
+    ///    (347: srednia wyplata x czesc doby do rozliczenia; tuz przed wyplata ~0), inne roznice przy wyplacie (srednia), pozycje taktu doby wedlug modulu (srednia z dob
+    ///    historii; 347: tylko regularne - etykieta w >= polowie dob historii; okupy, wojna i inne rzadkie poza prognoza, w linii dobowej osobno, rozjazd bez nich). Prace okregu i wioska poboczna
     ///    maja juz wlasne linie (DistrictWorks.AddView, SideVillageFief.AddLines) - w poprawkach pominiete, w ksiedze liczone.
     ///  - Panel Finance: dodatnie poprawki do przychodu, ujemne do wydatkow (tylko przy FinanceBox.In - nasze ksiegi liczace przychod rodu ich nie widza).
     /// Linia dobowa "Prognoza zlota gracza (345): dzien N | ..." - prognoza zrobiona na poczatku doby (koniec naszego taktu) wobec prawdziwej zmiany obiegu tej doby.
@@ -68,6 +69,10 @@ namespace Armoury
         private static bool _fcHave;
         private static long _fcTotal, _fcModel, _fcCorr;
         private static string _fcParts;
+        // 347: etykiety taktu doby wliczone do prognozy (pozycje regularne) - reszta dzisiejszego taktu = nieregularne, poza prognoza
+        private static HashSet<string> _fcLabels, _corrLabels;
+        // 347: godzina gry ostatniego rozliczenia rodu gracza (NaN - nieznana: od wczytania nie bylo wyplaty) - czesc doby do reszty warsztatow i wsi
+        private static double _lastPayH = double.NaN;
         // srednie rozjazdu (sesja) - do linii
         private static int _cmpN;
         private static long _cmpAbs, _cmpAbsT;
@@ -76,6 +81,7 @@ namespace Armoury
         {
             _hist.Clear(); _cur = null; _purse0 = 0; _lapGold = 0; _inTick = false; _stamp++;
             _fcHave = false; _fcTotal = _fcModel = _fcCorr = 0; _fcParts = null; _clanDiag = null;
+            _fcLabels = null; _corrLabels = null; _lastPayH = double.NaN;
             _cmpN = 0; _cmpAbs = _cmpAbsT = 0; _stumbles = 0;
             _cacheHour = int.MinValue; _corr = new List<Corr>();
         }
@@ -156,6 +162,7 @@ namespace Armoury
                     sb.Append(c.Log).Append(' ').Append(c.Amt >= 0 ? "+" : "").Append(c.Amt);
                 }
                 _fcTotal = all; _fcCorr = corr; _fcModel = all - corr; _fcParts = sb.Length > 0 ? sb.ToString() : "-";
+                _fcLabels = _corrLabels != null ? new HashSet<string>(_corrLabels, StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
                 _fcHave = true;
             }
             catch (Exception e) { _fcHave = false; Stumble("TickEnd", e); }
@@ -240,6 +247,7 @@ namespace Armoury
             try
             {
                 long c = Gold() - __state.G0;
+                try { _lastPayH = CampaignTime.Now.ToHours; } catch { _lastPayH = double.NaN; }
                 var d = _cur;
                 if (d != null)
                 {
@@ -407,35 +415,55 @@ namespace Armoury
                 foreach (var d in _hist) if (d.ClanN > 0) { np++; sw += d.WPay / d.ClanN; sv += d.VMe / d.ClanN; sr += d.Resid / d.ClanN; }
                 if (np > 0)
                 {
-                    long wNow = WorkshopsNow(fin);
-                    int dw = (int)Math.Round((double)sw / np - wNow);
-                    if (dw != 0) res.Add(new Corr { Amt = dw, Log = "warsztaty do wyplaty", Txt = new TextObject("{=!}Workshops: " + (dw > 0 ? "rest of today's profit" : "today's profit so far is above the usual") + " (payout " + Avg(np) + ")") });
-                    int dv = (int)Math.Round((double)sv / np - me);
-                    if (dv != 0) res.Add(new Corr { Amt = dv, Log = "wsie gracza do wyplaty", Txt = new TextObject("{=!}Village taxes: " + (dv > 0 ? "rest of today's sales" : "today's sales so far are above the usual") + " (payout " + Avg(np) + ")") });
+                    // 347 (test at346: "warsztaty do wyplaty" +1000..+2170 co dobe, a sam model + wsie do posiadaczy trafial w rozliczenie co do ~30 zl): stan "do tej chwili"
+                    // rosnie przez dobe, wiec reszta do wyplaty = srednia wyplata x czesc doby, ktora jeszcze zostala do rozliczenia ((1 - f), f = godziny od ostatniej
+                    // wyplaty / 24). Tuz przed wyplata f ~ 1 - model juz zawiera calosc, poprawka ~ 0. Bez znanej wyplaty od wczytania - bez poprawki (model jak jest).
+                    double f = double.NaN;
+                    if (!double.IsNaN(_lastPayH)) { try { f = (CampaignTime.Now.ToHours - _lastPayH) / 24.0; } catch { } }
+                    if (!double.IsNaN(f))
+                    {
+                        if (f < 0) f = 0; else if (f > 1) f = 1;
+                        int dw = (int)Math.Round((1.0 - f) * sw / np);
+                        if (dw != 0) res.Add(new Corr { Amt = dw, Log = "warsztaty do wyplaty", Txt = new TextObject("{=!}Workshops: rest of today's profit (payout " + Avg(np) + ")") });
+                        int dv = (int)Math.Round((1.0 - f) * sv / np);
+                        if (dv != 0) res.Add(new Corr { Amt = dv, Log = "wsie gracza do wyplaty", Txt = new TextObject("{=!}Village taxes: rest of today's sales (payout " + Avg(np) + ")") });
+                    }
                     int dr = (int)Math.Round((double)sr / np);
                     if (dr != 0) res.Add(new Corr { Amt = dr, Log = "inne roznice przy wyplacie", Txt = new TextObject("{=!}Other changes at the daily payout (" + Avg(np) + ")") });
                 }
                 // 5. nasz takt doby wedlug pozycji (srednia z dob historii; dzien bez wpisu = 0)
+                // 347 (test at346: okupy +12081 / -5859, wojna +9040, skarbiec zamku +3051 raz na 9 dob - srednia przenosila je na kazda dobe): do prognozy tylko
+                // pozycje regularne - etykieta obecna w co najmniej polowie dob historii; rzadsze (okupy, wojna, sprzedaze) - nieregularne, poza prognoza (linia dobowa je wypisuje).
                 int nd = _hist.Count;
+                var labs = new HashSet<string>(StringComparer.Ordinal);
                 if (nd > 0)
                 {
                     var sum = new Dictionary<string, long>(StringComparer.Ordinal);
+                    var days = new Dictionary<string, int>(StringComparer.Ordinal);
                     var order = new List<string>();
                     foreach (var d in _hist)
+                    {
+                        var seen = new HashSet<string>(StringComparer.Ordinal);
                         foreach (var kv in d.Laps)
                         {
                             bool shown; string lab = Label(kv.Key, out shown);
                             if (shown) continue;
                             long o; if (!sum.TryGetValue(lab, out o)) order.Add(lab);
                             sum[lab] = o + kv.Value;
+                            if (seen.Add(lab)) { int c0; days.TryGetValue(lab, out c0); days[lab] = c0 + 1; }
                         }
+                    }
                     foreach (var lab in order)
                     {
+                        int dn; days.TryGetValue(lab, out dn);
+                        if (dn * 2 < nd) continue;
+                        labs.Add(lab);
                         int a = (int)Math.Round((double)sum[lab] / nd);
                         if (a == 0) continue;
                         res.Add(new Corr { Amt = a, Log = lab, Txt = new TextObject("{=!}" + lab + " (" + Avg(nd) + ")") });
                     }
                 }
+                _corrLabels = labs;
             }
             catch (Exception e) { Stumble("Corrections", e); }
             _corr = res;
@@ -552,14 +580,25 @@ namespace Armoury
             try
             {
                 long t = d.Clan + d.Tick + d.Works;
+                // 347: pozycje taktu dzis spoza prognozy (etykieta nie weszla do prognozy jako regularna) - rozjazd liczony bez nich, wypisane osobno
+                long irr = 0; var irrSb = new StringBuilder();
+                if (_fcHave && _fcLabels != null)
+                    foreach (var kv in d.Laps)
+                    {
+                        bool sh; string lab = Label(kv.Key, out sh);
+                        if (sh || _fcLabels.Contains(lab)) continue;
+                        irr += kv.Value;
+                        if (irrSb.Length > 0) irrSb.Append(", ");
+                        irrSb.Append(kv.Key).Append(' ').Append(kv.Value >= 0 ? "+" : "").Append(kv.Value).Append(" [").Append(lab).Append(']');
+                    }
                 var sb = new StringBuilder(P);
                 sb.Append("dzien ").Append(d.Day).Append(" | klucz ").Append(On ? "TAK" : "NIE")
                   .Append(" | rozliczenie rodu ").Append(_clanWired ? "wpiete" : "BRAK (" + _clanWhy + ")").Append(", wydatki panelu ").Append(_expWired ? "wpiete" : "BRAK");
                 if (_fcHave)
                 {
-                    long diff = t - _fcTotal;
+                    long diff = (t - irr) - _fcTotal;
                     double pct = _fcTotal != 0 ? 100.0 * diff / Math.Abs(_fcTotal) : 0;
-                    _cmpN++; _cmpAbs += Math.Abs(diff); _cmpAbsT += Math.Abs(t);
+                    _cmpN++; _cmpAbs += Math.Abs(diff); _cmpAbsT += Math.Abs(t - irr);
                     sb.Append(" | prognoza wczoraj ").Append(_fcTotal).Append(" (model ").Append(_fcModel).Append(", poprawki 345 ").Append(_fcCorr).Append(": ").Append(_fcParts).Append(')')
                       .Append(" | naprawde dzis ").Append(t).Append(" = rozliczenie ").Append(d.Clan).Append(" (").Append(d.ClanN).Append(") + takt doby ").Append(d.Tick)
                       .Append(" + wozy prac ").Append(d.Works)
@@ -570,6 +609,7 @@ namespace Armoury
                       .Append(" | naprawde dzis ").Append(t).Append(" = rozliczenie ").Append(d.Clan).Append(" (").Append(d.ClanN).Append(") + takt doby ").Append(d.Tick)
                       .Append(" + wozy prac ").Append(d.Works).Append(" | rozjazd -");
                 sb.Append(" | kiesa naprawde ").Append(d.Purse).Append(" (poza obiegiem ").Append(d.Purse - t).Append(": handel, lupy, okupy, zakupy gracza)");
+                if (_fcHave) sb.Append(" | nieregularne poza prognoza ").Append(irr >= 0 ? "+" : "").Append(irr).Append(" (").Append(irrSb.Length > 0 ? irrSb.ToString() : "-").Append(')');
                 sb.Append(" | takt doby wedlug modulow: ");
                 if (d.Laps.Count == 0) sb.Append('-');
                 else
