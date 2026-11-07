@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 353 - CrashScribe: pamiec StrategicCampaignAI145 NearbyEnemyLordStrength na godzine gry (noc/352-prognoza-bez-korony po 352r; NIE WGRANE)
+**Problem:** Jeff 07.11 ~19:20: mapa coraz wolniejsza - srednia klatka mapy 92 ms wobec 16 ms wczesniej (Jeff: "to sie dopiero niedawno zaczelo, wczesniej tego nie bylo"). Probnik stosu ClrMD
+(300 migawek watku glownego zywej sesji, mapa w biegu): 52 ze 137 migawek taktu gry w StrategicCampaignAI145.StrategicAiHelpers.NearbyEnemyLordStrength(Settlement, IFaction, float),
+wolanej z StrategicTargetScoreModel.GetTargetScoreForFaction (NearbyEnemyLordStrength(cel, mobileParty.MapFaction, 95f) > ourStrength * 1.25f) <- AiMilitaryBehavior.FindBestTargetAndItsValueForFaction
+<- CalculateMilitaryBehaviorForSettlement <- AiHourlyTick <- ROT AIThinkPatch.PartyHourlyAiTick <- TickPartialHourlyAi. Wczesniejszy profil (docs/STAN-PRAC.md ok. linii 1775): StrategicCampaignAI 2% czasu.
+**Przyczyna:** cialo (dekompilacja StrategicCampaignAI145.dll): suma GetTotalLandStrengthWithFollowers(false) po WSZYSTKICH MobileParty.AllLordParties aktywnych wrogow frakcji w promieniu - przy kazdym
+wolaniu; kazda sila idzie przez GetPowerOfParty (NavalDLC / ROT, nasz postfiks Armoury p9 "sila z uzbrojeniem" od 25.10) -> MobileParty.Morale -> postfiks BK BKPartyMoraleTweakPatches.GetEffectivePartyMorale
+(potrzeby zaopatrzenia BK, odczyty MCM, TextObject, nasze postfiksy BkSupplyTemper). Ten sam cel / frakcja / promien pytany jest w jednej godzinie przez kazda partie AI tej frakcji.
+[nie wiem] dlaczego dopiero teraz (Jeff tego wczesniej nie widzial): SAI145.dll bez zmian od 25.07; kandydaci - wiecej wojen naraz (wiecej par wrog-cel), wiecej partii lordow, drozsza sila jednej partii
+(p9, morale BK). Linia doby 353 pokaze, ktore cele i frakcje dominuja (np. Ashemark gracza / Polnoc po odejsciu rodu z S9) - to rozstrzygnie albo obali to podejrzenie.
+**Zmiana (CrashScribe; nowy src/SaiStrength353.cs, wpiecie w MendsBehavior, nowy klucz settings.xml SaiStrengthCache - CrashScribe nie ma MCM, ustawienia sa w ModuleData/CrashScribe.settings.xml):**
+- Prefiks Priority.First + postfiks Priority.Last na StrategicAiHelpers.NearbyEnemyLordStrength (AccessTools.TypeByName("StrategicCampaignAI145.StrategicAiHelpers") + AccessTools.DeclaredMethod z sygnatura;
+  bez referencji do SAI). Wpiecie raz na proces przy pierwszym OnSessionLaunched, Harmony CrashScribe (Mends.LateHarmony), tylko przy SaiStrengthCache=true; po Patch sprawdzenie Harmony.GetPatchInfo
+  (oba wpiete? inaczej OSTRZEZENIE i zdjecie polowy tym samym MethodInfo). Mod nieobecny = linia "nieobecny", nic nie zmienione.
+- Pamiec: klucz (osada, frakcja, promien; rownosc po referencji) -> wynik ORYGINALU z pierwszego wolania w tej godzinie ((int)CampaignTime.Now.ToHours). Trafienie - oddajemy ta liczbe bez liczenia;
+  brak - oryginal liczy, postfiks zapisuje. Wartosci nie zmieniamy nigdy. Czyszczenie: zmiana godziny, konstruktor MendsBehavior (nowa gra / wczytanie), OnSessionLaunched, OnGameEnd (nowy override
+  w SubModuleMain). Bez Campaign.Current albo z null w argumentach - oryginal, bez pamieci. Wyjatek w naszym kodzie - potkniecie (licznik; pierwsze 3 z linia), oryginal liczy - bez globalnego wylacznika.
+- Liczniki tanie (lock + inkrementy w slownikach, bez LINQ i napisow na wolanie); czas liczenia Stopwatch.GetTimestamp w __state (prefiks -> postfiks, tylko liczone wolania).
+- Linia startu: "Mends: SAI sila wrogow (353) - pamiec wyniku na godzine gry wpieta TAK (<typ>.NearbyEnemyLordStrength, prefiks i postfiks potwierdzone w Harmony.GetPatchInfo, cudzych latek na celu N); ..."
+  albo "... - wylaczone (SaiStrengthCache=false) ..." / "... - StrategicCampaignAI145 nieobecny (...) - nic nie zmienione."
+- Linia doby (DailyTickEvent, tylko przy wpietej latce): "Mends: SAI sila wrogow (353) - dzien N (ostatnia doba) | wolan X, z pamieci Y (Z%), liczone W, czas liczenia T ms (srednio U ms) |
+  najczestsze cele: <osada (id)> / <frakcja (id)> xN, ... (5; par cel-frakcja K) | frakcje pytajace: <frakcja (id)> xN, ... (5; frakcji K) | od wczytania: wolan, z pamieci (%), liczone, czas liczenia ms |
+  potkniecia doby P, od wczytania Q."
+**Ryzyko / co sprawdzic (zasada 0):** (a) regresje - grep po repo: nikt nie patchuje StrategicAiHelpers ani StrategicTargetScoreModel (Armoury tylko opisuje SAI w komentarzach; latki Armoury na
+CampaignEventDispatcher.AiHourlyTick, GetPowerOfParty (p9), GetEffectivePartyMorale (BkrotChains) - inne metody, bez zmian); w Modules nazwe StrategicAiHelpers maja tylko DLL SAI (stary StrategicCampaignAI.dll
+nie jest ladowany - SubModule.xml wskazuje StrategicCampaignAI145.dll). Linia startu podaje liczbe cudzych latek na celu. (b) kolizje - NearbyEnemyLordStrength wolaja w SAI takze ocena zagrozenia
+twierdz (80f), cel wojny (DefendCapitalRegion, 80f) i wybor celow (95f) - wszystkie dostaja w tej samej godzinie liczbe z pierwszego wolania: partie ruszaja sie w ciagu godziny, wiec ocena moze byc
+nieaktualna o najwyzej 1 h ruchu (zgoda Jeffa na pamiec godzinowa). Wyjatek oryginalu leci jak dotad (postfiks nie biegnie, nic nie zapisane). (c) spojnosc - pamiec czyszczona miedzy kampaniami (trzy miejsca);
+klucz po referencji - stare obiekty nie trafiaja do nowej gry. (d) watki - wolanie na watku glownym (probnik); lock na wszelki wypadek, oryginal liczy poza lockiem. (e) koszt - na wolanie 3 wyszukania w slownikach;
+slowniki doby rosna z liczba par cel-frakcja (czyszczone co dobe). (f) Modules/BKROTPatch/BKROTLog.txt - finalizer BKROTPatch nie dotyczy (nasza Harmony, cel sprawdzany w GetPatchInfo).
+(g) W grze: linia startu "wpieta TAK", linia doby: odsetek z pamieci (oczekiwane > 80%), czas liczenia, czy Ashemark / Polnoc w najczestszych; srednia klatka mapy (Armoury 350 / f9) wobec 92 ms.
+**Status:** DO SPRAWDZENIA - NIE WGRANE (build CrashScribe 0 bledow, 0 ostrzezen; gra nieuruchamiana).
+
 ## 352 - prognoza zlota bez pozycji korony u rodu bez krolestwa (noc/352-prognoza-bez-korony od WGRANIA 174; NIE WGRANE)
 **Problem:** Jeff 07.11 (zrzut "Expected Change" po odejsciu rodu KARDA z Polnocy z lennami - Mend S9: rod bez krolestwa; economy CSV doba 109592: kolumna krolestwa pusta): podpowiedz dalej pokazuje
 "Rent from the crown (average of the last 3 days) -1025" i "Dues to the crown (average of the last 3 days) -17". Armoury-2026-11-07_17-34-39.log, linie "Prognoza zlota gracza (345)": doba 109590

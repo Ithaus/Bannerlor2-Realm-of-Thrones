@@ -2856,6 +2856,7 @@ namespace CrashScribe
         // nie jest dostepny (CrashScribe nie ma referencji do BK) - skladowe BK czytane refleksja, wartosci co wywolanie
         // (BK tez czyta Instance.CommanderWarband przy kazdym wywolaniu; atuty rejestrowane od nowa w kazdej kampanii).
         private static Harmony _lateHarmony;          // z Install
+        internal static Harmony LateHarmony { get { return _lateHarmony; } }   // 353: SaiStrength353 wpina sie ta sama Harmony
         private static bool _bkRewardChecked;         // raz na proces (latki BK tez raz na proces - BK Main._patchesInstalled)
         private static PropertyInfo _bkCfgInst, _bkEduMgr, _bkEduLife, _bkPerksInst, _bkWarband, _bkSellswords, _bkLifeInst, _bkCataphract, _bkLifeName;
         private static MethodInfo _bkGetEdu, _bkHasPerk;
@@ -6619,7 +6620,7 @@ namespace CrashScribe
     internal sealed class MendsBehavior : CampaignBehaviorBase
     {
         // B6b: stan oblezenia Harrenhal od zera przy kazdej nowej grze i wczytaniu (zachowanie tworzone w OnGameStart); B6c: tak samo Mur
-        public MendsBehavior() { Mends.HarrenhalResetSession(); Mends.WallResetSession(); Mends.ResetBkEducationCheck(); }   // E8/M: linia jezyka gracza raz na gre
+        public MendsBehavior() { Mends.HarrenhalResetSession(); Mends.WallResetSession(); Mends.ResetBkEducationCheck(); SaiStrength353.Reset(); }   // E8/M: linia jezyka gracza raz na gre; 353: pamiec sily wrogow SAI od zera
 
         public override void RegisterEvents()
         {
@@ -6632,7 +6633,7 @@ namespace CrashScribe
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m, PartyBase a, PartyBase d) { OthersSteel.OnMapEventStarted(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); Mends.BkRewardPerks(); Mends.BkRebelKingdoms(); });   // decyzja 4: atuty BK po OnGameStart BK; S9: BK bez krolestw z buntu
+                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); Mends.BkRewardPerks(); Mends.BkRebelKingdoms(); SaiStrength353.Session(); });   // decyzja 4: atuty BK po OnGameStart BK; S9: BK bez krolestw z buntu; 353: pamiec sily wrogow SAI
             // S9 (pomiar): rod buntownikow po 30 dobach - linia (BK MakeRebelKingdom slucha tego samego zdarzenia)
             CampaignEvents.RebelliousClanDisbandedAtSettlement.AddNonSerializedListener(this, delegate (Settlement st, Clan c) { Mends.BkRebelClanDisbanded(st, c); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
@@ -6647,6 +6648,7 @@ namespace CrashScribe
                     Army175.RespawnDaily();   // 175: partie lordow AI z szablonu (konni bez konia z odrodzenia)
                     OthersSteel.Daily();      // 175c: suwaki zasady stali Innych, linia dobowa bitew z Innymi
                     Mends.HeroSinewAll("dzien");   // Z16: przeglad bohaterow AI (drogi omijajace gardlo; normalnie 0)
+                    SaiStrength353.Daily();   // 353: linia doby pamieci sily wrogow StrategicCampaignAI145
                 });
             // Z16: bohaterowie AI ubrani z szablonu od ostatniej godziny - umiejetnosc do nowego zestawu
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, delegate { Mends.HeroSinewQueue(); Mends.HarrenhalOldSaveCheck(); Mends.WallOldSaveCheck(); });   // B6b/B6c: naprawa zapisu raz, na pierwszej godzinie

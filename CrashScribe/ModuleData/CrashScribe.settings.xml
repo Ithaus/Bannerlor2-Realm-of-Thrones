@@ -548,4 +548,11 @@
        propose it: the game took his influence first and only then cancelled the vote. With this on, such a proposal is simply not made
        and the lord keeps his influence; every other peace proposal is unchanged. Set to false for the old behaviour. -->
   <PeaceSkipForbiddenProposal>true</PeaceSkipForbiddenProposal>
+  <!-- Cache StrategicCampaignAI enemy strength per hour (needs Strategic Campaign AI). That mod's AI asks, for every target it weighs,
+       how strong the enemy lords around it are, and each time it goes over every lord party in the world - the same town, realm and
+       distance many times in the same in-game hour. With this on, the first answer in an hour is kept and handed back for the rest of that
+       hour; the number is always the one the mod itself computed, it is never changed. A daily line "Mends: SAI sila wrogow (353)" in the
+       CrashScribe log shows how many questions were answered from memory and which towns and realms are asked about most.
+       Set SaiStrengthCache to false to let the mod compute every time (takes effect after restarting the game). -->
+  <SaiStrengthCache>true</SaiStrengthCache>
 </CrashScribe>

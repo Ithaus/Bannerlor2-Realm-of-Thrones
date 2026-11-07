@@ -185,6 +185,12 @@ namespace CrashScribe
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
         }
 
+        public override void OnGameEnd(Game game)
+        {
+            try { SaiStrength353.Reset(); } catch { }   // 353: pamiec sily wrogow SAI nie trzyma obiektow skonczonej kampanii
+            base.OnGameEnd(game);
+        }
+
         protected override void OnSubModuleUnloaded()
         {
             Watchdog.Closing("OnSubModuleUnloaded");   // m105-drobne (8a): po wyladowaniu modulow watek glowny nie bije - bez falszywego hang-*.log (nie rzuca)
