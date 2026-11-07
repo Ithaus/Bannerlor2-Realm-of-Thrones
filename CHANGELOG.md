@@ -1,5 +1,30 @@
 # DZIENNIK ZMIAN
 
+## 352 - prognoza zlota bez pozycji korony u rodu bez krolestwa (noc/352-prognoza-bez-korony od WGRANIA 174; NIE WGRANE)
+**Problem:** Jeff 07.11 (zrzut "Expected Change" po odejsciu rodu KARDA z Polnocy z lennami - Mend S9: rod bez krolestwa; economy CSV doba 109592: kolumna krolestwa pusta): podpowiedz dalej pokazuje
+"Rent from the crown (average of the last 3 days) -1025" i "Dues to the crown (average of the last 3 days) -17". Armoury-2026-11-07_17-34-39.log, linie "Prognoza zlota gracza (345)": doba 109590
+CrownRents.Daily -1575 [Rent from the crown] (W6b tarczowe w kroku rent), KingdomTreasury.Daily -25 [Dues to the crown]; doba 109591 (po odejsciu) zaden z tych modulow kiesy nie ruszyl;
+najgorsza doba G1 109591: prognoza -4280, naprawde -2333, rozjazd +1947.
+**Przyczyna:** GoldForecast.Corrections (345/347c) bierze pozycje taktu doby z historii 7 dob wedlug modulu (regularne: >= polowa dob i >= 2 doby, kwota - srednia 3 ostatnich), bez wzgledu na to,
+czy rod byl wtedy w tym samym krolestwie co teraz. Doby wasala zostaja w historii (i w zapisie arm_prog345) jeszcze do 7 dob po odejsciu.
+**Zmiana (tylko GoldForecast.cs - widok; ile gracz dostaje, sie nie zmienia):**
+- DayRec.Kng: krolestwo rodu gracza (StringId, "" - bez krolestwa) zapisane na poczatku naszego taktu doby (TickBegin) - to stan, przy ktorym biegly moduly korony tej doby.
+- Moduly korony (IsCrownKey, sprawdzone w kodzie kazdego): KingdomTreasury.*, CrownRents., CrownWar314., CrownGifts., CrownBorrow., CrownCallToWar., MercContract., MercTenure., Ransom178.ThirdsSettle.
+  NIE: CrownIncome.Reparations (rata okupu krola do wierzyciela-bohatera bez wzgledu na jego krolestwo; Begin/End kiesy nie ruszaja), Ransom178.CrownStep (nagroda z zapamietanej korony - placona
+  takze po odejsciu), CouncilWages35, GentryService.
+- Corrections: wpis modulu korony z doby w innym krolestwie traktowany jak brak wpisu (licznik dob regularnosci i suma do sredniej 3 dob; mianowniki bez zmian - ta sama regula co "dzien bez wpisu = 0").
+  Rod bez krolestwa - pozycje korony znikaja calkiem. Pamiec poprawek (godzina + historia) liczona od nowa takze przy zmianie krolestwa w tej samej godzinie.
+- Zapis arm_prog345: 12. pole doby = krolestwo (tag "g345|1|" bez zmian; stary DLL czyta pola 0-10 i pomija nowe). Doba z zapisu sprzed 352 (pole brak = nieznane) liczy sie do pozycji korony
+  tylko gdy rod jest teraz w krolestwie: historia to najwyzej 7 dob (zwykle to samo krolestwo), a rod bez krolestwa nie ma z korona zadnego przeplywu - wiec u Jeffa po wgraniu poprawka dziala od razu.
+- Linia dobowa: dopisek " | korona prognozy (352): krolestwo <id|brak>, dob historii w tym krolestwie N, moduly korony w prognozie M" (przed "srednio z").
+- tools/sprawdz_logi.py grupa prognoza345: G7 (krolestwo brak -> N = 0 i M = 0; bez dob bez krolestwa / log sprzed 352 - INFO); G345-S: przypadki kng (INFO), nokng (TAK), nokngbad (NIE).
+**Ryzyko / co sprawdzic:** grep czytelnikow: _hist/Laps czyta tylko GoldForecast (Corrections 2-4 bez zmian - rozliczenie rodu; 5 - nowy filtr; Line - nieregularne wedlug _fcKeys, spojne: modul korony
+poza prognoza po odejsciu wyjdzie jako "nieregularne", nie jako rozjazd); Reset czysci nowe pola; Import/Export zgodne w obie strony. Inne pozycje, progi 347c i etykiety bez zmian. Doba odejscia:
+prognoza zrobiona rano jako wasal ma jeszcze korone - rozjazd tej jednej doby zostaje (prawdziwa zmiana stanu). W grze: po odejsciu z krolestwa podpowiedz bez "Rent from the crown" / "Dues to the crown";
+w logu "korona prognozy (352): krolestwo brak, dob historii w tym krolestwie 0, moduly korony w prognozie 0"; po wejsciu do nowego krolestwa pozycje korony wracaja od 2. doby w nim (regula 347c).
+Na logu Jeffa 07.11 G1 NIE (rozjazd 522 zl/dobe, 16.5%) - stan sprzed 352, najgorsza doba to doba odejscia.
+**Status:** DO SPRAWDZENIA - NIE WGRANE (build 0 bledow, G345-S TAK; gra nieuruchamiana).
+
 ## WGRANIE 174 - 351 = 344 (AI bitew: 344, 344r, 347b/b-r, 347d/d-r, 347f/f-r, 347g/g-r) + 350 (pomiar) na 173 (Armoury.dll acd118c2)
 **Decyzja Jeffa 07.11 ~16:25:** "1" = wgrac 344 mimo A344-3 i B344-1 (pytanie: zawracanie tylem pod ostrzalem naprawione, slaby wynik kontry dotyczy testowej przynety; B344-1 = stare wahadlo 333, w bazie bez 344 gorzej).
 **Test at351:** kod 0, 13/13 bitew, 0 ERROR; ai344 TAK A344-1/2/4/6/7/8, B344-2/6/7, X344, A344-T; NIE A344-3 1/11 (6 kontr bez wolnych jezdzcow - Nw "daleko" i "strefa 333"), B344-1 0.49/min, B344-3 1. Reszta jak at349/at350.

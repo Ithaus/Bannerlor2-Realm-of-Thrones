@@ -54,6 +54,8 @@ namespace Armoury
             public int Day;
             public long Clan, Pre, WPay, VMe, VOther, Resid, Works, Purse, Tick;
             public int ClanN;
+            // 352: krolestwo rodu gracza na poczatku naszego taktu tej doby (StringId; "" - rod bez krolestwa; null - nieznane: doba z zapisu sprzed 352)
+            public string Kng;
             public Dictionary<string, long> Laps = new Dictionary<string, long>(StringComparer.Ordinal);
         }
 
@@ -69,6 +71,9 @@ namespace Armoury
         private static bool _fcHave;
         private static long _fcTotal, _fcModel, _fcCorr;
         private static string _fcParts;
+        // 352: krolestwo, z ktorym zrobiono prognoze, doby historii w tym krolestwie i moduly korony wliczone do prognozy (do linii dobowej)
+        private static string _fcKng;
+        private static int _fcKngDays, _fcCrownKeys;
         // 347: moduly taktu doby wliczone do prognozy (pozycje regularne) - reszta dzisiejszego taktu = nieregularne, poza prognoza
         private static HashSet<string> _fcKeys, _corrKeys;
         // 347: godzina gry ostatniego rozliczenia rodu gracza (NaN - nieznana: od wczytania nie bylo wyplaty) - czesc doby do reszty warsztatow i wsi
@@ -80,7 +85,7 @@ namespace Armoury
         internal static void Reset()
         {
             _hist.Clear(); _cur = null; _purse0 = 0; _lapGold = 0; _inTick = false; _stamp++;
-            _fcHave = false; _fcTotal = _fcModel = _fcCorr = 0; _fcParts = null; _clanDiag = null;
+            _fcHave = false; _fcTotal = _fcModel = _fcCorr = 0; _fcParts = null; _clanDiag = null; _fcKng = null; _fcKngDays = _fcCrownKeys = 0; _cacheKng = null;
             _fcKeys = null; _corrKeys = null; _lastPayH = double.NaN;
             _cmpN = 0; _cmpAbs = _cmpAbsT = 0; _stumbles = 0;
             _cacheHour = int.MinValue; _corr = new List<Corr>();
@@ -117,7 +122,7 @@ namespace Armoury
                     _stamp++;
                     Line(done);
                 }
-                _cur = new DayRec { Day = Today() };
+                _cur = new DayRec { Day = Today(), Kng = KngNow() };
                 _purse0 = g; _lapGold = g; _inTick = true;
             }
             catch (Exception e) { _inTick = false; Stumble("TickBegin", e); }
@@ -163,6 +168,9 @@ namespace Armoury
                 }
                 _fcTotal = all; _fcCorr = corr; _fcModel = all - corr; _fcParts = sb.Length > 0 ? sb.ToString() : "-";
                 _fcKeys = _corrKeys != null ? new HashSet<string>(_corrKeys, StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
+                _fcKng = KngNow(); _fcKngDays = 0; _fcCrownKeys = 0;
+                foreach (var d in _hist) if (SameKng(d, _fcKng)) _fcKngDays++;
+                foreach (var k in _fcKeys) if (IsCrownKey(k)) _fcCrownKeys++;
                 _fcHave = true;
             }
             catch (Exception e) { _fcHave = false; Stumble("TickEnd", e); }
@@ -174,6 +182,42 @@ namespace Armoury
             var b = new StringBuilder(name.Length);
             foreach (char ch in name) b.Append(ch == '~' || ch == '#' || ch == ';' || ch == '=' || ch == ',' || ch == '|' ? '_' : ch);
             return b.ToString();
+        }
+
+        // ------------------------------------------------------------ 352: pozycje korony tylko z dob w tym samym krolestwie
+        // Jeff 07.11 (rod KARDA odszedl z Polnocy z lennami, Mend S9 - rod bez krolestwa): podpowiedz dalej pokazywala "Rent from the crown -1025" i "Dues to the crown -17"
+        // ze sredniej dob, gdy rod byl wasalem. Moduly, ktorych przeplyw z kiesa gracza istnieje TYLKO przez czlonkostwo w krolestwie (sprawdzone w kodzie modulow):
+        //  - KingdomTreasury.* - powinnosci rodow krolestwa (c.Kingdom), daniny/clo/mennica do wladcy, zwrot zoldu wasalom, W5/W6/W7 (plan krolestwa w wojnie);
+        //  - CrownRents. (renty 180 rodom krolestwa wedlug lenn; w tym kroku W5/W6b tarczowe), CrownWar314. (c.Kingdom == k), CrownGifts. (rody krolestwa odbiorcy),
+        //    CrownBorrow. (kredyt korony), CrownCallToWar. (portfele krolestw), MercContract./MercTenure. (sluzba najemna u korony);
+        //  - Ransom178.ThirdsSettle (1/9 lupow do skarbca OBECNEGO krolestwa gracza; bez krolestwa - wpis skreslony).
+        // NIE: CrownIncome.Reparations (rata okupu krola placi wierzyciela-bohatera bez wzgledu na jego krolestwo; Begin/End kiesy nie ruszaja),
+        // Ransom178.CrownStep (nagroda za wielkiego jenca z zapamietanej korony - placona takze po odejsciu), CouncilWages35, GentryService (miedzy bohaterami).
+        private static readonly string[] CrownKeys =
+        {
+            "KingdomTreasury.", "CrownRents.", "CrownWar314.", "CrownGifts.", "CrownBorrow.", "CrownCallToWar.", "MercContract.", "MercTenure.", "Ransom178.ThirdsSettle",
+        };
+
+        internal static bool IsCrownKey(string k)
+        {
+            if (k == null) return false;
+            foreach (var p in CrownKeys) if (k.StartsWith(p, StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        /// <summary>Krolestwo rodu gracza teraz: StringId, "" - bez krolestwa (najemnik ma Kingdom pracodawcy).</summary>
+        private static string KngNow()
+        {
+            try { var c = Clan.PlayerClan; var k = c != null ? c.Kingdom : null; return k != null && k.StringId != null ? Key(k.StringId) : ""; }
+            catch { return ""; }
+        }
+
+        /// <summary>Doba historii liczy sie do pozycji korony: to samo krolestwo co teraz. Doba z zapisu sprzed 352 (Kng null) - tylko gdy rod jest teraz w krolestwie
+        /// (historia to najwyzej 7 dob - zwykle to samo krolestwo; rod bez krolestwa nie ma z korona zadnego przeplywu, wiec stare doby nie moga mu nic dac).</summary>
+        private static bool SameKng(DayRec d, string now)
+        {
+            if (d.Kng == null) return now.Length > 0;
+            return string.Equals(d.Kng, now, StringComparison.Ordinal);
         }
 
         /// <summary>DistrictWorks.OnCartReturn: wyplata prac okregu glowie rodu przy powrocie wozu (poza taktem doby). Tylko gracz.</summary>
@@ -380,6 +424,7 @@ namespace Armoury
 
         private static List<Corr> _corr = new List<Corr>();
         private static int _cacheHour = int.MinValue, _cacheStamp = -1;
+        private static string _cacheKng;   // 352: zmiana krolestwa w tej godzinie - poprawki od nowa
 
         private static string Avg(int n) { return n == 1 ? "yesterday" : "average of the last " + n + " days"; }
 
@@ -387,8 +432,9 @@ namespace Armoury
         {
             int hour = int.MinValue;
             try { hour = (int)CampaignTime.Now.ToHours; } catch { }
-            if (hour == _cacheHour && _cacheStamp == _stamp) return _corr;
-            _cacheHour = hour; _cacheStamp = _stamp;
+            string kng = KngNow();
+            if (hour == _cacheHour && _cacheStamp == _stamp && string.Equals(kng, _cacheKng, StringComparison.Ordinal)) return _corr;
+            _cacheHour = hour; _cacheStamp = _stamp; _cacheKng = kng;
             var res = new List<Corr>();
             try
             {
@@ -441,8 +487,16 @@ namespace Armoury
                 if (nd > 0)
                 {
                     var days = new Dictionary<string, int>(StringComparer.Ordinal);
+                    // 352: pozycja korony z doby w innym krolestwie (albo sprzed odejscia) = brak wpisu w tej dobie (jak dzien bez wpisu); rod bez krolestwa - zadnej
                     foreach (var d in _hist)
-                        foreach (var kv in d.Laps) { int c0; days.TryGetValue(kv.Key, out c0); days[kv.Key] = c0 + 1; }   // Laps - jeden wpis na modul w dobie
+                    {
+                        bool same = SameKng(d, kng);
+                        foreach (var kv in d.Laps)
+                        {
+                            if (!same && IsCrownKey(kv.Key)) continue;
+                            int c0; days.TryGetValue(kv.Key, out c0); days[kv.Key] = c0 + 1;   // Laps - jeden wpis na modul w dobie
+                        }
+                    }
                     // 347c: regularny = w >= polowie dob historii i w co najmniej 2 dobach (przy 1 dobie historii nic nie jest "regularne" - prognoza = model);
                     // kwota = srednia z ostatnich 3 dob (symulacja na at346/at347: 3 doby lapia skoki poziomu, np. TownFolk.Daily 30 -> 900, lepiej niz 7)
                     foreach (var kv in days) if (kv.Value * 2 >= nd && kv.Value >= 2) keys.Add(kv.Key);
@@ -450,14 +504,18 @@ namespace Armoury
                     var sum = new Dictionary<string, long>(StringComparer.Ordinal);
                     var order = new List<string>();
                     for (int hi = nd - na; hi < nd; hi++)
+                    {
+                        bool same = SameKng(_hist[hi], kng);
                         foreach (var kv in _hist[hi].Laps)
                         {
                             if (!keys.Contains(kv.Key)) continue;
+                            if (!same && IsCrownKey(kv.Key)) continue;   // 352: kwota korony tylko z dob w tym samym krolestwie (inne = 0)
                             bool shown; string lab = Label(kv.Key, out shown);
                             if (shown) continue;
                             long o; if (!sum.TryGetValue(lab, out o)) order.Add(lab);
                             sum[lab] = o + kv.Value;
                         }
+                    }
                     foreach (var lab in order)
                     {
                         int a = (int)Math.Round((double)sum[lab] / na);
@@ -627,6 +685,9 @@ namespace Armoury
                     if (ks.Count > 20) sb.Append(", ... (").Append(ks.Count - 20).Append(" wiecej)");
                 }
                 sb.Append(" | ").Append(_clanDiag ?? "rozliczenie: brak w tej dobie");
+                if (_fcHave)
+                    sb.Append(" | korona prognozy (352): krolestwo ").Append(string.IsNullOrEmpty(_fcKng) ? "brak" : _fcKng).Append(", dob historii w tym krolestwie ").Append(_fcKngDays)
+                      .Append(", moduly korony w prognozie ").Append(_fcCrownKeys);
                 double avgAbs = _cmpN > 0 ? (double)_cmpAbs / _cmpN : 0, avgT = _cmpN > 0 ? (double)_cmpAbsT / _cmpN : 0;
                 sb.Append(" | srednio z ").Append(_cmpN).Append(" dob (sesja): |rozjazd| ").Append(avgAbs.ToString("0", Inv)).Append(", |naprawde| ").Append(avgT.ToString("0", Inv))
                   .Append(" | historia ").Append(_hist.Count).Append(" dob | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumblesSess).Append(").");
@@ -637,7 +698,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zapis (arm_prog345)
-        /// <summary>"g345|1|doba,rozliczenie,n,podglad,warsztaty,wsie_gracza,wsie_innych,reszta,wozy,kiesa,takt#modul=kwota;...~..." - 7 dob historii. null - brak historii.</summary>
+        /// <summary>"g345|1|doba,rozliczenie,n,podglad,warsztaty,wsie_gracza,wsie_innych,reszta,wozy,kiesa,takt[,krolestwo 352]#modul=kwota;...~..." - 7 dob historii. null - brak historii.</summary>
         internal static string Export()
         {
             try
@@ -649,7 +710,10 @@ namespace Armoury
                     var d = _hist[i];
                     if (i > 0) sb.Append('~');
                     sb.Append(d.Day).Append(',').Append(d.Clan).Append(',').Append(d.ClanN).Append(',').Append(d.Pre).Append(',').Append(d.WPay).Append(',').Append(d.VMe)
-                      .Append(',').Append(d.VOther).Append(',').Append(d.Resid).Append(',').Append(d.Works).Append(',').Append(d.Purse).Append(',').Append(d.Tick).Append('#');
+                      .Append(',').Append(d.VOther).Append(',').Append(d.Resid).Append(',').Append(d.Works).Append(',').Append(d.Purse).Append(',').Append(d.Tick);
+                    // 352: 12. pole - krolestwo doby ("" - bez krolestwa); stary odczyt bierze pola 0-10 i to pomija; doba nieznana (null) zostaje nieznana
+                    if (d.Kng != null) sb.Append(',').Append(d.Kng);
+                    sb.Append('#');
                     bool first = true;
                     foreach (var kv in d.Laps) { if (!first) sb.Append(';'); first = false; sb.Append(kv.Key).Append('=').Append(kv.Value); }
                 }
@@ -675,7 +739,8 @@ namespace Armoury
                         {
                             Day = int.Parse(f[0], Inv), Clan = long.Parse(f[1], Inv), ClanN = int.Parse(f[2], Inv), Pre = long.Parse(f[3], Inv), WPay = long.Parse(f[4], Inv),
                             VMe = long.Parse(f[5], Inv), VOther = long.Parse(f[6], Inv), Resid = long.Parse(f[7], Inv), Works = long.Parse(f[8], Inv), Purse = long.Parse(f[9], Inv),
-                            Tick = long.Parse(f[10], Inv)
+                            Tick = long.Parse(f[10], Inv),
+                            Kng = f.Length > 11 ? f[11] : null   // 352: brak pola - zapis sprzed 352 (nieznane)
                         };
                         if (h >= 0 && h + 1 < rec.Length)
                             foreach (var kv in rec.Substring(h + 1).Split(';'))

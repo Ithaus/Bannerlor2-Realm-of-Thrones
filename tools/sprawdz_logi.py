@@ -98118,6 +98118,8 @@ G345_STUM = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
 # 347c: "historia N dob" w linii = historia po tej dobie; prognoza tej doby miala N-1 dob. G1 ocenia doby z prognoza z >= 3 dob historii (krotsza - INFO)
 G345_HIST = re.compile(r"\| historia (\d+) dob \|")
 G345_IRR = re.compile(r"\| nieregularne poza prognoza ([+-]?\d+) \(")
+# 352: pozycje korony tylko z dob w tym samym krolestwie; rod bez krolestwa - zadnej (G7: krolestwo brak -> dob historii 0 i moduly korony w prognozie 0)
+G345_KNG = re.compile(r"\| korona prognozy \(352\): krolestwo (\S+), dob historii w tym krolestwie (\d+), moduly korony w prognozie (\d+) \|")
 
 
 def prognoza345_collect(logp):
@@ -98149,6 +98151,8 @@ def prognoza345_collect(logp):
             r["irr"] = int(mi.group(1)) if mi else 0
             mh = G345_HIST.search(line)
             r["hist"] = int(mh.group(1)) if mh else 99
+            mk = G345_KNG.search(line)
+            r["kng"] = (mk.group(1), int(mk.group(2)), int(mk.group(3))) if mk else None
             D["day"].append(r)
     return D
 
@@ -98193,17 +98197,30 @@ def prognoza345_rows(rep, D):
     irr = [x["irr"] for x in dd if x["fc"] is not None]
     rep.add("G6: nieregularne pozycje taktu poza prognoza (347: okupy, wojna, rzadkie - rozjazd G1 bez nich)",
             f"dob {len(irr)}, z nieregularnymi {sum(1 for v in irr if v)}, srednio |nieregularne| {(sum(abs(v) for v in irr) / len(irr)) if irr else 0:.0f} zl/dobe", "INFO", None)
+    kk = [x for x in dd if x["fc"] is not None and x.get("kng")]
+    if kk:
+        bad = [x for x in kk if x["kng"][0] == "brak" and (x["kng"][1] != 0 or x["kng"][2] != 0)]
+        nk = [x for x in kk if x["kng"][0] == "brak"]
+        rep.add("G7: rod bez krolestwa - prognoza bez pozycji korony (352: renty, powinnosci, dary, kredyt, kontrakty tylko z dob w tym samym krolestwie)",
+                f"dob z polem 352 {len(kk)}, bez krolestwa {len(nk)}, z pozycja korony albo doba historii 'w krolestwie' przy braku krolestwa {len(bad)}"
+                + (f" (pierwsza: dzien {bad[0]['day']} {bad[0]['kng']})" if bad else "")
+                + f"; krolestwa: {', '.join(sorted(set(x['kng'][0] for x in kk)))}",
+                "0 (bez dob bez krolestwa - INFO)", (len(bad) == 0) if nk else None)
+    else:
+        rep.add("G7: rod bez krolestwa - prognoza bez pozycji korony (352)", "brak pola 'korona prognozy (352)'", "INFO (log sprzed 352)", None)
     rep.add("G5: poza obiegiem (handel, lupy, okupy, zakupy gracza - bez prognozy)", f"srednio {sum(x['out'] for x in dd) / len(dd):.0f} zl/dobe, kiesa srednio "
             f"{sum(x['purse'] for x in dd) / len(dd):.0f}", "INFO", None)
 
 
-def prognoza345_line(d, fc=-2600, t=-2622, diff=None, stum=0, n=1, key="TAK", irr=None, hist=7):
+def prognoza345_line(d, fc=-2600, t=-2622, diff=None, stum=0, n=1, key="TAK", irr=None, hist=7, kng=None):
     diff = (t - (irr or 0) - fc) if diff is None else diff
     irs = "" if irr is None else f" | nieregularne poza prognoza {irr:+d} (RansomFlows.Daily {irr:+d} [Ransoms])"
     return (G345_P + f"dzien {d} | klucz {key} | rozliczenie rodu wpiete, wydatki panelu wpiete | prognoza wczoraj {fc} (model 5190, poprawki 345 {fc - 5190}: wsie do posiadaczy tytulu -8161) "
             f"| naprawde dzis {t} = rozliczenie {t - 700} ({n}) + takt doby 675 + wozy prac 25 | rozjazd {diff:+d} (1.0%) | kiesa naprawde {t + 900} (poza obiegiem 900: handel, lupy, okupy, zakupy gracza){irs} "
             f"| takt doby wedlug modulow: TownFolk.Daily +1142 [Dues from your people (surplus tax, lord's rights)] | rozliczenie: zmiana kiesy -3322, podglad modelu tuz przed 4839 "
-            f"(warsztaty 752, wsie do gracza 0, do posiadaczy tytulu 8161), inne roznice 0 | srednio z 3 dob (sesja): |rozjazd| 22, |naprawde| 2622 | historia {hist} dob | potkniecia {stum} (sesja {stum}).")
+            f"(warsztaty 752, wsie do gracza 0, do posiadaczy tytulu 8161), inne roznice 0"
+            + ("" if kng is None else f" | korona prognozy (352): krolestwo {kng[0]}, dob historii w tym krolestwie {kng[1]}, moduly korony w prognozie {kng[2]}")
+            + f" | srednio z 3 dob (sesja): |rozjazd| 22, |naprawde| 2622 | historia {hist} dob | potkniecia {stum} (sesja {stum}).")
 
 
 def prognoza345_synth():
@@ -98221,7 +98238,11 @@ def prognoza345_synth():
             L.append(prognoza345_line(109500 + i, **kw))
         return L
     runs = {
-        "good": (run(), {"G0": "TAK", "G1": "TAK", "G2": "INFO", "G3": "TAK", "G4": "INFO", "G5": "INFO"}),
+        "good": (run(), {"G0": "TAK", "G1": "TAK", "G2": "INFO", "G3": "TAK", "G4": "INFO", "G5": "INFO", "G7": "INFO"}),
+        # 352: rod gracza w krolestwie (INFO), bez krolestwa i bez pozycji korony (TAK), bez krolestwa z renta korony z dob wasala (NIE - blad sprzed 352)
+        "kng": (run(kng=("battania", 6, 3)), {"G1": "TAK", "G7": "INFO"}),
+        "nokng": (run(kng=("brak", 0, 0)), {"G1": "TAK", "G7": "TAK"}),
+        "nokngbad": (run(kng=("brak", 6, 2)), {"G7": "NIE"}),
         "far": (run(fc=5190), {"G1": "NIE"}),
         "pct": (run(fc=-20000, t=-24000), {"G1": "NIE"}),
         "bigok": (run(fc=-20000, t=-21000), {"G1": "TAK"}),
@@ -98255,7 +98276,7 @@ def prognoza345_main(logp):
         s2 = prognoza345_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("G345-S: test syntetyczny (dobry 10 dob; 347 nieregularne okupy poza prognoza / wliczone; prognoza z oknem +5190, rozjazd ponad 10%, duzy obieg w 10%, krotki bieg, potkniecia, rozliczenie BRAK, bez startu, log sprzed 345)",
+    rep.add("G345-S: test syntetyczny (dobry 10 dob; 347 nieregularne okupy poza prognoza / wliczone; prognoza z oknem +5190, rozjazd ponad 10%, duzy obieg w 10%, krotki bieg, potkniecia, rozliczenie BRAK, bez startu, log sprzed 345; 352 krolestwo / bez krolestwa / bez krolestwa z korona)",
             s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("G345-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
