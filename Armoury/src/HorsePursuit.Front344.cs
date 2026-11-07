@@ -77,6 +77,9 @@ namespace Armoury
             public bool KFull, KContact, FOpen, LongNoted;
             public bool KPend, KPPs;   // 347b A344-3b: kontra bez jezdzcow na strzelcu czeka na KontraTake (KontraConfirm); KPPs - weszla z powrotu PS
             public bool KHold;   // 347f: ta kontra juz raz wstrzymala koniec 204 "odpedzony" (licznik raz na kontre)
+            // 347g (krok 2, at348 K6/K7 petla front -> kontra -> front): wyjscie "szybszy" z SP / SK - do konca zagrozenia kontra na szybszego strzelca
+            // tylko przy jego trafieniu z Rb; FSkipOn - pominieta kontra juz policzona (do passu bez warunku kontry)
+            public bool FFast, FSkipOn;
             public float Vs = -1f, Vr = -1f;   // 347f-r: ostatni pass - najwieksza predkosc konia strzelca i mediana koni jezdzcow (Faster), do linii konca trzymanej kontry
             public bool KEmptyOn;   // 347b-r: pusta kontra juz policzona w tym epizodzie (do kontry z jezdzcami albo passu bez warunku kontry)
             public float EvAt = -1000f, KPAt;   // 347d: chwila narodzin zdarzenia A344-2; At powrotu PS sprzed kontry czekajacej (przywracany przy pustej)
@@ -123,6 +126,7 @@ namespace Armoury
         // 347b A344-3b/3c: kontry cofniete, bo KontraTake nikogo nie wyslal; powody odrzucenia w Take (tylko na czas KontraTake, bez NoteNw)
         private static int _z4KHoldLn;   // 347f-r: linie "koniec trzymanej kontry" w bitwie (najwyzej ZKHoldLines, osobno od ZMaxLines)
         private const int ZKHoldLines = 8;
+        private static int _z4KFast;   // 347g: kontry pominiete - strzelec szybszy po wyjsciu "szybszy" (FFast), bez trafienia z Rb
         private static int _z4KHold;   // 347f: kontry, ktore wstrzymaly koniec 204 "odpedzony" (strzelec cichy i dalej niz zasieg od Rest, a kontra goni)
         private static int _z4KEmpty, _ktForm, _ktCav, _ktCap, _ktSkip, _ktCand;
         // 347d-r: odrzucenia ostatniej KontraTake same czasowe / 283 (KontraConfirm); GNear tego passu - szyk pominiety przez NoFreeF (i z odrzucen nieczasowych)
@@ -144,6 +148,7 @@ namespace Armoury
             _z4Press = _z4FOut = _z4FHit = _z4FUnans = _z4PsExt = 0;
             _z4KEmpty = 0;
             _z4KHold = 0;
+            _z4KFast = 0;
             _z4KHoldLn = 0;
             KEmptySeen.Clear();
         }
@@ -470,18 +475,34 @@ namespace Armoury
             bool adv = gN > 0 && gN >= 2 * (1 + esc);
             bool faster = Faster(t, s);
             q.Vs = _zVs; q.Vr = _zVr;
+            // 347g (krok 2): po wyjsciu "szybszy" (FFast) strzelec dalej szybszy i bez trafienia z Rb - brak przewagi dla kontry (kc, ev, strzal w wracajacych);
+            // at348 K6/K7: SF -> "wyszedl za oslone" -> SK -> "szybszy" -> SF co 1 s. Start poscigu P (SW), docisniecie frontu (SF) - adv bez zmian.
+            bool fastNo = q.FFast && faster && !hitRb;
             if (d < float.MaxValue && d < q.BestD - 1f) { q.BestD = d; q.BestDAt = now; }
             bool outCover = g >= ZOutGap;
-            bool kc = !t.Group && adv && d <= _maxFrom && ((outCover && (closing || hitRs)) || (g >= ZBreakGap && hitRb));
+            bool kcA = !t.Group && adv && d <= _maxFrom && ((outCover && (closing || hitRs)) || (g >= ZBreakGap && hitRb));
+            bool kc = kcA && !fastNo;
+            // 347g: licznik "kontr pominietych - strzelec szybszy" raz na ciag passow z warunkiem kontry (poza SK; w SPS tez strzal w wracajacych)
+            bool psShot = q.St == SPS && q.HitAt >= q.At && now - q.HitAt <= ZHitNow && g >= ZOutGap && adv;
+            if (fastNo && q.St != SK && (kcA || psShot)) { if (!q.FSkipOn) { q.FSkipOn = true; _z4KFast++; } }
+            else if (!kcA && !psShot) q.FSkipOn = false;
             // 347b-r: koniec epizodu pustej kontry; 347d-r: nie w czasie blokady NoFreeF (szyk pominiety po pustej kontrze - ten sam epizod, bez drugiego _z4KEmpty)
             if (!kc && !_gNf) q.KEmptyOn = false;
             // A344-2: zdarzenie "strzelec poza oslona zbliza sie / trafia z Rw" przy przewadze - czeka na K / R
-            bool ev = !t.Group && adv && outCover && (closing || hitRw) && d <= ZRw;
+            bool evA = !t.Group && adv && outCover && (closing || hitRw) && d <= ZRw;
+            bool ev = evA && !fastNo;
             // poczatek zdarzenia: trafienie z Rw poza oslona (OnRiderShot344) albo ten pass - reakcja liczona od trafienia (pass co 1 s)
             if (ev && q.St != SK && q.CondAt < 0f) { q.CondAt = now - q.HitEvAt <= 1.5f ? q.HitEvAt : now; q.EvAt = now; _z4Ev++; }
-            else if (!ev && q.St != SK && q.CondAt >= 0f) { q.CondAt = -1f; _z4Miss++; }
+            else if (!ev && q.St != SK && q.CondAt >= 0f)
+            {
+                // 347g: zdarzenie zdjete przez szybszego strzelca (FFast) - jak brak przewagi w 347d: bez Miss, zdarzenie cofniete, trafienia A344-4 zdjete (NoAdvAt nizej)
+                if (evA) { if (_z4Ev > 0) _z4Ev--; }
+                else _z4Miss++;
+                q.CondAt = -1f;
+            }
             // 347d-r: brak przewagi tylko z blokady NoFreeF po odrzuceniach nieczasowych (daleko, kon, zajety, strefa) nie zdejmuje trafien A344-4 (prawdziwy blad)
             if (!adv && gAll > 0 && (closing || hitRw) && outCover) { _z4NoAdv++; if (!_gNfOth) q.NoAdvAt = now; }
+            else if (fastNo && adv && (closing || hitRw) && outCover) q.NoAdvAt = now;   // 347g: front wobec szybszego to rozsadna odpowiedz (A344-4), licznik osobno (_z4KFast)
             PendCheck(q, now);
             FPendCheck(q, now);
             if (riders > 0 && q.St == SW) { q.St = SP; q.At = now; q.BestD = d; q.BestDAt = now; }
@@ -501,6 +522,7 @@ namespace Armoury
                     {
                         if (now - q.BestDAt > ZSlowFor + 1.5f && !q.LongNoted) { q.LongNoted = true; _z4Long++; }
                         _z4FFast++;
+                        q.FFast = true;   // 347g
                         EnterF(t, q, now, "strzelec szybszy, " + F0(ZSlowFor) + " s bez zblizania");
                         return BFront;
                     }
@@ -545,14 +567,14 @@ namespace Armoury
                     }
                     if (d <= ShieldsUp.RaiseNear) q.KContact = true;
                     if (g < ZBreakGap) { KEnd(t, q, now, true, "pod armie"); EnterF(t, q, now, "kontra odepchnela strzelca pod jego armie"); return BFront; }
-                    if (faster && now - q.BestDAt >= ZSlowFor) { KEnd(t, q, now, q.KContact, "szybszy, bez zblizania"); _z4FFast++; EnterF(t, q, now, "kontra: strzelec szybszy, bez zblizania"); return BFront; }
+                    if (faster && now - q.BestDAt >= ZSlowFor) { KEnd(t, q, now, q.KContact, "szybszy, bez zblizania"); _z4FFast++; q.FFast = true; EnterF(t, q, now, "kontra: strzelec szybszy, bez zblizania"); return BFront; }
                     if (now - q.At >= ZKMax) { KEnd(t, q, now, q.KContact, F0(ZKMax) + " s"); EnterF(t, q, now, "kontra " + F0(ZKMax) + " s"); return BFront; }
                     return q.KFull ? BKontra : BNone;
                 case SPS:
                     if (kc) { _z4PsK++; EnterK(t, q, now, true, "strzelec za wracajacymi, " + F0(g) + " m od strefy"); return BKontra; }
                     if (q.HitAt >= q.At && now - q.HitAt <= ZHitNow)
                     {
-                        if (g >= ZOutGap && adv) { _z4PsK++; EnterK(t, q, now, true, "strzal w wracajacych"); return BKontra; }
+                        if (g >= ZOutGap && adv && !fastNo) { _z4PsK++; EnterK(t, q, now, true, "strzal w wracajacych"); return BKontra; }   // 347g: !fastNo
                         // recenzja 344 W3: front z powrotu tylko, gdy strzelec wyszedl za wracajacymi poza oslone (stanac przodem do szarzy z eskorta); pod oslona -
                         // dalej powrot galopem poza zasieg (bez petli PS -> F -> PS w zasiegu oslonietego strzelca)
                         if (g >= ZOutGap && d <= ZRw && ReFront(m, t, q, now)) { _z4PsF++; return BFront; }
@@ -1202,6 +1224,7 @@ namespace Armoury
               .Append(", jezdzcow kontry ").Append(_z4KRiders).Append("), zdarzen kontry ").Append(_z4Ev).Append(" (odpowiedzi ").Append(_z4Ans).Append(", mediana reakcji ")
               .Append(Med(KReact)).Append(" s, bez odpowiedzi ").Append(_z4Miss).Append(", bez przewagi ").Append(_z4NoAdv).Append("), wynik kontry dobry ").Append(_z4KOk)
               .Append('/').Append(_z4KEnd).Append(", kontry bez wolnych jezdzcow ").Append(_z4KEmpty).Append(", kontra trzyma odpedzenie ").Append(_z4KHold)
+              .Append(", kontr pominietych - strzelec szybszy ").Append(_z4KFast)
               .Append(" | trafienia bez odpowiedzi ").Append(_z4Unans).Append(" (trafien z Rw poza oslona ").Append(_z4PendN).Append(')')
               .Append(" | powroty szykiem ").Append(_z4Ps).Append(" (kontra z powrotu ").Append(_z4PsK).Append(", front z powrotu ").Append(_z4PsF).Append("), klus przy strzelcu ")
               .Append(_z4Trot).Append(" s")

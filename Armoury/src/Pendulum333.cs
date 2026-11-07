@@ -164,6 +164,9 @@ namespace Armoury
             public Vec2 StillPos = Vec2.Invalid;
             public float StillAt = -1000f;
             public bool StillN, StuckN;
+            // 347g (krok A, B344-6): ostatni rozkaz Move zatrzymany galezia Keep nastepcy (prowadzacy bez ruchu) i PF prowadzacego - tylko do linii "stoi z celem naprzod"
+            public bool SuccHeld;
+            public PF SuccLp;
         }
 
         /// <summary>344r (recenzja W7): zmiany taktyki druzyny (surowe, przed histereza) - wszystkie i szybkie (w TacFast s od poprzedniej).</summary>
@@ -480,6 +483,8 @@ namespace Armoury
                 // 344 (1): szyk boczny (nastepca) rusza tylko po przyjetej zmianie punktu prowadzacego
                 pf.Succ = false;
                 pf.SuccStill = false;
+                pf.SuccHeld = false;   // 347g krok A (diagnostyka)
+                pf.SuccLp = null;
                 pf.LeadNext = Vec2.Invalid;
                 if (beh == typeof(BehaviorProtectFlank) || beh == typeof(BehaviorScreenedSkirmish))
                 {
@@ -491,7 +496,7 @@ namespace Armoury
                         // recenzja 344 W5: prowadzacy idzie do dalekiego punktu (P bez zmian) - nastepca rusza za jego POZYCJA (>= martwa strefa od ostatniego przyjecia)
                         Vec2 lc = Cur(lead);
                         bool moved = !pf.LeadP.IsValid || !pf.LeadPos.IsValid || lp.P.Distance(pf.LeadP) >= ldz || (lc.IsValid && lc.Distance(pf.LeadPos) >= ldz);
-                        if (!moved && pf.P.IsValid) { Keep(f, pf, ref input, beh); _succKeep++; return; }
+                        if (!moved && pf.P.IsValid) { pf.SuccHeld = true; pf.SuccLp = lp; Keep(f, pf, ref input, beh); _succKeep++; return; }   // 347g krok A: SuccHeld - tylko linia
                         pf.Succ = true;
                         pf.SuccStill = !moved;
                         pf.LeadNext = lp.P;
@@ -1079,7 +1084,8 @@ namespace Armoury
                     Line("AI bitwy (333) stoi z celem naprzod: " + S1(now) + " s | szyk " + Who(f) + " | zachowanie " + BehName(f) + " | ostatnia regula " + pf.AccRule
                          + (pf.AccSg > 0 ? " naprzod " : pf.AccSg < 0 ? " wstecz " : " w bok ") + (pf.AccAt > -999f ? S1(now - pf.AccAt) : "-") + " s temu | kierunek "
                          + pf.Dir + " od " + (pf.DirAt > -999f ? S1(now - pf.DirAt) : "-") + " s, okno " + F0(Win(pf)) + " s, nawrotow " + pf.Revs + " | nastepca "
-                         + (pf.Succ ? "tak" : "nie") + " | cel gry - P na osi " + (pf.P.IsValid ? S1((pf.T - pf.P).DotProduct(pf.Axis)) : "-") + " m, cel gry - szyk "
+                         + (pf.Succ ? "tak" : "nie") + ", nastepca trzymany: " + (pf.SuccHeld ? "tak" : "nie") + ", prowadzacy stoi "
+                         + (pf.SuccHeld && pf.SuccLp != null && pf.SuccLp.StillPos.IsValid ? S1(now - pf.SuccLp.StillAt) : "-") + " s | cel gry - P na osi " + (pf.P.IsValid ? S1((pf.T - pf.P).DotProduct(pf.Axis)) : "-") + " m, cel gry - szyk "
                          + S1((pf.T - cp).DotProduct(pf.Axis)) + " m, szyk - P " + (pf.P.IsValid ? S1((cp - pf.P).DotProduct(pf.Axis)) : "-") + " m (martwa strefa "
                          + S1(dz) + " m) | od wroga " + F0(pf.Gap) + " m.");
                 }
