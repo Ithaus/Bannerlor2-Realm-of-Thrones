@@ -76,6 +76,7 @@ namespace Armoury
             public float PressAt = -1f, FAnsAt = -1000f;   // 344r: docisniecie frontu, ostatnia reakcja na ostrzal frontu
             public bool KFull, KContact, FOpen, LongNoted;
             public bool KPend, KPPs;   // 347b A344-3b: kontra bez jezdzcow na strzelcu czeka na KontraTake (KontraConfirm); KPPs - weszla z powrotu PS
+            public bool KHold;   // 347f: ta kontra juz raz wstrzymala koniec 204 "odpedzony" (licznik raz na kontre)
             public bool KEmptyOn;   // 347b-r: pusta kontra juz policzona w tym epizodzie (do kontry z jezdzcami albo passu bez warunku kontry)
             public float EvAt = -1000f, KPAt;   // 347d: chwila narodzin zdarzenia A344-2; At powrotu PS sprzed kontry czekajacej (przywracany przy pustej)
             public string KPWhy;
@@ -119,6 +120,7 @@ namespace Armoury
         private static int _z4K, _z4KFull, _z4R, _z4RRiders, _z4KRiders, _z4Ev, _z4Ans, _z4Miss, _z4KEnd, _z4KOk, _z4Unans, _z4PendN, _z4Ps, _z4PsK, _z4PsF, _z4Trot;
         private static int _z4Press, _z4FOut, _z4FHit, _z4FUnans, _z4PsExt;   // 344r
         // 347b A344-3b/3c: kontry cofniete, bo KontraTake nikogo nie wyslal; powody odrzucenia w Take (tylko na czas KontraTake, bez NoteNw)
+        private static int _z4KHold;   // 347f: kontry, ktore wstrzymaly koniec 204 "odpedzony" (strzelec cichy i dalej niz zasieg od Rest, a kontra goni)
         private static int _z4KEmpty, _ktForm, _ktCav, _ktCap, _ktSkip, _ktCand;
         // 347d-r: odrzucenia ostatniej KontraTake same czasowe / 283 (KontraConfirm); GNear tego passu - szyk pominiety przez NoFreeF (i z odrzucen nieczasowych)
         private static bool _ktTimed, _gNf, _gNfOth;
@@ -138,6 +140,7 @@ namespace Armoury
             _z4K = _z4KFull = _z4R = _z4RRiders = _z4KRiders = _z4Ev = _z4Ans = _z4Miss = _z4KEnd = _z4KOk = _z4Unans = _z4PendN = _z4Ps = _z4PsK = _z4PsF = _z4Trot = 0;
             _z4Press = _z4FOut = _z4FHit = _z4FUnans = _z4PsExt = 0;
             _z4KEmpty = 0;
+            _z4KHold = 0;
             KEmptySeen.Clear();
         }
 
@@ -682,6 +685,18 @@ namespace Armoury
             for (int i = 0; i < t.Hs.Count; i++) t.Hs[i].Z4 = ZNone;
         }
 
+        /// <summary>347f A344-3: kontra z jezdzcami trwa (SK potwierdzona, jezdzcy na strzelcu, przed ZKMax, strzelec jeszcze poza krawedzia strefy) - koniec 204
+        /// "odpedzony" (cichy i dalej niz zasieg od Rest strony, a jezdzcy kontry sie tam nie licza) czeka, az kontra skonczy sie wlasnym wyjsciem
+        /// (pod armie / szybszy / ZKMax / brak jezdzcow). Wolane z HorsePursuit.Hunt (pass zagrozenia).</summary>
+        private static bool KontraRuns(Threat t, float now)
+        {
+            if (!_zOn || !t.Z333) return false;
+            var q = t.Q;
+            if (q.St != SK || q.KPend || now - q.At >= ZKMax || t.Gap333 < ZBreakGap || RidersOf(t) <= 0) return false;
+            if (!q.KHold) { q.KHold = true; _z4KHold++; }
+            return true;
+        }
+
         private static void KEnd(St344 q, bool ok)
         {
             _z4KEnd++;
@@ -739,6 +754,7 @@ namespace Armoury
             q.At = now;
             q.KFull = full || q.KFull;
             q.KContact = false;
+            q.KHold = false;
             q.BestD = float.MaxValue;
             q.BestDAt = now;
             q.PressAt = -1f;
@@ -1158,7 +1174,7 @@ namespace Armoury
               .Append(" | kontry ").Append(_z4K).Append(" (calego G ").Append(_z4KFull).Append(", odruchow ").Append(_z4R).Append(", jezdzcow odruchu ").Append(_z4RRiders)
               .Append(", jezdzcow kontry ").Append(_z4KRiders).Append("), zdarzen kontry ").Append(_z4Ev).Append(" (odpowiedzi ").Append(_z4Ans).Append(", mediana reakcji ")
               .Append(Med(KReact)).Append(" s, bez odpowiedzi ").Append(_z4Miss).Append(", bez przewagi ").Append(_z4NoAdv).Append("), wynik kontry dobry ").Append(_z4KOk)
-              .Append('/').Append(_z4KEnd).Append(", kontry bez wolnych jezdzcow ").Append(_z4KEmpty)
+              .Append('/').Append(_z4KEnd).Append(", kontry bez wolnych jezdzcow ").Append(_z4KEmpty).Append(", kontra trzyma odpedzenie ").Append(_z4KHold)
               .Append(" | trafienia bez odpowiedzi ").Append(_z4Unans).Append(" (trafien z Rw poza oslona ").Append(_z4PendN).Append(')')
               .Append(" | powroty szykiem ").Append(_z4Ps).Append(" (kontra z powrotu ").Append(_z4PsK).Append(", front z powrotu ").Append(_z4PsF).Append("), klus przy strzelcu ")
               .Append(_z4Trot).Append(" s")

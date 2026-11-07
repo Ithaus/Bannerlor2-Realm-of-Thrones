@@ -97700,7 +97700,7 @@ A344_RX = {
     "front": re.compile(r"\| front wejsc (\d+) \(jezdzcow (\d+); krawedz strefy (\d+), szybszy strzelec (\d+), strona przegrywa (\d+)\), trafienia w plecy w front/powrot "
                         r"(\d+) \(na wejscie mediana (\S+), najwiecej (\d+)\), wszystkie w plecy (\d+), przodem do strzelca (\d+)/(\d+) probek"),
     "kontra": re.compile(r"\| kontry (\d+) \(calego G (\d+), odruchow (\d+), jezdzcow odruchu (\d+), jezdzcow kontry (\d+)\), zdarzen kontry (\d+) \(odpowiedzi (\d+), "
-                         r"mediana reakcji (\S+) s, bez odpowiedzi (\d+), bez przewagi (\d+)\), wynik kontry dobry (\d+)/(\d+)(?:, kontry bez wolnych jezdzcow (\d+))?"),
+                         r"mediana reakcji (\S+) s, bez odpowiedzi (\d+), bez przewagi (\d+)\), wynik kontry dobry (\d+)/(\d+)(?:, kontry bez wolnych jezdzcow (\d+))?(?:, kontra trzyma odpedzenie (\d+))?"),
     "unans": re.compile(r"\| trafienia bez odpowiedzi (\d+) \(trafien z Rw poza oslona (\d+)\)"),
     "ps": re.compile(r"\| powroty szykiem (\d+) \(kontra z powrotu (\d+), front z powrotu (\d+)\), klus przy strzelcu (\d+) s"),
     "keyB": re.compile(r"\| szyki: klucz (TAK|NIE) \(latka ruchu ([^,]+), latka ustawienia ([^;]+);"),
@@ -97725,7 +97725,7 @@ A344_KEYS = {
     "head": ["kind", "keyA", "key204"],
     "chase": ["chase", "l1fast", "long"],
     "front": ["fEnt", "fRiders", "fEdge", "fFast", "fLose", "backF", "backMed", "backMax", "backAll", "faceOk", "faceN"],
-    "kontra": ["k", "kFull", "r", "rRiders", "kRiders", "ev", "ans", "react", "miss", "noAdv", "kOk", "kEnd", "kEmpty"],
+    "kontra": ["k", "kFull", "r", "rRiders", "kRiders", "ev", "ans", "react", "miss", "noAdv", "kOk", "kEnd", "kEmpty", "kHold"],
     "unans": ["unans", "pend"],
     "ps": ["ps", "psK", "psF", "trot"],
     "keyB": ["keyB", "patch", "patchArr"],
@@ -97841,8 +97841,10 @@ def ai344_rows(rep, D):
                 "100%, mediana <= 1.5 s", ans >= ev and rm <= 1.5)
     # 347b-r: kontra cofnieta bez wolnych jezdzcow (KontraConfirm, raz na epizod) to zly wynik - w mianowniku (w at346 te kontry liczyly sie jako zle)
     ke, ko, kz = sum(r["kEnd"] for r in on), sum(r["kOk"] for r in on), sum(r["kEmpty"] for r in on)
+    kh = sum(r["kHold"] for r in on)   # 347f: INFO - kontry, ktore wstrzymaly koniec 204 "odpedzony" (log sprzed 347f: 0)
     kt = ke + kz
-    rep.add("A344-3: wynik kontry", f"dobry {ko}/{kt}" + (f" ({100.0 * ko / kt:.0f}%)" if kt else "") + f" (zakonczonych {ke}, bez wolnych jezdzcow {kz})",
+    rep.add("A344-3: wynik kontry", f"dobry {ko}/{kt}" + (f" ({100.0 * ko / kt:.0f}%)" if kt else "") + f" (zakonczonych {ke}, bez wolnych jezdzcow {kz}, "
+            f"kontra trzyma odpedzenie {kh})",
             ">= 80% (kontakt, strzelec pod swoja armia albo padl; kontra bez wolnych jezdzcow = zla)", (ko >= 0.8 * kt) if kt else None)
     un, pe = sum(r["unans"] for r in on), sum(r["pend"] for r in on)
     rep.add("A344-4: trafienia bez odpowiedzi", f"{un} (trafien z Rw poza oslona {pe})", "0", un == 0)
@@ -97940,13 +97942,13 @@ def ai344_bait_rows(rep, D):
 
 def ai344_line(fEnt=2, backF=1, backMed="0", backMax=1, faceOk=40, faceN=44, k=2, kFull=1, r=1, ev=2, ans=2, react="0.6", kOk=2, kEnd=2, unans=0, pend=3,
                trot=0, long=0, keyB="TAK", patch="TAK", patchArr="TAK", callAi=120, rtSec=200, ffSec=0, mins="6.0", revA=1, revABack=0, src="BehaviorHoldHighGround 5/30/2",
-               arrRet=0, succNo=0, stum=0, keyA="TAK", fUnans=0, stuck=0, tacFast=0, aiMax="0.40", lost=0, kEmpty=0, comp=0, arrRetFire=0, arrRetComp=0):
+               arrRet=0, succNo=0, stum=0, keyA="TAK", fUnans=0, stuck=0, tacFast=0, aiMax="0.40", lost=0, kEmpty=0, comp=0, arrRetFire=0, arrRetComp=0, kHold=None):
     return (f"AI bitwy (344): misja bitwa polowa | konnica wobec strzelca klucz {keyA} (jazda 204 TAK; strefa armii strzelca: piechota +50 m, lucznicy +0.8 zasiegu 60-120 m, "
             f"konnica +60 m; front < 10 m, start >= 30 m, oslona 20 m; Rs 60 m, Rw 40 m, Rb 30 m; pogon bez zblizania 8 s, kontra do 40 s, powrot 30 s bez capu; "
             f"przewaga 2 x (1 + eskorta)) | poscigi 3 (L1 przy szybszym strzelcu 1, pogonie bez szans ponad 8 s {long}) | front wejsc {fEnt} (jezdzcow 12; krawedz "
             f"strefy 1, szybszy strzelec 1, strona przegrywa 0), trafienia w plecy w front/powrot {backF} (na wejscie mediana {backMed}, najwiecej {backMax}), wszystkie w "
             f"plecy 2, przodem do strzelca {faceOk}/{faceN} probek | kontry {k} (calego G {kFull}, odruchow {r}, jezdzcow odruchu 3, jezdzcow kontry 9), zdarzen kontry "
-            f"{ev} (odpowiedzi {ans}, mediana reakcji {react} s, bez odpowiedzi 0, bez przewagi 0), wynik kontry dobry {kOk}/{kEnd}, kontry bez wolnych jezdzcow {kEmpty} | trafienia bez odpowiedzi {unans} "
+            f"{ev} (odpowiedzi {ans}, mediana reakcji {react} s, bez odpowiedzi 0, bez przewagi 0), wynik kontry dobry {kOk}/{kEnd}, kontry bez wolnych jezdzcow {kEmpty}{'' if kHold is None else f', kontra trzyma odpedzenie {kHold}'} | trafienia bez odpowiedzi {unans} "
             f"(trafien z Rw poza oslona {pend}) | powroty szykiem 1 (kontra z powrotu 1, front z powrotu 0), klus przy strzelcu {trot} s | front pod ostrzalem: trafien 4, docisniec 1, odwrotow spod ognia 1, bez "
             f"reakcji {fUnans}, powrotow przedluzonych 1 | strzelcy przy swojej armii "
             f"bez poscigu 1, lekkie odpedzenia L1 0, krawedzi strefy na strzelca najwiecej 1 (razem 1), petla przynety 0 | jezdzcy zawroceni w strefie 0, nie wyslani "
@@ -97984,6 +97986,8 @@ def ai344_synth():
         "succ": [ai344_line(succNo=1)],
         "kempty": [ai344_line(kOk=2, kEnd=2, kEmpty=2)],   # 347b-r: 2/4 = 50%
         "kempty0": [ai344_line(kOk=0, kEnd=0, kEmpty=1)],
+        "khold": [ai344_line(kHold=2)],   # 347f: pole INFO, wynik bez zmian
+        "kholdbad": [ai344_line(kOk=1, kEnd=3, kHold=1)],
         "comp": [ai344_line(comp=3)],   # 3 na 6 szyko-min = 0.5/min
         "arrsep": [ai344_line(arrRetFire=6)],
         "arrcomp": [ai344_line(arrRetComp=1)],
@@ -98021,6 +98025,8 @@ def ai344_synth():
         "succ": {"B344-5": "NIE"},
         "kempty": {"A344-3": "NIE"},
         "kempty0": {"A344-3": "NIE"},
+        "khold": {"A344-0": "TAK", "A344-3": "TAK"},
+        "kholdbad": {"A344-3": "NIE"},
         "comp": {"B344-1": "INFO"},
         "arrsep": {"B344-3": "INFO"},
         "arrcomp": {"B344-3": "INFO"},

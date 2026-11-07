@@ -887,7 +887,7 @@ namespace Armoury
             bool quiet = now - t.LastFire >= _hold;
             // 311a: samotny strzelec, ktory trafil ludzi strony, zyje wlasnym zegarem (CoverHoldSeconds po szkodzie) - cisza (schowal sie i laduje) nie konczy
             if (rx && CoverKeep(m, t, sp, lone, dAll, now)) quiet = false;
-            if (quiet && dAll > range) { EndThreat(t, HAway, now); return; }   // odpedzony (albo zapomniany, gdy bez epizodu)
+            if (quiet && dAll > range && !KontraRuns(t, now)) { EndThreat(t, HAway, now); return; }   // odpedzony (albo zapomniany, gdy bez epizodu); 347f: nie w trakcie kontry z jezdzcami
             if (quiet && !t.Active) { EndThreat(t, HOther, now); return; }     // zauwazony, ale bez jezdzcow i cicho - zapomniany (nowy strzal = nowe wykrycie)
             if (quiet && rx && t.Melee + t.Foot <= 0) { EndThreat(t, HOther, now); return; }   // 283: epizod tylko lucznikow / postoju - cisza konczy
             // poziom
