@@ -75,6 +75,8 @@ namespace Armoury
             public float GPrev = float.MaxValue;
             public float PressAt = -1f, FAnsAt = -1000f;   // 344r: docisniecie frontu, ostatnia reakcja na ostrzal frontu
             public bool KFull, KContact, FOpen, LongNoted;
+            public bool KPend, KPPs;   // 347b A344-3b: kontra bez jezdzcow na strzelcu czeka na KontraTake (KontraConfirm); KPPs - weszla z powrotu PS
+            public string KPWhy;
             public int FBack, Esc;
             public readonly List<float> FPend = new List<float>();   // 344r: trafienia w F czekajace na reakcje (A344-8)
             public readonly Dictionary<Formation, float> GF = new Dictionary<Formation, float>();
@@ -104,6 +106,8 @@ namespace Armoury
         private static readonly List<Vec2>[] SPos = { new List<Vec2>(), new List<Vec2>() };
         private static readonly Dictionary<Formation, float> Ret344 = new Dictionary<Formation, float>();
         private static readonly HashSet<Formation> TrotSeen = new HashSet<Formation>();
+        // 347b A344-6: strzelcy w SPos poprzedniego passu - klus liczony tylko przy nich (cap z MarchToContact.Eval liczony jeszcze bez nowego strzelca to opoznienie)
+        private static readonly HashSet<int> SPosPrev = new HashSet<int>(), SPosNow = new HashSet<int>();
         private static readonly List<float> KReact = new List<float>();
         private static readonly List<int> FBacks = new List<int>();
         private static int _zFullBefore;
@@ -112,18 +116,25 @@ namespace Armoury
         private static int _z4L1Fast, _z4Long, _z4NoAdv, _z4F, _z4FRiders, _z4FEdge, _z4FFast, _z4FLose, _z4BackF, _z4BackAll, _z4FaceN, _z4FaceOk;
         private static int _z4K, _z4KFull, _z4R, _z4RRiders, _z4KRiders, _z4Ev, _z4Ans, _z4Miss, _z4KEnd, _z4KOk, _z4Unans, _z4PendN, _z4Ps, _z4PsK, _z4PsF, _z4Trot;
         private static int _z4Press, _z4FOut, _z4FHit, _z4FUnans, _z4PsExt;   // 344r
+        // 347b A344-3b/3c: kontry cofniete, bo KontraTake nikogo nie wyslal; powody odrzucenia w Take (tylko na czas KontraTake, bez NoteNw)
+        private static int _z4KEmpty, _ktForm, _ktCav, _ktCap, _ktSkip, _ktCand;
+        private static readonly int[] KtNo = new int[NwKinds];
+        private static readonly HashSet<int> KEmptySeen = new HashSet<int>();
 
         private static void Bait333Clear()
         {
             Baits.Clear();
             for (int s = 0; s < 2; s++) { ZC[s].Clear(); ZR[s].Clear(); ZF[s].Clear(); SPos[s].Clear(); }
             ZNoStartSeen.Clear(); GList.Clear(); GTmp.Clear(); ZSpeeds.Clear(); ZTmp.Clear(); Ret344.Clear(); TrotSeen.Clear(); KReact.Clear(); FBacks.Clear();
+            SPosPrev.Clear(); SPosNow.Clear();
             _z4Next = ZNone;
             _zFullBefore = 0;
             _zFull = _zNoStart = _zLight = _zLightFull = _zBreaks = _zShooterBreakMax = _zLoops = _zRiderIn = _zClamp = _zZoneMax = _zLines = _zStum = 0;
             _z4L1Fast = _z4Long = _z4NoAdv = _z4F = _z4FRiders = _z4FEdge = _z4FFast = _z4FLose = _z4BackF = _z4BackAll = _z4FaceN = _z4FaceOk = 0;
             _z4K = _z4KFull = _z4R = _z4RRiders = _z4KRiders = _z4Ev = _z4Ans = _z4Miss = _z4KEnd = _z4KOk = _z4Unans = _z4PendN = _z4Ps = _z4PsK = _z4PsF = _z4Trot = 0;
             _z4Press = _z4FOut = _z4FHit = _z4FUnans = _z4PsExt = 0;
+            _z4KEmpty = 0;
+            KEmptySeen.Clear();
         }
 
         // ------------------------------------------------------------ strefa (pass, po BuildHForms) - bez zmian z 333
@@ -468,7 +479,7 @@ namespace Armoury
                     if (!q.KFull && kc) q.KFull = true;
                     if (riders == 0)
                     {
-                        if (now - q.At > 1.5f) { KEnd(q, q.KContact); Leave(t, q, now, false); return BNone; }   // recenzja 344 D1 (techn.): po wyjsciu bez kontry
+                        if (now - q.At > 1.5f) { Leave(t, q, now, false); return BNone; }   // 347b A344-3a: KEnd robi Leave (wczesniej liczony dwa razy)   // recenzja 344 D1 (techn.): po wyjsciu bez kontry
                         return q.KFull ? BKontra : BNone;
                     }
                     if (d <= ShieldsUp.RaiseNear) q.KContact = true;
@@ -611,7 +622,8 @@ namespace Armoury
         /// <summary>Wyjscie ze stanu do W (bez jezdzcow, klucz).</summary>
         private static void Leave(Threat t, St344 q, float now, bool line)
         {
-            if (q.St == SK) KEnd(q, q.KContact);
+            if (q.St == SK && !q.KPend) KEnd(q, q.KContact);
+            q.KPend = false;
             FClose(q);
             q.St = SW;
             q.At = now;
@@ -670,16 +682,31 @@ namespace Armoury
                 n++;
             }
             bool was = q.St == SK;
+            bool fromPs = q.St == SPS;
             q.St = SK;
             q.At = now;
             q.KFull = full || q.KFull;
             q.KContact = false;
             q.BestD = float.MaxValue;
             q.BestDAt = now;
-            q.AnsAt = now;
-            q.FAnsAt = now;
             q.PressAt = -1f;
             q.Men.Clear();
+            // 347b A344-3b: nowa kontra calego G bez nikogo na strzelcu liczy sie (odpowiedz, kontra, linia) dopiero, gdy KontraTake kogos wysle (KontraConfirm)
+            if (!was && full && n == 0)
+            {
+                q.KPend = true;
+                q.KPPs = fromPs;
+                q.KPWhy = why;
+                return;
+            }
+            KCount(t, q, now, was, full, why, n);
+        }
+
+        /// <summary>Odpowiedz A344-2, licznik kontr i linia "kontra:" (z EnterK albo po potwierdzeniu w KontraConfirm).</summary>
+        private static void KCount(Threat t, St344 q, float now, bool was, bool full, string why, int n)
+        {
+            q.AnsAt = now;
+            q.FAnsAt = now;
             if (q.CondAt >= 0f)
             {
                 if (KReact.Count < ZListCap) KReact.Add(now - q.CondAt);
@@ -691,6 +718,32 @@ namespace Armoury
             if (full) _z4KFull++;
             ZLine("kontra: strzelec " + Who(t.S) + " (" + (t.S.IsMainAgent ? "gracz" : "AI") + ") " + F0(t.Gap333) + " m od strefy swojej armii | " + why + " | "
                   + (full ? "caly G" : "oddzial") + ", jezdzcow juz na nim " + n);
+        }
+
+        /// <summary>347b A344-3b: po KontraTake (ten sam pass) - kontra z wyslanymi jezdzcami liczy sie jak dotad; bez nikogo (sent 0, jezdzcow 0) cofnieta do W
+        /// bez wyniku kontry i bez odpowiedzi (zdarzenie A344-2 czeka dalej), osobny licznik i linia z powodami odrzucenia (A344-3c, raz na strzelca).</summary>
+        private static void KontraConfirm(Threat t, float now, int sent)
+        {
+            var q = t.Q;
+            if (!q.KPend) return;
+            q.KPend = false;
+            if (q.St != SK) return;
+            if (sent > 0 || RidersOf(t) > 0) { KCount(t, q, now, false, true, q.KPWhy, 0); return; }
+            _z4KEmpty++;
+            if (q.KPPs && _z4PsK > 0) _z4PsK--;
+            float cond = q.CondAt;
+            q.St = SW;
+            Leave(t, q, now, false);
+            q.CondAt = cond;
+            q.KFull = false;
+            if (t.S == null || !KEmptySeen.Add(t.S.Index)) return;
+            var sb = new StringBuilder();
+            for (int i = 0; i < NwKinds; i++) if (KtNo[i] > 0) sb.Append(sb.Length > 0 ? ", " : "").Append(i).Append(':').Append(KtNo[i]);
+            ZLine("kontra bez wolnych jezdzcow: strzelec " + Who(t.S) + " (" + (t.S.IsMainAgent ? "gracz" : "AI") + ") " + F0(t.Gap333) + " m od strefy swojej armii | "
+                  + q.KPWhy + " | szykow G " + GList.Count + ", eskorta " + q.Esc + " | szyki pominiete " + _ktForm + ", zwarcie/oslona przed jazda (283) " + _ktCav
+                  + ", limit przegladu " + _ktCap + ", juz w poscigu/lucznicy/piesi " + _ktSkip + ", kandydaci " + _ktCand + " | odrzuceni wedlug Nw (0 zwarcie, 1 panika, "
+                  + "2 poscig 148, 3 bohater, 4 chorazy, 5 kon, 6 daleko, 7 gracz, 9 zajety, 10 przerwa, 11 limit zapytan, 12 inne, 13 nietkniety szyk, 14 strefa) "
+                  + (sb.Length > 0 ? sb.ToString() : "-") + " | cofnieta, bez wyniku");
         }
 
         /// <summary>PS: jezdzcy oddani grze bez przerwy, szyki 30 s bez capu marszu; ludzie zapamietani (strzal w plecy - znowu F tymi samymi).</summary>
@@ -758,6 +811,8 @@ namespace Armoury
         {
             _z4Next = ZKontraRole;
             int before = sent;
+            _ktForm = _ktCav = _ktCap = _ktSkip = _ktCand = 0;   // 347b A344-3c: powody odrzucenia tej kontry
+            Array.Clear(KtNo, 0, KtNo.Length);
             try
             {
                 GTmp.Clear();
@@ -765,10 +820,10 @@ namespace Armoury
                 for (int i = 0; i < GTmp.Count; i++)
                 {
                     int k = FindFI(fl, GTmp[i]);
-                    if (k < 0) continue;
+                    if (k < 0) { _ktForm++; continue; }
                     var fi = fl[k];
-                    if (!fi.Cav || fi.Ha || fi.Retreat) continue;
-                    if (fi.Player) { NotePlayerForm(t, fi, 0f); continue; }
+                    if (!fi.Cav || fi.Ha || fi.Retreat) { _ktForm++; continue; }
+                    if (fi.Player) { _ktForm++; NotePlayerForm(t, fi, 0f); continue; }
                     Take(m, t, fi, Math.Max(PerVictim + 1, 3 * (1 + t.Q.Esc)), now, ref sent, ref sentCharge);   // recenzja 344 D2: nie cale skrzydlo za jednym strzelcem
                 }
                 GTmp.Clear();
@@ -814,7 +869,8 @@ namespace Armoury
         private static void Front344End(Threat t, bool down)
         {
             var q = t.Q;
-            if (q.St == SK) KEnd(q, down || q.KContact);
+            if (q.St == SK && !q.KPend) KEnd(q, down || q.KContact);
+            q.KPend = false;
             FClose(q);
             q.St = SW;
         }
@@ -902,7 +958,8 @@ namespace Armoury
         {
             SPos[0].Clear(); SPos[1].Clear();
             TrotSeen.Clear();
-            if (!_zOn) return;
+            SPosNow.Clear();
+            if (!_zOn) { SPosPrev.Clear(); return; }
             for (int i = 0; i < ThreatList.Count; i++)
             {
                 var t = ThreatList[i];
@@ -911,6 +968,8 @@ namespace Armoury
                 if (!t.Active && t.Q.St == SW && now - t.LastFire > _hold) continue;
                 Vec2 sp = s.Position.AsVec2;
                 SPos[t.Side].Add(sp);
+                SPosNow.Add(s.Index);
+                if (!SPosPrev.Contains(s.Index)) continue;   // 347b A344-6: nowy strzelec - Eval szykow jeszcze go nie widzial
                 var fl = HForms[t.Side];
                 for (int j = 0; j < fl.Count; j++)
                 {
@@ -923,6 +982,8 @@ namespace Armoury
                 }
             }
             TrotSeen.Clear();
+            SPosPrev.Clear();
+            SPosPrev.UnionWith(SPosNow);
             if (Ret344.Count > 0)
             {
                 GTmp.Clear();
@@ -1010,7 +1071,7 @@ namespace Armoury
               .Append(" | kontry ").Append(_z4K).Append(" (calego G ").Append(_z4KFull).Append(", odruchow ").Append(_z4R).Append(", jezdzcow odruchu ").Append(_z4RRiders)
               .Append(", jezdzcow kontry ").Append(_z4KRiders).Append("), zdarzen kontry ").Append(_z4Ev).Append(" (odpowiedzi ").Append(_z4Ans).Append(", mediana reakcji ")
               .Append(Med(KReact)).Append(" s, bez odpowiedzi ").Append(_z4Miss).Append(", bez przewagi ").Append(_z4NoAdv).Append("), wynik kontry dobry ").Append(_z4KOk)
-              .Append('/').Append(_z4KEnd)
+              .Append('/').Append(_z4KEnd).Append(", kontry bez wolnych jezdzcow ").Append(_z4KEmpty)
               .Append(" | trafienia bez odpowiedzi ").Append(_z4Unans).Append(" (trafien z Rw poza oslona ").Append(_z4PendN).Append(')')
               .Append(" | powroty szykiem ").Append(_z4Ps).Append(" (kontra z powrotu ").Append(_z4PsK).Append(", front z powrotu ").Append(_z4PsF).Append("), klus przy strzelcu ")
               .Append(_z4Trot).Append(" s")

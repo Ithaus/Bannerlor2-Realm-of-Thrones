@@ -975,6 +975,7 @@ namespace Armoury
                 }
             }
             if (bm == BFull || bm == BLight) BaitFullSent(t, now, sent);   // 333
+            if (t.Q.KPend) { try { KontraConfirm(t, now, sent); } catch (Exception e) { t.Q.KPend = false; _zStum++; HStumble("HorsePursuit.Kontra344", e); } }   // 347b A344-3b
             int foot = 0, halted = 0;
             if (rx)
             {
@@ -1055,18 +1056,19 @@ namespace Armoury
         {
             // 283 R3: szyk w zwarciu zostaje (chyba ze wodz, wartosc szyku ofiary, polowa strzelcow strony), oslona skrzydla przed jazda wroga zostaje
             int pull;
-            if (!CavAllowed(t, fi, out pull)) return;
+            bool kt = _z4Next == ZKontraRole;   // 347b A344-3c: powody odrzucenia kontry (KontraConfirm)
+            if (!CavAllowed(t, fi, out pull)) { if (kt) _ktCav++; return; }
             int cap = want;
             if (t.Group)
             {
                 int g;
                 FormGroup.TryGetValue(fi.F, out g);
                 int room = Math.Max(0, PerVictim - g);
-                if (room <= 0) { _hGroupCut++; return; }   // szyk oddal juz limit - bez przegladu
+                if (room <= 0) { _hGroupCut++; if (kt) _ktCap++; return; }   // szyk oddal juz limit - bez przegladu
                 if (room < cap) cap = room;
             }
             int left = _hScanCap - _hScan;
-            if (left <= 0) { _hScanCut++; return; }
+            if (left <= 0) { _hScanCut++; if (kt) _ktCap++; return; }
             HUnits.Clear();
             fi.F.ApplyActionOnEachUnit(HCollect);   // gra iteruje swoje listy - my tylko zbieramy
             HCand.Clear();
@@ -1078,11 +1080,12 @@ namespace Armoury
                 if (u >= nu) u -= nu;
                 var a = HUnits[u];
                 int why = Elig(m, a, t, now);
-                if (why == -2) continue;   // recenzja 204 (3): juz pod 204 / pieszy / konny lucznik - poza limitem przegladu
-                if (used >= left) { _hScanCut++; _hScanOff += k; break; }   // reszta szyku w nastepnym passie (poczatek przesuniety)
+                if (why == -2) { if (kt) _ktSkip++; continue; }   // recenzja 204 (3): juz pod 204 / pieszy / konny lucznik - poza limitem przegladu
+                if (used >= left) { _hScanCut++; _hScanOff += k; if (kt) _ktCap++; break; }   // reszta szyku w nastepnym passie (poczatek przesuniety)
                 used++;
-                if (why >= 0) { NoteNw(a, why); continue; }
+                if (why >= 0) { NoteNw(a, why); if (kt) KtNo[why]++; continue; }
                 HCand.Add(new KeyValuePair<float, Agent>(a.Position.AsVec2.Distance(sp), a));
+                if (kt) _ktCand++;
                 if (_rKey) RCavFree.Add(a.Index);   // 283: wolna jazda (do wyslania)
             }
             _hScan += used;
@@ -1097,6 +1100,7 @@ namespace Armoury
                 if (_hQPass >= ShieldsUp.QueriesPerPass)
                 {
                     for (int j = i; j < HCand.Count; j++) NoteNw(HCand[j].Value, NwQuery);
+                    if (kt) KtNo[NwQuery] += HCand.Count - i;
                     break;
                 }
                 _hQPass++;
@@ -1104,6 +1108,7 @@ namespace Armoury
                 {
                     MeleeUntil[a] = now + ShieldsUp.Window;   // zapamietane - nastepne passy bez zapytania
                     NoteNw(a, NwMelee);
+                    if (kt) KtNo[NwMelee]++;
                     continue;
                 }
                 StartHunter(t, a, fi, (byte)(t.MeleeEver % 2 == 0 ? RoleIntercept : RoleCut), 0f, now);

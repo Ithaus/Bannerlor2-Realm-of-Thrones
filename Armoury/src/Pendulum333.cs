@@ -154,6 +154,9 @@ namespace Armoury
             public sbyte BlkDir;
             public float BlkAt = -1000f, FireAt = -1000f, ArrChgAt = -1000f, ArrObsAt = -1000f;
             public int ArrPrevE = -1, ArrObsPrev = -1;
+            // 347b B344-1 / B344-3: liczba ludzi przy ostatniej probce i przy ostatniej obserwacji ustawienia, chwila zmiany skladu, wejscie W4 (Loose pod ostrzalem)
+            public int Cnt = -1, ArrObsCnt = -1;
+            public float CompAt = -1000f, ArrFireAccAt = -1000f;
             // 344r: pozycja prowadzacego przy ostatnim przyjeciu nastepcy (W5), taktyka kandydat (W7), szarza konnicy wroga (W2 techn.), szyk stojacy (W6)
             public Vec2 LeadPos = Vec2.Invalid, LeadPosNext = Vec2.Invalid;
             public Type TacNew;
@@ -207,6 +210,7 @@ namespace Armoury
         private static readonly Dictionary<string, int[]> SrcBy = new Dictionary<string, int[]>(StringComparer.Ordinal);
         private static int _callMain, _callAi, _arrMain, _arrAi, _plan, _blink, _tac, _succKeep, _succAcc, _succNo, _blk;
         private static int _arrSeen, _arrAcc, _arrBlk, _arrBack, _arrCav, _arrBlkC, _arrRet;
+        private static int _comp, _arrRetFire, _arrRetComp;   // 347b: zmiany skladu szyku (zygzak od nowa), powroty Line/Loose z wejscia W4 / przy zmianie skladu
         private static float _ffSec, _rtSec;
         // 344r: czas w prefiksach w watku AI (czekanie na lock / praca, ticki Stopwatch), zgubione linie, krok naprzod w martwej strefie, szyki stojace, taktyki
         private static long _aiWait, _aiWaitMax, _aiWork, _aiWorkMax;
@@ -287,6 +291,7 @@ namespace Armoury
             SrcBy.Clear();
             _callMain = _callAi = _arrMain = _arrAi = _plan = _blink = _tac = _succKeep = _succAcc = _succNo = _blk = 0;
             _arrSeen = _arrAcc = _arrBlk = _arrBack = _arrCav = _arrBlkC = _arrRet = 0;
+            _comp = _arrRetFire = _arrRetComp = 0;
             _ffSec = _rtSec = 0f;
             _aiWait = _aiWaitMax = _aiWork = _aiWorkMax = 0;
             _aiN = _lost = _fwdStep = _still = _stuck = _tacBlink = _arrFireAcc = 0;
@@ -767,7 +772,7 @@ namespace Armoury
             {
                 float ur = 0f;
                 try { var fq = f.QuerySystem; ur = fq != null ? fq.UnderRangedAttackRatio : 0f; } catch { ur = 0f; }
-                if (ur >= ArrFireIn) { _arrFireAcc++; pf.FireAt = now; pf.ArrPrevE = (int)cur; pf.ArrChgAt = now; _arrAcc++; return true; }
+                if (ur >= ArrFireIn) { _arrFireAcc++; pf.FireAt = now; pf.ArrFireAccAt = now; pf.ArrPrevE = (int)cur; pf.ArrChgAt = now; _arrAcc++; return true; }
             }
             if (pf.Contact)
             {
@@ -832,7 +837,7 @@ namespace Armoury
             {
                 if (pf.LeadNext.IsValid) pf.LeadP = pf.LeadNext;
                 if (pf.LeadPosNext.IsValid) pf.LeadPos = pf.LeadPosNext;
-                if (pf.SuccStill && rule != '1') _succNo++; else _succAcc++;
+                if (pf.SuccStill && pf.P.IsValid) _succNo++; else _succAcc++;   // 347b B344-5: nastepca bez P (pierwszy punkt / po Forget, takze regula B przez Side) to nie ruch bez zmiany prowadzacego
                 pf.Succ = false;
             }
             pf.AccN++;   // 333d
@@ -974,6 +979,19 @@ namespace Armoury
         {
             Refresh(pf, now);
             var f = pf.F;
+            // 347b B344-1: gra przenosi ludzi miedzy szykami (TransferUnits) - srodek ciezkosci i mediana skacza o dziesiatki metrow; zygzak od nowa jak przy kontakcie
+            int cnt = f.CountOfUnits;
+            bool comp = pf.Cnt > 0 && Math.Abs(cnt - pf.Cnt) >= Math.Max(HorsePursuit.IntactMin, 0.2f * Math.Max(cnt, pf.Cnt));
+            pf.Cnt = cnt;
+            if (comp)
+            {
+                pf.CompAt = now;
+                _comp++;
+                pf.Last = Vec2.Invalid;
+                pf.LastA = Vec2.Invalid;
+                pf.Trend = 0;
+                pf.TrendA = 0;
+            }
             Vec2 c = f.CachedMedianPosition.AsVec2;
             Vec2 a = f.CachedAveragePosition;
             if (pf.Contact || pf.Gap == float.MaxValue || !pf.Axis.IsValid || !c.IsValid || !a.IsValid)
@@ -1131,6 +1149,7 @@ namespace Armoury
             {
                 pf.Fac = fac;
                 pf.Arr = arr;
+                pf.ArrObsCnt = f.CountOfUnits;
                 SetLine(pf, now, "poczatek FacingOrder " + FacName(fac) + ", ArrangementOrder " + ArrName(arr));
                 return;
             }
@@ -1141,9 +1160,19 @@ namespace Armoury
                 // 344 B344-3: powrot Line / Loose do ustawienia sprzed poprzedniej zmiany w ArrHold s
                 bool ll = (arr == (int)ArrangementOrder.ArrangementOrderEnum.Line || arr == (int)ArrangementOrder.ArrangementOrderEnum.Loose)
                           && (pf.Arr == (int)ArrangementOrder.ArrangementOrderEnum.Line || pf.Arr == (int)ArrangementOrder.ArrangementOrderEnum.Loose);
-                if (ll && arr == pf.ArrObsPrev && now - pf.ArrObsAt < ArrHold) _arrRet++;
+                if (ll && arr == pf.ArrObsPrev && now - pf.ArrObsAt < ArrHold)
+                {
+                    // 347b B344-3: wejscie w Loose pod ostrzalem (W4, przyjete zawsze) i nowa grupa ludzi w tym samym szyku (CopyOrdersFrom przy TransferUnits) - osobno
+                    int oc = f.CountOfUnits;
+                    bool compObs = pf.CompAt > pf.ArrObsAt
+                                   || (pf.ArrObsCnt > 0 && Math.Abs(oc - pf.ArrObsCnt) >= Math.Max(HorsePursuit.IntactMin, 0.5f * Math.Max(oc, pf.ArrObsCnt)));
+                    if (arr == (int)ArrangementOrder.ArrangementOrderEnum.Loose && now - pf.ArrFireAccAt <= SampleEvery + RefreshEvery) _arrRetFire++;
+                    else if (compObs) _arrRetComp++;
+                    else _arrRet++;
+                }
                 pf.ArrObsPrev = pf.Arr;
                 pf.ArrObsAt = now;
+                pf.ArrObsCnt = f.CountOfUnits;
                 SetLine(pf, now, "ArrangementOrder " + ArrName(pf.Arr) + " -> " + ArrName(arr));
                 pf.Arr = arr;
             }
@@ -1269,7 +1298,7 @@ namespace Armoury
               .Append(" | wywolania arbitra glowny watek ").Append(_callMain).Append(" / watek AI ").Append(_callAi).Append(", ustawienia glowny ").Append(_arrMain)
               .Append(" / AI ").Append(_arrAi).Append(", czas misji z przewijaniem ").Append(_ffSec.ToString("0", Inv)).Append(" s / bez ").Append(_rtSec.ToString("0", Inv)).Append(" s")
               .Append(" | szyko-minut przed kontaktem ").Append(min.ToString("0.0", Inv)).Append(", nawroty srodka ciezkosci ").Append(_revA).Append(" (w tyl ").Append(_revABack)
-              .Append("), mediany ").Append(_rev).Append(" (w tyl ").Append(_revBack).Append(')')
+              .Append("), mediany ").Append(_rev).Append(" (w tyl ").Append(_revBack).Append("), zmian skladu szyku ").Append(_comp)
               .Append(" | rozkazy Move przyjete/trzymane/obciete wedlug zrodla ");
             if (SrcBy.Count == 0) sb.Append('-');
             else
@@ -1285,6 +1314,7 @@ namespace Armoury
             sb.Append(" | ustawienie Line/Loose: wywolan ").Append(_arrSeen).Append(", przyjete ").Append(_arrAcc).Append(", zablokowane ").Append(_arrBlk)
               .Append(", powroty pod ostrzalem zablokowane ").Append(_arrBack).Append(", w kontakcie zablokowane ").Append(_arrBlkC).Append(", szarza konnicy ").Append(_arrCav)
               .Append(", zmian ustawienia przed kontaktem ").Append(_arrChg).Append(", powroty w ").Append(ArrHold.ToString("0", Inv)).Append(" s ").Append(_arrRet)
+              .Append(" (osobno: z wejscia pod ostrzalem ").Append(_arrRetFire).Append(", przy zmianie skladu ").Append(_arrRetComp).Append(')')
               .Append(" | zachowania: zmian planu ").Append(_plan).Append(", migniec ").Append(_blink).Append(", zmian taktyki ").Append(_tac)
               .Append(" | nastepcy: trzymani ").Append(_succKeep).Append(", ruszeni za prowadzacym ").Append(_succAcc).Append(", ruchy bez zmiany prowadzacego ").Append(_succNo)
               .Append(" | blokada przeciwnego rozkazu ").Append(_blk)

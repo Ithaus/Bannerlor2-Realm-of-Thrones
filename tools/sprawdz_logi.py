@@ -70595,7 +70595,7 @@ M204_RX = {
     "cost": re.compile(r"\| koszt passu sr\. (\S+) / max (\S+) ms \(passow (\d+); ludzi przejrzanych najwiecej (\d+) na pass, limit (\d+), ciec przegladu (\d+); "
                        r"strzelcow naraz najwiecej (\d+), na pass (\d+), passow z odlozonymi (\d+); obnizen poziomu (\d+)(?:; FF poza kolejka (\d+))?\)"),
     "start": re.compile(r"^Jazda na strzelca \(204\) start: strzelec (\S+) \((gracz|AI), konno, (\S+)\) \| strona (atak|obrona) \| wykrycie (trafienie|pudlo|przelot|cel AI), "
-                        r"pociskow w 5 s (\d+), padlo od niego (\d+) \| poziom (oddzial|szyk|cala jazda).*? \| jezdzcow (\d+) \(z szyku w szarzy (\d+)\), "
+                        r"pociskow w 5 s (\d+), padlo od niego (\d+) \| poziom (oddzial|szyk|cala jazda|-).*? \| jezdzcow (\d+) \(z szyku w szarzy (\d+)\), "
                         r"lucznikow na cel (\d+) \| odleglosc od szyku (\d+) m$"),
     "contact1": re.compile(r"^Jazda na strzelca \(204\) kontakt: po ([\d.]+) s, jezdziec (\S+), ([\d.]+) m \| strzelec (\S+)$"),
     "end1": re.compile(r"^Jazda na strzelca \(204\) koniec: (padl od jezdzcow|padl od innych|odpedzony|uszedl poza smycz|konie|odwrot wodza|koniec bitwy|inne) "
@@ -70635,6 +70635,9 @@ M204_TEST = {
               "| poziom szyk | szyki [Cavalry 5/5] | jezdzcow 5 (z szyku w szarzy 0), lucznikow na cel 4 | odleglosc od szyku 12 m"),
     "startpl": ("Jazda na strzelca (204) start: strzelec gracz (gracz, konno, Bow) | strona atak | wykrycie pudlo, pociskow w 5 s 1, padlo od niego 0 | poziom oddzial "
                 "(zaslona - strzelec przy swojej piechocie) | szyki [Cavalry 2/9] | jezdzcow 2 (z szyku w szarzy 0), lucznikow na cel 0 | odleglosc od szyku 140 m"),
+    # 347b: epizod samych lucznikow oslony 311a po powrocie 344 (t.Level 0 - "poziom -", jezdzcow 0)
+    "start0": ("Jazda na strzelca (204) start: strzelec frey_rider#410 (AI, konno, Bow) | strona obrona | wykrycie cel AI, pociskow w 5 s 0, padlo od niego 0 "
+               "| poziom - | szyki [] | jezdzcow 0 (z szyku w szarzy 0), lucznikow na cel 8 | odleglosc od szyku 53 m"),
     "contact1": "Jazda na strzelca (204) kontakt: po 6.5 s, jezdziec sea_raiders_raider#77, 5.2 m | strzelec vlandian_horse_archer#211",
     "end1": ("Jazda na strzelca (204) koniec: padl od jezdzcow po 9.0 s | strzelec vlandian_horse_archer#211 | jezdzcy padli 0, ciosy w strzelca 3, kontakt 6.5 s, "
              "najdalej od szyku 80 m"),
@@ -70697,6 +70700,9 @@ def m204jazda_selftest():
     m = RX["start"].match(T["startpl"])
     if not m or m.group(1) != "gracz" or m.group(5) != "pudlo" or m.group(8) != "oddzial" or m.group(12) != "140":
         return f"startpl: {m.groups() if m else 'brak dopasowania'}"
+    m = RX["start"].match(T["start0"])   # 347b: poziom - (epizod samych lucznikow oslony po powrocie 344)
+    if not m or m.groups() != ("frey_rider#410", "AI", "Bow", "obrona", "cel AI", "0", "0", "-", "0", "0", "8", "53"):
+        return f"start0: {m.groups() if m else 'brak dopasowania'}"
     m = RX["contact1"].match(T["contact1"])
     if not m or m.groups() != ("6.5", "sea_raiders_raider#77", "5.2", "vlandian_horse_archer#211"):
         return "contact1"
@@ -97925,16 +97931,16 @@ def ai344_line(fEnt=2, backF=1, backMed="0", backMax=1, faceOk=40, faceN=44, k=2
             f"przewaga 2 x (1 + eskorta)) | poscigi 3 (L1 przy szybszym strzelcu 1, pogonie bez szans ponad 8 s {long}) | front wejsc {fEnt} (jezdzcow 12; krawedz "
             f"strefy 1, szybszy strzelec 1, strona przegrywa 0), trafienia w plecy w front/powrot {backF} (na wejscie mediana {backMed}, najwiecej {backMax}), wszystkie w "
             f"plecy 2, przodem do strzelca {faceOk}/{faceN} probek | kontry {k} (calego G {kFull}, odruchow {r}, jezdzcow odruchu 3, jezdzcow kontry 9), zdarzen kontry "
-            f"{ev} (odpowiedzi {ans}, mediana reakcji {react} s, bez odpowiedzi 0, bez przewagi 0), wynik kontry dobry {kOk}/{kEnd} | trafienia bez odpowiedzi {unans} "
+            f"{ev} (odpowiedzi {ans}, mediana reakcji {react} s, bez odpowiedzi 0, bez przewagi 0), wynik kontry dobry {kOk}/{kEnd}, kontry bez wolnych jezdzcow 0 | trafienia bez odpowiedzi {unans} "
             f"(trafien z Rw poza oslona {pend}) | powroty szykiem 1 (kontra z powrotu 1, front z powrotu 0), klus przy strzelcu {trot} s | front pod ostrzalem: trafien 4, docisniec 1, odwrotow spod ognia 1, bez "
             f"reakcji {fUnans}, powrotow przedluzonych 1 | strzelcy przy swojej armii "
             f"bez poscigu 1, lekkie odpedzenia L1 0, krawedzi strefy na strzelca najwiecej 1 (razem 1), petla przynety 0 | jezdzcy zawroceni w strefie 0, nie wyslani "
             f"przy strefie 2, punktow przycietych do strefy 30, szykow w strefie najwiecej 5 | szyki: klucz {keyB} (latka ruchu {patch}, latka ustawienia {patchArr}; "
             f"histereza zachowan 6 s, blokada przeciwnego rozkazu 10 s, ustawienie Line/Loose co 20 s, powrot po 20 s bez ostrzalu) | wywolania arbitra glowny watek 4 "
             f"/ watek AI {callAi}, ustawienia glowny 0 / AI 6, czas misji z przewijaniem {ffSec} s / bez {rtSec} s | szyko-minut przed kontaktem {mins}, nawroty srodka "
-            f"ciezkosci {revA} (w tyl {revABack}), mediany 3 (w tyl 1) | rozkazy Move przyjete/trzymane/obciete wedlug zrodla {src} | ustawienie Line/Loose: wywolan 12, "
+            f"ciezkosci {revA} (w tyl {revABack}), mediany 3 (w tyl 1), zmian skladu szyku 0 | rozkazy Move przyjete/trzymane/obciete wedlug zrodla {src} | ustawienie Line/Loose: wywolan 12, "
             f"przyjete 2, zablokowane 9, powroty pod ostrzalem zablokowane 1, w kontakcie zablokowane 0, szarza konnicy 0, zmian ustawienia przed kontaktem 2, "
-            f"powroty w 20 s {arrRet} | zachowania: zmian planu 2, migniec 5, zmian taktyki 0 | nastepcy: trzymani 40, ruszeni za prowadzacym 3, ruchy bez zmiany "
+            f"powroty w 20 s {arrRet} (osobno: z wejscia pod ostrzalem 1, przy zmianie skladu 0) | zachowania: zmian planu 2, migniec 5, zmian taktyki 0 | nastepcy: trzymani 40, ruszeni za prowadzacym 3, ruchy bez zmiany "
             f"prowadzacego {succNo} | blokada przeciwnego rozkazu 4 | 344r: krok naprzod w martwej strefie 3, pierwszy kontakt po 95 s, szykow stojacych ponad 60 s "
             f"przed kontaktem 2 (z celem gry naprzod {stuck}), Loose pod ostrzalem od razu 1, migniec taktyki 2, taktyki druzyn d0 2 (szybkich {tacFast}), d1 1 (szybkich 0) "
             f"| watek AI: wywolan 120, czekanie na lock 1.20 ms (najwiecej 0.10 ms), praca 9.50 ms (najwiecej {aiMax} ms), zgubione linie {lost} | 333: wahadlo: klucz TAK (latka TAK; przed kontaktem > 75 m) | szykow AI 9 | test bez "
