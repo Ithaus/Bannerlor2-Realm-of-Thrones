@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 174 - 351 = 344 (AI bitew: 344, 344r, 347b/b-r, 347d/d-r, 347f/f-r, 347g/g-r) + 350 (pomiar) na 173 (Armoury.dll acd118c2)
+**Decyzja Jeffa 07.11 ~16:25:** "1" = wgrac 344 mimo A344-3 i B344-1 (pytanie: zawracanie tylem pod ostrzalem naprawione, slaby wynik kontry dotyczy testowej przynety; B344-1 = stare wahadlo 333, w bazie bez 344 gorzej).
+**Test at351:** kod 0, 13/13 bitew, 0 ERROR; ai344 TAK A344-1/2/4/6/7/8, B344-2/6/7, X344, A344-T; NIE A344-3 1/11 (6 kontr bez wolnych jezdzcow - Nw "daleko" i "strefa 333"), B344-1 0.49/min, B344-3 1. Reszta jak at349/at350.
+**Co sprawdzic w grze Jeffa:** konnica AI przy jego strzelcach konnych - front przodem zamiast ucieczki tylem, kontra na niego poza oslona jego armii; linie "AI bitwy (344): misja" (sprawdz_logi --grupa ai344).
+**Dalej (opcjonalnie):** krok 4 - przewaga w GNear tylko z jezdzcow w zasiegu i poza strefa 333 (warunki Elig NwFar / NwZone).
+**Status:** WGRANE 174 (07.11 16:25). Kopia 173: Armoury.dll.bak-2026-11-07-przed-wgranie174 + D:/Backup-Bannerlord/wgrane/2026-11-07-wgranie174-przed.
+
 ## 350 - pomiar spowolnienia w sesji (noc/350-pomiar-spowolnienia od WGRANIA 172; NIE WGRANE, TYLKO LOG)
 **Problem:** Jeff 07.11: "sprawdz czemu gra dziala coraz wolniej". Raport docs/RAPORT-SPOWOLNIENIE-2026-11-07.md: w sesji 06.11 18:15 doba gry na mapie rosnie 22.8 -> 36 s po ~45-60 dobach,
 po wczytaniu wraca; nasz takt doby stoi (2.1-2.6 s/d), partie stoja (~4700), GC gen0/s rosnie 45 -> 80. Linia f9 z tej sesji (Armoury-2026-11-06_18-15-03.log, kosz "szybko",
