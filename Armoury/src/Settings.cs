@@ -3412,6 +3412,9 @@ namespace Armoury
         // E8/0 (242, PLAN 8.17 pomiar): linia "Profil doby (E8/0)" raz na dobe - takt doby (top 15 wywolan Daily), sluchacze godzinowe, zdarzenia (probka 1/16),
         // podzialy CyclePrefix / musztry / cen wedlug wolajacego, pamiec polki, zapis logu, GC (DayProfile.cs); opakowania zdarzen zakladane przy wczytaniu tylko przy wlaczonym kluczu
         public bool Stage8ProfileLog = true;               // Writes one daily line with the time each part of the mod takes (diagnostics only).
+        // 350 (raport spowolnienia 07.11): linia "Pomiar sesji (350)" raz na dobe - klatki mapy, czas klatki, czas rzeczywisty doby, GC, pamiec; co 30 dob sluchacze
+        // HourlyTick wszystkich modow i licznosc statycznych kolekcji Armoury (SessionPerf350.cs); tylko log, gra bez zmian
+        public bool SessionPerfLog = true;                 // Writes one daily line measuring how the game runs over a long session: map frames per day, average and longest frame, real time per day, garbage collections and memory; every 30 days also the time of all hourly listeners and the size of the mod's largest lists (diagnostics only; nothing in the game changes).
         // E8/P3 (245, PLAN 8.15, 8.12c; stan "przed" dla E8/G1 i E8/G2): pomiary swiata w logu (Stage8World.cs) - model produkcji wsi pod NavalDLC (raz na sesje),
         // kara DTE "Underequipped" po bitwie gracza, owce (stada, welna, utarg wozow wsi owczych), postoj karawan AI w miastach, zamiana BK u klanow najemnikow,
         // zrodla i ujscia BK bez platnika (dopisek do linii "BK i Diplomacy (E5/A8)"), wsie Normal bez wozu ponad 7 dob, rozkazy partii ze statkami po switcie; gra bez zmian

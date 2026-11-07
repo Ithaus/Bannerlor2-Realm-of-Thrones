@@ -124,6 +124,7 @@ namespace Armoury
                 if (s == null || c == null || __instance == null) return;
                 int fast = FastOf(s), very = VeryFastOf(s);
                 int state = __instance.TimeFlowState;
+                SessionPerf350.Frame(state, t0);   // 350: pomiar klatek mapy w sesji (tylko log, bez alokacji; przed returnem przy Better Time)
                 if (MapSpeedProfile.On) MapSpeedProfile.Frame(BinOf(state, c.SpeedUpMultiplier, fast, very), t0);   // pomiar klatek takze przy Better Time (jego x3 / x6 - kosz "inny mnoznik")
                 if (BetterTimeActive) return;   // f17: predkosc prowadzi Better Time - bez naszego mnoznika i klawiszy (recenzja: return PO pomiarze klatki)
                 ArmMapSpeedVM vm;
