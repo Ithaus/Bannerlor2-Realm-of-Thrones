@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 347c - prognoza 345: regularnosc wedlug modulu, srednia z 3 dob, G1 od 3 dob historii (noc/347-bitwy-zloto-2; NIE WGRANE)
+**Problem:** test at347 (07.11 13:20, DLL 347b 6879806d): G1 NIE - srednio |rozjazd| 1382 zl, srednio -1316 (prognoza za wysoko); 109576 poprawka "Dues to the crown" +8757, potem +4376, +2916 ... (wojna CrownWar314 +9040 z jednej doby).
+**Przyczyna:** regula 347a "regularne = etykieta w >= polowie dob" - pod etykieta "Dues to the crown" jest jednorazowy CrownWar314 i codzienny KingdomTreasury.Daily (-5..-60), wiec jednorazowka przechodzila; przy 1-2 dobach historii wszystko bylo "regularne"; srednia z 7 dob nie lapie skokow poziomu (TownFolk.Daily 30 -> 900).
+**Zmiana (GoldForecast.cs, sprawdz_logi prognoza345):** regularny = MODUL (klucz taktu) w >= polowie dob historii i w >= 2 dobach; kwota = srednia z ostatnich 3 dob historii; nieregularne w linii dobowej tez wedlug modulu. G1 ocenia tylko doby, ktorych prognoza miala >= 3 doby historii (linia "historia N dob" - 1); same krotsze - INFO; test syntetyczny + przypadek "young".
+**Symulacja (logi at346 i at347, doby z historia >= 3):** srednio |rozjazd| 184 i 208 zl (prog < 300). W tescie historia startuje od zera (zapis Jeffa sprzed 345 - bez arm_prog345), w grze Jeffa po tygodniu pelna.
+**Ryzyko / co sprawdzic:** tylko widok. Nowy modul pojawia sie w prognozie dopiero od 2. dnia obecnosci. Po tescie G1 TAK.
+**Status:** DO SPRAWDZENIA (build Release kod 0, Armoury.dll a40aedb0, NIE testowane, NIE WGRANE).
+
 ## 347a - prognoza zlota 345 poprawiona po tescie at346 (noc/347-bitwy-zloto-2 od 346; NIE WGRANE)
 **Problem:** test at346 (07.11, 9 dob z prognoza na kopii zapisu Jeffa): G1 NIE - srednio |rozjazd| 4041 zl (114.7% prawdziwej zmiany); najgorsza doba 109582 prognoza -667, naprawde +9649.
 **Przyczyna (z logu):** (1) sam model + "wsie do posiadaczy tytulu" trafia w rozliczenie rodu co do ~30 zl kazdego dnia (109580: 7516 - 10231 = -2715 wobec -2731; 109582: -786 - 2450 = -3236 wobec -3269), a poprawka "warsztaty do wyplaty" (srednia wyplat minus stan teraz) dokladala +1000..+2170 - w chwili prognozy (koniec naszego taktu) model ma juz caly dzien warsztatow, a srednia ciagnela stare wyplaty (4333, 2359 -> dzis 98..749); (2) pozycje jednorazowe taktu (RansomFlows +12081 / -1000, Ransom178 -5859 / -1340, CrownWar314 +9040, CastlePurse +3051 - raz na 9 dob) szly srednia na kazda dobe.
