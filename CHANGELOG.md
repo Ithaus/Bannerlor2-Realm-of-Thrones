@@ -5,7 +5,7 @@
 **Przyczyna:** 338 grupa 4 (Buildings338Mason): w osadach z oplacona budowa (gracz przy PaidConstructionPlayer = true u Jeffa) dopisek Masona = min(punkty Masona, punkty pana + robota ludu) - przyspieszenie zlotem ("Craftsmen services") nie liczylo sie jako praca, wiec przy budowie napedzanej zlotem Mason dawal ~0.
 **Zmiana:** BuildFunding.PowerPostfix: Mason = min(punkty Masona, pana + lud + przyspieszenie zlotem); MasonDay (linia doby murarza) tak samo; EngPaidNeed (ile pan doplaca): postep = p x f + min(m, p + b). PowerIntPostfix (moc BEZ przyspieszenia) bez zmian - tam przyspieszenia nie ma.
 **Ryzyko / co sprawdzic:** Mason dalej najwyzej swoje punkty (+2/4/6 zamek, +3/6/9 miasto) - B338-8 "dopisek <= punkty Masona". AI rzadko przyspiesza zlotem - wplyw glownie na gracza. Po wgraniu: dymek budowy w Ashemark z linia "Mason (works with the paid builders)".
-**Status:** DO SPRAWDZENIA (build Release kod 0, NIE WGRANE).
+**Status:** WGRANE 172 (07.11 15:10, Armoury.dll d78974ab = noc/349-zloto-murarz; test at349 kod 0, budynki338 0 NIE, B338-8 TAK).
 
 ## 347c - prognoza 345: regularnosc wedlug modulu, srednia z 3 dob, G1 od 3 dob historii (noc/347-bitwy-zloto-2; NIE WGRANE)
 **Problem:** test at347 (07.11 13:20, DLL 347b 6879806d): G1 NIE - srednio |rozjazd| 1382 zl, srednio -1316 (prognoza za wysoko); 109576 poprawka "Dues to the crown" +8757, potem +4376, +2916 ... (wojna CrownWar314 +9040 z jednej doby).
@@ -13,7 +13,7 @@
 **Zmiana (GoldForecast.cs, sprawdz_logi prognoza345):** regularny = MODUL (klucz taktu) w >= polowie dob historii i w >= 2 dobach; kwota = srednia z ostatnich 3 dob historii; nieregularne w linii dobowej tez wedlug modulu. G1 ocenia tylko doby, ktorych prognoza miala >= 3 doby historii (linia "historia N dob" - 1); same krotsze - INFO; test syntetyczny + przypadek "young".
 **Symulacja (logi at346 i at347, doby z historia >= 3):** srednio |rozjazd| 184 i 208 zl (prog < 300). W tescie historia startuje od zera (zapis Jeffa sprzed 345 - bez arm_prog345), w grze Jeffa po tygodniu pelna.
 **Ryzyko / co sprawdzic:** tylko widok. Nowy modul pojawia sie w prognozie dopiero od 2. dnia obecnosci. Po tescie G1 TAK.
-**Status:** DO SPRAWDZENIA (build Release kod 0, Armoury.dll a40aedb0, NIE testowane, NIE WGRANE).
+**Status:** WGRANE 172 (07.11 15:10; test at348 G1 TAK 163 zl, at349 G1 TAK 215 zl).
 
 ## 347a - prognoza zlota 345 poprawiona po tescie at346 (noc/347-bitwy-zloto-2 od 346; NIE WGRANE)
 **Problem:** test at346 (07.11, 9 dob z prognoza na kopii zapisu Jeffa): G1 NIE - srednio |rozjazd| 4041 zl (114.7% prawdziwej zmiany); najgorsza doba 109582 prognoza -667, naprawde +9649.
@@ -21,7 +21,7 @@
 **Zmiana (GoldForecast.cs, tylko widok):** (1) warsztaty i wsie gracza: reszta do wyplaty = srednia wyplata x (1 - f), f = godziny od ostatniego rozliczenia rodu gracza / 24 (czas zapisany w ClanTickPostfix); bez znanej wyplaty od wczytania - bez poprawki. (2) pozycje taktu do prognozy tylko regularne: etykieta obecna w >= polowie dob historii; reszta poza prognoza. Linia dobowa: nowy segment "| nieregularne poza prognoza X (modul kwota [etykieta], ...)" po "kiesa naprawde", rozjazd = (naprawde - nieregularne) - prognoza. sprawdz_logi prognoza345: G1 liczy |naprawde| bez nieregularnych, nowe G6 (INFO), test syntetyczny + 2 przypadki (okupy poza prognoza TAK, wliczone NIE).
 **Symulacja na logu at346 (regula 2 bez 1 i z modelem jak w logu):** rozjazd dob z historia >= 3: 302, 282, 242, 133, 456, 335 (srednio 292 zl < 300); dwie pierwsze doby po wczytaniu gorsze (historia 1-2 dob).
 **Ryzyko / co sprawdzic:** tylko widok (podpowiedz zlota, panel Finance) - zloto gracza bez zmian. Okupy i wojna nie sa juz w "Expected Change" (nie da sie ich przewidziec) - gracz widzi je dopiero gdy wpadna. f zalezy od kolejnosci rozliczenia rodu i naszego taktu - w at346 model w chwili prognozy = wyplata (f ~ 1). Kolizje: WorkshopsNow zostaje w prefiksie (podglad), _hist/zapis arm_prog345 bez zmian formatu. Po tescie: --grupa prognoza345 G1 TAK, G6 INFO.
-**Status:** DO SPRAWDZENIA (build Release kod 0, NIE testowane, NIE WGRANE).
+**Status:** WGRANE 172 (07.11 15:10; razem z 347c).
 
 ## 345 - przewidywany dochod gracza = prawdziwy obieg (noc/345-przewidywany-dochod od 5bddce2b; NIE WGRANE, bez autotestu; DLL test/m345)
 **Problem:** Jeff 07.11 01:38 przy Seagard: "dostaje -prawie 3k, a pokazuje mi, ze mam dostac na plusie". Okno "Expected change" (podpowiedz zlota): Village Demesnes 8161,
