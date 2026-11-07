@@ -1029,6 +1029,7 @@ namespace Armoury
                     paidTax += fromTax; paidVil += fromVil;
                     long got = fromTax + fromVil;
                     paid += got;
+                    GoldForecast.NoteWorksCart(leader, got);   // 345: ksiega kiesy gracza (wyplata poza taktem doby; wlasny try)
                     lock (Gate)
                     {
                         // m112-inwest po recenzji: got dzielone na wiersze rodu metoda najwiekszej reszty - cale kwoty sumuja sie dokladnie do got (Out i doby te same liczby;

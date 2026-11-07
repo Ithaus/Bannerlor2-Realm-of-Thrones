@@ -187,6 +187,7 @@ namespace Armoury
         /// <summary>Koniec odcinka taktu doby: czas od poprzedniego Lap (albo od poczatku taktu) pod ta nazwa.</summary>
         internal static void Lap(string name)
         {
+            GoldForecast.Lap(name);   // 345: ksiega kiesy gracza wedlug modulu taktu doby (zawsze, takze bez profilu; wlasny try)
             if (!_inTick) return;
             long now = Stopwatch.GetTimestamp();
             _lapCount++;

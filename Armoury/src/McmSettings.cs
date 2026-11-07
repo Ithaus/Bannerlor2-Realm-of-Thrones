@@ -11608,6 +11608,14 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338CastleMines { get; set; } = true;
 
+        [SettingPropertyBool("Gold Forecast Real", HintText = "Your daily gold tooltip and the clan screen's Finance box show what really reaches your purse in a day: village taxes that Banner Kings pays to a village's title holder instead of you are taken off, workshops and village taxes show the whole day's payout (average of the last days) instead of the profit so far, and the daily dues and payments outside the daily settlement (taxes from your people, workshop tax, dues to the crown, council, rents, bank, debts ...) get their own lines, each the average of the last days. Display only - what you get does not change. Off = the game's own numbers", RequireRestart = false)]
+        [SettingPropertyGroup("Expected gold shows what really comes (345)")]
+        public bool GoldForecastReal { get; set; } = true;
+
+        [SettingPropertyBool("Land Dues Follow Title Holder", HintText = "The crown dues, the soldiers' pay caps and the land price of a clan count a village's tax for the clan that really gets it: when Banner Kings pays the tax to the village's title holder in another clan, it counts for that clan; a title with no living holder counts for nobody (Banner Kings burns that tax). Off = the tax counts for the village's holder as before       // With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Expected gold shows what really comes (345)")]
+        public bool LandDuesFollowTitleHolder { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -14509,6 +14517,8 @@ namespace Armoury
             s.Buildings338VillageGoods = Buildings338VillageGoods;
             s.Buildings338Studs = Buildings338Studs;
             s.Buildings338CastleMines = Buildings338CastleMines;
+            s.GoldForecastReal = GoldForecastReal;
+            s.LandDuesFollowTitleHolder = LandDuesFollowTitleHolder;
         }
 
         internal static void Apply()

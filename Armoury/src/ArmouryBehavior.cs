@@ -745,6 +745,8 @@ namespace Armoury
         // inwest (noc 17/18.10): stan kampanii zajec wiosek, ikon i prac okregu od zera przy kazdym nowym zachowaniu (jak Reset w konstruktorze; osobna linia - bez zmiany
         // wspolnej linii konstruktora, ktora dopisuja inne paczki)
         private readonly bool _inwestReset = InwestReset();
+        private readonly bool _p345Reset = P345Reset();   // 345: ksiega kiesy gracza od zera przy kazdym nowym zachowaniu (nowa gra / wczytanie)
+        private static bool P345Reset() { try { GoldForecast.Reset(); } catch (Exception e) { Log.Error("P345Reset", e); } return true; }
         private static bool InwestReset() { try { VillageCrafts.Reset(); DistrictIcon.Reset(); DistrictWorks.Reset(); FiefInvestments.Reset(); } catch (Exception e) { Log.Error("InwestReset", e); } return true; }
         // f5-bitwa (noc 17/18.10): zestaw bitwy autotestu - stan poprzedniej kampanii od zera (osobna linia, jak inwest)
         private readonly bool _f5BitwaReset = F5BitwaReset();
@@ -1486,6 +1488,9 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_crafts_g", e); }
             try { string po = dataStore.IsSaving ? DistrictWorks.Export() : null; SaveText.Sync(dataStore, "arm_works", ref po); if (dataStore.IsLoading) DistrictWorks.Import(po); }
             catch (Exception e) { Log.Error("SyncData.arm_works", e); }
+            // 345: ksiega kiesy gracza - 7 dob historii prognozy zlota ("g345|1|..."); pisany tylko z historia; brak klucza (stary zapis, Ironman Jeffa) = pusto; starsza DLL ignoruje klucz
+            try { string pg = dataStore.IsSaving ? GoldForecast.Export() : null; if (!dataStore.IsSaving || pg != null) SaveText.Sync(dataStore, "arm_prog345", ref pg); if (dataStore.IsLoading) GoldForecast.Import(pg); }
+            catch (Exception e) { Log.Error("SyncData.arm_prog345", e); }
             // n20-wioska (noc 19/20.10): wioska poboczna gracza ("sf1|uid|okreg|nazwa|doba|wyplacone|srednia"); wlasny try, brak klucza (stary zapis, Ironman Jeffa) = brak wioski gracza
             try { string sf = dataStore.IsSaving ? SideVillageFief.Export() : null; SaveText.Sync(dataStore, "arm_side_fief", ref sf); if (dataStore.IsLoading) SideVillageFief.Import(sf); }
             catch (Exception e) { Log.Error("SyncData.arm_side_fief", e); }
@@ -2806,10 +2811,11 @@ namespace Armoury
 
         private void OnDailyTick()
         {
+            GoldForecast.TickBegin();   // 345: ksiega kiesy gracza - linia poprzedniej doby i nowa doba (przed wszystkim, co rusza kiese w takcie; wlasny try)
             MapSpeedProfile.Daily();   // f9-predkosc: linia "Predkosc mapy (f9)" za okres od poprzedniego taktu (tylko log) - przed profilem doby, poza jego stoperem
             DayProfile.TickBegin();
             try { OnDailyTickBody(); }
-            finally { DayProfile.TickEnd(); }
+            finally { DayProfile.TickEnd(); GoldForecast.TickEnd(); }   // 345: ostatni odcinek i prognoza na te dobe (wlasny try)
         }
 
         private void OnDailyTickBody()
@@ -3162,7 +3168,7 @@ namespace Armoury
             try { DistrictIcon.Daily(); } catch (Exception e) { Log.Error("DistrictIcon.Daily", e); } DayProfile.Lap("DistrictIcon.Daily");
             try { MoneyLedger.Probe169("DistrictIcon.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { DistrictWorks.Daily(); } catch (Exception e) { Log.Error("DistrictWorks.Daily", e); } DayProfile.Lap("DistrictWorks.Daily");
-            try { SideVillageFief.Daily(); } catch (Exception e) { Log.Error("SideVillageFief.Daily", e); }
+            try { SideVillageFief.Daily(); } catch (Exception e) { Log.Error("SideVillageFief.Daily", e); } DayProfile.Lap("SideVillageFief.Daily");   // 345: wlasny odcinek (wyplata wioski pobocznej - linia widoku SideVillageFief)
             try { LandSale.Daily(); } catch (Exception e) { Log.Error("LandSale.Daily", e); } DayProfile.Lap("LandSale.Daily");   // m113-zakup: linia na sucho (raz na sesje i co 28 dob), linia doby z ruchem albo co 7 dob
             try { FiefInvestments.Daily(); } catch (Exception e) { Log.Error("FiefInvestments.Daily", e); }   // m112-inwest: komunikat wyplat prac i majatkow minionej doby, linia "Majatki i prace w Fiefs (m112)"
             try { SideVillageVisit.Daily(); } catch (Exception e) { Log.Error("SideVillageVisit.Daily", e); }   // m97-wioski: linia "Wioski poboczne (WP): dzien N" (tylko z ruchem)   // n20-wioska: linia "Wioska gracza (n20): dzien N" i srednia 7 dob udzialu

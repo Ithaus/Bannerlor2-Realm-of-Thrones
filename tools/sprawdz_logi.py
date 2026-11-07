@@ -97673,5 +97673,168 @@ def main(argv):
     return _armie342_main_prev(argv)
 
 
+# ------------------------------------------------------------ paczka 345: grupa prognoza345 - przewidywany dochod gracza = prawdziwy obieg (GoldForecast.cs)
+#  Jeff 07.11: "dostaje -prawie 3k, a pokazuje mi, ze mam dostac na plusie". Linie 'Prognoza zlota gracza (345): ' - start i dzien N.
+#  G0 start: rozliczenie rodu gracza (DailyTickClan) wpiete; G1 rozjazd prognozy (zrobionej na poczatku doby) wobec prawdziwej zmiany obiegu tej doby (rozliczenie rodu +
+#  takt doby + wozy prac): srednio |rozjazd| < 300 zl albo < 10% sredniego |naprawde| (>= 3 dob z prognoza, mniej - INFO); G2 jedno rozliczenie rodu na dobe (INFO);
+#  G3 potkniecia 0; G4 wsie do posiadaczy tytulu i inne roznice przy wyplacie (INFO); G5 poza obiegiem - handel, lupy, okupy, zakupy gracza (INFO).
+#   python -I tools/sprawdz_logi.py --grupa prognoza345 <Armoury-*.log>
+G345_P = "Prognoza zlota gracza (345): "
+G345_START = re.compile(r"Prognoza zlota gracza \(345\): start \| rozliczenie rodu gracza \(DailyTickClan\) (wpiete|BRAK.*?)\.$")
+G345_DAY = re.compile(r"Prognoza zlota gracza \(345\): dzien (-?\d+) \| klucz (TAK|NIE) \| rozliczenie rodu (\S+).*? \| prognoza wczoraj (?:(-?\d+) \(model (-?\d+), poprawki 345 (-?\d+): (.*?)\)|brak.*?) "
+                      r"\| naprawde dzis (-?\d+) = rozliczenie (-?\d+) \((\d+)\) \+ takt doby (-?\d+) \+ wozy prac (-?\d+) \| rozjazd (\S+)(?: \((\S+)%\))? "
+                      r"\| kiesa naprawde (-?\d+) \(poza obiegiem (-?\d+):")
+G345_CLAN = re.compile(r"rozliczenie: zmiana kiesy (-?\d+), podglad modelu tuz przed (-?\d+) \(warsztaty (-?\d+), wsie do gracza (-?\d+), do posiadaczy tytulu (-?\d+)\), inne roznice (-?\d+)")
+G345_STUM = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
+
+
+def prognoza345_collect(logp):
+    D = {"start": [], "day": [], "bad": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.rstrip("\n").rstrip("\r")
+            if G345_P not in line:
+                continue
+            if G345_P + "start |" in line:
+                m = G345_START.search(line)
+                D["start"].append(m.group(1) if m else "?")
+                continue
+            if G345_P + "dzien " not in line:
+                continue
+            m = G345_DAY.search(line)
+            if not m:
+                D["bad"] += 1
+                continue
+            g = m.groups()
+            r = {"day": int(g[0]), "key": g[1], "wired": g[2], "fc": None if g[3] is None else int(g[3]), "model": None if g[4] is None else int(g[4]),
+                 "corr": None if g[5] is None else int(g[5]), "parts": g[6], "t": int(g[7]), "clan": int(g[8]), "n": int(g[9]), "tick": int(g[10]), "works": int(g[11]),
+                 "diff": None if g[12] == "-" else int(g[12]), "purse": int(g[14]), "out": int(g[15])}
+            mc = G345_CLAN.search(line)
+            r["cl"] = tuple(int(x) for x in mc.groups()) if mc else None
+            ms = G345_STUM.search(line)
+            r["stum"] = int(ms.group(1)) if ms else 0
+            D["day"].append(r)
+    return D
+
+
+def prognoza345_rows(rep, D):
+    if D["start"]:
+        rep.add("G0: start 345 - rozliczenie rodu gracza (DailyTickClan) wpiete", f"startow {len(D['start'])}, ostatni: {D['start'][-1]}", "wpiete",
+                all(x == "wpiete" for x in D["start"]))
+    else:
+        rep.add("G0: start 345", "brak linii startu 345", "INFO (log sprzed 345)", None)
+    dd = D["day"]
+    if not dd:
+        rep.add("G1: rozjazd prognozy", "brak linii doby 345" + (f" (nierozpoznane {D['bad']})" if D["bad"] else ""), "INFO", False if D["bad"] else None)
+        return
+    fc = [x for x in dd if x["fc"] is not None and x["diff"] is not None and x["key"] == "TAK"]
+    if fc:
+        ma = sum(abs(x["diff"]) for x in fc) / len(fc)
+        mt = sum(abs(x["t"]) for x in fc) / len(fc)
+        ms = sum(x["diff"] for x in fc) / len(fc)
+        worst = max(fc, key=lambda x: abs(x["diff"]))
+        ok = ma < 300 or (mt > 0 and ma < 0.10 * mt)
+        rep.add("G1: rozjazd prognozy (poczatek doby) wobec prawdziwej zmiany obiegu (rozliczenie + takt doby + wozy prac)",
+                f"dob z prognoza {len(fc)}: srednio |rozjazd| {ma:.0f} zl, srednio rozjazd {ms:+.0f}, srednio |naprawde| {mt:.0f} ({(100.0 * ma / mt) if mt else 0:.1f}%); "
+                f"najgorsza doba {worst['day']}: prognoza {worst['fc']} (model {worst['model']}, poprawki {worst['corr']}), naprawde {worst['t']}, rozjazd {worst['diff']:+d}"
+                + (f"; nierozpoznane {D['bad']}" if D["bad"] else ""),
+                "< 300 zl albo < 10% (>= 3 dob, mniej - INFO)", (None if len(fc) < 3 else ok) if not D["bad"] else False)
+    else:
+        rep.add("G1: rozjazd prognozy", f"dob {len(dd)}, z prognoza 0 (pierwsza doba po wczytaniu / klucz NIE)", "INFO", None)
+    n1 = sum(1 for x in dd if x["n"] == 1)
+    rep.add("G2: jedno rozliczenie rodu gracza na dobe", f"dob {len(dd)}: n=1 {n1}, n=0 {sum(1 for x in dd if x['n'] == 0)}, n>1 {sum(1 for x in dd if x['n'] > 1)}", "INFO", None)
+    st = sum(x["stum"] for x in dd)
+    rep.add("G3: potkniecia 345", f"{st}", "0", st == 0)
+    cl = [x["cl"] for x in dd if x["cl"]]
+    if cl:
+        rep.add("G4: rozliczenie - wsie do posiadaczy tytulu i inne roznice przy wyplacie (srednio na dobe)",
+                f"wyplat {len(cl)}: zmiana kiesy {sum(c[0] for c in cl) / len(cl):.0f}, podglad tuz przed {sum(c[1] for c in cl) / len(cl):.0f}, warsztaty {sum(c[2] for c in cl) / len(cl):.0f}, "
+                f"wsie do gracza {sum(c[3] for c in cl) / len(cl):.0f}, do posiadaczy tytulu {sum(c[4] for c in cl) / len(cl):.0f}, inne roznice {sum(c[5] for c in cl) / len(cl):.0f}",
+                "INFO", None)
+    rep.add("G5: poza obiegiem (handel, lupy, okupy, zakupy gracza - bez prognozy)", f"srednio {sum(x['out'] for x in dd) / len(dd):.0f} zl/dobe, kiesa srednio "
+            f"{sum(x['purse'] for x in dd) / len(dd):.0f}", "INFO", None)
+
+
+def prognoza345_line(d, fc=-2600, t=-2622, diff=None, stum=0, n=1, key="TAK"):
+    diff = (t - fc) if diff is None else diff
+    return (G345_P + f"dzien {d} | klucz {key} | rozliczenie rodu wpiete, wydatki panelu wpiete | prognoza wczoraj {fc} (model 5190, poprawki 345 {fc - 5190}: wsie do posiadaczy tytulu -8161) "
+            f"| naprawde dzis {t} = rozliczenie {t - 700} ({n}) + takt doby 675 + wozy prac 25 | rozjazd {diff:+d} (1.0%) | kiesa naprawde {t + 900} (poza obiegiem 900: handel, lupy, okupy, zakupy gracza) "
+            f"| takt doby wedlug modulow: TownFolk.Daily +1142 [Dues from your people (surplus tax, lord's rights)] | rozliczenie: zmiana kiesy -3322, podglad modelu tuz przed 4839 "
+            f"(warsztaty 752, wsie do gracza 0, do posiadaczy tytulu 8161), inne roznice 0 | srednio z 3 dob (sesja): |rozjazd| 22, |naprawde| 2622 | historia 3 dob | potkniecia {stum} (sesja {stum}).")
+
+
+def prognoza345_synth():
+    import tempfile
+    import shutil
+    start = G345_P + "start | rozliczenie rodu gracza (DailyTickClan) wpiete."
+    first = (G345_P + "dzien 109499 | klucz TAK | rozliczenie rodu wpiete, wydatki panelu wpiete | prognoza wczoraj brak (pierwsza doba po wczytaniu albo klucz wylaczony) "
+             "| naprawde dzis -2622 = rozliczenie -3322 (1) + takt doby 675 + wozy prac 25 | rozjazd - | kiesa naprawde -1700 (poza obiegiem 922: handel, lupy, okupy, zakupy gracza) "
+             "| takt doby wedlug modulow: - | rozliczenie: brak w tej dobie | srednio z 0 dob (sesja): |rozjazd| 0, |naprawde| 0 | historia 1 dob | potkniecia 0 (sesja 0).")
+
+    def run(days=10, s=start, **kw):
+        L = [s] if s else []
+        L.append(first)
+        for i in range(days):
+            L.append(prognoza345_line(109500 + i, **kw))
+        return L
+    runs = {
+        "good": (run(), {"G0": "TAK", "G1": "TAK", "G2": "INFO", "G3": "TAK", "G4": "INFO", "G5": "INFO"}),
+        "far": (run(fc=5190), {"G1": "NIE"}),
+        "pct": (run(fc=-20000, t=-24000), {"G1": "NIE"}),
+        "bigok": (run(fc=-20000, t=-21000), {"G1": "TAK"}),
+        "short": (run(days=2, fc=5190), {"G1": "INFO"}),
+        "stum": (run(stum=2), {"G3": "NIE"}),
+        "nowire": (run(s=start.replace("wpiete.", "BRAK (brak DailyTickClan).")), {"G0": "NIE"}),
+        "nostart": (run(s=None), {"G0": "INFO"}),
+        "old": (["Prace okregu (PO): dzien 1 | ..."], {"G0": "INFO", "G1": "INFO"}),
+    }
+    tmp = tempfile.mkdtemp(prefix="g345_")
+    diff = []
+    try:
+        for kind, (Ls, exp) in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {x}" for i, x in enumerate(Ls)) + "\n")
+            rep = Report()
+            prognoza345_rows(rep, prognoza345_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp.items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def prognoza345_main(logp):
+    rep = Report()
+    try:
+        s2 = prognoza345_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("G345-S: test syntetyczny (dobry 10 dob; prognoza z oknem +5190, rozjazd ponad 10%, duzy obieg w 10%, krotki bieg, potkniecia, rozliczenie BRAK, bez startu, log sprzed 345)",
+            s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("G345-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = prognoza345_collect(logp)
+    print(f"plik: {logp} | startow 345 {len(D['start'])}, dob {len(D['day'])}, nierozpoznanych {D['bad']}")
+    prognoza345_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_prognoza345_main_prev = main
+
+
+def main(argv):
+    # paczka 345: grupa prognoza345 - opakowanie main jak armie342
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "prognoza345":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return prognoza345_main(rest[0] if rest else None)
+    return _prognoza345_main_prev(argv)
+
+
 if __name__ == "__main__":
     sys.exit(main(sys.argv))

@@ -436,6 +436,8 @@ namespace Armoury
                     else if (m != null && decl == _incDecl) _incWired = true;
                 }
                 catch (Exception e) { _incWired = false; Stumble("EnsureHooks(przychod rodu)", e); }
+                // 345: wydatki rodu (panel Finance: Total Expenses) - ujemne poprawki prawdziwego obiegu, tylko przy FinanceBox.In (wlasny try w srodku)
+                GoldForecast.EnsureExpenseHook(h, fin);
             }
         }
 
@@ -453,9 +455,11 @@ namespace Armoury
             try
             {
                 if (__2 || __0 == null || !ReferenceEquals(__0, Clan.PlayerClan)) return;
+                if (GoldForecast.Raw) return;   // 345: podglad modelu tuz przed wyplata rodu gracza - bez linii widoku
                 var s = Settings.Current;
                 if (s == null || Campaign.Current == null || !ReferenceEquals(__instance, Campaign.Current.Models.ClanFinanceModel)) return;
                 if (s.WorksIncomeShown && FinanceBox.In) DistrictWorks._dVwBox += DistrictWorks.AddView(ref __result, false);   // m115: tylko panel Finance (nasze ksiegi nie widza linii)
+                if (FinanceBox.In) GoldForecast.AddBox(ref __result, true);   // 345: dodatnie poprawki prawdziwego obiegu - tylko panel Finance (sam odczyt), wlasny try
                 if (!HasFief || !s.SideVillageFiefIncome) return;
                 AddLines(ref __result);
             }
@@ -1128,9 +1132,11 @@ namespace Armoury
             try
             {
                 if (!__1 || __2 || __0 == null || !ReferenceEquals(__0, Clan.PlayerClan)) return;
+                if (GoldForecast.Raw) return;   // 345: podglad modelu tuz przed wyplata rodu gracza - bez linii widoku
                 var s = Settings.Current;
                 if (s == null || Campaign.Current == null || !ReferenceEquals(__instance, Campaign.Current.Models.ClanFinanceModel)) return;
                 if (s.WorksIncomeShown) DistrictWorks._dVwTip += DistrictWorks.AddView(ref __result, __3);   // m115: podpowiedz zlota (z opisami, bez pobrania)
+                GoldForecast.AddTip(ref __result, __3);   // 345: prawdziwy obieg (wsie do posiadaczy tytulu, reszta do wyplaty, pozycje naszego taktu doby) - klucz GoldForecastReal, wlasny try
                 if (!HasFief || !s.SideVillageFiefIncome) return;
                 _dTip += AddLines(ref __result);   // recenzja: obciete do tego, co platnik ma teraz (bez obietnicy +N, gdy nie ma z czego)
             }

@@ -1,5 +1,47 @@
 # DZIENNIK ZMIAN
 
+## 345 - przewidywany dochod gracza = prawdziwy obieg (noc/345-przewidywany-dochod od 5bddce2b; NIE WGRANE, bez autotestu; DLL test/m345)
+**Problem:** Jeff 07.11 01:38 przy Seagard: "dostaje -prawie 3k, a pokazuje mi, ze mam dostac na plusie". Okno "Expected change" (podpowiedz zlota): Village Demesnes 8161,
+Workshop Income 376, Garrison and Party Expense -3365, Recruitment -7, Village works 25, Total 5190; komunikat gry "Daily Gold Change: -2622". Log 2026-11-07_00-27-28, doba 109545:
+zold druzyny 2699 + zaloga ok. 674 - warsztaty 752 (pelny zysk doby, nie 376 "do tej chwili") + werbunek 7 = -2628 - podatek wsi w wyplacie 0. Poza rozliczeniem rodu do kiesy w tej
+samej dobie: podatek od nadwyzki ludu +1142, prawa panskie +40, prace wsi +25, podatek warsztatow -208, powinnosci wobec korony -267 - okno ich nie pokazywalo.
+**Przyczyna:** okno to SAM model finansow (ROT -> BK) w chwili najechania, bez pobrania: (1) BK ClanFinancesPatches.VillageIncomePrefix liczy w podgladzie podatek wszystkich wsi
+z GetActualVillages, a przy prawdziwej wyplacie wies z tytulem de iure innym niz glowa rodu idzie do posiadacza tytulu (ApplyWithdrawal(..., title.deJure); deJure null - nikomu);
+(2) warsztaty (ProfitMade/2) i licznik podatku wsi to stan "do tej chwili"; (3) moduly Armoury w naszym takcie doby ruszaja kiese wprost (TownFolk, Seal31B, KingdomTreasury, ...).
+Uwaga: to, ze 8161 Jeffa to wlasnie warunek de iure, NIE jest dowiedzione - linia StableD z tej doby liczy podatek wsi "do posiadacza de iure" calego swiata na 2389 zl (mniej niz 8161),
+wiec moze to byc inna droga; nowa linia 345 pokazuje przy wyplacie kazda wies gracza (kwota BK, do kogo, licznik przed/po, zmiana kiesy posiadacza) - pierwszy log rozstrzygnie.
+**Zmiana (klucz Gold Forecast Real, domyslnie TAK; TYLKO WIDOK - ile Jeff dostaje, sie nie zmienia):** GoldForecast.cs.
+- Ksiega kiesy gracza: doba = od poczatku naszego taktu doby do nastepnego; takt doby rozbity na moduly (DayProfile.Lap - zawsze, takze bez profilu; nowy odcinek
+  "SideVillageFief.Daily"), rozliczenie rodu gracza para prefiks (priorytet 10000) / postfiks (-10000) na ClanVariablesCampaignBehavior.DailyTickClan (zmiana kiesy, podglad modelu
+  tuz przed wyplata bez naszych linii widoku - GoldForecast.Raw, warsztaty glowy rodu, wsie do gracza / do posiadaczy tytulu wedlug regul BK), wyplata prac przy powrocie wozu
+  (DistrictWorks.OnCartReturn -> NoteWorksCart). Historia 7 dob w zapisie (arm_prog345, "g345|1|..."; brak klucza = pusto).
+- Linie podpowiedzi zlota (SideVillageFief.GoldTipPostfix -> GoldForecast.AddTip; cache na godzine gry): "Village taxes paid to the title holders, not to you (N villages)"
+  (z opisami - wies po wsi), "Workshops: rest of today's profit (payout average of the last N days)", "Village taxes: rest of today's sales (...)", "Other changes at the daily
+  payout (...)", i pozycje naszego taktu doby wedlug modulu (srednia z historii; dzien bez wpisu = 0): "Dues from your people (surplus tax, lord's rights)", "Workshop owner tax
+  to the towns", "Dues to the crown", "Council wages", "Iron Bank", "Debts and loans", "Family purses", ... reszta "Other daily dues and payments". Prace okregu i wioska poboczna
+  maja juz swoje linie (DistrictWorks.AddView, SideVillageFief.AddLines) - pominiete w poprawkach, liczone w ksiedze.
+- Panel Finance ekranu rodu (tylko FinanceBox.In): dodatnie poprawki do przychodu (IncomeViewPostfix), ujemne do wydatkow (nowy postfiks CalculateClanExpenses czynnego modelu).
+- Linia dobowa "Prognoza zlota gracza (345): dzien N | ... | prognoza wczoraj F (model, poprawki 345: ...) | naprawde dzis T = rozliczenie + takt doby + wozy prac | rozjazd |
+  kiesa naprawde (poza obiegiem: handel, lupy, okupy, zakupy gracza) | takt doby wedlug modulow | rozliczenie: ... wsie ... | srednio | potkniecia". Prognoza = wynik
+  CalculateClanGoldChange z poprawkami na koniec naszego taktu doby.
+- sprawdz_logi --grupa prognoza345: G0 start (rozliczenie wpiete), G1 srednio |rozjazd| < 300 zl albo < 10% (>= 3 dob), G2 rozliczenia na dobe, G3 potkniecia 0, G4/G5 INFO; synteza TAK.
+**Blad naliczania (klucz Land Dues Follow Title Holder, domyslnie TAK):** ClanIncomeBook.StableD liczyl podatek wsi BK do "ziemi" (podstawa powinnosci wobec korony
+KingdomTreasury CrownDuesFromLand, pulapy W5/W6, cena ziemi LandSale) posiadaczowi faktycznemu, choc BK przy wyplacie daje go posiadaczowi de iure z innego rodu (swiat: 24-26 wsi
+dziennie) - rod placil powinnosci od dochodu, ktory dostaje kto inny. Teraz: de iure z innego rodu (zywy, rod nie wyeliminowany) - ziemia u jego rodu; tytul bez posiadacza albo
+posiadacz niezywy - ziemi nikt z tego nie ma (BK pali podatek / daje zmarlemu). Porownanie linii modelu z suma podatku ("ziemia bez osady") liczy przeniesione z powrotem
+(_vMovedOut/_vMovedIn) - inaczej przeniesiony podatek wracalby do rodu jako ziemia bez osady. Linia StableD: "345 ziemia za tytulem ... przeniesione N wsi, X zl, bez zywego
+posiadacza de iure M wsi, Y zl". Podatek wsi przy wyplacie do de iure z rodu gracza (rodzina) - bez zmian (zostaje w rodzie). Pieniadze nie znikaja i nie licza sie podwojnie
+w samym obiegu (BK zdejmuje licznik i dopisuje posiadaczowi); ryzyko BK do sprawdzenia w logu 345: zloto dopisane niezywemu posiadaczowi (w linii wsi "(niezywy)").
+**Ryzyko / co sprawdzic:** (1) linia 345 przy pierwszej wyplacie: wsie Jeffa - "do posiadacza ..." czy "do gracza" i licznik przed/po; jesli "do gracza", a kiesa nie rosnie -
+przyczyna jest gdzie indziej, okno i tak sie zgadza przez "Other changes at the daily payout" (srednia), ale trzeba znalezc droge pieniedzy. (2) Podglad modelu w prefiksie
+DailyTickClan rodu gracza raz na dobe: BK CalculateVillageTaxFromIncome zapisuje DueWage/DueTax (te same wartosci co tuz potem przy wyplacie - idempotentne); prefiks przed
+SoldierPay i innymi (bez ich stanu), postfiks po nich. (3) Poprawki z historii - pierwsza doba po wczytaniu starego zapisu bez arm_prog345: tylko linia wsi do posiadaczy tytulu.
+(4) Kolizje: GoldTipPostfix / IncomeViewPostfix pomijaja linie widoku przy GoldForecast.Raw; nasze ksiegi (ClanIncomeBook, KingdomTreasury, IronBank, BuildFunding) wolaja
+CalculateClanIncome bez FinanceBox.In i CalculateClanGoldChange nie wolaja - poprawek nie widza; straznik m105 (KtKnownPatches): tresc IncomeViewPostfix - tylko odczyt dla gracza.
+(5) Klucz LandDues zmienia powinnosci AI rodow z wsiami de iure innego rodu - D169 i ziemia przeniesione, linia StableD pokazuje skale. MCM: dwa nowe pola dopisane recznie
+(gen_mcm.py nadpisalby reczne nazwy innych pol - nie uzyty do zapisu). Build Release kod 0 (GameLibs z repo glownego).
+**Status:** DO SPRAWDZENIA (NIE WGRANE; Jeff gra) - po wgraniu: sprawdz_logi --grupa prognoza345 po >= 3 dobach i linia wsi przy wyplacie.
+
 ## 343r - recenzja 343: te same dane na obu mapach (NIE WGRANE, bez autotestu; build kontrolny Armoury.dll cd6629cf)
 **Problem (recenzja):** pliki 343 mialy "# scene_xml_crc: 0" i jeden terrain_size 8.1.2 - nowa DLL (i kazda pozniejsza paczka zbudowana na 343) na STAREJ mapie 8.1.8
 (DLL wgrana przed ROT-Map 8.1.2, Jeff zostaje przy kroku A albo cofniecie ROT-Map z kopii) wylaczylaby po cichu drogi +15%, drogi boczne, wioski, ksiege wiosek i zajazdy.
