@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 347e - murarz (Mason) pracuje tez z przyspieszeniem zlotem (NIE WGRANE)
+**Problem:** Jeff 07.11 ~14:20, Ashemark (zamek gracza): zbudowal Masona, a szybkosc budowy dalej 5 - "4 to daje moje przyspieszenie za kase".
+**Przyczyna:** 338 grupa 4 (Buildings338Mason): w osadach z oplacona budowa (gracz przy PaidConstructionPlayer = true u Jeffa) dopisek Masona = min(punkty Masona, punkty pana + robota ludu) - przyspieszenie zlotem ("Craftsmen services") nie liczylo sie jako praca, wiec przy budowie napedzanej zlotem Mason dawal ~0.
+**Zmiana:** BuildFunding.PowerPostfix: Mason = min(punkty Masona, pana + lud + przyspieszenie zlotem); MasonDay (linia doby murarza) tak samo; EngPaidNeed (ile pan doplaca): postep = p x f + min(m, p + b). PowerIntPostfix (moc BEZ przyspieszenia) bez zmian - tam przyspieszenia nie ma.
+**Ryzyko / co sprawdzic:** Mason dalej najwyzej swoje punkty (+2/4/6 zamek, +3/6/9 miasto) - B338-8 "dopisek <= punkty Masona". AI rzadko przyspiesza zlotem - wplyw glownie na gracza. Po wgraniu: dymek budowy w Ashemark z linia "Mason (works with the paid builders)".
+**Status:** DO SPRAWDZENIA (build Release kod 0, NIE WGRANE).
+
 ## 347c - prognoza 345: regularnosc wedlug modulu, srednia z 3 dob, G1 od 3 dob historii (noc/347-bitwy-zloto-2; NIE WGRANE)
 **Problem:** test at347 (07.11 13:20, DLL 347b 6879806d): G1 NIE - srednio |rozjazd| 1382 zl, srednio -1316 (prognoza za wysoko); 109576 poprawka "Dues to the crown" +8757, potem +4376, +2916 ... (wojna CrownWar314 +9040 z jednej doby).
 **Przyczyna:** regula 347a "regularne = etykieta w >= polowie dob" - pod etykieta "Dues to the crown" jest jednorazowy CrownWar314 i codzienny KingdomTreasury.Daily (-5..-60), wiec jednorazowka przechodzila; przy 1-2 dobach historii wszystko bylo "regularne"; srednia z 7 dob nie lapie skokow poziomu (TownFolk.Daily 30 -> 900).

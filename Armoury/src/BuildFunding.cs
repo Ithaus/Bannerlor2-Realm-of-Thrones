@@ -149,13 +149,13 @@ namespace Armoury
                 if (b > 0f) r.Add(b, _boostTxt);
                 EngAdd(town, f, b, ref r);   // R3-10b (BuildFunding.Engineering.cs): premia zarzadcy z Inzynierii i perki budowy do punktow pana i przyspieszenia zlotem
                 if (fl > 0f) r.Add(fl, _folkTxt);
-                Buildings338Mason.Add(town, f + fl, ref r);   // 338 grupa 4: Mason - min(punkty Masona, oplacona praca)
+                Buildings338Mason.Add(town, f + fl + b, ref r);   // 338 grupa 4: Mason - min(punkty Masona, praca przy budowie); 347e (Jeff 07.11, Ashemark: "4 to daje moje przyspieszenie za kase", Mason +0) - rzemieslnicy z przyspieszenia zlotem tez sa praca
                 __result = r;
             }
             catch { }
         }
         /// <summary>338 (linia doby murarza): dopisek Masona tej doby w osadzie objetej rozliczeniem (0 - nieobjeta).</summary>
-        internal static float MasonDay(Town town) { if (!On || town == null || !Covered(town)) return 0f; float f; _funded.TryGetValue(town, out f); return Buildings338Mason.Extra(town, f + FolkHead(town)); }
+        internal static float MasonDay(Town town) { if (!On || town == null || !Covered(town)) return 0f; float f; _funded.TryGetValue(town, out f); return Buildings338Mason.Extra(town, f + FolkHead(town) + Boost(town)); }   // 347e: jak dymek (z przyspieszeniem zlotem)
         public static void PowerIntPostfix(Town town, ref int __result)
         {
             if (_depth > 1 || !On || town == null) return;
