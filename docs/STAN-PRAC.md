@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 07.11.2026 20:20 CEST: WGRANIE 175 (najnowszy) = noc/352-prognoza-bez-korony cd17c3ec (Armoury.dll 459c9a99, CrashScribe.dll 3cab76a3) = 174 + 352/352r + 353/353b
+- PRZYCIECIA: sprawca StrategicCampaignAI145 NearbyEnemyLordStrength (probkowanie stosu ClrMD na zywo: 40% tiku gry). 353b liczy sume sama z pamiecia sily partii na godzine. Test na kopii zapisu Jeffa 19:24: 51.9 -> 26.2 s/dobe, klatka 36-81 -> 19-24 ms bez narastania. Pytaja Baratheonowie KL i Polnoc (Dorzecze), nie Ashemark. Szczegoly CHANGELOG "WGRANIE 175".
+- Rod KARDA na zapisie 19:24 jest w The North (wyjscie z sesji 17:34 nie weszlo do zapisu) - powiedziec Jeffowi, niech sprawdzi w grze. Pokoj rodu bez krolestwa: rozmowa z lordem "Our realms should make peace" + zloto (wynik workflow wf_8ed2c41c, nie testowane w grze).
+- Do sprawdzenia w logach Jeffa: CrashScribe "Mends: SAI sila wrogow (353) - dzien" (potkniecia 0, sila partii z pamieci ~80%), Armoury "Pomiar sesji (350)" klatka ~20 ms w dlugiej sesji (sprawdz_logi --grupa pomiar350, P3). Artefakty grafiki w bitwie (RTX 5080): rada - cache shaderow, Shader Quality Low, sterownik.
+- prognoza345 G1 NIE na tym zapisie takze w bazie (874-993 zl) - osobna sprawa (duze "wsie do posiadaczy tytulu"), nie regresja 352.
+- Narzedzie: profiler ClrMD bez admina (memory probkowanie-stosu-clrmd). Test CS z 353: cs/CrashScribe-at-n353b.dll (zrodlo at308 + SaiStrength353.cs).
+
 ## STAN 07.11.2026 16:25 CEST: WGRANIE 174 (najnowszy) = noc/351-bitwy-pomiar (Armoury.dll acd118c2) = 173 + 344 (AI bitew, rundy 347b-g)
 - Jeff "1": wgrac 344 mimo A344-3 (1/11) i B344-1 (stare wahadlo). Kopia 173 (ed0961d2): .bak-2026-11-07-przed-wgranie174 + D:/Backup-Bannerlord/wgrane/2026-11-07-wgranie174-przed.
 - Galaz stanu gry: noc/351-bitwy-pomiar (zawiera 343, 345, 347a-g, 350). Nowe prace zaczynac od niej.
