@@ -11612,7 +11612,7 @@ namespace Armoury
         [SettingPropertyGroup("Expected gold shows what really comes (345)")]
         public bool GoldForecastReal { get; set; } = true;
 
-        [SettingPropertyBool("Land Dues Follow Title Holder", HintText = "The crown dues, the soldiers' pay caps and the land price of a clan count a village's tax for the clan that really gets it: when Banner Kings pays the tax to the village's title holder in another clan, it counts for that clan; a title with no living holder counts for nobody (Banner Kings burns that tax). Off = the tax counts for the village's holder as before       // With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
+        [SettingPropertyBool("Land Dues Follow Title Holder", HintText = "The crown dues, the soldiers' pay caps and the land price of a clan count a village's tax for the clan that really gets it: when Banner Kings pays the tax to the village's title holder in another clan, it counts for that clan; a title with no living holder counts for nobody (Banner Kings burns that tax). Off = the tax counts for the village's holder as before", RequireRestart = false)]
         [SettingPropertyGroup("Expected gold shows what really comes (345)")]
         public bool LandDuesFollowTitleHolder { get; set; } = true;
 

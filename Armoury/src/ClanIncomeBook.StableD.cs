@@ -347,6 +347,8 @@ namespace Armoury
                                     _dDeJureOtherN++; _dDeJureOtherGold += t;
                                     // 345: BK placi temu posiadaczowi (payTo.Gold += podatek) - ziemia (powinnosci, W5/W6, cena ziemi) u jego rodu, nie u posiadacza faktycznego
                                     if (follow && dj.IsAlive && dj.Clan != null && !dj.Clan.IsEliminated && dj.Clan.Leader != null) { hD = dj.Clan; _dLandMovedN++; _dLandMovedGold += t; }
+                                    // 345r: zywy posiadacz bez rodu (albo rod wybity / bez glowy) - BK i tak placi jemu (payTo.Gold), nie rodowi posiadacza faktycznego; ziemi rod nie ma
+                                    else if (follow && dj.IsAlive) { hD = null; _dLandLostN++; _dLandLostGold += t; }
                                 }
                                 // 345: posiadacz de iure niezywy - BK dopisuje zloto zmarlemu (payTo.Gold), nikt go nie wyda; ziemi nikt z tego nie ma
                                 if (follow && !dj.IsAlive) { hD = null; _dLandLostN++; _dLandLostGold += t; }
