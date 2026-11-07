@@ -268,6 +268,9 @@ namespace Armoury
                 if (mf == null || Skip(mf) != 0 || !FactionManager.IsAtWarAgainstFaction(kingdom, mf)) continue;
                 foes.Add(mp);
             }
+            // 356: sila wroga liczona raz na wywolanie (leniwie, przy pierwszym uzyciu w promieniu 80) - ten sam float, ta sama kolejnosc sumy
+            var str = new float[foes.Count];
+            var has = new bool[foes.Count];
             int n = 0;
             foreach (var s in kingdom.Settlements)
             {
@@ -280,9 +283,14 @@ namespace Armoury
                 }
                 float sum = 0f;
                 var pos = s.GetPosition2D;
-                foreach (var mp in foes)
+                for (int i = 0; i < foes.Count; i++)
                 {
-                    if (mp.GetPosition2D.Distance(pos) <= 80f) sum += mp.GetTotalLandStrengthWithFollowers(false);
+                    var mp = foes[i];
+                    if (mp.GetPosition2D.Distance(pos) <= 80f)
+                    {
+                        if (!has[i]) { str[i] = mp.GetTotalLandStrengthWithFollowers(false); has[i] = true; }
+                        sum += str[i];
+                    }
                 }
                 float own = s.Party != null ? s.Party.EstimatedStrength : 0f;
                 if (sum > own) n++;
