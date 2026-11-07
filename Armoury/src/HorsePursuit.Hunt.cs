@@ -78,7 +78,7 @@ namespace Armoury
         // recenzja 204: UMelee - wrog inny niz strzelec w RaiseNear (bron sie sam), UIntact - jezdziec w CounterFootGap od nietknietego szyku strony strzelca
         // (bez wjazdu w jego szyk, jak OIntact 148), UNoCheck - lucznicy bez sprawdzenia swoich przy strzelcu (limit zapytan) - cel zdjety
         private const int UGone = 0, UPanic = 1, UHorse = 2, ULeash = 3, URetreat = 4, UPlayer = 5, UKey = 6, UEnded = 7, UOther = 8, UThreat = 9, URange = 10, UFriend = 11,
-                          UMelee = 12, UIntact = 13, UNoCheck = 14, UTrim = 15, UTime = 16, UZone = 17, UKinds = 18;   // UTrim - recenzja 204 (2): nadwyzka po obnizeniu poziomu; UTime - 283: piechota 60 s
+                          UMelee = 12, UIntact = 13, UNoCheck = 14, UTrim = 15, UTime = 16, UZone = 17, UPs344 = 18, UKinds = 19;   // UTrim - recenzja 204 (2): nadwyzka po obnizeniu poziomu; UTime - 283: piechota 60 s
         // nie wyslani (rozni ludzie)
         private const int NwMelee = 0, NwPanic = 1, NwChase = 2, NwHero = 3, NwBanner = 4, NwHorse = 5, NwFar = 6, NwPlayer = 7, NwLosing = 8, NwBusy = 9, NwCool = 10,
                           NwQuery = 11, NwOther = 12, NwIntact = 13, NwZone = 14, NwKinds = 15;   // 333: UZone / NwZone - strefa armii strzelca (HorsePursuit.Bait333.cs)
@@ -1752,7 +1752,7 @@ namespace Armoury
               .Append(", koniec bitwy ").Append(UEnd[UEnded]).Append(", koniec strzelca ").Append(UEnd[UThreat]).Append(", poza zasiegiem ").Append(UEnd[URange])
               .Append(", swoi przy strzelcu ").Append(UEnd[UFriend]).Append(", inne ").Append(UEnd[UOther]).Append(", zwarcie ").Append(UEnd[UMelee])
               .Append(", przy szyku strzelca ").Append(UEnd[UIntact]).Append(", bez sprawdzenia FF ").Append(UEnd[UNoCheck]).Append(", nadwyzka po obnizeniu ").Append(UEnd[UTrim])
-              .Append(", strefa armii strzelca 333 ").Append(UEnd[UZone])
+              .Append(", strefa armii strzelca 333 ").Append(UEnd[UZone]).Append(", powrot szykiem 344 ").Append(UEnd[UPs344])   // recenzja 344 D6: powroty PS osobno
               .Append("; najdalej od szyku ").Append(F0(_hMaxFar)).Append(" m")
               .Append("; jezdzcy padli ").Append(_hRidersLost)
               .Append(" | strzelcy w szyku ").Append(HGroupShooters.Count).Append(" (najwiecej z jednego szyku ").Append(_hGroupMax).Append(", limit ").Append(PerVictim)

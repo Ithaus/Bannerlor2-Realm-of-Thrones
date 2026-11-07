@@ -70591,7 +70591,7 @@ M204_RX = {
     "left": re.compile(r"\| pod sterowaniem 204 na koniec (\d+) \(oczekiwane 0\)"),
     "stum": re.compile(r"\| potkniecia jazda (\d+) \(wypadli (\d+)\)\.$"),
     "grp": re.compile(r"\| strzelcy w szyku (\d+) \(najwiecej z jednego szyku (\d+), limit (\d+), ucietych limitem (\d+); kontrola zwarcia ponad limit (\d+)\)"),
-    "ret": re.compile(r"\| powroty: .*?, zwarcie (\d+), przy szyku strzelca (\d+), bez sprawdzenia FF (\d+)(?:, nadwyzka po obnizeniu (\d+))?(?:, strefa armii strzelca 333 \d+)?;"),
+    "ret": re.compile(r"\| powroty: .*?, zwarcie (\d+), przy szyku strzelca (\d+), bez sprawdzenia FF (\d+)(?:, nadwyzka po obnizeniu (\d+))?(?:, strefa armii strzelca 333 \d+)?(?:, powrot szykiem 344 \d+)?;"),
     "cost": re.compile(r"\| koszt passu sr\. (\S+) / max (\S+) ms \(passow (\d+); ludzi przejrzanych najwiecej (\d+) na pass, limit (\d+), ciec przegladu (\d+); "
                        r"strzelcow naraz najwiecej (\d+), na pass (\d+), passow z odlozonymi (\d+); obnizen poziomu (\d+)(?:; FF poza kolejka (\d+))?\)"),
     "start": re.compile(r"^Jazda na strzelca \(204\) start: strzelec (\S+) \((gracz|AI), konno, (\S+)\) \| strona (atak|obrona) \| wykrycie (trafienie|pudlo|przelot|cel AI), "
@@ -97707,6 +97707,12 @@ A344_RX = {
     "succ": re.compile(r"\| nastepcy: trzymani (\d+), ruszeni za prowadzacym (\d+), ruchy bez zmiany prowadzacego (\d+)"),
     "blk": re.compile(r"\| blokada przeciwnego rozkazu (\d+)"),
     "nff": re.compile(r"\| test bez przewijania: odrzucone wlaczenia (\d+)"),
+    # 344r: front pod ostrzalem (A344-8), szyki stojace / taktyki (B344-6, B344-7), czas w watku AI (X344-T)
+    "fpress": re.compile(r"\| front pod ostrzalem: trafien (\d+), docisniec (\d+), odwrotow spod ognia (\d+), bez reakcji (\d+), powrotow przedluzonych (\d+)"),
+    "r344": re.compile(r"\| 344r: krok naprzod w martwej strefie (\d+), pierwszy kontakt po (\S+) s, szykow stojacych ponad \d+ s przed kontaktem (\d+) "
+                       r"\(z celem gry naprzod (\d+)\), Loose pod ostrzalem od razu (\d+), migniec taktyki (\d+), taktyki druzyn (.+?) \| watek AI"),
+    "aitime": re.compile(r"\| watek AI: wywolan (\d+), czekanie na lock ([\d.]+) ms \(najwiecej ([\d.]+) ms\), praca ([\d.]+) ms \(najwiecej ([\d.]+) ms\), "
+                         r"zgubione linie (\d+)"),
     "stum": re.compile(r"\| potkniecia 344 (\d+)\.\s*$"),
 }
 A344_KEYS = {
@@ -97725,9 +97731,13 @@ A344_KEYS = {
     "succ": ["succKeep", "succAcc", "succNo"],
     "blk": ["blk"],
     "nff": ["nff"],
+    "fpress": ["fHit", "press", "fOut", "fUnans", "psExt"],
+    "r344": ["fwdStep", "contact1", "still", "stuck", "arrFire", "tacBlink", "tacs"],
+    "aitime": ["aiN", "aiWait", "aiWaitMax", "aiWork", "aiWorkMax", "lost"],
     "stum": ["stum"],
 }
-A344_TXT = {"kind", "keyA", "key204", "keyB", "patch", "patchArr", "src", "backMed", "react"}
+A344_TXT = {"kind", "keyA", "key204", "keyB", "patch", "patchArr", "src", "backMed", "react", "contact1", "tacs"}
+A344_FLOAT = {"minutes", "aiWait", "aiWaitMax", "aiWork", "aiWorkMax"}
 A344_ERR = re.compile(r"ERROR in (Pendulum333\.|NoFastForward344|HorsePursuit\.(Brama344|Strefa333|Strzelcy344|Front344|Odruch344|Powrot344|Linia333|Wahadlo333))")
 
 
@@ -97758,7 +97768,7 @@ def ai344_collect(logp):
                 for k, v in zip(A344_KEYS[seg], m.groups()):
                     if k in A344_TXT:
                         r[k] = v.strip()
-                    elif k == "minutes":
+                    elif k in A344_FLOAT:
                         r[k] = float(v)
                     else:
                         r[k] = int(v)
@@ -97866,6 +97876,24 @@ def ai344_rows(rep, D):
     sn = sum(r["succNo"] for r in onB)
     rep.add("B344-5: nastepcy", f"ruchy bez zmiany prowadzacego {sn}, trzymani {sum(r['succKeep'] for r in onB)}, ruszeni za prowadzacym {sum(r['succAcc'] for r in onB)}",
             "0", sn == 0 if onB else None)
+    # 344r
+    fu = sum(r["fUnans"] for r in on)
+    rep.add("A344-8: front pod ostrzalem", f"bez reakcji {fu} (trafien w front {sum(r['fHit'] for r in on)}, docisniec {sum(r['press'] for r in on)}, odwrotow "
+            f"{sum(r['fOut'] for r in on)}, powrotow przedluzonych {sum(r['psExt'] for r in on)})", "0", fu == 0 if on else None)
+    sk = sum(r["stuck"] for r in onB)
+    c1 = [r["contact1"] for r in onB if r["contact1"] != "-"]
+    rep.add("B344-6: szyki stojace przed kontaktem", f"z celem gry naprzod {sk}, stojacych > 60 s {sum(r['still'] for r in onB)}, krok naprzod w martwej strefie "
+            f"{sum(r['fwdStep'] for r in onB)}; pierwszy kontakt po [{', '.join(c1[:6]) or '-'}] s", "z celem gry naprzod = 0", sk == 0 if onB else None)
+    fast = []
+    for r in onB:
+        for mt in re.finditer(r"d\d+ \d+ \(szybkich (\d+)\)", r["tacs"]):
+            fast.append(int(mt.group(1)))
+    rep.add("B344-7: zmiany taktyki druzyn", f"szybkich (< 10 s) najwiecej {max(fast + [0])}; migniec taktyki {sum(r['tacBlink'] for r in onB)}; np. {onB[0]['tacs'][:120] if onB else '-'}",
+            "<= 1 na druzyne w bitwie", (max(fast + [0]) <= 1) if onB else None)
+    wmax = max([r["aiWaitMax"] + r["aiWorkMax"] for r in onB] + [0.0])
+    lost = sum(r["lost"] for r in onB)
+    rep.add("X344-T: czas arbitra w watku AI", f"wywolan {sum(r['aiN'] for r in onB)}, najdluzsze czekanie+praca {wmax:.2f} ms, zgubione linie {lost}", "<= 20 ms, 0 zgubionych",
+            (wmax <= 20.0 and lost == 0) if onB else None)
     st = sum(r["stum"] for r in L)
     badp = [r["patch"] + " / " + r["patchArr"] for r in onB if r["patch"] != "TAK" or r["patchArr"] != "TAK"]
     rep.add("X344: potkniecia, ERROR, latki", f"potkniecia {st}, ERROR {D['err']}, latki nie TAK {len(badp)}" + (f" [{badp[0]}]" if badp else ""), "0, 0, TAK",
@@ -97891,14 +97919,15 @@ def ai344_bait_rows(rep, D):
 
 def ai344_line(fEnt=2, backF=1, backMed="0", backMax=1, faceOk=40, faceN=44, k=2, kFull=1, r=1, ev=2, ans=2, react="0.6", kOk=2, kEnd=2, unans=0, pend=3,
                trot=0, long=0, keyB="TAK", patch="TAK", patchArr="TAK", callAi=120, rtSec=200, ffSec=0, mins="6.0", revA=1, revABack=0, src="BehaviorHoldHighGround 5/30/2",
-               arrRet=0, succNo=0, stum=0, keyA="TAK"):
+               arrRet=0, succNo=0, stum=0, keyA="TAK", fUnans=0, stuck=0, tacFast=0, aiMax="0.40", lost=0):
     return (f"AI bitwy (344): misja bitwa polowa | konnica wobec strzelca klucz {keyA} (jazda 204 TAK; strefa armii strzelca: piechota +50 m, lucznicy +0.8 zasiegu 60-120 m, "
             f"konnica +60 m; front < 10 m, start >= 30 m, oslona 20 m; Rs 60 m, Rw 40 m, Rb 30 m; pogon bez zblizania 8 s, kontra do 40 s, powrot 30 s bez capu; "
             f"przewaga 2 x (1 + eskorta)) | poscigi 3 (L1 przy szybszym strzelcu 1, pogonie bez szans ponad 8 s {long}) | front wejsc {fEnt} (jezdzcow 12; krawedz "
             f"strefy 1, szybszy strzelec 1, strona przegrywa 0), trafienia w plecy w front/powrot {backF} (na wejscie mediana {backMed}, najwiecej {backMax}), wszystkie w "
             f"plecy 2, przodem do strzelca {faceOk}/{faceN} probek | kontry {k} (calego G {kFull}, odruchow {r}, jezdzcow odruchu 3, jezdzcow kontry 9), zdarzen kontry "
             f"{ev} (odpowiedzi {ans}, mediana reakcji {react} s, bez odpowiedzi 0, bez przewagi 0), wynik kontry dobry {kOk}/{kEnd} | trafienia bez odpowiedzi {unans} "
-            f"(trafien z Rw poza oslona {pend}) | powroty szykiem 1 (kontra z powrotu 1, front z powrotu 0), klus przy strzelcu {trot} s | strzelcy przy swojej armii "
+            f"(trafien z Rw poza oslona {pend}) | powroty szykiem 1 (kontra z powrotu 1, front z powrotu 0), klus przy strzelcu {trot} s | front pod ostrzalem: trafien 4, docisniec 1, odwrotow spod ognia 1, bez "
+            f"reakcji {fUnans}, powrotow przedluzonych 1 | strzelcy przy swojej armii "
             f"bez poscigu 1, lekkie odpedzenia L1 0, krawedzi strefy na strzelca najwiecej 1 (razem 1), petla przynety 0 | jezdzcy zawroceni w strefie 0, nie wyslani "
             f"przy strefie 2, punktow przycietych do strefy 30, szykow w strefie najwiecej 5 | szyki: klucz {keyB} (latka ruchu {patch}, latka ustawienia {patchArr}; "
             f"histereza zachowan 6 s, blokada przeciwnego rozkazu 10 s, ustawienie Line/Loose co 20 s, powrot po 20 s bez ostrzalu) | wywolania arbitra glowny watek 4 "
@@ -97906,7 +97935,9 @@ def ai344_line(fEnt=2, backF=1, backMed="0", backMax=1, faceOk=40, faceN=44, k=2
             f"ciezkosci {revA} (w tyl {revABack}), mediany 3 (w tyl 1) | rozkazy Move przyjete/trzymane/obciete wedlug zrodla {src} | ustawienie Line/Loose: wywolan 12, "
             f"przyjete 2, zablokowane 9, powroty pod ostrzalem zablokowane 1, w kontakcie zablokowane 0, szarza konnicy 0, zmian ustawienia przed kontaktem 2, "
             f"powroty w 20 s {arrRet} | zachowania: zmian planu 2, migniec 5, zmian taktyki 0 | nastepcy: trzymani 40, ruszeni za prowadzacym 3, ruchy bez zmiany "
-            f"prowadzacego {succNo} | blokada przeciwnego rozkazu 4 | 333: wahadlo: klucz TAK (latka TAK; przed kontaktem > 75 m) | szykow AI 9 | test bez "
+            f"prowadzacego {succNo} | blokada przeciwnego rozkazu 4 | 344r: krok naprzod w martwej strefie 3, pierwszy kontakt po 95 s, szykow stojacych ponad 60 s "
+            f"przed kontaktem 2 (z celem gry naprzod {stuck}), Loose pod ostrzalem od razu 1, migniec taktyki 2, taktyki druzyn d0 2 (szybkich {tacFast}), d1 1 (szybkich 0) "
+            f"| watek AI: wywolan 120, czekanie na lock 1.20 ms (najwiecej 0.10 ms), praca 9.50 ms (najwiecej {aiMax} ms), zgubione linie {lost} | 333: wahadlo: klucz TAK (latka TAK; przed kontaktem > 75 m) | szykow AI 9 | test bez "
             f"przewijania: odrzucone wlaczenia 3 | potkniecia 344 {stum}.")
 
 
@@ -97931,6 +97962,11 @@ def ai344_synth():
         "arr": [ai344_line(arrRet=2)],
         "succ": [ai344_line(succNo=1)],
         "stum": [ai344_line(stum=1)],
+        "funans": [ai344_line(fUnans=2)],
+        "stuck": [ai344_line(stuck=1)],
+        "tac": [ai344_line(tacFast=3)],
+        "aitime": [ai344_line(aiMax="45.00")],
+        "lost": [ai344_line(lost=4)],
         "err": [ai344_line(), "ERROR in HorsePursuit.Brama344: System.NullReferenceException"],
         "patch": [ai344_line(patchArr="NIE (brak Formation.SetArrangementOrder)")],
         "bait0": [ai344_line(), ai333_bait_line(turn=0)],
@@ -97939,7 +97975,8 @@ def ai344_synth():
     }
     exp = {
         "good": {"A344-0": "TAK", "A344-1": "TAK", "A344-2": "TAK", "A344-3": "TAK", "A344-4": "TAK", "A344-5": "TAK", "A344-6": "TAK", "A344-7": "TAK",
-                 "B344-1": "TAK", "B344-2": "TAK", "B344-3": "TAK", "B344-4": "INFO", "B344-5": "TAK", "X344": "TAK", "A344-T": "TAK"},
+                 "B344-1": "TAK", "B344-2": "TAK", "B344-3": "TAK", "B344-4": "INFO", "B344-5": "TAK", "X344": "TAK", "A344-T": "TAK",
+                 "A344-8": "TAK", "B344-6": "TAK", "B344-7": "TAK", "X344-T": "TAK"},
         "ff": {"A344-0": "INFO"},
         "noai": {"A344-0": "NIE"},
         "back": {"A344-1": "NIE"},
@@ -97955,6 +97992,11 @@ def ai344_synth():
         "arr": {"B344-3": "NIE"},
         "succ": {"B344-5": "NIE"},
         "stum": {"X344": "NIE"},
+        "funans": {"A344-8": "NIE"},
+        "stuck": {"B344-6": "NIE"},
+        "tac": {"B344-7": "NIE"},
+        "aitime": {"X344-T": "NIE"},
+        "lost": {"X344-T": "NIE"},
         "err": {"X344": "NIE"},
         "patch": {"X344": "NIE"},
         "bait0": {"A344-T": "NIE"},

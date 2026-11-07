@@ -88,6 +88,11 @@ namespace Armoury
     ///  4. prefiks Formation.SetArrangementOrder (przed kontaktem, tylko Line / Loose szyku AI): zmiana najwczesniej 20 s po poprzedniej, powrot do poprzedniego
     ///     ustawienia dopiero po 20 s bez ostrzalu (UnderRangedAttackRatio ponizej 0.1 - prog wyjscia gry); kontakt: 5 s, szarza konnicy wroga - od razu; ShieldWall /
     ///     Square / Circle (CloseRanks 146/310, gra przed szarza) - bez zmian; zablokowane = prefiks zwraca false (zostaje biezace ustawienie).
+    /// 344r (recenzje 344): nastepca rusza takze, gdy POZYCJA prowadzacego odeszla >= martwa strefa (marsz do dalekiego P); taktyka druzyny pod histereza 6 s
+    /// (licznik surowych zmian i szybkich < 10 s na druzyne); krok naprzod do wroga w martwej strefie przyjety po trzymaniu 10 s (CautiousAdvance nie stoi);
+    /// "twarda" zmiana planu tylko Advance po kontakcie; ustawienie: tylko szyki Eligible, wejscie w Loose pod ostrzalem (>= 0.2) zawsze, sama bliskosc
+    /// konnicy - regula 5 s (od razu tylko szarza i tylko do Line), odrzucenie przez inny prefiks (__runOriginal) bez zapisu blokady; punkt rozkazu liczony przed
+    /// lockiem; czas prefiksow w watku AI (czekanie / praca), zgubione linie, szyki stojace > 60 s z celem gry naprzod, pierwszy kontakt - w linii.
     /// </summary>
     internal static class Pendulum333
     {
@@ -99,6 +104,8 @@ namespace Armoury
         private const int MaxBeh = 8, MaxRevLines = 30, MaxSetLines = 16, MaxWays = 10;
         // 344: histereza zachowan, blokada przeciwnego rozkazu, ustawienie Line / Loose
         internal const float BehHold = 6f, Block = 10f, ArrHold = 20f, ArrContact = 5f, ArrFire = 0.1f;
+        // 344r: wejscie w Loose pod ostrzalem - prog wejscia gry (BehaviorProtectFlank 0.2); szyk stojacy przed kontaktem (pomiar W6); szybka zmiana taktyki
+        internal const float ArrFireIn = 0.2f, Still = 60f, TacFast = 10f;
         private const int MaxPend = 32;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -147,6 +154,21 @@ namespace Armoury
             public sbyte BlkDir;
             public float BlkAt = -1000f, FireAt = -1000f, ArrChgAt = -1000f, ArrObsAt = -1000f;
             public int ArrPrevE = -1, ArrObsPrev = -1;
+            // 344r: pozycja prowadzacego przy ostatnim przyjeciu nastepcy (W5), taktyka kandydat (W7), szarza konnicy wroga (W2 techn.), szyk stojacy (W6)
+            public Vec2 LeadPos = Vec2.Invalid, LeadPosNext = Vec2.Invalid;
+            public Type TacNew;
+            public float TacNewAt = -1000f, ChargeUntil = -1000f;
+            public Vec2 StillPos = Vec2.Invalid;
+            public float StillAt = -1000f;
+            public bool StillN, StuckN;
+        }
+
+        /// <summary>344r (recenzja W7): zmiany taktyki druzyny (surowe, przed histereza) - wszystkie i szybkie (w TacFast s od poprzedniej).</summary>
+        private sealed class TS
+        {
+            public Type T;
+            public float At = -1000f;
+            public int N, Fast;
         }
 
         private static bool _live, _key, _tried;
@@ -186,6 +208,11 @@ namespace Armoury
         private static int _callMain, _callAi, _arrMain, _arrAi, _plan, _blink, _tac, _succKeep, _succAcc, _succNo, _blk;
         private static int _arrSeen, _arrAcc, _arrBlk, _arrBack, _arrCav, _arrBlkC, _arrRet;
         private static float _ffSec, _rtSec;
+        // 344r: czas w prefiksach w watku AI (czekanie na lock / praca, ticki Stopwatch), zgubione linie, krok naprzod w martwej strefie, szyki stojace, taktyki
+        private static long _aiWait, _aiWaitMax, _aiWork, _aiWorkMax;
+        private static int _aiN, _lost, _fwdStep, _still, _stuck, _tacBlink, _arrFireAcc;
+        private static float _depAt = -1f, _contact1 = -1f;
+        private static readonly Dictionary<Team, TS> TacBy = new Dictionary<Team, TS>();
 
         // ------------------------------------------------------------ latka (Doctrine.ApplyMissionPatches - pierwsza bitwa, raz na proces)
 
@@ -261,6 +288,10 @@ namespace Armoury
             _callMain = _callAi = _arrMain = _arrAi = _plan = _blink = _tac = _succKeep = _succAcc = _succNo = _blk = 0;
             _arrSeen = _arrAcc = _arrBlk = _arrBack = _arrCav = _arrBlkC = _arrRet = 0;
             _ffSec = _rtSec = 0f;
+            _aiWait = _aiWaitMax = _aiWork = _aiWorkMax = 0;
+            _aiN = _lost = _fwdStep = _still = _stuck = _tacBlink = _arrFireAcc = 0;
+            _depAt = _contact1 = -1f;
+            TacBy.Clear();
             Forms.Clear(); RevBy.Clear(); HeldForms.Clear();
             _acc = 0f;
             _seen = _backHeld = _backS4 = _backBeh = _fwdHeld = _rev = _revBack = _forms = _contactIn = _contactCav = 0;
@@ -348,15 +379,15 @@ namespace Armoury
             if (near <= ContactIn) pf.FootContact = true;
             else if (near > ContactOut) pf.FootContact = false;
             // konnica wroga: bardzo blisko albo w 120 m i szarzuje (zbliza sie >= 3 m/s) - kontakt na CavKeep s od ostatniego takiego pomiaru
-            bool cav = false;
-            if (bestCav <= CavClose) cav = true;
-            else if (bestCav <= CavNear && pf.CavGap != float.MaxValue && now - pf.CavAt > 0.05f && now - pf.CavAt < 3f
-                     && (pf.CavGap - bestCav) / (now - pf.CavAt) >= CavClosing) cav = true;
+            bool charge = bestCav <= CavNear && pf.CavGap != float.MaxValue && now - pf.CavAt > 0.05f && now - pf.CavAt < 3f
+                          && (pf.CavGap - bestCav) / (now - pf.CavAt) >= CavClosing;
+            bool cav = bestCav <= CavClose || charge;
             pf.CavGap = bestCav;
             pf.CavAt = now;
             if (cav) pf.CavUntil = now + CavKeep;
+            if (charge) pf.ChargeUntil = now + CavKeep;   // 344r: prawdziwa szarza (zbliza sie) - osobno od samej bliskosci konnicy
             pf.Contact = pf.FootContact || now < pf.CavUntil;
-            if (pf.Contact && !was) { _contactIn++; if (!pf.FootContact) _contactCav++; }
+            if (pf.Contact && !was) { _contactIn++; if (!pf.FootContact) _contactCav++; if (_contact1 < 0f && _depAt >= 0f) _contact1 = Math.Max(0f, now - _depAt); }
             if (!pf.Contact && was) pf.OutAt = now;   // 333d
         }
 
@@ -366,17 +397,41 @@ namespace Armoury
         {
             if (!_live) return;
             bool main = Thread.CurrentThread.ManagedThreadId == _mainThread;
+            long t0 = main ? 0L : System.Diagnostics.Stopwatch.GetTimestamp();
+            // recenzja 344 W5 (techn.): punkt rozkazu (wywolanie silnika) przed lockiem - nie zalezy od stanu arbitra
+            WorldPosition tw = WorldPosition.Invalid;
+            bool twOk = false;
+            if (_key && __instance != null && input.OrderEnum == MovementOrder.MovementOrderEnum.Move)
+            {
+                try { tw = input.CreateNewOrderWorldPositionMT(__instance, WorldPosition.WorldPositionEnforcedCache.None); twOk = true; } catch { twOk = false; }
+            }
             lock (L)
             {
+                long t1 = main ? 0L : System.Diagnostics.Stopwatch.GetTimestamp();
                 _inMain = main;
-                try { PreIn(__instance, ref input, main); }
+                try { PreIn(__instance, ref input, main, tw, twOk); }
                 catch (Exception e) { _stum++; Err("Pendulum333.Rozkaz", e); }
-                finally { _inMain = true; }
+                finally { _inMain = true; if (!main) AiTime(t0, t1); }
             }
         }
 
+        /// <summary>344r (recenzja D7): czas prefiksu w watku AI - czekanie na lock (t0..t1) i praca (t1..teraz); pod lockiem.</summary>
+        private static void AiTime(long t0, long t1)
+        {
+            long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
+            long w = t1 - t0, k = t2 - t1;
+            _aiN++;
+            _aiWait += w; if (w > _aiWaitMax) _aiWaitMax = w;
+            _aiWork += k; if (k > _aiWorkMax) _aiWorkMax = k;
+        }
+
+        private static string Ms(long ticks)
+        {
+            return (ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.00", Inv);
+        }
+
         /// <summary>344: prefiks ruchu pod lockiem - w kazdym watku (333: tylko glowny - w grze Jeffa 0 wywolan). Wyjatki lapie Pre.</summary>
-        private static void PreIn(Formation __instance, ref MovementOrder input, bool main)
+        private static void PreIn(Formation __instance, ref MovementOrder input, bool main, WorldPosition tw, bool twOk)
         {
             if (main) _callMain++; else _callAi++;
             {
@@ -401,7 +456,7 @@ namespace Armoury
                 if (!_key) return;
                 if (!pre) { Forget(pf, pf.Contact && !pf.FootContact); return; }
                 Vec2 q = Cur(f);   // 333f: pozycja szyku w ukladzie punktu rozkazu (srodek ciezkosci przesuniety o srednie miejsce w szyku - Formation.CurrentPosition)
-                WorldPosition tw = input.CreateNewOrderWorldPositionMT(f, WorldPosition.WorldPositionEnforcedCache.None);
+                if (!twOk) return;
                 Vec2 tp = tw.AsVec2;
                 if (!q.IsValid || !tw.IsValid || !tp.IsValid) return;
                 _seen++;
@@ -424,11 +479,14 @@ namespace Armoury
                     if (lead != null && Forms.TryGetValue(lead, out lp) && lp.P.IsValid && !lp.Contact)
                     {
                         float ldz = Math.Max(DeadMove, lead.Depth);
-                        bool moved = !pf.LeadP.IsValid || lp.P.Distance(pf.LeadP) >= ldz;
+                        // recenzja 344 W5: prowadzacy idzie do dalekiego punktu (P bez zmian) - nastepca rusza za jego POZYCJA (>= martwa strefa od ostatniego przyjecia)
+                        Vec2 lc = Cur(lead);
+                        bool moved = !pf.LeadP.IsValid || !pf.LeadPos.IsValid || lp.P.Distance(pf.LeadP) >= ldz || (lc.IsValid && lc.Distance(pf.LeadPos) >= ldz);
                         if (!moved && pf.P.IsValid) { Keep(f, pf, ref input, beh); _succKeep++; return; }
                         pf.Succ = true;
                         pf.SuccStill = !moved;
                         pf.LeadNext = lp.P;
+                        pf.LeadPosNext = lc;
                     }
                 }
                 // 333f: kierunek celu liczony od miejsca, w ktorym szyk JEST (q), nie od P - 333e liczyl zapadke i obciecie od P, wiec gdy P zostal za szykiem
@@ -493,6 +551,12 @@ namespace Armoury
                         clip = true;
                     }
                 }
+                // recenzja 344 W6: krok naprzod do wroga (RBM CautiousAdvance +5 / +10 m) wewnatrz martwej strefy - szyk stojacy na P po trzymaniu HoldMin s
+                // przyjmuje go (nie przy ruchu wstecz zapadki) - inaczej szyk przed kontaktem stalby bez konca
+                if (q.Distance(pf.P) < dz && pf.ArrAt < pf.PAt) pf.ArrAt = now;
+                bool fwd = !clip && rule != 'Z' && pf.Dir >= 0 && u >= DeadMin && tt.Distance(pf.P) < dz && q.Distance(pf.P) < dz && pf.ArrAt >= pf.PAt
+                           && now - Math.Max(pf.PAt, pf.ArrAt) >= HoldMin;
+                if (fwd) { _fwdStep++; Accept(pf, tw, tp, (sbyte)1, now, beh, 'K'); return; }
                 // 2. martwa strefa (cel po obcieciu)
                 if (tt.Distance(pf.P) < dz) { Keep(f, pf, ref input, beh); if (!clip) _dead++; return; }
                 // 4. trzymanie: szyk stoi na P - nowy punkt najwczesniej HoldMin s po przyjeciu P i od dojscia do P (333e)
@@ -527,7 +591,7 @@ namespace Armoury
         private static void Line(string txt)
         {
             if (_inMain) { Log.Info(txt); return; }
-            if (PendLines.Count < MaxPend) PendLines.Add(txt);
+            if (PendLines.Count < MaxPend) PendLines.Add(txt); else _lost++;
         }
 
         /// <summary>344 (2): histereza zachowan i zmiana planu.</summary>
@@ -535,8 +599,19 @@ namespace Armoury
         {
             if (beh == null) return;
             Type tac = Tactic(f.Team);
-            bool tacChg = tac != null && pf.Tac != null && tac != pf.Tac;
-            if (tac != null) pf.Tac = tac;
+            TacRaw(f.Team, tac, now);
+            // recenzja 344 W7: taktyka druzyny pod ta sama histereza BehHold s co zachowanie (291B / RBM przerzucajace taktyke - powrot w BehHold s = migniecie)
+            bool tacChg = false;
+            if (tac != null)
+            {
+                if (pf.Tac == null) pf.Tac = tac;
+                else if (tac == pf.Tac) { if (pf.TacNew != null) { _tacBlink++; pf.TacNew = null; } }
+                else
+                {
+                    if (pf.TacNew != tac) { pf.TacNew = tac; pf.TacNewAt = now; }
+                    if (now - pf.TacNewAt >= BehHold) { pf.Tac = tac; pf.TacNew = null; tacChg = true; }
+                }
+            }
             if (pf.Beh == null) { pf.Beh = beh; return; }
             if (beh == pf.Beh)
             {
@@ -545,7 +620,8 @@ namespace Armoury
                 return;
             }
             if (pf.BehNew != beh) { pf.BehNew = beh; pf.BehNewAt = now; }
-            bool hard = beh == typeof(BehaviorCharge) || beh == typeof(BehaviorRetreat) || (beh == typeof(BehaviorAdvance) && pf.OutAt > -999f);
+            // recenzja 344 D4 (techn.): szarza i odwrot wydaja rozkazy nie-Move (PreIn wraca przed PlanCheck) - "twarda" zmiana planu tylko Advance po kontakcie
+            bool hard = beh == typeof(BehaviorAdvance) && pf.OutAt > -999f;
             if (now - pf.BehNewAt < BehHold && !tacChg && !hard) return;
             pf.Beh = beh;
             pf.BehNew = null;
@@ -555,6 +631,19 @@ namespace Armoury
             pf.Dir = 0;
             pf.DirAt = -1000f;
             pf.Revs = 0;
+        }
+
+        /// <summary>344r (recenzja W7): surowe zmiany taktyki druzyny (pod lockiem) - licznik i szybkie (w TacFast s od poprzedniej).</summary>
+        private static void TacRaw(Team t, Type tac, float now)
+        {
+            if (t == null || tac == null) return;
+            TS ts;
+            if (!TacBy.TryGetValue(t, out ts)) { if (TacBy.Count >= MaxBeh) return; ts = new TS { T = tac, At = now }; TacBy[t] = ts; return; }
+            if (ts.T == tac) return;
+            ts.N++;
+            if (now - ts.At < TacFast) ts.Fast++;
+            ts.T = tac;
+            ts.At = now;
         }
 
         /// <summary>344: typ biezacej taktyki druzyny (TeamAIComponent._currentTactic, refleksja raz na proces).</summary>
@@ -639,16 +728,19 @@ namespace Armoury
 
         /// <summary>344: Line / Loose szyku AI przed kontaktem - najwyzej raz na ArrHold s, powrot do poprzedniego dopiero po ArrHold s bez ostrzalu; kontakt
         /// ArrContact s, szarza konnicy wroga - od razu. false = zostaje biezace ustawienie (bez SoftUpdate).</summary>
-        public static bool PreArr(Formation __instance, ArrangementOrder order)
+        public static bool PreArr(Formation __instance, ArrangementOrder order, bool __runOriginal)
         {
+            if (!__runOriginal) return false;   // recenzja 344 D3: inny prefiks (CloseRanks 310) juz odrzucil zmiane - bez zapisu blokady
             if (!_live) return true;
             bool main = Thread.CurrentThread.ManagedThreadId == _mainThread;
+            long t0 = main ? 0L : System.Diagnostics.Stopwatch.GetTimestamp();
             lock (L)
             {
+                long t1 = main ? 0L : System.Diagnostics.Stopwatch.GetTimestamp();
                 _inMain = main;
                 try { return PreArrIn(__instance, order, main); }
                 catch (Exception e) { _stum++; Err("Pendulum333.Ustawienie", e); return true; }
-                finally { _inMain = true; }
+                finally { _inMain = true; if (!main) AiTime(t0, t1); }
             }
         }
 
@@ -663,16 +755,24 @@ namespace Armoury
             if (!ll) return true;
             var m = Mission.Current;
             if (!Here(m) || !m.IsDeploymentFinished) return true;
-            if (f.CountOfUnits < HorsePursuit.IntactMin || !f.IsAIControlled || f.IsDeployment || !MissionTeams.Valid(f.Team) || NotAi(f)) return true;
+            if (!Eligible(f)) return true;   // recenzja 344 W3 (techn.): tylko piechota i lucznicy AI (bez konnicy, bez wpisow PF dla niej)
             if (main) _arrMain++; else _arrAi++;
             float now = m.CurrentTime;
             var pf = Get(f);
             Refresh(pf, now);
             _arrSeen++;
             if (!_key) return true;
+            // recenzja 344 W4: wejscie w Loose pod ostrzalem (prog wejscia gry) zawsze - wahadlo to powrot do Line, nie samo rozluznienie
+            if (nw == ArrangementOrder.ArrangementOrderEnum.Loose)
+            {
+                float ur = 0f;
+                try { var fq = f.QuerySystem; ur = fq != null ? fq.UnderRangedAttackRatio : 0f; } catch { ur = 0f; }
+                if (ur >= ArrFireIn) { _arrFireAcc++; pf.FireAt = now; pf.ArrPrevE = (int)cur; pf.ArrChgAt = now; _arrAcc++; return true; }
+            }
             if (pf.Contact)
             {
-                if (!pf.FootContact) { _arrCav++; pf.ArrPrevE = (int)cur; pf.ArrChgAt = now; return true; }   // szarza konnicy wroga - od razu
+                // recenzja 344 W2 (techn.): od razu tylko przy prawdziwej szarzy konnicy wroga (zbliza sie) i tylko do Line; sama bliskosc konnicy - regula ArrContact s
+                if (!pf.FootContact && now < pf.ChargeUntil && nw == ArrangementOrder.ArrangementOrderEnum.Line) { _arrCav++; pf.ArrPrevE = (int)cur; pf.ArrChgAt = now; return true; }
                 if (now - pf.ArrChgAt < ArrContact) { _arrBlkC++; return false; }
                 pf.ArrPrevE = (int)cur;
                 pf.ArrChgAt = now;
@@ -731,6 +831,7 @@ namespace Armoury
             if (pf.Succ)
             {
                 if (pf.LeadNext.IsValid) pf.LeadP = pf.LeadNext;
+                if (pf.LeadPosNext.IsValid) pf.LeadPos = pf.LeadPosNext;
                 if (pf.SuccStill && rule != '1') _succNo++; else _succAcc++;
                 pf.Succ = false;
             }
@@ -841,6 +942,7 @@ namespace Armoury
             try
             {
                 if (!m.IsDeploymentFinished) return;
+                if (_depAt < 0f) _depAt = now;
                 bool ff = false;
                 try { ff = m.IsFastForward; } catch { ff = false; }
                 if (ff) _ffSec += step; else _rtSec += step;
@@ -881,9 +983,11 @@ namespace Armoury
                 pf.Trend = 0;
                 pf.TrendA = 0;
                 if (pf.Contact) Forget(pf, !pf.FootContact);
+                pf.StillPos = Vec2.Invalid;
                 return;
             }
             Poll(pf, now);   // 333d: FacingOrder / ArrangementOrder przed kontaktem
+            StillCheck(pf, now);
             if (pf.P.IsValid && pf.ArrAt < pf.PAt && Cur(f).Distance(pf.P) < Math.Max(DeadMove, f.Depth)) pf.ArrAt = now;   // 333e: dojscie do P (333f: pozycja szyku)
             _preSec += step;
             if (!pf.Last.IsValid || !pf.LastA.IsValid)
@@ -925,6 +1029,20 @@ namespace Armoury
                 if (x < pf.Ext) { pf.Ext = x; Snap(pf, c, now); }
                 else if (x - pf.Ext >= thr) { Reversal(pf, false, x, thr, c, a, now); pf.Trend = 1; Turn(pf, x, c, now); }
             }
+        }
+
+        /// <summary>344r (recenzja W6): szyk przed kontaktem stoi (pozycja w martwej strefie) >= Still s - licznik szykow; "utkniety" = cel gry naprzod >= martwa strefa
+        /// (ostatni rozkaz w 5 s) przy stojacym szyku - warunek wgrania obok A344-0.</summary>
+        private static void StillCheck(PF pf, float now)
+        {
+            var f = pf.F;
+            Vec2 cp = Cur(f);
+            if (!cp.IsValid) return;
+            float dz = Math.Max(DeadMove, f.Depth);
+            if (!pf.StillPos.IsValid || cp.Distance(pf.StillPos) >= dz) { pf.StillPos = cp; pf.StillAt = now; pf.StillN = pf.StuckN = false; return; }
+            if (now - pf.StillAt < Still) return;
+            if (!pf.StillN) { pf.StillN = true; _still++; }
+            if (!pf.StuckN && _key && pf.T.IsValid && now - pf.TAt < 5f && (pf.T - cp).DotProduct(pf.Axis) >= dz) { pf.StuckN = true; _stuck++; }
         }
 
         /// <summary>333d: stan szyku w chwili ekstremum mediany (do porownania przy nawrocie).</summary>
@@ -1170,6 +1288,23 @@ namespace Armoury
               .Append(" | zachowania: zmian planu ").Append(_plan).Append(", migniec ").Append(_blink).Append(", zmian taktyki ").Append(_tac)
               .Append(" | nastepcy: trzymani ").Append(_succKeep).Append(", ruszeni za prowadzacym ").Append(_succAcc).Append(", ruchy bez zmiany prowadzacego ").Append(_succNo)
               .Append(" | blokada przeciwnego rozkazu ").Append(_blk)
+              .Append(" | 344r: krok naprzod w martwej strefie ").Append(_fwdStep).Append(", pierwszy kontakt po ").Append(_contact1 >= 0f ? _contact1.ToString("0", Inv) : "-")
+              .Append(" s, szykow stojacych ponad ").Append(Still.ToString("0", Inv)).Append(" s przed kontaktem ").Append(_still).Append(" (z celem gry naprzod ").Append(_stuck)
+              .Append("), Loose pod ostrzalem od razu ").Append(_arrFireAcc).Append(", migniec taktyki ").Append(_tacBlink).Append(", taktyki druzyn ");
+            if (TacBy.Count == 0) sb.Append('-');
+            else
+            {
+                bool ft = true;
+                int ti = 0;
+                foreach (var kv in TacBy)
+                {
+                    if (!ft) sb.Append(", ");
+                    ft = false;
+                    sb.Append('d').Append(ti++).Append(' ').Append(kv.Value.N).Append(" (szybkich ").Append(kv.Value.Fast).Append(')');
+                }
+            }
+            sb.Append(" | watek AI: wywolan ").Append(_aiN).Append(", czekanie na lock ").Append(Ms(_aiWait)).Append(" ms (najwiecej ").Append(Ms(_aiWaitMax))
+              .Append(" ms), praca ").Append(Ms(_aiWork)).Append(" ms (najwiecej ").Append(Ms(_aiWorkMax)).Append(" ms), zgubione linie ").Append(_lost)
               .Append(" | 333: ");
             sb.Append("wahadlo: klucz ").Append(_key ? "TAK" : "NIE").Append(" (latka ").Append(_patch).Append("; przed kontaktem > ").Append(ContactIn.ToString("0", Inv))
               .Append(" m miara RBM, wyjscie > ").Append(ContactOut.ToString("0", Inv)).Append(" m; 333b: punkt przyjety, martwa strefa rozkazu max(")

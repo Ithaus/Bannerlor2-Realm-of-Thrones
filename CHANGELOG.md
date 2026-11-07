@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 344r - poprawki dwoch recenzji 344 na noc/344-ai-bitwy (NIE WGRANE, BEZ AUTOTESTU - Jeff gra; Armoury.dll fa34763f test/m344; status DO SPRAWDZENIA)
+**Problem (recenzje 344):** front F nie mial wyjscia pod ostrzalem (strzelec przy krawedzi swojej strefy, g 0-20 m, strzela z 31-59 m - jezdzcy stoja przodem
+i gina = nowa postac skargi (A)); kontra / odruch z trafienia tylko do 40 m; strzal w wracajacych pod oslona robil petle PS -> F -> PS; konni lucznicy liczeni do
+przewagi G, choc w K nie jada. (B): nastepca zamarzal przy marszu prowadzacego na daleki punkt; krok RBM CautiousAdvance (+5/+10 m) w martwej strefie 12 m -
+szyk mogl stac przed kontaktem; zmiana taktyki druzyny od razu zmieniala plan (291B / RBM przerzucajace taktyke = "jedna komenda zamieniana druga"); blokada
+Line/Loose: sama bliskosc konnicy wpuszczala kazda zmiane, szyki konnicy objete, wejscie w Loose pod ostrzalem blokowane 20 s.
+**Zmiana (A, HorsePursuit.Front344.cs):** F pod ostrzalem bez kontry - docisniecie do krawedzi strefy strzelca (punkt w Rb od niego, przy przewadze; najwyzej
+Rs / 10 m/s = 6 s, dalej trafia - PS), strzelec glebiej albo brak przewagi - PS; F konczy sie tez, gdy strzelec pod oslona (g < 20 m) milczy 5 s; kontra (kc)
+i odruch R poza oslona w calym Rs (60 m); strzal w PS pod oslona - powrot dalej (okno i bez capu marszu od nowa), F z powrotu tylko gdy strzelec wyszedl za
+wracajacymi poza oslone w Rw; G bez szykow konnych lucznikow; K najwyzej max(PerVictim + 1, 3 x (1 + eskorta)) z szyku; ReFront przez Elig 204; po K bez
+jezdzcow BNone; zakres strony w OnRiderShot344; powod konca UPs344 (linia 204 "powrot szykiem 344", nie "strefa armii strzelca 333"); ShieldsUp.RiderHit wola
+OnRiderShotAny bez klucza ShieldsUp. Linia 344: "front pod ostrzalem: trafien, docisniec, odwrotow spod ognia, bez reakcji, powrotow przedluzonych".
+**Zmiana (B, Pendulum333.cs):** nastepca rusza takze za POZYCJA prowadzacego (>= martwa strefa od ostatniego przyjecia); taktyka pod histereza 6 s (migniecia
+taktyki, surowe zmiany i szybkie < 10 s na druzyne w linii); krok naprzod do wroga w martwej strefie przyjety po trzymaniu 10 s; "twarda" zmiana planu tylko
+Advance po kontakcie (szarza / odwrot to rozkazy nie-Move); SetArrangementOrder: tylko szyki Eligible, Loose pod ostrzalem (>= 0.2) zawsze, kontakt samej konnicy -
+regula 5 s (od razu tylko szarza zblizajaca sie i tylko do Line), __runOriginal (odrzucenie CloseRanks bez zapisu blokady); punkt rozkazu
+(CreateNewOrderWorldPositionMT) przed lockiem; pomiar czasu prefiksow w watku AI (czekanie na lock / praca, suma i maksimum), zgubione linie kolejki, szyki stojace
+> 60 s przed kontaktem (i z celem gry naprzod), pierwszy kontakt. NoFastForward344: argument __0 (bez zaleznosci od nazwy parametru gry).
+**sprawdz_logi --grupa ai344:** nowe A344-8 (front bez reakcji = 0), B344-6 (szyki stojace z celem gry naprzod = 0, czas do kontaktu INFO), B344-7 (szybkie zmiany
+taktyki <= 1 na druzyne), X344-T (czekanie + praca w watku AI <= 20 ms, 0 zgubionych linii); synteza A344-S TAK; regex 204 "powroty" przyjmuje "powrot szykiem 344".
+**Do sprawdzenia po zamknieciu gry przez Jeffa:** bieg z przewijaniem i bez (flaga armoury-bez-przewijania344.flag); warunki wgrania A344-0 (watek AI > 0),
+B344-6, X344-T, A344-8; regresja ai204, wodz335, m204jazda; w linii doktryny "bez przewijania 344 TAK".
+
 ## 344 - AI bitwy: konnica z glowa wobec konnego strzelca (front / kontra / powrot szykiem / odruch) i jeden rozkaz szyku (arbiter w watku AI) na noc/344-ai-bitwy od 5bddce2b (NIE WGRANE, BEZ AUTOTESTU - Jeff gra; Armoury.dll test/m344)
 **Problem (Jeff 07.11, bitwy 01:01 / 01:07 / 01:15, log D:/Backup-Bannerlord/logi-jeffa/2026-11-07-bitwy/Armoury-2026-11-07_00-27-28.log; po 333 z 06.11):**
 (A) "atakuje kawaleria i jada za mna; jak zblizamy sie do mojego wojska, to zawracaja, ja wtedy jade za nimi i wybijam ich w plecy strzalami; nikt z nich nie atakuje

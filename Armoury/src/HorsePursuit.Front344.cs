@@ -35,6 +35,10 @@ namespace Armoury
     ///    inaczej znowu F tymi samymi ludzmi; po 30 s - W;
     ///  - R odruch (szyk konnicy AI poza G, np. oslona skrzydla pod ostrzalem): trafiony jezdziec + 2 najblizsi od razu na strzelca (glowny watek, trafienie z ShieldsUp),
     ///    gdy trafienie z d <= Rw przy g >= 20 albo z d <= Rb przy g >= 10.
+    /// 344r (recenzje 344, W1-W4): F pod ostrzalem nie stoi - trafienie bez kontry: docisniecie do krawedzi strefy strzelca (punkt w Rb od niego, przy przewadze;
+    ///    najwyzej ZPressFor s, dalej trafia - PS), inaczej PS; F konczy sie tez, gdy strzelec pod oslona (g &lt; 20 m) milczy 5 s; kontra i odruch poza oslona w calym Rs
+    ///    (strzal z 40-60 m); strzal w PS pod oslona - powrot dalej (bez nawrotu do F), F z powrotu tylko gdy strzelec wyszedl za wracajacymi poza oslone w Rw;
+    ///    konni lucznicy poza przewaga G; K najwyzej max(PerVictim + 1, 3 x (1 + eskorta)) z szyku; linia: "front pod ostrzalem" (A344-8 bez reakcji = 0).
     /// Bez ochloniecia: po F / K / PS zadnej blokady 60/120/240 s - pamiec przynety ogranicza tylko START P, nigdy F / K / PS / R. Strona przegrywajaca: P zakazany,
     /// F, K i R dozwolone (obrona). Strzelec AI w nietknietym szyku swojej strony (szyk na szyk 204) - bez K / R. Bohaterowie (335) i chorazowie nie jada (Elig 204).
     /// Miary w linii "AI bitwy (344): misja ..." (A344-1..7, sprawdz_logi --grupa ai344); linie "AI bitwy (344) front / kontra / powrot / odruch" (najwyzej 16 na bitwe).
@@ -50,6 +54,9 @@ namespace Armoury
         internal const float ZRs = ZShotMin, ZRw = 40f, ZRb = HuntScreen, ZOutGap = 20f, ZKMax = 40f, ZSlowFor = 8f, ZFarHold = 3f, ZDeepHold = 5f, ZPsFor = 30f;
         internal const float ZCloseV = 1f, ZCloseWin = 2f, ZHitRecent = 5f, ZFaster = 1.05f, ZBackAng = 120f, ZFaceAng = 60f, ZAnswer = 2f, ZPredict = 3f, ZGKeep = 30f;
         internal const float ZTrotNear = 60f, ZStopLead = 1f;
+        // 344r (recenzje W1-W3): front pod ostrzalem - trafienie w ostatnich ZHitNow s; docisniecie do krawedzi strefy strzelca najwyzej ZPressFor s (Rs przy galopie
+        // ~10 m/s), potem odwrot PS; przedluzenie powrotu przy strzale w wracajacych
+        internal const float ZHitNow = 1.5f, ZGallop = 10f, ZPressFor = ZRs / ZGallop;
         private const int ZMaxLines = 16, ZListCap = 256;
         private const int BFull = 0, BNone = 2, BLight = 3, BFront = 4, BKontra = 5;   // BLight - jak BFull, ale najwyzej oddzial L1
         private const byte SW = 0, SP = 1, SF = 2, SK = 3, SPS = 4;
@@ -66,8 +73,10 @@ namespace Armoury
             public float HitAt = -1000f, HitD = float.MaxValue;
             public float FarSince = -1f, PsUntil = -1f, CondAt = -1f, AnsAt = -1000f, NoAdvAt = -1000f, HitEvAt = -1000f;
             public float GPrev = float.MaxValue;
+            public float PressAt = -1f, FAnsAt = -1000f;   // 344r: docisniecie frontu, ostatnia reakcja na ostrzal frontu
             public bool KFull, KContact, FOpen, LongNoted;
-            public int FBack;
+            public int FBack, Esc;
+            public readonly List<float> FPend = new List<float>();   // 344r: trafienia w F czekajace na reakcje (A344-8)
             public readonly Dictionary<Formation, float> GF = new Dictionary<Formation, float>();
             public readonly List<Agent> Men = new List<Agent>();
             public readonly List<float> Pend = new List<float>();
@@ -102,6 +111,7 @@ namespace Armoury
         private static int _zFull, _zNoStart, _zLight, _zLightFull, _zBreaks, _zShooterBreakMax, _zLoops, _zRiderIn, _zClamp, _zZoneMax, _zLines, _zStum;
         private static int _z4L1Fast, _z4Long, _z4NoAdv, _z4F, _z4FRiders, _z4FEdge, _z4FFast, _z4FLose, _z4BackF, _z4BackAll, _z4FaceN, _z4FaceOk;
         private static int _z4K, _z4KFull, _z4R, _z4RRiders, _z4KRiders, _z4Ev, _z4Ans, _z4Miss, _z4KEnd, _z4KOk, _z4Unans, _z4PendN, _z4Ps, _z4PsK, _z4PsF, _z4Trot;
+        private static int _z4Press, _z4FOut, _z4FHit, _z4FUnans, _z4PsExt;   // 344r
 
         private static void Bait333Clear()
         {
@@ -113,6 +123,7 @@ namespace Armoury
             _zFull = _zNoStart = _zLight = _zLightFull = _zBreaks = _zShooterBreakMax = _zLoops = _zRiderIn = _zClamp = _zZoneMax = _zLines = _zStum = 0;
             _z4L1Fast = _z4Long = _z4NoAdv = _z4F = _z4FRiders = _z4FEdge = _z4FFast = _z4FLose = _z4BackF = _z4BackAll = _z4FaceN = _z4FaceOk = 0;
             _z4K = _z4KFull = _z4R = _z4RRiders = _z4KRiders = _z4Ev = _z4Ans = _z4Miss = _z4KEnd = _z4KOk = _z4Unans = _z4PendN = _z4Ps = _z4PsK = _z4PsF = _z4Trot = 0;
+            _z4Press = _z4FOut = _z4FHit = _z4FUnans = _z4PsExt = 0;
         }
 
         // ------------------------------------------------------------ strefa (pass, po BuildHForms) - bez zmian z 333
@@ -259,7 +270,7 @@ namespace Armoury
                 int i = FindFI(fl, kv.Key);
                 if (i < 0) continue;
                 var fi = fl[i];
-                if (!fi.Cav || fi.Player || fi.Retreat) continue;
+                if (!fi.Cav || fi.Ha || fi.Player || fi.Retreat) continue;   // recenzja 344 W4: konni lucznicy nie jada w K - bez nich w przewadze
                 GList.Add(fi.F);
                 gN += fi.N;
                 float e = Math.Max(0f, sp.Distance(fi.Rest) - fi.R);
@@ -385,12 +396,14 @@ namespace Armoury
             bool closing = Closing(q, d, now);
             bool hitRw = now - q.HitAt <= ZHitRecent && q.HitD <= ZRw;
             bool hitRb = now - q.HitAt <= ZHitRecent && q.HitD <= ZRb;
+            bool hitRs = now - q.HitAt <= ZHitRecent && q.HitD <= ZRs;   // recenzja 344 W2: strzelec poza oslona strzelajacy z 40-60 m - tez kontra
             int esc = gN > 0 ? Escort(m, s, sp) : 0;
+            q.Esc = esc;
             bool adv = gN > 0 && gN >= 2 * (1 + esc);
             bool faster = Faster(t, s);
             if (d < float.MaxValue && d < q.BestD - 1f) { q.BestD = d; q.BestDAt = now; }
             bool outCover = g >= ZOutGap;
-            bool kc = !t.Group && adv && d <= _maxFrom && ((outCover && (closing || hitRw)) || (g >= ZBreakGap && hitRb));
+            bool kc = !t.Group && adv && d <= _maxFrom && ((outCover && (closing || hitRs)) || (g >= ZBreakGap && hitRb));
             // A344-2: zdarzenie "strzelec poza oslona zbliza sie / trafia z Rw" przy przewadze - czeka na K / R
             bool ev = !t.Group && adv && outCover && (closing || hitRw) && d <= ZRw;
             // poczatek zdarzenia: trafienie z Rw poza oslona (OnRiderShot344) albo ten pass - reakcja liczona od trafienia (pass co 1 s)
@@ -398,6 +411,7 @@ namespace Armoury
             else if (!ev && q.St != SK && q.CondAt >= 0f) { q.CondAt = -1f; _z4Miss++; }
             if (!adv && gN > 0 && (closing || hitRw) && outCover) { _z4NoAdv++; q.NoAdvAt = now; }
             PendCheck(q, now);
+            FPendCheck(q, now);
             if (riders > 0 && q.St == SW) { q.St = SP; q.At = now; q.BestD = d; q.BestDAt = now; }
             switch (q.St)
             {
@@ -424,15 +438,37 @@ namespace Armoury
                     if (riders == 0) { Leave(t, q, now, false); break; }
                     if (kc) { EnterK(t, q, now, true, "strzelec wyszedl " + F0(g) + " m za oslone"); return BKontra; }
                     if (d >= ZRs) { if (q.FarSince < 0f) q.FarSince = now; } else q.FarSince = -1f;
-                    bool deep = g < 0f && now - t.LastFire >= ZDeepHold;
-                    if ((q.FarSince >= 0f && now - q.FarSince >= ZFarHold) || deep) { EnterPS(t, q, now, deep ? "strzelec w swojej strefie bez strzalu" : "strzelec poza zasiegiem"); return BNone; }
+                    // recenzja 344 W1 (c): strzelec pod oslona swojej armii (nie tylko w strefie) i cichy 5 s - front nie stoi bez konca
+                    bool deep = g < ZOutGap && now - t.LastFire >= ZDeepHold;
+                    if ((q.FarSince >= 0f && now - q.FarSince >= ZFarHold) || deep) { EnterPS(t, q, now, deep ? "strzelec pod oslona swojej armii bez strzalu" : "strzelec poza zasiegiem"); return BNone; }
+                    // recenzja 344 W1 (a, b): front pod ostrzalem bez kontry - docisniecie do krawedzi strefy strzelca (szansa na cios, strzelec musi sie cofnac), gdy
+                    // ten punkt jest w Rb od niego; strzelec glebiej albo docisniecie ZPressFor s bez skutku (dalej trafia) - odwrot PS poza zasieg
+                    bool hitNow = q.HitAt >= q.At && now - q.HitAt <= ZHitNow;
+                    Vec2 edge = ZoneClamp(t, sp);
+                    bool edgeOk = edge.Distance(sp) <= ZRb;
+                    if (q.PressAt >= 0f)
+                    {
+                        if (hitNow && now - q.PressAt >= ZPressFor) { _z4FOut++; EnterPS(t, q, now, "docisniecie " + F0(ZPressFor) + " s bez skutku, dalej ostrzal - odwrot poza zasieg"); return BNone; }
+                        if (edgeOk) FrontTo(t, edge);
+                        else q.PressAt = -1f;   // strzelec cofnal sie w glab swojej armii - jezdzcy stoja na punkcie docisniecia (ostrzal stamtad - odwrot)
+                    }
+                    else if (hitNow)
+                    {
+                        if (!edgeOk || !adv) { _z4FOut++; EnterPS(t, q, now, !adv ? "ostrzal bez przewagi nad strzelcem i eskorta - odwrot poza zasieg" : "ostrzal spod oslony armii strzelca - odwrot poza zasieg"); return BNone; }
+                        q.PressAt = now;
+                        q.FAnsAt = now;
+                        _z4Press++;
+                        FrontTo(t, edge);
+                        ZLine("front: strzelec " + Who(t.S) + " " + F0(g) + " m od strefy swojej armii strzela w stojacych | docisniecie do krawedzi jego strefy ("
+                              + F0(edge.Distance(sp)) + " m od niego), najwyzej " + F0(ZPressFor) + " s");
+                    }
                     FaceSample(t, sp);
                     return BFront;
                 case SK:
                     if (!q.KFull && kc) q.KFull = true;
                     if (riders == 0)
                     {
-                        if (now - q.At > 1.5f) { KEnd(q, q.KContact); Leave(t, q, now, false); }
+                        if (now - q.At > 1.5f) { KEnd(q, q.KContact); Leave(t, q, now, false); return BNone; }   // recenzja 344 D1 (techn.): po wyjsciu bez kontry
                         return q.KFull ? BKontra : BNone;
                     }
                     if (d <= ShieldsUp.RaiseNear) q.KContact = true;
@@ -442,11 +478,13 @@ namespace Armoury
                     return q.KFull ? BKontra : BNone;
                 case SPS:
                     if (kc) { _z4PsK++; EnterK(t, q, now, true, "strzelec za wracajacymi, " + F0(g) + " m od strefy"); return BKontra; }
-                    if (q.HitAt >= q.At && now - q.HitAt <= 1.5f)
+                    if (q.HitAt >= q.At && now - q.HitAt <= ZHitNow)
                     {
                         if (g >= ZOutGap && adv) { _z4PsK++; EnterK(t, q, now, true, "strzal w wracajacych"); return BKontra; }
-                        _z4PsF++;
-                        if (ReFront(m, t, q, now)) return BFront;
+                        // recenzja 344 W3: front z powrotu tylko, gdy strzelec wyszedl za wracajacymi poza oslone (stanac przodem do szarzy z eskorta); pod oslona -
+                        // dalej powrot galopem poza zasieg (bez petli PS -> F -> PS w zasiegu oslonietego strzelca)
+                        if (g >= ZOutGap && d <= ZRw && ReFront(m, t, q, now)) { _z4PsF++; return BFront; }
+                        PsExtend(q, now);
                     }
                     if (now >= q.PsUntil) { q.St = SW; q.At = now; q.Men.Clear(); q.FOpen = false; FClose(q); }
                     return BNone;
@@ -509,6 +547,57 @@ namespace Armoury
             }
         }
 
+        /// <summary>344r A344-8: trafienia jezdzcow frontu bez reakcji (docisniecie / odwrot / kontra) w ZAnswer s.</summary>
+        private static void FPendCheck(St344 q, float now)
+        {
+            for (int i = q.FPend.Count - 1; i >= 0; i--)
+            {
+                float p = q.FPend[i];
+                if (q.FAnsAt >= p - 0.01f) { q.FPend.RemoveAt(i); continue; }
+                if (now - p < ZAnswer) continue;
+                _z4FUnans++;
+                q.FPend.RemoveAt(i);
+            }
+        }
+
+        /// <summary>344r docisniecie: jezdzcy frontu na punkt krawedzi strefy strzelca (kazdy z przesunieciem wzgledem srodka grupy - bez tloku w jednym punkcie).</summary>
+        private static void FrontTo(Threat t, Vec2 edge)
+        {
+            Vec2 sum = Vec2.Zero;
+            int n = 0;
+            for (int i = 0; i < t.Hs.Count; i++)
+            {
+                var h = t.Hs[i];
+                if (h.Z4 != ZFrontRole || h.A == null) continue;
+                sum += h.A.Position.AsVec2;
+                n++;
+            }
+            if (n == 0) return;
+            Vec2 mean = sum * (1f / n);
+            for (int i = 0; i < t.Hs.Count; i++)
+            {
+                var h = t.Hs[i];
+                if (h.Z4 != ZFrontRole || h.A == null) continue;
+                h.FrontAt = ZoneClamp(t, edge + (h.A.Position.AsVec2 - mean));
+            }
+        }
+
+        /// <summary>344r (recenzja W3): strzal w wracajacych pod oslona strzelca - powrot dalej galopem (okno PS i bez capu marszu od nowa).</summary>
+        private static void PsExtend(St344 q, float now)
+        {
+            if (q.PsUntil >= now + ZPsFor - 1f) return;
+            q.PsUntil = now + ZPsFor;
+            q.FAnsAt = now;
+            _z4PsExt++;
+            for (int i = 0; i < q.Men.Count; i++)
+            {
+                var a = q.Men[i];
+                Formation f = null;
+                try { f = a != null && a.IsActive() ? a.Formation : null; } catch { f = null; }
+                if (f != null) Ret344[f] = q.PsUntil;
+            }
+        }
+
         // ------------------------------------------------------------ przejscia
 
         private static void FClose(St344 q)
@@ -528,6 +617,7 @@ namespace Armoury
             q.At = now;
             q.FarSince = -1f;
             q.CondAt = -1f;
+            q.PressAt = -1f;
             q.LongNoted = false;
             for (int i = 0; i < t.Hs.Count; i++) t.Hs[i].Z4 = ZNone;
         }
@@ -556,6 +646,7 @@ namespace Armoury
             q.St = SF;
             q.At = now;
             q.FarSince = -1f;
+            q.PressAt = -1f;
             q.FOpen = true;
             q.FBack = 0;
             q.LongNoted = false;
@@ -586,6 +677,8 @@ namespace Armoury
             q.BestD = float.MaxValue;
             q.BestDAt = now;
             q.AnsAt = now;
+            q.FAnsAt = now;
+            q.PressAt = -1f;
             q.Men.Clear();
             if (q.CondAt >= 0f)
             {
@@ -618,7 +711,7 @@ namespace Armoury
                 if (h.A == null || !Hunters.TryGetValue(h.A, out cur) || !ReferenceEquals(cur, h)) continue;
                 if (q.Men.Count < 64) q.Men.Add(h.A);
                 if (h.F != null) Ret344[h.F] = now + ZPsFor;
-                try { EndHunter(h, UZone, now, false, false); }
+                try { EndHunter(h, UPs344, now, false, false); }   // recenzja 344 D6: osobny powod (nie 'zawroceni w strefie')
                 catch (Exception e) { _zStum++; HStumble("HorsePursuit.Powrot344", e); DropHunter(h); }
                 n++;
             }
@@ -626,6 +719,8 @@ namespace Armoury
             q.St = SPS;
             q.At = now;
             q.PsUntil = now + ZPsFor;
+            q.FAnsAt = now;
+            q.PressAt = -1f;
             _z4Ps++;
             ZLine("powrot: strzelec " + Who(t.S) + " " + F0(t.Gap333) + " m od strefy swojej armii | " + why + " | jezdzcow " + n + " wraca do szyku galopem ("
                   + F0(ZPsFor) + " s bez capu marszu)");
@@ -643,7 +738,7 @@ namespace Armoury
                 {
                     var a = q.Men[i];
                     if (a == null || !a.IsActive() || Hunters.ContainsKey(a) || a.MountAgent == null || a.IsRunningAway) continue;
-                    if (!a.CanBeAssignedForScriptedMovement()) continue;
+                    if (Elig(m, a, t, now) != -1) continue;   // recenzja 344 D1: te same warunki co 204 (odwrot, panika, przerwa, kon, szyk strzelca, strefa)
                     int k = FindFI(fl, a.Formation);
                     if (k < 0 || fl[k].Player || fl[k].Retreat) continue;
                     var h = StartHunter(t, a, fl[k], RoleIntercept, 0f, now);
@@ -674,7 +769,7 @@ namespace Armoury
                     var fi = fl[k];
                     if (!fi.Cav || fi.Ha || fi.Retreat) continue;
                     if (fi.Player) { NotePlayerForm(t, fi, 0f); continue; }
-                    Take(m, t, fi, int.MaxValue, now, ref sent, ref sentCharge);
+                    Take(m, t, fi, Math.Max(PerVictim + 1, 3 * (1 + t.Q.Esc)), now, ref sent, ref sentCharge);   // recenzja 344 D2: nie cale skrzydlo za jednym strzelcem
                 }
                 GTmp.Clear();
             }
@@ -733,6 +828,7 @@ namespace Armoury
             if (!_zOn || !_hKey || a == null || s == null || !s.IsHuman || s.MountAgent == null) return;
             Threat t;
             if (!Threats.TryGetValue(s, out t) || t.S == null) return;
+            if (t.Side < 0 || t.Side > 1) return;   // recenzja 344 D2 (techn.): poza passem - HForms[t.Side]
             var q = t.Q;
             float now = m.CurrentTime;
             Vec2 sp = s.Position.AsVec2, ap = a.Position.AsVec2;
@@ -757,7 +853,12 @@ namespace Armoury
                 }
             }
             bool outCover = g >= ZOutGap;
-            bool reach = (outCover && d <= ZRw) || (g >= ZBreakGap && d <= ZRb);
+            bool reach = (outCover && d <= ZRs) || (g >= ZBreakGap && d <= ZRb);   // recenzja 344 W2: poza oslona caly zasieg Rs
+            if (mine && q.St == SF && h.Z4 == ZFrontRole)
+            {
+                _z4FHit++;
+                if (q.PressAt < 0f && q.FPend.Count < 16) q.FPend.Add(now);   // A344-8: trafienie stojacego frontu - reakcja w ZAnswer s
+            }
             if (outCover && d <= ZRw && !t.Group)
             {
                 q.HitEvAt = now;
@@ -913,6 +1014,8 @@ namespace Armoury
               .Append(" | trafienia bez odpowiedzi ").Append(_z4Unans).Append(" (trafien z Rw poza oslona ").Append(_z4PendN).Append(')')
               .Append(" | powroty szykiem ").Append(_z4Ps).Append(" (kontra z powrotu ").Append(_z4PsK).Append(", front z powrotu ").Append(_z4PsF).Append("), klus przy strzelcu ")
               .Append(_z4Trot).Append(" s")
+              .Append(" | front pod ostrzalem: trafien ").Append(_z4FHit).Append(", docisniec ").Append(_z4Press).Append(", odwrotow spod ognia ").Append(_z4FOut)
+              .Append(", bez reakcji ").Append(_z4FUnans).Append(", powrotow przedluzonych ").Append(_z4PsExt)
               .Append(" | strzelcy przy swojej armii bez poscigu ").Append(_zNoStart).Append(", lekkie odpedzenia L1 ").Append(_zLight).Append(", krawedzi strefy na strzelca najwiecej ")
               .Append(_zShooterBreakMax).Append(" (razem ").Append(_zBreaks).Append("), petla przynety ").Append(_zLoops)
               .Append(" | jezdzcy zawroceni w strefie ").Append(_zRiderIn).Append(", nie wyslani przy strefie ").Append(Nw[NwZone]).Append(", punktow przycietych do strefy ")

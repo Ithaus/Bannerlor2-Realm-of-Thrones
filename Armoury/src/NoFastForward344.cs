@@ -47,9 +47,9 @@ namespace Armoury
             return _patch;
         }
 
-        public static bool Pre(Mission __instance, bool fastForwarding)
+        public static bool Pre(Mission __instance, bool __0)   // recenzja 344 D8: argument po pozycji (nazwa parametru gry bez znaczenia)
         {
-            if (!fastForwarding || !_flag) return true;
+            if (!__0 || !_flag) return true;
             Interlocked.Increment(ref _blocked);
             return false;
         }
