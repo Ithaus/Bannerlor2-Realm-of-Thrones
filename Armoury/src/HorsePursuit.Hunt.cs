@@ -1407,7 +1407,7 @@ namespace Armoury
             if (t.Cov != null) CoverEnd(t, outcome == HDownRiders || outcome == HDownOthers ? CeDown : outcome == HEnded ? CeEnded : CeOther, now, false);
             // 347d-r: cofniete 347d "HAway = dobry wynik" - at347 l.794/796 i l.821/822: "odpedzony" 1 s po kontrze, strzelec w fazie ucieczki skryptu
             // testu i z powrotem po 3 s (l.804 [13:24:06], [13:24:13]) - HAway nie mowi, ze odpedzila go kontra
-            try { Front344End(t, outcome == HDownRiders || outcome == HDownOthers); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Front344", e); }   // 344: wynik kontry
+            try { Front344End(t, outcome == HDownRiders || outcome == HDownOthers, now, HName[outcome]); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Front344", e); }   // 344: wynik kontry
             if (t.Active) EndEp(t, outcome, now);
             for (int i = t.Hs.Count - 1; i >= 0; i--)
             {

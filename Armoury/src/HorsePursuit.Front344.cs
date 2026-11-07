@@ -77,6 +77,7 @@ namespace Armoury
             public bool KFull, KContact, FOpen, LongNoted;
             public bool KPend, KPPs;   // 347b A344-3b: kontra bez jezdzcow na strzelcu czeka na KontraTake (KontraConfirm); KPPs - weszla z powrotu PS
             public bool KHold;   // 347f: ta kontra juz raz wstrzymala koniec 204 "odpedzony" (licznik raz na kontre)
+            public float Vs = -1f, Vr = -1f;   // 347f-r: ostatni pass - najwieksza predkosc konia strzelca i mediana koni jezdzcow (Faster), do linii konca trzymanej kontry
             public bool KEmptyOn;   // 347b-r: pusta kontra juz policzona w tym epizodzie (do kontry z jezdzcami albo passu bez warunku kontry)
             public float EvAt = -1000f, KPAt;   // 347d: chwila narodzin zdarzenia A344-2; At powrotu PS sprzed kontry czekajacej (przywracany przy pustej)
             public string KPWhy;
@@ -120,6 +121,8 @@ namespace Armoury
         private static int _z4K, _z4KFull, _z4R, _z4RRiders, _z4KRiders, _z4Ev, _z4Ans, _z4Miss, _z4KEnd, _z4KOk, _z4Unans, _z4PendN, _z4Ps, _z4PsK, _z4PsF, _z4Trot;
         private static int _z4Press, _z4FOut, _z4FHit, _z4FUnans, _z4PsExt;   // 344r
         // 347b A344-3b/3c: kontry cofniete, bo KontraTake nikogo nie wyslal; powody odrzucenia w Take (tylko na czas KontraTake, bez NoteNw)
+        private static int _z4KHoldLn;   // 347f-r: linie "koniec trzymanej kontry" w bitwie (najwyzej ZKHoldLines, osobno od ZMaxLines)
+        private const int ZKHoldLines = 8;
         private static int _z4KHold;   // 347f: kontry, ktore wstrzymaly koniec 204 "odpedzony" (strzelec cichy i dalej niz zasieg od Rest, a kontra goni)
         private static int _z4KEmpty, _ktForm, _ktCav, _ktCap, _ktSkip, _ktCand;
         // 347d-r: odrzucenia ostatniej KontraTake same czasowe / 283 (KontraConfirm); GNear tego passu - szyk pominiety przez NoFreeF (i z odrzucen nieczasowych)
@@ -141,6 +144,7 @@ namespace Armoury
             _z4Press = _z4FOut = _z4FHit = _z4FUnans = _z4PsExt = 0;
             _z4KEmpty = 0;
             _z4KHold = 0;
+            _z4KHoldLn = 0;
             KEmptySeen.Clear();
         }
 
@@ -380,13 +384,17 @@ namespace Armoury
             return n;
         }
 
+        private static float _zVs = -1f, _zVr = -1f;   // 347f-r: predkosci z ostatniego wywolania Faster (kopiowane do St344 w BaitGate)
+
         /// <summary>Strzelec szybszy: najwieksza predkosc jego konia > 1.05 x mediana koni jezdzcow G (bez jezdzcow - pierwszy konny szyku G).</summary>
         private static bool Faster(Threat t, Agent s)
         {
+            _zVs = _zVr = -1f;
             var sm = s.MountAgent;
             if (sm == null) return false;
             float vs;
             try { vs = sm.GetMaximumForwardUnlimitedSpeed(); } catch { return false; }
+            _zVs = vs;
             ZSpeeds.Clear();
             for (int i = 0; i < t.Hs.Count; i++)
             {
@@ -411,6 +419,7 @@ namespace Armoury
             ZSpeeds.Sort();
             float vr = ZSpeeds[ZSpeeds.Count / 2];
             ZSpeeds.Clear();
+            _zVr = vr;
             return vs > ZFaster * vr;
         }
 
@@ -460,6 +469,7 @@ namespace Armoury
             q.Esc = esc;
             bool adv = gN > 0 && gN >= 2 * (1 + esc);
             bool faster = Faster(t, s);
+            q.Vs = _zVs; q.Vr = _zVr;
             if (d < float.MaxValue && d < q.BestD - 1f) { q.BestD = d; q.BestDAt = now; }
             bool outCover = g >= ZOutGap;
             bool kc = !t.Group && adv && d <= _maxFrom && ((outCover && (closing || hitRs)) || (g >= ZBreakGap && hitRb));
@@ -534,9 +544,9 @@ namespace Armoury
                         return q.KFull ? BKontra : BNone;
                     }
                     if (d <= ShieldsUp.RaiseNear) q.KContact = true;
-                    if (g < ZBreakGap) { KEnd(q, true); EnterF(t, q, now, "kontra odepchnela strzelca pod jego armie"); return BFront; }
-                    if (faster && now - q.BestDAt >= ZSlowFor) { KEnd(q, q.KContact); _z4FFast++; EnterF(t, q, now, "kontra: strzelec szybszy, bez zblizania"); return BFront; }
-                    if (now - q.At >= ZKMax) { KEnd(q, q.KContact); EnterF(t, q, now, "kontra " + F0(ZKMax) + " s"); return BFront; }
+                    if (g < ZBreakGap) { KEnd(t, q, now, true, "pod armie"); EnterF(t, q, now, "kontra odepchnela strzelca pod jego armie"); return BFront; }
+                    if (faster && now - q.BestDAt >= ZSlowFor) { KEnd(t, q, now, q.KContact, "szybszy, bez zblizania"); _z4FFast++; EnterF(t, q, now, "kontra: strzelec szybszy, bez zblizania"); return BFront; }
+                    if (now - q.At >= ZKMax) { KEnd(t, q, now, q.KContact, F0(ZKMax) + " s"); EnterF(t, q, now, "kontra " + F0(ZKMax) + " s"); return BFront; }
                     return q.KFull ? BKontra : BNone;
                 case SPS:
                     if (kc) { _z4PsK++; EnterK(t, q, now, true, "strzelec za wracajacymi, " + F0(g) + " m od strefy"); return BKontra; }
@@ -673,7 +683,7 @@ namespace Armoury
         /// <summary>Wyjscie ze stanu do W (bez jezdzcow, klucz).</summary>
         private static void Leave(Threat t, St344 q, float now, bool line)
         {
-            if (q.St == SK && !q.KPend) KEnd(q, q.KContact);
+            if (q.St == SK && !q.KPend) KEnd(t, q, now, q.KContact, "bez jezdzcow / wyjscie");
             q.KPend = false;
             FClose(q);
             q.St = SW;
@@ -696,6 +706,23 @@ namespace Armoury
             if (!q.KHold) { q.KHold = true; _z4KHold++; }
             return true;
         }
+
+        /// <summary>347f-r: KEnd z linia diagnostyczna dla kontry, ktora wstrzymala koniec 204 "odpedzony" (KHold) - jak sie skonczyla: odleglosc, najblizej,
+        /// czas od ostatniego zblizenia, predkosci koni (Faster). Zachowanie bez zmian.</summary>
+        private static void KEnd(Threat t, St344 q, float now, bool ok, string how)
+        {
+            if (q.KHold && _z4KHoldLn < ZKHoldLines)
+            {
+                _z4KHoldLn++;
+                Log.Info("AI bitwy (344) koniec trzymanej kontry: strzelec " + Who(t.S) + " | " + how + " | wynik " + (ok ? "dobry" : "zly") + " | trwala " + F1(now - q.At)
+                         + " s, d " + (q.D1 >= 0f ? F0(q.D1) : "-") + " m, najblizej " + (q.BestD < float.MaxValue ? F0(q.BestD) : "-") + " m (" + (q.BestDAt >= 0f ? F1(now - q.BestDAt) : "-")
+                         + " s temu), od strefy " + F0(t.Gap333) + " m, kontakt " + (q.KContact ? "TAK" : "NIE") + " | kon strzelca " + (q.Vs >= 0f ? F1(q.Vs) : "-")
+                         + " m/s, mediana jezdzcow " + (q.Vr >= 0f ? F1(q.Vr) : "-") + " m/s, szybszy " + (q.Vs >= 0f && q.Vr >= 0f && q.Vs > ZFaster * q.Vr ? "TAK" : "NIE") + ".");
+            }
+            KEnd(q, ok);
+        }
+
+        private static string F1(float v) { return v.ToString("0.0", Inv); }
 
         private static void KEnd(St344 q, bool ok)
         {
@@ -969,10 +996,10 @@ namespace Armoury
         }
 
         /// <summary>EndThreat: K konczy sie wynikiem (padl = dobry), F zamkniety.</summary>
-        private static void Front344End(Threat t, bool down)
+        private static void Front344End(Threat t, bool down, float now, string how)
         {
             var q = t.Q;
-            if (q.St == SK && !q.KPend) KEnd(q, down || q.KContact);
+            if (q.St == SK && !q.KPend) KEnd(t, q, now, down || q.KContact, "koniec 204: " + how);
             q.KPend = false;
             FClose(q);
             q.St = SW;
