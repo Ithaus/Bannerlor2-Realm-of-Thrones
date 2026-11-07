@@ -76,6 +76,7 @@ namespace Armoury
             public float PressAt = -1f, FAnsAt = -1000f;   // 344r: docisniecie frontu, ostatnia reakcja na ostrzal frontu
             public bool KFull, KContact, FOpen, LongNoted;
             public bool KPend, KPPs;   // 347b A344-3b: kontra bez jezdzcow na strzelcu czeka na KontraTake (KontraConfirm); KPPs - weszla z powrotu PS
+            public bool KEmptyOn;   // 347b-r: pusta kontra juz policzona w tym epizodzie (do kontry z jezdzcami albo passu bez warunku kontry)
             public string KPWhy;
             public int FBack, Esc;
             public readonly List<float> FPend = new List<float>();   // 344r: trafienia w F czekajace na reakcje (A344-8)
@@ -415,6 +416,7 @@ namespace Armoury
             if (d < float.MaxValue && d < q.BestD - 1f) { q.BestD = d; q.BestDAt = now; }
             bool outCover = g >= ZOutGap;
             bool kc = !t.Group && adv && d <= _maxFrom && ((outCover && (closing || hitRs)) || (g >= ZBreakGap && hitRb));
+            if (!kc) q.KEmptyOn = false;   // 347b-r: koniec epizodu pustej kontry
             // A344-2: zdarzenie "strzelec poza oslona zbliza sie / trafia z Rw" przy przewadze - czeka na K / R
             bool ev = !t.Group && adv && outCover && (closing || hitRw) && d <= ZRw;
             // poczatek zdarzenia: trafienie z Rw poza oslona (OnRiderShot344) albo ten pass - reakcja liczona od trafienia (pass co 1 s)
@@ -707,6 +709,7 @@ namespace Armoury
         {
             q.AnsAt = now;
             q.FAnsAt = now;
+            q.KEmptyOn = false;   // 347b-r
             if (q.CondAt >= 0f)
             {
                 if (KReact.Count < ZListCap) KReact.Add(now - q.CondAt);
@@ -729,7 +732,7 @@ namespace Armoury
             q.KPend = false;
             if (q.St != SK) return;
             if (sent > 0 || RidersOf(t) > 0) { KCount(t, q, now, false, true, q.KPWhy, 0); return; }
-            _z4KEmpty++;
+            if (!q.KEmptyOn) { q.KEmptyOn = true; _z4KEmpty++; }   // 347b-r: raz na epizod (SW ponawia EnterK co pass, poki kc)
             if (q.KPPs && _z4PsK > 0) _z4PsK--;
             float cond = q.CondAt;
             q.St = SW;
