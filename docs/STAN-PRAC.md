@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 07.11.2026 16:25 CEST: WGRANIE 174 (najnowszy) = noc/351-bitwy-pomiar (Armoury.dll acd118c2) = 173 + 344 (AI bitew, rundy 347b-g)
+- Jeff "1": wgrac 344 mimo A344-3 (1/11) i B344-1 (stare wahadlo). Kopia 173 (ed0961d2): .bak-2026-11-07-przed-wgranie174 + D:/Backup-Bannerlord/wgrane/2026-11-07-wgranie174-przed.
+- Galaz stanu gry: noc/351-bitwy-pomiar (zawiera 343, 345, 347a-g, 350). Nowe prace zaczynac od niej.
+- Otwarte: 344 krok 4 (GNear tylko z jezdzcow w zasiegu / poza strefa 333); pomiar350 po dlugiej sesji Jeffa; optymalizacje z RAPORT-SPOWOLNIENIE (sondy cen co 28 dob, swaty ROT); kolejka z PRZEKAZANIA 00:45 (BK audyt 339: 1a PILNE - cele BK rodu gracza).
+
 ## STAN 07.11.2026 16:20 CEST: test at351 (344 + 350, DLL acd118c2) - NIE WGRANE, czeka na decyzje Jeffa; w grze WGRANIE 173
 - at351: kod 0, 13/13 bitew, 0 ERROR. ai344 TAK: A344-1 (plecy 0), A344-2, A344-4, A344-6, A344-7, A344-8, B344-2, B344-6 (0 - naprawione), B344-7, X344, A344-T. NIE: A344-3 1/11 (zakonczonych 5 dobrych 1, bez wolnych jezdzcow 6 - odrzuceni Nw 6 "daleko" i 14 "strefa 333", czyli GNear dalej liczy przewage z jezdzcow, ktorych Elig odrzuca za odleglosc / strefe), B344-1 0.49/min (stare wahadlo 333 - baza bez 344 at349 0.76), B344-3 1 powrot Line/Loose.
 - Mozliwy krok 4 (jesli Jeff chce dalej): w GNear / CavBlock liczyc tylko jezdzcow w zasiegu i poza strefa 333 (te same warunki co Elig NwFar / NwZone).
