@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 07.11.2026 16:20 CEST: test at351 (344 + 350, DLL acd118c2) - NIE WGRANE, czeka na decyzje Jeffa; w grze WGRANIE 173
+- at351: kod 0, 13/13 bitew, 0 ERROR. ai344 TAK: A344-1 (plecy 0), A344-2, A344-4, A344-6, A344-7, A344-8, B344-2, B344-6 (0 - naprawione), B344-7, X344, A344-T. NIE: A344-3 1/11 (zakonczonych 5 dobrych 1, bez wolnych jezdzcow 6 - odrzuceni Nw 6 "daleko" i 14 "strefa 333", czyli GNear dalej liczy przewage z jezdzcow, ktorych Elig odrzuca za odleglosc / strefe), B344-1 0.49/min (stare wahadlo 333 - baza bez 344 at349 0.76), B344-3 1 powrot Line/Loose.
+- Mozliwy krok 4 (jesli Jeff chce dalej): w GNear / CavBlock liczyc tylko jezdzcow w zasiegu i poza strefa 333 (te same warunki co Elig NwFar / NwZone).
+- PYTANIE DO JEFFA: wgrac 351 (344 naprawia jego skarge: zawracanie tylem pod ostrzalem i nikt nie atakuje gracza - A344-1/8 TAK) mimo A344-3 (wynik kontry w bitwie testowej z przyneta) i B344-1 (stare wahadlo)? Czy jeszcze runda 4?
+- Logi: D:/Backup-Bannerlord/logs/2026-11-07-at351.
+
 ## STAN 07.11.2026 15:55 CEST: WGRANIE 173 (najnowszy) = noc/350-pomiar-spowolnienia (Armoury.dll ed0961d2) = 172 + 350
 - 350: linia "Pomiar sesji (350): dzien N | ..." co dobe (klatki mapy, sr./maks. ms klatki, GC 0/1/2, pamiec zarzadzana i procesu) + co 30 dob blok (sluchacze HourlyTick, najwieksze kolekcje). Klucz SessionPerfLog (TAK). Tylko log. Test at350: kod 0, pomiar350 P0-P2 TAK, koszt 2.5 ms/dobe; reszta jak at349 (prognoza345 G1 416 zl = rozrzut biegow na tym samym kodzie: at348 163, at349 215).
 - PO NASTEPNEJ DLUGIEJ SESJI JEFFA (>= 60 dob): --grupa pomiar350 na jego logu - P3 trend (ms klatki, GC, pamiec) i bloki P4 -> kto spowalnia w sesji (raport docs/RAPORT-SPOWOLNIENIE-2026-11-07.md, zadanie 1).
