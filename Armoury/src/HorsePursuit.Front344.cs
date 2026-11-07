@@ -80,6 +80,7 @@ namespace Armoury
             // 347g (krok 2, at348 K6/K7 petla front -> kontra -> front): wyjscie "szybszy" z SP / SK - do konca zagrozenia kontra na szybszego strzelca
             // tylko przy jego trafieniu z Rb; FSkipOn - pominieta kontra juz policzona (do passu bez warunku kontry)
             public bool FFast, FSkipOn;
+            public float FFastAt = -1000f;   // 347g-r: chwila ostatniego wyjscia "szybszy" - trafienie z Rb liczy sie tylko nowsze; zdarzenie A344-2 cofane tylko starsze
             public float Vs = -1f, Vr = -1f;   // 347f-r: ostatni pass - najwieksza predkosc konia strzelca i mediana koni jezdzcow (Faster), do linii konca trzymanej kontry
             public bool KEmptyOn;   // 347b-r: pusta kontra juz policzona w tym epizodzie (do kontry z jezdzcami albo passu bez warunku kontry)
             public float EvAt = -1000f, KPAt;   // 347d: chwila narodzin zdarzenia A344-2; At powrotu PS sprzed kontry czekajacej (przywracany przy pustej)
@@ -477,15 +478,17 @@ namespace Armoury
             q.Vs = _zVs; q.Vr = _zVr;
             // 347g (krok 2): po wyjsciu "szybszy" (FFast) strzelec dalej szybszy i bez trafienia z Rb - brak przewagi dla kontry (kc, ev, strzal w wracajacych);
             // at348 K6/K7: SF -> "wyszedl za oslone" -> SK -> "szybszy" -> SF co 1 s. Start poscigu P (SW), docisniecie frontu (SF) - adv bez zmian.
-            bool fastNo = q.FFast && faster && !hitRb;
+            // 347g-r (recenzja 1): trafienie z Rb tylko nowsze niz wyjscie "szybszy" (at348 K6/K7: trafienie z 26 m sprzed wyjscia zdejmowalo blokade);
+            // (recenzja 2): nie w SPS - tam strzelec goni wracajacych, jego przewaga predkosci bez znaczenia (A344-T: po pogoni w plecy kontra)
+            bool fastNo = q.FFast && faster && q.St != SPS && !(hitRb && q.HitAt > q.FFastAt);
             if (d < float.MaxValue && d < q.BestD - 1f) { q.BestD = d; q.BestDAt = now; }
             bool outCover = g >= ZOutGap;
             bool kcA = !t.Group && adv && d <= _maxFrom && ((outCover && (closing || hitRs)) || (g >= ZBreakGap && hitRb));
             bool kc = kcA && !fastNo;
-            // 347g: licznik "kontr pominietych - strzelec szybszy" raz na ciag passow z warunkiem kontry (poza SK; w SPS tez strzal w wracajacych)
-            bool psShot = q.St == SPS && q.HitAt >= q.At && now - q.HitAt <= ZHitNow && g >= ZOutGap && adv;
-            if (fastNo && q.St != SK && (kcA || psShot)) { if (!q.FSkipOn) { q.FSkipOn = true; _z4KFast++; } }
-            else if (!kcA && !psShot) q.FSkipOn = false;
+            // 347g: licznik "kontr pominietych - strzelec szybszy" raz na ciag passow z warunkiem kontry (poza SK)
+            // 347g-r: strzal w wracajacych (SPS) bez fastNo - poza licznikiem
+            if (fastNo && q.St != SK && kcA) { if (!q.FSkipOn) { q.FSkipOn = true; _z4KFast++; } }
+            else if (!kcA) q.FSkipOn = false;
             // 347b-r: koniec epizodu pustej kontry; 347d-r: nie w czasie blokady NoFreeF (szyk pominiety po pustej kontrze - ten sam epizod, bez drugiego _z4KEmpty)
             if (!kc && !_gNf) q.KEmptyOn = false;
             // A344-2: zdarzenie "strzelec poza oslona zbliza sie / trafia z Rw" przy przewadze - czeka na K / R
@@ -496,7 +499,8 @@ namespace Armoury
             else if (!ev && q.St != SK && q.CondAt >= 0f)
             {
                 // 347g: zdarzenie zdjete przez szybszego strzelca (FFast) - jak brak przewagi w 347d: bez Miss, zdarzenie cofniete, trafienia A344-4 zdjete (NoAdvAt nizej)
-                if (evA) { if (_z4Ev > 0) _z4Ev--; }
+                // 347g-r (recenzja 3): tylko zdarzenie urodzone przed wyjsciem "szybszy" (EvAt <= FFastAt); nowsze (np. zostawione po nieczasowej pustej kontrze) - Miss
+                if (evA && q.EvAt <= q.FFastAt) { if (_z4Ev > 0) _z4Ev--; }
                 else _z4Miss++;
                 q.CondAt = -1f;
             }
@@ -522,7 +526,7 @@ namespace Armoury
                     {
                         if (now - q.BestDAt > ZSlowFor + 1.5f && !q.LongNoted) { q.LongNoted = true; _z4Long++; }
                         _z4FFast++;
-                        q.FFast = true;   // 347g
+                        q.FFast = true; q.FFastAt = now;   // 347g, 347g-r
                         EnterF(t, q, now, "strzelec szybszy, " + F0(ZSlowFor) + " s bez zblizania");
                         return BFront;
                     }
@@ -567,14 +571,14 @@ namespace Armoury
                     }
                     if (d <= ShieldsUp.RaiseNear) q.KContact = true;
                     if (g < ZBreakGap) { KEnd(t, q, now, true, "pod armie"); EnterF(t, q, now, "kontra odepchnela strzelca pod jego armie"); return BFront; }
-                    if (faster && now - q.BestDAt >= ZSlowFor) { KEnd(t, q, now, q.KContact, "szybszy, bez zblizania"); _z4FFast++; q.FFast = true; EnterF(t, q, now, "kontra: strzelec szybszy, bez zblizania"); return BFront; }
+                    if (faster && now - q.BestDAt >= ZSlowFor) { KEnd(t, q, now, q.KContact, "szybszy, bez zblizania"); _z4FFast++; q.FFast = true; q.FFastAt = now; EnterF(t, q, now, "kontra: strzelec szybszy, bez zblizania"); return BFront; }
                     if (now - q.At >= ZKMax) { KEnd(t, q, now, q.KContact, F0(ZKMax) + " s"); EnterF(t, q, now, "kontra " + F0(ZKMax) + " s"); return BFront; }
                     return q.KFull ? BKontra : BNone;
                 case SPS:
                     if (kc) { _z4PsK++; EnterK(t, q, now, true, "strzelec za wracajacymi, " + F0(g) + " m od strefy"); return BKontra; }
                     if (q.HitAt >= q.At && now - q.HitAt <= ZHitNow)
                     {
-                        if (g >= ZOutGap && adv && !fastNo) { _z4PsK++; EnterK(t, q, now, true, "strzal w wracajacych"); return BKontra; }   // 347g: !fastNo
+                        if (g >= ZOutGap && adv) { _z4PsK++; EnterK(t, q, now, true, "strzal w wracajacych"); return BKontra; }   // 347g-r: bez fastNo (w SPS fastNo zawsze NIE)
                         // recenzja 344 W3: front z powrotu tylko, gdy strzelec wyszedl za wracajacymi poza oslone (stanac przodem do szarzy z eskorta); pod oslona -
                         // dalej powrot galopem poza zasieg (bez petli PS -> F -> PS w zasiegu oslonietego strzelca)
                         if (g >= ZOutGap && d <= ZRw && ReFront(m, t, q, now)) { _z4PsF++; return BFront; }
