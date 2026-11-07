@@ -42,7 +42,8 @@ namespace Armoury
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         private static MemberInfo _deJure;         // FeudalTitle.deJure (wlasciwosc albo pole)
 
-        // liczniki doby (tylko przy wyplacie): [0] wrogi posiadacz, [1] bez posiadacza, [2] posiadacz niezywy
+        // liczniki doby (tylko przy wyplacie): [0] wrogi posiadacz, [1] bez posiadacza, [2] posiadacz niezywy (354r: tylko spoza frakcji wsi - niezywy z frakcji wsi tu nie trafia,
+        // BK GetActualOwner nie sprawdza IsAlive, wiec takiej wsi nie ma na zadnej liscie GetActualVillages)
         private static readonly int[] _nPl = new int[3], _nAi = new int[3];
         private static readonly long[] _gPl = new long[3], _gAi = new long[3];
         private static readonly List<string> _plNames = new List<string>();
@@ -158,7 +159,7 @@ namespace Armoury
             {
                 if (Settings.Current != null && Settings.Current.LogEnabled)
                     Log.Info(P + "start sesji | klucz " + (On ? "tak" : "nie") + ", transpiler podatku wsi BK " + _note
-                             + " | regula: posiadacz tytulu wsi dostaje jej podatek tylko zywy i w tej samej frakcji co wies; wrog, brak, niezywy - pan ziemi (Village Demesnes).");
+                             + " | regula: posiadacz tytulu wsi dostaje jej podatek tylko zywy i w tej samej frakcji co wies; spoza frakcji (zywy albo niezywy) albo brak - pan ziemi (Village Demesnes); niezywy z frakcji wsi - bez zmian (wies na niczyjej liscie).");
             }
             catch { }
         }
