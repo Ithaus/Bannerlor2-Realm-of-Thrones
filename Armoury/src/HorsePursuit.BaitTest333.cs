@@ -22,6 +22,9 @@ namespace Armoury
     ///  - POGON: jedzie 55 m za najblizszym jezdzcem wroga (nie blizej niz 40 m od pieszych szykow wroga) i strzela w plecy; gdy jezdzcy znowu ruszaja na niego
     ///    (jak wyzej) - NAWROT KONNICY (liczony: ilu jezdzcow naraz; wiecej niz 5 w 120 s po poprzedniej ucieczce = "cala jazda znowu", czyli ping-pong Jeffa)
     ///    i znowu UCIECZKA.
+    /// 344 (harasser - przypadki Jeffa 07.11 jako test macierzy HorsePursuit.Front344.cs): POGON jedzie juz 40 m (Rw 344 - zasieg wypadu) za najblizszym jezdzcem
+    /// wroga, nie 55 m - po ucieczce pod swoja armie wraca za konnica poza strefe i strzela w plecy / bok z Rw; oczekiwane: F (konnica stoi przodem przy krawedzi
+    /// strefy), potem K calego G, gdy wyjdzie za oslone (nawrot konnicy po pogoni = kontra, nie ping-pong). Linie bez zmian formatu (sprawdz_logi ai344 A344-T).
     /// Koniec jak 204 (padl, koniec bitwy, 180 s); morale i odwrot rannego oslaniane przez caly test (gracz nie panikuje), HP - do pierwszego wykrycia (jak 291).
     /// Strzaly liczone w OnFire (HorsePursuit.Hunt.cs) wedlug fazy. Linie: "Jazda na strzelca (204) TEST: ... faza strzal / ucieczka / pogon / nawrot" i
     /// "AI bitwy (333) TEST przyneta koniec: ..." (sprawdz_logi --grupa ai333: A333-7 strzaly, A333-8 nawroty calej jazdy).
@@ -34,8 +37,8 @@ namespace Armoury
     internal static partial class HorsePursuit
     {
         private const float BaitFar = 80f, BaitNear = 65f, BaitReach = 8f, BaitCloserAfter = 25f, BaitFleeR = 35f, BaitChaseR = 90f, BaitApproach = 3f,
-                            BaitLeave = -2f, BaitCalm = 2f, BaitTrail = 55f, BaitFootGap = 40f, BaitLost = 170f, BaitMaxSec = 180f, BaitN60 = 60f;
-        private const int BaitFull = ZGuardMaxN;
+                            BaitLeave = -2f, BaitCalm = 2f, BaitTrail = ZRw, BaitFootGap = 40f, BaitLost = 170f, BaitMaxSec = 180f, BaitN60 = 60f;
+        private const int BaitFull = 5;   // 333: "cala jazda" (> 5 jezdzcow naraz) - miara bez zmian (344: po pogoni oczekiwana kontra calego G)
         private static readonly string[] BaitPhName = { "podjazd", "strzal", "ucieczka", "pogon" };
 
         private static bool _bOn;

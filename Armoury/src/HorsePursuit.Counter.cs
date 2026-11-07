@@ -109,7 +109,16 @@ namespace Armoury
             if (w == null || !ReferenceEquals(w.Target, m)) return;
             _cShots++;
             if (charging) _cShotsCharge++;
-            try { Bait333Hit(m, s); } catch (Exception e) { _zStum++; Stumble("HorsePursuit.Plecy333", e); }   // 333: strzaly w plecy wracajacych
+        }
+
+        /// <summary>344 (ShieldsUp.RiderHit, glowny watek): KAZDY konny czlowiek AI (nie szyk gracza) trafiony pociskiem strzelca s - niezaleznie od typu szyku
+        /// (vanguardzi i oslona skrzydla bywaja poza szykiem IsCavalryFormation): grupa G, plecy, odruch R, trafienia czekajace na odpowiedz (HorsePursuit.Front344.cs).</summary>
+        internal static void OnRiderShotAny(Mission m, Agent a, Agent s)
+        {
+            if (!_live || a == null || m == null || s == null) return;
+            var w = _m;
+            if (w == null || !ReferenceEquals(w.Target, m)) return;
+            try { OnRiderShot344(m, a, s); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Odruch344", e); }
         }
 
         /// <summary>Miejsce szyku: punkt rozkazu (oslona skrzydla - punkt trzymania), bez niego srodek szyku.</summary>

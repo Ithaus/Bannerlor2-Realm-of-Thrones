@@ -1,5 +1,43 @@
 # DZIENNIK ZMIAN
 
+## 344 - AI bitwy: konnica z glowa wobec konnego strzelca (front / kontra / powrot szykiem / odruch) i jeden rozkaz szyku (arbiter w watku AI) na noc/344-ai-bitwy od 5bddce2b (NIE WGRANE, BEZ AUTOTESTU - Jeff gra; Armoury.dll test/m344)
+**Problem (Jeff 07.11, bitwy 01:01 / 01:07 / 01:15, log D:/Backup-Bannerlord/logi-jeffa/2026-11-07-bitwy/Armoury-2026-11-07_00-27-28.log; po 333 z 06.11):**
+(A) "atakuje kawaleria i jada za mna; jak zblizamy sie do mojego wojska, to zawracaja, ja wtedy jade za nimi i wybijam ich w plecy strzalami; nikt z nich nie atakuje
+mnie i moge tak wybic niemal wszystkich". (B) "wojsko przeciwnika chodzi przod-tyl, przod-tyl, jakby uruchamiala sie jedna komenda, a potem byla zamieniana druga".
+Bitwa 1: 52 s pogoni 10 jezdzcow za szybszym Jeffem bez kontaktu, zerwanie 333 przy strefie = wszyscy naraz tylem i klusem (cap 128), 5 trafien w plecy w 20 s,
+100 s bez odpowiedzi (ochloniecie 60/120/240 s, straz 3 ludzi od 40 m), trafienie z 2 m bez reakcji; 187 nawrotow mediany / 78 srodka, 40 zmian Line/Loose,
+prefiks 333 - 0 rozkazow.
+**Przyczyna:** (A) 333 samo tworzylo (A): ReleaseRiders oddawal cala grupe zachowaniu szyku (BehaviorProtectFlank / Move, RBM nie szarzuje na samotnego), pamiec
+przynety blokowala obrone, trafienie jezdzca szyku bylo tylko pomiarem (i tylko dla IsCavalryFormation), MarchToContact.EnemyGap liczyl klus od szykow armii
+strzelca. (B) Pendulum333.Pre mial "if (watek != glowny) return" - w zwyklym tempie AI szykow (asyncAITick) idzie w watku silnika; testy z przewijaniem (AI w glownym
+watku) przechodzily, gra nigdy. Do tego bez zapadki: Line/Loose (ProtectFlank co tick), szyki boczne za kazdym drgnieciem glownego, przelaczanie zachowan.
+**Zmiana:** projekt docs/PROJEKT-344-AI-BITWY.md.
+(A) HorsePursuit.Bait333.cs -> HorsePursuit.Front344.cs (klucz CavalryFaceShooterAtArmyEdge zamiast RidersBreakOffNearShootersArmy): strefa armii strzelca bez zmian;
+stany grupy W / P / F / K / PS (+ odruch R) zamiast zerwania, ochloniecia i tylnej strazy (usuniete: ReleaseRiders, ZReChaseGap/Hold, FarSince, Calm, GuardState /
+GuardTake / GuardSize, ZGuard*, ZBreakCool, Hunter.Guard). P tylko przy g >= 30 m, przewadze 2 x (1 + eskorta konna w 40 m), strona nie przegrywa; szybszy strzelec -
+tylko L1 w 40 m i F po 8 s bez zblizania; F - jezdzcy staja na miejscu przodem do strzelca (SetScriptedPositionAndDirection), PS dopiero gdy strzelec > 60 m przez
+3 s (albo w swojej strefie 5 s bez strzalu) - galopem (MarchToContact: szyk w powrocie 30 s bez capu); K - strzelec poza oslona (g >= 20) zbliza sie / trafia z 40 m
+(albo z 30 m przy g >= 10) -> caly G na niego (przeciecie, w 30 m prosto), do g < 10 / 40 s / szybszy 8 s; R - KAZDY konny AI trafiony (ShieldsUp.RiderHit ->
+HorsePursuit.OnRiderShotAny, nie tylko szyk konnicy) z 40 m poza oslona: on + 2 najblizsi od razu. Strona przegrywajaca: F/K bez przycinania Trim do L1.
+MarchToContact.Eval konnica: galop takze, gdy aktywny konny strzelec w CavalryGallopDistance (HorsePursuit.ShooterGap344).
+(B) Pendulum333.cs (klucz FormationOrderArbiter zamiast FormationsSteadyBeforeContact): bez sprawdzenia watku, caly stan pod lockiem, migawka szykow gracza z glownego
+watku, linie / potkniecia z watku AI do kolejki, siatka przez SetVec2MT / GetNavMeshMT w watku AI; nowe: nastepca (ProtectFlank / ScreenedSkirmish) tylko po zmianie
+punktu prowadzacego (_mainFormation), histereza zachowan 6 s (zmiana taktyki / szarza / odwrot od razu), blokada przeciwnego rozkazu 10 s po przyjeciu, prefiks
+Formation.SetArrangementOrder (Line <-> Loose najwyzej co 20 s, powrot dopiero po 20 s bez ostrzalu; kontakt 5 s, szarza konnicy od razu; ShieldWall / Square / CloseRanks
+bez zmian). Reguly 0-5 z 333f zostaja.
+Linia "AI bitwy (344): misja ..." (zastepuje "AI bitwy (333): misja" - grupa ai333 daje teraz INFO), linie "AI bitwy (344) front / kontra / powrot" (do 16 na bitwe).
+Autotest: NoFastForward344.cs - tylko LogGate.Mode 1 i plik CrashScribe/armoury-bez-przewijania344.flag: prefiks Mission.SetFastForwardingFromUI odrzuca wlaczenie
+przewijania (CrashScribe-at wlacza je co 3 s) - bieg w watku AI jak u Jeffa bez nowej DLL CrashScribe; -BattleSec podniesc w skrypcie (sekundy rzeczywiste).
+Harasser testu (HorsePursuit.BaitTest333.cs): pogon 40 m (Rw) za konnica zamiast 55 m. sprawdz_logi: grupa ai344 (A344-0..7, B344-1..5, X344, A344-T + synteza A344-S),
+m204jazda J204-3 przyjmuje linie 344 front / kontra / powrot jak dawne zerwanie 333.
+**Ryzyko / co sprawdzic:** (1) prefiks w watku AI po raz pierwszy w grze Jeffa (dotad martwy) - koszt jak 333 w autotestach (raz na rozkaz), lock krotki; sprawdzic
+A344-0 (watek AI > 0) w biegu BEZ przewijania, czas klatki, brak zawieszen (lock + GetNavMeshMT pod blokada fizyki). (2) SetArrangementOrder ma tez prefiks CloseRanks
+310 - 344 dziala tylko przy Line <-> Loose, CloseRanks tylko z ShieldWall; bez kolizji w kodzie, do sprawdzenia w biegu. (3) K jest agresywniejsza niz 204: caly G na
+samotnego strzelca poza oslona - sprawdzic straty jazdy, A344-3. (4) Klucze nowe (domyslnie TAK) - stare wpisy w Armoury.json Jeffa zostaja martwe (obie stare byly TAK).
+(5) R pomija szyk ProtectFlank przy jezdzie wroga (283 CavAllowed) - jak dotad. (6) Wariant testu z eskorta i z lekka konnica (projekt rozdz. 7, test 1b/2) NIE dodany - tylko
+zmiana dystansu pogoni harassera; testy po zamknieciu gry przez Jeffa: bieg z przewijaniem i bez (flaga), regresja 333/204/283/335 (ai204, wodz335, m204jazda).
+**Status:** DO SPRAWDZENIA - zbudowane (Release kod 0), NIE testowane, NIE WGRANE.
+
 ## 343r - recenzja 343: te same dane na obu mapach (NIE WGRANE, bez autotestu; build kontrolny Armoury.dll cd6629cf)
 **Problem (recenzja):** pliki 343 mialy "# scene_xml_crc: 0" i jeden terrain_size 8.1.2 - nowa DLL (i kazda pozniejsza paczka zbudowana na 343) na STAREJ mapie 8.1.8
 (DLL wgrana przed ROT-Map 8.1.2, Jeff zostaje przy kroku A albo cofniecie ROT-Map z kopii) wylaczylaby po cichu drogi +15%, drogi boczne, wioski, ksiege wiosek i zajazdy.

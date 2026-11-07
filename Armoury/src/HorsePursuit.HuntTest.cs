@@ -92,7 +92,7 @@ namespace Armoury
             _tWhy = "czynny";
             _tSeq++;
             _tScen = _rKey ? (_tSeq - 1) % 3 : 0;   // 283: A, B, C po kolei (bez klucza 283 - zawsze A, jak 204)
-            _bOn = _tScen == 0 && c.RidersRunDownShooters && c.RidersBreakOffNearShootersArmy;   // 333t: A = przyneta jak u Jeffa (HorsePursuit.BaitTest333.cs)
+            _bOn = _tScen == 0 && c.RidersRunDownShooters && c.CavalryFaceShooterAtArmyEdge;   // 333t: A = przyneta jak u Jeffa (HorsePursuit.BaitTest333.cs)
         }
 
         private static void HuntTestClear()

@@ -108,7 +108,7 @@ namespace Armoury
             public bool Z333;              // 333: brama strefy armii strzelca dziala (konny i pieszy strzelec, klucz; bez nekajacego wrecz 283)
             public Formation ZEx;          // 333: szyk samego strzelca (poza strefa)
             public float Gap333 = float.MaxValue;   // 333: odleglosc strzelca od strefy swojej armii (ostatni pass)
-            public int EpBreaks;           // 333: zerwan w biezacym poscigu calosci (oczekiwane najwyzej 1)
+            public readonly St344 Q = new St344();   // 344: stan grupy wobec strzelca (HorsePursuit.Front344.cs)
         }
 
         private sealed class Hunter
@@ -132,7 +132,8 @@ namespace Armoury
             public int CovBlind;                  // 311a: kontroli z rzedu bez linii u stojacego obchodzacego
             public float Leash;                   // 311a: smycz szturmujacego (0 - InfRearm jak R2)
             public float CovAt;                   // 311a (recenzja 4): chwila wyslania obchodzacego na punkt (limit drogi CovMoveMax)
-            public bool Guard;                    // 333: tylna straz (stan ZERWANY - HorsePursuit.Bait333.cs)
+            public byte Z4;                       // 344: rola wobec strzelca - ZFrontRole (stoi przodem), ZKontraRole (kontra calej grupy) - HorsePursuit.Front344.cs
+            public Vec2 FrontAt = Vec2.Invalid;   // 344: punkt frontu (pozycja przy wejsciu w F, przycieta przed strefa)
         }
 
         private struct FI
@@ -588,7 +589,7 @@ namespace Armoury
                 _rHaltKey = _rKey && c.ArmyHaltsForHarassers;
                 _rMarchOn = _rKey && c.ArmyMarchesPastHarassers;             // 291
                 CoverKeys(c);                                                // 311a
-                _zOn = _hKey && c.RidersBreakOffNearShootersArmy;           // 333: poscig z glowa (strefa armii strzelca)
+                _zOn = _hKey && c.CavalryFaceShooterAtArmyEdge;             // 344: konnica z glowa wobec strzelca (strefa armii strzelca 333, stany F / K / PS / R)
                 Volatile.Write(ref _rLive, _rKey ? 1 : 0);                   // OnHit: kolejka wrecz tylko po rozstawieniu (Tick wola pass po IsDeploymentFinished)
                 _hQPass = 0;
                 _hQChk = 0;
@@ -603,6 +604,7 @@ namespace Armoury
                 HuntersPass(m, now);
                 HuntersMelee(m, now);
                 ThreatsRun(m, now);
+                try { ShooterPosPass(now); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Strzelcy344", e); }   // 344: strzelcy dla MarchToContact, A344-6
                 try { HaltPass(m, now); } catch (Exception e) { RStumble("HorsePursuit.NekaniePostoj", e); }   // 283: R4/R5 zwolnienia (takze przy kluczu NIE)
                 HuntTrack(m, now);
                 try { HuntTestStep(m, now, true); } catch (Exception e) { HStumble("HorsePursuit.JazdaTest", e); }
@@ -921,7 +923,8 @@ namespace Armoury
             if (losing || t.Group)
             {
                 if (t.Level > 1) { t.Level = 1; _hLower++; }
-                if (t.Melee > 0) Trim(t, PerVictim + down, now);   // nadwyzka ponad oddzial L1 wraca (takze jezdzcy L2/L3 sprzed wejscia w szyk)
+                // 344: front i kontra to obrona (strona przegrywajaca tez sie broni) - bez przycinania do oddzialu L1
+                if (t.Melee > 0 && !(losing && !t.Group && (t.Q.St == SF || t.Q.St == SK))) Trim(t, PerVictim + down, now);   // nadwyzka ponad oddzial L1 wraca (takze jezdzcy L2/L3 sprzed wejscia w szyk)
             }
             int prev = t.Level;
             if (lvl > t.Level)
@@ -932,13 +935,13 @@ namespace Armoury
             if (!_hKey && !rx) return;   // klucz NIE: tylko wykrycia (bez sterowania); 283 bez 204 - bez jazdy, reszta macierzy dziala
             int sent = 0, sentCharge = 0;
             HFormsTxt.Length = 0;
-            // 333: strefa armii strzelca - zerwanie calosci, pamiec przynety, tylna straz (HorsePursuit.Bait333.cs)
+            // 344: konnica z glowa wobec strzelca - poscig / front / kontra / powrot szykiem (HorsePursuit.Front344.cs; strefa armii strzelca 333)
             int bm = BFull;
-            try { bm = BaitGate(m, t, sp, now, mounted, rx); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Brama333", e); bm = BFull; }
+            try { bm = BaitGate(m, t, sp, now, rx, losing); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Brama344", e); bm = BFull; }
             if (!_hKey) { }
-            else if (bm == BNone) { }
-            else if (bm == BGuard) GuardTake(m, t, fl, sp, now, ref sent, ref sentCharge);
-            else if (t.Level <= 1 || bm == BLight)   // 333 BLight: najwyzej oddzial L1 (przy armii strzelca / po 2. zerwaniu)
+            else if (bm == BNone || bm == BFront) { }
+            else if (bm == BKontra) KontraTake(m, t, fl, now, ref sent, ref sentCharge);
+            else if (t.Level <= 1 || bm == BLight)   // BLight: najwyzej oddzial L1 (przy armii strzelca, szybszy strzelec, pamiec przynety)
             {
                 // najblizszy szyk konnicy AI bez szarzy (szarza wodza zostaje), w smyczy od strzelca
                 int best = -1;
@@ -1250,7 +1253,7 @@ namespace Armoury
         private static Hunter StartHunter(Threat t, Agent a, FI fi, byte role, float range, float now)
         {
             CleanShot.Yield(a);   // 310: nasz wpis czystego strzalu zdjety (wstrzymanie ognia tez) - cel ustawia 204/283 ponizej
-            var h = new Hunter { A = a, F = fi.F, T = t, Role = role, Start = now, Range = range };
+            var h = new Hunter { A = a, F = fi.F, T = t, Role = role, Start = now, Range = range, Z4 = role == RoleRanged || role == RoleFoot ? ZNone : _z4Next };   // 344: rola wobec strzelca
             Hunters[a] = h;
             HList.Add(h);
             t.Hs.Add(h);
@@ -1366,6 +1369,7 @@ namespace Armoury
         {
             // 311a: epizod oslony zamkniety bez zwalniania - ludzi (takze 311a) zwalnia petla nizej, wynik 283 z EndEp
             if (t.Cov != null) CoverEnd(t, outcome == HDownRiders || outcome == HDownOthers ? CeDown : outcome == HEnded ? CeEnded : CeOther, now, false);
+            try { Front344End(t, outcome == HDownRiders || outcome == HDownOthers); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Front344", e); }   // 344: wynik kontry
             if (t.Active) EndEp(t, outcome, now);
             for (int i = t.Hs.Count - 1; i >= 0; i--)
             {
@@ -1507,6 +1511,19 @@ namespace Armoury
             float d = a.Position.AsVec2.Distance(sp);
             if (d <= ShieldsUp.RaiseNear && t.Active && t.FirstContact < 0f) Contact(t, a, d, now);
             Vec2 p = sp;
+            // 344 F: jezdziec stoi na punkcie frontu przodem do strzelca (bez zawracania tylem); cel dalej strzelec (cios, gdy podjedzie)
+            if (h.Z4 == ZFrontRole && h.FrontAt.IsValid && h.Role != RoleFoot)
+            {
+                var wf = s.GetWorldPosition();
+                if (!wf.IsValid) return;
+                wf.SetVec2(h.FrontAt);
+                if (wf.GetNavMesh() == UIntPtr.Zero) { wf = a.GetWorldPosition(); h.FrontAt = a.Position.AsVec2; }
+                Vec2 fd = sp - h.FrontAt;
+                float rot = fd.Length > 0.5f ? fd.RotationInRadians : a.LookDirection.AsVec2.RotationInRadians;
+                a.SetScriptedPositionAndDirection(ref wf, rot, false, Agent.AIScriptedFrameFlags.None);
+                _hSets++;
+                return;
+            }
             if (h.Role == RoleFoot) { if (h.Cov >= CvRushL) p = RushPoint(h, sp, d); }   // 283: piechota prosto na nekajacego (smycz 50 m trzyma ja przy szyku); 311a: szturm z boku, w 12 m prosto
             else if (t.Screen && t.ScreenC.IsValid)
             {
@@ -1516,7 +1533,7 @@ namespace Armoury
             }
             else if (d > HuntScreen)
             {
-                if (h.Role == RoleIntercept)
+                if (h.Role == RoleIntercept || h.Z4 == ZKontraRole)   // 344 K: przeciecie, bez odciecia (w Rb prosto - galaz wyzej)
                 {
                     var sm = s.MountAgent ?? s;
                     Vec2 vel = sm.Velocity.AsVec2;

@@ -638,7 +638,12 @@ namespace Armoury
 
             if (kind == KCav)
             {
-                if (gap <= _gallop)
+                // 344: konnica liczy odleglosc takze do aktywnego konnego strzelca, ktory strzela w jej strone (nie tylko do szykow jego armii - klus 128 pod jego
+                // strzalami), a szyk w powrocie szykiem 344 (PS) jedzie bez capu marszu (galop - bez klusa tylem pod ostrzalem)
+                float sg = float.MaxValue;
+                bool ret = false;
+                try { sg = HorsePursuit.ShooterGap344(f); ret = HorsePursuit.Return344(f, now); } catch { sg = float.MaxValue; ret = false; }
+                if (gap <= _gallop || sg <= _gallop || ret)
                 {
                     if (marching) { _tGallop++; _tSumGallopD += gap; _tNGallopD++; }
                     Release(idx, now);

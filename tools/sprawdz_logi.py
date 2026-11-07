@@ -70745,6 +70745,11 @@ def m204jazda_collect(logp):
                 if mz:
                     D["z333"].append(mz.group(1))
                 continue
+            if s.startswith(("AI bitwy (344) front: ", "AI bitwy (344) kontra: ", "AI bitwy (344) powrot: ")):   # 344: front / kontra / powrot = poprawny wynik (jak zerwanie 333)
+                mz = re.match(r"AI bitwy \(344\) \w+: strzelec (\S+)", s)
+                if mz:
+                    D["z333"].append(mz.group(1))
+                continue
             if not s.startswith("Jazda na strzelca (204)"):
                 continue
             for key, dst in (("line", "lines"), ("start", "starts"), ("contact1", "contacts"), ("end1", "ends"), ("tstart", "tstarts"), ("tnone", "tnone"), ("tend", "tends")):
@@ -97671,6 +97676,336 @@ def main(argv):
             rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
             return armie342_main(rest[0] if rest else None)
     return _armie342_main_prev(argv)
+
+
+# ------------------------------------------------------------ paczka 344: grupa ai344 - AI bitwy: konnica z glowa wobec konnego strzelca (HorsePursuit.Front344.cs)
+#  i jeden rozkaz szyku (Pendulum333.cs - arbiter 344). Linia raz na bitwe polowa "AI bitwy (344): misja ..." (zastepuje linie 333 - grupa ai333 daje teraz INFO).
+#  A344-0 wywolania arbitra w watku AI > 0 w bitwie bez przewijania (blad 333: prefiks tylko w glownym watku - w grze Jeffa 0); A344-1 trafienia w plecy jezdzcow
+#  grupy w front / powrocie na wejscie w F (mediana <= 1, najwiecej <= 2); A344-2 kontra na strzelca poza oslona (odpowiedzi 100% zdarzen, mediana reakcji <= 1.5 s);
+#  A344-3 wynik kontry dobry >= 80%; A344-4 trafienia bez odpowiedzi = 0; A344-5 front przodem do strzelca >= 80% probek; A344-6 klus przy strzelcu 0 s;
+#  A344-7 pogon bez szans ponad 8 s = 0; B344-1 nawroty srodka ciezkosci <= 0.25 / szyko-minute, w tyl <= 0.10 - KAZDA bitwa osobno (od 2 szyko-minut);
+#  B344-2 rozkazy wedlug zrodla (INFO + trzymane > 0); B344-3 powroty Line / Loose w 20 s = 0; B344-4 zmiany planu / migniecia (INFO); B344-5 ruchy nastepcow bez
+#  zmiany prowadzacego = 0; X344 potkniecia 0, ERROR miejsc 344 0, latki TAK; A344-T harasser testu (linia 333t): po pogoni w plecy kontra konnicy.
+#   python -I tools/sprawdz_logi.py --grupa ai344 <Armoury-*.log>
+A344_P = "AI bitwy (344): misja "
+A344_RX = {
+    "head": re.compile(r"AI bitwy \(344\): misja (.+?) \| konnica wobec strzelca klucz (TAK|NIE) \(jazda 204 (TAK|NIE);"),
+    "chase": re.compile(r"\| poscigi (\d+) \(L1 przy szybszym strzelcu (\d+), pogonie bez szans ponad \d+ s (\d+)\)"),
+    "front": re.compile(r"\| front wejsc (\d+) \(jezdzcow (\d+); krawedz strefy (\d+), szybszy strzelec (\d+), strona przegrywa (\d+)\), trafienia w plecy w front/powrot "
+                        r"(\d+) \(na wejscie mediana (\S+), najwiecej (\d+)\), wszystkie w plecy (\d+), przodem do strzelca (\d+)/(\d+) probek"),
+    "kontra": re.compile(r"\| kontry (\d+) \(calego G (\d+), odruchow (\d+), jezdzcow odruchu (\d+), jezdzcow kontry (\d+)\), zdarzen kontry (\d+) \(odpowiedzi (\d+), "
+                         r"mediana reakcji (\S+) s, bez odpowiedzi (\d+), bez przewagi (\d+)\), wynik kontry dobry (\d+)/(\d+)"),
+    "unans": re.compile(r"\| trafienia bez odpowiedzi (\d+) \(trafien z Rw poza oslona (\d+)\)"),
+    "ps": re.compile(r"\| powroty szykiem (\d+) \(kontra z powrotu (\d+), front z powrotu (\d+)\), klus przy strzelcu (\d+) s"),
+    "keyB": re.compile(r"\| szyki: klucz (TAK|NIE) \(latka ruchu ([^,]+), latka ustawienia ([^;]+);"),
+    "calls": re.compile(r"\| wywolania arbitra glowny watek (\d+) / watek AI (\d+), ustawienia glowny (\d+) / AI (\d+), czas misji z przewijaniem (\d+) s / bez (\d+) s"),
+    "rev": re.compile(r"\| szyko-minut przed kontaktem ([\d.]+), nawroty srodka ciezkosci (\d+) \(w tyl (\d+)\), mediany (\d+) \(w tyl (\d+)\)"),
+    "src": re.compile(r"\| rozkazy Move przyjete/trzymane/obciete wedlug zrodla (.+?) \| ustawienie Line/Loose"),
+    "arr": re.compile(r"\| ustawienie Line/Loose: wywolan (\d+), przyjete (\d+), zablokowane (\d+), powroty pod ostrzalem zablokowane (\d+), w kontakcie zablokowane (\d+), "
+                      r"szarza konnicy (\d+), zmian ustawienia przed kontaktem (\d+), powroty w \d+ s (\d+)"),
+    "plan": re.compile(r"\| zachowania: zmian planu (\d+), migniec (\d+), zmian taktyki (\d+)"),
+    "succ": re.compile(r"\| nastepcy: trzymani (\d+), ruszeni za prowadzacym (\d+), ruchy bez zmiany prowadzacego (\d+)"),
+    "blk": re.compile(r"\| blokada przeciwnego rozkazu (\d+)"),
+    "nff": re.compile(r"\| test bez przewijania: odrzucone wlaczenia (\d+)"),
+    "stum": re.compile(r"\| potkniecia 344 (\d+)\.\s*$"),
+}
+A344_KEYS = {
+    "head": ["kind", "keyA", "key204"],
+    "chase": ["chase", "l1fast", "long"],
+    "front": ["fEnt", "fRiders", "fEdge", "fFast", "fLose", "backF", "backMed", "backMax", "backAll", "faceOk", "faceN"],
+    "kontra": ["k", "kFull", "r", "rRiders", "kRiders", "ev", "ans", "react", "miss", "noAdv", "kOk", "kEnd"],
+    "unans": ["unans", "pend"],
+    "ps": ["ps", "psK", "psF", "trot"],
+    "keyB": ["keyB", "patch", "patchArr"],
+    "calls": ["callMain", "callAi", "arrMain", "arrAi", "ffSec", "rtSec"],
+    "rev": ["minutes", "revA", "revABack", "rev", "revBack"],
+    "src": ["src"],
+    "arr": ["arrSeen", "arrAcc", "arrBlk", "arrBack", "arrBlkC", "arrCav", "arrChg", "arrRet"],
+    "plan": ["plan", "blink", "tac"],
+    "succ": ["succKeep", "succAcc", "succNo"],
+    "blk": ["blk"],
+    "nff": ["nff"],
+    "stum": ["stum"],
+}
+A344_TXT = {"kind", "keyA", "key204", "keyB", "patch", "patchArr", "src", "backMed", "react"}
+A344_ERR = re.compile(r"ERROR in (Pendulum333\.|NoFastForward344|HorsePursuit\.(Brama344|Strefa333|Strzelcy344|Front344|Odruch344|Powrot344|Linia333|Wahadlo333))")
+
+
+def ai344_collect(logp):
+    D = {"lines": [], "bad": 0, "badWhy": [], "err": 0, "bait": [], "baitBad": 0}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if "AI bitwy (3" not in line and "ERROR in" not in line:
+                continue
+            if A344_ERR.search(line):
+                D["err"] += 1
+                continue
+            if "AI bitwy (333) TEST przyneta koniec: " in line:
+                mb = A333_BAIT.search(line.rstrip())
+                if not mb:
+                    D["baitBad"] += 1
+                else:
+                    D["bait"].append({k: (v if k in ("who", "why", "ph", "army") else float(v) if k == "sec" else int(v)) for k, v in zip(A333_BK, mb.groups())})
+                continue
+            if A344_P not in line:
+                continue
+            r, miss = {}, []
+            for seg, rx in A344_RX.items():
+                m = rx.search(line)
+                if not m:
+                    miss.append(seg)
+                    continue
+                for k, v in zip(A344_KEYS[seg], m.groups()):
+                    if k in A344_TXT:
+                        r[k] = v.strip()
+                    elif k == "minutes":
+                        r[k] = float(v)
+                    else:
+                        r[k] = int(v)
+            if miss:
+                D["bad"] += 1
+                D["badWhy"].append(",".join(miss))
+                continue
+            D["lines"].append(r)
+    return D
+
+
+def ai344_med(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def ai344_rows(rep, D):
+    L = D["lines"]
+    if not L:
+        rep.add("A344-0: linia 'AI bitwy (344): misja'", f"brak linii (nierozpoznanych {D['bad']}{' - ' + D['badWhy'][0] if D['badWhy'] else ''})",
+                "INFO (stary DLL albo bez bitwy polowej)", None if D["bad"] == 0 else False)
+        rep.add("X344: potkniecia, ERROR, latki", f"ERROR {D['err']}", "0", D["err"] == 0)
+        ai344_bait_rows(rep, D)
+        return
+    onB = [r for r in L if r["keyB"] == "TAK"]
+    rt = [r for r in onB if r["rtSec"] >= 30]
+    calls_ai = sum(r["callAi"] for r in onB)
+    calls_all = sum(r["callMain"] + r["callAi"] for r in onB)
+    val0 = (f"bitew {len(L)}, nierozpoznanych {D['bad']}{' (' + D['badWhy'][0] + ')' if D['badWhy'] else ''}; wywolania arbitra glowny {sum(r['callMain'] for r in onB)} / "
+            f"watek AI {calls_ai}; bitew bez przewijania (>= 30 s) {len(rt)}, odrzuconych wlaczen przewijania {sum(r['nff'] for r in L)}")
+    if D["bad"]:
+        rep.add("A344-0: linia i watek AI arbitra", val0, "0 nierozpoznanych; watek AI > 0 w bitwie bez przewijania", False)
+    elif not onB:
+        rep.add("A344-0: linia i watek AI arbitra", val0, "INFO (klucz FormationOrderArbiter NIE)", None)
+    elif not rt:
+        rep.add("A344-0: linia i watek AI arbitra", val0, "INFO (bieg z przewijaniem - watek AI nie sprawdzony; warunek wgrania: bieg bez przewijania)",
+                None if calls_all > 0 else False)
+    else:
+        rep.add("A344-0: linia i watek AI arbitra", val0, "watek AI > 0 w kazdej bitwie bez przewijania", all(r["callAi"] > 0 for r in rt))
+    on = [r for r in L if r["keyA"] == "TAK" and r["key204"] == "TAK"]
+    fe = sum(r["fEnt"] for r in on)
+    meds = [ai344_med(r["backMed"]) for r in on if r["fEnt"] > 0 and ai344_med(r["backMed"]) is not None]
+    bmax = max([r["backMax"] for r in on] + [0])
+    if fe == 0:
+        rep.add("A344-1: plecy przy froncie", f"wejsc w front 0 (trafien w plecy wszystkich {sum(r['backAll'] for r in on)})", "INFO (strzelec nie doprowadzil konnicy do armii)", None)
+    else:
+        mm = max(meds) if meds else 0.0
+        rep.add("A344-1: plecy przy froncie", f"wejsc w front {fe} (jezdzcow {sum(r['fRiders'] for r in on)}; krawedz {sum(r['fEdge'] for r in on)}, szybszy "
+                f"{sum(r['fFast'] for r in on)}), trafien w plecy w front/powrot {sum(r['backF'] for r in on)}, mediana na wejscie najwiecej {mm:g}, najwiecej {bmax}",
+                "mediana <= 1, najwiecej <= 2 na wejscie", mm <= 1 and bmax <= 2)
+    ev, ans = sum(r["ev"] for r in on), sum(r["ans"] for r in on)
+    reacts = [ai344_med(r["react"]) for r in on if r["ans"] > 0 and ai344_med(r["react"]) is not None]
+    if ev == 0:
+        rep.add("A344-2: kontra na strzelca poza oslona", f"zdarzen 0 (kontr {sum(r['k'] for r in on)}, odruchow {sum(r['r'] for r in on)}, bez przewagi "
+                f"{sum(r['noAdv'] for r in on)})", "INFO (strzelec nie wyszedl za oslone)", None)
+    else:
+        rm = max(reacts) if reacts else 99.0
+        rep.add("A344-2: kontra na strzelca poza oslona", f"zdarzen {ev}, odpowiedzi {ans} ({100.0 * ans / ev:.0f}%), mediana reakcji najwiecej {rm:g} s, kontr "
+                f"{sum(r['k'] for r in on)} (calego G {sum(r['kFull'] for r in on)}, odruchow {sum(r['r'] for r in on)}), bez przewagi {sum(r['noAdv'] for r in on)}",
+                "100%, mediana <= 1.5 s", ans >= ev and rm <= 1.5)
+    ke, ko = sum(r["kEnd"] for r in on), sum(r["kOk"] for r in on)
+    rep.add("A344-3: wynik kontry", f"dobry {ko}/{ke}" + (f" ({100.0 * ko / ke:.0f}%)" if ke else ""), ">= 80% (kontakt, strzelec pod swoja armia albo padl)",
+            (ko >= 0.8 * ke) if ke else None)
+    un, pe = sum(r["unans"] for r in on), sum(r["pend"] for r in on)
+    rep.add("A344-4: trafienia bez odpowiedzi", f"{un} (trafien z Rw poza oslona {pe})", "0", un == 0)
+    fo, fn = sum(r["faceOk"] for r in on), sum(r["faceN"] for r in on)
+    rep.add("A344-5: front przodem do strzelca", f"{fo}/{fn} probek" + (f" ({100.0 * fo / fn:.0f}%)" if fn else ""), ">= 80%", (fo >= 0.8 * fn) if fn else None)
+    tr = sum(r["trot"] for r in on)
+    rep.add("A344-6: klus przy strzelcu", f"{tr} s (powrotow szykiem {sum(r['ps'] for r in on)}, kontra z powrotu {sum(r['psK'] for r in on)}, front z powrotu "
+            f"{sum(r['psF'] for r in on)})", "0 s", tr == 0 if on else None)
+    lg = sum(r["long"] for r in on)
+    rep.add("A344-7: pogon bez szans ponad 8 s", f"{lg} (poscigow {sum(r['chase'] for r in on)}, L1 przy szybszym {sum(r['l1fast'] for r in on)})", "0", lg == 0 if on else None)
+    # B344-1: kazda bitwa osobno
+    big = [r for r in onB if r["minutes"] >= 2.0]
+    if not big:
+        rep.add("B344-1: nawroty szykow przed kontaktem (kazda bitwa)", f"bitew z >= 2 szyko-minutami {len(big)} (razem {sum(r['minutes'] for r in onB):.1f})",
+                "INFO (< 2 szyko-minut)", None)
+    else:
+        worst = max(big, key=lambda r: r["revA"] / r["minutes"])
+        worstb = max(big, key=lambda r: r["revABack"] / r["minutes"])
+        a, b = worst["revA"] / worst["minutes"], worstb["revABack"] / worstb["minutes"]
+        rep.add("B344-1: nawroty szykow przed kontaktem (kazda bitwa)", f"bitew {len(big)}; najgorsza {worst['revA']} na {worst['minutes']:.1f} szyko-min = {a:.2f}/min, "
+                f"w tyl najgorsza {b:.2f}/min (mediana razem {sum(r['rev'] for r in big)})", "<= 0.25/min, w tyl <= 0.10/min w kazdej bitwie", a <= 0.25 and b <= 0.10)
+    acc = kept = clip = 0
+    for r in onB:
+        for part in r["src"].split(", "):
+            m = re.search(r"(\d+)/(\d+)/(\d+)$", part)
+            if m:
+                acc += int(m.group(1)); kept += int(m.group(2)); clip += int(m.group(3))
+    allm = sum(r["minutes"] for r in onB)
+    if acc + kept + clip == 0:
+        rep.add("B344-2: rozkazy wedlug zrodla", "brak rozkazow Move przed kontaktem", "INFO", None)
+    else:
+        rep.add("B344-2: rozkazy wedlug zrodla", f"przyjete {acc}, trzymane {kept}, obciete {clip}" + (f" ({(acc + kept + clip) / allm:.1f}/szyko-min)" if allm > 0 else "")
+                + f"; np. {onB[0]['src'][:160]}", "trzymane > 0", kept > 0)
+    ret = sum(r["arrRet"] for r in onB)
+    chg = sum(r["arrChg"] for r in onB)
+    rep.add("B344-3: ustawienie Line/Loose", f"powroty w 20 s {ret}; zmian przed kontaktem {chg}" + (f" ({chg / allm:.2f}/szyko-min)" if allm > 0 else "")
+            + f", przyjete {sum(r['arrAcc'] for r in onB)}, zablokowane {sum(r['arrBlk'] for r in onB)}, powroty pod ostrzalem {sum(r['arrBack'] for r in onB)}, "
+            f"szarza konnicy {sum(r['arrCav'] for r in onB)}", "powroty w 20 s = 0", ret == 0 if onB else None)
+    rep.add("B344-4: zachowania", f"zmian planu {sum(r['plan'] for r in onB)}, migniec {sum(r['blink'] for r in onB)}, zmian taktyki {sum(r['tac'] for r in onB)}, "
+            f"blokada przeciwnego rozkazu {sum(r['blk'] for r in onB)}", "INFO", None)
+    sn = sum(r["succNo"] for r in onB)
+    rep.add("B344-5: nastepcy", f"ruchy bez zmiany prowadzacego {sn}, trzymani {sum(r['succKeep'] for r in onB)}, ruszeni za prowadzacym {sum(r['succAcc'] for r in onB)}",
+            "0", sn == 0 if onB else None)
+    st = sum(r["stum"] for r in L)
+    badp = [r["patch"] + " / " + r["patchArr"] for r in onB if r["patch"] != "TAK" or r["patchArr"] != "TAK"]
+    rep.add("X344: potkniecia, ERROR, latki", f"potkniecia {st}, ERROR {D['err']}, latki nie TAK {len(badp)}" + (f" [{badp[0]}]" if badp else ""), "0, 0, TAK",
+            st == 0 and D["err"] == 0 and not badp)
+    ai344_bait_rows(rep, D)
+
+
+def ai344_bait_rows(rep, D):
+    """A344-T: harasser testu (linia 333t BaitEndLine): po ucieczce pod armie pogon 40 m za konnica i strzaly w plecy - oczekiwana kontra konnicy (nawrot po pogoni)."""
+    B = D.get("bait", [])
+    if not B:
+        rep.add("A344-T: harasser testu", f"brak linii 'TEST przyneta koniec' (nierozpoznanych {D.get('baitBad', 0)})", "INFO (bieg bez -Harasser albo gra Jeffa)",
+                None if D.get("baitBad", 0) == 0 else False)
+        return
+    pog = [b for b in B if b["sh3"] > 0]
+    val = (f"prob {len(B)}, strzalow {sum(b['shots'] for b in B)} (w plecy {sum(b['sh3'] for b in B)}), konnica ruszyla {sum(b['chase'] for b in B)}, "
+           f"kontr po pogoni {sum(b['turn'] for b in B)} (najwiecej jezdzcow naraz {max(b['turnMax'] for b in B)}), wynik {', '.join(b['why'] for b in B[:3])}")
+    if not pog:
+        rep.add("A344-T: harasser testu", val, "INFO (harasser nie doszedl do pogoni)", None if D.get("baitBad", 0) == 0 else False)
+        return
+    rep.add("A344-T: harasser testu", val, "po pogoni w plecy kontra konnicy (nawrot >= 1 w kazdej probie z pogonia)", all(b["turn"] >= 1 for b in pog))
+
+
+def ai344_line(fEnt=2, backF=1, backMed="0", backMax=1, faceOk=40, faceN=44, k=2, kFull=1, r=1, ev=2, ans=2, react="0.6", kOk=2, kEnd=2, unans=0, pend=3,
+               trot=0, long=0, keyB="TAK", patch="TAK", patchArr="TAK", callAi=120, rtSec=200, ffSec=0, mins="6.0", revA=1, revABack=0, src="BehaviorHoldHighGround 5/30/2",
+               arrRet=0, succNo=0, stum=0, keyA="TAK"):
+    return (f"AI bitwy (344): misja bitwa polowa | konnica wobec strzelca klucz {keyA} (jazda 204 TAK; strefa armii strzelca: piechota +50 m, lucznicy +0.8 zasiegu 60-120 m, "
+            f"konnica +60 m; front < 10 m, start >= 30 m, oslona 20 m; Rs 60 m, Rw 40 m, Rb 30 m; pogon bez zblizania 8 s, kontra do 40 s, powrot 30 s bez capu; "
+            f"przewaga 2 x (1 + eskorta)) | poscigi 3 (L1 przy szybszym strzelcu 1, pogonie bez szans ponad 8 s {long}) | front wejsc {fEnt} (jezdzcow 12; krawedz "
+            f"strefy 1, szybszy strzelec 1, strona przegrywa 0), trafienia w plecy w front/powrot {backF} (na wejscie mediana {backMed}, najwiecej {backMax}), wszystkie w "
+            f"plecy 2, przodem do strzelca {faceOk}/{faceN} probek | kontry {k} (calego G {kFull}, odruchow {r}, jezdzcow odruchu 3, jezdzcow kontry 9), zdarzen kontry "
+            f"{ev} (odpowiedzi {ans}, mediana reakcji {react} s, bez odpowiedzi 0, bez przewagi 0), wynik kontry dobry {kOk}/{kEnd} | trafienia bez odpowiedzi {unans} "
+            f"(trafien z Rw poza oslona {pend}) | powroty szykiem 1 (kontra z powrotu 1, front z powrotu 0), klus przy strzelcu {trot} s | strzelcy przy swojej armii "
+            f"bez poscigu 1, lekkie odpedzenia L1 0, krawedzi strefy na strzelca najwiecej 1 (razem 1), petla przynety 0 | jezdzcy zawroceni w strefie 0, nie wyslani "
+            f"przy strefie 2, punktow przycietych do strefy 30, szykow w strefie najwiecej 5 | szyki: klucz {keyB} (latka ruchu {patch}, latka ustawienia {patchArr}; "
+            f"histereza zachowan 6 s, blokada przeciwnego rozkazu 10 s, ustawienie Line/Loose co 20 s, powrot po 20 s bez ostrzalu) | wywolania arbitra glowny watek 4 "
+            f"/ watek AI {callAi}, ustawienia glowny 0 / AI 6, czas misji z przewijaniem {ffSec} s / bez {rtSec} s | szyko-minut przed kontaktem {mins}, nawroty srodka "
+            f"ciezkosci {revA} (w tyl {revABack}), mediany 3 (w tyl 1) | rozkazy Move przyjete/trzymane/obciete wedlug zrodla {src} | ustawienie Line/Loose: wywolan 12, "
+            f"przyjete 2, zablokowane 9, powroty pod ostrzalem zablokowane 1, w kontakcie zablokowane 0, szarza konnicy 0, zmian ustawienia przed kontaktem 2, "
+            f"powroty w 20 s {arrRet} | zachowania: zmian planu 2, migniec 5, zmian taktyki 0 | nastepcy: trzymani 40, ruszeni za prowadzacym 3, ruchy bez zmiany "
+            f"prowadzacego {succNo} | blokada przeciwnego rozkazu 4 | 333: wahadlo: klucz TAK (latka TAK; przed kontaktem > 75 m) | szykow AI 9 | test bez "
+            f"przewijania: odrzucone wlaczenia 3 | potkniecia 344 {stum}.")
+
+
+def ai344_synth():
+    """A344-S: dobry bieg i po jednym zlym przypadku na kazdy prog. None = OK."""
+    import tempfile
+    import shutil
+    runs = {
+        "good": [ai344_line(), ai333_bait_line(turn=2)],
+        "ff": [ai344_line(callAi=0, rtSec=0, ffSec=180)],
+        "noai": [ai344_line(callAi=0)],
+        "back": [ai344_line(backMed="2", backMax=4)],
+        "slow": [ai344_line(react="2.5")],
+        "noans": [ai344_line(ans=1)],
+        "kbad": [ai344_line(kOk=1, kEnd=3)],
+        "unans": [ai344_line(unans=2)],
+        "face": [ai344_line(faceOk=10, faceN=40)],
+        "trot": [ai344_line(trot=12)],
+        "long": [ai344_line(long=1)],
+        "pend": [ai344_line(), ai344_line(revA=8, revABack=1)],
+        "nokept": [ai344_line(src="BehaviorRegroup 30/0/0")],
+        "arr": [ai344_line(arrRet=2)],
+        "succ": [ai344_line(succNo=1)],
+        "stum": [ai344_line(stum=1)],
+        "err": [ai344_line(), "ERROR in HorsePursuit.Brama344: System.NullReferenceException"],
+        "patch": [ai344_line(patchArr="NIE (brak Formation.SetArrangementOrder)")],
+        "bait0": [ai344_line(), ai333_bait_line(turn=0)],
+        "broken": [ai344_line().replace("wynik kontry dobry", "wynik kontr dobry")],
+        "none": ["AI bitwy (333) zerwanie: cos."],
+    }
+    exp = {
+        "good": {"A344-0": "TAK", "A344-1": "TAK", "A344-2": "TAK", "A344-3": "TAK", "A344-4": "TAK", "A344-5": "TAK", "A344-6": "TAK", "A344-7": "TAK",
+                 "B344-1": "TAK", "B344-2": "TAK", "B344-3": "TAK", "B344-4": "INFO", "B344-5": "TAK", "X344": "TAK", "A344-T": "TAK"},
+        "ff": {"A344-0": "INFO"},
+        "noai": {"A344-0": "NIE"},
+        "back": {"A344-1": "NIE"},
+        "slow": {"A344-2": "NIE"},
+        "noans": {"A344-2": "NIE"},
+        "kbad": {"A344-3": "NIE"},
+        "unans": {"A344-4": "NIE"},
+        "face": {"A344-5": "NIE"},
+        "trot": {"A344-6": "NIE"},
+        "long": {"A344-7": "NIE"},
+        "pend": {"B344-1": "NIE"},
+        "nokept": {"B344-2": "NIE"},
+        "arr": {"B344-3": "NIE"},
+        "succ": {"B344-5": "NIE"},
+        "stum": {"X344": "NIE"},
+        "err": {"X344": "NIE"},
+        "patch": {"X344": "NIE"},
+        "bait0": {"A344-T": "NIE"},
+        "broken": {"A344-0": "NIE"},
+        "none": {"A344-0": "INFO"},
+    }
+    tmp = tempfile.mkdtemp(prefix="a344_")
+    diff = []
+    try:
+        for kind, Ls in runs.items():
+            logp = os.path.join(tmp, f"Armoury-{kind}.log")
+            open(logp, "w", encoding="utf-8").write("\n".join(f"[10:00:{i % 60:02d}] {x}" for i, x in enumerate(Ls)) + "\n")
+            rep = Report()
+            ai344_rows(rep, ai344_collect(logp))
+            got = {r[0].split(":")[0]: r[3] for r in rep.rows}
+            diff += [f"{kind} {k}: {got.get(k)} (oczekiwane {v})" for k, v in exp[kind].items() if got.get(k) != v]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return "; ".join(diff) if diff else None
+
+
+def ai344_main(logp):
+    rep = Report()
+    try:
+        s2 = ai344_synth()
+    except Exception as ex:
+        s2 = f"wyjatek {type(ex).__name__}: {ex}"
+    rep.add("A344-S: test syntetyczny (dobry bieg i zly przypadek na kazdy prog)", s2 or "OK", "OK", s2 is None)
+    if not logp or not os.path.isfile(logp):
+        rep.add("A344-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = ai344_collect(logp)
+    print(f"plik: {logp} | linii 344 {len(D['lines'])}, nierozpoznanych {D['bad']}, ERROR {D['err']}, prob harassera {len(D['bait'])}")
+    ai344_rows(rep, D)
+    rep.show()
+    return 0
+
+
+_ai344_main_prev = main
+
+
+def main(argv):
+    # paczka 344: grupa ai344 - opakowanie main jak armie342
+    a = argv[1:]
+    if "--grupa" in a:
+        i = a.index("--grupa")
+        if i + 1 < len(a) and a[i + 1] == "ai344":
+            rest = [x for j, x in enumerate(a) if j != i and j != i + 1]
+            return ai344_main(rest[0] if rest else None)
+    return _ai344_main_prev(argv)
 
 
 if __name__ == "__main__":

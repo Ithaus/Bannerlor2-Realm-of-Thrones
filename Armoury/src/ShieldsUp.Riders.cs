@@ -155,6 +155,7 @@ namespace Armoury
             if (rider.IsMainAgent || !rider.IsAIControlled) return;
             var f = rider.Formation;
             if (f == null) return;
+            if (_counterKey && !HorsePursuit.PlayerForm(f)) HorsePursuit.OnRiderShotAny(m, rider, at);   // 344: kazdy konny AI (nie tylko szyk konnicy) - kontra / odruch
             var q = f.QuerySystem;
             if (q == null || !q.IsCavalryFormation || HorsePursuit.PlayerForm(f)) return;
             bool horse = v.IsMount;
