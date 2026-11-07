@@ -40,7 +40,7 @@ namespace Armoury
             catch (Exception e) { Buildings338.Stumble(Buildings338.GMason, "Mason.Points", e); return 0f; }
         }
 
-        /// <summary>BuildFunding.PowerPostfix (galaz Covered): pozycja dymku "Mason" = min(punkty Masona, punkty pana + robota ludu).</summary>
+        /// <summary>BuildFunding.PowerPostfix (galaz Covered): pozycja dymku "Mason" = min(punkty Masona, punkty pana + robota ludu + przyspieszenie zlotem (347e)).</summary>
         internal static void Add(Town t, float paid, ref ExplainedNumber r)
         {
             float x = Extra(t, paid);
