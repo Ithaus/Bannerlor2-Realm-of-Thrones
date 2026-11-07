@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 07.11.2026 21:55 CEST: WGRANIE 176 (najnowszy) = noc/352-prognoza-bez-korony (Armoury.dll e0c915a7, CrashScribe 3cab76a3) = 175 + 354 + 355 + 356
+- 354 podatek wsi do pana ziemi przy wrogim/brakujacym posiadaczu tytulu BK (Jeff: "niech odbije zamek"); 355 tarczowe gracza jako "Scutage (shield money) to the crown"; 356 Threatened bez powtornego liczenia. Test at356 OK (25.6 s/dobe). Szczegoly CHANGELOG "WGRANIE 176".
+- Otwarte: posiadacz tytulu z tej samej frakcji dalej dostaje podatek (rycerze BK, LandSale) - decyzja Jeffa; G1 prognozy - zaleglosc licznika wsi splywa po 10000/dobe, sprawdzic po kilku dobach.
+- Dalej z listy plynnosci: zaciecie o polnocy 0.87 s (MorningReport 178 ms, SupplyDemand 117, ksiegi ~150) - rozlozenie na godziny; morale BK (~16% kodu gry) - pamiec na godzine, ryzyko wieksze.
+
 ## STAN 07.11.2026 20:20 CEST: WGRANIE 175 (najnowszy) = noc/352-prognoza-bez-korony cd17c3ec (Armoury.dll 459c9a99, CrashScribe.dll 3cab76a3) = 174 + 352/352r + 353/353b
 - PRZYCIECIA: sprawca StrategicCampaignAI145 NearbyEnemyLordStrength (probkowanie stosu ClrMD na zywo: 40% tiku gry). 353b liczy sume sama z pamiecia sily partii na godzine. Test na kopii zapisu Jeffa 19:24: 51.9 -> 26.2 s/dobe, klatka 36-81 -> 19-24 ms bez narastania. Pytaja Baratheonowie KL i Polnoc (Dorzecze), nie Ashemark. Szczegoly CHANGELOG "WGRANIE 175".
 - Rod KARDA na zapisie 19:24 jest w The North (wyjscie z sesji 17:34 nie weszlo do zapisu) - powiedziec Jeffowi, niech sprawdzi w grze. Pokoj rodu bez krolestwa: rozmowa z lordem "Our realms should make peace" + zloto (wynik workflow wf_8ed2c41c, nie testowane w grze).
