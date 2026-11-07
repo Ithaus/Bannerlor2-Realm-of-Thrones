@@ -27,7 +27,7 @@ liczba klatek stoi, rosnie koszt jednej klatki.
 koszt linii doby (Process.Refresh) i bloku w logu - prog orientacyjny < 5 ms/dobe. Mapa: zero dotykania wizerunkow. Kolizje: f9 i E8/0 bez zmian (wlasne liczniki), DayProfile tylko akcesor.
 Wylaczenie klucza w grze: Frame/Daily/latka od razu nic nie licza; ponowne wlaczenie - pierwsza doba baza. Klucza nie ma w Armoury.json Jeffa - wezmie sie domyslne TAK.
 Granica: HourlyTick = tylko HourlyTickEvent; koszt cudzych modow na klatke dalej nierozbity (nastepny krok po pierwszym logu).
-**Status:** DO SPRAWDZENIA (build 0 bledow, G350-S TAK; gra nieuruchamiana, nic nie wgrane).
+**Status:** WGRANE 173 (07.11 15:55, Armoury.dll ed0961d2 = noc/350-pomiar-spowolnienia; test at350 kod 0, pomiar350 P0-P2 TAK, koszt linii sr. 2.5 ms/dobe).
 -r (recenzja): (1) komentarz "Z.3 poz. 3" wrocil na linie DayProfile.EnsureHooks (byl doklejony do linii 350). (2+4, to samo zgloszenie) przelaczenie klucza w sesji: Daily pisze raz
 "Pomiar sesji (350): wylaczone | ..." przy pierwszej dobie z kluczem NIE i "Pomiar sesji (350): wznowienie | ..." przy pierwszej z TAK (EnsureHooks ustawia _off = !On, wiec start z NIE
 nie daje drugiego znacznika; Reset zeruje); sprawdzarka: "wylaczone" = odcinek bez zbierania dob E8/0, "wznowienie" = nowy odcinek, pierwsza doba E8/0 w nim to baza; G350-S + "toggle"
