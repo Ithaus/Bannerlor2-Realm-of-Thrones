@@ -17,11 +17,12 @@ czy rod byl wtedy w tym samym krolestwie co teraz. Doby wasala zostaja w histori
 - Zapis arm_prog345: 12. pole doby = krolestwo (tag "g345|1|" bez zmian; stary DLL czyta pola 0-10 i pomija nowe). Doba z zapisu sprzed 352 (pole brak = nieznane) liczy sie do pozycji korony
   tylko gdy rod jest teraz w krolestwie: historia to najwyzej 7 dob (zwykle to samo krolestwo), a rod bez krolestwa nie ma z korona zadnego przeplywu - wiec u Jeffa po wgraniu poprawka dziala od razu.
 - Linia dobowa: dopisek " | korona prognozy (352): krolestwo <id|brak>, dob historii w tym krolestwie N, moduly korony w prognozie M" (przed "srednio z").
+- 352r (przeglad): N (dob historii w tym krolestwie) liczone tylko, gdy rod jest w krolestwie - bez krolestwa doby z Kng "" dawaly N>0 od 2. doby i falszywe G7 NIE.
 - tools/sprawdz_logi.py grupa prognoza345: G7 (krolestwo brak -> N = 0 i M = 0; bez dob bez krolestwa / log sprzed 352 - INFO); G345-S: przypadki kng (INFO), nokng (TAK), nokngbad (NIE).
 **Ryzyko / co sprawdzic:** grep czytelnikow: _hist/Laps czyta tylko GoldForecast (Corrections 2-4 bez zmian - rozliczenie rodu; 5 - nowy filtr; Line - nieregularne wedlug _fcKeys, spojne: modul korony
 poza prognoza po odejsciu wyjdzie jako "nieregularne", nie jako rozjazd); Reset czysci nowe pola; Import/Export zgodne w obie strony. Inne pozycje, progi 347c i etykiety bez zmian. Doba odejscia:
 prognoza zrobiona rano jako wasal ma jeszcze korone - rozjazd tej jednej doby zostaje (prawdziwa zmiana stanu). W grze: po odejsciu z krolestwa podpowiedz bez "Rent from the crown" / "Dues to the crown";
-w logu "korona prognozy (352): krolestwo brak, dob historii w tym krolestwie 0, moduly korony w prognozie 0"; po wejsciu do nowego krolestwa pozycje korony wracaja od 2. doby w nim (regula 347c).
+w logu "korona prognozy (352): krolestwo brak, dob historii w tym krolestwie 0, moduly korony w prognozie 0"; po wejsciu do nowego krolestwa pozycje korony wracaja, gdy co najmniej polowa dob historii (i co najmniej 2) jest w nim (regula 347c; przy pelnej historii 7 dob - od 4. doby; wczesniej ich kwoty ida jako "nieregularne poza prognoza").
 Na logu Jeffa 07.11 G1 NIE (rozjazd 522 zl/dobe, 16.5%) - stan sprzed 352, najgorsza doba to doba odejscia.
 **Status:** DO SPRAWDZENIA - NIE WGRANE (build 0 bledow, G345-S TAK; gra nieuruchamiana).
 

@@ -169,7 +169,8 @@ namespace Armoury
                 _fcTotal = all; _fcCorr = corr; _fcModel = all - corr; _fcParts = sb.Length > 0 ? sb.ToString() : "-";
                 _fcKeys = _corrKeys != null ? new HashSet<string>(_corrKeys, StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
                 _fcKng = KngNow(); _fcKngDays = 0; _fcCrownKeys = 0;
-                foreach (var d in _hist) if (SameKng(d, _fcKng)) _fcKngDays++;
+                // 352r (przeglad): bez krolestwa doby bez krolestwa (Kng "") nie sa "dobami w krolestwie" - N = 0 (G7)
+                if (_fcKng.Length > 0) foreach (var d in _hist) if (SameKng(d, _fcKng)) _fcKngDays++;
                 foreach (var k in _fcKeys) if (IsCrownKey(k)) _fcCrownKeys++;
                 _fcHave = true;
             }
