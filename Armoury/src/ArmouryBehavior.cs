@@ -756,6 +756,8 @@ namespace Armoury
         private static bool F9Reset() { try { MapSpeedProfile.Reset(); } catch (Exception e) { Log.Error("F9Reset", e); } return true; }
         private readonly bool _p350Reset = P350Reset();   // 350: pomiar sesji od zera przy nowej grze / wczytaniu
         private static bool P350Reset() { try { SessionPerf350.Reset(); } catch (Exception e) { Log.Error("P350Reset", e); } return true; }
+        private readonly bool _p354Reset = P354Reset();   // 354: liczniki podatku wsi do pana ziemi od zera przy nowej grze / wczytaniu
+        private static bool P354Reset() { try { VillageTaxToLand354.Reset(); } catch (Exception e) { Log.Error("P354Reset", e); } return true; }
         // p9 (25.10): gotowosc zbrojowni partii i wyjazdy po sprzet od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
         private readonly bool _p9Reset = P9Reset();
         private static bool P9Reset() { try { ArmedStrength.Reset(); } catch (Exception e) { Log.Error("P9Reset", e); } return true; }
@@ -2527,6 +2529,7 @@ namespace Armoury
             try { CanonHouses277.SessionStart(); } catch (Exception e) { Log.Error("CanonHouses277.SessionStart", e); }   // 277: rody z zapisu po id, linia "Rody kanonu (277): start sesji"
             try { IndebtedSpan.EnsureHooks(); } catch (Exception e) { Log.Error("IndebtedSpan.EnsureHooks", e); }   // 314b: kara Indebted Lord 5 x 84 dob, nie 5 lat po 364 dni
             try { SideVillageFief.EnsureHooks(); } catch (Exception e) { Log.Error("SideVillageFief.EnsureHooks", e); }   // n20-wioska: start BK "Indebted Lord" (TitleManager.GiveLordshipOnKingdomJoin) i linia podpowiedzi zlota - latki w kampanii (CLAUDE.md 7)   // 3.1/3.3 (31b) E3/2: majatki BK bez dochodu z produkcji (latki w kampanii), srednie i liczniki od zera
+            try { VillageTaxToLand354.EnsureHooks(); } catch (Exception e) { Log.Error("VillageTaxToLand354.EnsureHooks", e); }   // 354: podatek wsi do pana ziemi, nie do wrogiego / niezywego / zadnego posiadacza tytulu (transpiler BK VillageIncomePrefix w kampanii - CLAUDE.md 7), linia startu
             try { Seal31B.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31B.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
             try { CaravanSettle.EnsureHooks(); } catch (Exception e) { Log.Error("CaravanSettle.EnsureHooks", e); }   // 259: rozliczenie karawan rodow - latki gry i BK w kampanii (raz na proces), PO Seal31B (E3/9 ProfitPre czyta Settled)
             try { PerfD2.EnsureHooks(); } catch (Exception e) { Log.Error("PerfD2.EnsureHooks", e); }   // perf-d2d3: straznik i prefiks podatku miast BK (PerfTownTaxSkipBk) - PO PopulationLaw (SubModule), CouncilWages35 i Seal31B; linia startowa "Szybkosc doby (perf-d2d3)"   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
@@ -3189,6 +3192,7 @@ namespace Armoury
             try { PeaceHold.Daily(); } catch (Exception e) { Log.Error("PeaceHold.Daily", e); } DayProfile.Lap("PeaceHold.Daily");
             try { CanonPeaceLock.Daily(); } catch (Exception e) { Log.Error("CanonPeaceLock.Daily", e); } DayProfile.Lap("CanonPeaceLock.Daily");   // 264: linia "Pokoj kanonu (264)" i linie wladcow / krolestw wojny kanonu (tylko log)
             try { ScaNoBandits320.Daily(); } catch (Exception e) { Log.Error("ScaNoBandits320.Daily", e); } DayProfile.Lap("ScaNoBandits320.Daily");   // 320b: linia "SCA bez band (320b)" (tylko log)
+            try { VillageTaxToLand354.Daily(); } catch (Exception e) { Log.Error("VillageTaxToLand354.Daily", e); } DayProfile.Lap("VillageTaxToLand354.Daily");   // 354: linia "Wies dla trzymajacego (354)" (tylko log)
             try { KingdomStrengthField336.Daily(); } catch (Exception e) { Log.Error("KingdomStrengthField336.Daily", e); } DayProfile.Lap("KingdomStrengthField336.Daily");   // 336: linia "Sila krolestw w polu (336)" (tylko log)
             try { MoneyLedger.Probe169("PeaceHold.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // 171: zawrocony towar i nadwyzki zalog na polkach PRZED handlem kupcow (kupcy wywioza nadwyzke zamkow tego samego dnia)

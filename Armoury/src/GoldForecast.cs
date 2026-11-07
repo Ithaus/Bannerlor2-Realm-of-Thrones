@@ -19,6 +19,7 @@ namespace Armoury
     /// (ClanManagementVM.RefreshDailyValues: CalculateClanIncome i CalculateClanExpenses, Daily Change = |przychod| - |wydatki|) pokazywaly SAM model w chwili najechania:
     ///  - "Village Demesnes" liczy podatek WSZYSTKICH wsi z GetActualVillages, a BK (ClanFinancesPatches.VillageIncomePrefix) przy prawdziwej wyplacie daje podatek wsi,
     ///    ktorej tytul de iure ma ktos inny niz glowa rodu, temu posiadaczowi (ApplyWithdrawal(..., title.deJure); deJure null - nikomu) - ten warunek dziala tylko z pobraniem;
+    ///    354: z kluczem VillageTaxToLandHolder tylko posiadaczowi zywemu z frakcji wsi; wrogi / niezywy / brak - graczowi przez "Village Demesnes" (poprawka ich nie zdejmuje);
     ///  - warsztaty i licznik podatku wsi to stan "do tej chwili" (ProfitMade / 2, licznik w polowie doby), a wyplata liczy stan w chwili rozliczenia rodu;
     ///  - wplywy i wydatki modulow Armoury w naszym takcie doby (podatek od nadwyzki ludu, prawa panskie, podatek warsztatow, powinnosci wobec korony, rada, renty, Bank,
     ///    dlugi ...) ida prosto do kiesy, poza modelem.
@@ -412,7 +413,8 @@ namespace Armoury
                     int amt = (int)en.ResultNumber;
                     object title = _mGetTitle != null ? _mGetTitle.Invoke(titles, new object[] { v.Settlement }) : null;
                     Hero dj = DeJureOf(title);
-                    bool toMe = title == null || dj == pc.Leader;
+                    // 354: posiadacz wrogi (inna frakcja niz wies), niezywy albo brak - BK z transpilerem 354 daje podatek panu ziemi (Village Demesnes, jak wlasne wsie)
+                    bool toMe = title == null || dj == pc.Leader || !VillageTaxToLand354.HolderGets(dj, v);
                     list.Add(new VilNow { V = v, Amt = amt, DeJure = dj, HasTitle = title != null, ToMe = toMe });
                     if (toMe) me += amt; else other += amt;
                 }

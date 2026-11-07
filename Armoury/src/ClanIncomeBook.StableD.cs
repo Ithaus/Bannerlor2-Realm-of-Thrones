@@ -339,7 +339,9 @@ namespace Armoury
                         {
                             var title = CdTitle(titleMgr, v.Settlement);   // m105-optym: jak _mGetTitle.Invoke(titleMgr, new object[] { v.Settlement })
                             var dj = title != null ? _pDeJure.GetValue(title, null) as Hero : null;
-                            if (dj != null && dj != h.Leader)
+                            // 354: posiadacz wrogi (inna frakcja niz wies), niezywy albo brak - BK z transpilerem 354 placi panu ziemi (rodowi h, Village Demesnes) - ziemia u h
+                            bool red354 = VillageTaxToLand354.Redirects(title != null, dj, v);
+                            if (!red354 && dj != null && dj != h.Leader)
                             {
                                 _dDeJureN++; _dDeJureGold += t;
                                 if (dj.Clan != h)
@@ -353,7 +355,7 @@ namespace Armoury
                                 // 345: posiadacz de iure niezywy - BK dopisuje zloto zmarlemu (payTo.Gold), nikt go nie wyda; ziemi nikt z tego nie ma
                                 if (follow && !dj.IsAlive) { hD = null; _dLandLostN++; _dLandLostGold += t; }
                             }
-                            else if (follow && title != null && dj == null)
+                            else if (!red354 && follow && title != null && dj == null)
                             {
                                 // 345: tytul bez posiadacza de iure - BK przy wyplacie zdejmuje licznik i nie placi nikomu (ApplyWithdrawal(..., null)); ziemi nikt z tego nie ma
                                 hD = null; _dLandLostN++; _dLandLostGold += t;

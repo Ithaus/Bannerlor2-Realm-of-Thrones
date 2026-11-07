@@ -11620,6 +11620,10 @@ namespace Armoury
         [SettingPropertyGroup("Expected gold shows what really comes (345)")]
         public bool LandDuesFollowTitleHolder { get; set; } = true;
 
+        [SettingPropertyBool("Village Tax To Land Holder", HintText = "Village tax goes to whoever holds the land, not to a title holder who has lost it. When a castle or town changes hands, the old lord keeps the Banner Kings titles of its villages, and Banner Kings kept paying him their whole tax - even when he is your enemy at war. Now a village pays its title holder only while he is alive and in the same realm as the village; otherwise the tax goes to the lord who holds the land, like the tax of his other villages. A title with no holder no longer burns the tax. The same rule holds for every lord, AI included. Holders in the village's own realm (knights, bought lordships) are paid as before. Off = as Banner Kings pays", RequireRestart = false)]
+        [SettingPropertyGroup("Expected gold shows what really comes (345)")]
+        public bool VillageTaxToLandHolder { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -14524,6 +14528,7 @@ namespace Armoury
             s.Buildings338CastleMines = Buildings338CastleMines;
             s.GoldForecastReal = GoldForecastReal;
             s.LandDuesFollowTitleHolder = LandDuesFollowTitleHolder;
+            s.VillageTaxToLandHolder = VillageTaxToLandHolder;
         }
 
         internal static void Apply()
