@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 07.11.2026 11:15 CEST: test 346 zrobiony - NIE WGRANE (progi przekazania niespelnione); w grze nadal WGRANIE 171
+- noc/346-bitwy-zloto 5811e670 = 344 + 345 (scalenie dokonczone: CHANGELOG i sprawdz_logi unia, liczby linii zgodne; klucze 344/345 w Settings i McmSettings). Build Release kod 0, Armoury.dll e944ef25 (test/m346). Wypchnieta.
+- Test at-346 (kopia zapisu Jeffa 02:31 md5 ed2537da, -Days 10 -Battles 10 -BattleSec 300 -NoArena -Harasser 3 -LordBattles 3, CS at-n335): kod 0, 936/936, bitwy 13/13 bledy 0, CS 23 (baza), Armoury 0 ERROR. Logi: D:/Backup-Bannerlord/logs/2026-11-07-at346; zapis testowy w D:/Backup-Bannerlord/zapisy-testowe-archiwum/2026-11-07-at346.
+- BLOKUJE WGRANIE: ai344 NIE x5 - A344-3 wynik kontry 2/10 (prog 80%), A344-6 klus przy strzelcu 2 s (prog 0), B344-1 nawroty szykow 0.46/min (prog 0.25), B344-3 powroty Line/Loose w 20 s = 2 (prog 0), B344-5 nastepcy 1 (prog 0). TAK: A344-1 plecy 0, A344-2 kontra 100%, A344-4/5/7.
+  prognoza345 G1 NIE: srednio |rozjazd| 4041 zl (114.7% prawdziwej zmiany), najgorsza doba 109582 prognoza -667, naprawde +9649 -> prognoza nadal nie trafia.
+- Reszta vs at343 bez nowych NIE (J204-0: 1 nierozpoznana linia 204 - nowy format z 344; J204-2/3 poprawione; B309-4b, OB2-6a, NKA-4, A2, A7, L12 jak w bazie).
+- Zapis Jeffa i DLL w grze nietkniete (Armoury 9a33af56). Czeka na Jeffa: naprawiac 344/345 dalej czy wgrac mimo NIE.
+
 ## PRZEKAZANIE 07.11.2026 ok. 02:45 CEST (Jeff: limit konczy sie, drugie konto wgrywa)
 - W GRZE nadal WGRANIE 171 (Armoury 9a33af56, ROT 8.1.2 mapa) - patrz nizej.
 - GOTOWE, NIETESTOWANE (wypchniete):
