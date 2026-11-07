@@ -36,6 +36,7 @@ namespace Armoury
 
         // ---- doba
         private static bool _hadDay;
+        private static bool _off;   // klucz wylaczony w MCM w trakcie sesji (znacznik "wylaczone" juz w logu; przy ponownym wlaczeniu linia "wznowienie")
         private static int _sessionDays, _day = -1;
         private static long _dayTs;
         private static readonly int[] _gc = new int[3];
@@ -60,7 +61,7 @@ namespace Armoury
         internal static void Reset()
         {
             _lastTs = 0; _fDaily = false; ClearFrames();
-            _hadDay = false; _sessionDays = 0; _dayTs = 0; _day = -1; _stumbles = 0;
+            _hadDay = false; _sessionDays = 0; _dayTs = 0; _day = -1; _stumbles = 0; _off = false;
             ClearBlock();
             _cHavePrev = false;
         }
@@ -110,7 +111,18 @@ namespace Armoury
         {
             try
             {
-                if (!On) { _hadDay = false; _sessionDays = 0; _lastTs = 0; _fDaily = false; ClearFrames(); ClearBlock(); return; }
+                if (!On)
+                {
+                    // recenzja 350: przelaczenie w trakcie sesji - znacznik dla sprawdzarki (doby E8/0 bez linii 350 do wznowienia nie sa brakami)
+                    if (!_off) { _off = true; Log.Info("Pomiar sesji (350): wylaczone | klucz SessionPerfLog NIE w trakcie sesji - linie doby wstrzymane do ponownego wlaczenia."); }
+                    _hadDay = false; _sessionDays = 0; _lastTs = 0; _fDaily = false; ClearFrames(); ClearBlock(); return;
+                }
+                if (_off)
+                {
+                    _off = false;
+                    Log.Info("Pomiar sesji (350): wznowienie | klucz SessionPerfLog TAK w trakcie sesji - ta doba to baza, licznik doby sesji od 1, sluchacze HourlyTick "
+                             + (_hooked ? "wpiete" : "BRAK (" + _hookWhy + ")") + ".");
+                }
                 long t0 = Stopwatch.GetTimestamp();
                 int g0 = GC.CollectionCount(0), g1 = GC.CollectionCount(1), g2 = GC.CollectionCount(2);
                 int cur = -1;
@@ -293,6 +305,7 @@ namespace Armoury
             {
                 if (Campaign.Current == null) return;
                 if (On && !_hookTried) { _hookTried = true; Hook(); }
+                _off = !On;   // start z kluczem NIE mowi to juz linia startu - bez drugiego znacznika "wylaczone"; wlaczenie pozniej = "wznowienie"
                 Log.Info("Pomiar sesji (350): start | klucz SessionPerfLog " + (On ? "TAK" : "NIE") + " | sluchacze HourlyTick (CampaignEventDispatcher.HourlyTick) "
                          + (_hooked ? "wpiete" : "BRAK (" + _hookWhy + ")")
                          + " | godzinowe tiki partii, osad i klanow oraz AI partii gra rozklada na klatki - nie wchodza do sluchaczy, widac je tylko w czasie klatki.");

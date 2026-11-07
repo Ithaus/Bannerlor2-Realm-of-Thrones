@@ -97857,7 +97857,7 @@ def main(argv):
 # ------------------------------------------------------------ paczka 350: grupa pomiar350 - pomiar spowolnienia w sesji (SessionPerf350.cs, tylko log)
 #  Raport 07.11: doba gry na mapie rosnie w sesji (22.8 -> 36 s), nasz takt stoi. Linie 'Pomiar sesji (350)': start, dzien N (co dobe), blok 30 dob.
 #  P0 start: sluchacze HourlyTick wpiete (BRAK = NIE, klucz NIE albo bez startu = INFO); P1 linia w kazdej dobie (w kazdym odcinku miedzy startami doby
-#  kolejne bez dziur, nierozpoznanych 0; kazda doba "Profil doby (E8/0)" ma linie 350); P2 potkniecia 0; P3 trend (pierwsze 10 dob wobec ostatnich 10) INFO;
+#  kolejne bez dziur, nierozpoznanych 0; kazda doba "Profil doby (E8/0)" ma linie 350; linie "wylaczone"/"wznowienie" = klucz przelaczony w sesji, nowy odcinek); P2 potkniecia 0; P3 trend (pierwsze 10 dob wobec ostatnich 10) INFO;
 #  P4 bloki 30 dob INFO (HourlyTick ms/dobe, najszybciej rosnace kolekcje); P5 koszt linii i bloku INFO.
 #   python -I tools/sprawdz_logi.py --grupa pomiar350 <Armoury-*.log>
 G350_P = "Pomiar sesji (350)"
@@ -97874,16 +97874,29 @@ G350_E80 = re.compile(r"Profil doby \(E8/0\): dzien (-?\d+) \|")
 
 def pomiar350_collect(logp):
     # odcinki: kazda linia startu 350 otwiera nowy odcinek (wczytanie / nowa gra); przed pierwszym startem - odcinek 0
-    D = {"start": [], "seg": [{"day": [], "e80": []}], "blk": [], "bad": 0, "badblk": 0}
+    # recenzja 350: "wylaczone" (klucz NIE w trakcie sesji) otwiera odcinek bez zbierania dob E8/0, "wznowienie" - nowy odcinek, pierwsza doba E8/0 to baza
+    D = {"start": [], "seg": [{"day": [], "e80": []}], "blk": [], "bad": 0, "badblk": 0, "off": 0, "resume": 0}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             line = line.rstrip("\n").rstrip("\r")
             if "Profil doby (E8/0): dzien " in line:
                 m = G350_E80.search(line)
-                if m:
-                    D["seg"][-1]["e80"].append(int(m.group(1)))
+                sg = D["seg"][-1]
+                if m and not sg.get("off"):
+                    if sg.get("base", 0) > 0:
+                        sg["base"] -= 1
+                    else:
+                        sg["e80"].append(int(m.group(1)))
                 continue
             if G350_P not in line:
+                continue
+            if G350_P + ": wylaczone |" in line:
+                D["off"] += 1
+                D["seg"].append({"day": [], "e80": [], "off": True})
+                continue
+            if G350_P + ": wznowienie |" in line:
+                D["resume"] += 1
+                D["seg"].append({"day": [], "e80": [], "base": 1})
                 continue
             if G350_P + ": start |" in line:
                 m = G350_START.search(line)
@@ -97943,7 +97956,7 @@ def pomiar350_rows(rep, D):
         miss += [d for d in s["e80"] if d not in have]
     ok1 = not holes and not miss and not kbad and D["bad"] == 0 and D["badblk"] == 0
     rep.add("P1: linia 350 w kazdej dobie (odcinki miedzy startami bez dziur, kazda doba E8/0 ma linie 350, nierozpoznanych 0)",
-            f"odcinkow {len(segs)}, dob {len(days)}, dziury {len(holes)}" + (f" ({', '.join(holes[:5])})" if holes else "")
+            f"odcinkow {len(segs)} (klucz wylaczony / wznowiony w sesji {D['off']}/{D['resume']}), dob {len(days)}, dziury {len(holes)}" + (f" ({', '.join(holes[:5])})" if holes else "")
             + f", doby E8/0 bez linii 350 {len(miss)}" + (f" ({', '.join(str(x) for x in miss[:5])})" if miss else "")
             + f", licznik doby sesji nie po kolei {kbad}, nierozpoznane dzien/blok {D['bad']}/{D['badblk']}", "0 dziur, 0 brakow, 0 nierozpoznanych", ok1)
     stum = max([x["stum"] for x in days] + [b["stum"] for b in D["blk"]] + [0])
@@ -97958,9 +97971,12 @@ def pomiar350_rows(rep, D):
         def av(L, f):
             v = [f(x) for x in L if f(x) is not None]
             return sum(v) / len(v) if v else 0.0
+        # recenzja 350: czas rzeczywisty tylko z dob bez przerw > 5 s (bitwa, menu, wczytanie), obok sam bieg mapy (runS)
+        A0, B0 = [x for x in A if x["gaps"] == 0], [x for x in B if x["gaps"] == 0]
         rep.add(f"P3: trend w sesji (najdluzszy odcinek {n} dob: pierwsze {k} wobec ostatnich {k})",
                 f"sr. ms klatki biegu {av(A, lambda x: x['avg']):.1f} -> {av(B, lambda x: x['avg']):.1f}, klatek biegu/dobe {av(A, lambda x: x['runN']):.0f} -> {av(B, lambda x: x['runN']):.0f}, "
-                f"czas rzeczywisty {av(A, lambda x: x['real']):.1f} -> {av(B, lambda x: x['real']):.1f} s, GC gen0/dobe {av(A, lambda x: x['gc0']):.0f} -> {av(B, lambda x: x['gc0']):.0f}, "
+                f"bieg mapy {av(A, lambda x: x['runS']):.1f} -> {av(B, lambda x: x['runS']):.1f} s/dobe, "
+                f"czas rzeczywisty (doby bez przerw > 5 s) {av(A0, lambda x: x['real']):.1f} -> {av(B0, lambda x: x['real']):.1f} s (pominieto {k - len(A0)}/{k - len(B0)} dob z przerwami), GC gen0/dobe {av(A, lambda x: x['gc0']):.0f} -> {av(B, lambda x: x['gc0']):.0f}, "
                 f"pamiec zarzadzana {av(A, lambda x: x['mem']):.0f} -> {av(B, lambda x: x['mem']):.0f} MB, prywatna {av(A, lambda x: x['priv']):.0f} -> {av(B, lambda x: x['priv']):.0f} MB, "
                 f"klatek > 100 ms/dobe {av(A, lambda x: x['long']):.1f} -> {av(B, lambda x: x['long']):.1f}", "INFO", None)
     else:
@@ -98015,6 +98031,16 @@ def pomiar350_synth():
             L.append(G350_P + ": dzien 9999 | cos innego")
         return L
     two = run(days=12) + run(days=12, d0=1005)
+    # toggle: linie 350 do 1009, klucz NIE w dobach 1010-1012 (E8/0 bez 350), wznowienie w 1013 (baza), od 1014 doba sesji 1
+    tog = run(days=10)
+    tog.append(G350_P + ": wylaczone | klucz SessionPerfLog NIE w trakcie sesji - linie doby wstrzymane do ponownego wlaczenia.")
+    tog += [f"Profil doby (E8/0): dzien {d} | takt doby 2.3 s" for d in (1010, 1011, 1012)]
+    tog.append(G350_P + ": wznowienie | klucz SessionPerfLog TAK w trakcie sesji - ta doba to baza, licznik doby sesji od 1, sluchacze HourlyTick wpiete.")
+    tog.append("Profil doby (E8/0): dzien 1013 | takt doby 2.3 s")
+    for i, d in enumerate(range(1014, 1020)):
+        tog += [f"Profil doby (E8/0): dzien {d} | takt doby 2.3 s", pomiar350_line(d, i + 1)]
+    # toggle bez znacznikow (log sprzed recenzji) nadal NIE - dziura i licznik od 1
+    tog_old = [x for x in tog if ": wylaczone |" not in x and ": wznowienie |" not in x]
     runs = {
         "good": (run(), {"P0": "TAK", "P1": "TAK", "P2": "TAK", "P3": "INFO", "P4": "INFO", "P5": "INFO"}),
         "hole": (run(skip=10), {"P1": "NIE"}),
@@ -98024,6 +98050,8 @@ def pomiar350_synth():
         "nostart": (run(s=None), {"P0": "INFO", "P1": "TAK"}),
         "old": (["Predkosc mapy (f9): dzien 1 | ..."], {"P0": "INFO", "P1": "INFO"}),
         "twoloads": (two, {"P0": "TAK", "P1": "TAK"}),
+        "toggle": (tog, {"P0": "TAK", "P1": "TAK", "P2": "TAK"}),
+        "toggle_nomark": (tog_old, {"P1": "NIE"}),
     }
     tmp = tempfile.mkdtemp(prefix="g350_")
     diff = []
@@ -98046,7 +98074,7 @@ def pomiar350_main(logp):
         s2 = pomiar350_synth()
     except Exception as ex:
         s2 = f"wyjatek {type(ex).__name__}: {ex}"
-    rep.add("G350-S: test syntetyczny (dobry bieg 35 dob z blokiem w 30. dobie; dziura w dobach, linia nierozpoznana, potkniecia, latka BRAK, bez startu, log sprzed 350, dwa wczytania)",
+    rep.add("G350-S: test syntetyczny (dobry bieg 35 dob z blokiem w 30. dobie; dziura w dobach, linia nierozpoznana, potkniecia, latka BRAK, bez startu, log sprzed 350, dwa wczytania, klucz wylaczony i wznowiony w sesji)",
             s2 or "OK", "OK", s2 is None)
     if not logp or not os.path.isfile(logp):
         rep.add("G350-L: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)

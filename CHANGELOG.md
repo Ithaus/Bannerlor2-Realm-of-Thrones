@@ -28,6 +28,11 @@ koszt linii doby (Process.Refresh) i bloku w logu - prog orientacyjny < 5 ms/dob
 Wylaczenie klucza w grze: Frame/Daily/latka od razu nic nie licza; ponowne wlaczenie - pierwsza doba baza. Klucza nie ma w Armoury.json Jeffa - wezmie sie domyslne TAK.
 Granica: HourlyTick = tylko HourlyTickEvent; koszt cudzych modow na klatke dalej nierozbity (nastepny krok po pierwszym logu).
 **Status:** DO SPRAWDZENIA (build 0 bledow, G350-S TAK; gra nieuruchamiana, nic nie wgrane).
+-r (recenzja): (1) komentarz "Z.3 poz. 3" wrocil na linie DayProfile.EnsureHooks (byl doklejony do linii 350). (2+4, to samo zgloszenie) przelaczenie klucza w sesji: Daily pisze raz
+"Pomiar sesji (350): wylaczone | ..." przy pierwszej dobie z kluczem NIE i "Pomiar sesji (350): wznowienie | ..." przy pierwszej z TAK (EnsureHooks ustawia _off = !On, wiec start z NIE
+nie daje drugiego znacznika; Reset zeruje); sprawdzarka: "wylaczone" = odcinek bez zbierania dob E8/0, "wznowienie" = nowy odcinek, pierwsza doba E8/0 w nim to baza; G350-S + "toggle"
+(P1 TAK) i "toggle_nomark" (stary log bez znacznikow, P1 NIE). (3) P3: "bieg mapy" (runS s/dobe) i czas rzeczywisty tylko z dob bez przerw > 5 s (z liczba pominietych).
+Ryzyko: dwie nowe linie Log.Info tylko przy przelaczeniu klucza; zachowanie gry bez zmian. Build 0 bledow, G350-S TAK.
 
 ## 347e - murarz (Mason) pracuje tez z przyspieszeniem zlotem (NIE WGRANE)
 **Problem:** Jeff 07.11 ~14:20, Ashemark (zamek gracza): zbudowal Masona, a szybkosc budowy dalej 5 - "4 to daje moje przyspieszenie za kase".
