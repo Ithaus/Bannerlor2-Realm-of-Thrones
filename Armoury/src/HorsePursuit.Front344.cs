@@ -120,6 +120,8 @@ namespace Armoury
         private static int _z4Press, _z4FOut, _z4FHit, _z4FUnans, _z4PsExt;   // 344r
         // 347b A344-3b/3c: kontry cofniete, bo KontraTake nikogo nie wyslal; powody odrzucenia w Take (tylko na czas KontraTake, bez NoteNw)
         private static int _z4KEmpty, _ktForm, _ktCav, _ktCap, _ktSkip, _ktCand;
+        // 347d-r: odrzucenia ostatniej KontraTake same czasowe / 283 (KontraConfirm); GNear tego passu - szyk pominiety przez NoFreeF (i z odrzucen nieczasowych)
+        private static bool _ktTimed, _gNf, _gNfOth;
         private static readonly int[] KtNo = new int[NwKinds];
         private static readonly HashSet<int> KEmptySeen = new HashSet<int>();
 
@@ -263,9 +265,18 @@ namespace Armoury
         /// <summary>347d: szyk, ktorego Take nie ruszy - oslona / zwarcie 283 (CavBlock) albo bez wolnych w ostatnim przegladzie kontry (NoFreeF).</summary>
         private static bool GBlocked(Threat t, FI fi, float now)
         {
-            float u;
-            if (NoFreeF.TryGetValue(fi.F, out u) && now < u) return true;
+            if (NfOn(fi, now)) return true;
             return CavBlock(t, fi);
+        }
+
+        /// <summary>347d-r: blokada NoFreeF szyku trwa (dla GNear: _gNf - epizod pustej kontry trwa; _gNfOth - odrzucenia nieczasowe, bez NoAdvAt).</summary>
+        private static bool NfOn(FI fi, float now)
+        {
+            float u;
+            if (!NoFreeF.TryGetValue(fi.F, out u) || now >= u) return false;
+            _gNf = true;
+            if (NoFreeOth.Contains(fi.F)) _gNfOth = true;
+            return true;
         }
 
         /// <summary>347d: wolni ludzie szyku (bez jezdzcow 204 z tego szyku na jakimkolwiek strzelcu).</summary>
@@ -295,6 +306,8 @@ namespace Armoury
             GList.Clear();
             gN = 0;
             gAll = 0;
+            _gNf = _gNfOth = false;
+            int gRaw = 0;
             float d = float.MaxValue;
             var fl = HForms[t.Side];
             foreach (var kv in q.GF)
@@ -304,12 +317,14 @@ namespace Armoury
                 var fi = fl[i];
                 if (!fi.Cav || fi.Ha || fi.Player || fi.Retreat) continue;   // recenzja 344 W4: konni lucznicy nie jada w K - bez nich w przewadze
                 gAll += fi.N;
+                gRaw++;
+                // 347d-r (recenzja 347d): d od kazdego szyku G jak przed 347d (takze zablokowanego) - blokada NoFreeF nie przestawia d (falszywe Closing)
+                float e = Math.Max(0f, sp.Distance(fi.Rest) - fi.R);
+                if (e < d) d = e;
                 int fr = GFree(fi);
                 if (fr <= 0 || GBlocked(t, fi, now)) continue;   // 347d
                 GList.Add(fi.F);
                 gN += fr;
-                float e = Math.Max(0f, sp.Distance(fi.Rest) - fi.R);
-                if (e < d) d = e;
             }
             if (GList.Count == 0)
             {
@@ -327,7 +342,8 @@ namespace Armoury
                     best = i;
                 }
                 if (gAll == 0 && bestRaw >= 0) gAll = fl[bestRaw].N;
-                if (best >= 0) { GList.Add(fl[best].F); gN = GFree(fl[best]); d = bd; }
+                if (best >= 0) { GList.Add(fl[best].F); gN = GFree(fl[best]); }
+                if (gRaw == 0) d = bdRaw;   // 347d-r: bez G - d od najblizszego szyku w smyczy jak przed 347d (nie od wybranego wolnego)
             }
             for (int i = 0; i < t.Hs.Count; i++)
             {
@@ -444,13 +460,15 @@ namespace Armoury
             if (d < float.MaxValue && d < q.BestD - 1f) { q.BestD = d; q.BestDAt = now; }
             bool outCover = g >= ZOutGap;
             bool kc = !t.Group && adv && d <= _maxFrom && ((outCover && (closing || hitRs)) || (g >= ZBreakGap && hitRb));
-            if (!kc) q.KEmptyOn = false;   // 347b-r: koniec epizodu pustej kontry
+            // 347b-r: koniec epizodu pustej kontry; 347d-r: nie w czasie blokady NoFreeF (szyk pominiety po pustej kontrze - ten sam epizod, bez drugiego _z4KEmpty)
+            if (!kc && !_gNf) q.KEmptyOn = false;
             // A344-2: zdarzenie "strzelec poza oslona zbliza sie / trafia z Rw" przy przewadze - czeka na K / R
             bool ev = !t.Group && adv && outCover && (closing || hitRw) && d <= ZRw;
             // poczatek zdarzenia: trafienie z Rw poza oslona (OnRiderShot344) albo ten pass - reakcja liczona od trafienia (pass co 1 s)
             if (ev && q.St != SK && q.CondAt < 0f) { q.CondAt = now - q.HitEvAt <= 1.5f ? q.HitEvAt : now; q.EvAt = now; _z4Ev++; }
             else if (!ev && q.St != SK && q.CondAt >= 0f) { q.CondAt = -1f; _z4Miss++; }
-            if (!adv && gAll > 0 && (closing || hitRw) && outCover) { _z4NoAdv++; q.NoAdvAt = now; }
+            // 347d-r: brak przewagi tylko z blokady NoFreeF po odrzuceniach nieczasowych (daleko, kon, zajety, strefa) nie zdejmuje trafien A344-4 (prawdziwy blad)
+            if (!adv && gAll > 0 && (closing || hitRw) && outCover) { _z4NoAdv++; if (!_gNfOth) q.NoAdvAt = now; }
             PendCheck(q, now);
             FPendCheck(q, now);
             if (riders > 0 && q.St == SW) { q.St = SP; q.At = now; q.BestD = d; q.BestDAt = now; }
@@ -773,15 +791,22 @@ namespace Armoury
             if (!q.KEmptyOn) { q.KEmptyOn = true; _z4KEmpty++; }   // 347b-r: raz na epizod (SW ponawia EnterK co pass, poki kc)
             if (q.KPPs && _z4PsK > 0) _z4PsK--;
             float cond = q.CondAt;
+            bool timed = _ktTimed;
+            _ktTimed = false;
             // 347d (at347 l.970: 2 zdarzenia bez odpowiedzi = 2 puste kontry): zdarzenie A344-2 urodzone w tym passie z przewagi, ktorej Take nie potwierdzil -
-            // cofniete (jak brak przewagi: bez Miss, trafienia A344-4 zdjete przez NoAdvAt); zdarzenie starsze zostaje jak dotad
-            if (cond >= 0f && q.EvAt == now)
+            // cofniete (jak brak przewagi: bez Miss, trafienia A344-4 zdjete przez NoAdvAt); zdarzenie starsze zostaje jak dotad.
+            // 347d-r (recenzja): tylko gdy wszystkie odrzucenia byly czasowe (HuntCool, zwarcie) albo 283 - przy innych (daleko, kon, zajety, strefa, limit
+            // przegladu, szyk pominiety) zdarzenie zostaje i liczy sie jako bez odpowiedzi (dowod at347 dotyczy tylko przypadkow czasowych i 283)
+            if (timed)
             {
-                if (_z4Ev > 0) _z4Ev--;
-                cond = -1f;
-                _z4NoAdv++;
+                if (cond >= 0f && q.EvAt == now)
+                {
+                    if (_z4Ev > 0) _z4Ev--;
+                    cond = -1f;
+                    _z4NoAdv++;
+                }
+                q.NoAdvAt = now;
             }
-            q.NoAdvAt = now;
             if (q.KPPs)
             {
                 // 347d: pusta kontra z powrotu - powrot PS trwa dalej (PsUntil, ludzie, szyki bez capu marszu), bez Leave
@@ -873,6 +898,7 @@ namespace Armoury
             _z4Next = ZKontraRole;
             int before = sent;
             _ktForm = _ktCav = _ktCap = _ktSkip = _ktCand = 0;   // 347b A344-3c: powody odrzucenia tej kontry
+            _ktTimed = true;   // 347d-r: kasuja go Take (odrzucenia nieczasowe, limit) i szyk pominiety; czyta KontraConfirm
             Array.Clear(KtNo, 0, KtNo.Length);
             try
             {
@@ -881,10 +907,10 @@ namespace Armoury
                 for (int i = 0; i < GTmp.Count; i++)
                 {
                     int k = FindFI(fl, GTmp[i]);
-                    if (k < 0) { _ktForm++; continue; }
+                    if (k < 0) { _ktForm++; _ktTimed = false; continue; }
                     var fi = fl[k];
-                    if (!fi.Cav || fi.Ha || fi.Retreat) { _ktForm++; continue; }
-                    if (fi.Player) { _ktForm++; NotePlayerForm(t, fi, 0f); continue; }
+                    if (!fi.Cav || fi.Ha || fi.Retreat) { _ktForm++; _ktTimed = false; continue; }
+                    if (fi.Player) { _ktForm++; _ktTimed = false; NotePlayerForm(t, fi, 0f); continue; }
                     Take(m, t, fi, Math.Max(PerVictim + 1, 3 * (1 + t.Q.Esc)), now, ref sent, ref sentCharge);   // recenzja 344 D2: nie cale skrzydlo za jednym strzelcem
                 }
                 GTmp.Clear();

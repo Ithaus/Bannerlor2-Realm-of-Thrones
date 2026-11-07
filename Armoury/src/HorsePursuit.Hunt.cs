@@ -176,6 +176,7 @@ namespace Armoury
         private static readonly Dictionary<Agent, float> MeleeUntil = new Dictionary<Agent, float>();
         // 347d (344 GNear): szyk bez wolnych jezdzcow wedlug ostatniego przegladu kontry (Take przy ZKontraRole) - do kiedy GNear go pomija
         private static readonly Dictionary<Formation, float> NoFreeF = new Dictionary<Formation, float>();
+        private static readonly HashSet<Formation> NoFreeOth = new HashSet<Formation>();   // 347d-r: NoFreeF z odrzucen nieczasowych
         private static readonly List<Hunter> HChk = new List<Hunter>();
         // recenzja 204 (2): koszt passu (obrot strzelcow, ludzie przejrzani, czas), obnizenie poziomu (nadwyzka jezdzcow)
         private static readonly List<KeyValuePair<float, Hunter>> HTrim = new List<KeyValuePair<float, Hunter>>();
@@ -234,7 +235,7 @@ namespace Armoury
             Threats.Clear(); ThreatList.Clear(); ThreatTmp.Clear(); Hunters.Clear(); HList.Clear(); HuntCool.Clear(); DownBy.Clear();
             HForms[0].Clear(); HForms[1].Clear(); HUnits.Clear(); HBuf.Clear(); HCand.Clear(); RangedForms.Clear(); RangedRange.Clear();
             lock (HLock) BlowQ.Clear();
-            FormRiders.Clear(); FormGroup.Clear(); MeleeUntil.Clear(); HChk.Clear(); HGroupShooters.Clear(); NoFreeF.Clear();
+            FormRiders.Clear(); FormGroup.Clear(); MeleeUntil.Clear(); HChk.Clear(); HGroupShooters.Clear(); NoFreeF.Clear(); NoFreeOth.Clear();
             _hQChk = _hQFriend = _hChkRot = _hGroupCut = _hGroupMax = _hChkOver = 0;
             HTrim.Clear();
             _hScan = _hScanOff = _hThrRot = _hScanCut = _hScanMax = _hThrMax = _hThrDefer = _hPassN = _hLower = _hFfOut = 0;
@@ -1066,11 +1067,11 @@ namespace Armoury
                 int g;
                 FormGroup.TryGetValue(fi.F, out g);
                 int room = Math.Max(0, PerVictim - g);
-                if (room <= 0) { _hGroupCut++; if (kt) _ktCap++; return; }   // szyk oddal juz limit - bez przegladu
+                if (room <= 0) { _hGroupCut++; if (kt) { _ktCap++; _ktTimed = false; } return; }   // szyk oddal juz limit - bez przegladu
                 if (room < cap) cap = room;
             }
             int left = _hScanCap - _hScan;
-            if (left <= 0) { _hScanCut++; if (kt) _ktCap++; return; }
+            if (left <= 0) { _hScanCut++; if (kt) { _ktCap++; _ktTimed = false; } return; }
             // 347d: szyk bez wolnych w przegladzie kontry (bez ciecia limitu) - GNear pomija go do konca przerwy / zwarcia odrzuconych (gdy wszystkie odrzucenia
             // sa czasowe), inaczej ZAnswer s; przewaga 344 nie liczy ludzi, ktorych nie da sie wyslac
             int ktCut0 = kt ? _ktCap + KtNo[NwQuery] : 0;
@@ -1137,7 +1138,13 @@ namespace Armoury
             if (n <= 0)
             {
                 if (kt && _ktCap + KtNo[NwQuery] == ktCut0)
-                    NoFreeF[fi.F] = ktOther || ktFree == float.MaxValue ? now + ZAnswer : Math.Max(now + ZAnswer, ktFree);
+                {
+                    bool oth = ktOther || ktFree == float.MaxValue;
+                    NoFreeF[fi.F] = oth ? now + ZAnswer : Math.Max(now + ZAnswer, ktFree);
+                    // 347d-r: odrzucenia nieczasowe - pusta kontra nie cofa zdarzenia A344-2, blokada nie zdejmuje trafien A344-4
+                    if (oth) { NoFreeOth.Add(fi.F); _ktTimed = false; } else NoFreeOth.Remove(fi.F);
+                }
+                else if (kt) _ktTimed = false;   // ciecie limitu przegladu / zapytania - nie wiadomo, czy szyk ma wolnych
                 return;
             }
             NotePull(pull, n);
@@ -1398,8 +1405,9 @@ namespace Armoury
         {
             // 311a: epizod oslony zamkniety bez zwalniania - ludzi (takze 311a) zwalnia petla nizej, wynik 283 z EndEp
             if (t.Cov != null) CoverEnd(t, outcome == HDownRiders || outcome == HDownOthers ? CeDown : outcome == HEnded ? CeEnded : CeOther, now, false);
-            // 347d A344-3: odpedzenie (HAway) przy zywym epizodzie z jezdzcami tez jest dobrym wynikiem kontry (strzelec poza zasiegiem kazdego szyku i cichy)
-            try { Front344End(t, outcome == HDownRiders || outcome == HDownOthers || (outcome == HAway && t.Active && RidersOf(t) > 0)); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Front344", e); }   // 344: wynik kontry
+            // 347d-r: cofniete 347d "HAway = dobry wynik" - at347 l.794/796 i l.821/822: "odpedzony" 1 s po kontrze, strzelec w fazie ucieczki skryptu
+            // testu i z powrotem po 3 s (l.804 [13:24:06], [13:24:13]) - HAway nie mowi, ze odpedzila go kontra
+            try { Front344End(t, outcome == HDownRiders || outcome == HDownOthers); } catch (Exception e) { _zStum++; HStumble("HorsePursuit.Front344", e); }   // 344: wynik kontry
             if (t.Active) EndEp(t, outcome, now);
             for (int i = t.Hs.Count - 1; i >= 0; i--)
             {

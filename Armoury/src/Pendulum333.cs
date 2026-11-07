@@ -545,7 +545,8 @@ namespace Armoury
                     // 347d (B344-6, at347 l.790-834 Infantry 26 HoldHighGround ~100 s z celem gry naprzod, at346 10:53 Ranged 51 ScreenedSkirmish regula B 97 s):
                     // przed kontaktem cel NAPRZOD do wroga (u > 0 przy Dir < 0) po oknie przechodzi bez wymogu 2 martwych stref (wystarczy poza martwa strefa P);
                     // cofanie (u < 0) jak dotad
-                    if (big && !inWin && (Math.Abs(u) >= 2f * dz || (u > 0f && tp.Distance(pf.P) >= dz)))
+                    // 347d-r (recenzja): tylko szyk stojacy na P (q w martwej strefie P) - szyk w drodze wstecz do P nie zawraca od kroku RBM 3-5 m (P za nim)
+                    if (big && !inWin && (Math.Abs(u) >= 2f * dz || (u > 0f && q.Distance(pf.P) < dz && tp.Distance(pf.P) >= dz)))
                     {
                         pf.Revs++;
                         _revOk++;
