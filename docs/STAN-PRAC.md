@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 07.11.2026 23:30 CET: WGRANIE 177 (najnowszy) = noc/352-prognoza-bez-korony 80c9ab22 (Armoury.dll 65f9c35e, CrashScribe 3cab76a3) = 176 + 357
+- 357: poranny meldunek kwatermistrza (MorningReport ~177 ms w takcie doby Jeffa) idzie 6 h po takcie doby (MorningLater357). Test at357 kod 0, 25.5 s/dobe, bledy 22 jak at356.
+- SPRAWDZIC w sesji Jeffa: "Profil doby (E8/0)" takt ~700 ms zamiast ~877, MorningReport ~0, MorningReport357.Hourly w czesci "godzina" raz na dobe; "QM morning" na ekranie raz na dobe.
+- Dalej (kazde osobno, po zgodzie Jeffa): sondy cen PriceWalk299/299b/PlayerHaggle co 28 dob zamiast 7 (szczyt co 7 dob ~1.2 s); SupplyDemand/BuildFunding/Sutlers/NewLordKit na inne godziny (ekonomia - audyt kolejnosci); morale BK.
+
 ## STAN 07.11.2026 21:55 CEST: WGRANIE 176 (najnowszy) = noc/352-prognoza-bez-korony (Armoury.dll e0c915a7, CrashScribe 3cab76a3) = 175 + 354 + 355 + 356
 - 354 podatek wsi do pana ziemi przy wrogim/brakujacym posiadaczu tytulu BK (Jeff: "niech odbije zamek"); 355 tarczowe gracza jako "Scutage (shield money) to the crown"; 356 Threatened bez powtornego liczenia. Test at356 OK (25.6 s/dobe). Szczegoly CHANGELOG "WGRANIE 176".
 - ZAMKNIETE (Jeff 07.11 ~22:30 "zostawiamy tak jak jest"): posiadacz tytulu z tej samej frakcji dalej dostaje podatek (rycerze BK, LandSale) - bez zmian. Otwarte: G1 prognozy - zaleglosc licznika wsi splywa po 10000/dobe, sprawdzic po kilku dobach.
