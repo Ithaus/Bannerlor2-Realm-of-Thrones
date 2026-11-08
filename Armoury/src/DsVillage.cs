@@ -225,13 +225,13 @@ namespace Armoury
         /// API dla KS (rozdz. 4.1, k_v): czesc oddanego utargu, ktora z PRAW zostaje wsi na wydatki - (u_v - T) x (1 - g_k x DsWarShareVillage) + T x 1/2
         /// (T - dziesiecina TitheVillageShare przy TempleTithe, polowa wraca jako jalmuzna). Bez kiesy, bez rampy, bez remisji. 0..1.
         /// </summary>
-        // R3-09f: lordExtra - dodatkowy udzial pana w oddanym utargu spoza modelu podatku (regale gornicze, MineRegale.KsShareOfTakings) - odjety od u_v.
+        // R3-09f: lordExtra - dodatkowy udzial pana w oddanym utargu spoza modelu podatku (regale gornicze, MineRegale.KsShareOfTakings) - odjety od u_v; 360b: netto (regale - zwrot podatku od kruszcu), moze byc ujemny.
         internal static double BudgetShare(Village v, Kingdom k, double lordExtra = 0)
         {
             if (v == null) return 0;
             var s = Settings.Current;
             double u = VillageShareOfTakings(v);
-            if (lordExtra > 0) u = Unit(u - lordExtra);
+            if (lordExtra != 0) u = Unit(u - lordExtra);                 // 360b: udzial netto pana spoza modelu (regale - zwrot podatku od kruszcu) moze byc ujemny
             double t = s != null && s.TempleTithe ? Math.Max(0.0, Math.Min(0.2, (double)s.TitheVillageShare)) : 0.0;
             if (t > u) t = u;
             double w = s != null && s.DsVillageCartDues ? WarShare(s) : 0.0;

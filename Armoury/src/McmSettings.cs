@@ -7776,6 +7776,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public float MineRegaleShare { get; set; } = 0.125f;
 
+        [SettingPropertyBool("Ore Pays Only Mine Regale", HintText = "With Mine Regale: what a mining village's carts get for iron, silver and gold pays the lord only the mine regale (Mine Regale Share), not his usual village tax as well - as under the old mining law, the ore was the lord's by right of regale and the miners kept the rest. The usual tax is still taken from everything else the cart sold. The gold not taken stays in the village purse. Off - as before.", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool MineOrePaysOnlyRegale { get; set; } = true;
+
         [SettingPropertyBool("Tools By Use", HintText = "a town's tool makers work only while the market holds less than thirty days of the town's demand for tools; past that the iron stays on the shelf for the armourers and fletchers (off = tools are made whenever it pays, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ToolsByUse { get; set; } = true;
@@ -13571,6 +13575,7 @@ namespace Armoury
             s.BloomeryCoalBeforeLordShare = BloomeryCoalBeforeLordShare;
             s.MineRegale = MineRegale;
             s.MineRegaleShare = MineRegaleShare;
+            s.MineOrePaysOnlyRegale = MineOrePaysOnlyRegale;
             s.ToolsByUse = ToolsByUse;
             s.AiBuysBarding = AiBuysBarding;
             s.ArmsTradeByCart = ArmsTradeByCart;

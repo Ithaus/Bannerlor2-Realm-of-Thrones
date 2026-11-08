@@ -159,6 +159,7 @@ namespace Armoury
         private static long _patchTicks, _dayTicks;
         // gotowka wsi wedlug polityki (okno ksiegi pieniadza - zerowane w Lines): [polityka, 0 utarg 1 licznik pana 2 majatki 3 kiesa], przelewy, sakiewki
         private static readonly long[,] _vc = new long[5, 4];
+        private static readonly long[] _vcFree = new long[5];          // 360b: utarg bez podatku pana wedlug polityki (rachunek F4b + kruszec ponad rachunek)
         private static readonly long[] _vcTrans = new long[5], _vcRel = new long[5];
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.TownFolkMode >= 1 && s.LogEnabled; } }
@@ -177,7 +178,7 @@ namespace Armoury
                 _stumbles = _stumbleSess = _offThread = 0; _err.Clear();
                 _skupN = 0; _skupStumbles = 0;                        // GL-B / 11c
                 _patchTicks = _dayTicks = 0;
-                Array.Clear(_vc, 0, _vc.Length); Array.Clear(_vcTrans, 0, _vcTrans.Length); Array.Clear(_vcRel, 0, _vcRel.Length);
+                Array.Clear(_vc, 0, _vc.Length); Array.Clear(_vcTrans, 0, _vcTrans.Length); Array.Clear(_vcRel, 0, _vcRel.Length); Array.Clear(_vcFree, 0, _vcFree.Length);
                 ResetProbe();
                 _hDay = int.MinValue;   // GL-2/GL-3: srednie glow swiata od nowa (TownFolk.Market.cs)
                 ResetLive();   // E5/B1: kiesy czynne, flagi zapasow startowych, liczniki (zapis wczytuje Import po konstruktorze)
@@ -356,7 +357,7 @@ namespace Armoury
         }
 
         /// <summary>MoneyLedger.OnAfterEntered (powrot taboru do wsi): te same liczby co "Przeplywy osad" - utarg, licznik pana, majatki, kiesa wsi.</summary>
-        internal static void NoteVillageReturn(Settlement home, int handed, int kept, int tax, int estates)
+        internal static void NoteVillageReturn(Settlement home, int handed, int kept, int tax, int estates, long taxFree = 0)
         {
             try
             {
@@ -366,6 +367,7 @@ namespace Armoury
                 f.VHanded += handed;
                 int p = Pol(f);
                 _vc[p, 0] += handed; _vc[p, 1] += tax; _vc[p, 2] += estates; _vc[p, 3] += kept;
+                if (taxFree > 0) _vcFree[p] += taxFree;                   // 360b: utarg bez podatku pana (rachunek F4b + kruszec ponad rachunek) - tylko do linii
             }
             catch (Exception e) { Stumble("NoteVillageReturn", e); }
         }
@@ -929,7 +931,8 @@ namespace Armoury
                 if (sb.Length > 0) sb.Append("; ");
                 sb.Append(PolName(p)).Append(": wsi ").Append(n[p]).Append(", G ").Append(g).Append(" (utarg ").Append(_vc[p, 0]).Append(", przelewy ").Append(_vcTrans[p])
                   .Append(", sakiewki ").Append(_vcRel[p]).Append("), pan ").Append(Pct(lord, g)).Append(", pan z majatkami ").Append(Pct(lord + _vc[p, 2], g))
-                  .Append(", w utargu: pan ").Append(Pct(_vc[p, 1], _vc[p, 0])).Append(" / majatki ").Append(Pct(_vc[p, 2], _vc[p, 0])).Append(" / wies ").Append(Pct(_vc[p, 3], _vc[p, 0]));
+                  .Append(", w utargu: pan ").Append(Pct(_vc[p, 1], _vc[p, 0])).Append(" / majatki ").Append(Pct(_vc[p, 2], _vc[p, 0])).Append(" / wies ").Append(Pct(_vc[p, 3], _vc[p, 0]))
+                  .Append(", bez podatku pana (F4b drewno, 360b kruszec) ").Append(Pct(_vcFree[p], _vc[p, 0]));
             }
             return sb.Length > 0 ? sb.ToString() : "-";
         }
@@ -937,7 +940,7 @@ namespace Armoury
         /// <summary>Okno ksiegi pieniadza dla podzialu wedlug polityki - zerowane po jej dobie (TownFolk.Lines biegnie zaraz po MoneyLedger.Daily).</summary>
         private static void ClearVillageCash()
         {
-            Array.Clear(_vc, 0, _vc.Length); Array.Clear(_vcTrans, 0, _vcTrans.Length); Array.Clear(_vcRel, 0, _vcRel.Length);
+            Array.Clear(_vc, 0, _vc.Length); Array.Clear(_vcTrans, 0, _vcTrans.Length); Array.Clear(_vcRel, 0, _vcRel.Length); Array.Clear(_vcFree, 0, _vcFree.Length);
         }
     }
 }

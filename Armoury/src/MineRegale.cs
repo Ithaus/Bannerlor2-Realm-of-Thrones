@@ -66,6 +66,9 @@ namespace Armoury
         private static readonly Dictionary<string, long> _vDay = new Dictionary<string, long>(StringComparer.Ordinal);
         private static readonly List<string> _keyBuf = new List<string>();
         private static int _vN;
+        // 360b: srednia 28 dob zwrotu podatku od kruszcu (licznik pana -> kiesa wsi, VillageTakings.OreFirst) wedlug wsi - udzial NETTO pana dla alfy z praw DS
+        private static readonly Dictionary<string, double> _bEma = new Dictionary<string, double>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, long> _bDay = new Dictionary<string, long>(StringComparer.Ordinal);
 
         internal sealed class Snap
         {
@@ -99,7 +102,7 @@ namespace Armoury
         private static void ClearSession()
         {
             lock (Gate) _acc.Clear();
-            _vEma.Clear(); _vDay.Clear(); _vN = 0;
+            _vEma.Clear(); _vDay.Clear(); _vN = 0; _bEma.Clear(); _bDay.Clear();
             _open = null; _openBill = 0; _stumSess = 0; _errOnce.Clear();
             ClearDay();
         }
@@ -316,18 +319,63 @@ namespace Armoury
             return taken;
         }
 
+        /// <summary>360b (VillageTakings.OreFirst, po F4b, przed AtCart): podglad konta kruszcu wozu BEZ zamykania - oreGold = floor(utarg x Ore/All) i d = min(rachunek
+        /// za drewno z Open, utarg) - ta sama miara co regale w AtCart. false - klucz Mine Regale nieczynny, woz w obcej wsi albo bez konta z kruszcem. Nie rzuca.</summary>
+        internal static bool PeekOre(VillageTakings.Entry st, int handed, out long oreGold, out long d)
+        {
+            oreGold = 0; d = 0;
+            int bill = ReferenceEquals(_open, st) ? _openBill : 0;
+            try
+            {
+                if (st == null || st.Party == null || st.Home == null || st.Here != null || handed <= 0 || !On) return false;
+                string id = st.Party.StringId;
+                if (string.IsNullOrEmpty(id)) return false;
+                long ore, all;
+                lock (Gate)
+                {
+                    Acc a;
+                    if (!_acc.TryGetValue(id, out a) || a == null) return false;
+                    ore = a.Ore; all = a.All;
+                }
+                if (all <= 0 || ore <= 0) return false;
+                double sh = Math.Min(1.0, (double)ore / all);
+                oreGold = (long)Math.Floor(handed * sh);
+                d = Math.Min((long)Math.Max(0, bill), (long)handed);
+                return true;
+            }
+            catch (Exception e) { oreGold = 0; d = 0; Stumble("PeekOre", e); return false; }
+        }
+
+        /// <summary>360b: zwrot podatku od kruszcu do kiesy wsi w tym oknie (VillageTakings.OreFirst) - do sredniej 28 dob wsi (alfa z praw DS). Nie rzuca.</summary>
+        internal static void NoteOreBack(Village v, long back)
+        {
+            try
+            {
+                if (v == null || v.Settlement == null || back <= 0) return;
+                string sid = v.Settlement.StringId;
+                if (string.IsNullOrEmpty(sid)) return;
+                long x; _bDay.TryGetValue(sid, out x); _bDay[sid] = x + back;
+            }
+            catch (Exception e) { Stumble("NoteOreBack", e); }
+        }
+
         // ------------------------------------------------------------ KS: alfa z praw DS
         /// <summary>StartCalibration.VilAlphaFor (galaz alfy z praw DS, watek glowny BuildInput): udzial regale w oddanym utargu wsi = srednia 28 dob regale pobranego
-        /// tej wsi / srednia 28 dob jej utargu (`handedPerDay`, ta sama waga). 0 - klucz wylaczony, brak regale albo brak utargu. Nie rzuca.</summary>
+        /// tej wsi / srednia 28 dob jej utargu (`handedPerDay`, ta sama waga). 0 - klucz wylaczony, brak regale albo brak utargu. Nie rzuca.
+        /// 360b: udzial NETTO pana spoza modelu podatku = (regale - zwrot podatku od kruszcu) / utarg - moze byc ujemny (wies dostaje wiecej niz z modelu podatku);
+        /// bez zwrotu (klucz Ore Pays Only Mine Regale wylaczony) - jak dotad co do bitu.</summary>
         internal static double KsShareOfTakings(Village v, double handedPerDay)
         {
             try
             {
                 if (v == null || v.Settlement == null || !(handedPerDay > 0) || !On) return 0.0;
                 EnsureCampaign();
-                double e;
-                if (!_vEma.TryGetValue(v.Settlement.StringId ?? "", out e) || !(e > 0)) return 0.0;
-                return Math.Min(1.0, e / handedPerDay);
+                string sid = v.Settlement.StringId ?? "";
+                double e, b;
+                if (!_vEma.TryGetValue(sid, out e) || !(e > 0)) e = 0.0;
+                if (!_bEma.TryGetValue(sid, out b) || !(b > 0)) b = 0.0;
+                if (b <= 0) return e > 0 ? Math.Min(1.0, e / handedPerDay) : 0.0;
+                return Math.Max(-1.0, Math.Min(1.0, (e - b) / handedPerDay));
             }
             catch (Exception ex) { Stumble("KsShareOfTakings", ex); return 0.0; }
         }
@@ -337,19 +385,25 @@ namespace Armoury
         {
             _vN++;
             double w = 1.0 / Math.Min(28, _vN);
+            Roll(_vEma, _vDay, w);
+            Roll(_bEma, _bDay, w);                          // 360b: zwrot podatku od kruszcu - ta sama waga
+        }
+
+        private static void Roll(Dictionary<string, double> ema, Dictionary<string, long> day, double w)
+        {
             _keyBuf.Clear();
-            foreach (var k in _vEma.Keys) _keyBuf.Add(k);
-            foreach (var k in _vDay.Keys) if (!_vEma.ContainsKey(k)) _keyBuf.Add(k);
+            foreach (var k in ema.Keys) _keyBuf.Add(k);
+            foreach (var k in day.Keys) if (!ema.ContainsKey(k)) _keyBuf.Add(k);
             for (int i = 0; i < _keyBuf.Count; i++)
             {
                 string k = _keyBuf[i];
-                double e; _vEma.TryGetValue(k, out e);
-                long d; _vDay.TryGetValue(k, out d);
+                double e; ema.TryGetValue(k, out e);
+                long d; day.TryGetValue(k, out d);
                 e += (d - e) * w;
-                if (d <= 0 && e < 0.05) _vEma.Remove(k); else _vEma[k] = e;
+                if (d <= 0 && e < 0.05) ema.Remove(k); else ema[k] = e;
             }
             _keyBuf.Clear();
-            _vDay.Clear();
+            day.Clear();
         }
 
         // ------------------------------------------------------------ zapis (arm_regale)
@@ -371,13 +425,19 @@ namespace Armoury
                     if (!(kv.Value > 0) || !SafeId(kv.Key)) continue;
                     sb.Append("|@").Append(kv.Key).Append('~').Append(kv.Value.ToString("0.###", Inv));
                 }
+                // 360b: "^idWsi~zl/d" - srednia zwrotu podatku od kruszcu (stary DLL: 2 pola < 3 - wpis pominiety)
+                foreach (var kv in _bEma)
+                {
+                    if (!(kv.Value > 0) || !SafeId(kv.Key)) continue;
+                    sb.Append("|^").Append(kv.Key).Append('~').Append(kv.Value.ToString("0.###", Inv));
+                }
                 sb.Append("|#").Append(_vN.ToString(Inv));
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return null; }
         }
 
-        private static bool SafeId(string id) { return !string.IsNullOrEmpty(id) && id.IndexOf('|') < 0 && id.IndexOf('~') < 0 && id[0] != '@' && id[0] != '#'; }
+        private static bool SafeId(string id) { return !string.IsNullOrEmpty(id) && id.IndexOf('|') < 0 && id.IndexOf('~') < 0 && id[0] != '@' && id[0] != '#' && id[0] != '^'; }
 
         internal static void Import(string s)
         {
@@ -401,6 +461,12 @@ namespace Armoury
                         {
                             double e;
                             if (f.Length >= 2 && f[0].Length > 1 && double.TryParse(f[1], NumberStyles.Float, Inv, out e) && e > 0 && e < 1e9) _vEma[f[0].Substring(1)] = e;
+                            continue;
+                        }
+                        if (p[0] == '^')                    // 360b: srednia zwrotu podatku od kruszcu
+                        {
+                            double e;
+                            if (f.Length >= 2 && f[0].Length > 1 && double.TryParse(f[1], NumberStyles.Float, Inv, out e) && e > 0 && e < 1e9) _bEma[f[0].Substring(1)] = e;
                             continue;
                         }
                         if (f.Length < 3 || string.IsNullOrEmpty(f[0])) continue;

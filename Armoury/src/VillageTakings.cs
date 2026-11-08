@@ -93,6 +93,13 @@ namespace Armoury
         // F4b: rachunek za drewno kopaln przed dzialka pana - powroty ze zwrotem, zloto z licznikow panow do kies wsi, utarg zaliczony na rachunek
         private static int _tCoalN;
         private static long _tCoalBack, _tCoalBill;
+        // 360b: kruszec placi panu tylko regale - powroty z kontem kruszcu, utarg, za kruszec, drewno, podatek od reszty, zwrot z licznika do kiesy, uciete, kontrola
+        private static int _tOreN, _tOreBackN;
+        private static long _tOreHanded, _tOreOre, _tOreBill, _tOreDue, _tOreBack, _tOreCut, _tOreFree, _tOreTaxOut, _tOrePurseIn;
+        private static readonly Dictionary<Clan, long> _oClan = new Dictionary<Clan, long>();
+        private static readonly Dictionary<IFaction, long> _oKing = new Dictionary<IFaction, long>();
+        // 360b: utarg bez podatku pana w biezacym oknie (rachunek F4b + kruszec ponad rachunek) - dla ksiegi pieniadza (TownFolk "Gotowka wsi"), odbior TakeTaxFree
+        private static MobileParty _freeParty; private static long _freeZl; private static int _winCoalD;
         private static int _fN, _fShort;
         private static long _fPaid, _fGone, _fAddPurse;
         private static int _cFoughtN, _cDisbandN, _cToHeroN, _cToBandN, _cSpareN;
@@ -102,7 +109,7 @@ namespace Armoury
         // odczyt dla ksiegi pieniadza (MoneyLedger.Daily biegnie tuz przed naszym Daily - te same granice doby)
         /// <summary>KS krok 8 (pieniadze Planu): utarg oddany przez powracajace tabory od ostatniego Daily i czesc, ktora zostala we wsi (kiesa od BK + dopisane + zwrot za drewno).
         /// Wolane przed VillageTakings.Daily tej samej doby (StartCalibration.Daily) - okno pelnej doby.</summary>
-        internal static void SplitToday(out long handed, out long village) { handed = _tHanded; village = _tKept + _tAddPurse + _tCoalBack - _tRegale; }
+        internal static void SplitToday(out long handed, out long village) { handed = _tHanded; village = _tKept + _tAddPurse + _tCoalBack + _tOreBack - _tRegale; }   // 360b: + zwrot podatku od kruszcu
 
         // R3-09f: regale gornicze zdjete z kies wsi w oknach powrotu wozow tej doby (MineRegale.AtCart) - czesc wsi utargu mniejsza o tyle (SplitToday, alfa KS)
         private static long _tRegale;
@@ -147,7 +154,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _open = null; _openEstates = 0; _hooksLogged = false; _errSites.Clear();
+            _open = null; _openEstates = 0; _hooksLogged = false; _errSites.Clear(); _freeParty = null; _freeZl = 0; _winCoalD = 0;
             ClearDay();
         }
 
@@ -157,6 +164,7 @@ namespace Armoury
             _tHanded = _tKept = _tTax = _tEstates = _tGone = _tAddPurse = _tAddTax = _tLeft = 0;
             _tNoBk.Clear();
             _tCoalN = 0; _tCoalBack = _tCoalBill = 0;
+            _tOreN = _tOreBackN = 0; _tOreHanded = _tOreOre = _tOreBill = _tOreDue = _tOreBack = _tOreCut = _tOreFree = _tOreTaxOut = _tOrePurseIn = 0; _oClan.Clear(); _oKing.Clear();
             _fN = _fShort = 0; _fPaid = _fGone = _fAddPurse = 0;
             _cFoughtN = _cDisbandN = _cToHeroN = _cToBandN = _cSpareN = 0;
             _cFought = _cDisband = _cToHero = _cToBand = _cToPlayer = _cHomeTax = _cHomePurse = _cSpare = _cLost = 0;
@@ -245,7 +253,10 @@ namespace Armoury
             long estates;
             if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
             MineRegale.Open(__state);                        // R3-09f: rachunek za drewno kopalni przed F4b (podstawa regale po drewnie)
+            _freeParty = __state.Party; _freeZl = 0; _winCoalD = 0;   // 360b: utarg bez podatku pana w tym oknie (ksiega pieniadza - TakeTaxFree)
             CoalFirst(__state, estates);
+            _freeZl = _winCoalD;
+            OreFirst(__state, estates);                      // 360b (klucz Mine Ore Pays Only Regale): od kruszcu pan bierze tylko regale - zwrot podatku od kruszcu z licznika do kiesy wsi (przed regale)
             MineRegale.AtCart(__state);                      // R3-09f: regale gornicze - kiesa wsi -> licznik pana od utargu za kruszec (przed pracami okregu i daninami DS)
             long works = WorksPay(__state);                  // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
             long side = SideFief(__state);                   // n20-wioska: wozy okregu wioski pobocznej gracza - r4-wioska: tylko licznik (dochod co dobe w SideVillageFief.Pay), zwraca 0
@@ -471,10 +482,114 @@ namespace Armoury
                     if (put < back) back = put;                           // z licznika schodzi najwyzej tyle, ile kiesa przyjela
                     if (back > 0) { home.TradeTaxAccumulated -= (int)back; _tCoalBack += back; _tCoalN++; NoteV(home, 0, back); }
                 }
-                _tCoalBill += d;
+                _tCoalBill += d; _winCoalD = d;
                 Bloomery.BillSettled(home, d, back);
             }
             catch (Exception e) { Stumble("VillageTakings.CoalFirst", e); }
+        }
+
+        /// <summary>
+        /// 360b (Jeff 08.11 "rob obie"; klucz MineOrePaysOnlyRegale, tylko przy Mine Regale): OD KRUSZCU PAN BIERZE TYLKO REGALE - jak w dawnym prawie gorniczym
+        /// (urbura 1/8 w Ius regale montanorum), nie zwykly podatek wsi i regale razem. Po F4b (CoalFirst), przed MineRegale.AtCart, tylko woz we wsi MACIERZYSTEJ
+        /// z kontem kruszcu (zelazo, srebro, zloto - ten sam zestaw i ta sama miara co regale: MineRegale.PeekOre):
+        ///   oreGold = floor(utarg x Ore/All), d = min(rachunek za drewno, utarg) - ten sam rachunek co F4b;
+        ///   nalezne panu = podatek z czynnego modelu od (utarg - max(d, oreGold)) - tylko od niekruszcowej reszty ladunku, drewno nie liczone drugi raz;
+        ///   zwrot = min(przyrost licznika w oknie (po F4b), przyrost + majatki BK - nalezne), nie mniej niz 0 - ten sam wzor co F4b (jedna zasada);
+        ///   licznik podatku wsi -= zwrot, kiesa wsi += zwrot (z licznika najwyzej tyle, ile kiesa przyjela). Nic nie znika, nic nie powstaje.
+        /// Regale pobiera potem AtCart jak dotad (z wiekszego przyrostu kiesy). Majatki BK zostaja, jak wyplacil je BK (ich udzial z kruszcu ponosi pan - jak F4b).
+        /// Klucz NIE albo Mine Regale wylaczone - nic. Wlasny try.
+        /// </summary>
+        private static void OreFirst(Entry st, long estates)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.MineOrePaysOnlyRegale || !s.MineRegale) return;
+                if (st == null || st.Here != null || st.Home == null || st.Party == null) return;
+                var home = st.Home;
+                int handed = st.Gold - st.Party.PartyTradeGold;
+                if (handed <= 0) return;
+                long oreGold, d;
+                if (!MineRegale.PeekOre(st, handed, out oreGold, out d) || oreGold <= 0) return;
+                long got = (long)home.TradeTaxAccumulated - st.HomeTax;   // licznik pana w tym oknie: BK + dopisek 112 - zwrot F4b
+                if (got <= 0) return;
+                long free = Math.Max(d, oreGold);
+                int due = TaxOf(home, (int)Math.Max(0L, handed - free));
+                long want = Math.Max(0L, got + Math.Max(0L, estates) - due);
+                long back = Math.Min(got, want);
+                _tOreN++; _tOreHanded += handed; _tOreOre += oreGold; _tOreBill += d; _tOreDue += due;
+                _tOreFree += Math.Max(0L, oreGold - d); _freeZl += Math.Max(0L, oreGold - d);
+                if (back > 0)
+                {
+                    int had = home.Gold;
+                    home.ChangeGold((int)back);
+                    long put = Math.Max(0L, (long)home.Gold - had);
+                    _tOrePurseIn += put;
+                    if (put < back) back = put;                           // z licznika schodzi najwyzej tyle, ile kiesa przyjela
+                    if (back > 0)
+                    {
+                        int taxHad = home.TradeTaxAccumulated;
+                        home.TradeTaxAccumulated = taxHad - (int)back;
+                        _tOreTaxOut += taxHad - (long)home.TradeTaxAccumulated;
+                        _tOreBack += back; _tOreBackN++; NoteV(home, 0, back);
+                        try
+                        {
+                            var hs = home.Settlement;
+                            var c = hs != null ? hs.OwnerClan : null;
+                            if (c != null) { long x; _oClan.TryGetValue(c, out x); _oClan[c] = x + back; }
+                            var f = hs != null ? hs.MapFaction : null;
+                            if (f != null) { long x; _oKing.TryGetValue(f, out x); _oKing[f] = x + back; }
+                        }
+                        catch (Exception e) { Stumble("VillageTakings.OreFirst(rod)", e); }
+                        MineRegale.NoteOreBack(home, back);                // KS: srednia 28 dob zwrotu wsi (alfa z praw DS - udzial netto pana)
+                    }
+                }
+                _tOreCut += want - Math.Max(0L, back);
+            }
+            catch (Exception e) { Stumble("VillageTakings.OreFirst", e); }
+        }
+
+        /// <summary>360b: MoneyLedger.OnAfterEntered (zaraz po oknie powrotu tego wozu) - utarg bez podatku pana w oknie: rachunek F4b + kruszec ponad rachunek
+        /// (dla linii "Gotowka wsi" - podstawa podatku). Odbior zeruje. Inny woz - 0.</summary>
+        internal static long TakeTaxFree(MobileParty mp)
+        {
+            if (mp == null || !ReferenceEquals(mp, _freeParty)) return 0;
+            long v = _freeZl;
+            _freeParty = null; _freeZl = 0;
+            return Math.Max(0L, v);
+        }
+
+        private static string OreLine(int day, Settings s)
+        {
+            var sb = new StringBuilder(900);
+            sb.Append("Kruszec bez podatku (360b): dzien ").Append(day).Append(" | ");
+            if (!s.MineOrePaysOnlyRegale) sb.Append("WYLACZONE w ustawieniach (Ore Pays Only Mine Regale) - od kruszcu zwykly podatek wsi i regale");
+            else if (!s.MineRegale) sb.Append("NIECZYNNE - Mine Regale wylaczone (od kruszcu zwykly podatek wsi)");
+            else if (!MineRegale.On) sb.Append("NIECZYNNE - brak okna powrotu wozu (Village Takings Whole wylaczone albo latka nie wpieta)");
+            else sb.Append("CZYNNE - od kruszcu tylko regale, zwykly podatek pana od reszty ladunku");
+            sb.Append(" | powroty z kruszcem ").Append(_tOreN).Append(", utarg ").Append(_tOreHanded).Append(", za kruszec ").Append(_tOreOre).Append(", drewno (F4b) ").Append(_tOreBill)
+              .Append(", podatek pana od reszty (utarg - max(drewno, kruszec)) ").Append(_tOreDue).Append(", z licznikow panow do kies wsi ").Append(_tOreBack)
+              .Append(" (").Append(_tOreBackN).Append(" powrotow, sufit przyrostu licznika uciete ").Append(_tOreCut).Append(")")
+              .Append(" | kontrola: liczniki panow -").Append(_tOreTaxOut).Append(", kiesy wsi +").Append(_tOrePurseIn).Append(", reszta ").Append(_tOrePurseIn - _tOreTaxOut);
+            OreTop(sb, " | najwiecej (rody): ", _oClan);
+            OreTop(sb, " | wedlug krolestw: ", _oKing);
+            sb.Append('.');
+            return sb.ToString();
+        }
+
+        private static void OreTop<T>(StringBuilder sb, string head, Dictionary<T, long> d)
+        {
+            if (d.Count <= 0) return;
+            var top = new List<KeyValuePair<T, long>>(d);
+            top.Sort((x, y) => y.Value.CompareTo(x.Value));
+            sb.Append(head);
+            for (int i = 0; i < top.Count && i < 4; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                string n = "?";
+                try { object o = top[i].Key; var c = o as Clan; var f = o as IFaction; n = c != null ? (c.Name != null ? c.Name.ToString() : c.StringId) : (f != null && f.Name != null ? f.Name.ToString() : "?"); } catch { }
+                sb.Append(n).Append(' ').Append(top[i].Value);
+            }
         }
 
         /// <summary>Nasluch HeroOrPartyTradedGold: wyplata "nic -> bohater" w oknie powrotu taboru to udzial wlasciciela majatku BK w podatku.</summary>
@@ -783,15 +898,19 @@ namespace Armoury
                 {
                     // F4b: zwrot za drewno kopaln (licznik pana -> kiesa wsi) jest juz odjety od "pan" i doliczony do "wies razem" - prog W12-5 czyta "pan";
                     // z F4b: oddane = pan + majatki + kiesa od BK + bez odbiorcy + zwrot za drewno
-                    sb.Append(_tReturns).Append(": oddane ").Append(_tHanded).Append(" = pan (licznik podatku) ").Append(Math.Max(0L, _tTax - _tCoalBack)).Append(" (").Append(Pct(_tTax + _tAddTax - _tCoalBack, _tHanded))
+                    // 360b: zwrot podatku od kruszcu (licznik pana -> kiesa wsi) odjety od "pan" i doliczony do "wies razem" jak F4b
+                    sb.Append(_tReturns).Append(": oddane ").Append(_tHanded).Append(" = pan (licznik podatku) ").Append(Math.Max(0L, _tTax - _tCoalBack - _tOreBack)).Append(" (").Append(Pct(_tTax + _tAddTax - _tCoalBack - _tOreBack, _tHanded))
                       .Append(" po dopisaniu) + wlasciciele majatkow BK ").Append(_tEstates).Append(" + kiesa wsi od BK ").Append(_tKept).Append(" + bez odbiorcy ").Append(_tGone)
-                      .Append("; z tego dopisane kiesom wsi ").Append(_tAddPurse).Append(" (wies razem ").Append(Pct(_tKept + _tAddPurse + _tCoalBack, _tHanded)).Append(" utargu)")
+                      .Append("; z tego dopisane kiesom wsi ").Append(_tAddPurse).Append(" (wies razem ").Append(Pct(_tKept + _tAddPurse + _tCoalBack + _tOreBack, _tHanded)).Append(" utargu)")
                       .Append(", licznikom panow ").Append(_tAddTax).Append(" (").Append(_tAddTaxN).Append(" powrotow bez podatku BK")
                       .Append(_tNoBk.Count > 0 ? ": " + string.Join(", ", _tNoBk.ToArray()) : "").Append("), nieprzypisane ").Append(_tLeft)
                       .Append("; powroty, w ktorych nic nie zniklo ").Append(_tNoLoss).Append(", z nadwyzka rozliczona przez BK ").Append(_tOver)
                       .Append(", okna niedomkniete ").Append(_tStale)
                       .Append("; rachunek za drewno kopaln (F4b): ").Append(Bloomery.CoalFirst ? "CZYNNE" : "nieczynne").Append(", powroty ze zwrotem ").Append(_tCoalN)
                       .Append(", utarg zaliczony na rachunek ").Append(_tCoalBill).Append(", z licznikow panow do kies wsi ").Append(_tCoalBack)
+                      .Append(" (odjete od \"pan\", doliczone do \"wies razem\")")
+                      .Append("; kruszec bez podatku pana (360b): ").Append(s.MineOrePaysOnlyRegale && MineRegale.On ? "CZYNNE" : "nieczynne").Append(", powroty ze zwrotem ").Append(_tOreBackN)
+                      .Append(", utarg za kruszec ponad rachunek zwolniony z podatku pana ").Append(_tOreFree).Append(", z licznikow panow do kies wsi ").Append(_tOreBack)
                       .Append(" (odjete od \"pan\", doliczone do \"wies razem\")");
                 }
                 sb.Append(" | towar kupiony we wsiach ");
@@ -818,6 +937,7 @@ namespace Armoury
                 if (_stumbles > 0) sb.Append(" | wyjatki zlapane ").Append(_stumbles).Append(" (pierwszy z kazdego miejsca w logu jako ERROR)");
                 sb.Append('.');
                 Log.Info(sb.ToString());
+                if (_enterHooked && s.VillageTakingsWhole && (s.MineOrePaysOnlyRegale || _tOreN > 0)) Log.Info(OreLine(day, s));   // 360b: linia doby (klucz NIE - bez linii)
             }
             catch (Exception e) { Log.Error("VillageTakings.Daily", e); }
             finally { ClearDay(); }

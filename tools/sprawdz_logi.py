@@ -8566,9 +8566,11 @@ def etap5_b1(rep, lines, start, until, logp):
         x = gw.get(d)
         if not x:
             continue
-        for mm in re.finditer(r"(niska|zwykla|wysoka|zwolnienie): wsi \d+, G -?\d+ \([^)]*\), pan [^,]+, pan z majatkami ([\d.]+)%, w utargu: pan ([\d.]+)% / majatki ([\d.]+)%", x):
+        for mm in re.finditer(r"(niska|zwykla|wysoka|zwolnienie): wsi \d+, G -?\d+ \([^)]*\), pan [^,]+, pan z majatkami ([\d.]+)%, w utargu: pan ([\d.]+)% / majatki ([\d.]+)%(?: / wies [\d.]+%, bez podatku pana \(F4b drewno, 360b kruszec\) ([\d.]+)%)?", x):
             if mm.group(1) == "zwykla":
-                ut.append(float(mm.group(3)) + float(mm.group(4))); gg.append(float(mm.group(2)))
+                # 360b: udzial pana w podstawie podatku (utarg bez rachunku F4b i kruszcu ponad rachunek); log bez dopisku - jak dotad
+                fz = float(mm.group(5)) if mm.group(5) else 0.0
+                ut.append((float(mm.group(3)) + float(mm.group(4))) * (100.0 / (100.0 - fz) if fz < 100 else 1.0)); gg.append(float(mm.group(2)))
             worst.append(float(mm.group(2)))
     u10, g11 = _mean(ut), _mean(gg)
     # decyzja Jeffa 12.10 (wsie nie gromadza): dopisek pana z utargu (VillageLordExtraShare) z linii stanu - zwykla 35 + dopisek (0.10 -> 45%, niska 35, wysoka 55);
@@ -8690,14 +8692,18 @@ def etap5_wsie(rep, lines, start, until):
         rep.add("W12-1: dziesiecina", "wylaczona (Temple Tithe 0)" + (f"; linii {len(ti)}" if ti else ""), "0 linii przy wylaczonej", len(ti) == 0)
     # ---- W12-5 pan z majatkami w utargu wszystkich wsi (mieszanka polityk; przed decyzja 35.0% w kopia-fin3)
     ut = by_day(lines, "Utarg wsi (112): dzien")
-    hd = lt = es = 0
+    hd = lt = es = fr = 0
     for d in w28:
         m = re.search(r"oddane (\d+) = pan \(licznik podatku\) (\d+) .*?wlasciciele majatkow BK (\d+)", ut.get(d, ""))
         if m:
             hd += int(m.group(1)); lt += int(m.group(2)); es += int(m.group(3))
+            # 360b: podstawa podatku pana bez utargu zaliczonego na rachunek za drewno (F4b) i bez kruszcu ponad rachunek (od kruszcu tylko regale) -
+            # log bez dopisku 360b: tylko F4b (jak dotad pan byl mniejszy o zwrot F4b przy pelnym mianowniku)
+            fr += (num(r"utarg zaliczony na rachunek (\d+)", ut[d], int, 0) or 0) + (num(r"utarg za kruszec ponad rachunek zwolniony z podatku pana (\d+)", ut[d], int, 0) or 0)
     e5 = 35 + extra * 100
-    q5 = (lt + es) / hd * 100 if hd > 0 else None
-    rep.add("W12-5: pan z majatkami w utargu taborow - wszystkie wsie (sr28)", f"{q5:.1f}% (pan {lt / hd * 100:.1f}%, majatki {es / hd * 100:.1f}%)" if q5 is not None else "brak linii Utarg wsi (112)",
+    hb = hd - fr
+    q5 = (lt + es) / hb * 100 if hb > 0 else None
+    rep.add("W12-5: pan z majatkami w utargu taborow - wszystkie wsie (sr28; podstawa bez rachunku F4b i kruszcu 360b)", f"{q5:.1f}% (pan {lt / hb * 100:.1f}%, majatki {es / hb * 100:.1f}%; utarg {hd}, bez podatku pana {fr})" if q5 is not None else "brak linii Utarg wsi (112)",
             f"{e5:.0f}% +-3 pp (mieszanka polityk, gros zwykla; przed decyzja 35.0%)", (abs(q5 - e5) <= 3) if q5 is not None else None)
     # ---- W12-6 tempo nadwyzki: oferta (W = tempo x lokata, R/P na wierzch) / lokata W
     off = sum(num(r"oferta nadwyzki na jutro (\d+)", kie[d], int, 0) or 0 for d in w28)
