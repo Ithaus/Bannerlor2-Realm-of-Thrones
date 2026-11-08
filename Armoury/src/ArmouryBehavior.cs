@@ -3003,6 +3003,7 @@ namespace Armoury
                 DayProfile.Lap("PriceBand306.Daily");
             }
             else { try { RawPrice.QuietDay(); } catch (Exception e) { Log.Error("RawPrice.QuietDay", e); } DayProfile.Lap("RawPrice.Daily"); }
+            try { OrePrice360.Daily(LogGate.Lines); } catch (Exception e) { Log.Error("OrePrice360.Daily", e); }   // 360d: linia "Kruszec w cenie (360d)" w dobie pomiaru, liczniki doby od zera
             try { XbowPrice.Daily(); } catch (Exception e) { Log.Error("XbowPrice.Daily", e); } DayProfile.Lap("XbowPrice.Daily");   // kusze wedlug luku (noc 15/16.10): linia "Kusze wedlug luku (zakupy)" (tylko log)
             try { VillageFruit.Daily(); } catch (Exception e) { Log.Error("VillageFruit.Daily", e); } DayProfile.Lap("VillageFruit.Daily");       // placek i marchew (B1): linia "Owoce wsi" (tylko log)
             try { VillageFruit.EggDaily(); } catch (Exception e) { Log.Error("VillageFruit.EggDaily", e); } DayProfile.Lap("VillageFruit.EggDaily");   // N2-E1: linia "Jaja wsi (N2-E1)" (tylko log)

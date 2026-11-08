@@ -3548,6 +3548,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float PriceSupplyMemoryDaily { get; set; } = 0.15f;
 
+        [SettingPropertyBool("Ore Price Sees All Stock", HintText = "the price of silver and gold ore in a town sees all the ore lying in its market (Westeros or Essos), not only its own stall: the ore in villages and their carts, castles, caravan packs and merchant carts is shared among the towns by how much each wants, and each town's remembered supply takes in its share at the market memory's pace (Price Supply Memory Daily). The price you see is the price paid by everyone - you, caravans, carts and the mints. It falls by at most 5 in 100 a day, so a large unsold stock lowers it over some weeks; it rises as before. Nothing is made or lost, only the price changes. Off - the price sees only the stall, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool OreStockInPrice { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Price Instant Share", 0.020f, 0.150f, "0.000", HintText = "share of a stocked stall's weight that a piece or lot bought or sold weighs on the town's price at once (0.02-0.15; 0.06 = for trade goods about a fifth of the game's step, for arms, armour and horses 6 parts in 100 of a whole piece; 0.15 = package 299). The rest reaches the price over the next days at Price Supply Memory Daily. Needs Price Slow Supply Memory", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float PriceInstantShare { get; set; } = 0.06f;
@@ -12534,6 +12538,7 @@ namespace Armoury
             s.PriceFlatterLotWalk = PriceFlatterLotWalk;
             s.PriceSlowSupplyMemory = PriceSlowSupplyMemory;
             s.PriceSupplyMemoryDaily = PriceSupplyMemoryDaily;
+            s.OreStockInPrice = OreStockInPrice;
             s.PriceInstantShare = PriceInstantShare;
             s.PriceFlatterAllItems = PriceFlatterAllItems;
             s.TradeExportPhysicalShelf = TradeExportPhysicalShelf;

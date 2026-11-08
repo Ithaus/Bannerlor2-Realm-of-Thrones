@@ -257,21 +257,27 @@ namespace Armoury
 
         public static void SupplyPacePostfix(Town __0, ItemCategory __1, float __2, float __3, float __4, float __5, ref ValueTuple<float, float> __result)
         {
+            double p = GameDayW;
             try
             {
-                double p = PaceOf(Settings.Current);
+                p = PaceOf(Settings.Current);
                 bool apply = MemoryLive && p < GameDayW - 1e-6;
                 if (!MemoryLive) System.Threading.Interlocked.Increment(ref _paceBefore);
                 else NotePace(apply);
-                if (!apply) return;
-                float pf = (float)p;
-                __result = new ValueTuple<float, float>(Math.Max(0.1f, __4 * (1f - pf) + __2 * pf), __result.Item2);
+                if (apply)
+                {
+                    float pf = (float)p;
+                    __result = new ValueTuple<float, float>(Math.Max(0.1f, __4 * (1f - pf) + __2 * pf), __result.Item2);
+                }
             }
             catch (Exception e)
             {
                 System.Threading.Interlocked.Increment(ref _stPace);
                 if (!_errPace) { _errPace = true; Log.Error("RawPrice.SupplyPacePostfix", e); }   // raz na kampanie; podaz zostaje wedle gry
             }
+            // 360d (klucz Ore Price Sees All Stock): podaz srebra i rudy zlota z udzialem miasta w zapasie rynku poza polkami - po podazy bazowej (gra / 299b),
+            // przed cieciem BK (popyt x rok); tylko wywolanie dobowe w kampanii (straznik i wlasny try w OrePrice360.Supply)
+            if (MemoryLive) OrePrice360.Supply(__0, __1, __2, __4, p, ref __result);
         }
 
         private static void NotePace(bool applied)
