@@ -25,7 +25,7 @@ namespace Armoury
     /// spadnie do tego, co rynek naprawde zjada (lacznie z mennica), a W liczy sie dalej wobec C bez mennicy (mennica bierze tylko nadwyzke).
     /// (2) przy kluczu 360d (Ore Price Sees All Stock) cena srebra i zlota stale widzi towar w drodze (wozy - kilkanascie dob wydobycia), wiec indeks
     /// wzgledny 360a lezy trwale ponizej 0.8 takze w rownowadze - regula ceny tnialaby rece co cykl bez konca. Przy 360d o rekach srebra i zlota decyduje
-    /// sam zapas: nadwyzka - w dol, pasmo - bez zmian, niski zapas (W < 30 x C bez mennicy) i wydobycie ponizej calego zuzycia - w gore (+10%), poza tym
+    /// sam zapas: nadwyzka - w dol, pasmo - bez zmian, niski zapas (W < 30 x C bez mennicy) i wydobycie ponizej zuzycia bez mennicy (360r2; wczesniej calego - petla z mennica) - w gore (+10%), poza tym
     /// bez zmian; bez danych (pierwsze 7 dob, spis z bledem, klucz 360c wylaczony) - bez zmian. Bez 360d - regula ceny jak dotad (pasmo blokuje tylko wzrost).
     /// </summary>
     internal static partial class StartCalibration
@@ -110,7 +110,7 @@ namespace Armoury
                     long w = OreStock360.Sum(_surW, m, mk, 0);
                     // 360r-c/d: wydobycie wobec calego zuzycia (z mennica); przy 360d decyzja bez reguly ceny
                     if (w > SurHi * cn && _surPa[m, mk] > SurPk * _surCa[m, mk]) _surDec[m, mk] = DecDown;
-                    else if (w < SurLo * cn) _surDec[m, mk] = !px ? DecLow : (_surPa[m, mk] < _surCa[m, mk] ? DecUp : DecLowFix);
+                    else if (w < SurLo * cn) _surDec[m, mk] = !px ? DecLow : (_surPa[m, mk] < cn ? DecUp : DecLowFix);   // 360r2: wzrost tylko, gdy wydobycie nie pokrywa zuzycia BEZ mennicy (mennica bierze kazda nadwyzke - liczona w C dawala petle: at360cd Westeros +10% dwa razy)
                     else _surDec[m, mk] = px ? DecBandFix : DecBand;
                 }
         }
@@ -151,7 +151,7 @@ namespace Armoury
             var sb = new StringBuilder(2000);
             sb.Append("Kopalnie (360c): dzien ").Append(today).Append(" | cykl co ").Append(RegCycle).Append(" dob od D ").Append(DDay)
               .Append(" | prog: zapas rynku W > ").Append(SurHi.ToString("0", Inv)).Append(" x C bez mennicy i P > ").Append(SurPk.ToString("0.0", Inv)).Append(" x C z mennica - rece -10%; wzrost tylko przy W < ")
-              .Append(SurLo.ToString("0", Inv)).Append(" x C bez mennicy").Append(OrePrice360.On ? " i P < C z mennica (360d - cena nie rusza rak)" : "").Append(" (srednia ").Append(_surN).Append(" dob z ").Append(SurWin).Append(", min. ").Append(SurMinN).Append(')')
+              .Append(SurLo.ToString("0", Inv)).Append(" x C bez mennicy").Append(OrePrice360.On ? " i P < C bez mennicy (360d - cena nie rusza rak; 360r2)" : "").Append(" (srednia ").Append(_surN).Append(" dob z ").Append(SurWin).Append(", min. ").Append(SurMinN).Append(')')
               .Append(" | spis ").Append(_surWOk ? "OK" : "BLAD - bez zmian");
             for (int m = 0; m < Mt; m++)
                 for (int mk = 0; mk < 2; mk++)
