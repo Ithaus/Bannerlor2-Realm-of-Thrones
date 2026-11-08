@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 08.11.2026 04:00 CET: WGRANIE 181 (najnowszy) = noc/360-kopalnie 4e753ae1 (Armoury.dll 44e2001f, CrashScribe 3cab76a3) = 177 + 358 + 359/359b/359c + 359d + 360a/360b
+- 178 = 358 sondy cen co 28 dob; 179 = 359 zbiorka uciekajacych (wodz/kapitan/gracz, raz na zolnierza), 359b bron w ucieczce (latka Artem DropAllWeapons), 359c 36 klipow holdline/turnback (manifest.tsv +36); 180 = 359d okrzyki czesciej; 181 = 360a rece kopaln srebra/zlota za indeksem wzglednym, 360b od kruszcu pan bierze tylko regale.
+- Galaz noc/360-kopalnie zawiera noc/352 (merge 377d75a5) - dalej pracowac na niej (worktree scratchpad sesji 264cfac3 n360).
+- SPRAWDZIC w sesji Jeffa: "okrzyki dowodcow (359)" w duzych bitwach (zwarcie N; jesli malo - skrocic odstep szyku); "ZBIORKA (359)"; "Kruszec bez podatku (360b)" reszta 0; "Kopalnie (360a)" w 109682; rozliczenie rodu gracza po 360b ok. -3..-4k/dobe.
+- Decyzje Jeffa czekajace: 360c (rece kopaln w dol od nadwyzki na wozach - 360a juz tnie ok. 4%/cykl); bandyci nieme w okrzykach (zostawione). Zamkniete: posiadacz tytulu wsi z frakcji bez zmian (Jeff "zostawiamy").
+
 ## STAN 07.11.2026 23:30 CET: WGRANIE 177 (najnowszy) = noc/352-prognoza-bez-korony 80c9ab22 (Armoury.dll 65f9c35e, CrashScribe 3cab76a3) = 176 + 357
 - 357: poranny meldunek kwatermistrza (MorningReport ~177 ms w takcie doby Jeffa) idzie 6 h po takcie doby (MorningLater357). Test at357 kod 0, 25.5 s/dobe, bledy 22 jak at356.
 - SPRAWDZIC w sesji Jeffa: "Profil doby (E8/0)" takt ~700 ms zamiast ~877, MorningReport ~0, MorningReport357.Hourly w czesci "godzina" raz na dobe; "QM morning" na ekranie raz na dobe.
