@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 181 - 360a/360b (+360r-a, 360r-b) na 180 (Armoury.dll d893b28c -> 44e2001f = build 377d75a5, merge noc/352 do noc/360-kopalnie)
+**Test at360 (kopia zapisu Jeffa 08.11 00:19, 20 dob - do cyklu 109654):** kod 0, 22.3 s/dobe, bledy CrashScribe 23 (jak at358/359/359d).
+**360a (doba 109654):** mediana miast W/E 3.19/3.24; silver indeks wzgledny mediana 0.61 -> w gore 0 / w dol 160 / bez zmian 61, rece 23437 -> 22425; gold_ore mediana 0.33 -> w dol 139 / bez zmian 43, rece 15977 -> 15515; potkniecia 0. Wbrew projektowi (srebro 1.09/0.88 w 109634) regula juz ZMNIEJSZA rece (ok. -4% srebro, -3% zloto na cykl 28 dob) - 360c przyspieszyloby, decyzja Jeffa.
+**360b:** "Kruszec bez podatku (360b)" - kontrola liczniki panow -X / kiesy wsi +X, reszta 0 (np. 109652: 24701 zl z 13 powrotow; KARDA ok. 20-23k na powrot przed zmiana). Gracz: podatek 2 wsi po splynieciu zaleglosci (109640-109654) ok. 1.5k/dobe (bylo ok. 8.6k); rozliczenie rodu gracza spada do ok. -3..-4k/dobe (109643-109653) - Jeff na minusie dziennie (wojsko/garnizon), do powiedzenia wprost.
+**Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie181, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie181(-przed). Klucze MCM KsRegaleRelativePrice i MineOrePaysOnlyRegale - wylaczenie = jak dotad.
+**Status:** WGRANE (181).
+
 ## WGRANIE 180 - 359d (okrzyki dowodcow czesciej) na 179 (Armoury.dll 67dd5867 -> d893b28c = build 66c094eb)
 **Test at359d (kopia zapisu Jeffa 08.11 00:19, 10 dob + 13 bitew):** kod 0, misje sprawdzone, bledy CrashScribe 23 (jak at358/at359). Okrzyki: bitwy z bandami 0-1 (gracz sami konni - "nie piechota", bandyci niemi), bitwy z lordem: zwarcie 1/2/1, przed szarza 0/1/0 (kandydatow 0/1/3); glowna blokada "odstep szyku" (60 w bitwie 12) i "odstep strony" (25) - male bitwy testu (1 szyk piechoty na strone, ok. minuta zwarcia). Zawroc 0 z 0 - w tym biegu zadnego zawrocenia (los), sciezki glosu nie sprawdzone w tescie.
 **Do sprawdzenia w grze Jeffa (duze bitwy):** linia "okrzyki dowodcow (359)" - zwarcie N na bitwe; jesli dalej malo - skrocic odstep szyku (HoldLineEvery/Span, OGap) albo dopuscic szyki inne niz piechota.
