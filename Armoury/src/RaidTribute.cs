@@ -43,7 +43,8 @@ namespace Armoury
     ///  - rod w potrzebie (CitySack.NeedOf.InNeed - ta sama miara co okup oblezenia: zalegly zold albo kiesa rodu ponizej 14 dob zoldu druzyn rodu) - rabunek;
     ///  - okup ponizej doby zoldu WLASNEJ druzyny wodza (NeedOf.LeadWage) - grosze, biedna wies plonie - rabunek (recenzja 20.10: miara zoldu calej armii - 8-13 tys./d
     ///    w logu wzorcowym wobec mediany kiesy wsi 7317 - wycinala okup armiom prawie zawsze, zanim policzono zysk);
-    ///  - rabunek oplaca sie bardziej: T &lt; E - C x D, gdzie E = s x (kiesa + wartosc magazynu wsi) - lup kroku, D - doby kroku (DistrictRaid.StepEstimate - ta sama
+    ///  - rabunek oplaca sie bardziej: T &lt; E - C x D, gdzie E = s x (kiesa + wartosc magazynu wsi) - lup kroku (od 362: zloto max(s, S wodza) x kiesa - skrytki wedlug
+    ///    Roguery, RaidCache.Share, ta sama funkcja co wyplata), D - doby kroku (DistrictRaid.StepEstimate - ta sama
     ///    arytmetyka co krok R1), C = doba zoldu armii (wszystkie jej druzyny sa w tym czasie zajete) - rabunek; inaczej OKUP (pewny i od razu, bez spustoszenia i uchodzcow).
     /// GRACZ: opcja "Demand tribute" w menu "village_hostile_action" (tylko w wojnie z panem wsi) - dymek z kwota, stawka, sila i dniami ochrony; zablokowana z powodem,
     /// gdy wies stawia opor, ma pusta kiese, juz zaplacila krolestwu gracza albo gracz w ostatnich 10 dobach zabral z niej zapasy lub rekrutow (pamiec wrogich czynow
@@ -410,11 +411,20 @@ namespace Armoury
                 double share, days, e = 0.0;
                 if (DistrictRaid.StepEstimate(st.Village, q.Men, out share, out days, mp.MapFaction != null ? mp.MapFaction.StringId : null))   // m97-wioski: bez wiosek po okupie
                 {
-                    e = share * (q.Purse + StockValue(st));
-                    if (q.T < e - wage * days) { _rBetter++; _dRaid++; _dRaidE += (long)e; return true; }   // C = zold calej armii: wszystkie jej druzyny stoja te doby
+                    // 362 (RaidCache): zloto rabunku = max(s, S wodza) x kiesa (skrytki wedlug Roguery - ta sama funkcja co wyplata, u = 1), towar s x magazyn
+                    long stock = StockValue(st);
+                    double e0 = share * (q.Purse + stock);
+                    e = Math.Max(share, RaidCache.Share(leader, 1.0)) * q.Purse + share * stock;
+                    if (q.T < e - wage * days)   // C = zold calej armii: wszystkie jej druzyny stoja te doby
+                    {
+                        _rBetter++; _dRaid++; _dRaidE += (long)e;
+                        RaidCache.NoteChoice(true, !(q.T < e0 - wage * days));                                  // przez skrytki: bez nich bylby okup
+                        return true;
+                    }
                 }
                 else { _dNoEst++; days = 0.0; }
                 if (!Pay(mp, leader, st, q, e, days, army)) { _dRaid++; return true; }                        // nic nie przeszlo (kiesa pusta w miedzyczasie) - rabunek jak w grze
+                RaidCache.NoteChoice(false, false);
                 Hold(mp);
                 return false;
             }

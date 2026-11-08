@@ -102,6 +102,9 @@ namespace Armoury
             // m97-wioski: MainOnly - krok gracza pali tylko osady wsi gry (klucz SideVillagesEnterable; wioski poboczne rabuje sie osobno); Fid - frakcja napastnika
             // (wioski, ktore zaplacily jej okup, poza planem i lancuchem). Bez zapisu - Decide liczy od nowa po wczytaniu.
             public bool MainOnly; public string Fid;
+            // 362: udzial wsi gry w ludziach okregu w domu na poczatku sesji gracza z MainOnly (skrytki: S x udzial - kiesa wspolna dla okregu, wioski poboczne
+            // rabuje sie osobno, jak w SideVillageVisit); NaN - nie policzony (AI, po wczytaniu) - Loot liczy wtedy teraz
+            public double CacheSh = double.NaN;
         }
 
         internal sealed class EndCtx { public Sess Ss; public long Cap0; public double RaidDead; }
@@ -381,6 +384,7 @@ namespace Armoury
             if (p.BurnedOut) _dBurnedOut++;
             if (p.UClamped) _dUClamped++;
             ss.L0 = p.L; ss.Home0 = p.Home; ss.Sv = p.Sv;
+            if (ss.MainOnly && ss.Steps == 0 && double.IsNaN(ss.CacheSh)) ss.CacheSh = MainShareOf(v);   // 362: przed pierwszym uderzeniem
             try { var lp = comp.AttackerSide.LeaderParty; var h = lp != null ? lp.LeaderHero : null; ss.Lord = h != null && h.IsLord; }
             catch { ss.Lord = false; }
         }
@@ -539,7 +543,7 @@ namespace Armoury
             int rg = ReaverLaw.RaidGroup(lp);
             bool first = ss.Steps == 0;
             double u = ss.Work > 0.0 ? Clamp01(Math.Min(ss.Prog, ss.Work) / ss.Work) : 0.0;
-            double s = first ? ReaverLaw.IronShare(rg, s0, u) : s0;
+            double s = first ? ReaverLaw.IronShare(rg, s0, u) : s0;   // towar i stado; zloto ze skrytek (362, RaidCache) - nizej, tylko zloto
             // R3-06c (p5-stada): stado okregu najpierw - ubytek stada za udzial s, zwierzeta do taboru wodza (liczba do okienka gracza); znacznik rabunku takze przy s = 0 (VillageHerds; wlasny try w srodku)
             try { ss.STake += VillageHerds.OnRaid(v, s, lp != null ? lp.MobileParty : null); } catch (Exception e) { Stumble("Loot(stado)", e); }
             if (!(s > 0.0)) return;
@@ -564,11 +568,31 @@ namespace Armoury
                         if (dueI > 0) extra = SmallGold.PayRaidLoot(v, leader, dueI);
                         if (extra > 0) ReaverLaw.NoteIronGold(leader, extra);
                     }
+                    // 362 (RaidCache): skrytki wsi wedlug Roguery wodza - RAZ NA SESJE (pierwszy krok, jak zelazna cena). Zloto razem = max(s0, zelazna cena, S x u) x kiesa
+                    // przed lupem (v0): doplata = round(S x u x v0) - to, co juz poszlo (s0 i zelazna cena) - MAX, nie suma. Ten sam platnik (kiesa wsi -> wodz, najwyzej
+                    // tyle, ile w kiesie). U najezdzcow doplata ponad zelazna cene idzie do kosza WW2 tak jak zelazna cena (to ten sam "lup ponad s"). Towar - bez zmian (s).
+                    int rogS = 0;
+                    double sRaw = first ? RaidCache.Raw(leader, out rogS) : 0.0;
+                    // gracz z MainOnly pali tylko wies gry - skrytki z jej czesci kiesy okregu (wioski poboczne - osobno, SideVillageVisit); AI pali lancuchem - cala kiesa
+                    double sc = sRaw * u * (ss.MainOnly ? (double.IsNaN(ss.CacheSh) ? MainShareOf(v) : ss.CacheSh) : 1.0);
+                    long topUp = 0, cacheGold = 0;
+                    if (sc > 0.0)
+                    {
+                        long target = (long)Math.Round(sc * Math.Max(0L, v0));
+                        long dueC = target - paid - extra;
+                        if (dueC > 0) topUp = SmallGold.PayRaidLoot(v, leader, dueC);
+                        if (topUp > 0 && rg >= 0) ReaverLaw.NoteIronGold(leader, topUp);
+                        // zloto ze skrytek (podstawa XP i komunikatu) = sama doplata: ponad max(s0, zelazna cena), do S x u x kiesa. Recenzja 362 (1-3, 2-1): nie wliczac
+                        // przyrostu zelaznej ceny (extra) - to lup sprzed 362, bez tortur; inaczej najezdzca z S < Q dostawal XP i komunikat za zloto, ktore i tak bral.
+                        cacheGold = Math.Max(0L, topUp);
+                    }
                     long g1 = leader.Gold, v1 = v.Gold;
-                    ss.SGold += paid + extra;
-                    _dGold += paid + extra;
+                    ss.SGold += paid + extra + topUp;
+                    _dGold += paid + extra + topUp;
                     _dBal1 += (g1 - g0) - (v0 - v1);                          // niezalezny bilans: przyrost kiesy wodza - ubytek kiesy wsi
-                    ReaverLaw.NoteVillageGold(rg, leader, v, paid, extra, (g1 - g0) - (v0 - v1));
+                    ReaverLaw.NoteVillageGold(rg, leader, v, paid, extra + topUp, (g1 - g0) - (v0 - v1));
+                    if (sRaw > 0.0)
+                        RaidCache.After(leader, st, rogS, sRaw, sRaw * u, v0 > 0 ? (paid + extra + topUp) / (double)v0 : 0.0, cacheGold, topUp, ss.Player, false);
                     // WW1 nabrzeze: rabunek z morza wsi portu - Qw x u kiesy W portu ponad zapas dni (kiesa ludu -> wodz); raz na sesje (sea tylko w pierwszym kroku)
                     if (sea) ss.SGold += ReaverLaw.Waterfront(rg, leader, v, u);
                 }
@@ -671,6 +695,20 @@ namespace Armoury
         }
 
         private static bool Walks(ItemObject it) { return it != null && (it.HasHorseComponent || it.IsAnimal); }
+
+        /// <summary>362: udzial wsi gry w ludziach okregu w domu (VillageBook.PartsOf). Ksiega nieczynna albo okreg nieznany - 1 (MainOnly i tak nic wtedy nie wyklucza).</summary>
+        private static double MainShareOf(Village v)
+        {
+            try
+            {
+                var pv = new List<VillageBook.PartView>();
+                if (!VillageBook.PartsOf(v, pv)) return 1.0;
+                double all = 0.0, main = 0.0;
+                foreach (var p in pv) { if (p == null) continue; all += p.Home; if (p.Main) main += p.Home; }
+                return all > 0.0 ? Clamp01(main / all) : 1.0;
+            }
+            catch (Exception e) { Stumble("MainShareOf", e); return 1.0; }
+        }
         private static double PerKg(ItemObject it) { return it == null ? 0.0 : it.Value / Math.Max(0.1, (double)it.Weight); }
 
         // ------------------------------------------------------------ koniec rabunku: RaidEventComponent.OnBeforeFinalize - prefiks i finalizer Priority.First

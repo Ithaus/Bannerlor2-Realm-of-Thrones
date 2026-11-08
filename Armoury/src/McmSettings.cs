@@ -7916,6 +7916,34 @@ namespace Armoury
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public int RaidTributeSpareDays { get; set; } = 30;
 
+        [SettingPropertyBool("Raid Cache By Roguery", HintText = "when you or a lord raid a village, the raiders force the villagers to give up the coin they hid: on top of the share of the people struck, the raid takes a share of the village purse that grows with the raid leader's Roguery (Raid Cache Base plus Raid Cache Per Skill for every point, at most Raid Cache Cap) - Know-How adds 5 points, Scarface makes it a quarter more (villagers reveal their hiding places), Salt the Earth a fifth more, Rogue Extraordinaire 1 point for every point of Roguery above 200. Taken once per raid, from what the village holds - nothing out of thin air; a smaller village of a district gives its part. The lords weigh it against tribute too. Off = only the share of the people struck, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public bool RaidCacheByRoguery { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Raid Cache Base", 0.000f, 0.500f, "0.000", HintText = "with Raid Cache By Roguery: the share of the village purse a raid leader with no Roguery forces out of the villagers (0.05 = a twentieth)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public float RaidCacheBase { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Raid Cache Per Skill", 0.0000f, 0.0100f, "0.0000", HintText = "with Raid Cache By Roguery: how much more of the village purse each point of the raid leader's Roguery forces out (0.002 = a fifth of a hundredth: Roguery 100 adds 20 points)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public float RaidCachePerSkill { get; set; } = 0.002f;
+
+        [SettingPropertyFloatingInteger("Raid Cache Cap", 0.00f, 1.00f, "0.00", HintText = "with Raid Cache By Roguery: the most of the village purse a raid can force out of the villagers, perks included (0.50 = half)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public float RaidCacheCap { get; set; } = 0.50f;
+
+        [SettingPropertyFloatingInteger("Raid Cache Xp Per Gold", 0.00f, 5.00f, "0.00", HintText = "with Raid Cache By Roguery: Roguery experience the raid leader earns for each denar of hidden coin forced out of the villagers (0.5 = as much as for goods of the same worth)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public float RaidCacheXpPerGold { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Raid Cache Xp Cap", 0, 20000, "0", HintText = "with Raid Cache By Roguery: the most Roguery experience one raid gives for hidden coin, so a very rich village does not teach a lifetime at once", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public int RaidCacheXpCap { get; set; } = 2000;
+
+        [SettingPropertyFloatingInteger("Raid Cache Relation Over", 0.00f, 1.00f, "0.00", HintText = "with Raid Cache By Roguery: torturing the villagers costs the raider 1 more relation with the village's lord and each of its elders for every 10 points the forced share of the purse goes above this (0.20 = a fifth; 1 = never)", RequireRestart = false)]
+        [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
+        public float RaidCacheRelationOver { get; set; } = 0.20f;
+
         [SettingPropertyBool("Village Herds As Loot", HintText = "raiders drive off a village's sheep, pigs and cattle first: its herd shrinks, and its animals, wool, cheese and butter come back only as the herd regrows - sheep and pigs about a quarter a year, cattle about an eighth. Raiders keep at most one animal for every two men", RequireRestart = false)]
         [SettingPropertyGroup("Roads, camps and villages (stage 7)")]
         public bool VillageHerdsAsLoot { get; set; } = true;
@@ -13634,6 +13662,13 @@ namespace Armoury
             s.RaidTributeShareLow = RaidTributeShareLow;
             s.RaidTributeShareHigh = RaidTributeShareHigh;
             s.RaidTributeSpareDays = RaidTributeSpareDays;
+            s.RaidCacheByRoguery = RaidCacheByRoguery;
+            s.RaidCacheBase = RaidCacheBase;
+            s.RaidCachePerSkill = RaidCachePerSkill;
+            s.RaidCacheCap = RaidCacheCap;
+            s.RaidCacheXpPerGold = RaidCacheXpPerGold;
+            s.RaidCacheXpCap = RaidCacheXpCap;
+            s.RaidCacheRelationOver = RaidCacheRelationOver;
             s.VillageHerdsAsLoot = VillageHerdsAsLoot;
             s.TiredLandYield = TiredLandYield;
             s.TwinsCrossingCount = TwinsCrossingCount;

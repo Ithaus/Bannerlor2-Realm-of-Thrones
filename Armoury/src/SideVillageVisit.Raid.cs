@@ -50,6 +50,7 @@ namespace Armoury
         {
             public string Uid, Dist, Name;
             public double Work, Done, Hours, HoursDone, Pend, Hit, Dead, Fled, Home0;
+            public double VShare = double.NaN;   // 362: udzial wioski w ludziach okregu w domu przy starcie (skrytki: S x udzial, jak okup wioski); NaN - stary zapis
             public int Men, Day, Misses;
             public bool Stop, SlaverSet;   // SlaverSet - niewola napastnika policzona (po wczytaniu - przy pierwszym ticku, recenzja 20.10)
             public Devastation.RaidState Rs;
@@ -300,9 +301,10 @@ namespace Armoury
                 if (why == null) RaidPlan(st, me, nAll, men, out work, out hours, out home0, out why);
                 if (why != null) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); return true; }
                 double s0 = home0 > 0 ? Math.Min(1.0, work / home0) : 0;
+                double sg = Math.Max(s0, RaidCache.Share(Hero.MainHero, 1.0) * share);   // 362: zloto - z ukrytym (skrytki wedlug Roguery x udzial wioski), towar - s0
                 a.Tooltip = new TextObject("{=!}" + (DefOn ? DefTip(def, men) + " " : "") + "Burn and plunder " + NameOf(r) + " alone - " + Math.Round(work).ToString("N0", Inv) + " people to drive off, about " + FmtHours(hours)
                                            + ". You take its share of the purse and the store of " + Txt(st.Name) + " (about " + Math.Round(100 * s0).ToString("0", Inv) + "%: "
-                                           + Math.Round(s0 * Math.Max(0, st.Village.Gold)).ToString("N0", Inv) + " denars). " + Txt(st.Name) + " itself is not raided. Its lord will hate you for it.");
+                                           + Math.Round(sg * Math.Max(0, st.Village.Gold)).ToString("N0", Inv) + " denars" + (sg > s0 + 1e-9 ? ", with the coin your men will force the villagers to give up" : "") + "). " + Txt(st.Name) + " itself is not raided. Its lord will hate you for it.");
                 return true;
             }
             catch (Exception e) { Stumble("RaidCondition", e); return false; }
@@ -346,7 +348,7 @@ namespace Armoury
             if (!RaidPlan(st, me, nAll, men, out work, out hours, out home0, out why)) { Log.Player("You cannot raid " + NameOf(r) + " now" + (why != null ? ": " + why : "."), true); return false; }
             bool slaver = false;
             try { slaver = Hero.MainHero.MapFaction != null && LosersFlee.SlaveCulture(Hero.MainHero.MapFaction.Culture); } catch { }
-            _raid = new Raid { Uid = _uid, Dist = st.StringId, Name = NameOf(r), Work = work, Hours = hours, Home0 = home0, Men = men, Day = Today(), SlaverSet = true,
+            _raid = new Raid { Uid = _uid, Dist = st.StringId, Name = NameOf(r), Work = work, Hours = hours, Home0 = home0, Men = men, Day = Today(), SlaverSet = true, VShare = share,
                                Rs = new Devastation.RaidState { Slaver = slaver, MaxMen = men } };
             _dRaidStart++;
             Log.Info(P + "rabunek " + _raid.Name + " (" + _uid + ", okreg " + st.StringId + ") - start (" + how + "): ludzi do przeszukania " + work.ToString("0.0", Inv) + " (osady " + me.Nw.ToString("0.0", Inv)
@@ -479,7 +481,7 @@ namespace Armoury
                 var mp = MobileParty.MainParty;
                 bool alive = mp != null && mp.IsActive && Hero.MainHero != null && Hero.MainHero.IsAlive && !PlayerCaptivity.IsCaptive;
                 double s = rd.Home0 > 0 ? Math.Max(0.0, Math.Min(1.0, rd.Hit / rd.Home0)) : 0.0;
-                if (alive && st != null && st.Village != null && s > 0) Loot(st, s, mp, out gold, out take, out burn, out herd);
+                if (alive && st != null && st.Village != null && s > 0) Loot(st, s, mp, out gold, out take, out burn, out herd, rd);
                 if (rd.Hit > 0.5 && st != null) Relations(st, RelLordRaid, RelNotableRaid);
                 _lastRaid[rd.Uid] = Today();
                 _dRaidGold += gold; _dRaidTake += take; _dRaidBurn += burn;
@@ -500,15 +502,42 @@ namespace Armoury
         }
 
         /// <summary>Lup (DistrictRaid.Loot w malym): zloto s x kiesa wsi (SmallGold.PayRaidLoot), stado, towar s z magazynu wsi okregu do taboru gracza w ramce FRaid.</summary>
-        private static void Loot(Settlement st, double s, MobileParty mp, out long gold, out long take, out long burn, out int herd)
+        private static void Loot(Settlement st, double s, MobileParty mp, out long gold, out long take, out long burn, out int herd, Raid rd = null)
         {
             gold = take = burn = 0; herd = 0;
             var v = st.Village;
             try { herd = VillageHerds.OnRaid(v, s, mp); } catch (Exception e) { Stumble("Loot(stado)", e); }
             try
             {
-                long due = (long)Math.Round(s * Math.Max(0, v.Gold));
+                long v0 = Math.Max(0, v.Gold);
+                long due = (long)Math.Round(s * v0);
                 gold = SmallGold.PayRaidLoot(v, Hero.MainHero, due);
+                // 362 (RaidCache): skrytki - S x u x udzial wioski w ludziach okregu (kiesa wspolna dla okregu, jak okup wioski); zloto razem = max(s, S x u x udzial) x kiesa,
+                // doplata tym samym platnikiem. Raz na rabunek (rabunek wioski to jedna sesja). Towar - bez zmian (s).
+                int rogS;
+                double sRaw = RaidCache.Raw(Hero.MainHero, out rogS);
+                if (sRaw > 0.0 && rd != null)
+                {
+                    double u = rd.Work > 0 ? Math.Max(0.0, Math.Min(1.0, rd.Done / rd.Work)) : 0.0;
+                    double vs = rd.VShare;
+                    if (double.IsNaN(vs))
+                    {
+                        // stary zapis bez udzialu: udzial wioski teraz (po rabunku - mniejszy niz na starcie, wiec lup raczej za maly niz za duzy)
+                        VillageBook.PartView me; double homeAll, nAll;
+                        vs = PartOf(st, rd.Uid, out me, out homeAll, out nAll) && me != null && homeAll > 0 ? Math.Max(0.0, Math.Min(1.0, me.Home / homeAll)) : 0.0;
+                    }
+                    double sc = sRaw * u * vs;
+                    long topUp = 0, cacheGold = 0;
+                    if (sc > 0.0)
+                    {
+                        long target = (long)Math.Round(sc * v0);
+                        long dueC = target - gold;
+                        if (dueC > 0) topUp = SmallGold.PayRaidLoot(v, Hero.MainHero, dueC);
+                        cacheGold = Math.Max(0L, topUp);   // zloto ze skrytek = sama doplata ponad s (jak DistrictRaid.Loot)
+                        gold += topUp;
+                    }
+                    RaidCache.After(Hero.MainHero, st, rogS, sRaw, sRaw * u, v0 > 0 ? gold / (double)v0 : 0.0, cacheGold, topUp, true, true);
+                }
             }
             catch (Exception e) { Stumble("Loot(zloto)", e); }
             try
@@ -724,7 +753,7 @@ namespace Armoury
             if (rd != null)
                 sb.Append(rd.Uid).Append(',').Append(rd.Dist).Append(',').Append(rd.Work.ToString("R", Inv)).Append(',').Append(rd.Done.ToString("R", Inv)).Append(',').Append(rd.Hours.ToString("R", Inv))
                   .Append(',').Append(rd.HoursDone.ToString("R", Inv)).Append(',').Append(rd.Hit.ToString("R", Inv)).Append(',').Append(rd.Home0.ToString("R", Inv)).Append(',').Append(rd.Men.ToString(Inv))
-                  .Append(',').Append(rd.Day.ToString(Inv));
+                  .Append(',').Append(rd.Day.ToString(Inv)).Append(',').Append(double.IsNaN(rd.VShare) ? "" : rd.VShare.ToString("R", Inv));   // 362: 11. pole (stary czytnik bierze 10)
             DefExport(sb);   // krok 2: pamiec poleglych (d=) i bitwa w toku (f=) - tylko gdy sa (stary czytnik pomija nieznane sekcje)
             string x = sb.ToString();
             return x == SaveVer + "|t=|l=|r=" ? "" : x;
@@ -773,8 +802,11 @@ namespace Armoury
                             || !double.TryParse(a[4], NumberStyles.Float, Inv, out hours) || !double.TryParse(a[5], NumberStyles.Float, Inv, out hd) || !double.TryParse(a[6], NumberStyles.Float, Inv, out hit)
                             || !double.TryParse(a[7], NumberStyles.Float, Inv, out home0) || !int.TryParse(a[8], NumberStyles.Integer, Inv, out men) || !int.TryParse(a[9], NumberStyles.Integer, Inv, out day))
                         { bad++; continue; }
+                        double vsh;
+                        if (a.Length < 11 || !double.TryParse(a[10], NumberStyles.Float, Inv, out vsh)) vsh = double.NaN;   // 362: stary zapis - udzial wioski policzony przy koncu
+                        else vsh = Math.Max(0.0, Math.Min(1.0, vsh));
                         _raid = new Raid { Uid = a[0], Dist = a[1], Work = work, Done = done, Hours = hours, HoursDone = hd, Hit = hit, Home0 = home0, Men = Math.Max(1, men), Day = day,
-                                           Rs = new Devastation.RaidState { MaxMen = men } };
+                                           VShare = vsh, Rs = new Devastation.RaidState { MaxMen = men } };
                         _uid = a[0];
                     }
                 }

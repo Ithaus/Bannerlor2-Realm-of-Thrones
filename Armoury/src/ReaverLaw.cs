@@ -437,7 +437,7 @@ namespace Armoury
         private static double PayDays { get { var s = S; return s == null ? 4.0 : Math.Max(1f, Math.Min(28f, s.ReaverRaidPayDays)); } }
         private const double MaxExtra = 2.0;   // M = 1 + min(2, E / (C x T)): najwyzej x3 - AI nie porzuca obrony wlasnych twierdz dla bogatej wsi
 
-        private struct ECache { public int Hour; public double Base; public bool Burned; }
+        private struct ECache { public int Hour; public double Gold, Stock; public bool Burned; }   // 362: kiesa i magazyn osobno (skrytki S tylko do zlota)
         private static readonly Dictionary<Settlement, ECache> _eCache = new Dictionary<Settlement, ECache>();
         private static readonly HashSet<AIBehaviorData> _done = new HashSet<AIBehaviorData>();
         private static readonly List<(AIBehaviorData, float)> _copy = new List<(AIBehaviorData, float)>(64);
@@ -453,6 +453,7 @@ namespace Armoury
             {
                 double cost = DayCost(party) * PayDays;
                 if (!(cost > 1.0)) cost = 1.0;
+                double cacheS = RaidCache.Share(party.LeaderHero, 1.0);   // 362: skrytki wodza (u = 1) - raz na mysl partii
                 _copy.Clear(); _done.Clear();
                 foreach (var it in p.AIBehaviorScores) _copy.Add(it);
                 best = float.MinValue;
@@ -465,7 +466,7 @@ namespace Armoury
                     {
                         var st = it.Item1.Party as Settlement;
                         bool burned;
-                        double e = LootEstimate(st, it.Item1.NavigationType, out burned);
+                        double e = LootEstimate(st, it.Item1.NavigationType, out burned, cacheS);
                         if (burned) t.Burned++;
                         double m = 1.0 + Math.Min(MaxExtra, Math.Max(0.0, e) / cost);
                         if (m > 1.0 + 1e-6)
@@ -486,10 +487,11 @@ namespace Armoury
             return best == float.MinValue ? bestRaid : best;
         }
 
-        /// <summary>342r (odsiew rabunkow LocalFront334e): czy WW3 (Profit) pomnozy opcje rabunku tej partii w tej mysli; cost - C x T jak w Profit. Nie rzuca.</summary>
-        internal static bool SieveBoostPrep(MobileParty party, out double cost)
+        /// <summary>342r (odsiew rabunkow LocalFront334e): czy WW3 (Profit) pomnozy opcje rabunku tej partii w tej mysli; cost - C x T jak w Profit. Nie rzuca.
+        /// 362: sc - udzial skrytek wodza partii (RaidCache.Share, u = 1) do SieveBoost - ta sama miara co Profit.</summary>
+        internal static bool SieveBoostPrep(MobileParty party, out double cost, out double sc)
         {
-            cost = 1.0;
+            cost = 1.0; sc = 0.0;
             try
             {
                 if (party == null || !party.IsLordParty || party.IsMainParty) return false;
@@ -497,18 +499,19 @@ namespace Armoury
                 if (g < 0 || !ProfitOn || (g == GFree && !ProfitFreeOn)) return false;
                 cost = DayCost(party) * PayDays;
                 if (!(cost > 1.0)) cost = 1.0;
+                sc = RaidCache.Share(party.LeaderHero, 1.0);
                 return true;
             }
             catch { return false; }
         }
 
         /// <summary>342r: mnoznik WW3 opcji rabunku wsi st (M = 1 + min(2, E / (C x T)), jak Profit). Nie rzuca.</summary>
-        internal static double SieveBoost(Settlement st, MobileParty.NavigationType nav, double cost)
+        internal static double SieveBoost(Settlement st, MobileParty.NavigationType nav, double cost, double sc = 0.0)
         {
             try
             {
                 bool burned;
-                double e = LootEstimate(st, nav, out burned);
+                double e = LootEstimate(st, nav, out burned, sc);
                 return 1.0 + Math.Min(MaxExtra, Math.Max(0.0, e) / cost);
             }
             catch { return 1.0; }
@@ -518,7 +521,9 @@ namespace Armoury
         /// Recenzja R2-7: okreg wypalony (DistrictRaid.BurnedOutNow - ta sama arytmetyka co Plan kroku: Z = 0 osad w zasiegu) - E = 0, bo krok nic nie spali (u = 0,
         /// lup 0). Recenzja R1-1: nabrzeze tylko dla opcji, ktora prowadzi morzem (NavigationType.Naval - partia dotrze i rabuje z morza), nie wedlug tego, czy
         /// partia jest na morzu w chwili mysli.</summary>
-        private static double LootEstimate(Settlement st, MobileParty.NavigationType nav, out bool burned)
+        /// 362: sc - skrytki wodza (RaidCache.Share, u = 1): zloto max(Q, sc) x kiesa (wyplata DistrictRaid.Loot bierze max(s0, Q x u, S x u) - MAX, nie suma),
+        /// magazyn Q x wartosc (skrytki to tylko zloto). Przy domyslnych liczbach (Q 0.50, Cap 0.50) sc nie przebija Q - E bez zmian.
+        private static double LootEstimate(Settlement st, MobileParty.NavigationType nav, out bool burned, double sc = 0.0)
         {
             burned = false;
             var v = st != null ? st.Village : null;
@@ -537,11 +542,11 @@ namespace Armoury
                     }
                 bool bo = false;
                 try { bo = DistrictRaid.BurnedOutNow(v); } catch (Exception ex) { Stumble("LootEstimate(okreg)", ex); }
-                c = new ECache { Hour = hour, Base = Math.Max(0, v.Gold) + stock, Burned = bo };
+                c = new ECache { Hour = hour, Gold = Math.Max(0, v.Gold), Stock = stock, Burned = bo };
                 _eCache[st] = c;
             }
             if (c.Burned) { burned = true; return 0.0; }
-            double e = Q * c.Base;
+            double e = Math.Max(Q, Math.Max(0.0, sc)) * c.Gold + Q * c.Stock;
             try
             {
                 var port = v.Bound;

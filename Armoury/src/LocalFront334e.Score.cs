@@ -539,8 +539,8 @@ namespace Armoury
                 var k = p.MapFaction as Kingdom;
                 if (k == null || _svL == null || _svL.Count == 0) { if (_svOm > 0) lock (_lk) _dModelT += _svOm; return; }
                 var scores = __1.AIBehaviorScores;
-                double rc;
-                bool boost = ReaverLaw.SieveBoostPrep(p, out rc);
+                double rc, rsc;
+                bool boost = ReaverLaw.SieveBoostPrep(p, out rc, out rsc);   // 362: rsc - skrytki wodza (RaidCache), ta sama miara co WW3 Profit
                 if (_svOrd == null) _svOrd = new List<KeyValuePair<float, int>>(); else _svOrd.Clear();
                 for (int i = _svStart; i < scores.Count; i++)
                 {
@@ -549,7 +549,7 @@ namespace Armoury
                     if (e.Item1.AiBehavior != AiBehavior.RaidSettlement || st == null || !_svL.ContainsKey(st)) continue;
                     float up = e.Item2;
                     if (!(up > 0f)) continue;
-                    float mw = boost ? (float)ReaverLaw.SieveBoost(st, e.Item1.NavigationType, rc) : 1f;
+                    float mw = boost ? (float)ReaverLaw.SieveBoost(st, e.Item1.NavigationType, rc, rsc) : 1f;
                     _svOrd.Add(new KeyValuePair<float, int>(up * mw, i));
                 }
                 _svOrd.Sort(SvCmp);
