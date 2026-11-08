@@ -70,6 +70,7 @@ namespace Armoury
         private static int _kVill; private static double _kGold, _kChest, _kOver, _kBudget, _kP5Plan, _kBkPlan, _kP5, _kOldExtra, _kOldLadder;
         private static long _kBkSpent, _kBkOldPlan, _kBkNewPlan, _kBkOldSpent, _kBkNoMkt, _kBkLeft, _kBkCarry; private static int _kBkTicks, _kBkNoMktN, _kBkCarryN;
         private static long _kGoods, _kWorks, _kWorksWage, _kWorksMat; private static double _kWorksNo; private static int _kWorksN, _kWorksNoN;
+        private static long _kWorksOrd; private static int _kWorksOrdN;   // 363: material robot gminy kupiony u wsi-wytworcow (kiesa wsi -> kiesa wytworcy)
         private static long _oLevy, _oHoard, _oW7, _oW7Cut; private static int _oLevyN, _oHoardN, _oW7N, _oW7CutN;
         private static long _payOut, _payIn, _flushed;
         private static long _k5Treas; private static int _k5N;                                   // K5 przy samym F1: brak zwrotu pokryty ze skarbca ponad zapas wojny (DsSeason.TreasuryForRefund)
@@ -91,7 +92,7 @@ namespace Armoury
             _rDue = _rPaid = _rArrPaid = _rNewArr = _rForgiven = _rRemit = _rLost = 0;
             _kVill = 0; _kGold = _kChest = _kOver = _kBudget = _kP5Plan = _kBkPlan = _kP5 = _kOldExtra = _kOldLadder = 0;
             _kBkSpent = _kBkOldPlan = _kBkNewPlan = _kBkOldSpent = _kBkNoMkt = _kBkLeft = _kBkCarry = 0; _kBkTicks = _kBkNoMktN = _kBkCarryN = 0;
-            _kGoods = _kWorks = _kWorksWage = _kWorksMat = 0; _kWorksNo = 0; _kWorksN = _kWorksNoN = 0;
+            _kGoods = _kWorks = _kWorksWage = _kWorksMat = 0; _kWorksNo = 0; _kWorksN = _kWorksNoN = 0; _kWorksOrd = 0; _kWorksOrdN = 0;
             _oLevy = _oHoard = _oW7 = _oW7Cut = 0; _oLevyN = _oHoardN = _oW7N = _oW7CutN = 0;
             _payOut = _payIn = _flushed = 0;
             _k5Treas = 0; _k5N = 0;
@@ -781,6 +782,15 @@ namespace Armoury
             _kWorksNo = Math.Max(0, _kWorksNo - works);
         }
 
+        /// <summary>363 (TownFolk.Order363): material robot gminy kupiony u wsi-wytworcow (kiesa wsi -> kiesa wytworcy) - w kroku 5 byl liczony jako niewydany; osobna pozycja
+        /// linii DS (poza "roboty gminy" - tam place ludu i material do kas miast, jak dotad).</summary>
+        internal static void NoteWorksOrder(long x)
+        {
+            if (x <= 0) return;
+            _kP5 += x; _kWorksOrd += x; _kWorksOrdN++;
+            _kWorksNo = Math.Max(0, _kWorksNo - x);
+        }
+
         /// <summary>DsSeason.TreasuryForRefund przy samym F1 (bez firm F3): brak zwrotu pokryty ze skarbca ponad zapas wojny - licznik linii.</summary>
         internal static void NoteK5(long x) { if (x > 0) { _k5Treas += x; _k5N++; } }
 
@@ -927,6 +937,7 @@ namespace Armoury
                   .Append(", kupione ").Append(_kBkSpent).Append(" (w starym pulapie ").Append(_kBkOldSpent).Append(")), rampa ").Append(ramp.ToString("0.000", Inv)).Append(" (od doby ").Append(_dayOn).Append(")")
                   .Append(" | krok 5 wydany: towar ").Append(_kGoods).Append(", roboty gminy ").Append(_kWorks).Append(" (").Append(_kWorksN).Append(" wsi: place ludu miast targowych ").Append(_kWorksWage)
                   .Append(" + material do kas ").Append(_kWorksMat).Append("), niewydane ").Append(N0(_kWorksNo)).Append(" (").Append(_kWorksNoN).Append(" wsi)")
+                  .Append(_kWorksOrdN > 0 || StartCalibration.OrderOn ? ", material do kies wytworcow (363) " + _kWorksOrd + " (" + _kWorksOrdN + " wsi)" : "")
                   .Append(_kKeptN > 0 ? ", zostalo w kiesie (potrzeba pokryta) " + N0(_kKept) + " (" + _kKeptN + " wsi)" : "")
                   .Append("; budzet BK niewydany w ticku ").Append(_kBkLeft).Append(", z poprzedniego ticku do P5 ").Append(_kBkCarry).Append(" (").Append(_kBkCarryN).Append(" wsi)")
                   .Append(" | stare pobory wsi DS (oczekiwane 0 po rampie): danina ").Append(_oLevy).Append(" (").Append(_oLevyN).Append(" wsi), podatek od nadwyzki ").Append(_oHoard).Append(" (").Append(_oHoardN)

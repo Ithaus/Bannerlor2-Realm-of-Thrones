@@ -49,6 +49,7 @@ namespace Armoury
             public int Coal;                                       // ZC1 (CharcoalBurners): drewno z magazynow wsi drwali wypalone na wegiel - ujscie
             public int Ingot;                                      // ZC1 (IronIngotsOffShelf): zelazo z przekutych sztab z polek osad - zrodlo
             public int Crafts;                                     // fix-ksiega: wsad rzemiosla miasta (przetwory ZC5, rzemioslo 148) - osobno od linii towarowych gry
+            public int Orders;                                     // 363: drewno zrobione na zamowienie u wsi drwali i zuzyte od razu przez roboty gminy zamawiajacej (zrodlo = ujscie, poza rosterami)
             public float Model;
             public readonly HashSet<Settlement> Makers = new HashSet<Settlement>();
             public readonly HashSet<Settlement> WoodlotMakers = new HashSet<Settlement>();
@@ -58,7 +59,7 @@ namespace Armoury
             public long[] Folk; public int FolkDay = -1;            // 282 (F5): drewno - [dawne bez wyjasnienia, mieszczanie, pola mieszczan (KS), naprawy kowali, inne pozycje] z dzisiejszej linii
 
             public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
-            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Scrap = 0; DrillScrap = 0; BloomWood = 0; Coal = 0; Ingot = 0; Crafts = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
+            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Scrap = 0; DrillScrap = 0; BloomWood = 0; Coal = 0; Ingot = 0; Crafts = 0; Orders = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
             public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; Shown = null; ShownDay = -1; Folk = null; FolkDay = -1; }
         }
 
@@ -240,6 +241,14 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>363 (TownFolk.Order363): sztuki zrobione na zamowienie u wsi-wytworcy i zuzyte od razu przez roboty gminy (bez rostera) - w linii "Drewno:" zrodlo
+        /// i ujscie tej samej liczby ("bez wyjasnienia" bez zmian). Tylko licznik.</summary>
+        internal static void NoteVillageOrder(ItemObject item, int loads)
+        {
+            try { var b = Of(item); if (b != null && loads > 0) b.Orders += loads; }
+            catch { }
+        }
+
         /// <summary>Material zdjety z targu przez nasze budowy (BuildFunding.BuyMaterials / BuyOneCheapest). Tylko licznik.</summary>
         internal static void NoteBuild(ItemObject item, int loads)
         {
@@ -297,10 +306,12 @@ namespace Armoury
             if (b.Scrap > 0) sb.Append(", zlom z nadmiaru (174) +").Append(b.Scrap);
             if (b.DrillScrap > 0) sb.Append(", zlom z cwiczen (musztra) +").Append(b.DrillScrap);
             if (b.Ingot > 0) sb.Append(", sztaby z polek (ZC1) +").Append(b.Ingot);
+            if (b.Orders > 0) sb.Append(", na zamowienie wsi (363) +").Append(b.Orders);
             sb.Append("; zuzycie: warsztaty zbrojne ").Append(b.Shops).Append(", linie towarowe (").Append(b.LineName).Append(") ").Append(b.Lines)
               .Append(", budowy ").Append(b.Builds)
               .Append(", strzelarze (172) ").Append(b.Fletch);
             if (b.Coal > 0) sb.Append(", wegiel drwali (ZC1) ").Append(b.Coal);
+            if (b.Orders > 0) sb.Append(", roboty wsi na zamowienie (363) ").Append(b.Orders);
             bool craftCol = CraftColumnOn;   // fix-ksiega: klucz wylaczony - linia co do znaku jak dotad
             if (craftCol) sb.Append(", przetwory miast (ZC5/148) ").Append(b.Crafts);
             if (b == _wood && (b.BloomWood > 0 || Bloomery.On)) sb.Append(Bloomery.WoodSegment(b.BloomWood));   // E6/R1 (214): dymarki przy kopalniach (targ - ujscie zapasu; las okregu - poza zapasem)

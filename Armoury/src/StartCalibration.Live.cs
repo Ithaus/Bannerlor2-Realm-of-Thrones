@@ -73,10 +73,18 @@ namespace Armoury
             // 324 (glod zimy, StartCalibration.Glod324.cs; pamiec sesji, z ostatniego przeliczenia okregu): brak wlasnego stolu (racje/d - koszyk, ktorego dom nie robi; NaN - brak
             // rachunku), koszyk jedzenia pokryty dzis ze stodoly wsi (racje/d i kcal/d) i kg zboza zdjete z koszyka (zboze, ktorego wies nie kupi w miescie)
             public double DefR324 = double.NaN, BarnR324, BarnKcal324, BarnGrainKg324;
+            // 363 (zamowienia wsi, StartCalibration.Order363.cs; pamiec sesji, bez zapisu - po wczytaniu H = 0): zajecie materialowe okregu (-1 - nie wytworca), towar dostawy,
+            // rece na zamowienie (H) i pulap, rece pola, kg na reke, popyt (EMA sztuk/d) i popyt doby, czynnik zimy i rak z ostatniego rachunku, sztuki doby do sprzedania,
+            // produkcja towaru i zboza przed czynnikami (do przeliczenia po nich), zboze zdjete z pola przed zima / po zimie, glod przy rachunku
+            public int OrdCraft = -1, OrdItem = -1; public double OrdH, OrdCapH, OrdFieldH, OrdKgHand, OrdDemand, OrdToday, OrdF = 1.0, OrdLeft, OrdPre, OrdPreGrain, OrdAddKg, OrdGrain0, OrdGrain1;
+            public bool OrdHungry;
+            // poprawki 363 (recenzje): prawo do rak przy ostatnim rachunku (glod, rampa, prace okregu, nie Normal - false), doba ostatniego rachunku (narastanie wedlug czasu),
+            // przeliczenie wymuszone w najblizszej dobie KS (klucz wylaczony przy rekach na zamowieniu) - zamiast Res = null
+            public bool OrdOk, OrdRedo; public int OrdDay = int.MinValue;
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed;
-            public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; public double[] WSpareKg; }   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
+            public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; public double[] WSpareKg; public double OrdPcs; }   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
         // m114-prace (recenzja): WorksAll - caly dodatek po czynnikach (sztuki gry na dobe), WorksPart - kg dodatku czesci przed zima (klucz DistrictWorks.PartKey):
         // udzial czesci w dodatku na targ (wycena okna i podzial puli miedzy posiadaczy wedlug dodatku NA TARG, nie wedlug calego E)
 
@@ -373,6 +381,7 @@ namespace Armoury
             var prod = res.Prod;
             KsDeliver.Produce(d, ld.B, prod);
             if (factors && !ld.TF) HerdKs(ld, prod, kgT);   // R3-06c (p5-stada, recenzja): stado wsi PRZED pracami okregu (stado prac pedzi DistrictWorks) - tylko gra; StartCalibration.Stada.cs
+            bool ord = factors && !ld.TF && OrderKs(ld, prod, kgT);   // 363: rece z pola na zamowienie materialu (wies-wytworca) - przed pracami okregu i czynnikami; tylko gra
             Dictionary<string, double[]> wPart = null;
             double[] wx = factors ? WorksKs(ld, prod, out wPart) : null;   // inwest: dodatek prac okregu (b x kg zajecia czesci) przed zima i czynnikami rak - tylko gra (Plan nie)
             double[] wSnap = wx != null ? (double[])prod.Clone() : null;   // m114-prace: produkcja z dodatkiem przed zima i czynnikami (dodatek po nich = wx x po / przed)
@@ -408,6 +417,8 @@ namespace Armoury
                 HarvestYear.KsApply(ld.TF ? (ld.T != null ? ld.T.Settlement : null) : (ld.V != null ? ld.V.Settlement : null), prod);   // R3-05e: plony pol okregu x rok urodzaju (poza zima)
                 // R3-06d (TiredLand): ziemia zajeta ponad baze okregu - tylko gra (Plan bez zmian); przedtem kopia plonu bez stada i ziemi do bramki krainy (StartCalibration.Stada.cs)
                 LandKs(ld, prod, f);
+                // 363: towar zamowienia po zimie i czynnikach rak wyjety z produkcji PRZED stolem okregu i targiem (okreg go nie spala, wozy go nie wioza) - sztuki doby dla zamawiajacych
+                if (ord) OrderAfter(ld, res, prod, kgT);
             }
             if (wx != null && wSnap != null)
                 for (int i = 0; i < ItemCount; i++) wx[i] = wx[i] > 0 && wSnap[i] > 1e-12 ? wx[i] * Math.Max(0.0, prod[i] / wSnap[i]) : 0.0;   // m114-prace: dodatek po czynnikach (przed stolem okregu)
@@ -577,14 +588,14 @@ namespace Armoury
                     // koszt doby (projekt rozdz. 11.3: doba KS <= 3 ms): okreg przeliczany co LiveEvery dob na zmiane (ludzie, udzialy osad, zima i rece zmieniaja sie powoli;
                     // wies najezdzana albo spladrowana ma 0 od razu - ProdStep); pierwsza doba sesji, wlaczenie i ponowne wlaczenie - wszystkie
                     if (ld.Slot < 0) ld.Slot = (int)(Fnv(ld.Id) % (uint)LiveEvery);
-                    if (!full && ld.Res != null && (today + ld.Slot) % LiveEvery != 0)
+                    if (!full && ld.Res != null && !ld.OrdRedo && (today + ld.Slot) % LiveEvery != 0)   // 363: OrdRedo - przeliczenie wymuszone (klucz wylaczony)
                     {
                         LiveReuse(ld, rates, mkByM, mk, zv, zvp, tfList, regionHands, ref nv, ref ntf, ref ownKcal, ref kcalNeed);
                         continue;
                     }
                     DailyLife.KsRec rec;
                     if (!byS.TryGetValue(ld.TF ? ld.T.Settlement : ld.V.Settlement, out rec)) { stale++; if (ld.Res != null) LiveReuse(ld, rates, mkByM, mk, zv, zvp, tfList, regionHands, ref nv, ref ntf, ref ownKcal, ref kcalNeed); else if (!ld.TF && ld.V != null) { VRate old; if (_ratesKeep.TryGetValue(ld.V, out old)) rates[ld.V] = old; } continue; }
-                    redone++; tr0 = T0Now();
+                    redone++; tr0 = T0Now(); ld.OrdRedo = false;
                     var bask = DailyLife.KsBasket(rec.Cul, true);
                     bool oil = DailyLife.OilProf(rec.ProfId), north = DailyLife.NorthFur(rec.ProfId);
                     var kd = ld.K;

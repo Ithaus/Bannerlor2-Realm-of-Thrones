@@ -70,6 +70,7 @@ namespace Armoury
         {
             _daQ.Clear(); DaZero(); _daStSess = 0; _daErr.Clear(); _daTiSept = 0; _daBtIds = null;
             P2Reset();                                                       // 322b: pomiar pieniadza w podkrokach DaWorksRun (sesja od nowa)
+            OrReset();                                                       // 363: zamowienia wsi u wytworcow (pamiec zasiegu i liczniki - sesja od nowa)
             _daStart = -1; _dvStart = -1; _daM9F = null; _daM9C = -1; _daM9T = 0;   // zapis arm_dsakum wczytuje ImportDsAkum po konstruktorze
         }
 
@@ -84,6 +85,7 @@ namespace Armoury
             _dvTake = _dvLord = _dvCoffer = _dvHeld = 0; _dvN = _dvSeen = 0; _dvRoom = 0;
             _daBtOpen = _daBtCeil = 0; _daBtOpenN = _daBtCeilN = 0;
             _daTicks = 0; _daSt = 0;
+            _dwOrdOut = _dwOrdIn = 0; _dwOrdN = 0;                           // 363: material u wytworcow (dopisek linii Akumulator)
         }
 
         private static void DaStumble(string where, Exception e)
@@ -286,9 +288,11 @@ namespace Armoury
         /// </summary>
         internal static void DaWorksRun()
         {
+            OrDayOpen();                                                     // 363: sztuki doby wytworcow (zamowienia wsi) - przed zleceniami
             P2Begin();                                                       // 322b: pomiar pieniadza w podkrokach (tylko log, klucz bisekcji f19-e1)
             try { DaWorksRunCore(); }
             finally { P2End(); }
+            OrDayClose();                                                    // 363: niesprzedane przepadaja, popyt (EMA), linia "Zamowienia wsi (363)" - co dobe, takze bez zlecen
         }
 
         private static void DaWorksRunCore()
@@ -307,8 +311,15 @@ namespace Armoury
                 foreach (var o in q)
                 {
                     long used = o.Amount;
+                    _orLastPaid = 0;
                     try { used = DaRunOne(o, o.Sept ? SeptWagePerMat : kw, items, empty); }
                     catch (Exception e) { DaStumble("DaWorksRun(zlecenie)", e); }
+                    // 363: zlecenie z materialem u wytworcow - liczniki linii (danina od skarbca wsi: ten sam warunek, `used` z zakupem u wytworcow)
+                    if (_orLastPaid > 0)
+                    {
+                        _orOrders++;
+                        if (s.DsHoardDueVillages && !((o.Amount - used) * 2 > o.Amount) && (o.Amount - (used - _orLastPaid)) * 2 > o.Amount) _orNoDue++;   // poprawka (recenzja 2): tylko gdy danina jest czynna
+                    }
                     // recenzja: danina od skarbca wsi (DsHoardDueVillages) PO zleceniu i tylko u wsi, ktora nie znalazla materialu na wiecej niz polowe zlecenia robot
                     // (zgodnie z opisem klucza; resztki z zaokraglen sztuk sie nie licza) - nie zmniejsza budzetu robot, ktore znalazly material
                     if (!o.Sept && o.Vil != null && (o.Amount - used) * 2 > o.Amount && s.DsHoardDueVillages)
@@ -365,13 +376,21 @@ namespace Armoury
                 if (none) empty.Add(mk);                                 // polka bez materialu ponad zapas - nastepne zlecenia tego targu bez czytania
             }
             _dwCap += cap;
-            if (spent <= 0) { if (o.Sept) { _dsNoMat += o.Amount; _dsNoMatN++; } else { _dwNoMat += o.Amount; _dwNoMatN++; } return 0; }
-            long wage = Math.Max(0, Math.Min((long)Math.Floor(k * spent), budget - spent));
+            // 363: reszta budzetu materialu u wsi-wytworcow w zasiegu (bez wozu i polki: kiesa wsi -> kiesa wytworcy); klucz wylaczony, septy, lud miasta - 0 (jak dotad)
+            long ordPaid = 0;
+            if (!o.Sept && o.Vil != null && matBudget - spent >= 1)
+            {
+                try { ordPaid = ProducerBuy(o, matBudget - spent); }
+                catch (Exception e) { DaStumble("ProducerBuy", e); ordPaid = _orLastPaid; }
+            }
+            if (spent + ordPaid <= 0) { if (o.Sept) { _dsNoMat += o.Amount; _dsNoMatN++; } else { _dwNoMat += o.Amount; _dwNoMatN++; } return 0; }
+            long wage = Math.Max(0, Math.Min((long)Math.Floor(k * (spent + ordPaid)), budget - spent - ordPaid));   // 363: rzemieslnicy od calego materialu (polka + wytworca)
+            if (ordPaid > 0) _orWage += wage * (double)ordPaid / (spent + ordPaid);
             // 322b: pomiar podkroku zaplaty (tylko odczyt; P2Close w finally - wynik i wyjatek jak dotad)
             if (o.Vil != null)
             {
                 P2Open(P2Vil); P2TouchSt(o.Vil.Settlement); P2TouchSt(mk); P2TouchFolk(mf);
-                try { return DaPayVillage(o, mk, mf, spent, wage); }
+                try { return DaPayVillage(o, mk, mf, spent, wage) + ordPaid; }   // 363: zwrot z zakupem u wytworcow (warunek daniny od skarbca wsi)
                 finally { P2Close(); }
             }
             P2Open(P2Town); P2TouchSt(mk); P2TouchFolk(mf); P2TouchFolk(o.Payer);
@@ -689,7 +708,7 @@ namespace Armoury
                   .Append("; zmiana polek targow (sztuki zdjete, zmierzone na polce) ").Append(_daShelf).Append(", kontrola sztuk: zakup - zmiana polek = ").Append(_daTook - _daShelf)
                   .Append(" (zlecen z rozjazdem albo bez odczytu polki ").Append(_daShelfBad).Append(")")
                   .Append("; kontrola robot: z kies wsi - (do kas + do ludu) = ").Append(_dwVilOut - _dwCofIn - _dwFolkIn).Append(", material zaplacony - koszt zdjetego towaru = ").Append(-_dwGap)
-                  .Append(", zwrot do wsi (lud nie przyjal) ").Append(_dwRefund)
+                  .Append(", zwrot do wsi (lud nie przyjal) ").Append(_dwRefund).Append(OrAkNote())
                   .Append(" | septy z dziesieciny (ta sama regula): zlecone ").Append(_dsQ).Append(" (").Append(_dsQN).Append("), material ").Append(_dsMat).Append(", rzemieslnicy ").Append(_dsWage)
                   .Append(" (zlecen wykonanych ").Append(_dsN).Append(": lud miast ").Append(_dsTownN).Append(", wsie ").Append(_dsVilN).Append("), bez materialu (zostalo u placacych) ").Append(_dsNoMat)
                   .Append("; kontrola septow: od placacych - (do kas + do ludu) = ").Append(_dsPayOut - _dsCofIn - _dsFolkIn).Append(", material zaplacony - koszt zdjetego towaru = ").Append(-_dsGap)

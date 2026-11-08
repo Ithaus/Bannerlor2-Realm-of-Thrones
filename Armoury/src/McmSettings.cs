@@ -9648,6 +9648,18 @@ namespace Armoury
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
         public bool DsHoardDueVillages { get; set; } = true;
 
+        [SettingPropertyBool("Village Made To Order", HintText = "a village whose communal works find no material on its market stall can order timber, clay, limestone or marble from a nearby woodcutters', clay-diggers', quarry or lime-pit village of a friendly realm; that village takes hands off its fields (less grain) for the order and is paid from the buyer's purse at its own market price (off = stall only, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public bool VillageMadeToOrder { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Order Field Hands Share", 0.00f, 0.25f, "0.00", HintText = "with Village Made To Order: the most of a producing village's field hands that may leave the fields to work on orders (0.05 = a twentieth; the hands come back to the fields at once when the orders stop, and in a famine none leave)", RequireRestart = false)]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public float VillageOrderFieldShare { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Order Range", 0f, 600f, "0", HintText = "with Village Made To Order: how far (straight line on the map) a village looks for a producing village to order its material from - about two to three days on the road at 150; no carts, the order is made and used on the spot (0 = no orders)", RequireRestart = false)]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public float VillageOrderRange { get; set; } = 150f;
+
         [SettingPropertyBool("Folk Better Table", HintText = "with Start Calibration applied: townsfolk with savings above their reserve may buy a better table - meat, cheese, butter, beer, wine, mead, oil, honey - beyond what their basket holds, as long as the price stays at or below the price ceiling of Market Sees Purse (above it the rich do not outbid the poor for food). Until now the basket took all of it and the coin stayed in the purse (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
         public bool FolkBetterTable { get; set; } = true;
@@ -14095,6 +14107,9 @@ namespace Armoury
             s.DsWorksRealMaterial = DsWorksRealMaterial;
             s.DsWorksWagePerMaterial = DsWorksWagePerMaterial;
             s.DsHoardDueVillages = DsHoardDueVillages;
+            s.VillageMadeToOrder = VillageMadeToOrder;
+            s.VillageOrderFieldShare = VillageOrderFieldShare;
+            s.VillageOrderRange = VillageOrderRange;
             s.FolkBetterTable = FolkBetterTable;
             s.CrownWindfallToReserve = CrownWindfallToReserve;
             s.KsTownFieldsEvery2 = KsTownFieldsEvery2;

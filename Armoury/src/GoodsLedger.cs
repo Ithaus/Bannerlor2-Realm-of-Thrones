@@ -81,7 +81,8 @@ namespace Armoury
                              GZc1 = "drogi towarow (ZC1)",   // ZC1 (16.10): przemiana towaru we wsi i w osadzie (opis w podpozycji)
                              GKs = "pola mieszczan (KS)",    // KS (kalibracja startu): plon pol mieszczan na polke miasta (StartCalibration.TownFields) - zrodlo
                              GKsOwn = "wies je wlasny towar (KS)",   // KS-R3 G3: wies zjadla towar z magazynu (czekajacy na woz), gdy kupila mniej kcal niz zaplacone z Planu - ujscie
-                             GKsLost = "kupcy zywnosci (KS-H): stracone w drodze";   // recenzja runda 3: psucie w drodze, woz bez celu i zrodla, zawrocony bez zwrotu zaplaty - ujscie
+                             GKsLost = "kupcy zywnosci (KS-H): stracone w drodze",   // recenzja runda 3: psucie w drodze, woz bez celu i zrodla, zawrocony bez zwrotu zaplaty - ujscie
+                             GOrder = "roboty wsi na zamowienie (363)";   // 363: material zrobiony u wsi-wytworcy i zuzyty od razu przez roboty gminy zamawiajacej (zrodlo = ujscie, zapas bez zmian)
         private static readonly string[] SrcOrder = { GVil, GWoodlot, GFish, GShop, GArt, GTanW, GCraft, GZc1, GKs, GScrap, GDrill, GSlaughter, GSpawn, GBkParty, GBkSettle, GBee, GForage, GTick };
         private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GZc1, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GCourt, GKsOwn, GKsLost, GBloom, GMint, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GNoBuyer, GTick };
 
@@ -358,6 +359,27 @@ namespace Armoury
                 Book(i, GDiscard, null, -n);
             }
             catch (Exception e) { Stumble("NoteDiscard", e); }
+        }
+
+        /// <summary>363 (TownFolk.Order363): n sztuk materialu zrobionych na zamowienie u wsi-wytworcy i zuzytych od razu przez roboty gminy zamawiajacej - bez rostera:
+        /// +n zrodlo i -n ujscie w grupie GOrder (zapas bez zmian, "bez wyjasnienia" +0). Bez podzialu na rynki KS (MkP/MkC) - towar nie byl na targu; Plan KS (KsCons)
+        /// go nie widzi (KsNote odejmuje grupe) - rece na zamowienie liczy rachunek okregu, nie Plan. Nie rzuca.</summary>
+        internal static void NoteMadeToOrder(ItemObject item, int n)
+        {
+            try
+            {
+                if (n <= 0 || item == null || !On || !EnsureItems()) return;
+                int i;
+                if (!_idx.TryGetValue(item, out i) || _acc == null) return;
+                var a = _acc[i];
+                foreach (var d in new[] { a.Src, a.Sink })
+                {
+                    Dictionary<string, long> subs;
+                    if (!d.TryGetValue(GOrder, out subs)) { subs = new Dictionary<string, long>(); d[GOrder] = subs; }
+                    long v; subs.TryGetValue("", out v); subs[""] = v + n;
+                }
+            }
+            catch (Exception e) { Stumble("NoteMadeToOrder", e); }
         }
 
         /// <summary>Recenzja runda 3 (KS-H): towar wozu kupcow zywnosci stracony w drodze (psucie, woz bez celu i zrodla, zawrocony bez zwrotu zaplaty) - posiadacz "kupcy zywnosci
@@ -1328,7 +1350,8 @@ namespace Armoury
             v[KsShop] = Group(a.Sink, GShopIn) + Group(a.Sink, GArms) + Group(a.Sink, GArt) + Group(a.Sink, GCraft) + Group(a.Sink, GMend) + Group(a.Sink, GFletch) + Group(a.Sink, GBloom);
             // 311b (recenzja): mennica bierze tylko nadwyzke ponad zapas polki - to nie popyt; w KsCons (Plan KS: popyt 1:1, CrownMint: zuzycie swiata) bez niej, inaczej
             // Plan podnosi wydobycie pod mennice, a mennica bije wiecej (petla)
-            v[KsCons] = Math.Max(0, cons - Group(a.Sink, GMint)); v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
+            // 363: roboty wsi na zamowienie - towar spoza targu (rece z pola liczy rachunek okregu wytworcy); w KsCons bez nich, inaczej Plan przestawia rece drugi raz
+            v[KsCons] = Math.Max(0, cons - Group(a.Sink, GMint) - Group(a.Sink, GOrder)); v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
             v[KsCloth] = Group(a.Sink, GArmyCloth) + Group(a.Sink, GArms) + Group(a.Sink, GMend);
             _ksDay[it.StringId] = v;
             StartCalibration.M96LenLedger(it.StringId, _ksDayN, Group(a.Sink, GFolkVill));   // m96-len: zakupy plotna i sukna przez wsie w miastach (nie rzuca)
