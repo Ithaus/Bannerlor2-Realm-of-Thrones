@@ -1,5 +1,10 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 08.11.2026 23:50 CET: WGRANIE 189 (najnowszy) = noc/360-kopalnie 518ac30a (Armoury.dll 7e8d910a, CrashScribe d7fbd602) = 187 + 365 (188, CrashScribe: narzedzia chlopskie nie dla jazdy) + 366 (189, rozmowa z krolem w niewoli etap 1)
+- 366: w zapisie Jeffa warunek T (uznanie zdobyczy) bez tytulow - wsie Jeffa de iure u Lefforda i Marbranda (wasale Baratheonow); etap 2 = tytuly wasali + przejscie pod korone jenca. Wagi zgody niesprawdzone - SPRAWDZIC "ROKOWANIA (366)" w logu Jeffa.
+- Okupy krolow 08.11: Balon 160639 i Joffrey 1167391 do skarbca Polnocy (wielcy jency 178), nagrody Jeffa 14485 i 115509. Do decyzji Jeffa: Crown Great Captive Reward (0.1) albo wylaczenie Crown Great Captives.
+- 365: w tescie 0 jezdzcow z narzedziem; piechota T2+ z kilofem tylko jako ostatnia bron biala. SPRAWDZIC HIT "peasant_ ... konno" w logu Jeffa.
+
 ## STAN 08.11.2026 21:25 CET: WGRANIE 187 (najnowszy) = noc/360-kopalnie 2adefc41 (Armoury.dll cb445382) = 186 + 363b (material na zamowienie wedlug ziemi, zasieg 600 z frachtem, pulap 3%)
 - at-363b: 267 wytworcow, material do ok. 19 tys. zl/d po 40 dobach i dalej rosnie (rece 2% -> pulap 3%). SPRAWDZIC w grze Jeffa: "Zamowienia wsi (363/363b)", danina skarbcow wsi ("Akumulator kies" pobrano), zboze z pola mniej; jesli material > 60 tys. zl/d - Village Order Field Share 0.02.
 - Zawieszenie 20:55 w kryjowce hideout_mountain_35 - silnik natywny (MissionState.TickMission -> PInvoke), pierwsze; Jeff stracil gre 19:02-20:55 (Ironman bez zapisu).
