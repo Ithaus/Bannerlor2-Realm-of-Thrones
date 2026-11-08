@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 185 - 363 na 184 (Armoury.dll de23853f -> 10eb14c3 = build 3eb57d31) + MCM Jeffa MineRegaleShare 0.25
+**Test at-363 (kopia zapisu Jeffa 08.11 19:02, 40 dob):** kod 0, bledy CrashScribe 22 (norma), potkniecia 0, kontrola zlota i sztuk 363 = 0 co dobe, czas 0.1-0.4 ms. SKALA ZNIKOMA: wytworcow KS w zasiegu 150 tylko 3 (wszyscy lumberjack; clay_mine/lime_pit/quarry 0), z rekami 2, rece z pola 926 (3.6% rak tych okregow), drewno 108 szt./d, zloto 349 zl/d (109734); zamowien bez wytworcy w zasiegu ok. 191-211 tys. zl/d (396-479 zlecen). Projekt zakladal ok. 80 wytworcow - zasieg 150 i prog 5% rak zajecia odcinaja prawie wszystkich. Do decyzji: 363b (zasieg wozem jak Bloomery, nizszy prog, inne zajecia).
+**MCM Jeffa (decyzja Jeffa 08.11 "Mine Regale Share ... ustaw na 0.25"):** Armoury.json dopisany klucz "MineRegaleShare": 0.25 (wczesniej brak - domyslne 0.125); kopia Armoury.json.bak-2026-11-08-przed-regale025.
+**Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie185, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie185(-przed).
+**Status:** WGRANE (185).
+
 ## WGRANIE 184 - 362 na 183 (Armoury.dll 6dc04665 -> de23853f = build dd042490)
 **Test at-362 (kopia zapisu Jeffa 08.11 19:02, 20 dob):** kod 0, bledy CrashScribe 22 (norma), potkniecia 362 brak. "Skrytki wsi (362)": sesji z S 3 (S 0.488, 0.428, srednio 0.265) - wszystkie u najezdzcow (Zelazne Wyspy / Wolni Ludzie), gdzie zelazna cena WW1 0.5 >= S, wiec zloto ze skrytek 0 i XP 0 - zgodnie z regula max(s0, Q, S). Bilans v2 = 0. Rabunkow AI w tych 20 dobach bardzo malo (pokoj), okupy 0-2/d. NIE ZAOBSERWOWANO w tescie doplaty skrytek (topUp > 0) ani kary relacji - do sprawdzenia w grze Jeffa (pierwszy rabunek gracza / lorda AI spoza najezdzcow).
 **Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie184, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie184(-przed). Zapis testu: D:/Backup-Bannerlord/zapisy-testowe/at-362-*.sav.
