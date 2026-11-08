@@ -81,6 +81,8 @@ namespace Armoury
             // poprawki 363 (recenzje): prawo do rak przy ostatnim rachunku (glod, rampa, prace okregu, nie Normal - false), doba ostatniego rachunku (narastanie wedlug czasu),
             // przeliczenie wymuszone w najblizszej dobie KS (klucz wylaczony przy rekach na zamowieniu) - zamiast Res = null
             public bool OrdOk, OrdRedo; public int OrdDay = int.MinValue;
+            // 363b: wytworca wedlug ziemi okregu (zajecie bez rak w planie KS - rece tylko z pola na zamowienie)
+            public bool OrdLand;
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed;

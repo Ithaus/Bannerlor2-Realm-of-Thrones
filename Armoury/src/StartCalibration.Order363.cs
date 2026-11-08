@@ -9,7 +9,7 @@ namespace Armoury
     /// <summary>
     /// 363 (Jeff 08.11: "Wsie napraw to, trzeba naprawic ekonomie" - wybor "Ukryte zloto do lupu": produkcja materialu na zamowienie u wsi drwali i gliniarzy) - strona KS:
     /// wies-wytworca (zajecie regale okregu: lumberjack - hardwood, clay_mine - clay, quarry - marble, lime_pit - limestone; jedno zajecie na okreg - to z najwiekszymi
-    /// rekami) zabiera rece z pola (wheat_farm) na zamowienie. Rachunek okregu (ComputeDistrict, tylko gra, co LiveEvery dob): H = min(popyt / sztuki na reke, pulap
+    /// rekami; 363b: wedlug ziemi - zloze w bloku, najwieksza wartosc na reke) zabiera rece z pola (wheat_farm) na zamowienie. Rachunek okregu (ComputeDistrict, tylko gra, co LiveEvery dob): H = min(popyt / sztuki na reke, pulap
     /// VillageOrderFieldShare x rece pola), narastanie najwyzej +1% rak pola na przeliczenie, spadek od razu; glod, rampa KS, wies nie Normal, prace okregu gracza,
     /// klucz wylaczony - H = 0. Kg zajecia wheat_farm (zboze i drobny inwentarz P0) spada o H / F, towar rosnie o H x kg na reke PRZED zima i czynnikami rak; po
     /// czynnikach towar zamowienia wychodzi z produkcji przed stolem okregu (nie spalony jako opal, nie na wozy) jako sztuki doby (DistResult.OrdPcs). Zywnosc: mniej
@@ -62,28 +62,47 @@ namespace Armoury
             return 0.0;
         }
 
+        /// <summary>363b: zloze w ziemi bloku - ta sama regula co wiersze regale planu KS (RegRows): L >= 0.5 (drewno >= 0.8), zajecie nie zablokowane w okregu (NoReg).</summary>
+        private static bool OrdLandOk(KsDistrict d, KsPart lb, int c, string type, out double L)
+        {
+            L = 0;
+            if (d == null || lb == null || lb.K == null || c < 0 || c >= 63) return false;
+            if ((d.NoReg & (1L << c)) != 0) return false;
+            L = lb.L(c, type);
+            if (double.IsNaN(L) || double.IsInfinity(L)) { L = 0; return false; }
+            if (c == KsTab.CLumber && L < 0.8) return false;
+            return L >= 0.5;
+        }
+
         /// <summary>
         /// ComputeDistrict (z czynnikami, wies; po HerdKs, przed WorksKs i zima): wytworca - rece na zamowienie z pola do towaru zajecia materialowego. true - okreg jest
         /// wytworca (OrderAfter po czynnikach liczy sztuki doby i czynnik zimy), takze przy H = 0. Nie rzuca.
+        /// 363b (VillageOrderByLand): wytworca wedlug ziemi - zajecie materialowe, ktorego zloze lezy w bloku (regula RegRows), takze bez rak w planie; pulap i narastanie
+        /// od rak pola blokow ze zlozem (F_res), kg na reke - rece zajecia z planu i rece pola blokow ze zlozem (P0 x L); jedno zajecie na okreg - najwieksza wartosc
+        /// na reke (kg na reke / kg sztuki x wartosc sztuki, bez ceny rynku); bez progu OrdMinCraftShare. Klucz wylaczony - regula 363 (rece w planie, prog 5%).
         /// </summary>
         private static bool OrderKs(LiveDist ld, double[] prod, double[] kgT)
         {
             if (ld == null) return false;
             ld.OrdAddKg = 0; ld.OrdGrain0 = 0; ld.OrdGrain1 = 0; ld.OrdHungry = false; ld.OrdPre = 0; ld.OrdPreGrain = 0;
-            if (ld.TF || ld.V == null || ld.B == null || ld.K == null || prod == null || kgT == null) { ld.OrdH = 0; ld.OrdCraft = -1; ld.OrdItem = -1; ld.OrdOk = false; return false; }
+            if (ld.TF || ld.V == null || ld.B == null || ld.K == null || prod == null || kgT == null) { ld.OrdH = 0; ld.OrdCraft = -1; ld.OrdItem = -1; ld.OrdOk = false; ld.OrdLand = false; return false; }
             try
             {
                 string type = ld.K.Type;
+                var s = Settings.Current;
+                bool byLand = s != null && s.VillageOrderByLand;
                 var hc = new double[OrdCrafts.Length]; var kc = new double[OrdCrafts.Length];
+                var fr = new double[OrdCrafts.Length]; var kr = new double[OrdCrafts.Length];   // 363b: rece pola blokow ze zlozem i ich kg (Fb x P0 x L)
                 double F = 0, all = 0;
                 foreach (var lb in ld.B)
                 {
                     if (lb == null || lb.K == null || lb.C == null || lb.X == null) continue;
                     if (lb.Hands > 0) all += lb.Hands;
+                    double fb = 0;
                     for (int j = 0; j < lb.C.Length; j++)
                     {
                         int c = lb.C[j];
-                        if (c == KsTab.CWheat) { F += OrdCraftHands(lb, j); continue; }
+                        if (c == KsTab.CWheat) { double w = OrdCraftHands(lb, j); F += w; fb += w; continue; }
                         int m = OrdSlot(c);
                         if (m < 0) continue;
                         double h = OrdCraftHands(lb, j);
@@ -99,19 +118,48 @@ namespace Armoury
                             if (!(lab > 0)) continue;
                             hc[m] += lab; kc[m] += lab * OrdP0(lb.RC[j], OrdItems[m]) * lb.L(lb.RC[j], type);
                         }
+                    if (byLand && fb > 0)
+                        for (int m = 0; m < OrdCrafts.Length; m++)
+                        {
+                            double L;
+                            if (!OrdLandOk(ld.K, lb, OrdCrafts[m], type, out L)) continue;
+                            double p0 = OrdP0(OrdCrafts[m], OrdItems[m]);
+                            if (!(p0 > 0)) continue;
+                            fr[m] += fb; kr[m] += fb * p0 * L;
+                        }
                 }
                 int best = -1; double bh = 0;
-                for (int m = 0; m < hc.Length; m++) if (hc[m] > bh && kc[m] > 0) { bh = hc[m]; best = m; }
-                if (best >= 0 && !(bh >= OrdMinCraftShare * all)) best = -1;   // poprawka 363 (recenzja 2): slad zajecia materialowego - nie wytworca
-                if (best < 0) { ld.OrdH = 0; ld.OrdCraft = -1; ld.OrdItem = -1; ld.OrdCapH = 0; ld.OrdFieldH = 0; ld.OrdOk = false; return false; }
+                if (byLand)
+                {
+                    // 363b: jedno zajecie na okreg - najwieksza wartosc na reke (stala wartosc sztuki, bez ceny rynku); zloze z rekami pola w bloku albo rece zajecia w planie
+                    // (wytworca 363 bez rak pola w blokach ze zlozem zostaje wytworca - pulap od rak pola okregu, jak w 363)
+                    EnsureItems();
+                    for (int m = 0; m < OrdCrafts.Length; m++)
+                    {
+                        // poprawka 363b (recenzje 1 i 2): bez zloza w blokach z polem (fr = 0) - regula 363 (prog OrdMinCraftShare); slad zajecia w planie nie daje pulapu od pola okregu
+                        if (!((fr[m] > 0 && kr[m] > 0) || (hc[m] > 0 && kc[m] > 0 && hc[m] >= OrdMinCraftShare * all))) continue;
+                        double kgH = (kc[m] + kr[m]) / (hc[m] + fr[m]);
+                        int im = OrdItems[m];
+                        var io = _items != null && im >= 0 && im < _items.Length ? _items[im] : null;
+                        double val = Math.Max(1, io != null ? io.Value : 1) * kgH / Math.Max(0.01, kgT[im]);
+                        if (val > bh && !double.IsNaN(val) && !double.IsInfinity(val)) { bh = val; best = m; }
+                    }
+                }
+                else
+                {
+                    for (int m = 0; m < hc.Length; m++) if (hc[m] > bh && kc[m] > 0) { bh = hc[m]; best = m; }
+                    if (best >= 0 && !(bh >= OrdMinCraftShare * all)) best = -1;   // poprawka 363 (recenzja 2): slad zajecia materialowego - nie wytworca
+                }
+                if (best < 0) { ld.OrdH = 0; ld.OrdCraft = -1; ld.OrdItem = -1; ld.OrdCapH = 0; ld.OrdFieldH = 0; ld.OrdOk = false; ld.OrdLand = false; return false; }
                 int it = OrdItems[best];
                 ld.OrdCraft = OrdCrafts[best]; ld.OrdItem = it;
-                ld.OrdKgHand = kc[best] / hc[best];
-                ld.OrdFieldH = F;
-                var s = Settings.Current;
+                double Fcap = byLand && fr[best] > 0 ? fr[best] : F;             // 363b: pulap i narastanie od rak pola blokow ze zlozem (bez nich - rece pola okregu, jak 363)
+                ld.OrdKgHand = byLand ? (kc[best] + kr[best]) / (hc[best] + fr[best]) : kc[best] / hc[best];
+                ld.OrdLand = byLand && !(hc[best] >= OrdMinCraftShare * all);   // poprawka 363b: "wedlug ziemi" - rece zajecia w planie ponizej progu 363 (slad tez)
+                ld.OrdFieldH = Fcap;
                 double share = s != null ? Math.Max(0.0, Math.Min(0.25, (double)s.VillageOrderFieldShare)) : 0.0;
-                ld.OrdCapH = share * F;
-                bool ok = OrderOn && F > 0 && RampFull(ld.Market == 0 ? 0 : 1) && ld.V.VillageState == Village.VillageStates.Normal && !DistrictWorks.HasWorks(ld.V);
+                ld.OrdCapH = share * Fcap;
+                bool ok = OrderOn && F > 0 && Fcap > 0 && RampFull(ld.Market == 0 ? 0 : 1) && ld.V.VillageState == Village.VillageStates.Normal && !DistrictWorks.HasWorks(ld.V);
                 if (ok && Famine.HungerOf(ld.V) > 0f) { ld.OrdHungry = true; ok = false; }
                 ld.OrdOk = ok;   // poprawka 363 (recenzje 1 i 2): wytworca bez prawa do rak (glod, rampa, prace okregu, nie Normal) - w ofercie "na pulapie", popyt idzie do zdrowego
                 // poprawka 363 (recenzja 1): narastanie wedlug czasu, nie liczby przeliczen (_liveFull, KsDirty, przelom pory) - +1% rak pola na LiveEvery dob
@@ -127,14 +175,14 @@ namespace Armoury
                     double pcsHand = ld.OrdKgHand * f / (sigma * Math.Max(0.01, kgT[it]));
                     double want = pcsHand > 1e-9 && ld.OrdDemand > 0 ? ld.OrdDemand / pcsHand : 0.0;
                     double prev = Math.Max(0.0, ld.OrdH);
-                    H = want > prev ? Math.Min(want, prev + OrdRiseStep * F * riseK) : want;
+                    H = want > prev ? Math.Min(want, prev + OrdRiseStep * Fcap * riseK) : want;
                     H = Math.Max(0.0, Math.Min(H, ld.OrdCapH));
                     if (double.IsNaN(H) || double.IsInfinity(H)) H = 0;
                 }
                 ld.OrdH = H;
                 if (H > 0)
                 {
-                    // rece z pola: kg zajecia wheat_farm (zboze i drobny inwentarz P0) spada o H / F
+                    // rece z pola: kg zajecia wheat_farm (zboze i drobny inwentarz P0) spada o H / F (363b: H / F calego okregu - uproszczenie, rece z blokow ze zlozem)
                     double frac = Math.Min(1.0, H / F);
                     var tmp = new double[ItemCount];
                     foreach (var lb in ld.B)
@@ -155,7 +203,7 @@ namespace Armoury
                 ld.OrdPre = prod[it]; ld.OrdPreGrain = prod[IGrain];
                 return true;
             }
-            catch (Exception e) { Stumble("OrderKs", e); ld.OrdH = 0; ld.OrdAddKg = 0; ld.OrdCraft = -1; ld.OrdItem = -1; ld.OrdOk = false; return false; }
+            catch (Exception e) { Stumble("OrderKs", e); ld.OrdH = 0; ld.OrdAddKg = 0; ld.OrdCraft = -1; ld.OrdItem = -1; ld.OrdOk = false; ld.OrdLand = false; return false; }
         }
 
         /// <summary>ComputeDistrict (po zimie, czynnikach rak, HarvestYear i LandKs; przed KsDeliver.Own): towar zamowienia wyjety z produkcji - sztuki doby (OrdPcs);
@@ -222,16 +270,16 @@ namespace Armoury
             return true;
         }
 
-        /// <summary>Sprzedaz n sztuk tej doby (po zaplacie) - takze popyt doby wytworcy.</summary>
-        internal static void OrderTake(Village p, int n)
+        /// <summary>Sprzedaz tej doby (po zaplacie): `units` jednostek produkcji - sztuki razem z frachtem (363b: wozacy wytworcy, sztuka x (1 + frach)) - takze popyt doby.</summary>
+        internal static void OrderTake(Village p, double units)
         {
             var ld = OrdLd(p);
-            if (ld == null || n <= 0) return;
-            ld.OrdLeft = Math.Max(0.0, ld.OrdLeft - n);
-            ld.OrdToday += n;
+            if (ld == null || !(units > 0) || double.IsNaN(units) || double.IsInfinity(units)) return;
+            ld.OrdLeft = Math.Max(0.0, ld.OrdLeft - units);
+            ld.OrdToday += units;
         }
 
-        /// <summary>Popyt niezaspokojony przypisany wytworcy (sztuki) - do EMA popytu (rece przy nastepnym rachunku okregu).</summary>
+        /// <summary>Popyt niezaspokojony przypisany wytworcy (jednostki produkcji - sztuki razem z frachtem, 363b) - do EMA popytu (rece przy nastepnym rachunku okregu).</summary>
         internal static void NoteOrderDemand(Village p, double pcs)
         {
             var ld = OrdLd(p);
@@ -286,10 +334,10 @@ namespace Armoury
         }
 
         /// <summary>Liczby linii 363 (z ostatniego rachunku okregow): wytworcy na towar (OrdNames), z rekami, rece na zamowienie, rece pola tych okregow, glodni,
-        /// zboze z pola mniej (kg/d przed zima i po zimie).</summary>
-        internal static void OrderStats(int[] byCraft, out int withHands, out double hands, out double field, out int hungry, out double grain0, out double grain1)
+        /// zboze z pola mniej (kg/d przed zima i po zimie); 363b: wytworcy wedlug ziemi i z rekami w planie.</summary>
+        internal static void OrderStats(int[] byCraft, out int withHands, out double hands, out double field, out int hungry, out double grain0, out double grain1, out int byLand, out int inPlan)
         {
-            withHands = 0; hands = 0; field = 0; hungry = 0; grain0 = 0; grain1 = 0;
+            withHands = 0; hands = 0; field = 0; hungry = 0; grain0 = 0; grain1 = 0; byLand = 0; inPlan = 0;
             if (_state != StateApplied) return;
             foreach (var ld in _live.Values)
             {
@@ -297,6 +345,7 @@ namespace Armoury
                 int m = OrdSlot(ld.OrdCraft);
                 if (m >= 0 && byCraft != null && m < byCraft.Length) byCraft[m]++;
                 if (ld.OrdHungry) hungry++;
+                if (ld.OrdLand) byLand++; else inPlan++;   // 363b: wytworca wedlug ziemi (bez rak w planie) / z rekami zajecia w planie KS
                 if (ld.OrdH > 0) { withHands++; hands += ld.OrdH; field += ld.OrdFieldH; grain0 += ld.OrdGrain0; grain1 += ld.OrdGrain1; }
             }
         }

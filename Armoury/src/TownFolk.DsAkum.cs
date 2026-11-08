@@ -377,15 +377,18 @@ namespace Armoury
             }
             _dwCap += cap;
             // 363: reszta budzetu materialu u wsi-wytworcow w zasiegu (bez wozu i polki: kiesa wsi -> kiesa wytworcy); klucz wylaczony, septy, lud miasta - 0 (jak dotad)
-            long ordPaid = 0;
+            long ordPaid = 0, ordBase = 0;
             if (!o.Sept && o.Vil != null && matBudget - spent >= 1)
             {
                 try { ordPaid = ProducerBuy(o, matBudget - spent); }
                 catch (Exception e) { DaStumble("ProducerBuy", e); ordPaid = _orLastPaid; }
+                ordBase = Math.Max(0, Math.Min(ordPaid, _orLastBase));   // poprawka 363b: bez frachtu (wozacy wytworcy oplaceni we frachcie)
             }
             if (spent + ordPaid <= 0) { if (o.Sept) { _dsNoMat += o.Amount; _dsNoMatN++; } else { _dwNoMat += o.Amount; _dwNoMatN++; } return 0; }
-            long wage = Math.Max(0, Math.Min((long)Math.Floor(k * (spent + ordPaid)), budget - spent - ordPaid));   // 363: rzemieslnicy od calego materialu (polka + wytworca)
-            if (ordPaid > 0) _orWage += wage * (double)ordPaid / (spent + ordPaid);
+            // 363: rzemieslnicy od calego materialu (polka + wytworca); poprawka 363b (recenzje 1 i 2): od materialu wytworcy BEZ frachtu - frach to praca wozakow wytworcy,
+            // juz zaplacona jego kiesie (jedna zaplata za jedna prace); gorna granica - budzet po calym wyplywie (z frachtem)
+            long wage = Math.Max(0, Math.Min((long)Math.Floor(k * (spent + ordBase)), budget - spent - ordPaid));
+            if (ordBase > 0) _orWage += wage * (double)ordBase / (spent + ordBase);
             // 322b: pomiar podkroku zaplaty (tylko odczyt; P2Close w finally - wynik i wyjatek jak dotad)
             if (o.Vil != null)
             {

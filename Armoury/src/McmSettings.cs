@@ -9656,13 +9656,21 @@ namespace Armoury
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
         public bool VillageMadeToOrder { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Order Field Hands Share", 0.00f, 0.25f, "0.00", HintText = "with Village Made To Order: the most of a producing village's field hands that may leave the fields to work on orders (0.05 = a twentieth; the hands come back to the fields at once when the orders stop, and in a famine none leave)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Order Field Hands Share", 0.00f, 0.25f, "0.00", HintText = "with Village Made To Order: the most of a producing village's field hands that may leave the fields to work on orders (0.03 = three in a hundred; the hands come back to the fields at once when the orders stop, and in a famine none leave)", RequireRestart = false)]
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
-        public float VillageOrderFieldShare { get; set; } = 0.05f;
+        public float VillageOrderFieldShare { get; set; } = 0.03f;
 
-        [SettingPropertyFloatingInteger("Order Range", 0f, 600f, "0", HintText = "with Village Made To Order: how far (straight line on the map) a village looks for a producing village to order its material from - about two to three days on the road at 150; no carts, the order is made and used on the spot (0 = no orders)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Order Range", 0f, 600f, "0", HintText = "with Village Made To Order: how far (straight line on the map) a village looks for a producing village to order its material from (600 = about ten days on the road); the carters of the producing village bring it; each day on the road adds freight paid to that village (0 = no orders)", RequireRestart = false)]
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
-        public float VillageOrderRange { get; set; } = 150f;
+        public float VillageOrderRange { get; set; } = 600f;
+
+        [SettingPropertyFloatingInteger("Order Freight Per Day", 0.00f, 0.20f, "0.00", HintText = "with Village Made To Order: the share of the price added per day on the road; the producing village's own people do the carting, so more of its hands leave the fields; 0 = free road", RequireRestart = false)]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public float VillageOrderFreightPerDay { get; set; } = 0.05f;
+
+        [SettingPropertyBool("Order Producers By Land", HintText = "with Village Made To Order: a village with woods, clay, limestone or stone on its land can become a producer even if it worked none before; off = only villages already working that trade", RequireRestart = false)]
+        [SettingPropertyGroup("Money that cannot be spent (18.10)")]
+        public bool VillageOrderByLand { get; set; } = true;
 
         [SettingPropertyBool("Folk Better Table", HintText = "with Start Calibration applied: townsfolk with savings above their reserve may buy a better table - meat, cheese, butter, beer, wine, mead, oil, honey - beyond what their basket holds, as long as the price stays at or below the price ceiling of Market Sees Purse (above it the rich do not outbid the poor for food). Until now the basket took all of it and the coin stayed in the purse (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
@@ -14115,6 +14123,8 @@ namespace Armoury
             s.VillageMadeToOrder = VillageMadeToOrder;
             s.VillageOrderFieldShare = VillageOrderFieldShare;
             s.VillageOrderRange = VillageOrderRange;
+            s.VillageOrderFreightPerDay = VillageOrderFreightPerDay;
+            s.VillageOrderByLand = VillageOrderByLand;
             s.FolkBetterTable = FolkBetterTable;
             s.CrownWindfallToReserve = CrownWindfallToReserve;
             s.KsTownFieldsEvery2 = KsTownFieldsEvery2;
