@@ -11712,6 +11712,14 @@ namespace Armoury
         [SettingPropertyGroup("Terms with a captive king (366)")]
         public bool CaptiveTerms { get; set; } = true;
 
+        [SettingPropertyBool("Captive Terms Vassal Titles", HintText = "When you ask a captive king to confirm your conquests, he also puts it to the lords of his realm who hold Banner Kings titles to the castles and villages you hold. Each names his price to give up his claim - a steep one: several years of the land's income, more for the seat of his house, less with your Charm, his regard for you and his king, and when his house is in need. A proud lord may refuse gold, but give up his claim if you (or an unwed man of your house) marry his daughter - or, for less gold, another unwed woman of his house. You pay each lord yourself; the king's own titles still cost nothing. Off = the king confirms only his own titles", RequireRestart = false)]
+        [SettingPropertyGroup("Terms with a captive king (366)")]
+        public bool CaptiveTermsVassalTitles { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Captive Title Claim Years", 1.00f, 20.00f, "0.0", HintText = "with Captive Terms Vassal Titles: how many years of a holding's income a lord asks to give up his title to it (before the castle and seat premiums of Land Sales and the other factors). A full sale of land costs 14 to 20 years; giving up a claim to land already lost costs less", RequireRestart = false)]
+        [SettingPropertyGroup("Terms with a captive king (366)")]
+        public float CaptiveTitleClaimYears { get; set; } = 5f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -14639,6 +14647,8 @@ namespace Armoury
             s.LandDuesFollowTitleHolder = LandDuesFollowTitleHolder;
             s.VillageTaxToLandHolder = VillageTaxToLandHolder;
             s.CaptiveTerms = CaptiveTerms;
+            s.CaptiveTermsVassalTitles = CaptiveTermsVassalTitles;
+            s.CaptiveTitleClaimYears = CaptiveTitleClaimYears;
         }
 
         internal static void Apply()

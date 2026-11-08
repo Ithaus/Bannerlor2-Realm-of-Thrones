@@ -1768,6 +1768,56 @@ namespace Armoury
         /// <summary>m105-kronika B2: postac po stronie gracza (gracz, jego rod, towarzysz, druzyna, jeniec gracza) - opis albo null (ta sama regula co #move).</summary>
         internal static string PlayerSideOf(Hero h) { return h != null ? PlayerSide(h) : null; }
 
+        /// <summary>367a (recenzja): postac slubu kanonu, ktory jeszcze moze zajsc - wiersz #move marry/wed niewykonany (kto albo z kim; tylko przy kluczu z zalozenia
+        /// kampanii) albo efekt Kroniki wed:/marry: (id bohaterow wprost). Rokowania z jencem (CaptiveTerms.Claims) nie zenia jej z rodem gracza - inaczej wiersz kanonu
+        /// konczy sie Skip ("juz w malzenstwie" / PlayerSide), a fabula idzie bez slubu. ROT.dll niezdekompilowany - to minimum. Blad odczytu - true (ostroznie).</summary>
+        internal static bool IsCanonMarriageRef(Hero h)
+        {
+            if (h == null) return false;
+            try
+            {
+                string id = h.StringId ?? "", k = Key(h);
+                if (_on)
+                {
+                    EnsureLoaded();
+                    foreach (var m in _moves)
+                    {
+                        if ((m.Action != "marry" && m.Action != "wed") || _done.ContainsKey(m.Id)) continue;
+                        if (m.Who == k || m.Who == id || m.Arg == id) return true;
+                    }
+                }
+                if (id.Length > 0 && Chronicle.Data.Loaded)
+                    foreach (var w in Chronicle.Data.Windows)
+                    {
+                        if (w == null) continue;
+                        if (WedRef(w.Main, id)) return true;
+                        foreach (var r in w.Variants) if (WedRef(r, id)) return true;
+                    }
+                return false;
+            }
+            catch (Exception e) { Stumble("IsCanonMarriageRef", e); return true; }
+        }
+
+        private static bool WedRef(Chronicle.Data.RowDef r, string id)
+        {
+            if (r == null) return false;
+            if (WedIn(r.Effects, id)) return true;
+            foreach (var o in r.Options) if (o != null && WedIn(o.Effects, id)) return true;
+            return false;
+        }
+
+        private static bool WedIn(string[] fx, string id)
+        {
+            if (fx == null) return false;
+            foreach (var a in fx)
+            {
+                if (a == null || !(a.StartsWith("wed:", StringComparison.Ordinal) || a.StartsWith("marry:", StringComparison.Ordinal))) continue;
+                var p = a.Split(':');
+                for (int i = 1; i < p.Length; i++) if (p[i].Trim() == id) return true;
+            }
+            return false;
+        }
+
         /// <summary>0 - poza lista chronionych, 1 - na liscie i wydarzenie juz zaszlo (need = term spelniony), 2 - na liscie, wydarzenie jeszcze nie (need = czego brak).</summary>
         internal static int GuardState(Hero h, out string need)
         {

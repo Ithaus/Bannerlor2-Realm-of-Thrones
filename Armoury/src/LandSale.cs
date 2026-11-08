@@ -594,7 +594,7 @@ namespace Armoury
             return o;
         }
 
-        private static bool CanonSeat(Clan c, Settlement st)
+        internal static bool CanonSeat(Clan c, Settlement st)   // 367: internal - cena roszczen wasali (CaptiveTerms.Claims)
         {
             try { var h = CanonHouses.OfClan(c); return h != null && CanonHouses.SeatIs(h, st.StringId); }
             catch { return false; }
