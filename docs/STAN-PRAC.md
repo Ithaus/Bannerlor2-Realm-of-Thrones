@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 08.11.2026 20:20 CET: WGRANIE 186 (najnowszy) = noc/360-kopalnie 2ff303a9 (Armoury.dll 46de0a6f) = 182 + 361 (183) + 362 (184) + 363 (185) + 364 (186); MCM Jeffa MineRegaleShare 0.25
+- 361: komunikat "Today in total" po wyplacie rodu + poprawiona podpowiedz zlota (at-361: |rozjazd| ok. 250 przy |naprawde| ok. 4100/d). Wyjasnienie dla Jeffa: "Daily Gold Change" gry to tylko wyplata modelu, nasze daniny wchodza ok. 1.6 h wczesniej.
+- 362: zloto ze skrytek wsi wg Roguery (5% + 0.2%/pkt, max 50%, perki, XP, kara relacji). W tescie tylko najezdzcy (zelazna cena 50% >= S) - doplaty skrytek NIE widziano; SPRAWDZIC w logu Jeffa "Skrytki wsi (362)" po pierwszym rabunku gracza / lorda AI.
+- 363: material na zamowienie u wsi-wytworcow - dziala, ale znikomo (3 wytworcow w zasiegu 150, ok. 350 zl/d wobec ok. 200 tys. zamowien). DECYZJA JEFFA: czy 363b (zasieg wozem jak Bloomery, nizszy prog 5%, wiecej zajec).
+- 364: pelny garnizon nie rekrutuje (patrol BK liczony w zalodze); at-364 przepelnienie swiata 30-49/d -> 3-6/d. Linia "Zalogi gracza (364)" pokazuje Ashemark i Goldentooth.
+- Inne: Nocny Krol (sesja 08.11 17:05): 543 trupow, 4 bandy / 930 w polu, 0 osad, czeka na osade za Murem z przewaga 2.0x.
+
 ## STAN 08.11.2026 15:00 CET: WGRANIE 182 (najnowszy) = noc/360-kopalnie (Armoury.dll a5b2f4a6) = 181 + 360c (rece kopaln od nadwyzki rynku) + 360d (cena srebra/zlota widzi caly zapas w obiegu) + 360r2 (wzrost tylko ponizej zuzycia bez mennicy)
 - Test at360r2 76 dob OK; Westeros srebro rece stoja, Essos srebro/zloto -10%/cykl; ceny 360d spadaja plynnie; mennica ok. 11k zl/dobe.
 - SPRAWDZIC u Jeffa: "Kopalnie (360c)" w 109682 (bez wzrostu srebra W), "Kruszec w cenie (360d)" mediana indeksu, "Mennica (311b)", dochod gracza po 360b (rozliczenie rodu ok. -3..-4k/dobe w tescie 360 - powiedziane Jeffowi).
