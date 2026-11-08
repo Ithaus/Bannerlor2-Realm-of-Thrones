@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 180 - 359d (okrzyki dowodcow czesciej) na 179 (Armoury.dll 67dd5867 -> d893b28c = build 66c094eb)
+**Test at359d (kopia zapisu Jeffa 08.11 00:19, 10 dob + 13 bitew):** kod 0, misje sprawdzone, bledy CrashScribe 23 (jak at358/at359). Okrzyki: bitwy z bandami 0-1 (gracz sami konni - "nie piechota", bandyci niemi), bitwy z lordem: zwarcie 1/2/1, przed szarza 0/1/0 (kandydatow 0/1/3); glowna blokada "odstep szyku" (60 w bitwie 12) i "odstep strony" (25) - male bitwy testu (1 szyk piechoty na strone, ok. minuta zwarcia). Zawroc 0 z 0 - w tym biegu zadnego zawrocenia (los), sciezki glosu nie sprawdzone w tescie.
+**Do sprawdzenia w grze Jeffa (duze bitwy):** linia "okrzyki dowodcow (359)" - zwarcie N na bitwe; jesli dalej malo - skrocic odstep szyku (HoldLineEvery/Span, OGap) albo dopuscic szyki inne niz piechota.
+**Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie180, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie180(-przed).
+**Status:** WGRANE (180).
+
 ## 359d - okrzyki dowodcow czesciej: "Hold the line!" w zwarciu i przed uderzeniem szarzy, "Turn back!" przy kazdym zawroceniu (Armoury.dll d893b28c, NIE WGRANE)
 **Problem:** Jeff 08.11: "plus okrzyki trzymaj linie wracac trzymaj linie jak na wojnie za malo jest okrzykow dowodcow". Test at359 (13 bitew: 10 z bandami, 3 z lordem), linia "okrzyki dowodcow (359)": trzymaj linie - zwarcie 0-1 na bitwe (lacznie 1 na 13), przed szarza 0; zawroc 0 (bez glosu 2) przy 6 udanych zawroceniach (ZBIORKA (359)).
 **Przyczyna:** (1) zwarcie wykluczalo szyki z Charge/ChargeToTarget - a piechota w zwarciu prawie zawsze ma ChargeToTarget; zwarcie liczone od srodkow szykow ponizej 15 m - rzadko. (2) "Przed szarza" wisial na OnChargeStarted wroga (wrog ~400 m, szyk-cel dawno nie stoi) - martwy. (3) "Turn back!" tylko przy pierwszym zawroceniu dowodcy i potem 1 na 3; zawracajaca kobieta / niemy = cisza bez zastepcy. (4) tlo (petle wiatru/deszczu/szczeku) zjadalo limit 5 nowych zdarzen/s.
