@@ -1,5 +1,9 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 08.11.2026 15:00 CET: WGRANIE 182 (najnowszy) = noc/360-kopalnie (Armoury.dll a5b2f4a6) = 181 + 360c (rece kopaln od nadwyzki rynku) + 360d (cena srebra/zlota widzi caly zapas w obiegu) + 360r2 (wzrost tylko ponizej zuzycia bez mennicy)
+- Test at360r2 76 dob OK; Westeros srebro rece stoja, Essos srebro/zloto -10%/cykl; ceny 360d spadaja plynnie; mennica ok. 11k zl/dobe.
+- SPRAWDZIC u Jeffa: "Kopalnie (360c)" w 109682 (bez wzrostu srebra W), "Kruszec w cenie (360d)" mediana indeksu, "Mennica (311b)", dochod gracza po 360b (rozliczenie rodu ok. -3..-4k/dobe w tescie 360 - powiedziane Jeffowi).
+
 ## STAN 08.11.2026 04:00 CET: WGRANIE 181 (najnowszy) = noc/360-kopalnie 4e753ae1 (Armoury.dll 44e2001f, CrashScribe 3cab76a3) = 177 + 358 + 359/359b/359c + 359d + 360a/360b
 - 178 = 358 sondy cen co 28 dob; 179 = 359 zbiorka uciekajacych (wodz/kapitan/gracz, raz na zolnierza), 359b bron w ucieczce (latka Artem DropAllWeapons), 359c 36 klipow holdline/turnback (manifest.tsv +36); 180 = 359d okrzyki czesciej; 181 = 360a rece kopaln srebra/zlota za indeksem wzglednym, 360b od kruszcu pan bierze tylko regale.
 - Galaz noc/360-kopalnie zawiera noc/352 (merge 377d75a5) - dalej pracowac na niej (worktree scratchpad sesji 264cfac3 n360).
