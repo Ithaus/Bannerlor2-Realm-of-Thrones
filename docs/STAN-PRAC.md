@@ -1,5 +1,9 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 09.11.2026 00:45 CET: WGRANIE 190 (najnowszy) = noc/360-kopalnie 16e8c1c1 (Armoury.dll 52d1aeaf, CrashScribe d7fbd602) = 189 + 367a (roszczenia wasali krola za odszkodowanie albo slub)
+- NASTEPNE: 367b - przejscie Jeffa pod korone jenca z lennami (Jeff chcial w etapie 2); wymaga audytu fabuly ROT (CanonThroneWars.PlayerRealm, StorylineWars, WarTruce dla rodu, uwolnienie jencow przez gre przy zmianie krolestwa). Projekt w workflow wf_c02f46f6-2cd (design, sekcja 2).
+- SPRAWDZIC w grze Jeffa: "ROKOWANIA (367): spis roszczen" przy pierwszym krolu/nastepcy w niewoli.
+
 ## STAN 08.11.2026 23:50 CET: WGRANIE 189 (najnowszy) = noc/360-kopalnie 518ac30a (Armoury.dll 7e8d910a, CrashScribe d7fbd602) = 187 + 365 (188, CrashScribe: narzedzia chlopskie nie dla jazdy) + 366 (189, rozmowa z krolem w niewoli etap 1)
 - 366: w zapisie Jeffa warunek T (uznanie zdobyczy) bez tytulow - wsie Jeffa de iure u Lefforda i Marbranda (wasale Baratheonow); etap 2 = tytuly wasali + przejscie pod korone jenca. Wagi zgody niesprawdzone - SPRAWDZIC "ROKOWANIA (366)" w logu Jeffa.
 - Okupy krolow 08.11: Balon 160639 i Joffrey 1167391 do skarbca Polnocy (wielcy jency 178), nagrody Jeffa 14485 i 115509. Do decyzji Jeffa: Crown Great Captive Reward (0.1) albo wylaczenie Crown Great Captives.
