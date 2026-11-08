@@ -313,12 +313,14 @@ namespace Armoury
         }
 
         /// <summary>Okup jenca (AI-AI, kurier): cena, gotowka od rodziny (albo skarbca krola), dlug okupu w ksiedze 168. Jenca uwalnia wolajacy. false - bez umowy.</summary>
-        private static bool Execute(Hero captive, Clan captorClan, string path)
+        private static bool Execute(Hero captive, Clan captorClan, string path, double mult = 1.0)
         {
             var s = Settings.Current;
             bool byCrown; double D;
             long price = PriceOf(captive, out byCrown, out D);
             long fullBase = price;   // M6a-2: cena z mnoznikiem okupu powtornego, przed pulapem dlugu (licznik)
+            if (mult != 1.0) price = (long)(price * Math.Max(0.0, mult));   // 366: warunek R (okup podwojony) - ten sam przeplyw, licznik M6a-2 z ceny zwyklej
+            _lastExecPrice = 0;
             var rcv = ReceiverFor(captive, captorClan);
             if (rcv.Hero == null && rcv.Crown == null) return false;
             var payerClan = captive.Clan;
@@ -352,11 +354,96 @@ namespace Armoury
             // M6a-2: licznik okupu powtornego (cena pelna = cena bez mnoznika; po mnozniku = cena przed pulapem dlugu - pulap liczy sie osobno, jak dotad)
             try { double rf = RansomRepeat.Factor(captive); RansomRepeat.Note(rf > 0 && rf < 1.0 ? (long)Math.Round(fullBase / rf) : fullBase, fullBase, rf < 1.0); } catch { }
             _dPrice += price; _dCash += cash; _dDebt += debt;
+            _lastExecPrice = price;
             if (price > _dMaxV) { _dMaxV = price; _dMax = Name(payerClan) + " -> " + (rcv.Crown != null ? "korona " + rcv.Crown.Name : Name(rcv.Hero)) + " " + price + " za " + Name(captive); }
             Log.Info("Okupy (178): " + path + " - " + Name(captive) + " (" + (captive.Clan.Leader == captive ? "glowa rodu" : "lord") + ", " + Name(payerClan) + ") wolny za " + price
                      + " zl (D " + Math.Round(D) + (byCrown ? ", placi skarbiec " + captive.MapFaction.Name : "") + "): gotowka " + cash + ", dlug " + debt + " -> "
                      + (rcv.Crown != null ? "skarbiec " + rcv.Crown.Name + " (wielki jeniec)" : Name(rcv.Hero) + " (" + Name(rcv.Hero.Clan) + ")") + ".");
             return true;
+        }
+
+        // ------------------------------------------------------------ 366: rokowania z wielkim jencem gracza (CaptiveTerms) - te same reguly i ten sam przeplyw
+        private static long _lastExecPrice;
+
+        /// <summary>366: czy okupy wedlug majatku sa czynne (warunek R idzie tylko tym przeplywem).</summary>
+        internal static bool FlowsOn { get { try { return On; } catch { return false; } } }
+
+        /// <summary>366: zwykla cena okupu (PriceOf) - 0 gdy nie lord albo blad.</summary>
+        internal static long PriceFor(Hero h)
+        {
+            try { bool b; double D; return h != null && Lord(h) ? PriceOf(h, out b, out D) : 0; }
+            catch (Exception e) { Stumble("PriceFor", e); return 0; }
+        }
+
+        /// <summary>366: srednia wplywow dnia korony (28 dob) - miara gniewu pana przy utraconym okupie.</summary>
+        internal static double CrownDayIncome(Kingdom k) { try { return k != null ? CrownAvg(k) : 0; } catch { return 0; } }
+
+        /// <summary>366: korona, do ktorej skarbca idzie okup wielkiego jenca (null - jeniec nie przeszedl na korone; okup dla porywacza).</summary>
+        internal static Kingdom CaptiveCrown(Hero h)
+        {
+            try
+            {
+                string kid;
+                if (!GreatOn || h == null || h.StringId == null || !_crownCaptive.TryGetValue(h.StringId, out kid)) return null;
+                var k = KingdomById(kid);
+                return k != null && !k.IsEliminated ? k : null;
+            }
+            catch (Exception e) { Stumble("CaptiveCrown", e); return null; }
+        }
+
+        /// <summary>366: niewyplacona nagroda zdobywcy `to` od korony `k` (suma wpisow - nagrody nie sa przypisane do jenca).</summary>
+        internal static long PendingReward(Hero to, Kingdom k)
+        {
+            long v = 0;
+            try { if (to != null && k != null) foreach (var r in _rewards) if (r != null && r.Hero == to.StringId && r.Kingdom == k.StringId) v += Math.Max(0, r.Left); }
+            catch (Exception e) { Stumble("PendingReward", e); }
+            return v;
+        }
+
+        /// <summary>366 (warunek T): uwolnienie bez okupu - korona nie dostanie okupu, wiec skresla niewyplacona nagrode zdobywcy (najwyzej `max`). Zwraca skreslone.</summary>
+        internal static long CancelReward(Hero to, Kingdom k, long max)
+        {
+            long done = 0;
+            try
+            {
+                if (to == null || k == null || max <= 0) return 0;
+                foreach (var r in _rewards.ToArray())
+                {
+                    if (done >= max) break;
+                    if (r == null || r.Hero != to.StringId || r.Kingdom != k.StringId || r.Left <= 0) continue;
+                    long x = Math.Min(r.Left, max - done);
+                    r.Left -= x; done += x;
+                    if (r.Left <= 0) _rewards.Remove(r);
+                }
+            }
+            catch (Exception e) { Stumble("CancelReward", e); }
+            return done;
+        }
+
+        /// <summary>366 (warunek R): okup x mult tym samym przeplywem co kurier (Execute: skarbiec korony jenca albo rod jenca -> skarbiec korony zdobywcy albo
+        /// porywacz; brak gotowki - dlug korony / dlug okupu, pomoc wasali R3-01d). Gdy okup idzie do korony - nagroda gracza 1/10 takze od nadwyzki (ta sama regula
+        /// co przy pojmaniu, m116 - bez nagrody dla krola tej korony). Jenca NIE uwalnia (wolajacy). false - bez umowy.</summary>
+        internal static bool TermsRansom(Hero captive, double mult, out long price, out long extraReward, out string receiver)
+        {
+            price = 0; extraReward = 0; receiver = "-";
+            try
+            {
+                if (!On || captive == null || !Lord(captive) || Clan.PlayerClan == null) return false;
+                long basePrice = PriceFor(captive);
+                var crown = CaptiveCrown(captive);
+                if (!Execute(captive, Clan.PlayerClan, "rokowania 366 (okup x" + mult.ToString("0.##", Inv) + ")", mult)) return false;
+                price = _lastExecPrice;
+                receiver = crown != null ? "skarbiec " + crown.Name : Name(Hero.MainHero);
+                if (crown != null)
+                {
+                    var s = Settings.Current;
+                    bool ownKing = crown.Leader == Hero.MainHero && s.RansomNoRewardToOwnKing;
+                    extraReward = ownKing ? 0 : (long)(Math.Max(0f, Math.Min(1f, s.CrownGreatCaptiveReward)) * Math.Max(0, price - basePrice));
+                    if (extraReward > 0) { _rewards.Add(new Reward { Hero = Hero.MainHero.StringId, Kingdom = crown.StringId, Left = extraReward }); _dRewardQueued += extraReward; }
+                }
+                return true;
+            }
+            catch (Exception e) { Stumble("TermsRansom", e); return false; }
         }
 
         // ------------------------------------------------------------ latki gry

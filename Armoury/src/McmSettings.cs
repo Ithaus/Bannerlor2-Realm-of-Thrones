@@ -11708,6 +11708,10 @@ namespace Armoury
         [SettingPropertyGroup("Expected gold shows what really comes (345)")]
         public bool VillageTaxToLandHolder { get; set; } = true;
 
+        [SettingPropertyBool("Captive Terms", HintText = "On a captive king or heir to the throne you hold (in your party or your dungeon), you can talk terms: his crown pays a doubled ransom, or he confirms your conquests - the Banner Kings titles he or his house holds to the castles, towns and villages you hold pass to you - and goes free. Whether he agrees depends on your Charm and Lordship, his regard for you, his honour, valour and cunning, how long he has been held and how the war goes; a hint tells you how he leans. If he is your liege's captive, freeing him for your conquests costs your liege his ransom: pay it yourself or face his anger. A refusal waits 7 days. Off = no such talk", RequireRestart = false)]
+        [SettingPropertyGroup("Terms with a captive king (366)")]
+        public bool CaptiveTerms { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -14634,6 +14638,7 @@ namespace Armoury
             s.GoldDailySummary = GoldDailySummary;
             s.LandDuesFollowTitleHolder = LandDuesFollowTitleHolder;
             s.VillageTaxToLandHolder = VillageTaxToLandHolder;
+            s.CaptiveTerms = CaptiveTerms;
         }
 
         internal static void Apply()
