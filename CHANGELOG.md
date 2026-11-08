@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 179 - 359/359b/359c (zbiorka uciekajacych, bron w ucieczce, klipy okrzykow) na 178 (Armoury.dll 38c2fd9c -> 67dd5867 = build 6bea7f0f; manifest.tsv +36 wierszy, 36 klipow rozkaz/*holdline*, *turnback*)
+**Test at359 (kopia zapisu Jeffa 08.11 00:19, 10 dob + 13 bitew: 10 z bandami, 3 z partia lorda):** kod 0, misje sprawdzone, 22.8 s/dobe, bledy CrashScribe 23 (jak at358). Katalog dzwieku: manifest 431 wierszy, klipow dobrych 431 (or 95), zle 0. Linia "Latki nocy (K3)": Artem DropAllWeapons 1/1.
+**Wynik ZBIORKA (359):** 359b zrzut pominiety 26-133 na bitwe; zbiorka tylko w bitwie z lordem (02:46): w zasiegu 14, rzutow 10, udane 6 (wodz), wrocili do szyku 5 (szyk sprzed paniki), druga panika 2, padli po powrocie 4, pominieci ranni 3 / wrog blisko 4; wyjazdy dowodcow start 2, dotarl 0 (czas 1, grupa 1), straznikow 6; potkniecia 0, koszt <= 0.63 ms. W bitwach z bandami strona uciekajacych rozbita (bramka) - zgodnie z projektem.
+**PROBLEM do 359d:** okrzyki prawie nie graja - "trzymaj linie" zwarcie 0-1 na bitwe (1 na 13 bitew), przed szarza 0; "zawroc" 0 (bez glosu 2 przy 6 zawroceniach). Prosba Jeffa "za malo okrzykow dowodcow" NIE spelniona - poprawka wyzwalaczy osobno (359d).
+**Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie179, manifest.tsv.bak-2026-11-08-przed-wgranie179, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie179(-przed).
+**Status:** WGRANE (179).
+
 ## WGRANIE 178 - 358 (sondy cen co 28 dob) na 177 (Armoury.dll 65f9c35e -> 38c2fd9c, build z 920de3d4; CrashScribe bez zmian)
 **Test at358 (kopia zapisu Jeffa 08.11 00:19, md5 d7e9ad80, 10 dob):** kod 0, 22.7 s/dobe, bledy CrashScribe 23 (22 jak at357 + 1 znany AmbiguousMatch paska DTE MapArmoryReadinessMixin, ERRORS A6); sondy w autotescie co dobe jak dotad (brama ProbeLines przepuszcza tryb autotestu).
 **357 w grze Jeffa (sesja 07.11 23:29, 20 dob):** takt doby mediana 717 ms (przed 357: ok. 877), MorningReport357.Hourly ok. 190 ms raz na dobe w osobnej klatce; max 1973 ms w dobie pomiaru z sondami - 358 to zetnie.
