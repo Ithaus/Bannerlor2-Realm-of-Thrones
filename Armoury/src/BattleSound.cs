@@ -82,6 +82,7 @@ namespace Armoury
         private const float RealShare = 0.5f;             // odstep w czasie rzeczywistym = polowa odstepu w czasie misji
         private const float FarExtra = 50f;               // dalej niz max + 50 m od sluchacza - nie tworzymy
         private const int MaxNewPerSec = 5;
+        private const int AmbNewPerSec = 3;               // 359d: petla tla (GAmb, LoopTick) zaczyna klip tylko przy < 3 nowych w tej sekundzie - reszta budzetu dla glosow i rogow
         private const int QueueMax = 256;
 
         // grupy puli i limity naraz
@@ -338,6 +339,10 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>359d: Play wolany z petli tla (LoopTick) - tylko petle podlegaja limitowi tla 3 na sekunde (ponawiaja w nastepnym takcie);
+        /// jednorazowe zdarzenia GAmb (tetent szarzy, ranny kon, ptaki, probki autotestu) nie sa powtarzane, wiec limitu nie maja.</summary>
+        private static bool _ambLoopPlay;
+
         /// <summary>Miejsce w limicie nowych zdarzen na sekunde czasu rzeczywistego.</summary>
         private static bool RateOk()
         {
@@ -372,7 +377,7 @@ namespace Armoury
         {
             if (clip == null) { _rejNoClip++; return null; }
             if (LiveIn(group) >= GroupCap[group]) { _rejLimit++; _rejGroup[group]++; return null; }
-            if (!RateOk()) { _rejRate++; _rejGroup[group]++; return null; }
+            if (!RateOk() || (group == GAmb && _ambLoopPlay && _secCount >= AmbNewPerSec)) { _rejRate++; _rejGroup[group]++; return null; }
             var c = Settings.Current;
             float k = LoudScale(c);
             min *= k; max *= k;

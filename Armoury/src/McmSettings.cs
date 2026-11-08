@@ -1744,9 +1744,21 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool WoundedFightWarily { get; set; } = true;
 
-        [SettingPropertyBool("Routed Men Never Rally", HintText = "with Broken Men Never Rally on: in a field battle every man who panics - his morale broken by the fighting, or his whole side giving up a lost battle - runs for good, just like a broken wounded man: no turning back to fight bare-handed ten seconds later, no second scream or fright, and if his flight stalls he is sent off again quietly. Both sides alike, your men too. No rallying at the banner yet. Sieges, sorties, sea battles and hideouts are left as they were. Off = as before (the game lets a panicked man return to the fight)", RequireRestart = false)]
+        [SettingPropertyBool("Routed Men Never Rally", HintText = "with Broken Men Never Rally on: in a field battle every man who panics - his morale broken by the fighting, or his whole side giving up a lost battle - runs for good, just like a broken wounded man: no turning back to fight bare-handed ten seconds later, no second scream or fright, and if his flight stalls he is sent off again quietly. Both sides alike, your men too. Only a commander can turn them back (see Rally Routed Men). Sieges, sorties, sea battles and hideouts are left as they were. Off = as before (the game lets a panicked man return to the fight)", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool RoutedMenNeverRally { get; set; } = true;
+
+        [SettingPropertyBool("Rally Routed Men", HintText = "with Routed Men Never Rally on: in a field battle a living, unbroken lord or companion leading his side or a formation can turn back his fleeing men. Men running past within a few paces of him - or of you - may stop, gather around him for a few seconds and return to their own formation; the better his Leadership and their spirit, the likelier, less so when he is wounded or the battle is going badly. An AI commander with an escort rides out to fugitives gathering behind the lines, well away from the enemy. Each man is given only one chance a battle; if he breaks again he runs for good. A man without a weapon only returns if he can pick one up nearby. Off = routed men run for good, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool RallyRoutedMen { get; set; } = true;
+
+        [SettingPropertyBool("Routed Men Keep Arms", HintText = "with Routed Men Never Rally on and Artem's Lively Animations installed: in a field battle a man who panics keeps his weapons instead of throwing them all down - he still shows his fright and runs, but if a commander turns him back he has something to fight with. Sieges, sorties, sea battles and hideouts are left as they were. Off = he drops everything, as Artem's mod does", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool RoutedMenKeepArms { get; set; } = true;
+
+        [SettingPropertyBool("Commander Shouts Hold Line", HintText = "captains shout more in battle: 'Hold the line!' while their foot is locked in close fighting (about every half minute) and when enemy horse or foot charges a formation that is standing its ground, and 'Turn back!' when a commander rallies fleeing men (you too). Uses the recorded order voices; new lines are picked up when present. Off = only the orders as before", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool CommanderShoutsHoldLine { get; set; } = true;
 
         [SettingPropertyBool("Heroes Keep Behind Their Men", HintText = "lords, companions and other heroes fight for their lives: an AI hero no longer charges at the head of his men or fights on alone. In his formation he keeps to the rear ranks; when he is cut off - none of his own men within 5 m and two or more enemies about him - he falls back behind his formation (or the main body, or the nearest banner of his side) without panic or scream, waits there a few seconds and goes back into the fight with his men; once wounded below 45% health he stays behind his formation for the rest of the battle and fights only whoever reaches him. His skill with weapons (Duelists In Battles) is unchanged, and he still breaks only from pain (AI Flee Below Percent) or panic. Both sides alike, your companions too; you yourself are never moved and a formation you stand in keeps its order. Field battles only. Off = heroes fight as before (still measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
@@ -12068,6 +12080,9 @@ namespace Armoury
             s.WoundedWithdrawWithArms = WoundedWithdrawWithArms;
             s.WoundedFightWarily = WoundedFightWarily;
             s.RoutedMenNeverRally = RoutedMenNeverRally;
+            s.RallyRoutedMen = RallyRoutedMen;
+            s.RoutedMenKeepArms = RoutedMenKeepArms;
+            s.CommanderShoutsHoldLine = CommanderShoutsHoldLine;
             s.HeroesKeepBehindTheirMen = HeroesKeepBehindTheirMen;
             s.CommandersKeepCommandPost = CommandersKeepCommandPost;
             s.CommanderTactics = CommanderTactics;

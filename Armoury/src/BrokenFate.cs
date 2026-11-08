@@ -42,6 +42,7 @@ namespace Armoury
             public bool Back;          // powrot do walki zauwazony w probce (do ponownej paniki)
             public bool Returned;      // kiedykolwiek wrocil z paniki
             public bool Winded;        // zadyszka w ucieczce - kiedykolwiek
+            public bool Rallied;       // 359: zawrocony przez dowodce / gracza (RallyRouted359) - osobna kategoria, nie "powrot RBM" i nie "padl po powrocie"
             public int Fails;
             public float Since;        // poczatek biezacej ucieczki (czas misji)
             public Vec2 Last;          // pozycja z ostatniej probki
@@ -72,6 +73,7 @@ namespace Armoury
         private static int _ours, _game, _taken, _rePanic, _dropped;
         private static readonly int[,] Fate = new int[2, 3];   // [nasi, panika gry] x [zabici, nieprzytomni, uszli]
         private static int _byHorse, _byFoot, _byMissile, _byOther, _fellAfterReturn;
+        private static int _rallied, _ralliedFell, _ralliedFled;   // 359: zawroceni (ludzi), padli po zawroceniu nie w panice, uszli z pola po zawroceniu
         private static int _caughtN, _escN;
         private static float _caughtPath, _caughtTime, _escPath, _escTime;
         private static int _winded;
@@ -100,6 +102,7 @@ namespace Armoury
             _ours = _game = _taken = _rePanic = _dropped = 0;
             Array.Clear(Fate, 0, Fate.Length);
             _byHorse = _byFoot = _byMissile = _byOther = _fellAfterReturn = 0;
+            _rallied = _ralliedFell = _ralliedFled = 0;
             _caughtN = _escN = 0;
             _caughtPath = _caughtTime = _escPath = _escTime = 0f;
             _winded = 0;
@@ -203,6 +206,23 @@ namespace Armoury
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteFate, "BrokenFate.Broken", e); }
         }
 
+        /// <summary>359: RoutKeeper.StartOne - czlowiek zawrocony z paniki (raz na bitwe). Osobna kategoria w linii 139.</summary>
+        internal static void Rallied(Agent a)
+        {
+            if (!_live || a == null) return;
+            try
+            {
+                lock (RoutHold.Gate)
+                {
+                    Track t;
+                    if (!_live || !ByAgent.TryGetValue(a, out t) || t.Done || t.Rallied) return;
+                    t.Rallied = true;
+                    _rallied++;
+                }
+            }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SiteFate, "BrokenFate.Rallied", e); }
+        }
+
         /// <summary>RoutKeeper.OnAgentPanicked (kazda panika w misji): panika gry - nowy czlowiek albo ponowna panika po powrocie.</summary>
         internal static void Panicked(Mission m, Agent a)
         {
@@ -258,6 +278,12 @@ namespace Armoury
                     t.Done = true;
                     int f = state == AgentState.Killed ? 0 : (state == AgentState.Unconscious ? 1 : (state == AgentState.Routed ? 2 : -1));
                     if (f < 0) return;                            // inny stan - zostaje w "na polu" (liczone odejmowaniem)
+                    // 359: zawrocony nie w panice - osobna kategoria (bez "uszli" i bez "padli po powrocie do walki" - to nie powrot RBM)
+                    if (t.Rallied && !SurvivalMode.InPanic(a))
+                    {
+                        if (f < 2) _ralliedFell++; else _ralliedFled++;
+                        return;
+                    }
                     Fate[t.Ours ? 0 : 1, f]++;
                     if (!SurvivalMode.InPanic(a))
                     {
@@ -534,6 +560,7 @@ namespace Armoury
               .Append(" | dopadnieci w ucieczce ").Append(_caughtN).Append(": konny ").Append(_byHorse).Append(" / pieszy ").Append(_byFoot)
               .Append(" / pocisk ").Append(_byMissile).Append(" / inne ").Append(_byOther)
               .Append("; padli po powrocie do walki ").Append(_fellAfterReturn)
+              .Append(" | zawroceni (359) ").Append(_rallied).Append(" (padli po zawroceniu ").Append(_ralliedFell).Append(", uszli po zawroceniu ").Append(_ralliedFled).Append(')')
               .Append(" | sr. bieg: dopadnieci ").Append(Avg(_caughtPath, _caughtN, "0")).Append(" m / ").Append(Avg(_caughtTime, _caughtN, "0.0"))
               .Append(" s, uszli ").Append(Avg(_escPath, _escN, "0")).Append(" m / ").Append(Avg(_escTime, _escN, "0.0")).Append(" s (droga z probek co ")
               .Append(SampleEvery.ToString("0", Inv)).Append(" s)")

@@ -150,6 +150,15 @@ namespace Armoury
               .Append(", zalaman ").Append(Breaks).Append(" (ludzi ").Append(BrokenMen).Append("), okrzykow zwyciestwa ").Append(Cheers);
         }
 
+        /// <summary>359: szyk z kompania w trakcie zalamania (BannerCompaniesMission.BreakingIn) - odczyt; bez misji choragwi false.</summary>
+        internal static bool CompanyBreaking(Formation f)
+        {
+            var k = RunLive;
+            if (k == null || f == null) return false;
+            try { return k.BreakingIn(f); }
+            catch { return false; }
+        }
+
         internal static void Stumble(string where, Exception e)
         {
             Stumbles++;
@@ -826,9 +835,29 @@ namespace Armoury
                 bool wd = false;
                 try { wd = k != null && k.Withdrawing(a); } catch { wd = false; }
                 if (wd) { if (count) BannerCompanies.RanksWithdrawSkip++; continue; }
+                // 359: zawrocony w zbiorce (przed szykiem) - jeszcze nie w szeregu
+                bool rl = false;
+                try { rl = k != null && k.InRally(a); } catch { rl = false; }
+                if (rl) continue;
                 n++;
             }
             return n;
+        }
+
+        /// <summary>359 (RallyRouted359.Join, glowny watek, tylko odczyt): szyk z kompania w trakcie fal zalamania albo z samymi zlamanymi kompaniami - zawrocony
+        /// tam nie dolacza.</summary>
+        internal bool BreakingIn(Formation f)
+        {
+            List<Company> list;
+            if (f == null || !_forms.TryGetValue(f, out list) || list == null || list.Count == 0) return false;
+            bool allBroken = true;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var co = list[i];
+                if (co.Queue != null) return true;
+                if (!co.Broken) allBroken = false;
+            }
+            return allBroken;
         }
 
         /// <summary>Sztandar podniesiony: chorazy gry w formacji bez kompanii-wlasciciela - do kompanii bez sztandaru najblizej miejsca upadku (co 0.5 s);

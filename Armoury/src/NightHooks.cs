@@ -46,6 +46,8 @@ namespace Armoury
             Part(sb, "doktryna", RoutHold.SiteDoctrine, () => Doctrine.ApplyMissionPatches(_h));
             sb.Append(" | ");
             Part(sb, "dzwiek", RoutHold.SiteSound, () => BattleSound.ApplyMissionPatches(_h));
+            sb.Append(" | ");
+            Part(sb, "bron w ucieczce (359b)", RoutHold.SiteRally, () => RoutedKeepArms359.ApplyMissionPatches(_h));   // 359b: prefiks na Artem DropAllWeapons
             sb.Append('.');
             Log.Info(sb.ToString());
         }

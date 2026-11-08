@@ -339,6 +339,7 @@ namespace Armoury
             if (man.Role == RoleNone && man.Mode != ModeThreat)
             {
                 if (man.Mode == ModePost) { Release(man); PostOff(man); }
+                else if (man.Mode == ModeRally) { Release(man); RallyOff(man, now, Rally359End.Other); }   // 359: juz nie dowodzi
                 return false;
             }
             int foes = 0, riders = 0;
@@ -352,12 +353,20 @@ namespace Armoury
             }
             if (thr)
             {
+                if (man.Mode == ModeRally) RallyOff(man, now, Rally359End.Threat);   // 359: zagrozenie ma pierwszenstwo (pozycje nadpisze cel wycofania)
                 StartThreat(man, m, now, foes, riders, att);
                 StepOne(man, m, now);
                 return true;
             }
+            // 359: wyjazd do uciekajacych - trwa (ocena co 0.5 s) albo start (z eskorta, grupa za linia daleko od wroga); inaczej stanowisko 335
+            if (man.Mode == ModeRally)
+            {
+                RallyStep(man, m, now, true);
+                if (man.Mode == ModeRally) return true;
+            }
             if (man.Role == RoleCmd)
             {
+                if (RallyTry(man, m, now)) return true;
                 PostPass(man, m, now);
                 return true;
             }
@@ -593,6 +602,8 @@ namespace Armoury
             if (x == null || ReferenceEquals(x, hero) || !x.IsHuman || x.IsHero || x.IsMainAgent || !x.IsAIControlled || !x.IsActive()) return false;
             if (!ReferenceEquals(x.Team, t) || x.IsRunningAway || SurvivalMode.InPanic(x) || SurvivalMode.OrderedRetreat(x, x.CommonAIComponent) || Withdrawing(x)) return false;
             if (GuardSet.Contains(x) || HorsePursuit.Banner(x) || HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x)) return false;
+            var rk = RoutHold.Live;
+            if (rk != null && rk.InRally(x)) return false;                                                            // 359: zawrocony w zbiorce (przed szykiem)
             var f = x.Formation;
             if (f == null || f.HasPlayerControlledTroop || HorsePursuit.PlayerForm(f)) return false;
             if (charge ? InMelee(x) : Busy(x)) return false;                                                           // recenzja 335: nie z walki wrecz ani z szarzy (340: szarza w 2. przejsciu)
@@ -663,8 +674,8 @@ namespace Armoury
                 else if (o == null || o.Out || o.A == null || !o.A.IsActive()) why = 3;
                 else if (x.IsRunningAway || SurvivalMode.InPanic(x) || Withdrawing(x)) why = 2;
                 else if (HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x)) why = 5;   // inny mechanizm wzial czlowieka - jego pozycja
-                else if (!(o.Mode == ModeThreat || (o.Mode == ModeWounded && o.St == StTravel))) why = 0;
-                else if (now - g.Since > TravelMax) why = 1;
+                else if (!(o.Mode == ModeThreat || (o.Mode == ModeWounded && o.St == StTravel) || o.Mode == ModeRally)) why = 0;   // 359: straz jedzie z dowodca do uciekajacych
+                else if (now - g.Since > (o.Mode == ModeRally ? RideMax + RideHoldMax + 1f : TravelMax)) why = 1;   // przeglad 359: straz do konca postoju przy uciekajacych
                 if (why >= 0)
                 {
                     GGuardEnd[why]++;

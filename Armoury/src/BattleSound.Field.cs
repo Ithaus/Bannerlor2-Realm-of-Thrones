@@ -76,7 +76,10 @@ namespace Armoury
             }
             var clip = Pick(l.Code, l.Key);
             if (clip == null) return false;
-            var s = Play(m, clip, GAmb, l.Is3d ? l.Pos : Vec3.Zero, l.Min, l.Max, l.Is3d, null, null, l.Tag);
+            Snd s;
+            _ambLoopPlay = true;   // 359d: limit tla 3/s tylko dla petli
+            try { s = Play(m, clip, GAmb, l.Is3d ? l.Pos : Vec3.Zero, l.Min, l.Max, l.Is3d, null, null, l.Tag); }
+            finally { _ambLoopPlay = false; }
             if (s == null) return false;
             l.Cur = s;
             return true;
