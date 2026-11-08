@@ -1,5 +1,10 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 182 - 360c/360d/360r-c/d/360r2 na 181 (Armoury.dll 44e2001f -> a5b2f4a6 = build 9406b3df)
+**Test at360r2 (kopia zapisu Jeffa 08.11 00:19, 76 dob, 3 cykle 109654/109682/109710):** kod 0, 22.4 s/dobe, bledy CrashScribe 23 (jak wczesniej). Kopalnie (360c): silver Westeros niski zapas - bez zmian, rece 17591 -> 17555 -> 17524 (petla z mennica usunieta); silver Essos NADWYZKA 5846 -> 5261 -> 4721 -> 4250 (W 23.4k -> 32k na wozach wsi - rosnie dalej, wydobycie 385/d wobec ok. 150/d zuzycia); gold_ore Westeros raz w gore w 109682 (W 54, P < C bez mennicy - prawdziwy brak) 6688 -> 7357, potem bez zmian; gold_ore Essos NADWYZKA 9271 -> 6780. Mennica srednio 11383 zl/dobe nowej monety (przed 360d 16.5-18.9k).
+**Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie182, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie182(-przed). Klucze MCM KsRegaleWorldSurplus (360c), OreStockInPrice (360d) - wylaczenie = jak dotad.
+**Status:** WGRANE (182).
+
 ## 360r2 - 360c: wzrost rak srebra/zlota tylko, gdy wydobycie ponizej zuzycia BEZ mennicy (NIE WGRANE)
 **Problem (test at360cd, kopia zapisu Jeffa 00:19, 76 dob, kod 0):** "Kopalnie (360c)" silver Westeros: 109654 W/C 15, P 821 < C z mennica 881 -> "BRAK - w gore", rece 17592 -> 19351; 109710 to samo, 19276 -> 21203. Mennica (311b) bierze kazda nadwyzke ponad 30 dob polki (ok. 500-590/d w Westeros), wiec "P < C z mennica" jest zawsze prawda - petla wiecej rak -> wiecej srebra -> mennica bierze wiecej. Essos dzialal dobrze (nadwyzka 21-30 tys. na wozach wsi: rece 5847 -> 5262 -> 4723 -> 4252; zloto Essos 9272 -> 8345 -> 7531 -> 6780).
 **Zmiana:** StartCalibration.Sur360.cs SurBegin: DecUp przy _surPa < cn (zuzycie bez mennicy), inaczej DecLowFix (bez zmian); tekst linii i komentarz.
