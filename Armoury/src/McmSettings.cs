@@ -7776,7 +7776,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public float MineRegaleShare { get; set; } = 0.125f;
 
-        [SettingPropertyBool("Ore Pays Only Mine Regale", HintText = "With Mine Regale: what a mining village's carts get for iron, silver and gold pays the lord only the mine regale (Mine Regale Share), not his usual village tax as well - as under the old mining law, the ore was the lord's by right of regale and the miners kept the rest. The usual tax is still taken from everything else the cart sold. The gold not taken stays in the village purse. Off - as before.", RequireRestart = false)]
+        [SettingPropertyBool("Ore Pays Only Mine Regale", HintText = "With Mine Regale: what a mining village's carts get for iron, silver and gold pays the lord only the mine regale (Mine Regale Share), not his usual village tax as well - as under the old mining law, the ore was the lord's by right of regale and the miners kept the rest. The usual tax is still taken from everything else the cart sold, and the Banner Kings estate owners still take their share of the whole takings. The gold not taken stays in the village purse. Off - as before.", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool MineOrePaysOnlyRegale { get; set; } = true;
 

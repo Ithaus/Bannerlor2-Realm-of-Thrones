@@ -218,6 +218,7 @@ namespace Armoury
         public static void EnterPrefix(MobileParty __0, Settlement __1, out Entry __state)
         {
             __state = null;
+            _freeParty = null; _freeZl = 0;                  // 360r-b: nieodebrany utarg bez podatku z poprzedniego okna nie przechodzi do nastepnego (tylko licznik linii)
             try
             {
                 var s = Settings.Current;
@@ -518,7 +519,7 @@ namespace Armoury
                 long want = Math.Max(0L, got + Math.Max(0L, estates) - due);
                 long back = Math.Min(got, want);
                 _tOreN++; _tOreHanded += handed; _tOreOre += oreGold; _tOreBill += d; _tOreDue += due;
-                _tOreFree += Math.Max(0L, oreGold - d); _freeZl += Math.Max(0L, oreGold - d);
+                long oreFree = Math.Max(0L, oreGold - d);
                 if (back > 0)
                 {
                     int had = home.Gold;
@@ -545,6 +546,10 @@ namespace Armoury
                     }
                 }
                 _tOreCut += want - Math.Max(0L, back);
+                // 360r-b: do podstawy bez podatku pana (W12-5, "Gotowka wsi") tylko czesc naprawde zwolniona - przy zwrocie przycietym (want > got, put < back)
+                // pan dalej ma podatek od reszty kruszcu
+                long freed = want <= 0 || back >= want ? oreFree : (back > 0 ? (long)Math.Floor(oreFree * (double)back / want) : 0L);   // want 0 = licznik juz bez podatku od kruszcu
+                _tOreFree += freed; _freeZl += freed;
             }
             catch (Exception e) { Stumble("VillageTakings.OreFirst", e); }
         }

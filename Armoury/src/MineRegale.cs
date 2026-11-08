@@ -374,6 +374,8 @@ namespace Armoury
                 double e, b;
                 if (!_vEma.TryGetValue(sid, out e) || !(e > 0)) e = 0.0;
                 if (!_bEma.TryGetValue(sid, out b) || !(b > 0)) b = 0.0;
+                var s360 = Settings.Current;
+                if (s360 == null || !s360.MineOrePaysOnlyRegale) b = 0.0;   // 360r-b: klucz NIE - srednia zwrotu z zapisu nie zaniza udzialu pana (jak przed 360b)
                 if (b <= 0) return e > 0 ? Math.Min(1.0, e / handedPerDay) : 0.0;
                 return Math.Max(-1.0, Math.Min(1.0, (e - b) / handedPerDay));
             }
