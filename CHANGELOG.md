@@ -1,5 +1,10 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 184 - 362 na 183 (Armoury.dll 6dc04665 -> de23853f = build dd042490)
+**Test at-362 (kopia zapisu Jeffa 08.11 19:02, 20 dob):** kod 0, bledy CrashScribe 22 (norma), potkniecia 362 brak. "Skrytki wsi (362)": sesji z S 3 (S 0.488, 0.428, srednio 0.265) - wszystkie u najezdzcow (Zelazne Wyspy / Wolni Ludzie), gdzie zelazna cena WW1 0.5 >= S, wiec zloto ze skrytek 0 i XP 0 - zgodnie z regula max(s0, Q, S). Bilans v2 = 0. Rabunkow AI w tych 20 dobach bardzo malo (pokoj), okupy 0-2/d. NIE ZAOBSERWOWANO w tescie doplaty skrytek (topUp > 0) ani kary relacji - do sprawdzenia w grze Jeffa (pierwszy rabunek gracza / lorda AI spoza najezdzcow).
+**Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie184, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie184(-przed). Zapis testu: D:/Backup-Bannerlord/zapisy-testowe/at-362-*.sav.
+**Status:** WGRANE (184).
+
 ## WGRANIE 183 - 361 na 182 (Armoury.dll a5b2f4a6 -> 6dc04665 = build 5d9ba084)
 **Test at-361 (kopia zapisu Jeffa 08.11 19:02, 12 dob):** kod 0, 23.8 s/dobe, bledy CrashScribe 22 (norma). Komunikat 361a 11 razy (raz na wyplate rodu), "inne" -15..+3 (bez handlu gracza); prognoza 345 po 361: srednio |rozjazd| 252 przy |naprawde| ok. 4100 na dobe (6%), potkniecia 0. Danina skarbcow wsi gracza 5.6-8.2 tys./d jako osobna pozycja.
 **Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie183, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie183(-przed). Zapis testu: D:/Backup-Bannerlord/zapisy-testowe/at-361-*.sav.
