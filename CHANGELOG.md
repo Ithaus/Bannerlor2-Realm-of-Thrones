@@ -1,5 +1,10 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 189 - 366 na 188 (Armoury.dll cb445382 -> 7e8d910a = build 518ac30a); CrashScribe d7fbd602 bez zmian
+**Test at-366 (kopia zapisu Jeffa 08.11 23:00, 10 dob):** kod 0, bledy CrashScribe 23 (norma), linia startu "ROKOWANIA (366): rozmowa wpieta (hero_main_options, priorytet 106) | klucz TAK | BK tytuly TAK | okupy 178 TAK", brak wpisow CaptiveTerms w bledach. Samej rozmowy autotest nie przechodzi (wymaga krola w niewoli gracza) - do sprawdzenia w grze Jeffa.
+**Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie189, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie189(-przed).
+**Status:** WGRANE (189).
+
 ## WGRANIE 188 - 365 (CrashScribe 3cab76a3 -> d7fbd602 = build 8a2342e9); Armoury bez zmian (cb445382)
 **Test at-365 (kopia zapisu Jeffa 08.11 23:00, 13 bitew w polu + 3 bitwy lordow, 3 doby, CrashScribe-at-n365):** kod 0 (misje sprawdzone), bledy CrashScribe 23 (norma). Trafien HIT 1439, z narzedziem chlopskim w rece 65 - KONNO 0. Piechota z narzedziem: stormlands_basher 31 (kilof; wzorzec ROT morningstar_mace + tarcza + oszczepy - mace brak na polce, kilof jedyna bron biala = ostatnia deska wedlug reguly), stormlands_levy/archer/bowman, vlandian_infantry 2, man_at_arms 4. Licznik "365 narzedzia chlopskie odrzucone" 0 w 52 liniach (w tych bitwach nie bylo jezdzca z narzedziem ani piechura T2+ z inna bronia biala). Do obserwacji w grze Jeffa: linie HIT "peasant_ ... konno" maja byc 0.
 **Kopie:** CrashScribe.dll.bak-2026-11-08-przed-wgranie188, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie188(-przed).
