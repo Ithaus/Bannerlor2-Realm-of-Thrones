@@ -13,7 +13,7 @@ namespace Armoury
     /// 1.1^33 ~ 23 - przy srebrze 21674 rak wobec planu ok. 0.8 tys. (log 2026-11-07_23-29-50, doba 109626). Nadwyzka stoi na wozach wsi (21990 srebra), polki
     /// miast jej nie widza.
     ///
-    /// Zmiana (klucz Mine Hands Follow Relative Price): dla srebra, zlota, gliny, wapienia, marmuru i przypraw (zloza bez celu polki) prog bierze indeks towaru
+    /// Zmiana (klucz Mine Hands Follow Relative Price): dla srebra i zlota (zloza bez celu polki; 360r-a - glina, wapien, marmur, przyprawy jak dotad) prog bierze indeks towaru
     /// podzielony przez mediane indeksu wszystkich towarow tego samego miasta targowego (ta sama tablica px). Progi i kroki bez zmian, sufit bez zmian.
     /// Zelazo (f5-ruda), sol i daktyle (f20-d4) - wlasne reguly; drewno - bez zmian (indeks wzgledny ok. 0.3 cialby rece dymarek i bud - osobna decyzja).
     /// Klucz NIE - RegaleCycle jak dotad co do bitu. RF jest w zapisie KS (arm_ks) - bez nowego klucza zapisu; mediana liczona w kazdym cyklu od nowa.
@@ -23,7 +23,9 @@ namespace Armoury
     {
         internal static bool RegRelOn { get { var s = Settings.Current; return s != null && s.KsRegaleRelativePrice; } }
 
-        private static readonly int[] RelCrafts = { KsTab.CSilver, KsTab.CGoldM, KsTab.CClay, KsTab.CLime, KsTab.CQuarry, KsTab.CSpice };
+        // 360r-a: tylko srebro i zloto - glina, wapien, marmur i przyprawy zostaja przy dawnym progu (wapien W wzglednie ok. 0.75 cialby rece co cykl przy
+        // rownowadze zuzycia 0.99 i stosie 10 dni - log 2026-11-07_23-29-50, doba 109634; poszerzenie = osobna decyzja Jeffa)
+        private static readonly int[] RelCrafts = { KsTab.CSilver, KsTab.CGoldM };
 
         private static bool RelGood(int craft)
         {
@@ -92,7 +94,7 @@ namespace Armoury
             }
             var sb = new StringBuilder(1200);
             sb.Append("Kopalnie (360a): dzien ").Append(today).Append(" | cykl co ").Append(RegCycle).Append(" dob od D ").Append(DDay)
-              .Append(" | prog: indeks towaru / mediana indeksu wszystkich towarow miasta targowego > 1.2 - rece +10%, < 0.8 - rece -10% (zelazo, sol, daktyle, drewno - bez zmian)")
+              .Append(" | prog: indeks towaru / mediana indeksu wszystkich towarow miasta targowego > 1.2 - rece +10%, < 0.8 - rece -10%; tylko srebro i zloto (zelazo, sol, daktyle, drewno, glina, wapien, marmur, przyprawy - bez zmian)")
               .Append(" | mediana miast W/E ").Append(mw.Count > 0 ? Med(mw).ToString("0.00", Inv) : "-").Append('/').Append(me.Count > 0 ? Med(me).ToString("0.00", Inv) : "-");
             foreach (int c in RelCrafts)
             {

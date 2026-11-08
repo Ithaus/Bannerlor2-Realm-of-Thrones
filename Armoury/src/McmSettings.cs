@@ -10008,7 +10008,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool KsIronHandsFollowMarket { get; set; } = true;
 
-        [SettingPropertyBool("Mine Hands Follow Relative Price", HintText = "Under the start calibration, every 28 days the hands at silver, gold, clay, limestone, marble and spice workings follow that good's price compared with the town's usual price level (its price index divided by the median index of all goods in the town), not the bare index - when every price in the realm is three times higher, miners are no longer hired for that alone. Iron, salt, dates and timber keep their own rules. Off - as before.", RequireRestart = false)]
+        [SettingPropertyBool("Mine Hands Follow Relative Price", HintText = "Under the start calibration, every 28 days the hands at silver and gold mines follow that good's price compared with the town's usual price level (its price index divided by the median index of all goods in the town), not the bare index - when every price in the realm is three times higher, miners are no longer hired for that alone. Iron, salt, dates, timber, clay, limestone, marble and spice keep their own rules. Off - as before.", RequireRestart = false)]
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool KsRegaleRelativePrice { get; set; } = true;
 

@@ -473,7 +473,7 @@ namespace Armoury
                 if (F5IronSkip(b.RC[j])) { sum += b.RF[j]; continue; }
                 // f20-d4 (klucz Ks Food Hands Follow Market): sol i daktyle po D+49 - krok co 7 dob za polkami rynku (StartCalibration.Jedzenie.cs); przed pomiarem f4 jak zelazo
                 if (F20RegSkipOf(b.RC[j])) { sum += b.RF[j]; continue; }
-                // 360a (klucz Mine Hands Follow Relative Price): srebro, zloto, glina, wapien, marmur, przyprawy - indeks towaru wobec mediany indeksu wszystkich towarow
+                // 360a (klucz Mine Hands Follow Relative Price): srebro i zloto (360r-a) - indeks towaru wobec mediany indeksu wszystkich towarow
                 // miasta targowego (wszystkie ceny swiata x3 nie werbuja juz gornikow); kierunek liczony raz - ten sam dla linii f4 (NF4-5b) i licznika regali
                 double r = ix; bool rel = RegRelOn && RelGood(b.RC[j]);
                 if (rel) { double md = RelMed(px); if (md > 0) r = ix / md; }

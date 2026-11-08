@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## 360r-a - poprawka po przegladzie 360a: regula wzgledna tylko dla srebra i zlota (glina, wapien, marmur, przyprawy jak dotad) (StartCalibration.Rel360.cs RelCrafts; Armoury.dll caa855b2 = 358 + 360a + 360r-a + 360b, NIE WGRANE)
+**Dotyczy:** 360a.
+**Problem (przeglad 08.11):** 360a objela tez gline, wapien, marmur i przyprawy, choc Jeff pytal o srebro (Ashemark Mines). Wapien W: indeks 2.40 / mediana miasta 3.21 = ok. 0.75 -> od doby cyklu 109654 rece -10% co 28 dob, a wapien jest w rownowadze (Armoury-2026-11-07_23-29-50.log, zawor: "limestone: x1.30, zuzycie/produkcja 0.99 (2376/2401), stos 411 = 10 dni zuzycia"; glina 1.04 i stos 6 dni, marmur 0.98 i 10 dni) - brak dla budow, zanim cena odbije. Glina W ok. 0.81 na granicy.
+**Przyczyna:** RelCrafts = { CSilver, CGoldM, CClay, CLime, CQuarry, CSpice } - poszerzenie zakresu ponad decyzje.
+**Zmiana:** RelCrafts = { CSilver, CGoldM }. Glina, wapien, marmur i przyprawy - dawny prog na indeksie bezwzglednym (jak przed 360a). Opis MCM "Mine Hands Follow Relative Price" (Settings.cs + McmSettings.cs recznie - gen_mcm.py cofa dzis reczne nazwy pol 334e/340/342/326d/326x, wiec go NIE uruchamiano na zapis) i tekst linii "Kopalnie (360a)".
+**Ryzyko / co sprawdzic:** linia "Kopalnie (360a)" ma teraz tylko silver i gold_ore. Odrzucone z przegladu: "360a nie zmniejszy rak srebra" - prawda i zgodne z projektem (indeks wzgledny srebra 1.09/0.88, zlota 1.00/1.17 = pasmo bez zmian: WZROST STAJE, RAK NIE UBYWA); zmniejszenie wymaga 360c (regula nadwyzki rynku: 21990 srebra na wozach) - czeka na decyzje Jeffa, nie dopisane. _relStum nie zerowany miedzy kampaniami - kosmetyka linii, bez zmiany.
+**Status:** NIE WGRANE (gra Jeffa wlaczona 08.11).
+
 ## 360b - od kruszcu (zelazo, srebro, zloto) pan bierze tylko regale, zwykly podatek wsi tylko od reszty ladunku wozu (VillageTakings.OreFirst; klucz MineOrePaysOnlyRegale "Ore Pays Only Mine Regale"; Armoury.dll cdc0e5cc, NIE WGRANE)
 **Decyzja Jeffa 08.11:** na "360b: od sprzedazy kruszcu pan bierze tylko regale (12,5%) zamiast podatku wsi plus regale - jak historycznie" - "rob obie".
 **Problem:** pan kopalni bral od utargu za kruszec zwykly podatek wsi (ok. 45%: BK 70% x 0.5 + 0.1 - TownFolk.Live VillageTaxPostfix) I DO TEGO regale 12.5% (MineRegale.AtCart). Dowod: Armoury-2026-11-07_23-29-50.log, "Regale gornicze (R3-09f)" dzien 109634: powroty z kruszcem 9, utarg 39637, za kruszec 23384, drewno (F4b) 5716, regale 2207; pan z tych powrotow ok. 15.3 tys. podatku + 2.2 tys. regale. Historycznie (urbura 1/8, Bergzehnt 1/10) regale zastepowalo dziesiecine od kruszcu, nie dochodzilo do niej.
