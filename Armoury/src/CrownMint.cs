@@ -58,6 +58,22 @@ namespace Armoury
         private static readonly Dictionary<Settlement, double> _wearTown = new Dictionary<Settlement, double>();   // ulamek zuzycia kasy miasta na jutro
         private static readonly Dictionary<string, double[]> _ks = new Dictionary<string, double[]>(StringComparer.Ordinal);
         private static long _sessCoin, _sessWear; private static int _sessDays;
+        // 360c (StartCalibration.Sur360): kruszec zdjety przez mennice w ostatniej dobie wedlug rynku miasta [rynek W/E, kruszec] - tylko odczyt
+        private static readonly long[,] _mkPcs = new long[2, Metals];
+        private static int _mkDay = -1;
+
+        /// <summary>360c: kopia sztuk mennicy ostatniej doby wedlug rynku [0 Westeros / 1 Essos, 0 srebro / 1 ruda zlota]; zwraca dzien (-1 - mennica nie bila w tej
+        /// kampanii albo klucz wylaczony). Nie rzuca.</summary>
+        internal static int MintByMarket(long[,] dst)
+        {
+            try
+            {
+                if (dst == null) return -1;
+                for (int m = 0; m < 2; m++) for (int k = 0; k < Metals; k++) dst[m, k] = _mkPcs[m, k];
+                return _mkDay;
+            }
+            catch { return -1; }
+        }
 
         internal static int Stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -75,6 +91,7 @@ namespace Armoury
             _camp = c; _lastDay = -1;
             for (int m = 0; m < Metals; m++) _item[m] = null;
             _wearTown.Clear(); _ks.Clear(); _sessCoin = _sessWear = 0; _sessDays = 0; _err.Clear();
+            Array.Clear(_mkPcs, 0, _mkPcs.Length); _mkDay = -1;   // 360c
         }
 
         private static ItemObject ItemOf(int m)
@@ -97,6 +114,7 @@ namespace Armoury
                 if (today == _lastDay) return;
                 _lastDay = today;
                 Stumbles = 0;
+                Array.Clear(_mkPcs, 0, _mkPcs.Length);   // 360c: sztuki mennicy tej doby wedlug rynku
                 var s = Settings.Current;
                 long t0 = Stopwatch.GetTimestamp();
                 long w0 = MoneyLedger.WorldNow();
@@ -184,6 +202,7 @@ namespace Armoury
                                 Seal31.AddWorld(Seal31.ZMint, value + ext);
                                 try { TownFolk.Sale(st, (int)toTown, TownFolk.MixGoods); } catch { }   // sprzedaz kupcow (podstawa robocizny handlu - jak dymarki): tyle, ile dostala kasa
                                 pcs[m] += take; val[m] += value; coin += value + ext; seig += fee; extra += ext; toTowns += toTown;
+                                try { int mk = StartCalibration.TownMarketOf(town); if (mk == 0 || mk == 1) _mkPcs[mk, m] += take; } catch { }   // 360c: tylko licznik
                                 if (row == null) { row = new KRow { Name = k.Name != null ? k.Name.ToString() : k.StringId, Debase = debase }; rows.Add(row); }
                                 row.Pcs[m] += take; row.Coin += value + ext; row.Seig += fee; row.Extra += ext;
                                 any = true;
@@ -193,6 +212,8 @@ namespace Armoury
                         catch (Exception e) { Stumble("Town", e); }
                     }
                 }
+
+                _mkDay = today;   // 360c: sztuki mennicy tej doby gotowe (takze 0)
 
                 // ---- zuzycie monety: kiesy ludu (miasta i podzamcza) i kasy miast i zamkow - ta sama regula po obu stronach (recenzja 311b)
                 int folkPurses = 0, wearTowns = 0;

@@ -98,6 +98,12 @@ namespace Armoury
 
         internal static long InTransitOf(ItemObject item) { long n = 0; if (item != null) foreach (var c in _carts) if (ReferenceEquals(c.Item, item)) n += c.N; return n; }
 
+        /// <summary>360c (OreStock360.Census): kazda sztuka w drodze z osada celu (rynek zapasu) - tylko odczyt.</summary>
+        internal static void ForEachInTransitDst(Action<Settlement, ItemObject, int> f)
+        {
+            foreach (var c in _carts) if (c.Item != null && c.N > 0) f(c.Dst, c.Item, c.N);
+        }
+
         /// <summary>Ksiegi (GoodsLedger, OreLedger, spis regulatora wsi): kazda sztuka w drodze.</summary>
         internal static void ForEachInTransit(Action<ItemObject, int> f)
         {

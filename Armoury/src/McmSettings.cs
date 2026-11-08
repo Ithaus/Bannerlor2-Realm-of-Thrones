@@ -10024,6 +10024,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool KsRegaleRelativePrice { get; set; } = true;
 
+        [SettingPropertyBool("Mine Hands Shed Unsold Ore", HintText = "Under the start calibration, every 28 days the hands at silver and gold mines also look at all the silver or gold ore lying unsold in the market (Westeros or Essos): in villages and their carts, castles, town stalls, caravan packs and merchant carts. While that stock is over 60 days of what the market uses (the royal mints left out - they only take what is over) and the mines still dig at least 9 tenths of that use, the hands go back to the fields by a tenth each cycle, whatever the price; between 30 and 60 days of stock no new miners are hired. At most one step per cycle together with Mine Hands Follow Relative Price. Off - as before.", RequireRestart = false)]
+        [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
+        public bool KsRegaleWorldSurplus { get; set; } = true;
+
         [SettingPropertyBool("Bloomery Wood Credit", HintText = "under the start calibration, with Bloomery At Mine: when a mining village has no gold for the wood of its bloomery, the merchants of its market town give the wood on credit - only while a bloom sells there for more than the wood it burns, up to 7 days of the bloomery's need, only if the town's treasury covers all the credit its merchants have given (wood and food) and the village's oldest bill is not overdue (the same days as the merchants' food credit); the village pays back the oldest bill first from what its carts bring home (and a quarter of its purse each day); if the town goes to war with the village the merchants lose the debt (no gold is made). Off = no new credit (debts already given are still paid back), as before", RequireRestart = false)]
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool BloomeryWoodCredit { get; set; } = true;
@@ -14149,6 +14153,7 @@ namespace Armoury
             s.SideVillageCraftKsSignal = SideVillageCraftKsSignal;
             s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
             s.KsRegaleRelativePrice = KsRegaleRelativePrice;
+            s.KsRegaleWorldSurplus = KsRegaleWorldSurplus;
             s.BloomeryWoodCredit = BloomeryWoodCredit;
             s.KsRampMineralTimes = KsRampMineralTimes;
             s.CaravanBulkFlowGate = CaravanBulkFlowGate;

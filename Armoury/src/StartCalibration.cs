@@ -89,6 +89,7 @@ namespace Armoury
             _pending = null; _keepRaw = null; _loadNote = ""; _exportLogged = -1;
             _stumbles = _stumblesDay = 0; _err.Clear(); _offLogged = false; _lastPlanDay = int.MinValue; _keyLineDay = int.MinValue;
             F5Reset285();   // 285: trend zapasu rudy rynku - pamiec sesji
+            Sur360Reset();  // 360c: okno probek ksiegi i mennicy - pamiec sesji
             PlanReset();
             LiveReset();
             RampReset();

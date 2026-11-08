@@ -764,6 +764,7 @@ RANGES = {
 LABELS = {
     'MineOrePaysOnlyRegale': 'Ore Pays Only Mine Regale',   # 360b
     'KsRegaleRelativePrice': 'Mine Hands Follow Relative Price',   # 360a
+    'KsRegaleWorldSurplus': 'Mine Hands Shed Unsold Ore',   # 360c
     'LektorEnabled': 'Narrator Enabled',
     'LektorEventWindows': 'Narrator Event Windows',
     'LektorGossipLive': 'Narrator Gossip Live',

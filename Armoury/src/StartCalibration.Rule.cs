@@ -226,6 +226,11 @@ namespace Armoury
             if (f4reg) F4RegBegin();
             bool rel360 = reg && RegRelOn;                                   // 360a (klucz Mine Hands Follow Relative Price): mediana miast i liczniki linii od zera
             if (rel360) RelBegin();
+            // 360c (klucz Mine Hands Shed Unsold Ore): probka doby ksiegi towarow i mennicy co dobe (tylko odczyt, przed wczesnym wyjsciem K4a); w dobie cyklu regali
+            // spis srebra i zlota rynku, srednie okna i decyzja (RegaleCycle bierze ja tylko przy _surCycle)
+            SurDaily(today);
+            bool sur360 = reg && RegSurOn;
+            if (sur360) { try { SurBegin(); } catch (Exception e) { _surStum++; _surCycle = false; Stumble("SurBegin", e); } }
             // f5-ruda (klucz Ks Iron Hands Follow Market): rece przy zlozach zelaza co 7 dob od D za ruda rynku - przed wczesnym wyjsciem K4a (wlasny try)
             if (F5IronDay(today, d0))
             {
@@ -311,7 +316,7 @@ namespace Armoury
                         // f5-a7 (klucz Ks Switch Signal): doba bez kroku i bez regali przy przebudowach w toku - blok bez Held nie ma tu nic do zrobienia (blokada prac zeruje
                         // tylko Held > 0); wynik ten sam, bez sprawdzania blokady prac dla ~15 tys. blokow co dobe
                         if (sig && !step && !reg && b.Held <= 0) continue;
-                        if (reg && b.RC != null) RegaleCycle(b, px, f4reg ? mt : null, f4reg);
+                        if (reg && b.RC != null) RegaleCycle(b, px, f4reg ? mt : null, f4reg, ld.Market);
                         if (KsWorksLock(ld, b)) { b.Held = 0; continue; }   // inwest: czesc z pracami okregu nie zmienia zajecia (projekt A7)
                         if (!step || b.Cand == null || b.Cand.Count < 2) continue;
                         int ci = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[ci]) ci = i;
@@ -384,6 +389,8 @@ namespace Armoury
             }
             if (f4reg) { try { F4RegLine(today); } catch (Exception e) { Stumble("F4RegLine", e); } }
             if (rel360) { try { RelLine(today); } catch (Exception e) { _relStum++; Stumble("RelLine", e); } }
+            if (sur360 && _surCycle) { try { SurLine(today); } catch (Exception e) { _surStum++; Stumble("SurLine", e); } }
+            _surCycle = false;                                                // 360c: decyzja tylko w tej dobie cyklu
             _rActive = active;
             _k4Live = _live; _k4Clean = active == 0 && K4NoTransition();   // ks-koszt T10 (K4a): pelny przeglad bez przebudowy w toku (w zadnym bloku - takze okregow pominietych)
             if (sig)
@@ -461,7 +468,7 @@ namespace Armoury
             }
         }
 
-        private static void RegaleCycle(LiveBlock b, double[] px, Town mt, bool f4)
+        private static void RegaleCycle(LiveBlock b, double[] px, Town mt, bool f4, int mk)
         {
             double sum = 0;
             for (int j = 0; j < b.RC.Length; j++)
@@ -478,6 +485,9 @@ namespace Armoury
                 double r = ix; bool rel = RegRelOn && RelGood(b.RC[j]);
                 if (rel) { double md = RelMed(px); if (md > 0) r = ix / md; }
                 int dir = r > 1.2 ? 1 : (r < 0.8 ? -1 : 0);
+                // 360c (klucz Mine Hands Shed Unsold Ore): srebro i zloto - nadwyzka zapasu rynku w obiegu: w dol niezaleznie od ceny; pasmo - bez wzrostu (przed pomiarem f4
+                // i 360a - te same liczniki widza kierunek koncowy; jeden kierunek na wpis = jeden krok na cykl)
+                if (_surCycle && RelGood(b.RC[j])) dir = SurDir(b, j, g, mk, dir);
                 if (f4) { try { F4RegNote(b, j, g, ix, mt, dir); } catch (Exception e) { Stumble("F4RegNote", e); } }   // f4-pomiary: polka wobec celu obok progu (tylko liczniki)
                 if (rel) RelNoteBefore(g, b, j, r, dir);
                 if (dir > 0) { b.RF[j] *= 1.1f; _rUp++; }
@@ -487,6 +497,7 @@ namespace Armoury
             double cap = 0.5 * Math.Max(0.0, 1.0 - b.HomeFrac);
             if (sum > cap && sum > 0) { float k = (float)(cap / sum); for (int j = 0; j < b.RF.Length; j++) b.RF[j] *= k; }
             if (RegRelOn) RelNoteAfter(b);                                    // 360a: rece po kroku i suficie (linia "Kopalnie (360a)")
+            if (_surCycle) SurNoteAfter(b, mk);                               // 360c: rece po kroku i suficie (linia "Kopalnie (360c)")
         }
 
         // kontrola pieniedzy KS od ostatniej linii: przebudowa (kiesy wsi -> kasy miast), pola mieszczan (kasy miast -> kiesy ludu)
