@@ -762,6 +762,7 @@ RANGES = {
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze
 # po angielsku); id pola w Armoury.json zostaje nazwa klucza. Reszta pol - jak dotad (podzial nazwy na slowa).
 LABELS = {
+    'KsRegaleRelativePrice': 'Mine Hands Follow Relative Price',   # 360a
     'LektorEnabled': 'Narrator Enabled',
     'LektorEventWindows': 'Narrator Event Windows',
     'LektorGossipLive': 'Narrator Gossip Live',

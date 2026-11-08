@@ -224,6 +224,8 @@ namespace Armoury
             }
             bool f4reg = reg && F4RegOn;                                     // f4-pomiary (klucz Measure Regale Shelf): regale wobec polki - tylko liczniki
             if (f4reg) F4RegBegin();
+            bool rel360 = reg && RegRelOn;                                   // 360a (klucz Mine Hands Follow Relative Price): mediana miast i liczniki linii od zera
+            if (rel360) RelBegin();
             // f5-ruda (klucz Ks Iron Hands Follow Market): rece przy zlozach zelaza co 7 dob od D za ruda rynku - przed wczesnym wyjsciem K4a (wlasny try)
             if (F5IronDay(today, d0))
             {
@@ -381,6 +383,7 @@ namespace Armoury
                 catch (Exception e) { Stumble("RuleDaily(okreg)", e); }
             }
             if (f4reg) { try { F4RegLine(today); } catch (Exception e) { Stumble("F4RegLine", e); } }
+            if (rel360) { try { RelLine(today); } catch (Exception e) { _relStum++; Stumble("RelLine", e); } }
             _rActive = active;
             _k4Live = _live; _k4Clean = active == 0 && K4NoTransition();   // ks-koszt T10 (K4a): pelny przeglad bez przebudowy w toku (w zadnym bloku - takze okregow pominietych)
             if (sig)
@@ -470,13 +473,20 @@ namespace Armoury
                 if (F5IronSkip(b.RC[j])) { sum += b.RF[j]; continue; }
                 // f20-d4 (klucz Ks Food Hands Follow Market): sol i daktyle po D+49 - krok co 7 dob za polkami rynku (StartCalibration.Jedzenie.cs); przed pomiarem f4 jak zelazo
                 if (F20RegSkipOf(b.RC[j])) { sum += b.RF[j]; continue; }
-                if (f4) { try { F4RegNote(b, j, g, ix, mt); } catch (Exception e) { Stumble("F4RegNote", e); } }   // f4-pomiary: polka wobec celu obok progu (tylko liczniki)
-                if (ix > 1.2) { b.RF[j] *= 1.1f; _rUp++; }
-                else if (ix < 0.8) { b.RF[j] *= 0.9f; _rDown++; }
+                // 360a (klucz Mine Hands Follow Relative Price): srebro, zloto, glina, wapien, marmur, przyprawy - indeks towaru wobec mediany indeksu wszystkich towarow
+                // miasta targowego (wszystkie ceny swiata x3 nie werbuja juz gornikow); kierunek liczony raz - ten sam dla linii f4 (NF4-5b) i licznika regali
+                double r = ix; bool rel = RegRelOn && RelGood(b.RC[j]);
+                if (rel) { double md = RelMed(px); if (md > 0) r = ix / md; }
+                int dir = r > 1.2 ? 1 : (r < 0.8 ? -1 : 0);
+                if (f4) { try { F4RegNote(b, j, g, ix, mt, dir); } catch (Exception e) { Stumble("F4RegNote", e); } }   // f4-pomiary: polka wobec celu obok progu (tylko liczniki)
+                if (rel) RelNoteBefore(g, b, j, r, dir);
+                if (dir > 0) { b.RF[j] *= 1.1f; _rUp++; }
+                else if (dir < 0) { b.RF[j] *= 0.9f; _rDown++; }
                 sum += b.RF[j];
             }
             double cap = 0.5 * Math.Max(0.0, 1.0 - b.HomeFrac);
             if (sum > cap && sum > 0) { float k = (float)(cap / sum); for (int j = 0; j < b.RF.Length; j++) b.RF[j] *= k; }
+            if (RegRelOn) RelNoteAfter(b);                                    // 360a: rece po kroku i suficie (linia "Kopalnie (360a)")
         }
 
         // kontrola pieniedzy KS od ostatniej linii: przebudowa (kiesy wsi -> kasy miast), pola mieszczan (kasy miast -> kiesy ludu)

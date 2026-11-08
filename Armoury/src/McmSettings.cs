@@ -10004,6 +10004,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool KsIronHandsFollowMarket { get; set; } = true;
 
+        [SettingPropertyBool("Mine Hands Follow Relative Price", HintText = "Under the start calibration, every 28 days the hands at silver, gold, clay, limestone, marble and spice workings follow that good's price compared with the town's usual price level (its price index divided by the median index of all goods in the town), not the bare index - when every price in the realm is three times higher, miners are no longer hired for that alone. Iron, salt, dates and timber keep their own rules. Off - as before.", RequireRestart = false)]
+        [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
+        public bool KsRegaleRelativePrice { get; set; } = true;
+
         [SettingPropertyBool("Bloomery Wood Credit", HintText = "under the start calibration, with Bloomery At Mine: when a mining village has no gold for the wood of its bloomery, the merchants of its market town give the wood on credit - only while a bloom sells there for more than the wood it burns, up to 7 days of the bloomery's need, only if the town's treasury covers all the credit its merchants have given (wood and food) and the village's oldest bill is not overdue (the same days as the merchants' food credit); the village pays back the oldest bill first from what its carts bring home (and a quarter of its purse each day); if the town goes to war with the village the merchants lose the debt (no gold is made). Off = no new credit (debts already given are still paid back), as before", RequireRestart = false)]
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool BloomeryWoodCredit { get; set; } = true;
@@ -14124,6 +14128,7 @@ namespace Armoury
             s.TownWorksHireDistrict = TownWorksHireDistrict;
             s.SideVillageCraftKsSignal = SideVillageCraftKsSignal;
             s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
+            s.KsRegaleRelativePrice = KsRegaleRelativePrice;
             s.BloomeryWoodCredit = BloomeryWoodCredit;
             s.KsRampMineralTimes = KsRampMineralTimes;
             s.CaravanBulkFlowGate = CaravanBulkFlowGate;

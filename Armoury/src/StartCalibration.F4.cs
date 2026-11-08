@@ -333,12 +333,12 @@ namespace Armoury
         }
 
         /// <summary>RegaleCycle (przed zmiana RF, klucz Measure Regale Shelf): decyzja progu indeksu obok miary polki - tylko liczniki.</summary>
-        private static void F4RegNote(LiveBlock b, int j, int g, double ix, Town mt)
+        private static void F4RegNote(LiveBlock b, int j, int g, double ix, Town mt, int dir)
         {
             if (g < 0 || g >= KsTab.NG) return;
             int st = F4ShelfState(mt, g);
             if (st == 4) { _f4RegNoMap++; st = 3; }                              // w sumach linii - "bez celu" (sumy bez zmian), osobno w dopisku
-            bool up = ix > 1.2, down = !up && ix < 0.8;
+            bool up = dir > 0, down = dir < 0;                                  // 360a: kierunek z RegaleCycle (przy kluczu - indeks wzgledny dla zloz bez celu)
             _f4Reg[g, 0]++;
             if (up) _f4Reg[g, 1]++; else if (down) _f4Reg[g, 2]++;
             _f4Reg[g, 3 + st]++;
@@ -355,7 +355,9 @@ namespace Armoury
             int withT = t[3] + t[4] + t[5];
             var sb = new StringBuilder(1600);
             sb.Append(PK).Append("regale wobec polki (f4-pomiary) dzien ").Append(today).Append(" | cykl co ").Append(RegCycle).Append(" dob od D ").Append(DDay)
-              .Append(" | prog dzisiejszy: indeks towaru w miescie targowym > 1.2 - rece +10%, < 0.8 - rece -10% | miara polki (tylko pomiar): sol i daktyle - cel T* x popyt zaplacony (KS-H), ruda i drewno - zapas rzemiosla miasta (CaravanBulk), reszta bez celu")
+              .Append(" | prog dzisiejszy: indeks towaru w miescie targowym > 1.2 - rece +10%, < 0.8 - rece -10%")
+              .Append(RegRelOn ? " (360a: srebro, zloto, glina, wapien, marmur, przyprawy - indeks wzgledny: indeks towaru / mediana indeksu wszystkich towarow miasta)" : "")
+              .Append(" | miara polki (tylko pomiar): sol i daktyle - cel T* x popyt zaplacony (KS-H), ruda i drewno - zapas rzemiosla miasta (CaravanBulk), reszta bez celu")
               .Append(" | razem: wpisow ").Append(t[0]).Append(", w gore ").Append(t[1]).Append(", w dol ").Append(t[2]).Append(", bez zmiany ").Append(t[0] - t[1] - t[2])
               .Append("; polka < T* ").Append(t[3]).Append(", > 2T* ").Append(t[4]).Append(", pomiedzy ").Append(t[5]).Append(", bez celu ").Append(t[6])
               .Append("; w gore przy polce > 2T* ").Append(t[7]).Append(", w dol przy polce < T* ").Append(t[8]).Append("; zgodne z polka (w gore przy < T*, w dol przy > 2T*, bez zmiany pomiedzy) ").Append(t[9]).Append(" z ").Append(withT).Append(" wpisow z celem")
