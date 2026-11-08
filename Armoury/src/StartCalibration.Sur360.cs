@@ -19,6 +19,14 @@ namespace Armoury
     /// Ponizej 7 probek ksiegi albo spis z wyjatkiem - bez zmian. Jeden kierunek na wpis (360a, 360c i regula ceny razem - najwyzej jeden krok x0.9 na cykl,
     /// nigdy 0.81); sufit polowy rak bez zmian. Dziala takze przy wylaczonym 360a. Okno probek tylko w sesji (bez nowego klucza zapisu). Klucz NIE - co do bitu jak dotad.
     /// Linia "Kopalnie (360c)" w dobie cyklu.
+    ///
+    /// 360r-c/d (przeglad 08.11): (1) prog wydobycia liczony wobec CALEGO zuzycia rynku z mennica (P > 0.9 x C) - przy C bez mennicy rece schodzily
+    /// do ok. 0.9 x 240/d w Westeros i mennica (najwieksze ujscie srebra, dla zlota prawie jedyne) tracila wsad; teraz ciecie konczy sie, gdy wydobycie
+    /// spadnie do tego, co rynek naprawde zjada (lacznie z mennica), a W liczy sie dalej wobec C bez mennicy (mennica bierze tylko nadwyzke).
+    /// (2) przy kluczu 360d (Ore Price Sees All Stock) cena srebra i zlota stale widzi towar w drodze (wozy - kilkanascie dob wydobycia), wiec indeks
+    /// wzgledny 360a lezy trwale ponizej 0.8 takze w rownowadze - regula ceny tnialaby rece co cykl bez konca. Przy 360d o rekach srebra i zlota decyduje
+    /// sam zapas: nadwyzka - w dol, pasmo - bez zmian, niski zapas (W < 30 x C bez mennicy) i wydobycie ponizej calego zuzycia - w gore (+10%), poza tym
+    /// bez zmian; bez danych (pierwsze 7 dob, spis z bledem, klucz 360c wylaczony) - bez zmian. Bez 360d - regula ceny jak dotad (pasmo blokuje tylko wzrost).
     /// </summary>
     internal static partial class StartCalibration
     {
@@ -41,7 +49,9 @@ namespace Armoury
         private static readonly int[,] _surNe = new int[Mt, 2], _surForced = new int[Mt, 2], _surHeld = new int[Mt, 2];
         private static readonly double[,] _surH0 = new double[Mt, 2], _surH1 = new double[Mt, 2];
         private static int _surStum;
-        private static readonly string[] SurDecName = { "bez danych (bez zmian)", "NADWYZKA - w dol", "pasmo - bez wzrostu", "niski zapas - regula ceny" };
+        private static readonly string[] SurDecName = { "bez danych (bez zmian)", "NADWYZKA - w dol", "pasmo - bez wzrostu", "niski zapas - regula ceny",
+                                                        "pasmo - bez zmian (360d)", "niski zapas - bez zmian (360d)", "BRAK - w gore (360d)" };
+        private const int DecNone = 0, DecDown = 1, DecBand = 2, DecLow = 3, DecBandFix = 4, DecLowFix = 5, DecUp = 6;
 
         /// <summary>Nowa kampania / wczytanie (StartCalibration.Reset): okno probek od zera.</summary>
         internal static void Sur360Reset()
@@ -87,6 +97,7 @@ namespace Armoury
             Array.Clear(_surNe, 0, _surNe.Length); Array.Clear(_surForced, 0, _surForced.Length); Array.Clear(_surHeld, 0, _surHeld.Length);
             Array.Clear(_surH0, 0, _surH0.Length); Array.Clear(_surH1, 0, _surH1.Length); Array.Clear(_surDec, 0, _surDec.Length);
             _surWOk = OreStock360.Census(_surW);
+            bool px = OrePrice360.On;
             for (int m = 0; m < Mt; m++)
                 for (int mk = 0; mk < 2; mk++)
                 {
@@ -94,12 +105,13 @@ namespace Armoury
                     for (int i = 0; i < _surN; i++) { p += _surP[i, m, mk]; c += _surC[i, m, mk]; n += _surMint[i, m, mk]; }
                     double k = Math.Max(1, _surN);
                     _surPa[m, mk] = p / k; _surCa[m, mk] = c / k; _surMa[m, mk] = n / k;
-                    if (!_surWOk || _surN < SurMinN) { _surDec[m, mk] = 0; continue; }
+                    if (!_surWOk || _surN < SurMinN) { _surDec[m, mk] = DecNone; continue; }
                     double cn = Math.Max(0.0, _surCa[m, mk] - _surMa[m, mk]);
                     long w = OreStock360.Sum(_surW, m, mk, 0);
-                    if (w > SurHi * cn && _surPa[m, mk] > SurPk * cn) _surDec[m, mk] = 1;
-                    else if (w < SurLo * cn) _surDec[m, mk] = 3;
-                    else _surDec[m, mk] = 2;
+                    // 360r-c/d: wydobycie wobec calego zuzycia (z mennica); przy 360d decyzja bez reguly ceny
+                    if (w > SurHi * cn && _surPa[m, mk] > SurPk * _surCa[m, mk]) _surDec[m, mk] = DecDown;
+                    else if (w < SurLo * cn) _surDec[m, mk] = !px ? DecLow : (_surPa[m, mk] < _surCa[m, mk] ? DecUp : DecLowFix);
+                    else _surDec[m, mk] = px ? DecBandFix : DecBand;
                 }
         }
 
@@ -111,8 +123,11 @@ namespace Armoury
             _surNe[m, mk]++;
             _surH0[m, mk] += b.Hands * b.RF[j];
             int dec = _surDec[m, mk];
-            if (dec == 1) { if (dir >= 0) _surForced[m, mk]++; return -1; }
-            if (dec == 2 && dir > 0) { _surHeld[m, mk]++; return 0; }
+            if (dec == DecDown) { if (dir >= 0) _surForced[m, mk]++; return -1; }
+            if (dec == DecBand && dir > 0) { _surHeld[m, mk]++; return 0; }
+            if (dec == DecUp) { if (dir <= 0) _surForced[m, mk]++; return 1; }
+            // 360r-c/d: przy 360d cena nie rusza rak srebra i zlota (bez danych, pasmo, niski zapas bez spadku)
+            if (dec == DecBandFix || dec == DecLowFix || (dec == DecNone && OrePrice360.On)) { if (dir != 0) _surHeld[m, mk]++; return 0; }
             return dir;
         }
 
@@ -135,8 +150,8 @@ namespace Armoury
             _surCycle = false;
             var sb = new StringBuilder(2000);
             sb.Append("Kopalnie (360c): dzien ").Append(today).Append(" | cykl co ").Append(RegCycle).Append(" dob od D ").Append(DDay)
-              .Append(" | prog: zapas rynku W > ").Append(SurHi.ToString("0", Inv)).Append(" x C i P > ").Append(SurPk.ToString("0.0", Inv)).Append(" x C - rece -10%; wzrost tylko przy W < ")
-              .Append(SurLo.ToString("0", Inv)).Append(" x C (C - zuzycie rynku bez mennicy, srednia ").Append(_surN).Append(" dob z ").Append(SurWin).Append(", min. ").Append(SurMinN).Append(')')
+              .Append(" | prog: zapas rynku W > ").Append(SurHi.ToString("0", Inv)).Append(" x C bez mennicy i P > ").Append(SurPk.ToString("0.0", Inv)).Append(" x C z mennica - rece -10%; wzrost tylko przy W < ")
+              .Append(SurLo.ToString("0", Inv)).Append(" x C bez mennicy").Append(OrePrice360.On ? " i P < C z mennica (360d - cena nie rusza rak)" : "").Append(" (srednia ").Append(_surN).Append(" dob z ").Append(SurWin).Append(", min. ").Append(SurMinN).Append(')')
               .Append(" | spis ").Append(_surWOk ? "OK" : "BLAD - bez zmian");
             for (int m = 0; m < Mt; m++)
                 for (int mk = 0; mk < 2; mk++)
@@ -148,7 +163,7 @@ namespace Armoury
                     sb.Append("), P ").Append(_surPa[m, mk].ToString("0.0", Inv)).Append("/d, C ").Append(_surCa[m, mk].ToString("0.0", Inv)).Append("/d (mennica ")
                       .Append(_surMa[m, mk].ToString("0.0", Inv)).Append("/d, bez mennicy ").Append(cn.ToString("0.0", Inv)).Append("/d), W/C ")
                       .Append(cn > 0 ? (w / cn).ToString("0.0", Inv) : "-").Append(", decyzja ").Append(SurDecName[_surDec[m, mk]])
-                      .Append(" | wpisow ").Append(_surNe[m, mk]).Append(", wymuszone w dol ").Append(_surForced[m, mk]).Append(", wstrzymane wzrosty ").Append(_surHeld[m, mk])
+                      .Append(" | wpisow ").Append(_surNe[m, mk]).Append(", wymuszone ").Append(_surForced[m, mk]).Append(", wstrzymane kroki ceny ").Append(_surHeld[m, mk])
                       .Append(", rece ").Append(_surH0[m, mk].ToString("0", Inv)).Append(" -> ").Append(_surH1[m, mk].ToString("0", Inv));
                 }
             sb.Append(" | potkniecia ").Append(_surStum).Append(" (spis ").Append(OreStock360.Stumbles).Append(")").Append('.');

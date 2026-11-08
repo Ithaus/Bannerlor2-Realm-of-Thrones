@@ -55,6 +55,7 @@ namespace Armoury
         private static readonly object _lock = new object();
         [ThreadStatic] private static bool _raw;                    // odczyt indeksu bez pasma (linia doby: przed / po)
         private static long _floorN, _ceilN;
+        [ThreadStatic] internal static int Quiet;                   // 360r-c/d: wyceny probne 360d (polowienie limitu) - pasmo tnie, ale nie liczy do linii 306a
         private static int _st, _models;
         private static bool _err, _errLine;
         private static readonly List<string> _names = new List<string>();
@@ -166,7 +167,7 @@ namespace Armoury
                 float k;
                 if (!sn.K.TryGetValue(__0, out k)) return;
                 float lo = 1f / k;
-                bool outer = RawPrice.Depth <= 1;
+                bool outer = RawPrice.Depth <= 1 && Quiet == 0;
                 if (__result < lo) { __result = lo; if (outer) System.Threading.Interlocked.Increment(ref _floorN); }
                 else if (__result > k) { __result = k; if (outer) System.Threading.Interlocked.Increment(ref _ceilN); }
             }

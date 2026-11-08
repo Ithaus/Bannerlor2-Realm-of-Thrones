@@ -136,24 +136,29 @@ namespace Armoury
                 if (model == null) return;
                 float b0 = res.Item1, dn = res.Item2;
                 double full = b0 + Math.Max(0.0, pace) * x;
-                double lim = MaxDrop * model.GetBasePriceFactor(cat, inStore, oldSupply, dn, false, 0);
                 double sNew; bool clip = false;
-                if (model.GetBasePriceFactor(cat, inStore, (float)full, dn, false, 0) >= lim) sNew = full;
-                else
+                PriceBand306.Quiet++;                                     // 360r-c/d: wyceny probne nie licza sie do linii pasma 306a
+                try
                 {
-                    clip = true;
-                    if (model.GetBasePriceFactor(cat, inStore, b0, dn, false, 0) < lim) sNew = b0;   // gra sama zbija cene ponad limit - bez dodatku
+                    double lim = MaxDrop * model.GetBasePriceFactor(cat, inStore, oldSupply, dn, false, 0);
+                    if (model.GetBasePriceFactor(cat, inStore, (float)full, dn, false, 0) >= lim) sNew = full;
                     else
                     {
-                        double lo = b0, hi = full;
-                        for (int i = 0; i < Steps; i++)
+                        clip = true;
+                        if (model.GetBasePriceFactor(cat, inStore, b0, dn, false, 0) < lim) sNew = b0;   // gra sama zbija cene ponad limit - bez dodatku
+                        else
                         {
-                            double mid = 0.5 * (lo + hi);
-                            if (model.GetBasePriceFactor(cat, inStore, (float)mid, dn, false, 0) >= lim) lo = mid; else hi = mid;
+                            double lo = b0, hi = full;
+                            for (int i = 0; i < Steps; i++)
+                            {
+                                double mid = 0.5 * (lo + hi);
+                                if (model.GetBasePriceFactor(cat, inStore, (float)mid, dn, false, 0) >= lim) lo = mid; else hi = mid;
+                            }
+                            sNew = lo;
                         }
-                        sNew = lo;
                     }
                 }
+                finally { PriceBand306.Quiet--; }
                 res = new ValueTuple<float, float>(Math.Max(0.1f, (float)sNew), dn);
                 int mk = StartCalibration.TownMarketOf(t);
                 if (mk == 0 || mk == 1)

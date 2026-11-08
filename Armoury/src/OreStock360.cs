@@ -30,7 +30,7 @@ namespace Armoury
         internal static ItemObject ItemOf(int m)
         {
             var c = Campaign.Current;
-            if (!ReferenceEquals(c, _camp)) { _camp = c; for (int k = 0; k < Metals; k++) _item[k] = null; }
+            if (!ReferenceEquals(c, _camp)) { _camp = c; for (int k = 0; k < Metals; k++) _item[k] = null; Stumbles = 0; _errLogged = false; }   // 360r-c/d: liczniki od zera w nowej kampanii
             if (m < 0 || m >= Metals) return null;
             if (_item[m] != null) return _item[m];
             try { var om = MBObjectManager.Instance; _item[m] = om != null ? om.GetObject<ItemObject>(MetalId[m]) : null; } catch { _item[m] = null; }

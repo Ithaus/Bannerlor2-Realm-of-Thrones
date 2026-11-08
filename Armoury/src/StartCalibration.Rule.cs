@@ -488,6 +488,8 @@ namespace Armoury
                 // 360c (klucz Mine Hands Shed Unsold Ore): srebro i zloto - nadwyzka zapasu rynku w obiegu: w dol niezaleznie od ceny; pasmo - bez wzrostu (przed pomiarem f4
                 // i 360a - te same liczniki widza kierunek koncowy; jeden kierunek na wpis = jeden krok na cykl)
                 if (_surCycle && RelGood(b.RC[j])) dir = SurDir(b, j, g, mk, dir);
+                // 360r-c/d: przy 360d bez decyzji 360c (klucz wylaczony / blad SurBegin) indeks srebra i zlota stale widzi towar w drodze - cena nie rusza rak
+                else if (RelGood(b.RC[j]) && OrePrice360.On) dir = 0;
                 if (f4) { try { F4RegNote(b, j, g, ix, mt, dir); } catch (Exception e) { Stumble("F4RegNote", e); } }   // f4-pomiary: polka wobec celu obok progu (tylko liczniki)
                 if (rel) RelNoteBefore(g, b, j, r, dir);
                 if (dir > 0) { b.RF[j] *= 1.1f; _rUp++; }
