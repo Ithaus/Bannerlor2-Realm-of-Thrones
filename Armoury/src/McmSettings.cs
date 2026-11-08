@@ -4120,6 +4120,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int GarrisonAutoRecruitPerDay { get; set; } = 2;
 
+        [SettingPropertyBool("Garrison Counts Patrols", HintText = "a garrison counts its men out on a Banner Kings patrol as its own: while a patrol is away the garrison recruits only up to its size limit minus the men on patrol, so they have room when they come back instead of the garrison overflowing and men leaving. Yours and the AI's alike (off = the game counts only the men inside the walls)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool GarrisonCountsPatrols { get; set; } = true;
+
         [SettingPropertyBool("Militia From Free Hands", HintText = "militia grows only from the free hands of its own land: each new militiaman leaves his village (1/k of a hearth) or town, a land with no free hands left raises no new militia, and militia that shrinks without a fight goes back home", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool MilitiaFromFreeHands { get; set; } = true;
@@ -12725,6 +12729,7 @@ namespace Armoury
             s.PeopleMenuShowsBread = PeopleMenuShowsBread;
             s.GarrisonGrowthOnlyRecruits = GarrisonGrowthOnlyRecruits;
             s.GarrisonAutoRecruitPerDay = GarrisonAutoRecruitPerDay;
+            s.GarrisonCountsPatrols = GarrisonCountsPatrols;
             s.MilitiaFromFreeHands = MilitiaFromFreeHands;
             s.NewPartyFromPeople = NewPartyFromPeople;
             s.NewPartyFromSeatGarrison = NewPartyFromSeatGarrison;

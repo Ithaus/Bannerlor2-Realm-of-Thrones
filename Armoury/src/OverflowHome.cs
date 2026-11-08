@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Armoury
 {
@@ -51,13 +52,27 @@ namespace Armoury
         private static bool DebtOn { get { var s = Settings.Current; return s != null && s.DebtorDisbandsHome; } }
         private static bool NearestOn { get { var s = Settings.Current; return s != null && s.DebtorHomeNearestVillage; } }
         private static readonly HashSet<string> _err = new HashSet<string>();
+        // 364: odeszli z przepelnienia z zalog twierdz rodu gracza (do domu i bez wsi) - na osade, od ostatniej linii "Zalogi gracza (364)" (TakePlayerOut zeruje)
+        private static readonly Dictionary<Settlement, int> _playerOut = new Dictionary<Settlement, int>();
+
+        /// <summary>364: odeszli z przepelnienia z zalogi tej twierdzy od ostatniego odczytu (odczyt zeruje osade).</summary>
+        internal static int TakePlayerOut(Settlement st)
+        {
+            int v;
+            if (st == null || !_playerOut.TryGetValue(st, out v)) return 0;
+            _playerOut.Remove(st);
+            return v;
+        }
+
+        /// <summary>364: koniec linii - reszta osad (np. twierdza stracona w ciagu doby) bez przenoszenia na nastepna dobe.</summary>
+        internal static void ClearPlayerOut() { _playerOut.Clear(); }
 
         private static Harmony _harmony;
         private static bool _hooksTried, _hooked;
 
         internal static void SetHarmony(Harmony h) { _harmony = h; }
 
-        internal static void Reset() { _notes = new ConditionalWeakTable<TroopRoster, Note>(); NewDay(); LastDebtLimit = LastDebtArrears = LastDebtNoVillage = LastDebtClans = LastDebtNearest = 0; _err.Clear(); }
+        internal static void Reset() { _notes = new ConditionalWeakTable<TroopRoster, Note>(); NewDay(); _playerOut.Clear(); LastDebtLimit = LastDebtArrears = LastDebtNoVillage = LastDebtClans = LastDebtNearest = 0; _err.Clear(); }
 
         internal static void NewDay()
         {
@@ -208,10 +223,22 @@ namespace Armoury
                     }
                     else if (note.Debt) _debtNoVillage += n;
                     else _noVillage += n;
+                    if (!note.Debt && party.IsGarrison) NotePlayerOut(party, n);   // 364: do domu i bez wsi - obie drogi to odejscie z przepelnienia
                 }
             }
             catch (Exception e) { Stumble("SendHome", e); }
             return sent;
+        }
+
+        private static void NotePlayerOut(MobileParty party, int n)
+        {
+            try
+            {
+                var st = party.CurrentSettlement ?? party.HomeSettlement;
+                if (st == null || n <= 0 || st.OwnerClan != Clan.PlayerClan) return;
+                int v; _playerOut.TryGetValue(st, out v); _playerOut[st] = v + n;
+            }
+            catch (Exception e) { Stumble("NotePlayerOut", e); }
         }
 
         /// <summary>Dopisek do linii "Wyrzutki:" (liczniki od poprzedniej linii).</summary>

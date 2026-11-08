@@ -808,6 +808,26 @@ namespace Armoury
             return _patrols;
         }
 
+        /// <summary>364: ludzie (z rannymi) w czynnych patrolach BK tej twierdzy - z mapy patroli doby (patrol z tej doby dopisuje BkPatrolCreatedPostfix;
+        /// patrol, ktory wrocil, jest nieczynny albo pusty). 0 - brak patroli, brak typu BK albo blad.</summary>
+        internal static int MenOnPatrol(Settlement st)
+        {
+            try
+            {
+                if (st == null || _bkPatrolType == null) return 0;
+                List<MobileParty> pl;
+                if (!PatrolsToday().TryGetValue(st, out pl) || pl == null || pl.Count == 0) return 0;
+                int n = 0;
+                foreach (var p in pl)
+                {
+                    var r = p != null && p.IsActive ? p.MemberRoster : null;
+                    if (r != null) n += r.TotalManCount;
+                }
+                return n;
+            }
+            catch (Exception e) { Stumble("MenOnPatrol", e); return 0; }
+        }
+
         private static Dictionary<Settlement, List<MobileParty>> Patrols()
         {
             var d = new Dictionary<Settlement, List<MobileParty>>();

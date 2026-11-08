@@ -116,6 +116,7 @@ namespace Armoury
         {
             D = new Day(); _stumbles = _stumblesDay = 0; _stumbleAt.Clear(); _errSites.Clear(); _startLogged = false; _bkTop = null;
             _tickV = null; _tickDH = 0.0; _k8Town = null;
+            GarrisonPatrol364.Reset();   // 364: liczniki linii "Patrole BK a werbunek zalog" / "Zalogi gracza" tylko z tej kampanii
         }
 
         // ---------------------------------------------------------------- pomocnicze
@@ -303,6 +304,9 @@ namespace Armoury
         /// <summary>326c-E (recenzja R1-5 / R2-5 / R3-8): dodatkowe wywolania werbunku zalogi z CanonWarBalance.FrontGarrisonDaily - limit K8 dziala, ale bez licznikow
         /// A5/K8 doby (jedna twierdza liczylaby sie setki razy); E podaje wlasne sumy w linii "zaloga frontu (326c)".</summary>
         [ThreadStatic] internal static bool FrontGarrisonCall;
+
+        /// <summary>364 (GarrisonPatrol364.LimitPostfix): wolanie z okna A5 tej twierdzy (TickAutoRecruitmentGarrisonChange), bez UI i bez wywolan zalogi frontu 326c.</summary>
+        internal static bool InA5Window(Town t) { return t != null && ReferenceEquals(_a5Town, t) && !FrontGarrisonCall; }
 
         public static void A5LimitPostfix(Town __0, ExplainedNumber __result)
         {
@@ -999,6 +1003,11 @@ namespace Armoury
             Wire(h, "przyrost zalog z modelu (TickGarrisonChangeForTown)", AccessTools.Method(grc, "TickGarrisonChangeForTown", new[] { typeof(Town) }), PP(nameof(GarrisonGrowthPrefix), Priority.Low), null, P(nameof(GarrisonGrowthFin)));
             Wire(h, "A5 - okno pomiaru (TickAutoRecruitmentGarrisonChange)", AccessTools.Method(grc, "TickAutoRecruitmentGarrisonChange", new[] { typeof(Town) }), P(nameof(A5MeasurePre)), null, P(nameof(A5MeasureFin)));
             Wire(h, "A5 - limity (GetAutoRecruitmentGarrisonChangeExplainedNumber)", AccessTools.Method(grc, "GetAutoRecruitmentGarrisonChangeExplainedNumber", new[] { typeof(Town) }), null, P(nameof(A5LimitPostfix)), null);
+            // 364: ludzie na patrolu BK licza sie do miejsca w zalodze - postfiks z ref ExplainedNumber PRZED A5LimitPostfix (High > domyslny 400); metoda zadeklarowana w grc
+            Wire(h, "364 - patrol BK w miejscu zalogi (GetAutoRecruitmentGarrisonChangeExplainedNumber)", AccessTools.DeclaredMethod(grc, "GetAutoRecruitmentGarrisonChangeExplainedNumber", new[] { typeof(Town) }), null,
+                 new HarmonyMethod(typeof(GarrisonPatrol364), nameof(GarrisonPatrol364.LimitPostfix)) { priority = Priority.High }, null);
+            Wire(h, "364 - werbunek zalog gracza (TickAutoRecruitmentGarrisonChange)", AccessTools.DeclaredMethod(grc, "TickAutoRecruitmentGarrisonChange", new[] { typeof(Town) }),
+                 new HarmonyMethod(typeof(GarrisonPatrol364), nameof(GarrisonPatrol364.RecPre)), null, new HarmonyMethod(typeof(GarrisonPatrol364), nameof(GarrisonPatrol364.RecFin)));
             // K8: kazda zadeklarowana GetMaximumDailyAutoRecruitmentCount(Town) modeli zalogi (gra, BK, ROT, NavalDLC) - licznik zagniezdzenia + postfiks
             var k8 = new List<MethodInfo>();
             try
@@ -1102,6 +1111,7 @@ namespace Armoury
             try { day = (int)CampaignTime.Now.ToDays - 1; } catch { }
             var d = D;
             D = new Day();
+            try { GarrisonPatrol364.Daily(log); } catch (Exception e) { Stumble("Daily(364)", e); }   // 364: linie zalog i patroli BK (bez logu - tylko zerowanie)
             if (!log) { _stumblesDay = 0; _stumbleAt.Clear(); try { TownGrowth.Line(day, false); } catch (Exception e) { Stumble("Daily(Miasta)", e); } return; }
             long t0 = Stopwatch.GetTimestamp();
             if (!_startLogged) { _startLogged = true; try { Log.Info(StartLine()); } catch (Exception e) { Stumble("StartLine", e); } }
