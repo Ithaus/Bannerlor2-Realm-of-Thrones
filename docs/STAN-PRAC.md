@@ -1,5 +1,9 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 08.11.2026 21:25 CET: WGRANIE 187 (najnowszy) = noc/360-kopalnie 2adefc41 (Armoury.dll cb445382) = 186 + 363b (material na zamowienie wedlug ziemi, zasieg 600 z frachtem, pulap 3%)
+- at-363b: 267 wytworcow, material do ok. 19 tys. zl/d po 40 dobach i dalej rosnie (rece 2% -> pulap 3%). SPRAWDZIC w grze Jeffa: "Zamowienia wsi (363/363b)", danina skarbcow wsi ("Akumulator kies" pobrano), zboze z pola mniej; jesli material > 60 tys. zl/d - Village Order Field Share 0.02.
+- Zawieszenie 20:55 w kryjowce hideout_mountain_35 - silnik natywny (MissionState.TickMission -> PInvoke), pierwsze; Jeff stracil gre 19:02-20:55 (Ironman bez zapisu).
+
 ## STAN 08.11.2026 20:20 CET: WGRANIE 186 (najnowszy) = noc/360-kopalnie 2ff303a9 (Armoury.dll 46de0a6f) = 182 + 361 (183) + 362 (184) + 363 (185) + 364 (186); MCM Jeffa MineRegaleShare 0.25
 - 361: komunikat "Today in total" po wyplacie rodu + poprawiona podpowiedz zlota (at-361: |rozjazd| ok. 250 przy |naprawde| ok. 4100/d). Wyjasnienie dla Jeffa: "Daily Gold Change" gry to tylko wyplata modelu, nasze daniny wchodza ok. 1.6 h wczesniej.
 - 362: zloto ze skrytek wsi wg Roguery (5% + 0.2%/pkt, max 50%, perki, XP, kara relacji). W tescie tylko najezdzcy (zelazna cena 50% >= S) - doplaty skrytek NIE widziano; SPRAWDZIC w logu Jeffa "Skrytki wsi (362)" po pierwszym rabunku gracza / lorda AI.
