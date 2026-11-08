@@ -34,6 +34,8 @@ namespace Armoury
             Step("Rozkazy", () => Orders(m, c));
             Step("Ostrzal", () => Volleys(m, c));
             Step("Zdarzenia", () => Events(m, c));
+            Step("Trzymaj linie", () => HoldLines(m, c));   // 359: "Hold the line!" 2 s po szarzy wroga
+            Step("Zawroc", () => TurnBacks(m, c));          // 359: "Turn back!" zawracajacego
             Step("Tetent", () => Gallops(m));
             Step("Przemowy", () => Speeches(m, c));
             Step("Motto po przemowie", () => Thens(m));

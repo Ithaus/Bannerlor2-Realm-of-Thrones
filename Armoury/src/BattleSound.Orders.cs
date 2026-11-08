@@ -33,9 +33,15 @@ namespace Armoury
     /// </summary>
     internal static partial class BattleSound
     {
-        private const int OMarch = 0, OCharge = 1, OHold = 2, OShields = 3, OLoose = 4, OFallback = 5, ORally = 6, OArchback = 7, OFlank = 8, OKinds = 9;
-        private static readonly string[] OName = { "march", "charge", "hold", "shields", "loose", "fallback", "rally", "archback", "flank" };
-        private static readonly float[] OGap = { 20f, 20f, 20f, 30f, 25f, 20f, 30f, 30f, 30f };
+        // 359 (Jeff 08.11: "okrzyki trzymaj linie wracac trzymaj linie jak na wojnie za malo jest okrzykow dowodcow", klucz CommanderShoutsHoldLine): OHoldLine - "Hold the line!"
+        // szyku piechoty w zwarciu i przed uderzeniem szarzy wroga; OTurnBack - "Turn back!" dowodcy (i gracza), ktory zawraca uciekajacych (RallyRouted359). Klipy
+        // or_<region>_holdline / _turnback, gdy beda w manifescie; do tego czasu lancuch zastepczy (OrderClip): holdline -> hold, turnback -> okrzyk zbiorki (OwnBannerCry:
+        // ob "Rally to me!" / or_rally) -> hold; bez fallback (przeglad 359: "Fall back!" do uciekajacych to odwrotnosc zawracania)
+        private const int OMarch = 0, OCharge = 1, OHold = 2, OShields = 3, OLoose = 4, OFallback = 5, ORally = 6, OArchback = 7, OFlank = 8, OHoldLine = 9, OTurnBack = 10, OKinds = 11;
+        private static readonly string[] OName = { "march", "charge", "hold", "shields", "loose", "fallback", "rally", "archback", "flank", "holdline", "turnback" };
+        private static readonly float[] OGap = { 20f, 20f, 20f, 30f, 25f, 20f, 30f, 30f, 30f, 30f, 15f };
+        private const float HoldLineNear = 15f, HoldLineLeave = 20f, HoldLineEvery = 25f, HoldLineSpan = 10f, HoldLineChargeRange = 120f, HoldLineChargeDelay = 2f, TurnBackGap = 15f;
+        private const int HoldLineMinMen = 10;
         private const int HMarch = 0, HCharge = 1, HRetreat = 2, HRally = 3, HKinds = 4;
         private static readonly string[] HName = { "march", "charge", "retreat", "rally" };
         private static readonly float[] HGap = { 40f, 15f, 20f, 20f };
@@ -52,6 +58,8 @@ namespace Armoury
             internal MovementOrder.MovementOrderEnum Order;
             internal bool Init;
             internal float ChargeAt = -1000f, ChargeEnd = -1000f, LastHit = -1000f, LastShot = -1000f;
+            internal float NextHoldLine = -1f;   // 359: nastepny "Hold the line!" (-1 = jeszcze nie; wejscie w zwarcie = od razu)
+            internal bool InContact;             // 359: szyk w zwarciu (EnemyDist < 15 m, wyjscie powyzej 20 m)
             internal Stamp AnyOrder;
             internal readonly Stamp[] Kind = new Stamp[OKinds];
         }
@@ -135,6 +143,8 @@ namespace Armoury
             _spSample = null;
             _kardaQ.Clear(); _kardaDone.Clear(); _kardaForm.Clear();
             _cKarda = _cKardaCap = _cKardaQ = 0;
+            _holdQ.Clear(); _turnQ.Clear(); _turnSpk.Clear();   // 359
+            _cHoldContact = _cHoldCharge = _cTurnPlayer = _cTurnQuiet = 0;
             _kardaTest = KardaTestWanted();
         }
 
@@ -183,6 +193,7 @@ namespace Armoury
             if (ev.Motto != null && ev.Motto.Key == KardaKey) _cKardaCap++;
             try { KardaShouts(f, c, ev); } catch (Exception e) { _units.Clear(); RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Karda", e); }
             ChargeHorse(f, c);   // tetent konnicy (BattleSound.Field.cs)
+            try { HoldLineAgainst(f, c); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.HoldLineSzarza", e); }   // 359: wrog szarzuje - "Hold the line!" za 2 s
             if (ev.Motto != null || ev.Order != null || ev.Horn) { if (_chargeQ.Count < 64) _chargeQ.Add(ev); }
         }
 
@@ -278,6 +289,8 @@ namespace Armoury
                     var st = FS(f);
                     var oe = f.GetReadonlyMovementOrderReference().OrderEnum;
                     if (!st.Init) { st.Init = true; st.Order = oe; continue; }
+                    // 359: "Hold the line!" piechoty w zwarciu - przed "continue" bez zmiany rozkazu (szyk w walce zwykle rozkazu nie zmienia)
+                    if (orders && c.CommanderShoutsHoldLine) HoldLineContact(m, f, st, oe);
                     if (oe == st.Order) continue;
                     var prev = st.Order;
                     st.Order = oe;
@@ -355,18 +368,170 @@ namespace Armoury
             if (reg == "dothraki") return kind == OCharge ? Pick("or", "dothraki_charge") : null;
             var oc = Pick("or", reg + "_" + OName[kind]);
             if (oc == null && reg == "ghiscari") oc = Pick("or", "essos_" + OName[kind]);
+            // 359: nowe rodzaje bez nagran - lancuch zastepczy (Pick bez klipu = null, cisza bez wyjatku)
+            if (oc == null && kind == OHoldLine) oc = OrderClip(cul, OHold);
+            if (oc == null && kind == OTurnBack) oc = OwnBannerCry(cul) ?? OrderClip(cul, OHold);
             return oc;
         }
 
-        private static void SayFormation(Mission m, Formation f, FState st, int kind, string cul)
+        private static bool SayFormation(Mission m, Formation f, FState st, int kind, string cul)
         {
-            if (!st.Kind[kind].Ready(OGap[kind]) || !st.AnyOrder.Ready(OrderFormGap)) return;
+            if (!st.Kind[kind].Ready(OGap[kind]) || !st.AnyOrder.Ready(OrderFormGap)) return false;
             var spk = SpeakerOf(f);
-            if (spk == null) return;
+            if (spk == null) return false;
             var oc = OrderClip(cul, kind);
-            if (oc == null) return;
-            if (!PlayerVoiceOk(f)) return;
-            Say(m, f, st, kind, oc, spk);
+            if (oc == null) return false;
+            if (!PlayerVoiceOk(f)) return false;
+            return Say(m, f, st, kind, oc, spk);
+        }
+
+        // ============================================================ 359: "Hold the line!" i "Turn back!"
+
+        private sealed class HoldEv { internal Formation F; internal float At; }
+        private static readonly List<HoldEv> _holdQ = new List<HoldEv>();
+        private static readonly List<Agent> _turnQ = new List<Agent>();
+        private static readonly Dictionary<Agent, Stamp> _turnSpk = new Dictionary<Agent, Stamp>();
+        private static int _cHoldContact, _cHoldCharge, _cTurnPlayer, _cTurnQuiet;
+
+        /// <summary>Szyk piechoty (od 10 ludzi) moze krzyczec "Hold the line!": nie szarzuje, nie cofa sie.</summary>
+        private static bool HoldLineForm(Formation f, MovementOrder.MovementOrderEnum oe)
+        {
+            if (f == null || f.CountOfUnits < HoldLineMinMen || !MissionTeams.Valid(f.Team)) return false;
+            if (oe == MovementOrder.MovementOrderEnum.Charge || oe == MovementOrder.MovementOrderEnum.ChargeToTarget
+                || oe == MovementOrder.MovementOrderEnum.Retreat || oe == MovementOrder.MovementOrderEnum.FallBack) return false;
+            try
+            {
+                var q = f.QuerySystem;
+                return q != null && q.IsInfantryFormationReadOnly && !q.IsCavalryFormationReadOnly;
+            }
+            catch { return false; }
+        }
+
+        private static bool SayHoldLine(Mission m, Formation f, FState st)
+        {
+            BasicCharacterObject ch;
+            string cul = FormCul(f, out ch);
+            if (Silent(ch, cul)) return false;
+            if (!SayFormation(m, f, st, OHoldLine, cul)) return false;
+            st.NextHoldLine = _now + HoldLineEvery + (float)_rng.NextDouble() * HoldLineSpan;   // wspolna przerwa zwarcia i szarzy
+            return true;
+        }
+
+        /// <summary>Takt 0.25 s (Orders): wejscie w zwarcie - od razu, potem co 25-35 s, dopoki trwa (EnemyDist ponizej 15 m, wyjscie powyzej 20 m).</summary>
+        private static void HoldLineContact(Mission m, Formation f, FState st, MovementOrder.MovementOrderEnum oe)
+        {
+            float ed = EnemyDist(f);
+            if (!st.InContact)
+            {
+                if (ed >= HoldLineNear) return;
+                st.InContact = true;
+                if (st.NextHoldLine < _now) st.NextHoldLine = _now;
+            }
+            else if (ed > HoldLineLeave) { st.InContact = false; return; }
+            if (_now < st.NextHoldLine || !HoldLineForm(f, oe)) return;
+            if (SayHoldLine(m, f, st)) _cHoldContact++;
+        }
+
+        /// <summary>Szarza szyku f: najblizszy stojacy szyk piechoty wroga do 120 m - "Hold the line!" za 2 s (kolejka, takt 0.25 s).</summary>
+        private static void HoldLineAgainst(Formation f, Settings c)
+        {
+            if (c == null || !c.CommanderShoutsHoldLine || !c.BattleCaptainOrders || _holdQ.Count >= 16) return;
+            var m = Mission.Current;
+            if (m == null || m.MissionEnded) return;
+            Vec2 p = f.CachedAveragePosition;
+            Formation best = null;
+            float bd = HoldLineChargeRange * HoldLineChargeRange;
+            var teams = m.Teams;
+            for (int i = 0; teams != null && i < teams.Count; i++)
+            {
+                var t = teams[i];
+                if (!MissionTeams.Enemies(t, f.Team)) continue;
+                var fl = t.FormationsIncludingSpecialAndEmpty;
+                for (int j = 0; fl != null && j < fl.Count; j++)
+                {
+                    var g = fl[j];
+                    if (g == null || g.CountOfUnits < HoldLineMinMen) continue;
+                    var oe = g.GetReadonlyMovementOrderReference().OrderEnum;
+                    bool stand = oe == MovementOrder.MovementOrderEnum.Stop
+                                 || (oe == MovementOrder.MovementOrderEnum.Move && g.CachedCurrentVelocity.LengthSquared < 0.36f);
+                    if (!stand || !HoldLineForm(g, oe)) continue;
+                    float d = g.CachedAveragePosition.DistanceSquared(p);
+                    if (d < bd) { bd = d; best = g; }
+                }
+            }
+            if (best == null) return;
+            for (int i = 0; i < _holdQ.Count; i++) if (ReferenceEquals(_holdQ[i].F, best)) return;
+            _holdQ.Add(new HoldEv { F = best, At = _now + HoldLineChargeDelay });
+        }
+
+        private static void HoldLines(Mission m, Settings c)
+        {
+            if (_holdQ.Count == 0) return;
+            bool on = c.BattleCaptainOrders && c.CommanderShoutsHoldLine && !m.MissionEnded;
+            for (int i = _holdQ.Count - 1; i >= 0; i--)
+            {
+                var h = _holdQ[i];
+                if (on && _now < h.At) continue;
+                _holdQ.RemoveAt(i);
+                var f = h.F;
+                if (!on || f == null || f.CountOfUnits <= 0) continue;
+                var st = FS(f);
+                var oe = f.GetReadonlyMovementOrderReference().OrderEnum;
+                if (_now < st.NextHoldLine || !HoldLineForm(f, oe)) continue;
+                if (SayHoldLine(m, f, st)) _cHoldCharge++;
+            }
+        }
+
+        /// <summary>359: RoutKeeper (glowny watek) - zawracajacy (dowodca AI albo gracz) wlasnie zawrocil uciekajacego: "Turn back!" w nastepnym takcie.</summary>
+        internal static void OnRoutTurned(Agent rallier)
+        {
+            if (!_on || rallier == null || _turnQ.Count >= 16 || _turnQ.Contains(rallier)) return;
+            _turnQ.Add(rallier);
+        }
+
+        /// <summary>Glos "Turn back!": AI - CanSpeak (mezczyzna, nie gracz, kultura z glosem); gracz - wyjatek tylko dla tego okrzyku (warunek IsFemale zostaje).</summary>
+        private static bool TurnSpeaker(Agent a)
+        {
+            if (a == null) return false;
+            if (!a.IsMainAgent) return CanSpeak(a);
+            try
+            {
+                if (!a.IsActive() || !a.IsHuman || a.IsFemale || !MissionTeams.Valid(a.Team)) return false;
+                return !Silent(a.Character, CulOf(a.Character));
+            }
+            catch { return false; }
+        }
+
+        private static void TurnBacks(Mission m, Settings c)
+        {
+            if (_turnQ.Count == 0) return;
+            bool on = c.BattleCaptainOrders && c.CommanderShoutsHoldLine && !m.MissionEnded;
+            for (int i = 0; i < _turnQ.Count; i++)
+            {
+                var a = _turnQ[i];
+                if (!on || a == null || !TurnSpeaker(a) || IsSpeaking(a)) { _cTurnQuiet++; continue; }
+                Stamp sp;
+                _turnSpk.TryGetValue(a, out sp);
+                var ts = TS(a.Team);
+                if (!sp.Ready(TurnBackGap) || !ts.OrderVoice.Ready(OrderTeamGapAi)) { _cTurnQuiet++; continue; }
+                var oc = OrderClip(CulOf(a.Character), OTurnBack);
+                if (oc == null || Play(m, oc, GVoice, HeadOf(a), OrderMin, OrderMax, true, a, null, "zawroc (359)") == null) { _cTurnQuiet++; continue; }
+                sp.Hit();
+                _turnSpk[a] = sp;
+                ts.OrderVoice.Hit();
+                _cOrder[OTurnBack]++;
+                if (a.IsMainAgent) _cTurnPlayer++;
+            }
+            _turnQ.Clear();
+        }
+
+        /// <summary>Jest nagrany klip rodzaju (dowolny region) - do linii (holdline / turnback).</summary>
+        private static bool AnyOrderKind(string kind)
+        {
+            string suffix = "_" + kind;
+            foreach (var kv in _byKey)
+                if (kv.Key.StartsWith("or:", StringComparison.Ordinal) && kv.Key.EndsWith(suffix, StringComparison.Ordinal) && kv.Value.L.Count > 0) return true;
+            return false;
         }
 
         private static bool Say(Mission m, Formation f, FState st, int kind, Clip oc, Agent spk)
@@ -839,6 +1004,10 @@ namespace Armoury
             sb.Append(" | rozkazy ").Append(c != null && c.BattleCaptainOrders ? "TAK" : "NIE").Append(' ').Append(orders).Append(" (");
             for (int i = 0; i < OKinds; i++) sb.Append(i == 0 ? "" : ", ").Append(OName[i]).Append(' ').Append(_cOrder[i]);
             sb.Append("; ustapione BA ").Append(_cOrderBa).Append(')');
+            // 359: Hold the line! (zwarcie / szarza wroga) i Turn back! (zawracanie uciekajacych)
+            sb.Append(" | okrzyki dowodcow (359) ").Append(c != null && c.CommanderShoutsHoldLine ? "TAK" : "NIE").Append(": trzymaj linie - zwarcie ").Append(_cHoldContact)
+              .Append(", przed szarza ").Append(_cHoldCharge).Append("; zawroc ").Append(_cOrder[OTurnBack]).Append(" (gracz ").Append(_cTurnPlayer).Append(", bez glosu ").Append(_cTurnQuiet)
+              .Append("); klipy holdline ").Append(AnyOrderKind("holdline") ? "TAK" : "NIE (zastepczo hold)").Append(", turnback ").Append(AnyOrderKind("turnback") ? "TAK" : "NIE (zastepczo rally to me / hold)");
             sb.Append(" | motta przy szarzy ").Append(c != null && c.BattleChargeMottos ? "TAK" : "NIE").Append(' ').Append(_cMotto);
             sb.Append(" | okrzyki krolestwa gracza (129) ").Append(c != null && c.OwnKingdomWarCries ? "TAK" : "NIE").Append(": ludzi ").Append(_cKarda).Append(" z ").Append(_cKardaQ)
               .Append(" w kolejce, motto wodzow ").Append(_cKardaCap).Append(", wladca ").Append(PlayerKingdom() != null ? "TAK" : "NIE").Append(_kardaTest ? ", proba autotestu" : "");

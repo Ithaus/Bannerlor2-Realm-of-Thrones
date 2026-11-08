@@ -98,6 +98,10 @@ namespace Armoury
             public int Role, PostKind, EverRole;
             public bool Big, BigKnown, EverPost, EverThreat;
             public float LoneSec, PresentSec, DryUntil = -1000f;
+            // 359 (HeroCaution.Rally359.cs): wyjazd do uciekajacych - liczba wyjazdow, przerwa, dotarcie, srodek grupy
+            public int RallyRides;
+            public float RallyCool = -1000f, RallyArrived = -1f;
+            public Vec2 RallyC = Vec2.Invalid;
             public Vec2 Target = Vec2.Invalid;
             public WorldPosition Wp = WorldPosition.Invalid;
         }
@@ -481,6 +485,7 @@ namespace Armoury
                 if (man.Mode != ModeWounded)
                 {
                     if (man.Mode == ModePost) { Release(man); PostOff(man); }   // 335: ze stanowiska w rannego - nowa droga
+                    else if (man.Mode == ModeRally) { Release(man); RallyOff(man, now, Rally359End.Wound); }   // 359: wyjazd do uciekajacych - ranny wraca do swoich
                     Start(man, ModeWounded, now, hp, 0);
                 }
             }
@@ -488,8 +493,9 @@ namespace Armoury
             {
                 return;                                                   // 335: dowodca / glowa rodu - zagrozenie albo stanowisko (krok w GuardPass)
             }
-            else if (man.Mode == ModePost || man.Mode == ModeThreat)
+            else if (man.Mode == ModePost || man.Mode == ModeThreat || man.Mode == ModeRally)
             {
+                if (man.Mode == ModeRally) Rally359.RideOther++;          // 359
                 Release(man); PostOff(man);                               // 335: klucz NIE w trakcie
             }
             else if (man.Mode == ModeNone && now >= man.CoolUntil)
@@ -578,6 +584,7 @@ namespace Armoury
             var a = man.A;
             if (a == null || !a.IsActive()) return;
             if (man.Mode == ModePost) { PostPass(man, m, now); return; }   // 335: stanowisko dowodcy
+            if (man.Mode == ModeRally) { RallyStep(man, m, now, false); return; }   // 359: wyjazd do uciekajacych (krok 0.25 s)
             bool lone = man.Mode == ModeAlone || man.Mode == ModeThreat;   // 335: zagrozony dowodca jak samotny (postoj, powrot)
             if (man.St == StTravel)
             {
@@ -694,6 +701,7 @@ namespace Armoury
         private static void EndMode(Man man, int why)
         {
             if (man.Mode == ModeThreat || man.Mode == ModePost) GEnd[Math.Max(0, Math.Min(EKinds - 1, why))]++;   // 335: osobne liczniki
+            else if (man.Mode == ModeRally) { if (why == E143) Rally359.RideWound++; else Rally359.RideOther++; }   // 359: wyjazd przerwany (rana 143, panika, gracz, rozkaz)
             else if (why >= 0 && why < EKinds) EndWhy[why]++;
             man.PostKind = 0;
             man.Mode = ModeNone;
