@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 186 - 364 na 185 (Armoury.dll 10eb14c3 -> 46de0a6f = build 2ff303a9)
+**Test at-364 (kopia zapisu Jeffa 08.11 19:02, 20 dob):** kod 0, bledy CrashScribe 22 (norma), latki E4/8 24 z 24 (BRAK: -). "Patrole BK a werbunek zalog (364)": limit patrolu w 6-10 twierdzach/d, zatrzymane 18-34 ludzi/d (gracz 0 - Ashemark bez patrolu w tescie). "Wyrzutki: przepelnienie - do domu (zalogi N)": 30, 49, 43, 25, 32 ... spadek do 3-6/d w ostatnich dobach. "Zalogi gracza (364)": Ashemark 332/331 -> 331/331, werbunek 0, odeszli 1 (pierwsza doba); Goldentooth 69 -> 126 / 356, werbunek 3/d.
+**Kopie:** Armoury.dll.bak-2026-11-08-przed-wgranie186, D:/Backup-Bannerlord/wgrane/2026-11-08-wgranie186(-przed).
+**Status:** WGRANE (186).
+
+## 364 - pelny garnizon nie rekrutuje: autowerbunek zalogi liczy ludzi na patrolu BK (GarrisonPatrol364.cs, GarrisonArmory.MenOnPatrol, ArmsFromPeople, OverflowHome; klucz GarrisonCountsPatrols; commit 2ff303a9)
+**Problem (Jeff 08.11):** "ciage sa rekrutowani ludzi a potem jest ichwiecej niz moze turzymac garnizon i dezerteruja ... jak garnizon jest pelny to wiecej nie rekrutujemy". Log 17-05-55: "przepelnienie - do domu (zalogi 8-41/d)", powroty patroli BK +305..+799/d (169c).
+**Przyczyna:** BK HandleGarrison (bk.cs:100278) wysyla patrol z 30-50% zalogi (CreateParty bk.cs:84250); autowerbunek gry liczy miejsce = PartySizeLimit - obecni (cs_full.cs:187175) i dobiera w miejsce patrolu; powrot AddPatrolBehavior (bk.cs:96815) wrzuca caly patrol bez sprawdzenia limitu -> ponad PartySizeLimit -> gra zdejmuje 25% nadwyzki/d (cs_full.cs:64061), W4c odsyla do wsi, zloto werbunku przepada.
+**Zmiana:** postfiks (Priority.High, przed A5) na GarrisonRecruitmentCampaignBehavior.GetAutoRecruitmentGarrisonChangeExplainedNumber: cap = max(0, PartySizeLimit - NumberOfAllMembers - ludzie na patrolu BK tej twierdzy); LimitMax tylko gdy cap < LimitMaxValue i BaseNumber > 0. Linie "Patrole BK a werbunek zalog (364)" i "Zalogi gracza (364)" (stan/limit, patrol, werbunek, odeszli W4c, zold).
+**Ryzyko / co sprawdzic:** patrol zabity - zaloga 2-3 doby ponizej celu; nadmiar z innych zrodel (reczne dolozenie, spadek limitu) dalej odchodzi przez W4c; powrot patrolu i dezercja bez zmian.
+**Status:** WGRANE (186).
+
 ## WGRANIE 185 - 363 na 184 (Armoury.dll de23853f -> 10eb14c3 = build 3eb57d31) + MCM Jeffa MineRegaleShare 0.25
 **Test at-363 (kopia zapisu Jeffa 08.11 19:02, 40 dob):** kod 0, bledy CrashScribe 22 (norma), potkniecia 0, kontrola zlota i sztuk 363 = 0 co dobe, czas 0.1-0.4 ms. SKALA ZNIKOMA: wytworcow KS w zasiegu 150 tylko 3 (wszyscy lumberjack; clay_mine/lime_pit/quarry 0), z rekami 2, rece z pola 926 (3.6% rak tych okregow), drewno 108 szt./d, zloto 349 zl/d (109734); zamowien bez wytworcy w zasiegu ok. 191-211 tys. zl/d (396-479 zlecen). Projekt zakladal ok. 80 wytworcow - zasieg 150 i prog 5% rak zajecia odcinaja prawie wszystkich. Do decyzji: 363b (zasieg wozem jak Bloomery, nizszy prog, inne zajecia).
 **MCM Jeffa (decyzja Jeffa 08.11 "Mine Regale Share ... ustaw na 0.25"):** Armoury.json dopisany klucz "MineRegaleShare": 0.25 (wczesniej brak - domyslne 0.125); kopia Armoury.json.bak-2026-11-08-przed-regale025.
