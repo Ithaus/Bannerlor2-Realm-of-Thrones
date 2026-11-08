@@ -35,6 +35,11 @@ namespace Armoury
     ///    maja juz wlasne linie (DistrictWorks.AddView, SideVillageFief.AddLines) - w poprawkach pominiete, w ksiedze liczone.
     ///  - Panel Finance: dodatnie poprawki do przychodu, ujemne do wydatkow (tylko przy FinanceBox.In - nasze ksiegi liczace przychod rodu ich nie widza).
     /// Linia dobowa "Prognoza zlota gracza (345): dzien N | ..." - prognoza zrobiona na poczatku doby (koniec naszego taktu) wobec prawdziwej zmiany obiegu tej doby.
+    /// 361 (Jeff 08.11: "zuleny rozjad z tego co zarabiam a to co pokazuje" - komunikat gry "Daily Gold Change" to tylko wyplata rodu, bez naszego taktu doby):
+    ///  (a) komunikat "Today in total" po wyplacie rodu gracza (klucz GoldDailySummary): wyplata, takt doby i wozy prac od ostatniej wyplaty, zmiana kiesy od ostatniej wyplaty;
+    ///  (b) podatek warsztatow z kolejki Seal31B (po wyplacie) albo udzial x przewidywana wyplata warsztatow (przed wyplata) zamiast sredniej 3 dob;
+    ///  (c) linia kontrolna "Your purse actually changed" (srednia kiesy z dob ksiegi) poza suma; (d) danina od skarbca wsi (TownFolk.DaWorksRun) osobno, z ostatniej doby;
+    ///  (e) reszta warsztatow i wsi do wyplaty z mierzonego przyrostu zapasu (podglad tuz po wyplacie), przy < 3 pomiarach stara metoda.
     /// Kazdy blad liczony (potkniecia), bez globalnych wylacznikow. Watek gry.
     /// </summary>
     internal static class GoldForecast
@@ -57,6 +62,12 @@ namespace Armoury
             public int ClanN;
             // 352: krolestwo rodu gracza na poczatku naszego taktu tej doby (StringId; "" - rod bez krolestwa; null - nieznane: doba z zapisu sprzed 352)
             public string Kng;
+            // 361e: zmierzony przyrost zapasu warsztatow (GW) i wsi gracza (GV) od poprzedniej wyplaty (podglad tuz po niej) do tej (podglad tuz przed); GN - ile wyplat z pomiarem
+            public int GN;
+            public long GW, GV;
+            // 361b (recenzja): doba utworzona w TickBegin TEJ sesji (bez zapisu; doby z zapisu - false). Para (doba z zapisu, pierwsza doba sesji) nie wchodzi do udzialu
+            // podatku warsztatow: kolejka _otPay nie jest zapisywana - podatek od ostatniej wyplaty przed zapisem ginie albo pobiera go doba niezapisana.
+            public bool Fresh;
             public Dictionary<string, long> Laps = new Dictionary<string, long>(StringComparer.Ordinal);
         }
 
@@ -64,6 +75,7 @@ namespace Armoury
         private static DayRec _cur;                 // doba w toku (od TickBegin)
         private static long _purse0, _lapGold;
         private static bool _inTick;
+        private static bool _inTickEnd;             // 361d: Corrections() wolane z TickEnd (prognoza na te dobe)
         private static int _stamp;                  // zmiana historii - poprawki od nowa
         private static int _stumbles, _stumblesSess;
         private static string _clanDiag;            // linia wsi przy wyplacie (do linii dobowej)
@@ -83,8 +95,25 @@ namespace Armoury
         private static int _cmpN;
         private static long _cmpAbs, _cmpAbsT;
 
+        // 361a: komunikat "razem dzis" - stan od ostatniej wyplaty rodu gracza (tylko pamiec, bez zapisu: po wczytaniu pierwszy komunikat bez zmiany kiesy)
+        private static long _sumTick, _sumWorks;          // takt doby i wozy prac od ostatniej wyplaty
+        private static bool _sumTickSeen;                 // byl takt doby od ostatniej wyplaty (albo od wczytania)
+        private static long _purseAtPay = long.MinValue;  // kiesa tuz po ostatniej wyplacie; MinValue - nieznana (od wczytania nie bylo wyplaty)
+        // 361b: wyplata rodu gracza od poczatku ostatniego taktu doby (pusta kolejka podatku warsztatow = zero do pobrania, a nie "wyplata jeszcze przed nami")
+        private static bool _paySinceTick;
+        // 361e: podglad warsztatow i wsi gracza tuz PO ostatniej wyplacie (NaN godziny - nieznany: od wczytania nie bylo wyplaty)
+        private static long _postW, _postV;
+        private static double _postH = double.NaN;
+        private static HashSet<object> _postSet;    // 361e: warsztaty glowy rodu i wsie placace graczowi przy ostatniej wyplacie (zmiana zbioru - doba bez pomiaru)
+        // 361: opis nowych pozycji poprawek (ostatnie przeliczenie; w TickEnd kopiowany do linii dobowej)
+        private static string _diag361, _fc361;
+        private const string OtKey = "Seal31B.OwnerTaxDaily", HoardKey = "TownFolk.DaWorksRun";
+        private const int GrowMin = 3;
+
         internal static void Reset()
         {
+            _sumTick = _sumWorks = 0; _sumTickSeen = false; _purseAtPay = long.MinValue; _paySinceTick = false;
+            _postW = _postV = 0; _postH = double.NaN; _postSet = null; _diag361 = _fc361 = null;
             _hist.Clear(); _cur = null; _purse0 = 0; _lapGold = 0; _inTick = false; _stamp++;
             _fcHave = false; _fcTotal = _fcModel = _fcCorr = 0; _fcParts = null; _clanDiag = null; _fcKng = null; _fcKngDays = _fcCrownKeys = 0; _cacheKng = null;
             _fcKeys = null; _corrKeys = null; _lastPayH = double.NaN;
@@ -123,8 +152,9 @@ namespace Armoury
                     _stamp++;
                     Line(done);
                 }
-                _cur = new DayRec { Day = Today(), Kng = KngNow() };
+                _cur = new DayRec { Day = Today(), Kng = KngNow(), Fresh = true };
                 _purse0 = g; _lapGold = g; _inTick = true;
+                _sumTickSeen = true; _paySinceTick = false;   // 361a/b: takt doby od ostatniej wyplaty byl; kolejka podatku warsztatow pobrana w tym takcie
             }
             catch (Exception e) { _inTick = false; Stumble("TickBegin", e); }
         }
@@ -142,6 +172,7 @@ namespace Armoury
                 string k = Key(name);
                 long o; _cur.Laps.TryGetValue(k, out o); _cur.Laps[k] = o + d;
                 _cur.Tick += d;
+                if (IsWorksKey(k)) _sumWorks += d; else _sumTick += d;   // 361a (recenzja: prace okregu w takcie - pod "village works", jak w podpowiedzi)
             }
             catch (Exception e) { Stumble("Lap", e); }
         }
@@ -158,6 +189,7 @@ namespace Armoury
                 string k = Key(name);
                 long o; _cur.Laps.TryGetValue(k, out o); _cur.Laps[k] = o + d;
                 _cur.Tick += d;
+                if (IsWorksKey(k)) _sumWorks += d; else _sumTick += d;   // 361a
                 _lapGold += d;
             }
             catch (Exception e) { Stumble("NoteSub", e); }
@@ -178,13 +210,18 @@ namespace Armoury
                 _cacheHour = int.MinValue;   // poprawki z dzisiejsza historia
                 long all = (long)Math.Round(fin.CalculateClanGoldChange(Clan.PlayerClan, true, false, false).ResultNumber);
                 long corr = 0; var sb = new StringBuilder();
-                foreach (var c in Corrections())
+                List<Corr> cs;
+                _inTickEnd = true;
+                try { cs = Corrections(); }
+                finally { _inTickEnd = false; _cacheHour = int.MinValue; }   // 361d: podpowiedz liczy od nowa (danina z _cur, nie z historii)
+                foreach (var c in cs)
                 {
                     corr += c.Amt;
                     if (sb.Length > 0) sb.Append(", ");
                     sb.Append(c.Log).Append(' ').Append(c.Amt >= 0 ? "+" : "").Append(c.Amt);
                 }
                 _fcTotal = all; _fcCorr = corr; _fcModel = all - corr; _fcParts = sb.Length > 0 ? sb.ToString() : "-";
+                _fc361 = _diag361;   // 361: sposob liczenia nowych pozycji (Corrections tuz wyzej)
                 _fcKeys = _corrKeys != null ? new HashSet<string>(_corrKeys, StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
                 _fcKng = KngNow(); _fcKngDays = 0; _fcCrownKeys = 0;
                 // 352r (przeglad): bez krolestwa doby bez krolestwa (Kng "") nie sa "dobami w krolestwie" - N = 0 (G7)
@@ -194,6 +231,9 @@ namespace Armoury
             }
             catch (Exception e) { _fcHave = false; Stumble("TickEnd", e); }
         }
+
+        /// <summary>361a: modul prac okregu (DistrictWorks.Daily / BeforeProduction) - w komunikacie pod "village works" razem z wozami (podpowiedz ma dla nich wlasna linie).</summary>
+        private static bool IsWorksKey(string k) { return k != null && k.StartsWith("DistrictWorks.", StringComparison.Ordinal); }
 
         private static string Key(string name)
         {
@@ -242,7 +282,12 @@ namespace Armoury
         /// <summary>DistrictWorks.OnCartReturn: wyplata prac okregu glowie rodu przy powrocie wozu (poza taktem doby). Tylko gracz.</summary>
         internal static void NoteWorksCart(Hero leader, long got)
         {
-            try { if (got != 0 && leader != null && leader == Hero.MainHero && _cur != null && !_inTick) _cur.Works += got; }
+            try
+            {
+                if (got == 0 || leader == null || leader != Hero.MainHero || _inTick) return;
+                if (_cur != null) _cur.Works += got;
+                _sumWorks += got;   // 361a: komunikat "razem dzis" (takze przed pierwszym taktem po wczytaniu)
+            }
             catch (Exception e) { Stumble("NoteWorksCart", e); }
         }
 
@@ -345,6 +390,73 @@ namespace Armoury
                 _clanDiag = sb.ToString();
             }
             catch (Exception e) { Stumble("ClanTickPostfix", e); }
+            // 361e: podglad warsztatow i wsi gracza tuz PO wyplacie; przyrost tej doby = podglad przed ta wyplata - podglad po poprzedniej (tylko gdy odstep ~ doba:
+            // po wczytaniu gra ustala nowa godzine rozliczenia, pierwszy odstep jest dowolny - bez pomiaru). Bez CalculateClanGoldChange - te same odczyty co prefiks.
+            try
+            {
+                var fin = Campaign.Current != null ? Campaign.Current.Models.ClanFinanceModel : null;
+                double h = CampaignTime.Now.ToHours;
+                long wPost = fin != null ? WorkshopsNow(fin) : 0;
+                List<VilNow> vl2; long vPost, oth2;
+                VillagesNow(out vl2, out vPost, out oth2);
+                // recenzja (08.11): zbior warsztatow glowy rodu i wsi placacych graczowi - po sprzedazy / utracie / kupnie miedzy wyplatami roznica podgladow
+                // to nie przyrost, tylko wyplata calego obiektu (ProfitMade po wyplacie nie spada do zera) - wtedy doba bez pomiaru
+                var set = new HashSet<object>();
+                var pc = Clan.PlayerClan; var ld = pc != null ? pc.Leader : null;
+                if (ld != null && ld.OwnedWorkshops != null) foreach (Workshop ws in ld.OwnedWorkshops) if (ws != null) set.Add(ws);
+                if (vl2 != null) foreach (var x in vl2) if (x.ToMe && x.V != null) set.Add(x.V);
+                var d = _cur;
+                if (d != null && !double.IsNaN(_postH))
+                {
+                    double gap = h - _postH;
+                    bool same = _postSet != null && _postSet.SetEquals(set);
+                    if (gap >= 20 && gap <= 28 && same) { d.GN++; d.GW += __state.W - _postW; d.GV += __state.VMe - _postV; _stamp++; }
+                    else if (gap >= 20 && gap <= 28) Log.Info(P + "przyrost 361e: doba bez pomiaru - zmienil sie zbior warsztatow / wsi gracza od poprzedniej wyplaty");
+                }
+                _postW = wPost; _postV = vPost; _postH = h; _postSet = set;
+            }
+            catch (Exception e) { _postH = double.NaN; _postSet = null; Stumble("ClanTickPostfix(361e)", e); }
+            // 361a: komunikat "razem dzis" zaraz po komunikacie gry "Daily Gold Change" (ten pokazuje tylko wyplate rodu, bez naszego taktu doby)
+            try
+            {
+                long g = Gold(), c = g - __state.G0;
+                var s = Settings.Current;
+                if (s != null && s.GoldDailySummary) DailySummary(c, g);
+            }
+            catch (Exception e) { Stumble("ClanTickPostfix(361a)", e); }
+            finally
+            {
+                // stan "od ostatniej wyplaty" od nowa - takze przy wylaczonym komunikacie (wlaczenie w trakcie gry liczy od nastepnej wyplaty poprawnie)
+                try { _purseAtPay = Gold(); } catch { _purseAtPay = long.MinValue; }
+                _sumTick = 0; _sumWorks = 0; _sumTickSeen = false; _paySinceTick = true;
+                _stamp++;   // 361b (recenzja): kolejka podatku warsztatow i _paySinceTick zmienione - poprawki od nowa (takze bez doby w toku)
+            }
+        }
+
+        private static string Sg(long v) { return (v >= 0 ? "+" : "") + v.ToString("N0", Inv); }
+
+        /// <summary>361a: wlasny komunikat po wyplacie rodu gracza: wyplata, takt doby i wozy prac od ostatniej wyplaty, zmiana kiesy od ostatniej wyplaty i reszta
+        /// (handel, lupy, okupy). Kolejnosc taktu i wyplaty zalezy od godziny wczytania - liczone "od ostatniej wyplaty", nie od polnocy. Rzuca (wolajacy lapie).</summary>
+        private static void DailySummary(long pay, long g)
+        {
+            bool purse = _purseAtPay != long.MinValue;
+            var m = new StringBuilder("Today in total: daily payout ").Append(Sg(pay));
+            if (purse || _sumTickSeen) m.Append(", daily dues and duties ").Append(Sg(_sumTick));
+            else m.Append(", daily dues and duties: not counted yet since loading");
+            m.Append(", village works ").Append(Sg(_sumWorks));
+            long ch = 0, other = 0;
+            if (purse)
+            {
+                ch = g - _purseAtPay;
+                other = ch - pay - _sumTick - _sumWorks;
+                m.Append(" - your purse changed by ").Append(Sg(ch)).Append(" since the last payout (trade, loot, ransoms and other: ").Append(Sg(other)).Append(").");
+            }
+            else m.Append(". The change of your purse is shown from the next payout on.");
+            string text = m.ToString();
+            TaleWorlds.Library.InformationManager.DisplayMessage(new TaleWorlds.Library.InformationMessage(text, TaleWorlds.Library.Color.FromUint(0xFFE8C547u)));
+            Log.Info(P + "komunikat dobowy (361a): wyplata " + pay + ", takt doby od ostatniej wyplaty " + (purse || _sumTickSeen ? _sumTick.ToString(Inv) : "nieznany (po wczytaniu)")
+                     + ", wozy prac " + _sumWorks + ", kiesa od ostatniej wyplaty " + (purse ? ch.ToString(Inv) + ", inne " + other.ToString(Inv) : "nieznana (pierwsza wyplata po wczytaniu)")
+                     + " | tekst: " + text);
         }
 
         // ------------------------------------------------------------ odczyty modelu teraz (warsztaty, wsie wedlug regul BK)
@@ -478,26 +590,109 @@ namespace Armoury
                     res.Add(c);
                 }
                 // 2-4. srednie z wyplat rodu (doby z rozliczeniem)
+                var diag = new StringBuilder();
                 int np = 0; long sw = 0, sv = 0, sr = 0;
                 foreach (var d in _hist) if (d.ClanN > 0) { np++; sw += d.WPay / d.ClanN; sv += d.VMe / d.ClanN; sr += d.Resid / d.ClanN; }
-                if (np > 0)
+                // 361e: zmierzony przyrost zapasu warsztatow i wsi gracza miedzy wyplatami (ostatnie 7 pomiarow: historia i doba w toku)
+                int ng = 0; long gw = 0, gv = 0;
+                {
+                    var recs = new List<DayRec>(_hist);
+                    if (_cur != null) recs.Add(_cur);
+                    for (int i = recs.Count - 1; i >= 0 && ng < Days; i--)
+                    {
+                        var d = recs[i];
+                        if (d.GN <= 0) continue;
+                        ng++; gw += d.GW / d.GN; gv += d.GV / d.GN;
+                    }
+                }
+                bool grow = ng >= GrowMin;
+                double f = double.NaN;
+                if (!double.IsNaN(_lastPayH)) { try { f = (CampaignTime.Now.ToHours - _lastPayH) / 24.0; } catch { } }
+                if (!double.IsNaN(f)) { if (f < 0) f = 0; else if (f > 1) f = 1; }
+                int dwRest = 0;   // 361b: reszta warsztatow do wyplaty (do przewidywanej wyplaty warsztatow)
+                if (np > 0 || grow)
                 {
                     // 347 (test at346: "warsztaty do wyplaty" +1000..+2170 co dobe, a sam model + wsie do posiadaczy trafial w rozliczenie co do ~30 zl): stan "do tej chwili"
                     // rosnie przez dobe, wiec reszta do wyplaty = srednia wyplata x czesc doby, ktora jeszcze zostala do rozliczenia ((1 - f), f = godziny od ostatniej
                     // wyplaty / 24). Tuz przed wyplata f ~ 1 - model juz zawiera calosc, poprawka ~ 0. Bez znanej wyplaty od wczytania - bez poprawki (model jak jest).
-                    double f = double.NaN;
-                    if (!double.IsNaN(_lastPayH)) { try { f = (CampaignTime.Now.ToHours - _lastPayH) / 24.0; } catch { } }
+                    // 361e (diagnoza 08.11: w dobach, gdy zapas tylko splywa, srednia wyplata zawyzala reszte o 150-650): przy >= 3 pomiarach przyrostu reszta =
+                    // (1 - f) x sredni PRZYROST zapasu od wyplaty do wyplaty (po wyplacie zapas nie spada do zera - liczy sie tylko to, co dojdzie); mniej - stara metoda.
+                    // Wymog 3, nie 7 pomiarow: wyplata tuz po kazdym wczytaniu nie ma pomiaru (nowa godzina rozliczenia), wiec 7 z 7 oznaczaloby tydzien starej metody po wczytaniu.
                     if (!double.IsNaN(f))
                     {
-                        if (f < 0) f = 0; else if (f > 1) f = 1;
-                        int dw = (int)Math.Round((1.0 - f) * sw / np);
-                        if (dw != 0) res.Add(new Corr { Amt = dw, Log = "warsztaty do wyplaty", Txt = new TextObject("{=!}Workshops: rest of today's profit (payout " + Avg(np) + ")") });
-                        int dv = (int)Math.Round((1.0 - f) * sv / np);
-                        if (dv != 0) res.Add(new Corr { Amt = dv, Log = "wsie gracza do wyplaty", Txt = new TextObject("{=!}Village taxes: rest of today's sales (payout " + Avg(np) + ")") });
+                        long bw = grow ? gw : sw, bv = grow ? gv : sv; int bn = grow ? ng : np;
+                        string how = grow ? "growth since the last payout, " : "payout ";
+                        string lg = grow ? " (przyrost " + ng + " dob)" : " (srednia wyplata " + np + " dob)";
+                        int dw = (int)Math.Round((1.0 - f) * bw / bn);
+                        dwRest = dw;
+                        if (dw != 0) res.Add(new Corr { Amt = dw, Log = "warsztaty do wyplaty" + lg, Txt = new TextObject("{=!}Workshops: rest of today's profit (" + how + Avg(bn) + ")") });
+                        int dv = (int)Math.Round((1.0 - f) * bv / bn);
+                        if (dv != 0) res.Add(new Corr { Amt = dv, Log = "wsie gracza do wyplaty" + lg, Txt = new TextObject("{=!}Village taxes: rest of today's sales (" + how + Avg(bn) + ")") });
+                        diag.Append("reszta warsztatow/wsi ").Append(grow ? "z przyrostu" : "ze sredniej wyplaty").Append(" (1-f ").Append((1.0 - f).ToString("0.00", Inv))
+                            .Append(", przyrost ").Append(ng).Append(" pomiarow: warsztaty ").Append(ng > 0 ? (gw / ng).ToString(Inv) : "-").Append(", wsie ").Append(ng > 0 ? (gv / ng).ToString(Inv) : "-")
+                            .Append("; srednia wyplata ").Append(np).Append(" dob: warsztaty ").Append(np > 0 ? (sw / np).ToString(Inv) : "-").Append(", wsie ").Append(np > 0 ? (sv / np).ToString(Inv) : "-").Append(')');
                     }
-                    int dr = (int)Math.Round((double)sr / np);
-                    if (dr != 0) res.Add(new Corr { Amt = dr, Log = "inne roznice przy wyplacie", Txt = new TextObject("{=!}Other changes at the daily payout (" + Avg(np) + ")") });
+                    else diag.Append("reszta warsztatow/wsi: brak (od wczytania nie bylo wyplaty)");
+                    if (np > 0)
+                    {
+                        int dr = (int)Math.Round((double)sr / np);
+                        if (dr != 0) res.Add(new Corr { Amt = dr, Log = "inne roznice przy wyplacie", Txt = new TextObject("{=!}Other changes at the daily payout (" + Avg(np) + ")") });
+                    }
                 }
+                // 4b. 361b (diagnoza 08.11: podatek warsztatow to staly udzial ~28,8% ostatniej wyplaty warsztatow, pobierany w nastepnym takcie doby - srednia z 3 dob
+                // mylila sie o 600-1100 po skoku wyplaty): po wyplacie - kwota z kolejki Seal31B (naliczona, niepobrana; odczyt bez zmiany stanu); przed wyplata -
+                // udzial (podatek / wyplata poprzedniej doby, z historii) x przewidywana wyplata warsztatow (model teraz + reszta do wyplaty). Brak danych - jak dotad (srednia).
+                bool otDone = false;
+                try
+                {
+                    int otN; int pend = Seal31B.PendingOwnerTax(Hero.MainHero, out otN);
+                    if (pend >= 0)
+                    {
+                        if (otN > 0)
+                        {
+                            otDone = true;
+                            res.Add(new Corr { Amt = -pend, Log = "podatek warsztatow 361b (kolejka " + otN + ")", Txt = new TextObject("{=!}Workshop owner tax to the towns (on the last workshop payout)") });
+                            diag.Append("; podatek warsztatow z kolejki ").Append(-pend).Append(" (").Append(otN).Append(" migawek)");
+                        }
+                        else if (_paySinceTick)
+                        {
+                            otDone = true;   // wyplata juz byla, a kolejka pusta: nastepny takt nic nie pobierze
+                            diag.Append("; podatek warsztatow 0 (wyplata byla, kolejka pusta)");
+                        }
+                        else
+                        {
+                            // udzial: pary (wyplata warsztatow doby D-1, podatek w takcie doby D) - tylko kolejne doby z jedna wyplata (luka po wczytaniu - kolejka ginie)
+                            var recs = new List<DayRec>(_hist);
+                            if (_cur != null && !_inTick) recs.Add(_cur);
+                            long tp = 0, tt = 0; int pairs = 0;
+                            for (int i = 1; i < recs.Count; i++)
+                            {
+                                var a = recs[i - 1]; var b = recs[i];
+                                if (b.Day != a.Day + 1 || a.ClanN != 1 || a.WPay <= 0) continue;
+                                if (!a.Fresh && b.Fresh) continue;   // luka po wczytaniu (kolejka podatku nie jest zapisywana)
+                                long t; b.Laps.TryGetValue(OtKey, out t);
+                                tp += a.WPay; tt += -t; pairs++;
+                            }
+                            if (pairs > 0 && tp > 0)
+                            {
+                                otDone = true;
+                                double share = Math.Max(0.0, (double)tt / tp);
+                                long predW;
+                                var fin2 = Campaign.Current != null ? Campaign.Current.Models.ClanFinanceModel : null;
+                                if (!double.IsNaN(f)) predW = (fin2 != null ? WorkshopsNow(fin2) : 0) + dwRest;
+                                else predW = np > 0 ? sw / np : (fin2 != null ? WorkshopsNow(fin2) : 0);
+                                if (predW < 0) predW = 0;
+                                int a2 = -(int)Math.Round(share * predW);
+                                string pct = (100.0 * share).ToString("0.0", Inv);
+                                if (a2 != 0) res.Add(new Corr { Amt = a2, Log = "podatek warsztatow 361b (udzial " + pct + "% x " + predW + ")", Txt = new TextObject("{=!}Workshop owner tax to the towns (about " + pct + "% of the coming workshop payout)") });
+                                diag.Append("; podatek warsztatow z udzialu ").Append(pct).Append("% (").Append(pairs).Append(" par) x przewidywana wyplata ").Append(predW).Append(" = ").Append(a2);
+                            }
+                            else diag.Append("; podatek warsztatow: brak par w historii - srednia jak dotad");
+                        }
+                    }
+                    else diag.Append("; podatek warsztatow: D11-3 nieczynne - srednia jak dotad");
+                }
+                catch (Exception e) { otDone = false; Stumble("Corrections(361b)", e); }
                 // 5. nasz takt doby wedlug pozycji (srednia z dob historii; dzien bez wpisu = 0)
                 // 347 (test at346: okupy +12081 / -5859, wojna +9040, skarbiec zamku +3051 raz na 9 dob - srednia przenosila je na kazda dobe): do prognozy tylko
                 // pozycje regularne - MODUL (klucz taktu) obecny w co najmniej polowie dob historii; rzadsze (okupy, wojna, sprzedaze) - nieregularne, poza prognoza
@@ -531,6 +726,8 @@ namespace Armoury
                         {
                             if (!keys.Contains(kv.Key)) continue;
                             if (!same && IsCrownKey(kv.Key)) continue;   // 352: kwota korony tylko z dob w tym samym krolestwie (inne = 0)
+                            if (otDone && kv.Key == OtKey) continue;     // 361b: podatek warsztatow wyzej (kolejka albo udzial)
+                            if (kv.Key == HoardKey) continue;            // 361d: danina skarbcow wsi nizej (ostatnia doba)
                             bool shown; string lab = Label(kv.Key, out shown);
                             if (shown) continue;
                             long o; if (!sum.TryGetValue(lab, out o)) order.Add(lab);
@@ -543,8 +740,25 @@ namespace Armoury
                         if (a == 0) continue;
                         res.Add(new Corr { Amt = a, Log = lab, Txt = new TextObject("{=!}" + lab + " (" + Avg(na) + ")") });
                     }
+                    // 361d (diagnoza 08.11: danina od skarbca wsi - TownFolk.DaWorksRun, ok. 80% dawnego "Dues from your people" - splywa powoli z doby na dobe, a srednia
+                    // z 3 dob zostawala w tyle i zawyzala o 200-400): osobna linia, kwota z OSTATNIEJ doby historii (opoznienie 1 doby zamiast ok. 2; srednia wazona
+                    // tez by zostawala w tyle przy stalym spadku). Regula regularnosci 347c jak dla innych pozycji.
+                    // Recenzja (08.11): w podpowiedzi po takcie doby najswiezsza danina jest juz w _cur (doba w toku) - bierzemy ja; w TickEnd (_inTickEnd) _cur to
+                    // wlasnie mierzony takt (porownanie byloby z gory trafione) - wtedy ostatnia doba historii.
+                    if (keys.Contains(HoardKey))
+                    {
+                        long lastV;
+                        if (_cur != null && !_inTick && !_inTickEnd && _cur.Laps.ContainsKey(HoardKey)) lastV = _cur.Laps[HoardKey];
+                        else _hist[nd - 1].Laps.TryGetValue(HoardKey, out lastV);
+                        int a = (int)Math.Max(int.MinValue, Math.Min(int.MaxValue, lastV));
+                        bool sh; string lab = Label(HoardKey, out sh);
+                        if (a != 0 && !sh) res.Add(new Corr { Amt = a, Log = "danina skarbcow wsi 361d (ostatni takt)", Txt = new TextObject("{=!}" + lab + " (last daily tick)") });
+                        diag.Append("; danina skarbcow wsi z ostatniego taktu ").Append(a);
+                    }
                 }
+                if (otDone) keys.Add(OtKey);   // 361b: podatek warsztatow w prognozie zawsze (deterministyczny) - linia dobowa nie liczy go jako nieregularny
                 _corrKeys = keys;
+                _diag361 = diag.ToString();
             }
             catch (Exception e) { Stumble("Corrections", e); }
             _corr = res;
@@ -564,6 +778,41 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("AddTip", e); }
+            // 361c: linia kontrolna - ile kiesa NAPRAWDE zmieniala sie na dobe (srednia z ostatnich dob ksiegi, wszystko: takze handel, lupy, okupy). Poza suma:
+            // linia objasnienia z liczba 0 (ExplainedNumber.Add pomija 0, wiec wprost do objasnienia - wynik i Total bez zmian; liczba w tekscie). Przy < 3 dobach - brak.
+            try
+            {
+                if (!On || Raw) return;
+                int n = 0; long ps = 0;
+                for (int i = _hist.Count - 1; i >= 0 && n < Days; i--) { ps += _hist[i].Purse; n++; }
+                if (n < 3) return;
+                long avg = (long)Math.Round((double)ps / n);
+                InfoLine(ref r, "Your purse actually changed: " + Sg(avg) + " a day (" + Avg(n) + "; for comparison, not in the total)");
+            }
+            catch (Exception e) { Stumble("AddTip(361c)", e); }
+        }
+
+        private static bool _explDone;
+        private static FieldInfo _fExpl;
+        private static MethodInfo _mAddLine;
+        private static object _opAdd;
+
+        /// <summary>361c: linia objasnienia z liczba 0 (StatExplainer.AddLine) - nie zmienia BaseNumber ani wyniku. Brak pola / metody (inna wersja gry) - nic. Rzuca (wolajacy lapie).</summary>
+        private static void InfoLine(ref ExplainedNumber r, string text)
+        {
+            if (!_explDone)
+            {
+                _explDone = true;
+                _fExpl = AccessTools.Field(typeof(ExplainedNumber), "_explainer");
+                var t = _fExpl != null ? _fExpl.FieldType : null;
+                _mAddLine = t != null ? AccessTools.Method(t, "AddLine") : null;
+                var ot = t != null ? t.GetNestedType("OperationType", BindingFlags.Public | BindingFlags.NonPublic) : null;
+                _opAdd = ot != null ? Enum.Parse(ot, "Add") : null;
+            }
+            if (_fExpl == null || _mAddLine == null || _opAdd == null) return;
+            object ex = _fExpl.GetValue(r);   // kopia struktury, ale objasnienie to obiekt (referencja wspolna z r)
+            if (ex == null) return;           // bez opisow - nie ma gdzie dopisac
+            _mAddLine.Invoke(ex, new object[] { text, 0f, _opAdd });
         }
 
         /// <summary>Panel Finance ekranu rodu (tylko FinanceBox.In): dodatnie poprawki do przychodu, ujemne do wydatkow. Nie rzuca.</summary>
@@ -617,6 +866,7 @@ namespace Armoury
         private static readonly string[][] Labels =
         {
             new[] { "DistrictWorks.", "" }, new[] { "SideVillageFief.", "" },   // maja juz linie widoku (prace okregu, wioska poboczna)
+            new[] { "TownFolk.DaWorksRun", "Dues from village hoards (lord's share)" },   // 361d: danina od skarbca wsi (DaVillageDue) osobno
             new[] { "TownFolk.", "Dues from your people (surplus tax, lord's rights)" },
             new[] { "Seal31B.OwnerTaxDaily", "Workshop owner tax to the towns" },
             new[] { "KingdomTreasury.WageRefund", "Wage refund from the crown" },
@@ -707,6 +957,19 @@ namespace Armoury
                     if (ks.Count > 20) sb.Append(", ... (").Append(ks.Count - 20).Append(" wiecej)");
                 }
                 sb.Append(" | ").Append(_clanDiag ?? "rozliczenie: brak w tej dobie");
+                // 361: przewidywane vs naprawde dla nowych pozycji (podatek warsztatow: prognoza z TickEnd dotyczy wyplaty TEJ doby - porownac z kolejka teraz,
+                // ktora pobierze nastepny takt; w takcie tej doby pobrano podatek od wyplaty poprzedniej doby)
+                try
+                {
+                    long otNow, hoard; d.Laps.TryGetValue(OtKey, out otNow); d.Laps.TryGetValue(HoardKey, out hoard);
+                    int qn; int q = Seal31B.PendingOwnerTax(Hero.MainHero, out qn);
+                    sb.Append(" | 361: prognoza ").Append(_fcHave ? (_fc361 ?? "-") : "brak")
+                      .Append(" | naprawde: podatek warsztatow w takcie tej doby ").Append(otNow).Append(", kolejka po wyplacie tej doby (pobierze nastepny takt) ")
+                      .Append(q >= 0 ? (-q).ToString(Inv) + " (" + qn + " migawek)" : "D11-3 nieczynne")
+                      .Append(", danina skarbcow wsi ").Append(hoard)
+                      .Append(", przyrost tej doby (361e): ").Append(d.GN > 0 ? "warsztaty " + (d.GW / d.GN) + ", wsie " + (d.GV / d.GN) : "brak pomiaru");
+                }
+                catch (Exception e) { Stumble("Line(361)", e); }
                 if (_fcHave)
                     sb.Append(" | korona prognozy (352): krolestwo ").Append(string.IsNullOrEmpty(_fcKng) ? "brak" : _fcKng).Append(", dob historii w tym krolestwie ").Append(_fcKngDays)
                       .Append(", moduly korony w prognozie ").Append(_fcCrownKeys);
@@ -735,6 +998,8 @@ namespace Armoury
                       .Append(',').Append(d.VOther).Append(',').Append(d.Resid).Append(',').Append(d.Works).Append(',').Append(d.Purse).Append(',').Append(d.Tick);
                     // 352: 12. pole - krolestwo doby ("" - bez krolestwa); stary odczyt bierze pola 0-10 i to pomija; doba nieznana (null) zostaje nieznana
                     if (d.Kng != null) sb.Append(',').Append(d.Kng);
+                    // 361e: pola 13-15 - przyrost zapasu (tylko za polem krolestwa; stary odczyt bierze pola 0-11 i reszte pomija)
+                    if (d.Kng != null && d.GN > 0) sb.Append(',').Append(d.GN).Append(',').Append(d.GW).Append(',').Append(d.GV);
                     sb.Append('#');
                     bool first = true;
                     foreach (var kv in d.Laps) { if (!first) sb.Append(';'); first = false; sb.Append(kv.Key).Append('=').Append(kv.Value); }
@@ -764,6 +1029,12 @@ namespace Armoury
                             Tick = long.Parse(f[10], Inv),
                             Kng = f.Length > 11 ? f[11] : null   // 352: brak pola - zapis sprzed 352 (nieznane)
                         };
+                        if (f.Length > 14)   // 361e: przyrost zapasu (brak - zapis sprzed 361, doba bez pomiaru)
+                        {
+                            int gn; long gw, gv;
+                            if (int.TryParse(f[12], NumberStyles.Integer, Inv, out gn) && long.TryParse(f[13], NumberStyles.Integer, Inv, out gw)
+                                && long.TryParse(f[14], NumberStyles.Integer, Inv, out gv) && gn > 0) { d.GN = gn; d.GW = gw; d.GV = gv; }
+                        }
                         if (h >= 0 && h + 1 < rec.Length)
                             foreach (var kv in rec.Substring(h + 1).Split(';'))
                             {

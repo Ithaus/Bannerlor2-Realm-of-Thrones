@@ -11644,6 +11644,10 @@ namespace Armoury
         [SettingPropertyGroup("Expected gold shows what really comes (345)")]
         public bool GoldForecastReal { get; set; } = true;
 
+        [SettingPropertyBool("Gold Daily Summary", HintText = "Right after the game's 'Daily Gold Change' message (which shows only the daily payout of your clan), a second message adds it all up: the daily payout, the daily dues and duties, the village works (carts and district works), and how much your purse really changed since the last payout (the rest is trade, loot, ransoms and other). Display only. Off = no message", RequireRestart = false)]
+        [SettingPropertyGroup("Expected gold shows what really comes (345)")]
+        public bool GoldDailySummary { get; set; } = true;
+
         [SettingPropertyBool("Land Dues Follow Title Holder", HintText = "The crown dues, the soldiers' pay caps and the land price of a clan count a village's tax for the clan that really gets it: when Banner Kings pays the tax to the village's title holder in another clan, it counts for that clan; a title with no living holder counts for nobody (Banner Kings burns that tax). Off = the tax counts for the village's holder as before", RequireRestart = false)]
         [SettingPropertyGroup("Expected gold shows what really comes (345)")]
         public bool LandDuesFollowTitleHolder { get; set; } = true;
@@ -14562,6 +14566,7 @@ namespace Armoury
             s.Buildings338Studs = Buildings338Studs;
             s.Buildings338CastleMines = Buildings338CastleMines;
             s.GoldForecastReal = GoldForecastReal;
+            s.GoldDailySummary = GoldDailySummary;
             s.LandDuesFollowTitleHolder = LandDuesFollowTitleHolder;
             s.VillageTaxToLandHolder = VillageTaxToLandHolder;
         }

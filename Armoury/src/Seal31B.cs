@@ -1071,6 +1071,18 @@ namespace Armoury
             finally { _clanCap0.Clear(); }
         }
 
+        /// <summary>361b (GoldForecast, tylko widok): podatek warsztatow wlasciciela o naliczony przy ostatniej wyplacie rodu, a jeszcze niepobrany (kolejka _otPay,
+        /// pobierze ja nastepny OwnerTaxDaily). Odczyt BEZ zmiany stanu. n - liczba migawek. -1 - D11-3 nieczynne (nic nie bedzie pobrane).</summary>
+        internal static int PendingOwnerTax(Hero o, out int n)
+        {
+            n = 0;
+            if (o == null || !OwnerTaxLive || !Live) return -1;
+            long s = 0;
+            foreach (var p in _otPay)
+                if (p != null && ReferenceEquals(p.Owner, o) && p.Tax > 0) { s += p.Tax; n++; }
+            return (int)Math.Min(int.MaxValue, s);
+        }
+
         /// <summary>
         /// D11-3, ArmouryBehavior raz na dobe po PopulationLaw.Daily, przed RentMerge (w bloku ksiegi - zmiane kas miast lapie migawka rent): kazdy warsztat
         /// lorda albo gracza w cudzym miescie placi podatek BK (GetWorkshopTaxes - kwota linii 'Taxes from') - czesc autonomii do kasy miasta (zdarzenie gry),
