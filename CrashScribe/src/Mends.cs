@@ -1682,7 +1682,24 @@ namespace CrashScribe
                 if (!__result || assignment == null) return;
                 var co = Traverse.Create(assignment).Property("Character").GetValue() as CharacterObject;
                 if (co == null || co.IsHero) return;
-                if (!CanUse(co, equipment.Item)) __result = false;
+                if (!CanUse(co, equipment.Item)) { __result = false; return; }
+                // 365 (b): jezdzcowi narzedzie chlopskie nie jest bronia - DTE od razu siegnie po nastepna wlocznie/lance z polki (strict=false i
+                // ByItemEnumType wolaja IsWeaponSuitable). Tylko jezdzcy: piechote rozstrzyga SkillLawWard (zna wzorzec i reszte broni czlowieka).
+                // "Jezdziec" = NA KONIU w tym przydziale, nie tylko konny wzorzec: DTE IsMounted patrzy wylacznie na ReferenceEquipment slot 10, a
+                // AssignHorseAndHarness przerywa, gdy zabraknie koni - czlowiek z konnego wzorca stoi wtedy pieszo i zostaje piechurem (DoAssignAsync
+                // daje konie PRZED bronia, wiec slot 10 jest tu juz ustalony). CanUse konia jak SkillLawWard krok 5 (kon ponad Jazde schodzi).
+                if (FarmTool(equipment.Item))
+                {
+                    bool mounted = false;
+                    try { mounted = Traverse.Create(assignment).Property("IsMounted").GetValue<bool>(); } catch { mounted = false; }
+                    if (mounted)
+                    {
+                        ItemObject hz = null;
+                        try { hz = Traverse.Create(assignment).Method("GetEquipmentFromSlot", EquipmentIndex.ArmorItemEndSlot).GetValue<EquipmentElement>().Item; }
+                        catch { hz = null; }
+                        if (hz != null && CanUse(co, hz)) __result = false;
+                    }
+                }
             }
             catch { }
         }
@@ -1692,6 +1709,9 @@ namespace CrashScribe
             public Traverse Ta; public CharacterObject Co; public int Slot; public EquipmentElement Held; public bool Gap;
             public string Group; public string Type; public bool Mounted; public int Skill; public int Order; public int Pick = -1;
             public bool Extra;   // bron, ktorej wzorzec oddzialu w tej grupie NIE MA - dodatek DTE (AssignExtraEquipments)
+            public int OtherMelee;  // 365: ile INNYCH slotow 0-3 tego czlowieka ma bron biala (MeleeArm) - ostatnia deska piechura T2+
+            public bool OnHorse;    // 365: konny wzorzec (Mounted) I kon w slocie 10, ktorego umie dosiasc - jezdziec dla reguly narzedzi chlopskich
+            public bool FarmRej;    // 365: w kroku 3 odrzucono temu slotowi narzedzie chlopskie
         }
         private sealed class WardSup
         {
@@ -1766,6 +1786,90 @@ namespace CrashScribe
             return true;
         }
 
+        // ---- 365 NARZEDZIA CHLOPSKIE (Jeff 08.11, zrzut bitwy: Westerlands Scout konno z widlami) ----
+        // Widly wnosza do zbrojowni lorda rekruci (vlandian_recruit ma peasant_pitchfork_1_t1 we wzorcu ROT). DTE (strict=false, dodatki, losowy
+        // fallback) i nasz SkillLawWard (krok 3: tylko CanUse i MountOk) wydawaly je kazdemu - widly przechodza MountOk jak wlocznia.
+        // Lista sprawdzona grepem po Modules/*/ModuleData (08.11): wszystkie bronie "peasant_" sa w SandBoxCore/ModuleData/items/weapons.xml -
+        // peasant_maul_t1, peasant_maul_t1_2, peasant_pickaxe_1_t1, peasant_hatchet_1_t1, peasant_sickle_1_t1, peasant_hammer_1_t1,
+        // peasant_hammer_2_t1, peasant_2haxe_1_t1, peasant_pitchfork_1_t1, peasant_pitchfork_2_t1, peasant_polearm_1_t1 (kosa). ROT i RBM nie dodaja
+        // zadnej broni peasant_ (jedyne inne trafienie: peasant_costume - zbroja, odpada na WeaponComponent). military_fork_* to bron wojskowa - nie lapiemy.
+        internal static bool FarmTool(ItemObject it)
+        {
+            try { return it != null && it.HasWeaponComponent && it.StringId != null && it.StringId.StartsWith("peasant_", StringComparison.Ordinal); }
+            catch { return false; }
+        }
+
+        // pamiec: czy wlasny wzorzec oddzialu (BattleEquipments, sloty 0-3) ma narzedzie chlopskie w danej grupie (WardGroup) - pod zamkiem, bo
+        // DoAssignAsync idzie na watku roboczym; czyszczona na starcie kazdej kampanii (FarmResetSession z konstruktora MendsBehavior) - klucze to
+        // CharacterObject danej kampanii, a Army175 (AfterRegister) moze zestawy przepisac
+        private static readonly System.Collections.Generic.Dictionary<CharacterObject, System.Collections.Generic.HashSet<string>> _farmTpl =
+            new System.Collections.Generic.Dictionary<CharacterObject, System.Collections.Generic.HashSet<string>>();
+        private static readonly object _farmLock = new object();
+
+        internal static void FarmResetSession()
+        {
+            lock (_farmLock) { _farmTpl.Clear(); }
+            WardFarmRider = 0; WardFarmFoot = 0; WardFarmRiderBare = 0; WardFarmFootBare = 0; WardFarmRiderNaked = 0;
+        }
+
+        private static bool FarmInTemplate(CharacterObject co, string group)
+        {
+            if (co == null || group == null) return false;
+            System.Collections.Generic.HashSet<string> set;
+            lock (_farmLock) { if (_farmTpl.TryGetValue(co, out set)) return set.Contains(group); }
+            set = new System.Collections.Generic.HashSet<string>();
+            try
+            {
+                foreach (var eq in co.BattleEquipments)
+                {
+                    if (eq == null) continue;
+                    for (int s = 0; s <= 3; s++)
+                    {
+                        ItemObject x = null; try { x = eq[(EquipmentIndex)s].Item; } catch { }
+                        if (FarmTool(x)) set.Add(WardGroup(x));
+                    }
+                }
+            }
+            catch { }
+            lock (_farmLock) { _farmTpl[co] = set; }
+            return set.Contains(group);
+        }
+
+        /// <summary>365: czy wolno dac temu zolnierzowi narzedzie chlopskie it (sloty broni 0-3); mounted = NA KONIU (WardDemand.OnHorse). Jezdziec - nigdy (widly z siodla to nie bron jazdy, a
+        /// zaden wzorzec konny ROT ich nie ma). Piechur - gdy jego WLASNY wzorzec ma narzedzie chlopskie w tej grupie broni (jak Army175Gear.PeasantOk: oryginal
+        /// tez peasant_ - rekrut, milicja ROT z widlami), albo gdy to rekrut / tier <= 1 / milicja kultury (CharacterObject.Tier: ceil((Level-5)/5), rekrut
+        /// lvl 6 = 1, milicja lvl 11 = 2 - dlatego milicja po nazwie z kultury, nie po tierze). Reszta - nie (ostatnia deska jest w SkillLawWard, nie tutaj).</summary>
+        internal static bool FarmToolOk(CharacterObject co, ItemObject it, bool mounted)
+        {
+            if (!FarmTool(it)) return true;
+            if (mounted) return false;
+            if (co == null) return true;
+            try
+            {
+                if (FarmInTemplate(co, WardGroup(it))) return true;
+                if (co.Tier <= 1) return true;
+                var cu = co.Culture;
+                if (cu != null && (cu.BasicTroop == co || cu.MeleeMilitiaTroop == co || cu.RangedMilitiaTroop == co)) return true;
+            }
+            catch { return true; }   // blad odczytu - jak przed 365 (nie odbieramy broni na slepo)
+            return false;
+        }
+
+        /// <summary>365: INNA BRON BIALA w slotach 0-3 (jednoreczna, dwureczna, drzewcowa; nie narzedzie chlopskie) - do "ostatniej deski" piechura T2+.
+        /// Wszystkie narzedzia peasant_ to bron biala, wiec zastepstwem moze byc tylko bron biala: luk, kusza, oszczep czy proch sie nie licza -
+        /// lucznik T2+, ktorego jedyna bron biala to sierp z polki, zatrzymuje sierp (inaczej w zwarciu walczy piesciami, a podloga GearFit go nie
+        /// zlapie, bo ma luk). Rzucane z trybem walki wrecz (toporki) tez sie nie licza - ostroznie, na korzysc zatrzymania narzedzia.</summary>
+        private static bool MeleeArm(ItemObject it)
+        {
+            if (it == null || !it.HasWeaponComponent || FarmTool(it)) return false;
+            var ty = it.ItemType;
+            return ty == ItemObject.ItemTypeEnum.OneHandedWeapon || ty == ItemObject.ItemTypeEnum.TwoHandedWeapon || ty == ItemObject.ItemTypeEnum.Polearm;
+        }
+
+        // liczniki 365 do WardReport (linia "Straz unikatow", dopisek NA KONCU): sloty, w ktorych SkillLawWard odrzucil narzedzie chlopskie (jezdzcy na
+        // koniu / piechota T2+ spoza wzorca), ile z nich zostalo pustych i ilu jezdzcow nie mialo innej broni bialej (te sloty ida jako PUSTE - widoczne)
+        internal static int WardFarmRider, WardFarmFoot, WardFarmRiderBare, WardFarmFootBare, WardFarmRiderNaked;
+
         /// <summary>Postfix na DoAssignAsync: JEDNO DOPASOWANIE CALEJ PARTII - ten sam
         /// algorytm co kwatermistrz (QuartermasterLaw.FitFor): najsilniejszy pierwszy,
         /// najtrudniejsza uzyteczna sztuka pierwsza. Dlaczego nie per zolnierz (stara
@@ -1830,6 +1934,7 @@ namespace CrashScribe
 
                     var heldGroups = new System.Collections.Generic.Dictionary<string, int>();   // grupy broni na czlowieku
                     var freeSlots = new System.Collections.Generic.List<int>();
+                    int dStart = demands.Count;   // 365: popyt tego czlowieka zaczyna sie tutaj (OtherMelee, OnHorse nizej)
                     for (int s = 0; s <= 9; s++)
                     {
                         if (s == 4) continue;                                   // sztandar
@@ -1883,6 +1988,22 @@ namespace CrashScribe
                             Ta = ta, Co = co, Slot = s, Held = el, Group = WardGroup(it), Type = it.ItemType.ToString(),
                             Mounted = mounted, Skill = co.GetSkillValue(skill), Order = demands.Count, Extra = extra
                         });
+                    }
+                    // 365: inna bron biala na tym czlowieku (stan po DTE, przed krokiem 3) - piechur T2+ z mieczem traci widly spoza wzorca,
+                    // piechur, ktory poza nimi nie ma innej broni bialej, je zatrzymuje (ostatnia deska: bezbronny w zwarciu = trup, a sztuka i tak jest
+                    // jego z polki). Jezdziec = na koniu: konny wzorzec (mounted, juz po ZB-5b) I kon w slocie 10, ktorego umie dosiasc (krok 5 zdejmuje
+                    // konia ponad Jazde) - DTE IsMounted patrzy tylko na wzorzec, a przy braku koni AssignHorseAndHarness przerywa i czlowiek stoi pieszo.
+                    // MountOk zostaje na Mounted (jak przed 365 - bez regresji).
+                    bool[] arm = new bool[4];
+                    for (int s = 0; s <= 3; s++) { try { arm[s] = MeleeArm(eq[(EquipmentIndex)s].Item); } catch { arm[s] = false; } }
+                    bool onHorse = false;
+                    if (mounted) { try { var hz = eq[(EquipmentIndex)10].Item; onHorse = hz != null && CanUse(co, hz); } catch { onHorse = false; } }
+                    for (int k = dStart; k < demands.Count; k++)
+                    {
+                        int oa = 0;
+                        for (int s = 0; s <= 3; s++) if (s != demands[k].Slot && arm[s]) oa++;
+                        demands[k].OtherMelee = oa;
+                        demands[k].OnHorse = onHorse;
                     }
                     // LUKI W STRZELECKIM: wzorzec ma luk/kolczan/oszczep, ktorego DTE nie dal
                     // (sufit tieru wzorzec+2, kolejnosc) - popyt na wolny slot, sztuka z polki wedle skilla
@@ -1957,6 +2078,9 @@ namespace CrashScribe
                         var ci = s.El.Item;
                         if (!CanUse(d.Co, ci)) continue;
                         if (d.Mounted && d.Slot <= 3 && !MountOk(ci)) continue;
+                        // 365 (a): narzedzie chlopskie - jezdziec na koniu nigdy, piechur wedlug FarmToolOk, piechur T2+ spoza wzorca tylko gdy nie ma innej
+                        // broni bialej (ostatnia deska). Odrzucona sztuka wraca na polke krokiem 4 (noszona bez Taken = AddEquipmentToAssign).
+                        if (d.Slot <= 3 && FarmTool(ci) && !FarmToolOk(d.Co, ci, d.OnHorse) && (d.OnHorse || d.OtherMelee > 0)) { d.FarmRej = true; continue; }
                         s.Taken++; d.Pick = i; break;
                     }
                 }
@@ -1975,13 +2099,31 @@ namespace CrashScribe
                 var emptyWho = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, int>>();
                 var emptyGroupOf = new System.Collections.Generic.Dictionary<string, string>();
                 bool diagParty = who != null && who == MobileParty.MainParty && !pv;   // 133a: diagnostyka "PUSTE" tylko w bitwie
+                int farmRider = 0, farmFoot = 0, farmRiderBare = 0, farmFootBare = 0, farmRiderNaked = 0;   // 365
                 foreach (var d in demands)
                 {
+                    if (d.FarmRej) { if (d.OnHorse) farmRider++; else farmFoot++; }
                     if (d.Pick < 0)
                     {
                         // nic uzytecznego: sztuka ponad skill juz wrocila na polke (krok wyzej), slot pusty
                         if (!d.Gap) { try { d.Ta.Method("SetEquipment", (EquipmentIndex)d.Slot, default(EquipmentElement)).GetValue(); } catch { } }
-                        if (d.Extra) { extras++; continue; }                    // dodatek DTE spoza wzorca - nie "pusty"
+                        if (d.Extra)                                             // dodatek DTE spoza wzorca - nie "pusty"
+                        {
+                            extras++;
+                            if (d.FarmRej) { if (d.OnHorse) farmRiderBare++; else farmFootBare++; }   // 365: widly z dodatku DTE tez licz jako pusty slot
+                            continue;
+                        }
+                        // 365: slot pusty, bo w grupie zostalo tylko narzedzie chlopskie, ktorego temu czlowiekowi nie dajemy. CICHO (nie "PUSTE", nie
+                        // emptyByType, nie zolte "QM: ... EMPTY") tylko gdy czlowiek ma inna bron biala: to nasza regula, nie brak w zbrojowni, a kwatermistrz
+                        // liczy na papierze bez niej - "nic uzytecznego na polce" przy lezacych widlach i mieczu w drugim slocie bylby falszywy (jak dodatki
+                        // DTE wyzej). Jezdziec na koniu BEZ innej broni bialej to prawdziwy brak broni dla jazdy - idzie dalej jako PUSTE (gracz ma to
+                        // widziec), a osobno w liczniku "bez innej broni bialej". Piechur T2+ tu zawsze ma inna bron biala (warunek odrzucenia w kroku 3).
+                        if (d.FarmRej)
+                        {
+                            if (d.OnHorse) farmRiderBare++; else farmFootBare++;
+                            if (d.OtherMelee > 0) continue;
+                            farmRiderNaked++;
+                        }
                         if (d.Type == "Arrows" || d.Type == "Bolts") keptAmmo++; else kept++;
                         int n; emptyByType.TryGetValue(d.Type, out n); emptyByType[d.Type] = n + 1;
                         if (diagParty)
@@ -2096,14 +2238,26 @@ namespace CrashScribe
                     }
                     catch { }
                 }
-                if (!pv && (moved > 0 || filled > 0 || kept > 0 || keptAmmo > 0 || extras > 0))
+                if (!pv && (farmRider > 0 || farmFoot > 0))
+                {
+                    // 365: suma na bitwe do WardReport (watek roboczy - Interlocked)
+                    System.Threading.Interlocked.Add(ref WardFarmRider, farmRider);
+                    System.Threading.Interlocked.Add(ref WardFarmFoot, farmFoot);
+                    System.Threading.Interlocked.Add(ref WardFarmRiderBare, farmRiderBare);
+                    System.Threading.Interlocked.Add(ref WardFarmFootBare, farmFootBare);
+                    System.Threading.Interlocked.Add(ref WardFarmRiderNaked, farmRiderNaked);
+                }
+                if (!pv && (moved > 0 || filled > 0 || kept > 0 || keptAmmo > 0 || extras > 0 || farmRider > 0 || farmFoot > 0))
                 {
                     string types = "";
                     foreach (var kv in emptyByType) types += (types.Length > 0 ? ", " : "") + kv.Key + " " + kv.Value;
                     Scribe.Line("Mends: swieta zasada skilli w DTE [" + (who != null ? who.Name.ToString() : "?") + ", " + demands.Count
                                 + " slotow]: " + moved + " sztuk przelozonych wedle skilla (najsilniejszy pierwszy), " + filled
                                 + " luk zapelnionych z polki, " + (kept + keptAmmo) + " slotow PUSTYCH - nic uzytecznego na polce"
-                                + (types.Length > 0 ? " (" + types + ")" : "") + ", " + extras + " dodatkow DTE spoza wzorca zdjetych cicho.");
+                                + (types.Length > 0 ? " (" + types + ")" : "") + ", " + extras + " dodatkow DTE spoza wzorca zdjetych cicho"
+                                + " | 365 narzedzia chlopskie odrzucone: jezdzcy " + farmRider + ", piechota T2+ " + farmFoot
+                                + " (slot zostal pusty: jezdzcy " + farmRiderBare + ", piechota " + farmFootBare
+                                + "; jezdzcy bez innej broni bialej - PUSTE " + farmRiderNaked + ").");
                 }
                 // GRACZ MA TO WIDZIEC NA EKRANIE (Jeff 14.09: "info mowi, ze wszystko
                 // okay, a stoja bez kolczanow") - krotko, tylko jego partia
@@ -6375,16 +6529,21 @@ namespace CrashScribe
         {
             try
             {
-                if (WardBlades == 0 && WardArmour == 0 && WardStumbles == 0 && WardForeign == 0 && WardSubLegend == 0 && WardSubGiant == 0 && WardFootRiders == 0 && WardSkillFoot == 0) return;
+                if (WardBlades == 0 && WardArmour == 0 && WardStumbles == 0 && WardForeign == 0 && WardSubLegend == 0 && WardSubGiant == 0 && WardFootRiders == 0 && WardSkillFoot == 0
+                    && WardFarmRider == 0 && WardFarmFoot == 0) return;
                 // GearFit (noc 15/16.10): dopisek NA KONCU - zamiennik obcej z polki rozdzielacza / bez zamiennika (slot pusty; Z + B = sztuk z polki, reszta ze wzorca)
                 Scribe.Line("Straz unikatow: " + WardBlades + " klng/unikatow zdjetych z przydzialu DTE, "
                             + WardArmour + " sztuk pancerza cofnietych do wzorca oddzialu, "
                             + WardForeign + " sztuk zza Waskiego Morza wroconych na polke, "
                             + WardStumbles + " potkniec | zamiennik z polki (GearFit) " + WardForeignSub + ", bez zamiennika (slot pusty, podloga Armoury) " + WardForeignBare
                             + ", ze wzorca (Gear Fit Realm From Stores wylaczone albo brak puli) " + WardForeignTpl + "."
-                            + " | ZB: zamiennik pominal legendy " + WardSubLegend + ", sprzet olbrzymow " + WardSubGiant + "; jezdzcy pieszo (kryjowka/oblezenie) " + WardFootRiders + ", w dopasowaniu umiejetnosci " + WardSkillFoot + ".");
+                            + " | ZB: zamiennik pominal legendy " + WardSubLegend + ", sprzet olbrzymow " + WardSubGiant + "; jezdzcy pieszo (kryjowka/oblezenie) " + WardFootRiders + ", w dopasowaniu umiejetnosci " + WardSkillFoot + "."
+                            + " | 365 narzedzia chlopskie odrzucone: jezdzcy " + WardFarmRider + ", piechota T2+ " + WardFarmFoot
+                            + " (slot zostal pusty: jezdzcy " + WardFarmRiderBare + ", piechota " + WardFarmFootBare
+                            + "; jezdzcy bez innej broni bialej - PUSTE " + WardFarmRiderNaked + ").");
                 WardBlades = 0; WardArmour = 0; WardStumbles = 0; WardForeign = 0; WardForeignSub = 0; WardForeignBare = 0; WardForeignTpl = 0;
                 WardSubLegend = 0; WardSubGiant = 0; WardFootRiders = 0; WardSkillFoot = 0;
+                WardFarmRider = 0; WardFarmFoot = 0; WardFarmRiderBare = 0; WardFarmFootBare = 0; WardFarmRiderNaked = 0;
             }
             catch { }
         }
@@ -6620,7 +6779,7 @@ namespace CrashScribe
     internal sealed class MendsBehavior : CampaignBehaviorBase
     {
         // B6b: stan oblezenia Harrenhal od zera przy kazdej nowej grze i wczytaniu (zachowanie tworzone w OnGameStart); B6c: tak samo Mur
-        public MendsBehavior() { Mends.HarrenhalResetSession(); Mends.WallResetSession(); Mends.ResetBkEducationCheck(); SaiStrength353.Reset(); }   // E8/M: linia jezyka gracza raz na gre; 353: pamiec sily wrogow SAI od zera
+        public MendsBehavior() { Mends.HarrenhalResetSession(); Mends.WallResetSession(); Mends.ResetBkEducationCheck(); SaiStrength353.Reset(); Mends.FarmResetSession(); }   // E8/M: linia jezyka gracza raz na gre; 353: pamiec sily wrogow SAI od zera
 
         public override void RegisterEvents()
         {

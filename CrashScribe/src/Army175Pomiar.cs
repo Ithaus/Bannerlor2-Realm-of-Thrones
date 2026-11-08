@@ -179,6 +179,7 @@ namespace CrashScribe
                         if (need <= 0) break;
                         if (s.Left <= 0 || !Mends.CanUse(d.Co, s.Item)) continue;
                         if (d.Mounted && !Mends.MountOk(s.Item)) continue;
+                        if (d.Mounted && Mends.FarmTool(s.Item)) continue;   // 365: jezdzcowi narzedzie chlopskie nie jest sztuka (SkillLawWard krok 3, SuitableWard)
                         int take = Math.Min(need, s.Left);
                         s.Left -= take; need -= take;
                     }
