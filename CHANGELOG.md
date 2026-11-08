@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 190 - 367a na 189 (Armoury.dll 7e8d910a -> 52d1aeaf = build 16e8c1c1); CrashScribe d7fbd602 bez zmian
+**Test at-367 (kopia zapisu Jeffa 08.11 23:00, 10 dob):** kod 0, bledy CrashScribe 23 (norma), linia startu "ROKOWANIA (366): rozmowa wpieta ... | 367 roszczenia wasali TAK (lata 5)", brak bledow CaptiveTerms/CanonCompanions i brak "IsMarriageAdequate/GetSpouseScore nieznalezione". Samej rozmowy autotest nie przechodzi (krol w niewoli gracza) - do sprawdzenia w grze: linia "ROKOWANIA (367): spis roszczen" (kto trzyma tytuly zamkow Jeffa, ceny, zgody, pary slubne).
+**367b (przejscie pod korone jenca z lennami) NIE w tym wgraniu** - odlozone do audytu fabuly ROT (CanonThroneWars, StorylineWars, WarTruce na rod).
+**Kopie:** Armoury.dll.bak-2026-11-09-przed-wgranie190, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie190(-przed).
+**Status:** WGRANE (190).
+
 ## 367a - rokowania z wielkim jencem, etap 2a: krol pyta wasali, ile chca za tytuly (zloto albo slub) (CaptiveTerms.Claims.cs nowy, CaptiveTerms.cs, LandSale.CanonSeat internal; klucze CaptiveTermsVassalTitles, CaptiveTitleClaimYears; NIE WGRANE)
 **Decyzja Jeffa 09.11:** "rob etap 2, okup niech zostanie jak jest, plus krol musi zrekompensowac lordom strate wiec zapyta ich ile chca zlota za swoje tytuly i jesli sie zgodza, to warunki sa bardzo wygorowane i zalezy od charyzmy i ilosci zlota, moze byc tez tak, ze pod warunkiem ze wezme slub z corka jakiegos lorda jesli ma, generalnie jakby to bylo historycznie".
 **Problem:** w 366 "Confirm my conquests" przenosi tylko tytuly krola i jego rodu. U Jeffa (log 08.11 :113553, linia 354) wsie Oxcross i Toothmarket trzyma de iure Leo Lefford, Ashemark Mines i Tumblestone - Damon Marbrand: zostaja przy nich, krol nie moze ich oddac.
