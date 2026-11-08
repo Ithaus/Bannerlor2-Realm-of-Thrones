@@ -160,7 +160,6 @@ namespace Armoury
         private readonly Dictionary<Team, List<RallyGroup>> _groups = new Dictionary<Team, List<RallyGroup>>();
         private readonly Dictionary<Team, List<Vec2>> _gcand = new Dictionary<Team, List<Vec2>>();
         private readonly Dictionary<Agent, float> _armsWait = new Dictionary<Agent, float>();
-        private readonly HashSet<Agent> _rallyAnnounced = new HashSet<Agent>();
         private readonly WeakGameEntity[] _rallyEnts = new WeakGameEntity[64];
         private readonly UIntPtr[] _rallyIds = new UIntPtr[64];
         private readonly Random _rallyRng = new Random(359);
@@ -205,7 +204,7 @@ namespace Armoury
             try
             {
                 _rallyTried.Clear(); _rallied.Clear(); _rallyBy.Clear(); _rallyList.Clear(); _rallyQ.Clear(); _ralliers.Clear();
-                _tinfo.Clear(); _groups.Clear(); _gcand.Clear(); _armsWait.Clear(); _rallyAnnounced.Clear();
+                _tinfo.Clear(); _groups.Clear(); _gcand.Clear(); _armsWait.Clear();
                 for (int i = 0; i < _rallyEnts.Length; i++) _rallyEnts[i] = default(WeakGameEntity);
             }
             catch { }
@@ -698,10 +697,8 @@ namespace Armoury
             }
             if (g.Item == null) SetPoint(g);
             else g.Arms = false;
-            if (_rallyAnnounced.Add(by) || _rallyRng.Next(3) == 0)
-            {
-                try { BattleSound.OnRoutTurned(by); } catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnRoutTurned", ex); }
-            }
+            // 359d: "Turn back!" przy kazdym zawroceniu (dotad pierwsze zawrocenie dowodcy i 1 na 3) - odstepy pilnuje BattleSound (mowca 6 s, druzyna 3 s)
+            try { BattleSound.OnRoutTurned(by); } catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.OnRoutTurned", ex); }
             return true;
         }
 
