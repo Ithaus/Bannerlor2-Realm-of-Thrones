@@ -570,7 +570,11 @@ namespace Armoury
             if (_titles.Count > 0) sb.Append(" His seal confirms ").Append(_titleNames).Append('.');
             if (FactionManager.IsAtWarAgainstFaction(pc, nk)) sb.Append(" Your war with ").Append(nk.Name).Append(" ends.");
             List<Kingdom> wars, peace; WarsAfter(null, nk, out wars, out peace);
-            if (wars.Count > 0) sb.Append(" His wars become yours: ").Append(Names(wars, 0)).Append('.');
+            // 367e (recenzja): wojny, w ktorych rod juz jest (np. Polnoc po odejsciu), osobno od nowych - tylko tekst
+            var fresh = new List<Kingdom>(); var still = new List<Kingdom>();
+            foreach (var k in wars) (FactionManager.IsAtWarAgainstFaction(k, pc) ? still : fresh).Add(k);
+            if (fresh.Count > 0) sb.Append(" His wars become yours: ").Append(Names(fresh, 0)).Append('.');
+            if (still.Count > 0) sb.Append(" Your war with ").Append(Names(still, 0)).Append(" goes on, now at his side.");
             if (peace.Count > 0) sb.Append(" You make peace with ").Append(Names(peace, 0)).Append('.');
             int freed = 0; foreach (var x in HeldHeroes()) if (GameFrees(x, king, null, nk)) freed++;
             int kin = KinFreed(null, nk).Count;
