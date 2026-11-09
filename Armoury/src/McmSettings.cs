@@ -11620,6 +11620,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeRepelRebuildMaxDays { get; set; } = 14f;
 
+        [SettingPropertyBool("Siege Defender Engineering Xp", HintText = "When you defend a fortress and its defenders finish a siege engine, but nobody inside has any Engineering (the game then gives the engine's experience to no one), your party's engineer gets the Engineering experience the game gives for a built engine. Only the experience - who leads the engine work, perks and building speed are unchanged. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: defenders' engineers (377)")]
+        public bool SiegeDefenderEngineeringXp { get; set; } = true;
+
         [SettingPropertyBool("Siege Assault Hold Retreat", HintText = "With Siege Assault Break Mission, in an assault on a fortress you defend yourself: the enemy's stormers do not give up and fall back on their own while their assault party still holds - only the breaking point of Siege Assault Break decides when they fall back, and then they really leave the walls. Off = the enemy may also call a retreat on its own, as in the game (its men then often stand below the walls without leaving)", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool SiegeAssaultHoldRetreat { get; set; } = true;
@@ -14744,6 +14748,7 @@ namespace Armoury
             s.SiegeRepelPauseMaxDays = SiegeRepelPauseMaxDays;
             s.SiegeRepelRebuildMinDays = SiegeRepelRebuildMinDays;
             s.SiegeRepelRebuildMaxDays = SiegeRepelRebuildMaxDays;
+            s.SiegeDefenderEngineeringXp = SiegeDefenderEngineeringXp;
             s.SiegeAssaultHoldRetreat = SiegeAssaultHoldRetreat;
             s.SiegeLadderWaitSeconds = SiegeLadderWaitSeconds;
             s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;

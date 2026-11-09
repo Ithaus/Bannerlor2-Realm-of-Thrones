@@ -1266,6 +1266,7 @@ namespace Armoury
         {
             try
             {
+                if (ev != null && t != null && side == BattleSideEnum.Defender) OnDefenderEngineBuilt377(ev, t);   // 377: XP Engineering gracza-obroncy, gdy gra nie da nikomu
                 if (ev == null || t == null || side != BattleSideEnum.Attacker) return;
                 var camp = ev.BesiegerCamp;
                 if (camp != null && camp.LeaderParty != null && camp.LeaderParty.IsMainParty) { _dEngPlayer++; return; }
@@ -1365,6 +1366,7 @@ namespace Armoury
                 Log.Info(sb.ToString());
                 SzDaily();                                                       // SZ: linia doby bitwy szturmu
                 LvlDaily();                                                      // 320c: linia doby czynnika poziomu murow
+                Eng377Daily();                                                   // 377: linia doby inzynierii obroncow
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ZeroDay(); }
@@ -1396,6 +1398,7 @@ namespace Armoury
             _dAssaults = _dWon = _dRepelled = _dDefWon = _dNone = _dOutside = _dFromWalls = _dFromWallsHeld = _dScripted = 0;
             _dLossSum = _dThrSum = _dPauseSum = 0;
             ZeroDay371();
+            ZeroDay377();
             _dEngWall = _dEngAnti = _dEngRam = _dEngTower = _dEngPlayer = _dWallHits = _dWallBroken = _dSiegesNew = 0;
             _dDispersed.Clear(); _dPrepAi.Clear(); _dPrepPlayer.Clear(); _dPrepExcl.Clear(); _vetoLogged.Clear(); _dStumbles = 0;
             _dSz = _dSzPlayer = _dSzExcl = _dSzSmall = _dSzSmallHeld = _dSzEnded = _dSzPushed = 0; _dSzMd = _dSzMa = 0; _dSzDefT = _dSzAttT = _dSzGDefT = _dSzGAttT = 0;
