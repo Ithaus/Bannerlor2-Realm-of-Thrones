@@ -37,7 +37,7 @@ namespace Armoury
         private const float Delay = 1f, NearMin = 15f, PerNewFormation = 15f;
         private const int ErrMax = 3;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        private static int _errs;
+        private int _errs;                                               // wpisy potkniec do logu - na misje (pierwsze 3)
 
         private bool _done;
         private float _at = -1f;
