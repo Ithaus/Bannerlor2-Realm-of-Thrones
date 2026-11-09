@@ -219,11 +219,12 @@ namespace Armoury
             return d;
         }
 
-        /// <summary>371b: najwyzsza znosna wymiana strat przy przewadze _n: 1 + Slope x ln N, najwyzej sufit; przy rozbitych bramach x GateExchangeFactor.</summary>
+        /// <summary>371b: najwyzsza znosna wymiana strat przy przewadze _n: (1 + Slope x ln N) x GateExchangeFactor przy rozbitych bramach; sufit ExchangeMax
+        /// obejmuje TAKZE bramy (recenzja 371b: mnoznik po suficie dawal 3.6:1 przy N &gt;= 85, wbrew opisowi MCM "however great its numbers"); nie mniej niz 1:1.</summary>
         private double ExchangeLimit(bool gatesDown)
         {
-            double r = Math.Min(SiegeWalls.ExchangeMax, 1.0 + SiegeWalls.ExchangeSlope * Math.Log(Math.Max(1.0, _n)));
-            return Math.Max(1.0, r) * (gatesDown ? SiegeWalls.GateExchangeFactor : 1.0);
+            double r = (1.0 + SiegeWalls.ExchangeSlope * Math.Log(Math.Max(1.0, _n))) * (gatesDown ? SiegeWalls.GateExchangeFactor : 1.0);
+            return Math.Max(1.0, Math.Min(SiegeWalls.ExchangeMax, r));
         }
 
         /// <summary>371b: obroncy w polu + jeszcze do wystawienia przez spawner gry.</summary>

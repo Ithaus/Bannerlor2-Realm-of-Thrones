@@ -11616,7 +11616,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeAssaultBreakGateFactor { get; set; } = 1.5f;
 
-        [SettingPropertyFloatingInteger("Siege Assault Break Gate Exchange Factor", 1.00f, 2.00f, "0.00", HintText = "With Siege Assault Break Exchange: when all the gates are broken, the highest bearable trade of losses is multiplied by this", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Siege Assault Break Gate Exchange Factor", 1.00f, 2.00f, "0.00", HintText = "With Siege Assault Break Exchange: when all the gates are broken, the highest bearable trade of losses is multiplied by this, but never above the Exchange Max", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeAssaultBreakGateExchangeFactor { get; set; } = 1.2f;
 
