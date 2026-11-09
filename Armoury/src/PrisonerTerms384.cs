@@ -26,7 +26,7 @@ namespace Armoury
     ///
     /// Skad rozmowa: ta sama co 374 (gracz w oblezonej twierdzy, "Request a parley" gry -> rozmowa z wodzem obozu; warunki jak SiegeSurrender374.AskCond).
     /// Linia w hero_main_options (priorytet 104, obok 374): ZADANIE (co gracz chce) -> OFERTA (co daje: jency-lordowie frakcji wodza z lochow rodu
-    /// gracza i z jego druzyny - 8 najcenniejszych osobno i "wszyscy", zloto 5 000 / 20 000, zamek albo miasto rodu gracza - do 3, bez oblezonych)
+    /// gracza i z jego druzyny - 8 najcenniejszych osobno i "wszyscy", zloto 5 000 / 20 000, zamek albo miasto rodu gracza - do 6, najcenniejsze pierwsze, bez oblezonych; 384b)
     /// -> ocena wodza -> zgoda / kontroferta (najwyzej 2 rundy: dodaj zloto albo jeszcze jednego jenca) / odmowa (3 doby przerwy). Bez okien - same linie
     /// rozmowy (zadnego okna nad misja rozmowy, zadnego SwitchToMenu).
     /// ZADANIA:
@@ -41,12 +41,17 @@ namespace Armoury
     ///   twierdzy x (1 - 0.7 p) - wodz i tak ich uwolni, gdy zdobedzie mury; Mercy +10%/poziom) + zloto + ziemia (SettlementValueModel dla rodu wodza);
     ///   Honor > 0: +5%/poziom. C = L: p x wartosc osady x (1 + 0.15 Valor); P: p x (okup gracza + 0.3 wartosci wojskowej druzyny) + 2000; A: L + (N/60) x 0.1 x
     ///   wartosc pozostalych twierdz gracza; relacja wodza z graczem x (1 - rel/200). p = szansa zdobycia (sila obozu do murow R, odparte szturmy i straty
-    ///   z 374, jedzenie, 0.05-0.95). Zgoda: V >= C x prog (Calculating > 0: 1.0, < 0: 0.9, inaczej 0.95); kontroferta od 0.7 progu (Calculating > 0: 0.8).
+    ///   z 374, jedzenie, 0.05-0.95). Zgoda: V >= C x prog (Calculating > 0: 1.0, < 0: 0.9, inaczej 0.95); kontroferta od V >= 0.7 C (Calculating > 0: 0.8 C) - od C, nie od progu.
     /// ZDRADA (losowana przy zgodzie, SiegeSurrender374.BetrayChance - tylko Honor < 0): L/A - oboz odchodzi i bierze jencow, ale rozejmu / paktu nie
     ///   dotrzymuje (wpisy tylko pilnowane); powrot w czasie umowy = linia ZDRADA, klamca (lista 374), relacja -30, honorowe glowy rodow -5 x Honor.
     ///   P - jency i zloto oddane przy bramie, potem pojmanie gracza i towarzyszy, szeregowi do lochu (jak RunBetray 374, bez zmiany pana twierdzy).
-    /// ZLAMANIE PRZEZ GRACZA (atak na druzyne / najazd / oblezenie frakcji z umowa w czasie umowy): wpisy tej umowy zdjete (takze rozejm osady),
-    ///   relacja z przysiegajacym -20 i z wladca jego frakcji -10, Honor gracza -500 xp (TraitLevelingHelper.OnIncidentResolved).
+    /// ZLAMANIE PRZEZ GRACZA (384b): tylko PAKT (A - przysiega wzajemna, "and I swear the same") - gracz zaczyna atak na druzyne / wies / oblezenie frakcji
+    ///   z paktem w czasie paktu. NIE: samoobrona (wypad na oboz pod twierdza rodu gracza, atak na druzyne, ktora najezdza wies gracza albo ma za cel druzyne
+    ///   gracza) i umowa L (gracz niczego nie przysiega). Skutek: wpisy tej umowy zdjete (takze rozejm osady), relacja z przysiegajacym -20 i z wladca -10,
+    ///   Honor gracza -500 xp (TraitLevelingHelper.OnIncidentResolved). P: gracz wyszedl za brame, a nie oddal obiecanego (jency zniknely, zloto, ziemia) -
+    ///   oddane, co sie da, i ta sama kara (bez terminu 3 dob - usluga juz wykonana).
+    /// UCZCIWA UMOWA A ARMIE BK (384b): wybor celu armii BK nie pyta o wynik celu - oblezenie wbrew niezdradzieckiemu wpisowi (OnSiegeStarted albo przeglad
+    ///   doby) idzie do kolejki zwiniecia (SiegeRansom.Lift384 w takcie kampanii, ta sama droga co okup), bez kary dla przysiegajacego.
     /// WYKONANIE tylko w takcie kampanii (bez misji i rozmowy; L/A przy braku bitwy przy obozie, najwyzej 1 doba czekania; P po wyjsciu gracza na mape):
     ///   najpierw sprawdzenie (jency nadal u rodu gracza, zloto, ziemia wolna od oblezenia), dla L/A najpierw zwiniecie obozu (nie wyszlo = bez zaplaty),
     ///   potem jency wolni (EndCaptivityAction.ApplyByReleasedByChoice - jak gra przy uwolnieniu z lochu; bez urazy 367d, bo uraza liczy okup i rokowania),
@@ -60,7 +65,7 @@ namespace Armoury
         internal const string Tag = "Wymiana jencow (384)";
         private const string MenuId = "arm384_pass";
         private const int AskPriority = 104;
-        private const int ShowPris = 8, ShowFiefs = 3, MaxRounds = 2;
+        private const int ShowPris = 8, ShowFiefs = 6, MaxRounds = 2;
         private const double CooldownDays = 3.0;
         private const int NoAttackHours = 48, PactNoAttackHours = 25;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -81,6 +86,10 @@ namespace Armoury
         private static readonly List<Deal> _queue = new List<Deal>();
         private static readonly List<Entry> _entries = new List<Entry>();
         private static readonly Dictionary<string, Cool> _cool = new Dictionary<string, Cool>();
+        /// <summary>384b: oblezenia wbrew uczciwej umowie do zwiniecia w takcie kampanii (StringId osady -> poczatek oblezenia w godzinach). Nie w zapisie -
+        /// przeglad doby (Daily) znajduje je ponownie po wczytaniu.</summary>
+        private static readonly Dictionary<string, double> _relift = new Dictionary<string, double>();
+        private static int _dRelift, _dReliftFail;
         private static Deal _offer;          // P: zgoda w rozmowie, czeka na opcje menu arm384_pass
         private static bool _armed;
         private static int _stumbles, _dZero, _dNoAttack;
@@ -103,7 +112,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _queue.Clear(); _entries.Clear(); _cool.Clear(); _offer = null; _armed = false; _stumbles = 0; _dZero = 0; _dNoAttack = 0; _err.Clear();
+            _queue.Clear(); _entries.Clear(); _cool.Clear(); _relift.Clear(); _dRelift = 0; _dReliftFail = 0; _offer = null; _armed = false; _stumbles = 0; _dZero = 0; _dNoAttack = 0; _err.Clear();
             ClearTalk();
         }
 
@@ -289,7 +298,9 @@ namespace Armoury
                     if (inSt != null) inSt[h] = here;
                 }
             };
-            try { scan(PartyBase.MainParty != null ? PartyBase.MainParty.PrisonRoster : null, false); } catch (Exception e) { Stumble("Prisoners.Party", e); }
+            // 384b: druzyna gracza w oblezonej twierdzy dzieli jej los (mury padna - jency z druzyny tez wolni), wiec ten sam rabat co loch tej twierdzy
+            bool partyHere = besieged != null && MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == besieged;
+            try { scan(PartyBase.MainParty != null ? PartyBase.MainParty.PrisonRoster : null, partyHere); } catch (Exception e) { Stumble("Prisoners.Party", e); }
             try
             {
                 var pc = Clan.PlayerClan;
@@ -357,7 +368,7 @@ namespace Armoury
                 if (pc != null)
                     foreach (var s in pc.Settlements)
                         if (s != null && s.IsFortification && s != st && s.SiegeEvent == null && s.Party != null && s.Party.MapEvent == null) _fiefs.Add(s);
-                _fiefs.Sort((a, b) => FiefValue(a, h).CompareTo(FiefValue(b, h)));
+                _fiefs.Sort((a, b) => FiefValue(b, h).CompareTo(FiefValue(a, h)));   // 384b: najcenniejsze pierwsze (dotad 3 najtansze)
                 if (_fiefs.Count > ShowFiefs) _fiefs.RemoveRange(ShowFiefs, _fiefs.Count - ShowFiefs);
             }
             catch (Exception e) { Stumble("Begin", e); }
@@ -388,7 +399,7 @@ namespace Armoury
         private static bool WantACond()
         {
             if (_talk == null || _st == null) return false;
-            MBTextManager.SetTextVariable("ARM384_WA", "Lift the siege, and swear that your realm will not raise a hand against my lands or my men for " + Days + " days.");
+            MBTextManager.SetTextVariable("ARM384_WA", "Lift the siege, and swear that your realm will not raise a hand against my lands or my men for " + Days + " days. I swear the same for mine.");
             return true;
         }
 
@@ -556,7 +567,7 @@ namespace Armoury
             string cp;
             if (want == 'P')
             {
-                double ransom = Ransom178.PriceFor(me), mil = 0;
+                double ransom = PlayerPrice(me, lord), mil = 0;   // 384b: Ransom178.PriceFor(MainHero) = 0 (Lord() wyklucza gracza)
                 try { mil = Campaign.Current.Models.ValuationModel.GetMilitaryValueOfParty(MobileParty.MainParty); } catch { }
                 c = e.PTake * (ransom + 0.3 * mil) + 2000;
                 cp = "przejscie: p x (okup gracza " + N(ransom) + " + 0.3 x wojsko " + N(mil) + ") + 2000";
@@ -584,6 +595,16 @@ namespace Armoury
             e.Parts = pp + " | oferta: jency " + N(e.Vp) + " (" + _sel.Count + ", Mercy " + mercy + "), zloto " + N(e.Vg) + ", ziemia " + N(e.Vf) + " (" + _selF.Count + "), Honor " + honor
                       + " -> V " + N(e.V) + " | koszt: " + cp + ", relacja " + rel + " -> C " + N(e.C) + " | prog " + e.Thr.ToString("0.00", Inv) + " (Calc " + calc + "), kontroferta od " + e.Lo.ToString("0.00", Inv) + ", Valor " + valor;
             return e;
+        }
+
+        /// <summary>384b: okup gracza dla wodza - wieksza z: cena wedlug majatku (Ransom178.PriceOf, bez warunku Lord) i cena gry (RansomValueCalculationModel,
+        /// jak SafePassageBarterable).</summary>
+        private static double PlayerPrice(Hero me, Hero lord)
+        {
+            double a = 0, b = 0;
+            try { bool bc; double dd; a = Ransom178.PriceOf(me, out bc, out dd); } catch (Exception e) { Stumble("PlayerPrice.Own", e); }
+            try { b = Campaign.Current.Models.RansomValueCalculationModel.PrisonerRansomValue(me.CharacterObject, lord); } catch (Exception e) { Stumble("PlayerPrice.Game", e); }
+            return Math.Max(0, Math.Max(a, b));
         }
 
         private static void Decide()
@@ -800,6 +821,7 @@ namespace Armoury
         internal static void Tick()
         {
             if (_offer != null) ExpireOffer();
+            if (_relift.Count > 0) Relift();
             if (_queue.Count == 0) return;
             try
             {
@@ -870,7 +892,7 @@ namespace Armoury
             foreach (var id in d.Fiefs)
             {
                 var s = Settlement.Find(id);
-                if (s == null || s.OwnerClan != Clan.PlayerClan) continue;
+                if (s == null || s.OwnerClan != Clan.PlayerClan || s.SiegeEvent != null || (s.Party != null && s.Party.MapEvent != null)) continue;   // 384b: jak Payable
                 try
                 {
                     bool crown = Clan.PlayerClan.Kingdom != null && s.MapFaction == Clan.PlayerClan.Kingdom;
@@ -892,10 +914,23 @@ namespace Armoury
             {
                 st = Settlement.Find(d.St);
                 var lord = Hero.Find(d.Lord);
-                if (Today - d.Day > 3.0) { Drop(d, st, "The terms agreed at " + Name(st) + " have lapsed.", "umowa przedawniona (ponad 3 doby)"); return; }
+                // 384b: P - usluga juz wykonana (gracz za brama, RideCons), wiec bez terminu 3 dob; przed wyjsciem P nie trafia do kolejki
+                if (d.Want != 'P' && Today - d.Day > 3.0) { Drop(d, st, "The terms agreed at " + Name(st) + " have lapsed.", "umowa przedawniona (ponad 3 doby)"); return; }
                 if (lord == null || !lord.IsAlive || lord.IsPrisoner) { Drop(d, st, "The lord who gave you his word at " + Name(st) + " can no longer keep it.", "przysiegajacy nie zyje albo w niewoli"); return; }
                 string why;
-                if (!Payable(d, out why)) { Drop(d, st, "You can no longer pay what you promised at " + Name(st) + ". The terms are void.", why); return; }
+                if (!Payable(d, out why))
+                {
+                    if (d.Want == 'P')
+                    {
+                        // 384b: gracz wyszedl na slowo i nie oddaje obiecanego - oddane, co sie da, i kara jak za zlamanie przysiegi
+                        string part = Pay(d, lord);
+                        string rel = BrokeWord(new HashSet<string> { lord.StringId }, lord.MapFaction);
+                        Log.Info(Tag + ": dzien " + F(Today) + " | " + Name(st) + " - GRACZ NIE ODDAL obiecanego za swobodne przejscie (" + why + ") | oddane: " + part + " | " + rel + ".");
+                        Log.Player("You rode out of " + Name(st) + " on " + Name(lord) + "'s word, but did not hand over all you promised. Men will remember it.", true);
+                        return;
+                    }
+                    Drop(d, st, "You can no longer pay what you promised at " + Name(st) + ". The terms are void.", why); return;
+                }
                 if (d.Want == 'P') { RunPass(d, st, lord); return; }
                 var ev = st != null ? st.SiegeEvent : null;
                 if (st == null || ev == null || Math.Abs(ev.SiegeStartTime.ToHours - d.Start) > 0.05) { Drop(d, st, null, "oblezenie skonczylo sie przed wymiana - nic nie oddane"); return; }
@@ -1052,7 +1087,8 @@ namespace Armoury
             return list;
         }
 
-        /// <summary>Nasluch OnSiegeEventStarted: oblezenie twierdzy rodu gracza wbrew umowie (zdrada / mimo latki) albo gracz oblega frakcje z umowa.</summary>
+        /// <summary>Nasluch OnSiegeEventStarted: oblezenie twierdzy rodu gracza wbrew umowie (zdrada - kara; uczciwy wpis - armia BK poza modelem celu - do kolejki
+        /// zwiniecia, 384b) albo gracz oblega frakcje z PAKTEM (384b: umowa L gracza nie wiaze).</summary>
         internal static void OnSiegeStarted(SiegeEvent ev)
         {
             if (_entries.Count == 0) return;
@@ -1064,40 +1100,95 @@ namespace Armoury
                 if (lp == null) return;
                 if (lp.IsMainParty) { PlayerBroke(st.MapFaction, st.OwnerClan, "oblezenie " + Name(st)); return; }
                 if (st.OwnerClan != Clan.PlayerClan) return;
-                AiBroke(Covering(lp.MapFaction, lp.ActualClan, st), "oblezenie " + Name(st) + " przez " + (lp.LeaderHero != null ? Name(lp.LeaderHero) : lp.StringId));
+                AiBroke(Covering(lp.MapFaction, lp.ActualClan, st), "oblezenie " + Name(st) + " przez " + (lp.LeaderHero != null ? Name(lp.LeaderHero) : lp.StringId), st, ev);
             }
             catch (Exception e) { Stumble("OnSiegeStarted", e); }
         }
 
-        /// <summary>Nasluch MapEventStarted: gracz atakuje druzyne / wies frakcji z umowa, albo AI z umowa atakuje druzyne gracza / wies rodu gracza.</summary>
+        /// <summary>Nasluch MapEventStarted: gracz zaczyna atak na druzyne / wies frakcji z paktem (bez samoobrony), albo AI z paktem atakuje druzyne gracza / wies rodu gracza.</summary>
         internal static void OnMapEventStarted(MapEvent me, PartyBase a, PartyBase d)
         {
             if (_entries.Count == 0) return;
             try
             {
                 if (a == null || d == null) return;
-                if (a == PartyBase.MainParty) { PlayerBroke(d.MapFaction, d.MobileParty != null ? d.MobileParty.ActualClan : (d.Settlement != null ? d.Settlement.OwnerClan : null), "atak na " + d.Name); return; }
+                if (a == PartyBase.MainParty)
+                {
+                    if (!PactWith(d.MapFaction, d.MobileParty != null ? d.MobileParty.ActualClan : (d.Settlement != null ? d.Settlement.OwnerClan : null))) return;
+                    string self = SelfDefence(d);
+                    if (self != null) { Log.Info(Tag + ": dzien " + F(Today) + " | gracz atakuje " + d.Name + " - samoobrona (" + self + "), pakt nie zlamany."); return; }
+                    PlayerBroke(d.MapFaction, d.MobileParty != null ? d.MobileParty.ActualClan : (d.Settlement != null ? d.Settlement.OwnerClan : null), "atak na " + d.Name);
+                    return;
+                }
                 bool onMe = d == PartyBase.MainParty || (d.Settlement != null && d.Settlement.OwnerClan == Clan.PlayerClan);
                 if (!onMe) return;
                 var mp = a.MobileParty;
                 var list = Covering(a.MapFaction, mp != null ? mp.ActualClan : null, null);
                 list.RemoveAll(e => e.Scope != "*");
-                AiBroke(list, "atak " + a.Name + " na " + d.Name);
+                AiBroke(list, "atak " + a.Name + " na " + d.Name, null, null);
             }
             catch (Exception e) { Stumble("OnMapEventStarted", e); }
         }
 
-        private static void AiBroke(List<Entry> list, string what)
+        private static bool PactWith(IFaction f, Clan c)
+        {
+            int today = (int)Today;
+            foreach (var e in _entries) if (e.Until > today && e.Scope == "*" && Match(e, f, c)) return true;
+            return false;
+        }
+
+        private static bool MineSt(Settlement t, Clan pc)
+        {
+            if (t == null || pc == null) return false;
+            return t.OwnerClan == pc || (t.IsVillage && t.Village != null && t.Village.Bound != null && t.Village.Bound.OwnerClan == pc);
+        }
+
+        /// <summary>384b: atak gracza to samoobrona, gdy cel (albo lider jego armii) oblega twierdze rodu gracza (takze wypad - gra: StartPartyEncounter(MainParty,
+        /// LeaderParty)), najezdza / idzie oblegac ziemie rodu gracza albo ma za cel druzyne gracza. Zwraca powod albo null.</summary>
+        private static string SelfDefence(PartyBase d)
+        {
+            try
+            {
+                var mp = d != null ? d.MobileParty : null;
+                if (mp == null) return null;
+                var pc = Clan.PlayerClan;
+                var main = MobileParty.MainParty;
+                for (int k = 0; k < 2; k++)
+                {
+                    var x = k == 0 ? mp : (mp.Army != null ? mp.Army.LeaderParty : null);
+                    if (x == null || (k == 1 && x == mp)) continue;
+                    var camp = x.BesiegerCamp;
+                    var bs = camp != null && camp.SiegeEvent != null ? camp.SiegeEvent.BesiegedSettlement : null;
+                    if (MineSt(bs, pc)) return "oblega " + Name(bs);
+                    if (main != null && (x.TargetParty == main || x.ShortTermTargetParty == main)) return "ma za cel druzyne gracza";
+                    foreach (var t in new[] { x.TargetSettlement, x.ShortTermTargetSettlement })
+                    {
+                        if (!MineSt(t, pc)) continue;
+                        if (x.DefaultBehavior == AiBehavior.RaidSettlement || x.ShortTermBehavior == AiBehavior.RaidSettlement) return "najezdza " + Name(t);
+                        if (x.DefaultBehavior == AiBehavior.BesiegeSettlement || x.ShortTermBehavior == AiBehavior.BesiegeSettlement) return "idzie oblegac " + Name(t);
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("SelfDefence", e); }
+            return null;
+        }
+
+        private static void AiBroke(List<Entry> list, string what, Settlement st, SiegeEvent ev)
         {
             if (list == null || list.Count == 0) return;
+            // 384b: kara tylko dla przysiegajacych ze ZDRADZIECKICH wpisow (dotad kazdy wpis pasujacej frakcji - uczciwy wodz tez dostawal -30)
             var lords = new HashSet<string>();
-            bool betray = false;
-            foreach (var e in list) { lords.Add(e.Lord); if (e.Betray) betray = true; }
-            if (!betray)
+            bool honest = false;
+            foreach (var e in list) { if (e.Betray) lords.Add(e.Lord); else honest = true; }
+            if (honest)
             {
-                Log.Info(Tag + ": dzien " + F(Today) + " | UMOWA NARUSZONA przez AI mimo latki celu (" + what + ") - wpisy " + list.Count + "; brak kary (AI nie lamie umowy z wlasnej woli - droga poza modelem celu).");
-                return;
+                // 384b: uczciwa umowa, a armia (BK FindArmyObjective / ArmySiegePersistence - poza wynikiem celu) i tak przyszla - oblezenie do zwiniecia
+                bool queued = false;
+                if (st != null && ev != null && st.StringId != null) { _relift[st.StringId] = ev.SiegeStartTime.ToHours; queued = true; }
+                Log.Info(Tag + ": dzien " + F(Today) + " | UMOWA NARUSZONA przez AI mimo latki celu (" + what + ") - wpis uczciwy, brak kary (droga poza modelem celu)"
+                         + (queued ? " | oblezenie w kolejce do zwiniecia (takt kampanii)" : " | atak - bez cofniecia") + ".");
             }
+            if (lords.Count == 0) return;
             var names = new List<string>();
             foreach (var id in lords)
             {
@@ -1111,15 +1202,78 @@ namespace Armoury
             Log.Player("The enemy breaks the oath sworn for your prisoners: " + what.Replace("oblezenie", "siege of").Replace("atak", "attack").Replace(" na ", " on ").Replace(" przez ", " by ") + ".", true);
         }
 
+        /// <summary>384b: zwiniecie oblezen wbrew uczciwej umowie - takt kampanii, bez misji, rozmowy i bitwy (gracza i przy obozie); jedna proba na oblezenie,
+        /// jedno na takt.</summary>
+        private static void Relift()
+        {
+            try
+            {
+                if (Campaign.Current == null || Mission.Current != null) return;
+                var cm = Campaign.Current.ConversationManager;
+                if (cm != null && (cm.IsConversationInProgress || cm.IsConversationFlowActive)) return;
+                var mp = MobileParty.MainParty;
+                if (mp == null || mp.MapEvent != null) return;
+                var done = new List<string>();
+                foreach (var kv in _relift)
+                {
+                    var st = Settlement.Find(kv.Key);
+                    var ev = st != null ? st.SiegeEvent : null;
+                    if (ev == null || Math.Abs(ev.SiegeStartTime.ToHours - kv.Value) > 0.05) { done.Add(kv.Key); continue; }   // to oblezenie juz sie skonczylo
+                    if (SiegeSurrender374.CampBusy(st)) continue;   // bitwa przy obozie - czekamy
+                    string lp = ev.BesiegerCamp != null && ev.BesiegerCamp.LeaderParty != null ? ev.BesiegerCamp.LeaderParty.Name.ToString() : "-";
+                    string info;
+                    bool ok = SiegeRansom.Lift384(st, out info);
+                    if (ok) _dRelift++; else _dReliftFail++;
+                    done.Add(kv.Key);
+                    Log.Info(Tag + ": dzien " + F(Today) + " | " + Name(st) + " [" + st.StringId + "] oblezenie wbrew umowie (" + lp + ") - zwiniecie: " + info + ".");
+                    if (ok) Log.Player("The besiegers of " + Name(st) + " remember the oath sworn for your prisoners and break camp.");
+                    break;
+                }
+                foreach (var k in done) _relift.Remove(k);
+            }
+            catch (Exception e) { _relift.Clear(); Stumble("Relift", e); }
+        }
+
+        /// <summary>384b: przeglad doby - twierdze rodu gracza oblegane wbrew uczciwemu wpisowi (np. po wczytaniu - _relift nie jest w zapisie).</summary>
+        private static void ScanViolations()
+        {
+            try
+            {
+                var pc = Clan.PlayerClan;
+                if (pc == null || _entries.Count == 0) return;
+                foreach (var st in pc.Settlements)
+                {
+                    var ev = st != null ? st.SiegeEvent : null;
+                    if (ev == null || ev.BesiegerCamp == null || ev.BesiegerCamp.LeaderParty == null || st.StringId == null || _relift.ContainsKey(st.StringId)) continue;
+                    var lp = ev.BesiegerCamp.LeaderParty;
+                    if (lp.IsMainParty) continue;
+                    foreach (var e in Covering(lp.MapFaction, lp.ActualClan, st))
+                        if (!e.Betray)
+                        {
+                            _relift[st.StringId] = ev.SiegeStartTime.ToHours;
+                            Log.Info(Tag + ": doba " + (int)Today + " | " + Name(st) + " oblegana wbrew umowie (" + lp.Name + ") - do zwiniecia.");
+                            break;
+                        }
+                }
+            }
+            catch (Exception e) { Stumble("ScanViolations", e); }
+        }
+
         private static void PlayerBroke(IFaction f, Clan c, string what)
         {
-            var list = new List<Entry>();
-            int today = (int)Today;
-            foreach (var e in _entries) if (e.Until > today && Match(e, f, c)) list.Add(e);
-            if (list.Count == 0) return;
+            // 384b: wiaze tylko PAKT (zasieg "*", przysiega wzajemna) - umowa L to przysiega wodza, gracz niczego nie slubowal
             var lords = new HashSet<string>();
-            foreach (var e in list) lords.Add(e.Lord);
-            // wszystkie wpisy tych umow (takze innych kluczy) - umowa zerwana w calosci
+            int today = (int)Today;
+            foreach (var e in _entries) if (e.Until > today && e.Scope == "*" && Match(e, f, c)) lords.Add(e.Lord);
+            if (lords.Count == 0) return;
+            string rel = BrokeWord(lords, f);
+            Log.Info(Tag + ": dzien " + F(Today) + " | GRACZ LAMIE PAKT (" + what + ") | " + rel + ".");
+            Log.Player("You break the oath sworn over the prisoners. Men will remember it.", true);
+        }
+
+        /// <summary>Gracz zlamal slowo wobec przysiegajacych: ich wpisy precz (z rozejmem osady), relacja -20, wladca f -10, Honor -500 xp. Zwraca opis do logu.</summary>
+        private static string BrokeWord(HashSet<string> lords, IFaction f)
+        {
             var gone = new List<Entry>();
             foreach (var e in _entries) if (lords.Contains(e.Lord)) gone.Add(e);
             foreach (var e in gone)
@@ -1127,7 +1281,7 @@ namespace Armoury
                 _entries.Remove(e);
                 if (e.Scope != "*" && !e.Betray) SiegeRansom.EndTruce384(Settlement.Find(e.Scope), e.Key);
             }
-            var rel = new List<string>();
+            var rel = new List<string> { "wpisy zdjete " + gone.Count };
             try
             {
                 foreach (var id in lords)
@@ -1136,13 +1290,12 @@ namespace Armoury
                     if (h != null && h.IsAlive) { ChangeRelationAction.ApplyPlayerRelation(h, -20); rel.Add(Name(h) + " -20"); }
                 }
                 var ruler = f != null ? f.Leader : null;
-                if (ruler != null && ruler.IsAlive && ruler != Hero.MainHero) { ChangeRelationAction.ApplyPlayerRelation(ruler, -10); rel.Add(Name(ruler) + " -10"); }
+                if (ruler != null && ruler.IsAlive && ruler != Hero.MainHero && !lords.Contains(ruler.StringId)) { ChangeRelationAction.ApplyPlayerRelation(ruler, -10); rel.Add(Name(ruler) + " -10"); }
                 TraitLevelingHelper.OnIncidentResolved(DefaultTraits.Honor, -500);
                 rel.Add("Honor gracza -500 xp");
             }
-            catch (Exception e) { Stumble("PlayerBroke", e); }
-            Log.Info(Tag + ": dzien " + F(Today) + " | GRACZ LAMIE UMOWE (" + what + ") | wpisy zdjete " + gone.Count + " | " + string.Join(", ", rel.ToArray()) + ".");
-            Log.Player("You break the oath sworn over the prisoners. Men will remember it.", true);
+            catch (Exception e) { Stumble("BrokeWord", e); }
+            return string.Join(", ", rel.ToArray());
         }
 
         /// <summary>Doba: wygasle wpisy precz, pakt - odswiezenie SetDoNotAttackMainParty, linia stanu (gdy sa wpisy albo cos sie zdarzylo).</summary>
@@ -1156,15 +1309,15 @@ namespace Armoury
                 var dead = new List<string>();
                 foreach (var kv in _cool) if (kv.Value.End <= Today) dead.Add(kv.Key);
                 foreach (var k in dead) _cool.Remove(k);
-                if (_entries.Count > 0 && On) NoAttack();
-                if (_entries.Count > 0 || before > 0 || _dZero > 0 || _queue.Count > 0)
+                if (_entries.Count > 0 && On) { NoAttack(); ScanViolations(); }
+                if (_entries.Count > 0 || before > 0 || _dZero > 0 || _queue.Count > 0 || _dRelift + _dReliftFail > 0)
                 {
                     int pact = 0, st = 0, bet = 0;
                     foreach (var e in _entries) { if (e.Betray) bet++; else if (e.Scope == "*") pact++; else st++; }
                     Log.Info(Tag + ": doba " + today + " | wpisy umow " + _entries.Count + " (pakt ziem " + pact + ", rozejm osady " + st + ", pilnowane zdrady " + bet + "; wygaslo " + (before - _entries.Count) + ")"
-                             + " | cele AI wyzerowane paktem " + _dZero + " | druzyny bez ataku na gracza " + _dNoAttack + " | kolejka " + _queue.Count + " | potkniecia " + _stumbles + ".");
+                             + " | cele AI wyzerowane paktem " + _dZero + " | druzyny bez ataku na gracza " + _dNoAttack + " | kolejka " + _queue.Count + " | oblezenia wbrew umowie zwiniete " + _dRelift + " (nieudane " + _dReliftFail + ", czeka " + _relift.Count + ") | potkniecia " + _stumbles + ".");
                 }
-                _dZero = 0; _dNoAttack = 0;
+                _dZero = 0; _dNoAttack = 0; _dRelift = 0; _dReliftFail = 0;
             }
             catch (Exception e) { Stumble("Daily", e); }
         }
