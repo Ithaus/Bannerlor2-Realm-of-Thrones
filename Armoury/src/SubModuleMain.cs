@@ -88,6 +88,8 @@ namespace Armoury
                 TrueArmourCost.ApplyAll(_harmony);
                 // m110-animacje: latka HP sprzetu na Agent.InitializeSpawnEquipment - TU, nie w PatchAll z OnSubModuleLoad (tam psula indeksy akcji: postac lezy w ekwipunku)
                 try { HeroHp.Install(_harmony); } catch (Exception e) { Log.Error("HeroHp.Install", e); }
+                // 379: celnosc machin wedlug Engineering operatora, losowy czlowiek szyku i losowy cel sposrod podobnych (prefiksy ShootProjectile / AddCustomMissile, postfiksy celu); wlasny try
+                try { SiegeAim379.Install(_harmony); } catch (Exception e) { Log.Error("SiegeAim379.Install", e); }
                 ThrownWobblePatch.ApplyAll(_harmony);
                 FairXpPatch.ApplyAll(_harmony);
                 try { RaceLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RaceLaw.ApplyAll", e); }   // Jeff 10.10: sluby i ciaze tylko w obrebie rasy (olbrzymy z olbrzymami) - model slubu, MarriageAction, ciaza, porod
@@ -742,6 +744,9 @@ namespace Armoury
                 // 378: limit czasu szturmu - gracz atakuje: tylko ostrzezenia (5 min przed i przy uplywie); gracz broni - odwrot robi SiegeBreak371; samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultTimeLimitMinutes > 0)
                     mission.AddMissionBehavior(new SiegeClock378());
+                // 379: zerowanie licznikow celnosci machin i linia konca misji 'Celnosc machin (379)' (same latki dzialaja wedlug klucza na zywo)
+                if (Settings.Current.SiegeEngineAccuracyBySkill && mission != null)
+                    mission.AddMissionBehavior(new SiegeAim379.Logic());
                 // 373: ranni atakujacy pod murami / w srodku - ksiega misji (przenosiny do lochu w SiegeWounded373Behavior po zalamaniu 371); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission && Settings.Current.SiegeWoundedTakenPrisoner)
                     mission.AddMissionBehavior(new SiegeWounded373());
