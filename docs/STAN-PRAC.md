@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 09.11.2026 03:45 CET: WGRANIE 193 (najnowszy) = noc/367c-jeniec-po-odejsciu 13e3ed23 (Armoury.dll 0400cebf, CrashScribe d7fbd602) = 190 + 367c (191) + 367b/367d/367e (192) + 368/368b (193)
+- GALEZ: aktualna linia to noc/367c-jeniec-po-odejsciu (worktree scratchpad/n367c), zawiera noc/360-kopalnie (merge 877d48c3). Dalsza praca od niej.
+- Jeff 09.11: wyszedl z Polnocy (bez krolestwa), przysiegal Joffreyowi 02:55 (F, slub z Jeyne Marbrand, Lefford 808500) - ALE wyszedl 03:07 bez zapisu (Ironman 02:22), wiec w zapisie tego nie ma. Powtorzyc w grze; po wyjsciu sprawdzic "Zapis (D4)".
+- SPRAWDZIC w grze: "ROKOWANIA (367b) WYKONANE", "URAZA (367d)" dobowa, podpowiedz zlota (rata "Town and castle rent installments").
+- Zawieszenie 08.11 20:55 w kryjowce (silnik natywny) - obserwowac.
+
 ## STAN 09.11.2026 00:45 CET: WGRANIE 190 (najnowszy) = noc/360-kopalnie 16e8c1c1 (Armoury.dll 52d1aeaf, CrashScribe d7fbd602) = 189 + 367a (roszczenia wasali krola za odszkodowanie albo slub)
 - NASTEPNE: 367b - przejscie Jeffa pod korone jenca z lennami (Jeff chcial w etapie 2); wymaga audytu fabuly ROT (CanonThroneWars.PlayerRealm, StorylineWars, WarTruce dla rodu, uwolnienie jencow przez gre przy zmianie krolestwa). Projekt w workflow wf_c02f46f6-2cd (design, sekcja 2).
 - SPRAWDZIC w grze Jeffa: "ROKOWANIA (367): spis roszczen" przy pierwszym krolu/nastepcy w niewoli.
