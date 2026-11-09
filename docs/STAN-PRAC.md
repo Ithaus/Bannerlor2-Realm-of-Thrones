@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 09.11.2026 12:45 CET: WGRANIE 196 (najnowszy) = noc/367c-jeniec-po-odejsciu 7723d95d (Armoury.dll d2be9d16, CrashScribe d7fbd602) = 193 + 369 (194) + 370 (195) + 371 (196); mody: Epic Sieges 1.1.6, Vanilla AI Sieges for RBM 1.1.0 (ustawienia Restore* = true), RBM KeepBattleEnabled 1, DynamicReinforcements BattleSize Large (1500)
+- 369: zamek zdobyty na graczu zostaje u zdobywcy, roszczenie gracza (arm_k369); Ashemark -> Mormont po wyjsciu Jeffa z Goldentooth (przed d.109807) - SPRAWDZIC "Roszczenia gracza (369): naprawa Ashemark ... WYKONANA".
+- 370: log misji oblezenia co 30 s; 371: zalamanie szturmu (oddzial 25%, prog OB2 x wola dowodcy, przerwa 1-5 / 7-14 dob) - tylko gracz-obronca; SPRAWDZIC w pierwszym oblezeniu.
+- Oblezenie Goldentooth 09.11: AI stalo (RBM: AI oblezen + zdejmowanie odwrotu w HumanAIComponent.OnTick) - teraz Vanilla AI Sieges; jesli dalej stoja - linie 370.
+- Do zrobienia: 371 faza 2 (gracz atakuje).
+
 ## STAN 09.11.2026 03:45 CET: WGRANIE 193 (najnowszy) = noc/367c-jeniec-po-odejsciu 13e3ed23 (Armoury.dll 0400cebf, CrashScribe d7fbd602) = 190 + 367c (191) + 367b/367d/367e (192) + 368/368b (193)
 - GALEZ: aktualna linia to noc/367c-jeniec-po-odejsciu (worktree scratchpad/n367c), zawiera noc/360-kopalnie (merge 877d48c3). Dalsza praca od niej.
 - Jeff 09.11: wyszedl z Polnocy (bez krolestwa), przysiegal Joffreyowi 02:55 (F, slub z Jeyne Marbrand, Lefford 808500) - ALE wyszedl 03:07 bez zapisu (Ironman 02:22), wiec w zapisie tego nie ma. Powtorzyc w grze; po wyjsciu sprawdzic "Zapis (D4)".
