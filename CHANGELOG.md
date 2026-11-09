@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 191 - 367c na 190 (Armoury.dll 52d1aeaf -> f6e0a8b5 = build 91cb3dda, galaz noc/367c-jeniec-po-odejsciu); CrashScribe d7fbd602 bez zmian
+**Problem (Jeff 09.11 01:38, zrzut rozmowy z Joffreyem):** "co to za bzdura opuscile kroelstwo polnocy" - Jeff opuscil Polnoc (wojna z nia), Joffrey w jego partii, a rokowania R zablokowane: "He is the captive of The North, a crown you no longer serve". Przyczyna: Ransom178 _crownCaptive (wielki jeniec pojmany 08.11 22:57 jako wasal Polnocy) nie byl zdejmowany po odejsciu trzymajacego.
+**Zmiana:** CrownCheck - wielki jeniec nalezy do korony tylko dopoki rod, ktory go trzyma (partia albo loch), tej koronie sluzy; inaczej Revoke: okup i rokowania dla trzymajacego, wyplacona nagroda zostaje, niewyplacona przypisana do jenca anulowana. Sprawdzane w CaptiveCrown/ReceiverFor/CourierAccept i dobowo (CrownSweep). MoveKingdom (unia 332) zostawia jencow rodow, ktore zostaja w starej koronie. Zapis arm_rans178 +2 pola (przypisanie nagrod, wyplacone) - stary DLL je pomija.
+**Test at-367c (zapis Jeffa 09.11 01:45, 5 dob):** kod 0, bledy 22. Log: "Okupy (178): jeniec Joffrey Baratheon wraca do KARDA - KARDA nie sluzy juz koronie The North (bez krolestwa) (nagroda wyplacona ? - sprzed 367c, bez zapisu zostaje); okup i rokowania - dla KARDA."
+**Ryzyko:** niewyplacona nagroda wiernego zdobywcy przepada, gdy jenca trzyma inny rod, ktory odszedl (regula do potwierdzenia z Jeffem).
+**Kopie:** Armoury.dll.bak-2026-11-09-przed-wgranie191, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie191(-przed).
+**Status:** WGRANE (191). 367b (commit d912080c w noc/360-kopalnie) i 367d - NIE WGRANE, do polaczenia.
+
 ## WGRANIE 190 - 367a na 189 (Armoury.dll 7e8d910a -> 52d1aeaf = build 16e8c1c1); CrashScribe d7fbd602 bez zmian
 **Test at-367 (kopia zapisu Jeffa 08.11 23:00, 10 dob):** kod 0, bledy CrashScribe 23 (norma), linia startu "ROKOWANIA (366): rozmowa wpieta ... | 367 roszczenia wasali TAK (lata 5)", brak bledow CaptiveTerms/CanonCompanions i brak "IsMarriageAdequate/GetSpouseScore nieznalezione". Samej rozmowy autotest nie przechodzi (krol w niewoli gracza) - do sprawdzenia w grze: linia "ROKOWANIA (367): spis roszczen" (kto trzyma tytuly zamkow Jeffa, ceny, zgody, pary slubne).
 **367b (przejscie pod korone jenca z lennami) NIE w tym wgraniu** - odlozone do audytu fabuly ROT (CanonThroneWars, StorylineWars, WarTruce na rod).
