@@ -1,5 +1,10 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 198 - 375 na 197 (Armoury.dll c751bf18 -> d12eb39c = build c32f1e83); CrashScribe d7fbd602 bez zmian
+**Test at-375 (zapis Jeffa 02:22, 3 doby):** kod 0, bledy CrashScribe 22 (norma), "SiegeArmoury (375): opcje zbrojowni w menu oblezenia: encounter_interrupted_siege_preparations TAK (pozycja 2), menu_siege_strategies TAK (pozycja 3); DTE OpenArmoryScreen TAK". Samo otwarcie w oblezeniu - do sprawdzenia w Goldentooth u Jeffa.
+**Kopie:** Armoury.dll.bak-2026-11-09-przed-wgranie198, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie198(-przed).
+**Status:** WGRANE (198).
+
 ## 375 - zbrojownia w oblezonej twierdzy: "View Army Armory" i "Hand kit to the garrison" w menu oblezenia (SiegeArmoury.cs nowy, GarrisonKit.cs 2 linie widocznosci, ArmouryBehavior.cs 1 nasluch, Settings.cs, McmSettings.cs; na WGRANIE 197 = 760bb9d5)
 **Problem (Jeff 09.11):** "plus nie mam jak w zmaku wejsc do amroury dodaj w zamku ze wchdoze do armoury zamku obelgajacym". Gracz w srodku oblezonej twierdzy widzi tylko menu oblezenia (autotest: "menu encounter_interrupted_siege_preparations" z join_defend / break_out_of_town / leave_town) - zadnej drogi do zbrojowni.
 **Przyczyna (dekompilacja DTE v1.4.7 i gry 1.4.8):** zwykla zbrojownia wojska to DTE: opcja "Manage Armory" (army_armory_manage) TYLKO w menu "town" (AddTownMenuOptions; zamek nigdy) -> GameMenu.SwitchToMenu("army_armory_submenu") -> "View Army Armory" -> ArmyArmoryBehavior.OpenArmoryScreen (InventoryScreenHelper.OpenScreenAsStash(ArmyArmory.Armory); nasza latka QuartermasterEscrow.HoldPrefix na tej metodzie). U nas TownMenus przenosi ja do "Go to the smithy". Przycisk DTE na pasku mapy dziala tylko bez spotkania (CanOpenArmory: PlayerEncounter.Current == null). "Hand kit to the garrison" (GarrisonKit) jest tylko w menu "town"/"castle". W oblezonej twierdzy gra (EncounterGameMenuModel.GetGenericStateMenu) daje "encounter_interrupted_siege_preparations" (zwykle menu, gdy gracz czekal) albo "menu_siege_strategies" (MENU OCZEKIWANIA, AddWaitGameMenu; tick co klatke RefreshMenuOptionConditions) - zadne z nich nie ma zbrojowni.
