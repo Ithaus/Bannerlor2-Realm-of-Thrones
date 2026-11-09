@@ -11676,11 +11676,11 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public float SiegeWoundedWallDistance { get; set; } = 35f;
 
-        [SettingPropertyBool("Siege Engine Accuracy By Skill", HintText = "Siege engines (catapults, trebuchets, ballistas) shoot less true, the more so the less Engineering their operator has: every shot gets a random error to the side, in height and in range (Siege Engine Spread and Range Spread at 0 and at 300 skill, in between in a straight line). The operator's skill counts in full; ordinary soldiers have none, so the crew of a side counts half the skill of its party's or its siege's engineer. AI engines also aim at a random man of the enemy formation instead of always the nearest one, and after each shot choose at random among targets of similar worth (Siege Engine Similar Target Share). Off = as in the game", RequireRestart = false)]
+        [SettingPropertyBool("Siege Engine Accuracy By Skill", HintText = "Siege engines (catapults, trebuchets, ballistas) shoot less true, the more so the less Engineering their operator has: every shot gets a random error to the side, in height and in range (Siege Engine Spread and Range Spread at 0 and at 300 skill, in between in a straight line). The operator's skill counts in full; ordinary soldiers have none, so the crew counts a share (Siege Engine Side Engineer Share) of the skill of the best engineer of its side in the battle. AI engines also aim at a random man of the enemy formation instead of always the nearest one, and after each shot choose at random among targets of similar worth (Siege Engine Similar Target Share). Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
         public bool SiegeEngineAccuracyBySkill { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Siege Engine Spread Throwers At 0", 0.00f, 20.00f, "0.0", HintText = "With Siege Engine Accuracy By Skill: the largest aiming error in degrees of a catapult (mangonel) or trebuchet shot when the operator's Engineering is 0. The game's own error of the engine is part of it, not added on top", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Siege Engine Spread Throwers At 0", 0.00f, 20.00f, "0.0", HintText = "With Siege Engine Accuracy By Skill: about the largest aiming error in degrees of a catapult (mangonel) or trebuchet shot when the operator's Engineering is 0. Only what is above the engine's own error in the game is added, to the side in full and in height at 0.4 (a low arc turns an error in height into a much longer miss in range); the game's error and the added one together can reach a little more than this", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
         public float SiegeEngineSpreadThrowersAt0 { get; set; } = 6f;
 
@@ -11688,7 +11688,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
         public float SiegeEngineSpreadThrowersAt300 { get; set; } = 1.5f;
 
-        [SettingPropertyFloatingInteger("Siege Engine Spread Ballista At 0", 0.00f, 20.00f, "0.0", HintText = "With Siege Engine Accuracy By Skill: the largest aiming error in degrees of a ballista shot (a direct shot, so less than a throwing engine) when the operator's Engineering is 0", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Siege Engine Spread Ballista At 0", 0.00f, 20.00f, "0.0", HintText = "With Siege Engine Accuracy By Skill: about the largest aiming error in degrees of a ballista shot (a direct shot, so less than a throwing engine) when the operator's Engineering is 0. Only what is above the engine's own error in the game is added", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
         public float SiegeEngineSpreadBallistaAt0 { get; set; } = 3f;
 
@@ -11696,13 +11696,17 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
         public float SiegeEngineSpreadBallistaAt300 { get; set; } = 0.5f;
 
-        [SettingPropertyFloatingInteger("Siege Engine Range Spread At 0", 0.00f, 0.30f, "0.00", HintText = "With Siege Engine Accuracy By Skill: the largest change of a shot's speed (0.08 = up to 8% faster or slower) when the operator's Engineering is 0 - shots then fall short or long, not only to the sides. The range changes about twice as much as the speed", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Siege Engine Range Spread At 0", 0.00f, 0.30f, "0.00", HintText = "With Siege Engine Accuracy By Skill: the largest change of a shot's speed (0.03 = up to 3% faster or slower) when the operator's Engineering is 0 - shots then fall short or long, not only to the sides. The range changes about twice as much as the speed", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
-        public float SiegeEngineRangeSpreadAt0 { get; set; } = 0.08f;
+        public float SiegeEngineRangeSpreadAt0 { get; set; } = 0.03f;
 
         [SettingPropertyFloatingInteger("Siege Engine Range Spread At 300", 0.00f, 0.30f, "0.00", HintText = "With Siege Engine Accuracy By Skill: the largest change of a shot's speed when the operator's Engineering is 300", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
-        public float SiegeEngineRangeSpreadAt300 { get; set; } = 0.02f;
+        public float SiegeEngineRangeSpreadAt300 { get; set; } = 0.01f;
+
+        [SettingPropertyFloatingInteger("Siege Engine Side Engineer Share", 0.00f, 1.00f, "0.00", HintText = "With Siege Engine Accuracy By Skill: what share of the Engineering of the best engineer of its side in the battle (the engineer of a party, or the leader when it has none; the governor for a garrison without a leader) the crew of a siege engine aims with, when the operator's own skill is lower (1.0 = in full, 0 = only the operator's own skill)", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
+        public float SiegeEngineSideEngineerShare { get; set; } = 0.8f;
 
         [SettingPropertyFloatingInteger("Siege Engine Similar Target Share", 0.00f, 1.00f, "0.00", HintText = "With Siege Engine Accuracy By Skill: after each shot an AI engine chooses at random among all targets worth at least this share of the best one (0.8 = 80%), instead of keeping to its last target, and aims at a random man of an enemy formation instead of the nearest one. Targets the scene marks as ones to attack first stay first. 0 = targets chosen as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
@@ -14833,6 +14837,7 @@ namespace Armoury
             s.SiegeEngineSpreadBallistaAt300 = SiegeEngineSpreadBallistaAt300;
             s.SiegeEngineRangeSpreadAt0 = SiegeEngineRangeSpreadAt0;
             s.SiegeEngineRangeSpreadAt300 = SiegeEngineRangeSpreadAt300;
+            s.SiegeEngineSideEngineerShare = SiegeEngineSideEngineerShare;
             s.SiegeEngineSimilarTargetShare = SiegeEngineSimilarTargetShare;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;

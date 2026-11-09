@@ -28,7 +28,7 @@ namespace Armoury
     ///  (1) prefiks ShootProjectile losuje JEDEN wspolny blad strzalu (odchylenie w poziomie i w pionie, trojkatne -dod..+dod, oraz mnoznik predkosci
     ///      = rozrzut wzdluz toru), prefiks AddCustomMissile obraca kierunek kazdego pocisku tego strzalu (salwa odlamkow przesuwa sie razem, wlasny rozrzut
     ///      odlamkow zostaje). dod = max(0, cel(skill) - MaximumBallisticError instancji), cel liniowo od "przy 0" do "przy 300";
-    ///      skill = max(Engineering operatora, 0.5 x Engineering inzyniera strony) - zwykli zolnierze ROT maja 0 (ROT-Troops.xml: brak Engineering),
+    ///      skill = max(Engineering operatora, udzial (379b: 0.8, klucz) x Engineering inzyniera strony) - zwykli zolnierze ROT maja 0 (ROT-Troops.xml: brak Engineering),
     ///      inzynier ustawia i kalibruje machiny, ale nie celuje kazda sam; bohater przy machinie (gracz, towarzysz) liczy sie w pelni;
     ///  (2) postfiks PrepareTargetFromTask: gdy cel to szyk - losowy czlowiek szyku (do 6 prob, IsActive i CanShootAtAgent), inaczej zostaje wybor gry;
     ///  (3) postfiks Prepare: zdjete x2 biezacego celu, cele bez ForceTarget o wartosci >= udzial x najlepsza dostaja te sama wartosc (+-1% losowo) -
@@ -39,8 +39,11 @@ namespace Armoury
     internal static class SiegeAim379
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        private const int ErrMax = 3, AgentTries = 6;
-        private const float SideEngineerShare = 0.5f;
+        private const int ErrMax = 3, AgentTries = 6, SkillListMax = 4000;
+        // 379b: blad w pionie miotajacych x0.4 - przy niskim luku (mangonel 9-19 deg, trebusz 14-38) kat w pionie daje chybienie wzdluz toru 3-4 razy
+        // wieksze niz ten sam kat w poziomie (symulacja recenzji 2: przy pelnym pionie katapulta na murze 17% trafien zamiast 56-62% gry); balista strzela
+        // plasko - pion = wysokosc na celu, jak poziom = bok, wiec x1
+        private const float ThrowerPitchFactor = 0.4f;
 
         private static bool _installed;
         private static string _installInfo = "NIE";
@@ -65,7 +68,8 @@ namespace Armoury
 
         // liczniki misji
         private static int _shots, _missiles, _agentPicks, _similarRolls, _targetChanges, _stumbles, _errs;
-        private static double _sumSpread;
+        private static double _sumSpread, _sumYaw, _sumPitch, _sumVs;
+        private static bool _written;
         private static readonly List<int> _opSkills = new List<int>(), _effSkills = new List<int>();
 
         private static bool On { get { var s = Settings.Current; return s != null && s.SiegeEngineAccuracyBySkill; } }
@@ -137,7 +141,7 @@ namespace Armoury
                 if (a == null && __instance.PlayerForceUse) a = Agent.Main;   // NavalDLC ShipBallista: gracz strzela "na sile" (strzelec = Agent.Main dopiero w ShootProjectileAux)
                 int op = OperatorSkill(a);
                 int sideEng = SideEngineer(a);
-                int skill = Math.Max(op, (int)(SideEngineerShare * sideEng));
+                int skill = Math.Max(op, (int)(TMath.Clamp(s.SiegeEngineSideEngineerShare, 0f, 1f) * sideEng));
                 float t = TMath.Clamp(skill / 300f, 0f, 1f);
                 bool ballista = __instance is Ballista;
                 float at0 = ballista ? s.SiegeEngineSpreadBallistaAt0 : s.SiegeEngineSpreadThrowersAt0;
@@ -146,13 +150,15 @@ namespace Armoury
                 float extra = Math.Max(0f, target - BaseError(__instance));
                 float vs = Math.Max(0f, s.SiegeEngineRangeSpreadAt0 + (s.SiegeEngineRangeSpreadAt300 - s.SiegeEngineRangeSpreadAt0) * t);
                 _ctxYaw = (extra * Tri()) * (TMath.PI / 180f);
-                _ctxPitch = (extra * Tri()) * (TMath.PI / 180f);
+                _ctxPitch = ((ballista ? 1f : ThrowerPitchFactor) * extra * Tri()) * (TMath.PI / 180f);
                 _ctxSpeed = TMath.Clamp(1f + vs * Tri(), 0.5f, 1.5f);
                 _ctxOn = extra > 0f || vs > 0f;
                 _shots++;
                 _sumSpread += target;
-                _opSkills.Add(op);
-                _effSkills.Add(skill);
+                _sumYaw += Math.Abs(_ctxYaw) * (180f / TMath.PI);
+                _sumPitch += Math.Abs(_ctxPitch) * (180f / TMath.PI);
+                _sumVs += Math.Abs(_ctxSpeed - 1f);
+                if (_opSkills.Count < SkillListMax) { _opSkills.Add(op); _effSkills.Add(skill); }   // klucz wlaczony w trakcie misji (bez Logic) - listy nie rosna bez konca
             }
             catch (Exception e) { _ctxOn = false; Stumble("ShootPrefix", e); }
         }
@@ -210,7 +216,9 @@ namespace Armoury
             catch (Exception e) { Stumble("OperatorSkill", e); return 0; }
         }
 
-        // inzynier strony: wiekszy z (inzynier oddzialu operatora, inzynier strony oblezenia gry); 0 poza kampania
+        // inzynier strony: wiekszy z (inzynier oddzialu operatora, najlepszy inzynier oddzialow tej strony bitwy); 0 poza kampania.
+        // 379b: strona z MapEvent.PlayerMapEvent.PartiesOnSide(strona druzyny) - strony misji = strony bitwy gry; dawniej SiegeEventModel.GetEffectiveSiegePartyForSide,
+        // ktory zawsze daje Attacker = oblegajacy (cs_full :69603), a przy wypadzie / odsieczy Attacker misji to oblezeni - strony dostawaly inzyniera wroga
         private static int SideEngineer(Agent a)
         {
             if (a == null || Campaign.Current == null) return 0;
@@ -236,11 +244,16 @@ namespace Armoury
                     if (_sideEng[i] < 0)
                     {
                         _sideEng[i] = 0;
-                        SiegeEvent se = PlayerSiege.PlayerSiegeEvent;
-                        if (se == null) { var me = MapEvent.PlayerMapEvent; se = me != null && me.MapEventSettlement != null ? me.MapEventSettlement.SiegeEvent : null; }
-                        var model = Campaign.Current.Models != null ? Campaign.Current.Models.SiegeEventModel : null;
-                        var mp = se != null && model != null ? model.GetEffectiveSiegePartyForSide(se, team.Side) : null;
-                        if (mp != null) _sideEng[i] = PartyEngineer(mp.Party);
+                        var me = MapEvent.PlayerMapEvent;
+                        var parties = me != null ? me.PartiesOnSide(team.Side) : null;
+                        if (parties != null)
+                            for (int k = 0; k < parties.Count; k++)
+                            {
+                                var mep = parties[k];
+                                if (mep == null || mep.Party == null) continue;
+                                if (!_partyEng.TryGetValue(mep.Party, out int pe)) { pe = PartyEngineer(mep.Party); _partyEng[mep.Party] = pe; }
+                                if (pe > _sideEng[i]) _sideEng[i] = pe;
+                            }
                     }
                     best = Math.Max(best, _sideEng[i]);
                 }
@@ -342,7 +355,8 @@ namespace Armoury
         private static void Reset()
         {
             _shots = _missiles = _agentPicks = _similarRolls = _targetChanges = _stumbles = _errs = 0;
-            _sumSpread = 0;
+            _sumSpread = _sumYaw = _sumPitch = _sumVs = 0;
+            _written = false;
             _opSkills.Clear();
             _effSkills.Clear();
             _engMission = null;
@@ -371,20 +385,39 @@ namespace Armoury
 
             protected override void OnEndMission()
             {
+                Write();
+                Reset();
+                base.OnEndMission();
+            }
+
+            // 379b: misja bez OnEndMission (np. odwrot) - linia tu, raz (Reset po zapisie zeruje liczniki, _written chroni przed podwojnym wpisem)
+            public override void OnRemoveBehavior()
+            {
+                Write();
+                Reset();
+                _written = true;
+                base.OnRemoveBehavior();
+            }
+
+            private static void Write()
+            {
+                if (_written) return;
+                _written = true;
                 try
                 {
                     if (_shots > 0 || _agentPicks > 0 || _similarRolls > 0 || _stumbles > 0)
                     {
-                        Log.Info("Celnosc machin (379): strzalow " + _shots + " (pociskow " + _missiles + "), sredni rozrzut "
-                                 + (_shots > 0 ? (_sumSpread / _shots).ToString("0.00", Inv) : "-") + " deg, operatorzy Engineering min/med/max "
+                        string f(double v) { return v.ToString("0.00", Inv); }
+                        Log.Info("Celnosc machin (379): strzalow " + _shots + " (pociskow " + _missiles + "), rozrzut nastawy (max) sredni "
+                                 + (_shots > 0 ? f(_sumSpread / _shots) : "-") + " deg, dodany blad sredni poziom/pion "
+                                 + (_shots > 0 ? f(_sumYaw / _shots) + "/" + f(_sumPitch / _shots) : "-") + " deg, predkosc +-"
+                                 + (_shots > 0 ? (100.0 * _sumVs / _shots).ToString("0.0", Inv) : "-") + "%, operatorzy Engineering min/med/max "
                                  + MinMedMax(_opSkills) + " (z inzynierem strony " + MinMedMax(_effSkills) + "), cele losowe szyku " + _agentPicks
                                  + ", losowania wsrod podobnych " + _similarRolls + ", zmiany celu " + _targetChanges + ", potkniecia " + _stumbles
                                  + " | latki " + _installInfo + ".");
                     }
                 }
-                catch (Exception e) { Stumble("OnEndMission", e); }
-                Reset();
-                base.OnEndMission();
+                catch (Exception e) { Stumble("Write", e); }
             }
         }
     }
