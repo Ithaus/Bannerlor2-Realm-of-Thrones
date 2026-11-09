@@ -16,7 +16,7 @@ namespace Armoury
     ///  - gracz-wodz: AssignPlayerRoleInTeamMissionController.OnTeamDeployed daje kazdemu szykowi druzyny gracza PlayerOwner -> SetControlledByAI(false),
     ///    czyli IsAIControlled = false (log 370: szyki strony O "(gracz)");
     ///  - StonePile.TickOccasionally: gdy w VolumeBox pod murem sa atakujacy, wybiera szyk obroncow z najblizszym czlowiekiem i wola
-    ///    bestFormation.StartUsingMachine(this) BEZ flagi rozkazu gracza; FormationExtensions.StartUsingMachine robi JoinDetachment tylko gdy
+    ///    bestFormation.StartUsingMachine(this) BEZ flagi rozkazu gracza; ModuleExtensions.StartUsingMachine robi JoinDetachment tylko gdy
     ///    isPlayerOrder || IsAIControlled -> dla szyku gracza cicha no-op co 0.5-1 s, a ze szyk gracza jest najblizszy, kamieni nie dostaje nikt;
     ///    zwolnienie (ReleaseAllUserAgentsAndFormations -> StopUsingMachine bez flagi) - ta sama no-op;
     ///  - machiny miotajace gra obsadza dobrze (SiegeWeapon.TickAux: StartUsingMachine(this, !formation.IsAIControlled)) - blad dotyczy tylko kamieni;
@@ -89,7 +89,7 @@ namespace Armoury
             hits = 0;
             try
             {
-                MethodInfo o = AccessTools.DeclaredMethod(typeof(FormationExtensions), orig, new[] { typeof(Formation), typeof(UsableMachine), typeof(bool) });
+                MethodInfo o = AccessTools.DeclaredMethod(typeof(ModuleExtensions), orig, new[] { typeof(Formation), typeof(UsableMachine), typeof(bool) });
                 MethodInfo r = AccessTools.DeclaredMethod(typeof(SiegeStones383), repl);
                 if (o == null || r == null) { hits = -1; return L; }
                 foreach (var c in L)
@@ -113,7 +113,7 @@ namespace Armoury
             return L;
         }
 
-        /// <summary>Zamiast FormationExtensions.StartUsingMachine w StonePile.TickOccasionally.</summary>
+        /// <summary>Zamiast ModuleExtensions.StartUsingMachine w StonePile.TickOccasionally.</summary>
         public static void Start(Formation formation, UsableMachine usable, bool isPlayerOrder)
         {
             bool force = false;
@@ -121,7 +121,8 @@ namespace Armoury
             {
                 if (!isPlayerOrder && formation != null && On && !formation.IsAIControlled && formation.Team != null
                     && formation.Team.Side == BattleSideEnum.Defender && Mission.Current != null && !Mission.Current.IsMissionEnding
-                    && formation.GetReadonlyMovementOrderReference().OrderEnum != MovementOrder.MovementOrderEnum.Retreat)
+                    && formation.GetReadonlyMovementOrderReference().OrderEnum != MovementOrder.MovementOrderEnum.Retreat
+                    && HasVolumeBoxes(usable))
                     force = true;
             }
             catch (Exception e) { Stumble("Start", e); }
@@ -129,7 +130,25 @@ namespace Armoury
             formation.StartUsingMachine(usable, isPlayerOrder || force);
         }
 
-        /// <summary>Zamiast FormationExtensions.StopUsingMachine w StonePile.ReleaseAllUserAgentsAndFormations.</summary>
+        // 383b: kupa bez VolumeBox (gra: _volumeBoxTimerPairs.Count == 0 -> "flag" stale prawdziwe) wolalaby ludzi przez cala bitwe, takze bez
+        // atakujacych pod murem - dla szyku gracza flagi wtedy nie dajemy (zachowanie gry). Pole czytane refleksja, wynik pamietany per kupa w misji.
+        private static readonly FieldInfo _fBoxes = AccessTools.Field(typeof(StonePile), "_volumeBoxTimerPairs");
+        private static readonly Dictionary<UsableMachine, bool> _boxes = new Dictionary<UsableMachine, bool>();
+        private static int _noBoxPiles;
+
+        private static bool HasVolumeBoxes(UsableMachine usable)
+        {
+            if (usable == null || _fBoxes == null) return false;
+            bool has;
+            if (_boxes.TryGetValue(usable, out has)) return has;
+            var c = _fBoxes.GetValue(usable) as System.Collections.ICollection;
+            has = c != null && c.Count > 0;
+            _boxes[usable] = has;
+            if (!has) _noBoxPiles++;
+            return has;
+        }
+
+        /// <summary>Zamiast ModuleExtensions.StopUsingMachine w StonePile.ReleaseAllUserAgentsAndFormations.</summary>
         public static void Stop(Formation formation, UsableMachine usable, bool isPlayerOrder)
         {
             bool force = false;
@@ -142,6 +161,7 @@ namespace Armoury
         private static void Reset()
         {
             _forcedStart = _forcedStop = _throws = _hits = _stumbles = _errs = 0;
+            _boxes.Clear(); _noBoxPiles = 0;
             _stoneIds.Clear();
             _stoneIds.Add("boulder");
         }
@@ -268,7 +288,7 @@ namespace Armoury
                     if (!write || (piles == 0 && engines == 0 && _forcedStart == 0 && _stumbles == 0)) return;
                     Log.Info("Kamienie (383)" + tag + ": klucz " + (On ? "TAK" : "NIE") + ", kup " + piles + ", obsadzone " + manned + ", pustych " + empty
                              + ", kamieni pobranych " + taken + " (zostalo " + left + "), rzutow " + _throws + ", trafien " + _hits
-                             + ", przydzialow szykom gracza " + _forcedStart + " (zwolnien " + _forcedStop + "), machin obrony obsadzonych "
+                             + ", przydzialow szykom gracza " + _forcedStart + " (zwolnien " + _forcedStop + ", kup bez strefy pod murem " + _noBoxPiles + "), machin obrony obsadzonych "
                              + enginesManned + "/" + engines + ", czas misji " + (Mission != null ? Mission.CurrentTime.ToString("0", Inv) : "-")
                              + " s, potkniecia " + _stumbles + " | latki " + _installInfo + ".");
                 }
