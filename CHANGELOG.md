@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## MODY 09.11 12:00 - Vanilla AI Sieges for RBM 1.1.0 + Dynamic Reinforcements BattleSize Large (1500) (bez zmiany DLL naszych modow)
+**Decyzja Jeffa:** "Vanilla AI Sieges for RBM wgraj to" (zip z Pobranych, Nexus 7216) i "daj tryb large" (bitwy 1500 zamiast 1000).
+**Problem:** oblezenie Goldentooth 09.11 10:58 - atakujacy staneli 40-120 m od murow, taran/wieza/drabiny nie ruszyly, lucznicy obroncow przestali strzelac. RBM (RBMAI.SiegePatches) podmienia AI oblezen (BehaviorShootFromCastleWalls prefiks return false, StopUsingAllMachines, StopUsingStrategicAreas, Scatter dla machin/drabin).
+**Zmiana:** Modules/VanillaAiSiegesforRBM (Id VanillaAISiegesforRBM) w LauncherData.xml po RBM_WS, przed EpicSieges (kopia LauncherData.xml.bak-2026-11-09-przed-vais). Ustawienia MCM tego moda z lutego mialy wylaczone wlasnie lucznikow na murach, machiny i obrone zamku - wlaczone: RestoreBehaviorShootFromCastleWalls, RestoreBehaviorUseSiegeMachines, RestoreTacticDefendCastle, RestoreLadderQueueManager = true (kopia .json.bak-2026-11-09). Mod przy starcie misji (AfterStart) zdejmuje latki com.rbmai z tych metod (na reszte procesu - dotyczy tylko oblezen). DynamicReinforcements_v1.json BattleSize 0 -> 1 (Large: GetRealBattleSize x1.5 = 1500; MaxAgentsOnField 1500 bez zmian) (kopia .json.bak-2026-11-09-przed-large).
+**Ryzyko / co sprawdzic:** zgodnosc z 1.4.8 (mod podaje 1.3.10) - komunikaty "Restored vanilla ..." w pierwszym oblezeniu; Epic Sieges zdejmuje ten sam prefiks drabin (drugi juz nic nie znajdzie - nieszkodliwe); bitwy 1500 - wydajnosc i limit 2048 agentow z konmi; linia 370 (gdy wgrana) pokaze zachowania szykow.
+**Status:** WGRANE (pliki modow i ustawien), DO SPRAWDZENIA w grze.
+
 ## WGRANIE 194 - 369 na 193 (Armoury.dll 0400cebf -> 73231668 = build a618a859) + Epic Sieges 1.1.6 + RBM KeepBattleEnabled 1
 **Test at-369 (zapis Jeffa 10:54):** NIE DOTARL - gracz w oblezonym Goldentooth (menu encounter_interrupted_siege_preparations), autotest nie umie wyjsc; 369 bez bledow, naprawa Ashemark "czeka - gracz w osadzie". **Test at-369b (zapis 02:22, 10 dob):** kod 0, bledy 22, "Roszczenia gracza (369)" start OK, naprawa "nie dotyczy" (Ashemark u KARDA).
 **Do sprawdzenia w grze Jeffa:** po wyjsciu z Goldentooth na mape linia "Roszczenia gracza (369): naprawa Ashemark ... WYKONANA - Ashemark od Marbrandow -> Mormont" i roszczenie; termin - przed dniem 109807 (wygasa weto 326b).
