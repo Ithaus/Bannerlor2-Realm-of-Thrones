@@ -30,6 +30,9 @@ namespace Armoury
     ///    CaptureDefeatedPartyMembers gry); ksiega ludzi PeopleBook.Transfer(FCaptured). Kazdy ranny ma jedno miejsce. Typ, ktorego gra nie bierze w niewole
     ///    (BattleRewardModel.CanTroopBeTakenPrisoner), zostaje.
     ///  - bohaterowie: zywy, ranny, nie jeniec, bez znaku smierci, CanBecomePrisoner, Occupation != Special, w partii po stronie atakujacej -&gt; TakePrisonerAction.Apply(osada).
+    ///    373b (crash 09.11 19:43): WODZ PARTII (i wodz armii) zostaje w swojej partii jak w grze - TakePrisonerAction robi tylko RemovePartyLeader, armii nie
+    ///    rusza; partia bez wodza zostawala w armii i Army.HourlyTick -> ThinkAboutCohesionBoost -> CalculatePartyInfluenceCost rzucal NRE (armyLeaderParty.LeaderHero).
+    ///    Gra nigdy nie zostawia partii bez wodza w armii (KillCharacterAction: najpierw DisbandArmyAction / Army = null, potem nastepca albo StartDisband).
     ///  - zdarzenia OnPrisonerTaken (rozbieranie jencow 3792) NIE odpalamy - jak w grze przy zwyklym pojmaniu zolnierzy w bitwie (to robi tylko ekran / loot).
     /// Wyjatek per partia / typ / bohater = potkniecie, bez globalnego wylacznika. Ksiega tylko w pamieci (wczytanie w trakcie bitwy - gubi wpis, log przy czyszczeniu).
     /// </summary>
@@ -224,6 +227,11 @@ namespace Armoury
             SiegeWounded373.Book.Clear();
             if (stale > 0) Log.Info("Ranni pod murami (373): ksiega z poprzedniej gry wyczyszczona (" + stale + " bitew bez rozliczenia).");
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
+            // 373b: armie z partia bez wodza (zapis sprzed poprawki) - naprawa + bezpieczniki Army.HourlyTick / CalculatePartyInfluenceCost
+            ArmyRepair373b.Reset();
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, delegate (CampaignGameStarter g) { ArmyRepair373b.SessionStart(); });
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, ArmyRepair373b.OnTick);
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, ArmyRepair373b.Daily);
         }
 
         public override void SyncData(IDataStore dataStore) { }
@@ -303,8 +311,7 @@ namespace Armoury
                 }
                 // bohaterowie spod murow
                 var names = new List<string>();
-                int hMissed = 0;
-                bool chief = false;
+                int hMissed = 0, hLeads = 0;
                 Hero leader = null;
                 try { var lp = me.AttackerSide.LeaderParty; leader = lp != null ? lp.LeaderHero : null; } catch { leader = null; }
                 foreach (var h in t.Heroes)
@@ -315,7 +322,8 @@ namespace Armoury
                         if (h == null || h == Hero.MainHero || !h.IsAlive || !h.IsWounded || h.IsPrisoner || hp == null || !parties.Contains(hp.Party)
                             || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner())
                         { hMissed++; continue; }
-                        if (h == leader) chief = true;
+                        // 373b: wodz partii / wodz armii / wodz strony zostaje z ludzmi (jak w grze bez 373) - inaczej partia bez wodza w armii = NRE w Army.HourlyTick
+                        if (h == leader || hp.LeaderHero == h) { hLeads++; continue; }
                         TakePrisonerAction.Apply(captor, h);
                         string nm = h.Name != null ? h.Name.ToString() : h.StringId;
                         names.Add(nm);
@@ -328,7 +336,7 @@ namespace Armoury
                 var tb = new StringBuilder();
                 foreach (var kv in types) tb.Append(tb.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
                 Log.Info("Ranni pod murami (373): osada " + t.St + " | do lochu " + moved + " (typy: " + (tb.Length > 0 ? tb.ToString() : "-") + "), bohaterowie " + names.Count
-                         + " [" + string.Join(", ", names) + "]" + (hMissed > 0 ? " (pominieci " + hMissed + ")" : "") + (chief ? " | WODZ OBLEZENIA POJMANY" : "")
+                         + " [" + string.Join(", ", names) + "]" + (hMissed > 0 ? " (pominieci " + hMissed + ")" : "") + " | wodzowie partii pominieci (373b) " + hLeads
                          + " | zapisanych " + saved + ", nie bylo juz wsrod rannych partii " + missing + (notTaken > 0 ? ", bez niewoli (typ) " + notTaken : "")
                          + " | loch " + l0 + " -> " + prison.TotalManCount + " | ksiega ludzi " + book.ToString("0", CultureInfo.InvariantCulture)
                          + " | partie oproznione " + emptied + " | potkniecia " + s + ".");

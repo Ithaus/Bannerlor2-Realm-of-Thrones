@@ -11668,7 +11668,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool SiegeDefenderArchersToWalls { get; set; } = true;
 
-        [SettingPropertyBool("Siege Wounded Taken Prisoner", HintText = "With Siege Assault Break Mission, in an assault on a fortress you defend yourself: when the assault breaks and the enemy falls back, its wounded who lie inside the fortress or close beneath the walls cannot be carried away - they are taken prisoner into the fortress dungeon, lords among them. Wounded lying farther out go back with their army. Off = all the enemy's wounded go back with their army, as in the game", RequireRestart = false)]
+        [SettingPropertyBool("Siege Wounded Taken Prisoner", HintText = "With Siege Assault Break Mission, in an assault on a fortress you defend yourself: when the assault breaks and the enemy falls back, its wounded who lie inside the fortress or close beneath the walls cannot be carried away - they are taken prisoner into the fortress dungeon, lords among them - but a lord who leads a party stays with his men. Wounded lying farther out go back with their army. Off = all the enemy's wounded go back with their army, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeWoundedTakenPrisoner { get; set; } = true;
 
