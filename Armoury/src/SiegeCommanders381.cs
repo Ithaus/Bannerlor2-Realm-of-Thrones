@@ -33,12 +33,14 @@ namespace Armoury
     ///  - zostali sami: 2 skany z rzedu bez zadnego innego walczacego czlowieka atakujacych i bez odwodu spawnera - wodzowie odstepuja (Agent.Retreat
     ///    do najblizszego wyjscia, jak 371) - inaczej misja stalaby bez konca (obroncy nie schodza z murow).
     /// Linie logu: 'Wodzowie (381): start ...' (ilu, imiona, odleglosc od obroncow), 'dolaczyl' (posilki), 'koniec misji' (ilu padlo / rannych, z imionami).
+    /// 381b (recenzja): odwrot (_broken) tylko gdy polowa strony ucieka; posilek do oproznionego szyku 8 - AI szyku znow wylaczone; punkt z planu
+    /// tylko w granicach pola i do 400 m od lordow; 'zostali sami' liczone takze przy kluczu wylaczonym w bitwie i przy nieznanym spawnerze (8 skanow).
     /// Wyjatek per czlowiek / druzyna = potkniecie (log 3 pierwszych), bez globalnego wylacznika.
     /// </summary>
     internal sealed class SiegeCommanders381 : MissionLogic
     {
-        private const float ScanEvery = 2f, NoDeployStart = 10f, SafeDist = 150f, Step = 10f;
-        private const int ErrMax = 3, NamesMax = 30;
+        private const float ScanEvery = 2f, NoDeployStart = 10f, SafeDist = 150f, Step = 10f, MaxPlanFar = 400f;
+        private const int ErrMax = 3, NamesMax = 30, UnknownHits = 8;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private sealed class Hold
@@ -100,10 +102,12 @@ namespace Armoury
                 }
                 if (now < _nextScan) return;
                 _nextScan = now + ScanEvery;
-                if (!On) return;                                   // klucz NIE w trakcie - nic nowego (juz odsunieci stoja, gdzie stoja)
-                Scan(m);
-                if (!_startLogged && _moved.Count > 0) LogStart(m);
-                Alone(m);
+                if (On)                                            // klucz NIE w trakcie - nic nowego (juz odsunieci stoja, gdzie stoja)
+                {
+                    Scan(m);
+                    if (!_startLogged && _moved.Count > 0) LogStart(m);
+                }
+                Alone(m);                                          // 381b: takze przy kluczu wylaczonym w bitwie - odsunieci nie moga zawiesic misji
             }
             catch (Exception e) { Stumble("Tick", e); }
         }
@@ -111,6 +115,7 @@ namespace Armoury
         /// <summary>Spis bohaterow-lordow atakujacych i przeniesienie do szyku 8; pilnowanie, by szyk 8 nie wrocil pod AI druzyny.</summary>
         private void Scan(Mission m)
         {
+            if (!_broken && SideRouting(m)) _broken = true;       // 381b: odwrot strony (371 / 378 / zalamanie morale), nie pojedynczy uciekajacy
             foreach (var t in m.Teams)
             {
                 try
@@ -124,7 +129,7 @@ namespace Armoury
                         try
                         {
                             if (!Lord(a)) continue;
-                            if (a.IsRunningAway) { _broken = true; continue; }
+                            if (a.IsRunningAway) continue;               // 381b: sam jeden uciekajacy lord nie gasi pilnowania szyku 8
                             if (h == null) h = HoldOf(m, t);
                             if (h == null || h.F == null) break;
                             if (a.Formation == h.F) { Record(a, h); continue; }   // bez RBM: wodz juz w szyku wodza gry (przejetym)
@@ -142,6 +147,23 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Team", e); }
             }
+        }
+
+        /// <summary>381b: strona atakujacych w odwrocie - co najmniej polowa jej ludzi w polu ucieka (zapasc 371 cofa wszystkich naraz).</summary>
+        private static bool SideRouting(Mission m)
+        {
+            int all = 0, run = 0;
+            foreach (var t in m.Teams)
+            {
+                if (!MissionTeams.Valid(t) || t.Side != BattleSideEnum.Attacker) continue;
+                foreach (var a in t.ActiveAgents)
+                {
+                    if (a == null || !a.IsHuman) continue;
+                    all++;
+                    if (a.IsRunningAway) run++;
+                }
+            }
+            return all > 0 && run * 2 >= all;
         }
 
         private static bool Lord(Agent a)
@@ -177,7 +199,13 @@ namespace Armoury
                 {
                     m.SetFormationPositioningFromDeploymentPlan(f);
                     h.Pos = f.CreateNewOrderWorldPosition(WorldPosition.WorldPositionEnforcedCache.GroundVec3);
-                    planned = h.Pos.IsValid && h.Pos.GetNavMesh() != UIntPtr.Zero;
+                    planned = h.Pos.IsValid && h.Pos.GetNavMesh() != UIntPtr.Zero && m.IsPositionInsideBoundaries(h.Pos.AsVec2);
+                    if (planned)
+                    {
+                        // 381b: plan bez punktu startu dla szyku 8 (WorldFrame.Invalid) daje stare / zerowe polozenie - musi byc blisko lordow
+                        foreach (var a in t.ActiveAgents)
+                            if (Lord(a)) { if (a.Position.AsVec2.Distance(h.Pos.AsVec2) > MaxPlanFar) planned = false; break; }
+                    }
                 }
                 catch (Exception e) { Stumble("Plan", e); }
                 if (!planned)
@@ -253,6 +281,13 @@ namespace Armoury
             var old = a.Formation;
             if (a.IsUsingGameObject) a.StopUsingGameObject(false, Agent.StopUsingGameObjectFlags.None);
             a.Formation = h.F;
+            if (!_broken && h.Placed && h.F.IsAIControlled)
+            {
+                // 381b: szyk 8 oprozniony wczesniej - gra (Formation.RemoveUnit) wlaczyla mu AI; posilek nie moze pojsc z nim pod mury
+                h.F.SetControlledByAI(false);
+                h.F.SetMovementOrder(MovementOrder.MovementOrderMove(h.Pos));
+                _reAi++;
+            }
             h.T.TriggerOnFormationsChanged(h.F);
             h.F.QuerySystem.Expire();
             if (old != null && old != h.F)
@@ -307,9 +342,9 @@ namespace Armoury
             }
             int rem = -1;                                      // spawner nieznany - nie zgadujemy, czy odwod jeszcze przyjdzie
             try { var sp = m.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>(); if (sp != null) rem = Math.Max(0, sp.NumberOfRemainingAttackerTroops); } catch (Exception e) { Stumble("Spawn", e); }
-            if (rem < 0) return;
+            // 381b: spawner nieznany - nie wiemy o odwodzie; czekamy dluzej (UnknownHits skanow bez zadnego innego atakujacego), potem odstepujemy
             if (ours == 0 || others > 0 || rem > 0) { _aloneHits = 0; return; }
-            if (++_aloneHits < 2) return;
+            if (++_aloneHits < (rem < 0 ? UnknownHits : 2)) return;
             _alone = true;
             int sent = 0;
             foreach (var a in _moved)
