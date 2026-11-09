@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 09.11 17:45 - WGRANIE 199 (374 + 375 + 376)
+
+- Armoury.dll ed3142db (galaz noc/367c-jeniec-po-odejsciu, d66f4518); przed: d12eb39c (.bak-2026-11-09-przed-wgranie199, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie199*). CrashScribe bez zmian d7fbd602.
+- Autotest at-376: 5 dob, 2 bitwy, arena, bledy 23 (zwykle), zapisy Jeffa nietkniete; gra zawisla przy zamykaniu - zabita recznie (kod 1 tylko z tego powodu).
+- 374 honorowe poddanie (hero_main_options, rozmowa wpieta), 375 zbrojownia w oblezonym zamku, 376 armia ratunkowa regenta przy jencu-wladcy.
+- Do sprawdzenia w grze Jeffa (zapis 23:00, Joffrey w niewoli): linie 'Odbicie (222/376)' - 'regent', 'cel armii ratunkowej', komunikat 'The crown musters a host...' po ok. 3 dobach; autotest tego nie pokazal (w zapisie testowym brak jenca-wladcy).
+
 ## STAN 09.11.2026 16:35 CET: WGRANIE 198 (najnowszy) = noc/367c-jeniec-po-odejsciu c32f1e83 (Armoury.dll d12eb39c, CrashScribe d7fbd602) = 196 + 372/372b/373 (197) + 375 (198)
 - 371 POTWIERDZONE w grze Jeffa (Goldentooth 14:46: ZALAMANIE przy 436/435 strat, DefenderVictory, oblezenie trwa).
 - SPRAWDZIC w nastepnym szturmie: "Szturm (372)" (brak Retreating, drabiny po 60 s), "Strzelcy na mury (372b)", "Ranni pod murami (373)", "SiegeArmoury (375)" (otwarcie zbrojowni w oblezeniu bez CTD).
