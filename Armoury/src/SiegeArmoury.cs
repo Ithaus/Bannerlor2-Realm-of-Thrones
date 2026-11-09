@@ -111,9 +111,9 @@ namespace Armoury
             try
             {
                 if (_open == null) return;
+                _open.Invoke(null, null);   // log PO otwarciu - jesli ekran rzuci, w logu tylko potkniecie, nie "otwarta"
                 _opened++;
                 Log.Info(P + "zbrojownia wojska otwarta w oblezonej " + Name(BesiegedHere()) + " (" + _opened + ". raz w sesji).");
-                _open.Invoke(null, null);
             }
             catch (Exception e) { Stumble("ArmoryConsequence", e); }
         }
@@ -132,8 +132,8 @@ namespace Armoury
         {
             try
             {
-                Log.Info(P + "kit dla zalogi otwarty w oblezonej " + Name(BesiegedHere()) + ".");
                 GarrisonKit.Consequence(args);   // ekran ekwipunku, bez przelaczania menu
+                Log.Info(P + "kit dla zalogi otwarty w oblezonej " + Name(BesiegedHere()) + ".");
             }
             catch (Exception e) { Stumble("KitConsequence", e); }
         }
