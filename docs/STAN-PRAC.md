@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 09.11 20:55 - WGRANIE 201 (373b, 378-383)
+
+- Armoury.dll aadb2bbf (galaz noc/367c-jeniec-po-odejsciu, 9a97197d); przed: 7036ba6c (.bak-2026-11-09-przed-wgranie201, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie201*).
+- CRASH Jeffa 19:43: 373 wzial do lochu rannych wodzow partii (96 bohaterow, w tym Galbart, Roose Bolton, Greatjon, Blackfish) -> armia z partia bez wodza -> NRE Army.HourlyTick. 373b: wodzowie partii pomijani, ArmyRepair373b (skan + 2 bezpieczniki). Zapis Ironman 19:43 (kopia D:/Backup-Bannerlord/zapisy-testowe/...-1943-po-crashu373.sav) ma tych lordow w lochu - decyzja Jeffa: wypuscic wodzow czy zostawic (czeka).
+- Autotest at-383: 5 dob, 2 bitwy, bledy 23, latki 379 4/4, 383 2/2, 373b bezpieczniki TAK. Po crashu Jeffa start gry wisial na oknie Safe Mode (at-380, at-382 nic nie sprawdzily) - odpowiedz No (pamiec autotest-safe-mode-po-crashu).
+- 378 limit czasu szturmu 30 min; 379 celnosc machin wg Engineering; 380 okno jencow i lupu po odpartym szturmie; 381 wodzowie AI-atakujacych z tylu; 382 nadzy bohaterowie AI - pomiar + puste sloty ze wzorca (suknie zostaja - decyzja Jeffa czeka); 383 kamienie nad brama dla szykow gracza-wodza.
+- Do sprawdzenia przy wczytaniu 19:43: linia 'Armie bez wodza (373b): start sesji' i brak NRE po kilku godzinach mapy; w obronie: 'Wodzowie (381)', 'Kamienie (383)', 'Celnosc machin (379)', 'Okno jencow i lupu (380)', 'Nadzy (382)'.
+
 ## STAN 09.11 19:05 - WGRANIE 200 (377 + 371b)
 
 - Armoury.dll 7036ba6c (galaz noc/367c-jeniec-po-odejsciu, 16c9c907); przed: ed3142db (.bak-2026-11-09-przed-wgranie200, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie200*).
