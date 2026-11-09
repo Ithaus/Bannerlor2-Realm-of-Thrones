@@ -186,7 +186,7 @@ namespace Armoury
         /// <summary>Suknia i obuwie kobiece (ROT nie ma NotUsableByMale - heurystyka nazw, jak w rozpoznaniu m117).</summary>
         private static readonly string[] FemaleWords = { "dress", "female", "lady", "gown", "woman", "maiden", "wench", "bride" };
 
-        private static bool Female(ItemObject it)
+        internal static bool Female(ItemObject it)        // 382c: internal - ta sama regula sukni w HeroDress382
         {
             if ((it.ItemFlags & ItemFlags.NotUsableByMale) != 0) return true;
             string id = (it.StringId ?? "").ToLowerInvariant();
@@ -199,7 +199,7 @@ namespace Armoury
         /// i straznikom neutral_culture przeszywanice z flaga Civilian ("Short Gambeson over Tunic", "Infantryman Long Gambeson", "Corsair Cloth Armor").</summary>
         private static readonly string[] ArmourWords = { "gambeson", "padded", "quilted", "armor", "armour", "mail", "plate", "lamellar", "scale", "brigandine", "cuirass", "hauberk" };
 
-        private static bool Armour(ItemObject it)
+        internal static bool Armour(ItemObject it)        // 382c: internal - HeroDress382 odroznia stroj od zbroi
         {
             string id = (it.StringId ?? "").ToLowerInvariant();
             string nm = it.Name != null ? it.Name.ToString().ToLowerInvariant() : "";

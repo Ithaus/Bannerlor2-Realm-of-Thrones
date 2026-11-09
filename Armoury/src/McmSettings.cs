@@ -908,9 +908,13 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool HeroSkillToOwnGear { get; set; } = false;
 
-        [SettingPropertyBool("AI Heroes Never Fight Bare", HintText = "In battle, an AI lord or lady (not you, not your clan - you dress them yourself; not the undead) who would come out without any body armour or without any weapon at all gets the empty places filled for that battle only, from his own gear template in the game data (or, when he has none, from a lord's template of his culture and sex): all the weapons of one set when he has none, and each empty armour place (head, body, legs, gloves, cape) when his body armour is missing. Within his Athletics (Hero Gear Requirements), never renowned or legendary pieces. A gown worn as body armour stays on. His own gear on the map does not change and nothing is added to the world. Every such lord is written to the log ('Nadzy (382)'). Off = only the log, nobody is dressed", RequireRestart = false)]
+        [SettingPropertyBool("AI Heroes Never Fight Bare", HintText = "In battle, an AI lord or lady (not you, not your clan - you dress them yourself; not the undead) who would come out without any body armour or without any weapon at all gets the empty places filled for that battle only, from his own gear template in the game data (or, when he has none, from a lord's template of his culture and sex): all the weapons of one set when he has none, and each empty armour place (head, body, legs, gloves, cape) when his body armour is missing. Within his Athletics (Hero Gear Requirements), never renowned or legendary pieces. A gown or plain clothes worn as body armour are changed for armour when AI Heroes Armour Over Dress is on. His own gear on the map does not change and nothing is added to the world. Every such lord is written to the log ('Nadzy (382)'). Off = only the log, nobody is dressed", RequireRestart = false)]
         [SettingPropertyGroup("Skills rule the gear")]
         public bool AiHeroesNeverFightBare { get; set; } = true;
+
+        [SettingPropertyBool("AI Heroes Armour Over Dress", HintText = "In battle, an AI lady or lord (not you, not your clan - you dress them yourself; not the undead) who would come out in a gown or in plain clothes (tunic, noble clothes) instead of body armour gets body armour for that battle only, and a helmet, leggings and gloves where those are missing or plain too: from her own battle gear template in the game data without the gown, else from the lords' templates of her culture (for a lady first the ladies', then the men's). Within Athletics (Hero Gear Requirements), never renowned or legendary pieces; when no armour fits, the gown stays. Her own gear on the map does not change and nothing is added to the world. Works only with AI Heroes Never Fight Bare on. Counted in the log line 'Nadzy (382)'. Off = gowns stay on in battle", RequireRestart = false)]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool AiHeroesArmourOverDress { get; set; } = true;
 
         [SettingPropertyInteger("Weapon Skill Per Tier", 0, 140, "0", HintText = "Weapon Tier Law: a weapon or shield needs at least (tier - 1) x this in its skill, whatever the data says - a tier 6 blade wants 175, so a One Handed 30 bandit never 'qualifies' for it; 0 turns the law off. Applied at session start", RequireRestart = false)]
         [SettingPropertyGroup("Skills rule the gear")]
@@ -12155,6 +12159,7 @@ namespace Armoury
             s.HeroBardingNeedsRiding = HeroBardingNeedsRiding;
             s.HeroSkillToOwnGear = HeroSkillToOwnGear;
             s.AiHeroesNeverFightBare = AiHeroesNeverFightBare;
+            s.AiHeroesArmourOverDress = AiHeroesArmourOverDress;
             s.WeaponSkillPerTier = WeaponSkillPerTier;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
