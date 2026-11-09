@@ -11604,6 +11604,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public int SiegeLadderWaitSeconds { get; set; } = 60;
 
+        [SettingPropertyBool("Siege Defender Archers To Walls", HintText = "When you defend a fortress and command your side yourself: at the end of deployment, once, your archers and crossbowmen (not heroes, not standard bearers, not men at siege engines) are moved out of your other formations into your formations that shoot from the wall posts, spread evenly; if none stands at a wall post, empty formations are sent to free posts. Afterwards you command as usual. Off = your formations stay as you deployed them", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
+        public bool SiegeDefenderArchersToWalls { get; set; } = true;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -14704,6 +14708,7 @@ namespace Armoury
             s.SiegeRepelRebuildMaxDays = SiegeRepelRebuildMaxDays;
             s.SiegeAssaultHoldRetreat = SiegeAssaultHoldRetreat;
             s.SiegeLadderWaitSeconds = SiegeLadderWaitSeconds;
+            s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;
