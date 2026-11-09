@@ -159,6 +159,7 @@ namespace Armoury
             try
             {
                 if (!On || h == null || !Ransom178.IsRulerOrHeir(h)) return "";
+                if (cond == 'F') return "";   // 367e: przysiega F (367b) - krol zyskuje wasala z ziemiami, nie upokorzenie; RunF/RunFNone nie wolaja TermsBegin (uwolnienie ReleasedByChoice - OnReleased pomija)
                 int t, c, v; CountTitles(cond == 'R' ? null : titles, out t, out c, out v);
                 string p; double H = Humiliation(cond, t, c, v, DaysHeld(h), out p);
                 double G = H * Temper(h, out p);

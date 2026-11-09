@@ -39,6 +39,7 @@ namespace Armoury
     /// Log: "ROKOWANIA (366): ..." przy kazdej probie i przy wykonaniu; linia startu przy wpieciu rozmowy. Zapis "arm_terms366": przerwy odmow i kolejka umow.
     /// 367a: "Confirm my conquests" z roszczeniami wasali (CaptiveTerms.Claims.cs) - krol mowi, ile chca jego lordowie (zloto albo slub); gracz wybiera pakiet
     /// albo "Only your own seal" (T jak wyzej). Warunek 'V' w kolejce; zapis v2 (Import czyta v1).
+    /// 367b: warunek F "Go free, and I will bend the knee to you" (CaptiveTerms.Knee.cs) - w kolejce z siodmym czlonem From (id krolestwa gracza z rozmowy).
     /// </summary>
     internal static partial class CaptiveTerms
     {
@@ -51,7 +52,7 @@ namespace Armoury
 
         private enum Liege { None = 0, Pay = 1, Anger = 2 }
 
-        private sealed class Deal { public string Hero = ""; public char Cond; public Liege Mode; public long Owed; public double Score; public string Claims = ""; }   // 367: Claims - roszczenia wasali (Cond 'V')
+        private sealed class Deal { public string Hero = ""; public char Cond; public Liege Mode; public long Owed; public double Score; public string Claims = ""; public string From = ""; }   // 367: Claims - roszczenia wasali (Cond 'V', 'F'); 367b: From - id krolestwa gracza z chwili rozmowy (Cond 'F')
 
         private static readonly Dictionary<string, double> _cool = new Dictionary<string, double>();   // "jeniec:R" -> doba konca przerwy
         private static readonly List<Deal> _queue = new List<Deal>();
@@ -75,7 +76,7 @@ namespace Armoury
 
         private static void ClearTalk()
         {
-            _talk = null; _cond = ' '; _sc = null; _needLiege = false; _accepted = false; _owed = 0; _ransom2 = 0; _titles = new List<object>(); _titleNames = "-";
+            _talk = null; _cond = ' '; _fTalk = false; _fWait = false; _sc = null; _needLiege = false; _accepted = false; _owed = 0; _ransom2 = 0; _titles = new List<object>(); _titleNames = "-";
             ClearClaims();   // 367
         }
 
@@ -105,6 +106,14 @@ namespace Armoury
                 starter.AddPlayerLine("arm367_wed", "arm367_pick", "arm366_hint", "{=!}{ARM367_WED}", WedPkgCond, PickWed, 109, WedPkgClick);
                 starter.AddPlayerLine("arm367_own", "arm367_pick", "arm366_hint", "{=!}Only your own seal, then.", OwnSealCond, PickT, 108);
                 starter.AddPlayerLine("arm367_back", "arm367_pick", "lord_pretalk", "{=!}Never mind.", null, ClearTalkCons, 100);
+                // 367b: warunek F - przysiega koronie jenca z zachowaniem lenn (CaptiveTerms.Knee.cs); spis roszczen wspolny z 367a, cena F
+                starter.AddPlayerLine("arm367_f", "arm366_menu", "arm367f_claims", "{=!}Go free, and I will bend the knee to you - if my lands stay mine.", FCondClaims, FOpen, 107, FClick);
+                starter.AddPlayerLine("arm367_f1", "arm366_menu", "arm366_hint", "{=!}Go free, and I will bend the knee to you - if my lands stay mine.", FCondBare, PickFBare, 107, FClick);
+                starter.AddDialogLine("arm367f_claims", "arm367f_claims", "arm367f_pick", "{=!}{ARM367_CLAIMS}", ClaimsLineCond, null, 200);
+                starter.AddPlayerLine("arm367f_gold", "arm367f_pick", "arm366_hint", "{=!}I swear it, and I pay your lords ({ARM367_TOTAL} denars).", GoldPkgCond, PickFGold, 110, GoldPkgClick);
+                starter.AddPlayerLine("arm367f_wed", "arm367f_pick", "arm366_hint", "{=!}{ARM367_FWED}", WedPkgCond, PickFWed, 109, WedPkgClick);
+                starter.AddPlayerLine("arm367f_wait", "arm367f_pick", "arm366_hint", "{=!}I swear it; my titles can wait.", null, PickFWait, 108);
+                starter.AddPlayerLine("arm367f_back", "arm367f_pick", "lord_pretalk", "{=!}Never mind.", null, ClearTalkCons, 100);
                 starter.AddPlayerLine("arm366_menu_back", "arm366_menu", "lord_pretalk", "{=!}Never mind.", null, ClearTalkCons, 100);
                 starter.AddDialogLine("arm366_hint", "arm366_hint", "arm366_confirm", "{=!}{ARM366_HINT}", HintCond, null, 200);
                 starter.AddPlayerLine("arm366_go", "arm366_confirm", "arm366_answer", "{=!}Then swear to it, and it is done.", GoCond, GoCons, 110, GoClick);
@@ -117,6 +126,7 @@ namespace Armoury
                 Log.Info(Tag + ": rozmowa wpieta (hero_main_options, priorytet " + AskPriority + ") | klucz " + (s != null && s.CaptiveTerms ? "TAK" : "NIE")
                          + " | BK tytuly " + (LandBk.Ready ? "TAK" : "NIE") + " | okupy 178 " + (Ransom178.FlowsOn ? "TAK" : "NIE")
                          + " | 367 roszczenia wasali " + (s != null && s.CaptiveTermsVassalTitles ? "TAK (lata " + F(s.CaptiveTitleClaimYears) + ")" : "NIE")
+                         + " | 367b przysiega F " + (s != null && s.CaptiveTermsBendKnee ? "TAK" : "NIE")
                          + " | kolejka umow " + _queue.Count + ", przerwy odmow " + _cool.Count + ".");
             }
             catch (Exception e) { Stumble("AddDialogs", e); }
@@ -207,8 +217,8 @@ namespace Armoury
                 var h = _talk;
                 if (h == null) return;
                 _cond = c;
-                if (c != 'V') { _pkg = new List<Pick367>(); _pkgKind = ' '; _pkgGold = 0; }   // 367: "Only your own seal" po spisie - bez pakietu
-                _titles = c == 'T' || c == 'V' ? TitlesFor(h, out _titleNames) : new List<object>();
+                if (c != 'V' && c != 'F') { _pkg = new List<Pick367>(); _pkgKind = ' '; _pkgGold = 0; }   // 367: "Only your own seal" po spisie - bez pakietu; 367b: F ustawia pakiet sam (PickF*)
+                _titles = c == 'T' || c == 'V' || c == 'F' ? TitlesFor(h, out _titleNames) : new List<object>();
                 _ransom2 = c == 'R' ? 2 * Ransom178.PriceFor(h) : 0;
                 _sc = Evaluate(h, c, _titles);
                 _needLiege = false; _owed = 0;
@@ -226,10 +236,17 @@ namespace Armoury
                 Band(_sc.Total, out mood, out word);
                 var sb = new StringBuilder(200);
                 sb.Append(mood).Append(" (Chance: ").Append(word).Append('.');
-                if (_cond == 'R') sb.Append(" Ransom: ").Append(_ransom2.ToString("N0", Inv)).Append(" denars, double the usual.");
+                if (_cond == 'F') sb.Append(FHint());   // 367b
+                else if (_cond == 'R') sb.Append(" Ransom: ").Append(_ransom2.ToString("N0", Inv)).Append(" denars, double the usual.");
                 else if (_cond == 'V' && _titles.Count == 0) sb.Append(" His own seal covers nothing you hold.");
                 else sb.Append(" His seal can confirm: ").Append(_titleNames).Append('.');
-                if (_cond == 'V') sb.Append(PkgHint());   // 367
+                if (_cond == 'V' || (_cond == 'F' && _pkg.Count > 0)) sb.Append(PkgHint());   // 367
+                if (_cond == 'F')   // 367b (recenzja 1): kazdy tytul wsi poza pakietem, nie tylko "titles can wait"
+                {
+                    int dt, dv; DuesLeft(out dt, out dv);
+                    if (dv > 0) sb.Append(_fWait || _pkg.Count == 0 ? " Your villages' dues will go to their title holders, who may press their claims."
+                                                                    : " The dues of " + dv + (dv == 1 ? " village" : " villages") + " will go to their title holders, who may press their claims.");
+                }
                 if ((_cond == 'T' || _cond == 'V') && _needLiege) sb.Append(" He is your liege's captive - your liege loses his ransom.");
                 sb.Append(CaptiveGrudge.Preview(_talk, _cond, _titles));   // 367d: uraza po uwolnieniu
                 sb.Append(')');
@@ -265,7 +282,7 @@ namespace Armoury
         private static bool GoClick(out TextObject why)
         {
             why = null;
-            if (_cond != 'V' || _pkgGold <= 0 || (Hero.MainHero != null && Hero.MainHero.Gold >= _pkgGold)) return true;
+            if ((_cond != 'V' && _cond != 'F') || _pkgGold <= 0 || (Hero.MainHero != null && Hero.MainHero.Gold >= _pkgGold)) return true;
             why = new TextObject("{=!}You do not have " + _pkgGold.ToString("N0", Inv) + " denars for his lords.");
             return false;
         }
@@ -284,6 +301,7 @@ namespace Armoury
                 _accepted = _sc.Total > 0;
                 string ans;
                 if (_accepted) ans = _cond == 'R' ? "Very well. My treasury will pay what you ask. You have my word."
+                                   : _cond == 'F' ? "Then kneel, and rise my sworn " + (Hero.MainHero.IsFemale ? "lady" : "lord") + ". What you hold, you hold of me - and by right. Now let me go."
                                    : _cond == 'V' ? "So be it. My seal, and my lords' quitclaims - what you hold, you hold by right. Now let me go."
                                    : "So be it. What you hold, you hold by right - I will put my seal to it. Now let me go.";
                 else ans = _sc.Total < -20 ? "You insult me. I would sooner rot in this cell." : "No. I will not buy my freedom at that price.";
@@ -291,7 +309,8 @@ namespace Armoury
                 string effect;
                 if (_accepted)
                 {
-                    _queue.Add(new Deal { Hero = h.StringId, Cond = _cond, Mode = TLike && _needLiege ? mode : Liege.None, Owed = _owed, Score = _sc.Total, Claims = _cond == 'V' ? PkgCode() : "" });
+                    _queue.Add(new Deal { Hero = h.StringId, Cond = _cond, Mode = TLike && _needLiege ? mode : Liege.None, Owed = _owed, Score = _sc.Total, Claims = _cond == 'V' || _cond == 'F' ? PkgCode() : "",
+                                          From = _cond != 'F' ? "" : Clan.PlayerClan != null && Clan.PlayerClan.Kingdom != null ? Clan.PlayerClan.Kingdom.StringId : FromNone });   // 367e: rod bez krolestwa - FromNone
                     _armed = false;
                     effect = "umowa w kolejce (wykonanie po rozmowie, w takcie mapy)" + (TLike && _needLiege ? (mode == Liege.Pay ? "; gracz zaplaci panu " + _owed : "; pan straci okup " + _owed + " - gniew") : "");
                 }
@@ -302,7 +321,8 @@ namespace Armoury
                     if (_sc.Total < -20) { drop = (int)Math.Max(2, Math.Min(5, Math.Round(-_sc.Total / 10.0))); ChangeRelationAction.ApplyPlayerRelation(h, -drop); }
                     effect = "odmowa - przerwa " + CooldownDays + " dob na ten warunek" + (drop > 0 ? ", obraza: relacja z jencem -" + drop : "");
                 }
-                if (_cond == 'V') { int nc = CoolRefusers(h); if (nc > 0) effect += "; odmowy lordow - przerwa " + CooldownDays + " dob: " + nc; }   // 367
+                if (_cond == 'V' || (_cond == 'F' && _pkg.Count > 0)) { int nc = CoolRefusers(h); if (nc > 0) effect += "; odmowy lordow - przerwa " + CooldownDays + " dob: " + nc; }   // 367
+                if (_cond == 'F') { LogFDecide(h, effect); return; }   // 367b: wlasna linia "ROKOWANIA (367b)"
                 Log.Info(Tag + ": " + (h.MapFaction != null && h.MapFaction.Leader == h ? "krol " : "nastepca tronu ") + Name(h) + " (" + h.MapFaction.Name + ") | warunek "
                          + (_cond == 'R' ? "R (okup x2, " + _ransom2 + " zl)" : _cond == 'V' ? "V (367: pieczec " + _titleNames + "; pakiet " + (_pkgKind == 'M' ? "slub" : "zloto") + " " + _pkgGold + " zl: " + PkgPl() + ")" : "T (tytuly: " + _titleNames + ")") + " | wynik " + F(_sc.Total) + (_accepted ? " - PRZYJMUJE" : " - ODMAWIA")
                          + " | skladniki: " + _sc.Parts + " | skutek: " + effect + ".");
@@ -378,6 +398,15 @@ namespace Armoury
                 double wallet = k != null && k.Leader == h ? Math.Max(1, (double)k.KingdomBudgetWallet) : Math.Max(1, (double)ClanIncomeBook.FamilyGoldOf(h.Clan));
                 C = 20 + 30 * Math.Min(1.5, extra / wallet);
                 cost = "okup x2: dodatek " + extra + " / " + (k != null && k.Leader == h ? "skarbiec " : "kiesy rodu ") + Math.Round(wallet);
+            }
+            else if (cond == 'F')
+            {
+                // 367b: krol ZYSKUJE wasala z jego ziemiami - koszt ujemny (25 za miasto, 15 za zamek, 5 za wies rodu gracza); tytuly wasali w pakiecie jak V
+                int towns, castles, villages;
+                PlayerFiefs(out towns, out castles, out villages);
+                C = -(25 * towns + 15 * castles + 5 * villages);
+                cost = "przysiega F: wnosi miasta " + towns + ", zamki " + castles + ", wsie " + villages;
+                if (_pkg != null && _pkg.Count > 0) { string vp; C += VassalCost(out vp); cost += "; " + vp; }
             }
             else
             {
@@ -475,7 +504,8 @@ namespace Armoury
 
         private static void Drop(Deal d, Hero h, string en, string pl)
         {
-            Log.Info(Tag + ": umowa PRZEPADLA - " + Name(h) + " | warunek " + d.Cond + " | " + pl + ".");
+            if (d.Cond == 'F') Log.Info(Tag367b + ": PRZEPADLA - " + pl + " | " + Name(h) + " | warunek F (z " + (d.From ?? "-") + ").");   // 367b (recenzja 1): wlasny znacznik
+            else Log.Info(Tag + ": umowa PRZEPADLA - " + Name(h) + " | warunek " + d.Cond + " | " + pl + ".");
             if (h != null) Log.Player("The terms agreed with " + Name(h) + " fell through: " + en, true);
         }
 
@@ -487,7 +517,7 @@ namespace Armoury
             {
                 if (h == null || !h.IsAlive) { Drop(d, h, "he is no more.", "jeniec nie zyje albo nie istnieje"); return; }
                 if (!h.IsPrisoner || !(HeldUnderPlayer(h))) { Drop(d, h, "he is no longer your captive.", "jeniec juz nie u gracza"); return; }
-                if (d.Cond == 'R') RunR(d, h); else if (d.Cond == 'V') RunV(d, h); else RunT(d, h);
+                if (d.Cond == 'R') RunR(d, h); else if (d.Cond == 'V') RunV(d, h); else if (d.Cond == 'F') RunF(d, h); else RunT(d, h);
             }
             catch (Exception e) { Stumble("Run", e); }
         }
@@ -610,10 +640,11 @@ namespace Armoury
                 sb.Append('|'); f = true;
                 foreach (var d in _queue)
                 {
-                    if (d.Hero.IndexOfAny(Bad) >= 0 || (d.Claims ?? "").IndexOfAny(Bad) >= 0) continue;
+                    if (d.Hero.IndexOfAny(Bad) >= 0 || (d.Claims ?? "").IndexOfAny(Bad) >= 0 || (d.From ?? "").IndexOfAny(Bad) >= 0) continue;
                     if (!f) sb.Append(';'); f = false;
                     sb.Append(d.Hero).Append(':').Append(d.Cond).Append(':').Append((int)d.Mode).Append(':').Append(d.Owed.ToString(Inv)).Append(':').Append(d.Score.ToString("0.#", Inv))
                       .Append(':').Append(d.Claims ?? "");
+                    if (d.Cond == 'F') sb.Append(':').Append(d.From ?? "");   // 367b: siodmy czlon tylko dla F (starsza DLL policzy wpis jako bledny i pominie)
                 }
                 return sb.ToString();
             }
@@ -642,13 +673,15 @@ namespace Armoury
                 {
                     if (p.Length == 0) continue;
                     var x = p.Split(':'); int m; long o; double sc;
-                    bool shape = x.Length == 5 || (v2 && x.Length == 6);
-                    if (shape && x[1].Length == 1 && (x[1][0] == 'R' || x[1][0] == 'T' || (v2 && x[1][0] == 'V')) && int.TryParse(x[2], out m) && long.TryParse(x[3], NumberStyles.Integer, Inv, out o)
+                    bool isF = v2 && x.Length == 7 && x[1] == "F" && x[6].Length > 0;   // 367b
+                    bool shape = x.Length == 5 || (v2 && x.Length == 6 && x[1] != "F") || isF;
+                    if (shape && x[1].Length == 1 && (x[1][0] == 'R' || x[1][0] == 'T' || (v2 && x[1][0] == 'V') || isF) && int.TryParse(x[2], out m) && long.TryParse(x[3], NumberStyles.Integer, Inv, out o)
                         && double.TryParse(x[4], NumberStyles.Float, Inv, out sc))
                     {
-                        string cl = x.Length == 6 ? x[5] : "";
+                        string cl = x.Length >= 6 ? x[5] : "";
                         if (x[1][0] == 'V' && (cl.Length == 0 || !ValidCode(cl))) { bad++; continue; }
-                        _queue.Add(new Deal { Hero = x[0], Cond = x[1][0], Mode = (Liege)Math.Max(0, Math.Min(2, m)), Owed = o, Score = sc, Claims = cl }); n++;
+                        if (isF && !ValidCode(cl)) { bad++; continue; }   // 367b: F bez roszczen ("titles can wait") - pusty kod jest poprawny
+                        _queue.Add(new Deal { Hero = x[0], Cond = x[1][0], Mode = (Liege)Math.Max(0, Math.Min(2, m)), Owed = o, Score = sc, Claims = cl, From = isF ? x[6] : "" }); n++;
                     }
                     else bad++;
                 }

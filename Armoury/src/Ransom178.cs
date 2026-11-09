@@ -494,6 +494,39 @@ namespace Armoury
             return done;
         }
 
+        /// <summary>367b (warunek F, przysiega koronie jenca): rod gracza przechodzi od korony `old` do jej wroga - zdrajca nie dostaje od niej nagrod ani nie oddaje
+        /// nowej koronie 1/9 zebranej jeszcze pod stara. Skresla WSZYSTKIE niewyplacone nagrody bohaterow rodu gracza od `old` (nie tylko za tego jenca) i zeruje ich
+        /// podstawe 1/9 doby i zaleglosc (_acc: Third/Ninth/Purse/Carry - o swicie poszlyby do skarbca NOWEJ korony, ktora ich nie zarobila). Bez przelewow: zloto
+        /// sie nie rusza (zamknieta ekonomia - znika tylko roszczenie). Wolac PO udanej zmianie krolestwa, w tym samym takcie (przed rozliczeniem doby). Zwraca sumy do logu.</summary>
+        internal static void ForfeitPlayer(Kingdom old, out long rewards, out long thirds)
+        {
+            rewards = 0; thirds = 0;
+            try
+            {
+                if (Clan.PlayerClan == null) return;
+                var ids = new HashSet<string>();
+                foreach (var h in Clan.PlayerClan.Heroes) if (h != null && h.StringId != null) ids.Add(h.StringId);
+                if (Hero.MainHero != null && Hero.MainHero.StringId != null) ids.Add(Hero.MainHero.StringId);
+                if (old != null && old.StringId != null)
+                    foreach (var r in _rewards.ToArray())
+                    {
+                        if (r == null || r.Kingdom != old.StringId || !ids.Contains(r.Hero)) continue;
+                        rewards += Math.Max(0, r.Left);
+                        _rewards.Remove(r);
+                    }
+                var s = Settings.Current;
+                double sh = s != null ? Math.Max(0f, Math.Min(1f, s.CrownThirdsShare)) : 0;
+                foreach (var id in ids)
+                {
+                    Acc a;
+                    if (!_acc.TryGetValue(id, out a)) continue;
+                    thirds += Math.Max(0, a.Carry) + (long)(a.Third * sh * 3.0 + a.Ninth * sh) + (long)(a.Purse * sh);   // wzor ThirdsSettle / PendingClaim
+                    _acc.Remove(id);
+                }
+            }
+            catch (Exception e) { Stumble("ForfeitPlayer", e); }
+        }
+
         /// <summary>366 (warunek R): okup x mult tym samym przeplywem co kurier (Execute: skarbiec korony jenca albo rod jenca -> skarbiec korony zdobywcy albo
         /// porywacz; brak gotowki - dlug korony / dlug okupu, pomoc wasali R3-01d). Gdy okup idzie do korony - nagroda gracza 1/10 takze od nadwyzki (ta sama regula
         /// co przy pojmaniu, m116 - bez nagrody dla krola tej korony). Jenca NIE uwalnia (wolajacy). false - bez umowy.</summary>
