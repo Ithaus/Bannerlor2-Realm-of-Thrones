@@ -1,5 +1,11 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 197 - 372 + 372b + 373 na 196 (Armoury.dll d2be9d16 -> c751bf18 = build a82b44a4); CrashScribe d7fbd602 bez zmian
+**Test at-372 (zapis Jeffa 02:22, 5 dob, 4 bitwy + 2 lordow, sam 372 = aca1477f):** kod 0, bledy 23 (norma), "Szturm (372): latki TacticBreachWalls wpiete 2/2". **Test at-373 (ten sam zapis, 4 doby, 3 bitwy + 1 lordow, 372+372b+373):** kod 0, bledy 23. Oblezen w autotestach brak - 372 (bez przedwczesnego odwrotu, drabiny po 60 s), 372b (strzelcy gracza na mury) i 373 (ranni pod murami do lochu) do sprawdzenia w obronie Jeffa (Goldentooth): linie "Szturm (372)", "Strzelcy na mury (372b)", "Ranni pod murami (373)", "Oblezenie misja (370)".
+**Dowod z gry Jeffa (WGRANIE 196):** 371 zadzialalo w obronie Goldentooth 14:46 - "Szturm (371): ZALAMANIE ... straty oddzialu 436 / prog 435 (wodz padl x0.50)", koniec misji DefenderVictory (wrog odstapil), oblezenie trwa (12968 ludzi).
+**Kopie:** Armoury.dll.bak-2026-11-09-przed-wgranie197, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie197(-przed). Zapis Jeffa 15:39 skopiowany: D:/Backup-Bannerlord/zapisy-testowe/Ironman0gXONzURi8yO-2026-11-09-1539.sav.
+**Status:** WGRANE (197).
+
 ## 373 - ranni atakujacy pod murami do lochu obroncow po zalamaniu szturmu (SiegeWounded373.cs nowy, SiegeBreak371.cs 1 linia, SubModuleMain.cs, Settings.cs, McmSettings.cs; na 372b = 19a9ad82)
 **Problem (Jeff 09.11):** "a co z rannymi ktorzy leza pod murami, mysle ze w obronie jesli ranni leza blisko murow lub w srodku zamku a obrona sie zalamala to sa schwytani przeciwnik nie moze ich leczyc boskad milaby ich wziasc?" Dzis po zalamaniu 371 kazdy ranny atakujacy wraca do swojej partii i leczy sie normalnie.
 **Przyczyna (dekompilacja 1.4.8, cs_full):** nieprzytomny atakujacy jest rannym w MemberRoster swojej partii od razu w misji (BattleAgentLogic.OnAgentRemoved -> MapEventSide.OnTroopWounded -> MapEventParty.OnTroopWounded -> WoundTroop). Odwrot wroga -> PlayerEncounter.ContinueBattle -> FinishBattleAndKeepSiegeEvent = bitwa bez zwyciezcy; FinalizeEventAux przy BattleState None nie wola CaptureDefeatedPartyMembers - nikt nie trafia do niewoli.
