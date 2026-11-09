@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 194 - 369 na 193 (Armoury.dll 0400cebf -> 73231668 = build a618a859) + Epic Sieges 1.1.6 + RBM KeepBattleEnabled 1
+**Test at-369 (zapis Jeffa 10:54):** NIE DOTARL - gracz w oblezonym Goldentooth (menu encounter_interrupted_siege_preparations), autotest nie umie wyjsc; 369 bez bledow, naprawa Ashemark "czeka - gracz w osadzie". **Test at-369b (zapis 02:22, 10 dob):** kod 0, bledy 22, "Roszczenia gracza (369)" start OK, naprawa "nie dotyczy" (Ashemark u KARDA).
+**Do sprawdzenia w grze Jeffa:** po wyjsciu z Goldentooth na mape linia "Roszczenia gracza (369): naprawa Ashemark ... WYKONANA - Ashemark od Marbrandow -> Mormont" i roszczenie; termin - przed dniem 109807 (wygasa weto 326b).
+**Mody (decyzja Jeffa 09.11 "robimy epic sieges i bronimy sie tez w zamku"):** Epic Sieges 1.1.6 (Nexus 7294, zip z Pobranych Jeffa) do Modules/EpicSieges, w LauncherData.xml zaraz po RBM_WS (kopia LauncherData.xml.bak-2026-11-09-przed-epicsieges). Mod: zdejmuje prefiks RBM na SiegeLadder.IsDisabledForBattleSide (obroncy zrzucaja drabiny), XML: wieze/tarany wolniejsze i wytrzymalsze; MCM "Enable Vanilla Ladder Pushing". RBM Configs/RBM/config.xml KeepBattleEnabled 0 -> 1 (kopia config.xml.bak-2026-11-09-przed-keep). NIE naprawia AI lucznikow na murach (RBM BehaviorShootFromCastleWalls) - do tego Vanilla AI Sieges for RBM (Nexus 7216) albo nasza latka.
+**Kopie:** Armoury.dll.bak-2026-11-09-przed-wgranie194, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie194(-przed).
+**Status:** WGRANE (194). Epic Sieges i walka w twierdzy - DO SPRAWDZENIA (zgodnosc z 1.4.8 niesprawdzona przed uruchomieniem).
+
 ## 370 - pomiar misji szturmu: linie "Oblezenie misja (370)" co 30 s (SiegeMissionLog370.cs nowy, Settings.cs, McmSettings.cs, SubModuleMain.cs; galaz noc/367c-jeniec-po-odejsciu na a618a859)
 **Problem (Jeff 09.11):** oblezenie Goldentooth - "ludzie stoja jak debile", lucznicy nie strzelaja, taran i drabiny nieuzywane. Diagnoza (Armoury-2026-11-09_10-21-58.log l.46977 'szturm murow ... wiez 1 (u murow 0), taranow 1 (u bramy 0)'; rgl_log_29796.txt 11:00:22 'Formation order position is not valid. Team: 1, Formation: 6/7') nie wie, KTO stoi: brak zachowan szykow, rozkazow, obsady machin i stanu taktyk. Jeff: "tak zrob logi oblezen aby bylo wiadomo co sie dzieje".
 **Przyczyna:** brak pomiaru - BattleSound.Siege podaje tylko podsumowanie machin na koniec, HitScribe konczy sie limitem 150 wpisow w pierwszej minucie.
