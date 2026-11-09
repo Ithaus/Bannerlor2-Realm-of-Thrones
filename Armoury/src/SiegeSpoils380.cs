@@ -35,13 +35,15 @@ namespace Armoury
     ///    warowni bez zaplaty (ta sama regula co SpoilsSeal.RemnantPostfix), inaczej przepada jak w grze.
     ///  - bramka (4 razy na sekunde, warunki stabilne 1 s): brak misji, rozmowy i bitwy gracza, na wierzchu mapa (MapScreen), czynny stan MapState, okno lupu 117 /
     ///    opowiesci zamkniete. Ekrany wchodza na stos nad menu oblezenia i po zamknieciu wracaja do niego same - zadnego SwitchToMenu / ExitToLast (CLAUDE.md).
-    ///  - zapas: brak bramki przez godzine gry - jency zostaja w lochu, dzialka do sakw (FlushShareToBaggage), jak "ekran lupow nie przyszedl".
+    ///  - zapas: brak bramki przez 24 h gry (380b; przy spelnionej bramce czas stoi) - jency zostaja w lochu, dzialka do sakw (FlushShareToBaggage), jak "ekran lupow nie przyszedl".
     /// Stan tylko w pamieci (wczytanie - Reset; dzialka i tak zyje tylko w pamieci). Potkniecia liczone, bez globalnego wylacznika.
     /// </summary>
     internal static class SiegeSpoils380
     {
         private const string Tag = "Okno jencow i lupu (380): ";
-        private const double StableSec = 1.0, WaitHours = 1.0;
+        // 380b (recenzja 2): zapas po 24 h gry, nie 1 h - menu oblezenia to menu oczekiwania (StartWait = UnstoppableFastForward), przy przyspieszeniu
+        // 1 h gry mijala w ulamku sekundy i zapas wygrywal z bramka (1 s czasu rzeczywistego); dodatkowo przy spelnionej bramce czas stoi (jak gra przed ekranem po bitwie)
+        private const double StableSec = 1.0, WaitHours = 24.0;
         private const int ErrMax = 6;
         private static readonly long CheckTicks = Stopwatch.Frequency / 4;
 
@@ -57,6 +59,8 @@ namespace Armoury
         private static ItemRoster _loot;
         private static int _lootIn;
         private static string _why = "";
+        private static double _share = 1.0;   // 380b: udzial gracza w jencach (twierdza rodu gracza = 1, cudza = jego zdrowi / zdrowi obroncy w osadzie)
+        private static int _stops;
 
         private static void Stumble(string where, Exception e)
         {
@@ -70,7 +74,7 @@ namespace Armoury
         internal static void Reset()
         {
             _phase = PNone; _heldMe = null; _prisMe = null; _captor = null; _st = "-"; _pris.Clear(); _loot = null; _lootIn = 0;
-            _okSince = 0; _missing = 0; _stumbles = 0; _errs = 0; _why = "";
+            _okSince = 0; _missing = 0; _stumbles = 0; _errs = 0; _why = ""; _share = 1.0; _stops = 0;
         }
 
         /// <summary>373 (MapEventEnded): obrona odparta w tej bitwie (gdy 373 biegl przed ArmouryBehavior).</summary>
@@ -110,9 +114,36 @@ namespace Armoury
             if (!ReferenceEquals(_prisMe, me)) { _pris.Clear(); _prisMe = me; }
             _phase = PWaitParty;
             _deadlineH = CampaignTime.Now.ToHours + WaitHours;
-            _okSince = 0; _missing = 0; _loot = null; _lootIn = 0; _why = "";
-            Log.Info(Tag + "obrona odparta (" + _st + ") - dzialka lupu w kolejce " + (BattlefieldLaw.SharePending() ? "TAK" : "pusta") + ", czeka na okno jencow i lupu (bez zwrotu do zbrojowni).");
+            _okSince = 0; _missing = 0; _loot = null; _lootIn = 0; _why = ""; _stops = 0;
+            string sh = "-";
+            try { _share = PlayerShare(st, out sh); } catch (Exception e) { _share = 0.0; sh = "blad"; Stumble("Arm.share", e); }
+            Log.Info(Tag + "obrona odparta (" + _st + ") - dzialka lupu w kolejce " + (BattlefieldLaw.SharePending() ? "TAK" : "pusta") + ", udzial w jencach " + sh
+                     + ", czeka na okno jencow i lupu (bez zwrotu do zbrojowni; zapas po " + WaitHours.ToString("0") + " h gry).");
             return true;
+        }
+
+        /// <summary>380b (recenzja 2): udzial gracza w jencach z lochu. Twierdza rodu gracza - wszyscy (i tak siedza w jego lochu). Cudza twierdza
+        /// (sojusznik, lenno innego rodu) - czesc wedlug sily: zdrowi gracza / zdrowi wszystkich partii strony gracza w osadzie (zaloga, milicja, lordowie,
+        /// gracz) - jak podzial jencow wedlug udzialu w bitwie w grze; reszta zostaje w lochu wlasciciela (jego okup nie przechodzi na gracza).</summary>
+        private static double PlayerShare(Settlement st, out string how)
+        {
+            how = "1 (brak osady)";
+            var mp = MobileParty.MainParty;
+            if (st == null || mp == null) return 1.0;
+            if (st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan) { how = "1 (twierdza rodu gracza)"; return 1.0; }
+            int mine = mp.Party != null ? mp.Party.NumberOfHealthyMembers : 0, all = 0;
+            bool meIn = false;
+            var fac = mp.MapFaction;
+            foreach (var p in st.Parties)
+            {
+                if (p == null || p.Party == null || p.MapFaction != fac) continue;
+                if (p == mp) meIn = true;
+                all += p.Party.NumberOfHealthyMembers;
+            }
+            if (!meIn) all += mine;
+            double r = all > 0 ? Math.Max(0.0, Math.Min(1.0, mine / (double)all)) : 0.0;
+            how = r.ToString("0.00") + " (cudza twierdza: gracz " + mine + " / obroncy " + all + ")";
+            return r;
         }
 
         // ------------------------------------------------------------ takt (SubModuleMain.SpoilsTick - co klatke)
@@ -159,6 +190,8 @@ namespace Armoury
             }
             string why = Gate(c);
             if (why != null) { _why = why; _okSince = 0; return; }
+            // 380b: bramka spelniona - czas stoi (menu oblezenia samo przyspiesza czas), zeby sekunda stabilnosci nie przepalala terminu zapasu; jak gra przed ekranem po bitwie
+            try { if (c.TimeControlMode != CampaignTimeControlMode.Stop) { c.TimeControlMode = CampaignTimeControlMode.Stop; _stops++; } } catch (Exception e) { Stumble("Step.stop", e); }
             if (_okSince == 0) { _okSince = t; return; }
             if ((t - _okSince) / (double)Stopwatch.Frequency < StableSec) return;
             _okSince = 0;
@@ -204,22 +237,25 @@ namespace Armoury
             try
             {
                 var prison = _captor != null ? _captor.PrisonRoster : null;
+                // 380b: cudza twierdza - do wyboru tylko udzial gracza (zaokraglony), reszta zostaje w lochu wlasciciela
+                int quota = (int)Math.Round(Sum() * _share);
                 if (prison != null)
                     foreach (var kv in _pris)
                     {
+                        if (quota <= 0) break;
                         int idx = prison.FindIndexOfTroop(kv.Key);
                         if (idx < 0) continue;
                         int have = prison.GetElementNumber(idx), wnd = prison.GetElementWoundedNumber(idx);
-                        int n = Math.Min(kv.Value, have);
+                        int n = Math.Min(Math.Min(kv.Value, have), quota);
                         if (n <= 0) continue;
                         copy.AddToCounts(kv.Key, n, false, Math.Min(n, wnd));
-                        men += n;
+                        men += n; quota -= n;
                     }
             }
             catch (Exception e) { Stumble("OpenParty.copy", e); men = 0; }
             if (men <= 0)
             {
-                if (_pris.Count > 0) Note("okno jencow pominiete - nikogo z " + Sum() + " zapisanych nie ma juz w lochu");
+                if (_pris.Count > 0) Note("okno jencow pominiete - " + ((int)Math.Round(Sum() * _share) <= 0 ? "udzial gracza w jencach 0 (cudza twierdza)" : "nikogo z " + Sum() + " zapisanych nie ma juz w lochu"));
                 _phase = PWaitLoot;
                 return;
             }
@@ -240,7 +276,7 @@ namespace Armoury
                 ps.PartyScreenLogic = logic;
                 _phase = PParty; _missing = 0;
                 Game.Current.GameStateManager.PushState(ps);
-                Log.Info(Tag + _st + " | okno jencow: w lochu do wyboru " + men + " (zapisanych przez 373 " + Sum() + ").");
+                Log.Info(Tag + _st + " | okno jencow: w lochu do wyboru " + men + " (zapisanych przez 373 " + Sum() + ", udzial " + _share.ToString("0.00") + ", czas zatrzymany " + _stops + "x).");
             }
             catch (Exception e)
             {

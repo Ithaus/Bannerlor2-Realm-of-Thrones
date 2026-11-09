@@ -11676,7 +11676,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public float SiegeWoundedWallDistance { get; set; } = 35f;
 
-        [SettingPropertyBool("Siege Held Spoils Window", HintText = "When you defend a fortress and the assault breaks and the enemy falls back (Siege Assault Break Mission), the game shows no aftermath: now, back on the siege menu, you get the prisoners window (the wounded attackers taken beneath the walls - take as many as you want into your party, the rest stay in the dungeon) and then the loot window with your share of the gear from the field. What you leave goes to the nearest friendly market with Spoils Remnants Home. Off = as before: no windows, your share of the field goes back to the army stores", RequireRestart = false)]
+        [SettingPropertyBool("Siege Held Spoils Window", HintText = "When you defend a fortress and the assault breaks and the enemy falls back (Siege Assault Break Mission), the game shows no aftermath: now, back on the siege menu, you get the prisoners window (the wounded attackers taken beneath the walls - take as many as you want into your party - in a fortress of another clan only your share by strength among its defenders - the rest stay in the dungeon) and then the loot window with your share of the gear from the field. What you leave goes to the nearest friendly market with Spoils Remnants Home. Off = as before: no windows, your share of the field goes back to the army stores", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeHeldSpoilsWindow { get; set; } = true;
 

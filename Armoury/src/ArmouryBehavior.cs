@@ -3477,11 +3477,12 @@ namespace Armoury
                 if (!won)
                 {
                     // 380: obrona odparta (zalamanie 371, wrog odstapil, bitwa bez zwyciezcy) - pole zostaje przy graczu: dzialka czeka na okno lupu SiegeSpoils380
-                    // (po oknie jencow), zapas: SiegeSpoils380 po godzinie do sakw, tu termin 2 h (ta sama droga co ekran, ktory nie przyszedl)
+                    // (po oknie jencow), zapas: SiegeSpoils380 po 24 h gry do sakw, tu termin 25 h - dluzszy niz zapas 380 (380b: przy 2 h menu oblezenia,
+                    // ktore samo przyspiesza czas, oproznialo kolejke przed oknem)
                     bool held = false;
                     try { held = SiegeSpoils380.Arm(mapEvent); } catch (Exception e) { Log.Error("OnMapEventEnded.SiegeSpoils380", e); }
                     if (held)
-                        _lootFlushDue = BattlefieldLaw.SharePending() ? CampaignTime.HoursFromNow(2f) : CampaignTime.Zero;
+                        _lootFlushDue = BattlefieldLaw.SharePending() ? CampaignTime.HoursFromNow(25f) : CampaignTime.Zero;
                     int dropped = held ? 0 : BattlefieldLaw.DropShare();
                     if (!held) _lootFlushDue = CampaignTime.Zero;
                     if (dropped > 0)
