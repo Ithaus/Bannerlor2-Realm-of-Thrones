@@ -11676,6 +11676,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public float SiegeWoundedWallDistance { get; set; } = 35f;
 
+        [SettingPropertyBool("Siege Held Spoils Window", HintText = "When you defend a fortress and the assault breaks and the enemy falls back (Siege Assault Break Mission), the game shows no aftermath: now, back on the siege menu, you get the prisoners window (the wounded attackers taken beneath the walls - take as many as you want into your party, the rest stay in the dungeon) and then the loot window with your share of the gear from the field. What you leave goes to the nearest friendly market with Spoils Remnants Home. Off = as before: no windows, your share of the field goes back to the army stores", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public bool SiegeHeldSpoilsWindow { get; set; } = true;
+
         [SettingPropertyBool("Siege Engine Accuracy By Skill", HintText = "Siege engines (catapults, trebuchets, ballistas) shoot less true, the more so the less Engineering their operator has: every shot gets a random error to the side, in height and in range (Siege Engine Spread and Range Spread at 0 and at 300 skill, in between in a straight line). The operator's skill counts in full; ordinary soldiers have none, so the crew counts a share (Siege Engine Side Engineer Share) of the skill of the best engineer of its side in the battle. AI engines also aim at a random man of the enemy formation instead of always the nearest one, and after each shot choose at random among targets of similar worth (Siege Engine Similar Target Share). Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
         public bool SiegeEngineAccuracyBySkill { get; set; } = true;
@@ -14830,6 +14834,7 @@ namespace Armoury
             s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;
             s.SiegeWoundedTakenPrisoner = SiegeWoundedTakenPrisoner;
             s.SiegeWoundedWallDistance = SiegeWoundedWallDistance;
+            s.SiegeHeldSpoilsWindow = SiegeHeldSpoilsWindow;
             s.SiegeEngineAccuracyBySkill = SiegeEngineAccuracyBySkill;
             s.SiegeEngineSpreadThrowersAt0 = SiegeEngineSpreadThrowersAt0;
             s.SiegeEngineSpreadThrowersAt300 = SiegeEngineSpreadThrowersAt300;

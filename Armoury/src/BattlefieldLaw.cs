@@ -1714,19 +1714,27 @@ namespace Armoury
         {
             // noc 25.10 P5: ramka F okna lupu wokol calego przelewu (tylko odczyt sakw przed i po; w ramce bitwy/Spoils nic nie liczy - liczy ramka zewnetrzna)
             var spoilsF = SpoilsReport.OpenF();
-            try { return FlushShareToBaggageCore(why); }
+            try { return FlushShareToBaggageCore(why, null); }
             finally { SpoilsReport.CloseF(spoilsF, why); }
         }
 
-        private static int FlushShareToBaggageCore(string why)
+        /// <summary>380: kolejka lupu do podanego rostera (ekran lupu po odpartym szturmie, SiegeSpoils380) - ta sama droga co sakwy (stan bojowy, wraki jak wraki,
+        /// pomiar LootTally / LootWear zamkniety), tylko celem jest lista ekranu zamiast sakw; bez ramki F okna lupu (sakwy rusza dopiero ekran gry).</summary>
+        internal static int FlushShareToRoster(ItemRoster target, string why)
+        {
+            if (target == null) return 0;
+            return FlushShareToBaggageCore(why, target);
+        }
+
+        private static int FlushShareToBaggageCore(string why, ItemRoster target)
         {
             int moved = 0;
             int wOk = -1, wMod = 0;   // m114-lup: bron bez loterii stanu (linia m110)
             try
             {
-                var bag = MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null;
+                var bag = target ?? (MobileParty.MainParty != null ? MobileParty.MainParty.ItemRoster : null);
                 if (bag == null) return 0;
-                LootTally.QueueOut(ShareQueue, LootTally.Sakwy);   // m109-lup: pomiar
+                LootTally.QueueOut(ShareQueue, target != null ? LootTally.Lista : LootTally.Sakwy);   // m109-lup: pomiar (380: lista ekranu)
                 if (Settings.Current.LootWeaponsKeepCondition) wOk = 0;
                 for (int i = 0; i < ShareQueue.Count; i++)
                 {
@@ -1751,7 +1759,8 @@ namespace Armoury
                 ShareQueue.Clear(); _simPending = false;   // recenzja E8/L: kolejka oddana do sakw
                 moved += AppendWrecks(bag);
                 if (MountHold.Count > 0) moved += FlushMountsToBaggage(why);   // m109-lup: siatka bezpieczenstwa (MountHold zyje tylko w wywolaniu Spoils)
-                if (moved > 0)
+                if (moved > 0 && target != null) Log.Info("BattlefieldLaw: kolejka lupow na ekran lupu (" + moved + " szt.) - " + why + ".");
+                else if (moved > 0)
                 {
                     Log.Info("BattlefieldLaw: kolejka lupow wysypana do sakw (" + moved + " szt.) - " + why + ".");
                     Log.Player("The spoils are packed into your baggage: " + moved + " pieces of gear.", true);
@@ -1759,8 +1768,9 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("FlushShareToBaggage", e); }
             ClearB();   // m110-stan: kolejka oddana (sprawne B wysypane - _soundFlushed dla WearTheLoot)
-            LootTally.Close("sakwy - " + why);   // m109-lup: pomiar bitwy zamkniety
-            LootWear.Close("sakwy - " + why, 0, 0, wOk, Math.Max(0, wOk), wMod);
+            string dest = target != null ? "ekran lupu 380 - " : "sakwy - ";
+            LootTally.Close(dest + why);   // m109-lup: pomiar bitwy zamkniety
+            LootWear.Close(dest + why, 0, 0, wOk, Math.Max(0, wOk), wMod);
             return moved;
         }
 

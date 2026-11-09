@@ -624,6 +624,7 @@ namespace Armoury
         private static void SpoilsTick()
         {
             SpoilsWindow.AppTick();
+            try { SiegeSpoils380.AppTick(); } catch (Exception e) { Log.Error("SiegeSpoils380.AppTick", e); }   // 380: okno jencow i lupu po odpartym szturmie (bramka 4x/s; wlasny try)
             WindowPhotos.AppTick();   // paczka 132: proba zdjec nowych okien (tylko DLL autotestu i plik armoury-zdjecia-okien.flag; wlasny try, potem od razu wyjscie)
             // paczka 150: proba obrazkow okna lupu (tylko DLL autotestu i plik armoury-zdjecia-obrazkow.flag; wlasny try w srodku) - tu tylko blad ladowania typu,
             // liczony osobno (po 3 proba nie startuje), zeby nie gasil okna lupu (_spoilsFails)

@@ -225,6 +225,7 @@ namespace Armoury
             _errs = 0;   // limit wpisow potkniec do logu na kampanie, nie na proces
             int stale = SiegeWounded373.Book.Count;
             SiegeWounded373.Book.Clear();
+            SiegeSpoils380.Reset();
             if (stale > 0) Log.Info("Ranni pod murami (373): ksiega z poprzedniej gry wyczyszczona (" + stale + " bitew bez rozliczenia).");
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             // 373b: armie z partia bez wodza (zapis sprzed poprawki) - naprawa + bezpieczniki Army.HourlyTick / CalculatePartyInfluenceCost
@@ -254,9 +255,11 @@ namespace Armoury
             try
             {
                 var set = Settings.Current;
-                bool go = set != null && set.SiegeWoundedTakenPrisoner && t.LastBroken && t.LastRetreated && me.WinningSide == BattleSideEnum.None && me.IsSiegeAssault;
+                bool held = t.LastBroken && t.LastRetreated && me.WinningSide == BattleSideEnum.None && me.IsSiegeAssault;
+                bool go = set != null && set.SiegeWoundedTakenPrisoner && held;
                 var st = me.MapEventSettlement;
                 var captor = st != null ? st.Party : null;
+                if (held) SiegeSpoils380.NoteHeld(me);   // 380: obrona odparta - okno jencow i lupu (gdy ArmouryBehavior biegl po nas)
                 if (!go || captor == null)
                 {
                     if (t.Inside + t.Near > 0)
@@ -296,6 +299,7 @@ namespace Armoury
                                 mr.AddToCounts(troop, -n, false, -n);
                                 prison.AddToCounts(troop, n, false, n);
                                 moved += n; here += n;
+                                SiegeSpoils380.NotePrisoners(me, captor, troop, n);   // 380: ci jency do wyboru w oknie jencow
                                 string id = troop.StringId;
                                 int c; types.TryGetValue(id, out c); types[id] = c + n;
                             }

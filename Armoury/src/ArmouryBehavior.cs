@@ -3476,8 +3476,14 @@ namespace Armoury
                 try { won = mapEvent.WinningSide == mapEvent.PlayerSide; } catch { }
                 if (!won)
                 {
-                    int dropped = BattlefieldLaw.DropShare();
-                    _lootFlushDue = CampaignTime.Zero;
+                    // 380: obrona odparta (zalamanie 371, wrog odstapil, bitwa bez zwyciezcy) - pole zostaje przy graczu: dzialka czeka na okno lupu SiegeSpoils380
+                    // (po oknie jencow), zapas: SiegeSpoils380 po godzinie do sakw, tu termin 2 h (ta sama droga co ekran, ktory nie przyszedl)
+                    bool held = false;
+                    try { held = SiegeSpoils380.Arm(mapEvent); } catch (Exception e) { Log.Error("OnMapEventEnded.SiegeSpoils380", e); }
+                    if (held)
+                        _lootFlushDue = BattlefieldLaw.SharePending() ? CampaignTime.HoursFromNow(2f) : CampaignTime.Zero;
+                    int dropped = held ? 0 : BattlefieldLaw.DropShare();
+                    if (!held) _lootFlushDue = CampaignTime.Zero;
                     if (dropped > 0)
                         Log.Info("Pole przegrane/opuszczone - " + dropped + " sztuk lupu zostaje na ziemi.");
                     _hpBeforeBattle = -1;
@@ -3798,6 +3804,9 @@ namespace Armoury
         /// po bitwie zostaje obszukany: cale jego wyposazenie wpada do sakw,
         /// zuzyte jak lupy. Lordowie NIE - za nich bierze sie okup, nie plaszcz.
         /// </summary>
+        /// <summary>380: &gt; 0 w trakcie TakePrisonerAction.ApplyByTakenFromPartyScreen okna jencow SiegeSpoils380 - jency z walki (bez obszukania).</summary>
+        internal static int PrisonersFromField;
+
         private void OnPrisonerTaken(TaleWorlds.CampaignSystem.Roster.FlattenedTroopRoster roster)
         {
             // KONIEC PODWOJNEGO LICZENIA (Jeff 29.08: "lupy po bitwie, a potem
@@ -3813,7 +3822,8 @@ namespace Armoury
             try
             {
                 fromBattle = MapEvent.PlayerMapEvent != null
-                    || TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Battle != null;
+                    || TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Battle != null
+                    || PrisonersFromField > 0;   // 380: jency z okna po odpartym szturmie (ranni spod murow) - ich sprzet DTE liczyl w lupie z pola
             }
             catch { }
             if (fromBattle)   // audyt pelny W3: jeniec z walki oddal sprzet w lupie z pola (DTE liczy nieprzytomnych jak poleglych)
