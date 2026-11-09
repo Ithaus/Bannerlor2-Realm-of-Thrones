@@ -83,6 +83,13 @@ namespace Armoury
                     Log.Info("Szturm (371): misja poza regula zalamania - " + _why + ".");
                     return _active = false;
                 }
+                if (SiegeWalls.EffThr(_a) <= 0.0)
+                {
+                    // prog OB2 0 (SiegeAssaultRepelLoss wylaczony) - _limit 0 dalby zalamanie w pierwszej sekundzie kazdej misji
+                    SiegeWalls.NoteMissionNone();
+                    Log.Info("Szturm (371): misja poza regula zalamania - prog OB2 0 (OB2 wylaczony).");
+                    return _active = false;
+                }
                 _prior = _a.MisCas;
                 _active = true;
             }
@@ -131,15 +138,15 @@ namespace Armoury
                     Start(m);
                     return;
                 }
-                if (m.MissionEnded) return;
                 if (!_broken)
                 {
+                    if (m.MissionEnded) return;                                   // misja skonczona bez zalamania - nic do oceny
                     if (now < _nextEval) return;
                     _nextEval = now + EvalEvery;
                     Evaluate(m, now);
                     return;
                 }
-                Drive(m, now);
+                Drive(m, now);                                                    // po zalamaniu takze po koncu misji (do OnEndMission): kto jeszcze walczy na murach, schodzi - inaczej gracz nie wyjdzie TAB-em (BattleEndLogic.TryExit: wrog obok)
             }
             catch (Exception e) { Stumble("Tick", e); }
         }
@@ -261,11 +268,12 @@ namespace Armoury
                 if (_queue.Count == 0)
                     foreach (var a in m.Agents)
                     {
-                        if (a == null || !a.IsActive() || !a.IsHuman || !a.IsAIControlled || !Attacker(a) || a.IsRunningAway) continue;
+                        if (a == null || !a.IsActive() || !a.IsHuman || !a.IsAIControlled || !Attacker(a)) continue;
+                        if (a.IsRunningAway && !a.IsUsingGameObject) continue;            // uciekajacy, ale znow przypiety do drabiny / wiezy przez AI szyku - zdjac jeszcze raz
                         _queue.Add(a);
                     }
             }
-            if (!_fuse && now - _breakAt >= SiegeWalls.BreakEndSeconds) _fuse = true;   // MissionEnded przy nastepnym sprawdzeniu konca
+            if (!_fuse && !m.MissionEnded && now - _breakAt >= SiegeWalls.BreakEndSeconds) _fuse = true;   // bezpiecznik tylko, gdy misja jeszcze trwa (MissionEnded przy nastepnym sprawdzeniu konca)
         }
 
         private void Send(Mission m, Agent a)

@@ -437,7 +437,7 @@ namespace Armoury
                     // 307c (2): po kilku odparciach te same mury - szturm dopiero przy wyrwie albo miazdzacej przewadze (wodz nie posyla ludzi trzeci raz bez zmiany warunkow)
                     mPre = Measure(camp);
                     string why307;
-                    if (SiegeWalls2.RetryHeld(camp, mPre, pz.Repels, pz.Until + 3.0 * PauseDays, true, out why307))
+                    if (SiegeWalls2.RetryHeld(camp, mPre, pz.Repels, HoldEnd(pz), true, out why307))
                     {
                         _dPause++;
                         bool ro = SiegeWalls2.RetryRansomOn;
@@ -544,7 +544,18 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ OB2: przerwa po odparciu (pamiec + zapis)
-        private sealed class Pause { public SiegeEvent Ev; public string St; public double Start; public float Until; public int Repels; }
+        private sealed class Pause { public SiegeEvent Ev; public string St; public double Start; public float Until; public int Repels; public float At = -1f; }   // At - dzien ostatniego odparcia (371, poza zapisem; po wczytaniu -1)
+
+        /// <summary>307c okno "nie na te same mury". 371 wlaczony (Jeff 09.11: kolejny szturm po kilku dniach, najwyzej 2 tygodnie): koniec przerwy + 3 x
+        /// SiegeRepelPauseMidDays, ale nie dalej niz SiegeRepelRebuildMaxDays od odparcia (gdy znany) i nie przed koncem przerwy. Wylaczony - stara formula
+        /// (koniec przerwy + 3 x SiegeRepelPauseDays, u Jeffa 7 = 21 dob).</summary>
+        private static double HoldEnd(Pause pz)
+        {
+            if (!BreakOn) return pz.Until + 3.0 * PauseDays;
+            double end = pz.Until + 3.0 * PauseMid;
+            if (pz.At >= 0f) end = Math.Min(end, pz.At + RebuildMax);
+            return Math.Max(end, pz.Until);
+        }
         private static readonly Dictionary<SiegeEvent, Pause> _pauses = new Dictionary<SiegeEvent, Pause>();
         private static readonly List<Pause> _pendingPauses = new List<Pause>();
 
@@ -569,10 +580,10 @@ namespace Armoury
             catch (Exception e) { Stumble("RepelsOf", e); return 0; }
         }
 
-        /// <summary>307c: koniec okna "nie na te same mury" - koniec przerwy + 3 x podstawa (SiegeRepelPauseDays). Bez przerwy - 0 (bez wstrzymania).</summary>
+        /// <summary>307c: koniec okna "nie na te same mury" - koniec przerwy + 3 x podstawa (SiegeRepelPauseDays; przy 371 - patrz HoldEnd). Bez przerwy - 0 (bez wstrzymania).</summary>
         internal static double RetryHoldUntil(SiegeEvent ev)
         {
-            try { var pz = PauseOf(ev, false); return pz != null ? pz.Until + 3.0 * PauseDays : 0.0; }
+            try { var pz = PauseOf(ev, false); return pz != null ? HoldEnd(pz) : 0.0; }
             catch (Exception e) { Stumble("RetryHoldUntil", e); return 0.0; }
         }
 
@@ -722,7 +733,7 @@ namespace Armoury
                 T = Pause371(fM, fL, fO, lost, prior, out grow, out lo, out hi, out bd);
             }
             else T = SiegeWalls2.GrowPause(T, prior, b * 4.0, out grow);         // 307c (2): kazde wczesniejsze odparcie w tym oblezeniu wydluza przerwe (najwyzej 4 x podstawa)
-            if (pz != null) { pz.Until = Now + (float)T; pz.Repels++; }
+            if (pz != null) { pz.Until = Now + (float)T; pz.Repels++; pz.At = Now; }
             a.Repelled = true;
             double thrE = b371 ? EffThr(a) : a.Thr;
             _dRepelled++; _dLossSum += a.Loss; _dThrSum += thrE; _dPauseSum += T;
