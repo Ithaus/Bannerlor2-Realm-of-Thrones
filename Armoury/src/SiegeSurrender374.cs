@@ -128,7 +128,7 @@ namespace Armoury
         }
 
         /// <summary>Recenzja 374: bitwa przy osadzie albo przy obozie (szturm, odsiecz pod murami, wypad) - SiegeCompleted nie moze ruszac partii w bitwie.</summary>
-        private static bool CampBusy(Settlement st)
+        internal static bool CampBusy(Settlement st)   // 384: internal
         {
             if (st == null) return false;
             if (st.Party != null && st.Party.MapEvent != null) return true;
@@ -173,7 +173,7 @@ namespace Armoury
         }
 
         /// <summary>Wodz obozu: wodz armii LeaderParty albo LeaderParty (jak gra w request_meeting_with_besiegers) i GetLeaderOfSiegeEvent.</summary>
-        private static bool IsCampLeader(SiegeEvent ev, Hero h)
+        internal static bool IsCampLeader(SiegeEvent ev, Hero h)   // 384: internal
         {
             var camp = ev != null ? ev.BesiegerCamp : null;
             if (camp == null || h == null) return false;
@@ -186,7 +186,7 @@ namespace Armoury
             try { return Campaign.Current.Models.EncounterModel.GetLeaderOfSiegeEvent(ev, BattleSideEnum.Attacker) == h; } catch { return false; }
         }
 
-        private static bool Excluded(Hero h)
+        internal static bool Excluded(Hero h)   // 384: internal
         {
             if (h.Clan == null || h.MapFaction == null) return true;
             if (h.MapFaction.IsBanditFaction || h.Clan.IsBanditFaction) return true;
@@ -229,10 +229,23 @@ namespace Armoury
                 try { def = Campaign.Current.Models.EncounterModel.GetLeaderOfSiegeEvent(ev, BattleSideEnum.Defender); } catch { }
                 if (def != me && st.OwnerClan != Clan.PlayerClan) return false;
                 foreach (var d in _queue) if (d.St == st.StringId) return false;
+                if (PrisonerTerms384.Pending(st)) return false;   // 384: umowa wymiany w toku - bez drugiej umowy o te sama twierdze
                 return true;
             }
             catch (Exception e) { Stumble("AskCond", e); return false; }
         }
+
+        /// <summary>384: czy w toku jest umowa 374 o te osade (oferta w menu albo kolejka).</summary>
+        internal static bool Pending(Settlement st)
+        {
+            if (st == null) return false;
+            if (_offer != null && _offer.St == st.StringId) return true;
+            foreach (var d in _queue) if (d.St == st.StringId) return true;
+            return false;
+        }
+
+        /// <summary>384: zdrajca slowa (wymiana jencow) - ta sama lista klamcow co 374 (ostrzezenie w podpowiedziach obu rozmow).</summary>
+        internal static void MarkLiar(Hero h) { if (h != null && h.StringId != null) _liars[h.StringId] = (int)Today; }
 
         private static bool AskClick(out TextObject why)
         {
@@ -262,7 +275,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Pick", e); _sc = null; }
         }
 
-        private static bool IsLiar(Hero h) { return h != null && h.StringId != null && _liars.ContainsKey(h.StringId); }
+        internal static bool IsLiar(Hero h) { return h != null && h.StringId != null && _liars.ContainsKey(h.StringId); }
 
         private static bool HintCond()
         {
@@ -393,7 +406,7 @@ namespace Armoury
         // ------------------------------------------------------------ ocena zgody
         private sealed class Score { public double Total; public string Parts = "-"; public char Why = 'T'; public int Held, Lost, MenCamp, MenIn; public double Days, Camp, Walls, Food; }
 
-        private static int Trait(Hero h, TraitObject t) { try { return t != null ? h.GetTraitLevel(t) : 0; } catch { return 0; } }
+        internal static int Trait(Hero h, TraitObject t) { try { return t != null ? h.GetTraitLevel(t) : 0; } catch { return 0; } }
 
         private static float Power(PartyBase p)
         {
@@ -410,7 +423,7 @@ namespace Armoury
             foreach (var mp in st.Parties) if (mp != null && (mp.IsGarrison || mp.IsLordParty || mp.IsMainParty || mp.IsMilitia)) walls += Power(mp.Party);
         }
 
-        private static void Assaults(Settlement st, out int held, out int lost)
+        internal static void Assaults(Settlement st, out int held, out int lost)   // 384: internal
         {
             held = 0; lost = 0;
             var ev = st.SiegeEvent;
@@ -471,7 +484,7 @@ namespace Armoury
             return sc;
         }
 
-        private static double BetrayChance(Hero h)
+        internal static double BetrayChance(Hero h)   // 384: internal
         {
             int honor = Trait(h, DefaultTraits.Honor);
             if (honor >= 0) return 0;
@@ -687,7 +700,7 @@ namespace Armoury
         }
 
         /// <summary>Szeregowi z rosteru do lochu (ranni zostaja ranni); ksiega ludzi FCaptured. Zwraca liczbe.</summary>
-        private static int ToPrison(TaleWorlds.CampaignSystem.Roster.TroopRoster from, TaleWorlds.CampaignSystem.Roster.TroopRoster to)
+        internal static int ToPrison(TaleWorlds.CampaignSystem.Roster.TroopRoster from, TaleWorlds.CampaignSystem.Roster.TroopRoster to)
         {
             int total = 0;
             try

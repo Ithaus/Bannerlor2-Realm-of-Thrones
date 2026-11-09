@@ -396,13 +396,82 @@ namespace Armoury
         /// <summary>Postfiks GetTargetScoreForFaction (Last): rozejm - oblezenie tej osady przez te frakcje ma wynik 0 (AI wybiera inny cel). Nie rzuca.</summary>
         public static void ScorePost(Settlement __0, Army.ArmyTypes __1, MobileParty __2, ref float __result)
         {
+            if (__result <= 0f) return;
+            PrisonerTerms384.ScorePact(__0, __1, __2, ref __result);   // 384: pakt o nieagresji wobec ziem rodu gracza (oblezenie i najazd); bez paktow - jedno porownanie
             if (__result <= 0f || _truce.Count == 0 || __1 != Army.ArmyTypes.Besieger) return;
             try
             {
-                if (!ActOn || __0 == null || __2 == null) return;
+                if ((!ActOn && !PrisonerTerms384.On) || __0 == null || __2 == null) return;   // 384: rozejm z wymiany jencow dziala tez przy wylaczonych okupach
                 if (IsTruce(__0, __2.MapFaction, __2.ActualClan)) { __result = 0f; _dScoreZero++; }
             }
             catch (Exception e) { Stumble("ScorePost", e); }
+        }
+
+        // ------------------------------------------------------------ 384: zdjecie oblezenia i rozejm osady z wymiany jencow (ta sama droga co okup)
+        /// <summary>384: frakcje i rody druzyn obozu (klucze rozejmu jak w Execute: StringId frakcji, "c:" + rod) - zbierane PRZED zwinieciem.</summary>
+        internal static List<string> CampKeys384(BesiegerCamp camp)
+        {
+            var keys = new List<string>(4);
+            try
+            {
+                if (camp == null) return keys;
+                foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
+                {
+                    var mp = pb != null ? pb.MobileParty : null;
+                    if (mp == null) continue;
+                    var f = mp.MapFaction;
+                    if (f != null && f.StringId != null && !keys.Contains(f.StringId)) keys.Add(f.StringId);
+                    string ck = ClanKey(mp.ActualClan);
+                    if (ck != null && !keys.Contains(ck)) keys.Add(ck);
+                }
+                var cf = camp.MapFaction;
+                if (cf != null && cf.StringId != null && !keys.Contains(cf.StringId)) keys.Add(cf.StringId);
+            }
+            catch (Exception e) { Stumble("CampKeys384", e); }
+            return keys;
+        }
+
+        /// <summary>384: zwiniecie obozu droga gry (RemoveAllSiegeParties, jak Execute okupu - w takcie kampanii). Zwraca true, gdy oblezenie naprawde sie skonczylo.</summary>
+        internal static bool Lift384(Settlement st, out string info)
+        {
+            info = "-";
+            var ev = st != null ? st.SiegeEvent : null;
+            var camp = ev != null ? ev.BesiegerCamp : null;
+            if (camp == null) { info = "brak obozu"; return false; }
+            Exception err = null;
+            try { camp.RemoveAllSiegeParties(); } catch (Exception e) { err = e; }
+            bool ended = st.SiegeEvent != ev;
+            if (err != null)
+            {
+                _stumbles++;
+                try { Log.Error("SiegeRansom.Lift384 (" + st.StringId + ", oblezenie zakonczone " + (ended ? "tak" : "nie") + ")", err); } catch { }
+            }
+            info = "oblezenie zakonczone " + (ended ? "tak" : "NIE") + (err != null ? " (wyjatek " + err.GetType().Name + ")" : "");
+            return ended;
+        }
+
+        /// <summary>384: rozejm osady st z kluczami (frakcje / "c:" rody) do doby until + zawrocenie druzyn juz w drodze (TurnBack). Zwraca ile zawrocono.</summary>
+        internal static int Truce384(Settlement st, List<string> keys, int until)
+        {
+            if (st == null || keys == null) return 0;
+            foreach (var k in keys) AddTruce(st, k, until);
+            _dTruceNew += keys.Count;
+            int bk;
+            return TurnBack(st, out bk);
+        }
+
+        /// <summary>384: gracz zlamal umowe wymiany - rozejm osady st dla klucza zdjety (oblegajacy znow moga ja celowac). Tablica wspolna z okupem: rozejm
+        /// okupu tej samej osady i tego samego klucza (rzadki zbieg) gasnie razem - gracz zlamal slowo dane tej samej stronie. Nie rzuca.</summary>
+        internal static void EndTruce384(Settlement st, string key)
+        {
+            try
+            {
+                Dictionary<string, int> m;
+                if (st == null || st.StringId == null || key == null || !_truce.TryGetValue(st.StringId, out m)) return;
+                m.Remove(key);
+                if (m.Count == 0) _truce.Remove(st.StringId);
+            }
+            catch (Exception e) { Stumble("EndTruce384", e); }
         }
 
         /// <summary>Po okupie: druzyny frakcji z rozejmem juz w drodze na oblezenie tej osady - SetMoveModeHold (AI mysli od nowa; wynik celu 0). Zwraca ile;

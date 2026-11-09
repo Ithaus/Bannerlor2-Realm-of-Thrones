@@ -836,6 +836,14 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool SiegeHonourableSurrender { get; set; } = true;
 
+        [SettingPropertyBool("Prisoner Exchange For Terms", HintText = "When you hold a besieged town or castle, you can request a parley with the besiegers' commander and bargain: what you want - that he lifts the siege and does not come back for Prisoner Exchange Pact Days, or that he also swears his realm will leave your lands and your men in peace that long, or that he lets you and your men ride out unharmed on his word (the keep and its garrison stay yours) - for what you give: lords of his realm you hold in your dungeons or party (each with his worth to him; kin and the royal house weigh more, lords held in the besieged keep less, since he frees them when the walls fall), gold, or one of your castles or towns. He weighs it by his traits, your relation and how the siege goes, may ask for more once or twice ('Add 20,000 denars and we have a deal'), or refuses (ask again in 3 days). A lord without honour may break his word. Breaking the oath yourself costs relation and Honor. Peace between realms is not made here. Log: 'Wymiana jencow (384)'. Off = no such talk", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerExchangeForTerms { get; set; } = true;
+
+        [SettingPropertyInteger("Prisoner Exchange Pact Days", 10, 364, "0", HintText = "With Prisoner Exchange For Terms: how many days a commander who took your terms keeps away from the keep he besieged (and, with the oath of peace, from all your lands and your men). 60 days is a sixth of the 364-day year, the same measure as the siege ransom truce", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public int PrisonerExchangePactDays { get; set; } = 60;
+
         [SettingPropertyBool("Siege Armoury Access", HintText = "inside a besieged town or castle (you stay within the walls - the siege menu replaces the town or castle menu) the siege menu offers 'View Army Armory' (the troop armoury of Dynamic Troop Equipment, the same window as in a town) and, in your own towns and castles, 'Hand kit to the garrison' - the same windows and rules as usual; off = no armoury while besieged, as before", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool SiegeArmouryAccess { get; set; } = true;
@@ -12140,6 +12148,8 @@ namespace Armoury
             s.GearFitSkillLawFootInHideoutSiege = GearFitSkillLawFootInHideoutSiege;
             s.NightPromptSkipWhenRested = NightPromptSkipWhenRested;
             s.SiegeHonourableSurrender = SiegeHonourableSurrender;
+            s.PrisonerExchangeForTerms = PrisonerExchangeForTerms;
+            s.PrisonerExchangePactDays = PrisonerExchangePactDays;
             s.SiegeArmouryAccess = SiegeArmouryAccess;
             s.GarrisonKitMenu = GarrisonKitMenu;
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;
