@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 09.11 19:05 - WGRANIE 200 (377 + 371b)
+
+- Armoury.dll 7036ba6c (galaz noc/367c-jeniec-po-odejsciu, 16c9c907); przed: ed3142db (.bak-2026-11-09-przed-wgranie200, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie200*).
+- Autotest at-377: 5 dob, 2 bitwy, bledy 23, zapisy Jeffa nietkniete; gra zawisla przy wyjsciu - zabita (kod 1 tylko z tego).
+- 377: XP Engineering obroncy za machiny, gdy gra nie wybiera nikogo (wszyscy Engineering 0). Sprawdzic linie 'Inzynieria obroncow (377)' i E8/P1 'armia i oblezenie' u gracza.
+- 371b: zalamanie szturmu wedlug wymiany strat (granica 1 + 0.45 ln N, sufit 3:1; bramy rozbite x1.5 progu i x1.2 wymiany; twardy pulap 2x prog -> 1:1; zdobywaja < 15% obroncow). Sprawdzic w obronie: linia startu misji z granica wymiany, 'Szturm (371b)' i ZALAMANIE przy ok. 2.2-2.6:1.
+
 ## STAN 09.11 17:45 - WGRANIE 199 (374 + 375 + 376)
 
 - Armoury.dll ed3142db (galaz noc/367c-jeniec-po-odejsciu, d66f4518); przed: d12eb39c (.bak-2026-11-09-przed-wgranie199, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie199*). CrashScribe bez zmian d7fbd602.
