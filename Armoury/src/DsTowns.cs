@@ -1400,7 +1400,9 @@ namespace Armoury
                 SampleTown(st, t, f, reserve);
                 spare = (long)t.Gold - reserve;
                 Kingdom k;
+                long g0 = MineGold(st);
                 Pay(st, t, f, reserve, s, true, out lordPay, out crownFarm, out crownMov, out crownAid, out k);
+                NoteMine(st, g0);                                            // 368: rata (co 7 dob) do kiesy gracza - w podpowiedzi zlota osobna pozycja
                 if (f.CLeft > 0)                                             // f7-kasy: czesc doby gersumy (rozlozonej na okno przegladu) - ta sama droga co rata firmy
                 {
                     long cu0 = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -1428,11 +1430,110 @@ namespace Armoury
                 if (t == null || s == null) return;
                 var f = FarmOf(st, true);
                 if (f == null) return;
+                long g0 = MineGold(st);
                 Pay(st, t, f, reserve, s, false, out lordPay, out crownFarm, out crownMov, out crownAid, out k);
+                NoteMine(st, g0);                                            // 368: jak miasto
                 f.PaidWin += lordPay + crownFarm + crownMov + crownAid;
                 suburb = (int)Math.Min(int.MaxValue, Draw(st, t, f, reserve, s, false));
             }
             catch (Exception e) { Stumble("CastleDay", e); }
+        }
+
+        // ============================================================ 368: raty firm do kiesy gracza (podpowiedz zlota)
+        // Jeff 09.11 ("35k dochodu a dochod realny 1k"): rata firmy miasta gracza (FL/52 + zaleglosc, raz na 7 dob - PayDay) szla w GoldForecast pod
+        // PopulationLaw.Daily ("Rents from your land"), a srednia 3 dob rozmazywala ja na 3 kolejne doby (+33,8k "na dobe", potem 4 doby +186).
+        // Teraz: zmiana kiesy gracza w Pay idzie przez GoldForecast.NoteSub na wlasny klucz (ta sama moneta, inna nazwa - suma taktu bez zmian),
+        // a prognoza bierze rate tylko w dzien raty (PlayerRateDue). Zloto i stan firm bez zmian - tylko ksiega podpowiedzi.
+
+        /// <summary>368: kiesa gracza przed Pay, gdy osada jest rodu gracza i jego glowa to gracz (rata idzie do glowy rodu); inaczej long.MinValue.</summary>
+        private static long MineGold(Settlement st)
+        {
+            try
+            {
+                var mh = Hero.MainHero;
+                var c = st != null ? st.OwnerClan : null;
+                return mh != null && c != null && ReferenceEquals(c, Clan.PlayerClan) && ReferenceEquals(c.Leader, mh) ? mh.Gold : long.MinValue;
+            }
+            catch { return long.MinValue; }
+        }
+
+        /// <summary>368: przyrost kiesy gracza w Pay (rata firmy, zaleglosc, czesc z oszczednosci ludu, urzad podatkowy, zajecie) - na klucz raty w GoldForecast. Nie rzuca.</summary>
+        private static void NoteMine(Settlement st, long g0)
+        {
+            if (g0 == long.MinValue) return;
+            try
+            {
+                var mh = Hero.MainHero;
+                long d = mh != null ? mh.Gold - g0 : 0;
+                if (d != 0) GoldForecast.NoteSub(GoldForecast.RateKey, d);
+            }
+            catch (Exception e) { Stumble("NoteMine(368)", e); }
+        }
+
+        /// <summary>
+        /// 368: szacunek raty firm do kiesy gracza w dobie Today + ahead (ahead 0..7): miasta i zamki rodu gracza (glowa rodu = gracz) z dniem raty w tej dobie -
+        /// ta sama regula co Pay: zwolnienie (oblezenie, swiezo zdobyte) - 0; rata FL/52 x rampa + zaleglosc AL (bez krolestwa - takze czesc korony); dzial pana
+        /// z kasy ponad podloge (po zaleglosci pomocy korony); doplata urzedu podatkowego z reszty; czesc z oszczednosci ludu bez limitu (kies ludu nie liczymy).
+        /// Szacunek (kasa jutro inna niz teraz, dziesiata i zajecie pominiete). n - ile osad ma rate w tej dobie, names - ich nazwy. Nie rzuca (potkniecie - 0).
+        /// </summary>
+        internal static long PlayerRateDue(int ahead, out int n, List<string> names)
+        {
+            n = 0;
+            long sum = 0;
+            var s = Settings.Current;
+            var pc = Clan.PlayerClan;
+            var mh = Hero.MainHero;
+            if (s == null || !FarmsLive || pc == null || mh == null || !ReferenceEquals(pc.Leader, mh) || !mh.IsAlive) return 0;
+            int day = Today + ahead;
+            var k = pc.Kingdom;
+            if (k != null && k.IsEliminated) k = null;
+            double rn = NewShare;
+            foreach (var st in pc.Settlements)
+            {
+                try
+                {
+                    if (st == null || st.StringId == null || st.Town == null || !(st.IsTown || st.IsCastle)) continue;
+                    if (st.IsTown ? !TownPurse.ValveLive : !s.CastlePurseEnabled) continue;   // recenzja 368: TownDay tylko przy ValveLive (PopulationLaw), CastleDay tylko przy CastlePurseEnabled
+                    if ((day + (int)(Fnv(st.StringId) % 7u)) % 7 != 0) continue;
+                    var f = FarmOf(st, false);
+                    if (f == null || RemitOf(st) != 0) continue;
+                    var t = st.Town;
+                    double iL = f.FL / Weeks * rn, iC = f.FC / Weeks * rn, iLf = f.FLf / Weeks * rn, aL = f.AL, aC = f.AC, aLf = f.ALf;
+                    if (k == null) { iL += iC; iC = 0; aL += aC; aC = 0; }
+                    double xL = 0, xC = 0;                                   // recenzja 368: urzad podatkowy jak w Pay - z iL/iC PRZED scaleniem czesci ludu
+                    if (st.IsTown && Buildings338.TaxOfficeOn && iL + iC > 0)
+                    {
+                        var e = new ExplainedNumber(1f);
+                        t.AddEffectOfBuildings(TaleWorlds.CampaignSystem.Settlements.Buildings.BuildingEffectEnum.TaxPerDay, ref e);
+                        double m = e.ResultNumber;
+                        if (m > 1.0 && !double.IsNaN(m) && !double.IsInfinity(m)) { xL = iL * (m - 1.0); xC = iC * (m - 1.0); }
+                    }
+                    if (!s.DsFarmFolkFromSavings) { iL += iLf; iLf = 0; aL += aLf; aLf = 0; }
+                    int reserve = st.IsTown ? TownPurse.Reserve(t) : CastlePurse.Reserve(t);
+                    double avail = Math.Max(0, Math.Floor(t.Gold - FloorOf(s, reserve)));
+                    if (f.AidArr >= 1 && k != null && f.AidK == k.StringId) avail = Math.Max(0, avail - f.AidArr);
+                    double wantL = aL + iL, wantC = aC + iC, tot = wantL + wantC, pL = 0;
+                    if (tot >= 1)
+                    {
+                        double pay = Math.Floor(Math.Min(tot, avail));
+                        pL = pay > 0 ? Math.Floor(pay * wantL / tot) : 0;
+                        avail -= pay;
+                    }
+                    // urzad podatkowy (338 2c): jak TaxOfficePay - z reszty kasy, pan i korona w stosunku doplat xL : xC
+                    if (xL + xC >= 1 && avail > 0)
+                    {
+                        double xp = Math.Floor(Math.Min(xL + xC, avail));
+                        if (xp > 0) pL += Math.Floor(xp * xL / (xL + xC));
+                    }
+                    double lf = Math.Floor(aLf + iLf);
+                    long x = (long)Math.Max(0, pL + (lf >= 1 ? lf : 0));
+                    if (x <= 0) continue;
+                    sum += x; n++;
+                    if (names != null && names.Count < 4) names.Add(st.Name != null ? st.Name.ToString() : st.StringId);
+                }
+                catch (Exception e) { Stumble("PlayerRateDue(368)", e); }
+            }
+            return sum;
         }
 
         /// <summary>Podloga kasy dla firm, pomocy i dziesiatej: DsFarmFloorShare zapasu kupcow; przy regulatorze kas w trybie 1 (doplata do zapasu z niczego) - caly zapas

@@ -108,6 +108,16 @@ namespace Armoury
         // 361: opis nowych pozycji poprawek (ostatnie przeliczenie; w TickEnd kopiowany do linii dobowej)
         private static string _diag361, _fc361;
         private const string OtKey = "Seal31B.OwnerTaxDaily", HoardKey = "TownFolk.DaWorksRun";
+        /// <summary>368: rata firmy miasta / zamku do kiesy gracza (DsTowns.Pay, co 7 dob na osade) - wlasny klucz taktu (NoteSub), prognoza tylko w dzien raty.</summary>
+        internal const string RateKey = "DsTowns.FarmRate";
+        // 368: siatka na skoki pozycji regularnych - wartosc doby odstaje od mediany historii o wiecej niz max(SpikeMin, SpikeX x |mediana|) i jest JEDYNA taka doba
+        // w historii (dwie i wiecej - zmiana poziomu, zostaje) - w sredniej zastapiona mediana
+        private const long SpikeMin = 2000; private const int SpikeX = 5;
+        private static List<KeyValuePair<string, long>> _spikeYest = new List<KeyValuePair<string, long>>();   // 368: skoki wczorajszej doby (etykieta, kwota) - linia poza suma
+        private static string _rateInfo;   // 368: linia rat firm poza suma (harmonogram 7 dob)
+        // 368: szacunek rat tej doby zrobiony na POCZATKU taktu (przed Pay - ta sama formula co podpowiedz "jutro"); -1 - brak. Prognoza TickEnd bierze go (rozjazd
+        // linii dobowej sprawdza formule), linia dobowa wypisuje go obok raty naprawde
+        private static long _rateTick = -1; private static int _rateTickN;
         private const int GrowMin = 3;
 
         internal static void Reset()
@@ -117,6 +127,7 @@ namespace Armoury
             _hist.Clear(); _cur = null; _purse0 = 0; _lapGold = 0; _inTick = false; _stamp++;
             _fcHave = false; _fcTotal = _fcModel = _fcCorr = 0; _fcParts = null; _clanDiag = null; _fcKng = null; _fcKngDays = _fcCrownKeys = 0; _cacheKng = null;
             _fcKeys = null; _corrKeys = null; _lastPayH = double.NaN;
+            _spikeYest = new List<KeyValuePair<string, long>>(); _rateInfo = null; _rateTick = -1; _rateTickN = 0;
             _cmpN = 0; _cmpAbs = _cmpAbsT = 0; _stumbles = 0;
             _cacheHour = int.MinValue; _corr = new List<Corr>();
         }
@@ -155,6 +166,9 @@ namespace Armoury
                 _cur = new DayRec { Day = Today(), Kng = KngNow(), Fresh = true };
                 _purse0 = g; _lapGold = g; _inTick = true;
                 _sumTickSeen = true; _paySinceTick = false;   // 361a/b: takt doby od ostatniej wyplaty byl; kolejka podatku warsztatow pobrana w tym takcie
+                _rateTick = -1; _rateTickN = 0;
+                try { if (On && DsTowns.FarmsLive) _rateTick = DsTowns.PlayerRateDue(0, out _rateTickN, null); }   // 368: przed Pay tej doby
+                catch (Exception e) { _rateTick = -1; Stumble("TickBegin(368)", e); }
             }
             catch (Exception e) { _inTick = false; Stumble("TickBegin", e); }
         }
@@ -719,6 +733,7 @@ namespace Armoury
                     int na = Math.Min(3, nd);
                     var sum = new Dictionary<string, long>(StringComparer.Ordinal);
                     var order = new List<string>();
+                    var spikes = SpikesOf(kng, keys, diag);   // 368: (klucz#indeks doby) -> mediana zamiast wartosci
                     for (int hi = nd - na; hi < nd; hi++)
                     {
                         bool same = SameKng(_hist[hi], kng);
@@ -728,10 +743,13 @@ namespace Armoury
                             if (!same && IsCrownKey(kv.Key)) continue;   // 352: kwota korony tylko z dob w tym samym krolestwie (inne = 0)
                             if (otDone && kv.Key == OtKey) continue;     // 361b: podatek warsztatow wyzej (kolejka albo udzial)
                             if (kv.Key == HoardKey) continue;            // 361d: danina skarbcow wsi nizej (ostatnia doba)
+                            if (kv.Key == RateKey) continue;             // 368: raty firm nizej (tylko w dzien raty)
                             bool shown; string lab = Label(kv.Key, out shown);
                             if (shown) continue;
+                            long val = kv.Value, med;
+                            if (spikes.TryGetValue(kv.Key + "#" + hi, out med)) val = med;   // 368: skok - w sredniej mediana
                             long o; if (!sum.TryGetValue(lab, out o)) order.Add(lab);
-                            sum[lab] = o + kv.Value;
+                            sum[lab] = o + val;
                         }
                     }
                     foreach (var lab in order)
@@ -757,11 +775,87 @@ namespace Armoury
                     }
                 }
                 if (otDone) keys.Add(OtKey);   // 361b: podatek warsztatow w prognozie zawsze (deterministyczny) - linia dobowa nie liczy go jako nieregularny
+                // 368: raty firm miast i zamkow gracza - w sumie tylko w dzien raty (TickEnd: ta doba, podpowiedz: nastepny takt doby); poza suma harmonogram 7 dob
+                try
+                {
+                    _rateInfo = null;
+                    if (DsTowns.FarmsLive)
+                    {
+                        int ahead = _inTickEnd ? 0 : 1, rn = 0;
+                        var names = new List<string>();
+                        // TickEnd: szacunek z poczatku taktu (po Pay kasa osady i zaleglosci juz inne); podpowiedz: nastepny takt doby
+                        long due = _inTickEnd ? Math.Max(0, _rateTick) : DsTowns.PlayerRateDue(ahead, out rn, names);
+                        if (_inTickEnd) rn = _rateTickN;
+                        if (due > 0)
+                        {
+                            int a = (int)Math.Min(int.MaxValue, due);
+                            res.Add(new Corr { Amt = a, Log = "raty firm 368 (" + rn + " osad)", Txt = new TextObject("{=!}Town and castle rent installments due " + (ahead == 0 ? "today" : "tomorrow")
+                                + " (" + string.Join(", ", names.ToArray()) + (rn > names.Count ? ", ..." : "") + ")") });
+                        }
+                        diag.Append("; raty firm 368 (doba +").Append(ahead).Append(") ").Append(due).Append(" z ").Append(rn).Append(" osad");
+                        keys.Add(RateKey);
+                        if (!_inTickEnd)
+                        {
+                            long wk = 0; int next = -1, nn;
+                            for (int i = 1; i <= 7; i++) { long x = DsTowns.PlayerRateDue(i, out nn, null); wk += x; if (x > 0 && next < 0) next = i; }
+                            if (wk > 0)
+                                _rateInfo = "Town and castle rent installments (paid every 7 days, " + (next == 1 ? "next tomorrow" : "next in " + next + " days") + "): about " + Sg(wk)
+                                            + " a week, " + Sg((long)Math.Round(wk / 7.0)) + " a day on average (only an installment due tomorrow is in the total)";
+                        }
+                    }
+                }
+                catch (Exception e) { _rateInfo = null; Stumble("Corrections(368)", e); }
                 _corrKeys = keys;
                 _diag361 = diag.ToString();
             }
             catch (Exception e) { Stumble("Corrections", e); }
             _corr = res;
+            return res;
+        }
+
+        /// <summary>368: mediana (dla parzystej liczby - srednia dwoch srodkowych, zaokraglona). Pusta - 0.</summary>
+        private static long Median(List<long> v)
+        {
+            if (v == null || v.Count == 0) return 0;
+            var a = new List<long>(v); a.Sort();
+            int m = a.Count / 2;
+            return a.Count % 2 == 1 ? a[m] : (long)Math.Round((a[m - 1] + a[m]) / 2.0);
+        }
+
+        /// <summary>368: skoki pozycji regularnych w historii (>= 3 dob): klucz "modul#indeks doby" -> mediana modulu z dob historii (doba bez wpisu = 0; korona z innego
+        /// krolestwa = 0, jak w sredniej). Skok = |wartosc - mediana| > max(SpikeMin, SpikeX x |mediana|) i to jedyna taka doba modulu w historii. Skok wczorajszej doby
+        /// (ostatniej w historii) - do _spikeYest (linia poza suma, tylko poza TickEnd). Nie rzuca.</summary>
+        private static Dictionary<string, long> SpikesOf(string kng, HashSet<string> keys, StringBuilder diag)
+        {
+            var res = new Dictionary<string, long>(StringComparer.Ordinal);
+            var yest = new List<KeyValuePair<string, long>>();
+            try
+            {
+                int nd = _hist.Count;
+                if (nd >= 3)
+                    foreach (var key in keys)
+                    {
+                        if (key == RateKey || key == OtKey || key == HoardKey) continue;
+                        bool sh; string lab = Label(key, out sh);
+                        if (sh) continue;
+                        var v = new long[nd];
+                        for (int i = 0; i < nd; i++)
+                        {
+                            if (!SameKng(_hist[i], kng) && IsCrownKey(key)) continue;
+                            long x; if (_hist[i].Laps.TryGetValue(key, out x)) v[i] = x;
+                        }
+                        long med = Median(new List<long>(v));
+                        long lim = Math.Max(SpikeMin, SpikeX * Math.Abs(med));
+                        int hit = -1, nHit = 0;
+                        for (int i = 0; i < nd; i++) if (Math.Abs(v[i] - med) > lim) { hit = i; nHit++; }
+                        if (nHit != 1) continue;
+                        res[key + "#" + hit] = med;
+                        diag.Append("; skok 368 ").Append(key).Append(" doba ").Append(_hist[hit].Day).Append(' ').Append(v[hit]).Append(" (mediana ").Append(med).Append(')');
+                        if (hit == nd - 1) yest.Add(new KeyValuePair<string, long>(lab, v[hit] - med));
+                    }
+            }
+            catch (Exception e) { Stumble("SpikesOf(368)", e); }
+            if (!_inTickEnd) _spikeYest = yest;
             return res;
         }
 
@@ -783,11 +877,17 @@ namespace Armoury
             try
             {
                 if (!On || Raw) return;
+                // 368: raty firm (harmonogram) i jednorazowe skoki wczoraj - poza suma
+                if (_rateInfo != null) InfoLine(ref r, _rateInfo);
+                foreach (var sp in _spikeYest) InfoLine(ref r, "One-off yesterday: " + sp.Key + " " + Sg(sp.Value) + " (not in the total)");
                 int n = 0; long ps = 0;
-                for (int i = _hist.Count - 1; i >= 0 && n < Days; i--) { ps += _hist[i].Purse; n++; }
+                var pv = new List<long>();
+                for (int i = _hist.Count - 1; i >= 0 && n < Days; i--) { ps += _hist[i].Purse; pv.Add(_hist[i].Purse); n++; }
                 if (n < 3) return;
                 long avg = (long)Math.Round((double)ps / n);
-                InfoLine(ref r, "Your purse actually changed: " + Sg(avg) + " a day (" + Avg(n) + "; for comparison, not in the total)");
+                // 368: srednia 7 dob zawiera dokladnie jedna rate firmy kazdej osady (cykl 7 dob = Days) - to prawdziwa srednia, ale "zwykla doba" to mediana
+                InfoLine(ref r, "Your purse actually changed: typical day " + Sg(Median(pv)) + " (median of the last " + n + " days), average " + Sg(avg)
+                                + " a day incl. weekly installments and one-offs (for comparison, not in the total)");
             }
             catch (Exception e) { Stumble("AddTip(361c)", e); }
         }
@@ -867,6 +967,7 @@ namespace Armoury
         {
             new[] { "DistrictWorks.", "" }, new[] { "SideVillageFief.", "" },   // maja juz linie widoku (prace okregu, wioska poboczna)
             new[] { "TownFolk.DaWorksRun", "Dues from village hoards (lord's share)" },   // 361d: danina od skarbca wsi (DaVillageDue) osobno
+            new[] { "DsTowns.FarmRate", "Town and castle rent installments" },   // 368: rata firm co 7 dob osobno (prognoza w dzien raty)
             new[] { "TownFolk.", "Dues from your people (surplus tax, lord's rights)" },
             new[] { "Seal31B.OwnerTaxDaily", "Workshop owner tax to the towns" },
             new[] { "KingdomTreasury.WageRefund", "Wage refund from the crown" },
@@ -967,6 +1068,7 @@ namespace Armoury
                       .Append(" | naprawde: podatek warsztatow w takcie tej doby ").Append(otNow).Append(", kolejka po wyplacie tej doby (pobierze nastepny takt) ")
                       .Append(q >= 0 ? (-q).ToString(Inv) + " (" + qn + " migawek)" : "D11-3 nieczynne")
                       .Append(", danina skarbcow wsi ").Append(hoard)
+                      .Append(", raty firm 368 naprawde ").Append(d.Laps.ContainsKey(RateKey) ? d.Laps[RateKey] : 0).Append(" (szacunek z poczatku taktu ").Append(_rateTick).Append(", osad ").Append(_rateTickN).Append(')')
                       .Append(", przyrost tej doby (361e): ").Append(d.GN > 0 ? "warsztaty " + (d.GW / d.GN) + ", wsie " + (d.GV / d.GN) : "brak pomiaru");
                 }
                 catch (Exception e) { Stumble("Line(361)", e); }
