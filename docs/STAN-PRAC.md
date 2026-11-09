@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 10.11 00:10 - WGRANIE 202 (382c, 384, 384b, 384c)
+
+- Armoury.dll 866ce291 (galaz noc/367c-jeniec-po-odejsciu, 38940018); przed: aadb2bbf (.bak-2026-11-10-przed-wgranie202, D:/Backup-Bannerlord/wgrane/2026-11-10-wgranie202*).
+- Sesja Jeffa 21:17-23:51 na WGRANIU 201 (zapis po crashu 19:43): BEZ crasha (PIERWOTNY 0), 373b start sesji: armii 7, rozwiazane 0 - gra sama naprawila przy wczytaniu, bezpieczniki 0. Zapis 23:51 skopiowany na D:.
+- Autotest at-384: 5 dob, 2 bitwy, bledy 23; 384 rozmowa wpieta, 384c latka wpieta (Szczelnosc 164a, BRAK -).
+- 382c suknie -> zbroja w bitwie (AI, nie rod gracza); 384 pertraktacje z wodzem oblezenia (jency/zloto/ziemia za odstapienie, pakt 60 dob, swobodne przejscie na slowo); 384c Request a parley bez wodza-bohatera ukryte (NRE gry).
+- Decyzje Jeffa 09.11: jency (96 lordow Polnocy w lochu Goldentooth, w tym Roose, Galbart, Bran i Sansa) - nie sprzedaje, wymienia za warunki (384). Suknie -> zbroja: tak (382c).
+
 ## STAN 09.11 20:55 - WGRANIE 201 (373b, 378-383)
 
 - Armoury.dll aadb2bbf (galaz noc/367c-jeniec-po-odejsciu, 9a97197d); przed: 7036ba6c (.bak-2026-11-09-przed-wgranie201, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie201*).
