@@ -38,6 +38,14 @@ namespace Armoury
         private static bool CommanderOn { get { var s = Settings.Current; return s != null && s.SiegeAssaultBreakCommander; } }
         /// <summary>371: mnoznik progu po upadku wodza atakujacych albo utracie wszystkich taranow i wiez w misji (kazde osobno).</summary>
         internal static double ShockFactor { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakShockFactor) ? 0.5 : Clamp(s.SiegeAssaultBreakShockFactor, 0.1, 1.0); } }
+        // 371b: wymiana strat (straty atakujacych / straty, jakie zadali obroncom) z przewaga liczebna, bramy jako mnoznik, twardy pulap, "zdobywaja"
+        internal static bool ExchangeOn { get { var s = Settings.Current; return s == null || s.SiegeAssaultBreakExchange; } }
+        internal static double ExchangeSlope { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakExchangeSlope) ? 0.45 : Clamp(s.SiegeAssaultBreakExchangeSlope, 0.0, 2.0); } }
+        internal static double ExchangeMax { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakExchangeMax) ? 3.0 : Clamp(s.SiegeAssaultBreakExchangeMax, 1.0, 10.0); } }
+        internal static double GateFactor { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakGateFactor) ? 1.5 : Clamp(s.SiegeAssaultBreakGateFactor, 1.0, 3.0); } }
+        internal static double GateExchangeFactor { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakGateExchangeFactor) ? 1.2 : Clamp(s.SiegeAssaultBreakGateExchangeFactor, 1.0, 2.0); } }
+        internal static double HardCap { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakHardCap) ? 2.0 : Clamp(s.SiegeAssaultBreakHardCap, 1.0, 5.0); } }
+        internal static double TakenShare { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakTakenShare) ? 0.15 : Clamp(s.SiegeAssaultBreakTakenShare, 0.0, 0.5); } }
         internal static float BreakEndSeconds { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakEndSeconds) ? 45f : (float)Clamp(s.SiegeAssaultBreakEndSeconds, 10.0, 300.0); } }
         private static double PauseMin { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelPauseMinDays) ? 1.0 : Clamp(s.SiegeRepelPauseMinDays, 0.25, 28.0); } }
         private static double PauseMax { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelPauseMaxDays) ? 5.0 : Clamp(s.SiegeRepelPauseMaxDays, PauseMin, 28.0); } }
@@ -46,7 +54,7 @@ namespace Armoury
         private static double RebuildMax { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelRebuildMaxDays) ? 14.0 : Clamp(s.SiegeRepelRebuildMaxDays, RebuildMin, 56.0); } }
 
         // liczniki doby 371 (misja)
-        private static int _dMisSeen, _dMisBreak, _dMisFuse, _dMisLate, _dMisNone, _dMisInside, _dMisRegistered;
+        private static int _dMisSeen, _dMisBreak, _dMisFuse, _dMisLate, _dMisNone, _dMisTaken, _dMisHoldEx, _dMisRegistered;
 
         /// <summary>371: oddzial szturmowy K z zdrowych oblegajacych A i obroncow D (procent armii z dolna granica wobec obroncow, nie wiecej niz A).</summary>
         internal static int PartyOf(int a, int d)
@@ -170,7 +178,8 @@ namespace Armoury
         internal static void NoteMissionSeen() { _dMisSeen++; }
         internal static void NoteMissionNone() { _dMisNone++; }
         internal static void NoteMissionBreak(bool fuse, int late) { _dMisBreak++; if (fuse) _dMisFuse++; _dMisLate += late; }
-        internal static void NoteMissionInside() { _dMisInside++; }
+        internal static void NoteMissionTaken() { _dMisTaken++; }      // 371b: raz na misje - prog osiagniety, ale obroncow prawie nie ma (zdobywaja)
+        internal static void NoteMissionHoldEx() { _dMisHoldEx++; }    // 371b: raz na misje - prog osiagniety, ale wymiana strat w granicy
         internal static void NoteMissionStumble(string where, Exception e) { Stumble("SiegeBreak371." + where, e); }
 
         /// <summary>Z OnMapEventEnded: szturm zalamany w misji gracza-obroncy (droga gry FinishBattleAndKeepSiegeEvent juz przeszla) - przerwa jak po OB2.</summary>
@@ -190,12 +199,14 @@ namespace Armoury
         private static string Break371DayText()
         {
             return " | 371: zalamanie " + (BreakOn ? "tak" : "nie") + " (oddzial " + F(PartyShare * 100.0, "0") + "% armii, co najmniej " + F(PartyMinVsDef, "0.0")
-                 + " x obroncy; wodz " + (CommanderOn ? "tak" : "nie") + ", wstrzas x" + F(ShockFactor, "0.00") + "; przerwa " + F(PauseMin, "0.0") + "-" + F(PauseMid, "0.0") + "-" + F(PauseMax, "0.0")
+                 + " x obroncy; wodz " + (CommanderOn ? "tak" : "nie") + ", wstrzas x" + F(ShockFactor, "0.00")
+                 + "; 371b wymiana " + (ExchangeOn ? "tak" : "nie") + " (1 + " + F(ExchangeSlope, "0.00") + " x ln przewagi, sufit " + F(ExchangeMax, "0.0") + ":1, bramy prog x" + F(GateFactor, "0.00")
+                 + " wymiana x" + F(GateExchangeFactor, "0.00") + ", pulap " + F(HardCap, "0.0") + " x prog -> 1:1, zdobywaja < " + F(TakenShare * 100.0, "0") + "% obroncow); przerwa " + F(PauseMin, "0.0") + "-" + F(PauseMid, "0.0") + "-" + F(PauseMax, "0.0")
                  + " dob, odbudowa machin " + F(RebuildMin, "0.0") + "-" + F(RebuildMax, "0.0") + " dob), misja " + (BreakMissionOn ? "tak" : "nie")
                  + ": misji szturmu z graczem w obronie " + _dMisSeen + ", poza regula " + _dMisNone + ", zalaman " + _dMisBreak + " (bezpiecznik " + _dMisFuse + ", wystawionych po zalamaniu "
-                 + _dMisLate + "), wstrzymane - atakujacy w srodku " + _dMisInside + ", przerw zapisanych " + _dMisRegistered;
+                 + _dMisLate + "), wstrzymane - zdobywaja " + _dMisTaken + ", wstrzymane - wymiana korzystna " + _dMisHoldEx + ", przerw zapisanych " + _dMisRegistered;
         }
 
-        private static void ZeroDay371() { _dMisSeen = _dMisBreak = _dMisFuse = _dMisLate = _dMisNone = _dMisInside = _dMisRegistered = 0; }
+        private static void ZeroDay371() { _dMisSeen = _dMisBreak = _dMisFuse = _dMisLate = _dMisNone = _dMisTaken = _dMisHoldEx = _dMisRegistered = 0; }
     }
 }

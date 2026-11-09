@@ -11600,6 +11600,34 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeAssaultBreakEndSeconds { get; set; } = 45f;
 
+        [SettingPropertyBool("Siege Assault Break Exchange", HintText = "With Siege Assault Break Mission: whether an assault breaks also depends on the trade of losses - the stormers' losses against the losses they have dealt the defenders. Once the assault party has lost its breaking share, it falls back only when it has paid more per fallen defender than its numbers allow (Siege Assault Break Exchange Slope and Max); an assault that loses fewer men than it kills never breaks. Off = the breaking share alone, with broken gates only raising it", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public bool SiegeAssaultBreakExchange { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Assault Break Exchange Slope", 0.00f, 2.00f, "0.00", HintText = "With Siege Assault Break Exchange: how much more the stormers will pay per fallen defender for each step of numbers - the highest bearable trade is 1 + this x the natural logarithm of how many times the attackers outnumber the defenders (even numbers: 1 to 1; five to one: about 1.7 to 1; twenty-five to one: about 2.5 to 1)", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultBreakExchangeSlope { get; set; } = 0.45f;
+
+        [SettingPropertyFloatingInteger("Siege Assault Break Exchange Max", 1.00f, 10.00f, "0.0", HintText = "With Siege Assault Break Exchange: the highest trade of losses any assault will bear, however great its numbers - the old rule of three attackers for one defender", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultBreakExchangeMax { get; set; } = 3.0f;
+
+        [SettingPropertyFloatingInteger("Siege Assault Break Gate Factor", 1.00f, 3.00f, "0.00", HintText = "With Siege Assault Break Mission: when all the gates are broken, the stormers' breaking share is multiplied by this - an open way in is worth more blood, but broken gates alone no longer stop an assault from breaking", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultBreakGateFactor { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Siege Assault Break Gate Exchange Factor", 1.00f, 2.00f, "0.00", HintText = "With Siege Assault Break Exchange: when all the gates are broken, the highest bearable trade of losses is multiplied by this", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultBreakGateExchangeFactor { get; set; } = 1.2f;
+
+        [SettingPropertyFloatingInteger("Siege Assault Break Hard Cap", 1.00f, 5.00f, "0.0", HintText = "With Siege Assault Break Exchange: once the assault party has lost this many times its breaking share, numbers and broken gates no longer count - it falls back as soon as it has lost more men than it has killed", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultBreakHardCap { get; set; } = 2.0f;
+
+        [SettingPropertyFloatingInteger("Siege Assault Break Taken Share", 0.00f, 0.50f, "0.00", HintText = "With Siege Assault Break Mission: an assault never breaks while the defenders still standing and still to come are fewer than this share of all the defenders of the battle - the place is being taken", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultBreakTakenShare { get; set; } = 0.15f;
+
         [SettingPropertyFloatingInteger("Siege Repel Pause Min Days", 0.25f, 28.00f, "0.0", HintText = "With Siege Assault Break: the shortest pause in days before the besiegers try again after a broken assault when their rams and siege towers still stand", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeRepelPauseMinDays { get; set; } = 1f;
@@ -14743,6 +14771,13 @@ namespace Armoury
             s.SiegeAssaultBreakCommander = SiegeAssaultBreakCommander;
             s.SiegeAssaultBreakShockFactor = SiegeAssaultBreakShockFactor;
             s.SiegeAssaultBreakEndSeconds = SiegeAssaultBreakEndSeconds;
+            s.SiegeAssaultBreakExchange = SiegeAssaultBreakExchange;
+            s.SiegeAssaultBreakExchangeSlope = SiegeAssaultBreakExchangeSlope;
+            s.SiegeAssaultBreakExchangeMax = SiegeAssaultBreakExchangeMax;
+            s.SiegeAssaultBreakGateFactor = SiegeAssaultBreakGateFactor;
+            s.SiegeAssaultBreakGateExchangeFactor = SiegeAssaultBreakGateExchangeFactor;
+            s.SiegeAssaultBreakHardCap = SiegeAssaultBreakHardCap;
+            s.SiegeAssaultBreakTakenShare = SiegeAssaultBreakTakenShare;
             s.SiegeRepelPauseMinDays = SiegeRepelPauseMinDays;
             s.SiegeRepelPauseMidDays = SiegeRepelPauseMidDays;
             s.SiegeRepelPauseMaxDays = SiegeRepelPauseMaxDays;

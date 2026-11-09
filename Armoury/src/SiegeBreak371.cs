@@ -23,8 +23,14 @@ namespace Armoury
     ///  - prog: zabici + nieprzytomni atakujacy (ludzie; uciekinierzy nie) tej misji + z poprzednich misji tej bitwy &gt;= prog x K_m; prog = OB2 (SZ3) x wodz (fW)
     ///    x SiegeAssaultBreakShockFactor po upadku wodza atakujacych (Team.GeneralAgent zabity / nieprzytomny) i drugi raz po utracie WSZYSTKICH taranow
     ///    i wiez, ktore staly na starcie (drabin nie liczymy - gra stawia je wciaz od nowa); sprawdzane co 1 s.
-    ///  - bez zalamania, gdy atakujacy sa juz w srodku (wszystkie bramy do rozbicia rozbite) albo na murach zostala garstka (obroncow mniej niz
-    ///    SiegeWalls.ManShare z ludzi obrony na starcie misji) - jak SZ1 bez misji.
+    ///  - 371b (Jeff 09.11 "jesli stracil 1000 ale my 2000 to sie nie wycofa"; Goldentooth: 598 / 598 przy bramach 2/2 i dalej ok. 2330 strat atakujacych
+    ///    wobec 660 obroncow, 3.5:1 - stara regula "wszystkie bramy rozbite = bez zalamania" wylaczala sprawdzanie do konca misji). Po progu decyduje
+    ///    WYMIANA STRAT X = A / D (A - straty atakujacych tej bitwy, D - zabici + nieprzytomni obroncy tej bitwy): zalamanie, gdy X &gt; R,
+    ///    R = min(SiegeAssaultBreakExchangeMax, 1 + SiegeAssaultBreakExchangeSlope x ln(przewaga N)) [x SiegeAssaultBreakGateExchangeFactor przy rozbitych
+    ///    bramach]; N = ludzie atakujacych / obroncow w misji (spawner gry). Rozbite bramy podnosza prog (x SiegeAssaultBreakGateFactor), nie wylaczaja.
+    ///    Twardy pulap: A &gt;= SiegeAssaultBreakHardCap x prog bazowy -&gt; R = 1 (kto placi wiecej, niz zadaje, odstepuje). Kto wygrywa wymiane (X &lt;= 1),
+    ///    nie odstepuje nigdy. Zdobywaja: obroncow w polu + w odwodzie spawnera mniej niz SiegeAssaultBreakTakenShare wszystkich obroncow bitwy - bez
+    ///    zalamania (sprawdzane co 1 s, bez trwalej flagi). Wymiana wylaczona - sam prog (z mnoznikiem bram) + "zdobywaja".
     ///  - zalamanie (raz na misje): StopSpawner(Attacker); kazdy czlowiek AI atakujacych - StopUsingGameObject (bez ponownego przypiecia) i natywne
     ///    Agent.Retreat(Mission.GetClosestFleePositionForAgent) - BEZ CommonAIComponent i bez rozkazu Retreat szyku, wiec RBM tego nie gasi (wzor RoutHold 143);
     ///    co 4 s ponowione u tych, ktorym odwrot zgasl; wystawieni po zalamaniu (takze Dynamic Reinforcements - wystawia z pominieciem spawnera gry) dostaja
@@ -41,10 +47,11 @@ namespace Armoury
         private const int PerTick = 150, ErrMax = 3;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        private bool _known, _active, _started, _broken, _fuse, _ended, _genDown, _engDown, _inside;
+        private bool _known, _active, _started, _broken, _fuse, _ended, _genDown, _engDown, _genLogged, _engLogged, _takenNoted, _holdNoted, _cap;
         private float _nextEval, _breakAt = -1f, _nextResend;
         private int _cas, _prior, _km, _total, _def0, _sent, _resent, _late, _stumbles, _errs, _engines;
-        private double _thr, _limit;
+        private int _dcas, _dPrior, _dTot, _dLeft, _state;               // 371b: straty obroncow tej misji / poprzednich misji, obroncy w misji (spawner), zostalo; stan 0 ponizej progu, 1 trwa (wymiana), 2 zdobywaja
+        private double _thr, _limit, _x, _r = -1, _n = 1, _share = 1, _nextLogA;
         private string _why = "-";
         private MapEvent _me;
         private SiegeWalls.Assault _a;
@@ -97,6 +104,7 @@ namespace Armoury
                     return _active = false;
                 }
                 _prior = _a.MisCas;
+                _dPrior = _a.MisDefCas;
                 _active = true;
             }
             catch (Exception e) { Stumble("Known", e); _active = false; }
@@ -108,12 +116,16 @@ namespace Armoury
             if (!_active || _ended) return;
             try
             {
-                if (affectedAgent == null || !affectedAgent.IsHuman || !Attacker(affectedAgent)) return;
-                if (agentState == AgentState.Killed || agentState == AgentState.Unconscious)
+                if (affectedAgent == null || !affectedAgent.IsHuman) return;
+                if (agentState != AgentState.Killed && agentState != AgentState.Unconscious) return;
+                if (!Attacker(affectedAgent))
                 {
-                    _cas++;
-                    if (_general != null && ReferenceEquals(affectedAgent, _general)) _genDown = true;
+                    var t = affectedAgent.Team;
+                    if (t != null && t.Side == BattleSideEnum.Defender) _dcas++;   // 371b: strata obroncow (wymiana)
+                    return;
                 }
+                _cas++;
+                if (_general != null && ReferenceEquals(affectedAgent, _general)) _genDown = true;
             }
             catch (Exception e) { Stumble("Removed", e); }
         }
@@ -164,6 +176,7 @@ namespace Armoury
             {
                 var sp = m.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();   // spawner szturmu SandBox (fale z BannerlordConfig); inny - K bez obciecia
                 _total = sp != null ? sp.GetTotalNumberOfTroopsForSide(BattleSideEnum.Attacker) : 0;
+                _dTot = sp != null ? sp.GetTotalNumberOfTroopsForSide(BattleSideEnum.Defender) : 0;
             }
             catch (Exception e) { Stumble("Start.spawn", e); }
             int k = Math.Max(1, _a.K);
@@ -183,12 +196,16 @@ namespace Armoury
             }
             _engines = _machines.Count;
             _def0 = DefendersActive(m);
+            if (_dTot <= 0) _dTot = Math.Max(_def0, _a.Def0);                    // 371b: zapas, gdy spawner inny
+            _n = Math.Max(1.0, (_total > 0 ? _total : _a.Men0) / (double)Math.Max(1, _dTot));
             _a.Missions++;
             Log.Info("Szturm (371): start misji | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " (" + _a.FWTxt + ") | armia na starcie szturmu " + _a.Men0
                      + ", obroncow " + _a.Def0 + " | oddzial szturmowy K " + _a.K + ", w misji K_m " + _km + " (misja wystawi " + _total + ") | prog " + F(_thr * 100.0, "0.0")
                      + "% (OB2 " + F(_a.Thr * 100.0, "0.0") + "% x wodz " + F(_a.FW, "0.00") + ") = " + F(_thr * _km, "0") + " strat | straty z poprzednich misji tej bitwy " + _prior
                      + " | tarany i wieze w misji " + _engines + ", wodz atakujacych w misji " + (_general != null ? "tak" : "nie") + ", obroncow w misji " + _def0
-                     + " | misja tej bitwy nr " + _a.Missions + (_why != null ? " (" + _why + ")" : "") + ".");
+                     + " | misja tej bitwy nr " + _a.Missions + (_why != null ? " (" + _why + ")" : "")
+                     + " | 371b: obroncow w misji (spawner) " + _dTot + ", straty obrony z poprzednich misji " + _dPrior + ", przewaga " + F(_n, "0.0") + "x -> granica wymiany "
+                     + (SiegeWalls.ExchangeOn ? F(ExchangeLimit(false), "0.00") + ":1 (bramy rozbite " + F(ExchangeLimit(true), "0.00") + ":1)" : "wylaczona") + ".");
         }
 
         private static int DefendersActive(Mission m)
@@ -202,6 +219,22 @@ namespace Armoury
             return d;
         }
 
+        /// <summary>371b: najwyzsza znosna wymiana strat przy przewadze _n: 1 + Slope x ln N, najwyzej sufit; przy rozbitych bramach x GateExchangeFactor.</summary>
+        private double ExchangeLimit(bool gatesDown)
+        {
+            double r = Math.Min(SiegeWalls.ExchangeMax, 1.0 + SiegeWalls.ExchangeSlope * Math.Log(Math.Max(1.0, _n)));
+            return Math.Max(1.0, r) * (gatesDown ? SiegeWalls.GateExchangeFactor : 1.0);
+        }
+
+        /// <summary>371b: obroncy w polu + jeszcze do wystawienia przez spawner gry.</summary>
+        private int DefendersLeft(Mission m, int dNow)
+        {
+            int rem = 0;
+            try { var sp = m.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>(); if (sp != null) rem = sp.NumberOfRemainingDefenderTroops; }
+            catch (Exception e) { Stumble("Eval.spawn", e); }
+            return dNow + Math.Max(0, rem);
+        }
+
         private void Evaluate(Mission m, float now)
         {
             if (!_engDown && _engines > 0)
@@ -211,9 +244,14 @@ namespace Armoury
                 if (!any) _engDown = true;
             }
             double shock = SiegeWalls.ShockFactor;
-            _limit = _thr * _km * (_genDown ? shock : 1.0) * (_engDown ? shock : 1.0);
-            if (_prior + _cas < _limit) return;
-            // atakujacy w srodku (wszystkie bramy rozbite) albo na murach garstka - szturm idzie dalej (jak SZ1 bez misji)
+            double baseLim = _thr * _km;
+            // 371b: chwila wstrzasu do logu (dotad 1196 -> 598 bez sladu)
+            if (_genDown && !_genLogged) { _genLogged = true; Log.Info("Szturm (371b): wodz atakujacych padl (czas misji " + F(now, "0") + " s, straty " + (_prior + _cas) + ") - prog x" + F(shock, "0.00") + "."); }
+            if (_engDown && !_engLogged) { _engLogged = true; Log.Info("Szturm (371b): tarany i wieze stracone (" + _engines + " z " + _engines + ", czas misji " + F(now, "0") + " s, straty " + (_prior + _cas) + ") - prog x" + F(shock, "0.00") + "."); }
+            int A = _prior + _cas;
+            // tanie wyjscie: ponizej progu z wstrzasami (bramy tylko podnosza) - bez liczenia bram i obroncow
+            double lim0 = baseLim * (_genDown ? shock : 1.0) * (_engDown ? shock : 1.0);
+            if (A < lim0) { _limit = lim0; _state = 0; return; }
             int gates = 0, down = 0;
             var all = m.MissionObjects;
             int n = all != null ? all.Count : 0;
@@ -228,15 +266,48 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Gate", e); }
             }
+            bool gatesDown = gates > 0 && down >= gates;
+            _limit = lim0 * (gatesDown ? SiegeWalls.GateFactor : 1.0);
+            if (A < _limit) { _state = 0; return; }
             int dNow = DefendersActive(m);
-            bool inside = (gates > 0 && down >= gates) || (_def0 > 0 && dNow < SiegeWalls.ManShare * _def0);
-            if (inside)
+            _dLeft = DefendersLeft(m, dNow);
+            int D = _dPrior + _dcas;
+            double allDef = Math.Max(1, _dTot + _dPrior);
+            _share = _dLeft / allDef;
+            _x = A / (double)Math.Max(1, D);
+            _cap = A >= SiegeWalls.HardCap * baseLim;
+            _r = _cap ? 1.0 : ExchangeLimit(gatesDown);
+            // 1) zdobywaja - obroncow prawie nie ma: nigdy nie lamac (co sekunde od nowa, bez trwalej flagi)
+            if (_share < SiegeWalls.TakenShare)
             {
-                if (!_inside) { _inside = true; SiegeWalls.NoteMissionInside(); Log.Info("Szturm (371): prog strat osiagniety (" + (_prior + _cas) + " / " + F(_limit, "0") + "), ale szturm idzie dalej - "
-                    + (gates > 0 && down >= gates ? "wszystkie bramy rozbite (" + down + "/" + gates + ")" : "na murach garstka (" + dNow + " z " + _def0 + ")") + "."); }
+                if (!_takenNoted) { _takenNoted = true; SiegeWalls.NoteMissionTaken(); }
+                Hold(2, A, D, gates, down, now);
+                return;
+            }
+            // 2) wymiana wylaczona - sam prog (z mnoznikiem bram)
+            if (!SiegeWalls.ExchangeOn) { Break(m, now, gates, down, dNow); return; }
+            // 3) wymiana w granicy - szturm trwa (R >= 1: kto traci mniej, niz zadaje, nie odstepuje nigdy, takze po pulapie)
+            if (_x <= _r)
+            {
+                if (!_holdNoted) { _holdNoted = true; SiegeWalls.NoteMissionHoldEx(); }
+                Hold(1, A, D, gates, down, now);
                 return;
             }
             Break(m, now, gates, down, dNow);
+        }
+
+        /// <summary>371b: linia "szturm trwa" przy zmianie stanu i co 10% progu bazowego przyrostu strat.</summary>
+        private void Hold(int state, int A, int D, int gates, int down, float now)
+        {
+            bool log = state != _state || A >= _nextLogA;
+            _state = state;
+            if (!log) return;
+            _nextLogA = A + Math.Max(1.0, 0.1 * _thr * _km);
+            Log.Info("Szturm (371b): prog strat osiagniety (" + A + " / " + F(_limit, "0") + "), szturm trwa - " + (state == 2 ? "ZDOBYWAJA (obroncow zostalo " + F(_share * 100.0, "0.0")
+                     + "% < " + F(SiegeWalls.TakenShare * 100.0, "0") + "%)" : "wymiana " + F(_x, "0.00") + ":1 <= granica " + F(_r, "0.00") + ":1"
+                     + (_cap ? " (pulap " + F(SiegeWalls.HardCap, "0.0") + " x prog - granica 1:1)" : ""))
+                     + " | straty A " + A + " / O " + D + " | przewaga " + F(_n, "0.0") + "x | bramy rozbite " + down + "/" + gates + " | obroncow zostalo " + _dLeft
+                     + " (" + F(_share * 100.0, "0.0") + "%) | czas misji " + F(now, "0") + " s.");
         }
 
         private void Break(Mission m, float now, int gates, int down, int dNow)
@@ -260,7 +331,9 @@ namespace Armoury
             Log.Info("Szturm (371): ZALAMANIE | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " | czas misji " + F(now, "0") + " s | straty oddzialu "
                      + (_prior + _cas) + " (ta misja " + _cas + ", wczesniej " + _prior + ") / prog " + F(_limit, "0") + " (" + F(_thr * 100.0, "0.0") + "% x K_m " + _km
                      + (_genDown ? ", wodz padl x" + F(SiegeWalls.ShockFactor, "0.00") : "") + (_engDown ? ", tarany i wieze stracone x" + F(SiegeWalls.ShockFactor, "0.00") : "")
-                     + ") | atakujacych w polu " + att + ", obroncow " + dNow + " z " + _def0 + " | bramy rozbite " + down + "/" + gates + ".");
+                     + (gates > 0 && down >= gates ? ", bramy rozbite x" + F(SiegeWalls.GateFactor, "0.00") : "") + ") | atakujacych w polu " + att + ", obroncow " + dNow + " z " + _def0
+                     + " | bramy rozbite " + down + "/" + gates + " | 371b: wymiana " + (SiegeWalls.ExchangeOn ? F(_x, "0.00") + ":1 > granica " + F(_r, "0.00") + ":1 (straty A " + (_prior + _cas)
+                     + " / O " + (_dPrior + _dcas) + ", przewaga " + F(_n, "0.0") + "x, pulap " + (_cap ? "tak" : "nie") + ")" : "wylaczona") + ", obroncow zostalo " + _dLeft + " (" + F(_share * 100.0, "0.0") + "%).");
         }
 
         private void Drive(Mission m, float now)
@@ -320,10 +393,12 @@ namespace Armoury
                 if (_active && _started && _a != null)
                 {
                     _a.MisCas = _prior + _cas;
+                    _a.MisDefCas = _dPrior + _dcas;                             // 371b: straty obrony do nastepnej misji tej bitwy
                     if (_broken) SiegeWalls.NoteMissionBreak(_fuse, _late);
                     var r = Mission != null ? Mission.MissionResult : null;
                     Log.Info("Szturm (371): koniec misji | osada " + (_a.St != null ? _a.St.StringId : "-") + " | zalamanie " + (_broken ? "tak (po " + F((Mission != null ? Mission.CurrentTime : 0f) - _breakAt, "0") + " s)" : "nie")
-                             + " | straty oddzialu " + (_prior + _cas) + " / prog " + F(_limit, "0") + " | odwrot wyslany " + _sent + ", ponowiony " + _resent + ", wystawieni po zalamaniu " + _late
+                             + " | straty oddzialu " + (_prior + _cas) + " / prog " + F(_limit, "0") + " | 371b: straty obrony " + (_dPrior + _dcas) + ", wymiana "
+                             + F((_prior + _cas) / (double)Math.Max(1, _dPrior + _dcas), "0.00") + ":1 | odwrot wyslany " + _sent + ", ponowiony " + _resent + ", wystawieni po zalamaniu " + _late
                              + " | bezpiecznik " + (_fuse ? "tak" : "nie") + " | " + SiegeHold372.MissionSummary(Mission) + " | wynik misji " + (r == null ? "-" : r.BattleState + (r.EnemyRetreated ? " (wrog odstapil)" : ""))
                              + " | potkniecia " + _stumbles + ". Przerwa - linia 'Szturm (371): przerwa' przy koncu bitwy na mapie.");
                 }

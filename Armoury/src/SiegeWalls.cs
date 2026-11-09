@@ -617,7 +617,8 @@ namespace Armoury
         {
             // 371: K - oddzial szturmowy, FW - czynnik wodza (prog x FW), Ram0/Tower0 - machiny na starcie, MisCas - straty z poprzednich misji tej bitwy,
             // MissionBreak - zalamanie w misji (przerwa przy MapEventEnded), MisEngLost - w misji padly wszystkie tarany i wieze
-            public int K, Ram0 = -1, Tower0 = -1, MisCas, Missions; public double FW = 1.0; public string FWTxt = "-"; public bool MissionBreak, MisEngLost;
+            // 371b: MisDefCas - straty obroncow (zabici + nieprzytomni) z poprzednich misji tej bitwy
+            public int K, Ram0 = -1, Tower0 = -1, MisCas, MisDefCas, Missions; public double FW = 1.0; public string FWTxt = "-"; public bool MissionBreak, MisEngLost;
             public Settlement St; public float Start; public float Thr, U; public bool ThrMorale; public int Men0, Def0, LastCas = -1; public double Loss;   // U - los progu (SZ3: morale ustawia prog w pasmie)
             public string Fac, Leader; public bool Capital, Repelled, Outside, FromWalls, Off, Pushed; public int WallRounds, FieldRounds; public int Fort = -1, Side = -1;   // Off - odparcie nie wyszlo (wyjatek), dalej jak w grze; Pushed - SZ1: prog strat osiagniety przy garstce na murach (szturm idzie dalej)
         }
