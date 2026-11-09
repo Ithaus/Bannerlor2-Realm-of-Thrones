@@ -734,6 +734,9 @@ namespace Armoury
                 // 370: pomiar szturmu (tylko odczyt, linie "Oblezenie misja (370)"); samo sprawdza Mission.IsSiegeBattle przy pierwszym ticku
                 if (Settings.Current.SiegeMissionLog && mission != null)
                     mission.AddMissionBehavior(new SiegeMissionLog370());
+                // 371: zalamanie szturmu w misji gracza-obroncy (oddzial szturmowy, odstapienie spod murow, oblezenie trwa); samo sprawdza szturm i strone gracza
+                if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission)
+                    mission.AddMissionBehavior(new SiegeBreak371());
                 // m111-walka (24.10): BattleSense niesie tez flage pojedynku (turniej, arena, pojedynek ROT) dla DuelAi / DuelCraft / DuelGuard / BattleWind
                 // m113-walka2 (24.10): i dla rozszerzen bitwy fazy 2 (bohaterowie-pojedynkowicze, tier z umiejetnosci, roznica umiejetnosci gracza, zrywy)
                 // po recenzji: takze przy fladze testu bitwaOFF (FieldDuel.TestOff, tylko DLL autotestu) - linia misji z kluczami NIE

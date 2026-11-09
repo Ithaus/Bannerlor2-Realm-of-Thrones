@@ -1,0 +1,330 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+
+namespace Armoury
+{
+    /// <summary>
+    /// 371 (Jeff 09.11, Goldentooth: ok. 600 obroncow gracza wobec 13,4 tys. Polnocy - "nie jest tak ze oblezenie sie skonczy az zabije 13k ludzi w jednej
+    /// bitwie, tylko szturm sie zalamywal i kontynuowano za dzien dwa 5"). ZALAMANIE SZTURMU W MISJI - faza 1: gracz BRONI, wodz atakujacych AI.
+    /// Dowod (dekompilacja 1.4.8, scratchpad/d371): misja szturmu konczy sie dzis tylko wyczerpaniem strony (BattleEndLogic.IsSideDepleted) - TacticBreachWalls
+    /// odstepuje, gdy stosunek sil spadnie ponizej startowego (przy 22:1 nigdy), a RBM co klatke gasi odwrot komponentu (CommonAIComponent.StopRetreating) -
+    /// wiec AI nie odstepuje nigdy; wygrana gracza bez flagi odwrotu = PlayerEncounter.ContinueBattle "Battle continues" = kolejna misja z nastepnymi ~2,8 tys.,
+    /// az do wybicia calej armii. Gra MA droge odstapienia bez rozbicia oblezenia: wynik misji z EnemyRetreated przy szturmie (wrogiem jest strona atakujaca)
+    /// -> ContinueBattle -> MapEvent.FinishBattleAndKeepSiegeEvent + menu_siege_strategies (bitwa bez zwyciezcy, oboz zostaje) - ta sama metoda co OB2.
+    /// Zasady:
+    ///  - start (po rozstawieniu): oddzial w misji K_m = min(K, GetTotalNumberOfTroopsForSide(Attacker)) - nie wiecej, niz misja w ogole wystawi; reszta armii
+    ///    zostaje w obozie, bo zalamanie konczy bitwe (FinishBattleAndKeepSiegeEvent). Wystawiania NIE obcinamy przed zalamaniem: StopSpawner przy ludziach
+    ///    w rezerwie trzyma IsSideDepleted na false (RemainingSpawnNumber &gt; 0) - misja nie skonczylaby sie wyczerpaniem.
+    ///  - prog: zabici + nieprzytomni atakujacy (ludzie; uciekinierzy nie) tej misji + z poprzednich misji tej bitwy &gt;= prog x K_m; prog = OB2 (SZ3) x wodz (fW)
+    ///    x SiegeAssaultBreakShockFactor po upadku wodza atakujacych (Team.GeneralAgent zabity / nieprzytomny) i drugi raz po utracie WSZYSTKICH taranow
+    ///    i wiez, ktore staly na starcie (drabin nie liczymy - gra stawia je wciaz od nowa); sprawdzane co 1 s.
+    ///  - bez zalamania, gdy atakujacy sa juz w srodku (wszystkie bramy do rozbicia rozbite) albo na murach zostala garstka (obroncow mniej niz
+    ///    SiegeWalls.ManShare z ludzi obrony na starcie misji) - jak SZ1 bez misji.
+    ///  - zalamanie (raz na misje): StopSpawner(Attacker); kazdy czlowiek AI atakujacych - StopUsingGameObject (bez ponownego przypiecia) i natywne
+    ///    Agent.Retreat(Mission.GetClosestFleePositionForAgent) - BEZ CommonAIComponent i bez rozkazu Retreat szyku, wiec RBM tego nie gasi (wzor RoutHold 143);
+    ///    co 4 s ponowione u tych, ktorym odwrot zgasl; wystawieni po zalamaniu (takze Dynamic Reinforcements - wystawia z pominieciem spawnera gry) dostaja
+    ///    odwrot w nastepnym ticku (OnAgentBuild). Uciekinier ze zwyklym morale schodzi z pola jako odwrot na rozkaz (BattleAgentLogic: SetRouted(morale &gt;= 0.01))
+    ///    - zostaje w druzynie. Komunikat "The assault breaks! The enemy falls back from the walls."
+    ///  - koniec: BattleEndLogic sam zglasza odwrot wroga (wszyscy aktywni IsRunningAway dluzej niz odstep posilkow + 3 s); bezpiecznik - po
+    ///    SiegeAssaultBreakEndSeconds (45 s) nasze MissionEnded daje ten sam wynik (DefenderVictory, EnemyRetreated) - ta sama droga kampanii.
+    ///  - przerwa przed kolejnym szturmem: SiegeWalls.OnMapEventEnded (a.MissionBreak) -&gt; Repel bez FinishBattle (1-5 / 7-14 dob, zapis arm_siege_walls).
+    /// Gracz atakuje (faza 2) - bez zmian (osobny wpis, zasada "jedna zmiana naraz"). Wyjatek per czlowiek / obiekt = potkniecie, bez globalnego wylacznika.
+    /// </summary>
+    internal sealed class SiegeBreak371 : MissionLogic
+    {
+        private const float EvalEvery = 1f, ResendEvery = 4f, NoDeployStart = 10f;
+        private const int PerTick = 150, ErrMax = 3;
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+        private bool _known, _active, _started, _broken, _fuse, _ended, _genDown, _engDown, _inside;
+        private float _nextEval, _breakAt = -1f, _nextResend;
+        private int _cas, _prior, _km, _total, _def0, _sent, _resent, _late, _stumbles, _errs, _engines;
+        private double _thr, _limit;
+        private string _why = "-";
+        private MapEvent _me;
+        private SiegeWalls.Assault _a;
+        private Agent _general;
+        private readonly List<UsableMachine> _machines = new List<UsableMachine>();
+        private readonly List<Agent> _queue = new List<Agent>();
+        private readonly HashSet<Agent> _sentTo = new HashSet<Agent>();
+        private int _qi;
+
+        public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
+
+        private static string F(double v, string f) { return v.ToString(f, Inv); }
+
+        private static bool Attacker(Agent a)
+        {
+            var t = a != null ? a.Team : null;
+            return t != null && t.Side == BattleSideEnum.Attacker;
+        }
+
+        /// <summary>Raz na misje: szturm, gracz w obronie, rekord szturmu AI (SiegeWalls.MissionAssault).</summary>
+        private bool Known(Mission m)
+        {
+            if (_known) return _active;
+            _known = true;
+            try
+            {
+                if (m == null || !m.IsSiegeBattle || !SiegeWalls.BreakMissionOn) return _active = false;
+                var pt = m.PlayerTeam;
+                if (pt == null || pt.Side != BattleSideEnum.Defender) return _active = false;   // faza 1: tylko gracz-obronca
+                _me = MapEvent.PlayerMapEvent;
+                SiegeWalls.NoteMissionSeen();
+                _a = SiegeWalls.MissionAssault(_me, out _why);
+                if (_a == null)
+                {
+                    SiegeWalls.NoteMissionNone();
+                    Log.Info("Szturm (371): misja poza regula zalamania - " + _why + ".");
+                    return _active = false;
+                }
+                _prior = _a.MisCas;
+                _active = true;
+            }
+            catch (Exception e) { Stumble("Known", e); _active = false; }
+            return _active;
+        }
+
+        public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
+        {
+            if (!_active || _ended) return;
+            try
+            {
+                if (affectedAgent == null || !affectedAgent.IsHuman || !Attacker(affectedAgent)) return;
+                if (agentState == AgentState.Killed || agentState == AgentState.Unconscious)
+                {
+                    _cas++;
+                    if (_general != null && ReferenceEquals(affectedAgent, _general)) _genDown = true;
+                }
+            }
+            catch (Exception e) { Stumble("Removed", e); }
+        }
+
+        public override void OnAgentBuild(Agent agent, Banner banner)
+        {
+            if (!_broken || _ended) return;
+            try
+            {
+                if (agent != null && agent.IsHuman && agent.IsAIControlled && Attacker(agent)) { _queue.Add(agent); _late++; }
+            }
+            catch (Exception e) { Stumble("Build", e); }
+        }
+
+        public override void OnMissionTick(float dt)
+        {
+            if (_ended) return;
+            var m = Mission;
+            if (m == null) return;
+            try
+            {
+                if (!Known(m)) { _ended = true; return; }
+                float now = m.CurrentTime;
+                if (!_started)
+                {
+                    bool deployed = m.IsDeploymentFinished || (m.Mode != MissionMode.Deployment && now >= NoDeployStart);
+                    if (!deployed) return;
+                    Start(m);
+                    return;
+                }
+                if (m.MissionEnded) return;
+                if (!_broken)
+                {
+                    if (now < _nextEval) return;
+                    _nextEval = now + EvalEvery;
+                    Evaluate(m, now);
+                    return;
+                }
+                Drive(m, now);
+            }
+            catch (Exception e) { Stumble("Tick", e); }
+        }
+
+        private void Start(Mission m)
+        {
+            _started = true;
+            try
+            {
+                var sp = m.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>();   // spawner szturmu SandBox (fale z BannerlordConfig); inny - K bez obciecia
+                _total = sp != null ? sp.GetTotalNumberOfTroopsForSide(BattleSideEnum.Attacker) : 0;
+            }
+            catch (Exception e) { Stumble("Start.spawn", e); }
+            int k = Math.Max(1, _a.K);
+            _km = _total > 0 ? Math.Min(k, _total) : k;
+            _thr = SiegeWalls.EffThr(_a);
+            try { var t = m.AttackerTeam; _general = t != null ? t.GeneralAgent : null; } catch { _general = null; }
+            var all = m.MissionObjects;
+            int n = all != null ? all.Count : 0;
+            for (int i = 0; i < n; i++)
+            {
+                try
+                {
+                    var o = all[i];
+                    if ((o is BatteringRam || o is SiegeTower) && !((UsableMachine)o).IsDestroyed) _machines.Add((UsableMachine)o);
+                }
+                catch (Exception e) { Stumble("Start.machine", e); }
+            }
+            _engines = _machines.Count;
+            _def0 = DefendersActive(m);
+            _a.Missions++;
+            Log.Info("Szturm (371): start misji | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " (" + _a.FWTxt + ") | armia na starcie szturmu " + _a.Men0
+                     + ", obroncow " + _a.Def0 + " | oddzial szturmowy K " + _a.K + ", w misji K_m " + _km + " (misja wystawi " + _total + ") | prog " + F(_thr * 100.0, "0.0")
+                     + "% (OB2 " + F(_a.Thr * 100.0, "0.0") + "% x wodz " + F(_a.FW, "0.00") + ") = " + F(_thr * _km, "0") + " strat | straty z poprzednich misji tej bitwy " + _prior
+                     + " | tarany i wieze w misji " + _engines + ", wodz atakujacych w misji " + (_general != null ? "tak" : "nie") + ", obroncow w misji " + _def0
+                     + " | misja tej bitwy nr " + _a.Missions + (_why != null ? " (" + _why + ")" : "") + ".");
+        }
+
+        private static int DefendersActive(Mission m)
+        {
+            int d = 0;
+            foreach (var t in m.Teams)
+            {
+                if (t == null || t.Side != BattleSideEnum.Defender) continue;
+                foreach (var a in t.ActiveAgents) if (a != null && a.IsHuman) d++;
+            }
+            return d;
+        }
+
+        private void Evaluate(Mission m, float now)
+        {
+            if (!_engDown && _engines > 0)
+            {
+                bool any = false;
+                foreach (var x in _machines) { try { if (x != null && !x.IsDestroyed) { any = true; break; } } catch { } }
+                if (!any) _engDown = true;
+            }
+            double shock = SiegeWalls.ShockFactor;
+            _limit = _thr * _km * (_genDown ? shock : 1.0) * (_engDown ? shock : 1.0);
+            if (_prior + _cas < _limit) return;
+            // atakujacy w srodku (wszystkie bramy rozbite) albo na murach garstka - szturm idzie dalej (jak SZ1 bez misji)
+            int gates = 0, down = 0;
+            var all = m.MissionObjects;
+            int n = all != null ? all.Count : 0;
+            for (int i = 0; i < n; i++)
+            {
+                try
+                {
+                    var g = all[i] as CastleGate;
+                    if (g == null || !g.IsDestructible) continue;
+                    gates++;
+                    if (g.IsDestroyed) down++;
+                }
+                catch (Exception e) { Stumble("Gate", e); }
+            }
+            int dNow = DefendersActive(m);
+            bool inside = (gates > 0 && down >= gates) || (_def0 > 0 && dNow < SiegeWalls.ManShare * _def0);
+            if (inside)
+            {
+                if (!_inside) { _inside = true; SiegeWalls.NoteMissionInside(); Log.Info("Szturm (371): prog strat osiagniety (" + (_prior + _cas) + " / " + F(_limit, "0") + "), ale szturm idzie dalej - "
+                    + (gates > 0 && down >= gates ? "wszystkie bramy rozbite (" + down + "/" + gates + ")" : "na murach garstka (" + dNow + " z " + _def0 + ")") + "."); }
+                return;
+            }
+            Break(m, now, gates, down, dNow);
+        }
+
+        private void Break(Mission m, float now, int gates, int down, int dNow)
+        {
+            _broken = true;
+            _breakAt = now;
+            _a.MissionBreak = true;
+            _a.MisEngLost = _engDown;
+            _a.Loss = (_prior + _cas) / (double)Math.Max(1, _km);
+            try { var sp = m.GetMissionBehavior<IMissionAgentSpawnLogic>(); if (sp != null) sp.StopSpawner(BattleSideEnum.Attacker); }
+            catch (Exception e) { Stumble("StopSpawner", e); }
+            _queue.Clear(); _qi = 0;
+            int att = 0;
+            foreach (var a in m.Agents)
+            {
+                if (a == null || !a.IsActive() || !a.IsHuman || !a.IsAIControlled || !Attacker(a)) continue;
+                _queue.Add(a); att++;
+            }
+            try { InformationManager.DisplayMessage(new InformationMessage("The assault breaks! The enemy falls back from the walls.", Color.FromUint(0xFF9ACD65u))); } catch { }
+            Log.Info("Szturm (371): ZALAMANIE | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " | czas misji " + F(now, "0") + " s | straty oddzialu "
+                     + (_prior + _cas) + " (ta misja " + _cas + ", wczesniej " + _prior + ") / prog " + F(_limit, "0") + " (" + F(_thr * 100.0, "0.0") + "% x K_m " + _km
+                     + (_genDown ? ", wodz padl x" + F(SiegeWalls.ShockFactor, "0.00") : "") + (_engDown ? ", tarany i wieze stracone x" + F(SiegeWalls.ShockFactor, "0.00") : "")
+                     + ") | atakujacych w polu " + att + ", obroncow " + dNow + " z " + _def0 + " | bramy rozbite " + down + "/" + gates + ".");
+        }
+
+        private void Drive(Mission m, float now)
+        {
+            // kolejka odwrotu: najwyzej PerTick ludzi na klatke (pierwsze wyslanie przy tysiacach ludzi)
+            int budget = PerTick;
+            while (_qi < _queue.Count && budget-- > 0) Send(m, _queue[_qi++]);
+            if (_qi >= _queue.Count) { _queue.Clear(); _qi = 0; }
+            if (now >= _nextResend)
+            {
+                _nextResend = now + ResendEvery;
+                if (_queue.Count == 0)
+                    foreach (var a in m.Agents)
+                    {
+                        if (a == null || !a.IsActive() || !a.IsHuman || !a.IsAIControlled || !Attacker(a) || a.IsRunningAway) continue;
+                        _queue.Add(a);
+                    }
+            }
+            if (!_fuse && now - _breakAt >= SiegeWalls.BreakEndSeconds) _fuse = true;   // MissionEnded przy nastepnym sprawdzeniu konca
+        }
+
+        private void Send(Mission m, Agent a)
+        {
+            try
+            {
+                if (a == null || !a.IsActive() || !a.IsHuman || !a.IsAIControlled || !Attacker(a)) return;
+                if (!MissionTeams.Valid(a.Team)) return;
+                if (a.IsUsingGameObject) a.StopUsingGameObject(false, Agent.StopUsingGameObjectFlags.None);
+                var wp = m.GetClosestFleePositionForAgent(a);
+                if (!wp.IsValid) return;
+                a.Retreat(wp);
+                if (_sentTo.Add(a)) _sent++; else _resent++;
+            }
+            catch (Exception e) { Stumble("Send", e); }
+        }
+
+        public override bool MissionEnded(ref MissionResult missionResult)
+        {
+            if (!_fuse || _ended) return false;
+            try
+            {
+                var m = Mission;
+                if (m == null || m.MissionEnded) return false;
+                // ten sam wynik, co BattleEndLogic przy odwrocie wroga (CreateSuccessful(enemyRetreated: true) gracza-obroncy)
+                missionResult = new MissionResult(BattleState.DefenderVictory, true, false, true);
+                Log.Info("Szturm (371): bezpiecznik - " + F(SiegeWalls.BreakEndSeconds, "0") + " s po zalamaniu misja trwala; koniec z odwrotem wroga (EnemyRetreated).");
+                return true;
+            }
+            catch (Exception e) { Stumble("MissionEnded", e); return false; }
+        }
+
+        protected override void OnEndMission()
+        {
+            try
+            {
+                if (_active && _started && _a != null)
+                {
+                    _a.MisCas = _prior + _cas;
+                    if (_broken) SiegeWalls.NoteMissionBreak(_fuse, _late);
+                    var r = Mission != null ? Mission.MissionResult : null;
+                    Log.Info("Szturm (371): koniec misji | osada " + (_a.St != null ? _a.St.StringId : "-") + " | zalamanie " + (_broken ? "tak (po " + F((Mission != null ? Mission.CurrentTime : 0f) - _breakAt, "0") + " s)" : "nie")
+                             + " | straty oddzialu " + (_prior + _cas) + " / prog " + F(_limit, "0") + " | odwrot wyslany " + _sent + ", ponowiony " + _resent + ", wystawieni po zalamaniu " + _late
+                             + " | bezpiecznik " + (_fuse ? "tak" : "nie") + " | wynik misji " + (r == null ? "-" : r.BattleState + (r.EnemyRetreated ? " (wrog odstapil)" : ""))
+                             + " | potkniecia " + _stumbles + ". Przerwa - linia 'Szturm (371): przerwa' przy koncu bitwy na mapie.");
+                }
+            }
+            catch (Exception e) { Stumble("Koniec", e); }
+            _ended = true;
+            _queue.Clear(); _sentTo.Clear(); _machines.Clear();
+            base.OnEndMission();
+        }
+
+        private void Stumble(string where, Exception e)
+        {
+            _stumbles++;
+            if (_errs >= ErrMax) return;
+            _errs++;
+            SiegeWalls.NoteMissionStumble(where, e);
+        }
+    }
+}

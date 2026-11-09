@@ -11548,6 +11548,54 @@ namespace Armoury
         [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
         public bool SiegeMissionLog { get; set; } = true;
 
+        [SettingPropertyBool("Siege Assault Break", HintText = "An assault on walls breaks the way assaults really broke: only an assault party goes in (Siege Assault Party Share of the besiegers), and when it has lost its breaking share (Siege Assault Repel Loss, more or less with the commander's Leadership, Tactics and Valor) the stormers fall back to their camp and the siege goes on - the next assault comes after a few days (Siege Repel Pause Min / Mid / Max Days), or after one to two weeks when the ram or a siege tower was lost and must be built again (Siege Repel Rebuild Min / Max Days). Off = losses counted against the whole army and the old pause (Siege Repel Pause Days)", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public bool SiegeAssaultBreak { get; set; } = true;
+
+        [SettingPropertyBool("Siege Assault Break Mission", HintText = "With Siege Assault Break: also in an assault on a fortress you defend yourself - when the enemy's assault party has lost its breaking share, the enemy stops sending reinforcements and its men fall back from the walls; the battle ends with the enemy in retreat and the siege goes on. Off = the enemy keeps coming until all its men in the battle are down, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public bool SiegeAssaultBreakMission { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Assault Party Share", 0.05f, 1.00f, "0.00", HintText = "With Siege Assault Break: the share of the besiegers' healthy men that goes into an assault - the rest stay in the camp, at the engines and in reserve. Real assaults went in with columns and a first wave, about a quarter of the army. Never fewer than Siege Assault Party Min Vs Defenders times the defenders, never more than the whole army", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultPartyShare { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Siege Assault Party Min Vs Defenders", 0.00f, 10.00f, "0.0", HintText = "With Siege Assault Break: the assault party is never smaller than this many times the defenders - a small army goes in whole", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultPartyMinVsDefenders { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Siege Assault Break Commander", HintText = "With Siege Assault Break: the commander of the stormers matters - his Leadership, Tactics and Valor move the breaking point (from x0.8 to x1.3), and in a battle you fight, the fall of the enemy commander or the loss of all its rams and siege towers lowers it (Siege Assault Break Shock Factor). Off = the breaking point alone", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public bool SiegeAssaultBreakCommander { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Assault Break Shock Factor", 0.10f, 1.00f, "0.00", HintText = "With Siege Assault Break Commander: in a battle you fight, the breaking point of the enemy assault party is multiplied by this when the enemy commander falls, and again when all its rams and siege towers are destroyed", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultBreakShockFactor { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Siege Assault Break End Seconds", 10.00f, 300.00f, "0", HintText = "With Siege Assault Break Mission: seconds after the assault breaks before the battle is ended with the enemy in retreat, if not all its men have left the walls by then", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeAssaultBreakEndSeconds { get; set; } = 45f;
+
+        [SettingPropertyFloatingInteger("Siege Repel Pause Min Days", 0.25f, 28.00f, "0.0", HintText = "With Siege Assault Break: the shortest pause in days before the besiegers try again after a broken assault when their rams and siege towers still stand", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeRepelPauseMinDays { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Siege Repel Pause Mid Days", 0.25f, 28.00f, "0.0", HintText = "With Siege Assault Break: the usual pause in days before the next assault when the rams and siege towers still stand - longer when the besiegers' morale is low, when few of them are left against the defenders and when the place is worth little against the army's pay; shorter otherwise, between Siege Repel Pause Min Days and Siege Repel Pause Max Days", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeRepelPauseMidDays { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Siege Repel Pause Max Days", 0.25f, 28.00f, "0.0", HintText = "With Siege Assault Break: the longest pause in days before the next assault when the rams and siege towers still stand", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeRepelPauseMaxDays { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Siege Repel Rebuild Min Days", 0.25f, 56.00f, "0.0", HintText = "With Siege Assault Break: the shortest pause in days before the next assault when a ram or a siege tower was lost in the assault and must be built again (with the same morale, men and worth factors)", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeRepelRebuildMinDays { get; set; } = 7f;
+
+        [SettingPropertyFloatingInteger("Siege Repel Rebuild Max Days", 0.25f, 56.00f, "0.0", HintText = "With Siege Assault Break: the longest pause in days before the next assault when a ram or a siege tower must be built again", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public float SiegeRepelRebuildMaxDays { get; set; } = 14f;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -14634,6 +14682,18 @@ namespace Armoury
             s.BattleStallBreak = BattleStallBreak;
             s.BattleStallSeconds = BattleStallSeconds;
             s.SiegeMissionLog = SiegeMissionLog;
+            s.SiegeAssaultBreak = SiegeAssaultBreak;
+            s.SiegeAssaultBreakMission = SiegeAssaultBreakMission;
+            s.SiegeAssaultPartyShare = SiegeAssaultPartyShare;
+            s.SiegeAssaultPartyMinVsDefenders = SiegeAssaultPartyMinVsDefenders;
+            s.SiegeAssaultBreakCommander = SiegeAssaultBreakCommander;
+            s.SiegeAssaultBreakShockFactor = SiegeAssaultBreakShockFactor;
+            s.SiegeAssaultBreakEndSeconds = SiegeAssaultBreakEndSeconds;
+            s.SiegeRepelPauseMinDays = SiegeRepelPauseMinDays;
+            s.SiegeRepelPauseMidDays = SiegeRepelPauseMidDays;
+            s.SiegeRepelPauseMaxDays = SiegeRepelPauseMaxDays;
+            s.SiegeRepelRebuildMinDays = SiegeRepelRebuildMinDays;
+            s.SiegeRepelRebuildMaxDays = SiegeRepelRebuildMaxDays;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;
