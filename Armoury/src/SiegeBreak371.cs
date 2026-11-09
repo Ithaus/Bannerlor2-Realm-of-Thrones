@@ -244,6 +244,7 @@ namespace Armoury
             _broken = true;
             _breakAt = now;
             _a.MissionBreak = true;
+            SiegeWounded373.NoteBreak(_me);   // 373: ranni atakujacy pod murami do lochu przy koncu bitwy
             _a.MisEngLost = _engDown;
             _a.Loss = (_prior + _cas) / (double)Math.Max(1, _km);
             try { var sp = m.GetMissionBehavior<IMissionAgentSpawnLogic>(); if (sp != null) sp.StopSpawner(BattleSideEnum.Attacker); }

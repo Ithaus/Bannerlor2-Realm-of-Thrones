@@ -739,6 +739,9 @@ namespace Armoury
                 // 371: zalamanie szturmu w misji gracza-obroncy (oddzial szturmowy, odstapienie spod murow, oblezenie trwa); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission)
                     mission.AddMissionBehavior(new SiegeBreak371());
+                // 373: ranni atakujacy pod murami / w srodku - ksiega misji (przenosiny do lochu w SiegeWounded373Behavior po zalamaniu 371); samo sprawdza szturm i strone gracza
+                if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission && Settings.Current.SiegeWoundedTakenPrisoner)
+                    mission.AddMissionBehavior(new SiegeWounded373());
                 // 372b: gracz-obronca i wodz - strzelcy z jego szykow na stanowiska na murach, jednorazowo po rozstawieniu; samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeDefenderArchersToWalls)
                     mission.AddMissionBehavior(new SiegeArchers372b());
@@ -862,6 +865,7 @@ namespace Armoury
                 starter.AddBehavior(new CanonWarsBehavior());       // m104-wojny: wojny wedlug ksiazki - Essos na kalendarzu, Reach i Dorne z korona, smoki Daenerys (zapis arm_m104)
                 starter.AddBehavior(new ChronicleBehavior());       // m105-kronika K0: Kronika Westeros - okna z arm_kronika_kNN.tsv (zapis arm_kronika); PO CanonCompanions (doba po dobie postaci kanonu)
                 starter.AddBehavior(new KingInTheNorthBehavior(_harmony));
+                starter.AddBehavior(new SiegeWounded373Behavior());  // 373: ranni spod murow do lochu - nasluch MapEventEnded PO ArmouryBehavior (SiegeWalls.OnMapEventEnded)
                 starter.AddBehavior(new WarTruceBehavior());        // 330: wojna do kapitulacji Polnoc-korona - rozejm zamiast pokoju, kapitulacja, zapis arm_k330; latki H4/H5 przy starcie sesji   // 272: unia Dorzecza z Polnoca (hold lordow rzecznych - Krol Polnocy i Tridentu), zapis arm_k272; latki leniwie (Krwawe Gody przy starcie sesji, armie przy unii)
                 Log.Info("Behavior dodany do kampanii.");
             }

@@ -11608,6 +11608,14 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool SiegeDefenderArchersToWalls { get; set; } = true;
 
+        [SettingPropertyBool("Siege Wounded Taken Prisoner", HintText = "With Siege Assault Break Mission, in an assault on a fortress you defend yourself: when the assault breaks and the enemy falls back, its wounded who lie inside the fortress or close beneath the walls cannot be carried away - they are taken prisoner into the fortress dungeon, lords among them. Wounded lying farther out go back with their army. Off = all the enemy's wounded go back with their army, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public bool SiegeWoundedTakenPrisoner { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Wounded Wall Distance", 0f, 100f, "0", HintText = "With Siege Wounded Taken Prisoner: how close to a gate, a wall section, a ladder or the target of a ram or siege tower (in metres) a fallen attacker must lie to be taken prisoner. 0 = only those who fell inside the fortress", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public float SiegeWoundedWallDistance { get; set; } = 35f;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -14709,6 +14717,8 @@ namespace Armoury
             s.SiegeAssaultHoldRetreat = SiegeAssaultHoldRetreat;
             s.SiegeLadderWaitSeconds = SiegeLadderWaitSeconds;
             s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;
+            s.SiegeWoundedTakenPrisoner = SiegeWoundedTakenPrisoner;
+            s.SiegeWoundedWallDistance = SiegeWoundedWallDistance;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;
