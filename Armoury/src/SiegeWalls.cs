@@ -1413,6 +1413,7 @@ namespace Armoury
             _lastCamp = null; _last = null; _lastAt = -1f; _lastDrCamp = null; _lastDrAt = -1f;
             SiegeWalls2.Reset();                                                 // oblezenia 2: trebusze, glod, drabiny - pamiec od zera
             ZeroDay();
+            Reset377();                                                          // 377: liczniki kampanii i kolejka XP od zera
             _stumbles = 0; _err.Clear();
         }
 

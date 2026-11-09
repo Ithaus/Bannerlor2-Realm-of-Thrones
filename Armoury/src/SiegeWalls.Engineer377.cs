@@ -24,8 +24,14 @@ namespace Armoury
     {
         private static bool Eng377On { get { var s = Settings.Current; return s != null && s.SiegeDefenderEngineeringXp; } }
 
-        // liczniki doby i sesji 377
+        // liczniki doby i kampanii 377 (kampanii: zerowane w Reset - nowa kampania i kazde wczytanie)
         private static int _dEng377Built, _dEng377Given, _dEng377Game, _sEng377Given;
+        // 377 po recenzji: machiny czekajace na XP. Sluchacze MbEvent ida od OSTATNIO dopisanego (cs_full.cs:22805 - LIFO), a ArmouryBehavior rejestruje sie
+        // po zachowaniach gry, wiec nasz OnEngineBuilt biegnie PRZED SiegeEventCampaignBehavior.OnSiegeEngineBuilt. XP dane od razu (>= 32, prog poziomu 1
+        // = 30) podnosi inzyniera na Engineering 1 i gra zaraz potem wybralaby MainParty i dala XP drugi raz. Dlatego: decyzja tu (model pytany przed
+        // jakimkolwiek XP - wynik prawdziwy), samo XP w najblizszym ticku kampanii (Tick377), gdy sluchacz gry juz skonczyl.
+        private static readonly System.Collections.Generic.List<KeyValuePair377> _eng377Pending = new System.Collections.Generic.List<KeyValuePair377>();
+        private sealed class KeyValuePair377 { public Settlement St; public SiegeEngineType T; }
         private static float _dEng377Xp, _sEng377Xp;
         private static string _dEng377Who = "-", _dEng377GameWho = "-";
 
@@ -52,15 +58,36 @@ namespace Armoury
                     _dEng377GameWho = eff.LeaderHero != null ? eff.LeaderHero.Name.ToString() : (eff.Name != null ? eff.Name.ToString() : "-");
                     return;
                 }
-                Hero who = null;
-                try { who = mp.GetEffectiveRoleHolder(PartyRole.Engineer); } catch { }
-                float xp = 30f + 2f * t.Difficulty;                              // DefaultSkillLevelingManager.OnSiegeEngineBuilt - tylko do logu
-                SkillLevelingManager.OnSiegeEngineBuilt(mp, t);                  // ten sam wzor i rola co gra; ksiega XP: "armia i oblezenie"
-                _dEng377Given++; _sEng377Given++;
-                _dEng377Xp += xp; _sEng377Xp += xp;
-                _dEng377Who = who != null ? who.Name.ToString() : "-";
+                if (_eng377Pending.Count < 16) _eng377Pending.Add(new KeyValuePair377 { St = st, T = t });   // XP w Tick377 - po sluchaczu gry
             }
             catch (Exception e) { Stumble("Engineer377", e); }
+        }
+
+        /// <summary>Z CampaignEvents.TickEvent: XP za machiny odlozone w OnDefenderEngineBuilt377 (sluchacz gry juz skonczyl). Pusta lista = jedno porownanie.</summary>
+        internal static void Tick377()
+        {
+            if (_eng377Pending.Count == 0) return;
+            var list = _eng377Pending.ToArray();
+            _eng377Pending.Clear();
+            foreach (var p in list)
+            {
+                try
+                {
+                    if (!Eng377On || p == null || p.St == null || p.T == null) continue;
+                    // warunki jeszcze raz: gracz dalej aktywny, wolny, w tej osadzie i tej samej frakcji
+                    var mp = MobileParty.MainParty;
+                    if (mp == null || !mp.IsActive || mp.CurrentSettlement != p.St || !p.St.Parties.Contains(mp) || mp.MapFaction == null || mp.MapFaction != p.St.MapFaction
+                        || (Hero.MainHero != null && Hero.MainHero.IsPrisoner)) continue;
+                    Hero who = null;
+                    try { who = mp.GetEffectiveRoleHolder(PartyRole.Engineer); } catch { }
+                    float xp = 30f + 2f * p.T.Difficulty;                        // DefaultSkillLevelingManager.OnSiegeEngineBuilt - tylko do logu
+                    SkillLevelingManager.OnSiegeEngineBuilt(mp, p.T);            // ten sam wzor i rola co gra; ksiega XP: "armia i oblezenie"
+                    _dEng377Given++; _sEng377Given++;
+                    _dEng377Xp += xp; _sEng377Xp += xp;
+                    _dEng377Who = who != null ? who.Name.ToString() : "-";
+                }
+                catch (Exception e) { Stumble("Engineer377.Tick", e); }
+            }
         }
 
         /// <summary>Linia doby "Inzynieria obroncow (377)" - tylko gdy w dobie obroncy osady z graczem zbudowali machine.</summary>
@@ -72,10 +99,13 @@ namespace Armoury
                 Log.Info("Inzynieria obroncow (377): dzien " + Today + " | klucz " + (Eng377On ? "tak" : "nie") + " | machin obroncow zbudowanych (osada z graczem) " + _dEng377Built
                          + " | XP od gry (ktos z Engineering > 0) " + _dEng377Game + (_dEng377Game > 0 ? " (ostatnio " + _dEng377GameWho + ")" : "")
                          + " | XP od nas (nikt > 0, gracz w osadzie) " + _dEng377Given + ", razem " + F(_dEng377Xp, "0") + " XP Engineering, komu " + _dEng377Who
-                         + " | sesja: " + _sEng377Given + " machin, " + F(_sEng377Xp, "0") + " XP.");
+                         + " | kampania (od wczytania): " + _sEng377Given + " machin, " + F(_sEng377Xp, "0") + " XP.");
             }
             catch (Exception e) { Stumble("Eng377Daily", e); }
         }
+
+        /// <summary>Z SiegeWalls.Reset (nowa kampania i kazde wczytanie): liczniki kampanii i kolejka od zera.</summary>
+        private static void Reset377() { _sEng377Given = 0; _sEng377Xp = 0f; _eng377Pending.Clear(); ZeroDay377(); }
 
         private static void ZeroDay377() { _dEng377Built = _dEng377Given = _dEng377Game = 0; _dEng377Xp = 0f; _dEng377Who = "-"; _dEng377GameWho = "-"; }
     }

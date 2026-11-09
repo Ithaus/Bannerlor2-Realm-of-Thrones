@@ -1750,6 +1750,7 @@ namespace Armoury
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, SiegeWalls.OnSiegeStarted);
             CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, SiegeWalls.OnArmyDispersed);
             CampaignEvents.SiegeEngineBuiltEvent.AddNonSerializedListener(this, SiegeWalls.OnEngineBuilt);
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SiegeWalls.Tick377(); });   // 377: XP inzynierii obroncow po sluchaczu gry (LIFO)
             CampaignEvents.OnSiegeBombardmentWallHitEvent.AddNonSerializedListener(this, SiegeWalls.OnWallHit);
             // oblezenia 3 (W, SiegeWalls2.Oblezenia3.cs): trafienia trebuszy obozow AI w machiny obroncow - przy stojacym murze i po rozbiciu murow (licznik linii "Oblezenia 3 (doba)")
             CampaignEvents.OnSiegeBombardmentHitEvent.AddNonSerializedListener(this, SiegeWalls2.OnBombardHit);
