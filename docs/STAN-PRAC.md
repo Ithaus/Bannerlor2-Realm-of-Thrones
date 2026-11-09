@@ -1,5 +1,11 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 09.11.2026 16:35 CET: WGRANIE 198 (najnowszy) = noc/367c-jeniec-po-odejsciu c32f1e83 (Armoury.dll d12eb39c, CrashScribe d7fbd602) = 196 + 372/372b/373 (197) + 375 (198)
+- 371 POTWIERDZONE w grze Jeffa (Goldentooth 14:46: ZALAMANIE przy 436/435 strat, DefenderVictory, oblezenie trwa).
+- SPRAWDZIC w nastepnym szturmie: "Szturm (372)" (brak Retreating, drabiny po 60 s), "Strzelcy na mury (372b)", "Ranni pod murami (373)", "SiegeArmoury (375)" (otwarcie zbrojowni w oblezeniu bez CTD).
+- Do zrobienia: 374 (honorowe poddanie przez rozmowe z oblegajacymi - czeka na nazwe istniejacej opcji rozmowy od Jeffa), 371 faza 2 (gracz atakuje), 373b (ranni bez misji).
+- Krwawe Gody: ok. 47 dob od doby 109756 (zapowiedz ~109789, rzez ~109803); Roose Bolton w obozie pod Goldentooth - jego smierc kasuje Gody.
+
 ## STAN 09.11.2026 12:45 CET: WGRANIE 196 (najnowszy) = noc/367c-jeniec-po-odejsciu 7723d95d (Armoury.dll d2be9d16, CrashScribe d7fbd602) = 193 + 369 (194) + 370 (195) + 371 (196); mody: Epic Sieges 1.1.6, Vanilla AI Sieges for RBM 1.1.0 (ustawienia Restore* = true), RBM KeepBattleEnabled 1, DynamicReinforcements BattleSize Large (1500)
 - 369: zamek zdobyty na graczu zostaje u zdobywcy, roszczenie gracza (arm_k369); Ashemark -> Mormont po wyjsciu Jeffa z Goldentooth (przed d.109807) - SPRAWDZIC "Roszczenia gracza (369): naprawa Ashemark ... WYKONANA".
 - 370: log misji oblezenia co 30 s; 371: zalamanie szturmu (oddzial 25%, prog OB2 x wola dowodcy, przerwa 1-5 / 7-14 dob) - tylko gracz-obronca; SPRAWDZIC w pierwszym oblezeniu.
