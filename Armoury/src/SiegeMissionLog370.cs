@@ -183,7 +183,16 @@ namespace Armoury
                     try
                     {
                         var f = fl[j];
-                        if (f == null || f.CountOfUnits <= 0) continue;
+                        if (f == null) continue;
+                        if (f.CountOfUnits <= 0)
+                        {
+                            // Pusty szyk: w linii strony pomijany, ale na liscie niewaznych pozycji TAK - komunikat silnika
+                            // "Formation order position is not valid" idzie z CreateNewOrderWorldPosition wolanego przez
+                            // CacheAverageAndMedianPositionAndVelocity tylko dla szyku z CountOfUnits == 0 (Formation.cs:1453).
+                            if (bad != null && !f.OrderPositionIsValid)
+                                bad.Add("T" + t.TeamIndex + " F" + (int)f.FormationIndex + " (" + (side == BattleSideEnum.Attacker ? "A" : "O") + ", pusty, rozkaz " + f.GetReadonlyMovementOrderReference().OrderEnum + ")");
+                            continue;
+                        }
                         fN++;
                         int idx = (int)f.FormationIndex;
                         sb.Append(' ').Append('F').Append(idx).Append(' ').Append(idx >= 0 && idx < FcName.Length ? FcName[idx] : f.FormationIndex.ToString())
@@ -320,15 +329,17 @@ namespace Armoury
             {
                 var f = uf[i];
                 if (f == null) continue;
-                if (i > 0) s.Append(',');
+                if (s.Length > 8) s.Append(',');
                 s.Append('T').Append(f.Team != null ? f.Team.TeamIndex : -1).Append('F').Append((int)f.FormationIndex);
             }
-            return s.ToString();
+            return s.Length > 8 ? s.ToString() : ", szyki -";
         }
 
         private static string BehName(BehaviorComponent b)
         {
             if (b == null) return "-";
+            // Tag RBM: tylko dla wlasnych klas RBMBehavior*. Vanillowe UseSiegeMachines, AssaultWalls, WaitForLadders,
+            // ShootFromCastleWalls (i TacticDefendCastle) RBMAI zmienia latkami - wypisane bez tagu, ale logika jest RBM.
             string n = b.GetType().Name;
             if (n.StartsWith("RBMBehavior", StringComparison.Ordinal)) return "RBM:" + n.Substring(11);
             if (n.StartsWith("Behavior", StringComparison.Ordinal) && n.Length > 8) return n.Substring(8);

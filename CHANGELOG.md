@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 370 poprawki recenzji - lista niewaznych pozycji obejmuje puste szyki (SiegeMissionLog370.cs; na 3d296739)
+**Problem (recenzja 370):** lista "niewazne pozycje rozkazow przy pierwszym odczycie" pomijala szyki z CountOfUnits == 0, a to z nich najpewniej pochodzi komunikat rgl "Formation order position is not valid. Team: 1, Formation: 6/7" (Goldentooth) - linia mowilaby "brak" mimo komunikatu silnika.
+**Przyczyna:** `if (f == null || f.CountOfUnits <= 0) continue;` przed zbieraniem listy. Komunikat pisze Formation.CreateNewOrderWorldPosition (Formation.cs:667-671), wolany w zwyklym toku przez CacheAverageAndMedianPositionAndVelocity (Formation.cs:1453) tylko dla pustego szyku - po OnUnitAddedOrRemoved, gdy odchodzi ostatni czlowiek (w oblezeniu typowo kawaleria: LKon F6, CKon F7).
+**Zmiana:** pusty szyk dalej pomijany w linii strony, ale przy pierwszym odczycie trafia na liste niewaznych jako "T1 F6 (A, pusty, rozkaz X)" (czyta tylko getter OrderPositionIsValid => _orderPosition.IsValid i OrderEnum). Kosmetyka: Users() nie wypisze ", szyki ,T1F2" przy null na poczatku listy (przecinek dopiero po pierwszym wpisie, sam null -> "szyki -"). Komentarz w BehName: tag RBM: tylko dla klas RBMBehavior*; vanillowe UseSiegeMachines/AssaultWalls/WaitForLadders/ShootFromCastleWalls i TacticDefendCastle RBMAI zmienia latkami - w logu bez tagu, ale logika RBM (czytajac log nie wnioskowac "to nie RBM").
+**Ryzyko / co sprawdzic:** tylko odczyt, bez zmian stanu; lista moze byc dluzsza (puste szyki z nigdy nieustawiona pozycja tez sie pojawia) - raz na misje. W grze przy szturmie: czy T1 F6/F7 sa na liscie jako "pusty". Autotest (bitwy polowe): brak bledow SiegeMissionLog370.*.
+**Status:** DO SPRAWDZENIA (build 0 bledow; NIE WGRANE).
+
 ## MODY 09.11 12:00 - Vanilla AI Sieges for RBM 1.1.0 + Dynamic Reinforcements BattleSize Large (1500) (bez zmiany DLL naszych modow)
 **Decyzja Jeffa:** "Vanilla AI Sieges for RBM wgraj to" (zip z Pobranych, Nexus 7216) i "daj tryb large" (bitwy 1500 zamiast 1000).
 **Problem:** oblezenie Goldentooth 09.11 10:58 - atakujacy staneli 40-120 m od murow, taran/wieza/drabiny nie ruszyly, lucznicy obroncow przestali strzelac. RBM (RBMAI.SiegePatches) podmienia AI oblezen (BehaviorShootFromCastleWalls prefiks return false, StopUsingAllMachines, StopUsingStrategicAreas, Scatter dla machin/drabin).
