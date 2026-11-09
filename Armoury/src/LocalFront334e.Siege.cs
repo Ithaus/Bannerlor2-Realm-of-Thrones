@@ -264,7 +264,8 @@ namespace Armoury
                 if (me != null) { if (BreakOn && me.IsRaid && me.AttackerSide != null && me.AttackerSide.LeaderParty == party.Party) RaidBreak(party, me, partyThinkParams); }
                 else
                 {
-                    if (ArmyRaidOn && party.Army != null && party.Army.LeaderParty == party) ArmyRaid(party, partyThinkParams);
+                    // 376: armia ratunkowa regenta (RescueHunt, klucz RescueHuntHostKeepsTarget) - bez dokladanego rabunku, cel zostaje lowom
+                    if (ArmyRaidOn && party.Army != null && party.Army.LeaderParty == party && !RescueHunt.HostKeeps(party)) ArmyRaid(party, partyThinkParams);
                     if (PowerOn && WarFront334.IronOn && party.MapFaction.StringId == WarFront334.IronId) IronSiege(party, partyThinkParams);
                 }
                 long mt = _modelT, wt = _tWait;

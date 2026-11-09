@@ -284,7 +284,8 @@ namespace Armoury
                     double reach = (r.Own || t.Tier == TThree ? 8.02 : 4.01) * day;
                     float ds = q.Distance(t.Seat);
                     double heard = t.SeatH + (ds <= 40f ? 0.0 : Math.Min(288.0, 3.0 + ds / 6.25));
-                    int exp = d > reach ? VFar : now - heard > 72.0 ? VSpent : VCand;
+                    // 376: okno T3 z klucza RescueHuntRulerSearchDays (T1/T2 - 72 h jak dotad); wzor niezalezny - liczby wprost, nie SearchHours
+                    int exp = d > reach ? VFar : now - heard > (t.Tier == TThree ? Math.Max(72.0, RulerSearchDays * 24.0) : 72.0) ? VSpent : VCand;
                     if (exp == VCand) nc++; else if (exp == VFar) nf++; else ns++;
                     if (r.V == VCand) cand++;
                     if (exp == r.V && noRoad == r.NoRoad && (noRoad || (kp.Distance(r.Kp) < 1f && toFief == (r.Fief != null)))) ok++;

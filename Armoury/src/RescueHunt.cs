@@ -67,12 +67,26 @@ namespace Armoury
     ///    twierdzy krolestwa jako najlepsza opcja (OB5), wodz armii w zbiorce (DoNotChangeBehavior).
     ///  - Koniec: uwolnienie (okup, ucieczka, bitwa, wypuszczenie, wykup, pokoj), smierc, jeniec juz nie u gracza, rod po stronie gracza / bez krolestwa, 24 h
     ///    pokoju (okno PeaceHold M6a-3).
+    ///  - 376 ARMIA RATUNKOWA REGENTA (Jeff 09.11 "czemu lanisterowie nie organizuja armii aby odbic krola?" -> "tak rob 376"; klucze RescueHuntRegentHost,
+    ///    RescueHuntHostDays, RescueHuntRulerSearchDays, RescueHuntHostKeepsTarget). Dotad przy jencu-wladcy wodzem lowow byl sam jeniec (want = K.Leader odrzucony),
+    ///    zastepca tylko z rodu panujacego - Tywin (inny rod) nigdy; armii nie bylo. Teraz, gdy jencem jest SAM wladca i lowcy sa za slabi, armie zwoluje REGENT
+    ///    sposrod kandydatow lowow (w zasiegu, wiedza, bez armii, nie najem, nie dziecko, nie wstrzymani 223): (1) najstarszy dorosly rodu panujacego, (2) glowa rodu
+    ///    z rodziny wladcy (krewny Kin wladcy, jego ojca, matki albo malzonka - dziadkowie, wujowie, tesc), najsilniejsza, (3) najsilniejsza glowa rodu, (4) najsilniejszy
+    ///    lord; przy rownej randze zostaje dotychczasowy regent. Dopiero RescueHuntHostDays dob po wiesci u regenta (okup mial czas; zawarty okup/umowa konczy lowy
+    ///    w OnReleased) - wczesniej tryb "za slabi - regent czeka". Zbiorka przy twierdzy krolestwa najblizszej sladu (loch: najblizszej lochu - takze dla lochu,
+    ///    dotad tylko "loch - za slabi"). Armie zaklada gra (CanLordCreateArmy z regula i kolejka rodu 342, budzet i koszt wplywu gry - placi rod regenta). Potem
+    ///    armia to jeden kandydat z sila calej armii (Contrib): poscig / szukanie / oblezenie lochu jak dotad; uwolnienie robi gra (ApplyByReleasedAfterBattle po
+    ///    pokonaniu druzyny gracza, PrisonerReleaseCampaignBehavior.OnSettlementOwnerChanged po zdobyciu twierdzy z lochem - jeniec nie w wojnie z nowym panem).
+    ///    Okno szukania bez swiezego sladu dla T3: RescueHuntRulerSearchDays dob zamiast 72 h. 334e (armie lupia) nie podmienia celu armii ratunkowej (HostKeeps).
+    ///    Linie "Odbicie (222/376): ...". Zapis: wiersz 'h' pole 25 (regent@godzina zwolania).
     /// WATKI: postfiks czyta tylko migawke rozkazow (slownik podmieniany w calosci raz na godzine - jak RaidTribute), liczniki Interlocked. Reszta - watek kampanii.
     /// ZAPIS: klucz arm_odbicie (v1; lowy i slady); brak klucza = brak lowow. Linie "Odbicie (222): ...". Potkniecia liczone, bez globalnego wylacznika.
     /// </summary>
     internal static partial class RescueHunt
     {
         internal const string P = "Odbicie (222): ";
+        internal const string P376 = "Odbicie (222/376): ";
+        private const string MRegentWait = "za slabi - regent czeka", MHost = "armia regenta";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         // liczby z modeli gry i moda (opis w naglowku) - zadnej nowej stalej rozgrywki
@@ -138,6 +152,9 @@ namespace Armoury
             public int Out = -1; public bool OutFief, OutCap; public string SearchSig = "";
             public readonly HashSet<MobileParty> Elig = new HashSet<MobileParty>();
             public MapEvent BattleMe; public int BattleSide = -1; public double BattleEndH = -1.0;
+            // 376: regent (zapis pole 25 razem z HostH - godzina zwolania armii, -1 = brak armii); armia i opisy - sesja (po wczytaniu z druzyny regenta, SyncHost)
+            public Hero Regent; public double HostH = -1.0;
+            public Army HostArmy; public string RegentWhy = "", HostLog = "";
             public Vec2 Seat { get { return new Vec2(SX, SY); } }
         }
 
@@ -146,6 +163,7 @@ namespace Armoury
             public Hunt H; public int Kind; public MobileParty Target; public Vec2 Pos; public Settlement Fort; public Settlement Dungeon;
             public float P, Need, Own;
             public bool Search;                             // 222d: PatrolAroundPoint po zimnym tropie (cel szukania, nie slad)
+            public bool Host;                               // 376: zbiorka armii ratunkowej regenta (OArmy)
             public Settlement Area;                         // recenzja 222d: osada szukania (PatrolAroundPoint wokol osady z droga gry - AiHelper, jak AiPatrollingBehavior)
             public double OfferedH = -10.0;
         }
@@ -170,6 +188,10 @@ namespace Armoury
         private static int _dNew, _dEnded, _dSkipped, _dCourier, _dRethink, _dSight, _dSightCap, _dMarkMsg, _dStumbles, _stumbles, _dSkipTrip, _dSkipHeld;
         private static int _dRaise, _dAdd, _dPatrol, _dArmyOffer, _dArmyNoCall, _dArmyShort, _dSiege, _dRaid, _dSkipRelief, _dSkipOwn, _dSkipDnc, _dArmies;
         private static int _dSearch, _dWake;   // 222d: szukanie po zimnym tropie w mysli AI (Interlocked), lowy ruszone po czekaniu
+        private static int _dHostCalled, _dHostEnded, _dHostKeep;   // 376: armie regenta zalozone / rozwiazane dzis; 334e nie podmienil celu (Interlocked)
+        // 376: wodzowie armii ratunkowych - zbior podmieniany w calosci raz na godzine (czytany z mysli AI, takze rownoleglej - 334e ThinkField)
+        private static readonly HashSet<MobileParty> NoHosts = new HashSet<MobileParty>();
+        private static HashSet<MobileParty> _hostSnap = NoHosts;
         private static readonly Dictionary<string, int> _dSkipWhy = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly HashSet<string> _err = new HashSet<string>(StringComparer.Ordinal);
 
@@ -180,6 +202,26 @@ namespace Armoury
         internal static bool On { get { var s = S; return s != null && s.RescueHunt; } }
         private static bool RealmOn { get { var s = S; return s != null && s.RescueHuntRealm; } }
         private static bool TellOn { get { var s = S; return s != null && s.RescueHuntTellPlayer; } }
+        private static bool HostOn { get { var s = S; return s != null && s.RescueHuntRegentHost; } }
+        private static bool KeepOn { get { var s = S; return s != null && s.RescueHuntHostKeepsTarget; } }
+        private static int HostDays { get { var s = S; return s != null ? Math.Max(0, Math.Min(30, s.RescueHuntHostDays)) : 3; } }
+        private static int RulerSearchDays { get { var s = S; return s != null ? Math.Max(3, Math.Min(60, s.RescueHuntRulerSearchDays)) : 14; } }
+
+        /// <summary>376: okno szukania bez swiezego sladu (od wiesci u lorda) - T3 RescueHuntRulerSearchDays dob (nie krocej niz ColdHours), reszta ColdHours.</summary>
+        private static double SearchHours(Hunt t) { return t != null && t.Tier == TThree ? Math.Max(ColdHours, RulerSearchDays * 24.0) : ColdHours; }
+
+        /// <summary>376 (z 334e ThinkField, takze z watku mysli rownoleglej): wodz armii ratunkowej regenta - 334e nie doklada mu rabunku (nie podmienia celu). Nie rzuca.</summary>
+        internal static bool HostKeeps(MobileParty p)
+        {
+            try
+            {
+                var hs = Volatile.Read(ref _hostSnap);
+                if (hs.Count == 0 || p == null || !On || !KeepOn || !hs.Contains(p)) return false;
+                Interlocked.Increment(ref _dHostKeep);
+                return true;
+            }
+            catch { return false; }
+        }
         private static double NowH { get { return CampaignTime.Now.ToHours; } }
         private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
 
@@ -213,7 +255,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _hunts.Clear(); Volatile.Write(ref _snap, Empty); _pendingH.Clear(); _pendingS.Clear();
+            _hunts.Clear(); Volatile.Write(ref _snap, Empty); Volatile.Write(ref _hostSnap, NoHosts); _pendingH.Clear(); _pendingS.Clear();
             _importN = -1; _importBad = 0; _lastHour = -1.0; _hourNowH = _hourPrevH = -1.0; _sessionDays = 0; _stumbles = 0; _adopted = false; _forts = null;
             lock (_err) _err.Clear();
             ClearDay();
@@ -227,7 +269,7 @@ namespace Armoury
             Interlocked.Exchange(ref _dArmyOffer, 0); Interlocked.Exchange(ref _dArmyNoCall, 0); Interlocked.Exchange(ref _dArmyShort, 0);
             Interlocked.Exchange(ref _dSiege, 0); Interlocked.Exchange(ref _dRaid, 0); Interlocked.Exchange(ref _dSkipRelief, 0);
             Interlocked.Exchange(ref _dSkipOwn, 0); Interlocked.Exchange(ref _dSkipDnc, 0); Interlocked.Exchange(ref _dSearch, 0);
-            _dArmies = 0; _dWake = 0;
+            _dArmies = 0; _dWake = 0; _dHostCalled = 0; _dHostEnded = 0; Interlocked.Exchange(ref _dHostKeep, 0);
             _dSkipWhy.Clear();
         }
 
@@ -307,6 +349,9 @@ namespace Armoury
                      + " h, zasieg " + F2(ReachOwnDays) + "/" + F2(ReachHelpDays) + " dob marszu"
                      + " | zimny trop: szukanie (222d) " + F0(ColdHours) + " h od wiesci u lorda, cele: osada najblizsza miejsca pojmania i twierdza rodu porywacza najblizsza miejsca pojmania"
                      + " (droga gry - AiHelper; bez drogi - poza zasiegiem; wiesc u lorda w zapisie); poza zasiegiem - czekaja.");
+            Log.Info(P376 + "start sesji | Rescue Hunt Regent Host " + (HostOn ? "tak" : "nie") + " (armia regenta po " + HostDays + " dobach od wiesci u regenta)"
+                     + " | Rescue Hunt Ruler Search Days " + RulerSearchDays + " (okno szukania T3 " + F0(SearchHours(new Hunt { Tier = TThree })) + " h, reszta " + F0(ColdHours) + " h)"
+                     + " | Rescue Hunt Host Keeps Target " + (KeepOn ? "tak" : "nie") + " (334e nie doklada rabunku armii ratunkowej).");
         }
 
         // ------------------------------------------------------------ kto jest czyj
@@ -327,6 +372,14 @@ namespace Armoury
             if (a.Father != null && a.Father == b.Father) return true;
             if (a.Mother != null && a.Mother == b.Mother) return true;
             return false;
+        }
+
+        /// <summary>376: rodzina wladcy dla wyboru regenta - Kin wladcy, jego ojca, matki albo malzonka (dziadkowie, wujowie i ciotki, rodzenstwo, tesciowie).
+        /// TierOf (ranga jenca) zostaje przy Kin.</summary>
+        private static bool KinWide(Hero a, Hero r)
+        {
+            if (a == null || r == null) return false;
+            return Kin(a, r) || Kin(a, r.Father) || Kin(a, r.Mother) || Kin(a, r.Spouse);
         }
 
         private static int TierOf(Hero h, Kingdom k)
@@ -690,6 +743,18 @@ namespace Armoury
             Order o;
             if (!snap.TryGetValue(a.LeaderParty, out o) || o.Kind != OArmy || NowH - o.OfferedH > 2.0) return;
             o.H.Armies++; _dArmies++;
+            if (o.Host)
+            {
+                // 376: armia ratunkowa regenta - koszt wplywu policzyla i pobrala gra (CreateArmy) z rodu wodza
+                var t = o.H; var lh = a.LeaderParty.LeaderHero;
+                t.HostArmy = a; t.HostH = NowH; t.Regent = lh; t.HostLog = ""; _dHostCalled++;
+                int n = 0; try { n = a.Parties.Count; } catch { }
+                Log.Info(P376 + "armia ratunkowa zwolana | " + When() + " | " + Nm(t.Captive) + " (wladca " + Nm(t.K) + ") | regent " + Nm(lh) + " rodu " + Nm(lh != null ? lh.Clan : null)
+                         + " (" + t.RegentWhy + ") | zbiorka " + Nm(o.Fort) + " | druzyn w armii " + n + ", sila z wezwanymi " + F0(Contrib(a.LeaderParty)) + " / potrzeba " + F0(o.Need)
+                         + " | wplyw rodu regenta po zwolaniu " + F0(lh != null && lh.Clan != null ? lh.Clan.Influence : 0f) + " (koszt wedlug gry).");
+                if (TellOn) Show("The crown musters a host under " + Nm(lh) + " to free " + Nm(t.Captive) + ".");
+                return;
+            }
             Log.Info(P + "armia zalozona | " + When() + " | " + Nm(o.H.Captive) + " | wodz " + Nm(a.LeaderParty.LeaderHero) + " | zbiorka " + Nm(o.Fort) + " | sila z wezwanymi "
                      + F0(Contrib(a.LeaderParty)) + " / potrzeba " + F0(o.Need) + ".");
         }
@@ -717,6 +782,9 @@ namespace Armoury
             Log.Info(P + "koniec | " + When() + " | " + Nm(t.Captive) + " - " + why + " | dob " + F1((NowH - t.StartH) / 24.0)
                      + " | wiesc " + (t.Told ? "doszla" : "nie doszla") + " | bitwy lowcow z graczem " + t.Battles + " (wygrane " + t.Wins + ") | armie " + t.Armies
                      + " | najwieksza sila " + F0(t.TopStr) + ".");
+            if (t.Regent != null)
+                Log.Info(P376 + "koniec | " + When() + " | " + Nm(t.Captive) + " - " + why + " | regent " + Nm(t.Regent) + " | armia ratunkowa "
+                         + (t.HostArmy != null ? "czynna - zostaje grze (wodz mysli od nowa bez rozkazu lowow; rozwiazanie wedlug gry)" : "brak") + ".");
             TestEnded(t.Captive, why);
         }
 
@@ -902,6 +970,21 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Rethink", e); }
             Volatile.Write(ref _snap, nw.Count > 0 ? nw : Empty);
+            // 376: wodzowie armii ratunkowych (po Step - SyncHost juz zdjal rozwiazane)
+            try
+            {
+                HashSet<MobileParty> hs = null;
+                foreach (var t in _hunts.Values)
+                {
+                    var a = t.HostArmy;
+                    var lp = a != null ? a.LeaderParty : null;
+                    if (lp == null || !lp.IsActive || lp.Army != a) continue;
+                    if (hs == null) hs = new HashSet<MobileParty>();
+                    hs.Add(lp);
+                }
+                Volatile.Write(ref _hostSnap, hs ?? NoHosts);
+            }
+            catch (Exception e) { Stumble("HostSnap", e); }
             try { TestHour(); } catch (Exception e) { Stumble("TestHour", e); }
         }
 
@@ -1061,6 +1144,8 @@ namespace Armoury
             Settlement fief = x == null ? CaptorFief(cap) : null;
             Settlement capSite = x == null ? CapSite(t) : null;
             int notYet = 0, cold = 0, far = 0, skip = 0, trip = 0, held = 0, spent = 0, noRoad = 0;
+            double searchH = SearchHours(t);
+            SyncHost(t);
             MobileParty farMp = null; float farD = 0f, farR = 0f; Settlement farFief = null; bool farSearch = false;
             var wpcs = t.K.WarPartyComponents;
             for (int i = 0; i < wpcs.Count; i++)
@@ -1134,8 +1219,8 @@ namespace Armoury
                     if (farMp == null || d - reach < farD - farR) { farMp = mp; farD = d; farR = (float)reach; farFief = sf; farSearch = search; }
                     continue;
                 }
-                // 222d: okno szukania ColdHours od wiesci u tego lorda - potem czeka na slad (lord w zasiegu)
-                if (rec != null && now - rec.Heard > ColdHours) { spent++; rec.V = VSpent; continue; }
+                // 222d: okno szukania ColdHours od wiesci u tego lorda - potem czeka na slad (lord w zasiegu); 376: T3 - RescueHuntRulerSearchDays dob
+                if (rec != null && now - rec.Heard > searchH) { spent++; rec.V = VSpent; continue; }
                 bool sees = false;
                 if (tVisible)
                 {
@@ -1160,20 +1245,50 @@ namespace Armoury
             {
                 // za slabi wszyscy - wodz lowow zwoluje armie (gdy gra da mu druzyny), inaczej czekaja
                 Cand lead = null;
-                Hero want = t.Tier == TThree ? t.K.Leader : t.Clan.Leader;
-                foreach (var cd in _cands) if (cd.Mp.Army == null && cd.Mp.LeaderHero == want && want != t.Captive) { lead = cd; break; }
-                if (lead == null)
+                string wait = null;
+                // 376: jencem jest sam wladca - armie zwoluje regent (dotad want = jeniec, zastepca tylko z rodu panujacego), po HostDays dobach od wiesci u niego
+                bool host = HostOn && t.Tier == TThree && t.Captive == t.K.Leader;
+                if (host && t.HostArmy != null) wait = "za slabi - armia regenta zbiera sile";   // 376: armia juz jest - bez drugiej (sila calej armii w Contrib wodza)
+                else if (host)
                 {
-                    Clan lc = t.Tier == TThree ? t.K.RulingClan : t.Clan;
-                    foreach (var cd in _cands) if (cd.Mp.Army == null && cd.Mp.ActualClan == lc && (lead == null || cd.Str > lead.Str)) lead = cd;
+                    string why;
+                    lead = PickRegent(t, out why);
+                    if (lead == null) wait = x != null ? "loch - za slabi" : "za slabi - czekaja";
+                    else
+                    {
+                        var rh = lead.Mp.LeaderHero;
+                        double heardR;
+                        if (!t.Heard.TryGetValue(rh, out heardR)) heardR = now;
+                        double left = HostDays * 24.0 - (now - heardR);
+                        if (rh != t.Regent || why != t.RegentWhy)
+                        {
+                            t.Regent = rh; t.RegentWhy = why;
+                            Log.Info(P376 + "regent | " + When() + " | " + Nm(t.Captive) + " (wladca " + Nm(t.K) + ") w niewoli | regent " + Nm(rh) + " rodu " + Nm(rh.Clan) + " (" + why + ")"
+                                     + " | wplyw rodu " + F0(rh.Clan != null ? rh.Clan.Influence : 0f) + " | sila " + F0(lead.Str) + " | lowcow " + _cands.Count + " sila " + F0(total) + " / potrzeba " + F0(need)
+                                     + " | wiesc u regenta " + F0(now - heardR) + " h temu | armia ratunkowa " + (left > 0 ? "za " + F0(left) + " h" : "teraz") + " (Rescue Hunt Host Days " + HostDays + ").");
+                        }
+                        if (left > 0) { wait = MRegentWait; lead = null; }
+                    }
                 }
-                if (lead != null && x == null)
+                else
                 {
-                    var fort = NearestFort(t.K, lead.Kp);
+                    Hero want = t.Tier == TThree ? t.K.Leader : t.Clan.Leader;
+                    foreach (var cd in _cands) if (cd.Mp.Army == null && cd.Mp.LeaderHero == want && want != t.Captive) { lead = cd; break; }
+                    if (lead == null)
+                    {
+                        Clan lc = t.Tier == TThree ? t.K.RulingClan : t.Clan;
+                        foreach (var cd in _cands) if (cd.Mp.Army == null && cd.Mp.ActualClan == lc && (lead == null || cd.Str > lead.Str)) lead = cd;
+                    }
+                }
+                if (wait != null) mode = wait;
+                else if (lead != null && (x == null || host))
+                {
+                    // 376: zbiorka regenta przy twierdzy krolestwa najblizszej lochu (loch) albo sladu
+                    var fort = NearestFort(t.K, x != null ? x.GetPosition2D : lead.Kp);
                     if (fort != null)
                     {
-                        nw[lead.Mp] = new Order { H = t, Kind = OArmy, Fort = fort, P = PFor(t, lead.Own), Need = need, Own = lead.Str };
-                        mode = "armia"; nArmy = 1;
+                        nw[lead.Mp] = new Order { H = t, Kind = OArmy, Fort = fort, P = PFor(t, lead.Own), Need = need, Own = lead.Str, Host = host };
+                        mode = host ? MHost : "armia"; nArmy = 1;
                     }
                     else mode = "za slabi - czekaja";
                 }
@@ -1203,7 +1318,7 @@ namespace Armoury
             // 222d: wynik dla komunikatu - rozkazy inne niz szukanie = "ride to free", samo szukanie = "searching", bez rozkazow - za slabi albo za daleko
             int orders = nChase + nPatrol + nSiege + nSearch + nArmy;
             int outc = orders > 0 ? (orders > nSearch ? OutRide : OutSearch)
-                     : (mode == "za slabi - czekaja" || mode == "loch - za slabi" || mode == "widza - za slabi blisko") ? OutWeak : OutFar;
+                     : (mode.StartsWith("za slabi", StringComparison.Ordinal) || mode == "loch - za slabi" || mode == "widza - za slabi blisko") ? OutWeak : OutFar;   // 376: takze "za slabi - regent czeka"
             t.Out = outc; t.OutFief = sFief; t.OutCap = sCap;
             string sig = "";
             if (nSearch > 0)
@@ -1239,8 +1354,79 @@ namespace Armoury
                          + ", szukanie po zimnym tropie " + nSearch + (mode == "armia" ? ", armia 1" : "") + " | nie wiedza " + notYet + ", zimny trop " + cold + ", za daleko " + far
                          + ", po oknie szukania " + spent + ", pominieci " + skip + " (wyjazd po bron " + trip + ", wstrzymani 223 " + held + ")" + extra + ".");
             }
+            // 376: cel armii ratunkowej (linia przy zmianie)
+            if (t.HostArmy != null)
+            {
+                try
+                {
+                    var lp = t.HostArmy.LeaderParty;
+                    Order ho;
+                    string aim = lp == null ? "-" : nw.TryGetValue(lp, out ho) ? AimText(ho) : t.Elig.Contains(lp) ? "bez rozkazu (" + mode + ")" : "poza lowami (zbiorka, bitwa, pominieta albo za daleko)";
+                    if (aim != t.HostLog)
+                    {
+                        t.HostLog = aim;
+                        Log.Info(P376 + "cel armii ratunkowej | " + When() + " | " + Nm(t.Captive) + " | wodz " + Nm(lp) + " (sila armii " + F0(lp != null ? Contrib(lp) : 0f) + " / potrzeba " + F0(need)
+                                 + ") | " + aim + " | cel lowow " + (x != null ? "loch " + Nm(x) : Nm(tp)) + ".");
+                    }
+                }
+                catch (Exception e) { Stumble("HostAim", e); }
+            }
             _cands.Clear();
             return outc;
+        }
+
+        private static string AimText(Order o)
+        {
+            switch (o.Kind)
+            {
+                case OChase: return "poscig za " + Nm(o.Target);
+                case OPatrol: return o.Search ? "szukanie wokol " + Nm(o.Area) : "szukanie przy sladzie (" + NearName(o.Pos) + ")";
+                case OSiege: return "oblezenie lochu " + Nm(o.Dungeon);
+                case OArmy: return "zbiorka przy " + Nm(o.Fort);
+                default: return "-";
+            }
+        }
+
+        /// <summary>376: regent sposrod kandydatow lowow (bez armii, nie najem, nie dziecko, nie jeniec): ranga 1 - rod panujacy (najstarszy dorosly), 2 - glowa rodu
+        /// z rodziny wladcy (KinWide; najsilniejsza), 3 - najsilniejsza glowa rodu, 4 - najsilniejszy lord. Rowna ranga - zostaje dotychczasowy regent. null - brak.</summary>
+        private static Cand PickRegent(Hunt t, out string why)
+        {
+            why = "";
+            var ruler = t.Captive; var rc = t.K.RulingClan;
+            Cand best = null; int br = 99; float bk = 0f; bool bCur = false;
+            foreach (var cd in _cands)
+            {
+                var h = cd.Mp.LeaderHero; var c = h != null ? h.Clan : null;
+                if (cd.Mp.Army != null || h == null || h == ruler || c == null || h.IsChild || c.IsUnderMercenaryService) continue;
+                int r; float k;
+                if (c == rc) { r = 1; k = h.Age; }
+                else if (c.Leader == h && KinWide(h, ruler)) { r = 2; k = cd.Str; }
+                else if (c.Leader == h) { r = 3; k = cd.Str; }
+                else { r = 4; k = cd.Str; }
+                bool cur = h == t.Regent;
+                if (best == null || r < br || (r == br && (cur && !bCur || (cur == bCur && k > bk)))) { best = cd; br = r; bk = k; bCur = cur; }
+            }
+            if (best != null)
+                why = br == 1 ? "rod panujacy - najstarszy dorosly" : br == 2 ? "rodzina wladcy - glowa rodu" : br == 3 ? "najsilniejsza glowa rodu w zasiegu" : "najsilniejszy lord w zasiegu";
+            return best;
+        }
+
+        /// <summary>376: armia ratunkowa po wczytaniu (z druzyny regenta, gdy ta prowadzi armie) i jej koniec (wodz bez tej armii, rozwiazana) - linia raz.</summary>
+        private static void SyncHost(Hunt t)
+        {
+            if (t.HostH < 0) return;
+            if (t.HostArmy == null && t.Regent != null)
+            {
+                var rp = t.Regent.PartyBelongedTo;
+                if (rp != null && rp.Army != null && rp.Army.LeaderParty == rp) { t.HostArmy = rp.Army; t.HostLog = ""; }
+            }
+            var a = t.HostArmy;
+            var lp = a != null ? a.LeaderParty : null;
+            if (lp != null && lp.IsActive && lp.Army == a) return;
+            _dHostEnded++;
+            Log.Info(P376 + "armia ratunkowa rozwiazana | " + When() + " | " + Nm(t.Captive) + " | regent " + Nm(t.Regent) + " | po " + F1((NowH - t.HostH) / 24.0)
+                     + " dob od zwolania | regent moze zwolac nowa, gdy lowcy dalej za slabi.");
+            t.HostArmy = null; t.HostH = -1.0; t.HostLog = "";
         }
 
         private static float PFor(Hunt t, bool own) { return t.Tier == TThree ? PRealm : own ? POwn : PHelp; }
@@ -1396,7 +1582,7 @@ namespace Armoury
                     else if (t.Mode == "szuka") look++;
                     else if (t.Mode == MSearch) coldLook++;
                     else if (t.Mode == MWaitFar || t.Mode == MWaitSpent) wait++;
-                    else if (t.Mode == "armia") army++;
+                    else if (t.Mode == "armia" || t.Mode == MHost) army++;
                     else if (t.Mode.StartsWith("za slabi", StringComparison.Ordinal) || t.Mode == "loch - za slabi") weak++;
                     else if (t.Mode == "oblezenie lochu") dun++;
                     else other++;
@@ -1411,6 +1597,11 @@ namespace Armoury
                          + " | pominiete: odsiecz OB5 " + _dSkipRelief + ", obrona osady wlasnego rodu " + _dSkipOwn + ", zbiorka armii " + _dSkipDnc + ", wyjazd po bron (druzynogodziny) " + _dSkipTrip + ", wstrzymani przez 223 (druzynogodziny) " + _dSkipHeld
                          + " | slady " + _dSight + " (bezpiecznik " + _dSightCap + ")" + ", komunikaty 'marked your column' " + _dMarkMsg + ", wstrzymani kurierzy " + _dCourier + ", przemyslenia " + _dRethink
                          + " | kurier 178 " + CourierWired() + " | potkniecia " + _dStumbles + " (sesja " + _stumbles + ").");
+                int hosts = 0, regents = 0;
+                foreach (var kv in _hunts) { if (kv.Value.HostArmy != null) hosts++; if (kv.Value.Regent != null) regents++; }
+                if (regents > 0 || _dHostCalled > 0 || _dHostEnded > 0)
+                    Log.Info(P376 + "dzien " + Today + " | lowy z regentem " + regents + ", armie ratunkowe czynne " + hosts + " | dzis zwolane " + _dHostCalled + ", rozwiazane " + _dHostEnded
+                             + " | 334e nie dolozyl rabunku armii ratunkowej (mysli) " + Volatile.Read(ref _dHostKeep) + ".");
             }
             catch (Exception e) { Stumble("Daily.Line", e); }
             ClearDay();
@@ -1436,7 +1627,8 @@ namespace Armoury
                       .Append('\t').Append(t.Armies.ToString(Inv)).Append('\t').Append(t.Battles.ToString(Inv)).Append('\t').Append(t.Wins.ToString(Inv)).Append('\t').Append(t.TopStr.ToString("R", Inv))
                       .Append('\t').Append(t.Planned ? "c" : "-")    // recenzja 222c: pole 22 - stary build (f.Length >= 22) je pomija
                       .Append('\t').Append(t.Rode ? "r" : "-")       // 222d: pole 23 - lowy juz wydaly rozkazy (komunikat "rides to free" byl)
-                      .Append('\t').Append(HeardOut(t));             // recenzja 222d: pole 24 - wiesc u lordow (bohater@godzina;...), "-" = brak
+                      .Append('\t').Append(HeardOut(t))              // recenzja 222d: pole 24 - wiesc u lordow (bohater@godzina;...), "-" = brak
+                      .Append('\t').Append(RegentOut(t));            // 376: pole 25 - regent@godzina zwolania armii (-1 = bez armii), "-" = brak
                     foreach (var s in t.Sights)
                     {
                         sb.Append("\ns\t").Append(t.Captive.StringId).Append('\t').Append(s.H.ToString("R", Inv)).Append('\t').Append(s.X.ToString("R", Inv)).Append('\t').Append(s.Y.ToString("R", Inv))
@@ -1509,6 +1701,28 @@ namespace Armoury
             }
         }
 
+        /// <summary>376: pole 25 wiersza 'h' - "StringId regenta@HostH" ("-" = brak regenta; id ze znakiem zakazanym - pominiety, regent wybierany od nowa).</summary>
+        private static string RegentOut(Hunt t)
+        {
+            var id = t.Regent != null ? t.Regent.StringId : null;
+            if (string.IsNullOrEmpty(id) || id.IndexOfAny(HeardBad) >= 0) return "-";
+            return id + "@" + t.HostH.ToString("R", Inv);
+        }
+
+        private static void RegentIn(Hunt t, string v)
+        {
+            if (string.IsNullOrEmpty(v) || v == "-") return;
+            try
+            {
+                int at = v.LastIndexOf('@');
+                if (at <= 0) { _importBad++; return; }
+                var h = Hero.Find(v.Substring(0, at));
+                if (h == null || !h.IsAlive) return;   // regent zginal - wybor od nowa
+                t.Regent = h; t.RegentWhy = "z zapisu"; t.HostH = D(v.Substring(at + 1));
+            }
+            catch { _importBad++; }
+        }
+
         private static double D(string s) { return double.Parse(s, NumberStyles.Float, Inv); }
         private static float Fl(string s) { return float.Parse(s, NumberStyles.Float, Inv); }
         private static int I(string s) { return int.Parse(s, NumberStyles.Integer, Inv); }
@@ -1539,6 +1753,7 @@ namespace Armoury
                     if (t.K == null) { _importBad++; continue; }
                     // recenzja 222d: zapis bez pola 24 (222/222c/222d) - wiesc u lorda z pierwszego przegladu po wczytaniu (z pozycji w tej chwili), potem stala
                     if (f.Length > 24) HeardIn(t, f[24]);
+                    if (f.Length > 25) RegentIn(t, f[25]);   // 376
                     _hunts[h] = t; map[f[1]] = t;
                 }
                 catch { _importBad++; }

@@ -8536,6 +8536,22 @@ namespace Armoury
         [SettingPropertyGroup("Rescue of captured lords")]
         public bool RescueHuntTellPlayer { get; set; } = true;
 
+        [SettingPropertyBool("Rescue Hunt Regent Host", HintText = "with Rescue Hunt: when you hold the ruler of a realm himself and the lords hunting you are too weak, a regent calls a host to free him - someone of the ruling house, else the head of a house of the ruler's family (a grandfather, an uncle, a father-in-law), else the strongest lord within reach. The host gathers at the realm's stronghold nearest to where you were last seen (or to the dungeon that holds him), then hunts you or besieges that dungeon. The realm pays for it in influence as for any army. Off = nobody calls a host while the ruler is held", RequireRestart = false)]
+        [SettingPropertyGroup("Rescue of captured lords")]
+        public bool RescueHuntRegentHost { get; set; } = true;
+
+        [SettingPropertyInteger("Rescue Hunt Host Days", 0, 30, "0", HintText = "with Rescue Hunt Regent Host: how many days after the regent learns of the capture he calls the host - time for a ransom to be agreed first (0-30)", RequireRestart = false)]
+        [SettingPropertyGroup("Rescue of captured lords")]
+        public int RescueHuntHostDays { get; set; } = 3;
+
+        [SettingPropertyInteger("Rescue Hunt Ruler Search Days", 3, 60, "0", HintText = "with Rescue Hunt: how many days the lords of a realm keep searching for their ruler or the ruler's close kin when nobody has seen you lately, counted from when each lord learned of the capture; other captives - three days (3-60)", RequireRestart = false)]
+        [SettingPropertyGroup("Rescue of captured lords")]
+        public int RescueHuntRulerSearchDays { get; set; } = 14;
+
+        [SettingPropertyBool("Rescue Hunt Host Keeps Target", HintText = "with Rescue Hunt Regent Host: the host keeps to the rescue - the realm's war plans do not send it off to raid villages instead. Off = the host may be sent raiding like any other army", RequireRestart = false)]
+        [SettingPropertyGroup("Rescue of captured lords")]
+        public bool RescueHuntHostKeepsTarget { get; set; } = true;
+
         [SettingPropertyBool("Siege Phantom Lift", HintText = "A siege camp in which fewer than Siege Phantom Min Men men are able to fight (all its parties together, the wounded not counted), or whose parties together have a strength below 1 in the game's own reckoning, for Siege Phantom Lift Days days in a row breaks up: its parties leave the siege, as when peace is made, and choose a new aim. Not a camp with the player's own party, the player's army or a party of the player's clan, not a siege with the player inside the walls, not the sieges of the Realm of Thrones story, not the Others, never during a battle. The count of days is not saved - after loading a game it starts again. Off = such a camp stays until something else ends the siege", RequireRestart = false)]
         [SettingPropertyGroup("Siege camps without fighting men")]
         public bool SiegePhantomLift { get; set; } = true;
@@ -13957,6 +13973,10 @@ namespace Armoury
             s.RescueHunt = RescueHunt;
             s.RescueHuntRealm = RescueHuntRealm;
             s.RescueHuntTellPlayer = RescueHuntTellPlayer;
+            s.RescueHuntRegentHost = RescueHuntRegentHost;
+            s.RescueHuntHostDays = RescueHuntHostDays;
+            s.RescueHuntRulerSearchDays = RescueHuntRulerSearchDays;
+            s.RescueHuntHostKeepsTarget = RescueHuntHostKeepsTarget;
             s.SiegePhantomLift = SiegePhantomLift;
             s.SiegePhantomLiftDays = SiegePhantomLiftDays;
             s.SiegePhantomMinMen = SiegePhantomMinMen;
