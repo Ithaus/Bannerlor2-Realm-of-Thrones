@@ -11544,6 +11544,10 @@ namespace Armoury
         [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
         public int BattleStallSeconds { get; set; } = 60;
 
+        [SettingPropertyBool("Siege Mission Log", HintText = "log only, nothing changes on the field: in a siege assault the Armoury log gets a report after deployment, every 30 seconds and at the end - each side's tactic, every formation's men, behaviour, order and distance to its target and to the enemy, and how many men work the ram, the siege towers and the ladders. Off = no report", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
+        public bool SiegeMissionLog { get; set; } = true;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -14629,6 +14633,7 @@ namespace Armoury
             s.BannerBreakBattleState = BannerBreakBattleState;
             s.BattleStallBreak = BattleStallBreak;
             s.BattleStallSeconds = BattleStallSeconds;
+            s.SiegeMissionLog = SiegeMissionLog;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;

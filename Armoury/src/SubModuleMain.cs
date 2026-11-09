@@ -731,6 +731,9 @@ namespace Armoury
                 // 307e: zastoj bitwy polowej - ludzie bez czym walczyc schodza z pola (klucz BattleStallBreak) i linia diagnozy zastoju (takze przy kluczu NIE); samo sprawdza bitwe polowa
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new BattleStall307e());
+                // 370: pomiar szturmu (tylko odczyt, linie "Oblezenie misja (370)"); samo sprawdza Mission.IsSiegeBattle przy pierwszym ticku
+                if (Settings.Current.SiegeMissionLog && mission != null)
+                    mission.AddMissionBehavior(new SiegeMissionLog370());
                 // m111-walka (24.10): BattleSense niesie tez flage pojedynku (turniej, arena, pojedynek ROT) dla DuelAi / DuelCraft / DuelGuard / BattleWind
                 // m113-walka2 (24.10): i dla rozszerzen bitwy fazy 2 (bohaterowie-pojedynkowicze, tier z umiejetnosci, roznica umiejetnosci gracza, zrywy)
                 // po recenzji: takze przy fladze testu bitwaOFF (FieldDuel.TestOff, tylko DLL autotestu) - linia misji z kluczami NIE
