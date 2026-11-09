@@ -43,7 +43,7 @@ namespace Armoury
         {
             public readonly Dictionary<PartyBase, Dictionary<CharacterObject, int>> Troops = new Dictionary<PartyBase, Dictionary<CharacterObject, int>>();
             public readonly HashSet<Hero> Heroes = new HashSet<Hero>();
-            public bool Broken, LastRetreated;
+            public bool Broken, LastBroken, LastRetreated;   // Broken - zalamanie 371 w biezacej misji; LastBroken / LastRetreated - wynik ostatniej misji (OnEndMission)
             public int Missions, Inside, Near, Mid, Far, NoPos;
             public string St = "-";
         }
@@ -185,11 +185,13 @@ namespace Armoury
                 {
                     var r = Mission != null ? Mission.MissionResult : null;
                     _t.LastRetreated = r != null && r.EnemyRetreated;
+                    _t.LastBroken = _t.Broken;   // zalamanie scisle w tej misji (recenzja 2: misja 1 z 371 bez odwrotu, misja 2 z odwrotem bez 371 - bez przenosin)
+                    _t.Broken = false;
                     int tot = _inside + _near + _mid + _far + _nopos;
                     string D = Dist.ToString("0", Inv), D2 = (2f * Dist).ToString("0", Inv);
                     Log.Info("Ranni pod murami (373): koniec misji | osada " + _t.St + " | rannych atakujacych " + tot + ": w srodku " + _inside + ", pod murami (<=" + D + " m) " + _near
                              + ", " + D + "-" + D2 + " m " + _mid + ", dalej " + _far + ", bez pozycji " + _nopos + " | punktow murow " + _pts.Count
-                             + " | bohaterowie [" + string.Join(", ", _heroes) + "] | zalamanie 371 " + (_t.Broken ? "tak" : "nie") + ", wrog odstapil " + (_t.LastRetreated ? "tak" : "nie")
+                             + " | bohaterowie [" + string.Join(", ", _heroes) + "] | zalamanie 371 " + (_t.LastBroken ? "tak" : "nie") + ", wrog odstapil " + (_t.LastRetreated ? "tak" : "nie")
                              + " | w bitwie (misji " + _t.Missions + "): w srodku " + _t.Inside + ", pod murami " + _t.Near + ", dalej " + (_t.Mid + _t.Far) + " | potkniecia " + _stumbles + ".");
                 }
             }
@@ -217,6 +219,7 @@ namespace Armoury
 
         public override void RegisterEvents()
         {
+            _errs = 0;   // limit wpisow potkniec do logu na kampanie, nie na proces
             int stale = SiegeWounded373.Book.Count;
             SiegeWounded373.Book.Clear();
             if (stale > 0) Log.Info("Ranni pod murami (373): ksiega z poprzedniej gry wyczyszczona (" + stale + " bitew bez rozliczenia).");
@@ -243,13 +246,13 @@ namespace Armoury
             try
             {
                 var set = Settings.Current;
-                bool go = set != null && set.SiegeWoundedTakenPrisoner && t.Broken && t.LastRetreated && me.WinningSide == BattleSideEnum.None && me.IsSiegeAssault;
+                bool go = set != null && set.SiegeWoundedTakenPrisoner && t.LastBroken && t.LastRetreated && me.WinningSide == BattleSideEnum.None && me.IsSiegeAssault;
                 var st = me.MapEventSettlement;
                 var captor = st != null ? st.Party : null;
                 if (!go || captor == null)
                 {
                     if (t.Inside + t.Near > 0)
-                        Log.Info("Ranni pod murami (373): osada " + t.St + " | bez przenosin (zalamanie " + (t.Broken ? "tak" : "nie") + ", wrog odstapil " + (t.LastRetreated ? "tak" : "nie")
+                        Log.Info("Ranni pod murami (373): osada " + t.St + " | bez przenosin (zalamanie " + (t.LastBroken ? "tak" : "nie") + ", wrog odstapil " + (t.LastRetreated ? "tak" : "nie")
                                  + ", wynik " + me.BattleState + (captor == null ? ", brak osady" : "") + ") - " + (t.Inside + t.Near) + " rannych pod murami zostaje jak w grze.");
                     return;
                 }
@@ -321,7 +324,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("Hero", e, ref s); }
                 }
                 if (moved > 0)
-                    try { InformationManager.DisplayMessage(new InformationMessage(moved + " wounded attackers left beneath the walls are taken prisoner.", Color.FromUint(0xFF9ACD65u))); } catch { }
+                    try { InformationManager.DisplayMessage(new InformationMessage(moved == 1 ? "1 wounded attacker left beneath the walls is taken prisoner." : moved + " wounded attackers left beneath the walls are taken prisoner.", Color.FromUint(0xFF9ACD65u))); } catch { }
                 var tb = new StringBuilder();
                 foreach (var kv in types) tb.Append(tb.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
                 Log.Info("Ranni pod murami (373): osada " + t.St + " | do lochu " + moved + " (typy: " + (tb.Length > 0 ? tb.ToString() : "-") + "), bohaterowie " + names.Count
