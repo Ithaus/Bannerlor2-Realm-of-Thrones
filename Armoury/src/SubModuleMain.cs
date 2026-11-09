@@ -90,6 +90,8 @@ namespace Armoury
                 try { HeroHp.Install(_harmony); } catch (Exception e) { Log.Error("HeroHp.Install", e); }
                 // 379: celnosc machin wedlug Engineering operatora, losowy czlowiek szyku i losowy cel sposrod podobnych (prefiksy ShootProjectile / AddCustomMissile, postfiksy celu); wlasny try
                 try { SiegeAim379.Install(_harmony); } catch (Exception e) { Log.Error("SiegeAim379.Install", e); }
+                // 383: obroncy zrzucaja kamienie - transpiler StonePile (flaga rozkazu dla szykow obroncow nie pod AI, jak gra dla machin miotajacych); klucz czytany na zywo; wlasny try
+                try { SiegeStones383.Install(_harmony); } catch (Exception e) { Log.Error("SiegeStones383.Install", e); }
                 ThrownWobblePatch.ApplyAll(_harmony);
                 FairXpPatch.ApplyAll(_harmony);
                 try { RaceLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RaceLaw.ApplyAll", e); }   // Jeff 10.10: sluby i ciaze tylko w obrebie rasy (olbrzymy z olbrzymami) - model slubu, MarriageAction, ciaza, porod
@@ -753,6 +755,9 @@ namespace Armoury
                 // 381: wodzowie AI-atakujacych zostaja z tylu w szturmie (szyk 8 poza zasiegiem murow); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAttackerLordsStayBack)
                     mission.AddMissionBehavior(new SiegeCommanders381());
+                // 383: linia 'Kamienie (383)' co 60 s i na koniec misji szturmu (kupy kamieni, rzuty, trafienia, machiny obrony); samo sprawdza szturm
+                if (mission != null && (Settings.Current.SiegeDefendersUseStones || Settings.Current.SiegeMissionLog))
+                    mission.AddMissionBehavior(new SiegeStones383.Logic());
                 // 382: linia sumy "Nadzy (382): koniec misji" (pomiar i wypelnianie w prefiksie HeroDress382)
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new HeroDress382.Logic());

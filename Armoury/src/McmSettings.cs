@@ -11724,6 +11724,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: attacking lords lead from behind (381)")]
         public bool SiegeAttackerLordsStayBack { get; set; } = true;
 
+        [SettingPropertyBool("Siege Defenders Use Stones", HintText = "When you defend a fortress (or fight on its defenders' side), your own and allied defenders drop the stones piled above the gate and on the walls onto attackers who come beneath them: as soon as stormers stand below a stone pile, men from the nearest defending formation go to it, one to each throwing place, and leave it when the stones run out, when the attackers have gone or when an enemy is within a few steps. The game does this only for formations under AI command, so the formations you command as general never used the stones. Your formations keep their orders; only the few men at the pile are taken out. Formations falling back are not used. Off = as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: defenders drop stones from the walls (383)")]
+        public bool SiegeDefendersUseStones { get; set; } = true;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -14854,6 +14858,7 @@ namespace Armoury
             s.SiegeEngineSideEngineerShare = SiegeEngineSideEngineerShare;
             s.SiegeEngineSimilarTargetShare = SiegeEngineSimilarTargetShare;
             s.SiegeAttackerLordsStayBack = SiegeAttackerLordsStayBack;
+            s.SiegeDefendersUseStones = SiegeDefendersUseStones;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;
