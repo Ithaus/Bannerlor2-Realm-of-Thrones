@@ -25,6 +25,7 @@ namespace Armoury
     ///    ktory dostalby od gry (nadpis innego moda albo Hero.BattleEquipment), wypelniamy WYLACZNIE puste sloty:
     ///      bron 0-3 - tylko gdy wszystkie cztery puste (bez broni) - caly komplet broni z jednego zestawu wzorca (luk ze strzalami razem);
     ///      pancerz 5-9 - kazdy pusty slot osobno, jesli wzorzec ma tam sztuke;
+    ///    (382b: kazda sztuka przez ItemReq.MeetsHero przy HeroGearRequirements, dystansowa tylko w parze z amunicja; pancerz tylko przy pustym tulowiu);
     ///    konie 10-11 bez zmian. Zrodlo: wlasny szablon XML postaci (BasicCharacterObject._equipmentRoster - jak UniqueLaw.InTemplate; bez pustych
     ///    zestawow), a gdy go brak - szablon lorda (IsLordTemplate) jego kultury i plci (bez szablonow wladcow, dzieci i mlodziezy), wybor staly dla bohatera.
     ///    Bez unikatow, legend, koron i sprzetu umarlych (UniqueGear.Is, LegendaryLaw.IsLegend, UniqueLaw.IsDead). Pancerz w granicy Atletyki
@@ -72,21 +73,11 @@ namespace Armoury
                 var hero = co.HeroObject;
                 if (hero == null || hero == Hero.MainHero || (hero.Clan != null && hero.Clan == Clan.PlayerClan)) return;
                 if (agentBuildData.AgentCivilianEquipment || MapEvent.PlayerMapEvent == null) return;
-                if (Undead(hero)) return;
+                if (Undead.Character(co)) return;                     // jedna regula na umarlych (Undead.Character, 382b)
                 if (!ReferenceEquals(__instance, _m)) Begin(__instance);
                 One(agentBuildData, co, hero);
             }
             catch (Exception e) { Stumble("Prefix", e); }
-        }
-
-        private static bool Undead(Hero h)
-        {
-            try
-            {
-                var c = h.Culture != null ? h.Culture.StringId ?? "" : "";
-                return c == "wights" || c == "whitewalker";
-            }
-            catch { return false; }
         }
 
         private static void One(AgentBuildData bd, CharacterObject co, Hero hero)
@@ -121,22 +112,32 @@ namespace Armoury
                     var eq = src.Clone();
                     int n = 0;
                     var got = new List<string>();
+                    bool req = Settings.Current != null && Settings.Current.HeroGearRequirements;
                     if (noWeapon && wtpl != null)
                     {
+                        // 382b: komplet broni przez to samo sito co reszta drog bohatera (ItemReq.MeetsHero - umiejetnosc broni i Prawo Tieru
+                        // przez Difficulty), a dystansowa bez pary (luk bez strzal / strzaly bez luku) wypada - bez polowek kompletu
+                        var kit = new ItemObject[4];
                         for (int i = 0; i < 4; i++)
                         {
                             var it = wtpl[(EquipmentIndex)i].Item;
                             if (it == null || Banned(it)) continue;
-                            eq[(EquipmentIndex)i] = new EquipmentElement(it);
+                            if (req && !ItemReq.MeetsHero(co, it)) continue;
+                            kit[i] = it;
+                        }
+                        Pair(kit);
+                        for (int i = 0; i < 4; i++)
+                        {
+                            if (kit[i] == null) continue;
+                            eq[(EquipmentIndex)i] = new EquipmentElement(kit[i]);
                             n++;
-                            got.Add(it.StringId);
+                            got.Add(kit[i].StringId);
                         }
                     }
-                    if (tpl != null)
+                    if (tpl != null && bareBody)                     // 382b: pancerz tylko gdy brak zbroi tulowia (opis MCM / CHANGELOG)
                     {
                         int ath = 0;
                         try { ath = co.GetSkillValue(DefaultSkills.Athletics); } catch { }
-                        bool req = Settings.Current != null && Settings.Current.HeroGearRequirements;
                         foreach (var s in Armour)
                         {
                             if (!eq[s].IsEmpty) continue;
@@ -175,6 +176,28 @@ namespace Armoury
                          + ", " + (noWeapon ? "BEZ BRONI" : "bron jest") + ", pustych slotow pancerza " + emptyArm + "/5 | zrodlo zestawu: " + (bd.AgentOverridenSpawnEquipment != null ? "nadpis spawnu" : "Hero.BattleEquipment")
                          + ", w Hero.BattleEquipment tulow " + (hero.BattleEquipment != null && !hero.BattleEquipment[EquipmentIndex.Body].IsEmpty ? "jest" : "PUSTY")
                          + " | szablon " + RosterId(co) + " | " + done + ".");
+        }
+
+        /// <summary>382b: bron dystansowa tylko w parze z amunicja (luk - strzaly, kusza - belty, palna - kule); bez pary obie strony wypadaja.</summary>
+        private static void Pair(ItemObject[] kit)
+        {
+            Fix(kit, ItemObject.ItemTypeEnum.Arrows, ItemObject.ItemTypeEnum.Bow);
+            Fix(kit, ItemObject.ItemTypeEnum.Bolts, ItemObject.ItemTypeEnum.Crossbow);
+            Fix(kit, ItemObject.ItemTypeEnum.Bullets, ItemObject.ItemTypeEnum.Musket, ItemObject.ItemTypeEnum.Pistol);
+        }
+
+        private static void Fix(ItemObject[] kit, ItemObject.ItemTypeEnum ammo, params ItemObject.ItemTypeEnum[] launchers)
+        {
+            bool l = false, a = false;
+            for (int i = 0; i < kit.Length; i++)
+            {
+                if (kit[i] == null) continue;
+                if (Array.IndexOf(launchers, kit[i].ItemType) >= 0) l = true;
+                else if (kit[i].ItemType == ammo) a = true;
+            }
+            if (l == a) return;
+            for (int i = 0; i < kit.Length; i++)
+                if (kit[i] != null && (Array.IndexOf(launchers, kit[i].ItemType) >= 0 || kit[i].ItemType == ammo)) kit[i] = null;
         }
 
         private static bool Dress(ItemObject it)
