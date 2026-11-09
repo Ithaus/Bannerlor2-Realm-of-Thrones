@@ -11716,6 +11716,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: siege engine aim by Engineering (379)")]
         public float SiegeEngineSimilarTargetShare { get; set; } = 0.8f;
 
+        [SettingPropertyBool("Siege Attacker Lords Stay Back", HintText = "When the enemy storms a fortress you defend (or one your allies defend while you fight with them): the attacking lords - the army commander and the lords leading their parties - do not climb the ladders or run at the gate with their men. After deployment they gather in a formation of their own at the start of the attack, pulled back out of bowshot of the walls (150 m from the nearest defender where the ground allows), and lead from there; lords coming with reinforcements join them. They still fall back with their men when the assault breaks, and leave the field when nobody else of theirs is left to fight. Arrows, siege engines or a sally can still reach them. When you storm a fortress yourself, nothing changes. Off = the lords storm the walls with their men, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: attacking lords lead from behind (381)")]
+        public bool SiegeAttackerLordsStayBack { get; set; } = true;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -14844,6 +14848,7 @@ namespace Armoury
             s.SiegeEngineRangeSpreadAt300 = SiegeEngineRangeSpreadAt300;
             s.SiegeEngineSideEngineerShare = SiegeEngineSideEngineerShare;
             s.SiegeEngineSimilarTargetShare = SiegeEngineSimilarTargetShare;
+            s.SiegeAttackerLordsStayBack = SiegeAttackerLordsStayBack;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;

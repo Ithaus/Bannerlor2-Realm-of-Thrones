@@ -748,6 +748,9 @@ namespace Armoury
                 // 379: zerowanie licznikow celnosci machin i linia konca misji 'Celnosc machin (379)' (same latki dzialaja wedlug klucza na zywo)
                 if (Settings.Current.SiegeEngineAccuracyBySkill && mission != null)
                     mission.AddMissionBehavior(new SiegeAim379.Logic());
+                // 381: wodzowie AI-atakujacych zostaja z tylu w szturmie (szyk 8 poza zasiegiem murow); samo sprawdza szturm i strone gracza
+                if (Campaign.Current != null && mission != null && Settings.Current.SiegeAttackerLordsStayBack)
+                    mission.AddMissionBehavior(new SiegeCommanders381());
                 // 373: ranni atakujacy pod murami / w srodku - ksiega misji (przenosiny do lochu w SiegeWounded373Behavior po zalamaniu 371); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission && Settings.Current.SiegeWoundedTakenPrisoner)
                     mission.AddMissionBehavior(new SiegeWounded373());
