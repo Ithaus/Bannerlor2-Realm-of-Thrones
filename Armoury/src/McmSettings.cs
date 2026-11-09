@@ -11648,6 +11648,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeRepelRebuildMaxDays { get; set; } = 14f;
 
+        [SettingPropertyInteger("Siege Assault Time Limit Minutes", 0, 180, "0", HintText = "In an assault on walls: the time limit in minutes of battle time, counted from the end of deployment and over all the rounds of the same battle. When the enemy storms a fortress you defend (with Siege Assault Break Mission) and has not taken it in this time, its stormers fall back from the walls the same way as when the assault breaks, and the next assault comes after the usual pause - unless the place is being taken (Siege Assault Break Taken Share). When you storm a fortress yourself, you only get a warning 5 minutes before and when the time is up - falling back is your call. 0 = no limit", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public int SiegeAssaultTimeLimitMinutes { get; set; } = 30;
+
         [SettingPropertyBool("Siege Defender Engineering Xp", HintText = "When you defend a fortress and its defenders finish a siege engine, but nobody inside has any Engineering (the game then gives the engine's experience to no one), your party's engineer gets the Engineering experience the game gives for a built engine. Only the experience - who leads the engine work, perks and building speed are unchanged. Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: defenders' engineers (377)")]
         public bool SiegeDefenderEngineeringXp { get; set; } = true;
@@ -14783,6 +14787,7 @@ namespace Armoury
             s.SiegeRepelPauseMaxDays = SiegeRepelPauseMaxDays;
             s.SiegeRepelRebuildMinDays = SiegeRepelRebuildMinDays;
             s.SiegeRepelRebuildMaxDays = SiegeRepelRebuildMaxDays;
+            s.SiegeAssaultTimeLimitMinutes = SiegeAssaultTimeLimitMinutes;
             s.SiegeDefenderEngineeringXp = SiegeDefenderEngineeringXp;
             s.SiegeAssaultHoldRetreat = SiegeAssaultHoldRetreat;
             s.SiegeLadderWaitSeconds = SiegeLadderWaitSeconds;

@@ -739,6 +739,9 @@ namespace Armoury
                 // 371: zalamanie szturmu w misji gracza-obroncy (oddzial szturmowy, odstapienie spod murow, oblezenie trwa); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission)
                     mission.AddMissionBehavior(new SiegeBreak371());
+                // 378: limit czasu szturmu - gracz atakuje: tylko ostrzezenia (5 min przed i przy uplywie); gracz broni - odwrot robi SiegeBreak371; samo sprawdza szturm i strone gracza
+                if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultTimeLimitMinutes > 0)
+                    mission.AddMissionBehavior(new SiegeClock378());
                 // 373: ranni atakujacy pod murami / w srodku - ksiega misji (przenosiny do lochu w SiegeWounded373Behavior po zalamaniu 371); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission && Settings.Current.SiegeWoundedTakenPrisoner)
                     mission.AddMissionBehavior(new SiegeWounded373());

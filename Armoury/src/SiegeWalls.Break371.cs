@@ -46,6 +46,8 @@ namespace Armoury
         internal static double GateExchangeFactor { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakGateExchangeFactor) ? 1.2 : Clamp(s.SiegeAssaultBreakGateExchangeFactor, 1.0, 2.0); } }
         internal static double HardCap { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakHardCap) ? 2.0 : Clamp(s.SiegeAssaultBreakHardCap, 1.0, 5.0); } }
         internal static double TakenShare { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakTakenShare) ? 0.15 : Clamp(s.SiegeAssaultBreakTakenShare, 0.0, 0.5); } }
+        /// <summary>378: limit czasu szturmu w sekundach czasu misji (0 = bez limitu).</summary>
+        internal static float TimeLimitSeconds { get { var s = Settings.Current; return s == null ? 1800f : 60f * Math.Max(0, Math.Min(600, s.SiegeAssaultTimeLimitMinutes)); } }
         internal static float BreakEndSeconds { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeAssaultBreakEndSeconds) ? 45f : (float)Clamp(s.SiegeAssaultBreakEndSeconds, 10.0, 300.0); } }
         private static double PauseMin { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelPauseMinDays) ? 1.0 : Clamp(s.SiegeRepelPauseMinDays, 0.25, 28.0); } }
         private static double PauseMax { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelPauseMaxDays) ? 5.0 : Clamp(s.SiegeRepelPauseMaxDays, PauseMin, 28.0); } }
@@ -54,7 +56,7 @@ namespace Armoury
         private static double RebuildMax { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeRepelRebuildMaxDays) ? 14.0 : Clamp(s.SiegeRepelRebuildMaxDays, RebuildMin, 56.0); } }
 
         // liczniki doby 371 (misja)
-        private static int _dMisSeen, _dMisBreak, _dMisFuse, _dMisLate, _dMisNone, _dMisTaken, _dMisHoldEx, _dMisRegistered;
+        private static int _dMisSeen, _dMisBreak, _dMisFuse, _dMisLate, _dMisNone, _dMisTaken, _dMisHoldEx, _dMisRegistered, _dMisTime, _dMisTimeTaken;
 
         /// <summary>371: oddzial szturmowy K z zdrowych oblegajacych A i obroncow D (procent armii z dolna granica wobec obroncow, nie wiecej niz A).</summary>
         internal static int PartyOf(int a, int d)
@@ -180,6 +182,7 @@ namespace Armoury
         internal static void NoteMissionBreak(bool fuse, int late) { _dMisBreak++; if (fuse) _dMisFuse++; _dMisLate += late; }
         internal static void NoteMissionTaken() { _dMisTaken++; }      // 371b: raz na misje - prog osiagniety, ale obroncow prawie nie ma (zdobywaja)
         internal static void NoteMissionHoldEx() { _dMisHoldEx++; }    // 371b: raz na misje - prog osiagniety, ale wymiana strat w granicy
+        internal static void NoteMissionTimeUp(bool taken) { if (taken) _dMisTimeTaken++; else _dMisTime++; }   // 378: raz na misje - limit czasu (odwrot albo wstrzymany - zdobywaja)
         internal static void NoteMissionStumble(string where, Exception e) { Stumble("SiegeBreak371." + where, e); }
 
         /// <summary>Z OnMapEventEnded: szturm zalamany w misji gracza-obroncy (droga gry FinishBattleAndKeepSiegeEvent juz przeszla) - przerwa jak po OB2.</summary>
@@ -204,9 +207,10 @@ namespace Armoury
                  + " wymiana x" + F(GateExchangeFactor, "0.00") + ", pulap " + F(HardCap, "0.0") + " x prog -> 1:1, zdobywaja < " + F(TakenShare * 100.0, "0") + "% obroncow); przerwa " + F(PauseMin, "0.0") + "-" + F(PauseMid, "0.0") + "-" + F(PauseMax, "0.0")
                  + " dob, odbudowa machin " + F(RebuildMin, "0.0") + "-" + F(RebuildMax, "0.0") + " dob), misja " + (BreakMissionOn ? "tak" : "nie")
                  + ": misji szturmu z graczem w obronie " + _dMisSeen + ", poza regula " + _dMisNone + ", zalaman " + _dMisBreak + " (bezpiecznik " + _dMisFuse + ", wystawionych po zalamaniu "
-                 + _dMisLate + "), wstrzymane - zdobywaja " + _dMisTaken + ", wstrzymane - wymiana korzystna " + _dMisHoldEx + ", przerw zapisanych " + _dMisRegistered;
+                 + _dMisLate + "), wstrzymane - zdobywaja " + _dMisTaken + ", wstrzymane - wymiana korzystna " + _dMisHoldEx + ", przerw zapisanych " + _dMisRegistered
+                 + "; 378 limit czasu " + (TimeLimitSeconds > 0f ? F(TimeLimitSeconds / 60.0, "0") + " min: odwrotow " + _dMisTime + ", wstrzymanych - zdobywaja " + _dMisTimeTaken : "wylaczony");
         }
 
-        private static void ZeroDay371() { _dMisSeen = _dMisBreak = _dMisFuse = _dMisLate = _dMisNone = _dMisTaken = _dMisHoldEx = _dMisRegistered = 0; }
+        private static void ZeroDay371() { _dMisSeen = _dMisBreak = _dMisFuse = _dMisLate = _dMisNone = _dMisTaken = _dMisHoldEx = _dMisRegistered = _dMisTime = _dMisTimeTaken = 0; }
     }
 }
