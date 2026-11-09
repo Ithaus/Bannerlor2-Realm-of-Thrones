@@ -347,6 +347,8 @@ namespace Armoury
                 try { WeaponEase.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WeaponEase.ApplyAll", e); }
                 // 314a (01.11): bez leczenia RBM w bitwie (transpiler StanceLogic.OnMissionTick - set_Health tylko w dol); wlasny try
                 try { RbmNoRegen.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RbmNoRegen.ApplyAll", e); }
+                // 372: szturm AI - odwrot taktyki tylko przez 371 (postfiks TacticBreachWalls.ShouldRetreat) i drabiny bez czekania na taran / wieze (postfiks TickOccasionally); przed JIT wolajacych
+                try { SiegeHold372.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SiegeHold372.ApplyAll", e); }
                 BkSupplyTemper.ApplyAll(_harmony);
                 try { BkSupplyMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSupplyMarket.ApplyAll", e); }   // 3.4: zakupy zaopatrzenia BK wedlug zapasu partii, zaplata do kasy osady (PRZED ksiega towarow)
                 try { BkSeal34.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSeal34.ApplyAll", e); }               // 3.4: rynek wsi BK, sprzedaz niewolnikow, wyposazenie rycerza BKROT - bez zlota z niczego (PRZED oknami ksiegi obiegu)

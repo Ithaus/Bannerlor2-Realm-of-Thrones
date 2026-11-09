@@ -11596,6 +11596,14 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeRepelRebuildMaxDays { get; set; } = 14f;
 
+        [SettingPropertyBool("Siege Assault Hold Retreat", HintText = "With Siege Assault Break Mission, in an assault on a fortress you defend yourself: the enemy's stormers do not give up and fall back on their own while their assault party still holds - only the breaking point of Siege Assault Break decides when they fall back, and then they really leave the walls. Off = the enemy may also call a retreat on its own, as in the game (its men then often stand below the walls without leaving)", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
+        public bool SiegeAssaultHoldRetreat { get; set; } = true;
+
+        [SettingPropertyInteger("Siege Ladder Wait Seconds", 0, 600, "0", HintText = "In an assault on walls, the stormers with ladders wait for their ram and siege towers at most this many seconds after the assault begins, or until all rams and siege towers are lost - then they raise the ladders and climb instead of standing below the walls. 0 = they wait until a ram or a tower reaches the walls, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
+        public int SiegeLadderWaitSeconds { get; set; } = 60;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -14694,6 +14702,8 @@ namespace Armoury
             s.SiegeRepelPauseMaxDays = SiegeRepelPauseMaxDays;
             s.SiegeRepelRebuildMinDays = SiegeRepelRebuildMinDays;
             s.SiegeRepelRebuildMaxDays = SiegeRepelRebuildMaxDays;
+            s.SiegeAssaultHoldRetreat = SiegeAssaultHoldRetreat;
+            s.SiegeLadderWaitSeconds = SiegeLadderWaitSeconds;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;

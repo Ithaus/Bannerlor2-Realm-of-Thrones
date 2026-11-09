@@ -40,6 +40,8 @@ namespace Armoury
         private int _readings, _stumbles, _errs;
         private int _shotsA, _shotsD, _shotsAllA, _shotsAllD;
         private readonly Dictionary<Formation, int> _hits = new Dictionary<Formation, int>();
+        // 372: sklad szyku przy odczycie - [0] z bronia dystansowa i amunicja (Agent.IsRangedCached), [1] konno (HasMount)
+        private readonly Dictionary<Formation, int[]> _mix = new Dictionary<Formation, int[]>();
         private readonly StringBuilder _sb = new StringBuilder(1024);
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
@@ -123,6 +125,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Koniec", e); }
             _ended = true;
             _hits.Clear();
+            _mix.Clear();
             base.OnEndMission();
         }
 
@@ -141,6 +144,7 @@ namespace Armoury
             _readings++;
             string head = "Oblezenie misja (370): t=" + m.CurrentTime.ToString("0", Inv) + "s" + (tag != null ? " (" + tag + ")" : "");
             List<string> bad = !_firstDone ? new List<string>() : null;
+            Mix(m);
             Side(m, BattleSideEnum.Attacker, head, bad);
             Side(m, BattleSideEnum.Defender, head, bad);
             Machines(m, head);
@@ -198,6 +202,8 @@ namespace Armoury
                         sb.Append(' ').Append('F').Append(idx).Append(' ').Append(idx >= 0 && idx < FcName.Length ? FcName[idx] : f.FormationIndex.ToString())
                           .Append(f.IsAIControlled ? "" : "(gracz)")
                           .Append(" ludzi ").Append(f.CountOfUnits);
+                        int[] mx;
+                        if (_mix.TryGetValue(f, out mx)) sb.Append(" (dyst ").Append(mx[0]).Append(", konno ").Append(mx[1]).Append(')');   // 372: sklad (indeks F to miejsce szyku, nie klasa ludzi)
                         int det = f.CountOfDetachedUnits;
                         if (det > 0) sb.Append(" (odl. ").Append(det).Append(')');
                         var b = f.AI != null ? f.AI.ActiveBehavior : null;
@@ -218,9 +224,54 @@ namespace Armoury
                     catch (Exception e) { Stumble("Szyk", e); sb.Append(" ?;"); }
                 }
                 if (fN == 0) sb.Append(" brak");
+                if (side == BattleSideEnum.Defender) sb.Append(Posts(t));
             }
             if (teamsN == 0) sb.Append(" | brak druzyn");
             Log.Info(sb.ToString());
+        }
+
+        /// <summary>372: sklad szykow (ludzie z bronia dystansowa i amunicja, konni) - jeden przeglad agentow na odczyt.</summary>
+        private void Mix(Mission m)
+        {
+            _mix.Clear();
+            try
+            {
+                foreach (var a in m.Agents)
+                {
+                    try
+                    {
+                        if (a == null || !a.IsActive() || !a.IsHuman) continue;
+                        var f = a.Formation;
+                        if (f == null) continue;
+                        int[] mx;
+                        if (!_mix.TryGetValue(f, out mx)) { mx = new int[2]; _mix[f] = mx; }
+                        if (a.IsRangedCached) mx[0]++;
+                        if (a.HasMount) mx[1]++;
+                    }
+                    catch (Exception e) { Stumble("Sklad", e); }
+                }
+            }
+            catch (Exception e) { Stumble("Sklad", e); }
+        }
+
+        /// <summary>372: stanowiska strzelcow obroncy (TeamAISiegeDefender.ArcherPositions) i szyki, ktore strzelaja z murow (ShootFromCastleWalls).</summary>
+        private static string Posts(Team t)
+        {
+            try
+            {
+                var d = t.TeamAI as TeamAISiegeDefender;
+                if (d == null || d.ArcherPositions == null) return " | stanowiska strzelcow -";
+                var used = new StringBuilder();
+                foreach (var f in t.FormationsIncludingSpecialAndEmpty)
+                {
+                    if (f == null || f.CountOfUnits <= 0 || f.AI == null) continue;
+                    var b = f.AI.ActiveBehavior as BehaviorShootFromCastleWalls;
+                    if (b == null || b.ArcherPosition == null) continue;
+                    used.Append(used.Length > 0 ? "," : "").Append('F').Append((int)f.FormationIndex);
+                }
+                return " | stanowiska strzelcow " + d.ArcherPositions.Count + ", strzelaja z murow " + (used.Length > 0 ? used.ToString() : "-");
+            }
+            catch { return " | stanowiska strzelcow ?"; }
         }
 
         private void Machines(Mission m, string head)

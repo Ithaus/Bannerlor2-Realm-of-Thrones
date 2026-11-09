@@ -56,6 +56,12 @@ namespace Armoury
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
+        /// <summary>372: regula zalamania dziala w tej misji (szturm, gracz w obronie, rekord szturmu) - odwrot taktyki atakujacych tylko przez 371.</summary>
+        internal bool HoldsAssault { get { return _known && _active && !_ended; } }
+
+        /// <summary>372: szturm juz sie zalamal (atakujacy schodza z murow) - bez zwalniania drabin.</summary>
+        internal bool IsBroken { get { return _broken; } }
+
         private static string F(double v, string f) { return v.ToString(f, Inv); }
 
         private static bool Attacker(Agent a)
@@ -317,7 +323,7 @@ namespace Armoury
                     var r = Mission != null ? Mission.MissionResult : null;
                     Log.Info("Szturm (371): koniec misji | osada " + (_a.St != null ? _a.St.StringId : "-") + " | zalamanie " + (_broken ? "tak (po " + F((Mission != null ? Mission.CurrentTime : 0f) - _breakAt, "0") + " s)" : "nie")
                              + " | straty oddzialu " + (_prior + _cas) + " / prog " + F(_limit, "0") + " | odwrot wyslany " + _sent + ", ponowiony " + _resent + ", wystawieni po zalamaniu " + _late
-                             + " | bezpiecznik " + (_fuse ? "tak" : "nie") + " | wynik misji " + (r == null ? "-" : r.BattleState + (r.EnemyRetreated ? " (wrog odstapil)" : ""))
+                             + " | bezpiecznik " + (_fuse ? "tak" : "nie") + " | " + SiegeHold372.MissionSummary(Mission) + " | wynik misji " + (r == null ? "-" : r.BattleState + (r.EnemyRetreated ? " (wrog odstapil)" : ""))
                              + " | potkniecia " + _stumbles + ". Przerwa - linia 'Szturm (371): przerwa' przy koncu bitwy na mapie.");
                 }
             }
