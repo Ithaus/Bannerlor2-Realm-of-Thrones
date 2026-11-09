@@ -1,5 +1,10 @@
 # DZIENNIK ZMIAN
 
+## WGRANIE 195 - 370 na 194 (Armoury.dll 73231668 -> 8d447156 = build 03b86dbd); CrashScribe d7fbd602 bez zmian
+**Test at-370 (zapis Jeffa 02:22, 6 bitew polowych + 2 bitwy lordow, 3 doby, z nowymi modami Vanilla AI Sieges for RBM + Epic Sieges + DR BattleSize Large):** kod 0 (misje sprawdzone), bledy CrashScribe 23 (norma), oba mody oblezen zaladowane. Linii "Oblezenie misja (370)" w autotescie nie ma (brak szturmu) - do sprawdzenia w pierwszym oblezeniu w grze Jeffa.
+**Kopie:** Armoury.dll.bak-2026-11-09-przed-wgranie195, D:/Backup-Bannerlord/wgrane/2026-11-09-wgranie195(-przed).
+**Status:** WGRANE (195).
+
 ## 370 poprawki recenzji - lista niewaznych pozycji obejmuje puste szyki (SiegeMissionLog370.cs; na 3d296739)
 **Problem (recenzja 370):** lista "niewazne pozycje rozkazow przy pierwszym odczycie" pomijala szyki z CountOfUnits == 0, a to z nich najpewniej pochodzi komunikat rgl "Formation order position is not valid. Team: 1, Formation: 6/7" (Goldentooth) - linia mowilaby "brak" mimo komunikatu silnika.
 **Przyczyna:** `if (f == null || f.CountOfUnits <= 0) continue;` przed zbieraniem listy. Komunikat pisze Formation.CreateNewOrderWorldPosition (Formation.cs:667-671), wolany w zwyklym toku przez CacheAverageAndMedianPositionAndVelocity (Formation.cs:1453) tylko dla pustego szyku - po OnUnitAddedOrRemoved, gdy odchodzi ostatni czlowiek (w oblezeniu typowo kawaleria: LKon F6, CKon F7).
