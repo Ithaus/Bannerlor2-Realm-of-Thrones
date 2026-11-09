@@ -249,7 +249,7 @@ namespace Armoury
         /// <summary>Recenzja D (harness 2.14/178): krol albo nastepca tronu przy czynnych wielkich jencach.</summary>
         internal static bool IsGreatCaptive(Hero h) { try { return GreatOn && h != null && IsGreat(h); } catch { return false; } }
 
-        private static Clan CaptorClan(PartyBase p)
+        internal static Clan CaptorClan(PartyBase p)   // 367d: uzywane tez przez CaptiveGrudge.OnReleased
         {
             if (p == null) return null;
             if (p.IsSettlement && p.Settlement != null) return p.Settlement.OwnerClan;

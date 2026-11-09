@@ -231,6 +231,7 @@ namespace Armoury
                 else sb.Append(" His seal can confirm: ").Append(_titleNames).Append('.');
                 if (_cond == 'V') sb.Append(PkgHint());   // 367
                 if ((_cond == 'T' || _cond == 'V') && _needLiege) sb.Append(" He is your liege's captive - your liege loses his ransom.");
+                sb.Append(CaptiveGrudge.Preview(_talk, _cond, _titles));   // 367d: uraza po uwolnieniu
                 sb.Append(')');
                 MBTextManager.SetTextVariable("ARM366_HINT", sb.ToString());
                 MBTextManager.SetTextVariable("ARM366_OWED", _owed.ToString("N0", Inv));
@@ -506,10 +507,12 @@ namespace Armoury
             bool crownIsMine = rc != null && rc.Leader == Hero.MainHero;
             var payer = h.Clan != null ? (h.Clan.Leader != h ? h.Clan.Leader : null) : null;
             if (!Ransom178.TermsRansom(h, 2.0, out price, out extra, out to)) { Drop(d, h, "his house could not settle the ransom.", "okup 178 bez umowy (przeplyw odmowil)"); return; }
-            EndCaptivityAction.ApplyByRansom(h, payer ?? (h.Clan != null ? h.Clan.Leader : h));
+            CaptiveGrudge.TermsBegin(h, 'R', null);   // 367d: przed uwolnieniem (dni niewoli)
+            try { EndCaptivityAction.ApplyByRansom(h, payer ?? (h.Clan != null ? h.Clan.Leader : h)); } catch { CaptiveGrudge.TermsAbort(); throw; }
             Log.Info(Tag + ": WYKONANE - " + Name(h) + " | R okup x2 " + price + " zl -> " + to + (extra > 0 ? ", nagroda gracza od nadwyzki " + extra + " (kolejka nagrod 178)" : "") + " | uwolniony (okup).");
             Log.Player(Name(h) + " is set free. His ransom, doubled (" + price.ToString("N0", Inv) + " denars), goes to " + (to.StartsWith("skarbiec") ? (crownIsMine ? "your treasury" : rc != null ? "the treasury of " + rc.Name : "your liege's treasury") : "you")
                        + (extra > 0 ? "; your reward grows by " + extra.ToString("N0", Inv) + " denars." : "."));
+            CaptiveGrudge.TermsEnd(h);   // 367d
         }
 
         private static void RunT(Deal d, Hero h)
@@ -533,18 +536,21 @@ namespace Armoury
             }
             // 366 popr. (R2-1): najpierw tytuly - nic nie przeszlo = umowa przepada bez zaplaty, bez gniewu, bez skreslenia nagrody i bez uwolnienia (jeniec zostaje)
             int moved = 0, failed = 0;
+            var movedL = new List<object>();   // 367d: przeniesione - sila urazy
             foreach (var t in titles)
             {
                 var from = LandBk.DeJure(t);
-                if (from != null && LandBk.Inherit(from, me, t) && LandBk.DeJure(t) == me) moved++; else failed++;
+                if (from != null && LandBk.Inherit(from, me, t) && LandBk.DeJure(t) == me) { moved++; movedL.Add(t); } else failed++;
             }
             if (moved == 0) { Drop(d, h, "his seal could not confirm your conquests. He stays your captive.", "BK nie przenioslo zadnego tytulu (" + failed + ") - bez zaplaty, bez uwolnienia"); return; }
             string liege = SettleLiege(d, crown, need, owed);
             long cancelled = crown != null && crown.Leader != me ? Ransom178.CancelReward(me, crown, cut) : 0;
-            EndCaptivityAction.ApplyByReleasedByChoice(h, me);
+            CaptiveGrudge.TermsBegin(h, 'T', movedL);   // 367d
+            try { EndCaptivityAction.ApplyByReleasedByChoice(h, me); } catch { CaptiveGrudge.TermsAbort(); throw; }
             Log.Info(Tag + ": WYKONANE - " + Name(h) + " | T tytuly de iure -> gracz: " + moved + " (" + names + ")" + (failed > 0 ? ", nieudane " + failed : "")
                      + " | " + liege + (cancelled > 0 ? " | nagroda gracza skreslona " + cancelled : "") + " | uwolniony (z wyboru).");
             Log.Player(Name(h) + " goes free and puts his seal to your conquests: " + names + (failed > 0 ? " (" + failed + " could not be confirmed)" : "") + ".");
+            CaptiveGrudge.TermsEnd(h);   // 367d
         }
 
         /// <summary>366 (wydzielone w 367): pan gracza traci okup - zaplata gracza (kiesa -> skarbiec pana) albo gniew. Zwraca opis do logu.</summary>

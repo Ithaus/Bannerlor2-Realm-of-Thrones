@@ -11720,6 +11720,26 @@ namespace Armoury
         [SettingPropertyGroup("Terms with a captive king (366)")]
         public float CaptiveTitleClaimYears { get; set; } = 5f;
 
+        [SettingPropertyBool("Captive Grudge", HintText = "A king or heir you free on your terms remembers the humiliation - most of all when he had to seal away his own lands, less for a doubled ransom, a little for an ordinary ransom you took. How hard he takes it and how long he remembers depend on his mercy, valour, generosity and pride; his house, his kin and his lords think less of you too. When it runs deep, he makes war on you once his hands are free and he feels strong enough - an honourable king keeps the word he swore for his freedom, a dishonourable one breaks it, and his honourable lords think less of him for it. Never against a truce or the course of the story. His grudge dies with him; an heir of his blood may keep part of it. Off = kings bear no grudge", RequireRestart = false)]
+        [SettingPropertyGroup("Terms with a captive king (366)")]
+        public bool CaptiveGrudge { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Captive Grudge War At", 10.00f, 200.00f, "0", HintText = "with Captive Grudge: how deep a grudge must run before he makes war on you (Joffrey sealing away a castle and two villages after 20 days is about 107; an ordinary ransom of him about 32)", RequireRestart = false)]
+        [SettingPropertyGroup("Terms with a captive king (366)")]
+        public float CaptiveGrudgeWarAt { get; set; } = 50f;
+
+        [SettingPropertyFloatingInteger("Captive Grudge Oath Years", 0.00f, 10.00f, "0.0", HintText = "with Captive Grudge: how many years a king of some honour (Honour 1) keeps the word he swore for his freedom before his grudge may turn to war. Honour 2 keeps it for life, Honour 0 one year, a dishonourable king not at all", RequireRestart = false)]
+        [SettingPropertyGroup("Terms with a captive king (366)")]
+        public float CaptiveGrudgeOathYears { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Captive Grudge Heir Share", 0.00f, 1.00f, "0.00", HintText = "with Captive Grudge: how much of a dead king's grudge his heir of the same blood takes on (before the heir's own regard for him and temper)", RequireRestart = false)]
+        [SettingPropertyGroup("Terms with a captive king (366)")]
+        public float CaptiveGrudgeHeirShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Captive Grudge Ransom", HintText = "with Captive Grudge: an ordinary ransom you take for a captive king or heir also leaves a small grudge - not enough for war alone, but twice may be", RequireRestart = false)]
+        [SettingPropertyGroup("Terms with a captive king (366)")]
+        public bool CaptiveGrudgeRansom { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -14649,6 +14669,11 @@ namespace Armoury
             s.CaptiveTerms = CaptiveTerms;
             s.CaptiveTermsVassalTitles = CaptiveTermsVassalTitles;
             s.CaptiveTitleClaimYears = CaptiveTitleClaimYears;
+            s.CaptiveGrudge = CaptiveGrudge;
+            s.CaptiveGrudgeWarAt = CaptiveGrudgeWarAt;
+            s.CaptiveGrudgeOathYears = CaptiveGrudgeOathYears;
+            s.CaptiveGrudgeHeirShare = CaptiveGrudgeHeirShare;
+            s.CaptiveGrudgeRansom = CaptiveGrudgeRansom;
         }
 
         internal static void Apply()

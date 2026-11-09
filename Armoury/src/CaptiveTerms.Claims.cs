@@ -785,7 +785,8 @@ namespace Armoury
             // tytuly krola i jego rodu (366 T, za darmo)
             string names; var titles = TitlesFor(h, out names);
             int moved = 0, failed = 0;
-            foreach (var t in titles) { var from = LandBk.DeJure(t); if (from != null && LandBk.Inherit(from, me, t) && LandBk.DeJure(t) == me) moved++; else failed++; }
+            var movedL = new List<object>();   // 367d: tytuly pod wlasna pieczecia krola - sila urazy
+            foreach (var t in titles) { var from = LandBk.DeJure(t); if (from != null && LandBk.Inherit(from, me, t) && LandBk.DeJure(t) == me) { moved++; movedL.Add(t); } else failed++; }
             var lines = new List<string>(); var got = new List<string>(); var wed = new List<string>();
             foreach (var p in pkg)
             {
@@ -809,12 +810,14 @@ namespace Armoury
             }
             string liege = SettleLiege(d, crown, need, owed);
             long cancelled = crown != null && crown.Leader != me ? Ransom178.CancelReward(me, crown, cut) : 0;
-            EndCaptivityAction.ApplyByReleasedByChoice(h, me);
+            CaptiveGrudge.TermsBegin(h, 'V', movedL);   // 367d
+            try { EndCaptivityAction.ApplyByReleasedByChoice(h, me); } catch { CaptiveGrudge.TermsAbort(); throw; }
             Log.Info(Tag367 + ": WYKONANE - " + Name(h) + " | pieczec krola: " + titles.Count + " (" + names + ") | " + string.Join(" || ", lines.ToArray())
                      + " | razem tytulow " + moved + (failed > 0 ? ", nieudane " + failed : "") + " | kiesa gracza " + pg0 + " -> " + me.Gold + " | " + liege
                      + (cancelled > 0 ? " | nagroda gracza skreslona " + cancelled : "") + " | uwolniony (z wyboru).");
             Log.Player(Name(h) + " goes free. His seal and his lords' quitclaims confirm your conquests" + (got.Count > 0 ? " - " + Join(got) : "") + (failed > 0 ? " (" + failed + " titles could not be confirmed)" : "") + "."
                        + (wed.Count > 0 ? " The marriage is sealed: " + Join(wed) + " joins your house." : ""));
+            CaptiveGrudge.TermsEnd(h);   // 367d
         }
     }
 }

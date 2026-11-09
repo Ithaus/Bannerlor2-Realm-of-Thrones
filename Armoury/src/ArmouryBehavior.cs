@@ -756,6 +756,8 @@ namespace Armoury
         private static bool F9Reset() { try { MapSpeedProfile.Reset(); } catch (Exception e) { Log.Error("F9Reset", e); } return true; }
         private readonly bool _p350Reset = P350Reset();   // 350: pomiar sesji od zera przy nowej grze / wczytaniu
         private static bool P350Reset() { try { SessionPerf350.Reset(); } catch (Exception e) { Log.Error("P350Reset", e); } return true; }
+        private readonly bool _p367dReset = P367dReset();   // 367d: urazy uwolnionych wladcow od zera przy nowej grze / wczytaniu
+        private static bool P367dReset() { try { CaptiveGrudge.Reset(); } catch (Exception e) { Log.Error("P367dReset", e); } return true; }
         private readonly bool _p354Reset = P354Reset();   // 354: liczniki podatku wsi do pana ziemi od zera przy nowej grze / wczytaniu
         private static bool P354Reset() { try { VillageTaxToLand354.Reset(); } catch (Exception e) { Log.Error("P354Reset", e); } return true; }
         // p9 (25.10): gotowosc zbrojowni partii i wyjazdy po sprzet od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
@@ -1346,6 +1348,9 @@ namespace Armoury
             // 366: rokowania z wielkim jencem - przerwy po odmowie i umowy czekajace na wykonanie - wlasny try; brak klucza = puste
             try { string tr = dataStore.IsSaving ? CaptiveTerms.Export() : null; SaveText.Sync(dataStore, "arm_terms366", ref tr); if (dataStore.IsLoading) CaptiveTerms.Import(tr); }
             catch (Exception e) { Log.Error("SyncData.arm_terms366", e); }
+            // 367d: urazy uwolnionych wladcow (wiersze, dziedziczenia czekajace) - wlasny try; brak klucza = puste
+            try { string gr = dataStore.IsSaving ? CaptiveGrudge.Export() : null; SaveText.Sync(dataStore, "arm_grudge367d", ref gr); if (dataStore.IsLoading) CaptiveGrudge.Import(gr); }
+            catch (Exception e) { Log.Error("SyncData.arm_grudge367d", e); }
             // 314c: dni sluzby rodow w roku, wczorajszy zold krolewski (ciecie zwrotu), kolejka darow krola - wlasny try; brak klucza (stary zapis) = od zera
             try { string z314 = dataStore.IsSaving ? CrownWar314.Export() : null; SaveText.Sync(dataStore, "arm_zold314", ref z314); if (dataStore.IsLoading) CrownWar314.Import(z314); }
             catch (Exception e) { Log.Error("SyncData.arm_zold314", e); }
@@ -1889,6 +1894,10 @@ namespace Armoury
             CampaignEvents.WarDeclared.AddNonSerializedListener(this, MercTenure.OnWarDeclared);   // M6a-1: pole gry od wypowiedzenia wojny (nie od nastepnej doby)
             CampaignEvents.MakePeace.AddNonSerializedListener(this, MercTenure.OnMakePeace);       // M6a-1: wyjatek "pokoj" od zawarcia pokoju
             CampaignEvents.HeroPrisonerReleased.AddNonSerializedListener(this, RansomRepeat.OnReleased);
+            // 367d: uraza uwolnionego wladcy - uwolnienie (rokowania / zwykly okup jenca gracza), smierc (dziedziczenie), pokoj w wojnie z urazy
+            CampaignEvents.HeroPrisonerReleased.AddNonSerializedListener(this, CaptiveGrudge.OnReleased);
+            CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, CaptiveGrudge.OnKilled);
+            CampaignEvents.MakePeace.AddNonSerializedListener(this, CaptiveGrudge.OnPeace);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("PeaceHold.Hourly", delegate { try { PeaceHold.Hourly(); } catch (Exception e) { Log.Error("PeaceHold.Hourly", e); } }));
             // 264: diagnostyka wladcow wojny kanonu (probka godziny, bitwy) i proba autotestu (tylko DLL autotestu z flaga armoury-pokoj264.flag)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("CanonWarWatch.Hourly", delegate { try { CanonWarWatch.Hourly(); CanonPeaceLockTest.Hourly(); } catch (Exception e) { Log.Error("CanonWarWatch.Hourly", e); } }));
@@ -3202,6 +3211,7 @@ namespace Armoury
             try { MercTenure.Daily(); } catch (Exception e) { Log.Error("MercTenure.Daily", e); } DayProfile.Lap("MercTenure.Daily");
             try { PeaceHold.Daily(); } catch (Exception e) { Log.Error("PeaceHold.Daily", e); } DayProfile.Lap("PeaceHold.Daily");
             try { CanonPeaceLock.Daily(); } catch (Exception e) { Log.Error("CanonPeaceLock.Daily", e); } DayProfile.Lap("CanonPeaceLock.Daily");   // 264: linia "Pokoj kanonu (264)" i linie wladcow / krolestw wojny kanonu (tylko log)
+            try { CaptiveGrudge.Daily(); } catch (Exception e) { Log.Error("CaptiveGrudge.Daily", e); } DayProfile.Lap("CaptiveGrudge.Daily");   // 367d: wygasanie, dziedziczenie, wojna z urazy (bramki fabuly)
             try { ScaNoBandits320.Daily(); } catch (Exception e) { Log.Error("ScaNoBandits320.Daily", e); } DayProfile.Lap("ScaNoBandits320.Daily");   // 320b: linia "SCA bez band (320b)" (tylko log)
             try { VillageTaxToLand354.Daily(); } catch (Exception e) { Log.Error("VillageTaxToLand354.Daily", e); } DayProfile.Lap("VillageTaxToLand354.Daily");   // 354: linia "Wies dla trzymajacego (354)" (tylko log)
             try { KingdomStrengthField336.Daily(); } catch (Exception e) { Log.Error("KingdomStrengthField336.Daily", e); } DayProfile.Lap("KingdomStrengthField336.Daily");   // 336: linia "Sila krolestw w polu (336)" (tylko log)
