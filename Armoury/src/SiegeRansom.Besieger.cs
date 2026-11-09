@@ -39,7 +39,8 @@ namespace Armoury
         private static bool _besAsk, _besOpen;
         private static SiegeEvent _besEv;
         private static int _besFails;
-        private static int _dBesClick, _dBesShown, _dBesAcc, _dBesRef, _dBesFail, _dBesBlocked, _dBesAssaultBlocked;
+        private static int _dBesClick, _dBesShown, _dBesAcc, _dBesRef, _dBesFail, _dBesBlocked, _dBesAssaultBlocked, _dParleyNoLeader;
+        private static string _hookParley = "nie zakladana";
         private static string _hookOption = "nie dodana", _hookBesiege = "nie zakladana", _hookAssaultOpt = "nie zakladana";
 
         // regula dla opcji - pamiec na godzine gry (gra odswieza warunki menu oczekiwania co klatke)
@@ -242,6 +243,27 @@ namespace Armoury
             catch (Exception e) { Stumble("BesiegeCondPost", e); }
         }
 
+        // ------------------------------------------------------------ 384c: "Request a parley" bez wodza-bohatera
+        /// <summary>Prefiks EncounterGameMenuBehavior.game_menu_request_meeting_with_besiegers_on_condition. Gra bez sprawdzenia wola
+        /// LeaderParty(armii albo obozu).LeaderHero.CharacterObject - gdy wodz obozu siedzi w lochu gracza (373 przed 373b), NRE w kazdej klatce menu oblezenia.
+        /// Wtedy opcja ukryta (nie ma z kim rozmawiac), oryginal pominiety. W kazdym innym razie oryginal bez zmian. Nie rzuca.</summary>
+        public static bool ParleyCondPre(ref bool __result)
+        {
+            try
+            {
+                var st = Settlement.CurrentSettlement;
+                var camp = st?.SiegeEvent?.BesiegerCamp;
+                if (camp == null) return true;
+                var lp = camp.LeaderParty;
+                var mp = lp?.Army != null ? lp.Army.LeaderParty : lp;
+                if (mp != null && mp.LeaderHero != null) return true;
+                __result = false;
+                _dParleyNoLeader++;
+                return false;
+            }
+            catch (Exception e) { Stumble("ParleyCondPre", e); return true; }
+        }
+
         // ------------------------------------------------------------ szturm gracza po "Accept"
         /// <summary>Postfiks SiegeEventCampaignBehavior.game_menu_siege_strategies_lead_assault_on_condition i ..._order_assault_on_condition (recenzja 14.10): po
         /// przyjeciu okupu ("Accept", umowa w toku) "Lead an assault" i "Send troops" nieczynne z dymkiem - szturm miasta, ktore placi, zerwalby umowe (i tak
@@ -263,17 +285,18 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ doba i wpiecia
-        private static bool DayAnyBes { get { return _dBesClick + _dBesShown + _dBesAcc + _dBesRef + _dBesFail + _dBesBlocked + _dBesAssaultBlocked > 0; } }
+        private static bool DayAnyBes { get { return _dBesClick + _dBesShown + _dBesAcc + _dBesRef + _dBesFail + _dBesBlocked + _dBesAssaultBlocked + _dParleyNoLeader > 0; } }
 
         private static void DayPartBes(StringBuilder sb)
         {
             sb.Append(" | gracz-oblegajacy: opcja ").Append(_hookOption).Append(", klikniec ").Append(_dBesClick).Append(", okno ").Append(_dBesShown).Append(", przyjmij ").Append(_dBesAcc)
               .Append(", odmowa ").Append(_dBesRef).Append(", okno zamkniete bez wyboru ").Append(_dBesFail).Append("; rozejm gracza - oblezenie nieczynne ").Append(_dBesBlocked)
               .Append(" (latka ").Append(_hookBesiege).Append(')')
-              .Append("; szturm po Accept nieczynny (klatki menu) ").Append(_dBesAssaultBlocked).Append(" (latka ").Append(_hookAssaultOpt).Append(')');
+              .Append("; szturm po Accept nieczynny (klatki menu) ").Append(_dBesAssaultBlocked).Append(" (latka ").Append(_hookAssaultOpt).Append(')')
+              .Append("; 384c parley bez wodza-bohatera ukryte (klatki menu) ").Append(_dParleyNoLeader).Append(" (latka ").Append(_hookParley).Append(')');
         }
 
-        private static void ZeroDayBes() { _dBesClick = _dBesShown = _dBesAcc = _dBesRef = _dBesFail = _dBesBlocked = _dBesAssaultBlocked = 0; }
+        private static void ZeroDayBes() { _dBesClick = _dBesShown = _dBesAcc = _dBesRef = _dBesFail = _dBesBlocked = _dBesAssaultBlocked = _dParleyNoLeader = 0; }
 
         private static void ResetBes() { _besAsk = _besOpen = false; _besEv = null; _besFails = 0; _cEv = null; _cJ = null; _cHour = -1; _cValid = false; }
 
@@ -305,6 +328,18 @@ namespace Armoury
                 _hookAssaultOpt = wired == 2 ? "wpieta" : wired == 1 ? "wpieta czesciowo (1 z 2)" : "BRAK (warunki szturmu gry nie znalezione)";
             }
             catch (Exception e) { _hookAssaultOpt = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooksBes.Assault", e); }
+            try
+            {
+                var m = AccessTools.DeclaredMethod(typeof(EncounterGameMenuBehavior), "game_menu_request_meeting_with_besiegers_on_condition");
+                if (m == null) _hookParley = "BRAK (game_menu_request_meeting_with_besiegers_on_condition nie znaleziona)";
+                else
+                {
+                    Seal31.Patch("384c: parley bez wodza-bohatera (EncounterGameMenuBehavior.game_menu_request_meeting_with_besiegers_on_condition)", m, typeof(SiegeRansom), nameof(ParleyCondPre), null, null,
+                                 Priority.First);
+                    _hookParley = "wpieta";
+                }
+            }
+            catch (Exception e) { _hookParley = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooksBes.Parley", e); }
         }
     }
 }
