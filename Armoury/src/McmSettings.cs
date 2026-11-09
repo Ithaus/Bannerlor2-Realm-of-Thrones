@@ -832,6 +832,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool NightPromptSkipWhenRested { get; set; } = true;
 
+        [SettingPropertyBool("Siege Armoury Access", HintText = "inside a besieged town or castle (you stay within the walls - the siege menu replaces the town or castle menu) the siege menu offers 'View Army Armory' (the troop armoury of Dynamic Troop Equipment, the same window as in a town) and, in your own towns and castles, 'Hand kit to the garrison' - the same windows and rules as usual; off = no armoury while besieged, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SiegeArmouryAccess { get; set; } = true;
+
         [SettingPropertyBool("Garrison Kit Menu", HintText = "'Hand kit to the garrison' in the menu of your towns and castles: drop kit on the garrison - they take what fills empty hands or beats their own and give you their worse pieces back; the rest comes back to you", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonKitMenu { get; set; } = true;
@@ -12023,6 +12027,7 @@ namespace Armoury
             s.GearFitRealmFootInHideoutSiege = GearFitRealmFootInHideoutSiege;
             s.GearFitSkillLawFootInHideoutSiege = GearFitSkillLawFootInHideoutSiege;
             s.NightPromptSkipWhenRested = NightPromptSkipWhenRested;
+            s.SiegeArmouryAccess = SiegeArmouryAccess;
             s.GarrisonKitMenu = GarrisonKitMenu;
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;
             s.GarrisonFightsWithArmoryOnly = GarrisonFightsWithArmoryOnly;

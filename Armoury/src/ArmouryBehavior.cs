@@ -1718,6 +1718,8 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, ShortLabels.Audit);
             // O3: opcja "Demand a ransom" w menu oblezenia gry - po wszystkich OnSessionLaunched (menu gry juz jest; wstawiona przed "Leave")
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
+            // 375: zbrojownia wojska (DTE) i kit dla zalogi w menu oblezonej twierdzy (gracz w srodku) - przed "Leave"; tylko ekran, bez przelaczania menu
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeArmoury.AddMenus);
             // m109-list: zadania przyjetych listow z arm_board (po QuestManager.OnGameLoaded); dopisane PRZED AddMenus - gra wola je PO nim (linia m109 za liniami m102)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.BountySessionStart(); NoticeBoard.BandMarkersOff(); NoticeBoard.BandMarkersSync("start sesji"); } catch (Exception e) { Log.Error("NoticeBoard.BountySessionStart", e); } });
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.AddMenus(s); } catch (Exception e) { Log.Error("NoticeBoard.AddMenus", e); } });   // m102-tablica: "Read the notice board" w menu miasta - po wszystkich OnSessionLaunched (opcje gry "town" juz stoja; miejsce za karczma)

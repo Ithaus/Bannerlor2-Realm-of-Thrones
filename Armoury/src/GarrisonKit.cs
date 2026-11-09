@@ -129,7 +129,7 @@ namespace Armoury
 
         private static string _hintKey, _hint;
 
-        private static bool Condition(MenuCallbackArgs args)
+        internal static bool Condition(MenuCallbackArgs args)   // 375: wolana tez z menu oblezenia (SiegeArmoury)
         {
             try
             {
@@ -155,7 +155,7 @@ namespace Armoury
             catch { return false; }
         }
 
-        private static void Consequence(MenuCallbackArgs args)
+        internal static void Consequence(MenuCallbackArgs args)   // 375: wolana tez z menu oblezenia (SiegeArmoury)
         {
             try
             {
