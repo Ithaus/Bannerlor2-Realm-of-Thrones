@@ -844,6 +844,7 @@ namespace Armoury
                 starter.AddBehavior(new BookHoldingsBehavior());    // f19-kanon-b: jednorazowe przywrocenie wlosci z ksiazki (flaga arm_book_holdings w zapisie)
                 starter.AddBehavior(new NavalRealmsBehavior());     // 326a: floty wedlug krolestw - nadmiar statkow do portow, linia "Floty krolestw (326a)"
                 starter.AddBehavior(new NorthConquestBehavior());   // 326b: zwrot zdobyczy Polnocy spoza jej ziem (zapis arm_k326b)
+                starter.AddBehavior(new PlayerClaims369Behavior());  // 369: roszczenia gracza do twierdz zdobytych na jego rodzie (zapis arm_k369), naprawa Ashemark
                 starter.AddBehavior(new WarFront334Behavior());     // 334: balans wojny korona-Polnoc z Zelaznymi (zapis arm_f334, zdarzenia, start sesji)
                 starter.AddBehavior(new CanonCompanionsBehavior()); // m101-postacie: postacie kanonu do rodow, usuniete, zmiany stron (flaga arm_canon_companions, tylko nowa kampania)
                 starter.AddBehavior(new PrologueBehavior());        // m101-prolog: wybor startu w zapisie (arm_prologue), zdarzenia prologu 298

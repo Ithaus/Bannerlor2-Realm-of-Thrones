@@ -44,6 +44,9 @@ namespace Armoury
     ///    (BastardsSiegeEvent 2), nie tylko po FightsOnEnd;
     ///  - najwyzej 3 zwroty na dobe (spis po wczytaniu rozlozony), obsada zalogi tylko od partii krolestwa odbiorcy w promieniu 80 od bramy;
     ///  - czekanie najwyzej 30 dob na osade (potem z kolejki z linia); klucz wlaczony ponownie w tej samej grze - spis jeszcze raz.
+    /// 369 (Jeff 09.11: "czemu regula ma oddawac ten zamek polnoc go zdobyla i nalezy do polnocy musze go odbic"): twierdza zdobyta przez Polnoc NA RODZIE GRACZA
+    /// (albo z roszczeniem gracza PlayerClaims369) nie jest nikomu oddawana - zostaje u zdobywcy; zapamietany rod, ktoremu zabrano (_takenFrom, zapis nc3).
+    /// Blad 326b: Ashemark kupiony przez gracza (367b), zdobyty przez Polnoc, oddany Marbrandom (pan startowy) - Jeff stracil go dwa razy.
     /// </summary>
     internal static class NorthConquest
     {
@@ -80,6 +83,8 @@ namespace Armoury
         private static readonly Dictionary<string, int> _queue = new Dictionary<string, int>(StringComparer.Ordinal);   // osada -> GODZINA zdobycia (spis: teraz - 24)
         private static int _total;                                                              // zwroconych od paczki
         private static readonly Dictionary<string, int> _veto = new Dictionary<string, int>(StringComparer.Ordinal);    // osada -> godzina konca weta Polnocy
+        // 369: osada w kolejce -> rod, ktoremu Polnoc ja zabrala (zdobycie BySiege); zabrana rodowi gracza - nikomu nie oddajemy (roszczenie gracza, PlayerClaims369)
+        private static readonly Dictionary<string, string> _takenFrom = new Dictionary<string, string>(StringComparer.Ordinal);
 
         // ---- sesja
         private static readonly Dictionary<string, int> _err = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -98,7 +103,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _init = ""; _queue.Clear(); _total = 0; _veto.Clear();
+            _init = ""; _queue.Clear(); _total = 0; _veto.Clear(); _takenFrom.Clear();
             _err.Clear(); _errSites.Clear(); _stumbles = 0; _today = 0; _todayDay = -1; _waitDay = -1; _sumDay = -1; _waitText = null;
             _todayDone.Clear(); _todaySkip.Clear(); _lastWaits = "";
             _wasOff = false; _notCanonLogged = false; _vSiege = _vRaid = _vBk = _vExpired = 0; _vSayDay = -1; _vSaid.Clear();
@@ -128,10 +133,13 @@ namespace Armoury
         internal static string Export()
         {
             var sb = new StringBuilder(128);
-            sb.Append("nc2|").Append(_init).Append('|');
+            sb.Append("nc3|").Append(_init).Append('|');
             Map(sb, _queue);
             sb.Append('|').Append(_total.ToString(Inv)).Append('|');
             Map(sb, _veto);
+            sb.Append('|');   // 369: rod, ktoremu zabrano (id rodu bez '=' ';' '|')
+            bool first = true;
+            foreach (var kv in _takenFrom) { if (!first) sb.Append(';'); first = false; sb.Append(kv.Key).Append('=').Append(kv.Value); }
             return sb.ToString();
         }
 
@@ -158,17 +166,31 @@ namespace Armoury
             try
             {
                 var p = v.Split('|');
-                bool v1 = p.Length >= 4 && p[0] == "nc1", v2 = p.Length >= 5 && p[0] == "nc2";
+                bool v1 = p.Length >= 4 && p[0] == "nc1", v3 = p.Length >= 6 && p[0] == "nc3", v2 = v3 || (p.Length >= 5 && p[0] == "nc2");
                 if (!v1 && !v2) { _init = "done"; Log.Info(Tag + "zapis w nieznanym formacie - spis uznany za zrobiony, kolejka pusta."); return; }
                 _init = p[1] == "done" ? "done" : "";
                 ReadMap(p[2], _queue, v1 ? 24 : 1);   // nc1 - doby, nc2 - godziny
                 int t; _total = int.TryParse(p[3], NumberStyles.Integer, Inv, out t) ? t : 0;
                 if (v2) ReadMap(p[4], _veto, 1);
+                if (v3 && p[5].Length > 0)
+                    foreach (var e in p[5].Split(';')) { int i = e.IndexOf('='); if (i > 0 && i < e.Length - 1) _takenFrom[e.Substring(0, i)] = e.Substring(i + 1); }
             }
             catch (Exception e) { _init = "done"; Stumble("Import", e); }
         }
 
         internal static void SetHarmony(Harmony h) { _harmony = h; }
+
+        /// <summary>369: weto 326b na te osade (jednorazowa naprawa zapisu - slad zwrotu 326b). Tylko odczyt.</summary>
+        internal static bool HasVeto(string id) { return id != null && _veto.ContainsKey(id); }
+
+        /// <summary>369: zdejmij weto 326b i wpis kolejki (osada wrocila do Polnocy - weto zbedne). Opis do linii logu.</summary>
+        internal static string DropVeto(string id)
+        {
+            if (id == null) return "-";
+            bool v = _veto.Remove(id), q = _queue.Remove(id);
+            _takenFrom.Remove(id);
+            return "weto 326b " + (v ? "zdjete" : "brak") + (q ? ", z kolejki 326b" : "");
+        }
 
         internal static void SessionStart()
         {
@@ -335,11 +357,15 @@ namespace Armoury
                 if (!Candidate(st, out origId, out origK)) return;
                 int hour = NowHour;
                 if (!_queue.ContainsKey(st.StringId)) _queue[st.StringId] = hour;
+                var tc = oldOwner != null ? oldOwner.Clan : null;
+                if (tc != null) _takenFrom[st.StringId] = tc.StringId; else _takenFrom.Remove(st.StringId);
+                bool fromPlayer = tc != null && tc == Clan.PlayerClan;
                 int vu;
                 bool vetoed = _veto.TryGetValue(st.StringId, out vu) && vu > hour;
                 Log.Info(Tag + "dzien " + (hour / 24) + " | " + Nm(st) + " [" + st.StringId + "] zdobyta przez " + (newOwner != null && newOwner.Clan != null ? newOwner.Clan.Name.ToString() : "-")
                          + " (Polnoc) od " + (oldOwner != null && oldOwner.Clan != null ? oldOwner.Clan.Name.ToString() : "-") + " | pierwotnie " + origId + " (" + origK + ")"
-                         + " | do kolejki - zwrot najwczesniej za " + MinHours + " godzin, gdy przy osadzie spokoj (lup oblezenia zostaje u zdobywcow)"
+                         + (fromPlayer ? " | zabrana RODOWI GRACZA - nikomu nie oddajemy, zostaje u zdobywcy (369: roszczenie gracza)"
+                                       : " | do kolejki - zwrot najwczesniej za " + MinHours + " godzin, gdy przy osadzie spokoj (lup oblezenia zostaje u zdobywcow)")
                          + (vetoed ? " | ZDOBYTA MIMO WETA (do dnia " + (vu / 24) + ") - droga spoza mysli AI i BK (gracz w armii, inny mod)" : "") + ".");
             }
             catch (Exception e) { Stumble("OnOwnerChanged", e); }
@@ -389,7 +415,7 @@ namespace Armoury
                              + (list.Count > 0 ? " [" + string.Join("; ", list.ToArray()) + "]" : "") + " | dane ROT: " + KingInTheNorth.OrigDataText()
                              + " | wyjatki: Harrenhal (Boltonowie dla Robba), Red Keep (z King's Landing), Skagos i Wolni Ludzie | zwroty najwyzej " + MaxPerDay + " na dobe.");
                 }
-                if (_queue.Count == 0) return;
+                if (_queue.Count == 0) { _takenFrom.Clear(); return; }
 
                 var waits = new List<string>();
                 var msg = new List<string>();
@@ -403,6 +429,16 @@ namespace Armoury
                         string origId, origK;
                         if (st == null || !Candidate(st, out origId, out origK))
                         { _queue.Remove(id); _todaySkip.Add(id + " (juz nie u Polnocy albo poza regula)"); continue; }
+                        // 369 (Jeff 09.11: "polnoc go zdobyla i nalezy do polnocy musze go odbic"): twierdza zdobyta na rodzie gracza (albo z roszczeniem gracza) - nikomu jej nie oddajemy
+                        string tf;
+                        bool takenPlayer = _takenFrom.TryGetValue(id, out tf) && Clan.PlayerClan != null && tf == Clan.PlayerClan.StringId;
+                        if (takenPlayer || PlayerClaims369.Has(id))
+                        {
+                            _queue.Remove(id); _todaySkip.Add(Nm(st) + " (zdobyta na rodzie gracza - zostaje u zdobywcy)");
+                            Log.Info(Tag + "dzien " + day + " | " + Nm(st) + " [" + id + "] zostaje u " + Nm(st.OwnerClan) + ": " + (takenPlayer ? "zdobyta na rodzie gracza" : "roszczenie gracza (369)")
+                                     + " - bez zwrotu rodowi pierwotnemu " + origId + "; gracz musi ja odbic (369).");
+                            continue;
+                        }
                         int waited = hour - _queue[id];
                         if (waited < MinHours) { waits.Add(Nm(st) + ": swiezo zdobyta"); continue; }
                         if (waited >= (GiveUpDays + MinDays) * 24)
@@ -448,6 +484,7 @@ namespace Armoury
                     }
                 }
                 _lastWaits = string.Join("; ", waits.ToArray());
+                foreach (var k in _takenFrom.Keys.ToList()) if (!_queue.ContainsKey(k)) _takenFrom.Remove(k);   // 369: slad tylko dla osad w kolejce
                 if (msg.Count > 0)
                 {
                     try { Log.Player("The North gives back what it took beyond its own lands: " + string.Join(", ", msg.ToArray()) + "."); } catch { }

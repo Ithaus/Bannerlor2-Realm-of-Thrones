@@ -273,7 +273,10 @@ namespace Armoury
             foreach (var st in Settlement.All)
             {
                 string oc;
-                if (CedeCandidate(st, n, out oc)) { list.Add(st); orig[st] = oc; }
+                if (!CedeCandidate(st, n, out oc)) continue;
+                // 369: twierdza zdobyta przez Polnoc na rodzie gracza (roszczenie gracza) - nie idzie panu startowemu; gracz musi ja odbic
+                if (PlayerClaims369.Has(st.StringId)) { Info("cesja " + st.Name + " - roszczenie gracza (369: zdobyta na rodzie gracza), zostaje u Polnocy."); continue; }
+                list.Add(st); orig[st] = oc;
             }
             var done = new List<string>();
             int wait = 0;
@@ -323,6 +326,7 @@ namespace Armoury
                     var st = f.Length >= 3 ? Settlement.Find(f[0]) : null;
                     int since = f.Length >= 3 ? I(f[2], day) : day;
                     if (st == null || st.MapFaction != n) { Info("cesja " + (st != null ? st.Name.ToString() : f[0]) + " - juz nie Polnocy, wypada z kolejki."); _cession.RemoveAt(i); continue; }
+                    if (PlayerClaims369.Has(st.StringId)) { Info("cesja " + st.Name + " - roszczenie gracza (369), wypada z kolejki - zostaje u Polnocy."); _cession.RemoveAt(i); continue; }
                     if (day - since > CessionMaxDays) { Info("cesja " + st.Name + " - " + CessionMaxDays + " dob bez warunkow, porzucona."); _cession.RemoveAt(i); continue; }
                     var to = Clan.FindFirst(x => x != null && x.StringId == f[1]);
                     if (to == null || to.IsEliminated || to.Kingdom != c) to = c.RulingClan;
