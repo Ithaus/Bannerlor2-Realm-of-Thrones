@@ -71,8 +71,8 @@ namespace Armoury
     ///    RescueHuntHostDays, RescueHuntRulerSearchDays, RescueHuntHostKeepsTarget). Dotad przy jencu-wladcy wodzem lowow byl sam jeniec (want = K.Leader odrzucony),
     ///    zastepca tylko z rodu panujacego - Tywin (inny rod) nigdy; armii nie bylo. Teraz, gdy jencem jest SAM wladca i lowcy sa za slabi, armie zwoluje REGENT
     ///    sposrod kandydatow lowow (w zasiegu, wiedza, bez armii, nie najem, nie dziecko, nie wstrzymani 223): (1) najstarszy dorosly rodu panujacego, (2) glowa rodu
-    ///    z rodziny wladcy (krewny Kin wladcy, jego ojca, matki albo malzonka - dziadkowie, wujowie, tesc), najsilniejsza, (3) najsilniejsza glowa rodu, (4) najsilniejszy
-    ///    lord; przy rownej randze zostaje dotychczasowy regent. Dopiero RescueHuntHostDays dob po wiesci u regenta (okup mial czas; zawarty okup/umowa konczy lowy
+    ///    z rodziny wladcy (krewny Kin wladcy, jego ojca, matki albo malzonka - dziadkowie, wujowie, tesc), najsilniejsza, (3) glowa najmozniejszego rodu (Clan.Tier; korona ROT: Tywin), (4) najsilniejszy
+    ///    lord; przy rownej randze zostaje dotychczasowy regent; tylko komu gra da armie (wplyw > 100, MayLead 342), 36 h ofert bez armii - odsuniety na 72 h. Dopiero RescueHuntHostDays dob po wiesci u regenta (okup mial czas; zawarty okup/umowa konczy lowy
     ///    w OnReleased) - wczesniej tryb "za slabi - regent czeka". Zbiorka przy twierdzy krolestwa najblizszej sladu (loch: najblizszej lochu - takze dla lochu,
     ///    dotad tylko "loch - za slabi"). Armie zaklada gra (CanLordCreateArmy z regula i kolejka rodu 342, budzet i koszt wplywu gry - placi rod regenta). Potem
     ///    armia to jeden kandydat z sila calej armii (Contrib): poscig / szukanie / oblezenie lochu jak dotad; uwolnienie robi gra (ApplyByReleasedAfterBattle po
@@ -87,6 +87,8 @@ namespace Armoury
         internal const string P = "Odbicie (222): ";
         internal const string P376 = "Odbicie (222/376): ";
         private const string MRegentWait = "za slabi - regent czeka", MHost = "armia regenta";
+        // 376 (recenzja): po tylu godzinach ofert bez armii regent odsuniety na RegentBarH, wybor przechodzi do nastepnego (gra mysli o armii co kilka godzin)
+        private const double RegentFailH = 36.0, RegentBarH = 72.0;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         // liczby z modeli gry i moda (opis w naglowku) - zadnej nowej stalej rozgrywki
@@ -155,6 +157,8 @@ namespace Armoury
             // 376: regent (zapis pole 25 razem z HostH - godzina zwolania armii, -1 = brak armii); armia i opisy - sesja (po wczytaniu z druzyny regenta, SyncHost)
             public Hero Regent; public double HostH = -1.0;
             public Army HostArmy; public string RegentWhy = "", HostLog = "";
+            // 376 (recenzja): regent, ktoremu gra nie dala armii mimo oferty przez RegentFailH - odsuniety do godziny (sesja); OfferSinceH - pierwsza godzina oferty obecnego regenta
+            public readonly Dictionary<Hero, double> RegentBar = new Dictionary<Hero, double>(); public double OfferSinceH = -1.0;
             public Vec2 Seat { get { return new Vec2(SX, SY); } }
         }
 
@@ -747,7 +751,7 @@ namespace Armoury
             {
                 // 376: armia ratunkowa regenta - koszt wplywu policzyla i pobrala gra (CreateArmy) z rodu wodza
                 var t = o.H; var lh = a.LeaderParty.LeaderHero;
-                t.HostArmy = a; t.HostH = NowH; t.Regent = lh; t.HostLog = ""; _dHostCalled++;
+                t.HostArmy = a; t.HostH = NowH; t.Regent = lh; t.HostLog = ""; t.OfferSinceH = -1.0; _dHostCalled++;
                 int n = 0; try { n = a.Parties.Count; } catch { }
                 Log.Info(P376 + "armia ratunkowa zwolana | " + When() + " | " + Nm(t.Captive) + " (wladca " + Nm(t.K) + ") | regent " + Nm(lh) + " rodu " + Nm(lh != null ? lh.Clan : null)
                          + " (" + t.RegentWhy + ") | zbiorka " + Nm(o.Fort) + " | druzyn w armii " + n + ", sila z wezwanymi " + F0(Contrib(a.LeaderParty)) + " / potrzeba " + F0(o.Need)
@@ -1248,11 +1252,12 @@ namespace Armoury
                 string wait = null;
                 // 376: jencem jest sam wladca - armie zwoluje regent (dotad want = jeniec, zastepca tylko z rodu panujacego), po HostDays dobach od wiesci u niego
                 bool host = HostOn && t.Tier == TThree && t.Captive == t.K.Leader;
-                if (host && t.HostArmy != null) wait = "za slabi - armia regenta zbiera sile";   // 376: armia juz jest - bez drugiej (sila calej armii w Contrib wodza)
+                // 376: armia ratunkowa juz jest - bez drugiej (sila calej armii w Contrib wodza); recenzja: przed obiema galeziami (zmiana wladcy w trakcie niewoli)
+                if (t.HostArmy != null) wait = "za slabi - armia regenta zbiera sile";
                 else if (host)
                 {
-                    string why;
-                    lead = PickRegent(t, out why);
+                    string why, rskip;
+                    lead = PickRegent(t, out why, out rskip);
                     if (lead == null) wait = x != null ? "loch - za slabi" : "za slabi - czekaja";
                     else
                     {
@@ -1262,12 +1267,22 @@ namespace Armoury
                         double left = HostDays * 24.0 - (now - heardR);
                         if (rh != t.Regent || why != t.RegentWhy)
                         {
-                            t.Regent = rh; t.RegentWhy = why;
-                            Log.Info(P376 + "regent | " + When() + " | " + Nm(t.Captive) + " (wladca " + Nm(t.K) + ") w niewoli | regent " + Nm(rh) + " rodu " + Nm(rh.Clan) + " (" + why + ")"
+                            t.Regent = rh; t.RegentWhy = why; t.OfferSinceH = -1.0;
+                            Log.Info(P376 + "regent | " + When() + " | " + Nm(t.Captive) + " (wladca " + Nm(t.K) + ") w niewoli | regent " + Nm(rh) + " rodu " + Nm(rh.Clan) + " (" + why + ")" + rskip
                                      + " | wplyw rodu " + F0(rh.Clan != null ? rh.Clan.Influence : 0f) + " | sila " + F0(lead.Str) + " | lowcow " + _cands.Count + " sila " + F0(total) + " / potrzeba " + F0(need)
                                      + " | wiesc u regenta " + F0(now - heardR) + " h temu | armia ratunkowa " + (left > 0 ? "za " + F0(left) + " h" : "teraz") + " (Rescue Hunt Host Days " + HostDays + ").");
                         }
-                        if (left > 0) { wait = MRegentWait; lead = null; }
+                        if (left > 0) { wait = MRegentWait; lead = null; t.OfferSinceH = -1.0; }
+                        else if (t.OfferSinceH < 0) t.OfferSinceH = now;
+                        else if (now - t.OfferSinceH > RegentFailH)
+                        {
+                            // 376 (recenzja): gra nie dala regentowi armii (brak czlonkow, sila, jedzenie, kolejka 342) - odsuniety, nastepna ranga od nastepnej godziny
+                            t.RegentBar[rh] = now + RegentBarH;
+                            Log.Info(P376 + "regent odsuniety | " + When() + " | " + Nm(t.Captive) + " | " + Nm(rh) + " rodu " + Nm(rh.Clan) + " (" + why + ") - " + F0(now - t.OfferSinceH)
+                                     + " h ofert armii bez armii od gry | wplyw rodu " + F0(rh.Clan != null ? rh.Clan.Influence : 0f) + " | na " + F0(RegentBarH) + " h, wybor przechodzi dalej.");
+                            t.Regent = null; t.RegentWhy = ""; t.OfferSinceH = -1.0;
+                            wait = MRegentWait; lead = null;
+                        }
                     }
                 }
                 else
@@ -1387,27 +1402,36 @@ namespace Armoury
             }
         }
 
-        /// <summary>376: regent sposrod kandydatow lowow (bez armii, nie najem, nie dziecko, nie jeniec): ranga 1 - rod panujacy (najstarszy dorosly), 2 - glowa rodu
-        /// z rodziny wladcy (KinWide; najsilniejsza), 3 - najsilniejsza glowa rodu, 4 - najsilniejszy lord. Rowna ranga - zostaje dotychczasowy regent. null - brak.</summary>
-        private static Cand PickRegent(Hunt t, out string why)
+        /// <summary>376: regent sposrod kandydatow lowow (bez armii, nie najem, nie dziecko, nie jeniec), tylko ten, komu gra pozwoli zalozyc armie
+        /// (AnyLordArmy342.MayLead: glowa rodu, pierwsza druzyna rodu bez glowy w polu albo regula 342 z limitem wplywu; wplyw rodu > 100 jak w CanLordCreateArmy)
+        /// i nie odsuniety (RegentBar): ranga 1 - rod panujacy (najstarszy dorosly), 2 - glowa rodu z rodziny wladcy (KinWide; najsilniejsza), 3 - glowa rodu
+        /// najmozniejszego (Clan.Tier, potem sila; korona ROT: Tywin - w ROT_heroes.xml Cersei bez ojca, wiec nie ranga 2), 4 - najsilniejszy lord.
+        /// Rowna ranga - zostaje dotychczasowy regent. null - brak. skip - pominieci (do linii regent).</summary>
+        private static Cand PickRegent(Hunt t, out string why, out string skip)
         {
-            why = "";
+            why = ""; skip = "";
             var ruler = t.Captive; var rc = t.K.RulingClan;
+            double now = NowH;
             Cand best = null; int br = 99; float bk = 0f; bool bCur = false;
+            int nBar = 0, nLead = 0;
             foreach (var cd in _cands)
             {
                 var h = cd.Mp.LeaderHero; var c = h != null ? h.Clan : null;
                 if (cd.Mp.Army != null || h == null || h == ruler || c == null || h.IsChild || c.IsUnderMercenaryService) continue;
+                double until;
+                if (t.RegentBar.TryGetValue(h, out until)) { if (until > now) { nBar++; continue; } t.RegentBar.Remove(h); }
+                if (!(c.Influence > 100f) || !AnyLordArmy342.MayLead(cd.Mp)) { nLead++; continue; }
                 int r; float k;
                 if (c == rc) { r = 1; k = h.Age; }
                 else if (c.Leader == h && KinWide(h, ruler)) { r = 2; k = cd.Str; }
-                else if (c.Leader == h) { r = 3; k = cd.Str; }
+                else if (c.Leader == h) { r = 3; k = c.Tier * 1000000f + cd.Str; }
                 else { r = 4; k = cd.Str; }
                 bool cur = h == t.Regent;
                 if (best == null || r < br || (r == br && (cur && !bCur || (cur == bCur && k > bk)))) { best = cd; br = r; bk = k; bCur = cur; }
             }
             if (best != null)
-                why = br == 1 ? "rod panujacy - najstarszy dorosly" : br == 2 ? "rodzina wladcy - glowa rodu" : br == 3 ? "najsilniejsza glowa rodu w zasiegu" : "najsilniejszy lord w zasiegu";
+                why = br == 1 ? "rod panujacy - najstarszy dorosly" : br == 2 ? "rodzina wladcy - glowa rodu" : br == 3 ? "najmozniejsza glowa rodu w zasiegu (tier rodu)" : "najsilniejszy lord w zasiegu";
+            if (nBar > 0 || nLead > 0) skip = " | pominieci: odsunieci " + nBar + ", gra nie da armii (wplyw/prawo wodza) " + nLead;
             return best;
         }
 
