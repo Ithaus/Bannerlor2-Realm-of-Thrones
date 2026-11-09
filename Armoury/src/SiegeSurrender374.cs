@@ -68,6 +68,7 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static volatile bool _ceding;   // okno SiegeCompleted przy dotrzymanym slowie (PlayerClaims369 - bez roszczenia)
         private static string _cededSt;
+        private static string _yieldSt;          // okno SiegeCompleted 374 (oba skutki) - BesiegedRelief: wynik "ZDOBYTE" bez znacznika bitwy
 
         // stan rozmowy
         private static Hero _talk;
@@ -78,7 +79,7 @@ namespace Armoury
         internal static void Reset()
         {
             _recs.Clear(); _cool.Clear(); _liars.Clear(); _queue.Clear(); _offer = null; _armed = false; _stumbles = 0; _err.Clear();
-            _ceding = false; _cededSt = null; ClearTalk();
+            _ceding = false; _cededSt = null; _yieldSt = null; ClearTalk();
         }
 
         private static void ClearTalk() { _talk = null; _st = null; _sc = null; _accepted = false; }
@@ -97,6 +98,46 @@ namespace Armoury
 
         /// <summary>PlayerClaims369: czy ta zmiana pana to cesja pod przysiega (bez roszczenia). Tylko w trakcie SiegeCompleted przy dotrzymanym slowie.</summary>
         internal static bool Ceded(Settlement st) { return _ceding && st != null && st.StringId == _cededSt; }
+
+        /// <summary>BesiegedRelief: oblezenie zwijane przez SiegeCompleted 374 (oddanie albo zdrada) - twierdza przechodzi do oblegajacych bez bitwy.</summary>
+        internal static bool Yielding(Settlement st) { return _yieldSt != null && st != null && st.StringId == _yieldSt; }
+
+        /// <summary>Recenzja 374: oferta czeka TYLKO na menu arm374_yield. Jesli menu nie jest czynne (inny mod/gra przelaczyly menu po misji,
+        /// zapis spoza menu), po 0.1 doby albo po koncu tego oblezenia oferta przepada - inaczej AskCond ukrylby linie we wszystkich oblezeniach.</summary>
+        private static void ExpireOffer()
+        {
+            var o = _offer;
+            if (o == null) return;
+            try
+            {
+                if (Mission.Current != null) return;
+                var cm = Campaign.Current != null ? Campaign.Current.ConversationManager : null;
+                if (cm != null && (cm.IsConversationInProgress || cm.IsConversationFlowActive)) return;
+                var ctx = Campaign.Current != null ? Campaign.Current.CurrentMenuContext : null;
+                string menu = ctx != null && ctx.GameMenu != null ? ctx.GameMenu.StringId : null;
+                if (menu == MenuId) return;
+                var st = Settlement.Find(o.St);
+                bool siegeGone = st == null || st.SiegeEvent == null || Math.Abs(st.SiegeEvent.SiegeStartTime.ToHours - o.Start) > 0.05;
+                double age = Today - o.Day;
+                if (!siegeGone && age <= 0.1) return;
+                _offer = null;
+                Log.Info(Tag + ": dzien " + F(Today) + " | " + (st != null ? Name(st) : o.St) + " - oferta PRZEPADLA (menu " + MenuId + " nie otwarte; czynne menu " + (menu ?? "-")
+                         + ", " + (siegeGone ? "oblezenie skonczone" : "minelo " + F(age) + " d") + ").");
+            }
+            catch (Exception e) { Stumble("ExpireOffer", e); }
+        }
+
+        /// <summary>Recenzja 374: bitwa przy osadzie albo przy obozie (szturm, odsiecz pod murami, wypad) - SiegeCompleted nie moze ruszac partii w bitwie.</summary>
+        private static bool CampBusy(Settlement st)
+        {
+            if (st == null) return false;
+            if (st.Party != null && st.Party.MapEvent != null) return true;
+            var ev = st.SiegeEvent;
+            if (ev == null || ev.BesiegerCamp == null) return false;
+            foreach (var pb in ev.BesiegerCamp.GetInvolvedPartiesForEventType())
+                if (pb != null && pb.MapEvent != null) return true;
+            return false;
+        }
 
         // ------------------------------------------------------------ rozmowa
         internal static void AddDialogs(CampaignGameStarter starter)
@@ -169,7 +210,9 @@ namespace Armoury
         {
             try
             {
-                if (!On || _offer != null) return false;
+                if (!On) return false;
+                ExpireOffer();
+                if (_offer != null) return false;
                 var h = Hero.OneToOneConversationHero;
                 var me = Hero.MainHero;
                 var mp = MobileParty.MainParty;
@@ -199,7 +242,7 @@ namespace Armoury
                 var h = Hero.OneToOneConversationHero;
                 var st = MobileParty.MainParty != null ? MobileParty.MainParty.CurrentSettlement : null;
                 double cl = CoolLeft(st, h);
-                if (cl > 0) { why = new TextObject("{=!}He has refused you already. You may ask again in " + Math.Ceiling(cl).ToString(Inv) + " days."); return false; }
+                if (cl > 0) { int n = (int)Math.Ceiling(cl); why = new TextObject("{=!}He has refused you already. You may ask again in " + (n <= 1 ? "1 day." : n.ToString(Inv) + " days.")); return false; }
                 return true;
             }
             catch (Exception e) { Stumble("AskClick", e); return true; }
@@ -348,7 +391,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ ocena zgody
-        private sealed class Score { public double Total; public string Parts = "-"; public char Why = 'T'; public int Held, Lost; public double Days, Camp, Walls, Food; }
+        private sealed class Score { public double Total; public string Parts = "-"; public char Why = 'T'; public int Held, Lost, MenCamp, MenIn; public double Days, Camp, Walls, Food; }
 
         private static int Trait(Hero h, TraitObject t) { try { return t != null ? h.GetTraitLevel(t) : 0; } catch { return 0; } }
 
@@ -388,6 +431,13 @@ namespace Armoury
             double camp, walls; Strength(st, out camp, out walls);
             int menIn = 0;
             foreach (var mp in st.Parties) if (mp != null && mp.MemberRoster != null && (mp.IsGarrison || mp.IsLordParty || mp.IsMainParty || mp.IsMilitia)) menIn += mp.MemberRoster.TotalManCount;
+            int menCamp = 0;
+            try
+            {
+                if (ev != null && ev.BesiegerCamp != null)
+                    foreach (var pb in ev.BesiegerCamp.GetInvolvedPartiesForEventType()) if (pb != null && pb.MemberRoster != null) menCamp += pb.MemberRoster.TotalManCount;
+            }
+            catch { }
             double days = ev != null ? Math.Max(0, ev.SiegeStartTime.ElapsedDaysUntilNow) : 0;
             double food = 999;
             try { float ch = st.Town.FoodChange; if (ch < 0) food = st.Town.FoodStocks / -ch; } catch { }
@@ -411,8 +461,9 @@ namespace Armoury
             double Tw = st.IsTown ? -5 : 0;
             sc.Total = baseV + A + B + T + S + Fd + Rl + Hn + Cc + Mc + Vl + Lr + Ch + Pr + Tw;
             // glowny powod odmowy: przewaga sil / okrutny albo dumny / reszta
-            if (S <= -15) sc.Why = 'S'; else if (mercy < 0 || valor > 0) sc.Why = 'C'; else sc.Why = 'T';
-            sc.Held = held; sc.Lost = lost; sc.Days = days; sc.Camp = camp; sc.Walls = walls; sc.Food = food;
+            // 'S' tylko gdy bez czlonu sil tez bylaby odmowa (recenzja: "po co mi uklady" przy wyniku tuz pod zerem przeczylo obietnicy przerwy)
+            if (S <= -15 && sc.Total - S <= 0) sc.Why = 'S'; else if (mercy < 0 || valor > 0) sc.Why = 'C'; else sc.Why = 'T';
+            sc.Held = held; sc.Lost = lost; sc.MenCamp = menCamp; sc.MenIn = menIn; sc.Days = days; sc.Camp = camp; sc.Walls = walls; sc.Food = food;
             sc.Parts = "podstawa " + F(baseV) + ", szturmy " + F(A) + " (" + held + "), krew " + F(B) + " (" + lost + "/" + (2 * menIn) + "), czas " + F(T) + " (" + F(days) + " d)"
                      + ", sily " + F(S) + " (R " + R.ToString("0.0", Inv) + "), jedzenie " + F(Fd) + " (" + (food >= 999 ? "bez ubytku" : F(food) + " d") + "), relacja " + F(Rl) + " (" + rel + ")"
                      + ", Honor " + F(Hn) + ", Calc " + F(Cc) + ", Mercy " + F(Mc) + ", Valor " + F(Vl) + (Lr > 0 ? ", klamca " + F(Lr) : "")
@@ -436,7 +487,7 @@ namespace Armoury
                 int rel = 0; try { rel = h.GetRelation(Hero.MainHero); } catch { }
                 Log.Info(Tag + ": dzien " + F(Today) + " | " + Name(st) + " [" + st.StringId + "] | wodz " + Name(h) + " (Honor " + Trait(h, DefaultTraits.Honor) + ", Calc " + Trait(h, DefaultTraits.Calculating)
                          + ", Mercy " + Trait(h, DefaultTraits.Mercy) + ", Valor " + Trait(h, DefaultTraits.Valor) + ", rel " + rel + (IsLiar(h) ? ", znany klamca" : "") + ") | szturmy odparte " + sc.Held + ", straty " + sc.Lost
-                         + ", dni " + F(sc.Days) + ", sily " + Math.Round(sc.Camp) + "/" + Math.Round(sc.Walls) + ", jedzenie " + (sc.Food >= 999 ? "-" : F(sc.Food) + " d") + " | wynik " + sc.Total.ToString("+0.0;-0.0", Inv)
+                         + ", dni " + F(sc.Days) + ", ludzie " + sc.MenCamp + "/" + sc.MenIn + ", sila bojowa " + Math.Round(sc.Camp) + "/" + Math.Round(sc.Walls) + " (R z sily bojowej), jedzenie " + (sc.Food >= 999 ? "-" : F(sc.Food) + " d") + " | wynik " + sc.Total.ToString("+0.0;-0.0", Inv)
                          + " [" + sc.Parts + "] -> " + verdict + ".");
             }
             catch (Exception e) { Stumble("LogDecision", e); }
@@ -463,6 +514,7 @@ namespace Armoury
         // ------------------------------------------------------------ wykonanie (takt mapy)
         internal static void Tick()
         {
+            if (_offer != null) ExpireOffer();
             if (_queue.Count == 0) return;
             try
             {
@@ -473,7 +525,7 @@ namespace Armoury
                 if (PlayerEncounter.Current != null || mp == null || mp.CurrentSettlement != null || mp.MapEvent != null || Hero.MainHero.IsPrisoner) return;
                 var d = _queue[0];
                 var st0 = Settlement.Find(d.St);
-                if (st0 != null && st0.Party != null && st0.Party.MapEvent != null && Today - d.Day < 2.0) return;   // szturm w toku - czekamy (najwyzej 2 doby)
+                if (CampBusy(st0) && Today - d.Day < 2.0) return;   // szturm albo bitwa przy obozie w toku - czekamy (najwyzej 2 doby)
                 if (!_armed) { _armed = true; return; }
                 _queue.RemoveAt(0);   // najpierw z kolejki - wyjatek nie powtorzy umowy
                 _armed = false;
@@ -511,11 +563,11 @@ namespace Armoury
                 var cap = Capturer(ev, lord);
                 if (cap == null) { Drop(d, st, null, "brak wodza obozu"); return; }
                 if (!FactionManager.IsAtWarAgainstFaction(cap.MapFaction, st.MapFaction)) { Drop(d, st, null, "pokoj miedzy stronami - osada zostaje"); return; }
-                if (st.Party != null && st.Party.MapEvent != null) { Drop(d, st, null, "szturm w toku dluzej niz 2 doby"); return; }
-                bool betray = d.Betray && lord != null && cap.LeaderHero == lord && cap.MapEvent == null;
+                if (CampBusy(st) || cap.MapEvent != null) { Drop(d, st, "The terms agreed at " + Name(st) + " have lapsed amid the fighting.", "bitwa przy osadzie/obozie w toku dluzej niz 2 doby"); return; }
+                bool betray = d.Betray && lord != null && cap.LeaderHero == lord;
                 if (betray) RunBetray(d, st, lord, cap); else RunKept(d, st, lord, cap);
             }
-            catch (Exception e) { Stumble("Run", e); try { _ceding = false; _cededSt = null; } catch { } }
+            catch (Exception e) { Stumble("Run", e); try { _ceding = false; _cededSt = null; _yieldSt = null; } catch { } }
         }
 
         /// <summary>Partie lordow strony obroncow w osadzie wychodza przed zmiana pana (inaczej zostalyby w osadzie wroga).</summary>
@@ -546,9 +598,9 @@ namespace Armoury
             bool myFaction = st.MapFaction == me.MapFaction;
             int lords = LeadOutLords(st, cap);
             string out1 = BookHoldings.YieldOut(st, cap.MapFaction, mine ? MobileParty.MainParty : null, "374-" + st.StringId);
-            _cededSt = st.StringId; _ceding = true;
+            _cededSt = st.StringId; _ceding = true; _yieldSt = st.StringId;
             try { Campaign.Current.KingdomManager.SiegeCompleted(st, cap, true, MapEvent.BattleTypes.Siege); }
-            finally { _ceding = false; _cededSt = null; }
+            finally { _ceding = false; _cededSt = null; _yieldSt = null; }
             var rel = new List<string>();
             try
             {
@@ -606,7 +658,9 @@ namespace Armoury
             try { TakePrisonerAction.Apply(cap.Party, me); taken = true; } catch (Exception e) { Stumble("RunBetray.Player", e); }
             // twierdza - zwykla droga zdobycia (umowa zlamana: roszczenie 369 jak przy zdobyciu)
             var oldClan = st.OwnerClan;
-            Campaign.Current.KingdomManager.SiegeCompleted(st, cap, true, MapEvent.BattleTypes.Siege);
+            _yieldSt = st.StringId;
+            try { Campaign.Current.KingdomManager.SiegeCompleted(st, cap, true, MapEvent.BattleTypes.Siege); }
+            finally { _yieldSt = null; }
             // kara: zdrajca wobec gracza i honorowych glow rodow
             int punished = 0;
             try

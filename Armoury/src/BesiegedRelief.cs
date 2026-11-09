@@ -699,7 +699,7 @@ namespace Armoury
             try
             {
                 // oblezenia 3: gra zwija oboz (KingdomManager.SiegeCompleted) PRZED zmiana pana - zdobycie ze znacznika MapEventEnded (Cape Wrath 15.10 "utrzymane" przy zdobyciu)
-                bool cap = t.Captured || (t.St != null && !ReferenceEquals(t.St.MapFaction, t.K)) || SiegeWalls2.CapturedNow(t.St);
+                bool cap = t.Captured || (t.St != null && !ReferenceEquals(t.St.MapFaction, t.K)) || SiegeWalls2.CapturedNow(t.St) || SiegeSurrender374.Yielding(t.St);   // 374: oddanie bez bitwy
                 if (ev != null) _endedRelief[ev] = new[] { t.LastC, Math.Max(t.Need0, t.LastNeed) };
                 _dEnded++; if (cap) _dCaptured++;
                 float pct = t.LastNeed > 0f ? 100f * t.CMax / Math.Max(t.Need0, t.LastNeed) : 0f;
