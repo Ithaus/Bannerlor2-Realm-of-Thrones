@@ -156,6 +156,12 @@ namespace Armoury
                     return;
                 }
                 if (detail != ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege) return;
+                // 374: dobrowolne oddanie pod przysiega (slowo dotrzymane) - cesja, nie zdobycie: bez roszczenia (zdrada idzie zwykla droga nizej)
+                if (oc == pc && SiegeSurrender374.Ceded(st))
+                {
+                    Log.Info(Tag + "dzien " + (hour / 24) + " | " + Nm(st) + " [" + st.StringId + "] ODDANA przez rod gracza na warunkach (374) - cesja, bez roszczenia | roszczen " + _claims.Count + ".");
+                    return;
+                }
                 if (oc == pc)
                 {
                     c = new Claim { Taker = nc != null ? nc.StringId : "-", Lost = hour };

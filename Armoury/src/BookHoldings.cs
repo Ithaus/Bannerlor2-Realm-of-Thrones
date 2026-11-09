@@ -771,6 +771,56 @@ namespace Armoury
             try { return Math.Max(0, mp.Party.PartySizeLimit - mp.MemberRoster.TotalManCount); } catch { return 0; }
         }
 
+        /// <summary>374 (SiegeSurrender374): poddanie twierdzy na warunkach - PRZED SiegeCompleted wyprowadza bohaterow bez druzyny, ktorych gra pojmalaby przy zmianie
+        /// pana (WouldBeCaptured wobec `newF`; do najblizszej wlasnej twierdzy, NearestRefuge), i szeregowych zalogi: `toParty` (druzyna gracza - twierdza rodu gracza,
+        /// ponad limit) albo odbiorcy starego pana (Recipients / HeadParty / MoveGarrison), bez nich do domu (ReleaseHome, droga W4c). Ksiega ludzi i zbrojownia z ludzmi.
+        /// Zwraca opis do linii. Nie rzuca.</summary>
+        internal static string YieldOut(Settlement st, IFaction newF, MobileParty toParty, string rowId)
+        {
+            var sb = new StringBuilder(200);
+            try
+            {
+                var sites = new List<Settlement> { st };
+                int nh = 0;
+                foreach (var h in new List<Hero>(st.HeroesWithoutParty))
+                {
+                    try
+                    {
+                        if (!WouldBeCaptured(h, newF)) continue;
+                        var dest = NearestRefuge(h, st, sites);
+                        if (dest == null) continue;
+                        if (h.GovernorOf != null) ChangeGovernorAction.RemoveGovernorOf(h);
+                        TeleportHeroAction.ApplyImmediateTeleportToSettlement(h, dest);
+                        nh++;
+                    }
+                    catch (Exception e) { Stumble("YieldOut.Hero(" + rowId + ")", e); }
+                }
+                sb.Append("bohaterowie bez druzyny wyprowadzeni ").Append(nh);
+                var g = st.Town != null ? st.Town.GarrisonParty : null;
+                int n0 = Men(g);
+                sb.Append(" | zaloga ").Append(n0);
+                if (n0 > 0)
+                {
+                    if (toParty != null) sb.Append(" -> ").Append(Nm(toParty)).Append(' ').Append(MoveMen(st, g, toParty, n0, rowId)).Append(" (ponad limit)");
+                    else
+                    {
+                        var l = Recipients(st, st.MapFaction, sites);
+                        var hp = HeadParty(st.OwnerClan);
+                        if (l.Count > 0 || hp != null) sb.Append(" -> ").Append(MoveGarrison(st, g, l, hp, rowId));
+                        else
+                        {
+                            var hv = ClanBudget.OverflowVillage(g);
+                            if (hv != null) sb.Append(" -> do domu ").Append(ReleaseHome(g, hv, rowId));
+                            else sb.Append(" -> brak odbiorcy (reszta znika z zaloga przy zmianie pana, jak przy zdobyciu)");
+                        }
+                    }
+                    sb.Append(", zostalo ").Append(Men(g));
+                }
+            }
+            catch (Exception e) { Stumble("YieldOut(" + rowId + ")", e); sb.Append(" | BLAD"); }
+            return sb.ToString();
+        }
+
         /// <summary>Szeregowi zalogi do odbiorcow: najpierw wolne miejsca od najblizszego, reszta - druzyna glowy starego rodu, bez niej najblizszy odbiorca
         /// (ponad limit). Ksiega ludzi i sprzet zbrojowni ida z ludzmi. Zwraca opis do linii.</summary>
         private static string MoveGarrison(Settlement s, MobileParty g, List<MobileParty> recips, MobileParty headParty, string rowId)

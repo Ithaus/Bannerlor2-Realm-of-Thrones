@@ -832,6 +832,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool NightPromptSkipWhenRested { get; set; } = true;
 
+        [SettingPropertyBool("Siege Honourable Surrender", HintText = "When you hold a besieged town or castle, you can request a parley with the besiegers' commander and offer to yield it on terms: you, your companions and the garrison march out free and under arms, and the keep is his. Whether he agrees depends on the assaults you have thrown back and the blood they cost him, how long the siege has lasted, the strength on each side, your food, his regard for you, his honour, mercy, valour and cunning, and your Charm; a hint tells you how he leans and whether men trust his word. A man without honour may swear and then seize you at the gates. A refusal waits 3 days. Off = no such talk", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SiegeHonourableSurrender { get; set; } = true;
+
         [SettingPropertyBool("Siege Armoury Access", HintText = "inside a besieged town or castle (you stay within the walls - the siege menu replaces the town or castle menu) the siege menu offers 'View Army Armory' (the troop armoury of Dynamic Troop Equipment, the same window as in a town) and, in your own towns and castles, 'Hand kit to the garrison' - the same windows and rules as usual; off = no armoury while besieged, as before", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool SiegeArmouryAccess { get; set; } = true;
@@ -12027,6 +12031,7 @@ namespace Armoury
             s.GearFitRealmFootInHideoutSiege = GearFitRealmFootInHideoutSiege;
             s.GearFitSkillLawFootInHideoutSiege = GearFitSkillLawFootInHideoutSiege;
             s.NightPromptSkipWhenRested = NightPromptSkipWhenRested;
+            s.SiegeHonourableSurrender = SiegeHonourableSurrender;
             s.SiegeArmouryAccess = SiegeArmouryAccess;
             s.GarrisonKitMenu = GarrisonKitMenu;
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;
