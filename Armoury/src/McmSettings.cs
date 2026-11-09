@@ -908,6 +908,10 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool HeroSkillToOwnGear { get; set; } = false;
 
+        [SettingPropertyBool("AI Heroes Never Fight Bare", HintText = "In battle, an AI lord or lady (not you, not your clan - you dress them yourself; not the undead) who would come out without any body armour or without any weapon at all gets the empty places filled for that battle only, from his own gear template in the game data (or, when he has none, from a lord's template of his culture and sex): all the weapons of one set when he has none, and each empty armour place (head, body, legs, gloves, cape) when his body armour is missing. Within his Athletics (Hero Gear Requirements), never renowned or legendary pieces. A gown worn as body armour stays on. His own gear on the map does not change and nothing is added to the world. Every such lord is written to the log ('Nadzy (382)'). Off = only the log, nobody is dressed", RequireRestart = false)]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool AiHeroesNeverFightBare { get; set; } = true;
+
         [SettingPropertyInteger("Weapon Skill Per Tier", 0, 140, "0", HintText = "Weapon Tier Law: a weapon or shield needs at least (tier - 1) x this in its skill, whatever the data says - a tier 6 blade wants 175, so a One Handed 30 bandit never 'qualifies' for it; 0 turns the law off. Applied at session start", RequireRestart = false)]
         [SettingPropertyGroup("Skills rule the gear")]
         public int WeaponSkillPerTier { get; set; } = 35;
@@ -12146,6 +12150,7 @@ namespace Armoury
             s.HeroGearRequirements = HeroGearRequirements;
             s.HeroBardingNeedsRiding = HeroBardingNeedsRiding;
             s.HeroSkillToOwnGear = HeroSkillToOwnGear;
+            s.AiHeroesNeverFightBare = AiHeroesNeverFightBare;
             s.WeaponSkillPerTier = WeaponSkillPerTier;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;

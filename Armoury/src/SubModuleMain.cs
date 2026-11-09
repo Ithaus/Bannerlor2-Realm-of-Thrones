@@ -323,6 +323,8 @@ namespace Armoury
                 try { QualityScarcity.ApplyAll(_harmony); } catch (Exception e) { Log.Error("QualityScarcity.ApplyAll", e); }   // m96-jakosc: rzadkosc legendarnych i mistrzowskich (droga gry, lup gracza)
                 SmeltTab.ApplyAll(_harmony);
                 DressCode.ApplyAll(_harmony);
+                // 382: nadzy bohaterowie AI - pomiar przy spawnie i puste sloty ze wzorca (prefiks Last na Mission.SpawnAgent, klon; klucz AI Heroes Never Fight Bare)
+                try { HeroDress382.ApplyAll(_harmony); } catch (Exception e) { Log.Error("HeroDress382.ApplyAll", e); }
                 // n20-herby (Jeff 19.10): ludzie band w bitwie z herbami prawdziwych rodow na tarczach (prefiks High na Mission.SpawnAgent; klucz Band Shields Stolen Arms)
                 try { BandShields.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BandShields.ApplyAll", e); }
                 UniqueLaw.ApplyAll(_harmony);        // unikaty imienne: nabor do magazynow DTE zamienia kopie na zamienniki
@@ -751,6 +753,9 @@ namespace Armoury
                 // 381: wodzowie AI-atakujacych zostaja z tylu w szturmie (szyk 8 poza zasiegiem murow); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAttackerLordsStayBack)
                     mission.AddMissionBehavior(new SiegeCommanders381());
+                // 382: linia sumy "Nadzy (382): koniec misji" (pomiar i wypelnianie w prefiksie HeroDress382)
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new HeroDress382.Logic());
                 // 373: ranni atakujacy pod murami / w srodku - ksiega misji (przenosiny do lochu w SiegeWounded373Behavior po zalamaniu 371); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission && Settings.Current.SiegeWoundedTakenPrisoner)
                     mission.AddMissionBehavior(new SiegeWounded373());
