@@ -383,8 +383,8 @@ namespace Armoury
                      + (_prior + _cas) + " (ta misja " + _cas + ", wczesniej " + _prior + ") / prog " + F(_limit, "0") + " (" + F(_thr * 100.0, "0.0") + "% x K_m " + _km
                      + (_genDown ? ", wodz padl x" + F(SiegeWalls.ShockFactor, "0.00") : "") + (_engDown ? ", tarany i wieze stracone x" + F(SiegeWalls.ShockFactor, "0.00") : "")
                      + (gates > 0 && down >= gates ? ", bramy rozbite x" + F(SiegeWalls.GateFactor, "0.00") : "") + ") | atakujacych w polu " + att + ", obroncow " + dNow + " z " + _def0
-                     + " | bramy rozbite " + down + "/" + gates + " | 371b: wymiana " + (SiegeWalls.ExchangeOn ? F(_x, "0.00") + ":1 > granica " + F(_r, "0.00") + ":1 (straty A " + (_prior + _cas)
-                     + " / O " + (_dPrior + _dcas) + ", przewaga " + F(_n, "0.0") + "x, pulap " + (_cap ? "tak" : "nie") + ")" : "wylaczona") + ", obroncow zostalo " + _dLeft + " (" + F(_share * 100.0, "0.0") + "%).");
+                     + " | bramy rozbite " + down + "/" + gates + " | 371b: wymiana " + (SiegeWalls.ExchangeOn ? F(_x, "0.00") + (_byTime ? ":1 (378: limit czasu - wymiana nie sprawdzana; straty A " : ":1 > granica " + F(_r, "0.00") + ":1 (straty A ") + (_prior + _cas)
+                     + " / O " + (_dPrior + _dcas) + ", przewaga " + F(_n, "0.0") + "x" + (_byTime ? "" : ", pulap " + (_cap ? "tak" : "nie")) + ")" : "wylaczona") + ", obroncow zostalo " + _dLeft + " (" + F(_share * 100.0, "0.0") + "%).");
         }
 
         private void Drive(Mission m, float now)

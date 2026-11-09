@@ -1,5 +1,12 @@
 # DZIENNIK ZMIAN
 
+## 378b - poprawka po recenzji 378: log ZALAMANIE przy odwrocie z limitu nie pokazuje nieaktualnej granicy wymiany; "Time is up" raz na bitwe (SiegeBreak371.cs Break, SiegeClock378.cs Start; NIE WGRANE)
+**Problem (recenzje 1 i 2):** (1) po odwrocie z limitu linia "Szturm (371): ZALAMANIE (378: limit czasu)" pisala "wymiana X:1 > granica _r:1, pulap ..." - TimeUp nie liczy _r/_cap, wiec granica byla stara albo -1.00 (gdy prog nie padl), a o odwrocie zdecydowal czas; (2) gracz-atakujacy: gdy limit minal w misji 1, kolejna misja tej samej bitwy ("Battle continues") znow pokazywala "Time is up" i dopisywala linie logu.
+**Przyczyna:** (1) Break wypisywal galaz wymiany bez wzgledu na _byTime; (2) SiegeClock378.Start ustawial z _tPrior tylko _warned, nie _up.
+**Zmiana:** (1) przy _byTime linia ZALAMANIE pisze "371b: wymiana X:1 (378: limit czasu - wymiana nie sprawdzana; straty A .. / O .., przewaga ..x)" bez granicy i pulapu; logika bez zmian (tylko napis). (2) Start: _up = limit > 0 && _tPrior >= limit - "Time is up" raz na bitwe, jak ostrzezenie.
+**Ryzyko / co sprawdzic:** kontrola: _r/_cap czytane gdzie indziej bez zmian (Evaluate, linia OB); _up blokuje dalszy Drive tylko po komunikatach (SiegeClock378 nie robi nic poza komunikatami i logiem), linia "koniec misji" pokaze "limit minal tak" - zgodnie z prawda dla bitwy. W grze: przy obronie po 30 min w linii ZALAMANIE (378: limit czasu) brak "> granica"; przy szturmie gracza i drugiej misji tej bitwy brak drugiego "Time is up".
+**Status:** DO SPRAWDZENIA
+
 ## 378 - limit czasu szturmu: AI odstepuje po 30 min walki, gracz-atakujacy dostaje tylko ostrzezenia (SiegeBreak371.cs, nowy SiegeClock378.cs, SiegeWalls.Break371.cs, SiegeWalls.cs Assault.MisTime, Settings.cs / McmSettings.cs SiegeAssaultTimeLimitMinutes, SubModuleMain.cs; NIE WGRANE)
 **Problem:** Jeff 09.11: "i powinien byc tez czas odliczany ze jak nie zdobede w iles minut to tez wycofanie np 30 minut". Obrona Goldentooth trwala 1874 s misji bez rozstrzygniecia - zalamanie 371/371b zalezy tylko od strat i wymiany, czasu nie liczy nic.
 **Przyczyna:** SiegeBreak371.Evaluate (co 1 s) zna tylko prog strat, wstrzasy, bramy i wymiane A/D; gdy atakujacy placa malo (wymiana <= R), szturm moze trwac bez konca. Gdy szturmuje gracz, 371 w ogole nie dziala (faza 2 nie istnieje).

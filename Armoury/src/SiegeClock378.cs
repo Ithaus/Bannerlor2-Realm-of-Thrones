@@ -83,6 +83,7 @@ namespace Armoury
                     _started = true;
                     _startAt = now;
                     _warned = _tPrior >= SiegeWalls.TimeLimitSeconds - WarnBefore;   // kolejna misja tej bitwy juz po progu ostrzezenia - bez powtorki
+                    _up = SiegeWalls.TimeLimitSeconds > 0f && _tPrior >= SiegeWalls.TimeLimitSeconds;   // recenzja 378: limit minal w poprzedniej misji tej bitwy - "Time is up" raz na bitwe, nie co misje
                     Log.Info("Szturm (378): start misji (gracz atakuje) | osada " + Settlement() + " | limit czasu " + F(SiegeWalls.TimeLimitSeconds / 60.0, "0") + " min, z poprzednich misji tej bitwy "
                              + F(_tPrior, "0") + " s - tylko komunikaty, bez przymusowego odwrotu.");
                     return;
