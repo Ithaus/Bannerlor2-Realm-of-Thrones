@@ -52,6 +52,8 @@ namespace Armoury
         /// <summary>Ta sesja wczytala zapis (SyncData), a nie zaczela nowej kampanii.</summary>
         internal static bool Loaded { get { return _imported; } }
         internal static int TransitionDay { get { return _transitionDay; } }
+        /// <summary>368b: numer dnia ostatniego taktu doby (z zapisu albo z sesji); -1 - nieznany. Takt doby wypada o porze kanonicznej (np. 05:55), nie o polnocy.</summary>
+        internal static int LastDay { get { return _lastDay; } }
 
         internal static void Reset()
         {

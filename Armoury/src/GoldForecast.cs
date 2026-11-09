@@ -146,6 +146,16 @@ namespace Armoury
 
         private static int Today() { try { return (int)CampaignTime.Now.ToDays; } catch { return -1; } }
 
+        /// <summary>368b: za ile dob od dzis wypada nastepny takt doby: 1 - dzisiejszy takt juz byl (DayGate.LastDay albo doba ksiegi = dzis), 0 - jeszcze przed nami. Nie rzuca.</summary>
+        private static int NextTickAhead()
+        {
+            int d = Today();
+            if (d < 0) return 1;
+            int last = DayGate.LastDay;
+            if (_cur != null && _cur.Day > last) last = _cur.Day;
+            return last >= d ? 1 : 0;
+        }
+
         // ------------------------------------------------------------ takt doby (ArmouryBehavior.OnDailyTick / DayProfile.Lap)
         /// <summary>Poczatek naszego taktu doby: zamkniecie poprzedniej doby (linia), nowa doba ksiegi. Nie rzuca.</summary>
         internal static void TickBegin()
@@ -222,11 +232,18 @@ namespace Armoury
                 var fin = Campaign.Current.Models.ClanFinanceModel;
                 if (fin == null) return;
                 _cacheHour = int.MinValue;   // poprawki z dzisiejsza historia
-                long all = (long)Math.Round(fin.CalculateClanGoldChange(Clan.PlayerClan, true, false, false).ResultNumber);
+                long all;
                 long corr = 0; var sb = new StringBuilder();
                 List<Corr> cs;
+                // 368b: _inTickEnd PRZED wolaniem modelu - CalculateClanGoldChange (z opisami) wola AddTip -> Corrections() i ta sama godzina idzie do pamieci
+                // podrecznej; dotad liczyl ja tryb podpowiedzi (raty na doba +1, danina z _cur), a Corrections() nizej oddawal ja z pamieci - prognoza tej doby
+                // brala rate NASTEPNEJ doby (log 09.11: +100775 w prognozie 109736, rata weszla w takt 109737)
                 _inTickEnd = true;
-                try { cs = Corrections(); }
+                try
+                {
+                    all = (long)Math.Round(fin.CalculateClanGoldChange(Clan.PlayerClan, true, false, false).ResultNumber);
+                    cs = Corrections();
+                }
                 finally { _inTickEnd = false; _cacheHour = int.MinValue; }   // 361d: podpowiedz liczy od nowa (danina z _cur, nie z historii)
                 foreach (var c in cs)
                 {
@@ -781,7 +798,9 @@ namespace Armoury
                     _rateInfo = null;
                     if (DsTowns.FarmsLive)
                     {
-                        int ahead = _inTickEnd ? 0 : 1, rn = 0;
+                        // 368b: podpowiedz - doba NASTEPNEGO taktu: takt doby jest o porze kanonicznej (np. 05:55), nie o polnocy; przed dzisiejszym taktem (ostatni
+                        // takt wczoraj) - dzis (ahead 0), po nim - jutro (ahead 1)
+                        int ahead = _inTickEnd ? 0 : NextTickAhead(), rn = 0;
                         var names = new List<string>();
                         // TickEnd: szacunek z poczatku taktu (po Pay kasa osady i zaleglosci juz inne); podpowiedz: nastepny takt doby
                         long due = _inTickEnd ? Math.Max(0, _rateTick) : DsTowns.PlayerRateDue(ahead, out rn, names);
@@ -789,7 +808,7 @@ namespace Armoury
                         if (due > 0)
                         {
                             int a = (int)Math.Min(int.MaxValue, due);
-                            res.Add(new Corr { Amt = a, Log = "raty firm 368 (" + rn + " osad)", Txt = new TextObject("{=!}Town and castle rent installments due " + (ahead == 0 ? "today" : "tomorrow")
+                            res.Add(new Corr { Amt = a, Log = "raty firm 368 (" + rn + " osad)", Txt = new TextObject("{=!}Town and castle rent installments due " + (ahead == 0 ? "at today's daily tick" : "tomorrow")
                                 + " (" + string.Join(", ", names.ToArray()) + (rn > names.Count ? ", ..." : "") + ")") });
                         }
                         diag.Append("; raty firm 368 (doba +").Append(ahead).Append(") ").Append(due).Append(" z ").Append(rn).Append(" osad");
@@ -797,10 +816,11 @@ namespace Armoury
                         if (!_inTickEnd)
                         {
                             long wk = 0; int next = -1, nn;
-                            for (int i = 1; i <= 7; i++) { long x = DsTowns.PlayerRateDue(i, out nn, null); wk += x; if (x > 0 && next < 0) next = i; }
+                            // 368b: 7 kolejnych taktow od nastepnego (ahead .. ahead + 6); next - za ile dob od dzis (0 - dzisiejszy takt)
+                            for (int i = ahead; i < ahead + 7; i++) { long x = DsTowns.PlayerRateDue(i, out nn, null); wk += x; if (x > 0 && next < 0) next = i; }
                             if (wk > 0)
-                                _rateInfo = "Town and castle rent installments (paid every 7 days, " + (next == 1 ? "next tomorrow" : "next in " + next + " days") + "): about " + Sg(wk)
-                                            + " a week, " + Sg((long)Math.Round(wk / 7.0)) + " a day on average (only an installment due tomorrow is in the total)";
+                                _rateInfo = "Town and castle rent installments (paid every 7 days, " + (next == 0 ? "next at today's daily tick" : next == 1 ? "next tomorrow" : "next in " + next + " days")
+                                            + "): about " + Sg(wk) + " a week, " + Sg((long)Math.Round(wk / 7.0)) + " a day on average (only an installment due at the next daily tick is in the total)";
                         }
                     }
                 }
