@@ -429,7 +429,9 @@ namespace Armoury
         }
 
         /// <summary>366 popr.: jeniec przeszedl przy pojmaniu na korone, ktorej gracz juz nie sluzy (zmiana krolestwa albo gracz bez krolestwa) - T zablokowane: ta korona
-        /// stracilaby okup bez zaplaty i bez gniewu, a nagroda gracza od niej dalej by czekala (dziura w zamknietej ekonomii). R bez zmian (okup idzie do niej).</summary>
+        /// stracilaby okup bez zaplaty i bez gniewu, a nagroda gracza od niej dalej by czekala (dziura w zamknietej ekonomii). R bez zmian (okup idzie do niej).
+        /// 367c: CaptiveCrown zdejmuje jenca z korony, gdy trzymajacy (tu gracz) juz jej nie sluzy - jeniec gracza wraca do gracza, wiec przy jencu trzymanym przez
+        /// gracza OtherCrown zwraca null (R i T jak przy wlasnym jencu: okup do kiesy gracza). Zostaje jako bezpiecznik.</summary>
         private static Kingdom OtherCrown(Hero h)
         {
             var crown = Ransom178.CaptiveCrown(h);

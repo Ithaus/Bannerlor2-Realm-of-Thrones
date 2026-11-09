@@ -251,7 +251,7 @@ namespace Armoury
         //    CrownBorrow. (kredyt korony), CrownCallToWar. (portfele krolestw), MercContract./MercTenure. (sluzba najemna u korony);
         //  - Ransom178.ThirdsSettle (1/9 lupow do skarbca OBECNEGO krolestwa gracza; bez krolestwa - wpis skreslony).
         // NIE: CrownIncome.Reparations (rata okupu krola placi wierzyciela-bohatera bez wzgledu na jego krolestwo; Begin/End kiesy nie ruszaja),
-        // Ransom178.CrownStep (nagroda za wielkiego jenca z zapamietanej korony - placona takze po odejsciu), CouncilWages35, GentryService (miedzy bohaterami).
+        // Ransom178.CrownStep (nagroda za wielkiego jenca z zapamietanej korony - placona takze po odejsciu; 367c: niewyplacona za jenca, ktorego trzymajacy opuscil korone - anulowana),CouncilWages35, GentryService (miedzy bohaterami).
         private static readonly string[] CrownKeys =
         {
             "KingdomTreasury.", "CrownRents.", "CrownWar314.", "CrownGifts.", "CrownBorrow.", "CrownCallToWar.", "MercContract.", "MercTenure.", "Ransom178.ThirdsSettle",

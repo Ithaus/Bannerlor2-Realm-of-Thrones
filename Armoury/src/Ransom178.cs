@@ -52,12 +52,14 @@ namespace Armoury
         private static bool ThirdsOn { get { var s = Settings.Current; return s != null && s.CrownThirds && CrownIncome.On; } }
 
         private sealed class Acc { public double Third, Ninth, Purse; public long Carry; }
-        private sealed class Reward { public string Hero = "", Kingdom = ""; public long Left; }
+        private sealed class Reward { public string Hero = "", Kingdom = "", Captive = ""; public long Left; }   // 367c: Captive - nagroda za pojmanie tego jenca ("" - bez przypisania)
         private sealed class Ema { public double V; public int N; }
 
         private static readonly Dictionary<string, Acc> _acc = new Dictionary<string, Acc>();          // id bohatera -> podstawa 1/9 doby i zaleglosc
         private static readonly Dictionary<string, string> _crownCaptive = new Dictionary<string, string>(); // id jenca -> id korony zdobywcy
         private static readonly List<Reward> _rewards = new List<Reward>();
+        private static readonly Dictionary<string, long> _paidFor = new Dictionary<string, long>();   // 367c: id jenca korony -> wyplacona juz nagroda za jego pojmanie (log zdjecia)
+        private static int _dRevokedN; private static long _dRevokedKept, _dRevokedVoid;   // 367c: licznik doby - jency zdjeci z koron (nagroda zostaje / anulowana)
 
         /// <summary>272 (unia Dorzecza z Polnoca): wielcy jency korony `fromId` (okup do jej skarbca) i nagrody, ktore ta korona jest winna zdobywcom, przechodza na
         /// korone `toId` razem z jej skarbcem - inaczej po upadku krolestwa nagroda przepada, a okup wielkiego jenca idzie do porywacza. Nie rzuca.</summary>
@@ -66,8 +68,22 @@ namespace Armoury
             captives = 0; rewards = 0;
             try
             {
-                foreach (var k in new List<string>(_crownCaptive.Keys)) if (_crownCaptive[k] == fromId) { _crownCaptive[k] = toId; captives++; }
-                foreach (var r in _rewards) if (r != null && r.Kingdom == fromId) { r.Kingdom = toId; rewards++; }
+                // 367c: unia 332 bez zniszczenia (czesc rodow zostaje) - jeniec trzymany przez rod, ktory ZOSTAL w starej koronie, zostaje jej jencem
+                // (razem z przypisana do niego nagroda); inaczej najblizszy CrownCheck zdjalby go z nowej korony, choc trzymajacy dalej sluzy starej
+                var stay = new HashSet<string>();
+                foreach (var k in new List<string>(_crownCaptive.Keys))
+                {
+                    if (_crownCaptive[k] != fromId) continue;
+                    try
+                    {
+                        Hero h = Hero.Find(k);
+                        var holder = h != null ? HolderClan(h) : null;
+                        if (holder != null && !holder.IsEliminated && holder.Kingdom != null && holder.Kingdom.StringId == fromId) { stay.Add(k); continue; }
+                    }
+                    catch (Exception e) { Stumble("MoveKingdom.Holder", e); }
+                    _crownCaptive[k] = toId; captives++;
+                }
+                foreach (var r in _rewards) if (r != null && r.Kingdom == fromId && !stay.Contains(r.Captive ?? "")) { r.Kingdom = toId; rewards++; }
             }
             catch (Exception e) { Stumble("MoveKingdom", e); }
         }
@@ -87,13 +103,14 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _acc.Clear(); _crownCaptive.Clear(); _rewards.Clear(); _crownIncome.Clear(); _thirdsToday.Clear(); _heirCache.Clear(); _heirDay = -1;
+            _acc.Clear(); _crownCaptive.Clear(); _rewards.Clear(); _paidFor.Clear(); _crownIncome.Clear(); _thirdsToday.Clear(); _heirCache.Clear(); _heirDay = -1;
             _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; ZeroDay(); LastThirds = LastRewards = LastRansomCash = LastToCrown = 0;
         }
 
         private static void ZeroDay()
         {
-            _dAiN = _dCourierN = _dBrokerN = _dPlayerN = _dZeroN = _dBlockedN = _dCapN = _dKingN = _dGreatTakenN = _dDungeonN = _dBrokerShortN = _dRewardOwnKing = 0;
+            _dAiN = _dCourierN = _dBrokerN = _dPlayerN = _dZeroN = _dBlockedN = _dCapN = _dKingN = _dGreatTakenN = _dDungeonN = _dBrokerShortN = _dRewardOwnKing = _dRevokedN = 0;
+            _dRevokedKept = _dRevokedVoid = 0;
             _dPrice = _dCash = _dDebt = _dCapCut = _dKingCash = _dKingDebt = _dRewardQueued = _dRewardPaid = _dBaseThird = _dBaseLoot = _dBaseRansom = _dBasePurse = 0;
             _dBaseScreen = _dThirdsGot = _dThirdsPurse = _dThirdsCarry = _dToCrown = _dBrokerShort = _dBaseGold = 0;
             _dMax = null; _dMaxV = 0;
@@ -260,7 +277,8 @@ namespace Armoury
                 // m116-fabula (Jeff 24.10, raport: Joffrey dostal 7322 zl nagrody ze skarbca wlasnej korony za Neda): zdobywca = krol korony zdobywcy - bez nagrody
                 bool ownKing = captor != null && captor == k.Leader && Settings.Current.RansomNoRewardToOwnKing;
                 if (ownKing) { _dRewardOwnKing++; reward = 0; }
-                if (captor != null && reward > 0) { _rewards.Add(new Reward { Hero = captor.StringId, Kingdom = k.StringId, Left = reward }); _dRewardQueued += reward; }
+                _paidFor.Remove(prisoner.StringId);
+                if (captor != null && reward > 0) { _rewards.Add(new Reward { Hero = captor.StringId, Kingdom = k.StringId, Captive = prisoner.StringId, Left = reward }); _dRewardQueued += reward; }
                 _dGreatTakenN++;
                 Log.Info("Okupy (178): wielki jeniec - " + Name(prisoner) + " (" + (prisoner.MapFaction != null && prisoner.MapFaction.Leader == prisoner ? "krol" : "nastepca tronu") + ", "
                          + prisoner.MapFaction.Name + ") pojmany przez " + Name(captor) + " - przechodzi na korone " + k.Name + "; okup ok. " + price + " zl do skarbca " + k.Name
@@ -273,7 +291,15 @@ namespace Armoury
 
         private static void OnPrisonerReleased(Hero h, PartyBase party, IFaction f, EndCaptivityDetail d, bool show)
         {
-            try { if (h != null && h.StringId != null) _crownCaptive.Remove(h.StringId); } catch { }
+            try
+            {
+                if (h == null || h.StringId == null) return;
+                _crownCaptive.Remove(h.StringId);
+                _paidFor.Remove(h.StringId);
+                // 367c: jeniec wolny (okup poszedl tam, gdzie mial) - niewyplacona nagroda za niego zostaje, ale bez przypisania (nastepne pojmanie to nowa sprawa)
+                foreach (var r in _rewards) if (r != null && r.Captive == h.StringId) r.Captive = "";
+            }
+            catch { }
         }
 
         internal static void RegisterEvents(CampaignBehaviorBase owner)
@@ -288,12 +314,8 @@ namespace Armoury
         private static Rcv ReceiverFor(Hero captive, Clan captorClan)
         {
             var r = new Rcv();
-            string kid;
-            if (GreatOn && captive != null && captive.StringId != null && _crownCaptive.TryGetValue(captive.StringId, out kid))
-            {
-                var k = KingdomById(kid);
-                if (k != null && !k.IsEliminated) { r.Crown = k; return r; }
-            }
+            var k = CrownCheck(captive);   // 367c: korona tylko, gdy trzymajacy jej dalej sluzy
+            if (k != null) { r.Crown = k; return r; }
             var h = captorClan != null ? captorClan.Leader : null;
             r.Hero = h != null && h.IsAlive ? h : null;
             return r;
@@ -381,14 +403,66 @@ namespace Armoury
         /// <summary>366: korona, do ktorej skarbca idzie okup wielkiego jenca (null - jeniec nie przeszedl na korone; okup dla porywacza).</summary>
         internal static Kingdom CaptiveCrown(Hero h)
         {
-            try
-            {
-                string kid;
-                if (!GreatOn || h == null || h.StringId == null || !_crownCaptive.TryGetValue(h.StringId, out kid)) return null;
-                var k = KingdomById(kid);
-                return k != null && !k.IsEliminated ? k : null;
-            }
+            try { return CrownCheck(h); }
             catch (Exception e) { Stumble("CaptiveCrown", e); return null; }
+        }
+
+        // ------------------------------------------------------------ 367c: jeniec korony tylko, dopoki trzymajacy sluzy tej koronie
+        /// <summary>Rod, ktory fizycznie trzyma jenca (partia - jak przy pojmaniu, loch - wlasciciel osady). null - nie wiadomo.</summary>
+        private static Clan HolderClan(Hero h)
+        {
+            try { return h != null && h.IsPrisoner ? CaptorClan(h.PartyBelongedToAsPrisoner) : null; }
+            catch { return null; }
+        }
+
+        /// <summary>367c: korona wielkiego jenca albo null. Gdy rod trzymajacego jenca nie sluzy juz tej koronie (odejscie, defekcja, wygnanie) - jeniec schodzi
+        /// z korony (Revoke): okup i rokowania naleza do trzymajacego. Trzymajacy nieznany (bez partii, rod martwy) - bez zmian. Bez zdarzenia ClanChangedKingdom:
+        /// unia 272/332 przenosi rody PRZED Ransom178.MoveKingdom - zdarzenie zdjeloby jencow korony, ktora sie wlasnie laczy. Wolajacy lapie wyjatki.</summary>
+        private static Kingdom CrownCheck(Hero h)
+        {
+            string kid;
+            if (!GreatOn || h == null || h.StringId == null || !_crownCaptive.TryGetValue(h.StringId, out kid)) return null;
+            var k = KingdomById(kid);
+            if (k == null || k.IsEliminated) return null;
+            var holder = HolderClan(h);
+            if (holder == null || holder.IsEliminated || holder.Kingdom == k) return k;
+            Revoke(h, k, holder);
+            return null;
+        }
+
+        /// <summary>367c: zdjecie jenca z korony. Nagroda za niego juz wyplacona zostaje u zdobywcy (korona ja stracila - zdrada kosztuje korone, zloto sie nie rusza);
+        /// niewyplacona (przypisana do tego jenca) - anulowana (skarbiec jej nie placi). Wpisy sprzed 367c bez przypisania - placone dalej jak dotad.</summary>
+        private static void Revoke(Hero h, Kingdom k, Clan holder)
+        {
+            _crownCaptive.Remove(h.StringId);
+            long kept;
+            bool known = _paidFor.TryGetValue(h.StringId, out kept);
+            _paidFor.Remove(h.StringId);
+            long voided = 0;
+            foreach (var r in _rewards.ToArray())
+                if (r != null && r.Captive == h.StringId && r.Kingdom == k.StringId) { voided += Math.Max(0, r.Left); _rewards.Remove(r); }
+            _dRevokedN++; _dRevokedKept += kept; _dRevokedVoid += voided;
+            Log.Info("Okupy (178): jeniec " + Name(h) + " wraca do " + Name(holder) + " - " + Name(holder) + " nie sluzy juz koronie " + k.Name
+                     + (holder.Kingdom != null ? " (teraz " + holder.Kingdom.Name + ")" : " (bez krolestwa)") + " (nagroda wyplacona " + (known ? kept.ToString(Inv) : "? - sprzed 367c, bez zapisu") + " zostaje"
+                     + (voided > 0 ? ", niewyplacona " + voided + " anulowana" : "") + "); okup i rokowania - dla " + Name(holder) + ".");
+            if (holder == Clan.PlayerClan)
+                Log.Player(Name(h) + " is your captive now: you no longer serve " + k.Name + "." + (voided > 0 ? " The crown's unpaid reward of " + voided.ToString("N0", Inv) + " denars is void." : ""));
+        }
+
+        /// <summary>367c: dzienne sprawdzenie wszystkich jencow koron (takze pierwsza doba po wczytaniu zapisu). Potkniecia per jeniec.</summary>
+        private static void CrownSweep()
+        {
+            foreach (var id in new List<string>(_crownCaptive.Keys))
+            {
+                try
+                {
+                    Hero h = null;
+                    try { h = Hero.Find(id); } catch { h = null; }
+                    if (h == null) continue;
+                    CrownCheck(h);
+                }
+                catch (Exception e) { Stumble("CrownSweep", e); }
+            }
         }
 
         /// <summary>366: niewyplacona nagroda zdobywcy `to` od korony `k` (suma wpisow - nagrody nie sa przypisane do jenca).</summary>
@@ -545,7 +619,7 @@ namespace Armoury
                 var b = beh as RansomOfferCampaignBehavior;
                 var captorClan = GetCaptorClan(beh, hero);
                 if (b == null || captorClan == null) return false;
-                bool crown = GreatOn && hero.StringId != null && _crownCaptive.ContainsKey(hero.StringId);
+                bool crown = CrownCheck(hero) != null;   // 367c: ta sama regula co odbiorca okupu
                 bool ok = Execute(hero, captorClan, "kurier");
                 try { var declined = _fDeclined != null ? _fDeclined.GetValue(beh) as List<Hero> : null; if (declined != null) declined.Remove(hero); } catch { }
                 b.SetCurrentRansomHero(null);
@@ -906,6 +980,7 @@ namespace Armoury
             }
             catch (Exception ex) { Stumble("CrownStep(srednia)", ex); }
             if (!GreatOn) return;
+            try { CrownSweep(); } catch (Exception ex) { Stumble("CrownStep(367c)", ex); }   // 367c: przed nagrodami - nie placi za jenca, ktorego korona stracila
             var s = Settings.Current;
             foreach (var r in _rewards.ToArray())
             {
@@ -927,6 +1002,7 @@ namespace Armoury
                     CirculationWindows.NoteHeroGold(h, ip);
                     if (h != Hero.MainHero) ClanIncomeBook.NoteInflow(h, ip, ClanIncomeBook.KRansom);
                     r.Left -= ip; _dRewardPaid += ip;
+                    if (!string.IsNullOrEmpty(r.Captive)) { long pv; _paidFor.TryGetValue(r.Captive, out pv); _paidFor[r.Captive] = pv + ip; }
                     try { var kd = CrownIncome.DayOf(k); if (kd != null) kd.Reward178 += ip; } catch { }   // 312e (recenzja): tylko licznik linii "Skarbce:"
                     if (h == Hero.MainHero) Log.Player("The crown of " + k.Name + " pays you " + ip + " denars as the reward for a royal captive.");
                     if (r.Left <= 0) _rewards.Remove(r);
@@ -957,6 +1033,7 @@ namespace Armoury
                   .Append(CrownIncome.LastKingRansomPaid).Append(", do splaty razem ").Append(CrownIncome.KingRansomDebtLeft()).Append(')')
                   .Append(" | wielcy jency: pojmani dzis ").Append(_dGreatTakenN).Append(", u koron zdobywcow ").Append(_crownCaptive.Count).Append(", okup do skarbcow zdobywcow ").Append(_dToCrown)
                   .Append("; nagrody zdobywcow: nowe ").Append(_dRewardQueued).Append(", wyplacone ").Append(_dRewardPaid).Append(", czeka ").Append(pend).Append(", pominiete - zdobywca krolem (m116) ").Append(_dRewardOwnKing)
+                  .Append("; zdjeci z koron - trzymajacy nie sluzy juz koronie (367c) ").Append(_dRevokedN).Append(" (nagroda wyplacona zostaje ").Append(_dRevokedKept).Append(", anulowana ").Append(_dRevokedVoid).Append(')')
                   .Append(" | prawo trzecich (1/9): podstawa - trzecie lordow ").Append(_dBaseThird).Append(" (korona 1/3), sprzedaz lupu lordow AI ").Append(_dBaseLoot)
                   .Append(", okupy otrzymane ").Append(_dBaseRansom).Append(", sakwy ludzi gracza ").Append(_dBasePurse).Append(", lup gracza z ekranu ").Append(_dBaseScreen).Append(", zloto z kies rozbitych i poddanych graczowi (3.2/112) ").Append(_dBaseGold)
                   .Append("; nalezne z dzisiejszej podstawy ").Append(Math.Round(due)).Append(" | sciagniete do skarbcow (rozliczenie dzis rano, podstawa wczoraj) ").Append(_dThirdsGot + _dThirdsPurse)
@@ -980,7 +1057,7 @@ namespace Armoury
         // ------------------------------------------------------------ zapis (SaveText, "arm_rans178")
         private static readonly char[] Bad = { '|', ';', ':' };
 
-        /// <summary>"v1|krolestwo:srednia:n;...|jeniec:korona;...|bohater:korona:reszta;...|bohater:zaleglosc;..."</summary>
+        /// <summary>"v1|krolestwo:srednia:n;...|jeniec:korona;...|bohater:korona:reszta;...|bohater:zaleglosc;...|pozycja nagrody:jeniec;...|jeniec:wyplacona nagroda;..." (367c: 2 ostatnie)</summary>
         internal static string Export()
         {
             try
@@ -992,9 +1069,19 @@ namespace Armoury
                 sb.Append('|'); f = true;
                 foreach (var kv in _crownCaptive) { if (kv.Key.IndexOfAny(Bad) >= 0 || kv.Value.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(kv.Key).Append(':').Append(kv.Value); }
                 sb.Append('|'); f = true;
-                foreach (var r in _rewards) { if (r.Left <= 0 || r.Hero.IndexOfAny(Bad) >= 0 || r.Kingdom.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(r.Hero).Append(':').Append(r.Kingdom).Append(':').Append(r.Left.ToString(Inv)); }
+                var ties = new StringBuilder(64); int pos = 0;
+                foreach (var r in _rewards)
+                {
+                    if (r.Left <= 0 || r.Hero.IndexOfAny(Bad) >= 0 || r.Kingdom.IndexOfAny(Bad) >= 0) continue;
+                    if (!f) sb.Append(';'); f = false; sb.Append(r.Hero).Append(':').Append(r.Kingdom).Append(':').Append(r.Left.ToString(Inv));
+                    if (!string.IsNullOrEmpty(r.Captive) && r.Captive.IndexOfAny(Bad) < 0) { if (ties.Length > 0) ties.Append(';'); ties.Append(pos.ToString(Inv)).Append(':').Append(r.Captive); }
+                    pos++;
+                }
                 sb.Append('|'); f = true;
                 foreach (var kv in _acc) { if (kv.Value.Carry <= 0 || kv.Key.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(kv.Key).Append(':').Append(kv.Value.Carry.ToString(Inv)); }
+                // 367c: pola dopisane na koncu (stara wersja czyta 5 pierwszych i reszte pomija): przypisanie nagrod do jencow (pozycja:jeniec), wyplacone nagrody (jeniec:zl)
+                sb.Append('|').Append(ties.ToString()).Append('|'); f = true;
+                foreach (var kv in _paidFor) { if (kv.Value <= 0 || kv.Key.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(kv.Key).Append(':').Append(kv.Value.ToString(Inv)); }
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -1002,7 +1089,7 @@ namespace Armoury
 
         internal static void Import(string data)
         {
-            _crownIncome.Clear(); _crownCaptive.Clear(); _rewards.Clear(); _acc.Clear(); _importN = 0; _importBad = 0;
+            _crownIncome.Clear(); _crownCaptive.Clear(); _rewards.Clear(); _paidFor.Clear(); _acc.Clear(); _importN = 0; _importBad = 0;
             try
             {
                 if (string.IsNullOrEmpty(data)) return;
@@ -1010,8 +1097,14 @@ namespace Armoury
                 if (f.Length < 5 || f[0] != "v1") { _importBad++; return; }
                 foreach (var p in f[1].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); double v; int n; if (x.Length == 3 && double.TryParse(x[1], NumberStyles.Float, Inv, out v) && int.TryParse(x[2], out n)) { _crownIncome[x[0]] = new Ema { V = v, N = Math.Max(0, Math.Min(28, n)) }; _importN++; } else _importBad++; }
                 foreach (var p in f[2].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); if (x.Length == 2) { _crownCaptive[x[0]] = x[1]; _importN++; } else _importBad++; }
-                foreach (var p in f[3].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); long v; if (x.Length == 3 && long.TryParse(x[2], NumberStyles.Integer, Inv, out v) && v > 0) { _rewards.Add(new Reward { Hero = x[0], Kingdom = x[1], Left = v }); _importN++; } else _importBad++; }
+                var at = new Dictionary<int, Reward>(); int pos = 0;   // 367c: pozycja wpisu (jak przy zapisie - kazdy niepusty) -> nagroda
+                foreach (var p in f[3].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); long v; if (x.Length == 3 && long.TryParse(x[2], NumberStyles.Integer, Inv, out v) && v > 0) { var rw = new Reward { Hero = x[0], Kingdom = x[1], Left = v }; _rewards.Add(rw); at[pos] = rw; _importN++; } else _importBad++; pos++; }
                 foreach (var p in f[4].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); long v; if (x.Length == 2 && long.TryParse(x[1], NumberStyles.Integer, Inv, out v) && v > 0) { _acc[x[0]] = new Acc { Carry = v }; _importN++; } else _importBad++; }
+                if (f.Length >= 7)   // 367c (zapis sprzed 367c - brak pol: nagrody bez przypisania, wyplacone nieznane)
+                {
+                    foreach (var p in f[5].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); int ix; Reward rw; if (x.Length == 2 && int.TryParse(x[0], NumberStyles.Integer, Inv, out ix) && at.TryGetValue(ix, out rw)) { rw.Captive = x[1]; _importN++; } else _importBad++; }
+                    foreach (var p in f[6].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); long v; if (x.Length == 2 && long.TryParse(x[1], NumberStyles.Integer, Inv, out v) && v > 0) { _paidFor[x[0]] = v; _importN++; } else _importBad++; }
+                }
             }
             catch (Exception e) { Stumble("Import", e); }
         }
