@@ -321,7 +321,7 @@ namespace Armoury
             return false;
         }
 
-        private static bool InW(Kingdom k)
+        internal static bool InW(Kingdom k)   // 367b: internal - warunek F (CaptiveTerms.Knee: przysiega tylko koronie Westeros, najezdzcy po ladowaniu)
         {
             if (k == null || k.IsEliminated) return false;
             string id = k.StringId;

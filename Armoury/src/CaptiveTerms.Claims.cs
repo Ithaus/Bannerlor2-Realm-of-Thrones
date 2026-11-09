@@ -74,7 +74,9 @@ namespace Armoury
         private static char _pkgKind = ' ';
         private static long _pkgGold;
 
-        private static void ClearClaims() { _claims = null; _pkg = new List<Pick367>(); _pkgKind = ' '; _pkgGold = 0; }
+        private static bool _claimsF;   // 367b: _claims liczone dla warunku F (cena x FPriceMul, zgoda + FScoreBonus)
+
+        private static void ClearClaims() { _claims = null; _claimsF = false; _pkg = new List<Pick367>(); _pkgKind = ' '; _pkgGold = 0; }
 
         private static long R100(double v) { return v > 0 ? (long)(Math.Round(v / 100.0) * 100) : 0; }
         private static int YearDays() { return Math.Max(28, 4 * LandValue.DaysInSeason()); }
@@ -82,10 +84,10 @@ namespace Armoury
         /// <summary>Roszczenia wasali w biezacej rozmowie (raz na rozmowe; spis do logu).</summary>
         private static List<Claim> TalkClaims()
         {
-            if (_claims != null) return _claims;
-            _claims = new List<Claim>();
+            if (_claims != null && _claimsF == _fTalk) return _claims;   // 367b: po wyborze F - spis od nowa z cena F
+            _claims = new List<Claim>(); _claimsF = _fTalk;
             if (_talk == null || !ClaimsOn) return _claims;
-            try { _claims = ClaimsFor(_talk); LogClaims(_talk, _claims); }
+            try { _claims = ClaimsFor(_talk, _fTalk); LogClaims(_talk, _claims, _fTalk); }
             catch (Exception e) { Stumble("TalkClaims", e); _claims = new List<Claim>(); }
             return _claims;
         }
@@ -93,7 +95,7 @@ namespace Armoury
         private static bool HasClaims() { try { return ClaimsOn && _talk != null && TalkClaims().Count > 0; } catch { return false; } }
 
         // ------------------------------------------------------------ spis, cena, zgoda
-        private static List<Claim> ClaimsFor(Hero king)
+        private static List<Claim> ClaimsFor(Hero king, bool f)
         {
             var by = new Dictionary<Hero, Claim>();
             var order = new List<Claim>();
@@ -142,7 +144,7 @@ namespace Armoury
             }
             foreach (var c in order)
             {
-                try { NameList(c); PriceAndScore(king, c); }
+                try { NameList(c); PriceAndScore(king, c, f); }
                 catch (Exception e) { Stumble("ClaimsFor(cena)", e); c.Ask = 0; c.SGold = c.SWed = -1; }
             }
             order.Sort((a, b) => b.Ask.CompareTo(a.Ask));
@@ -180,7 +182,9 @@ namespace Armoury
             catch { return false; }
         }
 
-        private static void PriceAndScore(Hero king, Claim c)
+        /// <summary>367b: f - warunek F (gracz przechodzi pod korone krola): posiadacz zyskuje nowego sasiada-wasala tej samej korony i zgode swego krola, wiec cena
+        /// x FPriceMul (0.75) i zgoda + FScoreBonus (10).</summary>
+        private static void PriceAndScore(Hero king, Claim c, bool f)
         {
             var me = Hero.MainHero;
             var h = c.Holder;
@@ -197,16 +201,17 @@ namespace Armoury
             double fCechy = 1 + 0.15 * Math.Max(0, calc) - 0.10 * Math.Max(0, gen);
             double fKrol = 1 - 0.0015 * Math.Max(-100, Math.Min(100, relK));
             double fNeed = need ? 0.9 : 1.0;
-            c.Factor = fCharm * fRel * fCechy * fKrol * fNeed;
+            double fF = f ? FPriceMul : 1.0;
+            c.Factor = fCharm * fRel * fCechy * fKrol * fNeed * fF;
             c.Ask = R100(c.Sum * c.Factor);
             c.FactorPl = "fCharm " + fCharm.ToString("0.###", Inv) + " (Charm " + charm + "), fRel " + fRel.ToString("0.###", Inv) + " (" + relMe + "), fCechy " + fCechy.ToString("0.###", Inv)
                        + " (Calculating " + calc + ", Generosity " + gen + "), fKrol " + fKrol.ToString("0.###", Inv) + " (" + relK + "), fPotrzeba " + fNeed.ToString("0.##", Inv) + " (" + needPl + ")"
-                       + " = x" + c.Factor.ToString("0.###", Inv);
-            double S = 10 + 0.25 * relMe + 0.15 * relK + charm / 10.0 + lord / 20.0 + 5 * honor - 6 * Math.Max(0, valor) - (c.SeatName != null ? 20 : 0) + (need ? 10 : 0);
+                       + (f ? ", fF " + fF.ToString("0.##", Inv) + " (367b przysiega)" : "") + " = x" + c.Factor.ToString("0.###", Inv);
+            double S = 10 + 0.25 * relMe + 0.15 * relK + charm / 10.0 + lord / 20.0 + 5 * honor - 6 * Math.Max(0, valor) - (c.SeatName != null ? 20 : 0) + (need ? 10 : 0) + (f ? FScoreBonus : 0);
             c.SGold = S; c.SWed = S + WedScoreBonus;
             if (c.Ask > int.MaxValue) { c.Ask = 0; c.SGold = c.SWed = -1; }   // poza zasiegiem przelewu - ani zloto, ani slub krewnej za 40% (recenzja: bylby za darmo)
             c.ScorePl = "10 + rel " + F(0.25 * relMe) + " + krol " + F(0.15 * relK) + " + Charm " + F(charm / 10.0) + " + Lordship " + F(lord / 20.0) + " + Honor " + F(5 * honor)
-                      + " - Valor " + F(6 * Math.Max(0, valor)) + (c.SeatName != null ? " - siedziba 20" : "") + (need ? " + potrzeba 10" : "");
+                      + " - Valor " + F(6 * Math.Max(0, valor)) + (c.SeatName != null ? " - siedziba 20" : "") + (need ? " + potrzeba 10" : "") + (f ? " + przysiega " + F(FScoreBonus) : "");
             c.CoolDays = CoolLeftV(king, h);
         }
 
@@ -467,6 +472,7 @@ namespace Armoury
                 }
                 MBTextManager.SetTextVariable("ARM367_TOTAL", g0.ToString("N0", Inv));
                 MBTextManager.SetTextVariable("ARM367_WED", "Seal it with marriage: " + Join(pairs) + ", and pay the rest (" + g1.ToString("N0", Inv) + " denars).");
+                MBTextManager.SetTextVariable("ARM367_FWED", "I swear it, and seal it with marriage: " + Join(pairs) + " (" + g1.ToString("N0", Inv) + " denars).");   // 367b
                 return true;
             }
             catch (Exception e) { Stumble("ClaimsLineCond", e); MBTextManager.SetTextVariable("ARM367_CLAIMS", "My lords will not answer now."); return true; }
@@ -612,13 +618,13 @@ namespace Armoury
             return ParseCode(code).Count == code.Split('~').Length;
         }
 
-        private static void LogClaims(Hero king, List<Claim> cl)
+        private static void LogClaims(Hero king, List<Claim> cl, bool f)
         {
             var sb = new StringBuilder(600);
             string own; var mine = TitlesFor(king, out own);
             sb.Append(Tag367).Append(": spis roszczen - ").Append(king.MapFaction != null && king.MapFaction.Leader == king ? "krol " : "nastepca ").Append(Name(king))
               .Append(" | jego pieczec (366 T, za darmo): ").Append(mine.Count).Append(" (").Append(own).Append(") | rok ").Append(YearDays()).Append(" dob, lata ")
-              .Append(F(Settings.Current.CaptiveTitleClaimYears)).Append(" | posiadaczy ").Append(cl.Count);
+              .Append(F(Settings.Current.CaptiveTitleClaimYears)).Append(" | posiadaczy ").Append(cl.Count).Append(f ? " | 367b warunek F (cena x" + FPriceMul.ToString("0.##", Inv) + ", zgoda +" + F(FScoreBonus) + ")" : "");
             foreach (var c in cl)
             {
                 sb.Append(" || ").Append(Name(c.Holder)).Append(" (").Append(c.Holder.Clan != null ? c.Holder.Clan.Name.ToString() : "-").Append(") - ").Append(c.Rows)
@@ -654,7 +660,7 @@ namespace Armoury
             en = pl = null;
             var wants = ParseCode(d.Claims);
             if (wants.Count == 0) { en = "the claims of his lords could not be read."; pl = "brak roszczen w umowie"; return null; }
-            var now = ClaimsFor(king);
+            var now = ClaimsFor(king, d.Cond == 'F');   // 367b: przy F przed zmiana krolestwa (posiadacze jeszcze w koronie krola, nie gracza)
             var res = new List<Pick367>();
             foreach (var w in wants)
             {

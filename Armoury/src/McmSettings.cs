@@ -11720,6 +11720,10 @@ namespace Armoury
         [SettingPropertyGroup("Terms with a captive king (366)")]
         public float CaptiveTitleClaimYears { get; set; } = 5f;
 
+        [SettingPropertyBool("Captive Terms Bend The Knee", HintText = "On a captive king you hold, you may offer to bend the knee: he goes free, and your house leaves its crown and is sworn to his for a year, keeping all its fiefs. His lords may still hold Banner Kings titles to your lands: pay them (at a quarter less), seal it with a marriage, or let the titles wait - then your villages' dues go to their holders. Your old crown loses his ransom and every reward it still owes you; its ruler and lords will not forgive it. The game frees without ransom the captives you hold from realms at peace with your new crown, ends your influence and takes your workshops in the towns of your new enemies. Only when your crowns are at war, you serve as a vassal (not a ruler or mercenary), your house is not in battle, siege or an army, and none of your holdings is under siege. Off = no such offer", RequireRestart = false)]
+        [SettingPropertyGroup("Terms with a captive king (366)")]
+        public bool CaptiveTermsBendKnee { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -14649,6 +14653,7 @@ namespace Armoury
             s.CaptiveTerms = CaptiveTerms;
             s.CaptiveTermsVassalTitles = CaptiveTermsVassalTitles;
             s.CaptiveTitleClaimYears = CaptiveTitleClaimYears;
+            s.CaptiveTermsBendKnee = CaptiveTermsBendKnee;
         }
 
         internal static void Apply()
