@@ -144,6 +144,14 @@ namespace Armoury
                 Claim c;
                 if (nc == pc)
                 {
+                    // gracz krolem: gra daje zdobyta osade wladcy (rodowi gracza), ale lenno jest jeszcze otwarte (IsOwnerUnassigned
+                    // ustawia nasluch gry po nas) - roszczenie czeka na nadanie, nie znika (Handover zdejmie je, gdy osada zostanie u gracza)
+                    if (detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege && openToClaim && oc != pc && _claims.TryGetValue(st.StringId, out c))
+                    {
+                        c.Pending = hour;
+                        Log.Info(Tag + "dzien " + (hour / 24) + " | " + Nm(st) + " [" + st.StringId + "] ODBITA przez rod gracza (wladca) - lenno otwarte, roszczenie czeka na nadanie.");
+                        return;
+                    }
                     if (_claims.Remove(st.StringId)) Log.Info(Tag + "dzien " + (hour / 24) + " | " + Nm(st) + " [" + st.StringId + "] znow u rodu gracza (" + detail + ") - roszczenie spelnione | roszczen " + _claims.Count + ".");
                     return;
                 }
@@ -217,7 +225,6 @@ namespace Armoury
             var st = Settlement.Find(id);
             var pc = Clan.PlayerClan;
             if (st == null || st.Town == null) { _claims.Remove(id); Log.Info(Tag + id + " - osady nie ma, roszczenie usuniete."); return; }
-            if (st.OwnerClan == pc) { _claims.Remove(id); return; }
             if (pc == null || st.MapFaction == null || st.MapFaction != pc.MapFaction)
             {
                 c.Pending = -1; _waitSaid.Remove(id);
@@ -232,6 +239,7 @@ namespace Armoury
                     var sd = d as SettlementClaimantDecision;
                     if (sd != null && sd.Settlement == st) { Wait(id, "decyzja krolestwa o lennie w toku"); return; }
                 }
+            if (st.OwnerClan == pc) { _claims.Remove(id); _waitSaid.Remove(id); _err.Remove(id); Log.Info(Tag + "dzien " + (NowHour / 24) + " | " + Nm(st) + " [" + id + "] lenno rozstrzygniete - u rodu gracza, roszczenie spelnione | roszczen " + _claims.Count + "."); return; }
             if (st.IsUnderSiege || (st.Party != null && st.Party.MapEvent != null)) { Wait(id, "oblezenie albo bitwa przy osadzie"); return; }
             if (st.OwnerClan == null || st.OwnerClan.Leader == null) { Wait(id, "pan bez glowy rodu"); return; }
             var me = pc.Leader;
@@ -273,8 +281,16 @@ namespace Armoury
                 if (bk) { try { var t = LandBk.Title(st); dj = t != null ? LandBk.DeJure(t) : null; } catch (Exception e) { Stumble("Fix.title", e); } }
                 bool titleMine = dj != null && pc != null && dj.Clan == pc;
                 bool sameKingdom = pc != null && pc.Kingdom != null && oc.Kingdom == pc.Kingdom;
-                // wyznacznik: slad zwrotu 326b (weto Polnocy na Ashemark) + tytul BK de iure w rodzie gracza (kupiony w 367b); bez BK - Marbrand w krolestwie gracza
-                bool ok = veto && (titleMine || (!bk && sameKingdom));
+                // wyznacznik: slad zwrotu 326b (weto Polnocy na Ashemark) + tytul BK de iure w rodzie gracza (kupiony w 367b);
+                // bez BK nie zgadujemy slabszym testem - czekamy (najwyzej FixMaxHours prob), potem rezygnacja bez zmian
+                if (veto && !bk)
+                {
+                    _fixTries++;
+                    if (_fixTries >= FixMaxHours) { FixDone("porzucona po " + _fixTries + " probach - BK (tytul de iure) niegotowy, bez zmian"); return; }
+                    FixWait("BK niegotowy - tytul de iure nieznany");
+                    return;
+                }
+                bool ok = veto && titleMine;
                 if (!ok)
                 {
                     FixDone("warunki niespelnione - weto 326b " + (veto ? "TAK" : "NIE") + ", tytul BK de iure " + (bk ? (dj != null ? dj.Name + (titleMine ? " (rod gracza)" : "") : "-") : "BK brak")
