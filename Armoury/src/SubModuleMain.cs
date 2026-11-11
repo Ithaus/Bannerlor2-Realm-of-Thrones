@@ -730,6 +730,9 @@ namespace Armoury
                 // 414: liczniki oslony tarcz (strzaly i belty / bron miotana / pociski przebijajace) - linia "Tarcze (414): koniec misji"
                 if (Campaign.Current != null && mission != null && Settings.Current.ShieldMissileGuardEnabled)
                     mission.AddMissionBehavior(new ShieldGuard.Logic());
+                // 415: szyja / barki z helmu i pancerza tulowia, lezacy - liczniki trafien wedlug czesci ciala i linia "Szyja i barki (415): koniec misji"
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new NeckGuard415.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)

@@ -524,6 +524,22 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool WornWeaponStillBites { get; set; } = true;
 
+        [SettingPropertyBool("Helmet Guards Neck, Armour Guards Shoulders", HintText = "With Realistic Battle Mod: a helmet guards the neck with a share of its head armour (Neck From Helmet Share) and a body armour guards the shoulders with a share of its body armour (Shoulder From Body Share), so a knight in plate no longer falls to a single spear or arrow in the neck or to a few blows on an unarmoured shoulder. Realm of Thrones helmets carry no neck armour and its body armours have weak shoulders. A helmet that already has neck armour and pauldrons better than the share are left as they are; a hit in the face or under the arm stays a weak spot. Off = as before this change. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 415).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool NeckShoulderCoverEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Neck From Helmet Share", 0.00f, 1.00f, "0.00", HintText = "With Helmet Guards Neck, Armour Guards Shoulders: the neck gets at least this share of the helmet's head armour on top of the collar of the body armour. 0.20 = a plate helmet (head 97) adds 19, so a one-handed spear thrust in a knight's neck deals about 66 instead of 133 and a 100-pound bow about 16 instead of 70; a mail coif adds 12, a leather cap 6. 0 = no neck cover from the helmet.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float NeckFromHelmetShare { get; set; } = 0.20f;
+
+        [SettingPropertyFloatingInteger("Shoulder From Body Share", 0.00f, 1.00f, "0.00", HintText = "With Helmet Guards Neck, Armour Guards Shoulders: the shoulders are protected by at least this share of the body armour's body value; pauldrons that give more are left as they are. 0.50 = plate without pauldrons 24 -> 60 (a spear thrust 13 instead of 53), mail 18 -> 44 (25 instead of 61), a gambeson 12 -> 30 (44 instead of 69). 0 = shoulders as before.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float ShoulderFromBodyShare { get; set; } = 0.50f;
+
+        [SettingPropertyFloatingInteger("Prone Armor Percent", 0.00f, 100.00f, "0", HintText = "With Realistic Battle Mod: percent of his armour a man knocked down on the ground keeps against the blow that finishes him. Realistic Battle Mod counts 75 for both a man knocked down and a man merely staggered; this slider changes the knocked-down man only. 50 = a fallen man in mail takes 37 from a spear thrust in the chest instead of 18, in a gambeson 66 instead of 34; plate still holds against one-handed weapons, but its blunt hurt rises. 75 = as before this change. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 415).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float ProneArmorPercent { get; set; } = 50f;
+
         [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ArmorPoolMinPoints { get; set; } = 40;
@@ -12470,6 +12486,10 @@ namespace Armoury
             s.ConditionPenaltyMax = ConditionPenaltyMax;
             s.ConditionPenaltyExponent = ConditionPenaltyExponent;
             s.WornWeaponStillBites = WornWeaponStillBites;
+            s.NeckShoulderCoverEnabled = NeckShoulderCoverEnabled;
+            s.NeckFromHelmetShare = NeckFromHelmetShare;
+            s.ShoulderFromBodyShare = ShoulderFromBodyShare;
+            s.ProneArmorPercent = ProneArmorPercent;
             s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;
