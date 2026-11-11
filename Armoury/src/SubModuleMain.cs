@@ -736,6 +736,9 @@ namespace Armoury
                 // 416: premia pancerza wypoczetego (RBM x1.0-1.3) - liczniki ciosow w wypoczetych / zmeczonych i linia "Wypoczety (416): koniec misji"
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new RestedArmor416.Logic());
+                // 417: mloty 2h z rodzimym obuchem i buzdygany 2h - liczniki ciosow i trafien, linia "Mloty (417): koniec misji"
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new BluntHammers417.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)

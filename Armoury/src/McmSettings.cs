@@ -544,6 +544,14 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool RestedArmorBonusRemoved { get; set; } = true;
 
+        [SettingPropertyBool("Two Handed Hammers Strike As Hammers", HintText = "With Realistic Battle Mod: two-handed hammers strike as hammers. Realm of Thrones stores its two-handed war hammers (Robert Baratheon's, Gendry's, the Westerling hammer, the sledgehammer) and the giant club as two-handed axes with a blunt head, and Realistic Battle Mod counts a blunt blow from an axe as a blow with the wooden shaft - about a quarter of the force of a two-handed mace. On = a swing of a two-handed axe whose head is blunt by its own data is counted with the two-handed mace skill window (Robert's hammer at skill 100: about 24 instead of 6 through plate, 36 instead of 9 through a gambeson, 118 instead of 30 on an unarmoured man). An ordinary axe that lands with its shaft stays as weak as before. Swing speed and posture cost stay those of an axe. Off = as before this change. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 417).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool NativeBluntHammersEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Two Handed Mace Skill Scale Fix", HintText = "With Realistic Battle Mod: repairs the skill scale of two-handed maces. Realistic Battle Mod adds 1.125 of the wielder's skill to the swing of a two-handed mace where every related weapon adds 0.075 to 0.199 - a misplaced decimal point, so every blow lands at the very top of its range no matter how it was swung and a recruit with a maul hits like a master. On = 0.1125 (the one-handed mace scale times 1.5, as swords and axes go from one hand to two): the two-handed maces lose 5 to 10 percent, the peasant maul about a quarter, and a poor swing is weaker than a good one. With Two Handed Hammers Strike As Hammers the hammers use the same scale. Off = as before this change. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 417).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool TwoHandedMaceSkillScaleFix { get; set; } = true;
+
         [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ArmorPoolMinPoints { get; set; } = 40;
@@ -12495,6 +12503,8 @@ namespace Armoury
             s.ShoulderFromBodyShare = ShoulderFromBodyShare;
             s.ProneArmorPercent = ProneArmorPercent;
             s.RestedArmorBonusRemoved = RestedArmorBonusRemoved;
+            s.NativeBluntHammersEnabled = NativeBluntHammersEnabled;
+            s.TwoHandedMaceSkillScaleFix = TwoHandedMaceSkillScaleFix;
             s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;
