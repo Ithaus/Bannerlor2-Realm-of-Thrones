@@ -193,7 +193,10 @@ namespace Armoury
                 int left = 0, dmen = 0;
                 try { left = me.AttackerSide.TroopCount; dmen = me.DefenderSide.TroopCount; } catch { }
                 Repel(me, a, left, dmen, false);
-                _dMisRegistered++;
+                // 387f-p: przerwa po szturmie armii AI z graczem w szeregu liczona osobno (linia doby 387f), nie w "misji z graczem w obronie"
+                bool al = false;
+                try { al = me.IsPlayerMapEvent && me.PlayerSide == BattleSideEnum.Attacker; } catch { al = false; }
+                if (al) NoteArmyRegistered(); else _dMisRegistered++;
             }
             catch (Exception e) { Stumble("RegisterMissionBreak", e); }
         }

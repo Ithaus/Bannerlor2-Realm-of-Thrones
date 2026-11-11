@@ -157,7 +157,8 @@ namespace Armoury
                     if (!SiegeWalls.PlayerBreakOn) return _active = false;
                     if (!pt.IsPlayerGeneral || !lead)
                     {
-                        Log.Info("Szturm (387): gracz atakuje, ale " + (lead ? "nie jest generalem misji mimo bycia wodzem bitwy" : "jest generalem misji bez bycia wodzem bitwy") + " - bez zalamania, jak dotad.");
+                        if (!lead) SiegeWalls.NoteArmyGeneral();   // 387f-p: licznik doby (gracz dolaczyl do oblezenia bez armii - gra robi go generalem misji)
+                        Log.Info("Szturm (387): gracz atakuje, ale " + (lead ? "nie jest generalem misji mimo bycia wodzem bitwy" : "jest generalem misji bez bycia wodzem bitwy (dolaczyl do oblezenia bez armii - 387f go nie obejmuje)") + " - bez zalamania, jak dotad.");
                         return _active = false;
                     }
                     SiegeWalls.NotePlayerSeen();
@@ -288,7 +289,7 @@ namespace Armoury
             if (_dTot <= 0) _dTot = Math.Max(_def0, _a.Def0);                    // 371b: zapas, gdy spawner inny
             _n = Math.Max(1.0, (_total > 0 ? _total : _a.Men0) / (double)Math.Max(1, _dTot));
             _a.Missions++;
-            Log.Info("Szturm (371): start misji" + (_pl ? " (GRACZ dowodzi, 387)" : _al ? " (gracz w armii AI, 387f: " + (TaleWorlds.CampaignSystem.Party.MobileParty.MainParty != null && TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.Army != null ? "w armii" : "obok armii") + ")" : "") + " | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " (" + _a.FWTxt + ") | armia na starcie szturmu " + _a.Men0
+            Log.Info("Szturm (371): start misji" + (_pl ? " (GRACZ dowodzi, 387)" : _al ? " (gracz w armii AI, 387f: " + (TaleWorlds.CampaignSystem.Party.MobileParty.MainParty != null && TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.Army != null ? "w armii" : "bez armii - zaciag ROT z CommandFormation?") + ")" : "") + " | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " (" + _a.FWTxt + ") | armia na starcie szturmu " + _a.Men0
                      + ", obroncow " + _a.Def0 + " | oddzial szturmowy K " + _a.K + ", w misji K_m " + _km + " (misja wystawi " + _total + ") | prog " + F(_thr * 100.0, "0.0")
                      + "% (OB2 " + F(_a.Thr * 100.0, "0.0") + "% x wodz " + F(_a.FW, "0.00") + ") = " + F(_thr * _km, "0") + " strat | straty z poprzednich misji tej bitwy " + _prior
                      + " | tarany i wieze w misji " + _engines + ", wodz atakujacych w misji " + (_general != null ? "tak" : "nie") + ", obroncow w misji " + _def0
@@ -472,7 +473,15 @@ namespace Armoury
             {
                 if (_al)
                 {
-                    string ln = _a.Leader != null && _a.Leader.Length > 0 && _a.Leader != "-" ? _a.Leader : "the commander";
+                    // 387f-p: imie wodza z bohatera (rekord _a.Leader bywa identyfikatorem partii albo "?")
+                    string ln = "the commander";
+                    try
+                    {
+                        var lp = _me != null && _me.AttackerSide != null ? _me.AttackerSide.LeaderParty : null;
+                        var lh = lp != null ? lp.LeaderHero : null;
+                        if (lh != null && lh.Name != null) ln = lh.Name.ToString();
+                    }
+                    catch { ln = "the commander"; }
                     InformationManager.DisplayMessage(new InformationMessage(_byTime ? "The assault has dragged on too long - " + ln + " calls it off. Fall back to the siege lines." : "The assault breaks - " + ln + " sounds the retreat. Fall back to the siege lines.", Color.FromUint(0xFFE07040u)));
                 }
                 else if (_pl) InformationManager.DisplayMessage(new InformationMessage(_byTime ? "The assault has dragged on too long - your men fall back to the siege lines." : "Your men have had enough - the assault breaks. They fall back to the siege lines.", Color.FromUint(0xFFE07040u)));

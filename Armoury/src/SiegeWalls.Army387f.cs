@@ -38,11 +38,14 @@ namespace Armoury
         private static Assault _alPendA;
         private static bool _alPendFuse;
         private static int _dAlSeen, _dAlNone, _dAlWarn, _dAlBreak, _dAlFuse, _dAlLate, _dAlFinished, _dAlSkipped;
+        private static int _dAlGen, _dAlReg, _dAlWait, _dAlMend;   // 387f-p: general bez bycia wodzem bitwy (poza regula), przerwy zapisane po 387f, proby poza mapa, naprawy polstanu
         private static string _hookAl = "nie zakladana";
 
         internal static void NoteArmySeen() { _dAlSeen++; }
         internal static void NoteArmyNone() { _dAlNone++; }
         internal static void NoteArmyWarn() { _dAlWarn++; }
+        internal static void NoteArmyGeneral() { _dAlGen++; }   // 387f-p: gracz generalem misji bez bycia wodzem bitwy (dolaczyl do oblezenia bez armii) - bez zalamania
+        internal static void NoteArmyRegistered() { _dAlReg++; }
 
         /// <summary>387f (SiegeBreak371.OnEndMission, tryb _al): szturm armii AI zalamal sie w misji z graczem w szeregu i misja nie skonczyla sie
         /// zwyciestwem atakujacych - bitwe zakonczy postfiks PlayerEncounter.ContinueBattle. Tylko pamiec. Nie rzuca.</summary>
@@ -61,13 +64,14 @@ namespace Armoury
 
         private static void Reset387f() { _alPend = null; _alPendA = null; _alPendFuse = false; ZeroDay387f(); }
 
-        private static void ZeroDay387f() { _dAlSeen = _dAlNone = _dAlWarn = _dAlBreak = _dAlFuse = _dAlLate = _dAlFinished = _dAlSkipped = 0; }
+        private static void ZeroDay387f() { _dAlSeen = _dAlNone = _dAlWarn = _dAlBreak = _dAlFuse = _dAlLate = _dAlFinished = _dAlSkipped = _dAlGen = _dAlReg = _dAlWait = _dAlMend = 0; }
 
         private static string Day387fText()
         {
             return "; 387f szturm armii AI z graczem " + (ArmyBreakOn ? "tak" : "nie") + ": misji z graczem w szeregu " + _dAlSeen + ", poza regula " + _dAlNone + ", ostrzezen 75% " + _dAlWarn
                  + ", zalaman " + _dAlBreak + " (bezpiecznik " + _dAlFuse + ", wystawionych po zalamaniu " + _dAlLate + "), bitew zakonczonych " + _dAlFinished + ", pominietych " + _dAlSkipped
-                 + " (latka " + _hookAl + ")";
+                 + ", przerw zapisanych " + _dAlReg + ", gracz generalem bez bycia wodzem bitwy (bez zalamania) " + _dAlGen
+                 + (_dAlWait > 0 ? ", prob poza mapa " + _dAlWait : "") + (_dAlMend > 0 ? ", naprawionych polstanow " + _dAlMend : "") + " (latka " + _hookAl + ")";
         }
 
         private static string Start387fText()
@@ -109,6 +113,18 @@ namespace Armoury
             var me = _alPend;
             if (me == null) return;
             var a = _alPendA; bool fuse = _alPendFuse;
+            // 387f-p: Finish -> GameMenu.ExitToLast zaklada mape. Poza MapState oczekiwania NIE zuzywamy - zostaje do nastepnego ContinueBattle
+            // (kasuje je i tak ArmyEventEnded / Reset). Mission.Current celowo nie sprawdzane: on_init menu "encounter" biegnie z MapState.OnActivate.
+            try
+            {
+                var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
+                if (gsm == null || !(gsm.ActiveState is TaleWorlds.CampaignSystem.GameState.MapState))
+                {
+                    if (_dAlWait++ == 0) Log.Info("Szturm (387f): ContinueBattle poza mapa (" + (gsm != null && gsm.ActiveState != null ? gsm.ActiveState.GetType().Name : "brak stanu") + ") - zakonczenie bitwy czeka na nastepne wywolanie.");
+                    return;
+                }
+            }
+            catch (Exception e) { Stumble("ContinueBattlePost.State", e); return; }
             _alPend = null; _alPendA = null;                                     // jedna proba na zalamanie - nieudana = menu "encounter" jak w grze
             string no;
             try { no = ArmyEndBlock(me, a); }
@@ -142,7 +158,25 @@ namespace Armoury
                 if (PlayerEncounter.Current != null) PlayerEncounter.Finish(false);   // zamyka menu "encounter" (ExitToLast); menu oblezenia otwiera sama gra
                 closed = PlayerEncounter.Current == null;
             }
-            catch (Exception e) { Stumble("ContinueBattlePost.Finish", e); }
+            catch (Exception e)
+            {
+                Stumble("ContinueBattlePost.Finish", e);
+                // 387f-p: spotkanie nie zamkniete - gra domknie je sama przy nastepnym Update (PlayerEncounter.UpdateInternal: _leaveEncounter -> Finish)
+                try { if (PlayerEncounter.Current != null) PlayerEncounter.LeaveEncounter = true; } catch (Exception e2) { Stumble("ContinueBattlePost.Leave", e2); }
+            }
+            // 387f-p: polstan po wyjatku cudzego nasluchu MapEventEnded w srodku FinalizeEventAux (bitwa WaitingRemoval, strony nie posprzatane) -
+            // druzyna gracza nie moze wskazywac zakonczonej bitwy (GetGenericStateMenu dalby "encounter" bez spotkania)
+            try
+            {
+                var mpb = PartyBase.MainParty;
+                if (mpb != null && mpb.MapEventSide != null && ReferenceEquals(mpb.MapEvent, me) && me.IsFinalized)
+                {
+                    mpb.MapEventSide = null;
+                    _dAlMend++;
+                    Log.Info("Szturm (387f): polstan po zakonczeniu bitwy - druzyna gracza zdjeta ze strony zakonczonej bitwy (wyjatek cudzego nasluchu MapEventEnded? patrz bledy wyzej).");
+                }
+            }
+            catch (Exception e) { Stumble("ContinueBattlePost.Mend", e); }
             _dAlFinished++;
             double left = 0.0;
             try { left = st.SiegeEvent != null && ReferenceEquals(st.SiegeEvent, ev) ? RepelPauseLeftDays(ev) : 0.0; } catch (Exception e) { Stumble("ContinueBattlePost.Pause", e); }
