@@ -42,6 +42,7 @@ namespace Armoury
         private static int _dBesClick, _dBesShown, _dBesAcc, _dBesRef, _dBesFail, _dBesBlocked, _dBesAssaultBlocked, _dParleyNoLeader;
         private static string _hookParley = "nie zakladana";
         private static string _hookOption = "nie dodana", _hookBesiege = "nie zakladana", _hookAssaultOpt = "nie zakladana";
+        internal static string HookBesiegeText { get { return _hookBesiege; } }   // 406: linia startu pogrzebow
 
         // regula dla opcji - pamiec na godzine gry (gra odswieza warunki menu oczekiwania co klatke)
         private static SiegeEvent _cEv;
@@ -228,7 +229,9 @@ namespace Armoury
         /// <summary>Postfiks EncounterGameMenuBehavior.game_menu_town_town_besiege_on_condition: rozejm frakcji albo rodu gracza z ta osada - opcja nieczynna z dymkiem. Nie rzuca.</summary>
         public static void BesiegeCondPost(MenuCallbackArgs __0, ref bool __result)
         {
-            if (!__result || _truce.Count == 0) return;
+            if (!__result) return;
+            if (FuneralRites.PlayerBesiege(__0)) return;   // 406: pokoj pogrzebu - niezalezny od klucza okupow; bez pogrzebow jedno porownanie
+            if (_truce.Count == 0) return;
             try
             {
                 if (!ActOn || __0 == null || Hero.MainHero == null) return;

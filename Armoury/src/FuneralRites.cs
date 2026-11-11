@@ -37,8 +37,9 @@ namespace Armoury
     /// przelaczania menu) i "Give {GOLD} denars for the rites" (GiveGoldAction gracz -> dziedzic, +2, raz). AI nic nie placi i nic nie dostaje - jedyny przeplyw zlota.
     ///
     /// Nikogo nie zabijamy i nie okaleczamy (StoryGuard pytany tylko do linii: "dziedzic pod straza fabuly"). Wyjatki per zdarzenie liczone (potkniecia), nic sie nie
-    /// gasi. Zapis arm_funeral "v1" (stary zapis = pusto). Reset: konstruktor ArmouryBehavior i OnGameEnd.</summary>
-    internal static class FuneralRites
+    /// gasi. Zapis arm_funeral "v1" (stary zapis = pusto). Reset: konstruktor ArmouryBehavior i OnGameEnd.
+    /// 406: pokoj pogrzebu (FuneralRites.Ai.cs) - migawka z wierszy PELNYCH, liczniki rozejmu w wierszu (tylko sesja, nie w zapisie).</summary>
+    internal static partial class FuneralRites
     {
         internal const string Tag = "Pogrzeby (P5)";
         internal const int Full = 0, Quiet = 1;
@@ -54,6 +55,8 @@ namespace Armoury
             public string Clan, Dead, Name, Heir, Seat, Kingdom, Why, Line, Others;   // rod, zmarly (id, imie), dziedzic, siedziba, krolestwo w chwili smierci, powod trybu, linia BK, inni zmarli
             public int Day, Rite, End, Mode, Gift;                                    // doba smierci, obrzedu, konca; tryb; dar gracza
             public bool King, Attended;                                               // glowa rodu panujacego; gracz byl
+            public int TZero, TBk, TPlayer, TPlayerDay;                               // 406 (tylko sesja): wyzerowane cele AI (Interlocked), weta BK, doby z zablokowana opcja gracza
+            public bool TSaid, TBroken;                                               // 406 (tylko sesja): linia pokoju napisana; siedziba oblegana mimo pokoju
         }
 
         private sealed class Pre
@@ -83,12 +86,13 @@ namespace Armoury
         {
             _active.Clear(); _pre.Clear(); _changed.Clear(); _leaderOf.Clear(); _tmp.Clear(); _err.Clear();
             _stumbles = _nPre = _nChg = _nSnap = _nFull = _nQuiet = _nWord = _nJoint = 0;
+            TruceReset();   // 406
         }
 
         private static void Stumble(string where, Exception e)
         {
-            _stumbles++;
-            try { if (_err.Add(where)) Log.Error("FuneralRites." + where, e); } catch { }
+            System.Threading.Interlocked.Increment(ref _stumbles);   // 406: takze z watkow AI (ocena celu)
+            try { bool first; lock (_err) first = _err.Add(where); if (first) Log.Error("FuneralRites." + where, e); } catch { }
         }
 
         private static bool KeyOn { get { var s = Settings.Current; return s != null && s.Funerals; } }
@@ -282,6 +286,7 @@ namespace Armoury
             if (why != null) { row.Mode = Quiet; row.Why = why; _nQuiet++; } else _nFull++;
             _active[cl.StringId] = row;
             Info(head + " | siedziba " + seat.StringId + " | tryb " + (row.Mode == Full ? "PELNY" : "CICHY (" + why + ")") + " | obrzed dnia " + row.Rite + ", koniec " + row.End + ".");
+            TruceRebuild();   // 406: pokoj pogrzebu - nowy wiersz pelny (albo wyparty na cichy)
             Widow(victim);
             if (!TellPlayer(cl, victim, heir, seat)) return;
             if (row.Mode == Full)
@@ -410,7 +415,7 @@ namespace Armoury
                     var r = _active[id];
                     _active.Remove(id);
                     Info("KONIEC " + id + " (" + r.Name + (string.IsNullOrEmpty(r.Others) ? "" : " + " + r.Others) + ", siedziba " + r.Seat + ", tryb " + (r.Mode == Full ? "pelny" : "cichy") + ") | gracz obecny "
-                         + (r.Attended ? "T" : "N") + ", dar " + r.Gift + " | sesja: glowy wykryte przed " + _nPre + " / zmiana glowy " + _nChg + " / migawka " + _nSnap + ", pelnych " + _nFull + ", cichych " + _nQuiet
+                         + (r.Attended ? "T" : "N") + ", dar " + r.Gift + (r.Mode == Full ? TruceEndText(r) : "") + " | sesja: glowy wykryte przed " + _nPre + " / zmiana glowy " + _nChg + " / migawka " + _nSnap + ", pelnych " + _nFull + ", cichych " + _nQuiet
                          + ", tylko wiesc " + _nWord + ", wspolnych " + _nJoint + ", potkniecia " + _stumbles + ".");
                 }
                 if (_changed.Count > 0)
@@ -424,6 +429,7 @@ namespace Armoury
                 _tmp.Clear();
             }
             catch (Exception e) { Stumble("Daily", e); }
+            try { TruceDaily(); } catch (Exception e) { Stumble("TruceDaily", e); }   // 406: migawka pokoju po wygaszeniu wierszy (stan fabuly i pan siedziby na dzis)
         }
 
         private static void Snapshot()
@@ -452,15 +458,17 @@ namespace Armoury
             }
             catch (Exception e) { _hookMenu = "BRAK (blad: " + e.Message + ")"; Stumble("AddMenus", e); }
             try { Snapshot(); } catch (Exception e) { Stumble("Snapshot(start)", e); }
+            TruceRebuild();   // 406: po wczytaniu (Import zostawia migawke pusta - osady sa pewne dopiero tutaj)
             try
             {
                 var s = Settings.Current;
                 int full = 0;
                 foreach (var r in _active.Values) if (r.Mode == Full) full++;
-                Log.Info(Tag + " (405): start | klucze: pogrzeby " + YN(s != null && s.Funerals) + ", dni " + Days + ", naraz " + MaxActive + " (1 na krolestwo), gracz " + YN(s != null && s.FuneralPlayerAttend)
-                         + ", dar " + (s != null ? s.FuneralGiftGold : 0) + ", cichy w kanonie " + YN(s != null && s.FuneralCanonQuiet) + ", log " + YN(s != null && s.FuneralLog)
+                Log.Info(Tag + " (405/406): start | klucze: pogrzeby " + YN(s != null && s.Funerals) + ", dni " + Days + ", naraz " + MaxActive + " (1 na krolestwo), gracz " + YN(s != null && s.FuneralPlayerAttend)
+                         + ", dar " + (s != null ? s.FuneralGiftGold : 0) + ", cichy w kanonie " + YN(s != null && s.FuneralCanonQuiet) + ", log " + YN(s != null && s.FuneralLog) + ", pokoj pogrzebu " + YN(s != null && s.FuneralTruce)
                          + " | sluchacz przed BK " + BeforeBk() + " | BK linia dziedziczenia " + YN(BkReady()) + " | kanon tutaj " + YN(SafeCanon())
-                         + " | menu siedziby " + _hookMenu + " | latki 0 | migawka glow " + _leaderOf.Count + " rodow | w zapisie " + _active.Count + " (pelnych " + full + ").");
+                         + " | menu siedziby " + _hookMenu + " | pokoj: ocena celu " + SiegeRansom.HookScoreText + ", weto BK FindArmyObjective " + WarFront334.BkHookText
+                         + ", opcja oblezenia gracza " + SiegeRansom.HookBesiegeText + ", osad w pokoju " + (_truce != null ? _truce.By.Count : 0) + " | latki wlasne 0 | migawka glow " + _leaderOf.Count + " rodow | w zapisie " + _active.Count + " (pelnych " + full + ").");
             }
             catch (Exception e) { Stumble("StartLine", e); }
         }
@@ -617,6 +625,7 @@ namespace Armoury
         internal static void Import(string data)
         {
             _active.Clear();
+            TruceReset();   // 406: migawka pokoju od nowa w AddMenus (po starcie sesji)
             int bad = 0;
             try
             {

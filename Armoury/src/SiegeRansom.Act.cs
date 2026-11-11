@@ -398,6 +398,8 @@ namespace Armoury
         {
             if (__result <= 0f) return;
             PrisonerTerms384.ScorePact(__0, __1, __2, ref __result);   // 384: pakt o nieagresji wobec ziem rodu gracza (oblezenie i najazd); bez paktow - jedno porownanie
+            if (__result <= 0f) return;
+            FuneralRites.ScoreTruce(__0, __1, __2, ref __result);      // 406: pokoj pogrzebu (siedziba i jej wsie; oblezenie i najazd); bez pogrzebow - jedno porownanie
             if (__result <= 0f || _truce.Count == 0 || __1 != Army.ArmyTypes.Besieger) return;
             try
             {
@@ -724,6 +726,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ latki rozejmu (w kampanii)
         private static string _hookScore = "nie zakladana";
+        internal static string HookScoreText { get { return _hookScore; } }   // 406: linia startu pogrzebow
 
         private static void EnsureHooksMore()
         {

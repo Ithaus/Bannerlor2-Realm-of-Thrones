@@ -12048,7 +12048,7 @@ namespace Armoury
         [SettingPropertyGroup("Dungeons: lords dying of fever and ransom couriers turned away (404)")]
         public bool RansomCourierStandingRefusal { get; set; } = true;
 
-        [SettingPropertyBool("Funerals", HintText = "When the head of a great house dies (a noble clan of tier 4 or more, or a ruling house), the house buries him at its seat: the funeral lasts Funeral Days, word of it reaches you, and you may attend. In this version the lords of the realm do not yet ride to the funeral and nothing changes for the armies. Never for your own clan, bandits, minor or rebel clans, the Night's Watch, the Free Folk or the Others. Off = no funerals", RequireRestart = false)]
+        [SettingPropertyBool("Funerals", HintText = "When the head of a great house dies (a noble clan of tier 4 or more, or a ruling house), the house buries him at its seat: the funeral lasts Funeral Days, word of it reaches you, and you may attend. With Funeral Truce nobody besieges the seat while the funeral lasts. In this version the lords of the realm do not yet ride to the funeral. Never for your own clan, bandits, minor or rebel clans, the Night's Watch, the Free Folk or the Others. Off = no funerals", RequireRestart = false)]
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public bool Funerals { get; set; } = true;
 
@@ -12075,6 +12075,10 @@ namespace Armoury
         [SettingPropertyBool("Funeral Log", HintText = "With Funerals: writes every death of a head of house, the funeral and its end to Armoury.log", RequireRestart = false)]
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public bool FuneralLog { get; set; } = true;
+
+        [SettingPropertyBool("Funeral Truce", HintText = "With Funerals: for the days of a full funeral no AI party picks the seat of the mourning house as a target to besiege, nor its villages to raid, armies are not called against it, and you cannot lay siege to it yourself. A siege or raid already under way is not lifted. Never for a quiet funeral, and never for a stronghold the Realm of Thrones story still needs for its own siege. Off = a funeral protects nobody", RequireRestart = false)]
+        [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
+        public bool FuneralTruce { get; set; } = true;
 
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
@@ -15294,6 +15298,7 @@ namespace Armoury
             s.FuneralGiftGold = FuneralGiftGold;
             s.FuneralCanonQuiet = FuneralCanonQuiet;
             s.FuneralLog = FuneralLog;
+            s.FuneralTruce = FuneralTruce;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;

@@ -141,6 +141,7 @@ namespace Armoury
         // ================================================================ latki
         private static bool _hooksTried;
         private static string _wBk = "BRAK", _wThink = "BRAK";
+        internal static string BkHookText { get { return _wBk == "ok" ? "TAK" : _wBk; } }   // 406: linia startu pogrzebow
 
         private static void EnsureHooks()
         {
@@ -305,6 +306,7 @@ namespace Armoury
         private static bool VetoedAny(Kingdom k, Settlement st, out string why, MobileParty leader, out bool local)
         {
             why = null; local = false;
+            if (FuneralRites.TruceVeto(st)) { why = "pokoj pogrzebu 406"; return true; }   // 406: siedziba / wies w pokoju pogrzebu (nie trwajace oblezenie); bez pogrzebow jedno porownanie
             int v = 0;
             try { v = CanonWarBalance.VetoFor(k, st); } catch { }
             if (v == 1) { why = "siedziba 274"; return true; }
@@ -328,7 +330,17 @@ namespace Armoury
             try
             {
                 var v = __result.Value;
-                if (v.Item2 != Army.ArmyTypes.Besieger || v.Item1 == null || !Canon) return;
+                if (v.Item2 != Army.ArmyTypes.Besieger || v.Item1 == null) return;
+                // 406: pokoj pogrzebu - w kazdej kampanii (takze poza kanonem) i przy kazdym kluczu: nastepny cel wedlug reguly BK (kanon + klucz BK nastepny cel) albo brak celu
+                if (FuneralRites.BkVeto(v.Item1))
+                {
+                    var nf = Canon && BkNextOn ? NextBkTarget(__0, __1) : null;   // NextBkTarget pomija cele w pokoju (VetoedAny)
+                    if (nf == null) { __result = null; return; }
+                    __result = new ValueTuple<Settlement, Army.ArmyTypes>(nf, Army.ArmyTypes.Besieger);
+                    _bkReplaced = true;
+                    return;
+                }
+                if (!Canon) return;
                 string why; bool local;
                 if (!VetoedAny(__1, v.Item1, out why, __0, out local)) return;
                 if (TheatreVeto(__1, v.Item1) != 0) _dVetoBk++;
