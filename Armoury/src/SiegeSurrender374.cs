@@ -301,7 +301,7 @@ namespace Armoury
         {
             // 395: ta sama linia co dotad; gdy poslaniec (385d) jest w drodze z warunkami o te twierdze - krotki dopisek takze na opcji, ktora gracz klika
             string t = "Then swear it before gods and men, and the gates open.";
-            try { if (_sc != null && PrisonerTerms384.EnvoyStakeNote(_st, true, false).Length > 0) t += " (My envoy's errand for this place is void.)"; }
+            try { if (_sc != null && PrisonerTerms384.EnvoyStakeNote(_st, true, false).Length > 0) t += " (If he agrees, my envoy's errand for this place is void.)"; }   // 395-p: tryb warunkowy - wodz moze odmowic
             catch (Exception e) { Stumble("GoCond", e); }
             MBTextManager.SetTextVariable("ARM374_GO", t);
             return _sc != null;

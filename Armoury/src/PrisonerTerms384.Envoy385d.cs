@@ -81,8 +81,10 @@ namespace Armoury
                     if (r != null && lp != null && lp.MapFaction == r.MapFaction && EnvoySpeaksFor(st))
                     {
                         kind = "poslaniec do " + _envHero + " w stanie " + _envState + " (bez umowy)";
-                        note = yielding ? " (Your envoy to " + Name(r) + " is still on the road to speak for this place; yielding now leaves him nothing to bargain for here.)"
-                                        : " (Your envoy to " + Name(r) + " is still on the road to speak for this place; a bargain struck here leaves him nothing to bargain for.)";
+                        // 395-p: stan W - poslaniec juz stoi przed wladca (menu "Hear your envoy"), nie jest "w drodze"
+                        string where = _envState == 'W' ? "Your envoy stands before " + Name(r) + " to speak for this place" : "Your envoy to " + Name(r) + " is still on the road to speak for this place";
+                        note = yielding ? " (" + where + "; yielding now leaves him nothing to bargain for here.)"
+                                        : " (" + where + "; a bargain struck here leaves him nothing to bargain for.)";
                     }
                 }
                 if (note == null) return "";

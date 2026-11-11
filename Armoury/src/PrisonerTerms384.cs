@@ -1373,8 +1373,8 @@ namespace Armoury
                 if (d.Want == 'T') { RunTruce(d, st, lord); return; }   // 385
                 if (d.Field) { RunField(d, lord); return; }             // 385
                 var ev = st != null ? st.SiegeEvent : null;
-                if (st == null || ev == null || Math.Abs(ev.SiegeStartTime.ToHours - d.Start) > 0.05) { Drop(d, st, d.Envoy ? "Your envoy is back, but the siege " + Place(st) + " is over. The terms he carried are void; nothing was handed over." : null, "oblezenie skonczylo sie przed wymiana - nic nie oddane" + (d.Envoy ? " (umowa poslanca)" : "")); return; }   // 395: przy umowie poslanca gracz dostaje komunikat
-                if (!FactionManager.IsAtWarAgainstFaction(lord.MapFaction, st.MapFaction)) { Drop(d, st, null, "pokoj miedzy stronami - nic nie oddane"); return; }
+                if (st == null || ev == null || Math.Abs(ev.SiegeStartTime.ToHours - d.Start) > 0.05) { Drop(d, st, d.Envoy ? "Your envoy is back, but the siege he rode out from" + (st != null ? " at " + Name(st) : "") + " is over. The terms he carried are void; nothing was handed over." : null, "oblezenie skonczylo sie przed wymiana - nic nie oddane" + (d.Envoy ? " (umowa poslanca)" : "")); return; }   // 395: przy umowie poslanca gracz dostaje komunikat
+                if (!FactionManager.IsAtWarAgainstFaction(lord.MapFaction, st.MapFaction)) { Drop(d, st, d.Envoy ? "Your envoy is back, but there is peace between the two sides now. The terms he carried are void; nothing was handed over." : null, "pokoj miedzy stronami - nic nie oddane" + (d.Envoy ? " (umowa poslanca)" : "")); return; }   // 395-p
                 if (SiegeSurrender374.CampBusy(st)) { Drop(d, st, "The terms agreed at " + Name(st) + " have lapsed amid the fighting.", "bitwa przy obozie dluzej niz doba"); return; }
                 var keys = SiegeRansom.CampKeys384(ev.BesiegerCamp);   // przed zwinieciem
                 string lift;
