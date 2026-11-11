@@ -4161,7 +4161,7 @@ namespace Armoury
                 var a = it.ArmorComponent;
                 int pts = it.Type == ItemObject.ItemTypeEnum.HorseHarness
                     ? HorseBarding419.BookBody(it, a.BodyArmor)   // 419: pula ladrow z sufitem - z pancerza sprzed sufitu
-                    : ArmourLadder423.BookSum(it, a.HeadArmor + a.BodyArmor + a.LegArmor + a.ArmArmor);   // 423: korpus ROT po drabinie - pula z tulowia sprzed mapowania
+                    : RotData418.BookSum(it, ArmourLadder423.BookSum(it, a.HeadArmor + a.BodyArmor + a.LegArmor + a.ArmArmor));   // 423: korpus ROT po drabinie - pula z tulowia sprzed mapowania; 418-p: suknie / stroje imienne / dany_hair - pula z pol sprzed 418
                 int tier = Recipes.Grade(it);
                 // wpis 95 (audyt zuzycia pkt 7): rekawice (10 pkt) i nogawice zuzywaly sie 5-8x szybciej niz napiersnik - podloga puli
                 pts = Math.Max(pts, Math.Max(1, Settings.Current.ArmorPoolMinPoints));

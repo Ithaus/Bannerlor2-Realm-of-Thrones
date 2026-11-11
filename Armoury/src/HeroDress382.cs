@@ -445,7 +445,9 @@ namespace Armoury
             if (Civvies.Armour(it)) return 0;
             if (Civvies.Female(it)) return 1;
             var ac = it.ArmorComponent;
-            if (it.IsCivilian && (ac == null || ArmourLadder423.BookBody(it, ac.BodyArmor) < 30)) return 2;   // 423: prog 30 w starej skali (49 sztuk *_garb itd. nie zmienia klasy)
+            // 423: prog 30 w starej skali (49 sztuk *_garb itd. nie zmienia klasy); 418-p: stroje Varysa / Tyriona / Baelisha (99 -> 14 po 418) licza sie
+            // wartoscia sprzed 418 - zostaja "zbroja" jak w naglowku 382c (382c ich nie przebiera, HeroArms389 nie doposaza)
+            if (it.IsCivilian && (ac == null || RotData418.BookBody(it, ArmourLadder423.BookBody(it, ac.BodyArmor)) < 30)) return 2;
             return 0;
         }
 

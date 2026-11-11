@@ -911,7 +911,7 @@ namespace Armoury
                 starter.AddBehavior(new RotBows420());   // 420: strzaly dla lukow spoza listy ROT (OnSessionLaunched PRZED ArmouryBehavior - spisy ze wzorcow widza zestawy po podmianie) + luki lore z pelna energia (OnAfterSessionLaunched, po ROT)
                 starter.AddBehavior(new ArmouryBehavior());
                 starter.AddBehavior(new Uniques());
-                starter.AddBehavior(new RotData418());   // 418: tarcze ROT w skali 4-6 + ubrania bez pancerza zbroi - korekta danych w pamieci przy starcie sesji, PO ArmouryBehavior (wycena juz zbudowana)
+                starter.AddBehavior(new RotData418());   // 418: tarcze ROT w skali 4-6 + ubrania bez pancerza zbroi - korekta danych w pamieci przy starcie sesji; 418-p: rejestracja po ArmouryBehavior = OnSessionLaunched biegnie PRZED nim (MbEvent dopisuje na czolo listy) - wycena / zuzycie / klasa stroju licza z ksiegi sprzed 418
                 starter.AddBehavior(new ArmourLadder423());   // 423: korpusy ROT w skali RBM - korekta danych w pamieci w OnAfterSessionLaunched (po ArmorSanity / TierGearCheck / 418 / 419; ksiega wartosci sprzed mapowania)
                 starter.AddBehavior(new HorseBarding419());   // 419: sufit pancerza ladrow plytowych ROT - korekta danych w pamieci przy starcie sesji (wycena z wartosci sprzed sufitu)
                 starter.AddBehavior(new SmithWoodBehavior());   // Jeff 15.10: drewno w kuzni w kg - zapas otwartego ladunku w zapisie

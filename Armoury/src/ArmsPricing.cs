@@ -193,7 +193,7 @@ namespace Armoury
                     try
                     {
                         if (!PlateHelm(it) || it.Weight <= 0.05f || it.ArmorComponent.HeadArmor <= 0) continue;
-                        l.Add(it.Weight / it.ArmorComponent.HeadArmor);
+                        l.Add(it.Weight / RotData418.BookHead(it, it.ArmorComponent.HeadArmor));   // 418-p: dany_hair z pancerza sprzed 418 (mediana jak dotad)
                     }
                     catch { }
                 }
@@ -210,7 +210,7 @@ namespace Armoury
         private static float HelmCostWeight(ItemObject it, float w, Settings s)
         {
             if (!HelmRuleOn(s) || !PlateHelm(it)) return w;
-            int h = it.ArmorComponent.HeadArmor;
+            int h = RotData418.BookHead(it, it.ArmorComponent.HeadArmor);   // 418-p: dany_hair z pancerza sprzed 418
             float k = HelmKgPerArmor();
             if (h <= 0 || !(k > 0f)) return w;
             return Math.Min(w, Math.Max(0.5f, k * h));
