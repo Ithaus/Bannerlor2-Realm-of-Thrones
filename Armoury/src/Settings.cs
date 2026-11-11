@@ -880,9 +880,9 @@ namespace Armoury
         public bool WorldMeasureLog = true;                // once a day Armoury.log measures the world: how many km a day the AI lords' hosts really march (median and 90th percentile, big hosts, army leaders and all-mounted parties, the world pace in force) and how many days of food every town and castle has left, the North apart - log only, changes nothing in the game
         public int SiegePacePercent = 50;                  // siege engine construction speed - 50% makes sieges last twice as long, so starving a fortress out matters again
         public bool SiegeSicknessEnabled = true;           // camp fever: long sieges breed dysentery - the sick go down as wounded, some die; medicine is the shield
-        public int SiegeSicknessIncubationDays = 9;        // clean-camp grace period before the fever wakes
+        public int SiegeSicknessIncubationDays = 14;       // clean-camp grace period before the fever wakes
         public float SiegeSicknessBasePercent = 0.6f;      // daily share of healthy men falling sick once the fever wakes (before ramp, crowding and medicine)
-        public int SiegeSicknessRampPercent = 15;          // the daily rate grows by this much for every day past incubation - time is a weapon
+        public int SiegeSicknessRampPercent = 10;          // the daily rate grows by this much for every day past incubation - time is a weapon
         public int SiegeSicknessDefenderFactor = 40;       // defenders behind walls catch this share of the besiegers' rate; famine doubles it
         public int SiegeSicknessDeathShare = 10;           // share of the sick who die instead of joining the wounded (Siege Medic halves this)
         public int SiegeSicknessMedicineMax = 50;          // ceiling of the surgeon's risk reduction (0.25% per Medicine point up to this cap)
@@ -5612,6 +5612,11 @@ namespace Armoury
         // 383 (Jeff 09.11 "nad brama sa kamienie ... nikt ich nie uzywa ... powinni uzywac wszelkich dostepnych srodkow aby sie bronic"): SiegeStones383.cs
         public bool SiegeDefendersUseStones = true;        // When you defend a fortress (or fight on its defenders' side), your own and allied defenders drop the stones piled above the gate and on the walls onto attackers who come beneath them: as soon as stormers stand below a stone pile, men from the nearest defending formation go to it, one to each throwing place, and leave it when the stones run out, when the attackers have gone or when an enemy is within a few steps. The game does this only for formations under AI command, so the formations you command as general never used the stones. Your formations keep their orders; only the few men at the pile are taken out. Formations falling back are not used. Off = as in the game
         // --- Story Guard: Realm of Thrones story characters live until their event (396) ---
+        // 398 (Jeff 11.11 "rob 1" - glod i choroby w oblezeniu): CampFever.cs - sufity, tlok calego obozu, fabula ROT bez zarazy
+        public bool SiegeFeverSparesStorySieges = true;   // Sieges that belong to the Realm of Thrones storyline (the storyline commander leads the camp while his event runs) are spared the camp fever on both sides. Off = the fever treats them like any other siege
+        public float SiegeSicknessRampCap = 4f;   // With Siege Sickness Enabled: the growth of the daily rate with the length of the siege stops at this multiple of the base rate. With the ramp at 10% per day the fever reaches full strength 30 days after it wakes
+        public bool SiegeSicknessCrowdWholeCamp = true;   // With Siege Sickness Enabled: crowding is counted from the whole siege camp (every party in it together), and behind the walls from the garrison, the militia and the lords' parties inside together. A host of many parties then sickens like the crowd it is. Off = as before: each party counts only its own men, so a host of many small parties barely sickens
+        public float SiegeSicknessDailyCapPercent = 6f;   // With Siege Sickness Enabled: no party loses more than this share of its healthy men to the fever in one day. 0 = no ceiling
         // 396 (Jeff 11.11 "tylko aby postacie w fabule ROT nie ginely przed wydarzneiami, odpiero moga ginac ... po tym jak juz nie sa potrzebne"): StoryGuard.cs
         public bool StoryGuard = true;   // Story Guard: characters the Realm of Thrones storyline still needs cannot die before their event. Once the event has happened, or can never happen, they are as mortal as anyone. Off = no protection.
         public bool StoryGuardBattleAndAge = true;   // With Story Guard: story characters cannot die in battle, of wounds, of old age or in childbirth before their event - they fall wounded and can be captured instead.

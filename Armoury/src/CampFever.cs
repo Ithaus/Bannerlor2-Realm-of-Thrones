@@ -15,10 +15,10 @@ namespace Armoury
     /// PRAWO ZARAZY OBOZOWEJ (Jeff 31.08, "rob"). Historycznie dyzenteria
     /// i tyfus zabijaly wiecej wojska niz zelazo - a u nas armia stala pod
     /// murami pol roku i nikt nie kichnal. Odtad kazde oblezenie ma zegar:
-    ///  - inkubacja (dom. 9 dni) - swiezy oboz jest czysty;
-    ///  - potem dzienne zachorowania: baza 0.6%/dzien, rosnaca +15% za kazdy
-    ///    dzien ponad inkubacje, razy TLOK (sqrt(ludzi/500) - wielkie
-    ///    doomstacki gnija najszybciej);
+    ///  - inkubacja (dom. 14 dni, 398) - swiezy oboz jest czysty;
+    ///  - potem dzienne zachorowania: baza 0.6%/dzien, rosnaca +10% za kazdy
+    ///    dzien ponad inkubacje (398: najwyzej do x4), razy TLOK
+    ///    (sqrt(ludzi/500) - wielkie doomstacki gnija najszybciej);
     ///  - chorzy ida W RANNYCH (gorczka klade, rzadko scina) - wracaja naszym
     ///    powolnym leczeniem; co dziesiaty chory umiera;
     ///  - OBRONCY lapia 40% tempa oblegajacych, ale GLOD (pusty spichlerz)
@@ -29,16 +29,95 @@ namespace Armoury
     ///    mniej; reszta perkow leczenia dziala sama, bo chorzy sa rannymi;
     ///  - BOHATEROWIE nie choruja z ticka; UMARLI nie choruja wcale - horda
     ///    Nocnego Krola oblega bez zegara (lore: zaraza to bron na zywych).
+    /// 398 (Jeff 11.11 "rob 1" - glod i choroby w oblezeniu; porzadki, sufity, tlok calego obozu):
+    ///  - TLOK liczony z CALEGO obozu (suma ludzi wszystkich druzyn obozu; w murach: zaloga + milicja + druzyny lordow),
+    ///    nie z jednej druzyny - dotad armia AI z kilkunastu druzyn po 100-300 ludzi miala tlok 0.6-0.77 i prawie nie chorowala
+    ///    (klucz SiegeSicknessCrowdWholeCamp; wylaczony = stary rachunek na druzyne);
+    ///  - sufit narostu (SiegeSicknessRampCap) i sufit dobowy zachorowan druzyny (SiegeSicknessDailyCapPercent zdrowych);
+    ///  - druzyna (albo osada) w bitwie tej doby nie choruje (roster nalezy wtedy do bitwy);
+    ///  - oblezenie fabuly ROT (SiegePhantomLift.StoryOf) bez zarazy obu stron (SiegeFeverSparesStorySieges);
+    ///  - w obroncach takze milicja osady; pamiec ostrzezen czyszczona miedzy kampaniami;
+    ///  - funkcje wspolne modelu choroby dla 399 (trupy, zima) i 402 (loch): WinterTerm, MedicCut, DeathShare, Active.
     /// </summary>
     internal static class CampFever
     {
         // ostrzezenie "zaraza wstaje" - raz na oblezenie (klucz: osada)
         private static readonly HashSet<string> _warned = new HashSet<string>();
+        // 398: linia "oblezenie fabuly ROT - bez zarazy" raz na oblezenie (klucz: osada)
+        private static readonly HashSet<string> _storyNoted = new HashSet<string>();
+        private static readonly List<string> _tmpKeys = new List<string>();
+        private static Campaign _campaign;      // 398: kampania, do ktorej nalezy pamiec powyzej
+        private static int _stumbles;           // 398: potkniecia (wyjatki per obiekt) - liczone, nic sie nie gasi
+
+        /// <summary>398: pamiec od zera (nowa kampania i kazde wczytanie - wykrywane w OnDaily po zmianie Campaign.Current).</summary>
+        internal static void Reset()
+        {
+            _warned.Clear(); _storyNoted.Clear(); _tmpKeys.Clear(); _stumbles = 0;
+            _campaign = Campaign.Current;
+        }
+
+        private static void Stumble(string where, Exception e)
+        {
+            _stumbles++;
+            if (_stumbles <= 5 || _stumbles % 50 == 0) Log.Error("CampFever." + where + " (potkniecie " + _stumbles + ")", e);
+        }
+
+        // ---------------------------------------------------------------- funkcje wspolne modelu choroby (398; uzyja 399 i 402)
+
+        /// <summary>Czlon ZIMY czynnika zarazy dla osady. 398: zawsze 0 (zima wchodzi w 399 razem z SiegeMisery).</summary>
+        internal static float WinterTerm(Settlement st) { return 0f; }
+
+        /// <summary>Czlon ZIMY czynnika zarazy dla druzyny. 398: zawsze 0 (zima wchodzi w 399 razem z SiegeMisery).</summary>
+        internal static float WinterTerm(MobileParty mp) { return 0f; }
+
+        /// <summary>Ulga chirurga: 0.25% ryzyka za punkt Medycyny, najwyzej SiegeSicknessMedicineMax (ulamek 0..1 odejmowany od ryzyka).</summary>
+        internal static float MedicCut(int medicine)
+        {
+            var s = Settings.Current;
+            float cap = s != null ? Math.Max(0, s.SiegeSicknessMedicineMax) / 100f : 0.5f;
+            return MathF.Min(cap, Math.Max(0, medicine) * 0.0025f);
+        }
+
+        /// <summary>Udzial chorych, ktorzy umieraja zamiast pojsc w rannych (SiegeSicknessDeathShare; bez perkow - Siege Medic dzieli wynik u wolajacego).</summary>
+        internal static float DeathShare()
+        {
+            var s = Settings.Current;
+            return s != null ? Math.Max(0, s.SiegeSicknessDeathShare) / 100f : 0.1f;
+        }
+
+        /// <summary>Tylko odczyt: zaraza obozowa wlaczona i oblezenie tej osady trwa dluzej niz inkubacja. Nie rozstrzyga o fabule ROT (patrz Spared).</summary>
+        internal static bool Active(Settlement st)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.SiegeSicknessEnabled || st == null) return false;
+                var siege = st.SiegeEvent;
+                if (siege == null) return false;
+                return (int)siege.SiegeStartTime.ElapsedDaysUntilNow >= Math.Max(1, s.SiegeSicknessIncubationDays);
+            }
+            catch (Exception e) { Stumble("Active", e); return false; }
+        }
+
+        /// <summary>Tylko odczyt: oblezenie fabuly ROT oszczedzone przez zaraze (klucz SiegeFeverSparesStorySieges). Nazwa wydarzenia albo null.</summary>
+        internal static string Spared(SiegeEvent siege)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.SiegeFeverSparesStorySieges || siege == null || siege.BesiegerCamp == null) return null;
+                return SiegePhantomLift.StoryOf(siege.BesiegerCamp);
+            }
+            catch (Exception e) { Stumble("Spared", e); return null; }
+        }
+
+        // ---------------------------------------------------------------- doba
 
         internal static void OnDaily()
         {
             try
             {
+                if (!ReferenceEquals(_campaign, Campaign.Current)) Reset();   // 398: stan nie przechodzi miedzy kampaniami ani przez wczytanie
                 var s = Settings.Current;
                 if (s == null || !s.SiegeSicknessEnabled) return;
                 var mgr = Campaign.Current != null ? Campaign.Current.SiegeEventManager : null;
@@ -47,11 +126,30 @@ namespace Armoury
                 foreach (var siege in mgr.SiegeEvents)
                 {
                     try { TickSiege(s, siege); }
-                    catch (Exception e) { Log.Error("CampFever.TickSiege", e); }
+                    catch (Exception e) { Stumble("TickSiege", e); }
                 }
+                Prune(_warned); Prune(_storyNoted);
             }
             catch (Exception e) { Log.Error("CampFever.OnDaily", e); }
         }
+
+        /// <summary>398: wpisy osad, ktore nie sa juz oblegane, znikaja (nowe oblezenie tej samej osady ostrzega i notuje od nowa).</summary>
+        private static void Prune(HashSet<string> set)
+        {
+            if (set.Count == 0) return;
+            _tmpKeys.Clear();
+            foreach (var id in set)
+            {
+                Settlement st = null;
+                try { st = Settlement.Find(id); } catch { }
+                if (st == null || st.SiegeEvent == null) _tmpKeys.Add(id);
+            }
+            for (int i = 0; i < _tmpKeys.Count; i++) set.Remove(_tmpKeys[i]);
+            _tmpKeys.Clear();
+        }
+
+        /// <summary>398: licznik jednej strony za dobe.</summary>
+        private struct Tally { public int Sick, Dead, Capped, InBattle, WithHero; }
 
         private static void TickSiege(Settings s, SiegeEvent siege)
         {
@@ -59,9 +157,21 @@ namespace Armoury
             var st = siege.BesiegedSettlement;
             int days = (int)siege.SiegeStartTime.ElapsedDaysUntilNow;
             int incub = Math.Max(1, s.SiegeSicknessIncubationDays);
-            if (days < incub) { _warned.Remove(st.StringId); return; }
+            if (days < incub) { _warned.Remove(st.StringId); _storyNoted.Remove(st.StringId); return; }
 
-            float ramp = 1f + (days - incub) * Math.Max(0, s.SiegeSicknessRampPercent) / 100f;
+            // 398: oblezenie fabuly ROT - bez zarazy obu stron; linia raz na oblezenie
+            string story = Spared(siege);
+            if (story != null)
+            {
+                if (_storyNoted.Add(st.StringId))
+                    Log.Info("CampFever: oblezenie " + st.StringId + " dzien " + days + " - fabula ROT (" + story + "), bez zarazy obu stron (klucz Siege Fever Spares Story Sieges).");
+                return;
+            }
+
+            float rampCap = Math.Max(1f, s.SiegeSicknessRampCap);
+            float rampRaw = 1f + (days - incub) * Math.Max(0, s.SiegeSicknessRampPercent) / 100f;
+            bool rampCapped = rampRaw > rampCap;
+            float ramp = rampCapped ? rampCap : rampRaw;
 
             // ostrzezenie, gdy zaraza wstaje a gracz jest strona
             bool mainAttacks = MobileParty.MainParty != null && MobileParty.MainParty.BesiegerCamp == siege.BesiegerCamp;
@@ -74,27 +184,27 @@ namespace Armoury
                 Log.Info("CampFever: oblezenie " + st.StringId + " dzien " + days + " - zaraza wstaje.");
             }
 
-            int attSick = 0, attDead = 0, defSick = 0, defDead = 0;
+            bool whole = s.SiegeSicknessCrowdWholeCamp;
+            var att = new Tally(); var def = new Tally();
 
             // --- OBLEGAJACY ---
+            var attackers = new List<MobileParty>(8);
+            int campMen = 0;
             if (siege.BesiegerCamp != null)
             {
                 foreach (var pb in siege.BesiegerCamp.GetInvolvedPartiesForEventType())
                 {
                     var mp = pb != null ? pb.MobileParty : null;
-                    if (mp == null) continue;
-                    int sick, dead;
-                    int m0 = Measure40.MenOf(mp);   // E4/0: stan przed zaraza (MenOf ma wlasny try; tylko pomiar)
-                    int p0 = PeopleBook.MenOf(mp);  // E4/7: szeregowi bez wightow przed zaraza
-                    Strike(s, mp, ramp, 1f, out sick, out dead);
-                    try { Measure40.NoteDisease(mp, m0 - Measure40.MenOf(mp), dead); } catch { }   // E4/0: zmarli z rosteru i zadani (U9; tylko pomiar)
-                    try { int pd = p0 - PeopleBook.MenOf(mp); if (pd > 0) PeopleBook.DieShares(PeopleBook.Take(mp.MemberRoster, pd, PeopleBook.FDiePlague), PeopleBook.FDiePlague); } catch { }   // E4/7 (R12): POLEGLI regionu pochodzenia
-                    attSick += sick; attDead += dead;
-                    Shout(mp, sick, dead, st, mainAttacks || mainDefends);
+                    if (mp == null || mp.MemberRoster == null || attackers.Contains(mp)) continue;
+                    attackers.Add(mp);
+                    if (!Undead.Party(mp)) campMen += mp.MemberRoster.TotalManCount;   // umarli nie choruja i nie robia tloku zywym
                 }
             }
+            float campCrowd = whole ? Crowd(campMen) : -1f;
+            for (int i = 0; i < attackers.Count; i++)
+                StrikeParty(s, attackers[i], st, ramp, 1f, campCrowd, false, mainAttacks || mainDefends, ref att);
 
-            // --- OBRONCY: garnizon + partie lordow w srodku ---
+            // --- OBRONCY: garnizon + milicja (398) + partie lordow w srodku ---
             var town = st.Town;
             bool hunger = town != null && town.FoodStocks <= 0f;
             var gov = town != null ? town.Governor : null;
@@ -103,32 +213,64 @@ namespace Armoury
             if (pristine) defMul *= 0.7f;
             if (hunger) defMul *= pristine ? 1.5f : 2f;
 
-            var defenders = new List<MobileParty>();
+            var defenders = new List<MobileParty>(4);
             if (town != null && town.GarrisonParty != null) defenders.Add(town.GarrisonParty);
+            var mc = st.MilitiaPartyComponent;
+            var militia = mc != null ? mc.MobileParty : null;
+            if (militia != null && militia.IsActive && militia.MemberRoster != null && !defenders.Contains(militia)) defenders.Add(militia);
             foreach (var mp in st.Parties)
-                if (mp != null && mp.IsLordParty && mp.CurrentSettlement == st) defenders.Add(mp);
-            foreach (var mp in defenders)
-            {
-                int sick, dead;
-                int m0 = Measure40.MenOf(mp);   // E4/0: stan przed zaraza (MenOf ma wlasny try; tylko pomiar)
-                int p0 = PeopleBook.MenOf(mp);  // E4/7: szeregowi bez wightow przed zaraza
-                Strike(s, mp, ramp, defMul, out sick, out dead);
-                try { Measure40.NoteDisease(mp, m0 - Measure40.MenOf(mp), dead); } catch { }   // E4/0: zmarli z rosteru i zadani (U9; tylko pomiar)
-                try { int pd = p0 - PeopleBook.MenOf(mp); if (pd > 0) PeopleBook.DieShares(PeopleBook.Take(mp.MemberRoster, pd, PeopleBook.FDiePlague), PeopleBook.FDiePlague); } catch { }   // E4/7 (R12): POLEGLI regionu pochodzenia
-                defSick += sick; defDead += dead;
-                Shout(mp, sick, dead, st, mainAttacks || mainDefends);
-            }
+                if (mp != null && mp.IsLordParty && mp.CurrentSettlement == st && !defenders.Contains(mp)) defenders.Add(mp);
+            int wallMen = 0;
+            for (int i = 0; i < defenders.Count; i++)
+                if (defenders[i].MemberRoster != null && !Undead.Party(defenders[i])) wallMen += defenders[i].MemberRoster.TotalManCount;
+            float wallCrowd = whole ? Crowd(wallMen) : -1f;
+            bool wallsFight = st.Party != null && st.Party.MapEvent != null;   // 398: szturm albo wypad w toku - cale mury bez zarazy tej doby
+            for (int i = 0; i < defenders.Count; i++)
+                StrikeParty(s, defenders[i], st, ramp, defMul, wallCrowd, wallsFight, mainAttacks || mainDefends, ref def);
 
-            if (attSick + defSick + attDead + defDead > 0)
-                Log.Info("CampFever: " + st.StringId + " dzien " + days + " - oblegajacy " + attSick
-                         + " chorych/" + attDead + " zmarlych, obroncy " + defSick + "/" + defDead
-                         + (hunger ? " (GLOD w miescie)" : "") + ".");
+            if (att.Sick + def.Sick + att.Dead + def.Dead + att.Capped + def.Capped + att.InBattle + def.InBattle > 0)
+                Log.Info("CampFever: " + st.StringId + " dzien " + days + " - oblegajacy " + att.Sick
+                         + " chorych/" + att.Dead + " zmarlych, obroncy " + def.Sick + "/" + def.Dead
+                         + (hunger ? " (GLOD w miescie)" : "")
+                         + " | narost " + ramp.ToString("0.00") + " (sufit " + (rampCapped ? "tak" : "nie") + ")"
+                         + ", tlok " + (whole ? "oboz " + campCrowd.ToString("0.00") + " (" + campMen + " ludzi) / mury " + wallCrowd.ToString("0.00") + " (" + wallMen + " ludzi)" : "na druzyne (stary rachunek)")
+                         + " | sufit dobowy trafiony " + (att.Capped + def.Capped) + " partii"
+                         + " | pominiete w bitwie " + (att.InBattle + def.InBattle)
+                         + " | partie z chorymi i bohaterem: " + (att.WithHero + def.WithHero)
+                         + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
         }
 
-        /// <summary>Dzienne zniwo w jednej partii. Chorzy ida w rannych, czesc umiera.</summary>
-        private static void Strike(Settings s, MobileParty mp, float ramp, float sideMul, out int sick, out int dead)
+        /// <summary>Tlok strony: sqrt(ludzie / 500) w widelkach 0.6-2.5.</summary>
+        private static float Crowd(int men)
         {
-            sick = 0; dead = 0;
+            return MathF.Clamp(MathF.Sqrt(Math.Max(0, men) / 500f), 0.6f, 2.5f);
+        }
+
+        /// <summary>398: jedna druzyna jednej strony - bitwa pomija, potem zniwo, pomiar i ksiega ludzi (jak dotad), krzyk do gracza.</summary>
+        private static void StrikeParty(Settings s, MobileParty mp, Settlement st, float ramp, float sideMul, float sideCrowd, bool sideFights, bool playerInvolved, ref Tally t)
+        {
+            try
+            {
+                if (mp == null || mp.MemberRoster == null) return;
+                if (sideFights || mp.MapEvent != null) { t.InBattle++; return; }   // 398: roster w bitwie nalezy do bitwy - ta doba bez zarazy
+                int sick, dead; bool capped;
+                int m0 = Measure40.MenOf(mp);   // E4/0: stan przed zaraza (MenOf ma wlasny try; tylko pomiar)
+                int p0 = PeopleBook.MenOf(mp);  // E4/7: szeregowi bez wightow przed zaraza
+                Strike(s, mp, ramp, sideMul, sideCrowd, out sick, out dead, out capped);
+                try { Measure40.NoteDisease(mp, m0 - Measure40.MenOf(mp), dead); } catch { }   // E4/0: zmarli z rosteru i zadani (U9; tylko pomiar)
+                try { int pd = p0 - PeopleBook.MenOf(mp); if (pd > 0) PeopleBook.DieShares(PeopleBook.Take(mp.MemberRoster, pd, PeopleBook.FDiePlague), PeopleBook.FDiePlague); } catch { }   // E4/7 (R12): POLEGLI regionu pochodzenia
+                t.Sick += sick; t.Dead += dead;
+                if (capped) t.Capped++;
+                if (sick > 0 && mp.MemberRoster.TotalHeroes > 0) t.WithHero++;   // tylko licznik (bohaterow zaraza nie dotyka; punkt wpiecia ran - HeroWounds)
+                Shout(mp, sick, dead, st, playerInvolved);
+            }
+            catch (Exception e) { Stumble("StrikeParty", e); }
+        }
+
+        /// <summary>Dzienne zniwo w jednej partii. Chorzy ida w rannych, czesc umiera. sideCrowd &lt; 0 = stary tlok z rosteru tej partii.</summary>
+        private static void Strike(Settings s, MobileParty mp, float ramp, float sideMul, float sideCrowd, out int sick, out int dead, out bool capped)
+        {
+            sick = 0; dead = 0; capped = false;
             if (mp == null || mp.MemberRoster == null || sideMul <= 0f) return;
             if (Undead.Party(mp)) return;                      // umarli nie choruja
 
@@ -142,23 +284,30 @@ namespace Armoury
             }
             if (healthy <= 0) return;
 
-            float crowd = MathF.Clamp(MathF.Sqrt(roster.TotalManCount / 500f), 0.6f, 2.5f);
+            float crowd = sideCrowd >= 0f ? sideCrowd : Crowd(roster.TotalManCount);
 
             var surgeon = mp.EffectiveSurgeon;
             int med = surgeon != null ? surgeon.GetSkillValue(DefaultSkills.Medicine) : 0;
-            float relief = MathF.Min(Math.Max(0, s.SiegeSicknessMedicineMax) / 100f, med * 0.0025f);
+            float relief = MedicCut(med);
             bool prevent = surgeon != null && surgeon.GetPerkValue(DefaultPerks.Medicine.PreventiveMedicine);
             bool siegeMedic = surgeon != null && surgeon.GetPerkValue(DefaultPerks.Medicine.SiegeMedic);
 
             float risk = Math.Max(0f, s.SiegeSicknessBasePercent) / 100f
                        * ramp * crowd * sideMul * (1f - relief) * (prevent ? 0.85f : 1f);
             float expected = healthy * risk;
+            // 398: sufit dobowy - druzyna nie traci jednej doby wiecej niz ten udzial zdrowych (0 = bez sufitu)
+            float capPct = s.SiegeSicknessDailyCapPercent;
+            if (capPct > 0f)
+            {
+                float max = healthy * capPct / 100f;
+                if (expected > max) { expected = max; capped = true; }
+            }
             sick = (int)expected;
             if (MBRandom.RandomFloat < expected - sick) sick++;
             if (sick <= 0) return;
             if (sick > healthy) sick = healthy;
 
-            float deathShare = Math.Max(0, s.SiegeSicknessDeathShare) / 100f * (siegeMedic ? 0.5f : 1f);
+            float deathShare = DeathShare() * (siegeMedic ? 0.5f : 1f);
             float dexp = sick * deathShare;
             dead = (int)dexp;
             if (MBRandom.RandomFloat < dexp - dead) dead++;

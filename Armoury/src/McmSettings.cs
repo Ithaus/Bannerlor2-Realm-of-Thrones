@@ -2170,7 +2170,7 @@ namespace Armoury
 
         [SettingPropertyInteger("Siege Sickness Incubation Days", 0, 36, "0", HintText = "clean-camp grace period before the fever wakes", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
-        public int SiegeSicknessIncubationDays { get; set; } = 9;
+        public int SiegeSicknessIncubationDays { get; set; } = 14;
 
         [SettingPropertyFloatingInteger("Siege Sickness Base Percent", 0.00f, 2.40f, "0.00", HintText = "daily share of healthy men falling sick once the fever wakes (before ramp, crowding and medicine)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
@@ -2178,7 +2178,7 @@ namespace Armoury
 
         [SettingPropertyInteger("Siege Sickness Ramp Percent", 0, 60, "0", HintText = "the daily rate grows by this much for every day past incubation - time is a weapon", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
-        public int SiegeSicknessRampPercent { get; set; } = 15;
+        public int SiegeSicknessRampPercent { get; set; } = 10;
 
         [SettingPropertyInteger("Siege Sickness Defender Factor", 0, 160, "0", HintText = "defenders behind walls catch this share of the besiegers' rate; famine doubles it", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
@@ -2191,6 +2191,22 @@ namespace Armoury
         [SettingPropertyInteger("Siege Sickness Medicine Max", 0, 200, "0", HintText = "ceiling of the surgeon's risk reduction (0.25% per Medicine point up to this cap)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public int SiegeSicknessMedicineMax { get; set; } = 50;
+
+        [SettingPropertyBool("Siege Fever Spares Story Sieges", HintText = "Sieges that belong to the Realm of Thrones storyline (the storyline commander leads the camp while his event runs) are spared the camp fever on both sides. Off = the fever treats them like any other siege", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeFeverSparesStorySieges { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Sickness Ramp Cap", 1.00f, 10.00f, "0.00", HintText = "With Siege Sickness Enabled: the growth of the daily rate with the length of the siege stops at this multiple of the base rate. With the ramp at 10% per day the fever reaches full strength 30 days after it wakes", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeSicknessRampCap { get; set; } = 4f;
+
+        [SettingPropertyBool("Siege Sickness Crowd Whole Camp", HintText = "With Siege Sickness Enabled: crowding is counted from the whole siege camp (every party in it together), and behind the walls from the garrison, the militia and the lords' parties inside together. A host of many parties then sickens like the crowd it is. Off = as before: each party counts only its own men, so a host of many small parties barely sickens", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeSicknessCrowdWholeCamp { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Sickness Daily Cap Percent", 0.00f, 24.00f, "0.00", HintText = "With Siege Sickness Enabled: no party loses more than this share of its healthy men to the fever in one day. 0 = no ceiling", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeSicknessDailyCapPercent { get; set; } = 6f;
 
         [SettingPropertyBool("Siege Walls Hold Until Breached", HintText = "AI lords never storm a town or castle with ladders alone: first a battering ram and a siege tower must stand ready, or their engines must batter a breach in the walls - and even then only when their strength beats what the walls make of the defenders. The walls count in full however long the siege lasts and weaken only as engines batter them down (the game let them count for less every hour after the fourth day and after the sixth for nothing). You decide your own assaults as before - with ladders as soon as the camp is ready. Off = the game's waning patience", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
@@ -12619,6 +12635,10 @@ namespace Armoury
             s.SiegeSicknessDefenderFactor = SiegeSicknessDefenderFactor;
             s.SiegeSicknessDeathShare = SiegeSicknessDeathShare;
             s.SiegeSicknessMedicineMax = SiegeSicknessMedicineMax;
+            s.SiegeFeverSparesStorySieges = SiegeFeverSparesStorySieges;
+            s.SiegeSicknessRampCap = SiegeSicknessRampCap;
+            s.SiegeSicknessCrowdWholeCamp = SiegeSicknessCrowdWholeCamp;
+            s.SiegeSicknessDailyCapPercent = SiegeSicknessDailyCapPercent;
             s.SiegeWallsHoldUntilBreached = SiegeWallsHoldUntilBreached;
             s.SiegeCapitalWallsFactor = SiegeCapitalWallsFactor;
             s.SiegeDefenderEnginesOnWalls = SiegeDefenderEnginesOnWalls;
