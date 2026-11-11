@@ -205,7 +205,9 @@ namespace Armoury
                 var slot = (EquipmentIndex)i;
                 var el = eq[slot];
                 if (el.IsEmpty || !Is(el.Item)) continue;
-                if (giantRule && GiantGear.Is(el.Item)) { _cGiant++; continue; }   // 426a / 424: maczuga olbrzyma zostaje przy olbrzymie
+                // 426a / 424: maczuga olbrzyma zostaje przy olbrzymie; 426-p: polegly olbrzym - do taboru gracza tylko gdy gracz prowadzi olbrzymow,
+                // inaczej przepada z nim (osobny licznik ujscia w linii doby - GiantPiece)
+                if (giantRule && GiantGear.Is(el.Item) && GiantPiece(death, toPlayer) == 0) continue;
                 eq[slot] = StandIn(from, el.Item, death);
                 if (ValyrianBlades.Is(el.Item)) ClearTwin(from, el.Item.StringId);   // bohater spoza rodu gracza: blizniak w zestawie cywilnym to ta sama klinga
                 if (toPlayer) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
@@ -539,11 +541,14 @@ namespace Armoury
                 }
                 if (got == null) return;
                 string to;
-                if (destroyer == PartyBase.MainParty)
+                // 426-p: partia rozbita w wygranej bitwie gracza z roszczeniem - tabor do gracza takze wtedy, gdy "niszczycielem" z gry jest sojusznik AI
+                bool claimed = destroyer != PartyBase.MainParty && ClaimedParty(mp);
+                if (destroyer == PartyBase.MainParty || claimed)
                 {
                     foreach (var el in got) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
                     Log.Player("You find " + string.Join(", ", got.Select(x => x.Item.Name.ToString()).ToArray()) + " among the baggage of " + mp.Name + ".");
-                    to = "gracz";
+                    to = claimed ? "gracz (426: bitwa gracza, niszczyciel z gry " + (destroyer != null ? destroyer.Name.ToString() : "brak") + ")" : "gracz";
+                    if (claimed) _cBaggage += got.Count;
                 }
                 else
                 {

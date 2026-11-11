@@ -28,19 +28,35 @@ namespace Armoury
     {
         private static Harmony _harmony;
         private static bool _relTried, _relWired;
-        private static HashSet<string> _claimIds;          // StringId bohaterow strony pokonanej w ostatniej wygranej bitwie gracza z roszczeniem
+        private static HashSet<string> _claimIds;          // StringId POLEGLYCH (znak smierci DiedInBattle) strony pokonanej w ostatniej wygranej bitwie gracza z roszczeniem
+        private static HashSet<MobileParty> _claimParties; // 426-p: partie strony pokonanej tej bitwy (tabor rozbitej partii - OnPartyDestroyed)
         private static double _claimAt;                    // godzina gry migawki
-        private static int _cAlly, _cFallen, _cRelease, _cExec, _cGiant, _cStumble;   // liczniki doby (linia "Unikaty (177)")
+        private static int _cAlly, _cFallen, _cRelease, _cExec, _cGiant, _cGiantDead, _cGiantBag, _cBaggage, _cStumble;   // liczniki doby (linia "Unikaty (177)")
 
         internal static int ClaimMode { get { var s = Settings.Current; return s == null ? 0 : Math.Max(0, Math.Min(2, s.UniqueSpoilsClaim)); } }
 
-        private static void ClaimReset() { _claimIds = null; _claimAt = 0; ClaimClearDay(); _cStumble = 0; UniqueGold.Reset(); }
-        private static void ClaimClearDay() { _cAlly = _cFallen = _cRelease = _cExec = _cGiant = 0; }
-        private static int ClaimDaySum() { return _cAlly + _cFallen + _cRelease + _cExec + _cGiant; }
+        private static void ClaimReset() { _claimIds = null; _claimParties = null; _claimAt = 0; ClaimClearDay(); _cStumble = 0; UniqueGold.Reset(); }
+        private static void ClaimClearDay() { _cAlly = _cFallen = _cRelease = _cExec = _cGiant = _cGiantDead = _cGiantBag = _cBaggage = 0; }
+        private static int ClaimDaySum() { return _cAlly + _cFallen + _cRelease + _cExec + _cGiant + _cGiantDead + _cGiantBag + _cBaggage; }
         private static string ClaimDayText()
         {
             return "; do gracza (426): po jencach sojusznikow " + _cAlly + ", po poleglych w bitwie gracza " + _cFallen + ", po wypuszczonych " + _cRelease
-                   + ", po straconych " + _cExec + "; sprzet olbrzyma zostawiony olbrzymowi " + _cGiant + ", potkniecia 426 " + _cStumble;
+                   + ", po straconych " + _cExec + ", z taborow partii rozbitych w bitwie gracza " + _cBaggage
+                   + "; sprzet olbrzyma: zostawiony pojmanemu olbrzymowi " + _cGiant + ", przepadl z poleglym olbrzymem (ujscie) " + _cGiantDead
+                   + ", po poleglym olbrzymie do taboru gracza z olbrzymami " + _cGiantBag + ", potkniecia 426 " + _cStumble;
+        }
+
+        /// <summary>426-p: sprzet olbrzyma w Take, gdy odbiorca nie jest olbrzymem (424). 0 = sztuka zostaje w slocie (pojmany olbrzym ja trzyma; polegly -
+        /// przepada z nim, liczone jako ujscie - dawniej liczone razem z "zostawionymi"), 1 = idzie zwykla droga do taboru gracza: tylko polegly olbrzym
+        /// i tylko gdy gracz prowadzi olbrzymow (jest komu ja dac - ta sama regula co sakwy gracza w 424; inaczej sakwy by ja skasowaly przy menu).</summary>
+        private static int GiantPiece(bool death, bool toPlayer)
+        {
+            if (!death) { _cGiant++; return 0; }
+            bool keep = false;
+            try { keep = toPlayer && GiantGear.PartyHasGiants(MobileParty.MainParty); } catch { keep = false; }
+            if (!keep) { _cGiantDead++; return 0; }
+            _cGiantBag++;
+            return 1;
         }
 
         /// <summary>W kampanii (OnSessionLaunched): latka rozmowy raz na proces (cel zadeklarowany w LordConversationsCampaignBehavior - DeclaredMethod)
@@ -64,7 +80,7 @@ namespace Armoury
             var s = Settings.Current;
             int mode = ClaimMode;
             Log.Info("Unikaty (426): zwyczaj wojenny - tryb " + mode
-                     + (mode == 0 ? " (tylko wlasna druzyna gracza - jak przed 426)" : mode == 1 ? " (kazda bitwa, w ktorej gracz dowodzi)" : " (kazda wygrana bitwa gracza, takze w cudzej armii)")
+                     + (mode == 0 ? " (tylko wlasna druzyna gracza - jak przed 426)" : mode == 1 ? " (wygrana bitwa gracza bez wodza cudzej armii po jego stronie; jency partii WLASNEJ armii gracza zawsze)" : " (kazda wygrana bitwa gracza, takze w cudzej armii)")
                      + ", wypuszczony oddaje " + (s != null && s.UniqueSpoilsOnRelease ? "TAK" : "NIE") + ", latka rozmowy " + (_relWired ? "wpieta" : "BRAK")
                      + ", sprzet olbrzyma poza zdobycza " + (GiantGear.On ? "TAK" : "NIE") + ".");
         }
@@ -89,7 +105,7 @@ namespace Armoury
                 if (mp == null || mp == main || mp.Army == null) continue;
                 if (mp.Army.LeaderParty == mp) { why = "po stronie gracza dowodzi wodz armii " + mp.Name; return false; }
             }
-            why = "gracz dowodzi";
+            why = "po stronie gracza nie ma wodza cudzej armii";
             return true;
         }
 
@@ -103,6 +119,11 @@ namespace Armoury
                 if (me == null || me != MapEvent.PlayerMapEvent) return false;
                 var side = PartyBase.MainParty.Side;
                 if (side == BattleSideEnum.None || capturer.Side != side) return false;
+                // 426-p (recenzja, sredni 2): partia z armii, ktora prowadzi GRACZ, pojmuje dla gracza takze wtedy, gdy po jego stronie stoi druga armia AI
+                // (PlayerClaims odmawia calej stronie z powodu wodza tamtej armii - a to wprost "wojownik mojej armii" z polecenia Jeffa)
+                var cmp = capturer.MobileParty; var main = MobileParty.MainParty;
+                if (cmp != null && main != null && main.Army != null && main.Army.LeaderParty == main && cmp.Army == main.Army
+                    && Hero.MainHero != null && !Hero.MainHero.IsPrisoner && !BattlefieldLaw.RotEnlisted()) return true;
                 string why;
                 return PlayerClaims(me, out why);
             }
@@ -114,30 +135,44 @@ namespace Armoury
         {
             try
             {
-                if (me == null || !me.IsPlayerMapEvent) return;
-                _claimIds = null;
+                // 426-p: koniec kazdej INNEJ bitwy gasi migawke - gra zabija poleglych i rozbija partie w tym samym kroku co koniec bitwy gracza
+                // (MapEvent.FinalizeEvent: MapEventEnded -> HandleMapEventEnd), wiec po nim migawka nie ma juz czego obslugiwac
+                if (me == null) return;
+                _claimIds = null; _claimParties = null;
+                if (!me.IsPlayerMapEvent) return;
                 if (PartyBase.MainParty == null) return;
                 var side = PartyBase.MainParty.Side;
                 if (side == BattleSideEnum.None || !me.HasWinner || me.WinningSide != side) return;
                 var other = side == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
                 var ids = new HashSet<string>();
+                var parties = new HashSet<MobileParty>();
+                int heroes = 0;
                 foreach (var p in me.PartiesOnSide(other))
                 {
-                    var roster = p != null && p.Party != null ? p.Party.MemberRoster : null;
+                    var pb = p != null ? p.Party : null;
+                    if (pb == null) continue;
+                    if (pb.MobileParty != null) parties.Add(pb.MobileParty);
+                    var roster = pb.MemberRoster;
                     if (roster == null) continue;
                     for (int i = 0; i < roster.Count; i++)
                     {
                         var co = roster.GetCharacterAtIndex(i);
-                        if (co != null && co.IsHero && co.HeroObject != null && co.HeroObject.StringId != null) ids.Add(co.HeroObject.StringId);
+                        if (co == null || !co.IsHero || co.HeroObject == null || co.HeroObject.StringId == null) continue;
+                        heroes++;
+                        // 426-p: tylko ze znakiem smierci - dokladnie tych gra zabije za chwile (MapEventSide.HandleMapEventEndForPartyInternal bierze
+                        // z rostera bohaterow z DeathMark == DiedInBattle); zbieg z tej bitwy nie jest w migawce
+                        if (co.HeroObject.DeathMark == TaleWorlds.CampaignSystem.Actions.KillCharacterAction.KillCharacterActionDetail.DiedInBattle) ids.Add(co.HeroObject.StringId);
                     }
                 }
-                if (ids.Count == 0) return;   // banda bez bohaterow - bez linii
+                if (heroes == 0 && parties.Count == 0) return;
                 string why;
                 bool claim = PlayerClaims(me, out why);
-                if (claim) { _claimIds = ids; _claimAt = CampaignTime.Now.ToHours; }
-                Log.Info("Unikaty (426): bitwa gracza - roszczenie " + (claim ? "TAK" : "NIE") + " (" + why + "), bohaterow strony pokonanej " + ids.Count + ".");
+                if (claim) { _claimIds = ids; _claimParties = parties; _claimAt = CampaignTime.Now.ToHours; }
+                if (heroes > 0)   // banda bez bohaterow - bez linii
+                    Log.Info("Unikaty (426): bitwa gracza - roszczenie " + (claim ? "TAK" : "NIE") + " (" + why + "), bohaterow strony pokonanej " + heroes
+                             + " (poleglych " + ids.Count + "), partii " + parties.Count + ".");
             }
-            catch (Exception e) { _claimIds = null; if (_cStumble++ < 3) Log.Error("UniqueSpoils.OnMapEventEnded", e); }
+            catch (Exception e) { _claimIds = null; _claimParties = null; if (_cStumble++ < 3) Log.Error("UniqueSpoils.OnMapEventEnded", e); }
         }
 
         /// <summary>Polegly z migawki ostatniej wygranej bitwy gracza (nie starszej niz godzina gry - gra zabija poleglych w tym samym kroku).</summary>
@@ -145,8 +180,19 @@ namespace Armoury
         {
             if (_claimIds == null || victim == null || victim == Hero.MainHero || victim.StringId == null) return false;
             double age = CampaignTime.Now.ToHours - _claimAt;
-            if (age < 0 || age > 1.0) { _claimIds = null; return false; }
-            return _claimIds.Contains(victim.StringId);
+            if (age < 0 || age > 1.0) { _claimIds = null; _claimParties = null; return false; }
+            return _claimIds.Remove(victim.StringId);   // 426-p: migawka zuzywana - jeden polegly, jedno roszczenie
+        }
+
+        /// <summary>426-p (recenzja, sredni 1): partia strony pokonanej z ostatniej wygranej bitwy gracza z roszczeniem (migawka nie starsza niz godzina gry).
+        /// Gra rozbija ja przez DestroyPartyAction.Apply(GetLeaderParty(strona zwyciezcow), ...) - "niszczycielem" bywa sojusznik AI, ktory zaczal bitwe,
+        /// i unikat z TABORU pokonanego lorda szedl do jego taboru, choc unikat z biodra tego samego lorda szedl do gracza.</summary>
+        private static bool ClaimedParty(MobileParty mp)
+        {
+            if (_claimParties == null || mp == null) return false;
+            double age = CampaignTime.Now.ToHours - _claimAt;
+            if (age < 0 || age > 1.0) { _claimIds = null; _claimParties = null; return false; }
+            return _claimParties.Remove(mp);
         }
 
         /// <summary>Postfiks rozmowy po bitwie: lord puszczony wolno zostawia unikaty graczowi (dostaje zamiennik - StandIn). Rozmowa dotyczy tylko

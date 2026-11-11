@@ -106,6 +106,9 @@ namespace Armoury
             var it = om.GetObject<ItemObject>(id);
             if (it != null) return UniqueSpoils.Is(it);          // bez modyfikatora: dwa odczyty slownika, bez pamieci (spis wlasnych kling Qohoru rosnie)
             bool v;
+            // 426-p: nowa wlasna klinga z Qohoru (spis ValyrianBlades rosnie) - zapamietane "nie" moglo dotyczyc jej id z modyfikatorem; pamiec od nowa
+            int oc = ValyrianBlades.OwnCount;
+            if (oc != _ownSeen) { _modded.Clear(); _ownSeen = oc; }
             if (_modded.TryGetValue(id, out v)) return v;
             v = false;
             foreach (var u in RotUniques.Ids.Concat(ValyrianBlades.AllIds))
@@ -132,11 +135,12 @@ namespace Armoury
             catch { _st++; return null; }
         }
 
-        private static int _told = -1;
-        /// <summary>Linia doby - tylko gdy liczniki sesji sie zmienily od ostatniej linii.</summary>
+        private static int _told = -1, _ownSeen = -1;
+        /// <summary>Linia doby. 426-p: tylko gdy przybylo potkniec albo pierwszy raz cos zlocono (liczniki wierszy i linii rosna przy kazdym otwarciu
+        /// ekwipunku i kazdej podpowiedzi - linia co dobe byla szumem); stan licznikow jest w samej linii.</summary>
         internal static string DayLine()
         {
-            int sum = _gold + _white + _lines + _st;
+            int sum = _st * 2 + (_gold + _lines > 0 ? 1 : 0);
             if (sum == _told || (sum == 0 && _told < 0)) return null;
             _told = sum;
             return "Kolor unikatow (426): " + State + " | od startu gry: wiersze na zloto " + _gold + ", z powrotem na bialo " + _white + ", linie Unique w panelu i podpowiedzi " + _lines
