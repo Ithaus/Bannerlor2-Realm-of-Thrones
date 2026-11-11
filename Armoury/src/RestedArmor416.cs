@@ -142,7 +142,7 @@ namespace Armoury
         }
 
         /// <summary>Progi przebicia RBM z pamieci (lista RBMConfig.weaponTypesFactors) - tylko do logu, poza goraca sciezka.</summary>
-        private static string Thresholds()
+        internal static string Thresholds(bool withTarget = true)
         {
             try
             {
@@ -158,6 +158,7 @@ namespace Armoury
                     else if (name == "Bolt") b = Num(o, t, "ExtraArmorThresholdFactorCut");
                     else if (name == "Javelin") j = Num(o, t, "ExtraArmorThresholdFactorPierce");
                 }
+                if (!withTarget) return "Arrow ciecie " + a + ", Bolt ciecie " + b + ", Javelin klucie " + j + " (fabryczne RBM 2.60 / 2.60 / 3.00)";   // 423: linia startu drabiny
                 return "Arrow ciecie " + a + " (cel 2.00), Bolt ciecie " + b + " (cel 2.00), Javelin klucie " + j + " (cel 2.00)";
             }
             catch (Exception e) { return "odczyt nieudany (" + e.GetType().Name + ")"; }

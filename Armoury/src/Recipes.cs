@@ -83,6 +83,7 @@ namespace Armoury
                 var a = item.ArmorComponent;
                 int total = a.HeadArmor + a.BodyArmor + a.LegArmor + a.ArmArmor;
                 if (item.ItemType == ItemObject.ItemTypeEnum.HorseHarness) total = HorseBarding419.BookSum(item, total);   // 419: lader z sufitem - material z pol sprzed sufitu
+                else if (item.ItemType == ItemObject.ItemTypeEnum.BodyArmor) total = ArmourLadder423.BookSum(item, total);   // 423: korpus ROT po drabinie - material z tulowia sprzed mapowania
                 if (total <= 0) return 1;
                 float units = total / MathF.Max(1f, s.ArmorPointsPerMaterial);
                 units *= 1f + MathF.Max(0f, item.Tierf - 1f) * MathF.Max(0f, s.ArmorTierBonusPercent) / 100f;

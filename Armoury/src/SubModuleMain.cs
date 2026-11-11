@@ -756,6 +756,10 @@ namespace Armoury
                 // misji); bez latki Harmony; linia "Rany wg ciosu (422): koniec misji"
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new HeroBlow422.Logic());
+                // 423: drabina pancerzy ROT - trafienia w piers / brzuch wedlug klasy korpusu ofiary i rodzaju ciosu, zabici i ranni wedlug klasy,
+                // linia "Drabina pancerzy (423): koniec misji" (takze przy kluczu NIE - pomiar "przed")
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new ArmourLadder423.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)
@@ -903,6 +907,7 @@ namespace Armoury
                 starter.AddBehavior(new ArmouryBehavior());
                 starter.AddBehavior(new Uniques());
                 starter.AddBehavior(new RotData418());   // 418: tarcze ROT w skali 4-6 + ubrania bez pancerza zbroi - korekta danych w pamieci przy starcie sesji, PO ArmouryBehavior (wycena juz zbudowana)
+                starter.AddBehavior(new ArmourLadder423());   // 423: korpusy ROT w skali RBM - korekta danych w pamieci w OnAfterSessionLaunched (po ArmorSanity / TierGearCheck / 418 / 419; ksiega wartosci sprzed mapowania)
                 starter.AddBehavior(new HorseBarding419());   // 419: sufit pancerza ladrow plytowych ROT - korekta danych w pamieci przy starcie sesji (wycena z wartosci sprzed sufitu)
                 starter.AddBehavior(new SmithWoodBehavior());   // Jeff 15.10: drewno w kuzni w kg - zapas otwartego ladunku w zapisie
                 starter.AddBehavior(new HideoutPurge());

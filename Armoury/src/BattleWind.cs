@@ -157,7 +157,7 @@ namespace Armoury
             try
             {
                 var body = agent.SpawnEquipment[EquipmentIndex.Body];
-                if (!body.IsEmpty && body.GetModifiedBodyArmor() >= 30f) r *= 0.5f;
+                if (!body.IsEmpty && ArmourLadder423.BookModified(body) >= 30f) r *= 0.5f;   // 423: prog z wartosci sprzed mapowania - oddech jak przed drabina
             }
             catch { }
             return r;

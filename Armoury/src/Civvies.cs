@@ -168,14 +168,14 @@ namespace Armoury
         private static int Prot(ItemObject it, int s)
         {
             var ac = it != null ? it.ArmorComponent : null;
-            return ac == null ? 0 : s == 0 ? ac.BodyArmor : ac.LegArmor;
+            return ac == null ? 0 : s == 0 ? ArmourLadder423.BookBody(it, ac.BodyArmor) : ac.LegArmor;   // 423: tulow sprzed mapowania
         }
 
         /// <summary>Ochrona calej sztuki: glowa + tulow + rece + nogi (v3) - tym liczy sie granica, pula, kolejnosc i log.</summary>
         private static int Total(ItemObject it)
         {
             var ac = it != null ? it.ArmorComponent : null;
-            return ac == null ? 0 : ac.HeadArmor + ac.BodyArmor + ac.ArmArmor + ac.LegArmor;
+            return ac == null ? 0 : ArmourLadder423.BookSum(it, ac.HeadArmor + ac.BodyArmor + ac.ArmArmor + ac.LegArmor);   // 423: granica liczona przy starcie, porownywana pozniej - zawsze wartosc sprzed mapowania
         }
 
         private static bool TypeFits(ItemObject it, int s)

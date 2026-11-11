@@ -179,7 +179,10 @@ namespace Armoury
                 var body = eq[EquipmentIndex.Body];
                 var it = body.Item;
                 if (it == null || it.ItemType != ItemObject.ItemTypeEnum.BodyArmor) return;
-                float want = body.GetModifiedBodyArmor() * share;
+                // 423: udzial liczony z korpusu sprzed drabiny pancerzy (bark jak dotad), ale nie wiecej niz piers teraz; sztuka spoza drabiny - bez zmian
+                float want = ArmourLadder423.BookModified(body) * share;
+                float chest = body.GetModifiedBodyArmor();
+                if (want > chest) want = chest;
                 if (!(want > __result)) return;
                 _shRaised++; _shBefore += __result; _shAfter += want;
                 __result = want;

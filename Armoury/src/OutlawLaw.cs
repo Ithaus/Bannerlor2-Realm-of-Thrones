@@ -1839,7 +1839,7 @@ namespace Armoury
 
         private static float BodyOf(CharacterObject c)
         {
-            try { var it = c.FirstBattleEquipment[EquipmentIndex.Body].Item; return it != null && it.ArmorComponent != null ? it.ArmorComponent.BodyArmor : 0f; }
+            try { var it = c.FirstBattleEquipment[EquipmentIndex.Body].Item; return it != null && it.ArmorComponent != null ? ArmourLadder423.BookBody(it, it.ArmorComponent.BodyArmor) : 0f; }   // 423: wartosc sprzed mapowania (prog +2 i 0.8 w starej skali)
             catch { return 0f; }
         }
 
@@ -1855,7 +1855,7 @@ namespace Armoury
             bool horse = to.IsMounted && !from.IsMounted;
             if (!armour && !horse) return true;
             // A17 F3 (klucz A17UniquesNotOutlawKit): unikat nie idzie na awans bandy (znikal w zolnierzu - renly_armor, lyanna_armor) - zostaje na polce albo w jukach; czlon ostatni (licznik kandydatow)
-            Func<ItemObject, bool> armourOk = it => it.ItemType == ItemObject.ItemTypeEnum.BodyArmor && it.ArmorComponent != null && it.ArmorComponent.BodyArmor >= need * 0.8f && !A17Fix.OutlawSkip(it);
+            Func<ItemObject, bool> armourOk = it => it.ItemType == ItemObject.ItemTypeEnum.BodyArmor && it.ArmorComponent != null && ArmourLadder423.BookBody(it, it.ArmorComponent.BodyArmor) >= need * 0.8f && !A17Fix.OutlawSkip(it);
             Func<ItemObject, bool> horseOk = it => it.ItemType == ItemObject.ItemTypeEnum.Horse && it.HorseComponent != null && !it.HorseComponent.IsPackAnimal && !A17Fix.OutlawSkip(it);
             ItemObject a = null, h = null;
             Settlement aTown = null, hTown = null;

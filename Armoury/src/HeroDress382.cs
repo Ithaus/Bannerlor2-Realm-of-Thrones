@@ -445,7 +445,7 @@ namespace Armoury
             if (Civvies.Armour(it)) return 0;
             if (Civvies.Female(it)) return 1;
             var ac = it.ArmorComponent;
-            if (it.IsCivilian && (ac == null || ac.BodyArmor < 30)) return 2;
+            if (it.IsCivilian && (ac == null || ArmourLadder423.BookBody(it, ac.BodyArmor) < 30)) return 2;   // 423: prog 30 w starej skali (49 sztuk *_garb itd. nie zmienia klasy)
             return 0;
         }
 
