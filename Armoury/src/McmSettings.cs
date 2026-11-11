@@ -856,7 +856,7 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsReleaseMyMen { get; set; } = true;
 
-        [SettingPropertyBool("Prisoner Terms Oath", HintText = "With Prisoner Exchange For Terms: you can add your own oath to the offer - not to raise arms against his realm for Prisoner Exchange Pact Days. It is worth a part of your party's strength to him. The game itself holds you to it: until it runs out you cannot attack that realm, besiege or raid it, or join an army marching on it - unless they attack you first, which frees you", RequireRestart = false)]
+        [SettingPropertyBool("Prisoner Terms Oath", HintText = "With Prisoner Exchange For Terms: you can add your own oath to the offer - not to raise arms against his realm for Prisoner Exchange Pact Days. It is worth a part of your party's strength to him. The game itself holds you to it: until it runs out you cannot attack that realm, besiege or raid it, and you cannot join any army of your own realm while it is at war with them - unless they attack you first, which frees you", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsOath { get; set; } = true;
 

@@ -396,10 +396,13 @@ namespace Armoury
             if (!k.IsAtWarWith(e)) return "There is no war between your realms.";
             if (CanonPeaceLock.Blocks(k, e)) return "This war cannot be ended yet.";
             if (!WarTruce.IsPair(k, e) && Prologue.RotWarForced(k, e)) return "This war cannot be ended yet.";
+            // 385b: para 330 w fazie 1 / 2 (wesele ROT w toku, Polnoc walczy po Krwawych Godach) - WarTruce.OnPeace dalby rozejm 1 doby za pelna cene
+            if (WarTruce.IsPair(k, e)) { string pw; int ph = CanonPeaceLock.Phase330(k, e, out pw); if (ph == 1 || ph == 2) return "This war cannot be ended yet."; }
             return null;
         }
 
-        private static int TruceDaysFor(IFaction a, IFaction b) { try { return WarTruce.IsPair(a, b) ? WarTruce.TruceDays : Days; } catch { return Days; } }
+        /// <summary>385b: dlugosc rozejmu krolestw - para 330 przy czynnej regule 330 wedlug WarTruce (WarTruceDays), inaczej zwykly wpis "K" na Days.</summary>
+        private static int TruceDaysFor(IFaction a, IFaction b) { try { return WarTruce.IsPair(a, b) && WarTruce.On ? WarTruce.TruceDays : Days; } catch { return Days; } }
 
         /// <summary>385: bohaterowie rodu gracza i towarzysze w niewoli u rozmowcy: wladca frakcji - cala frakcja; inny lord - lochy i druzyny jego rodu, jego
         /// druzyna, jego armia i oboz oblezniczy.</summary>
@@ -463,7 +466,10 @@ namespace Armoury
         {
             double mil = 0;
             try { mil = Campaign.Current.Models.ValuationModel.GetMilitaryValueOfParty(MobileParty.MainParty); } catch (Exception e) { Stumble("OathValue", e); }
-            double v = 0.1 * mil * Math.Sqrt(Days / 5.0);
+            // 385b: gracz juz zwiazany (r dob zostalo) sprzedaje tylko przedluzenie: sqrt((r+N)/5) - sqrt(r/5), nie druga pelna wartosc
+            double r = 0;
+            try { var f = _talk != null ? _talk.MapFaction : null; if (f != null && f.NotAttackableByPlayerUntilTime.IsFuture) r = Math.Max(0, f.NotAttackableByPlayerUntilTime.ToDays - CampaignTime.Now.ToDays); } catch (Exception e) { Stumble("OathValue.Left", e); }
+            double v = 0.1 * mil * (Math.Sqrt((r + Days) / 5.0) - Math.Sqrt(r / 5.0));
             if (Trait(Hero.MainHero, DefaultTraits.Honor) < 0) v *= 0.5;
             return Math.Max(0, v);
         }
@@ -662,8 +668,8 @@ namespace Armoury
         // ------------------------------------------------------------ 385: okno wyboru jencow, moi ludzie, przysiega
         private static bool PickCond()
         {
-            if (!KPick || _pris.Count == 0 || _want == 'T') return false;
-            MBTextManager.SetTextVariable("ARM384_PICK", "Let me name the lords I would give up (" + _sel.Count + " of " + _pris.Count + " named).");
+            if (!KPick || _pris.Count == 0 || _want == 'T' || _sel.Count >= _pris.Count) return false;   // 385b: okno doklada - wszyscy nazwani = nie ma kogo
+            MBTextManager.SetTextVariable("ARM384_PICK", (_sel.Count > 0 ? "Let me name more lords I would give up (" : "Let me name the lords I would give up (") + _sel.Count + " of " + _pris.Count + " named).");
             return true;
         }
 
@@ -677,18 +683,18 @@ namespace Armoury
                 var rows = new List<InquiryElement>();
                 foreach (var h in _pris)
                 {
-                    if (h.StringId == null) continue;
+                    if (h.StringId == null || _sel.Contains(h)) continue;   // 385b: tylko jeszcze nie nazwani - zaznaczeni sa DOKLADANI do wyboru
                     bool here = _inSt.ContainsKey(h) && _inSt[h];
-                    rows.Add(new InquiryElement(h.StringId, Name(h) + " - " + Rank(h) + ", worth some " + N(_worth[h]) + (here ? ", held here" : "") + (_sel.Contains(h) ? " [named]" : ""), null, true,
+                    rows.Add(new InquiryElement(h.StringId, Name(h) + " - " + Rank(h) + ", worth some " + N(_worth[h]) + (here ? ", held here" : ""), null, true,
                                                 Name(h) + (h.Clan != null ? " of " + h.Clan.Name : "") + ". Worth some " + N(_worth[h]) + " denars to " + Name(talk) + (here ? "; held within these walls, so worth less to a man who means to take them." : ".")));
                 }
                 if (rows.Count == 0) return;
                 int shown = rows.Count;
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Lords to offer",
-                    "Tick the lords you would give up to " + Name(talk) + " (dearest first). What you tick here replaces what you named before; Back changes nothing.",
+                    "Tick the lords you would give up to " + Name(talk) + " (dearest first). The lords you tick are added to those you have already named; Back changes nothing.",
                     rows, false, 0, shown, "Offer these", "Back",
                     delegate (List<InquiryElement> picked) { PickDone(picked, talk, shown); },
-                    delegate (List<InquiryElement> _) { PickDone(null, talk, shown); }), true);
+                    delegate (List<InquiryElement> _) { PickDone(null, talk, shown); }), false);   // 385b: bez pauzy stanu gry - wzor gry dla okna z rozmowy
             }
             catch (Exception e) { Stumble("OpenPick", e); }
         }
@@ -698,15 +704,15 @@ namespace Armoury
             try
             {
                 if (talk == null || !ReferenceEquals(talk, _talk)) return;   // rozmowa juz inna albo zamknieta
+                int added = 0;
                 if (picked != null)
                 {
                     var ids = new HashSet<string>();
                     foreach (var p in picked) { var id = p != null ? p.Identifier as string : null; if (id != null) ids.Add(id); }
-                    _sel.Clear();
-                    foreach (var h in _pris) if (h.StringId != null && ids.Contains(h.StringId)) _sel.Add(h);
+                    foreach (var h in _pris) if (h.StringId != null && ids.Contains(h.StringId) && !_sel.Contains(h)) { _sel.Add(h); added++; }   // 385b: doklada
                 }
                 _dPick++;
-                Log.Info(Tag + ": okno wyboru: pokazano " + shown + ", " + (picked != null ? "wybrano " + _sel.Count : "Back - bez zmian (wybranych " + _sel.Count + ")") + ".");
+                Log.Info(Tag + ": okno wyboru: pokazano " + shown + ", " + (picked != null ? "dolozono " + added + ", wybranych " + _sel.Count : "Back - bez zmian (wybranych " + _sel.Count + ")") + ".");
                 var cm = Campaign.Current != null ? Campaign.Current.ConversationManager : null;
                 if (cm != null && cm.IsConversationFlowActive) cm.ContinueConversation();
             }
@@ -725,7 +731,7 @@ namespace Armoury
         {
             if (!KOath || _talk == null || _talk.MapFaction == null || !OathAllowed(_want)) return false;
             MBTextManager.SetTextVariable("ARM384_OATH", _oath ? "Take back my oath."
-                : "I swear not to raise arms against " + Realm(_talk.MapFaction) + " for " + Days + " days . (Until then you cannot attack them, nor join an army that marches on them, unless they strike at you first.)");
+                : "I swear not to raise arms against " + Realm(_talk.MapFaction) + " for " + Days + " days. (Until then you cannot attack, besiege or raid them, and you cannot join any army of your own realm while it is at war with them - unless they strike at you first.)");
             return true;
         }
 
@@ -1055,7 +1061,7 @@ namespace Armoury
                 foreach (var x in _sel) { if (names.Count >= 12) { names.Add("..."); break; } names.Add(Name(x)); }
                 Log.Info(Tag + ": dzien " + F(Today) + " | " + (st != null ? "oblezenie " + Name(st) + " [" + st.StringId + "]" : "pole (" + Realm(h.MapFaction) + ")") + " | wodz " + Name(h) + (Ruler(h) ? " - wladca" : "") + " (Honor " + Trait(h, DefaultTraits.Honor) + ", Calc " + Trait(h, DefaultTraits.Calculating)
                          + ", Mercy " + Trait(h, DefaultTraits.Mercy) + ", Valor " + Trait(h, DefaultTraits.Valor) + ", rel " + rel + (SiegeSurrender374.IsLiar(h) ? ", znany klamca" : "") + ")"
-                         + " | zadanie " + (_field && _want == 'A' ? "pakt (pole)" : WantName(_want)) + " (" + Days + " d)" + (_menOn && _men.Count > 0 ? " + moi ludzie " + _men.Count + " [" + MenNames() + "]" : "")
+                         + " | zadanie " + (_field && _want == 'A' ? "pakt (pole)" : WantName(_want)) + " (" + (_want == 'T' ? TruceDaysFor(Hero.MainHero.MapFaction, h.MapFaction) : Days) + " d)" + (_menOn && _men.Count > 0 ? " + moi ludzie " + _men.Count + " [" + MenNames() + "]" : "")
                          + " | oferta: jency " + _sel.Count + " [" + string.Join(", ", names.ToArray()) + "], zloto " + _gold + ", ziemia " + _selF.Count + (_oath && OathAllowed(_want) ? ", przysiega gracza" : "")
                          + " | " + e.Parts + " | wynik V/C " + (e.C > 0 ? (e.V / e.C).ToString("0.00", Inv) : "-") + " -> " + verdict + ".");
             }
@@ -1258,6 +1264,7 @@ namespace Armoury
                     }
                     Drop(d, st, "You can no longer pay what you promised " + Place(st) + ". The terms are void.", why); return;
                 }
+                if (!MenStill(d, st, lord)) return;   // 385b: moi ludzie juz nie u nich - bez zaplaty za nieobecnych
                 if (d.Want == 'P') { RunPass(d, st, lord); return; }
                 if (d.Want == 'T') { RunTruce(d, st, lord); return; }   // 385
                 if (d.Field) { RunField(d, lord); return; }             // 385
@@ -1290,6 +1297,37 @@ namespace Armoury
             catch (Exception e) { Stumble("Run", e); }
         }
 
+        /// <summary>385b: zamknieta ekonomia "moich ludzi" - miedzy zgoda a wykonaniem (do 3 dob) ktos mogl uciec, zginac albo trafic w inne rece. Zadanie M bez
+        /// ani jednego czlowieka u nich przepada bez zaplaty (false); inaczej zloto oferty maleje o okup nieobecnych (najwyzej do zera - jency i ziemia zostaja w ofercie).</summary>
+        private static bool MenStill(Deal d, Settlement st, Hero lord)
+        {
+            try
+            {
+                if (d.Men.Count == 0 || d.Want == 'T') return true;
+                var kept = new List<string>(); double miss = 0; int gone = 0;
+                foreach (var id in d.Men)
+                {
+                    var h = Hero.Find(id);
+                    var pb = h != null && h.IsAlive && h.IsPrisoner ? h.PartyBelongedToAsPrisoner : null;
+                    if (pb != null && pb.MapFaction == lord.MapFaction) { kept.Add(id); continue; }
+                    gone++;
+                    if (h != null) miss += ManPrice(h);
+                }
+                if (gone == 0) return true;
+                if (d.Want == 'M' && kept.Count == 0)
+                {
+                    Drop(d, st, Name(lord) + " no longer holds any of your people. Nothing was handed over.", "moi ludzie juz poza ich lochem (" + gone + ") - nic nie oddane");
+                    return false;
+                }
+                int back = (int)Math.Min(d.Gold, Math.Round(miss));
+                d.Gold -= back; d.Men = kept;
+                Log.Info(Tag + ": dzien " + F(Today) + " | " + (st != null ? Name(st) : "pole") + " - moi ludzie juz poza ich lochem: " + gone + " (okup " + N(miss) + ") | zloto oferty mniejsze o " + back + " -> " + d.Gold + ", zostalo do uwolnienia " + kept.Count + ".");
+                Log.Player(Name(lord) + " no longer holds " + gone + " of your people" + (back > 0 ? "; you keep " + N(back) + " denars of what you offered." : "."));
+            }
+            catch (Exception e) { Stumble("MenStill", e); }
+            return true;
+        }
+
         /// <summary>385: po zaplacie - moi ludzie wolni (nie przy zdradzie) i przysiega gracza na mechanizmie gry. Zwraca dopisek do linii WYKONANE.</summary>
         private static string After(Deal d, Hero lord)
         {
@@ -1320,7 +1358,8 @@ namespace Armoury
                         if (freed > 0) Log.Player(Name(lord) + " sets your people free: " + string.Join(", ", names.ToArray()) + ".");
                     }
                 }
-                if (d.Oath && lord.MapFaction != null)
+                if (d.Oath && d.Betray) sb.Append(" | przysiega gracza nie wchodzi (zdrada wylosowana)");   // 385b: jedna regula z RunPass
+                if (d.Oath && !d.Betray && lord.MapFaction != null)
                 {
                     // jak NoAttackBarterable.Apply: gra sama pilnuje (atak, oblezenie, najazd, dolaczenie do armii) i sama zwalnia, gdy tamci uderza na gracza
                     var f = lord.MapFaction;
@@ -1366,11 +1405,13 @@ namespace Armoury
             var e = lord.MapFaction as Kingdom;
             string bar = PeaceBar(lord);
             if (bar != null || k == null || e == null) { Drop(d, st, "The peace you agreed " + Place(st) + " can no longer be made.", "pokoj juz niemozliwy (" + (bar ?? "brak krolestwa") + ") - nic nie oddane"); return; }
-            bool pair = WarTruce.IsPair(k, e);
             try { MakePeaceAction.Apply(k, e); } catch (Exception ex) { Stumble("RunTruce.Peace", ex); }
             if (k.IsAtWarWith(e)) { Drop(d, st, "The peace you agreed " + Place(st) + " did not hold. Nothing was handed over.", "MakePeaceAction nie zgasil wojny (blokada) - nic nie oddane"); return; }
+            // 385b: dlugosc PO FAKCIE - para 330 tylko wtedy, gdy WarTruce.OnPeace naprawde wpisal rozejm (klucz 330 NIE, koniec 330, krol kanonu, kampania
+            // klasyczna = rozejmu WarTruce nie ma -> zwykly wpis "K", zeby pokoj mial bramke wojny AI)
+            bool pair = false; int days = d.Days;
+            try { if (WarTruce.IsPair(k, e) && WarTruce.TruceHolds) { pair = true; days = Math.Max(1, WarTruce.TruceEnd - (int)Today); } } catch (Exception ex) { Stumble("RunTruce.Pair", ex); }
             string paid = Pay(d, lord);
-            int days = pair ? WarTruce.TruceDays : d.Days;
             int until = (int)Today + days;
             if (!pair)
             {
@@ -1407,7 +1448,7 @@ namespace Armoury
             try
             {
                 var pk = Clan.PlayerClan != null ? Clan.PlayerClan.Kingdom : null;
-                if (pk == null) return false;
+                if (pk == null || pk.Leader != Hero.MainHero) return false;   // 385b: slowo dal gracz-wladca; po utracie tronu / zmianie krolestwa nowe krolestwo nie jest zwiazane
                 IFaction o = ReferenceEquals(a, pk) ? b : ReferenceEquals(b, pk) ? a : null;
                 if (o == null) return false;
                 string id = o.StringId;
@@ -1433,7 +1474,9 @@ namespace Armoury
                 int today = (int)Today;
                 var hit = _entries.FindAll(e => e.Scope == "K" && e.Key == o.StringId && e.Until > today);
                 if (hit.Count == 0) return;
-                bool byPlayer = ReferenceEquals(f1, pk) && pk.Leader == Hero.MainHero;
+                // 385b: zlamane slowo gracza tylko, gdy wojne wypowiedzial on (wrogosc gracza albo decyzja jego krolestwa); ROT / sojusz BK / Default = droga poza bramkami
+                bool byPlayer = ReferenceEquals(f1, pk) && pk.Leader == Hero.MainHero
+                                && (detail == DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility || detail == DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision);
                 var lords = new HashSet<string>();
                 foreach (var e in hit) { if (byPlayer || e.Betray) lords.Add(e.Lord); _entries.Remove(e); }
                 SyncRealm();
