@@ -11768,7 +11768,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeWoundedPlayerOnRetreat { get; set; } = true;
 
-        [SettingPropertyBool("Siege Wounded Simulated", HintText = "When an assault on a fortress fought without you (lords against lords, your own fortresses too while you are away) is beaten back from the walls, a share of the attackers wounded in that assault cannot be carried away either: they are taken prisoner into the fortress dungeon - never more than the room left in the dungeon and never more men than the defenders still standing; lords among them only if they do not lead a party. Needs Siege Wounded Taken Prisoner. Off = as in the game: all their wounded go back to camp", RequireRestart = false)]
+        [SettingPropertyBool("Siege Wounded Simulated", HintText = "When an assault on a fortress fought without you (lords against lords, your own fortresses too while you are away) is beaten back from the walls, a share of the attackers wounded in that assault cannot be carried away either: they are taken prisoner into the fortress dungeon - the ordinary soldiers never more than the room left in the dungeon and never more men than the defenders still standing; lords among them only if they do not lead a party, but taken first and without any limit. Needs Siege Wounded Taken Prisoner. Off = as in the game: all their wounded go back to camp", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeWoundedSimulated { get; set; } = true;
 
