@@ -92,7 +92,15 @@ namespace Armoury
     ///   (a) gotowy taran i wieza albo wyrwa - szansa wzorem gry, ale p liczone tylko z taranow i wiez w budowie (machiny dystansowe - trebusze -
     ///   nie czekaja); (b) DR (LadderOk: >= SiegeLadderMinDays i sila >= SiegeLadderMinRatio x obroncy) - szansa 0.1 x s gry bez kary machin.
     ///   Losowanie raz na godzine i oboz, warunkowo tak, by razem z losowaniem gry szansa byla ta wyliczona; potem OB1 (brama, mury, DR) i okup jak zwykle.
-    /// Wyjatek per obiekt = licznik potkniec (CLAUDE.md 7). Stan tylko w pamieci (po wczytaniu: licznik dob zamku i ludzie z poczatku oblezenia od wczytania).
+    ///   400 (Jeff 11.11 "rob 1", decyzja 15): TYDZIEN LASKI I UCIECZKA PRZEZ MUR. Doby 1..SiegeStarveGraceDays (7) od zapasu 0 nikt nie umiera z GL
+    ///   (rany gry IsGarrisonStarving zostaja, straty RB dalej pominiete); od nastepnej doby SiegeStarveLossPercent jak dotad. Od 1. doby glodu
+    ///   (klucz SiegeStarveFleeToBesiegers) SiegeStarveFleePercent (2%) zalogi, milicji i rosteru osady na dobe (ranni pierwsi) przechodzi przez mur do
+    ///   lochu wodza obozu - czesciowa kapitulacja (CanTroopBeTakenPrisoner, PeopleBook FCaptured), tylko do wolnego miejsca lochu
+    ///   (PartyBase.PrisonerSizeLimit - obecni); po tygodniu laski ucieczka jest CZESCIA dobowej straty, nie dodatkiem. Bez ucieczki: brak obozu / wodza,
+    ///   Inni, oblezenie fabuly ROT (skrypt albo SiegePhantomLift.StoryOf), bitwa w toku, oboz niegotowy, brak miejsca. Gracz-wodz: do lochu jego druzyny
+    ///   + komunikat. Prog kapitulacji i TrySurrender bez zmian. Poczatek glodu i stan obsady z poczatku oblezenia sa w zapisie (rekord SiegeMisery
+    ///   "arm_siegemisery") - po wczytaniu nie ma drugiego tygodnia laski ani nowego progu kapitulacji.
+    /// Wyjatek per obiekt = licznik potkniec (CLAUDE.md 7). Stan w pamieci (po wczytaniu: licznik dob zamku od wczytania); glod GL - patrz 400.
     /// </summary>
     internal static partial class SiegeWalls2
     {
@@ -113,6 +121,10 @@ namespace Armoury
         private static double LossPct { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeStarveLossPercent) ? 5.0 : Clamp(s.SiegeStarveLossPercent, 0.0, 20.0); } }
         private static double SurShare { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeSurrenderShare) ? 0.1 : Clamp(s.SiegeSurrenderShare, 0.0, 0.5); } }
         private static int SurMen { get { var s = Settings.Current; return s == null ? 20 : (int)Clamp(s.SiegeSurrenderMen, 0, 200); } }
+        // 400: tydzien laski i ucieczka przez mur
+        private static int GraceDays { get { var s = Settings.Current; return s == null ? 7 : (int)Clamp(s.SiegeStarveGraceDays, 0, 60); } }
+        private static bool FleeOn { get { var s = Settings.Current; return s != null && s.SiegeStarveFleeToBesiegers; } }
+        private static double FleePct { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeStarveFleePercent) ? 2.0 : Clamp(s.SiegeStarveFleePercent, 0.0, 20.0); } }
         internal static bool LadderOn { get { var s = Settings.Current; return s != null && s.SiegeLadderOverwhelm; } }
         private static int LadderDays { get { var s = Settings.Current; return s == null ? 30 : (int)Clamp(s.SiegeLadderMinDays, 0, 364); } }
         internal static double LadderRatio { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeLadderMinRatio) ? 6.0 : Clamp(s.SiegeLadderMinRatio, 2.0, 20.0); } }
@@ -418,6 +430,7 @@ namespace Armoury
         private static double _dClampSum, _dLongestHunger;
         private static string _dLongestHungerSt = "-";
         private static int _dBesieged, _dStarving, _dDead, _dSurr, _dSurrMen, _dRbSkip, _dNoPrison;
+        private static int _dGrace, _dFled, _dFleeSieges, _dFleeNoRoom;                          // 400: twierdze w tygodniu laski, zbiegli przez mur, z ilu twierdz, bez miejsca w lochu
 
         /// <summary>Postfiks (ostatni) CalculateTownFoodStocksChange czynnego modelu jedzenia: oblezona twierdza - bilans nie wiekszy niz 0 (bez dostaw z zewnatrz,
         /// takze dopiskow ROT i jedzenia z targu ponad potrzebe). Moze isc z watkow AI - tylko odczyt i licznik pod zamkiem. Nie rzuca.</summary>
@@ -470,7 +483,9 @@ namespace Armoury
             {
                 if (ev == null || ev.BesiegedSettlement == null || ev.BesiegedSettlement.Town == null) return;
                 int h, w;
-                _gl[ev] = new Gl { Start = MenOf(ev.BesiegedSettlement, out h, out w) };
+                var g = new Gl { Start = MenOf(ev.BesiegedSettlement, out h, out w) };
+                _gl[ev] = g;
+                SiegeMisery.HungerSet(ev.BesiegedSettlement, -1, g.Start);                        // 400: stan obsady z poczatku oblezenia do zapisu (nie rzuca; bez SiegeEvent osady - pierwsza doba)
                 NoteBesieger(ev, ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null);   // m116: zakaz powtorki
             }
             catch (Exception e) { Stumble("OnSiegeStarted", e); }
@@ -578,6 +593,60 @@ namespace Armoury
             return moved;
         }
 
+        /// <summary>400: ucieczka przez mur z jednego rosteru - n szeregowych (ranni najpierw, od losowego typu, jak Kill) do lochu wodza obozu; tylko ci,
+        /// ktorych wolno wziac do niewoli (CanTroopBeTakenPrisoner). Ksiega ludzi jak kapitulacja (FCaptured). Zwraca przeniesionych.</summary>
+        private static int Flee(TroopRoster r, TroopRoster prison, int n)
+        {
+            if (r == null || prison == null || n <= 0) return 0;
+            var model = Campaign.Current.Models.BattleRewardModel;
+            var els = new List<TroopRosterElement>();
+            for (int i = 0; i < r.Count; i++)
+            {
+                var e = r.GetElementCopyAtIndex(i);
+                if (e.Character == null || e.Character.IsHero || e.Number <= 0 || Undead.Character(e.Character)) continue;
+                if (model != null && !model.CanTroopBeTakenPrisoner(e.Character)) continue;
+                els.Add(e);
+            }
+            if (els.Count == 0) return 0;
+            int start = MBRandom.RandomInt(els.Count), left = n, moved = 0;
+            var num = new int[els.Count]; var wnd = new int[els.Count];
+            for (int i = 0; i < els.Count; i++) { num[i] = els[i].Number; wnd[i] = Math.Min(els[i].WoundedNumber, els[i].Number); }
+            for (int pass = 0; pass < 2 && left > 0; pass++)
+                for (int k = 0; k < els.Count && left > 0; k++)
+                {
+                    int i = (start + k) % els.Count;
+                    int can = pass == 0 ? wnd[i] : num[i] - wnd[i];
+                    int d = Math.Min(can, left);
+                    if (d <= 0) continue;
+                    r.AddToCounts(els[i].Character, -d, false, pass == 0 ? -d : 0);
+                    prison.AddToCounts(els[i].Character, d, false, pass == 0 ? d : 0);
+                    num[i] -= d; if (pass == 0) wnd[i] -= d;
+                    left -= d; moved += d;
+                }
+            if (moved > 0)
+            {
+                try { if (PeopleBook.OriginLive) PeopleBook.Give(prison, PeopleBook.Take(r, moved, PeopleBook.FCaptured), PeopleBook.FCaptured); }
+                catch (Exception e) { Stumble("Flee.PeopleBook", e); }
+            }
+            return moved;
+        }
+
+        /// <summary>400: czemu tej doby nikt nie przechodzi przez mur (null = wolno); room = wolne miejsce w lochu wodza obozu.</summary>
+        private static string FleeBlock(Settlement st, BesiegerCamp camp, MobileParty lp, bool battle, out int room)
+        {
+            room = 0;
+            if (!FleeOn || !(FleePct > 0.0)) return "klucz";
+            if (camp == null || lp == null || lp.Party == null || lp.PrisonRoster == null || !lp.IsActive) return "brak obozu";
+            if (Scripted(lp)) return "fabula ROT";
+            string story;
+            try { story = SiegePhantomLift.StoryOf(camp); } catch (Exception e) { Stumble("FleeBlock.StoryOf", e); story = "?"; }   // nie da sie ocenic = nietkniete
+            if (story != null) return "fabula ROT";
+            if (battle || lp.MapEvent != null) return "bitwa w toku";
+            if (!camp.IsPreparationComplete) return "oboz niegotowy";
+            room = Math.Max(0, lp.Party.PrisonerSizeLimit - lp.PrisonRoster.TotalManCount);
+            return room > 0 ? null : "brak miejsca";
+        }
+
         /// <summary>Twierdza, ktorej zaloga skapitulowala z glodu, a szturmu (pustej warowni) jeszcze nie bylo - SiegeWalls.Veto nie trzyma jej w przerwie OB2.</summary>
         internal static bool Surrendered(Settlement st) { return st != null && _surrendered.Count > 0 && _surrendered.Contains(st); }
 
@@ -615,22 +684,66 @@ namespace Armoury
             if (Und(lp, st)) return;                                                   // Inni - CrashScribe T2c; twierdze Bialych Wedrowcow nie jedza
             _dBesieged++;
             Gl g;
-            if (!_gl.TryGetValue(ev, out g)) { g = new Gl(); _gl[ev] = g; }
+            if (!_gl.TryGetValue(ev, out g))
+            {
+                // 400: po wczytaniu - poczatek glodu i stan obsady z zapisu (rekord SiegeMisery); bez rekordu (stary zapis) jak dotad: od tej doby
+                g = new Gl(); _gl[ev] = g;
+                double hf0; int sm0;
+                if (SiegeMisery.HungerGet(st, out hf0, out sm0))
+                {
+                    if (sm0 >= 0) g.Start = sm0;
+                    if (hf0 >= 0.0 && hf0 <= now + 0.01) g.HungerFrom = (float)hf0;
+                }
+            }
             int h, w;
             int n0 = MenOf(st, out h, out w);
-            if (g.Start < 0) g.Start = n0;                                             // po wczytaniu: stan pierwszej doby
-            if (st.Town.FoodStocks > 0f) { g.HungerFrom = -1f; return; }
+            if (g.Start < 0) g.Start = n0;                                             // stary zapis bez rekordu: stan pierwszej doby
+            if (st.Town.FoodStocks > 0f) { g.HungerFrom = -1f; SiegeMisery.HungerSet(st, -1, g.Start); return; }
             _dStarving++;
             if (g.HungerFrom < 0f) g.HungerFrom = now;
+            SiegeMisery.HungerSet(st, g.HungerFrom, g.Start);                          // 400: do zapisu (nie rzuca)
             double days = now - g.HungerFrom;
             if (days > _dLongestHunger) { _dLongestHunger = days; _dLongestHungerSt = st.StringId; }
             bool battle = InBattle(st);                                                // recenzja: rostery w bitwie - bez smierci tej doby (jak gra)
-            double pct = battle ? 0.0 : LossPct;
+            // 400: doba glodu 1 = pierwsza doba z zapasem 0; doby 1..GraceDays - tydzien laski (nikt nie umiera z GL)
+            int dayNo = (int)Math.Floor(days + 0.01) + 1, grace = GraceDays;
+            bool inGrace = dayNo <= grace;
+            if (inGrace) _dGrace++;
+            double pct = battle || inGrace ? 0.0 : LossPct;
             double p = pct / 100.0;
-            int dead = 0;
-            if (p > 0.0)
-                foreach (var r in Rosters(st)) { int rw; dead += Kill(r, MBRandom.RoundRandomized((float)(p * Regulars(r, out rw)))); }
+            int room; string fleeWhy = FleeBlock(st, camp, lp, battle, out room);
+            int room0 = room;
+            double fp = fleeWhy == null ? FleePct / 100.0 : 0.0;
+            int dead = 0, fled = 0;
+            if (!battle && (p > 0.0 || fp > 0.0))
+                foreach (var r in Rosters(st))
+                {
+                    int rw; int regs = Regulars(r, out rw);
+                    int total = p > 0.0 ? MBRandom.RoundRandomized((float)(p * regs)) : 0;       // dobowa strata rosteru po tygodniu laski
+                    int want = fp > 0.0 ? MBRandom.RoundRandomized((float)(fp * regs)) : 0;
+                    if (!inGrace) want = Math.Min(want, total);                                  // po lasce ucieczka jest CZESCIA straty, nie dodatkiem
+                    want = Math.Min(want, room - fled);
+                    int f = want > 0 ? Flee(r, lp.PrisonRoster, want) : 0;
+                    fled += f;
+                    if (total - f > 0) dead += Kill(r, total - f);
+                }
             _dDead += dead;
+            if (fled > 0)
+            {
+                _dFled += fled; _dFleeSieges++;
+                try
+                {
+                    string tn = Nm(st);
+                    if (lp.IsMainParty)
+                        Log.Player(fled == 1 ? "A starving man of the garrison slipped over the walls of " + tn + " and gave himself up to you."
+                                             : fled + " starving men of the garrison slipped over the walls of " + tn + " and gave themselves up to you.", true);
+                    else if (st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan)
+                        Log.Player(fled == 1 ? "One of your starving garrison at " + tn + " went over the walls to the enemy."
+                                             : fled + " of your starving garrison at " + tn + " went over the walls to the enemy.", true);
+                }
+                catch (Exception e) { Stumble("Flee.Message", e); }
+            }
+            else if (fleeWhy == "brak miejsca") _dFleeNoRoom++;
             SiegeMisery.AddCorpses(st, true, dead, SiegeMisery.SrcHunger);   // 399: zmarli z glodu leza niepogrzebani w murach (znacznik sanitarny; nie rzuca)
             int h1, w1;
             int left = MenOf(st, out h1, out w1);
@@ -646,7 +759,8 @@ namespace Armoury
                 if (camp != null) foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) if (pb != null) campMen += pb.NumberOfHealthyMembers;
                 Log.Info("Glod oblezenia (GL): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + Cls(st) + ") | oblegajacy " + (lp != null && lp.MapFaction != null ? lp.MapFaction.StringId : "-")
                          + ", wodz " + Hn(lp) + ", ludzi " + campMen + ", oboz gotowy " + (camp != null && camp.IsPreparationComplete ? "tak" : "nie") + ", oblezenie " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob"
-                         + " | glod od " + F(days, "0.0") + " dob | zaloga i milicja: bylo " + n0 + " (zdrowi " + h + ", ranni " + w + "), zmarli dzis " + dead + " (" + F(pct, "0.0") + "%), zostalo " + left
+                         + " | glod od " + F(days, "0.0") + " dob (doba " + dayNo + ", laska do " + grace + ") | zaloga i milicja: bylo " + n0 + " (zdrowi " + h + ", ranni " + w + "), zmarli dzis " + dead
+                         + " (" + F(pct, "0.0") + "%), przez mur " + fled + " (loch wodza: wolne " + room0 + (fleeWhy != null ? ", bez ucieczki: " + fleeWhy : "") + "), zostalo " + left
                          + " | na starcie oblezenia " + g.Start + ", prog kapitulacji " + thr + " | wynik: " + res + ".");
             }
             catch (Exception e) { Stumble("StarveLine", e); }
@@ -929,7 +1043,8 @@ namespace Armoury
                 var sb = new StringBuilder(1400);
                 sb.Append("Oblezenia 2 (doba): dzien ").Append(Today)
                   .Append(" | klucze: trebusze ").Append(TrebOn ? "tak" : "nie").Append(" (zamek po ").Append(CastleDays).Append(" dob), glod ").Append(StarveOn ? "tak" : "nie")
-                  .Append(" (").Append(F(LossPct, "0.0")).Append("%/d, kapitulacja < ").Append(F(SurShare * 100.0, "0")).Append("% / < ").Append(SurMen).Append("), drabiny ")
+                  .Append(" (").Append(F(LossPct, "0.0")).Append("%/d po ").Append(GraceDays).Append(" dobach laski, przez mur ").Append(FleeOn ? F(FleePct, "0.0") + "%/d" : "nie")
+                  .Append(", kapitulacja < ").Append(F(SurShare * 100.0, "0")).Append("% / < ").Append(SurMen).Append("), drabiny ")
                   .Append(LadderOn ? "tak" : "nie").Append(" (>= ").Append(LadderDays).Append(" dob, >= ").Append(F(LadderRatio, "0.0")).Append(" : 1)")
                   .Append(" | TB: obozy z trebuszami ").Append(mk).Append(" (miasta ").Append(mTown).Append(", stolice ").Append(mCap).Append(", zamki ").Append(mCastle)
                   .Append("), nowe dzis: miasta ").Append(_dNewTown).Append(", stolice ").Append(_dNewCap).Append(", zamki ").Append(_dNewCastle)
@@ -941,7 +1056,8 @@ namespace Armoury
                 int nClamp; double sClamp;
                 lock (Gate) { nClamp = _dClampSt.Count; sClamp = _dClampSum; }
                 sb.Append(", bilans dodatni uciety: ").Append(nClamp).Append(" twierdz (+").Append(F(sClamp, "0.0")).Append("/d)")
-                  .Append(", zmarli z glodu ").Append(_dDead).Append(", kapitulacje ").Append(_dSurr).Append(" (jencow ").Append(_dSurrMen).Append(", bez niewoli ").Append(_dNoPrison).Append(')')
+                  .Append(", w tygodniu laski ").Append(_dGrace).Append(", zmarli z glodu ").Append(_dDead)
+                  .Append(", przez mur ").Append(_dFled).Append(" (z ").Append(_dFleeSieges).Append(" twierdz, bez miejsca w lochu ").Append(_dFleeNoRoom).Append(')').Append(", kapitulacje ").Append(_dSurr).Append(" (jencow ").Append(_dSurrMen).Append(", bez niewoli ").Append(_dNoPrison).Append(')')
                   .Append(", wstrzymane: ");
                 if (_dSurSkip.Count == 0) sb.Append('0');
                 else { bool f1 = true; foreach (var kv in _dSurSkip) { if (!f1) sb.Append(", "); sb.Append(kv.Key).Append(' ').Append(kv.Value); f1 = false; } }
@@ -983,6 +1099,7 @@ namespace Armoury
             _dNewTown = _dNewCap = _dNewCastle = _dSwitch = _dParT = _dParM = _dParDone = _dTrebBuilt = _dTrebLost = _dUnmark = 0;
             _dEarlyT = _dEarlyFirst1 = _dEarlyFirstLate = _dUnGap = 0; _dEarlyFirstMax = 0;
             _dBesieged = _dStarving = _dDead = _dSurr = _dSurrMen = _dRbSkip = _dNoPrison = 0;
+            _dGrace = _dFled = _dFleeSieges = _dFleeNoRoom = 0;
             _dLongestHunger = 0; _dLongestHungerSt = "-"; _dSurSkip.Clear();
             _dDrGate = _dDrWalls = _dDrRoll = 0; _drLogged.Clear();
             _dUnEng = _dUnLad = _dUnRolls = 0; _unLogged.Clear();
@@ -1085,7 +1202,8 @@ namespace Armoury
                          + " | modele: plan " + TypeOf(mods.SiegeStrategyActionModel) + ", jedzenie " + TypeOf(mods.SettlementFoodModel)
                          + " (ziemie wokol ROT w oblezeniu odejmowane: " + (_rotFood ? "tak" : "nie") + "), oblezenie " + TypeOf(mods.SiegeEventModel)
                          + " | klucze: trebusze " + (TrebOn ? "tak" : "nie") + " (zamek po " + CastleDays + " dob), glod " + (StarveOn ? "tak" : "nie") + " (" + F(LossPct, "0.0")
-                         + "%/d, kapitulacja < " + F(SurShare * 100.0, "0") + "% / < " + SurMen + "), drabiny " + (LadderOn ? "tak" : "nie") + " (>= " + LadderDays + " dob, >= "
+                         + "%/d po " + GraceDays + " dobach laski, przez mur " + (FleeOn ? F(FleePct, "0.0") + "%/d" : "nie")
+                         + ", kapitulacja < " + F(SurShare * 100.0, "0") + "% / < " + SurMen + "), drabiny " + (LadderOn ? "tak" : "nie") + " (>= " + LadderDays + " dob, >= "
                          + F(LadderRatio, "0.0") + " : 1), log " + (LogOn ? "tak" : "nie") + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }

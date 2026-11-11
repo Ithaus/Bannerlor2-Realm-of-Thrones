@@ -24,7 +24,8 @@ namespace Armoury
     ///
     /// Rekord na oblezenie (klucz: osada; zgodnosc oblezenia jak 374: |Start - SiegeStartTime.ToHours| &lt;= 0.05):
     ///   trupy POD MURAMI (strona oblegajacych) i W MURACH (strona obroncow) + pola na 400/411 (poczatek glodu, stan obsady, seria dob - na razie
-    ///   tylko przechowywane w zapisie, nikt ich nie czyta) + flagi ostrzezen gracza. Zapis "arm_siegemisery" (brak klucza w starym zapisie = pusto).
+    ///   tylko przechowywane w zapisie, nikt ich nie czyta) + flagi ostrzezen gracza. Od 400 poczatek glodu i stan obsady pisze i czyta glod GL
+    ///   (SiegeWalls2.StarveOne przez HungerGet / HungerSet) - te dwa pola zyja takze przy wylaczonym kluczu trupow (rekord zostaje, konta trupow 0). Zapis "arm_siegemisery" (brak klucza w starym zapisie = pusto).
     /// Jedyne wejscie: AddCorpses(osada, wMurach, n, zrodlo). Pisza:
     ///   POD MURAMI - zmarli zarazy oblegajacych (CampFever), zmarli 391 (SiegeWounded373Behavior.LeftToDie391), zabici w bitwie oblezniczej
     ///                z druzyn spoza murow (MapEventParty.DiedInBattle, szeregowi bez Innych);
@@ -52,8 +53,8 @@ namespace Armoury
         {
             public double Start;                 // SiegeStartTime.ToHours
             public double Under, Within;         // trupy pod murami / w murach
-            public double HungerFrom = -1;       // 400: doba poczatku glodu (-1 = brak) - tu tylko przechowywane
-            public int StartMen = -1;            // 400: stan obsady z poczatku oblezenia (-1 = brak) - tu tylko przechowywane
+            public double HungerFrom = -1;       // 400: chwila poczatku glodu w dobach kampanii (-1 = brak) - pisze i czyta glod GL (SiegeWalls2)
+            public int StartMen = -1;            // 400: stan obsady z poczatku oblezenia (-1 = brak) - pisze i czyta glod GL (SiegeWalls2)
             public int Streak;                   // 411: seria dob zagnilego obozu - tu tylko przechowywane
             public int Flags;                    // ostrzezenia gracza (FWarn*)
             // tylko sesja (linia doby): stan po poprzedniej linii, doszlo wedlug zrodla, spalone od poprzedniej linii
@@ -151,6 +152,35 @@ namespace Armoury
             catch (Exception e) { Stumble("CorpseTerm", e); return 0f; }
         }
 
+        /// <summary>400: zapisany poczatek glodu (doby kampanii, -1 = nie gloduje) i stan obsady z poczatku trwajacego oblezenia (-1 = brak).
+        /// false bez rekordu. Niezalezne od klucza trupow. Nie rzuca.</summary>
+        internal static bool HungerGet(Settlement st, out double hungerFrom, out int startMen)
+        {
+            hungerFrom = -1; startMen = -1;
+            try
+            {
+                var r = RecOf(st, false);
+                if (r == null) return false;
+                hungerFrom = r.HungerFrom; startMen = r.StartMen;
+                return true;
+            }
+            catch (Exception e) { Stumble("HungerGet", e); return false; }
+        }
+
+        /// <summary>400: glod GL zapisuje poczatek glodu i stan obsady w rekordzie trwajacego oblezenia (rekord powstaje tylko, gdy jest co zapisac).
+        /// Niezalezne od klucza trupow. Nie rzuca.</summary>
+        internal static void HungerSet(Settlement st, double hungerFrom, int startMen)
+        {
+            try
+            {
+                if (double.IsNaN(hungerFrom) || double.IsInfinity(hungerFrom)) hungerFrom = -1;
+                var r = RecOf(st, hungerFrom >= 0 || startMen >= 0);
+                if (r == null) return;
+                r.HungerFrom = hungerFrom; r.StartMen = startMen;
+            }
+            catch (Exception e) { Stumble("HungerSet", e); }
+        }
+
         /// <summary>CampaignEvents.OnSiegeEventEndedEvent: koniec oblezenia - rekord osady znika. Nie rzuca.</summary>
         internal static void OnSiegeEnded(SiegeEvent ev)
         {
@@ -243,7 +273,14 @@ namespace Armoury
                         if (!_recs.TryGetValue(id, out r)) continue;
                         Settlement st = null;
                         try { st = Settlement.Find(id); } catch { st = null; }
-                        if (!On || st == null || st.SiegeEvent == null || Math.Abs(st.SiegeEvent.SiegeStartTime.ToHours - r.Start) > 0.05) { _recs.Remove(id); continue; }
+                        if (st == null || st.SiegeEvent == null || Math.Abs(st.SiegeEvent.SiegeStartTime.ToHours - r.Start) > 0.05) { _recs.Remove(id); continue; }
+                        if (!On)
+                        {
+                            // 400: klucz trupow wylaczony - konta trupow na zero; rekord zostaje tylko dla pol glodu GL (poczatek glodu, stan obsady)
+                            if (r.HungerFrom < 0 && r.StartMen < 0) { _recs.Remove(id); continue; }
+                            r.Under = 0; r.Within = 0; ClearDay(r);
+                            continue;
+                        }
                         DayOf(s, st, r, day);
                     }
                     catch (Exception e) { Stumble("DailyCorpses.Rec", e); }

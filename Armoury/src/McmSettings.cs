@@ -2236,6 +2236,18 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int SiegeBurnDeadPerHardwood { get; set; } = 20;
 
+        [SettingPropertyInteger("Siege Starve Grace Days", 0, 60, "0", HintText = "With Siege Starvation: for this many days after the food stock of a besieged fortress runs out nobody dies of hunger yet. After that the garrison and militia die every day as Siege Starve Loss Percent says. Fortresses fall to hunger about this many days later. 0 = they start dying at once, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeStarveGraceDays { get; set; } = 7;
+
+        [SettingPropertyBool("Siege Starve Flee To Besiegers", HintText = "With Siege Starvation: from the first day without food some of the starving garrison and militia slip over the walls every day and give themselves up to the besieging commander (Siege Starve Flee Percent, the wounded first), as long as he has room for prisoners. Once the days of grace are over these men are part of the daily loss, not on top of it. Not while a battle is fought there, not before the siege camp stands ready, not in the sieges of the Realm of Thrones storyline. When you lead the siege they come to your own prisoners. Off = nobody goes over the walls", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeStarveFleeToBesiegers { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Starve Flee Percent", 0.00f, 20.00f, "0.0", HintText = "With Siege Starve Flee To Besiegers: share of the starving garrison and militia that goes over the walls to the besiegers every day", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeStarveFleePercent { get; set; } = 2f;
+
         [SettingPropertyBool("Siege Walls Hold Until Breached", HintText = "AI lords never storm a town or castle with ladders alone: first a battering ram and a siege tower must stand ready, or their engines must batter a breach in the walls - and even then only when their strength beats what the walls make of the defenders. The walls count in full however long the siege lasts and weaken only as engines batter them down (the game let them count for less every hour after the fourth day and after the sixth for nothing). You decide your own assaults as before - with ladders as soon as the camp is ready. Off = the game's waning patience", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeWallsHoldUntilBreached { get; set; } = true;
@@ -12674,6 +12686,9 @@ namespace Armoury
             s.SiegeFeverWoundedCounts = SiegeFeverWoundedCounts;
             s.SiegeBurnDeadOption = SiegeBurnDeadOption;
             s.SiegeBurnDeadPerHardwood = SiegeBurnDeadPerHardwood;
+            s.SiegeStarveGraceDays = SiegeStarveGraceDays;
+            s.SiegeStarveFleeToBesiegers = SiegeStarveFleeToBesiegers;
+            s.SiegeStarveFleePercent = SiegeStarveFleePercent;
             s.SiegeWallsHoldUntilBreached = SiegeWallsHoldUntilBreached;
             s.SiegeCapitalWallsFactor = SiegeCapitalWallsFactor;
             s.SiegeDefenderEnginesOnWalls = SiegeDefenderEnginesOnWalls;
