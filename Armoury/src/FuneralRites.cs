@@ -38,6 +38,8 @@ namespace Armoury
     ///
     /// Nikogo nie zabijamy i nie okaleczamy (StoryGuard pytany tylko do linii: "dziedzic pod straza fabuly"). Wyjatki per zdarzenie liczone (potkniecia), nic sie nie
     /// gasi. Zapis arm_funeral "v1" (stary zapis = pusto). Reset: konstruktor ArmouryBehavior i OnGameEnd.
+    /// 405-p: (b) trzyma wpis ponad 24 h, dopoki stara glowa zyje ze znakiem smierci (zgon odroczony przez bitwe / oblezenie; wiersz "C" w zapisie);
+    /// pogrzeb CICHY = sama wiesc (opcje gracza tylko przy PELNYM); migawka doby "rod panujacy" (_rulerOf) dla zlej kolejnosci sluchaczy.
     /// 406: pokoj pogrzebu (FuneralRites.Ai.cs) - migawka z wierszy PELNYCH, liczniki rozejmu w wierszu (tylko sesja, nie w zapisie).
     /// 407: zjazd rodu (FuneralRites.Ai.cs) - jedyna latka: postfiks 130 CampaignEventDispatcher.AiHourlyTick (w kampanii, raz na proces).
     /// 410: sporna sukcesja i zaloba krolestwa dla 312c (FuneralRites.Succession.cs) - ocena sporu w Head po utworzeniu wiersza, pytanie do gracza po
@@ -67,14 +69,18 @@ namespace Armoury
         {
             public string Clan, Kingdom, Line;
             public bool Leader, Ruling, Important, Rot;   // 410: Rot = zgon glowy z wydarzenia ROT (ROT.Events na stosie)
+            public bool Skip;                             // 405-p: glowa rodu POZA regula w chwili smierci (np. rod w krolestwie pomijanej kultury) - bez pogrzebu, takze gdy rod po zgonie wyglada juz na zwykly
         }
 
-        private sealed class Chg { public string Clan; public double Hour; public bool Rot; }   // 410: Rot = glowe zmienilo wydarzenie ROT
+        // 410: Rot = glowe zmienilo wydarzenie ROT. 405-p: Old / OldId = stara glowa; Marked = stara glowa zyje ze ZNAKIEM SMIERCI (zgon odroczony przez bitwe /
+        // oblezenie - cs_full.cs:227143) - wpis trzymany ponad 24 h, az gra wykona zgon (DailyTickHero), i zapisywany w zapisie (wiersz "C").
+        private sealed class Chg { public string Clan, OldId; public double Hour; public bool Rot, Marked; public Hero Old; }
 
         private static readonly Dictionary<string, Row> _active = new Dictionary<string, Row>(StringComparer.Ordinal);       // rod -> pogrzeb (pelny albo cichy)
         private static readonly Dictionary<string, Pre> _pre = new Dictionary<string, Pre>(StringComparer.Ordinal);          // ofiara -> stan sprzed zmiany glowy (tylko sesja)
         private static readonly Dictionary<string, Chg> _changed = new Dictionary<string, Chg>(StringComparer.Ordinal);      // stara glowa -> rod i godzina zmiany (tylko sesja)
         private static readonly Dictionary<string, string> _leaderOf = new Dictionary<string, string>(StringComparer.Ordinal); // migawka doby: rod -> glowa (tylko sesja)
+        private static readonly Dictionary<string, string> _rulerOf = new Dictionary<string, string>(StringComparer.Ordinal);  // 405-p: migawka doby: rod panujacy -> krolestwo (tylko sesja)
         private static readonly List<string> _tmp = new List<string>();
         private static readonly HashSet<string> _err = new HashSet<string>(StringComparer.Ordinal);
         private static int _stumbles, _nPre, _nChg, _nSnap, _nFull, _nQuiet, _nWord, _nJoint;
@@ -88,7 +94,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _active.Clear(); _pre.Clear(); _changed.Clear(); _leaderOf.Clear(); _tmp.Clear(); _err.Clear();
+            _active.Clear(); _pre.Clear(); _changed.Clear(); _leaderOf.Clear(); _rulerOf.Clear(); _tmp.Clear(); _err.Clear();
             _stumbles = _nPre = _nChg = _nSnap = _nFull = _nQuiet = _nWord = _nJoint = 0;
             TruceReset();   // 406
             SuccReset();    // 410
@@ -151,10 +157,10 @@ namespace Armoury
 
         private static int FullCount(string kingdom, out Row inKingdom)
         {
-            int n = 0; inKingdom = null;
+            int n = 0, today = Today(); inKingdom = null;
             foreach (var r in _active.Values)
             {
-                if (r.Mode != Full) continue;
+                if (r.Mode != Full || today > r.End) continue;   // 405-p: wiersz po terminie (czeka na dobe) nie zajmuje limitu
                 n++;
                 if (!string.IsNullOrEmpty(kingdom) && r.Kingdom == kingdom && inKingdom == null) inKingdom = r;
             }
@@ -182,7 +188,13 @@ namespace Armoury
             {
                 if (victim == null || detail == KillCharacterAction.KillCharacterActionDetail.Lost || !KeyOn || victim == Hero.MainHero || !victim.IsLord) return;
                 var cl = victim.Clan;
-                if (!Eligible(cl) || victim.StringId == null) return;
+                if (victim.StringId == null) return;
+                if (!Eligible(cl))
+                {
+                    // 405-p: glowa rodu poza regula - zapamietane, bo po DestroyClanAction rod traci krolestwo i Eligible w HeroKilled moglby go przepuscic
+                    if (cl != null && cl.StringId != null && cl.Leader == victim) _pre[victim.StringId] = new Pre { Clan = cl.StringId, Skip = true };
+                    return;
+                }
                 var p = new Pre { Clan = cl.StringId, Kingdom = cl.Kingdom != null ? cl.Kingdom.StringId : "", Leader = cl.Leader == victim, Ruling = Ruling(cl) };
                 p.Important = cl.Tier >= 4 || p.Ruling;
                 if (p.Leader && p.Important) { p.Line = BkLine(cl, victim); p.Rot = RotOnStack(); }   // 410: stos raz na zgon glowy waznego rodu
@@ -199,7 +211,7 @@ namespace Armoury
                 if (oldLeader == null || oldLeader.StringId == null || !KeyOn) return;
                 var cl = oldLeader.Clan ?? (newLeader != null ? newLeader.Clan : null);
                 if (cl == null || cl == Clan.PlayerClan) return;
-                _changed[oldLeader.StringId] = new Chg { Clan = cl.StringId, Hour = CampaignTime.Now.ToHours, Rot = RotOnStack() };   // 410: stos raz na zmiane glowy
+                _changed[oldLeader.StringId] = new Chg { Clan = cl.StringId, OldId = oldLeader.StringId, Old = oldLeader, Hour = CampaignTime.Now.ToHours, Rot = RotOnStack() };   // 410: stos raz na zmiane glowy
             }
             catch (Exception e) { Stumble("OnLeaderChanged", e); }
         }
@@ -218,17 +230,24 @@ namespace Armoury
                 if (cl == null || cl.StringId == null) return;
                 string snap;
                 bool a = pre != null && pre.Leader && pre.Clan == cl.StringId;
-                bool b = chg != null && chg.Clan == cl.StringId && CampaignTime.Now.ToHours - chg.Hour <= 24.0;
+                bool late = chg != null && CampaignTime.Now.ToHours - chg.Hour > 24.0;
+                bool b = chg != null && chg.Clan == cl.StringId && (!late || chg.Marked);   // 405-p: po 24 h tylko zgon odroczony znakiem smierci
                 bool c = _leaderOf.TryGetValue(cl.StringId, out snap) && snap == victim.StringId;
                 _leaderOf[cl.StringId] = cl.Leader != null && cl.Leader.IsAlive ? cl.Leader.StringId : "";   // migawka po kazdym zgonie w rodzie
+                if (pre != null && pre.Skip && pre.Clan == cl.StringId) return;   // 405-p: rod byl poza regula w chwili smierci glowy
                 if (!Eligible(cl)) return;
                 if (!(a || b || c)) { Joint(cl, victim, false); return; }
                 if (a) _nPre++; else if (b) _nChg++; else _nSnap++;
                 bool ruling = pre != null ? pre.Ruling : Ruling(cl);
-                bool important = pre != null ? pre.Important : (cl.Tier >= 4 || ruling);
+                string kid = pre != null ? pre.Kingdom : (cl.Kingdom != null ? cl.Kingdom.StringId : "");
+                // 405-p: nasz sluchacz PO BK (linia startu "sluchacz przed BK NIE") czyta stan juz po sukcesji BK - tron mogl przejsc na inny rod
+                // (ChangeRulingClanAction, bk.cs:65419). Migawka doby "rod panujacy" przywraca stan sprzed zgonu.
+                string rk;
+                if (!ruling && _rulerOf.TryGetValue(cl.StringId, out rk) && !string.IsNullOrEmpty(rk)) { ruling = true; kid = rk; }
+                bool important = cl.Tier >= 4 || ruling || (pre != null && pre.Important);
                 if (!important) return;
                 bool rot = (pre != null && pre.Rot) || (chg != null && chg.Clan == cl.StringId && chg.Rot);   // 410: glowa / zgon z wydarzenia ROT - bez sporu
-                Head(cl, victim, detail, a ? "przed" : (b ? "zmiana glowy" : "migawka"), ruling, pre != null ? pre.Kingdom : (cl.Kingdom != null ? cl.Kingdom.StringId : ""), pre != null ? pre.Line : null, rot);
+                Head(cl, victim, detail, a ? "przed" : (b ? (late ? "zmiana glowy (zgon odroczony znakiem smierci)" : "zmiana glowy") : "migawka"), ruling, kid, pre != null ? pre.Line : null, rot);
             }
             catch (Exception e) { Stumble("OnKilled", e); }
         }
@@ -251,7 +270,13 @@ namespace Armoury
             int today = Today();
             Hero heir = !cl.IsEliminated && cl.Leader != null && cl.Leader != victim && cl.Leader.IsAlive ? cl.Leader : null;
             if (ruling) KingDied(kingdomId, victim);   // 410: zaloba krolestwa (312c) - kazdy tryb pogrzebu, takze sama wiesc i wspolny pogrzeb
-            if (Joint(cl, victim, true)) return;
+            if (Joint(cl, victim, true))
+            {
+                // 405-p: druga glowa rodu w oknie pogrzebu - wdowa do logu i krotka wiesc (wspolny pogrzeb nie mial zadnej)
+                Widow(victim);
+                if (TellPlayer(cl, kingdomId, victim, heir, null)) Log.Player(Nm(victim) + " of " + Nm(cl) + " is dead.");
+                return;
+            }
             Kingdom kingdom = cl.Kingdom;
             Settlement seat = cl.IsEliminated || heir == null ? null : SeatOf(cl);
             string head = "SMIERC GLOWY " + Nm(victim) + " (" + victim.StringId + ") rodu " + cl.StringId + (ruling ? " [panujacy]" : "") + " | powod " + detail + " | wykrycie: " + how
@@ -262,7 +287,7 @@ namespace Armoury
                 _nWord++;
                 Info(head + " | siedziba - | tryb TYLKO WIESC (" + (cl.IsEliminated ? "rod zniszczony" : (heir == null ? "brak dziedzica" : "rod bez twierdzy")) + ").");
                 Widow(victim);
-                if (TellPlayer(cl, victim, heir, null)) Log.Player(Nm(victim) + " of " + Nm(cl) + " is dead.");
+                if (TellPlayer(cl, kingdomId, victim, heir, null)) Log.Player(Nm(victim) + " of " + Nm(cl) + " is dead.");
                 return;
             }
             var row = new Row
@@ -283,7 +308,7 @@ namespace Armoury
                     if (ruling && !same.King && same.Day == today)
                     {
                         same.Mode = Quiet; same.Why = "wyparty przez pogrzeb wladcy";
-                        full--;
+                        full--; _nFull--; _nQuiet++;   // 405-p: liczniki sesji ida za trybem
                         Info("pogrzeb rodu " + same.Clan + " (" + same.Name + ") schodzi na CICHY - wladca " + row.Name + " zmarl tej samej doby (1 pelny na krolestwo).");
                     }
                     else why = "limit krolestwa (trwa pogrzeb rodu " + same.Clan + ")";
@@ -295,13 +320,13 @@ namespace Armoury
             Info(head + " | siedziba " + seat.StringId + " | tryb " + (row.Mode == Full ? "PELNY" : "CICHY (" + why + ")") + " | obrzed dnia " + row.Rite + ", koniec " + row.End + ".");
             TruceRebuild();   // 406: pokoj pogrzebu - nowy wiersz pelny (albo wyparty na cichy)
             Widow(victim);
-            bool told = TellPlayer(cl, victim, heir, seat);
+            bool told = TellPlayer(cl, kingdomId, victim, heir, seat);
             if (told)
             {
                 if (row.Mode == Full)
                     Log.Player("Word reaches you: " + Nm(victim) + " of " + Nm(cl) + " is dead. The house gathers at " + Nm(seat) + " to bury " + (victim.IsFemale ? "her" : "him")
-                               + "; the rites are held in " + (row.Rite - today) + " days.");
-                else if (siege) Log.Player(Nm(cl) + " buries its lord in silence - " + Nm(seat) + " is not theirs to gather in.");
+                               + "; the rites are held " + (row.Rite - today <= 1 ? "tomorrow." : "in " + (row.Rite - today) + " days."));
+                else if (siege) Log.Player(Nm(victim) + " of " + Nm(cl) + " is dead. The house buries " + (victim.IsFemale ? "her" : "him") + " in silence - " + Nm(seat) + " is under siege.");
                 else Log.Player(Nm(victim) + " of " + Nm(cl) + " is dead.");
             }
             SuccessionCheck(cl, victim, heir, row, line, rot, told);   // 410: spor o dziedzictwo - jedna ocena na zgon glowy (po wiesci o smierci)
@@ -321,14 +346,14 @@ namespace Armoury
         }
 
         /// <summary>Wiesc dociera do gracza: to samo krolestwo, relacja >= 10 ze zmarlym lub dziedzicem, albo siedziba w zasiegu 120.</summary>
-        private static bool TellPlayer(Clan cl, Hero victim, Hero heir, Settlement seat)
+        private static bool TellPlayer(Clan cl, string kingdomId, Hero victim, Hero heir, Settlement seat)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !s.FuneralPlayerAttend || Hero.MainHero == null) return false;
                 var pk = Clan.PlayerClan != null ? Clan.PlayerClan.Kingdom : null;
-                if (pk != null && cl.Kingdom == pk) return true;
+                if (pk != null && (cl.Kingdom == pk || (!string.IsNullOrEmpty(kingdomId) && pk.StringId == kingdomId))) return true;   // 405-p: krolestwo sprzed smierci (rod zniszczony juz go nie ma)
                 if (CharacterRelationManager.GetHeroRelation(Hero.MainHero, victim) >= NewsRelation) return true;
                 if (heir != null && CharacterRelationManager.GetHeroRelation(Hero.MainHero, heir) >= NewsRelation) return true;
                 var mp = MobileParty.MainParty;
@@ -433,7 +458,21 @@ namespace Armoury
                 {
                     double now = CampaignTime.Now.ToHours;
                     _tmp.Clear();
-                    foreach (var kv in _changed) if (now - kv.Value.Hour > 24.0) _tmp.Add(kv.Key);
+                    foreach (var kv in _changed)
+                    {
+                        // 405-p: stara glowa zyje ze znakiem smierci (zgon odroczony przez bitwe / oblezenie, np. wydarzenie ROT wobec lorda w obozie
+                        // oblezniczym) - wpis zostaje, az gra wykona zgon; bez znaku pamiec gasnie po 24 h jak dotad
+                        var ch = kv.Value;
+                        if (ch.Old == null && !string.IsNullOrEmpty(ch.OldId)) { string oid = ch.OldId; ch.OldId = null; try { ch.Old = Hero.FindFirst(x => x != null && x.StringId == oid); } catch { } }
+                        var o = ch.Old;
+                        if (o != null && o.IsAlive && o.DeathMark != KillCharacterAction.KillCharacterActionDetail.None)
+                        {
+                            if (!ch.Marked || ch.Hour == double.MinValue) { ch.Marked = true; if (ch.Hour == double.MinValue) ch.Hour = now - 25.0; Info("zmiana glowy rodu " + ch.Clan + ": stara glowa " + Nm(o) + " (" + o.StringId + ") zyje ze znakiem smierci " + o.DeathMark + " - pamiec trzymana do faktycznego zgonu."); }
+                            continue;
+                        }
+                        ch.Marked = false;
+                        if (now - ch.Hour > 24.0) _tmp.Add(kv.Key);
+                    }
                     foreach (var id in _tmp) _changed.Remove(id);
                 }
                 if (_pre.Count > 64) _pre.Clear();   // zgon wstrzymany po BeforeHeroKilled nie zdarza sie w grze; bezpiecznik pamieci
@@ -446,11 +485,13 @@ namespace Armoury
 
         private static void Snapshot()
         {
-            _leaderOf.Clear();
+            _leaderOf.Clear(); _rulerOf.Clear();
             foreach (var c in Clan.All)
             {
                 if (c == null || c.StringId == null || c.IsEliminated || c.Leader == null) continue;
                 _leaderOf[c.StringId] = c.Leader.StringId;
+                var k = c.Kingdom;
+                if (k != null && !k.IsEliminated && k.RulingClan == c && k.StringId != null) _rulerOf[c.StringId] = k.StringId;
             }
         }
 
@@ -505,7 +546,8 @@ namespace Armoury
             return true;
         }
 
-        /// <summary>Pogrzeb trwajacy w osadzie, w ktorej stoi gracz (siedziba dalej rodu, rod zyje, dziedzic zyje, bez wojny z rodem). null = brak.</summary>
+        /// <summary>Pogrzeb PELNY trwajacy w osadzie, w ktorej stoi gracz (siedziba dalej rodu, rod zyje, dziedzic zyje, bez wojny z rodem). null = brak.
+        /// 405-p: pogrzeb cichy to sama wiesc (decyzja 20 planu) - bez opcji gracza; wiersz niewazny nie zaslania nastepnego z ta sama siedziba.</summary>
         private static Row Here(out Clan clan, out Hero heir)
         {
             clan = null; heir = null;
@@ -516,13 +558,13 @@ namespace Armoury
             int today = Today();
             foreach (var r in _active.Values)
             {
-                if (r.Seat != st.StringId || today > r.End) continue;
+                if (r.Seat != st.StringId || today > r.End || r.Mode != Full) continue;
                 var cl = FindClan(r.Clan);
-                if (cl == null || cl.IsEliminated || st.OwnerClan != cl) return null;
+                if (cl == null || cl.IsEliminated || st.OwnerClan != cl) continue;
                 var h = cl.Leader;
-                if (h == null || !h.IsAlive || h == Hero.MainHero) return null;
+                if (h == null || !h.IsAlive || h == Hero.MainHero) continue;
                 var pf = Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null;
-                if (pf != null && cl.MapFaction != null && pf.IsAtWarWith(cl.MapFaction)) return null;
+                if (pf != null && cl.MapFaction != null && pf.IsAtWarWith(cl.MapFaction)) continue;
                 clan = cl; heir = h;
                 return r;
             }
@@ -551,7 +593,8 @@ namespace Armoury
             {
                 Clan cl; Hero heir;
                 var r = Here(out cl, out heir);
-                if (r == null || r.Attended) return;
+                if (r == null) return;
+                if (r.Attended) { Log.Player("You have already stood at the grave of " + r.Name + "."); return; }   // 405-p: menu nie odswieza warunku po kliknieciu
                 r.Attended = true;
                 var st = Settlement.CurrentSettlement;
                 int lords = 0;
@@ -600,18 +643,27 @@ namespace Armoury
                 var s = Settings.Current;
                 Clan cl; Hero heir;
                 var r = Here(out cl, out heir);
-                if (r == null || r.Gift > 0 || s.FuneralGiftGold <= 0) return;
+                if (r == null || s.FuneralGiftGold <= 0) return;
+                if (r.Gift > 0) { Log.Player("You have already given for the rites of " + r.Name + "."); return; }   // 405-p: menu nie odswieza warunku po kliknieciu
                 int gold = s.FuneralGiftGold;
                 if (Hero.MainHero.Gold < gold) return;
                 r.Gift = gold;
                 GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, heir, gold);
                 ChangeRelationAction.ApplyPlayerRelation(heir, 2);
+                Log.Player("You gave " + gold + " denars for the rites of " + r.Name + ".");
                 Info("dar gracza na obrzedy " + r.Name + " (rod " + r.Clan + "): " + gold + " zlota do dziedzica " + Nm(heir) + " (" + heir.StringId + "), relacja +2.");
             }
             catch (Exception e) { Stumble("GiftConsequence", e); }
         }
 
         // ---------------------------------------------------------------- zapis
+
+        /// <summary>405-p: stara glowa ze znakiem smierci (zgon odroczony) - wpis do zapisu takze przed pierwsza doba.</summary>
+        private static bool MarkedNow(Chg ch)
+        {
+            if (ch.Marked) return true;
+            try { var o = ch.Old; return o != null && o.IsAlive && o.DeathMark != KillCharacterAction.KillCharacterActionDetail.None; } catch { return false; }
+        }
 
         private static bool Ok(string id) { return !string.IsNullOrEmpty(id) && id.IndexOf('|') < 0 && id.IndexOf('\n') < 0 && id.IndexOf('\r') < 0; }
 
@@ -621,7 +673,9 @@ namespace Armoury
         {
             try
             {
-                if (_active.Count == 0 && !SuccAny) return "";
+                bool marked = false;
+                foreach (var ch in _changed.Values) if (MarkedNow(ch)) { marked = true; break; }
+                if (_active.Count == 0 && !SuccAny && !marked) return "";
                 var sb = new StringBuilder(32 + 128 * (_active.Count + _disputes.Count));
                 sb.Append("v1");
                 foreach (var r in _active.Values)
@@ -633,6 +687,12 @@ namespace Armoury
                       .Append('|').Append(Clean(r.Why)).Append('|').Append(Clean(r.Line)).Append('|').Append(Clean(r.Others));
                 }
                 SuccExport(sb);   // 410
+                foreach (var kv in _changed)   // 405-p: stara glowa ze znakiem smierci (zgon odroczony) - "C|stara glowa|rod|ROT"
+                {
+                    var ch = kv.Value;
+                    if (!MarkedNow(ch) || !Ok(kv.Key) || !Ok(ch.Clan)) continue;
+                    sb.Append('\n').Append("C|").Append(kv.Key).Append('|').Append(ch.Clan).Append('|').Append(ch.Rot ? '1' : '0');
+                }
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -641,7 +701,7 @@ namespace Armoury
         /// <summary>Wczytanie (brak klucza w starym zapisie = pusto). Zly wiersz pominiety; wiersz po terminie zamknie pierwsza doba.</summary>
         internal static void Import(string data)
         {
-            _active.Clear();
+            _active.Clear(); _changed.Clear(); _pre.Clear();
             TruceReset();   // 406: migawka pokoju od nowa w AddMenus (po starcie sesji)
             SuccReset();    // 410: spory i zaloby z zapisu; migawka 312c w AddMenus (SuccStart)
             int bad = 0;
@@ -657,6 +717,12 @@ namespace Armoury
                     try
                     {
                         if (p[0] == "S" || p[0] == "K") { if (!SuccImportLine(p)) bad++; continue; }   // 410
+                        if (p[0] == "C")   // 405-p: zgon odroczony starej glowy; bohater szukany w pierwszej dobie (Daily), bez znaku smierci wpis gasnie
+                        {
+                            if (p.Length < 4 || p[1].Length == 0 || p[2].Length == 0) { bad++; continue; }
+                            _changed[p[1]] = new Chg { Clan = p[2], OldId = p[1], Hour = double.MinValue, Rot = p[3] == "1", Marked = true };
+                            continue;
+                        }
                         if (p[0] != "F" || p.Length < 14 || p[1].Length == 0 || p[2].Length == 0 || p[5].Length == 0) { bad++; continue; }
                         var r = new Row
                         {

@@ -12072,11 +12072,11 @@ namespace Armoury
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public int FuneralDays { get; set; } = 5;
 
-        [SettingPropertyInteger("Funeral Max Active", 1, 10, "0", HintText = "With Funerals: the most full funerals in the world at one time, and never more than one in a kingdom (a ruler's funeral takes the place of a lesser one begun the same day). Further deaths are buried quietly: word reaches you and you may still attend", RequireRestart = false)]
+        [SettingPropertyInteger("Funeral Max Active", 1, 10, "0", HintText = "With Funerals: the most full funerals in the world at one time, and never more than one in a kingdom (a ruler's funeral takes the place of a lesser one begun the same day). Further deaths are buried quietly: only word of them reaches you", RequireRestart = false)]
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public int FuneralMaxActive { get; set; } = 3;
 
-        [SettingPropertyBool("Funeral Player Attend", HintText = "With Funerals: word of a funeral reaches you when you belong to that kingdom, when the dead lord or his heir thought well of you (relation 10 or more), or when you are near the seat. In the town or castle menu of the seat you may attend the funeral (the heir +3, every lord of the house who is there +1) and give Funeral Gift Gold for the rites. Off = no word and no menu options", RequireRestart = false)]
+        [SettingPropertyBool("Funeral Player Attend", HintText = "With Funerals: word of a funeral reaches you when you belong to that kingdom, when the dead lord or his heir thought well of you (relation 10 or more), or when you are near the seat. In the town or castle menu of the seat you may attend a full funeral (the heir +3, every lord of the house who is there +1) and give Funeral Gift Gold for the rites. Off = no word and no menu options", RequireRestart = false)]
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public bool FuneralPlayerAttend { get; set; } = true;
 
@@ -12084,7 +12084,7 @@ namespace Armoury
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public int FuneralGiftGold { get; set; } = 1000;
 
-        [SettingPropertyBool("Funeral Canon Quiet", HintText = "With Funerals, in a campaign that follows the Realm of Thrones story: funerals are quiet (word and your own visit only) until the Red Wedding is over, and in the North and for its allies until the Battle of the Bastards. Off = full funerals from the first day", RequireRestart = false)]
+        [SettingPropertyBool("Funeral Canon Quiet", HintText = "With Funerals, in a campaign that follows the Realm of Thrones story: funerals are quiet (only word of the death reaches you) until the Red Wedding is over, and in the North and for its allies until the Battle of the Bastards. Off = full funerals from the first day", RequireRestart = false)]
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public bool FuneralCanonQuiet { get; set; } = true;
 
