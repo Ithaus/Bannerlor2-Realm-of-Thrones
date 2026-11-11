@@ -848,9 +848,13 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int PrisonerExchangePactDays { get; set; } = 60;
 
-        [SettingPropertyBool("Prisoner Exchange Pact Guards Clan Parties", HintText = "With Prisoner Exchange For Terms and the oath of peace: the realm (or house) that swore it also leaves your caravans, your companions' parties and the villagers of your villages alone, and your companions' parties do not start fights with that realm (unless it besieges or raids your lands or goes after your men; joining a battle already being fought is allowed, as it is for you). Neither side flees from the other. A clan party that has joined another lord's army fights under his command and is not covered; on its way to that army it still is, unless that army marches against them. Their lords do not even close in on your party or your clan's parties. Off = the oath covers only your lands and your own party, as before", RequireRestart = false)]
+        [SettingPropertyBool("Prisoner Exchange Pact Guards Clan Parties", HintText = "With Prisoner Exchange For Terms and the oath of peace: the realm (or house) that swore it also leaves your caravans, your companions' parties and the villagers of your villages alone, and your companions' parties do not start fights with that realm (unless it besieges or raids your lands or goes after your men; joining a battle already being fought is allowed, as it is for you). Neither side flees from the other. A clan party that has joined another lord's army fights under his command and is not covered; on its way to that army it still is, unless that army marches against them. With Prisoner Exchange Pact No Approach their lords do not even close in on those parties. Off = the oath covers only your lands and your own party, as before", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerExchangePactGuardsClan { get; set; } = true;
+
+        [SettingPropertyBool("Prisoner Exchange Pact No Approach", HintText = "With Prisoner Exchange For Terms and the oath of peace: lords of the realm (or house) that swore it do not even ride up to your own party - the game otherwise sends every lord near the front to close in on a hostile party, and from there a fight can start without the oath being asked. With Prisoner Exchange Pact Guards Clan Parties the same holds both ways for your clan's parties, and an order to close in given before the oath is dropped. Their rescue hunts for captives you hold stop closing in on you as well while the oath lasts. Off = lords under oath may still ride up to and circle your party; only the attack itself is forbidden, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerExchangePactNoApproach { get; set; } = true;
 
         [SettingPropertyBool("Prisoner Terms Pick Window", HintText = "With Prisoner Exchange For Terms: the lords you offer are picked in one window that lists every lord of his realm you hold (dearest first, with his worth), instead of eight lines in the talk. Turn it off if the window misbehaves during the parley - the eight lines come back", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
@@ -12248,6 +12252,7 @@ namespace Armoury
             s.PrisonerExchangeForTerms = PrisonerExchangeForTerms;
             s.PrisonerExchangePactDays = PrisonerExchangePactDays;
             s.PrisonerExchangePactGuardsClan = PrisonerExchangePactGuardsClan;
+            s.PrisonerExchangePactNoApproach = PrisonerExchangePactNoApproach;
             s.PrisonerTermsPickWindow = PrisonerTermsPickWindow;
             s.PrisonerTermsReleaseMyMen = PrisonerTermsReleaseMyMen;
             s.PrisonerTermsReleaseMySoldiers = PrisonerTermsReleaseMySoldiers;

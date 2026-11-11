@@ -1570,6 +1570,7 @@ namespace Armoury
         {
             var tgt = o.Target;
             if (tgt == null || !tgt.IsActive) return;
+            if (PrisonerTerms384.GoBlocked(party, tgt)) return;   // 386c-p: pakt i tak wytnie to podejscie (ThinkPact 140) - bez opcji i bez licznika poscigu
             var scores = pt.AIBehaviorScores;
             for (int i = 0; i < scores.Count; i++)
             {

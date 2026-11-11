@@ -125,6 +125,7 @@ namespace Armoury
         // 385d: zwykli zolnierze gracza w niewoli (razem z "moimi ludzmi" - wymaga KMen)
         private static bool KSol { get { var s = Settings.Current; return s != null && s.PrisonerTermsReleaseMyMen && s.PrisonerTermsReleaseMySoldiers; } }
         // 386
+        private static bool KGo { get { var s = Settings.Current; return s != null && s.PrisonerExchangeForTerms && s.PrisonerExchangePactNoApproach; } }   // 386c-p: wyciecie podejscia (GoAroundParty) ma wlasny klucz
         private static bool KClan { get { var s = Settings.Current; return s != null && s.PrisonerExchangeForTerms && s.PrisonerExchangePactGuardsClan; } }
         private const string FieldCool = "@f";
 
@@ -1969,6 +1970,8 @@ namespace Armoury
             if (b.MapEvent == null) return false;
             if (HasSt(k, b.MapEvent.MapEventSettlement)) return true;
             var side = b.MapEventSide;
+            // 386c-p: tylko strona ATAKUJACA wystepuje przeciw nim - partia rodu napadnieta przez partie paktu (obronca) nie traci przez to ochrony
+            if (side == null || side != b.MapEvent.AttackerSide) return false;
             var opp = side != null ? side.OtherSide : null;
             var lp = opp != null && opp.LeaderParty != null ? opp.LeaderParty.MobileParty : null;
             return Has(k, lp);
@@ -2038,7 +2041,7 @@ namespace Armoury
             if (k == null) return;
             try
             {
-                if (party == null || partyThinkParams == null || party.IsMainParty || partyThinkParams.DoNotChangeBehavior || !On) return;
+                if (party == null || partyThinkParams == null || party.IsMainParty || partyThinkParams.DoNotChangeBehavior || !KGo) return;   // 386c-p: klucz NIE = stan sprzed 386c
                 bool kc = KClan;
                 bool a = Has(k, party);
                 bool m = !a && kc && Mine(party);
@@ -2127,6 +2130,10 @@ namespace Armoury
 
         /// <summary>LordEscort.Guard335.Attacker (watek glowny): obroncy chronionego wodza p nie biora za napastnika druzyny gracza ani partii rodu, gdy frakcja /
         /// rod p ma uczciwy pakt - 335 wymusza EngageParty z pominieciem ShouldConsiderAttacking (i SetDoNotAttackMainParty). Druzyna gracza: sam klucz 384.</summary>
+        /// <summary>386c-p (RescueHunt.Chase, mysl godzinowa): podejscie p -> t i tak wytnie ThinkPact (140) - lowca nie dodaje wtedy opcji i nie liczy "poscigu",
+        /// ktorego nie bedzie. Przy kluczu podejscia NIE - false (lowy jak przed 386c).</summary>
+        internal static bool GoBlocked(MobileParty p, MobileParty t) { return KGo && PactBlocks(p, t); }
+
         internal static bool PactBlocks(MobileParty p, MobileParty t)
         {
             var k = _pact;
@@ -2148,7 +2155,8 @@ namespace Armoury
         {
             var k = _pact;
             if (k == null || !On) return;
-            bool kc = KClan;
+            bool kc = KClan, kg = KGo;
+            if (!kc && !kg) return;   // 386c-p: bez klucza podejscia wejscie jak przed 386c (tylko KClan, tylko EngageParty)
             try
             {
                 foreach (var mp in MobileParty.AllLordParties)
@@ -2158,7 +2166,7 @@ namespace Armoury
                         if (mp == null || !mp.IsActive || mp.IsMainParty || mp.Ai == null || mp.MapEvent != null || mp.AttachedTo != null) continue;
                         // 386c: takze GoAroundParty - od kiedy ThinkPact wycina te opcje u zrodla, gra jej nie odnowi, wiec zdjecie rozkazu sprzed paktu
                         // (albo przywroconego po obozie przez NightRest) ma sens; 386b slusznie tego nie robilo (gra nadawala cel od nowa co godzine)
-                        bool go = mp.DefaultBehavior == AiBehavior.GoAroundParty;
+                        bool go = kg && mp.DefaultBehavior == AiBehavior.GoAroundParty;
                         if (mp.DefaultBehavior != AiBehavior.EngageParty && !go) continue;
                         var t = mp.TargetParty;
                         if (t == null) continue;
@@ -2194,7 +2202,7 @@ namespace Armoury
             lock (PactGate) { aiP = _pAiSet.Count; myP = _pMySet.Count; }
             return " | 386 partie rodu (" + (KClan ? "klucz TAK" : "klucz NIE") + ", latka atak " + _pactHook + " / ucieczka " + _avoidHook + " / podejscie " + _thinkHook + "): ataki AI zablokowane " + _pAiCalls + " wywolan / " + aiP
                    + " partii, ataki rodu zablokowane " + _pMyCalls + " / " + myP + ", ucieczki zdjete " + _pFlee + ", rozkazy zdjete " + _pOrders + ", atak mimo paktu na partie rodu " + _pDespite
-                   + ", atak partii rodu mimo paktu " + _pMyDespite + ", chronionych teraz " + (car + lords + vil) + " (karawany " + car + ", druzyny " + lords + ", wiesniacy " + vil + "; w drodze do cudzej armii " + road + "), 386c podejscia wyciete AI " + _pGoAi + " / rodu " + _pGoMy + " (zostalo mimo wyciecia " + _pGoFuse + "), potkniecia watkow " + _pThreadStumbles;
+                   + ", atak partii rodu mimo paktu " + _pMyDespite + ", chronionych teraz " + (car + lords + vil) + " (karawany " + car + ", druzyny " + lords + ", wiesniacy " + vil + "; w drodze do cudzej armii " + road + "), 386c podejscia (klucz " + (KGo ? "TAK" : "NIE") + ") wyciete AI " + _pGoAi + " / rodu " + _pGoMy + " (zostalo mimo wyciecia " + _pGoFuse + "), potkniecia watkow " + _pThreadStumbles;
         }
 
         private static List<Entry> Covering(IFaction f, Clan c, Settlement st)
