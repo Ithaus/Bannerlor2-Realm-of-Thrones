@@ -684,7 +684,7 @@ namespace Armoury
                 {
                     foreach (var r in done) Drop(r);
                 }
-                if (_dEv + _dRose + _dCrisis + _dDeferred + _dGone + _dStumbles + _dRb + _rows.Count + _healCuts + _setCuts + _aiOrders + _aiOff + _dFell + _dDropped + _dNk > 0)
+                if (_dEv + _dRose + _dCrisis + _dDeferred + _dGone + _dStumbles + _dRb + _rows.Count + _healCuts + _setCuts + _aiOrders + _aiOff + _aiFood + _dFell + _dDropped + _dNk > 0)
                     Log.Info(Tag + "dzien " + day + " | rany w bitwie dzis " + _dBattle + " (misja " + _dMission + " / symulacja " + _dSim + "): light " + _dLight + ", serious "
                              + _dSerious + ", grave " + _dGrave + ", chronieni fabula " + _dGuard + " | zdarzen HeroWounded " + _dEv + " (poza bitwa " + _dNoBattle + ", poza zakresem "
                              + _dOut + ", rana Kroniki " + _dCanon + ", juz na lozu " + _dHas + ") | na lozu " + sr + " serious / " + gr + " grave (jency " + pris + ", w twierdzy " + fort

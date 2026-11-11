@@ -611,12 +611,14 @@ namespace Armoury
                 }
                 else
                 {
-                    Army army = s.LordsJoinNearArmy ? NearArmy(party, h) : null;
+                    // 408-p: partia z wodzem na lozu, ktora 408 prowadzi do twierdzy - bez dolaczania do armii i bez jazdy za silniejszym (zostaje krok 3: twierdza)
+                    bool rest408 = HeroWounds.RestingParty(party);
+                    Army army = !rest408 && s.LordsJoinNearArmy ? NearArmy(party, h) : null;
                     // za silniejszym tylko przy prawdziwym zagrozeniu - wrogi lord, armia albo gracz w zasiegu (bandy sa prawie zawsze; jazda za kims nie odbudowuje
                     // partii) i nie z wlasnej twierdzy (tam werbunek i eskorta z zalogi) - recenzja 223
                     var cs = party.CurrentSettlement;
                     bool inOwnFort = cs != null && cs.IsFortification && cs.OwnerClan == clan;
-                    MobileParty esc = army == null && !inOwnFort && thr.Lords > 0f ? Escort(party, T, S) : null;
+                    MobileParty esc = !rest408 && army == null && !inOwnFort && thr.Lords > 0f ? Escort(party, T, S) : null;
                     if (army != null)
                     {
                         _joinQ[party] = army;

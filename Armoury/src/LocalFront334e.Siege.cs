@@ -266,7 +266,8 @@ namespace Armoury
                 {
                     // 376: armia ratunkowa regenta (RescueHunt, klucz RescueHuntHostKeepsTarget) - bez dokladanego rabunku, cel zostaje lowom
                     if (ArmyRaidOn && party.Army != null && party.Army.LeaderParty == party && !RescueHunt.HostKeeps(party)) ArmyRaid(party, partyThinkParams);
-                    if (PowerOn && WarFront334.IronOn && party.MapFaction.StringId == WarFront334.IronId) IronSiege(party, partyThinkParams);
+                    // 408-p: wodz na lozu wieziony do twierdzy (HeroWounds.RestingParty; nigdy armia) nie dostaje dopisanego oblezenia ze zwolaniem armii
+                    if (PowerOn && WarFront334.IronOn && party.MapFaction.StringId == WarFront334.IronId && !HeroWounds.RestingParty(party)) IronSiege(party, partyThinkParams);
                 }
                 long mt = _modelT, wt = _tWait;
                 double ms = TMs(Ts() - t0 - mt - wt);   // 334f: model gry (ocena celu, droga) poza kosztem 334e - osobny licznik; 340: czekanie na zamek tez poza

@@ -20,6 +20,8 @@ namespace Armoury
     /// Cel: partia stojaca w nieoblezonej twierdzy swojej frakcji zostaje w niej; inaczej najblizsza nieoblezona twierdza RODU, a gdy rod zadnej nie ma
     /// (albo zadna nie ma drogi ladowej) - najblizsza twierdza frakcji. Ocena GoToSettlement (droga ladowa) = max(ArmsFirst.FloorScore, 1.1 x najlepsza inna
     /// opcja po naszych -1); wyniku &lt;= -1 (cudza blokada) nie podnosimy, twierdza z taka blokada nie jest kandydatem. Cel trzymany 24 h (bez wahadla).
+    /// 408-p: do ZAMKU tylko z zapasem jedzenia >= prog gry (12 dni) - inaczej w tej mysli bez wyjazdu (gra jedzie po zapasy); obrona osady rodu ze zwolaniem
+    /// armii nie wstrzymuje wyjazdu; LordEscort 223 i IronSiege 334e pytaja RestingParty (bez dolaczania do armii, jazdy za silniejszym, zwolywania).
     /// Zadnych doplat: zold i jedzenie normalnie. Wodz armii na lozu - bez zmian. Bez stanu w zapisie; pamiec czyszczona w Reset i w dobie.</summary>
     internal static partial class HeroWounds
     {
@@ -37,11 +39,40 @@ namespace Armoury
         private static readonly List<(AIBehaviorData, float)> _aiCopy = new List<(AIBehaviorData, float)>(32);
         private static readonly List<KeyValuePair<Settlement, float>> _aiCand = new List<KeyValuePair<Settlement, float>>(16);
         private static int _aiOrders, _aiInside, _aiOff, _aiNoFort, _aiOwnDef, _aiSea, _aiStarve, _aiStory, _aiNeed, _aiVeto, _aiSessOrders;
+        private static int _aiFood;   // 408-p: bez wyjazdu do zamku - zapas jedzenia ponizej progu gry (partia najpierw kupuje w miescie / wsi)
 
         private static void AiReset()
         {
             _aiPick.Clear(); _aiSaid.Clear(); _aiDay.Clear(); _aiCopy.Clear(); _aiCand.Clear();
             _aiOrders = _aiInside = _aiOff = _aiNoFort = _aiOwnDef = _aiSea = _aiStarve = _aiStory = _aiNeed = _aiVeto = _aiSessOrders = 0;
+            _aiFood = 0;
+        }
+
+        /// <summary>408-p: partia lorda AI, ktora regula 408 TERAZ prowadzi do twierdzy (klucze, wodz w ksiedze ran, nie rod gracza, nie armia, nie morze / glod,
+        /// nie wodz oblezenia fabuly ROT ani postac fabuly tuz przed wydarzeniem). Dla innych regul AI naszego moda (LordEscort 223, LocalFront334e.IronSiege):
+        /// taka partia nie jest dolaczana do armii, nie jedzie za silniejszym i nie zwoluje armii - jedna zasada na rannego wodza. Watek glowny (mysl AI).</summary>
+        internal static bool RestingParty(MobileParty party)
+        {
+            if (_n == 0 || party == null) return false;
+            try
+            {
+                if (!party.IsLordParty || party.IsMainParty || party.Army != null) return false;
+                var lh = party.LeaderHero;
+                if (lh == null || lh == Hero.MainHero || !_bed.ContainsKey(lh)) return false;
+                var s = Settings.Current;
+                if (s == null || !s.HeroWoundsEnabled || !s.HeroWoundsLordsRest) return false;
+                var clan = party.ActualClan;
+                if (clan == null || clan == Clan.PlayerClan) return false;
+                if (party.IsCurrentlyAtSea || party.Party.IsStarving) return false;
+                if (SiegePhantomLift.StoryLeaderOf(party) != null) return false;
+                if (StoryGuard.Needed(lh))
+                {
+                    double need = StoryGuard.NextNeedDay(lh);
+                    if (need >= 0 && need - CanonCompanions.StoryDay() < AiNeedDays) return false;
+                }
+                return true;
+            }
+            catch (Exception e) { Stumble("RestingParty", e); return false; }
         }
 
         /// <summary>Z Wire (OnSessionLaunched, raz na proces): postfiks 60 na metode zadeklarowana w CampaignEventDispatcher. Stan w linii startu ran.</summary>
@@ -183,7 +214,8 @@ namespace Armoury
                 {
                     var e = scores[i];
                     _aiCopy.Add(e);
-                    if (ArmsFirst.IsOwnDefend(in e.Item1, clan)) { if (e.Item2 > ownDef) ownDef = e.Item2; }
+                    // 408-p: bez wariantu "zbierz armie obronna" - te opcje za chwile sami gasimy (AiIsBattle: WillGatherArmy), nie moze wiec wstrzymac wyjazdu
+                    if (!e.Item1.WillGatherArmy && ArmsFirst.IsOwnDefend(in e.Item1, clan)) { if (e.Item2 > ownDef) ownDef = e.Item2; }
                     if (e.Item2 > -1f) continue;
                     var bs = e.Item1.Party as Settlement;
                     if (bs == null || !bs.IsFortification) continue;
@@ -205,6 +237,15 @@ namespace Armoury
                 bool own; float road;
                 var fort = AiFort(party, clan, blocked, out own, out road);
                 if (fort == null) { _aiNoFort++; return; }
+                if (!fort.IsTown)
+                {
+                    // 408-p: w zamku nikt partii lorda nie karmi (gra i BK kupuja jedzenie tylko w miescie / wsi), a nasza ocena przebijalaby wizyte gry po
+                    // jedzenie az do glodu. Zapas ponizej progu gry (MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege, 12 dni) = w tej mysli bez
+                    // wyjazdu do zamku: opcje bitwy zostaja na -1, wygrywa zwykla wizyta gry po zapasy; po zakupach partia wraca.
+                    float thr = 12f;
+                    try { var c0 = Campaign.Current; if (c0 != null && c0.Models != null && c0.Models.MobilePartyAIModel != null) thr = c0.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForSiege; } catch { }
+                    if (party.GetNumDaysForFoodToLast() < thr) { _aiFood++; return; }
+                }
                 int mine = -1; float other = 0f;
                 for (int i = 0; i < scores.Count; i++)
                 {
@@ -251,10 +292,10 @@ namespace Armoury
         /// <summary>Ogon linii doby "Rany (HW)".</summary>
         private static string AiDayText()
         {
-            int skips = _aiOff + _aiNoFort + _aiOwnDef + _aiSea + _aiStarve + _aiStory + _aiNeed + _aiVeto;
+            int skips = _aiOff + _aiNoFort + _aiOwnDef + _aiSea + _aiStarve + _aiStory + _aiNeed + _aiVeto + _aiFood;
             if (_aiOrders == 0 && skips == 0) return " | partie do twierdzy 0";
             return " | partie do twierdzy " + _aiDay.Count + " (ocen wyjazdu " + _aiOrders + ", z tego stojac w murach " + _aiInside + "; opcje bitwy -1: " + _aiOff
-                   + "; bez wyjazdu: brak twierdzy " + _aiNoFort + ", obrona osady rodu " + _aiOwnDef + ", cel zawetowany " + _aiVeto + "; pominiete: morze " + _aiSea
+                   + "; bez wyjazdu: brak twierdzy " + _aiNoFort + ", obrona osady rodu " + _aiOwnDef + ", cel zawetowany " + _aiVeto + ", malo jedzenia na zamek " + _aiFood + "; pominiete: morze " + _aiSea
                    + ", glod " + _aiStarve + ", wodz oblezenia fabuly " + _aiStory + ", przed wydarzeniem fabuly " + _aiNeed + "; sesja ocen " + _aiSessOrders + ")";
         }
 
@@ -263,7 +304,7 @@ namespace Armoury
         {
             try
             {
-                _aiOrders = _aiInside = _aiOff = _aiNoFort = _aiOwnDef = _aiSea = _aiStarve = _aiStory = _aiNeed = _aiVeto = 0;
+                _aiOrders = _aiInside = _aiOff = _aiNoFort = _aiOwnDef = _aiSea = _aiStarve = _aiStory = _aiNeed = _aiVeto = _aiFood = 0;
                 _aiDay.Clear();
                 if (_aiPick.Count == 0 && _aiSaid.Count == 0) return;
                 if (_n == 0) { _aiPick.Clear(); _aiSaid.Clear(); return; }
