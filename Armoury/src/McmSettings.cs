@@ -2548,6 +2548,22 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool HarvestYearEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Winter Year Enabled", HintText = "with Harvest Year Enabled: the years of a long winter are no longer all alike. Once a year, on the day the harvest would begin, each region gets a better or a worse year (fields, orchards and the villages' own food yield a little more or less, neighbouring regions alike, the world as a whole unchanged) and you hear how the year turned out in your lands. A bad year means thinner granaries, rationing and dearer grain there - but the cut fades as a village's granary runs low and stops for the whole world when too many villages are rationing, so a bad year alone never empties a granary. Off = every winter year the same, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool WinterYearEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Winter Year Spread Percent", 0, 25, "0", HintText = "with Winter Year Enabled: how far a region's winter year can stray from the usual yield, in percent either way (15 = from 0.85 to 1.15 at the centre of a region; most villages fall nearer the middle). Takes effect at the next yearly draw", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int WinterYearSpreadPercent { get; set; } = 15;
+
+        [SettingPropertyInteger("Winter Year Relief Days", 0, 365, "0", HintText = "with Winter Year Enabled: a bad winter year cuts a village's yield in full only while its granary holds at least twice this many days of food; below that the cut fades and at this many days it is gone (0 = no relief by granary)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int WinterYearReliefDays { get; set; } = 45;
+
+        [SettingPropertyInteger("Winter Year World Brake Percent", 0, 100, "0", HintText = "with Winter Year Enabled: when more than this share of the world's villages is on short rations (granary below Famine Ration Days) the bad-year cut stops everywhere until the share falls under half of it (0 = no world brake)", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int WinterYearWorldBrakePercent { get; set; } = 10;
+
         [SettingPropertyBool("Herd Cull Enabled", HintText = "in the last four weeks of autumn the herding villages slaughter part of their herds before the winter: more meat and hides go to market, the village buys salt in its market town to salt the meat (salt grows dearer in autumn; without salt or money the animals are kept), and after it the village sends half of its new animals less to market until the slaughtered ones are made up (the village regulator does not chase this winter shortage). Off = herds as usual", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool HerdCullEnabled { get; set; } = true;
@@ -13228,6 +13244,10 @@ namespace Armoury
             s.WinterTownAppetitePer1000 = WinterTownAppetitePer1000;
             s.AutumnStockMultiplier = AutumnStockMultiplier;
             s.HarvestYearEnabled = HarvestYearEnabled;
+            s.WinterYearEnabled = WinterYearEnabled;
+            s.WinterYearSpreadPercent = WinterYearSpreadPercent;
+            s.WinterYearReliefDays = WinterYearReliefDays;
+            s.WinterYearWorldBrakePercent = WinterYearWorldBrakePercent;
             s.HerdCullEnabled = HerdCullEnabled;
             s.NorthGradientPercent = NorthGradientPercent;
             s.WinterByRealm = WinterByRealm;
