@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 11.11 23:00 - BLOKADA: Steam zaktualizowal gre 1.4.8 -> 1.5.7; seria 413-423 w kodzie, NIE wgrana
+
+- **BLOKADA (sprawdzone 11.11 wieczorem):** `bin/Win64_Shipping_Client/Version.xml` = v1.5.7, pliki gry z 11.11 19:53-20:25, `appmanifest_261550.acf` buildid 26566465. Mody (ROT 8.1.8, RBM, BK, nasze) sa pod 1.4.8 - gry NIE uruchamiano, nie wiadomo, czy wstaje. Decyzja Jeffa: cofnac gre do 1.4.8 (Steam: Wlasciwosci -> Wersje beta) i zablokowac aktualizacje, albo swiadomie przejsc na 1.5.7 (wtedy czeka sie na ROT/RBM/BK pod nowa wersje). Steama ani instalacji gry nie ruszalem.
+- **W grze nadal:** Armoury.dll WGRANIE 206 (`d05f8e2c5126919908b9fe432994cb0c`).
+- **Build:** projekt bierze czesc bibliotek wprost z katalogu gry, wiec zwykly build pada (MapVillagePennants.cs: MobilePartyVisual.GetBannerOfCharacter zniknelo w 1.5.7). Build KONTROLNY (tylko dowod kompilacji, NIE do wgrania): `-p:SandBoxLibs=D:/Backup-Bannerlord/Modules/SandBox/bin/Win64_Shipping_Client -p:NativeViewLibs=D:/Backup-Bannerlord/Modules/Native/bin/Win64_Shipping_Client` - 0 bledow; TaleWorlds.TwoDimension.dll i TaleWorlds.MountAndBlade.ViewModelCollection.dll ida wtedy z 1.5.7 (kopii 1.4.8 brak na dysku).
+- **Seria 413-423 (walka po audycie RBM) - kod gotowy, po recenzjach i poprawkach, wypchniety:** galaz `noc/367c-jeniec-po-odejsciu`, HEAD `4796dfcb` (24 commity ponad 349c9c6d). 28 nowych kluczy MCM (grupa "Wear and tear"), lista i wylaczniki w CHANGELOG 413..423-p. `tools/rbm_config_combat.py` (progi RBM strzal/oszczepow) - NIE stosowac przy wlaczonej drabinie 423 przed pomiarem.
+- **Po przywroceniu 1.4.8:** czysty build z polecenia -> md5 -> autotest (takze bitwa armii - drabina pancerzy 423 zmienia sile wszystkich wojsk) -> WGRANIE 207.
+- **Kolejka (Jeff 11.11):** maczuga olbrzyma tylko dla olbrzymow, rydwany poza Westeros, unikaty (valyrianska stal) w kolorze i zawsze do gracza -> ekonomia (audyt + lancuch podazy: inwestycja + ludzie, przezbrajanie i nowe warsztaty, migracja za praca) -> AI bitwy pakiety 0-8. Decyzje: pamiec `jeff-11-11-decyzje-po-audytach`, raporty `docs/audyty-2026-11-11/`.
+
 ## STAN 11.11 17:00 - WGRANIE 206 (396-410 + poprawki -p: straz fabuly, zaraza/glod, rany, loch, pogrzeby, sukcesja)
 
 - **W grze:** Armoury.dll `d05f8e2c5126919908b9fe432994cb0c` (galaz `noc/367c-jeniec-po-odejsciu`, HEAD `349c9c6d`, wypchniete; 30 commitow ponad 8324ba7e). CrashScribe bez zmian (`d7fbd602`). Kopie: `Armoury.dll.bak-2026-11-11-przed-wgranie206`, `D:/Backup-Bannerlord/wgrane/2026-11-11-wgranie206(-przed)`.
