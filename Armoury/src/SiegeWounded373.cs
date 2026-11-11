@@ -729,13 +729,13 @@ namespace Armoury
                         if (h == leader || hp.LeaderHero == h) { hLeads++; continue; }   // 373b: wodz zostaje z ludzmi
                         bool clanH = h.Clan == Clan.PlayerClan || h.IsPlayerCompanion;
                         bool mineH = clanH || hp == MobileParty.MainParty;
+                        if (mineH && !comp) { hKept++; continue; }                       // klucz NIE: swoich bohaterow gracz zawsze wynosi (394-p: takze gosc - licznik "wyniesieni")
                         if (mineH && !clanH) { hGuest++; continue; }                     // 394: gosc druzyny gracza (spoza rodu, nie towarzysz - np. bohater zadania) nigdy
-                        if (mineH && !comp) { hKept++; continue; }                       // klucz NIE: swoich bohaterow gracz zawsze wynosi
                         TakePrisonerAction.Apply(captor, h);
                         string nm = h.Name != null ? h.Name.ToString() : h.StringId;
                         if (mineH) own.Add(nm); else names.Add(nm);
                         // 394: wlasny bohater - osobny komunikat (gdzie siedzi), inni jak dotad
-                        try { InformationManager.DisplayMessage(new InformationMessage(mineH ? nm + " fell beneath the walls of " + stName + " and could not be carried away - taken prisoner and held in its dungeon." : nm + " lies wounded beneath the walls of " + stName + " and is taken prisoner.", Color.FromUint(0xFFE06050u))); } catch { }
+                        try { InformationManager.DisplayMessage(new InformationMessage(mineH ? nm + " fell at the walls of " + stName + " and could not be carried away - taken prisoner and held in its dungeon." : nm + " lies wounded beneath the walls of " + stName + " and is taken prisoner.", Color.FromUint(0xFFE06050u))); } catch { }
                     }
                     catch (Exception e) { Stumble("387c.Hero", e, ref s); }
                 }
