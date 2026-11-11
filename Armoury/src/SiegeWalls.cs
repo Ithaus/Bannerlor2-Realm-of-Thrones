@@ -619,6 +619,7 @@ namespace Armoury
             // MissionBreak - zalamanie w misji (przerwa przy MapEventEnded), MisEngLost - w misji padly wszystkie tarany i wieze
             // 371b: MisDefCas - straty obroncow (zabici + nieprzytomni) z poprzednich misji tej bitwy
             public int K, Ram0 = -1, Tower0 = -1, MisCas, MisDefCas, Missions; public double FW = 1.0; public string FWTxt = "-"; public bool MissionBreak, MisEngLost;
+            public int Carry;        // 387d: straty z wczesniejszych odwrotow gracza bez przerwy (inne bitwy tego oblezenia) - tylko do miary odwrotu, nie do progu zalamania
             public float MisTime;   // 378: sekundy walki (od konca rozstawienia) z poprzednich misji tej bitwy - limit czasu liczy caly szturm, jak straty
             public Settlement St; public float Start; public float Thr, U; public bool ThrMorale; public int Men0, Def0, LastCas = -1; public double Loss;   // U - los progu (SZ3: morale ustawia prog w pasmie)
             public string Fac, Leader; public bool Capital, Repelled, Outside, FromWalls, Off, Pushed; public int WallRounds, FieldRounds; public int Fort = -1, Side = -1;   // Off - odparcie nie wyszlo (wyjatek), dalej jak w grze; Pushed - SZ1: prog strat osiagniety przy garstce na murach (szturm idzie dalej)
@@ -686,7 +687,7 @@ namespace Armoury
 
         /// <summary>Odparcie OB2. finish - bitwa bez misji: nasze FinishBattleAndKeepSiegeEvent; false (371, szturm zalamany w misji) - gra juz zakonczyla
         /// bitwe ta sama droga (PlayerEncounter.ContinueBattle, EnemyRetreated), tu tylko przerwa i liczniki.</summary>
-        private static void Repel(MapEvent me, Assault a, int left, int dmen, bool finish, bool player = false)
+        private static void Repel(MapEvent me, Assault a, int left, int dmen, bool finish, bool player = false, double scale = 1.0)
         {
             var st = a.St;
             var ev = st.SiegeEvent;
@@ -735,7 +736,15 @@ namespace Armoury
                 T = Pause371(fM, fL, fO, lost, prior, out grow, out lo, out hi, out bd);
             }
             else T = SiegeWalls2.GrowPause(T, prior, b * 4.0, out grow);         // 307c (2): kazde wczesniejsze odparcie w tym oblezeniu wydluza przerwe (najwyzej 4 x podstawa)
-            if (pz != null) { pz.Until = Now + (float)T; pz.Repels++; pz.At = Now; }
+            // 387d: odwrot gracza przed zalamaniem - czesc pelnej przerwy (scale < 1); to nie odparcie: licznik odparc i chwila odparcia bez zmian,
+            // trwajaca przerwa nigdy nie jest skracana
+            bool part = player && scale < 1.0;
+            if (part) T *= Math.Max(0.0, scale);
+            if (pz != null)
+            {
+                if (part) pz.Until = Math.Max(pz.Until, Now + (float)T);
+                else { pz.Until = Now + (float)T; pz.Repels++; pz.At = Now; }
+            }
             a.Repelled = true;
             double thrE = b371 ? EffThr(a) : a.Thr;
             if (!player) { _dRepelled++; _dLossSum += a.Loss; _dThrSum += thrE; _dPauseSum += T; }   // 387: przerwa gracza poza licznikami szturmow AI (wlasny licznik 387)
@@ -744,7 +753,7 @@ namespace Armoury
                 try
                 {
                     var sb = new StringBuilder(700);
-                    sb.Append(b371 ? (finish ? "Szturm odparty (OB2, 371): dzien " : player ? "Szturm (371): przerwa po zalamaniu w misji (387: szturm GRACZA - 'Lead an assault' / 'Send troops' nieczynne) | dzien " : "Szturm (371): przerwa po zalamaniu w misji | dzien ") : "Szturm odparty (OB2): dzien ").Append(Today).Append(" | osada ").Append(st.StringId).Append(" (").Append(Nm(st)).Append(", ").Append(st.IsTown ? "miasto" : "zamek")
+                    sb.Append(b371 ? (finish ? "Szturm odparty (OB2, 371): dzien " : part ? "Szturm (371): przerwa po ODWROCIE GRACZA przed zalamaniem (387d: " + F(scale * 100.0, "0") + "% pelnej przerwy, bez licznika odparc - 'Lead an assault' / 'Send troops' nieczynne) | dzien " : player ? "Szturm (371): przerwa po zalamaniu w misji (387: szturm GRACZA - 'Lead an assault' / 'Send troops' nieczynne) | dzien " : "Szturm (371): przerwa po zalamaniu w misji | dzien ") : "Szturm odparty (OB2): dzien ").Append(Today).Append(" | osada ").Append(st.StringId).Append(" (").Append(Nm(st)).Append(", ").Append(st.IsTown ? "miasto" : "zamek")
                       .Append(", stolica ").Append(a.Capital ? "tak" : "nie").Append(") | frakcja ").Append(a.Fac).Append(", wodz ").Append(a.Leader)
                       .Append(" | ludzi na starcie ").Append(a.Men0).Append(", zostalo ").Append(left).Append("; obroncow bylo ").Append(a.Def0).Append(", zostalo ").Append(dmen)
                       .Append(b371 ? " | oddzial szturmowy " + a.K + " (" + F(PartyShare * 100.0, "0") + "% armii, co najmniej " + F(PartyMinVsDef, "0.0") + " x obroncy), prog oddzialu "
@@ -756,7 +765,7 @@ namespace Armoury
                       .Append(" x morale ").Append(F(morale, "0")).Append(" -> ").Append(F(fM, "0.00"))
                       .Append(" x ludzie ").Append(left).Append('/').Append(dmen).Append(" = ").Append(F(ratio, "0.00")).Append(" -> ").Append(F(fL, "0.00"))
                       .Append(" x oplacalnosc ").Append(F(val, "0")).Append(" / zold ").Append(wage).Append("/d = ").Append(worth >= 9999 ? "-" : F(worth, "0")).Append(" dob -> ").Append(F(fO, "0.00"))
-                      .Append(")").Append(grow > 1.0001 ? " x wczesniejsze odparcia " + prior + " -> " + F(grow, "0.00") + " (307c)" : "").Append(" | odparc w tym oblezeniu ").Append(pz != null ? pz.Repels : 1).Append('.');
+                      .Append(")").Append(part ? " x odwrot gracza " + F(scale, "0.00") + " (387d)" : "").Append(grow > 1.0001 ? " x wczesniejsze odparcia " + prior + " -> " + F(grow, "0.00") + " (307c)" : "").Append(" | odparc w tym oblezeniu ").Append(pz != null ? pz.Repels : 1).Append('.');
                     Log.Info(sb.ToString());
                 }
                 catch (Exception e) { Stumble("RepelLine", e); }

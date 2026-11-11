@@ -51,6 +51,9 @@ namespace Armoury
     /// CampaignSiegeStateHandler przesunalby oblezenie do sali lorda; bitwa na mapie trwa ("Battle continues"), gracz wraca do obozu opcja gry
     /// "Continue siege preparations."; przerwa zapisywana przy koncu misji (SiegeWalls.RegisterPlayerBreak), chyba ze misja skonczyla sie zwyciestwem
     /// atakujacych. Ranni gracza pod murami (373) - NIE w tym wpisie (387b). Gracz w armii AI (nie wodz) - bez zalamania (osobny wpis).
+    /// 387d (Jeff 11.11 "zamknac"): misja gracza-wodza skonczona bez zalamania i bez wziecia murow (odwrot gracza - OnRetreatMission) daje CZESC przerwy:
+    /// miara q = max(straty / prog zalamania, czas walki / limit 378); q ponizej 25% - bez przerwy, inaczej min(1, q) x pelna przerwa
+    /// (SiegeWalls.RegisterPlayerRetreat -> ten sam Repel i te same latki menu co 387). Klucz SiegePlayerRetreatCountsAsBreak.
     /// Wyjatek per czlowiek / obiekt = potkniecie, bez globalnego wylacznika.
     /// </summary>
     internal sealed class SiegeBreak371 : MissionLogic
@@ -69,6 +72,7 @@ namespace Armoury
         private float _startAt, _tPrior, _endAt = -1f;                                    // 378: czas misji na starcie walki, sekundy walki z poprzednich misji tej bitwy
         private bool _byTime, _timeNoted;                                   // 378: zalamanie z limitu czasu; limit minal przy "zdobywaja" (raz na misje)
         private int _plR0 = -1, _plH0 = -1;                                 // 387b: zbiegli / zdrowi strony atakujacej w chwili zalamania (pomiar strat z odwrotu)
+        private bool _retreat, _rGatesKnown, _rGatesDown;                   // 387d: gracz zszedl z pola (RetreatMission); bramy w chwili odwrotu
         private bool _pl, _plWarned;                                        // 387: gracz atakuje i dowodzi; ostrzezenie 75% progu pokazane
         private MapEvent _me;
         private SiegeWalls.Assault _a;
@@ -494,6 +498,32 @@ namespace Armoury
             catch (Exception e) { routed = -1; healthy = -1; Stumble("PlTally", e); }
         }
 
+        /// <summary>387d: gracz konczy misje odwrotem (TAB / potwierdzenie odwrotu; takze wyjscie po upadku bohatera, gdy bitwa trwa) -
+        /// Mission.RetreatMission. Tu tylko znacznik i stan bram (prog z mnoznikiem bram); przerwe liczy OnEndMission.</summary>
+        public override void OnRetreatMission()
+        {
+            try
+            {
+                if (!_active || !_pl || _ended) return;
+                _retreat = true;
+                var m = Mission;
+                if (m == null || !_started) return;
+                int gates, down;
+                CountGates(m, out gates, out down);
+                _rGatesKnown = true; _rGatesDown = gates > 0 && down >= gates;
+            }
+            catch (Exception e) { Stumble("Retreat", e); }
+        }
+
+        /// <summary>387d: prog zalamania na koniec misji (prog x K_m x wstrzasy x bramy) - mianownik miary odwrotu.</summary>
+        private double EndLimit()
+        {
+            double shock = SiegeWalls.ShockFactor;
+            double lim0 = _thr * _km * (_genDown ? shock : 1.0) * (_engDown ? shock : 1.0);
+            if (_rGatesKnown) return lim0 * (_rGatesDown ? SiegeWalls.GateFactor : 1.0);
+            return Math.Max(lim0, _limit);   // bez odwrotu: ostatni prog z oceny (z bramami, gdy byl liczony)
+        }
+
         public override bool MissionEnded(ref MissionResult missionResult)
         {
             if (!_fuse || _ended) return false;
@@ -538,6 +568,28 @@ namespace Armoury
                         if (!plWon) SiegeWalls.RegisterPlayerBreak(_me, _a, _fuse);
                         else Log.Info("Szturm (387): zalamanie, ale misja skonczona zwyciestwem atakujacych - bez przerwy.");
                     }
+                    // 387d: szturm gracza-wodza skonczony BEZ zalamania i bez wziecia murow (odwrot przed zalamaniem) - czesc przerwy wedlug bliskosci zalamania.
+                    // Nigdy razem z zalamaniem (galaz wyzej) - jedna misja = najwyzej jedna przerwa.
+                    string ret387 = null;
+                    if (_pl && !_broken)
+                    {
+                        plWon = r != null && (r.BattleState == BattleState.AttackerVictory || r.BattleState == BattleState.DefenderPullBack);
+                        if (plWon) ret387 = "misja wygrana - bez przerwy";
+                        else
+                        {
+                            double days = SiegeWalls.RegisterPlayerRetreat(_me, _a, _prior + _cas, EndLimit(), _a.MisTime, _retreat, _engDown, _km, out ret387);
+                            if (days > 0.0)
+                            {
+                                try
+                                {
+                                    int d = (int)Math.Ceiling(days);
+                                    InformationManager.DisplayMessage(new InformationMessage((_retreat ? "You called off the assault after your men had taken a beating" : "The assault has failed") + " - they will not storm the walls again for "
+                                        + (days < 1.0 ? "the rest of the day." : d + (d == 1 ? " day." : " days.")), Color.FromUint(0xFFE07040u)));
+                                }
+                                catch { }
+                            }
+                        }
+                    }
                     string tally = "";
                     if (_pl)
                     {
@@ -549,7 +601,7 @@ namespace Armoury
                              + " | straty oddzialu " + (_prior + _cas) + " / prog " + F(_limit, "0") + " | 371b: straty obrony " + (_dPrior + _dcas) + ", wymiana "
                              + F((_prior + _cas) / (double)Math.Max(1, _dPrior + _dcas), "0.00") + ":1 | odwrot wyslany " + _sent + ", ponowiony " + _resent + ", wystawieni po zalamaniu " + _late
                              + " | bezpiecznik " + (_fuse ? "tak" : "nie") + " | " + SiegeHold372.MissionSummary(Mission) + " | wynik misji " + (r == null ? "-" : r.BattleState + (r.EnemyRetreated ? " (wrog odstapil)" : "") + (r.PlayerDefeated ? " (gracz pokonany)" : ""))
-                             + " | 378: czas walki " + F(_a.MisTime, "0") + " s" + (_byTime ? " (odwrot z limitu)" : "") + tally + " | potkniecia " + _stumbles + (_pl ? ". 387: szturm gracza - " + (_broken ? (plWon ? "bez przerwy (wygrana)" : "przerwa zapisana wyzej (linia 'Szturm (371): przerwa ... 387'), w menu: 'Continue siege preparations.'") : "bez zalamania") + "."
+                             + " | 378: czas walki " + F(_a.MisTime, "0") + " s" + (_byTime ? " (odwrot z limitu)" : "") + tally + " | potkniecia " + _stumbles + (_pl ? ". 387: szturm gracza - " + (_broken ? (plWon ? "bez przerwy (wygrana)" : "przerwa zapisana wyzej (linia 'Szturm (371): przerwa ... 387'), w menu: 'Continue siege preparations.'") : "bez zalamania; 387d " + (ret387 ?? "-")) + "."
                                : ". Przerwa - linia 'Szturm (371): przerwa' przy koncu bitwy na mapie."));
                 }
             }

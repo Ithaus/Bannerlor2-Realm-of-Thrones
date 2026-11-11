@@ -34,6 +34,19 @@ namespace Armoury
         /// <summary>387: szturm gracza-wodza lamie sie jak szturm AI (wymaga 371 w misji).</summary>
         internal static bool PlayerBreakOn { get { var s = Settings.Current; return s != null && s.SiegeAssaultBreak && s.SiegeAssaultBreakMission && s.SiegePlayerAssaultBreaks; } }
 
+        /// <summary>387d: odwrot gracza-wodza przed zalamaniem tez daje przerwe (czesc pelnej, wedlug bliskosci zalamania). Wylaczony = stan 387b.</summary>
+        internal static bool PlayerRetreatOn { get { var s = Settings.Current; return PlayerBreakOn && s != null && s.SiegePlayerRetreatCountsAsBreak; } }
+        /// <summary>387d: ponizej tej czesci progu zalamania (i limitu czasu) odwrot nie daje przerwy (rozpoznanie / pomylka).</summary>
+        internal const double RetreatFree = 0.25;
+
+        // 387d: straty odwrotow BEZ przerwy (ponizej RetreatFree) - sumuja sie w tym samym oblezeniu przez SiegeRepelPauseMidDays dob, inaczej szturm
+        // dalo by sie prowadzic kawalkami po 24% progu bez zadnej przerwy. Tylko pamiec (jak rekord 387: wczytanie = od zera).
+        private static string _plCarrySt;
+        private static int _plCarryCas;
+        private static float _plCarryAt = -1f;
+        private static int _dPlRet, _dPlRetFree, _dPlRetPause, _dPlRetFull;
+        private static double _dPlRetDays;
+
         private static MapEvent _plMe;
         private static Assault _plAssault;
         private static int _dPlSeen, _dPlNone, _dPlWarn, _dPlBreak, _dPlFuse, _dPlPause, _dPlMenuSiege, _dPlMenuEnc;
@@ -57,6 +70,9 @@ namespace Armoury
                 // ta sama bitwa (kolejna misja "Battle continues") - ten sam rekord (straty i czas z poprzednich misji); po zapisanej przerwie - nowy szturm
                 if (ReferenceEquals(_plMe, me) && _plAssault != null && !_plAssault.Repelled) return _plAssault;
                 var a = NewAssault(me, lp, st);
+                // 387d: nowa bitwa tego samego oblezenia niedlugo po odwrocie bez przerwy - tamte straty licza sie do miary nastepnego odwrotu
+                if (_plCarryCas > 0 && _plCarrySt == st.StringId && _plCarryAt >= 0f && Now >= _plCarryAt && Now - _plCarryAt <= PauseMid) a.Carry = _plCarryCas;
+                else { _plCarrySt = null; _plCarryCas = 0; _plCarryAt = -1f; }
                 _plMe = me; _plAssault = a;
                 why = "rekord gracza zalozony w misji";
                 return a;
@@ -82,8 +98,60 @@ namespace Armoury
                 try { left = me.AttackerSide.TroopCount; dmen = me.DefenderSide.TroopCount; } catch { }
                 Repel(me, a, left, dmen, false, true);
                 _dPlPause++;
+                _plCarrySt = null; _plCarryCas = 0; _plCarryAt = -1f;   // 387d: pelna przerwa - drobne straty wczesniejszych odwrotow rozliczone
             }
             catch (Exception e) { Stumble("RegisterPlayerBreak", e); }
+        }
+
+        /// <summary>387d (SiegeBreak371.OnEndMission): misja szturmu gracza-wodza skonczona BEZ zalamania i bez wziecia murow (odwrot gracza / koniec bez
+        /// zwyciestwa). Miara q = max(straty / prog zalamania, czas walki / limit czasu 378); straty = ta bitwa (wszystkie jej misje) + odwroty bez przerwy
+        /// z ostatnich SiegeRepelPauseMidDays dob tego oblezenia. q &lt; RetreatFree - bez przerwy (straty zapamietane); inaczej przerwa = min(1, q) x pelna
+        /// przerwa 371 (ten sam Repel co zalamanie: 1-5 dob, 7-14 gdy taran / wieza stracone) - te same latki menu. Zwraca doby przerwy (0 = brak) i opis
+        /// do linii konca misji. Tylko dane; bitwy nie konczymy. Nie rzuca.</summary>
+        internal static double RegisterPlayerRetreat(MapEvent me, Assault a, int cas, double lim, float fought, bool retreat, bool engLost, int km, out string txt)
+        {
+            txt = "poza regula";
+            try
+            {
+                if (!PlayerRetreatOn) { txt = "klucz wylaczony (stan 387b)"; return 0.0; }
+                if (me == null || a == null || !BreakOn) return 0.0;
+                if (a.Repelled) { txt = "przerwa tej bitwy juz zapisana"; return 0.0; }
+                var st = a.St;
+                var ev = st != null ? st.SiegeEvent : null;
+                if (ev == null) { txt = "bez oblezenia"; return 0.0; }
+                if (st.CurrentSiegeState != Settlement.SiegeState.OnTheWalls) { txt = "mury wziete (sala lorda)"; return 0.0; }
+                _dPlRet++;
+                int all = Math.Max(0, a.Carry) + Math.Max(0, cas);
+                double qL = lim > 0.0 ? all / lim : 0.0;
+                float tl = TimeLimitSeconds;
+                double qT = tl > 0f ? Math.Max(0f, fought) / tl : 0.0;
+                double q = Math.Max(qL, qT);
+                string head = (retreat ? "odwrot gracza" : "koniec misji bez zwyciestwa") + ": straty " + cas + (a.Carry > 0 ? " + " + a.Carry + " z wczesniejszych odwrotow bez przerwy" : "") + " / prog " + F(lim, "0")
+                            + " = " + F(qL * 100.0, "0") + "%, czas " + F(fought, "0") + " s / limit " + (tl > 0f ? F(tl, "0") + " s = " + F(qT * 100.0, "0") + "%" : "wylaczony") + " -> miara " + F(q * 100.0, "0") + "%";
+                if (q < RetreatFree)
+                {
+                    _dPlRetFree++;
+                    _plCarrySt = st.StringId; _plCarryCas = all; _plCarryAt = Now;
+                    txt = head + " < " + F(RetreatFree * 100.0, "0") + "% - BEZ przerwy (straty " + all + " pamietane " + F(PauseMid, "0.0") + " dob w tym oblezeniu)";
+                    return 0.0;
+                }
+                double scale = Math.Min(1.0, q);
+                int left = 0, dmen = 0;
+                try { left = me.AttackerSide.TroopCount; dmen = me.DefenderSide.TroopCount; } catch { }
+                a.MisEngLost = engLost;
+                a.Loss = all / (double)Math.Max(1, km);
+                double before = RepelPauseLeftDays(ev);
+                Repel(me, a, left, dmen, false, true, scale);
+                if (!a.Repelled) { txt = head + " - przerwa NIE zapisana"; return 0.0; }
+                _plCarrySt = null; _plCarryCas = 0; _plCarryAt = -1f;
+                double days = RepelPauseLeftDays(ev);
+                _dPlRetPause++; if (scale >= 1.0) _dPlRetFull++;
+                _dPlRetDays += days;
+                txt = head + " -> " + (scale >= 1.0 ? "PELNA przerwa" : F(scale * 100.0, "0") + "% pelnej przerwy") + " = " + F(days, "0.00") + " dob" + (before > 0.0 ? " (przed misja zostawalo " + F(before, "0.00") + ")" : "")
+                    + " (linia 'Szturm (371): przerwa po " + (scale >= 1.0 ? "zalamaniu" : "ODWROCIE GRACZA") + "')";
+                return days;
+            }
+            catch (Exception e) { Stumble("RegisterPlayerRetreat", e); txt = "potkniecie"; return 0.0; }
         }
 
         /// <summary>Z OnMapEventEnded (przed wyjsciem bez rejestru): bitwa gracza skonczona - rekord szturmu gracza do kosza.</summary>
@@ -92,15 +160,16 @@ namespace Armoury
             if (_plMe != null && (ReferenceEquals(_plMe, me) || _plMe.IsFinalized)) { _plMe = null; _plAssault = null; }
         }
 
-        private static void Reset387() { _plMe = null; _plAssault = null; ZeroDay387(); }
+        private static void Reset387() { _plMe = null; _plAssault = null; _plCarrySt = null; _plCarryCas = 0; _plCarryAt = -1f; ZeroDay387(); }
 
-        private static void ZeroDay387() { _dPlSeen = _dPlNone = _dPlWarn = _dPlBreak = _dPlFuse = _dPlPause = _dPlMenuSiege = _dPlMenuEnc = 0; }
+        private static void ZeroDay387() { _dPlSeen = _dPlNone = _dPlWarn = _dPlBreak = _dPlFuse = _dPlPause = _dPlMenuSiege = _dPlMenuEnc = 0; _dPlRet = _dPlRetFree = _dPlRetPause = _dPlRetFull = 0; _dPlRetDays = 0.0; }
 
         private static string Day387Text()
         {
             return "; 387 szturm gracza " + (PlayerBreakOn ? "tak" : "nie") + ": misji z graczem-wodzem " + _dPlSeen + ", poza regula " + _dPlNone + ", ostrzezen 75% " + _dPlWarn + ", zalaman "
                  + _dPlBreak + " (bezpiecznik " + _dPlFuse + "), przerw zapisanych " + _dPlPause + ", szturm nieczynny (klatki menu): oblezenie " + _dPlMenuSiege + ", encounter " + _dPlMenuEnc
-                 + " (latki " + _hookPl + ")";
+                 + " (latki " + _hookPl + "); 387d odwrot gracza " + (PlayerRetreatOn ? "tak" : "nie") + ": misji bez zalamania i bez zwyciestwa " + _dPlRet + ", bez przerwy (< " + F(RetreatFree * 100.0, "0") + "%) " + _dPlRetFree
+                 + ", przerw " + _dPlRetPause + " (pelnych " + _dPlRetFull + ", razem " + F(_dPlRetDays, "0.0") + " dob)";
         }
 
         private static TextObject PauseTip(double left)
@@ -214,7 +283,7 @@ namespace Armoury
 
         private static string Start387Text()
         {
-            return " | 387 szturm gracza-wodza: klucz " + (PlayerBreakOn ? "tak" : "nie") + ", latki menu " + _hookPl;
+            return " | 387 szturm gracza-wodza: klucz " + (PlayerBreakOn ? "tak" : "nie") + ", latki menu " + _hookPl + ", 387d odwrot gracza = czesc przerwy " + (PlayerRetreatOn ? "tak" : "nie") + " (bez przerwy ponizej " + F(RetreatFree * 100.0, "0") + "% progu / limitu czasu)";
         }
     }
 }

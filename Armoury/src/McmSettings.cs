@@ -11776,6 +11776,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public bool SiegePlayerAssaultBreaks { get; set; } = true;
 
+        [SettingPropertyBool("Siege Player Retreat Counts As Break", HintText = "With Siege Player Assault Breaks: falling back from an assault you lead before it breaks no longer lets you storm again at once. When you leave the battle without taking the walls, your men need a part of the usual pause before the next assault - as large a part as the assault was close to breaking: your losses against the breaking share (or the time fought against Siege Assault Time Limit Minutes, whichever is closer). From the full breaking share on it is the whole pause, as after a broken assault. Below a quarter there is no pause at all, so a look at the walls or a mistake costs nothing - but such small losses add up over two days of the same siege. Off = only a broken assault gives a pause; falling back yourself in time gives none", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public bool SiegePlayerRetreatCountsAsBreak { get; set; } = true;
+
         [SettingPropertyBool("Siege Ally Lords Stay Back", HintText = "With Siege Attacker Lords Stay Back: also when you fight in an assault on walls that an AI lord commands (you ride in his army or joined his siege) - the lords of your side, the army commander among them, stay back out of bowshot of the walls in a formation of their own, as enemy lords do when you defend. Members of your own clan and formations under your command are left alone. When you command the assault yourself, nothing changes. Off = allied lords storm the walls with their men, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: attacking lords lead from behind (381)")]
         public bool SiegeAllyLordsStayBack { get; set; } = true;
@@ -14927,6 +14931,7 @@ namespace Armoury
             s.SiegeEngineSimilarTargetShare = SiegeEngineSimilarTargetShare;
             s.SiegeAttackerLordsStayBack = SiegeAttackerLordsStayBack;
             s.SiegePlayerAssaultBreaks = SiegePlayerAssaultBreaks;
+            s.SiegePlayerRetreatCountsAsBreak = SiegePlayerRetreatCountsAsBreak;
             s.SiegeAllyLordsStayBack = SiegeAllyLordsStayBack;
             s.SiegeDefendersUseStones = SiegeDefendersUseStones;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
