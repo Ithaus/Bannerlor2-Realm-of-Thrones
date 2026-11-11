@@ -26,10 +26,20 @@ namespace Armoury
     /// wkleja) liczy galaz buzdyganu 2h sam i pomija oryginal w dwoch przypadkach: (1) "TwoHandedMace" nie-Pierce przy kluczu C5; (2) "TwoHandedAxe"
     /// + Blunt, gdy to RODZIMY obuch. Rodzimosci w tej metodzie nie widac (dostaje tylko napis klasy i typ juz po zamianie na Blunt), wiec znacznik
     /// stawia wlasny prefiks (Priority.First - przed RBM) na MissionCombatMechanicsHelper.ComputeBlowDamage: zamach (StrikeType 0), nie pocisk,
-    /// nie kopniak / uderzenie tarcza, klasa TwoHandedAxe i SwingDamageType == Blunt w DANYCH broni (nie typ ciosu - ten RBM zmienia). Znacznik jest
-    /// nadpisywany przy kazdym ciosie i zdejmowany przy pierwszym wywolaniu okna, wiec nie przechodzi na cudzy cios. Zwykly topor trafiajacy
-    /// trzonkiem ma SwingDamageType Cut - zostaje przy x1.2 jak dotad. Drugie wywolanie okna (lowerArmorQualityCheck, rbm.cs:5521) liczy wynik,
-    /// ktorego potem nie uzywa - bez skutku.
+    /// nie kopniak / uderzenie tarcza, klasa TwoHandedAxe i SwingDamageType == Blunt w DANYCH broni (nie typ ciosu - ten RBM zmienia). Zwykly topor
+    /// trafiajacy trzonkiem ma SwingDamageType Cut - zostaje przy x1.2 jak dotad.
+    ///
+    /// 417-p (po recenzji): znacznik ODWROCONY. Okno ma jeszcze wolajacych POZA ComputeBlowDamage, ktorych wynik idzie do gry: karta / porownanie
+    /// broni (GetRBMMeleeWeaponStats, rbm.cs:1693-1694) i - w osobnej kopii okna RBMAI.Utilities.GetSkillBasedDamage (rbmai.cs:11937) - obrazenia ciosu,
+    /// ktory przebil postawe (calculateHealthDamage, rbmai.cs:7203, wolane z 6421 przy crushThrough). Wszyscy oni podaja typ obrazen Z DANYCH broni
+    /// (SwingDamageType), wiec poza ciosem "TwoHandedAxe" + Blunt + zamach = zawsze rodzimy obuch; tylko wewnatrz ComputeBlowDamage typ Blunt moze byc
+    /// trzonkiem zwyklego topora. Dlatego: prefiks na ComputeBlowDamage stawia "w ciosie" + "rodzimy obuch tego ciosu", postfiks zdejmuje "w ciosie"
+    /// (postfiks biegnie takze, gdy prefiks RBM pominal oryginal; po wyjatku w srodku flage nadpisuje nastepny cios, a do tego czasu wywolania spoza
+    /// ciosu ida starym wzorem - nigdy nowym dla cudzej broni). Kopia RBMAI: jej galaz "TwoHandedMace" nie ma literowki (0.0975, okno 20-26, x4),
+    /// a "TwoHandedAxe" + Blunt to ta sama liczba x0.3 - prefiks podmienia tam sam napis klasy na "TwoHandedMace" i puszcza oryginal RBMAI (mlot
+    /// przebijajacy postawe liczony jak buzdygan 2h TEJ kopii; C5 jej nie dotyczy). Liczniki "ciosy" licza tylko wywolania z wnetrza ComputeBlowDamage;
+    /// wywolania poboczne (karta broni, lowerArmorQualityCheck rbm.cs:5521 - wynik nieuzywany) ida do osobnej rubryki.
+    /// Mlot trafiajacy drzewcem tez dostaje pelne okno (RBM nie rozroznia tego dla typu juz-Blunt, tak samo buzdygan 2h) - zawyza srednie w scisku.
     ///
     /// Predkosc zamachu (klasa TwoHandedAxe: x0.75 x (1 + DR/800), buzdygan: x0.83 x (1 + DR/1000)), koszt postury i reszta zostaja wedlug klasy
     /// z danych - zmienia sie tylko okno umiejetnosci. Wszystko w glownym watku (GetAttackCollisionResults). Zero alokacji, bez try/catch.
@@ -43,7 +53,12 @@ namespace Armoury
 
         private static int _patched, _wanted;
         private static string _note = "nie zakladano";
-        private static bool _native;                         // znacznik: biezacy cios to zamach toporem 2h z rodzima glowica obuchowa
+        private static bool _inBlow;                         // 417-p: jestesmy wewnatrz ComputeBlowDamage (miedzy naszym prefiksem a postfiksem)
+        private static bool _native;                         // biezacy cios (tylko przy _inBlow) to zamach toporem 2h z rodzima glowica obuchowa
+        private static int _sideCalls, _aiHam, _aiHamChanged; // 417-p: wywolania okna poza ciosem (mloty i buzdygany 2h) / okno RBMAI dla mlota / z tego podmienione
+
+        /// <summary>417-p: latka zostaje w procesie po wyjsciu z kampanii - zachowanie misji dodawane takze w bitwie wlasnej (jak 415-p / 416-p).</summary>
+        internal static bool Patched { get { return _patched > 0; } }
 
         // liczniki misji (glowny watek)
         private static int _hamBlows, _hamChanged, _maceBlows, _maceChanged, _maceLower;
@@ -79,7 +94,8 @@ namespace Armoury
                         && ps[2].ParameterType == typeof(string) && ps[2].Name == "weaponType"
                         && ps[3].ParameterType == typeof(DamageTypes) && ps[3].Name == "damageType"
                         && ps[4].ParameterType == typeof(float) && ps[4].Name == "effectiveSkill"
-                        && ps[5].ParameterType == typeof(float) && ps[5].Name == "skillModifier";
+                        && ps[5].ParameterType == typeof(float) && ps[5].Name == "skillModifier"
+                        && ps[6].ParameterType == typeof(StrikeType) && ps[6].Name == "strikeType";
             }
             MethodInfo blow = null;
             try { blow = AccessTools.DeclaredMethod(typeof(MissionCombatMechanicsHelper), "ComputeBlowDamage"); } catch { }
@@ -101,11 +117,41 @@ namespace Armoury
                 {
                     try
                     {
-                        h.Patch(blow, prefix: new HarmonyMethod(typeof(BluntHammers417), nameof(MarkPrefix)) { priority = Priority.First });
-                        if (Owned(blow, h.Id)) _patched++; else miss += " prefiks znacznika NIE wszedl;";
+                        // 417-p: prefiks i postfiks jednym wywolaniem - albo oba, albo zaden (sam prefiks zostawilby "w ciosie" na stale)
+                        h.Patch(blow, prefix: new HarmonyMethod(typeof(BluntHammers417), nameof(MarkPrefix)) { priority = Priority.First },
+                                postfix: new HarmonyMethod(typeof(BluntHammers417), nameof(MarkPostfix)));
+                        if (Owned(blow, h.Id) && OwnedPost(blow, h.Id)) _patched++; else miss += " znacznik ciosu (prefiks + postfiks) NIE wszedl;";
                     }
-                    catch (Exception e) { miss += " prefiks znacznika BLAD " + e.GetType().Name + ";"; Log.Error("BluntHammers417.Patch(blow)", e); }
+                    catch (Exception e) { miss += " znacznik ciosu BLAD " + e.GetType().Name + ";"; Log.Error("BluntHammers417.Patch(blow)", e); }
                 }
+            }
+
+            // 417-p: kopia okna w RBMAI (obrazenia ciosu przebijajacego postawe) - osobna latka, brak modulu AI RBM = tylko linia
+            _wanted++;
+            Type tAi = null;
+            try { tAi = AccessTools.TypeByName("RBMAI.Utilities"); } catch { }
+            MethodInfo aiSkill = null;
+            if (tAi != null) { try { aiSkill = AccessTools.DeclaredMethod(tAi, "GetSkillBasedDamage"); } catch { } }
+            bool aiSig = false;
+            if (aiSkill != null && aiSkill.IsStatic && aiSkill.ReturnType == typeof(float))
+            {
+                var ps = aiSkill.GetParameters();
+                aiSig = ps.Length == 8
+                        && ps[2].ParameterType == typeof(string) && ps[2].Name == "weaponType"
+                        && ps[3].ParameterType == typeof(DamageTypes) && ps[3].Name == "damageType"
+                        && ps[6].ParameterType == typeof(StrikeType) && ps[6].Name == "strikeType";
+            }
+            if (tAi == null) miss += " brak RBMAI.Utilities (przebicie postawy mlotem po staremu);";
+            else if (aiSkill == null) miss += " brak RBMAI.Utilities.GetSkillBasedDamage;";
+            else if (!aiSig) miss += " RBMAI GetSkillBasedDamage ma inna sygnature - latka NIE zalozona;";
+            else
+            {
+                try
+                {
+                    h.Patch(aiSkill, prefix: new HarmonyMethod(typeof(BluntHammers417), nameof(AiSkillPrefix)));
+                    if (Owned(aiSkill, h.Id)) _patched++; else miss += " prefiks okna RBMAI NIE wszedl;";
+                }
+                catch (Exception e) { miss += " prefiks okna RBMAI BLAD " + e.GetType().Name + ";"; Log.Error("BluntHammers417.Patch(aiSkill)", e); }
             }
 
             var s = Settings.Current;
@@ -113,7 +159,8 @@ namespace Armoury
             Log.Info("Mloty (417): latka raz na proces - " + _note + ". Klucz NativeBluntHammersEnabled " + (s != null && s.NativeBluntHammersEnabled ? "TAK" : "NIE")
                      + ": topor 2h z rodzima glowica obuchowa (mloty ROT, maczuga olbrzyma) liczony oknem buzdyganu 2h zamiast ciosu trzonkiem"
                      + " | klucz TwoHandedMaceSkillScaleFix " + (s != null && s.TwoHandedMaceSkillScaleFix ? "TAK" : "NIE")
-                     + ": wspolczynnik umiejetnosci buzdyganu 2h 1.125 -> 0.1125 (okno 15-22 x 4.6 bez zmian).");
+                     + ": wspolczynnik umiejetnosci buzdyganu 2h 1.125 -> 0.1125 (okno 15-22 x 4.6 bez zmian)"
+                     + " | 417-p: mlot liczony tak samo w ciosie, w karcie broni i przy przebiciu postawy (okno RBMAI: galaz buzdyganu 2h tej kopii, x4 zamiast x1.2).");
             return _note;
         }
 
@@ -130,9 +177,23 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>Przed prefiksem RBM na ComputeBlowDamage: znacznik "zamach toporem 2h z rodzima glowica obuchowa". Same odczyty pol.</summary>
+        private static bool OwnedPost(MethodBase mi, string id)
+        {
+            try
+            {
+                var info = Harmony.GetPatchInfo(mi);
+                if (info == null) return false;
+                foreach (var p in info.Postfixes)
+                    if (p != null && p.owner == id && p.PatchMethod != null && p.PatchMethod.DeclaringType == typeof(BluntHammers417)) return true;
+            }
+            catch { }
+            return false;
+        }
+
+        /// <summary>Przed prefiksem RBM na ComputeBlowDamage: "w ciosie" + znacznik "zamach toporem 2h z rodzima glowica obuchowa". Same odczyty pol.</summary>
         private static void MarkPrefix(ref AttackCollisionData attackCollisionData, WeaponComponentData attackerWeapon)
         {
+            _inBlow = true;
             _native = attackerWeapon != null
                       && attackerWeapon.WeaponClass == WeaponClass.TwoHandedAxe
                       && attackerWeapon.SwingDamageType == DamageTypes.Blunt
@@ -141,13 +202,35 @@ namespace Armoury
                       && !attackCollisionData.IsAlternativeAttack;
         }
 
+        /// <summary>417-p: koniec ComputeBlowDamage (takze gdy prefiks RBM pominal oryginal) - od teraz wywolania okna sa "poza ciosem".</summary>
+        private static void MarkPostfix()
+        {
+            _inBlow = false;
+            _native = false;
+        }
+
+        /// <summary>417-p: kopia okna RBMAI (cios, ktory przebil postawe). Wolajacy podaja typ z danych broni, wiec "TwoHandedAxe" + Blunt + zamach to
+        /// zawsze rodzimy obuch: podmiana napisu klasy na "TwoHandedMace" i oryginal RBMAI (jego galaz buzdyganu 2h). Stala napisowa - bez alokacji.</summary>
+        private static void AiSkillPrefix(ref string weaponType, DamageTypes damageType, StrikeType strikeType)
+        {
+            if (damageType != DamageTypes.Blunt || strikeType != StrikeType.Swing || weaponType == null || weaponType.Length != 12
+                || !string.Equals(weaponType, "TwoHandedAxe", StringComparison.Ordinal)) return;
+            _aiHam++;
+            var s = Settings.Current;
+            if (s == null || !s.NativeBluntHammersEnabled) return;
+            _aiHamChanged++;
+            weaponType = "TwoHandedMace";
+        }
+
         /// <summary>Okno umiejetnosci RBM. Zwraca true (oryginal RBM) dla wszystkiego poza buzdyganem 2h nie-Pierce i mlotem z rodzimym obuchem.
         /// Liczniki rosna takze przy kluczach NIE (pomiar "przed"). Wzor galezi "TwoHandedMace" przepisany 1:1 z rbm.cs:5794-5811, lacznie
-        /// z regula "magnituda do 1 przechodzi bez zmian".</summary>
-        private static bool SkillPrefix(ref float __result, float magnitude, string weaponType, DamageTypes damageType, float effectiveSkill, float skillModifier)
+        /// z regula "magnituda do 1 przechodzi bez zmian". 417-p: w ciosie rodzimosc mowi znacznik, poza ciosem - sam typ Blunt przy zamachu
+        /// (typ z danych broni); liczniki "ciosy" tylko z wnetrza ComputeBlowDamage.</summary>
+        private static bool SkillPrefix(ref float __result, float magnitude, string weaponType, DamageTypes damageType, float effectiveSkill, float skillModifier,
+            StrikeType strikeType)
         {
-            bool native = _native;
-            _native = false;                                                                 // znacznik jednorazowy
+            bool inBlow = _inBlow;
+            bool native = inBlow ? _native : strikeType == StrikeType.Swing;
             if (weaponType == null) return true;
             bool mace;
             if (weaponType.Length == 13)
@@ -165,7 +248,13 @@ namespace Armoury
             float min = 15f * (1f + skillModifier);
             float max = 22f * (1f + 2f * skillModifier);
             float after = MBMath.ClampFloat(magnitude + effectiveSkill * (fix ? MaceScaleFixed : MaceScaleRbm), min, max) * 4.6f;
-            if (mace)
+            if (!inBlow)
+            {
+                // 417-p: karta broni, lowerArmorQualityCheck - ta sama regula co w ciosie, ale poza licznikami "ciosy" i srednimi
+                _sideCalls++;
+                if (mace ? !fix : (s == null || !s.NativeBluntHammersEnabled)) return true;
+            }
+            else if (mace)
             {
                 _maceBlows++;
                 float before = MBMath.ClampFloat(magnitude + effectiveSkill * MaceScaleRbm, min, max) * 4.6f;
@@ -188,7 +277,8 @@ namespace Armoury
 
         private static void Reset()
         {
-            _native = false;
+            _native = false; _inBlow = false;
+            _sideCalls = 0; _aiHam = 0; _aiHamChanged = 0;
             _hamBlows = 0; _hamChanged = 0; _maceBlows = 0; _maceChanged = 0; _maceLower = 0;
             _hamBefore = 0f; _hamAfter = 0f; _maceBefore = 0f; _maceAfter = 0f;
             _hHam = 0; _hHamHeavy = 0; _hMace = 0; _hMaceHeavy = 0; _hHamMax = 0; _hMaceMax = 0;
@@ -199,7 +289,7 @@ namespace Armoury
 
         private static void Flush(Mission m)
         {
-            if (_hamBlows == 0 && _maceBlows == 0 && _hHam == 0 && _hMace == 0) { Reset(); return; }   // misja bez mlotow i buzdyganow 2h - bez linii
+            if (_hamBlows == 0 && _maceBlows == 0 && _hHam == 0 && _hMace == 0 && _aiHam == 0) { Reset(); return; }   // misja bez mlotow i buzdyganow 2h - bez linii
             var s = Settings.Current;
             string kind = "?";
             try { kind = MissionTeams.Kind(m); } catch { }
@@ -211,7 +301,10 @@ namespace Armoury
                      + " | BUZDYGANY 2H, klucz " + (s != null && s.TwoHandedMaceSkillScaleFix ? "TAK" : "NIE")
                      + ": ciosy " + _maceBlows + ", policzone z 0.1125 " + _maceChanged + " (ponizej sufitu okna " + _maceLower + ")"
                      + ", sila po oknie srednio " + Avg(_maceBefore, _maceBlows) + " (1.125) -> " + Avg(_maceAfter, _maceBlows)
-                     + "; trafienia w ludzi " + _hMace + " srednio " + Avg(_hpMace, _hMace) + " HP, najwiecej " + _hMaceMax + ", od 60 HP " + _hMaceHeavy + ".");
+                     + "; trafienia w ludzi " + _hMace + " srednio " + Avg(_hpMace, _hMace) + " HP, najwiecej " + _hMaceMax + ", od 60 HP " + _hMaceHeavy
+                     + " | 417-p: przebicie postawy mlotem (okno RBMAI) " + _aiHam + ", z tego liczone jak buzdygan 2h " + _aiHamChanged
+                     + "; wywolania okna poza ciosem (karta broni, kontrola pancerza - poza srednimi) " + _sideCalls
+                     + " | ciosy = wywolania okna z wnetrza ComputeBlowDamage (takze zablokowane i w konie); mlot trafiajacy drzewcem liczony jak glowica (jak buzdygan 2h w RBM).");
             Reset();
         }
 

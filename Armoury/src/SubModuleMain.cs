@@ -741,7 +741,8 @@ namespace Armoury
                 if ((Campaign.Current != null || RestedArmor416.Patched) && mission != null)
                     mission.AddMissionBehavior(new RestedArmor416.Logic());
                 // 417: mloty 2h z rodzimym obuchem i buzdygany 2h - liczniki ciosow i trafien, linia "Mloty (417): koniec misji"
-                if (Campaign.Current != null && mission != null)
+                // 417-p: jak 415-p / 416-p - latka zostaje w procesie, wiec w bitwie wlasnej po kampanii zachowanie zeruje flagi "w ciosie" i liczniki
+                if ((Campaign.Current != null || BluntHammers417.Patched) && mission != null)
                     mission.AddMissionBehavior(new BluntHammers417.Logic());
                 // 418: tarcze ROT (ciosy wrecz przyjete na tarcze wedlug klasy) i ubrania z tabeli wyjatkow - linia "Tarcze i ubrania ROT (418): koniec misji"
                 if (Campaign.Current != null && mission != null)
