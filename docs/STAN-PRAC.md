@@ -1,5 +1,15 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 11.11 12:50 - WGRANIE 205 (390-395 + poprawki -p: decyzje Jeffa po 204)
+
+- **W grze:** Armoury.dll `c2601f6bf1d6bb454930bbe30a0447bb` (galaz `noc/367c-jeniec-po-odejsciu`, HEAD `8324ba7e`, wypchniete). CrashScribe bez zmian (`d7fbd602`). Kopie: `Armoury.dll.bak-2026-11-11-przed-wgranie205`, `D:/Backup-Bannerlord/wgrane/2026-11-11-wgranie205(-przed)`.
+- **Autotest at-395 (n390):** KONIEC OK, 5 dob, bitwy 2/2, bledy 23 (stale, cudze), kod wyjscia 0, wyjatkow w Armoury.log 0. Potwierdza tylko, ze gra startuje i doby biegna - zadna z szesciu zmian nie byla widziana w dzialaniu (oblezenia i rozmowy tylko recznie).
+- **Co weszlo (decyzje Jeffa 11.11):** 390 szturm wodza AI lamie sie takze, gdy gracz dolaczyl bez armii (klucz Siege Joined Assault Breaks; zaciag ROT poza regula); 391 pelny loch -> nadwyzke rannych bierze druzyna gracza, reszta umiera pod murami, sprzet do lupu obroncow (klucze Siege Wounded Player Takes Overflow, Siege Wounded Left To Die); 392 lordowie bez limitu lochu takze w 388; 393 zakladnik scinany po zlamaniu slowa (Prisoner Terms Hostage Death domyslnie TAK, bez bramki Mercy); 394 towarzysze padli w strefie murow do niewoli (Siege Wounded Player Companions domyslnie TAK); 395 ostrzezenie o poslancu przed poddaniem / parley. Armoury.json Jeffa nie ma tych kluczy zapisanych - dzialaja domyslne.
+- **Pierwszy punkt ryzyka:** 390/387f - powrot do menu oblezenia po zalamanym szturmie wodza AI (awaryjnie klucze Siege Joined Assault Breaks / Siege Army Assault Breaks NIE). 391 mocno podnosi straty po odpartym szturmie (obie strony) - awaryjnie Siege Wounded Left To Die NIE.
+- **Odstepstwo od decyzji 2 (do wiedzy Jeffa):** przy RECZNYM odwrocie gracza sprzet zmarlych pod murami zostaje u atakujacych (zdzieranie tylko przy rozstrzygnietym wyniku misji) - pelne zdzieranie odlozone, grozi podwojnym zdjeciem bez testu w grze.
+- **Odlozone:** jak w raporcie 390-395 (CHANGELOG 390-p..395-p, "Ryzyko"): ranni przy "wyslij wojsko" gracza, straznica ostatniego czlowieka partii dla bohaterow w 373c/387c, drugi poslaniec o to samo oblezenie, rynsztunek straconego zakladnika przepada jak w grze.
+- **NIE URUCHAMIAC `tools/gen_mcm.py` na tej galezi** (reczny McmSettings.cs serii 374-395).
+
 ## STAN 11.11 11:00 - WGRANIE 204 (387d/387e, 373c, 374c, 387c, 387f, 386c, 385c, 385d, 389c + poprawki -p)
 
 - **W grze:** Armoury.dll `6f80211f63b6db84a94702af5cba0ee0` (galaz `noc/367c-jeniec-po-odejsciu`, HEAD `4f69a2b1`, wypchniete). CrashScribe bez zmian (`d7fbd602`). Kopie: `Armoury.dll.bak-2026-11-11-przed-wgranie204`, `D:/Backup-Bannerlord/wgrane/2026-11-11-wgranie204(-przed)`.
