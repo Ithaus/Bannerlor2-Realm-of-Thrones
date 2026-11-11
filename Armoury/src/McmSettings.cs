@@ -11720,6 +11720,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public float SiegeWoundedWallDistance { get; set; } = 35f;
 
+        [SettingPropertyBool("Siege Wounded Dungeon Limit", HintText = "With Siege Wounded Taken Prisoner, in an assault on a fortress you defend yourself: the ordinary wounded attackers taken prisoner beneath the walls are never more than the room left in the fortress dungeon and never more men than the defenders still standing - the same share from every enemy party; the rest of their wounded go back with their army, as in the game. Lords are taken without any limit. Off = all the wounded lying inside or close beneath the walls are taken, however many", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public bool SiegeWoundedDungeonLimit { get; set; } = true;
+
         [SettingPropertyBool("Siege Wounded Simulated", HintText = "When an assault on a fortress fought without you (lords against lords, your own fortresses too while you are away) is beaten back from the walls, a share of the attackers wounded in that assault cannot be carried away either: they are taken prisoner into the fortress dungeon - never more than the room left in the dungeon and never more men than the defenders still standing; lords among them only if they do not lead a party. Needs Siege Wounded Taken Prisoner. Off = as in the game: all their wounded go back to camp", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeWoundedSimulated { get; set; } = true;
@@ -14917,6 +14921,7 @@ namespace Armoury
             s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;
             s.SiegeWoundedTakenPrisoner = SiegeWoundedTakenPrisoner;
             s.SiegeWoundedWallDistance = SiegeWoundedWallDistance;
+            s.SiegeWoundedDungeonLimit = SiegeWoundedDungeonLimit;
             s.SiegeWoundedSimulated = SiegeWoundedSimulated;
             s.SiegeWoundedSimulatedShare = SiegeWoundedSimulatedShare;
             s.SiegeHeldSpoilsWindow = SiegeHeldSpoilsWindow;
