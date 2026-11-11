@@ -1,5 +1,18 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 11.11 17:00 - WGRANIE 206 (396-410 + poprawki -p: straz fabuly, zaraza/glod, rany, loch, pogrzeby, sukcesja)
+
+- **W grze:** Armoury.dll `d05f8e2c5126919908b9fe432994cb0c` (galaz `noc/367c-jeniec-po-odejsciu`, HEAD `349c9c6d`, wypchniete; 30 commitow ponad 8324ba7e). CrashScribe bez zmian (`d7fbd602`). Kopie: `Armoury.dll.bak-2026-11-11-przed-wgranie206`, `D:/Backup-Bannerlord/wgrane/2026-11-11-wgranie206(-przed)`.
+- **Armoury.json Jeffa poprawiony recznie** (kopia `.bak-2026-11-11-przed-wgranie206`): SiegeSicknessIncubationDays 9 -> 14, SiegeSicknessRampPercent 15 -> 10 (warunek 398).
+- **Plan i decyzje:** `docs/audyty-2026-11-11/PLAN-396.md` (rozdzial 5 = decyzje z domyslnymi; Jeff ich nie zmienial). 72 nowe klucze MCM (lista: commit-y serii; kazdy system ma wylacznik: Story Guard, Hero Wounds Enabled, Dungeon Sickness, Funerals, Succession Disputes, Captive Fate itd.).
+- **Autotest at-410 (n390), 11 dob + 2 bitwy:** KONIEC OK, bledy 23 (stale, cudze), kod 0, wyjatkow w Armoury.log 0.
+- **Dowod z logu testu (tylko to potwierdzone):** StoryGuard widzi 29 wydarzen ROT, chroni 24/32 postaci, latki kata gracza 3/3 + BannerKings 4/4, zero WETO/UTRATA w 11 dob; HeroWounds start: latki leczenia, setera HP, RB krytycznej, encyklopedii i dymka TAK, 408 wpieta; DungeonFate liczy dobe (ROT_town29: 200/215, chorzy 9, zgon szeregowego 1); SiegeMisery pisze linie trupow; Pogrzeby start: sluchacz przed BK TAK, menu siedziby 4/4, pokoj wpiety; sukcesja start.
+- **NIE widziane w dzialaniu:** zadna rana bohatera (ksiega 0), zaden pogrzeb ani spor, zadna smierc z ran / w lochu, weto strazy, palenie trupow, ucieczka przez mur, wyrok gracza (rozmowa), wszystko z oblezen i rozmow. Dalej niewidziane u Jeffa: 371b, 374-395.
+- **Pierwsze punkty ryzyka:** seter Hero.HitPoints (401, najgoretsza latka - awaryjnie Hero Wounds Enabled NIE); gracz na lozu nie wejdzie do bitwy (Hero Wounds Player NIE); zaraza obozow AI ok. 2.5x mocniejsza niz dotad (398); ~24 lordow fabuly nie ginie w bitwach.
+- **Odlozone / decyzje:** 411 (oboz AI zwija oblezenie przez zaraze) i 412 (na Mur) - czekaja na dane z gry; latka-pas na PartyScreenLogic.ExecuteTroop (397); term done:StannisDeathEvent (Stannis nieosiagalny przy Battle And Age TAK); miasto gracza pod oblezeniem pali trupy z kiesy gracza bez pytania (399-p).
+- **Kolejne serie (decyzje Jeffa 11.11, pamiec `jeff-11-11-decyzje-po-audytach`):** walka/RBM -> AI bitwy pakiety 0-8 -> ekonomia A-C. Raporty: `docs/audyty-2026-11-11/`.
+- **NIE URUCHAMIAC `tools/gen_mcm.py` na tej galezi.**
+
 ## STAN 11.11 12:50 - WGRANIE 205 (390-395 + poprawki -p: decyzje Jeffa po 204)
 
 - **W grze:** Armoury.dll `c2601f6bf1d6bb454930bbe30a0447bb` (galaz `noc/367c-jeniec-po-odejsciu`, HEAD `8324ba7e`, wypchniete). CrashScribe bez zmian (`d7fbd602`). Kopie: `Armoury.dll.bak-2026-11-11-przed-wgranie205`, `D:/Backup-Bannerlord/wgrane/2026-11-11-wgranie205(-przed)`.
