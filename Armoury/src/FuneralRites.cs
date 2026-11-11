@@ -61,7 +61,7 @@ namespace Armoury
             public int Day, Rite, End, Mode, Gift;                                    // doba smierci, obrzedu, konca; tryb; dar gracza
             public bool King, Attended;                                               // glowa rodu panujacego; gracz byl
             public int TZero, TBk, TPlayer, TPlayerDay;                               // 406 (tylko sesja): wyzerowane cele AI (Interlocked), weta BK, doby z zablokowana opcja gracza
-            public bool TSaid, TBroken;                                               // 406 (tylko sesja): linia pokoju napisana; siedziba oblegana mimo pokoju
+            public int TState; public bool TBroken;                                   // 406 (tylko sesja): ostatni stan pokoju w logu (406-p: 0 nic, 1 siedziba nie rodu, 2 osada fabuly, 3 pokoj) - linia przy ZMIANIE; siedziba oblegana mimo pokoju
             public int GOrders;                                                       // 407 (tylko sesja): rozkazy zjazdu (ocena GoToSettlement siedziby podniesiona / dodana)
         }
 
@@ -94,7 +94,8 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _active.Clear(); _pre.Clear(); _changed.Clear(); _leaderOf.Clear(); _rulerOf.Clear(); _tmp.Clear(); _err.Clear();
+            _active.Clear(); _pre.Clear(); _changed.Clear(); _leaderOf.Clear(); _rulerOf.Clear(); _tmp.Clear();
+            lock (_err) _err.Clear();   // 406-p: Stumble bierze ten sam zamek z watkow AI
             _stumbles = _nPre = _nChg = _nSnap = _nFull = _nQuiet = _nWord = _nJoint = 0;
             TruceReset();   // 406
             SuccReset();    // 410

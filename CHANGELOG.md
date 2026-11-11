@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 406-p (11.11) - POKOJ POGRZEBU: poprawki po recenzji 406 - linia stanu pokoju pisana przy kazdej zmianie (nie raz na wiersz), czyszczenie pamieci bledow pod zamkiem (FuneralRites.cs, FuneralRites.Ai.cs; bez nowych kluczy MCM, bez zmian w zachowaniu gry)
+
+**Problem:** recenzja 406 (stabilnosc): KRYTYCZNYCH i SREDNICH brak, 3 NISKIE. Dowod z kodu - w grze nic nie uruchamiano. (1) Linia "POKOJ POGRZEBU ..." / "pokoj pogrzebu ...: BRAK" szla raz na wiersz (`TSaid`): gdy siedziba zmienila pana w trakcie pogrzebu albo wydarzenie ROT osady fabuly doszlo do stanu 2, log zostawal ze stanem z pierwszej doby. (2) `Reset` czyscil `_err` bez zamka, ktory `Stumble` bierze takze z watkow AI. (3) Poza kanonem weto armii BK daje brak celu zamiast nastepnego.
+
+**Przyczyna:** `Row.TSaid` jako bool; `_err.Clear()` poza `lock (_err)`.
+
+**Zmiana:**
+- `Row.TState` (0 nic, 1 siedziba nie rodu, 2 osada fabuly ROT, 3 pokoj): linia przy kazdej ZMIANIE stanu wiersza. Po wczytaniu zapisu stan od zera - linia powtarza sie raz (tylko sesja, jak dotad).
+- `Reset`: `lock (_err) _err.Clear();`.
+- ODRZUCONE / ZOSTAJE (zarzut 1, znana dziura): poza kampania kanonu `BkFirstPostfix` dalej daje null. `NextBkTarget` wola `VetoedAny` z teatrami 334, zwrotem 326b i sila lokalna 334e - kod pisany i testowany tylko dla kanonu; wlaczenie go poza kanonem ozywiloby martwy dotad kod dla zysku "wiecej armii BK przez 6 dob wokol jednej twierdzy". Jeff gra kanon. Opisane w naglowku FuneralRites.Ai.cs.
+
+**Ryzyko / co sprawdzic:** sama diagnostyka - `TState` czyta i pisze tylko `TruceRebuild` (watek glowny); migawka `_truce`, oceny celu, weta i opcja gracza bez zmian. W logu: przy zmianie pana siedziby w trakcie pogrzebu druga linia "pokoj pogrzebu rodu X: BRAK - siedziba ... nie jest juz rodu."
+
+**Status:** DO SPRAWDZENIA
+
 ## 405-p (11.11) - POGRZEBY: poprawki po recenzji 405 - zgon glowy odroczony znakiem smierci (wydarzenie ROT wobec lorda w bitwie / obozie oblezniczym) nie gubi pogrzebu; pogrzeb cichy = sama wiesc (bez opcji w siedzibie); teksty wiesci; migawka "rod panujacy"; liczniki i limity (FuneralRites.cs, Settings.cs, McmSettings.cs; bez nowych kluczy MCM)
 
 **Problem:** dwie recenzje 405 (stabilnosc, logika): KRYTYCZNYCH brak, 1 SREDNI, reszta NISKIE. Dowod z kodu i dekompilacji - w grze nic nie uruchamiano. (1, SREDNI) Wydarzenia ROT zmieniaja glowe rodu (`ChangeClanLeaderAction.ApplyWithSelectedNewLeader`) i zaraz potem zabijaja stara (rot_all.cs:22336, 24542, 26066, 26281 - Joffrey, Roose, Karstark, Robb). Gdy ofiara stoi w bitwie albo w obozie oblezniczym, gra tylko nadaje znak smierci i wraca bez zdarzenia (`KillCharacterAction.ApplyInternal`, cs_full.cs:227143-227147), a zgon wykonuje `DailyTickHero` po wyjsciu z bitwy / oblezenia - nawet po wielu dobach. Pamiec "zmiana glowy" gasla po 24 h, migawka doby pokazywala juz nowa glowe: brak wiersza pogrzebu, wiesci i zaloby krolestwa (410). Najbardziej narazony Robb przy Krwawych Godach, jesli akurat oblega. (2) Pogrzeb cichy dawal graczowi sama linie "X of Y is dead.", a opcje "Attend" / dar byly w siedzibie czynne - gracz nie wiedzial, gdzie jechac; decyzja 20 planu mowi o cichych "sama wiesc". (3) Tekst przy oblezonej siedzibie ("is not theirs to gather in") sugerowal, ze rod stracil twierdze. (4) `Here()` konczyl petle na pierwszym wierszu z dana siedziba (stary rod po zmianie pana zaslanial pogrzeb nowego). (5) Klikniecie opcji nie odswieza menu - drugi klik nic nie robil i nic nie mowil. (6) Liczniki sesji po wyparciu przez wladce, wiersz po terminie w limitach, rod zwyklej kultury w krolestwie kultury pomijanej (po zniszczeniu rodu przechodzil `Eligible`), stan "panujacy" czytany po sukcesji BK przy zlej kolejnosci sluchaczy, wiesc dla rodu zniszczonego (krolestwo czytane po zniszczeniu), druga glowa w oknie bez wiesci i bez wdowy w logu, "in 1 days".

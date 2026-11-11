@@ -20,7 +20,10 @@ namespace Armoury
     /// NIGDY: tryb cichy, osada fabuly ROT (SiegeRansom.IsStory), dopoki jej wydarzenie oblezenia nie ma stanu 2; siedziba, ktora przestala byc rodu.
     /// TRWAJACEGO oblezenia / najazdu NIE zdejmujemy (osada z SiegeEvent albo wies nie w stanie Normal = bez weta).
     /// Watki: ocena celu bywa liczona rownolegle - czytana jest NIEZMIENNA migawka (_truce), podmieniana w calosci w watku glownym (TruceRebuild);
-    /// liczniki przez Interlocked. Zero nowych latek. Najazd gracza na wies i gracz w cudzej armii - bez blokady (odlozone).</summary>
+    /// liczniki przez Interlocked. Linia stanu pokoju (BRAK / POKOJ) pisana przy kazdej ZMIANIE stanu wiersza (406-p), po wczytaniu od nowa. Zero nowych latek.
+    /// Znana dziura (406-p, swiadomie): poza kampania kanonu weto armii BK daje brak celu (null) zamiast nastepnego - lord, ktoremu najblizej do siedziby
+    /// w zalobie, przez czas pogrzebu nie zwola armii BK (NextBkTarget i jego weta 334 sa pisane i testowane tylko dla kanonu).
+    /// Najazd gracza na wies i gracz w cudzej armii - bez blokady (odlozone).</summary>
     internal static partial class FuneralRites
     {
         private sealed class TruceRow
@@ -67,7 +70,7 @@ namespace Armoury
                         var cl = FindClan(r.Clan);
                         if (seat == null || cl == null || seat.OwnerClan != cl)
                         {
-                            if (!r.TSaid) { r.TSaid = true; Info("pokoj pogrzebu rodu " + r.Clan + ": BRAK - siedziba " + r.Seat + " nie jest juz rodu."); }
+                            if (r.TState != 1) { r.TState = 1; Info("pokoj pogrzebu rodu " + r.Clan + ": BRAK - siedziba " + r.Seat + " nie jest juz rodu."); }
                             continue;
                         }
                         if (SiegeRansom.IsStory(seat))
@@ -76,7 +79,7 @@ namespace Armoury
                             int state = ev != null ? Prologue.RotEventState(ev) : -1;
                             if (state != 2)
                             {
-                                if (!r.TSaid) { r.TSaid = true; Info("pokoj pogrzebu rodu " + r.Clan + ": BRAK - " + seat.StringId + " to osada fabuly ROT (" + (ev ?? "?") + " stan " + state + ", potrzeba 2)."); }
+                                if (r.TState != 2) { r.TState = 2; Info("pokoj pogrzebu rodu " + r.Clan + ": BRAK - " + seat.StringId + " to osada fabuly ROT (" + (ev ?? "?") + " stan " + state + ", potrzeba 2)."); }
                                 continue;
                             }
                         }
@@ -92,9 +95,9 @@ namespace Armoury
                                 if (vs == null || vs.StringId == null) continue;
                                 map.By[vs.StringId] = t; villages++;
                             }
-                        if (!r.TSaid)
+                        if (r.TState != 3)
                         {
-                            r.TSaid = true;
+                            r.TState = 3;
                             Info("POKOJ POGRZEBU rodu " + r.Clan + ": siedziba " + seat.StringId + " i " + villages + " wsi do dnia " + r.End + " wlacznie (klucz " + YN(TruceKey)
                                  + "; oblezenie i najazd AI -> ocena 0, armie BK - weto, gracz - opcja oblezenia nieczynna).");
                         }
