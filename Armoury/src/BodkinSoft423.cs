@@ -25,9 +25,17 @@ namespace Armoury
     /// ciezka skora 72, kolczuga 82, luska 93; plyta bez zmian 182.
     ///
     /// Czego nie obejmuje: glowa, szyja, barki, rece, nogi (tam zostaje polowa RBM - inne sztuki, inna skala), konie (419), strzaly szerokie (Cut).
+    /// 423-p - WYJATEK: korpus ze zbioru ROT, ktorego drabina nie obnizyla (ArmourLadder423.KeptAtRotScale: Dothrakowie i Nieskalani przy kluczu
+    /// NIE, Inni, olbrzym, oponcza valyrianska, suknie 418). Jego liczba jest w starej skali x2.1-2.4, a polowa RBM byla strojona wlasnie do niej -
+    /// 75% dawaloby Dothrakowi 77 prog 115 J zamiast 77 J (iglica 101 J: 27 -> 6 HP), czyli 4.5 raza twardszego na strzaly niz przed 423.
+    /// Tam zostaje polowa RBM; licznik w linii konca misji.
     /// Rzadki przypadek pominiety swiadomie: RBM zamienia typ obrazen na obuch, gdy napastnik trzyma w chwili trafienia bron kuta i cios nie
-    /// trafil ostrzem (rbm.cs:3409-3413) - wtedy polowy nie ma, wiec i my nie ruszamy.
+    /// trafil ostrzem (rbm.cs:3409-3413, Utilities.HitWithWeaponBlade rbm.cs:5211-5235) - wtedy polowy nie ma, wiec i my nie ruszamy.
+    /// 423-p: warunek powtorzony DOKLADNIE (BladeHit) zamiast "trzyma jakakolwiek bron kuta" - lucznik, ktory po strzale dobyl miecza, a RBM
+    /// typu nie zamienil, jest objety regula; osobny licznik zamian.
     /// Jedna regula dla gracza i AI. Brak RBM = nieczynne (linia logu). Latka w kampanii (NightHooks.InCampaign, raz na proces) - jak 415 / 416.
+    /// 423-p: latka zostaje w procesie, ale poza wczytana kampania (ArmourLadder423.InSession) prefiks wychodzi na pierwszym warunku - w bitwie
+    /// wlasnej po kampanii korpusy sa swiezo wczytane w liczbach ROT i obowiazuje sama regula RBM.
     /// </summary>
     internal static class BodkinSoft423
     {
@@ -40,6 +48,7 @@ namespace Armoury
 
         // liczniki misji (glowny watek: ComputeBlowDamage i OnScoreHit ida z Mission.GetAttackCollisionResults / RegisterBlow)
         private static int _blows, _changed;
+        private static int _keptRot, _blunted;               // 423-p: iglice w korpus zostawiony w liczbach ROT (polowa RBM); iglice zamienione przez RBM na obuch
         private static float _armBefore, _armAfter;
         private static Agent _last;                          // ofiara ostatniej iglicy objetej regula - do licznika trafien
         private static int _hits, _hitsDeep;
@@ -79,7 +88,9 @@ namespace Armoury
             _note = "iglica w miekki pancerz " + _patched + "/" + _wanted + (miss.Length > 0 ? " |" + miss : "");
             Log.Info("Iglica w miekki pancerz (423b): latka raz na proces - " + _note + ". Klucz BodkinSoftArmourPercent " + (s != null ? s.BodkinSoftArmourPercent.ToString() : "?")
                      + ": strzala / belt Pierce w piers albo brzuch czlowieka, korpus inny niz plyta - pancerz x procent / 50 przed prefiksem RBM (RBM x0.5 -> procent / 100);"
-                     + " procent = 50 + (klucz - 50) x sila drabiny 423 (ustalana przy wczytaniu zapisu; drabina wylaczona = 50 = regula RBM).");
+                     + " procent = 50 + (klucz - 50) x sila drabiny 423 (ustalana przy wczytaniu zapisu; drabina wylaczona = 50 = regula RBM);"
+                     + " korpus ROT zostawiony przez drabine w starych liczbach (Dothrakowie i Nieskalani przy kluczu NIE, Inni, olbrzym, suknie) - polowa RBM jak dotad;"
+                     + " poza wczytana kampania (bitwa wlasna) nieczynne.");
             return _note;
         }
 
@@ -127,7 +138,7 @@ namespace Armoury
         /// Licznik iglic rosnie takze przy procencie 50 (pomiar "przed").</summary>
         private static void SoftPrefix(ref AttackInformation attackInformation, ref AttackCollisionData attackCollisionData, WeaponComponentData attackerWeapon, DamageTypes damageType)
         {
-            if (!_rbmBlow || attackerWeapon == null || damageType != DamageTypes.Pierce || !attackCollisionData.IsMissile) return;
+            if (!ArmourLadder423.InSession || !_rbmBlow || attackerWeapon == null || damageType != DamageTypes.Pierce || !attackCollisionData.IsMissile) return;
             var wc = attackerWeapon.WeaponClass;
             if (wc != WeaponClass.Arrow && wc != WeaponClass.Bolt) return;
             var part = attackCollisionData.VictimHitBodyPart;
@@ -138,19 +149,22 @@ namespace Armoury
             if (eq == null) return;
             // material tulowia jak w RBM: pierwsza sztuka typu BodyArmor w slotach pancerza
             var mat = ArmorComponent.ArmorMaterialTypes.None;
+            ItemObject body = null;
             for (EquipmentIndex i = EquipmentIndex.NumAllWeaponSlots; i < EquipmentIndex.ArmorItemEndSlot; i++)
             {
                 var it = eq[i].Item;
-                if (it != null && it.ItemType == ItemObject.ItemTypeEnum.BodyArmor && it.ArmorComponent != null) { mat = it.ArmorComponent.MaterialType; break; }
+                if (it != null && it.ItemType == ItemObject.ItemTypeEnum.BodyArmor && it.ArmorComponent != null) { body = it; mat = it.ArmorComponent.MaterialType; break; }
             }
             if (mat == ArmorComponent.ArmorMaterialTypes.None || mat == ArmorComponent.ArmorMaterialTypes.Plate) return;
-            // RBM zamieni Pierce na obuch (bez polowy), gdy napastnik trzyma bron kuta i cios "nie ostrzem" - nie nasz przypadek
+            // RBM zamieni Pierce na obuch (bez polowy), gdy napastnik trzyma bron kuta i cios "nie ostrzem" - nie nasz przypadek (423-p: warunek RBM dokladnie)
             var a = attackInformation.AttackerAgent;
             if (a != null && attackCollisionData.StrikeType == 0)
             {
                 var held = a.WieldedWeapon;
-                if (!held.IsEmpty && held.Item != null && held.Item.WeaponDesign != null) return;
+                if (!held.IsEmpty && !BladeHit(ref attackCollisionData, held)) { _blunted++; return; }
             }
+            // 423-p: korpus ROT zostawiony w starej skali - polowa RBM jak przed 423
+            if (ArmourLadder423.KeptAtRotScale(body)) { _keptRot++; return; }
             _blows++;
             _last = v;
             float pct = Percent();
@@ -160,6 +174,22 @@ namespace Armoury
             float b = arm * (pct / RbmHalfPercent);
             attackInformation.ArmorAmountFloat = b;
             _changed++; _armBefore += arm * 0.5f; _armAfter += b * 0.5f;
+        }
+
+        /// <summary>423-p: to samo co RBMCombat Utilities.HitWithWeaponBlade (rbm.cs:5211-5235) - false = RBM zamieni typ obrazen na obuch.
+        /// Same odczyty, bez alokacji (MissionWeapon to struktura).</summary>
+        private static bool BladeHit(ref AttackCollisionData cd, MissionWeapon w)
+        {
+            var item = w.Item;
+            var use = w.CurrentUsageItem;
+            if (item == null || use == null) return true;
+            var d = item.WeaponDesign;
+            if (d == null) return true;
+            var pieces = d.UsedPieces;
+            if (pieces == null || pieces.Length == 0 || pieces[0] == null) return true;
+            bool sword = (uint)((int)use.WeaponClass - 1) <= 2u;                              // Dagger, OneHandedSword, TwoHandedSword - jak w RBM
+            float blade = pieces[0].ScaledBladeLength + (sword ? 0f : 0.15f);
+            return !(cd.CollisionDistanceOnWeapon < use.GetRealWeaponLength() - blade);
         }
 
         /// <summary>Wolane z ArmourLadder423.Logic.OnScoreHit przy KAZDYM trafieniu (znacznik zdejmowany zawsze). Bez alokacji.</summary>
@@ -175,6 +205,7 @@ namespace Armoury
         internal static void Reset()
         {
             _blows = 0; _changed = 0; _armBefore = 0f; _armAfter = 0f;
+            _keptRot = 0; _blunted = 0;
             _last = null; _hits = 0; _hitsDeep = 0; _hitHp = 0;
         }
 
@@ -186,7 +217,8 @@ namespace Armoury
             return " | iglica w miekki korpus (423b): latka " + _patched + "/" + _wanted + (_rbmBlow ? "" : " (prefiks RBM NIEOBECNY - nieczynne)")
                    + ", pancerz liczony w " + F1(Percent()) + "% (RBM 50), ciosow objetych " + _blows + ", pancerz zmieniony " + _changed
                    + " (srednio po polowie RBM " + (_changed > 0 ? F1(_armBefore / _changed) + " -> " + F1(_armAfter / _changed) : "-") + ")"
-                   + ", trafienia " + _hits + " srednio " + (_hits > 0 ? (_hitHp / _hits).ToString() : "-") + " HP, od " + ArmourLadder423.DeepHp + " HP " + _hitsDeep;
+                   + ", trafienia " + _hits + " srednio " + (_hits > 0 ? (_hitHp / _hits).ToString() : "-") + " HP, od " + ArmourLadder423.DeepHp + " HP " + _hitsDeep
+                   + "; poza regula: korpus w liczbach ROT (polowa RBM jak dotad) " + _keptRot + ", zamienione przez RBM na obuch " + _blunted;
         }
     }
 }

@@ -661,6 +661,7 @@ namespace Armoury
             try { EventMusic.RestoreNow("wyjscie z kampanii"); } catch (Exception e) { Log.Error("OnGameEnd (muzyka m108)", e); }   // m108-muzyka: muzyka gry z powrotem   // m105-dziennik: linia kampanii i test od nowa
             try { Chronicle.GameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (Kronika Westeros)", e); }   // m105-kronika: stan kampanii Kroniki od zera
             try { SpoilsWindow.Close("wyjscie z kampanii"); } catch (Exception e) { Log.Error("OnGameEnd (okno lupu)", e); }   // noc 25.10 P5: warstwa zdjeta, obrazek zwolniony
+            try { ArmourLadder423.GameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (drabina pancerzy 423)", e); }   // 423-p: pola korpusow do danych ROT, ksiega pusta, drabina i iglica 423b nieczynne poza kampania (latka 423b zostaje w procesie)
             try { HeroWounds.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (ksiega ran 401)", e); }   // 401: ksiega ran (bohaterowie) nie zostaje po kampanii - latki bez wpisow nic nie robia
             try { HeroFate.Reset(); LordToll.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (los bohaterow 403)", e); }   // 403: okaleczenia i roczne konto smierci nie zostaja po kampanii
             try { FuneralRites.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (pogrzeby 405)", e); }   // 405: pogrzeby i pamiec wykrycia glow nie zostaja po kampanii
@@ -912,7 +913,7 @@ namespace Armoury
                 starter.AddBehavior(new ArmouryBehavior());
                 starter.AddBehavior(new Uniques());
                 starter.AddBehavior(new RotData418());   // 418: tarcze ROT w skali 4-6 + ubrania bez pancerza zbroi - korekta danych w pamieci przy starcie sesji; 418-p: rejestracja po ArmouryBehavior = OnSessionLaunched biegnie PRZED nim (MbEvent dopisuje na czolo listy) - wycena / zuzycie / klasa stroju licza z ksiegi sprzed 418
-                starter.AddBehavior(new ArmourLadder423());   // 423: korpusy ROT w skali RBM - korekta danych w pamieci w OnAfterSessionLaunched (po ArmorSanity / TierGearCheck / 418 / 419; ksiega wartosci sprzed mapowania)
+                starter.AddBehavior(new ArmourLadder423());   // 423: korpusy ROT w skali RBM - korekta danych w pamieci w OnAfterSessionLaunched (po ArmorSanity / TierGearCheck / 418 / 419 - te ida w OnSessionLaunched; ksiega wartosci sprzed mapowania). 423-p: rejestracja po ArmouryBehavior = Apply biegnie PRZED jego nasluchami OnAfterSessionLaunched (MbEvent dopisuje na czolo listy) - bez skutku, wycena liczy korpus przez ksiege
                 starter.AddBehavior(new HorseBarding419());   // 419: sufit pancerza ladrow plytowych ROT - korekta danych w pamieci przy starcie sesji (wycena z wartosci sprzed sufitu); 419-p: rejestracja ostatnia z trzech = OnSessionLaunched biegnie przed 418 i ArmouryBehavior
                 starter.AddBehavior(new SmithWoodBehavior());   // Jeff 15.10: drewno w kuzni w kg - zapas otwartego ladunku w zapisie
                 starter.AddBehavior(new HideoutPurge());

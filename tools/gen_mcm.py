@@ -4,6 +4,10 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 423-p: drabina pancerzy ROT i iglica w miekki pancerz - zakresy jak w recznym McmSettings.cs (ArmourLadder423.Apply przycina sile do 0..1,
+    # BodkinSoft423.Percent procent do 50..100; regula ogolna dalaby 0..4.00 i 0..300)
+    'ArmourLadderStrength': (0.0, 1.0, "0.00"),
+    'BodkinSoftArmourPercent': (50, 100, "0"),
     # 419-p: sufit pancerza ladrow plytowych ROT - zakres jak w recznym McmSettings.cs (HorseBarding419 przycina do 31..90; regula ogolna dalaby 0..180)
     'RotBardingArmorCap': (31, 90, "0"),
     # 415-p: szyja / barki / lezacy - zakresy jak w recznym McmSettings.cs (NeckGuard415 przycina udzialy do 0..1, procent do 0..100;
@@ -778,6 +782,9 @@ RANGES = {
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze
 # po angielsku); id pola w Armoury.json zostaje nazwa klucza. Reszta pol - jak dotad (podzial nazwy na slowa).
 LABELS = {
+    'ArmourLadderEnabled': 'ROT Body Armour In RBM Scale',   # 423a (423-p: nazwy jak w recznym McmSettings.cs - odwoluja sie do nich opisy i log)
+    'ArmourLadderDothrakiUnsullied': 'Armour Ladder Covers Dothraki And Unsullied',   # 423a
+    'BodkinSoftArmourPercent': 'Bodkin Versus Soft Armour Percent',   # 423b
     'MineOrePaysOnlyRegale': 'Ore Pays Only Mine Regale',   # 360b
     'KsRegaleRelativePrice': 'Mine Hands Follow Relative Price',   # 360a
     'KsRegaleWorldSurplus': 'Mine Hands Shed Unsold Ore',   # 360c

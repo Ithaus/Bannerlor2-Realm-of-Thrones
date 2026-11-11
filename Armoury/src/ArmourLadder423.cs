@@ -26,8 +26,10 @@ namespace Armoury
     /// tarcze, konie - bez zmian. Mediany: skora 61 -> 26, kolczuga 88 -> 55, plyta 120 -> 91.
     ///
     /// POZA TABELA (w zbiorze do pomiaru, liczby nietkniete): 7 sukien i strojow z tabeli 418 (juz 14), Inni i olbrzym, valyrian_surcoat_master;
-    /// Dothrakowie i Nieskalani pod kluczem ArmourLadderDothrakiUnsullied (TAK = ida tabela i zachowuja MIEJSCE w drabinie: 77 -> 39, 99 -> 58;
-    /// NIE = te same liczby co dzis - wtedy Nieskalany w 6 kg jest rowny plycie rycerskiej). To pytanie czeka na Jeffa przed wgraniem.
+    /// Dothrakowie i Nieskalani pod kluczem ArmourLadderDothrakiUnsullied. 423-p: domyslnie NIE - decyzja Jeffa 4 "ok zostawiamy" (bez zmian):
+    /// te same liczby co dzis (77 / 99), a iglica 423b liczy przeciw nim polowe RBM jak dzis (znacznik "zostawiona w skali ROT" w ksiedze -
+    /// KeptAtRotScale; to samo dla Innych, olbrzyma, oponczy i sukien 418). Skutek uboczny decyzji: Nieskalany w 6 kg jest po drabinie rowny
+    /// plycie rycerskiej (99 wobec 91). TAK = ida tabela i zachowuja MIEJSCE w drabinie: 77 -> 39, 99 -> 58.
     ///
     /// KSIEGA (kontrola calosci). Tier zamrozony przez TierfOverride PRZED zmiana pola (jak 418 / 419); cena gry (Value) i Effectiveness sa zapisane
     /// przy wczytaniu XML. Wszystko, co u nas liczy z pancerza korpusu rzeczy inne niz walka, bierze wartosc SPRZED mapowania (BookBody / BookSum /
@@ -37,8 +39,14 @@ namespace Armoury
     /// (gracz widzi prawdziwe liczby), Spoils of War, DTE.
     ///
     /// CHWILA: OnAfterSessionLaunched - po wszystkich OnSessionLaunched (ArmorSanity i TierGearCheck CrashScribe, 418, 419); ROT slucha tam tylko
-    /// smokow i krukow. Obiekty przedmiotow sa nowe w kazdej grze; gdyby ta sama sztuka przyszla drugi raz, Apply najpierw przywraca wartosc sprzed
+    /// smokow i krukow. 423-p: MbEvent dopisuje nasluch na CZOLO listy (cs_full.cs:15248-15254), a ArmourLadder423 jest rejestrowane po
+    /// ArmouryBehavior - wiec Apply biegnie PRZED nasluchami ArmouryBehavior tego samego zdarzenia (RotBows420.ApplyLore,
+    /// ArmsPricing.RefreshAfterFinalStats, MassStartLine, ForgeBill.SessionStart). Bez skutku: wszystkie licza korpus przez ksiege (BookSum),
+    /// tier jest zamrozony, a ksiega jest publikowana przed pierwsza zmiana pola (dwa przebiegi).
+    /// Obiekty przedmiotow sa nowe w kazdej grze; gdyby ta sama sztuka przyszla drugi raz, Apply najpierw przywraca wartosc sprzed
     /// mapowania (slownik ksiegi), wiec NIE = dokladnie dane ROT, a zmiana suwaka nie sklada sie z poprzednia. Regula nie zna wlasciciela.
+    /// KONIEC KAMPANII (423-p): GameEnd z SubModuleMain.OnGameEnd - pola wracaja do danych ROT, ksiega pusta, drabina i iglica 423b nieczynne do
+    /// nastepnego Apply (latka 423b zostaje w procesie; w bitwie wlasnej po kampanii prefiks wychodzi na pierwszym warunku).
     /// </summary>
     internal sealed partial class ArmourLadder423 : CampaignBehaviorBase
     {
@@ -65,8 +73,12 @@ namespace Armoury
         private static readonly string[] ClassName = { "bez korpusu / tkanina / spoza zbioru", "ubranie (skora < 50)", "przeszywanica (skora 50-69)", "ciezka skora (70+)", "kolczuga", "plyta" };
         private static readonly string[] KindName = { "ciecie", "klucie", "obuch", "iglica", "strzala szeroka", "inny pocisk" };
 
-        // stan sesji. Ksiega: sztuka ze zbioru -> BodyArmor sprzed mapowania (16 bitow) | klasa korpusu << 16; podmieniana w calosci (czytaja ja watki wyceny)
+        // stan sesji. Ksiega: sztuka ze zbioru -> BodyArmor sprzed mapowania (16 bitow) | klasa korpusu << 16 (3 bity) | KeptBit;
+        // podmieniana w calosci (czytaja ja watki wyceny), po publikacji nie zmieniana
+        private const int KeptBit = 1 << 20;                 // 423-p: sztuka ze zbioru zostawiona w liczbach ROT (poza tabela, klucz Dothrakow NIE, tier nie dal sie zamrozic)
         private static Dictionary<ItemObject, int> _book = new Dictionary<ItemObject, int>();
+        private static FieldInfo _fBody;                     // ArmorComponent.BodyArmor - do przywrocenia pol przy wyjsciu z kampanii
+        private static bool _session;                        // 423-p: miedzy Apply a GameEnd (kampania wczytana)
         private static bool _on;
         private static float _strength = 1f;
         private static int _changed;
@@ -82,6 +94,18 @@ namespace Armoury
         /// <summary>Czy drabina teraz zmienia dane (klucz TAK, sila > 0, pola gry pasuja).</summary>
         internal static bool Active { get { return _on; } }
         internal static float Strength { get { return _on ? _strength : 0f; } }
+        /// <summary>423-p: kampania wczytana (Apply przeszlo, GameEnd jeszcze nie) - poza nia prefiks 423b nic nie robi.</summary>
+        internal static bool InSession { get { return _session; } }
+
+        /// <summary>423-p: korpus ze zbioru ROT, ktorego drabina NIE obnizyla, choc jest w starej skali (x2.1-2.4): Dothrakowie i Nieskalani przy
+        /// kluczu NIE, Inni, olbrzym, oponcza valyrianska, suknie 418. Przeciw nim iglica zostaje przy polowie RBM (jak przed 423) - 75% od liczby
+        /// ROT dawaloby Dothraka 77 z progiem 115 J zamiast 77 J. Jedno wyszukanie w slowniku, bez alokacji.</summary>
+        internal static bool KeptAtRotScale(ItemObject it)
+        {
+            int v;
+            var d = _book;
+            return d.Count > 0 && it != null && d.TryGetValue(it, out v) && (v & KeptBit) != 0;
+        }
 
         public override void RegisterEvents()
         {
@@ -137,7 +161,7 @@ namespace Armoury
         {
             int v;
             var d = _book;
-            return d.Count > 0 && it != null && d.TryGetValue(it, out v) ? (v >> 16) : 0;
+            return d.Count > 0 && it != null && d.TryGetValue(it, out v) ? ((v >> 16) & 7) : 0;
         }
 
         private static int ClassFor(ArmorComponent.ArmorMaterialTypes mat, int body)
@@ -191,10 +215,45 @@ namespace Armoury
 
         private static string F(float v) { return v.ToString("0.00", CultureInfo.InvariantCulture); }
 
+        // 423-p: zmiana pola odlozona do drugiego przebiegu (po publikacji ksiegi)
+        private struct Pending
+        {
+            public string Id; public ItemObject It; public ArmorComponent A; public int B0, B1, Mi, G0; public bool Doth;
+        }
+
+        /// <summary>423-p: wyjscie z kampanii (SubModuleMain.OnGameEnd). Pola wracaja do danych ROT (gdyby te same obiekty przedmiotow przezyly gre -
+        /// inaczej nastepne Apply wzieloby liczbe po drabinie za dane ROT i zmapowalo ja drugi raz), potem ksiega pusta, drabina i iglica 423b
+        /// nieczynne, liczniki od zera. Bez tego w bitwie wlasnej po kampanii iglica liczyla 75% od swiezych liczb ROT (kolczuga 88: 66 zamiast 44).</summary>
+        internal static void GameEnd()
+        {
+            var old = _book;
+            _session = false; _on = false; _changed = 0;
+            int back = 0;
+            try
+            {
+                var f = _fBody;
+                if (f != null && old != null)
+                    foreach (var kv in old)
+                    {
+                        var a = kv.Key != null ? kv.Key.ArmorComponent : null;
+                        int o = kv.Value & 0xFFFF;
+                        if (a != null && a.BodyArmor != o) { f.SetValue(a, o); back++; }
+                    }
+            }
+            catch (Exception e) { Log.Error("ArmourLadder423.GameEnd", e); }
+            _book = new Dictionary<ItemObject, int>();
+            Reset();
+            if (old != null && old.Count > 0)
+                Log.Info("Drabina pancerzy ROT (423): wyjscie z kampanii - pola przywrocone do danych ROT " + back + ", ksiega pusta (bylo " + old.Count
+                         + " sztuk), drabina i iglica 423b nieczynne do nastepnego wczytania kampanii.");
+        }
+
         private static void Apply()
         {
             var old = _book;
             var neu = new Dictionary<ItemObject, int>();
+            var todo = new List<Pending>(Ids.Length);
+            _session = true;
             _on = false; _changed = 0;
             try
             {
@@ -208,6 +267,7 @@ namespace Armoury
                 var getOv = AccessTools.PropertyGetter(typeof(ItemObject), "TierfOverride");
                 var setOv = AccessTools.PropertySetter(typeof(ItemObject), "TierfOverride");
                 bool field = fBody != null && fBody.FieldType == typeof(int);
+                _fBody = field ? fBody : null;
                 bool model = false;
                 try { model = Game.Current != null && Game.Current.BasicModels != null && Game.Current.BasicModels.ItemValueModel != null; } catch { }
                 string off = !c.ArmourLadderEnabled ? "klucz ROT Body Armour In RBM Scale NIE - korpusy jak w danych ROT"
@@ -239,15 +299,20 @@ namespace Armoury
                         if (field && old != null && old.TryGetValue(it, out ov) && (ov & 0xFFFF) != a.BodyArmor) { fBody.SetValue(a, ov & 0xFFFF); restored++; }
                         int b0 = a.BodyArmor;
                         if (b0 < 0 || b0 > 0xFFFF) { odd++; continue; }
-                        neu[it] = b0 | (ClassFor(mat, b0) << 16);
                         int mi = mat == ArmorComponent.ArmorMaterialTypes.Leather ? 0 : mat == ArmorComponent.ArmorMaterialTypes.Chainmail ? 1 : 2;
-                        cnt[mi]++; before[mi].Add(b0);
                         int b1 = b0;
+                        bool kept = false, queued = false;
                         bool isDoth = dothSet.Contains(id);
                         if (dress.Contains(id) || others.Contains(id))
+                        {
+                            kept = true;
                             sbKept.Append(sbKept.Length > 0 ? ", " : "").Append(id).Append(' ').Append(b0);
+                        }
                         else if (isDoth && !doth)
+                        {
+                            kept = true;
                             sbDoth.Append(sbDoth.Length > 0 ? ", " : "").Append(id).Append(' ').Append(b0);
+                        }
                         else if (_on)
                         {
                             b1 = Map(mat, b0, s);
@@ -255,26 +320,44 @@ namespace Armoury
                             else
                             {
                                 float tf = it.Tierf; int g0 = (int)it.Tier;
-                                if (!Freeze(it, tf, getOv, setOv)) { odd++; b1 = b0; }
+                                // tier zamrazany juz tutaj (sam w sobie nic nie zmienia); pole dopiero w drugim przebiegu, po publikacji ksiegi
+                                if (!Freeze(it, tf, getOv, setOv)) { odd++; b1 = b0; kept = true; }
                                 else
                                 {
-                                    fBody.SetValue(a, b1);
-                                    if ((int)it.Tier != g0) tierMoved++;
-                                    _changed++;
-                                    if (isDoth) sbDoth.Append(sbDoth.Length > 0 ? ", " : "").Append(id).Append(' ').Append(b0).Append(" -> ").Append(b1);
-                                    else if (id == "stark_armor" || id == "lannister_armor" || id == "nightswatch_armor2" || id == "cersei_armor" || (shown < 2 && mi == 1))
-                                    {
-                                        if (mi == 1) shown++;
-                                        sbEx.Append(sbEx.Length > 0 ? ", " : "").Append(id).Append(' ').Append(b0).Append(" -> ").Append(b1);
-                                    }
+                                    queued = true;
+                                    todo.Add(new Pending { Id = id, It = it, A = a, B0 = b0, B1 = b1, Mi = mi, G0 = g0, Doth = isDoth });
                                 }
                             }
                         }
-                        after[mi].Add(b1);
+                        neu[it] = b0 | (ClassFor(mat, b0) << 16) | (kept ? KeptBit : 0);
+                        cnt[mi]++; before[mi].Add(b0);
+                        if (!queued) after[mi].Add(b1);
                     }
                     catch (Exception e) { odd++; Log.Error("ArmourLadder423.Apply " + id, e); }
                 }
+                // 423-p: najpierw ksiega, potem pola - czytelnik BookSum / BookBody nigdy nie widzi nowej liczby bez ksiegi (przed zmiana pola
+                // ksiega daje to samo co pole, po zmianie wartosc sprzed mapowania)
                 _book = neu;
+                for (int q = 0; q < todo.Count; q++)
+                {
+                    var p = todo[q];
+                    int got = p.B0;
+                    try
+                    {
+                        fBody.SetValue(p.A, p.B1);
+                        got = p.B1;
+                        if ((int)p.It.Tier != p.G0) tierMoved++;
+                        _changed++;
+                        if (p.Doth) sbDoth.Append(sbDoth.Length > 0 ? ", " : "").Append(p.Id).Append(' ').Append(p.B0).Append(" -> ").Append(p.B1);
+                        else if (p.Id == "stark_armor" || p.Id == "lannister_armor" || p.Id == "nightswatch_armor2" || p.Id == "cersei_armor" || (shown < 2 && p.Mi == 1))
+                        {
+                            if (p.Mi == 1) shown++;
+                            sbEx.Append(sbEx.Length > 0 ? ", " : "").Append(p.Id).Append(' ').Append(p.B0).Append(" -> ").Append(p.B1);
+                        }
+                    }
+                    catch (Exception e) { odd++; Log.Error("ArmourLadder423.Apply (pole) " + p.Id, e); }
+                    after[p.Mi].Add(got);
+                }
                 string thr;
                 try { thr = RestedArmor416.Thresholds(false); } catch { thr = "odczyt nieudany"; }
                 string med = "skora " + cnt[0] + " (mediana " + Median(before[0]) + " -> " + Median(after[0]) + "), kolczuga " + cnt[1] + " (" + Median(before[1]) + " -> " + Median(after[1])
@@ -284,7 +367,7 @@ namespace Armoury
                          + ", pominiete (inny typ / material / blad) " + odd + (restored > 0 ? ", przywrocone do danych ROT " + restored : "")
                          + " | tier zamrozony (TierfOverride), zmienionych tierow " + tierMoved
                          + " | poza tabela (418, Inni, olbrzym): " + (sbKept.Length > 0 ? sbKept.ToString() : "-")
-                         + " | Dothrakowie i Nieskalani (klucz " + (doth ? "TAK - tabela" : "NIE - bez zmian") + "): " + (sbDoth.Length > 0 ? sbDoth.ToString() : "-")
+                         + " | Dothrakowie i Nieskalani (klucz " + (doth ? "TAK - tabela" : "NIE - bez zmian, iglica 423b liczy polowe RBM jak dotad") + "): " + (sbDoth.Length > 0 ? sbDoth.ToString() : "-")
                          + " | przyklady: " + (sbEx.Length > 0 ? sbEx.ToString() : "-")
                          + " | receptury, pula zuzycia, zamienniki unikatow, awanse band, granice stroju, prog oddechu i podloga barkow 415 licza z wartosci sprzed mapowania; cena gry bez zmian"
                          + " | progi RBM w pamieci: " + thr + ".");
@@ -351,7 +434,7 @@ namespace Armoury
             if (eq == null) return 0;
             var it = eq[EquipmentIndex.Body].Item;
             int v;
-            return it != null && d.TryGetValue(it, out v) ? (v >> 16) : 0;
+            return it != null && d.TryGetValue(it, out v) ? ((v >> 16) & 7) : 0;
         }
 
         /// <summary>Liczniki misji: ludzie wedlug klasy korpusu, trafienia w piers / brzuch wedlug klasy ofiary i rodzaju ciosu, zabici i ranni wedlug
