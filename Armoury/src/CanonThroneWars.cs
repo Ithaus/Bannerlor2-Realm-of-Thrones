@@ -588,6 +588,8 @@ namespace Armoury
                 if (__2 != null && ReferenceEquals(__2, __0)) return;   // wywolanie z GetScoreOfDeclaringPeace BK - wynik pokoju bez zmian
                 // 330 (H5): Polnoc-korona w rozejmie albo w zatrzasku Z - zakaz wojny niezaleznie od klucza 312c (klucz 330 NIE - BlocksWar false, nic sie nie zmienia)
                 if (WarTruce.BlocksWar(__0, __1)) { WarTruce.NoteBkBlock(); __result.Add(-1000000f, new TextObject("{=!}A truce or a surrender holds between these realms")); return; }
+                // 385: rozejm krolestw gracza-wladcy (PrisonerTerms384, wpis "K") - ocena wojny tej pary zbita jak przy rozejmie 330
+                if (PrisonerTerms384.RealmTruce(__0, __1)) { PrisonerTerms384.NoteRealmBlock(); __result.Add(-1000000f, new TextObject("{=!}A truce sworn over prisoners holds between these realms")); return; }
                 if (!Key) return;
                 var a = __0 as Kingdom; var t = __1 as Kingdom;
                 lock (_lock) { _dCalls++; _tCalls++; }

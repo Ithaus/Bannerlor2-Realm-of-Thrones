@@ -628,7 +628,12 @@ namespace Armoury
             try
             {
                 var k = __1 as IFaction; var t = __2 as IFaction;
-                if (!BlocksWar(k, t)) return true;
+                if (!BlocksWar(k, t))
+                {
+                    // 385: rozejm krolestw gracza-wladcy (PrisonerTerms384, wpis "K") - AI wezwane do wojny z krolestwem gracza nie wchodzi
+                    if (PrisonerTerms384.RealmTruce(k, t) && !Prologue.RulesRealm(k)) { PrisonerTerms384.NoteRealmBlock(); return false; }
+                    return true;
+                }
                 _dBlockAi++; _sBlockAi++;
                 InfoOnce("h5b|" + (k != null ? k.StringId : "?"), "blok: AI wojna w " + BlockName() + " (call-to-war sojuszu, wezwany " + Name(k) + " przeciw " + Name(t) + ").");
                 return false;
@@ -673,7 +678,12 @@ namespace Armoury
                 else if (pc != null) { k = pc.CalledKingdom; t = pc.KingdomToCallToWarAgainst; kind = "AddDecision call-to-war"; }   // recenzja 330: wezwany do wojny z para
                 else if (ac != null) { k = ac.Kingdom ?? __instance; t = ac.KingdomToCallToWarAgainst; kind = "AddDecision przyjecie call-to-war"; }
                 else return true;
-                if (!BlocksWar(k, t)) return true;
+                if (!BlocksWar(k, t))
+                {
+                    // 385: rozejm krolestw gracza-wladcy (PrisonerTerms384, wpis "K") - wniosek AI o wojne tej pary nie wchodzi; gracz sam moze (wtedy lamie slowo)
+                    if (PrisonerTerms384.RealmTruce(k, t) && __0.ProposerClan != Clan.PlayerClan) { PrisonerTerms384.NoteRealmBlock(); return false; }
+                    return true;
+                }
                 _dBlockAi++; _sBlockAi++;
                 if (WarTruceTest.Armed) WarTruceTest.Hits++;
                 var who = __0.ProposerClan;

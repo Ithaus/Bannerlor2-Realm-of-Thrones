@@ -1654,6 +1654,7 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, SiegeSurrender374.OnMapEventEnded);   // 374: odparte szturmy i straty oblegajacych (zgoda na poddanie)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { PrisonerTerms384.Tick(); });   // 384: wymiana jencow wykonana w takcie kampanii (bez misji i rozmowy)
             CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, PrisonerTerms384.OnSiegeStarted);   // 384: zlamanie umowy (zdrada AI albo gracz)
+            CampaignEvents.WarDeclared.AddNonSerializedListener(this, PrisonerTerms384.OnWarDeclared);   // 385: rozejm krolestw gracza-wladcy zlamany wojna
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, PrisonerTerms384.OnMapEventStarted);   // 384: zlamanie paktu (atak, najazd)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SideVillageVisit.Tick(); });   // m97-wioski: wjazd do wioski pobocznej po kliku, oboz po menu, straznik rabunku (4 razy na sekunde, tylko gdy cos czeka)   // n20-wioska: wjazd do wioski gracza po kliku / postoju (4 razy na sekunde, jedno porownanie odleglosci)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("SideVillageFief.Hourly", delegate { try { SideVillageFief.Hourly(); } catch (Exception e) { Log.Error("SideVillageFief.Hourly", e); } }));   // n20-wioska: oczekujace nadanie, furtka autotestu

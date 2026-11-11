@@ -844,6 +844,26 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int PrisonerExchangePactDays { get; set; } = 60;
 
+        [SettingPropertyBool("Prisoner Terms Pick Window", HintText = "With Prisoner Exchange For Terms: the lords you offer are picked in one window that lists every lord of his realm you hold (dearest first, with his worth), instead of eight lines in the talk. Turn it off if the window misbehaves during the parley - the eight lines come back", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsPickWindow { get; set; } = true;
+
+        [SettingPropertyBool("Prisoner Terms Release My Men", HintText = "With Prisoner Exchange For Terms: when the lord you bargain with (or, if he rules, anyone in his realm) holds members of your clan or your companions, you can ask for their release as part of the terms - their ransom is added to what he wants for the deal. Your common soldiers are not covered", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsReleaseMyMen { get; set; } = true;
+
+        [SettingPropertyBool("Prisoner Terms Oath", HintText = "With Prisoner Exchange For Terms: you can add your own oath to the offer - not to raise arms against his realm for Prisoner Exchange Pact Days. It is worth a part of your party's strength to him. The game itself holds you to it: until it runs out you cannot attack that realm, besiege or raid it, or join an army marching on it - unless they attack you first, which frees you", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsOath { get; set; } = true;
+
+        [SettingPropertyBool("Prisoner Terms Field Parley", HintText = "With Prisoner Exchange For Terms: you can also talk terms with any enemy lord leading a party on the map, when you ride up to him (not when he attacks you) - a pact of peace for your lands and men from his house (from his whole realm, if he rules it), or the release of your people, for lords you hold, gold or land", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsFieldParley { get; set; } = true;
+
+        [SettingPropertyBool("Prisoner Terms Realm Truce", HintText = "With Prisoner Exchange For Terms: if you rule a kingdom, you can make peace with an enemy kingdom by talking to its ruler - at a siege parley or in the field. He weighs it as the game weighs a peace barter; every lord of his you hold counts for you, since peace opens the dungeons anyway. The truce lasts Prisoner Exchange Pact Days. Wars the story forces cannot be ended this way", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsRealmTruce { get; set; } = true;
+
         [SettingPropertyBool("Siege Armoury Access", HintText = "inside a besieged town or castle (you stay within the walls - the siege menu replaces the town or castle menu) the siege menu offers 'View Army Armory' (the troop armoury of Dynamic Troop Equipment, the same window as in a town) and, in your own towns and castles, 'Hand kit to the garrison' - the same windows and rules as usual; off = no armoury while besieged, as before", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool SiegeArmouryAccess { get; set; } = true;
@@ -12150,6 +12170,11 @@ namespace Armoury
             s.SiegeHonourableSurrender = SiegeHonourableSurrender;
             s.PrisonerExchangeForTerms = PrisonerExchangeForTerms;
             s.PrisonerExchangePactDays = PrisonerExchangePactDays;
+            s.PrisonerTermsPickWindow = PrisonerTermsPickWindow;
+            s.PrisonerTermsReleaseMyMen = PrisonerTermsReleaseMyMen;
+            s.PrisonerTermsOath = PrisonerTermsOath;
+            s.PrisonerTermsFieldParley = PrisonerTermsFieldParley;
+            s.PrisonerTermsRealmTruce = PrisonerTermsRealmTruce;
             s.SiegeArmouryAccess = SiegeArmouryAccess;
             s.GarrisonKitMenu = GarrisonKitMenu;
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;

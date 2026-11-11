@@ -561,6 +561,7 @@ namespace Armoury
             }
             // 5 rozejm kanonu (WarTruce 330)
             if (WarTruce.BlocksWar(k, target) || (WarTruce.IsPair(k, target) && WarTruce.TruceHolds)) return Blocked(r, h, "5 rozejm kanonu (330)", out why);
+            if (PrisonerTerms384.RealmTruce(k, target)) return Blocked(r, h, "5b rozejm krolestw gracza (385)", out why);
             var tk = target as Kingdom;
             if (tk != null)
             {
