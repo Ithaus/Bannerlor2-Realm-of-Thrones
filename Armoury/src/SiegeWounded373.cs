@@ -38,6 +38,11 @@ namespace Armoury
     ///    zolnierzami. Klucz Siege Wounded Dungeon Limit (NIE = bez sufitu, jak przed 373c).
     ///  - zdarzenia OnPrisonerTaken (rozbieranie jencow 3792) NIE odpalamy - jak w grze przy zwyklym pojmaniu zolnierzy w bitwie (to robi tylko ekran / loot).
     /// Wyjatek per partia / typ / bohater = potkniecie, bez globalnego wylacznika. Ksiega tylko w pamieci (wczytanie w trakcie bitwy - gubi wpis, log przy czyszczeniu).
+    /// 387c (Jeff 11.11 "tak, rob wszystko 2-4" - "twoi ranni spod murow do lochu obroncow"): ta sama ksiega misji, gdy GRACZ ATAKUJE (Tally.Pl). Szturm gracza
+    /// odparty (zalamanie 371/387, odwrot reczny, gracz pokonany) konczy sie "Battle continues" (PlayerEncounter.ContinueBattle), a potem "Continue siege
+    /// preparations." / "Leave..." -> PlayerEncounter.Finish -> LeaveBattle -> MapEvent.FinalizeEvent bez zwyciezcy (cs_full 99560-99575, 112804-112826) -
+    /// MapEventEnded pada, gdy MainParty jest jeszcze po stronie atakujacej. Rozliczenie: SiegeWounded373Behavior.Player387c (osobna galaz, galaz obroncy nietknieta).
+    /// Sam gracz nigdy; bohaterowie rodu / towarzysze tylko z kluczem Siege Wounded Player Companions (domyslnie NIE); okien 380 nie ma.
     /// </summary>
     internal sealed class SiegeWounded373 : MissionLogic
     {
@@ -52,7 +57,14 @@ namespace Armoury
             public bool Broken, LastBroken, LastRetreated;   // Broken - zalamanie 371 w biezacej misji; LastBroken / LastRetreated - wynik ostatniej misji (OnEndMission)
             public int Missions, Inside, Near, Mid, Far, NoPos;
             public string St = "-";
+            // 387c: gracz po stronie atakujacych. LastHeld - ostatnia misja bez wziecia murow; LastLeft - gracz zszedl z pola (odwrot reczny / pokonany / bez wyniku)
+            public bool Pl, LastHeld, LastLeft;
+            public int PlNear, AllyNear;      // zapisani zolnierze (w srodku + pod murami): partia gracza / partie sojusznikow
+            public string LastWhy = "-";
         }
+
+        /// <summary>387c: ranni strony gracza-atakujacego tez zostaja pod murami (wymaga klucza nadrzednego 373).</summary>
+        internal static bool PlayerSideOn { get { var s = Settings.Current; return s != null && s.SiegeWoundedTakenPrisoner && s.SiegeWoundedPlayerSide; } }
 
         internal static readonly Dictionary<MapEvent, Tally> Book = new Dictionary<MapEvent, Tally>();
 
@@ -70,6 +82,7 @@ namespace Armoury
         }
 
         private bool _known, _active;
+        private bool _pl, _retreat;   // 387c: gracz atakuje; gracz zszedl z pola (Mission.RetreatMission)
         private MapEvent _me;
         private Tally _t;
         private readonly List<Vec2> _pts = new List<Vec2>();
@@ -89,10 +102,23 @@ namespace Armoury
             {
                 if (m == null || !m.IsSiegeBattle) return _active = false;
                 var pt = m.PlayerTeam;
-                if (pt == null || pt.Side != BattleSideEnum.Defender) return _active = false;
+                if (pt == null) return _active = false;
+                bool pl = false;
+                if (pt.Side == BattleSideEnum.Attacker)
+                {
+                    // 387c: gracz atakuje (wodz albo sierzant w armii) - tylko walka o mury twierdzy; sala lorda poza regula (ranni leza za wlasna linia)
+                    if (!PlayerSideOn) return _active = false;
+                    var pme = MapEvent.PlayerMapEvent;
+                    if (pme == null || !pme.IsSiegeAssault || pme.IsNavalMapEvent || pme.PlayerSide != BattleSideEnum.Attacker) return _active = false;
+                    var pst = pme.MapEventSettlement;
+                    if (pst == null || !pst.IsFortification || pst.CurrentSiegeState != Settlement.SiegeState.OnTheWalls) return _active = false;
+                    pl = true;
+                }
+                else if (pt.Side != BattleSideEnum.Defender) return _active = false;
                 _me = MapEvent.PlayerMapEvent;
                 if (_me == null || !_me.IsSiegeAssault) return _active = false;
                 if (!Book.TryGetValue(_me, out _t)) { _t = new Tally(); Book[_me] = _t; }
+                if (pl) { _pl = true; _t.Pl = true; }
                 var st = _me.MapEventSettlement;
                 _t.St = st != null ? st.StringId : "-";
                 _t.Missions++;
@@ -171,9 +197,10 @@ namespace Armoury
                 if (co.IsHero)
                 {
                     var h = co.HeroObject;
-                    if (h != null && _t.Heroes.Add(h)) _heroes.Add(h.Name != null ? h.Name.ToString() : h.StringId);
+                    if (h != null && h != Hero.MainHero && _t.Heroes.Add(h)) _heroes.Add(h.Name != null ? h.Name.ToString() : h.StringId);   // 387c: sam gracz nigdy
                     return;
                 }
+                if (_pl) { if (pb == PartyBase.MainParty) _t.PlNear++; else _t.AllyNear++; }
                 Dictionary<CharacterObject, int> d2;
                 if (!_t.Troops.TryGetValue(pb, out d2)) { d2 = new Dictionary<CharacterObject, int>(); _t.Troops[pb] = d2; }
                 int c;
@@ -183,6 +210,12 @@ namespace Armoury
             catch (Exception e) { Stumble("Removed", e); }
         }
 
+        /// <summary>387c: gracz konczy misje odwrotem (TAB / potwierdzenie; takze wyjscie po upadku bohatera) - Mission.RetreatMission. Tylko znacznik.</summary>
+        public override void OnRetreatMission()
+        {
+            _retreat = true;
+        }
+
         protected override void OnEndMission()
         {
             try
@@ -190,15 +223,24 @@ namespace Armoury
                 if (Known(Mission) && _t != null)   // takze misja bez rannych - wynik ostatniej misji (odwrot wroga) musi byc jej wlasny
                 {
                     var r = Mission != null ? Mission.MissionResult : null;
-                    _t.LastRetreated = r != null && r.EnemyRetreated;
+                    _t.LastRetreated = !_pl && r != null && r.EnemyRetreated;
                     _t.LastBroken = _t.Broken;   // zalamanie scisle w tej misji (recenzja 2: misja 1 z 371 bez odwrotu, misja 2 z odwrotem bez 371 - bez przenosin)
                     _t.Broken = false;
+                    if (_pl)
+                    {
+                        // 387c: wynik ostatniej misji gracza-atakujacego. Mury wziete = AttackerVictory / DefenderPullBack (to samo, co plWon w SiegeBreak371)
+                        _t.LastHeld = r == null || (r.BattleState != BattleState.AttackerVictory && r.BattleState != BattleState.DefenderPullBack);
+                        _t.LastLeft = _retreat || r == null || r.PlayerDefeated;
+                        _t.LastWhy = _t.LastBroken ? "zalamanie 371" : _retreat ? "odwrot reczny" : r == null ? "koniec bez wyniku" : r.PlayerDefeated ? "gracz pokonany" : "bez zalamania i bez odwrotu";
+                    }
                     int tot = _inside + _near + _mid + _far + _nopos;
                     string D = Dist.ToString("0", Inv), D2 = (2f * Dist).ToString("0", Inv);
                     Log.Info("Ranni pod murami (373): koniec misji | osada " + _t.St + " | rannych atakujacych " + tot + ": w srodku " + _inside + ", pod murami (<=" + D + " m) " + _near
                              + ", " + D + "-" + D2 + " m " + _mid + ", dalej " + _far + ", bez pozycji " + _nopos + " | punktow murow " + _pts.Count
                              + " | bohaterowie [" + string.Join(", ", _heroes) + "] | zalamanie 371 " + (_t.LastBroken ? "tak" : "nie") + ", wrog odstapil " + (_t.LastRetreated ? "tak" : "nie")
-                             + " | w bitwie (misji " + _t.Missions + "): w srodku " + _t.Inside + ", pod murami " + _t.Near + ", dalej " + (_t.Mid + _t.Far) + " | potkniecia " + _stumbles + ".");
+                             + " | w bitwie (misji " + _t.Missions + "): w srodku " + _t.Inside + ", pod murami " + _t.Near + ", dalej " + (_t.Mid + _t.Far) + " | potkniecia " + _stumbles + "."
+                             + (_pl ? " (387c: gracz atakuje - zolnierze zapisani w bitwie: gracz " + _t.PlNear + ", sojusznicy " + _t.AllyNear + " | mury utrzymane " + (_t.LastHeld ? "tak" : "nie")
+                                 + ", gracz zszedl z pola " + (_t.LastLeft ? "tak" : "nie") + " [" + _t.LastWhy + "], wynik misji " + (r == null ? "-" : r.BattleState.ToString()) + ")" : ""));
                 }
             }
             catch (Exception e) { Stumble("Koniec", e); }
@@ -448,6 +490,182 @@ namespace Armoury
             catch (Exception e) { Stumble("Sim388", e, ref s); _dSt += s; }
         }
 
+        // ------------------------------------------------------------ 387c: ranni GRACZA i jego sojusznikow spod murow do lochu obroncow
+        /// <summary>387c: bitwa szturmu z graczem po stronie atakujacych skonczona BEZ zwyciezcy (PlayerEncounter.Finish -> LeaveBattle -> FinalizeEvent, gdy
+        /// gracz jest wodzem strony), ostatnia misja odparta (zalamanie 371/387 albo - z kluczem Siege Wounded Player On Retreat - odwrot / gracz pokonany).
+        /// Zolnierze zapisani w misji (w srodku / pod murami): MemberRoster -n rannych = loch osady +n rannych, PeopleBook.Transfer(FCaptured); sufit ZAWSZE jak
+        /// 388 / 373c (wolne miejsce lochu po bohaterach, nie wiecej niz obroncow na nogach, ta sama skala partii). Bohaterowie: filtr 373, wodz partii i wodz
+        /// strony zostaja (373b), sam gracz nigdy; bohater z partii gracza / rodu gracza / towarzysz tylko z kluczem Siege Wounded Player Companions.
+        /// Partia bez wodza nie do zera (jak 388). SiegeSpoils380 NIE wolane (okna sa dla obroncy). Nie rzuca.</summary>
+        private static void Player387c(MapEvent me, SiegeWounded373.Tally t)
+        {
+            int s = 0;
+            try
+            {
+                var set = Settings.Current;
+                int rec = t.Inside + t.Near;
+                var st = me.MapEventSettlement;
+                var captor = st != null ? st.Party : null;
+                string no = null;
+                if (set == null || !set.SiegeWoundedTakenPrisoner || !set.SiegeWoundedPlayerSide) no = "klucz wylaczony";
+                else if (!me.IsSiegeAssault || me.AttackerSide == null || me.DefenderSide == null) no = "nie szturm";
+                else if (me.WinningSide != BattleSideEnum.None) no = "zwyciezca " + me.WinningSide + " - rozlicza gra";
+                else if (me.DiplomaticallyFinished) no = "bitwa zakonczona pokojem";
+                else if (!me.IsPlayerMapEvent || me.PlayerSide != BattleSideEnum.Attacker) no = "gracz opuscil bitwe przed jej koncem";
+                else if (captor == null || !st.IsFortification) no = "brak twierdzy";
+                else if (st.CurrentSiegeState != Settlement.SiegeState.OnTheWalls) no = "mury wziete (sala lorda)";
+                else if (!t.LastHeld) no = "ostatnia misja wygrana";
+                else if (!t.LastBroken && !t.LastLeft) no = "ostatnia misja bez zalamania i bez odwrotu";
+                else if (!t.LastBroken && !set.SiegeWoundedPlayerOnRetreat) no = "odwrot bez zalamania, klucz Siege Wounded Player On Retreat NIE";
+                if (no != null)
+                {
+                    if (rec + t.Heroes.Count > 0)
+                        Log.Info("Ranni pod murami (387c): osada " + t.St + " | bez przenosin (" + no + "; ostatnia misja: " + t.LastWhy + ", wynik bitwy " + me.BattleState + ") - "
+                                 + rec + " rannych pod murami (zolnierze gracza " + t.PlNear + ", sojusznikow " + t.AllyNear + ", bohaterowie " + t.Heroes.Count + ") zostaje jak w grze.");
+                    return;
+                }
+                string stName = st.Name != null ? st.Name.ToString() : st.StringId;
+                var parties = new HashSet<PartyBase>();
+                foreach (var mep in me.AttackerSide.Parties) if (mep != null && mep.Party != null) parties.Add(mep.Party);
+                var prison = captor.PrisonRoster;
+                int l0 = prison.TotalManCount;
+                // 1. bohaterowie - przed zolnierzami, bez limitu (jak 373c)
+                var names = new List<string>();
+                var own = new List<string>();
+                int hMissed = 0, hLeads = 0, hKept = 0;
+                bool comp = set.SiegeWoundedPlayerCompanions;
+                Hero leader = null;
+                try { var lp = me.AttackerSide.LeaderParty; leader = lp != null ? lp.LeaderHero : null; } catch { leader = null; }
+                foreach (var h in t.Heroes)
+                {
+                    try
+                    {
+                        var hp = h != null ? h.PartyBelongedTo : null;
+                        if (h == null || h == Hero.MainHero || !h.IsAlive || !h.IsWounded || h.IsPrisoner || hp == null || !parties.Contains(hp.Party)
+                            || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner())
+                        { hMissed++; continue; }
+                        if (h == leader || hp.LeaderHero == h) { hLeads++; continue; }   // 373b: wodz zostaje z ludzmi
+                        bool mineH = hp == MobileParty.MainParty || h.Clan == Clan.PlayerClan || h.IsPlayerCompanion;
+                        if (mineH && !comp) { hKept++; continue; }                       // klucz NIE: swoich bohaterow gracz zawsze wynosi
+                        TakePrisonerAction.Apply(captor, h);
+                        string nm = h.Name != null ? h.Name.ToString() : h.StringId;
+                        if (mineH) own.Add(nm); else names.Add(nm);
+                        try { InformationManager.DisplayMessage(new InformationMessage(nm + " lies wounded beneath the walls of " + stName + " and is taken prisoner.", Color.FromUint(0xFFE06050u))); } catch { }
+                    }
+                    catch (Exception e) { Stumble("387c.Hero", e, ref s); }
+                }
+                // 2. kandydaci: zapisani w misji, ktorzy wciaz sa rannymi swojej partii
+                var cands = new Dictionary<PartyBase, List<Cand>>();
+                int wantSum = 0, saved = 0, missing = 0, notTaken = 0;
+                var model = Campaign.Current.Models.BattleRewardModel;
+                foreach (var kv in t.Troops)
+                {
+                    var pb = kv.Key;
+                    int recP = 0;
+                    foreach (var x in kv.Value) recP += x.Value;
+                    saved += recP;
+                    try
+                    {
+                        if (pb == null || !parties.Contains(pb) || !pb.IsActive) { missing += recP; continue; }
+                        var mr = pb.MemberRoster;
+                        foreach (var x in kv.Value)
+                        {
+                            try
+                            {
+                                var troop = x.Key;
+                                if (!model.CanTroopBeTakenPrisoner(troop)) { notTaken += x.Value; continue; }
+                                int idx = mr.FindIndexOfTroop(troop);
+                                int w = idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0;
+                                int n = Math.Min(x.Value, w);
+                                missing += x.Value - n;
+                                if (n <= 0) continue;
+                                List<Cand> l;
+                                if (!cands.TryGetValue(pb, out l)) { l = new List<Cand>(); cands[pb] = l; }
+                                l.Add(new Cand { Troop = troop, Want = n });
+                                wantSum += n;
+                            }
+                            catch (Exception e) { Stumble("387c.Cand", e, ref s); }
+                        }
+                    }
+                    catch (Exception e) { Stumble("387c.Party", e, ref s); }
+                }
+                // 3. sufit jak 388 / 373c: wolne miejsce lochu (po bohaterach) i nie wiecej niz obroncow na nogach. Potkniecie = NIKT nie idzie (ostroznie wobec gracza)
+                int l1 = prison.TotalManCount, limit = 0, free = 0, def = 0, cap0 = 0;
+                try
+                {
+                    limit = captor.PrisonerSizeLimit;
+                    free = Math.Max(0, limit - l1);
+                    def = Math.Max(0, me.DefenderSide.TroopCount);
+                    cap0 = Math.Min(free, def);
+                }
+                catch (Exception e) { Stumble("387c.Limit", e, ref s); cap0 = 0; }
+                int cap = cap0;
+                double k = wantSum > cap ? cap / (double)Math.Max(1, wantSum) : 1.0;
+                int moved = 0, mine = 0, ally = 0, emptied = 0, kept = 0;
+                double book = 0.0;
+                var types = new Dictionary<string, int>();
+                foreach (var kv in cands)
+                {
+                    if (cap <= 0) break;
+                    var pb = kv.Key;
+                    try
+                    {
+                        var mr = pb.MemberRoster;
+                        int from0 = PeopleBook.Men(mr), to0 = PeopleBook.Men(prison), here = 0;
+                        bool isMain = pb == PartyBase.MainParty;
+                        bool noLead = pb.LeaderHero == null;
+                        foreach (var c in kv.Value)
+                        {
+                            try
+                            {
+                                if (cap <= 0) break;
+                                var troop = c.Troop;
+                                int n = k < 1.0 ? Math.Min(c.Want, MBRandom.RoundRandomized((float)(c.Want * k))) : c.Want;
+                                int idx = mr.FindIndexOfTroop(troop);
+                                n = Math.Min(Math.Min(n, cap), idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0);
+                                if (noLead && mr.TotalManCount - n <= 0) { n = mr.TotalManCount - 1; kept++; }   // partia bez wodza nie zostaje pusta (gra by ja skasowala)
+                                if (n <= 0) continue;
+                                mr.AddToCounts(troop, -n, false, -n);
+                                prison.AddToCounts(troop, n, false, n);
+                                // PUNKT WPIECIA (odlozone "twoi zwykli zolnierze w niewoli"): dla isMain tu wiadomo, ilu ludzi gracza jakiego typu poszlo do ktorej osady
+                                moved += n; here += n; cap -= n;
+                                if (isMain) mine += n; else ally += n;
+                                string id = troop.StringId;
+                                int c0; types.TryGetValue(id, out c0); types[id] = c0 + n;
+                            }
+                            catch (Exception e) { Stumble("387c.Troop", e, ref s); }
+                        }
+                        if (here > 0)
+                        {
+                            try { book += PeopleBook.Transfer(mr, from0, prison, to0, PeopleBook.FCaptured); } catch (Exception e) { Stumble("387c.Book", e, ref s); }
+                            if (pb.NumberOfAllMembers == 0) emptied++;
+                        }
+                    }
+                    catch (Exception e) { Stumble("387c.Move", e, ref s); }
+                }
+                int cut = wantSum > cap0 ? Math.Max(0, wantSum - moved) : 0;
+                bool byPrison = free <= def;
+                Color red = Color.FromUint(0xFFE06050u);
+                if (mine > 0)
+                    try { InformationManager.DisplayMessage(new InformationMessage(mine == 1 ? "1 of your wounded left beneath the walls of " + stName + " is taken prisoner." : mine + " of your wounded left beneath the walls of " + stName + " are taken prisoner.", red)); } catch { }
+                if (ally > 0)
+                    try { InformationManager.DisplayMessage(new InformationMessage(ally == 1 ? "1 wounded of your allies left beneath the walls of " + stName + " is taken prisoner." : ally + " wounded of your allies left beneath the walls of " + stName + " are taken prisoner.", red)); } catch { }
+                var tb = new StringBuilder();
+                foreach (var kv in types) tb.Append(tb.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
+                Log.Info("Ranni pod murami (387c): dzien " + (int)CampaignTime.Now.ToDays + " | osada " + t.St + " | gracz atakowal, szturm odparty: " + t.LastWhy
+                         + " | zapisanych zolnierzy " + saved + " (gracz " + t.PlNear + ", sojusznicy " + t.AllyNear + "), nie bylo juz wsrod rannych partii " + missing
+                         + (notTaken > 0 ? ", bez niewoli (typ) " + notTaken : "") + " -> chce " + wantSum
+                         + " | loch po bohaterach " + l1 + "/" + limit + ", wolne " + free + ", obroncow " + def + " -> sufit " + cap0 + " (skala " + k.ToString("0.00", CultureInfo.InvariantCulture) + ")"
+                         + " | do lochu " + moved + ": gracz " + mine + ", sojusznicy " + ally + " (typy: " + (tb.Length > 0 ? tb.ToString() : "-") + ")"
+                         + (cut > 0 ? ", obciete " + cut + (byPrison ? " (loch)" : " (zaloga)") + " - wracaja z partia" : "")
+                         + " | bohaterowie: do lochu " + names.Count + " [" + string.Join(", ", names) + "], rodu / towarzysze gracza " + own.Count + " [" + string.Join(", ", own) + "]"
+                         + ", wyniesieni (klucz towarzyszy " + (comp ? "TAK" : "NIE") + ") " + hKept + ", wodzowie pominieci (373b) " + hLeads + ", poza regula " + hMissed
+                         + " | loch " + l0 + " -> " + prison.TotalManCount + " | ksiega ludzi " + book.ToString("0", CultureInfo.InvariantCulture)
+                         + " | partie oproznione " + emptied + (kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + kept : "") + " | potkniecia " + s + ".");
+            }
+            catch (Exception e) { Stumble("Player387c", e, ref s); }
+        }
+
         private static void OnMapEventEnded(MapEvent me)
         {
             if (me == null) return;
@@ -456,6 +674,7 @@ namespace Armoury
             SiegeWounded373.Tally t;
             if (!SiegeWounded373.Book.TryGetValue(me, out t)) return;
             SiegeWounded373.Book.Remove(me);
+            if (t.Pl) { Player387c(me, t); return; }   // 387c: gracz atakowal - osobne rozliczenie (bez okien 380); galaz obroncy ponizej bez zmian
             int s = 0;
             try
             {

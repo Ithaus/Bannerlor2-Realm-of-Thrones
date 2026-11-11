@@ -11728,6 +11728,18 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeWoundedDungeonLimit { get; set; } = true;
 
+        [SettingPropertyBool("Siege Wounded Player Side", HintText = "When an assault on a fortress in which you fight on the attackers' side is beaten back (it breaks, or - with Siege Wounded Player On Retreat - you call the retreat or fall), your own and your allies' wounded who lie inside the fortress or close beneath its walls cannot be carried away: they are taken prisoner into the fortress dungeon - never more than the room left in the dungeon and never more men than the defenders still standing. You yourself are never taken this way. Only while the fight is for the walls and only when the battle ends without a winner. Needs Siege Wounded Taken Prisoner. Off = all your wounded come back with you, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public bool SiegeWoundedPlayerSide { get; set; } = true;
+
+        [SettingPropertyBool("Siege Wounded Player Companions", HintText = "With Siege Wounded Player Side: companions and members of your clan who lie wounded beneath the walls (and do not lead a party) are taken prisoner too, without any limit - you get them back as any captive: ransom, escape or talks. Off = your own heroes are always carried back; only ordinary soldiers and other lords' heroes are left behind", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public bool SiegeWoundedPlayerCompanions { get; set; } = false;
+
+        [SettingPropertyBool("Siege Wounded Player On Retreat", HintText = "With Siege Wounded Player Side: the wounded beneath the walls are also lost when you end the fight yourself - you call the retreat, or you fall and leave the field - not only when the assault breaks. Off = only a broken assault (Siege Player Assault Breaks) leaves them behind; leaving the field in time saves them all", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public bool SiegeWoundedPlayerOnRetreat { get; set; } = true;
+
         [SettingPropertyBool("Siege Wounded Simulated", HintText = "When an assault on a fortress fought without you (lords against lords, your own fortresses too while you are away) is beaten back from the walls, a share of the attackers wounded in that assault cannot be carried away either: they are taken prisoner into the fortress dungeon - never more than the room left in the dungeon and never more men than the defenders still standing; lords among them only if they do not lead a party. Needs Siege Wounded Taken Prisoner. Off = as in the game: all their wounded go back to camp", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeWoundedSimulated { get; set; } = true;
@@ -14927,6 +14939,9 @@ namespace Armoury
             s.SiegeWoundedTakenPrisoner = SiegeWoundedTakenPrisoner;
             s.SiegeWoundedWallDistance = SiegeWoundedWallDistance;
             s.SiegeWoundedDungeonLimit = SiegeWoundedDungeonLimit;
+            s.SiegeWoundedPlayerSide = SiegeWoundedPlayerSide;
+            s.SiegeWoundedPlayerCompanions = SiegeWoundedPlayerCompanions;
+            s.SiegeWoundedPlayerOnRetreat = SiegeWoundedPlayerOnRetreat;
             s.SiegeWoundedSimulated = SiegeWoundedSimulated;
             s.SiegeWoundedSimulatedShare = SiegeWoundedSimulatedShare;
             s.SiegeHeldSpoilsWindow = SiegeHeldSpoilsWindow;
