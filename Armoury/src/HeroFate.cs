@@ -350,7 +350,7 @@ namespace Armoury
                 Add(new Maim { Id = h.StringId, Type = pick, Day = (int)CampaignTime.Now.ToDays, Skills = skills.ToString(), Attr = attr });
                 type = pick;
                 detail = Label(pick) + " (" + (log.Length > 0 ? log.ToString() : "bez zmian liczb - juz na dnie") + ")"
-                         + (part >= 0 ? " [422: cios w " + HeroBlow422.PartName(part) + (w == Weights ? ", stara tabela" : "") + "]" : "");
+                         + (part >= 0 ? " [422: cios: " + HeroBlow422.PartName(part) + (w == Weights ? ", stara tabela" : "") + "]" : "");
                 return true;
             }
             catch (Exception e) { Stumble("TryMaim", e); detail = "blad"; return false; }

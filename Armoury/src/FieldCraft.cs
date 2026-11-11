@@ -1744,6 +1744,9 @@ namespace Armoury
                 }
                 catch (Exception e) { Bleed313.Stumble("DeathMissile", e); }
             }
+            // 422-p: wykrwawienie omija HandleBlow / OnScoreHit - znacznik bohatera z ostatniego prawdziwego ciosu ("nie powalil", glebokosc 0) dostaje
+            // glebokosc neutralna, zeby wykrwawiony nie mial lzejszej rany niz powalony ciosem (jeden odczyt slownika, tylko bohater)
+            HeroBlow422.BledOut(agent);
             try { agent.Die(b, Agent.KillInfo.Invalid); }
             catch (Exception e)
             {

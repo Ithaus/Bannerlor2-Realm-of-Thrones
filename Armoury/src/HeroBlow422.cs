@@ -21,8 +21,11 @@ namespace Armoury
     /// najpierw OnEndMission zachowan, potem agent.OnRemove) - dlatego znaczniki NIE sa czyszczone w OnEndMission, tylko w OnMissionStateFinalized
     /// i na starcie nastepnej misji; HeroWounds bierze znacznik tylko, gdy Mission.Current != null (symulacja = stary rzut).
     ///
-    /// Logic.OnScoreHit zapamietuje OSTATNI cios, ktory zabral bohaterowi HP: typ obrazen, grupe czesci ciala, glebokosc (nadwyzka obrazen ponad
-    /// reszte HP / polowa limitu HP - jak 421; 0 dla ciosu, ktory nie powalil) i czy powalil. HeroWounds.OnHeroWounded mnozy nim szanse:
+    /// Logic.OnScoreHit zapamietuje OSTATNI cios, ktory zabral bohaterowi HP: typ obrazen, grupe czesci ciala, glebokosc (BlowFate421.Depth - 422-p:
+    /// wieksza z dwoch miar, nadwyzka obrazen ponad reszte HP / polowa limitu HP oraz cale obrazenia / limit HP; 0 dla ciosu, ktory nie powalil)
+    /// i czy powalil. 422-p: sztuczny cios od siebie bez energii (Artem KnockBackAnimation) nie nadpisuje znacznika; bohater, ktory sie wykrwawil
+    /// (FieldCraft 313: Agent.Die bez OnScoreHit), dostaje przez BledOut glebokosc neutralna 0.40 (mnoznik glebokosci 1.00) zamiast "nie powalil".
+    /// HeroWounds.OnHeroWounded mnozy nim szanse:
     ///
     ///   GRAVE   x TYP (ciecie / klucie 1.05, obuch 0.70) x CZESC (glowa / szyja 1.50, tulow i cios bez czesci ciala 1.10, barki 0.70,
     ///             reka 0.30, noga 0.30) x GLEBOKOSC (0.80 + 0.50 x glebokosc: 0.80 ledwie powalil ... 1.30 gleboko)
@@ -30,7 +33,8 @@ namespace Armoury
     ///             x GLEBOKOSC (0.90 + 0.25 x glebokosc)
     ///
     /// SREDNIA zostaje (rachunek w CHANGELOG 422; ZALOZENIE rozkladu ciosow powalajacych bohatera: glowa / szyja 35%, tulow 25%, barki 15%, rece 10%,
-    /// nogi 15%; obuch 15%; srednia glebokosc 0.4): Grave x0.98 x0.9975 x1.00 = x0.98, Serious x1.015 x1.001 x1.00 = x1.02. Faktyczna srednia
+    /// nogi 15%; obuch 15%; srednia glebokosc 0.4): Grave x0.98 x0.9975 x1.00 = x0.98, Serious x1.015 x1.001 x1.00 = x1.02. Po 422-p srednia glebokosc
+    /// powalajacego ciosu D obrazen = 1.25 x D / limit HP (0.28 dla 22 HP, 0.56 dla 45 HP przy limicie 100) - Grave x0.92-1.06. Faktyczna srednia
     /// "szansa gry -> po regule" jest w linii doby "Rany (HW)" (czlon 422).
     /// Okaleczenie (HeroFate.TryMaim, przesilenie): czesc ciala z wiersza ksiegi zaweza typ - glowa / szyja: blizna 60 / oko 40; reka: dlon;
     /// barki: dlon 60 / blizna 40; noga: kulawizna; tulow / brak: stara tabela. Liczba okaleczen bez zmian (Hero Wounds Maim Percent).
@@ -43,6 +47,7 @@ namespace Armoury
     {
         internal const int P = 5;   // glowa / szyja, tulow, barki, rece, nogi (jak BlowFate421)
         internal const float GraveCapPercent = 30f;   // sufit szansy Grave po regule (stary bohater + gleboki cios w glowe)
+        internal const float NeutralDepth = 0.40f;    // 422-p: glebokosc, przy ktorej mnozniki glebokosci Grave i Serious = 1.00 (wykrwawienie)
 
         private struct Mark
         {
@@ -54,7 +59,8 @@ namespace Armoury
         private static readonly Dictionary<Hero, Mark> _marks = new Dictionary<Hero, Mark>(64);
 
         // liczniki misji
-        private static int _hits, _felled, _taken;
+        private static int _hits, _felled, _taken, _synth, _bled;   // 422-p: sztuczne ciosy od siebie (pominiete), wykrwawieni bohaterowie
+        private static string _kind = "?";                          // rodzaj misji zapamietany w OnEndMission (linia idzie pozniej)
         private static readonly int[] _felledPart = new int[P + 1];   // [P] = bez czesci ciala
         private static int _felledBlunt;
 
@@ -62,7 +68,7 @@ namespace Armoury
 
         private static void ResetCounters()
         {
-            _hits = 0; _felled = 0; _taken = 0; _felledBlunt = 0;
+            _hits = 0; _felled = 0; _taken = 0; _felledBlunt = 0; _synth = 0; _bled = 0;
             Array.Clear(_felledPart, 0, _felledPart.Length);
         }
 
@@ -130,17 +136,32 @@ namespace Armoury
             return true;
         }
 
-        private static void Flush(Mission m)
+        /// <summary>422-p: bohater wykrwawil sie (FieldCraft, tuz przed Agent.Die). Znacznik z ostatniego prawdziwego ciosu zostaje (typ, czesc ciala),
+        /// ale liczy sie jak cios powalajacy o glebokosci neutralnej. Brak znacznika = nic (stary rzut). Glowny watek misji.</summary>
+        internal static void BledOut(Agent a)
         {
-            if (_hits == 0) { ResetCounters(); return; }
-            string kind = "?";
-            try { kind = MissionTeams.Kind(m); } catch { }
+            if (a == null || _marks.Count == 0 || !a.IsHero) return;
+            var co = a.Character as CharacterObject;
+            var h = co != null ? co.HeroObject : null;
+            Mark m;
+            if (h == null || !_marks.TryGetValue(h, out m) || m.Felled) return;
+            m.Felled = true; m.Depth = NeutralDepth;
+            _marks[h] = m;
+            _bled++;
+        }
+
+        /// <summary>Linia konca misji - 422-p: pisana w OnMissionStateFinalized, PO tym jak silnik zdjal stojacych agentow (bohater z HP pod progiem
+        /// rany bierze znacznik dopiero w EndMissionInternal, po OnEndMission), wiec "wziete" jest pelne.</summary>
+        private static void Flush()
+        {
+            if (_hits == 0 && _synth == 0) { ResetCounters(); return; }
+            string kind = _kind;
             var s = Settings.Current;
             Log.Info("Rany wg ciosu (422): koniec misji (" + kind + ") | klucz Hero Wounds By Blow " + (s != null && s.HeroWoundsByBlowEnabled ? "TAK" : "NIE")
                      + " | ciosy w bohaterow (zabraly HP) " + _hits + ", powalajace " + _felled + ": glowa i szyja " + _felledPart[0] + ", tulow " + _felledPart[1]
                      + ", barki " + _felledPart[2] + ", rece " + _felledPart[3] + ", nogi " + _felledPart[4] + ", bez czesci ciala " + _felledPart[P]
-                     + "; obuchem " + _felledBlunt + " | znaczniki wziete przez ksiege ran do tej chwili " + _taken + ", czekaja " + _marks.Count
-                     + " (bohater z HP pod progiem rany na koniec misji bierze swoj po tej linii; reszta przepada).");
+                     + "; obuchem " + _felledBlunt + " | wykrwawieni (znacznik z glebokoscia neutralna) " + _bled + ", sztuczne ciosy od siebie (pominiete) " + _synth
+                     + " | znaczniki wziete przez ksiege ran " + _taken + ", przepadlo " + _marks.Count + " (bohater bez rany albo poza regula ksiegi).");
             ResetCounters();
         }
 
@@ -159,6 +180,9 @@ namespace Armoury
                 in Blow blow, in AttackCollisionData collisionData, float damagedHp, float hitDistance, float shotDifficulty)
             {
                 if (affectedAgent == null || !(damagedHp > 0f) || !affectedAgent.IsHero) return;
+                // 422-p: sztuczny cios od siebie bez energii (Artem KnockBackAnimation po prawdziwym ciosie, gdy HP < 33: new Blow(agent.Index), InflictedDamage 1,
+                // BaseMagnitude 0, czesc ciala = Head z default(Blow)) nie nadpisuje znacznika prawdziwego ciosu - ten sam warunek co FieldCraft 313d
+                if (blow.OwnerId == affectedAgent.Index && blow.BaseMagnitude <= 0f) { _synth++; return; }
                 var co = affectedAgent.Character as CharacterObject;
                 var h = co != null ? co.HeroObject : null;
                 if (h == null) return;
@@ -167,10 +191,8 @@ namespace Armoury
                 Mark m;
                 m.Type = blow.DamageType == DamageTypes.Blunt ? 2 : (blow.DamageType == DamageTypes.Pierce ? 1 : 0);
                 m.Part = PartIx(part);
-                m.Felled = affectedAgent.Health < 1f;                                   // Agent.Health to pole (mb_full.cs:11862)
-                float limit = affectedAgent.HealthLimit;
-                float over = blow.InflictedDamage - damagedHp;
-                m.Depth = m.Felled && limit > 1f && over > 0f ? Clamp01(over / (limit * 0.5f)) : 0f;
+                m.Felled = affectedAgent.Health < 1f;                                   // Agent.Health: prosty getter pola _health (mb_full.cs:11862-11867)
+                m.Depth = m.Felled ? BlowFate421.Depth(blow.InflictedDamage, damagedHp, affectedAgent.HealthLimit) : 0f;   // 422-p: wspolna miara z 421
                 _marks[h] = m;
                 _hits++;
                 if (m.Felled)
@@ -183,13 +205,17 @@ namespace Armoury
 
             protected override void OnEndMission()
             {
-                // UWAGA: bez Clear() - silnik zdejmuje stojacych agentow (i ustawia HP bohaterow) PO tym wywolaniu (Mission.EndMissionInternal)
-                try { Flush(Mission); } catch (Exception e) { Log.Error("HeroBlow422.Flush", e); }
+                // UWAGA: bez Clear() i bez linii - silnik zdejmuje stojacych agentow (i ustawia HP bohaterow) PO tym wywolaniu (Mission.EndMissionInternal);
+                // tu tylko rodzaj misji, poki druzyny istnieja
+                _kind = "?";
+                try { _kind = MissionTeams.Kind(Mission); } catch { }
                 base.OnEndMission();
             }
 
             public override void OnMissionStateFinalized()
             {
+                // Mission.Current zerowane dopiero po tej petli zachowan (mb_full.cs:54208-54225) - wszystkie rany tej misji juz wziely znaczniki
+                try { Flush(); } catch (Exception e) { Log.Error("HeroBlow422.Flush", e); }
                 Clear();
                 base.OnMissionStateFinalized();
             }
