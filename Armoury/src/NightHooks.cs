@@ -71,6 +71,8 @@ namespace Armoury
             Part(sb, "premia wypoczetego (416)", RoutHold.SiteBanner, () => RestedArmor416.ApplyInCampaign(_h));   // 416: prefiks przed RBM na ComputeBlowDamage - pancerz / mnoznik wypoczetego
             sb.Append(" | ");
             Part(sb, "mloty i buzdygany 2h (417)", RoutHold.SiteBanner, () => BluntHammers417.ApplyInCampaign(_h));   // 417: prefiks na okno umiejetnosci RBM + znacznik rodzimego obuchu przed RBM na ComputeBlowDamage
+            sb.Append(" | ");
+            Part(sb, "smierc czy rana (421)", RoutHold.SiteBanner, () => BlowFate421.ApplyInCampaign(_h));   // 421: postfiks na szanse smierci powalonego w modelu misji (Sandbox)
             sb.Append('.');
             Log.Info(sb.ToString());
         }

@@ -748,6 +748,10 @@ namespace Armoury
                 // 420: lucznicy wedlug grotu w kolczanie, trafienia strzal w ludzi wedlug grotu i z lukow lore - linia "Luki (420): koniec misji"
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new RotBows420.Logic());
+                // 421: smierc czy rana zolnierza zalezna od ciosu - zapis ciosu, po ktorym czlowiek ma HP 0 (dla postfiksu na model misji), rozklad
+                // zabitych / rannych wedlug typu ciosu i czesci ciala, linia "Smierc czy rana (421): koniec misji"
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new BlowFate421.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)

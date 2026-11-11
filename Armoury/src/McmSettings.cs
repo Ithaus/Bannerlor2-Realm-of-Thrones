@@ -584,6 +584,26 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool RotLoreBowsFullEnergyEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Blow Decides Death Or Wound", HintText = "When a soldier is struck down in a battle you fight on the field, the blow that felled him decides whether he dies or is only wounded. Until now it was one roll on his level and his party's surgeon alone - a recruit without a surgeon died nine times in ten, and a club killed as surely as a sword. Now that chance is multiplied by the kind of blow (Blow Death Blunt Factor for a blunt blow), by the part of the body (head and neck in full, Blow Death Torso Factor for chest and belly, Blow Death Limb Factor for an arm or a leg, the shoulders halfway between) and by how deep the blow went beyond the health he had left (Blow Death Shallow Factor for a blow that barely felled him). Level, surgeon and perks count as before. More of the fallen are wounded rather than dead: more men to heal, and more prisoners for the victor. Heroes and battles resolved without fighting are not changed. Off = as before this change. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 421).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool BlowDecidesDeathEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Blow Death Blunt Factor", 0.00f, 1.00f, "0.00", HintText = "With Blow Decides Death Or Wound: the chance of death is multiplied by this for a blunt blow - mace, hammer, club, fist, sling stone, a horse's charge, a fall. 0.35 = a blunt blow kills about a third as often as a blade or a point. 1.00 = blunt kills like a blade (as before this change), 0 = blunt never kills (as in the game without Realistic Battle Mod).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float BlowDeathBluntFactor { get; set; } = 0.35f;
+
+        [SettingPropertyFloatingInteger("Blow Death Torso Factor", 0.00f, 1.00f, "0.00", HintText = "With Blow Decides Death Or Wound: the chance of death is multiplied by this when the felling blow landed in the chest or belly (head and neck always count in full). The shoulders count halfway between this and Blow Death Limb Factor. 1.00 = like the head.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float BlowDeathTorsoFactor { get; set; } = 0.60f;
+
+        [SettingPropertyFloatingInteger("Blow Death Limb Factor", 0.00f, 1.00f, "0.00", HintText = "With Blow Decides Death Or Wound: the chance of death is multiplied by this when the felling blow landed in an arm or a leg. 0.15 = a recruit without a surgeon dies of a deep leg wound about one time in eight instead of nine in ten. 0 = a blow in a limb never kills. 1.00 = like the head.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float BlowDeathLimbFactor { get; set; } = 0.15f;
+
+        [SettingPropertyFloatingInteger("Blow Death Shallow Factor", 0.00f, 1.00f, "0.00", HintText = "With Blow Decides Death Or Wound: the chance of death is multiplied by this when the blow only just took the man's last health; it rises evenly to 1.00 for a blow that went beyond his remaining health by half of his full health or more. 1.00 = the depth of the blow does not matter.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float BlowDeathShallowFactor { get; set; } = 0.50f;
+
         [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ArmorPoolMinPoints { get; set; } = 40;
@@ -12545,6 +12565,11 @@ namespace Armoury
             s.RotBardingArmorCap = RotBardingArmorCap;
             s.RotUnlistedBowBodkinsEnabled = RotUnlistedBowBodkinsEnabled;
             s.RotLoreBowsFullEnergyEnabled = RotLoreBowsFullEnergyEnabled;
+            s.BlowDecidesDeathEnabled = BlowDecidesDeathEnabled;
+            s.BlowDeathBluntFactor = BlowDeathBluntFactor;
+            s.BlowDeathTorsoFactor = BlowDeathTorsoFactor;
+            s.BlowDeathLimbFactor = BlowDeathLimbFactor;
+            s.BlowDeathShallowFactor = BlowDeathShallowFactor;
             s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;
