@@ -226,6 +226,7 @@ namespace Armoury
             int stale = SiegeWounded373.Book.Count;
             SiegeWounded373.Book.Clear();
             SiegeSpoils380.Reset();
+            Reset388();
             if (stale > 0) Log.Info("Ranni pod murami (373): ksiega z poprzedniej gry wyczyszczona (" + stale + " bitew bez rozliczenia).");
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
             // 373b: armie z partia bez wodza (zapis sprzed poprawki) - naprawa + bezpieczniki Army.HourlyTick / CalculatePartyInfluenceCost
@@ -233,6 +234,7 @@ namespace Armoury
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, delegate (CampaignGameStarter g) { ArmyRepair373b.SessionStart(); });
             CampaignEvents.TickEvent.AddNonSerializedListener(this, ArmyRepair373b.OnTick);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, ArmyRepair373b.Daily);
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, Daily388);   // 388: linia doby
         }
 
         public override void SyncData(IDataStore dataStore) { }
@@ -245,9 +247,217 @@ namespace Armoury
             Log.Error("SiegeWounded373Behavior." + where, e);
         }
 
+        // ------------------------------------------------------------ 388: ranni pod murami po szturmie odpartym BEZ misji
+        // (Jeff 10.11 "rob caly punkt 2" - 2d: "Ranni pod murami (373) ida do lochu tylko po bitwie, ktora sam grasz; przy rozstrzygnieciu bez misji nie").
+        // Odparcie bez misji = OB2 (SiegeWalls.UpdatePost -> Repel(finish) -> FinishBattleAndKeepSiegeEvent): bitwa bez zwyciezcy, FinalizeEventAux bez
+        // CaptureDefeatedPartyMembers - ranni atakujacy zostaja w swoich partiach. Ranni Z TEGO szturmu = MapEventParty.WoundedInBattle (symulacja:
+        // MapEventSide.ApplySimulationDamageToSelectedTroop -> MapEventParty.OnTroopWounded), migawki nie trzeba. Symulacja nie zna pozycji, wiec udzial
+        // (SiegeWoundedSimulatedShare, 0.5: misja 09.11 w Goldentooth dala 69% rannych do lochu, ale tam byl pogrom pod murami, a OB2 to uporzadkowany odwrot).
+        // Sufit: wolne miejsce w lochu (PartyBase.PrisonerSizeLimit - gra sama go nie pilnuje) i nie wiecej niz obroncow na nogach. Ksiega ludzi zamknieta:
+        // MemberRoster -n (ranni) = loch +n (ranni), PeopleBook.Transfer(FCaptured). Bohater: jak 373 / 373b - wodz partii i wodz strony zostaja.
+        // Okien 380 nie ma (gracza w bitwie nie ma). Partia bez wodza nie jest oprozniana do zera (zostaje 1 czlowiek). Stan tylko w pamieci.
+        private static readonly HashSet<MapEvent> _sim = new HashSet<MapEvent>();
+        private static int _dRep, _dWnd, _dMoved, _dCutPrison, _dCutDef, _dHero, _dSt, _dSkip, _dStale;
+
+        private sealed class Cand { public CharacterObject Troop; public int Want; }
+
+        /// <summary>Z SiegeWalls.OnMapEventEnded: szturm AI odparty bez misji. Wpis zyje do naszego nasluchu w tym samym wywolaniu MapEventEnded.</summary>
+        internal static void NoteSimRepel(MapEvent me)
+        {
+            try { if (me != null) _sim.Add(me); } catch { }
+        }
+
+        private static void Reset388()
+        {
+            _sim.Clear();
+            _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = _dStale = 0;
+        }
+
+        private static void Daily388()
+        {
+            try
+            {
+                if (_sim.Count > 0) { _dStale += _sim.Count; _sim.Clear(); }   // wpis bez rozliczenia (nasluch nie dobiegl) - nie trzymamy bitew w pamieci
+                var set = Settings.Current;
+                bool on = set != null && set.SiegeWoundedTakenPrisoner && set.SiegeWoundedSimulated && set.SiegeWoundedSimulatedShare > 0f;
+                Log.Info("Ranni pod murami (388) doba: dzien " + (int)CampaignTime.Now.ToDays + " | czynne " + (on ? "tak" : "nie") + ", udzial "
+                         + (set != null ? set.SiegeWoundedSimulatedShare.ToString("0.00", CultureInfo.InvariantCulture) : "-") + " | odparc bez misji " + _dRep + ", rannych atakujacych " + _dWnd
+                         + ", do lochu " + _dMoved + ", obciete lochem " + _dCutPrison + ", obciete zaloga " + _dCutDef + ", bohaterowie " + _dHero
+                         + " | pominiete (misja 373 / nie szturm / zwyciezca) " + _dSkip + ", wpisy bez rozliczenia " + _dStale + " | potkniecia " + _dSt + ".");
+                _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = _dStale = 0;
+            }
+            catch (Exception e) { int s = 0; Stumble("Daily388", e, ref s); }
+        }
+
+        private static void Sim388(MapEvent me)
+        {
+            int s = 0;
+            try
+            {
+                var set = Settings.Current;
+                if (set == null || !set.SiegeWoundedTakenPrisoner || !set.SiegeWoundedSimulated) return;
+                float share = Math.Max(0f, Math.Min(1f, set.SiegeWoundedSimulatedShare));
+                if (share <= 0f) return;
+                if (!me.IsSiegeAssault || me.WinningSide != BattleSideEnum.None || me.IsPlayerMapEvent || me.AttackerSide == null || me.DefenderSide == null) { _dSkip++; return; }
+                var st = me.MapEventSettlement;
+                var captor = st != null ? st.Party : null;
+                if (captor == null || !st.IsFortification) { _dSkip++; return; }
+                var prison = captor.PrisonRoster;
+                int l0 = prison.TotalManCount, limit = captor.PrisonerSizeLimit, free = Math.Max(0, limit - l0);
+                int def = Math.Max(0, me.DefenderSide.TroopCount);
+                int cap0 = Math.Min(free, def), cap = cap0;
+                Hero leader = null;
+                try { var lp = me.AttackerSide.LeaderParty; leader = lp != null ? lp.LeaderHero : null; } catch { leader = null; }
+                // 1. kandydaci: ranni z tego szturmu, ktorzy wciaz sa rannymi swojej partii
+                var cands = new Dictionary<PartyBase, List<Cand>>();
+                var heroes = new List<Hero>();
+                int wounded = 0, parties = 0, wantSum = 0, notTaken = 0, gone = 0, hSeen = 0, hLeads = 0, hMissed = 0, hStay = 0;
+                var model = Campaign.Current.Models.BattleRewardModel;
+                foreach (var mep in me.AttackerSide.Parties)
+                {
+                    try
+                    {
+                        var pb = mep != null ? mep.Party : null;
+                        var wb = mep != null ? mep.WoundedInBattle : null;
+                        if (pb == null || !pb.IsActive || wb == null || wb.Count == 0) continue;
+                        parties++;
+                        var mr = pb.MemberRoster;
+                        for (int i = 0; i < wb.Count; i++)
+                        {
+                            try
+                            {
+                                var el = wb.GetElementCopyAtIndex(i);
+                                var troop = el.Character;
+                                int cnt = el.Number;
+                                if (troop == null || cnt <= 0) continue;
+                                if (troop.IsHero)
+                                {
+                                    hSeen++;
+                                    var h = troop.HeroObject;
+                                    var hp = h != null ? h.PartyBelongedTo : null;
+                                    if (h == null || h == Hero.MainHero || !h.IsAlive || !h.IsWounded || h.IsPrisoner || hp == null || hp.Party != pb
+                                        || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner())
+                                    { hMissed++; continue; }
+                                    if (h == leader || hp.LeaderHero == h) { hLeads++; continue; }   // 373b: wodz zostaje z ludzmi
+                                    if (MBRandom.RandomFloat < share) heroes.Add(h); else hStay++;
+                                    continue;
+                                }
+                                wounded += cnt;
+                                if (!model.CanTroopBeTakenPrisoner(troop)) { notTaken += cnt; continue; }
+                                int idx = mr.FindIndexOfTroop(troop);
+                                int w = Math.Min(cnt, idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0);
+                                gone += cnt - w;
+                                if (w <= 0) continue;
+                                int want = Math.Min(w, MBRandom.RoundRandomized(w * share));
+                                if (want <= 0) continue;
+                                List<Cand> l;
+                                if (!cands.TryGetValue(pb, out l)) { l = new List<Cand>(); cands[pb] = l; }
+                                l.Add(new Cand { Troop = troop, Want = want });
+                                wantSum += want;
+                            }
+                            catch (Exception e) { Stumble("Sim388.Cand", e, ref s); }
+                        }
+                    }
+                    catch (Exception e) { Stumble("Sim388.Party", e, ref s); }
+                }
+                _dRep++; _dWnd += wounded;
+                // 2. bohaterowie (nie-wodzowie) - kazdy zajmuje jedno miejsce sufitu
+                var names = new List<string>();
+                int hCut = 0;
+                foreach (var h in heroes)
+                {
+                    try
+                    {
+                        if (cap <= 0) { hCut++; continue; }
+                        TakePrisonerAction.Apply(captor, h);
+                        cap--;
+                        names.Add(h.Name != null ? h.Name.ToString() : h.StringId);
+                    }
+                    catch (Exception e) { Stumble("Sim388.Hero", e, ref s); }
+                }
+                // 3. zolnierze: ta sama skala dla wszystkich partii, gdy chetnych wiecej niz sufit
+                double k = wantSum > cap ? cap / (double)Math.Max(1, wantSum) : 1.0;
+                int moved = 0, emptied = 0, kept = 0;
+                double book = 0.0;
+                var types = new Dictionary<string, int>();
+                foreach (var kv in cands)
+                {
+                    if (cap <= 0) break;
+                    var pb = kv.Key;
+                    try
+                    {
+                        var mr = pb.MemberRoster;
+                        int from0 = PeopleBook.Men(mr), to0 = PeopleBook.Men(prison), here = 0;
+                        bool noLead = pb.LeaderHero == null;
+                        foreach (var c in kv.Value)
+                        {
+                            try
+                            {
+                                if (cap <= 0) break;
+                                int n = k < 1.0 ? Math.Min(c.Want, MBRandom.RoundRandomized((float)(c.Want * k))) : c.Want;
+                                int idx = mr.FindIndexOfTroop(c.Troop);
+                                n = Math.Min(Math.Min(n, cap), idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0);
+                                if (noLead && mr.TotalManCount - n <= 0) { n = mr.TotalManCount - 1; kept++; }   // partia bez wodza nie zostaje pusta
+                                if (n <= 0) continue;
+                                mr.AddToCounts(c.Troop, -n, false, -n);
+                                prison.AddToCounts(c.Troop, n, false, n);
+                                moved += n; here += n; cap -= n;
+                                string id = c.Troop.StringId;
+                                int t0; types.TryGetValue(id, out t0); types[id] = t0 + n;
+                            }
+                            catch (Exception e) { Stumble("Sim388.Troop", e, ref s); }
+                        }
+                        if (here > 0)
+                        {
+                            try { book += PeopleBook.Transfer(mr, from0, prison, to0, PeopleBook.FCaptured); } catch (Exception e) { Stumble("Sim388.Book", e, ref s); }
+                            if (pb.NumberOfAllMembers == 0) emptied++;
+                        }
+                    }
+                    catch (Exception e) { Stumble("Sim388.Move", e, ref s); }
+                }
+                int cut = Math.Max(0, wantSum - moved) + hCut;
+                bool byPrison = free <= def;
+                if (cut > 0) { if (byPrison) _dCutPrison += cut; else _dCutDef += cut; }
+                _dMoved += moved; _dHero += names.Count; _dSt += s;
+                bool mine = false;
+                try { mine = st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan; } catch { mine = false; }
+                if (mine && moved + names.Count > 0)
+                {
+                    try
+                    {
+                        string nm = st.Name != null ? st.Name.ToString() : st.StringId;
+                        int all = moved + names.Count;
+                        InformationManager.DisplayMessage(new InformationMessage(all == 1 ? "1 wounded attacker left beneath the walls of " + nm + " is taken prisoner."
+                            : all + " wounded attackers left beneath the walls of " + nm + " are taken prisoner.", Color.FromUint(0xFF9ACD65u)));
+                    }
+                    catch { }
+                }
+                var tb = new StringBuilder();
+                foreach (var kv in types) tb.Append(tb.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
+                string owner = "-";
+                try { owner = st.OwnerClan != null ? st.OwnerClan.StringId : "-"; } catch { }
+                Log.Info("Ranni pod murami (388): dzien " + (int)CampaignTime.Now.ToDays + " | osada " + st.StringId + " (" + owner + (mine ? ", rod gracza" : "") + ") | szturm odparty bez misji"
+                         + " | rannych atakujacych w szturmie " + wounded + " (partii " + parties + ")" + (gone > 0 ? ", nie bylo juz wsrod rannych partii " + gone : "")
+                         + (notTaken > 0 ? ", bez niewoli (typ) " + notTaken : "") + " | udzial " + share.ToString("0.00", CultureInfo.InvariantCulture) + " -> chce " + wantSum
+                         + " | loch " + l0 + "/" + limit + ", wolne " + free + ", obroncow " + def + " -> sufit " + cap0 + " (skala " + k.ToString("0.00", CultureInfo.InvariantCulture) + ")"
+                         + " | do lochu " + moved + " (typy: " + (tb.Length > 0 ? tb.ToString() : "-") + ")" + (cut > 0 ? ", obciete " + cut + (byPrison ? " (loch)" : " (zaloga)") : "")
+                         + " | bohaterowie ranni " + hSeen + ": do lochu " + names.Count + " [" + string.Join(", ", names) + "], wodzowie pominieci (373b) " + hLeads + ", wyniesieni " + hStay
+                         + ", poza regula " + hMissed + (hCut > 0 ? ", bez miejsca " + hCut : "") + " | loch po " + prison.TotalManCount + " | ksiega ludzi " + book.ToString("0", CultureInfo.InvariantCulture)
+                         + " | partie oproznione " + emptied + (kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + kept : "") + " | potkniecia " + s + ".");
+            }
+            catch (Exception e) { Stumble("Sim388", e, ref s); _dSt += s; }
+        }
+
         private static void OnMapEventEnded(MapEvent me)
         {
-            if (me == null || SiegeWounded373.Book.Count == 0) return;
+            if (me == null) return;
+            // 388: szturm odparty BEZ misji (OB2, wpis z SiegeWalls.OnMapEventEnded w tym samym wywolaniu). Bitwa z ksiega misji (373) - rozlicza 373, 388 nie rusza.
+            if (_sim.Count > 0 && _sim.Remove(me))
+            {
+                if (!SiegeWounded373.Book.ContainsKey(me)) { Sim388(me); return; }
+                _dSkip++;
+            }
+            if (SiegeWounded373.Book.Count == 0) return;
             SiegeWounded373.Tally t;
             if (!SiegeWounded373.Book.TryGetValue(me, out t)) return;
             SiegeWounded373.Book.Remove(me);

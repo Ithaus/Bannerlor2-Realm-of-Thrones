@@ -11716,6 +11716,14 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public float SiegeWoundedWallDistance { get; set; } = 35f;
 
+        [SettingPropertyBool("Siege Wounded Simulated", HintText = "When an assault on a fortress fought without you (lords against lords, your own fortresses too while you are away) is beaten back from the walls, a share of the attackers wounded in that assault cannot be carried away either: they are taken prisoner into the fortress dungeon - never more than the room left in the dungeon and never more men than the defenders still standing; lords among them only if they do not lead a party. Needs Siege Wounded Taken Prisoner. Off = as in the game: all their wounded go back to camp", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public bool SiegeWoundedSimulated { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Wounded Simulated Share", 0f, 1f, "0.00", HintText = "With Siege Wounded Simulated: the share of the attackers wounded in a beaten-back assault fought without you who lie too close to the walls to be carried away (in an assault you fight yourself their place on the field decides instead). 0 = none", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public float SiegeWoundedSimulatedShare { get; set; } = 0.5f;
+
         [SettingPropertyBool("Siege Held Spoils Window", HintText = "When you defend a fortress and the assault breaks and the enemy falls back (Siege Assault Break Mission), the game shows no aftermath: now, back on the siege menu, you get the prisoners window (the wounded attackers taken beneath the walls - take as many as you want into your party - in a fortress of another clan only your share by strength among its defenders - the rest stay in the dungeon) and then the loot window with your share of the gear from the field. What you leave goes to the nearest friendly market with Spoils Remnants Home. Off = as before: no windows, your share of the field goes back to the army stores", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeHeldSpoilsWindow { get; set; } = true;
@@ -14900,6 +14908,8 @@ namespace Armoury
             s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;
             s.SiegeWoundedTakenPrisoner = SiegeWoundedTakenPrisoner;
             s.SiegeWoundedWallDistance = SiegeWoundedWallDistance;
+            s.SiegeWoundedSimulated = SiegeWoundedSimulated;
+            s.SiegeWoundedSimulatedShare = SiegeWoundedSimulatedShare;
             s.SiegeHeldSpoilsWindow = SiegeHeldSpoilsWindow;
             s.SiegeEngineAccuracyBySkill = SiegeEngineAccuracyBySkill;
             s.SiegeEngineSpreadThrowersAt0 = SiegeEngineSpreadThrowersAt0;

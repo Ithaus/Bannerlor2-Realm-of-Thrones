@@ -1161,7 +1161,7 @@ namespace Armoury
                 if (bt != null && !bt.Excl) SzEnd(me, bt, a);                  // SZ: linia bitwy szturmu (AI i gracz)
                 if (a == null) return;
                 var w = me.WinningSide;
-                if (a.Repelled) { }
+                if (a.Repelled) { if (!a.MissionBreak && !me.IsPlayerMapEvent) SiegeWounded373Behavior.NoteSimRepel(me); }   // 388: odparcie bez misji (OB2) - ranni spod murow do lochu (nasluch 373 po nas)
                 else if (w == BattleSideEnum.Attacker) _dWon++;
                 else if (w == BattleSideEnum.Defender) _dDefWon++;
                 else { _dNone++; SiegeWalls2.NoteAborted(a.St, me); }                // oblezenia 3 (KO): szturm AI przerwany bez zwyciezcy (i czy pod regula F2)
