@@ -880,7 +880,7 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsHostage { get; set; } = true;
 
-        [SettingPropertyBool("Prisoner Terms Hostage Death", HintText = "With Prisoner Terms Hostage: if you break the word your hostage stands for, a lord without mercy has the hostage put to death (if that lord is dead or a captive himself, the lord of the hall where the hostage sits decides). A lord with mercy, or with this off: the hostage only becomes a common prisoner, who may escape or be ransomed as usual.")]
+        [SettingPropertyBool("Prisoner Terms Hostage Death", HintText = "With Prisoner Terms Hostage: if you break the word your hostage stands for, the lord you swore to has the hostage put to death, whatever his nature (if that lord is dead or a captive himself, the lord of the hall where the hostage sits does it; never while a battle is fought at that hall - then the next day). Off = the hostage only becomes a common prisoner, who may escape or be ransomed as usual.")]
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsHostageDeath { get; set; } = true;
 

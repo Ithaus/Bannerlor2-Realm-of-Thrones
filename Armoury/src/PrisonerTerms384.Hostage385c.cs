@@ -348,7 +348,9 @@ namespace Armoury
                     r.State = 'B';
                     var h = Hero.Find(r.Hero); var lord = Hero.Find(r.Lord);
                     names.Add(h != null ? Name(h) : r.Hero);
-                    Log.Player("Your broken oath falls on " + (h != null ? Name(h) : "your hostage") + ": " + (lord != null ? Name(lord) : "the lord you swore to") + " holds your hostage as a common prisoner now.", true);
+                    // 393-p: przy kluczu egzekucji tekst nie moze obiecywac "zwyklego jenca" (HostDaily tej samej doby moze go stracic); klucz NIE - tekst jak dotad
+                    Log.Player("Your broken oath falls on " + (h != null ? Name(h) : "your hostage") + ": " + (KHostDeath ? "the hostage's life is in the hands of " + (lord != null ? Name(lord) : "the lord you swore to") + " now."
+                               : (lord != null ? Name(lord) : "the lord you swore to") + " holds your hostage as a common prisoner now."), true);
                 }
             }
             catch (Exception e) { Stumble("HostBroke", e); }
@@ -363,7 +365,7 @@ namespace Armoury
         }
 
         /// <summary>Doba: przeglad wpisow - martwi / poza rodem / juz nie w tym lochu precz, termin -> zwolnienie, przysiega zdjeta przez gre -> zwolnienie,
-        /// zdrada po terminie -> klamca, zlamane slowo gracza -> zwykly jeniec albo (klucz, Mercy < 0) egzekucja. Wolane z Daily; wyjatek wpisu nie gasi reszty.</summary>
+        /// zdrada po terminie -> klamca, zlamane slowo gracza -> zwykly jeniec albo (klucz) egzekucja - 393-p: bez bramki Mercy. Wolane z Daily; wyjatek wpisu nie gasi reszty.</summary>
         private static void HostDaily(int today)
         {
             if (_hosts.Count == 0 && _hEsc + _hCour + _hStripCut == 0) return;
@@ -407,10 +409,12 @@ namespace Armoury
                         if (ex == null)
                         {
                             var oc = pb.Settlement.OwnerClan; var ol = oc != null ? oc.Leader : null;
-                            if (ol != null && ol.IsAlive && !ol.IsPrisoner && ol != Hero.MainHero && oc != Clan.PlayerClan) { ex = ol; exHow = "pan lochu (lord przysiegi " + (lord != null ? Name(lord) : r.Lord) + " martwy / w niewoli / poza frakcja)"; }
+                            if (ol != null && ol.IsAlive && !ol.IsPrisoner && !ol.IsChild && ol != Hero.MainHero && oc != Clan.PlayerClan) { ex = ol; exHow = "pan lochu (lord przysiegi " + (lord != null ? Name(lord) : r.Lord) + " martwy / w niewoli / poza frakcja)"; }
                         }
                         int mercy = ex != null ? Trait(ex, DefaultTraits.Mercy) : 0;
-                        string whyNot = ex == null ? "brak kata (lord przysiegi i pan lochu martwi / w niewoli)" : mercy >= 0 ? Name(ex) + " (" + exHow + ") ma Mercy " + mercy + " (egzekucja tylko przy Mercy < 0)"
+                        // 393-p (Jeff 11.11, odp. 6 "tak, maja go sciac" - bez zastrzezen): bramka Mercy < 0 zdjeta - scina kazdy kat (w ROT_lords.xml Mercy < 0 ma ok. 13%
+                        // postaci, wiec z bramka zakladnik ginalby w 1 przypadku na 8); Mercy zostaje tylko w logu
+                        string whyNot = ex == null ? "brak kata (lord przysiegi i pan lochu martwi / w niewoli / dziecko)"
                             : !h.CanDie(KillCharacterAction.KillCharacterActionDetail.Executed) ? "smierc zablokowana (CanHeroDie)" : null;
                         if (whyNot == null)
                         {
