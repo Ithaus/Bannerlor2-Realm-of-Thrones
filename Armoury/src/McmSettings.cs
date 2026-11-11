@@ -836,6 +836,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool SiegeHonourableSurrender { get; set; } = true;
 
+        [SettingPropertyBool("Siege Surrender Spares Caravans", HintText = "With Siege Honourable Surrender: when the commander keeps his word, the oath also covers the caravans of your side standing inside the walls (yours included) - they ride out free with their coin, cargo and master, and his men leave them alone for half a day, just as they do your lords. If he breaks his word, they are seized as in a storm. Off = caravans inside a yielded keep are seized even when the word is kept, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SiegeSurrenderSparesCaravans { get; set; } = true;
+
         [SettingPropertyBool("Prisoner Exchange For Terms", HintText = "When you hold a besieged town or castle, you can request a parley with the besiegers' commander and bargain: what you want - that he lifts the siege and does not come back for Prisoner Exchange Pact Days, or that he also swears his realm will leave your lands and your men in peace that long, or that he lets you and your men ride out unharmed on his word (the keep and its garrison stay yours) - for what you give: lords of his realm you hold in your dungeons or party (each with his worth to him; kin and the royal house weigh more, lords held in the besieged keep less, since he frees them when the walls fall), gold, or one of your castles or towns. He weighs it by his traits, your relation and how the siege goes, may ask for more once or twice ('Add 20,000 denars and we have a deal'), or refuses (ask again in 3 days). A lord without honour may break his word. The oath of peace binds you too: attacking his realm while it lasts (self-defence excepted), or not handing over what you promised for safe passage, costs relation and Honor. Peace between realms is not made here. Log: 'Wymiana jencow (384)'. Off = no such talk", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerExchangeForTerms { get; set; } = true;
@@ -12200,6 +12204,7 @@ namespace Armoury
             s.GearFitSkillLawFootInHideoutSiege = GearFitSkillLawFootInHideoutSiege;
             s.NightPromptSkipWhenRested = NightPromptSkipWhenRested;
             s.SiegeHonourableSurrender = SiegeHonourableSurrender;
+            s.SiegeSurrenderSparesCaravans = SiegeSurrenderSparesCaravans;
             s.PrisonerExchangeForTerms = PrisonerExchangeForTerms;
             s.PrisonerExchangePactDays = PrisonerExchangePactDays;
             s.PrisonerExchangePactGuardsClan = PrisonerExchangePactGuardsClan;

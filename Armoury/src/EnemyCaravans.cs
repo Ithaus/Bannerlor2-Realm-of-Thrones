@@ -98,7 +98,15 @@ namespace Armoury
             public readonly List<MobileParty> Trapped = new List<MobileParty>();
             public int TrExits, TrOld, TrOther, TrBattle, TrFriendly, TrNaval, TrGone;
             public string TrEx;
+            // 374c: cesja pod przysiega (slowo dotrzymane) - czytane w prefiksie, bo okno SiegeSurrender374 zamyka sie zaraz po SiegeCompleted
+            public bool Ceded;
         }
+
+        // 374c: ostatnia cesja pod przysiega - ile karawan strony obroncow wyjechalo wolno (czyta linia "Poddanie (374): WYKONANE"); -1 = brak pomiaru
+        internal static string CededSt;
+        internal static int CededFree = -1, CededFreePlayer;
+        internal const float CededIgnoreHours = 12f;   // jak LeadOutLords (SiegeSurrender374)
+        internal static bool SpareOn { get { var s = Settings.Current; return s != null && s.SiegeSurrenderSparesCaravans; } }
 
         // A11: wyjscie karawany z murow oblezonej osady - osada, godzina kampanii, bitwa osady w tej chwili
         private sealed class Exit { public Settlement St; public double Hour; public bool Battle; }
@@ -132,6 +140,7 @@ namespace Armoury
             _atStart.Clear(); _leftSiege = _dLeftSiege = _stackLines = 0;
             _leftAt.Clear();
             _bkLines = _bkKept = _bkKeptFoe = _bkShadow = 0;
+            CededSt = null; CededFree = -1; CededFreePlayer = 0;
         }
 
         // ------------------------------------------------------------ diagnoza drobne14 (tylko pamiec i log - zachowanie gry bez zmian)
@@ -328,6 +337,7 @@ namespace Armoury
                                          || battleType == MapEvent.BattleTypes.BlockadeSallyOutBattle);
                 if (!capture || settlement == null || capturerParty == null || !settlement.IsFortification) return;
                 var sn = new Snap { St = settlement, Cap = capturerParty, WinF = capturerParty.MapFaction };
+                try { sn.Ceded = SiegeSurrender374.Ceded(settlement); } catch (Exception e) { Stumble("SiegePre(cesja)", e); }
                 var list = new List<MobileParty>(settlement.Parties);
                 foreach (var mp in list)
                 {
@@ -417,7 +427,32 @@ namespace Armoury
             string why = null;
             var ex = new List<string>();
             var playerLeaders = new List<string>();
+            // 374c: cesja pod przysiega, slowo dotrzymane - umowa "wychodzimy wolni" obejmuje karawany strony obroncow w murach (jedna regula z cesja ziemi 384,
+            // ktora idzie przez ApplyByBarter i karawan nie rusza). Gra wyprowadzila je juz sama (PartyDiplomaticHandler przy zmianie pana) - tu tylko ochrona
+            // na drodze jak lordowie w LeadOutLords (IgnoreForHours - samo pole czasu, kolejnosc wobec wyjazdu bez znaczenia) i licznik. Zdrada: Ceded = false.
+            bool ceded = sn.Ceded && SpareOn;
+            int cededFree = 0, cededFreePlayer = 0;
+            if (sn.Ceded) { CededSt = st.StringId; CededFree = -1; CededFreePlayer = 0; }
+            if (taken && ceded)
+            {
+                foreach (var c in sn.Enemy)
+                {
+                    try
+                    {
+                        if (c == null || !c.IsActive || c.MapEvent != null) continue;
+                        var fNow = c.MapFaction;
+                        if (fNow == null || !fNow.IsAtWarWith(sn.WinF)) continue;       // karawana kupca oddanej osady - poddana nowego pana, zostaje
+                        c.IgnoreForHours(CededIgnoreHours);
+                        cededFree++;
+                        if (c.ActualClan == Clan.PlayerClan || (c.Owner != null && c.Owner.Clan == Clan.PlayerClan)) cededFreePlayer++;
+                    }
+                    catch (Exception e) { Stumble("Seize(cesja)", e); }
+                }
+                CededFree = cededFree; CededFreePlayer = cededFreePlayer;
+            }
             if (!taken) why = "osada nie zmienila frakcji - bez zajecia";
+            else if (ceded) why = "cesja pod przysiega (374c) - karawany wyjezdzaja wolne z towarem i kiesa: " + cededFree + " (gracza " + cededFreePlayer + "), bez zaczepki "
+                                  + ((int)CededIgnoreHours).ToString(Inv) + " h";
             else if (undead) why = "zdobywca Inni - karawany wyjezdzaja jak w grze";
             else if (cap == null || !cap.IsActive) why = "druzyna zdobywcy nieczynna - karawany wyjezdzaja jak w grze";
             else if (!On) why = "W CIENIU (klucz wylaczony) - karawany wyjezdzaja jak w grze";

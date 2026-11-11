@@ -614,6 +614,10 @@ namespace Armoury
             _cededSt = st.StringId; _ceding = true; _yieldSt = st.StringId;
             try { Campaign.Current.KingdomManager.SiegeCompleted(st, cap, true, MapEvent.BattleTypes.Siege); }
             finally { _ceding = false; _cededSt = null; _yieldSt = null; }
+            // 374c: ile karawan strony obroncow wyjechalo wolno (pomiar postfiksu EnemyCaravans z tego wywolania SiegeCompleted)
+            int cvFree = -1, cvMine = 0;
+            try { if (EnemyCaravans.CededSt == st.StringId) { cvFree = EnemyCaravans.CededFree; cvMine = Math.Max(0, EnemyCaravans.CededFreePlayer); } }
+            catch (Exception e) { Stumble("RunKept.Karawany", e); }
             var rel = new List<string>();
             try
             {
@@ -627,8 +631,12 @@ namespace Armoury
             catch (Exception e) { Stumble("RunKept.Relacje", e); }
             Log.Info(Tag + ": dzien " + F(Today) + " | " + Name(st) + " [" + st.StringId + "] WYKONANE: slowo dotrzymane | wodz " + Name(lord) + ", zdobywca " + Name(cap) + " | partie lordow wyprowadzone " + lords
                      + " | " + out1 + " | wlasciciel " + (oldClan != null ? oldClan.Name.ToString() : "-") + " -> " + (st.OwnerClan != null ? st.OwnerClan.Name.ToString() : "-") + " (SiegeCompleted)"
-                     + " | relacje: " + (rel.Count > 0 ? string.Join(", ", rel.ToArray()) : "-") + " | roszczenie: brak (cesja).");
-            Log.Player("You yield " + Name(st) + " to " + Name(lord) + ". Your men march out under arms, and he keeps his word.");
+                     + " | relacje: " + (rel.Count > 0 ? string.Join(", ", rel.ToArray()) : "-") + " | roszczenie: brak (cesja)"
+                     + " | karawany w murach (374c): " + (!EnemyCaravans.SpareOn ? "klucz wylaczony - jak przy szturmie (L5b-2)"
+                                                         : cvFree < 0 ? "brak pomiaru (latka L5b-2 nie wpieta albo osada nie zmienila pana)"
+                                                         : "wolne " + cvFree + " (gracza " + cvMine + ")") + ".");
+            Log.Player("You yield " + Name(st) + " to " + Name(lord) + ". Your men march out under arms, and he keeps his word."
+                       + (cvMine > 0 ? (cvMine == 1 ? " Your caravan" : " Your " + cvMine + " caravans") + " inside the walls " + (cvMine == 1 ? "rides" : "ride") + " out unharmed with all cargo." : ""));
         }
 
         private static void RunBetray(Deal d, Settlement st, Hero lord, MobileParty cap)
