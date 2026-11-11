@@ -1,5 +1,16 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 11.11 02:15 - WGRANIE 203 (385-389 + poprawki 385b-389b)
+
+- **W grze:** Armoury.dll `77c93c8ec594ce7943dae8a0dd98dce8` (galaz `noc/367c-jeniec-po-odejsciu`, HEAD `5b6b1777`, wypchniete). CrashScribe bez zmian (`d7fbd602`). Kopie: `Armoury.dll.bak-2026-11-11-przed-wgranie203`, `D:/Backup-Bannerlord/wgrane/2026-11-11-wgranie203(-przed)`.
+- **Autotest at-389:** KONIEC OK, 5 dob, bitwy 2/2, bledy 23 (stale, cudze), zapisy Jeffa nietkniete. Gra jak zawsze zawisla przy wyjsciu (kill).
+- **Dowod z logu testu (tylko to jest potwierdzone):** latki 386 wpiete (atak, ucieczka); rozmowa 384/385 wpieta z 5 kluczami TAK; "387 ... latki menu wpiete 4/4"; 389 dziala: bezbronnych 383 -> 202 w 4 doby (60 na dobe, potkniecia 0), 316 z 383 to "dziecko gentry BK" w stroju dzieciecym - hipoteza potwierdzona.
+- **389 - zostalo 202 bezbronnych, z tego 187 kobiet:** "wzorzec nic nie dal" (szablon bez broni) - do zbadania jako 389c/d.
+- **NIE sprawdzone w grze (autotest nie gra oblezen ani rozmow):** cale 385 (okno wyboru jencow nad rozmowa - pierwszy punkt ryzyka, awaryjnie klucz Prisoner Terms Pick Window NIE; moi ludzie; przysiega; rozmowa w polu; rozejm krolestw), 386 w dzialaniu (potrzebny zawarty pakt), 387 (szturm gracza-wodza), 388 (odparcie bez misji nie padlo w tescie). Dalej niewidziane u Jeffa: 371b, 374-384.
+- **UWAGA dla Jeffa:** przysiega w ofercie wobec Polnocy = 60 dob bez ataku na nich i bez udzialu w armiach korony przeciw nim (mechanizm gry NotAttackableByPlayerUntilTime).
+- **Odlozone (w CHANGELOG przy wpisach):** 385c zakladnik; zolnierze gracza w niewoli; poslaniec do wladcy; 386 latka AiEngagePartyBehavior (GoAround), partie rodu w cudzych armiach; 387 zalamanie szturmu armii AI z graczem w srodku, 387c ranni gracza pod murami, morale przy odwrocie (po pomiarze "387b zbiegli z partii"); 388 symulacja z graczem; 389c zestaw cywilny.
+- **Decyzje Jeffa:** (1) obejscie przerwy po zalamanym szturmie recznym odwrotem - zostawic?; (2) limit lochu takze dla 373?; (3) karawany wroga przy cesji (374) - stare.
+
 ## STAN 10.11 00:10 - WGRANIE 202 (382c, 384, 384b, 384c)
 
 - Armoury.dll 866ce291 (galaz noc/367c-jeniec-po-odejsciu, 38940018); przed: aadb2bbf (.bak-2026-11-10-przed-wgranie202, D:/Backup-Bannerlord/wgrane/2026-11-10-wgranie202*).
