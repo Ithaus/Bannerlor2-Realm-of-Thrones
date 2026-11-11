@@ -196,14 +196,114 @@ namespace Armoury
                 // 425a (klucz ChariotsLeaveWesteros): rydwan - strona morza wedlug ZIEMI, nie wedlug tego, czyja kulture osada ma dzis (BK zmienia kultury
                 // osad): kultura z dnia kalibracji (PeopleBook.CultureAtCalibration; bez kalibracji zwraca biezaca - jak dotad). Ta sama definicja dla
                 // wszystkich wolajacych: wywoz kupcow (SupplyDemand), skup lupu (SpoilsSeal), paserzy (OutlawLaw), targi (LegendaryLaw)
+                // 425-p: tylko razem z ExoticMountsNeverVanish (tak mowi opis klucza) - przy tamtym kluczu NIE czystka polek liczy jak przed 425;
+                // zamek nie ma wlasnego wpisu kalibracji (PeopleBook.FillUnits bierze wsie i miasta) - strona morza z jego wsi (LandCulture)
                 if (f == Fam.Chariot && st != null)
                 {
                     var s = Settings.Current;
-                    if (s != null && s.ChariotsLeaveWesteros) return Essos.Contains(PeopleBook.CultureAtCalibration(st) ?? "");
+                    if (s != null && s.ChariotsLeaveWesteros && s.ExoticMountsNeverVanish) return Essos.Contains(LandCulture(st) ?? "");
                 }
                 return AllowedFor(cul, false, f);
             }
             catch { return true; }
+        }
+
+        /// <summary>425-p: kultura ZIEMI osady - z dnia kalibracji (PeopleBook.CultureAtCalibration; brak wpisu = biezaca). Zamek wpisu nie ma, wiec bierze
+        /// kulture z kalibracji pierwszej zwiazanej wsi (zamek Westeros, ktoremu BK zmienil kulture na essoska, dalej lezy w Westeros); zamek bez wsi -
+        /// biezaca. Watek glowny.</summary>
+        internal static string LandCulture(Settlement st)
+        {
+            if (st == null) return null;
+            if (st.IsCastle)
+            {
+                try
+                {
+                    var bv = st.BoundVillages;
+                    if (bv != null)
+                        foreach (var v in bv)
+                            if (v != null && v.Settlement != null) return PeopleBook.CultureAtCalibration(v.Settlement);
+                }
+                catch { }
+            }
+            return PeopleBook.CultureAtCalibration(st);
+        }
+
+        // ------------------------------------------------------------ 425-p: bitwa na ziemi Westeros = bez rydwanu
+        private static int _groundMission;        // misja, dla ktorej policzono strone morza (RuntimeHelpers.GetHashCode)
+        private static bool _groundWest;
+        private static int _toldChariot;
+        /// <summary>Licznik kampanii: rydwany zdjete jezdzcom przy spawnie w bitwach na ziemi Westeros (linia "Rydwany (425)").</summary>
+        internal static int RiddenBarred;
+
+        internal static void SessionReset() { _groundMission = 0; _groundWest = false; _toldChariot = 0; RiddenBarred = 0; }
+
+        /// <summary>
+        /// 425-p (Jeff 11.11: "rydwany ... wywal je z Westeros, nie uzywano ich tutaj"; klucz ChariotsNotRiddenInWesteros, czytany na zywo). 425a ruszal
+        /// tylko polki osad - o jezdzcu decydowala sama kultura (Allowed: rydwan = kultury Essos), bez wzgledu na miejsce bitwy: lord Sarnoru na wojnie
+        /// w Westeros, gracz albo towarzysz kultury Essos. Tu: rydwan nie wyjezdza w bitwie toczonej po zachodniej stronie morza. Strona morza - ziemia
+        /// osady bitwy (oblezenie, najazd) albo najblizszego miasta / wsi / zamku od partii gracza (kazda misja bitwy jest bitwa gracza), kultura z
+        /// kalibracji (LandCulture); liczone raz na misje. Poza bitwa kampanii (arena, miasto, bitwa wlasna) i przy nieznanej kulturze - bez zmian.
+        /// Wolane przy spawnie (DragonUnmount.WouldStrip slot 10 i galaz bohatera) - sam ekwipunek MISJI: rydwan zostaje w zestawie jezdzca, w taborze
+        /// i w zbrojowni (posiadac wolno), zamiennik to ten sam TopMount co dla wielblada "nie u swoich" (istnieje tylko w misji) - bez ksiegowania.
+        /// </summary>
+        internal static bool ChariotBarredHere(ItemObject mount)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.ChariotsNotRiddenInWesteros || mount == null || FamilyOf(mount) != Fam.Chariot) return false;
+                var m = TaleWorlds.MountAndBlade.Mission.Current;
+                if (m == null || Campaign.Current == null) return false;
+                int h = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(m);
+                if (h != _groundMission)
+                {
+                    string where;
+                    _groundWest = WestGround(out where);
+                    _groundMission = h;
+                    Log.Info("Rydwany (425-p): bitwa - " + where + " -> " + (_groundWest ? "ziemia Westeros, rydwany nie wyjezdzaja (jezdziec dostaje konia w granicy Jazdy)" : "rydwany jada jak dotad") + ".");
+                }
+                if (_groundWest) RiddenBarred++;
+                return _groundWest;
+            }
+            catch { return false; }
+        }
+
+        private static bool WestGround(out string where)
+        {
+            where = "poza bitwa kampanii";
+            var main = MobileParty.MainParty;
+            if (main == null || main.MapEvent == null) return false;
+            Settlement st = main.CurrentSettlement;
+            if (st == null) { try { st = main.MapEvent.MapEventSettlement; } catch { st = null; } }
+            if (st != null && !(st.IsTown || st.IsCastle || st.IsVillage)) st = null;   // kryjowka ma kulture bandy, nie ziemi
+            if (st == null)
+            {
+                var p = main.Position.ToVec2();
+                float bd = float.MaxValue;
+                foreach (var c in Settlement.All)
+                {
+                    if (c == null || !(c.IsTown || c.IsCastle || c.IsVillage)) continue;
+                    float d = p.DistanceSquared(c.GetPosition2D);
+                    if (d < bd) { bd = d; st = c; }
+                }
+            }
+            if (st == null) { where = "brak osady w poblizu"; return false; }
+            string cul = LandCulture(st);
+            where = (st.Name != null ? st.Name.ToString() : st.StringId) + ", ziemia '" + cul + "'";
+            if (string.IsNullOrEmpty(cul) || cul == "?") return false;
+            return !Essos.Contains(cul);
+        }
+
+        /// <summary>Gracz zsadzony z rydwanu - komunikat raz na misje.</summary>
+        internal static void TellPlayerChariot()
+        {
+            try
+            {
+                if (_groundMission == 0 || _groundMission == _toldChariot) return;
+                _toldChariot = _groundMission;
+                Log.Player("Chariots are not driven in Westeros - you take the field on horseback.", true);
+            }
+            catch { }
         }
     }
 }

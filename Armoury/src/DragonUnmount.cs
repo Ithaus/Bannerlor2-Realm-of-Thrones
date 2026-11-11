@@ -111,7 +111,7 @@ namespace Armoury
             }
             if (slot == 10)
             {
-                bool geo = !MountLaw.Allowed(soldier, it);
+                bool geo = !MountLaw.Allowed(soldier, it) || MountLaw.ChariotBarredHere(it);   // 425-p: rydwan w bitwie na ziemi Westeros (tylko w misji bitwy kampanii)
                 if (!geo && ItemReq.Meets(soldier, it, out whyNot)) return Keeps;
                 repl = SkillsDecide.TopMount(soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Riding));
                 return geo ? StripMountLand : StripMountSkill;
@@ -308,7 +308,9 @@ namespace Armoury
                         // GEOGRAFIA WIERZCHOWCOW u bohatera (gracz tez): lord Polnocy
                         // nie wjezdza w bitwe na wielbladzie ani mamucie
                         var hm = eq[(EquipmentIndex)10].Item;
-                        if (hm != null && !MountLaw.Allowed(soldier, hm))
+                        bool chBar = hm != null && MountLaw.ChariotBarredHere(hm);   // 425-p: rydwan w bitwie na ziemi Westeros - takze bohater kultury Essos (gracz tez)
+                        if (chBar && soldier.IsPlayerCharacter) MountLaw.TellPlayerChariot();
+                        if (hm != null && (chBar || !MountLaw.Allowed(soldier, hm)))
                         {
                             var htop = SkillsDecide.TopMount(soldier.GetSkillValue(TaleWorlds.Core.DefaultSkills.Riding));
                             eq[(EquipmentIndex)10] = htop != null ? new EquipmentElement(htop) : new EquipmentElement(null);
@@ -319,7 +321,7 @@ namespace Armoury
                                 eq[(EquipmentIndex)11] = new EquipmentElement(null);
                             if (_floorLog++ < 20)
                                 Log.Info("MountLaw: bohater " + soldier.StringId + " nie ma prawa do " + hm.StringId
-                                         + " (" + MountLaw.Name(MountLaw.FamilyOf(hm)) + " nie u swoich) - "
+                                         + " (" + MountLaw.Name(MountLaw.FamilyOf(hm)) + (chBar ? " w bitwie na ziemi Westeros, 425-p) - " : " nie u swoich) - ")
                                          + (htop != null ? "dostaje " + htop.StringId : "idzie pieszo") + ".");
                         }
                         // pancerz olbrzyma na bohaterze: czlowiek go nie nosi

@@ -85,6 +85,7 @@ namespace Armoury
         private void OnSession(CampaignGameStarter starter)
         {
             _chStumbles = 0;   // 425a: licznik potkniec wywozu rydwanow od nowa w kazdej kampanii
+            MountLaw.SessionReset();   // 425-p: strona morza misji i licznik rydwanow zdjetych jezdzcom od nowa
             try { BuildLegendSet(); } catch (Exception e) { Log.Error("LegendaryLaw.BuildLegendSet", e); }
             // 177-2: stan startowy stali valyrianskiej z szablonow postaci - PRZED SweepTemplates (ta podmienia klingi w szablonach w pamieci sesji)
             try { ValyrianBlades.CaptureTemplates(); } catch (Exception e) { Log.Error("ValyrianBlades.CaptureTemplates", e); }
@@ -230,7 +231,7 @@ namespace Armoury
             // 425a (Jeff 11.11: "rydwany ... wywal je z Westeros, nie uzywano ich tutaj", klucz ChariotsLeaveWesteros): rydwan z polki po zachodniej stronie
             // morza jedzie do najblizszego miasta Essos takze wtedy, gdy tamtejszego kupca nie stac na cala cene (ChariotHome) - liczniki linii "Rydwany (425)"
             bool chOn = keep && s.ChariotsLeaveWesteros;
-            int chWest = 0, chPlaces = 0, chMoved = 0, chEssos = 0; long chGold = 0, chOff = 0;
+            int chWest = 0, chPlaces = 0, chStacks = 0, chMoved = 0, chEssos = 0; long chGold = 0, chOff = 0;
             Settlement chLast = null; List<string> chList = null; Dictionary<string, int> chTargets = null;
             try
             {
@@ -252,6 +253,7 @@ namespace Armoury
                             chWest += el.Amount;
                             if (st != chLast) { chLast = st; chPlaces++; }
                             if (chList == null) chList = new List<string>();
+                            chStacks++;   // 425-p: lista ma wpis na STOS - znak uciecia liczony stosami, nie osadami
                             if (chList.Count < 12) chList.Add((st.Name != null ? st.Name.ToString() : st.StringId) + ": " + it.StringId + " x" + el.Amount);
                         }
                         if (!keep)
@@ -311,11 +313,13 @@ namespace Armoury
                     targets = " (cele: " + string.Join(", ", tl.ToArray()) + ")";
                 }
                 Log.Info("Rydwany (425): " + why + " | na polkach Westeros " + chWest + " szt. w " + chPlaces + " osadach"
-                         + (chList != null ? " [" + string.Join(", ", chList.ToArray()) + (chPlaces > chList.Count ? ", ..." : "") + "]" : "")
+                         + (chList != null ? " [" + string.Join(", ", chList.ToArray()) + (chStacks > chList.Count ? ", ... (+" + (chStacks - chList.Count) + " stosow)" : "") + "]" : "")
                          + " | wywiezione do Essos " + chMoved + " szt." + targets + ", zaplacone " + chGold + " zl, odpis kupcow " + chOff + " zl"
                          + (move ? (TradeCarts.On ? ", wozem kupcow" : ", od razu") : " (przy wczytaniu nic nie jedzie - pierwsza doba)")
                          + " | zostaje " + (chWest - chMoved) + (move && chWest - chMoved > 0 ? " (oblezenie, najazd na wies albo brak wolnego miasta Essos)" : "")
-                         + " | w Essos na polkach " + chEssos + " szt. | potkniecia " + _chStumbles + ".");
+                         + " | w Essos na polkach " + chEssos + " szt."
+                         + " | zdjete jezdzcom w bitwach na ziemi Westeros (425-p, od wczytania) " + MountLaw.RiddenBarred + (s.ChariotsNotRiddenInWesteros ? "" : " (klucz Chariots Not Ridden In Westeros NIE)")
+                         + " | potkniecia " + _chStumbles + ".");
             }
         }
 
@@ -360,11 +364,16 @@ namespace Armoury
                 worth += (long)Math.Max(0, eel.ItemValue) * k;
                 n += k;
             }
+            // 425-p (recenzje 425): zaplata policzona PRZED wyjazdem i wpisana w ksiege wozu (jak SendHome) - zawrocony woz (30 dob oblezenia celu) oddaje
+            // ja kupcowi z Essos (TradeCarts.Back: nie wiecej, niz ma kasa zrodla; zrodlo-wies - z kiesy wsi). Dotad woz mial zaplate 0: rydwan wracal na
+            // polke, zrodlo zatrzymywalo zloto i nazajutrz bralo zaplate drugi raz za te sama sztuke.
+            int pay = (int)Math.Min(worth, (long)Math.Max(0, CastlePurse.Spendable(best.Town)));
+            if (src.Town == null && !(src.IsVillage && src.Village != null)) pay = 0;   // osada bez kasy (kryjowka) - sztuka jedzie bez zaplaty
             // sztuka zdjeta - musi dojechac: woz kupcow (Ship sam odklada na polke celu, gdy woz sie nie zapisze) albo od razu polka celu
             bool landed = false;
             try
             {
-                if (carts) { TradeCarts.Ship(src, best, eel, n, 0, bestD); landed = true; }   // zaplata wozu 0: zawrocony woz (30 dob oblezenia celu) nie siega po kase zrodla - rydwan wraca na polke i jedzie znowu
+                if (carts) { TradeCarts.Ship(src, best, eel, n, pay, bestD); landed = true; }
                 else
                 {
                     best.ItemRoster.AddToCounts(eel, n); landed = true;
@@ -376,15 +385,13 @@ namespace Armoury
                 if (++_chStumbles <= 3) Log.Error("LegendaryLaw.ChariotHome (dowoz)", e);
                 if (!landed) { try { roster.AddToCounts(eel, n); } catch { } return 0; }   // nie wyjechala - wraca na polke zrodla, bez zaplaty
             }
-            int pay = (int)Math.Min(worth, (long)Math.Max(0, CastlePurse.Spendable(best.Town)));
             if (pay > 0)
             {
                 try
                 {
                     if (src.Town != null) { best.Town.ChangeGold(-pay); src.Town.ChangeGold(pay); }
-                    else if (src.IsVillage && src.Village != null) { best.Town.ChangeGold(-pay); src.Village.ChangeGold(pay); }
-                    else pay = 0;
-                    if (pay > 0) try { TownFolk.OnTownCoin(best, -pay, TownFolk.BOurs); } catch { }
+                    else { best.Town.ChangeGold(-pay); src.Village.ChangeGold(pay); }
+                    try { TownFolk.OnTownCoin(best, -pay, TownFolk.BOurs); } catch { }
                 }
                 catch (Exception e) { if (++_chStumbles <= 3) Log.Error("LegendaryLaw.ChariotHome (zaplata)", e); }
             }

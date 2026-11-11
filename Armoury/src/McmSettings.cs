@@ -7896,6 +7896,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public float ChariotPriceFactor { get; set; } = 0.30f;
 
+        [SettingPropertyBool("Chariots Not Ridden In Westeros", HintText = "Chariots were never driven in Westeros: in a battle fought on the western side of the Narrow Sea nobody rides a chariot - not you, not a companion, not a lord of Sarnor come to raid - the driver takes the field on the best horse his Riding allows (or on foot) for that battle only; the chariot itself stays his and he drives it again in Essos. Which side of the sea a battlefield lies on is decided by the land of the nearest town or village, not by who rules it now. Off = an Essosi rider keeps his chariot anywhere, as before. Counted in the Armoury log (line 425)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ChariotsNotRiddenInWesteros { get; set; } = true;
+
         [SettingPropertyBool("Qarth Stables Buy Camels", HintText = "a lord whose camel riders have no camel in the troops' armoury buys camels for them at a market that keeps camels (Qarth), with his own gold - no bigger share of his purse than he spends on horses at one stop, and no more head than he buys at one stop (off = camel riders get no camels from the market, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool QarthStablesBuyCamels { get; set; } = true;
@@ -14437,6 +14441,7 @@ namespace Armoury
             s.ExoticMountsNeverVanish = ExoticMountsNeverVanish;
             s.ChariotsLeaveWesteros = ChariotsLeaveWesteros;
             s.ChariotPriceFactor = ChariotPriceFactor;
+            s.ChariotsNotRiddenInWesteros = ChariotsNotRiddenInWesteros;
             s.QarthStablesBuyCamels = QarthStablesBuyCamels;
             s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;
             s.FodderFromHorseState = FodderFromHorseState;

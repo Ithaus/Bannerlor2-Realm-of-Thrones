@@ -787,6 +787,7 @@ RANGES = {
 # po angielsku); id pola w Armoury.json zostaje nazwa klucza. Reszta pol - jak dotad (podzial nazwy na slowa).
 LABELS = {
     'ChariotsLeaveWesteros': 'Chariots Stay In Essos',   # 425a (nazwa jak w recznym McmSettings.cs)
+    'ChariotsNotRiddenInWesteros': 'Chariots Not Ridden In Westeros',   # 425-p (jak w recznym McmSettings.cs)
     'ArmourLadderEnabled': 'ROT Body Armour In RBM Scale',   # 423a (423-p: nazwy jak w recznym McmSettings.cs - odwoluja sie do nich opisy i log)
     'ArmourLadderDothrakiUnsullied': 'Armour Ladder Covers Dothraki And Unsullied',   # 423a
     'BodkinSoftArmourPercent': 'Bodkin Versus Soft Armour Percent',   # 423b

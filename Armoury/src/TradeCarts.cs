@@ -228,7 +228,19 @@ namespace Armoury
                     try { Measure174b.NoteArrival(c.Src, l.El.Item, n, Measure174b.ArrTrade, true); } catch { }
                 }
             _dBack++; _dBackPcs += pcs;
-            if (c.Src == null || c.Src.Town == null || c.Dst == null || c.Dst.Town == null) return;
+            if (c.Src == null || c.Dst == null || c.Dst.Town == null) return;
+            if (c.Src.Town == null)
+            {
+                // 425-p: zrodlo-wies (jedyny woz ze wsi z zaplata to rydwan - LegendaryLaw.ChariotHome): zwrot z kiesy wsi, nie wiecej niz w niej jest
+                var v = c.Src.IsVillage ? c.Src.Village : null;
+                if (v == null) return;
+                int rv = Math.Min(c.Paid, Math.Max(0, v.Gold));
+                if (rv <= 0) return;
+                v.ChangeGold(-rv);
+                c.Dst.Town.ChangeGold(rv);
+                _dRefund += rv;
+                return;
+            }
             int r = Math.Min(c.Paid, Math.Max(0, c.Src.Town.Gold));
             if (r <= 0) return;
             c.Src.Town.ChangeGold(-r);
