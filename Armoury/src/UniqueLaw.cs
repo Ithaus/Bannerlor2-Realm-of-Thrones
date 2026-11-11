@@ -250,7 +250,8 @@ namespace Armoury
                     else continue;
                     int armour = 0;
                     var ac = it.ArmorComponent;
-                    if (ac != null) armour = ArmourLadder423.BookSum(it, ac.HeadArmor + ac.BodyArmor + ac.LegArmor + ac.ArmArmor);   // 423: kolejnosc zamiennikow z wartosci sprzed mapowania
+                    // 423: kolejnosc zamiennikow z wartosci sprzed mapowania; 419-p: ladry plytowe z sufitem - z pol sprzed sufitu (ksiegi rozlaczne: korpusy / rzedy)
+                    if (ac != null) armour = HorseBarding419.BookSum(it, ArmourLadder423.BookSum(it, ac.HeadArmor + ac.BodyArmor + ac.LegArmor + ac.ArmArmor));
                     long score = cs * 100000000000L + (long)(int)it.Tier * 1000000000L + (long)armour * 100000L + Math.Min(it.Value, 99999);
                     if (score > bestScore) { bestScore = score; best = it; }
                 }

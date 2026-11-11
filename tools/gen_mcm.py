@@ -4,6 +4,8 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 419-p: sufit pancerza ladrow plytowych ROT - zakres jak w recznym McmSettings.cs (HorseBarding419 przycina do 31..90; regula ogolna dalaby 0..180)
+    'RotBardingArmorCap': (31, 90, "0"),
     # 415-p: szyja / barki / lezacy - zakresy jak w recznym McmSettings.cs (NeckGuard415 przycina udzialy do 0..1, procent do 0..100;
     # regula ogolna dalaby barkom 0..2.00, a lezacemu 0..200 z formatem 0.00)
     'NeckFromHelmetShare': (0.0, 1.0, "0.00"),

@@ -14,6 +14,13 @@ namespace Armoury
     /// 419 (audyt RBM 11.11, B4 + decyzja Jeffa 2 "tak maja byc do przebicia"): SUFIT PANCERZA LADROW PLYTOWYCH ROT. Sama korekta danych w pamieci,
     /// raz na start sesji (wzor: RotData418). Bez edycji XML, bez latek Harmony.
     ///
+    /// 419-p (po recenzji): (1) SZYJA NIE SCHODZI PONIZEJ 41. RBM AI liczy "ciezka jazde" po polu szyi rzedu: RBMTacticEmbolon.GetTacticWeight
+    /// (rbmai.cs:1377-1378) - jezdziec poziomu >= 21 z harness.GetModifiedArmArmor() > 40; przy >= 60% takiej jazdy waga taktyki klina = 5, inaczej 0.01.
+    /// Przy suficie 45 nic sie nie zmienia (45 dalej > 40), ale suwak <= 40 po cichu wylaczylby te taktyke 33 rodzajom ladrow. Szyja = min(dane ROT,
+    /// max(sufit, 41)); o przebiciu piersi decyduja tulow i nogi, wiec przebijalnosc ta sama. (2) Bez RBM regula nieczynna (lacznik ROT nie rozklada
+    /// wtedy pancerza konia, a sufit cialby rodzimy tulow 65-80 - zmiana poza zalozeniem). (3) Sciezki bledu nie gubia ksiegi. (4) Kolejnosc: 419 jest
+    /// rejestrowane po 418 i ArmouryBehavior, wiec jego OnSessionLaunched biegnie PRZED nimi (MbEvent dopisuje nasluch na czolo listy) - od 418 niezalezne.
+    ///
     /// SKAD LICZBY. ROTassets.xml daje ladrom plytowym body_armor 65-80 przy 140-145 kg; lacznik ROT z RBM (ROT.HarmonyPatches.ModCompatibility.RBM
     /// .DeserializeArmorComponent, rot_all.cs:17517) rozklada to na glowa x1.2 / tulow x1.1 / szyja x0.6 / nogi x1.0 - w grze 90 / 82 / 45 / 75 (rot_horse_armor*).
     /// RBM (ArmorRework.GetBaseArmorEffectivenessForBodyPartRBM, rbm.cs:459) dodaje koniowi 10 do kazdego pola i liczy piers = (nogi + tulow) / 2 = 88.5,
@@ -60,6 +67,7 @@ namespace Armoury
 
         internal const int CapMin = 31, CapMax = 90;      // ponizej 31 lader wpadalby w klase "kropierz" cennika (PriceList8.CaparisonMaxArmor = 30)
         private const float HeadShare = 1.2f;             // glowa = sufit x 1.2 (proporcja lacznika ROT: glowa 1.2, tulow 1.1 bazy XML)
+        internal const int NeckFloor = 41;                // 419-p: RBM AI liczy ciezka jazde przy polu szyi rzedu > 40 (RBMTacticEmbolon, rbmai.cs:1378)
 
         // stan sesji. Orig: sztuka z listy -> pola sprzed sufitu (glowa, tulow, szyja, nogi); podmieniany w calosci (czytaja go watki wyceny)
         private static Dictionary<ItemObject, int[]> _orig = new Dictionary<ItemObject, int[]>();
@@ -105,9 +113,10 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                if (c == null) { _orig = neu; return; }
+                if (c == null) return;      // 419-p: ksiega zostaje stara (pola nieruszone - dalej prawdziwa)
                 _cap = Math.Max(CapMin, Math.Min(CapMax, c.RotBardingArmorCap));
                 int capHead = (int)Math.Round(_cap * HeadShare);
+                int capNeck = Math.Max(_cap, NeckFloor);
                 var fHead = AccessTools.Field(typeof(ArmorComponent), "<HeadArmor>k__BackingField");
                 var fBody = AccessTools.Field(typeof(ArmorComponent), "<BodyArmor>k__BackingField");
                 var fArm = AccessTools.Field(typeof(ArmorComponent), "<ArmArmor>k__BackingField");
@@ -118,6 +127,7 @@ namespace Armoury
                 bool model = false;
                 try { model = Game.Current != null && Game.Current.BasicModels != null && Game.Current.BasicModels.ItemValueModel != null; } catch { }
                 string off = !c.RotBardingCapEnabled ? "klucz ROT Plate Barding Can Be Pierced NIE - ladry plytowe jak w danych ROT"
+                           : !RangedRank.RbmLoaded ? "brak Realistic Battle Mod - poza RBM lacznik ROT nie rozklada pancerza konia, bez zmian"
                            : !fields ? "brak pol ArmorComponent (inna wersja gry) - bez zmian"
                            : getOv == null || setOv == null || !model ? "brak ItemObject.TierfOverride albo modelu wartosci - bez zamrozenia tieru nie ruszam (tier rzedu liczy sie z pancerza)" : null;
                 _on = off == null;
@@ -137,7 +147,7 @@ namespace Armoury
                         if (fields && old != null && old.TryGetValue(it, out o))
                         { fHead.SetValue(a, o[0]); fBody.SetValue(a, o[1]); fArm.SetValue(a, o[2]); fLeg.SetValue(a, o[3]); restored++; }
                         int h0 = a.HeadArmor, b0 = a.BodyArmor, a0 = a.ArmArmor, l0 = a.LegArmor;
-                        int h1 = Math.Min(h0, capHead), b1 = Math.Min(b0, _cap), a1 = Math.Min(a0, _cap), l1 = Math.Min(l0, _cap);
+                        int h1 = Math.Min(h0, capHead), b1 = Math.Min(b0, _cap), a1 = Math.Min(a0, capNeck), l1 = Math.Min(l0, _cap);
                         if (h1 == h0 && b1 == b0 && a1 == a0 && l1 == l0) { under++; neu[it] = new[] { h0, b0, a0, l0 }; continue; }
                         over++;
                         // sztuka w zbiorze takze przy kluczu NIE - pomiar "przed" w linii konca misji idzie w te same rubryki (ksiega = wartosci biezace)
@@ -160,14 +170,21 @@ namespace Armoury
                     Log.Info("Ladry ROT (419): " + off + " | ladrow plytowych z listy powyzej sufitu " + _cap + ": " + over + ", w sufcie " + under + ", brak w grze " + missing
                              + ", pominiete (inny typ / material) " + odd + (restored > 0 ? ", przywrocone do danych ROT " + restored : "") + " (tylko pomiar w linii konca misji).");
                 else
-                    Log.Info("Ladry ROT (419): sufit pancerza ladrow plytowych " + _cap + " (glowa " + capHead + ") | obnizone " + _changed + ", juz w sufcie " + under
+                    Log.Info("Ladry ROT (419): sufit pancerza ladrow plytowych " + _cap + " (glowa " + capHead + ", szyja " + capNeck
+                             + (capNeck > _cap ? " - nie nizej niz " + NeckFloor + ", prog ciezkiej jazdy RBM AI" : "") + ") | obnizone " + _changed + ", juz w sufcie " + under
                              + ", brak w grze " + missing + (missing > 0 ? " (" + sbMiss + ")" : "") + ", pominiete (inny typ / material / blad) " + odd
                              + " | tier zamrozony (TierfOverride), zmienionych tierow " + tierMoved
                              + " | wycena, kwit kuzni i pula zuzycia licza z wartosci sprzed sufitu; waga, cena gry i HP koni bez zmian"
                              + " | glowa/tulow/szyja/nogi: " + (_changed > 0 ? sb + (_changed > 4 ? ", ..." : "") : "-")
                              + " | swiadomie pominiete: " + string.Join(", ", SkippedByDecision) + ".");
             }
-            catch (Exception e) { _orig = neu; Log.Error("HorseBarding419.Apply", e); }
+            catch (Exception e)
+            {
+                // 419-p: po wyjatku ksiega nie gubi sztuk, ktorych pola moga byc dalej przyciete (wpisy nowe maja pierwszenstwo)
+                try { if (old != null) foreach (var kv in old) if (!neu.ContainsKey(kv.Key)) neu[kv.Key] = kv.Value; } catch { }
+                _orig = neu;
+                Log.Error("HorseBarding419.Apply", e);
+            }
         }
 
         /// <summary>Tier sprzed zmiany wpisany do TierfOverride (wartosc + 1), o ile sztuka nie ma juz wlasnego. Zwraca false, gdy sie nie udalo.</summary>
