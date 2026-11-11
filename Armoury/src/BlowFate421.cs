@@ -31,7 +31,9 @@ namespace Armoury
     ///   TYP: ciecie / klucie 1.0, obuch BlowDeathBluntFactor (0.35)
     ///   CZESC: glowa / szyja 1.0, piers / brzuch (i cios bez czesci ciala, np. upadek) BlowDeathTorsoFactor (0.60),
     ///          barki = srednia tulowia i konczyny, reka / noga BlowDeathLimbFactor (0.15)
-    ///   GLEBOKOSC: BlowDeathShallowFactor (0.50) dla ciosu, ktory ledwie zabral reszte HP, rosnie liniowo do 1.0 przy nadwyzce = polowa limitu HP.
+    ///   GLEBOKOSC: BlowDeathShallowFactor (0.50) dla lekkiego ciosu, ktory ledwie zabral reszte HP, rosnie liniowo do 1.0. Miara glebokosci (421-p,
+    ///          Depth) = wieksza z dwoch: nadwyzka obrazen ponad zabrane HP / polowa limitu HP oraz cale obrazenia ciosu / limit HP. Sama nadwyzka
+    ///          liczyla najciezszy cios (zdrowy czlowiek powalony jednym uderzeniem za 105) jako plytki, a dobicie rannego jako glebokie.
     /// Wszystkie czynniki &lt;= 1, wiec regula tylko obniza smiertelnosc (wiecej rannych, mniej zabitych). Bohaterowie: bez zmian (wczesny powrot).
     /// Postfiks: bez alokacji, bez try/catch, bez wywolan silnika (same pola agenta); wolany raz na powalonego, nie na trafienie.
     /// Latka w kampanii (NightHooks.InCampaign, raz na proces) - jak 413 / 415.
@@ -49,7 +51,8 @@ namespace Armoury
         // znacznik ciosu, po ktorym ofiara ma HP 0 (ten sam watek co rzut silnika)
         [ThreadStatic] private static Agent _victim;
         [ThreadStatic] private static int _vType, _vPart;
-        [ThreadStatic] private static float _vDepth;         // 0..1: nadwyzka obrazen / (polowa limitu HP)
+        [ThreadStatic] private static float _vDepth;         // 0..1: Depth()
+        [ThreadStatic] private static float _vTime;          // 421-p: czas misji w chwili ciosu - rzut bierze znacznik tylko z tej samej klatki
         // ofiara ostatniego rzutu z zapisanym ciosem - do rozkladu w OnAgentRemoved (KillingBlow nie wystarcza: Blow zrobiony przez new Blow(id),
         // np. zgon z krwawienia 313, ma VictimBodyPart = 0 = Head)
         [ThreadStatic] private static Agent _rolled;
@@ -58,6 +61,7 @@ namespace Armoury
         // liczniki misji
         private static readonly int[] _killed = new int[T * P], _wounded = new int[T * P];
         private static int _rolls, _changed, _noBlow, _heroes, _edge, _stum;
+        private static int _full, _stale, _synth;            // 421-p: rzuty z szansa gry 1 (czlowiek bez partii), znaczniki z innej klatki, sztuczne ciosy od siebie
         private static float _sumBase, _sumNew;
         private static int _otherKilled, _otherWounded;      // zolnierze zabici / ranni bez zapisanego ciosu albo bez czesci ciala (krwawienie, upadek)
 
@@ -134,6 +138,15 @@ namespace Armoury
             }
         }
 
+        /// <summary>Glebokosc ciosu 0..1 (421-p; wspolna z HeroBlow422): wieksza z dwoch miar - nadwyzka obrazen ponad zabrane HP / polowa limitu HP
+        /// (dobicie rannego ciosem duzo ciezszym niz trzeba) oraz cale obrazenia ciosu / limit HP (zdrowy czlowiek powalony jednym uderzeniem).</summary>
+        internal static float Depth(float inflicted, float damagedHp, float limit)
+        {
+            if (!(limit > 1f) || !(inflicted > 0f)) return 0f;
+            float a = (inflicted - damagedHp) / (limit * 0.5f), b = inflicted / limit;
+            return Clamp01(a > b ? a : b);
+        }
+
         /// <summary>Mnoznik szansy smierci dla ciosu (typ 0-2, grupa czesci ciala -1..4, glebokosc 0..1). Wszystkie czynniki przyciete do 0..1.</summary>
         internal static float Factor(Settings s, int type, int part, float depth)
         {
@@ -147,8 +160,8 @@ namespace Armoury
         }
 
         /// <summary>Po SandboxAgentDecideKilledOrUnconsciousModel.GetAgentStateProbability(napastnik, ofiara, typ, flagi, out chirurg): __result = szansa smierci.
-        /// Tylko zolnierz (nie bohater), tylko gdy tuz przed chwila OnScoreHit zapisal cios, ktory zabral mu reszte HP, i tylko szansa z przedzialu (0, 1)
-        /// (0 = obuch w grze bez RBM / bohater niesmiertelny; 1 = brak kampanii albo partii - nie nasza sprawa).</summary>
+        /// Tylko zolnierz (nie bohater), tylko gdy w tej samej klatce OnScoreHit zapisal cios, ktory zabral mu reszte HP, i tylko szansa z przedzialu (0, 1]
+        /// (0 = obuch w grze bez RBM - zostaje; 1 = czlowiek bez partii, np. bojka w miescie: RBM daje mu przezycie 0 - 421-p: ta sama regula co w polu).</summary>
         private static void ProbPostfix(Agent __1, ref float __result)
         {
             var v = _victim;
@@ -156,10 +169,15 @@ namespace Armoury
             if (__1 == null || !__1.IsHuman) return;
             if (__1.IsHero) { _heroes++; return; }
             if (v == null || !ReferenceEquals(v, __1)) { _noBlow++; return; }
+            // 421-p: znacznik tylko z tej samej klatki (cios i rzut ida jednym wywolaniem HandleBlow); stary znacznik na zywym agencie (HP podniesione
+            // przez inne zachowanie po ciosie) nie przechodzi na jego pozniejszy zgon z krwawienia
+            var mc = Mission.Current;
+            if (mc == null || mc.CurrentTime != _vTime) { _noBlow++; _stale++; return; }
             _rolled = __1; _rolledIx = _vPart >= 0 ? _vType * P + _vPart : -1;
             float p0 = __result;
-            if (!(p0 > 0f) || !(p0 < 1f)) { _edge++; return; }
+            if (!(p0 > 0f) || p0 > 1f) { _edge++; return; }
             _rolls++; _sumBase += p0;
+            if (p0 >= 1f) _full++;
             var s = Settings.Current;
             if (s == null || !s.BlowDecidesDeathEnabled) { _sumNew += p0; return; }
             float p = p0 * Factor(s, _vType, _vPart, _vDepth);
@@ -175,7 +193,7 @@ namespace Armoury
             _victim = null; _rolled = null;
             Array.Clear(_killed, 0, _killed.Length);
             Array.Clear(_wounded, 0, _wounded.Length);
-            _rolls = 0; _changed = 0; _noBlow = 0; _heroes = 0; _edge = 0; _stum = 0;
+            _rolls = 0; _changed = 0; _noBlow = 0; _heroes = 0; _edge = 0; _stum = 0; _full = 0; _stale = 0; _synth = 0;
             _sumBase = 0f; _sumNew = 0f; _otherKilled = 0; _otherWounded = 0;
         }
 
@@ -188,7 +206,8 @@ namespace Armoury
                 if (gm == null) { _model = "brak"; _modelOk = false; return; }
                 var t = gm.GetType();
                 _model = t.Name;
-                // obcy model, ktory nie dziedziczy po Sandbox (albo nadpisuje metode bez wolania bazy) - nasz postfiks moze nie biec
+                // model, ktory nie dziedziczy po Sandbox: postfiks biegnie tylko, gdy ten model wola Sandbox przez BaseModel (tak robi
+                // StoryModeAgentDecideKilledOrUnconsciousModel) - o dzialaniu rozstrzyga pole RZUTY w linii konca misji, nie ten znacznik
                 _modelOk = typeof(SandboxAgentDecideKilledOrUnconsciousModel).IsAssignableFrom(t);
             }
             catch { _modelOk = false; }
@@ -216,20 +235,21 @@ namespace Armoury
             Log.Info("Smierc czy rana (421): koniec misji (" + kind + ") | klucz " + (s != null && s.BlowDecidesDeathEnabled ? "TAK" : "NIE")
                      + " obuch " + F(s != null ? s.BlowDeathBluntFactor : 0f) + " tulow " + F(s != null ? s.BlowDeathTorsoFactor : 0f)
                      + " konczyna " + F(s != null ? s.BlowDeathLimbFactor : 0f) + " plytki " + F(s != null ? s.BlowDeathShallowFactor : 0f)
-                     + " | latka " + _patched + "/" + _wanted + ", model " + _model + (_modelOk ? "" : " (OBCY - regula moze nie dzialac)")
+                     + " | latka " + _patched + "/" + _wanted + ", model " + _model + (_modelOk ? "" : " (typ nie-Sandbox: regula dziala, jesli RZUTY z ciosem > 0)")
                      + " | ZOLNIERZE powaleni " + (k + w) + ": zabici " + k + ", ranni " + w + ", ranni do zabitych " + Ratio(k, w)
                      + " | zabici/ranni wg TYPU: ciecie " + Pair(kt[0], wt[0]) + ", klucie " + Pair(kt[1], wt[1]) + ", obuch " + Pair(kt[2], wt[2])
                      + " | wg CZESCI CIALA: glowa i szyja " + Pair(kp[0], wp[0]) + ", tulow " + Pair(kp[1], wp[1]) + ", barki " + Pair(kp[2], wp[2])
                      + ", rece " + Pair(kp[3], wp[3]) + ", nogi " + Pair(kp[4], wp[4]) + ", bez zapisanego ciosu / czesci ciala (krwawienie, upadek) " + Pair(_otherKilled, _otherWounded)
                      + " | RZUTY z ciosem " + _rolls + ": srednia szansa smierci gry " + (_rolls > 0 ? F(_sumBase / _rolls) : "-") + " -> po regule "
-                     + (_rolls > 0 ? F(_sumNew / _rolls) : "-") + ", obnizonych " + _changed
-                     + " | bez zapisanego ciosu " + _noBlow + ", szansa 0 albo 1 (bez zmian) " + _edge + ", bohaterowie (pominieci) " + _heroes
+                     + (_rolls > 0 ? F(_sumNew / _rolls) : "-") + ", obnizonych " + _changed + ", w tym z szansa gry 1.00 (czlowiek bez partii) " + _full
+                     + " | bez zapisanego ciosu " + _noBlow + " (w tym znacznik z innej klatki " + _stale + "), szansa 0 (bez zmian) " + _edge
+                     + ", bohaterowie (pominieci) " + _heroes + ", sztuczny cios od siebie liczony bez czesci ciala " + _synth
                      + (_stum > 0 ? ", potkniecia " + _stum : "") + ".");
             Reset();
         }
 
         /// <summary>Zapis ciosu, po ktorym czlowiek ma HP 0 (dla postfiksu), i rozklad zabitych / rannych zolnierzy wedlug typu ciosu i czesci ciala
-        /// (takze przy kluczu NIE - pomiar "przed"). Sciezka trafien: dwa porownania i odczyt pola HP, bez alokacji, bez try/catch.</summary>
+        /// (takze przy kluczu NIE - pomiar "przed"). Sciezka trafien: dwa porownania i odczyt HP, bez alokacji, bez try/catch.</summary>
         internal sealed class Logic : MissionLogic
         {
             public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
@@ -244,14 +264,17 @@ namespace Armoury
             public override void OnScoreHit(Agent affectedAgent, Agent affectorAgent, WeaponComponentData attackerWeapon, bool isBlocked, bool isSiegeEngineHit,
                 in Blow blow, in AttackCollisionData collisionData, float damagedHp, float hitDistance, float shotDifficulty)
             {
-                if (affectedAgent == null || !affectedAgent.IsHuman || affectedAgent.Health >= 1f) return;   // Agent.Health to pole (mb_full.cs:11862)
+                if (affectedAgent == null || !affectedAgent.IsHuman || affectedAgent.Health >= 1f) return;   // Agent.Health: wlasciwosc z prostym getterem pola _health (mb_full.cs:11862-11867)
                 var part = blow.VictimBodyPart;
                 if (part == BoneBodyPartType.None) part = collisionData.VictimHitBodyPart;
-                float limit = affectedAgent.HealthLimit;
-                float over = blow.InflictedDamage - damagedHp;
                 _vType = TypeIx(blow.DamageType);
-                _vPart = PartIx(part);
-                _vDepth = limit > 1f && over > 0f ? over / (limit * 0.5f) : 0f;
+                // 421-p: sztuczny cios od siebie bez energii (Artem KnockBackAnimation: new Blow(agent.Index), InflictedDamage 1, BaseMagnitude 0 - ten sam
+                // warunek co FieldCraft 313d) ma VictimBodyPart = 0 = Head z default(Blow) - liczony jako cios bez czesci ciala, nie jako glowa
+                if (blow.OwnerId == affectedAgent.Index && blow.BaseMagnitude <= 0f) { _vPart = -1; _synth++; }
+                else _vPart = PartIx(part);
+                _vDepth = Depth(blow.InflictedDamage, damagedHp, affectedAgent.HealthLimit);
+                var mc = Mission.Current;
+                _vTime = mc != null ? mc.CurrentTime : -1f;
                 _victim = affectedAgent;
             }
 
