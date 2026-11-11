@@ -423,8 +423,11 @@ namespace Armoury
                         int mercy = ex != null ? Trait(ex, DefaultTraits.Mercy) : 0;
                         // 393-p (Jeff 11.11, odp. 6 "tak, maja go sciac" - bez zastrzezen): bramka Mercy < 0 zdjeta - scina kazdy kat (w ROT_lords.xml Mercy < 0 ma ok. 13%
                         // postaci, wiec z bramka zakladnik ginalby w 1 przypadku na 8); Mercy zostaje tylko w logu
+                        // 396-p: przez StoryGuard.MayDie (straz + gra) zamiast golego CanDie - w oknie trwajacego wydarzenia ROT sluchacz 396 przepuszcza jego ofiare
+                        // kazdemu katu; zakladnik-postac fabuly nie ginie od nas przed swoim wydarzeniem. Klucz Story Guard NIE = samo CanDie jak dotad
+                        string sgWhy = null;
                         string whyNot = ex == null ? "brak kata (lord przysiegi i pan lochu martwi / w niewoli / dziecko)"
-                            : !h.CanDie(KillCharacterAction.KillCharacterActionDetail.Executed) ? "smierc zablokowana (CanHeroDie)" : null;
+                            : !StoryGuard.MayDie(h, KillCharacterAction.KillCharacterActionDetail.Executed, "hostage", out sgWhy) ? "smierc zablokowana (" + (sgWhy ?? "CanHeroDie") + ")" : null;
                         if (whyNot == null)
                         {
                             KillCharacterAction.ApplyByExecution(h, ex);

@@ -64,6 +64,7 @@ namespace Armoury
         private static readonly Dictionary<string, Hero> _byId = new Dictionary<string, Hero>(StringComparer.Ordinal);       // robocze: id z tabel -> bohater (zywy albo martwy)
         private static readonly HashSet<string> _ids = new HashSet<string>(StringComparer.Ordinal);                          // wszystkie id z tabel Guarded + Need
         private static readonly HashSet<Hero> _passed = new HashSet<Hero>();                        // przepuszczeni jako ofiary trwajacego wydarzenia (nie UTRATA)
+        private static readonly HashSet<Hero> _blind = new HashSet<Hero>();                         // 396-p: stan 1 z BLEDU oceny / nieznanego typu wydarzenia - weto gry otwarte, ale NASZ kod nie zabija (Clear)
         private static readonly Dictionary<Hero, int> _vetoSaid = new Dictionary<Hero, int>();      // maska przyczyn z linia WETO w tej dobie
         private static readonly HashSet<Hero> _passSaid = new HashSet<Hero>();                      // linia PRZEPUSZCZONE w tej dobie
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
@@ -95,7 +96,7 @@ namespace Armoury
         {
             _built = _ready = _startSaid = _blindSaid = false;
             _tryHour = int.MinValue; _eventsSeen = -1;
-            _memo.Clear(); _why.Clear(); _evObj.Clear(); _byId.Clear(); _passed.Clear(); _vetoSaid.Clear(); _passSaid.Clear(); _errSites.Clear();
+            _memo.Clear(); _why.Clear(); _evObj.Clear(); _byId.Clear(); _passed.Clear(); _blind.Clear(); _vetoSaid.Clear(); _passSaid.Clear(); _errSites.Clear();
             _dBattle = _dKill = _dLabor = _dPass = _dLost = _dFreed = _dStumbles = _stumbles = 0;
         }
 
@@ -119,7 +120,7 @@ namespace Armoury
             if (_camp != c) { _camp = c; Wipe(); }
             if (_built && _ready) return true;
             int hr = (int)CampaignTime.Now.ToHours;
-            if (_built && hr == _tryHour) return true;
+            if (hr == _tryHour) return _built;   // 396-p: jedna proba na godzine gry niezaleznie od wyniku (Rebuild, ktory padl przed _built, nie jest ponawiany przy kazdym pytaniu CanDie)
             _tryHour = hr;
             Rebuild();
             return _built;
@@ -141,16 +142,19 @@ namespace Armoury
                 foreach (var h in Hero.AllAliveHeroes) if (h != null && h.StringId != null && _ids.Contains(h.StringId)) _byId[h.StringId] = h;
                 foreach (var h in Hero.DeadOrDisabledHeroes) if (h != null && h.StringId != null && _ids.Contains(h.StringId) && !_byId.ContainsKey(h.StringId)) _byId[h.StringId] = h;
 
+                // 396-p: swiezy odczyt stanu wydarzen - w pamieci dobowej CanonCompanions moze lezec -1 zapisane (BaseTrue / Kronika), zanim ROT dopisal wydarzenia;
+                // bez tego pierwsza udana budowa dalaby "nieznany typ wydarzenia" calej tabeli do nastepnej doby. Rebuild jest rzadki (doba, leniwy start, co godzine przy slepej liscie)
+                CanonCompanions.ClearEventCache();
                 int n = CanonCompanions.EventObjects(_evObj);
                 _eventsSeen = n;
                 bool ready = n > 0;
                 double day = CanonCompanions.StoryDay();
-                int total = 0, gone = 0, kept = 0, freed = 0;
+                int total = 0, gone = 0, kept = 0, freed = 0, blind = 0;
                 StringBuilder sbKept = null, sbFreed = null;
                 bool first = !_startSaid && ready;
                 if (first) { sbKept = new StringBuilder(); sbFreed = new StringBuilder(); }
                 var old = _built && _ready ? new Dictionary<Hero, int>(_memo) : null;
-                _memo.Clear(); _why.Clear();
+                _memo.Clear(); _why.Clear(); _blind.Clear();
                 foreach (var id in CanonCompanions.GuardedIds)
                 {
                     total++;
@@ -159,7 +163,10 @@ namespace Armoury
                     if (h == Hero.MainHero) continue;
                     string why = "lista wydarzen ROT niewidoczna"; int st = 1;
                     try { if (ready) st = Compute(h, CanonCompanions.GuardedTerms(id), s, day, out why); }
-                    catch (Exception e) { Stumble("Compute", e); st = 1; why = "blad oceny"; }
+                    catch (Exception e) { Stumble("Compute", e); st = -1; why = "blad oceny"; }
+                    // 396-p: -1 = nie dalo sie ocenic (wyjatek albo nieznany typ wydarzenia ROT): weto gry zostaje otwarte (stan 1, nie chronimy "na zawsze"),
+                    // ale nasze wlasne zabojstwa / okaleczenia / wyroki odmawiaja (PLAN-396 rozdz. 0 pkt 4 - nie zabijamy postaci fabuly na slepo)
+                    if (st < 0) { st = 1; _blind.Add(h); blind++; why = "NIEOCENIONY: " + why; }
                     _memo[h] = st; _why[h] = why;
                     if (st == 2) { kept++; if (first) sbKept.Append(kept > 1 ? ", " : "").Append(Nm(h)).Append(' ').Append(id).Append(" -> ").Append(why); }
                     else
@@ -192,13 +199,14 @@ namespace Armoury
                              + s.StoryGuardGraceDays + ", Roose po Godach " + YN(s.StoryGuardRooseSurvivesRedWedding) + ") | wydarzen ROT widac " + n + " | os Fabuli "
                              + YN(Chronicle.Terms.PlanAvailable) + " | dzien opowiesci " + day.ToString("0", Inv) + " | chronionych " + kept + "/" + total + ": "
                              + (kept > 0 ? sbKept.ToString() : "-") + " | zwolnionych " + freed + ": " + (freed > 0 ? sbFreed.ToString() : "-")
-                             + " | poza swiatem (martwi / brak id) " + gone + ".");
+                             + " | nieocenionych (bez weta gry, nasz kod ich nie zabija) " + blind + " | poza swiatem (martwi / brak id) " + gone + ".");
                 }
             }
             catch (Exception e) { Stumble("Rebuild", e); }
         }
 
-        /// <summary>Stan bohatera z tabeli przy widocznej liscie wydarzen: 1 zwolniony (why = powod) albo 2 chroniony (why = na co czeka, z planem).</summary>
+        /// <summary>Stan bohatera z tabeli przy widocznej liscie wydarzen: 1 zwolniony (why = powod), 2 chroniony (why = na co czeka, z planem) albo
+        /// -1 nieoceniony (396-p: nieznany typ wydarzenia ROT - Rebuild zapisuje stan 1 i dopisuje bohatera do _blind).</summary>
         private static int Compute(Hero h, string[] terms, Settings s, double day, out string why)
         {
             why = "";
@@ -210,7 +218,7 @@ namespace Armoury
             {
                 string ev = EventOf(t);
                 int es = CanonCompanions.EventState(ev);
-                if (es < 0) { why = "nieznany typ wydarzenia ROT " + ev + " (term " + t + ")"; return 1; }   // przy widocznej liscie: nie chronimy "na zawsze" 
+                if (es < 0) { why = "nieznany typ wydarzenia ROT " + ev + " (term " + t + ")"; return -1; }   // przy widocznej liscie: nie chronimy "na zawsze" (weto gry otwarte), nasz kod odmawia
                 if (t.StartsWith("ev:", StringComparison.Ordinal) ? es >= 1 : es == 2) { why = t + " spelnione"; return 1; }
             }
             // (d) niemozliwe i (e) zawor
@@ -360,14 +368,40 @@ namespace Armoury
                 if (!_memo.TryGetValue(victim, out st) || st != 2) return;
                 string ev;
                 if (_passed.Contains(victim) || Walker(victim) || VictimNow(victim, out ev)) return;
-                _dLost++;
-                _memo[victim] = 1;
                 string why;
                 _why.TryGetValue(victim, out why);
+                // 396-p: dwa przypadki, ktore NIE sa utrata mimo strazy (falszywe linie UTRATA w zwyklym biegu fabuly):
+                // (a) znak smierci postawiony wczesniej (klucz Battle And Age NIE albo znak sprzed ochrony) - sluchacz sam przepuszcza naznaczonych;
+                // (b) usuniecie Lost w trakcie wydarzenia ROT - ROT niszczy rod (DestroyClanAction.ApplyByClanLeaderDeath zdejmuje wszystkich poza glowa)
+                if (Marked(victim))
+                {
+                    _dPass++; _memo[victim] = 1;
+                    Log.Info(Tag + "ZGON chronionego ze znakiem smierci " + Nm(victim) + " (" + victim.StringId + ") przyczyna " + detail + ", znak " + victim.DeathMark
+                             + " (weto bitwy wylaczone kluczem albo znak sprzed ochrony) - " + (why ?? "?") + " moze nie zajsc.");
+                    return;
+                }
+                string run;
+                if (detail == KillCharacterAction.KillCharacterActionDetail.Lost && AnyEventActive(out run))
+                {
+                    _dPass++; _memo[victim] = 1;
+                    Log.Info(Tag + "USUNIETY przez wydarzenie ROT " + Nm(victim) + " (" + victim.StringId + ") - Lost w trakcie " + run + " (niszczenie rodu przez wydarzenie); czekal na " + (why ?? "?") + ".");
+                    return;
+                }
+                _dLost++;
+                _memo[victim] = 1;
                 Log.Info(Tag + "UTRATA chronionego " + Nm(victim) + " (" + victim.StringId + ") przyczyna " + detail + (killer != null ? ", zabojca " + Nm(killer) : "")
                          + " mimo strazy (droga wymuszona albo usuniecie) - " + (why ?? "?") + " moze nie zajsc.");
             }
             catch (Exception e) { Stumble("BeforeHeroKilled", e); }
+        }
+
+        /// <summary>396-p: ktorekolwiek wydarzenie ROT wlasnie trwa (IsActive na zywo; do ~40 odczytow, wolane tylko przy smierci chronionego). name = typ.</summary>
+        private static bool AnyEventActive(out string name)
+        {
+            name = null;
+            foreach (var kv in _evObj)
+                if (CanonCompanions.EventActiveLive(kv.Value)) { name = kv.Key; return true; }
+            return false;
         }
 
         /// <summary>Doba strazy (pierwsza w dobie Armoury): swiezy odczyt wydarzen ROT, przeliczenie tabeli, linia doby tylko gdy cos zaszlo.</summary>
@@ -507,13 +541,14 @@ namespace Armoury
             catch (Exception e) { Stumble("ClanLocked", e); return false; }
         }
 
-        /// <summary>Bramka strazy dla naszych systemow: false = chroniony albo postac z tabeli przy niewidocznej liscie wydarzen ROT.</summary>
+        /// <summary>Bramka strazy dla naszych systemow: false = chroniony, nieoceniony (396-p) albo postac z tabeli przy niewidocznej liscie wydarzen ROT.</summary>
         private static bool Clear(Hero h, out string why)
         {
             why = null;
             if (!KeyOn || h == Hero.MainHero) return true;
             string w;
             if (State(h, out w) == 2) { why = "straz fabuly (" + (w ?? "?") + ")"; return false; }
+            if (_blind.Contains(h)) { why = "straz fabuly (" + (w ?? "stan nieoceniony") + ")"; return false; }   // 396-p: blad oceny / nieznany typ wydarzenia - nie zabijamy na slepo
             if (h.StringId != null && CanonCompanions.GuardedTerms(h.StringId) != null && !(Ensure() && _ready))
             { why = "straz fabuly (postac z tabeli obsady, lista wydarzen ROT niewidoczna)"; return false; }
             return true;

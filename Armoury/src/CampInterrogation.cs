@@ -857,7 +857,10 @@ namespace Armoury
                     res.Died = true; _dDeadMen++; _sum[4]++;
                     return "TAK (zwykly, ksiega ludzi straceni 1)";
                 }
-                if (!g.Hero.CanDie(KillCharacterAction.KillCharacterActionDetail.Murdered)) { res.Blocked = true; _dBlocked++; return "zablokowana (CanHeroDie)"; }
+                // 396-p: przez StoryGuard.MayDie (straz + gra) zamiast golego CanDie - sluchacz 396 przepuszcza ofiare TRWAJACEGO wydarzenia ROT kazdemu zabojcy
+                // (np. Robb przez 14 dob Krwawych Godow); nasza smierc od tortur nie moze wyprzedzic wydarzenia. Klucz Story Guard NIE = samo CanDie jak dotad
+                string sgWhy;
+                if (!StoryGuard.MayDie(g.Hero, KillCharacterAction.KillCharacterActionDetail.Murdered, "interrogation", out sgWhy)) { res.Blocked = true; _dBlocked++; return "zablokowana (" + (sgWhy ?? "CanHeroDie") + ")"; }
                 // zamknieta ekonomia: gra przy smierci daje sakiewke zabitego glowie jego klanu (GiveGoldAction.ApplyBetweenCharacters); klan bandytow bez glowy (albo glowa = on)
                 // - zloto przepadloby w nicosc (odbiorca null), wiec bierze je gracz, ktory trzyma jenca
                 string purse = "";
