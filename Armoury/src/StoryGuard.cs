@@ -531,6 +531,26 @@ namespace Armoury
             catch (Exception e) { Stumble("Shielded", e); return false; }
         }
 
+        /// <summary>403-p: w rodzie zyje (poza except) postac, ktorej nasz kod nie moze wyjac z fabuly (Shielded) - smierc glowy bez dziedzica usunelaby
+        /// ja razem z rodem (DestroyClanAction.ApplyByClanLeaderDeath -> ApplyByRemove, wymuszone). who: jej imie do logu. Nie rzuca.</summary>
+        internal static bool ClanHoldsStory(Clan c, Hero except, out string who)
+        {
+            who = null;
+            try
+            {
+                if (c == null || !KeyOn) return false;
+                foreach (var x in c.Heroes)
+                {
+                    string w;
+                    if (x == null || x == except || !x.IsAlive || Clear(x, out w)) continue;
+                    who = (x.Name != null ? x.Name.ToString() : "?") + " [" + x.StringId + "]";
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception e) { Stumble("ClanHoldsStory", e); who = "blad oceny"; return true; }   // blad = odmowa (ostroznie)
+        }
+
         /// <summary>410: rod, w ktorym zyje ktokolwiek chroniony (stan 2) - spor o dziedzictwo takiego rodu nie rusza (FuneralRites.Succession). Nie rzuca.</summary>
         internal static bool ClanLocked(Clan c)
         {

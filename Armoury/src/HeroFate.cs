@@ -18,7 +18,8 @@ namespace Armoury
     /// TryKill - kolejnosc: zywy i bez znaku smierci -> StoryGuard.MayDie (straz fabuly + CanHeroDie gry i cudzych sluchaczy) -> dziecko -> (gdy to nie wybor
     /// gracza) wladca przy Hero Fate Rulers Can Die NIE, ostatni dorosly zywy lord rodu przy Hero Fate Spare Last Of House TAK (warunek gry z
     /// KillCharacterAction.ApplyInternal: bez innego doroslego lorda rod ginie - DestroyClanAction.ApplyByClanLeaderDeath), roczny sufit LordToll ->
-    /// odroczenie (Busy: partia bohatera albo pojmujacego w bitwie, wolny bohater w oblezeniu, misja, rozmowa gracza z nim, menu lochu tej osady) ->
+    /// odroczenie (Busy: partia bohatera albo pojmujacego w bitwie, partia bohatera oblega, misja, spotkanie POLOWE gracza, rozmowa gracza z nim, menu lochu
+    /// tej osady; 403-p: sam pobyt gracza w osadzie ani oblezona osada nie odraczaja - gra zabija tam ze starosci tak samo) ->
     /// wykonanie akcja gry (ApplyByWounds / ApplyByMurder / ApplyByExecution). NIGDY przez znak smierci: w warunkach, w ktorych gra postawilaby znak
     /// (PartyBelongedTo w MapEvent / SiegeEvent), odraczamy - wiec akcja gry zabija od razu albo wcale. Po smierci gra sama: zloto do glowy rodu, partia -
     /// nowy wodz albo rozwiazanie, jeniec znika z listy, armia rozwiazana, wybor wladcy (ale wladce domyslnie oszczedzamy).
@@ -110,16 +111,24 @@ namespace Armoury
             catch { return false; }
         }
 
-        /// <summary>Ostatni dorosly zywy lord rodu (warunek gry: bez innego rod ginie przy smierci glowy). Bohater bez rodu - NIE.</summary>
+        /// <summary>Ostatni z rodu - smierc tego bohatera konczy rod albo zostawia go bez doroslego lorda. Bohater bez rodu - NIE.
+        /// 403-p: GLOWA rodu liczona tak, jak gra wybiera nastepce (KillCharacterAction.ApplyInternal: jest inny dorosly zywy lord ORAZ
+        /// Clan.GetHeirApparents() niepuste - dziedzic bez znaku smierci, nie Disabled / NotSpawned, nie wedrowiec; inaczej glowa zostaje i
+        /// DestroyClanAction.ApplyByClanLeaderDeath usuwa caly rod). Pozostali: brak innego doroslego lorda zdolnego dziedziczyc.</summary>
         internal static bool LastOfHouse(Hero h)
         {
             try
             {
                 var c = h != null ? h.Clan : null;
                 if (c == null) return false;
+                bool other = false;
                 foreach (var x in c.Heroes)
-                    if (x != null && x != h && x.IsAlive && !x.IsChild && x.IsLord) return false;
-                return true;
+                    if (x != null && x != h && x.IsAlive && !x.IsChild && x.IsLord && x.DeathMark == KillCharacterAction.KillCharacterActionDetail.None
+                        && !x.IsDisabled && !x.IsNotSpawned) { other = true; break; }
+                if (!other) return true;
+                if (c.Leader != h) return false;
+                var heirs = c.GetHeirApparents();
+                return heirs == null || heirs.Count == 0;
             }
             catch (Exception e) { Stumble("LastOfHouse", e); return true; }   // blad = oszczedzamy (ostroznie)
         }
@@ -136,19 +145,20 @@ namespace Armoury
                 if (mp != null)
                 {
                     if (mp.MapEvent != null) { what = "bitwa"; return true; }
-                    if (mp.SiegeEvent != null) { what = "oblezenie"; return true; }
-                    var cs = mp.CurrentSettlement;
-                    if (cs != null && cs.IsUnderSiege) { what = "oblezona osada"; return true; }
+                    if (mp.SiegeEvent != null) { what = "oblezenie"; return true; }   // partia OBLEGA (MobileParty.SiegeEvent = BesiegerCamp) - gra postawilaby znak smierci
                 }
+                // 403-p: bohater w OBLEZONEJ osadzie nie odracza - gra nie stawia tam znaku smierci (warunek to tylko MapEvent / SiegeEvent partii), a loze
+                // rannego obroncy trwaloby cale oblezenie
                 var cap = h.PartyBelongedToAsPrisoner;
                 if (cap != null && cap.MapEvent != null) { what = "bitwa pojmujacego"; return true; }
-                if (cap == null)
-                {
-                    var st = h.CurrentSettlement;
-                    if (st != null && st.IsUnderSiege) { what = "oblezona osada"; return true; }
-                }
                 bool playerSide = h == Hero.MainHero || (mp != null && mp == MobileParty.MainParty) || (cap != null && cap == PartyBase.MainParty);
-                if (playerSide) { try { if (PlayerEncounter.Current != null) { what = "spotkanie gracza"; return true; } } catch { } }
+                // 403-p: tylko spotkanie POLOWE albo bitwa. Sam pobyt gracza w miescie / zamku / wsi trzyma PlayerEncounter przez caly czas (gra zabija tam
+                // towarzyszy ze starosci) - odraczanie zamrazalo przesilenie i loze gracza, ktory odpoczywal w murach
+                if (playerSide)
+                {
+                    try { if (PlayerEncounter.Current != null && (PlayerEncounter.Battle != null || PlayerEncounter.EncounterSettlement == null)) { what = "spotkanie gracza"; return true; } }
+                    catch { }
+                }
                 try
                 {
                     var cm = Campaign.Current != null ? Campaign.Current.ConversationManager : null;
@@ -188,10 +198,18 @@ namespace Armoury
                 if (h.IsChild) { why = "dziecko"; return Fate.Refused; }
                 var s = Settings.Current;
                 if (s == null) { why = "brak ustawien"; return Fate.Refused; }
+                bool last = h != Hero.MainHero && LastOfHouse(h);
+                // 403-p: smierc glowy bez dziedzica niszczy rod, a gra usuwa wtedy WSZYSTKICH jego zywych czlonkow (ApplyByRemove, wymuszone - omija CanHeroDie).
+                // Jesli w rodzie zyje postac fabuly, odmawiamy zawsze - takze wyrokowi gracza i przy kluczu Hero Fate Spare Last Of House NIE.
+                if (last && h.Clan != null && h.Clan.Leader == h)
+                {
+                    string who;
+                    if (StoryGuard.ClanHoldsStory(h.Clan, h, out who)) { why = "straz fabuly (rod zginalby z glowa, a zyje w nim " + who + ")"; return Fate.Refused; }
+                }
                 if (!playerChoice)
                 {
                     if (!s.HeroFateRulersCanDie && IsRuler(h)) { why = "oszczedzony (wladca)"; return Fate.Refused; }
-                    if (s.HeroFateSpareLastOfHouse && LastOfHouse(h)) { why = "oszczedzony (ostatni z rodu)"; return Fate.Refused; }
+                    if (s.HeroFateSpareLastOfHouse && last) { why = "oszczedzony (ostatni z rodu)"; return Fate.Refused; }
                     if (!LordToll.Allow(source, out why)) return Fate.Refused;
                 }
                 string what;
@@ -204,9 +222,10 @@ namespace Armoury
 
                 if (player)
                 {
-                    // gra nie zabija gracza od razu: OnBeforeMainCharacterDied (wybor dziedzica albo koniec gry) - dalej prowadzi gra
-                    LordToll.Note(source);
-                    why = "gracz - gra przejela (wybor dziedzica)";
+                    // gra nie zabija gracza od razu: OnBeforeMainCharacterDied (wybor dziedzica albo koniec gry) - dalej prowadzi gra.
+                    // 403-p: konto roku tylko przy potwierdzonej smierci (sluchacz wyboru dziedzica jest poza naszym kodem - NIETESTOWANE w tym zestawie modow)
+                    if (!h.IsAlive) { LordToll.Note(source); why = "gracz - wykonane (" + detail + ")"; }
+                    else why = "gracz - gra przejela (wybor dziedzica; zgon nie potwierdzony, poza kontem roku)";
                     return Fate.Killed;
                 }
                 if (!h.IsAlive) { LordToll.Note(source); why = "wykonane (" + detail + ")"; return Fate.Killed; }

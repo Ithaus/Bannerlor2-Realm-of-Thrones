@@ -38,8 +38,9 @@ namespace Armoury
     /// 403 - PRZESILENIE: w dniu przesilenia (doba; nigdy w seterze HP ani w misji) rzut smierci z warunkami Z TEJ CHWILI: p = Hero Wounds Death Base Percent
     /// + Hero Wounds Death Per Year Over40 x lata ponad 40 (sufit 40%); wolny bohater w nieoblezonej twierdzy x0.6; chirurg partii Medicine >= 100 x0.75,
     /// >= 200 x0.5; jeniec x1.5. Trafiony idzie do HeroFate.TryKill (straz fabuly, dziecko, wladca, ostatni z rodu, sufit roku LordToll, akcja gry
-    /// ApplyByWounds - nigdy znak smierci). Bohater zajety (bitwa, oblezenie, misja, rozmowa - HeroFate.Busy) -> przesilenie czeka do nastepnej doby, loze nie
-    /// konczy sie przed nim. Odmowa -> wpis zostaje jako Serious. Gracz bez rzutu przy Hero Wounds Player Can Die NIE. Kto przezyl przesilenie, ma rzut
+    /// ApplyByWounds - nigdy znak smierci). Bohater zajety (bitwa, partia oblega, misja, spotkanie polowe gracza, rozmowa - HeroFate.Busy) -> przesilenie czeka
+    /// do nastepnej doby, loze nie konczy sie przed nim; 403-p: najdluzej do dnia rany + 24, potem mija bez rzutu, a galezie bez smierci (klucze NIE, gracz bez
+    /// rzutu, opcja kampanii bez smierci w bitwie) nie czekaja wcale. Odmowa -> wpis zostaje jako Serious. Gracz bez rzutu przy Hero Wounds Player Can Die NIE. Kto przezyl przesilenie, ma rzut
     /// okaleczenia Hero Wounds Maim Percent (HeroFate.TryMaim; w dobie, nie w chwili rany - HeroWounded pada w seterze HP w srodku misji).
     ///
     /// Rana krytyczna RealisticBannerlord (15% przy kazdym HeroWounded, -4 HP/dobe) - wylaczona prefiksem przy kluczu Hero Wounds Replace Rb Critical (jedna zasada).
@@ -48,6 +49,7 @@ namespace Armoury
     internal static partial class HeroWounds
     {
         private const string Tag = "Rany (HW): ";
+        private const int CrisisMaxWaitDays = 24;   // 403-p: przesilenie pada 3..10 dni po ranie; odroczenia (bitwa, oblezenie) najdluzej do rana + 24, potem bez rzutu smierci
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal const int Serious = 1, Grave = 2;
 
@@ -298,7 +300,8 @@ namespace Armoury
 
         private static string StateText(Row r)
         {
-            return r.Grade == Grave && r.Crisis > 0 ? "Gravely wounded - the crisis has not passed" : "Bedridden (" + Math.Max(1, r.Left) + " days of rest left)";
+            var s = Settings.Current;   // 403-p: przy Hero Wounds Death Enabled NIE przesilenie nikogo nie zabija - bez grozby w napisie
+            return r.Grade == Grave && r.Crisis > 0 && s != null && s.HeroWoundsDeathEnabled ? "Gravely wounded - the crisis has not passed" : "Bedridden (" + Math.Max(1, r.Left) + " days of rest left)";
         }
 
         /// <summary>Encyklopedia bohatera: wiersz "Wounds" w statystykach lezacego (nie przy ukrytych informacjach o bohaterze).</summary>
@@ -711,18 +714,35 @@ namespace Armoury
             bool log = s.HeroWoundsLog;
             string head = Tag + Nm(h) + " (" + r.Id + ", wiek " + ((int)h.Age) + ") przesilenie rany z dnia " + r.Day.ToString("0", Inv) + " " + r.Place + ": ";
             string what;
-            if (HeroFate.Busy(h, out what))
+            bool player = h == Hero.MainHero;
+            // 403-p: najpierw galezie BEZ smierci - nie potrzebuja odroczenia (klucz NIE = stan sprzed 403; gracz bez rzutu nie czeka na wyjazd z miasta)
+            string noRoll = null;
+            bool keyOff = !s.HeroWoundsEnabled || !s.HeroWoundsDeathEnabled;
+            if (keyOff) noRoll = "klucz Hero Wounds Enabled / Hero Wounds Death Enabled NIE";
+            else if (player && !s.HeroWoundsPlayerCanDie) noRoll = "gracz - klucz Hero Wounds Player Can Die NIE";
+            else
             {
-                _dDeferred++;
-                if (!r.DeferSaid) { r.DeferSaid = true; if (log) Log.Info(head + "odroczone (" + what + ") - ponowna proba co dobe."); }
-                return false;
+                // opcja kampanii gry: przy najlatwiejszej bohaterowie nie gina w bitwie (DefaultPartyHealingModel.GetSurvivalChance), przy latwej - gracz
+                CampaignOptions.Difficulty bd = CampaignOptions.Difficulty.Realistic;
+                try { bd = CampaignOptions.BattleDeath; } catch { }
+                if (bd == CampaignOptions.Difficulty.VeryEasy) noRoll = "opcja kampanii: bohaterowie nie gina w bitwie";
+                else if (player && bd == CampaignOptions.Difficulty.Easy) noRoll = "opcja kampanii: gracz nie ginie w bitwie";
+            }
+            if (noRoll == null && HeroFate.Busy(h, out what))
+            {
+                // 403-p: sufit odroczen - po CrisisMaxWaitDays od rany przesilenie mija bez rzutu (lord oblegajacy przez miesiace nie lezy bez konca)
+                if (day >= (int)r.Day + CrisisMaxWaitDays) noRoll = "odroczenia ponad " + CrisisMaxWaitDays + " dob od rany (" + what + ")";
+                else
+                {
+                    _dDeferred++;
+                    if (!r.DeferSaid) { r.DeferSaid = true; if (log) Log.Info(head + "odroczone (" + what + ") - ponowna proba co dobe, najdluzej do dnia " + ((int)r.Day + CrisisMaxWaitDays) + "."); }
+                    return false;
+                }
             }
             r.Crisis = -1; _dCrisis++;
-            bool player = h == Hero.MainHero;
             bool dead = false;
             string outcome;
-            if (!s.HeroWoundsEnabled || !s.HeroWoundsDeathEnabled) { outcome = "bez rzutu smierci (klucz Hero Wounds Enabled / Hero Wounds Death Enabled NIE)"; _dSpared++; }
-            else if (player && !s.HeroWoundsPlayerCanDie) { outcome = "bez rzutu smierci (gracz - klucz Hero Wounds Player Can Die NIE)"; _dSpared++; }
+            if (noRoll != null) { outcome = "bez rzutu smierci (" + noRoll + ")"; _dSpared++; }
             else
             {
                 float age = h.Age;
@@ -763,7 +783,7 @@ namespace Armoury
                         try { if (tell) Log.Player(name + " has died of wounds taken " + (string.IsNullOrEmpty(r.Place) ? "in battle" : r.Place) + ".", mine); }
                         catch (Exception e) { Stumble("Crisis.Player", e); }
                     }
-                    else if (fate == HeroFate.Fate.Deferred)
+                    else if (fate == HeroFate.Fate.Deferred && day < (int)r.Day + CrisisMaxWaitDays)
                     {
                         r.Crisis = day + 1; _dCrisis--; _dDeferred++;
                         if (log) Log.Info(head + outcome + why + " - ponowna proba jutro.");
@@ -795,10 +815,11 @@ namespace Armoury
             {
                 try
                 {
-                    if (player) { Log.Player("You have passed the worst and will live."); if (maimType != null) Log.Player(HeroFate.News(h, maimType), true); }
+                    // 403-p: "przezyl najgorsze" tylko gdy przesilenie bylo grozba (klucze smierci TAK); przy kluczu NIE sam komunikat okaleczenia
+                    if (player) { if (!keyOff) Log.Player("You have passed the worst and will live."); if (maimType != null) Log.Player(HeroFate.News(h, maimType), true); }
                     else if (Concerns(h, true))
                     {
-                        Log.Player(Nm(h) + " has passed the worst and will live.");
+                        if (!keyOff) Log.Player(Nm(h) + " has passed the worst and will live.");
                         if (maimType != null) Log.Player(HeroFate.News(h, maimType), h.MapFaction == Hero.MainHero.MapFaction);
                     }
                 }

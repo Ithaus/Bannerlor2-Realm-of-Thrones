@@ -11972,7 +11972,7 @@ namespace Armoury
         [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
         public bool HeroWoundsLog { get; set; } = true;
 
-        [SettingPropertyBool("Hero Wounds Death Enabled", HintText = "With Hero Wounds Enabled: a grave wound comes to its crisis three to ten days after the battle, and the hero may die of it then (Hero Wounds Death Base Percent, more with age; less inside a castle or town and with a skilled surgeon in the party, more for a prisoner). Characters the Realm of Thrones story still needs, children, rulers (Hero Fate Rulers Can Die) and the last grown lord of a house (Hero Fate Spare Last Of House) do not die this way, and no more than Hero Wounds Max Deaths Per Year die in one year. Off = nobody dies of wounds after the battle", RequireRestart = false)]
+        [SettingPropertyBool("Hero Wounds Death Enabled", HintText = "With Hero Wounds Enabled: a grave wound comes to its crisis three to ten days after the battle, and the hero may die of it then (Hero Wounds Death Base Percent, more with age; less inside a castle or town and with a skilled surgeon in the party, more for a prisoner). Characters the Realm of Thrones story still needs, children, rulers (Hero Fate Rulers Can Die) and the last grown lord of a house (Hero Fate Spare Last Of House) do not die this way, and no more than Hero Wounds Max Deaths Per Year die in one year. Lasting injuries are a separate matter (Hero Wounds Maim Percent). Nobody dies this way while the campaign option for death in battle is at its easiest. Off = nobody dies of wounds after the battle", RequireRestart = false)]
         [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
         public bool HeroWoundsDeathEnabled { get; set; } = true;
 
@@ -11984,7 +11984,7 @@ namespace Armoury
         [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
         public float HeroWoundsDeathPerYearOver40 { get; set; } = 1f;
 
-        [SettingPropertyBool("Hero Wounds Player Can Die", HintText = "With Hero Wounds Death Enabled and Hero Wounds Player: you yourself can die at the crisis of a grave wound (the game then lets you choose an heir). Off = your grave wounds never kill you", RequireRestart = false)]
+        [SettingPropertyBool("Hero Wounds Player Can Die", HintText = "With Hero Wounds Death Enabled and Hero Wounds Player: you yourself can die at the crisis of a grave wound (the game then lets you choose an heir). Not tested with this mod list. Your companions and family follow the rules for lords either way (Hero Wounds Companions), and a lasting injury can still mark you (Hero Wounds Maim Percent). Off = your grave wounds never kill you", RequireRestart = false)]
         [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
         public bool HeroWoundsPlayerCanDie { get; set; } = false;
 
@@ -11992,7 +11992,7 @@ namespace Armoury
         [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
         public int HeroWoundsMaxDeathsPerYear { get; set; } = 10;
 
-        [SettingPropertyInteger("Lord Deaths Max Per Year", 0, 400, "0", HintText = "The most heroes in the whole world who may die in one calendar year by the rules of this mod taken together (wounds, and later dungeon fever). Deaths in battle, of old age, by execution and in the Realm of Thrones story are not counted and not limited. 0 = nobody dies by these rules", RequireRestart = false)]
+        [SettingPropertyInteger("Lord Deaths Max Per Year", 0, 400, "0", HintText = "The most heroes in the whole world who may die in one calendar year by the rules of this mod taken together (wounds, and later dungeon fever). Deaths in battle, of old age, by execution and in the Realm of Thrones story are not counted and not limited. The year is the calendar year in use (364 days with the long year of this mod, 84 without it). 0 = nobody dies by these rules", RequireRestart = false)]
         [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
         public int LordDeathsMaxPerYear { get; set; } = 20;
 

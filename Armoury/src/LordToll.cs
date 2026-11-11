@@ -67,7 +67,7 @@ namespace Armoury
             if (Campaign.Current == null) return;
             int y = CampaignTime.Now.GetYear;
             if (y == _year) return;
-            if (_year != int.MinValue && Total > 0)
+            if (_year != int.MinValue && _n.Count > 0)
                 Log.Info("LordToll: rok " + _year + " zamkniety - smierci bohaterow z naszych regul: " + Describe() + ". Nowy rok " + y + " od zera.");
             _year = y; _n.Clear();
         }
@@ -81,9 +81,11 @@ namespace Armoury
             return source != null && _n.TryGetValue(source, out v) ? v : 0;
         }
 
+        /// <summary>Konto wspolnego sufitu: zrodla losowe (rany, loch). 403-p: wyrok gracza ("sentence") jest zapisywany, ale NIE wchodzi do sufitu -
+        /// egzekucje gracza nie blokuja smierci od ran i goraczki (opis klucza Lord Deaths Max Per Year: "by execution ... not counted").</summary>
         internal static int Total
         {
-            get { int t = 0; foreach (var kv in _n) t += kv.Value; return t; }
+            get { int t = 0; foreach (var kv in _n) if (kv.Key != Sentence) t += kv.Value; return t; }
         }
 
         internal static int MaxAll { get { var s = Settings.Current; return s != null ? Math.Max(0, s.LordDeathsMaxPerYear) : 0; } }
