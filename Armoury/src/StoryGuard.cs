@@ -447,5 +447,45 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("NextNeedDay", e); return -1; }
         }
+
+        // ---------------------------------------------------------------- API 403 (HeroFate: rany; od 404 loch, od 409 wyrok)
+        /// <summary>403: NASZ kod moze zabic tego bohatera ta przyczyna? NIE dla chronionego (stan 2); NIE dla bohatera z tabeli obsady, gdy listy wydarzen ROT
+        /// nie widac (nie zabijamy postaci fabuly "na slepo" - PLAN-396 rozdz. 0 pkt 4); NIE, gdy gra / inny sluchacz CanHeroDie odmawia (Prologue: Robert, Ned).
+        /// Klucz Story Guard NIE = pytamy tylko gre. Pytac PRZED jakimkolwiek ksiegowaniem. why: powod odmowy do logu (PL).</summary>
+        internal static bool MayDie(Hero h, KillCharacterAction.KillCharacterActionDetail detail, string source, out string why)
+        {
+            why = null;
+            try
+            {
+                if (h == null || !h.IsAlive) { why = "brak bohatera"; return false; }
+                if (!Clear(h, out why)) return false;
+                if (!h.CanDie(detail)) { why = "zablokowane (CanHeroDie: gra albo cudzy sluchacz, przyczyna " + detail + ")"; return false; }
+                return true;
+            }
+            catch (Exception e) { Stumble("MayDie", e); why = "blad strazy fabuly"; return false; }
+        }
+
+        /// <summary>403: NASZ kod moze trwale okaleczyc tego bohatera? Te same bramki co MayDie z przyczyna WoundedInBattle (chroniony nigdy).</summary>
+        internal static bool MayBeMaimed(Hero h, string source)
+        {
+            try
+            {
+                string why;
+                return h != null && h.IsAlive && Clear(h, out why) && h.CanDie(KillCharacterAction.KillCharacterActionDetail.WoundedInBattle);
+            }
+            catch (Exception e) { Stumble("MayBeMaimed", e); return false; }
+        }
+
+        /// <summary>Bramka strazy dla naszych systemow: false = chroniony albo postac z tabeli przy niewidocznej liscie wydarzen ROT.</summary>
+        private static bool Clear(Hero h, out string why)
+        {
+            why = null;
+            if (!KeyOn || h == Hero.MainHero) return true;
+            string w;
+            if (State(h, out w) == 2) { why = "straz fabuly (" + (w ?? "?") + ")"; return false; }
+            if (h.StringId != null && CanonCompanions.GuardedTerms(h.StringId) != null && !(Ensure() && _ready))
+            { why = "straz fabuly (postac z tabeli obsady, lista wydarzen ROT niewidoczna)"; return false; }
+            return true;
+        }
     }
 }

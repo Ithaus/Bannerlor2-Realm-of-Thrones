@@ -11928,7 +11928,7 @@ namespace Armoury
         [SettingPropertyGroup("Story Guard: Realm of Thrones story characters live until their event (396)")]
         public bool StoryGuardRooseSurvivesRedWedding { get; set; } = true;
 
-        [SettingPropertyBool("Hero Wounds Enabled", HintText = "A lord, a companion or you yourself wounded in battle may take more than a scratch. Most wounds are light and heal as before. A serious wound (Hero Wounds Serious Percent) or a grave wound (Hero Wounds Grave Percent) keeps the hero abed for weeks: his health does not rise above the wounded mark until the days of rest are over, so he does not fight - he can still ride with his party, and a beaten party's wounded lord is always taken prisoner, as in the game. Characters the Realm of Thrones story still needs never take a grave wound and are up a week before their event. Nobody dies of these wounds. Off = wounds heal in a day or two, as before", RequireRestart = false)]
+        [SettingPropertyBool("Hero Wounds Enabled", HintText = "A lord, a companion or you yourself wounded in battle may take more than a scratch. Most wounds are light and heal as before. A serious wound (Hero Wounds Serious Percent) or a grave wound (Hero Wounds Grave Percent) keeps the hero abed for weeks: his health does not rise above the wounded mark until the days of rest are over, so he does not fight - he can still ride with his party, and a beaten party's wounded lord is always taken prisoner, as in the game. Characters the Realm of Thrones story still needs never take a grave wound and are up a week before their event. A grave wound may kill or mark for life at its crisis (Hero Wounds Death Enabled, Hero Wounds Maim Percent). Off = wounds heal in a day or two, as before", RequireRestart = false)]
         [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
         public bool HeroWoundsEnabled { get; set; } = true;
 
@@ -11971,6 +11971,42 @@ namespace Armoury
         [SettingPropertyBool("Hero Wounds Log", HintText = "Writes every battle wound of a lord, companion or yourself and every hero who rises from the sickbed to Armoury.log. The daily summary line is written either way", RequireRestart = false)]
         [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
         public bool HeroWoundsLog { get; set; } = true;
+
+        [SettingPropertyBool("Hero Wounds Death Enabled", HintText = "With Hero Wounds Enabled: a grave wound comes to its crisis three to ten days after the battle, and the hero may die of it then (Hero Wounds Death Base Percent, more with age; less inside a castle or town and with a skilled surgeon in the party, more for a prisoner). Characters the Realm of Thrones story still needs, children, rulers (Hero Fate Rulers Can Die) and the last grown lord of a house (Hero Fate Spare Last Of House) do not die this way, and no more than Hero Wounds Max Deaths Per Year die in one year. Off = nobody dies of wounds after the battle", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
+        public bool HeroWoundsDeathEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hero Wounds Death Base Percent", 0.00f, 100.00f, "0.0", HintText = "With Hero Wounds Death Enabled: chance in percent that a hero of forty or younger dies at the crisis of a grave wound", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
+        public float HeroWoundsDeathBasePercent { get; set; } = 6f;
+
+        [SettingPropertyFloatingInteger("Hero Wounds Death Per Year Over40", 0.00f, 10.00f, "0.00", HintText = "With Hero Wounds Death Enabled: added to the chance of death for every year of age above forty, up to 40 percent in all before the place, the surgeon and captivity are counted", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
+        public float HeroWoundsDeathPerYearOver40 { get; set; } = 1f;
+
+        [SettingPropertyBool("Hero Wounds Player Can Die", HintText = "With Hero Wounds Death Enabled and Hero Wounds Player: you yourself can die at the crisis of a grave wound (the game then lets you choose an heir). Off = your grave wounds never kill you", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
+        public bool HeroWoundsPlayerCanDie { get; set; } = false;
+
+        [SettingPropertyInteger("Hero Wounds Max Deaths Per Year", 0, 200, "0", HintText = "With Hero Wounds Death Enabled: the most heroes in the whole world who may die of wounds in one calendar year. Once it is reached the wounded live. 0 = nobody dies of wounds", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
+        public int HeroWoundsMaxDeathsPerYear { get; set; } = 10;
+
+        [SettingPropertyInteger("Lord Deaths Max Per Year", 0, 400, "0", HintText = "The most heroes in the whole world who may die in one calendar year by the rules of this mod taken together (wounds, and later dungeon fever). Deaths in battle, of old age, by execution and in the Realm of Thrones story are not counted and not limited. 0 = nobody dies by these rules", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
+        public int LordDeathsMaxPerYear { get; set; } = 20;
+
+        [SettingPropertyFloatingInteger("Hero Wounds Maim Percent", 0.00f, 100.00f, "0.0", HintText = "With Hero Wounds Enabled: chance in percent that a hero who lives through the crisis of a grave wound is marked for life - a scarred face (Charm -10), a lame leg (Athletics -60, Riding -20, Endurance -1), a lost eye (Bow -40, Crossbow -40, Throwing -30, Scouting -20) or a maimed hand (Two Handed -60, Bow -60, Polearm -30, Vigor -1). At most two such injuries for one hero, never the same twice, never for characters the story still needs. The skills can be trained again. 0 = no lasting injuries", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
+        public float HeroWoundsMaimPercent { get; set; } = 20f;
+
+        [SettingPropertyBool("Hero Fate Rulers Can Die", HintText = "The ruler of a kingdom can die of wounds after a battle (and later of dungeon fever), which brings the election of a new ruler. Off = rulers die only in battle, of old age, under the axe and in the story", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
+        public bool HeroFateRulersCanDie { get; set; } = false;
+
+        [SettingPropertyBool("Hero Fate Spare Last Of House", HintText = "The last grown lord of a house never dies of wounds after a battle (or later of dungeon fever), so a house is not wiped from the map by these rules. Off = he can die and his house ends with him", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
+        public bool HeroFateSpareLastOfHouse { get; set; } = true;
 
         [SettingPropertyBool("Dungeon Sickness", HintText = "A dungeon of your own castle or town that holds more prisoners than Dungeon Crowding From of its room breeds fever. Common prisoners sicken every day (Dungeon Regular Sick Percent): one in ten of the sick dies (Siege Sickness Death Share), the rest lie wounded. Captive lords may fall ill (Dungeon Hero Sick Chance Percent) for Dungeon Sick Days; in this version no lord dies of it. Winter, a siege with camp fever and the unburied dead within the walls make it worse; a governor skilled in medicine helps. Spreading prisoners over several fortresses ends it. Dungeons of other lords are only counted. Off = dungeons are as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
@@ -15188,6 +15224,15 @@ namespace Armoury
             s.HeroWoundsCompanions = HeroWoundsCompanions;
             s.HeroWoundsReplaceRbCritical = HeroWoundsReplaceRbCritical;
             s.HeroWoundsLog = HeroWoundsLog;
+            s.HeroWoundsDeathEnabled = HeroWoundsDeathEnabled;
+            s.HeroWoundsDeathBasePercent = HeroWoundsDeathBasePercent;
+            s.HeroWoundsDeathPerYearOver40 = HeroWoundsDeathPerYearOver40;
+            s.HeroWoundsPlayerCanDie = HeroWoundsPlayerCanDie;
+            s.HeroWoundsMaxDeathsPerYear = HeroWoundsMaxDeathsPerYear;
+            s.LordDeathsMaxPerYear = LordDeathsMaxPerYear;
+            s.HeroWoundsMaimPercent = HeroWoundsMaimPercent;
+            s.HeroFateRulersCanDie = HeroFateRulersCanDie;
+            s.HeroFateSpareLastOfHouse = HeroFateSpareLastOfHouse;
             s.DungeonSickness = DungeonSickness;
             s.DungeonCrowdingFrom = DungeonCrowdingFrom;
             s.DungeonRegularSickPercent = DungeonRegularSickPercent;

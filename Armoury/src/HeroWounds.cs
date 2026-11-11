@@ -19,7 +19,8 @@ using TaleWorlds.Library;
 
 namespace Armoury
 {
-    /// <summary>401 (Jeff 11.11 "rob 4" - rany i blizny bohaterow; PLAN-396 commit 401) - KSIEGA RAN I LOZE. Bez smierci, bez okaleczen, bez AI (403, 408).
+    /// <summary>401 (Jeff 11.11 "rob 4" - rany i blizny bohaterow; PLAN-396 commit 401) - KSIEGA RAN I LOZE. Od 403 przesilenie: smierc od ran i okaleczenia
+    /// (HeroFate / LordToll). Bez AI (408).
     ///
     /// Wyzwalacz: CampaignEvents.HeroWounded (gra wola go w seterze Hero.HitPoints przy przejsciu ponad prog rany -> pod prog). Liczy sie tylko rana W BITWIE
     /// (partia bohatera w MapEvent albo gracz w PlayerEncounter.Battle), lord / gracz / towarzysz i rod gracza, dorosly, zywy, bez znaku smierci, nie
@@ -32,7 +33,14 @@ namespace Armoury
     /// pomija metode - chirurg nie bierze XP Medycyny za leczenie bez skutku) i prefiks setera Hero.HitPoints (sciezki bez Heal: bohater bez partii, cudze mody).
     /// Seter NIE przenosi przez prog: rusza tylko wartosc ponad prog przy biezacym HP pod progiem, wiec zadnego HeroWounded i zadnego przeskoku rostera.
     /// Doba: pozostalo -1; -2 w nieoblezonej twierdzy / miescie (Hero Wounds Fortress Rest Double); jeniec zawsze -1. Koniec terminu: wpis znika, gra leczy dalej.
-    /// Przesilenie rany Grave (dzien rany + 3..10) jest w zapisie od razu; w 401 mija BEZ rzutu (liczone) - rzut smierci dopisze 403.
+    /// Przesilenie rany Grave (dzien rany + 3..10) jest w zapisie od razu.
+    ///
+    /// 403 - PRZESILENIE: w dniu przesilenia (doba; nigdy w seterze HP ani w misji) rzut smierci z warunkami Z TEJ CHWILI: p = Hero Wounds Death Base Percent
+    /// + Hero Wounds Death Per Year Over40 x lata ponad 40 (sufit 40%); wolny bohater w nieoblezonej twierdzy x0.6; chirurg partii Medicine >= 100 x0.75,
+    /// >= 200 x0.5; jeniec x1.5. Trafiony idzie do HeroFate.TryKill (straz fabuly, dziecko, wladca, ostatni z rodu, sufit roku LordToll, akcja gry
+    /// ApplyByWounds - nigdy znak smierci). Bohater zajety (bitwa, oblezenie, misja, rozmowa - HeroFate.Busy) -> przesilenie czeka do nastepnej doby, loze nie
+    /// konczy sie przed nim. Odmowa -> wpis zostaje jako Serious. Gracz bez rzutu przy Hero Wounds Player Can Die NIE. Kto przezyl przesilenie, ma rzut
+    /// okaleczenia Hero Wounds Maim Percent (HeroFate.TryMaim; w dobie, nie w chwili rany - HeroWounded pada w seterze HP w srodku misji).
     ///
     /// Rana krytyczna RealisticBannerlord (15% przy kazdym HeroWounded, -4 HP/dobe) - wylaczona prefiksem przy kluczu Hero Wounds Replace Rb Critical (jedna zasada).
     /// Zapis arm_herowounds_v1: wiersz "id|stopien|dzienRany|pozostalo|dzienPrzesilenia|miejsce|zrodlo" (stary zapis = pusta ksiega). Statyki: Reset w konstruktorze
@@ -49,6 +57,7 @@ namespace Armoury
             public int Grade, Left, Crisis;      // Crisis: dzien kampanii przesilenia (Grave); 0 = brak; -1 = minelo
             public double Day;                   // dzien kampanii rany (z ulamkiem)
             public Hero H;
+            public bool DeferSaid;               // 403: linia "przesilenie odroczone" juz napisana (poza zapisem)
         }
 
         // ---------------------------------------------------------------- stan (zapis: _rows)
@@ -67,6 +76,8 @@ namespace Armoury
         private static int _dEv, _dBattle, _dMission, _dSim, _dLight, _dSerious, _dGrave, _dGuard, _dNoBattle, _dOut, _dCanon, _dHas, _dRose, _dCrisis, _dGone, _dRb;
         private static int _sBattle, _sSerious, _sGrave, _sDays;
         private static int _healCuts, _setCuts, _dStumbles, _stumbles;
+        private static int _dDied, _dLived, _dDeferred, _dSpared, _dMaimed, _sDied, _sMaimed;   // 403: przesilenia
+        private static readonly List<Row> _crisisBuf = new List<Row>();
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
 
         internal static void SetHarmony(Harmony h) { _harmony = h; }
@@ -91,6 +102,8 @@ namespace Armoury
             _dEv = _dBattle = _dMission = _dSim = _dLight = _dSerious = _dGrave = _dGuard = _dNoBattle = _dOut = _dCanon = _dHas = _dRose = _dCrisis = _dGone = _dRb = 0;
             _sBattle = _sSerious = _sGrave = _sDays = 0;
             _healCuts = _setCuts = _dStumbles = _stumbles = 0;
+            _dDied = _dLived = _dDeferred = _dSpared = _dMaimed = _sDied = _sMaimed = 0;
+            _crisisBuf.Clear();
         }
 
         internal static string Export()
@@ -155,7 +168,12 @@ namespace Armoury
                          + ", RB krytyczna " + (_mRb != null ? "TAK" : _rbPresent ? "BLAD" : "BRAK (nie ma RealisticBannerlord)")
                          + ", encyklopedia " + YN(_mEnc != null) + ", dymek " + YN(_mTip != null)
                          + " | ksiega " + _rows.Count + " (serious " + sr + ", grave " + gr + (gone != null ? "; usuniete bez bohatera " + gone.Count : "") + ")"
-                         + " | 401: bez smierci, okaleczen i AI (przesilenie mija bez rzutu).");
+                         + " | 403 przesilenie: smierc od ran " + YN(s != null && s.HeroWoundsDeathEnabled)
+                         + (s != null ? " (p " + s.HeroWoundsDeathBasePercent.ToString("0.#", Inv) + "% + " + s.HeroWoundsDeathPerYearOver40.ToString("0.##", Inv)
+                                        + " pp/rok ponad 40, gracz " + YN(s.HeroWoundsPlayerCanDie) + ", wladcy " + YN(s.HeroFateRulersCanDie) + ", ostatni z rodu oszczedzony "
+                                        + YN(s.HeroFateSpareLastOfHouse) + "), okaleczenie " + s.HeroWoundsMaimPercent.ToString("0.#", Inv) + "%" : "")
+                         + " | okaleczen w ksiedze " + HeroFate.MaimRows + " | LordToll rok " + LordToll.Year + ": rany " + LordToll.Count(LordToll.Wounds) + "/" + LordToll.MaxWounds
+                         + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll + " | bez AI (408).");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
@@ -277,14 +295,17 @@ namespace Armoury
         /// <summary>Encyklopedia bohatera: wiersz "Wounds" w statystykach lezacego (nie przy ukrytych informacjach o bohaterze).</summary>
         private static void EncPostfix(EncyclopediaHeroPageVM __instance)
         {
-            if (_n == 0) return;
+            if (_n == 0 && HeroFate.MaimRows == 0) return;
             try
             {
                 if (_encHero == null || __instance == null || __instance.IsInformationHidden || __instance.Stats == null) return;
                 var h = _encHero(__instance);
+                if (h == null) return;
                 Row r;
-                if (h == null || !_bed.TryGetValue(h, out r)) return;
-                __instance.Stats.Add(new StringPairItemVM("Wounds:", StateText(r)));
+                string bed = _bed.TryGetValue(h, out r) ? StateText(r) : null;
+                string scars = HeroFate.Labels(h);   // 403: trwale okaleczenia (takze po wstaniu z loza i po smierci)
+                if (bed == null && scars == null) return;
+                __instance.Stats.Add(new StringPairItemVM("Wounds:", bed != null && scars != null ? bed + "; " + scars : bed ?? scars));
             }
             catch (Exception e) { Stumble("EncPostfix", e); }
         }
@@ -292,13 +313,15 @@ namespace Armoury
         /// <summary>Dymek bohatera: jedna linia o lozu.</summary>
         private static void TipPostfix(PropertyBasedTooltipVM propertyBasedTooltipVM, object[] args)
         {
-            if (_n == 0) return;
+            if (_n == 0 && HeroFate.MaimRows == 0) return;
             try
             {
                 var h = args != null && args.Length > 0 ? args[0] as Hero : null;
+                if (h == null || propertyBasedTooltipVM == null) return;
                 Row r;
-                if (h == null || propertyBasedTooltipVM == null || !_bed.TryGetValue(h, out r)) return;
-                propertyBasedTooltipVM.AddProperty("", StateText(r));
+                if (_bed.TryGetValue(h, out r)) propertyBasedTooltipVM.AddProperty("", StateText(r));
+                string scars = HeroFate.Labels(h);   // 403
+                if (scars != null) propertyBasedTooltipVM.AddProperty("", scars);
             }
             catch (Exception e) { Stumble("TipPostfix", e); }
         }
@@ -422,7 +445,7 @@ namespace Armoury
                     Log.Info(Tag + Nm(h) + " (" + id + ", wiek " + ((int)age) + (h.Clan != null && h.Clan.Name != null ? ", " + h.Clan.Name : "") + ") ranny " + where
                              + " [" + r.Src + "] - rzut " + (roll / 100f).ToString("0.00", Inv) + " (grave < " + (gp / 100f).ToString("0.00", Inv) + ", serious < "
                              + ((gp + sp) / 100f).ToString("0.00", Inv) + ") -> " + GradeName(grade) + ", loze " + days + " dni spoczynku"
-                             + (grade == Grave ? ", przesilenie dnia " + r.Crisis + " (401: bez rzutu smierci)" : "") + " | HP " + h.HitPoints + ", prog " + h.WoundedHealthLimit
+                             + (grade == Grave ? ", przesilenie dnia " + r.Crisis : "") + " | HP " + h.HitPoints + ", prog " + h.WoundedHealthLimit
                              + " | straz fabuly: " + guard + ".");
                 try
                 {
@@ -440,7 +463,7 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------------- doba
-        /// <summary>Doba ran (po StoryGuard.Daily, przed zaraza): termin loza, przesilenie bez rzutu (401), wstajacy, sprzatanie, linia doby.</summary>
+        /// <summary>Doba ran (po StoryGuard.Daily, przed zaraza): termin loza, przesilenie (403: rzut smierci i okaleczenia), wstajacy, sprzatanie, linia doby.</summary>
         internal static void Daily()
         {
             try
@@ -469,12 +492,11 @@ namespace Armoury
                             if (cs != null && cs.IsFortification && !cs.IsUnderSiege) { fort++; if (s == null || s.HeroWoundsFortressRestDouble) step = 2; }
                         }
                         r.Left -= step;
-                        if (r.Grade == Grave && r.Crisis > 0 && day >= r.Crisis)
+                        if (r.Grade == Grave && r.Crisis > 0)
                         {
-                            r.Crisis = -1; _dCrisis++;
-                            if (s == null || s.HeroWoundsLog)
-                                Log.Info(Tag + Nm(h) + " (" + r.Id + ", wiek " + ((int)h.Age) + ") - przesilenie minelo bez rzutu smierci (401) | jeniec " + YN(h.IsPrisoner)
-                                         + ", w twierdzy " + YN(step == 2 || (!h.IsPrisoner && h.CurrentSettlement != null && h.CurrentSettlement.IsFortification)) + ".");
+                            // 403: przesilenie przed nami - loze nie konczy sie przed nim; rzut PO petli (smierc bohatera nie moze isc w srodku przegladu ksiegi)
+                            if (day >= r.Crisis) _crisisBuf.Add(r);
+                            if (r.Left < 1) r.Left = 1;
                         }
                         if (r.Left <= 0)
                         {
@@ -497,22 +519,149 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Daily(" + r.Id + ")", e); }
                 }
+                // 403: przesilenia dnia (po petli - TryKill wola akcje gry i jej zdarzenia)
+                if (_crisisBuf.Count > 0)
+                {
+                    for (int i = 0; i < _crisisBuf.Count; i++)
+                    {
+                        var r = _crisisBuf[i];
+                        try
+                        {
+                            int was = r.Grade;
+                            bool died = Crisis(r, s, day);
+                            if (died) (done ?? (done = new List<Row>())).Add(r);
+                            if (died || r.Grade != was) { if (was == Grave) gr--; else sr--; }
+                            if (!died && r.Grade != was) { if (r.Grade == Grave) gr++; else sr++; }
+                        }
+                        catch (Exception e) { Stumble("Crisis(" + r.Id + ")", e); }
+                    }
+                    _crisisBuf.Clear();
+                }
                 if (done != null)
                 {
                     foreach (var r in done) { _rows.Remove(r.Id); if (r.H != null) _bed.Remove(r.H); }
                     _n = _bed.Count;
                 }
-                if (_dEv + _dRose + _dCrisis + _dGone + _dStumbles + _dRb + _rows.Count + _healCuts + _setCuts > 0)
+                if (_dEv + _dRose + _dCrisis + _dDeferred + _dGone + _dStumbles + _dRb + _rows.Count + _healCuts + _setCuts > 0)
                     Log.Info(Tag + "dzien " + day + " | rany w bitwie dzis " + _dBattle + " (misja " + _dMission + " / symulacja " + _dSim + "): light " + _dLight + ", serious "
                              + _dSerious + ", grave " + _dGrave + ", chronieni fabula " + _dGuard + " | zdarzen HeroWounded " + _dEv + " (poza bitwa " + _dNoBattle + ", poza zakresem "
                              + _dOut + ", rana Kroniki " + _dCanon + ", juz na lozu " + _dHas + ") | na lozu " + sr + " serious / " + gr + " grave (jency " + pris + ", w twierdzy " + fort
-                             + ") | wstali " + _dRose + ", przesilenia bez rzutu " + _dCrisis + ", wpisy bez bohatera " + _dGone + " | przyciecia: leczenie " + _healCuts + ", seter "
+                             + ") | wstali " + _dRose + ", przesilenia " + _dCrisis + " (przezyli " + _dLived + ", oszczedzeni / bez rzutu " + _dSpared + ", odroczone " + _dDeferred
+                             + "), zmarli " + _dDied + " (rok " + LordToll.Count(LordToll.Wounds) + "/" + LordToll.MaxWounds + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll
+                             + "), okaleczeni " + _dMaimed + ", wpisy bez bohatera " + _dGone + " | przyciecia: leczenie " + _healCuts + ", seter "
                              + _setCuts + " | RB rana krytyczna pominieta " + _dRb + " | od startu sesji: ran w bitwie " + _sBattle + ", serious " + _sSerious + ", grave " + _sGrave
-                             + ", dni loza " + _sDays + " | potkniecia " + _dStumbles + " (sesja " + _stumbles + ").");
+                             + ", dni loza " + _sDays + ", zmarli od ran " + _sDied + ", okaleczeni " + _sMaimed + " | potkniecia " + _dStumbles + " (sesja " + _stumbles
+                             + ", HeroFate " + HeroFate.Stumbles + ").");
                 _dEv = _dBattle = _dMission = _dSim = _dLight = _dSerious = _dGrave = _dGuard = _dNoBattle = _dOut = _dCanon = _dHas = _dRose = _dCrisis = _dGone = _dRb = 0;
                 _healCuts = _setCuts = _dStumbles = 0;
+                _dDied = _dLived = _dDeferred = _dSpared = _dMaimed = 0;
             }
-            catch (Exception e) { Stumble("Daily", e); }
+            catch (Exception e) { Stumble("Daily", e); _crisisBuf.Clear(); }
+        }
+
+        // ---------------------------------------------------------------- 403: przesilenie
+        /// <summary>Przesilenie rany Grave w dobie. true = bohater zmarl (wpis do usuniecia). Odroczenie zostawia r.Crisis (ponowna proba jutro).</summary>
+        private static bool Crisis(Row r, Settings s, int day)
+        {
+            var h = r.H;
+            if (h == null || !h.IsAlive || s == null) return false;
+            bool log = s.HeroWoundsLog;
+            string head = Tag + Nm(h) + " (" + r.Id + ", wiek " + ((int)h.Age) + ") przesilenie rany z dnia " + r.Day.ToString("0", Inv) + " " + r.Place + ": ";
+            string what;
+            if (HeroFate.Busy(h, out what))
+            {
+                _dDeferred++;
+                if (!r.DeferSaid) { r.DeferSaid = true; if (log) Log.Info(head + "odroczone (" + what + ") - ponowna proba co dobe."); }
+                return false;
+            }
+            r.Crisis = -1; _dCrisis++;
+            bool player = h == Hero.MainHero;
+            bool dead = false;
+            string outcome;
+            if (!s.HeroWoundsEnabled || !s.HeroWoundsDeathEnabled) { outcome = "bez rzutu smierci (klucz Hero Wounds Enabled / Hero Wounds Death Enabled NIE)"; _dSpared++; }
+            else if (player && !s.HeroWoundsPlayerCanDie) { outcome = "bez rzutu smierci (gracz - klucz Hero Wounds Player Can Die NIE)"; _dSpared++; }
+            else
+            {
+                float age = h.Age;
+                float p = Math.Max(0f, s.HeroWoundsDeathBasePercent) + Math.Max(0f, s.HeroWoundsDeathPerYearOver40) * Math.Max(0f, age - 40f);
+                if (p > 40f) p = 40f;
+                p /= 100f;
+                string mods = "wiek " + ((int)age);
+                if (h.IsPrisoner) { p *= 1.5f; mods += ", jeniec x1.5"; }
+                else
+                {
+                    var cs = h.CurrentSettlement;
+                    if (cs != null && cs.IsFortification && !cs.IsUnderSiege) { p *= 0.6f; mods += ", twierdza x0.6"; }
+                    var mp = h.PartyBelongedTo;
+                    Hero surgeon = mp != null ? mp.EffectiveSurgeon : null;
+                    if (surgeon != null && surgeon != h)
+                    {
+                        int med = surgeon.GetSkillValue(DefaultSkills.Medicine);
+                        if (med >= 200) { p *= 0.5f; mods += ", chirurg " + med + " x0.5"; }
+                        else if (med >= 100) { p *= 0.75f; mods += ", chirurg " + med + " x0.75"; }
+                    }
+                }
+                if (p > 1f) p = 1f;
+                float roll = MBRandom.RandomFloat;
+                outcome = "p " + p.ToString("0.00", Inv) + " (" + mods + ") rzut " + roll.ToString("0.00", Inv) + " -> ";
+                if (roll >= p) { outcome += "PRZEZYL"; _dLived++; }
+                else
+                {
+                    string why;
+                    bool tell = false, mine = false;
+                    try { tell = !player && Concerns(h, true); mine = h.MapFaction == Hero.MainHero.MapFaction; } catch { }
+                    string name = Nm(h);
+                    var fate = HeroFate.TryKill(h, KillCharacterAction.KillCharacterActionDetail.WoundedInBattle, LordToll.Wounds, null, false, out why);
+                    if (fate == HeroFate.Fate.Killed)
+                    {
+                        dead = true; _dDied++; _sDied++;
+                        outcome += "ZMARL (" + why + ") | rok " + LordToll.Year + ": rany " + LordToll.Count(LordToll.Wounds) + "/" + LordToll.MaxWounds + ", wspolny "
+                                   + LordToll.Total + "/" + LordToll.MaxAll;
+                        try { if (tell) Log.Player(name + " has died of wounds taken " + (string.IsNullOrEmpty(r.Place) ? "in battle" : r.Place) + ".", mine); }
+                        catch (Exception e) { Stumble("Crisis.Player", e); }
+                    }
+                    else if (fate == HeroFate.Fate.Deferred)
+                    {
+                        r.Crisis = day + 1; _dCrisis--; _dDeferred++;
+                        if (log) Log.Info(head + outcome + why + " - ponowna proba jutro.");
+                        return false;
+                    }
+                    else
+                    {
+                        _dSpared++;
+                        r.Grade = Serious;   // odmowa: rana zostaje jako Serious
+                        outcome += (why ?? "odmowa") + " - wpis zostaje jako SERIOUS";
+                    }
+                }
+            }
+            // okaleczenie: tylko kto przezyl przesilenie
+            string maim = "";
+            string maimType = null;
+            if (!dead && s.HeroWoundsEnabled && s.HeroWoundsMaimPercent > 0f)
+            {
+                float mr = MBRandom.RandomFloat * 100f;
+                if (mr < s.HeroWoundsMaimPercent)
+                {
+                    string det;
+                    if (HeroFate.TryMaim(h, LordToll.Wounds, out maimType, out det)) { _dMaimed++; _sMaimed++; maim = " | okaleczenie: " + det; }
+                    else maim = " | okaleczenie: nie (" + det + ")";
+                }
+            }
+            if (log || dead || maimType != null) Log.Info(head + outcome + maim + ".");
+            if (!dead)
+            {
+                try
+                {
+                    if (player) { Log.Player("You have passed the worst and will live."); if (maimType != null) Log.Player(HeroFate.News(h, maimType), true); }
+                    else if (Concerns(h, true))
+                    {
+                        Log.Player(Nm(h) + " has passed the worst and will live.");
+                        if (maimType != null) Log.Player(HeroFate.News(h, maimType), h.MapFaction == Hero.MainHero.MapFaction);
+                    }
+                }
+                catch (Exception e) { Stumble("Crisis.Player", e); }
+            }
+            return dead;
         }
     }
 }
