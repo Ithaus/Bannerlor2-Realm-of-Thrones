@@ -687,7 +687,7 @@ namespace Armoury
 
         /// <summary>Odparcie OB2. finish - bitwa bez misji: nasze FinishBattleAndKeepSiegeEvent; false (371, szturm zalamany w misji) - gra juz zakonczyla
         /// bitwe ta sama droga (PlayerEncounter.ContinueBattle, EnemyRetreated), tu tylko przerwa i liczniki.</summary>
-        private static void Repel(MapEvent me, Assault a, int left, int dmen, bool finish, bool player = false, double scale = 1.0)
+        private static void Repel(MapEvent me, Assault a, int left, int dmen, bool finish, bool player = false, double scale = 1.0, bool retreat = false)
         {
             var st = a.St;
             var ev = st.SiegeEvent;
@@ -738,8 +738,10 @@ namespace Armoury
             else T = SiegeWalls2.GrowPause(T, prior, b * 4.0, out grow);         // 307c (2): kazde wczesniejsze odparcie w tym oblezeniu wydluza przerwe (najwyzej 4 x podstawa)
             // 387d: odwrot gracza przed zalamaniem - czesc pelnej przerwy (scale < 1); to nie odparcie: licznik odparc i chwila odparcia bez zmian,
             // trwajaca przerwa nigdy nie jest skracana
-            bool part = player && scale < 1.0;
-            if (part) T *= Math.Max(0.0, scale);
+            // 387e: o tym, ze to odwrot, mowi jawny znacznik (retreat), nie scale < 1 - odwrot przy miarze >= 100% daje PELNA przerwe, ale dalej nie jest
+            // odparciem (regula 371b mogla szturmu nie zlamac: wymiana w granicy / "zdobywaja"); licznik czytaja morale SZ, 307c i kapitulacja 374
+            bool part = player && retreat;
+            if (part) T *= Clamp(scale, 0.0, 1.0);
             if (pz != null)
             {
                 if (part) pz.Until = Math.Max(pz.Until, Now + (float)T);
@@ -1311,6 +1313,7 @@ namespace Armoury
                 _pauses.Remove(ev);
                 _prep.Remove(ev);
                 _vetoLogged.Remove(ev);
+                CarryEnd387(ev);                                                 // 387e: straty odwrotow gracza bez przerwy nie przechodza na nowe oblezenie tej samej twierdzy
                 SiegeWalls2.OnSiegeEnded(ev);                                    // oblezenia 2: pamiec obozu (trebusze) i glodu
             }
             catch (Exception e) { Stumble("OnSiegeEnded", e); }

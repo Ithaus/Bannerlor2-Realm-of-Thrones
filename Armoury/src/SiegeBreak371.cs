@@ -73,6 +73,7 @@ namespace Armoury
         private bool _byTime, _timeNoted;                                   // 378: zalamanie z limitu czasu; limit minal przy "zdobywaja" (raz na misje)
         private int _plR0 = -1, _plH0 = -1;                                 // 387b: zbiegli / zdrowi strony atakujacej w chwili zalamania (pomiar strat z odwrotu)
         private bool _retreat, _rGatesKnown, _rGatesDown;                   // 387d: gracz zszedl z pola (RetreatMission); bramy w chwili odwrotu
+        private bool _heroDown;                                             // 387e: w chwili odwrotu bohater gracza lezal (wyjscie po upadku, nie rozkaz odwrotu)
         private bool _pl, _plWarned;                                        // 387: gracz atakuje i dowodzi; ostrzezenie 75% progu pokazane
         private MapEvent _me;
         private SiegeWalls.Assault _a;
@@ -507,6 +508,9 @@ namespace Armoury
                 if (!_active || !_pl || _ended) return;
                 _retreat = true;
                 var m = Mission;
+                // 387e: BattleEndLogic.TryExit daje to samo potwierdzenie, gdy bohater lezy (MainAgent null / nieaktywny) - to nie rozkaz odwrotu
+                try { var ma = m != null ? m.MainAgent : null; _heroDown = ma == null || !ma.IsActive(); } catch { _heroDown = false; }
+                if (!SiegeWalls.PlayerRetreatOn) return;                         // 387e: klucz NIE - doslownie stan 387b (bez liczenia bram)
                 if (m == null || !_started) return;
                 int gates, down;
                 CountGates(m, out gates, out down);
@@ -520,8 +524,23 @@ namespace Armoury
         {
             double shock = SiegeWalls.ShockFactor;
             double lim0 = _thr * _km * (_genDown ? shock : 1.0) * (_engDown ? shock : 1.0);
+            if (!_rGatesKnown)
+            {
+                // 387e: koniec misji bez odwrotu - bramy liczone teraz (ostatni _limit z oceny mogl byc sprzed wstrzasu: wodz padl / machiny stracone)
+                try
+                {
+                    var m = Mission;
+                    if (m != null && SiegeWalls.PlayerRetreatOn)
+                    {
+                        int gates, down;
+                        CountGates(m, out gates, out down);
+                        _rGatesKnown = true; _rGatesDown = gates > 0 && down >= gates;
+                    }
+                }
+                catch (Exception e) { Stumble("EndLimit", e); }
+            }
             if (_rGatesKnown) return lim0 * (_rGatesDown ? SiegeWalls.GateFactor : 1.0);
-            return Math.Max(lim0, _limit);   // bez odwrotu: ostatni prog z oceny (z bramami, gdy byl liczony)
+            return Math.Max(lim0, _limit);   // bram nie dalo sie policzyc: ostatni prog z oceny
         }
 
         public override bool MissionEnded(ref MissionResult missionResult)
@@ -582,9 +601,9 @@ namespace Armoury
                             {
                                 try
                                 {
-                                    int d = (int)Math.Ceiling(days);
-                                    InformationManager.DisplayMessage(new InformationMessage((_retreat ? "You called off the assault after your men had taken a beating" : "The assault has failed") + " - they will not storm the walls again for "
-                                        + (days < 1.0 ? "the rest of the day." : d + (d == 1 ? " day." : " days.")), Color.FromUint(0xFFE07040u)));
+                                    // 387e: po upadku bohatera to nie rozkaz odwrotu - osobne zdanie; czas tym samym tekstem co dymek menu
+                                    InformationManager.DisplayMessage(new InformationMessage((_retreat ? (_heroDown ? "You fell, and your men pulled back from the walls after taking a beating" : "You called off the assault after your men had taken a beating") : "The assault has failed")
+                                        + " - they will not storm the walls again for " + SiegeWalls.PauseSpan(days, false) + ".", Color.FromUint(0xFFE07040u)));
                                 }
                                 catch { }
                             }
@@ -601,7 +620,7 @@ namespace Armoury
                              + " | straty oddzialu " + (_prior + _cas) + " / prog " + F(_limit, "0") + " | 371b: straty obrony " + (_dPrior + _dcas) + ", wymiana "
                              + F((_prior + _cas) / (double)Math.Max(1, _dPrior + _dcas), "0.00") + ":1 | odwrot wyslany " + _sent + ", ponowiony " + _resent + ", wystawieni po zalamaniu " + _late
                              + " | bezpiecznik " + (_fuse ? "tak" : "nie") + " | " + SiegeHold372.MissionSummary(Mission) + " | wynik misji " + (r == null ? "-" : r.BattleState + (r.EnemyRetreated ? " (wrog odstapil)" : "") + (r.PlayerDefeated ? " (gracz pokonany)" : ""))
-                             + " | 378: czas walki " + F(_a.MisTime, "0") + " s" + (_byTime ? " (odwrot z limitu)" : "") + tally + " | potkniecia " + _stumbles + (_pl ? ". 387: szturm gracza - " + (_broken ? (plWon ? "bez przerwy (wygrana)" : "przerwa zapisana wyzej (linia 'Szturm (371): przerwa ... 387'), w menu: 'Continue siege preparations.'") : "bez zalamania; 387d " + (ret387 ?? "-")) + "."
+                             + " | 378: czas walki " + F(_a.MisTime, "0") + " s" + (_byTime ? " (odwrot z limitu)" : "") + tally + " | potkniecia " + _stumbles + (_pl ? ". 387: szturm gracza - " + (_broken ? (plWon ? "bez przerwy (wygrana)" : "przerwa zapisana wyzej (linia 'Szturm (371): przerwa ... 387'), w menu: 'Continue siege preparations.'") : "bez zalamania; 387d " + (ret387 ?? "-") + (_retreat ? (_heroDown ? " [387e: wyjscie po upadku bohatera]" : " [387e: odwrot z rozkazu, bohater na nogach]") : "")) + "."
                                : ". Przerwa - linia 'Szturm (371): przerwa' przy koncu bitwy na mapie."));
                 }
             }

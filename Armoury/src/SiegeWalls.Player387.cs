@@ -120,6 +120,8 @@ namespace Armoury
                 var ev = st != null ? st.SiegeEvent : null;
                 if (ev == null) { txt = "bez oblezenia"; return 0.0; }
                 if (st.CurrentSiegeState != Settlement.SiegeState.OnTheWalls) { txt = "mury wziete (sala lorda)"; return 0.0; }
+                // 387e: twierdza po kapitulacji z glodu - latki menu przerwy tam nie stosuja (jak Veto AI), wiec jej nie zapisujemy i nie oglaszamy
+                if (SiegeWalls2.Surrendered(st)) { txt = "twierdza po kapitulacji - bez przerwy"; return 0.0; }
                 _dPlRet++;
                 int all = Math.Max(0, a.Carry) + Math.Max(0, cas);
                 double qL = lim > 0.0 ? all / lim : 0.0;
@@ -141,14 +143,14 @@ namespace Armoury
                 a.MisEngLost = engLost;
                 a.Loss = all / (double)Math.Max(1, km);
                 double before = RepelPauseLeftDays(ev);
-                Repel(me, a, left, dmen, false, true, scale);
+                Repel(me, a, left, dmen, false, true, scale, true);
                 if (!a.Repelled) { txt = head + " - przerwa NIE zapisana"; return 0.0; }
                 _plCarrySt = null; _plCarryCas = 0; _plCarryAt = -1f;
                 double days = RepelPauseLeftDays(ev);
                 _dPlRetPause++; if (scale >= 1.0) _dPlRetFull++;
                 _dPlRetDays += days;
                 txt = head + " -> " + (scale >= 1.0 ? "PELNA przerwa" : F(scale * 100.0, "0") + "% pelnej przerwy") + " = " + F(days, "0.00") + " dob" + (before > 0.0 ? " (przed misja zostawalo " + F(before, "0.00") + ")" : "")
-                    + " (linia 'Szturm (371): przerwa po " + (scale >= 1.0 ? "zalamaniu" : "ODWROCIE GRACZA") + "')";
+                    + " (linia 'Szturm (371): przerwa po ODWROCIE GRACZA', bez licznika odparc)";
                 return days;
             }
             catch (Exception e) { Stumble("RegisterPlayerRetreat", e); txt = "potkniecie"; return 0.0; }
@@ -158,6 +160,13 @@ namespace Armoury
         private static void PlayerEventEnded(MapEvent me)
         {
             if (_plMe != null && (ReferenceEquals(_plMe, me) || _plMe.IsFinalized)) { _plMe = null; _plAssault = null; }
+        }
+
+        /// <summary>387e (OnSiegeEnded): oblezenie skonczone - pamiec strat z odwrotow bez przerwy tej twierdzy do kosza (carry dotyczy jednego oblezenia).</summary>
+        private static void CarryEnd387(SiegeEvent ev)
+        {
+            var st = ev != null ? ev.BesiegedSettlement : null;
+            if (st != null && _plCarrySt != null && _plCarrySt == st.StringId) { _plCarrySt = null; _plCarryCas = 0; _plCarryAt = -1f; }
         }
 
         private static void Reset387() { _plMe = null; _plAssault = null; _plCarrySt = null; _plCarryCas = 0; _plCarryAt = -1f; ZeroDay387(); }
@@ -172,10 +181,19 @@ namespace Armoury
                  + ", przerw " + _dPlRetPause + " (pelnych " + _dPlRetFull + ", razem " + F(_dPlRetDays, "0.0") + " dob)";
         }
 
+        /// <summary>387e: ile przerwy zostalo, slowami - ponizej doby w godzinach (doba = 24 h), inaczej w dobach w gore. Ten sam tekst w dymku menu i w
+        /// komunikacie po misji ("8 hours" / "8 more hours", "3 days" / "3 more days").</summary>
+        internal static string PauseSpan(double left, bool more)
+        {
+            string m = more ? " more" : "";
+            if (left < 1.0) { int h = (int)Math.Max(1.0, Math.Ceiling(left * 24.0)); return h + m + (h == 1 ? " hour" : " hours"); }
+            int d = (int)Math.Ceiling(left);
+            return d + m + (d == 1 ? " day" : " days");
+        }
+
         private static TextObject PauseTip(double left)
         {
-            int d = (int)Math.Max(1.0, Math.Ceiling(left));
-            return new TextObject("{=!}Your men will not storm the walls again so soon - they need " + d + (d == 1 ? " more day." : " more days."));
+            return new TextObject("{=!}Your men will not storm the walls again so soon - they need " + PauseSpan(left, true) + ".");
         }
 
         /// <summary>Postfiks SiegeEventCampaignBehavior.game_menu_siege_strategies_lead_assault_on_condition i ..._order_assault_on_condition: w przerwie po
