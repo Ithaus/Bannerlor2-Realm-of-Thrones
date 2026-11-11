@@ -15,7 +15,7 @@ namespace Armoury
     /// <summary>
     /// 385c (Jeff 11.11 "tak, rob wszystko 2-4", pkt 2 "zakladnik jako czesc oferty"). ZAKLADNIK reczy za slowo GRACZA: tylko gdy gracz cos przysiega -
     /// zadanie A (pakt wzajemny) albo przysiega w ofercie (L / P / M); nigdy przy T (pokoj i tak otwiera lochy). Klucze PrisonerTermsHostage (TAK) i
-    /// PrisonerTermsHostageDeath (NIE - decyzja Jeffa).
+    /// PrisonerTermsHostageDeath (TAK od 393 - Jeff 11.11 "tak, maja go sciac"; do 392 NIE).
     /// KTO: bohater rodu gracza z DRUZYNY GRACZA (nie gracz, nie dziecko, nie wodz partii ani gubernator - ci nie stoja w szeregu druzyny; nie postac kanonu z
     ///   wierszami #move / trzymana scena; nie krol ani nastepca - Ransom178 zrobilby z niego "wielkiego jenca" korony). Do 4 linii rozmowy, jeden wybor.
     /// GDZIE: zwykly jeniec gry (stan Prisoner, TakePrisonerAction.Apply ze zdarzeniem - role w partii zdejmuje gra i BK) w LOCHU OSADY rodu rozmowcy
@@ -32,7 +32,8 @@ namespace Armoury
     /// ZDRADA LORDA (wylosowana przy zgodzie, niejawna): bierze zakladnika jak reszte zaplaty, stan Z - bez strazy (moze uciec, kurier okupu przychodzi);
     ///   termin mija, a on nadal trzyma -> klamca (374) i kara jak za zdrade. Zdrada jawna od razu (nie uwolnil "moich ludzi") - zakladnik nie jest przekazywany.
     /// GRACZ LAMIE SLOWO (BrokeWord): stan B - straz zdjeta od razu, zostaje zwyklym jencem; egzekucja tylko z kluczem PrisonerTermsHostageDeath i u lorda z
-    ///   Mercy < 0 (w dobie, nie w srodku zdarzenia bitwy).
+    ///   Mercy < 0 (w dobie, nie w srodku zdarzenia bitwy). 393: kat = lord przysiegi, a gdy martwy / w niewoli / poza frakcja - pan lochu; bitwa przy lochu ->
+    ///   rozliczenie nastepnej doby (wpis B zostaje); zakladnik, ktory zostal bohaterem gracza (dziedzic) - wpis precz bez egzekucji.
     /// Zapis: pole 17 rekordu umowy (id zakladnika) i piata sekcja "arm_k384": bohater:frakcja:wodz:osada:do:stan:przysiega;... (starszy DLL czyta 4 sekcje).
     /// </summary>
     internal static partial class PrisonerTerms384
@@ -366,7 +367,7 @@ namespace Armoury
         private static void HostDaily(int today)
         {
             if (_hosts.Count == 0 && _hEsc + _hCour + _hStripCut == 0) return;
-            int nH = 0, nZ = 0, nB = 0, freed = 0, gone = 0;
+            int nH = 0, nZ = 0, nB = 0, nBWait = 0, freed = 0, gone = 0;
             for (int i = _hosts.Count - 1; i >= 0; i--)
             {
                 var r = _hosts[i];
@@ -376,6 +377,8 @@ namespace Armoury
                     var lord = Hero.Find(r.Lord);
                     string who = h != null ? Name(h) : r.Hero;
                     if (h == null || !h.IsAlive) { _hosts.RemoveAt(i); gone++; Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " nie zyje - wpis zdjety."); continue; }
+                    // 393: zakladnik zostal GRACZEM (dziedzic po smierci gracza) - niewola gracza to droga gry, nie nasza; nigdy egzekucja
+                    if (h == Hero.MainHero) { _hosts.RemoveAt(i); gone++; Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " jest teraz bohaterem gracza - wpis zdjety (stan " + r.State + "), bez egzekucji."); continue; }
                     if (h.Clan != Clan.PlayerClan) { _hosts.RemoveAt(i); gone++; Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " poza rodem gracza - wpis zdjety (dalej zwykly jeniec gry)."); continue; }
                     var pb = h.IsPrisoner ? h.PartyBelongedToAsPrisoner : null;
                     if (pb == null) { _hosts.RemoveAt(i); gone++; Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " juz nie jest jencem (pokoj, odbicie, zwolnienie, ucieczka bez strazy) - wpis zdjety, stan " + r.State + ", termin byl do dnia " + r.Until + "."); continue; }
@@ -394,15 +397,33 @@ namespace Armoury
                     }
                     if (r.State == 'B')
                     {
+                        // 393: bitwa / szturm przy tym lochu wlasnie trwa - rozliczenie jutro (wpis B zostaje, strazy i tak juz nie ma)
+                        if (KHostDeath && pb.MapEvent != null) { nBWait++; continue; }
                         _hosts.RemoveAt(i); nB++;
-                        bool kill = KHostDeath && lord != null && lord.IsAlive && !lord.IsPrisoner && Trait(lord, DefaultTraits.Mercy) < 0 && h.CanDie(KillCharacterAction.KillCharacterActionDetail.Executed);
-                        if (kill)
+                        if (!KHostDeath) { Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " po zlamaniu slowa gracza: zwykly jeniec gry (ucieczka i kurier okupu jak w grze), klucz egzekucji NIE - wpis zdjety."); continue; }
+                        // 393: kat = lord, ktoremu gracz przysiegal; martwy / sam w niewoli / juz poza ta frakcja -> pan lochu, w ktorym zakladnik siedzi
+                        Hero ex = lord != null && lord.IsAlive && !lord.IsPrisoner && lord.MapFaction == f ? lord : null;
+                        string exHow = "lord przysiegi";
+                        if (ex == null)
                         {
-                            KillCharacterAction.ApplyByExecution(h, lord);
-                            Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " STRACONY przez " + Name(lord) + " (gracz zlamal slowo; Mercy " + Trait(lord, DefaultTraits.Mercy) + ", klucz Prisoner Terms Hostage Death TAK).");
-                            Log.Player(Name(lord) + " has " + who + " put to death for your broken oath.", true);
+                            var oc = pb.Settlement.OwnerClan; var ol = oc != null ? oc.Leader : null;
+                            if (ol != null && ol.IsAlive && !ol.IsPrisoner && ol != Hero.MainHero && oc != Clan.PlayerClan) { ex = ol; exHow = "pan lochu (lord przysiegi " + (lord != null ? Name(lord) : r.Lord) + " martwy / w niewoli / poza frakcja)"; }
                         }
-                        else Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " po zlamaniu slowa gracza: zwykly jeniec gry (ucieczka i kurier okupu jak w grze)" + (KHostDeath ? ", bez egzekucji (lord bez Mercy < 0 albo bohater nie moze zginac)" : ", klucz egzekucji NIE") + " - wpis zdjety.");
+                        int mercy = ex != null ? Trait(ex, DefaultTraits.Mercy) : 0;
+                        string whyNot = ex == null ? "brak kata (lord przysiegi i pan lochu martwi / w niewoli)" : mercy >= 0 ? Name(ex) + " (" + exHow + ") ma Mercy " + mercy + " (egzekucja tylko przy Mercy < 0)"
+                            : !h.CanDie(KillCharacterAction.KillCharacterActionDetail.Executed) ? "smierc zablokowana (CanHeroDie)" : null;
+                        if (whyNot == null)
+                        {
+                            KillCharacterAction.ApplyByExecution(h, ex);
+                            if (!h.IsAlive)
+                            {
+                                Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " STRACONY przez " + Name(ex) + " [" + exHow + "] w lochu " + r.St + " (gracz zlamal slowo; Mercy " + mercy + ", klucz Prisoner Terms Hostage Death TAK) - wpis zdjety.");
+                                Log.Player(Name(ex) + " has " + who + " put to death for your broken oath.", true);
+                                continue;
+                            }
+                            whyNot = "KillCharacterAction.ApplyByExecution bez skutku (stan " + h.HeroState + ", znak smierci " + h.DeathMark + ")";
+                        }
+                        Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " po zlamaniu slowa gracza: zwykly jeniec gry (ucieczka i kurier okupu jak w grze), bez egzekucji - " + whyNot + " - wpis zdjety.");
                         continue;
                     }
                     if (r.State == 'Z')
@@ -436,7 +457,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("HostDaily.Row", e); }
             }
-            Log.Info(Tag + ": doba " + today + " | 385c zakladnicy " + _hosts.Count + " (H " + nH + " / Z " + nZ + "; B rozliczone dzis " + nB + "), zwolnieni dzis " + freed + ", wpisy zdjete " + gone + ", zwolnienia zablokowane " + _hBlocked
+            Log.Info(Tag + ": doba " + today + " | 385c zakladnicy " + _hosts.Count + " (H " + nH + " / Z " + nZ + "; B rozliczone dzis " + nB + ", B odlozone - bitwa przy lochu " + nBWait + "), zwolnieni dzis " + freed + ", wpisy zdjete " + gone + ", zwolnienia zablokowane " + _hBlocked
                      + " | losowania ucieczki wstrzymane " + _hEsc + ", rozwazenia okupu wstrzymane " + _hCour + ", rozbierania RC wyciete " + _hStripCut + ".");
             _hEsc = 0; _hCour = 0; _hStripCut = 0; _hBlocked = 0;
         }
