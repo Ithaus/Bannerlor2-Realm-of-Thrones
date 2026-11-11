@@ -48,7 +48,56 @@ namespace Armoury
 
         private static void EnvoyReset()
         {
-            _envHero = ""; _envSt = ""; _envSiegeStart = 0; _envArrive = 0; _envUntil = 0; _envHours = 0; _envState = '\0'; _envTalk = false; _dEnvSent = 0; _dEnvHeard = 0; _dEnvBack = 0; _dEnvKept = 0; _fiefWait = null;
+            _envHero = ""; _envSt = ""; _envSiegeStart = 0; _envArrive = 0; _envUntil = 0; _envHours = 0; _envState = '\0'; _envTalk = false; _dEnvSent = 0; _dEnvHeard = 0; _dEnvBack = 0; _dEnvKept = 0; _fiefWait = null; _envWarn = "";
+        }
+
+        private static string _envWarn = "";    // 395: ostatnie zalogowane ostrzezenie (osada|doba|rodzaj) - jedna linia logu na rozmowe, nie na kazde wyliczenie warunku
+
+        /// <summary>395 (Jeff 11.11, decyzja 8): poddanie 374 / inna umowa parley 384 w czasie drogi poslanca kasuje jego umowe bez zaplaty - gracz ma to
+        /// wiedziec PRZED zgoda. Zwraca dopisek do linii rozmowy (ze spacja na poczatku) albo "", gdy poslaniec nie ma nic wspolnego z ta twierdza.
+        /// Dwa przypadki: (1) umowa poslanca L / A o TO oblezenie czeka na jego powrot (NotBefore > Today; Run po powrocie zobaczy brak oblezenia -> Drop);
+        /// (2) poslaniec jeszcze jedzie / stoi przed wladca oblegajacych, wyslany z TEGO oblezenia (po poddaniu moze targowac tylko umowe bez osady).
+        /// Umowa T poslanca nie przepada (RunTruce nie wymaga oblezenia) - bez ostrzezenia. Tylko tekst: niczego nie zmienia w stanie. Nie rzuca.</summary>
+        internal static string EnvoyStakeNote(Settlement st, bool yielding, bool log)
+        {
+            try
+            {
+                if (st == null || st.StringId == null || st.SiegeEvent == null) return "";
+                double start = st.SiegeEvent.SiegeStartTime.ToHours;
+                string note = null, kind = null;
+                foreach (var d in _queue)
+                {
+                    if (d.St != st.StringId || !(d.NotBefore > Today) || (d.Want != 'L' && d.Want != 'A') || Math.Abs(d.Start - start) > 0.05) continue;
+                    kind = "umowa " + WantName(d) + " z " + d.Lord + " czeka na powrot (doba " + F(d.NotBefore) + ")";
+                    note = yielding ? " (Your envoy is still on the road with terms for this place; yielding now voids them.)"
+                                    : " (Your envoy is still on the road with terms for this place; striking another bargain here voids them.)";
+                    break;
+                }
+                if (note == null && _envState != '\0' && !_envTalk && _envSt.Length > 0 && _envSt == st.StringId && Math.Abs(_envSiegeStart - start) < 0.05)
+                {
+                    var r = Hero.Find(_envHero);
+                    var camp = st.SiegeEvent.BesiegerCamp;
+                    var lp = camp != null ? camp.LeaderParty : null;
+                    if (r != null && lp != null && lp.MapFaction == r.MapFaction && EnvoySpeaksFor(st))
+                    {
+                        kind = "poslaniec do " + _envHero + " w stanie " + _envState + " (bez umowy)";
+                        note = yielding ? " (Your envoy to " + Name(r) + " is still on the road to speak for this place; yielding now leaves him nothing to bargain for here.)"
+                                        : " (Your envoy to " + Name(r) + " is still on the road to speak for this place; a bargain struck here leaves him nothing to bargain for.)";
+                    }
+                }
+                if (note == null) return "";
+                if (log)
+                {
+                    string key = st.StringId + "|" + (int)Today + "|" + (yielding ? "374" : "384") + "|" + kind;
+                    if (key != _envWarn)
+                    {
+                        _envWarn = key;
+                        Log.Info(Tag + ": dzien " + F(Today) + " | " + Name(st) + " - OSTRZEZENIE (395) pokazane w rozmowie " + (yielding ? "poddania 374" : "parley 384") + ": " + kind + " - zgoda teraz skasuje to bez zaplaty.");
+                    }
+                }
+                return note;
+            }
+            catch (Exception e) { Stumble("EnvoyStakeNote", e); return ""; }
         }
 
         private static void EnvoyClear() { _envHero = ""; _envSt = ""; _envSiegeStart = 0; _envArrive = 0; _envUntil = 0; _envHours = 0; _envState = '\0'; }

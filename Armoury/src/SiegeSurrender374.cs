@@ -150,7 +150,7 @@ namespace Armoury
                 starter.AddPlayerLine("arm374_terms", "arm374_menu", "arm374_hint", "{=!}My men and I march out with our arms and banners, unharmed and free. The keep is yours.", null, Pick, 110);
                 starter.AddPlayerLine("arm374_back", "arm374_menu", "lord_pretalk", "{=!}Never mind.", null, ClearTalkCons, 100);
                 starter.AddDialogLine("arm374_hint", "arm374_hint", "arm374_confirm", "{=!}{ARM374_HINT}", HintCond, null, 200);
-                starter.AddPlayerLine("arm374_go", "arm374_confirm", "arm374_answer", "{=!}Then swear it before gods and men, and the gates open.", GoCond, Decide, 110);
+                starter.AddPlayerLine("arm374_go", "arm374_confirm", "arm374_answer", "{=!}{ARM374_GO}", GoCond, Decide, 110);   // 395: tekst zmienna - dopisek o poslancu
                 starter.AddPlayerLine("arm374_back2", "arm374_confirm", "lord_pretalk", "{=!}Never mind.", null, ClearTalkCons, 100);
                 starter.AddDialogLine("arm374_yes", "arm374_answer", "close_window", "{=!}You held well. Keep your steel and go - you have my word.", YesCond, YesCons, 200);
                 starter.AddDialogLine("arm374_no", "arm374_answer", "lord_pretalk", "{=!}{ARM374_NO}", NoCond, NoCons, 199);
@@ -290,13 +290,22 @@ namespace Armoury
                 int honor = Trait(_talk, DefaultTraits.Honor);
                 if (IsLiar(_talk) || honor < 0) sb.Append(" Beware: men say he has broken faith before.");
                 else if (honor > 0) sb.Append(" His word: men say he keeps it.");
+                sb.Append(PrisonerTerms384.EnvoyStakeNote(_st, true, true));   // 395: poslaniec w drodze z warunkami o te twierdze - poddanie je kasuje
                 MBTextManager.SetTextVariable("ARM374_HINT", sb.ToString());
                 return true;
             }
             catch (Exception e) { Stumble("HintCond", e); MBTextManager.SetTextVariable("ARM374_HINT", "..."); return true; }
         }
 
-        private static bool GoCond() { return _sc != null; }
+        private static bool GoCond()
+        {
+            // 395: ta sama linia co dotad; gdy poslaniec (385d) jest w drodze z warunkami o te twierdze - krotki dopisek takze na opcji, ktora gracz klika
+            string t = "Then swear it before gods and men, and the gates open.";
+            try { if (_sc != null && PrisonerTerms384.EnvoyStakeNote(_st, true, false).Length > 0) t += " (My envoy's errand for this place is void.)"; }
+            catch (Exception e) { Stumble("GoCond", e); }
+            MBTextManager.SetTextVariable("ARM374_GO", t);
+            return _sc != null;
+        }
 
         private static void Decide()
         {

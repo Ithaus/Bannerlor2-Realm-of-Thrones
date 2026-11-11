@@ -698,6 +698,8 @@ namespace Armoury
                      : _want == 'P' ? "You ask me to let the prize walk out of the trap. What would you give for it?"
                      : _want == 'A' ? "A long oath for a whole realm. What would you give for it?"
                      : _field ? "What would you give for it?" : "You ask me to give up a siege half won. What would you give for it?";
+            // 395: parley o twierdze, a poslaniec (385d) jest w drodze z warunkami o nia - L / A / T koncza oblezenie, wiec jego umowa przepadnie (P nie konczy)
+            if (!_field && !_envTalk && _st != null && (_want == 'L' || _want == 'A' || _want == 'T')) t += EnvoyStakeNote(_st, false, true);
             MBTextManager.SetTextVariable("ARM384_WFOR", t);
             return true;
         }
@@ -1371,7 +1373,7 @@ namespace Armoury
                 if (d.Want == 'T') { RunTruce(d, st, lord); return; }   // 385
                 if (d.Field) { RunField(d, lord); return; }             // 385
                 var ev = st != null ? st.SiegeEvent : null;
-                if (st == null || ev == null || Math.Abs(ev.SiegeStartTime.ToHours - d.Start) > 0.05) { Drop(d, st, null, "oblezenie skonczylo sie przed wymiana - nic nie oddane"); return; }
+                if (st == null || ev == null || Math.Abs(ev.SiegeStartTime.ToHours - d.Start) > 0.05) { Drop(d, st, d.Envoy ? "Your envoy is back, but the siege " + Place(st) + " is over. The terms he carried are void; nothing was handed over." : null, "oblezenie skonczylo sie przed wymiana - nic nie oddane" + (d.Envoy ? " (umowa poslanca)" : "")); return; }   // 395: przy umowie poslanca gracz dostaje komunikat
                 if (!FactionManager.IsAtWarAgainstFaction(lord.MapFaction, st.MapFaction)) { Drop(d, st, null, "pokoj miedzy stronami - nic nie oddane"); return; }
                 if (SiegeSurrender374.CampBusy(st)) { Drop(d, st, "The terms agreed at " + Name(st) + " have lapsed amid the fighting.", "bitwa przy obozie dluzej niz doba"); return; }
                 var keys = SiegeRansom.CampKeys384(ev.BesiegerCamp);   // przed zwinieciem
