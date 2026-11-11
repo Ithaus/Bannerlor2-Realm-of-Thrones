@@ -731,7 +731,9 @@ namespace Armoury
                 if (Campaign.Current != null && mission != null && Settings.Current.ShieldMissileGuardEnabled)
                     mission.AddMissionBehavior(new ShieldGuard.Logic());
                 // 415: szyja / barki z helmu i pancerza tulowia, lezacy - liczniki trafien wedlug czesci ciala i linia "Szyja i barki (415): koniec misji"
-                if (Campaign.Current != null && mission != null)
+                // 415-p: latki zostaja w procesie po wyjsciu z kampanii - w bitwie wlasnej po kampanii zachowanie tez jest dodawane (odswieza stan prefiksu RBM,
+                // zeruje liczniki i zdejmuje znacznik ostatniej ofiary na koncu misji); bez zalozonych latek poza kampania nic nie dochodzi
+                if ((Campaign.Current != null || NeckGuard415.Patched) && mission != null)
                     mission.AddMissionBehavior(new NeckGuard415.Logic());
                 // 416: premia pancerza wypoczetego (RBM x1.0-1.3) - liczniki ciosow w wypoczetych / zmeczonych i linia "Wypoczety (416): koniec misji"
                 if (Campaign.Current != null && mission != null)

@@ -42,6 +42,8 @@ namespace Armoury
 
         private static int _patched, _wanted;
         private static string _note = "nie zakladano";
+        /// <summary>415-p: choc jedna latka 415 siedzi w procesie (takze po wyjsciu z kampanii) - SubModuleMain dodaje wtedy Logic w kazdej misji.</summary>
+        internal static bool Patched { get { return _patched > 0; } }
         private static MethodBase _blow;                     // MissionCombatMechanicsHelper.ComputeBlowDamage
         private static bool _rbmBlow;                        // prefiks RBM (mnoznik x0.75) jest teraz na ComputeBlowDamage
 
@@ -190,6 +192,12 @@ namespace Armoury
         }
 
         /// <summary>C4. Przed prefiksem RBM na ComputeBlowDamage. Warunki jak w RBM (ofiara i napastnik nie null), ale tylko czlowiek i tylko akcja Fall.
+        /// 415-p: akcja Fall (action_types.xml, actt_fall) to nie tylko powalenie ciosem: act_strike_fall_* razem z calym wstawaniem, act_rider_only_fall*
+        /// (zrzucony z konia, takze gdy wstaje), act_fall* / act_fall_hard* (twarde ladowanie, np. z muru) - ten sam zbior, ktory RBM mnozy x0.75.
+        /// _rbmBlow odswiezany tylko na starcie misji: gdyby RBM zdjal swoj prefiks W TRAKCIE misji, lezacy do jej konca dostaje pancerz x(procent / 75)
+        /// bez x0.75 RBM (przy 50: x0.667 zamiast x1.0) - swiadomy kompromis, bez GetPatchInfo w goracej sciezce.
+        /// Srednie pancerza w linii konca misji sa PRZYBLIZONE: pole czytane przed albo po prefiksach 416 / 423b (kolejnosc Harmony), bez mnoznika zmeczenia RBM;
+        /// dokladny jest tylko stosunek po / przed = procent / 75.
         /// Licznik ciosow w lezacych rosnie takze przy suwaku 75 (pomiar "przed").</summary>
         private static void PronePrefix(ref AttackInformation attackInformation)
         {
@@ -238,8 +246,8 @@ namespace Armoury
                      + "; reszta " + _hOther + " srednio " + Avg(_hpOther, _hOther) + " HP"
                      + " | PANCERZ szyi liczony " + _neckCalls + " razy, podniesiony " + _neckRaised + " (srednio " + Avg(_neckBefore, _neckRaised) + " -> " + Avg(_neckAfter, _neckRaised) + ")"
                      + "; barkow " + _shCalls + ", podniesiony " + _shRaised + " (srednio " + Avg(_shBefore, _shRaised) + " -> " + Avg(_shAfter, _shRaised) + ")"
-                     + " | ciosy w lezacych " + _proneBlows + ", pancerz zmieniony " + _proneChanged
-                     + " (srednio po mnozniku " + Avg(_proneArmBefore, _proneChanged) + " -> " + Avg(_proneArmAfter, _proneChanged) + ").");
+                     + " | ciosy w lezacych " + _proneBlows + " (akcja Fall: powaleni i wstajacy, zrzuceni z konia, twarde ladowanie - wiecej niz powalen), pancerz zmieniony " + _proneChanged
+                     + " (srednio po mnozniku, PRZYBLIZONE - nie porownywac z HIT: " + Avg(_proneArmBefore, _proneChanged) + " -> " + Avg(_proneArmAfter, _proneChanged) + ").");
             Reset();
         }
 

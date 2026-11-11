@@ -4,6 +4,11 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 415-p: szyja / barki / lezacy - zakresy jak w recznym McmSettings.cs (NeckGuard415 przycina udzialy do 0..1, procent do 0..100;
+    # regula ogolna dalaby barkom 0..2.00, a lezacemu 0..200 z formatem 0.00)
+    'NeckFromHelmetShare': (0.0, 1.0, "0.00"),
+    'ShoulderFromBodyShare': (0.0, 1.0, "0.00"),
+    'ProneArmorPercent': (0.0, 100.0, "0"),
     # 414-p: bron miotana w tarcze - zakres jak w recznym McmSettings.cs (ShieldGuard.Classify przycina do 0..100; regula ogolna dalaby 0..400)
     'ThrownShieldDamagePercent': (0.0, 100.0, "0.00"),
     # 402 / 404 (402-p): lochy - zakresy jak w recznym McmSettings.cs (kod przycina prog do 0.05..0.99, przebieg do >= 1)
