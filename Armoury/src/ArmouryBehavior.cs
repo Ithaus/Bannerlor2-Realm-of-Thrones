@@ -1672,7 +1672,7 @@ namespace Armoury
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SideVillageFief.Tick(); });
             VillageEntryDiag.Reset();   // 316e/331: diagnostyka wjazdu do osad gry (tylko log); takt z SubModuleMain.OnApplicationTick - TickEvent gra wola tylko przy dt > 0 (menu osady = brak taktu)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { LandSale.Tick(); });   // m113-zakup: umowa z kolejki (bez rozmowy), okno ofert po rozmowie
-            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { DungeonFate.TalkTick(); });   // 409: wyrok gracza (slowo rodu / egzekucja) wykonany po rozmowie; pusta kolejka = jedno porownanie
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { DungeonFate.TalkTick(dt); });   // 409: wyrok gracza (slowo rodu / egzekucja) wykonany po rozmowie; pusta kolejka = jedno porownanie
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { CaptiveTerms.Tick(); });   // 366: umowa z jencem-krolem wykonana po rozmowie (czas plynie, bez misji i rozmowy)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SiegeSurrender374.Tick(); });   // 374: poddanie twierdzy wykonane po wyjsciu gracza za brame (bez misji, rozmowy, spotkania)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeMisery.OnMapEventEnded", SiegeMisery.OnMapEventEnded));   // 399: zabici bitew oblezniczych do licznika trupow (tylko odczyt bitwy)

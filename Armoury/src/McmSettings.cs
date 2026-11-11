@@ -12060,7 +12060,7 @@ namespace Armoury
         [SettingPropertyGroup("Captives: the player's sentence - a house's word or the block (409)")]
         public bool CaptiveFateParole { get; set; } = true;
 
-        [SettingPropertyBool("Captive Fate Execution", HintText = "With Captive Fate: you may sentence a captive lord to death from the talk, also one held in your dungeon. There is no scene: he dies once you have left, with all the usual consequences of an execution (relations, honour, a house without a grown lord ends). His house will never again give you its word, and any oath it had sworn with you is void. Never a character the Realm of Thrones story still needs (Story Guard)", RequireRestart = false)]
+        [SettingPropertyBool("Captive Fate Execution", HintText = "With Captive Fate: you may sentence a captive lord to death from the talk, also one held in your dungeon. There is no scene: he dies once you have left, with all the usual consequences of an execution (relations, honour, a house without a grown lord ends). The house of the dead will never again give you its word; if it had sworn peace with you, putting its lord to death breaks your own oath (the price of a broken oath) and the peace is void. Never a character the Realm of Thrones story still needs (Story Guard)", RequireRestart = false)]
         [SettingPropertyGroup("Captives: the player's sentence - a house's word or the block (409)")]
         public bool CaptiveFateExecution { get; set; } = true;
 

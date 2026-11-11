@@ -1819,6 +1819,20 @@ namespace Armoury
             catch (Exception e) { Stumble("DropHousePact", e); return 0; }
         }
 
+        /// <summary>409-p: gracz scina lorda rodu, z ktorym ma CZYNNA przysiege wzajemna (wpis "c:"+rod, zasieg "*") - to zlamanie slowa jak atak na jego
+        /// druzyne: kara 384b (PlayerBroke -> BrokeWord). true = byl pakt i kara poszla. Bez paktu nic. Watek glowny. Nie rzuca.</summary>
+        internal static bool ExecutionBreaksPact(Clan clan, string what)
+        {
+            try
+            {
+                if (_entries.Count == 0 || clan == null || clan.StringId == null) return false;
+                if (!PactWith(null, clan)) return false;
+                PlayerBroke(null, clan, what);
+                return true;
+            }
+            catch (Exception e) { Stumble("ExecutionBreaksPact", e); return false; }
+        }
+
         // ------------------------------------------------------------ pakt: cele AI, druzyna gracza, zlamania
         private static bool Match(Entry e, IFaction f, Clan c)
         {

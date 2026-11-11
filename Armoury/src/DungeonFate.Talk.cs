@@ -216,15 +216,17 @@ namespace Armoury
                 if (h == null) return;
                 string parts;
                 _vScore = ParoleScore(h, out parts);
-                _vAccepted = _vScore >= ParoleAgreeFrom;
-                if (_vAccepted)
+                bool yes = _vScore >= ParoleAgreeFrom;
+                Log.Info(Tag + ": WYROK parole " + Nm(h) + " [" + h.StringId + "] - " + (yes ? "zgoda" : "odmowa") + " (S=" + _vScore.ToString("0.#", Inv) + ", prog " + ParoleAgreeFrom.ToString("0", Inv)
+                         + ": " + parts + ")" + (yes ? " | do kolejki, wykonanie w takcie mapy." : " | przerwa do doby " + (Today() + ParoleRefusalDays) + "."));
+                // 409-p: stan na samym koncu (po logu) - wyjatek wyzej nie zostawi wyroku w kolejce przy odpowiedzi "odmowa"
+                if (yes)
                 {
                     _verdicts.Add(new Verdict { Hero = h.StringId, Kind = 'P', Day = Today() });
                     _vArmed = false; _vWait = 0;
                 }
                 else _paroleCool[h.StringId] = Today() + ParoleRefusalDays;
-                Log.Info(Tag + ": WYROK parole " + Nm(h) + " [" + h.StringId + "] - " + (_vAccepted ? "zgoda" : "odmowa") + " (S=" + _vScore.ToString("0.#", Inv) + ", prog " + ParoleAgreeFrom.ToString("0", Inv)
-                         + ": " + parts + ")" + (_vAccepted ? " | do kolejki, wykonanie w takcie mapy." : " | przerwa do doby " + (Today() + ParoleRefusalDays) + "."));
+                _vAccepted = yes;
             }
             catch (Exception e) { Stumble("ParoleCons", e); _vAccepted = false; }
         }
@@ -260,6 +262,10 @@ namespace Armoury
                 if (h.IsChild) { why = new TextObject("{=!}" + He(h, true) + " is too young."); return false; }
                 string pl;
                 if (!StoryGuard.MayLeaveStory(h, out pl)) { why = new TextObject("{=!}" + His(h, true) + " part in what is to come is not yet played."); return false; }
+                // 409-p: glowa rodu bez dziedzica - gra usunelaby z nia caly rod (DestroyClanAction.ApplyByClanLeaderDeath -> ApplyByRemove). HeroFate.TryKill
+                // odmawia wtedy, gdy w rodzie zyje postac fabuly (403-p) - linia ma byc nieczynna z dymkiem, a nie przepadac po rozmowie
+                if (h.Clan != null && h.Clan.Leader == h && HeroFate.LastOfHouse(h) && StoryGuard.ClanHoldsStory(h.Clan, h, out pl))
+                { why = new TextObject("{=!}" + His(h, true) + " house cannot end yet: one of its blood has a part still to play."); return false; }
                 if (h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || !h.CanDie(KillCharacterAction.KillCharacterActionDetail.Executed))
                 { why = new TextObject("{=!}" + He(h, true) + " cannot be put to death now."); return false; }
                 return true;
@@ -288,10 +294,13 @@ namespace Armoury
 
         // ---------------------------------------------------------------- wykonanie (takt mapy)
 
-        /// <summary>CampaignEvents.TickEvent (gra wola tylko, gdy czas plynie): pusta kolejka = jedno porownanie. Jeden wyrok na takt. Nie rzuca.</summary>
-        internal static void TalkTick()
+        /// <summary>CampaignEvents.TickEvent: pusta kolejka = jedno porownanie. Jeden wyrok na takt. Nie rzuca.
+        /// 409-p: gra wola TickEvent takze w dwoch pierwszych taktach po starcie przy stojacym czasie (Campaign.Tick: _dt > 0 || CurrentTickCount &lt; 3,
+        /// cs_full.cs:10094) - wyrok z zapisu wykonalby sie w chwili wczytania. Dlatego tylko przy dt > 0 (czas plynie).</summary>
+        internal static void TalkTick(float dt)
         {
             if (_verdicts.Count == 0) return;
+            if (!(dt > 0f)) return;
             try
             {
                 if (Campaign.Current == null || Mission.Current != null) return;
@@ -324,6 +333,13 @@ namespace Armoury
                 if (!Sentenceable(h, false, out why)) { VDrop(v, h, h != null && h.IsAlive ? "Your sentence on " + Nm(h) + " comes to nothing: " + He(h, false) + " is no longer your captive." : null, why); return true; }
                 if (s == null || !s.CaptiveFate) { VDrop(v, h, null, "klucz Captive Fate NIE"); return true; }
                 bool late = Today() - v.Day > SentenceKeepDays;
+                // 409-p: gracz sam w niewoli nie wykonuje wyrokow - odroczenie, po SentenceKeepDays wyrok przepada
+                if (Hero.MainHero != null && Hero.MainHero.IsPrisoner)
+                {
+                    if (late) { VDrop(v, h, "Your sentence on " + Nm(h) + " was never carried out: you are a captive yourself.", "gracz w niewoli dluzej niz " + SentenceKeepDays + " doby"); return true; }
+                    if (!v.Told) { v.Told = true; Log.Info(Tag + ": WYROK " + (v.Kind == 'P' ? "parole" : "egzekucja") + " " + Nm(h) + " [" + v.Hero + "] - odroczone (gracz w niewoli), ponowna proba co " + RetryTicks + " taktow mapy (najdluzej " + SentenceKeepDays + " doby)."); }
+                    return false;
+                }
                 if (v.Kind == 'P') return RunParole(v, h, s, late);
                 if (v.Kind == 'E') return RunExecution(v, h, s, late);
                 VDrop(v, h, null, "nieznany rodzaj wyroku");
@@ -341,6 +357,7 @@ namespace Armoury
             if (cap != null && cap.MapEvent != null)
             {
                 if (late) { VDrop(v, h, "The oath of " + Nm(h) + " comes to nothing amid the fighting.", "bitwa pojmujacego dluzej niz " + SentenceKeepDays + " doby"); return true; }
+                if (!v.Told) { v.Told = true; Log.Info(Tag + ": WYROK parole " + Nm(h) + " [" + v.Hero + "] - odroczone (bitwa pojmujacego), ponowna proba co " + RetryTicks + " taktow mapy (najdluzej " + SentenceKeepDays + " doby)."); }
                 return false;
             }
             var clan = h.Clan;
@@ -372,22 +389,37 @@ namespace Armoury
                 if (!v.Told) { v.Told = true; Log.Info(Tag + ": WYROK egzekucja " + name + " [" + v.Hero + "] - " + (why ?? "odroczone") + ", ponowna proba co " + RetryTicks + " taktow mapy (najdluzej " + SentenceKeepDays + " doby)."); }
                 return false;
             }
+            if (fate != HeroFate.Fate.Killed && h.IsAlive && clan != Clan.PlayerClan && h.Clan == Clan.PlayerClan)
+            {
+                // 409-p: gracz z rodu Bialych Wedrowcow - prefiks ROT na KillCharacterAction.ApplyByExecution (rot_all.cs:21215-21248) zamiast smierci
+                // przemienia ofiare, uwalnia ja i przenosi do rodu i druzyny gracza. To nie zgon (LordToll nie liczy), ale rod ofiary stracil lorda z wyroku gracza.
+                string oathW = SentenceOnHouse(clan, clanId, name);
+                Log.Info(Tag + ": WYROK egzekucja " + name + " [" + v.Hero + "] - PRZEJETY PRZEZ ROT (gracz Bialy Wedrowiec): przemieniony i wcielony do rodu gracza, bez smierci | rod " + clanName + " [" + (clanId ?? "-") + "] w wasni (rodow w wasni " + _feud.Count + "), " + oathW + ".");
+                Log.Player(name + " rises again to serve you.", true);
+                return true;
+            }
             if (fate != HeroFate.Fate.Killed)
             {
                 bool story = why != null && why.StartsWith("straz fabuly", StringComparison.Ordinal);
                 VDrop(v, h, story ? name + " is spared: " + His(h, false) + " part in what is to come is not yet played." : "Your sentence on " + name + " could not be carried out.", why ?? "odmowa");
                 return true;
             }
-            int dropped = 0;
-            if (clanId != null)
-            {
-                _feud.Add(clanId);
-                dropped = PrisonerTerms384.DropHousePact(clan);
-            }
+            string oath = SentenceOnHouse(clan, clanId, name);
             Log.Info(Tag + ": WYROK egzekucja " + name + " [" + v.Hero + "] - WYKONANE (" + why + ") w " + (st != null ? st.StringId : "druzynie gracza") + " | rod " + clanName + " [" + (clanId ?? "-") + "] w wasni (rodow w wasni " + _feud.Count
-                     + "), wpisy paktu zdjete " + dropped + " | kary gry (relacje, Honor) bez zmian | LordToll rok " + LordToll.Year + ": wyrok " + LordToll.Count(LordToll.Sentence) + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll + ".");
+                     + "), " + oath + " | kary gry (relacje, Honor) bez zmian | LordToll rok " + LordToll.Year + ": wyrok " + LordToll.Count(LordToll.Sentence) + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll + ".");
             Log.Player(name + " has been put to death " + (st != null ? "at " + Nm(st) : "in your camp") + ".", true);
             return true;
+        }
+
+        /// <summary>409-p: skutki wyroku smierci dla rodu ofiary - rod w wasni; czynna przysiega wzajemna z tym rodem (slowo rodu 409 / pakt 384 z kluczem
+        /// rodu) jest ZLAMANA przez gracza (kara 384b: relacja z przysiegajacym -20, Honor -500 xp, komunikat), potem pozostale wpisy rodu precz. Opis do logu.</summary>
+        private static string SentenceOnHouse(Clan clan, string clanId, string victim)
+        {
+            if (clanId == null) return "bez rodu";
+            _feud.Add(clanId);
+            bool broke = PrisonerTerms384.ExecutionBreaksPact(clan, "egzekucja " + victim);
+            int dropped = PrisonerTerms384.DropHousePact(clan);
+            return (broke ? "PRZYSIEGA WZAJEMNA ZLAMANA (kara 384b), " : "") + "wpisy paktu zdjete " + dropped;
         }
 
         // ---------------------------------------------------------------- doba / zapis
