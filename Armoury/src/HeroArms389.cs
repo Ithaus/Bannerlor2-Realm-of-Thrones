@@ -18,7 +18,8 @@ namespace Armoury
     /// skopiowanym takze do zestawu BOJOWEGO (12 slotow razem z pustymi - bez broni). Doroslego w chwili utworzenia gra nie ma na liscie dorastajacych
     /// (AgingCampaignBehavior._heroesYoungerThanHeroComesOfAge), wiec OnHeroComesOfAge - jedyne miejsce dajace zestaw lorda - nigdy sie dla niego nie odpala.
     /// Brak broni NIE wplywa na symulacje bitew (DefaultCombatSimulationModel liczy z poziomu / tieru; ArmedStrength pomija bohaterow) - szkodzi w misji
-    /// gracza, gdzie dziala 382 (klon). Tu naprawa TRWALA, zeby bohater byl ubrany takze poza bitwa gracza (rozmowy, turnieje, okup, lup).
+    /// gracza, gdzie dziala 382 (klon). Tu naprawa TRWALA zestawu BOJOWEGO (bitwy, turnieje, okup, lup). 389b: zestaw CYWILNY zostaje, jaki byl - obdarowany w miescie / zamku
+    /// dalej chodzi w dzieciecej tunice (gra przy dorastaniu daje oba zestawy; cywilny odlozony jako 389c).
     ///
     /// (A) SPIS (zawsze, tylko log): dorosli zywi bohaterowie AI bez notabli, gracza i jego rodu, umarlych Innych; linia 'Bezbronni (389): spis' po wczytaniu
     ///     i potem raz na dobe tylko przy zmianie liczby; lista imion (typ, kultura, wiek, stan, tulow) tylko po wczytaniu, do 400.
@@ -137,7 +138,9 @@ namespace Armoury
             }
             if (cid.EndsWith("_knight_clan", StringComparison.Ordinal)) return 3;
             if (h.Occupation == Occupation.Wanderer) return h.CompanionOf != null ? 6 : 5;
-            if (h.Occupation == Occupation.Lord) return (h.StringId ?? "").StartsWith("lord_", StringComparison.Ordinal) ? 4 : 7;
+            // 389b: po pochodzeniu postaci, nie po prefiksie id - lordowie ROT z danych to ROTlord_* / spc_* (594 postaci), "lord_*" ma tylko vanilla;
+            // postac z XML jest oryginalna, bohater utworzony w grze (HeroCreator) ma postac skopiowana z szablonu (OriginalCharacter != null)
+            if (h.Occupation == Occupation.Lord) { var co = h.CharacterObject; return co != null && co.IsOriginalCharacter ? 4 : 7; }
             return 8;
         }
 
