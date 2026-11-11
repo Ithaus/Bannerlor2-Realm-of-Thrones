@@ -205,7 +205,7 @@ namespace Armoury
                     if (detail == EndCaptivityDetail.ReleasedAfterEscape) _dEsc++;
                     else if (detail == EndCaptivityDetail.Ransom) _dRansom++;
                 }
-                Drop(h, false);
+                if (detail != EndCaptivityDetail.Death && h.IsAlive) Drop(h, false);   // 404-p: zgon w lochu to nie "wpis zdjety (uwolniony / przeniesiony)" - wpis zmarlego zdejmuje OnKilled
                 if (_threat.Count != 0 && h.StringId != null) _threat.Remove(h.StringId);   // 404: koniec niewoli - nastepna niewola moze dostac nowa grozbe
             }
             catch (Exception e) { Stumble("OnReleased", e); }
@@ -414,12 +414,20 @@ namespace Armoury
             int hDead = 0, hGrave = 0;
             for (int i = 0; i < _die.Count; i++)
             {
+                HRow row = null;
+                bool done = false;   // 404-p: wiersz rozstrzygniety (zgon albo gravely ill) - potkniecie PRZED tym tez konczy sie gravely ill, nigdy drugim rzutem
                 try
                 {
                     string hid = _die[i];
+                    if (!_rows.TryGetValue(hid, out row) || !row.Sick) { row = null; continue; }
                     Hero h = FindHero(pr, hid);
-                    HRow row;
-                    if (h == null || !_rows.TryGetValue(hid, out row) || !row.Sick) continue;
+                    if (h == null)
+                    {
+                        // trafiony zniknal z rosteru miedzy petlami (nie powinno sie zdarzyc): bez rzutu jutro
+                        row.Grave = true; row.End = day + GraveExtraDays; done = true; hGrave++; _hOther++;
+                        Log.Info(Tag + ": [" + hid + "] w lochu " + id + " - trafiony rzutem, ale nie ma go w rosterze -> ciezko chory do doby " + row.End + " (bez drugiego rzutu).");
+                        continue;
+                    }
                     string why;
                     bool killed = false;
                     Clan clan = h.Clan;
@@ -441,18 +449,27 @@ namespace Armoury
                         if (rec.HeroDeaths == null) rec.HeroDeaths = new List<int>(2);
                         rec.HeroDeaths.Add(day);
                         _rows.Remove(hid); _threat.Remove(hid);   // OnKilled juz to zrobil; drugi raz nie szkodzi (takze przy znaku smierci zamiast smierci)
+                        done = true;
                         string rel = AfterDeath(h, clan, ruler);
+                        // 404-p: nekrolog gry dla Murdered mowi "was assassinated" (cs_full.cs:227446) - nadpisany zdaniem o goraczce (Hero.EncyclopediaText ma publiczny seter)
+                        try { if (!h.IsAlive) h.EncyclopediaText = new TextObject("{=!}" + (h.IsFemale ? "She" : "He") + " died of fever in captivity at " + Nm(st) + " in " + CampaignTime.Now.GetYear.ToString(Inv) + " at the age of " + ((int)h.Age).ToString(Inv) + "."); }
+                        catch (Exception e) { Stumble("Obituary", e); }
                         Log.Info(Tag + ": " + name + " [" + hid + "] ZMARL od goraczki w lochu " + id + " (" + why + ") | rod " + clanName + " | relacje: " + rel
                                  + " | zgony boh. w tym lochu w " + DeathWindowDays + " dobach " + rec.HeroDeaths.Count + "/" + cap + " | LordToll rok " + LordToll.Year + ": loch " + LordToll.Count(LordToll.Dungeon) + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll + ".");
                         Log.Player(name + " has died of fever in your dungeon at " + Nm(st) + ". House " + clanName + " will not forget it.", true);   // zawsze (takze przy Dungeon Warnings NIE): smierc jenca gracza
                         continue;
                     }
                     // odmowa / odroczenie: "gravely ill" - przebieg +5 dob, potem zdrowieje bez rzutu
-                    row.Grave = true; row.End = day + GraveExtraDays; hGrave++;
+                    row.Grave = true; row.End = day + GraveExtraDays; hGrave++; done = true;
                     Log.Info(Tag + ": " + name + " [" + hid + "] w lochu " + id + " - smierc WSTRZYMANA: " + (why ?? "?") + " -> ciezko chory do doby " + row.End + ", potem zdrowieje (bez drugiego rzutu).");
                     if (warn) Log.Player(name + " lies gravely ill in your dungeon at " + Nm(st) + ".", true);
                 }
-                catch (Exception e) { Stumble("HeroDeath", e); }
+                catch (Exception e)
+                {
+                    Stumble("HeroDeath", e);
+                    // 404-p: blad przed rozstrzygnieciem = "gravely ill" jak kazda odmowa (inaczej wiersz Sick z minionym koncem losowalby zgon co dobe)
+                    if (!done && row != null && row.Sick) { row.Grave = true; row.End = day + GraveExtraDays; hGrave++; _hOther++; }
+                }
             }
             _die.Clear();
             _dHeroDead += hDead; _dGrave += hGrave;
@@ -506,7 +523,7 @@ namespace Armoury
                 Frag(id + ": jency " + total + "/" + limit + " (boh. " + heroes + ", szer. " + regulars + ", ranni " + wounded + "), nacisk " + c.ToString("0.00", Inv)
                      + " (zima " + winter.ToString("0.00", Inv) + ", oblezenie " + (siege == null ? "nie" : storySiege ? "fabuly ROT (bez dodatku)" : siegeFever ? "zaraza" : "tak") + ", trupy " + corpse.ToString("0.00", Inv) + ", medyk -" + (cut * 100f).ToString("0", Inv) + "%)"
                      + ", chorych boh. " + hSick + " (+" + hNew + ", zdrowi " + hHealed + "), szer. chorzy " + sick + ", zgony szer. " + dead + ", zgony boh. " + hDead + ", ciezko chorzy (smierc wstrzymana) +" + hGrave
-                     + ", umarlby " + hWould + (rec.NoCourier ? ", kurier odprawiany" : ""));
+                     + ", umarlby " + hWould + (rec.NoCourier ? (s.RansomCourierStandingRefusal ? ", kurier odprawiany" : ", kurier: odmowa zapisana, klucz NIE (bramka nie dziala)") : ""));
         }
 
         /// <summary>404: powod wstrzymania smierci (napis HeroFate.TryKill / StoryGuard.MayDie) do licznikow linii doby.</summary>
@@ -584,12 +601,16 @@ namespace Armoury
             _frag.Append(t);
         }
 
-        /// <summary>Bohater, ktory moze zachorowac: lord z rodem, nie rod gracza, nie towarzysz, nie dziecko, nie zakladnik 385c, bez czynnej rany Grave.</summary>
+        /// <summary>Bohater, ktory moze zachorowac: lord z rodem, nie rod gracza, nie towarzysz, nie dziecko, nie Inny (404-p), nie zakladnik 385c, bez czynnej rany Grave.</summary>
         private static bool Eligible(Hero h)
         {
             if (h == null || !h.IsAlive || !h.IsPrisoner || h == Hero.MainHero) return false;
             if (!h.IsLord || h.Clan == null || h.Clan == Clan.PlayerClan || h.IsPlayerCompanion || h.IsChild) return false;
             if (h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None) return false;
+            // 404-p: Inni (Bialy Wedrowiec Race 1 / 2, rod kultury whitewalker) nie choruja i nie umieraja od goraczki - jak szeregowi Inni (PeopleBook.IsWight)
+            // i jak rany (HeroWounds). StoryGuard celowo ZWALNIA Wedrowcow, a ROT CanHeroDie przepuszcza Murdered po starcie inwazji (rot_all.cs:31279-31295).
+            var co = h.CharacterObject;
+            if ((co != null && (co.Race == 1 || co.Race == 2)) || OthersRise.IsWhiteWalkerClan(h.Clan)) return false;
             if (PrisonerTerms384.HostageGuardedNow(h)) return false;
             if (HeroWounds.GradeOf(h) == HeroWounds.Grave) return false;   // ranny Grave ma wlasne przesilenie (403) - jedna regula smierci rannego jenca
             return true;
@@ -688,7 +709,14 @@ namespace Armoury
                     _tmp.Clear();
                 }
 
-                if ((s.DungeonSickness && (_frag.Length > 0 || _dEsc + _dRansom + _dAiOver + _dStumbles + _dGone > 0)) || _dCourier > 0)
+                if (!s.DungeonSickness)
+                {
+                    // 404-p: sama bramka kuriera (choroba wylaczona) - krotka linia zamiast pelnej z zerami
+                    if (_dCourier > 0)
+                        Log.Info(Tag + ": doba " + day + " | Dungeon Sickness NIE | kurier odprawiony " + _dCourier + " (jencow-dob; lochy z odmowa " + _noCourier + ") | ucieczki z lochow gracza dzis " + _dEsc + ", okupy " + _dRansom
+                                 + " | potkniecia " + _dStumbles + " (sesja " + _stumbles + ").");
+                }
+                else if (_frag.Length > 0 || _dEsc + _dRansom + _dAiOver + _dStumbles + _dGone + _dCourier > 0)
                     Log.Info(Tag + ": doba " + day + " | " + (_frag.Length > 0 ? _frag.ToString() : "lochy rodu gracza puste")
                              + " | razem: nowi chorzy boh. " + _dNewSick + ", zdrowi " + _dHealed + ", umarlby " + _dWould + ", zgony szer. " + _dRegDead + ", wpisy zdjete (uwolnieni / przeniesieni) " + _dGone
                              + ", lochy w bitwie " + _dBattle
