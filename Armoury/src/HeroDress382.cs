@@ -111,87 +111,14 @@ namespace Armoury
             string done = "-";
             if (On)
             {
-                Equipment tpl = OwnTemplate(co, true), wtpl = OwnTemplate(co, false);
-                string from = "wlasny szablon";
-                if (tpl == null && wtpl == null)
+                var k = Fill(src, co, hero, bareBody, noWeapon, over, Over);
+                if (k != null)
                 {
-                    tpl = CultureTemplate(hero, hero.IsFemale);
-                    wtpl = tpl;
-                    from = "szablon lorda kultury";
-                }
-                string afrom = from;
-                if (Over && (bareBody || over))
-                {
-                    // 382c: pancerz z lancucha bez cywilnego tulowia; nagi tulow bez takiego wzorca - stary wzorzec (suknia lepsza niz nic)
-                    string f2;
-                    var a = ArmourTemplate(co, hero, out f2);
-                    if (a != null) { tpl = a; afrom = f2; }
-                    else if (over) tpl = null;
-                }
-                if (tpl != null || wtpl != null)
-                {
-                    var eq = src.Clone();
-                    int n = 0;
-                    var got = new List<string>();
-                    bool req = Settings.Current != null && Settings.Current.HeroGearRequirements;
-                    if (noWeapon && wtpl != null)
-                    {
-                        // 382b: komplet broni przez to samo sito co reszta drog bohatera (ItemReq.MeetsHero - umiejetnosc broni i Prawo Tieru
-                        // przez Difficulty), a dystansowa bez pary (luk bez strzal / strzaly bez luku) wypada - bez polowek kompletu
-                        var kit = new ItemObject[4];
-                        for (int i = 0; i < 4; i++)
-                        {
-                            var it = wtpl[(EquipmentIndex)i].Item;
-                            if (it == null || Banned(it)) continue;
-                            if (req && !ItemReq.MeetsHero(co, it)) continue;
-                            kit[i] = it;
-                        }
-                        Pair(kit);
-                        for (int i = 0; i < 4; i++)
-                        {
-                            if (kit[i] == null) continue;
-                            eq[(EquipmentIndex)i] = new EquipmentElement(kit[i]);
-                            n++;
-                            got.Add(kit[i].StringId);
-                        }
-                    }
-                    int ath = 0;
-                    try { ath = co.GetSkillValue(DefaultSkills.Athletics); } catch { }
-                    bool swapped = false;
-                    if (tpl != null && over)
-                    {
-                        // 382c: najpierw zbroja tulowia - bez niej stroj zostaje caly (bez helmu do sukni)
-                        var body = Pick(tpl[EquipmentIndex.Body].Item, co, hero, req, ath);
-                        if (body != null && CivilBody(body) == 0)
-                        {
-                            eq[EquipmentIndex.Body] = new EquipmentElement(body);
-                            n++;
-                            got.Add(body.StringId);
-                            swapped = true;
-                            foreach (var s in Armour)
-                            {
-                                if (s == EquipmentIndex.Body) continue;
-                                if (!eq[s].IsEmpty && (s == EquipmentIndex.Cape || !CivilPiece(eq[s].Item))) continue;
-                                var it = Pick(tpl[s].Item, co, hero, req, ath);
-                                if (it == null || CivilPiece(it)) continue;
-                                eq[s] = new EquipmentElement(it);
-                                n++;
-                                got.Add(it.StringId);
-                            }
-                        }
-                    }
-                    else if (tpl != null && bareBody)                // 382b: pancerz tylko gdy brak zbroi tulowia (opis MCM / CHANGELOG)
-                    {
-                        foreach (var s in Armour)
-                        {
-                            if (!eq[s].IsEmpty) continue;
-                            var it = Pick(tpl[s].Item, co, hero, req, ath);
-                            if (it == null) continue;
-                            eq[s] = new EquipmentElement(it);
-                            n++;
-                            got.Add(it.StringId);
-                        }
-                    }
+                    var eq = k.Eq;
+                    int n = k.N;
+                    var got = k.Got;
+                    bool swapped = k.Swapped;
+                    string from = k.From, afrom = k.AFrom;
                     if (over)
                     {
                         if (swapped)
@@ -224,6 +151,103 @@ namespace Armoury
                          + ", " + (noWeapon ? "BEZ BRONI" : "bron jest") + ", pustych slotow pancerza " + emptyArm + "/5 | zrodlo zestawu: " + (bd.AgentOverridenSpawnEquipment != null ? "nadpis spawnu" : "Hero.BattleEquipment")
                          + ", w Hero.BattleEquipment tulow " + (hero.BattleEquipment != null && !hero.BattleEquipment[EquipmentIndex.Body].IsEmpty ? "jest" : "PUSTY")
                          + " | szablon " + RosterId(co) + " | " + done + ".");
+        }
+
+        /// <summary>389: wynik doboru - klon zestawu z wypelnionymi slotami (N sztuk), zrodla wzorca broni (From) i pancerza (AFrom).</summary>
+        internal sealed class Kit
+        {
+            public Equipment Eq;
+            public int N;
+            public List<string> Got;
+            public bool Swapped;
+            public string From, AFrom;
+        }
+
+        /// <summary>Dobor 382 / 382b / 382c wydzielony z One (389: ten sam dobor dla trwalego "spoznionego dorosniecia" - HeroArms389).
+        /// src nietkniete (klon). null = brak wzorca (ani wlasnego, ani lorda kultury). overKey = klucz AiHeroesArmourOverDress (389 podaje true).</summary>
+        internal static Kit Fill(Equipment src, CharacterObject co, Hero hero, bool bareBody, bool noWeapon, bool over, bool overKey)
+        {
+            Equipment tpl = OwnTemplate(co, true), wtpl = OwnTemplate(co, false);
+            string from = "wlasny szablon";
+            if (tpl == null && wtpl == null)
+            {
+                tpl = CultureTemplate(hero, hero.IsFemale);
+                wtpl = tpl;
+                from = "szablon lorda kultury";
+            }
+            string afrom = from;
+            if (overKey && (bareBody || over))
+            {
+                // 382c: pancerz z lancucha bez cywilnego tulowia; nagi tulow bez takiego wzorca - stary wzorzec (suknia lepsza niz nic)
+                string f2;
+                var a = ArmourTemplate(co, hero, out f2);
+                if (a != null) { tpl = a; afrom = f2; }
+                else if (over) tpl = null;
+            }
+            if (tpl == null && wtpl == null) return null;
+            var eq = src.Clone();
+            int n = 0;
+            var got = new List<string>();
+            bool req = Settings.Current != null && Settings.Current.HeroGearRequirements;
+            if (noWeapon && wtpl != null)
+            {
+                // 382b: komplet broni przez to samo sito co reszta drog bohatera (ItemReq.MeetsHero - umiejetnosc broni i Prawo Tieru
+                // przez Difficulty), a dystansowa bez pary (luk bez strzal / strzaly bez luku) wypada - bez polowek kompletu
+                var kit = new ItemObject[4];
+                for (int i = 0; i < 4; i++)
+                {
+                    var it = wtpl[(EquipmentIndex)i].Item;
+                    if (it == null || Banned(it)) continue;
+                    if (req && !ItemReq.MeetsHero(co, it)) continue;
+                    kit[i] = it;
+                }
+                Pair(kit);
+                for (int i = 0; i < 4; i++)
+                {
+                    if (kit[i] == null) continue;
+                    eq[(EquipmentIndex)i] = new EquipmentElement(kit[i]);
+                    n++;
+                    got.Add(kit[i].StringId);
+                }
+            }
+            int ath = 0;
+            try { ath = co.GetSkillValue(DefaultSkills.Athletics); } catch { }
+            bool swapped = false;
+            if (tpl != null && over)
+            {
+                // 382c: najpierw zbroja tulowia - bez niej stroj zostaje caly (bez helmu do sukni)
+                var body = Pick(tpl[EquipmentIndex.Body].Item, co, hero, req, ath);
+                if (body != null && CivilBody(body) == 0)
+                {
+                    eq[EquipmentIndex.Body] = new EquipmentElement(body);
+                    n++;
+                    got.Add(body.StringId);
+                    swapped = true;
+                    foreach (var s in Armour)
+                    {
+                        if (s == EquipmentIndex.Body) continue;
+                        if (!eq[s].IsEmpty && (s == EquipmentIndex.Cape || !CivilPiece(eq[s].Item))) continue;
+                        var it = Pick(tpl[s].Item, co, hero, req, ath);
+                        if (it == null || CivilPiece(it)) continue;
+                        eq[s] = new EquipmentElement(it);
+                        n++;
+                        got.Add(it.StringId);
+                    }
+                }
+            }
+            else if (tpl != null && bareBody)                // 382b: pancerz tylko gdy brak zbroi tulowia (opis MCM / CHANGELOG)
+            {
+                foreach (var s in Armour)
+                {
+                    if (!eq[s].IsEmpty) continue;
+                    var it = Pick(tpl[s].Item, co, hero, req, ath);
+                    if (it == null) continue;
+                    eq[s] = new EquipmentElement(it);
+                    n++;
+                    got.Add(it.StringId);
+                }
+            }
+            return new Kit { Eq = eq, N = n, Got = got, Swapped = swapped, From = from, AFrom = afrom };
         }
 
         /// <summary>382b: bron dystansowa tylko w parze z amunicja (luk - strzaly, kusza - belty, palna - kule); bez pary obie strony wypadaja.</summary>

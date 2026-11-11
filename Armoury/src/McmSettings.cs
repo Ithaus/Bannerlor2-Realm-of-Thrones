@@ -948,6 +948,10 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool AiHeroesArmourOverDress { get; set; } = true;
 
+        [SettingPropertyBool("AI Heroes Late Coming Of Age Kit", HintText = "A grown AI lord who never came of age in the game (made adult by another mod, still in a child's or plain tunic, or bare, and with no weapon at all) gets, once in his life, the battle gear he would wear anyway in your battles: weapons and armour from his own gear template or a lord's template of his culture, within his skills (Hero Gear Requirements), never renowned or legendary pieces. Checked once a day, at most 60 lords a day. Not you, not your clan, not wanderers or companions, not the undead. A lord who has armour but no weapon is only counted. Off = only the count in the log ('Bezbronni (389)')", RequireRestart = false)]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool AiHeroesLateComingOfAgeKit { get; set; } = true;
+
         [SettingPropertyInteger("Weapon Skill Per Tier", 0, 140, "0", HintText = "Weapon Tier Law: a weapon or shield needs at least (tier - 1) x this in its skill, whatever the data says - a tier 6 blade wants 175, so a One Handed 30 bandit never 'qualifies' for it; 0 turns the law off. Applied at session start", RequireRestart = false)]
         [SettingPropertyGroup("Skills rule the gear")]
         public int WeaponSkillPerTier { get; set; } = 35;
@@ -12216,6 +12220,7 @@ namespace Armoury
             s.HeroSkillToOwnGear = HeroSkillToOwnGear;
             s.AiHeroesNeverFightBare = AiHeroesNeverFightBare;
             s.AiHeroesArmourOverDress = AiHeroesArmourOverDress;
+            s.AiHeroesLateComingOfAgeKit = AiHeroesLateComingOfAgeKit;
             s.WeaponSkillPerTier = WeaponSkillPerTier;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;
