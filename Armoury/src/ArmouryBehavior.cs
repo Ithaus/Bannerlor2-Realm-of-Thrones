@@ -4160,7 +4160,7 @@ namespace Armoury
                 if (it == null || !it.HasArmorComponent) return 0;
                 var a = it.ArmorComponent;
                 int pts = it.Type == ItemObject.ItemTypeEnum.HorseHarness
-                    ? a.BodyArmor
+                    ? HorseBarding419.BookBody(it, a.BodyArmor)   // 419: pula ladrow z sufitem - z pancerza sprzed sufitu
                     : a.HeadArmor + a.BodyArmor + a.LegArmor + a.ArmArmor;
                 int tier = Recipes.Grade(it);
                 // wpis 95 (audyt zuzycia pkt 7): rekawice (10 pkt) i nogawice zuzywaly sie 5-8x szybciej niz napiersnik - podloga puli

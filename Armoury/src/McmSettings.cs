@@ -568,6 +568,14 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool ClothingArmorExceptionsEnabled { get; set; } = true;
 
+        [SettingPropertyBool("ROT Plate Barding Can Be Pierced", HintText = "With Realistic Battle Mod and Realm of Thrones: the plate horse armour of Realm of Thrones can be pierced by war bows. Realm of Thrones gives its plate bardings (Lannister, Stark, Reach, Vale, Kingsguard, the Free Cities and the rest - 45 pieces, 140 kg each) an armour of 82 on the body, where the bardings of Realistic Battle Mod have 10 to 50, so no bow in the game goes through: a bodkin arrow from a 150 lb longbow takes 5 to 7 of a warhorse's 340 hit points and archers cannot stop a charge. On = every armour value of these bardings is cut down to the cap set by the slider below (head to 1.2 times the cap). At the cap of 45 a bodkin arrow from a 150 lb longbow in the chest of a charging horse takes about 54 at 20 metres and 27 at 100 metres (18 if the horse stands), from a 100 lb bow 11 at 20 metres; broadhead arrows still glance off for 3 to 8. Weight, speed, charge, price, tier, forging cost and wear of the bardings stay as they are, and so do the hit points of the horses. Dothraki horse armour, elephant armour, saddles with a faceguard and the Stark horse mail are left alone. Off = as in the Realm of Thrones data. Takes effect on the next load of a save. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 419).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool RotBardingCapEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("ROT Plate Barding Armour Cap", 31, 90, "0", HintText = "highest armour a Realm of Thrones plate barding may have on the body, neck and legs of the horse (ROT Plate Barding Can Be Pierced); the head keeps 1.2 times this. Realm of Thrones gives 71 to 88, Realistic Battle Mod's own heaviest bardings 47 to 50. A bodkin arrow from a 150 lb longbow in the chest of a charging horse at 20 metres: cap 50 - about 46 hit points, 45 - 54, 40 - 63 (and a 100 lb bow 6, 11 and 20). Takes effect on the next load of a save", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public int RotBardingArmorCap { get; set; } = 45;
+
         [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ArmorPoolMinPoints { get; set; } = 40;
@@ -12525,6 +12533,8 @@ namespace Armoury
             s.RotShieldArmorMin = RotShieldArmorMin;
             s.RotShieldArmorMax = RotShieldArmorMax;
             s.ClothingArmorExceptionsEnabled = ClothingArmorExceptionsEnabled;
+            s.RotBardingCapEnabled = RotBardingCapEnabled;
+            s.RotBardingArmorCap = RotBardingArmorCap;
             s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;

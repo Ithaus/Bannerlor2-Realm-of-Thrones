@@ -156,7 +156,8 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s != null && it.ItemType == ItemObject.ItemTypeEnum.HeadArmor) return HelmCostWeight(it, w, s);   // N9 (noc 16.10): helm plytowy z pancerza glowy
                 if (s == null || s.HarnessKgPerArmor <= 0f || it.ItemType != ItemObject.ItemTypeEnum.HorseHarness || it.ArmorComponent == null) return w;
-                float real = Math.Max(3f, s.HarnessKgPerArmor * Math.Max(0, it.ArmorComponent.BodyArmor));
+                // 419: lader plytowy ROT z sufitem pancerza liczy koszt z wartosci sprzed sufitu (HorseBarding419.BookBody) - wycena bez zmian
+                float real = Math.Max(3f, s.HarnessKgPerArmor * Math.Max(0, HorseBarding419.BookBody(it, it.ArmorComponent.BodyArmor)));
                 return Math.Min(w, real);
             }
             catch { return w; }

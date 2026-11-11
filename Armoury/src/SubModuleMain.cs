@@ -742,6 +742,9 @@ namespace Armoury
                 // 418: tarcze ROT (ciosy wrecz przyjete na tarcze wedlug klasy) i ubrania z tabeli wyjatkow - linia "Tarcze i ubrania ROT (418): koniec misji"
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new RotData418.Logic());
+                // 419: ladry plytowe ROT - trafienia pociskow w konie wedlug grotu, konie zabite pociskiem, linia "Ladry (419): koniec misji"
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new HorseBarding419.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)
@@ -888,6 +891,7 @@ namespace Armoury
                 starter.AddBehavior(new ArmouryBehavior());
                 starter.AddBehavior(new Uniques());
                 starter.AddBehavior(new RotData418());   // 418: tarcze ROT w skali 4-6 + ubrania bez pancerza zbroi - korekta danych w pamieci przy starcie sesji, PO ArmouryBehavior (wycena juz zbudowana)
+                starter.AddBehavior(new HorseBarding419());   // 419: sufit pancerza ladrow plytowych ROT - korekta danych w pamieci przy starcie sesji (wycena z wartosci sprzed sufitu)
                 starter.AddBehavior(new SmithWoodBehavior());   // Jeff 15.10: drewno w kuzni w kg - zapas otwartego ladunku w zapisie
                 starter.AddBehavior(new HideoutPurge());
                 starter.AddBehavior(new BattleMuster());
