@@ -696,7 +696,7 @@ namespace Armoury
                 foreach (var mep in me.AttackerSide.Parties) if (mep != null && mep.Party != null) parties.Add(mep.Party);
                 var prison = captor.PrisonRoster;
                 int l0 = prison.TotalManCount;
-                int moved = 0, saved = 0, missing = 0, emptied = 0, notTaken = 0;
+                int moved = 0, saved = 0, missing = 0, emptied = 0, notTaken = 0, kept = 0;
                 double book = 0.0;
                 var types = new Dictionary<string, int>();
                 // 373c: bohaterowie spod murow PRZED zolnierzami i BEZ limitu (Jeff 11.11) - zolnierze dostaja to, co po nich zostanie wolne w lochu
@@ -780,6 +780,7 @@ namespace Armoury
                     {
                         var mr = pb.MemberRoster;
                         int from0 = PeopleBook.Men(mr), to0 = PeopleBook.Men(prison), here = 0;
+                        bool noLead = pb.LeaderHero == null;
                         foreach (var c in kv.Value)
                         {
                             try
@@ -789,6 +790,7 @@ namespace Armoury
                                 int n = k < 1.0 ? Math.Min(c.Want, MBRandom.RoundRandomized((float)(c.Want * k))) : c.Want;
                                 int idx = mr.FindIndexOfTroop(troop);
                                 n = Math.Min(Math.Min(n, cap), idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0);
+                                if (noLead && mr.TotalManCount - n <= 0) { n = mr.TotalManCount - 1; kept++; }   // 373c-p: partia bez wodza nie zostaje pusta (jak 388 / 387c)
                                 if (n <= 0) continue;
                                 mr.AddToCounts(troop, -n, false, -n);
                                 prison.AddToCounts(troop, n, false, n);
@@ -810,15 +812,17 @@ namespace Armoury
                 }
                 int cut = lim && wantSum > cap0 ? Math.Max(0, wantSum - moved) : 0;   // nadwyzka wraca ze swoja partia jak w grze (nikt jej nie rusza)
                 bool byPrison = free <= def;
+                // 373c-p: najpierw wzieci, potem odniesieni ("more" tylko wtedy, gdy linia o wzietych padla)
+                if (moved > 0)
+                    try { InformationManager.DisplayMessage(new InformationMessage(moved == 1 ? "1 wounded attacker left beneath the walls is taken prisoner." : moved + " wounded attackers left beneath the walls are taken prisoner.", Color.FromUint(0xFF9ACD65u))); } catch { }
                 if (cut > 0)
                     try
                     {
-                        InformationManager.DisplayMessage(new InformationMessage((cut == 1 ? "1 more wounded attacker is carried back by his army: " : cut + " more wounded attackers are carried back by their army: ")
+                        string more = moved > 0 ? " more" : "";
+                        InformationManager.DisplayMessage(new InformationMessage((cut == 1 ? "1" + more + " wounded attacker is carried back by his army: " : cut + more + " wounded attackers are carried back by their army: ")
                             + (byPrison ? "the dungeon has no room left." : "too few defenders are left standing to bring them in."), Color.FromUint(0xFF9ACD65u)));
                     }
                     catch { }
-                if (moved > 0)
-                    try { InformationManager.DisplayMessage(new InformationMessage(moved == 1 ? "1 wounded attacker left beneath the walls is taken prisoner." : moved + " wounded attackers left beneath the walls are taken prisoner.", Color.FromUint(0xFF9ACD65u))); } catch { }
                 var tb = new StringBuilder();
                 foreach (var kv in types) tb.Append(tb.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
                 Log.Info("Ranni pod murami (373): osada " + t.St + " | do lochu " + moved + " (typy: " + (tb.Length > 0 ? tb.ToString() : "-") + "), bohaterowie " + names.Count
@@ -828,7 +832,7 @@ namespace Armoury
                              + " (skala " + k.ToString("0.00", CultureInfo.InvariantCulture) + ")" + (cut > 0 ? ", obciete " + cut + (byPrison ? " (loch)" : " (zaloga)") + " - wracaja z partia" : "")
                              : "wylaczony (chce " + wantSum + ")")
                          + " | loch " + l0 + " -> " + prison.TotalManCount + " | ksiega ludzi " + book.ToString("0", CultureInfo.InvariantCulture)
-                         + " | partie oproznione " + emptied + " | potkniecia " + s + ".");
+                         + " | partie oproznione " + emptied + (kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + kept : "") + " | potkniecia " + s + ".");
             }
             catch (Exception e) { Stumble("OnMapEventEnded", e, ref s); }
         }
