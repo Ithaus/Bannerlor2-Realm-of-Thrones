@@ -170,16 +170,16 @@ namespace Armoury
         }
 
         /// <summary>Dochod rodziny na pracujacego zajecia c w bloku przy indeksach cen miasta (regula 3.1 przy cenach gry).</summary>
-        private static double Income(LiveBlock b, string type, int c, double[] px)
+        private static double Income(LiveBlock b, string type, int c, double[] px, double nf = 1.0)   // 435-L6: nf - czynnik niedoboru przychodu (1 = jak dotad)
         {
             double L = b.L(c, type);
             double v = 0; int o = c * KsTab.NG;
             for (int g = 0; g < KsTab.NG; g++) { double m = _mv[o + g]; if (m != 0) v += m * Px(px, g); }
-            return L * v - KsTab.KCost[c] - b.Rent * KsTab.Ha(c, b.K);      // r4-polnoc: ha wedlug strefy bloku (bez klucza Ks Cold Land - HaPerWorker[c])
+            return L * v * nf - KsTab.KCost[c] - b.Rent * KsTab.Ha(c, b.K);      // r4-polnoc: ha wedlug strefy bloku (bez klucza Ks Cold Land - HaPerWorker[c])
         }
 
         /// <summary>ks-koszt T2: Income z wartoscia towarow zajecia c z wiersza miasta (liczona raz ta sama petla co w Income) - ten sam wynik co do bitu.</summary>
-        private static double IncomeV(LiveBlock b, string type, int c, double[] px, double[] vRow)
+        private static double IncomeV(LiveBlock b, string type, int c, double[] px, double[] vRow, double nf = 1.0)   // 435-L6: nf jak w Income
         {
             double L = b.L(c, type);
             double v = vRow[c];
@@ -189,13 +189,13 @@ namespace Armoury
                 for (int g = 0; g < KsTab.NG; g++) { double m = _mv[o + g]; if (m != 0) v += m * Px(px, g); }
                 vRow[c] = v;
             }
-            return L * v - KsTab.KCost[c] - b.Rent * KsTab.Ha(c, b.K);
+            return L * v * nf - KsTab.KCost[c] - b.Rent * KsTab.Ha(c, b.K);
         }
 
         /// <summary>m106-wozy P1: dochod zajecia c bloku w regule A7 - ta sama miara co ocena bloku w tej dobie (sygnal KS albo ceny gry z wierszem miasta albo bez).</summary>
-        private static double FachInc(LiveBlock b, string type, int c, bool sig, double[] sRow, double[] sV, double[] px, double[] vRow)
+        private static double FachInc(LiveBlock b, string type, int c, bool sig, double[] sRow, double[] sV, double[] px, double[] vRow, double nf = 1.0)   // 435-L6: nf jak w Income
         {
-            return sig ? A7sIncome(b, type, c, sRow, sV, A7sRent(b)) : (vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px));
+            return sig ? A7sIncome(b, type, c, sRow, sV, A7sRent(b), nf) : (vRow != null ? IncomeV(b, type, c, px, vRow, nf) : Income(b, type, c, px, nf));
         }
 
         private static bool Tree(int c) { return c == KsTab.CVine || c == KsTab.COlive || c == KsTab.CDate || c == KsTab.CCitrus; }
@@ -262,6 +262,9 @@ namespace Armoury
             Dictionary<string, double> relRefund = null;
             if (step && rule) { try { relRefund = StallRefund(today, season); } catch (Exception e) { Stumble("StallRefund", e); relRefund = null; } }
             bool gsw = VillageGear.SwitchOn;                                 // 435-L4: zmiana zajecia przez sprzet (oba klucze)
+            // 435-L6 (klucz Crafts Follow Shortage): w dobie kroku przychod zajecia x sqrt(N towarow zajecia w miescie targowym) - ta sama funkcja czynnika co ZW
+            // (CraftShortage.Row); klucz wylaczony albo miasto bez niedoboru - nf null i rachunek co do bitu jak dotad
+            bool lp6 = step && CraftShortage.On;
             foreach (var ld in _live.Values)
             {
                 if (ld.St == null || ld.K == null || ld.B == null) continue;
@@ -274,6 +277,7 @@ namespace Armoury
                     double[] vRow = null;
                     if (vTab != null && !vTab.TryGetValue(px, out vRow)) { vRow = new double[KsTab.NC]; for (int c0 = 0; c0 < vRow.Length; c0++) vRow[c0] = double.NaN; vTab[px] = vRow; }
                     double[] sRow = sig && step ? A7sRow(mt) : null, sV = sRow != null ? A7sVRow(sRow) : null;   // f5-a7: cena sygnalu miasta targowego (srednia 4 krokow)
+                    double[] nf = lp6 ? CraftShortage.Row(mt) : null;        // 435-L6: czynnik niedoboru na zajecie (null - wszedzie 1)
                     string type = ld.K.Type;
                     // 435-L2: przebudowa stojaca (zaleglosc raty >= prog) nie zajmuje miejsca "jedna czesc okregu naraz"; klucz 0 - Released zawsze false (jak dotad)
                     // 435-L4 (klucz Village Gear On Switch): zmiana OD RAZU (koszt 0, sprzet z robot gminy) trzyma miejsce tylko do sprzetu dla polowy rak w zmianie albo
@@ -314,8 +318,8 @@ namespace Armoury
                                     if (bc == fct) continue;
                                     double L = b.L(fct, type);
                                     if (!(L > bl) || KsWorksLock(ld, b)) continue;
-                                    double fi = FachInc(b, type, fct, sig, sRow, sV, px, vRow);
-                                    if (!(fi > 0) || fi < FachInc(b, type, bc, sig, sRow, sV, px, vRow) || FeedKeeps(ld, bc, fct)) continue;
+                                    double fi = FachInc(b, type, fct, sig, sRow, sV, px, vRow, nf != null ? nf[fct] : 1.0);
+                                    if (!(fi > 0) || fi < FachInc(b, type, bc, sig, sRow, sV, px, vRow, nf != null ? nf[bc] : 1.0) || FeedKeeps(ld, bc, fct)) continue;
                                     double area = BlockArea(ld, b), after = b.LandUse + b.X[mi] * (b.LandOf(fct, type) - b.LandOf(bc, type));
                                     if (area > 0 && after > area * 1.02 && after > b.LandUse) continue;
                                     bl = L; fRet = b;
@@ -341,23 +345,39 @@ namespace Armoury
                         int ci = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[ci]) ci = i;
                         int cur = b.C[ci];
                         double incCur, incBest = double.NegativeInfinity; int best = -1;
+                        bool rawPress = false;                               // 435-L6: czy blok bylby pod naciskiem BEZ czynnika niedoboru (tylko do licznikow linii)
                         if (sig)
                         {
                             // f5-a7 (klucz Ks Switch Signal): dochod rodziny przy cenie sygnalu KS (wzor Planu); miasto bez sygnalu - blok bez oceny (Held bez zmian)
                             if (sRow == null) { _a7sNoSig++; continue; }
                             double rent = A7sRent(b);
-                            incCur = A7sIncome(b, type, cur, sRow, sV, rent);
-                            foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent); if (v > incBest) { incBest = v; best = c; } }
+                            incCur = A7sIncome(b, type, cur, sRow, sV, rent, nf != null ? nf[cur] : 1.0);
+                            foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent, nf != null ? nf[c] : 1.0); if (v > incBest) { incBest = v; best = c; } }
+                            if (nf != null)
+                            {
+                                double r0 = A7sIncome(b, type, cur, sRow, sV, rent), rb = double.NegativeInfinity; bool any = false;
+                                foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent); if (v > rb) { rb = v; any = true; } }
+                                rawPress = any && rb >= SwitchRatio * Math.Max(0.02, r0);
+                                CraftShortage.NoteEval(CraftShortage.SysKs);
+                            }
                             A7sNoteEval(b, ci);
                         }
                         // f5-koszt (klucz Ks Cost Fast2; scalenie fali 5: tylko bez sygnalu KS f5-a7 - sygnal liczony na watku glownym w regule): te same dochody przy cenach gry policzyla dzis diagnoza A7 (ten sam wiersz cen miasta, to samo zajecie biezace, ta sama
                         // lista kandydatow i kolejnosc) - bez liczenia drugi raz; probka 1/64 sprawdza je starym rachunkiem (linia "KS: koszt f5")
                         // (recenzja: po roznicy w probce F5Fallback - od nastepnego bloku do konca sesji starym rachunkiem; blok z roznica bierze liczby starego rachunku)
-                        else if (f5g && !F5Off && b.F5Day == today && b.F5Cur == cur && ReferenceEquals(b.F5Px, px)) { incCur = b.F5Ic; incBest = b.F5Ib; best = b.F5Best; F5RuleNote(b, type, cur, px, vRow, today, ref incCur, ref incBest, ref best); }
+                        else if (nf == null && f5g && !F5Off && b.F5Day == today && b.F5Cur == cur && ReferenceEquals(b.F5Px, px)) { incCur = b.F5Ic; incBest = b.F5Ib; best = b.F5Best; F5RuleNote(b, type, cur, px, vRow, today, ref incCur, ref incBest, ref best); }
                         else
                         {
-                            incCur = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px);
-                            foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > incBest) { incBest = v; best = c; } }
+                            // 435-L6: przy czynniku niedoboru (nf) zawsze ten rachunek (dochody z diagnozy f5 sa bez czynnika); nf null - co do bitu jak dotad
+                            incCur = vRow != null ? IncomeV(b, type, cur, px, vRow, nf != null ? nf[cur] : 1.0) : Income(b, type, cur, px, nf != null ? nf[cur] : 1.0);
+                            foreach (int c in b.Cand) { if (c == cur) continue; double f6 = nf != null ? nf[c] : 1.0; double v = vRow != null ? IncomeV(b, type, c, px, vRow, f6) : Income(b, type, c, px, f6); if (v > incBest) { incBest = v; best = c; } }
+                            if (nf != null)
+                            {
+                                double r0 = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px), rb = double.NegativeInfinity; bool any = false;
+                                foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > rb) { rb = v; any = true; } }
+                                rawPress = any && rb >= SwitchRatio * Math.Max(0.02, r0);
+                                CraftShortage.NoteEval(CraftShortage.SysKs);
+                            }
                         }
                         // m106-wozy P1 (fach wsi): blok z zajeciem typu jako glownym trzyma rece, dopoki praca typu daje wiecej, niz kosztuje, a okreg nie robi wiecej towaru,
                         // niz chce Plan (na targ <= 1.05 x cel); blok powrotu (najlepsza ziemia typu) w okregu z niedoborem (< 0.95 x celu) dostaje nacisk ku zajeciu typu
@@ -365,14 +385,15 @@ namespace Armoury
                         bool fachRet = false;
                         if (fct >= 0)
                         {
-                            double fInc = FachInc(b, type, fct, sig, sRow, sV, px, vRow);
+                            double fInc = FachInc(b, type, fct, sig, sRow, sV, px, vRow, nf != null ? nf[fct] : 1.0);
                             if (cur == fct)
                             {
-                                if (fM <= 1.05 * fT && fInc > 0) { b.Held = 0; _fKeep++; continue; }
+                                if (fM <= 1.05 * fT && fInc > 0) { b.Held = 0; _fKeep++; if (nf != null) CraftShortage.NoteFach(CraftShortage.SysKs); continue; }
                             }
                             else if (ReferenceEquals(b, fRet) && fM < 0.95 * fT && fInc > 0 && fInc >= incCur) { best = fct; fachRet = true; }   // recenzja R3: nie na gorzej platna prace
                         }
-                        if (!fachRet && (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur))) { b.Held = 0; continue; }
+                        if (!fachRet && (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur))) { b.Held = 0; if (nf != null) CraftShortage.Note(CraftShortage.SysKs, false, rawPress, b.Hands * b.X[ci]); continue; }
+                        if (nf != null) { if (fachRet) CraftShortage.NoteFach(CraftShortage.SysKs); else CraftShortage.Note(CraftShortage.SysKs, true, rawPress, b.Hands * b.X[ci]); }   // 435-L6: sam licznik
                         b.Held += StepDays; _rPress++; if (b.Held > _rMaxHeld) _rMaxHeld = b.Held;
                         if (fachRet) _fPress++;
                         if (sig) A7sNotePress(b, ci);                    // f5-a7: rece pod naciskiem i trzymane >= 60 dob
@@ -415,6 +436,7 @@ namespace Armoury
                             b.C = nc; b.X = nx;
                         }
                         busy = true; _rStarted++; _rWinStarted++; active++;
+                        if (nf != null && !fachRet) CraftShortage.NoteStart(CraftShortage.SysKs, best, rawPress, hands);   // 435-L6: zmiana zaczeta przy czynniku niedoboru (sam licznik)
                         if (fachRet) { _fStart++; _fStartAll++; }                   // m106-wozy P1: przebudowa do zajecia typu wsi
                         if (sig) A7sNoteStart(ld, b, cur, best, hands, mt, T, today);   // f5-a7: sezon wedlug rynku i przejscia, powroty, komunikat gracza (jego wies)
                         if (_rStarted <= 12) _startNotes.Add((ld.St.Name != null ? ld.St.Name.ToString() : ld.Id) + " " + KsTab.Crafts[cur] + "->" + KsTab.Crafts[best] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(b.Cost) + " zl)");

@@ -235,7 +235,7 @@ namespace Armoury
         }
 
         /// <summary>Dochod rodziny na pracujacego zajecia c bloku przy cenie sygnalu (wzor Planu); rent - renta ziemi bloku (A7sRent).</summary>
-        private static double A7sIncome(LiveBlock b, string type, int c, double[] row, double[] vRow, double rent)
+        private static double A7sIncome(LiveBlock b, string type, int c, double[] row, double[] vRow, double rent, double nf = 1.0)   // 435-L6: nf - czynnik niedoboru przychodu (1 = jak dotad)
         {
             double v = vRow[c];
             if (double.IsNaN(v))
@@ -244,7 +244,7 @@ namespace Armoury
                 for (int g = 0; g < KsTab.NG; g++) { double m = _sigMv[o + g]; if (m != 0) v += m * row[g]; }
                 vRow[c] = v;
             }
-            return b.L(c, type) * v - KsTab.KCost[c] - rent * KsTab.Ha(c, b.K);
+            return b.L(c, type) * v * nf - KsTab.KCost[c] - rent * KsTab.Ha(c, b.K);
         }
 
         /// <summary>Renta ziemi bloku do sygnalu: z biezacego Planu (ta sama doba cen cienia co P), bez wpisu - renta z Planu wlaczenia (b.Rent).</summary>
@@ -519,7 +519,7 @@ namespace Armoury
 
         /// <summary>ZW: dochod rodziny na pracujacego zajecia c wioski pobocznej (wiersz ziemi row) przy cenie sygnalu miasta mt - ta sama funkcja co A7 (przydatnosc ziemi KsTab.Land2,
         /// wartosc kg Planu, koszt K, renta bloku Planu wioski x ha strefy). Po SideSignalReady; nie rzuca.</summary>
-        internal static double SideSignalIncome(Town mt, LandRow row, int c, string dtype)
+        internal static double SideSignalIncome(Town mt, LandRow row, int c, string dtype, double nf = 1.0)   // 435-L6: nf - czynnik niedoboru przychodu (1 = jak dotad)
         {
             try
             {
@@ -529,7 +529,7 @@ namespace Armoury
                 double v = 0; int o = c * KsTab.NG;
                 for (int g = 0; g < KsTab.NG; g++) { double m = _sigMv[o + g]; if (m != 0) v += m * r[g]; }
                 double L = row.O != null ? KsTab.Land2(c, row.O, dtype) : 0.0;
-                return L * v - KsTab.KCost[c] - A7sRentOf(row.Uid) * KsTab.Ha(c, row.O != null ? row.O.Zone : null);
+                return L * v * nf - KsTab.KCost[c] - A7sRentOf(row.Uid) * KsTab.Ha(c, row.O != null ? row.O.Zone : null);
             }
             catch (Exception e) { _a7sSt++; Stumble("SideSignalIncome", e); return 0.0; }
         }

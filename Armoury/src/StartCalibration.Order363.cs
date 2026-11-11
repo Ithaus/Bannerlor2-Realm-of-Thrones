@@ -29,6 +29,17 @@ namespace Armoury
         internal static readonly string[] OrdNames = { "hardwood", "clay", "limestone", "marble" };
         internal static readonly string[] OrdCraftNames = { "lumberjack", "clay_mine", "lime_pit", "quarry" };
 
+        /// <summary>435-L6 (linia "LP niedobor", watek glowny): wytworcy z pulapem podniesionym przy ostatnim rachunku i rece na zamowienie ponad dawny pulap.</summary>
+        internal static void OrderBoostStats(out int n, out double over)
+        {
+            n = 0; over = 0;
+            foreach (var ld in _live.Values)
+            {
+                if (ld == null || ld.OrdCraft < 0 || !(ld.OrdBoost > 1.0)) continue;
+                n++; over += Math.Max(0.0, ld.OrdH - ld.OrdCapH / ld.OrdBoost);
+            }
+        }
+
         private static int OrdSlot(int craft) { for (int i = 0; i < OrdCrafts.Length; i++) if (OrdCrafts[i] == craft) return i; return -1; }
 
         /// <summary>Klucz 363 czynny (Village Made To Order, zasieg i pulap > 0, roboty gminy z prawdziwym materialem).</summary>
@@ -158,6 +169,13 @@ namespace Armoury
                 ld.OrdLand = byLand && !(hc[best] >= OrdMinCraftShare * all);   // poprawka 363b: "wedlug ziemi" - rece zajecia w planie ponizej progu 363 (slad tez)
                 ld.OrdFieldH = Fcap;
                 double share = s != null ? Math.Max(0.0, Math.Min(0.25, (double)s.VillageOrderFieldShare)) : 0.0;
+                // 435-L6 (klucz Village Order Shortage Boost > 1): material zamowienia z N >= 1.5 w miescie targowym wytworcy - pulap rak x mnoznik (najwyzej 0.25 rak pola);
+                // mnoznik 1 albo brak niedoboru - pulap co do bitu jak dotad. Narastanie +1% rak pola na przeliczenie bez zmian
+                ld.OrdBoost = 1.0;
+                {
+                    double ob = CraftShortage.OrderBoost(ld.V, _items != null && it >= 0 && it < _items.Length ? _items[it] : null);
+                    if (ob > 1.0 && share > 0) { double sh2 = Math.Min(0.25, share * ob); ld.OrdBoost = sh2 / share; share = sh2; }
+                }
                 ld.OrdCapH = share * Fcap;
                 bool ok = OrderOn && F > 0 && Fcap > 0 && RampFull(ld.Market == 0 ? 0 : 1) && ld.V.VillageState == Village.VillageStates.Normal && !DistrictWorks.HasWorks(ld.V);
                 if (ok && Famine.HungerOf(ld.V) > 0f) { ld.OrdHungry = true; ok = false; }

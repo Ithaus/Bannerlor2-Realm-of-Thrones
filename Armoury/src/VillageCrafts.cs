@@ -1603,6 +1603,21 @@ namespace Armoury
         }
 
         /// <summary>Indeks cen towarow zajecia w miescie (wagi stawka x wartosc), projekt F16.</summary>
+        /// <summary>435-L6: niedobor N towarow zajecia w miescie targowym (te same wagi co CraftIndex: stawka x wartosc); 1 - bez niedoboru albo zajecie bez towarow.</summary>
+        internal static double CraftShortageN(SupplySignal.NTable tab, Settlement mk, int craft)
+        {
+            var m = Meta(craft);
+            if (m == null || m.Goods == null || tab == null) return 1.0;
+            double a = 0, b = 0;
+            for (int i = 0; i < m.Goods.Length; i++)
+            {
+                if (m.Goods[i] == null) continue;
+                double w = m.Rates[i] * Math.Max(1, m.Goods[i].Value);
+                a += w * SupplySignal.TownN(tab, mk, m.Goods[i].ItemCategory); b += w;
+            }
+            return b > 0 ? a / b : 1.0;
+        }
+
         private static double CraftIndex(Town t, CraftMeta m)
         {
             double a = 0, b = 0;
@@ -2179,21 +2194,45 @@ namespace Armoury
             // recenzja calosci fali 5: SideSignalReady tylko przy regule A7 przy sygnale (SideSignalKeys) - pierwszy krok z sygnalem zeruje Held wszystkich wiosek pobocznych
             // raz (nacisk 60 dob nowej miary, nie przydatnosci x sqrt(indeks)); miasto bez wiersza sygnalu (kss false przy kluczach) miary nie przelacza
             if (kss && _zwHeldKind != 1) ZwHeldZero();
+            // 435-L6 (klucz Crafts Follow Shortage): wynik zajecia x sqrt(N towarow zajecia w miescie targowym) - przy sygnale KS czynnik mnozy przychod (jak A7),
+            // bez sygnalu caly wynik przydatnosc x sqrt(indeks); klucz wylaczony albo miasto bez niedoboru - nf null i rachunek co do bitu jak dotad
+            double[] nf = CraftShortage.On ? CraftShortage.Row(mt) : null;
             foreach (var s in di.Sides)
             {
                 if (s.Target >= 0 || s.Cand == null || s.Cand.Count < 2 || s.Row == null) continue;
                 if (DistrictWorks.Locks(di.V, s.Uid)) { s.Held = 0; _dLocked++; continue; }
                 var cm = meta[s.Craft];
                 if (cm == null) continue;
-                double cur = kss ? StartCalibration.SideSignalIncome(mt, s.Row, s.Craft, dtype) : StartCalibration.Suit(s.Row, s.Craft, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, cm)));
-                double best = double.NegativeInfinity; int bc = -1;
-                foreach (int c in s.Cand)
+                double cur, best = double.NegativeInfinity; int bc = -1; bool rawPress = false;
+                if (nf == null)
                 {
-                    if (c == s.Craft || meta[c] == null) continue;
-                    double v = kss ? StartCalibration.SideSignalIncome(mt, s.Row, c, dtype) : StartCalibration.Suit(s.Row, c, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, meta[c])));
-                    if (v > best) { best = v; bc = c; }
+                    cur = kss ? StartCalibration.SideSignalIncome(mt, s.Row, s.Craft, dtype) : StartCalibration.Suit(s.Row, s.Craft, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, cm)));
+                    foreach (int c in s.Cand)
+                    {
+                        if (c == s.Craft || meta[c] == null) continue;
+                        double v = kss ? StartCalibration.SideSignalIncome(mt, s.Row, c, dtype) : StartCalibration.Suit(s.Row, c, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, meta[c])));
+                        if (v > best) { best = v; bc = c; }
+                    }
+                }
+                else
+                {
+                    // 435-L6: ten sam rachunek z czynnikiem niedoboru i obok bez niego (bez czynnika tylko do licznikow linii: nacisk dzieki sygnalowi / zdjety sygnalem)
+                    double r0 = kss ? StartCalibration.SideSignalIncome(mt, s.Row, s.Craft, dtype) : StartCalibration.Suit(s.Row, s.Craft, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, cm)));
+                    cur = kss ? StartCalibration.SideSignalIncome(mt, s.Row, s.Craft, dtype, nf[s.Craft]) : r0 * nf[s.Craft];
+                    double rb = double.NegativeInfinity; bool any = false;
+                    foreach (int c in s.Cand)
+                    {
+                        if (c == s.Craft || meta[c] == null) continue;
+                        double v0 = kss ? StartCalibration.SideSignalIncome(mt, s.Row, c, dtype) : StartCalibration.Suit(s.Row, c, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, meta[c])));
+                        double v = kss ? StartCalibration.SideSignalIncome(mt, s.Row, c, dtype, nf[c]) : v0 * nf[c];
+                        if (v0 > rb) { rb = v0; any = true; }
+                        if (v > best) { best = v; bc = c; }
+                    }
+                    rawPress = any && rb >= sw * Math.Max(0.02, r0);
+                    CraftShortage.NoteEval(CraftShortage.SysZw);
                 }
                 if (F4On) { try { double h0; home.TryGetValue(s.Uid, out h0); F4ZwNote(s.Craft, bc, cur, best, sw, h0 * 0.5); } catch (Exception e) { Stumble("F4ZwNote", e); } }   // f4-pomiary: nacisk i przejscia (tylko liczniki; blad nie przerywa reguly)
+                if (nf != null) { double hn; home.TryGetValue(s.Uid, out hn); CraftShortage.Note(CraftShortage.SysZw, !(bc < 0 || best < sw * Math.Max(0.02, cur)), rawPress, hn * 0.5); }   // 435-L6: sam licznik
                 if (bc < 0 || best < sw * Math.Max(0.02, cur)) { s.Held = 0; continue; }
                 s.Held += StepDays; _dPress++;
                 if (s.Held < hold) continue;
@@ -2223,6 +2262,7 @@ namespace Armoury
                 }
                 _regionMoved[di.Region ?? "-"] = moved + hands;
                 busy = true; _dStarted++;
+                if (nf != null) CraftShortage.NoteStart(CraftShortage.SysZw, bc, rawPress, hands);   // 435-L6: zmiana zaczeta przy czynniku niedoboru (sam licznik)
                 string nm; if (!vname.TryGetValue(s.Uid, out nm)) nm = s.Uid;
                 if (_notes.Count < 10) _notes.Add(nm + " (" + Name(di) + ") " + KsTab.Crafts[s.Craft] + "->" + KsTab.Crafts[bc] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(s.Cost) + " zl)");
                 Notify(di, s, bc, mt);

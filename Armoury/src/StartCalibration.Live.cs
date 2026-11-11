@@ -78,6 +78,7 @@ namespace Armoury
             // produkcja towaru i zboza przed czynnikami (do przeliczenia po nich), zboze zdjete z pola przed zima / po zimie, glod przy rachunku
             public int OrdCraft = -1, OrdItem = -1; public double OrdH, OrdCapH, OrdFieldH, OrdKgHand, OrdDemand, OrdToday, OrdF = 1.0, OrdLeft, OrdPre, OrdPreGrain, OrdAddKg, OrdGrain0, OrdGrain1;
             public bool OrdHungry;
+            public double OrdBoost = 1.0;   // 435-L6: mnoznik pulapu rak na zamowienie przy ostatnim rachunku (1 = bez podniesienia)
             // poprawki 363 (recenzje): prawo do rak przy ostatnim rachunku (glod, rampa, prace okregu, nie Normal - false), doba ostatniego rachunku (narastanie wedlug czasu),
             // przeliczenie wymuszone w najblizszej dobie KS (klucz wylaczony przy rekach na zamowieniu) - zamiast Res = null
             public bool OrdOk, OrdRedo; public int OrdDay = int.MinValue;

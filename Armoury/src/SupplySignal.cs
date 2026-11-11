@@ -22,7 +22,8 @@ namespace Armoury
     ///     materialy budow (reszta budzetu oznacza, ze wszystkie sa wyczerpane do zapasu albo ponad sufitem ceny; reszta mniejsza od najtanszej sztuki - pominieta);
     ///     wsad warsztatow towarowych, ktorego zabraklo do cyklu (CommodityInputs284.SufPost: potrzeba - stan polki). Obok sztuki KUPIONE tymi samymi drogami.
     ///     Zlecenie robot ponawia sie co dobe (ta sama potrzeba), dlatego pamiec to POZIOM dobowy (srednia 28 dob), nie suma (krytyka B8).
-    ///  2. TABLICA N (towar x miasto targowe), nigdzie nie uzywana: N = max(1, S_stos, S_kolejka), najwyzej 2. Cena NIE wchodzi do N.
+    ///  2. TABLICA N (towar x miasto targowe): N = max(1, S_stos, S_kolejka), najwyzej 2. Cena NIE wchodzi do N. Od 435-L5 czyta ja kolejnosc zlecen sprzetu wsi,
+    ///     od 435-L6 (klucze domyslnie wylaczone) regula zmiany zajec i pulap zamowien 363 - przez opublikowana tablice (Table / TownN), CraftShortage.cs.
     ///     S_stos = 1.25 ^ (liczba kolejnych decyzji regulatora wsi 221 z mnoznikiem na suficie kroku i stosem ponizej dolnego progu), najwyzej 2;
     ///     S_kolejka = 1 + min(1, brak / sprzedaz), srednie dobowe 28 dob w sztukach; zboze: N = 2 w miescie, ktorego wsie gloduja (Famine.HungerOf &gt; 0).
     ///     ODSTEPSTWO od projektu (do decyzji przed L6): "sprzedaz" = wieksza z dwoch liczb - prawdziwa sprzedaz miasta z 28 dob (MarketSales 241; tylko kategorie bedace
@@ -247,6 +248,34 @@ namespace Armoury
             return m.Count > 0 && m.TryGetValue(c, out n) && n > 1.0 && On ? Math.Min(2.0, n) : 1.0;
         }
 
+        // 435-L6: tablica N (towar x miasto targowe) z ostatniej linii niedoboru - jedna podmieniana, nigdy nie zmieniana po publikacji referencja (odczyt z reguly
+        // zmiany zajec obu drog i z zamowien 363; bezpieczna dla kazdego watku). Cell - tylko komorki z N > 1; Stock - S_stos swiata (towar na suficie regulatora);
+        // Hungry - miasta targowe, ktorych wsie gloduja (zboze N = 2).
+        internal sealed class NTable
+        {
+            public readonly Dictionary<Settlement, Dictionary<ItemCategory, double>> Cell = new Dictionary<Settlement, Dictionary<ItemCategory, double>>();
+            public readonly Dictionary<ItemCategory, double> Stock = new Dictionary<ItemCategory, double>();
+            public readonly HashSet<Settlement> Hungry = new HashSet<Settlement>();
+            public ItemCategory Grain; public int Day;
+        }
+        private static volatile NTable _pubT;
+        /// <summary>435-L6: tablica N z ostatniej doby pomiaru; null - bez pomiaru w tej sesji albo klucz Supply Chain Log wylaczony (wtedy N = 1 wszedzie).</summary>
+        internal static NTable Table { get { return On ? _pubT : null; } }
+        /// <summary>435-L6: niedobor N towaru `c` w miescie targowym `mk` wedlug tablicy `t` (1 - bez niedoboru; najwyzej 2). Sam odczyt, nie rzuca.</summary>
+        internal static double TownN(NTable t, Settlement mk, ItemCategory c)
+        {
+            if (t == null || c == null) return 1.0;
+            double n = 1.0, x;
+            if (t.Stock.TryGetValue(c, out x) && x > n) n = x;
+            if (mk != null)
+            {
+                Dictionary<ItemCategory, double> m;
+                if (t.Cell.TryGetValue(mk, out m) && m.TryGetValue(c, out x) && x > n) n = x;
+                if (t.Grain != null && c == t.Grain && t.Hungry.Contains(mk)) n = 2.0;
+            }
+            return n > 2.0 ? 2.0 : n;
+        }
+
         // ============================================================ 5. rece okregow (zmiana doby)
         private static readonly Dictionary<string, double> _prevHome = new Dictionary<string, double>(StringComparer.Ordinal);
         private static int _prevHomeDay = int.MinValue;
@@ -282,7 +311,7 @@ namespace Armoury
             _st = _stSess = 0; _err.Clear(); _startLine = false; _first = int.MinValue;
             _cells.Clear(); _price.Clear(); ZeroDay();
             _ws.Clear(); CycleBegin();
-            _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>();
+            _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>(); _pubT = null;
             _prevHome.Clear(); _prevHomeDay = int.MinValue;
             _dryDay = int.MinValue; _whyDay = int.MinValue;
         }
@@ -316,7 +345,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
-            if (!s.SupplyChainLog) { ZeroDay(); _price.Clear(); if (_pubN.Count > 0) _pubN = new Dictionary<ItemCategory, double>(); return; }
+            if (!s.SupplyChainLog) { ZeroDay(); _price.Clear(); if (_pubN.Count > 0) _pubN = new Dictionary<ItemCategory, double>(); _pubT = null; CraftShortage.ZeroLine(); return; }
             long t0 = Stopwatch.GetTimestamp();
             int today = Today;
             bool log = s.LogEnabled && LogGate.Lines;
@@ -509,6 +538,7 @@ namespace Armoury
             var agg = new Dictionary<ItemCategory, double[]>();
             var hot = new HashSet<Settlement>();
             int cells = 0, real = 0;
+            var nt = new NTable { Grain = grain, Day = today };   // 435-L6: tablica do odczytu (publikowana na koncu, po zbudowaniu)
             foreach (var tk in _cells)
             {
                 foreach (var ck in tk.Value)
@@ -524,6 +554,12 @@ namespace Armoury
                     double[] st; double ss = stock.TryGetValue(ck.Key, out st) ? st[0] : 1.0;
                     double n = Math.Min(2.0, Math.Max(1.0, Math.Max(ss, sq)));
                     if (grain != null && ck.Key == grain && hungry.Contains(tk.Key)) n = 2.0;
+                    if (n > 1.0 + 1e-9)
+                    {
+                        Dictionary<ItemCategory, double> tm;
+                        if (!nt.Cell.TryGetValue(tk.Key, out tm)) { tm = new Dictionary<ItemCategory, double>(); nt.Cell[tk.Key] = tm; }
+                        tm[ck.Key] = n;
+                    }
                     double[] a;
                     if (!agg.TryGetValue(ck.Key, out a)) { a = new double[5]; agg[ck.Key] = a; }
                     a[0] += miss; a[1] += sales; a[4]++;
@@ -532,7 +568,9 @@ namespace Armoury
                 }
             }
             foreach (var kv in stock) if (!agg.ContainsKey(kv.Key)) agg[kv.Key] = new double[5];
-            foreach (var h in hungry) hot.Add(h);
+            foreach (var h in hungry) { hot.Add(h); nt.Hungry.Add(h); }
+            foreach (var kv in stock) if (kv.Value[0] > 1.0 + 1e-9) nt.Stock[kv.Key] = Math.Min(2.0, kv.Value[0]);
+            _pubT = nt;
             var rows = new List<KeyValuePair<ItemCategory, double[]>>();
             int over = 0;
             foreach (var kv in agg)
@@ -549,7 +587,7 @@ namespace Armoury
             foreach (var r in rows) if (r.Value[0] > 1.0 + 1e-9) pn[r.Key] = r.Value[0];
             _pubN = pn;
             var sb = new StringBuilder(1200);
-            sb.Append("L1 sam pomiar, N nigdzie nie uzywane | N = max(1, S_stos, S_kolejka) <= 2, cena poza N; srednie z ").Append(Span(today)).Append(" dob sesji (okno 28)")
+            sb.Append(CraftShortage.UsedText()).Append(" | N = max(1, S_stos, S_kolejka) <= 2, cena poza N; srednie z ").Append(Span(today)).Append(" dob sesji (okno 28)")
               .Append(" | towarow z N swiata > 1: ").Append(over).Append(" z ").Append(rows.Count).Append(" | lista (towar N swiata = stos / kolejka; brak szt./d; sprzedaz szt./d; miast z N >= 1.5 / z pomiarem; najwyzsze N miasta): ");
             int shown = 0;
             foreach (var r in rows)
@@ -579,7 +617,8 @@ namespace Armoury
               .Append(" | miast z N >= 1.5 dla jakiegos towaru: ").Append(hot.Count).Append(" | komorek (miasto x towar) z pomiarem ").Append(cells)
               .Append(", w tym sprzedaz z prawdziwej sprzedazy miasta (241) ").Append(real).Append(", reszta: sztuki kupione tymi samymi drogami (odstepstwo od projektu - brak licznika calej sprzedazy surowcow)")
               .Append(" | poza pomiarem: surowiec warsztatow zbrojnych (linia 'Warsztaty: dzien' - brak surowca), kontrakty 174")
-              .Append(" | uzycie: zajecia zmienione sygnalem 0, zamowienia 363 podniesione 0; kolejnosc zlecen sprzetu wsi (435-L5, tylko przy zuzyciu sprzetu): ").Append(VillageGear.WearOn ? "czyta N swiata" : "nieczynna");
+              .Append(" | ").Append(CraftShortage.LineText(nt))
+              .Append(" | kolejnosc zlecen sprzetu wsi (435-L5, tylko przy zuzyciu sprzetu): ").Append(VillageGear.WearOn ? "czyta N swiata" : "nieczynna");
             return sb.ToString();
         }
 

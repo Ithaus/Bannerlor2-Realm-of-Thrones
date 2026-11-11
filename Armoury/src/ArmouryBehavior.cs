@@ -813,7 +813,7 @@ namespace Armoury
         private static bool A427Reset() { try { EcoAudit427.Reset(); } catch (Exception e) { Log.Error("A427Reset", e); } return true; }
         // 435-L1 (lancuch podazy, sam pomiar): liczniki i pamiec sesji od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak 427)
         private readonly bool _lp1Reset = Lp1Reset();
-        private static bool Lp1Reset() { try { SupplySignal.Reset(); } catch (Exception e) { Log.Error("Lp1Reset", e); } return true; }
+        private static bool Lp1Reset() { try { SupplySignal.Reset(); CraftShortage.Reset(); } catch (Exception e) { Log.Error("Lp1Reset", e); } return true; }
         // 435-L2 (lancuch podazy, odblokowanie zmiany zajec): liczniki linii "LP zajecia" od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L1)
         private readonly bool _lp2Reset = Lp2Reset();
         private static bool Lp2Reset() { try { CraftUnblock.Reset(); } catch (Exception e) { Log.Error("Lp2Reset", e); } return true; }
