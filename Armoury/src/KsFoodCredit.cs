@@ -86,6 +86,54 @@ namespace Armoury
         // linia doby 322e: dluznicy, z rata, w terminie, odblokowani, bez pomiaru, splacone z raty
         internal static long DRateRepaid; internal static int DRateN, DRateDebtors, DRateOnTime, DRateReleased, DRateNoMeasure;
 
+        // 428 A8 (Town Pays Villages First; Jeff 11.11: pierwszenstwo do kasy miasta ma wies, nie pan): w dzien raty firmy DS (DsTowns.Pay, PRZED przelewem panu i koronie)
+        // miasto zostawia w kasie ponad podloge to, co jest winne wsiom (HoldForVillages - zloto sie nie rusza); PayDaily tej samej doby wyplaca z tej kwoty NAJPIERW
+        // rachunki wsi (od najstarszego), potem jak dotad wszystkie rachunki od najstarszego. Liczniki od linii do linii DsTowns (TakeHold): wstrzymane = splacone wsiom
+        // + niewykorzystane (kasa zeszla ponizej podlogi miedzy rata a splata, rachunek przepadl wojna). Sesja - bez zapisu (wstrzymanie zyje jedna dobe).
+        private static readonly Dictionary<Settlement, long> _vilHold = new Dictionary<Settlement, long>();
+        private static int _vilHoldDay = int.MinValue;
+        internal static long HoldSet, HoldPaid, HoldUnused; internal static int HoldTowns;
+
+        /// <summary>428 A8: rachunki wsi otwarte wobec miasta `town` (zl; bez komisu - ten splaca sprzedaz). Nie rzuca.</summary>
+        internal static long VillageOpenOf(Settlement town)
+        {
+            long s = 0;
+            try
+            {
+                Resolve();
+                if (town == null || _acc.Count == 0) return 0;
+                foreach (var a in _acc.Values) { if (!a.Vil || a.Dst != town) continue; foreach (var b in a.B) if (b.Left > 0) s += b.Left; }
+            }
+            catch (Exception e) { Stumble("VillageOpenOf", e); return 0; }
+            return s;
+        }
+
+        /// <summary>428 A8 (DsTowns.Pay w dzien raty): z `avail` (kasa miasta ponad podloge firm) zostaje dla wsi najwyzej tyle, ile miasto jest im winne. Zwraca
+        /// wstrzymane (wolajacy zmniejsza o tyle to, co bierze pan i korona). Zloto sie nie rusza. Nie rzuca.</summary>
+        internal static long HoldForVillages(Settlement town, long avail)
+        {
+            try
+            {
+                if (town == null || town.Town == null || avail <= 0) return 0;
+                long h = Math.Min(avail, VillageOpenOf(town));
+                if (h <= 0) return 0;
+                int today = Today();
+                if (_vilHoldDay != today) { foreach (var v in _vilHold.Values) HoldUnused += v; _vilHold.Clear(); _vilHoldDay = today; }
+                long had; _vilHold.TryGetValue(town, out had); _vilHold[town] = had + h;
+                HoldSet += h; if (had <= 0) HoldTowns++;
+                return h;
+            }
+            catch (Exception e) { Stumble("HoldForVillages", e); return 0; }
+        }
+
+        /// <summary>428 A8 (linia DsTowns po SupplyDemand.DailyTrade): liczniki wstrzymania od poprzedniej linii; wstrzymania, ktorych PayDaily nie obsluzyla - niewykorzystane.</summary>
+        internal static void TakeHold(out long set, out long paid, out long unused, out int towns)
+        {
+            try { if (_vilHold.Count > 0 && _payDay >= _vilHoldDay) { foreach (var v in _vilHold.Values) HoldUnused += v; _vilHold.Clear(); } } catch { }
+            set = HoldSet; paid = HoldPaid; unused = HoldUnused; towns = HoldTowns;
+            HoldSet = HoldPaid = HoldUnused = 0; HoldTowns = 0;
+        }
+
         internal static double RateShare { get { var s = Settings.Current; return s == null ? 0.15 : Math.Max(0.0, Math.Min(0.5, s.KsConsignRateShare)); } }
         internal static int RateReleaseDays { get { var s = Settings.Current; return s == null ? 91 : Math.Max(0, Math.Min(364, s.KsConsignRateReleaseDays)); } }
 
@@ -95,6 +143,7 @@ namespace Armoury
             _payDay = int.MinValue; _relDay = int.MinValue; _paidToday.Clear(); _paidPrev.Clear(); _released.Clear();
             _lordPaidToday.Clear(); _lordPaidPrev.Clear();
             _vilRepaidLast = 0; _vilRepaidDay = int.MinValue;
+            _vilHold.Clear(); _vilHoldDay = int.MinValue; HoldSet = HoldPaid = HoldUnused = 0; HoldTowns = 0;   // 428
             ClearDay();
         }
 
@@ -291,6 +340,23 @@ namespace Armoury
                         long gold0 = dt.Gold, owed0 = 0, food0 = 0;
                         foreach (var p in l) { if (p.Value.Left <= 0) continue; owed0 += p.Value.Left; if (Blocking(p.Key)) food0 += p.Value.Left; }
                         long free = Free(dt), paidS = 0, paidR = 0;
+                        // 428 A8: wstrzymane w dzien raty firmy (przed panem i korona) - najpierw rachunki wsi, od najstarszego, z kasy ponad podloge
+                        long hold;
+                        if (_vilHoldDay == today && _vilHold.TryGetValue(dst, out hold))
+                        {
+                            _vilHold.Remove(dst);
+                            long left = Math.Min(hold, free), used = 0;
+                            foreach (var p in l)
+                            {
+                                if (left <= 0) break;
+                                if (!p.Key.Vil) continue;
+                                var b = p.Value; if (b.Left <= 0) continue;
+                                long got = TransferTo(dt, p.Key.Src, Math.Min(left, b.Left));
+                                if (got <= 0) break;
+                                b.Left -= got; left -= got; free -= got; used += got; DRepaid += got; paidS += got; DVilRepaid += got;
+                            }
+                            HoldPaid += used; HoldUnused += Math.Max(0L, hold - used);
+                        }
                         foreach (var p in l)
                         {
                             if (free <= 0) break;

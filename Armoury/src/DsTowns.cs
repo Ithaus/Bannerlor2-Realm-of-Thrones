@@ -77,6 +77,7 @@ namespace Armoury
             public int SLow = -1;                                  // m103 P3 (e, Ks Farm Surplus Cap Net): doba startu cyklu obnizki z dochodu (kasa po naleznosciach do 1.5 x zapas albo zaleglosci; sesja)
             public int FastDay = -1;                               // m105 G1 (Ds Farm Cut Below Reserve): doba ostatniej szybkiej obnizki (najwyzej raz na FastGapDays; sesja)
             public int DebtCutDay = -1;                            // 322d (Town Debt Farm Cut): doba ostatniej obnizki firmy przy duzym dlugu rady (najwyzej raz na FastGapDays; sesja)
+            public int NImpFast = int.MinValue;                    // 428 A3: doba ostatniej szybkiej obnizki miasta z zapisu (do pierwszej probki sesji - SampleTown)
             public int NImpN; public double NImpAvg;               // m107 K3 (poprawka R2): pamiec doplywu zamku z zapisu (liczba dob, srednia) - do pierwszej probki sesji (CastleSample)
         }
 
@@ -137,6 +138,7 @@ namespace Armoury
             _revArrN = _revHeld = _revSame = _revEarly = 0; _revUpAmt = _revDownAmt = 0; _revMinGap = int.MaxValue;
             _ccN = _ccShare = 0; _ccAmt = 0;                                     // m105 gosp4 G6 (doba)
             _lfFree = 0; _lfFreeN = 0; _cfN = 0; _cfAmt = 0; _ccArrFree = 0;   // m107 K2 / K3 (doba)
+            A428ClearDay();                                                      // 428 (doba)
             _stumbles = 0;
         }
 
@@ -151,6 +153,7 @@ namespace Armoury
             _ccNS = _ccShareS = 0; _ccAmtS = 0;                      // m105 gosp4 G6 (sesja)
             _lfFreeS = 0; _lfFreeOld = 0; _lfFreeSet.Clear(); _cfNS = 0; _cfAmtS = 0; _ccArrFreeS = 0;   // m107 K2 / K3 (sesja)
             DebtCutReset();                                          // 322d (sesja i doba)
+            A428Reset();                                             // 428 (sesja)
             ClearCounters();
         }
 
@@ -578,7 +581,7 @@ namespace Armoury
         private static bool CapNetTown(Farm f, Settings s)
         {
             if (s == null || !s.KsFarmFollowsSurplus || !s.KsFarmSurplusCapNet || f == null || f.St == null) return false;
-            if (f.St.IsTown) return f.St.Town != null && StartCalibration.KsTownApplied(f.St.Town);
+            if (f.St.IsTown) return f.St.Town != null && (StartCalibration.KsTownApplied(f.St.Town) || s.DsFarmBrakesAllTowns);   // 428 A8: miasto bez KS pod hamulcami - cel przegladu tez najwyzej caly doplyw
             return CastleCutOn(s) && f.St.IsCastle && f.St.Town != null;     // m105 gosp4 G6 (Ds Castle Income Cut): zamek - ta sama regula co miasto z KS
         }
 
@@ -736,7 +739,13 @@ namespace Armoury
                     }
                     if (st == null || !st.IsTown || st.Town == null || f.Fixed < 0) continue;
                     var t = st.Town;
-                    if (!StartCalibration.KsTownApplied(t)) { f.SG0 = long.MinValue; f.SGDay = -1; f.SLow = -1; continue; }
+                    if (!StartCalibration.KsTownApplied(t))
+                    {
+                        // 428 A8 (Ds Farm Brakes All Towns): miasto bez KS - same hamulce (szybka obnizka i obnizka z dochodu), bez podwyzek i gersumy; klucz NIE - jak dotad
+                        f.SG0 = long.MinValue; f.SGDay = -1;
+                        if (!capNet || !s.DsFarmBrakesAllTowns || inRamp) f.SLow = -1; else A428Brakes(f, st, t, today, days, mx, s, fastOn);
+                        continue;
+                    }
                     if (inRamp) { f.SG0 = long.MinValue; f.SGDay = -1; f.SLow = -1; continue; }
                     long g = t.Gold;
                     double inst = (f.FL + f.FC + f.FLf) / Weeks;
@@ -1315,6 +1324,7 @@ namespace Armoury
         private static void SampleTown(Settlement st, Town t, Farm f, int reserve)
         {
             long net;
+            if (f.NImpN > 0) A428Seed(f);                                    // 428 A3: pamiec doplywu miasta z zapisu przy pierwszej probce sesji
             if (TownPurse.NetOf(t, out net)) Push(f, net);
             DsSeason.NoteMovBase(st, Math.Max(0, t.Gold - OverReserve * reserve));
         }
@@ -1513,6 +1523,7 @@ namespace Armoury
                     if (!s.DsFarmFolkFromSavings) { iL += iLf; iLf = 0; aL += aLf; aLf = 0; }
                     int reserve = st.IsTown ? TownPurse.Reserve(t) : CastlePurse.Reserve(t);
                     double avail = Math.Max(0, Math.Floor(t.Gold - FloorOf(s, reserve)));
+                    if (st.IsTown && avail > 0 && s.TownPaysVillagesFirst) avail = Math.Max(0, avail - KsFoodCredit.VillageOpenOf(st));   // 428 A8: wies przed panem (szacunek jak Pay)
                     if (f.AidArr >= 1 && k != null && f.AidK == k.StringId) avail = Math.Max(0, avail - f.AidArr);
                     double wantL = aL + iL, wantC = aC + iC, tot = wantL + wantC, pL = 0;
                     if (tot >= 1)
@@ -1588,6 +1599,10 @@ namespace Armoury
             double forgOld = 0;                                     // m107 K2: zaleglosc z zapisu darowana w tej racie (nie "splacona")
             double floor = FloorOf(s, reserve);
             long avail = Math.Max(0L, (long)Math.Floor(t.Gold - floor));
+            // 0. 428 A8 (Town Pays Villages First; Jeff 11.11 "wies"): wies przed panem i korona - z kasy ponad podloge najpierw zostaje w kasie to, co miasto jest
+            //    winne wsiom (rachunki wsi KsFoodCredit); wyplaca je splata rachunkow tej doby (KsFoodCredit.PayDaily, wsie pierwsze do tej kwoty). Klucz NIE - jak dotad
+            double vfL = 0, vfC = 0;                                // czesc biezacej raty darowana przez pierwszenstwo wsi (klucz NIE - 0)
+            if (town && avail > 0 && s.TownPaysVillagesFirst) avail -= A428Hold(st, f, k, avail, iL, iC, out vfL, out vfC);
             // 1. zaleglosc pomocy od sprzedazy (M7) - przed firma; recenzja 17.10: do skarbca jako wplyw dnia przez LeviesToday (AidesDay), nie jako "firmy korony"
             if (f.AidArr >= 1)
             {
@@ -1604,7 +1619,7 @@ namespace Armoury
                 }
             }
             // 2. firma z kasy: zaleglosc i rata (pan i korona w stosunku naleznosci)
-            double wantL = f.AL + iL, wantC = f.AC + iC, tot = wantL + wantC;
+            double wantL = f.AL + iL - vfL, wantC = f.AC + iC - vfC, tot = wantL + wantC;
             if (tot >= 1)
             {
                 long pay = (long)Math.Floor(Math.Min(tot, avail));
@@ -1647,6 +1662,7 @@ namespace Armoury
                 long gF = FolkToLord(st, lord, (long)Math.Floor(wantLf));
                 f.ALf = Math.Max(0, wantLf - gF);
                 _paidLf += gF;
+                if (town && folkPays && s.DsFarmFolkPartCut && rn >= 1.0) forgOld += A428FolkCut(f, iLf, wantLf, gF, s);   // 428 A8: hamulec czesci z oszczednosci ludu (zmniejszona zaleglosc to nie "splacona")
             }
             else f.ALf = wantLf;
             // 3. dziesiata od ruchomosci kasy (M9): wymiar w pierwszy dzien raty po nadaniu wojennym, potem 1/13 co 7 dob; w przejsciu rata x rampa (reszta darowana)
@@ -1978,6 +1994,7 @@ namespace Armoury
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');
                 Log.Info(sb.ToString());
+                if (_fixDay >= 0) { try { A428Line(day, s); } catch (Exception e) { Stumble("Daily(428)", e); } }   // 428: linia hamulcow i kolejnosci wierzycieli (wszystkie klucze NIE - bez linii)
                 if (_fixDay >= 0 && CatchUpOn(s)) CatchUpLine(day, s);        // f7-kasy: linia gersumy (klucz wylaczony - bez linii)
                 CofferLoanLine(day);                                          // scalenie f7/f8: prog kasy dla pozyczki miejskiej i pomiar przyrostu bez pozyczek (tylko gdy cos sie zmienilo)
             }
@@ -2064,6 +2081,7 @@ namespace Armoury
                 var sb = new StringBuilder(256 + _farm.Count * 80);
                 var s0 = Settings.Current;
                 bool k3Save = s0 != null && s0.DsCastleFastCut;                   // m107 K3 (poprawka R2): pamiec doplywu zamkow w zapisie
+                bool a3Save = s0 != null && s0.DsTownInflowSaved;                 // 428 A3: pamiec doplywu miast w zapisie
                 sb.Append("1|w~").Append(_dayOn.ToString(Inv)).Append('~').Append(_fixDay.ToString(Inv)).Append('~').Append(_mDays.ToString(Inv)).Append('~')
                   .Append(double.IsNaN(_worldShare) ? "-" : _worldShare.ToString("R", Inv));
                 foreach (var kv in _farm)
@@ -2080,10 +2098,20 @@ namespace Armoury
                       .Append('~').Append(R(f.AidCut)).Append('~').Append(R(f.MovCur));   // recenzja 17.10: pola 17-23 (starszy zapis bez nich = 0)
                     // m107 K3 (poprawka R2): zamek - pola 24-25 pamiec doplywu (liczba dob, srednia); starsza DLL czyta pola do 23 (a.Length >= 24), nadmiar pomija.
                     // Pamiec z zapisu jeszcze nieuzyta (zapis przed pierwsza probka sesji) - ta z zapisu. Klucz NIE - bez pol (zapis jak w 5da5f304)
-                    if (k3Save)
+                    // 428 A3 (Ds Town Inflow Saved): miasto - te same pola 24-25 i pole 26 doba ostatniej szybkiej obnizki (-1 brak); starsza DLL nadmiar pomija. Klucz NIE - miasta bez pol
+                    if (k3Save || a3Save)
                     {
-                        if (f.NF > 0 && f.St != null && f.St.IsCastle) sb.Append('~').Append(f.NF.ToString(Inv)).Append('~').Append(R(NetAvg(f, 1)));
-                        else if (f.NF == 0 && f.NImpN > 0) sb.Append('~').Append(f.NImpN.ToString(Inv)).Append('~').Append(R(f.NImpAvg));
+                        bool twn = f.St != null && f.St.IsTown;
+                        if (f.NF > 0 && f.St != null && ((k3Save && f.St.IsCastle) || (a3Save && twn)))
+                        {
+                            sb.Append('~').Append(f.NF.ToString(Inv)).Append('~').Append(R(NetAvg(f, 1)));
+                            if (twn) sb.Append('~').Append(f.FastDay.ToString(Inv));
+                        }
+                        else if (f.NF == 0 && f.NImpN > 0)
+                        {
+                            sb.Append('~').Append(f.NImpN.ToString(Inv)).Append('~').Append(R(f.NImpAvg));
+                            if (f.NImpFast != int.MinValue) sb.Append('~').Append(f.NImpFast.ToString(Inv));
+                        }
                     }
                 }
                 DsSeason.Export(sb);
@@ -2132,6 +2160,7 @@ namespace Armoury
                             {
                                 int n = I(a[24], 0); double avg = D(a[25]);
                                 if (n > 0 && !double.IsNaN(avg)) { f.NImpN = Math.Min(NetDays, n); f.NImpAvg = avg; }
+                                if (a.Length >= 27) f.NImpFast = I(a[26], -1);   // 428 A3: doba ostatniej szybkiej obnizki miasta
                             }
                             if (f.AidArr <= 0) f.AidK = null;
                             if (f.MovLeft <= 0) { f.MovLeft = 0; f.MovPer = 0; }

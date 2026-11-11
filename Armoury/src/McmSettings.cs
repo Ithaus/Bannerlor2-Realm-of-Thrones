@@ -9828,6 +9828,22 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsCastleFastCut { get; set; } = true;
 
+        [SettingPropertyBool("Ds Town Inflow Saved", HintText = "with Ds Towns: a town's memory of what its merchants really earn a day (the last four weeks) is kept in the save, as it already is for castles, so after loading a game the rules that lower a town's yearly due to what it earns work from the first days instead of waiting up to four weeks of play (off = the memory starts empty after every load, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsTownInflowSaved { get; set; } = true;
+
+        [SettingPropertyBool("Ds Farm Brakes All Towns", HintText = "with Ks Farm Follows Surplus and Ks Farm Surplus Cap Net: towns outside the start calibration (about half of the world) get the same brakes as the calibrated ones - a town whose merchants' purse, after what it owes, is below their working stock or that is behind on its dues has its lord's and crown's yearly due lowered to what the town earns, and the quarterly review never aims above the town's whole earnings; such towns get no rises beyond the quarterly review (off = these towns are only reviewed once a quarter, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsFarmBrakesAllTowns { get; set; } = true;
+
+        [SettingPropertyBool("Ds Farm Folk Part Cut", HintText = "with Ds Farm Folk From Savings: when the townsfolk cannot pay the whole weekly instalment of the part of the town's farm raised from their savings, that part drops towards what they did pay (by no more than Ks Farm Surplus Review Max an instalment) and its arrears shrink in the same measure, instead of piling up for a year; it rises again with the quarterly review (off = that part is never lowered when the people cannot pay, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsFarmFolkPartCut { get; set; } = true;
+
+        [SettingPropertyBool("Town Pays Villages First", HintText = "the village comes before the lord: on the day a town pays its weekly farm, the gold it owes its villages for grain already sold stays in the purse and is paid to those villages the same day, and only what is left goes to the lord and the crown; what they miss of that week's instalment is forgiven, not written down as arrears - lords of towns in debt to their villages earn less until the debt is paid (off = the lord and the crown take first, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool TownPaysVillagesFirst { get; set; } = true;
+
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
@@ -14928,6 +14944,10 @@ namespace Armoury
             s.DsCastleIncomeCut = DsCastleIncomeCut;
             s.DsCastleFolkPartNoArrears = DsCastleFolkPartNoArrears;
             s.DsCastleFastCut = DsCastleFastCut;
+            s.DsTownInflowSaved = DsTownInflowSaved;
+            s.DsFarmBrakesAllTowns = DsFarmBrakesAllTowns;
+            s.DsFarmFolkPartCut = DsFarmFolkPartCut;
+            s.TownPaysVillagesFirst = TownPaysVillagesFirst;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;
