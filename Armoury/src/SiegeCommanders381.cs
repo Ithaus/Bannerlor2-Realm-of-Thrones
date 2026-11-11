@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -35,6 +36,11 @@ namespace Armoury
     /// Linie logu: 'Wodzowie (381): start ...' (ilu, imiona, odleglosc od obroncow), 'dolaczyl' (posilki), 'koniec misji' (ilu padlo / rannych, z imionami).
     /// 381b (recenzja): odwrot (_broken) tylko gdy polowa strony ucieka; posilek do oproznionego szyku 8 - AI szyku znow wylaczone; punkt z planu
     /// tylko w granicach pola i do 400 m od lordow; 'zostali sami' liczone takze przy kluczu wylaczonym w bitwie i przy nieznanym spawnerze (8 skanow).
+    /// 387 (Jeff 10.11 "rob caly punkt 2" - 2c: "wodzowie AI zostaja z tylu tylko wtedy, gdy sie bronisz"): takze gdy gracz walczy PO STRONIE ATAKUJACYCH,
+    /// a szturmem dowodzi AI (wodz strony atakujacej nie jest druzyna gracza; klucz SiegeAllyLordsStayBack) - tryb _ally. Dowod (mb_full 57175
+    /// Mission.GetAgentTeam): partie z armii gracza trafiaja do Mission.PlayerTeam, wiec lordowie AI stoja w druzynie gracza - pomijamy ja tylko wtedy,
+    /// gdy gracz jest jej generalem (Team.IsPlayerGeneral - wtedy wszystkie szyki maja PlayerOwner i sa pod jego rozkazami). Szyk 8 oddany graczowi
+    /// (PlayerOwner) zostaje nietkniety. Bohaterowie rodu gracza i towarzysze - nie (Lord()). Gracz dowodzi szturmem sam - modul nieczynny jak dotad.
     /// Wyjatek per czlowiek / druzyna = potkniecie (log 3 pierwszych), bez globalnego wylacznika.
     /// </summary>
     internal sealed class SiegeCommanders381 : MissionLogic
@@ -52,7 +58,7 @@ namespace Armoury
             public float Dist0 = -1f, Dist = -1f;   // odleglosc od najblizszego obroncy: z planu i po cofnieciu
         }
 
-        private bool _known, _active, _started, _ended, _alone, _broken, _startLogged;
+        private bool _known, _active, _started, _ended, _alone, _broken, _startLogged, _ally;   // _ally (387): gracz po stronie atakujacych, szturmem dowodzi AI
         private float _nextScan;
         private int _stumbles, _errs, _aloneHits, _reAi;
         private MapEvent _me;
@@ -65,6 +71,7 @@ namespace Armoury
         private static string F(double v, string f) { return v.ToString(f, Inv); }
 
         private static bool On { get { var s = Settings.Current; return s != null && s.SiegeAttackerLordsStayBack; } }
+        private static bool AllyOn { get { var s = Settings.Current; return s != null && s.SiegeAllyLordsStayBack; } }
 
         private bool Known(Mission m)
         {
@@ -74,9 +81,16 @@ namespace Armoury
             {
                 if (m == null || !m.IsSiegeBattle || m.IsSallyOutBattle || m.IsNavalBattle) return _active = false;
                 var pt = m.PlayerTeam;
-                if (pt == null || pt.Side == BattleSideEnum.Attacker) return _active = false;   // gracz szturmuje (sam albo w armii AI) - jego sprawa
+                if (pt == null) return _active = false;
                 _me = MapEvent.PlayerMapEvent;
                 if (_me == null || !_me.IsSiegeAssault || _me.IsNavalMapEvent) return _active = false;
+                if (pt.Side == BattleSideEnum.Attacker)
+                {
+                    // 387: gracz po stronie atakujacych - tylko gdy szturmem dowodzi AI (gracz-wodz: jego sprawa, jak dotad) i klucz
+                    var lpb = _me.AttackerSide != null ? _me.AttackerSide.LeaderParty : null;
+                    if (lpb == null || lpb == PartyBase.MainParty || !AllyOn) return _active = false;
+                    _ally = true;
+                }
                 _active = true;
             }
             catch (Exception e) { Stumble("Known", e); _active = false; }
@@ -102,7 +116,7 @@ namespace Armoury
                 }
                 if (now < _nextScan) return;
                 _nextScan = now + ScanEvery;
-                if (On)                                            // klucz NIE w trakcie - nic nowego (juz odsunieci stoja, gdzie stoja)
+                if (On && (!_ally || AllyOn))                      // klucz NIE w trakcie - nic nowego (juz odsunieci stoja, gdzie stoja)
                 {
                     Scan(m);
                     if (!_startLogged && _moved.Count > 0) LogStart(m);
@@ -120,7 +134,8 @@ namespace Armoury
             {
                 try
                 {
-                    if (!MissionTeams.Valid(t) || t.Side != BattleSideEnum.Attacker || t.IsPlayerTeam) continue;
+                    if (!MissionTeams.Valid(t) || t.Side != BattleSideEnum.Attacker) continue;
+                    if (t.IsPlayerTeam && (!_ally || t.IsPlayerGeneral)) continue;   // 387: druzyna gracza tylko wtedy, gdy dowodzi nia AI (gracz w armii AI)
                     Hold h = null;
                     var list = t.ActiveAgents;
                     for (int i = 0; i < list.Count; i++)
@@ -193,6 +208,7 @@ namespace Armoury
             {
                 var f = t.GetFormation(FormationClass.NumberOfRegularFormations);
                 if (f == null) return h;
+                if (_ally && f.PlayerOwner != null) return h;   // 387: gra oddala ten szyk graczowi - nie ruszamy (lordowie zostaja w szykach gry)
                 h.F = f;
                 bool planned = false;
                 try
@@ -323,7 +339,7 @@ namespace Armoury
             }
             string gen = "-";
             try { var g = m.AttackerTeam != null ? m.AttackerTeam.GeneralAgent : null; gen = g != null ? Name(g) + (_moved.Contains(g) ? " (z tylu)" : " (nie lord AI - bez zmian)") : "brak w misji"; } catch { }
-            Log.Info("Wodzowie (381): start | osada " + Settlement() + " | odsunieto " + _names.Count + " bohaterow-lordow atakujacych: " + Join(_names) + " | wodz druzyny " + gen + sb + ".");
+            Log.Info("Wodzowie (381): start" + (_ally ? " (387: gracz po stronie atakujacych, szturmem dowodzi AI)" : "") + " | osada " + Settlement() + " | odsunieto " + _names.Count + " bohaterow-lordow atakujacych: " + Join(_names) + " | wodz druzyny " + gen + sb + ".");
         }
 
         /// <summary>Same wodzowie bez wojska i bez odwodu - odstepuja (inaczej misja bez konca).</summary>

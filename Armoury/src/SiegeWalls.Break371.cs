@@ -208,9 +208,9 @@ namespace Armoury
                  + " dob, odbudowa machin " + F(RebuildMin, "0.0") + "-" + F(RebuildMax, "0.0") + " dob), misja " + (BreakMissionOn ? "tak" : "nie")
                  + ": misji szturmu z graczem w obronie " + _dMisSeen + ", poza regula " + _dMisNone + ", zalaman " + _dMisBreak + " (bezpiecznik " + _dMisFuse + ", wystawionych po zalamaniu "
                  + _dMisLate + "), wstrzymane - zdobywaja " + _dMisTaken + ", wstrzymane - wymiana korzystna " + _dMisHoldEx + ", przerw zapisanych " + _dMisRegistered
-                 + "; 378 limit czasu " + (TimeLimitSeconds > 0f ? F(TimeLimitSeconds / 60.0, "0") + " min: odwrotow " + _dMisTime + ", wstrzymanych - zdobywaja " + _dMisTimeTaken : "wylaczony");
+                 + "; 378 limit czasu " + (TimeLimitSeconds > 0f ? F(TimeLimitSeconds / 60.0, "0") + " min: odwrotow " + _dMisTime + ", wstrzymanych - zdobywaja " + _dMisTimeTaken : "wylaczony") + Day387Text();
         }
 
-        private static void ZeroDay371() { _dMisSeen = _dMisBreak = _dMisFuse = _dMisLate = _dMisNone = _dMisTaken = _dMisHoldEx = _dMisRegistered = _dMisTime = _dMisTimeTaken = 0; }
+        private static void ZeroDay371() { _dMisSeen = _dMisBreak = _dMisFuse = _dMisLate = _dMisNone = _dMisTaken = _dMisHoldEx = _dMisRegistered = _dMisTime = _dMisTimeTaken = 0; ZeroDay387(); }
     }
 }

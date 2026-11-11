@@ -25,7 +25,7 @@ namespace Armoury
         private static MapEvent _lastMe;
         private static float _lastFought;
 
-        private bool _known, _active, _started, _warned, _up, _ended;
+        private bool _known, _active, _started, _warned, _up, _ended, _by371;   // _by371 (387): szturm gracza lamie SiegeBreak371 - tu tylko ostrzezenie 5 min
         private float _startAt, _tPrior, _endAt = -1f;
         private int _aCas, _dCas, _stumbles, _errs;
         private MapEvent _me;
@@ -84,8 +84,10 @@ namespace Armoury
                     _startAt = now;
                     _warned = _tPrior >= SiegeWalls.TimeLimitSeconds - WarnBefore;   // kolejna misja tej bitwy juz po progu ostrzezenia - bez powtorki
                     _up = SiegeWalls.TimeLimitSeconds > 0f && _tPrior >= SiegeWalls.TimeLimitSeconds;   // recenzja 378: limit minal w poprzedniej misji tej bitwy - "Time is up" raz na bitwe, nie co misje
+                    // 387: SiegeBreak371 dodawany przed nami (SubModuleMain) - jego Known juz po pierwszym ticku; gdy lamie szturm gracza, odwrot z limitu robi on
+                    try { var b = m.GetMissionBehavior<SiegeBreak371>(); _by371 = b != null && b.PlayerMode; } catch (Exception e) { Stumble("By371", e); _by371 = false; }
                     Log.Info("Szturm (378): start misji (gracz atakuje) | osada " + Settlement() + " | limit czasu " + F(SiegeWalls.TimeLimitSeconds / 60.0, "0") + " min, z poprzednich misji tej bitwy "
-                             + F(_tPrior, "0") + " s - tylko komunikaty, bez przymusowego odwrotu.");
+                             + F(_tPrior, "0") + " s - " + (_by371 ? "ostrzezenie 5 min tutaj, odwrot z limitu robi 371 (387: szturm gracza)." : "tylko komunikaty, bez przymusowego odwrotu."));
                     return;
                 }
                 if (m.MissionEnded) { if (_endAt < 0f) _endAt = now; return; }
@@ -102,6 +104,7 @@ namespace Armoury
                 {
                     _up = true;
                     _warned = true;
+                    if (_by371) { Log.Info("Szturm (378): limit czasu (gracz atakuje) - bez komunikatu, odwrot robi 371 (387) | czas walki " + F(fought, "0") + " s / limit " + F(tl, "0") + " s."); return; }
                     Show("Time is up - the assault has stalled. You may fall back.", 0xFFE07040u);
                     int dNow = 0, rem = 0;
                     try

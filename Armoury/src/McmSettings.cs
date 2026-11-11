@@ -11688,7 +11688,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeRepelRebuildMaxDays { get; set; } = 14f;
 
-        [SettingPropertyInteger("Siege Assault Time Limit Minutes", 0, 180, "0", HintText = "In an assault on walls: the time limit in minutes of battle time, counted from the end of deployment and over all the rounds of the same battle. When the enemy storms a fortress you defend (with Siege Assault Break Mission) and has not taken it in this time, its stormers fall back from the walls the same way as when the assault breaks, and the next assault comes after the usual pause - unless the place is being taken (Siege Assault Break Taken Share). When you storm a fortress yourself, you only get a warning 5 minutes before and when the time is up - falling back is your call. 0 = no limit", RequireRestart = false)]
+        [SettingPropertyInteger("Siege Assault Time Limit Minutes", 0, 180, "0", HintText = "In an assault on walls: the time limit in minutes of battle time, counted from the end of deployment and over all the rounds of the same battle. When the enemy storms a fortress you defend (with Siege Assault Break Mission) and has not taken it in this time, its stormers fall back from the walls the same way as when the assault breaks, and the next assault comes after the usual pause - unless the place is being taken (Siege Assault Break Taken Share). When you storm a fortress yourself, you only get a warning 5 minutes before and when the time is up - falling back is your call - unless Siege Player Assault Breaks is on: then your men fall back too. 0 = no limit", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public int SiegeAssaultTimeLimitMinutes { get; set; } = 30;
 
@@ -11759,6 +11759,14 @@ namespace Armoury
         [SettingPropertyBool("Siege Attacker Lords Stay Back", HintText = "When the enemy storms a fortress you defend (or one your allies defend while you fight with them): the attacking lords - the army commander and the lords leading their parties - do not climb the ladders or run at the gate with their men. After deployment they gather in a formation of their own at the start of the attack, pulled back out of bowshot of the walls (150 m from the nearest defender where the ground allows), and lead from there; lords coming with reinforcements join them. They still fall back with their men when the assault breaks, and leave the field when nobody else of theirs is left to fight. Arrows, siege engines or a sally can still reach them. When you storm a fortress yourself, nothing changes. Off = the lords storm the walls with their men, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: attacking lords lead from behind (381)")]
         public bool SiegeAttackerLordsStayBack { get; set; } = true;
+
+        [SettingPropertyBool("Siege Player Assault Breaks", HintText = "When you lead an assault on walls yourself (you command the besiegers): your men break by the same rule as the enemy's (Siege Assault Break Mission - the breaking share of the assault party, moved by your own Leadership, Tactics and Valor, the trade of losses, broken gates, and never while the place is being taken) and by the time limit (Siege Assault Time Limit Minutes). You get a warning when losses reach three quarters of the breaking share. When the assault breaks, your men fall back to the siege lines and no more go in - you are not carried out and may be left alone on the walls; fall back yourself, or the battle ends as lost after Siege Assault Break End Seconds. The siege goes on: choose Continue siege preparations, and you cannot lead or send another assault for the usual pause (Siege Repel Pause Min / Mid / Max Days, or Siege Repel Rebuild Min / Max Days when your ram or a siege tower was lost). Off = as in the game: your assault never breaks and the time limit only warns", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public bool SiegePlayerAssaultBreaks { get; set; } = true;
+
+        [SettingPropertyBool("Siege Ally Lords Stay Back", HintText = "With Siege Attacker Lords Stay Back: also when you fight in an assault on walls that an AI lord commands (you ride in his army or joined his siege) - the lords of your side, the army commander among them, stay back out of bowshot of the walls in a formation of their own, as enemy lords do when you defend. Members of your own clan and formations under your command are left alone. When you command the assault yourself, nothing changes. Off = allied lords storm the walls with their men, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: attacking lords lead from behind (381)")]
+        public bool SiegeAllyLordsStayBack { get; set; } = true;
 
         [SettingPropertyBool("Siege Defenders Use Stones", HintText = "When you defend a fortress (or fight on its defenders' side), your own and allied defenders drop the stones piled above the gate and on the walls onto attackers who come beneath them: as soon as stormers stand below a stone pile, men from the nearest defending formation go to it, one to each throwing place, and leave it when the stones run out, when the attackers have gone or when an enemy is within a few steps. The game does this only for formations under AI command, so the formations you command as general never used the stones. Your formations keep their orders; only the few men at the pile are taken out. Formations falling back are not used. Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: defenders drop stones from the walls (383)")]
@@ -14903,6 +14911,8 @@ namespace Armoury
             s.SiegeEngineSideEngineerShare = SiegeEngineSideEngineerShare;
             s.SiegeEngineSimilarTargetShare = SiegeEngineSimilarTargetShare;
             s.SiegeAttackerLordsStayBack = SiegeAttackerLordsStayBack;
+            s.SiegePlayerAssaultBreaks = SiegePlayerAssaultBreaks;
+            s.SiegeAllyLordsStayBack = SiegeAllyLordsStayBack;
             s.SiegeDefendersUseStones = SiegeDefendersUseStones;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;

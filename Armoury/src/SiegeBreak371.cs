@@ -43,12 +43,21 @@ namespace Armoury
     ///    Czas walki = Mission.CurrentTime od Start (koniec rozstawienia, jak prog) + MisTime z poprzednich misji tej bitwy. Po SiegeAssaultTimeLimitMinutes
     ///    (domyslnie 30) - Break jak przy zalamaniu (ten sam odwrot, bezpiecznik, ranni 373 przez NoteBreak, przerwa 1-5 / 7-14 dob przez MissionBreak
     ///    i MisEngLost), niezaleznie od progu i wymiany strat; wyjatek tylko "zdobywaja" (obroncow &lt; TakenShare) - wtedy szturm trwa. Gracz atakuje: SiegeClock378.
-    /// Gracz atakuje (faza 2) - bez zmian (osobny wpis, zasada "jedna zmiana naraz"). Wyjatek per czlowiek / obiekt = potkniecie, bez globalnego wylacznika.
+    /// 387 (Jeff 10.11 "rob caly punkt 2" - 2c: "gdy ty szturmujesz, twoj szturm sie nie zalamuje"): GRACZ ATAKUJE I DOWODZI (wodz strony atakujacej =
+    /// druzyna gracza, Team.IsPlayerGeneral, klucz SiegePlayerAssaultBreaks) - te same reguly (prog x wodz z Leadership / Tactics / Valor gracza, wstrzasy,
+    /// bramy, wymiana, "zdobywaja", limit czasu) na rekordzie SiegeWalls.MissionAssaultPlayer. Roznice trybu _pl: ostrzezenie raz na misje przy 75% progu;
+    /// komunikaty w wersji gracza; odwrot obejmuje ludzi AI gracza i druzyny sojusznicze (gracz zostaje - nie teleportujemy, moze zostac sam w zamku:
+    /// TAB dziala dopiero ponad 5 m od wroga); bezpiecznik = wynik (DefenderVictory, PlayerDefeated) jak natywne CreateDefeated - inaczej
+    /// CampaignSiegeStateHandler przesunalby oblezenie do sali lorda; bitwa na mapie trwa ("Battle continues"), gracz wraca do obozu opcja gry
+    /// "Continue siege preparations."; przerwa zapisywana przy koncu misji (SiegeWalls.RegisterPlayerBreak), chyba ze misja skonczyla sie zwyciestwem
+    /// atakujacych. Ranni gracza pod murami (373) - NIE w tym wpisie (387b). Gracz w armii AI (nie wodz) - bez zalamania (osobny wpis).
+    /// Wyjatek per czlowiek / obiekt = potkniecie, bez globalnego wylacznika.
     /// </summary>
     internal sealed class SiegeBreak371 : MissionLogic
     {
         private const float EvalEvery = 1f, ResendEvery = 4f, NoDeployStart = 10f;
         private const int PerTick = 150, ErrMax = 3;
+        private const double WarnShare = 0.75;   // 387: ostrzezenie gracza przy tej czesci progu
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private bool _known, _active, _started, _broken, _fuse, _ended, _genDown, _engDown, _genLogged, _engLogged, _takenNoted, _holdNoted, _cap;
@@ -59,6 +68,7 @@ namespace Armoury
         private string _why = "-";
         private float _startAt, _tPrior, _endAt = -1f;                                    // 378: czas misji na starcie walki, sekundy walki z poprzednich misji tej bitwy
         private bool _byTime, _timeNoted;                                   // 378: zalamanie z limitu czasu; limit minal przy "zdobywaja" (raz na misje)
+        private bool _pl, _plWarned;                                        // 387: gracz atakuje i dowodzi; ostrzezenie 75% progu pokazane
         private MapEvent _me;
         private SiegeWalls.Assault _a;
         private Agent _general;
@@ -69,11 +79,14 @@ namespace Armoury
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
-        /// <summary>372: regula zalamania dziala w tej misji (szturm, gracz w obronie, rekord szturmu) - odwrot taktyki atakujacych tylko przez 371.</summary>
+        /// <summary>372: regula zalamania dziala w tej misji (szturm, rekord szturmu; gracz w obronie albo - 387 - gracz-wodz atakujacych) - odwrot taktyki atakujacych tylko przez 371.</summary>
         internal bool HoldsAssault { get { return _known && _active && !_ended; } }
 
         /// <summary>372: szturm juz sie zalamal (atakujacy schodza z murow) - bez zwalniania drabin.</summary>
         internal bool IsBroken { get { return _broken; } }
+
+        /// <summary>387 (dla SiegeClock378): w tej misji lamie sie szturm GRACZA - limit czasu robi 371 (odwrot), zegar 378 tylko ostrzega.</summary>
+        internal bool PlayerMode { get { return _known && _active && _pl; } }
 
         private static string F(double v, string f) { return v.ToString(f, Inv); }
 
@@ -92,23 +105,48 @@ namespace Armoury
             {
                 if (m == null || !m.IsSiegeBattle || !SiegeWalls.BreakMissionOn) return _active = false;
                 var pt = m.PlayerTeam;
-                if (pt == null || pt.Side != BattleSideEnum.Defender) return _active = false;   // faza 1: tylko gracz-obronca
-                _me = MapEvent.PlayerMapEvent;
-                SiegeWalls.NoteMissionSeen();
-                _a = SiegeWalls.MissionAssault(_me, out _why);
-                if (_a == null)
+                if (pt == null) return _active = false;
+                if (pt.Side == BattleSideEnum.Attacker)
                 {
-                    SiegeWalls.NoteMissionNone();
-                    Log.Info("Szturm (371): misja poza regula zalamania - " + _why + ".");
-                    return _active = false;
+                    // 387: gracz atakuje - tylko gdy sam dowodzi szturmem (jego druzyna wodzem strony; w armii AI jest sierzantem - bez zmian)
+                    if (!SiegeWalls.PlayerBreakOn) return _active = false;
+                    _me = MapEvent.PlayerMapEvent;
+                    if (_me == null || !_me.IsSiegeAssault) return _active = false;
+                    if (!pt.IsPlayerGeneral)
+                    {
+                        Log.Info("Szturm (387): gracz atakuje, ale nie dowodzi (armia AI) - bez zalamania, jak dotad.");
+                        return _active = false;
+                    }
+                    SiegeWalls.NotePlayerSeen();
+                    _a = SiegeWalls.MissionAssaultPlayer(_me, out _why);
+                    if (_a == null || SiegeWalls.EffThr(_a) <= 0.0)
+                    {
+                        SiegeWalls.NotePlayerNone();
+                        Log.Info("Szturm (387): misja gracza poza regula zalamania - " + (_a == null ? _why : "prog OB2 0 (OB2 wylaczony)") + ".");
+                        return _active = false;
+                    }
+                    _pl = true;
                 }
-                if (SiegeWalls.EffThr(_a) <= 0.0)
+                else if (pt.Side == BattleSideEnum.Defender)
                 {
-                    // prog OB2 0 (SiegeAssaultRepelLoss wylaczony) - _limit 0 dalby zalamanie w pierwszej sekundzie kazdej misji
-                    SiegeWalls.NoteMissionNone();
-                    Log.Info("Szturm (371): misja poza regula zalamania - prog OB2 0 (OB2 wylaczony).");
-                    return _active = false;
+                    _me = MapEvent.PlayerMapEvent;
+                    SiegeWalls.NoteMissionSeen();
+                    _a = SiegeWalls.MissionAssault(_me, out _why);
+                    if (_a == null)
+                    {
+                        SiegeWalls.NoteMissionNone();
+                        Log.Info("Szturm (371): misja poza regula zalamania - " + _why + ".");
+                        return _active = false;
+                    }
+                    if (SiegeWalls.EffThr(_a) <= 0.0)
+                    {
+                        // prog OB2 0 (SiegeAssaultRepelLoss wylaczony) - _limit 0 dalby zalamanie w pierwszej sekundzie kazdej misji
+                        SiegeWalls.NoteMissionNone();
+                        Log.Info("Szturm (371): misja poza regula zalamania - prog OB2 0 (OB2 wylaczony).");
+                        return _active = false;
+                    }
                 }
+                else return _active = false;
                 _prior = _a.MisCas;
                 _dPrior = _a.MisDefCas;
                 _tPrior = Math.Max(0f, _a.MisTime);                             // 378
@@ -207,7 +245,7 @@ namespace Armoury
             if (_dTot <= 0) _dTot = Math.Max(_def0, _a.Def0);                    // 371b: zapas, gdy spawner inny
             _n = Math.Max(1.0, (_total > 0 ? _total : _a.Men0) / (double)Math.Max(1, _dTot));
             _a.Missions++;
-            Log.Info("Szturm (371): start misji | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " (" + _a.FWTxt + ") | armia na starcie szturmu " + _a.Men0
+            Log.Info("Szturm (371): start misji" + (_pl ? " (GRACZ dowodzi, 387)" : "") + " | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " (" + _a.FWTxt + ") | armia na starcie szturmu " + _a.Men0
                      + ", obroncow " + _a.Def0 + " | oddzial szturmowy K " + _a.K + ", w misji K_m " + _km + " (misja wystawi " + _total + ") | prog " + F(_thr * 100.0, "0.0")
                      + "% (OB2 " + F(_a.Thr * 100.0, "0.0") + "% x wodz " + F(_a.FW, "0.00") + ") = " + F(_thr * _km, "0") + " strat | straty z poprzednich misji tej bitwy " + _prior
                      + " | tarany i wieze w misji " + _engines + ", wodz atakujacych w misji " + (_general != null ? "tak" : "nie") + ", obroncow w misji " + _def0
@@ -313,6 +351,14 @@ namespace Armoury
             // 378: limit czasu przed progiem i wymiana - po uplywie odwrot niezaleznie od strat (wyjatek: zdobywaja)
             float tl = SiegeWalls.TimeLimitSeconds, fought = _tPrior + (now - _startAt);
             if (tl > 0f && fought >= tl) { TimeUp(m, now, fought, A, lim0); return; }
+            // 387: gracz-wodz dostaje ostrzezenie raz na misje, gdy straty dojda do 75% progu (z wstrzasami, bez mnoznika bram)
+            if (_pl && !_plWarned && A >= WarnShare * lim0)
+            {
+                _plWarned = true;
+                SiegeWalls.NotePlayerWarn();
+                if (A < lim0) { try { InformationManager.DisplayMessage(new InformationMessage("Your men waver - losses are mounting.", Color.FromUint(0xFFE0B040u))); } catch { } }
+                Log.Info("Szturm (387): ostrzezenie 75% | straty oddzialu " + A + " / prog " + F(lim0, "0") + " (czas misji " + F(now, "0") + " s)" + (A >= lim0 ? " - prog juz osiagniety, bez komunikatu" : "") + ".");
+            }
             // tanie wyjscie: ponizej progu z wstrzasami (bramy tylko podnosza) - bez liczenia bram i obroncow
             if (A < lim0) { _limit = lim0; _state = 0; return; }
             int gates, down;
@@ -366,7 +412,7 @@ namespace Armoury
             _broken = true;
             _breakAt = now;
             _a.MissionBreak = true;
-            SiegeWounded373.NoteBreak(_me);   // 373: ranni atakujacy pod murami do lochu przy koncu bitwy
+            if (!_pl) SiegeWounded373.NoteBreak(_me);   // 373: ranni atakujacy pod murami do lochu przy koncu bitwy (ranni GRACZA - osobny wpis 387b)
             _a.MisEngLost = _engDown;
             _a.Loss = (_prior + _cas) / (double)Math.Max(1, _km);
             try { var sp = m.GetMissionBehavior<IMissionAgentSpawnLogic>(); if (sp != null) sp.StopSpawner(BattleSideEnum.Attacker); }
@@ -378,8 +424,13 @@ namespace Armoury
                 if (a == null || !a.IsActive() || !a.IsHuman || !a.IsAIControlled || !Attacker(a)) continue;
                 _queue.Add(a); att++;
             }
-            try { InformationManager.DisplayMessage(new InformationMessage(_byTime ? "The assault has dragged on too long - the enemy falls back from the walls." : "The assault breaks! The enemy falls back from the walls.", Color.FromUint(0xFF9ACD65u))); } catch { }
-            Log.Info("Szturm (371): ZALAMANIE" + (_byTime ? " (378: limit czasu)" : "") + " | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " | czas misji " + F(now, "0") + " s | straty oddzialu "
+            try
+            {
+                if (_pl) InformationManager.DisplayMessage(new InformationMessage(_byTime ? "The assault has dragged on too long - your men fall back to the siege lines." : "Your men have had enough - the assault breaks. They fall back to the siege lines.", Color.FromUint(0xFFE07040u)));
+                else InformationManager.DisplayMessage(new InformationMessage(_byTime ? "The assault has dragged on too long - the enemy falls back from the walls." : "The assault breaks! The enemy falls back from the walls.", Color.FromUint(0xFF9ACD65u)));
+            }
+            catch { }
+            Log.Info("Szturm (371): ZALAMANIE" + (_pl ? " (387: szturm gracza)" : "") + (_byTime ? " (378: limit czasu)" : "") + " | osada " + (_a.St != null ? _a.St.StringId : "-") + ", wodz " + _a.Leader + " | czas misji " + F(now, "0") + " s | straty oddzialu "
                      + (_prior + _cas) + " (ta misja " + _cas + ", wczesniej " + _prior + ") / prog " + F(_limit, "0") + " (" + F(_thr * 100.0, "0.0") + "% x K_m " + _km
                      + (_genDown ? ", wodz padl x" + F(SiegeWalls.ShockFactor, "0.00") : "") + (_engDown ? ", tarany i wieze stracone x" + F(SiegeWalls.ShockFactor, "0.00") : "")
                      + (gates > 0 && down >= gates ? ", bramy rozbite x" + F(SiegeWalls.GateFactor, "0.00") : "") + ") | atakujacych w polu " + att + ", obroncow " + dNow + " z " + _def0
@@ -429,6 +480,14 @@ namespace Armoury
             {
                 var m = Mission;
                 if (m == null || m.MissionEnded) return false;
+                if (_pl)
+                {
+                    // 387: ten sam wynik, co BattleEndLogic przy odwrocie strony gracza (CreateDefeated gracza-atakujacego): DefenderVictory, PlayerDefeated.
+                    // MUSI byc DefenderVictory - inaczej CampaignSiegeStateHandler.OnEndMission przesuwa oblezenie do sali lorda (SetNextSiegeState)
+                    missionResult = new MissionResult(BattleState.DefenderVictory, false, true, false);
+                    Log.Info("Szturm (387): bezpiecznik - " + F(SiegeWalls.BreakEndSeconds, "0") + " s po zalamaniu misja trwala; koniec z wynikiem DefenderVictory / PlayerDefeated (odstapienie, oblezenie trwa).");
+                    return true;
+                }
                 // ten sam wynik, co BattleEndLogic przy odwrocie wroga (CreateSuccessful(enemyRetreated: true) gracza-obroncy)
                 missionResult = new MissionResult(BattleState.DefenderVictory, true, false, true);
                 Log.Info("Szturm (371): bezpiecznik - " + F(SiegeWalls.BreakEndSeconds, "0") + " s po zalamaniu misja trwala; koniec z odwrotem wroga (EnemyRetreated).");
@@ -447,13 +506,22 @@ namespace Armoury
                     _a.MisTime = _tPrior + Math.Max(0f, (_broken ? _breakAt : endAt) - _startAt);   // 378: czas walki do nastepnej misji tej bitwy (do zalamania, bez schodzenia z murow)
                     _a.MisCas = _prior + _cas;
                     _a.MisDefCas = _dPrior + _dcas;                             // 371b: straty obrony do nastepnej misji tej bitwy
-                    if (_broken) SiegeWalls.NoteMissionBreak(_fuse, _late);
                     var r = Mission != null ? Mission.MissionResult : null;
+                    bool plWon = false;
+                    if (_broken && !_pl) SiegeWalls.NoteMissionBreak(_fuse, _late);
+                    else if (_broken)
+                    {
+                        // 387: przerwa od razu (bitwa na mapie trwa - gracz stoi w menu "encounter"); nie po misji wygranej mimo zalamania (zamek padl / sala lorda)
+                        plWon = r != null && r.BattleState == BattleState.AttackerVictory;
+                        if (!plWon) SiegeWalls.RegisterPlayerBreak(_me, _a, _fuse);
+                        else Log.Info("Szturm (387): zalamanie, ale misja skonczona zwyciestwem atakujacych - bez przerwy.");
+                    }
                     Log.Info("Szturm (371): koniec misji | osada " + (_a.St != null ? _a.St.StringId : "-") + " | zalamanie " + (_broken ? "tak (po " + F((Mission != null ? Mission.CurrentTime : 0f) - _breakAt, "0") + " s)" : "nie")
                              + " | straty oddzialu " + (_prior + _cas) + " / prog " + F(_limit, "0") + " | 371b: straty obrony " + (_dPrior + _dcas) + ", wymiana "
                              + F((_prior + _cas) / (double)Math.Max(1, _dPrior + _dcas), "0.00") + ":1 | odwrot wyslany " + _sent + ", ponowiony " + _resent + ", wystawieni po zalamaniu " + _late
-                             + " | bezpiecznik " + (_fuse ? "tak" : "nie") + " | " + SiegeHold372.MissionSummary(Mission) + " | wynik misji " + (r == null ? "-" : r.BattleState + (r.EnemyRetreated ? " (wrog odstapil)" : ""))
-                             + " | 378: czas walki " + F(_a.MisTime, "0") + " s" + (_byTime ? " (odwrot z limitu)" : "") + " | potkniecia " + _stumbles + ". Przerwa - linia 'Szturm (371): przerwa' przy koncu bitwy na mapie.");
+                             + " | bezpiecznik " + (_fuse ? "tak" : "nie") + " | " + SiegeHold372.MissionSummary(Mission) + " | wynik misji " + (r == null ? "-" : r.BattleState + (r.EnemyRetreated ? " (wrog odstapil)" : "") + (r.PlayerDefeated ? " (gracz pokonany)" : ""))
+                             + " | 378: czas walki " + F(_a.MisTime, "0") + " s" + (_byTime ? " (odwrot z limitu)" : "") + " | potkniecia " + _stumbles + (_pl ? ". 387: szturm gracza - " + (_broken ? (plWon ? "bez przerwy (wygrana)" : "przerwa zapisana wyzej (linia 'Szturm (371): przerwa ... 387'), w menu: 'Continue siege preparations.'") : "bez zalamania") + "."
+                               : ". Przerwa - linia 'Szturm (371): przerwa' przy koncu bitwy na mapie."));
                 }
             }
             catch (Exception e) { Stumble("Koniec", e); }
