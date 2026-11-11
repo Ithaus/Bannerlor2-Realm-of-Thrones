@@ -805,6 +805,10 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>435-L3 (VillageGear): okreg ze zmienionym czynnikiem sprzetu m - to samo przeliczenie co przy zmianie b (rachunek KS, plan zajec, wycena doby
+        /// dla wyplat prac). Nie rzuca.</summary>
+        internal static void NoteGearChanged(Village v) { MarkChanged(v); }
+
         // ============================================================ ogien, glod, powroty (burning)
         /// <summary>Devastation.Strike po ksiedze wiosek: okreg z pracami - roznica pustych osad od razu (stado do napastnika uderzenia). Nie rzuca.</summary>
         internal static void OnStrike(Village v, RaidEventComponent comp, MobileParty src)

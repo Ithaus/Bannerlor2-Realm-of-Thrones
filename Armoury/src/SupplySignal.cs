@@ -245,9 +245,10 @@ namespace Armoury
         // ============================================================ 4. tabela II.2 projektu (TYLKO do wyceny na sucho)
         private const int GPits = 0, GTrees = 1, GBoats = 2, GWoodD = 3, GWoodM = 4, GGrain = 5, GFields = 6, GOut = 7, GN = 8;
         private static readonly string[] GName = { "SZYBY", "SADY", "LODZIE", "LASY-D", "LASY-M", "POLA-Z", "POLA", "poza LP (stado, stadniny)" };
-        private static readonly double[] GPhi = { 0.15, 0.20, 0.25, 0.50, 0.70, 0.70, 0.60, 1.0 };
-        private static readonly double[] GDays = { 90, 60, 45, 14, 14, 14, 14, 0 };
-        private static readonly double[] GWear = { 0.12, 0.03, 0.10, 0.12, 0.08, 0.06, 0.06, 0 };
+        // 435-L3: jedna tabela - liczby z VillageGear (od L3 czyta je czynnik sprzetu; wycena na sucho liczy z tych samych)
+        private static readonly double[] GPhi = VillageGear.GPhi;
+        private static readonly double[] GDays = VillageGear.GDays;
+        private static readonly double[] GWear = VillageGear.GWear;
         private static int _dryDay = int.MinValue, _whyDay = int.MinValue;
 
         private static int GroupOf(string craft)

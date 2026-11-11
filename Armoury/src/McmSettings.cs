@@ -10200,6 +10200,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool GrainHandsWinterLock { get; set; } = false;
 
+        [SettingPropertyBool("Village Gear", HintText = "hands need gear: a hand without tools, shafts, boats or rows works at a fraction of its yield (mines 15%, orchards 20%, fisheries 25%, felling 50%, fields 60-70%; herds are not touched). On the first day every village part gets gear for all its people, at home and away, less what raiders burned - so nothing changes that day; after that people who come back after a raid, or are born, work at that fraction until the village buys gear. Gear comes only from the real building materials the village already buys from its market town for its common works (the same orders and the same gold as before): villages with hands lacking gear are served first, and what they pay for materials equips those hands before anything else. Raids burn the gear of the homesteads they empty; hunger destroys nothing. No wear yet. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool VillageGear { get; set; } = false;
+
         [SettingPropertyFloatingInteger("Side Village Craft Region Share", 0.000f, 1.000f, "0.000", HintText = "with Side Village Crafts: at most this share of the side villages' hands of one region (a stronghold and its villages) may change craft in one season (91 days); at most one village per district changes at a time", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float SideVillageCraftRegionShare { get; set; } = 0.05f;
@@ -15227,6 +15231,7 @@ namespace Armoury
             s.SideVillageCraftHoldDays = SideVillageCraftHoldDays;
             s.RebuildStallReleaseDays = RebuildStallReleaseDays;
             s.GrainHandsWinterLock = GrainHandsWinterLock;
+            s.VillageGear = VillageGear;
             s.SideVillageCraftChangeDays = SideVillageCraftChangeDays;
             s.SideVillageCraftTreeDays = SideVillageCraftTreeDays;
             s.SideVillageCraftRegionShare = SideVillageCraftRegionShare;

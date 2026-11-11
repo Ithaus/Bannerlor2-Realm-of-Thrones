@@ -48,6 +48,7 @@ namespace Armoury
 
         private sealed class DaOrder { public Village Vil; public Folk Payer; public Settlement Mk; public long Amount; public bool Sept; public long W0, W1, W2; }
         private static readonly List<DaOrder> _daQ = new List<DaOrder>();
+        private static long _daLastMat;                  // 435-L3: material zaplacony ostatnim zleceniem wsi (DaPayVillage -> DaRunOne -> VillageGear)
 
         // ---- liczniki od ostatniej linii
         private static int _daSeenN, _daCovered, _daTakeN; private static double _daRoom, _daPreAid, _daPreFarm, _daDuePlan, _daM9Day; private static long _daM9Lump;
@@ -308,6 +309,18 @@ namespace Armoury
                 double kw = Math.Max(0, Math.Min(3.0, (double)s.DsWorksWagePerMaterial));
                 var items = BuildFunding.DsWorksItems();                    // przedmioty materialow raz na przebieg
                 var empty = new HashSet<Settlement>();                       // targi bez materialu w tym przebiegu - kolejne zlecenia bez czytania polki
+                // 435-L3 (klucz Village Gear; NIE - kolejnosc jak dotad): zlecenia robot wsi z rekami bez sprzetu pierwsze do polki (priorytet a projektu), reszta w dotychczasowej kolejnosci
+                if (VillageGear.On)
+                {
+                    try
+                    {
+                        var qa = new List<DaOrder>(q.Count); var qb = new List<DaOrder>(q.Count);
+                        foreach (var o in q) { if (!o.Sept && o.Vil != null && VillageGear.NeedGold(o.Vil) >= 1.0) qa.Add(o); else qb.Add(o); }
+                        VillageGear.NoteFirst(qa.Count);
+                        if (qa.Count > 0 && qb.Count > 0) { qa.AddRange(qb); q = qa; }
+                    }
+                    catch (Exception e) { DaStumble("DaWorksRun(sprzet-kolejnosc)", e); }
+                }
                 foreach (var o in q)
                 {
                     long used = o.Amount;
@@ -396,7 +409,15 @@ namespace Armoury
             if (o.Vil != null)
             {
                 P2Open(P2Vil); P2TouchSt(o.Vil.Settlement); P2TouchSt(mk); P2TouchFolk(mf);
-                try { return DaPayVillage(o, mk, mf, spent, wage) + ordPaid; }   // 363: zwrot z zakupem u wytworcow (warunek daniny od skarbca wsi)
+                try
+                {
+                    _daLastMat = 0;
+                    long paidV = DaPayVillage(o, mk, mf, spent, wage);
+                    // 435-L3 (klucz Village Gear; NIE - nic): prawdziwy material zaplacony przez wies (polka targu + wytworcy 363 bez frachtu) to najpierw sprzet dla rak
+                    // bez sprzetu; zloto i sztuki bez zmian (sam zapis w ksiedze sprzetu)
+                    if (!o.Sept) VillageGear.OnWorksMaterial(o.Vil, _daLastMat + ordBase);
+                    return paidV + ordPaid;                                     // 363: zwrot z zakupem u wytworcow (warunek daniny od skarbca wsi)
+                }
                 finally { P2Close(); }
             }
             P2Open(P2Town); P2TouchSt(mk); P2TouchFolk(mf); P2TouchFolk(o.Payer);
@@ -413,6 +434,7 @@ namespace Armoury
             vil.ChangeGold(-(int)Math.Min(int.MaxValue, mat + wage));
             long got = Math.Max(0, (long)had - vil.Gold);
             long matPaid = Math.Min(got, mat), wagePaid = got - matPaid;
+            _daLastMat = matPaid;                                           // 435-L3: material zaplacony tym zleceniem (odczyt w DaRunOne)
             if (matPaid < mat) _dwGap += mat - matPaid;                     // kontrola: towar zdjety bez zaplaty (oczekiwane 0 - kiesa sprawdzona przed zakupem)
             long cin = 0, fin = 0;
             if (matPaid > 0)

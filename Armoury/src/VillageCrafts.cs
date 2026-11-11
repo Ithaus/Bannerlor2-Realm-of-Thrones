@@ -212,6 +212,7 @@ namespace Armoury
         private sealed class Plan
         {
             public float Other, NType, TypeBonus; public bool KitchenKeep; public VillageType Type;
+            public float TypeLoss;                              // 435-L3: udzial rak zajecia typu okregu stracony brakiem sprzetu (suma udzial x (1 - m)); 0 - jak dotad
             public bool WorksOnly;                              // recenzja: plan z samych prac okregu (zajecia nieczynne - klucz albo zrodla) - tylko premia prac w towarach typu, n = 1
             public Dictionary<ItemObject, float> Add;          // towar -> M x ten mnoznik = dopisek (suma po zajeciach innych wiosek)
             public HashSet<ItemObject> TypeGoods;
@@ -473,7 +474,7 @@ namespace Armoury
             if (!(tot > 1e-6)) return null;
             int D = di.TypeCraft;
             float gD = VillageByPeople.GOf(di.Type);
-            double other = 0, typeBonus = 0;
+            double other = 0, typeBonus = 0, typeLoss = 0;                // 435-L3: typeLoss - rece zajecia typu bez sprzetu (klucz Village Gear; bez niedoboru 0)
             var add = new Dictionary<ItemObject, float>();
             Dictionary<int, double> kBy = null;                       // f4b recenzja: dopisek wedlug zajecia (pomiar neutralnosci - rozbicie wyniku na n zajec)
             var bySide = new Dictionary<string, Side>(StringComparer.Ordinal);
@@ -485,19 +486,28 @@ namespace Armoury
                 if (!(sh > 0)) continue;
                 double b = 0; int wc; double wb;
                 if (DistrictWorks.BonusOf(di.V, p.Main ? null : p.Uid, out wc, out wb)) b = wb; else wc = -1;
-                if (p.Main) { if (wc == D) typeBonus += sh * b; continue; }
+                // 435-L3: stosunek sprzetu czesci (1 - bez niedoboru albo klucz Village Gear wylaczony: rachunek co do bitu jak dotad); produkcja zajecia x m x (1 + b)
+                double gr = VillageGear.RatioOf(di.V, p.Main ? null : p.Uid);
+                if (p.Main)
+                {
+                    if (gr < 1.0) { double mD = VillageGear.MAt(D, gr); if (wc == D) typeBonus += sh * b * mD; typeLoss += sh * (1.0 - mD); }
+                    else if (wc == D) typeBonus += sh * b;
+                    continue;
+                }
                 Side s; if (!bySide.TryGetValue(p.Uid, out s)) continue;
                 double shr = sh;
                 CraftShares(s, (c, x) =>
                 {
                     double part = shr * x;
                     double bb = c == wc ? b : 0.0;
-                    if (c == D) { typeBonus += part * bb; return; }
+                    double gm = gr < 1.0 ? VillageGear.MAt(c, gr) : 1.0;
+                    if (c == D) { if (gm < 1.0) { typeBonus += part * bb * gm; typeLoss += part * (1.0 - gm); } else typeBonus += part * bb; return; }
                     other += part;
                     var m = meta[c];
                     if (m == null || m.Type == null) return;
                     double k0 = part * (VillageByPeople.GOf(m.Type) / Math.Max(1e-3f, gD)) * (1.0 + bb);   // f5: k bez n (n na towar mnozy kazdy towar osobno)
                     double k = part * (VillageByPeople.GOf(m.Type) / Math.Max(1e-3f, gD)) * N(c) * (1.0 + bb);
+                    if (gm < 1.0) { k0 *= gm; k *= gm; }
                     if (kBy == null) kBy = new Dictionary<int, double>();
                     double kc; kBy.TryGetValue(c, out kc); kBy[c] = kc + k;
                     for (int i = 0; i < m.Goods.Length; i++)
@@ -525,8 +535,8 @@ namespace Armoury
                     if (Math.Abs(x - 1.0) >= 1e-4) anyN = true;
                 }
             }
-            if (other <= 1e-6 && !anyN && typeBonus <= 1e-9) return null;
-            var pl = new Plan { Other = (float)Math.Min(1.0, other), NType = (float)nD, TypeBonus = (float)(typeBonus * nD), Type = di.Type, Add = add, KitchenKeep = di.Type.StringId != "wheat_farm",
+            if (other <= 1e-6 && !anyN && typeBonus <= 1e-9 && typeLoss <= 1e-9) return null;   // 435-L3: plan powstaje takze przy samym braku sprzetu (krytyka B1)
+            var pl = new Plan { TypeLoss = (float)Math.Max(0.0, Math.Min(1.0, typeLoss)), Other = (float)Math.Min(1.0, other), NType = (float)nD, TypeBonus = (float)(typeBonus * nD), Type = di.Type, Add = add, KitchenKeep = di.Type.StringId != "wheat_farm",
                                 TypeGoods = new HashSet<ItemObject>(), TypeRate = new Dictionary<ItemObject, float>(), AddK = kBy, NTypeG = ntg, TypeBonusRaw = (float)typeBonus };
             foreach (var pr in di.Type.Productions)
             {
@@ -616,7 +626,9 @@ namespace Armoury
                     bool kitchen = pl.KitchenKeep && item.StringId == "grain";
                     float nT = pl.NType, bon = pl.TypeBonus;
                     if (pl.NTypeG != null) { float xg; if (pl.NTypeG.TryGetValue(item, out xg)) nT = xg; bon = pl.TypeBonusRaw * nT; }   // f5: n tego towaru (bez - jak dotad)
-                    float F = kitchen ? 1f : (1f - pl.Other) * nT + bon;
+                    float keepT = 1f - pl.Other;
+                    if (pl.TypeLoss > 0f) keepT = Math.Max(0f, keepT - pl.TypeLoss);   // 435-L3: rece zajecia typu bez sprzetu (TypeLoss 0 - jak dotad)
+                    float F = kitchen ? 1f : keepT * nT + bon;
                     if (F < 0f) F = 0f;
                     float sum = 1f + r.SumOfFactors;
                     if (before > 0f && Math.Abs(F - 1f) > 1e-5f && sum > 0f) r.AddFactor((F - 1f) * sum, _txtType);
@@ -1542,6 +1554,8 @@ namespace Armoury
                             if (m == null || m.Type == null) return;
                             double k = pc.Share * x * M * (c == D ? 1.0 : VillageByPeople.GOf(m.Type) / Math.Max(1e-3f, gD)) * (on ? N(c) : 1.0);
                             double k0 = pgv ? pc.Share * x * M * (c == D ? 1.0 : VillageByPeople.GOf(m.Type) / Math.Max(1e-3f, gD)) : 0.0;
+                            double gm = VillageGear.MOf(v, pc.Main ? null : pc.Uid, c);   // 435-L3: wartosc dnia czesci z czynnikiem sprzetu (jak plan); bez niedoboru 1
+                            if (gm < 1.0) { k *= gm; k0 *= gm; }
                             double val = 0;
                             for (int i = 0; i < m.Goods.Length; i++)
                             {

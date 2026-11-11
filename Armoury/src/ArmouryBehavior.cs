@@ -817,6 +817,9 @@ namespace Armoury
         // 435-L2 (lancuch podazy, odblokowanie zmiany zajec): liczniki linii "LP zajecia" od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L1)
         private readonly bool _lp2Reset = Lp2Reset();
         private static bool Lp2Reset() { try { CraftUnblock.Reset(); } catch (Exception e) { Log.Error("Lp2Reset", e); } return true; }
+        // 435-L3 (lancuch podazy, sprzet wsi): stan arm_lp i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L1 i L2)
+        private readonly bool _lp3Reset = Lp3Reset();
+        private static bool Lp3Reset() { try { VillageGear.Reset(); } catch (Exception e) { Log.Error("Lp3Reset", e); } return true; }
         // m96-dlugi: ksiegi dlugow rad miast od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6-a7)
         private readonly bool _m96DlugiReset = M96DlugiReset();
         private static bool M96DlugiReset() { try { TownDebt.Reset(); } catch (Exception e) { Log.Error("M96DlugiReset", e); } return true; }
@@ -1551,6 +1554,10 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_crafts_g", e); }
             try { string po = dataStore.IsSaving ? DistrictWorks.Export() : null; SaveText.Sync(dataStore, "arm_works", ref po); if (dataStore.IsLoading) DistrictWorks.Import(po); }
             catch (Exception e) { Log.Error("SyncData.arm_works", e); }
+            // 435-L3: sprzet podstawowy wsi (arm_lp: "lp1|doba wlaczenia|doba zuzycia|czesci"); pisany tylko ze stanem; brak klucza (stary zapis, Ironman Jeffa) = stan pusty
+            // (bilans otwarcia w pierwszej dobie klucza Village Gear); starsza DLL ignoruje klucz
+            try { string lp = dataStore.IsSaving ? VillageGear.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lp)) SaveText.Sync(dataStore, "arm_lp", ref lp); if (dataStore.IsLoading) VillageGear.Import(lp); }
+            catch (Exception e) { Log.Error("SyncData.arm_lp", e); }
             // 345: ksiega kiesy gracza - 7 dob historii prognozy zlota ("g345|1|..."); pisany tylko z historia; brak klucza (stary zapis, Ironman Jeffa) = pusto; starsza DLL ignoruje klucz
             try { string pg = dataStore.IsSaving ? GoldForecast.Export() : null; if (!dataStore.IsSaving || pg != null) SaveText.Sync(dataStore, "arm_prog345", ref pg); if (dataStore.IsLoading) GoldForecast.Import(pg); }
             catch (Exception e) { Log.Error("SyncData.arm_prog345", e); }
@@ -3294,6 +3301,8 @@ namespace Armoury
             // KS (kalibracja startu): PO DailyLife.Daily (stany doby) - wynik Planu z watku roboczego, Plan co 7 dob, w stanie zastosowanym stawki wsi na jutro, regula zmiany zajec
             // (przebudowa: kiesa wsi -> kasa miasta), pola mieszczan (kasa miasta -> kiesy ludu) - wlasna pozycja "Przeplywy osad" (MKs)
             try { DistrictWorks.BeforeProduction(); } catch (Exception e) { Log.Error("DistrictWorks.BeforeProduction", e); } DayProfile.Lap("DistrictWorks.BeforeProduction");   // inwest (recenzja): b prac okregu tej doby PRZED rachunkiem KS i planem zajec (ta sama doba co wyplaty przy wozach)
+            // 435-L3 (klucz Village Gear): czynnik sprzetu m czesci okregow tej doby - PO b prac okregu (ta sama doba, to samo oznaczenie okregow do przeliczenia), PRZED rachunkiem KS i planem zajec
+            try { VillageGear.BeforeProduction(); } catch (Exception e) { Log.Error("VillageGear.BeforeProduction", e); } DayProfile.Lap("VillageGear.BeforeProduction");
             try { StartCalibration.Daily(); } catch (Exception e) { Log.Error("StartCalibration.Daily", e); } DayProfile.Lap("StartCalibration.Daily");
             try { MoneyLedger.Probe169("StartCalibration.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             // inwest (noc 17/18.10): PO KS (bloki KS doby) - zajecia wiosek bez KS (plany produkcji, przebudowy: kiesa wsi -> kasa miasta), ikona okregu (co 28 dob), prace okregu

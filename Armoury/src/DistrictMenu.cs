@@ -93,6 +93,9 @@ namespace Armoury
                 // inwest (ui_text 4): produkcja okregu wedlug zajec, glowny towar i prace gracza (null - nic)
                 try { string po = DistrictWorks.HeadText(st); if (!string.IsNullOrEmpty(po)) head = (head ?? "") + "\n" + po; }
                 catch (Exception e) { Stumble("Works " + st.StringId, e); }
+                // 435-L3 (klucz Village Gear): linia informacyjna o sprzecie rak okregu (null - klucz wylaczony albo okreg bez drogi produkcji)
+                try { string lp = VillageGear.HeadText(st); if (!string.IsNullOrEmpty(lp)) head = (head ?? "") + "\n" + lp; }
+                catch (Exception e) { Stumble("Gear " + st.StringId, e); }
                 _dOpen++;
                 if (rows.Count > _dRowsMax) _dRowsMax = rows.Count;
                 string title = VillageTexts.Make(VillageTexts.DistTitle, "DISTRICT", name ?? "?").ToString();

@@ -233,6 +233,9 @@ namespace Armoury
                         pv.Mix[c] += lb.X[j] * lb.Hands;
                         Array.Clear(tmp, 0, tmp.Length);
                         BlockCraftKg(ld.K, lb, j, type, tmp);
+                        // 435-L3: wartosc dnia czesci z czynnikiem sprzetu m (wyplaty prac licza E z b i tej wartosci); bez niedoboru - 1 (jak dotad)
+                        double gmv = VillageGear.MOf(ld.V, lb.K.Main ? null : (lb.Uid ?? lb.K.Uid), c);
+                        if (gmv < 1.0) for (int i = 0; i < ItemCount; i++) tmp[i] *= gmv;
                         double val = 0;
                         for (int i = 0; i < ItemCount; i++) { if (tmp[i] <= 0) continue; pv.Kg[i] += tmp[i]; val += tmp[i] * ValKgItem(i); }
                         pv.CraftVal[c] += val;
@@ -287,6 +290,43 @@ namespace Armoury
             }
         }
 
+        // ------------------------------------------------------------ 435-L3: czynnik sprzetu wsi pod KS
+        /// <summary>ComputeDistrict (zaraz po KsDeliver.Produce, tylko gra): rece bez sprzetu pracuja z wydajnoscia phi - z produkcji okregu schodzi (1 - m) x kg zajecia
+        /// kazdego bloku czesci z niedoborem sprzetu (ten sam wzor kg co Produce - BlockCraftKg; zboze wlasne, praca domowa i regale bez zmian). Okreg bez niedoboru
+        /// (albo klucz Village Gear wylaczony) - nic, co do bitu jak dotad. Nie rzuca.</summary>
+        private static void GearKs(LiveDist ld, double[] prod)
+        {
+            if (ld == null || ld.TF || ld.V == null || ld.B == null || ld.K == null || prod == null || !VillageGear.Any(ld.V)) return;
+            try
+            {
+                string type = ld.K.Type;
+                var tmp = new double[ItemCount];
+                double kg = 0;
+                foreach (var lb in ld.B)
+                {
+                    if (lb == null || lb.K == null || lb.C == null || lb.X == null) continue;
+                    string puid = lb.K.Main ? null : (lb.Uid ?? lb.K.Uid);
+                    double ratio = VillageGear.RatioOf(ld.V, puid);
+                    if (!(ratio < 1.0)) continue;
+                    for (int j = 0; j < lb.C.Length; j++)
+                    {
+                        double m = VillageGear.MAt(lb.C[j], ratio);
+                        if (!(m < 1.0)) continue;
+                        Array.Clear(tmp, 0, tmp.Length);
+                        BlockCraftKg(ld.K, lb, j, type, tmp);
+                        for (int i = 0; i < ItemCount; i++)
+                        {
+                            if (!(tmp[i] > 0)) continue;
+                            double cut = Math.Min(prod[i], (1.0 - m) * tmp[i]);
+                            if (cut > 0) { prod[i] -= cut; kg += cut; }
+                        }
+                    }
+                }
+                VillageGear.NoteKs(kg);
+            }
+            catch (Exception e) { Stumble("GearKs", e); }
+        }
+
         // ------------------------------------------------------------ prace okregu pod KS (dodatek produkcji czesci)
         private static long _wkCalls, _wkParts; private static double _wkKg;
 
@@ -318,7 +358,10 @@ namespace Armoury
                         if (lb.C[j] != craft && !(KsTab.Crafts[lb.C[j]] == "cattle_farm:maslo" && KsTab.Crafts[craft] == "cattle_farm")) continue;
                         Array.Clear(tmp, 0, tmp.Length);
                         BlockCraftKg(ld.K, lb, j, type, tmp);
-                        for (int i = 0; i < ItemCount; i++) if (tmp[i] > 0) { extra[i] += b * tmp[i]; pe[i] += b * tmp[i]; }
+                        // 435-L3: dodatek prac mnozy produkcje zajecia PO czynniku sprzetu (produkcja = dotychczasowa x m x (1 + b)); bez niedoboru bb = b (jak dotad)
+                        double gmw = VillageGear.MOf(ld.V, puid, lb.C[j]);
+                        double bb = gmw < 1.0 ? b * gmw : b;
+                        for (int i = 0; i < ItemCount; i++) if (tmp[i] > 0) { extra[i] += bb * tmp[i]; pe[i] += bb * tmp[i]; }
                     }
                     _wkParts++;
                 }

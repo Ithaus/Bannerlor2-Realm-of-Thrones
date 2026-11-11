@@ -382,6 +382,7 @@ namespace Armoury
             var res = new DistResult();
             var prod = res.Prod;
             KsDeliver.Produce(d, ld.B, prod);
+            if (factors && !ld.TF) GearKs(ld, prod);        // 435-L3: czynnik sprzetu m zajec czesci (rece bez sprzetu) - tylko gra, przed stadem, zamowieniami i pracami okregu; klucz NIE - nic
             if (factors && !ld.TF) HerdKs(ld, prod, kgT);   // R3-06c (p5-stada, recenzja): stado wsi PRZED pracami okregu (stado prac pedzi DistrictWorks) - tylko gra; StartCalibration.Stada.cs
             bool ord = factors && !ld.TF && OrderKs(ld, prod, kgT);   // 363: rece z pola na zamowienie materialu (wies-wytworca) - przed pracami okregu i czynnikami; tylko gra
             Dictionary<string, double[]> wPart = null;
