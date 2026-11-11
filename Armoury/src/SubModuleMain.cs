@@ -405,6 +405,7 @@ namespace Armoury
                 NorthConquest.SetHarmony(_harmony);  // 326b po recenzji: tylko zapamietanie - weto oblezen Polnocy (mysl AI, BK) wpina SessionStart w kampanii
                 FolkAidLoyalty.SetHarmony(_harmony); // P1b: tylko zapamietanie - latka na czynny model lojalnosci w kampanii (CLAUDE.md 7)
                 WorldTime7.SetHarmony(_harmony);     // E7/K (226): tylko zapamietanie - latki turniejow, sojuszy i rozejmu gry w kampanii
+                StoryGuardHeadsman.SetHarmony(_harmony); // 397: tylko zapamietanie - latki kata gracza (ekran druzyny, rozmowa po bitwie) w kampanii
                 DebtLadder.SetHarmony(_harmony);    // 168: tylko zapamietanie - latki modelu finansow (portfele) i BK (B5) w kampanii
                 CouncilWages35.SetHarmony(_harmony); // 3.5: tylko zapamietanie - latki BK (rada: platnik i urzad radnego) w kampanii
                 FiefGrants.SetHarmony(_harmony);     // PROJEKT-LENNA (14.10): tylko zapamietanie - latki modelu BK / BKROT i decyzji "Owner of X" w kampanii

@@ -2555,6 +2555,7 @@ namespace Armoury
             try { StateHygiene.SessionStart(); } catch (Exception e) { Log.Error("StateHygiene.SessionStart", e); }   // E8/S (246): linia startowa "Porzadek stanu (E8/S)" - ile klas wyzerowal konstruktor tej kampanii i co zostalo w pamieci po poprzedniej (tylko log)
             try { Seal31.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31.EnsureHooks", e); }   // 3.1 (31): latki w kampanii (portfele wezwan, modele karawan, DTE) - PO CrownCallToWar i oknach ksiegi
             try { StoryGuard.SessionStart(); } catch (Exception e) { Log.Error("StoryGuard.SessionStart", e); }   // 396: straz fabuly - pamiec od zera (lista budowana leniwie, linia startu przy pierwszym przeliczeniu)
+            try { StoryGuardHeadsman.SessionStart(); } catch (Exception e) { Log.Error("StoryGuardHeadsman.SessionStart", e); }   // 397: kat gracza odprawiony - 3 latki w kampanii (raz na proces), linia startu "latki N/3"
             try { SiegePhantomLift.SessionStart(); } catch (Exception e) { Log.Error("SiegePhantomLift.SessionStart", e); }   // OB6 (noc-drobne): linia "Oboz bez sily (OB6): start sesji", pamiec serii od zera
             try { SiegeWalls.SessionStart(); } catch (Exception e) { Log.Error("SiegeWalls.SessionStart", e); }   // mury oblezen: linia startowa (modele, latki, wlasciciele latek Harmony) - PO Seal31.EnsureHooks
             try { DebtLadder.EnsureHooks(); } catch (Exception e) { Log.Error("DebtLadder.EnsureHooks", e); }   // 168: portfele gry bez zaliczki (OBIEG-1), B5 (karawany i warsztaty BK) - latki w kampanii
