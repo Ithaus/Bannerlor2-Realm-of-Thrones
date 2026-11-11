@@ -36,6 +36,17 @@ namespace Armoury
     /// Koniec przebiegu: rzut zgonu tylko LICZONY ("umarlby") - w 402 NIKT z bohaterow nie umiera (zgony = 404, przez HeroFate/StoryGuard);
     /// potem odpornosc 30 dob.
     ///
+    /// 404 (DungeonFate 2): ZGONY BOHATEROW i KURIER ODPRAWIONY. Koniec przebiegu choroby: rzut zgonu = Dungeon Hero Death Share Percent
+    /// (wiek >= 60: x2) x (1 - MedicCut gubernatora). Trafiony przy Dungeon Hero Deaths TAK -> bramki lochu (StoryGuard.Ready, sufit Dungeon
+    /// Hero Deaths Per Week na loch na 7 dob), potem JEDNO API smierci: HeroFate.TryKill(h, Murdered, "dungeon", null, false) - tam straz fabuly,
+    /// CanHeroDie, dziecko, wladca, ostatni z rodu, sufit roku LordToll, odroczenie (bitwa, misja, rozmowa, gracz w menu lochu). Kazda odmowa i
+    /// kazde odroczenie -> stan "gravely ill": przebieg +5 dob BEZ drugiego rzutu, potem zdrowieje (nigdy petla smierci); powod liczony w linii doby.
+    /// Zgon: relacja gracza z glowa rodu ofiary -30 i z wladca jej frakcji -5 (po jednym wywolaniu), zloto ofiary do glowy rodu droga gry.
+    /// Grozba rodu: przy zachorowaniu glowy rodu / czlonka rodu panujacego jeden komunikat (raz na niewole jenca).
+    /// Kurier: przelacznik w menu lochu per osada (klucz Ransom Courier Standing Refusal); bramka CourierRefused w Ransom178.ConsiderPrefix.
+    /// Zapis dalej "v1": wiersz S ma pola 8-9 (odmowa kuriera, doby zgonow bohaterow), wiersz H pole 8 (gravely ill), nowe wiersze "T|bohater"
+    /// (grozba wyslana) - zapis 402 czyta sie bez zmian (brak pol = puste).
+    ///
     /// Zapis "arm_dungeon" v1 (brak klucza w starym zapisie = pusto). Reset w konstruktorze ArmouryBehavior i w OnGameEnd.
     /// Potkniecia liczone per miejsce - nic sie nie gasi.
     /// </summary>
@@ -46,13 +57,18 @@ namespace Armoury
         private const int BelowDaysToClear = 3;  // doby z rzedu ponizej progu - goraczka wygasa
         private const int CrowdWarnEvery = 30;   // ostrzezenie o tloku najwyzej raz na tyle dob na loch
         private const int DeadMsgEvery = 7;      // komunikat o zmarlych szeregowych najwyzej raz na tyle dob na loch
+        private const int GraveExtraDays = 5;    // 404: "gravely ill" - przebieg przedluzony o tyle dob, potem zdrowieje (bez drugiego rzutu)
+        private const int DeathWindowDays = 7;   // 404: okno sufitu zgonow bohaterow na loch
+        private const int KinRelation = -30, RulerRelation = -5;   // 404: relacja gracza z glowa rodu ofiary / wladca jej frakcji po zgonie w lochu
         private const string OptTown = "arm402_dungeon_state_town", OptCastle = "arm402_dungeon_state_castle";
+        private const string OptCourierTown = "arm404_dungeon_courier_town", OptCourierCastle = "arm404_dungeon_courier_castle";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private sealed class HRow
         {
             public string Id, St;        // bohater, osada lochu (dla chorego)
             public bool Sick;            // true = choruje; false = sama odpornosc
+            public bool Grave;           // 404: "gravely ill" - smierc odmowiona / odroczona, przebieg przedluzony; na koncu zdrowieje bez rzutu
             public int Day, End, Immune; // doba zachorowania, koniec przebiegu, odpornosc do (doba)
         }
 
@@ -63,16 +79,23 @@ namespace Armoury
             public bool Fever;                // goraczka ogloszona w tym epizodzie tloku
             public int DeadAcc;               // zmarli szeregowi od ostatniego komunikatu
             public int DeadMsgDay = -100000;  // doba ostatniego komunikatu o zmarlych
+            public bool NoCourier;            // 404: kurierzy z okupem odprawiani w tym lochu (przelacznik gracza)
+            public List<int> HeroDeaths;      // 404: doby zgonow bohaterow w tym lochu (tylko ostatnie DeathWindowDays) - sufit na tydzien
         }
 
         private static readonly Dictionary<string, HRow> _rows = new Dictionary<string, HRow>(StringComparer.Ordinal);
         private static readonly Dictionary<string, SRec> _recs = new Dictionary<string, SRec>(StringComparer.Ordinal);
         private static readonly List<string> _tmp = new List<string>();
+        private static readonly List<string> _die = new List<string>();     // 404: trafieni rzutem zgonu w tej dobie lochu (wykonanie PO petli rosteru)
+        private static readonly HashSet<string> _threat = new HashSet<string>(StringComparer.Ordinal);   // 404: jency, o ktorych rod juz przyslal grozbe (raz na niewole)
+        private static int _noCourier;   // 404: liczba lochow z odprawianym kurierem (szybkie wyjscie CourierRefused)
         private static readonly HashSet<string> _present = new HashSet<string>(StringComparer.Ordinal);
         private static readonly HashSet<string> _err = new HashSet<string>(StringComparer.Ordinal);
         // linia doby (tylko sesja)
         private static readonly StringBuilder _frag = new StringBuilder(256);
         private static int _dEsc, _dRansom, _dAiOver, _dStumbles, _dBattle, _dGone, _dWould, _dRegDead, _dNewSick, _dHealed;
+        // 404: zgony bohaterow i powody wstrzymania (linia doby)
+        private static int _dHeroDead, _dGrave, _hStory, _hRuler, _hLast, _hCanDie, _hCeil, _hBattle, _hPlayer, _hOther, _dCourier;
         private static int _stumbles;
         private static string _hookMenu = "-";
 
@@ -82,7 +105,9 @@ namespace Armoury
         internal static void Reset()
         {
             _rows.Clear(); _recs.Clear(); _tmp.Clear(); _present.Clear(); _err.Clear(); _frag.Length = 0;
+            _die.Clear(); _threat.Clear(); _noCourier = 0;
             _dEsc = _dRansom = _dAiOver = _dStumbles = _dBattle = _dGone = _dWould = _dRegDead = _dNewSick = _dHealed = 0;
+            _dHeroDead = _dGrave = _hStory = _hRuler = _hLast = _hCanDie = _hCeil = _hBattle = _hPlayer = _hOther = _dCourier = 0;
             _stumbles = 0;
         }
 
@@ -115,6 +140,46 @@ namespace Armoury
             return _rows.Count != 0 && h != null && h.StringId != null && _rows.TryGetValue(h.StringId, out r) && r.Sick;
         }
 
+        /// <summary>404: bramka kuriera (Ransom178.ConsiderPrefix, obok HoldCourier): true = jeniec siedzi w lochu osady rodu gracza, w ktorym gracz
+        /// kazal odprawiac kurierow z okupem. Jeniec z rodu gracza nigdy. Bez odprawianych lochow - wyjscie na pierwszym porownaniu. Nie rzuca.</summary>
+        internal static bool CourierRefused(Hero h)
+        {
+            try
+            {
+                if (_noCourier == 0 || h == null || h == Hero.MainHero || h.Clan == null || h.Clan == Clan.PlayerClan) return false;
+                var s = Settings.Current;
+                if (s == null || !s.RansomCourierStandingRefusal) return false;
+                var cap = h.PartyBelongedToAsPrisoner;
+                var st = cap != null && cap.IsSettlement ? cap.Settlement : null;
+                if (!Mine(st) || st.StringId == null) return false;
+                SRec r;
+                if (!_recs.TryGetValue(st.StringId, out r) || !r.NoCourier) return false;
+                _dCourier++;
+                return true;
+            }
+            catch (Exception e) { Stumble("CourierRefused", e); return false; }
+        }
+
+        private static void CountNoCourier() { int n = 0; foreach (var r in _recs.Values) if (r.NoCourier) n++; _noCourier = n; }
+
+        /// <summary>404: zgony bohaterow w tym lochu w ostatnich DeathWindowDays dobach (stare doby wypadaja z listy).</summary>
+        private static int WeekDeaths(SRec rec, int day)
+        {
+            if (rec.HeroDeaths == null) return 0;
+            rec.HeroDeaths.RemoveAll(d => day - d >= DeathWindowDays || d > day);
+            return rec.HeroDeaths.Count;
+        }
+
+        private static Hero FindHero(TroopRoster pr, string heroId)
+        {
+            for (int k = 0; k < pr.Count; k++)
+            {
+                var ch = pr.GetCharacterAtIndex(k);
+                if (ch != null && ch.IsHero && ch.HeroObject != null && ch.HeroObject.StringId == heroId) return ch.HeroObject;
+            }
+            return null;
+        }
+
         private static int SickIn(string stId)
         {
             int n = 0;
@@ -136,6 +201,7 @@ namespace Armoury
                     else if (detail == EndCaptivityDetail.Ransom) _dRansom++;
                 }
                 Drop(h, false);
+                if (_threat.Count != 0 && h.StringId != null) _threat.Remove(h.StringId);   // 404: koniec niewoli - nastepna niewola moze dostac nowa grozbe
             }
             catch (Exception e) { Stumble("OnReleased", e); }
         }
@@ -143,7 +209,11 @@ namespace Armoury
         /// <summary>CampaignEvents.HeroKilledEvent: wpis zmarlego znika (takze odpornosc). Nie rzuca.</summary>
         internal static void OnKilled(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool notify)
         {
-            try { Drop(victim, true); }
+            try
+            {
+                Drop(victim, true);
+                if (_threat.Count != 0 && victim != null && victim.StringId != null) _threat.Remove(victim.StringId);
+            }
             catch (Exception e) { Stumble("OnKilled", e); }
         }
 
@@ -289,17 +359,34 @@ namespace Armoury
                         }
                         if (day >= row.End)
                         {
-                            // koniec przebiegu: rzut zgonu tylko LICZONY (402 nikogo nie zabija; zgony = 404 przez HeroFate / StoryGuard)
-                            float p = CampFever.DeathShare() * (h.Age >= 60f ? 2f : 1f) * (1f - cut);
+                            if (row.Grave)
+                            {
+                                // 404: "gravely ill" dobiegl konca - zdrowieje BEZ drugiego rzutu (nigdy petla smierci)
+                                row.Sick = false; row.Grave = false; row.Immune = day + ImmuneDays; hHealed++;
+                                Log.Info(Tag + ": " + Nm(h) + " [" + h.StringId + "] w lochu " + id + " - wyszedl z ciezkiej goraczki po " + (day - row.Day) + " dobach (bez rzutu) | odpornosc do doby " + row.Immune + ".");
+                                if (warn) Log.Player(Nm(h) + " has recovered from the fever.");
+                                continue;
+                            }
+                            // koniec przebiegu: rzut zgonu (404). Trafiony przy wlaczonych zgonach idzie na liste - wykonanie PO petli (smierc zdejmuje jenca z rosteru).
+                            bool elig = Eligible(h);   // zakladnik 385c / rana Grave / rod gracza nabyte w trakcie choroby: bez rzutu
+                            float p = MathF.Clamp(Math.Max(0f, s.DungeonHeroDeathSharePercent) / 100f * (h.Age >= 60f ? 2f : 1f) * (1f - cut), 0f, 1f);
                             float roll = MBRandom.RandomFloat;
-                            bool would = roll < p;
+                            bool would = elig && roll < p;
+                            if (would && s.DungeonHeroDeaths)
+                            {
+                                _die.Add(h.StringId);
+                                Log.Info(Tag + ": " + Nm(h) + " [" + h.StringId + "] w lochu " + id + " - koniec goraczki po " + (day - row.Day) + " dobach, rzut " + roll.ToString("0.00", Inv)
+                                         + " przy p " + p.ToString("0.00", Inv) + " (wiek " + ((int)h.Age) + ", medyk -" + (cut * 100f).ToString("0", Inv) + "%) -> TRAFIONY, pytam bramki.");
+                                hSick++;
+                                continue;
+                            }
                             if (would) hWould++;
                             row.Sick = false; row.Immune = day + ImmuneDays; hHealed++;
                             string why = null; int guard = 0;
                             try { guard = StoryGuard.State(h, out why); } catch { guard = 0; }
                             Log.Info(Tag + ": " + Nm(h) + " [" + h.StringId + "] w lochu " + id + " - koniec goraczki po " + (day - row.Day) + " dobach, rzut " + roll.ToString("0.00", Inv)
-                                     + " przy p " + p.ToString("0.00", Inv) + " -> " + (would ? "UMARLBY (402 nie zabija)" : "przezyl") + " | straz fabuly: " + (guard == 2 ? "tak (" + why + ")" : "nie")
-                                     + " | odpornosc do doby " + row.Immune + ".");
+                                     + " przy p " + p.ToString("0.00", Inv) + " -> " + (would ? "UMARLBY (Dungeon Hero Deaths NIE)" : elig ? "przezyl" : "przezyl (bez rzutu: zakladnik / rana Grave / rod gracza)")
+                                     + " | straz fabuly: " + (guard == 2 ? "tak (" + why + ")" : "nie") + " | odpornosc do doby " + row.Immune + ".");
                             if (warn) Log.Player(Nm(h) + " has recovered from the fever.");
                             continue;
                         }
@@ -314,16 +401,59 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Hero", e); }
             }
+            // 404: trafieni rzutem zgonu - bramki lochu, potem jedno API smierci (HeroFate.TryKill). Poza petla rosteru: smierc zdejmuje jenca z listy,
+            // a HeroKilledEvent wola nasz OnKilled (wpis znika) - tu nie iterujemy ani rosteru, ani _rows.
+            int hDead = 0, hGrave = 0;
+            for (int i = 0; i < _die.Count; i++)
+            {
+                try
+                {
+                    string hid = _die[i];
+                    Hero h = FindHero(pr, hid);
+                    HRow row;
+                    if (h == null || !_rows.TryGetValue(hid, out row) || !row.Sick) continue;
+                    string why;
+                    bool killed = false;
+                    Clan clan = h.Clan;
+                    string name = Nm(h), clanName = clan != null && clan.Name != null ? clan.Name.ToString() : "?";
+                    Hero ruler = null;
+                    try { ruler = clan != null && clan.Kingdom != null ? clan.Kingdom.Leader : null; } catch { ruler = null; }
+                    int cap = Math.Max(0, s.DungeonHeroDeathsPerWeek), week = WeekDeaths(rec, day);
+                    if (!StoryGuard.Ready) { why = "straz fabuly niegotowa (Story Guard wylaczony albo lista wydarzen ROT niewidoczna)"; _hStory++; }
+                    else if (week >= cap) { why = "sufit lochu (" + week + "/" + cap + " na " + DeathWindowDays + " dob)"; _hCeil++; }
+                    else
+                    {
+                        var fate = HeroFate.TryKill(h, KillCharacterAction.KillCharacterActionDetail.Murdered, LordToll.Dungeon, null, false, out why);
+                        killed = fate == HeroFate.Fate.Killed;
+                        if (!killed) CountHold(fate, why);
+                    }
+                    if (killed)
+                    {
+                        hDead++; hSick--;
+                        if (rec.HeroDeaths == null) rec.HeroDeaths = new List<int>(2);
+                        rec.HeroDeaths.Add(day);
+                        _rows.Remove(hid); _threat.Remove(hid);   // OnKilled juz to zrobil; drugi raz nie szkodzi (takze przy znaku smierci zamiast smierci)
+                        string rel = AfterDeath(h, clan, ruler);
+                        Log.Info(Tag + ": " + name + " [" + hid + "] ZMARL od goraczki w lochu " + id + " (" + why + ") | rod " + clanName + " | relacje: " + rel
+                                 + " | zgony boh. w tym lochu w " + DeathWindowDays + " dobach " + rec.HeroDeaths.Count + "/" + cap + " | LordToll rok " + LordToll.Year + ": loch " + LordToll.Count(LordToll.Dungeon) + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll + ".");
+                        Log.Player(name + " has died of fever in your dungeon at " + Nm(st) + ". House " + clanName + " will not forget it.", true);   // zawsze (takze przy Dungeon Warnings NIE): smierc jenca gracza
+                        continue;
+                    }
+                    // odmowa / odroczenie: "gravely ill" - przebieg +5 dob, potem zdrowieje bez rzutu
+                    row.Grave = true; row.End = day + GraveExtraDays; hGrave++;
+                    Log.Info(Tag + ": " + name + " [" + hid + "] w lochu " + id + " - smierc WSTRZYMANA: " + (why ?? "?") + " -> ciezko chory do doby " + row.End + ", potem zdrowieje (bez drugiego rzutu).");
+                    if (warn) Log.Player(name + " lies gravely ill in your dungeon at " + Nm(st) + ".", true);
+                }
+                catch (Exception e) { Stumble("HeroDeath", e); }
+            }
+            _die.Clear();
+            _dHeroDead += hDead; _dGrave += hGrave;
+
             for (int i = 0; i < _tmp.Count; i++)
             {
                 try
                 {
-                    Hero h = null;
-                    for (int k = 0; k < pr.Count; k++)
-                    {
-                        var ch = pr.GetCharacterAtIndex(k);
-                        if (ch != null && ch.IsHero && ch.HeroObject != null && ch.HeroObject.StringId == _tmp[i]) { h = ch.HeroObject; break; }
-                    }
+                    Hero h = FindHero(pr, _tmp[i]);
                     if (h == null) continue;
                     int days = Math.Max(1, s.DungeonSickDays);
                     _rows[h.StringId] = new HRow { Id = h.StringId, St = id, Sick = true, Day = day, End = day + days, Immune = 0 };
@@ -335,6 +465,7 @@ namespace Armoury
                     Log.Info(Tag + ": " + Nm(h) + " [" + h.StringId + "] zachorowal w lochu " + id + " (wiek " + ((int)h.Age) + ", nacisk " + c.ToString("0.00", Inv) + ", mnoznik " + mult.ToString("0.00", Inv)
                              + "), przebieg do doby " + (day + days) + " | straz fabuly: " + (guard == 2 ? "tak (" + why + ")" : "nie") + ".");
                     if (warn) Log.Player(Nm(h) + " has fallen ill in your dungeon at " + Nm(st) + ".", true);
+                    Threat(s, h, id);
                 }
                 catch (Exception e) { Stumble("HeroSick", e); }
             }
@@ -366,7 +497,76 @@ namespace Armoury
             if (total > 0 || hHealed > 0)
                 Frag(id + ": jency " + total + "/" + limit + " (boh. " + heroes + ", szer. " + regulars + ", ranni " + wounded + "), nacisk " + c.ToString("0.00", Inv)
                      + " (zima " + winter.ToString("0.00", Inv) + ", oblezenie " + (siege == null ? "nie" : siegeFever ? "zaraza" : "tak") + ", trupy " + corpse.ToString("0.00", Inv) + ", medyk -" + (cut * 100f).ToString("0", Inv) + "%)"
-                     + ", chorych boh. " + hSick + " (+" + hNew + ", zdrowi " + hHealed + "), szer. chorzy " + sick + ", zgony szer. " + dead + ", umarlby " + hWould);
+                     + ", chorych boh. " + hSick + " (+" + hNew + ", zdrowi " + hHealed + "), szer. chorzy " + sick + ", zgony szer. " + dead + ", zgony boh. " + hDead + ", ciezko chorzy (smierc wstrzymana) +" + hGrave
+                     + ", umarlby " + hWould + (rec.NoCourier ? ", kurier odprawiany" : ""));
+        }
+
+        /// <summary>404: powod wstrzymania smierci (napis HeroFate.TryKill / StoryGuard.MayDie) do licznikow linii doby.</summary>
+        private static void CountHold(HeroFate.Fate fate, string why)
+        {
+            string w = why ?? "";
+            if (fate == HeroFate.Fate.Deferred)
+            {
+                if (w.IndexOf("bitwa", StringComparison.Ordinal) >= 0 || w.IndexOf("oblez", StringComparison.Ordinal) >= 0) _hBattle++;
+                else _hPlayer++;   // misja, rozmowa, spotkanie gracza, gracz w menu lochu, blad oceny
+                return;
+            }
+            if (w.StartsWith("straz fabuly", StringComparison.Ordinal)) _hStory++;
+            else if (w.IndexOf("(wladca)", StringComparison.Ordinal) >= 0) _hRuler++;
+            else if (w.IndexOf("(ostatni z rodu)", StringComparison.Ordinal) >= 0) _hLast++;
+            else if (w.IndexOf("CanHeroDie", StringComparison.Ordinal) >= 0) _hCanDie++;
+            else if (w.StartsWith("sufit roku", StringComparison.Ordinal)) _hCeil++;
+            else _hOther++;
+        }
+
+        /// <summary>404: skutki zgonu jenca w lochu gracza - relacja gracza z glowa rodu ofiary (-30) i z wladca jej frakcji (-5), po jednym wywolaniu,
+        /// bez petli po przyjaciolach i bez Honoru. Glowa rodu czytana PO smierci (gra wybrala juz nastepce, gdy zmarl wodz rodu). Zwraca opis do logu.</summary>
+        private static string AfterDeath(Hero victim, Clan clan, Hero rulerBefore)
+        {
+            var sb = new StringBuilder(96);
+            try
+            {
+                Hero head = clan != null && !clan.IsEliminated ? clan.Leader : null;
+                if (head != null && head != victim && head.IsAlive && head != Hero.MainHero)
+                {
+                    int before = (int)head.GetRelationWithPlayer();
+                    ChangeRelationAction.ApplyPlayerRelation(head, KinRelation, false, true);
+                    sb.Append("glowa rodu ").Append(Nm(head)).Append(' ').Append(before).Append("->").Append((int)head.GetRelationWithPlayer());
+                }
+                else sb.Append("glowa rodu - brak (rod bez zywej glowy)");
+                Hero ruler = null;
+                try { ruler = clan != null && !clan.IsEliminated && clan.Kingdom != null ? clan.Kingdom.Leader : null; } catch { ruler = null; }
+                if (ruler == null || ruler == victim || !ruler.IsAlive) ruler = rulerBefore;
+                if (ruler != null && ruler != victim && ruler.IsAlive && ruler != head && ruler != Hero.MainHero)
+                {
+                    int before = (int)ruler.GetRelationWithPlayer();
+                    ChangeRelationAction.ApplyPlayerRelation(ruler, RulerRelation, false, false);
+                    sb.Append(", wladca ").Append(Nm(ruler)).Append(' ').Append(before).Append("->").Append((int)ruler.GetRelationWithPlayer());
+                }
+                else sb.Append(", wladca - brak / ten sam co glowa rodu");
+            }
+            catch (Exception e) { Stumble("AfterDeath", e); sb.Append(" (blad - patrz log bledow)"); }
+            return sb.ToString();
+        }
+
+        /// <summary>404: grozba rodu - przy zachorowaniu glowy rodu albo czlonka rodu panujacego jeden komunikat (raz na niewole jenca).
+        /// Sam komunikat; skutkiem jest kara relacji przy zgonie (AfterDeath). Nie rzuca.</summary>
+        private static void Threat(Settings s, Hero h, string stId)
+        {
+            try
+            {
+                if (s == null || !s.DungeonHeroDeaths || !s.DungeonWarnings || h == null || h.StringId == null) return;
+                var clan = h.Clan;
+                if (clan == null || clan == Clan.PlayerClan || clan.IsEliminated) return;
+                bool head = clan.Leader == h;
+                bool royal = clan.Kingdom != null && clan.Kingdom.RulingClan == clan;
+                if (!head && !royal) return;
+                if (!_threat.Add(h.StringId)) return;
+                string cn = clan.Name != null ? clan.Name.ToString() : "?";
+                Log.Player("House " + cn + " sends word: if " + Nm(h) + " dies in your cells, there will be no friendship between us.", true);
+                Log.Info(Tag + ": grozba rodu " + cn + " za " + Nm(h) + " [" + h.StringId + "] w lochu " + stId + " (" + (head ? "glowa rodu" : "rod panujacy") + ").");
+            }
+            catch (Exception e) { Stumble("Threat", e); }
         }
 
         private static void Frag(string t)
@@ -475,14 +675,17 @@ namespace Armoury
                         if (!Mine(st)) _tmp.Add(kv.Key);
                     }
                     for (int i = 0; i < _tmp.Count; i++) _recs.Remove(_tmp[i]);
+                    if (_tmp.Count > 0) CountNoCourier();   // utracona twierdza: odmowa kuriera znika razem z rekordem
                     _tmp.Clear();
                 }
 
-                if (s.DungeonSickness && (_frag.Length > 0 || _dEsc + _dRansom + _dAiOver + _dStumbles + _dGone > 0))
+                if ((s.DungeonSickness && (_frag.Length > 0 || _dEsc + _dRansom + _dAiOver + _dStumbles + _dGone > 0)) || _dCourier > 0)
                     Log.Info(Tag + ": doba " + day + " | " + (_frag.Length > 0 ? _frag.ToString() : "lochy rodu gracza puste")
                              + " | razem: nowi chorzy boh. " + _dNewSick + ", zdrowi " + _dHealed + ", umarlby " + _dWould + ", zgony szer. " + _dRegDead + ", wpisy zdjete (uwolnieni / przeniesieni) " + _dGone
                              + ", lochy w bitwie " + _dBattle
-                             + " | ucieczki z lochow gracza dzis " + _dEsc + ", okupy " + _dRansom
+                             + " | zgony boh. " + _dHeroDead + " (LordToll rok " + LordToll.Year + ": loch " + LordToll.Count(LordToll.Dungeon) + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll + "), ciezko chorzy +" + _dGrave
+                             + " | wstrzymane: fabula " + _hStory + ", wladca " + _hRuler + ", ostatni z rodu " + _hLast + ", CanHeroDie " + _hCanDie + ", sufit " + _hCeil + ", bitwa " + _hBattle + ", gracz na miejscu " + _hPlayer + ", inne " + _hOther
+                             + " | ucieczki z lochow gracza dzis " + _dEsc + ", okupy " + _dRansom + ", kurier odprawiony " + _dCourier + " (jencow-dob; lochy z odmowa " + _noCourier + ")"
                              + " | lochy AI ponad prog: " + _dAiOver
                              + " | ksiega: chorych " + CountSick() + ", odpornych " + (_rows.Count - CountSick())
                              + " | potkniecia " + _dStumbles + " (sesja " + _stumbles + ").");
@@ -490,6 +693,7 @@ namespace Armoury
             catch (Exception e) { Stumble("DailyLine", e); }
             _frag.Length = 0;
             _dEsc = _dRansom = _dAiOver = _dStumbles = _dBattle = _dGone = _dWould = _dRegDead = _dNewSick = _dHealed = 0;
+            _dHeroDead = _dGrave = _hStory = _hRuler = _hLast = _hCanDie = _hCeil = _hBattle = _hPlayer = _hOther = _dCourier = 0;
         }
 
         private static int CountSick() { int n = 0; foreach (var r in _rows.Values) if (r.Sick) n++; return n; }
@@ -502,9 +706,11 @@ namespace Armoury
             int added = 0;
             try
             {
-                added += AddLine(starter, "town_keep_dungeon", OptTown) ? 1 : 0;
-                added += AddLine(starter, "castle_dungeon", OptCastle) ? 1 : 0;
-                _hookMenu = added + "/2";
+                added += AddLine(starter, "town_keep_dungeon", OptTown, "{=!}{ARM_DF_STATE}", StateCondition, StateConsequence) ? 1 : 0;
+                added += AddLine(starter, "castle_dungeon", OptCastle, "{=!}{ARM_DF_STATE}", StateCondition, StateConsequence) ? 1 : 0;
+                added += AddLine(starter, "town_keep_dungeon", OptCourierTown, "{=!}{ARM_DF_COURIER}", CourierCondition, CourierConsequence) ? 1 : 0;   // 404: przelacznik kuriera (po linii stanu, przed "Back")
+                added += AddLine(starter, "castle_dungeon", OptCourierCastle, "{=!}{ARM_DF_COURIER}", CourierCondition, CourierConsequence) ? 1 : 0;
+                _hookMenu = added + "/4";
             }
             catch (Exception e) { _hookMenu = "BRAK (blad: " + e.Message + ")"; Stumble("AddMenus", e); }
             try
@@ -517,13 +723,17 @@ namespace Armoury
                 Log.Info(Tag + " (402): start sesji | klucze: choroba " + YN(s != null && s.DungeonSickness) + ", prog tloku " + (s != null ? From(s).ToString("0.00", Inv) : "-")
                          + ", szeregowi " + (s != null ? s.DungeonRegularSickPercent.ToString("0.0", Inv) : "-") + "%/d, bohater " + (s != null ? s.DungeonHeroSickChancePercent.ToString("0.0", Inv) : "-")
                          + "%/d, przebieg " + (s != null ? s.DungeonSickDays : 0) + " dob, ostrzezenia " + YN(s != null && s.DungeonWarnings)
-                         + " | lochy rodu gracza " + mine + " | StoryGuard gotowy " + YN(ready) + " (zgony bohaterow w lochu: NIE - 402 tylko liczy)"
-                         + " | menu lochu " + _hookMenu + " | latki 0 | z zapisu: chorych " + CountSick() + ", odpornych " + (_rows.Count - CountSick()) + ", lochy " + _recs.Count + ".");
+                         + " | lochy rodu gracza " + mine + " | StoryGuard gotowy " + YN(ready)
+                         + " | 404 zgony bohaterow " + YN(s != null && s.DungeonHeroDeaths) + (s != null && s.DungeonHeroDeaths && !ready ? " (WSTRZYMANE - straz fabuly niegotowa)" : "")
+                         + ", udzial zgonow " + (s != null ? s.DungeonHeroDeathSharePercent.ToString("0.0", Inv) : "-") + "% (wiek 60+ x2), sufit " + (s != null ? s.DungeonHeroDeathsPerWeek : 0) + " na loch na " + DeathWindowDays + " dob"
+                         + ", LordToll rok " + LordToll.Year + ": loch " + LordToll.Count(LordToll.Dungeon) + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll
+                         + " | kurier: przelacznik " + YN(s != null && s.RansomCourierStandingRefusal) + ", bramka " + (Ransom178.CourierGateWired ? "TAK" : "NIE (latka ConsiderRansomPrisoner nie weszla)") + ", lochy z odmowa " + _noCourier
+                         + " | menu lochu " + _hookMenu + " | latki 0 | z zapisu: chorych " + CountSick() + ", odpornych " + (_rows.Count - CountSick()) + ", lochy " + _recs.Count + ", grozby " + _threat.Count + ".");
             }
             catch { }
         }
 
-        private static bool AddLine(CampaignGameStarter starter, string menuId, string optId)
+        private static bool AddLine(CampaignGameStarter starter, string menuId, string optId, string text, GameMenuOption.OnConditionDelegate cond, GameMenuOption.OnConsequenceDelegate cons)
         {
             var mgr = Campaign.Current != null ? Campaign.Current.GameMenuManager : null;
             var menu = mgr != null ? mgr.GetGameMenu(menuId) : null;
@@ -535,7 +745,7 @@ namespace Armoury
                 if (o != null && o.IdString == "town_keep_dungeon_back" && idx < 0) idx = i;
                 i++;
             }
-            starter.AddGameMenuOption(menuId, optId, "{=!}{ARM_DF_STATE}", StateCondition, StateConsequence, false, idx);
+            starter.AddGameMenuOption(menuId, optId, text, cond, cons, false, idx);
             return true;
         }
 
@@ -562,6 +772,44 @@ namespace Armoury
 
         private static void StateConsequence(MenuCallbackArgs args) { }   // linia nieczynna - nic nie robi (i nigdy nie przelacza menu)
 
+        /// <summary>404: przelacznik kuriera - widoczny w lochu osady rodu gracza przy kluczu Ransom Courier Standing Refusal.</summary>
+        private static bool CourierCondition(MenuCallbackArgs args)
+        {
+            try
+            {
+                args.optionLeaveType = GameMenuOption.LeaveType.Default;
+                var s = Settings.Current;
+                var st = Settlement.CurrentSettlement;
+                if (s == null || !s.RansomCourierStandingRefusal || !Mine(st) || st.StringId == null) return false;
+                SRec r;
+                bool off = _recs.TryGetValue(st.StringId, out r) && r.NoCourier;
+                MBTextManager.SetTextVariable("ARM_DF_COURIER", off ? "Ransom couriers: turned away" : "Ransom couriers: received", false);
+                args.Tooltip = new TextObject(off
+                    ? "{=!}Couriers with ransom offers for the lords held in this dungeon are turned away at the gate. Click to receive them again."
+                    : "{=!}Couriers with ransom offers for the lords held in this dungeon are received. Click to turn them away: no ransom offers will come for prisoners held here until you change it back.");
+                return true;
+            }
+            catch (Exception e) { Stumble("CourierCondition", e); return false; }
+        }
+
+        /// <summary>404: zmiana flagi lochu + odswiezenie menu lochu. Menu lochu NIE jest menu oczekiwania (AddGameMenu, cs_full.cs:205772 / :205840) -
+        /// przelaczenie na to samo menu to droga gry (np. :206637); zakaz SwitchToMenu dotyczy menu oczekiwania.</summary>
+        private static void CourierConsequence(MenuCallbackArgs args)
+        {
+            try
+            {
+                var st = Settlement.CurrentSettlement;
+                if (!Mine(st) || st.StringId == null) return;
+                var r = RecOf(st.StringId);
+                r.NoCourier = !r.NoCourier;
+                CountNoCourier();
+                Log.Info(Tag + ": kurierzy z okupem w lochu " + st.StringId + " - " + (r.NoCourier ? "ODPRAWIANI" : "przyjmowani") + " (decyzja gracza; lochy z odmowa " + _noCourier + ").");
+                string menu = args != null && args.MenuContext != null && args.MenuContext.GameMenu != null ? args.MenuContext.GameMenu.StringId : null;
+                if (menu == "town_keep_dungeon" || menu == "castle_dungeon") GameMenu.SwitchToMenu(menu);
+            }
+            catch (Exception e) { Stumble("CourierConsequence", e); }
+        }
+
         // ---------------------------------------------------------------- zapis
 
         private static bool Ok(string id) { return !string.IsNullOrEmpty(id) && id.IndexOf('|') < 0 && id.IndexOf('\n') < 0 && id.IndexOf('\r') < 0; }
@@ -571,7 +819,7 @@ namespace Armoury
         {
             try
             {
-                if (_rows.Count == 0 && _recs.Count == 0) return "";
+                if (_rows.Count == 0 && _recs.Count == 0 && _threat.Count == 0) return "";
                 var sb = new StringBuilder(64 + 48 * (_rows.Count + _recs.Count));
                 sb.Append("v1");
                 foreach (var kv in _recs)
@@ -579,14 +827,18 @@ namespace Armoury
                     if (!Ok(kv.Key)) continue;
                     var r = kv.Value;
                     sb.Append('\n').Append("S|").Append(kv.Key).Append('|').Append(r.WarnDay.ToString(Inv)).Append('|').Append(r.Below.ToString(Inv)).Append('|').Append(r.Fever ? '1' : '0')
-                      .Append('|').Append(r.DeadAcc.ToString(Inv)).Append('|').Append(r.DeadMsgDay.ToString(Inv));
+                      .Append('|').Append(r.DeadAcc.ToString(Inv)).Append('|').Append(r.DeadMsgDay.ToString(Inv))
+                      .Append('|').Append(r.NoCourier ? '1' : '0').Append('|');   // 404: pola 8-9
+                    if (r.HeroDeaths != null)
+                        for (int i = 0; i < r.HeroDeaths.Count; i++) { if (i > 0) sb.Append(','); sb.Append(r.HeroDeaths[i].ToString(Inv)); }
                 }
                 foreach (var r in _rows.Values)
                 {
                     if (!Ok(r.Id) || (r.Sick && !Ok(r.St))) continue;
                     sb.Append('\n').Append("H|").Append(r.Id).Append('|').Append(r.Sick ? r.St : "").Append('|').Append(r.Sick ? '1' : '0').Append('|').Append(r.Day.ToString(Inv))
-                      .Append('|').Append(r.End.ToString(Inv)).Append('|').Append(r.Immune.ToString(Inv));
+                      .Append('|').Append(r.End.ToString(Inv)).Append('|').Append(r.Immune.ToString(Inv)).Append('|').Append(r.Sick && r.Grave ? '1' : '0');   // 404: pole 8
                 }
+                foreach (var hid in _threat) if (Ok(hid)) sb.Append('\n').Append("T|").Append(hid);   // 404
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -595,7 +847,7 @@ namespace Armoury
         /// <summary>Wczytanie (brak klucza w starym zapisie = pusto). Zly wiersz pominiety; wpisy nieistniejacych bohaterow / osad sprzata pierwsza doba.</summary>
         internal static void Import(string data)
         {
-            _rows.Clear(); _recs.Clear();
+            _rows.Clear(); _recs.Clear(); _threat.Clear(); _noCourier = 0;
             int bad = 0;
             try
             {
@@ -609,17 +861,29 @@ namespace Armoury
                     try
                     {
                         if (p[0] == "S" && p.Length >= 7 && p[1].Length > 0)
-                            _recs[p[1]] = new SRec { WarnDay = int.Parse(p[2], Inv), Below = int.Parse(p[3], Inv), Fever = p[4] == "1", DeadAcc = Math.Max(0, int.Parse(p[5], Inv)), DeadMsgDay = int.Parse(p[6], Inv) };
+                        {
+                            var rec = new SRec { WarnDay = int.Parse(p[2], Inv), Below = int.Parse(p[3], Inv), Fever = p[4] == "1", DeadAcc = Math.Max(0, int.Parse(p[5], Inv)), DeadMsgDay = int.Parse(p[6], Inv) };
+                            if (p.Length >= 8) rec.NoCourier = p[7] == "1";   // 404 (zapis 402: brak pol = kurier przyjmowany, bez zgonow)
+                            if (p.Length >= 9 && p[8].Length > 0)
+                            {
+                                rec.HeroDeaths = new List<int>(2);
+                                foreach (var d in p[8].Split(',')) { int v; if (int.TryParse(d, NumberStyles.Integer, Inv, out v)) rec.HeroDeaths.Add(v); }
+                            }
+                            _recs[p[1]] = rec;
+                        }
                         else if (p[0] == "H" && p.Length >= 7 && p[1].Length > 0)
                         {
                             var r = new HRow { Id = p[1], St = p[2], Sick = p[3] == "1", Day = int.Parse(p[4], Inv), End = int.Parse(p[5], Inv), Immune = int.Parse(p[6], Inv) };
                             if (r.Sick && r.St.Length == 0) { bad++; continue; }
+                            if (p.Length >= 8) r.Grave = r.Sick && p[7] == "1";   // 404
                             _rows[r.Id] = r;
                         }
+                        else if (p[0] == "T" && p.Length >= 2 && p[1].Length > 0) _threat.Add(p[1]);   // 404
                         else bad++;
                     }
                     catch { bad++; }
                 }
+                CountNoCourier();
                 if (bad > 0) Log.Info(Tag + ": wczytano z zapisu - bledne wiersze pominiete: " + bad + ".");
             }
             catch (Exception e) { Stumble("Import", e); }

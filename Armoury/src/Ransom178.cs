@@ -560,6 +560,8 @@ namespace Armoury
         private static MethodInfo _mCaptorClan;
         private static FieldInfo _fCurHero, _fDeclined, _fPrisoner;
         internal static void SetHarmony(Harmony h) { _harmony = h; }
+        /// <summary>404: prefiks ConsiderRansomPrisoner wpiety (niesie bramke DungeonFate.CourierRefused) - do linii startu lochu.</summary>
+        internal static bool CourierGateWired { get { foreach (var w in _wired) if (w.IndexOf("ConsiderRansomPrisoner", StringComparison.Ordinal) >= 0) return true; return false; } }
 
         internal static void EnsureHooks()
         {
@@ -611,7 +613,7 @@ namespace Armoury
         {
             try
             {
-                if (RescueHunt.HoldCourier(__0) || PrisonerTerms384.HostageHeld(__0)) return false;   // 222: kurier nie przychodzi, zanim rod jenca nie wie o pojmaniu (takze przy 178 wylaczonym)
+                if (RescueHunt.HoldCourier(__0) || PrisonerTerms384.HostageHeld(__0) || DungeonFate.CourierRefused(__0)) return false;   // 222: kurier nie przychodzi, zanim rod jenca nie wie o pojmaniu (takze przy 178 wylaczonym); 404: gracz kazal odprawiac kurierow w tym lochu
                 if (!On || __0 == null || !Lord(__0)) return true;
                 var hero = __0;
                 var captorClan = GetCaptorClan(__instance, hero);

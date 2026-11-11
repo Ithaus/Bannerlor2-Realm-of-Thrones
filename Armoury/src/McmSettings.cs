@@ -12008,7 +12008,7 @@ namespace Armoury
         [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
         public bool HeroFateSpareLastOfHouse { get; set; } = true;
 
-        [SettingPropertyBool("Dungeon Sickness", HintText = "A dungeon of your own castle or town that holds more prisoners than Dungeon Crowding From of its room breeds fever. Common prisoners sicken every day (Dungeon Regular Sick Percent): one in ten of the sick dies (Siege Sickness Death Share), the rest lie wounded. Captive lords may fall ill (Dungeon Hero Sick Chance Percent) for Dungeon Sick Days; in this version no lord dies of it. Winter, a siege with camp fever and the unburied dead within the walls make it worse; a governor skilled in medicine helps. Spreading prisoners over several fortresses ends it. Dungeons of other lords are only counted. Off = dungeons are as in the game", RequireRestart = false)]
+        [SettingPropertyBool("Dungeon Sickness", HintText = "A dungeon of your own castle or town that holds more prisoners than Dungeon Crowding From of its room breeds fever. Common prisoners sicken every day (Dungeon Regular Sick Percent): one in ten of the sick dies (Siege Sickness Death Share), the rest lie wounded. Captive lords may fall ill (Dungeon Hero Sick Chance Percent) for Dungeon Sick Days, and with Dungeon Hero Deaths some of them die of it. Winter, a siege with camp fever and the unburied dead within the walls make it worse; a governor skilled in medicine helps. Spreading prisoners over several fortresses ends it. Dungeons of other lords are only counted. Off = dungeons are as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
         public bool DungeonSickness { get; set; } = true;
 
@@ -12031,6 +12031,22 @@ namespace Armoury
         [SettingPropertyBool("Dungeon Warnings", HintText = "With Dungeon Sickness: messages about your dungeons - a crowded dungeon, fever breaking out, common prisoners dead of fever (at most once a week for each dungeon), a lord fallen ill or recovered. Off = only Armoury.log", RequireRestart = false)]
         [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
         public bool DungeonWarnings { get; set; } = true;
+
+        [SettingPropertyBool("Dungeon Hero Deaths", HintText = "With Dungeon Sickness: a captive lord whose fever has run its course may die of it (Dungeon Hero Death Share Percent). Never a character the Realm of Thrones story still needs, a child, the last grown lord of a house (Hero Fate Spare Last Of House) or a ruler (Hero Fate Rulers Can Die); never more than Dungeon Hero Deaths Per Week in one dungeon or Lord Deaths Max Per Year in the world; never while Story Guard is off or cannot see the story. A lord who is spared lies gravely ill five more days and then recovers. When a lord dies in your cells the head of his house thinks much worse of you (-30) and his ruler a little worse (-5). Off = lords fall ill and always recover", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: lords dying of fever and ransom couriers turned away (404)")]
+        public bool DungeonHeroDeaths { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Dungeon Hero Death Share Percent", 0.00f, 100.00f, "0.0", HintText = "With Dungeon Hero Deaths: chance in percent that a captive lord dies when his fever has run its course (twice as much from the age of 60; reduced by the governor's medicine). 10 means about one sick lord in ten", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: lords dying of fever and ransom couriers turned away (404)")]
+        public float DungeonHeroDeathSharePercent { get; set; } = 10f;
+
+        [SettingPropertyInteger("Dungeon Hero Deaths Per Week", 0, 50, "0", HintText = "With Dungeon Hero Deaths: the most captive lords who may die of fever in one dungeon within seven days. The others whose time has come lie gravely ill and recover. 0 = nobody dies", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: lords dying of fever and ransom couriers turned away (404)")]
+        public int DungeonHeroDeathsPerWeek { get; set; } = 1;
+
+        [SettingPropertyBool("Ransom Courier Standing Refusal", HintText = "Adds a switch to the dungeon menu of your own castles and towns: Ransom couriers: received / turned away. While couriers are turned away, no ransom offers come for the lords held in that dungeon (prisoners of your own clan are never affected). The switch is kept for each fortress and is cleared when you lose it. Off = the switch is hidden and couriers always come, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: lords dying of fever and ransom couriers turned away (404)")]
+        public bool RansomCourierStandingRefusal { get; set; } = true;
 
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
@@ -15239,6 +15255,10 @@ namespace Armoury
             s.DungeonHeroSickChancePercent = DungeonHeroSickChancePercent;
             s.DungeonSickDays = DungeonSickDays;
             s.DungeonWarnings = DungeonWarnings;
+            s.DungeonHeroDeaths = DungeonHeroDeaths;
+            s.DungeonHeroDeathSharePercent = DungeonHeroDeathSharePercent;
+            s.DungeonHeroDeathsPerWeek = DungeonHeroDeathsPerWeek;
+            s.RansomCourierStandingRefusal = RansomCourierStandingRefusal;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;
