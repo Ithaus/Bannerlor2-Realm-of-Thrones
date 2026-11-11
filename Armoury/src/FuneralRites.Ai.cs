@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using HarmonyLib;
+using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
@@ -32,7 +34,7 @@ namespace Armoury
 
         private static bool TruceKey { get { var s = Settings.Current; return s != null && s.Funerals && s.FuneralTruce; } }
 
-        private static void TruceReset() { _truce = null; }
+        private static void TruceReset() { _truce = null; GatherReset(); }
 
         /// <summary>Wydarzenie oblezenia ROT osady fabuly (SiegeRansom.StoryIds); null = nie osada fabuly.</summary>
         private static string StoryEvent(string seatId)
@@ -50,6 +52,7 @@ namespace Armoury
         /// <summary>Watek glowny: migawka pokoju od nowa (po smierci glowy, co dobe, po wczytaniu). Nie rzuca.</summary>
         private static void TruceRebuild()
         {
+            GatherRebuild();   // 407: zjazd rodu - ta sama chwila (smierc glowy, doba, start sesji)
             try
             {
                 if (_active.Count == 0) { _truce = null; return; }
@@ -204,6 +207,269 @@ namespace Armoury
         private static string TruceEndText(Row r)
         {
             return " | rozejm: wyzerowane cele " + Volatile.Read(ref r.TZero) + ", weta BK " + Volatile.Read(ref r.TBk) + ", gracz zablokowany " + r.TPlayer + (r.TBroken ? ", oblezona mimo pokoju TAK" : "");
+        }
+
+        // ================================================================ 407: ZJAZD RODU (AI)
+        // PLAN-396 commit 407 (Jeff 11.11 "rob 5"). Jedyna latka pogrzebow: postfiks priorytet 130 na CampaignEventDispatcher.AiHourlyTick(MobileParty, PartyThinkParams)
+        // (metoda zadeklarowana w tej klasie - DeclaredMethod; po RescueHunt 150 i pakcie 140, przed ArmsFirst 100, wetami 50/48/45 i LordEscort / SiegeWalls2 Last -
+        // dozbrojenie, weta i ucieczka przed silniejszym dalej wygrywaja). Wpinana w kampanii, raz na proces (GatherSessionStart).
+        // REGULA: partia lorda rodu zmarlego (pogrzeb PELNY, do dnia End wlacznie) dostaje GoToSettlement(siedziba) = najlepsza ocena tej godziny + 0.01, gdy WSZYSTKO:
+        //  nie gracz, nie w armii / bitwie / oblezeniu / na morzu, nie gloduje, !DoNotChangeBehavior, lider nie pod straza fabuly, odleglosc <= Funeral Travel Range,
+        //  zadna twierdza rodu ani krolestwa w zasiegu 120 od partii nie jest oblegana, krolestwo w wojnie -> zdrowych >= Funeral Min Escort,
+        //  NAJLEPSZA opcja tej godziny jest pokojowa (PatrolAroundPoint albo GoToSettlement, bez zwolywania armii) - kazda inna na czele = nie jedzie.
+        // Wyniku <= -1 (cudze weto celu) nie podnosimy. Partia stojaca w siedzibie dostaje te sama ocene do konca pogrzebu: gra przy GoToSettlement do osady, w ktorej
+        // partia juz jest, nie wydaje nowego rozkazu (cs_full.cs:221119) - partia zostaje.
+        // Mysl AI w 1.4.8 jest sekwencyjna (tickery TickPartialHourlyAi z doParallel: false, cs_full.cs:22049), mimo to postfiks czyta NIEZMIENNA migawke (_gather),
+        // a pamiec linii logu jest pod zamkiem. Bez pogrzebu pelnego: jedno porownanie z null.
+
+        private sealed class GatherRow
+        {
+            public Row Src; public string ClanId; public Clan Clan; public Settlement Seat; public int End;
+            public HashSet<string> Guarded;   // lordowie rodu pod straza fabuly w chwili budowy migawki (doba)
+        }
+
+        private sealed class GatherMap { public readonly Dictionary<string, GatherRow> By = new Dictionary<string, GatherRow>(StringComparer.Ordinal); }
+
+        private const string GatherHarmonyId = "armoury.funeralrites.gather407";
+        private const float GatherThreatRange = 120f;   // oblegana twierdza rodu / krolestwa blizej niz tyle od partii = obrona wazniejsza
+        private const int GatherLogCap = 4;              // linii "pominieta" na partie na pogrzeb
+        private static volatile GatherMap _gather;       // null = zadnego zjazdu (szybkie wyjscie)
+        private static bool _gTried, _gHooked;
+        private static string _gHook = "nie probowano";
+        private static readonly object _gLock = new object();
+        private static readonly Dictionary<string, string> _gSaid = new Dictionary<string, string>(StringComparer.Ordinal);            // "rod|partia" -> ostatni powod / stan w logu
+        private static readonly Dictionary<string, int> _gSaidN = new Dictionary<string, int>(StringComparer.Ordinal);                  // "rod|partia" -> ile linii "pominieta"
+        private static readonly Dictionary<string, HashSet<string>> _gSeen = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);      // rod -> partie lordow rodu widziane w mysli AI
+        private static readonly Dictionary<string, HashSet<string>> _gArrived = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);   // rod -> partie, ktore staly w siedzibie
+
+        private static void GatherReset()
+        {
+            _gather = null;
+            lock (_gLock) { _gSaid.Clear(); _gSaidN.Clear(); _gSeen.Clear(); _gArrived.Clear(); }
+        }
+
+        /// <summary>OnSessionLaunched (raz na proces): postfiks 130 na CampaignEventDispatcher.AiHourlyTick. Stan w linii startu pogrzebow. Nie rzuca.</summary>
+        internal static void GatherSessionStart()
+        {
+            if (_gTried) return;
+            _gTried = true;
+            try
+            {
+                var m = AccessTools.DeclaredMethod(typeof(CampaignEventDispatcher), "AiHourlyTick", new[] { typeof(MobileParty), typeof(PartyThinkParams) });
+                if (m == null) { _gHook = "BRAK (CampaignEventDispatcher.AiHourlyTick)"; return; }
+                new Harmony(GatherHarmonyId).Patch(m, postfix: new HarmonyMethod(typeof(FuneralRites), nameof(GatherPostfix)) { priority = 130 });
+                var info = Harmony.GetPatchInfo(m);
+                if (info != null) foreach (var p in info.Postfixes) if (p != null && p.owner == GatherHarmonyId) _gHooked = true;
+                _gHook = _gHooked ? "wpieta" : "BRAK (latka nie weszla)";
+            }
+            catch (Exception e) { _gHook = "BLAD (" + e.GetType().Name + ")"; Stumble("GatherSessionStart", e); }
+        }
+
+        /// <summary>Watek glowny (z TruceRebuild: po smierci glowy, co dobe, przy starcie sesji): migawka zjazdu od nowa. Nie rzuca.</summary>
+        private static void GatherRebuild()
+        {
+            try
+            {
+                if (_active.Count == 0) { _gather = null; return; }
+                int today = Today();
+                GatherMap map = null;
+                foreach (var r in _active.Values)
+                {
+                    if (r.Mode != Full || today > r.End) continue;
+                    try
+                    {
+                        var seat = Settlement.Find(r.Seat);
+                        var cl = FindClan(r.Clan);
+                        if (seat == null || cl == null || cl.IsEliminated || cl == Clan.PlayerClan || seat.OwnerClan != cl) continue;
+                        var g = new GatherRow { Src = r, ClanId = r.Clan, Clan = cl, Seat = seat, End = r.End, Guarded = new HashSet<string>(StringComparer.Ordinal) };
+                        foreach (var h in cl.Heroes)
+                            if (h != null && h.IsAlive && h.StringId != null && GuardedSafe(h)) g.Guarded.Add(h.StringId);
+                        if (map == null) map = new GatherMap();
+                        map.By[r.Clan] = g;
+                    }
+                    catch (Exception e) { Stumble("GatherRebuild.row", e); }
+                }
+                _gather = map;
+            }
+            catch (Exception e) { _gather = null; Stumble("GatherRebuild", e); }
+        }
+
+        private static bool RealmAtWar(IFaction f)
+        {
+            if (f == null || !f.IsKingdomFaction) return false;
+            foreach (var k in Kingdom.All)
+                if (k != null && k != f && !k.IsEliminated && f.IsAtWarWith(k)) return true;
+            return false;
+        }
+
+        /// <summary>Oblegana twierdza rodu albo jego krolestwa w zasiegu 120 od partii (obrona wazniejsza niz pogrzeb). null = brak.</summary>
+        private static Settlement ThreatNear(MobileParty party, Clan cl)
+        {
+            var pos = party.GetPosition2D;
+            foreach (var t in cl.Fiefs)
+            {
+                var st = t != null ? t.Settlement : null;
+                if (st != null && st.IsUnderSiege && pos.Distance(st.GetPosition2D) <= GatherThreatRange) return st;
+            }
+            var k = cl.Kingdom;
+            if (k != null)
+                foreach (var t in k.Fiefs)
+                {
+                    var st = t != null ? t.Settlement : null;
+                    if (st != null && st.IsUnderSiege && pos.Distance(st.GetPosition2D) <= GatherThreatRange) return st;
+                }
+            return null;
+        }
+
+        /// <summary>Linia "pominieta" - raz na zmiane powodu, najwyzej GatherLogCap na partie na pogrzeb.</summary>
+        private static void GatherSkip(GatherRow t, MobileParty party, string code, string detail)
+        {
+            if (!LogOn) return;
+            string key = t.ClanId + "|" + party.StringId;
+            lock (_gLock)
+            {
+                string last; int n;
+                if (_gSaid.TryGetValue(key, out last) && last == code) return;
+                _gSaidN.TryGetValue(key, out n);
+                if (n >= GatherLogCap) return;
+                _gSaid[key] = code; _gSaidN[key] = n + 1;
+            }
+            Info("zjazd " + t.ClanId + ": partia " + party.StringId + " pominieta (" + (detail ?? code) + ").");
+        }
+
+        /// <summary>true = pierwszy raz w tym stanie (linia do logu).</summary>
+        private static bool GatherMark(GatherRow t, MobileParty party, string code)
+        {
+            string key = t.ClanId + "|" + party.StringId;
+            lock (_gLock)
+            {
+                string last;
+                if (_gSaid.TryGetValue(key, out last) && last == code) return false;
+                _gSaid[key] = code;
+                return true;
+            }
+        }
+
+        private static void GatherNote(Dictionary<string, HashSet<string>> book, string clan, string partyId)
+        {
+            lock (_gLock)
+            {
+                HashSet<string> set;
+                if (!book.TryGetValue(clan, out set)) book[clan] = set = new HashSet<string>(StringComparer.Ordinal);
+                set.Add(partyId);
+            }
+        }
+
+        /// <summary>Postfiks (priorytet 130) CampaignEventDispatcher.AiHourlyTick: zjazd rodu na pogrzeb glowy (regula w naglowku sekcji). Nie rzuca.</summary>
+        public static void GatherPostfix(MobileParty party, PartyThinkParams partyThinkParams)
+        {
+            var g = _gather;
+            if (g == null) return;
+            try
+            {
+                if (party == null || partyThinkParams == null || !party.IsLordParty || party.IsMainParty || party.StringId == null) return;
+                var lh = party.LeaderHero;
+                var cl = lh != null ? lh.Clan : null;
+                if (cl == null || cl.StringId == null) return;
+                GatherRow t;
+                if (!g.By.TryGetValue(cl.StringId, out t) || party.ActualClan != cl) return;
+                var s = Settings.Current;
+                if (s == null || !s.Funerals || Today() > t.End) return;
+                float range = s.FuneralTravelRange;
+                if (range <= 0f) return;
+                var seat = t.Seat;
+                GatherNote(_gSeen, t.ClanId, party.StringId);
+                bool here = party.CurrentSettlement == seat;
+                if (here)
+                {
+                    GatherNote(_gArrived, t.ClanId, party.StringId);
+                    if (GatherMark(t, party, "dotarla")) Info("zjazd " + t.ClanId + ": partia " + party.StringId + " dotarla do " + seat.StringId + " (zostaje do dnia " + t.End + ", dopoki najlepsza opcja godziny jest pokojowa).");
+                }
+                var oc = seat.OwnerClan;
+                if (oc != cl) { GatherSkip(t, party, "siedziba", "siedziba nie jest juz rodu"); return; }
+                if (partyThinkParams.DoNotChangeBehavior) { GatherSkip(t, party, "dnc", "rozkaz nie do zmiany (DoNotChangeBehavior)"); return; }
+                if (party.Army != null) { GatherSkip(t, party, "armia", "w armii"); return; }
+                if (party.MapEvent != null) { GatherSkip(t, party, "bitwa", "w bitwie"); return; }
+                if (party.BesiegedSettlement != null || party.SiegeEvent != null) { GatherSkip(t, party, "oblega", "oblega"); return; }
+                if (party.CurrentSettlement != null && party.CurrentSettlement.IsUnderSiege) { GatherSkip(t, party, "oblezona", "stoi w oblezonej twierdzy"); return; }
+                if (party.IsCurrentlyAtSea) { GatherSkip(t, party, "morze", "na morzu"); return; }
+                if (party.Party.IsStarving) { GatherSkip(t, party, "glod", "gloduje"); return; }
+                if (lh.StringId != null && t.Guarded.Contains(lh.StringId)) { GatherSkip(t, party, "straz", "lider " + lh.StringId + " pod straza fabuly"); return; }
+                float dist = here ? 0f : party.GetPosition2D.Distance(seat.GetPosition2D);
+                if (dist > range) { GatherSkip(t, party, "daleko", "odleglosc " + dist.ToString("F0", Inv) + " > " + range.ToString("F0", Inv)); return; }
+                var threat = ThreatNear(party, cl);
+                if (threat != null) { GatherSkip(t, party, "obrona", "oblegana twierdza " + threat.StringId + " w zasiegu " + GatherThreatRange.ToString("F0", Inv)); return; }
+                int escort = s.FuneralMinEscort;
+                if (escort > 0 && RealmAtWar(cl.MapFaction))
+                {
+                    int healthy = party.MemberRoster != null ? party.MemberRoster.TotalHealthyCount : 0;
+                    if (healthy < escort) { GatherSkip(t, party, "eskorta", "wojna: zdrowych " + healthy + " < " + escort); return; }
+                }
+                var scores = partyThinkParams.AIBehaviorScores;
+                if (scores == null || scores.Count == 0) { GatherSkip(t, party, "brak", "brak opcji tej godziny"); return; }
+                int topI = -1, mineI = -1; float top = float.MinValue;
+                for (int i = 0; i < scores.Count; i++)
+                {
+                    var d = scores[i].Item1; float v = scores[i].Item2;
+                    if (v > top) { top = v; topI = i; }
+                    if (mineI < 0 && d.AiBehavior == AiBehavior.GoToSettlement && ReferenceEquals(d.Party, seat) && !d.WillGatherArmy) mineI = i;
+                }
+                if (topI < 0 || !(top > -1f)) { GatherSkip(t, party, "weta", "wszystkie opcje zawetowane"); return; }
+                var topD = scores[topI].Item1;
+                bool peaceful = (topD.AiBehavior == AiBehavior.PatrolAroundPoint || topD.AiBehavior == AiBehavior.GoToSettlement) && !topD.WillGatherArmy;
+                if (!peaceful) { GatherSkip(t, party, "wojenna:" + topD.AiBehavior, "najlepsza opcja wojenna: " + topD.AiBehavior + (topD.WillGatherArmy ? " (zwoluje armie)" : "") + " " + top.ToString("F2", Inv)); return; }
+                float ours = top + 0.01f;
+                if (mineI >= 0)
+                {
+                    float cur = scores[mineI].Item2;
+                    if (!(cur > -1f)) { GatherSkip(t, party, "weto", "cel " + seat.StringId + " zawetowany (ocena " + cur.ToString("F2", Inv) + ")"); return; }
+                    if (mineI != topI)
+                    {
+                        var d = scores[mineI].Item1;
+                        partyThinkParams.SetBehaviorScore(in d, ours);
+                    }
+                }
+                else
+                {
+                    MobileParty.NavigationType nav; float navDist; bool port;
+                    AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, seat, false, out nav, out navDist, out port);
+                    if (nav == MobileParty.NavigationType.None)
+                    {
+                        if (!here) { GatherSkip(t, party, "droga", "brak drogi do " + seat.StringId); return; }
+                        nav = MobileParty.NavigationType.Default; port = false;   // stoi w siedzibie - gra i tak nie wyda rozkazu (cs_full.cs:221119)
+                    }
+                    var a = new AIBehaviorData(seat, AiBehavior.GoToSettlement, nav, false, port, false);
+                    var item = (a, ours);
+                    partyThinkParams.AddBehaviorScore(in item);
+                }
+                Interlocked.Increment(ref t.Src.GOrders);
+                if (!here && GatherMark(t, party, "wyrusza"))
+                    Info("zjazd " + t.ClanId + ": partia " + party.StringId + " wyrusza do " + seat.StringId + " (odleglosc " + dist.ToString("F0", Inv) + ", ocena " + ours.ToString("F2", Inv) + " = najlepsza pokojowa " + topD.AiBehavior + " + 0.01).");
+            }
+            catch (Exception e) { Stumble("GatherPostfix", e); }
+        }
+
+        /// <summary>Koniec pogrzebu (watek glowny, linia KONIEC): "obecnych n/m" i sprzatanie pamieci zjazdu tego rodu.</summary>
+        private static string GatherEnd(Row r)
+        {
+            try
+            {
+                int n = 0, m = 0;
+                lock (_gLock)
+                {
+                    HashSet<string> set;
+                    if (_gArrived.TryGetValue(r.Clan, out set)) n = set.Count;
+                    if (_gSeen.TryGetValue(r.Clan, out set)) m = set.Count;
+                    _gArrived.Remove(r.Clan); _gSeen.Remove(r.Clan);
+                    string pre = r.Clan + "|";
+                    List<string> drop = null;
+                    foreach (var k in _gSaid.Keys) if (k.StartsWith(pre, StringComparison.Ordinal)) { if (drop == null) drop = new List<string>(); drop.Add(k); }
+                    if (drop != null) foreach (var k in drop) { _gSaid.Remove(k); _gSaidN.Remove(k); }
+                }
+                if (r.Mode != Full) return "";
+                return " | zjazd: obecnych " + n + "/" + m + " partii rodu, rozkazow " + Volatile.Read(ref r.GOrders);
+            }
+            catch (Exception e) { Stumble("GatherEnd", e); return ""; }
         }
     }
 }

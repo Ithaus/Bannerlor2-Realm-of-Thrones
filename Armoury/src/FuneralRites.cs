@@ -38,7 +38,8 @@ namespace Armoury
     ///
     /// Nikogo nie zabijamy i nie okaleczamy (StoryGuard pytany tylko do linii: "dziedzic pod straza fabuly"). Wyjatki per zdarzenie liczone (potkniecia), nic sie nie
     /// gasi. Zapis arm_funeral "v1" (stary zapis = pusto). Reset: konstruktor ArmouryBehavior i OnGameEnd.
-    /// 406: pokoj pogrzebu (FuneralRites.Ai.cs) - migawka z wierszy PELNYCH, liczniki rozejmu w wierszu (tylko sesja, nie w zapisie).</summary>
+    /// 406: pokoj pogrzebu (FuneralRites.Ai.cs) - migawka z wierszy PELNYCH, liczniki rozejmu w wierszu (tylko sesja, nie w zapisie).
+    /// 407: zjazd rodu (FuneralRites.Ai.cs) - jedyna latka: postfiks 130 CampaignEventDispatcher.AiHourlyTick (w kampanii, raz na proces).</summary>
     internal static partial class FuneralRites
     {
         internal const string Tag = "Pogrzeby (P5)";
@@ -57,6 +58,7 @@ namespace Armoury
             public bool King, Attended;                                               // glowa rodu panujacego; gracz byl
             public int TZero, TBk, TPlayer, TPlayerDay;                               // 406 (tylko sesja): wyzerowane cele AI (Interlocked), weta BK, doby z zablokowana opcja gracza
             public bool TSaid, TBroken;                                               // 406 (tylko sesja): linia pokoju napisana; siedziba oblegana mimo pokoju
+            public int GOrders;                                                       // 407 (tylko sesja): rozkazy zjazdu (ocena GoToSettlement siedziby podniesiona / dodana)
         }
 
         private sealed class Pre
@@ -415,7 +417,7 @@ namespace Armoury
                     var r = _active[id];
                     _active.Remove(id);
                     Info("KONIEC " + id + " (" + r.Name + (string.IsNullOrEmpty(r.Others) ? "" : " + " + r.Others) + ", siedziba " + r.Seat + ", tryb " + (r.Mode == Full ? "pelny" : "cichy") + ") | gracz obecny "
-                         + (r.Attended ? "T" : "N") + ", dar " + r.Gift + (r.Mode == Full ? TruceEndText(r) : "") + " | sesja: glowy wykryte przed " + _nPre + " / zmiana glowy " + _nChg + " / migawka " + _nSnap + ", pelnych " + _nFull + ", cichych " + _nQuiet
+                         + (r.Attended ? "T" : "N") + ", dar " + r.Gift + (r.Mode == Full ? TruceEndText(r) : "") + GatherEnd(r) + " | sesja: glowy wykryte przed " + _nPre + " / zmiana glowy " + _nChg + " / migawka " + _nSnap + ", pelnych " + _nFull + ", cichych " + _nQuiet
                          + ", tylko wiesc " + _nWord + ", wspolnych " + _nJoint + ", potkniecia " + _stumbles + ".");
                 }
                 if (_changed.Count > 0)
@@ -464,11 +466,12 @@ namespace Armoury
                 var s = Settings.Current;
                 int full = 0;
                 foreach (var r in _active.Values) if (r.Mode == Full) full++;
-                Log.Info(Tag + " (405/406): start | klucze: pogrzeby " + YN(s != null && s.Funerals) + ", dni " + Days + ", naraz " + MaxActive + " (1 na krolestwo), gracz " + YN(s != null && s.FuneralPlayerAttend)
+                Log.Info(Tag + " (405-407): start | klucze: pogrzeby " + YN(s != null && s.Funerals) + ", dni " + Days + ", naraz " + MaxActive + " (1 na krolestwo), gracz " + YN(s != null && s.FuneralPlayerAttend)
                          + ", dar " + (s != null ? s.FuneralGiftGold : 0) + ", cichy w kanonie " + YN(s != null && s.FuneralCanonQuiet) + ", log " + YN(s != null && s.FuneralLog) + ", pokoj pogrzebu " + YN(s != null && s.FuneralTruce)
                          + " | sluchacz przed BK " + BeforeBk() + " | BK linia dziedziczenia " + YN(BkReady()) + " | kanon tutaj " + YN(SafeCanon())
                          + " | menu siedziby " + _hookMenu + " | pokoj: ocena celu " + SiegeRansom.HookScoreText + ", weto BK FindArmyObjective " + WarFront334.BkHookText
-                         + ", opcja oblezenia gracza " + SiegeRansom.HookBesiegeText + ", osad w pokoju " + (_truce != null ? _truce.By.Count : 0) + " | latki wlasne 0 | migawka glow " + _leaderOf.Count + " rodow | w zapisie " + _active.Count + " (pelnych " + full + ").");
+                         + ", opcja oblezenia gracza " + SiegeRansom.HookBesiegeText + ", osad w pokoju " + (_truce != null ? _truce.By.Count : 0) + " | zjazd rodu: latka AiHourlyTick 130 " + _gHook + ", zasieg " + (s != null ? s.FuneralTravelRange : 0) + ", eskorta w wojnie " + (s != null ? s.FuneralMinEscort : 0) + ", rodow w zjezdzie " + (_gather != null ? _gather.By.Count : 0)
+                         + " | latki wlasne " + (_gHooked ? 1 : 0) + " | migawka glow " + _leaderOf.Count + " rodow | w zapisie " + _active.Count + " (pelnych " + full + ").");
             }
             catch (Exception e) { Stumble("StartLine", e); }
         }
