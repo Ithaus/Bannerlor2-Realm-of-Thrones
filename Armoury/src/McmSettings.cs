@@ -2168,7 +2168,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SiegeSicknessEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Siege Sickness Incubation Days", 0, 36, "0", HintText = "clean-camp grace period before the fever wakes", RequireRestart = false)]
+        [SettingPropertyInteger("Siege Sickness Incubation Days", 0, 56, "0", HintText = "clean-camp grace period before the fever wakes", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public int SiegeSicknessIncubationDays { get; set; } = 14;
 
@@ -2176,7 +2176,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float SiegeSicknessBasePercent { get; set; } = 0.6f;
 
-        [SettingPropertyInteger("Siege Sickness Ramp Percent", 0, 60, "0", HintText = "the daily rate grows by this much for every day past incubation - time is a weapon", RequireRestart = false)]
+        [SettingPropertyInteger("Siege Sickness Ramp Percent", 0, 40, "0", HintText = "the daily rate grows by this much for every day past incubation - time is a weapon", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public int SiegeSicknessRampPercent { get; set; } = 10;
 

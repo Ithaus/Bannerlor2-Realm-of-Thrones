@@ -213,7 +213,8 @@ namespace Armoury
             if (!_warned.Contains(st.StringId))
             {
                 _warned.Add(st.StringId);
-                if (mainAttacks || mainDefends)
+                // 398-p: _warned nie jest w zapisie - po wczytaniu trwajacego oblezenia graczowi nie powtarzamy (linia logu zostaje)
+                if ((mainAttacks || mainDefends) && days - incub <= 1)
                     Log.Player("Camp fever stirs among the tents at " + st.Name + " - the longer the siege, the deeper it bites.", true);
                 Log.Info("CampFever: oblezenie " + st.StringId + " dzien " + days + " - zaraza wstaje.");
             }
@@ -265,10 +266,19 @@ namespace Armoury
             for (int i = 0; i < defenders.Count; i++)
                 StrikeParty(s, defenders[i], st, ramp, defMul, wallCrowd, wallsFight, mainAttacks || mainDefends, true, wallWinter, ref def);
 
+            // 398-p (pomiar): zdrowi na murach po zarazie tej doby - gra oddaje oblezenie bez walki, gdy strona nie ma zdrowych (PlayerEncounter.Update)
+            int wallHealthy = 0;
+            for (int i = 0; i < defenders.Count; i++)
+            {
+                try { if (defenders[i].Party != null) wallHealthy += defenders[i].Party.NumberOfHealthyMembers; }
+                catch (Exception e) { Stumble("WallHealthy", e); }
+            }
+
             if (att.Sick + def.Sick + att.Dead + def.Dead + att.Capped + def.Capped + att.InBattle + def.InBattle > 0)
                 Log.Info("CampFever: " + st.StringId + " dzien " + days + " - oblegajacy " + att.Sick
                          + " chorych/" + att.Dead + " zmarlych, obroncy " + def.Sick + "/" + def.Dead
                          + (hunger ? " (GLOD w miescie)" : "")
+                         + " | zdrowi na murach " + wallHealthy + (wallHealthy == 0 && wallMen > 0 ? " (MURY BEZ ZDROWYCH)" : "")
                          + " | narost " + ramp.ToString("0.00") + " (sufit " + (rampCapped ? "tak" : "nie") + ")"
                          + ", tlok " + (whole ? "oboz " + campCrowd.ToString("0.00") + " (" + campMen + " ludzi) / mury " + wallCrowd.ToString("0.00") + " (" + wallMen + " ludzi)" : "na druzyne (stary rachunek)")
                          + " | czynnik oboz " + FactorText(att) + " / mury " + FactorText(def)
