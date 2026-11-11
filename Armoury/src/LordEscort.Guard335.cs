@@ -182,6 +182,7 @@ namespace Armoury
             if (t.CurrentSettlement != null || t.MapEvent != null || t.BesiegedSettlement != null) return false;
             if (!(t.IsLordParty || t.IsMainParty)) return false;
             if (t.AttachedTo != null || (t.Army != null && t.Army.LeaderParty != t)) return false;
+            if (PrisonerTerms384.PactBlocks(p, t)) return false;   // 386: pakt o nieagresji (384) - obroncy nie wymuszaja ataku na druzyne gracza / partie rodu
             return Hostile(p.MapFaction, t) && !t.IsBandit;
         }
 

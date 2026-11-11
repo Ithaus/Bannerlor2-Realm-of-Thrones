@@ -844,6 +844,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int PrisonerExchangePactDays { get; set; } = 60;
 
+        [SettingPropertyBool("Prisoner Exchange Pact Guards Clan Parties", HintText = "With Prisoner Exchange For Terms and the oath of peace: the realm (or house) that swore it also leaves your caravans, your companions' parties and the villagers of your villages alone, and your companions' parties do not start fights with that realm (unless it besieges or raids your lands or goes after your men; joining a battle already being fought is allowed, as it is for you). Neither side flees from the other. Parties riding in another lord's army are not covered. Off = the oath covers only your lands and your own party, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerExchangePactGuardsClan { get; set; } = true;
+
         [SettingPropertyBool("Prisoner Terms Pick Window", HintText = "With Prisoner Exchange For Terms: the lords you offer are picked in one window that lists every lord of his realm you hold (dearest first, with his worth), instead of eight lines in the talk. Turn it off if the window misbehaves during the parley - the eight lines come back", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsPickWindow { get; set; } = true;
@@ -12170,6 +12174,7 @@ namespace Armoury
             s.SiegeHonourableSurrender = SiegeHonourableSurrender;
             s.PrisonerExchangeForTerms = PrisonerExchangeForTerms;
             s.PrisonerExchangePactDays = PrisonerExchangePactDays;
+            s.PrisonerExchangePactGuardsClan = PrisonerExchangePactGuardsClan;
             s.PrisonerTermsPickWindow = PrisonerTermsPickWindow;
             s.PrisonerTermsReleaseMyMen = PrisonerTermsReleaseMyMen;
             s.PrisonerTermsOath = PrisonerTermsOath;
