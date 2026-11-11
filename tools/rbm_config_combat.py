@@ -12,6 +12,11 @@ z powrotem z pamieci (parseXmlConfig -> saveXmlConfig) - nasze wartosci zostaja.
 UWAGA: gdy RBM uzna plik za zly (brak atrybutu version="2" albo blad XML), tworzy nowy z wartosciami fabrycznymi - wtedy uruchom skrypt ponownie.
 Kontrola w grze: linia "Wypoczety (416)" w Armoury.log konczy sie "progi RBM w pamieci: Arrow ciecie 2.00 ...".
 
+UWAGA 423 (11.11): zestaw A1 / A2 liczono dla drabiny pancerzy ROT SPRZED 423 (przeszywanica 61, kolczuga 88, plyta 120). Po 423a korpusy ROT
+sa w skali RBM (26 / 55 / 91), a progi fabryczne 2.6 / 3 RBM stroil wlasnie pod te skale: strzala szeroka 90 lb przy progu 2.6 daje juz
+55 HP w ubranie i 26 w przeszywanice (przed 423: 9 i 5), oszczep 84 HP w przeszywanice. Przy wlaczonej drabinie 423 stosuj ten skrypt
+WYLACZNIE po pomiarze autotestem (linia "Drabina pancerzy (423): koniec misji"); nowych zestawow progow tu nie ma do czasu pomiaru.
+
 Uzycie (gra ZAMKNIETA):
   python tools/rbm_config_combat.py                   # --dry-run (domyslnie): pokazuje stare i nowe wartosci, niczego nie zapisuje
   python tools/rbm_config_combat.py --apply           # kopia config.xml.bak-<data>-przed-416 i zapis
@@ -84,6 +89,10 @@ def game_running():
     return any(n in out for n in ('"bannerlord.exe"', '"bannerlord.blse.', '"bannerlord_be.exe"', '"bannerlord.native.exe"', '"taleworlds.mountandblade.launcher.exe"'))
 
 
+WARN_423 = ("UWAGA 423: progi 2.0 (A1 / A2) liczono dla drabiny pancerzy ROT sprzed 423. Przy wlaczonym kluczu 'ROT Body Armour In RBM Scale' "
+            "progi fabryczne 2.6 / 3 sa wlasciwe dla nowej skali - ten skrypt stosuj wylacznie po pomiarze autotestem.")
+
+
 def main():
     ap = argparse.ArgumentParser(description="416: progi przebicia RBM (Arrow / Bolt ciecie 2.6 -> 2, Javelin klucie 3 -> 2)")
     ap.add_argument("--config", default=default_config(), help="sciezka do config.xml RBM")
@@ -95,6 +104,7 @@ def main():
     path = a.config
     print("Plik: " + path)
     print("Tryb: " + ("APPLY" if a.apply else "dry-run (niczego nie zapisuje)"))
+    print(WARN_423)
     if not os.path.isfile(path):
         print("BLAD: brak pliku. RBM tworzy go przy pierwszym starcie gry.")
         return 1
@@ -172,7 +182,7 @@ def main():
             return 1
 
     if not a.apply:
-        print("Wynik: dry-run - do zmiany %d wezlow. Uruchom z --apply (gra zamknieta)." % todo)
+        print("Wynik: dry-run - do zmiany %d wezlow. Uruchom z --apply (gra zamknieta) - przy wlaczonej drabinie 423 dopiero po pomiarze." % todo)
         return 0
     if game_running():
         print("BLAD: gra jest uruchomiona - RBM ma stare wartosci w pamieci i moze je zapisac z powrotem. Zamknij gre i powtorz.")

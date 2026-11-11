@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 423c (11.11) - SKRYPT 416 (progi strzal A1 / A2): OSTRZEZENIE PO DRABINIE 423 (tools/rbm_config_combat.py; bez zmiany gry i bez zmiany DLL)
+
+**Problem:** `tools/rbm_config_combat.py` (416: Arrow / Bolt ciecie 2.6 -> 2, Javelin klucie 3 -> 2) NIE jest u Jeffa zastosowany - dry-run 11.11 pokazuje w `Documents/.../Configs/RBM/config.xml` wartosci fabryczne 2.6 / 2.6 / 3 ("do zmiany 3 wezlow"). Zestaw A1 / A2 audyt liczyl dla drabiny pancerzy ROT sprzed 423 (przeszywanica 61, kolczuga 88). Po 423a te same progi fabryczne daja juz: strzala szeroka 90 lb w ubranie 9 -> 55 HP, w przeszywanice 5 -> 26; oszczep 162 J w przeszywanice 12 -> 84 (przeliczenie wzorow, nie pomiar). Zastosowanie skryptu "z rozpedu" po 423 zlozyloby dwie korekty tego samego zjawiska.
+
+**Przyczyna:** naglowek i wynik skryptu nie wiedzialy o 423; RBM stroil progi 2.6 / 3 pod skale pancerzy, do ktorej 423a sprowadza korpusy ROT.
+
+**Zmiana:** w naglowku skryptu akapit "UWAGA 423", stala `WARN_423` wypisywana po linii "Tryb:" (dry-run i --apply) oraz dopisek w linii wyniku dry-run: przy wlaczonej drabinie 423 skrypt stosowac WYLACZNIE po pomiarze autotestem (linia "Drabina pancerzy (423): koniec misji"). Zadnych nowych zestawow progow (A3-lekkie, A4 z pierwszej wersji projektu odrzucone - kod na zapas bez pomiaru). Dzialanie skryptu (wezly, kopia .bak, kontrole, kody wyjscia) bez zmian. Config Jeffa nie byl ruszany (uruchomiony tylko dry-run).
+
+**Ryzyko / co sprawdzic:** tylko tekst na wyjsciu skryptu; kod wyjscia i zapis bez zmian (dry-run po zmianie: te same 3 wezly, kod 0). Linia startu "Drabina pancerzy ROT (423)" konczy sie odczytem progow RBM z pamieci - ma byc "Arrow ciecie 2.60, Bolt ciecie 2.60, Javelin klucie 3.00"; linia 416 dalej pisze "(cel 2.00)" - to cel skryptu 416, po 423 nieobowiazujacy do czasu pomiaru.
+
+**Czego nie sprawdzono:** trybu --apply po zmianie (nie wolno mi zapisywac w Documents) - zmiana dotyczy wylacznie instrukcji print przed logika zapisu.
+
+**Odlozone:** decyzja o progach strzal i oszczepow (A1 / A2 albo inne) - 423d po autotescie wariantow A / B / C.
+
+**Status:** DO SPRAWDZENIA
+
 ## 423b (11.11) - IGLICA W MIEKKI PANCERZ: TRZY CZWARTE ZAMIAST POLOWY (dopelnienie drabiny 423a; audyt RBM B5 + decyzja Jeffa 1) (BodkinSoft423.cs nowy, ArmourLadder423.cs, NightHooks.cs, Settings.cs, McmSettings.cs; NOWY klucz MCM: Bodkin Versus Soft Armour Percent)
 
 **Problem:** po 423a (kolczuga ROT 88 -> 55, przeszywanica 61 -> 26) regula RBM "polowa pancerza nie-plytowego dla strzaly / beltu Pierce" daje prog iglicy w kolczuge 55 J i w przeszywanice 26 J. Z wzorow (pelny cios w piers, to przeliczenie, NIE pomiar): iglica 100 lb (101 J) w przeszywanice 40 -> 70 HP, w ciezka skore 21 -> 51, w kolczuge 18 -> 45; longbow 180 lb w kolczuge 73 -> 101 HP (jedna strzala zabija). Zrodla historyczne (docs/audyty-2026-11-11/rbm-zrodla-*.md): przeszywanica 50-80 J, kolczuga 80-120 J.
