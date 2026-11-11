@@ -20,7 +20,7 @@ using TaleWorlds.Library;
 namespace Armoury
 {
     /// <summary>401 (Jeff 11.11 "rob 4" - rany i blizny bohaterow; PLAN-396 commit 401) - KSIEGA RAN I LOZE. Od 403 przesilenie: smierc od ran i okaleczenia
-    /// (HeroFate / LordToll). Bez AI (408).
+    /// (HeroFate / LordToll). Od 408 AI: ranny wodz wiezie sie do twierdzy (HeroWounds.Ai.cs).
     ///
     /// Wyzwalacz: CampaignEvents.HeroWounded (gra wola go w seterze Hero.HitPoints przy przejsciu ponad prog rany -> pod prog). Liczy sie tylko rana W BITWIE
     /// (partia bohatera w MapEvent albo gracz w PlayerEncounter.Battle), lord / gracz / towarzysz i rod gracza, dorosly, zywy, bez znaku smierci, nie
@@ -45,7 +45,7 @@ namespace Armoury
     /// Rana krytyczna RealisticBannerlord (15% przy kazdym HeroWounded, -4 HP/dobe) - wylaczona prefiksem przy kluczu Hero Wounds Replace Rb Critical (jedna zasada).
     /// Zapis arm_herowounds_v1: wiersz "id|stopien|dzienRany|pozostalo|dzienPrzesilenia|miejsce|zrodlo" (stary zapis = pusta ksiega). Statyki: Reset w konstruktorze
     /// ArmouryBehavior i w OnGameEnd; bohaterowie rozwiazywani w SessionStart. Potkniecia liczone per miejsce - nic sie nie gasi.</summary>
-    internal static class HeroWounds
+    internal static partial class HeroWounds
     {
         private const string Tag = "Rany (HW): ";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -104,6 +104,7 @@ namespace Armoury
             _healCuts = _setCuts = _dStumbles = _stumbles = 0;
             _dDied = _dLived = _dDeferred = _dSpared = _dMaimed = _sDied = _sMaimed = 0;
             _crisisBuf.Clear();
+            AiReset();
         }
 
         internal static string Export()
@@ -173,7 +174,8 @@ namespace Armoury
                                         + " pp/rok ponad 40, gracz " + YN(s.HeroWoundsPlayerCanDie) + ", wladcy " + YN(s.HeroFateRulersCanDie) + ", ostatni z rodu oszczedzony "
                                         + YN(s.HeroFateSpareLastOfHouse) + "), okaleczenie " + s.HeroWoundsMaimPercent.ToString("0.#", Inv) + "%" : "")
                          + " | okaleczen w ksiedze " + HeroFate.MaimRows + " | LordToll rok " + LordToll.Year + ": rany " + LordToll.Count(LordToll.Wounds) + "/" + LordToll.MaxWounds
-                         + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll + " | bez AI (408).");
+                         + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll
+                         + " | 408 ranny wodz do twierdzy: klucz " + YN(s != null && s.HeroWoundsLordsRest) + ", latka CampaignEventDispatcher.AiHourlyTick (postfiks 60) " + _aiHook + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
@@ -197,6 +199,7 @@ namespace Armoury
             _mTip = Patch("TooltipRefresherCollection.RefreshHeroTooltip",
                           () => AccessTools.DeclaredMethod(typeof(TooltipRefresherCollection), "RefreshHeroTooltip", new[] { typeof(PropertyBasedTooltipVM), typeof(object[]) }),
                           null, nameof(TipPostfix));
+            AiWire();   // 408
         }
 
         /// <summary>Zwraca MethodInfo tylko, gdy latka weszla (null = brak celu albo blad Harmony).</summary>
@@ -542,7 +545,7 @@ namespace Armoury
                     foreach (var r in done) { _rows.Remove(r.Id); if (r.H != null) _bed.Remove(r.H); }
                     _n = _bed.Count;
                 }
-                if (_dEv + _dRose + _dCrisis + _dDeferred + _dGone + _dStumbles + _dRb + _rows.Count + _healCuts + _setCuts > 0)
+                if (_dEv + _dRose + _dCrisis + _dDeferred + _dGone + _dStumbles + _dRb + _rows.Count + _healCuts + _setCuts + _aiOrders + _aiOff > 0)
                     Log.Info(Tag + "dzien " + day + " | rany w bitwie dzis " + _dBattle + " (misja " + _dMission + " / symulacja " + _dSim + "): light " + _dLight + ", serious "
                              + _dSerious + ", grave " + _dGrave + ", chronieni fabula " + _dGuard + " | zdarzen HeroWounded " + _dEv + " (poza bitwa " + _dNoBattle + ", poza zakresem "
                              + _dOut + ", rana Kroniki " + _dCanon + ", juz na lozu " + _dHas + ") | na lozu " + sr + " serious / " + gr + " grave (jency " + pris + ", w twierdzy " + fort
@@ -551,10 +554,11 @@ namespace Armoury
                              + "), okaleczeni " + _dMaimed + ", wpisy bez bohatera " + _dGone + " | przyciecia: leczenie " + _healCuts + ", seter "
                              + _setCuts + " | RB rana krytyczna pominieta " + _dRb + " | od startu sesji: ran w bitwie " + _sBattle + ", serious " + _sSerious + ", grave " + _sGrave
                              + ", dni loza " + _sDays + ", zmarli od ran " + _sDied + ", okaleczeni " + _sMaimed + " | potkniecia " + _dStumbles + " (sesja " + _stumbles
-                             + ", HeroFate " + HeroFate.Stumbles + ").");
+                             + ", HeroFate " + HeroFate.Stumbles + ")" + AiDayText() + ".");
                 _dEv = _dBattle = _dMission = _dSim = _dLight = _dSerious = _dGrave = _dGuard = _dNoBattle = _dOut = _dCanon = _dHas = _dRose = _dCrisis = _dGone = _dRb = 0;
                 _healCuts = _setCuts = _dStumbles = 0;
                 _dDied = _dLived = _dDeferred = _dSpared = _dMaimed = 0;
+                AiDayEnd();   // 408
             }
             catch (Exception e) { Stumble("Daily", e); _crisisBuf.Clear(); }
         }

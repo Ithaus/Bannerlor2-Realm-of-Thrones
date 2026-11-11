@@ -12008,6 +12008,10 @@ namespace Armoury
         [SettingPropertyGroup("Hero wounds: the crisis, death of wounds and lasting injuries (403)")]
         public bool HeroFateSpareLastOfHouse { get; set; } = true;
 
+        [SettingPropertyBool("Hero Wounds Lords Rest", HintText = "With Hero Wounds Enabled: an AI lord who lies abed with a serious or grave wound takes his party to rest behind walls. He seeks no battle (no siege, raid, pursuit or call to arms; he still defends a threatened holding of his own house) and rides to the nearest castle or town of his house that is not under siege, or of his realm when his house holds none, and stays there. Not for a lord in an army, in battle, at a siege, at sea or starving, nor for a commander of a Realm of Thrones story siege or a character whose story event is less than 14 days away. No gold or food is given. Off = wounded lords go on campaigning as before", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public bool HeroWoundsLordsRest { get; set; } = true;
+
         [SettingPropertyBool("Dungeon Sickness", HintText = "A dungeon of your own castle or town that holds more prisoners than Dungeon Crowding From of its room breeds fever. Common prisoners sicken every day (Dungeon Regular Sick Percent): one in ten of the sick dies (Siege Sickness Death Share), the rest lie wounded. Captive lords may fall ill (Dungeon Hero Sick Chance Percent) for Dungeon Sick Days, and with Dungeon Hero Deaths some of them die of it. Winter, a siege with camp fever and the unburied dead within the walls make it worse; a governor skilled in medicine helps. Spreading prisoners over several fortresses ends it. Dungeons of other lords are only counted. Off = dungeons are as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
         public bool DungeonSickness { get; set; } = true;
@@ -15289,6 +15293,7 @@ namespace Armoury
             s.HeroWoundsMaimPercent = HeroWoundsMaimPercent;
             s.HeroFateRulersCanDie = HeroFateRulersCanDie;
             s.HeroFateSpareLastOfHouse = HeroFateSpareLastOfHouse;
+            s.HeroWoundsLordsRest = HeroWoundsLordsRest;
             s.DungeonSickness = DungeonSickness;
             s.DungeonCrowdingFrom = DungeonCrowdingFrom;
             s.DungeonRegularSickPercent = DungeonRegularSickPercent;

@@ -152,6 +152,25 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>408: partia jest wodzem (SiegeLeaderParty) CZYNNEGO oblezenia fabuly ROT - nazwa wydarzenia albo null. Takze w drodze pod mury (przed
+        /// postawieniem obozu). Tylko odczyt; przed refleksja sesji (ResolveStory) zawsze null.</summary>
+        internal static string StoryLeaderOf(MobileParty party)
+        {
+            if (party == null) return null;
+            for (int i = 0; i < _story.Count; i++)
+            {
+                var r = _story[i];
+                try
+                {
+                    var inst = r.Inst.GetValue(null);
+                    if (inst == null || !(bool)r.Active.GetValue(inst, null)) continue;
+                    if (ReferenceEquals(r.Leader.GetValue(inst) as MobileParty, party)) return r.Name;
+                }
+                catch (Exception e) { Stumble("StoryLeaderOf." + r.Name, e); }
+            }
+            return null;
+        }
+
         /// <summary>334f (L7): oblezenie fabuly ROT w tym obozie (nazwa wydarzenia) albo null - dla linii startu 334e (tylko odczyt).</summary>
         internal static string StoryOf(BesiegerCamp camp)
         {
