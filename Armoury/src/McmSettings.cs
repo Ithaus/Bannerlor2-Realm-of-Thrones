@@ -848,7 +848,7 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public int PrisonerExchangePactDays { get; set; } = 60;
 
-        [SettingPropertyBool("Prisoner Exchange Pact Guards Clan Parties", HintText = "With Prisoner Exchange For Terms and the oath of peace: the realm (or house) that swore it also leaves your caravans, your companions' parties and the villagers of your villages alone, and your companions' parties do not start fights with that realm (unless it besieges or raids your lands or goes after your men; joining a battle already being fought is allowed, as it is for you). Neither side flees from the other. Parties riding in another lord's army are not covered. Off = the oath covers only your lands and your own party, as before", RequireRestart = false)]
+        [SettingPropertyBool("Prisoner Exchange Pact Guards Clan Parties", HintText = "With Prisoner Exchange For Terms and the oath of peace: the realm (or house) that swore it also leaves your caravans, your companions' parties and the villagers of your villages alone, and your companions' parties do not start fights with that realm (unless it besieges or raids your lands or goes after your men; joining a battle already being fought is allowed, as it is for you). Neither side flees from the other. A clan party that has joined another lord's army fights under his command and is not covered; on its way to that army it still is, unless that army marches against them. Their lords do not even close in on your party or your clan's parties. Off = the oath covers only your lands and your own party, as before", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerExchangePactGuardsClan { get; set; } = true;
 

@@ -84,7 +84,8 @@ namespace Armoury
     ///
     /// 386 (Jeff 10.11 "rob caly punkt 2" - 2b: pakt chroni ziemie i druzyne gracza, ale nie karawany ani druzyny towarzyszy), klucz PrisonerExchangePactGuardsClan:
     ///  PARTIE RODU (Mine): partie rodu gracza poza druzyna gracza, zaloga i milicja (karawany, druzyny towarzyszy) oraz wiesniacy wsi rodu gracza; NIE partia
-    ///   jadaca w cudzej armii (walczy pod cudzym rozkazem w wojnie korony - pakt jest osobisty).
+    ///   DOLACZONA do cudzej armii (walczy pod cudzym rozkazem w wojnie korony - pakt jest osobisty). 386c: partia wezwana do cudzej armii, ale jeszcze w drodze,
+    ///   jest partia rodu - chyba ze wodz tej armii wystepuje przeciw frakcji paktu (Hunting patrzy tez na wodza armii).
     ///  LATKA: postfiks DefaultMobilePartyAIModel.ShouldConsiderAttacking (jedyna bramka ataku z inicjatywy - CalculateInitiativeScoresForEnemy; gra czyta tam
     ///   DoNotAttackMainPartyUntil tylko dla druzyny gracza): partia frakcji / rodu z uczciwym paktem nie zaczyna ataku na partie rodu i partia rodu nie zaczyna
     ///   ataku na partie tej frakcji. Wyjatki - ta sama regula co dla gracza (384b): samoobrona (cel oblega / najezdza ziemie rodu albo sciga druzyne gracza /
@@ -94,6 +95,12 @@ namespace Armoury
     ///   migawki nie wchodza (zdrajca atakuje i jest karany jak dotad - OnMapEventStarted). Dlugie rozkazy EngageParty sprzed paktu zdejmowane co dobe (ClearOrders).
     ///  LordEscort.Guard335 (obroncy chronionego wodza wymuszaja EngageParty z pominieciem ShouldConsiderAttacking): PactBlocks - napastnikiem nie jest druzyna
     ///   gracza ani partia rodu, gdy frakcja chronionego ma pakt (dziura 384: obroncy mogli uderzyc na gracza mimo paktu).
+    ///
+    /// 386c (Jeff 11.11 "tak, rob wszystko 2-4"): cel podejscia GoAroundParty (AiEngagePartyBehavior.AiHourlyTick; takze dodany przez RescueHunt) wyciety U ZRODLA -
+    ///  postfiks 140 CampaignEventDispatcher.AiHourlyTick (ThinkPact): partia z paktem na druzyne gracza (sam klucz 384) / partie rodu, partia rodu na partie z
+    ///  paktem; wyjatki jak w AttackPact. Powod: MobilePartyAi.GetGoAroundPartyBehavior bez punktu obejscia daje EngageParty prosto na cel BEZ pytania modelu
+    ///  (dziura w zalozeniu 386b), a samo podejscie to krazenie wokol partii, ktorej i tak nie wolno ruszyc. Zalogi i milicje: bez latki (gra nie daje im inicjatywy
+    ///  w polu ani nie bierze ich za cel - DefaultMobilePartyAIModel.GetBestInitiativeBehavior / ShouldPartyCheckInitiativeBehavior; Aggressiveness 0).
     /// </summary>
     internal static class PrisonerTerms384
     {
@@ -1650,7 +1657,8 @@ namespace Armoury
         /// glownym (SyncPact), czytana z watkow AI. null = brak paktu.</summary>
         private sealed class Pact { public readonly HashSet<string> F = new HashSet<string>(StringComparer.Ordinal), C = new HashSet<string>(StringComparer.Ordinal); }
         private static volatile Pact _pact;
-        private static string _pactHook = "nie wpinana", _avoidHook = "nie wpinana";
+        private static string _pactHook = "nie wpinana", _avoidHook = "nie wpinana", _thinkHook = "nie wpinana";
+        private static int _pGoAi, _pGoMy, _pGoFuse;   // 386c: watki AI (Interlocked)
         private static readonly object PactGate = new object();
         private static readonly HashSet<TaleWorlds.ObjectSystem.MBGUID> _pAiSet = new HashSet<TaleWorlds.ObjectSystem.MBGUID>(), _pMySet = new HashSet<TaleWorlds.ObjectSystem.MBGUID>();
         private static int _pAiCalls, _pMyCalls, _pFlee, _pThreadStumbles;   // watki AI (Interlocked / PactGate)
@@ -1660,6 +1668,7 @@ namespace Armoury
         {
             lock (PactGate) { _pAiSet.Clear(); _pMySet.Clear(); }
             Interlocked.Exchange(ref _pAiCalls, 0); Interlocked.Exchange(ref _pMyCalls, 0); Interlocked.Exchange(ref _pFlee, 0);
+            Interlocked.Exchange(ref _pGoAi, 0); Interlocked.Exchange(ref _pGoMy, 0); Interlocked.Exchange(ref _pGoFuse, 0);   // 386c
             _pOrders = 0; _pDespite = 0; _pMyDespite = 0;
         }
 
@@ -1696,7 +1705,9 @@ namespace Armoury
 
         /// <summary>Partia rodu gracza objeta paktem (poza druzyna gracza - ta ma SetDoNotAttackMainParty): karawany i druzyny towarzyszy (ActualClan = rod gracza,
         /// bez zalogi i milicji - twierdze obsluguje ScorePact + Relift) oraz wiesniacy wsi rodu gracza (pakt zakazuje najazdu na te wsie - zabicie wozu wsi to ten
-        /// sam cios). Nie: partia jadaca w cudzej armii. Tylko odczyt pol - watki AI.</summary>
+        /// sam cios). Nie: partia DOLACZONA do cudzej armii (AttachedTo - w szyku walczy pod cudzym rozkazem; gra i tak nie celuje w nia osobno). 386c: partia
+        /// wezwana do cudzej armii, ale jeszcze w drodze (Army != null, AttachedTo == null) JEST partia rodu - chyba ze wodz tej armii wystepuje przeciw frakcji
+        /// paktu (Hunting patrzy na wodza). Tylko odczyt pol - watki AI.</summary>
         private static bool Mine(MobileParty mp)
         {
             if (mp == null || mp.IsMainParty) return false;
@@ -1707,11 +1718,20 @@ namespace Armoury
             var main = MobileParty.MainParty;
             var at = mp.AttachedTo;
             if (at != null && at != main && at.ActualClan != pc) return false;
-            var army = mp.Army;
-            var lp = army != null ? army.LeaderParty : null;
-            if (lp != null && lp != mp && lp != main && lp.ActualClan != pc) return false;
             return true;
         }
+
+        /// <summary>386c: partia rodu wezwana do cudzej armii (wodz spoza rodu gracza, nie gracz), jeszcze niedolaczona. Tylko odczyt.</summary>
+        private static bool EnRoute(MobileParty mp)
+        {
+            var army = mp != null ? mp.Army : null;
+            var lp = army != null ? army.LeaderParty : null;
+            return lp != null && lp != mp && mp.AttachedTo == null && lp != MobileParty.MainParty && lp.ActualClan != Clan.PlayerClan;
+        }
+
+        /// <summary>386c: partia rodu objeta paktem TERAZ - Mine i sama (ani wodz jej armii) nie wystepuje przeciw frakcji paktu. Scigajacy taka partie jest
+        /// napastnikiem (AggressorCore); scigajacy partie rodu, ktora sama na nich idzie, broni sie legalnie i samoobrony graczowi nie daje.</summary>
+        private static bool Guarded(MobileParty mp, Pact k) { return Mine(mp) && !Hunting(mp, k); }
 
         /// <summary>386b: poscig to TYLKO EngageParty. GoAroundParty to podejscie, ktore gra co godzine daje kazdej druzynie lorda na pobliska wroga druzyne
         /// (AiEngagePartyBehavior.AiHourlyTick) - liczone jako poscig robilo z kazdego lorda przy froncie "napastnika" i rozbrajalo pakt w obie strony; atak z
@@ -1737,6 +1757,8 @@ namespace Armoury
             if (mp == null) return null;
             var pc = Clan.PlayerClan;
             var main = MobileParty.MainParty;
+            var pk = _pact;   // 386c: jeden odczyt migawki (null = Guarded to samo co Mine)
+            bool kc = KClan;
             for (int k = 0; k < 2; k++)
             {
                 var x = k == 0 ? mp : (mp.Army != null ? mp.Army.LeaderParty : null);
@@ -1747,7 +1769,7 @@ namespace Armoury
                 var tp = Engages(x.DefaultBehavior) ? x.TargetParty : null;
                 var sp = Engages(x.ShortTermBehavior) ? x.ShortTermTargetParty : null;
                 if (main != null && (tp == main || sp == main)) return "sciga druzyne gracza";
-                if (KClan && (Mine(tp) || Mine(sp))) return "sciga partie rodu gracza";   // 386b: przy kluczu NIE pakt nie obejmuje partii rodu - bez darmowej samoobrony
+                if (kc && (Guarded(tp, pk) || Guarded(sp, pk))) return "sciga partie rodu gracza";   // 386b: przy kluczu NIE pakt nie obejmuje partii rodu - bez darmowej samoobrony; 386c: Guarded
                 for (int j = 0; j < 2; j++)
                 {
                     var t = j == 0 ? x.TargetSettlement : x.ShortTermTargetSettlement;
@@ -1764,6 +1786,22 @@ namespace Armoury
         private static bool Hunting(MobileParty b, Pact k)
         {
             if (b == null || k == null) return false;
+            // 386c: czlonek armii (takze w drodze na zbiorke) wystepuje przeciw nim, gdy robi to wodz jego armii - "armia idaca na nich" to zwykly wrog.
+            // Armia gracza pominieta (czyny gracza sadzi PlayerBroke / SelfDefence). Jeden poziom, bez rekurencji.
+            return ArmyHunts(b, k) || HuntingCore(b, k);
+        }
+
+        /// <summary>386c: wodz armii partii b (nie ona sama, nie gracz) wystepuje przeciw frakcji paktu - b jest wtedy zwyklym wrogiem w OBIE strony
+        /// (oni moga ja atakowac, ona moze atakowac ich i ma przed nimi uciekac). Tylko odczyt.</summary>
+        private static bool ArmyHunts(MobileParty b, Pact k)
+        {
+            if (b == null || k == null) return false;
+            var al = b.Army != null ? b.Army.LeaderParty : null;
+            return al != null && al != b && al != MobileParty.MainParty && HuntingCore(al, k);
+        }
+
+        private static bool HuntingCore(MobileParty b, Pact k)
+        {
             if (Engages(b.DefaultBehavior) && Has(k, b.TargetParty)) return true;
             if (Engages(b.ShortTermBehavior) && Has(k, b.ShortTermTargetParty)) return true;
             // 386b: najazd / oblezenie ich osady (takze w drodze) to tez wystepowanie przeciw nim - obroncy nie maja weta
@@ -1805,7 +1843,75 @@ namespace Armoury
                 else _avoidHook = "BRAK ShouldConsiderAvoiding";
             }
             catch (Exception e) { _avoidHook = "blad " + e.GetType().Name; Log.Error("PrisonerTerms384.ApplyPact(ucieczka)", e); }
-            try { Log.Info(Tag + ": latka paktu partii rodu (386) - atak: " + _pactHook + ", ucieczka: " + _avoidHook + " (postfiksy DefaultMobilePartyAIModel.ShouldConsiderAttacking / ShouldConsiderAvoiding; dzialaja przy kluczu Prisoner Exchange Pact Guards Clan Parties i czynnym pakcie)."); } catch { }
+            // 386c: cel podejscia (GoAroundParty) wyciety u zrodla - postfiks 140 na mysli godzinowej: po RescueHunt (150, dodaje te opcje), przed ArmsFirst (100),
+            // CanonWarBalance (50) i LordEscort / SiegeWalls2 / CanonWarWatch (Last) - tamte nie podnosza wyniku <= -1. Metoda zadeklarowana w CampaignEventDispatcher (override).
+            try
+            {
+                var m = AccessTools.DeclaredMethod(typeof(CampaignEventDispatcher), "AiHourlyTick", new[] { typeof(MobileParty), typeof(PartyThinkParams) });
+                if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(PrisonerTerms384), nameof(ThinkPact)) { priority = 140 }); _thinkHook = "wpieta"; }
+                else _thinkHook = "BRAK CampaignEventDispatcher.AiHourlyTick";
+            }
+            catch (Exception e) { _thinkHook = "blad " + e.GetType().Name; Log.Error("PrisonerTerms384.ApplyPact(podejscie)", e); }
+            try { Log.Info(Tag + ": latka paktu partii rodu (386) - atak: " + _pactHook + ", ucieczka: " + _avoidHook + ", podejscie (386c): " + _thinkHook + " (postfiksy DefaultMobilePartyAIModel.ShouldConsiderAttacking / ShouldConsiderAvoiding i CampaignEventDispatcher.AiHourlyTick 140; partie rodu przy kluczu Prisoner Exchange Pact Guards Clan Parties, druzyna gracza przy samym Prisoner Exchange For Terms; tylko przy czynnym pakcie)."); } catch { }
+        }
+
+        /// <summary>386c: para z paktem (kierunek 1: partia frakcji / rodu z paktem -> druzyna gracza albo partia rodu). Tylko odczyt.</summary>
+        private static bool GoCutAi(Pact k, MobileParty t, bool kc)
+        {
+            if (t.IsMainParty) return true;                       // sam klucz 384 (jak NoAttack)
+            return kc && Mine(t) && !Hunting(t, k);               // partia rodu sama (albo wodz jej armii) idzie na nich - moga podejsc
+        }
+
+        /// <summary>386c: kierunek 2 - partia rodu -> partia z paktem; wyjatki jak w AttackPact (trwajaca bitwa, samoobrona). Tylko odczyt.</summary>
+        private static bool GoCutMine(Pact k, MobileParty self, MobileParty t)
+        {
+            return Has(k, t) && t.MapEvent == null && AggressorCore(t) == null && !ArmyHunts(self, k);
+        }
+
+        /// <summary>386c: postfiks (140) CampaignEventDispatcher.AiHourlyTick: opcja GoAroundParty (AiEngagePartyBehavior - podejscie do pobliskiej wrogiej druzyny,
+        /// takze dodana przez RescueHunt) na partie objeta paktem dostaje -1 (konwencja repo: wynik -1 nie wygrywa i nikt go nie podnosi). Zamyka droge
+        /// MobilePartyAi.GetGoAroundPartyBehavior -> EngageParty bez pytania modelu (gdy brak punktu obejscia) i krazenie lordow paktu wokol partii rodu.
+        /// Bez paktu - jeden odczyt migawki. Tylko migawka i pola partii (bez _entries). Nie rzuca.</summary>
+        public static void ThinkPact(MobileParty party, PartyThinkParams partyThinkParams)
+        {
+            var k = _pact;
+            if (k == null) return;
+            try
+            {
+                if (party == null || partyThinkParams == null || party.IsMainParty || partyThinkParams.DoNotChangeBehavior || !On) return;
+                bool kc = KClan;
+                bool a = Has(k, party);
+                bool m = !a && kc && Mine(party);
+                if (!a && !m) return;
+                var scores = partyThinkParams.AIBehaviorScores;
+                if (scores == null || scores.Count == 0) return;
+                List<AIBehaviorData> cut = null;
+                for (int i = 0; i < scores.Count; i++)
+                {
+                    var e = scores[i];
+                    if (!(e.Item2 > -1f) || e.Item1.AiBehavior != AiBehavior.GoAroundParty) continue;
+                    var t = e.Item1.Party as MobileParty;
+                    if (t == null || !(a ? GoCutAi(k, t, kc) : GoCutMine(k, party, t))) continue;
+                    if (cut == null) cut = new List<AIBehaviorData>(2);
+                    cut.Add(e.Item1);
+                }
+                if (cut == null) return;
+                foreach (var d0 in cut)
+                {
+                    var d = d0;
+                    partyThinkParams.SetBehaviorScore(in d, -1f);
+                    if (a) Interlocked.Increment(ref _pGoAi); else Interlocked.Increment(ref _pGoMy);
+                }
+                // bezpiecznik (wzor WatchLaw): SetBehaviorScore ustawia pierwsza rowna pozycje - duplikat opcji zostalby z wynikiem ponad -1
+                for (int i = 0; i < scores.Count; i++)
+                {
+                    var e = scores[i];
+                    if (!(e.Item2 > -1f) || e.Item1.AiBehavior != AiBehavior.GoAroundParty) continue;
+                    var t = e.Item1.Party as MobileParty;
+                    if (t != null && (a ? GoCutAi(k, t, kc) : GoCutMine(k, party, t))) Interlocked.Increment(ref _pGoFuse);
+                }
+            }
+            catch { Interlocked.Increment(ref _pThreadStumbles); }
         }
 
         /// <summary>Postfiks ShouldConsiderAttacking (watki AI): para z paktem nie zaczyna ataku. Bez paktu - jeden odczyt migawki. Nie rzuca.</summary>
@@ -1830,6 +1936,7 @@ namespace Armoury
                 {
                     if (__1.MapEvent != null) return;                  // dolaczenie do trwajacej bitwy to nie zaczecie ataku (regula gracza)
                     if (AggressorCore(__1) != null) return;            // samoobrona
+                    if (ArmyHunts(__0, k)) return;                     // 386c: jedzie do armii, ktora idzie na nich - wojna korony, bez weta
                     __result = false;
                     Interlocked.Increment(ref _pMyCalls);
                     lock (PactGate) { _pMySet.Add(__0.Id); }
@@ -1851,7 +1958,7 @@ namespace Armoury
                 int dir = PactPair(k, __0, __1);
                 if (dir == 0) return;
                 if (dir == 1) { if (Hunting(__1, k)) return; }
-                else if (AggressorCore(__1) != null) return;
+                else if (AggressorCore(__1) != null || ArmyHunts(__0, k)) return;   // 386c: ArmyHunts - tamci moga ja legalnie atakowac, wiec ucieka
                 __result = false;
                 Interlocked.Increment(ref _pFlee);
             }
@@ -1880,7 +1987,8 @@ namespace Armoury
         private static void ClearOrders()
         {
             var k = _pact;
-            if (k == null || !KClan) return;
+            if (k == null || !On) return;
+            bool kc = KClan;
             try
             {
                 foreach (var mp in MobileParty.AllLordParties)
@@ -1888,12 +1996,17 @@ namespace Armoury
                     try
                     {
                         if (mp == null || !mp.IsActive || mp.IsMainParty || mp.Ai == null || mp.MapEvent != null || mp.AttachedTo != null) continue;
-                        if (mp.DefaultBehavior != AiBehavior.EngageParty) continue;
+                        // 386c: takze GoAroundParty - od kiedy ThinkPact wycina te opcje u zrodla, gra jej nie odnowi, wiec zdjecie rozkazu sprzed paktu
+                        // (albo przywroconego po obozie przez NightRest) ma sens; 386b slusznie tego nie robilo (gra nadawala cel od nowa co godzine)
+                        bool go = mp.DefaultBehavior == AiBehavior.GoAroundParty;
+                        if (mp.DefaultBehavior != AiBehavior.EngageParty && !go) continue;
                         var t = mp.TargetParty;
                         if (t == null) continue;
                         bool stop = false;
-                        if (Mine(t)) stop = Has(k, mp) && !Hunting(t, k);
-                        else if (Mine(mp)) stop = Has(k, t) && t.MapEvent == null && AggressorCore(t) == null;
+                        if (t.IsMainParty) stop = go && Has(k, mp);   // druzyna gracza: tylko podejscie (sam klucz 384); EngageParty na gracza jak dotad - poza ta regula
+                        else if (!kc) continue;
+                        else if (Mine(t)) stop = Has(k, mp) && !Hunting(t, k);
+                        else if (Mine(mp)) stop = Has(k, t) && t.MapEvent == null && AggressorCore(t) == null && !ArmyHunts(mp, k);
                         if (!stop) continue;
                         mp.SetMoveModeHold();
                         mp.Ai.RethinkAtNextHourlyTick = true;
@@ -1908,20 +2021,20 @@ namespace Armoury
         /// <summary>Linia doby: ile partii rodu pakt teraz chroni (karawany, druzyny, wiesniacy).</summary>
         private static string PactLine()
         {
-            int car = 0, lords = 0, vil = 0, aiP, myP;
+            int car = 0, lords = 0, vil = 0, road = 0, aiP, myP;
             try
             {
                 foreach (var mp in MobileParty.All)
                 {
                     if (mp == null || !mp.IsActive || !Mine(mp)) continue;
-                    if (mp.IsVillager) vil++; else if (mp.IsCaravan) car++; else lords++;
+                    if (mp.IsVillager) vil++; else if (mp.IsCaravan) car++; else { lords++; if (EnRoute(mp)) road++; }
                 }
             }
             catch (Exception e) { Stumble("PactLine", e); }
             lock (PactGate) { aiP = _pAiSet.Count; myP = _pMySet.Count; }
-            return " | 386 partie rodu (" + (KClan ? "klucz TAK" : "klucz NIE") + ", latka atak " + _pactHook + " / ucieczka " + _avoidHook + "): ataki AI zablokowane " + _pAiCalls + " wywolan / " + aiP
+            return " | 386 partie rodu (" + (KClan ? "klucz TAK" : "klucz NIE") + ", latka atak " + _pactHook + " / ucieczka " + _avoidHook + " / podejscie " + _thinkHook + "): ataki AI zablokowane " + _pAiCalls + " wywolan / " + aiP
                    + " partii, ataki rodu zablokowane " + _pMyCalls + " / " + myP + ", ucieczki zdjete " + _pFlee + ", rozkazy zdjete " + _pOrders + ", atak mimo paktu na partie rodu " + _pDespite
-                   + ", atak partii rodu mimo paktu " + _pMyDespite + ", chronionych teraz " + (car + lords + vil) + " (karawany " + car + ", druzyny " + lords + ", wiesniacy " + vil + "), potkniecia watkow " + _pThreadStumbles;
+                   + ", atak partii rodu mimo paktu " + _pMyDespite + ", chronionych teraz " + (car + lords + vil) + " (karawany " + car + ", druzyny " + lords + ", wiesniacy " + vil + "; w drodze do cudzej armii " + road + "), 386c podejscia wyciete AI " + _pGoAi + " / rodu " + _pGoMy + " (zostalo mimo wyciecia " + _pGoFuse + "), potkniecia watkow " + _pThreadStumbles;
         }
 
         private static List<Entry> Covering(IFaction f, Clan c, Settlement st)
@@ -1976,6 +2089,7 @@ namespace Armoury
                 {
                     if (!PactWith(d.MapFaction, d.MobileParty != null ? d.MobileParty.ActualClan : (d.Settlement != null ? d.Settlement.OwnerClan : null))) return;
                     string why = d.MobileParty != null ? AggressorCore(d.MobileParty) : null;
+                    if (why == null && ArmyHunts(am, BuildPact(true))) why = "wojna korony - wodz jej armii wystepuje przeciw nim (386c)";
                     if (why == null) _pMyDespite++;
                     Log.Info(Tag + ": dzien " + F(Today) + " | partia rodu gracza " + a.Name + " atakuje " + d.Name + (why != null ? " - samoobrona (" + why + "), pakt nie zlamany." : " MIMO PAKTU (droga poza latka 386 i wyzerowanym celem osady 386b) - bez kary (gracz nie wydal rozkazu)."));
                     return;
@@ -2160,13 +2274,13 @@ namespace Armoury
                 foreach (var kv in _cool) if (kv.Value.End <= Today) dead.Add(kv.Key);
                 foreach (var k in dead) _cool.Remove(k);
                 if (_entries.Count > 0 && On) { NoAttack(); ScanViolations(); }
-                if (_entries.Count > 0 || before > 0 || _dZero + _dZeroMine > 0 || _queue.Count > 0 || _dRelift + _dReliftFail > 0 || _dRealmBlock > 0 || _dPick > 0 || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite > 0)
+                if (_entries.Count > 0 || before > 0 || _dZero + _dZeroMine > 0 || _queue.Count > 0 || _dRelift + _dReliftFail > 0 || _dRealmBlock > 0 || _dPick > 0 || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite + _pGoAi + _pGoMy > 0)
                 {
                     int pact = 0, st = 0, bet = 0, realm = 0;
                     foreach (var e in _entries) { if (e.Betray) bet++; else if (e.Scope == "*") pact++; else if (e.Scope == "K") realm++; else st++; }
                     Log.Info(Tag + ": doba " + today + " | wpisy umow " + _entries.Count + " (pakt ziem " + pact + ", rozejm osady " + st + ", rozejm krolestw " + realm + ", pilnowane zdrady " + bet + "; wygaslo " + (before - _entries.Count) + ")"
                              + " | 385: wojny AI zatrzymane rozejmem krolestw " + _dRealmBlock + ", okna wyboru " + _dPick
-                             + " | cele AI wyzerowane paktem " + _dZero + " (cele druzyn rodu na ich osadach " + _dZeroMine + ") | druzyny bez ataku na gracza " + _dNoAttack + " | kolejka " + _queue.Count + " | oblezenia wbrew umowie zwiniete " + _dRelift + " (nieudane " + _dReliftFail + ", czeka " + _relift.Count + ")" + (_pact != null || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite > 0 ? PactLine() : "") + " | potkniecia " + _stumbles + ".");
+                             + " | cele AI wyzerowane paktem " + _dZero + " (cele druzyn rodu na ich osadach " + _dZeroMine + ") | druzyny bez ataku na gracza " + _dNoAttack + " | kolejka " + _queue.Count + " | oblezenia wbrew umowie zwiniete " + _dRelift + " (nieudane " + _dReliftFail + ", czeka " + _relift.Count + ")" + (_pact != null || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite + _pGoAi + _pGoMy > 0 ? PactLine() : "") + " | potkniecia " + _stumbles + ".");
                 }
                 _dZero = 0; _dZeroMine = 0; _dNoAttack = 0; _dRelift = 0; _dReliftFail = 0; _dRealmBlock = 0; _dPick = 0;
                 PactZero();   // 386
