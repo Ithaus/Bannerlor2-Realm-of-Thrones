@@ -11760,9 +11760,9 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeWoundedPlayerSide { get; set; } = true;
 
-        [SettingPropertyBool("Siege Wounded Player Companions", HintText = "With Siege Wounded Player Side: companions and members of your clan who lie wounded beneath the walls (and do not lead a party) are taken prisoner too, without any limit - you get them back as any captive: ransom, escape or talks. Off = your own heroes are always carried back; only ordinary soldiers and other lords' heroes are left behind", RequireRestart = false)]
+        [SettingPropertyBool("Siege Wounded Player Companions", HintText = "With Siege Wounded Player Side: companions and members of your clan who are struck down senseless in the fight inside the fortress or within Siege Wounded Wall Distance of its walls - the same ground that decides for your ordinary soldiers - and do not lead a party are taken prisoner too, into the fortress dungeon, without any limit; those who fell farther out are carried back. You yourself are never taken this way, and neither is a guest who merely rides with your party. You get them back as any captive: ransom, escape or talks. Off = your own heroes are always carried back; only ordinary soldiers and other lords' heroes are left behind", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
-        public bool SiegeWoundedPlayerCompanions { get; set; } = false;
+        public bool SiegeWoundedPlayerCompanions { get; set; } = true;
 
         [SettingPropertyBool("Siege Wounded Player On Retreat", HintText = "With Siege Wounded Player Side: the wounded beneath the walls are also lost when you end the fight yourself - you call the retreat, or you fall and leave the field - not only when the assault breaks. Off = only a broken assault (Siege Player Assault Breaks, or Siege Army Assault Breaks when an AI commander leads) leaves them behind; leaving the field in time saves them all", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]

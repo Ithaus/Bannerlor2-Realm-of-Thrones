@@ -43,7 +43,11 @@ namespace Armoury
     /// odparty (zalamanie 371/387, odwrot reczny, gracz pokonany) konczy sie "Battle continues" (PlayerEncounter.ContinueBattle), a potem "Continue siege
     /// preparations." / "Leave..." -> PlayerEncounter.Finish -> LeaveBattle -> MapEvent.FinalizeEvent bez zwyciezcy (cs_full 99560-99575, 112804-112826) -
     /// MapEventEnded pada, gdy MainParty jest jeszcze po stronie atakujacej. Rozliczenie: SiegeWounded373Behavior.Player387c (osobna galaz, galaz obroncy nietknieta).
-    /// Sam gracz nigdy; bohaterowie rodu / towarzysze tylko z kluczem Siege Wounded Player Companions (domyslnie NIE); okien 380 nie ma.
+    /// Sam gracz nigdy; bohaterowie rodu / towarzysze tylko z kluczem Siege Wounded Player Companions (394, Jeff 11.11 odp. 7: domyslnie TAK); okien 380 nie ma.
+    /// 394: regula bohatera rodu gracza / towarzysza = DOKLADNIE regula zolnierza - ten sam wpis OnAgentRemoved (stan Unconscious, kategoria 0 w srodku albo
+    /// 1 pod murami <= Siege Wounded Wall Distance); padl dalej / bez pozycji -> nie ma go w Tally.Heroes -> wraca z druzyna. Bez misji (symulacja) pozycji
+    /// nie ma: Player387c nie biegnie (brak wpisu w ksiedze), a Sim388 bohaterow rodu gracza / towarzyszy pomija. Gosc druzyny gracza (bohater w MainParty
+    /// spoza rodu i nie towarzysz - np. z zadania) nigdy.
     /// 391 (Jeff 11.11, odp. 2 i 4): nadwyzka ponad sufit nie wraca ze swoja partia - gracz-obronca bierze ja do jencow druzyny (do limitu), reszta umiera
     /// pod murami (373, 388, 387c); opis i droga sprzetu przy SiegeWounded373Behavior.LeftToDie391.
     /// </summary>
@@ -453,7 +457,7 @@ namespace Armoury
                 // 1. kandydaci: ranni z tego szturmu, ktorzy wciaz sa rannymi swojej partii
                 var cands = new Dictionary<PartyBase, List<Cand>>();
                 var heroes = new List<Hero>();
-                int wounded = 0, parties = 0, wantSum = 0, notTaken = 0, gone = 0, hSeen = 0, hLeads = 0, hMissed = 0, hStay = 0;
+                int wounded = 0, parties = 0, wantSum = 0, notTaken = 0, gone = 0, hSeen = 0, hLeads = 0, hMissed = 0, hStay = 0, hOwn = 0;
                 var model = Campaign.Current.Models.BattleRewardModel;
                 foreach (var mep in me.AttackerSide.Parties)
                 {
@@ -481,6 +485,8 @@ namespace Armoury
                                         || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner())
                                     { hMissed++; continue; }
                                     if (h == leader || hp.LeaderHero == h) { hLeads++; continue; }   // 373b: wodz zostaje z ludzmi
+                                    // 394 (Jeff 11.11, odp. 7): bohater rodu gracza / towarzysz tylko wedle pozycji z misji - bez misji pozycji nie ma, wiec nigdy
+                                    if (h.Clan == Clan.PlayerClan || h.IsPlayerCompanion) { hOwn++; continue; }
                                     if (MBRandom.RandomFloat < share) heroes.Add(h); else hStay++;
                                     continue;
                                 }
@@ -628,7 +634,7 @@ namespace Armoury
                          + " | 391 nadwyzka: " + (dieOn ? "zmarli pod murami " + left.Dead + " (partii " + left.Parties + ", typy: " + left.TypesText() + "), sprzet do zbrojowni zalogi "
                              + left.Kit + " szt." + (garrison == null ? " (brak zalogi - zostaje w zbrojowniach partii)" : left.NoKit > 0 ? " (bez kompletu / bez DTE: " + left.NoKit + " ludzi)" : "")
                              + (left.Undead > 0 ? ", Inni pominieci " + left.Undead : "") : "klucz NIE - wraca z partia")
-                         + " | bohaterowie ranni " + hSeen + ": do lochu " + names.Count + " [" + string.Join(", ", names) + "], wodzowie pominieci (373b) " + hLeads + ", wyniesieni " + hStay
+                         + " | bohaterowie ranni " + hSeen + ": do lochu " + names.Count + " [" + string.Join(", ", names) + "], wodzowie pominieci (373b) " + hLeads + ", wyniesieni " + hStay + ", rodu gracza - bez pozycji (394) " + hOwn
                          + ", poza regula " + hMissed + " | loch po " + prison.TotalManCount + " | ksiega ludzi " + book.ToString("0", CultureInfo.InvariantCulture)
                          + " | partie oproznione " + emptied + (kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + kept : "") + " | potkniecia " + s + ".");
             }
@@ -677,7 +683,7 @@ namespace Armoury
                 // 1. bohaterowie - przed zolnierzami, bez limitu (jak 373c)
                 var names = new List<string>();
                 var own = new List<string>();
-                int hMissed = 0, hLeads = 0, hKept = 0;
+                int hMissed = 0, hLeads = 0, hKept = 0, hGuest = 0;
                 bool comp = set.SiegeWoundedPlayerCompanions;
                 Hero leader = null;
                 try { var lp = me.AttackerSide.LeaderParty; leader = lp != null ? lp.LeaderHero : null; } catch { leader = null; }
@@ -690,12 +696,15 @@ namespace Armoury
                             || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner())
                         { hMissed++; continue; }
                         if (h == leader || hp.LeaderHero == h) { hLeads++; continue; }   // 373b: wodz zostaje z ludzmi
-                        bool mineH = hp == MobileParty.MainParty || h.Clan == Clan.PlayerClan || h.IsPlayerCompanion;
+                        bool clanH = h.Clan == Clan.PlayerClan || h.IsPlayerCompanion;
+                        bool mineH = clanH || hp == MobileParty.MainParty;
+                        if (mineH && !clanH) { hGuest++; continue; }                     // 394: gosc druzyny gracza (spoza rodu, nie towarzysz - np. bohater zadania) nigdy
                         if (mineH && !comp) { hKept++; continue; }                       // klucz NIE: swoich bohaterow gracz zawsze wynosi
                         TakePrisonerAction.Apply(captor, h);
                         string nm = h.Name != null ? h.Name.ToString() : h.StringId;
                         if (mineH) own.Add(nm); else names.Add(nm);
-                        try { InformationManager.DisplayMessage(new InformationMessage(nm + " lies wounded beneath the walls of " + stName + " and is taken prisoner.", Color.FromUint(0xFFE06050u))); } catch { }
+                        // 394: wlasny bohater - osobny komunikat (gdzie siedzi), inni jak dotad
+                        try { InformationManager.DisplayMessage(new InformationMessage(mineH ? nm + " fell beneath the walls of " + stName + " and could not be carried away - taken prisoner and held in its dungeon." : nm + " lies wounded beneath the walls of " + stName + " and is taken prisoner.", Color.FromUint(0xFFE06050u))); } catch { }
                     }
                     catch (Exception e) { Stumble("387c.Hero", e, ref s); }
                 }
@@ -818,7 +827,7 @@ namespace Armoury
                              + (left.Kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + left.Kept : "") + (left.Undead > 0 ? ", Inni pominieci " + left.Undead : "")
                              : (set.SiegeWoundedLeftToDie ? "potkniecie sufitu - nikt nie umiera" : "klucz NIE") + " - wracaja z partia")
                          + " | bohaterowie: do lochu " + names.Count + " [" + string.Join(", ", names) + "], rodu / towarzysze gracza " + own.Count + " [" + string.Join(", ", own) + "]"
-                         + ", wyniesieni (klucz towarzyszy " + (comp ? "TAK" : "NIE") + ") " + hKept + ", wodzowie pominieci (373b) " + hLeads + ", poza regula " + hMissed
+                         + ", wyniesieni (klucz towarzyszy " + (comp ? "TAK" : "NIE") + ") " + hKept + ", goscie druzyny gracza (394) " + hGuest + ", wodzowie pominieci (373b) " + hLeads + ", poza regula " + hMissed
                          + " | loch " + l0 + " -> " + prison.TotalManCount + " | ksiega ludzi " + book.ToString("0", CultureInfo.InvariantCulture)
                          + " | partie oproznione " + emptied + (kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + kept : "") + " | potkniecia " + s + ".");
             }
