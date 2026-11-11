@@ -360,6 +360,56 @@ namespace Armoury
             return dir > 0 ? Math.Max(frozen, n) : Math.Min(frozen, n);
         }
 
+        /// <summary>430 (A6): ile sztuk koszyka (typ x tier) przybylo na polce od otwarcia ekranu handlu - sprzedaz gracza netto w tej wizycie (odkup i kupno z tego
+        /// koszyka zdejmuja). -1 = ekran handlu zamkniety (brak migawki polki). Tylko odczyt; ta sama migawka i ten sam licznik polki co Stock.</summary>
+        internal static int VisitAdded(ItemRoster shelf, ItemObject it)
+        {
+            if (shelf == null || it == null) return -1;
+            var view = ShelfView(shelf);
+            if (view == null) return -1;
+            int frozen = 0;
+            foreach (var kv in view) if (SameBucket(kv.Key, it)) frozen += kv.Value;
+            int n = ShelfIndex.Count(shelf, it.ItemType, TierOf(it));
+            if (n < 0)
+            {
+                n = 0;
+                for (int i = 0; i < shelf.Count; i++)
+                {
+                    var el = shelf.GetElementCopyAtIndex(i);
+                    if (el.Amount > 0 && SameBucket(el.EquipmentElement.Item, it)) n += el.Amount;
+                }
+            }
+            return Math.Max(0, n - frozen);
+        }
+
+        /// <summary>430 (A6): zamkniecie ekranu handlu - przyrost kazdego koszyka sprzetu na polce wobec migawki z otwarcia (klucz typ x 8 + tier -> sztuki > 0).
+        /// Migawki nie tworzy (brak = nic nie bylo wyceniane na tej polce w tej wizycie - pusto). Tylko odczyt.</summary>
+        internal static void VisitDeltas(ItemRoster shelf, Dictionary<int, int> into)
+        {
+            if (shelf == null || into == null || !TradeScreenOpen()) return;
+            List<KeyValuePair<ItemObject, int>> snap;
+            if (!_frozen.TryGetValue(shelf, out snap) || snap == null) return;
+            var live = new Dictionary<int, int>();
+            for (int i = 0; i < shelf.Count; i++)
+            {
+                var el = shelf.GetElementCopyAtIndex(i);
+                var x = el.EquipmentElement.Item;
+                if (el.Amount <= 0 || x == null || !Equipmentish(x)) continue;
+                int k = (int)x.ItemType * 8 + TierOf(x), v;
+                live.TryGetValue(k, out v); live[k] = v + el.Amount;
+            }
+            foreach (var kv in snap)
+            {
+                if (kv.Key == null || !Equipmentish(kv.Key)) continue;
+                int k = (int)kv.Key.ItemType * 8 + TierOf(kv.Key), v;
+                if (live.TryGetValue(k, out v)) live[k] = v - kv.Value;
+            }
+            foreach (var kv in live) if (kv.Value > 0) into[kv.Key] = kv.Value;
+        }
+
+        /// <summary>430 (A6): klucz koszyka pamieci sprzedazy gracza (typ x 8 + tier) - ten sam koszyk co prawo podazy.</summary>
+        internal static int BucketKey(ItemObject it) { return (int)it.ItemType * 8 + TierOf(it); }
+
         internal static float Factor(Settlement st, ItemObject it, bool isSelling, out float d, out int s)
         {
             var c = Settings.Current;
@@ -573,6 +623,19 @@ namespace Armoury
                 // bezpiecznika i koszt odtworzenia przy dzisiejszych cenach surowcow w okolicy
                 float arms = ArmsPricing.Multiplier(st, item);
                 float f = shelfF * arms;
+                // 430 (A6, Jeff 11.11 "tak ale rozsadnie"): sprzedaz gracza w ekranie handlu - sufit premii pustej polki maleje z kazda sztuka tego koszyka sprzedana
+                // w tym miescie (PlayerSale430.CapShelf: mniejsza z dwoch - mnoznik polki albo sufit; nigdy iloczyn, wiec spadek polki z zapasem nie liczy sie dwa razy;
+                // polka <= 1 - bez zmian). Poza ekranem handlu (satK < 0), sondy (_quiet), AI i klucz NIE - f jak dotad (bit w bit).
+                float satShelf = shelfF, satCap = 0f, satK = -1f;
+                if (__3 && !_quiet && __1 != null && __1.IsMainParty && PlayerSale430.On)
+                {
+                    int vis = VisitAdded(st.ItemRoster, item);
+                    if (vis >= 0)
+                    {
+                        satShelf = PlayerSale430.CapShelf(st, BucketKey(item), shelfF, vis, out satCap, out satK);
+                        if (satShelf < shelfF) f = satShelf * arms;
+                    }
+                }
                 int before = __result;
                 // 300b (Jeff 29.10 "ceny zalezne sa od persuazion i trade"): strona gracza (gracz, jego rod z przywodca, nie karawana) - marza kupca x czynnik targu h
                 // (PlayerHaggle.MarkupPct), sufit odkupu zamiast 1/10 ceny nowej, zacisk "kupno-1"; klucz wylaczony - mk = RetailMarkupPercent jak dotad (bit w bit)
@@ -597,6 +660,7 @@ namespace Armoury
                 }
                 int np = (int)Math.Round(baseP * f);
                 __result = np < 1 ? 1 : np;
+                if (satK >= 0f && satShelf < shelfF && SellByCondition.InPlayerTransfer) PlayerSale430.NoteCut((long)Math.Round(baseP * shelfF * arms) - np);   // 430: tylko licznik linii doby
                 int floorP = 0, capP = 0, bound = 0;
                 // wpis 88 (audyt pkt 10): podloga zlomu (MinSellPercentOfValue) liczyla sie PRZED nami - mnoznik polki 0.25 sciagal ja do 1.25%
                 if (__3 && Settings.Current.MinSellPercentOfValue > 0 && item.Value > 0)
@@ -631,6 +695,18 @@ namespace Armoury
                     askP = Math.Max(1, (int)Math.Round(Math.Max(1, __0.ItemValue) * (1f + mk / 100f) * f) - 1);
                     if (__result > askP) { __result = askP; bound = 4; }
                 }
+                // 430 (A6): kupiec nie placi graczowi za sztuke wiecej niz Player Sale Ceil Percent jej wartosci ze stanem (0 = bez pulapu); po wszystkich granicach,
+                // podloga (2% wartosci) zawsze nizsza od pulapu
+                int ceilP = 0;
+                if (satK >= 0f)
+                {
+                    ceilP = PlayerSale430.Ceil(__0);
+                    if (ceilP > 0 && __result > ceilP)
+                    {
+                        if (SellByCondition.InPlayerTransfer) PlayerSale430.NoteCeil(__result - ceilP);
+                        __result = ceilP; bound = 5;
+                    }
+                }
                 if (horseOld >= 0f && _horseForce == 0)   // E8/R (254): wycena sprzedazy konia nowa droga - ile dalaby stara (ta sama polka i podloga; konie bez sufitu) - tylko licznik
                 {
                     int op = (int)Math.Round(horseOld * f);
@@ -657,7 +733,8 @@ namespace Armoury
                                  + (ArmsPricing.IsUnique(item) ? ", UNIKAT" : "") + ") = x" + f.ToString("0.00")
                                  + " (" + before + " -> " + __result + ", wartosc " + item.Value
                                  + (__3 ? SellByCondition.Bounds(__0, floorP, capP, bound) : "")
-                                 + (side ? PlayerHaggle.Explain(__instance, __0, __1, __2, __3, __4, __5, __6, askP) : "") + ").");
+                                 + (side ? PlayerHaggle.Explain(__instance, __0, __1, __2, __3, __4, __5, __6, askP) : "")
+                                 + (satK >= 0f ? PlayerSale430.Explain(satK, satCap, satShelf < shelfF, ceilP, bound == 5) : "") + ").");
                     }
                 }
             }

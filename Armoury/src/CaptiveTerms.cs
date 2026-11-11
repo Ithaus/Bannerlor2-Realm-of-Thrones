@@ -180,6 +180,7 @@ namespace Armoury
             try
             {
                 if (!Ransom178.FlowsOn) { why = new TextObject("{=!}Ransoms by wealth are switched off."); return false; }
+                if (RansomHouse430.Refused(_talk)) { why = new TextObject("{=!}His house refuses to pay another ransom for now."); return false; }   // 430 (C5)
                 if (Ransom178.PriceFor(_talk) <= 0) { why = new TextObject("{=!}His crown has no income to pay a ransom with."); return false; }
                 double cl = CoolLeft(_talk, 'R');
                 if (cl > 0) { why = new TextObject("{=!}He has refused this already. Ask again in " + Math.Ceiling(cl).ToString(Inv) + " days."); return false; }

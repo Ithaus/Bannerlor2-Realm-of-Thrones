@@ -9872,6 +9872,62 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool NotablesSkipFineGoods { get; set; } = true;
 
+        [SettingPropertyBool("Player Sale Saturation", HintText = "when you sell arms, armour, mounts or harness in a town or castle, the premium a short stall pays shrinks with every piece of the same kind and tier you have sold there: the first Player Sale Free Pieces go at the full price, after that the most the merchant adds above the normal price fades piece by piece (never below the normal price), and no piece fetches more than Player Sale Ceil Percent of its worth; the town forgets Player Sale Recover Per Day pieces a day. Loot sold onto a full stall is not touched - the stall's own price already falls there (off = prices as before)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PlayerSaleSaturation { get; set; } = true;
+
+        [SettingPropertyInteger("Player Sale Free Pieces", 0, 50, "0", HintText = "with Player Sale Saturation: how many pieces of one kind and tier a town buys from you at the full short-stall price before the premium starts to fade", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public int PlayerSaleFreePieces { get; set; } = 2;
+
+        [SettingPropertyFloatingInteger("Player Sale Fade Pieces", 0.25f, 50.00f, "0.00", HintText = "with Player Sale Saturation: how gently the short-stall premium fades after the free pieces - after this many further pieces half of the premium is left (higher = gentler)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public float PlayerSaleFadePieces { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Player Sale Recover Per Day", 0.00f, 20.00f, "0.00", HintText = "with Player Sale Saturation: how many pieces of each kind and tier a town forgets a day, so the full price comes back with time (0 = never)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public float PlayerSaleRecoverPerDay { get; set; } = 1f;
+
+        [SettingPropertyInteger("Player Sale Ceil Percent", 0, 400, "0", HintText = "with Player Sale Saturation: a merchant never pays you more for a piece than this percent of its worth in its present condition, however short the stall is (0 = no ceiling)", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public int PlayerSaleCeilPercent { get; set; } = 100;
+
+        [SettingPropertyBool("Ransom House Fatigue", HintText = "with Lord Ransom By Income: a house that has already paid ransoms to the same captor house within Ransom House Window Days pays less for the next captive - the price is multiplied by Ransom House Step for every ransom already paid, never below Ransom House Floor; with Ransom Repeat Cheaper the lower of the two discounts counts, not both. Applies to ransoms paid to your house (see Ransom House All Captors); off = prices as before", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool RansomHouseFatigue { get; set; } = true;
+
+        [SettingPropertyInteger("Ransom House Window Days", 28, 1456, "0", HintText = "with Ransom House Fatigue: for how many days a paid ransom is remembered against the next ones of the same house to the same captor (364 = one year)", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public int RansomHouseWindowDays { get; set; } = 364;
+
+        [SettingPropertyFloatingInteger("Ransom House Step", 0.10f, 1.00f, "0.00", HintText = "with Ransom House Fatigue: the price of the next ransom is multiplied by this for every ransom the house has already paid to the same captor in the window (0.7 = 70%, 49%, 34%...)", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float RansomHouseStep { get; set; } = 0.7f;
+
+        [SettingPropertyFloatingInteger("Ransom House Floor", 0.00f, 1.00f, "0.00", HintText = "with Ransom House Fatigue: the lowest share of the usual price a house pays, however many ransoms it has paid already", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public float RansomHouseFloor { get; set; } = 0.25f;
+
+        [SettingPropertyBool("Ransom House Refusal", HintText = "with Ransom House Fatigue: a house that has already paid the same captor may refuse to pay for the next captive at all - no courier comes, the ransom broker offers nothing and the captive cannot be bartered for coin until the house thinks again (Ransom House Refuse Days). The chance grows with every ransom paid, with how heavy the ransom is for the family's purses and with the head of the house's dislike of the captor; honourable and generous heads refuse less, calculating ones more, and a house refuses less for its own head, a ruler or an heir. Exchange for terms, hostages and release work as before", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool RansomHouseRefusal { get; set; } = true;
+
+        [SettingPropertyInteger("Ransom House Refuse Percent", 0, 100, "0", HintText = "with Ransom House Refusal: the base chance in percent, for every ransom the house has already paid to the same captor in the window, that it refuses to pay for the next captive", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public int RansomHouseRefusePercent { get; set; } = 20;
+
+        [SettingPropertyInteger("Ransom House Refuse Max Percent", 0, 100, "0", HintText = "with Ransom House Refusal: the chance of a refusal never goes above this percent", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public int RansomHouseRefuseMaxPercent { get; set; } = 80;
+
+        [SettingPropertyInteger("Ransom House Refuse Days", 1, 364, "0", HintText = "with Ransom House Refusal: for how many days a refusal stands before the house thinks again (each later refusal in the same captivity is half as likely)", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public int RansomHouseRefuseDays { get; set; } = 28;
+
+        [SettingPropertyBool("Ransom House All Captors", HintText = "with Ransom House Fatigue: the cheaper repeated ransom and the refusal also bind houses ransoming their kin from other lords' houses, not only from yours (a refusal there means no deal that day; captive lords may sit longer)", RequireRestart = false)]
+        [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
+        public bool RansomHouseAllCaptors { get; set; } = false;
+
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
@@ -14983,6 +15039,20 @@ namespace Armoury
             s.ArmsConsignUnsoldPricePercent = ArmsConsignUnsoldPricePercent;
             s.AiPriceCapNotablesAndUpgrades = AiPriceCapNotablesAndUpgrades;
             s.NotablesSkipFineGoods = NotablesSkipFineGoods;
+            s.PlayerSaleSaturation = PlayerSaleSaturation;
+            s.PlayerSaleFreePieces = PlayerSaleFreePieces;
+            s.PlayerSaleFadePieces = PlayerSaleFadePieces;
+            s.PlayerSaleRecoverPerDay = PlayerSaleRecoverPerDay;
+            s.PlayerSaleCeilPercent = PlayerSaleCeilPercent;
+            s.RansomHouseFatigue = RansomHouseFatigue;
+            s.RansomHouseWindowDays = RansomHouseWindowDays;
+            s.RansomHouseStep = RansomHouseStep;
+            s.RansomHouseFloor = RansomHouseFloor;
+            s.RansomHouseRefusal = RansomHouseRefusal;
+            s.RansomHouseRefusePercent = RansomHouseRefusePercent;
+            s.RansomHouseRefuseMaxPercent = RansomHouseRefuseMaxPercent;
+            s.RansomHouseRefuseDays = RansomHouseRefuseDays;
+            s.RansomHouseAllCaptors = RansomHouseAllCaptors;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;

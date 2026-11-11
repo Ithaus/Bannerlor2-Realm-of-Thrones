@@ -285,7 +285,7 @@ namespace Armoury
             float pm = el.ItemModifier != null ? el.ItemModifier.PriceMultiplier : 1f;
             return ", stan x" + pm.ToString("0.00", CultureInfo.InvariantCulture) + (el.ItemModifier != null ? " " + el.ItemModifier.StringId : "")
                    + ", wartosc ze stanem " + el.ItemValue + ", granice " + (floor > 0 ? floor.ToString() : "-") + ".." + (cap > 0 ? cap.ToString() : "-")
-                   + ", wiaze: " + (bound == 1 ? "podloga" : bound == 2 ? "sufit" : bound == 3 ? "odkup" : bound == 4 ? "kupno-1" : "-");
+                   + ", wiaze: " + (bound == 1 ? "podloga" : bound == 2 ? "sufit" : bound == 3 ? "odkup" : bound == 4 ? "kupno-1" : bound == 5 ? "pulap wartosci (430)" : "-");
         }
 
         // ------------------------------------------------------------ ksiega skupu (tylko log)
@@ -296,6 +296,8 @@ namespace Armoury
         // gracz: ile sztuk danej rzeczy poszlo w biezacym ekranie handlu na podlodze [0] / na suficie [1] / na suficie odkupu [2] / przy cenie kupna-1 [3] (300b; rozliczane przy zamknieciu ekranu)
         private static readonly Dictionary<EquipmentElement, int[]> _screen = new Dictionary<EquipmentElement, int[]>();
         [ThreadStatic] private static int _ctx;                      // kto teraz sprzedaje (kontekst z TransferItem / SellItemsAction)
+        /// <summary>430 (A6): wycena w srodku ruchu sztuki w ekranie handlu gracza (TransferItem), nie podglad ceny na liscie - tylko do licznikow linii doby.</summary>
+        internal static bool InPlayerTransfer { get { return _ctx == Player; } }
         [ThreadStatic] private static ItemObject _lastItem;
         [ThreadStatic] private static ItemModifier _lastMod;
         [ThreadStatic] private static int _lastPrice, _lastBound;

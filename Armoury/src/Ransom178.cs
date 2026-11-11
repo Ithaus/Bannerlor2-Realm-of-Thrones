@@ -163,12 +163,27 @@ namespace Armoury
                 byCrown = true;
                 D = CrownAvg(k);
                 // M6a-2: okup powtorny w oknie RansomRepeatDays tanszy (RansomRepeat.Factor; klucz wylaczony - mnoznik 1, cena jak dotad)
-                return (long)(Math.Max(0f, s.RansomKingDays) * D * RansomRepeat.Factor(captive));   // Jeff 10.10 (wariant 1): krol 20 dni wplywow korony, osobno od glowy rodu
+                return (long)(Math.Max(0f, s.RansomKingDays) * D * RepeatFactor(captive));   // Jeff 10.10 (wariant 1): krol 20 dni wplywow korony, osobno od glowy rodu
             }
             D = DebtLadder.DebtD(captive.Clan);
             double w = captive.Clan.Leader == captive ? head : Math.Max(0f, s.RansomLordDays);
-            return (long)(w * D * RansomRepeat.Factor(captive));   // M6a-2: jw.
+            return (long)(w * D * RepeatFactor(captive));   // M6a-2: jw.; 430: mniejszy z mnoznikow osoby (M6a-2) i rodu (430 C5)
         }
+
+        /// <summary>430 (C5): jeden mnoznik powtarzalnosci okupu - MNIEJSZY z dwoch: ta sama osoba w 56 dob (M6a-2, RansomRepeat) i ten sam rod temu samemu
+        /// porywaczowi w roku (RansomHouse430). Nie iloczyn - jedno zjawisko liczone raz. Oba klucze wylaczone - 1 (cena jak dotad).</summary>
+        internal static double RepeatFactor(Hero captive)
+        {
+            double a = RansomRepeat.Factor(captive), b = RansomHouse430.Factor(captive);
+            return a < b ? a : b;
+        }
+
+        /// <summary>430 (C5): rod, ktory fizycznie trzyma jenca (null - nie wiadomo / nie siedzi).</summary>
+        internal static Clan HolderOf(Hero h) { return HolderClan(h); }
+        /// <summary>430 (C5): lord, ktorego okup liczy 178 (zywy lord z rodem, nie gracz, nie banda, nie umarly).</summary>
+        internal static bool IsRansomLord(Hero h) { try { return Lord(h); } catch { return false; } }
+        /// <summary>430 (C5): kto w rodzie jenca decyduje o okupie i go placi (glowa rodu; gdy to ona siedzi - inny lord rodu; null - nikt).</summary>
+        internal static Hero DeciderOf(Hero captive) { try { return captive != null && captive.Clan != null ? PayerHeroOf(captive) : null; } catch { return null; } }
 
         private static double CrownAvg(Kingdom k)
         {
@@ -339,6 +354,8 @@ namespace Armoury
         {
             var s = Settings.Current;
             bool byCrown; double D;
+            _lastExecPrice = 0;
+            if (RansomHouse430.Refused(captive)) { RansomHouse430.NoteBlocked(3); return false; }   // 430 (C5): rod odmowil zaplaty monety - bez umowy (kazda droga tego przeplywu)
             long price = PriceOf(captive, out byCrown, out D);
             long fullBase = price;   // M6a-2: cena z mnoznikiem okupu powtornego, przed pulapem dlugu (licznik)
             if (mult != 1.0) price = (long)(price * Math.Max(0.0, mult));   // 366: warunek R (okup podwojony) - ten sam przeplyw, licznik M6a-2 z ceny zwyklej
@@ -374,7 +391,8 @@ namespace Armoury
             }
             if (price <= 0) _dZeroN++;
             // M6a-2: licznik okupu powtornego (cena pelna = cena bez mnoznika; po mnozniku = cena przed pulapem dlugu - pulap liczy sie osobno, jak dotad)
-            try { double rf = RansomRepeat.Factor(captive); RansomRepeat.Note(rf > 0 && rf < 1.0 ? (long)Math.Round(fullBase / rf) : fullBase, fullBase, rf < 1.0); } catch { }
+            // 430 (C5): cena pelna liczona z mnoznika, ktory naprawde zadzialal (mniejszy z osoby i rodu); okup z wiazacym mnoznikiem rodu - licznik linii 430
+            try { double rf = RansomRepeat.Factor(captive), cf = RepeatFactor(captive); RansomRepeat.Note(cf > 0 && cf < 1.0 ? (long)Math.Round(fullBase / cf) : fullBase, fullBase, rf < 1.0); RansomHouse430.NoteDeal(captive, captorClan, fullBase, rf); } catch { }
             _dPrice += price; _dCash += cash; _dDebt += debt;
             _lastExecPrice = price;
             if (price > _dMaxV) { _dMaxV = price; _dMax = Name(payerClan) + " -> " + (rcv.Crown != null ? "korona " + rcv.Crown.Name : Name(rcv.Hero)) + " " + price + " za " + Name(captive); }
@@ -613,7 +631,8 @@ namespace Armoury
         {
             try
             {
-                if (RescueHunt.HoldCourier(__0) || PrisonerTerms384.HostageHeld(__0) || DungeonFate.CourierRefused(__0)) return false;   // 222: kurier nie przychodzi, zanim rod jenca nie wie o pojmaniu (takze przy 178 wylaczonym); 404: gracz kazal odprawiac kurierow w tym lochu
+                if (RescueHunt.HoldCourier(__0) || PrisonerTerms384.HostageHeld(__0) || DungeonFate.CourierRefused(__0) || RansomHouse430.Blocks(__0)) return false;   // 430 (C5): rod jenca odmowil kolejnego okupu (ostatnia w lancuchu - rod decyduje dopiero, gdy wie o pojmaniu);
+                // 222: kurier nie przychodzi, zanim rod jenca nie wie o pojmaniu (takze przy 178 wylaczonym); 404: gracz kazal odprawiac kurierow w tym lochu
                 if (!On || __0 == null || !Lord(__0)) return true;
                 var hero = __0;
                 var captorClan = GetCaptorClan(__instance, hero);
@@ -690,6 +709,7 @@ namespace Armoury
                 if (!On || __result == 0) return;
                 var p = _fPrisoner.GetValue(__instance) as Hero;
                 if (p == null || !Lord(p)) return;
+                if (RansomHouse430.Refused(p)) { RansomHouse430.NoteBlocked(2); __result = 0; return; }   // 430 (C5): rod odmowil - uwolnienie nie jest dla niego warte monety
                 bool byCrown; double D;
                 long price = PriceOf(p, out byCrown, out D);
                 int v = (int)Math.Min(int.MaxValue, price / 1.1);
@@ -709,6 +729,7 @@ namespace Armoury
             try
             {
                 if (!On || h == null || !Lord(h) || h.Clan == Clan.PlayerClan) return -1;
+                if (seller == Hero.MainHero && RansomHouse430.Refused(h)) return 0;   // 430 (C5): rod odmowil - posrednik nie ma od kogo wziac monety
                 bool byCrown; double D;
                 long price = PriceOf(h, out byCrown, out D);
                 if (seller != Hero.MainHero) return (int)Math.Min(int.MaxValue, price);
@@ -730,6 +751,8 @@ namespace Armoury
                     if (h == null || !Lord(h) || h.Clan == Clan.PlayerClan) continue;
                     bool byCrown; double D;
                     long price = PriceOf(h, out byCrown, out D);
+                    // 430 (C5): rod odmowil - cena RC byla 0, rod nic nie oddaje i nic nie jest winien (znacznik -1); inaczej mnoznik rodu sprzed uwolnienia do licznika
+                    if (RansomHouse430.Refused(h)) price = -1; else RansomHouse430.SalePeek(h);
                     if (__state == null) __state = new List<KeyValuePair<Hero, long>>();
                     __state.Add(new KeyValuePair<Hero, long>(h, price));
                 }
@@ -747,7 +770,14 @@ namespace Armoury
                 try
                 {
                     var h = kv.Key; long price = kv.Value;
-                    if (h.IsPrisoner) { _dDungeonN++; continue; }
+                    if (h.IsPrisoner) { _dDungeonN++; RansomHouse430.SaleDone(h, 0, false); continue; }
+                    if (price < 0)   // 430 (C5): sprzedany mimo odmowy rodu - gra zaplacila 0 (RcLordPrice), rod nic nie placi
+                    {
+                        RansomHouse430.NoteBlocked(1);
+                        Log.Info("Okupy (178): posrednik - gracz oddal " + Name(h) + " (" + Name(h.Clan) + ") mimo odmowy rodu (430): gotowka 0, dlug 0.");
+                        continue;
+                    }
+                    RansomHouse430.SaleDone(h, price, true);
                     var s = Settings.Current;
                     bool byCrown; double D;
                     PriceOf(h, out byCrown, out D);
