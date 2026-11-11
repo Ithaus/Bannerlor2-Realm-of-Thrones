@@ -564,6 +564,14 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float MissileShieldDamagePercent { get; set; } = 1f;
 
+        [SettingPropertyBool("Shield Guard Arrows Only", HintText = "Shield Missile Guard spares shields from arrows and bolts only. A thrown weapon (javelin, throwing axe, knife, thrown spear, stone) uses Thrown Shield Damage Percent instead, and a missile made to pierce shields (a giant's arrow, a ballista bolt) is not softened at all, so it can go through the shield again. Off = as before this change: every missile is cut to Missile Shield Damage Percent, a javelin barely marks a shield and nothing pierces one. The same rule for you and for the AI, in the fight and in the wear of your own shield. Counted in the Armoury log at the end of every fight (line 414).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool ShieldGuardArrowsOnly { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Thrown Shield Damage Percent", 0.00f, 100.00f, "0.00", HintText = "With Shield Guard Arrows Only: percent of its normal shield damage a thrown weapon deals (javelin, throwing axe, knife, thrown spear, stone). 100 = untouched: under Realistic Battle Mod a javelin breaks a wooden shield in one or two throws and a throwing axe in a few. Lower it to make shields last longer against skirmishers; 1 = as weak as arrows. The wear of your own shield from one blocked throw never counts more damage than the shield has hit points.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float ThrownShieldDamagePercent { get; set; } = 100f;
+
         [SettingPropertyInteger("Bow Uses At Tier1", 0, 10000, "0", HintText = "a tier-1 bow survives this many shots; each tier multiplies (tier 3 = x3, tier 6 = x6)", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int BowUsesAtTier1 { get; set; } = 2500;
@@ -12472,6 +12480,8 @@ namespace Armoury
             s.WearShieldFactor = WearShieldFactor;
             s.ShieldMissileGuardEnabled = ShieldMissileGuardEnabled;
             s.MissileShieldDamagePercent = MissileShieldDamagePercent;
+            s.ShieldGuardArrowsOnly = ShieldGuardArrowsOnly;
+            s.ThrownShieldDamagePercent = ThrownShieldDamagePercent;
             s.BowUsesAtTier1 = BowUsesAtTier1;
             s.BowSkillBonusPercentPerPoint = BowSkillBonusPercentPerPoint;
             s.TierDurabilityFactor = TierDurabilityFactor;

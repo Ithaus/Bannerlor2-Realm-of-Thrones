@@ -974,10 +974,23 @@ namespace Armoury
                             // dostaje pancerz linijke nizej - a przy wlaczonym "Break At Zero
                             // Condition" dojechana do zera tarcza znika z ekwipunku na zawsze.
                             // Strzaly zuzywaja tarcze w tym samym procencie, w jakim ja lupia.
-                            float shieldMissile = blow.IsMissile
-                                ? Math.Max(0f, Math.Min(100f, c.MissileShieldDamagePercent)) / 100f
-                                : 1f;
-                            if (sh >= 0) vled[sh] += raw * c.WearDamageFactor * Math.Max(0f, c.WearShieldFactor) * shieldMissile;
+                            // 414: ten sam podzial co w bitwie (ShieldGuard.Classify) - strzala / belt jak dotad, bron miotana
+                            // wlasnym procentem, pocisk przebijajacy tarcze bez ulgi. Dla dwoch ostatnich podstawa zuzycia nie
+                            // przekracza wytrzymalosci tarczy: oszczep RBM robi jej 1000-3000 pkt (x25), a tarcza ma 300-800 -
+                            // bez tej granicy jeden zablokowany rzut zjadalby caly stan sztuki w ekwipunku. Strzaly, belty i ciosy wrecz: bez zmian.
+                            float shieldMissile = 1f;
+                            float rawSh = raw;
+                            if (blow.IsMissile)
+                            {
+                                int mk;
+                                shieldMissile = ShieldGuard.Classify(c, affectorWeapon.IsEmpty ? null : affectorWeapon.CurrentUsageItem, out mk);
+                                if (mk != ShieldGuard.KindArrow && sh >= 0)
+                                {
+                                    var shw = affectedAgent.SpawnEquipment[(EquipmentIndex)sh].Item.PrimaryWeapon;
+                                    if (shw != null && shw.MaxDataValue > 0 && rawSh > shw.MaxDataValue) rawSh = shw.MaxDataValue;
+                                }
+                            }
+                            if (sh >= 0) vled[sh] += rawSh * c.WearDamageFactor * Math.Max(0f, c.WearShieldFactor) * shieldMissile;
                         }
                         else
                         {

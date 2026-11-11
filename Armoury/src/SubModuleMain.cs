@@ -727,6 +727,9 @@ namespace Armoury
                 // 413: liczniki zuzytej broni (postfiks na wspolczynnik obrazen RBM zalozony w kampanii) - zerowanie i linia "Zuzyta bron (413): koniec misji"
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new WornBlade413.Logic());
+                // 414: liczniki oslony tarcz (strzaly i belty / bron miotana / pociski przebijajace) - linia "Tarcze (414): koniec misji"
+                if (Campaign.Current != null && mission != null && Settings.Current.ShieldMissileGuardEnabled)
+                    mission.AddMissionBehavior(new ShieldGuard.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)
