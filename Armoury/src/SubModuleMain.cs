@@ -745,6 +745,9 @@ namespace Armoury
                 // 419: ladry plytowe ROT - trafienia pociskow w konie wedlug grotu, konie zabite pociskiem, linia "Ladry (419): koniec misji"
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new HorseBarding419.Logic());
+                // 420: lucznicy wedlug grotu w kolczanie, trafienia strzal w ludzi wedlug grotu i z lukow lore - linia "Luki (420): koniec misji"
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new RotBows420.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)
@@ -888,6 +891,7 @@ namespace Armoury
                 // dlugosc roku MUSI wejsc, zanim gra przeliczy swoj zegar
                 LongYearTimeModel.Install(gameStarterObject);
                 TierDesertionModel.Install(starter);   // prawo dezercji (Jeff 17.09) - patrz DesertionLaw.cs
+                starter.AddBehavior(new RotBows420());   // 420: strzaly dla lukow spoza listy ROT (OnSessionLaunched PRZED ArmouryBehavior - spisy ze wzorcow widza zestawy po podmianie) + luki lore z pelna energia (OnAfterSessionLaunched, po ROT)
                 starter.AddBehavior(new ArmouryBehavior());
                 starter.AddBehavior(new Uniques());
                 starter.AddBehavior(new RotData418());   // 418: tarcze ROT w skali 4-6 + ubrania bez pancerza zbroi - korekta danych w pamieci przy starcie sesji, PO ArmouryBehavior (wycena juz zbudowana)

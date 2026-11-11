@@ -576,6 +576,14 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public int RotBardingArmorCap { get; set; } = 45;
 
+        [SettingPropertyBool("ROT Bodkins For Unlisted Bows", HintText = "With Realistic Battle Mod and Realm of Thrones: archers whose bow Realm of Thrones left off its list get war arrows too. Realm of Thrones hands needle bodkin arrows to troops according to their bow, but its list knows only 14 bows; a troop with any other bow keeps the broadhead arrows of the base game, and Realistic Battle Mod stops a broadhead on almost any armour (from a 90 lb bow: 5 or 6 hit points through leather of 33 or more). The bow left out most often is the 90 lb ranger bow of the town militia archers of eight realms - the Vale, the Riverlands, the Reach, the Stormlands, Dragonstone, the Night's Watch, the Free Folk and the wights - along with the base game militias and a few noble bows. On = in every troop kit that holds such a bow, a broadhead arrow is replaced by the needle bodkin of the same weight and tier (50, 60 or 40 grams), so only the head changes: bare flesh takes about 13 percent less, but the arrow now goes through leather, padding and light mail up to an armour of about 73 where the broadhead stopped at 32 (a 90 lb bow at 20 metres in the body: leather 33 - about 40 instead of 6, a gambeson of 61 - 16 instead of 5; heavy mail of 88 and plate still stop it). Bows on the Realm of Thrones list (also the 90 lb steppe bow and the 60 lb hunting bow, which it gives broadheads on purpose), crossbows, special arrows and the gear heroes already carry are left alone. Off = as Realm of Thrones loads them. Takes effect on the next load of a save. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 420).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool RotUnlistedBowBodkinsEnabled { get; set; } = true;
+
+        [SettingPropertyBool("ROT Lore Bows At Full Strength", HintText = "With Realistic Battle Mod and Realm of Thrones: the legendary bows of Realm of Thrones shoot at full strength. Under Realistic Battle Mod the energy of an arrow is multiplied by (bow damage + arrow damage - 100) / 100, and every ordinary bow has a bow damage of 100. Realm of Thrones gives its own bows less - Dragonbone and Weirwood 84, Qarth 95, Ravens' Teeth 96, Goldenheart 97 - so the 180 lb Dragonbone Bow hits 16 percent weaker than a plain bow of the same draw. On = these five bows get 100 like every other bow: Dragonbone with a 90 gram bodkin at 20 metres carries about 163 joules instead of 137 (a plain 180 lb longbow 142), Weirwood with a 70 gram bodkin 148 instead of 124; into heavy mail of 88 that is 73 hit points instead of 50. Goldenheart, Ravens' Teeth and Qarth gain 3 to 5 percent. Draw weight, drawing speed, accuracy, price, tier and the skill needed stay as they are. Off = as Realm of Thrones sets them. Takes effect on the next load of a save. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 420).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool RotLoreBowsFullEnergyEnabled { get; set; } = true;
+
         [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ArmorPoolMinPoints { get; set; } = 40;
@@ -12535,6 +12543,8 @@ namespace Armoury
             s.ClothingArmorExceptionsEnabled = ClothingArmorExceptionsEnabled;
             s.RotBardingCapEnabled = RotBardingCapEnabled;
             s.RotBardingArmorCap = RotBardingArmorCap;
+            s.RotUnlistedBowBodkinsEnabled = RotUnlistedBowBodkinsEnabled;
+            s.RotLoreBowsFullEnergyEnabled = RotLoreBowsFullEnergyEnabled;
             s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;
