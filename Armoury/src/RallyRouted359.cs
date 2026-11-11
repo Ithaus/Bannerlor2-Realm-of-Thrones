@@ -536,6 +536,7 @@ namespace Armoury
                 if (sie == null || sie.HasUser || sie.HasAIMovingTo || sie.IsStuckMissile() || sie.IsBanner()) continue;
                 var w = sie.WeaponCopy;
                 if (w.IsEmpty || w.IsShield() || w.CurrentUsageItem == null || !w.CurrentUsageItem.IsMeleeWeapon) continue;
+                if (GiantGear.PickupBarred(a, w.Item)) continue;   // 424-p: czlowiek nie idzie po maczuge zabitego olbrzyma
                 Vec2 ip;
                 try { if (sie.GameEntityWithWorldPosition.GetNavMesh() == UIntPtr.Zero) continue; ip = sie.GameEntityWithWorldPosition.AsVec2; } catch { continue; }
                 float d = ip.DistanceSquared(pos.AsVec2);

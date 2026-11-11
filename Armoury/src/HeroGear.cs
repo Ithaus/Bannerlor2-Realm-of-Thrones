@@ -46,6 +46,7 @@ namespace Armoury
                     : "- CharacterHelper.CanUseItem(3) NIEZNALEZIONE, sito ekranu spi."));
             }
             catch (Exception e) { Log.Error("HeroGear.ApplyAll(CanUseItem)", e); }
+            GiantGear.ApplyPickup(h);   // 424-p: bron olbrzyma lezaca na polu bitwy - tylko olbrzym ja podniesie (wlasne try/catch)
             try
             {
                 var t = AccessTools.Method(typeof(ItemMenuVM), "SetGeneralComponentTooltip");
@@ -78,11 +79,12 @@ namespace Armoury
         {
             try
             {
-                if (!__result) return;                               // nigdy "nie" -> "tak"
                 var it = __1.Item;
                 var co = __0 as CharacterObject;
                 // 424 (Jeff 11.11): sprzet olbrzymow zaklada tylko olbrzym - przed HeroGearRequirements i OursOnly (maczuge pilnowal dotad tylko wymog gry
                 // TwoHanded 200, luk olbrzyma ma wymog 1, strzaly zadnego). Gra robi z odmowy czerwona karte i pokazuje powod (jak pancerz Z16).
+                // 424-p: PRZED "nigdy nie -> tak" - gdy gra juz odmowila (TwoHanded ponizej 200), odmowa zostaje, zmienia sie tylko powod (inaczej gracz
+                // czytal "za malo umiejetnosci" i myslal, ze trening wystarczy).
                 if (co != null && GiantGear.Is(it) && GiantGear.On && !GiantGear.MayWear(co))
                 {
                     __2 = GiantGear.WhyText(it);
@@ -90,6 +92,7 @@ namespace Armoury
                     GiantGear.ScreenRefused++;
                     return;
                 }
+                if (!__result) return;                               // nigdy "nie" -> "tak"
                 var s = Settings.Current;
                 if (s == null || !s.HeroGearRequirements) return;
                 if (!OursOnly(it)) return;
@@ -326,8 +329,10 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
-                if (s == null || !s.HeroGearRequirements || __0 == null) return;
+                if (s == null || __0 == null) return;
                 var got = __result.Item;
+                // 424-p: sprzet olbrzyma nie jest zamiennikiem dla jenca-czlowieka takze przy wylaczonym HeroGearRequirements (MeetsHero sam odmawia giant_*)
+                if (!s.HeroGearRequirements && !(GiantGear.On && GiantGear.Is(got))) return;
                 if (got == null || ItemReq.MeetsHero(__0, got)) return;
                 var special = _fGankSpecial != null ? _fGankSpecial.GetValue(__instance) as List<string> : null;
                 var stolen = _fGankStolen != null ? _fGankStolen.GetValue(__instance) as List<ItemObject> : null;

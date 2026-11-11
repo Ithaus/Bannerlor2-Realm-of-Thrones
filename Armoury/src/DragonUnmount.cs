@@ -330,7 +330,7 @@ namespace Armoury
                             if (!GiantGear.Is(a) || GiantGear.MayWear(soldier)) continue;
                             var gtop = SkillsDecide.TopArmor(a.ItemType, hath, soldier.Culture);
                             eq[(EquipmentIndex)slot] = gtop != null ? new EquipmentElement(gtop) : new EquipmentElement(null);
-                            GiantGear.SpawnHero++; if (soldier.IsPlayerCharacter) GiantGear.TellPlayerSpawn();   // 424: licznik i komunikat raz na misje
+                            if (giantOn) { GiantGear.SpawnHero++; if (soldier.IsPlayerCharacter) GiantGear.TellPlayerSpawn(); }   // 424: licznik i komunikat raz na misje; 424-p: tylko przy kluczu TAK (NIE = stan sprzed 424, bez nowego komunikatu)
                             if (_floorLog++ < 20)
                                 Log.Info("GiantGear: " + a.StringId + " zdjety z bohatera " + soldier.StringId
                                          + " - dostaje " + (gtop != null ? gtop.StringId : "goly slot") + ".");
@@ -344,7 +344,7 @@ namespace Armoury
                             int gs = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
                             var gswap = SkillsDecide.PatternFor(w.ItemType, gs, soldier);   // recenzja 313a
                             eq[(EquipmentIndex)slot] = gswap != null ? new EquipmentElement(gswap) : new EquipmentElement(null);
-                            GiantGear.SpawnHero++; if (soldier.IsPlayerCharacter) GiantGear.TellPlayerSpawn();   // 424: licznik i komunikat raz na misje
+                            if (giantOn) { GiantGear.SpawnHero++; if (soldier.IsPlayerCharacter) GiantGear.TellPlayerSpawn(); }   // 424 / 424-p: jak wyzej
                             if (_floorLog++ < 20)
                                 Log.Info("GiantGear: " + w.StringId + " zdjety z bohatera " + soldier.StringId
                                          + " - dostaje " + (gswap != null ? gswap.StringId : "goly slot") + ".");

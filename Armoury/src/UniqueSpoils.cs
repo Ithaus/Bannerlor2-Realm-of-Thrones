@@ -307,6 +307,9 @@ namespace Armoury
                 var s0 = Settings.Current;
                 if (s0 != null && s0.HeroGearRequirements && h != null && h.CharacterObject != null && el.Item != null
                     && !ItemReq.MeetsHero(h.CharacterObject, el.Item)) { Park(h, el, avoid, why + ", ponad umiejetnosc"); return; }
+                // 424-p: sprzet olbrzyma na czlowieka nie wchodzi takze przy wylaczonym HeroGearRequirements (jedna regula: GiantGear.MayWear)
+                if (h != null && h.CharacterObject != null && el.Item != null && GiantGear.On && GiantGear.Is(el.Item)
+                    && !GiantGear.MayWear(h.CharacterObject)) { Park(h, el, avoid, why + ", sprzet olbrzyma"); return; }
             }
             catch { }
             var eq = h.BattleEquipment;
@@ -374,6 +377,7 @@ namespace Armoury
                 {
                     if (k == null || k == h || !k.IsAlive || !k.IsActive || k.IsPrisoner || k.IsChild || k == Hero.MainHero || k.CharacterObject == null) continue;
                     if (req && !ItemReq.MeetsHero(k.CharacterObject, el.Item)) continue;
+                    if (GiantGear.On && GiantGear.Is(el.Item) && !GiantGear.MayWear(k.CharacterObject)) continue;   // 424-p: takze bez HeroGearRequirements
                     var eq = k.BattleEquipment;
                     if (eq == null) continue;
                     int slot = SlotFor(eq, el.Item);
@@ -692,6 +696,8 @@ namespace Armoury
                     var el = shelf.GetElementCopyAtIndex(i);
                     var it = el.EquipmentElement.Item;
                     if (el.Amount <= 0 || !Is(it)) continue;
+                    // 424-p: lord-czlowiek nie kupuje sprzetu olbrzyma takze bez HeroGearRequirements (zloto wydane, a czystka doby zdjelaby sztuke - w nicosc)
+                    if (GiantGear.On && GiantGear.Is(it) && !GiantGear.MayWear(lord.CharacterObject)) continue;
                     // Z16 (Jeff 09.10): kupuje tylko to, co udzwignie - CALY ekwipunek (pancerz: Atletyka), nie tylko RelevantSkill
                     if (Settings.Current != null && Settings.Current.HeroGearRequirements)
                     { if (!ItemReq.MeetsHero(lord.CharacterObject, it)) continue; }

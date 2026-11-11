@@ -1102,7 +1102,11 @@ namespace Armoury
             try
             {
                 var it = __result;
-                if (it == null || !Settings.Current.NoConjuredLegends || !(LegendaryLaw.IsLegend(it) || ArmsPricing.IsUnique(it) || Is(it))) return;
+                if (it == null) return;
+                // 424-p: sprzet olbrzyma nie jest nagroda takze wtedy, gdy nagrode wybral cudzy kod (RBM, Tournaments XPanded) albo jest juz wylosowana -
+                // osobny warunek, niezalezny od NoConjuredLegends (listy modelu sieje HistoricalPrices.PrizeListPostfix, ale to tylko zapas tych modow)
+                bool giant = GiantGear.On && GiantGear.Is(it);
+                if (!giant && (!Settings.Current.NoConjuredLegends || !(LegendaryLaw.IsLegend(it) || ArmsPricing.IsUnique(it) || Is(it)))) return;
                 ItemObject repl = null;
                 if (it.HasWeaponComponent) { try { repl = LegendaryLaw.ReplacementFor(it); } catch { } }
                 if (repl == null)
@@ -1111,9 +1115,21 @@ namespace Armoury
                     try { cul = __instance != null && __instance.Town != null ? __instance.Town.Culture : null; } catch { }
                     try { repl = UniqueLaw.StandInFor(it, cul); } catch { }
                 }
+                if (repl == null && giant)
+                {
+                    // zapas: pierwsza sztuka z odsianej listy zwyklych nagrod modelu (przedzial gry 1600-5000; HistoricalPrices sam go przelicza)
+                    try
+                    {
+                        var l = __instance != null && __instance.Town != null ? Campaign.Current.Models.TournamentModel.GetRegularRewardItems(__instance.Town, 1600, 5000) : null;
+                        if (l != null) foreach (var c in l) if (c != null && !GiantGear.Is(c)) { repl = c; break; }
+                    }
+                    catch { }
+                }
+                if (repl != null && GiantGear.Is(repl)) repl = null;
                 if (repl == null) return;
                 __result = repl;
                 _prizeSwaps++;
+                if (giant) GiantGear.PrizeSifted++;
                 Log.Info("ValyrianBlades: nagroda turniejowa " + it.StringId + " -> " + repl.StringId + " (unikat nie powstaje z niczego).");
             }
             catch (Exception e) { if (_stumbles++ < 3) Log.Error("ValyrianBlades.Prize", e); }
