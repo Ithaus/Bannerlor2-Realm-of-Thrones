@@ -588,6 +588,7 @@ namespace Armoury
                     if (ammoRule && SupplyDemand.Active && FacOf(w) > 1f) { shortage = true; continue; }
                     priced = true;
                     if (w.Price < 0) { try { w.Price = shop.Town.MarketData.GetPrice(w.El, mp, false, shop.Party); } catch { w.Price = 0; } }   // cena dopiero dla kandydata
+                    if (!player && AiBuyRules.OverCapA7(w.El, w.Price, false)) continue;   // 429 (A7): sufit ceny AiGearMaxPriceFactor takze w dozbrajaniu AI (lordowie, zalogi, zamowienia zamkow); ludzie gracza bez sufitu
                     if (SwapMath.UpgradeVerdict(ceil, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, w.Price, budget) != SwapMath.UpOk) { if (w.Price > budget && w.Price < poorMin) poorMin = w.Price; continue; }
                     double score = SwapMath.UpgradeScore(oldP.Power, w.Power, w.Price, oldSell);
                     if (score > bestScore) { bestScore = score; best = w; }

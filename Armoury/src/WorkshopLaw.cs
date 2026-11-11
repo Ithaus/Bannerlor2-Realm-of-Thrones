@@ -50,6 +50,7 @@ namespace Armoury
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
+            KomisReset();            // 429 (A5): zapisy komisu broni (przed SyncData wczytania)
             FastReset();             // E8/O2 (266): pamieci nazw linii i zakazanych oraz liczniki (nowa kampania = nowe obiekty przedmiotow i typow warsztatow)
         }
         private static ItemObject _ore, _wood, _leather, _linen, _wool;
@@ -261,6 +262,7 @@ namespace Armoury
                 var s = Settings.Current;
                 int day = (int)CampaignTime.Now.ToDays;
                 if (_dayStamp != day) { Flush(); _dayStamp = day; }
+                if (_kLots.Count > 0 || _kPending != null) KomisSettle(town, day);   // 429 (A5): raz na dobe na miasto - zaplata za sztuki z komisu, ktore zeszly z polki (wlasny try)
                 FastSync();   // E8/O2 (266): tryb kluczy _wip / _rank wedlug WorkshopLawFast - przed pierwszym odczytem obu slownikow w tym cyklu
                 string line = LineKey(production);
                 float floor;
@@ -339,10 +341,15 @@ namespace Armoury
                     // gotowa sztuka czeka u warsztatu (w.Item zostaje), place nie ida - towar zostaje u sprzedajacego, jak w pozostalych sciezkach
                     // 427 A1: ten sam warunek rozpisany na dwa powody (kasa miasta / kapital na place) - do licznika pomiaru; wynik warunku bez zmiany
                     bool townShort427 = town.Gold - TownPurse.BuyFloor(town, 0) < rev, wageShort427 = workshop.Capital < wagesI;
-                    if (townShort427 || wageShort427) { _skipGold++; EcoAudit427.WsReady(town, townShort427, wageShort427, rev, wagesI); break; }   // gotowa czeka na kupca / na place
+                    // 429 (A5, ArmsConsign): sztuka, ktorej miasto nie moze dzis kupic, idzie na polke w komis - zloto nie rusza, zaplata i place przy sprzedazy (KomisSettle);
+                    // ponad limit komisu miasta / koszyka, u gracza i przy wylaczonym kluczu - czeka jak dotad
+                    bool komis429 = (townShort427 || wageShort427) && KomisAccept(workshop, town, w.Item);
+                    if ((townShort427 || wageShort427) && !komis429) { _skipGold++; EcoAudit427.WsReady(town, townShort427, wageShort427, rev, wagesI); break; }   // gotowa czeka na kupca / na place
                     ItemModifier mod = null;
                     try { var g = w.Item.ItemComponent != null ? w.Item.ItemComponent.ItemModifierGroup : null; if (g != null) mod = g.GetRandomItemModifierProductionScoreBased(); } catch { }
                     mod = QualityScarcity.Roll(w.Item, mod, QualityScarcity.SrcWorkshop);   // m96-jakosc: legendarna i mistrzowska rzadko i w limicie rodzaju przedmiotu (klucz Quality Scarcity)
+                    if (!komis429)
+                    {
                     workshop.ChangeGold(-wagesI);
                     int folk = TownFolk.Earn(workshop.Settlement, wagesI, TownFolk.KCraftPaid);   // E5/B1 (R11, KL L7): place cyklu do kiesy ludu W70/R30 (arytmetyka - nie rzuca)
                     town.ChangeGold(wagesI - folk);             // place wydane w miescie (E5/B1: wprost do ludu)
@@ -351,18 +358,21 @@ namespace Armoury
                     MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, wagesI - folk);   // ksiega przeplywow osad (tylko liczniki) - czesc w kasie
                     MoneyLedger.Note(MoneyLedger.NShop, workshop.Settlement, -rev);
                     try { TownFolk.Note(workshop.Settlement, wagesI, TownFolk.KCraftPaid); } catch { }   // E5/0 (195): place cyklu juz wyplacone - kontrola plac 35% (tylko licznik)
+                    }
+                    else KomisAdd(workshop, town, w.Item, rev, wagesI, day, townShort427, wageShort427);   // 429: zapis komisu - sztuka idzie na polke nizej ta sama droga, bez zlota
                     shelf.AddToCounts(new EquipmentElement(w.Item, mod, null, false), 1);
                     CampaignEventDispatcher.Instance.OnItemProduced(w.Item, workshop.Settlement, 1);
                     // 305b (PlayerArmsAsFirm): sztuka warsztatu gracza oddana miastu daje Handel jak w cyklu gry (TickOneProductionCycleForPlayerWorkshop -> OnProductionProducedToWarehouse)
                     if (_plFirmCall) { try { TaleWorlds.CampaignSystem.CharacterDevelopment.SkillLevelingManager.OnProductionProducedToWarehouse(new EquipmentElement(w.Item, mod, null, false)); } catch (Exception e) { PlayerStumble(e); } }
                     Measure174b.NoteArrival(workshop.Settlement, w.Item, 1, Measure174b.ArrWorkshop);   // 174b.0 M1: nowa sztuka na polce (tylko licznik)
                     any = true;
-                    int cost = w.MatCost + wagesI;
-                    _made++; _dayRevenue += rev; _dayCost += cost; Note(w.Item, rev, cost);
+                    int cost = w.MatCost + (komis429 ? 0 : wagesI);   // 429: w komisie place i utarg dopiero przy sprzedazy (linia "Komis broni (429)")
+                    _made++; _dayRevenue += komis429 ? 0 : rev; _dayCost += cost; Note(w.Item, komis429 ? 0 : rev, cost);
                     int k; _madeByType.TryGetValue(w.Item.ItemType, out k); _madeByType[w.Item.ItemType] = k + 1;
                     NoteFinished(town, w.Item, w.Days, production);   // 174.1: licznik koszyka w robocie, zrobione t5-6, zuzyte rece cechu, q t1-t3
                     w.Labor -= w.Days;
                     w.Item = null; w.Days = 0f; w.MatCost = 0;
+                    if (komis429) break;   // 429: najwyzej jedna sztuka w komis na cykl linii - odlozona robota (bank do 60 dni) nie zalewa polki w jedna dobe
                 }
                 __result = any;
                 return false;
@@ -1490,6 +1500,7 @@ namespace Armoury
                          + "] (wszystkie typy " + (Settings.Current != null && Settings.Current.WorkshopNoFreeRawAllTypes ? "TAK" : "NIE - tylko ukryci rzemieslnicy") + ").");
                 _freeRawByType.Clear();
             }
+            KomisFlush(_dayStamp);   // 429 (A5): linia "Komis broni (429)" z kontrolami zamkniecia (wlasny try)
             FlushDiag();
             DiagShort();   // 174.1: najwiekszy brak swiata (koszyki)
             NewDay174();

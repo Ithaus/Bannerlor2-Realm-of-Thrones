@@ -1268,6 +1268,9 @@ namespace Armoury
             // 174.0b: robota w toku warsztatow zbrojnych (sztuki zaczete, dlug ulamkowy surowca) i zamowienia - kazdy klucz we wlasnym try; brak klucza = stary zapis (pusto)
             try { string ws = dataStore.IsSaving ? WorkshopLaw.Export() : null; SaveText.Sync(dataStore, "arm_workshops", ref ws); if (dataStore.IsLoading) WorkshopLaw.Import(ws); }
             catch (Exception e) { Log.Error("SyncData.arm_workshops", e); }
+            // 429 (A5): zapisy komisu broni (sztuki na polkach miast, za ktore warsztat dostanie zaplate przy sprzedazy); brak klucza = stan pusty, starsza DLL klucz pomija
+            try { string km = dataStore.IsSaving ? WorkshopLaw.KomisExport() : null; SaveText.Sync(dataStore, "arm_komis429", ref km); if (dataStore.IsLoading) WorkshopLaw.KomisImport(km); }
+            catch (Exception e) { Log.Error("SyncData.arm_komis429", e); }
             try { string un = dataStore.IsSaving ? SupplyDemand.ExportOrders() : null; SaveText.Sync(dataStore, "arm_unmet", ref un); if (dataStore.IsLoading) SupplyDemand.ImportOrders(un); }
             catch (Exception e) { Log.Error("SyncData.arm_unmet", e); }
             // 299b: pamiec polki sprzetu (ShelfMemory) - tylko roznice M - polka >= 0.005; stary zapis bez klucza = start neutralny (M = polka)
@@ -2474,6 +2477,7 @@ namespace Armoury
             try { GarrisonCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("GarrisonCarts.ResolvePending", e); }
             try { TradeCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("TradeCarts.ResolvePending", e); }   // E6/R3 (215): wozy kupcow w drodze z zapisu
             try { WorkshopLaw.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("WorkshopLaw.ResolvePending", e); }   // 174.0b: robota w toku warsztatow z zapisu (przed pierwszym cyklem)
+            try { WorkshopLaw.KomisResolve("wczytanie"); } catch (Exception e) { Log.Error("WorkshopLaw.KomisResolve", e); }   // 429 (A5): zapisy komisu broni z zapisu (przed pierwszym cyklem)
             try { MaterialOrders.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("MaterialOrders.ResolvePending", e); }   // 174.2: kontrakty surowca na karawany z zapisu
             try { CastleMarket.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("CastleMarket.ResolvePending", e); }   // E5/B4 (199): wozy w drodze do zamku, znaczniki i straz z zapisu (arm_castlemarket)
             try { ArmsScrap.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("ArmsScrap.ResolvePending", e); }   // 174b.6: zlom - pomiar zakupow i rozgrzewka z zapisu

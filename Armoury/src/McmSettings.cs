@@ -9844,6 +9844,34 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool TownPaysVillagesFirst { get; set; } = true;
 
+        [SettingPropertyBool("Arms Consign", HintText = "a finished piece of arms or armour that the town's merchants cannot pay for today (their purse is at its working stock, or the workshop cannot cover the wages) goes onto the town's stall on consignment instead of waiting in the workshop: no gold moves, and when the piece is bought the town pays the workshop out of the takings - the merchant's price of that day, never more than the price agreed when it was put on the stall - and the workshop pays its craftsmen their wages from it. The player's own workshops are not covered (off = the piece waits in the workshop until the town can pay, as before; pieces already on consignment are still settled)", RequireRestart = false)]
+        [SettingPropertyGroup("Arms production")]
+        public bool ArmsConsign { get; set; } = true;
+
+        [SettingPropertyInteger("Arms Consign Per Basket", 1, 50, "0", HintText = "with Arms Consign: most pieces of one kind and tier a town's stall holds on consignment at a time; beyond it a finished piece waits in the workshop as before", RequireRestart = false)]
+        [SettingPropertyGroup("Arms production")]
+        public int ArmsConsignPerBasket { get; set; } = 6;
+
+        [SettingPropertyInteger("Arms Consign Per Town", 1, 1000, "0", HintText = "with Arms Consign: most pieces a town's stall holds on consignment at a time, all kinds together; beyond it a finished piece waits in the workshop as before", RequireRestart = false)]
+        [SettingPropertyGroup("Arms production")]
+        public int ArmsConsignPerTown { get; set; } = 80;
+
+        [SettingPropertyInteger("Arms Consign Unsold Days", 7, 728, "0", HintText = "with Arms Consign: a consigned piece still unsold after this many days is taken over by the merchants at the clearance price (Arms Consign Unsold Price Percent) and stays on the stall as the town's own stock", RequireRestart = false)]
+        [SettingPropertyGroup("Arms production")]
+        public int ArmsConsignUnsoldDays { get; set; } = 91;
+
+        [SettingPropertyInteger("Arms Consign Unsold Price Percent", 0, 100, "0", HintText = "with Arms Consign: what the workshop gets for a consigned piece that did not sell in time or that the town's smiths took for scrap, as a percent of the merchant's price of that day (old mail went for a tenth of new)", RequireRestart = false)]
+        [SettingPropertyGroup("Arms production")]
+        public int ArmsConsignUnsoldPricePercent { get; set; } = 10;
+
+        [SettingPropertyBool("Ai Price Cap Notables And Upgrades", HintText = "Ai Gear Max Price Factor also binds the notables who arm their volunteers and the lords' men, town garrisons and castle orders trading up to better kit with their own purses: a piece priced above that many times its worth is left on the stall (a volunteer's promotion waits and the piece is ordered from the workshops, as when the stall is empty). The player's own men are not bound (off = only purchases of missing kit are capped, as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiPriceCapNotablesAndUpgrades { get; set; } = true;
+
+        [SettingPropertyBool("Notables Skip Fine Goods", HintText = "notables arming their volunteers leave the finer-than-usual pieces (Fine, Masterwork and the like) on the stall for the player and the heroes, as the lords' men already do under Ai Skip Fine Goods - the volunteer's kit does not remember the finer make, so the extra gold was lost (off = notables buy them as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool NotablesSkipFineGoods { get; set; } = true;
+
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
@@ -14948,6 +14976,13 @@ namespace Armoury
             s.DsFarmBrakesAllTowns = DsFarmBrakesAllTowns;
             s.DsFarmFolkPartCut = DsFarmFolkPartCut;
             s.TownPaysVillagesFirst = TownPaysVillagesFirst;
+            s.ArmsConsign = ArmsConsign;
+            s.ArmsConsignPerBasket = ArmsConsignPerBasket;
+            s.ArmsConsignPerTown = ArmsConsignPerTown;
+            s.ArmsConsignUnsoldDays = ArmsConsignUnsoldDays;
+            s.ArmsConsignUnsoldPricePercent = ArmsConsignUnsoldPricePercent;
+            s.AiPriceCapNotablesAndUpgrades = AiPriceCapNotablesAndUpgrades;
+            s.NotablesSkipFineGoods = NotablesSkipFineGoods;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;

@@ -50,6 +50,8 @@ namespace Armoury
         private static long _dHarSold, _dHarGold, _dHarSoldGar, _dHarThird, _dHarParties, _dHarNoBuyer;
         private static int _visit, _fineVisit = -1, _dressVisit = -1, _capVisit = -1;
         private static int _stumbles;
+        // 429 (A7): sufit ceny i dodatnie stany u notabli (VolunteerKit) i w dozbrajaniu AI (MenUpgrade.Pick) - liczniki doby
+        private static long _dA7NotCap, _dA7NotFine, _dA7UpCap;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
 
         internal static void Reset()
@@ -64,6 +66,7 @@ namespace Armoury
             _dFineSkip = _dFineVisits = _dFineBought = _dFineExtra = _dDressSkip = _dDressVisits = _dDressBought = 0;
             _dCapSkip = _dCapVisits = _dOverN = _dOverG = _dBought = _dOrders = _dLostFine = _dLostDress = _dLostCap = 0;
             _dHarSold = _dHarGold = _dHarSoldGar = _dHarThird = _dHarParties = _dHarNoBuyer = 0;
+            _dA7NotCap = _dA7NotFine = _dA7UpCap = 0;
         }
 
         internal static void Stumble(string where, Exception e)
@@ -136,6 +139,31 @@ namespace Armoury
             if (cap <= 0 || price <= cap) return false;
             if (count) { _dCapSkip++; if (_capVisit != _visit) { _capVisit = _visit; _dCapVisits++; } }
             return true;
+        }
+
+        // ------------------------------------------------------------ 429 (A7): ten sam sufit dla notabli i dozbrajania AI
+        private static bool A7On { get { var s = Settings.Current; return s != null && s.AiPriceCapNotablesAndUpgrades; } }
+        private static bool A7FineOn { get { var s = Settings.Current; return s != null && s.NotablesSkipFineGoods; } }
+
+        /// <summary>429 (A7): notabl zbrojacy ochotnika (VolunteerKit) nie bierze sztuki z dodatnim stanem (klucz NotablesSkipFineGoods). Liczy odrzucenie.</summary>
+        internal static bool NotableFine(EquipmentElement el)
+        {
+            try { var m = el.ItemModifier; if (m != null && m.PriceMultiplier > 1f && A7FineOn) { _dA7NotFine++; return true; } }
+            catch (Exception e) { Stumble("NotableFine", e); }
+            return false;
+        }
+
+        /// <summary>429 (A7): cena ponad sufit AiGearMaxPriceFactor takze dla notabla (notable = true) i dla dozbrajania AI "lepsze za swoje" (false);
+        /// klucz AiPriceCapNotablesAndUpgrades; sufit wylaczony (0) - nigdy. Liczy odrzucenie kandydata.</summary>
+        internal static bool OverCapA7(EquipmentElement el, int price, bool notable)
+        {
+            try
+            {
+                if (!A7On || el.Item == null || el.Item.ItemType == ItemObject.ItemTypeEnum.Horse || !OverCap(el, price, false)) return false;   // wierzchowce poza sufitem (ceny koni maja wlasne prawo - Stables)
+                if (notable) _dA7NotCap++; else _dA7UpCap++;
+                return true;
+            }
+            catch (Exception e) { Stumble("OverCapA7", e); return false; }
         }
 
         /// <summary>AiGear.OnShelf: brak poszedl jako zamowienie dla warsztatow, bo na polce lezala tylko sztuka nie dla AI (tylko licznik).</summary>
@@ -299,6 +327,9 @@ namespace Armoury
                       .Append(rL + rG).Append(" (lordowie ").Append(rL).Append(", zalogi ").Append(rG).Append("), ponad 1.5 x (jezdzcy + luz) zostaje ").Append(over)
                       .Append(" szt. w ").Append(overP).Append(" partiach (bez czekajacych na awans); koszt spisu ").Append(ms.ToString("0.0", ci)).Append(" ms");
                 else sb.Append("; uprzaz w zbrojowniach AI: brak spisu");
+                sb.Append(" | 429 sufit takze dla notabli i dozbrajania AI [").Append(A7On ? (f > 0f ? "WL" : "wl, ale sufit wylaczony") : "wyl").Append("]: odrzucenia kandydatow ponad sufit - notable dla ochotnikow ")
+                  .Append(_dA7NotCap).Append(", lepsze za swoje (lordowie, zalogi, zamowienia zamkow) ").Append(_dA7UpCap).Append("; notable bez dodatnich stanow [").Append(A7FineOn ? "WL" : "wyl")
+                  .Append("]: odrzucenia ").Append(_dA7NotFine);
                 sb.Append(" | potkniecia (sesja) ").Append(_stumbles).Append('.');
                 Log.Info(sb.ToString());
             }

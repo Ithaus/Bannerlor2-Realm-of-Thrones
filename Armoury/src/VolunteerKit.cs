@@ -259,6 +259,7 @@ namespace Armoury
                     // 174b.4: sztuka z rezerwy kramu nie jest kandydatem; scalenie sklad8: wybrane sztuki kompletu sa juz zdjete z polki (ceny hurtu),
                     // wiec Free liczy je samo - bez osobnego licznika pasma wybranych (174b takenBand liczylby je drugi raz)
                     if (ShopReserve.Free(market, cand) <= 0) { resHit = true; continue; }
+                    if (AiBuyRules.NotableFine(el.EquipmentElement)) continue;   // 429 (A7): dodatni stan zostaje dla gracza i bohaterow (klucz Notables Skip Fine Goods)
                     int price;
                     if (i < memo.Length && memoGen[i] == gen) price = memo[i];
                     else
@@ -266,6 +267,7 @@ namespace Armoury
                         try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
                         if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; }
                     }
+                    if (AiBuyRules.OverCapA7(el.EquipmentElement, price, true)) continue;   // 429 (A7): cena ponad sufit AiGearMaxPriceFactor - nie dla notabla (brak = zamowienie dla warsztatow, jak przy pustej polce)
                     if (price < bestPrice) { bestPrice = price; best = i; }
                     if (natOn && price < priceNat && GearFit.CultureRank(y, cand) == 0) { priceNat = price; bestNat = i; }
                 }
@@ -317,6 +319,7 @@ namespace Armoury
                     int why;
                     if (fitOn && !GearFit.ForTroop(y, cand, true, out why)) { GearFit.NoteBuyReject(why); fitHit2 = true; continue; }   // GearFit: jak wyzej
                     if (ShopReserve.Free(market, cand) <= 0) { resHit2 = true; continue; }   // 174b.4
+                    if (AiBuyRules.NotableFine(el.EquipmentElement)) continue;   // 429 (A7): jak wyzej
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
                     int price;
                     if (i < memo.Length && memoGen[i] == gen) price = memo[i];
@@ -325,6 +328,7 @@ namespace Armoury
                         try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
                         if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; }
                     }
+                    if (AiBuyRules.OverCapA7(el.EquipmentElement, price, true)) continue;   // 429 (A7): cena ponad sufit AiGearMaxPriceFactor - nie dla notabla (brak = zamowienie dla warsztatow, jak przy pustej polce)
                     if (price < bestPrice) { bestPrice = price; best = i; }
                     if (natOn && price < priceNat && GearFit.CultureRank(y, cand) == 0) { priceNat = price; bestNat = i; }
                 }
