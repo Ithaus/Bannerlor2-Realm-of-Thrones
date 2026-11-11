@@ -744,7 +744,7 @@ namespace Armoury
                 // 370: pomiar szturmu (tylko odczyt, linie "Oblezenie misja (370)"); samo sprawdza Mission.IsSiegeBattle przy pierwszym ticku
                 if (Settings.Current.SiegeMissionLog && mission != null)
                     mission.AddMissionBehavior(new SiegeMissionLog370());
-                // 371: zalamanie szturmu w misji gracza-obroncy (oddzial szturmowy, odstapienie spod murow, oblezenie trwa); 387: takze szturm gracza-wodza (klucz SiegePlayerAssaultBreaks); samo sprawdza szturm i strone gracza
+                // 371: zalamanie szturmu w misji gracza-obroncy (oddzial szturmowy, odstapienie spod murow, oblezenie trwa); 387: takze szturm gracza-wodza (klucz SiegePlayerAssaultBreaks); 387f: takze szturm armii AI z graczem w szeregu (klucz SiegeArmyAssaultBreaks); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission)
                     mission.AddMissionBehavior(new SiegeBreak371());
                 // 378: limit czasu szturmu - gracz atakuje: tylko ostrzezenia (5 min przed i przy uplywie; 387: gdy szturm gracza lamie 371 - ostrzezenie tu, odwrot tam); gracz broni - odwrot robi SiegeBreak371; MUSI byc dodany PO SiegeBreak371

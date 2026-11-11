@@ -11800,6 +11800,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public bool SiegePlayerRetreatCountsAsBreak { get; set; } = true;
 
+        [SettingPropertyBool("Siege Army Assault Breaks", HintText = "When you fight in an assault on walls led by an AI commander (you ride in his army or joined his siege, and do not command): his assault breaks by the same rule as an enemy assault on you (Siege Assault Break Mission - the breaking share of the assault party, moved by the commander's Leadership, Tactics and Valor, the trade of losses, broken gates, the time limit, and never while the place is being taken). The men of your side fall back to the siege lines, yours among them - you are not carried out; fall back yourself, or the battle ends after Siege Assault Break End Seconds. The battle then ends without a winner, the siege goes on, and the commander waits the usual pause before the next assault (Siege Repel Pause Min / Mid / Max Days, or Siege Repel Rebuild Min / Max Days). Off = as in the game: the assault never breaks and you can only attack again and again, or abandon the army", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public bool SiegeArmyAssaultBreaks { get; set; } = true;
+
         [SettingPropertyBool("Siege Ally Lords Stay Back", HintText = "With Siege Attacker Lords Stay Back: also when you fight in an assault on walls that an AI lord commands (you ride in his army or joined his siege) - the lords of your side, the army commander among them, stay back out of bowshot of the walls in a formation of their own, as enemy lords do when you defend. Members of your own clan and formations under your command are left alone. When you command the assault yourself, nothing changes. Off = allied lords storm the walls with their men, as in the game", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: attacking lords lead from behind (381)")]
         public bool SiegeAllyLordsStayBack { get; set; } = true;
@@ -14957,6 +14961,7 @@ namespace Armoury
             s.SiegeAttackerLordsStayBack = SiegeAttackerLordsStayBack;
             s.SiegePlayerAssaultBreaks = SiegePlayerAssaultBreaks;
             s.SiegePlayerRetreatCountsAsBreak = SiegePlayerRetreatCountsAsBreak;
+            s.SiegeArmyAssaultBreaks = SiegeArmyAssaultBreaks;
             s.SiegeAllyLordsStayBack = SiegeAllyLordsStayBack;
             s.SiegeDefendersUseStones = SiegeDefendersUseStones;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;

@@ -1162,6 +1162,7 @@ namespace Armoury
             try
             {
                 PlayerEventEnded(me);                                          // 387: rekord szturmu gracza-wodza (osobno od _assaults)
+                ArmyEventEnded(me);                                            // 387f: bitwa skonczona - oczekujace zakonczenie do kosza
                 if (me == null || (_assaults.Count == 0 && _bats.Count == 0)) return;
                 Assault a = null;
                 if (_assaults.Count > 0 && _assaults.TryGetValue(me, out a)) _assaults.Remove(me);
@@ -1429,6 +1430,7 @@ namespace Armoury
             ZeroDay();
             Reset377();                                                          // 377: liczniki kampanii i kolejka XP od zera
             Reset387();                                                          // 387: rekord szturmu gracza i liczniki od zera
+            Reset387f();                                                         // 387f: oczekujace zakonczenie bitwy i liczniki od zera
             _stumbles = 0; _err.Clear();
         }
 
@@ -1517,6 +1519,7 @@ namespace Armoury
             catch (Exception e) { _hookTicks = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooks.Ticks", e); }
             try { SiegeWalls2.EnsureHooks(); } catch (Exception e) { Stumble("EnsureHooks.Oblezenia2", e); }   // oblezenia 2: plan machin AI, druga ekipa, bilans jedzenia, straty RB
             EnsureHooks387();                                                    // 387: szturm gracza w przerwie po zalamaniu - 4 warunki menu (nie rzuca)
+            EnsureHooks387f();                                                   // 387f: koniec bitwy po zalamanym szturmie armii AI z graczem - PlayerEncounter.ContinueBattle (nie rzuca)
         }
 
         private static string Owners(System.Reflection.MethodBase m)
@@ -1558,7 +1561,7 @@ namespace Armoury
                          + (BreachOn ? "tak" : "nie") + ", OB2 prog " + F(RepelLoss, "0.00") + " +- " + F(RepelSpread, "0.00") + ", przerwa " + F(PauseDays, "0.0") + " dob, OB3 "
                          + (FromWallsOn ? "tak" : "nie") + " (udzial " + F(WallsShare, "0.00") + "), OB4 " + (s != null ? s.SiegeBesiegerPrepPercent : 100) + "% (miasto x"
                          + (s != null ? F(s.SiegeTownPrepFactor, "0.00") : "-") + ", stolica x" + (s != null ? F(s.SiegeCapitalPrepFactor, "0.00") : "-") + "), poziom murow (320c) " + LvlKeys()
-                         + ", log " + (LogOn ? "tak" : "nie") + Start387Text() + ".");
+                         + ", log " + (LogOn ? "tak" : "nie") + Start387Text() + Start387fText() + ".");
                 Log.Info("Bitwa szturmu (SZ start): latka tur rundy (GetSimulationTicksForBattleRound) " + _hookTicks + ", przewaga osady " + _hookAdv + " | klucze: " + SzKeys()
                          + " | regula: " + (SzAny ? "czynna - szturm AI i autobitwa gracza (bez Innych, skryptu fabuly, morza)" : "wylaczona - tury rundy gry") + ".");
                 SiegeWalls2.SessionStart();                                      // oblezenia 2: linia startowa (latki, modele, klucze)

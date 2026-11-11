@@ -85,9 +85,10 @@ namespace Armoury
                     _warned = _tPrior >= SiegeWalls.TimeLimitSeconds - WarnBefore;   // kolejna misja tej bitwy juz po progu ostrzezenia - bez powtorki
                     _up = SiegeWalls.TimeLimitSeconds > 0f && _tPrior >= SiegeWalls.TimeLimitSeconds;   // recenzja 378: limit minal w poprzedniej misji tej bitwy - "Time is up" raz na bitwe, nie co misje
                     // 387: SiegeBreak371 dodawany przed nami (SubModuleMain) - jego Known juz po pierwszym ticku; gdy lamie szturm gracza, odwrot z limitu robi on
-                    try { var b = m.GetMissionBehavior<SiegeBreak371>(); _by371 = b != null && b.PlayerMode; } catch (Exception e) { Stumble("By371", e); _by371 = false; }
+                    try { var b = m.GetMissionBehavior<SiegeBreak371>(); _by371 = b != null && b.BreaksPlayerSide;   // 387f: takze szturm armii AI z graczem w szeregu
+                    } catch (Exception e) { Stumble("By371", e); _by371 = false; }
                     Log.Info("Szturm (378): start misji (gracz atakuje) | osada " + Settlement() + " | limit czasu " + F(SiegeWalls.TimeLimitSeconds / 60.0, "0") + " min, z poprzednich misji tej bitwy "
-                             + F(_tPrior, "0") + " s - " + (_by371 ? "ostrzezenie 5 min tutaj, odwrot z limitu robi 371 (387: szturm gracza)." : "tylko komunikaty, bez przymusowego odwrotu."));
+                             + F(_tPrior, "0") + " s - " + (_by371 ? "ostrzezenie 5 min tutaj, odwrot z limitu robi 371 (387: szturm gracza / 387f: szturm armii AI z graczem)." : "tylko komunikaty, bez przymusowego odwrotu."));
                     return;
                 }
                 if (m.MissionEnded) { if (_endAt < 0f) _endAt = now; return; }
