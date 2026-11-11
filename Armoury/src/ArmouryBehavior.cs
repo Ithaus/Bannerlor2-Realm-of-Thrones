@@ -1558,6 +1558,9 @@ namespace Armoury
             // (bilans otwarcia w pierwszej dobie klucza Village Gear); starsza DLL ignoruje klucz
             try { string lp = dataStore.IsSaving ? VillageGear.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lp)) SaveText.Sync(dataStore, "arm_lp", ref lp); if (dataStore.IsLoading) VillageGear.Import(lp); }
             catch (Exception e) { Log.Error("SyncData.arm_lp", e); }
+            // 435-L7: wierzytelnosci fundatorow sprzetu wsi i okno tempa panow (arm_lpf: "lpf1|okno|wierzytelnosci"); pisany tylko ze stanem; brak klucza = stan pusty; starsza DLL ignoruje klucz
+            try { string lf = dataStore.IsSaving ? VillageGear.FundExport() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lf)) SaveText.Sync(dataStore, "arm_lpf", ref lf); if (dataStore.IsLoading) VillageGear.FundImport(lf); }
+            catch (Exception e) { Log.Error("SyncData.arm_lpf", e); }
             // 345: ksiega kiesy gracza - 7 dob historii prognozy zlota ("g345|1|..."); pisany tylko z historia; brak klucza (stary zapis, Ironman Jeffa) = pusto; starsza DLL ignoruje klucz
             try { string pg = dataStore.IsSaving ? GoldForecast.Export() : null; if (!dataStore.IsSaving || pg != null) SaveText.Sync(dataStore, "arm_prog345", ref pg); if (dataStore.IsLoading) GoldForecast.Import(pg); }
             catch (Exception e) { Log.Error("SyncData.arm_prog345", e); }
@@ -2695,6 +2698,7 @@ namespace Armoury
             try { TownFolk.TownLoanMenus(starter); } catch (Exception e) { Log.Error("TownFolk.TownLoanMenus", e); }   // f8-pozyczka: "Borrow from the town council" / "Repay ..." w menu wlasnego miasta i zamku
             try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
             try { DistrictWorks.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictWorks.AddMenus", e); }
+            try { VillageGear.AddMenus(starter); } catch (Exception e) { Log.Error("VillageGear.AddMenus", e); }   // 435-L7: "Fund gear for this village's hands" (ukryta bez klucza Village Gear Player Funds)
             try { SideVillageVisit.AddMenus(starter); } catch (Exception e) { Log.Error("SideVillageVisit.AddMenus", e); }   // m97-wioski: menu kazdej wioski pobocznej (nocleg, oboz, handel, prace, wrogie akcje)
             try { SideVillageFief.AddMenus(starter); } catch (Exception e) { Log.Error("SideVillageFief.AddMenus", e); }   // n20-wioska: menu wioski gracza (nocleg, prace, przeglad) i "Visit X (your village)" w menu wsi gry   // inwest: "Invest in the district's works" za "Look over the district" (village, village_looted)
             try { DailyLife.AddMenus(starter); } catch (Exception e) { Log.Error("DailyLife.AddMenus", e); }   // ZC2 (16.10): "Realm ledger" w menu miasta i zamku - stany i Dostatek krolestwa, regionow i swiata (ShowInquiry)
@@ -3093,6 +3097,9 @@ namespace Armoury
             // ds-akumulator (DsWorksRealMaterial): zlecenia robot gminy wsi i budowy septow - prawdziwy material z polek PO budowach pana i ludu tej doby (wlasne ramki FBuild
             // z osada targu), przed migawka MBuild (kiesy wsi i ludu -> kasy targow i lud targow); klucz wylaczony - kolejka pusta, nic
             try { TownFolk.DaWorksRun(); } catch (Exception e) { Log.Error("TownFolk.DaWorksRun", e); } DayProfile.Lap("TownFolk.DaWorksRun");
+            // 435-L7 (klucze Village Gear Lords / Towns Invest; wylaczone i bez wierzytelnosci - nic): fundatorzy sprzetu wsi PO budowach i zleceniach gminy tej doby (nie zabieraja
+            // im materialu), czynsz doby (naliczenie, gasniecie), linia "LP czynsz" - przed migawka MBuild (ta sama natura przeplywu: material z polek, rzemieslnicy, kiesy wsi)
+            try { VillageGear.FundDaily(); } catch (Exception e) { Log.Error("VillageGear.FundDaily", e); } DayProfile.Lap("VillageGear.FundDaily");
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
             try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); } DayProfile.Lap("BuildDiary.Daily");
             // 24c (14.10, klucz DragonsEatHerds): smoki jedza zwierzeta z taborow i stad wsi - PRZED ksiegami (ramka FDragon w tej samej dobie co linia "Smoki (24c)")

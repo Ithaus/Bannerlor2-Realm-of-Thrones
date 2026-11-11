@@ -96,6 +96,9 @@ namespace Armoury
                 // 435-L3 (klucz Village Gear): linia informacyjna o sprzecie rak okregu (null - klucz wylaczony albo okreg bez drogi produkcji)
                 try { string lp = VillageGear.HeadText(st); if (!string.IsNullOrEmpty(lp)) head = (head ?? "") + "\n" + lp; }
                 catch (Exception e) { Stumble("Gear " + st.StringId, e); }
+                // 435-L7: wierzytelnosc gracza za ufundowany sprzet w tym okregu (null - brak)
+                try { string lf = VillageGear.FundHeadText(st); if (!string.IsNullOrEmpty(lf)) head = (head ?? "") + "\n" + lf; }
+                catch (Exception e) { Stumble("GearFund " + st.StringId, e); }
                 _dOpen++;
                 if (rows.Count > _dRowsMax) _dRowsMax = rows.Count;
                 string title = VillageTexts.Make(VillageTexts.DistTitle, "DISTRICT", name ?? "?").ToString();

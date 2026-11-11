@@ -68,8 +68,11 @@ namespace Armoury
     ///   KOLEJNOSC ZLECEN (TownFolk.DaWorksRunCore, tylko przy zuzyciu): wsie (a), potem (b), potem reszta; w (a) i (b) malejaco wedlug niedoboru N towaru zajecia
     ///   (SupplySignal.WorldN - pomiar L1 z poprzedniej doby; bez pomiaru N = 1 i kolejnosc dotychczasowa).
     ///   Zapis bez zmian formatu (doba zuzycia w naglowku). Zloto: L5 nie dodaje ZADNEGO przelewu.
+    ///
+    /// 435-L7 - FUNDATORZY I CZYNSZ OD SPRZETU: VillageGear.Fund.cs (pan wsi AI, kupcy miasta targowego, gracz; zapis arm_lpf). Sprzet od fundatora wchodzi do K czesci
+    ///   jak sprzet z robot gminy (kontrola sprzetu linii L3: "+ od fundatorow").
     /// </summary>
-    internal static class VillageGear
+    internal static partial class VillageGear
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal const string P = "Sprzet wsi (LP, 435-L3): ";
@@ -215,6 +218,7 @@ namespace Armoury
                 _main = Environment.CurrentManagedThreadId; _preDay = int.MinValue; _st = _stAll = 0; _valuedAll = false; _startLine = false; _err.Clear();
                 _prevSum = double.NaN; _prevSumDay = int.MinValue; _gOf = null;
                 ZeroDay();
+                FundReset();                                                       // 435-L7: wierzytelnosci fundatorow i okno tempa od zera
             }
         }
 
@@ -226,6 +230,7 @@ namespace Armoury
             _dBackU = _dWriteU = _dOutU = _dInstU = _dInstGold = _dNewBuyU = 0;
             _dWearU = _dWearOldU = _dWearMat = _dRepU = _dRepGold = 0; _dWearN = _dWearOldN = _dWearFloor = _dWearGrain = _dWearOpen = _dRepN = _dOrdRep = _dOrdHot = 0;
             Array.Clear(_dWearG, 0, GN);
+            _dFundU = 0;                                                           // 435-L7: jednostki od fundatorow (kontrola sprzetu)
         }
 
         private static void Stumble(string where, Exception e)
@@ -443,7 +448,7 @@ namespace Armoury
                                         if (dR > 1e-6 && sBefore > 1e-6 && rec.K > 0)
                                         {
                                             double lost = Math.Max(0.0, Math.Min(1.0, rec.L)) * rec.K * Math.Min(1.0, dR / sBefore);
-                                            if (lost > 0) { rec.K -= lost; _dBurnU += lost; _dBurnN++; }
+                                            if (lost > 0) { rec.K -= lost; _dBurnU += lost; _dBurnN++; FundBurn(rec, lost / (rec.K + lost)); }   // 435-L7: wierzytelnosci fundatorow tej czesci maleja o te sama czesc
                                         }
                                         if (dR > 1e-6 && sBefore > 1e-6 && (rec.NewK > 0 || rec.OldK > 0))
                                         {
@@ -1088,8 +1093,8 @@ namespace Armoury
                   .Append(_dKsN).Append(" rachunkach okregow, wycenionych okregow ").Append(_dValued);
                 if (_prevSumDay == today - 1 && !double.IsNaN(_prevSum))
                     sb.Append(" | kontrola sprzetu: dzis - (wczoraj + kupione + otwarcie - spalone").Append(_dInstU > 0 || _dWriteU > 0 || _dOutU > 0 ? " + z rat przebudowy - odpisane" : "")
-                      .Append(_dWearU > 0 ? " - zuzyte " + F1(_dWearU) : "").Append(") = ")
-                      .Append(F2(sum - (_prevSum + _dBuyU + _dOpenU - _dBurnU + _dInstU - _dWriteU - _dOutU - _dWearU)));
+                      .Append(_dWearU > 0 ? " - zuzyte " + F1(_dWearU) : "").Append(_dFundU > 0 ? " + od fundatorow " + F1(_dFundU) : "").Append(") = ")
+                      .Append(F2(sum - (_prevSum + _dBuyU + _dOpenU - _dBurnU + _dInstU - _dWriteU - _dOutU - _dWearU + _dFundU)));
                 else sb.Append(" | kontrola sprzetu: brak wczorajszej sumy (pierwsza doba sesji albo klucza)");
                 sb.Append(" | kontrola zlota: sprzet nie rusza zlota (material zaplacony w linii 'Akumulator kies'); material - (sprzet + roboty bez skutku) = 0")
                   .Append(" | wpisow w zapisie ").Append(recs).Append(" | koszt ").Append(F2(ms)).Append(" ms | poza watkiem ").Append(_dOff).Append(" | potkniecia ").Append(_st).Append(" (sesja ").Append(_stAll).Append(").");

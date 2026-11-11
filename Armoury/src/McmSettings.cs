@@ -10220,6 +10220,22 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float VillageOrderShortageBoost { get; set; } = 1f;
 
+        [SettingPropertyBool("Village Gear Lords Invest", HintText = "with Village Gear: lords fund gear in their own villages for a yearly rent. Once in 28 days a clan with coin to spare (the District Works Ai reserve and surplus settings) buys the gear its villages' hands lack: real materials from the market town's shelves, wages to the town's craftsmen, the rest to the villagers - no materials, no purchase. The gear belongs to the village; the lord is owed a rent on what he paid. A clan with a bank debt, a crown loan for wages, arrears or a purse below twice its running costs does not fund; all lords together spend at most the District Works Ai World Pace share of the villages' yearly output in 28 days. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool VillageGearLordsInvest { get; set; } = false;
+
+        [SettingPropertyBool("Village Gear Towns Invest", HintText = "with Village Gear and Supply Chain Log: town merchants fund gear in the villages that feed their idle workshops. Once in 28 days a town that owes its villages nothing, has no council debt and holds at least 1.2 times its merchants' reserve spends up to a tenth of the coin above that reserve - only in villages trading with it, and only for crafts whose goods its own workshops lack. The materials come off the merchants' own shelves; craftsmen and villagers are paid in coin; the village owes the town a rent. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool VillageGearTownsInvest { get; set; } = false;
+
+        [SettingPropertyBool("Village Gear Player Funds", HintText = "with Village Gear: adds 'Fund gear for this village's hands' to the village menu. You pay the full price of the gear the hands lack - materials bought at the market town, wages to its craftsmen, the rest to the villagers - and the village pays you a yearly rent (Village Gear Rent) while the gear lasts. Raiders burn funded gear with the homesteads they empty. Off = the menu as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool VillageGearPlayerFunds { get; set; } = false;
+
+        [SettingPropertyFloatingInteger("Village Gear Rent", 0.00f, 1.00f, "0.00", HintText = "yearly rent a village pays to whoever funded its gear, as a share of the sum paid (0.20 = a fifth a year). It runs only while the village stands unraided and is not at war with the funder; it is paid when the village's carts come home, from at most half of the village's part of the takings; rent owed for more than 28 days is forgiven. What the funder is owed shrinks each year as the gear wears (mines and felling 12%, boats 10%, traps 8%, fields 6%, orchards 3%) and with every fire", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float VillageGearRent { get; set; } = 0.20f;
+
         [SettingPropertyFloatingInteger("Side Village Craft Region Share", 0.000f, 1.000f, "0.000", HintText = "with Side Village Crafts: at most this share of the side villages' hands of one region (a stronghold and its villages) may change craft in one season (91 days); at most one village per district changes at a time", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float SideVillageCraftRegionShare { get; set; } = 0.05f;
@@ -15252,6 +15268,10 @@ namespace Armoury
             s.VillageGearWearScale = VillageGearWearScale;
             s.CraftsFollowShortage = CraftsFollowShortage;
             s.VillageOrderShortageBoost = VillageOrderShortageBoost;
+            s.VillageGearLordsInvest = VillageGearLordsInvest;
+            s.VillageGearTownsInvest = VillageGearTownsInvest;
+            s.VillageGearPlayerFunds = VillageGearPlayerFunds;
+            s.VillageGearRent = VillageGearRent;
             s.SideVillageCraftChangeDays = SideVillageCraftChangeDays;
             s.SideVillageCraftTreeDays = SideVillageCraftTreeDays;
             s.SideVillageCraftRegionShare = SideVillageCraftRegionShare;

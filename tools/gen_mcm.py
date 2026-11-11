@@ -668,6 +668,7 @@ RANGES = {
     'SideVillageCraftTreeDays': (7, 728, "0"),
     'RebuildStallReleaseDays': (0, 364, "0"),   # 435-L2: 0 = wylaczone; 1-13 liczone w kodzie jak 14 (CraftUnblock.StallDays)
     'VillageOrderShortageBoost': (1.0, 8.0, "0.00"),   # 435-L6: 1 = jak dotad; pulap i tak najwyzej 0.25 rak pola (StartCalibration.OrderKs)
+    'VillageGearRent': (0.0, 1.0, "0.00"),   # 435-L7: czynsz roczny od wkladu fundatora sprzetu wsi; przyciete w kodzie do 0..1 (VillageGear.RentRate)
     'VillageGearWearScale': (0.0, 3.0, "0.00"),   # 435-L5: 0 = sprzet sie nie zuzywa; przyciete w kodzie do 0..3 (VillageGear.BeforeProduction)
     'SideVillageCraftRegionShare': (0.0, 1.0, "0.000"),
     'DistrictIconMargin': (0.0, 1.0, "0.00"),

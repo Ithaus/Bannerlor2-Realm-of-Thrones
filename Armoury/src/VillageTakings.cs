@@ -261,7 +261,8 @@ namespace Armoury
             MineRegale.AtCart(__state);                      // R3-09f: regale gornicze - kiesa wsi -> licznik pana od utargu za kruszec (przed pracami okregu i daninami DS)
             long works = WorksPay(__state);                  // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
             long side = SideFief(__state);                   // n20-wioska: wozy okregu wioski pobocznej gracza - r4-wioska: tylko licznik (dochod co dobe w SideVillageFief.Pay), zwraca 0
-            DsDues(__state, works, side);
+            long rent = GearRent(__state);                   // 435-L7: czynsz od sprzetu wsi (kiesa wsi -> fundator) - po pracach okregu, przed danina DS; bez wierzytelnosci 0 (okno jak dotad)
+            DsDues(__state, works + rent, side);
             F5WoodCredit(__state);                           // f5-ruda: kredyt kupcow na drewno dymarki - splata z reszty przyrostu kiesy (PO pracach okregu i daninie DS - ich podstawa bez zmian)
             LordRelief(__state);                             // m105 gosp5 (klucz Ds Lord Relief Below Chest): dzialka pana z tego wozu do kiesy wsi ponizej skrzyni (PO splacie drewna f5 - ulga nie splaca kupcow)
             CartCsv(__state);                                // f14-wsie: utarg wozu wies po wsi do wsie-kiesy.csv (tylko licznik, po wszystkich krokach okna)
@@ -372,6 +373,22 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("VillageTakings.WorksPay", e); }
             return Math.Max(0, paid);
+        }
+
+        /// <summary>435-L7 (VillageGear.Fund.cs): woz wrocil do wsi MACIERZYSTEJ - z przyrostu kiesy wsi w oknie (czesc wsi utargu po pracach okregu) wies placi nalezny czynsz
+        /// od sprzetu fundatorom (najwyzej polowa tego przyrostu; VillageGear.RentAtCart - wlasny try, nie rzuca). Woz w obcej wsi albo bez utargu - nic. Zwraca zaplacone:
+        /// linia DS liczy je razem z wyplata prac okregu (osobno od udzialu pana), a podstawa udzialu korony W4 to czesc wsi netto - ta sama regula co dla prac.</summary>
+        private static long GearRent(Entry st)
+        {
+            try
+            {
+                if (st == null || st.Here != null || st.Home == null || st.Party == null) return 0;
+                if (st.Gold - st.Party.PartyTradeGold <= 0) return 0;
+                long grown = (long)st.Home.Gold - st.HomeGold;
+                if (grown <= 0) return 0;
+                return Math.Max(0, VillageGear.RentAtCart(st.Party, st.Home, grown));
+            }
+            catch (Exception e) { Stumble("VillageTakings.GearRent", e); return 0; }
         }
 
         /// <summary>n20-wioska: woz wrocil do wsi MACIERZYSTEJ - przyrost licznika pana w oknie (BK + 112 - F4b - prace okregu) to podstawa udzialu wioski gracza
