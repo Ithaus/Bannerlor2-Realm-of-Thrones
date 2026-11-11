@@ -34,6 +34,14 @@ namespace Armoury
         /// <summary>387f: szturm armii AI z graczem w szeregu lamie sie jak szturm AI (wymaga 371 w misji).</summary>
         internal static bool ArmyBreakOn { get { var s = Settings.Current; return s != null && s.SiegeAssaultBreak && s.SiegeAssaultBreakMission && s.SiegeArmyAssaultBreaks; } }
 
+        /// <summary>390 (Jeff 11.11, decyzja 1): to samo, gdy gracz dolaczyl do oblezenia wodza AI BEZ ARMII i gra zrobila go generalem misji
+        /// (wodzem bitwy i oblezenia zostaje AI). NIE = stan sprzed 390 (taka misja poza regula).</summary>
+        internal static bool JoinedBreakOn { get { var s = Settings.Current; return ArmyBreakOn && s != null && s.SiegeJoinedAssaultBreaks; } }
+
+        private static int _dJoSeen, _dJoNone;   // 390: misje gracza-generala w oblezeniu wodza AI (w regule / poza regula)
+        internal static void NoteJoinedSeen() { _dJoSeen++; }
+        internal static void NoteJoinedNone() { _dJoNone++; }
+
         private static MapEvent _alPend;
         private static Assault _alPendA;
         private static bool _alPendFuse;
@@ -64,19 +72,21 @@ namespace Armoury
 
         private static void Reset387f() { _alPend = null; _alPendA = null; _alPendFuse = false; ZeroDay387f(); }
 
-        private static void ZeroDay387f() { _dAlSeen = _dAlNone = _dAlWarn = _dAlBreak = _dAlFuse = _dAlLate = _dAlFinished = _dAlSkipped = _dAlGen = _dAlReg = _dAlWait = _dAlMend = 0; }
+        private static void ZeroDay387f() { _dAlSeen = _dAlNone = _dAlWarn = _dAlBreak = _dAlFuse = _dAlLate = _dAlFinished = _dAlSkipped = _dAlGen = _dAlReg = _dAlWait = _dAlMend = _dJoSeen = _dJoNone = 0; }
 
         private static string Day387fText()
         {
             return "; 387f szturm armii AI z graczem " + (ArmyBreakOn ? "tak" : "nie") + ": misji z graczem w szeregu " + _dAlSeen + ", poza regula " + _dAlNone + ", ostrzezen 75% " + _dAlWarn
                  + ", zalaman " + _dAlBreak + " (bezpiecznik " + _dAlFuse + ", wystawionych po zalamaniu " + _dAlLate + "), bitew zakonczonych " + _dAlFinished + ", pominietych " + _dAlSkipped
                  + ", przerw zapisanych " + _dAlReg + ", gracz generalem bez bycia wodzem bitwy (bez zalamania) " + _dAlGen
+                 + "; 390 gracz-general w oblezeniu wodza AI " + (JoinedBreakOn ? "tak" : "nie") + ": misji " + _dJoSeen + ", poza regula " + _dJoNone + " (zalamania, bitwy zakonczone i przerwy - w licznikach 387f)"
                  + (_dAlWait > 0 ? ", prob poza mapa " + _dAlWait : "") + (_dAlMend > 0 ? ", naprawionych polstanow " + _dAlMend : "") + " (latka " + _hookAl + ")";
         }
 
         private static string Start387fText()
         {
-            return " | 387f szturm armii AI z graczem w szeregu: klucz " + (ArmyBreakOn ? "tak" : "nie") + ", latka PlayerEncounter.ContinueBattle " + _hookAl;
+            return " | 387f szturm armii AI z graczem w szeregu: klucz " + (ArmyBreakOn ? "tak" : "nie") + ", latka PlayerEncounter.ContinueBattle " + _hookAl
+                 + " | 390 takze gracz-general bez armii w oblezeniu wodza AI: " + (JoinedBreakOn ? "tak" : "nie");
         }
 
         /// <summary>Powod, dla ktorego bitwy NIE konczymy (null = konczymy). Rzuca - lapie wolajacy.</summary>
@@ -202,7 +212,7 @@ namespace Armoury
             _dAlSkipped++;
             string stId = "-";
             try { var st = me != null ? me.MapEventSettlement : null; if (st != null) stId = st.StringId; } catch { }
-            Log.Info("Szturm (387f): NIE zakonczono - " + why + " | osada " + stId + ", wodz " + (a != null ? a.Leader : "-") + " | gracz zostaje w menu bitwy jak w grze ('Attack!' / 'Abandon army').");
+            Log.Info("Szturm (387f): NIE zakonczono - " + why + " | osada " + stId + ", wodz " + (a != null ? a.Leader : "-") + " | gracz zostaje w menu bitwy jak w grze ('Attack!' / 'Abandon army'; bez armii: 'Leave...').");
         }
 
         /// <summary>Z SiegeWalls.EnsureHooks (kampania, raz na proces). Cel prywatny, zadeklarowany w PlayerEncounter - DeclaredMethod.</summary>
