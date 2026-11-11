@@ -1348,6 +1348,8 @@ namespace Armoury
                     }
                     Drop(d, st, "You can no longer pay what you promised " + Place(st) + ". The terms are void.", why); return;
                 }
+                // 385c-p: zakladnik liczony w ofercie, a nie da sie go przekazac - umowa przepada bez zaplaty (P: usluga juz wykonana - zostaje log w HostHand)
+                if (d.Want != 'P') { string hb = HostBlocked(d, lord); if (hb != null) { Drop(d, st, Name(lord) + " cannot keep your hostage now. The terms agreed " + Place(st) + " are void; nothing was handed over.", hb + " - nic nie oddane"); return; } }
                 if (!MenStill(d, st, lord)) return;   // 385b: moi ludzie juz nie u nich - bez zaplaty za nieobecnych
                 if (d.Want == 'P') { RunPass(d, st, lord); return; }
                 if (d.Want == 'T') { RunTruce(d, st, lord); return; }   // 385

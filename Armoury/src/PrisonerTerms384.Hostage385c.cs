@@ -124,13 +124,14 @@ namespace Armoury
             return null;
         }
 
-        /// <summary>Straz: wpis H, bohater nadal jencem w lochu osady z wpisu i u tej samej frakcji. Tylko odczyt.</summary>
+        /// <summary>Straz: wpis H, bohater nadal jencem w lochu osady tej samej frakcji (385c-p: nie tylko osady z wpisu). Tylko odczyt.</summary>
         private static bool HostGuarded(Hero h)
         {
             var r = HostFind(h);
             if (r == null || r.State != 'H' || !h.IsPrisoner) return false;
             var pb = h.PartyBelongedToAsPrisoner;
-            if (pb == null || !pb.IsSettlement || pb.Settlement == null || pb.Settlement.StringId != r.St) return false;
+            // 385c-p: loch DOWOLNEJ osady tej samej frakcji (gra / NorthConquest.MovePrisoners przenosi jencow miedzy twierdzami frakcji; r.St poprawia HostDaily)
+            if (pb == null || !pb.IsSettlement || pb.Settlement == null) return false;
             var f = pb.MapFaction;
             return f != null && f.StringId == r.Fac;
         }
@@ -228,6 +229,9 @@ namespace Armoury
                     var c = r.GetCharacterAtIndex(i);
                     var h = c != null && c.IsHero ? c.HeroObject : null;
                     if (!HostFit(h) || !Ok(h.StringId) || _hostVal.ContainsKey(h)) continue;
+                    // 385c-p: juz obiecany w umowie czekajacej na wykonanie (kolejka / oferta P) - druga umowa padlaby w Payable (przy P z kara)
+                    string hid = h.StringId;
+                    if ((_offer != null && _offer.Host == hid) || _queue.Exists(q => q.Host == hid)) continue;
                     try { if (CanonCompanions.HasMoveRows(h) || CanonCompanions.HeldRow(h) != null) continue; } catch (Exception e) { Stumble("HostBegin.Canon", e); continue; }
                     if (Ransom178.IsRulerOrHeir(h)) continue;   // "wielki jeniec" korony (178) - nie na zakladnika
                     double k = HostKin(h);
@@ -275,6 +279,22 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ wykonanie
+        /// <summary>385c-p (Run, przed zaplata; nie dla P - tam usluga juz wykonana): zakladnik policzony w wartosci oferty, a przekazac go sie nie da
+        /// (brak lochu rodu / frakcji rozmowcy w tej chwili albo latki strazy nieczynne) - umowa przepada bez zaplaty zamiast "warunki za nic". Powod po polsku albo null.</summary>
+        private static string HostBlocked(Deal d, Hero lord)
+        {
+            if (string.IsNullOrEmpty(d.Host)) return null;
+            try
+            {
+                if (d.Betray && (d.Men.Count > 0 || d.SolN > 0)) return null;   // zdrada jawna - i tak nie przekazywany
+                if (!HostHooksOk) return "zakladnik: latki strazy nieczynne (ucieczka " + _escHook + ", RC " + _rcHook + ")";
+                var st = HostHall(lord);
+                if (st == null || st.Party == null || st.MapFaction == null || !Ok(st.MapFaction.StringId) || !Ok(st.StringId) || !Ok(lord.StringId)) return "zakladnik: brak lochu rodu / frakcji rozmowcy";
+            }
+            catch (Exception e) { Stumble("HostBlocked", e); }
+            return null;
+        }
+
         /// <summary>After (po zaplacie, moich ludziach i przysiedze): przekazanie zakladnika do lochu. Nie wyszlo - log, bez wpisu, bez kary.</summary>
         private static void HostHand(Deal d, Hero lord, StringBuilder sb)
         {
@@ -283,9 +303,9 @@ namespace Armoury
             {
                 var h = Hero.Find(d.Host);
                 if (!HostFit(h)) { sb.Append(" | zakladnik " + (h != null ? Name(h) : d.Host) + ": juz nie w szeregu druzyny gracza - NIE przekazany"); return; }
-                if (d.Betray && d.Men.Count > 0)
+                if (d.Betray && (d.Men.Count > 0 || d.SolN > 0))   // 385c-p: takze zdrada jawna 385d (sami zwykli zolnierze - After juz oglosil klamce)
                 {
-                    sb.Append(" | zakladnik " + Name(h) + ": zdrada jawna (moi ludzie nie uwolnieni) - NIE przekazany");
+                    sb.Append(" | zakladnik " + Name(h) + ": zdrada jawna (" + (d.Men.Count > 0 ? "moi ludzie" : "moi zolnierze, " + d.SolN) + " nie uwolnieni) - NIE przekazany");
                     return;
                 }
                 if (!HostHooksOk) { sb.Append(" | zakladnik " + Name(h) + ": latki strazy nieczynne (ucieczka " + _escHook + ", RC " + _rcHook + ") - NIE przekazany"); return; }
@@ -360,6 +380,12 @@ namespace Armoury
                     var pb = h.IsPrisoner ? h.PartyBelongedToAsPrisoner : null;
                     if (pb == null) { _hosts.RemoveAt(i); gone++; Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " juz nie jest jencem (pokoj, odbicie, zwolnienie, ucieczka bez strazy) - wpis zdjety, stan " + r.State + ", termin byl do dnia " + r.Until + "."); continue; }
                     var f = pb.MapFaction;
+                    // 385c-p: ta sama frakcja, inna twierdza (przenosiny jencow, np. NorthConquest.MovePrisoners) - wpis idzie za zakladnikiem
+                    if (pb.IsSettlement && pb.Settlement != null && f != null && f.StringId == r.Fac && pb.Settlement.StringId != r.St && Ok(pb.Settlement.StringId))
+                    {
+                        Log.Info(Tag + ": doba " + today + " | zakladnik " + who + " przeniesiony do innej twierdzy tej samej frakcji (" + r.St + " -> " + pb.Settlement.StringId + ") - wpis poprawiony, stan " + r.State + " i termin bez zmian.");
+                        r.St = pb.Settlement.StringId;
+                    }
                     if (!pb.IsSettlement || pb.Settlement == null || pb.Settlement.StringId != r.St || f == null || f.StringId != r.Fac)
                     {
                         _hosts.RemoveAt(i); gone++;
