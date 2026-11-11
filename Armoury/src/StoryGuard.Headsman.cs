@@ -66,7 +66,10 @@ namespace Armoury
             Log.Info(Tag + "kat gracza (397) - latki " + _wired + "/3" + (_wired < 3 ? " BLAD (brak: " + Missing() + "; straz dalej dziala sluchaczem CanHeroDie)" : "")
                      + " | klucze: Story Guard " + (s != null && s.StoryGuard ? "TAK" : "NIE") + ", Story Guard Executions " + (s != null && s.StoryGuardExecutions ? "TAK" : "NIE")
                      + " | poza zasiegiem (tylko linia UTRATA): egzekucja ROT ze smoka/wilka (CustomHeroExecution, wymuszona), sciecie jencow rodu buntownikow przez gre, "
-                     + "DestroyClan/Lost, ROT 'send to the Wall', zamiana jenca w Bialego Wedrowca.");
+                     + "DestroyClan/Lost, ROT 'send to the Wall', przemiana pojmanego w Bialego Wedrowca przez partie Innych AI (ROT, prefiks TakePrisonerAction)."
+                     // 397-p: ROT robi przemiane jenca GRACZA z rodu Bialych Wedrowcow prefiksem na KillCharacterAction.ApplyByExecution (rot_all 21216) - to ta sama
+                     // droga co przycisk egzekucji i "Prepare to die!", wiec dla chronionego jenca jest po 397 zamknieta (zamierzone: postac fabuly nie znika)
+                     + " Gracz z rodu Bialych Wedrowcow: chronionego jenca nie przemieni (ROT robi to egzekucja z ekranu druzyny / rozmowy - obie drogi odmowione).");
             Log.Info(Tag + "kat gracza w BannerKings (396-p) - " + (!_bkSeen ? "typow BK nie widac (bez BK nic do latania)"
                      : "latki " + _bkWired + "/" + BkTargets + (_bkWired < BkTargets ? " BLAD (brak: " + _bkMissing.Trim() + "; sluchacz CanHeroDie dalej wetuje smierc, ale BK naliczy skutki)" : ""))
                      + " | obrzed ofiary (Human Sacrifice, Execute Traitor x2) i wyrok Beheading na postaci, ktorej fabula jeszcze potrzebuje: odmowa PRZED skutkami BK.");
