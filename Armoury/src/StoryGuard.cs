@@ -489,6 +489,24 @@ namespace Armoury
             catch (Exception e) { Stumble("MayLeaveStory", e); why = "blad strazy fabuly"; return false; }
         }
 
+        /// <summary>410: rod, w ktorym zyje ktokolwiek chroniony (stan 2) - spor o dziedzictwo takiego rodu nie rusza (FuneralRites.Succession). Nie rzuca.</summary>
+        internal static bool ClanLocked(Clan c)
+        {
+            try
+            {
+                if (c == null || !KeyOn || !Ensure()) return false;
+                foreach (var kv in _memo)
+                {
+                    var h = kv.Key;
+                    if (kv.Value != 2 || h == null || h.Clan != c || !h.IsAlive) continue;
+                    if (Marked(h) || Walker(h)) continue;   // jak State: znak smierci / Bialy Wedrowiec = zwolniony na zywo
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception e) { Stumble("ClanLocked", e); return false; }
+        }
+
         /// <summary>Bramka strazy dla naszych systemow: false = chroniony albo postac z tabeli przy niewidocznej liscie wydarzen ROT.</summary>
         private static bool Clear(Hero h, out string why)
         {

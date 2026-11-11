@@ -30,7 +30,7 @@ namespace Armoury
     ///     = IronThroneAmbitionScore x w x R x (1 - T_biedy); bramki (zero, liczone na pare w tej kolejnosci): prolog (dzien opowiesci &lt; 1), brak tronu (town_EW4),
     ///     gracz (A = krolestwo gracza - wladca, wasal albo najemnik: "Never pushes your own realm into a war"; T = krolestwo gracza przy kluczu IronThroneTargetsPlayer NIE), Essos/poza Westeros (A albo T poza W), bez celu (brak wagi), kanon (przed
     ///     CanonWarClock.OverNow - cisza do Krwawych Godow w calym Westeros, decyzja Jeffa 1), Polnoc-przed-Bekartami (para z battania albo z sojusznikiem Polnocy - projekt C.3 - przed ROT BastardsSiegeEvent = 2,
-    ///     decyzja Jeffa 2), limit (A ma &gt;= IronThroneMaxWars wrogow-krolestw bez Nocnej Strazy i Wolnych Ludzi), zmeczenie (Diplomacy A w ktorejkolwiek wojnie
+    ///     decyzja Jeffa 2), zaloba (410: wladca A zmarl mniej niz Funeral Days temu - FuneralRites.Mourning), limit (A ma &gt;= IronThroneMaxWars wrogow-krolestw bez Nocnej Strazy i Wolnych Ludzi), zmeczenie (Diplomacy A w ktorejkolwiek wojnie
     ///     &gt;= IronThroneWearyAt), sila (R = 0), przerwa (wojna o tron gdziekolwiek &lt; IronThroneWarGapDays dni temu), bieda (T_biedy &gt;= 0.5).
     /// W (Westeros): vlandia, dragonstone, stormlands, empire_w, empire, sturgia, aserai, riverlands, battania; najezdzcy valyrian (Aegon) i empire_s (Daenerys) dopiero
     ///     po najezdzie (ROT AegonInvasionEvent / DanyInvasionEvent stan &gt;= 1 albo twierdza o kulturze Westeros - PopulationLaw.WesterosCultures). Nocna Straz, Wolni
@@ -44,7 +44,8 @@ namespace Armoury
     /// BIEDA T_biedy (krytyk POPRAWKI 6; jedna regula na zjawisko): ta sama miara co CrashScribe PovertyPeace (domyslne ustawienia CS: zapas skarbca, bez jednorazowych
     ///     odplywow) - Armoury nie zalezy od CrashScribe, wiec liczy ja sama: historia skarbca krolestwa z 7 dob (od wczytania), ubytek/d bez skokow jednej doby (port
     ///     DrainNoOneOff), zapas = skarbiec / max(ubytek, 1000); &lt;= 28 dob - 1, &gt;= 91 - 0, liniowo; przed pierwsza doba - skarbiec / 1000 (jak PovertyPeace.Poverty).
-    ///     Czlon x (1 - T), 0 przy T &gt;= 0.5 (prog wniosku z biedy E1b). PovertyPeace (po nas) dalej odejmuje swoj czlon od calej oceny (z naszym czlonem) - bieda
+    ///     Czlon x (1 - T), 0 przy T &gt;= 0.5 (prog wniosku z biedy E1b). 410: czlon x (1 + Iron Throne Contested Bonus), gdy rod panujacy T ma otwarty spor o
+    ///     dziedzictwo (FuneralRites.ContestedBonus); pamiec doby kasowana takze przy smierci wladcy i otwarciu / zamknieciu sporu (Invalidate). PovertyPeace (po nas) dalej odejmuje swoj czlon od calej oceny (z naszym czlonem) - bieda
     ///     dziala na czlon dwa razy (x(1-T) tu i kara E1 od calosci; decyzja Jeffa 3, recenzja). Historia skarbca przesuwana razem z CS (ShiftHistory z BookHoldings.E1Shift).
     /// KLASYFIKACJA (CampaignEvents.WarDeclared): "wojna o tron" = detail CausedByKingdomDecision i para (A,T) miala dzis czlon &gt; 0 (droga: BK uzasadnienie, gdy
     ///     BKDeclareWarDecision na stosie, inaczej decyzja krolestwa) - ustawia przerwe (zapis arm_t312). "Dolaczenie" = CausedByCallToWarAgreement albo AddAlly/CallToWar/
@@ -75,8 +76,9 @@ namespace Armoury
         private const int DrainDays = 7;
 
         internal const string GProlog = "prolog", GNoThrone = "brak tronu", GPlayer = "gracz", GEssos = "Essos/poza Westeros", GNoAim = "bez celu", GCanon = "kanon",
-                              GNorth = "Polnoc-przed-Bekartami", GLimit = "limit", GWeary = "zmeczenie", GStrength = "sila", GGap = "przerwa", GPoor = "bieda";
-        private static readonly string[] GateOrder = { GCanon, GNorth, GLimit, GStrength, GGap, GWeary, GPoor, GPlayer, GEssos, GProlog, GNoThrone, GNoAim };
+                              GNorth = "Polnoc-przed-Bekartami", GLimit = "limit", GWeary = "zmeczenie", GStrength = "sila", GGap = "przerwa", GPoor = "bieda",
+                              GMourn = "zaloba";   // 410: wladca A zmarl < Funeral Days temu (FuneralRites.Mourning)
+        private static readonly string[] GateOrder = { GCanon, GNorth, GLimit, GStrength, GGap, GWeary, GPoor, GPlayer, GEssos, GProlog, GNoThrone, GNoAim, GMourn };
 
         private static Settings S { get { return Settings.Current; } }
         private static bool Key { get { var s = S; return s != null && s.IronThroneAmbition; } }
@@ -96,7 +98,7 @@ namespace Armoury
 
         private sealed class Mem
         {
-            public float Term, W, R, Pov; public int Wars; public string Gate = "", Why = "", Label = ""; public TextObject Text;
+            public float Term, W, R, Pov, Bonus; public int Wars; public string Gate = "", Why = "", Label = ""; public TextObject Text;
         }
 
         private static readonly Dictionary<string, Mem> _mem = new Dictionary<string, Mem>(StringComparer.Ordinal);   // pamiec doby A>T (kasowana przy wojnie/pokoju)
@@ -549,6 +551,7 @@ namespace Armoury
             m.W = w; m.Why = why; m.Label = label;
             if (!_canonOver) { Gate(m, GCanon); return m; }
             if (!_northOpen && (a.StringId == NorthId || t.StringId == NorthId || NorthAlly(a) || NorthAlly(t))) { Gate(m, GNorth); return m; }
+            if (FuneralRites.Mourning(a, day)) { Gate(m, GMourn); return m; }   // 410: krolestwo w zalobie po wladcy nikogo nie atakuje (niezmienna migawka, bez blokad)
             // limit wojen A
             int wars = 0, mx = MaxWars;
             float otherEnemies = 0f;
@@ -581,7 +584,8 @@ namespace Armoury
             float pov = PovertyOf(a);
             m.Pov = pov;
             if (pov >= PoorGate) { Gate(m, GPoor); return m; }
-            m.Term = Score * w * r * (1f - pov);
+            m.Bonus = FuneralRites.ContestedBonus(t);   // 410: rod PANUJACY celu w otwartym sporze o dziedzictwo - czlon x (1 + premia), pod wszystkimi bramkami wyzej
+            m.Term = Score * w * r * (1f - pov) * (1f + m.Bonus);
             if (m.Term > 0f) m.Text = new TextObject("{=!}" + label);
             return m;
         }
@@ -621,7 +625,7 @@ namespace Armoury
                     {
                         _posMax[key] = m.Term;
                         _posToday[key] = key + " w=" + m.W.ToString("0.00", Inv) + " R=" + m.R.ToString("0.00", Inv) + " T=" + m.Pov.ToString("0.00", Inv)
-                                         + " wojny=" + m.Wars + " czlon=" + m.Term.ToString("0", Inv) + " (" + m.Why + ")";
+                                         + " wojny=" + m.Wars + " czlon=" + m.Term.ToString("0", Inv) + " (" + m.Why + (m.Bonus > 0f ? ", spor o dziedzictwo x" + (1f + m.Bonus).ToString("0.00", Inv) : "") + ")";
                     }
                 }
                 __result.Add(m.Term, m.Text);
@@ -737,6 +741,14 @@ namespace Armoury
                 lock (_lock) { _memDay = int.MinValue; }   // _posWhy/_posTerm odswieza postfiks przy nastepnej ocenie
             }
             catch (Exception e) { Stumble("OnOwnerChanged", e); }
+        }
+
+        /// <summary>410: FuneralRites (watek glowny) - smierc wladcy, otwarcie albo zamkniecie sporu o dziedzictwo w rodzie: pamiec doby czlonu od nowa
+        /// (zaloba i premia sporu zmieniaja sie w srodku doby). Wolane BEZ blokad FuneralRites; _posWhy/_posTerm odswieza postfiks przy nastepnej ocenie.</summary>
+        internal static void Invalidate()
+        {
+            try { lock (_lock) { _memDay = int.MinValue; } }
+            catch (Exception e) { Stumble("Invalidate", e); }
         }
 
         /// <summary>Recenzja: wojny o tron bez pokoju (krolestwo zniszczone - DestroyKingdomAction nie wola MakePeace - albo wojny juz nie ma) zdejmowane z zapisu. Pod _lock.</summary>

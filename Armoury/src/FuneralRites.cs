@@ -39,7 +39,9 @@ namespace Armoury
     /// Nikogo nie zabijamy i nie okaleczamy (StoryGuard pytany tylko do linii: "dziedzic pod straza fabuly"). Wyjatki per zdarzenie liczone (potkniecia), nic sie nie
     /// gasi. Zapis arm_funeral "v1" (stary zapis = pusto). Reset: konstruktor ArmouryBehavior i OnGameEnd.
     /// 406: pokoj pogrzebu (FuneralRites.Ai.cs) - migawka z wierszy PELNYCH, liczniki rozejmu w wierszu (tylko sesja, nie w zapisie).
-    /// 407: zjazd rodu (FuneralRites.Ai.cs) - jedyna latka: postfiks 130 CampaignEventDispatcher.AiHourlyTick (w kampanii, raz na proces).</summary>
+    /// 407: zjazd rodu (FuneralRites.Ai.cs) - jedyna latka: postfiks 130 CampaignEventDispatcher.AiHourlyTick (w kampanii, raz na proces).
+    /// 410: sporna sukcesja i zaloba krolestwa dla 312c (FuneralRites.Succession.cs) - ocena sporu w Head po utworzeniu wiersza, pytanie do gracza po
+    /// "Attend the funeral", wiersze "S" / "K" w tym samym zapisie; Pre.Rot / Chg.Rot = wydarzenie ROT na stosie sluchacza.</summary>
     internal static partial class FuneralRites
     {
         internal const string Tag = "Pogrzeby (P5)";
@@ -64,10 +66,10 @@ namespace Armoury
         private sealed class Pre
         {
             public string Clan, Kingdom, Line;
-            public bool Leader, Ruling, Important;
+            public bool Leader, Ruling, Important, Rot;   // 410: Rot = zgon glowy z wydarzenia ROT (ROT.Events na stosie)
         }
 
-        private sealed class Chg { public string Clan; public double Hour; }
+        private sealed class Chg { public string Clan; public double Hour; public bool Rot; }   // 410: Rot = glowe zmienilo wydarzenie ROT
 
         private static readonly Dictionary<string, Row> _active = new Dictionary<string, Row>(StringComparer.Ordinal);       // rod -> pogrzeb (pelny albo cichy)
         private static readonly Dictionary<string, Pre> _pre = new Dictionary<string, Pre>(StringComparer.Ordinal);          // ofiara -> stan sprzed zmiany glowy (tylko sesja)
@@ -89,6 +91,7 @@ namespace Armoury
             _active.Clear(); _pre.Clear(); _changed.Clear(); _leaderOf.Clear(); _tmp.Clear(); _err.Clear();
             _stumbles = _nPre = _nChg = _nSnap = _nFull = _nQuiet = _nWord = _nJoint = 0;
             TruceReset();   // 406
+            SuccReset();    // 410
         }
 
         private static void Stumble(string where, Exception e)
@@ -182,7 +185,7 @@ namespace Armoury
                 if (!Eligible(cl) || victim.StringId == null) return;
                 var p = new Pre { Clan = cl.StringId, Kingdom = cl.Kingdom != null ? cl.Kingdom.StringId : "", Leader = cl.Leader == victim, Ruling = Ruling(cl) };
                 p.Important = cl.Tier >= 4 || p.Ruling;
-                if (p.Leader && p.Important) p.Line = BkLine(cl, victim);
+                if (p.Leader && p.Important) { p.Line = BkLine(cl, victim); p.Rot = RotOnStack(); }   // 410: stos raz na zgon glowy waznego rodu
                 _pre[victim.StringId] = p;
             }
             catch (Exception e) { Stumble("OnBeforeKilled", e); }
@@ -196,7 +199,7 @@ namespace Armoury
                 if (oldLeader == null || oldLeader.StringId == null || !KeyOn) return;
                 var cl = oldLeader.Clan ?? (newLeader != null ? newLeader.Clan : null);
                 if (cl == null || cl == Clan.PlayerClan) return;
-                _changed[oldLeader.StringId] = new Chg { Clan = cl.StringId, Hour = CampaignTime.Now.ToHours };
+                _changed[oldLeader.StringId] = new Chg { Clan = cl.StringId, Hour = CampaignTime.Now.ToHours, Rot = RotOnStack() };   // 410: stos raz na zmiane glowy
             }
             catch (Exception e) { Stumble("OnLeaderChanged", e); }
         }
@@ -224,7 +227,8 @@ namespace Armoury
                 bool ruling = pre != null ? pre.Ruling : Ruling(cl);
                 bool important = pre != null ? pre.Important : (cl.Tier >= 4 || ruling);
                 if (!important) return;
-                Head(cl, victim, detail, a ? "przed" : (b ? "zmiana glowy" : "migawka"), ruling, pre != null ? pre.Kingdom : (cl.Kingdom != null ? cl.Kingdom.StringId : ""), pre != null ? pre.Line : null);
+                bool rot = (pre != null && pre.Rot) || (chg != null && chg.Clan == cl.StringId && chg.Rot);   // 410: glowa / zgon z wydarzenia ROT - bez sporu
+                Head(cl, victim, detail, a ? "przed" : (b ? "zmiana glowy" : "migawka"), ruling, pre != null ? pre.Kingdom : (cl.Kingdom != null ? cl.Kingdom.StringId : ""), pre != null ? pre.Line : null, rot);
             }
             catch (Exception e) { Stumble("OnKilled", e); }
         }
@@ -242,10 +246,11 @@ namespace Armoury
             return true;
         }
 
-        private static void Head(Clan cl, Hero victim, KillCharacterAction.KillCharacterActionDetail detail, string how, bool ruling, string kingdomId, string line)
+        private static void Head(Clan cl, Hero victim, KillCharacterAction.KillCharacterActionDetail detail, string how, bool ruling, string kingdomId, string line, bool rot)
         {
             int today = Today();
             Hero heir = !cl.IsEliminated && cl.Leader != null && cl.Leader != victim && cl.Leader.IsAlive ? cl.Leader : null;
+            if (ruling) KingDied(kingdomId, victim);   // 410: zaloba krolestwa (312c) - kazdy tryb pogrzebu, takze sama wiesc i wspolny pogrzeb
             if (Joint(cl, victim, true)) return;
             Kingdom kingdom = cl.Kingdom;
             Settlement seat = cl.IsEliminated || heir == null ? null : SeatOf(cl);
@@ -290,12 +295,16 @@ namespace Armoury
             Info(head + " | siedziba " + seat.StringId + " | tryb " + (row.Mode == Full ? "PELNY" : "CICHY (" + why + ")") + " | obrzed dnia " + row.Rite + ", koniec " + row.End + ".");
             TruceRebuild();   // 406: pokoj pogrzebu - nowy wiersz pelny (albo wyparty na cichy)
             Widow(victim);
-            if (!TellPlayer(cl, victim, heir, seat)) return;
-            if (row.Mode == Full)
-                Log.Player("Word reaches you: " + Nm(victim) + " of " + Nm(cl) + " is dead. The house gathers at " + Nm(seat) + " to bury " + (victim.IsFemale ? "her" : "him")
-                           + "; the rites are held in " + (row.Rite - today) + " days.");
-            else if (siege) Log.Player(Nm(cl) + " buries its lord in silence - " + Nm(seat) + " is not theirs to gather in.");
-            else Log.Player(Nm(victim) + " of " + Nm(cl) + " is dead.");
+            bool told = TellPlayer(cl, victim, heir, seat);
+            if (told)
+            {
+                if (row.Mode == Full)
+                    Log.Player("Word reaches you: " + Nm(victim) + " of " + Nm(cl) + " is dead. The house gathers at " + Nm(seat) + " to bury " + (victim.IsFemale ? "her" : "him")
+                               + "; the rites are held in " + (row.Rite - today) + " days.");
+                else if (siege) Log.Player(Nm(cl) + " buries its lord in silence - " + Nm(seat) + " is not theirs to gather in.");
+                else Log.Player(Nm(victim) + " of " + Nm(cl) + " is dead.");
+            }
+            SuccessionCheck(cl, victim, heir, row, line, rot, told);   // 410: spor o dziedzictwo - jedna ocena na zgon glowy (po wiesci o smierci)
         }
 
         private static bool GuardedSafe(Hero h) { try { return StoryGuard.Needed(h); } catch { return false; } }
@@ -418,7 +427,7 @@ namespace Armoury
                     _active.Remove(id);
                     Info("KONIEC " + id + " (" + r.Name + (string.IsNullOrEmpty(r.Others) ? "" : " + " + r.Others) + ", siedziba " + r.Seat + ", tryb " + (r.Mode == Full ? "pelny" : "cichy") + ") | gracz obecny "
                          + (r.Attended ? "T" : "N") + ", dar " + r.Gift + (r.Mode == Full ? TruceEndText(r) : "") + GatherEnd(r) + " | sesja: glowy wykryte przed " + _nPre + " / zmiana glowy " + _nChg + " / migawka " + _nSnap + ", pelnych " + _nFull + ", cichych " + _nQuiet
-                         + ", tylko wiesc " + _nWord + ", wspolnych " + _nJoint + ", potkniecia " + _stumbles + ".");
+                         + ", tylko wiesc " + _nWord + ", wspolnych " + _nJoint + SuccEndText() + ", potkniecia " + _stumbles + ".");
                 }
                 if (_changed.Count > 0)
                 {
@@ -431,6 +440,7 @@ namespace Armoury
                 _tmp.Clear();
             }
             catch (Exception e) { Stumble("Daily", e); }
+            try { SuccDaily(); } catch (Exception e) { Stumble("SuccDaily", e); }     // 410: spory po koncu pogrzebu (rozstrzygniecie), urazy, zaloby; migawka 312c
             try { TruceDaily(); } catch (Exception e) { Stumble("TruceDaily", e); }   // 406: migawka pokoju po wygaszeniu wierszy (stan fabuly i pan siedziby na dzis)
         }
 
@@ -474,6 +484,7 @@ namespace Armoury
                          + " | latki wlasne " + (_gHooked ? 1 : 0) + " | migawka glow " + _leaderOf.Count + " rodow | w zapisie " + _active.Count + " (pelnych " + full + ").");
             }
             catch (Exception e) { Stumble("StartLine", e); }
+            SuccStart();   // 410: migawka 312c (zaloba, rody panujace w sporze) i linia startu sukcesji
         }
 
         private static bool SafeCanon() { try { return Prologue.CanonHere; } catch { return false; } }
@@ -552,6 +563,7 @@ namespace Armoury
                 _lordsHere.Clear();
                 Log.Player("You stood with " + Nm(cl) + " at the grave of " + r.Name + ". " + Nm(heir) + " will remember it.");
                 Info("gracz na pogrzebie " + r.Name + " (rod " + r.Clan + ", siedziba " + r.Seat + "): dziedzic " + Nm(heir) + " +3, lordowie rodu na miejscu " + lords + " po +1.");
+                SuccAsk(cl, heir);   // 410: otwarty spor o dziedzictwo - pytanie o strone (raz na spor; okno gry, menu bez zmian)
             }
             catch (Exception e) { Stumble("AttendConsequence", e); }
         }
@@ -603,13 +615,14 @@ namespace Armoury
 
         private static bool Ok(string id) { return !string.IsNullOrEmpty(id) && id.IndexOf('|') < 0 && id.IndexOf('\n') < 0 && id.IndexOf('\r') < 0; }
 
-        /// <summary>"v1" + wiersze "F|rod|zmarly|imie|dziedzic|siedziba|krolestwo|doba|obrzed|koniec|tryb|wladca|byl|dar|powod|linia|inni".</summary>
+        /// <summary>"v1" + wiersze "F|rod|zmarly|imie|dziedzic|siedziba|krolestwo|doba|obrzed|koniec|tryb|wladca|byl|dar|powod|linia|inni"
+        /// + 410: wiersze "S|..." (spor) i "K|..." (zaloba krolestwa) - SuccExport.</summary>
         internal static string Export()
         {
             try
             {
-                if (_active.Count == 0) return "";
-                var sb = new StringBuilder(32 + 128 * _active.Count);
+                if (_active.Count == 0 && !SuccAny) return "";
+                var sb = new StringBuilder(32 + 128 * (_active.Count + _disputes.Count));
                 sb.Append("v1");
                 foreach (var r in _active.Values)
                 {
@@ -619,6 +632,7 @@ namespace Armoury
                       .Append('|').Append(r.Mode.ToString(Inv)).Append('|').Append(r.King ? '1' : '0').Append('|').Append(r.Attended ? '1' : '0').Append('|').Append(r.Gift.ToString(Inv))
                       .Append('|').Append(Clean(r.Why)).Append('|').Append(Clean(r.Line)).Append('|').Append(Clean(r.Others));
                 }
+                SuccExport(sb);   // 410
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -629,6 +643,7 @@ namespace Armoury
         {
             _active.Clear();
             TruceReset();   // 406: migawka pokoju od nowa w AddMenus (po starcie sesji)
+            SuccReset();    // 410: spory i zaloby z zapisu; migawka 312c w AddMenus (SuccStart)
             int bad = 0;
             try
             {
@@ -641,6 +656,7 @@ namespace Armoury
                     if (p.Length == 0 || p[0].Length == 0) continue;
                     try
                     {
+                        if (p[0] == "S" || p[0] == "K") { if (!SuccImportLine(p)) bad++; continue; }   // 410
                         if (p[0] != "F" || p.Length < 14 || p[1].Length == 0 || p[2].Length == 0 || p[5].Length == 0) { bad++; continue; }
                         var r = new Row
                         {
