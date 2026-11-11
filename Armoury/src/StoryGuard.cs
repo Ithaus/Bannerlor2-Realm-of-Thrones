@@ -523,6 +523,14 @@ namespace Armoury
             catch (Exception e) { Stumble("MayLeaveStory", e); why = "blad strazy fabuly"; return false; }
         }
 
+        /// <summary>401-p: zywy bohater, ktorego NASZ kod nie moze zabic ani wyjac z fabuly - chroniony (stan 2), nieoceniony (396-p) albo postac z tabeli
+        /// obsady przy niewidocznej liscie wydarzen ROT. Rany: taki bohater nie dostaje rany Grave. Nie rzuca.</summary>
+        internal static bool Shielded(Hero h)
+        {
+            try { string w; return h != null && h.IsAlive && !Clear(h, out w); }
+            catch (Exception e) { Stumble("Shielded", e); return false; }
+        }
+
         /// <summary>410: rod, w ktorym zyje ktokolwiek chroniony (stan 2) - spor o dziedzictwo takiego rodu nie rusza (FuneralRites.Succession). Nie rzuca.</summary>
         internal static bool ClanLocked(Clan c)
         {

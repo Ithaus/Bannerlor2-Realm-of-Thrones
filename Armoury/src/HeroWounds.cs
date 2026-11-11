@@ -58,6 +58,9 @@ namespace Armoury
             public double Day;                   // dzien kampanii rany (z ulamkiem)
             public Hero H;
             public bool DeferSaid;               // 403: linia "przesilenie odroczone" juz napisana (poza zapisem)
+            public bool Fresh, Guard;            // 401-p: wpis z trwajacej bitwy - komunikat i liczniki dopiero, gdy bohater ja przezyl (poza zapisem)
+            public MapEvent Me;                  // 401-p: bitwa rany (poza zapisem)
+            public int Days0;                    // 401-p: dni loza z rzutu - do odlozonego komunikatu (poza zapisem)
         }
 
         // ---------------------------------------------------------------- stan (zapis: _rows)
@@ -77,6 +80,7 @@ namespace Armoury
         private static int _sBattle, _sSerious, _sGrave, _sDays;
         private static int _healCuts, _setCuts, _dStumbles, _stumbles;
         private static int _dDied, _dLived, _dDeferred, _dSpared, _dMaimed, _sDied, _sMaimed;   // 403: przesilenia
+        private static int _freshN, _dFell, _sFell, _dDropped, _dNk, _dTest;                    // 401-p: wpisy przed potwierdzeniem, polegli w bitwie rany, zdjete kluczem / HP, Nocny Krol, gracz autotestu
         private static readonly List<Row> _crisisBuf = new List<Row>();
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
 
@@ -103,6 +107,7 @@ namespace Armoury
             _sBattle = _sSerious = _sGrave = _sDays = 0;
             _healCuts = _setCuts = _dStumbles = _stumbles = 0;
             _dDied = _dLived = _dDeferred = _dSpared = _dMaimed = _sDied = _sMaimed = 0;
+            _freshN = _dFell = _sFell = _dDropped = _dNk = _dTest = 0;
             _crisisBuf.Clear();
             AiReset();
         }
@@ -114,7 +119,7 @@ namespace Armoury
             foreach (var r in _rows.Values)
             {
                 if (sb.Length > 0) sb.Append('\n');
-                sb.Append(r.Id).Append('|').Append(r.Grade).Append('|').Append(r.Day.ToString("0.00", Inv)).Append('|').Append(r.Left).Append('|').Append(r.Crisis)
+                sb.Append(r.Id).Append('|').Append(r.Grade).Append('|').Append(r.Day.ToString("R", Inv)).Append('|').Append(r.Left).Append('|').Append(r.Crisis)
                   .Append('|').Append(Clean(r.Place)).Append('|').Append(Clean(r.Src));
             }
             return sb.ToString();
@@ -123,7 +128,7 @@ namespace Armoury
         /// <summary>Wczytanie: same wiersze (bohaterow rozwiazuje SessionStart - w SyncData swiat nie musi byc gotowy). Zly wiersz pominiety z potknieciem.</summary>
         internal static void Import(string text)
         {
-            _rows.Clear(); _bed.Clear(); _n = 0;
+            _rows.Clear(); _bed.Clear(); _n = 0; _freshN = 0;
             if (string.IsNullOrEmpty(text)) return;
             foreach (var line in text.Split('\n'))
             {
@@ -216,17 +221,18 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------------- API (373, FieldDuel, pozniej 402/403/408)
-        /// <summary>Bohater lezy (czynny wpis Serious albo Grave).</summary>
-        internal static bool Abed(Hero h) { return _n != 0 && h != null && _bed.ContainsKey(h); }
+        /// <summary>Bohater lezy (czynny wpis Serious albo Grave). 401-p: przy kluczu Hero Wounds Enabled NIE cale API mowi "nie lezy" (wpisy dalej odliczaja,
+        /// ale HP nie jest trzymane - 373, loch 402, encyklopedia i dymek maja wtedy stan sprzed 401).</summary>
+        internal static bool Abed(Hero h) { return _n != 0 && h != null && _bed.ContainsKey(h) && KeyOn; }
 
         /// <summary>0 = bez wpisu, 1 = Serious, 2 = Grave.</summary>
-        internal static int GradeOf(Hero h) { Row r; return _n != 0 && h != null && _bed.TryGetValue(h, out r) ? r.Grade : 0; }
+        internal static int GradeOf(Hero h) { Row r; return _n != 0 && h != null && _bed.TryGetValue(h, out r) && KeyOn ? r.Grade : 0; }
 
         /// <summary>Dni spoczynku do konca loza (0 = bez wpisu).</summary>
-        internal static int DaysLeft(Hero h) { Row r; return _n != 0 && h != null && _bed.TryGetValue(h, out r) ? Math.Max(1, r.Left) : 0; }
+        internal static int DaysLeft(Hero h) { Row r; return _n != 0 && h != null && _bed.TryGetValue(h, out r) && KeyOn ? Math.Max(1, r.Left) : 0; }
 
         /// <summary>Dzien kampanii (z ulamkiem), od ktorego bohater lezy; double.MaxValue gdy nie lezy (porownanie "lezal przed bitwa" daje wtedy NIE).</summary>
-        internal static double BedriddenSince(Hero h) { Row r; return _n != 0 && h != null && _bed.TryGetValue(h, out r) ? r.Day : double.MaxValue; }
+        internal static double BedriddenSince(Hero h) { Row r; return _n != 0 && h != null && _bed.TryGetValue(h, out r) && KeyOn ? r.Day : double.MaxValue; }
 
         /// <summary>Bohater lezal juz PRZED ta bitwa (rana sprzed jej poczatku) - nie jest "rannym z tej bitwy" (SiegeWounded373).</summary>
         internal static bool AbedBefore(Hero h, MapEvent me)
@@ -235,13 +241,13 @@ namespace Armoury
             {
                 if (_n == 0 || h == null || me == null) return false;
                 Row r;
-                return _bed.TryGetValue(h, out r) && r.Day < me.BattleStartTime.ToDays;
+                return _bed.TryGetValue(h, out r) && KeyOn && r.Day < me.BattleStartTime.ToDays;
             }
             catch (Exception e) { Stumble("AbedBefore", e); return false; }
         }
 
         /// <summary>Rana Grave, ktorej przesilenie jeszcze nie minelo (403: rzut smierci; 402: goraczka lochu pomija).</summary>
-        internal static bool GraveCrisisAhead(Hero h) { Row r; return _n != 0 && h != null && _bed.TryGetValue(h, out r) && r.Grade == Grave && r.Crisis > 0; }
+        internal static bool GraveCrisisAhead(Hero h) { Row r; return _n != 0 && h != null && _bed.TryGetValue(h, out r) && r.Grade == Grave && r.Crisis > 0 && KeyOn; }
 
         // ---------------------------------------------------------------- latki
         /// <summary>Hero.HealByAmountInternal(int healingAmount, bool addXp): lezacemu leczenie przyciete do progu rany; nic do wyleczenia = metoda pominieta
@@ -305,7 +311,7 @@ namespace Armoury
                 var h = _encHero(__instance);
                 if (h == null) return;
                 Row r;
-                string bed = _bed.TryGetValue(h, out r) ? StateText(r) : null;
+                string bed = _bed.TryGetValue(h, out r) && KeyOn ? StateText(r) : null;
                 string scars = HeroFate.Labels(h);   // 403: trwale okaleczenia (takze po wstaniu z loza i po smierci)
                 if (bed == null && scars == null) return;
                 __instance.Stats.Add(new StringPairItemVM("Wounds:", bed != null && scars != null ? bed + "; " + scars : bed ?? scars));
@@ -321,8 +327,11 @@ namespace Armoury
             {
                 var h = args != null && args.Length > 0 ? args[0] as Hero : null;
                 if (h == null || propertyBasedTooltipVM == null) return;
+                bool hidden = false;   // 401-p: jak encyklopedia - nic o bohaterze, ktorego gracz nie zna (gra liczy to samo w RefreshHeroTooltip)
+                try { hidden = CampaignUIHelper.IsHeroInformationHidden(h, out _); } catch { hidden = false; }
+                if (hidden) return;
                 Row r;
-                if (_bed.TryGetValue(h, out r)) propertyBasedTooltipVM.AddProperty("", StateText(r));
+                if (_bed.TryGetValue(h, out r) && KeyOn) propertyBasedTooltipVM.AddProperty("", StateText(r));
                 string scars = HeroFate.Labels(h);   // 403
                 if (scars != null) propertyBasedTooltipVM.AddProperty("", scars);
             }
@@ -330,7 +339,26 @@ namespace Armoury
         }
 
         // ---------------------------------------------------------------- rana
-        private static bool Walker(Hero h) { var c = h.CharacterObject; return c != null && c.Race == 1; }
+        /// <summary>Bialy Wedrowiec (ROT Race 1) albo upior (Race 2, 401-p) - nie lezy na lozu i nie umiera od ran.</summary>
+        private static bool Walker(Hero h) { var c = h.CharacterObject; return c != null && (c.Race == 1 || c.Race == 2); }
+
+        /// <summary>401-p: partia Nocnego Krola (jak ROTDuelsBehavior.IsNightKingParty: wodz - Bialy Wedrowiec, glowa swojego rodu).</summary>
+        private static bool NkParty(PartyBase p)
+        {
+            try
+            {
+                var lh = p != null ? p.LeaderHero : null;
+                var c = lh != null ? lh.CharacterObject : null;
+                return c != null && c.Race == 1 && lh.Clan != null && lh.Clan.Leader == lh;
+            }
+            catch { return false; }
+        }
+
+        private static bool NkBattle(MapEvent me)
+        {
+            try { return me != null && (NkParty(me.AttackerSide != null ? me.AttackerSide.LeaderParty : null) || NkParty(me.DefenderSide != null ? me.DefenderSide.LeaderParty : null)); }
+            catch { return false; }
+        }
 
         /// <summary>Komunikat tylko, gdy rzecz dotyczy gracza: on sam, jego rod i towarzysze, jego jeniec, a przy ranie Grave takze lord jego krolestwa.</summary>
         private static bool Concerns(Hero h, bool grave)
@@ -385,6 +413,7 @@ namespace Armoury
                 MapEvent me = hp != null ? hp.MapEvent : null;
                 if (me == null && player) { try { me = PlayerEncounter.Battle; } catch { me = null; } }
                 if (me == null) { _dNoBattle++; return; }
+                if (player && (LogGate.Mode == 1 || LogGate.Mode == 2)) { _dTest++; _dOut++; return; }   // 401-p: DLL autotestu / profilu - gracz testu bitew nie trafia na loze (kolejne bitwy sesji musza otwierac misje)
                 string id = h.StringId;
                 if (string.IsNullOrEmpty(id)) { _dOut++; return; }
                 if (_rows.ContainsKey(id)) { _dHas++; return; }
@@ -404,10 +433,17 @@ namespace Armoury
                 int grade = roll < gp ? Grave : roll < gp + sp ? Serious : 0;
                 string guard = "nie";
                 bool needed = false;
+                if (grade != 0 && player && NkBattle(me))
+                {
+                    // 401-p: bitwa z Nocnym Krolem konczy sie WYMUSZONYM pojedynkiem gracza (ROT: przegrana = smierc postaci) - loze nie moze go trzymac pod progiem rany
+                    grade = 0; guard = "gracz w bitwie z Nocnym Krolem -> Light"; _dNk++;
+                }
                 if (grade != 0)
                 {
                     needed = StoryGuard.Needed(h);
-                    if (needed && grade == Grave) { grade = Serious; guard = "Grave -> Serious"; }
+                    // 401-p: postac z tabeli obsady przy niewidocznej liscie wydarzen ROT albo nieoceniona (StoryGuard.Shielded) - bez Grave, jak chroniona
+                    bool shielded = needed || StoryGuard.Shielded(h);
+                    if (shielded && grade == Grave) { grade = Serious; guard = needed ? "Grave -> Serious" : "Grave -> Serious (lista wydarzen niewidoczna / stan nieoceniony)"; }
                     else if (needed) guard = "chroniony";
                 }
                 int days = 0;
@@ -438,31 +474,106 @@ namespace Armoury
                     return;
                 }
                 double now = CampaignTime.Now.ToDays;
+                // 401-p: gra najpierw zadaje rane (ten nasluch), a dopiero potem rzuca smierc w tej samej bitwie - komunikat gracza i liczniki serious / grave /
+                // dni loza czekaja na koniec bitwy (OnMapEventEnded; zapas: doba). HP trzymamy od razu.
                 var r = new Row { Id = id, Grade = grade, Day = now, Left = days, Place = where, Src = mission ? "misja" : "symulacja", H = h,
-                                  Crisis = grade == Grave ? (int)now + 3 + MBRandom.RandomInt(8) : 0 };
-                _rows[id] = r; _bed[h] = r; _n = _bed.Count;
-                if (grade == Grave) { _dGrave++; _sGrave++; } else { _dSerious++; _sSerious++; }
-                if (needed) _dGuard++;
-                _sDays += days;
+                                  Crisis = grade == Grave ? (int)now + 3 + MBRandom.RandomInt(8) : 0, Fresh = true, Guard = needed, Me = me, Days0 = days };
+                _rows[id] = r; _bed[h] = r; _n = _bed.Count; _freshN++;
                 if (s.HeroWoundsLog)
                     Log.Info(Tag + Nm(h) + " (" + id + ", wiek " + ((int)age) + (h.Clan != null && h.Clan.Name != null ? ", " + h.Clan.Name : "") + ") ranny " + where
                              + " [" + r.Src + "] - rzut " + (roll / 100f).ToString("0.00", Inv) + " (grave < " + (gp / 100f).ToString("0.00", Inv) + ", serious < "
                              + ((gp + sp) / 100f).ToString("0.00", Inv) + ") -> " + GradeName(grade) + ", loze " + days + " dni spoczynku"
                              + (grade == Grave ? ", przesilenie dnia " + r.Crisis : "") + " | HP " + h.HitPoints + ", prog " + h.WoundedHealthLimit
-                             + " | straz fabuly: " + guard + ".");
-                try
-                {
-                    if (player)
-                        Log.Player((grade == Grave ? "You are gravely wounded." : "You have taken a serious wound.") + " You can ride, but you cannot fight for about " + days + " days."
-                                   + (s.HeroWoundsFortressRestDouble ? " Rest within castle or town walls mends you twice as fast." : ""), true);
-                    else if (Concerns(h, grade == Grave))
-                        Log.Player(grade == Grave
-                            ? Nm(h) + " lies gravely wounded. The healers cannot say whether " + (h.IsFemale ? "she" : "he") + " will live."
-                            : Nm(h) + " has taken a serious wound and will be abed for about " + days + " days.", h.MapFaction == Hero.MainHero.MapFaction);
-                }
-                catch (Exception e) { Stumble("OnHeroWounded.Player", e); }
+                             + " | straz fabuly: " + guard + " | wpis wstepny - komunikat i liczniki po bitwie, jesli przezyje.");
             }
             catch (Exception e) { Stumble("OnHeroWounded", e); }
+        }
+
+        /// <summary>401-p: bohater przezyl bitwe swojej rany - wpis liczony (serious / grave / dni loza) i komunikat dla gracza.</summary>
+        private static void Confirm(Row r)
+        {
+            if (!r.Fresh) return;
+            r.Fresh = false; r.Me = null; if (_freshN > 0) _freshN--;
+            var h = r.H;
+            int grade = r.Grade, days = r.Days0;
+            if (grade == Grave) { _dGrave++; _sGrave++; } else { _dSerious++; _sSerious++; }
+            if (r.Guard) _dGuard++;
+            _sDays += days;
+            try
+            {
+                var s = Settings.Current;
+                if (h == null || s == null || !s.HeroWoundsEnabled) return;
+                if (h == Hero.MainHero)
+                    Log.Player((grade == Grave ? "You are gravely wounded." : "You have taken a serious wound.") + " You can ride, but you cannot fight for about " + days + " days."
+                               + (s.HeroWoundsFortressRestDouble ? " Rest within castle or town walls mends you twice as fast." : ""), true);
+                else if (Concerns(h, grade == Grave))
+                    Log.Player(grade == Grave
+                        ? Nm(h) + " lies gravely wounded. The healers cannot say whether " + (h.IsFemale ? "she" : "he") + " will live."
+                        : Nm(h) + " has taken a serious wound and will be abed for about " + days + " days.", h.MapFaction == Hero.MainHero.MapFaction);
+            }
+            catch (Exception e) { Stumble("Confirm.Player", e); }
+        }
+
+        private static void Drop(Row r)
+        {
+            if (r.Fresh) { r.Fresh = false; r.Me = null; if (_freshN > 0) _freshN--; }
+            _rows.Remove(r.Id);
+            if (r.H != null) _bed.Remove(r.H);
+            _n = _bed.Count;
+        }
+
+        private static void Fell(Row r)
+        {
+            _dFell++; _sFell++;
+            Log.Info(Tag + (r.H != null ? Nm(r.H) : r.Id) + " (" + r.Id + ") polegl w tej samej bitwie - wpis wstepny " + GradeName(r.Grade) + " usuniety bez komunikatu i bez licznikow.");
+            Drop(r);
+        }
+
+        /// <summary>401-p CampaignEvents.MapEventEnded: wpisy wstepne tej bitwy - polegly (nie zyje albo znak smierci) znika bez komunikatu i bez licznikow,
+        /// zywy jest potwierdzany. Bez wpisow wstepnych jedno porownanie.</summary>
+        internal static void OnMapEventEnded(MapEvent me)
+        {
+            if (_freshN == 0) return;
+            try
+            {
+                List<Row> fresh = null;
+                foreach (var r in _rows.Values) if (r.Fresh && (r.Me == me || r.Me == null)) (fresh ?? (fresh = new List<Row>())).Add(r);
+                if (fresh == null) return;
+                foreach (var r in fresh)
+                {
+                    try
+                    {
+                        var h = r.H;
+                        if (h == null || !h.IsAlive || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None) Fell(r);
+                        else Confirm(r);
+                    }
+                    catch (Exception e) { Stumble("OnMapEventEnded(" + r.Id + ")", e); }
+                }
+            }
+            catch (Exception e) { Stumble("OnMapEventEnded", e); }
+        }
+
+        /// <summary>401-p CampaignEvents.MapEventStarted: Nocny Krol staje do bitwy z druzyna gracza, a gracz lezy - loze zdjete i HP przywrocone (ROT konczy
+        /// te bitwe wymuszonym pojedynkiem gracza, przegrana = smierc postaci; bez 401 gra dawno by go wyleczyla). Tylko ta jedna bitwa fabuly.</summary>
+        internal static void OnMapEventStarted(MapEvent me, PartyBase attacker, PartyBase defender)
+        {
+            if (_n == 0) return;
+            try
+            {
+                var h = Hero.MainHero;
+                Row r;
+                if (h == null || !_bed.TryGetValue(h, out r)) return;
+                var main = PartyBase.MainParty;
+                if (main == null || !((attacker == main && NkParty(defender)) || (defender == main && NkParty(attacker)))) return;
+                bool on = KeyOn;
+                int hp0 = h.HitPoints;
+                Drop(r); _dNk++;
+                if (on && h.IsAlive && h.HitPoints < h.MaxHitPoints) h.HitPoints = h.MaxHitPoints;
+                Log.Info(Tag + "gracz wstaje z loza przed bitwa z Nocnym Krolem (rana " + GradeName(r.Grade) + " z dnia " + r.Day.ToString("0", Inv) + ", zostalo " + Math.Max(1, r.Left)
+                         + " dni) - wpis usuniety, HP " + hp0 + " -> " + h.HitPoints + " (ROT: wymuszony pojedynek po bitwie).");
+                if (on) Log.Player("The Night King is upon you. You rise from the sickbed to face him.", true);
+            }
+            catch (Exception e) { Stumble("OnMapEventStarted", e); }
         }
 
         // ---------------------------------------------------------------- doba
@@ -481,11 +592,37 @@ namespace Armoury
                     try
                     {
                         var h = r.H;
+                        if (r.Fresh && h != null && (!h.IsAlive || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None))
+                        {
+                            // 401-p: zapas dla OnMapEventEnded - polegl w bitwie swojej rany
+                            (done ?? (done = new List<Row>())).Add(r); _dFell++; _sFell++;
+                            Log.Info(Tag + Nm(h) + " (" + r.Id + ") polegl w tej samej bitwie - wpis wstepny " + GradeName(r.Grade) + " usuniety bez komunikatu i bez licznikow.");
+                            continue;
+                        }
                         if (h == null || !h.IsAlive)
                         {
                             (done ?? (done = new List<Row>())).Add(r); _dGone++;
                             Log.Info(Tag + (h != null ? Nm(h) : r.Id) + " - wpis usuniety: " + (h == null ? "brak bohatera w grze" : "nie zyje") + " (rana " + GradeName(r.Grade) + " " + r.Place + ").");
                             continue;
+                        }
+                        if (r.Fresh)
+                        {
+                            var fp = h.PartyBelongedTo;
+                            if (fp == null || fp.MapEvent == null) Confirm(r);   // 401-p: bitwa rany juz sie skonczyla (zapas dla OnMapEventEnded)
+                        }
+                        if (s != null && s.HeroWoundsEnabled)
+                        {
+                            // 401-p: klucz zakresu przestawiony na NIE zdejmuje istniejace loze; HP ponad progiem = klucz glowny byl wylaczony i gra bohatera wyleczyla
+                            bool pl = h == Hero.MainHero;
+                            bool mineH = !pl && (h.IsPlayerCompanion || h.Clan == Clan.PlayerClan);
+                            string drop = pl && !s.HeroWoundsPlayer ? "klucz Hero Wounds Player NIE" : mineH && !s.HeroWoundsCompanions ? "klucz Hero Wounds Companions NIE"
+                                        : h.HitPoints > h.WoundedHealthLimit ? "HP " + h.HitPoints + " ponad progiem rany (wyleczony przy wylaczonym kluczu)" : null;
+                            if (drop != null)
+                            {
+                                (done ?? (done = new List<Row>())).Add(r); _dDropped++;
+                                Log.Info(Tag + Nm(h) + " (" + r.Id + ") - wpis usuniety: " + drop + " (rana " + GradeName(r.Grade) + " " + r.Place + ", zostalo " + Math.Max(1, r.Left) + " dni).");
+                                continue;
+                            }
                         }
                         int step = 1;
                         if (h.IsPrisoner) pris++;
@@ -542,22 +679,24 @@ namespace Armoury
                 }
                 if (done != null)
                 {
-                    foreach (var r in done) { _rows.Remove(r.Id); if (r.H != null) _bed.Remove(r.H); }
-                    _n = _bed.Count;
+                    foreach (var r in done) Drop(r);
                 }
-                if (_dEv + _dRose + _dCrisis + _dDeferred + _dGone + _dStumbles + _dRb + _rows.Count + _healCuts + _setCuts + _aiOrders + _aiOff > 0)
+                if (_dEv + _dRose + _dCrisis + _dDeferred + _dGone + _dStumbles + _dRb + _rows.Count + _healCuts + _setCuts + _aiOrders + _aiOff + _dFell + _dDropped + _dNk > 0)
                     Log.Info(Tag + "dzien " + day + " | rany w bitwie dzis " + _dBattle + " (misja " + _dMission + " / symulacja " + _dSim + "): light " + _dLight + ", serious "
                              + _dSerious + ", grave " + _dGrave + ", chronieni fabula " + _dGuard + " | zdarzen HeroWounded " + _dEv + " (poza bitwa " + _dNoBattle + ", poza zakresem "
                              + _dOut + ", rana Kroniki " + _dCanon + ", juz na lozu " + _dHas + ") | na lozu " + sr + " serious / " + gr + " grave (jency " + pris + ", w twierdzy " + fort
                              + ") | wstali " + _dRose + ", przesilenia " + _dCrisis + " (przezyli " + _dLived + ", oszczedzeni / bez rzutu " + _dSpared + ", odroczone " + _dDeferred
                              + "), zmarli " + _dDied + " (rok " + LordToll.Count(LordToll.Wounds) + "/" + LordToll.MaxWounds + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll
-                             + "), okaleczeni " + _dMaimed + ", wpisy bez bohatera " + _dGone + " | przyciecia: leczenie " + _healCuts + ", seter "
+                             + "), okaleczeni " + _dMaimed + ", wpisy bez bohatera " + _dGone + ", polegli w bitwie rany " + _dFell + " (sesja " + _sFell + "), czeka na koniec bitwy " + _freshN
+                             + ", zdjete kluczem / HP " + _dDropped + ", Nocny Krol (gracz bez loza) " + _dNk + (_dTest > 0 ? ", gracz autotestu pominiety " + _dTest : "")
+                             + " | przyciecia: leczenie " + _healCuts + ", seter "
                              + _setCuts + " | RB rana krytyczna pominieta " + _dRb + " | od startu sesji: ran w bitwie " + _sBattle + ", serious " + _sSerious + ", grave " + _sGrave
                              + ", dni loza " + _sDays + ", zmarli od ran " + _sDied + ", okaleczeni " + _sMaimed + " | potkniecia " + _dStumbles + " (sesja " + _stumbles
                              + ", HeroFate " + HeroFate.Stumbles + ")" + AiDayText() + ".");
                 _dEv = _dBattle = _dMission = _dSim = _dLight = _dSerious = _dGrave = _dGuard = _dNoBattle = _dOut = _dCanon = _dHas = _dRose = _dCrisis = _dGone = _dRb = 0;
                 _healCuts = _setCuts = _dStumbles = 0;
                 _dDied = _dLived = _dDeferred = _dSpared = _dMaimed = 0;
+                _dFell = _dDropped = _dNk = _dTest = 0;
                 AiDayEnd();   // 408
             }
             catch (Exception e) { Stumble("Daily", e); _crisisBuf.Clear(); }

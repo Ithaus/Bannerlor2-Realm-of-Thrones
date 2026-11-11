@@ -1676,6 +1676,8 @@ namespace Armoury
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { CaptiveTerms.Tick(); });   // 366: umowa z jencem-krolem wykonana po rozmowie (czas plynie, bez misji i rozmowy)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SiegeSurrender374.Tick(); });   // 374: poddanie twierdzy wykonane po wyjsciu gracza za brame (bez misji, rozmowy, spotkania)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeMisery.OnMapEventEnded", SiegeMisery.OnMapEventEnded));   // 399: zabici bitew oblezniczych do licznika trupow (tylko odczyt bitwy)
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, HeroWounds.OnMapEventEnded);       // 401-p: wpis rany potwierdzany po bitwie (polegly w tej samej bitwie znika bez komunikatu); bez wpisow wstepnych jedno porownanie
+            CampaignEvents.MapEventStarted.AddNonSerializedListener(this, HeroWounds.OnMapEventStarted);   // 401-p: gracz na lozu przed bitwa z Nocnym Krolem (ROT: wymuszony pojedynek) wstaje; pusta ksiega jedno porownanie
             CampaignEvents.HeroWounded.AddNonSerializedListener(this, HeroWounds.OnHeroWounded);   // 401: rana bohatera w bitwie - rzut stopnia i wpis do ksiegi ran (bez zmian HP, bez akcji gry)
             CampaignEvents.OnSiegeEventEndedEvent.AddNonSerializedListener(this, SiegeMisery.OnSiegeEnded);   // 399: koniec oblezenia - rekord trupow znika
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeMisery.AddMenus);   // 399: opcje palenia zmarlych w menu oblezenia (przed "Leave"; skutek od razu, bez przelaczania menu)

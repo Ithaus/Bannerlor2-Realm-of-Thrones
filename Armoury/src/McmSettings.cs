@@ -11928,7 +11928,7 @@ namespace Armoury
         [SettingPropertyGroup("Story Guard: Realm of Thrones story characters live until their event (396)")]
         public bool StoryGuardRooseSurvivesRedWedding { get; set; } = true;
 
-        [SettingPropertyBool("Hero Wounds Enabled", HintText = "A lord, a companion or you yourself wounded in battle may take more than a scratch. Most wounds are light and heal as before. A serious wound (Hero Wounds Serious Percent) or a grave wound (Hero Wounds Grave Percent) keeps the hero abed for weeks: his health does not rise above the wounded mark until the days of rest are over, so he does not fight - he can still ride with his party, and a beaten party's wounded lord is always taken prisoner, as in the game. Characters the Realm of Thrones story still needs never take a grave wound and are up a week before their event. A grave wound may kill or mark for life at its crisis (Hero Wounds Death Enabled, Hero Wounds Maim Percent). Off = wounds heal in a day or two, as before", RequireRestart = false)]
+        [SettingPropertyBool("Hero Wounds Enabled", HintText = "A lord, a companion or you yourself wounded in battle may take more than a scratch. Most wounds are light and heal as before. A serious wound (Hero Wounds Serious Percent) or a grave wound (Hero Wounds Grave Percent) keeps the hero abed for weeks: his health does not rise above the wounded mark until the days of rest are over, so he does not fight - he can still ride with his party, and a beaten party's wounded lord is always taken prisoner, as in the game. Characters the Realm of Thrones story still needs never take a grave wound and are up a week before their event. A grave wound may kill or mark for life at its crisis (Hero Wounds Death Enabled, Hero Wounds Maim Percent). Off = wounds heal in a day or two, as before, and heroes already abed are held down no longer", RequireRestart = false)]
         [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
         public bool HeroWoundsEnabled { get; set; } = true;
 
@@ -11952,7 +11952,7 @@ namespace Armoury
         [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
         public bool HeroWoundsFortressRestDouble { get; set; } = true;
 
-        [SettingPropertyBool("Hero Wounds Player", HintText = "With Hero Wounds Enabled: you can take serious and grave wounds too. While abed you can ride and lead your party on the map, but you cannot fight in person. Off = your own wounds heal as before", RequireRestart = false)]
+        [SettingPropertyBool("Hero Wounds Player", HintText = "With Hero Wounds Enabled: you can take serious and grave wounds too. While abed you can ride and lead your party on the map, but you cannot fight in person. Off = your own wounds heal as before (a sickbed you already lie on ends within a day)", RequireRestart = false)]
         [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
         public bool HeroWoundsPlayer { get; set; } = true;
 
