@@ -814,6 +814,9 @@ namespace Armoury
         // 435-L1 (lancuch podazy, sam pomiar): liczniki i pamiec sesji od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak 427)
         private readonly bool _lp1Reset = Lp1Reset();
         private static bool Lp1Reset() { try { SupplySignal.Reset(); } catch (Exception e) { Log.Error("Lp1Reset", e); } return true; }
+        // 435-L2 (lancuch podazy, odblokowanie zmiany zajec): liczniki linii "LP zajecia" od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L1)
+        private readonly bool _lp2Reset = Lp2Reset();
+        private static bool Lp2Reset() { try { CraftUnblock.Reset(); } catch (Exception e) { Log.Error("Lp2Reset", e); } return true; }
         // m96-dlugi: ksiegi dlugow rad miast od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6-a7)
         private readonly bool _m96DlugiReset = M96DlugiReset();
         private static bool M96DlugiReset() { try { TownDebt.Reset(); } catch (Exception e) { Log.Error("M96DlugiReset", e); } return true; }
@@ -3304,6 +3307,8 @@ namespace Armoury
             // 435-L1 (lancuch podazy, SAM POMIAR): linie "Lancuch podazy (LP)", "LP niedobor", "LP warsztaty", co 28 dob "LP wycena na sucho", co 7 dob "LP prace gracza" -
             // PO zleceniach robot (DaWorksRun), regulatorze wsi (HarvestValve.Daily), przebudowach zajec (StartCalibration.Daily, VillageCrafts.Daily) i pracach okregu tej doby
             try { SupplySignal.Daily(); } catch (Exception e) { Log.Error("SupplySignal.Daily", e); } DayProfile.Lap("SupplySignal.Daily");
+            // 435-L2 (odblokowanie zmiany zajec): linia "LP zajecia" - PO przebudowach tej doby obu drog (StartCalibration.Daily, VillageCrafts.Daily); sam odczyt licznikow
+            try { CraftUnblock.Daily(); } catch (Exception e) { Log.Error("CraftUnblock.Daily", e); }
             try { LandSale.Daily(); } catch (Exception e) { Log.Error("LandSale.Daily", e); } DayProfile.Lap("LandSale.Daily");   // m113-zakup: linia na sucho (raz na sesje i co 28 dob), linia doby z ruchem albo co 7 dob
             try { FiefInvestments.Daily(); } catch (Exception e) { Log.Error("FiefInvestments.Daily", e); }   // m112-inwest: komunikat wyplat prac i majatkow minionej doby, linia "Majatki i prace w Fiefs (m112)"
             try { SideVillageVisit.Daily(); } catch (Exception e) { Log.Error("SideVillageVisit.Daily", e); }   // m97-wioski: linia "Wioski poboczne (WP): dzien N" (tylko z ruchem)   // n20-wioska: linia "Wioska gracza (n20): dzien N" i srednia 7 dob udzialu

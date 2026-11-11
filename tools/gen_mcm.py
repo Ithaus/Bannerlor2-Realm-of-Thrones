@@ -666,6 +666,7 @@ RANGES = {
     'SideVillageCraftHoldDays': (7, 364, "0"),
     'SideVillageCraftChangeDays': (7, 364, "0"),
     'SideVillageCraftTreeDays': (7, 728, "0"),
+    'RebuildStallReleaseDays': (0, 364, "0"),   # 435-L2: 0 = wylaczone; 1-13 liczone w kodzie jak 14 (CraftUnblock.StallDays)
     'SideVillageCraftRegionShare': (0.0, 1.0, "0.000"),
     'DistrictIconMargin': (0.0, 1.0, "0.00"),
     'DistrictWorksShare': (0.0, 1.0, "0.00"),

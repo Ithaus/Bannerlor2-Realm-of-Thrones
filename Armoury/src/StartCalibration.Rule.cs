@@ -210,6 +210,7 @@ namespace Armoury
             long a7t0 = sig ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             EnsureValues();
             int season = today / Season;
+            CraftUnblock.BeginDay(CraftUnblock.SysKs);                       // 435-L2: stan przebudow tej doby do linii "LP zajecia" od zera
             if (season != _regionSeason) { if (sig) A7sSeasonClose(_regionSeason); _regionSeason = season; _regionMoved.Clear(); }   // f5-a7: linia sezonu zamknietego przed zerowaniem rak regionu
             int d0 = DDay;                                                    // recenzja 16.10: A7 i regale od D (nie od wlaczenia)
             bool step = d0 >= 0 && today > d0 && (today - d0) % StepDays == 0;
@@ -257,6 +258,9 @@ namespace Armoury
             // ks-koszt T10 (K4a, klucz Ks Cost Fast): doba bez kroku A7 i bez cyklu regali, a ostatni pelny przeglad tego stanu blokow nie mial zadnej przebudowy w toku -
             // petla nic by nie zrobila (przebudowy zaczynaja sie tylko w dobie kroku; Target zmienia tylko ta funkcja, a odczyt zapisu daje nowa mape okregow) - bez petli
             if (!step && !reg && SwCostFast && _k4Clean && ReferenceEquals(_k4Live, _live)) { _rActive = 0; return; }
+            // 435-L2 (klucz Rebuild Stall Release Days): w dobie kroku rece, ktore stojace przebudowy tego sezonu oddaja regionom (null - klucz 0, regula wylaczona albo nic nie stoi)
+            Dictionary<string, double> relRefund = null;
+            if (step && rule) { try { relRefund = StallRefund(today, season); } catch (Exception e) { Stumble("StallRefund", e); relRefund = null; } }
             foreach (var ld in _live.Values)
             {
                 if (ld.St == null || ld.K == null || ld.B == null) continue;
@@ -270,8 +274,9 @@ namespace Armoury
                     if (vTab != null && !vTab.TryGetValue(px, out vRow)) { vRow = new double[KsTab.NC]; for (int c0 = 0; c0 < vRow.Length; c0++) vRow[c0] = double.NaN; vTab[px] = vRow; }
                     double[] sRow = sig && step ? A7sRow(mt) : null, sV = sRow != null ? A7sVRow(sRow) : null;   // f5-a7: cena sygnalu miasta targowego (srednia 4 krokow)
                     string type = ld.K.Type;
-                    bool busy = false;
-                    foreach (var b in ld.B) if (b != null && b.Target >= 0) { busy = true; break; }
+                    // 435-L2: przebudowa stojaca (zaleglosc raty >= prog) nie zajmuje miejsca "jedna czesc okregu naraz"; klucz 0 - Released zawsze false (jak dotad)
+                    bool busy = false, stalled = false;
+                    foreach (var b in ld.B) if (b != null && b.Target >= 0) { if (CraftUnblock.Released(RbLag(b, today))) stalled = true; else { busy = true; break; } }
                     string region = ld.TF ? ld.St.StringId : (ld.V.Bound != null ? ld.V.Bound.StringId : ld.St.StringId);
                     // m106-wozy P1: fach okregu w dobie kroku - zajecie typu (bez regale: tych pilnuje cykl regali), produkcja na targ wobec celu z Planu i blok powrotu:
                     // najwieksza przydatnosc ziemi zajecia typu wsrod blokow, ktore naprawde moga przejsc (jedna czesc okregu naraz - jak hamulec A7)
@@ -312,7 +317,12 @@ namespace Armoury
                     foreach (var b in ld.B)
                     {
                         if (b == null || b.K == null || b.C == null) continue;
-                        if (b.Target >= 0) { EcoAudit427.RbAge(EcoAudit427.SysKs, today - b.TEnd); Progress(ld, b, today, mt); active++; continue; }   // 427 A1: wiek przebudowy wobec terminu (sam licznik)
+                        if (b.Target >= 0)
+                        {
+                            EcoAudit427.RbAge(EcoAudit427.SysKs, today - b.TEnd); Progress(ld, b, today, mt); active++;
+                            if (b.Target >= 0) CraftUnblock.Seen(CraftUnblock.SysKs, RbLag(b, today), b.Cost > 0 && b.Paid >= b.Cost - 0.5f);   // 435-L2: stan do linii (sam licznik)
+                            continue;
+                        }   // 427 A1: wiek przebudowy wobec terminu (sam licznik)
                         // f5-a7 (klucz Ks Switch Signal): doba bez kroku i bez regali przy przebudowach w toku - blok bez Held nie ma tu nic do zrobienia (blokada prac zeruje
                         // tylko Held > 0); wynik ten sam, bez sprawdzania blokady prac dla ~15 tys. blokow co dobe
                         if (sig && !step && !reg && b.Held <= 0) continue;
@@ -359,6 +369,10 @@ namespace Armoury
                         if (sig) A7sNotePress(b, ci);                    // f5-a7: rece pod naciskiem i trzymane >= 60 dob
                         if (b.Held < HoldDays) continue;
                         if (!rule) { _rWould++; continue; }                  // klucz wylaczony - sam pomiar nacisku (zmiana bylaby tu)
+                        // 435-L2 (klucz Grain Hands Winter Lock): bezpiecznik zboza - zmiana Z zboza nie zaczyna sie w zimie krainy, przy glodzie gospodarzy i gdy plon
+                        // okregu po odejsciu tych rak spadlby ponizej 1.2 x potrzeby; nacisk (Held) zostaje. Klucz wylaczony - bez liczenia (jak dotad)
+                        if (cur == KsTab.CWheat && best != KsTab.CWheat && CraftUnblock.GrainKey
+                            && CraftUnblock.GrainLock(CraftUnblock.SysKs, ld.TF ? null : ld.V, ld.TF ? ld.T : null, b.Hands * b.X[ci], WheatHands(ld), today) != 0) continue;
                         if (busy) { _rBusy++; continue; }
                         if (FeedKeeps(ld, cur, best)) { _rFeed++; continue; }   // r4-polnoc: najpierw wyzywic siebie - czesc przy jedzeniu nie idzie na zajecie tylko na targ
                         // ziemia bloku: po zmianie rak X0 z cur na best ziemia zajeta nie moze przekroczyc powierzchni bloku
@@ -368,7 +382,11 @@ namespace Armoury
                         double hands = b.Hands * b.X[ci];
                         double rh, moved;
                         _regionHands.TryGetValue(region ?? "-", out rh); _regionMoved.TryGetValue(region ?? "-", out moved);
-                        if (moved + hands > RegionShare * rh) { _rBudget++; continue; }
+                        // 435-L2: stojace przebudowy tego sezonu oddaja regionowi rece, ktore jeszcze nie przeszly (relRefund null przy kluczu 0 - rachunek jak dotad)
+                        double refund = 0; if (relRefund != null) relRefund.TryGetValue(region ?? "-", out refund);
+                        if (Math.Max(0.0, moved - refund) + hands > RegionShare * rh) { _rBudget++; continue; }
+                        if (refund > 0 && moved + hands > RegionShare * rh) CraftUnblock.NoteStartRefund(CraftUnblock.SysKs, hands);
+                        if (stalled) CraftUnblock.NoteStartPast(CraftUnblock.SysKs);
                         int T = Tree(best) ? 364 : 60;
                         b.Cur = (sbyte)cur; b.Target = (sbyte)best; b.TStart = today; b.TEnd = today + T; b.X0 = b.X[ci]; b.H0 = (float)hands;
                         b.Cost = ld.TF ? 0f : (float)(CostDays * KsTab.KCost[best] * hands / sigma); b.Paid = 0f;
@@ -414,6 +432,51 @@ namespace Armoury
         }
         private static readonly List<string> _startNotes = new List<string>();
 
+        /// <summary>435-L2: zaleglosc raty przebudowy bloku w dobach (CraftUnblock.Lag z pol zapisu bloku; 0 przy koszcie 0 - pola mieszczan).</summary>
+        private static double RbLag(LiveBlock b, int today) { return CraftUnblock.Lag(today, b.TStart, b.TEnd, b.Cost, b.Paid); }
+
+        /// <summary>435-L2: rece zboza okregu KS (rece blokow x udzial zajecia zbozowego) - do bezpiecznika zboza (CraftUnblock.GrainLock).</summary>
+        private static double WheatHands(LiveDist ld)
+        {
+            double w = 0;
+            if (ld == null || ld.B == null) return 0;
+            foreach (var b in ld.B)
+            {
+                if (b == null || b.C == null || b.X == null) continue;
+                for (int i = 0; i < b.C.Length && i < b.X.Length; i++) if (b.C[i] == KsTab.CWheat) w += b.Hands * b.X[i];
+            }
+            return w;
+        }
+
+        /// <summary>435-L2 (klucz Rebuild Stall Release Days): rece, ktore stojace przebudowy zaczete w TYM sezonie oddaja regionowi - czesc, ktora jeszcze nie przeszla
+        /// (H0 x reszta rak przy starym zajeciu / X0). Licznik regionu w zapisie zostaje bez zmian (zwrot liczony przy kazdym kroku od nowa - przebudowa, ktora
+        /// zaplaci i nadgoni, znow liczy sie w udziale). null - klucz 0 albo nic nie stoi. Ten sam klucz regionu co w RuleDaily.</summary>
+        private static Dictionary<string, double> StallRefund(int today, int season)
+        {
+            if (CraftUnblock.StallDays <= 0) return null;
+            Dictionary<string, double> m = null;
+            foreach (var ld in _live.Values)
+            {
+                if (ld == null || ld.St == null || ld.B == null || LandBackOf(ld.St)) continue;
+                if (!ld.TF && ld.V == null) continue;
+                string region = null;
+                foreach (var b in ld.B)
+                {
+                    if (b == null || b.Target < 0 || b.TStart < 0 || b.TStart / Season != season || !(b.Cost > 0) || !(b.X0 > 1e-6f) || b.X == null) continue;
+                    if (!CraftUnblock.Released(RbLag(b, today))) continue;
+                    int ci = IndexOfCraft(b, b.Cur);
+                    if (ci < 0 || ci >= b.X.Length) continue;
+                    double back = b.H0 * Math.Max(0.0, Math.Min(1.0, b.X[ci] / (double)b.X0));
+                    if (!(back > 0)) continue;
+                    if (region == null) region = (ld.TF ? ld.St.StringId : (ld.V.Bound != null ? ld.V.Bound.StringId : ld.St.StringId)) ?? "-";
+                    if (m == null) m = new Dictionary<string, double>(StringComparer.Ordinal);
+                    double cur; m.TryGetValue(region, out cur); m[region] = cur + back;
+                    CraftUnblock.NoteRefund(CraftUnblock.SysKs, back);
+                }
+            }
+            return m;
+        }
+
         /// <summary>Powierzchnia bloku (ha): ziemia okregu x udzial bloku (ostatni rachunek doby).</summary>
         private static double BlockArea(LiveDist ld, LiveBlock b) { return b.K != null ? b.K.Area : 0.0; }
 
@@ -423,7 +486,11 @@ namespace Armoury
         private static void Progress(LiveDist ld, LiveBlock b, int today, Town mt)
         {
             int ci = IndexOfCraft(b, b.Cur), ti = IndexOfCraft(b, b.Target);
-            if (ci < 0 || ti < 0 || today > b.TEnd + 364) { b.Target = -1; b.Cur = -1; b.Held = 0; b.TStart = b.TEnd = -1; b.Cost = b.Paid = b.X0 = b.H0 = 0f; _rCancel++; _a7sCancel++; return; }   // rok po terminie bez zaplaty - przebudowa porzucona (rece zostaja tam, gdzie doszly); f5-a7: licznik linii
+            // 435-L2 (klucz Rebuild Stall Release Days > 0): przebudowa nie zaplacona w calosci z zalegloscia raty >= max(91, prog) dob - porzucona ta sama galezia
+            // co dotad rok po terminie (rece zostaja, gdzie doszly); klucz 0 - Abandon zawsze false
+            bool stallOut = ci >= 0 && ti >= 0 && CraftUnblock.Abandon(RbLag(b, today), b.Cost, b.Paid);
+            if (stallOut) CraftUnblock.NoteAbandon(CraftUnblock.SysKs);
+            if (ci < 0 || ti < 0 || today > b.TEnd + 364 || stallOut) { b.Target = -1; b.Cur = -1; b.Held = 0; b.TStart = b.TEnd = -1; b.Cost = b.Paid = b.X0 = b.H0 = 0f; _rCancel++; _a7sCancel++; return; }   // rok po terminie bez zaplaty - przebudowa porzucona (rece zostaja tam, gdzie doszly); f5-a7: licznik linii
             string type = ld.K != null ? ld.K.Type : null;
             double area = BlockArea(ld, b);
             if (type != null && area > 0 && b.LandUse > area * 1.02 && b.LandOf(b.Target, type) > b.LandOf(b.Cur, type)) { _rLandStall++; return; }

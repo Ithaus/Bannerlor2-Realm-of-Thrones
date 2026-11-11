@@ -10192,6 +10192,14 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public int SideVillageCraftTreeDays { get; set; } = 364;
 
+        [SettingPropertyInteger("Rebuild Stall Release Days", 0, 364, "0", HintText = "a village part's change of craft that is this many days behind on its payments (days since it began, less the share already paid) is counted as standing still: it no longer keeps the other parts of its district from starting a change of their own, and the hands it has not yet moved go back into its region's share for the season; once it is 91 days behind (or this many, if more) and still not paid in full it is given up - the hands stay where they got to. It goes on paying and moving meanwhile, and takes its place back if it catches up. The same rule for side villages outside the start calibration and for village parts under it. Values from 1 to 13 count as 14. 0 = never, as before (a change stuck without materials holds its district and region until a year after its term)", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public int RebuildStallReleaseDays { get; set; } = 0;
+
+        [SettingPropertyBool("Grain Hands Winter Lock", HintText = "no village part starts to leave grain for another craft while its land is under winter, while the people of its district go hungry, or when the district's daily harvest without those hands would fall below 1.2 times what its people at home eat (the pull stays and it may change later; turning to grain is always allowed). The same rule for side villages outside the start calibration and for village parts under it. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool GrainHandsWinterLock { get; set; } = false;
+
         [SettingPropertyFloatingInteger("Side Village Craft Region Share", 0.000f, 1.000f, "0.000", HintText = "with Side Village Crafts: at most this share of the side villages' hands of one region (a stronghold and its villages) may change craft in one season (91 days); at most one village per district changes at a time", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float SideVillageCraftRegionShare { get; set; } = 0.05f;
@@ -15217,6 +15225,8 @@ namespace Armoury
             s.SideVillageCrafts = SideVillageCrafts;
             s.SideVillageCraftSwitch = SideVillageCraftSwitch;
             s.SideVillageCraftHoldDays = SideVillageCraftHoldDays;
+            s.RebuildStallReleaseDays = RebuildStallReleaseDays;
+            s.GrainHandsWinterLock = GrainHandsWinterLock;
             s.SideVillageCraftChangeDays = SideVillageCraftChangeDays;
             s.SideVillageCraftTreeDays = SideVillageCraftTreeDays;
             s.SideVillageCraftRegionShare = SideVillageCraftRegionShare;
