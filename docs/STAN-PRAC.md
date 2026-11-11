@@ -1,5 +1,16 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 11.11 22:10 - WGRANIE 207 (413-423 walka po audycie RBM + 424-426 sprzet olbrzymow, rydwany, unikaty); gra z powrotem na 1.4.8
+
+- **Gra cofnieta przez Jeffa do 1.4.8** (Version.xml v1.4.8, TaleWorlds.MountAndBlade.dll = libs bajt w bajt). Kopie bibliotek: `D:/Backup-Bannerlord/gra-1.4.8-dll` i `gra-1.5.7-dll`. UWAGA: appmanifest ma AutoUpdateBehavior 0 (zawsze aktualizuj) - Jeff ma to zmienic w Steam. Blokada z wpisu nizej NIEAKTUALNA.
+- **W grze:** Armoury.dll `4df8ba78211b3bbb6b8c2256053f31a6` (galaz `noc/367c-jeniec-po-odejsciu`, commit `1482f554`, wypchniety). CrashScribe bez zmian (`d7fbd602`). Kopie: `Armoury.dll.bak-2026-11-11-przed-wgranie207`, `D:/Backup-Bannerlord/wgrane/2026-11-11-wgranie207(-przed)`.
+- **Autotest at-426 (n390), 7 dob + 4 bitwy:** KONIEC OK, bledy 23 (stale, cudze), kod 0, wyjatkow w Armoury.log 0.
+- **Dowod z logu testu:** 413 latki 4/4 (zly stan broni w tescie 0 wywolan - bledu samego nie widziano); 423 drabina: 337 korpusow ROT, skora mediana 61 -> 26, kolczuga 88 -> 55, plyta 120 -> 91, tiery zamrozone; 421: bitwa 154 powalonych = 26 zabitych / 128 rannych (4.9:1), druga 4 / 34 (8.5:1) - WIECEJ rannych niz cel audytu 2:1-4:1, obuch 0 zabitych na 47 powalonych (do oceny: suwaki Blow Death * Factor); 424: rasa giant nr 3, przy wczytaniu zdjeto giant_club 3 lordom (-> war_scythe) i 1 sztuke z polki; linie 415-420, 425, 426 obecne.
+- **NIE widziane:** kolor nazw unikatow w UI, unikat z lupu po lordzie, rydwan w bitwie w Westeros, zakaz podniesienia maczugi, zuzyta bron w rekach, ladry pod ostrzalem, dobijanie lezacych - wszystko do obejrzenia przez Jeffa. Bitwy symulowane na mapie NIE maja reguly 421 (bitwa rozgrywana ok. 2.5x mniej smiertelna niz symulowana) - decyzja Jeffa, czy wyrownac.
+- **`tools/rbm_config_combat.py --apply` NIE uruchamiany** (progi RBM strzal liczone dla starej skali pancerzy; przy drabinie 423 zostaja fabryczne).
+- **W toku:** seria ekonomii 427+ (audyt A/B/C + lancuch podazy 435-L*) pisana w worktree - HEAD galezi lokalnie wyprzedza wgrany commit. Potem AI bitwy. Przenosiny na 1.5.7: pomiar w `docs/audyty-2026-11-11/PRZENOSINY-1.5.7.md` (wykonalne; czeka na decyzje Jeffa, kiedy).
+- **NIE URUCHAMIAC `tools/gen_mcm.py` na tej galezi.**
+
 ## STAN 11.11 23:00 - BLOKADA: Steam zaktualizowal gre 1.4.8 -> 1.5.7; seria 413-423 w kodzie, NIE wgrana
 
 - **BLOKADA (sprawdzone 11.11 wieczorem):** `bin/Win64_Shipping_Client/Version.xml` = v1.5.7, pliki gry z 11.11 19:53-20:25, `appmanifest_261550.acf` buildid 26566465. Mody (ROT 8.1.8, RBM, BK, nasze) sa pod 1.4.8 - gry NIE uruchamiano, nie wiadomo, czy wstaje. Decyzja Jeffa: cofnac gre do 1.4.8 (Steam: Wlasciwosci -> Wersje beta) i zablokowac aktualizacje, albo swiadomie przejsc na 1.5.7 (wtedy czeka sie na ROT/RBM/BK pod nowa wersje). Steama ani instalacji gry nie ruszalem.
