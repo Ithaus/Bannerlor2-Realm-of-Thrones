@@ -12016,7 +12016,7 @@ namespace Armoury
         [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
         public bool DungeonSickness { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Dungeon Crowding From", 0.05f, 0.99f, "0.00", HintText = "With Dungeon Sickness: share of the dungeon's room (0.75 = three quarters full) above which fever begins. The pressure grows from 0 at this share to 1 at a full dungeon and 2 at a dungeon far over its room", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Dungeon Crowding From", 0.05f, 0.99f, "0.00", HintText = "With Dungeon Sickness: share of the dungeon's room (0.75 = three quarters full) above which fever begins. The pressure grows from 0 at this share to 1 at a full dungeon. It can reach 2 only in a dungeon holding more captive lords than it has room for, because the common prisoners above its room are sold off every day. You are warned a tenth below this share, before the fever begins", RequireRestart = false)]
         [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
         public float DungeonCrowdingFrom { get; set; } = 0.75f;
 

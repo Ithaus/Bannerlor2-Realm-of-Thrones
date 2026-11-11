@@ -59,6 +59,7 @@ namespace Armoury
         private const int ImmuneDays = 30;       // odpornosc po przebytej goraczce
         private const int BelowDaysToClear = 3;  // doby z rzedu ponizej progu - goraczka wygasa
         private const int CrowdWarnEvery = 30;   // ostrzezenie o tloku najwyzej raz na tyle dob na loch
+        private const float CrowdWarnBelow = 0.10f;   // 402-p: ostrzezenie juz tyle PONIZEJ progu choroby (goraczka rusza od progu bez zwloki - ostrzezenie na progu przychodzilo razem z nia)
         private const int DeadMsgEvery = 7;      // komunikat o zmarlych szeregowych najwyzej raz na tyle dob na loch
         private const int GraveExtraDays = 5;    // 404: "gravely ill" - przebieg przedluzony o tyle dob, potem zdrowieje (bez drugiego rzutu)
         private const int DeathWindowDays = 7;   // 404: okno sufitu zgonow bohaterow na loch
@@ -278,7 +279,8 @@ namespace Armoury
             float winter = CampFever.WinterTerm(st);
             float corpse = 0f; bool siegeFever = false;
             var siege = st.SiegeEvent;
-            if (siege != null && CampFever.Spared(siege) == null)   // oblezenie fabuly ROT: bez zarazy, wiec i loch bez dodatku
+            bool storySiege = siege != null && CampFever.Spared(siege) != null;   // 402-p: jedna bramka dla czlonu trupow i dla dopisywania trupow
+            if (siege != null && !storySiege)   // oblezenie fabuly ROT: bez zarazy, wiec i loch bez dodatku
             {
                 if (CampFever.Active(st)) { siegeFever = true; if (c < 1f) c = 1f; }
                 corpse = SiegeMisery.CorpseTerm(st, true, WallMen(st));
@@ -307,11 +309,13 @@ namespace Armoury
                 wounded += pr.GetElementWoundedNumber(i);
             }
 
-            // ostrzezenie o tloku (zanim goraczka wybuchnie)
-            if (warn && f >= from && !rec.Fever && day - rec.WarnDay >= CrowdWarnEvery)
+            // ostrzezenie o tloku (zanim goraczka wybuchnie). 402-p: juz od progu - CrowdWarnBelow, zeby gracz mial czas rozlozyc jencow
+            if (warn && f >= from - CrowdWarnBelow && !rec.Fever && day - rec.WarnDay >= CrowdWarnEvery)
             {
                 rec.WarnDay = day;
-                Log.Player("The dungeon of " + Nm(st) + " is crowded (" + total + " held, room for " + limit + "). Fever will come if it stays so.", true);
+                if (f >= from) Log.Player("The dungeon of " + Nm(st) + " is crowded (" + total + " held, room for " + limit + "). Fever will come if it stays so.", true);
+                else Log.Player("The dungeon of " + Nm(st) + " is filling up (" + total + " held, room for " + limit + "). Above " + ((int)Math.Round(from * 100f)) + "% of its room fever will come.", true);
+                Log.Info(Tag + ": ostrzezenie o tloku w lochu " + id + " (jency " + total + "/" + limit + ", prog choroby " + from.ToString("0.00", Inv) + ", ostrzezenie od " + (from - CrowdWarnBelow).ToString("0.00", Inv) + ").");
             }
 
             // --- szeregowi ---
@@ -330,7 +334,7 @@ namespace Armoury
                         if (dead > 0)
                         {
                             PeopleBook.DieShares(PeopleBook.Take(pr, dead, PeopleBook.FDiePlague), PeopleBook.FDiePlague);   // ksiega ludzi: polegli regionu pochodzenia (wzor CampFever)
-                            if (siege != null) SiegeMisery.AddCorpses(st, true, dead, SiegeMisery.SrcDungeon);                // 399: znacznik sanitarny w murach (nie rzuca; nie ksiega)
+                            if (siege != null && !storySiege) SiegeMisery.AddCorpses(st, true, dead, SiegeMisery.SrcDungeon);   // 399: znacznik sanitarny w murach (nie rzuca; nie ksiega). 402-p: nie w oblezeniu fabuly ROT
                             rec.DeadAcc += dead; _dRegDead += dead;
                         }
                     }
@@ -500,7 +504,7 @@ namespace Armoury
             _dNewSick += hNew; _dHealed += hHealed; _dWould += hWould;
             if (total > 0 || hHealed > 0)
                 Frag(id + ": jency " + total + "/" + limit + " (boh. " + heroes + ", szer. " + regulars + ", ranni " + wounded + "), nacisk " + c.ToString("0.00", Inv)
-                     + " (zima " + winter.ToString("0.00", Inv) + ", oblezenie " + (siege == null ? "nie" : siegeFever ? "zaraza" : "tak") + ", trupy " + corpse.ToString("0.00", Inv) + ", medyk -" + (cut * 100f).ToString("0", Inv) + "%)"
+                     + " (zima " + winter.ToString("0.00", Inv) + ", oblezenie " + (siege == null ? "nie" : storySiege ? "fabuly ROT (bez dodatku)" : siegeFever ? "zaraza" : "tak") + ", trupy " + corpse.ToString("0.00", Inv) + ", medyk -" + (cut * 100f).ToString("0", Inv) + "%)"
                      + ", chorych boh. " + hSick + " (+" + hNew + ", zdrowi " + hHealed + "), szer. chorzy " + sick + ", zgony szer. " + dead + ", zgony boh. " + hDead + ", ciezko chorzy (smierc wstrzymana) +" + hGrave
                      + ", umarlby " + hWould + (rec.NoCourier ? ", kurier odprawiany" : ""));
         }

@@ -4,6 +4,13 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 402 / 404 (402-p): lochy - zakresy jak w recznym McmSettings.cs (kod przycina prog do 0.05..0.99, przebieg do >= 1)
+    'DungeonCrowdingFrom': (0.05, 0.99, "0.00"),
+    'DungeonRegularSickPercent': (0.0, 100.0, "0.0"),
+    'DungeonHeroSickChancePercent': (0.0, 100.0, "0.0"),
+    'DungeonSickDays': (1, 364, "0"),
+    'DungeonHeroDeathSharePercent': (0.0, 100.0, "0.0"),
+    'DungeonHeroDeathsPerWeek': (0, 50, "0"),
     # 322c: zboze zima - kod przycina dni do 0..728, prog indeksu do 1..10 (TownGranary.Zima322.cs; pulap ceny usuniety - recenzja 322c, cena od polki)
     'WinterGrainKeepDays': (0, 728, "0"),
     'WinterGrainTriggerIndex': (1.0, 10.0, "0.00"),
