@@ -73,6 +73,8 @@ namespace Armoury
             Part(sb, "mloty i buzdygany 2h (417)", RoutHold.SiteBanner, () => BluntHammers417.ApplyInCampaign(_h));   // 417: prefiks na okno umiejetnosci RBM + znacznik rodzimego obuchu przed RBM na ComputeBlowDamage
             sb.Append(" | ");
             Part(sb, "smierc czy rana (421)", RoutHold.SiteBanner, () => BlowFate421.ApplyInCampaign(_h));   // 421: postfiks na szanse smierci powalonego w modelu misji (Sandbox)
+            sb.Append(" | ");
+            Part(sb, "iglica w miekki pancerz (423b)", RoutHold.SiteBanner, () => BodkinSoft423.ApplyInCampaign(_h));   // 423b: prefiks przed RBM na ComputeBlowDamage - pancerz x procent / 50 dla strzaly / beltu Pierce w nie-plytowy korpus
             sb.Append('.');
             Log.Info(sb.ToString());
         }

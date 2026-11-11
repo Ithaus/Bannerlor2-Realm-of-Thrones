@@ -309,6 +309,7 @@ namespace Armoury
         {
             for (int i = 0; i < HitN.Length; i++) { HitN[i] = 0; HitHp[i] = 0; HitDeep[i] = 0; }
             for (int i = 0; i < ClassCount; i++) { Men[i] = 0; Killed[i] = 0; Wounded[i] = 0; }
+            BodkinSoft423.Reset();
         }
 
         private static void Flush(Mission m)
@@ -337,7 +338,7 @@ namespace Armoury
                     sb.Append(' ').Append(KindName[k]).Append(' ').Append(HitN[i]).Append(" / ").Append(HitHp[i] / HitN[i]).Append(" / ").Append(HitDeep[i] * 100 / HitN[i]).Append("%;");
                 }
             }
-            sb.Append('.');
+            sb.Append(BodkinSoft423.Tail()).Append('.');
             Log.Info(sb.ToString());
             Reset();
         }
@@ -363,6 +364,7 @@ namespace Armoury
             {
                 base.OnBehaviorInitialize();
                 Reset();
+                BodkinSoft423.RefreshRbm();
             }
 
             public override void OnAgentBuild(Agent agent, Banner banner)
@@ -374,6 +376,7 @@ namespace Armoury
             public override void OnScoreHit(Agent affectedAgent, Agent affectorAgent, WeaponComponentData attackerWeapon, bool isBlocked, bool isSiegeEngineHit,
                 in Blow blow, in AttackCollisionData collisionData, float damagedHp, float hitDistance, float shotDifficulty)
             {
+                BodkinSoft423.OnHit(affectedAgent, isBlocked, blow.InflictedDamage);   // 423b: znacznik iglicy objetej regula - zdejmowany przy kazdym trafieniu
                 if (isBlocked || affectedAgent == null || !affectedAgent.IsHuman || collisionData.IsFallDamage) return;
                 var part = collisionData.VictimHitBodyPart;
                 if (part != BoneBodyPartType.Chest && part != BoneBodyPartType.Abdomen) return;

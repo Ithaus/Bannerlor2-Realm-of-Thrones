@@ -1,5 +1,34 @@
 # DZIENNIK ZMIAN
 
+## 423b (11.11) - IGLICA W MIEKKI PANCERZ: TRZY CZWARTE ZAMIAST POLOWY (dopelnienie drabiny 423a; audyt RBM B5 + decyzja Jeffa 1) (BodkinSoft423.cs nowy, ArmourLadder423.cs, NightHooks.cs, Settings.cs, McmSettings.cs; NOWY klucz MCM: Bodkin Versus Soft Armour Percent)
+
+**Problem:** po 423a (kolczuga ROT 88 -> 55, przeszywanica 61 -> 26) regula RBM "polowa pancerza nie-plytowego dla strzaly / beltu Pierce" daje prog iglicy w kolczuge 55 J i w przeszywanice 26 J. Z wzorow (pelny cios w piers, to przeliczenie, NIE pomiar): iglica 100 lb (101 J) w przeszywanice 40 -> 70 HP, w ciezka skore 21 -> 51, w kolczuge 18 -> 45; longbow 180 lb w kolczuge 73 -> 101 HP (jedna strzala zabija). Zrodla historyczne (docs/audyty-2026-11-11/rbm-zrodla-*.md): przeszywanica 50-80 J, kolczuga 80-120 J.
+
+**Przyczyna:** `Utilities.RBMComputeDamage` (rbm.cs:5951-5954): material inny niz None i Plate + Pierce + bron Arrow / Bolt -> `armorEffectiveness *= 0.5`. Polowe strojono pod kolczugi RBM 50-79; material piersi / brzucha = pierwsza sztuka typu BodyArmor w slotach pancerza (rbm.cs:190-230). Liczba siedzi w srodku metody RBM.
+
+**Zmiana:**
+- NOWY `BodkinSoft423`: prefiks `Priority.First` (przed RBM) na `MissionCombatMechanicsHelper.ComputeBlowDamage` (prywatna statyczna, zadeklarowana w tej klasie - `AccessTools.DeclaredMethod`, ten sam cel i chwyt co lezacy 415 i wypoczety 416; zakladany w kampanii w `NightHooks.InCampaign`, raz na proces; brak `RBMCombat.ArmorRework` = nieczynne z linia logu; brak prefiksu RBM na metodzie = prefiks nic nie robi, sprawdzane na starcie kazdej misji).
+- Warunki jak polowa RBM, zawezone do tulowia czlowieka: `IsMissile`, bron `WeaponClass.Arrow` albo `Bolt`, `damageType == Pierce`, `VictimHitBodyPart` Chest albo Abdomen, ofiara czlowiek, material pierwszej sztuki BodyArmor w slotach pancerza inny niz None i Plate. KAZDY taki korpus (ROT, RBM, gra, takze tkanina) - poprawka B11 projektu: jedna regula na jedno zjawisko, nie tylko zbior ROT.
+- Dzialanie: `ArmorAmountFloat *= procent / 50`; po x0.5 RBM wychodzi `procent / 100`. `procent = 50 + (BodkinSoftArmourPercent - 50) x sila drabiny` (sila z chwili wczytania zapisu; drabina wylaczona albo sila 0 -> 50 -> pole nietkniete).
+- Licznik: czlon "iglica w miekki korpus (423b)" na koncu linii "Drabina pancerzy (423): koniec misji" - procent, ciosy objete regula (liczone takze przy 50), pancerz srednio przed -> po, trafienia / srednio HP / od 25 HP.
+- NOWY klucz `BodkinSoftArmourPercent` ("Bodkin Versus Soft Armour Percent", grupa Wear and tear, 50-100, domyslnie 75). 50 = dokladnie regula RBM (prefiks tylko liczy).
+- Goraca sciezka: bez alokacji, bez try / catch; dla ciosow wrecz koniec na pierwszym warunku (`damageType` / `IsMissile`); dla iglicy petla po 5 slotach pancerza i odczyt dwoch ustawien.
+
+**Przyklady z wzoru (po 423a; polowa RBM -> trzy czwarte):** iglica 100 lb w ubranie / przeszywanice / ciezka skore / kolczuge / plyte: 81 / 70 / 51 / 45 / 4 -> 76 / 59 / 31 / 22 / 4 (przed 423: 63 / 40 / 21 / 18 / 3); longbow 180 lb w kolczuge 101 -> 78 (przed 423: 73), w plyte 7; kusza 230 lb w kolczuge 93 (przed 423: 89). Progi przebicia tulowia iglica [J], ubranie / przeszywanica / ciezka skora / kolczuga / luska / plyta: przed 423 33 / 61 / 83 / 88 / 98 / 240; po 423a 12 / 26 / 48 / 55 / 62 / 182; po 423a + 423b 18 / 39 / 72 / 82 / 93 / 182.
+
+**Ryzyko / co sprawdzic (kontrola calosci, w KODZIE):**
+- Kolizje: trzy nasze prefiksy `Priority.First` na tej samej metodzie (415 lezacy, 416 wypoczety, 423b) mnoza to samo pole - przemienne. 417 (`MarkPrefix`) pola nie rusza. RBM czyta pole raz (rbm.cs:3352), struktura jest budowana na jedno trafienie (mb_full.cs:58466-58470) - zmiana nie wycieka. Trafienie w twarz / pod pache RBM podmienia pancerz PO naszym prefiksie, ale dotyczy glowy i barkow - poza zakresem 423b.
+- Zakres: glowa, szyja, barki, rece i nogi zostaja przy polowie RBM (inne sztuki, ktorych 423a nie ruszal); konie - 419; strzala szeroka (Cut) bez zmian.
+- Przypadek pominiety swiadomie: RBM zamienia Pierce na obuch, gdy napastnik w chwili trafienia trzyma bron kuta i `StrikeType == 0` (rbm.cs:3409-3413) - wtedy polowy nie ma; prefiks w tym ukladzie nie rusza pancerza (odczyt `Agent.WieldedWeapon`).
+- Regula jest wspolna dla korpusow RBM i gry (kolczuga 49 gry: prog iglicy 49 -> 74 J) - zamierzone (B11), ale to zmiana takze poza sztukami ROT; klucz 50 ja cofa.
+- DO SPRAWDZENIA W GRZE: (1) "Latki nocy (K3): kampania ... iglica w miekki pancerz (423b): iglica w miekki pancerz 1/1" i linia "Iglica w miekki pancerz (423b): latka raz na proces"; (2) po bitwie z lucznikami czlon "iglica w miekki korpus (423b): latka 1/1, pancerz liczony w 75.0% (RBM 50), ciosow objetych N, pancerz zmieniony N (srednio po polowie RBM a -> b)" - b = 1.5 x a; (3) srednie HP iglic wedlug klasy korpusu w tej samej linii wobec biegu z kluczem 50 (wariant B autotestu) - kolczuga ok. polowa, przeszywanica ok. -15%.
+
+**Czego nie sprawdzono:** gry nie uruchamialem (build 0 bledow). Wartosci `StrikeType` dla pociskow w silniku (warunek pominiecia wyzej moze nigdy nie zajsc albo zachodzic czesciej, niz zakladam - licznik "ciosow objetych" wobec liczby iglic w rubrykach klas to pokaze). Czy `CalculateAdjustedArmorForBlow` (perki) jest wszedzie multiplikatywne wobec pancerza wejsciowego.
+
+**Odlozone:** ta sama regula dla innych czesci ciala (po pomiarze); 423c (komunikat skryptu 416); 423d po autotescie.
+
+**Status:** DO SPRAWDZENIA
+
 ## 423a (11.11) - DRABINA PANCERZY ROT W SKALI RBM (audyt RBM B5 + decyzja Jeffa 1 "rob balans zbroi i broni") (ArmourLadder423.cs i ArmourLadder423.Ids.cs nowe, tools/rot_armour_ladder.py nowy, Recipes.cs, ArmouryBehavior.cs, UniqueLaw.cs, OutlawLaw.cs, Civvies.cs, HeroDress382.cs, BattleWind.cs, NeckGuard415.cs, RestedArmor416.cs, SubModuleMain.cs, Settings.cs, McmSettings.cs; NOWE klucze MCM: ROT Body Armour In RBM Scale, Armour Ladder Strength, Armour Ladder Covers Dothraki And Unsullied)
 
 **Problem:** audyt walki RBM (docs/audyty-2026-11-11/AUDYT-RBM-WALKA.md, B5) + decyzja Jeffa 11.11 "1. rob balans zboir i broni" (lekka piechota w przeszywanicy prawie tak twarda jak rycerz). Z wzorow RBM (pelny cios w piers, HP 100; to przeliczenie, NIE pomiar z gry): rowiesnik na rowiesnika T1..T6 pada po 12 / 13 / 12 / 12 / 10 / 10 cieciach miecza; przeszywanicy 61 nie tnie zaden miecz (prog ciecia 233, miecz T6 ma sile 186), wlocznia T2 zabiera jej 15 HP, strzala szeroka 90 lb w ubranie T1 9 HP. Projekt: scratchpad bad6/PROJEKT-423-po-krytyce.md (po krytyce: bledy pierwszej wersji poprawione - B2 HeroDress382, B3 oddech, B4 barki 415, B9 wezly przeszywanicy).
