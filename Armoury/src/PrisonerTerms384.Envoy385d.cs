@@ -44,11 +44,11 @@ namespace Armoury
         private static double _envSiegeStart, _envArrive, _envUntil, _envHours;
         private static char _envState = '\0';   // R - w drodze, W - stoi przed wladca i czeka na posluchanie
         private static bool _envTalk;           // rozmowa przez poslanca w toku (nie w zapisie)
-        private static int _dEnvSent, _dEnvHeard, _dEnvBack;
+        private static int _dEnvSent, _dEnvHeard, _dEnvBack, _dEnvKept;   // _dEnvKept 385d-p: umowy poslanca utrzymane mimo napasci na gracza
 
         private static void EnvoyReset()
         {
-            _envHero = ""; _envSt = ""; _envSiegeStart = 0; _envArrive = 0; _envUntil = 0; _envHours = 0; _envState = '\0'; _envTalk = false; _dEnvSent = 0; _dEnvHeard = 0; _dEnvBack = 0;
+            _envHero = ""; _envSt = ""; _envSiegeStart = 0; _envArrive = 0; _envUntil = 0; _envHours = 0; _envState = '\0'; _envTalk = false; _dEnvSent = 0; _dEnvHeard = 0; _dEnvBack = 0; _dEnvKept = 0; _fiefWait = null;
         }
 
         private static void EnvoyClear() { _envHero = ""; _envSt = ""; _envSiegeStart = 0; _envArrive = 0; _envUntil = 0; _envHours = 0; _envState = '\0'; }
@@ -137,11 +137,26 @@ namespace Armoury
             var ev = s != null ? s.SiegeEvent : null;
             var lp = ev != null && ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null;
             if (ev != null && lp != null && s.IsFortification && s.Town != null && Math.Abs(ev.SiegeStartTime.ToHours - _envSiegeStart) < 0.05 && lp.MapFaction == h.MapFaction
-                && (s.OwnerClan == Clan.PlayerClan || mp.CurrentSettlement == s) && (s.Party == null || s.Party.MapEvent == null) && mp.BesiegerCamp == null
+                && EnvoySpeaksFor(s) && (s.Party == null || s.Party.MapEvent == null) && mp.BesiegerCamp == null
                 && !Pending(s) && !SiegeSurrender374.Pending(s))   // druga umowa o te sama twierdze (384 / 374) w toku - tylko umowa bez osady
                 st = s;
             else field = true;
             return true;
+        }
+
+        /// <summary>385d-p: czy gracz moze przez poslanca targowac odstapienie od oblezenia s - jak Parley: twierdza rodu gracza albo gracz stoi w niej
+        /// jako wodz obrony (gosc w cudzej twierdzy - nie). Nie rzuca.</summary>
+        private static bool EnvoySpeaksFor(Settlement s)
+        {
+            try
+            {
+                if (s == null || s.SiegeEvent == null) return false;
+                if (s.OwnerClan == Clan.PlayerClan) return true;
+                var mp = MobileParty.MainParty;
+                if (mp == null || mp.CurrentSettlement != s) return false;
+                return Campaign.Current.Models.EncounterModel.GetLeaderOfSiegeEvent(s.SiegeEvent, BattleSideEnum.Defender) == Hero.MainHero;
+            }
+            catch (Exception e) { Stumble("EnvoySpeaksFor", e); return false; }
         }
 
         private static void EnvoyRefused(Hero h)
@@ -180,7 +195,7 @@ namespace Armoury
             {
                 try { starter.AddGameMenuOption(m, "arm385d_hear_" + m, "{=!}{ARM385D_HEAR}", EnvoyHearCond, EnvoyHearCons, false, 1); n++; } catch (Exception e) { Stumble("EnvoyMenus.hear." + m, e); }
             }
-            try { Log.Info(Tag + ": poslaniec (385d) - opcje menu wpiete " + n + " z 8 (wyslanie: request_meeting_with_besiegers, town_keep, castle; posluchanie: + town, village), klucz " + (KEnvoy ? "TAK" : "NIE") + (_envState != ' ' ? " | poslaniec w zapisie: stan " + _envState : "") + "."); } catch { }
+            try { Log.Info(Tag + ": poslaniec (385d) - opcje menu wpiete " + n + " z 8 (wyslanie: request_meeting_with_besiegers, town_keep, castle; posluchanie: + town, village), klucz " + (KEnvoy ? "TAK" : "NIE") + (_envState != '\0' ? " | poslaniec w zapisie: stan " + _envState : "") + "."); } catch { }
         }
 
         private static bool EnvoySendBase(MenuCallbackArgs args)
@@ -236,7 +251,7 @@ namespace Armoury
         {
             try
             {
-                if (_envState != ' ') { Log.Player("Your envoy is already on the road."); return; }   // menu nieodswiezone po wyslaniu (bez MenuContext.Refresh - przebudowa menu osady z okna nieprobowana)
+                if (_envState != '\0') { Log.Player("Your envoy is already on the road."); return; }   // menu nieodswiezone po wyslaniu (bez MenuContext.Refresh - przebudowa menu osady z okna nieprobowana)
                 var st = Settlement.CurrentSettlement;
                 var siegeSt = st != null && st.SiegeEvent != null ? st : null;
                 var siegeF = siegeSt != null && siegeSt.SiegeEvent.BesiegerCamp != null && siegeSt.SiegeEvent.BesiegerCamp.LeaderParty != null ? siegeSt.SiegeEvent.BesiegerCamp.LeaderParty.MapFaction : null;
@@ -249,9 +264,11 @@ namespace Armoury
                     if (h < 0) continue;
                     string no = null;
                     Cool c;
-                    if (_cool.TryGetValue(EnvoyCool + "|" + r.StringId, out c) && c.End > Today) no = "He has turned your terms down already. You may try again in " + Math.Max(1, (int)Math.Ceiling(c.End - Today)) + " day(s).";
+                    double cf = CoolLeft(null, r);   // 385d-p: odmowa twarza w twarz (rozmowa w polu) liczy sie takze dla poslanca
+                    if (cf > 0) no = "He has turned your terms down already. You may try again in " + Math.Max(1, (int)Math.Ceiling(cf)) + " day(s).";
+                    else if (_cool.TryGetValue(EnvoyCool + "|" + r.StringId, out c) && c.End > Today) no = "He has turned your terms down already. You may try again in " + Math.Max(1, (int)Math.Ceiling(c.End - Today)) + " day(s).";
                     else if (_queue.Exists(q => q.Lord == r.StringId)) no = "Terms agreed with him are still to be carried out.";
-                    bool lift = siegeSt != null && r.MapFaction == siegeF;
+                    bool lift = siegeSt != null && r.MapFaction == siegeF && EnvoySpeaksFor(siegeSt);
                     rows.Add(new InquiryElement(r.StringId, Name(r) + " of " + Realm(r.MapFaction) + " - " + RideText(h), null, no == null,
                         no ?? ("Your envoy rides to " + Name(r) + " (" + RideText(h) + "). When he stands before him you speak through him: a pact of peace for your lands and men, the release of your people and soldiers his realm holds"
                                + (lift ? ", or the lifting of the siege of " + Name(siegeSt) : "") + (Ruler(Hero.MainHero) ? ", or a truce between your realms" : "") + ". What is agreed is carried out when the envoy is back (the same ride).")));
@@ -290,12 +307,22 @@ namespace Armoury
                 if (!KEnvoy || !On || _envTalk) return false;
                 var r = Hero.Find(_envHero);
                 if (r == null) return false;
-                MBTextManager.SetTextVariable("ARM385D_HEAR", "Hear your envoy - he stands before " + Name(r));
+                string hear = "Hear your envoy - he stands before " + Name(r);
+                MBTextManager.SetTextVariable("ARM385D_HEAR", hear);
+                try { if (args.Text != null) args.Text.SetTextVariable("ARM385D_HEAR", hear); } catch { }   // 385d-p: wzor repo (NoticeBoard) - zmienna takze na tekscie opcji
                 args.optionLeaveType = GameMenuOption.LeaveType.Conversation;
                 var me = Hero.MainHero; var mp = MobileParty.MainParty;
                 if (me == null || mp == null || me.IsPrisoner || mp.MapEvent != null || mp.BesiegerCamp != null || _offer != null)
                 {
                     args.IsEnabled = false; args.Tooltip = new TextObject("{=!}Not now.");
+                }
+                else if (_queue.Exists(q => q.Lord == _envHero))   // 385d-p: druga umowa z tym samym wladca (zawarta w czasie jazdy poslanca) - najpierw tamta
+                {
+                    args.IsEnabled = false; args.Tooltip = new TextObject("{=!}Terms agreed with him are still to be carried out.");
+                }
+                else if (CoolLeft(null, r) > 0)   // 385d-p: odmowil twarza w twarz w czasie jazdy poslanca
+                {
+                    args.IsEnabled = false; args.Tooltip = new TextObject("{=!}He has turned your terms down already. Your envoy waits in vain.");
                 }
                 return true;
             }
@@ -344,6 +371,7 @@ namespace Armoury
                     return;
                 }
                 var r = Hero.Find(_envHero);
+                if (Settings.Current != null && !KEnvoy) { EnvoyReturn(r, "you have called him back", "klucz Prisoner Terms Envoy / Prisoner Exchange For Terms wylaczony"); return; }   // 385d-p: klucz NIE = bez poslanca
                 if (_envState == 'R')
                 {
                     if (NowH < _envArrive) return;
@@ -366,14 +394,14 @@ namespace Armoury
 
         private static void EnvoyDaily()
         {
-            if (_envState != '\0' || _dEnvSent + _dEnvHeard + _dEnvBack > 0)
+            if (_envState != '\0' || _dEnvSent + _dEnvHeard + _dEnvBack + _dEnvKept > 0)
             {
                 var r = _envHero.Length > 0 ? Hero.Find(_envHero) : null;
                 Log.Info(Tag + ": doba " + (int)Today + " | poslaniec (klucz " + (KEnvoy ? "TAK" : "NIE") + "): " + (_envState == 'R' ? "w drodze do " + Name(r) + ", dotrze za " + F(Math.Max(0, _envArrive - NowH)) + " h"
                          : _envState == 'W' ? "stoi przed " + Name(r) + ", czeka jeszcze " + F(Math.Max(0, _envUntil - NowH)) + " h" : "brak")
-                         + " | dzis: wyslani " + _dEnvSent + ", rozmowy " + _dEnvHeard + ", powroty bez rozmowy " + _dEnvBack + ".");
+                         + " | dzis: wyslani " + _dEnvSent + ", rozmowy " + _dEnvHeard + ", powroty bez rozmowy " + _dEnvBack + ", umowy utrzymane mimo napasci na gracza " + _dEnvKept + ".");
             }
-            _dEnvSent = 0; _dEnvHeard = 0; _dEnvBack = 0;
+            _dEnvSent = 0; _dEnvHeard = 0; _dEnvBack = 0; _dEnvKept = 0;
         }
 
         // ------------------------------------------------------------ zapis ("arm_env385d"): v1|wladca|twierdza|start oblezenia|stan|dotarcie|termin|godziny

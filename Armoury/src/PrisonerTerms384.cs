@@ -155,6 +155,7 @@ namespace Armoury
         private static readonly Dictionary<string, double> _relift = new Dictionary<string, double>();
         private static int _dRelift, _dReliftFail;
         private static Deal _offer;          // P: zgoda w rozmowie, czeka na opcje menu arm384_pass
+        private static Deal _fiefWait;       // 385d-p: umowa, o ktorej czekaniu (gracz stoi w oddawanej twierdzy) juz powiedziano - tylko pamiec
         private static bool _armed;
         private static int _stumbles, _dZero, _dNoAttack, _dZeroMine;   // _dZeroMine 386b: cele druzyn rodu gracza na osadach frakcji z paktem
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -227,7 +228,9 @@ namespace Armoury
         {
             if (st == null) return false;
             if (_offer != null && _offer.St == st.StringId) return true;
-            foreach (var d in _queue) if (d.St == st.StringId) return true;
+            // 385d-p: umowa poslanca, ktory jeszcze wraca (NotBefore w przyszlosci - do 10 dob), nie zamyka graczowi poddania 374 ani parley 384 z wodzem obozu;
+            // gdy tamte skoncza oblezenie wczesniej, Run umowy poslanca zobaczy inne / zadne oblezenie i umowa przepadnie bez zaplaty
+            foreach (var d in _queue) if (d.St == st.StringId && !(d.NotBefore > Today)) return true;
             return false;
         }
 
@@ -1255,6 +1258,19 @@ namespace Armoury
                     var st0 = Settlement.Find(d.St);
                     if (SiegeSurrender374.CampBusy(st0) && Today - Math.Max(d.Day, d.NotBefore) < 1.0) return;   // bitwa przy obozie - czekamy (najwyzej doba; 385d: od powrotu poslanca)
                 }
+                // 385d-p: umowa oddaje twierdze, w ktorej gracz wlasnie stoi (mozliwe przy poslancu bez osady - lista ziem nie wyklucza miejsca pobytu,
+                // a bramka spotkania jest dla poslanca zdjeta) - czekamy, az wyjedzie; termin 3 dob biegnie (Run)
+                var here = mp.CurrentSettlement;
+                if (here != null && here.StringId != null && d.Fiefs.Contains(here.StringId))
+                {
+                    if (_fiefWait != d)
+                    {
+                        _fiefWait = d;
+                        Log.Info(Tag + ": dzien " + F(Today) + " | umowa (" + WantName(d) + ") czeka: gracz stoi w " + Name(here) + ", ktore ma oddac - wykonanie po wyjezdzie (termin 3 dob biegnie).");
+                        Log.Player("The terms you agreed hand over " + Name(here) + ". Ride out of it, and they will be carried out.");
+                    }
+                    return;
+                }
                 if (!_armed) { _armed = true; return; }
                 _queue.RemoveAt(qi);   // najpierw z kolejki - wyjatek nie powtorzy umowy
                 _armed = false;
@@ -1536,7 +1552,7 @@ namespace Armoury
                 if (freed > 0)
                 {
                     var en = new List<string>();
-                    foreach (var kv in where) en.Add(kv.Value + (kv.Key == "your party" ? " rejoin your party" : " march to the garrison of " + kv.Key));
+                    foreach (var kv in where) en.Add(kv.Value + (kv.Key == "your party" ? " rejoin your party" : " are sent to the garrison of " + kv.Key));
                     Log.Player(Name(lord) + " sets " + freed + " of your soldiers free: " + string.Join(", ", en.ToArray()) + ".");
                 }
             }
@@ -1678,6 +1694,8 @@ namespace Armoury
                     if (!q.Field) continue;
                     var lord = Hero.Find(q.Lord);
                     if (lord == null || lord.MapFaction != other.MapFaction) continue;
+                    // 385d-p: umowa poslanca czeka do 10 dob w stanie wojny z cala frakcja - napasc ICH druzyny na gracza jej nie kasuje (tylko atak gracza)
+                    if (q.Envoy && a != PartyBase.MainParty) { _dEnvKept++; continue; }
                     _queue.RemoveAt(i); _armed = false;
                     Drop(q, null, "Steel is drawn before the terms agreed with " + Name(lord) + " were kept. They are void.", "walka z " + other.Name + " przed wykonaniem (" + (a == PartyBase.MainParty ? "atak gracza" : "atak na gracza") + ") - nic nie oddane");
                 }

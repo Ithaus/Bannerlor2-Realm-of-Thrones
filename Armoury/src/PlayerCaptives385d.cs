@@ -51,6 +51,9 @@ namespace Armoury
         private static int _stumbles, _dBattles, _dNoted;
         private static double _dTaken, _dLost, _dSold, _dGone, _dFreed;
 
+        /// <summary>385d-p: nowe wiersze tylko przy czynnym wykupie zolnierzy (klucz NIE = bez rejestru jak przed 385d; stare wiersze dalej uzgadniane i gasna).</summary>
+        private static bool On { get { var s = Settings.Current; return s != null && s.PrisonerExchangeForTerms && s.PrisonerTermsReleaseMyMen && s.PrisonerTermsReleaseMySoldiers; } }
+
         internal static void Reset()
         {
             _h.Clear(); _cache.Clear(); _err.Clear(); _stumbles = 0; _dBattles = 0; _dNoted = 0; _dTaken = 0; _dLost = 0; _dSold = 0; _dGone = 0; _dFreed = 0;
@@ -152,6 +155,22 @@ namespace Armoury
                     Log.Info(Tag + ": trzymajacy " + id + " juz nie istnieje - wiersze zdjete (" + F(sum) + " ludzi: odbici, rozpuszczeni albo w innych rekach).");
                     return;
                 }
+                // 385d-p: trzymajacy nie jest juz w wojnie z frakcja gracza (twierdza przeszla do frakcji gracza / neutralnej, pokoj) - wykupic ich nie ma u kogo
+                // (InScope wymaga frakcji rozmowcy w wojnie), wiec nie licza sie jako "moi w niewoli"
+                bool war = true;
+                try
+                {
+                    var hf = pb.MapFaction; var pf = Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null;
+                    war = hf != null && pf != null && hf != pf && FactionManager.IsAtWarAgainstFaction(hf, pf);
+                }
+                catch { war = true; }
+                if (!war)
+                {
+                    double sum = 0; foreach (var r in d.Values) sum += r.Mine;
+                    _dGone += sum; _h.Remove(id); _cache.Remove(id);
+                    Log.Info(Tag + ": trzymajacy " + id + " nie jest juz w wojnie z frakcja gracza - wiersze zdjete (" + F(sum) + " ludzi zostaje na jego liscie jencow jak w grze, poza rejestrem).");
+                    return;
+                }
                 List<string> dead = null;
                 foreach (var kv in d)
                 {
@@ -210,7 +229,7 @@ namespace Armoury
             __state = null;
             try
             {
-                if (__0 == null || __1 == null || Campaign.Current == null || Clan.PlayerClan == null) return;
+                if (__0 == null || __1 == null || Campaign.Current == null || Clan.PlayerClan == null || !On) return;
                 bool any = false;
                 foreach (var mep in __1) if (mep != null && MineParty(mep.Party)) { any = true; break; }
                 if (!any) return;
@@ -291,7 +310,7 @@ namespace Armoury
         {
             try
             {
-                if (n <= 0 || holder == null || troop == null || troop.IsHero || holder.PrisonRoster == null || !MineParty(source)) return;
+                if (n <= 0 || holder == null || troop == null || troop.IsHero || holder.PrisonRoster == null || !On || !MineParty(source)) return;
                 int now = holder.PrisonRoster.GetTroopCount(troop);
                 var r = Row0(holder, troop, false);
                 if (r == null)
