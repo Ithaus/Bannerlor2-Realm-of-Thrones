@@ -11776,7 +11776,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public float SiegeWoundedSimulatedShare { get; set; } = 0.5f;
 
-        [SettingPropertyBool("Siege Wounded Player Takes Overflow", HintText = "With Siege Wounded Dungeon Limit, when you are among the defenders of a fortress (you fight the assault yourself, or you stand inside while an assault fought without you is beaten back) and its dungeon is full: the wounded attackers lying beneath the walls whom the dungeon cannot hold are bound and taken along by your own party, up to your party's prisoner limit - still never more men in all than the defenders left standing. They go straight to your prisoners (not through the aftermath window). Off = only the dungeon takes them", RequireRestart = false)]
+        [SettingPropertyBool("Siege Wounded Player Takes Overflow", HintText = "With Siege Wounded Dungeon Limit (an assault you fight yourself) or Siege Wounded Simulated (you stand inside while an assault fought without you is beaten back), when you are among the defenders of a fortress and its dungeon is full: the wounded attackers lying beneath the walls whom the dungeon cannot hold are bound and taken along by your own party, up to your party's prisoner limit - still never more men in all than the defenders left standing. They go straight to your prisoners (not through the aftermath window). Off = only the dungeon takes them", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeWoundedPlayerTakesOverflow { get; set; } = true;
 
