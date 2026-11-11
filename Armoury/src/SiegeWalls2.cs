@@ -485,7 +485,9 @@ namespace Armoury
                 int h, w;
                 var g = new Gl { Start = MenOf(ev.BesiegedSettlement, out h, out w) };
                 _gl[ev] = g;
-                SiegeMisery.HungerSet(ev.BesiegedSettlement, -1, g.Start);                        // 400: stan obsady z poczatku oblezenia do zapisu (nie rzuca; bez SiegeEvent osady - pierwsza doba)
+                // 400-p: oblezenia z Innymi glodu GL nie maja (StarveOne wychodzi na Und) - bez rekordu
+                if (!Und(ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null, ev.BesiegedSettlement))
+                    SiegeMisery.HungerSet(ev.BesiegedSettlement, -1, g.Start);                    // 400: stan obsady z poczatku oblezenia do zapisu (nie rzuca; bez SiegeEvent osady - pierwsza doba)
                 NoteBesieger(ev, ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null);   // m116: zakaz powtorki
             }
             catch (Exception e) { Stumble("OnSiegeStarted", e); }
@@ -631,16 +633,22 @@ namespace Armoury
             return moved;
         }
 
+        /// <summary>400-p: oblezenie fabuly ROT (wodz ze skryptu albo oboz z wydarzenia - SiegePhantomLift.StoryOf). Nie da sie ocenic = fabula (nietkniete).</summary>
+        private static bool StorySiege(BesiegerCamp camp, MobileParty lp)
+        {
+            if (Scripted(lp)) return true;
+            if (camp == null) return false;
+            try { return SiegePhantomLift.StoryOf(camp) != null; }
+            catch (Exception e) { Stumble("StorySiege.StoryOf", e); return true; }
+        }
+
         /// <summary>400: czemu tej doby nikt nie przechodzi przez mur (null = wolno); room = wolne miejsce w lochu wodza obozu.</summary>
-        private static string FleeBlock(Settlement st, BesiegerCamp camp, MobileParty lp, bool battle, out int room)
+        private static string FleeBlock(Settlement st, BesiegerCamp camp, MobileParty lp, bool battle, bool story, out int room)
         {
             room = 0;
             if (!FleeOn || !(FleePct > 0.0)) return "klucz";
             if (camp == null || lp == null || lp.Party == null || lp.PrisonRoster == null || !lp.IsActive) return "brak obozu";
-            if (Scripted(lp)) return "fabula ROT";
-            string story;
-            try { story = SiegePhantomLift.StoryOf(camp); } catch (Exception e) { Stumble("FleeBlock.StoryOf", e); story = "?"; }   // nie da sie ocenic = nietkniete
-            if (story != null) return "fabula ROT";
+            if (story) return "fabula ROT";
             if (battle || lp.MapEvent != null) return "bitwa w toku";
             if (!camp.IsPreparationComplete) return "oboz niegotowy";
             room = Math.Max(0, lp.Party.PrisonerSizeLimit - lp.PrisonRoster.TotalManCount);
@@ -707,11 +715,14 @@ namespace Armoury
             bool battle = InBattle(st);                                                // recenzja: rostery w bitwie - bez smierci tej doby (jak gra)
             // 400: doba glodu 1 = pierwsza doba z zapasem 0; doby 1..GraceDays - tydzien laski (nikt nie umiera z GL)
             int dayNo = (int)Math.Floor(days + 0.01) + 1, grace = GraceDays;
-            bool inGrace = dayNo <= grace;
+            // 400-p (recenzja; PLAN-396: "smierci GL w oblezeniach fabuly zostaja jak dzis"): oblezenie fabuly ROT nie ma tygodnia laski - zaloga traci od 1. doby
+            // glodu jak przed 400 (inaczej skryptowany szturm trafialby na obsade do ok. 30% liczniejsza). Niezalezne od klucza ucieczki.
+            bool story = StorySiege(camp, lp);
+            bool inGrace = dayNo <= grace && !story;
             if (inGrace) _dGrace++;
             double pct = battle || inGrace ? 0.0 : LossPct;
             double p = pct / 100.0;
-            int room; string fleeWhy = FleeBlock(st, camp, lp, battle, out room);
+            int room; string fleeWhy = FleeBlock(st, camp, lp, battle, story, out room);
             int room0 = room;
             double fp = fleeWhy == null ? FleePct / 100.0 : 0.0;
             int dead = 0, fled = 0;
@@ -759,7 +770,7 @@ namespace Armoury
                 if (camp != null) foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) if (pb != null) campMen += pb.NumberOfHealthyMembers;
                 Log.Info("Glod oblezenia (GL): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + Cls(st) + ") | oblegajacy " + (lp != null && lp.MapFaction != null ? lp.MapFaction.StringId : "-")
                          + ", wodz " + Hn(lp) + ", ludzi " + campMen + ", oboz gotowy " + (camp != null && camp.IsPreparationComplete ? "tak" : "nie") + ", oblezenie " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob"
-                         + " | glod od " + F(days, "0.0") + " dob (doba " + dayNo + ", laska do " + grace + ") | zaloga i milicja: bylo " + n0 + " (zdrowi " + h + ", ranni " + w + "), zmarli dzis " + dead
+                         + " | glod od " + F(days, "0.0") + " dob (doba " + dayNo + ", laska " + (story ? "brak - fabula ROT" : "do " + grace) + ") | zaloga i milicja: bylo " + n0 + " (zdrowi " + h + ", ranni " + w + "), zmarli dzis " + dead
                          + " (" + F(pct, "0.0") + "%), przez mur " + fled + " (loch wodza: wolne " + room0 + (fleeWhy != null ? ", bez ucieczki: " + fleeWhy : "") + "), zostalo " + left
                          + " | na starcie oblezenia " + g.Start + ", prog kapitulacji " + thr + " | wynik: " + res + ".");
             }

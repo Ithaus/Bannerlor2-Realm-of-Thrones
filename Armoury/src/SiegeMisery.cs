@@ -664,6 +664,9 @@ namespace Armoury
                         && int.TryParse(x[5], NumberStyles.Integer, Inv, out men) && int.TryParse(x[6], NumberStyles.Integer, Inv, out streak) && int.TryParse(x[7], NumberStyles.Integer, Inv, out flags)
                         && u >= 0 && w >= 0 && !double.IsNaN(u) && !double.IsNaN(w) && !double.IsInfinity(u) && !double.IsInfinity(w))
                     {
+                        // 400-p: pola glodu z recznie zepsutego zapisu = brak (NaN / nieskonczonosc / ujemne -> -1)
+                        if (double.IsNaN(hf) || double.IsInfinity(hf) || hf < 0) hf = -1;
+                        if (men < 0) men = -1;
                         var r = new Rec { Start = start, Under = u, Within = w, HungerFrom = hf, StartMen = men, Streak = streak, Flags = flags };
                         r.WasU = u; r.WasW = w;
                         _recs[x[0]] = r;
@@ -671,7 +674,7 @@ namespace Armoury
                     else bad++;
                 }
                 if (_recs.Count > 0 || bad > 0)
-                    Log.Info(Tag + ": wczytano z zapisu - oblezenia " + _recs.Count + (bad > 0 ? " (bledne " + bad + ")" : "") + ".");
+                    Log.Info(Tag + ": wczytano z zapisu - rekordy trwajacych oblezen (od 400 kazde, takze bez trupow) " + _recs.Count + (bad > 0 ? " (bledne " + bad + ")" : "") + ".");
             }
             catch (Exception e) { Stumble("Import", e); }
         }
