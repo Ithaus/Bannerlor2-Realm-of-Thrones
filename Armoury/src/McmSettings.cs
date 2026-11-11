@@ -972,6 +972,14 @@ namespace Armoury
         [SettingPropertyGroup("Skills rule the gear")]
         public bool AiHeroesLateComingOfAgeKit { get; set; } = true;
 
+        [SettingPropertyBool("AI Heroes Spare Weapon", HintText = "When an AI lord or lady has no weapon at all and the usual gear template gives none (no battle set in the template, every weapon above her skills, a bow without arrows), a spare is tried: weapons from a lord's template of her culture (ladies', then men's), then from the Banner Kings gentry template of her culture (the sword her brothers got), then one plain weapon of her culture within her skills (one-handed first; highest tier she can use). Always within skills, never renowned or legendary pieces. Used both in your battles (AI Heroes Never Fight Bare, that battle only) and by the late coming-of-age kit (kept, once in her life). Civilians by design stay unarmed. Counted in the log lines 'Bezbronni (389)'. Off = no spare weapon, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool AiHeroesSpareArms { get; set; } = true;
+
+        [SettingPropertyBool("AI Heroes Adult Civilian Clothes", HintText = "A grown AI lord or lady whose town clothes are still the child's outfit (made adult by another mod and never dressed as an adult) gets, once in a lifetime, the civilian outfit the game gives at the age of 18 - a lord's civilian set of the same culture and sex. No skill check (the game gives a gown to every lady), never renowned pieces. If the battle outfit is still the child's tunic too (no armour within skills), the body, legs and head of the new outfit go there as well. Checked once a day, at most 60 a day, after the late coming-of-age kit. Not you, not your clan, not companions, not the undead. Off = clothes stay as they are", RequireRestart = false)]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool AiHeroesAdultCivilClothes { get; set; } = true;
+
         [SettingPropertyInteger("Weapon Skill Per Tier", 0, 140, "0", HintText = "Weapon Tier Law: a weapon or shield needs at least (tier - 1) x this in its skill, whatever the data says - a tier 6 blade wants 175, so a One Handed 30 bandit never 'qualifies' for it; 0 turns the law off. Applied at session start", RequireRestart = false)]
         [SettingPropertyGroup("Skills rule the gear")]
         public int WeaponSkillPerTier { get; set; } = 35;
@@ -12270,6 +12278,8 @@ namespace Armoury
             s.AiHeroesNeverFightBare = AiHeroesNeverFightBare;
             s.AiHeroesArmourOverDress = AiHeroesArmourOverDress;
             s.AiHeroesLateComingOfAgeKit = AiHeroesLateComingOfAgeKit;
+            s.AiHeroesSpareArms = AiHeroesSpareArms;
+            s.AiHeroesAdultCivilClothes = AiHeroesAdultCivilClothes;
             s.WeaponSkillPerTier = WeaponSkillPerTier;
             s.ElephantQuarantineEnabled = ElephantQuarantineEnabled;
             s.HideoutPurgeEnabled = HideoutPurgeEnabled;

@@ -1357,6 +1357,7 @@ namespace Armoury
             try { string c385 = dataStore.IsSaving ? PlayerCaptives385d.Export() : null; SaveText.Sync(dataStore, "arm_cap385d", ref c385); if (dataStore.IsLoading) PlayerCaptives385d.Import(c385); } catch (Exception e) { Log.Error("SyncData arm_cap385d", e); }
             // 389: rejestr posagu spoznionego dorosniecia (StringId bohaterow, raz w zyciu) - wlasny try; brak klucza = pusty
             try { string k389 = dataStore.IsSaving ? HeroArms389.Export() : null; SaveText.Sync(dataStore, "arm_389_done", ref k389); if (dataStore.IsLoading) HeroArms389.Import(k389); } catch (Exception e) { Log.Error("SyncData arm_389_done", e); }
+            try { string k389c = dataStore.IsSaving ? HeroArms389.ExportCiv() : null; SaveText.Sync(dataStore, "arm_389c_civ", ref k389c); if (dataStore.IsLoading) HeroArms389.ImportCiv(k389c); } catch (Exception e) { Log.Error("SyncData arm_389c_civ", e); }   // 389c: kto dostal dorosly stroj cywilny
             // 367d: urazy uwolnionych wladcow (wiersze, dziedziczenia czekajace) - wlasny try; brak klucza = puste
             try { string gr = dataStore.IsSaving ? CaptiveGrudge.Export() : null; SaveText.Sync(dataStore, "arm_grudge367d", ref gr); if (dataStore.IsLoading) CaptiveGrudge.Import(gr); }
             catch (Exception e) { Log.Error("SyncData.arm_grudge367d", e); }

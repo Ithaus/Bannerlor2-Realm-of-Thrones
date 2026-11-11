@@ -161,6 +161,10 @@ namespace Armoury
             public List<string> Got;
             public bool Swapped;
             public string From, AFrom;
+            /// <summary>389c: 0 bron ze zwyklego wzorca (albo brak), 1 zapasowa z szablonu lorda kultury, 2 z szablonu gentry BK, 3 z puli kultury.</summary>
+            public int Spare;
+            /// <summary>389c: bron, ktora odpadla (id:powod - unikat / sito / bez pary), do 12 wpisow; null = nic nie odpadlo.</summary>
+            public List<string> Rej;
         }
 
         /// <summary>Dobor 382 / 382b / 382c wydzielony z One (389: ten sam dobor dla trwalego "spoznionego dorosniecia" - HeroArms389).
@@ -184,32 +188,23 @@ namespace Armoury
                 if (a != null) { tpl = a; afrom = f2; }
                 else if (over) tpl = null;
             }
-            if (tpl == null && wtpl == null) return null;
+            bool spare = noWeapon && SpareOn;                 // 389c: bez wzorca tez probujemy broni zapasowej
+            if (tpl == null && wtpl == null && !spare) return null;
+            bool noTpl = tpl == null && wtpl == null;
             var eq = src.Clone();
-            int n = 0;
+            int n = 0, spareKind = 0;
             var got = new List<string>();
+            List<string> rej = null;
             bool req = Settings.Current != null && Settings.Current.HeroGearRequirements;
-            if (noWeapon && wtpl != null)
+            if (noWeapon && wtpl != null) n += Weapons(wtpl, co, req, eq, got, ref rej);
+            if (spare && n == 0)
             {
-                // 382b: komplet broni przez to samo sito co reszta drog bohatera (ItemReq.MeetsHero - umiejetnosc broni i Prawo Tieru
-                // przez Difficulty), a dystansowa bez pary (luk bez strzal / strzaly bez luku) wypada - bez polowek kompletu
-                var kit = new ItemObject[4];
-                for (int i = 0; i < 4; i++)
-                {
-                    var it = wtpl[(EquipmentIndex)i].Item;
-                    if (it == null || Banned(it)) continue;
-                    if (req && !ItemReq.MeetsHero(co, it)) continue;
-                    kit[i] = it;
-                }
-                Pair(kit);
-                for (int i = 0; i < 4; i++)
-                {
-                    if (kit[i] == null) continue;
-                    eq[(EquipmentIndex)i] = new EquipmentElement(kit[i]);
-                    n++;
-                    got.Add(kit[i].StringId);
-                }
+                // 389c: wzorzec nie dal ZADNEJ broni (brak zestawu bojowego w szablonie, sito umiejetnosci, luk bez strzal) - lancuch zapasowy
+                string sf;
+                int sn = SpareArms(co, hero, req, eq, got, wtpl, ref rej, out spareKind, out sf);
+                if (sn > 0) { n += sn; from = sf; if (noTpl) afrom = "-"; }
             }
+            if (noTpl && n == 0) return null;                 // jak dotad: brak wzorca (i zapas nic nie dal)
             int ath = 0;
             try { ath = co.GetSkillValue(DefaultSkills.Athletics); } catch { }
             bool swapped = false;
@@ -247,7 +242,174 @@ namespace Armoury
                     got.Add(it.StringId);
                 }
             }
-            return new Kit { Eq = eq, N = n, Got = got, Swapped = swapped, From = from, AFrom = afrom };
+            return new Kit { Eq = eq, N = n, Got = got, Swapped = swapped, From = from, AFrom = afrom, Spare = spareKind, Rej = rej };
+        }
+
+        /// <summary>382b (wydzielone w 389c bez zmiany reguly): komplet broni z jednego zestawu przez to samo sito co reszta drog bohatera
+        /// (ItemReq.MeetsHero - umiejetnosc broni i Prawo Tieru przez Difficulty), a dystansowa bez pary (luk bez strzal / strzaly bez luku) wypada -
+        /// bez polowek kompletu. Sloty 0-3 w eq sa puste (wolane tylko przy noWeapon). Zwraca liczbe wlozonych sztuk.</summary>
+        private static int Weapons(Equipment w, CharacterObject co, bool req, Equipment eq, List<string> got, ref List<string> rej)
+        {
+            var kit = new ItemObject[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var it = w[(EquipmentIndex)i].Item;
+                if (it == null) continue;
+                if (Banned(it)) { Rejected(ref rej, it, "unikat"); continue; }
+                if (req && !ItemReq.MeetsHero(co, it)) { Rejected(ref rej, it, "sito"); continue; }
+                kit[i] = it;
+            }
+            var pre = (ItemObject[])kit.Clone();
+            Pair(kit);
+            int n = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                if (kit[i] == null) { if (pre[i] != null) Rejected(ref rej, pre[i], "bez pary"); continue; }
+                eq[(EquipmentIndex)i] = new EquipmentElement(kit[i]);
+                n++;
+                got.Add(kit[i].StringId);
+            }
+            return n;
+        }
+
+        private static void Rejected(ref List<string> rej, ItemObject it, string why)
+        {
+            if (rej == null) rej = new List<string>();
+            if (rej.Count < 12) rej.Add(it.StringId + ":" + why);
+        }
+
+        // ------------------------------------------------------------ 389c: bron zapasowa
+        private static readonly Dictionary<string, List<CharacterObject>> _gentry = new Dictionary<string, List<CharacterObject>>();
+        private static readonly Dictionary<string, List<ItemObject>[]> _pool = new Dictionary<string, List<ItemObject>[]>();
+        private static readonly string[] PoolSkip = { "practice", "wooden", "training", "tournament", "blunt", "torch", "dummy", "test", "tool", "sickle", "pitchfork", "hoe", "pickaxe", "hammer", "scythe" };
+
+        private static bool SpareOn { get { var s = Settings.Current; return s != null && s.AiHeroesSpareArms; } }
+
+        /// <summary>389c: pamiec szablonow gentry i puli broni od nowa (nowa kampania / wczytanie - obiekty gry sa nowe).</summary>
+        internal static void ResetSpare() { _gentry.Clear(); _pool.Clear(); }
+
+        /// <summary>389c (Jeff 11.11 "tak, rob wszystko 2-4", pkt 3 "202 bohaterow nadal bez broni (187 kobiet) - ich wzorzec nie ma broni"; klucz
+        /// AiHeroesSpareArms). Lancuch, gdy zwykly wzorzec nie dal ZADNEJ broni - kazde ogniwo przez to samo sito (Banned, ItemReq.MeetsHero, Pair):
+        ///  1. bron z szablonu lorda kultury i plci bohatera, u kobiet potem z szablonu lordow-mezczyzn (gdy wlasny szablon mial bron ponad umiejetnosci);
+        ///  2. bron z szablonu postaci gentry BK tej kultury (Occupation.Lord, mezczyzna, id z "bannerkings_gentry_") - ten sam miecz, ktory dostali bracia
+        ///     (corki gentry i dworki BK maja szablon "_spouse_" z samymi zestawami cywilnymi - MBEquipmentRoster nie ma tam zestawu bojowego);
+        ///  3. pula kultury: jedna bron jednoreczna (dopiero potem dwureczna / drzewcowa) kultury bohatera albo bez kultury, w granicy umiejetnosci
+        ///     (sito ZAWSZE, takze przy wylaczonym HeroGearRequirements - inaczej kazdy dostalby najwyzszy tier), najwyzszy tier, miecz przed sztyletem
+        ///     przed reszta, wybor staly dla bohatera (hash StringId). Bron Dothrakow dla obcych nie wchodzi z definicji (pula = kultura bohatera / bez kultury).
+        /// Zwraca liczbe wlozonych sztuk; kind 1 / 2 / 3 = ogniwo, from = opis do logu.</summary>
+        private static int SpareArms(CharacterObject co, Hero hero, bool req, Equipment eq, List<string> got, Equipment tried, ref List<string> rej, out int kind, out string from)
+        {
+            kind = 0; from = null;
+            try
+            {
+                int n;
+                var e = CultureTemplate(hero, hero.IsFemale);
+                if (e != null && !ReferenceEquals(e, tried))
+                {
+                    n = Weapons(e, co, req, eq, got, ref rej);
+                    if (n > 0) { kind = 1; from = "bron zapasowa: szablon lorda kultury"; return n; }
+                }
+                if (hero.IsFemale)
+                {
+                    e = CultureTemplate(hero, false);
+                    if (e != null && !ReferenceEquals(e, tried))
+                    {
+                        n = Weapons(e, co, req, eq, got, ref rej);
+                        if (n > 0) { kind = 1; from = "bron zapasowa: szablon lorda kultury (m)"; return n; }
+                    }
+                }
+                var gl = Gentry(hero);
+                if (gl != null && gl.Count > 0)
+                {
+                    int start = (int)((uint)(hero.StringId ?? "").GetHashCode() % (uint)gl.Count);
+                    for (int j = 0; j < gl.Count; j++)
+                    {
+                        e = OwnTemplate(gl[(start + j) % gl.Count], false);
+                        if (e == null || ReferenceEquals(e, tried)) continue;
+                        n = Weapons(e, co, req, eq, got, ref rej);
+                        if (n > 0) { kind = 2; from = "bron zapasowa: szablon gentry"; return n; }
+                    }
+                }
+                var it = PoolArm(co, hero);
+                if (it != null)
+                {
+                    eq[EquipmentIndex.WeaponItemBeginSlot] = new EquipmentElement(it);
+                    got.Add(it.StringId);
+                    kind = 3; from = "bron zapasowa: pula kultury";
+                    return 1;
+                }
+            }
+            catch (Exception ex) { Stumble("SpareArms", ex); }
+            return 0;
+        }
+
+        private static List<CharacterObject> Gentry(Hero hero)
+        {
+            if (hero.Culture == null) return null;
+            string cid = hero.Culture.StringId ?? "";
+            List<CharacterObject> l;
+            if (_gentry.TryGetValue(cid, out l)) return l;
+            l = new List<CharacterObject>();
+            foreach (var c in CharacterObject.All)
+            {
+                if (c == null || c.IsHero || c.IsFemale || c.Occupation != Occupation.Lord || c.Culture == null || c.Culture.StringId != cid) continue;
+                if ((c.StringId ?? "").IndexOf("bannerkings_gentry_", StringComparison.Ordinal) < 0) continue;
+                l.Add(c);
+            }
+            _gentry[cid] = l;
+            return l;
+        }
+
+        /// <summary>Pula kultury: [0] jednoreczne, [1] dwureczne i drzewcowe; kazda lista od najwyzszego tieru, w tierze miecz, sztylet, reszta.</summary>
+        private static ItemObject PoolArm(CharacterObject co, Hero hero)
+        {
+            if (hero.Culture == null) return null;
+            string cid = hero.Culture.StringId ?? "";
+            List<ItemObject>[] p;
+            if (!_pool.TryGetValue(cid, out p))
+            {
+                p = new[] { new List<ItemObject>(), new List<ItemObject>() };
+                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    if (it == null || !it.HasWeaponComponent || it.PrimaryWeapon == null) continue;
+                    int li = it.ItemType == ItemObject.ItemTypeEnum.OneHandedWeapon ? 0
+                           : it.ItemType == ItemObject.ItemTypeEnum.TwoHandedWeapon || it.ItemType == ItemObject.ItemTypeEnum.Polearm ? 1 : -1;
+                    if (li < 0 || it.NotMerchandise || Banned(it) || GiantGear.Is(it)) continue;
+                    string ic = it.Culture != null ? it.Culture.StringId : null;
+                    if (!string.IsNullOrEmpty(ic) && ic != "neutral_culture" && ic != cid) continue;
+                    string id = it.StringId ?? "";
+                    if (id.StartsWith("dragon_", StringComparison.Ordinal)) continue;
+                    bool skip = false;
+                    foreach (var w in PoolSkip) if (id.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0) { skip = true; break; }
+                    if (skip) continue;
+                    p[li].Add(it);
+                }
+                foreach (var l in p) l.Sort((a, b) => { int c = PoolRank(b).CompareTo(PoolRank(a)); return c != 0 ? c : string.CompareOrdinal(a.StringId, b.StringId); });
+                _pool[cid] = p;
+                Log.Info("Bezbronni (389c): pula broni zapasowej kultury " + cid + " - jednorecznych " + p[0].Count + ", dwurecznych / drzewcowych " + p[1].Count + ".");
+            }
+            foreach (var l in p)
+            {
+                int rank = int.MinValue;
+                List<ItemObject> band = null;
+                foreach (var it in l)
+                {
+                    int r = PoolRank(it);
+                    if (band != null && r != rank) break;                 // lista posortowana: pierwsze pasmo w granicy umiejetnosci
+                    if (!ItemReq.MeetsHero(co, it)) continue;
+                    if (band == null) { band = new List<ItemObject>(); rank = r; }
+                    band.Add(it);
+                }
+                if (band != null) return band[(int)((uint)(hero.StringId ?? "").GetHashCode() % (uint)band.Count)];
+            }
+            return null;
+        }
+
+        private static int PoolRank(ItemObject it)
+        {
+            var wc = it.PrimaryWeapon.WeaponClass;
+            int cls = wc == WeaponClass.OneHandedSword || wc == WeaponClass.TwoHandedSword ? 2 : wc == WeaponClass.Dagger ? 1 : 0;
+            return (int)it.Tier * 4 + cls;
         }
 
         /// <summary>382b: bron dystansowa tylko w parze z amunicja (luk - strzaly, kusza - belty, palna - kule); bez pary obie strony wypadaja.</summary>
@@ -302,7 +464,7 @@ namespace Armoury
             return it;
         }
 
-        private static bool Sex(ItemObject it, Hero hero)
+        internal static bool Sex(ItemObject it, Hero hero)
         {
             var f = it.ItemFlags;
             return hero.IsFemale ? (f & ItemFlags.NotUsableByFemale) == 0 : (f & ItemFlags.NotUsableByMale) == 0;
@@ -324,7 +486,7 @@ namespace Armoury
             return null;
         }
 
-        private static bool Banned(ItemObject it)
+        internal static bool Banned(ItemObject it)
         {
             try
             {
@@ -359,7 +521,7 @@ namespace Armoury
             return null;
         }
 
-        private static string RosterId(CharacterObject co)
+        internal static string RosterId(CharacterObject co)
         {
             try
             {
