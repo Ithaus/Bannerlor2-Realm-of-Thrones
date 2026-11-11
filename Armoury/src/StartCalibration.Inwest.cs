@@ -302,15 +302,16 @@ namespace Armoury
                 string type = ld.K.Type;
                 var tmp = new double[ItemCount];
                 double kg = 0;
+                bool gsw = VillageGear.SwitchOn;                          // 435-L4: nowe zajecie w zmianie ma wlasny stosunek sprzetu (czynnik na zajecie czesci); wylaczone - jak L3
                 foreach (var lb in ld.B)
                 {
                     if (lb == null || lb.K == null || lb.C == null || lb.X == null) continue;
                     string puid = lb.K.Main ? null : (lb.Uid ?? lb.K.Uid);
                     double ratio = VillageGear.RatioOf(ld.V, puid);
-                    if (!(ratio < 1.0)) continue;
+                    if (!gsw && !(ratio < 1.0)) continue;
                     for (int j = 0; j < lb.C.Length; j++)
                     {
-                        double m = VillageGear.MAt(lb.C[j], ratio);
+                        double m = gsw ? VillageGear.MOf(ld.V, puid, lb.C[j]) : VillageGear.MAt(lb.C[j], ratio);
                         if (!(m < 1.0)) continue;
                         Array.Clear(tmp, 0, tmp.Length);
                         BlockCraftKg(ld.K, lb, j, type, tmp);

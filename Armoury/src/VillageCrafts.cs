@@ -496,11 +496,13 @@ namespace Armoury
                 }
                 Side s; if (!bySide.TryGetValue(p.Uid, out s)) continue;
                 double shr = sh;
+                // 435-L4 (klucz Village Gear On Switch): wioska w zmianie zajecia przez sprzet - nowe zajecie ma wlasny stosunek sprzetu (MOf na zajecie); bez niej jak L3
+                bool gsw = VillageGear.SwitchOn; string guid = p.Uid;   // takze po koncu zmiany, dopoki sprzet nowego zajecia nie wszedl do sprzetu czesci
                 CraftShares(s, (c, x) =>
                 {
                     double part = shr * x;
                     double bb = c == wc ? b : 0.0;
-                    double gm = gr < 1.0 ? VillageGear.MAt(c, gr) : 1.0;
+                    double gm = gsw ? VillageGear.MOf(di.V, guid, c) : (gr < 1.0 ? VillageGear.MAt(c, gr) : 1.0);
                     if (c == D) { if (gm < 1.0) { typeBonus += part * bb * gm; typeLoss += part * (1.0 - gm); } else typeBonus += part * bb; return; }
                     other += part;
                     var m = meta[c];
@@ -1663,6 +1665,7 @@ namespace Armoury
             // 435-L2 (klucz Rebuild Stall Release Days): w dobie kroku rece, ktore stojace przebudowy tego sezonu oddaja regionom (null - klucz 0 albo nic nie stoi)
             Dictionary<string, double> relRefund = null;
             if (step) { try { relRefund = StallRefund(today, season); } catch (Exception e) { Stumble("StallRefund", e); relRefund = null; } }
+            bool gsw = VillageGear.SwitchOn;                          // 435-L4: zmiana zajecia przez sprzet (oba klucze)
             foreach (var di in _dist.Values)
             {
                 try
@@ -1681,8 +1684,13 @@ namespace Armoury
                             // 435-L2: przebudowa stojaca (zaleglosc raty >= prog) nie zajmuje miejsca "jedna czesc okregu naraz"; klucz 0 - Released zawsze false (jak dotad)
                             double lag = CraftUnblock.Lag(today, s.TStart, s.TEnd, s.Cost, s.Paid);
                             CraftUnblock.Seen(CraftUnblock.SysZw, lag, s.Cost > 0 && s.Paid >= s.Cost - 0.5f);
-                            if (CraftUnblock.Released(lag)) stalled = true; else busy = true;
+                            // 435-L4 (klucz Village Gear On Switch): zmiana OD RAZU (koszt 0, sprzet z robot gminy) trzyma miejsce tylko do sprzetu dla polowy rak w zmianie
+                            // albo 182 dob; klucz wylaczony - gsw false, jak dotad
+                            int slot = gsw && s.Cost <= 0f ? VillageGear.SlotOf(di.V, s.Uid, s.Target) : 0;
+                            if (slot == 2) continue;
+                            if (slot != 1 && CraftUnblock.Released(lag)) stalled = true; else busy = true;
                         }
+                    if (gsw && !busy && VillageGear.HoldsAfter(di.V)) busy = true;   // 435-L4: rece przeszly, sprzet nowego zajecia jeszcze ponizej polowy (przed 182 doba)
                     if (step && mt != null) { int before = _dStarted; Rule(di, mt, today, busy, stalled, relRefund); if (_dStarted != before) moved = true; }
                     // koszt doby: plan okregu przeliczany co 7 dob na zmiane (udzialy ludzi w domu zmieniaja sie powoli), od razu przy przebudowie, pracach i pierwszej dobie sesji
                     if (di.Slot < 0) di.Slot = (int)((uint)(di.Id ?? "").GetHashCode() % 7u);
@@ -2207,6 +2215,12 @@ namespace Armoury
                 double sigma = Math.Max(1, DailyLife.KsSigma);
                 s.Target = bc; s.TStart = today; s.TEnd = today + T; s.F = 0f; s.Paid = 0f;
                 s.Cost = (float)(CostDays * KsTab.KCost[bc] * hands / sigma);
+                // 435-L4 (klucz Village Gear On Switch): zmiana przez sprzet - OD RAZU (pola, lasy): bez raty w zlocie, sprzet nowego zajecia z robot gminy; ZA SPRZETEM
+                // (szyby, sady, lodzie): koszt = cena sprzetu rak wioski, rata jak dotad. Tryb 0 (klucz wylaczony, cel poza LP, bez wyceny) - koszt jak dotad
+                {
+                    double gcost; int gmode = VillageGear.SwitchBegin(di.V, s.Uid, s.Craft, bc, 1.0, out gcost);
+                    if (gmode == 1) s.Cost = 0f; else if (gmode == 2) s.Cost = (float)gcost;
+                }
                 _regionMoved[di.Region ?? "-"] = moved + hands;
                 busy = true; _dStarted++;
                 string nm; if (!vname.TryGetValue(s.Uid, out nm)) nm = s.Uid;
@@ -2302,6 +2316,7 @@ namespace Armoury
         {
             if (CraftUnblock.StallDays <= 0) return null;
             Dictionary<string, double> m = null;
+            List<VillageBook.PartView> gparts = null;                // 435-L4
             double sigma = Math.Max(1, DailyLife.KsSigma);
             foreach (var di in _dist.Values)
             {
@@ -2313,6 +2328,14 @@ namespace Armoury
                     double k = KsTab.KCost[s.Target];
                     if (!(k > 0)) continue;
                     double back = s.Cost * sigma / (CostDays * k) * (1.0 - Math.Max(0f, Math.Min(1f, s.F)));
+                    // 435-L4: przy zmianie ZA SPRZETEM koszt to cena sprzetu (nie 28 dob x K x rece) - rece wioski wprost z ksiegi wiosek (polowa ludzi w domu, jak w Rule)
+                    if (VillageGear.SwitchMode(di.V, s.Uid, s.Target, s.Cost) == 2)
+                    {
+                        if (gparts == null) gparts = new List<VillageBook.PartView>();
+                        double gh = 0;
+                        if (VillageBook.PartsOf(di.V, gparts)) foreach (var gp in gparts) if (gp != null && !gp.Main && gp.Uid == s.Uid) { gh = gp.Home * 0.5; break; }
+                        back = gh * (1.0 - Math.Max(0f, Math.Min(1f, s.F)));
+                    }
                     if (!(back > 0)) continue;
                     if (m == null) m = new Dictionary<string, double>(StringComparer.Ordinal);
                     double cur; m.TryGetValue(di.Region ?? "-", out cur); m[di.Region ?? "-"] = cur + back;
@@ -2361,9 +2384,11 @@ namespace Armoury
             bool stallOut = CraftUnblock.Abandon(CraftUnblock.Lag(today, s.TStart, s.TEnd, s.Cost, s.Paid), s.Cost, s.Paid);
             if (today > s.TEnd + 364 || stallOut)
             {
+                int tg0 = s.Target; bool over = s.F >= 0.5f;
                 if (s.F >= 0.5f) s.Craft = s.Target;
                 s.Target = -1; s.F = 0f; s.Held = 0; s.TStart = s.TEnd = -1; s.Cost = s.Paid = 0f; _dCancel++;
                 if (stallOut) CraftUnblock.NoteAbandon(CraftUnblock.SysZw);
+                VillageGear.SwitchEnd(di.V, s.Uid, tg0, over ? 1.0 : 0.0, false);   // 435-L4: rece wioski przy nowym zajeciu albo z powrotem przy starym (bez zmiany przez sprzet - nic)
                 return;
             }
             double progress = 1.0;
@@ -2373,10 +2398,16 @@ namespace Armoury
                 // czeka, az starczy na sztuke), najwyzej 1/4 kiesy; placona prawdziwym materialem i rzemieslnikami (PayRebuild). Postep najwyzej 1/T na dobe i nigdy ponad
                 // czesc zaplacona - doba bez zaplaty = przebudowa stoi (jak dotad), pierwsza doba z pelna zaplata = rata Cost/T (jak dotad)
                 double fTime = Math.Min(1.0, Math.Max(0, today - s.TStart) / (double)T);
+                // 435-L4 (zmiana ZA SPRZETEM): "zaplacone" = lustro sprzetu nowego zajecia (koszt x sprzet / rece w zmianie) - sprzet z robot gminy liczy sie jak rata,
+                // material raty tej doby jest sprzetem; bez zmiany przez sprzet (tryb 0, klucz wylaczony) gm = 0 i rachunek jak dotad
+                int gm = VillageGear.SwitchMode(di.V, s.Uid, s.Target, s.Cost);
+                if (gm == 2) { double sh0 = VillageGear.SwitchPaid(di.V, s.Uid, s.Target, 0); if (sh0 >= 0) s.Paid = sh0 >= 1.0 ? s.Cost : (float)(s.Cost * sh0); }
+                long gmat0 = _tally.Mat;
                 double owe = Math.Min(s.Cost - s.Paid, fTime * s.Cost - s.Paid);
                 int ask = owe >= 0.5 ? (int)Math.Min(Math.Ceiling(owe), Math.Max(0, di.V.Gold) / 4) : 0;
                 long got = ask > 0 ? PayRebuild(di.V, mt, ask, _tally) : 0;
                 s.Paid += got; _dPaid += got;
+                if (gm == 2) { double sh1 = VillageGear.SwitchPaid(di.V, s.Uid, s.Target, _tally.Mat - gmat0); if (sh1 >= 0) s.Paid = sh1 >= 1.0 ? s.Cost : (float)(s.Cost * sh1); }
                 double fPay = s.Paid >= s.Cost - 0.5f ? 1.0 : Math.Max(0.0, s.Paid / s.Cost);
                 progress = Math.Max(0.0, Math.Min(1.0, (fPay - s.F) * T));
                 if (progress < 1.0 - 1e-6) { _dStall++; EcoAudit427.RbStall(EcoAudit427.SysZw, owe, ask, got, di.V.Gold, true, true); }   // 427 A1: powod doby postoju (sam licznik)
@@ -2384,7 +2415,9 @@ namespace Armoury
             s.F = (float)Math.Min(1.0, s.F + progress / T);
             if (s.F >= 0.9999f)
             {
+                int tg1 = s.Target;
                 s.Craft = s.Target; s.Target = -1; s.F = 0f; s.Held = 0; s.TStart = s.TEnd = -1; s.Cost = s.Paid = 0f; _dDone++;
+                VillageGear.SwitchEnd(di.V, s.Uid, tg1, 1.0, true);   // 435-L4: rece doszly - stary sprzet bezczynny, nowy czeka na wejscie do sprzetu czesci
             }
         }
 
@@ -2677,6 +2710,27 @@ namespace Armoury
         {
             if (uid == null) return -1;
             lock (Gate) { Side s; return _side.TryGetValue(uid, out s) ? s.Craft : -1; }
+        }
+
+        /// <summary>435-L4, VillageGear (doba, sam odczyt): wioska poboczna drogi bez KS wobec zajecia `target` - `trans`: jest w przebudowie do tego zajecia; `w` - udzial
+        /// rak czesci w zmianie (cala wioska: 1); `q` - czesc, ktora przeszla (F); `tAll` - udzial rak wioski przy tym zajeciu. Wies gry (uid null) nie zmienia zajecia.
+        /// false - wioska nieznana. Nie rzuca.</summary>
+        internal static bool GearSwitchOf(Village v, string uid, int target, out bool trans, out double w, out double q, out double tAll)
+        {
+            trans = false; w = q = tAll = 0;
+            if (uid == null) return v != null;
+            try
+            {
+                lock (Gate)
+                {
+                    Side s;
+                    if (!_side.TryGetValue(uid, out s) || s == null) return false;
+                    if (s.Target >= 0 && s.Target == target && s.Target != s.Craft) { trans = true; w = 1.0; q = Math.Max(0f, Math.Min(1f, s.F)); tAll = q; }
+                    else tAll = s.Craft == target ? 1.0 : 0.0;
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("GearSwitchOf", e); trans = false; return false; }
         }
     }
 }
