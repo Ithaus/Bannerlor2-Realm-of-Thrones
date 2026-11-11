@@ -552,6 +552,22 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool TwoHandedMaceSkillScaleFix { get; set; } = true;
 
+        [SettingPropertyBool("ROT Shield Armour Scale", HintText = "With Realistic Battle Mod and Realm of Thrones: brings the armour of Realm of Thrones shields onto one scale. Realm of Thrones gives its shields an armour of either 1 or 7 to 9 with nothing in between, and at armour 1 every axe cuts straight through: a Targaryen, Baratheon, Bolton or Tyrell shield falls apart after 4 blows of a two-handed axe while a Stark or Martell shield of the same wood takes 20. On = every Realm of Thrones shield is brought into the range set by the two sliders below (4 to 6, the range of Realistic Battle Mod's own wooden shields): about 13 to 18 blows of a two-handed axe for a wooden shield, whoever painted it. Shield hit points, prices and tiers stay as they are. The shields of the Unsullied are left alone. Off = as in the Realm of Thrones data. Takes effect on the next load of a save. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 418).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool RotShieldArmorScaleEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("ROT Shield Armour Min", 0, 20, "0", HintText = "lowest armour a Realm of Thrones shield may have (ROT Shield Armour Scale); shields below it are raised to it. Realistic Battle Mod's own wooden shields have 4 to 6. Takes effect on the next load of a save", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public int RotShieldArmorMin { get; set; } = 4;
+
+        [SettingPropertyInteger("ROT Shield Armour Max", 0, 20, "0", HintText = "highest armour a Realm of Thrones shield may have (ROT Shield Armour Scale); shields above it are lowered to it. Realistic Battle Mod's own wooden shields have 4 to 6, its steel shields 9 to 15. Takes effect on the next load of a save", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public int RotShieldArmorMax { get; set; } = 6;
+
+        [SettingPropertyBool("Dresses Are Not Plate", HintText = "With Realm of Thrones: a dress is not a suit of plate. Realm of Thrones gives some named clothes the armour of mail or plate at the weight of a dress - Daenerys' dress 132 on the body at 3 kg (the best plate has about 120 at 34 kg), the dresses of Cersei, Margaery and Melisandre 110, the clothes of Varys, Tyrion and Littlefinger 99, and Daenerys' hair counts as a helmet of 150. On = these nine pieces protect like what they are: the dresses and clothes like a noble dress of cloth (14 on the body, 4 on arms and legs), Cersei's armoured dress like leather court clothes (44, 17, 17), the hair like a crown (10). Their prices and tiers stay as they are. The Dothraki and the Unsullied are left alone, and so are the Others. Off = as in the Realm of Thrones data. Takes effect on the next load of a save. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 418).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool ClothingArmorExceptionsEnabled { get; set; } = true;
+
         [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ArmorPoolMinPoints { get; set; } = 40;
@@ -12505,6 +12521,10 @@ namespace Armoury
             s.RestedArmorBonusRemoved = RestedArmorBonusRemoved;
             s.NativeBluntHammersEnabled = NativeBluntHammersEnabled;
             s.TwoHandedMaceSkillScaleFix = TwoHandedMaceSkillScaleFix;
+            s.RotShieldArmorScaleEnabled = RotShieldArmorScaleEnabled;
+            s.RotShieldArmorMin = RotShieldArmorMin;
+            s.RotShieldArmorMax = RotShieldArmorMax;
+            s.ClothingArmorExceptionsEnabled = ClothingArmorExceptionsEnabled;
             s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;
