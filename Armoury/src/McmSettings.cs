@@ -864,6 +864,14 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsOath { get; set; } = true;
 
+        [SettingPropertyBool("Prisoner Terms Hostage", HintText = "With Prisoner Exchange For Terms: when you swear something yourself - the mutual pact of peace, or your own oath in the offer - you can leave a member of your clan or a companion from your own party as a hostage for the same number of days. He is worth a part of his ransom to the lord (more for close kin), and with a hostage your oath counts in full even if men doubt your honour. The hostage sits in a hall of that lord's house as a prisoner who neither escapes nor is ransomed, keeps his gear, and is released when the term is served - or at once, if they strike at you first. If the lord meant to break his word, he keeps the hostage as a common prisoner.")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsHostage { get; set; } = true;
+
+        [SettingPropertyBool("Prisoner Terms Hostage Death", HintText = "With Prisoner Terms Hostage: if you break the word your hostage stands for, a lord without mercy has the hostage put to death. Off: the hostage only becomes a common prisoner, who may escape or be ransomed as usual.")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsHostageDeath { get; set; } = false;
+
         [SettingPropertyBool("Prisoner Terms Field Parley", HintText = "With Prisoner Exchange For Terms: you can also talk terms with any enemy lord leading a party on the map, when you ride up to him (not when he attacks you) - a pact of peace for your lands and men from his house (from his whole realm, if he rules it), or the release of your people, for lords you hold, gold or land", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsFieldParley { get; set; } = true;
@@ -12227,6 +12235,8 @@ namespace Armoury
             s.PrisonerTermsPickWindow = PrisonerTermsPickWindow;
             s.PrisonerTermsReleaseMyMen = PrisonerTermsReleaseMyMen;
             s.PrisonerTermsOath = PrisonerTermsOath;
+            s.PrisonerTermsHostage = PrisonerTermsHostage;
+            s.PrisonerTermsHostageDeath = PrisonerTermsHostageDeath;
             s.PrisonerTermsFieldParley = PrisonerTermsFieldParley;
             s.PrisonerTermsRealmTruce = PrisonerTermsRealmTruce;
             s.SiegeArmouryAccess = SiegeArmouryAccess;
