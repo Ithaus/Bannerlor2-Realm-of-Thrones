@@ -37,6 +37,9 @@ namespace Armoury
     ///   ceil(trupy / SiegeBurnDeadPerHardwood) sztuk "hardwood" z jego jukow, widoczne od 20 trupow; skutek od razu w konsekwencji opcji
     ///   (bez przelaczania menu). AI - raz na dobe wodz obozu (drewno z jukow jego druzyny) i osada (drewno z polki osady) pala od 50 trupow,
     ///   ta sama stawka, ile drewna starczy. Drewno znika ze swiata: GoodsLedger.NotePyre ("stosy pogrzebowe oblezen (399)").
+    ///   399-p: AI pali dopiero od 3 dob przed koncem inkubacji zarazy; oboz - drewnem z jukow wszystkich druzyn obozu (nie tylko wodza, bez gracza);
+    ///   zamek - z wlasnego skladu; MIASTO - pan kupuje drewno z polki targu po cenie polki (kiesa glowy rodu -> kasa miasta), tylko ponad zapas
+    ///   rzemiosla (BuildFunding.WoodReserve); bez nadwyzki albo zlota nie pali. Bitwa odsieczy z obozem (bez MapEventSettlement) tez liczy zabitych.
     /// Oblezenie fabuly ROT (CampFever.Spared): zaraza go nie dotyka, wiec trupow sie nie trzyma (konta zerowane w dobie, bez palenia i ostrzezen).
     /// </summary>
     internal static class SiegeMisery
@@ -45,6 +48,7 @@ namespace Armoury
         internal const int SrcFever = 0, Src391 = 1, SrcBattle = 2, SrcHunger = 3, SrcDungeon = 4, Srcs = 5;
         private const int PlayerBurnMin = 20;   // opcja gracza widoczna od tylu trupow
         private const int AiBurnMin = 50;       // AI pali od tylu trupow; ten sam prog ostrzezenia gracza
+        private const int NearDays = 3;         // 399-p: AI pali i prog ostrzega dopiero od tylu dob przed koncem inkubacji zarazy
         private const int FWarnUnder = 1, FWarnWithin = 2, FWarnWinter = 4;
         private const string OptUnder = "arm399_burn_under", OptWithin = "arm399_burn_within";
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
@@ -63,6 +67,7 @@ namespace Armoury
             public double BurnU, BurnW;
             public int WoodU, WoodW;
             public string WhoU, WhoW;
+            public string WhyW;                  // 399-p: czemu mury dzis nie palily (null = palily albo nie bylo czego)
         }
 
         private static readonly Dictionary<string, Rec> _recs = new Dictionary<string, Rec>(StringComparer.Ordinal);
@@ -71,11 +76,13 @@ namespace Armoury
         private static int _stumbles;
         private static ItemObject _wood;
         private static string _hookMenu = "-";
+        private static readonly List<MobileParty> _camp = new List<MobileParty>(8);   // 399-p: druzyny obozu przy paleniu AI (tylko watek glowny, doba)
 
         /// <summary>Pamiec od zera: konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie) oraz Import.</summary>
         internal static void Reset()
         {
             _recs.Clear(); _tmp.Clear(); _err.Clear(); _stumbles = 0; _wood = null;
+            _hookMenu = "-"; _camp.Clear();   // 399-p
         }
 
         private static void Stumble(string where, Exception e)
@@ -203,6 +210,9 @@ namespace Armoury
                 if (me == null || !On) return;
                 if (!me.IsSiegeAssault && !me.IsSallyOut && !me.IsSiegeOutside) return;
                 var st = me.MapEventSettlement;
+                // 399-p: bitwa odsieczy z obozem (MapEvent.StartSiegeOutsideMapEvent) nie ma MapEventSettlement - gra ustawia je tylko, gdy strona jest osada
+                // albo stoi w osadzie (MapEvent.Initialize). Osada = oblegana przez pierwsza druzyne bitwy, ktora nalezy do obozu.
+                if (st == null && me.IsSiegeOutside) st = CampSettlement(me);
                 if (st == null || st.SiegeEvent == null) return;
                 int under = 0, within = 0;
                 for (int k = 0; k < 2; k++)
@@ -225,6 +235,24 @@ namespace Armoury
                 AddCorpses(st, true, within, SrcBattle);
             }
             catch (Exception e) { Stumble("OnMapEventEnded", e); }
+        }
+
+        /// <summary>399-p: osada oblegana przez pierwsza druzyne bitwy z obozu oblezniczego (najpierw obroncy bitwy - oboz napadniety przez odsiecz). null = brak.</summary>
+        private static Settlement CampSettlement(MapEvent me)
+        {
+            for (int k = 0; k < 2; k++)
+            {
+                var side = k == 0 ? me.DefenderSide : me.AttackerSide;
+                if (side == null || side.Parties == null) continue;
+                foreach (var mep in side.Parties)
+                {
+                    var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
+                    if (mp == null || mp.BesiegerCamp == null || mp.BesiegerCamp.SiegeEvent == null) continue;
+                    var st = mp.BesiegerCamp.SiegeEvent.BesiegedSettlement;
+                    if (st != null) return st;
+                }
+            }
+            return null;
         }
 
         private static int Regulars(TroopRoster r)
@@ -304,21 +332,26 @@ namespace Armoury
                 return;
             }
 
-            // gasniecie
+            // gasniecie. Kolejnosc doby (399-p, swiadomie): CampFever.OnDaily -> tu -> SiegeWalls2.Daily, wiec zmarli zarazy z tej doby gasna raz, zanim wejda
+            // do czynnika, a zmarli z glodu (dopisani po nas) wchodza jutro w calosci; "zgaslo" w linii liczy sie takze od "doszlo". Roznica 10% miedzy zrodlami.
             double pct = Math.Min(100.0, Math.Max(0.0, s.SiegeCorpseDecayPercent)) / 100.0;
             double fadeU = r.Under * pct, fadeW = r.Within * pct;
             r.Under -= fadeU; r.Within -= fadeW;
             if (r.Under < 0.5) r.Under = 0;
             if (r.Within < 0.5) r.Within = 0;
 
+            // 399-p: przed inkubacja zarazy trupy nic nie robia (gasna same) - AI nie pali na zapas, gracz nie dostaje ostrzezenia o chorobie, ktorej nie ma;
+            // od 3 dob przed koncem inkubacji juz tak (trupy z tych dob waza jeszcze, gdy zaraza wstanie)
+            bool near = CampFever.ActiveWithin(st, NearDays);
+
             // palenie AI
-            if (s.SiegeBurnDeadOption)
+            if (s.SiegeBurnDeadOption && near)
             {
                 try { AiBurn(s, st, siege, r); } catch (Exception e) { Stumble("AiBurn", e); }
             }
 
             // ostrzezenia gracza
-            try { Warn(st, siege, r); } catch (Exception e) { Stumble("Warn", e); }
+            try { Warn(st, siege, r, near); } catch (Exception e) { Stumble("Warn", e); }
 
             if (r.WasU + r.WasW + addU + addW + r.BurnU + r.BurnW >= 1.0)
                 Log.Info(Tag + ": dzien " + day + " | " + st.StringId
@@ -327,6 +360,7 @@ namespace Armoury
                          + " | w murach " + N(r.WasW) + "/" + addW + " (glod " + r.AddW[SrcHunger] + ", zaraza " + r.AddW[SrcFever] + ", bitwa " + r.AddW[SrcBattle] + ", loch " + r.AddW[SrcDungeon] + ")/" + N(fadeW)
                          + "/" + N(r.BurnW) + (r.BurnW > 0 ? " (" + r.WhoW + ", drewna " + r.WoodW + ")" : "") + "/" + N(r.Within)
                          + " [bylo/doszlo/zgaslo/spalone/jest]"
+                         + (r.WhyW != null ? " | mury nie pala: " + r.WhyW : "") + (near ? "" : " | przed inkubacja zarazy - AI nie pali")
                          + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
             ClearDay(r);
         }
@@ -335,7 +369,7 @@ namespace Armoury
         {
             r.WasU = r.Under; r.WasW = r.Within;
             Array.Clear(r.AddU, 0, Srcs); Array.Clear(r.AddW, 0, Srcs);
-            r.BurnU = 0; r.BurnW = 0; r.WoodU = 0; r.WoodW = 0; r.WhoU = null; r.WhoW = null;
+            r.BurnU = 0; r.BurnW = 0; r.WoodU = 0; r.WoodW = 0; r.WhoU = null; r.WhoW = null; r.WhyW = null;
         }
 
         private static string N(double v) { return ((int)Math.Round(v)).ToString(Inv); }
@@ -353,11 +387,35 @@ namespace Armoury
 
             if (r.Under >= AiBurnMin)
             {
-                var lead = siege.BesiegerCamp != null ? siege.BesiegerCamp.LeaderParty : null;
-                if (lead != null && lead != main && lead.MapEvent == null && lead.ItemRoster != null && !Undead.Party(lead))
+                // 399-p: wodz AI decyduje, ale drewno idzie z jukow CALEGO obozu (najpierw wodza, potem pozostalych druzyn) - bez gracza (pali sam z menu),
+                // bez Innych i bez druzyn w bitwie. Kazda druzyna pali swoim drewnem: wlasciciel = platnik.
+                var camp = siege.BesiegerCamp;
+                var lead = camp != null ? camp.LeaderParty : null;
+                if (lead != null && lead != main && lead.MapEvent == null && !Undead.Party(lead))
                 {
-                    double burned; int used = Burn(lead.ItemRoster, wood, r.Under, per, out burned);
-                    if (used > 0) { r.Under -= burned; if (r.Under < 0.5) r.Under = 0; r.BurnU += burned; r.WoodU += used; r.WhoU = "wodz " + lead.StringId; }
+                    _camp.Clear();
+                    _camp.Add(lead);
+                    foreach (var pb in camp.GetInvolvedPartiesForEventType())
+                    {
+                        var mp = pb != null ? pb.MobileParty : null;
+                        if (mp != null && mp != main && !_camp.Contains(mp)) _camp.Add(mp);
+                    }
+                    int usedAll = 0, givers = 0; double burnedAll = 0;
+                    for (int i = 0; i < _camp.Count && r.Under >= 0.5; i++)
+                    {
+                        var mp = _camp[i];
+                        try
+                        {
+                            if (mp.MapEvent != null || mp.ItemRoster == null || Undead.Party(mp)) continue;
+                            double burned; int used = Burn(mp.ItemRoster, wood, r.Under, per, out burned);
+                            if (used <= 0) continue;
+                            r.Under -= burned; if (r.Under < 0.5) r.Under = 0;
+                            usedAll += used; burnedAll += burned; givers++;
+                        }
+                        catch (Exception e) { Stumble("AiBurn.Camp", e); }
+                    }
+                    _camp.Clear();
+                    if (usedAll > 0) { r.BurnU += burnedAll; r.WoodU += usedAll; r.WhoU = "oboz wodza " + lead.StringId + ", druzyn z drewnem " + givers; }
                 }
             }
 
@@ -367,11 +425,52 @@ namespace Armoury
                 bool playersOwn = main != null && main.CurrentSettlement == st && st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan;   // gracz-pan w swoich murach decyduje sam
                 var gar = st.Town != null ? st.Town.GarrisonParty : null;
                 if (!fight && !playersOwn && st.ItemRoster != null && !(gar != null && Undead.Party(gar)))
-                {
-                    double burned; int used = Burn(st.ItemRoster, wood, r.Within, per, out burned);
-                    if (used > 0) { r.Within -= burned; if (r.Within < 0.5) r.Within = 0; r.BurnW += burned; r.WoodW += used; r.WhoW = "osada"; }
-                }
+                    BurnWithin(st, wood, per, r);
             }
+        }
+
+        /// <summary>399-p (recenzja, "nic z niczego"): mury pala W MURACH. ZAMEK - drewnem z wlasnego skladu (nie jest targiem; sklad nalezy do zalogi),
+        /// jak wodz obozu z jukow. MIASTO - drewno lezy na polce TARGU (towar kupcow, na tej samej polce stoi zapas rzemiosla K1): pan miasta KUPUJE je
+        /// po cenie polki (kiesa glowy rodu -> kasa miasta, sztuka po sztuce przez ShelfBuy), tylko nadwyzke ponad zapas rzemiosla
+        /// (BuildFunding.WoodReserve - ten sam prog co budowy pana); bez nadwyzki albo bez zlota - nie pali (trupy gasna same).</summary>
+        private static void BurnWithin(Settlement st, ItemObject wood, int per, Rec r)
+        {
+            if (!st.IsTown || st.Town == null)
+            {
+                double burned; int used = Burn(st.ItemRoster, wood, r.Within, per, out burned);
+                if (used > 0) { r.Within -= burned; if (r.Within < 0.5) r.Within = 0; r.BurnW += burned; r.WoodW += used; r.WhoW = "zamek, wlasny sklad"; }
+                else r.WhyW = "zamek bez drewna w skladzie";
+                return;
+            }
+            int shelf = st.ItemRoster.GetItemNumber(wood);
+            int keep = BuildFunding.WoodReserve(st, wood);
+            int spare = shelf - keep;
+            if (spare <= 0) { r.WhyW = "bez nadwyzki drewna (polka " + shelf + ", zapas rzemiosla " + keep + ")"; return; }
+            var clan = st.OwnerClan;
+            var lord = clan != null ? clan.Leader : null;
+            if (lord == null || !lord.IsAlive || lord.Gold <= 0) { r.WhyW = "pan bez zlota"; return; }
+            int need = (int)Math.Ceiling(r.Within / per);
+            var el = new EquipmentElement(wood);
+            var town = st.Town;
+            int cost, first, last;
+            int n = ShelfBuy.Take(st.ItemRoster, el, Math.Min(need, spare), lord.Gold, () => Math.Max(1, town.GetItemPrice(el, null, false)), out cost, out first, out last, 0, false);
+            if (n <= 0) { r.WhyW = "pana nie stac (kiesa " + lord.Gold + ")"; return; }
+            GoodsLedger.NotePyre(wood, n);
+            if (cost > 0)
+            {
+                lord.ChangeHeroGold(-cost);
+                CirculationWindows.NoteHeroGold(lord, -cost);       // glowa poza swiatem - tylko licznik
+                town.ChangeGold(cost);
+                ClanIncomeBook.NoteOwnPaid(st, clan, cost);         // 110-p (K8): wplata rodu do kasy wlasnego miasta (tylko licznik "wlasne")
+                try { TownFolk.Sale(st, cost, TownFolk.MixBuild); } catch { }   // sprzedaz kupcow targu (tylko licznik; drewno = material)
+            }
+            double done = Math.Min(r.Within, (double)n * per);
+            r.Within -= done; if (r.Within < 0.5) r.Within = 0;
+            r.BurnW += done; r.WoodW += n;
+            r.WhoW = "miasto, pan " + (clan.StringId ?? "?") + " zaplacil targowi " + cost;
+            if (n < Math.Min(need, spare)) r.WhyW = "kiesa pana starczyla na " + n + " z " + Math.Min(need, spare);
+            if (clan == Clan.PlayerClan)
+                Log.Player("Your steward at " + Nm(st) + " bought " + n + " hardwood for " + cost + " denars and burned the dead within the walls.");
         }
 
         /// <summary>Zdejmuje z rosteru tyle drewna, ile trzeba na te trupy (najwyzej ile jest); zwraca zuzyte sztuki, burned = spalone trupy. Drewno do ksiegi towarow.</summary>
@@ -388,7 +487,7 @@ namespace Armoury
             return use;
         }
 
-        private static void Warn(Settlement st, SiegeEvent siege, Rec r)
+        private static void Warn(Settlement st, SiegeEvent siege, Rec r, bool near)
         {
             var main = MobileParty.MainParty;
             if (main == null) return;
@@ -397,7 +496,7 @@ namespace Armoury
             if (!attacks && !defends) return;
             double mine = attacks ? r.Under : r.Within;
             int flag = attacks ? FWarnUnder : FWarnWithin;
-            if (mine >= AiBurnMin && (r.Flags & flag) == 0)
+            if (near && mine >= AiBurnMin && (r.Flags & flag) == 0)
             {
                 r.Flags |= flag;
                 Log.Player((int)Math.Round(mine) + " dead lie unburied " + (attacks ? "beneath" : "within") + " the walls of " + Nm(st) + ". They breed sickness.", true);

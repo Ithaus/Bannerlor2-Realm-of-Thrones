@@ -72,6 +72,21 @@ namespace Armoury
             catch (Exception e) { _woodErrN++; if (!_woodErr) { _woodErr = true; Log.Error("BuildFunding.WoodHold", e); } return 0; }   // licznik potkniec, blad raz na sesje (CLAUDE.md 7)
         }
 
+        /// <summary>399-p (stosy pogrzebowe oblezen, SiegeMisery): ten sam zapas drewna rzemiosla miasta co WoodHold dla pana (folk = false), ale TYLKO ODCZYT -
+        /// bez licznikow linii "Roboty ludu (P2)" (to nie budowa). Klucz wylaczony, zamek albo blad - 0.</summary>
+        internal static int WoodReserve(Settlement market, ItemObject it)
+        {
+            try
+            {
+                if (!WoodHoldOn || market == null || market.Town == null || it == null || it.StringId != "hardwood") return 0;
+                int keep = CaravanBulk.TargetFor(market.Town, it);
+                if (keep <= 0) return 0;
+                if (WoodHalfOn && market.Town.GetItemCategoryPriceIndex(it.ItemCategory) < 1f) keep = Math.Max(Math.Min(keep, 20), keep / 2);   // E3-B1b: drewno tanie - polowa zapasu
+                return keep;
+            }
+            catch (Exception e) { _woodErrN++; if (!_woodErr) { _woodErr = true; Log.Error("BuildFunding.WoodReserve", e); } return 0; }
+        }
+
         /// <summary>K1: dopisek linii "Roboty ludu (P2)" - po zakupach pana i ludu tej doby: targi, na ktorych budowy zostawily drewno rzemioslu (sztuki zostawione
         /// przy pierwszym zakupie doby), zapas rzemiosla miast razem i srednio, drewno na polkach miast, miasta ponizej zapasu i bez drewna. Liczniki doby zerowane tu.</summary>
         internal static string WoodTail()

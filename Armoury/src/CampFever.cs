@@ -133,6 +133,20 @@ namespace Armoury
             catch (Exception e) { Stumble("Active", e); return false; }
         }
 
+        /// <summary>399-p, tylko odczyt: jak Active, ale juz od marginDays dob PRZED koncem inkubacji (trupy z tych dob waza jeszcze, gdy zaraza wstanie).</summary>
+        internal static bool ActiveWithin(Settlement st, int marginDays)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.SiegeSicknessEnabled || st == null) return false;
+                var siege = st.SiegeEvent;
+                if (siege == null) return false;
+                return (int)siege.SiegeStartTime.ElapsedDaysUntilNow >= Math.Max(1, s.SiegeSicknessIncubationDays) - Math.Max(0, marginDays);
+            }
+            catch (Exception e) { Stumble("ActiveWithin", e); return false; }
+        }
+
         /// <summary>Tylko odczyt: oblezenie fabuly ROT oszczedzone przez zaraze (klucz SiegeFeverSparesStorySieges). Nazwa wydarzenia albo null.</summary>
         internal static string Spared(SiegeEvent siege)
         {
