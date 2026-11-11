@@ -456,7 +456,7 @@ namespace Armoury
             _breakAt = now;
             _a.MissionBreak = true;
             if (_pl || _al) PlTally(out _plR0, out _plH0);   // 387b; 387f: takze armia AI z graczem (pomiar zbieglych przy 45 s odwrotu)
-            if (!_pl || SiegeWounded373.PlayerSideOn) SiegeWounded373.NoteBreak(_me);   // 373: ranni atakujacy pod murami do lochu przy koncu bitwy; 387c: takze ranni GRACZA-atakujacego (klucz Siege Wounded Player Side)
+            if ((!_pl && !_al) || SiegeWounded373.PlayerSideOn) SiegeWounded373.NoteBreak(_me);   // 373: ranni atakujacy pod murami do lochu przy koncu bitwy; 387c: takze ranni GRACZA-atakujacego (klucz Siege Wounded Player Side; 387c-p: takze tryb _al 387f tylko z kluczem)
             _a.MisEngLost = _engDown;
             _a.Loss = (_prior + _cas) / (double)Math.Max(1, _km);
             try { var sp = m.GetMissionBehavior<IMissionAgentSpawnLogic>(); if (sp != null) sp.StopSpawner(BattleSideEnum.Attacker); }
