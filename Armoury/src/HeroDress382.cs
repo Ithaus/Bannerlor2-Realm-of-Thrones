@@ -172,6 +172,10 @@ namespace Armoury
         internal static Kit Fill(Equipment src, CharacterObject co, Hero hero, bool bareBody, bool noWeapon, bool over, bool overKey)
         {
             Equipment tpl = OwnTemplate(co, true), wtpl = OwnTemplate(co, false);
+            // 389c-p: cywil z danych (postac z XML z WLASNYM zestawem bojowym bez broni - Varys, Baelish) zostaje bez broni takze w bitwie gracza:
+            // przed 389c wzorzec "nie mial czym wypelnic", lancuch zapasowy nie jest dla niego (decyzja 389c, opis klucza)
+            bool civByData = false;
+            try { civByData = co != null && co.IsOriginalCharacter && tpl != null && wtpl == null; } catch { civByData = false; }
             string from = "wlasny szablon";
             if (tpl == null && wtpl == null)
             {
@@ -188,7 +192,7 @@ namespace Armoury
                 if (a != null) { tpl = a; afrom = f2; }
                 else if (over) tpl = null;
             }
-            bool spare = noWeapon && SpareOn;                 // 389c: bez wzorca tez probujemy broni zapasowej
+            bool spare = noWeapon && SpareOn && !civByData;   // 389c: bez wzorca tez probujemy broni zapasowej; 389c-p: nie dla cywila z danych
             if (tpl == null && wtpl == null && !spare) return null;
             bool noTpl = tpl == null && wtpl == null;
             var eq = src.Clone();
@@ -374,7 +378,7 @@ namespace Armoury
                     if (it == null || !it.HasWeaponComponent || it.PrimaryWeapon == null) continue;
                     int li = it.ItemType == ItemObject.ItemTypeEnum.OneHandedWeapon ? 0
                            : it.ItemType == ItemObject.ItemTypeEnum.TwoHandedWeapon || it.ItemType == ItemObject.ItemTypeEnum.Polearm ? 1 : -1;
-                    if (li < 0 || it.NotMerchandise || Banned(it) || GiantGear.Is(it)) continue;
+                    if (li < 0 || it.NotMerchandise || it.IsCraftedByPlayer || Banned(it) || GiantGear.Is(it)) continue;   // 389c-p: bez wyrobow gracza (jak gra, Drill, CastleSteel, ArmsScrap)
                     string ic = it.Culture != null ? it.Culture.StringId : null;
                     if (!string.IsNullOrEmpty(ic) && ic != "neutral_culture" && ic != cid) continue;
                     string id = it.StringId ?? "";

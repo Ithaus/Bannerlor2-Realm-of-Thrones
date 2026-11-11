@@ -62,6 +62,7 @@ namespace Armoury
         private static HashSet<string> _childBody;                                 // sesja: sztuki tulowia z szablonow dzieciecych / mlodziezowych
         private static readonly HashSet<string> _civ = new HashSet<string>();      // 389c, w zapisie: kto dostal dorosly stroj cywilny (raz w zyciu)
         private static readonly HashSet<string> _civFailed = new HashSet<string>(); // 389c, sesja: brak zestawu cywilnego dla kultury / plci
+        private static HashSet<string> _childAll;                                  // 389c-p, sesja: WSZYSTKIE tulowia z rosterow dzieciecych (takze noszone przez doroslych lordow)
         private static HashSet<string> _childOnly;                                 // 389c, sesja: tulowia TYLKO dzieciece (bez noszonych przez doroslych lordow)
         private static int _lastBare = -1, _total, _errs, _stumbles, _civTotal;
 
@@ -71,7 +72,7 @@ namespace Armoury
         internal static void Reset()
         {
             _done.Clear(); _failed.Clear(); _childBody = null;
-            _civ.Clear(); _civFailed.Clear(); _childOnly = null; _civTotal = 0;
+            _civ.Clear(); _civFailed.Clear(); _childOnly = null; _childAll = null; _civTotal = 0;
             HeroDress382.ResetSpare();
             _lastBare = -1; _total = 0; _errs = 0; _stumbles = 0;
         }
@@ -97,7 +98,7 @@ namespace Armoury
         /// <summary>Po wczytaniu / starcie kampanii: spis z lista imion (tylko log).</summary>
         internal static void OnSession()
         {
-            try { _failed.Clear(); _childBody = null; _civFailed.Clear(); _childOnly = null; HeroDress382.ResetSpare(); _lastBare = -1; Census(true); }
+            try { _failed.Clear(); _childBody = null; _civFailed.Clear(); _childOnly = null; _childAll = null; HeroDress382.ResetSpare(); _lastBare = -1; Census(true); }
             catch (Exception e) { Log.Error("HeroArms389.OnSession", e); }
         }
 
@@ -196,7 +197,7 @@ namespace Armoury
         // ------------------------------------------------------------ (A) spis
         private static void Census(bool names)
         {
-            int n = 0, bare = 0, male = 0, female = 0, sig = 0, zero = 0, lordArm = 0, notLord = 0, civChild = 0, civBare = 0;
+            int n = 0, bare = 0, male = 0, female = 0, sig = 0, zero = 0, lordArm = 0, notLord = 0, civChild = 0, civBare = 0, civWide = 0, civData = 0, civKept = 0;
             var kind = new int[KindName.Length];
             var state = new int[StateName.Length];
             var body = new int[BodyName.Length];
@@ -214,7 +215,15 @@ namespace Armoury
                     {
                         var cb = h.CivilianEquipment[EquipmentIndex.Body].Item;
                         if (cb == null) civBare++;
-                        else if (ChildOnly().Contains(cb.StringId ?? "")) civChild++;
+                        else
+                        {
+                            // 389c-p: ten sam podpis co w Civil() (caly zestaw, nie sam tulow); przebrani z rejestru liczeni osobno
+                            bool dataC; int cs = ChildSig(h, h.CivilianEquipment, out dataC);
+                            if (dataC) civData++;
+                            else if (cs > 0 && _civ.Contains(h.StringId ?? "")) civKept++;
+                            else if (cs == 1) civChild++;
+                            else if (cs == 2) { civChild++; civWide++; }
+                        }
                     }
                     if (!NoWeapon(eq)) continue;
                     bare++;
@@ -255,7 +264,8 @@ namespace Armoury
             sb.Append(" | z podpisem spoznionego dorosniecia (lord, bez broni, tulow bez zbroi) ").Append(sig).Append(", w rejestrze posagu ").Append(_done.Count);
             sb.Append(" | poza posagiem - cywile z danych, zostaja bez broni: lord w zbroi / stroju z danych ").Append(lordArm).Append(", nie-lord (ksiegarze BK itp.) ").Append(notLord);
             sb.Append(" | umiejetnosci bojowe wszystkie 0: ").Append(zero);
-            sb.Append(" | 389c stroj cywilny lordow AI: tulow dzieciecy ").Append(civChild).Append(", tulow pusty ").Append(civBare).Append(", w rejestrze przebranych ").Append(_civ.Count)
+            sb.Append(" | 389c stroj cywilny lordow AI: tulow dzieciecy ").Append(civChild).Append(" (w tym podpis szeroki - tulow noszony tez przez doroslych, zestaw bez broni i konia: ").Append(civWide)
+              .Append("), z danych w takim stroju - pominieci ").Append(civData).Append(", przebrani z takim tulowiem (rejestr) ").Append(civKept).Append(", tulow pusty ").Append(civBare).Append(", w rejestrze przebranych ").Append(_civ.Count)
               .Append(CivOn ? "" : " (AiHeroesAdultCivilClothes WYLACZONY)");
             sb.Append(On ? " | posag wlaczony (AiHeroesLateComingOfAgeKit), do " + PerDay + " na dobe." : " | posag WYLACZONY (AiHeroesLateComingOfAgeKit) - tylko spis.");
             Log.Info(sb.ToString());
@@ -390,19 +400,49 @@ namespace Armoury
                             if (it != null && it.StringId != null) (child ? set : adult).Add(it.StringId);
                         }
                     }
+                _childAll = new HashSet<string>(set);
                 set.ExceptWith(adult);
             }
             catch (Exception e) { Stumble("ChildOnly", null, e); }
+            if (_childAll == null) _childAll = new HashSet<string>(set);
             _childOnly = set;
             return set;
         }
 
-        private static bool GoodCivil(Equipment e, Hero h)
+        /// <summary>389c-p: wszystkie tulowia z rosterow IsChildEquipmentTemplate (takze te, ktore nosza dorosli lordowie: leather_coat, fine_town_tunic,
+        /// empire_dress...). Sam taki tulow NIE jest podpisem - patrz ChildSig.</summary>
+        private static HashSet<string> ChildAll()
+        {
+            if (_childAll == null) ChildOnly();
+            return _childAll ?? new HashSet<string>();
+        }
+
+        /// <summary>389c-p: podpis "stroj cywilny dzieciecy". 1 = scisly (tulow tylko dzieciecy - jak 389c); 2 = szeroki: tulow z rosteru dzieciecego noszony
+        /// takze przez doroslych, ale CALY zestaw wyglada jak dzieciecy - bez broni (sloty 0-3), bez konia i rzedu (zestawy dzieciece ROT: 127, zadnego z
+        /// koniem ani bronia; dorosle cywilne ROT maja konia i rzad w 422 z 423) - i postac NIE pochodzi z danych (lord z XML nosi to, co mu dano w danych:
+        /// data = true, podpisu nie ma). 0 = nie.</summary>
+        private static int ChildSig(Hero h, Equipment cv, out bool data)
+        {
+            data = false;
+            var cb = cv != null ? cv[EquipmentIndex.Body].Item : null;
+            if (cb == null) return 0;
+            string id = cb.StringId ?? "";
+            if (ChildOnly().Contains(id)) return 1;
+            if (!ChildAll().Contains(id)) return 0;
+            for (int i = 0; i < 4; i++) if (!cv[(EquipmentIndex)i].IsEmpty) return 0;
+            if (!cv[EquipmentIndex.Horse].IsEmpty || !cv[EquipmentIndex.HorseHarness].IsEmpty) return 0;
+            var co = h != null ? h.CharacterObject : null;
+            if (co != null && co.IsOriginalCharacter) { data = true; return 0; }
+            return 2;
+        }
+
+        private static bool GoodCivil(Equipment e, Hero h, bool strict)
         {
             if (e == null || !e.IsCivilian) return false;
             var b = e[EquipmentIndex.Body].Item;
             if (b == null || HeroDress382.Banned(b) || !HeroDress382.Sex(b, h)) return false;
-            return !ChildOnly().Contains(b.StringId ?? "");
+            // 389c-p: strict - tulow spoza wszystkich rosterow dzieciecych (model nie "przebierze" w leather_coat); luzno - jak 389c (tylko nie scisle dzieciecy)
+            return !(strict ? ChildAll() : ChildOnly()).Contains(b.StringId ?? "");
         }
 
         /// <summary>Zestaw cywilny doroslego lorda: jak gra w wieku 18 lat; gdy model nic nie da (albo da zestaw z unikatem / nie dla tej plci) - wlasny
@@ -412,22 +452,28 @@ namespace Armoury
             Equipment e = null;
             try { e = Campaign.Current.Models.EquipmentSelectionModel.GetEquipmentForHeroComeOfAge(h, Equipment.EquipmentType.Civilian); }
             catch (Exception ex) { Stumble("CivilSet.model", h, ex); }
-            if (!GoodCivil(e, h))
+            if (!GoodCivil(e, h, true))
             {
+                var loose = GoodCivil(e, h, false) ? e : null;   // 389c-p: zestaw modelu z tulowiem noszonym takze przez dzieci - dopiero gdy nie ma lepszego
+                var looseC = new List<Equipment>();
                 e = null;
-                if (h.Culture == null) return null;
-                string cid = h.Culture.StringId ?? "";
+                if (h.Culture == null && loose == null) return null;
+                string cid = h.Culture != null ? (h.Culture.StringId ?? "") : "";
                 var cands = new List<Equipment>();
                 var rosters = MBObjectManager.Instance.GetObjectTypeList<MBEquipmentRoster>();
                 if (rosters == null) return null;
                 foreach (var ro in rosters)
                 {
-                    if (ro == null || ro.EquipmentCulture == null || ro.EquipmentCulture.StringId != cid) continue;
+                    if (ro == null || h.Culture == null || ro.EquipmentCulture == null || ro.EquipmentCulture.StringId != cid) continue;
                     var c = ro.EquipmentCategories;
                     if ((c & EquipmentCategories.IsLordTemplate) == 0) continue;
                     if ((c & (EquipmentCategories.IsKingdomRulerTemplate | EquipmentCategories.IsChildEquipmentTemplate | EquipmentCategories.IsTeenagerEquipmentTemplate)) != 0) continue;
                     if (((c & EquipmentCategories.IsFemaleTemplate) != 0) != h.IsFemale) continue;
-                    foreach (var x in ro.AllEquipments) if (GoodCivil(x, h)) cands.Add(x);
+                    foreach (var x in ro.AllEquipments) { if (GoodCivil(x, h, true)) cands.Add(x); else if (GoodCivil(x, h, false)) looseC.Add(x); }
+                }
+                if (cands.Count == 0)
+                {
+                    if (loose != null) cands.Add(loose); else cands = looseC;
                 }
                 if (cands.Count == 0) return null;
                 e = cands[(int)((uint)(h.StringId ?? "").GetHashCode() % (uint)cands.Count)];
@@ -441,6 +487,25 @@ namespace Armoury
                 bool armour = i >= (int)EquipmentIndex.Head && i <= (int)EquipmentIndex.Cape;
                 if (HeroDress382.Banned(it) || (armour && !HeroDress382.Sex(it, h))) cl[(EquipmentIndex)i] = default(EquipmentElement);
             }
+            // 389c-p: bron (sloty 0-3) i kon z zestawu cywilnego przez to samo sito co reszta drog bohatera (ItemReq.MeetsHero - umiejetnosc i Prawo Tieru);
+            // suknia / stroj dalej bez sita (gra daje suknie kazdej damie). Kon odpadl - rzad tez. Przy wylaczonym HeroGearRequirements bez sita, jak 382 / 389.
+            try
+            {
+                var set0 = Settings.Current;
+                var co = h.CharacterObject;
+                if (set0 != null && set0.HeroGearRequirements && co != null)
+                {
+                    for (int i = 0; i < 4; i++)
+                    {
+                        var it = cl[(EquipmentIndex)i].Item;
+                        if (it != null && !ItemReq.MeetsHero(co, it)) cl[(EquipmentIndex)i] = default(EquipmentElement);
+                    }
+                    var hs = cl[EquipmentIndex.Horse].Item;
+                    if (hs != null && !ItemReq.MeetsHero(co, hs)) cl[EquipmentIndex.Horse] = default(EquipmentElement);
+                }
+                if (cl[EquipmentIndex.Horse].IsEmpty) cl[EquipmentIndex.HorseHarness] = default(EquipmentElement);
+            }
+            catch (Exception ex) { Stumble("CivilSet.sito", h, ex); }
             return cl.IsCivilian && !cl[EquipmentIndex.Body].IsEmpty ? cl : null;
         }
 
@@ -452,7 +517,9 @@ namespace Armoury
             int given = 0, left = 0, wait = 0, none = 0, battle = 0, st0 = _stumbles;
             var who = new List<string>();
             var child = ChildOnly();
-            if (child.Count == 0) return;
+            var childAll = ChildAll();
+            if (childAll.Count == 0) return;
+            int wide = 0;
             foreach (var h in Hero.AllAliveHeroes)
             {
                 try
@@ -464,7 +531,9 @@ namespace Armoury
                     var cv = h.CivilianEquipment;
                     if (cv == null) continue;
                     var cb = cv[EquipmentIndex.Body].Item;
-                    if (cb == null || !child.Contains(cb.StringId ?? "")) continue;       // podpis: cywilny tulow z szablonu dzieciecego (pusty - tylko miara w spisie)
+                    bool dataC;
+                    int sig = cb != null ? ChildSig(h, cv, out dataC) : 0;                 // 389c-p: podpis po calym zestawie (ChildSig), nie po samym tulowiu
+                    if (sig == 0) continue;                                               // pusty tulow / lord z danych w takim stroju - tylko miara w spisie
                     if (_civFailed.Contains(id)) { left++; continue; }
                     var be = h.BattleEquipment;
                     // najpierw posag (krok 1 / 389): kto ma jeszcze podpis 389 i nie byl probowany, czeka - 2b ma widziec zestaw bojowy PO probie zbroi
@@ -480,10 +549,12 @@ namespace Armoury
                     global::Helpers.EquipmentHelper.AssignHeroEquipmentFromEquipment(h, set);
                     _civ.Add(id);
                     given++; _civTotal++;
+                    if (sig == 2) wide++;
                     // 2b: tulow bojowy nadal dzieciecy (zbroja nie wyszla) - tulow / nogi / glowa z nowego stroju tam, gdzie nadal lezy sztuka starego stroju
                     bool b2 = false;
                     var bb = be[EquipmentIndex.Body].Item;
-                    if (!be.IsCivilian && !be.IsStealth && bb != null && child.Contains(bb.StringId ?? ""))
+                    // 389c-p: takze tulow "wspolny" (noszony i przez dzieci, i przez doroslych), ale tylko gdy to TA SAMA sztuka co w starym stroju cywilnym
+                    if (!be.IsCivilian && !be.IsStealth && bb != null && (child.Contains(bb.StringId ?? "") || (bb == old[(int)EquipmentIndex.Body] && childAll.Contains(bb.StringId ?? ""))))
                     {
                         var nb = new Equipment(Equipment.EquipmentType.Battle);
                         nb.FillFrom(be, false);
@@ -505,7 +576,7 @@ namespace Armoury
             }
             if (given == 0 && none == 0 && _stumbles == st0) return;   // cicha doba
             Log.Info("Bezbronni (389c): doba " + (int)CampaignTime.Now.ToDays + " - dorosly stroj cywilny: przebrano " + given + " (w tej sesji " + _civTotal + ", rejestr " + _civ.Count
-                     + "), z tego takze tulow bojowy " + battle + ", zostalo " + left + ", czeka na posag " + wait + ", bez zestawu dla kultury / plci " + none
+                     + "), z tego podpis szeroki " + wide + ", takze tulow bojowy " + battle + ", zostalo " + left + ", czeka na posag " + wait + ", bez zestawu dla kultury / plci " + none
                      + ", potkniecia " + (_stumbles - st0) + (who.Count > 0 ? ": " + string.Join("; ", who) : "") + (given > who.Count ? " ... (+" + (given - who.Count) + ")" : "") + ".");
         }
 
