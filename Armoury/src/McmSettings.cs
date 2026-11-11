@@ -7876,6 +7876,14 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool ExoticMountsNeverVanish { get; set; } = true;
 
+        [SettingPropertyBool("Chariots Stay In Essos", HintText = "Chariots were never used in Westeros: a chariot that ends up on a market shelf west of the Narrow Sea is carted to the nearest market in Essos the next day - the merchants there pay what their purse allows, the rest is the seller's loss. Which side of the sea a market lies on is decided by the land, not by who rules it now. Needs Exotic Mounts Never Vanish on. Off = chariots are handled like other exotic mounts. Counted in the Armoury log (line 425)", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool ChariotsLeaveWesteros { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Chariot Price Factor", 0.25f, 1.00f, "0.00", HintText = "A chariot costs this part of the game's 22 000 d: 0.30 = 6 600 d, about two war horses and a cart. Not below 0.25, so a chariot stays out of tournament prizes. 1.00 = the game's price. Needs Historical Prices on; takes effect on the next load of a save", RequireRestart = false)]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public float ChariotPriceFactor { get; set; } = 0.30f;
+
         [SettingPropertyBool("Qarth Stables Buy Camels", HintText = "a lord whose camel riders have no camel in the troops' armoury buys camels for them at a market that keeps camels (Qarth), with his own gold - no bigger share of his purse than he spends on horses at one stop, and no more head than he buys at one stop (off = camel riders get no camels from the market, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool QarthStablesBuyCamels { get; set; } = true;
@@ -14412,6 +14420,8 @@ namespace Armoury
             s.SandSteedsInDorne = SandSteedsInDorne;
             s.CamelsOnlyQarth = CamelsOnlyQarth;
             s.ExoticMountsNeverVanish = ExoticMountsNeverVanish;
+            s.ChariotsLeaveWesteros = ChariotsLeaveWesteros;
+            s.ChariotPriceFactor = ChariotPriceFactor;
             s.QarthStablesBuyCamels = QarthStablesBuyCamels;
             s.SpareHorsesCarryFootmen = SpareHorsesCarryFootmen;
             s.FodderFromHorseState = FodderFromHorseState;

@@ -13,8 +13,10 @@ namespace Armoury
     /// rydwany tylko armie na wschodzie, nie w Westeros; reszte usun i daj
     /// zamienniki konie"). Dane ROT: mammoth (kultura freefolk) siedzi
     /// w szablonie JEDNEGO oddzialu - Mammoth Riding Giant; wielblady maja
-    /// Dornijczycy i Qartheen (wlasne szablony); rydwany NIE maja zadnego
-    /// szablonu - zyly wylacznie w losowych pulach DTE, na targach i w naszej
+    /// Dornijczycy i Qartheen (wlasne szablony); rydwany nie maja szablonu
+    /// zadnego oddzialu (425, sprostowanie: chariot2 jest w pieciu szablonach
+    /// lordow Sarnoru sar_bat_template_* - Essos) - poza tym zyly w losowych
+    /// pulach DTE, na targach i w naszej
     /// stajni AI (14.09: "Stajnia AI: Barristan Selmy kupil 9 koni [mammoth]");
     /// slonie tylko Volantis (Zlota Kompania).
     /// Regula: KON zawsze; MAMUT - tylko ten, kto ma go we wlasnym szablonie
@@ -190,6 +192,14 @@ namespace Armoury
                     // CamelLaw wybiera stadniny Qarthu ta sama kultura z kalibracji) - wielblad z Qarthu nie schodzi z polki Qarthu
                     if (CamelCulture(cul)) return true;
                     return CamelsQarthOnly && st != null && PeopleBook.CultureAtCalibration(st) == "qartheen";
+                }
+                // 425a (klucz ChariotsLeaveWesteros): rydwan - strona morza wedlug ZIEMI, nie wedlug tego, czyja kulture osada ma dzis (BK zmienia kultury
+                // osad): kultura z dnia kalibracji (PeopleBook.CultureAtCalibration; bez kalibracji zwraca biezaca - jak dotad). Ta sama definicja dla
+                // wszystkich wolajacych: wywoz kupcow (SupplyDemand), skup lupu (SpoilsSeal), paserzy (OutlawLaw), targi (LegendaryLaw)
+                if (f == Fam.Chariot && st != null)
+                {
+                    var s = Settings.Current;
+                    if (s != null && s.ChariotsLeaveWesteros) return Essos.Contains(PeopleBook.CultureAtCalibration(st) ?? "");
                 }
                 return AllowedFor(cul, false, f);
             }

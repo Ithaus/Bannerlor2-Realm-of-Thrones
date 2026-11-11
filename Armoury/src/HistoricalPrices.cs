@@ -444,6 +444,20 @@ namespace Armoury
             return 1f;
         }
 
+        /// <summary>425b (Jeff 11.11: "rydwany sa za drogie", klucz ChariotPriceFactor): rydwan (MountLaw.Fam.Chariot, na handel) kosztuje te czesc
+        /// wartosci gry (22 000 d w danych ROT, bez zadnej reguly): 0.30 = 6 600 d - dwa rumaki zbrojnego i woz; powyzej huntera (5 980), ponizej
+        /// szlachetnego (10 000). Przyciecie 0.25..1: ponizej 5 000 d rydwan wszedlby do nagrod turniejowych gry (GetRegularRewardItems 1600-5000).
+        /// 1 = bez zmiany. Niezalezne od HistHorsePrices; wartosc idzie droga koni E8/C (setter, _target, _orig), ale POZA przelicznikiem popytu
+        /// kategorii "horse" (krok 3: _ratioSkip - popyt mieszczan na zwykle konie zostaje, jaki byl; na polce rydwan wazy dawna wartosc w monecie popytu).</summary>
+        private static float ChariotFactor(Settings s, ItemObject it)
+        {
+            if (s == null || it == null || it.ItemType != ItemObject.ItemTypeEnum.Horse || it.NotMerchandise || it.Value <= 0) return 1f;
+            float f = s.ChariotPriceFactor;
+            if (!(f < 1f)) return 1f;   // 1 i wiecej (albo NaN) - bez zmiany
+            if (MountLaw.FamilyOf(it) != MountLaw.Fam.Chariot) return 1f;
+            return Math.Max(0.25f, f);
+        }
+
         /// <summary>E8/C: czesc linii startu cennika - konie przeliczone w tej sesji (PriceList8.StartLine).</summary>
         internal static string HorseLine()
         {
@@ -584,22 +598,29 @@ namespace Armoury
 
                 // 1d. E8/C (253): konie wedlug kategorii (opis przy HorseFactor) - przed przelicznikiem popytu kategorii (krok 3) i wagami polki
                 _e8cHorses.Clear();
-                if (s.HistHorsePrices)
+                var chariotSet = new HashSet<ItemObject>();   // 425b: rydwany przeliczone w tej sesji (krok 3 - poza przelicznikiem kategorii)
+                var chariotLog = new List<string>();
+                bool chariotOn = s.ChariotPriceFactor < 1f;
+                if (s.HistHorsePrices || chariotOn)
                     foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
                     {
                         try
                         {
-                            float f = HorseFactor(it);
+                            float fc = chariotOn ? ChariotFactor(s, it) : 1f;
+                            float f = fc != 1f ? fc : (s.HistHorsePrices ? HorseFactor(it) : 1f);   // HorseFactor nie obejmuje rydwanow - czynniki sie nie skladaja
                             if (f == 1f) continue;
                             int was;
                             if (!_orig.TryGetValue(it, out was)) was = it.Value;   // drugie przeliczenie tych samych obiektow liczy od wartosci sprzed zmiany
                             set(it, was * f);
                             _target[it] = it.Value;
+                            if (fc != 1f) { chariotSet.Add(it); chariotLog.Add(it.StringId + " " + was + "->" + it.Value); continue; }   // rydwan ma wlasna linie (linia koni E8/C zostaje o koniach)
                             _e8cHorses.Add(it.StringId + " " + was + "->" + it.Value);
                         }
                         catch (Exception e) { _e8cHorseSt++; if (_e8cHorseSt <= 1) Log.Error("HistoricalPrices.Apply (E8/C konie)", e); }   // jeden kon - licznik, reszta idzie dalej
                     }
 
+                Log.Info("Rydwany (425b): cena rydwanu " + (chariotOn ? "x" + Math.Max(0.25f, s.ChariotPriceFactor).ToString("0.00", CultureInfo.InvariantCulture) : "bez zmian (ChariotPriceFactor 1.00)")
+                         + " | przeliczone " + chariotLog.Count + " szt. [" + string.Join(", ", chariotLog.ToArray()) + "] | poza przelicznikiem popytu kategorii (jak ges i kura, poprawka 156) | potkniecia (wspolne z konmi E8/C) " + _e8cHorseSt + ".");
                 foreach (var g in new[] { CraftingMaterials.Iron1, CraftingMaterials.Iron2, CraftingMaterials.Iron3, CraftingMaterials.Iron4, CraftingMaterials.Iron5, CraftingMaterials.Iron6 })
                 {
                     var it = Recipes.MaterialItem(g);
@@ -660,6 +681,7 @@ namespace Armoury
                     var cat = kv.Key.ItemCategory;
                     if (cat == null || kv.Key.Value <= 0) continue;
                     if (beastOut.Contains(cat) && beastSet.Contains(kv.Key)) { beastOutLog.Add(kv.Key.StringId + " [" + cat.StringId + "]"); _ratioSkip.Add(kv.Key); continue; }   // poprawka 156 (E8/C: zapamietane dla MixedShelf)
+                    if (chariotSet.Contains(kv.Key)) { _ratioSkip.Add(kv.Key); continue; }   // 425b: szesc rydwanow x0.30 nie przesuwa przelicznika "horse" (ta sama klasa bledu co poprawka 156)
                     int def = DemandBase(kv.Key, kv.Value);
                     if (def != kv.Value) { _defUsed.Add(cat); defLog.Add(kv.Key.StringId + " " + kv.Value + " -> " + def); }
                     int old = fromDef ? def : kv.Value;

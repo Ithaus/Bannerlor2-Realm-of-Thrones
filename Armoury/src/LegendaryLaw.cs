@@ -84,6 +84,7 @@ namespace Armoury
 
         private void OnSession(CampaignGameStarter starter)
         {
+            _chStumbles = 0;   // 425a: licznik potkniec wywozu rydwanow od nowa w kazdej kampanii
             try { BuildLegendSet(); } catch (Exception e) { Log.Error("LegendaryLaw.BuildLegendSet", e); }
             // 177-2: stan startowy stali valyrianskiej z szablonow postaci - PRZED SweepTemplates (ta podmienia klingi w szablonach w pamieci sesji)
             try { ValyrianBlades.CaptureTemplates(); } catch (Exception e) { Log.Error("ValyrianBlades.CaptureTemplates", e); }
@@ -219,12 +220,18 @@ namespace Armoury
         /// (mamut - nikt go nie trzyma, wies, zamek bez targu, biedny odbiorca, wczytanie) zostaje na polce. Stajnia AI i tak bierze tylko IsPlainMount,
         /// notabl - MountLaw przez GearFit. Linia: "Egzotyczne wierzchowce (r2-konie)".</summary>
         private static int _exStumbles;
+        private static int _chStumbles;   // 425a: potkniecia wywozu rydwanow (pierwsze 3 do logu; licznik, nie wylacznik)
         private static void SweepMarkets(string why)
         {
             var s = Settings.Current;
             bool keep = s != null && s.ExoticMountsNeverVanish;
             bool move = keep && why == "dzien";   // przy wczytaniu woz kupcow nie jest jeszcze odtworzony (TradeCarts w OnSessionLaunched) - tylko licznik
             int off = 0, moved = 0, kept = 0, deals = 0; long gold = 0;
+            // 425a (Jeff 11.11: "rydwany ... wywal je z Westeros, nie uzywano ich tutaj", klucz ChariotsLeaveWesteros): rydwan z polki po zachodniej stronie
+            // morza jedzie do najblizszego miasta Essos takze wtedy, gdy tamtejszego kupca nie stac na cala cene (ChariotHome) - liczniki linii "Rydwany (425)"
+            bool chOn = keep && s.ChariotsLeaveWesteros;
+            int chWest = 0, chPlaces = 0, chMoved = 0, chEssos = 0; long chGold = 0, chOff = 0;
+            Settlement chLast = null; List<string> chList = null; Dictionary<string, int> chTargets = null;
             try
             {
                 List<Settlement> towns = null;
@@ -238,7 +245,15 @@ namespace Armoury
                         var el = roster.GetElementCopyAtIndex(i);
                         var it = el.EquipmentElement.Item;
                         if (it == null || el.Amount <= 0 || !MountLaw.IsExotic(it)) continue;
-                        if (MountLaw.AllowedForSettlement(st, it)) continue;
+                        bool chariot = chOn && MountLaw.FamilyOf(it) == MountLaw.Fam.Chariot;
+                        if (MountLaw.AllowedForSettlement(st, it)) { if (chariot) chEssos += el.Amount; continue; }
+                        if (chariot)
+                        {
+                            chWest += el.Amount;
+                            if (st != chLast) { chLast = st; chPlaces++; }
+                            if (chList == null) chList = new List<string>();
+                            if (chList.Count < 12) chList.Add((st.Name != null ? st.Name.ToString() : st.StringId) + ": " + it.StringId + " x" + el.Amount);
+                        }
                         if (!keep)
                         {
                             roster.AddToCounts(el.EquipmentElement, -el.Amount);
@@ -246,6 +261,7 @@ namespace Armoury
                             continue;
                         }
                         int got = 0;
+                        long gold0 = gold;
                         if (move && st.IsTown && st.Town != null && !st.IsUnderSiege)
                         {
                             try
@@ -257,7 +273,23 @@ namespace Armoury
                             catch (Exception e) { if (++_exStumbles <= 3) Log.Error("LegendaryLaw.SendHome", e); }
                         }
                         moved += got;
-                        kept += el.Amount - got;
+                        int gotCh = 0;
+                        if (chariot)
+                        {
+                            chMoved += got; chGold += gold - gold0;   // rydwan kupiony zwykla droga (kupca stac na sztuke) tez wyjechal do Essos
+                            if (move && got < el.Amount && !st.IsUnderSiege)
+                            {
+                                try
+                                {
+                                    if (towns == null) { towns = new List<Settlement>(); foreach (var t in Settlement.All) if (t != null && t.IsTown && t.Town != null && t.ItemRoster != null) towns.Add(t); }
+                                    if (chTargets == null) chTargets = new Dictionary<string, int>();
+                                    gotCh = ChariotHome(st, el.EquipmentElement, el.Amount - got, towns, carts, ref chGold, ref chOff, chTargets);
+                                    chMoved += gotCh;
+                                }
+                                catch (Exception e) { if (++_chStumbles <= 3) Log.Error("LegendaryLaw.ChariotHome", e); }
+                            }
+                        }
+                        kept += el.Amount - got - gotCh;
                     }
                 }
             }
@@ -267,6 +299,99 @@ namespace Armoury
                 Log.Info("Egzotyczne wierzchowce (r2-konie): " + why + " | nie u swoich na polkach: kupione przez targ, ktory je trzyma, " + moved + " szt. w " + deals
                          + " transakcjach (zaplacone " + gold + " zl" + (move && TradeCarts.On ? ", wozem kupcow" : move ? ", od razu" : "") + "), zostaja na polce " + kept
                          + " szt. (brak targu, ktory je trzyma, albo kupca), skasowane 0" + (_exStumbles > 0 ? " | potkniecia " + _exStumbles : "") + ".");
+            // 425a: linia rydwanow - przy wczytaniu zawsze (sam spis; kultura z kalibracji moze nie byc jeszcze wczytana - wtedy biezaca), w dobie gdy cos stoi
+            // albo wyjechalo, poza tym co 7 dni
+            if (chOn && (why != "dzien" || chWest > 0 || chMoved > 0 || (int)CampaignTime.Now.ToDays % 7 == 0))
+            {
+                string targets = "";
+                if (chTargets != null && chTargets.Count > 0)
+                {
+                    var tl = new List<string>();
+                    foreach (var kv in chTargets) tl.Add(kv.Key + " x" + kv.Value);
+                    targets = " (cele: " + string.Join(", ", tl.ToArray()) + ")";
+                }
+                Log.Info("Rydwany (425): " + why + " | na polkach Westeros " + chWest + " szt. w " + chPlaces + " osadach"
+                         + (chList != null ? " [" + string.Join(", ", chList.ToArray()) + (chPlaces > chList.Count ? ", ..." : "") + "]" : "")
+                         + " | wywiezione do Essos " + chMoved + " szt." + targets + ", zaplacone " + chGold + " zl, odpis kupcow " + chOff + " zl"
+                         + (move ? (TradeCarts.On ? ", wozem kupcow" : ", od razu") : " (przy wczytaniu nic nie jedzie - pierwsza doba)")
+                         + " | zostaje " + (chWest - chMoved) + (move && chWest - chMoved > 0 ? " (oblezenie, najazd na wies albo brak wolnego miasta Essos)" : "")
+                         + " | w Essos na polkach " + chEssos + " szt. | potkniecia " + _chStumbles + ".");
+            }
+        }
+
+        /// <summary>425a (klucz ChariotsLeaveWesteros): reszta stosu rydwanow, ktorej zwykly SendHome nie sprzedal (kupca w Essos nie stac na cala cene),
+        /// jedzie do najblizszego nieoblezonego miasta Essos (MountLaw.AllowedForSettlement - strona morza z kalibracji). Zamknieta ekonomia: sztuka
+        /// schodzi z polki zrodla i 1:1 wchodzi na woz kupcow (TradeCarts.Ship) albo od razu na polke celu - nic nie jest kasowane; kupiec z Essos placi
+        /// tyle, ile jego kasa ma ponad zapas (CastlePurse.Spendable), nie wiecej niz cena straganu zrodla, i dokladnie tyle dostaje kasa zrodla
+        /// (miasto, zamek - Town.ChangeGold; wies - Village.ChangeGold; inna osada - bez zaplaty); roznica do ceny straganu to odpis kupca zrodla -
+        /// sam licznik w logu (zloto nie powstaje i nie znika). Cena: miasto - stragan sztuka po sztuce (ShelfBuy.Take, jak SendHome), zamek i wies -
+        /// wartosc sztuki ze stanem (ItemValue). Zwraca, ile sztuk wyjechalo.</summary>
+        private static int ChariotHome(Settlement src, EquipmentElement eel, int rest, List<Settlement> towns, bool carts, ref long gold, ref long writeOff, Dictionary<string, int> targets)
+        {
+            var it = eel.Item;
+            var roster = src != null ? src.ItemRoster : null;
+            if (it == null || roster == null || rest <= 0) return 0;
+            if (src.IsVillage && src.Village != null && src.Village.VillageState != Village.VillageStates.Normal) return 0;   // najazd / spalona wies - woz nie wyjedzie, proba jutro
+            var srcPos = src.GetPosition2D;
+            Settlement best = null; float bestD = float.MaxValue;
+            foreach (var t in towns)
+            {
+                if (t == src || t.IsUnderSiege || !MountLaw.AllowedForSettlement(t, it)) continue;
+                float d = srcPos.Distance(t.GetPosition2D);
+                if (d < bestD) { bestD = d; best = t; }
+            }
+            if (best == null) return 0;
+            int at = roster.FindIndexOfElement(eel);
+            rest = Math.Min(rest, at >= 0 ? roster.GetElementNumber(at) : 0);   // nie wiecej, niz naprawde lezy
+            if (rest <= 0) return 0;
+            int n = 0; long worth = 0;
+            if (src.IsTown && src.Town != null)
+            {
+                var market = src;
+                int cost, first, last;
+                n = ShelfBuy.Take(roster, eel, rest, int.MaxValue, () => market.Town.MarketData.GetPrice(eel, null, false, market.Party), out cost, out first, out last, 0, false);
+                worth = cost;
+            }
+            if (n < rest)
+            {
+                // zamek, wies albo stragan bez ceny: reszta po wartosci sztuki (ze stanem)
+                int k = rest - n;
+                roster.AddToCounts(eel, -k);
+                worth += (long)Math.Max(0, eel.ItemValue) * k;
+                n += k;
+            }
+            // sztuka zdjeta - musi dojechac: woz kupcow (Ship sam odklada na polke celu, gdy woz sie nie zapisze) albo od razu polka celu
+            bool landed = false;
+            try
+            {
+                if (carts) { TradeCarts.Ship(src, best, eel, n, 0, bestD); landed = true; }   // zaplata wozu 0: zawrocony woz (30 dob oblezenia celu) nie siega po kase zrodla - rydwan wraca na polke i jedzie znowu
+                else
+                {
+                    best.ItemRoster.AddToCounts(eel, n); landed = true;
+                    Measure174b.NoteArrival(best, it, n, Measure174b.ArrTrade);
+                }
+            }
+            catch (Exception e)
+            {
+                if (++_chStumbles <= 3) Log.Error("LegendaryLaw.ChariotHome (dowoz)", e);
+                if (!landed) { try { roster.AddToCounts(eel, n); } catch { } return 0; }   // nie wyjechala - wraca na polke zrodla, bez zaplaty
+            }
+            int pay = (int)Math.Min(worth, (long)Math.Max(0, CastlePurse.Spendable(best.Town)));
+            if (pay > 0)
+            {
+                try
+                {
+                    if (src.Town != null) { best.Town.ChangeGold(-pay); src.Town.ChangeGold(pay); }
+                    else if (src.IsVillage && src.Village != null) { best.Town.ChangeGold(-pay); src.Village.ChangeGold(pay); }
+                    else pay = 0;
+                    if (pay > 0) try { TownFolk.OnTownCoin(best, -pay, TownFolk.BOurs); } catch { }
+                }
+                catch (Exception e) { if (++_chStumbles <= 3) Log.Error("LegendaryLaw.ChariotHome (zaplata)", e); }
+            }
+            gold += pay; writeOff += worth - pay;
+            string name = best.Name != null ? best.Name.ToString() : best.StringId;
+            int had; targets.TryGetValue(name, out had); targets[name] = had + n;
+            return n;
         }
 
         /// <summary>r2-konie: najblizsze miasto, ktore trzyma ten wierzchowiec, kupuje stos z polki src - jak wywoz kupcow (SupplyDemand.DailyTradeCore):
