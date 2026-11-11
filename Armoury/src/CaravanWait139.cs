@@ -594,7 +594,7 @@ namespace Armoury
                 if (!loaded && mp.Owner != null)
                 {
                     int cap, floor;
-                    CaravanSettle.CapFloor(mp, out cap, out floor);
+                    CaravanSettle.WorkCapFloor(mp, out cap, out floor);   // 434: ten sam sufit ladunku co regula kupna 284 (karawana pod jedna regula - K)
                     loaded = cap - floor > 0 && cargo >= cap - floor;
                 }
                 bool stuck = AOn(s) && CaravanTrade284.Stuck7(mp, (int)CampaignTime.Now.ToDays);   // recenzja 139: ksiega 284 co najmniej 7 dob (nie nowa karawana)

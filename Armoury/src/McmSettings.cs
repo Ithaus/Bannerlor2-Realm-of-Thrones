@@ -9084,6 +9084,10 @@ namespace Armoury
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool CaravanProfitToOwner { get; set; } = true;
 
+        [SettingPropertyBool("Caravan One Working Capital", HintText = "one rule for the working capital of a merchant's caravan (a caravan settled by its house under Caravan Clan Settlement already has one). The 10,000 it used to keep in coin (or a month of wages, if more) and the stock it was allowed to carry on top of that are counted together as its working capital - about 15,000 for an ordinary caravan - and it may hold it as coin or as goods, as trade demands. It buys while its goods at cost are below that capital less the coin it must keep for wages (about twice the old load), and once a day hands its owner only what its coin and goods together are worth above the capital, never dipping into the coin kept for wages. Banner Kings' own deposit of everything above 10,000 at the owner's town is switched off for these caravans, so there is one rule. Caravans carry bigger loads and even out prices between towns; merchants see less profit for a while as the caravans fill up. Needs Caravan Profit To Owner. Off = as before: 10,000 kept in coin and the goods capped separately", RequireRestart = false)]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool CaravanOneWorkingCapital { get; set; } = true;
+
         [SettingPropertyBool("Caravan Clan Settlement", HintText = "once a day the caravans of lords, of their companions and yours - whose wages the house pays - send the house what they have earned: what the caravan is worth (coin plus its goods, counted at what it paid or at the market if that is lower) above what it was given to trade with (15,000 for yours, 10,000 for a lord's; more for armed and sea caravans), but never so much that its coin falls below 5,000 and a day of wages. It is paid with the house's daily income ('Caravan income' in the clan finances) and replaces the game's 10% a day and the Banner Kings deposit at the owner's home, so nothing is paid twice; notables' caravans keep their own rule (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool CaravanClanSettlement { get; set; } = true;
@@ -9119,6 +9123,10 @@ namespace Armoury
         [SettingPropertyBool("Village Hands Follow Price", HintText = "the villagers move their hands to what is dear: where eggs, fruit or honey fetch far more in the village's market town than its other crops, the village yields up to twice as much of them (the square root of how many times dearer, between 1 and 2), and as much less of its other crops by worth at the usual price - the same hands, the same work, at most 15% less of the other crops and at most 5% less grain; timber and ore (iron, silver, salt, clay) are never cut, a village with nothing else to give keeps its yield (off = the usual yields, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
         public bool VillageHandsFollowPrice { get; set; } = true;
+
+        [SettingPropertyBool("Village Hands Keep Short Goods", HintText = "with Village Hands Follow Price: villagers do not take hands off a crop the world is short of - one whose output the village regulator (Harvest Valve) has raised above its base because stocks are low, such as flax or papyrus - to make more eggs, fruit or honey. The shift then comes only out of the village's other crops, or does not happen at all. While the regulator is off or has not yet decided, nothing changes. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool VillageHandsKeepShortGoods { get; set; } = true;
 
         [SettingPropertyBool("Court Buys Goods", HintText = "a lord's household living in a town lives off its market: up to 60% of what the head of the house spends on his court buys wine, beer, cheese, meat, fish, bread, fruit and oil (half), linen above the army's reserve, velvet and furs (a fifth) and jewels, silver, spice and pottery (the rest) from that town's stall at its price - only goods that are not dear there (price at most one and a half times the usual), never below the last few pieces, at most a quarter of a stack a day. The townsfolk get their fifth of what the court spends only from the part that pays for service, not for goods (off = the court pays the town in coin only, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
@@ -9479,6 +9487,10 @@ namespace Armoury
         [SettingPropertyBool("Charcoal Burners", HintText = "the woodcutters' villages burn charcoal from the wood in their own store (6.5 kg of wood for 1 kg of charcoal) whenever the charcoal from a load fetches more in their market town than the load of wood itself - when charcoal piles up it gets cheap and they stop; at most one load of wood a village a day and one village a town a day (off = nobody makes charcoal, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool CharcoalBurners { get; set; } = true;
+
+        [SettingPropertyBool("Charcoal Burners Follow Valve", HintText = "with Charcoal Burners: when the village regulator (Harvest Valve) has cut charcoal because the world holds far more than it burns, the woodcutters heed it - the burners of a market town fire their kiln only on that share of days (cut to a tenth, one day in ten) instead of burning good timber into charcoal nobody wants wherever the local price happens to look fair. While the regulator is off or has not cut charcoal, nothing changes. Off = by the local price alone, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool CharcoalBurnersFollowValve { get; set; } = true;
 
         [SettingPropertyBool("Iron Ingots Off Shelf", HintText = "iron bars of every grade lying on the stall of a town or castle (sold there by you - nobody else makes them) are taken by the town's smiths once a day and worked back into iron for the forges, at the same worth; the smiths' repairs then use ore and wood instead of the bars from the stall. The bars in your own bags stay yours (off = they lie on the stall, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
@@ -14926,6 +14938,7 @@ namespace Armoury
             s.TownGroundRent = TownGroundRent;
             s.CaravanSellWhereDear = CaravanSellWhereDear;
             s.CaravanProfitToOwner = CaravanProfitToOwner;
+            s.CaravanOneWorkingCapital = CaravanOneWorkingCapital;
             s.CaravanClanSettlement = CaravanClanSettlement;
             s.CaravanReports = CaravanReports;
             s.VillageCartBringsGoods = VillageCartBringsGoods;
@@ -14935,6 +14948,7 @@ namespace Armoury
             s.WorkshopRetoolFairScore = WorkshopRetoolFairScore;
             s.WorkshopRetoolOwnMarket = WorkshopRetoolOwnMarket;
             s.VillageHandsFollowPrice = VillageHandsFollowPrice;
+            s.VillageHandsKeepShortGoods = VillageHandsKeepShortGoods;
             s.CourtBuysGoods = CourtBuysGoods;
             s.CrownCourtGoods = CrownCourtGoods;
             s.CrownCourtShare = CrownCourtShare;
@@ -15025,6 +15039,7 @@ namespace Armoury
             s.SilverOreToSmiths = SilverOreToSmiths;
             s.PlanksToBuilding = PlanksToBuilding;
             s.CharcoalBurners = CharcoalBurners;
+            s.CharcoalBurnersFollowValve = CharcoalBurnersFollowValve;
             s.IronIngotsOffShelf = IronIngotsOffShelf;
             s.BkSideGoodsOrigin = BkSideGoodsOrigin;
             s.CartPriceByDestination = CartPriceByDestination;

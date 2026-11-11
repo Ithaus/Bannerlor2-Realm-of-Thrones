@@ -1405,6 +1405,7 @@ namespace Armoury
                 // 259: karawana rozliczana przez rod (CaravanSettle) - zysk idzie codziennie w rozliczeniu rodu; ten prefiks (void) biegnie nawet, gdy prefiks 259
                 // na AddRealisticIncome zwrocil false (Harmony pomija tylko prefiksy bool / z ref) - stad wlasny warunek; licznik "E3/9 n" w linii 259
                 if (CaravanSettle.Settled(__0)) { CaravanSettle.NoteE39Blocked(__0, __1); return; }
+                if (CaravanSettle.OneCap(__0)) return;   // 434: karawana pod jedna regula kapitalu obrotowego - zysk oddaje raz na dobe E3-T2 (wartosc ponad K), nie "ponad 10 000" przy wjezdzie
                 __state = __0.PartyTradeGold;
             }
             catch { __state = int.MinValue; }

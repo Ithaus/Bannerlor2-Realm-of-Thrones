@@ -455,15 +455,23 @@ namespace Armoury
         private static readonly SortedDictionary<string, HStat> _hF = new SortedDictionary<string, HStat>(StringComparer.Ordinal);
         private static readonly SortedDictionary<string, double[]> _hCut = new SortedDictionary<string, double[]>(StringComparer.Ordinal);   // plon -> [szt., wartosc]
         private static int _hVill, _hWith, _hNoOther, _hBind;
+        // 434 (audyt ekonomii 11.11 B6, klucz VillageHandsKeepShortGoods): plon, ktorego swiatu brakuje (regulator wsi 221 podniosl go ponad baze - HarvestValve.Factor > 1:
+        // stos swiata ponizej 30 dni zuzycia), nie oddaje rak na jaja, owoce i miod - poza budzetem ubytku (c = 1). Dowod: linia E3-D1 d109814 "flax -8.8 szt.",
+        // "Papyrus -3.6 szt." przy regulatorze na suficie x1.30 dla lnu i papirusu - jedna regula podnosila plon, druga go zdejmowala. Przyrost dalej = ubytek
+        // (budzet liczony tylko z plonow niechronionych; wies, ktorej wszystkie inne plony sa chronione - bez przesuniecia). Regulator wylaczony / przed decyzja - bez zmian.
+        private static readonly SortedDictionary<string, double[]> _hKeep = new SortedDictionary<string, double[]>(StringComparer.Ordinal);   // plon -> [wsi, baza szt./d]
+        private static int _hKeptAll;
         private static double _hAdd, _hRem, _hCSum, _hCMin = double.NaN, _hGSum, _hGMin = double.NaN; private static int _hCN, _hGN;
 
         /// <summary>Przeliczenie f i c wszystkich wsi (watek glowny): nowy slownik, potem podmiana referencji.</summary>
         private static void HandsCompute()
         {
             _hF.Clear(); _hCut.Clear(); _hVill = _hWith = _hNoOther = _hBind = 0; _hAdd = _hRem = _hCSum = _hGSum = 0; _hCMin = _hGMin = double.NaN; _hCN = _hGN = 0;
+            _hKeep.Clear(); _hKeptAll = 0;
             var nd = new Dictionary<Village, Hands>();
             var s = Settings.Current;
             if (s == null || !s.VillageHandsFollowPrice) { _hands = nd; return; }
+            bool keep434 = s.VillageHandsKeepShortGoods;
             var ids = new List<string>(); var bases = new List<float>(); var items = new List<ItemObject>();
             var oth = new List<ItemObject>(); var othW = new List<float>();
             foreach (var v in Village.All)
@@ -496,19 +504,28 @@ namespace Armoury
                     if (ids.Count == 0) continue;
                     _hVill++;
                     oth.Clear(); othW.Clear();
-                    double vn = 0, vg = 0, ixw = 0;
+                    double vn = 0, vg = 0, ixw = 0, vkeep = 0;
                     foreach (var pr in v.VillageType.Productions)
                     {
                         var it = pr.Item1;
                         if (it == null || OutOfHands(it) || items.Contains(it) || !(pr.Item2 > 0f)) continue;
                         double val = pr.Item2 * lvl * it.Value;
+                        if (keep434 && HarvestValve.Factor(it) > 1f)
+                        {
+                            // 434 (B6): plonu brakuje - rece z niego nie schodza; dalej liczy sie do indeksu "innych plonow" (wies go robi), ale nie do budzetu ubytku
+                            vkeep += val; ixw += val * Index(town, it);
+                            string kid = it.StringId ?? "?"; double[] kp;
+                            if (!_hKeep.TryGetValue(kid, out kp)) { kp = new double[2]; _hKeep[kid] = kp; }
+                            kp[0] += 1; kp[1] += pr.Item2 * lvl;
+                            continue;
+                        }
                         if (it.ItemCategory == DefaultItemCategories.Grain) vg += val; else vn += val;
                         ixw += val * Index(town, it);
                         oth.Add(it); othW.Add(pr.Item2 * lvl);
                     }
                     double vo = vn + vg;
-                    if (vo <= 0) { _hNoOther++; continue; }
-                    double ixo = Math.Max(1.0, ixw / vo);
+                    if (vo <= 0) { _hNoOther++; if (vkeep > 0) _hKeptAll++; continue; }
+                    double ixo = Math.Max(1.0, ixw / (vo + vkeep));
                     var f0 = new float[ids.Count];
                     double extra = 0;
                     for (int i = 0; i < ids.Count; i++)
@@ -573,7 +590,19 @@ namespace Armoury
                    + " | c inne plony srednio " + D2(_hCN > 0 ? _hCSum / _hCN : double.NaN) + ", min " + D2(_hCMin) + " (prog 0.85); zboze srednio " + D2(_hGN > 0 ? _hGSum / _hGN : double.NaN) + ", min " + D2(_hGMin) + " (prog 0.95)"
                    + " | wartosc bazowa na dobe przed mnoznikami: przybylo " + _hAdd.ToString("0", Inv) + " d, ubylo " + _hRem.ToString("0", Inv) + " d (" + (cuts.Count > 0 ? string.Join(", ", cuts.ToArray()) : "-") + ")"
                    + ", roznica " + diff.ToString("0.0", Inv) + " d (" + (_hAdd > 0 ? (100.0 * diff / _hAdd).ToString("0.00", Inv) : "0.00") + "%)"
-                   + " | drewno, ruda i zwierzeta poza regula";
+                   + " | drewno, ruda i zwierzeta poza regula"
+                   + " | 434 plony, ktorych brakuje (regulator wsi > 1), rece nie schodza (Village Hands Keep Short Goods " + (KeepShortOn ? "TAK" : "NIE") + "): " + KeepText();
+        }
+
+        private static bool KeepShortOn { get { var s = Settings.Current; return s != null && s.VillageHandsKeepShortGoods; } }
+
+        /// <summary>434 (B6): plony chronione w ostatnim przeliczeniu - towar, liczba wsi z dodatkami listy BK, baza szt./d przed mnoznikami.</summary>
+        private static string KeepText()
+        {
+            if (_hKeep.Count == 0) return "zadnego (wsi z samymi chronionymi plonami 0)";
+            var parts = new List<string>();
+            foreach (var kv in _hKeep) parts.Add(kv.Key + " " + kv.Value[0].ToString("0", Inv) + " wsi (baza " + kv.Value[1].ToString("0.0", Inv) + " szt./d)");
+            return string.Join(", ", parts.ToArray()) + "; wsi z samymi chronionymi plonami (bez przesuniecia) " + _hKeptAll;
         }
 
         /// <summary>Z ArmouryBehavior.OnSessionLaunched (po EggSessionStart): przeliczenie i linia startu "Rece wsi za cena (E3-D1): start sesji".</summary>

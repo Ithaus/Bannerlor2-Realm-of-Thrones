@@ -181,6 +181,7 @@ namespace Armoury
         private static void DayReset()
         {
             _dWhaleSwap = _dWhaleFish = _dWhaleMade = _dHoney = _dMarbleGiven = _dCoal = _dCoalWood = _dCoalNoWood = _dCoalNoProfit = _dCoalNoTown = 0;
+            _dCoalUnwanted = 0;   // 434
             _dMeadCut = _dMarbleCut = 0;
             _dIngotPcs = _dIngotValue = _dIngotIron = 0; _dIngotTowns = 0;
             _dDteConv = _dDteFood = _dDteEats = _dBkEats = _dBkOtherEats = 0; _dHeroLedger = 0;
@@ -434,6 +435,13 @@ namespace Armoury
             return clay;
         }
 
+        // 434 (audyt ekonomii 11.11 B6, klucz CharcoalBurnersFollowValve): drwale sluchaja regulatora wsi 221. Dowod: "Towary: charcoal zapas 61 430, zuzycie 11/d"
+        // (ponad 5 000 dob zuzycia), regulator tnie wegiel do x0.10, a "drwale wypalili 23 ladunkow drewna na 69 bryl" na dobe - decyzja szla tylko z ceny miasta
+        // targowego (miasto bez wegla = wysoki indeks), wiec drewno, ktorego brakuje (regulator drewna x1.30), szlo na towar bez odbiorcy. Regula: gdy mnoznik
+        // regulatora dla wegla < 1, miasto targowe wypala tylko w tej czesci dob (jeden rzut na miasto na dobe - ten sam slot co 'jedna wies na miasto'); mnoznik >= 1
+        // albo regulator nieczynny - sama cena, jak dotad. Drewno zostaje w magazynie wsi i jedzie wozem na targ (nic nie znika).
+        private static long _dCoalUnwanted;
+
         private static void Coal(Village v, ItemRoster r)
         {
             if (!CoalOn || _coal == null || _wood == null) return;
@@ -445,6 +453,12 @@ namespace Armoury
             float units = Math.Max(0.1f, _wood.Weight) / WoodKgPerCoalKg / Math.Max(0.1f, _coal.Weight);
             int pc = mk.Town.GetItemPrice(_coal, null, true), pw = mk.Town.GetItemPrice(_wood, null, true);
             if (units * pc <= pw) { _dCoalNoProfit++; return; }
+            var s4 = S;
+            if (s4 != null && s4.CharcoalBurnersFollowValve)
+            {
+                float vf = HarvestValve.Factor(_coal);
+                if (vf < 1f && MBRandom.RandomFloat >= vf) { _coalTowns.Add(mk); _dCoalUnwanted++; return; }   // 434: wegiel niechciany - to miasto dzis nie wypala
+            }
             int n = MBRandom.RoundRandomized(units);
             if (n <= 0) return;
             var f = Fz(v.Settlement, "wegiel z drewna (drwale)");   // wlasna ramka: wsie dalej licza w ksiedze to, co wydobyly (kontrola z ksiega drewna)
@@ -1017,6 +1031,8 @@ namespace Armoury
                   .Append(" | wegiel (Charcoal Burners ").Append(TN(s.CharcoalBurners)).Append("): drwale wypalili ").Append(_dCoalWood).Append(" ladunkow drewna na ").Append(_dCoal)
                   .Append(" bryl; nie: bez drewna w magazynie ").Append(_dCoalNoWood).Append(", bez zysku (wegiel z ladunku tanszy niz ladunek) ").Append(_dCoalNoProfit)
                   .Append(", bez miasta ").Append(_dCoalNoTown)
+                  .Append(", 434 regulator wsi (Charcoal Burners Follow Valve ").Append(TN(s.CharcoalBurnersFollowValve)).Append(", mnoznik wegla ").Append((_coal != null ? HarvestValve.Factor(_coal) : 1f).ToString("0.00", Inv))
+                  .Append("): niechciany - miast bez wypalu dzis ").Append(_dCoalUnwanted)
                   .Append(" | sztaby z polek (Iron Ingots Off Shelf ").Append(TN(s.IronIngotsOffShelf)).Append("): osad ").Append(_dIngotTowns).Append(", sztab ").Append(_dIngotPcs)
                   .Append(" warte ").Append(_dIngotValue).Append(" zl -> zelaza ").Append(_dIngotIron)
                   .Append(" | pochodzenie BK (Bk Side Goods Origin ").Append(TN(s.BkSideGoodsOrigin)).Append("): przejscie ").Append(SideT.ToString("0.00", Inv))

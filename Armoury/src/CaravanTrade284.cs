@@ -864,7 +864,7 @@ namespace Armoury
             if (s == null || mp == null || !(s.CaravanBuyByFlow || s.CaravanBuyWorkingCapital || s.CaravanBuyProfitCheck)) return false;
             if (!mp.IsCaravan || mp.Owner == null || !CaravanBulk.TradesForT1(mp) || MaterialOrders.HasContract(mp) || CaravanBulk.HasOrders(mp)) return false;
             int cap, floor;
-            CaravanSettle.CapFloor(mp, out cap, out floor);
+            CaravanSettle.WorkCapFloor(mp, out cap, out floor);   // 434: karawana pod jedna regula - kapital obrotowy K (inaczej CapFloor jak dotad)
             _pk.Capital = cap; _pk.Floor = floor; _pk.Wage = Math.Max(0, mp.TotalWage); _pk.Purse0 = mp.PartyTradeGold;
             _pk.Stock0 = CaravanGoods.CargoCost(mp);
             _pk.Mp = mp;
@@ -962,7 +962,7 @@ namespace Armoury
             try
             {
                 int cap, floor;
-                CaravanSettle.CapFloor(mp, out cap, out floor);
+                CaravanSettle.WorkCapFloor(mp, out cap, out floor);   // 434: karawana pod jedna regula - kapital obrotowy K (inaczej CapFloor jak dotad)
                 _b.Capital = cap; _b.Floor = floor; _b.Wage = Math.Max(0, mp.TotalWage); _b.Purse0 = mp.PartyTradeGold;
                 _b.Stock0 = CaravanGoods.CargoCost(mp);
                 _b.Toll = TownToll.CaravanRateFor(mp, town.Settlement);

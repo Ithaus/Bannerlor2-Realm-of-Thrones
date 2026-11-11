@@ -1477,6 +1477,8 @@ namespace Armoury
         /// </summary>
         private const int KeepGold = 10000;
         internal const int KeepWageDays = 30;   // 259: ten sam zapas zoldu dla karawany rodu, ktorej rod nie zwraca zoldu (CaravanSettle - wodz z tytulem Lordship)
+        /// <summary>Prog E3-T2: max(10 000, 30 dni zoldu). 434: ta sama liczba jest czescia kapitalu obrotowego jednej reguly (CaravanSettle.OneCapital).</summary>
+        internal static long KeepOf(int wage) { return Math.Max(KeepGold, (long)KeepWageDays * Math.Max(0, wage)); }
         internal static long LastOwnerPaid, LastOwnerNot, LastOwnerLord, LastOwnerPlayer;   // linia "Obieg: notable i karawany" (MoneyLedger.Daily - ta sama doba)
         internal static int LastOwnerN;
         private static int _oStumbles, _oStumbleSess;
@@ -1507,6 +1509,10 @@ namespace Armoury
             }
             int n = 0, below = 0, paidN = 0, notN = 0, lordN = 0, plN = 0, sDis = 0, sBat = 0, sLead = 0, sOwn = 0, sModel = 0, sClan = 0;
             long keepAll = 0, held = 0, paid = 0, pNot = 0, pLord = 0, pPl = 0, ctlFrom = 0, ctlTo = 0;
+            // 434 (audyt B1): jedna regula kapitalu obrotowego (CaravanSettle.OneCapital) - liczniki linii
+            bool oneKey = CaravanSettle.OneCapKey;
+            int o4N = 0, o4OverN = 0, o4Stuck = 0, o4Low = 0, o4PaidN = 0, o4OldN = 0, o4Full = 0;
+            long o4K = 0, o4Coin = 0, o4Goods = 0, o4Cost = 0, o4Ceil = 0, o4Over = 0, o4Due = 0, o4Paid = 0, o4Old = 0, pPlOne = 0;
             var cfm = Campaign.Current.Models.ClanFinanceModel;
             var list = new List<MobileParty>(MobileParty.AllCaravanParties);
             foreach (var mp in list)
@@ -1518,22 +1524,48 @@ namespace Armoury
                     // 259: karawana lorda albo towarzysza, ktorej zold placi rod - rozlicza ja rod codziennie (CaravanSettle, w rozliczeniu rodu); tu tylko licznik
                     if (CaravanSettle.Settled(mp)) { sClan++; continue; }
                     int g = mp.PartyTradeGold;
-                    long keep = Math.Max(KeepGold, (long)KeepWageDays * Math.Max(0, mp.TotalWage));
+                    long keep = KeepOf(mp.TotalWage);
                     keepAll += keep; held += Math.Min(Math.Max(0, g), keep);
-                    if (g <= keep) { below++; continue; }
+                    bool one = oneKey && CaravanSettle.OneCapShape(mp);
+                    int due;
+                    if (one)
+                    {
+                        // 434: wyplata = max(0, min(wartosc - K, kiesa - podloga)) - wzor 259 (Formula) na kapitale obrotowym K; stary prog tylko jako pomiar
+                        if (g <= keep) below++;
+                        int fl4;
+                        int k4 = CaravanSettle.OneCapital(mp, out fl4);
+                        long cst4, mkt4, oth4; int kd4, un4;
+                        long goods4 = WorthOf(mp, out cst4, out mkt4, out kd4, out un4, out oth4);
+                        long worth4 = Math.Max(0, g) + goods4;
+                        due = CaravanSettle.Formula(worth4, k4, g, fl4);
+                        long ceil4 = Math.Max(0, k4 - fl4);
+                        o4N++; o4K += k4; o4Coin += Math.Max(0, g); o4Goods += goods4; o4Cost += cst4; o4Ceil += ceil4;
+                        if (g < fl4) o4Low++;
+                        if (ceil4 > 0 && cst4 >= ceil4) o4Full++;
+                        if (worth4 > k4) { o4OverN++; o4Over += worth4 - k4; if (due <= 0) o4Stuck++; }
+                        if (g > keep) { o4OldN++; o4Old += g - keep; }
+                        if (due <= 0) continue;
+                    }
+                    else
+                    {
+                        if (g <= keep) { below++; continue; }
+                        due = (int)Math.Min(int.MaxValue, g - keep);
+                    }
                     if (mp.IsDisbanding) { sDis++; continue; }
                     if (mp.MapEvent != null) { sBat++; continue; }
                     if (mp.LeaderHero != null) { sLead++; continue; }
                     var owner = mp.Owner;
                     if (owner == null || !owner.IsAlive) { sOwn++; continue; }
                     if (cfm != null && cfm.CalculateOwnerIncomeFromCaravan(mp) > 0) { sModel++; continue; }
-                    int amt = (int)Math.Min(int.MaxValue, g - keep);
+                    int amt = due;
                     int g0 = mp.PartyTradeGold, h0 = owner.Gold;
                     GiveGoldAction.ApplyForPartyToCharacter(mp.Party, owner, amt, true);
                     int moved = g0 - mp.PartyTradeGold, got = owner.Gold - h0;
                     ctlFrom += moved; ctlTo += got;
+                    if (one) { o4Due += amt; o4Paid += moved; if (moved > 0) o4PaidN++; }
                     if (moved <= 0) continue;
                     paid += moved; paidN++;
+                    if (one && owner == Hero.MainHero) pPlOne += moved;
                     if (owner == Hero.MainHero) { pPl += moved; plN++; }
                     else if (owner.IsNotable) { pNot += moved; notN++; }
                     else { pLord += moved; lordN++; }
@@ -1543,7 +1575,8 @@ namespace Armoury
                 catch (Exception e) { OStumble("ProfitToOwners(karawana)", e); }
             }
             LastOwnerPaid = paid; LastOwnerNot = pNot; LastOwnerLord = pLord; LastOwnerPlayer = pPl; LastOwnerN = paidN;
-            if (pPl > 0) Log.Player("Your caravans handed you " + pPl + " denars - all they held above what they keep for trade and a month of wages.");
+            if (pPl > 0 && pPlOne >= pPl) Log.Player("Your caravans handed you " + pPl + " denars - what their coin and goods together are worth above their working capital.");   // 434
+            else if (pPl > 0) Log.Player("Your caravans handed you " + pPl + " denars - all they held above what they keep for trade and a month of wages.");
             sb.Append(" | CZYNNE | karawan ").Append(n).Append(", oddaly ").Append(paidN).Append(" za ").Append(paid).Append(" zl (notablom ").Append(notN).Append('/').Append(pNot)
               .Append(", lordom i innym ").Append(lordN).Append('/').Append(pLord).Append(", graczowi ").Append(plN).Append('/').Append(pPl).Append(')')
               .Append(" | rozliczane przez rod (259) ").Append(sClan)
@@ -1556,7 +1589,27 @@ namespace Armoury
               .Append(" | wplyw na skrzynie: karawany -").Append(paid).Append(", notable +").Append(pNot).Append(" (ponad 10 500 pasmo gry oddaje nadwyzke kasie miasta handlu - E5/A3)")
               .Append(", lordowie i inni +").Append(pLord).Append(", gracz +").Append(pPl)
               .Append(" | BK Realistic Caravan Income tak - wplata BK ponad 10 000 przy wjezdzie do siedziby, osady lub miasta udzialowca (i E3/9 w miastach krolestwa pana) zostaje")
-              .Append(" | potkniecia ").Append(_oStumbles).Append(" (sesja ").Append(_oStumbleSess).Append(").");
+              .Append(oneKey ? " dla karawan poza regula 434" : "");
+            // 434 (audyt B1): jedna regula kapitalu obrotowego - pomiar i kontrola (wzor = zdjete z kies)
+            int bk4N; long bk4V;
+            CaravanSettle.TakeBk434(out bk4N, out bk4V);
+            if (!oneKey) sb.Append(" | 434 jedna regula kapitalu obrotowego NIE (Caravan One Working Capital) - prog 10 000 w monecie i sufit towaru osobno, jak przed 434");
+            else
+            {
+                long worthAll = o4Coin + o4Goods;
+                sb.Append(" | 434 jedna regula kapitalu obrotowego TAK: K = max(").Append(KeepGold).Append(", ").Append(KeepWageDays).Append(" dni zoldu) + (kapital modelu - podloga), podloga = prog doplaty + zold doby")
+                  .Append("; karawan pod regula ").Append(o4N).Append(", K lacznie ").Append(o4K).Append(" (srednio ").Append(o4N > 0 ? (o4K / o4N).ToString(Inv) : "-")
+                  .Append("), moneta ").Append(o4Coin).Append(" + towar ").Append(o4Goods).Append(" = wartosc ").Append(worthAll)
+                  .Append(" (").Append(o4K > 0 ? (100.0 * worthAll / o4K).ToString("0.0", Inv) : "-").Append("% K; udzial towaru ").Append(worthAll > 0 ? (100.0 * o4Goods / worthAll).ToString("0.0", Inv) : "-")
+                  .Append("%), sufit ladunku lacznie ").Append(o4Ceil).Append(", ladunek po koszcie ").Append(o4Cost).Append(" (").Append(o4Ceil > 0 ? (100.0 * o4Cost / o4Ceil).ToString("0.0", Inv) : "-")
+                  .Append("% sufitu; karawan z pelnym ladunkiem ").Append(o4Full).Append("), kiesa ponizej podlogi ").Append(o4Low)
+                  .Append(" | wartosc ponad K: ").Append(o4OverN).Append(" karawan, nadwyzka ").Append(o4Over).Append(", z tego nalezne dzis wedlug wzoru ").Append(o4Due)
+                  .Append(", zysk stoi w towarze (kiesa <= podloga) ").Append(o4Stuck)
+                  .Append(" | kontrola 434: wzor ").Append(o4Due).Append(" = zdjete z kies ").Append(o4Paid).Append(" (roznica ").Append(o4Due - o4Paid).Append("), wyplat ").Append(o4PaidN)
+                  .Append(" | pomiar: stary prog (moneta ponad max(10 000, 30 dni zoldu)) oddalby ").Append(o4Old).Append(" zl z ").Append(o4OldN).Append(" karawan (przed pominieciami)")
+                  .Append("; wplata BK przy wjezdzie wstrzymana ").Append(bk4N).Append(" (zdjelaby ").Append(bk4V).Append(')');
+            }
+            sb.Append(" | potkniecia ").Append(_oStumbles).Append(" (sesja ").Append(_oStumbleSess).Append(").");
             Log.Info(sb.ToString());
             _oStumbles = 0;
         }

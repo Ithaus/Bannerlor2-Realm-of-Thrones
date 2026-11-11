@@ -77,6 +77,7 @@ namespace Armoury
             lock (_lk) { ZeroDay(); _paidDay.Clear(); }
             lock (_funded) { _funded.Clear(); _fundImp = _fundImpBad = 0; _fundHad = false; }
             _sSt = _sDup = 0; _err.Clear(); _startDone = false;
+            lock (_lk) { _d434BkN = 0; _d434BkV = 0; }   // 434
             LastPaid = LastPaidPlayer = 0;
             PlayerReset();
             TestReset();
@@ -231,6 +232,62 @@ namespace Armoury
             }
         }
 
+        // ------------------------------------------------------------ 434 (audyt ekonomii 11.11 B1): JEDNA REGULA KAPITALU OBROTOWEGO karawan spoza rozliczenia rodu
+        // Dowod (AUDYT-EKONOMIA.md B1, eko-mapa-karawany-handel.md rozdz. 3 i 6; log d109740): karawana notabla miala DWIE osobne granice - prog oddawania zysku
+        // E3-T2 (w monecie zostaje max(10 000, 30 dni zoldu); "w kiesach do kapitalu 64%") i sufit towaru 284 (ladunek po koszcie < kapital modelu - podloga, ok. 4 900;
+        // "kupno BK odrzucone - kapital w towarze 381-453" na dobe). Moneta do 10 000 stala bezczynnie obok ladunku przycietego do 4 900, a kazdy zysk ponad 10 000
+        // w monecie szedl do wlasciciela, choc mogl jechac jako towar - handel ograniczony kapitalem (mediana marzy miedzy miastami 65-75%).
+        // Regula (klucz CaravanOneWorkingCapital przy CaravanProfitToOwner i BK Realistic Caravan Income - tam, gdzie dziala E3-T2): obie granice RAZEM sa kapitalem
+        // obrotowym K = max(10 000, 30 dni zoldu) + max(0, kapital modelu - podloga), podloga = PartyGoldLowerThreshold + zold doby (jak CapFloor) - ta sama koperta
+        // co dotad (ok. 14 900 dla zwyklej karawany), tylko bez sztywnego podzialu na monete i towar:
+        //   kupno (284 regula 2, 139 'pelny ladunek', 294c ocena celu): ladunek po koszcie < K - podloga (ok. 9 800 zamiast 4 900);
+        //   wyplata wlascicielowi raz na dobe (E3-T2): max(0, min(wartosc - K, kiesa - podloga)), wartosc = kiesa + towar (WorthOf) - ten sam wzor co 259 (Formula).
+        // Wplata BK przy wjezdzie (wszystko ponad 10 000 w siedzibie / osadzie wlasciciela) dla tych karawan wstrzymana (SettlePre) - inaczej druga regula zdejmowalaby
+        // monete, ktora ma stac sie towarem; E3/9 tak samo (Seal31B.ProfitPre). Nic z niczego: zadnego nowego zlota - kiesa karawany -> wlasciciel jak dotad, tylko pozniej.
+        // Karawany rozliczane przez rod (259) - bez zmian (maja juz jedna regule: ten sam kapital i podloga w wyplacie i w kupnie). Konwoje DTE i karawany z wodzem - bez zmian.
+        private static int _d434BkN; private static long _d434BkV;
+
+        /// <summary>434: klucze reguly (bez odczytu przelacznika BK).</summary>
+        internal static bool OneCapKey { get { var s = S; return s != null && s.CaravanOneWorkingCapital && s.CaravanProfitToOwner; } }
+
+        /// <summary>434: karawana, ktora rozlicza E3-T2 (czynna, bez wodza, nie konwoj DTE, nie rozliczana przez rod). Tylko odczyt.</summary>
+        internal static bool OneCapShape(MobileParty mp)
+        {
+            return mp != null && mp.IsCaravan && mp.IsActive && mp.LeaderHero == null && !Measure31.IsDteConvoy(mp) && !Settled(mp);
+        }
+
+        /// <summary>434: karawana pod jedna regula kapitalu obrotowego (klucze, kampania, E3-T2 czynne: BK Realistic Caravan Income). Tylko odczyt; blad - false (jak dotad).</summary>
+        internal static bool OneCap(MobileParty mp)
+        {
+            try { return OneCapKey && Live && OneCapShape(mp) && Seal31B.RealisticCaravanIncome(); }
+            catch { return false; }
+        }
+
+        /// <summary>434: kapital obrotowy K i podloga kiesy karawany pod jedna regula (opis wyzej). Tylko odczyt.</summary>
+        internal static int OneCapital(MobileParty mp, out int floor)
+        {
+            var ms = Campaign.Current.Models;
+            var cpc = mp.CaravanPartyComponent;
+            int model = ms.CaravanModel.GetInitialTradeGold(mp.Owner, cpc != null && cpc.CanHaveNavalNavigationCapability, cpc != null && cpc.IsElite);
+            int wage = Math.Max(0, mp.TotalWage);
+            floor = ms.ClanFinanceModel.PartyGoldLowerThreshold + wage;
+            long k = CaravanGoods.KeepOf(wage) + Math.Max(0L, (long)model - floor);
+            return (int)Math.Min(int.MaxValue, k);
+        }
+
+        /// <summary>434: kapital i podloga do REGUL KUPNA (284 regula 2, 139 'pelny ladunek', 294c): karawana pod jedna regula - K i podloga 434; inaczej CapFloor (jak dotad).</summary>
+        internal static void WorkCapFloor(MobileParty mp, out int capital, out int floor)
+        {
+            if (OneCap(mp)) { capital = OneCapital(mp, out floor); return; }
+            CapFloor(mp, out capital, out floor);
+        }
+
+        /// <summary>434 (linia E3-T2): wplaty BK przy wjezdzie wstrzymane od poprzedniej linii (n, ile by zdjely) - odczyt z zerowaniem.</summary>
+        internal static void TakeBk434(out int n, out long v)
+        {
+            lock (_lk) { n = _d434BkN; v = _d434BkV; _d434BkN = 0; _d434BkV = 0; }
+        }
+
         /// <summary>max(0, min(wartosc - kapital, kiesa - podloga)) - ta sama postac co K259-2 w sprawdz_logi.</summary>
         internal static int Formula(long worth, int capital, int purse, int floor)
         {
@@ -341,7 +398,18 @@ namespace Armoury
         {
             try
             {
-                if (!Settled(__0)) return true;
+                if (!Settled(__0))
+                {
+                    if (!OneCap(__0)) return true;
+                    // 434: karawana pod jedna regula kapitalu obrotowego - zysk oddaje raz na dobe E3-T2 (wartosc ponad K); wplata BK "wszystko ponad 10 000" wstrzymana.
+                    // Licznik "bylo by" - ten sam warunek miejsca co nizej (bez udzialowcow)
+                    int g4 = __0.PartyTradeGold;
+                    var o4 = __0.Owner;
+                    bool place4 = __1 != null && o4 != null && (__1 == o4.HomeSettlement || __1.Owner == o4 || __1.HeroesWithoutParty.Contains(o4)
+                                  || (o4.PartyBelongedTo != null && __1.Parties.Contains(o4.PartyBelongedTo)));
+                    if (g4 > BkKeep && place4) lock (_lk) { _d434BkN++; _d434BkV += g4 - BkKeep; }
+                    return false;
+                }
                 int g = __0.PartyTradeGold;
                 var o = __0.Owner;
                 // ten sam warunek miejsca co BK (siedziba, osada wlasciciela, wlasciciel w osadzie; bez udzialowcow) - tylko licznik "bylo by"
