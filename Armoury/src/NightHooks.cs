@@ -63,6 +63,8 @@ namespace Armoury
             Part(sb, "choragwie", RoutHold.SiteBanner, () => BannerKit.ApplyInCampaign(_h));
             sb.Append(" | ");
             Part(sb, "przypiecia typow (P12)", RoutHold.SiteBanner, () => ArmyReview.ApplyPinHooks(_h));   // spawn i posilki czynnego BattleSpawnModel, ekran Order of Battle
+            sb.Append(" | ");
+            Part(sb, "zuzyta bron (413)", RoutHold.SiteBanner, () => WornBlade413.ApplyInCampaign(_h));   // 413: postfiks na wspolczynnik obrazen RBM (cztery metody)
             sb.Append('.');
             Log.Info(sb.ToString());
         }

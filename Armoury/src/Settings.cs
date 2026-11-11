@@ -171,6 +171,7 @@ namespace Armoury
         public bool ConditionScalesStats = true;           // Jeff's rule: protection and edge follow condition - light wear costs little, heavy wear costs dearly
         public float ConditionPenaltyMax = 90f;            // an all-but-broken piece (1%) still keeps this much less - never the full hundred
         public float ConditionPenaltyExponent = 2.0f;     // the curve: above 1 = small wear is cheap, deep wear bites (99% state ~ -0.5%, 50% ~ -41%, 1% ~ -89%)
+        public bool WornWeaponStillBites = true;           // With Condition Scales Stats and Realistic Battle Mod: a weapon in a bad state (Damaged, Mangled, Wrecked) keeps its blade quality times its state, so it gets through armour worse but always still wounds. Off = as before this change: the state is subtracted from the blade quality, and a Mangled or Wrecked weapon with a poor blade may deal no damage at all, even to an unarmoured man. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 413).
         public int ArmorPoolMinPoints = 40;                // gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points
         public float WearPerBattle = 0f;                   // flat wear per battle ON TOP of real damage - 0 = gear suffers only when something actually hits it
         public float WearDamageFactor = 0.15f;             // wear per point of damage the STRUCK piece takes (armour wears where the blow lands)

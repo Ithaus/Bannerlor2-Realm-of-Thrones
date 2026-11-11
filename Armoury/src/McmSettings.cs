@@ -520,6 +520,10 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float ConditionPenaltyExponent { get; set; } = 2.0f;
 
+        [SettingPropertyBool("Worn Weapon Still Bites", HintText = "With Condition Scales Stats and Realistic Battle Mod: a weapon in a bad state (Damaged, Mangled, Wrecked) keeps its blade quality times its state, so it gets through armour worse but always still wounds. Off = as before this change: the state is subtracted from the blade quality, and a Mangled or Wrecked weapon with a poor blade may deal no damage at all, even to an unarmoured man. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 413).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool WornWeaponStillBites { get; set; } = true;
+
         [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ArmorPoolMinPoints { get; set; } = 40;
@@ -12457,6 +12461,7 @@ namespace Armoury
             s.ConditionScalesStats = ConditionScalesStats;
             s.ConditionPenaltyMax = ConditionPenaltyMax;
             s.ConditionPenaltyExponent = ConditionPenaltyExponent;
+            s.WornWeaponStillBites = WornWeaponStillBites;
             s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;

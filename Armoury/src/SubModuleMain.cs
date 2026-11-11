@@ -724,6 +724,9 @@ namespace Armoury
                 // n20-herby: linia "Tarcze band (herby):" po rozstawieniu i na koniec misji (sam herb idzie w prefiksie SpawnAgent)
                 if (Settings.Current.BandShieldsStolenArms && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new BandShieldsWatch());
+                // 413: liczniki zuzytej broni (postfiks na wspolczynnik obrazen RBM zalozony w kampanii) - zerowanie i linia "Zuzyta bron (413): koniec misji"
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new WornBlade413.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)
