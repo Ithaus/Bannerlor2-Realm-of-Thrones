@@ -736,7 +736,9 @@ namespace Armoury
                 if ((Campaign.Current != null || NeckGuard415.Patched) && mission != null)
                     mission.AddMissionBehavior(new NeckGuard415.Logic());
                 // 416: premia pancerza wypoczetego (RBM x1.0-1.3) - liczniki ciosow w wypoczetych / zmeczonych i linia "Wypoczety (416): koniec misji"
-                if (Campaign.Current != null && mission != null)
+                // 416-p: jak 415-p - w bitwie wlasnej po kampanii latka dalej dziala, wiec zachowanie odswieza stan RBM (prefiks walki, stamina, slownik postaw),
+                // zeruje liczniki i zdejmuje znacznik ostatniej ofiary; bez zalozonej latki poza kampania nic nie dochodzi
+                if ((Campaign.Current != null || RestedArmor416.Patched) && mission != null)
                     mission.AddMissionBehavior(new RestedArmor416.Logic());
                 // 417: mloty 2h z rodzimym obuchem i buzdygany 2h - liczniki ciosow i trafien, linia "Mloty (417): koniec misji"
                 if (Campaign.Current != null && mission != null)

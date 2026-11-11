@@ -23,6 +23,10 @@ namespace Armoury
     /// Czego to nie obejmuje (RBM podmienia pancerz PO naszym prefiksie, rbm.cs:3456-3494): trafienie pod pache (pancerz = korpus.arm + plaszcz.arm)
     /// i w twarz przy helmie z wlasnym body_armor - tam premia zostaje; twarz bez helmu (x0.15) i helm bez body_armor (0) wychodza poprawnie.
     /// Obrazenia od upadku: RBM nie liczy pancerza (num = 0) - pomijamy. Sila ciosu atakujacego (x0.85-1.0 od jego staminy) zostaje - to nie premia.
+    /// 416-p (recenzja): perk kusznika Piercer (CalculateAdjustedArmorForBlow, obr_sbsm.cs:228) zeruje pancerz ponizej progu i dostaje teraz pancerz juz
+    /// podzielony - u wypoczetego prog dziala do ok. 26 pancerza surowego zamiast do 20 (waskie pasmo, tylko bohater-kusznik z perkiem; bez transpilera nie do obejscia).
+    /// Postawe RBM maja tylko ludzie (rbmai.cs:6232) - koni regula nie dotyczy. Poza kampania (bitwa wlasna po kampanii) stan RBM odswieza Logic dodawana przez
+    /// SubModuleMain, gdy latka juz siedzi w procesie.
     ///
     /// Ostatnia czesc linii konca misji: progi przebicia RBM dla strzal, beltow i oszczepow odczytane z pamieci RBM (RBMConfig.weaponTypesFactors) -
     /// kontrola, czy tools/rbm_config_combat.py (A1, A2: config.xml w Documents) jest wgrany i czy RBM nie wrocil do wartosci fabrycznych.
@@ -36,6 +40,8 @@ namespace Armoury
 
         private static int _patched, _wanted;
         private static string _note = "nie zakladano";
+        /// <summary>416-p: latka 416 siedzi w procesie (takze po wyjsciu z kampanii) - SubModuleMain dodaje wtedy Logic w kazdej misji (swiezy stan RBM).</summary>
+        internal static bool Patched { get { return _patched > 0; } }
         private static MethodBase _blow;                     // MissionCombatMechanicsHelper.ComputeBlowDamage
         private static bool _rbmBlow;                        // prefiks RBM (z premia) jest teraz na ComputeBlowDamage
         private static bool _rbmStaminaOn;                   // RBMConfig.postureEnabled && staminaEnabled (odczyt na starcie misji)
@@ -159,7 +165,12 @@ namespace Armoury
                     else if (name == "Javelin") j = Num(o, t, "ExtraArmorThresholdFactorPierce");
                 }
                 if (!withTarget) return "Arrow ciecie " + a + ", Bolt ciecie " + b + ", Javelin klucie " + j + " (fabryczne RBM 2.60 / 2.60 / 3.00)";   // 423: linia startu drabiny
-                return "Arrow ciecie " + a + " (cel 2.00), Bolt ciecie " + b + " (cel 2.00), Javelin klucie " + j + " (cel 2.00)";
+                // 416-p: po 423c cel 2.00 obowiazuje tylko bez drabiny pancerzy; przy wlaczonym kluczu drabiny progi fabryczne sa wlasciwe (skrypt dopiero po pomiarze)
+                var s = Settings.Current;
+                bool ladder = s != null && s.ArmourLadderEnabled;
+                return "Arrow ciecie " + a + ", Bolt ciecie " + b + ", Javelin klucie " + j
+                       + (ladder ? " (drabina 423 wlaczona: fabryczne 2.60 / 2.60 / 3.00 = WLASCIWE; 2.00 ze skryptu dopiero po pomiarze)"
+                                 : " (drabina 423 wylaczona: cel skryptu tools/rbm_config_combat.py 2.00 / 2.00 / 2.00)");
             }
             catch (Exception e) { return "odczyt nieudany (" + e.GetType().Name + ")"; }
         }
@@ -236,7 +247,7 @@ namespace Armoury
             Log.Info("Wypoczety (416): koniec misji (" + kind + ") | klucz " + (s != null && s.RestedArmorBonusRemoved ? "TAK" : "NIE")
                      + " | latka " + _patched + "/" + _wanted + (_rbmBlow ? "" : " (prefiks RBM na ComputeBlowDamage NIEOBECNY - nieczynne)")
                      + " | ciosy w cele z postawa RBM " + _blows + ", w wypoczetych (pasek > 70%) " + _rested
-                     + " (sredni mnoznik RBM x" + (_rested > 0 ? F(_factorSum / _rested) : "-") + "), premia zdjeta " + _changed
+                     + " (sredni mnoznik RBM x" + (_rested > 0 ? F(_factorSum / _rested) : "-") + "), premia zdjeta " + _changed + " (licznik obejmuje tez trafienia pod pache i w twarz z helmem - tam RBM podmienia pancerz i premia ZOSTAJE)"
                      + " (pancerz po RBM srednio " + Avg(_armBefore, _changed) + " -> " + Avg(_armAfter, _changed) + ")"
                      + " | TRAFIENIA (nie zablokowane): w wypoczetych " + _hRested + " srednio " + Avg(_hpRested, _hRested) + " HP, od 60 HP " + _hRestedHeavy
                      + "; w zmeczonych (pasek do 70%) " + _hTired + " srednio " + Avg(_hpTired, _hTired) + " HP, od 60 HP " + _hTiredHeavy

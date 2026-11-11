@@ -10,7 +10,8 @@ Plik: Documents/Mount and Blade II Bannerlord/Configs/RBM/config.xml (RBMConfig.
 RBM czyta go przy starcie gry (SubModule.OnSubModuleLoad, RegisterSubModuleTypes, OnGameStart -> RBMConfig.LoadConfig) i zaraz zapisuje
 z powrotem z pamieci (parseXmlConfig -> saveXmlConfig) - nasze wartosci zostaja. Ekran ustawien RBM tych wezlow nie pokazuje.
 UWAGA: gdy RBM uzna plik za zly (brak atrybutu version="2" albo blad XML), tworzy nowy z wartosciami fabrycznymi - wtedy uruchom skrypt ponownie.
-Kontrola w grze: linia "Wypoczety (416)" w Armoury.log konczy sie "progi RBM w pamieci: Arrow ciecie 2.00 ...".
+Kontrola w grze: linia "Wypoczety (416)" w Armoury.log konczy sie "progi RBM w pamieci: Arrow ciecie 2.00, Bolt ciecie 2.00, Javelin klucie 2.00 (...)".
+416-p: nawias na koncu tej linii mowi, co jest wlasciwe - przy wlaczonej drabinie 423 "fabryczne 2.60 / 2.60 / 3.00 = WLASCIWE" (patrz UWAGA 423 nizej).
 
 UWAGA 423 (11.11): zestaw A1 / A2 liczono dla drabiny pancerzy ROT SPRZED 423 (przeszywanica 61, kolczuga 88, plyta 120). Po 423a korpusy ROT
 sa w skali RBM (26 / 55 / 91), a progi fabryczne 2.6 / 3 RBM stroil wlasnie pod te skale: strzala szeroka 90 lb przy progu 2.6 daje juz
@@ -204,7 +205,8 @@ def main():
         return 1
     print("Kopia: " + bak)
     print("Wynik: zapisano %d wezlow. Po starcie gry sprawdz w Armoury.log linie 'Wypoczety (416)': "
-          "'progi RBM w pamieci: Arrow ciecie 2.00 (cel 2.00), Bolt ciecie 2.00 (cel 2.00), Javelin klucie 2.00 (cel 2.00)'." % todo)
+          "'progi RBM w pamieci: Arrow ciecie 2.00, Bolt ciecie 2.00, Javelin klucie 2.00 (...)'. Przy wlaczonej drabinie 423 nawias na koncu tej linii "
+          "przypomina, ze wlasciwe sa progi fabryczne 2.60 / 2.60 / 3.00 - zapisane wartosci 2.00 trzymaj tylko po pomiarze autotestem." % todo)
     return 0
 
 
