@@ -47,10 +47,13 @@ namespace Armoury
     /// Zapis dalej "v1": wiersz S ma pola 8-9 (odmowa kuriera, doby zgonow bohaterow), wiersz H pole 8 (gravely ill), nowe wiersze "T|bohater"
     /// (grozba wyslana) - zapis 402 czyta sie bez zmian (brak pol = puste).
     ///
+    /// 409 (DungeonFate 3, plik DungeonFate.Talk.cs): WYROK GRACZA - rozmowa z jencem (slowo rodu, egzekucja), kolejka wykonywana w takcie mapy.
+    /// Zapis dalej "v1": nowe wiersze "F|rod" (wasn), "P|bohater|doba" (przerwa po odmowie slowa), "Q|bohater|rodzaj|doba" (kolejka wyrokow).
+    ///
     /// Zapis "arm_dungeon" v1 (brak klucza w starym zapisie = pusto). Reset w konstruktorze ArmouryBehavior i w OnGameEnd.
     /// Potkniecia liczone per miejsce - nic sie nie gasi.
     /// </summary>
-    internal static class DungeonFate
+    internal static partial class DungeonFate
     {
         internal const string Tag = "Loch (DF)";
         private const int ImmuneDays = 30;       // odpornosc po przebytej goraczce
@@ -109,6 +112,7 @@ namespace Armoury
             _dEsc = _dRansom = _dAiOver = _dStumbles = _dBattle = _dGone = _dWould = _dRegDead = _dNewSick = _dHealed = 0;
             _dHeroDead = _dGrave = _hStory = _hRuler = _hLast = _hCanDie = _hCeil = _hBattle = _hPlayer = _hOther = _dCourier = 0;
             _stumbles = 0;
+            TalkReset();   // 409
         }
 
         private static void Stumble(string where, Exception e)
@@ -647,6 +651,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || Campaign.Current == null) return;
                 int day = Today();
+                TalkDaily(day);   // 409: minione przerwy po odmowie slowa precz
                 if (_rows.Count != 0)
                 {
                     _tmp.Clear();
@@ -819,7 +824,7 @@ namespace Armoury
         {
             try
             {
-                if (_rows.Count == 0 && _recs.Count == 0 && _threat.Count == 0) return "";
+                if (_rows.Count == 0 && _recs.Count == 0 && _threat.Count == 0 && TalkEmpty) return "";
                 var sb = new StringBuilder(64 + 48 * (_rows.Count + _recs.Count));
                 sb.Append("v1");
                 foreach (var kv in _recs)
@@ -839,6 +844,7 @@ namespace Armoury
                       .Append('|').Append(r.End.ToString(Inv)).Append('|').Append(r.Immune.ToString(Inv)).Append('|').Append(r.Sick && r.Grave ? '1' : '0');   // 404: pole 8
                 }
                 foreach (var hid in _threat) if (Ok(hid)) sb.Append('\n').Append("T|").Append(hid);   // 404
+                TalkExport(sb);   // 409: wiersze F / P / Q
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -848,6 +854,7 @@ namespace Armoury
         internal static void Import(string data)
         {
             _rows.Clear(); _recs.Clear(); _threat.Clear(); _noCourier = 0;
+            TalkReset();   // 409
             int bad = 0;
             try
             {
@@ -879,6 +886,7 @@ namespace Armoury
                             _rows[r.Id] = r;
                         }
                         else if (p[0] == "T" && p.Length >= 2 && p[1].Length > 0) _threat.Add(p[1]);   // 404
+                        else if (TalkImport(p)) { }   // 409: F / P / Q
                         else bad++;
                     }
                     catch { bad++; }

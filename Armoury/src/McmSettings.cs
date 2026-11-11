@@ -12052,6 +12052,18 @@ namespace Armoury
         [SettingPropertyGroup("Dungeons: lords dying of fever and ransom couriers turned away (404)")]
         public bool RansomCourierStandingRefusal { get; set; } = true;
 
+        [SettingPropertyBool("Captive Fate", HintText = "Adds a line to the talk with a captive lord you hold (in your party or in a dungeon of your clan): I have decided what is to be done with you. From there you may free the head of a house on his house's word (Captive Fate Parole) or have the captive put to death (Captive Fate Execution). Never offered for a ruler or an heir (they have their own terms of release), a hostage, a child or a lord of your own realm. The sentence is carried out on the map once you have parted. Off = the line is hidden and sentences still waiting are dropped", RequireRestart = false)]
+        [SettingPropertyGroup("Captives: the player's sentence - a house's word or the block (409)")]
+        public bool CaptiveFate { get; set; } = true;
+
+        [SettingPropertyBool("Captive Fate Parole", HintText = "With Captive Fate: the captive head of a house at war with you may swear peace between his house and you for Prisoner Exchange Pact Days and go free, with no gold changing hands. He agrees more readily the longer he has been held, when he lies sick in your dungeon, when he likes you and when he is honourable; a valorous lord resists. A refusal bars the question for 7 days. The oath binds both sides exactly like the pact of the prisoner exchange: his house leaves your lands and your party alone, and if you attack his house you pay the price of a broken oath. A dishonourable lord may break his word. Needs Prisoner Exchange For Terms", RequireRestart = false)]
+        [SettingPropertyGroup("Captives: the player's sentence - a house's word or the block (409)")]
+        public bool CaptiveFateParole { get; set; } = true;
+
+        [SettingPropertyBool("Captive Fate Execution", HintText = "With Captive Fate: you may sentence a captive lord to death from the talk, also one held in your dungeon. There is no scene: he dies once you have left, with all the usual consequences of an execution (relations, honour, a house without a grown lord ends). His house will never again give you its word, and any oath it had sworn with you is void. Never a character the Realm of Thrones story still needs (Story Guard)", RequireRestart = false)]
+        [SettingPropertyGroup("Captives: the player's sentence - a house's word or the block (409)")]
+        public bool CaptiveFateExecution { get; set; } = true;
+
         [SettingPropertyBool("Funerals", HintText = "When the head of a great house dies (a noble clan of tier 4 or more, or a ruling house), the house buries him at its seat: the funeral lasts Funeral Days, word of it reaches you, and you may attend. With Funeral Truce nobody besieges the seat while the funeral lasts. The lords of the house who have no war on their hands ride to the seat and stay for the rites (Funeral Travel Range). Never for your own clan, bandits, minor or rebel clans, the Night's Watch, the Free Folk or the Others. Off = no funerals", RequireRestart = false)]
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public bool Funerals { get; set; } = true;
@@ -15304,6 +15316,9 @@ namespace Armoury
             s.DungeonHeroDeathSharePercent = DungeonHeroDeathSharePercent;
             s.DungeonHeroDeathsPerWeek = DungeonHeroDeathsPerWeek;
             s.RansomCourierStandingRefusal = RansomCourierStandingRefusal;
+            s.CaptiveFate = CaptiveFate;
+            s.CaptiveFateParole = CaptiveFateParole;
+            s.CaptiveFateExecution = CaptiveFateExecution;
             s.Funerals = Funerals;
             s.FuneralDays = FuneralDays;
             s.FuneralMaxActive = FuneralMaxActive;

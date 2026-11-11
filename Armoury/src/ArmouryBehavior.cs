@@ -1672,6 +1672,7 @@ namespace Armoury
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SideVillageFief.Tick(); });
             VillageEntryDiag.Reset();   // 316e/331: diagnostyka wjazdu do osad gry (tylko log); takt z SubModuleMain.OnApplicationTick - TickEvent gra wola tylko przy dt > 0 (menu osady = brak taktu)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { LandSale.Tick(); });   // m113-zakup: umowa z kolejki (bez rozmowy), okno ofert po rozmowie
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { DungeonFate.TalkTick(); });   // 409: wyrok gracza (slowo rodu / egzekucja) wykonany po rozmowie; pusta kolejka = jedno porownanie
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { CaptiveTerms.Tick(); });   // 366: umowa z jencem-krolem wykonana po rozmowie (czas plynie, bez misji i rozmowy)
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SiegeSurrender374.Tick(); });   // 374: poddanie twierdzy wykonane po wyjsciu gracza za brame (bez misji, rozmowy, spotkania)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeMisery.OnMapEventEnded", SiegeMisery.OnMapEventEnded));   // 399: zabici bitew oblezniczych do licznika trupow (tylko odczyt bitwy)
@@ -2451,6 +2452,7 @@ namespace Armoury
             RawPrice.MemoryLive = true;   // 299b: od teraz wygladzanie podazy rynku w tempie PriceSupplyMemoryDaily (ticki startowe nowej kampanii byly przed - tempo gry)
             try { HideoutBossTalk.AddDialogs(starter); } catch (Exception e) { Log.Error("HideoutBossTalk.AddDialogs", e); }   // 293: rozmowa z hersztem kryjowki zawsze pyta o pojedynek (warunek w kluczu HideoutBossTalkFix)
             try { CaptiveTerms.AddDialogs(starter); } catch (Exception e) { Log.Error("CaptiveTerms.AddDialogs", e); }   // 366: "Let us speak of the terms of your release." przy jencu-krolu albo nastepcy (klucz CaptiveTerms)
+            try { DungeonFate.AddDialogs(starter); } catch (Exception e) { Log.Error("DungeonFate.AddDialogs", e); }   // 409: "I have decided what is to be done with you." przy jencu-lordzie (klucz CaptiveFate)
             try { SiegeSurrender374.AddDialogs(starter); SiegeSurrender374.AddMenus(starter); } catch (Exception e) { Log.Error("SiegeSurrender374.Add", e); }   // 374: "I would yield the keep, on terms." z wodzem oblegajacych (parley) + menu arm374_yield
             try { PrisonerTerms384.AddDialogs(starter); PrisonerTerms384.AddMenus(starter); } catch (Exception e) { Log.Error("PrisonerTerms384.Add", e); }   // 384: pertraktacje z wodzem oblezenia (jency, zloto, ziemia -> odstapienie, pakt, przejscie) + menu arm384_pass
             HeroArms389.OnSession();   // 389: spis bohaterow AI bez broni z lista imion (tylko log, wlasny try)

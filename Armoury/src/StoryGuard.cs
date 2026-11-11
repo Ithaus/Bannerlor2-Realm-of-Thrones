@@ -476,6 +476,19 @@ namespace Armoury
             catch (Exception e) { Stumble("MayBeMaimed", e); return false; }
         }
 
+        /// <summary>409: NASZ kod moze trwale wyjac tego bohatera z fabuly (wyrok gracza; pozniej Mur)? Sama bramka strazy, bez pytania gry o CanDie:
+        /// NIE dla chronionego (stan 2) i dla postaci z tabeli obsady przy niewidocznej liscie wydarzen ROT. why: powod odmowy do logu (PL).</summary>
+        internal static bool MayLeaveStory(Hero h, out string why)
+        {
+            why = null;
+            try
+            {
+                if (h == null || !h.IsAlive) { why = "brak bohatera"; return false; }
+                return Clear(h, out why);
+            }
+            catch (Exception e) { Stumble("MayLeaveStory", e); why = "blad strazy fabuly"; return false; }
+        }
+
         /// <summary>Bramka strazy dla naszych systemow: false = chroniony albo postac z tabeli przy niewidocznej liscie wydarzen ROT.</summary>
         private static bool Clear(Hero h, out string why)
         {

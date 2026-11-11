@@ -1778,6 +1778,47 @@ namespace Armoury
             return punished;
         }
 
+        /// <summary>409 (DungeonFate.Talk - slowo rodu dane przez jenca-glowe rodu): dlugosc paktu ta sama co w wymianie jencow (Prisoner Exchange Pact Days).</summary>
+        internal static int PactDays { get { return Days; } }
+
+        /// <summary>409: pakt WZAJEMNY z rodem (wpis Key "c:"+rod, zasieg "*") - ta sama regula co zadanie A: uczciwy wpis zeruje cele AI rodu na ziemiach rodu
+        /// gracza i atak na druzyne gracza; zlamanie przez gracza = kara 384b (PlayerBroke czyta same wpisy, bez umowy Deal); wpis zdradziecki tylko pilnowany
+        /// (AiBroke). Watek glowny. Zwraca dobe konca albo -1.</summary>
+        internal static int AddHousePact(Clan clan, Hero lord, int days, bool betray)
+        {
+            try
+            {
+                if (clan == null || clan.StringId == null || lord == null || lord.StringId == null || days <= 0) return -1;
+                int until = (int)Today + days;
+                _entries.Add(new Entry { Key = "c:" + clan.StringId, Scope = "*", Until = until, Lord = lord.StringId, Betray = betray });
+                SyncPact();
+                if (!betray) NoAttack();
+                return until;
+            }
+            catch (Exception e) { Stumble("AddHousePact", e); return -1; }
+        }
+
+        /// <summary>409: wpisy rodu ("c:"+rod, kazdy zasieg) precz - rod w wasni z graczem (egzekucja jego lorda). Rozejm osady zdejmowany jak w BrokeWord.
+        /// Bez kary (to nie zlamanie slowa). Zwraca liczbe zdjetych wpisow.</summary>
+        internal static int DropHousePact(Clan clan)
+        {
+            try
+            {
+                if (_entries.Count == 0 || clan == null || clan.StringId == null) return 0;
+                string key = "c:" + clan.StringId;
+                var gone = _entries.FindAll(e => e.Key == key);
+                if (gone.Count == 0) return 0;
+                foreach (var e in gone)
+                {
+                    _entries.Remove(e);
+                    if (e.Scope != "*" && e.Scope != "K" && !e.Betray) SiegeRansom.EndTruce384(Settlement.Find(e.Scope), e.Key);
+                }
+                SyncRealm();   // wola SyncPact
+                return gone.Count;
+            }
+            catch (Exception e) { Stumble("DropHousePact", e); return 0; }
+        }
+
         // ------------------------------------------------------------ pakt: cele AI, druzyna gracza, zlamania
         private static bool Match(Entry e, IFaction f, Clan c)
         {
