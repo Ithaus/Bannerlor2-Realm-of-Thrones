@@ -52,6 +52,13 @@ namespace Armoury
         internal static bool MeetsHero(CharacterObject ch, ItemObject it, out string why)
         {
             why = null;
+            // 424 (Jeff 11.11): sprzet olbrzymow nosi tylko olbrzym - pierwszy warunek sita bohaterow (wszystkie drogi z listy wyzej).
+            // Szeregowi (Meets) maja wlasne jawne warunki GiantGear - bez podwojnego liczenia.
+            try
+            {
+                if (ch != null && GiantGear.Is(it) && GiantGear.On && !GiantGear.MayWear(ch)) { why = GiantGear.SieveWhy; GiantGear.SieveRefused++; return false; }
+            }
+            catch { }
             try { if (it != null && it.ItemType == ItemObject.ItemTypeEnum.HorseHarness && !BardingByRiding()) return true; }
             catch { return true; }
             return Meets(ch, it, out why);

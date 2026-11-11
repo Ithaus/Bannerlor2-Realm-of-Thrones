@@ -50,7 +50,7 @@ namespace Armoury
                 // (Jeff: "pancerze tak samo, dopiero uczysz sie pancerzy").
                 // Blokada stoi PRZED podzialem na strzeleckie i BK-owe, wiec
                 // zamknietego wzoru nie wykujesz zadna droga.
-                if (PatternGate.RareStuff(item)) { Log.Player(PatternGate.RareWhy, true); return false; }   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged)
+                if (PatternGate.RareStuff(item)) { Log.Player(PatternGate.RareWhyFor(item), true); return false; }   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged)
                 if (!RangedLore.KnownOf(item))
                 {
                     // unikat imienny NIE wpada z nauki przy kowadle - trzeba

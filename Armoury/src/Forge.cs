@@ -572,7 +572,7 @@ namespace Armoury
             why = null;
             try
             {
-                if (PatternGate.RareStuff(item)) { why = PatternGate.RareWhy; return false; }   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - obie drogi kucia i menu kowala
+                if (PatternGate.RareStuff(item)) { why = PatternGate.RareWhyFor(item); return false; }   // m96-wzory po recenzjach: rzadki material (RareBowsNotForged) - obie drogi kucia i menu kowala
                 if (!RareMaterials.Ready(item, out why)) return false;   // m97-surowce: luk z czardrzewa / smoczej kosci - surowiec w sakwach
                 if (!Recipes.IsLegendary(item)) return true;
                 // OPANOWANY WZOR UNIKATU (Jeff 30.08: "moge kuc wiecej niz

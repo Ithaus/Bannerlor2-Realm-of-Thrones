@@ -31,6 +31,7 @@ namespace Armoury
     internal static class HeroGear
     {
         private static System.Reflection.FieldInfo _fTarget, _fCompared, _fCharacter;
+        internal static bool CanUseHooked;   // 424: postfiks CanUseItem wpiety (linia startu GiantGear)
 
         internal static void ApplyAll(Harmony h)
         {
@@ -38,7 +39,7 @@ namespace Armoury
             {
                 var m = AccessTools.Method(typeof(global::Helpers.CharacterHelper), "CanUseItem",
                     new[] { typeof(BasicCharacterObject), typeof(EquipmentElement), typeof(TextObject).MakeByRefType() });
-                if (m != null) h.Patch(m, postfix: new HarmonyMethod(typeof(HeroGear), nameof(CanUsePostfix)));
+                if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(HeroGear), nameof(CanUsePostfix))); CanUseHooked = true; }
                 Log.Info("Z16: ekran ekwipunku " + (m != null
                     ? "pilnuje pancerza (Athletics) u bohaterow - ta sama regula co u zolnierzy; strzaly (Bow) i belty (Crossbow) pilnuje sama gra; ladry (Riding) - "
                       + (ItemReq.BardingByRiding() ? "wedlug Jazdy (HeroBardingNeedsRiding)." : "bez sprawdzania (HeroBardingNeedsRiding wylaczone).")
@@ -78,11 +79,20 @@ namespace Armoury
             try
             {
                 if (!__result) return;                               // nigdy "nie" -> "tak"
+                var it = __1.Item;
+                var co = __0 as CharacterObject;
+                // 424 (Jeff 11.11): sprzet olbrzymow zaklada tylko olbrzym - przed HeroGearRequirements i OursOnly (maczuge pilnowal dotad tylko wymog gry
+                // TwoHanded 200, luk olbrzyma ma wymog 1, strzaly zadnego). Gra robi z odmowy czerwona karte i pokazuje powod (jak pancerz Z16).
+                if (co != null && GiantGear.Is(it) && GiantGear.On && !GiantGear.MayWear(co))
+                {
+                    __2 = GiantGear.WhyText(it);
+                    __result = false;
+                    GiantGear.ScreenRefused++;
+                    return;
+                }
                 var s = Settings.Current;
                 if (s == null || !s.HeroGearRequirements) return;
-                var it = __1.Item;
                 if (!OursOnly(it)) return;
-                var co = __0 as CharacterObject;
                 if (co == null || ItemReq.MeetsHero(co, it)) return;
                 __2 = WhyFor(ItemReq.SkillFor(it));
                 __result = false;
@@ -126,6 +136,24 @@ namespace Armoury
         /// CanUseItem (juz z naszym postfiksem) mowi "moze", inaczej czerwony; porownywana sztuka - tak samo, bez napisu.</summary>
         public static void TooltipPostfix(ItemMenuVM __instance)
         {
+            // 424: opis sprzetu olbrzymow - linia "Giants only" (zielona u olbrzyma, czerwona u czlowieka); przy porownaniu pusty wiersz po drugiej stronie
+            try
+            {
+                if (__instance != null && _fTarget != null && GiantGear.On)
+                {
+                    var gt = _fTarget.GetValue(__instance) as ItemVM;
+                    if (gt != null && GiantGear.Is(gt.ItemRosterElement.EquipmentElement.Item) && __instance.TargetItemProperties != null)
+                    {
+                        var gch = (_fCharacter != null ? _fCharacter.GetValue(__instance) : null) as CharacterObject;
+                        bool gok = gch == null || GiantGear.MayWear(gch);
+                        var gcol = gok ? TaleWorlds.CampaignSystem.ViewModelCollection.UIColors.PositiveIndicator : TaleWorlds.CampaignSystem.ViewModelCollection.UIColors.NegativeIndicator;
+                        __instance.TargetItemProperties.Add(new ItemMenuTooltipPropertyVM("Giants only", "", 0, gcol, false, null, TooltipProperty.TooltipPropertyFlags.None));
+                        if (__instance.IsComparing && __instance.ComparedItemProperties != null)
+                            __instance.ComparedItemProperties.Add(new ItemMenuTooltipPropertyVM("", "", 0, gcol, false, null, TooltipProperty.TooltipPropertyFlags.None));
+                    }
+                }
+            }
+            catch (Exception e) { Log.Error("HeroGear.Tooltip (424)", e); }
             try
             {
                 var s = Settings.Current;

@@ -676,7 +676,7 @@ namespace Armoury
             text = null;
             if (QuartermasterLaw.BarredInBattle(r) || IsDragon(r)) { text = "Never handed out to a soldier: an heirloom, a lore blade, kit of the dead or a dragon."; return RBarred; }
             if (LegendaryLaw.IsLegend(r)) { text = "A legendary blade - taken off any soldier as he takes the field."; return RLegend; }
-            if (GiantGear.Is(r) && !GiantGear.MayWear(t)) { text = "Giant's gear - only for troops that carry it in their own kit."; return RGiant; }
+            if (GiantGear.Is(r) && !GiantGear.MayWear(t)) { text = GiantGear.On ? "Giant's gear - only giants carry it." : "Giant's gear - only for troops that carry it in their own kit."; return RGiant; }   // 424
             if (r.ItemType != ItemObject.ItemTypeEnum.HorseHarness)   // K5: uprzezy w bitwie nikt nie sprawdza pod katem Jazdy - tu tez nie
             {
                 string why;

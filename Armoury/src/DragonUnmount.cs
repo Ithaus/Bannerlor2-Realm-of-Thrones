@@ -261,7 +261,9 @@ namespace Armoury
                                 && mis != null && (mis.IsFieldBattle || mis.IsSiegeBattle || mis.IsSallyOutBattle || InLordsHall());
                         }
                         catch { enlistKit = false; }
-                        if (enlistKit && heroReq)
+                        // 424: sito zaciagu dziala dla sprzetu olbrzymow takze bez HeroGearRequirements ("Mag's Secret" ROT wydaje czlowiekowi zestaw oddzialu giant)
+                        bool giantOn = GiantGear.On;
+                        if (enlistKit && (heroReq || giantOn))
                         {
                             for (int slot = 0; slot <= 9; slot++)
                             {
@@ -270,6 +272,7 @@ namespace Armoury
                                 if (it == null) continue;
                                 var mine = ownEq[(EquipmentIndex)slot];
                                 if (mine.Item == it) continue;
+                                if (!heroReq && !GiantGear.Is(it)) continue;   // 424: przy wylaczonym HeroGearRequirements tylko sprzet olbrzymow
                                 string whyNot;
                                 if (ItemReq.MeetsHero(soldier, it, out whyNot)) continue;
                                 string got;
@@ -295,6 +298,8 @@ namespace Armoury
                                     }
                                     else got = "lzejszej sztuki tego typu brak - zostaje przy wydanej";
                                 }
+                                // 424: sztuka olbrzyma zdjeta przez sito - licznik i komunikat raz na misje (niezdjeta idzie do galezi "olbrzymi sprzet na bohaterze" nizej)
+                                if (giantOn && GiantGear.Is(it) && eq[(EquipmentIndex)slot].Item != it) { GiantGear.SpawnHero++; if (soldier.IsPlayerCharacter) GiantGear.TellPlayerSpawn(); }
                                 if (_e8Log++ < 20)
                                     Log.Info("Z16: zaciag - bohater " + soldier.StringId + " nie udzwignie wydanego " + it.StringId
                                              + " (" + whyNot + ") - " + got + ".");
@@ -325,6 +330,7 @@ namespace Armoury
                             if (!GiantGear.Is(a) || GiantGear.MayWear(soldier)) continue;
                             var gtop = SkillsDecide.TopArmor(a.ItemType, hath, soldier.Culture);
                             eq[(EquipmentIndex)slot] = gtop != null ? new EquipmentElement(gtop) : new EquipmentElement(null);
+                            GiantGear.SpawnHero++; if (soldier.IsPlayerCharacter) GiantGear.TellPlayerSpawn();   // 424: licznik i komunikat raz na misje
                             if (_floorLog++ < 20)
                                 Log.Info("GiantGear: " + a.StringId + " zdjety z bohatera " + soldier.StringId
                                          + " - dostaje " + (gtop != null ? gtop.StringId : "goly slot") + ".");
@@ -338,6 +344,7 @@ namespace Armoury
                             int gs = w.RelevantSkill != null ? soldier.GetSkillValue(w.RelevantSkill) : 0;
                             var gswap = SkillsDecide.PatternFor(w.ItemType, gs, soldier);   // recenzja 313a
                             eq[(EquipmentIndex)slot] = gswap != null ? new EquipmentElement(gswap) : new EquipmentElement(null);
+                            GiantGear.SpawnHero++; if (soldier.IsPlayerCharacter) GiantGear.TellPlayerSpawn();   // 424: licznik i komunikat raz na misje
                             if (_floorLog++ < 20)
                                 Log.Info("GiantGear: " + w.StringId + " zdjety z bohatera " + soldier.StringId
                                          + " - dostaje " + (gswap != null ? gswap.StringId : "goly slot") + ".");

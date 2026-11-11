@@ -53,6 +53,9 @@ namespace Armoury
 
         // ------------------------------------------------------------ 6. luki z rzadkiego materialu
         internal const string RareWhy = "No smith can make this any more - the stuff it is made of cannot be had. Only the ones already in the world remain.";
+        internal const string GiantWhy = "Giant's work - no smith of men can make it.";   // 424
+        /// <summary>424: powod odmowy kowadla dla sztuki z RareStuff - sprzet olbrzymow ma wlasny tekst.</summary>
+        internal static string RareWhyFor(ItemObject it) { return GiantGear.ForgeBarred(it) ? GiantWhy : RareWhy; }
         private static readonly HashSet<string> _rare = new HashSet<string>(StringComparer.Ordinal);
         private static string _rareFrom;
 
@@ -60,6 +63,7 @@ namespace Armoury
         /// surowiec (RareMaterials.Covers: czardrzewo, smocza kosc), kuje sie z tego surowca (brama Forge.LegendAllowed) i rzadkim materialem nie jest.</summary>
         internal static bool RareStuff(ItemObject it)
         {
+            if (GiantGear.ForgeBarred(it)) return true;   // 424: sprzet olbrzymow nie jest wzorem ludzkiego kowala - nienauczalny i niekuty (te same bramy co rzadki material)
             return InRareList(it) && !RareMaterials.Covers(it);
         }
 
@@ -321,6 +325,7 @@ namespace Armoury
             try
             {
                 if (!TileOn || item == null) return null;
+                if (GiantGear.ForgeBarred(item)) return "GIANT'S WORK - CANNOT BE FORGED";   // 424
                 if (RareStuff(item)) return "RARE STUFF - CANNOT BE FORGED";   // po recenzjach: takze bez wzoru - kafelek nie obiecuje nauki
                 if (!RangedLore.KnownOf(item)) return null;   // nieznany - zostaje "PATTERN NOT LEARNED"
                 string rm = RareMaterials.TileText(item);   // m97-surowce: znany wzor luku z rzadkiego surowca, surowca brak w sakwach

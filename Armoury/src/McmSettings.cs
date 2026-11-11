@@ -436,7 +436,7 @@ namespace Armoury
         [SettingPropertyGroup("Learning patterns")]
         public bool ShieldCraftSkillGate { get; set; } = true;
 
-        [SettingPropertyBool("Forge Uniques By Study", HintText = "the famed pieces of Westeros (the named armours, the giants' arrows, and the great bows when Rare Bows Not Forged is off) are learned only by melting down or taking apart a captured original, like the gear of the great houses - they are never dealt at the start nor found by chance at the bench. Off: the great bows were ordinary patterns and named armours outside the old list could never be learned", RequireRestart = false)]
+        [SettingPropertyBool("Forge Uniques By Study", HintText = "the famed pieces of Westeros (the named armours, and the great bows when Rare Bows Not Forged is off) are learned only by melting down or taking apart a captured original, like the gear of the great houses - they are never dealt at the start nor found by chance at the bench. Off: the great bows were ordinary patterns and named armours outside the old list could never be learned", RequireRestart = false)]
         [SettingPropertyGroup("Learning patterns")]
         public bool ForgeUniquesByStudy { get; set; } = true;
 
@@ -1063,6 +1063,10 @@ namespace Armoury
         [SettingPropertyBool("Hero Gear Requirements", HintText = "you, your companions and the lords cannot put on armour above their Athletics - the same rule as for soldiers (arrows above Bow and bolts above Crossbow the game itself already refuses). On the inventory screen the card turns red, the game says 'You don't have enough Athletics skill to equip this item' and the description shows 'Requires: Athletics 175'. Armour asks Athletics by its weight only (Armour Kg Per Athletics), so gowns, robes, hats and gloves ask almost nothing. The same holds for Spoils' auto-equip of companions, for a lord buying or taking a renowned piece by the custom of war (what he cannot carry goes to his baggage and stays the renowned piece there), for the plain piece that replaces a renowned one, for the troop kit you and your companions are handed when enlisted in a lord's service (a piece you cannot carry is swapped for your own of the same kind, or for the best one you can carry) and for the weapon a captive gets when you take his famed one. What anyone already wears stays on him, in battle too. Horse barding asks Riding (Hero Barding Needs Riding). Off = only the game's own check of weapons, shields, arrows, bolts and horses", RequireRestart = false)]
         [SettingPropertyGroup("Skills rule the gear")]
         public bool HeroGearRequirements { get; set; } = true;
+
+        [SettingPropertyBool("Giant Gear Giants Only", HintText = "The giants' club, bow, arrows and hides are for giants alone. No man can put them on - not you, not a companion, not a lord - and no smith of men can make them. The inventory screen turns the card red (Only a giant can wield this), and the giant's kit that Realm of Thrones sells as Mag's Secret is swapped for arms of your own measure as you take the field. On loading a save and once a day, any man found carrying giant's gear gets ordinary arms of the same kind within his skill instead (you get an empty slot and a message), and giant's gear is cleared from market stalls and from the baggage of parties that lead no giants. It is never a tournament prize. Giants themselves - the giant troops, Mag the Mighty, Wun Wun - keep everything. Off: the old rule (soldiers only; heroes could wear what they held). Counted in the Armoury log (line 424)", RequireRestart = false)]
+        [SettingPropertyGroup("Skills rule the gear")]
+        public bool GiantGearGiantsOnly { get; set; } = true;
 
         [SettingPropertyBool("Hero Barding Needs Riding", HintText = "horse barding and saddles ask Riding of you, your companions and the lords too - the same rule as for soldiers. Realm of Thrones' own gear requirements (on by default) already make the inventory screen refuse barding above your Riding; this makes the rest follow the screen: Spoils' auto-equip of companions, your starting kit, a lord taking renowned barding by the custom of war (what he cannot ride with goes to his baggage). With Realm of Thrones' requirements off, the screen refuses barding above your Riding by this rule. What anyone already wears stays on him. Off = barding is not checked for heroes, except by the game's own screen", RequireRestart = false)]
         [SettingPropertyGroup("Skills rule the gear")]
@@ -12705,6 +12709,7 @@ namespace Armoury
             s.TroopSkillAutoFit = TroopSkillAutoFit;
             s.SkillsDecideEnabled = SkillsDecideEnabled;
             s.HeroGearRequirements = HeroGearRequirements;
+            s.GiantGearGiantsOnly = GiantGearGiantsOnly;
             s.HeroBardingNeedsRiding = HeroBardingNeedsRiding;
             s.HeroSkillToOwnGear = HeroSkillToOwnGear;
             s.AiHeroesNeverFightBare = AiHeroesNeverFightBare;

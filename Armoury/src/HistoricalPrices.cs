@@ -1269,10 +1269,15 @@ namespace Armoury
         {
             try
             {
-                if (!_applied || (__result != null && __result.Count > 0)) return;
+                // 424: sprzet olbrzymow nie jest nagroda turnieju (towar w danych ROT - gra bierze kazdy towar w przedziale wartosci); lista jest swieza
+                // (DefaultTournamentModel buduje ja przy kazdym wywolaniu). Gdy po odsianiu zostala pusta - zapas ponizej takze bez przeliczenia cen
+                // (pusta lista = losowanie z pustej listy = crash).
+                bool emptied = GiantGear.PrizeSift(__result) > 0 && __result.Count == 0;
+                if (!emptied && (!_applied || (__result != null && __result.Count > 0))) return;
                 var l = new TaleWorlds.Library.MBList<ItemObject>();
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
-                    if (it != null && !it.NotMerchandise && it.Value > 0 && (it.IsCraftedWeapon || it.ArmorComponent != null) && (int)it.Tier >= 2) l.Add(it);
+                    if (it != null && !it.NotMerchandise && it.Value > 0 && (it.IsCraftedWeapon || it.ArmorComponent != null) && (int)it.Tier >= 2
+                        && !GiantGear.ForgeBarred(it)) l.Add(it);   // 424
                 __result = l;
             }
             catch { }
