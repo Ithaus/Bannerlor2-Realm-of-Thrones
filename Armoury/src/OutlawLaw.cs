@@ -1183,18 +1183,83 @@ namespace Armoury
                         nv++;
                         if (v.VillageState == Village.VillageStates.Looted || v.VillageState == Village.VillageStates.BeingRaided) looted++;
                     }
-                float prosp = 0.5f, sec = 0.5f;
-                if (r.Town != null)
+                // 433 (C4): jedna miara w obu miejscach wzoru (tu i w naplywie doby) - MiseryCore to wzor sprzed 433, Extra433 dodatek biedy (klucz)
+                float prosp, sec;
+                float m = MiseryCore(r, s, AtWar(r.MapFaction), looted, nv, out prosp, out sec);
+                if (s.OutlawPovertyRisesBands && s.OutlawPovertyAlsoRecruits)
                 {
-                    prosp = MBMath.ClampFloat(r.Town.Prosperity / Math.Max(1f, s.OutlawProsperityGood), 0f, 1f);
-                    sec = MBMath.ClampFloat(r.Town.Security / 100f, 0f, 1f);
+                    var parts = default(Risk433.Parts);
+                    m += Extra433(r, s, prosp, sec, ref parts);
                 }
-                return (1f - prosp) + (1f - sec) * 0.5f
-                       + (AtWar(r.MapFaction) ? s.OutlawWarMisery : 0f)
-                       + (nv > 0 ? looted / nv * s.OutlawLootedMisery : 0f)
-                       + (r.IsStarving ? s.OutlawStarvingMisery : 0f);
+                return m;
             }
             catch { return 0f; }
+        }
+
+        /// <summary>Wzor nedzy sprzed 433 (bieda, bezprawie, wojna, spalone wsie, glod warowni) - wspolny dla MiseryOf i naplywu doby; prosp / sec 0..1 do dalszych rachunkow.</summary>
+        private static float MiseryCore(Settlement r, Settings s, bool war, float looted, int nv, out float prosp, out float sec)
+        {
+            prosp = 0.5f; sec = 0.5f;
+            if (r.Town != null)
+            {
+                prosp = MBMath.ClampFloat(r.Town.Prosperity / Math.Max(1f, s.OutlawProsperityGood), 0f, 1f);
+                sec = MBMath.ClampFloat(r.Town.Security / 100f, 0f, 1f);
+            }
+            return (1f - prosp) + (1f - sec) * 0.5f
+                   + (war ? s.OutlawWarMisery : 0f)
+                   + (nv > 0 ? looted / nv * s.OutlawLootedMisery : 0f)
+                   + (r.IsStarving ? s.OutlawStarvingMisery : 0f);
+        }
+
+        /// <summary>
+        /// 433 (audyt ekonomii C4, decyzja Jeffa 6): dodatek nedzy z biedy - (1) bieda warowni liczona OutlawPovertyScale razy ciezej, (2) glod wsi regionu
+        /// (Famine.HungerOf, srednia wsi), (3) uchodzcy spustoszenia poza domem (PeopleBook.RefugeesOf / ludzie wsi), (4) lud warowni tydzien bez monety na
+        /// jedzenie (TownFolk.MoneyHungry - tylko watek glowny, poza nim 0). HAMULCE: lad (bezpieczenstwo x OutlawPovertyOrderBrake zdejmuje czesc dodatku)
+        /// i sufit dodatku na region (OutlawPovertyMaxExtraMisery). parts - skladniki PO hamulcach (suma = wynik) i to, co hamulce zdjely. Tylko odczyt.
+        /// </summary>
+        private static float Extra433(Settlement r, Settings s, float prosp, float sec, ref Risk433.Parts parts)
+        {
+            try
+            {
+                float pov = (1f - prosp) * Math.Max(0f, s.OutlawPovertyScale - 1f);
+                float hunger = 0f, refu = 0f, purse = 0f;
+                var vs = r.BoundVillages;
+                if (vs != null && vs.Count > 0)
+                {
+                    double hu = 0.0, home = 0.0, away = 0.0; int n = 0;
+                    bool anyRef = PeopleBook.RefugeeVillages > 0;
+                    foreach (var v in vs)
+                    {
+                        if (v == null) continue;
+                        n++;
+                        hu += Famine.HungerOf(v);
+                        if (!anyRef) continue;
+                        double a = PeopleBook.RefugeesOf(v);
+                        if (a > 0.0) away += a;
+                        if (v.Settlement != null) home += PopulationLaw.PeopleOf(v.Settlement);
+                    }
+                    if (n > 0 && hu > 0.0) hunger = (float)Math.Min(1.0, hu / n) * Math.Max(0f, s.OutlawPovertyVillageHungerMisery);
+                    if (away > 0.0) refu = (float)(away / (home + away)) * Math.Max(0f, s.OutlawPovertyRefugeeMisery);
+                }
+                if (s.OutlawPovertyPurseMisery > 0f && TownFolk.MoneyHungry(r)) purse = s.OutlawPovertyPurseMisery;
+                float raw = pov + hunger + refu + purse;
+                if (!(raw > 0f)) return 0f;
+                float x = raw * (1f - MBMath.ClampFloat(sec, 0f, 1f) * MBMath.ClampFloat(s.OutlawPovertyOrderBrake, 0f, 1f));
+                float cap = Math.Max(0f, s.OutlawPovertyMaxExtraMisery);
+                if (x > cap) { x = cap; parts.Capped = true; }
+                float f = x / raw;
+                parts.Pov = pov * f; parts.Hunger = hunger * f; parts.Ref = refu * f; parts.Purse = purse * f; parts.Cut = raw - x;
+                return x;
+            }
+            catch (Exception e) { Risk433.Stumble("Extra433", e); return 0f; }
+        }
+
+        /// <summary>433 (C4): prosci regionu w puli (klucz "~") - hamulec pelnej puli i kontrola linii doby.</summary>
+        private static float CommonersIn(Settlement r)
+        {
+            Dictionary<string, float> d; float cm = 0f;
+            if (r != null && r.StringId != null && _pool.TryGetValue(r.StringId, out d)) d.TryGetValue(Commoner, out cm);
+            return cm;
         }
 
         internal static void Daily()
@@ -1226,19 +1291,26 @@ namespace Armoury
                                 hearth += PeopleUnit.Base(v); nv++;      // E4/3: podstawa naplywu - hearth, a przy liczeniu od ludzi ludnosc wsi w hearth sredniej wsi swiata
                                 if (v.VillageState == Village.VillageStates.Looted || v.VillageState == Village.VillageStates.BeingRaided) looted++;
                             }
-                        float prosp = 0.5f, sec = 0.5f;
-                        if (r.Town != null)
-                        {
-                            prosp = MBMath.ClampFloat(r.Town.Prosperity / Math.Max(1f, s.OutlawProsperityGood), 0f, 1f);
-                            sec = MBMath.ClampFloat(r.Town.Security / 100f, 0f, 1f);
-                        }
                         bool war = AtWar(r.MapFaction);
-                        float misery = (1f - prosp) + (1f - sec) * 0.5f
-                                       + (war ? s.OutlawWarMisery : 0f)
-                                       + (nv > 0 ? looted / nv * s.OutlawLootedMisery : 0f)
-                                       + (r.IsStarving ? s.OutlawStarvingMisery : 0f);
+                        float prosp, sec;
+                        float misery = MiseryCore(r, s, war, looted, nv, out prosp, out sec);      // 433: wzor sprzed 433 w jednym miejscu (MiseryOf liczy tym samym)
                         float inflow = hearth / 1000f * s.OutlawDailyPerThousandHearth * misery;
-                        if (inflow > 0f) _inMisery += TakeCommoners(r, inflow, PeopleBook.MMisery);
+                        if (s.OutlawPovertyRisesBands)
+                        {
+                            // 433 (C4): bieda rodzi wiecej zbojcow - dodatek nedzy z biedy (Extra433: lad i sufit juz zdjete); hamulec pelnej puli: prostych w puli regionu
+                            // >= OutlawPovertyPoolCapPerHearth x hearth - sam stary naplyw. Ludzie jak dotad z domow wsi regionu (TakeCommoners -> PeopleBook.Move)
+                            var parts = default(Risk433.Parts);
+                            float extra = Extra433(r, s, prosp, sec, ref parts);
+                            float unit = hearth / 1000f * s.OutlawDailyPerThousandHearth;
+                            float c0 = CommonersIn(r);
+                            bool full = extra > 0f && hearth > 0f && s.OutlawPovertyPoolCapPerHearth > 0f && c0 >= s.OutlawPovertyPoolCapPerHearth * hearth;
+                            float inflowOld = inflow;
+                            if (!full) inflow += unit * extra;
+                            float took = 0f; double h0 = _hMisery;
+                            if (inflow > 0f) { took = TakeCommoners(r, inflow, PeopleBook.MMisery); _inMisery += took; }
+                            Risk433.NoteRegion(r, inflowOld, unit, extra, ref parts, full, inflow, took, CommonersIn(r) - c0, _hMisery - h0, misery + (full ? 0f : extra));
+                        }
+                        else if (inflow > 0f) _inMisery += TakeCommoners(r, inflow, PeopleBook.MMisery);
 
                         Dictionary<string, float> d;
                         if (_pool.TryGetValue(r.StringId, out d) && d.Count > 0)

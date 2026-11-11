@@ -95,6 +95,15 @@ namespace Armoury
             return v;
         }
 
+        /// <summary>433 (C1, Risk433.RouteCost): najsilniejsza banda w dniu drogi wozu od odcinka a - b - ta sama miara i pamiec doby co straz 286 (BandRoute);
+        /// tylko odczyt. Bez osady startu 0.</summary>
+        internal static float RoadThreat433(Settlement a, Settlement b, bool naval, Settings s)
+        {
+            if (a == null || b == null || s == null) return 0f;
+            NewDayIfNeeded((int)CampaignTime.Now.ToDays);
+            return BandRoute(a, b, Math.Max(1.0, MarketCarts.PerDay(s)), naval);
+        }
+
         private sealed class Stack6 { public CharacterObject Ch; public int N; public double Per, Cost; public int W; }
 
         /// <summary>286: plan zwolnienia - najpierw najdrozsi za jednostke sily (stawka jednostki / moc jednostki gry), dopoki sila zostaje >= R i ludzi >= podstawa.</summary>

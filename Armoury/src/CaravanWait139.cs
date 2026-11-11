@@ -612,7 +612,15 @@ namespace Armoury
                 double dc = DayCost(mp);
                 int u; double rv, cs;
                 double vb = SaleValue(mp, result, db, SameDay(mp, result.Settlement), true, pantry, out u, out rv, out cs);
-                double rb = (vb - dc * db) / Math.Max(1.0, db);
+                // 433 (C1): karawana wycenia ryzyko trasy - koszt = (kiesa + towar po koszcie) x szansa straty na tej drodze; 0, gdy karawana nie jest slabsza od
+                // najsilniejszej bandy drogi (ta sama miara co straz 286). Klucz NIE - kb / k = 0 i rachunek 139 co do bitu
+                bool risk = Risk433.RouteOn(s);
+                Settlement from = risk ? mp.CurrentSettlement : null;
+                double stake = risk ? cargo + Math.Max(0, mp.PartyTradeGold) : 0.0;
+                float str = risk && mp.Party != null ? mp.Party.EstimatedStrength : 0f;
+                double kb = risk ? Risk433.RouteCost(mp, from, result.Settlement, db, stake, str, s) : 0.0;
+                double rb0 = (vb - dc * db) / Math.Max(1.0, db);
+                double rb = risk ? (vb - dc * db - kb) / Math.Max(1.0, db) : rb0;
                 if (home && rb > 0) { _cHome++; return; }                    // 140: dom z zyskiem zostaje (tylko seek - bez seek dom wyszedl wyzej)
                 double dmax0 = stuck ? Math.Max(db, Leg) : db;
                 // 139c: dowodca z ocena J > 0 przyjmuje miasto z zyskiem do dmax x (1 + J); J = 0 (AI) - zasieg 139
@@ -637,6 +645,7 @@ namespace Armoury
                     }
                 }
                 Town best = null; double rbest = rb, vbest = 0, dbest = 0, rmax = rb;
+                Town best0 = null; double rbest0 = rb0;                       // 433 (C1, tylko pomiar): wybor bez ryzyka trasy
                 if (cand.Count > 0)
                 {
                     cand.Sort((a, b) => a.Value.CompareTo(b.Value));
@@ -644,11 +653,14 @@ namespace Armoury
                     {
                         double d = cand[i].Value;
                         double v = SaleValue(mp, cand[i].Key, d, SameDay(mp, cand[i].Key.Settlement), true, pantry, out u, out rv, out cs);
-                        double rr = (v - dc * d) / Math.Max(1.0, d);
+                        double rr0 = (v - dc * d) / Math.Max(1.0, d);
+                        double rr = risk ? (v - dc * d - Risk433.RouteCost(mp, from, cand[i].Key.Settlement, d, stake, str, s)) / Math.Max(1.0, d) : rr0;
                         if (rr > rmax) rmax = rr;
                         if (rr > rbest) { rbest = rr; best = cand[i].Key; vbest = v; dbest = d; }
+                        if (risk && rr0 > rbest0) { rbest0 = rr0; best0 = cand[i].Key; }
                     }
                 }
+                if (risk) Risk433.NoteDecision((best != null && rbest > 0 ? best : result) != (best0 != null && rbest0 > 0 ? best0 : result));
                 if (!(rmax > 0)) _cNone++;
                 if (home) CaravanLeg140.NoteHomeNo(best != null && rbest > 0);   // 140: dom bez zysku (tylko seek)
                 if (best == null || !(rbest > 0)) return;

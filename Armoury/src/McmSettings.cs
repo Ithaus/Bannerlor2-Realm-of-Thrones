@@ -3504,6 +3504,10 @@ namespace Armoury
         [SettingPropertyGroup("The road to market")]
         public int NotableCaravanCap { get; set; } = 3;
 
+        [SettingPropertyInteger("Caravan Loss Wait Days", 0, 120, "0", HintText = "a merchant or lord whose caravan was beaten and destroyed on the road waits this many days before sending out a new one, so robbery truly thins the trade for a while. Your own clan is never bound. 0 = a new caravan at once, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The road to market")]
+        public int CaravanLossWaitDays { get; set; } = 14;
+
         [SettingPropertyBool("Village Clog Diagnostics", HintText = "log only, changes nothing in the game: once a day the Armoury log says why village storehouses stand full (one and a half times their size stops all village work) - village types, what lies in them, where each village's villagers are (at home, on the road and for how long, in town, none at all) and how many villages filled up or emptied that day; ten examples every five days (off = no such lines)", RequireRestart = false)]
         [SettingPropertyGroup("The road to market")]
         public bool VillageClogDiagnostics { get; set; } = true;
@@ -4131,6 +4135,42 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Outlaw Routed Home Days War", 0.00f, 480.00f, "0.00", HintText = "the same in a land whose realm is at war with another realm (the endless wars with the Free Folk and the Others do not count): the war goes on around them, so routed soldiers and deserters stay in the woods far longer and feed the bands while the war lasts; when peace comes they drain away and the bands shrink back. 0 = the same as in peace", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawRoutedHomeDaysWar { get; set; } = 120f;
+
+        [SettingPropertyBool("Outlaw Poverty Rises Bands", HintText = "poverty breeds outlaws: the daily flow of villagers to the woods counts the poverty of the land more heavily (Outlaw Poverty Scale) and also reads what the land really suffers - hunger in its villages, people driven from burnt farms who have not come home, and a town whose people cannot pay for bread. Every such man leaves his village in the people's book and joins the outlaws of his region; none comes from nowhere. Order holds it back: a town kept in good security halves the added flow (Outlaw Poverty Order Brake), the added misery has a ceiling, and a land whose woods are already full sends no more. Off = the old measure of misery, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool OutlawPovertyRisesBands { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Outlaw Poverty Scale", 1.00f, 10.00f, "0.00", HintText = "with Outlaw Poverty Rises Bands: how many times heavier a land's poverty (low prosperity) weighs in its misery than before (1 = as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float OutlawPovertyScale { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Outlaw Poverty Village Hunger Misery", 0.00f, 5.00f, "0.00", HintText = "with Outlaw Poverty Rises Bands: misery added when all the villages of a land go wholly without food (scaled by how short they are)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float OutlawPovertyVillageHungerMisery { get; set; } = 1.5f;
+
+        [SettingPropertyFloatingInteger("Outlaw Poverty Refugee Misery", 0.00f, 5.00f, "0.00", HintText = "with Outlaw Poverty Rises Bands: misery added when all the people of a land's villages have been driven from their homes by raids (scaled by the share still away)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float OutlawPovertyRefugeeMisery { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Outlaw Poverty Purse Misery", 0.00f, 5.00f, "0.00", HintText = "with Outlaw Poverty Rises Bands: misery added while the people of the land's town or castle have gone a week without the coin for their food", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float OutlawPovertyPurseMisery { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Outlaw Poverty Order Brake", 0.00f, 1.00f, "0.00", HintText = "with Outlaw Poverty Rises Bands: how much of the added misery a town or castle in perfect security takes away (0.5 = half at security 100, a quarter at 50; 0 = order does not matter)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float OutlawPovertyOrderBrake { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Outlaw Poverty Max Extra Misery", 0.00f, 10.00f, "0.00", HintText = "with Outlaw Poverty Rises Bands: the most misery this rule may add to one land, whatever befalls it", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float OutlawPovertyMaxExtraMisery { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Outlaw Poverty Pool Cap Per Hearth", 0.00f, 1.00f, "0.000", HintText = "with Outlaw Poverty Rises Bands: once this many villagers per hearth of a land already hide in its woods (twice what a new world starts with), the added flow stops there and only the old flow goes on (0 = no such brake)", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public float OutlawPovertyPoolCapPerHearth { get; set; } = 0.06f;
+
+        [SettingPropertyBool("Outlaw Poverty Also Recruits", HintText = "with Outlaw Poverty Rises Bands: the same heavier measure of misery also pushes men to take service (Recruit Misery Weight) - one truth about a land for the woods and for the recruiter. Off = volunteers follow the old measure", RequireRestart = false)]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool OutlawPovertyAlsoRecruits { get; set; } = true;
 
         [SettingPropertyBool("Disbanded Villagers Go Home", HintText = "a village caravan or fishing crew the game breaks up without a fight (no healthy men left, a lost party, too many boats) goes back to its village, the wounded too, instead of vanishing", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
@@ -10720,6 +10760,14 @@ namespace Armoury
         [SettingPropertyGroup("Caravans weigh waiting, lot cap and road cost (139)")]
         public bool CaravanRouteRoadCost { get; set; } = true;
 
+        [SettingPropertyBool("Caravans Price Road Risk", HintText = "with Caravans Count Road Cost In Destination: a caravan weaker than the strongest bandit band near the road to a town counts the risk of that road as a cost - its purse and goods times the chance of losing them (Caravan Route Risk Per Day Percent for each day of road, scaled by how much weaker it is). A caravan at least as strong as the band counts nothing. Dangerous towns are visited less. Off = roads are weighed by wages and food only, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans weigh waiting, lot cap and road cost (139)")]
+        public bool CaravanRouteRisk { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Caravan Route Risk Per Day Percent", 0.00f, 20.00f, "0.00", HintText = "with Caravans Price Road Risk: the chance in percent, for each day of road, that a caravan with no strength at all beside the band of that road loses everything (a caravan half as strong as the band counts half of it)", RequireRestart = false)]
+        [SettingPropertyGroup("Caravans weigh waiting, lot cap and road cost (139)")]
+        public float CaravanRouteRiskPerDayPercent { get; set; } = 2f;
+
         [SettingPropertyBool("Caravan Leg Counts Moving Caravans", HintText = "140: the measured caravan leg (the road days between towns used for the escort food a caravan keeps, the road-to-straight ratio of every road-day reckoning and the cost of carrying goods on) leaves out caravans standing in a castle or a village - they travel no leg and leave no town. A stay in a town stays part of the leg, as before. Off = every caravan counts, as in 139", RequireRestart = false)]
         [SettingPropertyGroup("Caravan leg and stuck caravans (140)")]
         public bool CaravanLegMovingOnly { get; set; } = true;
@@ -13483,6 +13531,7 @@ namespace Armoury
             s.CaravanTownHourlyMaxTicks = CaravanTownHourlyMaxTicks;
             s.IslandCaravanFix = IslandCaravanFix;
             s.NotableCaravanCap = NotableCaravanCap;
+            s.CaravanLossWaitDays = CaravanLossWaitDays;
             s.VillageClogDiagnostics = VillageClogDiagnostics;
             s.CaravanBulkEnabled = CaravanBulkEnabled;
             s.CaravanBulkStockDays = CaravanBulkStockDays;
@@ -13640,6 +13689,15 @@ namespace Armoury
             s.OutlawsCountedByPeople = OutlawsCountedByPeople;
             s.OutlawRoutedHomeDays = OutlawRoutedHomeDays;
             s.OutlawRoutedHomeDaysWar = OutlawRoutedHomeDaysWar;
+            s.OutlawPovertyRisesBands = OutlawPovertyRisesBands;
+            s.OutlawPovertyScale = OutlawPovertyScale;
+            s.OutlawPovertyVillageHungerMisery = OutlawPovertyVillageHungerMisery;
+            s.OutlawPovertyRefugeeMisery = OutlawPovertyRefugeeMisery;
+            s.OutlawPovertyPurseMisery = OutlawPovertyPurseMisery;
+            s.OutlawPovertyOrderBrake = OutlawPovertyOrderBrake;
+            s.OutlawPovertyMaxExtraMisery = OutlawPovertyMaxExtraMisery;
+            s.OutlawPovertyPoolCapPerHearth = OutlawPovertyPoolCapPerHearth;
+            s.OutlawPovertyAlsoRecruits = OutlawPovertyAlsoRecruits;
             s.DisbandedVillagersGoHome = DisbandedVillagersGoHome;
             s.NaturalGrowthEnabled = NaturalGrowthEnabled;
             s.GrowthBasePercent = GrowthBasePercent;
@@ -15287,6 +15345,8 @@ namespace Armoury
             s.CaravanWaitCostsWage = CaravanWaitCostsWage;
             s.CaravanBkLotInItemCoin = CaravanBkLotInItemCoin;
             s.CaravanRouteRoadCost = CaravanRouteRoadCost;
+            s.CaravanRouteRisk = CaravanRouteRisk;
+            s.CaravanRouteRiskPerDayPercent = CaravanRouteRiskPerDayPercent;
             s.CaravanLegMovingOnly = CaravanLegMovingOnly;
             s.CaravanStuckSeekPayingTown = CaravanStuckSeekPayingTown;
             s.BkRetinueFromVillage = BkRetinueFromVillage;

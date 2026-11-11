@@ -309,6 +309,8 @@ namespace Armoury
                 if (at == null) return;
                 bool ships;
                 if (!Template(__0, at, out ships)) return;
+                // 433 (C2): lord, ktoremu rozbito karawane, czeka tak samo jak kupiec (jedna regula na wlasciciela) - przed licznikami zakupu E8/G1 i brama 294
+                if (__0 != Hero.MainHero && (__0.Clan == null || __0.Clan != Clan.PlayerClan) && Risk433.Waits(__0, true)) { __result = false; return; }
                 _dBuyAsk++;
                 // 294 (klucz CaravanEntryWhenTradePays): lord BK kupuje karawane tylko przy miejscu na rynku karawan - kazda galaz, w ktorej zakup by zaszedl
                 // (morska, z droga, slepy zaulek w cieniu Island Caravan Fix); zakup pominiety przez Island Caravan Fix (nizej) bramy nie pyta
@@ -531,6 +533,8 @@ namespace Armoury
             try
             {
                 if (__0 == Hero.MainHero || (__0.Clan != null && __0.Clan == Clan.PlayerClan)) return;
+                // 433 (C2): wlasciciel, ktoremu rozbito karawane, czeka Caravan Loss Wait Days dob - przed brama 294 i limitem A1 (ich liczniki bez tej odmowy)
+                if (Risk433.Waits(__0, false)) { __result = false; return; }
                 int n = Owned(__0);
                 if (n <= 0)
                 {
