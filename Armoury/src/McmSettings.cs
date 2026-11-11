@@ -12096,7 +12096,7 @@ namespace Armoury
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public bool FuneralTruce { get; set; } = true;
 
-        [SettingPropertyInteger("Funeral Travel Range", 0, 400, "0", HintText = "With Funerals: for a full funeral the lords of the dead lord's own house ride to the seat and stay there until the funeral is over, when they are no farther than this many map units (120 is about two days' ride). Only a party whose best choice of the hour is peaceful (a patrol or a visit to a town) goes: never one in an army, in battle, at a siege, starving or at sea, never while a stronghold of the house or the realm near it is besieged, and never a lord the Realm of Thrones story still needs. 0 = nobody rides to a funeral", RequireRestart = false)]
+        [SettingPropertyInteger("Funeral Travel Range", 0, 400, "0", HintText = "With Funerals: for a full funeral the lords of the dead lord's own house ride to the seat and stay there until the funeral is over, when they are no farther than this many map units (120 is about two days' ride). Only a party whose best choice of the hour is peaceful (a patrol or a visit to a town) goes: never one in an army, in battle, at a siege, starving, short of food (two days for a town; for a castle enough to last the funeral and two days more) or at sea, never while the seat or a stronghold of the house or the realm near the party is besieged, never across the Wall, and never a lord the Realm of Thrones story still needs. 0 = nobody rides to a funeral", RequireRestart = false)]
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public int FuneralTravelRange { get; set; } = 120;
 

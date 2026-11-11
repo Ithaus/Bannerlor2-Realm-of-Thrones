@@ -217,9 +217,12 @@ namespace Armoury
         // (metoda zadeklarowana w tej klasie - DeclaredMethod; po RescueHunt 150 i pakcie 140, przed ArmsFirst 100, wetami 50/48/45 i LordEscort / SiegeWalls2 Last -
         // dozbrojenie, weta i ucieczka przed silniejszym dalej wygrywaja). Wpinana w kampanii, raz na proces (GatherSessionStart).
         // REGULA: partia lorda rodu zmarlego (pogrzeb PELNY, do dnia End wlacznie) dostaje GoToSettlement(siedziba) = najlepsza ocena tej godziny + 0.01, gdy WSZYSTKO:
-        //  nie gracz, nie w armii / bitwie / oblezeniu / na morzu, nie gloduje, !DoNotChangeBehavior, lider nie pod straza fabuly, odleglosc <= Funeral Travel Range,
+        //  nie gracz, nie w armii / bitwie / oblezeniu / na morzu, nie gloduje i ma zapas jedzenia (407-p: miasto 2 doby, zamek do konca pogrzebu + 2), siedziba nie
+        //  oblezona, nie przez Mur (gdy gra / ROT nie daly wpisu do siedziby), !DoNotChangeBehavior, lider nie pod straza fabuly, odleglosc <= Funeral Travel Range,
         //  zadna twierdza rodu ani krolestwa w zasiegu 120 od partii nie jest oblegana, krolestwo w wojnie -> zdrowych >= Funeral Min Escort,
         //  NAJLEPSZA opcja tej godziny jest pokojowa (PatrolAroundPoint albo GoToSettlement, bez zwolywania armii) - kazda inna na czele = nie jedzie.
+        // DECYZJA (407-p, swiadomie): zbiorka wojenna W1b i werbunek W1a z CanonWarBalance (250) oraz patrol lowow RescueHunt (150) to dla nas zwykle
+        // GoToSettlement / PatrolAroundPoint = "pokojowe" - lord rodu w zalobie w zasiegu 120 jedzie na pogrzeb zamiast na zbiorke (do 6 dob, litera planu).
         // Wyniku <= -1 (cudze weto celu) nie podnosimy. Partia stojaca w siedzibie dostaje te sama ocene do konca pogrzebu: gra przy GoToSettlement do osady, w ktorej
         // partia juz jest, nie wydaje nowego rozkazu (cs_full.cs:221119) - partia zostaje.
         // Mysl AI w 1.4.8 jest sekwencyjna (tickery TickPartialHourlyAi z doParallel: false, cs_full.cs:22049), mimo to postfiks czyta NIEZMIENNA migawke (_gather),
@@ -390,6 +393,8 @@ namespace Armoury
                 }
                 var oc = seat.OwnerClan;
                 if (oc != cl) { GatherSkip(t, party, "siedziba", "siedziba nie jest juz rodu"); return; }
+                // 407-p: siedziba oblezona w trakcie pogrzebu - wprost (dotad posrednio przez ThreatNear w zasiegu 120; przy Funeral Travel Range > 120 partia jechala pod oboz)
+                if (seat.IsUnderSiege && !here) { GatherSkip(t, party, "siedziba-oblezona", "siedziba " + seat.StringId + " oblezona"); return; }
                 if (partyThinkParams.DoNotChangeBehavior) { GatherSkip(t, party, "dnc", "rozkaz nie do zmiany (DoNotChangeBehavior)"); return; }
                 if (party.Army != null) { GatherSkip(t, party, "armia", "w armii"); return; }
                 if (party.MapEvent != null) { GatherSkip(t, party, "bitwa", "w bitwie"); return; }
@@ -397,7 +402,13 @@ namespace Armoury
                 if (party.CurrentSettlement != null && party.CurrentSettlement.IsUnderSiege) { GatherSkip(t, party, "oblezona", "stoi w oblezonej twierdzy"); return; }
                 if (party.IsCurrentlyAtSea) { GatherSkip(t, party, "morze", "na morzu"); return; }
                 if (party.Party.IsStarving) { GatherSkip(t, party, "glod", "gloduje"); return; }
-                if (lh.StringId != null && t.Guarded.Contains(lh.StringId)) { GatherSkip(t, party, "straz", "lider " + lh.StringId + " pod straza fabuly"); return; }
+                // 407-p: zapas jedzenia. Wizyta gry po zywnosc to tez GoToSettlement (bylaby przebita o 0.01), a gra kupuje jedzenie tylko w miescie i wsi
+                // (cs_full.cs:202481) - w ZAMKU partia stalaby do dnia End i zaglodzila sie. Miasto: 2 doby zapasu; zamek: zapas do konca pogrzebu + 2 doby.
+                int foodNeed = seat.IsTown ? 2 : Math.Max(0, t.End - Today()) + 2;
+                int foodHave = party.GetNumDaysForFoodToLast();
+                if (foodHave < foodNeed) { GatherSkip(t, party, "zywnosc", "zapas jedzenia " + foodHave + " dob < " + foodNeed + (seat.IsTown ? "" : " (zamek: do konca pogrzebu + 2)")); return; }
+                // 407-p: straz fabuly takze na zywo (migawka doby mogla nie znac bohatera, ktory wszedl w stan "potrzebny" w srodku doby); mysl AI jest sekwencyjna
+                if (lh.StringId != null && (t.Guarded.Contains(lh.StringId) || GuardedSafe(lh))) { GatherSkip(t, party, "straz", "lider " + lh.StringId + " pod straza fabuly"); return; }
                 float dist = here ? 0f : party.GetPosition2D.Distance(seat.GetPosition2D);
                 if (dist > range) { GatherSkip(t, party, "daleko", "odleglosc " + dist.ToString("F0", Inv) + " > " + range.ToString("F0", Inv)); return; }
                 var threat = ThreatNear(party, cl);
@@ -434,6 +445,15 @@ namespace Armoury
                 }
                 else
                 {
+                    // 407-p: gra / ROT nie daly wpisu do siedziby. ROT (AIThinkPatch.Patch1, rot_all.cs:17966) usuwa cele po drugiej stronie Muru - nie dopisujemy
+                    // go z powrotem (ta sama bramka strony Muru co ranny wodz 408: ROTUtilities.IsBeyondTheWall przez ArmsFirst.Beyond)
+                    if (!here)
+                    {
+                        var bw = ArmsFirst.Beyond();
+                        bool wall = false;
+                        if (bw != null) { try { wall = bw(party.GetPosition2D) != bw(seat.GetPosition2D); } catch { wall = false; } }
+                        if (wall) { GatherSkip(t, party, "mur", "siedziba " + seat.StringId + " po drugiej stronie Muru"); return; }
+                    }
                     MobileParty.NavigationType nav; float navDist; bool port;
                     AiHelper.GetBestNavigationTypeAndAdjustedDistanceOfSettlementForMobileParty(party, seat, false, out nav, out navDist, out port);
                     if (nav == MobileParty.NavigationType.None)

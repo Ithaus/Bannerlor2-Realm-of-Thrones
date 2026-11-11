@@ -317,6 +317,13 @@ namespace Armoury
                 if (why == null && full >= MaxActive) why = "limit swiata (" + full + "/" + MaxActive + ")";
             }
             if (why != null) { row.Mode = Quiet; row.Why = why; _nQuiet++; } else _nFull++;
+            Row stale;
+            if (_active.TryGetValue(cl.StringId, out stale))
+            {
+                // 407-p: wiersz po terminie, ktorego doba jeszcze nie zamknela (Joint wyzej go nie wzial) - pamiec zjazdu starego pogrzebu nie przechodzi na nowy
+                string ge = GatherEnd(stale);
+                Info("KONIEC " + cl.StringId + " (" + stale.Name + ", po terminie dnia " + stale.End + ") - zastapiony nowym pogrzebem rodu" + ge + ".");
+            }
             _active[cl.StringId] = row;
             Info(head + " | siedziba " + seat.StringId + " | tryb " + (row.Mode == Full ? "PELNY" : "CICHY (" + why + ")") + " | obrzed dnia " + row.Rite + ", koniec " + row.End + ".");
             TruceRebuild();   // 406: pokoj pogrzebu - nowy wiersz pelny (albo wyparty na cichy)

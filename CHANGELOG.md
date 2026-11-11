@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 407-p (11.11) - ZJAZD RODU: poprawki po recenzji 407 - na pogrzeb tylko z zapasem jedzenia (zamek: do konca pogrzebu + 2 doby), nie do oblezonej siedziby, nie przez Mur wbrew situ ROT, straz fabuly na zywo, pamiec zjazdu nie przechodzi na nastepny pogrzeb rodu (FuneralRites.Ai.cs, FuneralRites.cs, Settings.cs, McmSettings.cs; bez nowych kluczy MCM)
+
+**Problem:** recenzja 407 (stabilnosc): KRYTYCZNYCH i SREDNICH brak, 6 NISKICH. Dowod z kodu i dekompilacji - w grze nic nie uruchamiano. (1) Wizyta gry po zywnosc to tez `GoToSettlement` (AiVisitSettlementBehavior, cs_full.cs:220563) - zjazd przebijal ja o 0.01; straz `IsStarving` dziala dopiero przy pustych jukach, a gra kupuje jedzenie tylko w miescie i wsi (cs_full.cs:202481): partia stojaca w ZAMKU-siedzibie do dnia End glodowala. (2) ROT `AIThinkPatch.Patch1` (rot_all.cs:17966-18025) usuwa cele po drugiej stronie Muru partiom frakcji w wojnie ze Straza; gdy wpisu do siedziby nie bylo, dopisywalismy go od nowa. (3) Oblezona siedziba byla odrzucana tylko posrednio (`ThreatNear`, stala 120) - przy Funeral Travel Range > 120 partia jechala pod oboz oblegajacych. (4) Zjazd przebija zbiorke wojenna / werbunek CanonWarBalance i patrol lowow. (5) Druga smierc glowy rodu po terminie wiersza (przed doba) nadpisywala wiersz bez `GatherEnd` - limit linii, "dotarla" i "obecnych n/m" przechodzily na nowy pogrzeb. (6) Straz fabuly tylko z migawki doby.
+
+**Przyczyna:** brak bramki zapasu jedzenia, strony Muru i `seat.IsUnderSiege` w `GatherPostfix`; `Head` podmienial wiersz bez zamkniecia pamieci zjazdu.
+
+**Zmiana:**
+- Zapas jedzenia: `GetNumDaysForFoodToLast()` < 2 doby (siedziba-miasto) albo < (dni do konca pogrzebu + 2) (siedziba-zamek) -> "pominieta (zapas jedzenia N dob < M)". Dotyczy takze partii juz stojacej w siedzibie (wtedy wygrywa wizyta gry po zapasy).
+- Siedziba oblezona -> "pominieta (siedziba X oblezona)" (partia w srodku: jak dotad "stoi w oblezonej twierdzy").
+- Mur: gdy gra / ROT nie daly wpisu do siedziby, a partia i siedziba sa po roznych stronach Muru (`ROTUtilities.IsBeyondTheWall` przez `ArmsFirst.Beyond`, jak ranny wodz 408) -> "pominieta (siedziba X po drugiej stronie Muru)". Wpis dany przez gre (ROT go nie usunal) podnosimy jak dotad.
+- Straz fabuly: obok migawki doby `StoryGuard.Needed(lider)` na zywo.
+- `Head`: przed podmiana wiersza po terminie `GatherEnd(stary)` + linia "KONIEC rod (..., po terminie dnia N) - zastapiony nowym pogrzebem rodu | zjazd: ...".
+- ZOSTAJE (zarzut 4, decyzja): zbiorka W1b / werbunek W1a (CanonWarBalance 250) i patrol lowow (RescueHunt 150) sa dla zjazdu "pokojowe" - zgodnie z litera planu ("PatrolAroundPoint albo GoToSettlement bez zwolywania armii"); dotyczy tylko partii rodu zmarlego w zasiegu Funeral Travel Range, do 6 dob; w wojnie dziala Funeral Min Escort. Opisane w naglowku sekcji 407 - do decyzji Jeffa, jesli w logu zbiorki beda cierpiec.
+- Opis klucza Funeral Travel Range uzupelniony (jedzenie, oblezona siedziba, Mur).
+
+**Ryzyko / co sprawdzic:** kontrola calosci - `GatherPostfix` (130) dalej biegnie po RescueHunt 150 / pakcie 140 i przed ArmsFirst 100, wetami 50 / 48 / 45 i rannym wodzem 408 (60); nowe bramki tylko ODMAWIAJA (mniej rozkazow, nigdy wiecej). Prog jedzenia dla zamku przy Funeral Days 5 to do 7 dob - partie z malym zapasem nie przyjada do zamku-siedziby (w logu "zapas jedzenia"); miara skutku dalej "obecnych n/m" w linii KONIEC. `GetNumDaysForFoodToLast` (cs_full.cs:103398) - jedno wywolanie na mysl partii rodu w zalobie. W grze nie sprawdzano.
+
+**Status:** DO SPRAWDZENIA
+
 ## 406-p (11.11) - POKOJ POGRZEBU: poprawki po recenzji 406 - linia stanu pokoju pisana przy kazdej zmianie (nie raz na wiersz), czyszczenie pamieci bledow pod zamkiem (FuneralRites.cs, FuneralRites.Ai.cs; bez nowych kluczy MCM, bez zmian w zachowaniu gry)
 
 **Problem:** recenzja 406 (stabilnosc): KRYTYCZNYCH i SREDNICH brak, 3 NISKIE. Dowod z kodu - w grze nic nie uruchamiano. (1) Linia "POKOJ POGRZEBU ..." / "pokoj pogrzebu ...: BRAK" szla raz na wiersz (`TSaid`): gdy siedziba zmienila pana w trakcie pogrzebu albo wydarzenie ROT osady fabuly doszlo do stanu 2, log zostawal ze stanem z pierwszej doby. (2) `Reset` czyscil `_err` bez zamka, ktory `Stumble` bierze takze z watkow AI. (3) Poza kanonem weto armii BK daje brak celu zamiast nastepnego.
