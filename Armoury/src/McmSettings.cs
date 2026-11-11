@@ -11972,6 +11972,30 @@ namespace Armoury
         [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
         public bool HeroWoundsLog { get; set; } = true;
 
+        [SettingPropertyBool("Dungeon Sickness", HintText = "A dungeon of your own castle or town that holds more prisoners than Dungeon Crowding From of its room breeds fever. Common prisoners sicken every day (Dungeon Regular Sick Percent): one in ten of the sick dies (Siege Sickness Death Share), the rest lie wounded. Captive lords may fall ill (Dungeon Hero Sick Chance Percent) for Dungeon Sick Days; in this version no lord dies of it. Winter, a siege with camp fever and the unburied dead within the walls make it worse; a governor skilled in medicine helps. Spreading prisoners over several fortresses ends it. Dungeons of other lords are only counted. Off = dungeons are as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
+        public bool DungeonSickness { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Dungeon Crowding From", 0.05f, 0.99f, "0.00", HintText = "With Dungeon Sickness: share of the dungeon's room (0.75 = three quarters full) above which fever begins. The pressure grows from 0 at this share to 1 at a full dungeon and 2 at a dungeon far over its room", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
+        public float DungeonCrowdingFrom { get; set; } = 0.75f;
+
+        [SettingPropertyFloatingInteger("Dungeon Regular Sick Percent", 0.00f, 100.00f, "0.0", HintText = "With Dungeon Sickness: percent of the common prisoners who sicken each day in a full dungeon (multiplied by the pressure, winter and the dead within besieged walls; reduced by the governor's medicine). One in ten of the sick dies, so 5 means about half a percent of the prisoners dead a day", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
+        public float DungeonRegularSickPercent { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Dungeon Hero Sick Chance Percent", 0.00f, 100.00f, "0.0", HintText = "With Dungeon Sickness: chance in percent a day that a captive lord falls ill in a full dungeon (multiplied by the pressure, winter and the dead within besieged walls; half as much again from the age of 50). Members and companions of your clan, hostages held under guard and gravely wounded lords are left out", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
+        public float DungeonHeroSickChancePercent { get; set; } = 1f;
+
+        [SettingPropertyInteger("Dungeon Sick Days", 1, 364, "0", HintText = "With Dungeon Sickness: days a captive lord's fever lasts. He recovers sooner when the dungeon stays below Dungeon Crowding From for three days, or when he is released or moved. After a fever he cannot fall ill again for 30 days", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
+        public int DungeonSickDays { get; set; } = 10;
+
+        [SettingPropertyBool("Dungeon Warnings", HintText = "With Dungeon Sickness: messages about your dungeons - a crowded dungeon, fever breaking out, common prisoners dead of fever (at most once a week for each dungeon), a lord fallen ill or recovered. Off = only Armoury.log", RequireRestart = false)]
+        [SettingPropertyGroup("Dungeons: crowding and fever in your own dungeons (402)")]
+        public bool DungeonWarnings { get; set; } = true;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -15164,6 +15188,12 @@ namespace Armoury
             s.HeroWoundsCompanions = HeroWoundsCompanions;
             s.HeroWoundsReplaceRbCritical = HeroWoundsReplaceRbCritical;
             s.HeroWoundsLog = HeroWoundsLog;
+            s.DungeonSickness = DungeonSickness;
+            s.DungeonCrowdingFrom = DungeonCrowdingFrom;
+            s.DungeonRegularSickPercent = DungeonRegularSickPercent;
+            s.DungeonHeroSickChancePercent = DungeonHeroSickChancePercent;
+            s.DungeonSickDays = DungeonSickDays;
+            s.DungeonWarnings = DungeonWarnings;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;

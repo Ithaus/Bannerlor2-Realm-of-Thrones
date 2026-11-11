@@ -154,6 +154,15 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>402 (DungeonFate): tylko odczyt - zakladnik ze straza (bez licznika kuriera). Goraczka lochu go nie dotyka.</summary>
+        internal static bool HostageGuardedNow(Hero h)
+        {
+            if (_hosts.Count == 0 || h == null) return false;
+            try { return HostGuarded(h); }
+            catch (Exception e) { Stumble("HostageGuardedNow", e); }
+            return false;
+        }
+
         /// <summary>Ransom178.ConsiderPrefix (takze przy 178 wylaczonym): kurier okupu nie przychodzi po zakladnika ze straza.</summary>
         internal static bool HostageHeld(Hero h)
         {
