@@ -405,6 +405,7 @@ namespace Armoury
                 NorthConquest.SetHarmony(_harmony);  // 326b po recenzji: tylko zapamietanie - weto oblezen Polnocy (mysl AI, BK) wpina SessionStart w kampanii
                 FolkAidLoyalty.SetHarmony(_harmony); // P1b: tylko zapamietanie - latka na czynny model lojalnosci w kampanii (CLAUDE.md 7)
                 WorldTime7.SetHarmony(_harmony);     // E7/K (226): tylko zapamietanie - latki turniejow, sojuszy i rozejmu gry w kampanii
+                HeroWounds.SetHarmony(_harmony);         // 401: tylko zapamietanie - latki loza (leczenie, seter HP, RB, encyklopedia, dymek) w kampanii
                 StoryGuardHeadsman.SetHarmony(_harmony); // 397: tylko zapamietanie - latki kata gracza (ekran druzyny, rozmowa po bitwie) w kampanii
                 DebtLadder.SetHarmony(_harmony);    // 168: tylko zapamietanie - latki modelu finansow (portfele) i BK (B5) w kampanii
                 CouncilWages35.SetHarmony(_harmony); // 3.5: tylko zapamietanie - latki BK (rada: platnik i urzad radnego) w kampanii
@@ -660,6 +661,7 @@ namespace Armoury
             try { EventMusic.RestoreNow("wyjscie z kampanii"); } catch (Exception e) { Log.Error("OnGameEnd (muzyka m108)", e); }   // m108-muzyka: muzyka gry z powrotem   // m105-dziennik: linia kampanii i test od nowa
             try { Chronicle.GameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (Kronika Westeros)", e); }   // m105-kronika: stan kampanii Kroniki od zera
             try { SpoilsWindow.Close("wyjscie z kampanii"); } catch (Exception e) { Log.Error("OnGameEnd (okno lupu)", e); }   // noc 25.10 P5: warstwa zdjeta, obrazek zwolniony
+            try { HeroWounds.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (ksiega ran 401)", e); }   // 401: ksiega ran (bohaterowie) nie zostaje po kampanii - latki bez wpisow nic nie robia
             try { StoryGuard.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (straz fabuly 396)", e); }   // 396: pamiec strazy (bohaterowie, obiekty wydarzen ROT) nie zostaje po kampanii
             try { SpoilsReport.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (raport lupu)", e); }                     // noc 25.10 P5: raport w pamieci od zera
         }

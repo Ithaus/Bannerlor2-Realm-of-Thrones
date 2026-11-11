@@ -130,7 +130,7 @@ namespace Armoury
                 {
                     AddCompanionAction.Apply(pc, h);
                     AddHeroToPartyAction.Apply(h, main, true);
-                    h.HitPoints = h.MaxHitPoints;
+                    if (!HeroWounds.Abed(h)) h.HitPoints = h.MaxHitPoints;   // 401: lezacego nie "leczymy" (seter i tak przytnie do progu rany)
                     _added.Add(h);
                     sb.Append(n > 0 ? ", " : "").Append(h.Name).Append(" (najlepsza umiejetnosc ").Append(skill[h]).Append(", poziom ").Append(h.Level).Append(')');
                     n++;
@@ -150,13 +150,14 @@ namespace Armoury
             try
             {
                 if (me == null || !me.IsPlayerMapEvent) return;
-                int healed = 0, dead = 0;
+                int healed = 0, dead = 0, abed = 0;
                 foreach (var h in _added)
                 {
                     if (h == null || !h.IsAlive) { dead++; continue; }
+                    if (HeroWounds.Abed(h)) { abed++; continue; }   // 401: lezacy zostaje ranny (ksiega ran) - nie liczymy go jako wyleczonego
                     if (h.HitPoints < h.MaxHitPoints) { h.HitPoints = h.MaxHitPoints; healed++; }
                 }
-                Log.Info("Bitwa (m113-walka2): TEST bohaterowie po bitwie: wyleczonych " + healed + ", niezywych " + dead + " z " + _added.Count + " - tylko autotest.");
+                Log.Info("Bitwa (m113-walka2): TEST bohaterowie po bitwie: wyleczonych " + healed + ", na lozu (401) " + abed + ", niezywych " + dead + " z " + _added.Count + " - tylko autotest.");
             }
             catch (Exception e) { Log.Error("FieldDuelHeroes.OnMapEventEnded", e); }
         }

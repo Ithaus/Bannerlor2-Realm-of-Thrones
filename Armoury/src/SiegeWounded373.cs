@@ -496,7 +496,8 @@ namespace Armoury
                                     var h = troop.HeroObject;
                                     var hp = h != null ? h.PartyBelongedTo : null;
                                     if (h == null || h == Hero.MainHero || !h.IsAlive || !h.IsWounded || h.IsPrisoner || hp == null || hp.Party != pb
-                                        || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner())
+                                        || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner()
+                                        || HeroWounds.AbedBefore(h, me))   // 401: lezal ranny juz przed tym szturmem - nie jest rannym spod murow
                                     { hMissed++; continue; }
                                     if (h == leader || hp.LeaderHero == h) { hLeads++; continue; }   // 373b: wodz zostaje z ludzmi
                                     // 394 (Jeff 11.11, odp. 7): bohater rodu gracza / towarzysz tylko wedle pozycji z misji - bez misji pozycji nie ma, wiec nigdy
@@ -725,7 +726,8 @@ namespace Armoury
                     {
                         var hp = h != null ? h.PartyBelongedTo : null;
                         if (h == null || h == Hero.MainHero || !h.IsAlive || !h.IsWounded || h.IsPrisoner || hp == null || !parties.Contains(hp.Party)
-                            || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner())
+                            || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner()
+                            || HeroWounds.AbedBefore(h, me))   // 401: lezal ranny juz przed tym szturmem - nie jest rannym spod murow
                         { hMissed++; continue; }
                         if (h == leader || hp.LeaderHero == h) { hLeads++; continue; }   // 373b: wodz zostaje z ludzmi
                         bool clanH = h.Clan == Clan.PlayerClan || h.IsPlayerCompanion;
@@ -917,7 +919,8 @@ namespace Armoury
                     {
                         var hp = h != null ? h.PartyBelongedTo : null;
                         if (h == null || h == Hero.MainHero || !h.IsAlive || !h.IsWounded || h.IsPrisoner || hp == null || !parties.Contains(hp.Party)
-                            || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner())
+                            || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None || h.Occupation == Occupation.Special || !h.CanBecomePrisoner()
+                            || HeroWounds.AbedBefore(h, me))   // 401: lezal ranny juz przed tym szturmem - nie jest rannym spod murow
                         { hMissed++; continue; }
                         // 373b: wodz partii / wodz armii / wodz strony zostaje z ludzmi (jak w grze bez 373) - inaczej partia bez wodza w armii = NRE w Army.HourlyTick
                         if (h == leader || hp.LeaderHero == h) { hLeads++; continue; }

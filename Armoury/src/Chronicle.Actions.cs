@@ -89,6 +89,13 @@ namespace Armoury
 
             private static readonly List<WoundRow> _wounds = new List<WoundRow>();
             internal static int WoundCount { get { return _wounds.Count; } }
+            /// <summary>401: bohater ma czynna rane Kroniki (akcja wound) - ksiega ran HeroWounds ustepuje kanonowi.</summary>
+            internal static bool HasWound(string heroId)
+            {
+                if (_wounds.Count == 0 || heroId == null) return false;
+                for (int i = 0; i < _wounds.Count; i++) if (_wounds[i].Hero == heroId) return true;
+                return false;
+            }
 
             internal static int WaitCount { get { return _wait.Count; } }
             /// <summary>Bandy Kroniki na mapie (B2: rejestr Chronicle.Bands - wpisy z zywa partia przy ostatnim przegladzie). Do linii doby (prog KW-14).</summary>

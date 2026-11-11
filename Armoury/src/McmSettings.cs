@@ -11928,6 +11928,50 @@ namespace Armoury
         [SettingPropertyGroup("Story Guard: Realm of Thrones story characters live until their event (396)")]
         public bool StoryGuardRooseSurvivesRedWedding { get; set; } = true;
 
+        [SettingPropertyBool("Hero Wounds Enabled", HintText = "A lord, a companion or you yourself wounded in battle may take more than a scratch. Most wounds are light and heal as before. A serious wound (Hero Wounds Serious Percent) or a grave wound (Hero Wounds Grave Percent) keeps the hero abed for weeks: his health does not rise above the wounded mark until the days of rest are over, so he does not fight - he can still ride with his party, and a beaten party's wounded lord is always taken prisoner, as in the game. Characters the Realm of Thrones story still needs never take a grave wound and are up a week before their event. Nobody dies of these wounds. Off = wounds heal in a day or two, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public bool HeroWoundsEnabled { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hero Wounds Serious Percent", 0.00f, 100.00f, "0.0", HintText = "With Hero Wounds Enabled: chance in percent that a wound taken in battle is serious (abed for Hero Wounds Serious Days)", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public float HeroWoundsSeriousPercent { get; set; } = 20f;
+
+        [SettingPropertyFloatingInteger("Hero Wounds Grave Percent", 0.00f, 100.00f, "0.0", HintText = "With Hero Wounds Enabled: chance in percent that a wound taken in battle is grave (abed for Hero Wounds Grave Days). Every year of age above 50 adds 0.4, up to 20 in all", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public float HeroWoundsGravePercent { get; set; } = 8f;
+
+        [SettingPropertyInteger("Hero Wounds Serious Days", 1, 364, "0", HintText = "With Hero Wounds Enabled: days of rest a serious wound takes, a third more or less by chance", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public int HeroWoundsSeriousDays { get; set; } = 21;
+
+        [SettingPropertyInteger("Hero Wounds Grave Days", 1, 728, "0", HintText = "With Hero Wounds Enabled: days of rest a grave wound takes, a third more or less by chance", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public int HeroWoundsGraveDays { get; set; } = 63;
+
+        [SettingPropertyBool("Hero Wounds Fortress Rest Double", HintText = "With Hero Wounds Enabled: a day spent inside a castle or town that is not under siege counts as two days of rest. A prisoner's day always counts as one. Off = a day is a day everywhere", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public bool HeroWoundsFortressRestDouble { get; set; } = true;
+
+        [SettingPropertyBool("Hero Wounds Player", HintText = "With Hero Wounds Enabled: you can take serious and grave wounds too. While abed you can ride and lead your party on the map, but you cannot fight in person. Off = your own wounds heal as before", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public bool HeroWoundsPlayer { get; set; } = true;
+
+        [SettingPropertyInteger("Hero Wounds Player Bed Percent", 0, 100, "0", HintText = "With Hero Wounds Player: length of your own days of rest in percent of what a lord would get for the same wound. 0 = your wounds are always light", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public int HeroWoundsPlayerBedPercent { get; set; } = 50;
+
+        [SettingPropertyBool("Hero Wounds Companions", HintText = "With Hero Wounds Enabled: your companions and the members of your clan can take serious and grave wounds. Off = their wounds heal as before", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public bool HeroWoundsCompanions { get; set; } = true;
+
+        [SettingPropertyBool("Hero Wounds Replace Rb Critical", HintText = "With Hero Wounds Enabled: the 'critical wound' of the RealisticBannerlord mod (15% on every wound, health drains outside settlements) is no longer rolled, so one wound is judged by one rule. Critical wounds it has already given run out by themselves. Off = both rules work side by side", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public bool HeroWoundsReplaceRbCritical { get; set; } = true;
+
+        [SettingPropertyBool("Hero Wounds Log", HintText = "Writes every battle wound of a lord, companion or yourself and every hero who rises from the sickbed to Armoury.log. The daily summary line is written either way", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public bool HeroWoundsLog { get; set; } = true;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -15109,6 +15153,17 @@ namespace Armoury
             s.StoryGuardExecutions = StoryGuardExecutions;
             s.StoryGuardGraceDays = StoryGuardGraceDays;
             s.StoryGuardRooseSurvivesRedWedding = StoryGuardRooseSurvivesRedWedding;
+            s.HeroWoundsEnabled = HeroWoundsEnabled;
+            s.HeroWoundsSeriousPercent = HeroWoundsSeriousPercent;
+            s.HeroWoundsGravePercent = HeroWoundsGravePercent;
+            s.HeroWoundsSeriousDays = HeroWoundsSeriousDays;
+            s.HeroWoundsGraveDays = HeroWoundsGraveDays;
+            s.HeroWoundsFortressRestDouble = HeroWoundsFortressRestDouble;
+            s.HeroWoundsPlayer = HeroWoundsPlayer;
+            s.HeroWoundsPlayerBedPercent = HeroWoundsPlayerBedPercent;
+            s.HeroWoundsCompanions = HeroWoundsCompanions;
+            s.HeroWoundsReplaceRbCritical = HeroWoundsReplaceRbCritical;
+            s.HeroWoundsLog = HeroWoundsLog;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;
