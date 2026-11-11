@@ -752,6 +752,10 @@ namespace Armoury
                 // zabitych / rannych wedlug typu ciosu i czesci ciala, linia "Smierc czy rana (421): koniec misji"
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new BlowFate421.Logic());
+                // 422: rana bohatera zalezna od ciosu - zapis ostatniego ciosu, ktory zabral bohaterowi HP (czyta HeroWounds.OnHeroWounded w tej samej
+                // misji); bez latki Harmony; linia "Rany wg ciosu (422): koniec misji"
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new HeroBlow422.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)

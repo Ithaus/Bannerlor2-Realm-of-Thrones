@@ -12032,6 +12032,10 @@ namespace Armoury
         [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
         public float HeroWoundsGravePercent { get; set; } = 8f;
 
+        [SettingPropertyBool("Hero Wounds By Blow", HintText = "With Hero Wounds Enabled: in a battle you fight on the field, how bad a hero's wound is depends on the blow that gave it, not on a plain roll. A grave wound is likelier from a blade or a point than from a blunt blow, far likelier from a blow to the head or neck than to the body, and rare from a blow to an arm or a leg; a blow that went deep beyond the health the hero had left is worse than one that barely felled him. A blunt blow or a blow to the leg more often means a serious wound instead - broken bones rather than death. Taken over many battles the share of grave and serious wounds stays close to Hero Wounds Grave Percent and Hero Wounds Serious Percent. A lasting injury follows the place of the wound: head or neck - a scarred face or a lost eye, arm - a maimed hand, leg - a lame leg. Battles resolved without fighting keep the plain roll. The same rule for you and for the AI. Off = the plain roll and the old table of injuries, as before this change. Counted in the daily wounds line of the Armoury log (part 422).", RequireRestart = false)]
+        [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
+        public bool HeroWoundsByBlowEnabled { get; set; } = true;
+
         [SettingPropertyInteger("Hero Wounds Serious Days", 1, 364, "0", HintText = "With Hero Wounds Enabled: days of rest a serious wound takes, a third more or less by chance", RequireRestart = false)]
         [SettingPropertyGroup("Hero wounds: the book of wounds and the sickbed (401)")]
         public int HeroWoundsSeriousDays { get; set; } = 21;
@@ -15427,6 +15431,7 @@ namespace Armoury
             s.HeroWoundsEnabled = HeroWoundsEnabled;
             s.HeroWoundsSeriousPercent = HeroWoundsSeriousPercent;
             s.HeroWoundsGravePercent = HeroWoundsGravePercent;
+            s.HeroWoundsByBlowEnabled = HeroWoundsByBlowEnabled;
             s.HeroWoundsSeriousDays = HeroWoundsSeriousDays;
             s.HeroWoundsGraveDays = HeroWoundsGraveDays;
             s.HeroWoundsFortressRestDouble = HeroWoundsFortressRestDouble;

@@ -51,6 +51,8 @@ namespace Armoury
         internal const string Scar = "scar", Eye = "eye", Hand = "hand", Leg = "leg";
         private static readonly string[] Types = { Scar, Leg, Eye, Hand };
         private static readonly int[] Weights = { 40, 25, 20, 15 };
+        // 422: wagi typu okaleczenia wedlug czesci ciala ciosu, ktory zadal rane (kolejnosc jak Types: blizna, noga, oko, dlon)
+        private static readonly int[] WeightsHead = { 60, 0, 40, 0 }, WeightsShoulder = { 40, 0, 0, 60 }, WeightsArm = { 0, 0, 0, 100 }, WeightsLeg = { 0, 100, 0, 0 };
         internal const int MaxMaims = 2;
 
         private static void Stumble(string where, Exception e)
@@ -295,7 +297,7 @@ namespace Armoury
 
         /// <summary>Trwale okaleczenie bohatera (losowy typ wg wag sposrod tych, ktorych jeszcze nie ma). false: bramka albo brak wolnego typu (why - PL).
         /// type: kod typu; detail: opis zmian do logu ("Bow 120->80, Vigor 4->3"). Wolac poza misja i poza seterem HP (doba).</summary>
-        internal static bool TryMaim(Hero h, string source, out string type, out string detail)
+        internal static bool TryMaim(Hero h, string source, out string type, out string detail, int part = -1)
         {
             type = null; detail = null;
             try
@@ -306,16 +308,23 @@ namespace Armoury
                 if (h.HeroDeveloper == null) { detail = "brak HeroDeveloper"; return false; }
                 if (MaimCount(h) >= MaxMaims) { detail = "ma juz " + MaxMaims + " okaleczenia"; return false; }
                 if (!StoryGuard.MayBeMaimed(h, source)) { detail = "straz fabuly / CanHeroDie"; return false; }
+                // 422: czesc ciala ciosu (0 glowa / szyja, 2 barki, 3 rece, 4 nogi) zaweza typ; tulow, brak danych (-1) albo typy z czesci juz zajete = stara tabela
+                int[] w = part == 0 ? WeightsHead : part == 2 ? WeightsShoulder : part == 3 ? WeightsArm : part == 4 ? WeightsLeg : Weights;
                 int sum = 0;
-                for (int i = 0; i < Types.Length; i++) if (!Has(h, Types[i])) sum += Weights[i];
+                for (int i = 0; i < Types.Length; i++) if (!Has(h, Types[i])) sum += w[i];
+                if (sum <= 0 && w != Weights)
+                {
+                    w = Weights;
+                    for (int i = 0; i < Types.Length; i++) if (!Has(h, Types[i])) sum += w[i];
+                }
                 if (sum <= 0) { detail = "brak wolnego typu"; return false; }
                 int roll = MBRandom.RandomInt(sum);
                 string pick = null;
                 for (int i = 0; i < Types.Length; i++)
                 {
                     if (Has(h, Types[i])) continue;
-                    if (roll < Weights[i]) { pick = Types[i]; break; }
-                    roll -= Weights[i];
+                    if (roll < w[i]) { pick = Types[i]; break; }
+                    roll -= w[i];
                 }
                 if (pick == null) { detail = "brak wolnego typu"; return false; }
 
@@ -340,7 +349,8 @@ namespace Armoury
                 }
                 Add(new Maim { Id = h.StringId, Type = pick, Day = (int)CampaignTime.Now.ToDays, Skills = skills.ToString(), Attr = attr });
                 type = pick;
-                detail = Label(pick) + " (" + (log.Length > 0 ? log.ToString() : "bez zmian liczb - juz na dnie") + ")";
+                detail = Label(pick) + " (" + (log.Length > 0 ? log.ToString() : "bez zmian liczb - juz na dnie") + ")"
+                         + (part >= 0 ? " [422: cios w " + HeroBlow422.PartName(part) + (w == Weights ? ", stara tabela" : "") + "]" : "");
                 return true;
             }
             catch (Exception e) { Stumble("TryMaim", e); detail = "blad"; return false; }

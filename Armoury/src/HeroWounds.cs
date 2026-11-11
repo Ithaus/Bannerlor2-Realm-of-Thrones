@@ -45,7 +45,10 @@ namespace Armoury
     ///
     /// Rana krytyczna RealisticBannerlord (15% przy kazdym HeroWounded, -4 HP/dobe) - wylaczona prefiksem przy kluczu Hero Wounds Replace Rb Critical (jedna zasada).
     /// Zapis arm_herowounds_v1: wiersz "id|stopien|dzienRany|pozostalo|dzienPrzesilenia|miejsce|zrodlo" (stary zapis = pusta ksiega). Statyki: Reset w konstruktorze
-    /// ArmouryBehavior i w OnGameEnd; bohaterowie rozwiazywani w SessionStart. Potkniecia liczone per miejsce - nic sie nie gasi.</summary>
+    /// ArmouryBehavior i w OnGameEnd; bohaterowie rozwiazywani w SessionStart. Potkniecia liczone per miejsce - nic sie nie gasi.
+    ///
+    /// 422 (audyt RBM C7) - RANA WG CIOSU: w misji szanse Grave / Serious mnozy ostatni cios, ktory zabral bohaterowi HP (HeroBlow422: typ, czesc ciala,
+    /// glebokosc), a czesc ciala (8. pole wiersza) zaweza typ okaleczenia przy przesileniu. Symulacja, brak znacznika i klucz Hero Wounds By Blow NIE = stary rzut.</summary>
     internal static partial class HeroWounds
     {
         private const string Tag = "Rany (HW): ";
@@ -63,6 +66,7 @@ namespace Armoury
             public bool Fresh, Guard;            // 401-p: wpis z trwajacej bitwy - komunikat i liczniki dopiero, gdy bohater ja przezyl (poza zapisem)
             public MapEvent Me;                  // 401-p: bitwa rany (poza zapisem)
             public int Days0;                    // 401-p: dni loza z rzutu - do odlozonego komunikatu (poza zapisem)
+            public int Part = -1;                // 422: grupa czesci ciala ciosu, ktory zadal rane (0 glowa / szyja, 1 tulow, 2 barki, 3 rece, 4 nogi; -1 = nieznana) - w zapisie (8. pole)
         }
 
         // ---------------------------------------------------------------- stan (zapis: _rows)
@@ -83,6 +87,10 @@ namespace Armoury
         private static int _healCuts, _setCuts, _dStumbles, _stumbles;
         private static int _dDied, _dLived, _dDeferred, _dSpared, _dMaimed, _sDied, _sMaimed;   // 403: przesilenia
         private static int _freshN, _dFell, _sFell, _dDropped, _dNk, _dTest;                    // 401-p: wpisy przed potwierdzeniem, polegli w bitwie rany, zdjete kluczem / HP, Nocny Krol, gracz autotestu
+        // 422: rana wg ciosu (HeroBlow422) - doba i sesja
+        private static int _dBlow, _dNoBlow, _dBlowBlunt, _dBlowStood, _sBlow;
+        private static readonly int[] _dBlowPart = new int[HeroBlow422.P + 1];   // [P] = bez czesci ciala
+        private static float _dGp0, _dGp1, _dSp0, _dSp1, _sGp0, _sGp1, _sSp0, _sSp1;
         private static readonly List<Row> _crisisBuf = new List<Row>();
         private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
 
@@ -110,6 +118,10 @@ namespace Armoury
             _healCuts = _setCuts = _dStumbles = _stumbles = 0;
             _dDied = _dLived = _dDeferred = _dSpared = _dMaimed = _sDied = _sMaimed = 0;
             _freshN = _dFell = _sFell = _dDropped = _dNk = _dTest = 0;
+            _dBlow = _dNoBlow = _dBlowBlunt = _dBlowStood = _sBlow = 0;
+            Array.Clear(_dBlowPart, 0, _dBlowPart.Length);
+            _dGp0 = _dGp1 = _dSp0 = _dSp1 = _sGp0 = _sGp1 = _sSp0 = _sSp1 = 0f;
+            HeroBlow422.Clear();   // 422: znaczniki ciosow nie zostaja po kampanii
             _crisisBuf.Clear();
             AiReset();
         }
@@ -122,7 +134,7 @@ namespace Armoury
             {
                 if (sb.Length > 0) sb.Append('\n');
                 sb.Append(r.Id).Append('|').Append(r.Grade).Append('|').Append(r.Day.ToString("R", Inv)).Append('|').Append(r.Left).Append('|').Append(r.Crisis)
-                  .Append('|').Append(Clean(r.Place)).Append('|').Append(Clean(r.Src));
+                  .Append('|').Append(Clean(r.Place)).Append('|').Append(Clean(r.Src)).Append('|').Append(r.Part);
             }
             return sb.ToString();
         }
@@ -141,6 +153,8 @@ namespace Armoury
                     var r = new Row { Id = p[0], Grade = int.Parse(p[1], Inv), Day = double.Parse(p[2], Inv), Left = int.Parse(p[3], Inv), Crisis = int.Parse(p[4], Inv),
                                       Place = p.Length > 5 ? p[5] : "", Src = p.Length > 6 ? p[6] : "" };
                     if (r.Grade != Serious && r.Grade != Grave) continue;
+                    int part;   // 422: 8. pole (zapis sprzed 422 go nie ma = -1)
+                    if (p.Length > 7 && int.TryParse(p[7], NumberStyles.Integer, Inv, out part) && part >= 0 && part < HeroBlow422.P) r.Part = part;
                     _rows[r.Id] = r;
                 }
                 catch (Exception e) { Stumble("Import", e); }
@@ -182,6 +196,9 @@ namespace Armoury
                                         + YN(s.HeroFateSpareLastOfHouse) + "), okaleczenie " + s.HeroWoundsMaimPercent.ToString("0.#", Inv) + "%" : "")
                          + " | okaleczen w ksiedze " + HeroFate.MaimRows + " | LordToll rok " + LordToll.Year + ": rany " + LordToll.Count(LordToll.Wounds) + "/" + LordToll.MaxWounds
                          + ", wspolny " + LordToll.Total + "/" + LordToll.MaxAll
+                         + " | 422 rana wg ciosu (w misji; symulacja = stary rzut): klucz Hero Wounds By Blow " + YN(s != null && s.HeroWoundsByBlowEnabled)
+                         + ", grave x typ (ostrze 1.05, obuch 0.70) x czesc (glowa / szyja 1.50, tulow 1.10, barki 0.70, reka / noga 0.30) x glebokosc 0.80-1.30 (sufit "
+                         + HeroBlow422.GraveCapPercent.ToString("0", Inv) + "%), serious x typ (ostrze 0.975, obuch 1.15) x noga 1.10 x glebokosc 0.90-1.15"
                          + " | 408 ranny wodz do twierdzy: klucz " + YN(s != null && s.HeroWoundsLordsRest) + ", latka CampaignEventDispatcher.AiHourlyTick (postfiks 60) " + _aiHook + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -432,6 +449,36 @@ namespace Armoury
                 float gp = Math.Max(0f, Math.Min(100f, s.HeroWoundsGravePercent));
                 if (age > 50f && gp > 0f) gp = Math.Min(Math.Max(20f, gp), gp + 0.4f * (age - 50f));
                 float sp = Math.Max(0f, Math.Min(100f, s.HeroWoundsSeriousPercent));
+                // 422: w misji szanse mnozy ostatni cios, ktory zabral bohaterowi HP (HeroBlow422); symulacja, klucz NIE albo brak znacznika = stary rzut.
+                // Liczba rzutow losowych bez zmian (jeden).
+                int bPart = -1;
+                string blowTxt = "";
+                if (mission && s.HeroWoundsByBlowEnabled)
+                {
+                    int bType; float bDepth; bool bFelled;
+                    if (HeroBlow422.Take(h, out bType, out bPart, out bDepth, out bFelled))
+                    {
+                        float gp0 = gp, sp0 = sp;
+                        float fg = HeroBlow422.GraveFactor(bType, bPart, bDepth), fs = HeroBlow422.SeriousFactor(bType, bPart, bDepth);
+                        gp = gp0 * fg;
+                        float cap = Math.Max(HeroBlow422.GraveCapPercent, gp0);   // sufit przycina tylko wzrost z reguly - szansa z kluczy ponad sufitem zostaje
+                        if (gp > cap) gp = cap;
+                        sp = sp0 * fs;
+                        if (gp + sp > 100f) sp = 100f - gp;
+                        if (!(gp >= 0f) || !(sp >= 0f)) { gp = gp0; sp = sp0; _dStumbles++; _stumbles++; }   // NaN - stary rzut
+                        _dBlow++; _sBlow++;
+                        _dBlowPart[bPart >= 0 ? bPart : HeroBlow422.P]++;
+                        if (bType == 2) _dBlowBlunt++;
+                        if (!bFelled) _dBlowStood++;
+                        _dGp0 += gp0; _dGp1 += gp; _dSp0 += sp0; _dSp1 += sp;
+                        _sGp0 += gp0; _sGp1 += gp; _sSp0 += sp0; _sSp1 += sp;
+                        if (s.HeroWoundsLog)
+                            blowTxt = " | 422 cios: " + HeroBlow422.TypeName(bType) + ", " + HeroBlow422.PartName(bPart) + (bFelled ? ", glebokosc " + bDepth.ToString("0.00", Inv) : ", nie powalil")
+                                      + " -> grave " + gp0.ToString("0.0", Inv) + "% x" + fg.ToString("0.00", Inv) + " = " + gp.ToString("0.0", Inv) + "%, serious "
+                                      + sp0.ToString("0.0", Inv) + "% x" + fs.ToString("0.00", Inv) + " = " + sp.ToString("0.0", Inv) + "%";
+                    }
+                    else { _dNoBlow++; if (s.HeroWoundsLog) blowTxt = " | 422 cios: brak znacznika - stary rzut"; }
+                }
                 float roll = MBRandom.RandomFloat * 100f;
                 int grade = roll < gp ? Grave : roll < gp + sp ? Serious : 0;
                 string guard = "nie";
@@ -473,20 +520,20 @@ namespace Armoury
                     if (s.HeroWoundsLog)
                         Log.Info(Tag + Nm(h) + " (" + id + ", wiek " + ((int)age) + ") ranny " + where + " [" + (mission ? "misja" : "symulacja") + "] - rzut "
                                  + (roll / 100f).ToString("0.00", Inv) + " (grave < " + (gp / 100f).ToString("0.00", Inv) + ", serious < " + ((gp + sp) / 100f).ToString("0.00", Inv)
-                                 + ") -> LIGHT | straz fabuly: " + guard + ".");
+                                 + ") -> LIGHT" + blowTxt + " | straz fabuly: " + guard + ".");
                     return;
                 }
                 double now = CampaignTime.Now.ToDays;
                 // 401-p: gra najpierw zadaje rane (ten nasluch), a dopiero potem rzuca smierc w tej samej bitwie - komunikat gracza i liczniki serious / grave /
                 // dni loza czekaja na koniec bitwy (OnMapEventEnded; zapas: doba). HP trzymamy od razu.
                 var r = new Row { Id = id, Grade = grade, Day = now, Left = days, Place = where, Src = mission ? "misja" : "symulacja", H = h,
-                                  Crisis = grade == Grave ? (int)now + 3 + MBRandom.RandomInt(8) : 0, Fresh = true, Guard = needed, Me = me, Days0 = days };
+                                  Crisis = grade == Grave ? (int)now + 3 + MBRandom.RandomInt(8) : 0, Fresh = true, Guard = needed, Me = me, Days0 = days, Part = bPart };
                 _rows[id] = r; _bed[h] = r; _n = _bed.Count; _freshN++;
                 if (s.HeroWoundsLog)
                     Log.Info(Tag + Nm(h) + " (" + id + ", wiek " + ((int)age) + (h.Clan != null && h.Clan.Name != null ? ", " + h.Clan.Name : "") + ") ranny " + where
                              + " [" + r.Src + "] - rzut " + (roll / 100f).ToString("0.00", Inv) + " (grave < " + (gp / 100f).ToString("0.00", Inv) + ", serious < "
                              + ((gp + sp) / 100f).ToString("0.00", Inv) + ") -> " + GradeName(grade) + ", loze " + days + " dni spoczynku"
-                             + (grade == Grave ? ", przesilenie dnia " + r.Crisis : "") + " | HP " + h.HitPoints + ", prog " + h.WoundedHealthLimit
+                             + (grade == Grave ? ", przesilenie dnia " + r.Crisis : "") + blowTxt + " | HP " + h.HitPoints + ", prog " + h.WoundedHealthLimit
                              + " | straz fabuly: " + guard + " | wpis wstepny - komunikat i liczniki po bitwie, jesli przezyje.");
             }
             catch (Exception e) { Stumble("OnHeroWounded", e); }
@@ -685,6 +732,17 @@ namespace Armoury
                     foreach (var r in done) Drop(r);
                 }
                 if (_dEv + _dRose + _dCrisis + _dDeferred + _dGone + _dStumbles + _dRb + _rows.Count + _healCuts + _setCuts + _aiOrders + _aiOff + _aiFood + _dFell + _dDropped + _dNk > 0)
+                {
+                    // 422: rana wg ciosu - ile ran w misji dostalo mnoznik i jak przesunal srednia szanse (kontrola "srednia zostaje")
+                    string by = " | 422 wg ciosu (klucz " + YN(s != null && s.HeroWoundsByBlowEnabled) + "): dzis z ciosem " + _dBlow;
+                    if (_dBlow > 0)
+                        by += " (glowa i szyja " + _dBlowPart[0] + ", tulow " + _dBlowPart[1] + ", barki " + _dBlowPart[2] + ", rece " + _dBlowPart[3] + ", nogi " + _dBlowPart[4]
+                              + ", bez czesci ciala " + _dBlowPart[HeroBlow422.P] + "; obuchem " + _dBlowBlunt + ", nie powalony " + _dBlowStood + "), srednia szansa grave "
+                              + (_dGp0 / _dBlow).ToString("0.0", Inv) + "% -> " + (_dGp1 / _dBlow).ToString("0.0", Inv) + "%, serious " + (_dSp0 / _dBlow).ToString("0.0", Inv) + "% -> "
+                              + (_dSp1 / _dBlow).ToString("0.0", Inv) + "%";
+                    by += ", w misji bez znacznika " + _dNoBlow + "; sesja z ciosem " + _sBlow
+                          + (_sBlow > 0 ? ": grave " + (_sGp0 / _sBlow).ToString("0.0", Inv) + "% -> " + (_sGp1 / _sBlow).ToString("0.0", Inv) + "%, serious "
+                                          + (_sSp0 / _sBlow).ToString("0.0", Inv) + "% -> " + (_sSp1 / _sBlow).ToString("0.0", Inv) + "%" : "");
                     Log.Info(Tag + "dzien " + day + " | rany w bitwie dzis " + _dBattle + " (misja " + _dMission + " / symulacja " + _dSim + "): light " + _dLight + ", serious "
                              + _dSerious + ", grave " + _dGrave + ", chronieni fabula " + _dGuard + " | zdarzen HeroWounded " + _dEv + " (poza bitwa " + _dNoBattle + ", poza zakresem "
                              + _dOut + ", rana Kroniki " + _dCanon + ", juz na lozu " + _dHas + ") | na lozu " + sr + " serious / " + gr + " grave (jency " + pris + ", w twierdzy " + fort
@@ -695,7 +753,11 @@ namespace Armoury
                              + " | przyciecia: leczenie " + _healCuts + ", seter "
                              + _setCuts + " | RB rana krytyczna pominieta " + _dRb + " | od startu sesji: ran w bitwie " + _sBattle + ", serious " + _sSerious + ", grave " + _sGrave
                              + ", dni loza " + _sDays + ", zmarli od ran " + _sDied + ", okaleczeni " + _sMaimed + " | potkniecia " + _dStumbles + " (sesja " + _stumbles
-                             + ", HeroFate " + HeroFate.Stumbles + ")" + AiDayText() + ".");
+                             + ", HeroFate " + HeroFate.Stumbles + ")" + by + AiDayText() + ".");
+                }
+                _dBlow = _dNoBlow = _dBlowBlunt = _dBlowStood = 0;
+                Array.Clear(_dBlowPart, 0, _dBlowPart.Length);
+                _dGp0 = _dGp1 = _dSp0 = _dSp1 = 0f;
                 _dEv = _dBattle = _dMission = _dSim = _dLight = _dSerious = _dGrave = _dGuard = _dNoBattle = _dOut = _dCanon = _dHas = _dRose = _dCrisis = _dGone = _dRb = 0;
                 _healCuts = _setCuts = _dStumbles = 0;
                 _dDied = _dLived = _dDeferred = _dSpared = _dMaimed = 0;
@@ -806,7 +868,7 @@ namespace Armoury
                 if (mr < s.HeroWoundsMaimPercent)
                 {
                     string det;
-                    if (HeroFate.TryMaim(h, LordToll.Wounds, out maimType, out det)) { _dMaimed++; _sMaimed++; maim = " | okaleczenie: " + det; }
+                    if (HeroFate.TryMaim(h, LordToll.Wounds, out maimType, out det, s.HeroWoundsByBlowEnabled ? r.Part : -1)) { _dMaimed++; _sMaimed++; maim = " | okaleczenie: " + det; }
                     else maim = " | okaleczenie: nie (" + det + ")";
                 }
             }
