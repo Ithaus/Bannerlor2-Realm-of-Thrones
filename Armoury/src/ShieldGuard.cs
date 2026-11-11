@@ -33,6 +33,12 @@ namespace Armoury
     /// pocisk z flaga CanPenetrateShield (strzala olbrzyma, balista) -> nietkniety; kazdy inny pocisk (oszczep, topor, noz, wlocznia rzucona,
     /// kamien) -> ThrownShieldDamagePercent (domyslnie 100 = wynik RBM / silnika bez zmiany). Klucz NIE = stan sprzed 414: jeden procent na wszystko.
     /// Ta sama klasyfikacja (Classify) idzie do zuzycia tarczy w FieldCraft.OnAgentHit. Regula nie zna wlasciciela pocisku - gracz i AI jednakowo.
+    /// 414-p (recenzja): Classify patrzy tylko na flage w DANYCH broni. Flage CanPenetrateShield nadawana w locie (AgentApplyDamageModel.DecideMissileWeaponFlags:
+    /// perk Throwing.Impale u bohatera, CrewOfSpears w bitwie morskiej NavalDLC) jest tu niewidoczna - taki oszczep to "bron miotana"; przy domyslnych 100%
+    /// bez skutku, przy obnizonym Thrown Shield Damage Percent perk slabnie (prog przebicia porownuje scieta liczbe). Swiadomie bez sprawdzania perka w goracej
+    /// sciezce. Tarcza na plecach: prefiks RBM na Mission.MissileHitCallback (rbm.cs:4865-4880) przepisuje takie trafienie na blok tarcza, wiec idzie przez
+    /// ComputeBlowDamageOnShield i przez nasz postfiks jak kazdy blok (wyjatek RBM: pocisk przebijajacy / obszarowy i rzucajacy z Impale).
+    /// Liczniki rosna takze poza kampania (bitwa wlasna - Logic rejestrowana tylko w kampanii); pierwsza misja kampanii je zeruje - tylko dokladnosc linii.
     /// </summary>
     internal static class ShieldGuard
     {

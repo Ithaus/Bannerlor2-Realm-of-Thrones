@@ -664,7 +664,7 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public bool ShieldGuardArrowsOnly { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Thrown Shield Damage Percent", 0.00f, 100.00f, "0.00", HintText = "With Shield Guard Arrows Only: percent of its normal shield damage a thrown weapon deals (javelin, throwing axe, knife, thrown spear, stone). 100 = untouched: under Realistic Battle Mod a javelin breaks a wooden shield in one or two throws and a throwing axe in a few. Lower it to make shields last longer against skirmishers; 1 = as weak as arrows. The wear of your own shield from one blocked throw never counts more damage than the shield has hit points.", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Thrown Shield Damage Percent", 0.00f, 100.00f, "0.00", HintText = "With Shield Guard Arrows Only: percent of its normal shield damage a thrown weapon deals (javelin, throwing axe, knife, thrown spear, stone). 100 = untouched: under Realistic Battle Mod a javelin breaks a wooden shield in one or two throws and a throwing axe in a few. Lower it to make shields last longer against skirmishers; 1 = as weak as arrows. A javelin thrown by a hero with the Impale perk counts as a thrown weapon here, so a low value also weakens that perk's shield piercing. The wear of your own shield from one blocked throw never counts more damage than the shield has hit points.", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public float ThrownShieldDamagePercent { get; set; } = 100f;
 
