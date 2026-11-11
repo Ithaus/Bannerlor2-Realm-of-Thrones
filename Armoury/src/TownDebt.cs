@@ -672,6 +672,7 @@ namespace Armoury
             {
                 int towns = 0, withN = 0, withB = 0, levyRecent = 0; double sP = 0, sR = 0, sB = 0, sN = 0, maxD = 0, sLim = 0; string maxName = null; double maxLim = 0;
                 int gap = GapDays(s);
+                var realms427 = EcoAudit427.On ? new Dictionary<string, double[]>(StringComparer.Ordinal) : null;   // 427 A1: dlug rad na krolestwa (sam odczyt ksiag)
                 foreach (var kv in _b)
                 {
                     var b = kv.Value;
@@ -679,6 +680,13 @@ namespace Armoury
                     if (b.LevyDay != int.MinValue && today - b.LevyDay < gap) levyRecent++;
                     double n = 0; foreach (var v in b.N.Values) n += v[0];
                     sP += b.P; sR += b.R; sB += b.B; sN += n;                     // recenzja: suma ze wszystkich ksiag (takze reszty < 1) - kontrola dlugu dokladna
+                    if (realms427 != null)
+                    {
+                        string rk = EcoAudit427.RealmOf(b.St);
+                        double[] ra; if (!realms427.TryGetValue(rk, out ra)) { ra = new double[5]; realms427[rk] = ra; }
+                        if (tot >= 1) ra[0]++;
+                        ra[1] += tot; ra[2] += b.B; ra[3] += b.P + b.R; ra[4] += n;
+                    }
                     if (tot < 1) continue;
                     towns++;
                     if (n >= 1) withN++; if (b.B >= 1) withB++;
@@ -718,12 +726,22 @@ namespace Armoury
                   .Append(" (oczekiwane 0); podatek - (wierzycielom + na zaleglosci + w kasie) ")
                   .Append(levy - levyUse).Append(" (oczekiwane 0)")
                   .Append(DsTowns.DebtCutNote(s))                                // 322d: obnizki firm DS przy duzym dlugu rady (DayStart tej doby), miasto po miescie
+                  .Append(EcoAudit427.DebtRealms(realms427, debt))              // 427 A1: dlug rad w podziale na krolestwa (klucz wylaczony - pusto)
                   .Append(" | czas ").Append(ms.ToString("0.000", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumblesSess).Append(").");
                 Log.Info(sb.ToString());
                 _debtPrev = debt;
                 _stumbles = 0;
             }
             catch (Exception e) { Stumble("Line", e); }
+        }
+
+        /// <summary>427 A1 (linia "Kiesy ludu - rozbicie zmiany"): kwity ludu wobec rad miast - dlug rad wobec kies P i R razem (sam odczyt ksiag). false - klucz Town Debt
+        /// wylaczony albo brak ksiag (kwity 0).</summary>
+        internal static bool A427FolkClaims(out double p, out double r)
+        {
+            p = r = 0;
+            foreach (var kv in _b) { p += kv.Value.P; r += kv.Value.R; }
+            return true;
         }
 
         // ------------------------------------------------------------ zapis

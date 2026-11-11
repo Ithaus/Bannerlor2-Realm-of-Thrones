@@ -99,6 +99,8 @@ namespace Armoury
         private static int _shortN, _shortNT;   // f14-miary (NKA-1): raty firmy z kasy niezaplacone w calosci tej doby (kasa przy podlodze) - osady, w tym miasta; tylko licznik linii
         private static double _dueL, _dueC, _dueLf, _remit, _noLordAmt, _arrNew, _arrPaid, _forgiven, _aidArrNew, _aidLost, _aidForg, _movAssess, _movRemit, _movRamp, _movShort, _movLost;
         private static long _paidL, _paidC, _paidLf, _distL, _distC, _drawT, _drawC, _aidPaid, _aidArrPaid, _movPaid;
+        /// <summary>427 A1 (linie "Pompy" i "Kiesy ludu - rozbicie zmiany"): czesc firmy pana zaplacona z oszczednosci ludu od ostatniej linii "Firmy miast i zamkow (DS)" (sam odczyt).</summary>
+        internal static long A427PaidFolk { get { return _paidLf; } }
         private static long _payOut, _payIn;
         // f4 P5 (przeglad ekonomii 18.10): przeglad firm co kwartal (Ds Farm Review Days) - w dol wymuszone przy zaleglosciach (tylko te, ktore naprawde obnizyly firme),
         // w gore wstrzymane przy zaleglosciach, bez zmiany, zmiana firm w gore / w dol (zl/rok, z czescia z oszczednosci ludu); recenzja f4: wymuszone przed wlasna doba

@@ -324,7 +324,7 @@ namespace Armoury
                         {
                             if (reason == 1 && !held) _skipLoss++;
                             else if (reason == 2) { _skipMat++; for (int m = 0; m < 4; m++) if ((miss & (1 << m)) != 0) _skipMatBy[m]++; MaterialOrders.NoteMissMask(town, miss); }   // 174.2: sygnal zamowienia surowca
-                            else if (reason == 4) _skipGold++;
+                            else if (reason == 4) { _skipGold++; EcoAudit427.WsStart(); }   // 427 A1: powod - kapital warsztatu ponizej kosztu surowca (sam licznik)
                             // 174b.3: ruda zostala strzelarzom - osobny licznik (nie "brak surowca"); sygnal zamowienia rudy idzie (miastu naprawde brakuje rudy dla obu cechow),
                             // ale bez licznika miast z "brakiem rudy" w linii nazw (krytyka 7)
                             else if (held) { _skipFletch++; TownFletchers.NoteHeld(town); MaterialOrders.NoteMissMask(town, 1, false); }
@@ -337,7 +337,9 @@ namespace Armoury
                     int rev = MBRandom.RoundRandomized(Revenue(town, w.Item));
                     // E5/A1 (poprawka po recenzji): miasto kupuje wyrob tylko z nadwyzki ponad zapas kupcow (TownPurse.BuyFloor; wylaczone A1 / TownPaysFromSurplus - 0, cala kasa jak dotad);
                     // gotowa sztuka czeka u warsztatu (w.Item zostaje), place nie ida - towar zostaje u sprzedajacego, jak w pozostalych sciezkach
-                    if (town.Gold - TownPurse.BuyFloor(town, 0) < rev || workshop.Capital < wagesI) { _skipGold++; break; }   // gotowa czeka na kupca / na place
+                    // 427 A1: ten sam warunek rozpisany na dwa powody (kasa miasta / kapital na place) - do licznika pomiaru; wynik warunku bez zmiany
+                    bool townShort427 = town.Gold - TownPurse.BuyFloor(town, 0) < rev, wageShort427 = workshop.Capital < wagesI;
+                    if (townShort427 || wageShort427) { _skipGold++; EcoAudit427.WsReady(town, townShort427, wageShort427, rev, wagesI); break; }   // gotowa czeka na kupca / na place
                     ItemModifier mod = null;
                     try { var g = w.Item.ItemComponent != null ? w.Item.ItemComponent.ItemModifierGroup : null; if (g != null) mod = g.GetRandomItemModifierProductionScoreBased(); } catch { }
                     mod = QualityScarcity.Roll(w.Item, mod, QualityScarcity.SrcWorkshop);   // m96-jakosc: legendarna i mistrzowska rzadko i w limicie rodzaju przedmiotu (klucz Quality Scarcity)
@@ -1469,7 +1471,7 @@ namespace Armoury
                          + " - cykl liczony przy kazdym surowcu, ktorego zabraklo na ktoras sztuke z rankingu], czeka na strzelarzy (ruda dla strzelarzy, 174b.3) " + _skipFletch + ", w robocie (cykle) " + _skipLabor + ", brak zlota/kupca " + _skipGold + "; rozpoczete sztuki " + _started + ", w toku teraz " + InProgress()
                          + (TownCrafts.Active ? " | garbowanie i tkanie 1:1 wylaczone (rzemioslo miasta 148 - linia \"Rzemioslo miasta\")" : " | rzemieslnicy miasta wygarbowali skor " + _tanned + ", utkali plotna " + _woven) + " | z niczego zablokowane: cykle rzemieslnikow " + _freeRawBlocked + ", sztabki/wegiel z losowania -> ruda/drewno " + _swappedSmith + Text174()
                          + " | warsztaty gracza (poprawka 174b, jedna regula" + (Settings.Current != null && Settings.Current.PlayerWorkshopsSameRule ? "" : " - WYLACZONA") + "): cykle linii bez wsadu (zbroja, strzaly) zamkniete "
-                         + _plFree + ", czeka na strzelarzy " + _plHeld + (_plStumbles > 0 ? ", potkniecia " + _plStumbles : "") + ".");
+                         + _plFree + ", czeka na strzelarzy " + _plHeld + (_plStumbles > 0 ? ", potkniecia " + _plStumbles : "") + EcoAudit427.WsText(_skipGold) + ".");
             }
             // 305b (PlayerArmsAsFirm): linia doby warsztatow gracza z liniami broni z wsadem (tylko gdy ktorys cykl przyszedl)
             if (_plFirmCycles + _plFirmGame > 0)
@@ -1492,6 +1494,7 @@ namespace Armoury
             DiagShort();   // 174.1: najwiekszy brak swiata (koszyki)
             NewDay174();
             _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _freeRawBlocked = _swappedSmith = _started = _tanned = _woven = _skipFletch = 0; _dayRevenue = _dayCost = 0; _madeByType.Clear();
+            EcoAudit427.WsZero();   // 427 A1: powody "brak zlota/kupca" razem z licznikiem doby
             _plFree = _plHeld = _plStumbles = 0;
             _plFirmCycles = _plFirmMade = _plFirmGame = _plFirmShops = 0; _plFirmRev = _plFirmCost = 0; _plFirmSeen.Clear();   // 305b
             _plSkipLoss = _plSkipMat = _plSkipLabor = _plSkipGold = _plSkipFletch = _plNoneMade = 0; Array.Clear(_plSkipMatBy, 0, _plSkipMatBy.Length);   // 307c

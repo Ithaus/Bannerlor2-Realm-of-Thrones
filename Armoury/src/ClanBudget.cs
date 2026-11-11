@@ -191,6 +191,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
+            EcoAudit427.ReserveZero();   // 427 A1: licznik rodow wobec progu wydawania skarbu - razem z licznikami doby
             _dCourt = _dCourtTown = _dFood = _dFamily = _dRelPurse = _dBuild = _dGear = _dCapSum = _dWageSum = _dD = 0;
             _dCourtGoods = 0;
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
@@ -874,6 +875,7 @@ namespace Armoury
                         // recenzja C1 (W5): budowy takze w wojnie (odstepstwo od tabeli 166 "0") - Jeff 05.10 "w wojnie 0, chyba ze mury - tak"; BuildFunding
                         // w wojnie i tak odcina budowy cywilne, wiec wojenny przydzial idzie tylko na mury, wieze i koszary. Dopelnienie ponad 120 D - tylko w pokoju.
                         b.Build = Math.Max(0f, s.BuildIncomeShare) * b.D * shareF;
+                        if (!merc) EcoAudit427.NoteReserve(c, b.War, Gc, Math.Max(0f, s.ReserveCapDays) * b.D + 50000);   // 427 A1: rody wobec progu wydawania skarbu (sam licznik, ten sam wzor co nizej)
                         if (merc) { b.Cap = mcap; b.Household = 0; b.Build = 0; f = 1; }   // 185: pulap najemnika = zold ludzi z umowy (nie udzial D), bez dworu
                         else if (!b.War)
                         {
@@ -2528,6 +2530,7 @@ namespace Armoury
               .Append(" (werbunek wstrzymany ").Append(_dRecruitBlock).Append(", przyrost zalog wstrzymany ").Append(_dGarBlock)
               .Append("; jeden pulap calej Strazy (2), rody ludzie/udzial w pulapie: ").Append(_watchDetail.Length > 0 ? _watchDetail : "-").Append(")")
               .Append(FfSegment(s))   // WL1/WL2: pula Wolnych Ludzi
+              .Append(EcoAudit427.ReserveText(s))   // 427 A1: ile rodow ponad progiem wydawania skarbu w pokoju (klucz wylaczony - pusto)
               .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');
             if (_importN >= 0) { sb.Append(" Wczytano z zapisu: rodow ").Append(_importN).Append(" (bledne ").Append(_importBad).Append(")."); _importN = -1; }
             Log.Info(sb.ToString());

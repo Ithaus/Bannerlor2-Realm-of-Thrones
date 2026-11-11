@@ -312,7 +312,7 @@ namespace Armoury
                     foreach (var b in ld.B)
                     {
                         if (b == null || b.K == null || b.C == null) continue;
-                        if (b.Target >= 0) { Progress(ld, b, today, mt); active++; continue; }
+                        if (b.Target >= 0) { EcoAudit427.RbAge(EcoAudit427.SysKs, today - b.TEnd); Progress(ld, b, today, mt); active++; continue; }   // 427 A1: wiek przebudowy wobec terminu (sam licznik)
                         // f5-a7 (klucz Ks Switch Signal): doba bez kroku i bez regali przy przebudowach w toku - blok bez Held nie ma tu nic do zrobienia (blokada prac zeruje
                         // tylko Held > 0); wynik ten sam, bez sprawdzania blokady prac dla ~15 tys. blokow co dobe
                         if (sig && !step && !reg && b.Held <= 0) continue;
@@ -451,7 +451,7 @@ namespace Armoury
                 double fPay = b.Paid >= b.Cost - 0.5 ? 1.0 : Math.Max(0.0, b.Paid / (double)b.Cost);
                 double moved = b.X0 > 1e-6f ? Math.Max(0.0, Math.Min(1.0, 1.0 - b.X[ci] / (double)b.X0)) : 1.0;
                 progress = Math.Max(0.0, Math.Min(1.0, (fPay - moved) * T));
-                if (progress < 1.0 - 1e-6) _rStall++;
+                if (progress < 1.0 - 1e-6) { _rStall++; EcoAudit427.RbStall(EcoAudit427.SysKs, owe, ask, got, ld.V.Gold, mt != null, !A7sOn || A7sPaySpan(ld, b, today) > 0); }   // 427 A1: powod doby postoju (sam licznik)
             }
             double dx = Math.Min(b.X[ci], b.X0 / T * progress);
             b.X[ci] -= (float)dx; b.X[ti] += (float)dx;
@@ -577,6 +577,7 @@ namespace Armoury
               .Append(", wstrzymane (inna czesc okregu w przebudowie) ").Append(_rBusy).Append(", (5% rak regionu w sezonie) ").Append(_rBudget).Append(", (ziemia bloku) ").Append(_rLand)
               .Append(", przejscia stojace na ziemi ").Append(_rLandStall)
               .Append(", dob bez pelnej zaplaty ").Append(_rStall).Append(", porzucone (rok po terminie) ").Append(_rCancel).Append(", zaplacone z kies wsi do kas miast ").Append(_rPaid).Append(" zl")
+              .Append(EcoAudit427.RbText(EcoAudit427.SysKs, _rStall))   // 427 A1: powod postoju i wiek przebudow (klucz wylaczony - pusto); zeruje swoje liczniki
               .Append(_startNotes.Count > 0 ? " (" + string.Join("; ", _startNotes.ToArray()) + ")" : "")
               .Append(" | regale (co ").Append(RegCycle).Append(" dob od D): rece przy zlozu w gore ").Append(_rUp).Append(", w dol ").Append(_rDown)
               .Append(FeedRuleText());                                  // r4-polnoc

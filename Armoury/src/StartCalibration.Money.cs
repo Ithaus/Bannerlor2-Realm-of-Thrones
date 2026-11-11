@@ -491,6 +491,7 @@ namespace Armoury
                 long g0; purse.TryGetValue(mk, out g0); purse[mk] = g0 + Math.Max(0, v.Gold);
             }
             var map = _zt;
+            bool csv427 = EcoAudit427.On;   // 427 A1: dwie kolumny na koncu (klucz wylaczony - plik co do znaku jak dotad; przelaczenie klucza w srodku sesji = wiersze roznej dlugosci)
             var sb = new StringBuilder(map.Count * 260);
             var ix = new List<double>(12);
             int rows = 0;
@@ -525,15 +526,23 @@ namespace Armoury
                       .Append(gd > 0 ? (gs / gd).ToString("0.0", Inv) : "-").Append(';').Append(tpf.ToString("0.000", Inv)).Append(';')
                       .Append(w != null ? F0(w[0]) : "0").Append(';').Append(w != null ? F0(w[1]) : "0").Append(';').Append(w != null ? F0(w[2]) : "0").Append(';')
                       .Append(w != null ? F0(w[3]) : "0").Append(';').Append(w != null ? F0(w[4]) : "0").Append(';').Append(pv).Append(';').Append(had ? (pv - p0).ToString(Inv) : "-")
-                      .Append(';').Append(TownLandOf(st)).Append(';').Append(KsFoodCarts.Incoming(st, ZGrain))   // KS-R3: kraina miasta (NKS-23 - krainy bez ujscia) i zboze w drodze KS-H
-                      .Append(Environment.NewLine);
+                      .Append(';').Append(TownLandOf(st)).Append(';').Append(KsFoodCarts.Incoming(st, ZGrain));  // KS-R3: kraina miasta (NKS-23 - krainy bez ujscia) i zboze w drodze KS-H
+                    if (csv427)
+                    {
+                        // 427 A1: znacznik oblezenia i wsie miasta w rabunku albo spladrowane (sam odczyt stanu gry) - dwie kolumny NA KONCU wiersza
+                        int raided = 0;
+                        var bv = st.BoundVillages;
+                        if (bv != null) for (int vi = 0; vi < bv.Count; vi++) { var v = bv[vi]; if (v != null && (v.VillageState == Village.VillageStates.BeingRaided || v.VillageState == Village.VillageStates.Looted)) raided++; }
+                        sb.Append(';').Append(st.IsUnderSiege ? 1 : 0).Append(';').Append(raided);
+                    }
+                    sb.Append(Environment.NewLine);
                     rows++;
                 }
                 catch (Exception e) { Stumble("TownsCsv(miasto)", e); }
             }
             _ztWeek.Clear();
             _vilPurse.Clear(); foreach (var kv in purse) _vilPurse[kv.Key] = kv.Value;
-            string path = Log.Csv(TownCsvName, TownCsvHeader, sb.ToString());
+            string path = Log.Csv(TownCsvName, csv427 ? TownCsvHeader + ";oblezone;wsie_w_rabunku_lub_spladrowane" : TownCsvHeader, sb.ToString());
             Log.Info(PK + TownCsvName + " " + (path != null ? rows + " wierszy (doba " + day + ")" : "NIE ZAPISANY (log wylaczony albo brak katalogu sesji)") + ".");
         }
 

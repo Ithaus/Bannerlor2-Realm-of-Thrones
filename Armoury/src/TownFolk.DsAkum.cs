@@ -481,20 +481,22 @@ namespace Armoury
             mat = matIn = wage = wageCof = 0; pcs = 0;
             try
             {
-                if (!DaWorksOn || OffMain()) return -1;
-                if (vil == null || mk == null || mk.Town == null || amount < 2) return 0;
+                // 427 A1: EcoAudit427.RbWhy - powod zwrotu 0 / -1 dla licznika postoju przebudowy (samo pole pomiaru; wynik i przelewy bez zmiany)
+                EcoAudit427.RbWhy = EcoAudit427.WhyNone;
+                if (!DaWorksOn || OffMain()) { EcoAudit427.RbWhy = EcoAudit427.WhyOld; return -1; }
+                if (vil == null || mk == null || mk.Town == null || amount < 2) { EcoAudit427.RbWhy = EcoAudit427.WhySmall; return 0; }
                 Folk mf = null;
                 _f.TryGetValue(mk, out mf);
-                if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive)) return 0;
+                if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive)) { EcoAudit427.RbWhy = EcoAudit427.WhyNoFolk; return 0; }
                 long avail = Math.Max(0, vil.Gold);
                 double ch = vil.Settlement != null ? DsVillage.ChestToday(vil.Settlement) : -1;
                 if (ch >= 0) avail = Math.Max(0, avail - (long)Math.Floor(ch));
                 long budget = Math.Min(amount, avail);
-                if (budget < 2) return 0;
+                if (budget < 2) { EcoAudit427.RbWhy = EcoAudit427.WhyChest; return 0; }
                 var s = Settings.Current;
                 double k = s != null ? Math.Max(0, Math.Min(3.0, (double)s.DsWorksWagePerMaterial)) : 0.5;
                 double matBudget = Math.Floor(budget / (1.0 + k));
-                if (matBudget < 1) return 0;
+                if (matBudget < 1) { EcoAudit427.RbWhy = EcoAudit427.WhySmall; return 0; }
                 var items = BuildFunding.DsWorksItems();
                 var pc = new int[Math.Max(BuildFunding.DsWorksMatCount, 1)];
                 int spent = 0, cap, drop; bool none;
@@ -503,7 +505,7 @@ namespace Armoury
                 try { spent = BuildFunding.DsWorksBuy(mk, matBudget, items, pc, out cap, out none, out drop); }
                 finally { GoodsLedger.End(gf); }
                 for (int i = 0; i < pc.Length; i++) pcs += pc[i];
-                if (spent <= 0) return 0;
+                if (spent <= 0) { EcoAudit427.RbWhy = !none && cap > 0 ? EcoAudit427.WhyPriceCap : EcoAudit427.WhyNoShelf; return 0; }   // 427 A1: brak materialu / tylko ponad sufit ceny
                 long w = Math.Max(0, Math.Min((long)Math.Floor(k * spent), budget - spent));
                 int had = vil.Gold;
                 vil.ChangeGold(-(int)Math.Min(int.MaxValue, spent + w));

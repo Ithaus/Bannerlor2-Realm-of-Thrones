@@ -808,6 +808,9 @@ namespace Armoury
         // p6-a7 (A7 + odplyw kas miast): pulapy kas miast robot z rak okregu od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p5)
         private readonly bool _p6a7Reset = P6a7Reset();
         private static bool P6a7Reset() { try { TownHire.Reset(); } catch (Exception e) { Log.Error("P6a7Reset", e); } return true; }
+        // 427 (audyt ekonomii A1): liczniki pomiarow sesji od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak m96-dlugi)
+        private readonly bool _a427Reset = A427Reset();
+        private static bool A427Reset() { try { EcoAudit427.Reset(); } catch (Exception e) { Log.Error("A427Reset", e); } return true; }
         // m96-dlugi: ksiegi dlugow rad miast od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6-a7)
         private readonly bool _m96DlugiReset = M96DlugiReset();
         private static bool M96DlugiReset() { try { TownDebt.Reset(); } catch (Exception e) { Log.Error("M96DlugiReset", e); } return true; }
@@ -1901,6 +1904,7 @@ namespace Armoury
             CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this, delegate { try { SaveSize.BeforeSave(); } catch (Exception e) { Log.Error("SaveSize.BeforeSave", e); } });
             CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, delegate (bool ok, string name) { try { SaveSize.SaveOver(ok, name); } catch (Exception e) { Log.Error("SaveSize.SaveOver", e); } });
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("FreeFolkRaids.Hourly", delegate { try { FreeFolkRaids.Hourly(); } catch (Exception e) { Log.Error("FreeFolkRaids.Hourly", e); } }));
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("EcoAudit427.OnPartyDestroyed", EcoAudit427.OnPartyDestroyed));   // 427 A1: kto rozbija bandy, karawany i tabory wsi (sam licznik)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("FreeFolkRaids.OnPartyDestroyed", FreeFolkRaids.OnPartyDestroyed));   // fix-mur: kto rozbil bande najazdu (tylko linia "cel:"; bez band - nic)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("FreeFolkRaids.OnMapEventEnded", FreeFolkRaids.OnMapEventEnded));   // recenzja fix-mur: kto pobil bande w marszu (tylko linia "cel:"; bez band w marszu - nic)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("Gallows.OnMapEventEnded", Gallows.OnMapEventEnded));   // p6-szubienice (R3-07a): rozbita banda / oczyszczona kryjowka -> szubienica przy rozstajach (tylko wyglad; sam odczyt bitwy)
@@ -3183,6 +3187,7 @@ namespace Armoury
             // w tym samym miejscu doby co naplyw biedy OutlawLaw, a linia puli wyrzutkow liczy dzisiejsze narodziny i rozwiazania band najazdu
             try { FreeFolkRaids.Daily(); } catch (Exception e) { Log.Error("FreeFolkRaids.Daily", e); } DayProfile.Lap("FreeFolkRaids.Daily");
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); } DayProfile.Lap("OutlawLaw.Daily");   // wyrzutki: bieda, powroty, werbunek band
+            try { EcoAudit427.DailyKills((int)CampaignTime.Now.ToDays); } catch (Exception e) { Log.Error("EcoAudit427.DailyKills", e); } DayProfile.Lap("EcoAudit427.DailyKills");   // 427 A1: linia "Kto rozbija bandy (427)" (tylko log)
             try { BanditLimit.Daily(); } catch (Exception e) { Log.Error("BanditLimit.Daily", e); } DayProfile.Lap("BanditLimit.Daily");   // f8-bandy: linia "Bandy i limit (f8-bandy): dzien N" - bandy wobec celu, narodziny, koszt AI band, doba realna (PO OutlawLaw.Daily - czas jego odcinka z profilu doby)
             try { MoneyLedger.Probe169("BanditLimit.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); } DayProfile.Lap("IronBank.Daily");   // Bank Zelazny: pozyczki AI, raty, bankructwa

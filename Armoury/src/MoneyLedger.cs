@@ -1286,6 +1286,7 @@ namespace Armoury
                         t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
                         try { Log.Info(ObiegWindowsLine(day, t169)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegWindowsLine", e); }   // dolicza wlasny czas
                     }
+                    try { A427FolkLine(day, hold, _lastHold); } catch (Exception e) { Log.Error("MoneyLedger.A427FolkLine", e); }   // 427 A1: linia "Kiesy ludu - rozbicie zmiany (427)" (tylko log; _lastHold = koniec poprzedniej doby)
                     try { Log.Info(PumpsLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.PumpsLine", e); }   // N1(a) (noc 16.10): "Pompy - sztuczne przelewy (nekon)" - te same liczniki co "Obieg" (tylko log)
                     try { F4CaravanDay(day, hold, _lastHold); } catch (Exception e) { Log.Error("MoneyLedger.F4CaravanDay", e); }   // f4-pomiary (klucz Measure Caravan Trade): wynik handlowy karawan co 7 dob (tylko log, przed ClearDay)
                 }

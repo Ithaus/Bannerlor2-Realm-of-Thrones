@@ -500,6 +500,7 @@ namespace Armoury
                       .Append("), wsie ").Append(_vhTake).Append(", razem ").Append(hoardT + _gdCrownT + _vhTake).Append("; do glow rodow ").Append(_hdLord + _vhLord)
                       .Append(", do kas miast ").Append(_hdTown + _vhTown).Append(", do kas zamkow ").Append(_hdCastle + _vhCastle).Append(", do skarbcow koron ").Append(_gdCrownT + _vhCrown)
                       .Append(" | kiesy ludu i wsi na koniec doby ").Append(folkEnd)
+                      .Append(A427GuardNote(s))   // 427 A1: stawka obowiazujaca (przy firmach DS straznik to cien) i gracz osobno od lordow AI (klucz wylaczony - pusto)
                       .Append(" | czas ").Append(Ms(_gdTicks + Stopwatch.GetTimestamp() - t0)).Append(" ms | potkniecia ").Append(_gdStumbles).Append(" (sesja ").Append(_gdStumbleSess).Append(").");
                     _lineGuard = sb.ToString();
                 }

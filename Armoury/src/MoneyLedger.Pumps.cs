@@ -78,6 +78,7 @@ namespace Armoury
               .Append(", danina markietanow zamiast do kies wsi ").Append(fSut).Append(", myto wozow wsi - utarg wsi przed 112 ").Append(fCart).Append("; z kies karawan - wlasciciele ").Append(fCar)
               .Append("), udzial z ludu w zwrocie od ludu F-lud / (B + F-lud) ").Append(B + fFolk > 0 ? (100.0 * fFolk / (B + fFolk)).ToString("0.0", Inv) + "%" : "-")
               .Append(" | poza suma: chleb M3 ").Append(m3).Append(", pozyczki koron od miast ").Append(crownLoan).Append(", dosypka regulatora kas miast ").Append(reg)
+              .Append(A427PumpsTail(all, pay, B))   // 427 A1: danina od skarbca wsi DS i czesc firmy pana z oszczednosci ludu - poza "razem" (klucz wylaczony - pusto)
               .Append(" | uspione (0 dzis): ").Append(sleep.Count > 0 ? string.Join(", ", sleep.ToArray()) : "-")
               .Append(" | potkniecia ").Append(st).Append('.');
             return sb.ToString();

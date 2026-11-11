@@ -1669,7 +1669,7 @@ namespace Armoury
                     {
                         if (s.Craft >= 0 && s.Craft < KsTab.NC) countBy[s.Craft]++;
                         if (s.Craft != di.TypeCraft) other++;
-                        if (s.Target >= 0) inTrans++;
+                        if (s.Target >= 0) { inTrans++; EcoAudit427.RbAge(EcoAudit427.SysZw, today - s.TEnd); }   // 427 A1: wiek przebudowy wobec terminu (sam licznik)
                         if (s.Row != null && s.Row.O != null && s.Row.O.Terr == "snieg" && (Crop(s.Craft) && s.Craft != di.TypeCraft || Crop(s.Target))) snow++;
                     }
                 }
@@ -2294,7 +2294,7 @@ namespace Armoury
                 s.Paid += got; _dPaid += got;
                 double fPay = s.Paid >= s.Cost - 0.5f ? 1.0 : Math.Max(0.0, s.Paid / s.Cost);
                 progress = Math.Max(0.0, Math.Min(1.0, (fPay - s.F) * T));
-                if (progress < 1.0 - 1e-6) _dStall++;
+                if (progress < 1.0 - 1e-6) { _dStall++; EcoAudit427.RbStall(EcoAudit427.SysZw, owe, ask, got, di.V.Gold, true, true); }   // 427 A1: powod doby postoju (sam licznik)
             }
             s.F = (float)Math.Min(1.0, s.F + progress / T);
             if (s.F >= 0.9999f)
@@ -2364,6 +2364,7 @@ namespace Armoury
             sb.Append(" | inne niz typ okregu ").Append(other).Append(", w przebudowie ").Append(inTrans).Append(", uprawy na sniegu (inne niz typ okregu) ").Append(snow)
               .Append(" | zmiany: nacisk ").Append(_dPress).Append(", zaczete ").Append(_dStarted).Append(", skonczone ").Append(_dDone).Append(", wstrzymane (inna wioska okregu) ").Append(_dBusy)
               .Append(", (udzial regionu) ").Append(_dBudget).Append(", zamrozone pracami ").Append(_dLocked).Append(", doby bez pelnej zaplaty ").Append(_dStall).Append(", porzucone ").Append(_dCancel)
+              .Append(EcoAudit427.RbText(EcoAudit427.SysZw, _dStall))   // 427 A1: powod postoju i wiek przebudow (klucz wylaczony - pusto); zeruje swoje liczniki
               .Append(_dHeldZero > 0 ? ", Held wyzerowane (pierwszy krok sygnalu KS) " + _dHeldZero : "")   // recenzja calosci fali 5
               .Append(", zaplacone ").Append(_dPaid).Append(" zl").Append(_notes.Count > 0 ? " (" + string.Join("; ", _notes.ToArray()) + ")" : "")
               .Append(F4ZwText())                                   // f4-pomiary (klucz Measure Craft Rule): nacisk ZW i przejscia "z -> na" (pusty napis przy kluczu wylaczonym)
