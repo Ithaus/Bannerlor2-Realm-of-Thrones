@@ -139,7 +139,7 @@ namespace Armoury
         private static int _dRelift, _dReliftFail;
         private static Deal _offer;          // P: zgoda w rozmowie, czeka na opcje menu arm384_pass
         private static bool _armed;
-        private static int _stumbles, _dZero, _dNoAttack;
+        private static int _stumbles, _dZero, _dNoAttack, _dZeroMine;   // _dZeroMine 386b: cele druzyn rodu gracza na osadach frakcji z paktem
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         // stan rozmowy
@@ -169,7 +169,7 @@ namespace Armoury
         {
             _realmKeys = NoKeys; _dRealmBlock = 0; _dPick = 0;
             _pact = null; PactZero(); _pThreadStumbles = 0;   // 386
-            _queue.Clear(); _entries.Clear(); _cool.Clear(); _relift.Clear(); _dRelift = 0; _dReliftFail = 0; _offer = null; _armed = false; _stumbles = 0; _dZero = 0; _dNoAttack = 0; _err.Clear();
+            _queue.Clear(); _entries.Clear(); _cool.Clear(); _relift.Clear(); _dRelift = 0; _dReliftFail = 0; _offer = null; _armed = false; _stumbles = 0; _dZero = 0; _dNoAttack = 0; _dZeroMine = 0; _err.Clear();
             ClearTalk();
         }
 
@@ -1604,8 +1604,18 @@ namespace Armoury
             {
                 if (!On || st == null || party == null) return;
                 if (type != Army.ArmyTypes.Besieger && type != Army.ArmyTypes.Raider) return;
-                if (st.OwnerClan != Clan.PlayerClan) return;
                 int today = (int)Today;
+                // 386b: odwrotnie - druzyna rodu gracza (towarzysz) nie wybiera za cel najazdu / oblezenia osady frakcji albo rodu z uczciwym paktem
+                if (KClan && Mine(party) && !MineSt(st, Clan.PlayerClan))
+                {
+                    foreach (var e in _entries)
+                    {
+                        if (e.Betray || e.Scope != "*" || e.Until <= today) continue;
+                        if (Match(e, st.MapFaction, st.OwnerClan)) { result = 0f; _dZeroMine++; return; }
+                    }
+                    return;
+                }
+                if (st.OwnerClan != Clan.PlayerClan) return;
                 foreach (var e in _entries)
                 {
                     if (e.Betray || e.Scope != "*" || e.Until <= today) continue;
@@ -1703,10 +1713,24 @@ namespace Armoury
             return true;
         }
 
-        private static bool Engages(AiBehavior b) { return b == AiBehavior.EngageParty || b == AiBehavior.GoAroundParty; }
+        /// <summary>386b: poscig to TYLKO EngageParty. GoAroundParty to podejscie, ktore gra co godzine daje kazdej druzynie lorda na pobliska wroga druzyne
+        /// (AiEngagePartyBehavior.AiHourlyTick) - liczone jako poscig robilo z kazdego lorda przy froncie "napastnika" i rozbrajalo pakt w obie strony; atak z
+        /// podejscia i tak musi przejsc przez ShouldConsiderAttacking, czyli przez weto.</summary>
+        private static bool Engages(AiBehavior b) { return b == AiBehavior.EngageParty; }
+
+        /// <summary>386b: osada frakcji / rodu z migawki paktu. Tylko odczyt.</summary>
+        private static bool HasSt(Pact k, Settlement s)
+        {
+            if (k == null || s == null) return false;
+            var f = s.MapFaction;
+            if (f != null && k.F.Count > 0 && f.StringId != null && k.F.Contains(f.StringId)) return true;
+            if (k.C.Count == 0) return false;
+            var c = s.OwnerClan;
+            return c != null && c.StringId != null && k.C.Contains(c.StringId);
+        }
 
         /// <summary>384b + 386, jedna regula samoobrony dla gracza i partii rodu: x (albo wodz jego armii) oblega twierdze rodu gracza, najezdza / idzie oblegac
-        /// ziemie rodu gracza albo SCIGA (EngageParty / GoAroundParty - sam cel przy ucieczce to nie poscig: gra wpisuje w ShortTermTargetParty takze partie, przed
+        /// ziemie rodu gracza albo SCIGA (tylko EngageParty, 386b - sam cel przy ucieczce to nie poscig: gra wpisuje w ShortTermTargetParty takze partie, przed
         /// ktora sie ucieka) druzyne gracza albo partie rodu. Zwraca powod albo null. Tylko odczyt, bez lapania wyjatkow (lapie wolajacy) - takze watki AI.</summary>
         private static string AggressorCore(MobileParty mp)
         {
@@ -1723,7 +1747,7 @@ namespace Armoury
                 var tp = Engages(x.DefaultBehavior) ? x.TargetParty : null;
                 var sp = Engages(x.ShortTermBehavior) ? x.ShortTermTargetParty : null;
                 if (main != null && (tp == main || sp == main)) return "sciga druzyne gracza";
-                if (Mine(tp) || Mine(sp)) return "sciga partie rodu gracza";
+                if (KClan && (Mine(tp) || Mine(sp))) return "sciga partie rodu gracza";   // 386b: przy kluczu NIE pakt nie obejmuje partii rodu - bez darmowej samoobrony
                 for (int j = 0; j < 2; j++)
                 {
                     var t = j == 0 ? x.TargetSettlement : x.ShortTermTargetSettlement;
@@ -1742,7 +1766,11 @@ namespace Armoury
             if (b == null || k == null) return false;
             if (Engages(b.DefaultBehavior) && Has(k, b.TargetParty)) return true;
             if (Engages(b.ShortTermBehavior) && Has(k, b.ShortTermTargetParty)) return true;
+            // 386b: najazd / oblezenie ich osady (takze w drodze) to tez wystepowanie przeciw nim - obroncy nie maja weta
+            if (HasSt(k, b.BesiegedSettlement)) return true;
+            if ((b.DefaultBehavior == AiBehavior.RaidSettlement || b.DefaultBehavior == AiBehavior.BesiegeSettlement) && HasSt(k, b.TargetSettlement)) return true;
             if (b.MapEvent == null) return false;
+            if (HasSt(k, b.MapEvent.MapEventSettlement)) return true;
             var side = b.MapEventSide;
             var opp = side != null ? side.OtherSide : null;
             var lp = opp != null && opp.LeaderParty != null ? opp.LeaderParty.MobileParty : null;
@@ -1840,6 +1868,7 @@ namespace Armoury
             {
                 if (t.IsMainParty) { if (!On) return false; }
                 else if (!KClan || !Mine(t)) return false;
+                else if (Hunting(t, k)) return false;   // 386b: partia rodu sama wystepuje przeciw nim - obrona chronionego dozwolona (jak w AttackPact)
                 return Has(k, p);
             }
             catch { return false; }
@@ -1948,7 +1977,7 @@ namespace Armoury
                     if (!PactWith(d.MapFaction, d.MobileParty != null ? d.MobileParty.ActualClan : (d.Settlement != null ? d.Settlement.OwnerClan : null))) return;
                     string why = d.MobileParty != null ? AggressorCore(d.MobileParty) : null;
                     if (why == null) _pMyDespite++;
-                    Log.Info(Tag + ": dzien " + F(Today) + " | partia rodu gracza " + a.Name + " atakuje " + d.Name + (why != null ? " - samoobrona (" + why + "), pakt nie zlamany." : " MIMO PAKTU (droga poza latka 386) - bez kary (gracz nie wydal rozkazu)."));
+                    Log.Info(Tag + ": dzien " + F(Today) + " | partia rodu gracza " + a.Name + " atakuje " + d.Name + (why != null ? " - samoobrona (" + why + "), pakt nie zlamany." : " MIMO PAKTU (droga poza latka 386 i wyzerowanym celem osady 386b) - bez kary (gracz nie wydal rozkazu)."));
                     return;
                 }
                 bool onClan = d.MobileParty != null && KClan && Mine(d.MobileParty);   // 386
@@ -2131,15 +2160,15 @@ namespace Armoury
                 foreach (var kv in _cool) if (kv.Value.End <= Today) dead.Add(kv.Key);
                 foreach (var k in dead) _cool.Remove(k);
                 if (_entries.Count > 0 && On) { NoAttack(); ScanViolations(); }
-                if (_entries.Count > 0 || before > 0 || _dZero > 0 || _queue.Count > 0 || _dRelift + _dReliftFail > 0 || _dRealmBlock > 0 || _dPick > 0 || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite > 0)
+                if (_entries.Count > 0 || before > 0 || _dZero + _dZeroMine > 0 || _queue.Count > 0 || _dRelift + _dReliftFail > 0 || _dRealmBlock > 0 || _dPick > 0 || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite > 0)
                 {
                     int pact = 0, st = 0, bet = 0, realm = 0;
                     foreach (var e in _entries) { if (e.Betray) bet++; else if (e.Scope == "*") pact++; else if (e.Scope == "K") realm++; else st++; }
                     Log.Info(Tag + ": doba " + today + " | wpisy umow " + _entries.Count + " (pakt ziem " + pact + ", rozejm osady " + st + ", rozejm krolestw " + realm + ", pilnowane zdrady " + bet + "; wygaslo " + (before - _entries.Count) + ")"
                              + " | 385: wojny AI zatrzymane rozejmem krolestw " + _dRealmBlock + ", okna wyboru " + _dPick
-                             + " | cele AI wyzerowane paktem " + _dZero + " | druzyny bez ataku na gracza " + _dNoAttack + " | kolejka " + _queue.Count + " | oblezenia wbrew umowie zwiniete " + _dRelift + " (nieudane " + _dReliftFail + ", czeka " + _relift.Count + ")" + (_pact != null || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite > 0 ? PactLine() : "") + " | potkniecia " + _stumbles + ".");
+                             + " | cele AI wyzerowane paktem " + _dZero + " (cele druzyn rodu na ich osadach " + _dZeroMine + ") | druzyny bez ataku na gracza " + _dNoAttack + " | kolejka " + _queue.Count + " | oblezenia wbrew umowie zwiniete " + _dRelift + " (nieudane " + _dReliftFail + ", czeka " + _relift.Count + ")" + (_pact != null || _pAiCalls + _pMyCalls + _pFlee + _pOrders + _pDespite + _pMyDespite > 0 ? PactLine() : "") + " | potkniecia " + _stumbles + ".");
                 }
-                _dZero = 0; _dNoAttack = 0; _dRelift = 0; _dReliftFail = 0; _dRealmBlock = 0; _dPick = 0;
+                _dZero = 0; _dZeroMine = 0; _dNoAttack = 0; _dRelift = 0; _dReliftFail = 0; _dRealmBlock = 0; _dPick = 0;
                 PactZero();   // 386
             }
             catch (Exception e) { Stumble("Daily", e); }
