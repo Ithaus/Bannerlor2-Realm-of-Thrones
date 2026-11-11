@@ -48,6 +48,10 @@ namespace Armoury
     ///    sojusznikow w jednej bitwie dostaja kazde swoja nagrode. Zbior w pamieci, czyszczony przy zmianie doby (bez zapisu - wczytanie w polowie doby
     ///    najwyzej pozwoli nagrodzic raz jeszcze; zgubienie gorsze nie jest). Bitwa z samymi juz nagrodzonymi - linia "Nagroda krola (314c) pominieta".
     ///
+    /// 431 (audyt ekonomii B4, decyzja Jeffa 4 - klucz RoyalWarWageLoan, CrownWarLoan431.cs): zold A nie jest juz darem dla kazdego - korona daje go tylko rodom
+    /// W POTRZEBIE (x f, ta sama miara co renty f7) i jako POZYCZKE (roszczenie KCrownLoan drabiny 168, maly procent, limit, splata po wojnie). Skarbiec, kolejnosc,
+    /// PaidToday i ciecie zwrotu bez zmian; klucz wylaczony = wszystko ponizej co do zlotowki jak dotad. Nagroda B (dar za zwyciestwo) bez zmian.
+    ///
     /// Gracz i AI na tych samych zasadach. Liczniki KDay.Wage314 / Gift314 ida do rozkladu "Skarbce:" (312e, czesc "nagrody 178"). Linie "Zold krolewski (314c)"
     /// i "Nagroda krola (314c)". Wyjatek per krolestwo / rod / bitwa liczony (potkniecia w linii, pierwszy blad miejsca do logu) - bez globalnego wylacznika.
     /// </summary>
@@ -272,6 +276,7 @@ namespace Armoury
             if (!s.RoyalWarWageEnabled) return;
             int year = CampaignTime.Now.GetYear, free = FreeDays(s);
             double pct = Math.Max(0f, Math.Min(100f, s.RoyalWarWagePercent)) / 100.0;
+            bool loan = CrownWarLoan431.On;   // 431: zold tylko rodom w potrzebie i jako pozyczka korony (klucz wylaczony - dar jak dotad)
             foreach (var k in Kingdom.All)
             {
                 if (k == null || k.IsEliminated) continue;
@@ -316,6 +321,7 @@ namespace Armoury
                             long c277 = Math.Min(due, (long)Math.Floor(Math.Max(0, CanonHouses277.CashOf(c))));
                             if (c277 > 0) { due -= c277; _dCut277 += c277; }
                             if (due <= 0) continue;
+                            if (loan) { due = CrownWarLoan431.Want(c, k, due, year); if (due <= 0) continue; }   // 431: x f potrzeby, limit dlugu, zgoda gracza
                             rows.Add(new Row { C = c, Base = due, Men = men });
                         }
                         catch (Exception e) { Stumble("PayWages(rod)", e); }
@@ -334,6 +340,7 @@ namespace Armoury
                         _dDue += dueArr[i]; _dMen += rows[i].Men;
                         if (x <= 0) continue;
                         _dPaidN++; _dPaidAmt += x; got += x;
+                        if (loan) CrownWarLoan431.Lent(c, k, x);   // 431: wyplacone = dlug rodu wobec tej korony (ksiega drabiny 168)
                         long prev; _paid.TryGetValue(c.StringId, out prev); _paid[c.StringId] = prev + x;
                         if (c == Clan.PlayerClan) _dPlWage += x;
                     }
@@ -341,7 +348,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("PayWages(" + Name(k) + ")", e); }
             }
-            if (_dPlWage > 0) Log.Player("The crown pays your house " + _dPlWage + " denars of war wages for the men serving in the king's army.");
+            if (_dPlWage > 0) Log.Player(loan ? CrownWarLoan431.PlayerDayText(_dPlWage) : "The crown pays your house " + _dPlWage + " denars of war wages for the men serving in the king's army.");
         }
 
         private static void Report(Settings s, int day)
@@ -365,6 +372,7 @@ namespace Armoury
               .Append(" | rody w armiach ").Append(_dSvc).Append(" (bez zaplaty ").Append(_dFree).Append(", platnych ").Append(_dSvc - _dFree).Append(", wyplacono ").Append(_dPaidN).Append(')')
               .Append(", szeregowych platnych ").Append(_dMen)
               .Append(" | nalezne ").Append(_dDue).Append(", wyplacone ").Append(_dPaidAmt)
+              .Append(CrownWarLoan431.On ? " (431: nalezne juz wedlug potrzeby rodu i limitu, wyplacone to POZYCZKA korony - linia 'Pozyczka korony na zold (431)')" : "")
               .Append(" | dary za zwyciestwo: wyplacone ").Append(_dGiftPaid).Append(", w kolejce ").Append(pend).Append(" (pozycji ").Append(_gifts.Count).Append("), przepadlo ").Append(_dGiftLapsed)
               .Append(" | ze skarbca razem ").Append(_dFromLeft + _dFromStock).Append(" (z wplywow dnia ").Append(_dFromLeft).Append(", ponad zapas wojny ").Append(_dFromStock)
               .Append("; wplywy dnia zostawione dla W5 ").Append(_dKeptW5).Append(')')

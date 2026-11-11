@@ -48,7 +48,10 @@ namespace Armoury
         // f8-pozyczka (decyzja Jeffa 18.10 "2. tak"): pozyczka miejska - wierzyciel = osada (Creditor = id miasta / zamku; po przejeciu obieg2 takze wies), pieniadz ludu
         // i kasy kupcow tej osady (udzialy Sh). Zapis POZA arm_debt168 (klucz arm_townloan - ExportTown / ImportTown), wiec starsza DLL tego rodzaju nie widzi.
         internal const int KTown = 6;
-        private static readonly string[] KindName = { "-", "dlug zoldu", "zaliczka gry", "dlug wobec korony", "okup", "okup wielkiego jenca", "pozyczka miejska" };
+        // 431 (audyt ekonomii B4, decyzja Jeffa 4): pozyczka korony na zold wojenny - wierzyciel = krolestwo (Creditor = id krolestwa), odsetki Acc / Frac jak KTown
+        // (RoyalWarWageLoanRate), zloto raty -> skarbiec krolestwa. Zapis POZA arm_debt168 (klucz arm_zold431 - CrownWarLoan431), wiec starsza DLL tego rodzaju nie widzi.
+        internal const int KCrownLoan = 7;
+        private static readonly string[] KindName = { "-", "dlug zoldu", "zaliczka gry", "dlug wobec korony", "okup", "okup wielkiego jenca", "pozyczka miejska", "pozyczka korony na zold" };
 
         internal sealed class Claim
         {
@@ -156,7 +159,8 @@ namespace Armoury
         private static bool HasCreditClaims(L l)
         {
             if (l == null) return false;
-            foreach (var c in l.Claims) if (c.Left > 0 && c.Kind != KRansom && c.Kind != KGreat && c.Kind != KTown) return true;
+            // 431: pozyczka korony na zold (KCrownLoan) tez sama nie robi dluznika 166 - inaczej rod w potrzebie po pierwszym denarze pozyczki bralby pelny zwrot f6 i rente f7
+            foreach (var c in l.Claims) if (c.Left > 0 && c.Kind != KRansom && c.Kind != KGreat && c.Kind != KTown && c.Kind != KCrownLoan) return true;
             return false;
         }
 
@@ -479,6 +483,142 @@ namespace Armoury
             catch { return false; }
         }
 
+        // ------------------------------------------------------------ 431: pozyczka korony na zold wojenny (CrownWarLoan431 - regula; tu tylko ksiega)
+        private static bool IsCrownLoan(Claim x) { return x != null && x.Kind == KCrownLoan && x.Left > 0; }
+
+        private static long CrownLeft(L l) { long t = 0; if (l != null) foreach (var x in l.Claims) if (IsCrownLoan(x)) t += x.Left; return t; }
+
+        /// <summary>431: dlug rodu z pozyczek koron na zold (wszystkie korony, z narosnietymi odsetkami). Tylko odczyt; nie rzuca.</summary>
+        internal static long CrownLoanOf(Clan c)
+        {
+            try { return CrownLeft(Of(c, false)); } catch (Exception e) { Stumble("CrownLoanOf", e); return 0; }
+        }
+
+        /// <summary>431: nowa pozyczka korony w ksiedze rodu (dopisana do istniejacego roszczenia tej korony). Zloto rusza wolajacy (CrownWar314.Pay). False - nie wpisano.</summary>
+        internal static bool AddCrownLoan(Clan c, string kingdomId, long amount)
+        {
+            if (c == null || string.IsNullOrEmpty(kingdomId) || amount <= 0) return false;
+            var l = Of(c, true);
+            if (l == null) return false;
+            // Total = dlug zaraz po ostatniej pozyczce (podstawa raty po wojnie: Total / RoyalWarWageLoanRepayDays) - nie suma wszystkich pozyczek od poczatku
+            foreach (var x in l.Claims) if (IsCrownLoan(x) && x.Creditor == kingdomId) { x.Left += amount; x.Total = x.Left; return true; }
+            l.Claims.Add(new Claim { Kind = KCrownLoan, Creditor = kingdomId, Crown = "", Left = amount, Total = amount, Day = (int)CampaignTime.Now.ToDays });
+            return true;
+        }
+
+        /// <summary>431: odsetki doby od pozyczek korony rodu (rok kalendarza gry; RoyalWarWageLoanRate - takze przy wylaczonym kluczu: stare pozyczki biegna dalej).
+        /// Tylko zapis dlugu. Zwraca stan dlugu po odsetkach. Rod bez takich roszczen - 0 i nic.</summary>
+        private static long CrownLoanInterest(L l, Settings s)
+        {
+            if (l == null) return 0;
+            double rate = -1;
+            long left = 0, add = 0;
+            foreach (var x in l.Claims)
+            {
+                if (!IsCrownLoan(x)) continue;
+                if (rate < 0) rate = Math.Max(0f, Math.Min(0.5f, s.RoyalWarWageLoanRate)) / Math.Max(28, IronBank.DaysPerYearNow());
+                x.Frac += x.Left * rate;
+                if (double.IsNaN(x.Frac) || double.IsInfinity(x.Frac) || x.Frac < 0) x.Frac = 0;
+                long whole = (long)Math.Floor(x.Frac);
+                if (whole > 0) { x.Left += whole; x.Acc += whole; x.Frac -= whole; add += whole; }
+                left += x.Left;
+            }
+            if (add > 0) CrownWarLoan431.NoteInterest(add);
+            return left;
+        }
+
+        /// <summary>431: zloto juz zdjete z dluznika na pozyczki korony (najstarsze pierwsze). Zwraca reszte ponad dlug.</summary>
+        private static long PayCrownLoans(Clan c, L l, long amount)
+        {
+            if (amount <= 0 || l == null) return amount;
+            foreach (var cl in l.Claims.Where(IsCrownLoan).OrderBy(x => x.Day).ToList())
+            {
+                if (amount <= 0) break;
+                long x = Math.Min(amount, cl.Left);
+                Deliver(c, cl, x); amount -= x;
+            }
+            return amount;
+        }
+
+        /// <summary>431: ksiega pozyczek koron do linii doby - dlug razem, w tym odsetki niezaplacone, rody, rody w zaleglosci / zajeciu; byCrown: id krolestwa ->
+        /// { dlug, liczba roszczen }. Tylko odczyt.</summary>
+        internal static void CrownLoanBook(out long debt, out long acc, out int clans, out int arrearClans, out int seizedClans, Dictionary<string, long[]> byCrown)
+        {
+            debt = 0; acc = 0; clans = 0; arrearClans = 0; seizedClans = 0;
+            foreach (var kv in _l)
+            {
+                var l = kv.Value; bool any = false;
+                foreach (var x in l.Claims)
+                {
+                    if (!IsCrownLoan(x)) continue;
+                    debt += x.Left; acc += Math.Max(0, x.Acc); any = true;
+                    if (byCrown != null)
+                    {
+                        long[] v; string k = x.Creditor ?? "";
+                        if (!byCrown.TryGetValue(k, out v)) { v = new long[2]; byCrown[k] = v; }
+                        v[0] += x.Left; v[1]++;
+                    }
+                }
+                if (!any) continue;
+                clans++;
+                if (l.Seized) seizedClans++; else if (l.Missed > 0) arrearClans++;
+            }
+        }
+
+        /// <summary>431: zapis roszczen KCrownLoan - "rod^krolestwo^reszta^calosc^doba^odsetki^ulamek;..." (pusty napis - brak). Najwyzej 4000 roszczen.</summary>
+        internal static string ExportCrownLoans()
+        {
+            try
+            {
+                int n = 0;
+                var sb = new StringBuilder(64);
+                foreach (var kv in _l)
+                {
+                    if (kv.Key == null || kv.Key.IndexOfAny(Bad) >= 0) continue;
+                    foreach (var c in kv.Value.Claims)
+                    {
+                        if (!IsCrownLoan(c) || string.IsNullOrEmpty(c.Creditor) || c.Creditor.IndexOfAny(Bad) >= 0 || n >= TownMaxRecords) continue;
+                        if (n > 0) sb.Append(';');
+                        sb.Append(kv.Key).Append('^').Append(c.Creditor).Append('^').Append(c.Left.ToString(Inv)).Append('^').Append(c.Total.ToString(Inv)).Append('^')
+                          .Append(c.Day.ToString(Inv)).Append('^').Append(Math.Max(0, c.Acc).ToString(Inv)).Append('^').Append(Math.Round(c.Frac, 3).ToString(Inv));
+                        n++;
+                    }
+                }
+                return sb.ToString();
+            }
+            catch (Exception e) { Stumble("ExportCrownLoans", e); return ""; }
+        }
+
+        /// <summary>431: po Import (arm_debt168 czysci ksiege) - roszczenia KCrownLoan do ksiegi rodow. Zly rekord pomijany (bad). Zwraca liczbe wczytanych.</summary>
+        internal static int ImportCrownLoans(string data, ref int bad)
+        {
+            int n = 0;
+            try
+            {
+                if (string.IsNullOrEmpty(data)) return 0;
+                foreach (var rec in data.Split(';'))
+                {
+                    if (rec.Length == 0) continue;
+                    if (n >= TownMaxRecords) { bad++; break; }
+                    try
+                    {
+                        var y = rec.Split('^');
+                        long left, total, acc; int day; double frac;
+                        if (y.Length < 7 || y[0].Length == 0 || y[1].Length == 0 || !long.TryParse(y[2], NumberStyles.Integer, Inv, out left) || left <= 0
+                            || !long.TryParse(y[3], NumberStyles.Integer, Inv, out total) || !int.TryParse(y[4], NumberStyles.Integer, Inv, out day)
+                            || !long.TryParse(y[5], NumberStyles.Integer, Inv, out acc) || !double.TryParse(y[6], NumberStyles.Float, Inv, out frac)) { bad++; continue; }
+                        if (double.IsNaN(frac) || double.IsInfinity(frac) || frac < 0 || frac >= 1) frac = 0;
+                        var l = OfId(y[0], true);
+                        l.Claims.Add(new Claim { Kind = KCrownLoan, Creditor = y[1], Crown = "", Left = left, Total = Math.Max(left, total), Day = day, Acc = Math.Max(0, Math.Min(acc, left)), Frac = frac });
+                        n++;
+                    }
+                    catch { bad++; }
+                }
+            }
+            catch (Exception e) { Stumble("ImportCrownLoans", e); }
+            return n;
+        }
+
         /// <summary>Wyplata KW dzis: kapital Banku -> kiesa glowy (IronBank.LendKw); czesc KW w ksiedze rodu (splata z lupow najpierw na KW).</summary>
         internal static int LendWar(Clan c, int amount)
         {
@@ -534,6 +674,8 @@ namespace Armoury
             if (other > 0) sb.Append(" Other debts: " + other + " gold.");
             long townOwed = TownLeft(l);   // f8-pozyczka: czesc "innych" to pozyczki od rad miast i ludzi zamkow
             if (townOwed > 0) sb.Append(" Of that, " + townOwed + " gold is owed to town councils and castle folk.");
+            long crownOwed = CrownLeft(l);   // 431: pozyczka korony na zold wojenny
+            if (crownOwed > 0) sb.Append(" " + crownOwed + " gold of it is the crown's loan toward your war wages - nothing of it is due while your realm is at war.");
             if (l != null && l.Seized) sb.Append(" Your creditors take the income of your villages and every coin above " + s.SeizeFloorGold + " in your purse until all is paid.");
             else if (l != null && l.Missed > 0) sb.Append(" Missed instalments in a row: " + l.Missed + "/3 - at the third your creditors seize your villages' income.");
             return sb.ToString();
@@ -776,14 +918,16 @@ namespace Armoury
             }
             // f8-pozyczka: odsetki pozyczek miejskich (bez roszczen KTown - 0 i droga jak dotad); w zajeciu zamrozone jak odsetki Banku (Seize wyzej)
             long townLeft = TownInterest(l, s);
+            long cwLeft = CrownLoanInterest(l, s);   // 431: odsetki pozyczek korony na zold (bez roszczen KCrownLoan - 0 i droga jak dotad); w zajeciu zamrozone jak pozostale
             bool war = AtWar(c);
             // f8-pozyczka: ta sama regula splaty z jednorazowych co kredyt wojenny - udzial (wojna 50%, pokoj 100%) najpierw na Bank, reszta na rady (najstarsze
             // pierwsze); poza limitem rat z D. Rod bez roszczen KTown - galaz ponizej jak dotad.
-            if (townLeft > 0 && !player)
+            // 431: pozyczka korony na zold - ta sama regula (po Banku i radach); rod bez roszczen KCrownLoan - co do zlotowki jak dotad
+            if ((townLeft > 0 || cwLeft > 0) && !player)
             {
                 long once; _onceToday.TryGetValue(c, out once);
                 double share = war ? Math.Max(0f, Math.Min(1f, s.WarCreditLootRepayShare)) : 1.0;
-                long want = (long)Math.Min((bank ? d.Principal : 0) + townLeft, once * share);
+                long want = (long)Math.Min((bank ? d.Principal : 0) + townLeft + cwLeft, once * share);
                 if (want > 0)
                 {
                     long wage3 = 3L * Math.Max(0, ClanIncomeBook.WageOf(c));
@@ -794,6 +938,7 @@ namespace Armoury
                         if (toBank > 0) { PayBank(c, l, d, toBank); _dLootRepaid += toBank; }
                         long rest = got - toBank, back = PayTownClaims(c, l, rest);
                         _dTownLoot += rest - back;
+                        if (back > 0 && cwLeft > 0) { long back2 = PayCrownLoans(c, l, back); CrownWarLoan431.NoteLoot(back - back2); back = back2; }   // 431
                         if (back > 0) { head.ChangeHeroGold((int)back); CirculationWindows.NoteHeroGold(head, back); got -= back; }
                         if (got > 0) { paidSum += got; paidN++; _dPaidN++; }
                     }
@@ -834,6 +979,10 @@ namespace Armoury
                 if (room <= 0) break;
                 long left = cl.Left;
                 if (cl.Kind == KTown && war && !player) left = Math.Min(left, Math.Max(0, cl.Acc));   // f8-pozyczka: w wojnie z D tylko odsetki (kapital z lupow i po pokoju)
+                // 431: pozyczka korony na zold - w wojnie nic z D (odsetki narastaja; AI splaca z lupow) - sama pozyczka nie robi zaleglosci w wojnie; po wojnie rata
+                // = narosle odsetki albo 1/RoyalWarWageLoanRepayDays dlugu z dnia ostatniej pozyczki (wieksze z dwojga), w tym samym limicie rat co wszyscy wierzyciele
+                if (cl.Kind == KCrownLoan)
+                    left = war ? 0 : Math.Min(left, Math.Max(Math.Max(0, cl.Acc), (long)Math.Ceiling((double)Math.Max(cl.Total, cl.Left) / Math.Max(28, Math.Min(1456, s.RoyalWarWageLoanRepayDays)))));
                 long x = Math.Min(left, room);
                 if (x <= 0) continue;
                 dues.Add(new KeyValuePair<Claim, long>(cl, x)); room -= x; claimsDue += x;
@@ -847,7 +996,7 @@ namespace Armoury
                 head.ChangeHeroGold(-(int)total);
                 CirculationWindows.NoteHeroGold(head, -total);
                 if (bankDue > 0) { PayBank(c, l, d, bankDue); _dBankInst += bankDue; }
-                foreach (var kv in dues) { Deliver(c, kv.Key, kv.Value); _dClaimInst += kv.Value; if (kv.Key.Kind == KTown) _dTownInst += kv.Value; }   // f8: raty rad
+                foreach (var kv in dues) { Deliver(c, kv.Key, kv.Value); _dClaimInst += kv.Value; if (kv.Key.Kind == KTown) _dTownInst += kv.Value; else if (kv.Key.Kind == KCrownLoan) CrownWarLoan431.NoteInstalment(kv.Value); }   // f8: raty rad; 431: raty koron
                 paidN++; paidSum += total; _dPaidN++;
                 l.Missed = 0; if (d != null) d.Missed = 0;
                 return;
@@ -861,7 +1010,7 @@ namespace Armoury
                 CirculationWindows.NoteHeroGold(head, -can);
                 long left = can;
                 if (bankDue > 0) { long x = Math.Min(left, bankDue); PayBank(c, l, d, x); left -= x; }
-                foreach (var kv in dues) { if (left <= 0) break; long x = Math.Min(left, kv.Value); Deliver(c, kv.Key, x); left -= x; if (kv.Key.Kind == KTown) _dTownInst += x; }   // f8: raty rad w zaleglosci
+                foreach (var kv in dues) { if (left <= 0) break; long x = Math.Min(left, kv.Value); Deliver(c, kv.Key, x); left -= x; if (kv.Key.Kind == KTown) _dTownInst += x; else if (kv.Key.Kind == KCrownLoan) CrownWarLoan431.NoteInstalment(x); }   // f8: raty rad w zaleglosci; 431
                 if (left > 0) { head.ChangeHeroGold((int)left); CirculationWindows.NoteHeroGold(head, left); can -= left; }
                 _dArrearPaid += can; paidSum += can;
             }
@@ -1174,6 +1323,18 @@ namespace Armoury
                     SpareTown(debtor, ix); _dSpare += x;
                     return;
                 }
+                case KCrownLoan:
+                {
+                    // 431: najpierw odsetki (Acc), potem kapital; zloto do skarbca korony-wierzyciela (nie ma jej - korona, ktorej rod dzis sluzy; bez korony - zapasowy
+                    // odbiorca jak przy innych roszczeniach). Wplyw po CrownIncome.End - jutro w "inne" wplywach dnia tej korony (jak okup wielkiego jenca).
+                    long ipc = Math.Min(x, Math.Max(0, cl.Acc));
+                    cl.Acc -= ipc;
+                    var k = KingdomById(cl.Creditor);
+                    if (k == null || k.IsEliminated) k = debtor != null ? debtor.Kingdom : null;
+                    if (k != null && !k.IsEliminated) { k.KingdomBudgetWallet += ix; CrownWarLoan431.NoteRepaid(x, ipc, false); return; }
+                    SpareTown(debtor, ix); _dSpare += x; CrownWarLoan431.NoteRepaid(x, ipc, true);
+                    return;
+                }
                 case KTown:
                 {
                     // f8-pozyczka: najpierw odsetki (Acc), potem kapital; zloto do wierzycieli osady wedlug udzialow (kiesy W / R / P, kasa kupcow, podzamcze; wies z obieg2 -
@@ -1243,6 +1404,8 @@ namespace Armoury
             {
                 long townOrph = TownLeft(l);   // f8-pozyczka: dlug wobec rad wychodzi z ksiegi rad do "dlugu bez platnika" (kontrola linii f8)
                 if (townOrph > 0) TownFolk.NoteTownOrphan(townOrph);
+                long cwOrph = CrownLeft(l);   // 431: pozyczka korony wychodzi z ksiegi do "dlugu bez platnika" (kontrola linii 431)
+                if (cwOrph > 0) CrownWarLoan431.NoteOrphan(cwOrph);
                 _orphans.Add(new Orphan { Id = id, Name = name, Bank = bank, Claims = cl, Day = today });
                 _dOrphanNew += bank + cl; _dOrphanN++;
                 Log.Info("Dlugi (168): rod " + name + " wymarl bez wsi - dlug w Banku " + bank + " i inne " + cl + " zostaja w ksiedze jako dlug bez platnika (bez umorzenia).");
@@ -1278,7 +1441,7 @@ namespace Armoury
                             if (x.Left <= 0) continue;
                             // recenzja D: udzial od stanu sprzed podzialu (dotad od reszty - trzeci i dalsi dziedzice dostawali mniej, ostatni wiecej)
                             long part = last ? x.Left : Math.Min(x.Left, orig[j] * list[i].Value / all);
-                            long accPart = x.Kind == KTown && x.Left > 0 ? (last ? x.Acc : (long)((double)x.Acc * part / x.Left)) : 0;   // f8-pozyczka: odsetki niezaplacone wedlug udzialu
+                            long accPart = (x.Kind == KTown || x.Kind == KCrownLoan) && x.Left > 0 ? (last ? x.Acc : (long)((double)x.Acc * part / x.Left)) : 0;   // f8-pozyczka: odsetki niezaplacone wedlug udzialu
                             x.Left -= part; x.Acc -= accPart;
                             if (part > 0) { hl.Claims.Add(new Claim { Kind = x.Kind, Creditor = x.Creditor, Crown = x.Crown, Left = part, Total = part, Day = x.Day, Acc = accPart, Sh = x.Sh != null ? (double[])x.Sh.Clone() : null }); cGiven += part; }
                         }
@@ -1310,7 +1473,7 @@ namespace Armoury
                     L l; _l.TryGetValue(id, out l);
                     long b = d != null && d.Principal >= 1 ? (long)d.Principal : 0;
                     long men = 0, crown = 0, rans = 0, town = 0;   // f8-pozyczka: dlug wobec rad osobno (linia "Pozyczki miejskie (f8)"), nie "wobec korony"
-                    if (l != null) foreach (var x in l.Claims) { if (x.Left <= 0) continue; if (x.Kind == KMen) men += x.Left; else if (x.Kind == KRansom || x.Kind == KGreat) rans += x.Left; else if (x.Kind == KTown) town += x.Left; else crown += x.Left; }
+                    if (l != null) foreach (var x in l.Claims) { if (x.Left <= 0) continue; if (x.Kind == KMen) men += x.Left; else if (x.Kind == KRansom || x.Kind == KGreat) rans += x.Left; else if (x.Kind == KTown || x.Kind == KCrownLoan) town += x.Left; else crown += x.Left; }   // 431: pozyczka korony na zold jak rady (rod "kredyt"); kwota w linii 431, nie w "wobec korony" (stary dlug gry)
                     bankAll += b; menAll += men; crownAll += crown; ransomAll += rans;
                     if (l != null) kwAll += Math.Min(l.Kw, b);
                     if (l != null && l.Seized) { if (SaleRegime(l, d)) nSale++; else nSeize++; continue; }
@@ -1497,6 +1660,7 @@ namespace Armoury
                     {
                         if (c.Left <= 0 || (c.Creditor ?? "").IndexOfAny(Bad) >= 0 || (c.Crown ?? "").IndexOfAny(Bad) >= 0) continue;
                         if (c.Kind == KTown) continue;   // f8-pozyczka: pozyczki miejskie w kluczu arm_townloan (ExportTown) - starsza DLL ich nie widzi
+                        if (c.Kind == KCrownLoan) continue;   // 431: pozyczki koron na zold w kluczu arm_zold431 (ExportCrownLoans) - starsza DLL ich nie widzi
                         if (!fc) sb.Append('~'); fc = false;
                         sb.Append(c.Kind.ToString(Inv)).Append('^').Append(c.Creditor).Append('^').Append(c.Crown).Append('^').Append(c.Left.ToString(Inv)).Append('^').Append(c.Total.ToString(Inv)).Append('^').Append(c.Day.ToString(Inv));
                     }

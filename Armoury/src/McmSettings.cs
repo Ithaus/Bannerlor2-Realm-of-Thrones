@@ -4920,6 +4920,26 @@ namespace Armoury
         [SettingPropertyGroup("The soldier's pay")]
         public float RoyalWarWagePercent { get; set; } = 50f;
 
+        [SettingPropertyBool("Royal War Wage Loan", HintText = "with Royal War Wage Enabled: the crown no longer gives the royal war wages away - it lends them, and only to houses in need (by the same measure as Crown Rents By Need: all of it below the war reserve, a share up to twice the reserve, nothing above). The loan is written in the house's debt book, grows by Royal War Wage Loan Rate a year, is not due while the house is at war and is paid back from spoils and, after the war, in daily instalments; missed instalments lead to the usual arrears and seizure. Needs the debt ladder and the house budgets; off = the royal war wages are a gift to every serving house, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool RoyalWarWageLoan { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Royal War Wage Loan Rate", 0.00f, 0.20f, "0.000", HintText = "with Royal War Wage Loan: yearly interest on what a house owes the crown for its war wages (0.03 = 3% a year)", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public float RoyalWarWageLoanRate { get; set; } = 0.03f;
+
+        [SettingPropertyInteger("Royal War Wage Loan Limit Days", 0, 728, "0", HintText = "with Royal War Wage Loan: the crown lends a house no more once it owes the crown this many days of its steady income", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public int RoyalWarWageLoanLimitDays { get; set; } = 60;
+
+        [SettingPropertyInteger("Royal War Wage Loan Repay Days", 28, 1456, "0", HintText = "with Royal War Wage Loan: once the house is at peace it pays the crown back in daily instalments spread over this many days (728 = two years), never less than the interest and never more than its creditors may take of its steady income together", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public int RoyalWarWageLoanRepayDays { get; set; } = 728;
+
+        [SettingPropertyBool("Royal War Wage Loan Ask Player", HintText = "with Royal War Wage Loan: your own house is asked once a year, when the first loan is due, whether it accepts the crown's loan or refuses it; off = your house takes the loan like any other house", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool RoyalWarWageLoanAskPlayer { get; set; } = true;
+
         [SettingPropertyBool("Royal Victory Reward Enabled", HintText = "the king's reward for a great victory: beating a lord's party or an army of a kingdom you are at war with earns the houses of your kingdom that fought a gift from the treasury (by their share in the battle) and influence; bandits and looters earn nothing. The gift is paid at the next crown settlement and only while the treasury has gold above its war reserve; the king's own house and mercenaries get no gift. AI lords and you alike", RequireRestart = false)]
         [SettingPropertyGroup("The soldier's pay")]
         public bool RoyalVictoryRewardEnabled { get; set; } = true;
@@ -13801,6 +13821,11 @@ namespace Armoury
             s.RoyalWarWageEnabled = RoyalWarWageEnabled;
             s.RoyalWarWageFreeDays = RoyalWarWageFreeDays;
             s.RoyalWarWagePercent = RoyalWarWagePercent;
+            s.RoyalWarWageLoan = RoyalWarWageLoan;
+            s.RoyalWarWageLoanRate = RoyalWarWageLoanRate;
+            s.RoyalWarWageLoanLimitDays = RoyalWarWageLoanLimitDays;
+            s.RoyalWarWageLoanRepayDays = RoyalWarWageLoanRepayDays;
+            s.RoyalWarWageLoanAskPlayer = RoyalWarWageLoanAskPlayer;
             s.RoyalVictoryRewardEnabled = RoyalVictoryRewardEnabled;
             s.RoyalVictoryGoldPerEnemy = RoyalVictoryGoldPerEnemy;
             s.RoyalVictoryArmyMultiplier = RoyalVictoryArmyMultiplier;
