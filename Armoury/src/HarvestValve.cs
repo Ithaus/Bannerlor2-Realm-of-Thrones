@@ -150,6 +150,14 @@ namespace Armoury
         /// <summary>Po pierwszej decyzji: RawNoRot nie kasuje towarow (stawka 0).</summary>
         internal static bool Active { get { return On && _decisions > 0; } }
 
+        // 435-L1 (lancuch podazy, sam pomiar): migawka ostatniej decyzji towarow dla SupplySignal - mnoznik, czy na suficie kroku, stos w dniach zuzycia i czy ponizej
+        // dolnego progu. Tylko odczyt; nic w zapisie (po wczytaniu migawki nie ma do nastepnej decyzji - SupplySignal bierze wtedy same mnozniki z LpFactors).
+        internal sealed class LpGood { public ItemObject Item; public float M; public bool AtCeil, Short; public double StockDays; }
+        private static volatile List<LpGood> _lpPeek; private static int _lpPeekDec;
+        internal static List<LpGood> LpPeek(out int dec) { dec = _lpPeekDec; return _lpPeek; }
+        internal static Dictionary<ItemObject, float> LpFactors() { return On ? _factors : null; }
+        internal static float LpCeil() { var s = Settings.Current; return s != null ? Math.Max(1f, Math.Min(2f, s.VillageOutputStep)) : UpStep; }
+
         /// <summary>E6/K4 (220): klucz hodowli wedlug popytu.</summary>
         private static bool HorseKey { get { var s = Settings.Current; return s != null && s.HorseBreedingByDemand; } }
 
@@ -175,6 +183,7 @@ namespace Armoury
         {
             _goods.Clear(); _byItem.Clear(); _factors = null;
             _start = -1; _bucketStart = -1; _buckets = 0; _decisions = 0; _firstDecisionDay = -1;
+            _lpPeek = null; _lpPeekDec = 0;                                    // 435-L1: migawka pomiaru razem ze stanem
             _hm = null; _shift = 0f; _hHas = false; _hNow = new long[HCats];   // E6/K4 (220): konie razem z regulatorem
         }
 
@@ -570,6 +579,7 @@ namespace Armoury
                 catch (Exception e) { Stumble("Close.bezpiecznik", e); holdReady = false; }
             }
             var parts = new List<string>();
+            var lpPeek = new List<LpGood>();                                   // 435-L1: migawka decyzji (sam pomiar)
             var beastDecided = new List<string>(); var beastWait = new List<string>();   // T3-K2: zwierzeta w decyzji / czekajace na pelne okno
             var ids = new List<string>(_goods.Keys); ids.Sort(StringComparer.Ordinal);
             var f = new Dictionary<ItemObject, float>(new RefEq());
@@ -665,6 +675,7 @@ namespace Armoury
                                       + (cDay > 0.0 ? (now / cDay).ToString("0", inv) + " dni zuzycia" : "bez odbiorcy") + ", "
                                       + (dir < 0 ? "w dol" : dir > 0 ? "w gore" : "bez zmian") + (holdNote ?? ""));
                             if (Beast(g.Item)) beastDecided.Add(id);   // T3-K2: zwierze w tej decyzji (tylko licznik dopisku)
+                            lpPeek.Add(new LpGood { Item = g.Item, M = m1, AtCeil = m1 >= ceil - 1e-3f, Short = cDay > 0.0 && now < low * cDay, StockDays = cDay > 0.0 ? now / cDay : -1.0 });   // 435-L1
                         }
                     }
                     catch (Exception e) { Stumble("Decide", e); }
@@ -688,6 +699,7 @@ namespace Armoury
                 return;
             }
             _decisions++;
+            _lpPeek = lpPeek; _lpPeekDec = _decisions;                         // 435-L1: migawka tej decyzji (sam pomiar)
             if (_firstDecisionDay < 0) _firstDecisionDay = day;
             var sb = new StringBuilder();
             sb.Append("Regulator wsi (221): dzien ").Append(day).Append(" - CZYNNY, decyzja ").Append(_decisions).Append(" (doba pomiaru ").Append(today - _start)

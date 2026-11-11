@@ -10508,6 +10508,10 @@ namespace Armoury
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool EconomyAuditLines { get; set; } = true;
 
+        [SettingPropertyBool("Supply Chain Log", HintText = "log only, nothing in the game changes: write the daily supply chain lines to the Armoury log (measurement only) - pieces of building material and workshop input that were wanted and not found, by good and market town; a shortage table by good and town that nothing uses yet; how fully the towns' workshops work and why a cycle makes nothing; how many districts change their hands by more than 1% a day; every 28 days a dry valuation of village gear; every 7 days why the player's district works pay nothing. Off = no such lines and the counters do not count, exactly as before", RequireRestart = false)]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool SupplyChainLog { get; set; } = true;
+
         [SettingPropertyBool("Measure Craft Rule", HintText = "log only, nothing in the game changes: once a week, and on the day the start calibration fills the stalls, the log gets a diagnosis of the rule that would let village parts change their work under the start calibration - how many parts would want to change at today's prices, at base prices and at the calibration's own prices, the ten most wanted changes with their hands, and a plain note that works are frozen while that rule is off; side villages outside the calibration get the same numbers in their daily line (off = no such lines)", RequireRestart = false)]
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool MeasureCraftRule { get; set; } = true;
@@ -15294,6 +15298,7 @@ namespace Armoury
             s.SideVillageCraftNewLayoutBalance = SideVillageCraftNewLayoutBalance;
             s.DistrictIconCraftValue = DistrictIconCraftValue;
             s.EconomyAuditLines = EconomyAuditLines;
+            s.SupplyChainLog = SupplyChainLog;
             s.MeasureCraftRule = MeasureCraftRule;
             s.MeasureRegaleShelf = MeasureRegaleShelf;
             s.MeasureCaravanTrade = MeasureCaravanTrade;

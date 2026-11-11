@@ -568,6 +568,7 @@ namespace Armoury
         public static void CyclePostfix(WorkshopType.Production __0, Workshop __1, bool __2, bool __result)
         {
             ArtisanInputs.CycleEnd();   // 147: koniec cyklu rzemieslnikow BK (zamyka ich rachunek takze po pominietym cyklu)
+            SupplySignal.CycleEnd(__0, __1, __2, __result);   // 435-L1: wykorzystanie warsztatu i powod cyklu bez wyrobu (sam licznik, wlasny try)
             // f4-ksiega-i-skory: zapis ulamka skory osady tylko po udanym cyklu (KsHides - wlasne try; poza regula nic). 241: pozycje skory zdjete z listy wyrobow
             // nie ida juz do udzialu sztuk (cena kupca liczy sie od sztuk, ktore naprawde trafily na polke - OutPostfix)
             KsHides.CycleEnd(__1, __result);
@@ -720,6 +721,7 @@ namespace Armoury
         /// </summary>
         public static void ItemsGatePost(WorkshopType.Production production, Workshop workshop, List<EquipmentElement> __result, ref int income)
         {
+            SupplySignal.IncomeSeen(workshop, income);   // 435-L1: utarg progu cyklu przed cena kupca (sam odczyt)
             try
             {
                 if (!Fair || !Live || __result == null || __result.Count == 0 || workshop == null || workshop.WorkshopType == null || workshop.WorkshopType.IsHidden) return;
@@ -737,6 +739,7 @@ namespace Armoury
                 }
                 if (cut <= 0) return;
                 income = (int)Math.Max(int.MinValue, (long)income - cut);
+                SupplySignal.IncomeSeen(workshop, income);   // 435-L1: utarg progu po cenie kupca (sam odczyt)
                 _dGateCut++; _dGateCutGold += cut;
             }
             catch (Exception e) { Stumble("WorkshopTrade.ItemsGatePost", e); }

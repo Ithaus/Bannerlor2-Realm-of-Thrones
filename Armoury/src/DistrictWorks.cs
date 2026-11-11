@@ -196,6 +196,7 @@ namespace Armoury
             ViewDirty(); _dVwBox = _dVwTip = _vwStumble = 0;   // m115: widok finansow od nowa
             MenuReset();
             EatsReset();                                                   // 323c
+            LwReset();                                                     // 435-L1: pamiec powodow wyplat (sam pomiar)
             DistrictWorksAi.Reset();
         }
 
@@ -958,11 +959,11 @@ namespace Armoury
                     if (any || mkOn) { double h; _handToday.TryGetValue(id, out h); _handToday[id] = h + handed; }   // utarg doby (H okregu = utarg na dobe / wartosc produkcji dnia)
                     if (!any) { if (mkOn) _dMkRec++; return; }        // okreg bez prac - bez wyplaty
                 }
-                if (!PathOf(home)) { lock (Gate) _dNoPath++; return; }       // recenzja: bez drogi produkcji dodatku (rampa KS, produkcja wsi niewpieta) - bez wyplaty, zloto w zwyklym podziale
+                if (!PathOf(home)) { lock (Gate) _dNoPath++; LwDist(id, LwNoPath); return; }       // recenzja: bez drogi produkcji dodatku (rampa KS, produkcja wsi niewpieta) - bez wyplaty, zloto w zwyklym podziale
                 var s = Settings.Current;
                 double share = s != null ? Math.Max(0f, Math.Min(1f, s.DistrictWorksShare)) : 0.5;
                 DistVal dv = ValOf(home);
-                if (dv == null || !(dv.V > 0) || !(dv.E > 0)) { _dNoCart++; return; }
+                if (dv == null || !(dv.V > 0) || !(dv.E > 0)) { _dNoCart++; LwDist(id, LwNoE); return; }
                 long inWin = Math.Max(0L, tax) + Math.Max(0L, purse);
                 // m114-prace: udzial dodatku w utargu - dodatek na targ / towar okregu na targ (klucz Works Pay Market Share, liczby targu KS); bez nich - dawne E/V.
                 // Sufity bez zmian: najwyzej polowa utargu i najwyzej to, co weszlo w oknie (licznik pana + kiesa wsi). Jedna pula na powrot wozu - nic podwojnie.
@@ -980,7 +981,7 @@ namespace Armoury
                     _dPoolOld += (long)Math.Floor(Math.Max(0, poolOld)); _dPoolNew += (long)Math.Floor(Math.Max(0, pool));
                     if (byMkt) { if (dv.Em > 0) _dMkPays++; else _dMkEaten++; } else if (mkOn) _dMkFall++;
                 }
-                if (!(pool >= 1)) return;
+                if (!(pool >= 1)) { LwDist(id, byMkt && !(dv.Em > 0) ? LwEaten : (inWin <= 0 ? LwNoWindow : LwPoolSmall)); return; }   // 435-L1: powod (sam licznik)
                 int today = Today();
                 string pid = PlayerClanId();                                  // m112-inwest: wyplaty wedlug dob tylko dla wierszy gracza
                 // udzial posiadaczy: E wiersza = E czesci x jednostki wiersza / jednostki czesci; E rodu = suma jego wierszy
@@ -998,10 +999,10 @@ namespace Armoury
                     foreach (var r in _rows)
                     {
                         if (r.Dist != id) continue;
-                        double ep; if (!wPart.TryGetValue(r.Part, out ep) || !(ep > 0) || !dv.EPart.ContainsKey(r.Part)) continue;
+                        double ep; if (!wPart.TryGetValue(r.Part, out ep) || !(ep > 0) || !dv.EPart.ContainsKey(r.Part)) { LwRow(r, LwPartNoBonus); continue; }
                         double up; unitsPart.TryGetValue(r.Part, out up);
                         double e = up > 0 ? ep * r.Eff(today) / up : 0;
-                        if (!(e > 0)) continue;
+                        if (!(e > 0)) { LwRow(r, LwNoUnits); continue; }
                         er[r] = e;
                         double cur; eh.TryGetValue(r.Clan, out cur); eh[r.Clan] = cur + e; eAll += e;
                     }
@@ -1011,12 +1012,12 @@ namespace Armoury
                 foreach (var kv in eh)
                 {
                     double part = pool * kv.Value / eAll;
-                    if (!(part >= 1)) continue;
+                    if (!(part >= 1)) { LwClan(er, kv.Key, LwShareSmall); continue; }
                     var clan = kv.Key == VillageClan ? null : ClanOf(kv.Key);
                     var leader = clan != null && !clan.IsEliminated ? clan.Leader : null;
                     if (leader == null || !leader.IsAlive) continue;                        // wies albo rod bez glowy - dodatek w zwyklym podziale
                     IFaction mf = clan.MapFaction, df = home.Settlement.MapFaction;
-                    if (mf != null && df != null && mf != df && FactionManager.IsAtWarAgainstFaction(mf, df)) { lock (Gate) _dWar++; continue; }   // B9
+                    if (mf != null && df != null && mf != df && FactionManager.IsAtWarAgainstFaction(mf, df)) { lock (Gate) _dWar++; LwClan(er, kv.Key, LwWar); continue; }   // B9
                     long want = (long)Math.Floor(part);
                     long fromTax = inWin > 0 ? (long)Math.Floor(want * (double)Math.Max(0L, tax) / inWin) : 0;
                     long fromVil = want - fromTax;
@@ -1029,6 +1030,7 @@ namespace Armoury
                     paidTax += fromTax; paidVil += fromVil;
                     long got = fromTax + fromVil;
                     paid += got;
+                    LwClan(er, kv.Key, got > 0 ? LwPaid : LwEmptyPurse);   // 435-L1: powod (sam licznik)
                     GoldForecast.NoteWorksCart(leader, got);   // 345: ksiega kiesy gracza (wyplata poza taktem doby; wlasny try)
                     lock (Gate)
                     {

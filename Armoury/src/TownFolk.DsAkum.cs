@@ -374,6 +374,7 @@ namespace Armoury
                 if (drop >= 0) { _daShelf += drop; _daTook += took; if (drop != took) _daShelfBad++; }   // recenzja: sztuki zdjete wedlug zmiany polki targu (niezaleznie od ShelfBuy.Take)
                 else _daShelfBad++;                                       // -1 - polka po zakupie nie przeczytana (wyjatek) - zlecenie poza kontrola sztuk, licznik
                 if (none) empty.Add(mk);                                 // polka bez materialu ponad zapas - nastepne zlecenia tego targu bez czytania
+                SupplySignal.NoteWorksGot(mk, items, pcs, o.Sept ? SupplySignal.SSept : SupplySignal.SWorks);   // 435-L1: sztuki kupione wedlug towaru (sam licznik)
             }
             _dwCap += cap;
             // 363: reszta budzetu materialu u wsi-wytworcow w zasiegu (bez wozu i polki: kiesa wsi -> kiesa wytworcy); klucz wylaczony, septy, lud miasta - 0 (jak dotad)
@@ -384,6 +385,8 @@ namespace Armoury
                 catch (Exception e) { DaStumble("ProducerBuy", e); ordPaid = _orLastPaid; }
                 ordBase = Math.Max(0, Math.Min(ordPaid, _orLastBase));   // poprawka 363b: bez frachtu (wozacy wytworcy oplaceni we frachcie)
             }
+            // 435-L1 (sam licznik): budzet materialu, ktorego nie pokryla polka targu ani wytworcy 363 - sztuki chciane i nieznalezione wedlug towaru
+            if (matBudget >= 1) SupplySignal.NoteWorksGap(mk, matBudget - spent - ordPaid, items, o.Sept ? SupplySignal.SSept : SupplySignal.SWorks);
             if (spent + ordPaid <= 0) { if (o.Sept) { _dsNoMat += o.Amount; _dsNoMatN++; } else { _dwNoMat += o.Amount; _dwNoMatN++; } return 0; }
             // 363: rzemieslnicy od calego materialu (polka + wytworca); poprawka 363b (recenzje 1 i 2): od materialu wytworcy BEZ frachtu - frach to praca wozakow wytworcy,
             // juz zaplacona jego kiesie (jedna zaplata za jedna prace); gorna granica - budzet po calym wyplywie (z frachtem)
@@ -505,6 +508,8 @@ namespace Armoury
                 try { spent = BuildFunding.DsWorksBuy(mk, matBudget, items, pc, out cap, out none, out drop); }
                 finally { GoodsLedger.End(gf); }
                 for (int i = 0; i < pc.Length; i++) pcs += pc[i];
+                SupplySignal.NoteWorksGot(mk, items, pc, SupplySignal.SRebuild);                       // 435-L1: sztuki kupione i brakujace wedlug towaru (sam licznik)
+                SupplySignal.NoteWorksGap(mk, matBudget - spent, items, SupplySignal.SRebuild);
                 if (spent <= 0) { EcoAudit427.RbWhy = !none && cap > 0 ? EcoAudit427.WhyPriceCap : EcoAudit427.WhyNoShelf; return 0; }   // 427 A1: brak materialu / tylko ponad sufit ceny
                 long w = Math.Max(0, Math.Min((long)Math.Floor(k * spent), budget - spent));
                 int had = vil.Gold;

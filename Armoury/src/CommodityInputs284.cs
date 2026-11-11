@@ -46,6 +46,7 @@ namespace Armoury
         public static void CyclePre(Workshop __1)
         {
             _ctxChecked = false; _ctxMarket = false;
+            SupplySignal.CycleBegin();   // 435-L1: znaczniki cyklu od zera (prefiks First - biegnie takze, gdy pozniejszy prefiks pominie cykl)
             try { _ctx = __1 != null && __1.WorkshopType != null && !__1.WorkshopType.IsHidden && __1.Settlement != null && __1.Settlement.Town != null ? __1 : null; }
             catch { _ctx = null; }
         }
@@ -64,6 +65,7 @@ namespace Armoury
                     int x; _use.TryGetValue(inp.Item1, out x); _use[inp.Item1] = x + inp.Item2;
                     // recenzja 284 (drobna 2): wsad z magazynu gracza nie zdjal nic z polki miasta - bez zuzycia miasta do zamowien
                     if (s != null && s.TownMaterialOrderWorkshopInputs && _ctxMarket && MaterialOrders.NoteUseCategory(town, inp.Item1, inp.Item2)) _useOrders += inp.Item2;
+                    if (_ctxMarket) SupplySignal.NoteInput(town, inp.Item1, 0, inp.Item2);   // 435-L1: wsad wziety z polki miasta (sam licznik)
                 }
             }
             catch (Exception e) { Stumble("CyclePost", e); }
@@ -77,9 +79,10 @@ namespace Armoury
             if (_ctx == null || __1 == null || __2 == null || __0.Inputs == null) return;
             try
             {
-                if (__result) { _ctxChecked = true; _ctxMarket = __2.Owner != null && ReferenceEquals(__1, __2.Owner.ItemRoster); return; }   // gra: magazyn, potem polka - wazne ostatnie sprawdzenie
+                if (__result) { _ctxChecked = true; _ctxMarket = __2.Owner != null && ReferenceEquals(__1, __2.Owner.ItemRoster); SupplySignal.SufSeen(true); return; }   // gra: magazyn, potem polka - wazne ostatnie sprawdzenie
                 if (__2.Owner == null || !ReferenceEquals(__1, __2.Owner.ItemRoster) || _ctx.Settlement == null || _ctx.Settlement.Town != __2) return;   // magazyn gracza - potem polka miasta
                 _missCycles++;
+                SupplySignal.SufSeen(false);   // 435-L1: cykl stanal na wsadzie (sam znacznik)
                 var s = Settings.Current;
                 foreach (var inp in __0.Inputs)
                 {
@@ -93,6 +96,7 @@ namespace Armoury
                     }
                     if (have >= inp.Item2) continue;
                     int x; _miss.TryGetValue(c, out x); _miss[c] = x + 1;
+                    SupplySignal.NoteInput(__2, c, inp.Item2 - have, 0);   // 435-L1: sztuki wsadu, ktorych zabraklo do cyklu (sam licznik)
                     if (s != null && s.TownMaterialOrderWorkshopInputs && MaterialOrders.NoteMissCategory(__2, c)) _toOrders++;
                 }
             }
