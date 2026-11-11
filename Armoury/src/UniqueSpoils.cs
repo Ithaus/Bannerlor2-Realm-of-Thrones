@@ -43,7 +43,7 @@ namespace Armoury
     ///     to drugi miecz, nie duplikat), u bohatera spoza rodu gracza zestaw cywilny szablonu ROT powtarza bojowy (jedna sztuka); powody dla
     ///     gracza po angielsku osobno od powodow do logu.
     /// </summary>
-    internal static class UniqueSpoils
+    internal static partial class UniqueSpoils
     {
         private static bool _initDone;
         private static Dictionary<string, string> _last = new Dictionary<string, string>();
@@ -51,7 +51,7 @@ namespace Armoury
         private static int _dInherit, _dDestroyed, _dRestored, _dParked, _dKin, _dShelved, _dStandRoster, _dStandNothing, _dStandNone, _dStandDead, _stumbles;
         private static readonly List<EquipmentElement> _heirStealth = new List<EquipmentElement>();   // smierc gracza: VS z zestawu ukrycia do nastepcy
 
-        internal static void Reset() { _initDone = false; _last = new Dictionary<string, string>(); _common = null; ClearDay(); _stumbles = 0; _heirStealth.Clear(); }
+        internal static void Reset() { _initDone = false; _last = new Dictionary<string, string>(); _common = null; ClearDay(); _stumbles = 0; _heirStealth.Clear(); ClaimReset(); }
         internal static string Export() { return _initDone ? "init" : ""; }
         internal static void Import(string s) { _initDone = s == "init"; }
 
@@ -119,6 +119,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Log.Error("UniqueSpoils.init", e); }
             }
+            try { ClaimSessionLaunched(); } catch (Exception e) { Log.Error("UniqueSpoils.ClaimSessionLaunched", e); }   // 426a: latka rozmowy (raz na proces) i linia startu
             Log.Info("UniqueSpoils: unikaty ROT poza zaopatrzeniem sklepow - oznaczone " + flagged + "; kopie startowe zdjete raz na kampanie: z targow " + shelves + ", z bagazy AI " + bags + " szt.");
         }
 
@@ -140,7 +141,15 @@ namespace Armoury
         // ------------------------------------------------------------ zdobycz (pojmanie, smierc w walce)
         internal static void OnPrisonerTaken(PartyBase capturer, Hero prisoner)
         {
-            try { if (capturer != null) Take(prisoner, capturer.LeaderHero, capturer == PartyBase.MainParty, "pojmanie", false); }
+            try
+            {
+                if (capturer == null) return;
+                // 426a: jeniec wziety przez sojusznika w bitwie, w ktorej gracz ma roszczenie (PlayerClaims) - jeniec zostaje u sojusznika, unikat idzie do gracza
+                bool own = capturer == PartyBase.MainParty;
+                bool claim = !own && ClaimLive(capturer);
+                int n = Take(prisoner, own || claim ? Hero.MainHero : capturer.LeaderHero, own || claim, claim ? "pojmanie przez sojusznika " + capturer.Name : "pojmanie", false);
+                if (claim && n > 0) _cAlly += n;
+            }
             catch (Exception e) { Log.Error("UniqueSpoils.Prisoner", e); }
         }
 
@@ -148,7 +157,21 @@ namespace Armoury
         {
             try
             {
-                if (victim != null && killer != null && detail == KillCharacterAction.KillCharacterActionDetail.DiedInBattle)
+                // 426a: polegly ze strony pokonanej w bitwie gracza z roszczeniem (migawka z MapEventEnded) - do gracza bez wzgledu na "zabojce" z gry
+                // (OtherSide.LeaderParty.LeaderHero bywa sojusznikiem AI albo null - wtedy unikat ginal z poleglym)
+                if (victim != null && detail == KillCharacterAction.KillCharacterActionDetail.DiedInBattle && Claimed(victim))
+                {
+                    int n = Take(victim, Hero.MainHero, true, "smierc w walce (bitwa gracza)", true);
+                    if (n > 0) _cFallen += n;
+                }
+                // 426a: egzekucja reka gracza - kazdy unikat skazanego (nie tylko stal valyrianska z Inherit) idzie do gracza; Take PRZED Inherit, wiec nic dwa razy
+                else if (victim != null && killer == Hero.MainHero && victim != Hero.MainHero && ClaimMode > 0
+                         && (detail == KillCharacterAction.KillCharacterActionDetail.Executed || detail == KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent))
+                {
+                    int n = Take(victim, Hero.MainHero, true, "egzekucja", true, 2);
+                    if (n > 0) _cExec += n;
+                }
+                else if (victim != null && killer != null && detail == KillCharacterAction.KillCharacterActionDetail.DiedInBattle)
                 {
                     bool player = killer == Hero.MainHero || killer.PartyBelongedTo == MobileParty.MainParty;
                     Take(victim, player ? Hero.MainHero : (killer.PartyBelongedTo != null && killer.PartyBelongedTo.LeaderHero != null ? killer.PartyBelongedTo.LeaderHero : killer), player, "smierc w walce", true);
@@ -165,12 +188,15 @@ namespace Armoury
         /// slot), oba w granicy umiejetnosci ofiary (Z16); zdobywca AI zaklada przez Wear, ktory sam pilnuje sita Z16 (HeroGearRequirements:
         /// czego nie udzwignie - Park, jak wszystko, czego bohater nie trzyma w rekach: tabor jego partii, bez partii - polka miasta rodu).
         /// Z16-5 ClanBag (tabor glowy klanu), "zaklada mimo to" i "zostaje na jencu" zastapione przez Park - nic nie znika.</summary>
-        private static void Take(Hero from, Hero to, bool toPlayer, string how, bool death)
+        /// 426a: zwraca liczbe wzietych sztuk; msg - komunikat dla gracza (0 zwyczaj wojenny, 1 wypuszczony po bitwie, 2 egzekucja). Sprzet olbrzyma (424,
+        /// GiantGear) nie przechodzi na nikogo, kto nie jest olbrzymem - zostaje na olbrzymie (jedna regula: GiantGear.MayWear).
+        private static int Take(Hero from, Hero to, bool toPlayer, string how, bool death, int msg = 0)
         {
-            if (from == null || to == null || from == to) return;
-            if (from == Hero.MainHero && !Settings.Current.UniqueSpoilsFromPlayer) return;
+            if (from == null || to == null || from == to) return 0;
+            if (from == Hero.MainHero && !Settings.Current.UniqueSpoilsFromPlayer) return 0;
             var eq = from.BattleEquipment;
-            if (eq == null) return;
+            if (eq == null) return 0;
+            bool giantRule = GiantGear.On && (to.CharacterObject == null || !GiantGear.MayWear(to.CharacterObject));
             var got = new List<string>();
             var overSkill = new List<string>();
             bool req = Settings.Current != null && Settings.Current.HeroGearRequirements;
@@ -179,6 +205,7 @@ namespace Armoury
                 var slot = (EquipmentIndex)i;
                 var el = eq[slot];
                 if (el.IsEmpty || !Is(el.Item)) continue;
+                if (giantRule && GiantGear.Is(el.Item)) { _cGiant++; continue; }   // 426a / 424: maczuga olbrzyma zostaje przy olbrzymie
                 eq[slot] = StandIn(from, el.Item, death);
                 if (ValyrianBlades.Is(el.Item)) ClearTwin(from, el.Item.StringId);   // bohater spoza rodu gracza: blizniak w zestawie cywilnym to ta sama klinga
                 if (toPlayer) MobileParty.MainParty.ItemRoster.AddToCounts(el, 1);
@@ -189,13 +216,17 @@ namespace Armoury
                 }
                 got.Add(el.Item.Name.ToString());
             }
-            if (got.Count == 0) return;
+            if (got.Count == 0) return 0;
             string list = string.Join(", ", got.ToArray());
             Log.Info("Kronika unikatow: " + from.Name + " -> " + to.Name + " (" + how + "): " + list
                      + (overSkill.Count > 0 ? " (ponad umiejetnosc - do taboru, bez partii na polke: " + string.Join(", ", overSkill.ToArray()) + ")" : "") + ".");
-            if (toPlayer) Log.Player("By the custom of war, the arms of " + from.Name + " are yours: " + list + ".");
+            if (toPlayer)
+                Log.Player(msg == 1 ? from.Name + " goes free, but the renowned arms stay with you: " + list + "."
+                         : msg == 2 ? "The arms of " + from.Name + " are yours by the executioner's right: " + list + "."
+                         : "By the custom of war, the arms of " + from.Name + " are yours: " + list + ".");
             else if (from == Hero.MainHero) Log.Player(to.Name + " takes your arms by the custom of war: " + list + ".", true);
             // cudze zdobycze tylko w kronice (Jeff: za duzo smieci)
+            return got.Count;
         }
 
         /// <summary>Zamiennik w slocie pojmanego/zabitego (krytyka 177 pkt 28): najpierw najlepsza zwykla sztuka tego samego typu (dla broni
@@ -584,6 +615,7 @@ namespace Armoury
         {
             try
             {
+                _harmony = h;   // 426a: latka rozmowy "wypuszczony po bitwie" zakladana dopiero w kampanii (ClaimSessionLaunched)
                 var m = AccessTools.Method(typeof(global::Helpers.EquipmentHelper), "AssignHeroEquipmentFromEquipment", new[] { typeof(Hero), typeof(Equipment) });
                 if (m == null) { Log.Info("UniqueSpoils: EquipmentHelper.AssignHeroEquipmentFromEquipment nieznaleziona - przebranie wladcy bez ochrony unikatow."); return; }
                 h.Patch(m, prefix: new HarmonyMethod(typeof(UniqueSpoils), nameof(AssignPrefix)) { priority = Priority.Last },
@@ -751,13 +783,14 @@ namespace Armoury
                 _last = now;
                 if (changes.Count > 0)
                     Log.Info("Kronika unikatow: dzien " + (int)CampaignTime.Now.ToDays + (first ? " - stan swiata (" + now.Count + " unikatow w obiegu): " : " - zmiany: ") + string.Join(" | ", changes.ToArray()) + ".");
-                if (_dInherit + _dDestroyed + _dRestored + _dParked + _dShelved + _dStandRoster + _dStandNothing + _dStandNone + _dStandDead > 0)
+                if (_dInherit + _dDestroyed + _dRestored + _dParked + _dShelved + _dStandRoster + _dStandNothing + _dStandNone + _dStandDead + ClaimDaySum() > 0)
                     Log.Info("Unikaty (177): dzien " + (int)CampaignTime.Now.ToDays + " - dziedziczenie stali valyrianskiej " + _dInherit + ", unikaty z taborow znikajacych partii " + _dDestroyed
                              + ", zostawione w rekach przy przebraniu przez gre " + _dRestored + ", odlozone do taboru " + _dParked + ", stal valyrianska do krewnego " + _dKin + ", na polke miasta " + _dShelved
-                             + "; zamiennik pojmanego/zabitego: z jego taboru " + _dStandRoster + ", z niczego (zwykly zamiennik kultury) " + _dStandNothing + ", brak (pusty slot) " + _dStandNone + "; zabity w walce - pusty slot " + _dStandDead + ".");
+                             + "; zamiennik pojmanego/zabitego: z jego taboru " + _dStandRoster + ", z niczego (zwykly zamiennik kultury) " + _dStandNothing + ", brak (pusty slot) " + _dStandNone + "; zabity w walce - pusty slot " + _dStandDead + ClaimDayText() + ".");
             }
             catch (Exception e) { Log.Error("UniqueSpoils.Daily", e); }
-            ClearDay();
+            ClearDay(); ClaimClearDay();
+            try { var g = UniqueGold.DayLine(); if (g != null) Log.Info(g); } catch { }   // 426b: liczniki koloru (tylko gdy cos przybylo)
         }
     }
 }

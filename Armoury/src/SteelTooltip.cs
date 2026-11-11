@@ -40,6 +40,9 @@ namespace Armoury
             {
                 var elN = args != null && args.Length > 0 ? args[0] as EquipmentElement? : null;
                 if (elN == null || propertyBasedTooltipVM == null) return;
+                // 426b: zlota linia "Unique" (ten sam predykat co zdobycz - UniqueSpoils.Is); null - nic
+                var gold = UniqueGold.LineFor(elN.Value.Item);
+                if (gold != null) propertyBasedTooltipVM.AddColoredProperty("", gold, UniqueGold.Gold);
                 var line = SteelTooltip.LineFor(elN.Value.Item);
                 if (line == null) return;
                 propertyBasedTooltipVM.AddProperty(" ", " ");
@@ -62,10 +65,14 @@ namespace Armoury
                     _targetField = AccessTools.Field(typeof(TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemMenuVM), "_targetItem");
                 var itemVm = _targetField != null ? _targetField.GetValue(__instance) as TaleWorlds.Core.ViewModelCollection.ItemVM : null;
                 if (itemVm == null) return;
-                var line = SteelTooltip.LineFor(itemVm.ItemRosterElement.EquipmentElement.Item);
-                if (line == null) return;
                 var list = __instance.TargetItemProperties;
                 if (list == null) return;
+                // 426b: zlota linia "Unique" na koncu panelu (na koncu, nie na gorze: wiersze panelu i panelu porownania ida obok siebie)
+                var gold = UniqueGold.LineFor(itemVm.ItemRosterElement.EquipmentElement.Item);
+                if (gold != null)
+                    list.Add(new TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemMenuTooltipPropertyVM("", gold, 0, UniqueGold.Gold, false, null, TooltipProperty.TooltipPropertyFlags.None, null, false));
+                var line = SteelTooltip.LineFor(itemVm.ItemRosterElement.EquipmentElement.Item);
+                if (line == null) return;
                 list.Add(new TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemMenuTooltipPropertyVM(" ", " ", 0, false, null, null, false));
                 list.Add(new TaleWorlds.CampaignSystem.ViewModelCollection.Inventory.ItemMenuTooltipPropertyVM(line[0], line[1], 0, false, null, null, false));
             }

@@ -4,6 +4,8 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 426a: tryb roszczenia do unikatow pokonanych - zakres jak w recznym McmSettings.cs (UniqueSpoils.ClaimMode przycina do 0..2)
+    'UniqueSpoilsClaim': (0, 2, "0"),
     # 425b: cena rydwanu - zakres jak w recznym McmSettings.cs (HistoricalPrices.ChariotFactor przycina do 0.25..1; regula ogolna dalaby 0..1.20)
     'ChariotPriceFactor': (0.25, 1.0, "0.00"),
     # 423-p: drabina pancerzy ROT i iglica w miekki pancerz - zakresy jak w recznym McmSettings.cs (ArmourLadder423.Apply przycina sile do 0..1,

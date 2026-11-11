@@ -322,7 +322,7 @@ namespace Armoury
             catch { return false; }
         }
 
-        private static bool RotEnlisted()
+        internal static bool RotEnlisted()
         {
             try
             {

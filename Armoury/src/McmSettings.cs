@@ -2956,6 +2956,18 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool UniqueSpoilsFromPlayer { get; set; } = true;
 
+        [SettingPropertyInteger("Unique Spoils Claim", 0, 2, "0", HintText = "Renowned arms of a beaten lord come to you whoever struck him down or took him captive: 0 = only when your own party takes or kills him (the old rule), 1 = in every battle you command - your own army, or allies who joined your fight, 2 = in every battle you win, even under another lord's command. The captive stays with the ally who took him; only his Valyrian blade or named arms come to your baggage, and he keeps an ordinary weapon. A lord you put to death yourself leaves you all his renowned arms. Never while you serve as a hired soldier. Giant's gear stays with the giant. Counted in the Armoury log (line 426)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public int UniqueSpoilsClaim { get; set; } = 1;
+
+        [SettingPropertyBool("Unique Spoils On Release", HintText = "A lord you let go after the battle (You are free to go) leaves his renowned arms with you - he rides off with an ordinary weapon. Off = he keeps them, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool UniqueSpoilsOnRelease { get; set; } = true;
+
+        [SettingPropertyBool("Unique Names Gold", HintText = "Renowned pieces - every Valyrian blade and the named arms and armour of the realm - show their name in gold in the inventory, trade and loot lists and carry a gold Unique line in the item panel and tooltip; everything else stays white. Off = all names white, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool UniqueNamesGold { get; set; } = true;
+
         [SettingPropertyBool("Valyrian Guard", HintText = "Valyrian steel is a finite store - no smith alive can make more: every blade in the world is counted each day against the blades the world began with (and those reworked in Qohor); a copy beyond that, from any source, is only a fine forgery and becomes ordinary steel of the same kind; a blade that goes missing is reported in the log (off = only counted; the first count after this version - forgeries made ordinary, lost blades returned to their line - waits until it is on)", RequireRestart = false)]
         [SettingPropertyGroup("Valyrian steel")]
         public bool ValyrianGuard { get; set; } = true;
@@ -13190,6 +13202,9 @@ namespace Armoury
             s.GarrisonBuysGear = GarrisonBuysGear;
             s.GarrisonBuysGearPlayer = GarrisonBuysGearPlayer;
             s.UniqueSpoilsFromPlayer = UniqueSpoilsFromPlayer;
+            s.UniqueSpoilsClaim = UniqueSpoilsClaim;
+            s.UniqueSpoilsOnRelease = UniqueSpoilsOnRelease;
+            s.UniqueNamesGold = UniqueNamesGold;
             s.ValyrianGuard = ValyrianGuard;
             s.ValyrianNoSmelt = ValyrianNoSmelt;
             s.UniqueInheritance = UniqueInheritance;

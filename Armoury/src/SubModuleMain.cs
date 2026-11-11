@@ -78,6 +78,8 @@ namespace Armoury
                 try { Lektor.Install(_harmony); } catch (Exception e) { Log.Error("Lektor.Install", e); }
                 // m105-czcionki: nazwy osad na mapie czcionka ROT - postfiks SettlementNameplateWidget (odbicie; tabliczki buduje gotowy kod gry, prefaby i UIExtenderEx nie dzialaja); wlasny try
                 try { NameplateFont.Install(_harmony); } catch (Exception e) { Log.Error("NameplateFont.Install", e); }
+                // 426b: nazwa unikatu na zloto w wierszu listy ekwipunku - postfiks setterow InventoryItemTupleWidget (odbicie, widzet - nie model kampanii); wlasny try
+                try { UniqueGold.Install(_harmony); } catch (Exception e) { Log.Error("UniqueGold.Install", e); }
                 WeaponXpPatch.ApplyAll(_harmony);
                 ScrapFloorPatch.ApplyAll(_harmony);
                 BkPenaltyOnce.ApplyAll(_harmony);    // cena sprzedazy sprzetu (A): kara handlowa BK raz (x5) - dubel postfiksu BK zdjety z modelu, ktory wola base; BK wpina go wczesniej, w OnSubModuleLoad
