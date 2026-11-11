@@ -27,7 +27,8 @@ namespace Armoury
     /// REGULA. W zestawie (bojowym i cywilnym) wzorca jednostki albo zestawu z EquipmentRosters, w ktorym jest luk SPOZA listy ROT i nie ma luku z listy,
     /// strzala z grotem szerokim zamieniana jest na iglice TEJ SAMEJ WAGI: default_arrows 50 g -> bodkin_arrows_c 50 g, barbed_arrows 60 g ->
     /// heavy_steppe_arrows 60 g, range_arrows 40 g -> steppe_arrows 40 g. Ta sama waga = ten sam tier gry (RBM CalculateAmmoTier: obrazenia x waga -
-    /// 0.93 / 0.81, 1.85 / 1.61, 0.01 / 0.01) i ta sama cena wyrobu (ArmsPricing: grot bodkin i plaski to ta sama robota), wiec prawo tieru CrashScribe
+    /// 0.93 / 0.81, 1.85 / 1.61, 0.01 / 0.01 - calkowity tier rowny, ulamek nizszy, wiec cena GRY z DefaultItemValueModel jest dla iglicy nizsza o
+    /// ok. 13%) i ten sam koszt wyrobu u nas (ArmsPricing: grot bodkin i plaski to ta sama robota), wiec prawo tieru CrashScribe
     /// (Army175: amunicja nie ponad tier jednostki), koszyki strzelarzy (typ x tier) i zamowienia nie zmieniaja sie - zmienia sie tylko typ grotu.
     /// Para jest sprawdzana przy starcie (obie sztuki istnieja, zrodlo Cut, cel Pierce, cel nie wyzszego tieru, waga rowna) - inaczej para nieczynna.
     /// NIE ruszamy: lukow z listy ROT (takze tych, ktorym ROT swiadomie daje grot szeroki: steppe_bow 90 lb -> barbed, hunting_bow 60 lb -> range),
@@ -35,8 +36,16 @@ namespace Armoury
     /// Skutek z wzorow RBM (luk 90 lb, 20 m, tulow, ofiara bez premii wypoczetego): nagi 76 -> 66, skora 33: 6 -> 40, przeszywanica 61: 5 -> 16,
     /// kolczuga 88: 4 -> 5 (prog 88 J, strzala niesie 74), plyta bez zmian (2-5).
     ///
-    /// KOLEJNOSC. Podmiana biegnie w OnSessionLaunched PRZED ArmouryBehavior (rejestracja w SubModuleMain przed nim): spisy liczone ze wzorcow przy starcie
-    /// (CraftRealm.Wearers, TownFletchers, WorkshopLaw) widza juz zestawy po podmianie. Wzorce nie sa w zapisie - przy kazdym wczytaniu powstaja z XML.
+    /// KOLEJNOSC (420-p, sprostowanie). MbEvent dopisuje nasluch na czolo listy i wola od czola (cs_full.cs:22405-22424), wiec zachowanie zarejestrowane
+    /// PRZED ArmouryBehavior bieglo PO nim - odwrotnie, niz zakladalo 420 (TownFletchers.SessionStart widzial zestawy sprzed podmiany). Teraz obie czesci
+    /// wola wprost ArmouryBehavior: ApplyAmmo jako pierwsza rzecz w jego OnSessionLaunched (spisy liczone ze wzorcow przy starcie - CraftRealm.Wearers,
+    /// TownFletchers, WorkshopLaw - widza zestawy po podmianie niezaleznie od kolejnosci rejestracji), ApplyLore na poczatku jego nasluchu
+    /// OnAfterSessionLaunched z ArmsPricing.RefreshAfterFinalStats (dopisany ostatni = biegnie pierwszy z nasluchow ArmouryBehavior; OnSessionLaunched
+    /// ROT-u jest wtedy dawno skonczony). Wlasnych nasluchow zachowanie nie ma. Wzorce nie sa w zapisie - przy kazdym wczytaniu powstaja z XML.
+    /// Wzgledem CrashScribe (Army175.TierGear) kolejnosc zalezy od ladowania modow, ale TierGear buduje zestawy klonem BIEZACEGO zestawu
+    /// (new Equipment(eq), Army175Gear.cs:981) - przebieg po nas kopiuje iglice, przebieg przed nami zostawia nam swoje klony do podmiany.
+    /// Przebieg po EquipmentRosters obejmuje takze rostery-wzorce bohaterow (BasicCharacterObject.Deserialize rejestruje roster kazdej postaci) i rostery
+    /// odpiete przez Army175 - tak samo jak podmiana ROT (Equipment.Deserialize); "bohaterowie pominieci" znaczy: ich ZYWY ekwipunek (kopia w zapisie).
     ///
     /// CZESC 2 - LUKI LORE. Pod RBM energia strzaly = energia kinetyczna x (obrazenia luku + obrazenia strzaly - 100) / 100: silnik sumuje
     /// GetModifiedThrustDamageForCurrentUsage luku z obrazeniami strzaly (Mission.OnAgentShootMissile, mb_full.cs:56932), RBM odejmuje 100
@@ -81,6 +90,9 @@ namespace Armoury
         private static HashSet<ItemObject> _lore = new HashSet<ItemObject>();
         private static bool _swapOn, _loreOn;
         private static int _setsChanged, _loreChanged;
+        // 420-p: tylko na czas ApplyAmmo (glowny watek) - podmienione zestawy z rosterow bez zywej jednostki; zestawy z lukiem Z LISTY ROT i grotem szerokim
+        private static int _setsRosterOnly;
+        private static SortedDictionary<string, int> _listedBroad;
 
         // liczniki misji (glowny watek). Trafienia strzal w ludzi: 0 = grot przebijajacy, 1 = grot szeroki, 2 = strzala z luku lore (podzbior 0 / 1)
         private static readonly int[] HitN = new int[3];
@@ -90,8 +102,7 @@ namespace Armoury
 
         public override void RegisterEvents()
         {
-            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, _ => ApplyAmmo());
-            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, _ => ApplyLore());
+            // 420-p: bez wlasnych nasluchow - ApplyAmmo i ApplyLore wola ArmouryBehavior w ustalonym miejscu (patrz KOLEJNOSC w naglowku)
         }
 
         public override void SyncData(IDataStore dataStore) { }
@@ -101,13 +112,28 @@ namespace Armoury
             try { return AccessTools.TypeByName("ROT.HarmonyPatches.ModCompatibility.RBM") != null; } catch { return false; }
         }
 
+        /// <summary>420-p: ustawienie ROT "RBM Integration" (ROT.ROTSettings.RBMIntegration, rot_all.cs:6865; domyslnie w MCM false, u Jeffa true) - bez niego
+        /// ROT nie podmienia strzal wcale (rot_all.cs:17391, 17474). 1 = wlaczone, 0 = wylaczone, -1 = nie da sie odczytac (wtedy jak w 420: dzialamy).</summary>
+        private static int RotIntegration()
+        {
+            try
+            {
+                var t = AccessTools.TypeByName("ROT.ROTSettings");
+                var p = t != null ? AccessTools.Property(t, "RBMIntegration") : null;
+                if (p == null || p.PropertyType != typeof(bool)) return -1;
+                return (bool)p.GetValue(null, null) ? 1 : 0;
+            }
+            catch { return -1; }
+        }
+
         // ---------------- czesc 1: strzaly dla lukow spoza listy ROT ----------------
 
-        private static void ApplyAmmo()
+        internal static void ApplyAmmo()
         {
             var old = _swaps;
             var neu = new List<Swap>();
             _swapOn = false; _setsChanged = 0;
+            _setsRosterOnly = 0; _listedBroad = new SortedDictionary<string, int>(StringComparer.Ordinal);
             try
             {
                 // te same zestawy drugi raz w tym procesie: najpierw stan sprzed podmiany (NIE = dane ROT)
@@ -119,6 +145,7 @@ namespace Armoury
                     }
                 var c = Settings.Current;
                 if (c == null) { _swaps = neu; return; }
+                int rotInt = RotIntegration();
 
                 var from = new ItemObject[HeadFrom.Length]; var to = new ItemObject[HeadFrom.Length]; var ok = new bool[HeadFrom.Length];
                 int pairs = 0; var sbBad = new StringBuilder();
@@ -140,6 +167,7 @@ namespace Armoury
                 string off = !c.RotUnlistedBowBodkinsEnabled ? "klucz ROT Bodkins For Unlisted Bows NIE - strzaly jak wczytal ROT"
                            : !RangedRank.RbmLoaded ? "brak Realistic Battle Mod - poza RBM grot szeroki nie jest slabszy, bez zmian"
                            : !RotLinkLoaded() ? "brak lacznika ROT z RBM (ROT.HarmonyPatches.ModCompatibility.RBM) - nie ma listy do uzupelnienia, bez zmian"
+                           : rotInt == 0 ? "ustawienie ROT RBM Integration NIE - ROT nie podmienia strzal zadnemu lukowi, nie ma listy do uzupelnienia, bez zmian"
                            : pairs == 0 ? "zadna para grotow nie przeszla kontroli (" + sbBad + ") - bez zmian" : null;
                 _swapOn = off == null;
 
@@ -175,19 +203,29 @@ namespace Armoury
 
                 var sbBows = new StringBuilder();
                 foreach (var kv in byBow) sbBows.Append(sbBows.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
+                // 420-p: pomiar - zestawy z lukiem z listy ROT, w ktorych zostal grot szeroki (steppe_bow / hunting_bow: wybor ROT; inny luk = zestaw, ktorego
+                // lacznik ROT nie przetworzyl, np. wzorzec bez isROT) - nie ruszane
+                var sbListed = new StringBuilder(); int listedSets = 0;
+                foreach (var kv in _listedBroad) { listedSets += kv.Value; sbListed.Append(sbListed.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value); }
+                string tail420p = " | ROT RBM Integration " + (rotInt == 1 ? "TAK" : rotInt == 0 ? "NIE" : "nieodczytane")
+                                + " | zestawy z lukiem Z LISTY ROT i grotem szerokim (nie ruszane; poza steppe_bow / hunting_bow = nieprzetworzone przez lacznik ROT): "
+                                + listedSets + (listedSets > 0 ? " (" + sbListed + ")" : "");
+                _listedBroad = null;
                 string found = "zestawy z lukiem spoza listy ROT (14 lukow BuildMap): " + setsBow + " (pominiete, bo jest w nich tez luk z listy: " + setsMixed
                              + "), z grotem szerokim " + setsBroad + " (sztuk strzal " + slotsBroad + ")";
                 if (!_swapOn)
                     Log.Info("Luki ROT (420) strzaly: " + off + " | " + found + (restored > 0 ? " | przywrocone do danych ROT " + restored : "")
-                             + " | luki tych zestawow: " + (sbBows.Length > 0 ? sbBows.ToString() : "-") + " (tylko pomiar w linii konca misji).");
+                             + " | luki tych zestawow: " + (sbBows.Length > 0 ? sbBows.ToString() : "-") + tail420p + " (tylko pomiar w linii konca misji).");
                 else
                     Log.Info("Luki ROT (420) strzaly: grot szeroki -> iglica tej samej wagi i tieru | " + found + " | podmienione zestawy " + _setsChanged
-                             + " (wzorcow jednostek " + troops.Count + "): " + HeadFrom[0] + " -> " + HeadTo[0] + " " + perPair[0] + ", " + HeadFrom[1] + " -> " + HeadTo[1] + " "
+                             + " (wzorcow jednostek " + troops.Count + "; z tego zestawy z rosterow bez zywej jednostki - wzorce bohaterow, rostery odpiete przez 175 - "
+                             + _setsRosterOnly + "): " + HeadFrom[0] + " -> " + HeadTo[0] + " " + perPair[0] + ", " + HeadFrom[1] + " -> " + HeadTo[1] + " "
                              + perPair[1] + ", " + HeadFrom[2] + " -> " + HeadTo[2] + " " + perPair[2]
                              + (pairs < HeadFrom.Length ? " | pary nieczynne: " + sbBad : "")
                              + " | luki podmienionych zestawow: " + (sbBows.Length > 0 ? sbBows.ToString() : "-")
                              + " | np. " + (sbEx.Length > 0 ? sbEx.ToString() : "-")
-                             + " | bohaterowie pominieci " + heroes + (stumbles > 0 ? " | potkniecia " + stumbles : "")
+                             + " | bohaterowie: zywy ekwipunek pominiety " + heroes + " (ich rostery-wzorce podmieniane jak u ROT)" + (stumbles > 0 ? " | potkniecia " + stumbles : "")
+                             + tail420p
                              + " | luki z listy ROT (takze steppe_bow i hunting_bow z grotem szerokim), kusze i strzaly specjalne bez zmian.");
             }
             catch (Exception e) { _swaps = neu; Log.Error("RotBows420.ApplyAmmo", e); }
@@ -218,7 +256,23 @@ namespace Armoury
                 if (it == null || it.ItemType != ItemObject.ItemTypeEnum.Bow) continue;
                 if (RotMappedBows.Contains(it.StringId)) mapped = true; else bow = it;
             }
-            if (bow == null) return;
+            if (bow == null)
+            {
+                // 420-p: sam pomiar - luk z listy ROT i grot szeroki w tym samym zestawie
+                if (mapped && _listedBroad != null)
+                {
+                    string lb = null; bool br = false;
+                    for (int s = 0; s < 4; s++)
+                    {
+                        var it = eq[(EquipmentIndex)s].Item;
+                        if (it == null) continue;
+                        if (it.ItemType == ItemObject.ItemTypeEnum.Bow) { if (lb == null) lb = it.StringId; }
+                        else for (int i = 0; i < from.Length; i++) if (ReferenceEquals(it, from[i])) br = true;
+                    }
+                    if (br && lb != null) { int n0; _listedBroad.TryGetValue(lb, out n0); _listedBroad[lb] = n0 + 1; }
+                }
+                return;
+            }
             setsBow++;
             if (mapped) { setsMixed++; return; }      // ROT dobral juz strzaly wedlug luku z listy (ParseEquipment) - jego wybor zostaje
             bool broad = false, changed = false;
@@ -243,13 +297,14 @@ namespace Armoury
             }
             if (!changed) return;
             _setsChanged++;
+            if (co == null) _setsRosterOnly++;
             if (co != null && troops.Add(co) && troops.Count <= 6)
                 sbEx.Append(sbEx.Length > 0 ? ", " : "").Append(co.StringId).Append(" t").Append(co.Tier).Append(" [").Append(bow.StringId).Append(']');
         }
 
         // ---------------- czesc 2: luki lore z pelna energia ----------------
 
-        private static void ApplyLore()
+        internal static void ApplyLore()
         {
             var old = _loreOrig;
             var neu = new Dictionary<WeaponComponentData, int>();

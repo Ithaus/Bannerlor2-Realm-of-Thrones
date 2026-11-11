@@ -1786,7 +1786,7 @@ namespace Armoury
             // 321a (Jeff 03.11 "Ravens Teeth strzaly biora zwykle zelazo"): pamiec kosztu (ArmsPricing.CostOf) z tieru i wagi OSTATECZNYCH - rachunki policzone
             // w OnSessionLaunched przed zmiana statystyk ROT-RBM zdjete i policzone od nowa, potem linie amunicji (S1, 319c). Dopisany OSTATNI - biegnie PRZED
             // ForgeBill, MassStartLine, RareMaterials i LoreSeedFix (gra wola od ostatnio dopisanego), wiec wszystkie juz czytaja odswiezona pamiec
-            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { int ck; var rf = ArmsPricing.RefreshAfterFinalStats(out ck); Recipes.AmmoStartLine(rf, ck); } catch (Exception e) { Log.Error("ArmsPricing.RefreshAfterFinalStats/AmmoStartLine", e); } });
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { RotBows420.ApplyLore();   /* 420-p: luki lore przed odswiezeniem (wlasny try/catch; OnSessionLaunched ROT-u skonczony) */ try { int ck; var rf = ArmsPricing.RefreshAfterFinalStats(out ck); Recipes.AmmoStartLine(rf, ck); } catch (Exception e) { Log.Error("ArmsPricing.RefreshAfterFinalStats/AmmoStartLine", e); } });
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => LoreSeedFix.OnNewGame());
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
             // mury oblezen OB1-OB4 (SiegeWalls.cs): rejestr szturmow AI (prog odparcia OB2, bitwa z murow OB3), wynik szturmu, koniec oblezenia (przerwy, OB4),
@@ -2449,6 +2449,7 @@ namespace Armoury
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
+            RotBows420.ApplyAmmo();   // 420-p: strzaly dla lukow spoza listy ROT - PIERWSZE, przed kazdym spisem ze wzorcow nizej (wlasny try/catch; ustawienia gotowe od OnGameStart)
             MorningLater357.Reset();   // 357: oczekujacy poranny meldunek nie przechodzi miedzy kampaniami/wczytaniami
             SaveText.ReportAfterLoad();   // 161: ile dlugich napisow uratowal ratunek przy wczytaniu
             RawPrice.MemoryLive = true;   // 299b: od teraz wygladzanie podazy rynku w tempie PriceSupplyMemoryDaily (ticki startowe nowej kampanii byly przed - tempo gry)

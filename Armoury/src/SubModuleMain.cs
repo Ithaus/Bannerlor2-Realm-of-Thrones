@@ -908,7 +908,7 @@ namespace Armoury
                 // dlugosc roku MUSI wejsc, zanim gra przeliczy swoj zegar
                 LongYearTimeModel.Install(gameStarterObject);
                 TierDesertionModel.Install(starter);   // prawo dezercji (Jeff 17.09) - patrz DesertionLaw.cs
-                starter.AddBehavior(new RotBows420());   // 420: strzaly dla lukow spoza listy ROT (OnSessionLaunched PRZED ArmouryBehavior - spisy ze wzorcow widza zestawy po podmianie) + luki lore z pelna energia (OnAfterSessionLaunched, po ROT)
+                starter.AddBehavior(new RotBows420());   // 420: strzaly dla lukow spoza listy ROT (420-p: bez wlasnych nasluchow - ApplyAmmo wola ArmouryBehavior.OnSessionLaunched jako pierwsza rzecz, ApplyLore jego nasluch OnAfterSessionLaunched; rejestracja przed ArmouryBehavior dawala bieg PO nim) + luki lore z pelna energia (OnAfterSessionLaunched, po ROT)
                 starter.AddBehavior(new ArmouryBehavior());
                 starter.AddBehavior(new Uniques());
                 starter.AddBehavior(new RotData418());   // 418: tarcze ROT w skali 4-6 + ubrania bez pancerza zbroi - korekta danych w pamieci przy starcie sesji; 418-p: rejestracja po ArmouryBehavior = OnSessionLaunched biegnie PRZED nim (MbEvent dopisuje na czolo listy) - wycena / zuzycie / klasa stroju licza z ksiegi sprzed 418
