@@ -367,6 +367,12 @@ namespace Armoury
             try { return n != null && !n.IsEliminated && k.IsAllyWith(n); } catch { return false; }
         }
 
+        /// <summary>405: Polnoc albo jej sojusznik (ta sama strona co bramka "Polnoc po Bekartach") - FuneralRites, tryb cichy w kanonie. Nie rzuca.</summary>
+        internal static bool NorthSide(Kingdom k)
+        {
+            try { return k != null && (k.StringId == NorthId || NorthAlly(k)); } catch { return false; }
+        }
+
         private static bool PlayerRealm(Kingdom k)
         {
             try { return k != null && Clan.PlayerClan != null && Clan.PlayerClan.Kingdom == k; } catch { return false; }

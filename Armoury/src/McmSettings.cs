@@ -12048,6 +12048,34 @@ namespace Armoury
         [SettingPropertyGroup("Dungeons: lords dying of fever and ransom couriers turned away (404)")]
         public bool RansomCourierStandingRefusal { get; set; } = true;
 
+        [SettingPropertyBool("Funerals", HintText = "When the head of a great house dies (a noble clan of tier 4 or more, or a ruling house), the house buries him at its seat: the funeral lasts Funeral Days, word of it reaches you, and you may attend. In this version the lords of the realm do not yet ride to the funeral and nothing changes for the armies. Never for your own clan, bandits, minor or rebel clans, the Night's Watch, the Free Folk or the Others. Off = no funerals", RequireRestart = false)]
+        [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
+        public bool Funerals { get; set; } = true;
+
+        [SettingPropertyInteger("Funeral Days", 2, 14, "0", HintText = "With Funerals: days a funeral lasts, counted from the day of death. The rites are held on the last day but one; the day after, the funeral is over", RequireRestart = false)]
+        [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
+        public int FuneralDays { get; set; } = 5;
+
+        [SettingPropertyInteger("Funeral Max Active", 1, 10, "0", HintText = "With Funerals: the most full funerals in the world at one time, and never more than one in a kingdom (a ruler's funeral takes the place of a lesser one begun the same day). Further deaths are buried quietly: word reaches you and you may still attend", RequireRestart = false)]
+        [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
+        public int FuneralMaxActive { get; set; } = 3;
+
+        [SettingPropertyBool("Funeral Player Attend", HintText = "With Funerals: word of a funeral reaches you when you belong to that kingdom, when the dead lord or his heir thought well of you (relation 10 or more), or when you are near the seat. In the town or castle menu of the seat you may attend the funeral (the heir +3, every lord of the house who is there +1) and give Funeral Gift Gold for the rites. Off = no word and no menu options", RequireRestart = false)]
+        [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
+        public bool FuneralPlayerAttend { get; set; } = true;
+
+        [SettingPropertyInteger("Funeral Gift Gold", 0, 10000, "0", HintText = "With Funeral Player Attend: denars you may give the heir for the rites, once for each funeral (the heir +2). The denars go from your purse to his. 0 = no gift", RequireRestart = false)]
+        [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
+        public int FuneralGiftGold { get; set; } = 1000;
+
+        [SettingPropertyBool("Funeral Canon Quiet", HintText = "With Funerals, in a campaign that follows the Realm of Thrones story: funerals are quiet (word and your own visit only) until the Red Wedding is over, and in the North and for its allies until the Battle of the Bastards. Off = full funerals from the first day", RequireRestart = false)]
+        [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
+        public bool FuneralCanonQuiet { get; set; } = true;
+
+        [SettingPropertyBool("Funeral Log", HintText = "With Funerals: writes every death of a head of house, the funeral and its end to Armoury.log", RequireRestart = false)]
+        [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
+        public bool FuneralLog { get; set; } = true;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -15259,6 +15287,13 @@ namespace Armoury
             s.DungeonHeroDeathSharePercent = DungeonHeroDeathSharePercent;
             s.DungeonHeroDeathsPerWeek = DungeonHeroDeathsPerWeek;
             s.RansomCourierStandingRefusal = RansomCourierStandingRefusal;
+            s.Funerals = Funerals;
+            s.FuneralDays = FuneralDays;
+            s.FuneralMaxActive = FuneralMaxActive;
+            s.FuneralPlayerAttend = FuneralPlayerAttend;
+            s.FuneralGiftGold = FuneralGiftGold;
+            s.FuneralCanonQuiet = FuneralCanonQuiet;
+            s.FuneralLog = FuneralLog;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;
