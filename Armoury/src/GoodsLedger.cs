@@ -76,6 +76,7 @@ namespace Armoury
                              GFood = "zywnosc partii", GSlaughter = "uboj w partiach", GSupply = "zaopatrzenie BK", GBkSettle = "BK osady", GBkParty = "BK partie",
                              GBee = "BetterEconomy", GForage = "furaz armii (Armoury)", GLost = "przepadlo z rozbitymi partiami", GNoBuyer = "sprzedane bez kupca",
                              GDiscard = "porzucone przez lordow (gra)",
+                             GPyre = "stosy pogrzebowe oblezen (399)",   // 399: drewno spalone na stosach zmarlych oblezenia (SiegeMisery) - ujscie
                              GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)", GDecay = "kasowanie gry (5% stosow z modyfikatorem)", GScrap = "zlom z nadmiaru (174)", GDrill = "zlom z cwiczen (musztra)", GFolkVill = "wsie (zakupy w miescie, E5/B1)", GBloom = "dymarki przy kopalniach (214)", GRaid = "rabunek osada po osadzie (E7/R1)", GSack = "lup miast (L7)", GDragon = "zjedzone przez smoka (24c)", GCourt = "dwory (E3-P1)", GMint = "mennica (311b)",
                              GFish = "lodzie rybackie (NavalDLC, polow)", GSpawn = "nowe druzyny lordow (zboze gry)", GRemoved = "przepadlo z partiami usunietymi bez zniszczenia (RemoveParty)",   // m6b (5)
                              GZc1 = "drogi towarow (ZC1)",   // ZC1 (16.10): przemiana towaru we wsi i w osadzie (opis w podpozycji)
@@ -84,7 +85,7 @@ namespace Armoury
                              GKsLost = "kupcy zywnosci (KS-H): stracone w drodze",   // recenzja runda 3: psucie w drodze, woz bez celu i zrodla, zawrocony bez zwrotu zaplaty - ujscie
                              GOrder = "roboty wsi na zamowienie (363)";   // 363: material zrobiony u wsi-wytworcy i zuzyty od razu przez roboty gminy zamawiajacej (zrodlo = ujscie, zapas bez zmian)
         private static readonly string[] SrcOrder = { GVil, GWoodlot, GFish, GShop, GArt, GTanW, GCraft, GZc1, GKs, GScrap, GDrill, GSlaughter, GSpawn, GBkParty, GBkSettle, GBee, GForage, GTick };
-        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GZc1, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GCourt, GKsOwn, GKsLost, GBloom, GMint, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GNoBuyer, GTick };
+        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GZc1, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GCourt, GKsOwn, GKsLost, GBloom, GMint, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GPyre, GNoBuyer, GTick };
 
         // ------------------------------------------------------------ ramka
         internal sealed class Frame
@@ -359,6 +360,21 @@ namespace Armoury
                 Book(i, GDiscard, null, -n);
             }
             catch (Exception e) { Stumble("NoteDiscard", e); }
+        }
+
+        /// <summary>399 (SiegeMisery): n sztuk drewna spalonych na stosach zmarlych oblezenia (juki gracza / wodza obozu, polka osady) - ujscie
+        /// "stosy pogrzebowe oblezen (399)". W otwartej ramce (dobowy tick) ubytek ksieguje sama ramka - bez drugiego wpisu (jak NoteDiscard). Nie rzuca.</summary>
+        internal static void NotePyre(ItemObject item, int n)
+        {
+            try
+            {
+                if (n <= 0 || item == null || !On || !EnsureItems()) return;
+                int i;
+                if (!_idx.TryGetValue(item, out i)) return;
+                if (_top != null && Environment.CurrentManagedThreadId == _main) return;
+                Book(i, GPyre, null, -n);
+            }
+            catch (Exception e) { Stumble("NotePyre", e); }
         }
 
         /// <summary>363 (TownFolk.Order363): n sztuk materialu zrobionych na zamowienie u wsi-wytworcy i zuzytych od razu przez roboty gminy zamawiajacej - bez rostera:

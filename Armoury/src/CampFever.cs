@@ -38,6 +38,10 @@ namespace Armoury
     ///  - oblezenie fabuly ROT (SiegePhantomLift.StoryOf) bez zarazy obu stron (SiegeFeverSparesStorySieges);
     ///  - w obroncach takze milicja osady; pamiec ostrzezen czyszczona miedzy kampaniami;
     ///  - funkcje wspolne modelu choroby dla 399 (trupy, zima) i 402 (loch): WinterTerm, MedicCut, DeathShare, Active.
+    /// 399 (Jeff 11.11 "rob 1"): CZYNNIK zarazy, DODAWANY (nie mnozony): 1 + ZIMA + RANNI + TRUPY, najwyzej 3.0 -
+    ///  - ZIMA = (SiegeFeverWinterFactor - 1) x kraina (WinterRealm), tylko zima (WinterBite.WinterNow); oblegajacy wedlug krainy pod druzyna, mury wedlug krainy warowni;
+    ///  - RANNI = min(0.5, udzial rannych szeregowych druzyny) (SiegeFeverWoundedCounts) - chorzy leza w rannych, wiec zaraza sama sie karmi (stad +0.5 i sufit dobowy);
+    ///  - TRUPY = SiegeMisery.CorpseTerm strony (niepogrzebani pod murami / w murach); zmarli zarazy ida do tego licznika (SiegeMisery.AddCorpses).
     /// </summary>
     internal static class CampFever
     {
@@ -64,11 +68,41 @@ namespace Armoury
 
         // ---------------------------------------------------------------- funkcje wspolne modelu choroby (398; uzyja 399 i 402)
 
-        /// <summary>Czlon ZIMY czynnika zarazy dla osady. 398: zawsze 0 (zima wchodzi w 399 razem z SiegeMisery).</summary>
-        internal static float WinterTerm(Settlement st) { return 0f; }
+        /// <summary>399: czlon ZIMY czynnika zarazy dla osady (mury): (SiegeFeverWinterFactor - 1) x kraina warowni; 0 poza zima i dla wsi.</summary>
+        internal static float WinterTerm(Settlement st)
+        {
+            try
+            {
+                float b = WinterBase();
+                if (b <= 0f || st == null || st.Town == null) return 0f;
+                return b * MathF.Clamp(WinterRealm.OfTown(st.Town), 0f, 1f);
+            }
+            catch (Exception e) { Stumble("WinterTerm.Settlement", e); return 0f; }
+        }
 
-        /// <summary>Czlon ZIMY czynnika zarazy dla druzyny. 398: zawsze 0 (zima wchodzi w 399 razem z SiegeMisery).</summary>
-        internal static float WinterTerm(MobileParty mp) { return 0f; }
+        /// <summary>399: czlon ZIMY czynnika zarazy dla druzyny (oboz): (SiegeFeverWinterFactor - 1) x kraina pod druzyna; 0 poza zima.</summary>
+        internal static float WinterTerm(MobileParty mp)
+        {
+            try
+            {
+                float b = WinterBase();
+                if (b <= 0f || mp == null) return 0f;
+                return b * MathF.Clamp(WinterRealm.OfParty(mp), 0f, 1f);
+            }
+            catch (Exception e) { Stumble("WinterTerm.Party", e); return 0f; }
+        }
+
+        /// <summary>399: SiegeFeverWinterFactor - 1 w zimie (WinterBite.WinterNow: wlaczona zima i pora roku = zima), inaczej 0.</summary>
+        private static float WinterBase()
+        {
+            var s = Settings.Current;
+            if (s == null || s.SiegeFeverWinterFactor <= 1f) return 0f;
+            if (!WinterBite.WinterNow()) return 0f;
+            return s.SiegeFeverWinterFactor - 1f;
+        }
+
+        /// <summary>399: sufit czynnika zarazy (1 + zima + ranni + trupy).</summary>
+        internal const float FactorMax = 3f;
 
         /// <summary>Ulga chirurga: 0.25% ryzyka za punkt Medycyny, najwyzej SiegeSicknessMedicineMax (ulamek 0..1 odejmowany od ryzyka).</summary>
         internal static float MedicCut(int medicine)
@@ -149,7 +183,7 @@ namespace Armoury
         }
 
         /// <summary>398: licznik jednej strony za dobe.</summary>
-        private struct Tally { public int Sick, Dead, Capped, InBattle, WithHero; }
+        private struct Tally { public int Sick, Dead, Capped, InBattle, WithHero, Struck; public float FSum, ZSum, RSum, Corpse; }
 
         private static void TickSiege(Settings s, SiegeEvent siege)
         {
@@ -201,8 +235,9 @@ namespace Armoury
                 }
             }
             float campCrowd = whole ? Crowd(campMen) : -1f;
+            att.Corpse = SiegeMisery.CorpseTerm(st, false, campMen);   // 399: niepogrzebani pod murami (stan sprzed tej doby)
             for (int i = 0; i < attackers.Count; i++)
-                StrikeParty(s, attackers[i], st, ramp, 1f, campCrowd, false, mainAttacks || mainDefends, ref att);
+                StrikeParty(s, attackers[i], st, ramp, 1f, campCrowd, false, mainAttacks || mainDefends, false, WinterTerm(attackers[i]), ref att);
 
             // --- OBRONCY: garnizon + milicja (398) + partie lordow w srodku ---
             var town = st.Town;
@@ -225,8 +260,10 @@ namespace Armoury
                 if (defenders[i].MemberRoster != null && !Undead.Party(defenders[i])) wallMen += defenders[i].MemberRoster.TotalManCount;
             float wallCrowd = whole ? Crowd(wallMen) : -1f;
             bool wallsFight = st.Party != null && st.Party.MapEvent != null;   // 398: szturm albo wypad w toku - cale mury bez zarazy tej doby
+            def.Corpse = SiegeMisery.CorpseTerm(st, true, wallMen);   // 399: niepogrzebani w murach
+            float wallWinter = WinterTerm(st);
             for (int i = 0; i < defenders.Count; i++)
-                StrikeParty(s, defenders[i], st, ramp, defMul, wallCrowd, wallsFight, mainAttacks || mainDefends, ref def);
+                StrikeParty(s, defenders[i], st, ramp, defMul, wallCrowd, wallsFight, mainAttacks || mainDefends, true, wallWinter, ref def);
 
             if (att.Sick + def.Sick + att.Dead + def.Dead + att.Capped + def.Capped + att.InBattle + def.InBattle > 0)
                 Log.Info("CampFever: " + st.StringId + " dzien " + days + " - oblegajacy " + att.Sick
@@ -234,10 +271,18 @@ namespace Armoury
                          + (hunger ? " (GLOD w miescie)" : "")
                          + " | narost " + ramp.ToString("0.00") + " (sufit " + (rampCapped ? "tak" : "nie") + ")"
                          + ", tlok " + (whole ? "oboz " + campCrowd.ToString("0.00") + " (" + campMen + " ludzi) / mury " + wallCrowd.ToString("0.00") + " (" + wallMen + " ludzi)" : "na druzyne (stary rachunek)")
+                         + " | czynnik oboz " + FactorText(att) + " / mury " + FactorText(def)
                          + " | sufit dobowy trafiony " + (att.Capped + def.Capped) + " partii"
                          + " | pominiete w bitwie " + (att.InBattle + def.InBattle)
                          + " | partie z chorymi i bohaterem: " + (att.WithHero + def.WithHero)
                          + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
+        }
+
+        /// <summary>399: "x (zima a, ranni b, trupy c)" - srednia po druzynach strony, ktore zaraza dzis liczyla ("-" gdy zadnej).</summary>
+        private static string FactorText(Tally t)
+        {
+            if (t.Struck <= 0) return "- (trupy " + t.Corpse.ToString("0.00") + ")";
+            return (t.FSum / t.Struck).ToString("0.00") + " (zima " + (t.ZSum / t.Struck).ToString("0.00") + ", ranni " + (t.RSum / t.Struck).ToString("0.00") + ", trupy " + t.Corpse.ToString("0.00") + ")";
         }
 
         /// <summary>Tlok strony: sqrt(ludzie / 500) w widelkach 0.6-2.5.</summary>
@@ -247,16 +292,18 @@ namespace Armoury
         }
 
         /// <summary>398: jedna druzyna jednej strony - bitwa pomija, potem zniwo, pomiar i ksiega ludzi (jak dotad), krzyk do gracza.</summary>
-        private static void StrikeParty(Settings s, MobileParty mp, Settlement st, float ramp, float sideMul, float sideCrowd, bool sideFights, bool playerInvolved, ref Tally t)
+        private static void StrikeParty(Settings s, MobileParty mp, Settlement st, float ramp, float sideMul, float sideCrowd, bool sideFights, bool playerInvolved, bool within, float winter, ref Tally t)
         {
             try
             {
                 if (mp == null || mp.MemberRoster == null) return;
                 if (sideFights || mp.MapEvent != null) { t.InBattle++; return; }   // 398: roster w bitwie nalezy do bitwy - ta doba bez zarazy
-                int sick, dead; bool capped;
+                int sick, dead; bool capped; float factor, woundTerm;
                 int m0 = Measure40.MenOf(mp);   // E4/0: stan przed zaraza (MenOf ma wlasny try; tylko pomiar)
                 int p0 = PeopleBook.MenOf(mp);  // E4/7: szeregowi bez wightow przed zaraza
-                Strike(s, mp, ramp, sideMul, sideCrowd, out sick, out dead, out capped);
+                Strike(s, mp, ramp, sideMul, sideCrowd, winter, t.Corpse, out sick, out dead, out capped, out factor, out woundTerm);
+                if (factor > 0f) { t.Struck++; t.FSum += factor; t.ZSum += winter; t.RSum += woundTerm; }   // 399: tylko druzyny, ktore zaraza dzis liczyla
+                if (dead > 0) SiegeMisery.AddCorpses(st, within, dead, SiegeMisery.SrcFever);   // 399: zmarli zarazy leza niepogrzebani (znacznik, nie ksiega ludzi; AddCorpses nie rzuca)
                 try { Measure40.NoteDisease(mp, m0 - Measure40.MenOf(mp), dead); } catch { }   // E4/0: zmarli z rosteru i zadani (U9; tylko pomiar)
                 try { int pd = p0 - PeopleBook.MenOf(mp); if (pd > 0) PeopleBook.DieShares(PeopleBook.Take(mp.MemberRoster, pd, PeopleBook.FDiePlague), PeopleBook.FDiePlague); } catch { }   // E4/7 (R12): POLEGLI regionu pochodzenia
                 t.Sick += sick; t.Dead += dead;
@@ -268,21 +315,26 @@ namespace Armoury
         }
 
         /// <summary>Dzienne zniwo w jednej partii. Chorzy ida w rannych, czesc umiera. sideCrowd &lt; 0 = stary tlok z rosteru tej partii.</summary>
-        private static void Strike(Settings s, MobileParty mp, float ramp, float sideMul, float sideCrowd, out int sick, out int dead, out bool capped)
+        private static void Strike(Settings s, MobileParty mp, float ramp, float sideMul, float sideCrowd, float winter, float corpse, out int sick, out int dead, out bool capped, out float factor, out float woundTerm)
         {
-            sick = 0; dead = 0; capped = false;
+            sick = 0; dead = 0; capped = false; factor = 0f; woundTerm = 0f;
             if (mp == null || mp.MemberRoster == null || sideMul <= 0f) return;
             if (Undead.Party(mp)) return;                      // umarli nie choruja
 
             var roster = mp.MemberRoster;
-            int healthy = 0;
+            int healthy = 0, regulars = 0;
             for (int i = 0; i < roster.Count; i++)
             {
                 var ch = roster.GetCharacterAtIndex(i);
                 if (ch == null || ch.IsHero) continue;
+                regulars += roster.GetElementNumber(i);
                 healthy += roster.GetElementNumber(i) - roster.GetElementWoundedNumber(i);
             }
             if (healthy <= 0) return;
+
+            // 399: czynnik DODAWANY 1 + zima + ranni + trupy, najwyzej FactorMax
+            if (s.SiegeFeverWoundedCounts && regulars > 0) woundTerm = MathF.Min(0.5f, (regulars - healthy) / (float)regulars);
+            factor = MathF.Min(FactorMax, 1f + Math.Max(0f, winter) + woundTerm + Math.Max(0f, corpse));
 
             float crowd = sideCrowd >= 0f ? sideCrowd : Crowd(roster.TotalManCount);
 
@@ -293,7 +345,7 @@ namespace Armoury
             bool siegeMedic = surgeon != null && surgeon.GetPerkValue(DefaultPerks.Medicine.SiegeMedic);
 
             float risk = Math.Max(0f, s.SiegeSicknessBasePercent) / 100f
-                       * ramp * crowd * sideMul * (1f - relief) * (prevent ? 0.85f : 1f);
+                       * ramp * crowd * sideMul * (1f - relief) * (prevent ? 0.85f : 1f) * factor;
             float expected = healthy * risk;
             // 398: sufit dobowy - druzyna nie traci jednej doby wiecej niz ten udzial zdrowych (0 = bez sufitu)
             float capPct = s.SiegeSicknessDailyCapPercent;

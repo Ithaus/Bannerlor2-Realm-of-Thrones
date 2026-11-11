@@ -2208,6 +2208,34 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float SiegeSicknessDailyCapPercent { get; set; } = 6f;
 
+        [SettingPropertyBool("Siege Corpses Breed Fever", HintText = "With Siege Sickness Enabled: the unburied dead of a siege feed the camp fever. Those who die of the fever, of hunger behind the walls, in the assaults and sallies, and the wounded left to die beneath the walls are counted - beneath the walls for the besiegers, within the walls for the defenders. The more dead for every man of that side, the faster its fever spreads (up to Siege Corpse Factor Max). The count fades by itself and ends with the siege. Off = the dead are not counted and cannot be burned", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeCorpsesBreedFever { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Corpse Decay Percent", 0.00f, 100.00f, "0.00", HintText = "With Siege Corpses Breed Fever: this share of the unburied dead on each side stops spreading sickness every day", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeCorpseDecayPercent { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Siege Corpse Factor Max", 1.00f, 3.00f, "0.00", HintText = "With Siege Corpses Breed Fever: the unburied dead can at most multiply the fever rate of their side by this much on their own (reached when there is one corpse for every living man of that side). Winter and the wounded add on top, and the three together never more than triple the rate", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeCorpseFactorMax { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Siege Fever Winter Factor", 1.00f, 3.00f, "0.00", HintText = "With Siege Sickness Enabled: winter adds to the fever rate - 1.5 means half as much again in the cold realms, less in the warm realms and nothing in the Summer Isles (as the winter settings say). 1 = winter does not change the fever", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeFeverWinterFactor { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Siege Fever Wounded Counts", HintText = "With Siege Sickness Enabled: a party full of wounded sickens faster - the share of its wounded soldiers is added to the fever rate, at most half as much again. Off = the wounded do not change the fever", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeFeverWoundedCounts { get; set; } = true;
+
+        [SettingPropertyBool("Siege Burn Dead Option", HintText = "With Siege Corpses Breed Fever: in the siege menu you can burn the dead of your side for hardwood from your inventory (beneath the walls when you besiege, in the yard when you defend), once at least 20 lie unburied. AI siege commanders with hardwood in their baggage and besieged towns and castles with hardwood in store do the same once 50 lie unburied. The hardwood is used up. Off = nobody burns the dead and they only fade with time", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeBurnDeadOption { get; set; } = true;
+
+        [SettingPropertyInteger("Siege Burn Dead Per Hardwood", 1, 200, "0", HintText = "With Siege Burn Dead Option: one load of hardwood burns this many dead", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeBurnDeadPerHardwood { get; set; } = 20;
+
         [SettingPropertyBool("Siege Walls Hold Until Breached", HintText = "AI lords never storm a town or castle with ladders alone: first a battering ram and a siege tower must stand ready, or their engines must batter a breach in the walls - and even then only when their strength beats what the walls make of the defenders. The walls count in full however long the siege lasts and weaken only as engines batter them down (the game let them count for less every hour after the fourth day and after the sixth for nothing). You decide your own assaults as before - with ladders as soon as the camp is ready. Off = the game's waning patience", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeWallsHoldUntilBreached { get; set; } = true;
@@ -12639,6 +12667,13 @@ namespace Armoury
             s.SiegeSicknessRampCap = SiegeSicknessRampCap;
             s.SiegeSicknessCrowdWholeCamp = SiegeSicknessCrowdWholeCamp;
             s.SiegeSicknessDailyCapPercent = SiegeSicknessDailyCapPercent;
+            s.SiegeCorpsesBreedFever = SiegeCorpsesBreedFever;
+            s.SiegeCorpseDecayPercent = SiegeCorpseDecayPercent;
+            s.SiegeCorpseFactorMax = SiegeCorpseFactorMax;
+            s.SiegeFeverWinterFactor = SiegeFeverWinterFactor;
+            s.SiegeFeverWoundedCounts = SiegeFeverWoundedCounts;
+            s.SiegeBurnDeadOption = SiegeBurnDeadOption;
+            s.SiegeBurnDeadPerHardwood = SiegeBurnDeadPerHardwood;
             s.SiegeWallsHoldUntilBreached = SiegeWallsHoldUntilBreached;
             s.SiegeCapitalWallsFactor = SiegeCapitalWallsFactor;
             s.SiegeDefenderEnginesOnWalls = SiegeDefenderEnginesOnWalls;

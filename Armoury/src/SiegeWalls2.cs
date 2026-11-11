@@ -631,6 +631,7 @@ namespace Armoury
             if (p > 0.0)
                 foreach (var r in Rosters(st)) { int rw; dead += Kill(r, MBRandom.RoundRandomized((float)(p * Regulars(r, out rw)))); }
             _dDead += dead;
+            SiegeMisery.AddCorpses(st, true, dead, SiegeMisery.SrcHunger);   // 399: zmarli z glodu leza niepogrzebani w murach (znacznik sanitarny; nie rzuca)
             int h1, w1;
             int left = MenOf(st, out h1, out w1);
             int thr = Math.Max(SurMen, (int)Math.Ceiling(SurShare * g.Start));

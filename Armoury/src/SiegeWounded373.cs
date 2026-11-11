@@ -616,6 +616,7 @@ namespace Armoury
                 {
                     try { garrison = st.Town != null ? st.Town.GarrisonParty : null; } catch { garrison = null; }
                     LeftToDie391(cands, garrison, left, ref s);
+                    SiegeMisery.AddCorpses(st, false, left.Dead, SiegeMisery.Src391);   // 399: zostawieni pod murami leza niepogrzebani (znacznik; nie rzuca)
                 }
                 _dMoved += moved; _dHero += names.Count; _dSt += s; _dToPl += toPl; _dDied += left.Dead; _dKit += left.Kit;
                 bool mine = false;
@@ -842,7 +843,7 @@ namespace Armoury
                 // wynikiem DTE oddaje sprzet powalonych ich partiom (dte.cs FinalizeMission: bez BattleResolved nikt nie jest pokonany -> ItemsToRecover wraca) -
                 // ludzie umieraja, sprzet zostaje u atakujacych; komunikat i log mowia wtedy prawde (pelne zdzieranie - ODLOZONE, patrz CHANGELOG 391-p).
                 bool dieOn = set.SiegeWoundedLeftToDie && limOk;
-                if (dieOn) LeftToDie391(cands, null, left, ref s);
+                if (dieOn) { LeftToDie391(cands, null, left, ref s); SiegeMisery.AddCorpses(st, false, left.Dead, SiegeMisery.Src391); }   // 399: znacznik trupow pod murami
                 bool stripped = t.LastStripped;
                 Color red = Color.FromUint(0xFFE06050u);
                 if (mine > 0)
@@ -1044,7 +1045,7 @@ namespace Armoury
                 bool byPrison = free + (pPrison != null ? pFree : 0) <= def;
                 // 391 (b): nadwyzka nie wraca ze swoja partia - umiera pod murami. Sprzet: lup z pola DTE z misji (patrz opis 391) - dzialka gracza w oknie 380
                 bool dieOn = lim && set.SiegeWoundedLeftToDie;
-                if (dieOn) LeftToDie391(cands, null, left, ref s);
+                if (dieOn) { LeftToDie391(cands, null, left, ref s); SiegeMisery.AddCorpses(st, false, left.Dead, SiegeMisery.Src391); }   // 399: znacznik trupow pod murami
                 int back = Math.Max(0, cut - left.Dead);   // klucz NIE / partia bez wodza / Inni - wracaja z partia jak dotad
                 // 373c-p: najpierw wzieci, potem reszta ("more" tylko wtedy, gdy linia o wzietych padla)
                 Color green = Color.FromUint(0xFF9ACD65u);
