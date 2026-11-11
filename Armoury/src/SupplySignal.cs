@@ -237,6 +237,15 @@ namespace Armoury
         // ============================================================ 2. S_stos (regulator wsi 221)
         private static readonly Dictionary<ItemObject, int> _runs = new Dictionary<ItemObject, int>();   // kolejne decyzje na suficie przy stosie ponizej progu (sesja)
         private static int _seenDec = -1;
+        // 435-L5: N swiata z ostatniej linii niedoboru (tylko towary z N > 1); jedna podmieniana referencja - odczyt kolejnosci zlecen sprzetu wsi (VillageGear.OrderOf)
+        private static volatile Dictionary<ItemCategory, double> _pubN = new Dictionary<ItemCategory, double>();
+        /// <summary>435-L5: niedobor N towaru w swiecie z ostatniej doby pomiaru (1 - bez niedoboru, bez pomiaru albo klucz Supply Chain Log wylaczony). Sam odczyt.</summary>
+        internal static double WorldN(ItemCategory c)
+        {
+            if (c == null) return 1.0;
+            var m = _pubN; double n;
+            return m.Count > 0 && m.TryGetValue(c, out n) && n > 1.0 && On ? Math.Min(2.0, n) : 1.0;
+        }
 
         // ============================================================ 5. rece okregow (zmiana doby)
         private static readonly Dictionary<string, double> _prevHome = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -273,7 +282,7 @@ namespace Armoury
             _st = _stSess = 0; _err.Clear(); _startLine = false; _first = int.MinValue;
             _cells.Clear(); _price.Clear(); ZeroDay();
             _ws.Clear(); CycleBegin();
-            _runs.Clear(); _seenDec = -1;
+            _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>();
             _prevHome.Clear(); _prevHomeDay = int.MinValue;
             _dryDay = int.MinValue; _whyDay = int.MinValue;
         }
@@ -307,7 +316,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
-            if (!s.SupplyChainLog) { ZeroDay(); _price.Clear(); return; }
+            if (!s.SupplyChainLog) { ZeroDay(); _price.Clear(); if (_pubN.Count > 0) _pubN = new Dictionary<ItemCategory, double>(); return; }
             long t0 = Stopwatch.GetTimestamp();
             int today = Today;
             bool log = s.LogEnabled && LogGate.Lines;
@@ -535,6 +544,10 @@ namespace Armoury
                 rows.Add(new KeyValuePair<ItemCategory, double[]>(kv.Key, new[] { nw, ss, sq, kv.Value[0], kv.Value[1], kv.Value[2], kv.Value[3], kv.Value[4] }));
             }
             rows.Sort((a, b) => { int c = b.Value[0].CompareTo(a.Value[0]); return c != 0 ? c : b.Value[3].CompareTo(a.Value[3]); });
+            // 435-L5: N swiata do odczytu (kolejnosc zlecen sprzetu wsi nastepnej doby)
+            var pn = new Dictionary<ItemCategory, double>();
+            foreach (var r in rows) if (r.Value[0] > 1.0 + 1e-9) pn[r.Key] = r.Value[0];
+            _pubN = pn;
             var sb = new StringBuilder(1200);
             sb.Append("L1 sam pomiar, N nigdzie nie uzywane | N = max(1, S_stos, S_kolejka) <= 2, cena poza N; srednie z ").Append(Span(today)).Append(" dob sesji (okno 28)")
               .Append(" | towarow z N swiata > 1: ").Append(over).Append(" z ").Append(rows.Count).Append(" | lista (towar N swiata = stos / kolejka; brak szt./d; sprzedaz szt./d; miast z N >= 1.5 / z pomiarem; najwyzsze N miasta): ");
@@ -566,7 +579,7 @@ namespace Armoury
               .Append(" | miast z N >= 1.5 dla jakiegos towaru: ").Append(hot.Count).Append(" | komorek (miasto x towar) z pomiarem ").Append(cells)
               .Append(", w tym sprzedaz z prawdziwej sprzedazy miasta (241) ").Append(real).Append(", reszta: sztuki kupione tymi samymi drogami (odstepstwo od projektu - brak licznika calej sprzedazy surowcow)")
               .Append(" | poza pomiarem: surowiec warsztatow zbrojnych (linia 'Warsztaty: dzien' - brak surowca), kontrakty 174")
-              .Append(" | uzycie: brak (L1) - zajecia zmienione sygnalem 0, zamowienia 363 podniesione 0");
+              .Append(" | uzycie: zajecia zmienione sygnalem 0, zamowienia 363 podniesione 0; kolejnosc zlecen sprzetu wsi (435-L5, tylko przy zuzyciu sprzetu): ").Append(VillageGear.WearOn ? "czyta N swiata" : "nieczynna");
             return sb.ToString();
         }
 
