@@ -123,6 +123,7 @@ namespace Armoury
                 var ev = camp != null ? camp.SiegeEvent : null;
                 var st = ev != null ? ev.BesiegedSettlement : null;
                 if (st == null) return;                                            // gracz nie wodz - gra sama wylacza opcje (wyjscie na !IsEnabled wyzej)
+                if (st.CurrentSiegeState != Settlement.SiegeState.OnTheWalls) return;   // 387b: mury wziete (sala lorda) - przerwa nie blokuje dokonczenia
                 if (SiegeWalls2.Surrendered(st)) return;                           // twierdza po kapitulacji z glodu - bez przerwy (jak Veto AI)
                 double left = RepelPauseLeftDays(ev);
                 if (left <= 0.0) return;
@@ -149,6 +150,8 @@ namespace Armoury
                 var st = me.MapEventSettlement;
                 var ev = st != null ? st.SiegeEvent : null;
                 if (ev == null || !st.IsFortification || st.CurrentSiegeState != Settlement.SiegeState.OnTheWalls) return;
+                // 387b: "Continue siege preparations." gry wymaga jeszcze wojny (cs_full 185420) - bez niej nie zostawiamy menu z samymi nieczynnymi opcjami
+                if (Hero.MainHero == null || !FactionManager.IsAtWarAgainstFaction(Hero.MainHero.MapFaction, st.MapFaction)) return;
                 if (SiegeWalls2.Surrendered(st)) return;
                 double left = RepelPauseLeftDays(ev);
                 if (left <= 0.0) return;
