@@ -103,6 +103,20 @@ namespace Armoury
             return pcs;
         }
 
+        /// <summary>391 (Jeff 11.11 "sprzet jest z nich zdzierany"): ranni spod murow, ktorych nikt nie wzial, umarli pod murami po szturmie odpartym BEZ misji -
+        /// ich komplety ze zbrojowni DTE partii atakujacej ida do zbrojowni zalogi twierdzy (ta sama regula i ta sama droga co "sprzet idzie z ludzmi": MoveKits -
+        /// komplety wedlug typow, stan sztuk AiWear.MoveWorn). Wolac PO zdjeciu ludzi z rosteru. Bez DTE / bez zbrojowni dawcy - 0 (sprzet zostaje u dawcy). Wlasny
+        /// klucz (Siege Wounded Left To Die) - nie zalezy od KitMovesWithMen. Nie rzuca.</summary>
+        internal static int KitsStripped391(MobileParty from, MobileParty garrison, Dictionary<CharacterObject, int> dead)
+        {
+            try
+            {
+                if (from == null || garrison == null || from == garrison || dead == null || dead.Count == 0 || AiGear.Armories() == null) return 0;
+                return MoveKits(from, garrison, dead, "zdarci pod murami (391)");
+            }
+            catch (Exception e) { Stumble("KitsStripped391", e); return 0; }
+        }
+
         private static int TierOf(ItemObject it) { try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; } }
 
         private static Dictionary<ItemObject, int> ArmoryOf(MobileParty mp)

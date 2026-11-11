@@ -11752,7 +11752,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public float SiegeWoundedWallDistance { get; set; } = 35f;
 
-        [SettingPropertyBool("Siege Wounded Dungeon Limit", HintText = "With Siege Wounded Taken Prisoner, in an assault on a fortress you defend yourself: the ordinary wounded attackers taken prisoner beneath the walls are never more than the room left in the fortress dungeon and never more men than the defenders still standing - the same share from every enemy party; the rest of their wounded go back with their army, as in the game. Lords are taken without any limit. Off = all the wounded lying inside or close beneath the walls are taken, however many", RequireRestart = false)]
+        [SettingPropertyBool("Siege Wounded Dungeon Limit", HintText = "With Siege Wounded Taken Prisoner, in an assault on a fortress you defend yourself: the ordinary wounded attackers taken prisoner beneath the walls are never more than the room left in the fortress dungeon and never more men than the defenders still standing - the same share from every enemy party; the rest of their wounded are left to die beneath the walls (Siege Wounded Left To Die; off = they go back with their army, as in the game). Lords are taken without any limit. Off = all the wounded lying inside or close beneath the walls are taken, however many", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public bool SiegeWoundedDungeonLimit { get; set; } = true;
 
@@ -11775,6 +11775,14 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Siege Wounded Simulated Share", 0f, 1f, "0.00", HintText = "With Siege Wounded Simulated: the share of the attackers wounded in a beaten-back assault fought without you who lie too close to the walls to be carried away (in an assault you fight yourself their place on the field decides instead). 0 = none", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
         public float SiegeWoundedSimulatedShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Siege Wounded Player Takes Overflow", HintText = "With Siege Wounded Dungeon Limit, when you are among the defenders of a fortress (you fight the assault yourself, or you stand inside while an assault fought without you is beaten back) and its dungeon is full: the wounded attackers lying beneath the walls whom the dungeon cannot hold are bound and taken along by your own party, up to your party's prisoner limit - still never more men in all than the defenders left standing. They go straight to your prisoners (not through the aftermath window). Off = only the dungeon takes them", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public bool SiegeWoundedPlayerTakesOverflow { get; set; } = true;
+
+        [SettingPropertyBool("Siege Wounded Left To Die", HintText = "The wounded lying beneath the walls whom nobody takes prisoner (no room left in the dungeon or in your party, too few defenders left standing) are not carried back to their army any more: they are left where they fell and die of their wounds, and the defenders strip their gear (in an assault you fight yourself that gear is already part of the spoils of the field; after an assault fought without you it goes to the garrison's armoury). This holds for attackers beaten back from a fortress you defend, for assaults fought without you, and for your own and your allies' wounded when your assault is beaten back (Siege Wounded Player Side). Lords and companions never die this way, and a party without a leader always keeps one man. Off = they go back with their army, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
+        public bool SiegeWoundedLeftToDie { get; set; } = true;
 
         [SettingPropertyBool("Siege Held Spoils Window", HintText = "When you defend a fortress and the assault breaks and the enemy falls back (Siege Assault Break Mission), the game shows no aftermath: now, back on the siege menu, you get the prisoners window (the wounded attackers taken beneath the walls - take as many as you want into your party - in a fortress of another clan only your share by strength among its defenders - the rest stay in the dungeon) and then the loot window with your share of the gear from the field. What you leave goes to the nearest friendly market with Spoils Remnants Home. Off = as before: no windows, your share of the field goes back to the army stores", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: wounded beneath the walls (373)")]
@@ -14987,6 +14995,8 @@ namespace Armoury
             s.SiegeWoundedPlayerOnRetreat = SiegeWoundedPlayerOnRetreat;
             s.SiegeWoundedSimulated = SiegeWoundedSimulated;
             s.SiegeWoundedSimulatedShare = SiegeWoundedSimulatedShare;
+            s.SiegeWoundedPlayerTakesOverflow = SiegeWoundedPlayerTakesOverflow;
+            s.SiegeWoundedLeftToDie = SiegeWoundedLeftToDie;
             s.SiegeHeldSpoilsWindow = SiegeHeldSpoilsWindow;
             s.SiegeEngineAccuracyBySkill = SiegeEngineAccuracyBySkill;
             s.SiegeEngineSpreadThrowersAt0 = SiegeEngineSpreadThrowersAt0;

@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -43,6 +44,8 @@ namespace Armoury
     /// preparations." / "Leave..." -> PlayerEncounter.Finish -> LeaveBattle -> MapEvent.FinalizeEvent bez zwyciezcy (cs_full 99560-99575, 112804-112826) -
     /// MapEventEnded pada, gdy MainParty jest jeszcze po stronie atakujacej. Rozliczenie: SiegeWounded373Behavior.Player387c (osobna galaz, galaz obroncy nietknieta).
     /// Sam gracz nigdy; bohaterowie rodu / towarzysze tylko z kluczem Siege Wounded Player Companions (domyslnie NIE); okien 380 nie ma.
+    /// 391 (Jeff 11.11, odp. 2 i 4): nadwyzka ponad sufit nie wraca ze swoja partia - gracz-obronca bierze ja do jencow druzyny (do limitu), reszta umiera
+    /// pod murami (373, 388, 387c); opis i droga sprzetu przy SiegeWounded373Behavior.LeftToDie391.
     /// </summary>
     internal sealed class SiegeWounded373 : MissionLogic
     {
@@ -303,27 +306,124 @@ namespace Armoury
         // Okien 380 nie ma (gracza w bitwie nie ma). Partia bez wodza nie jest oprozniana do zera (zostaje 1 czlowiek). Stan tylko w pamieci.
         // 388b: rozliczenie wolane WPROST z SiegeWalls.OnMapEventEnded (galaz a.Repelled) - wpis-zbior "_sim" z 388 powstawal PO nasluchu, ktory mial go zuzyc
         // (nasluchy MapEventEnded biegna od ostatnio zarejestrowanego, cs_full 22405-22425; log 09.11 19:42:55: linia 373 przed linia przerwy 371) i 388 nie dzialalo nigdy.
-        private static int _dRep, _dWnd, _dMoved, _dCutPrison, _dCutDef, _dHero, _dSt, _dSkip;
+        private static int _dRep, _dWnd, _dMoved, _dCutPrison, _dCutDef, _dHero, _dSt, _dSkip, _dToPl, _dDied, _dKit;
 
-        private sealed class Cand { public CharacterObject Troop; public int Want; }
+        private sealed class Cand { public CharacterObject Troop; public int Want, Got; }   // 391: Got - ilu z Want ktos wzial (loch / druzyna gracza); reszta = nadwyzka ponad sufit
 
         private static void Reset388()
         {
-            _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = 0;
+            _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = _dToPl = _dDied = _dKit = 0;
+        }
+
+        // ------------------------------------------------------------ 391: ranni spod murow ponad sufit
+        // (Jeff 11.11, odp. 2: "tych co nie wzieto po prostu umieraja z ran pod murami, ale sprzet jest z nich zdzierany"; odp. 4: "kto padl tam zostaje").
+        // (a) gracz wsrod obroncow, loch pelny - nadwyzke bierze druzyna gracza do swojego limitu jencow (klucz Siege Wounded Player Takes Overflow), lacznie
+        //     nadal nie wiecej niz obroncow na nogach. (b) kogo nikt nie wzial, nie wraca do swojej partii: umiera pod murami (MemberRoster -n rannych, ksiega
+        //     ludzi PeopleBook FDieBattle - polegli regionu pochodzenia), klucz Siege Wounded Left To Die. Bohaterowie nigdy (nie sa kandydatami - maja wlasne
+        //     reguly); umarli (Inni) pominieci; partia bez wodza nie do zera (zostaje 1 czlowiek - pusta partie gra kasuje po nasluchach, jak 388 / 387c / 373c-p).
+        // SPRZET: bitwa z misja (373, 387c) - DTE rozlicza w misji kazdego powalonego, nieprzytomnego jak zabitego (dte.cs DynamicTroopMissionLogic.OnAgentRemoved:
+        //     stan Unconscious / Killed -> LootedItems partii, ktora go powalila; FinalizeMission / HandlePartyItems: zwyciezcy dostaja LootedItems, pokonani nie
+        //     odzyskuja ItemsToRecover) - to jest istniejaca droga "lup z pola" (dzialka gracza -> okno 380), drugi raz nie zdejmujemy. Bez misji (388) DTE nic
+        //     nie robi (EveryoneCampaignBehavior.OnMapEventEnded tylko przy zwyciezcy) - komplety zmarlych ze zbrojowni DTE ich partii ida do zbrojowni zalogi
+        //     (GarrisonArmory.KitsStripped391 = MoveKits "sprzet idzie z ludzmi"); bez zalogi / bez DTE sprzet zostaje w zbrojowni partii (liczone w logu).
+        private sealed class Left391
+        {
+            public int Dead, Mine, Ally, Kept, Parties, Kit, NoKit, Undead;
+            public readonly Dictionary<string, int> Types = new Dictionary<string, int>();
+            public string TypesText()
+            {
+                var tb = new StringBuilder();
+                foreach (var kv in Types) tb.Append(tb.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
+                return tb.Length > 0 ? tb.ToString() : "-";
+            }
+        }
+
+        /// <summary>391 (a): wolne miejsce na jencow w druzynie gracza (PartyBase.PrisonerSizeLimit - obecni); 0, gdy gracz sam jest jencem.</summary>
+        private static int PlayerRoom391(out TroopRoster prison)
+        {
+            prison = null;
+            var mp = PartyBase.MainParty;
+            if (mp == null || Hero.MainHero == null || Hero.MainHero.IsPrisoner) return 0;
+            var pr = mp.PrisonRoster;
+            if (pr == null) return 0;
+            int room = Math.Max(0, mp.PrisonerSizeLimit - pr.TotalManCount);
+            if (room > 0) prison = pr;
+            return room;
+        }
+
+        /// <summary>391 (a) w 388: gracz stoi w tej twierdzy po stronie jej pana (bitwa bez niego - np. wszedl tuz po rozpoczeciu szturmu).</summary>
+        private static bool PlayerInFortress391(Settlement st)
+        {
+            var mp = MobileParty.MainParty;
+            if (st == null || mp == null || mp.CurrentSettlement != st) return false;
+            return st.OwnerClan == Clan.PlayerClan || (st.MapFaction != null && st.MapFaction == mp.MapFaction);
+        }
+
+        /// <summary>391 (b): nadwyzka kandydatow (Want - Got), ktorzy wciaz sa rannymi swojej partii, umiera pod murami. kitTo != null (388) - ich komplety
+        /// ze zbrojowni DTE partii do zbrojowni tej zalogi. Wolac PO przenosinach do lochu i po ich wpisie w ksiedze ludzi (Transfer liczy z roznic rosterow).
+        /// Wyjatek per typ / partia = potkniecie. Nie rzuca.</summary>
+        private static void LeftToDie391(Dictionary<PartyBase, List<Cand>> cands, MobileParty kitTo, Left391 r, ref int s)
+        {
+            foreach (var kv in cands)
+            {
+                var pb = kv.Key;
+                try
+                {
+                    if (pb == null || !pb.IsActive) continue;
+                    var mr = pb.MemberRoster;
+                    bool noLead = pb.LeaderHero == null, isMain = pb == PartyBase.MainParty;
+                    int here = 0;
+                    Dictionary<CharacterObject, int> dead = null;
+                    foreach (var c in kv.Value)
+                    {
+                        try
+                        {
+                            int n = c.Want - c.Got;
+                            if (n <= 0 || c.Troop == null || c.Troop.IsHero) continue;
+                            if (Undead.Character(c.Troop)) { r.Undead += n; continue; }
+                            int idx = mr.FindIndexOfTroop(c.Troop);
+                            n = Math.Min(n, idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0);
+                            if (noLead && mr.TotalManCount - n <= 0) { n = mr.TotalManCount - 1; r.Kept++; }   // partia bez wodza nie zostaje pusta
+                            if (n <= 0) continue;
+                            mr.AddToCounts(c.Troop, -n, false, -n);
+                            here += n;
+                            if (dead == null) dead = new Dictionary<CharacterObject, int>();
+                            int d0; dead.TryGetValue(c.Troop, out d0); dead[c.Troop] = d0 + n;
+                            string id = c.Troop.StringId;
+                            int t0; r.Types.TryGetValue(id, out t0); r.Types[id] = t0 + n;
+                        }
+                        catch (Exception e) { Stumble("391.Troop", e, ref s); }
+                    }
+                    if (here <= 0) continue;
+                    r.Dead += here; r.Parties++;
+                    if (isMain) r.Mine += here; else r.Ally += here;
+                    try { PeopleBook.DieShares(PeopleBook.Take(mr, here, PeopleBook.FDieBattle), PeopleBook.FDieBattle); } catch (Exception e) { Stumble("391.Book", e, ref s); }
+                    if (kitTo != null)
+                    {
+                        var mp = pb.MobileParty;
+                        int pcs = mp != null ? GarrisonArmory.KitsStripped391(mp, kitTo, dead) : 0;
+                        r.Kit += pcs;
+                        if (pcs <= 0) r.NoKit += here;
+                    }
+                }
+                catch (Exception e) { Stumble("391.Party", e, ref s); }
+            }
         }
 
         private static void Daily388()
         {
             try
             {
-                if (_dRep + _dWnd + _dMoved + _dCutPrison + _dCutDef + _dHero + _dSt + _dSkip == 0) return;   // 388b: bez linii przy samych zerach
+                if (_dRep + _dWnd + _dMoved + _dCutPrison + _dCutDef + _dHero + _dSt + _dSkip + _dToPl + _dDied + _dKit == 0) return;   // 388b: bez linii przy samych zerach
                 var set = Settings.Current;
                 bool on = set != null && set.SiegeWoundedTakenPrisoner && set.SiegeWoundedSimulated && set.SiegeWoundedSimulatedShare > 0f;
                 Log.Info("Ranni pod murami (388) doba: dzien " + (int)CampaignTime.Now.ToDays + " | czynne " + (on ? "tak" : "nie") + ", udzial "
                          + (set != null ? set.SiegeWoundedSimulatedShare.ToString("0.00", CultureInfo.InvariantCulture) : "-") + " | odparc bez misji " + _dRep + ", rannych atakujacych " + _dWnd
                          + ", do lochu " + _dMoved + ", obciete lochem " + _dCutPrison + ", obciete zaloga " + _dCutDef + ", bohaterowie " + _dHero
+                         + " | 391: do druzyny gracza " + _dToPl + ", zmarli pod murami " + _dDied + " (sprzet do zbrojowni zalog " + _dKit + " szt.), klucze: druzyna gracza "
+                         + (set != null && set.SiegeWoundedPlayerTakesOverflow ? "tak" : "nie") + ", umieraja " + (set != null && set.SiegeWoundedLeftToDie ? "tak" : "nie")
                          + " | pominiete (misja 373 / nie szturm / zwyciezca) " + _dSkip + " | potkniecia " + _dSt + ".");
-                _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = 0;
+                _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = _dToPl = _dDied = _dKit = 0;
             }
             catch (Exception e) { int s = 0; Stumble("Daily388", e, ref s); }
         }
@@ -348,6 +448,15 @@ namespace Armoury
                 int l0 = prison.TotalManCount, limit = captor.PrisonerSizeLimit, free = Math.Max(0, limit - l0);
                 int def = Math.Max(0, me.DefenderSide.TroopCount);
                 int cap0 = Math.Min(free, def), cap = cap0;
+                // 391 (a): gracz stoi w tej twierdzy po stronie obroncow - nadwyzke ponad loch bierze jego druzyna (do limitu jencow); lacznie nadal <= obroncow na nogach
+                TroopRoster pPrison = null;
+                int pFree = 0, capP0 = 0;
+                try
+                {
+                    if (set.SiegeWoundedPlayerTakesOverflow && PlayerInFortress391(st)) { pFree = PlayerRoom391(out pPrison); capP0 = pPrison != null ? Math.Max(0, Math.Min(pFree, def - cap0)) : 0; }
+                }
+                catch (Exception e) { Stumble("Sim388.PlayerRoom", e, ref s); pPrison = null; pFree = 0; capP0 = 0; }
+                int capP = capP0;
                 Hero leader = null;
                 try { var lp = me.AttackerSide.LeaderParty; leader = lp != null ? lp.LeaderHero : null; } catch { leader = null; }
                 // 1. kandydaci: ranni z tego szturmu, ktorzy wciaz sa rannymi swojej partii
@@ -418,50 +527,71 @@ namespace Armoury
                     catch (Exception e) { Stumble("Sim388.Hero", e, ref s); }
                 }
                 // 3. zolnierze: ta sama skala dla wszystkich partii, gdy chetnych wiecej niz sufit
-                double k = wantSum > cap ? cap / (double)Math.Max(1, wantSum) : 1.0;
-                int moved = 0, emptied = 0, kept = 0;
+                int room = cap + capP;   // 391: loch (po bohaterach) + druzyna gracza
+                double k = wantSum > room ? room / (double)Math.Max(1, wantSum) : 1.0;
+                int moved = 0, toPl = 0, emptied = 0, kept = 0;
                 double book = 0.0;
                 var types = new Dictionary<string, int>();
                 foreach (var kv in cands)
                 {
-                    if (cap <= 0) break;
+                    if (cap + capP <= 0) break;
                     var pb = kv.Key;
                     try
                     {
                         var mr = pb.MemberRoster;
-                        int from0 = PeopleBook.Men(mr), to0 = PeopleBook.Men(prison), here = 0;
+                        int from0 = PeopleBook.Men(mr), to0 = PeopleBook.Men(prison), toP0 = pPrison != null ? PeopleBook.Men(pPrison) : 0, here = 0, hereP = 0;
                         bool noLead = pb.LeaderHero == null;
                         foreach (var c in kv.Value)
                         {
                             try
                             {
-                                if (cap <= 0) break;
+                                if (cap + capP <= 0) break;
                                 int n = k < 1.0 ? Math.Min(c.Want, MBRandom.RoundRandomized((float)(c.Want * k))) : c.Want;
                                 int idx = mr.FindIndexOfTroop(c.Troop);
-                                n = Math.Min(Math.Min(n, cap), idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0);
+                                n = Math.Min(Math.Min(n, cap + capP), idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0);
                                 if (noLead && mr.TotalManCount - n <= 0) { n = mr.TotalManCount - 1; kept++; }   // partia bez wodza nie zostaje pusta
                                 if (n <= 0) continue;
+                                int nD = Math.Min(n, cap), nP = n - nD;   // 391: najpierw loch, nadwyzka do druzyny gracza
                                 mr.AddToCounts(c.Troop, -n, false, -n);
-                                prison.AddToCounts(c.Troop, n, false, n);
-                                PlayerCaptives385d.Note(captor, pb, c.Troop, n);   // 385d: rejestr zolnierzy gracza w niewoli (liczy tylko partie gracza)
-                                moved += n; here += n; cap -= n;
+                                c.Got += n;
+                                if (nD > 0)
+                                {
+                                    prison.AddToCounts(c.Troop, nD, false, nD);
+                                    PlayerCaptives385d.Note(captor, pb, c.Troop, nD);   // 385d: rejestr zolnierzy gracza w niewoli (liczy tylko partie gracza)
+                                    moved += nD; here += nD; cap -= nD;
+                                }
+                                if (nP > 0) { pPrison.AddToCounts(c.Troop, nP, false, nP); toPl += nP; hereP += nP; capP -= nP; }
                                 string id = c.Troop.StringId;
                                 int t0; types.TryGetValue(id, out t0); types[id] = t0 + n;
                             }
                             catch (Exception e) { Stumble("Sim388.Troop", e, ref s); }
                         }
-                        if (here > 0)
+                        if (here + hereP > 0)
                         {
-                            try { book += PeopleBook.Transfer(mr, from0, prison, to0, PeopleBook.FCaptured); } catch (Exception e) { Stumble("Sim388.Book", e, ref s); }
+                            try
+                            {
+                                if (here > 0) book += PeopleBook.Transfer(mr, from0, prison, to0, PeopleBook.FCaptured);
+                                if (hereP > 0) book += PeopleBook.Transfer(mr, from0 - here, pPrison, toP0, PeopleBook.FCaptured);   // 391: reszta ubytku partii = jency druzyny gracza
+                            }
+                            catch (Exception e) { Stumble("Sim388.Book", e, ref s); }
                             if (pb.NumberOfAllMembers == 0) emptied++;
                         }
                     }
                     catch (Exception e) { Stumble("Sim388.Move", e, ref s); }
                 }
-                int cut = wantSum + heroes.Count > cap0 ? Math.Max(0, wantSum - moved) + hCut : 0;   // 388b: obciecie liczone tylko, gdy sufit naprawde ciasny (nie roznice zaokraglen)
-                bool byPrison = free <= def;
+                int cut = wantSum + heroes.Count > cap0 + capP0 ? Math.Max(0, wantSum - moved - toPl) + hCut : 0;   // 388b: obciecie liczone tylko, gdy sufit naprawde ciasny (nie roznice zaokraglen)
+                bool byPrison = free + (pPrison != null ? pFree : 0) <= def;
                 if (cut > 0) { if (byPrison) _dCutPrison += cut; else _dCutDef += cut; }
-                _dMoved += moved; _dHero += names.Count; _dSt += s;
+                // 391 (b): kogo nikt nie wzial, umiera pod murami; komplety ze zbrojowni DTE partii do zbrojowni zalogi (bitwa bez misji - DTE niczego nie rozliczyl)
+                var left = new Left391();
+                bool dieOn = set.SiegeWoundedLeftToDie;
+                MobileParty garrison = null;
+                if (dieOn)
+                {
+                    try { garrison = st.Town != null ? st.Town.GarrisonParty : null; } catch { garrison = null; }
+                    LeftToDie391(cands, garrison, left, ref s);
+                }
+                _dMoved += moved; _dHero += names.Count; _dSt += s; _dToPl += toPl; _dDied += left.Dead; _dKit += left.Kit;
                 bool mine = false;
                 try { mine = st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan; } catch { mine = false; }
                 if (mine && moved + names.Count > 0)
@@ -475,6 +605,16 @@ namespace Armoury
                     }
                     catch { }
                 }
+                if (toPl > 0)
+                    try { InformationManager.DisplayMessage(new InformationMessage((toPl == 1 ? "1 wounded attacker is" : toPl + " wounded attackers are") + " bound and taken along by your own party: the dungeon has no room left.", Color.FromUint(0xFF9ACD65u))); } catch { }
+                if ((mine || pPrison != null) && left.Dead > 0)
+                    try
+                    {
+                        string nm = st.Name != null ? st.Name.ToString() : st.StringId;
+                        InformationManager.DisplayMessage(new InformationMessage((left.Dead == 1 ? "1 wounded attacker nobody could take in is" : left.Dead + " wounded attackers nobody could take in are")
+                            + " left beneath the walls of " + nm + " to die of " + (left.Dead == 1 ? "his" : "their") + " wounds; the garrison strips " + (left.Dead == 1 ? "his" : "their") + " gear.", Color.FromUint(0xFF9ACD65u)));
+                    }
+                    catch { }
                 var tb = new StringBuilder();
                 foreach (var kv in types) tb.Append(tb.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
                 string owner = "-";
@@ -483,7 +623,11 @@ namespace Armoury
                          + " | rannych atakujacych w szturmie " + wounded + " (partii " + parties + ")" + (gone > 0 ? ", nie bylo juz wsrod rannych partii " + gone : "")
                          + (notTaken > 0 ? ", bez niewoli (typ) " + notTaken : "") + " | udzial " + share.ToString("0.00", CultureInfo.InvariantCulture) + " -> chce " + wantSum
                          + " | loch " + l0 + "/" + limit + ", wolne " + free + ", obroncow " + def + " -> sufit " + cap0 + " (skala " + k.ToString("0.00", CultureInfo.InvariantCulture) + ")"
-                         + " | do lochu " + moved + " (typy: " + (tb.Length > 0 ? tb.ToString() : "-") + ")" + (cut > 0 ? ", obciete " + cut + (byPrison ? " (loch)" : " (zaloga)") : "")
+                         + " | do lochu " + moved + (toPl > 0 || capP0 > 0 ? ", do druzyny gracza (391) " + toPl + " (wolne " + pFree + ", sufit " + capP0 + ")" : "")
+                         + " (typy: " + (tb.Length > 0 ? tb.ToString() : "-") + ")" + (cut > 0 ? ", obciete " + cut + (byPrison ? " (loch)" : " (zaloga)") : "")
+                         + " | 391 nadwyzka: " + (dieOn ? "zmarli pod murami " + left.Dead + " (partii " + left.Parties + ", typy: " + left.TypesText() + "), sprzet do zbrojowni zalogi "
+                             + left.Kit + " szt." + (garrison == null ? " (brak zalogi - zostaje w zbrojowniach partii)" : left.NoKit > 0 ? " (bez kompletu / bez DTE: " + left.NoKit + " ludzi)" : "")
+                             + (left.Undead > 0 ? ", Inni pominieci " + left.Undead : "") : "klucz NIE - wraca z partia")
                          + " | bohaterowie ranni " + hSeen + ": do lochu " + names.Count + " [" + string.Join(", ", names) + "], wodzowie pominieci (373b) " + hLeads + ", wyniesieni " + hStay
                          + ", poza regula " + hMissed + (hCut > 0 ? ", bez miejsca " + hCut : "") + " | loch po " + prison.TotalManCount + " | ksiega ludzi " + book.ToString("0", CultureInfo.InvariantCulture)
                          + " | partie oproznione " + emptied + (kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + kept : "") + " | potkniecia " + s + ".");
@@ -592,6 +736,7 @@ namespace Armoury
                 }
                 // 3. sufit jak 388 / 373c: wolne miejsce lochu (po bohaterach) i nie wiecej niz obroncow na nogach. Potkniecie = NIKT nie idzie (ostroznie wobec gracza)
                 int l1 = prison.TotalManCount, limit = 0, free = 0, def = 0, cap0 = 0;
+                bool limOk = true;   // 391: przy potknieciu sufitu nikt nie idzie do lochu I nikt nie umiera (ostroznie wobec gracza)
                 try
                 {
                     limit = captor.PrisonerSizeLimit;
@@ -599,7 +744,7 @@ namespace Armoury
                     def = Math.Max(0, me.DefenderSide.TroopCount);
                     cap0 = Math.Min(free, def);
                 }
-                catch (Exception e) { Stumble("387c.Limit", e, ref s); cap0 = 0; }
+                catch (Exception e) { Stumble("387c.Limit", e, ref s); cap0 = 0; limOk = false; }
                 int cap = cap0;
                 double k = wantSum > cap ? cap / (double)Math.Max(1, wantSum) : 1.0;
                 int moved = 0, mine = 0, ally = 0, emptied = 0, kept = 0;
@@ -628,6 +773,7 @@ namespace Armoury
                                 if (n <= 0) continue;
                                 mr.AddToCounts(troop, -n, false, -n);
                                 prison.AddToCounts(troop, n, false, n);
+                                c.Got += n;   // 391
                                 PlayerCaptives385d.Note(captor, pb, troop, n);   // 385d: rejestr zolnierzy gracza w niewoli (druzyna gracza i druzyny lordow jego rodu)
                                 moved += n; here += n; cap -= n;
                                 if (isMain) mine += n; else ally += n;
@@ -646,11 +792,20 @@ namespace Armoury
                 }
                 int cut = wantSum > cap0 ? Math.Max(0, wantSum - moved) : 0;
                 bool byPrison = free <= def;
+                // 391 (b), Jeff odp. 4 "kto padl tam zostaje": nadwyzka rannych gracza i sojusznikow ponad sufit nie wraca - umiera pod murami (obroncy to AI,
+                // druzyny gracza po tej stronie nie ma - punkt (a) tu nie dotyczy). Sprzet: lup z pola DTE z misji (patrz opis 391), bez drugiego zdejmowania.
+                var left = new Left391();
+                bool dieOn = set.SiegeWoundedLeftToDie && limOk;
+                if (dieOn) LeftToDie391(cands, null, left, ref s);
                 Color red = Color.FromUint(0xFFE06050u);
                 if (mine > 0)
                     try { InformationManager.DisplayMessage(new InformationMessage(mine == 1 ? "1 of your wounded left beneath the walls of " + stName + " is taken prisoner." : mine + " of your wounded left beneath the walls of " + stName + " are taken prisoner.", red)); } catch { }
                 if (ally > 0)
                     try { InformationManager.DisplayMessage(new InformationMessage(ally == 1 ? "1 wounded of your allies left beneath the walls of " + stName + " is taken prisoner." : ally + " wounded of your allies left beneath the walls of " + stName + " are taken prisoner.", red)); } catch { }
+                if (left.Mine > 0)
+                    try { InformationManager.DisplayMessage(new InformationMessage((left.Mine == 1 ? "1 of your wounded is" : left.Mine + " of your wounded are") + " left where " + (left.Mine == 1 ? "he" : "they") + " fell beneath the walls of " + stName + ": stripped by the defenders, " + (left.Mine == 1 ? "he dies of his" : "they die of their") + " wounds.", red)); } catch { }
+                if (left.Ally > 0)
+                    try { InformationManager.DisplayMessage(new InformationMessage((left.Ally == 1 ? "1 wounded of your allies is" : left.Ally + " wounded of your allies are") + " left beneath the walls of " + stName + " and " + (left.Ally == 1 ? "dies of his" : "die of their") + " wounds.", red)); } catch { }
                 var tb = new StringBuilder();
                 foreach (var kv in types) tb.Append(tb.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
                 Log.Info("Ranni pod murami (387c): dzien " + (int)CampaignTime.Now.ToDays + " | osada " + t.St + " | gracz atakowal, szturm odparty: " + t.LastWhy
@@ -658,7 +813,10 @@ namespace Armoury
                          + (notTaken > 0 ? ", bez niewoli (typ) " + notTaken : "") + " -> chce " + wantSum
                          + " | loch po bohaterach " + l1 + "/" + limit + ", wolne " + free + ", obroncow " + def + " -> sufit " + cap0 + " (skala " + k.ToString("0.00", CultureInfo.InvariantCulture) + ")"
                          + " | do lochu " + moved + ": gracz " + mine + ", sojusznicy " + ally + " (typy: " + (tb.Length > 0 ? tb.ToString() : "-") + ")"
-                         + (cut > 0 ? ", obciete " + cut + (byPrison ? " (loch)" : " (zaloga)") + " - wracaja z partia" : "")
+                         + (cut > 0 ? ", obciete " + cut + (byPrison ? " (loch)" : " (zaloga)") : "")
+                         + " | 391 nadwyzka: " + (dieOn ? "zmarli pod murami " + left.Dead + " (gracz " + left.Mine + ", sojusznicy " + left.Ally + "; typy: " + left.TypesText() + "), sprzet - lup z pola DTE z misji"
+                             + (left.Kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + left.Kept : "") + (left.Undead > 0 ? ", Inni pominieci " + left.Undead : "")
+                             : (set.SiegeWoundedLeftToDie ? "potkniecie sufitu - nikt nie umiera" : "klucz NIE") + " - wracaja z partia")
                          + " | bohaterowie: do lochu " + names.Count + " [" + string.Join(", ", names) + "], rodu / towarzysze gracza " + own.Count + " [" + string.Join(", ", own) + "]"
                          + ", wyniesieni (klucz towarzyszy " + (comp ? "TAK" : "NIE") + ") " + hKept + ", wodzowie pominieci (373b) " + hLeads + ", poza regula " + hMissed
                          + " | loch " + l0 + " -> " + prison.TotalManCount + " | ksiega ludzi " + book.ToString("0", CultureInfo.InvariantCulture)
@@ -770,57 +928,100 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Limit", e, ref s); lim = false; cap0 = int.MaxValue; }   // bez sufitu jak przed 373c, potkniecie w logu
                 }
-                int cap = cap0;
-                double k = wantSum > cap ? cap / (double)Math.Max(1, wantSum) : 1.0;   // ta sama skala dla wszystkich partii
+                // 391 (a): loch pelny - nadwyzke bierze druzyna gracza-obroncy do swojego limitu jencow; lacznie nadal nie wiecej niz obroncow na nogach
+                TroopRoster pPrison = null;
+                int pFree = 0, capP0 = 0;
+                if (lim && set.SiegeWoundedPlayerTakesOverflow)
+                {
+                    try { pFree = PlayerRoom391(out pPrison); capP0 = pPrison != null ? Math.Max(0, Math.Min(pFree, def - cap0)) : 0; }
+                    catch (Exception e) { Stumble("PlayerRoom", e, ref s); pPrison = null; pFree = 0; capP0 = 0; }
+                }
+                int cap = cap0, capP = capP0;
+                long room0 = (long)cap0 + capP0;   // cap0 = int.MaxValue przy wylaczonym sufcie
+                double k = wantSum > room0 ? room0 / (double)Math.Max(1, wantSum) : 1.0;   // ta sama skala dla wszystkich partii
+                int toPl = 0;
                 foreach (var kv in cands)
                 {
-                    if (cap <= 0) break;
+                    if (cap <= 0 && capP <= 0) break;
                     var pb = kv.Key;
                     try
                     {
                         var mr = pb.MemberRoster;
-                        int from0 = PeopleBook.Men(mr), to0 = PeopleBook.Men(prison), here = 0;
+                        int from0 = PeopleBook.Men(mr), to0 = PeopleBook.Men(prison), toP0 = pPrison != null ? PeopleBook.Men(pPrison) : 0, here = 0, hereP = 0;
                         bool noLead = pb.LeaderHero == null;
                         foreach (var c in kv.Value)
                         {
                             try
                             {
-                                if (cap <= 0) break;
+                                if (cap <= 0 && capP <= 0) break;
                                 var troop = c.Troop;
                                 int n = k < 1.0 ? Math.Min(c.Want, MBRandom.RoundRandomized((float)(c.Want * k))) : c.Want;
                                 int idx = mr.FindIndexOfTroop(troop);
-                                n = Math.Min(Math.Min(n, cap), idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0);
+                                n = Math.Min(Math.Min(n, (int)Math.Min((long)Math.Max(0, cap) + Math.Max(0, capP), int.MaxValue)), idx >= 0 ? mr.GetElementWoundedNumber(idx) : 0);
                                 if (noLead && mr.TotalManCount - n <= 0) { n = mr.TotalManCount - 1; kept++; }   // 373c-p: partia bez wodza nie zostaje pusta (jak 388 / 387c)
                                 if (n <= 0) continue;
+                                int nD = Math.Min(n, Math.Max(0, cap)), nP = n - nD;   // 391: najpierw loch, nadwyzka do druzyny gracza
                                 mr.AddToCounts(troop, -n, false, -n);
-                                prison.AddToCounts(troop, n, false, n);
-                                PlayerCaptives385d.Note(captor, pb, troop, n);   // 385d: rejestr (gracz-obronca bierze cudzych - Note liczy tylko partie gracza, tu zwykle nic)
-                                moved += n; here += n; cap -= n;
-                                SiegeSpoils380.NotePrisoners(me, captor, troop, n);   // 380: ci jency do wyboru w oknie jencow (tylko faktycznie przeniesieni)
+                                c.Got += n;
+                                if (nD > 0)
+                                {
+                                    prison.AddToCounts(troop, nD, false, nD);
+                                    PlayerCaptives385d.Note(captor, pb, troop, nD);   // 385d: rejestr (gracz-obronca bierze cudzych - Note liczy tylko partie gracza, tu zwykle nic)
+                                    moved += nD; here += nD; cap -= nD;
+                                    SiegeSpoils380.NotePrisoners(me, captor, troop, nD);   // 380: ci jency do wyboru w oknie jencow (tylko faktycznie przeniesieni do lochu)
+                                }
+                                if (nP > 0) { pPrison.AddToCounts(troop, nP, false, nP); toPl += nP; hereP += nP; capP -= nP; }   // 391: prosto do jencow druzyny (poza oknem 380)
                                 string id = troop.StringId;
                                 int c0; types.TryGetValue(id, out c0); types[id] = c0 + n;
                             }
                             catch (Exception e) { Stumble("Troop", e, ref s); }
                         }
-                        if (here > 0)
+                        if (here + hereP > 0)
                         {
-                            try { book += PeopleBook.Transfer(mr, from0, prison, to0, PeopleBook.FCaptured); } catch (Exception e) { Stumble("Book", e, ref s); }
+                            try
+                            {
+                                if (here > 0) book += PeopleBook.Transfer(mr, from0, prison, to0, PeopleBook.FCaptured);
+                                if (hereP > 0) book += PeopleBook.Transfer(mr, from0 - here, pPrison, toP0, PeopleBook.FCaptured);   // 391: reszta ubytku partii = jency druzyny gracza
+                            }
+                            catch (Exception e) { Stumble("Book", e, ref s); }
                             if (pb.NumberOfAllMembers == 0) emptied++;
                         }
                     }
                     catch (Exception e) { Stumble("Move", e, ref s); }
                 }
-                int cut = lim && wantSum > cap0 ? Math.Max(0, wantSum - moved) : 0;   // nadwyzka wraca ze swoja partia jak w grze (nikt jej nie rusza)
-                bool byPrison = free <= def;
-                // 373c-p: najpierw wzieci, potem odniesieni ("more" tylko wtedy, gdy linia o wzietych padla)
+                int cut = lim && wantSum > room0 ? Math.Max(0, wantSum - moved - toPl) : 0;   // nadwyzka ponad sufit
+                bool byPrison = free + (pPrison != null ? pFree : 0) <= def;
+                // 391 (b): nadwyzka nie wraca ze swoja partia - umiera pod murami. Sprzet: lup z pola DTE z misji (patrz opis 391) - dzialka gracza w oknie 380
+                var left = new Left391();
+                bool dieOn = lim && set.SiegeWoundedLeftToDie;
+                if (dieOn) LeftToDie391(cands, null, left, ref s);
+                int back = Math.Max(0, cut - left.Dead);   // klucz NIE / partia bez wodza / Inni - wracaja z partia jak dotad
+                // 373c-p: najpierw wzieci, potem reszta ("more" tylko wtedy, gdy linia o wzietych padla)
+                Color green = Color.FromUint(0xFF9ACD65u);
                 if (moved > 0)
-                    try { InformationManager.DisplayMessage(new InformationMessage(moved == 1 ? "1 wounded attacker left beneath the walls is taken prisoner." : moved + " wounded attackers left beneath the walls are taken prisoner.", Color.FromUint(0xFF9ACD65u))); } catch { }
-                if (cut > 0)
+                    try { InformationManager.DisplayMessage(new InformationMessage(moved == 1 ? "1 wounded attacker left beneath the walls is taken prisoner." : moved + " wounded attackers left beneath the walls are taken prisoner.", green)); } catch { }
+                if (toPl > 0)
                     try
                     {
                         string more = moved > 0 ? " more" : "";
-                        InformationManager.DisplayMessage(new InformationMessage((cut == 1 ? "1" + more + " wounded attacker is carried back by his army: " : cut + more + " wounded attackers are carried back by their army: ")
-                            + (byPrison ? "the dungeon has no room left." : "too few defenders are left standing to bring them in."), Color.FromUint(0xFF9ACD65u)));
+                        InformationManager.DisplayMessage(new InformationMessage((toPl == 1 ? "1" + more + " wounded attacker is" : toPl + more + " wounded attackers are")
+                            + " bound and taken along by your own party: the dungeon has no room left.", green));
+                    }
+                    catch { }
+                string why = byPrison ? (lim && set.SiegeWoundedPlayerTakesOverflow ? "neither the dungeon nor your party has room left." : "the dungeon has no room left.") : "too few defenders are left standing to bring them in.";
+                if (left.Dead > 0)
+                    try
+                    {
+                        string more = moved + toPl > 0 ? " more" : "";
+                        InformationManager.DisplayMessage(new InformationMessage((left.Dead == 1 ? "1" + more + " wounded attacker is left beneath the walls to die of his wounds, stripped of his gear: "
+                            : left.Dead + more + " wounded attackers are left beneath the walls to die of their wounds, stripped of their gear: ") + why, green));
+                    }
+                    catch { }
+                if (back > 0)
+                    try
+                    {
+                        string more = moved + toPl + left.Dead > 0 ? " more" : "";
+                        InformationManager.DisplayMessage(new InformationMessage((back == 1 ? "1" + more + " wounded attacker is carried back by his army: " : back + more + " wounded attackers are carried back by their army: ") + why, green));
                     }
                     catch { }
                 var tb = new StringBuilder();
@@ -829,7 +1030,11 @@ namespace Armoury
                          + " [" + string.Join(", ", names) + "]" + (hMissed > 0 ? " (pominieci " + hMissed + ")" : "") + " | wodzowie partii pominieci (373b) " + hLeads
                          + " | zapisanych " + saved + ", nie bylo juz wsrod rannych partii " + missing + (notTaken > 0 ? ", bez niewoli (typ) " + notTaken : "")
                          + " | sufit 373c " + (lim ? "chce " + wantSum + ", loch po bohaterach " + l1 + "/" + limit + ", wolne " + free + ", obroncow " + def + " -> sufit " + cap0
-                             + " (skala " + k.ToString("0.00", CultureInfo.InvariantCulture) + ")" + (cut > 0 ? ", obciete " + cut + (byPrison ? " (loch)" : " (zaloga)") + " - wracaja z partia" : "")
+                             + (capP0 > 0 || toPl > 0 ? ", druzyna gracza (391): wolne " + pFree + ", sufit " + capP0 + ", wzieci " + toPl : "")
+                             + " (skala " + k.ToString("0.00", CultureInfo.InvariantCulture) + ")" + (cut > 0 ? ", obciete " + cut + (byPrison ? " (loch)" : " (zaloga)") : "")
+                             + " | 391 nadwyzka: " + (dieOn ? "zmarli pod murami " + left.Dead + " (partii " + left.Parties + ", typy: " + left.TypesText() + "), sprzet - lup z pola DTE z misji"
+                                 + (left.Kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + left.Kept : "") + (left.Undead > 0 ? ", Inni pominieci " + left.Undead : "") + (back > 0 ? ", wraca z partia " + back : "")
+                                 : "klucz NIE - wraca z partia " + back)
                              : "wylaczony (chce " + wantSum + ")")
                          + " | loch " + l0 + " -> " + prison.TotalManCount + " | ksiega ludzi " + book.ToString("0", CultureInfo.InvariantCulture)
                          + " | partie oproznione " + emptied + (kept > 0 ? ", bez wodza - zostawiony 1 czlowiek " + kept : "") + " | potkniecia " + s + ".");
