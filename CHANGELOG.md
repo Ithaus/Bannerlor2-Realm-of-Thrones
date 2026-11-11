@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 392-p (11.11) - POPRAWKI PO RECENZJI 392: bohater nie jest brany jako ostatni czlowiek partii bez wodza; dopisek o skutku w lochu gracza (SiegeWounded373.cs Sim388; bez kluczy MCM; na 391-p, NIE WGRANE)
+
+**Problem:** dwie recenzje 392 - bez zarzutow krytycznych i srednich, same NISKIE. (1) straznik "partia bez wodza nie zostaje pusta" dotyczyl tylko zolnierzy - bohater-nie-wodz z partii bez wodza byl brany bez sprawdzenia, a od 392 ta galaz biegnie takze przy pelnym lochu. (2) "Ryzyko" wpisu 392 nie mowilo o skutku w twierdzy GRACZA. Z kodu, w grze nie ogladane.
+
+**Przyczyna:** petla bohaterow Sim388 nie miala odpowiednika straznicy noLead z petli zolnierzy.
+
+**Zmiana:** w petli bohaterow Sim388: bohater, ktorego partia nie ma wodza i liczy <= 1 czlowieka, zostaje (licznik "wyniesieni"). UZUPELNIENIE "Ryzyko" 392: w twierdzy gracza gra co dobe sprzedaje szeregowych jencow ponad limit lochu (cs_full 202839: TotalManCount - PrisonerSizeLimit, od najnizszego tieru, SellPrisonersAction) - kazdy lord wziety ponad limit wypycha nastepnej doby jednego zwyklego jenca na sprzedaz (nie w nicosc; twierdze AI sprzedaja 10% na dobe niezaleznie od limitu). To samo dzialalo juz po 373c / 387c. ODRZUCONE: osobny klucz-wylacznik dla "lordowie bez limitu" (373c / 387c tez go nie maja - jedna zasada; cofniecie = Siege Wounded Simulated NIE); zanizony licznik przy wyjatku nasluchu OnHeroPrisonerTaken (stan sprzed 392, slad w potknieciu "Sim388.Hero"). Opis klucza Siege Wounded Simulated o bohaterach rodu gracza - w 394-p. ODLOZONE: ta sama straznica dla bohaterow w 373c / 387c (poza recenzja; tam partia ma zwykle wodza).
+
+**Ryzyko / co sprawdzic:** Build 0 bledow; w grze NIE sprawdzone. Dotyka tylko skrajnego przypadku (partia AI bez wodza z rannym bohaterem jako ostatnim czlowiekiem); przy liscie bohaterow pustej - bez roznicy. Nie sprawdzone, czy w symulacji w ogole trafia sie ranny bohater-nie-wodz (galaz moze w praktyce nie odpalac) - linia "Ranni pod murami (388) ... bohaterowie ranni N".
+
+**Status:** DO SPRAWDZENIA
+
 ## 391-p (11.11) - POPRAWKI PO RECENZJI 391: potkniecie albo zaokraglenie przenosin nie zabija rannych (druga tura dopelnienia, partie z potknieciem poza zgonami), komunikat i log o sprzecie zgodne z tym, co DTE zrobil przy odwrocie recznym, komunikat dla partii rodu gracza, liczniki i opisy (SiegeWounded373.cs, Settings.cs, McmSettings.cs; bez nowych kluczy, domyslne bez zmian; na 390-p, NIE WGRANE)
 
 **Problem:** dwie recenzje 391, bez krytycznych. SREDNI (stabilnosc): LeftToDie391 zabijal KAZDA roznice Want - Got, takze gdy powstala z (a) wyjatku w petli przenosin (cala partia / typ z Got = 0 umieral, choc loch mial miejsce - odwrotnosc zasady "potkniecie = zostaje jak bylo"; dotyczylo tez rannych GRACZA w 387c), (b) losowego zaokraglenia skali (suma RoundRandomized ponizej sufitu - ludzie umierali przy 1-3 wolnych miejscach). SREDNI (logika): przy ODWROCIE RECZNYM gracza komunikat "stripped by the defenders" i log "sprzet - lup z pola DTE" mowily nieprawde - DTE bez rozstrzygnietego wyniku oddaje sprzet powalonych ich partiom (dte.cs 2919-2968, 3088-3107). NISKIE: typy w logu "do lochu" lacznie z druzyna gracza bez opisu; licznik "zostawiony 1 czlowiek" podwojny; komunikat 388 o zdzieraniu takze bez zbrojowni; cicha smierc rannych partii rodu gracza w 388; opis klucza; kolejnosc pol w Settings.cs; brak licznika Kept w linii 388. Wszystko z kodu, w grze nie ogladane.

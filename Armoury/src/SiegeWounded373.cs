@@ -530,6 +530,9 @@ namespace Armoury
                 {
                     try
                     {
+                        // 392-p: partia bez wodza nie zostaje pusta takze przez wziecie bohatera (jak zolnierze: zostaje 1 czlowiek) - od 392 ta galaz biegnie zawsze
+                        var hp2 = h.PartyBelongedTo;
+                        if (hp2 != null && hp2.LeaderHero == null && hp2.MemberRoster.TotalManCount <= 1) { hStay++; continue; }
                         TakePrisonerAction.Apply(captor, h);
                         names.Add(h.Name != null ? h.Name.ToString() : h.StringId);
                     }
