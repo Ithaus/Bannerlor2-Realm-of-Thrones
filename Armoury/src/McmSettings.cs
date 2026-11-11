@@ -11852,6 +11852,26 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: defenders drop stones from the walls (383)")]
         public bool SiegeDefendersUseStones { get; set; } = true;
 
+        [SettingPropertyBool("Story Guard", HintText = "Story Guard: characters the Realm of Thrones storyline still needs cannot die before their event. Once the event has happened, or can never happen, they are as mortal as anyone. Off = no protection.", RequireRestart = false)]
+        [SettingPropertyGroup("Story Guard: Realm of Thrones story characters live until their event (396)")]
+        public bool StoryGuard { get; set; } = true;
+
+        [SettingPropertyBool("Story Guard Battle And Age", HintText = "With Story Guard: story characters cannot die in battle, of wounds, of old age or in childbirth before their event - they fall wounded and can be captured instead.", RequireRestart = false)]
+        [SettingPropertyGroup("Story Guard: Realm of Thrones story characters live until their event (396)")]
+        public bool StoryGuardBattleAndAge { get; set; } = true;
+
+        [SettingPropertyBool("Story Guard Executions", HintText = "With Story Guard: story characters cannot be executed or murdered before their event, except by the event that is meant to kill them. Your own headsman is refused as well.", RequireRestart = false)]
+        [SettingPropertyGroup("Story Guard: Realm of Thrones story characters live until their event (396)")]
+        public bool StoryGuardExecutions { get; set; } = true;
+
+        [SettingPropertyInteger("Story Guard Grace Days", 0, 3640, "0", HintText = "With Story Guard: days after an event's planned date before its characters are released anyway. 0 = they wait for the event forever.", RequireRestart = false)]
+        [SettingPropertyGroup("Story Guard: Realm of Thrones story characters live until their event (396)")]
+        public int StoryGuardGraceDays { get; set; } = 364;
+
+        [SettingPropertyBool("Story Guard Roose Survives Red Wedding", HintText = "With Story Guard: Roose Bolton survives the Red Wedding, so the later Bolton events can still happen. Off = Realm of Thrones kills him there, as it does without this mod.", RequireRestart = false)]
+        [SettingPropertyGroup("Story Guard: Realm of Thrones story characters live until their event (396)")]
+        public bool StoryGuardRooseSurvivesRedWedding { get; set; } = true;
+
         [SettingPropertyBool("Caravan Sea True Distance", HintText = "A caravan with ships weighs the ports it could sail to by the real length of the sea voyage, not by the road it cannot take, takes a voyage longer than Caravan Sea Near Days only when it pays more per day than the best port within reach, and takes a merchant's order for materials only when the profit covers its wages and food for the days of the trip. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Caravans with ships: destination by profit per day of the real sea voyage (308a)")]
         public bool CaravanSeaTrueDistance { get; set; } = true;
@@ -15014,6 +15034,11 @@ namespace Armoury
             s.SiegeJoinedAssaultBreaks = SiegeJoinedAssaultBreaks;
             s.SiegeAllyLordsStayBack = SiegeAllyLordsStayBack;
             s.SiegeDefendersUseStones = SiegeDefendersUseStones;
+            s.StoryGuard = StoryGuard;
+            s.StoryGuardBattleAndAge = StoryGuardBattleAndAge;
+            s.StoryGuardExecutions = StoryGuardExecutions;
+            s.StoryGuardGraceDays = StoryGuardGraceDays;
+            s.StoryGuardRooseSurvivesRedWedding = StoryGuardRooseSurvivesRedWedding;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;
             s.BannerBreakEarly = BannerBreakEarly;

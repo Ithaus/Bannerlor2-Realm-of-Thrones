@@ -2554,6 +2554,7 @@ namespace Armoury
             try { CampScene.StartLine(); } catch (Exception e) { Log.Error("CampScene.StartLine", e); }   // E7/O2 (229): linia startowa "CampScene (E7/O2)" - prefaby obozu sprawdzone raz na proces (PrefabExists), tylko przy CampBattlePropsEnabled
             try { StateHygiene.SessionStart(); } catch (Exception e) { Log.Error("StateHygiene.SessionStart", e); }   // E8/S (246): linia startowa "Porzadek stanu (E8/S)" - ile klas wyzerowal konstruktor tej kampanii i co zostalo w pamieci po poprzedniej (tylko log)
             try { Seal31.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31.EnsureHooks", e); }   // 3.1 (31): latki w kampanii (portfele wezwan, modele karawan, DTE) - PO CrownCallToWar i oknach ksiegi
+            try { StoryGuard.SessionStart(); } catch (Exception e) { Log.Error("StoryGuard.SessionStart", e); }   // 396: straz fabuly - pamiec od zera (lista budowana leniwie, linia startu przy pierwszym przeliczeniu)
             try { SiegePhantomLift.SessionStart(); } catch (Exception e) { Log.Error("SiegePhantomLift.SessionStart", e); }   // OB6 (noc-drobne): linia "Oboz bez sily (OB6): start sesji", pamiec serii od zera
             try { SiegeWalls.SessionStart(); } catch (Exception e) { Log.Error("SiegeWalls.SessionStart", e); }   // mury oblezen: linia startowa (modele, latki, wlasciciele latek Harmony) - PO Seal31.EnsureHooks
             try { DebtLadder.EnsureHooks(); } catch (Exception e) { Log.Error("DebtLadder.EnsureHooks", e); }   // 168: portfele gry bez zaliczki (OBIEG-1), B5 (karawany i warsztaty BK) - latki w kampanii
@@ -2876,6 +2877,7 @@ namespace Armoury
         {
             try { Cost174.Daily(); } catch (Exception e) { Log.Error("Cost174.Daily", e); } DayProfile.Lap("Cost174.Daily");   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
             try { PerfD2.Daily(); } catch (Exception e) { Log.Error("PerfD2.Daily", e); } DayProfile.Lap("PerfD2.Daily");   // perf-d2d3: linia "Szybkosc doby (perf-d2d3)" za okres od poprzedniego taktu (tylko log) i straznik podatku miast raz na dobe   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
+            try { StoryGuard.Daily(); } catch (Exception e) { Log.Error("StoryGuard.Daily", e); } DayProfile.Lap("StoryGuard.Daily");   // 396: straz fabuly PIERWSZA w dobie (przed zaraza, murami, lochem) - przeliczenie 32 postaci, linia doby tylko gdy cos zaszlo
             try { CampFever.OnDaily(); } catch (Exception e) { Log.Error("CampFever", e); } DayProfile.Lap("CampFever.OnDaily");
             try { RecruitKit.Reconcile("doba"); } catch (Exception e) { Log.Error("RecruitKit.Reconcile", e); } DayProfile.Lap("RecruitKit.Reconcile");   // 161: komplety bez ochotnika w puli (sieroty)
             // audyt predkosci STAD, nie z postfixa - w postfixie SpeedExplained

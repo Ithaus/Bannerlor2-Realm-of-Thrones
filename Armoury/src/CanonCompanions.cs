@@ -1046,31 +1046,14 @@ namespace Armoury
         private static bool _evTypeTried;
 
         /// <summary>-1 = nie widac listy wydarzen ROT albo tego wydarzenia, 0 = czeka, 1 = trwa (IsActive), 2 = zakonczone (TotalEvents &gt; 0).</summary>
-        private static int EventState(string typeName)
+        internal static int EventState(string typeName)   // 396: internal - czyta tez StoryGuard (straz fabuly)
         {
             int cached;
             if (_evDay.TryGetValue(typeName, out cached)) return cached;
             int r = -1;
             try
             {
-                if (_evBeh == null || _evCamp != Campaign.Current)
-                {
-                    _evCamp = Campaign.Current;
-                    _evBeh = null;
-                    var tBeh = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTEventBehavior");
-                    if (tBeh != null && Campaign.Current != null)
-                    {
-                        var mi = typeof(Campaign).GetMethod("GetCampaignBehavior");
-                        if (mi != null) _evBeh = mi.MakeGenericMethod(tBeh).Invoke(Campaign.Current, null);
-                        if (_fEvents == null) _fEvents = AccessTools.Field(tBeh, "_events");
-                    }
-                    if (!_evTypeTried)
-                    {
-                        _evTypeTried = true;
-                        var tBase = AccessTools.TypeByName("ROT.Events.EventBase");
-                        if (tBase != null) { _pTotal = AccessTools.Property(tBase, "TotalEvents"); _pActive = AccessTools.Property(tBase, "IsActive"); }
-                    }
-                }
+                EnsureEventAccess();
                 var list = _evBeh != null && _fEvents != null ? _fEvents.GetValue(_evBeh) as System.Collections.IEnumerable : null;
                 if (list != null && _pTotal != null && _pActive != null)
                 {
@@ -1088,6 +1071,69 @@ namespace Armoury
             _evDay[typeName] = r;
             return r;
         }
+
+        /// <summary>Uchwyty odbicia listy wydarzen ROT (zachowanie kampanii, pole _events, wlasciwosci TotalEvents / IsActive) - raz na kampanie.
+        /// 396: wydzielone z EventState bez zmiany tresci (wola je tez EventObjects). Wyjatek idzie do wolajacego.</summary>
+        private static void EnsureEventAccess()
+        {
+            if (_evBeh == null || _evCamp != Campaign.Current)
+            {
+                _evCamp = Campaign.Current;
+                _evBeh = null;
+                var tBeh = AccessTools.TypeByName("ROT.CampaignBehaviors.ROTEventBehavior");
+                if (tBeh != null && Campaign.Current != null)
+                {
+                    var mi = typeof(Campaign).GetMethod("GetCampaignBehavior");
+                    if (mi != null) _evBeh = mi.MakeGenericMethod(tBeh).Invoke(Campaign.Current, null);
+                    if (_fEvents == null) _fEvents = AccessTools.Field(tBeh, "_events");
+                }
+                if (!_evTypeTried)
+                {
+                    _evTypeTried = true;
+                    var tBase = AccessTools.TypeByName("ROT.Events.EventBase");
+                    if (tBase != null) { _pTotal = AccessTools.Property(tBase, "TotalEvents"); _pActive = AccessTools.Property(tBase, "IsActive"); }
+                }
+            }
+        }
+
+        /// <summary>396 (StoryGuard): obiekty wydarzen ROT na zywo, nazwa typu -> obiekt (bez pamieci dobowej _evDay). Zwraca liczbe wydarzen na liscie,
+        /// -1 = listy nie widac (brak ROT, odbicie padlo). Lista pusta (nowa kampania przed OnSessionLaunched ROT albo ROTSettings.Events NIE) = 0.</summary>
+        internal static int EventObjects(Dictionary<string, object> into)
+        {
+            if (into != null) into.Clear();
+            try
+            {
+                EnsureEventAccess();
+                var list = _evBeh != null && _fEvents != null ? _fEvents.GetValue(_evBeh) as System.Collections.IEnumerable : null;
+                if (list == null || _pTotal == null || _pActive == null) return -1;
+                int n = 0;
+                foreach (var ev in list)
+                {
+                    if (ev == null) continue;
+                    n++;
+                    if (into != null) into[ev.GetType().Name] = ev;
+                }
+                return n;
+            }
+            catch (Exception e) { Stumble("EventObjects", e); return -1; }
+        }
+
+        /// <summary>396 (StoryGuard): IsActive wydarzenia ROT czytane NA ZYWO z obiektu (ROT zabija w tej samej dobie, w ktorej wlacza wydarzenie - pamiec dobowa
+        /// powiedzialaby "czeka"). Wyjatek idzie do wolajacego (StoryGuard liczy potkniecie i nie wetuje).</summary>
+        internal static bool EventActiveLive(object ev)
+        {
+            return ev != null && _pActive != null && Convert.ToBoolean(_pActive.GetValue(ev, null), Inv);
+        }
+
+        /// <summary>396 (StoryGuard): termy z listy chronionych (ev:X / done:X) dla id bohatera; null - poza lista. Tablica tylko do odczytu.</summary>
+        internal static string[] GuardedTerms(string id)
+        {
+            string[] ev;
+            return id != null && Guarded.TryGetValue(id, out ev) ? ev : null;
+        }
+
+        /// <summary>396 (StoryGuard): id bohaterow z listy chronionych (32).</summary>
+        internal static IEnumerable<string> GuardedIds { get { return Guarded.Keys; } }
 
         // ------------------------------------------------------------ wyszukiwanie
         private static Hero FindHeroId(string id)

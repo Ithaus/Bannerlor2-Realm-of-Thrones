@@ -368,6 +368,8 @@ namespace Armoury
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, OnNewGameCreated);
             CampaignEvents.OnNewGameCreatedPartialFollowUpEndEvent.AddNonSerializedListener(this, OnNewGameCreatedEnd);
             CampaignEvents.CanHeroDieEvent.AddNonSerializedListener(this, Prologue.CanHeroDie);
+            CampaignEvents.CanHeroDieEvent.AddNonSerializedListener(this, StoryGuard.CanHeroDie);             // 396: straz fabuly - weto smierci postaci, ktorych wydarzenia ROT jeszcze potrzebuja (nigdy nie ustawia true)
+            CampaignEvents.BeforeHeroKilledEvent.AddNonSerializedListener(this, StoryGuard.BeforeHeroKilled); // 396: chroniony ginie mimo strazy (droga wymuszona / Lost) - linia UTRATA
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, OnSessionLaunched);
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDaily);
             // m104-e5: sceny zmieniajace swiat - partie scen (flaga "bez nowych decyzji" poza zapisem gry, odbudowa po wczytaniu, ukrycie przed AI)
