@@ -67,6 +67,8 @@ namespace Armoury
             Part(sb, "zuzyta bron (413)", RoutHold.SiteBanner, () => WornBlade413.ApplyInCampaign(_h));   // 413: postfiks na wspolczynnik obrazen RBM (cztery metody)
             sb.Append(" | ");
             Part(sb, "szyja, barki, lezacy (415)", RoutHold.SiteBanner, () => NeckGuard415.ApplyInCampaign(_h));   // 415: postfiks na pancerz czesci ciala RBM + prefiks przed RBM na ComputeBlowDamage
+            sb.Append(" | ");
+            Part(sb, "premia wypoczetego (416)", RoutHold.SiteBanner, () => RestedArmor416.ApplyInCampaign(_h));   // 416: prefiks przed RBM na ComputeBlowDamage - pancerz / mnoznik wypoczetego
             sb.Append('.');
             Log.Info(sb.ToString());
         }

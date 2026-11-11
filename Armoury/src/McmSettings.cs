@@ -540,6 +540,10 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float ProneArmorPercent { get; set; } = 50f;
 
+        [SettingPropertyBool("Rested Armour Bonus Removed", HintText = "With Realistic Battle Mod: takes away the hidden armour bonus of a rested man. Realistic Battle Mod multiplies the armour of anyone whose stamina bar is above 70 percent, up to 1.3 times at a full bar, so in the first minutes of every battle everybody is almost a third tougher - and with our doubled stamina that lasts twice as long. On = armour counts the same for a fresh and a tired man (with the lowered Realistic Battle Mod thresholds from tools/rbm_config_combat.py a broadhead arrow from a 100 lb bow wounds a fresh man in a light leather coat for 27 instead of 6, a javelin a fresh man in a gambeson for 45 instead of 10; mail and plate still hold). A tired man strikes weaker as before. A hit under the arm keeps the bonus. Off = as before this change. The same rule for you and for the AI. Counted in the Armoury log at the end of every fight (line 416).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool RestedArmorBonusRemoved { get; set; } = true;
+
         [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ArmorPoolMinPoints { get; set; } = 40;
@@ -12490,6 +12494,7 @@ namespace Armoury
             s.NeckFromHelmetShare = NeckFromHelmetShare;
             s.ShoulderFromBodyShare = ShoulderFromBodyShare;
             s.ProneArmorPercent = ProneArmorPercent;
+            s.RestedArmorBonusRemoved = RestedArmorBonusRemoved;
             s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;

@@ -733,6 +733,9 @@ namespace Armoury
                 // 415: szyja / barki z helmu i pancerza tulowia, lezacy - liczniki trafien wedlug czesci ciala i linia "Szyja i barki (415): koniec misji"
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new NeckGuard415.Logic());
+                // 416: premia pancerza wypoczetego (RBM x1.0-1.3) - liczniki ciosow w wypoczetych / zmeczonych i linia "Wypoczety (416): koniec misji"
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new RestedArmor416.Logic());
                 if (Settings.Current.HitScribeEnabled && mission != null)
                     mission.AddMissionBehavior(new HitScribe());
                 if (Settings.Current.AutoParryEnabled && mission != null)
