@@ -431,7 +431,7 @@ namespace Armoury
             // ktora idzie przez ApplyByBarter i karawan nie rusza). Gra wyprowadzila je juz sama (PartyDiplomaticHandler przy zmianie pana) - tu tylko ochrona
             // na drodze jak lordowie w LeadOutLords (IgnoreForHours - samo pole czasu, kolejnosc wobec wyjazdu bez znaczenia) i licznik. Zdrada: Ceded = false.
             bool ceded = sn.Ceded && SpareOn;
-            int cededFree = 0, cededFreePlayer = 0;
+            int cededFree = 0, cededFreePlayer = 0, cededStay = 0;
             if (sn.Ceded) { CededSt = st.StringId; CededFree = -1; CededFreePlayer = 0; }
             if (taken && ceded)
             {
@@ -442,7 +442,8 @@ namespace Armoury
                         if (c == null || !c.IsActive || c.MapEvent != null) continue;
                         var fNow = c.MapFaction;
                         if (fNow == null || !fNow.IsAtWarWith(sn.WinF)) continue;       // karawana kupca oddanej osady - poddana nowego pana, zostaje
-                        c.IgnoreForHours(CededIgnoreHours);
+                        if (!c.ShouldBeIgnored) c.IgnoreForHours(CededIgnoreHours);     // 374c-p: nie skracac dluzszej ochrony (karawana zadania gry)
+                        if (c.CurrentSettlement != null) { cededStay++; continue; }      // 374c-p: cudza latka zatrzymala wyjazd - nie liczyc jako wolnej, slad w logu
                         cededFree++;
                         if (c.ActualClan == Clan.PlayerClan || (c.Owner != null && c.Owner.Clan == Clan.PlayerClan)) cededFreePlayer++;
                     }
@@ -451,7 +452,7 @@ namespace Armoury
                 CededFree = cededFree; CededFreePlayer = cededFreePlayer;
             }
             if (!taken) why = "osada nie zmienila frakcji - bez zajecia";
-            else if (ceded) why = "cesja pod przysiega (374c) - karawany wyjezdzaja wolne z towarem i kiesa: " + cededFree + " (gracza " + cededFreePlayer + "), bez zaczepki "
+            else if (ceded) why = "cesja pod przysiega (374c) - karawany wyjezdzaja wolne z towarem i kiesa: " + cededFree + " (gracza " + cededFreePlayer + ")" + (cededStay > 0 ? ", zostaly w murach " + cededStay : "") + ", bez zaczepki "
                                   + ((int)CededIgnoreHours).ToString(Inv) + " h";
             else if (undead) why = "zdobywca Inni - karawany wyjezdzaja jak w grze";
             else if (cap == null || !cap.IsActive) why = "druzyna zdobywcy nieczynna - karawany wyjezdzaja jak w grze";

@@ -836,7 +836,7 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool SiegeHonourableSurrender { get; set; } = true;
 
-        [SettingPropertyBool("Siege Surrender Spares Caravans", HintText = "With Siege Honourable Surrender: when the commander keeps his word, the oath also covers the caravans of your side standing inside the walls (yours included) - they ride out free with their coin, cargo and master, and his men leave them alone for half a day, just as they do your lords. If he breaks his word, they are seized as in a storm. Off = caravans inside a yielded keep are seized even when the word is kept, as before", RequireRestart = false)]
+        [SettingPropertyBool("Siege Surrender Spares Caravans", HintText = "With Siege Honourable Surrender: when the commander keeps his word, the oath also covers the caravans of his enemies standing inside the walls (yours included; caravans with ships sail off as the game has it) - they ride out free with their coin, cargo and master, and his men leave them alone for half a day, just as they do your lords. If he breaks his word, they are seized as in a storm. Off = caravans inside a yielded keep are seized even when the word is kept, as before", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool SiegeSurrenderSparesCaravans { get; set; } = true;
 

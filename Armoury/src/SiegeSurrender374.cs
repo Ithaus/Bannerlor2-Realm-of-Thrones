@@ -612,6 +612,7 @@ namespace Armoury
             int lords = LeadOutLords(st, cap);
             string out1 = BookHoldings.YieldOut(st, cap.MapFaction, mine ? MobileParty.MainParty : null, "374-" + st.StringId);
             _cededSt = st.StringId; _ceding = true; _yieldSt = st.StringId;
+            EnemyCaravans.CededSt = null; EnemyCaravans.CededFree = -1; EnemyCaravans.CededFreePlayer = 0;   // 374c-p: pomiar tylko z TEGO wywolania (prefiks moze wyjsc bez spisu)
             try { Campaign.Current.KingdomManager.SiegeCompleted(st, cap, true, MapEvent.BattleTypes.Siege); }
             finally { _ceding = false; _cededSt = null; _yieldSt = null; }
             // 374c: ile karawan strony obroncow wyjechalo wolno (pomiar postfiksu EnemyCaravans z tego wywolania SiegeCompleted)
