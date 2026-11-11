@@ -443,6 +443,7 @@ namespace Armoury
                                 if (n <= 0) continue;
                                 mr.AddToCounts(c.Troop, -n, false, -n);
                                 prison.AddToCounts(c.Troop, n, false, n);
+                                PlayerCaptives385d.Note(captor, pb, c.Troop, n);   // 385d: rejestr zolnierzy gracza w niewoli (liczy tylko partie gracza)
                                 moved += n; here += n; cap -= n;
                                 string id = c.Troop.StringId;
                                 int t0; types.TryGetValue(id, out t0); types[id] = t0 + n;
@@ -627,7 +628,7 @@ namespace Armoury
                                 if (n <= 0) continue;
                                 mr.AddToCounts(troop, -n, false, -n);
                                 prison.AddToCounts(troop, n, false, n);
-                                // PUNKT WPIECIA (odlozone "twoi zwykli zolnierze w niewoli"): dla isMain tu wiadomo, ilu ludzi gracza jakiego typu poszlo do ktorej osady
+                                PlayerCaptives385d.Note(captor, pb, troop, n);   // 385d: rejestr zolnierzy gracza w niewoli (druzyna gracza i druzyny lordow jego rodu)
                                 moved += n; here += n; cap -= n;
                                 if (isMain) mine += n; else ally += n;
                                 string id = troop.StringId;
@@ -791,6 +792,7 @@ namespace Armoury
                                 if (n <= 0) continue;
                                 mr.AddToCounts(troop, -n, false, -n);
                                 prison.AddToCounts(troop, n, false, n);
+                                PlayerCaptives385d.Note(captor, pb, troop, n);   // 385d: rejestr (gracz-obronca bierze cudzych - Note liczy tylko partie gracza, tu zwykle nic)
                                 moved += n; here += n; cap -= n;
                                 SiegeSpoils380.NotePrisoners(me, captor, troop, n);   // 380: ci jency do wyboru w oknie jencow (tylko faktycznie przeniesieni)
                                 string id = troop.StringId;

@@ -13,7 +13,9 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 
@@ -120,6 +122,8 @@ namespace Armoury
         private static bool KOath { get { var s = Settings.Current; return s != null && s.PrisonerTermsOath; } }
         private static bool KField { get { var s = Settings.Current; return s != null && s.PrisonerTermsFieldParley; } }
         private static bool KRealm { get { var s = Settings.Current; return s != null && s.PrisonerTermsRealmTruce; } }
+        // 385d: zwykli zolnierze gracza w niewoli (razem z "moimi ludzmi" - wymaga KMen)
+        private static bool KSol { get { var s = Settings.Current; return s != null && s.PrisonerTermsReleaseMyMen && s.PrisonerTermsReleaseMySoldiers; } }
         // 386
         private static bool KClan { get { var s = Settings.Current; return s != null && s.PrisonerExchangeForTerms && s.PrisonerExchangePactGuardsClan; } }
         private const string FieldCool = "@f";
@@ -130,6 +134,10 @@ namespace Armoury
             public List<string> Fiefs = new List<string>(); public bool Betray; public double P, Day, V, C; public int Days;
             public string Host = "";   // 385c: zakladnik (StringId bohatera rodu gracza) - pole 17 rekordu
             public List<string> Men = new List<string>(); public bool Oath;   // 385: moi ludzie do uwolnienia, przysiega gracza; St == "" - rozmowa w polu
+            public int SolN; public double SolCost;   // 385d: zwykli zolnierze gracza do uwolnienia (liczba i cena zamrozone przy zgodzie) - pole 19 rekordu
+            public double NotBefore;                  // 385d: umowa przez poslanca - wykonanie nie wczesniej niz ta doba (powrot poslanca); > 0 = umowa poslanca - pole 18
+            public bool Envoy { get { return NotBefore > 0; } }
+            public List<PlayerCaptives385d.Row> SolRows;   // 385d: wiersze rejestru z chwili sprawdzenia zaplaty (przed zwinieciem obozu - potem zakres obozu znika); nie w zapisie
             public bool Field { get { return string.IsNullOrEmpty(St); } }
         }
         /// <summary>Wpis umowy: Key - frakcja albo "c:"+rod; Scope - "*" (wszystkie ziemie rodu gracza), StringId osady (rozejm osady) albo "K" (385: rozejm
@@ -168,6 +176,10 @@ namespace Armoury
         private static bool _field, _menOn, _oath;
         private static readonly List<Hero> _men = new List<Hero>();
         private static double _menCost;
+        // 385d: zwykli zolnierze gracza u rozmowcy (rejestr PlayerCaptives385d) - liczba i cena zamrozone w Begin
+        private static int _sol;
+        private static double _solCost;
+        private static bool MenAny { get { return _men.Count > 0 || _sol > 0; } }
         private static int _dRealmBlock, _dPick;
         private static readonly string[] NoKeys = new string[0];
         /// <summary>385: krolestwa z czynnym, uczciwym rozejmem krolestw (migawka dla bramek wojny - czytana z dowolnego watku).</summary>
@@ -178,6 +190,7 @@ namespace Armoury
             _realmKeys = NoKeys; _dRealmBlock = 0; _dPick = 0;
             _pact = null; PactZero(); _pThreadStumbles = 0;   // 386
             HostReset();   // 385c
+            EnvoyReset();  // 385d
             _queue.Clear(); _entries.Clear(); _cool.Clear(); _relift.Clear(); _dRelift = 0; _dReliftFail = 0; _offer = null; _armed = false; _stumbles = 0; _dZero = 0; _dNoAttack = 0; _dZeroMine = 0; _err.Clear();
             ClearTalk();
         }
@@ -186,7 +199,7 @@ namespace Armoury
         {
             _talk = null; _st = null; _want = '\0'; _pris.Clear(); _worth.Clear(); _inSt.Clear(); _sel.Clear(); _fiefs.Clear(); _selF.Clear();
             _gold = 0; _round = 0; _ask = 0; _askHero = null; _ev = null; _verdict = '\0';
-            _field = false; _menOn = false; _oath = false; _men.Clear(); _menCost = 0;
+            _field = false; _menOn = false; _oath = false; _men.Clear(); _menCost = 0; _sol = 0; _solCost = 0;
             HostTalkClear();   // 385c
         }
 
@@ -230,7 +243,7 @@ namespace Armoury
                 starter.AddPlayerLine("arm384_w_pass", "arm384_want", "arm384_wfor", "{=!}{ARM384_WP}", WantPCond, () => SetWant('P'), 110);
                 starter.AddPlayerLine("arm384_w_men", "arm384_want", "arm384_wfor", "{=!}{ARM384_WM}", WantMCond, () => { SetWant('M'); _menOn = true; }, 109);   // 385: tylko w polu
                 starter.AddPlayerLine("arm384_w_peace", "arm384_want", "arm384_wfor", "{=!}A truce between our realms.", null, () => SetWant('T'), 108, PeaceClick);   // 385: czynna dla gracza-wladcy
-                starter.AddPlayerLine("arm384_w_back", "arm384_want", "lord_pretalk", "{=!}Never mind.", null, ClearTalk, 100);
+                starter.AddPlayerLine("arm384_w_back", "arm384_want", "lord_pretalk", "{=!}Never mind.", () => !_envTalk, ClearTalk, 100);
                 starter.AddDialogLine("arm384_wfor", "arm384_wfor", "arm384_offer", "{=!}{ARM384_WFOR}", WforCond, null, 200);
                 for (int k = 0; k < ShowPris; k++)
                 {
@@ -258,18 +271,19 @@ namespace Armoury
                     starter.AddPlayerLine("arm384_f" + i, "arm384_offer", "arm384_ack", "{=!}{ARM384_F" + i + "}", () => FCond(i), () => FToggle(i), 117 - i);
                 }
                 starter.AddPlayerLine("arm384_done", "arm384_offer", "arm384_answer", "{=!}That is my offer. What say you?", DoneCond, Decide, 105);
-                starter.AddPlayerLine("arm384_o_back", "arm384_offer", "lord_pretalk", "{=!}Never mind.", null, ClearTalk, 100);
+                starter.AddPlayerLine("arm384_o_back", "arm384_offer", "lord_pretalk", "{=!}Never mind.", () => !_envTalk, ClearTalk, 100);
                 starter.AddDialogLine("arm384_ack", "arm384_ack", "arm384_offer", "{=!}{ARM384_SUM}", SumCond, null, 200);
                 starter.AddDialogLine("arm384_yes", "arm384_answer", "close_window", "{=!}{ARM384_YES}", () => _verdict == 'Y', YesCons, 200);
                 starter.AddDialogLine("arm384_ctr", "arm384_answer", "arm384_counter", "{=!}{ARM384_CTR}", () => _verdict == 'K', null, 199);
-                starter.AddDialogLine("arm384_no", "arm384_answer", "lord_pretalk", "{=!}{ARM384_NO}", () => _verdict != 'Y' && _verdict != 'K', NoCons, 198);
+                starter.AddDialogLine("arm384_no", "arm384_answer", "lord_pretalk", "{=!}{ARM384_NO}", () => !_envTalk && _verdict != 'Y' && _verdict != 'K', NoCons, 198);
                 starter.AddPlayerLine("arm384_c_gold", "arm384_counter", "arm384_answer", "{=!}{ARM384_CG}", CGoldCond, () => { _gold += _ask; Decide(); }, 112);
                 starter.AddPlayerLine("arm384_c_hero", "arm384_counter", "arm384_answer", "{=!}{ARM384_CH}", CHeroCond, () => { if (_askHero != null) _sel.Add(_askHero); Decide(); }, 111);
                 starter.AddPlayerLine("arm384_c_more", "arm384_counter", "arm384_offer", "{=!}Let me weigh my offer again.", null, null, 110);
-                starter.AddPlayerLine("arm384_c_no", "arm384_counter", "lord_pretalk", "{=!}No. That is my last word.", null, LastWord, 100);
+                starter.AddPlayerLine("arm384_c_no", "arm384_counter", "lord_pretalk", "{=!}No. That is my last word.", () => !_envTalk, LastWord, 100);
+                EnvoyDialogs(starter);   // 385d: linia "start" poslanca i blizniaki wyjsc (close_window zamiast lord_pretalk - rozmowa na mapie bez spotkania)
                 var s = Settings.Current;
                 Log.Info(Tag + ": rozmowa wpieta (hero_main_options, priorytet " + AskPriority + ") | klucz " + (On ? "TAK" : "NIE") + ", rozejm / pakt " + Days + " dob"
-                         + " | 385: okno wyboru " + (KPick ? "TAK" : "NIE") + ", moi ludzie " + (KMen ? "TAK" : "NIE") + ", przysiega " + (KOath ? "TAK" : "NIE") + ", rozmowa w polu " + (KField ? "TAK" : "NIE") + ", rozejm krolestw " + (KRealm ? "TAK" : "NIE") + HostStartLine()
+                         + " | 385: okno wyboru " + (KPick ? "TAK" : "NIE") + ", moi ludzie " + (KMen ? "TAK" : "NIE") + " (385d zolnierze " + (KSol ? "TAK" : "NIE") + ", poslaniec " + (KEnvoy ? "TAK" : "NIE") + "), przysiega " + (KOath ? "TAK" : "NIE") + ", rozmowa w polu " + (KField ? "TAK" : "NIE") + ", rozejm krolestw " + (KRealm ? "TAK" : "NIE") + HostStartLine()
                          + " | kolejka " + _queue.Count + (_offer != null ? ", oferta w menu" : "") + ", wpisy umow " + _entries.Count + ", przerwy " + _cool.Count + ".");
             }
             catch (Exception e) { Stumble("AddDialogs", e); }
@@ -282,6 +296,7 @@ namespace Armoury
                 if (starter == null) return;
                 starter.AddGameMenu(MenuId, "{=!}{ARM384_MENU}", MenuInit, GameMenu.MenuOverlayType.None);
                 starter.AddGameMenuOption(MenuId, "arm384_ride", "{=!}Ride out under his word.", RideCond, RideCons, true);
+                EnvoyMenus(starter);   // 385d
             }
             catch (Exception e) { Stumble("AddMenus", e); }
         }
@@ -340,6 +355,8 @@ namespace Armoury
         private static bool Talk(out Hero h, out Settlement st, out bool field)
         {
             field = false;
+            if (EnvoyTalk(out h, out st, out field)) return true;   // 385d: rozmowa przez poslanca (na mapie, bez spotkania) - przed parley, bo gracz moze stac w oblezonej twierdzy
+            if (_envTalk) { h = null; st = null; field = false; return false; }   // 385d: flaga poslanca, a rozmowca inny - zadna rozmowa 384
             if (Parley(out h, out st)) return true;
             st = null;
             if (KField && Field(out h)) { field = true; return true; }
@@ -468,6 +485,36 @@ namespace Armoury
             return Math.Max(0, a);
         }
 
+        /// <summary>385d: zakres "u rozmowcy" dla listy jencow pb - ta sama regula co MenHeld: wladca = cala frakcja; inny lord = lochy i druzyny jego rodu,
+        /// jego druzyna, jego armia i oboz oblezniczy.</summary>
+        private static bool InScope(PartyBase pb, Hero lord, Settlement besieged)
+        {
+            var f = lord != null ? lord.MapFaction : null;
+            if (pb == null || f == null || pb.MapFaction != f) return false;
+            if (Ruler(lord)) return true;
+            var mp = pb.MobileParty;
+            var lp = lord.PartyBelongedTo;
+            Clan owner = pb.IsSettlement && pb.Settlement != null ? pb.Settlement.OwnerClan : (mp != null ? mp.ActualClan : null);
+            if (owner != null && owner == lord.Clan) return true;
+            if (mp != null && lp != null && (mp == lp || (mp.Army != null && mp.Army == lp.Army))) return true;
+            var camp = besieged != null && besieged.SiegeEvent != null ? besieged.SiegeEvent.BesiegerCamp : null;
+            return mp != null && camp != null && camp.HasInvolvedPartyForEventType(pb);
+        }
+
+        /// <summary>385d: zwykli zolnierze gracza w niewoli u rozmowcy (rejestr PlayerCaptives385d - przyblizenie, nigdy ponad stan listy jencow).</summary>
+        private static List<PlayerCaptives385d.Row> SoldiersHeld(Hero lord, Settlement besieged)
+        {
+            try { return PlayerCaptives385d.Held(pb => { try { return InScope(pb, lord, besieged); } catch { return false; } }); }
+            catch (Exception e) { Stumble("SoldiersHeld", e); return new List<PlayerCaptives385d.Row>(); }
+        }
+
+        /// <summary>385d: cena zwyklego zolnierza - to, co trzymajacy dostalby za niego przy sprzedazy w warowni (miara gry, SellPrisonersAction).</summary>
+        private static double SolPrice(CharacterObject troop)
+        {
+            try { return Math.Max(0, Campaign.Current.Models.RansomValueCalculationModel.PrisonerRansomValue(troop, null)); }
+            catch (Exception e) { Stumble("SolPrice", e); return 50; }
+        }
+
         private static string MenNames()
         {
             var sb = new StringBuilder();
@@ -575,6 +622,7 @@ namespace Armoury
                 if (!Talk(out h, out st, out field)) return;
                 _talk = h; _st = st; _field = field;
                 if (KMen) { foreach (var m in MenHeld(h, st)) { _men.Add(m); _menCost += ManPrice(m); } }
+                if (KSol) { foreach (var r in SoldiersHeld(h, st)) { _sol += r.N; _solCost += SolPrice(r.Troop) * r.N; } }   // 385d
                 HostBegin(h);   // 385c
                 foreach (var p in Prisoners(h, st, _inSt)) { _pris.Add(p); _worth[p] = WorthOf(h, p); }
                 _pris.Sort((a, b) => _worth[b].CompareTo(_worth[a]));
@@ -625,15 +673,15 @@ namespace Armoury
 
         private static bool WantPCond()
         {
-            if (_talk == null || _st == null) return false;
+            if (_talk == null || _st == null || _envTalk) return false;   // 385d: swobodne przejscie nie przez poslanca (wymaga menu przy bramie)
             MBTextManager.SetTextVariable("ARM384_WP", "Let my men and me ride out of " + Name(_st) + " unharmed, on your word of honour. The keep and its garrison stay.");
             return true;
         }
 
         private static bool WantMCond()
         {
-            if (_talk == null || !_field || !KMen || _men.Count == 0) return false;
-            MBTextManager.SetTextVariable("ARM384_WM", "Free my people you hold: " + MenNames() + ".");
+            if (_talk == null || (!_field && !_envTalk) || !KMen || !MenAny) return false;   // 385d: takze sami zolnierze; przez poslanca takze z oblezonej twierdzy
+            MBTextManager.SetTextVariable("ARM384_WM", _men.Count > 0 ? "Free my people you hold: " + MenNames() + (_sol > 0 ? " and " + _sol + " of my soldiers." : ".") : "Free the " + _sol + " soldiers of mine you hold.");
             return true;
         }
 
@@ -739,9 +787,10 @@ namespace Armoury
 
         private static bool MenCond()
         {
-            if (!KMen || _talk == null || _men.Count == 0 || _want == 'M' || _want == 'T' || _want == '\0') return false;
+            if (!KMen || _talk == null || !MenAny || _want == 'M' || _want == 'T' || _want == '\0') return false;
             MBTextManager.SetTextVariable("ARM384_MEN", _menOn ? "Leave my people out of it."
-                : "And free my people you hold: " + MenNames() + " (a ransom of some " + N(_menCost) + " denars by his reckoning).");
+                : (_men.Count > 0 ? "And free my people you hold: " + MenNames() + (_sol > 0 ? " and " + _sol + " of my soldiers" : "") : "And free the " + _sol + " soldiers of mine you hold")
+                  + " (a ransom of some " + N(_menCost + _solCost) + " denars by his reckoning).");
             return true;
         }
 
@@ -815,7 +864,7 @@ namespace Armoury
             {
                 var e = _talk != null && (_field || (_st != null && _st.SiegeEvent != null)) ? Evaluate(_talk, _st, _want) : null;
                 string lean = e == null ? "" : e.V >= e.C * e.Thr ? " (He looks at it long. It may be enough.)" : e.V >= e.C * e.Lo ? " (He frowns. It is close.)" : " (He shakes his head. It is far from enough.)";
-                string men = _menOn && _men.Count > 0 && _want != 'M' && _want != 'T' ? " You ask for your people as well (" + _men.Count + ")." : "";
+                string men = _menOn && MenAny && _want != 'M' && _want != 'T' ? " You ask for your people as well (" + (_men.Count > 0 ? _men.Count.ToString(Inv) : "") + (_men.Count > 0 && _sol > 0 ? " and " : "") + (_sol > 0 ? _sol + " soldiers" : "") + ")." : "";
                 MBTextManager.SetTextVariable("ARM384_SUM", "On the table: " + OfferText() + "." + men + lean);
             }
             catch (Exception ex) { Stumble("SumCond", ex); MBTextManager.SetTextVariable("ARM384_SUM", "Go on."); }
@@ -921,7 +970,7 @@ namespace Armoury
                 }
             }
             if (want != 'T') c *= 1.0 - Math.Max(-50, Math.Min(50, rel)) / 200.0;
-            if (_menOn && _men.Count > 0 && want != 'T') { c += _menCost; cp += " + moi ludzie " + _men.Count + " koszt " + N(_menCost); }   // 385: okup bez rabatu relacji
+            if (_menOn && MenAny && want != 'T') { c += _menCost + _solCost; cp += " + moi ludzie " + _men.Count + " koszt " + N(_menCost) + (_sol > 0 ? " + zolnierze " + _sol + " koszt " + N(_solCost) : ""); }   // 385: okup bez rabatu relacji; 385d: zolnierze po cenie sprzedazy jenca
             e.C = Math.Max(1000, c);
             e.Thr = calc > 0 ? 1.0 : calc < 0 ? 0.9 : 0.95;
             e.Lo = calc > 0 ? 0.8 : 0.7;
@@ -961,7 +1010,7 @@ namespace Armoury
                                : _want == 'P' ? "Go, then. Leave my lords at the gate, and no man of mine will lay a hand on you. You have my word."
                                : _want == 'A' ? "So be it. Free my lords, and we march at dawn - and for " + Days + " days my realm will leave your lands and your men in peace. You have my word."
                                : "So be it. Free my lords, and we march at dawn. For " + Days + " days no banner of mine comes back to " + Name(st) + ". You have my word.";
-                    if (_menOn && _men.Count > 0 && _want != 'M' && _want != 'T') yes += " Your people go free with it.";
+                    if (_menOn && MenAny && _want != 'M' && _want != 'T') yes += " Your people go free with it.";
                     if (HostOn) yes += " " + Name(_host) + " will be kept" + (_hostHall != null ? " at " + Name(_hostHall) : "") + " and come to no harm while you keep faith.";   // 385c
                     MBTextManager.SetTextVariable("ARM384_YES", yes);
                     return;
@@ -1006,6 +1055,7 @@ namespace Armoury
             {
                 if (h != null && st != null && st.SiegeEvent != null) _cool[CoolKey(st, h)] = new Cool { Start = st.SiegeEvent.SiegeStartTime.ToHours, End = Today + CooldownDays };
                 else if (h != null && st == null && _field && h.StringId != null) _cool[CoolKey(null, h)] = new Cool { Start = 0, End = Today + CooldownDays };
+                EnvoyRefused(h);   // 385d: przerwa poslanca do tego wladcy
                 if (_ev != null && h != null && (st != null || _field)) LogDecision(h, st, _ev, verdict + ", przerwa " + F(CooldownDays) + " d", 0);
             }
             catch (Exception e) { Stumble("Refuse", e); }
@@ -1045,17 +1095,20 @@ namespace Armoury
             {
                 var h = _talk; var st = _st;
                 bool siege = st != null && st.SiegeEvent != null;
-                if (h != null && (siege || _field) && _ev != null)
+                bool siegeTalk = siege;
+                if (_envTalk && _want == 'M') siege = false;   // 385d: samo uwolnienie ludzi przez poslanca z oblezonej twierdzy - umowa bez osady (RunField), nie zwiniecie obozu
+                if (h != null && (siegeTalk || _field) && _ev != null)
                 {
                     double p = SiegeSurrender374.BetrayChance(h);
                     bool betray = p > 0 && MBRandom.RandomFloat < p;
                     var d = new Deal { St = siege ? st.StringId : "", Lord = h.StringId, Start = siege ? st.SiegeEvent.SiegeStartTime.ToHours : 0, Want = _want, Gold = _gold, Betray = betray, P = p, Day = Today, V = _ev.V, C = _ev.C, Days = Days };
                     if (_want == 'T') d.Days = TruceDaysFor(Hero.MainHero.MapFaction, h.MapFaction);
                     else foreach (var x in _sel) if (x.StringId != null) d.Pris.Add(x.StringId);   // 385: przy pokoju jencow nie oddajemy sami - lochy otwiera pokoj (PeaceHold)
-                    if (_menOn && _want != 'T') foreach (var x in _men) if (x.StringId != null) d.Men.Add(x.StringId);
+                    if (_menOn && _want != 'T') { foreach (var x in _men) if (x.StringId != null) d.Men.Add(x.StringId); d.SolN = _sol; d.SolCost = _solCost; }   // 385d
+                    if (_envTalk) d.NotBefore = EnvoyBackDay();   // 385d: wykonanie po powrocie poslanca
                     d.Oath = _oath && OathAllowed(_want);
                     if (HostOn && _host.StringId != null) d.Host = _host.StringId;   // 385c
-                    if (!siege)
+                    if (!siege && !_envTalk)
                     {
                         // 385: w polu - druzyna rozmowcy nie rzuca sie na gracza, zanim umowa wykona sie po wyjsciu ze spotkania
                         try { var lp = h.PartyBelongedTo; if (lp != null && lp.Ai != null) lp.Ai.SetDoNotAttackMainParty(3); } catch (Exception e) { Stumble("YesCons.NoAttack", e); }
@@ -1084,7 +1137,7 @@ namespace Armoury
                 foreach (var x in _sel) { if (names.Count >= 12) { names.Add("..."); break; } names.Add(Name(x)); }
                 Log.Info(Tag + ": dzien " + F(Today) + " | " + (st != null ? "oblezenie " + Name(st) + " [" + st.StringId + "]" : "pole (" + Realm(h.MapFaction) + ")") + " | wodz " + Name(h) + (Ruler(h) ? " - wladca" : "") + " (Honor " + Trait(h, DefaultTraits.Honor) + ", Calc " + Trait(h, DefaultTraits.Calculating)
                          + ", Mercy " + Trait(h, DefaultTraits.Mercy) + ", Valor " + Trait(h, DefaultTraits.Valor) + ", rel " + rel + (SiegeSurrender374.IsLiar(h) ? ", znany klamca" : "") + ")"
-                         + " | zadanie " + (_field && _want == 'A' ? "pakt (pole)" : WantName(_want)) + " (" + (_want == 'T' ? TruceDaysFor(Hero.MainHero.MapFaction, h.MapFaction) : Days) + " d)" + (_menOn && _men.Count > 0 ? " + moi ludzie " + _men.Count + " [" + MenNames() + "]" : "")
+                         + (_envTalk ? " | PRZEZ POSLANCA" : "") + " | zadanie " + (_field && _want == 'A' ? "pakt (pole)" : WantName(_want)) + " (" + (_want == 'T' ? TruceDaysFor(Hero.MainHero.MapFaction, h.MapFaction) : Days) + " d)" + (_menOn && MenAny ? " + moi ludzie " + _men.Count + " [" + MenNames() + "]" + (_sol > 0 ? " + zolnierze " + _sol : "") : "")
                          + " | oferta: jency " + _sel.Count + " [" + string.Join(", ", names.ToArray()) + "], zloto " + _gold + ", ziemia " + _selF.Count + (_oath && OathAllowed(_want) ? ", przysiega gracza" : "") + (HostOn ? ", zakladnik " + Name(_host) : "")
                          + " | " + e.Parts + " | wynik V/C " + (e.C > 0 ? (e.V / e.C).ToString("0.00", Inv) : "-") + " -> " + verdict + ".");
             }
@@ -1174,6 +1227,7 @@ namespace Armoury
         {
             if (_offer != null) ExpireOffer();
             if (_relift.Count > 0) Relift();
+            EnvoyTick();   // 385d (wlasny try; bez poslanca - dwa porownania)
             if (_queue.Count == 0) return;
             try
             {
@@ -1182,22 +1236,26 @@ namespace Armoury
                 if (cm != null && (cm.IsConversationInProgress || cm.IsConversationFlowActive)) return;
                 var mp = MobileParty.MainParty;
                 if (mp == null || mp.MapEvent != null || Hero.MainHero.IsPrisoner) return;
-                var d = _queue[0];
+                // 385d: umowa poslanca czeka na jego powrot (NotBefore) i nie blokuje kolejki - bierzemy pierwsza gotowa
+                int qi = 0;
+                while (qi < _queue.Count && _queue[qi].NotBefore > Today) qi++;
+                if (qi >= _queue.Count) return;
+                var d = _queue[qi];
                 if (d.Want == 'P')
                 {
                     if (PlayerEncounter.Current != null || mp.CurrentSettlement != null) return;   // dopiero za brama
                 }
                 else if (d.Field)
                 {
-                    if (PlayerEncounter.Current != null) return;   // 385: dopiero po wyjsciu ze spotkania z druzyna rozmowcy
+                    if (!d.Envoy && PlayerEncounter.Current != null) return;   // 385: dopiero po wyjsciu ze spotkania z druzyna rozmowcy; 385d: poslaniec - gracz nie stoi przed rozmowca
                 }
                 else
                 {
                     var st0 = Settlement.Find(d.St);
-                    if (SiegeSurrender374.CampBusy(st0) && Today - d.Day < 1.0) return;   // bitwa przy obozie - czekamy (najwyzej doba)
+                    if (SiegeSurrender374.CampBusy(st0) && Today - Math.Max(d.Day, d.NotBefore) < 1.0) return;   // bitwa przy obozie - czekamy (najwyzej doba; 385d: od powrotu poslanca)
                 }
                 if (!_armed) { _armed = true; return; }
-                _queue.RemoveAt(0);   // najpierw z kolejki - wyjatek nie powtorzy umowy
+                _queue.RemoveAt(qi);   // najpierw z kolejki - wyjatek nie powtorzy umowy
                 _armed = false;
                 Run(d);
             }
@@ -1273,7 +1331,7 @@ namespace Armoury
                 st = d.Field ? null : Settlement.Find(d.St);   // 385: umowa z pola nie ma osady
                 var lord = Hero.Find(d.Lord);
                 // 384b: P - usluga juz wykonana (gracz za brama, RideCons), wiec bez terminu 3 dob; przed wyjsciem P nie trafia do kolejki
-                if (d.Want != 'P' && Today - d.Day > 3.0) { Drop(d, st, "The terms agreed " + Place(st) + " have lapsed.", "umowa przedawniona (ponad 3 doby)"); return; }
+                if (d.Want != 'P' && Today - Math.Max(d.Day, d.NotBefore) > 3.0) { Drop(d, st, "The terms agreed " + Place(st) + " have lapsed.", "umowa przedawniona (ponad 3 doby)"); return; }
                 if (lord == null || !lord.IsAlive || lord.IsPrisoner) { Drop(d, st, "The lord who gave you his word " + Place(st) + " can no longer keep it.", "przysiegajacy nie zyje albo w niewoli"); return; }
                 string why;
                 if (!Payable(d, out why))
@@ -1328,7 +1386,15 @@ namespace Armoury
         {
             try
             {
-                if (d.Men.Count == 0 || d.Want == 'T') return true;
+                if ((d.Men.Count == 0 && d.SolN <= 0) || d.Want == 'T') return true;
+                // 385d: zwykli zolnierze - ilu z umowionych nadal jest w zakresie rozmowcy (rejestr po uzgodnieniu); brakujacy zmniejszaja zloto oferty o swoja czesc ceny
+                int solHave = 0, solGone = 0; double solMiss = 0;
+                if (d.SolN > 0)
+                {
+                    d.SolRows = SoldiersHeld(lord, st);
+                    foreach (var r in d.SolRows) solHave += r.N;
+                    if (solHave < d.SolN) { solGone = d.SolN - solHave; solMiss = d.SolCost * solGone / d.SolN; }
+                }
                 var kept = new List<string>(); double miss = 0; int gone = 0;
                 foreach (var id in d.Men)
                 {
@@ -1338,16 +1404,17 @@ namespace Armoury
                     gone++;
                     if (h != null) miss += ManPrice(h);
                 }
-                if (gone == 0) return true;
-                if (d.Want == 'M' && kept.Count == 0)
+                if (gone == 0 && solGone == 0) return true;
+                if (d.Want == 'M' && kept.Count == 0 && (d.SolN <= 0 || solHave <= 0))
                 {
-                    Drop(d, st, Name(lord) + " no longer holds any of your people. Nothing was handed over.", "moi ludzie juz poza ich lochem (" + gone + ") - nic nie oddane");
+                    Drop(d, st, Name(lord) + " no longer holds any of your people. Nothing was handed over.", "moi ludzie juz poza ich lochem (" + gone + (solGone > 0 ? " + zolnierze " + solGone : "") + ") - nic nie oddane");
                     return false;
                 }
-                int back = (int)Math.Min(d.Gold, Math.Round(miss));
+                int back = (int)Math.Min(d.Gold, Math.Round(miss + solMiss));
                 d.Gold -= back; d.Men = kept;
-                Log.Info(Tag + ": dzien " + F(Today) + " | " + (st != null ? Name(st) : "pole") + " - moi ludzie juz poza ich lochem: " + gone + " (okup " + N(miss) + ") | zloto oferty mniejsze o " + back + " -> " + d.Gold + ", zostalo do uwolnienia " + kept.Count + ".");
-                Log.Player(Name(lord) + " no longer holds " + gone + " of your people" + (back > 0 ? "; you keep " + N(back) + " denars of what you offered." : "."));
+                if (solGone > 0) { d.SolCost -= solMiss; d.SolN = solHave; }
+                Log.Info(Tag + ": dzien " + F(Today) + " | " + (st != null ? Name(st) : "pole") + " - moi ludzie juz poza ich lochem: " + gone + " (okup " + N(miss) + ")" + (solGone > 0 ? " + zolnierze " + solGone + " (cena " + N(solMiss) + "; sprzedani w warowni wrocili do domow)" : "") + " | zloto oferty mniejsze o " + back + " -> " + d.Gold + ", zostalo do uwolnienia " + kept.Count + (d.SolN > 0 ? " + zolnierze " + d.SolN : "") + ".");
+                Log.Player(Name(lord) + " no longer holds " + (gone > 0 ? gone + " of your people" : "") + (gone > 0 && solGone > 0 ? " and " : "") + (solGone > 0 ? solGone + " of your soldiers" : "") + (back > 0 ? "; you keep " + N(back) + " denars of what you offered." : "."));
             }
             catch (Exception e) { Stumble("MenStill", e); }
             return true;
@@ -1359,11 +1426,21 @@ namespace Armoury
             var sb = new StringBuilder();
             try
             {
+                if (d.Men.Count == 0 && d.SolN > 0)
+                {
+                    // 385d: sami zolnierze (bez bohaterow) - zdrada jak dla bohaterow
+                    if (d.Betray)
+                    {
+                        sb.Append(" | moi zolnierze: ZDRADA - wzial zaplate, nie uwolnil (" + d.SolN + "), klamca zapisany (374)");
+                        SiegeSurrender374.MarkLiar(lord);
+                        Log.Player(Name(lord) + " takes what you gave and keeps your soldiers in chains. His word was worth nothing.", true);
+                    }
+                }
                 if (d.Men.Count > 0)
                 {
                     if (d.Betray)
                     {
-                        sb.Append(" | moi ludzie: ZDRADA - wzial zaplate, nie uwolnil (" + d.Men.Count + "), klamca zapisany (374)");
+                        sb.Append(" | moi ludzie: ZDRADA - wzial zaplate, nie uwolnil (" + d.Men.Count + (d.SolN > 0 ? " + zolnierze " + d.SolN : "") + "), klamca zapisany (374)");
                         SiegeSurrender374.MarkLiar(lord);
                         Log.Player(Name(lord) + " takes what you gave and keeps your people in chains. His word was worth nothing.", true);
                     }
@@ -1383,6 +1460,7 @@ namespace Armoury
                         if (freed > 0) Log.Player(Name(lord) + " sets your people free: " + string.Join(", ", names.ToArray()) + ".");
                     }
                 }
+                if (d.SolN > 0 && !d.Betray) SolFree(d, lord, sb);   // 385d: zwykli zolnierze (wlasny try)
                 if (d.Oath && d.Betray) sb.Append(" | przysiega gracza nie wchodzi (zdrada wylosowana)");   // 385b: jedna regula z RunPass
                 if (d.Oath && !d.Betray && lord.MapFaction != null)
                 {
@@ -1398,6 +1476,68 @@ namespace Armoury
             catch (Exception e) { Stumble("After", e); }
             HostHand(d, lord, sb);   // 385c: zakladnik do lochu (wlasny try; po zaplacie, moich ludziach i przysiedze)
             return sb.ToString();
+        }
+
+        /// <summary>385d: uwolnienie zwyklych zolnierzy gracza po zaplacie: lista jencow trzymajacego -k (ranni proporcjonalnie) = cel +k. CEL: trzymajacy
+        /// blisko druzyny gracza (do 10 jednostek mapy - spotkanie w polu, oboz pod twierdza) -> szereg druzyny gracza (jak ekran lupu - moze przekroczyc limit);
+        /// daleko -> zaloga najblizszej trzymajacemu warowni rodu gracza bez oblezenia; brak takiej -> druzyna gracza. Ksiega ludzi: PeopleBook.Transfer
+        /// (FLooted - ten sam kierunek co odbici jency: lista jencow -> sluzba). Oblezona twierdza umowy: oboz jeszcze stoi albo wlasnie zwiniety - zakres jak przy zgodzie.</summary>
+        private static void SolFree(Deal d, Hero lord, StringBuilder sb)
+        {
+            try
+            {
+                Settlement st = d.Field ? null : Settlement.Find(d.St);
+                var rows = d.SolRows ?? SoldiersHeld(lord, st);
+                int left = d.SolN, freed = 0;
+                var main = MobileParty.MainParty;
+                var where = new Dictionary<string, int>();
+                foreach (var r in rows)
+                {
+                    if (left <= 0) break;
+                    try
+                    {
+                        var pr = r.Holder.PrisonRoster;
+                        int idx = pr.FindIndexOfTroop(r.Troop);
+                        if (idx < 0) continue;
+                        int have = pr.GetElementNumber(idx), w = pr.GetElementWoundedNumber(idx);
+                        int k = Math.Min(Math.Min(r.N, left), have);
+                        if (k <= 0) continue;
+                        int kw = have > 0 ? Math.Min(w, (int)Math.Round((double)w * k / have)) : 0;
+                        Vec2 hp = r.Holder.IsSettlement ? r.Holder.Settlement.GetPosition2D : r.Holder.MobileParty.GetPosition2D;
+                        TroopRoster to = null; string name = "your party";
+                        if (main != null && hp.Distance(main.GetPosition2D) > 10f)
+                        {
+                            Settlement best = null; float bd = float.MaxValue;
+                            foreach (var s in Clan.PlayerClan.Settlements)
+                            {
+                                if (s == null || !s.IsFortification || s.SiegeEvent != null || s.Town == null || s.Town.GarrisonParty == null || !s.Town.GarrisonParty.IsActive) continue;
+                                float dd = s.GetPosition2D.Distance(hp);
+                                if (dd < bd) { bd = dd; best = s; }
+                            }
+                            if (best != null) { to = best.Town.GarrisonParty.MemberRoster; name = Name(best); }
+                        }
+                        if (to == null) to = main.MemberRoster;
+                        int from0 = PeopleBook.Men(pr), to0 = PeopleBook.Men(to);
+                        pr.AddToCounts(r.Troop, -k, false, -kw);
+                        to.AddToCounts(r.Troop, k, false, kw);
+                        try { PeopleBook.Transfer(pr, from0, to, to0, PeopleBook.FLooted); } catch (Exception e) { Stumble("SolFree.Book", e); }
+                        PlayerCaptives385d.Freed(r.Holder, r.Troop, k);
+                        left -= k; freed += k;
+                        int c0; where.TryGetValue(name, out c0); where[name] = c0 + k;
+                    }
+                    catch (Exception e) { Stumble("SolFree.Row", e); }
+                }
+                var parts = new List<string>();
+                foreach (var kv in where) parts.Add(kv.Value + " -> " + kv.Key);
+                sb.Append(" | moi zolnierze uwolnieni " + freed + " z " + d.SolN + (parts.Count > 0 ? " [" + string.Join(", ", parts.ToArray()) + "]" : "") + (left > 0 ? " (juz poza ich lochem " + left + ")" : ""));
+                if (freed > 0)
+                {
+                    var en = new List<string>();
+                    foreach (var kv in where) en.Add(kv.Value + (kv.Key == "your party" ? " rejoin your party" : " march to the garrison of " + kv.Key));
+                    Log.Player(Name(lord) + " sets " + freed + " of your soldiers free: " + string.Join(", ", en.ToArray()) + ".");
+                }
+            }
+            catch (Exception e) { Stumble("SolFree", e); }
         }
 
         /// <summary>385: umowa z rozmowy w polu (bez oblezenia): zaplata, pakt (wpis "*": frakcja, gdy przysiega wladca, inaczej rod), moi ludzie, przysiega.</summary>
@@ -1558,7 +1698,7 @@ namespace Armoury
             if (cap == null)
             {
                 try { ChangeRelationAction.ApplyPlayerRelation(lord, 5); } catch (Exception e) { Stumble("RunPass.Rel", e); }
-                var kept = new Deal { St = d.St, Lord = d.Lord, Days = d.Days, Men = d.Men, Oath = d.Oath, Host = d.Host, Betray = false };   // 385: slowo dotrzymane (takze gdy zdrada wylosowana, a oboz juz nie stoi)
+                var kept = new Deal { St = d.St, Lord = d.Lord, Days = d.Days, Men = d.Men, Oath = d.Oath, Host = d.Host, SolN = d.SolN, SolCost = d.SolCost, SolRows = d.SolRows, Betray = false };   // 385: slowo dotrzymane (takze gdy zdrada wylosowana, a oboz juz nie stoi)
                 paid += After(kept, lord);
                 Log.Info(Tag + ": dzien " + F(Today) + " | " + Name(st) + " WYKONANE: swobodne przejscie | wodz " + Name(lord) + " dotrzymal slowa" + (d.Betray ? " (zdrada wylosowana, ale oboz juz nie stoi)" : "")
                          + " | " + paid + " | twierdza zostaje u " + (st != null && st.OwnerClan != null ? st.OwnerClan.Name.ToString() : "-") + " | relacja wodza +5.");
@@ -1588,7 +1728,7 @@ namespace Armoury
             int punished = Punish(lord);
             Log.Info(Tag + ": dzien " + F(Today) + " | " + Name(st) + " ZDRADA przy przejsciu: wodz " + Name(lord) + " lamie slowo | " + paid + " | gracz " + (taken ? "W NIEWOLI" : "NIE pojmany (blad)")
                      + " u " + (cap.Name != null ? cap.Name.ToString() : "-") + ", towarzysze " + comp + ", szeregowi do lochu " + men + ", jency-bohaterowie gracza wolni " + freed
-                     + " | twierdza zostaje z zaloga | kara relacji " + punished + " glow rodow | klamca zapisany (374)" + (d.Men.Count > 0 ? " | moi ludzie nie uwolnieni (" + d.Men.Count + ")" : "") + (d.Oath ? " | przysiega gracza nie wchodzi (slowo zlamane)" : "") + ".");
+                     + " | twierdza zostaje z zaloga | kara relacji " + punished + " glow rodow | klamca zapisany (374)" + (d.Men.Count > 0 || d.SolN > 0 ? " | moi ludzie nie uwolnieni (" + d.Men.Count + (d.SolN > 0 ? " + zolnierze " + d.SolN : "") + ")" : "") + (d.Oath ? " | przysiega gracza nie wchodzi (slowo zlamane)" : "") + ".");
             Log.Player(Name(lord) + " breaks his word! His men take your lords at the gate - and then fall on you.", true);
         }
 
@@ -2308,6 +2448,7 @@ namespace Armoury
                 PactZero();   // 386
             }
             catch (Exception e) { Stumble("Daily", e); }
+            try { EnvoyDaily(); } catch (Exception e) { Stumble("EnvoyDaily", e); }   // 385d
             try { HostDaily((int)Today); } catch (Exception e) { Stumble("HostDaily", e); }   // 385c: po wpisach umow (zlamane slowo -> stan B juz ustawiony)
         }
 
@@ -2318,6 +2459,8 @@ namespace Armoury
         private static bool Ok(string s) { return s != null && s.IndexOfAny(Bad) < 0; }
 
         /// <summary>"v2|Q:st:wodz:start:zadanie:jency,..:zloto:ziemie,..:zdrada:p:doba:V:C:dni:moi,..:flagi:zakladnik;...(O - oferta w menu)|klucz:zasieg:do:wodz:zdrada;...|st:wodz:start:koniec;..."
+        /// 385d: rekord umowy 19 pol, gdy umowa ma termin poslanca (pole 18: doba, od ktorej wolno wykonac) albo zwyklych zolnierzy (pole 19: "liczba,cena"); stan
+        /// samego poslanca - osobny klucz zapisu "arm_env385d" (EnvoyExport).
         /// 385: v2 - rekord umowy 17 pol (moi ludzie; flagi: znak 0 - przysiega 0/1; zakladnik - 385c: id bohatera albo puste) + opcjonalna piata sekcja zakladnikow (HostExport); st puste = rozmowa w polu. v1 (14 pol) czytany.</summary>
         internal static string Export()
         {
@@ -2337,6 +2480,8 @@ namespace Armoury
                       .Append(':').Append(string.Join(",", pr.ToArray())).Append(':').Append(d.Gold.ToString(Inv)).Append(':').Append(string.Join(",", fi.ToArray()))
                       .Append(':').Append(d.Betray ? '1' : '0').Append(':').Append(D(d.P)).Append(':').Append(D(d.Day)).Append(':').Append(D(d.V)).Append(':').Append(D(d.C)).Append(':').Append(d.Days.ToString(Inv))
                       .Append(':').Append(string.Join(",", mn.ToArray())).Append(':').Append(d.Oath ? '1' : '0').Append(':').Append(Ok(d.Host) ? d.Host : "");   // 385c: pole 17 - zakladnik
+                    // 385d: pola 18-19 tylko, gdy uzyte (umowa poslanca / zwykli zolnierze) - rekord bez nich czyta tez DLL sprzed 385d
+                    if (d.NotBefore > 0 || d.SolN > 0) sb.Append(':').Append(D(d.NotBefore)).Append(':').Append(d.SolN.ToString(Inv)).Append(',').Append(D(d.SolCost));
                 }
                 sb.Append('|'); f = true;
                 int today = (int)Today;
@@ -2374,17 +2519,25 @@ namespace Armoury
                 {
                     if (p.Length == 0) continue;
                     var x = p.Split(':'); double s, pp, dy, v, c; int g, dd;
-                    if ((x.Length == 14 || x.Length == 17) && (x[0] == "Q" || x[0] == "O") && P(x[3], out s) && x[4].Length == 1 && int.TryParse(x[6], NumberStyles.Integer, Inv, out g)
+                    if ((x.Length == 14 || x.Length == 17 || x.Length == 19) && (x[0] == "Q" || x[0] == "O") && P(x[3], out s) && x[4].Length == 1 && int.TryParse(x[6], NumberStyles.Integer, Inv, out g)
                         && P(x[9], out pp) && P(x[10], out dy) && P(x[11], out v) && P(x[12], out c) && int.TryParse(x[13], NumberStyles.Integer, Inv, out dd))
                     {
                         var d = new Deal { St = x[1], Lord = x[2], Start = s, Want = x[4][0], Gold = g, Betray = x[8] == "1", P = pp, Day = dy, V = v, C = c, Days = dd };
                         foreach (var id in x[5].Split(',')) if (id.Length > 0) d.Pris.Add(id);
                         foreach (var id in x[7].Split(',')) if (id.Length > 0) d.Fiefs.Add(id);
-                        if (x.Length == 17)
+                        if (x.Length >= 17)
                         {
                             foreach (var id in x[14].Split(',')) if (id.Length > 0) d.Men.Add(id);
                             d.Oath = x[15].Length > 0 && x[15][0] == '1';
                             d.Host = x[16];   // 385c
+                        }
+                        if (x.Length == 19)
+                        {
+                            // 385d
+                            double nb, sc; int sn;
+                            if (P(x[17], out nb) && nb > 0) d.NotBefore = nb;
+                            var y = x[18].Split(',');
+                            if (y.Length == 2 && int.TryParse(y[0], NumberStyles.Integer, Inv, out sn) && P(y[1], out sc) && sn > 0) { d.SolN = sn; d.SolCost = Math.Max(0, sc); }
                         }
                         if (x[0] == "O") _offer = d; else _queue.Add(d);
                     }

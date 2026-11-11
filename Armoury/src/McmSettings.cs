@@ -856,9 +856,17 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsPickWindow { get; set; } = true;
 
-        [SettingPropertyBool("Prisoner Terms Release My Men", HintText = "With Prisoner Exchange For Terms: when the lord you bargain with (or, if he rules, anyone in his realm) holds members of your clan or your companions, you can ask for their release as part of the terms - their ransom is added to what he wants for the deal. Your common soldiers are not covered", RequireRestart = false)]
+        [SettingPropertyBool("Prisoner Terms Release My Men", HintText = "With Prisoner Exchange For Terms: when the lord you bargain with (or, if he rules, anyone in his realm) holds members of your clan or your companions, you can ask for their release as part of the terms - their ransom is added to what he wants for the deal. Your common soldiers are covered by Prisoner Terms Release My Soldiers", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
         public bool PrisonerTermsReleaseMyMen { get; set; } = true;
+
+        [SettingPropertyBool("Prisoner Terms Release My Soldiers", HintText = "With Prisoner Terms Release My Men: the common soldiers of your party, of your clan's lord parties and of your garrisons who were taken in battle (or carried wounded from under the walls) can be bought back in the same talk, at the price their captor would get for selling them. The mod keeps a tally of whose prison they sit in - an estimate when allies lost men of the same kind in the same battle, never more than that prison really holds. They can be freed only while they are still in the enemy party or dungeon that took them: once that party sells its prisoners in a keep (usually within days) they go home or into bondage and are gone from the tally. Freed men rejoin your party when their captor stands near you, otherwise they march to the garrison of your nearest keep", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsReleaseMySoldiers { get; set; } = true;
+
+        [SettingPropertyBool("Prisoner Terms Envoy", HintText = "With Prisoner Exchange For Terms: from the keep of your own town or castle, or from 'Request a parley' while you are besieged (also when the besiegers' commander is not there to talk), you can send an envoy to the ruler of a realm you are at war with. He rides at a horseman's pace (shown before you send him; at least 2 hours, at most 10 days), and one envoy rides at a time; it costs nothing but time. When he stands before the ruler you are told, and for two days you can hear him from any town, castle or village menu (or from 'Request a parley'): you then bargain through him with the same terms as face to face - a pact of peace, the release of your people and soldiers held anywhere in that realm, a truce between realms if you rule one, or the lifting of the siege he was sent out of. Free passage cannot be bargained this way. What is agreed is carried out when the envoy is back", RequireRestart = false)]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PrisonerTermsEnvoy { get; set; } = true;
 
         [SettingPropertyBool("Prisoner Terms Oath", HintText = "With Prisoner Exchange For Terms: you can add your own oath to the offer - not to raise arms against his realm for Prisoner Exchange Pact Days. It is worth a part of your party's strength to him. The game itself holds you to it: until it runs out you cannot attack that realm, besiege or raid it, and you cannot join any army of your own realm while it is at war with them - unless they attack you first, which frees you", RequireRestart = false)]
         [SettingPropertyGroup("The finished piece")]
@@ -12234,6 +12242,8 @@ namespace Armoury
             s.PrisonerExchangePactGuardsClan = PrisonerExchangePactGuardsClan;
             s.PrisonerTermsPickWindow = PrisonerTermsPickWindow;
             s.PrisonerTermsReleaseMyMen = PrisonerTermsReleaseMyMen;
+            s.PrisonerTermsReleaseMySoldiers = PrisonerTermsReleaseMySoldiers;
+            s.PrisonerTermsEnvoy = PrisonerTermsEnvoy;
             s.PrisonerTermsOath = PrisonerTermsOath;
             s.PrisonerTermsHostage = PrisonerTermsHostage;
             s.PrisonerTermsHostageDeath = PrisonerTermsHostageDeath;

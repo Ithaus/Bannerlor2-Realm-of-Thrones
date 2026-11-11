@@ -375,6 +375,7 @@ namespace Armoury
                 try { VillageFruit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageFruit.ApplyAll", e); }   // poprawka po recenzji noc-ekonomia2 16.10: magazyn wsi + 5 dob owocow, miodu i jaj z listy BK (GetWarehouseCapacity)
                 try { StartCalibration.ApplyAll(_harmony); } catch (Exception e) { Log.Error("StartCalibration.ApplyAll", e); }   // KS (kalibracja startu): wies zastosowana bez zywnosci wsi gry z niczego (TickFoodProduction)
                 try { FreeFolkRaids.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FreeFolkRaids.ApplyAll", e); }   // fix-mur: Wolni Ludzie nie bija wlasnych band najazdu (postfiks ShouldConsiderAttacking; klucz Free Folk Raid Kin Peace)
+                try { PlayerCaptives385d.Apply(_harmony); } catch (Exception e) { Log.Error("PlayerCaptives385d.Apply", e); }   // 385d: rejestr zwyklych zolnierzy gracza w niewoli (prefiks + finalizer MapEvent.CaptureDefeatedPartyMembers, tylko odczyt)
                 try { PrisonerTerms384.ApplyPact(_harmony); } catch (Exception e) { Log.Error("PrisonerTerms384.ApplyPact", e); }   // 386: pakt o nieagresji chroni partie rodu gracza (postfiksy ShouldConsiderAttacking / ShouldConsiderAvoiding; 386c: + postfiks 140 CampaignEventDispatcher.AiHourlyTick - cel podejscia)
                 SkillsDecide.ApplyAll(_harmony);
                 MusterOut.ApplyAll(_harmony);
