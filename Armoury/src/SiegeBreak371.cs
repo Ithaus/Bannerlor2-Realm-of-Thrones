@@ -60,6 +60,8 @@ namespace Armoury
     /// (DefenderVictory / PlayerDefeated). Po misji bitwe konczy SiegeWalls.Army387f (postfiks PlayerEncounter.ContinueBattle): bez zwyciezcy, oblezenie trwa,
     /// przerwa istniejaca droga OnMapEventEnded -> RegisterMissionBreak. Gracz-general bez bycia wodzem bitwy - poza regula (do 390).
     /// 390 (Jeff 11.11, decyzja 1 "tak" - jedna zasada wszedzie): GRACZ DOLACZYL DO OBLEZENIA WODZA AI BEZ ARMII. Gra robi go wtedy generalem misji
+    /// - ale tylko WLASNEJ druzyny: ludzie wodza AI walcza w drugiej druzynie strony (MissionCombatantsLogic.SupportsAllyTeamOnPlayerSide, mb_full 83268;
+    /// wlasny GeneralAgent i TeamAI). Regula liczy po stronie i po postaci wodza bitwy, wiec to znosi. 390-p: zaciag ROT (MainParty nieczynna) poza regula.
     /// (SandBoxMissions: isPlayerSergeant = MapEvent.IsPlayerSergeant() - prawda tylko w cudzej armii; AssignPlayerRoleInTeamMissionController(!sierzant, ...)),
     /// ale wodzem bitwy i oblezenia zostaje AI. Klucz SiegeJoinedAssaultBreaks: ten sam tryb _al (rekord wodza AI, koniec bitwy przez SiegeWalls.Army387f),
     /// znacznik _alGen. Jedyna roznica w misji: wstrzas "wodz padl" liczy sie od bohatera WODZA BITWY (rekord i czynnik wodza sa jego), nie od
@@ -137,7 +139,11 @@ namespace Armoury
                     var als = _me.AttackerSide;
                     bool lead = als != null && als.LeaderParty == TaleWorlds.CampaignSystem.Party.PartyBase.MainParty;
                     // 390: general misji bez bycia wodzem bitwy (dolaczyl do oblezenia bez armii) - z kluczem ta sama droga co 387f
-                    bool joined = !lead && pt.IsPlayerGeneral && SiegeWalls.JoinedBreakOn;
+                    // 390-p: zaciag ROT bez CommandFormation tez daje generala misji bez armii (ROT: MainParty.Army = null, IsActive = false w kazdym takcie) -
+                    // poza regula 390 (Jeff odpowiadal o dolaczeniu do oblezenia wlasna druzyna; po zakonczeniu bitwy ukryta druzyna zostalaby w obozie oblezniczym)
+                    bool enlisted = false;
+                    try { var mpx = TaleWorlds.CampaignSystem.Party.MobileParty.MainParty; enlisted = mpx != null && !mpx.IsActive; } catch { enlisted = false; }
+                    bool joined = !lead && pt.IsPlayerGeneral && !enlisted && SiegeWalls.JoinedBreakOn;
                     if (!lead && (!pt.IsPlayerGeneral || joined))
                     {
                         // 387f: o zalamaniu decyduje WODZ BITWY (AI) - ta sama regula i ten sam rekord co przy szturmie na gracza-obronce
@@ -161,6 +167,14 @@ namespace Armoury
                         _al = true;
                         _alGen = joined;
                         _prior = _a.MisCas;
+                        // 390-p: gracz mogl dolaczyc do szturmu juz toczonego na mapie (join_siege_event -> JoinBattle) - straty symulacji sprzed dolaczenia
+                        // (MapEventSide.TroopCasualties, ta sama miara co OB2) licza sie do progu. Tylko przed pierwsza misja bitwy: potem MisCas juz je niesie,
+                        // a TroopCasualties rosnie tez o zbieglych z misji (OnTroopRouted) - nie mieszamy.
+                        if (joined && _a.Missions == 0 && als != null && als.TroopCasualties > _prior)
+                        {
+                            _prior = als.TroopCasualties;
+                            Log.Info("Szturm (390): gracz dolaczyl do szturmu toczonego juz na mapie - straty atakujacych sprzed dolaczenia " + _prior + " licza sie do progu zalamania.");
+                        }
                         _dPrior = _a.MisDefCas;
                         _tPrior = Math.Max(0f, _a.MisTime);
                         return _active = true;
@@ -169,7 +183,7 @@ namespace Armoury
                     if (!pt.IsPlayerGeneral || !lead)
                     {
                         if (!lead) SiegeWalls.NoteArmyGeneral();   // 387f-p: licznik doby (gracz dolaczyl do oblezenia bez armii - gra robi go generalem misji)
-                        Log.Info("Szturm (387): gracz atakuje, ale " + (lead ? "nie jest generalem misji mimo bycia wodzem bitwy" : "jest generalem misji bez bycia wodzem bitwy (dolaczyl do oblezenia bez armii; 390: klucz Siege Joined Assault Breaks NIE albo Siege Army Assault Breaks NIE)") + " - bez zalamania, jak dotad.");
+                        Log.Info("Szturm (387): gracz atakuje, ale " + (lead ? "nie jest generalem misji mimo bycia wodzem bitwy" : enlisted ? "jest generalem misji w zaciagu ROT (druzyna gracza nieczynna) - 390-p: zaciag poza regula" : "jest generalem misji bez bycia wodzem bitwy (dolaczyl do oblezenia bez armii; 390: klucz Siege Joined Assault Breaks NIE albo Siege Army Assault Breaks NIE)") + " - bez zalamania, jak dotad.");
                         return _active = false;
                     }
                     SiegeWalls.NotePlayerSeen();
@@ -428,7 +442,7 @@ namespace Armoury
                 _plWarned = true;
                 if (_pl) SiegeWalls.NotePlayerWarn(); else SiegeWalls.NoteArmyWarn();
                 if (A < lim0) { try { InformationManager.DisplayMessage(new InformationMessage(_pl ? "Your men waver - losses are mounting." : "The men waver - losses are mounting.", Color.FromUint(0xFFE0B040u))); } catch { } }
-                Log.Info("Szturm (" + (_pl ? "387" : "387f") + "): ostrzezenie 75% | straty oddzialu " + A + " / prog " + F(lim0, "0") + " (czas misji " + F(now, "0") + " s)" + (A >= lim0 ? " - prog juz osiagniety, bez komunikatu" : "") + ".");
+                Log.Info("Szturm (" + (_pl ? "387" : _alGen ? "390" : "387f") + "): ostrzezenie 75% | straty oddzialu " + A + " / prog " + F(lim0, "0") + " (czas misji " + F(now, "0") + " s)" + (A >= lim0 ? " - prog juz osiagniety, bez komunikatu" : "") + ".");
             }
             // tanie wyjscie: ponizej progu z wstrzasami (bramy tylko podnosza) - bez liczenia bram i obroncow
             if (A < lim0) { _limit = lim0; _state = 0; return; }
@@ -634,7 +648,7 @@ namespace Armoury
                     // MUSI byc DefenderVictory - inaczej CampaignSiegeStateHandler.OnEndMission przesuwa oblezenie do sali lorda (SetNextSiegeState)
                     // 387f: to samo dla gracza w armii AI (strona gracza odstepuje, gracz zyje - BattleEndLogic sam misji nie skonczy)
                     missionResult = new MissionResult(BattleState.DefenderVictory, false, true, false);
-                    Log.Info("Szturm (" + (_pl ? "387" : "387f") + "): bezpiecznik - " + F(SiegeWalls.BreakEndSeconds, "0") + " s po zalamaniu misja trwala; koniec z wynikiem DefenderVictory / PlayerDefeated (odstapienie, oblezenie trwa).");
+                    Log.Info("Szturm (" + (_pl ? "387" : _alGen ? "390" : "387f") + "): bezpiecznik - " + F(SiegeWalls.BreakEndSeconds, "0") + " s po zalamaniu misja trwala; koniec z wynikiem DefenderVictory / PlayerDefeated (odstapienie, oblezenie trwa).");
                     return true;
                 }
                 // ten sam wynik, co BattleEndLogic przy odwrocie wroga (CreateSuccessful(enemyRetreated: true) gracza-obroncy)

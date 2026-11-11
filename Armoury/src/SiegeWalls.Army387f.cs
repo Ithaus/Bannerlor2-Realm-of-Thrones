@@ -79,8 +79,8 @@ namespace Armoury
             return "; 387f szturm armii AI z graczem " + (ArmyBreakOn ? "tak" : "nie") + ": misji z graczem w szeregu " + _dAlSeen + ", poza regula " + _dAlNone + ", ostrzezen 75% " + _dAlWarn
                  + ", zalaman " + _dAlBreak + " (bezpiecznik " + _dAlFuse + ", wystawionych po zalamaniu " + _dAlLate + "), bitew zakonczonych " + _dAlFinished + ", pominietych " + _dAlSkipped
                  + ", przerw zapisanych " + _dAlReg + ", gracz generalem bez bycia wodzem bitwy (bez zalamania) " + _dAlGen
-                 + "; 390 gracz-general w oblezeniu wodza AI " + (JoinedBreakOn ? "tak" : "nie") + ": misji " + _dJoSeen + ", poza regula " + _dJoNone + " (zalamania, bitwy zakonczone i przerwy - w licznikach 387f)"
-                 + (_dAlWait > 0 ? ", prob poza mapa " + _dAlWait : "") + (_dAlMend > 0 ? ", naprawionych polstanow " + _dAlMend : "") + " (latka " + _hookAl + ")";
+                 + (_dAlWait > 0 ? ", prob poza mapa " + _dAlWait : "") + (_dAlMend > 0 ? ", naprawionych polstanow " + _dAlMend : "") + " (latka " + _hookAl + ")"
+                 + "; 390 gracz-general w oblezeniu wodza AI " + (JoinedBreakOn ? "tak" : "nie") + ": misji " + _dJoSeen + ", poza regula " + _dJoNone + " (zalamania, bitwy zakonczone i przerwy - w licznikach 387f)";   // 390-p: po koncowce 387f
         }
 
         private static string Start387fText()
@@ -174,6 +174,14 @@ namespace Armoury
                 // 387f-p: spotkanie nie zamkniete - gra domknie je sama przy nastepnym Update (PlayerEncounter.UpdateInternal: _leaveEncounter -> Finish)
                 try { if (PlayerEncounter.Current != null) PlayerEncounter.LeaveEncounter = true; } catch (Exception e2) { Stumble("ContinueBattlePost.Leave", e2); }
             }
+            // 390-p: gracz bez armii w obozie oblezniczym po dolaczeniu przez JoinBattle (bez PlayerSiege.StartPlayerSiege) - druzyna stoi, jak po
+            // StartPlayerSiege (cs_full 184299-184309: BesiegerCamp + SetMoveModeHold); stary rozkaz ruchu nie zostaje
+            try
+            {
+                var mph = MobileParty.MainParty;
+                if (closed && mph != null && mph.IsActive && mph.Army == null && mph.BesiegerCamp != null) mph.SetMoveModeHold();
+            }
+            catch (Exception e) { Stumble("ContinueBattlePost.Hold", e); }
             // 387f-p: polstan po wyjatku cudzego nasluchu MapEventEnded w srodku FinalizeEventAux (bitwa WaitingRemoval, strony nie posprzatane) -
             // druzyna gracza nie moze wskazywac zakonczonej bitwy (GetGenericStateMenu dalby "encounter" bez spotkania)
             try
