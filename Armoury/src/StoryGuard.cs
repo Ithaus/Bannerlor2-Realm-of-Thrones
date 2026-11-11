@@ -556,7 +556,13 @@ namespace Armoury
         {
             try
             {
-                if (c == null || !KeyOn || !Ensure()) return false;
+                if (c == null || !KeyOn) return false;
+                if (!(Ensure() && _ready))
+                {
+                    // 410-p: straz slepa (lista wydarzen ROT niewidoczna) - jak Clear: rod z zywa postacia z tabeli obsady jest zamkniety (nie otwieramy sporu na slepo)
+                    foreach (var x in c.Heroes) if (x != null && x.IsAlive && x.StringId != null && CanonCompanions.GuardedTerms(x.StringId) != null) return true;
+                    return false;
+                }
                 foreach (var kv in _memo)
                 {
                     var h = kv.Key;
@@ -566,7 +572,7 @@ namespace Armoury
                 }
                 return false;
             }
-            catch (Exception e) { Stumble("ClanLocked", e); return false; }
+            catch (Exception e) { Stumble("ClanLocked", e); return true; }   // 410-p: blad = zamkniety (ostroznie, jak ClanHoldsStory)
         }
 
         /// <summary>Bramka strazy dla naszych systemow: false = chroniony, nieoceniony (396-p) albo postac z tabeli przy niewidocznej liscie wydarzen ROT.</summary>

@@ -94,7 +94,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _active.Clear(); _pre.Clear(); _changed.Clear(); _leaderOf.Clear(); _rulerOf.Clear(); _tmp.Clear();
+            _active.Clear(); _pre.Clear(); _changed.Clear(); _leaderOf.Clear(); _rulerOf.Clear(); _tmp.Clear(); _ended.Clear();
             lock (_err) _err.Clear();   // 406-p: Stumble bierze ten sam zamek z watkow AI
             _stumbles = _nPre = _nChg = _nSnap = _nFull = _nQuiet = _nWord = _nJoint = 0;
             TruceReset();   // 406
@@ -454,15 +454,36 @@ namespace Armoury
                 int today = Today();
                 _tmp.Clear();
                 foreach (var kv in _active) if (today > kv.Value.End) _tmp.Add(kv.Key);
-                foreach (var id in _tmp)
+                foreach (var id in _tmp) { _ended.Add(_active[id]); _active.Remove(id); }   // 410-p: linia KONIEC nizej, po SuccDaily (liczniki sporow z rozstrzygnieciem tej doby)
+                if (_changed.Count > 0)
                 {
-                    var r = _active[id];
-                    _active.Remove(id);
+                    DailyChanged();
+                }
+                if (_pre.Count > 64) _pre.Clear();   // zgon wstrzymany po BeforeHeroKilled nie zdarza sie w grze; bezpiecznik pamieci
+                _tmp.Clear();
+            }
+            catch (Exception e) { Stumble("Daily", e); }
+            try { SuccDaily(); } catch (Exception e) { Stumble("SuccDaily", e); }     // 410: spory po koncu pogrzebu (rozstrzygniecie), urazy, zaloby; migawka 312c
+            try
+            {
+                foreach (var r in _ended)
+                {
+                    string id = r.Clan;
                     Info("KONIEC " + id + " (" + r.Name + (string.IsNullOrEmpty(r.Others) ? "" : " + " + r.Others) + ", siedziba " + r.Seat + ", tryb " + (r.Mode == Full ? "pelny" : "cichy") + ") | gracz obecny "
                          + (r.Attended ? "T" : "N") + ", dar " + r.Gift + (r.Mode == Full ? TruceEndText(r) : "") + GatherEnd(r) + " | sesja: glowy wykryte przed " + _nPre + " / zmiana glowy " + _nChg + " / migawka " + _nSnap + ", pelnych " + _nFull + ", cichych " + _nQuiet
                          + ", tylko wiesc " + _nWord + ", wspolnych " + _nJoint + SuccEndText() + ", potkniecia " + _stumbles + ".");
                 }
-                if (_changed.Count > 0)
+            }
+            catch (Exception e) { Stumble("Daily.end", e); }
+            _ended.Clear();
+            try { TruceDaily(); } catch (Exception e) { Stumble("TruceDaily", e); }   // 406: migawka pokoju po wygaszeniu wierszy (stan fabuly i pan siedziby na dzis)
+        }
+
+        private static readonly List<Row> _ended = new List<Row>();
+
+        /// <summary>Doba: porzadek pamieci "zmiana glowy" (wolane z Daily w jego try; uzywa _tmp).</summary>
+        private static void DailyChanged()
+        {
                 {
                     double now = CampaignTime.Now.ToHours;
                     _tmp.Clear();
@@ -483,12 +504,6 @@ namespace Armoury
                     }
                     foreach (var id in _tmp) _changed.Remove(id);
                 }
-                if (_pre.Count > 64) _pre.Clear();   // zgon wstrzymany po BeforeHeroKilled nie zdarza sie w grze; bezpiecznik pamieci
-                _tmp.Clear();
-            }
-            catch (Exception e) { Stumble("Daily", e); }
-            try { SuccDaily(); } catch (Exception e) { Stumble("SuccDaily", e); }     // 410: spory po koncu pogrzebu (rozstrzygniecie), urazy, zaloby; migawka 312c
-            try { TruceDaily(); } catch (Exception e) { Stumble("TruceDaily", e); }   // 406: migawka pokoju po wygaszeniu wierszy (stan fabuly i pan siedziby na dzis)
         }
 
         private static void Snapshot()

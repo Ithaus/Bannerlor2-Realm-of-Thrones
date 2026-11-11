@@ -33,7 +33,10 @@ namespace Armoury
     /// GRACZ (klucz Succession Player Support): po "Attend the funeral" w siedzibie, przy otwartym sporze - pytanie (raz na spor): "Stand with {HEIR}" /
     ///  "Speak for {RIVAL}" / "Stay out of it": +8 z poparta strona, -8 z druga. Bez zlota.
     /// 312c (CanonThroneWars.Compute): bramka "zaloba" - krolestwo, ktorego wladca zmarl mniej niz Funeral Days temu, ma czlon 0 (takze przy pogrzebie cichym
-    ///  i samej wiesci); cel z otwartym sporem (takze uraza) w rodzie PANUJACYM: czlon x (1 + Iron Throne Contested Bonus). Ocena wojny bywa liczona poza
+    ///  i samej wiesci; 410-p: wlasny klucz Iron Throne Mourning, NIE = 312c jak przed 410); cel ze sporem w rodzie PANUJACYM - otwartym ALBO w stanie urazy
+    ///  (do 91 dni; swiadome rozszerzenie planu, decyzja 21 "rod panujacy w sporze"): czlon x (1 + Iron Throne Contested Bonus). Klucze czytane na zywo.
+    ///  410-p: klucz Succession Disputes / Funerals wylaczony w trakcie = wiersze sporow zdjete w dobie bez rzutu i bez zmiany relacji.
+    ///  Ocena wojny bywa liczona poza
     ///  watkiem glownym - czyta NIEZMIENNA migawke (_succ), podmieniana w calosci w watku glownym; pamiec doby czlonu kasowana przy smierci wladcy i przy
     ///  otwarciu / zamknieciu sporu (CanonThroneWars.Invalidate).
     /// Zapis: arm_funeral v1 + wiersze "S|..." (spor) i "K|krolestwo|doba" (zaloba); stary zapis = pusto; starsza wersja moda pominie nowe wiersze jako bledne.
@@ -84,7 +87,9 @@ namespace Armoury
             var m = _succ;
             if (m == null || k == null || m.Mourn.Count == 0) return false;
             int d;
-            return m.Mourn.TryGetValue(k.StringId, out d) && day >= d && day - d < m.Days;
+            if (!m.Mourn.TryGetValue(k.StringId, out d) || day < d || day - d >= m.Days) return false;
+            var s = Settings.Current;   // 410-p: klucze na zywo (migawka zyje do najblizszej doby)
+            return s != null && s.Funerals && s.IronThroneMourning;
         }
 
         /// <summary>410: premia czlonu 312c za cel, ktorego rod panujacy ma otwarty spor o dziedzictwo (0 = brak). Czyta niezmienna migawke. Nie rzuca.</summary>
@@ -92,7 +97,9 @@ namespace Armoury
         {
             var m = _succ;
             if (m == null || k == null || m.Contested.Count == 0) return 0f;
-            return m.Contested.Contains(k.StringId) ? m.Bonus : 0f;
+            if (!m.Contested.Contains(k.StringId)) return 0f;
+            var s = Settings.Current;   // 410-p: klucze na zywo (migawka zyje do najblizszej doby)
+            return s != null && s.Funerals && s.SuccessionDisputes ? m.Bonus : 0f;
         }
 
         /// <summary>Watek glowny: migawka dla 312c od nowa (smierc wladcy, otwarcie / zamkniecie sporu, doba, start sesji). Nie rzuca.</summary>
@@ -105,7 +112,7 @@ namespace Armoury
                 var map = new SuccMap { Days = Days };
                 float b = s.IronThroneContestedBonus;
                 map.Bonus = b < 0f ? 0f : (b > 1f ? 1f : b);
-                foreach (var kv in _kingDied) map.Mourn[kv.Key] = kv.Value;
+                if (s.IronThroneMourning) foreach (var kv in _kingDied) map.Mourn[kv.Key] = kv.Value;   // 410-p: zaloba ma wlasny klucz (NIE = 312c jak przed 410)
                 if (s.SuccessionDisputes && map.Bonus > 0f)
                     foreach (var d in _disputes.Values)
                     {
@@ -129,7 +136,11 @@ namespace Armoury
                 _sMourn++;
                 SuccRebuild();
                 CanonThroneWars.Invalidate();
-                Info("ZALOBA krolestwa " + kingdomId + " po wladcy " + Nm(victim) + ": czlon 312c tego krolestwa = 0 do dnia " + (today + Days - 1) + " (bramka \"zaloba\").");
+                var s = Settings.Current;
+                bool on = s != null && s.IronThroneMourning, amb = s != null && s.IronThroneAmbition;
+                Info("ZALOBA krolestwa " + kingdomId + " po wladcy " + Nm(victim) + ": " + (!on ? "klucz Iron Throne Mourning NIE - bez skutku dla 312c (data zapamietana)."
+                     : !amb ? "klucz Iron Throne Ambition NIE - czlonu 312c nie ma (data zapamietana)."
+                     : "czlon 312c tego krolestwa = 0 do dnia " + (today + Days - 1) + " (bramka \"zaloba\")."));
             }
             catch (Exception e) { Stumble("KingDied", e); }
         }
@@ -245,6 +256,19 @@ namespace Armoury
                 string head = "SPOR " + cl.StringId + ": dziedzic " + Nm(heir) + " (" + heir.StringId + ")";
                 Hero rival = null; string rule = null, no = null; bool first = false;
                 int gap = s.SuccessionMaxAgeGap < 0 ? 0 : (s.SuccessionMaxAgeGap > 15 ? 15 : s.SuccessionMaxAgeGap);
+                Dispute old;
+                if (_disputes.TryGetValue(cl.StringId, out old))
+                {
+                    // 410-p: stary spor z martwym dziedzicem (zmarly wlasnie byl tym dziedzicem) przepada od razu - nie blokuje oceny nowej smierci glowy do doby
+                    var oh = HeroIn(cl, old.Heir);
+                    if (old.Heir == victim.StringId || oh == null || !oh.IsAlive)
+                    {
+                        _disputes.Remove(cl.StringId); _sLapsed++;
+                        Info("SPOR " + old.Clan + " (dziedzic " + old.Heir + ", rywal " + old.Rival + ", regula " + old.Rule + ") PRZEPADL: dziedzic nie zyje (nowa smierc glowy rodu).");
+                        SuccRebuild();
+                        CanonThroneWars.Invalidate();
+                    }
+                }
                 if (_disputes.ContainsKey(cl.StringId)) no = "spor w rodzie juz trwa";
                 else if (cl == Clan.PlayerClan || cl.IsEliminated || cl.Leader != heir) no = "rod poza regula";
                 else if (rot) no = "zgon albo zmiana glowy z wydarzenia ROT";
@@ -302,6 +326,12 @@ namespace Armoury
             int today = Today();
             try
             {
+                if (!SuccKey && _disputes.Count > 0)
+                {
+                    // 410-p: klucz Funerals / Succession Disputes wylaczony w trakcie - wiersze zdjete bez rzutu, bez zmiany relacji i bez komunikatow
+                    foreach (var d in _disputes.Values) { _sLapsed++; Info("SPOR " + d.Clan + " (dziedzic " + d.Heir + ", rywal " + d.Rival + ", regula " + d.Rule + ") PRZEPADL: klucz wylaczony."); }
+                    _disputes.Clear(); changed = true;
+                }
                 _tmp.Clear();
                 foreach (var kv in _disputes)
                 {
@@ -414,7 +444,8 @@ namespace Armoury
                 ChangeRelationAction.ApplyPlayerRelation(forHeir ? rival : heir, -PlayerSide);
             }
             Info("SPOR " + clanId + ": gracz na pogrzebie poparl " + (d.Support > 0 ? "dziedzica " + Nm(heir) : (d.Support < 0 ? "rywala " + Nm(rival) : "nikogo"))
-                 + (d.Support != 0 ? " (+" + PlayerSide + " / -" + PlayerSide + ", szansa pojednania " + (ReconcileBase + SideShift * d.Support) + "%)" : "") + ".");
+                 + (d.Support != 0 ? " (+" + PlayerSide + " / -" + PlayerSide + ", szansa pojednania " + (ReconcileBase + SideShift * d.Support) + "%; relacja gracza teraz: dziedzic "
+                    + CharacterRelationManager.GetHeroRelation(Hero.MainHero, heir) + ", rywal " + CharacterRelationManager.GetHeroRelation(Hero.MainHero, rival) + ")" : "") + ".");   // 410-p: faktyczny skutek (zalezy od czynnego modelu dyplomacji)
         }
 
         // ---------------------------------------------------------------- start, zapis
@@ -430,7 +461,7 @@ namespace Armoury
                 foreach (var d in _disputes.Values) if (d.State == SGrudge) grudge++;
                 Log.Info(Tag + " (410): sukcesja start | klucze: spor " + YN(s != null && s.SuccessionDisputes) + ", roznica wieku " + (s != null ? s.SuccessionMaxAgeGap : 0) + ", szansa "
                          + (s != null ? s.SuccessionDisputeChance : 0) + "%, gracz popiera " + YN(s != null && s.SuccessionPlayerSupport) + ", premia 312c "
-                         + (s != null ? s.IronThroneContestedBonus : 0f).ToString("0.00", Inv) + " | BK linia dziedziczenia " + YN(BkReady()) + ", ustroj BK (republiki) " + YN(GovReady())
+                         + (s != null ? s.IronThroneContestedBonus : 0f).ToString("0.00", Inv) + ", zaloba 312c " + YN(s != null && s.IronThroneMourning) + " | BK linia dziedziczenia " + YN(BkReady()) + ", ustroj BK (republiki) " + YN(GovReady())
                          + " | w zapisie: sporow " + _disputes.Count + " (uraza " + grudge + "), zalob " + _kingDied.Count
                          + " | migawka 312c: krolestw w zalobie " + (_succ != null ? _succ.Mourn.Count : 0) + ", z rodem panujacym w sporze " + (_succ != null ? _succ.Contested.Count : 0) + ".");
             }

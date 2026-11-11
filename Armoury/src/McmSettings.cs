@@ -12104,7 +12104,7 @@ namespace Armoury
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public int FuneralMinEscort { get; set; } = 15;
 
-        [SettingPropertyBool("Succession Disputes", HintText = "With Funerals: when the head of a great house dies, a close kinsman may refuse to bow to the heir - a brother of about the same age, a grown uncle of an heir under 21, or the one who stood first in line and was passed over. Only a rival who is free, leads his own party, is no friend of the heir and is not an honourable man, and then only by Succession Dispute Chance. The two fall out (relation -20); when the funeral ends they either make their peace or the grudge lasts 91 days. No gold changes hands, no house breaks apart and no realm changes. Never your own house, a house with a character the Realm of Thrones story still needs, a head named by a story event, the Night's Watch, the Free Folk or a republic. Off = no disputes", RequireRestart = false)]
+        [SettingPropertyBool("Succession Disputes", HintText = "With Funerals: when the head of a great house dies, a close kinsman may refuse to bow to the heir - a brother of about the same age, a grown uncle of an heir under 21, or the one who stood first in line and was passed over. Only a rival who is free, leads his own party, is no friend of the heir and is not an honourable man, and then only by Succession Dispute Chance. The two fall out (relation -20); when the funeral ends they either make their peace or the grudge lasts 91 days. No gold changes hands, no house breaks apart and no realm changes. Never your own house, a house with a character the Realm of Thrones story still needs, a head named by a story event, the Night's Watch, the Free Folk or a republic. Off = no disputes; a dispute already open is dropped at the next dawn with nothing more happening", RequireRestart = false)]
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public bool SuccessionDisputes { get; set; } = true;
 
@@ -12120,7 +12120,11 @@ namespace Armoury
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public bool SuccessionPlayerSupport { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Iron Throne Contested Bonus", 0.00f, 1.00f, "0.00", HintText = "With Funerals and Ambition for the Iron Throne: a realm whose ruling house is divided over the succession is a more tempting target - the ambition against it is raised by this share (0.25 = a quarter more), under all the usual limits. A realm whose ruler died less than Funeral Days ago is in mourning and feels no ambition for the throne itself. 0 = no bonus", RequireRestart = false)]
+        [SettingPropertyBool("Iron Throne Mourning", HintText = "With Funerals and Ambition for the Iron Throne: a realm whose ruler died less than Funeral Days ago is in mourning and feels no ambition for the throne - it does not go to war for it until the mourning is over. Only the ambition is stilled: wars the story brings and wars Banner Kings judges for other reasons go on. Off = the ambition for the throne takes no notice of a ruler's death", RequireRestart = false)]
+        [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
+        public bool IronThroneMourning { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Iron Throne Contested Bonus", 0.00f, 1.00f, "0.00", HintText = "With Funerals and Ambition for the Iron Throne: a realm whose ruling house is divided over the succession is a more tempting target - the ambition against it is raised by this share (0.25 = a quarter more), under all the usual limits, for as long as the quarrel lasts (until the house makes its peace, or for 91 days when it does not). Needs Succession Disputes. 0 = no bonus", RequireRestart = false)]
         [SettingPropertyGroup("Funerals: a great house buries its dead lord (405)")]
         public float IronThroneContestedBonus { get; set; } = 0.25f;
 
@@ -15353,6 +15357,7 @@ namespace Armoury
             s.SuccessionMaxAgeGap = SuccessionMaxAgeGap;
             s.SuccessionDisputeChance = SuccessionDisputeChance;
             s.SuccessionPlayerSupport = SuccessionPlayerSupport;
+            s.IronThroneMourning = IronThroneMourning;
             s.IronThroneContestedBonus = IronThroneContestedBonus;
             s.CaravanSeaTrueDistance = CaravanSeaTrueDistance;
             s.CaravanSeaNearDays = CaravanSeaNearDays;

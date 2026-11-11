@@ -89366,7 +89366,7 @@ def tt312_rows(rep, starts, days, wars, errors, orders=None):
                 n8 += 1
                 if not north_ok:
                     bad8.append(f"dzien {m.group(1)}: {it.group(1)}>{it.group(2)} (Polnoc po Bekartach NIE, flaga NIE)")
-                if it.group(1) == "battania" and it.group(8) != "ziemie Polnocy":
+                if it.group(1) == "battania" and it.group(8).split(",")[0] != "ziemie Polnocy":   # 410-p: dopisek ", spor o dziedzictwo xN" w nawiasie powodu
                     bad8.append(f"dzien {m.group(1)}: {it.group(1)}>{it.group(2)} powod {it.group(8)} (Polnoc nigdy o tron)")
             for side in (it.group(1), it.group(2)):
                 if side not in TT312_WEST:
