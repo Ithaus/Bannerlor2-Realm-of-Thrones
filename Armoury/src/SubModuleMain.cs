@@ -888,7 +888,7 @@ namespace Armoury
                 starter.AddBehavior(new CanonWarsBehavior());       // m104-wojny: wojny wedlug ksiazki - Essos na kalendarzu, Reach i Dorne z korona, smoki Daenerys (zapis arm_m104)
                 starter.AddBehavior(new ChronicleBehavior());       // m105-kronika K0: Kronika Westeros - okna z arm_kronika_kNN.tsv (zapis arm_kronika); PO CanonCompanions (doba po dobie postaci kanonu)
                 starter.AddBehavior(new KingInTheNorthBehavior(_harmony));
-                starter.AddBehavior(new SiegeWounded373Behavior());  // 373: ranni spod murow do lochu - nasluch MapEventEnded PO ArmouryBehavior (SiegeWalls.OnMapEventEnded)
+                starter.AddBehavior(new SiegeWounded373Behavior());  // 373: ranni spod murow do lochu - nasluch MapEventEnded dodany po ArmouryBehavior, wiec biegnie PRZED jego nasluchami (388b: MbEvent wola od ostatnio zarejestrowanego)
                 starter.AddBehavior(new WarTruceBehavior());        // 330: wojna do kapitulacji Polnoc-korona - rozejm zamiast pokoju, kapitulacja, zapis arm_k330; latki H4/H5 przy starcie sesji   // 272: unia Dorzecza z Polnoca (hold lordow rzecznych - Krol Polnocy i Tridentu), zapis arm_k272; latki leniwie (Krwawe Gody przy starcie sesji, armie przy unii)
                 Log.Info("Behavior dodany do kampanii.");
             }

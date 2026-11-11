@@ -23,7 +23,7 @@ namespace Armoury
     ///  - w misji (OnAgentRemoved, Unconscious, czlowiek, strona Attacker): "w srodku" = GetCurrentNavigationFaceId() % 10 == 1 (jak Formation.CountUnitsOnNavMeshIDMod10(1)
     ///    w TeamAISiegeComponent.IsFormationInsideCastle); "pod murami" = 2D &lt;= SiegeWoundedWallDistance od bramy / odcinka muru / drabiny / celu taranu i wiezy
     ///    (punkty zebrane raz, przy pierwszym rannym); ksiega [MapEvent][partia][typ] przez wszystkie misje tej bitwy ("Battle continues" - ranni dalej leza pod murami).
-    ///  - przenosiny w MapEventEnded (nasz nasluch PO SiegeWalls.OnMapEventEnded - przerwa 371 liczona ze stanu sprzed przenosin), tylko gdy: szturm zalamal sie (371
+    ///  - przenosiny w MapEventEnded (388b: nasz nasluch biegnie PRZED SiegeWalls.OnMapEventEnded - MbEvent wola nasluchy od ostatnio zarejestrowanego; przerwa 371 liczy sie wiec ze stanu PO przenosinach - stan zastany, nie zmieniany), tylko gdy: szturm zalamal sie (371
     ///    NoteBreak), ostatnia misja skonczyla sie odwrotem wroga, bitwa bez zwyciezcy (WinningSide None) i IsSiegeAssault. Kazdy inny wynik (zamek padl, obronca
     ///    wygral bez zalamania) - wpis tylko usuniety (gra rozlicza jak dotad).
     ///  - zolnierze: n = min(zapisani, ranni typu w partii, ktora jest wciaz po stronie atakujacej) -&gt; MemberRoster -n (rannych) -&gt; loch osady +n (jako ranni, jak
@@ -214,7 +214,7 @@ namespace Armoury
         }
     }
 
-    /// <summary>373: nasluch MapEventEnded - ranni spod murow do lochu obroncow po zalamaniu szturmu (dodany PO ArmouryBehavior, wiec po SiegeWalls.OnMapEventEnded).</summary>
+    /// <summary>373: nasluch MapEventEnded - ranni spod murow do lochu obroncow po zalamaniu szturmu (dodany PO ArmouryBehavior, wiec - 388b - biegnie PRZED jego nasluchami, takze przed SiegeWalls.OnMapEventEnded: MbEvent.AddNonSerializedListener wstawia na poczatek listy).</summary>
     internal sealed class SiegeWounded373Behavior : CampaignBehaviorBase
     {
         private const int ErrMax = 5;
@@ -256,40 +256,37 @@ namespace Armoury
         // Sufit: wolne miejsce w lochu (PartyBase.PrisonerSizeLimit - gra sama go nie pilnuje) i nie wiecej niz obroncow na nogach. Ksiega ludzi zamknieta:
         // MemberRoster -n (ranni) = loch +n (ranni), PeopleBook.Transfer(FCaptured). Bohater: jak 373 / 373b - wodz partii i wodz strony zostaja.
         // Okien 380 nie ma (gracza w bitwie nie ma). Partia bez wodza nie jest oprozniana do zera (zostaje 1 czlowiek). Stan tylko w pamieci.
-        private static readonly HashSet<MapEvent> _sim = new HashSet<MapEvent>();
-        private static int _dRep, _dWnd, _dMoved, _dCutPrison, _dCutDef, _dHero, _dSt, _dSkip, _dStale;
+        // 388b: rozliczenie wolane WPROST z SiegeWalls.OnMapEventEnded (galaz a.Repelled) - wpis-zbior "_sim" z 388 powstawal PO nasluchu, ktory mial go zuzyc
+        // (nasluchy MapEventEnded biegna od ostatnio zarejestrowanego, cs_full 22405-22425; log 09.11 19:42:55: linia 373 przed linia przerwy 371) i 388 nie dzialalo nigdy.
+        private static int _dRep, _dWnd, _dMoved, _dCutPrison, _dCutDef, _dHero, _dSt, _dSkip;
 
         private sealed class Cand { public CharacterObject Troop; public int Want; }
 
-        /// <summary>Z SiegeWalls.OnMapEventEnded: szturm AI odparty bez misji. Wpis zyje do naszego nasluchu w tym samym wywolaniu MapEventEnded.</summary>
-        internal static void NoteSimRepel(MapEvent me)
-        {
-            try { if (me != null) _sim.Add(me); } catch { }
-        }
-
         private static void Reset388()
         {
-            _sim.Clear();
-            _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = _dStale = 0;
+            _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = 0;
         }
 
         private static void Daily388()
         {
             try
             {
-                if (_sim.Count > 0) { _dStale += _sim.Count; _sim.Clear(); }   // wpis bez rozliczenia (nasluch nie dobiegl) - nie trzymamy bitew w pamieci
+                if (_dRep + _dWnd + _dMoved + _dCutPrison + _dCutDef + _dHero + _dSt + _dSkip == 0) return;   // 388b: bez linii przy samych zerach
                 var set = Settings.Current;
                 bool on = set != null && set.SiegeWoundedTakenPrisoner && set.SiegeWoundedSimulated && set.SiegeWoundedSimulatedShare > 0f;
                 Log.Info("Ranni pod murami (388) doba: dzien " + (int)CampaignTime.Now.ToDays + " | czynne " + (on ? "tak" : "nie") + ", udzial "
                          + (set != null ? set.SiegeWoundedSimulatedShare.ToString("0.00", CultureInfo.InvariantCulture) : "-") + " | odparc bez misji " + _dRep + ", rannych atakujacych " + _dWnd
                          + ", do lochu " + _dMoved + ", obciete lochem " + _dCutPrison + ", obciete zaloga " + _dCutDef + ", bohaterowie " + _dHero
-                         + " | pominiete (misja 373 / nie szturm / zwyciezca) " + _dSkip + ", wpisy bez rozliczenia " + _dStale + " | potkniecia " + _dSt + ".");
-                _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = _dStale = 0;
+                         + " | pominiete (misja 373 / nie szturm / zwyciezca) " + _dSkip + " | potkniecia " + _dSt + ".");
+                _dRep = _dWnd = _dMoved = _dCutPrison = _dCutDef = _dHero = _dSt = _dSkip = 0;
             }
             catch (Exception e) { int s = 0; Stumble("Daily388", e, ref s); }
         }
 
-        private static void Sim388(MapEvent me)
+        /// <summary>388b: wolane wprost z SiegeWalls.OnMapEventEnded (odparcie OB2 bez misji, nie bitwa gracza). Biegnie po nasluchach ArmouryBehavior
+        /// zarejestrowanych pozniej niz SiegeWalls (BattleChronicle, AiWear, PeopleLedger, PeopleBook, ArmouryBehavior.OnMapEventEnded...) i przed wczesniejszymi
+        /// (SiegeRansom, NoticeBoard, Rumours, SiegeSurrender374 - zaden nie czyta rannych atakujacych z rosterow). Nie rzuca.</summary>
+        internal static void Sim388(MapEvent me)
         {
             int s = 0;
             try
@@ -415,7 +412,7 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Sim388.Move", e, ref s); }
                 }
-                int cut = Math.Max(0, wantSum - moved) + hCut;
+                int cut = wantSum + heroes.Count > cap0 ? Math.Max(0, wantSum - moved) + hCut : 0;   // 388b: obciecie liczone tylko, gdy sufit naprawde ciasny (nie roznice zaokraglen)
                 bool byPrison = free <= def;
                 if (cut > 0) { if (byPrison) _dCutPrison += cut; else _dCutDef += cut; }
                 _dMoved += moved; _dHero += names.Count; _dSt += s;
@@ -451,12 +448,7 @@ namespace Armoury
         private static void OnMapEventEnded(MapEvent me)
         {
             if (me == null) return;
-            // 388: szturm odparty BEZ misji (OB2, wpis z SiegeWalls.OnMapEventEnded w tym samym wywolaniu). Bitwa z ksiega misji (373) - rozlicza 373, 388 nie rusza.
-            if (_sim.Count > 0 && _sim.Remove(me))
-            {
-                if (!SiegeWounded373.Book.ContainsKey(me)) { Sim388(me); return; }
-                _dSkip++;
-            }
+            // 388b: tu tylko 373 (ksiega misji) - jak przed 388; odparcie bez misji rozlicza Sim388 wolane z SiegeWalls.OnMapEventEnded
             if (SiegeWounded373.Book.Count == 0) return;
             SiegeWounded373.Tally t;
             if (!SiegeWounded373.Book.TryGetValue(me, out t)) return;
