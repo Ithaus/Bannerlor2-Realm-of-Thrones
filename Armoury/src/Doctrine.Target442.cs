@@ -21,8 +21,10 @@ namespace Armoury
     ///   wiec rozkaz "szarza na lucznikow" konczy sie w piechocie, ktora stoi przed nimi.
     /// Wybor (glowny watek, OnMissionTick co 1 s, Doctrine.Tick): dla kazdego szyku jazdy AI (nie konni strzelcy, nie szyk gracza, nie szyk w roli 441) ocena
     ///   kazdego pieszego szyku wroga (piechota albo strzelcy, >= T442MinMen; jazda wroga poza zakresem jak RBM ChargeCavalry NIE):
-    ///   strzelcy odslonieci (zaden szyk piechoty wroga nie zaslania odcinka jazda - strzelcy, jak miara 437) 3.0; strzelcy zasloniecie 0.8;
-    ///   piechota skrzydlowa (nie najwiekszy szyk piechoty swojej druzyny) 1.2; piechota srodkowa 1.0;
+    ///   strzelcy odslonieci (zaden szyk piechoty wroga nie zaslania odcinka jazda - strzelcy, jak miara 437) 3.0; strzelcy zasloniecie 0.1 (442-p: ponizej
+    ///   kazdej piechoty, takze "zaprze sie" 0.2 - decyzja Jeffa 11.11: gdy nie ma drogi do lucznikow, jazda ich nie szarzuje; schowanie robi 443);
+    ///   piechota skrzydlowa (nie najwiekszy szyk piechoty swojej druzyny, przesuniety w bok od srodka o > pol szerokosci srodka) 1.2;
+    ///   piechota zasloniecie innym szykiem piechoty (np. odwod za srodkiem) 0.1; piechota srodkowa (i nie-boczna, niezasloniecie) 1.0;
     ///   x1.5 szyk zwiazany walka (>= 50% ludzi z ciosem wrecz zadanym / otrzymanym w 6 s - miara RBM FormationFightingInMelee);
     ///   x0.2 szyk, ktory sie zaprze: piechota srodkowa niezwiazana, a moja jazda blizej niej niz moja najblizsza piechota;
     ///   x 1 / (1 + odleglosc / 250 m). Histereza: nowy cel tylko przy ocenie > 1.3 x biezacego; jazda sama w zwarciu (>= 30% wrecz) - cel zamrozony.
@@ -34,6 +36,7 @@ namespace Armoury
     ///   podmienia znowu (licznik "cel podmieniony").
     /// Pojedynczy jezdziec (fakt 3): postfiks RBMAI.Utilities.GetCorrectTarget (DeclaredMethod, static): jezdziec szyku jazdy z naszym celem w rozkazie
     ///   ChargeWithTarget, ktoremu RBM dal czlowieka z INNEGO szyku (dalej niz 15 m - kto juz walczy obok, zostaje przy swoim) - dostaje najblizsza kotwice celu;
+    ///   cel zasloniety (strzelcy albo piechota za innym szykiem) - bez kotwic (442-p: kotwica dalej niz 60 m = jazda prosto przez zaslaniajaca piechote);
     ///   jezdziec poscigu 148 i jazdy na strzelca 204 (HorsePursuit.RidingAnyThread / HuntAnyThread) - bez zmiany (jeden wlasciciel jezdzca).
     ///   RBM kieruje go w nia, gdy jest dalej niz 60 m; blizej - jak dotad (gra i RBM).
     /// Watki: oba postfiksy biegna w watku silnika / AI - tylko odczyt tablic slotu (volatile), zapis wlasnych pol zachowania RBM (jak RBM w tej samej metodzie)
@@ -45,12 +48,15 @@ namespace Armoury
     /// </summary>
     internal static partial class Doctrine
     {
-        internal const float T442Every = 1f, T442Exposed = 3.0f, T442Covered = 0.8f, T442Wing = 1.2f, T442Centre = 1.0f, T442Bound = 1.5f, T442Brace = 0.2f;
+        internal const float T442Every = 1f, T442Exposed = 3.0f, T442Covered = 0.1f, T442Wing = 1.2f, T442Centre = 1.0f, T442Bound = 1.5f, T442Brace = 0.2f;
         internal const float T442BoundShare = 0.5f, T442OwnMelee = 0.3f, T442MeleeWin = 6f, T442DistRef = 250f, T442Hyst = 1.3f, T442BlockPad = 10f;
-        internal const float T442RiderKeep = 15f;
-        internal const int T442MinMen = 8, T442MinCav = 5, T442Anchors = 5, T442BlockMen = 10;
-        private const int TcExp = 0, TcCov = 1, TcBound = 2, TcWing = 3, TcCentre = 4, TcBrace = 5, TcK = 6;
-        private static readonly string[] TcName = { "strzelcy odslonieci", "strzelcy zasloniecie", "zwiazany walka", "skrzydlo piechoty", "srodek piechoty", "zaprze sie" };
+        internal const float T442RiderKeep = 15f, T442WingSide = 0.5f;
+        internal const int T442MinMen = 8, T442MinCav = 5, T442Anchors = 5, T442BlockMen = 10, T442SeenMax = 8192;
+        // 442-p: klasa celu osobno od mnoznika (zwiazany walka / zaprze sie) - dawniej TcBound nadpisywal klase i rozklad zanizal strzelcow
+        private const int TcExp = 0, TcCov = 1, TcWing = 2, TcCentre = 3, TcCovInf = 4, TcK = 5;
+        private const int TmNone = 0, TmBound = 1, TmBrace = 2, TmK = 3;
+        private static readonly string[] TcName = { "strzelcy odslonieci", "strzelcy zasloniecie", "skrzydlo piechoty", "srodek piechoty", "piechota zasloniecie" };
+        private static readonly string[] TmName = { "bez mnoznika", "zwiazany walka x1.5", "zaprze sie x0.2" };
         private static readonly IFormatProvider T4Inv = CultureInfo.InvariantCulture;
 
         // ---- stan czytany z watkow silnika (pisze glowny watek)
@@ -58,6 +64,12 @@ namespace Armoury
         private static readonly Formation[] _t4Who = new Formation[CrSlots];
         private static readonly Formation[] _t4Tgt = new Formation[CrSlots];
         private static readonly Agent[][] _t4Anc = new Agent[CrSlots][];
+        // ---- tylko postfiks szyku (watek AI): ostatnia para (cel RBM, cel 442) policzona przy kluczu NIE - licznik zdarzen, nie wywolan
+        private static readonly Formation[] _t4SeenRbm = new Formation[CrSlots];
+        private static readonly Formation[] _t4SeenTg = new Formation[CrSlots];
+        // ---- tylko postfiks jezdzca (watek silnika): bity "juz policzony w tej bitwie" per Agent.Index - liczniki jezdzcow, nie wywolan
+        private const int T4bAim = 1, T4bDry = 2, T4bKeep = 4, T4bOwned = 8;
+        private static readonly int[] _t4Seen = new int[T442SeenMax];
         // ---- tylko glowny watek
         private static readonly float[] _t4Score = new float[CrSlots];
         private static readonly byte[] _t4Cat = new byte[CrSlots];
@@ -69,9 +81,10 @@ namespace Armoury
         private static FieldInfo _t4fLast, _t4fDir, _t4fTimer;
 
         // ---- liczniki misji (T442Reset w Battle291.Begin); z watkow silnika - Interlocked
-        private static int _t4Swap, _t4Dry, _t4SwapErr, _t4Aim, _t4AimDry, _t4AimKeep, _t4AimOwned, _t4PostErr;
-        private static int _t4Pick, _t4Change, _t4Held, _t4Frozen, _t4Stum, _t4NoCand;
+        private static int _t4Swap, _t4SwapIdle, _t4Dry, _t4SwapErr, _t4Aim, _t4AimDry, _t4AimKeep, _t4AimOwned, _t4PostErr;
+        private static int _t4Pick, _t4Change, _t4Held, _t4Frozen, _t4Stum, _t4NoCand, _t4NoAnc;
         private static readonly int[] _t4CatN = new int[TcK];
+        private static readonly int[] _t4ModN = new int[TmK];
         private static float _t4CavSec, _t4ChargeSec;
 
         // ---- skan jednego taktu (glowny watek)
@@ -84,10 +97,12 @@ namespace Armoury
         /// <summary>Battle291.Begin (AfterStart): liczniki linii 442 od zera.</summary>
         internal static void T442Reset()
         {
-            Interlocked.Exchange(ref _t4Swap, 0); Interlocked.Exchange(ref _t4Dry, 0); Interlocked.Exchange(ref _t4SwapErr, 0);
+            Interlocked.Exchange(ref _t4Swap, 0); Interlocked.Exchange(ref _t4SwapIdle, 0); Interlocked.Exchange(ref _t4Dry, 0); Interlocked.Exchange(ref _t4SwapErr, 0);
             Interlocked.Exchange(ref _t4Aim, 0); Interlocked.Exchange(ref _t4AimDry, 0); Interlocked.Exchange(ref _t4AimKeep, 0); Interlocked.Exchange(ref _t4AimOwned, 0); Interlocked.Exchange(ref _t4PostErr, 0);
-            _t4Pick = _t4Change = _t4Held = _t4Frozen = _t4Stum = _t4NoCand = 0;
+            _t4Pick = _t4Change = _t4Held = _t4Frozen = _t4Stum = _t4NoCand = _t4NoAnc = 0;
             for (int k = 0; k < TcK; k++) _t4CatN[k] = 0;
+            for (int k = 0; k < TmK; k++) _t4ModN[k] = 0;
+            Array.Clear(_t4Seen, 0, _t4Seen.Length);   // Agent.Index liczony od nowa w kazdej misji
             _t4CavSec = _t4ChargeSec = 0f;
         }
 
@@ -117,6 +132,8 @@ namespace Armoury
             Volatile.Write(ref _t4Tgt[idx], null);
             Volatile.Write(ref _t4Anc[idx], null);
             Volatile.Write(ref _t4Who[idx], null);
+            Volatile.Write(ref _t4SeenRbm[idx], null);
+            Volatile.Write(ref _t4SeenTg[idx], null);
             _t4Score[idx] = 0f; _t4Cat[idx] = 0;
         }
 
@@ -194,7 +211,22 @@ namespace Armoury
                 var tg = Volatile.Read(ref _t4Tgt[idx]);
                 if (tg == null || tg.CountOfUnits <= 0 || ReferenceEquals(____currentOrder.TargetFormation, tg)) return;
                 if (!MissionTeams.Enemies(f.Team, tg.Team)) return;
-                if (!_t4Key) { Interlocked.Increment(ref _t4Dry); return; }
+                // 442-p: liczone tylko dla AKTYWNEGO zachowania (FindBestBehavior wola PrecalculateMovementOrder -> CalculateCurrentOrder takze na nieaktywnym)
+                var fai = f.AI;
+                bool active = fai != null && ReferenceEquals(fai.ActiveBehavior, __instance);
+                if (!_t4Key)
+                {
+                    // 442-p: zdarzenie, nie wywolanie - RBM zostawia ChargeToTarget(stary cel) przez caly Charging, metoda biegnie >= 2 razy na takt AI
+                    if (!active) return;
+                    var rt = ____currentOrder.TargetFormation;
+                    if (!ReferenceEquals(Volatile.Read(ref _t4SeenRbm[idx]), rt) || !ReferenceEquals(Volatile.Read(ref _t4SeenTg[idx]), tg))
+                    {
+                        Volatile.Write(ref _t4SeenRbm[idx], rt);
+                        Volatile.Write(ref _t4SeenTg[idx], tg);
+                        Interlocked.Increment(ref _t4Dry);
+                    }
+                    return;
+                }
                 var tq = tg.QuerySystem;
                 if (tq == null) return;
                 Vec2 d = tg.CachedMedianPosition.AsVec2 - f.CachedAveragePosition;
@@ -205,7 +237,13 @@ namespace Armoury
                 ____currentOrder = MovementOrder.MovementOrderChargeToTarget(tg);
                 ___IsCurrentOrderChanged = true;
                 ___CurrentFacingOrder = FacingOrder.FacingOrderLookAtDirection(d.Normalized());
-                Interlocked.Increment(ref _t4Swap);
+                if (active)
+                {
+                    // 442-p: front na szerokosc NASZEGO celu - RBM w tej samej metodzie (stan Charging) ustawil go wedlug swojego celu; ten sam watek i wzor co RBM
+                    f.SetFormOrder(FormOrder.FormOrderCustom(Math.Max(1f, tg.Width)));
+                    Interlocked.Increment(ref _t4Swap);
+                }
+                else Interlocked.Increment(ref _t4SwapIdle);
             }
             catch { Interlocked.Increment(ref _t4SwapErr); }
         }
@@ -227,11 +265,13 @@ namespace Armoury
                 var r = __result;
                 if (r != null && ReferenceEquals(r.Formation, tg)) return;
                 // jeden wlasciciel jezdzca: poscig 148 i jazda na strzelca 204 steruja nim same (tablice dowolnego watku) - bez zmiany
-                if (HorsePursuit.RidingAnyThread(agent) || HorsePursuit.HuntAnyThread(agent)) { Interlocked.Increment(ref _t4AimOwned); return; }
+                if (HorsePursuit.RidingAnyThread(agent) || HorsePursuit.HuntAnyThread(agent)) { T442SeenOnce(agent, T4bOwned, ref _t4AimOwned); return; }
                 var o = f.GetReadonlyMovementOrderReference();
-                if (o.OrderType != OrderType.ChargeWithTarget || !ReferenceEquals(o.TargetFormation, tg)) return;
+                if (o.OrderType != OrderType.ChargeWithTarget) return;
+                // klucz NIE: rozkaz szyku to cel RBM (postfiks szyku nie podmienia) - "bylby" liczy jezdzcow, ktorych 442 by przekierowal
+                if (_t4Key && !ReferenceEquals(o.TargetFormation, tg)) return;
                 Vec2 p = agent.Position.AsVec2;
-                if (r != null && p.DistanceSquared(r.Position.AsVec2) < T442RiderKeep * T442RiderKeep) { Interlocked.Increment(ref _t4AimKeep); return; }
+                if (r != null && p.DistanceSquared(r.Position.AsVec2) < T442RiderKeep * T442RiderKeep) { T442SeenOnce(agent, T4bKeep, ref _t4AimKeep); return; }
                 var anc = Volatile.Read(ref _t4Anc[idx]);
                 if (anc == null) return;
                 Agent best = null;
@@ -244,11 +284,25 @@ namespace Armoury
                     if (dd < bd) { bd = dd; best = a; }
                 }
                 if (best == null) return;
-                if (!_t4Key) { Interlocked.Increment(ref _t4AimDry); return; }
+                if (!_t4Key) { T442SeenOnce(agent, T4bDry, ref _t4AimDry); return; }
                 __result = best;
-                Interlocked.Increment(ref _t4Aim);
+                T442SeenOnce(agent, T4bAim, ref _t4Aim);
             }
             catch { Interlocked.Increment(ref _t4PostErr); }
+        }
+
+        /// <summary>442-p: licznik jezdzcow (raz na jezdzca na bitwe), nie wywolan - na goracej sciezce zwykle tylko odczyt wlasnej komorki.</summary>
+        private static void T442SeenOnce(Agent a, int bit, ref int counter)
+        {
+            int i = a.Index;
+            if (i < 0 || i >= T442SeenMax) return;
+            int v = Volatile.Read(ref _t4Seen[i]);
+            while ((v & bit) == 0)
+            {
+                int w = Interlocked.CompareExchange(ref _t4Seen[i], v | bit, v);
+                if (w == v) { Interlocked.Increment(ref counter); return; }
+                v = w;
+            }
         }
 
         // ------------------------------------------------------------ wybor celu (glowny watek, Doctrine.Tick co 1 s)
@@ -351,13 +405,13 @@ namespace Armoury
             if (curOk && T442MeleeShare(f) >= T442OwnMelee)
             {
                 _t4Frozen++;
-                T442SetAnchors(idx, cur);
+                T442Anchor(idx, cur, _t4Cat[idx]);
                 return;
             }
             // najblizsza wlasna piechota (do "zaprze sie")
             Formation best = null;
             float bs = 0f, curScore = -1f;
-            byte bc = 0;
+            byte bc = 0, bm = 0, curCat = 0;
             var teams = m.Teams;
             for (int i = 0; i < teams.Count; i++)
             {
@@ -377,7 +431,7 @@ namespace Armoury
                     Vec2 ep = e.CachedMedianPosition.AsVec2;
                     if (!ep.IsValid) continue;
                     float d = me.Distance(ep);
-                    byte cat;
+                    byte cat, mod = TmNone;
                     float s;
                     if (ranged)
                     {
@@ -385,14 +439,16 @@ namespace Armoury
                         cat = blocked ? (byte)TcCov : (byte)TcExp;
                         s = blocked ? T442Covered : T442Exposed;
                     }
-                    else if (ReferenceEquals(e, main)) { cat = TcCentre; s = T442Centre; }
-                    else { cat = TcWing; s = T442Wing; }
+                    else if (ReferenceEquals(e, main) || main == null) { cat = TcCentre; s = T442Centre; }
+                    else if (T442Blocked(t, e, me, ep)) { cat = TcCovInf; s = T442Covered; }   // 442-p: np. odwod za srodkiem - bez premii
+                    else if (T442Side(main, ep)) { cat = TcWing; s = T442Wing; }               // 442-p: skrzydlo = boczne przesuniecie wzgledem srodka
+                    else { cat = TcCentre; s = T442Centre; }
                     float ms = T442MeleeShareCached(e);
-                    if (ms >= T442BoundShare) { s *= T442Bound; cat = TcBound; }
-                    else if (cat == TcCentre && T442CavCloser(t, f, me, ep, d)) { s *= T442Brace; cat = TcBrace; }
+                    if (ms >= T442BoundShare) { s *= T442Bound; mod = TmBound; }
+                    else if (cat == TcCentre && T442CavCloser(t, f, me, ep, d)) { s *= T442Brace; mod = TmBrace; }
                     s /= 1f + d / T442DistRef;
-                    if (ReferenceEquals(e, cur)) curScore = s;
-                    if (best == null || s > bs) { best = e; bs = s; bc = cat; }
+                    if (ReferenceEquals(e, cur)) { curScore = s; curCat = cat; }
+                    if (best == null || s > bs) { best = e; bs = s; bc = cat; bm = mod; }
                 }
             }
             if (best == null) { _t4NoCand++; if (cur != null) T442Drop(idx); Volatile.Write(ref _t4Who[idx], f); return; }
@@ -400,19 +456,43 @@ namespace Armoury
             {
                 _t4Held++;
                 _t4Score[idx] = curScore;
-                T442SetAnchors(idx, cur);
+                _t4Cat[idx] = curCat;
+                T442Anchor(idx, cur, curCat);
                 return;
             }
             if (!ReferenceEquals(best, cur))
             {
                 if (cur == null) _t4Pick++; else _t4Change++;
                 if (bc < TcK) _t4CatN[bc]++;
-                _t4Cat[idx] = bc;
+                if (bm < TmK) _t4ModN[bm]++;
             }
+            _t4Cat[idx] = bc;
             _t4Score[idx] = bs;
             Volatile.Write(ref _t4Who[idx], f);
-            T442SetAnchors(idx, best);   // kotwice przed celem - postfiks jezdzca czyta cel, potem kotwice
+            T442Anchor(idx, best, bc);   // kotwice przed celem - postfiks jezdzca czyta cel, potem kotwice
             Volatile.Write(ref _t4Tgt[idx], best);
+        }
+
+        /// <summary>442-p: cel zasloniety (strzelcy albo piechota za innym szykiem) - bez kotwic; RBM kierowalby jezdzca dalej niz 60 m prosto do kotwicy,
+        /// czyli przez zaslaniajaca piechote. Postfiks jezdzca przy braku kotwic zostawia wybor RBM.</summary>
+        private static void T442Anchor(int idx, Formation tg, byte cat)
+        {
+            if (cat == TcCov || cat == TcCovInf)
+            {
+                if (Volatile.Read(ref _t4Anc[idx]) != null) _t4NoAnc++;
+                Volatile.Write(ref _t4Anc[idx], null);
+                return;
+            }
+            T442SetAnchors(idx, tg);
+        }
+
+        /// <summary>442-p: szyk piechoty przesuniety w bok od glownej piechoty o wiecej niz pol jej szerokosci (rzut na prawy wektor srodka).</summary>
+        private static bool T442Side(Formation main, Vec2 ep)
+        {
+            Vec2 mc = main.CachedMedianPosition.AsVec2, dir = main.Direction;
+            if (!mc.IsValid || !dir.IsValid || dir.LengthSquared < 0.0001f) return false;
+            Vec2 r = dir.Normalized().RightVec(), v = ep - mc;
+            return Math.Abs(v.x * r.x + v.y * r.y) > T442WingSide * Math.Max(1f, main.Width);
         }
 
         /// <summary>Do 5 ludzi celu rozlozonych wzdluz jego frontu (najblizszy srodkowi kazdego z pieciu pasow) - raz na takt na cel.</summary>
@@ -538,12 +618,16 @@ namespace Armoury
               .Append(" | klucz wybor celu jazdy ").Append(c != null && c.CavalryTargetChoice ? "TAK" : "NIE")
               .Append(" | jazda AI ").Append(_t4CavSec.ToString("0", T4Inv)).Append(" szyko-s (w szarzy RBM ").Append(_t4ChargeSec.ToString("0", T4Inv)).Append(')')
               .Append(" | wybor: pierwszy cel ").Append(_t4Pick).Append(", zmiana celu ").Append(_t4Change).Append(", trzymany histereza x")
-              .Append(T442Hyst.ToString("0.0", T4Inv)).Append(' ').Append(_t4Held).Append(", zamrozony w zwarciu jazdy ").Append(_t4Frozen)
-              .Append(", bez kandydata ").Append(_t4NoCand).Append(" | wybrany cel wedlug oceny:");
+              .Append(T442Hyst.ToString("0.0", T4Inv)).Append(' ').Append(_t4Held).Append(" szyko-s, zamrozony w zwarciu jazdy ").Append(_t4Frozen)
+              .Append(" szyko-s, bez kandydata ").Append(_t4NoCand).Append(" szyko-s | wybrany cel wedlug klasy:");
             for (int k = 0; k < TcK; k++) sb.Append(k > 0 ? "," : "").Append(' ').Append(TcName[k]).Append(' ').Append(_t4CatN[k]);
-            sb.Append(" | cel podmieniony ").Append(Volatile.Read(ref _t4Swap)).Append(" (bylby, klucz NIE ").Append(Volatile.Read(ref _t4Dry))
+            sb.Append(" | mnoznik wybranego celu:");
+            for (int k = 0; k < TmK; k++) sb.Append(k > 0 ? "," : "").Append(' ').Append(TmName[k]).Append(' ').Append(_t4ModN[k]);
+            sb.Append(" | kotwice zdjete (cel zasloniety) ").Append(_t4NoAnc)
+              .Append(" | cel podmieniony w aktywnej szarzy ").Append(Volatile.Read(ref _t4Swap)).Append(" (w nieaktywnym zachowaniu ").Append(Volatile.Read(ref _t4SwapIdle))
+              .Append("; bylby, klucz NIE - zmiana pary cel RBM / cel 442 ").Append(Volatile.Read(ref _t4Dry))
               .Append(", bledy ").Append(Volatile.Read(ref _t4SwapErr)).Append(')')
-              .Append(" | jezdziec skierowany na cel (wywolan) ").Append(Volatile.Read(ref _t4Aim)).Append(" (bylby ").Append(Volatile.Read(ref _t4AimDry))
+              .Append(" | jezdzcy skierowani na cel ").Append(Volatile.Read(ref _t4Aim)).Append(" (bylby ").Append(Volatile.Read(ref _t4AimDry))
               .Append(", zostal przy walczacym obok ").Append(Volatile.Read(ref _t4AimKeep)).Append(", jezdziec 148/204 pominiety ").Append(Volatile.Read(ref _t4AimOwned)).Append(')')
               .Append(" | latka ").Append(_t4Patch).Append(" | potkniecia ").Append(_t4Stum).Append(" (postfiks ").Append(Volatile.Read(ref _t4PostErr)).Append(").");
             return sb.ToString();
