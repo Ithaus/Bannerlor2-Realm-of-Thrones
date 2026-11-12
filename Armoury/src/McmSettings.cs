@@ -2556,7 +2556,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int WinterYearSpreadPercent { get; set; } = 15;
 
-        [SettingPropertyInteger("Winter Year Relief Days", 0, 365, "0", HintText = "with Winter Year Enabled: a bad winter year cuts a village's yield in full only while its granary holds at least twice this many days of food; below that the cut fades and at this many days it is gone (0 = no relief by granary)", RequireRestart = false)]
+        [SettingPropertyInteger("Winter Year Relief Days", 0, 365, "0", HintText = "with Winter Year Enabled: a bad winter year cuts a village's yield in full only while its granary holds at least Famine Ration Days of food; below that the cut fades and at this many days it is gone (0 = no relief by granary)", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public int WinterYearReliefDays { get; set; } = 45;
 

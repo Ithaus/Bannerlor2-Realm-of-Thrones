@@ -36,8 +36,9 @@ namespace Armoury
     ///    to plon spichlerza okregu (Famine) i koszyk zywnosci wsi gry (TickFoodProduction: zboze, ser, maslo) - swiadomie ser i maslo tez: zly rok = gorsze
     ///    pastwiska i siano, mniej mleka; bez wsi rybackich, wielorybniczych i lowcow morsow (ich zywnosc to morze);
     ///  - rachunek KS wsi i pol mieszczan po wlaczeniu kalibracji (StartCalibration.ComputeDistrict z czynnikami gry) - te same towary.
-    /// ZIMA: w zimie Westeros (WesterosClimate.Now) czynnik = 1 - plon tnie zima (WinterBite), dwie reguly na jedno zjawisko nie nakladaja sie
-    /// (ryzyko audytu: zly rok na wieloletniej zimie). Rok wazny 364 doby od losowania (rok gry); potem 1 do nastepnego okna.
+    /// ZIMA: rok ze ZNIW (tryb zniw) w zimie Westeros (WesterosClimate.Now) = 1 - plon tnie zima (WinterBite), dwie reguly na jedno zjawisko nie nakladaja sie
+    /// (ryzyko audytu: zly rok na wieloletniej zimie). OD 432 przy kluczu Winter Year Enabled zima ma WLASNY rok (tryb zimy, opis nizej), ktory mnozy plon
+    /// takze w zimie. Rok wazny 364 doby od losowania (rok gry); potem 1 do nastepnego okna.
     /// Start neutralny: do pierwszego losowania (nowa kampania albo pierwsze wczytanie z kluczem) wszedzie x1.
     /// Zapis: arm_harvest_year (SaveText.Sync) - doba i rok losowania, siatka i wartosci wezlow; brak klucza = stary zapis (x1 do nastepnego okna).
     /// Watki: odczyt z watkow AI (model wsi w PartiesThink) - jedna referencja migawki (slownik osada -> czynnik), budowana pod blokada, po publikacji
@@ -56,6 +57,14 @@ namespace Armoury
     /// (10%) wsi jest na przednowku, ujemna czesc gasnie wszedzie (wraca ponizej polowy progu). Dobry rok bez zmian. Bezpiecznik liczy watek glowny raz na dobe
     /// (druga migawka _eff - watki AI tylko czytaja). Zapis: dziesiate pole "w" / "s" (starsza DLL czyta 9 pol - rok trybu zimy widzi jako zwykly: w zimie x1).
     /// Linia doby "Lata zimy (432):" z kontrola pola (srednia wsi - 1) i pomiarem (wsie na przednowku wedlug roku, cena zboza w miastach wedlug roku).
+    ///
+    /// 432-p (po recenzjach): (1) WYROWNANIE PLONU - "swiat ma tyle plonu co dotad" jest teraz mierzone i trzymane WAGA PLONU SPICHLERZA wsi (ludzie x plon na
+    /// glowe bez roku: Hearth x zywnosc wsi gry / (poziom + 1); wsie morskie poza), nie liczba wsi: po uldze spichlerza dodatnia albo ujemna czesc roku jest
+    /// skalowana tak, by srednia wazona czynnika = 1 (ulga zdejmuje zle lata -> dobre lata proporcjonalnie mniejsze; zly rok na zyznych ziemiach -> zle lata
+    /// lagodniejsze). Bez wag (model niedostepny) - bez wyrownania. (2) HAMULEC SWIATA gasi CALY rok (takze dobre lata) - dotad zostawial dodatnia czesc pola,
+    /// czyli staly dodatek plonu ponad plan zimy wlasnie wtedy, gdy plan ma sie domknac. (3) Gorny prog ulgi spichlerza = Famine Ration Days (prog przednowka),
+    /// dolny = Winter Year Relief Days; (4) hamulec w zapisie (pole 11 "b"); (5) pierwsze losowanie "od razu" na mniej niz 91 dob przed nastepnym - bez wiesci
+    /// dla gracza; (6) rok zimy nie blokuje losowania zniw tego samego roku. KONTROLA plonu w linii doby: srednia wazona po bezpieczniku i wyrownaniu - 1.
     /// </summary>
     internal static class HarvestYear
     {
@@ -86,11 +95,13 @@ namespace Armoury
         private static volatile Snap _snap;
         private static volatile bool _active;
         private static volatile Snap _eff;                   // 432: migawka po bezpieczniku (tryb zimy; budowana raz na dobe na watku glownym), null = czytaj _snap
-        private static bool _brake;                          // 432: hamulec swiata (w pamieci; pierwsza doba po wczytaniu liczy go od nowa)
+        private static bool _brake;                          // 432: hamulec swiata (432-p: w zapisie, pole 11 - histereza 5..10% nie gubi sie przy wczytaniu)
+        [ThreadStatic] private static bool _rawFood;         // 432-p: odczyt zywnosci wsi BEZ roku (waga plonu w BuildEff) - FoodPostfix pomija
         private sealed class WStat
         {
             public int Nv, Good, Bad, Mid, Part, Full, WithBarn, Rationed, RatBad, RatGood, RatMid, DnBad, DnGood, DnMid, BrakePct;
             public double SumRaw, SumEff, DaysBad, DaysGood, DaysMid, SharePct, T, Ration;
+            public double Hi, WSum, WRaw, WEff, ScaleUp = 1.0, ScaleDn = 1.0; public int WN;   // 432-p: gorny prog ulgi, waga plonu (suma, pole, po bezpieczniku), wyrownanie
             public float Min = 9f, Max;
         }
         private static WStat _ws;
@@ -170,7 +181,7 @@ namespace Armoury
         {
             try
             {
-                if (!_active || village == null || village.Settlement == null || __result <= 0f) return;
+                if (_rawFood || !_active || village == null || village.Settlement == null || __result <= 0f) return;
                 var vt = village.VillageType;
                 if (vt != null && vt.StringId != null && SeaTypes.Contains(vt.StringId)) return;
                 __result *= Of(village.Settlement);
@@ -335,7 +346,41 @@ namespace Armoury
             if (w.BrakePct <= 0) _brake = false;
             else if (w.SharePct > w.BrakePct) _brake = true;
             else if (w.SharePct < 0.5 * w.BrakePct) _brake = false;
+            // 432-p (recenzja 6): gorny prog ulgi = prog przednowka (Famine Ration Days), dolny = Winter Year Relief Days; prog przednowka nie wyzszy od dolnego - 2T jak w 432
+            w.Hi = w.Ration > w.T ? w.Ration : 2 * w.T;
+            // 432-p (recenzja 1): waga plonu spichlerza wsi BEZ roku - ludzie (Hearth) x plon na glowe (zywnosc wsi gry / (poziom + 1), ten sam wzor co Famine); wsie morskie
+            // poza (rok ich zywnosci nie mnozy). Model gry z podmiana stanu wsi spladrowanej jak w Famine (watek glowny, raz na dobe).
+            var wt = new Dictionary<Settlement, double>();
+            try
+            {
+                var model = Campaign.Current != null ? Campaign.Current.Models.VillageProductionCalculatorModel : null;
+                if (model != null)
+                {
+                    _rawFood = true;
+                    try
+                    {
+                        foreach (var kv in sn.F)
+                        {
+                            try
+                            {
+                                var st = kv.Key;
+                                if (st == null || !st.IsVillage || st.Village == null) continue;
+                                var vt = st.Village.VillageType;
+                                if (vt != null && vt.StringId != null && SeaTypes.Contains(vt.StringId)) continue;
+                                int lvl = st.Village.GetHearthLevel();
+                                if (lvl < 0) continue;
+                                double x = Math.Max(0f, st.Village.Hearth) * (double)Devastation.FoodToday(model, st.Village) / (lvl + 1);
+                                if (x > 0 && !double.IsNaN(x) && !double.IsInfinity(x)) wt[st] = x;
+                            }
+                            catch (Exception e) { Stumble("BuildEff.weight", e); }
+                        }
+                    }
+                    finally { _rawFood = false; }
+                }
+            }
+            catch (Exception e) { Stumble("BuildEff.weights", e); }
             var map = new Dictionary<Settlement, float>(sn.F.Count);
+            double wPos = 0, wNeg = 0;
             foreach (var kv in sn.F)
             {
                 float f = kv.Value, e = f;
@@ -343,19 +388,25 @@ namespace Armoury
                 {
                     var st = kv.Key; bool vil = st != null && st.IsVillage;
                     double d = 0; bool has = vil && days.TryGetValue(st, out d);
-                    if (f < 1f)
+                    if (_brake) e = 1f;   // 432-p (recenzja 2): hamulec gasi caly rok, takze dobre lata (dotad tylko ujemna czesc - dodatek plonu swiata bez zrodla)
+                    else if (f < 1f)
                     {
-                        if (_brake) e = 1f;
-                        else if (has && w.T > 0)
+                        if (has && w.T > 0)
                         {
-                            double fade = (d - w.T) / w.T; if (fade < 0) fade = 0; if (fade > 1) fade = 1;
+                            double fade = (d - w.T) / Math.Max(1.0, w.Hi - w.T); if (fade < 0) fade = 0; if (fade > 1) fade = 1;
                             e = 1f - (1f - f) * (float)fade;
                             if (vil) { if (fade <= 0) w.Full++; else if (fade < 1) w.Part++; }
                         }
                     }
+                    double wv;
+                    if (vil && wt.TryGetValue(st, out wv))
+                    {
+                        w.WN++; w.WSum += wv; w.WRaw += wv * f;
+                        if (e > 1f) wPos += wv * (e - 1f); else wNeg += wv * (1f - e);
+                    }
                     if (vil)
                     {
-                        w.Nv++; w.SumRaw += f; w.SumEff += e; if (f < w.Min) w.Min = f; if (f > w.Max) w.Max = f;
+                        w.Nv++; w.SumRaw += f; if (f < w.Min) w.Min = f; if (f > w.Max) w.Max = f;
                         bool rat = has && d < w.Ration;
                         if (f >= WGood) { w.Good++; if (has) { w.DnGood++; w.DaysGood += d; } if (rat) w.RatGood++; }
                         else if (f <= WBad) { w.Bad++; if (has) { w.DnBad++; w.DaysBad += d; } if (rat) w.RatBad++; }
@@ -364,6 +415,29 @@ namespace Armoury
                 }
                 catch (Exception ex) { Stumble("BuildEff", ex); e = f; }
                 if (kv.Key != null) map[kv.Key] = e;
+            }
+            // 432-p (recenzje 1 i 2): wyrownanie - srednia czynnika wazona plonem = 1. Dobre lata ponad zle (ulga spichlerza zdjela czesc zlych lat albo dobry rok
+            // trafil w zyzne ziemie) -> dodatnia czesc x wNeg / wPos; odwrotnie -> ujemna czesc x wPos / wNeg. Jedna skala dla wsi i pol mieszczan. Bez wag - bez zmian.
+            if (!_brake && w.WSum > 0)
+            {
+                if (wPos > wNeg && wPos > 0) w.ScaleUp = wNeg / wPos;
+                else if (wNeg > wPos && wNeg > 0) w.ScaleDn = wPos / wNeg;
+            }
+            if (w.ScaleUp != 1.0 || w.ScaleDn != 1.0)
+            {
+                var keys = new List<Settlement>(map.Keys);
+                foreach (var st in keys)
+                {
+                    float e = map[st];
+                    if (e > 1f) map[st] = 1f + (e - 1f) * (float)w.ScaleUp;
+                    else if (e < 1f) map[st] = 1f - (1f - e) * (float)w.ScaleDn;
+                }
+            }
+            foreach (var kv in map)
+            {
+                if (kv.Key == null || !kv.Key.IsVillage) continue;
+                w.SumEff += kv.Value;
+                double wv; if (wt.TryGetValue(kv.Key, out wv)) w.WEff += wv * kv.Value;
             }
             _ws = w;
             _eff = new Snap { F = map };
@@ -383,9 +457,12 @@ namespace Armoury
             sb.Append(" | wsie ").Append(w.Nv).Append(": rok srednio x").Append(mean.ToString("0.0000", Inv)).Append(", min x").Append(w.Min.ToString("0.000", Inv)).Append(", max x").Append(w.Max.ToString("0.000", Inv))
               .Append("; dobry rok (>= ").Append(WGood.ToString("0.00", Inv)).Append(") ").Append(w.Good).Append(", zly rok (<= ").Append(WBad.ToString("0.00", Inv)).Append(") ").Append(w.Bad).Append(", zwykly ").Append(w.Mid)
               .Append(" | KONTROLA pola: srednia wsi - 1 = ").Append((mean - 1.0).ToString("+0.0000;-0.0000", Inv)).Append(Math.Abs(mean - 1.0) <= 0.005 ? " (OK)" : " (ROZJAZD)")
-              .Append(", wsie wedlug roku - razem = ").Append(w.Good + w.Bad + w.Mid - w.Nv)
-              .Append(" | bezpiecznik: po nim srednio x").Append(Avg(w.SumEff, w.Nv, "0.0000")).Append(", ulga czesciowa ").Append(w.Part).Append(" wsi, pelna ").Append(w.Full)
-              .Append(" wsi (spichlerz ").Append(w.T.ToString("0", Inv)).Append("..").Append((2 * w.T).ToString("0", Inv)).Append(" dni), hamulec swiata ").Append(_brake ? "TAK" : "NIE")
+              .Append(" | KONTROLA plonu (432-p; waga = plon spichlerza wsi bez roku, wsi z waga ").Append(w.WN).Append("): pole x").Append(w.WSum > 0 ? (w.WRaw / w.WSum).ToString("0.0000", Inv) : "-")
+              .Append(", po bezpieczniku i wyrownaniu x").Append(w.WSum > 0 ? (w.WEff / w.WSum).ToString("0.0000", Inv) : "-")
+              .Append(", roznica od 1 = ").Append(w.WSum > 0 ? (w.WEff / w.WSum - 1.0).ToString("+0.0000;-0.0000", Inv) + (Math.Abs(w.WEff / w.WSum - 1.0) <= 0.005 ? " (OK)" : " (ROZJAZD)") : "- (brak wag - bez wyrownania)")
+              .Append("; wyrownanie: dobre lata x").Append(w.ScaleUp.ToString("0.000", Inv)).Append(", zle lata x").Append(w.ScaleDn.ToString("0.000", Inv))
+              .Append(" | bezpiecznik: po nim srednio (po wsiach) x").Append(Avg(w.SumEff, w.Nv, "0.0000")).Append(", ulga czesciowa ").Append(w.Part).Append(" wsi, pelna ").Append(w.Full)
+              .Append(" wsi (spichlerz ").Append(w.T.ToString("0", Inv)).Append("..").Append(w.Hi.ToString("0", Inv)).Append(" dni), hamulec swiata ").Append(_brake ? "TAK - rok x1 wszedzie" : "NIE")
               .Append(" (na przednowku ").Append(w.Rationed).Append(" z ").Append(w.WithBarn).Append(" wsi = ").Append(w.SharePct.ToString("0.0", Inv)).Append("% wobec progu ").Append(w.BrakePct).Append("%)")
               .Append(" | wsie na przednowku (< ").Append(w.Ration.ToString("0", Inv)).Append(" dni): zly rok ").Append(w.RatBad).Append(" z ").Append(w.Bad).Append(", zwykly ").Append(w.RatMid).Append(" z ").Append(w.Mid)
               .Append(", dobry ").Append(w.RatGood).Append(" z ").Append(w.Good)
@@ -484,14 +561,23 @@ namespace Armoury
                 bool drew = false;
                 bool winter = WesterosClimate.Now() == CampaignTime.Seasons.Winter;
                 bool wKey = WinterKeyOn;
-                if (window && year != _drawYear) { Draw(today, year, false); drew = _drawYear == year; }
+                bool quietDraw = false; int toNext = -1;
+                // 432-p (recenzja 5): rok trybu zimy z tym samym numerem nie blokuje losowania zniw (okno zniw otwarte = zniwa sa - losuje sie rok zniw, jak przed 432)
+                if (window && (year != _drawYear || _winterMode)) { Draw(today, year, false); drew = _drawYear == year && !_winterMode; }
                 else if (wKey && winter)
                 {
                     // 432: w zimie okna zniw nie ma - rok rolny liczy sie od doby, w ktorej zniwa by sie zaczely (numer = rok kalendarza tej doby, jak w trybie zniw);
                     // rok rolny bez losowania (takze pierwsza doba z kluczem) - losowanie trybu zimy od razu
                     int from = (int)Math.Round(FreeHands.HarvestFrom * (double)yd / 364.0);
                     int agr = (int)Math.Floor((today - from) / (double)yd);
-                    if (agr != _drawYear) { Draw(today, agr, true); drew = _drawYear == agr && _drawDay == today; }
+                    if (agr != _drawYear)
+                    {
+                        Draw(today, agr, true); drew = _drawYear == agr && _drawDay == today;
+                        // 432-p (recenzja 4): losowanie "od razu" tuz przed doba nastepnego losowania (u Jeffa 25 dob) - rok dziala, ale bez wiesci dla gracza
+                        // (dwie, byc moze sprzeczne, wiesci w miesiac); pomiar "po 28-56 dobach" liczyc od nastepnego losowania
+                        toNext = (agr + 1) * yd + from - today;
+                        quietDraw = toNext < 91;
+                    }
                 }
                 // rok trybu zniw: poza zima (jak dotad); rok trybu zimy (432): przez caly rok, ale tylko z kluczem (klucz wylaczony = takiego roku nie ma, jak dotad)
                 bool act = _nodes != null && _drawDay >= 0 && today - _drawDay < yd && (_winterMode ? wKey : !winter);
@@ -502,7 +588,12 @@ namespace Armoury
                 {
                     _lastLogDay = today; _firstLine = true;
                     Log.Info(Line(today, window, winter, drew));
-                    if (drew) { if (_winterMode) TellWinter(); else Tell(); }
+                    if (drew)
+                    {
+                        if (!_winterMode) Tell();
+                        else if (!quietDraw) TellWinter();
+                        else Log.Info("Lata zimy (432): wiesc dla gracza pominieta - do nastepnego losowania tylko " + toNext + " dob (krotki pierwszy rok po wlaczeniu).");
+                    }
                 }
                 if (_active && _winterMode) Log.Info(WinterLine(today, drew));
                 _lastActive = _active;
@@ -611,6 +702,7 @@ namespace Armoury
                   .Append('|').Append(_cell.ToString("R", Inv)).Append('|').Append(_nx).Append('|').Append(_ny).Append('|');
                 for (int i = 0; i < nodes.Length; i++) { if (i > 0) sb.Append(','); sb.Append(nodes[i].ToString("0.####", Inv)); }
                 sb.Append('|').Append(_winterMode ? 'w' : 's');   // 432: tryb losowania (starsza DLL czyta 9 pol i to pomija)
+                sb.Append('|').Append(_brake ? 'b' : '-');        // 432-p: hamulec swiata (histereza) - brak pola = wylaczony
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -637,6 +729,7 @@ namespace Armoury
                     _minX = float.Parse(f[3], Inv); _minY = float.Parse(f[4], Inv); _cell = float.Parse(f[5], Inv);
                     _nx = nx; _ny = ny; _nodes = nodes; _snap = null;
                     _winterMode = f.Length > 9 && f[9] == "w";   // 432: brak pola = stary zapis = tryb zniw
+                    _brake = _winterMode && f.Length > 10 && f[10] == "b";   // 432-p
                 }
                 // czynnosc ustala pierwsza Daily po wczytaniu (w SyncData bez odczytow czasu i klimatu - zegar i pory moga nie byc jeszcze wczytane);
                 // do niej plony x1 (najwyzej czesc jednej doby ticku osad)

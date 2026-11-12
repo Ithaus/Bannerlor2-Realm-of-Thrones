@@ -418,7 +418,7 @@ namespace Armoury
                     }
                     res.WSpareKg = sk;                                // linia 297: kg produkcji okregu, ktorej zima juz nie zabiera (przed stolem okregu i targiem)
                 }
-                HarvestYear.KsApply(ld.TF ? (ld.T != null ? ld.T.Settlement : null) : (ld.V != null ? ld.V.Settlement : null), prod);   // R3-05e: plony pol okregu x rok urodzaju (poza zima)
+                HarvestYear.KsApply(ld.TF ? (ld.T != null ? ld.T.Settlement : null) : (ld.V != null ? ld.V.Settlement : null), prod);   // R3-05e: plony pol okregu x rok urodzaju (rok zniw - poza zima; 432: rok trybu zimy takze w zimie)
                 // R3-06d (TiredLand): ziemia zajeta ponad baze okregu - tylko gra (Plan bez zmian); przedtem kopia plonu bez stada i ziemi do bramki krainy (StartCalibration.Stada.cs)
                 LandKs(ld, prod, f);
                 // 363: towar zamowienia po zimie i czynnikach rak wyjety z produkcji PRZED stolem okregu i targiem (okreg go nie spala, wozy go nie wioza) - sztuki doby dla zamawiajacych
