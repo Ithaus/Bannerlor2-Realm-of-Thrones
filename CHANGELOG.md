@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 469-b (12.11) - zasieg bojowy lukow i kusz wedlug naciagu z wartosciami historycznymi (klucz "Historical Bow And Crossbow Range")
+
+**Problem:** Jeff 12.11: "luki powinny miec rozny zasieg w zaleznosci od naciagu, daj wartosci historyczne dla kusz i lukow". Po 469-a prog ognia G = 0.85 zasiegu fizycznego - dla wszystkich lukow 157-245 m, wiec luk mysliwski strzela prawie z tej samej odleglosci co luk wojenny.
+
+**Przyczyna:** zasieg fizyczny z predkosci RBM rosnie z naciagiem wolno (v ~ pierwiastek z naciagu; 60 lb 185 m, 166 lb 284 m), a historycznie skuteczna salwa slabego luku byla duzo krotsza niz jego lot maksymalny.
+
+**Zmiana (`FireRange469.cs`, `Settings.cs`, `McmSettings.cs`):**
+- `HistRange(uzytek, naciag)` - zasieg salwy w skali naciagu RBM (pole MissileSpeed + hit_points modyfikatora): luk < 70 lb 100 m, 70-110 lb 150 m, 110-150 lb 180 m, >= 150 lb 200 m; luk dlugi < 110 lb 130 m, 110-150 lb 170 m, >= 150 lb 200 m; kusza szybka (crossbow_fast) 110 m; kusza < 250 lb 140 m, >= 250 lb 170 m (badanie 469 rozdz. 3 i 4b, wartosci z wiedzy - niepewnosc srednia do duzej; kusze RBM 80-330 lb przy skoku 0.508 m, realnie 150-1200 lb przy 0.10-0.18 m, wiec progi w skali RBM).
+- `Gate`: G = min(HistRange, 0.85 x zasieg fizyczny) - fizyka dalej skraca pod gore. Nieznany uzytek / brak RBM (naciag nieznany) - tylko fizyka.
+- WYBOR WARIANTU: predkosci strzaly (MissileSpeed) NIE zmieniamy. RBM juz liczy predkosc z naciagu i jakosci przy strzale (rbmcombat.cs:4490-4631) i obrazenia z energii; zmiana dla silnika = drugi raz to samo i rozjechane celowanie (mechanizm P3 badania). Odrzucone tez globalne `Mission.SetMissileRangeModifier` (jedno na misje, nie wg naciagu). Naciag decyduje tylko o progu decyzji 469-a.
+- Linie: "Ogien w zasiegu (469)" naglowek `G = min(zasieg historyczny wg naciagu 469-b, 0.85 x ...)`; "Zasieg lukow (469)" - kolumna "historyczny m" i G po ograniczeniu, `zasieg historyczny TAK/NIE`.
+- Klucz `HistoricalBowAndCrossbowRange` (recznie, grupa 310, domyslnie TAK). NIE = G jak w 469-a co do bitu.
+
+**Ryzyko / co sprawdzic:**
+- Pat: szyk strzelcow RBM staje ok. pol natywnego MaximumMissileRange od wroga (RBMBehaviorArcherSkirmish, rbmai.cs:8580; bez strzelania co 15 s "Approaching" tylko do 0.9 tej odleglosci). Gdy natywny zasieg slabej broni jest bliski lotu w prozni (luk mysliwski v^2/g = 297 m -> pol 148 m) a G = 100 m, taki szyk w obronie moze stac poza swoim zasiegiem i nie strzelac, dopoki wrog nie podejdzie. Sprawdzic w linii 469: bronie "natywny sr." / 2 vs "G sr.", czas wstrzymania sr. / najdluzszy, "w zasiegu". Gdyby slabe luki staly bezczynnie - podniesc progi albo NIE.
+- Kolizje: tylko prog decyzji 469-a; predkosc, celowanie, obrazenia, wycena (XbowPrice, RangedRank) bez zmian. Skan IL 30, build 0 bledow.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 469-a (12.11) - lucznicy AI trzymaja ogien poza zasiegiem swojej broni (klucz "Archers Hold Fire Out Of Range")
 
 **Problem:** Jeff 12.11: "lucznicy zaczynaja strzelac na poczatku bitwy nawet jak nie maja zasiegu ... strzaly laduja w polu przed wojskiem, moze niech sprawdzaja czy jest zasieg i dopiero wtedy strzelaja". Brak linii logu, ktora mierzy odleglosc strzalu - posrednio: "Czysty strzal (310)" 297/300 i 662/703 strzal AI w klebowisko z 100+ m (Armoury-2026-11-12_23-15-40.log), autotest CrashScribe: ok. 3% kolizji pociskow to trafienia.

@@ -31,6 +31,8 @@ namespace Armoury
     /// Budzet: przeglad wszystkich ludzi misji co ok. 0.5 s (ludzi na klatke wg dt, 8..96), zapytan o wroga w 6 m najwyzej 16 na klatke, nowych symulacji lotu najwyzej 2 w przegladzie i 2 przy strzalach (wynik przechowany per predkosc i koszyk wysokosci).
     /// Pomiar (linia "Ogien w zasiegu (469)" raz na bitwe polowa): strzaly AI z luku / kuszy wg odleglosci do celu, strzaly poza G, pierwsza salwa kazdej strony
     /// (6 s od pierwszego strzalu: sredni dystans vs srednie G i natywny GetMissileRange), wstrzymania, czas, bronie (naciag, predkosc, zasieg, G, natywny).
+    /// 469-b (klucz HistoricalBowAndCrossbowRange): G dodatkowo ograniczone zasiegiem historycznym wg rodzaju i naciagu (HistRange) - tylko prog decyzji,
+    /// predkosc strzaly zostaje z RBM (zmiana MissileSpeed = podwojne liczenie naciagu i rozjechane celowanie, badanie P3).
     /// Linia "Zasieg lukow (469)" na start sesji: tabela kilku typowych broni. Potkniecia liczone (RoutHold miejsce "tarcze"), funkcji nie gasimy.
     /// </summary>
     internal static class FireRange469
@@ -63,13 +65,14 @@ namespace Armoury
         {
             public string Name, Usage;
             public int Lb, V;          // naciag (funty, z hit_points modyfikatora) i predkosc RBM (m/s); bez RBM Lb = 0, V = predkosc gry
+            public int Hist;           // 469-b: zasieg historyczny wg rodzaju i naciagu (m); 0 = brak (bez RBM - naciag nieznany)
             public bool Ok;            // false = nieznany uzytek (RBM 10 m/s) - czlowiek pominiety
             public int Shots, NatN, GN;
             public float NatSum, GSum;
         }
 
         private static WeakReference _m;
-        private static bool _live, _key, _written, _rbm;
+        private static bool _live, _key, _written, _rbm, _hist;
         private static string _kind = "?";
         private static float _k = 0.003f;
         private static int _rot, _frameNear, _frameSim;
@@ -116,6 +119,7 @@ namespace Armoury
             _kind = MissionTeams.Kind(m);
             _key = c == null || c.ArchersHoldFireOutOfRange;
             _rbm = RangedRank.RbmLoaded;
+            _hist = c == null || c.HistoricalBowAndCrossbowRange;
             _k = Friction();
             _live = true;
         }
@@ -209,6 +213,7 @@ namespace Armoury
                 p.Lb = lb + hp;
                 p.Ok = Known(p.Usage);
                 p.V = p.Ok ? RbmSpeed(aw, p.Usage, p.Lb) : 0;
+                p.Hist = p.Ok ? HistRange(p.Usage, p.Lb) : 0;
             }
             else
             {
@@ -293,12 +298,32 @@ namespace Armoury
             return 0f;
         }
 
-        /// <summary>Zasieg bojowy G (m) dla broni i roznicy wysokosci; -1 = bez budzetu klatki (nastepny przeglad).</summary>
+        /// <summary>Zasieg bojowy G (m) dla broni i roznicy wysokosci; -1 = bez budzetu klatki (nastepny przeglad).
+        /// 469-b (klucz HistoricalBowAndCrossbowRange): G = min(zasieg historyczny wg naciagu, 0.85 x zasieg fizyczny) - fizyka skraca pod gore.</summary>
         private static float Gate(Wp p, float dz, bool budget)
         {
             float r = MaxRange(p.V, dz, budget);
             if (r < 0f) return -1f;
-            return Eff * r;
+            float g = Eff * r;
+            if (_hist && p.Hist > 0 && p.Hist < g) g = p.Hist;
+            return g;
+        }
+
+        /// <summary>469-b: zasieg bojowy (salwa w szyk, nie strzal celowany w pojedynczego czlowieka) wg rodzaju broni i naciagu w skali RBM (pole
+        /// MissileSpeed + hit_points modyfikatora). Wartosci z historii (badanie 469 rozdz. 3, wiedza - niepewnosc srednia do duzej): luk mysliwski / krotki
+        /// 30-60 lb - salwa 100-180 m; refleksyjny stepowy 90-120 lb - 150-250 m bojowo; dlugi angielski 140-160 lb - 200-250 m ciezka strzala; kusza lekka
+        /// (strzemie, hak) - 150-250 m; ciezka (kolowrot, korba) - 250-350 m maks., skuteczna 60-100 m. RBM ma kusze 80-330 lb przy skoku 0.508 m (realnie
+        /// 0.10-0.18 m) - progi kusz w skali RBM. 0 = nieznany uzytek.</summary>
+        internal static int HistRange(string usage, int lb)
+        {
+            switch (usage)
+            {
+                case "bow": return lb < 70 ? 100 : lb < 110 ? 150 : lb < 150 ? 180 : 200;
+                case "long_bow": return lb < 110 ? 130 : lb < 150 ? 170 : 200;
+                case "crossbow_fast": return 110;
+                case "crossbow": return lb < 250 ? 140 : 170;
+                default: return 0;
+            }
         }
 
         // ------------------------------------------------------------ przeglad (ShieldsUp.Tick, glowny watek)
@@ -566,7 +591,8 @@ namespace Armoury
             var sb = new StringBuilder(1600);
             sb.Append("Ogien w zasiegu (469): misja ").Append(_kind).Append(", klucz ").Append(_key ? "TAK" : "NIE (tylko pomiar, bez wstrzyman)")
               .Append(_rbm ? "" : ", brak RBM (predkosc gry, bez naciagu)")
-              .Append(" (G = ").Append(Eff.ToString("0.00", Inv)).Append(" x zasieg maks. z oporem k ").Append(_k.ToString("0.0000", Inv))
+              .Append(" (G = ").Append(_hist && _rbm ? "min(zasieg historyczny wg naciagu 469-b, " : "").Append(Eff.ToString("0.00", Inv))
+              .Append(" x zasieg maks. z oporem k ").Append(_k.ToString("0.0000", Inv)).Append(_hist && _rbm ? ")" : "")
               .Append("; wstrzymanie powyzej ").Append(HoldOver.ToString("0.0", Inv)).Append(" G, ogien od G)")
               .Append(" | strzaly AI z luku / kuszy pieszo: ").Append(_shots).Append(" (<50/50-99/100-149/150-199/200+ m ")
               .Append(ShotBy[0]).Append('/').Append(ShotBy[1]).Append('/').Append(ShotBy[2]).Append('/').Append(ShotBy[3]).Append('/').Append(ShotBy[4])
@@ -617,6 +643,8 @@ namespace Armoury
             {
                 LbAtStart.Clear();
                 bool rbm = RangedRank.RbmLoaded;
+                var c = Settings.Current;
+                bool hist = rbm && (c == null || c.HistoricalBowAndCrossbowRange);
                 float k = Friction();
                 int bows = 0, xbows = 0;
                 foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
@@ -630,8 +658,9 @@ namespace Armoury
                 var sb = new StringBuilder(1200);
                 sb.Append("Zasieg lukow (469): start sesji | ").Append(rbm ? "RBM - predkosc z naciagu (wzor RBM)" : "brak RBM - predkosc gry")
                   .Append(", opor k ").Append(k.ToString("0.0000", Inv)).Append(", strzala ").Append(ArrowW.ToString("0.000", Inv)).Append(" kg, belt ")
-                  .Append(BoltW.ToString("0.000", Inv)).Append(" kg, G = ").Append(Eff.ToString("0.00", Inv)).Append(" x zasieg maks. | lukow ").Append(bows)
-                  .Append(", kusz ").Append(xbows).Append(" | bron: uzytek, naciag lb, v m/s, zasieg maks. m, G m:");
+                  .Append(BoltW.ToString("0.000", Inv)).Append(" kg, G = ").Append(hist ? "min(historyczny 469-b, " : "").Append(Eff.ToString("0.00", Inv))
+                  .Append(" x zasieg maks.").Append(hist ? ")" : "").Append(", zasieg historyczny ").Append(hist ? "TAK" : (rbm ? "NIE" : "brak RBM - bez naciagu"))
+                  .Append(" | lukow ").Append(bows).Append(", kusz ").Append(xbows).Append(" | bron: uzytek, naciag lb, v m/s, zasieg maks. m, historyczny m, G m:");
                 int shown = 0;
                 for (int i = 0; i < Typical.Length; i++)
                 {
@@ -643,8 +672,11 @@ namespace Armoury
                     int lb = rbm ? w.MissileSpeed : 0;
                     int v = rbm ? RbmSpeed(it.ItemType == ItemObject.ItemTypeEnum.Crossbow ? BoltW : ArrowW, u, lb) : w.MissileSpeed;
                     float r = Simulate(v, 0f, k);
+                    int h = rbm ? HistRange(u, lb) : 0;
+                    float g = Eff * r;
+                    if (hist && h > 0 && h < g) g = h;
                     sb.Append(' ').Append(it.StringId).Append(' ').Append(u).Append(' ').Append(lb).Append(' ').Append(v).Append(' ').Append(F0(r))
-                      .Append(' ').Append(F0(Eff * r)).Append(';');
+                      .Append(' ').Append(h > 0 ? h.ToString(Inv) : "-").Append(' ').Append(F0(g)).Append(';');
                     shown++;
                 }
                 if (shown == 0) sb.Append(" brak typowych broni w danych");
