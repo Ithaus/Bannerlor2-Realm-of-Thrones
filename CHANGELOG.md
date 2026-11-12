@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 471b-p4 (13.11) - limit (e) z odsiecza w drodze: oboz odchodzi zamiast kapitulacji zalogi (recenzja B6)
+
+**Problem:** recenzja B6: droga (e) (wiek >= 1.5 x gorna granica) nie patrzyla na odsiecz - przy obozie liczniejszym zaloga kapitulowala, choc odsiecz byla w drodze. Drogi (a) i (b) (`StarveYield471`) przy odsieczy czekaja - niespojna regula.
+
+**Przyczyna:** `Time471Daily`: `age >= lim` -> `ratio > 1.0 ? "e" : "e-odejscie"` bez `pz` (odsiecz w drodze, ta sama miara co zegar R).
+
+**Zmiana:** `SiegeWalls.Time471.cs`: po limicie - oboz liczniejszy I odsiecz nie stoi: kapitulacja z honorami (`Yield471`, droga e); odsiecz w drodze albo oboz nie liczniejszy: `Lift471` (oboz zwiniety droga gry + rozejm 30 dob, droga 384). Limit zostaje twardy (nie czeka na odsiecz - wojny nie stoja). Linia `Czas oblezenia (471b) odejscie po limicie` ma pole `powod: oboz nie liczniejszy / odsiecz w drodze`.
+
+**Ryzyko / co sprawdzic:** jedna regula "odsiecz w drodze = zaloga sie nie poddaje" dla a, b, e. Oboz z miazdzaca przewaga, do ktorego idzie odsiecz, po limicie odchodzi (zamiast brac osade) - zamierzone, limit to bezpiecznik. W logu: `odejscie po limicie ... powod: odsiecz w drodze`. Klucz NIE - bez zmian.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-p3 (13.11) - bramka szturmu: glod obroncow czeka na kapitulacje (b), licznik i plan trebuszy raz na dobe (recenzje B2, A4/B7)
 
 **Problem:** recenzja B2: `Gate471` przepuszczal szturm od pierwszej godziny glodu obroncow (`FoodStocks <= 0`), a kapitulacja z glodu (b) przychodzi dopiero po tygodniu laski GL - przez ten tydzien decydowalo dawne OB1/DR, AI szturmowalo glodujaca zaloge i brala ja w niewole, zanim zadzialalo `StarveYield471` (wbrew D4: zaloga, ktora poddala sie z glodu, wychodzi wolno). Recenzje A4/B7: `_d471Gate++` i `TryBreach(camp, Measure(camp))` przy KAZDYM wywolaniu Veto (kilka decyzji AI na dobe) - pole "szturmy zatrzymane bramka" liczylo wywolania, `Measure` liczony za kazdym razem.

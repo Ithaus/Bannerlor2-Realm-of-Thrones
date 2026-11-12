@@ -35,7 +35,7 @@ namespace Armoury
     ///      trebuszy TryBreach); zawsze wolno przy pustych murach; przy glodzie obroncow wolno tylko, gdy (b) nie przyjdzie (471b-p3); stoi PRZED 307c, DR i OB1
     ///      (MB/Unblock konczy w Veto, wiec tez jej podlega);
     ///  (d) odstapienie - bez zmian (glod obozu m116, odsiecz OB5/334e);
-    ///  (e) limit: wiek >= SiegeTimeLimitFactor x gorna granica - oboz liczniejszy: Yield471, inaczej Lift471 (RemoveAllSiegeParties + rozejm 30 dob, droga 384).
+    ///  (e) limit: wiek >= SiegeTimeLimitFactor x gorna granica - oboz liczniejszy i odsiecz nie stoi: Yield471, inaczej Lift471 (RemoveAllSiegeParties + rozejm 30 dob, droga 384).
     /// Yield471 (D4, kapitulacja z honorami): partie lordow obroncow wychodza, zaloga do swoich (BookHoldings.YieldOut), potem KingdomManager.SiegeCompleted -
     /// droga 374 "slowo dotrzymane" bez relacji gracza. Szturmem zdobyte - niewola jak w grze (bez zmian).
     /// U2: zegar i R licza sie przed LogOn (akcje takze bez logu). U8: zegar i doby z odsiecza w zapisie (dopisek "T|" do arm_siege_walls; brak = zegar od wieku).
@@ -285,7 +285,7 @@ namespace Armoury
                         if (age >= lim) { overLim++; r.OverLimit = true; }
                         if (acts == null)
                         {
-                            if (age >= lim) todo.Add(new KeyValuePair<SiegeEvent, string>(ev, ratio > 1.0 ? "e" : "e-odejscie"));
+                            if (age >= lim) todo.Add(new KeyValuePair<SiegeEvent, string>(ev, ratio > 1.0 && !pz ? "e" : pz ? "e-odejscie-odsiecz" : "e-odejscie"));   // 471b-p4 (recenzja B6): odsiecz w drodze - zaloga nie kapituluje, oboz odchodzi
                             else if (r.Clock >= R && !pz && ratio > 1.0) todo.Add(new KeyValuePair<SiegeEvent, string>(ev, "a"));
                         }
                         if (sbList.Length < 3000) sbList.Append(sbList.Length > 0 ? "; " : "").Append(st.StringId).Append(' ').Append(CatName[r.Cat]).Append(' ').Append(F(age, "0")).Append('/').Append(F(R, "0")).Append(" dob").Append(pz ? " (odsiecz)" : "");
@@ -300,7 +300,7 @@ namespace Armoury
                         var ev = kv.Key;
                         if (ev.BesiegedSettlement == null || ev.BesiegedSettlement.SiegeEvent != ev) continue;
                         string info;
-                        if (kv.Value == "e-odejscie") Lift471(ev, out info);
+                        if (kv.Value == "e-odejscie" || kv.Value == "e-odejscie-odsiecz") Lift471(ev, kv.Value == "e-odejscie" ? "oboz nie liczniejszy" : "odsiecz w drodze", out info);
                         else Yield471(ev, kv.Value == "a" ? "a - termin R minal" : "e - limit " + F(LimitK, "0.0") + " x gorna granica", out info);
                     }
                     catch (Exception e) { Stumble("Time471.Act", e); }
@@ -383,9 +383,9 @@ namespace Armoury
             catch (Exception e) { Stumble("Yield471", e); _yield471 = null; info = "blad"; return false; }
         }
 
-        /// <summary>471b-4 (e): limit przy obozie nie liczniejszym od obroncow - oboz zwiniety droga gry (SiegeRansom.Lift384 = RemoveAllSiegeParties) i rozejm tej
+        /// <summary>471b-4 (e): limit przy obozie nie liczniejszym od obroncow albo (471b-p4) z odsiecza w drodze - oboz zwiniety droga gry (SiegeRansom.Lift384 = RemoveAllSiegeParties) i rozejm tej
         /// osady dla frakcji i rodow obozu na LiftTruceDays dob (SiegeRansom.Truce384 - ocena celu 0, zawrocenie druzyn w drodze). Nie rzuca.</summary>
-        private static bool Lift471(SiegeEvent ev, out string info)
+        private static bool Lift471(SiegeEvent ev, string why, out string info)
         {
             info = "-";
             var st = ev != null ? ev.BesiegedSettlement : null;
@@ -408,7 +408,7 @@ namespace Armoury
                 info = li + (ended ? ", rozejm " + LiftTruceDays + " dob (" + string.Join(", ", keys.ToArray()) + "), zawrocone " + turned : "");
                 if (LogOn)
                     Log.Info("Czas oblezenia (471b) odejscie po limicie: dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ") | po " + F(age, "0.0") + " dob (limit " + (r != null ? F(LimitK * CatHi[r.Cat], "0") : "-") + ")"
-                             + " | oboz / obroncy " + F(ratio, "0.0") + ":1 (nie liczniejszy) | wodz " + Hn(lp) + " | " + info + ".");
+                             + " | powod: " + why + " | oboz / obroncy " + F(ratio, "0.0") + ":1 | wodz " + Hn(lp) + " | " + info + ".");
                 return ended;
             }
             catch (Exception e) { Stumble("Lift471", e); info = "blad"; return false; }
