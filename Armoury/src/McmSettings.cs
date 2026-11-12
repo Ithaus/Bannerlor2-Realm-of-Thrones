@@ -12880,7 +12880,7 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338FoodDouble { get; set; } = false;
 
-        [SettingPropertyBool("Buildings338 Mason", HintText = "With Buildings338: where the lord pays for the building work, the mason makes the paid builders work faster - his points (town 3/6/9, castle 2/4/6) raise the work done for the same money, at most double; with nothing paid he adds nothing. Off = the mason does nothing to paid building work, as before", RequireRestart = false)]
+        [SettingPropertyBool("Buildings338 Mason", HintText = "With Buildings338: where the lord pays for the building work, the mason makes the paid builders work faster - his points (town 3/6/9, castle 2/4/6) raise the work done for the same money, at most double; with nothing paid he adds nothing. With Buildings338 Mason Cheaper on, the mason lowers the price of a point instead (see below). Off = the mason does nothing to paid building work, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Mason { get; set; } = true;
 

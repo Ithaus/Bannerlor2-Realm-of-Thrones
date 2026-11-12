@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 473-p (13.11) - poprawki po recenzji 473: opis MCM Masona, linia murarza bez lenn gracza nieobjetych, dopisek o przyspieszeniu zlotem, licznik twierdz na suficie zoldu
+
+**Problem:** recenzja 473-a / 473-b (tylko odczyt, bez usterek blokujacych). U1: opis MCM "Buildings338 Mason" (`Settings.cs`, `McmSettings.cs`) nadal mowil o darmowych punktach Masona "at most double" - przy domyslnym Cheaper TAK nieprawda. U2: linia `Budynki (338) murarz` (`Buildings338Mason.CutLine`) liczyla osady z Masonem takze w lennach gracza bez PaidConstructionPlayer, gdzie rabatu nie ma (BK liczy Masona sam). U3: rabat w przyspieszeniu zlotem (`BuildFunding.Boost`) nie trafia do licznika "z rabatu E pkt/d" - linia zanizala bez slowa. U4: `Buildings338Wage.Daily` liczyl twierdze "na suficie" takze, gdy wolanie TotalWage przeszlo przez `_defRan` (Apply nic nie dodalo, roznica 0).
+
+**Przyczyna:** U1 - tekst sprzed 473-a. U2 - `PriceFactor` nie sprawdza `Covered` (prywatne w BuildFunding). U3 - `Boost` wolany wiele razy na dobe (dymek, PowerPostfix, MasonDay), liczenie tam dublowaloby. U4 - `capN++` bez warunku `a != u`.
+
+**Zmiana:** U1 - do obu opisow dopisane "With Buildings338 Mason Cheaper on, the mason lowers the price of a point instead (see below).". U2 - `CutLine` pomija osady bez wlasciciela i lenna gracza bez PaidConstructionPlayer (ten sam warunek co `BuildFunding.Covered`). U3 - linia mowi wprost "bez przyspieszenia zlotem - tam rabat nie liczony w linii" (bez nowego licznika). U4 - `if (a != u) { capN++; capGold += a - u; }`.
+Odrzucone: U5 (pozycja dymku "Mason (cheaper work -X%)") - recenzja sama nazywa to dopiskiem do decyzji Jeffa, nie usterka; zmiana UI nie objeta poleceniem ("nic przy okazji") - do pytania Jeffa.
+
+**Ryzyko / co sprawdzic:** mechanika bez zmian - zmienione tylko napisy MCM i liczniki/tekst linii doby (CutLine czyta, Wage.Daily: capGold przy a == u i tak dodawal 0). Build czysty OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 473-b (13.11) - sufit lacznej obnizki zoldu zalogi z budynkow: 50%
 
 **Problem:** Jeff 13.11 (odpowiedz 5 na pytania z `docs/BUDYNKI-TABELA-PROPOZYCJE-2026-11-13.md`: "Tak, limit do 50%"). Zamek z Barracks 3 (-30%), Castellan's Office 3 (-30%) i projektem Slacken Garrison (-5%) placil 35% zoldu zalogi. Log 60 dob: `Budynki (338) zold` - 214 twierdz z budynkiem (zamek Barracks 122, biuro 121), zold przed 210 827 po 164 779 zl/d.

@@ -132,6 +132,8 @@ namespace Armoury
                 {
                     try
                     {
+                        var oc = t.Settlement?.OwnerClan;   // 473-p (recenzja 2): jak BuildFunding.Covered - lenno gracza bez PaidConstructionPlayer bez rabatu (BK liczy Masona sam)
+                        if (oc == null || (oc == Clan.PlayerClan && !Settings.Current.PaidConstructionPlayer)) continue;
                         float f = PriceFactor(t);
                         if (!(f < 1f)) continue;
                         int lvl = (int)Math.Round((1f - f) / Math.Max(0.001f, Math.Min(0.3f, Settings.Current.Buildings338MasonPriceCut)));
@@ -145,7 +147,7 @@ namespace Armoury
                          + "%/poziom) | osad z Masonem " + (m1 + m2 + m3) + " (poz. 1/2/3: " + m1 + "/" + m2 + "/" + m3 + "), z budowa w kolejce " + inQ
                          + " | oplacone tej doby po tanszej cenie: osad " + _cutTowns.Count + " (wplat pana " + _cutLord + ", ludu " + _cutFolk + "), zaplacono " + _cutPaid.ToString("0", inv)
                          + " zl za " + _cutPts.ToString("0.0", inv) + " pkt, w tym z rabatu " + _cutExtra.ToString("0.0", inv) + " pkt/d, zaoszczedzone zloto " + _cutGold.ToString("0", inv)
-                         + " zl/d (te punkty po pelnej cenie) | darmowe punkty Masona 0" + Buildings338.Tail(Buildings338.GMason));
+                         + " zl/d (te punkty po pelnej cenie; bez przyspieszenia zlotem - tam rabat nie liczony w linii) | darmowe punkty Masona 0" + Buildings338.Tail(Buildings338.GMason));
             }
             catch (Exception e) { Buildings338.Stumble(Buildings338.GMason, "Mason.CutLine", e); }
             finally { CutReset(); }

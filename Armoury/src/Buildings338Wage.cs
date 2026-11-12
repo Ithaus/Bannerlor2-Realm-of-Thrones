@@ -185,7 +185,7 @@ namespace Armoury
                     {
                         int u; bool wn = _noCap; _noCap = true;
                         try { u = mp.TotalWage; } finally { _noCap = wn; }
-                        capN++; capGold += a - u;
+                        if (a != u) { capN++; capGold += a - u; }   // 473-p (recenzja 4): wolanie przez _defRan (Apply nic nie dodalo) - nie na suficie
                     }
                 }
                 catch (Exception e) { Buildings338.Stumble(Buildings338.GWage, "Wage.Daily", e); }
