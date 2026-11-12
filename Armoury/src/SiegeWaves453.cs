@@ -71,6 +71,17 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.SiegeWavesReinforceSuccess; } }
 
+        /// <summary>453-p: szyk zrodla bez nikogo w zamku. Przy TAK - IsSplittableByAI gry (przelicza zapytanie, gdy stare - to samo, co zrobi gra
+        /// przed wlasnym przelozeniem). Przy NIE - ten sam warunek z pamieci (IsAIOwned + InsideCastleUnitCountIncludingUnpositionedReadOnly, mb 42537,
+        /// 69077-69122), bez przeliczania i bez przesuwania chwili waznosci QueryData - pomiar 'bylby' nie zmienia stanu gry (co do bitu jak przed).</summary>
+        private bool Splittable(Formation src)
+        {
+            if (_keyOn) return src.IsSplittableByAI;
+            if (!src.IsAIOwned) return false;
+            var q = src.QuerySystem;
+            return q == null || q.InsideCastleUnitCountIncludingUnpositionedReadOnly == 0;
+        }
+
         private static void Refl()
         {
             if (_reflTried) return;
@@ -228,7 +239,7 @@ namespace Armoury
                     for (int k = 0; k < LaneN; k++) if (src != null && ReferenceEquals(f[k], src)) { sk = k; break; }
                     if (sk < 0) { x.Why = RNoLane; continue; }
                     if (hold[sk]) { Done(x, RSame); continue; }
-                    if (close[sk] < 0 || close[sk] >= WallMin || !src.IsAIControlled || !src.IsSplittableByAI) { x.Why = RSrcBusy; continue; }
+                    if (close[sk] < 0 || close[sk] >= WallMin || !src.IsAIControlled || !Splittable(src)) { x.Why = RSrcBusy; continue; }
                     if (SiegeMainEffort451.IsGuardedMain(src)) { x.Why = RMain; continue; }
                     int sc;
                     if (!cnt.TryGetValue(src, out sc)) sc = src.CountOfUnitsWithoutDetachedOnes;

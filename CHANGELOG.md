@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 453-p (12.11) - poprawka po recenzji 453 (fale na przyczolek): przy kluczu NIE warunek "nikt z szyku w zamku" czytany z pamieci zapytan, bez przeliczania
+
+**Problem:** recenzja commitu 453 (bez gry - szturm nie ma autotestu): brak usterek blokujacych, jedna realna drobna. Przy kluczu Siege Waves Reinforce Success = NIE regula liczy decyzje "bylby" i czyta src.IsSplittableByAI (Armoury/src/SiegeWaves453.cs). U atakujacych w szturmie to QuerySystem.InsideCastleUnitCountIncludingUnpositioned (mb_full 69077-69122), a ten odczyt przelicza QueryData (waznosc 3 s, mb_full 43013) i przesuwa chwile waznosci - gra moze potem dostac wartosc policzona przez nas. NIE nie bylo wiec co do bitu jak przed (zasada klucza).
+
+**Przyczyna:** odczyt wlasciwosci gry z efektem ubocznym (Value przelicza stara pamiec) w sciezce pomiaru.
+
+**Zmiana:** tylko SiegeWaves453.cs - nowa metoda Splittable(src): przy TAK dalej src.IsSplittableByAI (ten sam warunek i ta sama swiezosc, jakiej gra uzywa przed wlasnym przelozeniem - pas z naszymi w zamku nie oddaje ludzi); przy NIE ten sam warunek z pamieci: IsAIOwned && InsideCastleUnitCountIncludingUnpositionedReadOnly == 0 (GetCachedValueUnlessTooOld = sam odczyt pola, mb_full 42537; wzor 437-p). Pozostale dwie uwagi recenzji bez zmian kodu: (2) posilek w nadmiarowym szyku piechoty bez SetLastAssignedFormation (mb_full 37293-37313) liczony jako "nie w szyku pasa" - tylko licznik, ostroznie (nie przekladamy z szyku, ktorego pasa nie znamy); (3) przelamana brama zwykle nie jest przyczolkiem - CloseAttackerCount liczy tylko korone muru (15 m, +-3 m, mb_full 43519), to definicja gry.
+
+**Ryzyko / co sprawdzic:** kontrola calosci: przy TAK zachowanie identyczne jak 453 (ta sama wlasciwosc gry). Przy NIE pamiec moze byc starsza niz 3 s - "bylby" moze rzadko policzyc przelozenie z szyku, ktory wlasnie wszedl do zamku (tylko licznik, ludzie sie nie ruszaja); dodatkowo i tak wymagane < 5 atakujacych przy murze pasa zrodlowego. 451 (SiegeMainEffort451.cs, IsSplittableByAI) i 452 (SiegeDeadLane452.cs, IsSplittableByAI) maja ten sam wzorzec przy NIE - nie ruszane (jedna zmiana = jeden commit; do osobnej decyzji). Linie "(453)" bez zmian formatu.
+
+**Status:** DO SPRAWDZENIA (nie wgrane; build 0 bledow).
+
 ## 453 (12.11) - AI BITWY pakiet 7 krok 7.4: fale posilkow szturmu AI ida na pas z przyczolkiem (klucz Siege Waves Reinforce Success)
 
 **Problem:** audyt AI bitwy 11.11 (docs/audyty-2026-11-11/AUDYT-AI-BITWA.md, pakiet 7.4; Jeff 11.11 "rob wszystko po kolei tak jak radzisz"). Gdy szturmujacy AI zdobeda przyczolek na jednym pasie (drabina / wieza / brama / wylom), swieze fale posilkow nie ida tam, tylko na pas, ktory najwiecej stracil (czesto lejek bez szans). Dowodu z gry brak - szturm nie ma autotestu, w logach po 09.11 nie ma misji szturmu z nowym kodem (sonda 450 "fala posilkow (450)" jeszcze nic nie zmierzyla); regula ostrozna, z pomiarem "bylby".
