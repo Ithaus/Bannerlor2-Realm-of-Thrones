@@ -78,6 +78,8 @@ namespace Armoury
                 try { Lektor.Install(_harmony); } catch (Exception e) { Log.Error("Lektor.Install", e); }
                 // m105-czcionki: nazwy osad na mapie czcionka ROT - postfiks SettlementNameplateWidget (odbicie; tabliczki buduje gotowy kod gry, prefaby i UIExtenderEx nie dzialaja); wlasny try
                 try { NameplateFont.Install(_harmony); } catch (Exception e) { Log.Error("NameplateFont.Install", e); }
+                // 463: ikony typow warsztatow BK na ekranie miasta - postfiks ShopVisualIconBrushWidget.OnLateUpdate (odbicie, raz na proces); wlasny try
+                try { WorkshopIcons.Install(_harmony); } catch (Exception e) { Log.Error("WorkshopIcons.Install", e); }
                 // 426b: nazwa unikatu na zloto w wierszu listy ekwipunku - postfiks setterow InventoryItemTupleWidget (odbicie, widzet - nie model kampanii); wlasny try
                 try { UniqueGold.Install(_harmony); } catch (Exception e) { Log.Error("UniqueGold.Install", e); }
                 WeaponXpPatch.ApplyAll(_harmony);
@@ -962,6 +964,7 @@ namespace Armoury
                 starter.AddBehavior(new HideoutSpotter());
                 starter.AddBehavior(new HideoutSight());       // m100-kryjowki: wypatrzenie ze Zwiadu, plotka odslania, miejsce nowych kryjowek (zapis arm_hideout_sight)
                 starter.AddBehavior(new HouseLevies());
+                starter.AddBehavior(new WorkshopIconsBehavior());   // 463: ikony typow warsztatow BK (style pedzla Clan.Workshop.Type.Image, mapa ekranu miasta) - start sesji, linia logu
                 starter.AddBehavior(new WorkshopTradeBehavior());   // warsztaty towarowe: linia dnia, rozmowa kupna, srednie zysku w zapisie
                 starter.AddBehavior(new TownCraftsBehavior());      // paczka 148: rzemioslo miasta wedle wartosci (doba miasta, stan w zapisie)
                 starter.AddBehavior(new TownFletchersBehavior());   // paczka 172: strzelarze miasta - stan w zapisie (doba miasta przez latke po warsztatach)
