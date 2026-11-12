@@ -13,12 +13,17 @@ namespace Armoury
     /// 471a ZO "czas oblezenia z czynnikow" - KROK 1: SAM LOG (przewidywanie), BEZ ZMIANY ZACHOWANIA.
     /// Jeff 12.11: "tak ustaw takie cele i zrob test 90 dob ale co toznaczy maly zmaek lub duzy zamek??" oraz "i od czego zalezne beda doby??".
     /// Cele: maly zamek 20-40 dob, duzy zamek 40-90, miasto 60-150, wielka twierdza 60-150; limit bezpieczenstwa 1.5 x gorna granica.
-    /// Termin obrony R = lo + (hi - lo) x q, q = 0.35 qJ + 0.25 qM + 0.25 qS + 0.15 qMo (badanie 471, calc471.py):
-    ///   qJ  jedzenie zalogi = min(1, FoodStocks / -FoodChange / 365) (bez ubytku = 1, zapas 0 = 0);
+    /// Termin obrony R = lo + (hi - lo) x s, s = (q - 0.5) / (0.9 - 0.5) obciete do 0..1, q = 0.35 qJ + 0.25 qM + 0.25 qS + 0.15 qMo:
+    ///   qJ  jedzenie zalogi = min(1, FoodStocks / -FoodChange / limit kategorii) (bez ubytku = 1, zapas 0 = 0) - 471-p: wzgledem limitu, nie 365;
     ///   qM  mury = srednie HP odcinkow x poziom murow / 3;
-    ///   qS  sily = 1 - ln(ludzie obozu / obroncy z milicja) / ln 20, obciete do 0..1 (milicja liczy sie - sprawa pustej warowni Hornvale);
-    ///   qMo morale obroncow = Md / 100 (ten sam wzor co SZ3 DefMorale: 50 + jedzenie + lojalnosc + zold + odsiecz + mury).
-    /// Odsiecz w drodze (ta sama miara co SZ3/OB5: druzyny i armie frakcji z DefendSettlement tej osady) >= polowy sily obozu = zegar R stoi.
+    ///   qS  sily = 1 - ln(ludzie obozu / obroncy) / ln 40, obciete do 0..1 (471-p: ln 40 zamiast ln 20 - przewaga 20-40:1 jeszcze cos znaczy);
+    ///       obroncy liczeni jak w grze: Settlement.GetInvolvedPartiesForEventType(Siege) (zaloga, milicja, druzyny strony obroncy);
+    ///   qMo morale obroncow = Md / 100 (wzor SZ3 DefMorale: 50 + jedzenie + lojalnosc + zold + mury) BEZ skladnika odsieczy - odsiecz dziala tylko
+    ///       przez zatrzymanie zegara (471-p: jedno zjawisko, jeden skutek).
+    /// 471-p rozciagniecie q -> s (recenzja U1): w ROT 8.1.8 jedzenie zamku starcza na 486-807 dob (qJ = 1 zawsze), mury poziomu 2 bez trebuszy
+    /// (qM = 0.67 stale) - surowe q siedzialo w 0.52-0.75 i dolna polowa celu byla nieosiagalna. Stale 0.5 / 0.9 do sprawdzenia na liniach
+    /// "(471) start" z testu (linia podaje q i s).
+    /// Odsiecz w drodze (ReliefStrength - ta sama miara co SZ3/OB5) >= polowy sily obozu = zegar R stoi (sprawdzana PRZED doliczeniem doby).
     /// Kategorie (D1 czeka na Jeffa): wielka twierdza = lista kanoniczna id ROT-Map 8.1.8 (TwierdzaIds); miasto = kazde inne miasto; zamek: mury
     /// poziom 1 = maly, 2-3 = duzy (dokladnie slowa zadania). W ROT 8.1.8 zaden zamek nie ma murow 1 na starcie - linia pokazuje tez wariant D1
     /// "maly = mury <= 2", zeby test pokazal oba podzialy.
@@ -36,10 +41,11 @@ namespace Armoury
         private static readonly string[] CatName = { "maly zamek", "duzy zamek", "miasto", "wielka twierdza" };
         private static readonly int[] CatLo = { 20, 40, 60, 60 }, CatHi = { 40, 90, 150, 150 };
         private const double Limit471 = 1.5;
+        private const double Q471Lo = 0.5, Q471Hi = 0.9;   // 471-p: rozciagniecie q na pelny cel kategorii (kalibracja z testu)
 
         private sealed class T471
         {
-            public string St = "-", Why; public int Cat, Lvl, Seen = -1; public double Start, Clock, R0, R, Q0; public bool Over, OverLimit, Paused;
+            public string St = "-", Why; public int Cat, Lvl, Seen = -1; public double Start, Clock, R0, R, Q0, S0; public bool Over, OverLimit, Paused, PlayerClan;
             public int PausedDays;
         }
         private static readonly Dictionary<SiegeEvent, T471> _t471 = new Dictionary<SiegeEvent, T471>();
@@ -55,7 +61,7 @@ namespace Armoury
         }
 
         /// <summary>Czynniki i termin R dla jednego oblezenia; txt - czynniki do linii.</summary>
-        private static double R471(Settlement st, SiegeEvent ev, int cat, int lvl, out double q, out bool paused, out string txt)
+        private static double R471(Settlement st, SiegeEvent ev, int cat, int lvl, out double q, out double sq, out bool paused, out string txt)
         {
             var t = st.Town;
             // (1) jedzenie zalogi
@@ -63,7 +69,7 @@ namespace Armoury
             try { fs = t.FoodStocks; ch = t.FoodChange; } catch { }
             if (fs <= 0) qJ = 0;
             else if (ch >= 0) qJ = 1;
-            else { foodDays = fs / -ch; qJ = Clamp(foodDays / 365.0, 0, 1); }
+            else { foodDays = fs / -ch; qJ = Clamp(foodDays / (Limit471 * CatHi[cat]), 0, 1); }
             // (2) mury
             double hp = WallHp(st), qM = Clamp(hp * lvl / 3.0, 0, 1);
             // (3) sily: ludzie obozu / obroncy z milicja
@@ -76,11 +82,8 @@ namespace Armoury
                     att += pb.MemberRoster.TotalHealthyCount;
                     try { if (pb.IsMobile) { campFood += pb.MobileParty.Food; campCh += pb.MobileParty.FoodChange; } } catch { }
                 }
-            foreach (var mp in st.Parties)
-            {
-                if (mp == null || !mp.IsActive || mp.MemberRoster == null) continue;
-                if (mp.IsGarrison || mp.IsMilitia || mp.Aggressiveness > 0.01f) def += mp.MemberRoster.TotalHealthyCount;
-            }
+            foreach (var pb in st.GetInvolvedPartiesForEventType(TaleWorlds.CampaignSystem.MapEvents.MapEvent.BattleTypes.Siege))   // 471-p U6: strona obroncy jak w grze
+                if (pb != null && pb.MemberRoster != null) def += pb.MemberRoster.TotalHealthyCount;
             try
             {
                 var side = ev.GetSiegeEventSide(BattleSideEnum.Attacker);
@@ -90,43 +93,48 @@ namespace Armoury
             }
             catch { }
             double ratio = def <= 0 ? 999.0 : att / (double)def;
-            double qS = Clamp(1.0 - Math.Log(Math.Max(1.0, ratio)) / Math.Log(20.0), 0, 1);
-            // (4) odsiecz w drodze - ta sama miara co SZ3/OB5 (bez warunku bitwy: tu nie ma MapEvent)
-            double rel = 0, bes = 0;
-            if (camp != null)
-                foreach (var pb in camp.GetInvolvedPartiesForEventType(TaleWorlds.CampaignSystem.MapEvents.MapEvent.BattleTypes.Siege)) if (pb != null) bes += pb.EstimatedStrength;
-            var w = st.MapFaction != null ? st.MapFaction.WarPartyComponents : null;
-            if (w != null)
-                for (int i = 0; i < w.Count; i++)
-                {
-                    var mp = w[i] != null ? w[i].MobileParty : null;
-                    if (mp == null || !mp.IsActive || mp.CurrentSettlement == st) continue;
-                    if (mp.DefaultBehavior != AiBehavior.DefendSettlement || mp.TargetSettlement != st) continue;
-                    if (mp.Army != null) { if (mp.Army.LeaderParty == mp) rel += mp.Army.EstimatedStrength; }
-                    else if (mp.AttachedTo == null) rel += mp.Party.EstimatedStrength;
-                }
+            double qS = Clamp(1.0 - Math.Log(Math.Max(1.0, ratio)) / Math.Log(40.0), 0, 1);
+            // (4) odsiecz w drodze - wspolna funkcja SZ3/OB5 (471-p U7: me == null = bez warunku bitwy)
+            double bes, rel = ReliefStrength(st, null, out bes);
             paused = rel > 0 && bes > 0 && rel >= 0.5 * bes;
             // morale obroncow (wzor SZ3 DefMorale)
             double mFood = fs <= 0 ? -25 : ch >= 0 ? 10 : foodDays >= 28.0 ? 10.0 : foodDays < 7.0 ? -10.0 * (7.0 - foodDays) / 7.0 : 0.0;
             double mLoy = 0, mPay = 0;
             try { mLoy = (Clamp(t.Loyalty, 0.0, 100.0) - 50.0) * 0.4; } catch { }
             try { var g = t.GarrisonParty; mPay = g != null ? -20.0 * Clamp(g.HasUnpaidWages, 0.0, 1.0) : 0.0; } catch { }
-            double mRel = rel <= 0 ? 0 : (bes > 0 && rel >= 0.5 * bes) ? 15.0 : 7.0;
-            double md = Clamp(50.0 + mFood + mLoy + mPay + mRel - 15.0 * (1.0 - hp), 0, 100), qMo = md / 100.0;
+            double md = Clamp(50.0 + mFood + mLoy + mPay - 15.0 * (1.0 - hp), 0, 100), qMo = md / 100.0;   // 471-p U5: bez odsieczy (ta stawia zegar)
             q = 0.35 * qJ + 0.25 * qM + 0.25 * qS + 0.15 * qMo;
-            double r = CatLo[cat] + (CatHi[cat] - CatLo[cat]) * q;
+            sq = Clamp((q - Q471Lo) / (Q471Hi - Q471Lo), 0, 1);
+            double r = CatLo[cat] + (CatHi[cat] - CatLo[cat]) * sq;
             double campDays = campCh < 0 ? campFood / -campCh : -1;
             txt = "qJ " + F(qJ, "0.00") + " (jedzenie zalogi " + (fs <= 0 ? "0 - glod" : ch >= 0 ? "bez ubytku" : F(foodDays, "0") + " dob") + ", " + F(fs, "0") + " / " + F(ch, "0.0") + "/d)"
                 + ", qM " + F(qM, "0.00") + " (mury poziom " + lvl + ", HP " + F(hp * 100, "0") + "%)"
-                + ", qS " + F(qS, "0.00") + " (oboz " + att + " / obroncy z milicja " + def + " = " + (def <= 0 ? "pusta" : F(ratio, "0.0") + ":1") + ")"
-                + ", qMo " + F(qMo, "0.00") + " (Md " + F(md, "0") + ")"
+                + ", qS " + F(qS, "0.00") + " (oboz " + att + " / obroncy (strona gry, z milicja) " + def + " = " + (def <= 0 ? "pusta" : F(ratio, "0.0") + ":1") + ")"
+                + ", qMo " + F(qMo, "0.00") + " (Md bez odsieczy " + F(md, "0") + ")"
                 + " | odsiecz w drodze " + F(rel, "0") + " / sila obozu " + F(bes, "0") + (paused ? " -> ZEGAR STOI" : "")
                 + " | jedzenie obozu " + (campCh < 0 ? F(campDays, "0.0") + " dob" : "bez ubytku") + " (" + F(campFood, "0") + ", " + F(campCh, "0.0") + "/d)"
                 + " | trebusze obozu " + trebs + ", najslabszy odcinek " + F(WallHpMin(st) * 100, "0") + "%";
             return r;
         }
 
-        /// <summary>Z Daily (po LogOn): start (raz na oblezenie), zegar doby i linia doby 471.</summary>
+        /// <summary>471-p U3: powod "poza regula" albo null. Gracz: wodz obozu, PlayerSiege, druzyna gracza w obozie, oblega te osade albo w niej stoi.
+        /// Bez IsPlayerSiegeEvent (rzuca NRE przy LeaderParty == null - tu lp sprawdzony wyzej).</summary>
+        private static string Out471(SiegeEvent ev, Settlement st, MobileParty lp)
+        {
+            var main = MobileParty.MainParty;
+            if (lp.IsMainParty || PlayerSiege.PlayerSiegeEvent == ev) return "gracz";
+            if (main != null && (main.BesiegedSettlement == st || main.CurrentSettlement == st)) return "gracz";
+            var camp = ev.BesiegerCamp;
+            if (camp != null && main != null)
+                foreach (var pb in camp.GetInvolvedPartiesForEventType(TaleWorlds.CampaignSystem.MapEvents.MapEvent.BattleTypes.Siege))
+                    if (pb != null && pb.IsMobile && pb.MobileParty == main) return "gracz";
+            if (Und(lp, st)) return "Inni";
+            if (Scripted(lp)) return "skrypt fabuly";
+            return null;
+        }
+
+        /// <summary>Z Daily (po LogOn): start (raz na oblezenie), zegar doby i linia doby 471. 471-p U2: w 471a zegar zyje tylko z wlaczonym logiem
+        /// (nic poza logiem go nie czyta); 471b, ktory na nim dziala, MUSI wyniesc zegar i R przed LogOn i zapisywac zegar w save (U8).</summary>
         private static void Time471Daily()
         {
             try
@@ -143,38 +151,50 @@ namespace Armoury
                     var ev = st.SiegeEvent;
                     try
                     {
+                        var lp = ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null;
+                        if (lp == null) continue;                                    // 471-p U3: oboz bez wodza (gra konczy takie oblezenie) - pomijam bez potkniecia
                         T471 r;
                         bool fresh = !_t471.TryGetValue(ev, out r);
                         if (fresh)
                         {
                             r = new T471 { St = st.StringId, Start = ev.SiegeStartTime.ToDays };
                             r.Cat = Cat471(st, out r.Lvl);
-                            var lp = ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null;
-                            if (ev.IsPlayerSiegeEvent) r.Why = "gracz";
-                            else if (Und(lp, st)) r.Why = "Inni";
-                            else if (Scripted(lp)) r.Why = "skrypt fabuly";
+                            r.PlayerClan = st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan;   // 471-p U4: tylko znacznik (D5 czeka na Jeffa)
                             r.Clock = Math.Max(0.0, ev.SiegeStartTime.ElapsedDaysUntilNow);   // po wczytaniu: zegar od wieku oblezenia (przerwy odsieczy sprzed wczytania nieznane)
                             _t471[ev] = r;
                         }
                         if (r.Seen == today) continue;
-                        if (!fresh) { if (r.Why == null && !r.Paused) r.Clock += 1.0; }
                         r.Seen = today;
-                        if (r.Why != null) { outside++; if (fresh) { _d471Out++; Log.Info("Czas oblezenia (471) start: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ") | poza regula (" + r.Why + ")."); } continue; }
+                        bool newOut = false;
+                        if (r.Why == null) { r.Why = Out471(ev, st, lp); newOut = r.Why != null; }   // 471-p U3: co dobe; raz poza regula - zostaje
+                        if (r.Why != null)
+                        {
+                            outside++;
+                            if (newOut)
+                            {
+                                _d471Out++;
+                                Log.Info("Czas oblezenia (471) " + (fresh ? "start" : "poza regula od teraz") + ": dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ") | poza regula (" + r.Why + ")"
+                                    + (fresh ? "" : " | wiek " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob, zegar " + F(r.Clock, "0") + ", R " + F(r.R, "0.0")) + ".");
+                            }
+                            continue;
+                        }
                         going++; perCat[r.Cat]++;
-                        double q; bool pz; string txt;
-                        double R = R471(st, ev, r.Cat, r.Lvl, out q, out pz, out txt);
+                        double q, sq; bool pz; string txt;
+                        double R = R471(st, ev, r.Cat, r.Lvl, out q, out sq, out pz, out txt);
+                        if (!fresh && !pz) r.Clock += 1.0;                           // 471-p U8: odsiecz sprawdzona dzis, przed doliczeniem doby
                         r.R = R; r.Paused = pz;
                         if (pz) { r.PausedDays++; paused++; }
                         double age = ev.SiegeStartTime.ElapsedDaysUntilNow, lim = Limit471 * CatHi[r.Cat];
                         if (fresh)
                         {
-                            r.R0 = R; r.Q0 = q; _d471Start++;
-                            Log.Info("Czas oblezenia (471) start: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ") | kategoria " + CatName[r.Cat] + " (mury " + r.Lvl
+                            r.R0 = R; r.Q0 = q; r.S0 = sq; _d471Start++;
+                            Log.Info("Czas oblezenia (471) start: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ")" + (r.PlayerClan ? " [osada klanu gracza - D5]" : "")
+                                + " | kategoria " + CatName[r.Cat] + " (mury " + r.Lvl
                                 + (r.Cat <= 1 ? ", wariant D1 'maly = mury <= 2': " + CatName[r.Lvl <= 2 ? 0 : 1] : "") + "), cel " + CatLo[r.Cat] + "-" + CatHi[r.Cat] + " dob, limit " + F(lim, "0")
-                                + " | wodz " + Hn(ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null) + " | wiek " + F(age, "0.0") + " dob"
-                                + " | termin obrony R " + F(R, "0.0") + " dob (q " + F(q, "0.00") + ") | " + txt + " | TYLKO PRZEWIDYWANIE - zachowanie bez zmian.");
+                                + " | wodz " + Hn(lp) + " | wiek " + F(age, "0.0") + " dob"
+                                + " | termin obrony R " + F(R, "0.0") + " dob (q " + F(q, "0.00") + " -> s " + F(sq, "0.00") + ") | " + txt + " | TYLKO PRZEWIDYWANIE - zachowanie bez zmian.");
                         }
-                        if (r.Clock >= R) { over++; if (!r.Over) { r.Over = true; Log.Info("Czas oblezenia (471) termin minal: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ", " + CatName[r.Cat] + ") | zegar " + F(r.Clock, "0") + " >= R " + F(R, "0.0") + " (wiek " + F(age, "0.0") + ") | " + txt + " | wedlug 471b tu bylaby kapitulacja z terminu (przy s > 1)."); } }
+                        if (r.Clock >= R) { over++; if (!r.Over) { r.Over = true; Log.Info("Czas oblezenia (471) termin minal: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ", " + CatName[r.Cat] + ")" + (r.PlayerClan ? " [osada klanu gracza - D5]" : "") + " | zegar " + F(r.Clock, "0") + " >= R " + F(R, "0.0") + " (wiek " + F(age, "0.0") + ") | " + txt + " | wedlug 471b tu bylaby kapitulacja z terminu (przy s > 1)."); } }
                         if (age >= lim) { overLim++; r.OverLimit = true; }
                         if (sbList.Length < 3000) sbList.Append(sbList.Length > 0 ? "; " : "").Append(st.StringId).Append(' ').Append(CatName[r.Cat]).Append(' ').Append(F(age, "0")).Append('/').Append(F(R, "0")).Append(" dob").Append(pz ? " (odsiecz)" : "");
                     }
@@ -203,9 +223,11 @@ namespace Armoury
                 int c = r.Cat;
                 string vs = age < CatLo[c] ? "PONIZEJ celu" : age > CatHi[c] ? "POWYZEJ celu" : "w celu";
                 Log.Info("Czas oblezenia (471) koniec: dzien " + Today + " | osada " + r.St + " (" + Nm(st) + ", " + CatName[c] + ", mury " + r.Lvl + ") | trwalo " + F(age, "0.0") + " dob, " + vs + " " + CatLo[c] + "-" + CatHi[c]
-                    + " | R na starcie " + F(r.R0, "0.0") + " (q " + F(r.Q0, "0.00") + "), R ostatnie " + F(r.R, "0.0") + ", zegar " + F(r.Clock, "0") + (r.Over ? " (termin minal)" : "")
+                    + " | R na starcie " + F(r.R0, "0.0") + " (q " + F(r.Q0, "0.00") + " -> s " + F(r.S0, "0.00") + "), R ostatnie " + F(r.R, "0.0") + ", zegar " + F(r.Clock, "0") + (r.Over ? " (termin minal)" : "")
                     + ", dob z odsiecza " + r.PausedDays + (r.OverLimit ? ", PONAD LIMITEM " + F(Limit471 * CatHi[c], "0") : "") + " | HP murow " + F(WallHp(st) * 100, "0") + "%"
-                    + " | wlasciciel teraz " + (st != null && st.OwnerClan != null ? st.OwnerClan.StringId : "-") + ".");
+                    + " | wlasciciel w chwili konca " + (st != null && st.OwnerClan != null ? st.OwnerClan.StringId : "-")
+                    + " (gra zmienia wlasciciela PO tym zdarzeniu - zdobycie widac w linii KO)"   // 471-p U10: SiegeCompleted: RemoveAllSiegeParties -> koniec oblezenia -> ApplyBySiege
+                    + (r.PlayerClan ? " [osada klanu gracza - D5]" : "") + ".");
             }
             catch (Exception e) { Stumble("Time471End", e); }
         }

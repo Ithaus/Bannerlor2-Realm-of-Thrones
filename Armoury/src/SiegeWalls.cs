@@ -1009,7 +1009,7 @@ namespace Armoury
             for (int i = 0; i < w.Count; i++)
             {
                 var mp = w[i] != null ? w[i].MobileParty : null;
-                if (mp == null || !mp.IsActive || mp.CurrentSettlement == st || mp.MapEvent == me) continue;
+                if (mp == null || !mp.IsActive || mp.CurrentSettlement == st || (me != null && mp.MapEvent == me)) continue;   // 471-p: me == null (poza bitwa, 471) - bez warunku bitwy; SZ3 zawsze z me
                 if (mp.DefaultBehavior != AiBehavior.DefendSettlement || mp.TargetSettlement != st) continue;
                 if (mp.Army != null) { if (mp.Army.LeaderParty == mp) rel += mp.Army.EstimatedStrength; }
                 else if (mp.AttachedTo == null) rel += mp.Party.EstimatedStrength;
