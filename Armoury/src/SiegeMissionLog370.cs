@@ -547,7 +547,7 @@ namespace Armoury
         }
 
         /// <summary>450: wartosc z pamieci QueryData (GetCachedValue) albo -1, gdy pola brak (liczniki gry sa nieujemne).</summary>
-        private static int QVal(SiegeQuerySystem q, string field)
+        internal static int QVal(SiegeQuerySystem q, string field)
         {
             FieldInfo fi;
             if (!QFields.TryGetValue(field, out fi))
@@ -560,7 +560,7 @@ namespace Armoury
             return qd != null ? qd.GetCachedValue() : -1;
         }
 
-        private static string LanePrefix(FormationAI.BehaviorSide side)
+        internal static string LanePrefix(FormationAI.BehaviorSide side)
         {
             return side == FormationAI.BehaviorSide.Left ? "_left" : (side == FormationAI.BehaviorSide.Middle ? "_middle" : "_right");
         }

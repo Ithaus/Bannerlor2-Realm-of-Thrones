@@ -12328,6 +12328,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public int SiegeLadderWaitSeconds { get; set; } = 60;
 
+        [SettingPropertyBool("Siege Main Effort", HintText = "In an assault on walls led by the AI (enemy or allied), the stormers no longer spread their men evenly over the ladders, the siege towers and the gate: once, right after deployment and before anyone reaches the walls, about 60% of the men of the assault formations go to one main point - a breach, a siege tower or the gate, picked at random - and the rest are split over the other points (two points: 60 and 40). Until the main point reaches the walls the game no longer takes men back from it to even out the points. A new assault in the same siege picks another main point when it can. Men at the ram or the siege towers stay where they are, and no point is ever left empty. Formations you command yourself are never touched. Off = men spread evenly, as in the game. Counted in the Armoury log in each siege assault (line 451).", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
+        public bool SiegeMainEffort { get; set; } = true;
+
         [SettingPropertyBool("Siege Defender Archers To Walls", HintText = "When you defend a fortress and command your side yourself: at the end of deployment, once, your archers and crossbowmen (not heroes, not standard bearers, not men at siege engines) are moved out of your other formations into your formations that shoot from the wall posts, spread evenly; if none stands at a wall post, empty formations are sent to free posts. Afterwards you command as usual. Off = your formations stay as you deployed them", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool SiegeDefenderArchersToWalls { get; set; } = true;
@@ -15949,6 +15953,7 @@ namespace Armoury
             s.SiegeDefenderEngineeringXp = SiegeDefenderEngineeringXp;
             s.SiegeAssaultHoldRetreat = SiegeAssaultHoldRetreat;
             s.SiegeLadderWaitSeconds = SiegeLadderWaitSeconds;
+            s.SiegeMainEffort = SiegeMainEffort;   // 451
             s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;
             s.SiegeWoundedTakenPrisoner = SiegeWoundedTakenPrisoner;
             s.SiegeWoundedWallDistance = SiegeWoundedWallDistance;

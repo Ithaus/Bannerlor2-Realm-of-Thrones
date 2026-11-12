@@ -357,6 +357,8 @@ namespace Armoury
                 try { RbmNoRegen.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RbmNoRegen.ApplyAll", e); }
                 // 372: szturm AI - odwrot taktyki tylko przez 371 (postfiks TacticBreachWalls.ShouldRetreat) i drabiny bez czekania na taran / wieze (postfiks TickOccasionally); przed JIT wolajacych
                 try { SiegeHold372.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SiegeHold372.ApplyAll", e); }
+                // 451: wysilek glowny szturmu AI - prefiks TacticBreachWalls.BalanceAssaultLanes (ochrona szyku glownego w fazie podejscia); przed JIT wolajacych jak 372
+                try { SiegeMainEffort451.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SiegeMainEffort451.ApplyAll", e); }
                 BkSupplyTemper.ApplyAll(_harmony);
                 try { BkSupplyMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSupplyMarket.ApplyAll", e); }   // 3.4: zakupy zaopatrzenia BK wedlug zapasu partii, zaplata do kasy osady (PRZED ksiega towarow)
                 try { BkSeal34.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSeal34.ApplyAll", e); }               // 3.4: rynek wsi BK, sprzedaz niewolnikow, wyposazenie rycerza BKROT - bez zlota z niczego (PRZED oknami ksiegi obiegu)
@@ -797,6 +799,9 @@ namespace Armoury
                 // 370: pomiar szturmu (tylko odczyt, linie "Oblezenie misja (370)"); samo sprawdza Mission.IsSiegeBattle przy pierwszym ticku
                 if (Settings.Current.SiegeMissionLog && mission != null)
                     mission.AddMissionBehavior(new SiegeMissionLog370());
+                // 451: wysilek glowny szturmu AI (60/20/20 na pasy, klucz SiegeMainEffort; przy NIE tylko pomiar "bylby"); samo sprawdza szturm
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new SiegeMainEffort451());
                 // 371: zalamanie szturmu w misji gracza-obroncy (oddzial szturmowy, odstapienie spod murow, oblezenie trwa); 387: takze szturm gracza-wodza (klucz SiegePlayerAssaultBreaks); 387f: takze szturm armii AI z graczem w szeregu (klucz SiegeArmyAssaultBreaks); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission)
                     mission.AddMissionBehavior(new SiegeBreak371());
