@@ -6088,6 +6088,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipNeedsDrink { get; set; } = true;
 
+        [SettingPropertyBool("Innkeeper Ale Line", HintText = "talk to the innkeeper in a town tavern and you can say 'Pour me an ale. What's the news?' - the same tankard as the tavern menu's gossip option: the same price, the same coin to the innkeeper, the same news you have not heard in that town yet, and what you hear there is not told again in the menu. Needs Inn Gossip Needs Drink. Off = no such line, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnKeeperAleLine { get; set; } = true;
+
         [SettingPropertyBool("Gossip Per Drink By Charm", HintText = "how much the drinkers tell you over one tankard depends on your Charm: below 50 - one piece of news, 50 to 109 - two, 110 to 169 - three, 170 to 229 - four, from 230 - all there is. Buy another round to hear more. Each piece you hear teaches you a little Charm (5 xp). Off = one tankard tells you everything", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool GossipPerDrinkByCharm { get; set; } = true;
@@ -14501,6 +14505,7 @@ namespace Armoury
             s.RoadsideInnTavernSound = RoadsideInnTavernSound;
             s.InnGossipPages = InnGossipPages;
             s.InnGossipNeedsDrink = InnGossipNeedsDrink;
+            s.InnKeeperAleLine = InnKeeperAleLine;
             s.GossipPerDrinkByCharm = GossipPerDrinkByCharm;
             s.GossipPerDrinkByPersuasion = GossipPerDrinkByPersuasion;
             s.GossipTournaments = GossipTournaments;

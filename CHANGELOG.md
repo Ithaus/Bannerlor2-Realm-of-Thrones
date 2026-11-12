@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 474-P3 (13.11) - barman w karczmie miasta: "Pour me an ale. What's the news?"
+
+**Problem:** Jeff 13.11 (projekt `docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md` pkt 2 "Plotka u barmana za kufel", paczka 3): w karczmie 3D miasta karczmarz gry nie ma o czym mowic - kufel i plotki sa tylko w menu karczmy ("Buy a tankard of ale and listen to the gossip").
+
+**Przyczyna:** brak funkcji. Rozmowa karczmarza to `TavernEmployeesCampaignBehavior.AddDialogs` (SandBox.dll 1.4.8, dekompilacja): "talk_common_to_tavernkeeper" -> token `tavernkeeper_talk`, opcje gracza z priorytetem 100, `tavernkeeper_pretalk` wraca do `tavernkeeper_talk`. Tokenu uzywa tylko SandBox.dll (grep po Modules - ROT, BK i reszta go nie ruszaja).
+
+**Zmiana:** nowy klucz `InnKeeperAleLine` (MCM "Innkeeper Ale Line", grupa A night's rest, domyslnie TAK; Settings.cs + McmSettings.cs recznie). Nowy `Armoury/src/TavernKeeperAle.cs`: linia gracza `arm474_tk_ale` w `tavernkeeper_talk` (priorytet 105) "Pour me an ale. What's the news?" -> karczmarz "There you are. Drink up, and I'll tell you what the talk has been." -> koniec rozmowy; po zamknieciu (`ConversationManager.ConversationEndOneShot`) kufel `Rumours.KeeperAle` = dokladnie `DrinkConsequence` opcji menu karczmy miasta (ta sama cena 1/10 beczki piwa, ta sama zaplata do kiesy ludu i kasy miasta z kontrola obiegu, pijanstwo, XP Uroku, okno plotek, lektor, linia `Kufle (m98): kufel w ...`). Szara linia z powodem (brak pieniedzy, karczmarz nie naleje, wszystko uslyszane) i opis kufla w podpowiedzi - `Rumours.KeeperAleState`; cialo warunku menu wydzielone do `Rumours.DrinkState` (Rumours.Drink.cs) BEZ zmiany tekstow i kolejnosci sprawdzen - menu i rozmowa widza ten sam stan. Warunek linii: klucz + InnGossip + InnGossipNeedsDrink + TownInns, osada = miasto, rozmowca = karczmarz (Occupation.Tavernkeeper). Rejestracja w `ArmouryBehavior.OnSessionLaunched` obok CaptiveTerms.AddDialogs.
+Log: przy starcie kampanii `Barman (474-P3): linia "Pour me an ale. What's the news?" dodana ... - klucz Innkeeper Ale Line TAK`; przy kazdym kuflu z rozmowy `Barman (474-P3): "Pour me an ale" w <miasto> (<id>) - kufel jak z menu karczmy ... Warunek linii spelniony Nx, wybrana Nx, nalane Nx od startu gry.`, zaraz po niej zwykla linia `Kufle (m98): kufel w <miasto> (karczma miasta, <id>) ...`.
+
+**Ryzyko / co sprawdzic:** NIE = co do bitu jak przed (linii nie ma; warunek menu daje te same IsEnabled i Tooltip - refaktor bez zmiany tekstow). Bez podwojenia: jedna linia = jeden kufel, ta sama pula (raz na godzine) i ta sama ksiega uslyszanych (klucz = StringId miasta) co menu - plotka z menu nie wraca u karczmarza i odwrotnie. Zamknieta ekonomia: zaplata ta sama droga co nocleg/kufel z menu (`TownInns.DrinkPayTown`, kontrola obiegu w logu). Kolizje: inne linie karczmarza (zadania, informacje o wlascicielu - latka PlayerFees8 na `tavernkeeper_offer_clan_info_on_condition`, towarzysze) bez zmian. Okno plotek pokazuje sie w misji karczmy po zamknieciu rozmowy - NIE sprawdzone w grze (czy InquiryData w misji 3D wyswietla sie i nie blokuje kamery; to samo okno co menu, ale tam bez misji). Bez kufla (InnGossipNeedsDrink NIE) linii nie ma - plotki sa wtedy darmowe w menu. Build czysty OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 474-P2 (13.11) - linia "Makes: x (main), y, z" wioski pobocznej i ikona glownego towaru w oknie prac
 
 **Problem:** Jeff 13.11 (projekt `docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md` pkt 1 "Inwestycje z ikona glownego surowca i lista x, y, z", paczka 2): menu i dymek wioski pobocznej pisza zajecie i towary zajecia ("Makes: grain (wheat, flax)"), nie to, co wioska naprawde robi i co z tego jest najwazniejsze; okno prac nie ma ikony towaru.

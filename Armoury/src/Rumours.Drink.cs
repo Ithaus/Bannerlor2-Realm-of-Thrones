@@ -268,29 +268,39 @@ namespace Armoury
         {
             int price = TankardPrice(priceTown);
             MBTextManager.SetTextVariable(var, ShortLabels.Pick("Buy a tankard and listen (" + price + " d)", "Buy a tankard of ale and listen to the gossip (" + price + " d)"));
+            string tip;
+            args.IsEnabled = DrinkState(at, key, priceTown, barred, price, out tip);
+            args.Tooltip = new TextObject("{=!}" + tip);
+            return true;
+        }
+
+        /// <summary>474-P3: kufel z rozmowy z karczmarzem miasta ("Pour me an ale. What's the news?") - ten sam stan co opcja menu karczmy (DrinkState), ta sama pula
+        /// i ksiega uslyszanych (klucz miasta = StringId osady), ta sama zaplata (DrinkConsequence). true = mozna nalac; tip - powod albo opis jak w menu.</summary>
+        internal static bool KeeperAleState(Settlement st, out string tip)
+        {
+            if (st == null || !st.IsTown) { tip = "Nobody pours ale here now."; return false; }
+            return DrinkState(st.GetPosition2D, st.StringId, st, st.Town != null ? null : "Nobody pours ale here now.", TankardPrice(st), out tip);
+        }
+
+        /// <summary>474-P3: kufel po rozmowie z karczmarzem - dokladnie to, co opcja menu karczmy miasta przy InnGossipNeedsDrink (TownGossipConsequence).</summary>
+        internal static void KeeperAle(Settlement st)
+        {
+            if (st == null || !st.IsTown) return;
+            DrinkConsequence(st.GetPosition2D, st.StringId, st.Name.ToString(), true, st, null);
+        }
+
+        /// <summary>Stan kufla (dawniej cialo DrinkCondition, 474-P3 wydzielone bez zmiany tekstow i kolejnosci): false + powod (zajazd zakazany, nic nowego, karczmarz
+        /// nie naleje, brak pieniedzy) albo true + opis kufla.</summary>
+        private static bool DrinkState(Vec2 at, string key, Settlement priceTown, string barred, int price, out string tip)
+        {
             var me = Hero.MainHero;
-            if (barred != null || me == null) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}" + (barred ?? "Nobody pours ale here now.")); return true; }   // recenzja (gra): zajazd wroga / rabowany - jak nocleg
+            if (barred != null || me == null) { tip = barred ?? "Nobody pours ale here now."; return false; }   // recenzja (gra): zajazd wroga / rabowany - jak nocleg
             var fresh = Fresh(Pool(at, key), key);
             Persuasion.Parts pp;
             int cups = InnDrink.Cups, max = InnDrink.MaxCups(), ch = InnDrink.Talk(priceTown != null ? priceTown.Culture : null, out pp);   // m109-przesluch: miara perswazji (klucz off - Urok)
-            if (fresh.Count == 0)
-            {
-                args.IsEnabled = false;
-                args.Tooltip = new TextObject("{=!}You have heard all the talk here. Come back when there is fresh news.");
-                return true;
-            }
-            if (cups >= max)
-            {
-                args.IsEnabled = false;
-                args.Tooltip = new TextObject("{=!}The innkeeper will pour you no more - sleep it off first.");
-                return true;
-            }
-            if (me.Gold < price)
-            {
-                args.IsEnabled = false;
-                args.Tooltip = new TextObject("{=!}A tankard of ale costs " + price + " d and you cannot pay it - nobody talks to a man with a dry tongue.");
-                return true;
-            }
+            if (fresh.Count == 0) { tip = "You have heard all the talk here. Come back when there is fresh news."; return false; }
+            if (cups >= max) { tip = "The innkeeper will pour you no more - sleep it off first."; return false; }
+            if (me.Gold < price) { tip = "A tankard of ale costs " + price + " d and you cannot pay it - nobody talks to a man with a dry tongue."; return false; }
             int per = InnDrink.PerDrink(ch, fresh.Count);
             var t = new StringBuilder("Nobody talks to a man with a dry tongue: a tankard of ale costs " + price + " d, and the coin goes to the innkeeper. ");
             t.Append("Over it you hear ").Append(per == fresh.Count ? "all " + fresh.Count : per + " of the " + fresh.Count).Append(fresh.Count == 1 ? " piece" : " pieces")
@@ -304,7 +314,7 @@ namespace Armoury
                 t.Append("\nTankards since you last slept: ").Append(cups).Append(" - you get drunk after ").Append(th).Append('.');
                 if (InnDrink.Drunk) t.Append(" You are drunk already.");
             }
-            args.Tooltip = new TextObject("{=!}" + t.ToString());
+            tip = t.ToString();
             return true;
         }
 
