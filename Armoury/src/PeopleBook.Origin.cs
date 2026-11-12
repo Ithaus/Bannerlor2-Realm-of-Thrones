@@ -170,6 +170,8 @@ namespace Armoury
             public double Drift;
             // E4/8 (R19, 10.5): migracja miedzy regionami od siewu (wedrowcy BK u celu w innym regionie) - rownanie regionu: + MigOut - MigIn
             public double MigIn, MigOut;
+            // 435-L10-p (recenzja): migracja za praca L10 miedzy regionami od siewu - osobno od R19 (linia rozroznia), w rownaniu regionu tak samo: + WorkOut - WorkIn
+            public double WorkIn, WorkOut;
             // E4/9 (Z10): niewolni z regionu (wedlug pochodzenia) i konto MUR z regionu w dniu siewu, zmarli niewolni z regionu od siewu - rownanie regionu
             public double TRef, WRef, TDead;
             // 280: reszta rownania regionu zamrozona przy zalozeniu bazy (druga doba po pierwszym wczytaniu z 280; nowa kampania - 0 przy siewie) - "od 280" = Rest - Base280
@@ -380,7 +382,8 @@ namespace Armoury
                   .Append(';').Append(N3(r.TownOut)).Append(';').Append(N3(r.VillOut)).Append(';').Append(N3(r.TownBack)).Append(';').Append(N3(r.Drift))
                   .Append(';').Append(N3(r.MigIn)).Append(';').Append(N3(r.MigOut))        // E4/8 (pola 17, 18; zapis bez nich - 0)
                   .Append(';').Append(N3(r.TRef)).Append(';').Append(N3(r.WRef)).Append(';').Append(N3(r.TDead))     // E4/9 (pola 19-21; zapis bez nich - 0)
-                  .Append(';').Append(N3(r.Base280));                                                                  // 280 (pole 22, ze znakiem; zapis bez niego - 0)
+                  .Append(';').Append(N3(r.Base280))                                                                   // 280 (pole 22, ze znakiem; zapis bez niego - 0)
+                  .Append(';').Append(N3(r.WorkIn)).Append(';').Append(N3(r.WorkOut));                                // 435-L10-p (pola 23, 24; zapis bez nich - 0)
                 first = false;
             }
             // 280 (U7): oczekujace udzialy band "pd:idPartii=region:liczba;..." (jak so:; "" jako "~") - rozwiazanie w ResolveOrigin
@@ -450,7 +453,8 @@ namespace Armoury
                             TownOut = Num(a, 13), VillOut = Num(a, 14), TownBack = Num(a, 15), Drift = SNum(a, 16),     // recenzja E4/7 (R1-1, R2-3); zapis bez nich - 0
                             MigIn = Num(a, 17), MigOut = Num(a, 18),                                                   // E4/8 (R19); zapis E4/7 bez nich - 0
                             TRef = Num(a, 19), WRef = Num(a, 20), TDead = Num(a, 21),                                  // E4/9 (Z10); zapis bez nich - 0 (Num poza dlugoscia - 0)
-                            Base280 = SNum(a, 22)                                                                      // 280 (ze znakiem); zapis bez niego - 0
+                            Base280 = SNum(a, 22),                                                                     // 280 (ze znakiem); zapis bez niego - 0
+                            WorkIn = Num(a, 23), WorkOut = Num(a, 24)                                                  // 435-L10-p (migracja za praca); zapis bez nich - 0
                         };
                         _rg[item.Substring(0, eq)] = r;
                     }
@@ -2012,7 +2016,7 @@ namespace Armoury
                     // E4/9 (4.7): + NIEWOLNI i MUR z regionu (stan) - ich stan dnia siewu + zmarli niewolni od siewu; liczniki Enslaved/ToWall rosna juz tylko przy wylaczonych prawach
                     // N7: + czekajacy w osadach zbiorki (Rally; bez stanu w dniu siewu - udzialy z pochodzeniem dostaja dopiero przy rozbiciu po siewie)
                     v.Rest = (x.Dom + x.S + x.J + x.Wy + x.U + x.Carts + x.Road + x.Vet + x.T + x.W + x.Rally) - (r.DomRef + r.SRef + r.JRef + r.PoolRef + r.RefRef + r.CartRef + r.TRef + r.WRef)
-                             - r.Born + r.Fallen + r.Civil + r.Enslaved + r.ToWall + r.TDead - r.Drift + r.MigOut - r.MigIn
+                             - r.Born + r.Fallen + r.Civil + r.Enslaved + r.ToWall + r.TDead - r.Drift + r.MigOut - r.MigIn + r.WorkOut - r.WorkIn     // 435-L10-p: migracja za praca L10 (osobne pola)
                              + ZpOf(kv.Key);     // A12 (PartyGoneMenCounted): + ludzie regionu przy zniknieciu partii od siewu (jak POLEGLI; bez klucza - 0)
                 }
                 try

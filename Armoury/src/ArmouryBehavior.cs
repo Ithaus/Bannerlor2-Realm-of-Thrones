@@ -3262,8 +3262,14 @@ namespace Armoury
             try { Risk433.Daily(); } catch (Exception e) { Log.Error("Risk433.Daily", e); } DayProfile.Lap("Risk433.Daily");   // 433 (C4 + C1 + C2): linia "Zbojcy i ryzyko (433)" - PO OutlawLaw.Daily (naplyw biedy tej doby) i po liniach karawan
             // 435-L10 (klucz Work Migration; wylaczony - nic): migracja za praca - rece bez sprzetu do wsi z bezczynnym sprzetem albo do miasta targowego z brakiem rak; PO OutlawLaw.Daily
             // (bieda do lasu z tej samej puli ludzi, obie pilnuja podlogi 50 - II.17), PRZED ksiega ludzi (OthersRise -> PeopleBook.Daily) i VillageGear.BeforeProduction (rece tej doby)
-            try { WorkMigration.Daily(); } catch (Exception e) { Log.Error("WorkMigration.Daily", e); } DayProfile.Lap("WorkMigration.Daily");
+            // 435-L10-p (recenzja): sonda bisekcji "BanditLimit.Daily" znow przed migracja; migracja we wlasnym odcinku ksiegi pieniadza - pozostale moduly ticku
+            // zamkniete w MRest PRZED nia, jej przelewy (kiesa wsi -> kiesa wsi, kiesa wsi -> kiesa W miasta) w MFolk "kiesa ludu" jak uchodzcy z najazdu (RaidRefugees);
+            // Mark sumuje, wiec MRest dostaje te same kwoty co dotad (czesc przed migracja + IronBank po niej), a przy wylaczonym kluczu MFolk +0
             try { MoneyLedger.Probe169("BanditLimit.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
+            try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }
+            try { WorkMigration.Daily(); } catch (Exception e) { Log.Error("WorkMigration.Daily", e); } DayProfile.Lap("WorkMigration.Daily");
+            try { MoneyLedger.Probe169("WorkMigration.Daily"); } catch { }   // 435-L10-p: bisekcja RB (tylko log)
+            try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); } DayProfile.Lap("IronBank.Daily");   // Bank Zelazny: pozyczki AI, raty, bankructwa
             // 166 + 162m (projekt etapu 2, 2.0b): budzet rodow po Banku, przed ksiega rodow (na D z wczoraj); osobna pozycja ksiegi pieniadza (dwor do kas siedzib,
             // sakiewki zwolnionych do kies wsi) - granica MRest przed, MBudget po

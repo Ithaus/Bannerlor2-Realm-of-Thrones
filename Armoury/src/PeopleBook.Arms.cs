@@ -440,11 +440,11 @@ namespace Armoury
         /// <summary>Odcinek "Ludzie (ksiega)" (10.5): migracja R19 od siewu i w drodze teraz.</summary>
         private static string ArmsSegment()
         {
-            double mi = 0, mo = 0; int regs = 0;
-            foreach (var r in _rg.Values) { mi += r.MigIn; mo += r.MigOut; if (r.MigIn > Eps || r.MigOut > Eps) regs++; }
+            double mi = 0, mo = 0, wi = 0, wo = 0; int regs = 0, wregs = 0;
+            foreach (var r in _rg.Values) { mi += r.MigIn; mo += r.MigOut; if (r.MigIn > Eps || r.MigOut > Eps) regs++; wi += r.WorkIn; wo += r.WorkOut; if (r.WorkIn > Eps || r.WorkOut > Eps) wregs++; }
             double road = 0, rally = 0; foreach (var v in Views()) { road += v.Road; rally += v.Rally; }
             // N7 (recenzja K3 / O8): czekajacy w osadach zbiorki maja w rownaniu regionu wlasne konto (Rally) - nie sa "w drodze" BK
-            return " | E4/8: migracja R19 od siewu: wyszlo " + N0(mo) + ", przyszlo " + N0(mi) + " (regionow z migracja " + regs + "), w drodze teraz z pochodzeniem " + N0(road)
+            return " | E4/8: migracja R19 od siewu: wyszlo " + N0(mo) + ", przyszlo " + N0(mi) + " (regionow z migracja " + regs + "), migracja za praca L10 od siewu: wyszlo " + N0(wo) + ", przyszlo " + N0(wi) + " (regionow " + wregs + "), w drodze teraz z pochodzeniem " + N0(road)
                    + ", czekajacy w osadach zbiorki N7 z pochodzeniem " + N0(rally);
         }
     }

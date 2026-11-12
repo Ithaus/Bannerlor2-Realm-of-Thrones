@@ -43,10 +43,13 @@ namespace Armoury
         /// cap = min po czesciach LP (bezczynny sprzet czesci / jej udzial w ludziach w domu). Bezczynny sprzet czesci = K - max(srednia rak, rece dzis) - ludzie poza
         /// domem (uchodzcy: sprzet czeka na nich, II.4 / II.16); czesc w zmianie zajecia, w domykaniu bilansu otwarcia albo bez drogi materialu - 0 (okreg nie przyjmuje).
         /// Czesc poza LP (stado) nie ogranicza (m = 1 przy kazdej liczbie rak). false - klucz wylaczony, okreg bez wpisu albo bez swiezej doby. Nie rzuca.
+        /// 435-L10-p (recenzja): `needNow` - rece bez sprzetu liczone z ludzi w domu DZIS: min(srednia rak, rece dzis) zamiast samej sredniej (srednia z 7 dob
+        /// po przebiegu sprzed tygodnia widzi tylko ok. 63% ludzi, ktorzy wyszli) - tyle najwyzej wychodzi ze zrodla; ta sama ostroznosc co max(srednia, dzis) u celu.
+        /// `need` (cel: wies z rekami bez sprzetu nie jest celem) - bez zmian, ze sredniej.
         /// </summary>
-        internal static bool MigOf(Village v, List<VillageBook.PartView> book, int today, bool road, out double need, out double cap)
+        internal static bool MigOf(Village v, List<VillageBook.PartView> book, int today, bool road, out double need, out double cap, out double needNow)
         {
-            need = 0; cap = 0;
+            need = 0; cap = 0; needNow = 0;
             if (v == null || v.Settlement == null || v.Settlement.StringId == null || book == null || book.Count == 0 || !On) return false;
             try
             {
@@ -64,6 +67,12 @@ namespace Armoury
                         if (r == null) continue;
                         if (r.SeenDay >= today - 2) fresh = true;
                         need += Math.Max(0.0, r.Need);
+                        if (r.Need > 0)
+                        {
+                            double hs = Math.Min(Math.Max(0.0, r.Hs), Math.Max(0.0, p.Home));
+                            double hE = r.NewCraft >= 0 && r.HN > 0 ? Math.Max(0.0, hs - r.HN) : hs;
+                            needNow += Math.Min(r.Need, Math.Max(0.0, hE - r.K));
+                        }
                         if (!(r.WLp > 1e-9)) continue;                                 // czesc poza LP - bez ograniczenia
                         double s = Math.Max(0.0, p.Home) / home;
                         if (!(s > 1e-9)) continue;                                     // czesc bez ludzi w domu nie dostanie przybyszow
@@ -73,12 +82,12 @@ namespace Armoury
                         if (ok) idle = r.K - Math.Max(r.Hs, p.Home) - Math.Max(0.0, p.Away);
                         c = Math.Min(c, Math.Max(0.0, idle) / s);
                     }
-                    if (!fresh) { need = 0; return false; }
+                    if (!fresh) { need = 0; needNow = 0; return false; }
                     cap = anyLp && c < double.MaxValue ? Math.Max(0.0, c) : 0.0;
                     return true;
                 }
             }
-            catch (Exception e) { Stumble("MigOf", e); need = 0; cap = 0; return false; }
+            catch (Exception e) { Stumble("MigOf", e); need = 0; cap = 0; needNow = 0; return false; }
         }
     }
 }

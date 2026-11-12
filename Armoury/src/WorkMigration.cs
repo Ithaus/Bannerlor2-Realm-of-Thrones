@@ -28,7 +28,8 @@ namespace Armoury
     ///    wlasnym k_v); miasto - TownShift(+n, MWorkIn). Miedzy regionami - MigOut / MigIn rownania regionu (PeopleBook.NoteWorkRegion). Uchodzcy, niewolni, szlachta,
     ///    zolnierze - poza regula (ruszamy tylko konto DOM).
     ///  - PIENIADZ: migrant zabiera min(kiesa wsi ponad skrzynie / ludzie, 28 dni koszyka wsi na czlowieka) - kiesa wsi zrodla -> kiesa wsi celu (Village.ChangeGold)
-    ///    albo kiesa W miasta (TownFolk.WorkMigPurseIn). Przelew posiadacz -> posiadacz, bez kosztu drogi; ksiega pieniadza widzi go przez stan posiadaczy.
+    ///    albo kiesa W miasta (TownFolk.WorkMigPurseIn). Przelew posiadacz -> posiadacz, bez kosztu drogi; ksiega pieniadza widzi go przez stan posiadaczy
+    ///    (435-L10-p: we wlasnym odcinku doby, pozycja MFolk "kiesa ludu" - jak uchodzcy z najazdu).
     ///  - GRACZ: wiesc (angielski tekst) tylko o jego wsiach, najwyzej raz na 28 dob na wies i 3 na dobe.
     /// Pamiec m okregow (arm_lpm: "lpm1|wies~m28~dob;..."); brak klucza - pamiec od zera (28 dob do pierwszego zrodla z m). Kolejnosc doby: PO OutlawLaw.Daily (bieda
     /// do lasu bierze z tej samej puli ludzi - obie reguly pilnuja podlogi 50), PRZED VillageGear.BeforeProduction (rece okregow tej doby) i ksiega ludzi (OthersRise).
@@ -60,19 +61,24 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly Dictionary<string, double> _mNow = new Dictionary<string, double>(StringComparer.Ordinal);
         private static readonly List<VillageBook.PartView> _book = new List<VillageBook.PartView>();
-        private static readonly Dictionary<Settlement, double[]> _news = new Dictionary<Settlement, double[]>();   // wies gracza -> [wyszli, weszli] czekajace na wiesc
+        private static readonly Dictionary<Settlement, double[]> _news = new Dictionary<Settlement, double[]>();   // wies gracza -> [wyszli, weszli, wyszli z glodu] czekajace na wiesc
         private static readonly Dictionary<Settlement, int> _newsDay = new Dictionary<Settlement, int>();
         private static readonly HashSet<Village> _arrived = new HashSet<Village>();                                  // doba: wsie, ktore dzis przyjely ludzi (nie sa zrodlem tej doby)
 
         // doba
         private static int _dReg, _dSrcM, _dSrcHunger, _dToV1, _dToV2, _dToT, _hState, _hFloor, _hGrain, _hNoTarget, _hSmall, _hNoData, _dBelow50, _dBack, _dMoves;
         private static double _dOut, _dInV1, _dInV2, _dInT, _dHOut, _dHIn, _dNeedSrc, _dBackMen;
+        // 435-L10-p (recenzja): ludzie ZE SKUTKU - hearth zrodel / k (wyszli) i hearth celow / k + przyrost stanu miast + powrot do domu (weszli); kontrola linii
+        // liczy z nich, nie z tego samego n po obu stronach. _dUnbook - ruchy zaksiegowane przez Move bez zmiany hearth (wyjatek), odksiegowane
+        private static double _dOutM, _dInM, _dUnbookMen;
+        private static int _dUnbook, _dBackV;
         private static long _dGoldSrc, _dGoldV, _dGoldT;
 
         private static void ZeroDay()
         {
             _dReg = _dSrcM = _dSrcHunger = _dToV1 = _dToV2 = _dToT = _hState = _hFloor = _hGrain = _hNoTarget = _hSmall = _hNoData = _dBelow50 = _dBack = _dMoves = 0;
             _dOut = _dInV1 = _dInV2 = _dInT = _dHOut = _dHIn = _dNeedSrc = _dBackMen = 0;
+            _dOutM = _dInM = _dUnbookMen = 0; _dUnbook = _dBackV = 0;
             _dGoldSrc = _dGoldV = _dGoldT = 0;
             _st = 0;
             _arrived.Clear();
@@ -228,8 +234,8 @@ namespace Armoury
             {
                 if (Standing(t) && !Hungry(t) && VillageBook.PartsOf(t, _book))
                 {
-                    double need, cap;
-                    if (VillageGear.MigOf(t, _book, today, Road(t), out need, out cap) && need <= 1e-6) c = cap;   // wies z rekami bez sprzetu nie jest celem
+                    double need, cap, needNow;
+                    if (VillageGear.MigOf(t, _book, today, Road(t), out need, out cap, out needNow) && need <= 1e-6) c = cap;   // wies z rekami bez sprzetu nie jest celem
                 }
             }
             catch (Exception e) { Stumble("CapOf", e); c = 0; }
@@ -255,8 +261,9 @@ namespace Armoury
             if (!Standing(src)) { _hState++; return; }
             if (!(src.Hearth > 50f)) { _hFloor++; return; }
             if (!VillageBook.PartsOf(src, _book)) { _hNoData++; return; }
-            double need, capSrc;
-            if (!VillageGear.MigOf(src, _book, today, Road(src), out need, out capSrc)) { _hNoData++; return; }
+            double need, capSrc, needAvg;
+            // 435-L10-p (recenzja): ze zrodla najwyzej rece bez sprzetu z ludzi w domu DZIS (needNow), nie ze sredniej 7 dob
+            if (!VillageGear.MigOf(src, _book, today, Road(src), out needAvg, out capSrc, out need)) { _hNoData++; return; }
             if (hungry) _dSrcHunger++; else _dSrcM++;
             double people = PopulationLaw.PeopleOf(src.Settlement);
             if (!(people > 0)) { _hNoData++; return; }
@@ -288,7 +295,7 @@ namespace Armoury
                 if (left < MinMen) break;
                 double c = CapOf(t, src, capLeft, today);
                 if (c < MinMen) break;
-                left -= ToVillage(src, t, Math.Min(left, c), perMan, chest, capLeft, 1);
+                left -= ToVillage(src, t, Math.Min(left, c), perMan, chest, capLeft, 1, hungry);
             }
             // (2) wies w promieniu 250 z droga ladowa, ta sama strona morza - najblizsza najpierw
             if (left >= MinMen)
@@ -312,7 +319,7 @@ namespace Armoury
                     float road;
                     try { road = CartGuard.DistSS(src.Settlement, t.Settlement); } catch { continue; }
                     if (CartGuard.NoLandRoad(road)) continue;
-                    left -= ToVillage(src, t, Math.Min(left, CapOf(t, src, capLeft, today)), perMan, chest, capLeft, 2);
+                    left -= ToVillage(src, t, Math.Min(left, CapOf(t, src, capLeft, today)), perMan, chest, capLeft, 2, hungry);
                 }
             }
             // (3) wlasne miasto targowe z brakiem rak
@@ -321,7 +328,7 @@ namespace Armoury
                 var town = src.TradeBound;
                 float tp;
                 if (town != null && town.IsTown && town.Town != null && !town.IsUnderSiege && !town.IsStarving && KsWageHands.Factor(town) > 1.0 + 1e-6 && PeopleBook.TryTown(town, out tp))
-                    left -= ToTown(src, town, left, perMan, chest);
+                    left -= ToTown(src, town, left, perMan, chest, hungry);
             }
             if (left > want - 1e-9) _hNoTarget++;
         }
@@ -335,13 +342,23 @@ namespace Armoury
         }
 
         /// <summary>Ludzie zrodla -> DOM wsi celu (MWorkOut / MWorkIn), kiesa za nimi. Zwraca przeniesionych.</summary>
-        private static double ToVillage(Village src, Village dst, double n, double perMan, double chest, Dictionary<Village, double> capLeft, int kind)
+        private static double ToVillage(Village src, Village dst, double n, double perMan, double chest, Dictionary<Village, double> capLeft, int kind, bool hungry)
         {
             if (!(n >= MinMen)) return 0;
             double hOut = PeopleBook.Move(src, PeopleBook.ADom, PeopleBook.AOutside, n, PeopleBook.MWorkOut, PeopleUnit.GamePerMan);
-            if (!(hOut < 0)) { _hNoData++; return 0; }
+            if (!(hOut < 0)) { Unbook(n, PeopleBook.MWorkOut); _hNoData++; return 0; }     // 435-L10-p: hearth sie nie ruszyl - licznik ksiegi cofniety
             double hIn = PeopleBook.Move(dst, PeopleBook.AOutside, PeopleBook.ADom, n, PeopleBook.MWorkIn, PeopleUnit.GamePerMan);
-            _dOut += n; _dHOut += hOut; _dHIn += hIn; _dMoves++;
+            _dOut += n; _dHOut += hOut; _dOutM += MenOf(src, -hOut); _dMoves++;
+            if (!(hIn > 0))
+            {
+                // 435-L10-p (recenzja): cel nie przyjal (wyjatek w Move celu) - ludzie wracaja do domu zrodla; wpis MWorkIn celu cofniety, powrot ksiegowany MWorkIn
+                Unbook(n, PeopleBook.MWorkIn);
+                double hb = PeopleBook.Move(src, PeopleBook.AOutside, PeopleBook.ADom, n, PeopleBook.MWorkIn, PeopleUnit.GamePerMan);
+                if (!(hb > 0)) Unbook(n, PeopleBook.MWorkIn);
+                _dBack++; _dBackV++; _dBackMen += n; _dHIn += hb; _dInM += MenOf(src, hb);
+                return 0;
+            }
+            _dHIn += hIn; _dInM += MenOf(dst, hIn);
             if (kind == 1) { _dInV1 += n; _dToV1++; } else { _dInV2 += n; _dToV2++; }
             if (src.Hearth < 50f - 1e-3f) _dBelow50++;
             _arrived.Add(dst);
@@ -369,26 +386,28 @@ namespace Armoury
                     Stumble("ToVillage(kiesa)", e);
                 }
             }
-            NoteNews(src.Settlement, n, 0); NoteNews(dst.Settlement, 0, n);
+            NoteNews(src.Settlement, n, 0, hungry); NoteNews(dst.Settlement, 0, n, false);
             return n;
         }
 
         /// <summary>Ludzie zrodla -> stan miasta targowego (MWorkOut / MWorkIn), kiesa do kiesy W miasta. Zwraca przeniesionych.</summary>
-        private static double ToTown(Village src, Settlement town, double n, double perMan, double chest)
+        private static double ToTown(Village src, Settlement town, double n, double perMan, double chest, bool hungry)
         {
             if (!(n >= MinMen)) return 0;
             double hOut = PeopleBook.Move(src, PeopleBook.ADom, PeopleBook.AOutside, n, PeopleBook.MWorkOut, PeopleUnit.GamePerMan);
-            if (!(hOut < 0)) { _hNoData++; return 0; }
+            if (!(hOut < 0)) { Unbook(n, PeopleBook.MWorkOut); _hNoData++; return 0; }     // 435-L10-p: hearth sie nie ruszyl - licznik ksiegi cofniety
             double applied = PeopleBook.TownShift(town, n, PeopleBook.MWorkIn, true);
+            _dInM += Math.Max(0.0, applied);                                                  // 435-L10-p: przyrost stanu miasta (zwrot TownShift = stan po - stan przed)
             if (applied < n - 1e-6)
             {
                 // miasto nie przyjelo (stan znikl miedzy odczytem a ruchem) - reszta wraca do domu zrodla
                 double back = n - Math.Max(0.0, applied);
                 double hb = PeopleBook.Move(src, PeopleBook.AOutside, PeopleBook.ADom, back, PeopleBook.MWorkIn, PeopleUnit.GamePerMan);
-                _dBack++; _dBackMen += back; _dHIn += hb;
+                if (!(hb > 0)) Unbook(back, PeopleBook.MWorkIn);
+                _dBack++; _dBackMen += back; _dHIn += hb; _dInM += MenOf(src, hb);
             }
             double moved = Math.Max(0.0, applied);
-            _dOut += n; _dHOut += hOut; _dMoves++;
+            _dOut += n; _dHOut += hOut; _dOutM += MenOf(src, -hOut); _dMoves++;
             if (src.Hearth < 50f - 1e-3f) _dBelow50++;
             if (!(moved > 0)) return 0;
             _dInT += moved; _dToT++;
@@ -401,19 +420,37 @@ namespace Armoury
                 long gone = had - src.Gold;
                 _dGoldSrc += gone; _dGoldT += got;
             }
-            NoteNews(src.Settlement, moved, 0);
+            NoteNews(src.Settlement, moved, 0, hungry);
             return moved;
         }
 
+        /// <summary>435-L10-p: ludzie ze skutku - hearth faktycznie przesuniety / hearth na czlowieka tej wsi (ta sama stawka co w Move; 1/k_v stale od kalibracji).</summary>
+        private static double MenOf(Village v, double hearth)
+        {
+            try
+            {
+                bool unit;
+                float per = PeopleUnit.PerMan(v, PeopleUnit.GamePerMan, out unit);
+                return per > 0f && !double.IsNaN(hearth) ? hearth / per : 0.0;
+            }
+            catch (Exception e) { Stumble("MenOf", e); return 0.0; }
+        }
+
+        /// <summary>435-L10-p: Move zaksiegowal ruch, ktorego nie bylo (hearth 0) - cofniecie licznika doby ksiegi ludzi; liczone w linii.</summary>
+        private static void Unbook(double men, int cause)
+        {
+            try { PeopleBook.WorkUnbook(men, cause); _dUnbook++; _dUnbookMen += men; } catch (Exception e) { Stumble("Unbook", e); }
+        }
+
         // ============================================================ wiesci gracza
-        private static void NoteNews(Settlement st, double left, double came)
+        private static void NoteNews(Settlement st, double left, double came, bool hungry)
         {
             try
             {
                 if (st == null || st.OwnerClan == null || st.OwnerClan != Clan.PlayerClan) return;
                 double[] a;
-                if (!_news.TryGetValue(st, out a)) { a = new double[2]; _news[st] = a; }
-                a[0] += left; a[1] += came;
+                if (!_news.TryGetValue(st, out a)) { a = new double[3]; _news[st] = a; }
+                a[0] += left; a[1] += came; if (hungry) a[2] += left;
             }
             catch (Exception e) { Stumble("NoteNews", e); }
         }
@@ -429,10 +466,12 @@ namespace Armoury
                 if (_newsDay.TryGetValue(st, out last) && today - last < NewsDays) continue;
                 var a = _news[st];
                 int left = (int)Math.Round(a[0]), came = (int)Math.Round(a[1]);
+                bool famine = a.Length > 2 && a[2] > 0 && a[2] * 2.0 >= a[0];   // 435-L10-p (recenzja): wiekszosc wyszla z glodu - inny powod w wiesci
                 _news.Remove(st);
                 if (st.OwnerClan != Clan.PlayerClan || (left < 1 && came < 1)) continue;
                 string txt;
                 if (left >= 1 && came >= 1) txt = left + " people left " + Name(st) + " to find work elsewhere, and " + came + " came there looking for work.";
+                else if (left >= 1 && famine) txt = left + (left == 1 ? " person" : " people") + " left " + Name(st) + " to find work and bread elsewhere: its people go hungry.";
                 else if (left >= 1) txt = left + (left == 1 ? " person" : " people") + " left " + Name(st) + " to find work elsewhere: the village has more hands than tools.";
                 else txt = came + (came == 1 ? " person" : " people") + " came to " + Name(st) + " looking for work: its idle tools have hands again.";
                 Log.Player(txt);
@@ -460,8 +499,11 @@ namespace Armoury
               .Append(" | wstrzymane: stan wsi ").Append(_hState).Append(", podloga 50 ").Append(_hFloor).Append(", bezpiecznik zboza ").Append(_hGrain).Append(", brak celu ").Append(_hNoTarget)
               .Append(", za malo ").Append(_hSmall).Append(", bez danych ").Append(_hNoData)
               .Append(" | pamiec m28: okregow ").Append(mN).Append(", ponizej ").Append(F2(MLow)).Append(' ').Append(mLow)
-              .Append(" | kontrola ludzi (wyszli - weszli) ").Append(F3(_dOut - inAll))
+              .Append(" | kontrola ludzi ze skutku (wyszli z hearth zrodel ").Append(F3(_dOutM)).Append(" - weszli do hearth celow, stanu miast i z powrotem do domu ").Append(F3(_dInM))
+              .Append(") ").Append(F3(_dOutM - _dInM)).Append(", linia - skutek (wyszli) ").Append(F3(_dOut - _dOutM))
               .Append(", ksiega (MWorkOut - MWorkIn) ").Append(F3(bookOut - bookIn)).Append(", ksiega - linia ").Append(F3(bookOut - _dOut))
+              .Append(_dUnbook > 0 ? ", odksiegowane (Move bez ruchu hearth) " + _dUnbook + " / " + F1(_dUnbookMen) + " ludzi" : "")
+              .Append(_dBackV > 0 ? ", wies celu nie przyjela " + _dBackV : "")
               .Append(", zlota ").Append(_dGoldSrc - _dGoldV - _dGoldT).Append(", wsi ponizej 50 hearth po wyjsciu ").Append(_dBelow50)
               .Append(" | koszt ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_st).Append(" (sesja ").Append(_stAll).Append(')');
             Log.Info(sb.ToString());
