@@ -38,6 +38,11 @@ namespace Armoury
     /// Klucze NIE (albo bez dowodcy jazdy 441): decyzje liczone (tylko odczyt), role nie nadawane - co do znaku jak dotad; liczniki "bylby".
     /// Watki: wszystko w glownym watku (skan szykow, ApplyActionOnEachUnit ze statycznymi delegatami, GetNearbyEnemyAgents tylko dla kandydata oderwania,
     ///   WorldPosition.SetVec2 / GetNavMesh); zachowanie roli 441 czyta tylko rozkaz. Wyjatki per szyk liczone (potkniecia, rola oddana, slot od zera).
+    /// 445-p (po recenzji): kontrszarza tylko najblizszy wolny szyk spelniajacy prog sily (cel zajety przez nasz szyk CAVFIRST - nikt wiecej), przewaga konna tez
+    ///   z progiem sily szyku i bez jazdy wroga stojacej przy jej piechocie (30 m + pol szerokosci - RBM skreca tam jezdzcow w piechote); CAVFIRST najwyzej 3 wejscia
+    ///   na szyk, zakaz po stracie 40% ludzi od pierwszego wejscia, po stracie / czasie / bez zwarcia / odjezdzie 45 s przerwy tylko dla CAVFIRST (DISENGAGE osobno);
+    ///   strata celu i nasza liczone zabitymi i rannymi (V445OnRemoved), nie spadkiem CountOfUnits; klucz NIE w trakcie konczy role; dojazd DISENGAGE = >= 70% wolnych
+    ///   jezdzcow w 25 m od punktu; punkt zbiorki w granicach pola (>= 15 m od krawedzi); zwiazani liczeni jak RBM (bez filtra IsHuman / IsActive), raz na epizod.
     /// </summary>
     internal static partial class Doctrine
     {
@@ -46,7 +51,12 @@ namespace Armoury
         internal const float V445StuckSpeed = 3f, V445EngGap = 10f, V445Back = 60f, V445Back2 = 40f, V445Turn = 0.61f, V445Reach = 25f, V445Ride = 30f;
         internal const float V445Reform = 6f, V445Cool = 30f, V445TangleFoot = 7f, V445TangleRider = 15f, V445TangleMax = 0.5f, V445AtPoint = 30f, V445FoeGap = 30f;
         internal const int V445MaxDis = 3, V445MinLoss = 3;
+        // 445-p: limit wejsc CAVFIRST na szyk, udzial wolnych jezdzcow = dojazd, odstep punktu od krawedzi pola, jazda wroga przy swojej piechocie, okno straty w trakcie
+        internal const int V445CavMaxN = 3;
+        internal const float V445ReachShare = 0.7f, V445Edge = 15f, V445FootGap = 30f, V445LossWin = 10f;
         private const int V4R = 11;   // pierscien liczby ludzi slotu: 10 s (probka co takt 1 s)
+        // 445-p: osobny zatrzask na kazdy licznik "co 30 s / 10 s" (slot x VL)
+        private const int VL = 10, VlWeak = 0, VlDry = 1, VlRefC = 2, VlCap = 3, VlSpot = 4, VlDisDry = 5, VlRefD = 6, VlCavCap = 7, VlOther = 8, VlAdvWeak = 9;
         // progi profilu wodza 440 (0 OSTROZNY, 1 ZWYKLY, 2 PORYWCZY)
         private static readonly float[] V4Adv = { 2.0f, 1.5f, 1.2f };     // przewaga konna: nasza jazda >= x konnicy wroga
         private static readonly float[] V4Match = { 0.75f, 0.5f, 0.35f }; // kontrszarza: nasz szyk >= x ludzi szyku wroga
@@ -60,8 +70,15 @@ namespace Armoury
         private static int _v4RPos;
         private static readonly Formation[] _v4Who = new Formation[CrSlots];
         private static readonly byte[] _v4Mode = new byte[CrSlots];
-        private static readonly float[] _v4Since = new float[CrSlots], _v4Exit = new float[CrSlots], _v4DryC = new float[CrSlots], _v4DryD = new float[CrSlots];
+        private static readonly float[] _v4Since = new float[CrSlots], _v4Exit = new float[CrSlots], _v4CavWait = new float[CrSlots];
         private static readonly float[] _v4ContactAt = new float[CrSlots], _v4Reached = new float[CrSlots], _v4Cool = new float[CrSlots];
+        private static readonly float[] _v4Latch = new float[CrSlots * VL];
+        // 445-p: epizod "zwiazani" policzony, 443 wstrzymany policzony w tej roli, strata w trakcie zmierzona
+        private static readonly bool[] _v4TangEp = new bool[CrSlots], _v4K443 = new bool[CrSlots], _v4LossMeas = new bool[CrSlots];
+        // 445-p: wolni jezdzcy przy starcie oderwania, strata 10 s przed, zabici celu / nasi w roli, wejscia CAVFIRST, ludzie przy pierwszym wejsciu, nasi zabici w CAVFIRST lacznie
+        private static readonly int[] _v4Free0 = new int[CrSlots], _v4LossB4 = new int[CrSlots], _v4TgtKill = new int[CrSlots], _v4OwnKill = new int[CrSlots];
+        private static readonly int[] _v4CavNi = new int[CrSlots], _v4CavMen00 = new int[CrSlots], _v4CavKilled = new int[CrSlots];
+        private static readonly Formation[] _v4LastTgt = new Formation[CrSlots];
         private static readonly Formation[] _v4Tgt = new Formation[CrSlots];
         private static readonly bool[] _v4Counter = new bool[CrSlots];
         private static readonly Vec2[] _v4P = new Vec2[CrSlots];
@@ -76,12 +93,14 @@ namespace Armoury
         private static int _v4CavTime, _v4NoContact, _v4Fled, _v4CavBack, _v4CavOpen, _v4CavDone, _v4Refused, _v4Keep443, _v4Stum;
         private static int _v4DisN0, _v4DisDry, _v4DisTangled, _v4DisNoSpot, _v4DisCap, _v4DisReached, _v4DisRideOut, _v4DisDone, _v4DisBack, _v4DisEnd, _v4DisOpen;
         private static int _v4MaxCav, _v4MaxDis, _v4InterN;
+        private static int _v4CounterOther, _v4AdvWeak, _v4NearFoot, _v4CavGone, _v4CavKeyOff, _v4DisKeyOff, _v4CavCap, _v4CavSpent, _v4SameTgt, _v4LossN;
         private static float _v4CavSec, _v4DisSec;
         private static double _v4TgtLossSum, _v4OwnLossSum, _v4InterSum, _v4TangleSum, _v4AtPointSum, _v4LossBefore, _v4LossDuring;
 
         /// <summary>Battle291.Begin (AfterStart): liczniki linii 445 od zera.</summary>
         internal static void V445Reset()
         {
+            _v4CounterOther = _v4AdvWeak = _v4NearFoot = _v4CavGone = _v4CavKeyOff = _v4DisKeyOff = _v4CavCap = _v4CavSpent = _v4SameTgt = _v4LossN = 0;
             _v4CavN = _v4CounterN = _v4AdvN = _v4FromWait = _v4CounterDry = _v4AdvDry = _v4Weak = _v4Blocked = _v4Contact = _v4CavBroken = _v4CavLoss = 0;
             _v4CavTime = _v4NoContact = _v4Fled = _v4CavBack = _v4CavOpen = _v4CavDone = _v4Refused = _v4Keep443 = _v4Stum = 0;
             _v4DisN0 = _v4DisDry = _v4DisTangled = _v4DisNoSpot = _v4DisCap = _v4DisReached = _v4DisRideOut = _v4DisDone = _v4DisBack = _v4DisEnd = _v4DisOpen = 0;
@@ -108,7 +127,8 @@ namespace Armoury
                 if (_v4Mode[i] == VmCav) _v4CavOpen++;
                 else if (_v4Mode[i] == VmDis) _v4DisOpen++;
                 V445SlotClear(i);
-                _v4Who[i] = null; _v4Exit[i] = _v4DryC[i] = _v4DryD[i] = _v4Cool[i] = -1000f; _v4DisN[i] = 0;
+                V445SlotNew(i);
+                _v4Who[i] = null;
             }
             for (int i = 0; i < _v4Ring.Length; i++) _v4Ring[i] = 0;
             for (int i = 0; i < MaxTeams; i++) { _v4OurCav[i] = _v4FoeCav[i] = 0; }
@@ -123,6 +143,24 @@ namespace Armoury
             _v4Mode[i] = VmNone; _v4Tgt[i] = null; _v4Counter[i] = false;
             _v4Since[i] = 0f; _v4ContactAt[i] = _v4Reached[i] = -1f;
             _v4P[i] = Vec2.Invalid; _v4Men0[i] = _v4TgtMen0[i] = 0;
+            _v4K443[i] = _v4LossMeas[i] = false; _v4Free0[i] = _v4LossB4[i] = _v4TgtKill[i] = _v4OwnKill[i] = 0;
+        }
+
+        /// <summary>Stan szyku na cala bitwe (nowy szyk w slocie / koniec misji): przerwy, limity, zatrzaski, epizod zwiazanych.</summary>
+        private static void V445SlotNew(int i)
+        {
+            _v4Exit[i] = _v4CavWait[i] = _v4Cool[i] = -1000f; _v4DisN[i] = 0;
+            _v4CavNi[i] = _v4CavMen00[i] = _v4CavKilled[i] = 0; _v4LastTgt[i] = null; _v4TangEp[i] = false;
+            for (int k = 0; k < VL; k++) _v4Latch[i * VL + k] = -1000f;
+        }
+
+        /// <summary>Zatrzask licznika k slotu idx: true najwyzej raz na dur sekund.</summary>
+        private static bool V445Latch(int idx, int k, float now, float dur)
+        {
+            int i = idx * VL + k;
+            if (now < _v4Latch[i]) return false;
+            _v4Latch[i] = now + dur;
+            return true;
         }
 
         // ------------------------------------------------------------ odczyty dla 442 / 443 (glowny watek)
@@ -141,8 +179,29 @@ namespace Armoury
         {
             byte r = C441RoleOf(f);
             if (r != CrCavFirst && r != CrDisengage) return false;
-            _v4Keep443++;
+            // 445-p: raz na role 445 (nie co takt)
+            int idx = C441Idx(f);
+            if (idx >= 0 && idx < CrSlots && !_v4K443[idx]) { _v4K443[idx] = true; _v4Keep443++; }
             return true;
+        }
+
+        /// <summary>445-p: BattleSense.OnAgentRemoved (glowny watek, szyk ofiary jeszcze przypisany): czlowiek zabity / ranny w szyku CAVFIRST albo w jego celu -
+        /// strata liczona zabitymi i rannymi (nie spadkiem CountOfUnits, ktory spada tez przy przenosinach ludzi miedzy szykami).</summary>
+        internal static void V445OnRemoved(Agent v, AgentState st)
+        {
+            if (!_v4Live || v == null) return;
+            try
+            {
+                if (st != AgentState.Killed && st != AgentState.Unconscious) return;
+                if (!v.IsHuman) return;
+                var vf = v.Formation;
+                if (vf == null) return;
+                int vi = C441Idx(vf);
+                if (vi >= 0 && vi < CrSlots && _v4Mode[vi] == VmCav && ReferenceEquals(_v4Who[vi], vf)) { _v4OwnKill[vi]++; _v4CavKilled[vi]++; }
+                for (int i = 0; i < CrSlots; i++)
+                    if (_v4Mode[i] == VmCav && ReferenceEquals(_v4Tgt[i], vf)) _v4TgtKill[i]++;
+            }
+            catch (Exception e) { _v4Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.CavFirst445 zabity", e); }
         }
 
         // ------------------------------------------------------------ takt glownego watku (Doctrine.Tick)
@@ -243,7 +302,8 @@ namespace Armoury
             if (!ReferenceEquals(_v4Who[idx], f))
             {
                 V445SlotClear(idx);
-                _v4Who[idx] = f; _v4Exit[idx] = _v4DryC[idx] = _v4DryD[idx] = _v4Cool[idx] = -1000f; _v4DisN[idx] = 0;
+                V445SlotNew(idx);
+                _v4Who[idx] = f;
                 for (int k = 0; k < V4R; k++) _v4Ring[rb + k] = cnt;
             }
             // liczba ludzi 10 s temu (pierscien - kazdy slot, co takt)
@@ -272,8 +332,18 @@ namespace Armoury
             float own = V445MeleeOf(f);
             sbyte prof = _cpKey ? P440Prof(t) : (sbyte)1;
             if (prof < 0 || prof > 2) prof = 1;
-            if (mode == VmCav) { _v4CavSec += step; V445CavTick(t, f, idx, me, own, now); return; }
-            if (mode == VmDis) { _v4DisSec += step; V445DisTick(f, idx, me, now); return; }
+            // 445-p: klucz NIE (albo bez dowodcy jazdy) w trakcie - rola oddana od razu, jak 444
+            if (mode == VmCav)
+            {
+                if (!_v4KCav || !C441Live) { _v4CavKeyOff++; V445End(f, idx, now, 1); return; }
+                _v4CavSec += step; V445CavTick(t, f, idx, me, own, now); return;
+            }
+            if (mode == VmDis)
+            {
+                if (!_v4KDis || !C441Live) { _v4DisKeyOff++; V445End(f, idx, now, 2); return; }
+                _v4DisSec += step; V445DisTick(f, idx, now); return;
+            }
+            if (own < T442OwnMelee) _v4TangEp[idx] = false;   // 445-p: poza zwarciem - nowy epizod "zwiazani"
             if (now - _v4Exit[idx] < V445Reenter) return;
             if ((role == CrNone || role == CrWait) && own < T442OwnMelee) { V445TryCav(t, f, idx, me, prof, role, now); return; }
             if (role == CrNone && own >= T442OwnMelee) V445TryDis(m, t, f, idx, me, cnt, old, prof, now);
@@ -283,34 +353,115 @@ namespace Armoury
 
         private static void V445TryCav(Team t, Formation f, int idx, Vec2 me, sbyte prof, byte role, float now)
         {
+            if (now < _v4CavWait[idx]) return;   // 445-p: przerwa CAVFIRST po stracie / czasie / bez zwarcia / odjezdzie (DISENGAGE jej nie dzieli)
             int ti = t.TeamIndex;
-            Formation tg = null;
-            bool counter = false;
+            Formation tg = null, skip = null;
+            bool counter = false, blocked = false, byFoot = false;
+            bool spent = !V445CavFree(idx);
             float dArch;
-            var thr = V445Threat(t, me, out dArch);
+            var thr = V445Threat(t, me, ref blocked, out dArch);
             if (thr != null)
             {
-                if (f.CountOfUnits >= V4Match[prof] * thr.CountOfUnits) { tg = thr; counter = true; }
-                else if (now >= _v4DryC[idx]) { _v4Weak++; _v4DryC[idx] = now + R443Latch; }
+                skip = thr;   // 445-p: gdy nie ten szyk kontruje - galaz (b) nie bierze tego samego celu
+                if (f.CountOfUnits < V4Match[prof] * thr.CountOfUnits) { if (V445Latch(idx, VlWeak, now, R443Latch)) _v4Weak++; }
+                else if (V445Claimed(t, thr)) { if (V445Latch(idx, VlOther, now, R443Latch)) _v4CounterOther++; }
+                else if (spent || ReferenceEquals(V445CounterBy(t, thr, prof, now), f)) { tg = thr; counter = true; }   // spent: odrzucony nizej i liczony
+                else if (V445Latch(idx, VlOther, now, R443Latch)) _v4CounterOther++;
             }
             if (tg == null && ti >= 0 && ti < MaxTeams && _v4FoeCav[ti] >= R443CavMin && _v4OurCav[ti] >= V4Adv[prof] * _v4FoeCav[ti])
-                tg = V445NearestCav(t, me);
+            {
+                var c = V445NearestCav(t, me, skip, ref blocked, ref byFoot);
+                if (c != null)
+                {
+                    // 445-p: prog sily szyku jak przy kontrszarzy (sama przewaga druzyny nie wystarczy - 5 jezdzcow na 40)
+                    if (f.CountOfUnits >= V4Match[prof] * c.CountOfUnits) tg = c;
+                    else if (V445Latch(idx, VlAdvWeak, now, R443Latch)) _v4AdvWeak++;
+                }
+            }
+            if (blocked) _v4Blocked++;   // 445-p: raz na szyk na takt
+            if (byFoot) _v4NearFoot++;
             if (tg == null) return;
+            if (spent)
+            {
+                // 445-p: limit 3 wejsc na szyk albo strata 40% od pierwszego wejscia - bez kolejnych szarz na jazde w tej bitwie
+                if (V445Latch(idx, VlCavCap, now, R443Latch)) { if (_v4CavNi[idx] >= V445CavMaxN) _v4CavCap++; else _v4CavSpent++; }
+                return;
+            }
             if (!_v4KCav || !C441Live)
             {
-                if (now >= _v4DryC[idx]) { if (counter) _v4CounterDry++; else _v4AdvDry++; _v4DryC[idx] = now + R443Latch; }
+                if (V445Latch(idx, VlDry, now, R443Latch)) { if (counter) _v4CounterDry++; else _v4AdvDry++; }
                 return;
             }
             if (!C441SetRole(f, CrCavFirst, MovementOrder.MovementOrderChargeToTarget(tg)))
             {
-                if (now >= _v4DryC[idx]) { _v4Refused++; _v4DryC[idx] = now + R443Latch; }
+                if (V445Latch(idx, VlRefC, now, R443Latch)) _v4Refused++;
                 return;
             }
             _v4Mode[idx] = VmCav; _v4Since[idx] = now; _v4Tgt[idx] = tg; _v4Counter[idx] = counter;
             _v4ContactAt[idx] = -1f; _v4Men0[idx] = f.CountOfUnits; _v4TgtMen0[idx] = tg.CountOfUnits;
+            _v4TgtKill[idx] = _v4OwnKill[idx] = 0;
+            if (_v4CavNi[idx] == 0) _v4CavMen00[idx] = f.CountOfUnits;
+            _v4CavNi[idx]++;
+            if (ReferenceEquals(_v4LastTgt[idx], tg)) _v4SameTgt++;
+            _v4LastTgt[idx] = tg;
             _v4CavN++;
             if (counter) _v4CounterN++; else _v4AdvN++;
             if (role == CrWait) _v4FromWait++;
+        }
+
+        /// <summary>445-p: szyk moze jeszcze wejsc w CAVFIRST: mniej niz 3 wejscia i nasi zabici / ranni w CAVFIRST < 40% ludzi z pierwszego wejscia.</summary>
+        private static bool V445CavFree(int gi)
+        {
+            if (_v4CavNi[gi] >= V445CavMaxN) return false;
+            return _v4CavMen00[gi] <= 0 || _v4CavKilled[gi] < V445Loss * _v4CavMen00[gi];
+        }
+
+        /// <summary>445-p: na ten szyk jazdy wroga jedzie juz nasz szyk CAVFIRST (ta sama druzyna) - drugi nie rusza.</summary>
+        private static bool V445Claimed(Team t, Formation thr)
+        {
+            for (int i = 0; i < CrSlots; i++)
+            {
+                if (_v4Mode[i] != VmCav || !ReferenceEquals(_v4Tgt[i], thr)) continue;
+                var w = _v4Who[i];
+                if (w != null && ReferenceEquals(w.Team, t)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>445-p: najblizszy zagrozeniu wolny szyk jazdy AI druzyny (rola NONE / WAIT, poza zwarciem, po przerwach i limitach), ktory spelnia prog sily
+        /// kontrszarzy - tylko on kontruje (bez rezerwacji: kazdy szyk liczy to samo w tym samym takcie, wynik ten sam).</summary>
+        private static Formation V445CounterBy(Team t, Formation thr, sbyte prof, float now)
+        {
+            Vec2 tp = thr.CachedAveragePosition;
+            if (!tp.IsValid) return null;
+            Formation best = null;
+            float bd = float.MaxValue;
+            float need = V4Match[prof] * thr.CountOfUnits;
+            var fl = t.FormationsIncludingSpecialAndEmpty;
+            for (int j = 0; fl != null && j < fl.Count; j++)
+            {
+                var g = fl[j];
+                if (g == null || g.CountOfUnits < R443CavMin || g.CountOfUnits < need) continue;
+                var gq = g.QuerySystem;
+                if (gq == null || !gq.IsCavalryFormation || gq.IsRangedCavalryFormation) continue;
+                if (!g.IsAIControlled || HorsePursuit.PlayerForm(g) || g.HasPlayerControlledTroop) continue;
+                int gi = C441Idx(g);
+                if (gi < 0 || gi >= CrSlots) continue;
+                if (ReferenceEquals(_v4Who[gi], g))
+                {
+                    if (_v4Mode[gi] != VmNone) continue;
+                    if (now - _v4Exit[gi] < V445Reenter || now < _v4CavWait[gi]) continue;
+                    if (!V445CavFree(gi)) continue;
+                }
+                byte r = C441RoleOf(g);
+                if (r != CrNone && r != CrWait) continue;
+                if (V445MeleeOf(g) >= T442OwnMelee) continue;
+                Vec2 gp = g.CachedAveragePosition;
+                if (!gp.IsValid) continue;
+                float d = gp.Distance(tp);
+                if (d < bd) { bd = d; best = g; }
+            }
+            return best;
         }
 
         private static void V445CavTick(Team t, Formation f, int idx, Vec2 me, float own, float now)
@@ -318,11 +469,13 @@ namespace Armoury
             var tg = _v4Tgt[idx];
             int men0 = _v4TgtMen0[idx];
             bool alive = tg != null && tg.CountOfUnits >= R443CavMin && MissionTeams.Enemies(t, tg.Team);
-            if (!alive || (men0 > 0 && tg.CountOfUnits <= (1f - V445Broken) * men0)) { _v4CavBroken++; V445End(f, idx, now, 1); return; }
-            if (f.CountOfUnits < (1f - V445Loss) * _v4Men0[idx]) { _v4CavLoss++; V445End(f, idx, now, 1); return; }
-            if (now - _v4Since[idx] > V445Max) { _v4CavTime++; V445End(f, idx, now, 1); return; }
+            // 445-p: szyk celu zniknal / < 5 / nie wrog - osobno od "rozbita" (zabici i ranni celu >= 50% ludzi z poczatku roli)
+            if (!alive) { _v4CavGone++; V445End(f, idx, now, 1); return; }
+            if (men0 > 0 && _v4TgtKill[idx] >= V445Broken * men0) { _v4CavBroken++; V445End(f, idx, now, 1); return; }
+            if (_v4Men0[idx] > 0 && _v4OwnKill[idx] >= V445Loss * _v4Men0[idx]) { _v4CavLoss++; V445End(f, idx, now, 1); _v4CavWait[idx] = now + V445NoContactWait; return; }
+            if (now - _v4Since[idx] > V445Max) { _v4CavTime++; V445End(f, idx, now, 1); _v4CavWait[idx] = now + V445NoContactWait; return; }
             Vec2 ep = tg.CachedAveragePosition;
-            if (ep.IsValid && me.Distance(ep) > V445Lost) { _v4Fled++; V445End(f, idx, now, 1); _v4Exit[idx] = now + V445NoContactWait; return; }
+            if (ep.IsValid && me.Distance(ep) > V445Lost) { _v4Fled++; V445End(f, idx, now, 1); _v4CavWait[idx] = now + V445NoContactWait; return; }
             if (_v4ContactAt[idx] >= 0f) return;
             if (own >= V445Contact && V445MeleeOf(tg) >= V445Contact)
             {
@@ -335,12 +488,12 @@ namespace Armoury
                 }
                 return;
             }
-            if (now - _v4Since[idx] > V445NoContact) { _v4NoContact++; V445End(f, idx, now, 1); _v4Exit[idx] = now + V445NoContactWait; }
+            if (now - _v4Since[idx] > V445NoContact) { _v4NoContact++; V445End(f, idx, now, 1); _v4CavWait[idx] = now + V445NoContactWait; }
         }
 
         /// <summary>Kontrszarza: szyk jazdy wroga (>= 5, nie konni strzelcy) w 300 m od nas, jadacy na nasz pieszy szyk strzelcow (dojazd <= 15 s) albo w 30 m
-        /// od niego, niezasloniety piechota wroga - najblizszy nam. dArch - odstep od zagrozonych strzelcow.</summary>
-        private static Formation V445Threat(Team t, Vec2 me, out float dArch)
+        /// od niego, niezasloniety piechota wroga - najblizszy nam. dArch - odstep od zagrozonych strzelcow; blocked - jakis cel odrzucony przez zasloniecie.</summary>
+        private static Formation V445Threat(Team t, Vec2 me, ref bool blocked, out float dArch)
         {
             dArch = float.MaxValue;
             Formation best = null;
@@ -364,7 +517,7 @@ namespace Armoury
                     if (d > V445Range || d >= bd) continue;
                     float g;
                     if (!V445Rides(t, e, ep, out g)) continue;
-                    if (T442Blocked(t, e, me, ep)) { _v4Blocked++; continue; }
+                    if (T442Blocked(t, e, me, ep)) { blocked = true; continue; }
                     best = e; bd = d; dArch = g;
                 }
             }
@@ -400,8 +553,9 @@ namespace Armoury
             return thr;
         }
 
-        /// <summary>Przewaga konna: najblizszy szyk jazdy wroga (>= 5, nie konni strzelcy) w 300 m, niezasloniety piechota wroga.</summary>
-        private static Formation V445NearestCav(Team t, Vec2 me)
+        /// <summary>Przewaga konna: najblizszy szyk jazdy wroga (>= 5, nie konni strzelcy, nie skip) w 300 m, niezasloniety piechota wroga i nie stojacy przy pieszym
+        /// szyku swojej druzyny (445-p: RBM GetCorrectTarget daje jezdzcowi pieszego wroga w 30 m przed szykiem-celem - rbmai 10796).</summary>
+        private static Formation V445NearestCav(Team t, Vec2 me, Formation skip, ref bool blocked, ref bool byFoot)
         {
             Formation best = null;
             float bd = float.MaxValue;
@@ -415,18 +569,36 @@ namespace Armoury
                 for (int j = 0; efl != null && j < efl.Count; j++)
                 {
                     var e = efl[j];
-                    if (e == null || e.CountOfUnits < R443CavMin) continue;
+                    if (e == null || ReferenceEquals(e, skip) || e.CountOfUnits < R443CavMin) continue;
                     var eq = e.QuerySystem;
                     if (eq == null || !eq.IsCavalryFormation || eq.IsRangedCavalryFormation) continue;
                     Vec2 ep = e.CachedAveragePosition;
                     if (!ep.IsValid) continue;
                     float d = me.Distance(ep);
                     if (d > V445Range || d >= bd) continue;
-                    if (T442Blocked(t, e, me, ep)) { _v4Blocked++; continue; }
+                    if (T442Blocked(t, e, me, ep)) { blocked = true; continue; }
+                    if (V445ByFoot(et, e, ep)) { byFoot = true; continue; }
                     best = e; bd = d;
                 }
             }
             return best;
+        }
+
+        /// <summary>445-p: srodek jazdy wroga blizej niz 30 m + pol szerokosci od pieszego szyku (>= 5) jej druzyny.</summary>
+        private static bool V445ByFoot(Team et, Formation e, Vec2 ep)
+        {
+            var fl = et.FormationsIncludingSpecialAndEmpty;
+            for (int j = 0; fl != null && j < fl.Count; j++)
+            {
+                var x = fl[j];
+                if (x == null || ReferenceEquals(x, e) || x.CountOfUnits < R443CavMin) continue;
+                var xq = x.QuerySystem;
+                if (xq == null || xq.IsCavalryFormation || xq.IsRangedCavalryFormation) continue;
+                Vec2 xp = x.CachedMedianPosition.AsVec2;
+                if (!xp.IsValid) continue;
+                if (ep.Distance(xp) < V445FootGap + 0.5f * Math.Max(1f, x.Width)) return true;
+            }
+            return false;
         }
 
         /// <summary>Odstep jazdy wroga od najblizszego naszego pieszego szyku strzelcow (pomiar przechwycenia kontrszarzy).</summary>
@@ -460,7 +632,7 @@ namespace Armoury
             var nfq = nf.QuerySystem;
             if (nfq == null || nfq.IsCavalryFormation || nfq.IsRangedCavalryFormation) return;
             if (!nfq.IsInfantryFormation && !nfq.IsRangedFormation) return;
-            if (R443GapOf(f) > V445EngGap) return;
+            if (R443GapOf(f) > V445EngGap) { _v4TangEp[idx] = false; return; }   // 445-p: poza zwarciem z piechota - nowy epizod "zwiazani"
             // stoi i traci ludzi
             Vec2 v = f.CachedCurrentVelocity;
             float sp = v.IsValid ? v.Length : 0f;
@@ -469,48 +641,65 @@ namespace Armoury
             if (lost < V445MinLoss || lost < V4Bleed[prof] * old) return;
             if (_v4DisN[idx] >= V445MaxDis)
             {
-                if (now >= _v4DryD[idx]) { _v4DisCap++; _v4DryD[idx] = now + R443Latch; }
+                if (V445Latch(idx, VlCap, now, R443Latch)) _v4DisCap++;
                 return;
             }
-            float tangled = V445Tangled(m, f);
+            int free0;
+            float tangled = V445Tangled(m, f, out free0);
             if (tangled >= V445TangleMax)
             {
-                if (now >= _v4DryD[idx]) { _v4DisTangled++; _v4DryD[idx] = now + V445Reenter; }
+                // 445-p: raz na epizod zaklinowania (nie proba co 10 s) - porownywalne z liczba oderwan
+                if (!_v4TangEp[idx]) { _v4TangEp[idx] = true; _v4DisTangled++; }
                 return;
             }
             Vec2 p;
             WorldPosition wp;
-            if (!V445RallyPoint(t, f, nf, me, out p, out wp))
+            if (!V445RallyPoint(m, t, f, nf, me, out p, out wp))
             {
-                if (now >= _v4DryD[idx]) { _v4DisNoSpot++; _v4DryD[idx] = now + V445Reenter; }
+                if (V445Latch(idx, VlSpot, now, V445Reenter)) _v4DisNoSpot++;
                 return;
             }
             if (!_v4KDis || !C441Live)
             {
-                if (now >= _v4DryD[idx]) { _v4DisDry++; _v4DryD[idx] = now + R443Latch; }
+                if (V445Latch(idx, VlDisDry, now, R443Latch)) _v4DisDry++;
                 return;
             }
             if (!C441SetRole(f, CrDisengage, MovementOrder.MovementOrderMove(wp)))
             {
-                if (now >= _v4DryD[idx]) { _v4Refused++; _v4DryD[idx] = now + R443Latch; }
+                if (V445Latch(idx, VlRefD, now, R443Latch)) _v4Refused++;
                 return;
             }
             _v4Mode[idx] = VmDis; _v4Since[idx] = now; _v4P[idx] = p; _v4Reached[idx] = -1f; _v4Men0[idx] = cnt;
+            _v4Free0[idx] = Math.Max(1, free0); _v4LossB4[idx] = lost; _v4LossMeas[idx] = false;
             _v4DisN[idx]++;
             _v4DisN0++;
             _v4TangleSum += tangled;
-            _v4LossBefore += lost;
         }
 
-        private static void V445DisTick(Formation f, int idx, Vec2 me, float now)
+        private static void V445DisTick(Formation f, int idx, float now)
         {
+            if (now - _v4Since[idx] >= V445LossWin) V445LossMeasure(f, idx, now);
             if (_v4Reached[idx] < 0f)
             {
-                if (_v4P[idx].IsValid && me.Distance(_v4P[idx]) <= V445Reach) { _v4Reached[idx] = now; _v4DisReached++; }
+                // 445-p: dojazd = >= 70% jezdzcow wolnych przy starcie w 25 m od punktu (srednia szyku z zwiazanymi, ktorzy zostaja w piechocie, nie dojedzie)
+                int need = Math.Max(1, (int)Math.Ceiling(V445ReachShare * _v4Free0[idx]));
+                if (_v4P[idx].IsValid && V445AtPointCount(f, _v4P[idx], V445Reach) >= need) { _v4Reached[idx] = now; _v4DisReached++; }
                 else if (now - _v4Since[idx] > V445Ride) { _v4DisRideOut++; V445End(f, idx, now, 2); return; }
                 return;
             }
             if (now - _v4Reached[idx] >= V445Reform) { _v4DisDone++; V445End(f, idx, now, 2); }
+        }
+
+        /// <summary>445-p: strata w pierwszych 10 s roli DISENGAGE (przy wczesniejszym koncu - przeliczona na 10 s) obok straty 10 s przed - ta sama populacja.</summary>
+        private static void V445LossMeasure(Formation f, int idx, float now)
+        {
+            if (_v4LossMeas[idx]) return;
+            _v4LossMeas[idx] = true;
+            float el = Math.Max(1f, now - _v4Since[idx]);
+            int l = Math.Max(0, _v4Men0[idx] - (f != null ? f.CountOfUnits : 0));
+            _v4LossBefore += _v4LossB4[idx];
+            _v4LossDuring += l * (V445LossWin / el);
+            _v4LossN++;
         }
 
         /// <summary>Oddanie roli (tylko gdy rola jest nasza). why: 1 koniec CAVFIRST, 2 koniec DISENGAGE (liczniki powodu u wolajacego), 9 szyk zniknal / gracz.</summary>
@@ -524,9 +713,9 @@ namespace Armoury
                 else
                 {
                     _v4DisEnd++;
-                    _v4AtPointSum += V445AtPointShare(f, _v4P[idx]);
-                    int c0 = _v4Men0[idx];
-                    _v4LossDuring += Math.Max(0, c0 - (f != null ? f.CountOfUnits : 0));
+                    int fr = Math.Max(1, _v4Free0[idx]);
+                    _v4AtPointSum += Math.Min(1.0, (double)V445AtPointCount(f, _v4P[idx], V445AtPoint) / fr);
+                    V445LossMeasure(f, idx, now);
                 }
             }
             try
@@ -543,21 +732,19 @@ namespace Armoury
             if (mode == VmDis) _v4Cool[idx] = now + V445Cool;
         }
 
-        /// <summary>Wynik CAVFIRST: strata celu i naszej jazdy od poczatku roli.</summary>
+        /// <summary>Wynik CAVFIRST: strata celu i naszej jazdy od poczatku roli (445-p: zabici i ranni, nie spadek CountOfUnits).</summary>
         private static void V445Score(Formation f, int idx)
         {
             int t0 = _v4TgtMen0[idx], c0 = _v4Men0[idx];
             if (t0 <= 0 || c0 <= 0) return;
-            var tg = _v4Tgt[idx];
-            int tl = tg != null ? Math.Max(0, tg.CountOfUnits) : 0;
-            int cl = f != null ? Math.Max(0, f.CountOfUnits) : 0;
-            _v4TgtLossSum += Math.Max(0.0, 1.0 - (double)tl / t0);
-            _v4OwnLossSum += Math.Max(0.0, 1.0 - (double)cl / c0);
+            _v4TgtLossSum += Math.Min(1.0, (double)_v4TgtKill[idx] / t0);
+            _v4OwnLossSum += Math.Min(1.0, (double)_v4OwnKill[idx] / c0);
             _v4CavDone++;
         }
 
-        /// <summary>Punkt zbiorki: 60 m od wroga po linii wrog - jazda, potem 40 m, potem +/- 35 stopni (60 m); na siatce nawigacji, z dala od innych szykow wroga.</summary>
-        private static bool V445RallyPoint(Team t, Formation f, Formation foe, Vec2 me, out Vec2 p, out WorldPosition wp)
+        /// <summary>Punkt zbiorki: 60 m od wroga po linii wrog - jazda, potem 40 m, potem +/- 35 stopni (60 m); na siatce nawigacji, z dala od innych szykow wroga,
+        /// 445-p: w granicach pola i >= 15 m od krawedzi (przy granicy gra wygasza agentow - jak H439InField / RoutHold.Withdraw).</summary>
+        private static bool V445RallyPoint(Mission m, Team t, Formation f, Formation foe, Vec2 me, out Vec2 p, out WorldPosition wp)
         {
             p = Vec2.Invalid;
             wp = default(WorldPosition);
@@ -578,6 +765,7 @@ namespace Armoury
                 if (k == 2) dir = new Vec2(away.x * cs - away.y * sn, away.x * sn + away.y * cs);
                 else if (k == 3) dir = new Vec2(away.x * cs + away.y * sn, -away.x * sn + away.y * cs);
                 Vec2 c = me + dir * dist;
+                if (!m.IsPositionInsideBoundaries(c) || m.GetClosestBoundaryPosition(c).Distance(c) < V445Edge) continue;
                 if (!V445FoeClear(t, foe, c)) continue;
                 WorldPosition w = f.CachedMedianPosition;
                 w.SetVec2(c);
@@ -624,6 +812,7 @@ namespace Armoury
         private static Team _v4ScanT;
         private static int _v4ScanAll, _v4ScanIn;
         private static Vec2 _v4ScanP;
+        private static float _v4ScanR2;
 
         private static readonly Action<Agent> V445TangleMan = a =>
         {
@@ -634,37 +823,39 @@ namespace Armoury
             int riders = 0, foot = 0;
             for (int i = 0; i < _v4Buf.Count; i++)
             {
+                // 445-p: filtr jak RBM (rbmai 5073-5079: tylko MountAgent != null / == null, bez IsHuman / IsActive) - jesli silnik zwraca konie, RBM liczy je
+                // jako pieszych w 7 m i 445 tez
                 var x = _v4Buf[i];
-                if (x == null || !x.IsHuman || !x.IsActive()) continue;
+                if (x == null) continue;
                 if (x.MountAgent != null) riders++;
                 else if (p.DistanceSquared(x.Position.AsVec2) <= V445TangleFoot * V445TangleFoot) foot++;
             }
             if (riders > 2 || foot > 2) _v4ScanIn++;
         };
 
-        /// <summary>Udzial jezdzcow szyku, ktorych RBM trzyma w walce wolnej (rozkaz Move ich nie ruszy).</summary>
-        private static float V445Tangled(Mission m, Formation f)
+        /// <summary>Udzial jezdzcow szyku, ktorych RBM trzyma w walce wolnej (rozkaz Move ich nie ruszy); free - jezdzcy wolni.</summary>
+        private static float V445Tangled(Mission m, Formation f, out int free)
         {
             _v4ScanM = m; _v4ScanT = f.Team; _v4ScanAll = _v4ScanIn = 0;
             try { f.ApplyActionOnEachUnit(V445TangleMan); }
             finally { _v4ScanM = null; _v4ScanT = null; _v4Buf.Clear(); }
+            free = _v4ScanAll - _v4ScanIn;
             return _v4ScanAll > 0 ? (float)_v4ScanIn / _v4ScanAll : 1f;
         }
 
         private static readonly Action<Agent> V445AtPointMan = a =>
         {
-            if (a == null || !a.IsActive()) return;
-            _v4ScanAll++;
-            if (a.Position.AsVec2.DistanceSquared(_v4ScanP) <= V445AtPoint * V445AtPoint) _v4ScanIn++;
+            if (a == null || !a.IsActive() || a.MountAgent == null) return;
+            if (a.Position.AsVec2.DistanceSquared(_v4ScanP) <= _v4ScanR2) _v4ScanIn++;
         };
 
-        /// <summary>Udzial ludzi szyku w 30 m od punktu zbiorki (ilu sie oderwalo).</summary>
-        private static float V445AtPointShare(Formation f, Vec2 p)
+        /// <summary>445-p: liczba jezdzcow (na koniu, jak "wolni" przy starcie) szyku w r od punktu zbiorki.</summary>
+        private static int V445AtPointCount(Formation f, Vec2 p, float r)
         {
-            if (f == null || !p.IsValid) return 0f;
-            _v4ScanP = p; _v4ScanAll = _v4ScanIn = 0;
+            if (f == null || !p.IsValid) return 0;
+            _v4ScanP = p; _v4ScanR2 = r * r; _v4ScanIn = 0;
             f.ApplyActionOnEachUnit(V445AtPointMan);
-            return _v4ScanAll > 0 ? (float)_v4ScanIn / _v4ScanAll : 0f;
+            return _v4ScanIn;
         }
 
         // ------------------------------------------------------------ linia konca bitwy (Battle291.Write)
@@ -683,28 +874,37 @@ namespace Armoury
               .Append(" / ").Append(K444Pct(V4Match[2])).Append(" wroga, oderwanie strata w 10 s >= ").Append(K444Pct(V4Bleed[0])).Append(" / ").Append(K444Pct(V4Bleed[1]))
               .Append(" / ").Append(K444Pct(V4Bleed[2]))
               .Append(" | CAVFIRST: wejsc ").Append(_v4CavN).Append(" (kontrszarza na jazde idaca na strzelcow ").Append(_v4CounterN).Append(", przewaga konna ").Append(_v4AdvN)
-              .Append("; z czekania 444 ").Append(_v4FromWait).Append("), bylby (klucz NIE / bez dowodcy jazdy): kontrszarza ").Append(_v4CounterDry).Append(", przewaga ").Append(_v4AdvDry)
-              .Append("; za slaby na kontrszarze ").Append(_v4Weak).Append(", cel zasloniety piechota (szyko-takty) ").Append(_v4Blocked)
+              .Append("; z czekania 444 ").Append(_v4FromWait).Append("; ponownie na ten sam cel ").Append(_v4SameTgt).Append("), bylby (klucz NIE / bez dowodcy jazdy): kontrszarza ")
+              .Append(_v4CounterDry).Append(", przewaga ").Append(_v4AdvDry)
+              .Append("; za slaby na kontrszarze ").Append(_v4Weak).Append(", kontruje inny szyk (blizszy / juz na celu) ").Append(_v4CounterOther)
+              .Append(", za slaby na przewage ").Append(_v4AdvWeak)
+              .Append(", cel zasloniety piechota (szyko-takty) ").Append(_v4Blocked).Append(", jazda wroga przy swojej piechocie (szyko-takty) ").Append(_v4NearFoot)
+              .Append(", limit ").Append(V445CavMaxN).Append(" wejsc na szyk ").Append(_v4CavCap).Append(", szyk stracil ").Append(K444Pct(V445Loss)).Append(" w CAVFIRST ").Append(_v4CavSpent)
               .Append(", ").Append(_v4CavSec.ToString("0", V4Inv)).Append(" szyko-s")
               .Append(" | zwarc ").Append(_v4Contact).Append(" (kontrszarza przechwycila srednio ")
               .Append(_v4InterN > 0 ? (_v4InterSum / _v4InterN).ToString("0", V4Inv) + " m" : "-").Append(" od naszych strzelcow, ").Append(_v4InterN).Append(')')
-              .Append(" | koniec: jazda wroga rozbita ").Append(_v4CavBroken).Append(", straty naszej jazdy ").Append(_v4CavLoss).Append(", czas ").Append(_v4CavTime)
-              .Append(", bez zwarcia ").Append(_v4NoContact).Append(", odjechala ").Append(_v4Fled).Append(", oddana (gracz / szyk pusty / 441) ").Append(_v4CavBack)
-              .Append(", w toku przy koncu ").Append(_v4CavOpen)
-              .Append(" | wynik: jazda wroga stracila srednio ").Append(_v4CavDone > 0 ? (100.0 * _v4TgtLossSum / _v4CavDone).ToString("0", V4Inv) + "%" : "-")
+              .Append(" | koniec: jazda wroga rozbita (zabici i ranni >= ").Append(K444Pct(V445Broken)).Append(") ").Append(_v4CavBroken)
+              .Append(", szyk celu zniknal / < 5 / nie wrog ").Append(_v4CavGone)
+              .Append(", straty naszej jazdy ").Append(_v4CavLoss).Append(", czas ").Append(_v4CavTime)
+              .Append(", bez zwarcia ").Append(_v4NoContact).Append(", odjechala ").Append(_v4Fled).Append(", klucz NIE w trakcie ").Append(_v4CavKeyOff)
+              .Append(", oddana (gracz / szyk pusty / 441) ").Append(_v4CavBack).Append(", w toku przy koncu ").Append(_v4CavOpen)
+              .Append(" | wynik (zabici i ranni): jazda wroga stracila srednio ").Append(_v4CavDone > 0 ? (100.0 * _v4TgtLossSum / _v4CavDone).ToString("0", V4Inv) + "%" : "-")
               .Append(", nasza srednio ").Append(_v4CavDone > 0 ? (100.0 * _v4OwnLossSum / _v4CavDone).ToString("0", V4Inv) + "%" : "-")
               .Append(" | DISENGAGE: oderwan ").Append(_v4DisN0).Append(", bylby (klucz NIE / bez dowodcy jazdy) ").Append(_v4DisDry)
-              .Append(", zwiazani - nie posluchaliby (>= ").Append(K444Pct(V445TangleMax)).Append(" jezdzcow) ").Append(_v4DisTangled)
-              .Append(", brak punktu zbiorki ").Append(_v4DisNoSpot).Append(", limit ").Append(V445MaxDis).Append(" na szyk ").Append(_v4DisCap)
+              .Append(", zwiazani - nie posluchaliby (>= ").Append(K444Pct(V445TangleMax)).Append(" jezdzcow; epizody) ").Append(_v4DisTangled)
+              .Append(", brak punktu zbiorki (siatka / granica / szyk wroga) ").Append(_v4DisNoSpot).Append(", limit ").Append(V445MaxDis).Append(" na szyk ").Append(_v4DisCap)
               .Append(", ").Append(_v4DisSec.ToString("0", V4Inv)).Append(" szyko-s; zwiazanych przy oderwaniu srednio ")
               .Append(_v4DisN0 > 0 ? (100.0 * _v4TangleSum / _v4DisN0).ToString("0", V4Inv) + "%" : "-")
-              .Append(" | dojechali do punktu ").Append(_v4DisReached).Append(", po ").Append(V445Ride.ToString("0", V4Inv)).Append(" s bez dojazdu ").Append(_v4DisRideOut)
-              .Append(", po formowaniu oddane RBM ").Append(_v4DisDone).Append(", oddane (gracz / szyk pusty / 441) ").Append(_v4DisBack).Append(", w toku przy koncu ").Append(_v4DisOpen)
+              .Append(" | dojechali do punktu (>= ").Append(K444Pct(V445ReachShare)).Append(" wolnych w ").Append(V445Reach.ToString("0", V4Inv)).Append(" m) ").Append(_v4DisReached)
+              .Append(", po ").Append(V445Ride.ToString("0", V4Inv)).Append(" s bez dojazdu ").Append(_v4DisRideOut)
+              .Append(", po formowaniu oddane RBM ").Append(_v4DisDone).Append(", klucz NIE w trakcie ").Append(_v4DisKeyOff)
+              .Append(", oddane (gracz / szyk pusty / 441) ").Append(_v4DisBack).Append(", w toku przy koncu ").Append(_v4DisOpen)
               .Append(" | przy punkcie na koncu srednio ").Append(_v4DisEnd > 0 ? (100.0 * _v4AtPointSum / _v4DisEnd).ToString("0", V4Inv) + "%" : "-")
-              .Append(" ludzi; strata 10 s przed srednio ").Append(_v4DisN0 > 0 ? (_v4LossBefore / _v4DisN0).ToString("0.0", V4Inv) : "-")
-              .Append(", w trakcie srednio ").Append(_v4DisEnd > 0 ? (_v4LossDuring / _v4DisEnd).ToString("0.0", V4Inv) : "-")
+              .Append(" wolnych jezdzcow; strata w 10 s (ta sama populacja ").Append(_v4LossN).Append("): przed srednio ")
+              .Append(_v4LossN > 0 ? (_v4LossBefore / _v4LossN).ToString("0.0", V4Inv) : "-")
+              .Append(", w pierwszych 10 s roli srednio ").Append(_v4LossN > 0 ? (_v4LossDuring / _v4LossN).ToString("0.0", V4Inv) : "-")
               .Append(" | naraz maks: CAVFIRST ").Append(_v4MaxCav).Append(", DISENGAGE ").Append(_v4MaxDis)
-              .Append(" | rajd 443 wstrzymany ").Append(_v4Keep443).Append(", rola odrzucona ").Append(_v4Refused)
+              .Append(" | rajd 443 wstrzymany (rol 445) ").Append(_v4Keep443).Append(", rola odrzucona ").Append(_v4Refused)
               .Append(" | potkniecia ").Append(_v4Stum).Append('.');
             return sb.ToString();
         }

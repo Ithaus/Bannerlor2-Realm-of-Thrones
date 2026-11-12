@@ -336,6 +336,8 @@ namespace Armoury
                 Doctrine.Q446OnRemoved(affectedAgent, affectorAgent, agentState, in blow);
                 // 444-p: czlowiek celu uderzenia padl od jezdzca mlota - tylko licznik
                 Doctrine.K444OnRemoved(affectedAgent, affectorAgent, agentState);
+                // 445-p: zabici / ranni w szyku CAVFIRST i w jego celu - strata liczona ludzmi, nie spadkiem CountOfUnits
+                Doctrine.V445OnRemoved(affectedAgent, agentState);
                 // 447: gracz padl w czasie polowania (od jezdzca polowania albo innego) - tylko licznik
                 Doctrine.H447OnRemoved(affectedAgent, affectorAgent, agentState);
                 try { CleanShot.OnRemoved(Mission, affectedAgent); }

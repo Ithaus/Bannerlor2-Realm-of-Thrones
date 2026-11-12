@@ -1,5 +1,45 @@
 # DZIENNIK ZMIAN
 
+## 445-p (12.11) - POPRAWKI PO RECENZJI 445 (jazda na jazde i oderwanie): kontrszarza tylko najblizszy wolny szyk z progiem sily (cel zajety - nikt wiecej), przewaga konna z progiem sily szyku i bez jazdy wroga przy jej piechocie, CAVFIRST najwyzej 3 wejscia i zakaz po stracie 40%, przerwa 45 s tylko dla CAVFIRST, strata liczona zabitymi i rannymi, klucz NIE konczy role, dojazd DISENGAGE wedlug wolnych jezdzcow, punkt zbiorki w granicach pola, liczniki raz na epizod / role / szyk (Doctrine.CavFirst445.cs, BattleSense.cs, Settings.cs, McmSettings.cs)
+
+**Problem:** recenzja zmiany 445 (15 znalezisk, wszystkie sprawdzone w kodzie i przyjete; ostatnie uciete w JSON - odczytane z dowodu):
+- [sredni] "zwiazani - nie posluchaliby" liczyl proby co 10 s (szyk zaklinowany 60 s = do 6), a oderwan najwyzej 3 na szyk - kryterium "zwiazani dominuje" skrzywione.
+- [sredni] "strata 10 s przed" (pierscien 10 s, / _v4DisN0) wobec "w trakcie" (6-36 s roli, / _v4DisEnd) - rozne okna i populacje, porownanie bez sensu.
+- [sredni] kontrszarza: kazdy wolny szyk jazdy w 300 m decydowal sam o tym samym zagrozeniu (ruszala cala wolna jazda, takze czekajaca w 444); galaz przewagi (b) bez progu sily szyku i po "za slaby" brala ten sam cel (5 jezdzcow na 40). Opis MCM mowil "the nearest free cavalry formation".
+- [sredni] dojazd DISENGAGE srednia pozycja calego szyku z jezdzcami zwiazanymi (do 49%, zostaja w piechocie) - 25 m nieosiagalne przy udziale > ok. 0.42; "przy punkcie" tez.
+- [sredni, stabilnosc] punkt zbiorki sprawdzany tylko na siatce nawigacji - jazda przy krawedzi dostawala Move 40-60 m za granice (gra wygasza tam agentow; Mission.IsOrderPositionAvailable sprawdza granice).
+- [drobny] koniec CAVFIRST "bez zwarcia" / "odjechala" (_v4Exit = now + 35) blokowal tez DISENGAGE na 45 s.
+- [drobny] przewaga konna przyjmowala jazde wroga stojaca obok jej piechoty (np. WAIT 444) - RBM GetCorrectTarget daje jezdzcowi pieszego w 30 m przed szykiem-celem (rbmai 10796).
+- [drobny] jeden zatrzask _v4DryC / _v4DryD na kilka licznikow - "za slaby" tlumil "bylby" i "odrzucona" (i odwrotnie).
+- [drobny] "rajd 443 wstrzymany" liczyl szyko-takty (V445Busy co takt), nie rajdy.
+- [drobny] "jazda wroga rozbita" obejmowala szyk celu znikniety / < 5 / nie wrog; strata celu i nasza z CountOfUnits (spada tez przy przenosinach ludzi).
+- [drobny] skan zwiazanych filtrowal IsHuman / IsActive, a RBM (rbmai 5073-5079) liczy wszystko z GetNearbyEnemyAgents (tylko MountAgent != null / == null).
+- [drobny] "cel zasloniety piechota (szyko-takty)" liczony na pare szyk x kandydat i zalezny od kolejnosci.
+- [drobny, stabilnosc] klucz NIE w trakcie bitwy nie konczyl rol (CAVFIRST do 90 s, DISENGAGE do 36 s), a 444 oddaje od razu.
+- [drobny, stabilnosc] CAVFIRST bez limitu wejsc ani blokady po stracie: po stracie 40% / czasie ponowne wejscie po 10 s z nowym _v4Men0 (kolejne 40% reszty); wahadlo z 444 WAIT (kod dotad martwy ozywiony - zasada 4).
+
+**Przyczyna:** Doctrine.CavFirst445.cs - V445TryCav (decyzja per szyk bez wyboru najblizszego, (b) bez progu sily i bez pominiecia celu), V445NearestCav (tylko T442Blocked), V445TryDis (licznik zwiazanych z zatrzaskiem 10 s), V445DisTick (me = CachedAveragePosition calego szyku), V445End (_v4LossDuring od dojazdu do konca roli), V445RallyPoint (brak IsPositionInsideBoundaries), V445CavTick (CountOfUnits, _v4Exit wspolny), V445Form (brak odczytu kluczy w trakcie), V445Busy (licznik co wywolanie), V445TangleMan (filtr IsHuman / IsActive), wspolne _v4DryC / _v4DryD.
+
+**Zmiana:**
+- Kontrszarza (a): szyk kontruje tylko, gdy jest najblizszym zagrozeniu wolnym szykiem jazdy AI druzyny, ktory spelnia prog sily V4Match (V445CounterBy: rola NONE / WAIT, poza zwarciem, po przerwach i limitach); gdy na ten cel jedzie juz nasz szyk CAVFIRST (V445Claimed) - nikt wiecej. Licznik "kontruje inny szyk (blizszy / juz na celu)". Bez rezerwacji w takcie - kazdy szyk liczy to samo, wynik ten sam (glowny watek, kolejne szyki widza juz _v4Mode nadany wczesniej w takcie).
+- Przewaga (b): prog sily szyku jak przy kontrszarzy (licznik "za slaby na przewage"); zagrozenie, ktorego szyk nie kontruje, nie jest celem (b); jazda wroga, ktorej srodek jest blizej niz 30 m + pol szerokosci od pieszego szyku (>= 5) jej druzyny, odrzucona (V445ByFoot, licznik "jazda wroga przy swojej piechocie (szyko-takty)").
+- CAVFIRST: najwyzej 3 wejscia na szyk w bitwie (V445CavMaxN) i zakaz po stracie 40% ludzi z pierwszego wejscia (zabici / ranni w CAVFIRST lacznie) - liczniki "limit 3 wejsc na szyk", "szyk stracil 40% w CAVFIRST"; po stracie, czasie, bez zwarcia i odjezdzie 45 s przerwy w osobnym _v4CavWait (DISENGAGE sprawdza tylko _v4Cool i 10 s od oddania); licznik "ponownie na ten sam cel".
+- Strata celu i naszej jazdy: V445OnRemoved (BattleSense.OnAgentRemoved, glowny watek, obok K444OnRemoved) liczy ludzi zabitych / rannych w szyku CAVFIRST i w jego celu. "Rozbita" = zabici i ranni celu >= 50% ludzi z poczatku roli; osobno "szyk celu zniknal / < 5 / nie wrog"; strata 40% naszej jazdy i wynik "stracila srednio" tez z zabitych i rannych.
+- Klucz NIE (albo 441 nieczynny) w trakcie bitwy: rola CAVFIRST / DISENGAGE oddana w nastepnym takcie (liczniki "klucz NIE w trakcie").
+- DISENGAGE: dojazd = >= 70% jezdzcow wolnych przy starcie (skan zwiazanych) w 25 m od punktu; "przy punkcie na koncu" = jezdzcy w 30 m / wolni przy starcie. Strata w 10 s: "przed" i "w pierwszych 10 s roli" (przy koncu przed 10 s przeliczona na 10 s) w tej samej populacji (licznik n w linii). Punkt zbiorki tylko w granicach pola i >= 15 m od krawedzi (jak H439InField; odrzucenie liczone w "brak punktu zbiorki"). "Zwiazani" raz na epizod (flaga kasowana poza zwarciem: < 30% wrecz albo odstep > 10 m).
+- Skan zwiazanych: filtr jak RBM (bez IsHuman / IsActive na agentach wroga).
+- Liczniki: osobny zatrzask na kazdy licznik (slot x 10), "cel zasloniety" i "przy piechocie" raz na szyk na takt, "rajd 443 wstrzymany (rol 445)" raz na role.
+- MCM / Settings.cs: opisy Cavalry Fights Cavalry First i Cavalry Disengage (klucze i domyslne TAK bez zmian; nowych kluczy brak).
+
+**Ryzyko / co sprawdzic:**
+- Linia "Jazda na jazde i oderwanie (445)": nowe pola. Oczekiwane przy TAK: "naraz maks: CAVFIRST" najwyzej tyle, ile szykow jazdy wroga jest celem (zwykle 1-2, wczesniej mogla ruszac cala wolna jazda); "kontruje inny szyk" > 0 przy kilku szykach jazdy; "jazda wroga przy swojej piechocie" > 0 w poczatku bitwy (jazda AI wroga obok piechoty) - wtedy "przewaga konna" rzadsza niz w 445; "ponownie na ten sam cel" i "limit 3 wejsc" male; "rozbita" + "zniknal" ~ dawne "rozbita". DISENGAGE: "zwiazani (epizody)" porownywalne z "oderwan"; "dojechali do punktu" wiekszosc oderwan (wczesniej przy zwiazanych > 40% zawsze "bez dojazdu"); "w pierwszych 10 s roli" < "przed" = oderwanie ratuje ludzi.
+- Regresje: przy kluczach NIE role nie nadawane jak dotad (zmienia sie tylko liczenie "bylby": kontrszarza liczona dla jednego szyku na zagrozenie, przewaga z progiem sily). V445Busy (443) i V445AimTarget (442) - te same wartosci zwrotne. 444: WAIT dalej ustepuje CAVFIRST (_k4WaitTo445), teraz rzadziej (jeden szyk na zagrozenie).
+- Kolizje: 291/313/333/344/359/372 nie czytaja stanu 445; 148/204 - C441Hard bez zmian (CAVFIRST / DISENGAGE to role twarde jak dotad); 421/436 (bitwy symulowane) - nie dotyczy (tylko misja). BattleSense.OnAgentRemoved: V445OnRemoved pod ta sama bramka Night co K444OnRemoved, petla po 160 slotach tylko przy _v4Live, wyjatek liczony.
+- Martwy kod ozywiony: mniej szykow naraz niz w 445 (jeden na zagrozenie, limit 3 wejsc); skan GetNearbyEnemyAgents dalej tylko dla kandydata oderwania; nowy skan V445AtPointCount (ApplyActionOnEachUnit bez wywolan silnika) co takt 1 s na szyk w DISENGAGE. Watek: wszystko glowny (OnMissionTick / OnAgentRemoved), zachowanie roli 441 bez zmian.
+- Nie sprawdzone: czy GetNearbyEnemyAgents zwraca konie (wywolanie natywne) - teraz 445 liczy tak samo jak RBM niezaleznie od tego; ludzie uciekajacy (Routed) nie licza sie do straty celu - cel rozbity ucieczka konczy sie "zniknal / < 5", nie "rozbita".
+
+**Status:** DO SPRAWDZENIA
+
 ## 444-p (12.11) - POPRAWKI PO RECENZJI 444 (kowadlo i mlot): limit czekania laczny i od kontaktu piechot, WAIT konczy sie przy zwarciu na cala bitwe, pod ostrzalem i przy jezdzie wroga w 60 m, WAIT nie blokuje 148 / 204 / 344, objazd STRIKE oddany przy zwiazaniu, klucz NIE konczy STRIKE, kat wejscia wedlug krawedzi szyku, zabici przez mlot osobno, liczniki "bylby" / 443 / dojazd poprawione (Doctrine.Hammer444.cs, Doctrine.Cav441.cs, BattleSense.cs, HorsePursuit.cs, HorsePursuit.Hunt.cs, ShieldsUp.Riders.cs, Settings.cs, McmSettings.cs)
 
 **Problem:** recenzja zmiany 444 (13 znalezisk, wszystkie sprawdzone w kodzie i przyjete; 1 i 12 to to samo; ostatnie uciete w JSON - odczytane z dowodu):
