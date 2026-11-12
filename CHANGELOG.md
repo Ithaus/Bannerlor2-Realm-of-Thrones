@@ -1,5 +1,42 @@
 # DZIENNIK ZMIAN
 
+## 444-p (12.11) - POPRAWKI PO RECENZJI 444 (kowadlo i mlot): limit czekania laczny i od kontaktu piechot, WAIT konczy sie przy zwarciu na cala bitwe, pod ostrzalem i przy jezdzie wroga w 60 m, WAIT nie blokuje 148 / 204 / 344, objazd STRIKE oddany przy zwiazaniu, klucz NIE konczy STRIKE, kat wejscia wedlug krawedzi szyku, zabici przez mlot osobno, liczniki "bylby" / 443 / dojazd poprawione (Doctrine.Hammer444.cs, Doctrine.Cav441.cs, BattleSense.cs, HorsePursuit.cs, HorsePursuit.Hunt.cs, ShieldsUp.Riders.cs, Settings.cs, McmSettings.cs)
+
+**Problem:** recenzja zmiany 444 (13 znalezisk, wszystkie sprawdzone w kodzie i przyjete; 1 i 12 to to samo; ostatnie uciete w JSON - odczytane z dowodu):
+- [sredni] objazd STRIKE (Move galopem do 40 s) bez wyjscia przy zwiazaniu walka; sciezka "jazda wolna" brala szyk, ktory RBM prowadzil na jazde wroga (K444Form `free` bez rodzaju wroga; K444StrikeTick galaz `_k4Flank` - tylko side/reach/late).
+- [sredni] wahadlo czekanie - walka - czekanie: wyjscie przez zagrozenie i przejecie przez 443 nie ustawialy `_k4WaitedOut`, a `_k4Since = now` zerowal miare limitu.
+- [sredni] limit 90/150/210 s liczony od wejscia w WAIT, czyli w czasie marszu piechot - wygasal przed kowadlem, regula sprowadzala sie do opoznienia jazdy.
+- [sredni] WAIT = C441Owned -> 148 / 204 / 344 traktowaly czekajaca jazde jak szyk gracza (regresja wzgledem stanu przed 444).
+- [sredni] kat wejscia: cos kata od mediany celu - przy linii 60 x 8 m trafienie w pierwszy szereg 20 m od srodka = "bok" (cos 0.196).
+- [sredni] "cel stracil X%" miesza straty od piechoty i jazdy - nie pokazuje skutku mlota.
+- [drobny] "dojazd wprost" = `_k4Direct - _k4NoRoute`, a `_k4NoRoute` rosl tez w objezdzie (moglo wyjsc ujemne).
+- [drobny] "bylby" WAIT/STRIKE co 30 s (nieporownywalne z "wejsc"); `_k4Keep443` co takt ostrzalu (szyko-s, nie rajdy).
+- [drobny] przejecie WAIT przez 443 bez K444WaitDone - srednia wedlug profilu krzywa.
+- [drobny] klucz NIE w trakcie bitwy konczyl WAIT, nie STRIKE.
+- [sredni, stabilnosc] WAIT nie konczyl sie pod ostrzalem konnych strzelcow (443 liczy tylko pieszych, `near == null` -> nic) - "stali jak idioci" (decyzja Jeffa 11.11).
+- [sredni, stabilnosc] czekajaca jazda (waga 100) wypada z oslony skrzydla RBM (BehaviorProtectFlank 10) i z reakcji na jazde wroga jadaca na nasza piechote; 445 bierze tylko jazde na pieszych strzelcow / przy przewadze.
+
+**Przyczyna:** [K] jak w dowodach recenzji - Doctrine.Hammer444.cs K444Form (warunki wejscia / wyjscia WAIT, `_k4Since`), K444StrikeTick (brak odczytu wrecz / odstepu w objezdzie, brak klucza), K444ContactSide (K444FrontCos od mediany), K444Score (strata celu ogolem), K444Striking (licznik co wywolanie); Doctrine.Cav441.cs C441Owned (kazda rola != NONE) czytany w HorsePursuit.cs Form, HorsePursuit.Hunt.cs (wybor szykow, HunterCheck), ShieldsUp.Riders.cs.
+
+**Zmiana:**
+- WAIT: laczny czas czekania szyku na bitwe (`_k4PreSum` / `_k4PostSum`, od zera tylko przy nowym szyku w slocie / koncu misji). Kontakt = glowna piechota w 75 m od najblizszego szyku wroga (R443GapOf, prog kontaktu 333). Limit wedlug profilu (90/150/210 s) liczy tylko czas po kontakcie; przed kontaktem osobny limit 240 s (K444PreCap). Oba ustawiaja `_k4WaitedOut` (koniec czekania na bitwe).
+- WAIT: zwarcie / wrog w 15 m -> oddana RBM i `_k4WaitedOut` (bez wahadla). Nowe wyjscia: ostrzal >= 4 trafienia (R443CavHits) jezdzcow / koni w 10 s od KAZDEGO strzelca wroga (nowy licznik K444OnHit z BattleSense.OnAgentHit, Interlocked, pierscien 10 s w 444) - gdy 443 nie wzial szyku w tym takcie; jazda wroga (>= 5, nie konni strzelcy, nie sama w WAIT 444) w 60 m od czekajacej jazdy, glownej piechoty albo naszych pieszych strzelcow (mediana minus pol wiekszego wymiaru naszego szyku). Te dwa: ponowne czekanie najwczesniej po 20 s (laczny limit dalej liczony); w tych warunkach WAIT sie nie zaczyna (licznik "nie zaczete").
+- C441Hard (Cav441) = rola != NONE i != WAIT; 148 (HorsePursuit.Form), 204 (HorsePursuit.Hunt wybor szykow i HunterCheck), 344 (ShieldsUp.Riders) czytaja C441Hard - na czekajacej jezdzie dzialaja jak przed 444; jezdziec wraca, gdy szyk dostanie role twarda (STRIKE itd.). 442 (Target442) dalej C441Owned (WAIT bez celu - slot pusty, jak bylo).
+- STRIKE: klucz NIE / 441 nieczynny -> koniec uderzenia w toku (licznik "klucz wylaczony"). Objazd: inny szyk wroga niz cel w 15 m albo zwarcie >= 30%, gdy najblizszy wrog to nie cel -> K444End, licznik "zwiazana w objezdzie - oddana RBM"; zwarcie, gdy najblizszy wrog to cel -> ChargeToTarget (jak dojazd). Jazda wolna nie startuje STRIKE, gdy najblizszy szyk wroga to jazda (takze konni strzelcy) w 60 m (licznik "wolna jazda nie wzieta").
+- Kat wejscia: strona w ukladzie szyku celu - najblizsza krawedz prostokata Width x Depth wokol mediany (czolo / tyl / bok), nie cos kata od srodka.
+- Wynik: K444OnRemoved (BattleSense.OnAgentRemoved, glowny watek) liczy ludzi celu zabitych / ogluszonych przez agentow szyku w STRIKE; w linii obok straty celu ogolem "zabici przez jezdzcow mlota X%".
+- Liczniki: "dojazd: wprost N (z tego bez drogi z boku M)" bez odejmowania, osobny "bez punktu po przesunieciu celu" w objezdzie; "bylby" WAIT raz na szyk na bitwe (obok "szykow czekalo" przy TAK), "bylby" STRIKE najwyzej raz na 100 s; "rajd 443 wstrzymany" raz na uderzenie; przejecie WAIT przez 443 / 445 / 441 wola K444WaitDone; czas czekania rozdzielony na przed / po kontakcie. Pelny wirtualny WAIT przy NIE (sugestia recenzji) - nie zrobiony, zamiast niego liczba szykow.
+- MCM / Settings.cs: opis Hammer And Anvil (klucz i domyslna TAK bez zmian; nowych kluczy brak).
+
+**Ryzyko / co sprawdzic:**
+- Regresje: 148 / 204 / 344 znow biora jezdzcow z szyku w WAIT - jezdziec pojedynczo (SetScriptedPosition / SetTargetAgent) jak przed 444, szyk dalej ma rozkaz Move roli; przy przejsciu WAIT -> STRIKE HunterCheck zwraca jezdzcow (UPlayer). W linii 441 licznik pominiec spadnie (WAIT nie liczony).
+- Kolizje: 445 biegnie przed 444 w takcie - bierze WAIT pierwszy (licznik "przez 445"); nowe wyjscie "jazda wroga w 60 m" lapie reszte (jazda na piechote / w poblizu). 443 przed 444 - ostrzal od pieszych daje RAID/HIDE, wyjscie "ostrzal" tylko gdy 443 nie wzial (konni strzelcy, brak punktu). 291/313/333/359/372/421/436 - bez zmian w tych plikach, nie czytaja roli WAIT / STRIKE. 447: H447 wybiera szyk z rola NONE - bez zmian.
+- Przy obu stronach z 444 czekajaca jazda wroga nie jest zagrozeniem (C441RoleOf == CrWait), ale jazda wroga w STRIKE / u RBM w 60 m od naszej piechoty konczy nasze czekanie - w bitwach AI vs AI z jazda po obu stronach WAIT moze konczyc sie czesto przez "jazda wroga w 60 m": porownac ten licznik z "kowadlo -> uderzenie".
+- Martwy kod ozywiony: K444CavThreat to petla szykow wroga x nasze szyki raz na 1 s na szyk w WAIT / przed wejsciem (kilka szykow, < 100 porownan) - pomijalne; K444OnHit / K444OnRemoved bez alokacji. Watki: OnHit dowolny watek - tylko Interlocked na tablicy int; OnRemoved glowny; reszta w Doctrine.Tick.
+- Oczekiwane w logu (autotest bitwy armii): "limit przed kontaktem" rzadko > 0; "po kontakcie" > 0 przy "wejsc" > 0; "kowadlo -> uderzenie" > "limit czekania"; kat wejscia - czolo > 0 przy szarzach wprost; "zabici przez jezdzcow mlota" < "cel stracil".
+
+**Status:** DO SPRAWDZENIA (zbudowane, 0 bledow; nie wgrane, nie testowane w grze).
+
 ## 443-p (12.11) - POPRAWKI PO RECENZJI 443 (rajd i ostrzal): szarza rajdu sprawdza droge, straty jazdy laczne na bitwe i przerwa 30 s, sygnal tylko od pieszych strzelcow, schowani z powodu wymiany trzymani do konca przegranej, punkt HIDE obok wlasnych strzelcow, 5.1 tylko przy jezdzie z frontu piechoty i nie w zwarciu, liczniki S4/443 i miara "stala" jak w audycie (Doctrine.Raid443.cs, Doctrine.cs)
 
 **Problem:** recenzja zmiany 443 (10 znalezisk; numery linii przesuniete przez 442-p / 444-447 - sprawdzone po nazwach):

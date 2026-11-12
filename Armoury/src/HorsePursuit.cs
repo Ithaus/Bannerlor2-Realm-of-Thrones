@@ -708,7 +708,7 @@ namespace Armoury
             if (!c.IsValid) return;
             bool player = _delegated ? PlayerFormDirect(f) : PlayerForm(f);
             // 441 (jeden wlasciciel): szyk w roli jazdy Armoury jak szyk gracza - poscig nie zaczyna sie, trwajacy konczy (EPlayer); licznik w linii 441
-            if (!player && Doctrine.C441Owned(f)) { player = true; Doctrine.C441NoteSkip(0); }
+            if (!player && Doctrine.C441Hard(f)) { player = true; Doctrine.C441NoteSkip(0); }   // 444-p: WAIT nie blokuje
             if (st.Active)
             {
                 st.HasMain = hasMain;

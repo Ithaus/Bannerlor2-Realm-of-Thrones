@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -39,6 +40,12 @@ namespace Armoury
     ///   strona wzgledem czola celu: cos > 0.5 czolo, < -0.5 tyl, reszta bok (te same progi co "pierwszy cios szarzy" 437 - ten nie liczy rozkazu
     ///   ChargeToTarget roli, wiec liczymy sami); czas czekania (suma, srednio wedlug profilu); wynik (strata celu i jazdy w %, powody konca).
     /// Klucz NIE (albo bez dowodcy jazdy): decyzje liczone (tylko odczyt), role nie nadawane - co do znaku jak dotad; liczniki "bylby".
+    /// 444-p (recenzja): limit czekania laczny na bitwe, liczony od kontaktu piechot (glowna piechota w 75 m od wroga; przed nim osobno 240 s); zwarcie /
+    ///   wrog w 15 m konczy czekanie na cala bitwe; WAIT konczy sie tez pod ostrzalem (>= 4 trafienia w 10 s od kazdego strzelca, takze konnego) i gdy jazda
+    ///   wroga (nie czekajaca) jest w 60 m od nas, glownej piechoty albo naszych pieszych strzelcow (ponowne czekanie po 20 s) i nie zaczyna sie w tych
+    ///   warunkach; WAIT nie blokuje 148 / 204 / 344 (C441Hard); STRIKE: klucz NIE konczy uderzenie w toku, objazd zwiazany innym szykiem / zwarciem - oddany
+    ///   RBM (zwarcie z celem - szarza), wolna jazda nie startuje, gdy najblizszy wrog to jazda w 60 m; kat wejscia wedlug najblizszej krawedzi szyku celu;
+    ///   wynik osobno: zabici przez jezdzcow mlota; "bylby" WAIT raz na szyk, STRIKE raz na 100 s; rajd 443 wstrzymany raz na uderzenie.
     /// Watki: wszystko w glownym watku (skan szykow, ApplyActionOnEachUnit ze statycznym delegatem, WorldPosition.SetVec2 / GetNavMesh); zachowanie roli 441
     ///   czyta tylko rozkaz. Wyjatki per szyk liczone (potkniecia, rola oddana, slot od zera), bez globalnego wylacznika.
     /// </summary>
@@ -48,7 +55,11 @@ namespace Armoury
         internal const float K444Reenter = 10f, K444Rewait = 20f, K444FrontDot = 0.5f, K444SideDot = 0.2f, K444FlankOff = 30f, K444RearOff = 40f, K444Reach = 30f;
         internal const float K444Approach = 40f, K444NoContact = 40f, K444AfterContact = 10f, K444Max = 90f, K444Stale = 30f, K444Loss = 0.4f, K444Broken = 0.5f;
         internal const float K444InfShare = 0.5f;
-        // progi profilu wodza 440 (0 OSTROZNY, 1 ZWYKLY, 2 PORYWCZY): udzial celu w zwarciu i limit czekania
+        // 444-p: limit czekania przed kontaktem piechot (glowna piechota dalej niz 75 m od najblizszego szyku wroga), jazda wroga blisko (60 m), wolna jazda
+        // nie startuje, gdy najblizszy wrog to jazda w 60 m; "bylby" STRIKE najwyzej raz na 100 s (dlugosc uderzenia + przerwa)
+        internal const float K444PreCap = 240f, K444Contact = 75f, K444CavNear = 60f, K444DryStrike = 100f;
+        private const int K4SW = 11;   // pierscien trafien pociskami jazdy w WAIT: 10 s (probka co takt 1 s)
+        // progi profilu wodza 440 (0 OSTROZNY, 1 ZWYKLY, 2 PORYWCZY): udzial celu w zwarciu i limit czekania (444-p: liczony po kontakcie piechot, laczny na bitwe)
         private static readonly float[] K4Thr = { 0.65f, 0.5f, 0.35f };
         private static readonly float[] K4Cap = { 210f, 150f, 90f };
         private const byte KmNone = 0, KmWait = 1, KmStrike = 2;
@@ -70,17 +81,25 @@ namespace Armoury
         private static readonly int[] _k4Men0 = new int[CrSlots], _k4TgtMen0 = new int[CrSlots];
         private static readonly sbyte[] _k4Prof = new sbyte[CrSlots];
         private static readonly Dictionary<Formation, float> _k4Melee = new Dictionary<Formation, float>();
+        // 444-p: laczny czas czekania szyku na bitwe (przed / po kontakcie piechot), szyk policzony w "wejsc" / "bylby", rajd 443 wstrzymany w tym STRIKE,
+        // zabici w celu przez jezdzcow szyku w STRIKE (OnAgentRemoved, glowny watek), trafienia pociskami jazdy (OnAgentHit, dowolny watek - Interlocked)
+        private static readonly float[] _k4PreSum = new float[CrSlots], _k4PostSum = new float[CrSlots];
+        private static readonly bool[] _k4WaitSeen = new bool[CrSlots], _k4DrySeen = new bool[CrSlots], _k4KeepSeen = new bool[CrSlots];
+        private static readonly int[] _k4Kill = new int[CrSlots], _k4Shot = new int[CrSlots];
+        private static readonly int[] _k4ShotRing = new int[CrSlots * K4SW];
+        private static int _k4ShotPos;
 
         // ---- liczniki misji (K444Reset w Battle291.Begin)
         private static int _k4WaitN, _k4WaitDry, _k4WaitAnvil, _k4WaitCap, _k4WaitThreat, _k4WaitNoInf, _k4WaitNoFoe, _k4WaitTo443, _k4WaitBack, _k4WaitNoSpot;
         private static int _k4StrikeN, _k4StrikeDry, _k4StrikeFromWait, _k4StrikeFree, _k4Direct, _k4FlankN, _k4FlankToCharge, _k4FlankLate, _k4NoRoute, _k4Restale;
         private static int _k4Contact, _k4NoContact, _k4AfterC, _k4Broken, _k4CutLoss, _k4CutTime, _k4StrikeBack, _k4Open, _k4Keep443, _k4Stum, _k4Refused;
         private static int _k4MaxWait, _k4MaxStrike, _k4StrikeDone, _k4WaitTo445;
+        private static int _k4WaitShot, _k4WaitCav, _k4WaitForms, _k4WaitPreCap, _k4FlankCut, _k4FreeCavSkip, _k4FlankNoRoute, _k4KeyOff, _k4WaitCavSkip;
         private static readonly int[] _k4Angle = new int[KaK];
         private static readonly int[] _k4WaitProfN = new int[3];
         private static readonly float[] _k4WaitProfSec = new float[3];
-        private static float _k4WaitSec, _k4StrikeSec;
-        private static double _k4TgtLossSum, _k4CavLossSum;
+        private static float _k4WaitSec, _k4StrikeSec, _k4WaitPreSec, _k4WaitPostSec;
+        private static double _k4TgtLossSum, _k4CavLossSum, _k4KillSum;
 
         /// <summary>Battle291.Begin (AfterStart): liczniki linii 444 od zera.</summary>
         internal static void K444Reset()
@@ -89,10 +108,11 @@ namespace Armoury
             _k4StrikeN = _k4StrikeDry = _k4StrikeFromWait = _k4StrikeFree = _k4Direct = _k4FlankN = _k4FlankToCharge = _k4FlankLate = _k4NoRoute = _k4Restale = 0;
             _k4Contact = _k4NoContact = _k4AfterC = _k4Broken = _k4CutLoss = _k4CutTime = _k4StrikeBack = _k4Open = _k4Keep443 = _k4Stum = _k4Refused = 0;
             _k4MaxWait = _k4MaxStrike = _k4StrikeDone = _k4WaitTo445 = 0;
+            _k4WaitShot = _k4WaitCav = _k4WaitForms = _k4WaitPreCap = _k4FlankCut = _k4FreeCavSkip = _k4FlankNoRoute = _k4KeyOff = _k4WaitCavSkip = 0;
             for (int k = 0; k < KaK; k++) _k4Angle[k] = 0;
             for (int k = 0; k < 3; k++) { _k4WaitProfN[k] = 0; _k4WaitProfSec[k] = 0f; }
-            _k4WaitSec = _k4StrikeSec = 0f;
-            _k4TgtLossSum = _k4CavLossSum = 0.0;
+            _k4WaitSec = _k4StrikeSec = _k4WaitPreSec = _k4WaitPostSec = 0f;
+            _k4TgtLossSum = _k4CavLossSum = _k4KillSum = 0.0;
         }
 
         /// <summary>Doctrine.Begin (AfterStart, po Clear): bitwa polowa, nie morska - pomiar zawsze, decyzje wedlug klucza (czytany co takt).</summary>
@@ -114,14 +134,24 @@ namespace Armoury
                 K444SlotClear(i);
                 _k4Who[i] = null; _k4Exit[i] = _k4DryWait[i] = _k4DryStrike[i] = -1000f;
                 _k4Struck[i] = false; _k4WaitedOut[i] = false;
+                K444SlotNew(i);
             }
+            _k4ShotPos = 0;
             _k4Melee.Clear();
             _k4Acc = 0f;
         }
 
+        /// <summary>444-p: stan slotu na cala bitwe od zera (nowy szyk w slocie / koniec misji): laczny czas czekania, "policzony", trafienia.</summary>
+        private static void K444SlotNew(int i)
+        {
+            _k4PreSum[i] = _k4PostSum[i] = 0f; _k4WaitSeen[i] = _k4DrySeen[i] = false;
+            int hc = Volatile.Read(ref _k4Shot[i]);
+            for (int k = 0; k < K4SW; k++) _k4ShotRing[i * K4SW + k] = hc;
+        }
+
         private static void K444SlotClear(int i)
         {
-            _k4Mode[i] = KmNone; _k4Tgt[i] = null; _k4Flank[i] = false; _k4FromWait[i] = false;
+            _k4Mode[i] = KmNone; _k4Tgt[i] = null; _k4Flank[i] = false; _k4FromWait[i] = false; _k4KeepSeen[i] = false; _k4Kill[i] = 0;
             _k4Since[i] = 0f; _k4ChargeAt[i] = _k4ContactAt[i] = -1f;
             _k4P[i] = Vec2.Invalid; _k4TgtAt[i] = Vec2.Invalid; _k4Men0[i] = _k4TgtMen0[i] = 0; _k4Prof[i] = 1;
         }
@@ -141,8 +171,48 @@ namespace Armoury
         internal static bool K444Striking(Formation f)
         {
             if (C441RoleOf(f) != CrStrike) return false;
-            _k4Keep443++;
+            // 444-p: raz na uderzenie (nie co takt ostrzalu)
+            int idx = C441Idx(f);
+            if (idx >= 0 && idx < CrSlots && !_k4KeepSeen[idx]) { _k4KeepSeen[idx] = true; _k4Keep443++; }
             return true;
+        }
+
+        /// <summary>444-p: BattleSense.OnAgentHit (dowolny watek): trafienie pociskiem (obrazenia > 0) jezdzca albo konia przez wroga - kazdy strzelec,
+        /// takze konny i gracz (443 liczy tylko pieszych). Licznik slotu szyku jezdzca, Interlocked, bez alokacji i logu.</summary>
+        internal static void K444OnHit(Agent v, Agent by, in Blow blow)
+        {
+            if (!_k4Live || v == null || by == null) return;
+            try
+            {
+                if (!blow.IsMissile || blow.InflictedDamage <= 0) return;
+                var man = v.IsMount ? v.RiderAgent : v;
+                if (man == null || !man.IsHuman || (!v.IsMount && man.MountAgent == null)) return;
+                var f = man.Formation;
+                if (f == null || man.Team == null || by.Team == null || !man.Team.IsEnemyOf(by.Team)) return;
+                int idx = C441Idx(f);
+                if (idx < 0 || idx >= CrSlots) return;
+                Interlocked.Increment(ref _k4Shot[idx]);
+            }
+            catch { }
+        }
+
+        /// <summary>444-p: BattleSense.OnAgentRemoved (glowny watek, szyk ofiary jeszcze przypisany): czlowiek celu STRIKE padl od jezdzca szyku w STRIKE -
+        /// licznik zabitych przez mlot (wynik osobno od strat celu w tym czasie, ktore zadaje tez nasza piechota).</summary>
+        internal static void K444OnRemoved(Agent v, Agent by, AgentState st)
+        {
+            if (!_k4Live || v == null || by == null) return;
+            try
+            {
+                if (st != AgentState.Killed && st != AgentState.Unconscious) return;
+                if (!v.IsHuman) return;
+                var bf = by.Formation;
+                var vf = v.Formation;
+                if (bf == null || vf == null) return;
+                int idx = C441Idx(bf);
+                if (idx < 0 || idx >= CrSlots || _k4Mode[idx] != KmStrike || !ReferenceEquals(_k4Who[idx], bf) || !ReferenceEquals(_k4Tgt[idx], vf)) return;
+                _k4Kill[idx]++;
+            }
+            catch (Exception e) { _k4Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hammer444 zabity", e); }
         }
 
         // ------------------------------------------------------------ takt glownego watku (Doctrine.Tick)
@@ -165,6 +235,7 @@ namespace Armoury
             float now = m.CurrentTime;
             _t4Now = now;   // T442MeleeShare (glowny watek)
             _k4Melee.Clear();
+            _k4ShotPos = (_k4ShotPos + 1) % K4SW;   // 444-p: pierscien trafien (10 s)
             var teams = m.Teams;
             int n = teams != null ? teams.Count : 0;
             for (int i = 0; i < n; i++)
@@ -206,7 +277,12 @@ namespace Armoury
             {
                 K444SlotClear(idx);
                 _k4Who[idx] = f; _k4Exit[idx] = _k4DryWait[idx] = _k4DryStrike[idx] = -1000f; _k4Struck[idx] = false; _k4WaitedOut[idx] = false;
+                K444SlotNew(idx);
             }
+            // 444-p: trafienia pociskami szyku w ostatnich 10 s (kazdy strzelec wroga)
+            int shotNow = Volatile.Read(ref _k4Shot[idx]);
+            int shots = shotNow - _k4ShotRing[idx * K4SW + (_k4ShotPos + 1) % K4SW];
+            _k4ShotRing[idx * K4SW + _k4ShotPos] = shotNow;
             var q = f.QuerySystem;
             bool cav = q != null && q.IsCavalryFormation && !q.IsRangedCavalryFormation;
             bool mine = f.CountOfUnits >= R443CavMin && f.IsAIControlled && !HorsePursuit.PlayerForm(f) && !f.HasPlayerControlledTroop;
@@ -220,7 +296,11 @@ namespace Armoury
             if (mode != KmNone && role != (mode == KmWait ? CrWait : CrStrike))
             {
                 // rola zmieniona przez kogos innego: 443 (RAID / HIDE) albo 441 (gracz / szyk pusty) - stan 444 od zera, roli nie ruszamy
-                if (mode == KmWait) { if (role == CrRaid || role == CrHide) _k4WaitTo443++; else if (role == CrCavFirst) _k4WaitTo445++; else _k4WaitBack++; }
+                if (mode == KmWait)
+                {
+                    if (role == CrRaid || role == CrHide) _k4WaitTo443++; else if (role == CrCavFirst) _k4WaitTo445++; else _k4WaitBack++;
+                    K444WaitDone(idx, now - _k4Since[idx]);   // 444-p: przejete czekanie tez w sredniej wedlug profilu
+                }
                 else { _k4StrikeBack++; K444Score(f, idx); }
                 K444SlotClear(idx);
                 _k4Exit[idx] = now;
@@ -239,10 +319,26 @@ namespace Armoury
             if (mode == KmNone)
             {
                 if (now - _k4Exit[idx] < K444Reenter) return;
-                if (anvil != null && free) { K444StartStrike(t, f, idx, anvil, me, now, false); return; }
+                if (anvil != null && free)
+                {
+                    // 444-p: najblizszy wrog to jazda w 60 m - RBM prowadzi szyk na jazde (nie przejmujemy na mlot)
+                    if (K444CavClosest(f))
+                    {
+                        if (now >= _k4DryWait[idx]) { _k4FreeCavSkip++; _k4DryWait[idx] = now + R443Latch; }
+                        return;
+                    }
+                    K444StartStrike(t, f, idx, anvil, me, now, false);
+                    return;
+                }
                 if (_k4Struck[idx] || _k4WaitedOut[idx] || own >= T442OwnMelee || gap < K444WaitGap) return;
                 Formation inf, foe;
                 if (!K444WaitOk(t, f, me, out inf, out foe)) return;
+                // 444-p: pod ostrzalem albo z jazda wroga blisko (nas / glownej piechoty / naszych strzelcow) - nie zaczynamy czekac
+                if (shots >= R443CavHits || K444CavThreat(t, f, me, inf))
+                {
+                    if (now >= _k4DryWait[idx]) { _k4WaitCavSkip++; _k4DryWait[idx] = now + R443Latch; }
+                    return;
+                }
                 Vec2 p;
                 WorldPosition wp;
                 if (!K444WaitPoint(f, inf, foe, me, out p, out wp))
@@ -252,7 +348,8 @@ namespace Armoury
                 }
                 if (!_k4Key || !C441Live)
                 {
-                    if (now >= _k4DryWait[idx]) { _k4WaitDry++; _k4DryWait[idx] = now + R443Latch; }
+                    // 444-p: "bylby" raz na szyk na bitwe (przy TAK: "szykow czekalo") - nie co 30 s
+                    if (!_k4DrySeen[idx]) { _k4DrySeen[idx] = true; _k4WaitDry++; }
                     return;
                 }
                 if (!C441SetRole(f, CrWait, MovementOrder.MovementOrderMove(wp)))
@@ -262,6 +359,7 @@ namespace Armoury
                 }
                 _k4Mode[idx] = KmWait; _k4Since[idx] = now; _k4P[idx] = p; _k4Prof[idx] = prof;
                 _k4WaitN++;
+                if (!_k4WaitSeen[idx]) { _k4WaitSeen[idx] = true; _k4WaitForms++; }
                 return;
             }
             if (mode == KmWait)
@@ -279,8 +377,11 @@ namespace Armoury
                     if (_k4Mode[idx] != KmStrike) K444End(f, idx, now, -1);   // STRIKE odrzucony - rola oddana
                     return;
                 }
-                if (own >= T442OwnMelee || gap < K444FreeGap) { _k4WaitThreat++; K444End(f, idx, now, 0); _k4Exit[idx] = now + K444Rewait - K444Reenter; return; }
-                if (waited >= K4Cap[_k4Prof[idx] < 0 || _k4Prof[idx] > 2 ? 1 : _k4Prof[idx]]) { _k4WaitCap++; _k4WaitedOut[idx] = true; K444End(f, idx, now, 0); return; }
+                // 444-p: zwarcie / wrog w 15 m - oddana RBM i koniec czekania na te bitwe (bez wahadla czekanie - walka - czekanie)
+                if (own >= T442OwnMelee || gap < K444FreeGap) { _k4WaitThreat++; _k4WaitedOut[idx] = true; K444End(f, idx, now, 0); return; }
+                // 444-p: ostrzal (>= 4 trafienia ludzi / koni w 10 s, takze od konnych strzelcow), ktorego 443 nie wzial w tym takcie - oddana RBM
+                // (ponowne czekanie najwczesniej po 20 s, laczny limit czekania dalej liczony)
+                if (shots >= R443CavHits) { _k4WaitShot++; K444End(f, idx, now, 0); _k4Exit[idx] = now + K444Rewait - K444Reenter; return; }
                 Formation inf, foe;
                 if (!K444WaitOk(t, f, me, out inf, out foe))
                 {
@@ -288,6 +389,16 @@ namespace Armoury
                     K444End(f, idx, now, 0);
                     return;
                 }
+                // 444-p: jazda wroga (nie konni strzelcy) w 60 m od nas, glownej piechoty albo naszych pieszych strzelcow - oddana RBM (oslona skrzydla,
+                // kontra); 445 bierze szyk wczesniej w takcie, jesli jego regula pasuje
+                if (K444CavThreat(t, f, me, inf)) { _k4WaitCav++; K444End(f, idx, now, 0); _k4Exit[idx] = now + K444Rewait - K444Reenter; return; }
+                // 444-p: limit czekania laczny na bitwe; po kontakcie piechot (glowna piechota w 75 m od wroga) wedlug profilu, przed nim 240 s
+                bool contact = R443GapOf(inf) < K444Contact;
+                if (contact) { _k4PostSum[idx] += step; _k4WaitPostSec += step; }
+                else { _k4PreSum[idx] += step; _k4WaitPreSec += step; }
+                int pi = _k4Prof[idx] < 0 || _k4Prof[idx] > 2 ? 1 : _k4Prof[idx];
+                if (_k4PostSum[idx] >= K4Cap[pi]) { _k4WaitCap++; _k4WaitedOut[idx] = true; K444End(f, idx, now, 0); return; }
+                if (_k4PreSum[idx] >= K444PreCap) { _k4WaitPreCap++; _k4WaitedOut[idx] = true; K444End(f, idx, now, 0); return; }
                 Vec2 p;
                 WorldPosition wp;
                 if (K444WaitPoint(f, inf, foe, me, out p, out wp) && (!_k4P[idx].IsValid || p.Distance(_k4P[idx]) > K444WaitMove))
@@ -312,7 +423,7 @@ namespace Armoury
         {
             if (!_k4Key || !C441Live)
             {
-                if (now >= _k4DryStrike[idx]) { _k4StrikeDry++; _k4DryStrike[idx] = now + R443Latch; }
+                if (now >= _k4DryStrike[idx]) { _k4StrikeDry++; _k4DryStrike[idx] = now + K444DryStrike; }   // 444-p: najwyzej raz na 100 s (dlugosc uderzenia)
                 return;
             }
             Vec2 ep = tg.CachedMedianPosition.AsVec2;
@@ -344,6 +455,8 @@ namespace Armoury
 
         private static void K444StrikeTick(Team t, Formation f, int idx, Vec2 me, float now)
         {
+            // 444-p: klucz wylaczony w trakcie bitwy - uderzenie w toku tez oddane RBM (jak WAIT)
+            if (!_k4Key || !C441Live) { _k4KeyOff++; K444End(f, idx, now, 1); return; }
             var tg = _k4Tgt[idx];
             int men0 = _k4TgtMen0[idx];
             bool alive = tg != null && tg.CountOfUnits >= T442MinMen && MissionTeams.Enemies(t, tg.Team);
@@ -354,6 +467,14 @@ namespace Armoury
             if (!ep.IsValid) return;
             if (_k4Flank[idx])
             {
+                // 444-p: jazda zwiazana w objezdzie (zwarcie albo inny szyk wroga niz cel w 15 m) - oddana RBM, bez wymuszania szarzy na odlegle kowadlo
+                // (zwarcie z samym celem - szarza na cel, jak dojazd)
+                if (K444OtherNear(f, tg) || (K444MeleeOf(f) >= T442OwnMelee && !K444ClosestIs(f, tg))) { _k4FlankCut++; K444End(f, idx, now, 1); return; }
+                if (K444MeleeOf(f) >= T442OwnMelee)
+                {
+                    if (C441SetRole(f, CrStrike, MovementOrder.MovementOrderChargeToTarget(tg))) { _k4Flank[idx] = false; _k4ChargeAt[idx] = now; _k4FlankToCharge++; }
+                    return;
+                }
                 Vec2 dir = K444Dir(tg, me, ep);
                 bool side = K444FrontCos(me, ep, dir) <= K444SideDot && !T442Blocked(t, tg, me, ep);
                 bool reach = _k4P[idx].IsValid && me.Distance(_k4P[idx]) < K444Reach;
@@ -378,7 +499,7 @@ namespace Armoury
                     }
                     else if (C441SetRole(f, CrStrike, MovementOrder.MovementOrderChargeToTarget(tg)))
                     {
-                        _k4Flank[idx] = false; _k4ChargeAt[idx] = now; _k4NoRoute++;
+                        _k4Flank[idx] = false; _k4ChargeAt[idx] = now; _k4FlankNoRoute++;   // 444-p: osobny licznik (objazd, nie dojazd wprost)
                     }
                 }
                 return;
@@ -429,6 +550,7 @@ namespace Armoury
             int cl = f != null ? Math.Max(0, f.CountOfUnits) : 0;
             _k4TgtLossSum += Math.Max(0.0, 1.0 - (double)tl / t0);
             _k4CavLossSum += Math.Max(0.0, 1.0 - (double)cl / c0);
+            _k4KillSum += Math.Min(1.0, (double)_k4Kill[idx] / t0);   // 444-p: z tego zabici przez jezdzcow szyku
             _k4StrikeDone++;
         }
 
@@ -469,6 +591,72 @@ namespace Armoury
                 }
             }
             return best;
+        }
+
+        /// <summary>444-p: najblizszy szyk wroga jazdy to jazda (takze konni strzelcy) w 60 m - RBM prowadzi ja na jazde.</summary>
+        private static bool K444CavClosest(Formation f)
+        {
+            var nq = f.CachedClosestEnemyFormation;
+            if (nq == null || nq.Formation == null) return false;
+            if (!nq.IsCavalryFormation && !nq.IsRangedCavalryFormation) return false;
+            return R443GapOf(f) < K444CavNear;
+        }
+
+        /// <summary>444-p: najblizszy szyk wroga jazdy to podany szyk.</summary>
+        private static bool K444ClosestIs(Formation f, Formation tg)
+        {
+            var nq = f.CachedClosestEnemyFormation;
+            return nq != null && ReferenceEquals(nq.Formation, tg);
+        }
+
+        /// <summary>444-p: inny szyk wroga niz cel w 15 m (odstep jak R443GapOf).</summary>
+        private static bool K444OtherNear(Formation f, Formation tg)
+        {
+            var nq = f.CachedClosestEnemyFormation;
+            if (nq == null || nq.Formation == null || ReferenceEquals(nq.Formation, tg)) return false;
+            return R443GapOf(f) < K444FreeGap;
+        }
+
+        /// <summary>444-p: jazda wroga (nie konni strzelcy, >= 5) w 60 m od czekajacej jazdy, glownej piechoty albo pieszych strzelcow druzyny (odleglosc
+        /// median minus pol wiekszego wymiaru naszego szyku).</summary>
+        private static bool K444CavThreat(Team t, Formation f, Vec2 me, Formation inf)
+        {
+            var teams = t.Mission != null ? t.Mission.Teams : null;
+            int n = teams != null ? teams.Count : 0;
+            var own = t.FormationsIncludingSpecialAndEmpty;
+            int no = own != null ? own.Count : 0;
+            for (int i = 0; i < n; i++)
+            {
+                var et = teams[i];
+                if (!MissionTeams.Enemies(t, et)) continue;
+                var efl = et.FormationsIncludingSpecialAndEmpty;
+                for (int j = 0; efl != null && j < efl.Count; j++)
+                {
+                    var e = efl[j];
+                    if (e == null || e.CountOfUnits < R443CavMin) continue;
+                    var eq = e.QuerySystem;
+                    if (eq == null || !eq.IsCavalryFormation || eq.IsRangedCavalryFormation) continue;
+                    if (C441RoleOf(e) == CrWait) continue;   // jazda wroga sama czeka przy swojej piechocie (444 wroga) - nie zagrozenie
+                    Vec2 ep = e.CachedMedianPosition.AsVec2;
+                    if (!ep.IsValid) continue;
+                    if (K444Within(f, me, ep) || (inf != null && K444Within(inf, inf.CachedMedianPosition.AsVec2, ep))) return true;
+                    for (int k = 0; k < no; k++)
+                    {
+                        var o = own[k];
+                        if (o == null || o.CountOfUnits < R443CavMin || ReferenceEquals(o, f)) continue;
+                        var oq = o.QuerySystem;
+                        if (oq == null || !oq.IsRangedFormation || oq.IsCavalryFormation || oq.IsRangedCavalryFormation) continue;
+                        if (K444Within(o, o.CachedMedianPosition.AsVec2, ep)) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool K444Within(Formation o, Vec2 op, Vec2 ep)
+        {
+            if (!op.IsValid) return false;
+            return op.Distance(ep) - 0.5f * Math.Max(o.Width, o.Depth) < K444CavNear;
         }
 
         /// <summary>Czekanie ma sens: glowna piechota druzyny (>= 10 i >= pol jazdy) i pieszy szyk wroga (>= 8) - najblizszy tej piechocie.</summary>
@@ -608,8 +796,17 @@ namespace Armoury
             f.ApplyActionOnEachUnit(K444ContactMan);
             if (!_k4ScanBest.IsValid || _k4ScanBd == float.MaxValue) return false;
             Vec2 dir = K444Dir(tg, me, ep);
-            float cos = K444FrontCos(_k4ScanBest, ep, dir);
-            side = cos > 0.5f ? KaFront : (cos < -0.5f ? KaRear : KaSide);
+            // 444-p: strona w ukladzie szyku celu - najblizsza krawedz (czolo / tyl / bok) prostokata szerokosc x glebokosc wokol mediany;
+            // cos kata od srodka liczyl kazde trafienie w pierwszy szereg dalej niz ok. 0.87 x glebokosc od srodka jako "bok"
+            Vec2 r = _k4ScanBest - ep;
+            Vec2 lat = dir.RightVec();
+            float fwd = r.x * dir.x + r.y * dir.y;
+            float sd = Math.Abs(r.x * lat.x + r.y * lat.y);
+            float hw = 0.5f * Math.Max(1f, tg.Width), hd = 0.5f * Math.Max(1f, tg.Depth);
+            float toFront = Math.Abs(fwd - hd), toRear = Math.Abs(fwd + hd), toSide = Math.Abs(sd - hw);
+            if (sd > hw) { toFront += sd - hw; toRear += sd - hw; }                       // poza szerokoscia - czolo / tyl dalej
+            if (fwd > hd) toSide += fwd - hd; else if (fwd < -hd) toSide += -hd - fwd;   // przed czolem / za tylem - bok dalej
+            side = toSide < toFront && toSide < toRear ? KaSide : (toFront <= toRear ? KaFront : KaRear);
             return true;
         }
 
@@ -626,28 +823,33 @@ namespace Armoury
               .Append(", dowodca jazdy ").Append(c != null && c.CavalryCommander ? "TAK" : "NIE")
               .Append(", profil wodza ").Append(c != null && c.CommanderPersonalityInBattle ? "TAK" : "NIE")
               .Append(" | progi (OSTROZNY / ZWYKLY / PORYWCZY): cel w zwarciu ").Append(K444Pct(K4Thr[0])).Append(" / ").Append(K444Pct(K4Thr[1])).Append(" / ").Append(K444Pct(K4Thr[2]))
-              .Append(", limit czekania ").Append(K4Cap[0].ToString("0", K4Inv)).Append(" / ").Append(K4Cap[1].ToString("0", K4Inv)).Append(" / ").Append(K4Cap[2].ToString("0", K4Inv)).Append(" s")
-              .Append(" | czekanie WAIT: wejsc ").Append(_k4WaitN).Append(", bylby (klucz NIE / bez dowodcy jazdy) ").Append(_k4WaitDry)
-              .Append(", ").Append(_k4WaitSec.ToString("0", K4Inv)).Append(" szyko-s, srednio ").Append(wn > 0 ? (ws / wn).ToString("0", K4Inv) + " s" : "-")
+              .Append(", limit czekania po kontakcie piechot ").Append(K4Cap[0].ToString("0", K4Inv)).Append(" / ").Append(K4Cap[1].ToString("0", K4Inv)).Append(" / ").Append(K4Cap[2].ToString("0", K4Inv)).Append(" s")
+              .Append(", przed kontaktem ").Append(K444PreCap.ToString("0", K4Inv)).Append(" s (laczny na bitwe)")
+              .Append(" | czekanie WAIT: wejsc ").Append(_k4WaitN).Append(", szykow czekalo ").Append(_k4WaitForms).Append(", szykow bylby (klucz NIE / bez dowodcy jazdy) ").Append(_k4WaitDry)
+              .Append(", ").Append(_k4WaitSec.ToString("0", K4Inv)).Append(" szyko-s (przed kontaktem piechot ").Append(_k4WaitPreSec.ToString("0", K4Inv))
+              .Append(", po kontakcie ").Append(_k4WaitPostSec.ToString("0", K4Inv)).Append("), srednio na wejscie ").Append(wn > 0 ? (ws / wn).ToString("0", K4Inv) + " s" : "-")
               .Append(" (OSTROZNY ").Append(K444Avg(0)).Append(", ZWYKLY ").Append(K444Avg(1)).Append(", PORYWCZY ").Append(K444Avg(2)).Append(')')
-              .Append(", koniec: kowadlo -> uderzenie ").Append(_k4WaitAnvil).Append(", limit czekania ").Append(_k4WaitCap).Append(", zwarcie / wrog w 15 m ").Append(_k4WaitThreat)
+              .Append(", koniec: kowadlo -> uderzenie ").Append(_k4WaitAnvil).Append(", limit czekania ").Append(_k4WaitCap).Append(", limit przed kontaktem ").Append(_k4WaitPreCap)
+              .Append(", zwarcie / wrog w 15 m ").Append(_k4WaitThreat).Append(", ostrzal ").Append(_k4WaitShot).Append(", jazda wroga w 60 m ").Append(_k4WaitCav)
               .Append(", brak glownej piechoty ").Append(_k4WaitNoInf).Append(", brak pieszego wroga ").Append(_k4WaitNoFoe)
-              .Append(", przejete przez 443 ").Append(_k4WaitTo443).Append(", przez 445 (jazda na jazde) ").Append(_k4WaitTo445).Append(", oddane przez 441 ").Append(_k4WaitBack).Append("; brak miejsca ").Append(_k4WaitNoSpot)
+              .Append(", przejete przez 443 ").Append(_k4WaitTo443).Append(", przez 445 (jazda na jazde) ").Append(_k4WaitTo445).Append(", oddane przez 441 ").Append(_k4WaitBack).Append("; brak miejsca ").Append(_k4WaitNoSpot).Append(", nie zaczete (ostrzal / jazda wroga blisko) ").Append(_k4WaitCavSkip)
               .Append(" | uderzenia STRIKE ").Append(_k4StrikeN).Append(" (po czekaniu ").Append(_k4StrikeFromWait).Append(", jazda wolna ").Append(_k4StrikeFree)
-              .Append("), bylby (klucz NIE / bez dowodcy jazdy) ").Append(_k4StrikeDry).Append(", ").Append(_k4StrikeSec.ToString("0", K4Inv)).Append(" szyko-s")
-              .Append(" | dojazd: wprost (juz z boku / tylu) ").Append(_k4Direct - _k4NoRoute).Append(", wprost bez drogi z boku ").Append(_k4NoRoute)
+              .Append("), bylby (klucz NIE / bez dowodcy jazdy, najwyzej 1 na szyk na ").Append(K444DryStrike.ToString("0", K4Inv)).Append(" s) ").Append(_k4StrikeDry)
+              .Append(", wolna jazda nie wzieta (najblizszy wrog to jazda w 60 m) ").Append(_k4FreeCavSkip).Append(", ").Append(_k4StrikeSec.ToString("0", K4Inv)).Append(" szyko-s")
+              .Append(" | dojazd: wprost ").Append(_k4Direct).Append(" (z tego bez drogi z boku ").Append(_k4NoRoute).Append(')')
               .Append(", objazd ").Append(_k4FlankN).Append(" (-> szarza ").Append(_k4FlankToCharge).Append(", po ").Append(K444Approach.ToString("0", K4Inv)).Append(" s ").Append(_k4FlankLate)
-              .Append(", punkt od nowa ").Append(_k4Restale).Append(')')
-              .Append(" | kat wejscia (pierwsze zwarcie w szarzy): ").Append(KaName[KaFront]).Append(' ').Append(_k4Angle[KaFront])
+              .Append(", punkt od nowa ").Append(_k4Restale).Append(", bez punktu po przesunieciu celu ").Append(_k4FlankNoRoute).Append(", zwiazana w objezdzie - oddana RBM ").Append(_k4FlankCut).Append(')')
+              .Append(" | kat wejscia (pierwsze zwarcie w szarzy, najblizsza krawedz szyku celu): ").Append(KaName[KaFront]).Append(' ').Append(_k4Angle[KaFront])
               .Append(", ").Append(KaName[KaSide]).Append(' ').Append(_k4Angle[KaSide]).Append(", ").Append(KaName[KaRear]).Append(' ').Append(_k4Angle[KaRear])
               .Append(" (zwarc ").Append(_k4Contact).Append(')')
               .Append(" | koniec: po zwarciu oddana RBM ").Append(_k4AfterC).Append(", cel rozbity ").Append(_k4Broken).Append(", straty jazdy ").Append(_k4CutLoss)
               .Append(", czas ").Append(_k4CutTime).Append(", bez zwarcia ").Append(_k4NoContact).Append(", oddana (gracz / szyk pusty / 441) ").Append(_k4StrikeBack)
-              .Append(", w toku przy koncu ").Append(_k4Open)
+              .Append(", klucz wylaczony ").Append(_k4KeyOff).Append(", w toku przy koncu ").Append(_k4Open)
               .Append(" | wynik: cel stracil srednio ").Append(_k4StrikeDone > 0 ? (100.0 * _k4TgtLossSum / _k4StrikeDone).ToString("0", K4Inv) + "%" : "-")
+              .Append(" (od wszystkich; zabici przez jezdzcow mlota ").Append(_k4StrikeDone > 0 ? (100.0 * _k4KillSum / _k4StrikeDone).ToString("0", K4Inv) + "%" : "-").Append(')')
               .Append(", jazda stracila srednio ").Append(_k4StrikeDone > 0 ? (100.0 * _k4CavLossSum / _k4StrikeDone).ToString("0", K4Inv) + "%" : "-")
               .Append(" | naraz maks: WAIT ").Append(_k4MaxWait).Append(", STRIKE ").Append(_k4MaxStrike)
-              .Append(" | rajd 443 wstrzymany przy STRIKE ").Append(_k4Keep443).Append(", rola odrzucona ").Append(_k4Refused)
+              .Append(" | rajd 443 wstrzymany przy STRIKE (uderzen) ").Append(_k4Keep443).Append(", rola odrzucona ").Append(_k4Refused)
               .Append(" | potkniecia ").Append(_k4Stum).Append('.');
             return sb.ToString();
         }

@@ -308,6 +308,8 @@ namespace Armoury
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.OnHit", e); }
                 // 443: trafienie pociskiem czlowieka albo konia (konia - w szyk jezdzca) - licznik slotu szyku (Interlocked, bez logu; tick asynchroniczny mozliwy)
                 Doctrine.R443OnHit(affectedAgent, affectorAgent, in blow);
+                // 444-p: trafienie pociskiem jezdzca / konia od kazdego strzelca wroga - licznik slotu (WAIT konczy sie pod ostrzalem; Interlocked, bez logu)
+                Doctrine.K444OnHit(affectedAgent, affectorAgent, in blow);
                 // 447: cios jezdzca polowania w gracza / jego konia - licznik (Interlocked, bez logu)
                 Doctrine.H447OnHit(affectedAgent, affectorAgent, in blow);
             }
@@ -332,6 +334,8 @@ namespace Armoury
                 // 310: strzelec padl - wpis bez wywolan silnika; cel padl - automat celu wraca w najblizszym ticku
                 // 446: strata piechoty AI od ciosu wrecz jezdzca wroga - tylko licznik (w czworoboku / bylby / poza)
                 Doctrine.Q446OnRemoved(affectedAgent, affectorAgent, agentState, in blow);
+                // 444-p: czlowiek celu uderzenia padl od jezdzca mlota - tylko licznik
+                Doctrine.K444OnRemoved(affectedAgent, affectorAgent, agentState);
                 // 447: gracz padl w czasie polowania (od jezdzca polowania albo innego) - tylko licznik
                 Doctrine.H447OnRemoved(affectedAgent, affectorAgent, agentState);
                 try { CleanShot.OnRemoved(Mission, affectedAgent); }

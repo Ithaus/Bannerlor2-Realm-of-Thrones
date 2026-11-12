@@ -27,7 +27,7 @@ namespace Armoury
     ///   Move jazdy szedlby klusem. W 441 bez rol - wyjatek nigdy nie wchodzi (licznik 0).
     /// Jeden wlasciciel szyku: szyk w roli (C441Owned) jest dla 148 (poscig), 204 (jazda na strzelca), 283 (nekanie), 311a (oslona) i 344 (front / kontra / odruch)
     ///   tym, czym szyk gracza - nie bierze z niego jezdzcow, a jezdziec takiego szyku wraca (HunterCheck UPlayer, koniec poscigu EPlayer). Pominiecia liczone
-    ///   osobno (nie w licznikach "szyk gracza"). W 441 bez rol - 0.
+    ///   osobno (nie w licznikach "szyk gracza"). W 441 bez rol - 0. 444-p: 148 / 204 / 344 czytaja C441Hard - rola WAIT (czekanie 444) ich nie blokuje.
     /// Role: NONE, RAID (4.2 rajd na strzelcow), HIDE (4.2 schowaj za piechote), WAIT / STRIKE (4.3 kowadlo i mlot), CAVFIRST (4.4 najpierw jazda wroga),
     ///   DISENGAGE (4.5 wyjscie z grzezawiska), HUNT (polowanie na wodza). Nadaje je tylko C441SetRole z glownego watku (kolejne kroki) - najpierw rola i rozkaz,
     ///   potem WeightFactor; oddanie odwrotnie.
@@ -151,6 +151,15 @@ namespace Armoury
             if (!_c4Live || f == null) return false;
             int idx = C441Idx(f);
             return idx >= 0 && _c4Role[idx] != CrNone && ReferenceEquals(_c4Who[idx], f);
+        }
+
+        /// <summary>444-p: jak C441Owned, ale bez roli WAIT (444 czekanie) - 148 / 204 / 344 dzialaja na czekajacej jezdzie jak przed 444 (poscig, jazda na
+        /// strzelca, kontra / odruch na trafienie jezdzca); jezdziec takiej akcji wraca, gdy szyk dostanie role twarda (STRIKE, RAID, ...).</summary>
+        internal static bool C441Hard(Formation f)
+        {
+            if (!_c4Live || f == null) return false;
+            int idx = C441Idx(f);
+            return idx >= 0 && _c4Role[idx] != CrNone && _c4Role[idx] != CrWait && ReferenceEquals(_c4Who[idx], f);
         }
 
         /// <summary>MarchToContact (glowny watek): szyk w roli z galopem - rozkaz Move bez klusa 128.</summary>

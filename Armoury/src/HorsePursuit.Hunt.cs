@@ -481,7 +481,7 @@ namespace Armoury
                     if (!c.IsValid) continue;
                     bool cav = q.IsCavalryFormation || q.IsRangedCavalryFormation;
                     // 441 (jeden wlasciciel): szyk w roli jazdy Armoury - 204 / 283 / 311a / 344 traktuja go jak szyk gracza (nie biora z niego jezdzcow)
-                    bool role = Doctrine.C441Owned(f);
+                    bool role = Doctrine.C441Hard(f);   // 444-p: WAIT nie blokuje
                     if (role) Doctrine.C441NoteSkip(1);
                     var fi = new FI
                     {
@@ -807,7 +807,7 @@ namespace Armoury
             if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) return UPanic;
             if (!ReferenceEquals(a.Formation, h.F)) return UOther;
             if (m.MissionEnded || a.GetComponent<VictoryComponent>() != null) return UEnded;
-            if (h.F == null || PlayerForm(h.F) || Doctrine.C441Owned(h.F)) return UPlayer;   // 441: szyk jezdzca dostal role jazdy Armoury - jezdziec wraca
+            if (h.F == null || PlayerForm(h.F) || Doctrine.C441Hard(h.F)) return UPlayer;   // 441: szyk jezdzca dostal role jazdy Armoury - jezdziec wraca
             var s = h.T.S;
             if (s == null || !s.IsActive()) return UThreat;
             // recenzja 204: jezdziec nie wjezdza w nietkniety szyk strony strzelca (jak OIntact 148; zaslona przy piechocie trzyma 30 m od jej krawedzi);
