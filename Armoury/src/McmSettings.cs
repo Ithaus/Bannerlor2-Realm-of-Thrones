@@ -3180,6 +3180,34 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool EngineeringOnPaidWork { get; set; } = true;
 
+        [SettingPropertyBool("Wall Works Historical", HintText = "walls rise as slowly and dearly as in the Middle Ages: a point of wall works costs more than other military works (Wall Castle / Town Point Price Factor) and no stage of the walls can be finished faster than Wall Min Years (the lord, the townsfolk, the mason, the governor and gold paid to the craftsmen together put in at most the cost of the stage divided by those years each day; the lord pays only for what can be built that day, the rest of his allowance goes to his next work or stays in his purse). Works already started keep their progress. Needs Paid Construction. Off = walls cost and rise as before", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public bool WallWorksHistorical { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Wall Castle Point Price Factor", 1.00f, 10.00f, "0.00", HintText = "with Wall Works Historical: a point of castle walls costs this many times Build Pence Per Point Military (3 = 144 pence)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float WallCastlePointPriceFactor { get; set; } = 3.0f;
+
+        [SettingPropertyFloatingInteger("Wall Town Point Price Factor", 1.00f, 10.00f, "0.00", HintText = "with Wall Works Historical: a point of town walls costs this many times Build Pence Per Point Military (2 = 96 pence)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float WallTownPointPriceFactor { get; set; } = 2.0f;
+
+        [SettingPropertyFloatingInteger("Wall Min Years Castle 2", 0.00f, 20.00f, "0.0", HintText = "with Wall Works Historical: the shortest time in years to raise castle walls to level 2 (0 = no limit)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float WallMinYearsCastle2 { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Wall Min Years Castle 3", 0.00f, 20.00f, "0.0", HintText = "with Wall Works Historical: the shortest time in years to raise castle walls to level 3 (0 = no limit)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float WallMinYearsCastle3 { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Wall Min Years Town 2", 0.00f, 20.00f, "0.0", HintText = "with Wall Works Historical: the shortest time in years to raise town walls to level 2 (0 = no limit)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float WallMinYearsTown2 { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Wall Min Years Town 3", 0.00f, 20.00f, "0.0", HintText = "with Wall Works Historical: the shortest time in years to raise town walls to level 3 (0 = no limit)", RequireRestart = false)]
+        [SettingPropertyGroup("Army purchases")]
+        public float WallMinYearsTown3 { get; set; } = 5f;
+
         [SettingPropertyBool("Build Wood Above Craft Stock", HintText = "building works (the lord's and the townsfolk's) take timber off the market only above the stock the town keeps for its own smiths, bloomeries, workshops and households, never less than 40 loads (the same stock caravans fill for it - Caravan Bulk Stock Days of their use, building works not counted); below it the works buy the other materials or wait, so the armourers and fletchers are not left without wood. Off = the works buy timber down to the last piece (the townsfolk's works leave 50), as before", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
         public bool BuildWoodAboveCraftStock { get; set; } = true;
@@ -13738,6 +13766,13 @@ namespace Armoury
             s.FolkWorksLevelDays = FolkWorksLevelDays;
             s.BuildWagesByTown = BuildWagesByTown;
             s.EngineeringOnPaidWork = EngineeringOnPaidWork;
+            s.WallWorksHistorical = WallWorksHistorical;
+            s.WallCastlePointPriceFactor = WallCastlePointPriceFactor;
+            s.WallTownPointPriceFactor = WallTownPointPriceFactor;
+            s.WallMinYearsCastle2 = WallMinYearsCastle2;
+            s.WallMinYearsCastle3 = WallMinYearsCastle3;
+            s.WallMinYearsTown2 = WallMinYearsTown2;
+            s.WallMinYearsTown3 = WallMinYearsTown3;
             s.BuildWoodAboveCraftStock = BuildWoodAboveCraftStock;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.KitFromNotable = KitFromNotable;

@@ -2640,6 +2640,8 @@ namespace Armoury
             try { HorseCensus.SessionStart(); ArmoryFit.Arm(); } catch (Exception e) { Log.Error("HorseCensus.SessionStart", e); }   // przeglad 175: stan wylacznikow 175 i znacznikow CS (B0); stare zbrojownie w 1. godzinie
             try { MountedWage.EnsureContextHooks(); } catch (Exception e) { Log.Error("MountedWage.EnsureContextHooks", e); }   // paczka 160: zold partii - karawany bez premii konnego (latka w kampanii)
             try { Buildings338.SessionStart(); } catch (Exception e) { Log.Error("Buildings338.SessionStart", e); }   // 338: budynki robia to, co pisze ich opis - latki w kampanii (raz na proces), linia "Budynki (338): start sesji"
+            try { BuildFunding.WallHooks(); } catch (Exception e) { Log.Error("BuildFunding.WallHooks", e); }   // 472-p: latki w kampanii (raz na proces) - zwrot przyspieszenia zlotem przy limicie murow, dni w oknie budowy
+            try { BuildFunding.WallSessionLine(); } catch (Exception e) { Log.Error("BuildFunding.WallSessionLine", e); }   // 472: linia "Mury (472): start sesji" - tabela kosztu i czasu poziomow murow (tylko log)
             try { CirculationWindows.EnsureModelHooks(); } catch (Exception e) { Log.Error("CirculationWindows.EnsureModelHooks", e); }   // paczka 169: linie modelu finansow i kapital nowych karawan (latki w kampanii, tylko log)
             try { Measure169c.EnsureHooks(); } catch (Exception e) { Log.Error("Measure169c.EnsureHooks", e); }
             try { CrownIncome.EnsureHooks(); } catch (Exception e) { Log.Error("CrownIncome.EnsureHooks", e); }
