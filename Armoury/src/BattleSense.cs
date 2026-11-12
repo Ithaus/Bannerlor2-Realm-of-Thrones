@@ -67,6 +67,7 @@ namespace Armoury
                                  || c.CavalryFightsCavalryFirst || c.CavalryDisengage   // 445: Doctrine.CavFirst445.cs - V445Begin / V445Tick z Doctrine
                                  || c.InfantrySquareAgainstFlankCharge   // 446: Doctrine.Square446.cs - Q446Begin / Q446Tick z Doctrine, blokada w prefiksie 344
                                  || c.CavalryHuntsRearCommander   // 447: Doctrine.Hunt447.cs - H447Begin / H447Tick z Doctrine
+                                 || c.CavalryFeignedRetreat   // 460: Doctrine.Feint460.cs - F460Begin / F460Tick z Doctrine
                                  || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 
@@ -340,6 +341,8 @@ namespace Armoury
                 Doctrine.V445OnRemoved(affectedAgent, agentState);
                 // 447: gracz padl w czasie polowania (od jezdzca polowania albo innego) - tylko licznik
                 Doctrine.H447OnRemoved(affectedAgent, affectorAgent, agentState);
+                // 460: zabici / ranni w szyku FEINT i w scigajacym po zawrocie - tylko liczniki
+                Doctrine.F460OnRemoved(affectedAgent, affectorAgent, agentState);
                 try { CleanShot.OnRemoved(Mission, affectedAgent); }
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "CleanShot.OnRemoved", e); }
             }

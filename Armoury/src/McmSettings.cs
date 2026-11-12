@@ -11748,6 +11748,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool LineRelief { get; set; } = true;
 
+        [SettingPropertyBool("Cavalry Feigned Retreat", HintText = "AI cavalry in field battles can fake a flight to draw enemy infantry out of its ranks (feigned retreat, as at Hastings). When an enemy infantry formation (not archers) charges straight at an AI cavalry formation that is not in close combat - the infantry is coming on, 15 to 80 m away, and is at least as strong as the commander's nerve allows (a cautious commander does it against half its own number, a usual one against four fifths, a rash one only against a bigger force; weaker infantry is simply charged as before) - and the cavalry's own main infantry stands behind it, the riders turn and gallop about 70 m back towards their own lines, never through their own formations. If the enemy keeps chasing, the cavalry wheels round and charges the pursuers, who are now strung out and away from their friends; if the enemy stops, the cavalry is simply left to its usual orders. Not done when enemy cavalry or horse archers are within 80 m. The retreat is broken off if the riders are caught, lose a quarter of their men or enemy horse comes close; the counter-charge ends 10 seconds after it strikes, after 20 seconds without contact or when the cavalry has lost four tenths of its men. At most twice per formation in a battle, 45 seconds apart, and never again once it has lost three tenths of its men. Cavalry already busy with something more urgent (raids, hammer blows, fighting enemy cavalry, hunting the commander) is not taken. Needs Cavalry Commander. Every AI-led side - your own formations and the ones you command are left as they were. No bonus to any number on the field - only decisions. Field battles only. Off = exactly as before. Counted in the Armoury log at the end of each field battle (line 460).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CavalryFeignedRetreat { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15836,6 +15840,7 @@ namespace Armoury
             s.CavalryHuntsRearCommander = CavalryHuntsRearCommander;   // 447
             s.InfantryReserve = InfantryReserve;   // 457
             s.LineRelief = LineRelief;   // 459
+            s.CavalryFeignedRetreat = CavalryFeignedRetreat;   // 460
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

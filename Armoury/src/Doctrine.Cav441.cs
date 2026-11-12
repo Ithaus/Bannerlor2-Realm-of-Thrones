@@ -33,7 +33,7 @@ namespace Armoury
     ///   szyki na misje, osobno (nie w licznikach "szyk gracza"). W 441 bez rol - 0. 444-p: 148 / 204 / 344 czytaja C441Hard - rola WAIT (czekanie 444) ich nie blokuje;
     ///   447-b (wlaczenie 441-p na galaz): straz 335 i start postoju 283 tez C441Hard / C441Owned jak nizej (WAIT oddaje postoj 283 - rola prowadzi ruch szyku).
     /// Role: NONE, RAID (4.2 rajd na strzelcow), HIDE (4.2 schowaj za piechote), WAIT / STRIKE (4.3 kowadlo i mlot), CAVFIRST (4.4 najpierw jazda wroga),
-    ///   DISENGAGE (4.5 wyjscie z grzezawiska), HUNT (polowanie na wodza). Nadaje je tylko C441SetRole z glownego watku (kolejne kroki) - najpierw rola i rozkaz,
+    ///   DISENGAGE (4.5 wyjscie z grzezawiska), HUNT (polowanie na wodza), FEINT (460, pakiet 8.4 - pozorowany odwrot / przyneta). Nadaje je tylko C441SetRole z glownego watku (kolejne kroki) - najpierw rola i rozkaz,
     ///   potem WeightFactor; oddanie odwrotnie.
     /// Watki: zachowanie (GetAiWeight, ResetBehavior, CalculateCurrentOrder, TickOccasionally) biegnie w watku AI / silnika - tylko odczyt pol volatile i Interlocked;
     ///   postfiks dodania biegnie tam, gdzie Formation.AddUnit (glowny watek albo tick druzyn) - jedna alokacja jak RBM, bez logu i Settings.Current.
@@ -43,10 +43,11 @@ namespace Armoury
     /// </summary>
     internal static partial class Doctrine
     {
-        internal const byte CrNone = 0, CrRaid = 1, CrHide = 2, CrWait = 3, CrStrike = 4, CrCavFirst = 5, CrDisengage = 6, CrHunt = 7, CrK = 8;
-        private static readonly string[] CrName = { "NONE", "RAID", "HIDE", "WAIT", "STRIKE", "CAVFIRST", "DISENGAGE", "HUNT" };
+        // 460: FEINT (pozorowany odwrot / przyneta, Doctrine.Feint460.cs) - na koncu, numery dawnych rol bez zmian
+        internal const byte CrNone = 0, CrRaid = 1, CrHide = 2, CrWait = 3, CrStrike = 4, CrCavFirst = 5, CrDisengage = 6, CrHunt = 7, CrFeint = 8, CrK = 9;
+        private static readonly string[] CrName = { "NONE", "RAID", "HIDE", "WAIT", "STRIKE", "CAVFIRST", "DISENGAGE", "HUNT", "FEINT" };
         // rola, w ktorej Move jedzie galopem (wyjatek klusa 128 w MarchToContact); WAIT czeka - klus / stoj jak dotad
-        private static readonly bool[] CrGallop = { false, true, true, false, true, true, true, true };
+        private static readonly bool[] CrGallop = { false, true, true, false, true, true, true, true, true };
         internal const float C441Every = 1f;
         private const int CrSlots = MaxTeams * 10, CrRegular = 8;   // FormationClass.NumberOfRegularFormations
         // 148 / szyki 204-283-311a-344 (szyk w zasiegu odpowiedzi - NotePlayerForm) / odruch 344 na trafienie jezdzca / straz 335 (441-p)
