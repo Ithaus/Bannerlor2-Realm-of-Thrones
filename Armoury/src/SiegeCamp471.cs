@@ -22,6 +22,8 @@ namespace Armoury
     /// ODTAD (klucz SiegeCampAttritionByMedicine):
     ///  (1) prefiks na SiegeAttritionBehavior.OnDailyTickParty (AccessTools.DeclaredMethod na klasie RB, w kampanii) - druzyna oblegajaca: straty RB pominiete
     ///      (straty RB oblezonej twierdzy - OnDailyTickSettlement - bez zmian, tam rzadzi GL / SiegeWalls2.RbSettlementPre);
+    ///      471b-p6: wyjatki - druzyna GLODUJACA (RB jak dotad: kara za glod, CrashScribe Mends.RbSiegeCampFed), Inni i oblezenia fabuly oszczedzone przez zaraze
+    ///      (Daily ich nie liczy - RB jak dotad, nie zero strat);
     ///  (2) doba (Daily, po CampFever.OnDaily): kazda druzyna obozu traci p ludzi (zdrowi szeregowi, losowo wazeni liczebnoscia) - p = Low - (Low - High) x
     ///      min(1, Med / 200), Med = najlepsza Medycyna chirurga (EffectiveSurgeon) wsrod druzyn obozu ("najlepszy chirurg w armii"); domyslnie 0.5% .. 0.1%.
     ///      Zmarli: ksiega ludzi (PeopleBook FDiePlague - ta sama przyczyna co zaraza obozu), pomiar E4/0 (Measure40.NoteDisease), trupy pod murami
@@ -42,6 +44,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.SiegeCampAttritionByMedicine; } }
         private static double PctLow { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeCampAttritionLowMedicinePercent) ? 0.5 : Math.Max(0.0, Math.Min(5.0, s.SiegeCampAttritionLowMedicinePercent)); } }
         private static double PctHigh { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeCampAttritionHighMedicinePercent) ? 0.1 : Math.Max(0.0, Math.Min(5.0, s.SiegeCampAttritionHighMedicinePercent)); } }
+        private static bool FeverOn { get { var s = Settings.Current; return s != null && s.SiegeSicknessEnabled; } }   // 471b-p6 (A8/B8): wybuch tylko z zaraza CampFever
         private static double ObPct { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeCampOutbreakChancePercent) ? 4.0 : Math.Max(0.0, Math.Min(50.0, s.SiegeCampOutbreakChancePercent)); } }
 
         private sealed class Acc
@@ -49,9 +52,10 @@ namespace Armoury
             public int Dead, Days, ObCount, ObDays, ObFrom = -1, ObUntil = -1, Med = -1;
             public double RateSum; public string MedWho = "-";
             public int FeverSick, FeverDead;
+            public int MinePend, MineDay = -1;                 // 471b-p6 (recenzja A7): zmarli gracza do komunikatu (najwyzej raz na 7 dob)
         }
         private static readonly Dictionary<SiegeEvent, Acc> _acc = new Dictionary<SiegeEvent, Acc>();
-        private static int _stumbles, _dRbSkip, _dDead, _dObNew, _dSieges;
+        private static int _stumbles, _dRbSkip, _dRbStarve, _dDead, _dObNew, _dSieges;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static string _hookRb = "nie zakladana";
 
@@ -64,7 +68,7 @@ namespace Armoury
         private static string Hn(Hero h) { try { return h != null && h.Name != null ? h.Name.ToString() : "-"; } catch { return "?"; } }
 
         /// <summary>Z SiegeWalls.Reset (nowa kampania i kazde wczytanie).</summary>
-        internal static void Reset() { _acc.Clear(); _stumbles = 0; _err.Clear(); _dRbSkip = _dDead = _dObNew = _dSieges = 0; }
+        internal static void Reset() { _acc.Clear(); _stumbles = 0; _err.Clear(); _dRbSkip = _dRbStarve = _dDead = _dObNew = _dSieges = 0; }
 
         private static Acc AccOf(SiegeEvent ev)
         {
@@ -118,6 +122,13 @@ namespace Armoury
             try
             {
                 if (!On || __0 == null || __0.BesiegerCamp == null) return true;
+                // 471b-p6 (recenzja A3): glod druzyny - RB jak dotad (CrashScribe Mends.RbSiegeCampFed puszcza RB tylko przy glodzie: to kara za GLOD, inne zjawisko
+                // niz straty obozu wedlug medycyny; bez tego glodujacy oboz nie tracilby z glodu nikogo)
+                if (__0.Party != null && __0.Party.IsStarving) { _dRbStarve++; return true; }
+                // 471b-p6 (recenzja B4): obozy, ktorych Daily nie liczy (Inni, oblezenie fabuly oszczedzone przez zaraze) - RB jak dotad, nie zero strat
+                if (Undead.Party(__0)) return true;
+                var ev = __0.BesiegerCamp.SiegeEvent;
+                if (ev != null && CampFever.Spared(ev) != null) return true;
                 _dRbSkip++;
                 return false;
             }
@@ -153,7 +164,7 @@ namespace Armoury
             {
                 Log.Info("Straty obozu (471b-2 start): klucz Siege Camp Attrition By Medicine " + (On ? "TAK" : "NIE") + " | latka RB OnDailyTickParty " + _hookRb
                          + " | stawka dzienna " + F(PctLow, "0.00") + "% (Medycyna 0) .. " + F(PctHigh, "0.00") + "% (Medycyna " + F(MedFull, "0") + "+), najlepszy chirurg obozu"
-                         + " | wybuch choroby: po inkubacji zarazy szansa " + F(ObChance(0) * 100.0, "0.0") + "% .. " + F(ObChance((int)MedFull) * 100.0, "0.0") + "% na dobe, trwa " + ObMin + "-" + ObMax
+                         + " | wybuch choroby" + (FeverOn ? "" : " (zaraza obozowa CampFever WYLACZONA - bez wybuchow)") + ": po inkubacji zarazy szansa " + F(ObChance(0) * 100.0, "0.0") + "% .. " + F(ObChance((int)MedFull) * 100.0, "0.0") + "% na dobe, trwa " + ObMin + "-" + ObMax
                          + " dob (zaraza CampFever obozu tylko w wybuchu; obroncy bez zmian).");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -222,11 +233,11 @@ namespace Armoury
                     catch (Exception e) { Stumble("One", e); }
                 }
                 if (LogOn)
-                    Log.Info("Straty obozu (471b-2 doba): dzien " + (int)CampaignTime.Now.ToDays + " | oblezen ze stratami " + _dSieges + ", zmarli dzis " + _dDead + ", stawka RB pominieta (druzyn) " + _dRbSkip
+                    Log.Info("Straty obozu (471b-2 doba): dzien " + (int)CampaignTime.Now.ToDays + " | oblezen ze stratami " + _dSieges + ", zmarli dzis " + _dDead + ", stawka RB pominieta (druzyn) " + _dRbSkip + ", RB przy glodzie druzyny (jak dotad) " + _dRbStarve
                              + ", wybuchy choroby nowe " + _dObNew + " | " + (sb.Length == 0 ? "-" : sb.ToString()) + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + ".");
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { _dRbSkip = _dDead = _dObNew = _dSieges = 0; }
+            finally { _dRbSkip = _dRbStarve = _dDead = _dObNew = _dSieges = 0; }
         }
 
         private static bool LogOn { get { var s = Settings.Current; return s != null && s.SiegeWallsLog && s.LogEnabled; } }
@@ -273,8 +284,13 @@ namespace Armoury
             if (dead > 0) SiegeMisery.AddCorpses(st, false, dead, SiegeMisery.SrcFever);   // znacznik sanitarny pod murami (nie rzuca)
             a.Dead += dead; a.Days++; a.RateSum += p;
             _dDead += dead; if (dead > 0) _dSieges++;
-            if (mine > 0)
-                try { Log.Player("Hardship in the siege camp before " + st.Name + ": " + mine + " of your men died today" + (med >= 50 ? " (your surgeon kept it down)." : "."), true); } catch { }
+            a.MinePend += mine;                                                        // 471b-p6 (recenzja A7): komunikat przy pierwszej stracie, potem najwyzej raz na 7 dob z suma
+            int today = (int)CampaignTime.Now.ToDays;
+            if (a.MinePend > 0 && (a.MineDay < 0 || today - a.MineDay >= 7))
+            {
+                try { Log.Player("Hardship in the siege camp before " + st.Name + ": " + a.MinePend + " of your men died " + (a.MineDay < 0 ? "today" : "since the last report") + (med >= 50 ? " (your surgeon kept it down)." : "."), true); } catch { }
+                a.MineDay = today; a.MinePend = 0;
+            }
             if (sb.Length < 2500)
                 sb.Append(sb.Length > 0 ? "; " : "").Append(st.StringId).Append(' ').Append(men).Append(" ludzi, Med ").Append(med).Append(" (").Append(a.MedWho).Append("), ")
                   .Append(F(p * 100.0, "0.00")).Append("% -> zmarli ").Append(dead).Append(", razem ").Append(a.Dead)
@@ -315,7 +331,7 @@ namespace Armoury
                 if (!On) return "straty obozu: RB i zaraza jak dotad (klucz 471b-2 NIE)";
                 int med, men; Hero who;
                 Camp(ev, out med, out who, out men);
-                return "straty obozu (471b-2): " + F(Rate(med) * 100.0, "0.00") + "%/d, najlepsza Medycyna " + med + " (" + Hn(who) + "), szansa wybuchu choroby " + F(ObChance(med) * 100.0, "0.0") + "%/d";
+                return "straty obozu (471b-2): " + F(Rate(med) * 100.0, "0.00") + "%/d, najlepsza Medycyna " + med + " (" + Hn(who) + "), szansa wybuchu choroby " + F(ObChance(med) * 100.0, "0.0") + "%/d" + (FeverOn ? "" : " (zaraza wylaczona - bez wybuchow)");
             }
             catch (Exception e) { Stumble("StartText", e); return "straty obozu: blad"; }
         }

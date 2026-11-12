@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 471b-p6 (13.11) - straty obozu: RB przy glodzie i dla obozow bez stawki 471b, komunikat gracza raz na 7 dob, linie przy wylaczonej zarazie (recenzje A3/B4, A7, A8/B8)
+
+**Problem:**
+- Recenzja A3: prefiks `RbPartyPre` zwracal false dla KAZDEJ druzyny obozu. CrashScribe (`Mends.RbSiegeCampFed`, od 17.09) puszczal RB tylko przy `party.Party.IsStarving` - stawka RB byla w praktyce kara za glod. Glodujacy oboz tracil teraz tylko 0.1-0.5%/d; gra sama ludzi z glodu nie zabija (zostaje morale i odejscie m116) - regresja.
+- Recenzja B4: `Daily` pomija oblezenia fabuly oszczedzone przez zaraze (`CampFever.Spared`) i Innych (`Camp()` / `Undead.Party`), a prefiks gasil im RB - te obozy mialy ZERO strat.
+- Recenzja A7: "Hardship in the siege camp ... N of your men died today" codziennie przez cale oblezenie (spam).
+- Recenzje A8/B8: wybuch choroby istnieje tylko przy wlaczonej zarazie CampFever (`SiegeSicknessEnabled`); linie startu 471b-2 podawaly szanse wybuchu, ktory nigdy nie nastapi.
+
+**Przyczyna:** prefiks bez wyjatkow; komunikat bez pamieci; teksty bez warunku klucza zarazy.
+
+**Zmiana:** `SiegeCamp471.cs`:
+- `RbPartyPre`: przepuszcza RB (jak dotad, dalej filtr CrashScribe) gdy druzyna glodna (`Party.IsStarving`), gdy Inni (`Undead.Party`) i gdy oblezenie oszczedzone (`CampFever.Spared != null`). Syty oboz zywych - stawka wedlug Medycyny (bez zmian). Linia doby: nowe pole `RB przy glodzie druzyny (jak dotad) N`.
+- Komunikat gracza: przy pierwszej stracie, potem najwyzej raz na 7 dob z suma ("... N of your men died since the last report").
+- `SessionStart` i `StartText`: dopisek `(zaraza obozowa CampFever WYLACZONA - bez wybuchow)` / `(zaraza wylaczona - bez wybuchow)` przy `SiegeSicknessEnabled` NIE.
+
+**Ryzyko / co sprawdzic:**
+- Glodujaca druzyna traci RB (2-5 + narost na druzyne, jak przed 471b) PLUS 0.1-0.5% wedlug Medycyny - dwa zjawiska (glod i choroby/trudy), nie to samo dwa razy. Furaz 471b-3 odsuwa glod.
+- W logu: `Straty obozu (471b-2 doba)` - `RB przy glodzie druzyny` > 0 tylko przy glodujacych obozach; obozy Innych / fabuly - RB wedlug CrashScribe.
+- Klucz NIE - bez zmian (prefiks przepuszcza wszystko).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-p5 (13.11) - kapitulacja osady rodu gracza (D5): zaloga do najblizszej twierdzy rodu gracza albo do gracza; opis klucza D5 (recenzje B3, A9)
 
 **Problem:** recenzja B3: przy D5 `Yield471` wolal `BookHoldings.YieldOut(st, ..., null)` - `RecipientOk` wyklucza rod gracza i druzyne gracza, `Recipients` pomija twierdze gracza, `HeadParty` gracza = null. Ludzie gracza szli do lordow AI krolestwa, a przy wlasnym krolestwie jednego rodu - rozpuszczani do domu. Wbrew D4 ("wychodzi wolno do najblizszej wlasnej twierdzy"). Recenzja A9: opis klucza D5 mowil "With Siege Time By Factors", a furaz wsi gracza zalezy od klucza furazu (Siege Camp Forages The Villages), nie od Siege Time By Factors.
