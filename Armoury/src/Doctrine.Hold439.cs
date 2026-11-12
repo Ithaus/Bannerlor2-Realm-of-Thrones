@@ -51,11 +51,29 @@ namespace Armoury
     ///     (sr., wyzej >= 2 m, nizej <= -2 m), osobno druzyny z punktem 439 i ile z nich stalo na punkcie (<= max(15 m, glebokosc)).
     /// Watki: H439Tick (punkt, flaga wrecz, kontakt, liczniki) w glownym; postfiksy w ticku druzyn / szykow (watek silnika) - odczyt + Interlocked.
     /// Potkniecia liczone (_h439Stum), bez globalnego wylacznika.
+    ///
+    /// 439-p (recenzja 439) - opis wyzej poprawiony tymi punktami (gdzie sie rozni, obowiazuje ten):
+    ///  a) RBM CheckIfOnlyCavRemaining patrzy na WROGA (same szyki jazdy), a FindSignificantEnemy == null tez daje TAK - nie na pusta nasza piechote. Wrog bez
+    ///     szyku pieszego / strzelcow (flaga glownego watku _h439NoFoot, ta sama petla co FootGap) - wynik RBM bez zmian (jak dotad, bez ciecia).
+    ///  b) Zwolnienie Engage liczone w GLOWNYM watku (H439Tick) i z histereza: PIESZY wrog (bez jazdy, jak FootGap 291) w P440Gap (25 m / porywczy 40 m)
+    ///     albo >= 35% GLOWNEJ piechoty wrecz w 6 s (jak RBM FormationFightingInMelee na _mainInfantry, nie kazdy szyk piechoty). Raz zwolniona druzyna
+    ///     zostaje zwolniona, dopoki warunek trwa, i jeszcze H439RelHold (10 s) - bez wahadla Engage/Defend przy krazacej jezdzie. Jazda wroga w 25 m sama
+    ///     nie zwalnia (RBM tez jej nie liczy - includeCavalry NIE); uderzenie jazdy w glowna piechote zwalnia przez wrecz.
+    ///  c) Punkt wzgorza kasowany do konca bitwy, gdy trzymanie 291 sie skonczy (S2 / 291e / 320d / zwarcie / napastnik nie podchodzi - po powrocie trzymania
+    ///     po S2 piechota nie wraca pod ostrzalem na stary punkt), gdy wrog jest blizej punktu niz 75% drogi glownej piechoty do wroga (obszedl szyk) albo gdy
+    ///     piechota jest dalej od punktu niz H439MaxShift.
+    ///  d) 291 "napastnik nie podchodzi" dla druzyny z punktem (klucz DefenderSeeksHighGround TAK) mierzy odleglosc wroga od STALEGO punktu (H439StallGap), nie
+    ///     TeamGap - odwrot obroncy na punkt nie zjada zblizenia napastnika. Zmiana miary = nowa podstawa odleglosci, zegar 90 s bez zmian.
+    ///  e) Pomiar: "w trzymaniu" przy kontakcie ze stanu poprzedniego taktu (DhTick w tym samym takcie juz puszcza zwarciem); "naraz maks" = druzyny z
+    ///     zatrzymaniem w tym samym takcie 2 s; split RBM w Engage liczony tylko bez prawa do zwolnienia od 4 s (wieksze od 0 = latka bez skutku). Inlining:
+    ///     MonoMod.Core (Harmony 2.4) wylacza inlining latanej metody (TryDisableInlining), latki zakladane w AfterStart pierwszej bitwy - przed pierwszym
+    ///     JIT TickOccasionally splitu; miernik to rozstrzyga.
     /// </summary>
     internal static partial class Doctrine
     {
         internal const float H439MeleeShare = 0.35f, H439MeleeWin = 6f, H439MinRise = 2f, H439MaxShift = 120f, H439MinGap = 60f, H439EdgeMin = 40f;
         internal const float H439Toward = 0.75f, H439SlopeMin = 20f, H439SlopeMax = 60f, H439SlopeShare = 0.2f, H439OnPoint = 15f;
+        internal const float H439RelHold = 10f, H439Settle = 4f;   // 439-p: histereza zwolnienia Engage; miernik splitu - ile s po zwolnieniu nie liczyc
         private static readonly IFormatProvider H439Inv = CultureInfo.InvariantCulture;
 
         private sealed class H439Point
@@ -79,9 +97,20 @@ namespace Armoury
         private static readonly bool[] _h439Contact = new bool[MaxTeams];
         private static readonly bool[] _h439CutTeam = new bool[MaxTeams];   // pisze postfiks (zatrzymal Engage od ostatniego taktu), czysci glowny
         private static readonly bool[] _h439CutEver = new bool[MaxTeams];
+        // 439-p: glowny watek pisze, postfiks czyta - wrog bez pieszych / strzelcow, odleglosc do pieszego wroga, zwolnienie Engage (histereza)
+        private static readonly bool[] _h439NoFoot = new bool[MaxTeams];
+        private static readonly float[] _h439Gap = new float[MaxTeams];
+        private static readonly bool[] _h439Free = new bool[MaxTeams];
+        private static readonly bool[] _h439FreeEarly = new bool[MaxTeams];   // zwolnienie samym dystansem 25-40 m (porywczy 440)
+        private static readonly float[] _h439FreeAt = new float[MaxTeams];    // ostatni takt z warunkiem zwolnienia
+        private static readonly float[] _h439LetAt = new float[MaxTeams];     // ostatni takt, w ktorym postfiks przepuszczal TAK RBM (miernik splitu)
+        private static readonly bool[] _h439OnLast = new bool[MaxTeams];      // _dhOn z konca poprzedniego taktu 439 (przed DhTick tego taktu)
+        private static readonly bool[] _h439CutNow = new bool[MaxTeams];      // zatrzymanie od ostatniego taktu (naraz maks)
+        private static readonly H439Point[] _h439StallSrc = new H439Point[MaxTeams];   // punkt, od ktorego DhTick mierzy podstawe 'napastnik nie podchodzi'
 
         // ---- liczniki misji (Reset w Battle291.Begin); postfiksy - Interlocked
         private static int _h439Cut, _h439Dry, _h439Near, _h439MeleeN, _h439HighSet, _h439HighDry;
+        private static int _h439CavOnly, _h439FreeCalls, _h439Back, _h439KillRel, _h439KillSide, _h439KillFar, _h439StallPtTeams, _h439StallPtN;
         private static int _h439CutTeams, _h439PeakTeams, _h439Stum;
         private static float _h439SplitEngSec;
         private static int _h439PtMark, _h439PtSlope, _h439PtNoRise, _h439PtClose, _h439PtNoData, _h439PtNaval;
@@ -99,6 +128,8 @@ namespace Armoury
             Interlocked.Exchange(ref _h439Cut, 0); Interlocked.Exchange(ref _h439Dry, 0); Interlocked.Exchange(ref _h439Near, 0);
             Interlocked.Exchange(ref _h439MeleeN, 0); Interlocked.Exchange(ref _h439HighSet, 0); Interlocked.Exchange(ref _h439HighDry, 0);
             _h439CutTeams = _h439PeakTeams = _h439Stum = 0;
+            Interlocked.Exchange(ref _h439CavOnly, 0); Interlocked.Exchange(ref _h439FreeCalls, 0);
+            _h439Back = _h439KillRel = _h439KillSide = _h439KillFar = _h439StallPtTeams = _h439StallPtN = 0;
             _h439SplitEngSec = 0f;
             _h439PtMark = _h439PtSlope = _h439PtNoRise = _h439PtClose = _h439PtNoData = _h439PtNaval = 0;
             _h439RiseSum = _h439ShiftSum = 0f;
@@ -112,6 +143,8 @@ namespace Armoury
         private static void H439ClearTeam(int i)
         {
             _h439Melee[i] = false; _h439Pt[i] = null; _h439Frozen[i] = false; _h439Contact[i] = false; _h439CutTeam[i] = false; _h439CutEver[i] = false;
+            _h439NoFoot[i] = false; _h439Gap[i] = float.MaxValue; _h439Free[i] = false; _h439FreeEarly[i] = false; _h439FreeAt[i] = -1f; _h439LetAt[i] = -1f;
+            _h439OnLast[i] = false; _h439CutNow[i] = false; _h439StallSrc[i] = null;
         }
 
         private static void H439Keys(Settings c)
@@ -181,17 +214,17 @@ namespace Armoury
                 if (ti < 0 || ti >= MaxTeams || !ReferenceEquals(_dhRef[ti], team) || !_dhOn[ti]) return;
                 var fr = _f439Main;
                 var inf = fr != null ? fr(tc) : null;
-                if (inf == null || inf.CountOfUnits <= 0) return;   // RBM: sama jazda - jak dotad
-                if (_h439Melee[ti]) { Interlocked.Increment(ref _h439MeleeN); return; }
-                var ce = inf.CachedClosestEnemyFormation;
-                var ef = ce != null ? ce.Formation : null;
-                if (ef != null && ef.CountOfUnits > 0)
+                if (inf == null || inf.CountOfUnits <= 0) return;   // brak glownej piechoty (RBM CheckIfOnlyCavRemaining(null) = TAK) - jak dotad
+                // 439-p (a): wrog bez szyku pieszego / strzelcow (RBM: sama jazda wroga albo FindSignificantEnemy null - TAK) - jak dotad
+                if (_h439NoFoot[ti]) { Interlocked.Increment(ref _h439CavOnly); return; }
+                // 439-p (b): zwolnienie z glownego watku (pieszy wrog w 25 m / porywczy 40 m albo >= 35% glownej piechoty wrecz) z histereza 10 s
+                if (_h439Free[ti])
                 {
-                    float d = inf.CachedMedianPosition.AsVec2.Distance(ef.CachedMedianPosition.AsVec2) - 0.5f * (inf.Depth + ef.Depth);
-                    // 440 (3.3): porywczy wodz puszcza Engage przy szyku wroga w 40 m (reszta i klucz NIE - 25 m)
-                    if (d <= P440Gap(team, ti)) { if (d > S1ContactGap) Interlocked.Increment(ref _cpGapEarly); Interlocked.Increment(ref _h439Near); return; }
-                    P440GapDry(team, ti, d);
+                    if (_h439FreeEarly[ti]) Interlocked.Increment(ref _cpGapEarly);   // 440 (3.3): porywczy - pieszy wrog w 25-40 m
+                    Interlocked.Increment(ref _h439FreeCalls);
+                    return;
                 }
+                P440GapDry(team, ti, _h439Gap[ti]);
                 if (!_h439HoldKey) { Interlocked.Increment(ref _h439Dry); return; }
                 __result = false;
                 _h439CutTeam[ti] = true;
@@ -225,30 +258,53 @@ namespace Armoury
 
         // ------------------------------------------------------------ takt (glowny watek, Doctrine.Tick po DhTick)
 
-        /// <summary>Doctrine.Tick (co TickEvery, glowny watek) dla druzyny obroncy 291: flaga wrecz, punkt wzgorza, kontakt, liczniki.</summary>
+        /// <summary>Doctrine.Tick (co TickEvery, glowny watek) dla druzyny obroncy 291: zwolnienie Engage, punkt wzgorza, kontakt, liczniki.</summary>
         private static void H439Tick(Mission m, Team t, int ti, Settings c, float now)
         {
             H439Keys(c);
             bool dep = m.IsDeploymentFinished;
             var inf = MainInfantry(t);
-            // 2.1: flaga wrecz (czyta postfiks) - tylko druzyna w trzymaniu po rozstawieniu
+            bool hold = dep && _dhOn[ti];
+            // pieszy wrog glownej piechoty (jak FootGap 291 - bez jazdy i konnych lucznikow): zwolnienie 2.1 i pomiar kontaktu
+            Formation ef = null;
+            float fgap = float.MaxValue;
+            if (dep && inf != null) fgap = H439FootEnemy(t, inf, out ef);
+            // 2.1 + 439-p (a)(b): flagi dla postfiksu - tylko druzyna w trzymaniu po rozstawieniu
             bool melee = false;
-            if (dep && _dhOn[ti])
+            if (hold && inf != null)
             {
                 bool baseMelee;
-                melee = H439InMelee(t, now, P440MeleeShare(t), out baseMelee);   // 440 (3.3): prog wrecz wedlug profilu wodza (klucz NIE - 35%)
+                melee = H439InMelee(inf, now, P440MeleeShare(t), out baseMelee);   // 440 (3.3): prog wrecz wedlug profilu wodza (klucz NIE - 35%)
                 P440NoteMelee(melee, baseMelee);
+                _h439NoFoot[ti] = ef == null;
+                _h439Gap[ti] = ef != null ? fgap : float.MaxValue;
+                bool near = ef != null && fgap <= P440Gap(t, ti);
+                if (melee || near)
+                {
+                    if (!_h439Free[ti]) { _h439Free[ti] = true; if (melee) _h439MeleeN++; else _h439Near++; }
+                    _h439FreeEarly[ti] = near && !melee && fgap > S1ContactGap;
+                    _h439FreeAt[ti] = now;
+                }
+                else if (_h439Free[ti] && now - _h439FreeAt[ti] >= H439RelHold)
+                {
+                    _h439Free[ti] = false; _h439FreeEarly[ti] = false; _h439Back++;   // powrot do trzymania (RBM Defend przy nastepnym TickOccasionally)
+                }
+            }
+            else
+            {
+                _h439NoFoot[ti] = false; _h439Gap[ti] = float.MaxValue; _h439Free[ti] = false; _h439FreeEarly[ti] = false;
             }
             _h439Melee[ti] = melee;
-            // ozywiony kod: ile druzyn naraz stoi zamiast Engage (postfiks znaczy od ostatniego taktu)
-            if (_h439CutTeam[ti])
-            {
-                _h439CutTeam[ti] = false;
-                if (!_h439CutEver[ti]) { _h439CutEver[ti] = true; _h439CutTeams++; }
-                H439Peak(m);
-            }
-            // pomiar: split obrony RBM w Engage przy trzymaniu (latka bez skutku = sekundy rosna)
-            if (dep && _dhOn[ti])
+            if (_h439Free[ti] || _h439NoFoot[ti]) _h439LetAt[ti] = now;
+            // 439-p (e): ile druzyn naraz stoi zamiast Engage - zatrzymanie od ostatniego taktu (postfiks znaczy), nie "kiedykolwiek"
+            bool cutNow = _h439CutTeam[ti];
+            _h439CutTeam[ti] = false;
+            _h439CutNow[ti] = cutNow;
+            if (cutNow && !_h439CutEver[ti]) { _h439CutEver[ti] = true; _h439CutTeams++; }
+            H439Peak();
+            // pomiar: split obrony RBM w Engage przy trzymaniu BEZ prawa do zwolnienia od H439Settle s (latka bez skutku = sekundy rosna)
+            if (hold && _h439HoldKey && !_h439Free[ti] && !_h439NoFoot[ti] && now - _h439LetAt[ti] >= H439Settle
+                && _dhOnAt[ti] >= 0f && now - _dhOnAt[ti] >= H439Settle)
             {
                 var cur = CurTactic(t);
                 if (cur != null)
@@ -282,60 +338,114 @@ namespace Armoury
                 }
             }
             // pomiar: wysokosc obroncy wzgledem wroga w chwili kontaktu (pierwszy raz glowna piechota <= 25 m od pieszego wroga)
-            if (dep && !_h439Contact[ti] && inf != null)
+            if (dep && !_h439Contact[ti] && inf != null && ef != null && fgap <= S1ContactGap)
             {
-                Formation ef;
-                float gap = H439FootEnemy(t, inf, out ef);
-                if (ef != null && gap <= S1ContactGap)
+                _h439Contact[ti] = true;
+                float dz = inf.CachedMedianPosition.GetNavMeshZ() - ef.CachedMedianPosition.GetNavMeshZ();
+                if (!float.IsNaN(dz) && !float.IsInfinity(dz))
                 {
-                    _h439Contact[ti] = true;
-                    float dz = inf.CachedMedianPosition.GetNavMeshZ() - ef.CachedMedianPosition.GetNavMeshZ();
-                    if (!float.IsNaN(dz) && !float.IsInfinity(dz))
+                    _h439CtN++; _h439CtDz += dz;
+                    if (dz >= H439MinRise) _h439CtHi++; else if (dz <= -H439MinRise) _h439CtLo++;
+                    // 439-p (e): stan trzymania z poprzedniego taktu - DhTick tego taktu juz puscil druzyne zwarciem (_dhOff 2)
+                    if (_h439OnLast[ti]) _h439CtHold++;
+                    var pt = _h439Pt[ti];
+                    if (pt != null)
                     {
-                        _h439CtN++; _h439CtDz += dz;
-                        if (dz >= H439MinRise) _h439CtHi++; else if (dz <= -H439MinRise) _h439CtLo++;
-                        if (_dhOn[ti]) _h439CtHold++;
-                        var pt = _h439Pt[ti];
-                        if (pt != null)
-                        {
-                            _h439CtPtN++; _h439CtPtDz += dz;
-                            if (inf.CachedAveragePosition.Distance(pt.At) <= Math.Max(H439OnPoint, inf.Depth)) _h439CtOnPt++;
-                        }
+                        _h439CtPtN++; _h439CtPtDz += dz;
+                        if (inf.CachedAveragePosition.Distance(pt.At) <= Math.Max(H439OnPoint, inf.Depth)) _h439CtOnPt++;
                     }
                 }
             }
+            // 439-p (c): punkt zamrozony kasowany do konca bitwy - koniec trzymania, wrog obszedl punkt, piechota daleko od punktu
+            if (dep && _h439Frozen[ti])
+            {
+                var pt = _h439Pt[ti];
+                if (pt != null)
+                {
+                    byte kill = 0;
+                    if (_h439OnLast[ti] && !_dhOn[ti]) kill = 1;
+                    else if (_dhOn[ti] && inf != null)
+                    {
+                        var q = t.QuerySystem;
+                        Vec2 ev = q != null ? q.MedianTargetFormationPosition.AsVec2 : Vec2.Invalid;
+                        Vec2 p0 = inf.CachedAveragePosition;
+                        if (ev.IsValid && p0.IsValid && pt.At.Distance(ev) < H439Toward * p0.Distance(ev)) kill = 2;
+                        else if (p0.IsValid && p0.Distance(pt.At) > H439MaxShift) kill = 3;
+                    }
+                    if (kill != 0)
+                    {
+                        _h439Pt[ti] = null;
+                        if (kill == 1) _h439KillRel++; else if (kill == 2) _h439KillSide++; else _h439KillFar++;
+                    }
+                }
+            }
+            _h439OnLast[ti] = _dhOn[ti];
         }
 
-        private static void H439Peak(Mission m)
+        /// <summary>439-p (e): maks. liczba druzyn z zatrzymaniem Engage w tym samym takcie (okno TickEvery).</summary>
+        private static void H439Peak()
         {
             int n = 0;
-            for (int i = 0; i < MaxTeams; i++) if (_h439CutEver[i] && _dhOn[i] && _dhRef[i] != null) n++;
+            for (int i = 0; i < MaxTeams; i++) if (_h439CutNow[i] && _dhRef[i] != null) n++;
             if (n > _h439PeakTeams) _h439PeakTeams = n;
         }
 
-        /// <summary>2.1 (glowny watek): ktorykolwiek szyk piechoty druzyny ma >= 35% ludzi z ciosem wrecz zadanym / otrzymanym w ostatnich 6 s.</summary>
-        private static bool H439InMelee(Team t, float now, float share, out bool baseHit)
+        /// <summary>439-p (d) (DhTick, glowny watek): miara "napastnik nie podchodzi" 291. Druzyna z zamrozonym punktem wzgorza (klucz DefenderSeeksHighGround TAK)
+        /// - odleglosc najblizszego szyku wroga od STALEGO punktu (mediana minus pol glebokosci wroga) zamiast TeamGap; src = ten punkt. Inaczej TeamGap, src null.</summary>
+        private static float H439StallGap(Team t, int ti, Settings c, float teamGap, out H439Point src)
+        {
+            src = null;
+            if (c == null || !c.DefenderSeeksHighGround || !_h439Frozen[ti]) return teamGap;
+            var pt = _h439Pt[ti];
+            if (pt == null) return teamGap;
+            float best = float.MaxValue;
+            var teams = t.Mission != null ? t.Mission.Teams : null;
+            int n = teams != null ? teams.Count : 0;
+            for (int i = 0; i < n; i++)
+            {
+                var e = teams[i];
+                if (!MissionTeams.Enemies(t, e)) continue;
+                var fl = e.FormationsIncludingSpecialAndEmpty;
+                int nf = fl != null ? fl.Count : 0;
+                for (int j = 0; j < nf; j++)
+                {
+                    var f = fl[j];
+                    if (f == null || f.CountOfUnits <= 0) continue;
+                    float d = pt.At.Distance(f.CachedMedianPosition.AsVec2) - 0.5f * f.Depth;
+                    if (d < best) best = d;
+                }
+            }
+            if (best == float.MaxValue) return teamGap;
+            src = pt;
+            return best < 0f ? 0f : best;
+        }
+
+        /// <summary>439-p (d) (DhTick): zmiana miary 'napastnik nie podchodzi' (TeamGap / punkt 439) - true = podstawa odleglosci od nowa (zegar bez zmian).</summary>
+        private static bool H439StallRebase(int ti, H439Point src, bool started)
+        {
+            if (!started) { _h439StallSrc[ti] = src; return false; }
+            if (ReferenceEquals(src, _h439StallSrc[ti])) return false;
+            _h439StallSrc[ti] = src;
+            if (src != null) _h439StallPtTeams++;
+            return true;
+        }
+
+        /// <summary>439-p (d) (DhTick): 'napastnik nie podchodzi' puscil druzyne przy mierze od punktu 439.</summary>
+        private static void H439StallFired(int ti)
+        {
+            if (_h439StallSrc[ti] != null) _h439StallPtN++;
+        }
+
+        /// <summary>2.1 (glowny watek): >= prog ludzi GLOWNEJ piechoty z ciosem wrecz zadanym / otrzymanym w ostatnich 6 s (jak RBM FormationFightingInMelee na _mainInfantry).</summary>
+        private static bool H439InMelee(Formation f, float now, float share, out bool baseHit)
         {
             baseHit = false;
-            bool hit = false;
-            var fl = t.FormationsIncludingSpecialAndEmpty;
-            int nf = fl != null ? fl.Count : 0;
-            for (int j = 0; j < nf; j++)
-            {
-                var f = fl[j];
-                if (f == null || f.CountOfUnits <= 0) continue;
-                var fq = f.QuerySystem;
-                if (fq == null || !fq.IsInfantryFormation) continue;
-                _mlNow = now; _mlAll = _mlIn = 0;
-                f.ApplyActionOnEachUnit(H439MeleeMan);
-                if (_mlAll > 0)
-                {
-                    if (_mlIn >= share * _mlAll) hit = true;
-                    if (_mlIn >= H439MeleeShare * _mlAll) baseHit = true;   // 440: prog 439 bez profilu (licznik "wczesniej / pozniej")
-                }
-                if (hit && baseHit) return true;
-            }
-            return hit;
+            if (f == null || f.CountOfUnits <= 0) return false;
+            _mlNow = now; _mlAll = _mlIn = 0;
+            f.ApplyActionOnEachUnit(H439MeleeMan);
+            if (_mlAll <= 0) return false;
+            baseHit = _mlIn >= H439MeleeShare * _mlAll;   // 440: prog 439 bez profilu (licznik "wczesniej / pozniej")
+            return _mlIn >= share * _mlAll;
         }
 
         private static readonly Action<Agent> H439MeleeMan = a =>
@@ -449,18 +559,24 @@ namespace Armoury
               .Append(", obronca trzyma (291) ").Append(c != null && c.DefendersHoldTheirGround ? "TAK" : "NIE")
               .Append(" | 2.1 Engage RBM 75 m zatrzymany (wywolan) ").Append(Volatile.Read(ref _h439Cut))
               .Append(", bylby (klucz NIE) ").Append(Volatile.Read(ref _h439Dry))
-              .Append(", puszczony: szyk wroga <= ").Append(S1ContactGap.ToString("0", H439Inv)).Append(" m ").Append(Volatile.Read(ref _h439Near))
-              .Append(", wrecz >= ").Append(((int)(H439MeleeShare * 100f)).ToString(H439Inv)).Append("% ").Append(Volatile.Read(ref _h439MeleeN))
-              .Append("; druzyn z zatrzymaniem ").Append(_h439CutTeams).Append(", naraz maks ").Append(_h439PeakTeams)
-              .Append(", split obrony RBM w Engage przy trzymaniu ").Append(_h439SplitEngSec.ToString("0", H439Inv)).Append(" s")
+              .Append(", bez ciecia: wrog bez pieszych i strzelcow (RBM, wywolan) ").Append(Volatile.Read(ref _h439CavOnly))
+              .Append(", zwolniony (wywolan) ").Append(Volatile.Read(ref _h439FreeCalls))
+              .Append("; zwolnienia (zdarzen): pieszy wrog <= ").Append(S1ContactGap.ToString("0", H439Inv)).Append("/40 m ").Append(_h439Near)
+              .Append(", glowna piechota wrecz >= ").Append(((int)(H439MeleeShare * 100f)).ToString(H439Inv)).Append("% ").Append(_h439MeleeN)
+              .Append(", powrot do trzymania po ").Append(H439RelHold.ToString("0", H439Inv)).Append(" s ").Append(_h439Back)
+              .Append("; druzyn z zatrzymaniem ").Append(_h439CutTeams).Append(", naraz maks (ten sam takt) ").Append(_h439PeakTeams)
+              .Append(", split obrony RBM w Engage bez zwolnienia ").Append(_h439SplitEngSec.ToString("0", H439Inv)).Append(" s")
               .Append(" | 2.3 punkty wzgorza ").Append(pts).Append(" (znacznik sceny ").Append(_h439PtMark).Append(", stok silnika ").Append(_h439PtSlope)
               .Append("; sr. wzniesienie ").Append(pts > 0 ? (_h439RiseSum / pts).ToString("0.0", H439Inv) : "-")
               .Append(" m, odleglosc ").Append(pts > 0 ? (_h439ShiftSum / pts).ToString("0", H439Inv) : "-")
               .Append(" m), bez punktu: brak wzniesienia ").Append(_h439PtNoRise).Append(", wrog blizej ").Append(H439MinGap.ToString("0", H439Inv)).Append(" m ").Append(_h439PtClose)
               .Append(", morska ").Append(_h439PtNaval).Append(", brak danych ").Append(_h439PtNoData)
               .Append("; rozkazy w punkt ").Append(Volatile.Read(ref _h439HighSet)).Append(", bylby (klucz NIE) ").Append(Volatile.Read(ref _h439HighDry))
+              .Append("; punkt skasowany: koniec trzymania ").Append(_h439KillRel).Append(", wrog obszedl ").Append(_h439KillSide)
+              .Append(", piechota dalej niz ").Append(H439MaxShift.ToString("0", H439Inv)).Append(" m ").Append(_h439KillFar)
+              .Append("; 291 'napastnik nie podchodzi' od punktu: druzyn ").Append(_h439StallPtTeams).Append(", puszczen ").Append(_h439StallPtN)
               .Append(" | kontakt (glowna piechota <= ").Append(S1ContactGap.ToString("0", H439Inv)).Append(" m od pieszego wroga): druzyn ").Append(_h439CtN)
-              .Append(", w trzymaniu ").Append(_h439CtHold)
+              .Append(", w trzymaniu (poprzedni takt) ").Append(_h439CtHold)
               .Append(", wysokosc wzgledem wroga sr. ").Append(_h439CtN > 0 ? (_h439CtDz / _h439CtN).ToString("0.0", H439Inv) : "-")
               .Append(" m (wyzej >= ").Append(H439MinRise.ToString("0", H439Inv)).Append(" m ").Append(_h439CtHi).Append(", nizej ").Append(_h439CtLo)
               .Append("), z punktem 439 ").Append(_h439CtPtN).Append(" (sr. ").Append(_h439CtPtN > 0 ? (_h439CtPtDz / _h439CtPtN).ToString("0.0", H439Inv) : "-")

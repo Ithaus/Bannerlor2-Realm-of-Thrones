@@ -283,13 +283,13 @@ namespace Armoury
             return _cpKey ? adj : FireDead;
         }
 
-        /// <summary>439 (postfiks HasBattleBeenJoined, tick druzyn): odleglosc zwarcia - porywczy 40 m, reszta 25 m (S1ContactGap). Tylko odczyt.</summary>
+        /// <summary>439 (H439Tick, glowny watek - od 439-p): odleglosc zwolnienia od PIESZEGO wroga - porywczy 40 m, reszta 25 m (S1ContactGap). Tylko odczyt.</summary>
         private static float P440Gap(Team t, int ti)
         {
             return _cpKey && ReferenceEquals(_p4Ref[ti], t) && _cpProf[ti] == 2 ? P440RashGap : S1ContactGap;
         }
 
-        /// <summary>439 (postfiks): szyk wroga w 25-40 m - przy kluczu NIE licznik "bylby" dla porywczego.</summary>
+        /// <summary>439 (postfiks): pieszy szyk wroga w 25-40 m (odleglosc z glownego watku, 439-p) - przy kluczu NIE licznik "bylby" dla porywczego.</summary>
         private static void P440GapDry(Team t, int ti, float d)
         {
             if (!_cpKey && d <= P440RashGap && ReferenceEquals(_p4Ref[ti], t) && _cpProf[ti] == 2) Interlocked.Increment(ref _cpGapDry);

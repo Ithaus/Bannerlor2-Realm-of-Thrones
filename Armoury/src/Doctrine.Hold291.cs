@@ -413,10 +413,15 @@ namespace Armoury
                 if (inf != null && fg <= S1ContactGap) { _dhOff[ti] = 2; _dhContactN++; }
                 else
                 {
-                    float gap = TeamGap(t);
+                    // 439-p (d): druzyna z punktem wzgorza 439 - odleglosc wroga od stalego punktu (odwrot na punkt nie zjada zblizenia napastnika);
+                    // klucz DefenderSeeksHighGround NIE albo bez punktu - TeamGap jak dotad (src null, podstawa bez zmian)
+                    H439Point gsrc;
+                    float gap = H439StallGap(t, ti, c, TeamGap(t), out gsrc);
+                    bool rebase = H439StallRebase(ti, gsrc, _dhStarted[ti]);
                     if (!_dhStarted[ti]) { _dhStarted[ti] = true; _dhBest[ti] = gap; _dhBestAt[ti] = now; }
+                    else if (rebase) _dhBest[ti] = gap;
                     else if (gap < _dhBest[ti] - DhStallStep) { _dhBest[ti] = gap; _dhBestAt[ti] = now; }
-                    if (now - _dhBestAt[ti] >= DhStallSec) { _dhOff[ti] = 1; _dhStallN++; }
+                    if (now - _dhBestAt[ti] >= DhStallSec) { _dhOff[ti] = 1; _dhStallN++; H439StallFired(ti); }
                 }
             }
             bool s2 = _s2Live[ti] && ReferenceEquals(_s2Ref[ti], t);
