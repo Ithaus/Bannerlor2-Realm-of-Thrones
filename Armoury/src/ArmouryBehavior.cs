@@ -1679,6 +1679,7 @@ namespace Armoury
             // i VineOlive.OnNewGame - PinNewGame widzi _newGame), linia warsztatow po budowie startowej (FollowUpEnd, tylko log)
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => { try { VillageClimate.BeforeWorkshops(); } catch (Exception e) { Log.Error("VillageClimate.BeforeWorkshops", e); } });
             CampaignEvents.OnNewGameCreatedPartialFollowUpEndEvent.AddNonSerializedListener(this, _ => { try { VillageClimate.WorkshopsFit(); } catch (Exception e) { Log.Error("VillageClimate.WorkshopsFit", e); } });
+            CampaignEvents.OnNewGameCreatedPartialFollowUpEndEvent.AddNonSerializedListener(this, _ => SmallCastles471.OnNewGameEnd());   // 471b-1 (D1): male zamki nowej kampanii - mury 1 (po calym starcie gry; nie rzuca)
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, OreLedger.OnProduced);   // wpis 98: ksiega rudy i drewna - sztuki faktycznie dopisane osadom
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, GoodsPaths.OnItemProduced);   // ZC1 (BkSideGoodsOrigin): miod pitny zrobiony w miastach - o tyle drwale robia go mniej
@@ -2992,6 +2993,7 @@ namespace Armoury
             try { StoryGuard.Daily(); } catch (Exception e) { Log.Error("StoryGuard.Daily", e); } DayProfile.Lap("StoryGuard.Daily");   // 396: straz fabuly PIERWSZA w dobie (przed zaraza, murami, lochem) - przeliczenie 32 postaci, linia doby tylko gdy cos zaszlo
             try { HeroWounds.Daily(); } catch (Exception e) { Log.Error("HeroWounds.Daily", e); } DayProfile.Lap("HeroWounds.Daily");   // 401: ksiega ran po strazy fabuly, przed zaraza - termin loza, wstajacy, linia "Rany (HW): dzien"
             try { SimFate436.Daily(); } catch (Exception e) { Log.Error("SimFate436.Daily", e); } DayProfile.Lap("SimFate436.Daily");   // 436: linia "Smierc czy rana w symulacji (436)" - same liczniki, zloto i ludzie nie ruszaja
+            try { SmallCastles471.Daily(); } catch (Exception e) { Log.Error("SmallCastles471.Daily", e); }   // 471b-1: kontrola murow malych zamkow - raz, pierwsza doba nowej kampanii (tylko log)
             try { CampFever.OnDaily(); } catch (Exception e) { Log.Error("CampFever", e); } DayProfile.Lap("CampFever.OnDaily");
             try { SiegeMisery.DailyCorpses(); } catch (Exception e) { Log.Error("SiegeMisery.DailyCorpses", e); } DayProfile.Lap("SiegeMisery.DailyCorpses");   // 399: trupy oblezen - gasniecie, palenie AI, ostrzezenia, linia "Trupy oblezenia" (po zarazie, przed glodem GL)
             try { RecruitKit.Reconcile("doba"); } catch (Exception e) { Log.Error("RecruitKit.Reconcile", e); } DayProfile.Lap("RecruitKit.Reconcile");   // 161: komplety bez ochotnika w puli (sieroty)

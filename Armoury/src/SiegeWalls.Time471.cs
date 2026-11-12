@@ -38,6 +38,8 @@ namespace Armoury
         {
             "castle_V5", "town_EW4", "ROT_castle61", "town_B2", "town_V2", "ROT_town3", "town_EW3", "town_V5", "town_EW1", "town_EN1", "town_A1", "town_S3", "town_V6"
         };
+        /// <summary>471b-1: wielka twierdza z listy 471 (SmallCastles471 jej nie obniza).</summary>
+        internal static bool IsTwierdza471(Settlement st) { return st != null && st.StringId != null && TwierdzaIds.Contains(st.StringId); }
         private static readonly string[] CatName = { "maly zamek", "duzy zamek", "miasto", "wielka twierdza" };
         private static readonly int[] CatLo = { 20, 40, 60, 60 }, CatHi = { 40, 90, 150, 150 };
         private const double Limit471 = 1.5;

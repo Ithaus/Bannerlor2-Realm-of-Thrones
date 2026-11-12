@@ -12972,6 +12972,10 @@ namespace Armoury
         [SettingPropertyGroup("Terms with a captive king (366)")]
         public bool CaptiveTermsBendKnee { get; set; } = true;
 
+        [SettingPropertyBool("Small Castles Start With Level 1 Walls", HintText = "When a new campaign starts, the lesser castles - those of houses of tier 3 or lower, not the great fortresses (Casterly Rock, the Red Keep) - begin with walls of level 1 instead of 2, so they fall sooner than the seats of the great houses. Only a new campaign; a saved game keeps its walls. Off = all castles begin with the walls of the map", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeSmallCastlesWalls1 { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -16214,6 +16218,7 @@ namespace Armoury
             s.CaptiveGrudgeHeirShare = CaptiveGrudgeHeirShare;
             s.CaptiveGrudgeRansom = CaptiveGrudgeRansom;
             s.CaptiveTermsBendKnee = CaptiveTermsBendKnee;
+            s.SiegeSmallCastlesWalls1 = SiegeSmallCastlesWalls1;
         }
 
         internal static void Apply()

@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 471b-1 (13.11) - male zamki nowej kampanii zaczynaja z murami poziomu 1 (D1)
+
+**Problem:** Jeff 13.11, odpowiedz D1: "daj mniejsze zamki pozim murow 1". Kategorie 471 (maly zamek = mury 1, 20-40 dob) nie mialy ani jednego zamku: w ROT 8.1.8 (`ROT-Map/ModuleData/settlements.xml`) 128 zamkow ma `building_castle_fortifications` level 2, Casterly Rock (`castle_V5`) i Red Keep (`ROT_castle61`) - 3. Linie `Czas oblezenia (471) start` pokazywaly wiec same "duze zamki".
+
+**Przyczyna:** dane mapy ROT - wszystkie zamki na poziomie 2; nic w grze ani u nas nie rozroznia zamkow pomniejszych rodow.
+
+**Zmiana:** nowy plik `Armoury/src/SiegeSmallCastles471.cs`, klucz `SiegeSmallCastlesWalls1` (MCM "Small Castles Start With Level 1 Walls", nowa grupa "Sieges: length, supplies and yielding (471)", domyslnie TAK; Settings.cs + McmSettings.cs recznie, nazwa w `tools/gen_mcm.py` - skryptu nie uruchamialem).
+- Kryterium "mniejszy" z danych (`ROT-Content/ModuleData/spclans.xml`, tier rodu-wlasciciela): 130 zamkow, kazdy innego pana; rody tier 3 - 60 zamkow, tier 4 - 55, tier 5 - 9, tier 6 - 6; wladcy krolestw zamkow nie maja. Maly zamek = zamek rodu tier <= 3 (pomniejszy rod), nie wielka twierdza z listy 471 (`SiegeWalls.IsTwierdza471`), mury dokladnie 2. Oczekiwane ok. 60 z 130 (46%). Siedziby rodow tier 4-6 zostaja na 2.
+- Tylko NOWA kampania: nasluch `OnNewGameCreatedPartialFollowUpEndEvent` (po calym starcie gry) -> `Building.LevelDown()` budowli `CastleFortifications` (droga gry, `cs_full.cs:165548`: poziom 2 -> 1, postep 0, zdarzenie `OnBuildingLevelChanged`; StartLevel fortyfikacji zamku = 1, `cs_full.cs:166146`). Zapis trzyma poziom sam; wczytanie starego zapisu tej metody nie wola.
+- Linia `Mury malych zamkow (471b-1) start nowej kampanii: zamkow N | mury 2 -> 1: K (...) | bez zmian: wielkie twierdze, rod tier > 3, mury inne niz 2, bez pana, blad | tiery panow zamkow | lista: id nazwa (rod tN), ...`. Kontrola w pierwszej dobie sesji: `Mury malych zamkow (471b-1) kontrola pierwszej doby: obnizonych K, dalej mury 1: K` (+ `ZMIENIONE po starcie`, gdyby BK/ROT nadpisaly poziom).
+
+**Ryzyko / co sprawdzic:**
+- Regresje (czytelnicy poziomu murow): 320c `LevelFactor` (przewaga L1 x1.10 zamiast L2 x1.20 - zamierzone), `BreachBase` (wyrwa przy L1 latwiejsza), `Measure` OB1 (`m.Level`), linia KO, 471 `Cat471` (mury <= 1 = maly zamek - teraz trafia), gra: pojemnosc zalogi zamku +50 zamiast +75 i lochu +30 zamiast +45 (`cs_full.cs:166146`) - male zamki pomieszcza o 25 ludzi zalogi mniej; nic u nas ani w grze nie wyrzuca nadmiaru, AI po prostu mniej dosyla. Do sprawdzenia w tescie: zalogi malych zamkow i linie OB1/320c.
+- 472 (mury historycznie drogie): male zamki moga odbudowac mury 2 dopiero po `WallMinYearsCastle2` (2 lata) - zamierzone, kategoria 471 czyta poziom przy starcie oblezenia.
+- Kolizje: brak innych nasluchow `OnBuildingLevelChanged` u nas (CitySack.Burn liczy poziomy ponad start przy spaleniu - start budowli to 1, wiec spalenie z 1 nic nie zabiera, jak w grze).
+- Klucz NIE = zadnej zmiany (tylko linia logu); stary zapis = zadnej zmiany.
+
+**Status:** DO SPRAWDZENIA (nie wgrane; wymaga NOWEJ kampanii).
+
 ## 470-p (12.11) - poprawki po recenzji 470: prawdziwy brak jedzenia swiata zostaje w N (U1), S_stos po wczytaniu z zapisu (U2), Empty wymaga progu 221 (U3), napisy (U4, U5)
 
 **Problem:** recenzja 470-a / 470-b. U1: prog 470-b 2 szt./d jest na komorke - maslo (brak swiata 17.4 szt./d, sprzedaz 0, 10 miast z N >= 1.5) przy rownym rozkladzie ok. 1.74 szt./d na miasto wypadloby z N calkiem, choc to prawdziwy brak. U2: przy 470-a TAK po kazdym wczytaniu S_stos = 1 dla wszystkich towarow do pierwszej decyzji 221 (do 28 dob) - regresja wobec 435-L1-p. U3: `Empty()` nie wymagal `g.Short` (przy ValveStockDaysLow < 5 towar, ktorego 221 nie uwaza za krotki, dostawal S_stos). U4: napis MCM "falls back by itself as the stock refills" nieprawdziwy (StockDays to migawka decyzji co 28 dob). U5: linia LP przy TAK pisala "liczone 1.25" i "decyzji N" (to liczba pustych decyzji).

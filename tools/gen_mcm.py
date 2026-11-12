@@ -834,6 +834,7 @@ LABELS = {
     'NorthSparesWestSeats465': 'North Spares The Rock And Western Cities',
     'SiegeAssaultPartyStrikes': 'Assault Party Fights, Not The Whole Army',   # 467
     'SiegeAssaultPartyStrikesRepels': 'Assault Party Fights Until Repels',   # 467
+    'SiegeSmallCastlesWalls1': 'Small Castles Start With Level 1 Walls',   # 471b-1
     'BkVetoNextTarget334': 'Army Objective Skips Vetoed Seats',
     'IronbornCanonReave334': 'Ironborn Reave The North',
     'PartyPositionGuard334c': 'Party Position Guard',   # paczka 334c
