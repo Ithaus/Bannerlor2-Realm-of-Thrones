@@ -31,7 +31,8 @@ namespace Armoury
     ///   odszedl > 10 m); kazdy wolny jezdziec szyku (AI, konno, nie bohater, nie chorazy, nie smok, nie umarly, nie w panice / odwrocie / wycofaniu 143, nie pod
     ///   148 / 204 / 283a, CanBeAssignedForScriptedMovement) - wzor 148: SetAutomaticTargetSelection(false) + SetTargetAgent(gracz) + SetScriptedPosition(miejsce
     ///   gracza) co 0.25 s, bez NoAttack. Komunikat dla gracza (po angielsku): "Enemy horsemen ride for you!".
-    ///   Koniec: 40 s; szyk stracil 30% ludzi od startu; gracz padl / zniknal; wszyscy jezdzcy zawroceni; rola oddana przez 441 (gracz / szyk pusty). Jezdziec
+    ///   Koniec: 40 s; szyk stracil 30% ludzi od startu; gracz padl / zniknal; wszyscy jezdzcy zawroceni; rola oddana przez 441 (gracz / szyk pusty); klucz NIE
+    ///   w trakcie (447-p); potkniecie passu (447-p). Jezdziec
     ///   zwalniany pojedynczo: padl, bez konia, panika / ucieczka / odwrot szyku, wycofanie 143 (BeforeWithdraw - pozycja 143 nietknieta), zmiana szyku.
     ///   Zwolnienie: cel automatyczny, pozycja skryptowa zdjeta (chyba ze wycofanie 143 - ta jest jego), rola NONE (RBM wraca).
     /// Klucz NIE (albo bez dowodcy jazdy 441): warunki i wybor szyku liczone (tylko odczyt), rola nie nadawana - licznik "bylby" (raz na bitwe); co do znaku jak dotad.
@@ -44,8 +45,9 @@ namespace Armoury
         internal const float H447Every = 1f, H447Step = 0.25f, H447Fight = 80f, H447MeleeWin = 10f, H447ShotWin = 20f, H447Still = 3f, H447GuardR = 20f;
         internal const float H447Behind = 30f, H447Hold = 10f, H447Range = 300f, H447Max = 40f, H447Loss = 0.3f, H447Reach = 5f, H447Refresh = 10f, H447BusyMax = 0.5f;
         internal const int H447GuardMen = 5, H447FriendMen = 10, H447MinRiders = 5;
-        private const int HrTime = 0, HrLoss = 1, HrDown = 2, HrNoRiders = 3, HrBack = 4, HrGone = 5, HrK = 6;
-        private static readonly string[] HrName = { "czas 40 s", "strata 30%", "gracz padl", "jezdzcy zawroceni", "rola oddana (gracz / szyk pusty / 441)", "gracz zniknal" };
+        private const int HrTime = 0, HrLoss = 1, HrDown = 2, HrNoRiders = 3, HrBack = 4, HrGone = 5, HrKey = 6, HrErr = 7, HrK = 8;
+        private static readonly string[] HrName = { "czas 40 s", "strata 30%", "gracz padl", "jezdzcy zawroceni", "rola oddana (gracz / szyk pusty / 441)", "gracz zniknal",
+            "klucz NIE / bez dowodcy jazdy", "potkniecie" };
         private const int HuDown = 0, HuHorse = 1, HuPanic = 2, HuWithdraw = 3, HuForm = 4, HuK = 5;
         private static readonly string[] HuName = { "padl", "bez konia", "panika / odwrot", "wycofanie 143", "zmiana szyku" };
         private const int HnFight = 0, HnMelee = 1, HnShot = 2, HnMove = 3, HnGuard = 4, HnFront = 5, HnK = 6;
@@ -63,6 +65,8 @@ namespace Armoury
         private static Agent _h7Target;
         private static readonly List<Agent> _h7Riders = new List<Agent>();
         private static readonly HashSet<int> _h7Reached = new HashSet<int>();
+        private static readonly HashSet<int> _h7TakenIdx = new HashSet<int>();   // 447-p: jezdzcy wzieci (unikalnie po Index) - ponowne wziecia osobno
+        private static bool _h7BusySeen;   // 447-p: wstrzymanie 443 liczone raz na polowanie (nie co takt)
         private static Agent[] _h7Arr;
         private static readonly MBList<Agent> _h7Buf = new MBList<Agent>();
         private static readonly List<Agent> _h7Units = new List<Agent>();
@@ -70,7 +74,7 @@ namespace Armoury
 
         // ---- liczniki misji (H447Reset w Battle291.Begin); _h7ShotN, _h7HitN, _h7Dmg - Interlocked
         private static int _h7ShotN, _h7HitN, _h7Dmg;
-        private static int _h7Starts, _h7Dry, _h7Taken, _h7Late, _h7ReachN, _h7Down, _h7DownBy, _h7Open, _h7Busy443, _h7Stum, _h7RidersLost, _h7Refused;
+        private static int _h7Starts, _h7Dry, _h7Taken, _h7Late, _h7ReachN, _h7Down, _h7DownBy, _h7Open, _h7Busy443, _h7Stum, _h7RidersLost, _h7Refused, _h7Retake;
         private static float _h7RearSec, _h7GenSec, _h7HuntSec;
         private static readonly int[] _h7End = new int[HrK], _h7Rel = new int[HuK];
         private static readonly float[] _h7NoSec = new float[HnK];
@@ -80,7 +84,8 @@ namespace Armoury
         internal static void H447Reset()
         {
             Interlocked.Exchange(ref _h7ShotN, 0); Interlocked.Exchange(ref _h7HitN, 0); Interlocked.Exchange(ref _h7Dmg, 0);
-            _h7Starts = _h7Dry = _h7Taken = _h7Late = _h7ReachN = _h7Down = _h7DownBy = _h7Open = _h7Busy443 = _h7Stum = _h7RidersLost = _h7Refused = 0;
+            _h7Starts = _h7Dry = _h7Taken = _h7Late = _h7ReachN = _h7Down = _h7DownBy = _h7Open = _h7Busy443 = _h7Stum = _h7RidersLost = _h7Refused = _h7Retake = 0;
+            _h7BusySeen = false; _h7TakenIdx.Clear();
             _h7RearSec = _h7GenSec = _h7HuntSec = 0f;
             _h7Cnt0 = 0; _h7FirstReach = -1f;
             for (int k = 0; k < HrK; k++) _h7End[k] = 0;
@@ -106,7 +111,8 @@ namespace Armoury
             if (_h7On) { _h7Open++; H447Stop(-1); }
             _h7On = false; _h7Done = false;
             _h7F = null; _h7Target = null;
-            _h7Riders.Clear(); _h7Reached.Clear(); _h7Units.Clear(); _h7Buf.Clear();
+            _h7Riders.Clear(); _h7Reached.Clear(); _h7TakenIdx.Clear(); _h7Units.Clear(); _h7Buf.Clear();
+            _h7BusySeen = false;
             Volatile.Write(ref _h7Arr, null);
             _h7Acc = _h7StepAcc = 0f;
             _h7RearSince = -1f; _h7LastShot = -1000f;
@@ -130,7 +136,7 @@ namespace Armoury
         internal static bool H447Busy(Formation f)
         {
             if (C441RoleOf(f) != CrHunt) return false;
-            _h7Busy443++;
+            if (!_h7BusySeen) { _h7BusySeen = true; _h7Busy443++; }   // 447-p: raz na polowanie (443 pyta co takt pod ostrzalem)
             return true;
         }
 
@@ -222,7 +228,7 @@ namespace Armoury
                 catch (Exception e)
                 {
                     _h7Stum++;
-                    if (_h7On) { try { H447Stop(HrBack); } catch { } }
+                    if (_h7On) { try { H447Stop(HrErr); } catch { } }   // 447-p: wlasny powod konca (nie "rola oddana")
                     RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hunt447 pass", e);
                 }
                 return;
@@ -240,19 +246,33 @@ namespace Armoury
             int sn = Volatile.Read(ref _h7ShotN);
             if (sn != _h7ShotSeen) { _h7ShotSeen = sn; _h7LastShot = now; }
             var pm = Agent.Main;
-            if (_h7On) { _h7HuntSec += step; H447HuntPass(m, pm, now); return; }
-            if (_h7Done) return;
+            // 447-p: pomiar (wodz / z tylu / powody) przez cala bitwe, takze po decyzji - liczby linii to czasy z calej bitwy (porownywalne TAK / NIE)
             Team pt = null;
             bool gen = false;
+            int why = HnFront;
+            Vec2 pos = Vec2.Invalid;
             try { gen = pm != null && pm.IsActive() && (pt = pm.Team) != null && MissionTeams.Valid(pt) && pt.IsPlayerGeneral; } catch { gen = false; }
-            if (!gen) { _h7RearSince = -1f; _h7PrevPos = Vec2.Invalid; return; }
-            _h7GenSec += step;
-            Vec2 pos = pm.Position.AsVec2;
-            int why = H447NotRear(m, pm, pt, pos, now, step);
-            _h7PrevPos = pos;
-            if (why >= 0) { _h7NoSec[why] += step; _h7RearSince = -1f; return; }
-            _h7RearSec += step;
-            if (_h7RearSince < 0f) _h7RearSince = now;
+            if (!gen) { _h7RearSince = -1f; _h7PrevPos = Vec2.Invalid; }
+            else
+            {
+                try
+                {
+                    _h7GenSec += step;
+                    pos = pm.Position.AsVec2;
+                    why = H447NotRear(m, pm, pt, pos, now, step);
+                    _h7PrevPos = pos;
+                    if (why >= 0) { _h7NoSec[why] += step; _h7RearSince = -1f; }
+                    else { _h7RearSec += step; if (_h7RearSince < 0f) _h7RearSince = now; }
+                }
+                catch (Exception e)
+                {
+                    // potkniecie pomiaru nie konczy polowania w toku
+                    _h7Stum++; why = HnFront; _h7RearSince = -1f;
+                    RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hunt447 pomiar", e);
+                }
+            }
+            if (_h7On) { _h7HuntSec += step; H447HuntPass(m, pm, now); return; }
+            if (_h7Done || !gen || why >= 0) return;
             if (now - _h7RearSince < H447Hold) return;
             Formation f = H447PickCav(m, pt, pos);
             if (f == null) return;
@@ -439,7 +459,8 @@ namespace Armoury
             _h7F = f; _h7Target = pm; _h7Start = now; _h7FirstReach = -1f;
             _h7Men0 = f.CountOfUnits;
             _h7OrdAt = wp.AsVec2;
-            _h7Riders.Clear(); _h7Reached.Clear();
+            _h7Riders.Clear(); _h7Reached.Clear(); _h7TakenIdx.Clear();
+            _h7BusySeen = false;
             _h7Starts++;
             H447Take(f, false);
             _h7Cnt0 = _h7Riders.Count;
@@ -467,17 +488,28 @@ namespace Armoury
             {
                 var a = _h7Units[i];
                 if (!H447RiderOk(a)) continue;
+                bool added = false;
                 try
                 {
+                    // 447-p: wpis CleanShot 310 zdjety (jak 204 StartHunter) - jego Threat / termin nie zdejmie celu polowania
+                    CleanShot.Yield(a);
                     a.SetAutomaticTargetSelection(false);
                     a.SetTargetAgent(pm);
                     H447Mark(a, true);
                     _h7Riders.Add(a);
-                    _h7Taken++;
-                    if (late) _h7Late++;
+                    added = true;
+                    if (_h7TakenIdx.Add(a.Index)) { _h7Taken++; if (late) _h7Late++; }
+                    else _h7Retake++;   // 447-p: ten sam jezdziec wziety ponownie (np. po panice) - osobno
                     H447Push(a, pm);
                 }
-                catch (Exception e) { _h7Stum++; H447Release(a, HuForm); RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hunt447 jezdziec", e); }
+                catch (Exception e)
+                {
+                    // 447-p: jezdziec zdjety z listy (inaczej krok dalej by go pchal mimo zwolnienia); powod -1 (potkniecie liczy _h7Stum)
+                    _h7Stum++;
+                    if (added) _h7Riders.Remove(a);
+                    H447Release(a, -1);
+                    RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hunt447 jezdziec", e);
+                }
             }
             _h7Units.Clear();
         }
@@ -492,8 +524,13 @@ namespace Armoury
         private static void H447HuntPass(Mission m, Agent pm, float now)
         {
             var f = _h7F;
-            if (pm == null || !ReferenceEquals(pm, _h7Target)) { H447Stop(HrGone); return; }
-            if (!pm.IsActive()) { H447Stop(HrDown); return; }
+            // 447-p: klucz NIE (albo bez dowodcy jazdy 441) w trakcie - polowanie konczone od razu (jak 444)
+            var c = Settings.Current;
+            if (c == null || !c.CavalryHuntsRearCommander || !C441Live) { H447Stop(HrKey); return; }
+            // 447-p: najpierw stan celu - gra zeruje Agent.Main zaraz po OnAgentRemoved, wiec padly gracz dawal dotad "gracz zniknal"
+            var tg = _h7Target;
+            if (tg == null || !tg.IsActive()) { H447Stop(_h7Down > 0 ? HrDown : HrGone); return; }
+            if (pm == null || !ReferenceEquals(pm, tg)) { H447Stop(HrGone); return; }
             if (f == null || f.CountOfUnits <= 0 || C441RoleOf(f) != CrHunt) { H447Stop(HrBack); return; }
             if (now - _h7Start > H447Max) { H447Stop(HrTime); return; }
             if (f.CountOfUnits <= (1f - H447Loss) * _h7Men0) { H447Stop(HrLoss); return; }
@@ -538,7 +575,7 @@ namespace Armoury
                 {
                     _h7Stum++;
                     _h7Riders.RemoveAt(i);
-                    H447Release(a, HuForm);
+                    H447Release(a, -1);   // 447-p: potkniecie liczy _h7Stum, nie "zmiana szyku"
                     RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hunt447 krok", e);
                 }
             }
@@ -592,6 +629,7 @@ namespace Armoury
             for (int k = 0; k < HcK; k++) sb.Append(k > 0 ? "," : "").Append(' ').Append(HcName[k]).Append(' ').Append(_h7NoCav[k]);
             sb.Append(" | proby ").Append(_h7Starts).Append(", bylby (klucz NIE / bez dowodcy jazdy) ").Append(_h7Dry).Append(", rola odrzucona ").Append(_h7Refused)
               .Append(" | jezdzcow wzietych ").Append(_h7Taken).Append(" (na starcie ").Append(_h7Cnt0).Append(", dolaczonych pozniej ").Append(_h7Late).Append(')')
+              .Append(", ponownie wzietych ").Append(_h7Retake)
               .Append(", ").Append(_h7HuntSec.ToString("0", H7Inv)).Append(" s polowania")
               .Append(" | dojazd: pierwszy w ").Append(H447Reach.ToString("0", H7Inv)).Append(" m od gracza po ")
               .Append(_h7FirstReach >= 0f ? _h7FirstReach.ToString("0.0", H7Inv) + " s" : "-").Append(", jezdzcow w ").Append(H447Reach.ToString("0", H7Inv)).Append(" m ").Append(_h7ReachN)
@@ -602,7 +640,7 @@ namespace Armoury
             for (int k = 0; k < HrK; k++) sb.Append(k > 0 ? "," : "").Append(' ').Append(HrName[k]).Append(' ').Append(_h7End[k]);
             sb.Append(", w toku przy koncu ").Append(_h7Open).Append(" | jezdzcy zwolnieni pojedynczo:");
             for (int k = 0; k < HuK; k++) sb.Append(k > 0 ? "," : "").Append(' ').Append(HuName[k]).Append(' ').Append(_h7Rel[k]);
-            sb.Append(" | rajd 443 wstrzymany ").Append(_h7Busy443).Append(" | potkniecia ").Append(_h7Stum).Append('.');
+            sb.Append(" | rajd 443 wstrzymany (polowania) ").Append(_h7Busy443).Append(" | potkniecia ").Append(_h7Stum).Append('.');
             return sb.ToString();
         }
     }

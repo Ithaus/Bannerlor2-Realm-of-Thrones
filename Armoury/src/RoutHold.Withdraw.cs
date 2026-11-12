@@ -139,6 +139,9 @@ namespace Armoury
             catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.BeforeWithdraw", ex); }
             // recenzja 148: jezdziec w poscigu - cel automatyczny i pozycja skryptowa poscigu zdjete TERAZ (natywny odwrot 143 idzie dopiero w Evaluate, a
             // HorsePursuit.Uncontrol nie zdejmowal pozycji czlowiekowi juz w Withdrawing - zostawala na nim pozycja uciekajacego)
+            // 447-p: jezdziec polowania na wodza - wolany tu, poza bramka _live HorsePursuit (jego _field jest wezszy niz _h7Live 447)
+            try { Doctrine.H447BeforeWithdraw(a); }
+            catch (Exception ex) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hunt447 odwrot", ex); }
             try { HorsePursuit.BeforeWithdraw(a); }
             catch (Exception ex) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.BeforeWithdraw", ex); }
             // recenzja 158: biegacz po sztandar - claim i pozycja NoAttack zdjete TERAZ (Step zdejmowal je co 0.25 s przez StopUsingGameObject, a ten wola

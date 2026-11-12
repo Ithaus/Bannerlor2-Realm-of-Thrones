@@ -301,7 +301,6 @@ namespace Armoury
         internal static void BeforeWithdraw(Agent a)
         {
             if (!_live || a == null) return;
-            try { Doctrine.H447BeforeWithdraw(a); } catch (Exception e) { HStumble("Doctrine.Hunt447 odwrot", e); }   // 447: jezdziec polowania oddany grze przed pierwszym ruchem 143
             try { HuntBeforeWithdraw(a); } catch (Exception e) { HStumble("HorsePursuit.JazdaOdwrot", e); }   // 204: czlowiek 204 / nekajacy testu oddany grze przed pierwszym ruchem 143
             Rider r;
             if (!Riders.TryGetValue(a, out r) || r.St != RChase) return;

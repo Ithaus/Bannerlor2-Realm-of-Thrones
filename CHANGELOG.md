@@ -1,5 +1,43 @@
 # DZIENNIK ZMIAN
 
+## 447-p (12.11) - POPRAWKI PO RECENZJI 447 (polowanie jazdy na gracza-wodza z tylu): powod konca "gracz padl" liczony, pomiar wodz / z tylu przez cala bitwe, wstrzymanie 443 raz na polowanie, osobne powody konca "potkniecie" i "klucz NIE", jezdzcy wzieci unikalnie, catch H447Take zdejmuje jezdzca z listy, klucz NIE w trakcie konczy polowanie, BeforeWithdraw 447 poza bramka HorsePursuit, CleanShot 310 nie rusza jezdzca polowania (Doctrine.Hunt447.cs, RoutHold.Withdraw.cs, HorsePursuit.cs, CleanShot.cs)
+
+**Problem:** recenzja zmiany 447 (10 znalezisk, z czego 2 duplikaty - 8 roznych; wszystkie sprawdzone w kodzie, PRZYJETE):
+- [drobny] "koniec: gracz padl" zawsze 0 - gra (Mission.OnAgentRemoved, decout/rally/mission.cs:3005-3009) zeruje MainAgent zaraz po OnAgentRemoved zachowan, wiec nastepny pass mial Agent.Main == null i konczyl jako "gracz zniknal"; galaz `!pm.IsActive()` martwa (zglaszane dwa razy).
+- [drobny] "gracz wodzem N s", "z tylu (wszystkie warunki)" i "nie z tylu" liczone tylko do decyzji (return przy _h7On / _h7Done przed licznikami) - linia podawala je jak czasy z calej bitwy, TAK i NIE nieporownywalne.
+- [drobny] "rajd 443 wstrzymany" liczyl takty (H447Busy co 1 s pod ostrzalem), nie wstrzymania.
+- [drobny] wyjatek passu konczyl polowanie powodem "rola oddana (gracz / szyk pusty / 441)"; "jezdzcow wzietych" liczyl wziecia, nie jezdzcow (ten sam po panice dwa razy).
+- [drobny] catch w H447Take zwalnial jezdzca, ale zostawial go w _h7Riders - krok dalej pchal go na gracza, a 335 / 158 widzialy go jako wolnego (dwoch wlascicieli); w nastepnym passie mogl wejsc drugi raz (duplikat) (zglaszane dwa razy).
+- [drobny] klucz Cavalry Hunts Rear Commander na NIE w trakcie polowania nie konczyl go (do 40 s), choc 444 przy NIE oddaje szyk od razu, a MCM mowi "Off = exactly as before".
+- [drobny] Doctrine.H447BeforeWithdraw wolany z HorsePursuit.BeforeWithdraw za bramka `_live` HorsePursuit (_field: IsFieldBattle && rodzaj "bitwa" && nie morska / rajd morski), a _h7Live ma tylko IsFieldBattle && !IsNavalBattle - w misji poza _field 143 zaczynal wycofanie z pozycja 447 na rannym.
+- [drobny] CleanShot 310 nie rozpoznawal jezdzca polowania (Shot :175, Review :489) - jezdziec ze strzelba / lukiem w szyku jazdy (447 odrzuca tylko szyk konnych strzelcow) mogl dostac inny cel, a po OwnUntil Release wlaczal automat celu - przestawal celowac w gracza; w druga strone Threat / termin CleanShot zdejmowal cel ustawiony przez 447.
+
+**Przyczyna:** Doctrine.Hunt447.cs - kolejnosc sprawdzen w H447HuntPass (Agent.Main przed _h7Target), return przed licznikami pomiaru w H447Pass, licznik w H447Busy bez zapadki, HrBack w catch H447Tick, _h7Taken bez unikalnosci, brak `_h7Riders.Remove` w catch H447Take, brak odczytu klucza w H447HuntPass; HorsePursuit.cs (wolanie 447 za bramka _live); CleanShot.cs (brak Doctrine.H447AnyThread).
+
+**Zmiana:**
+- H447HuntPass: najpierw klucz (CavalryHuntsRearCommander NIE albo !C441Live -> koniec "klucz NIE / bez dowodcy jazdy"), potem stan _h7Target: nieaktywny -> "gracz padl" gdy _h7Down > 0, inaczej "gracz zniknal"; dopiero potem Agent.Main != cel -> "gracz zniknal".
+- H447Pass: pomiar (wodz / z tylu / powody "nie z tylu") co pass przez cala bitwe, takze w trakcie i po decyzji; decyzja dalej raz na bitwe. Wyjatek pomiaru liczony (potkniecie), nie konczy polowania w toku.
+- H447Busy: licznik raz na polowanie (_h7BusySeen, zerowany w H447Start / Reset / Clear); w linii "rajd 443 wstrzymany (polowania)".
+- Nowe powody konca: "klucz NIE / bez dowodcy jazdy" (HrKey), "potkniecie" (HrErr - catch H447Tick).
+- "jezdzcow wzietych" = unikalni po Agent.Index (HashSet); nowe pole "ponownie wzietych" (ten sam jezdziec drugi raz); "dolaczonych pozniej" tylko unikalni.
+- catch H447Take: `_h7Riders.Remove(a)` (gdy dodany) i H447Release(a, -1); catch H447Steer: powod -1 zamiast "zmiana szyku" (potkniecie liczy _h7Stum).
+- H447Take: CleanShot.Yield(a) przed przejeciem (jak 204 StartHunter) - wpis 310 zdjety, wstrzymanie ognia zdjete, celu nie rusza.
+- CleanShot.Shot / Review: `|| Doctrine.H447AnyThread` obok HuntAnyThread / RidingAnyThread (pomijany / oddawany jak jezdziec 204).
+- Doctrine.H447BeforeWithdraw wolany bezposrednio z RoutHold.Withdraw (przed HorsePursuit.BeforeWithdraw, ta sama kolejnosc co dotad), usuniety z HorsePursuit.BeforeWithdraw.
+- Klucze MCM bez zmian: Cavalry Hunts Rear Commander (TAK), Cavalry Commander (TAK). Klucz NIE: polowanie nie startuje (jak dotad); po przelaczeniu na NIE w trakcie - konczone w nastepnym passie (<= 1 s).
+
+**Linia logu "Polowanie na wodza (447)" - zmiany:** "gracz wodzem N s, z tylu (wszystkie warunki) N s, nie z tylu (s)" = czasy z calej bitwy; "jezdzcow wzietych N (na starcie A, dolaczonych pozniej B), ponownie wzietych R"; "koniec: ..., klucz NIE / bez dowodcy jazdy K, potkniecie P"; "rajd 443 wstrzymany (polowania) 0/1".
+
+**Oczekiwane liczby (bitwa polowa, gracz-wodz stoi z tylu, klucz TAK):** proby 1; gdy gracz padnie w polowaniu - "koniec: gracz padl 1" (dotad "gracz zniknal 1"); "gracz wodzem" ok. dlugosci bitwy (dotad urwane na starcie polowania); "rajd 443 wstrzymany (polowania)" 0 albo 1; "ponownie wzietych" maly (0-kilka); "potkniecie" 0; potkniecia ogolem 0.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: H447NotRear (GetNearbyEnemyAgents / GetNearbyAllyAgents w 80 / 20 m) liczony co 1 s przez cala bitwe zamiast do decyzji - koszt jednego zapytania na sekunde, pomijalny. Koniec "gracz padl" teraz zalezy od _h7Down (H447OnRemoved, glowny watek, przed nastepnym passem) - przy usunieciu gracza innym stanem niz Killed / Unconscious -> "gracz zniknal" (zgodne z nazwa). CleanShot.Yield w H447Take: _relTaken CleanShot liczy takze przejecia przez 447 (jak 204).
+- Kolizje: 291 (Battle291 - tylko nowe pola linii 447, H447Reset bez zmian kolejnosci), 313 / 333 / 344 (prefiksy ustawienia / 441 - bez zmian, rola CrHunt nadawana / oddawana jak dotad), 359 / 372 (bez zmian), 204 / 148 (HorsePursuit.BeforeWithdraw: 204 i 148 dalej za bramka _live, kolejnosc 447 -> 204 -> 148 zachowana, tylko 447 wyjety przed bramke), 143 (RoutHold.Withdraw - jedno wolanie wiecej, try/catch, glowny watek), 310 CleanShot (Doctrine.H447AnyThread - odczyt Volatile, bezpieczny z dowolnego watku; Yield - glowny watek, jak 204), 421 / 436 (nie dotyczy - 436 to bitwy symulowane, 447 tylko bitwa polowa w misji), 443 (H447Busy dalej zwraca true tak samo - zmieniony tylko licznik), 444 / 445 (bez zmian).
+- Martwy kod ozywiony: galaz "gracz padl" (tylko licznik); klucz NIE w trakcie konczy polowanie (jezdzcy oddani grze jak przy 40 s). Ile szykow naraz: dalej jedno polowanie na bitwe (wszystkie druzyny razem). Watek silnika: bez zmian - pass, krok, Yield, BeforeWithdraw w glownym watku; OnShoot / OnHit tylko Interlocked / Volatile.
+- Nie sprawdzone w grze: realny wyjatek w H447Push (sciezka catch); czy CleanShot w ogole trzymal jezdzcow polowania (licznik _relTaken).
+
+**Status:** DO SPRAWDZENIA (build 0 bledow, nie testowane w grze, nie wgrane).
+
 ## 446-p (12.11) - POPRAWKI PO RECENZJI 446 (czworobok piechoty przed jazda z boku): bok / tyl wedlug kierunku sprzed obrotu czola przez RBM, powrot do ostatniego odrzuconego ustawienia (szarza: ShieldWall -> Line), odstep wzdluz kierunku podejscia (Width / Depth), limit 30 / 90 s nie zrywa czworoboku przy jezdzie w 25 m (sufit 60 / 120 s), odwrot nie wchodzi i wychodzi od razu, szarza i piechota wroga wychodza przed 6 s, przejecie przez gracza przywraca ustawienie, pomiar strat na 10 szyko-s tylko piechoty, CloseRanks synchronizowany po powrocie (Doctrine.Square446.cs, CloseRanks.cs)
 
 **Problem:** recenzja zmiany 446 (9 znalezisk; wszystkie sprawdzone w kodzie i dekompilacji):

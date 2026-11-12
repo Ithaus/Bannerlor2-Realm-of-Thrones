@@ -172,7 +172,7 @@ namespace Armoury
             if (t == null || !t.IsActive()) { _skNoTarget++; return; }
             Agent tm = t.IsMount ? t.RiderAgent : t;   // cel-kon: strona jezdzca
             if (tm == null || tm.Team == null || !tm.Team.IsEnemyOf(s.Team)) { _skNoTarget++; return; }
-            if (HorsePursuit.HuntAnyThread(s) || HorsePursuit.RidingAnyThread(s)) { _skHunt++; return; }
+            if (HorsePursuit.HuntAnyThread(s) || HorsePursuit.RidingAnyThread(s) || Doctrine.H447AnyThread(s)) { _skHunt++; return; }   // 447-p: jezdziec polowania
             if (HorsePursuit.Banner(s)) { _skBanner++; return; }
             if (s.IsRunningAway || SurvivalMode.InPanic(s) || s.IsRetreating()) { _skPanic++; return; }
             if (s.Formation == null || s.IsDetachedFromFormation) { _skDetached++; return; }
@@ -486,7 +486,7 @@ namespace Armoury
             try
             {
                 if (a == null || !a.IsActive()) { e.Owned = false; EndHold(e, false); return; }
-                if (HorsePursuit.HuntAnyThread(a) || HorsePursuit.RidingAnyThread(a)) { _relTaken++; e.Owned = false; EndHold(e, true); return; }   // cel jego 204/283/148
+                if (HorsePursuit.HuntAnyThread(a) || HorsePursuit.RidingAnyThread(a) || Doctrine.H447AnyThread(a)) { _relTaken++; e.Owned = false; EndHold(e, true); return; }   // cel jego 204/283/148
                 if (HorsePursuit.Banner(a)) { _relBanner++; e.Owned = false; EndHold(e, true); return; }                                       // RBM steruje celem
                 if (a.IsRunningAway || SurvivalMode.InPanic(a))
                 {
