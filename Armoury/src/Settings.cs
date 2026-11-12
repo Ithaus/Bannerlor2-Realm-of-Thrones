@@ -1259,12 +1259,12 @@ namespace Armoury
         // 472 (Jeff 12.11: "okres budowy murow zamek 1 2 lub 3 powinny byc odpowiednio drogie i dlugie"; BuildFunding.Walls.cs): mury - osobna cena punktu (zamek x3, miasto x2)
         // i najkrotszy czas poziomu (dzienny limit punktow = koszt poziomu / (lata x doby roku)); koszt poziomu w grze i zapis bez zmian. Klucz NOWY; off = co do bitu jak dotad
         public bool WallWorksHistorical = true;            // walls rise as slowly and dearly as in the Middle Ages: a point of wall works costs more than other military works (Wall Castle / Town Point Price Factor) and no stage of the walls can be finished faster than Wall Min Years (the lord, the townsfolk, the mason, the governor and gold paid to the craftsmen together put in at most the cost of the stage divided by those years each day; the lord pays only for what can be built that day, the rest of his allowance goes to his next work or stays in his purse). Works already started keep their progress. Needs Paid Construction. Off = walls cost and rise as before
-        public float WallCastlePointPriceFactor = 3.0f;    // with Wall Works Historical: a point of castle walls costs this many times Build Pence Per Point Military (3 = 144 pence)
-        public float WallTownPointPriceFactor = 2.0f;      // with Wall Works Historical: a point of town walls costs this many times Build Pence Per Point Military (2 = 96 pence)
-        public float WallMinYearsCastle2 = 2f;             // with Wall Works Historical: the shortest time in years to raise castle walls to level 2 (0 = no limit)
-        public float WallMinYearsCastle3 = 4f;             // with Wall Works Historical: the shortest time in years to raise castle walls to level 3 (0 = no limit)
-        public float WallMinYearsTown2 = 3f;               // with Wall Works Historical: the shortest time in years to raise town walls to level 2 (0 = no limit)
-        public float WallMinYearsTown3 = 5f;               // with Wall Works Historical: the shortest time in years to raise town walls to level 3 (0 = no limit)
+        public float WallCastlePointPriceFactor = 1.5f;    // with Wall Works Historical: a point of castle walls costs this many times Build Pence Per Point Military (3 = 144 pence; 475: default 1.5 = 72 pence, walls in half the time)
+        public float WallTownPointPriceFactor = 1.0f;      // with Wall Works Historical: a point of town walls costs this many times Build Pence Per Point Military (2 = 96 pence; 475: default 1.0 = 48 pence, walls in half the time)
+        public float WallMinYearsCastle2 = 1f;             // with Wall Works Historical: the shortest time in years to raise castle walls to level 2 (0 = no limit)
+        public float WallMinYearsCastle3 = 2f;             // with Wall Works Historical: the shortest time in years to raise castle walls to level 3 (0 = no limit)
+        public float WallMinYearsTown2 = 1.5f;               // with Wall Works Historical: the shortest time in years to raise town walls to level 2 (0 = no limit)
+        public float WallMinYearsTown3 = 2.5f;               // with Wall Works Historical: the shortest time in years to raise town walls to level 3 (0 = no limit)
         // Towary 2 / K1 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A7-10): budowy (pan i lud) biora drewno z polki tylko ponad zapas rzemiosla miasta (CaravanBulk.TargetFor -
         // 10 dob zuzycia kuzni, dymarek, linii warsztatow notabli i domow, bez budow, nie mniej niz 40 ladunkow; recenzja: strzelarzy Target nie liczy - ok. 35 ladunkow/d
         // swiata, ok. 4 na miasto na 10 dob, mieszcza sie w podlodze 40); ponizej - inny material albo budowa czeka. Klucz NOWY - w Armoury.json Jeffa go nie ma; off = 449d453
