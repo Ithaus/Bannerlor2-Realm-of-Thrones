@@ -4136,7 +4136,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawRoutedHomeDaysWar { get; set; } = 120f;
 
-        [SettingPropertyBool("Outlaw Poverty Rises Bands", HintText = "poverty breeds outlaws: the daily flow of villagers to the woods counts the poverty of the land more heavily (Outlaw Poverty Scale) and also reads what the land really suffers - hunger in its villages, people driven from burnt farms who have not come home, and a town whose people cannot pay for bread. Every such man leaves his village in the people's book and joins the outlaws of his region; none comes from nowhere. Order holds it back: a town kept in good security halves the added flow (Outlaw Poverty Order Brake), the added misery has a ceiling, and a land whose woods are already full sends no more. Off = the old measure of misery, as before", RequireRestart = false)]
+        [SettingPropertyBool("Outlaw Poverty Rises Bands", HintText = "poverty breeds outlaws: the daily flow of villagers to the woods counts the poverty of the land more heavily (Outlaw Poverty Scale) and also reads what the land really suffers - famine in its villages, people driven from burnt farms who have not come home, and a town whose people cannot pay for bread. Every such man leaves his village in the people's book and joins the outlaws of his region; none comes from nowhere. Order holds it back: a town kept in good security halves the added flow (Outlaw Poverty Order Brake), the added misery has a ceiling, and a land whose woods are already full sends no more. Off = the old measure of misery, as before", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool OutlawPovertyRisesBands { get; set; } = true;
 
@@ -4144,7 +4144,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawPovertyScale { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Outlaw Poverty Village Hunger Misery", 0.00f, 5.00f, "0.00", HintText = "with Outlaw Poverty Rises Bands: misery added when all the villages of a land go wholly without food (scaled by how short they are)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Outlaw Poverty Village Hunger Misery", 0.00f, 5.00f, "0.00", HintText = "with Outlaw Poverty Rises Bands: misery added when all the villages of a land go wholly without food (scaled by how far their want goes beyond the famine threshold; planned winter rationing counts nothing)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawPovertyVillageHungerMisery { get; set; } = 1.5f;
 
@@ -4164,13 +4164,13 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawPovertyMaxExtraMisery { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Outlaw Poverty Pool Cap Per Hearth", 0.00f, 1.00f, "0.000", HintText = "with Outlaw Poverty Rises Bands: once this many villagers per hearth of a land already hide in its woods (twice what a new world starts with), the added flow stops there and only the old flow goes on (0 = no such brake)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Outlaw Poverty Pool Cap Per Hearth", 0.00f, 1.00f, "0.000", HintText = "with Outlaw Poverty Rises Bands: a last safeguard - once this many villagers per hearth of a land already hide in its woods (twice what a new world starts with, far above a settled world), the added flow stops there and only the old flow goes on (0 = no such safeguard)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float OutlawPovertyPoolCapPerHearth { get; set; } = 0.06f;
 
-        [SettingPropertyBool("Outlaw Poverty Also Recruits", HintText = "with Outlaw Poverty Rises Bands: the same heavier measure of misery also pushes men to take service (Recruit Misery Weight) - one truth about a land for the woods and for the recruiter. Off = volunteers follow the old measure", RequireRestart = false)]
+        [SettingPropertyBool("Outlaw Poverty Also Recruits", HintText = "with Outlaw Poverty Rises Bands: the same heavier measure of misery also pushes men to take service (Recruit Misery Weight), so poor lands give lords clearly more volunteers. Off = volunteers follow the old measure of misery, as before", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
-        public bool OutlawPovertyAlsoRecruits { get; set; } = true;
+        public bool OutlawPovertyAlsoRecruits { get; set; } = false;
 
         [SettingPropertyBool("Disbanded Villagers Go Home", HintText = "a village caravan or fishing crew the game breaks up without a fight (no healthy men left, a lost party, too many boats) goes back to its village, the wounded too, instead of vanishing", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]

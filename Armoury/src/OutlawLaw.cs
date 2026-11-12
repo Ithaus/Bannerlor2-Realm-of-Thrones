@@ -87,6 +87,9 @@ namespace Armoury
         // E4/3 (108n): hearth faktycznie przesuniety przez ksiege ludzi (PeopleBook.Move) za te same ruchy - do linii "Wyrzutki:" (stawka 1/k osady albo dotychczasowa);
         // od E4/3 linia "Hearth (E4/0)" czyta hearth wprost z ksiegi (PeopleBook.TakeHearth40) - dawne przekazanie TakeOutlaw i zywe liczniki zdjete
         private static double _hRaid, _hMisery, _hReturn, _hSeed;
+        // 433-p (rec. ksiegi 4): ludzie REALNIE zdjeci z konta DOM (hearth zwrocony przez PeopleBook.Move / stawka tej wsi) - licznik rosnacy, czytany roznica
+        // w Daily do kontroli linii "Zbojcy i ryzyko (433)" (TakeFrom zwraca zadane t bez patrzenia na wynik Move)
+        private static double _menBook;
         // E4/3: pula wyrzutkow - naplyw i odplyw wedlug przyczyny do linii "Pula wyrzutkow (E4/3)"; kazdy doplyw idzie przez Add, kazdy odplyw ma licznik
         private static double _pAdd, _pSeed, _pBirth, _pRecruit, _pHomeSold, _pHomeSoldWant, _pHomeGuard, _pHomePlain, _pHomeUndead, _pFrac, _pTrim, _pLast = -1;
         private static double _pFloor;      // E4/4 (R17): z puli do wsi, ktorej podloga 10 hearth dopisala ludzi (TakeForFloor)
@@ -413,6 +416,7 @@ namespace Armoury
             float t = Math.Min(can, men);
             if (t <= 0f) return 0f;
             double h = -PeopleBook.Move(v, PeopleBook.ADom, PeopleBook.AOutlaws, t, cause, legacy);
+            _menBook += h / per;      // 433-p: sam pomiar
             if (cause == PeopleBook.MSeed) _hSeed += h; else if (cause == PeopleBook.MRaidFlee) _hRaid += h; else _hMisery += h;
             return t;
         }
@@ -1213,7 +1217,7 @@ namespace Armoury
 
         /// <summary>
         /// 433 (audyt ekonomii C4, decyzja Jeffa 6): dodatek nedzy z biedy - (1) bieda warowni liczona OutlawPovertyScale razy ciezej, (2) glod wsi regionu
-        /// (Famine.HungerOf, srednia wsi), (3) uchodzcy spustoszenia poza domem (PeopleBook.RefugeesOf / ludzie wsi), (4) lud warowni tydzien bez monety na
+        /// (Hunger.District PONAD prog glodu Famine.ThresholdNow - racjonowanie planu zimy nie jest nedza), (3) uchodzcy spustoszenia poza domem (PeopleBook.RefugeesOf / ludzie wsi), (4) lud warowni tydzien bez monety na
         /// jedzenie (TownFolk.MoneyHungry - tylko watek glowny, poza nim 0). HAMULCE: lad (bezpieczenstwo x OutlawPovertyOrderBrake zdejmuje czesc dodatku)
         /// i sufit dodatku na region (OutlawPovertyMaxExtraMisery). parts - skladniki PO hamulcach (suma = wynik) i to, co hamulce zdjely. Tylko odczyt.
         /// </summary>
@@ -1226,20 +1230,24 @@ namespace Armoury
                 var vs = r.BoundVillages;
                 if (vs != null && vs.Count > 0)
                 {
-                    double hu = 0.0, home = 0.0, away = 0.0; int n = 0;
-                    bool anyRef = PeopleBook.RefugeeVillages > 0;
-                    foreach (var v in vs)
+                    // 433-p (rec. ksiegi 1): JEDNA definicja glodu - glod okregu (Hunger.District) liczy sie dopiero PONAD prog glodu (Famine.ThresholdNow), jak w
+                    // Hunger.NoFood / PopulationLaw / DsVillage; planowe racjonowanie zimy (U = prog, nikt nie umiera) to nie nedza. Skala: 0 na progu, 1 przy pelnym braku
+                    float T = Famine.ThresholdNow, dh = Hunger.District(r);
+                    if (dh > T && T < 1f) hunger = (dh - T) / (1f - T) * Math.Max(0f, s.OutlawPovertyVillageHungerMisery);
+                    if (PeopleBook.RefugeeVillages > 0)
                     {
-                        if (v == null) continue;
-                        n++;
-                        hu += Famine.HungerOf(v);
-                        if (!anyRef) continue;
-                        double a = PeopleBook.RefugeesOf(v);
-                        if (a > 0.0) away += a;
-                        if (v.Settlement != null) home += PopulationLaw.PeopleOf(v.Settlement);
+                        double home = 0.0, away = 0.0;
+                        foreach (var v in vs)
+                        {
+                            if (v == null) continue;
+                            double a = PeopleBook.RefugeesOf(v);
+                            if (a > 0.0) away += a;
+                            // 433-p (rec. ksiegi 5): bez kalibracji na sciezce modelu ochotnikow - k z KFor, jak Devastation.YieldFactor
+                            float k = v.Settlement != null ? PopulationLaw.KFor(v.Settlement) : 0f;
+                            if (k > 0f && !float.IsInfinity(k)) home += (double)Math.Max(0f, v.Hearth) * k;
+                        }
+                        if (away > 0.0) refu = (float)(away / (home + away)) * Math.Max(0f, s.OutlawPovertyRefugeeMisery);
                     }
-                    if (n > 0 && hu > 0.0) hunger = (float)Math.Min(1.0, hu / n) * Math.Max(0f, s.OutlawPovertyVillageHungerMisery);
-                    if (away > 0.0) refu = (float)(away / (home + away)) * Math.Max(0f, s.OutlawPovertyRefugeeMisery);
                 }
                 if (s.OutlawPovertyPurseMisery > 0f && TownFolk.MoneyHungry(r)) purse = s.OutlawPovertyPurseMisery;
                 float raw = pov + hunger + refu + purse;
@@ -1306,9 +1314,10 @@ namespace Armoury
                             bool full = extra > 0f && hearth > 0f && s.OutlawPovertyPoolCapPerHearth > 0f && c0 >= s.OutlawPovertyPoolCapPerHearth * hearth;
                             float inflowOld = inflow;
                             if (!full) inflow += unit * extra;
-                            float took = 0f; double h0 = _hMisery;
+                            float took = 0f; double h0 = _hMisery, b0 = _menBook;
                             if (inflow > 0f) { took = TakeCommoners(r, inflow, PeopleBook.MMisery); _inMisery += took; }
-                            Risk433.NoteRegion(r, inflowOld, unit, extra, ref parts, full, inflow, took, CommonersIn(r) - c0, _hMisery - h0, misery + (full ? 0f : extra));
+                            Risk433.NoteRegion(r, inflowOld, unit, extra, ref parts, full, inflow, took, CommonersIn(r) - c0, _hMisery - h0, misery + (full ? 0f : extra),
+                                               _menBook - b0, c0, s.OutlawPovertyPoolCapPerHearth > 0f ? s.OutlawPovertyPoolCapPerHearth * hearth : 0f);
                         }
                         else if (inflow > 0f) _inMisery += TakeCommoners(r, inflow, PeopleBook.MMisery);
 

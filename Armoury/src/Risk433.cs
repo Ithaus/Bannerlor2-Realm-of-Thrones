@@ -23,7 +23,12 @@ namespace Armoury
     ///  C2. KUPIEC CZEKA PO ROZBICIU KARAWANY (klucz Caravan Loss Wait Days, 0 = jak dotad): karawana AI zniszczona Z NISZCZYCIELEM (bitwa; nasze rozwiazania
     ///      ida bez niszczyciela) - wlasciciel (kupiec albo lord) przez N dob nie wystawia nowej (CaravanFlow.NotableCapPostfix / LordBuyPostfix). Rod gracza,
     ///      konwoje DTE i karawany bez wlasciciela poza regula. Pamiec w zapisie (arm_karawany433: id bohatera -> doba straty); brak klucza = stan pusty.
-    /// Linia doby "Zbojcy i ryzyko (433)" z kontrolami: C4 wzieci z domow - dopisani do puli = 0; C2 wpisy pamieci = wczoraj + nowe - wygasle.
+    /// Linia doby "Zbojcy i ryzyko (433)" z kontrolami: C4 wzieci z domow - dopisani do puli = 0 i wzieci - zdjeci z konta DOM w ksiedze ludzi = 0 (433-p:
+    /// hearth zwrocony przez PeopleBook.Move / stawka wsi - niezalezny od licznika puli); C2 wpisy pamieci = wczoraj + nowe - wygasle.
+    /// 433-p (po recenzjach): glod wsi liczy sie dopiero ponad prog glodu (racjonowanie planu zimy to nie nedza); Outlaw Poverty Also Recruits domyslnie NIE
+    /// (decyzja Jeffa 6 mowi o zbojcach, nie o poborze); pelna pula (0.06 / hearth) to bezpiecznik awaryjny, nie hamulec dnia; karawana z zadania poza C2.
+    /// Znane i zostawione: C1 liczy sile karawany SPRZED najmu strazy 286 (koszt ryzyka zawyzony dla tras, na ktore i tak dokupi straz) i nie dziala przy
+    /// zmianie celu w polu (brak osady startu - licznik "bez osady startu").
     /// Wyjatek = potkniecie liczone w linii, bez globalnego wylacznika (CLAUDE.md 7). Watek glowny (takt doby i zdarzenia kampanii); Extra433 moze isc z modelu
     /// ochotnikow - tam tylko czyta i w razie wyjatku liczy potkniecie.
     /// </summary>
@@ -46,17 +51,21 @@ namespace Armoury
         // ------------------------------------------------------------ C4: liczniki doby (pisze OutlawLaw.Daily)
         private static int _c4Regions, _c4Capped, _c4Full, _c4Flow;
         private static double _c4Old, _c4Want, _c4Took, _c4Pool, _c4Hearth, _c4Pov, _c4Hunger, _c4Ref, _c4Purse, _c4Cut, _c4FullLost;
+        private static double _c4Book, _c4Common, _c4CapSum;     // 433-p: zdjeci z DOM w ksiedze; prosci w puli przed naplywem; prog pelnej puli (suma regionow)
         private static readonly string[] _topName = new string[3];
         private static readonly float[] _topTook = new float[3];
         private static readonly float[] _topMis = new float[3];
 
         /// <summary>C4 (OutlawLaw.Daily, raz na region na dobe): stary naplyw, dodatek rozpisany na skladniki, hamulce, wzieci z domow, przyrost prostych w puli
-        /// i hearth zdjety z wsi (kontrola linii).</summary>
-        internal static void NoteRegion(Settlement r, float inflowOld, float unit, float extra, ref Parts p, bool full, float want, float took, float poolDelta, double hearth, float misery)
+        /// i hearth zdjety z wsi (kontrola linii). 433-p: bookMen - ludzie realnie zdjeci z konta DOM (hearth z PeopleBook.Move / stawka wsi), commoners -
+        /// prosci regionu w puli przed naplywem, capMen - prog pelnej puli regionu (0 = hamulec wylaczony).</summary>
+        internal static void NoteRegion(Settlement r, float inflowOld, float unit, float extra, ref Parts p, bool full, float want, float took, float poolDelta, double hearth, float misery,
+                                         double bookMen, float commoners, float capMen)
         {
             try
             {
                 _c4Regions++;
+                _c4Book += bookMen; _c4Common += commoners; _c4CapSum += capMen;
                 _c4Old += inflowOld; _c4Want += want; _c4Took += took; _c4Pool += poolDelta; _c4Hearth += hearth;
                 _c4Cut += unit * p.Cut;
                 if (p.Capped) _c4Capped++;
@@ -107,7 +116,7 @@ namespace Armoury
         // ------------------------------------------------------------ C2: wlasciciel rozbitej karawany czeka
         private static readonly Dictionary<string, int> _lost = new Dictionary<string, int>();   // id bohatera-wlasciciela -> doba straty (zapis arm_karawany433)
         private static readonly HashSet<string> _refWho = new HashSet<string>();
-        private static int _c2Lost, _c2LostBand, _c2LostSess, _c2Player, _c2Dte, _c2NoOwner, _c2Added, _c2Renewed, _c2RefNotable, _c2RefLord, _c2New;
+        private static int _c2Lost, _c2LostBand, _c2LostSess, _c2Player, _c2Dte, _c2NoOwner, _c2Added, _c2Renewed, _c2RefNotable, _c2RefLord, _c2New, _c2Quest;
         private static int _c2Last = -1, _c2Cars = -1, _importN, _importBad;
 
         /// <summary>C2: zdarzenie MobilePartyDestroyed - karawana AI zniszczona z niszczycielem: doba straty wlasciciela do pamieci. Partii nie rusza.</summary>
@@ -119,6 +128,8 @@ namespace Armoury
                 if (!party.IsCaravan) return;
                 var s = Settings.Current;
                 if (s == null || s.CaravanLossWaitDays <= 0 || Campaign.Current == null) return;
+                // 433-p (rec. ksiegi 6): karawana z zadania (gra niszczy ja sama po zasadzce: niszczyciel = ta sama partia) to nie rozboj - zleceniodawca nie czeka
+                if (destroyer.MobileParty == party || party.IsCurrentlyUsedByAQuest) { _c2Quest++; return; }
                 if (Measure31.IsDteConvoy(party)) { _c2Dte++; return; }
                 Hero owner = null;
                 try { owner = party.CaravanPartyComponent != null ? party.CaravanPartyComponent.Owner : party.Owner; } catch { owner = null; }
@@ -203,9 +214,10 @@ namespace Armoury
             _st = 0;
             _c4Regions = _c4Capped = _c4Full = _c4Flow = 0;
             _c4Old = _c4Want = _c4Took = _c4Pool = _c4Hearth = _c4Pov = _c4Hunger = _c4Ref = _c4Purse = _c4Cut = _c4FullLost = 0;
+            _c4Book = _c4Common = _c4CapSum = 0;
             for (int i = 0; i < 3; i++) { _topName[i] = null; _topTook[i] = 0f; _topMis[i] = 0f; }
             _c1Eval = _c1NoFrom = _c1Risky = _c1Dec = _c1Changed = 0; _c1Cost = _c1P = _c1Stake = 0;
-            _c2Lost = _c2LostBand = _c2Player = _c2Dte = _c2NoOwner = _c2Added = _c2Renewed = _c2RefNotable = _c2RefLord = _c2New = 0;
+            _c2Lost = _c2LostBand = _c2Player = _c2Dte = _c2NoOwner = _c2Added = _c2Renewed = _c2RefNotable = _c2RefLord = _c2New = _c2Quest = 0;
             _refWho.Clear();
         }
 
@@ -242,9 +254,11 @@ namespace Armoury
                       .Append(" + glod wsi ").Append(F(_c4Hunger, "0.0")).Append(" + uchodzcy ").Append(F(_c4Ref, "0.0")).Append(" + lud bez monety ").Append(F(_c4Purse, "0.0"))
                       .Append(" (rachunek: ").Append(F(_c4Want - _c4Old - add, "0.00")).Append(")")
                       .Append("; hamulce: lad i sufit zdjely ").Append(F(_c4Cut, "0.0")).Append(" (sufit w ").Append(_c4Capped).Append(" regionach), pelna pula w ").Append(_c4Full)
-                      .Append(" regionach (bez dodatku ").Append(F(_c4FullLost, "0.0")).Append(")")
+                      .Append(" regionach (bez dodatku ").Append(F(_c4FullLost, "0.0")).Append("; bezpiecznik awaryjny: prostych w puli ").Append(F(_c4Common, "0"))
+                      .Append(", prog swiata ").Append(_c4CapSum > 0 ? F(_c4CapSum, "0") : "-").Append(")")
                       .Append(" | wzieci z domow ").Append(F(_c4Took, "0.0")).Append(" w ").Append(_c4Flow).Append(" regionach (chciano ").Append(F(_c4Want, "0.0"))
                       .Append("; wies nie schodzi ponizej 50 hearth), kontrola: wzieci - dopisani do puli = ").Append(F(_c4Took - _c4Pool, "0.00"))
+                      .Append(", wzieci - zdjeci z domow w ksiedze ludzi (hearth z Move / stawka wsi) = ").Append(F(_c4Took - _c4Book, "0.00"))
                       .Append(", hearth wsi -").Append(F(_c4Hearth, "0.###")).Append(" | najwiecej: ");
                     bool any = false;
                     for (int i = 0; i < 3; i++)
@@ -268,7 +282,7 @@ namespace Armoury
                 if (wait > 0)
                 {
                     sb.Append(" | rozbite karawany AI ").Append(_c2Lost).Append(" (przez bandy ").Append(_c2LostBand).Append(", inni ").Append(_c2Lost - _c2LostBand)
-                      .Append("; poza regula: rodu gracza ").Append(_c2Player).Append(", konwoje DTE ").Append(_c2Dte).Append(", bez wlasciciela ").Append(_c2NoOwner)
+                      .Append("; poza regula: rodu gracza ").Append(_c2Player).Append(", konwoje DTE ").Append(_c2Dte).Append(", bez wlasciciela ").Append(_c2NoOwner).Append(", z zadania ").Append(_c2Quest)
                       .Append("), od wczytania ").Append(_c2LostSess)
                       .Append(" | czeka wlascicieli ").Append(_lost.Count).Append(", odmowy nowej karawany: kupcy ").Append(_c2RefNotable).Append(", lordowie ").Append(_c2RefLord)
                       .Append(" (osob ").Append(_refWho.Count).Append(")");
