@@ -6,6 +6,7 @@ using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -34,6 +35,13 @@ namespace Armoury
     ///    zbiegli z wodzem / zdrowi niewprowadzeni. Pozostale partie strony - gra (ich zbiegli tez).
     ///    458-p: przed rozliczeniem kontrola licznikow misji z licznikami gry (MapEventParty.DiedInBattle / WoundedInBattle / RoutedInBattle na postac);
     ///    rozjazd = partia do listy gry (rozlicza ja gra), bez zgadywania.
+    ///    458-s: RBM (RBMAI.AiModule.SpawningPatches.SetRoutedPatch, prefiks PlayerEncounter.CheckIfBattleShouldContinueAfterBattleMission, decout/full/rbmai.cs
+    ///    12650-12676) po KAZDEJ wygranej gracza w polu wola MapEventSide.OnTroopWounded na wszystkich deskryptorach pokonanej strony (GetAllTroops =
+    ///    gotowi + przydzieleni do misji, takze zabici / ranni / wypisani, cs 114243); MapEventParty.OnTroopWounded (cs 113444) dopisuje WoundedInBattle +1
+    ///    i WoundTroop w skladzie (AddToCountsAtIndex przycina rannych do liczby - cs 96536), wiec zdrowi skladu (zbiegli z wodzem, posilki) staja sie rannymi.
+    ///    Dlatego migawka PRZED RBM (nasz prefiks tej samej metody, Priority.First): sklad (liczba / ranni) i liczniki gry na postac; kontrola licznikow
+    ///    porownuje misje z migawka, a rozliczenie partii z wodzem bierze rannych z migawki (ranni dopisani przez RBM w tej partii cofnieci - zostaja zdrowi).
+    ///    Partie jak w grze - bez zmian (RBM dziala na nie jak dotad).
     ///  - MapEventEnded (nasluch ArmouryBehavior): partie "z wodzem" (ruchome, nie przypiete do armii) odchodza jak strona z RetreatingSide w grze
     ///    (AiMilitaryBehavior.OnMapEventEnded, cs 220459): TeleportPartyToOutSideOfEncounterRadius + Ai.CalculateFleePosition od wodza zwyciezcow + SetMoveGoToPoint.
     ///    RetreatingSide NIE ustawiamy (ratowalby caly sklad, wylaczal lup DTE i drogi H3 / 312 / A17).
@@ -56,12 +64,15 @@ namespace Armoury
             public string Cmd = "?";
             public Dictionary<PartyBase, Dictionary<CharacterObject, int[]>> Cnt;
             public HashSet<Hero> Spawned, Kept;
+            // 458-s: migawka przed RBM SetRoutedPatch - na postac: [0] liczba w skladzie, [1] ranni w skladzie, [2] DiedInBattle, [3] WoundedInBattle, [4] RoutedInBattle
+            public Dictionary<PartyBase, Dictionary<CharacterObject, int[]>> Pre;
         }
 
         private static Pending _p;                 // czeka na pojmanie tej bitwy (jedna bitwa gracza naraz)
         private static Pending _move;              // czeka na MapEventEnded tej bitwy
         private static List<MobileParty> _moveParties;
         private static string _hook = "nie wpieta";
+        private static string _hookPre = "nie wpieta";   // 458-s: migawka przed RBM (prefiks PlayerEncounter.CheckIfBattleShouldContinueAfterBattleMission)
         private static int _stumbles, _errs;
         private static bool _changed;   // 458-p: Settle zaczal zmieniac sklad (potkniecie potem nie oddaje partii grze)
 
@@ -92,10 +103,61 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _hook = "blad " + e.GetType().Name; Log.Error("CommanderWithdraw458Map.Apply", e); }
-            try { Log.Info("Odwrot wodza (458): latka rozliczenia - " + _hook + " (prefiks MapEvent.CaptureDefeatedPartyMembers, Priority.Last; dziala tylko po misji z odwrotem wodza)."); } catch { }
+            try
+            {
+                // 458-s: metoda prywatna zadeklarowana w PlayerEncounter (cs 99447) - DeclaredMethod; Priority.First = przed RBM SetRoutedPatch (prefiks bez priorytetu)
+                var m2 = AccessTools.DeclaredMethod(typeof(PlayerEncounter), "CheckIfBattleShouldContinueAfterBattleMission");
+                if (m2 == null) _hookPre = "BRAK PlayerEncounter.CheckIfBattleShouldContinueAfterBattleMission";
+                else
+                {
+                    h.Patch(m2, prefix: new HarmonyMethod(typeof(CommanderWithdraw458Map), nameof(ContPre)) { priority = Priority.First });
+                    _hookPre = "wpieta";
+                }
+            }
+            catch (Exception e) { _hookPre = "blad " + e.GetType().Name; Log.Error("CommanderWithdraw458Map.Apply (migawka)", e); }
+            try { Log.Info("Odwrot wodza (458): latka rozliczenia - " + _hook + " (prefiks MapEvent.CaptureDefeatedPartyMembers, Priority.Last; dziala tylko po misji z odwrotem wodza); migawka przed RBM - " + _hookPre + " (prefiks PlayerEncounter.CheckIfBattleShouldContinueAfterBattleMission, Priority.First)."); } catch { }
         }
 
         internal static string Hook { get { return _hook; } }
+
+        /// <summary>458-s: prefiks PlayerEncounter.CheckIfBattleShouldContinueAfterBattleMission (Priority.First, przed RBM SetRoutedPatch): migawka skladu i licznikow
+        /// gry partii strony wodza, raz na oczekiwanie (DoWait moze wolac metode wiecej razy - RBM dopisuje przy kazdym). Tylko odczyt.</summary>
+        public static void ContPre()
+        {
+            var p = _p;
+            if (p == null || p.Pre != null) return;
+            try
+            {
+                MapEvent me = null;
+                try { me = PlayerEncounter.Battle; } catch { me = null; }
+                if (me == null || !ReferenceEquals(me, p.Me)) return;
+                var side = me.GetMapEventSide(p.Side);
+                if (side == null || side.Parties == null) return;
+                var pre = new Dictionary<PartyBase, Dictionary<CharacterObject, int[]>>();
+                foreach (var mep in side.Parties)
+                {
+                    var pb = mep != null ? mep.Party : null;
+                    if (pb == null || pre.ContainsKey(pb)) continue;
+                    var d = new Dictionary<CharacterObject, int[]>();
+                    var r = pb.MemberRoster;
+                    for (int i = 0; i < r.Count; i++)
+                    {
+                        var e = r.GetElementCopyAtIndex(i);
+                        var c = e.Character;
+                        if (c == null || c.IsHero || e.Number <= 0) continue;
+                        int[] v;
+                        if (!d.TryGetValue(c, out v)) { v = new int[5]; d[c] = v; }
+                        v[0] += e.Number; v[1] += Math.Min(e.WoundedNumber, e.Number);
+                    }
+                    AddGame(d, mep.DiedInBattle, 2, 5);
+                    AddGame(d, mep.WoundedInBattle, 3, 5);
+                    AddGame(d, mep.RoutedInBattle, 4, 5);
+                    pre[pb] = d;
+                }
+                p.Pre = pre;
+            }
+            catch (Exception e) { Stumble("Migawka", e); }
+        }
 
         /// <summary>Prefiks CaptureDefeatedPartyMembers(winnerParties, defeatedParties): partie "z wodzem" rozliczone tutaj, lista gry bez nich.</summary>
         public static void CapPre(MapEvent __instance, MBReadOnlyList<MapEventParty> __0, ref MBReadOnlyList<MapEventParty> __1)
@@ -139,7 +201,8 @@ namespace Armoury
                 MBList<KeyValuePair<MapEventParty, float>> wch = null, hch = null;
                 Campaign.Current.Models.BattleRewardModel.GetCaptureMemberChancesForWinnerParties(__instance, __0, out wch, out hch);
                 var sb = new StringBuilder(512);
-                sb.Append(P).Append("wodz ").Append(p.Cmd).Append(" uszedl - partie z wodzem ").Append(keep.Count).Append(", jak w grze ").Append(rest.Count);
+                sb.Append(P).Append("wodz ").Append(p.Cmd).Append(" uszedl - partie z wodzem ").Append(keep.Count).Append(", jak w grze ").Append(rest.Count)
+                  .Append(" | migawka przed RBM ").Append(p.Pre != null ? "TAK (partii " + p.Pre.Count + ")" : "BRAK (" + _hookPre + ") - kontrola na licznikach biezacych");
                 var moved = new List<MobileParty>();
                 int tBefore = 0, tAfter = 0, tTaken = 0, tLost = 0, tHero = 0, tBad = 0, tGame = 0;
                 foreach (var mep in keep)
@@ -157,7 +220,7 @@ namespace Armoury
                             continue;
                         }
                         int before, after, taken, lost, heroOut;
-                        string line = Settle(__instance, p, pb, wch, hch, out before, out after, out taken, out lost, out heroOut);
+                        string line = Settle(__instance, p, pb, wch, hch, out before, out after, out taken, out lost, out heroOut) + RbmNote(p, mep);
                         bool ok = before == after + taken + lost + heroOut;
                         if (!ok) tBad++;
                         tBefore += before; tAfter += after; tTaken += taken; tLost += lost; tHero += heroOut;
@@ -215,13 +278,55 @@ namespace Armoury
         private static string GameCheck(Pending p, MapEventParty mep)
         {
             var g = new Dictionary<CharacterObject, int[]>();
-            AddGame(g, mep.DiedInBattle, 0);
-            AddGame(g, mep.WoundedInBattle, 1);
-            AddGame(g, mep.RoutedInBattle, 2);
-            Dictionary<CharacterObject, int[]> d;
-            if (p.Cnt == null || !p.Cnt.TryGetValue(mep.Party, out d)) d = new Dictionary<CharacterObject, int[]>();
+            var pre = PreOf(p, mep.Party);
             int bad = 0;
             string first = null;
+            if (pre != null)
+            {
+                // 458-s: liczniki gry z migawki przed RBM SetRoutedPatch (te same pola gry, przed dopisaniem przez RBM); sklad teraz = sklad z migawki
+                // (liczba na postac rowna, rannych nie mniej - RBM tylko rani), inaczej ktos inny zmienil sklad miedzy migawka a pojmaniem - partia do gry
+                foreach (var kv in pre)
+                {
+                    var v = kv.Value;
+                    if (v[2] + v[3] + v[4] > 0) g[kv.Key] = new int[] { v[2], v[3], v[4] };
+                }
+                var now = new Dictionary<CharacterObject, int[]>();
+                var r = mep.Party.MemberRoster;
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var e = r.GetElementCopyAtIndex(i);
+                    var c = e.Character;
+                    if (c == null || c.IsHero || e.Number <= 0) continue;
+                    int[] v;
+                    if (!now.TryGetValue(c, out v)) { v = new int[2]; now[c] = v; }
+                    v[0] += e.Number; v[1] += Math.Min(e.WoundedNumber, e.Number);
+                }
+                foreach (var kv in now)
+                {
+                    int[] q;
+                    pre.TryGetValue(kv.Key, out q);
+                    int n0 = q != null ? q[0] : 0, w0 = q != null ? q[1] : 0;
+                    if (kv.Value[0] != n0 || kv.Value[1] < w0)
+                    {
+                        bad++;
+                        if (first == null) first = (kv.Key.Name != null ? kv.Key.Name.ToString() : "?") + ": sklad przy migawce " + n0 + " (rannych " + w0 + "), teraz " + kv.Value[0] + " (rannych " + kv.Value[1] + ")";
+                    }
+                }
+                foreach (var kv in pre)
+                {
+                    if (now.ContainsKey(kv.Key) || kv.Value[0] <= 0) continue;
+                    bad++;
+                    if (first == null) first = (kv.Key.Name != null ? kv.Key.Name.ToString() : "?") + ": sklad przy migawce " + kv.Value[0] + ", teraz 0";
+                }
+            }
+            else
+            {
+                AddGame(g, mep.DiedInBattle, 0, 3);
+                AddGame(g, mep.WoundedInBattle, 1, 3);
+                AddGame(g, mep.RoutedInBattle, 2, 3);
+            }
+            Dictionary<CharacterObject, int[]> d;
+            if (p.Cnt == null || !p.Cnt.TryGetValue(mep.Party, out d)) d = new Dictionary<CharacterObject, int[]>();
             foreach (var kv in g)
             {
                 int[] k;
@@ -240,10 +345,30 @@ namespace Armoury
                 bad++;
                 if (first == null) first = (kv.Key.Name != null ? kv.Key.Name.ToString() : "?") + ": gra 0/0/0, misja " + kv.Value[CK] + "/" + kv.Value[CWS] + "/" + kv.Value[CRm];
             }
-            return bad == 0 ? null : "postaci " + bad + ", np. " + first + " (zabici/ranni/wypisani)";
+            return bad == 0 ? null : "postaci " + bad + ", np. " + first + " (zabici/ranni/wypisani)" + (pre != null ? " [gra = migawka przed RBM]" : " [gra = liczniki biezace]");
         }
 
-        private static void AddGame(Dictionary<CharacterObject, int[]> g, TaleWorlds.CampaignSystem.Roster.TroopRoster r, int slot)
+        private static Dictionary<CharacterObject, int[]> PreOf(Pending p, PartyBase pb)
+        {
+            Dictionary<CharacterObject, int[]> d;
+            if (p.Pre != null && pb != null && p.Pre.TryGetValue(pb, out d)) return d;
+            return null;
+        }
+
+        /// <summary>458-s: ile rannych dopisano tej partii po migawce (RBM SetRoutedPatch): licznik gry WoundedInBattle (zostaje - lup cial gry, cs 112447,
+        /// juz go uzyl przed pojmaniem) i ranni w skladzie (cofnieci w Settle).</summary>
+        private static string RbmNote(Pending p, MapEventParty mep)
+        {
+            var pre = PreOf(p, mep.Party);
+            if (pre == null) return "";
+            int w0 = 0, w1 = 0;
+            foreach (var kv in pre) w0 += kv.Value[3];
+            var r = mep.WoundedInBattle;
+            if (r != null) for (int i = 0; i < r.Count; i++) { var e = r.GetElementCopyAtIndex(i); if (e.Character != null && !e.Character.IsHero && e.Number > 0) w1 += e.Number; }
+            return " | licznik gry WoundedInBattle: przy migawce " + w0 + ", przy pojmaniu " + w1 + " (dopisane po misji " + (w1 - w0) + " - RBM SetRoutedPatch; licznik bez zmian)";
+        }
+
+        private static void AddGame(Dictionary<CharacterObject, int[]> g, TaleWorlds.CampaignSystem.Roster.TroopRoster r, int slot, int size)
         {
             if (r == null) return;
             for (int i = 0; i < r.Count; i++)
@@ -252,7 +377,7 @@ namespace Armoury
                 var c = e.Character;
                 if (c == null || c.IsHero || e.Number <= 0) continue;
                 int[] v;
-                if (!g.TryGetValue(c, out v)) { v = new int[3]; g[c] = v; }
+                if (!g.TryGetValue(c, out v)) { v = new int[size]; g[c] = v; }
                 v[slot] += e.Number;
             }
         }
@@ -294,7 +419,8 @@ namespace Armoury
             var r = pb.MemberRoster;
             before = r.TotalManCount;
             var model = Campaign.Current.Models.BattleRewardModel;
-            int keepEsc = 0, keepRes = 0, capW = 0, capH = 0, skew = 0, heroKept = 0, heroTaken = 0, heroFled = 0;
+            int keepEsc = 0, keepRes = 0, capW = 0, capH = 0, skew = 0, heroKept = 0, heroTaken = 0, heroFled = 0, rbmW = 0;
+            var pre = PreOf(p, pb);
             // plan (bez zmian)
             var planC = new List<CharacterObject>();
             var planH = new List<int>();
@@ -315,14 +441,20 @@ namespace Armoury
                 }
                 var k = Get(p, pb, c);
                 int hs = k != null ? k[CHS] : 0, es = k != null ? k[CE] : 0;
-                int wn = Math.Min(e.WoundedNumber, e.Number), hn = e.Number - wn;
+                int curW = Math.Min(e.WoundedNumber, e.Number);
+                int wn = curW;
+                int[] q;
+                // 458-s: ranni z migawki przed RBM (GameCheck sprawdzil: liczba jak w migawce, rannych nie mniej) - dopisani przez RBM to zdrowi skladu
+                if (pre != null && pre.TryGetValue(c, out q)) wn = Math.Max(0, Math.Min(q[1], curW));
+                rbmW += curW - wn;
+                int hn = e.Number - wn;
                 int cw = wn;   // 458-p (recenzja B2): wszyscy ranni do zwyciezcy - z pola i sprzed bitwy (decyzja 2B: zostaja TYLKO ci, co zeszli z wodzem + posilki)
                 int ch = Math.Max(0, Math.Min(hn, hs - es));
                 if (hs > hn) skew++;
                 int ke = Math.Min(es, hn - ch);   // recenzja B12: zbiegli w skladzie po odjeciu bioracych do niewoli
                 keepEsc += ke;
                 keepRes += Math.Max(0, hn - ch - ke);
-                if (cw + ch == 0) continue;
+                if (cw + ch == 0 && curW == 0) continue;   // 458-s: element z rannymi od RBM tez w planie - ranni wyzerowani (zostaja sami zdrowi)
                 planC.Add(c); planH.Add(ch); planW.Add(cw);
                 capW += cw; capH += ch;
             }
@@ -337,7 +469,10 @@ namespace Armoury
                 int idx = r.FindIndexOfTroop(c);
                 if (idx < 0) { skew++; continue; }
                 _changed = true;
-                r.AddToCountsAtIndex(idx, -(ch + cw), -cw, 0, false);
+                // 458-s: wszyscy prawdziwi ranni (cw) ida do zwyciezcy, wiec zostajacy sa zdrowi - ranni elementu do zera (cofa tez rannych dopisanych przez RBM;
+                // bez migawki curW = cw, czyli jak dotad -cw)
+                var en = r.GetElementCopyAtIndex(idx);
+                r.AddToCountsAtIndex(idx, -(ch + cw), -Math.Min(en.WoundedNumber, en.Number), 0, false);
                 for (int j = 0; j < cw; j++)
                 {
                     try
@@ -401,7 +536,8 @@ namespace Armoury
                    + " | zostaje: zbiegli z wodzem " + keepEsc + ", posilki niewprowadzone " + keepRes + ", bohaterowie " + heroKept
                    + " | do niewoli wg gry: ranni (z pola i sprzed bitwy) " + capW + ", zdrowi na polu / zeszli bez wodza " + capH + " (wzieci " + taken + ", bez odbiorcy " + lost + ")"
                    + " | bohaterowie bez wodza: pojmani " + heroTaken + ", zbiegli (fugitive) " + heroFled
-                   + " | po " + after + (skew > 0 ? " | elementow z liczbami misji ponad sklad " + skew : "");
+                   + " | po " + after + (skew > 0 ? " | elementow z liczbami misji ponad sklad " + skew : "")
+                   + (pre != null ? " | ranni w skladzie dopisani przez RBM po misji (cofnieci - to zdrowi) " + rbmW : "");
         }
 
         /// <summary>MapEventEnded (ArmouryBehavior): partie z wodzem odchodza od zwyciezcy jak strona RetreatingSide w grze (AiMilitaryBehavior.OnMapEventEnded).</summary>
