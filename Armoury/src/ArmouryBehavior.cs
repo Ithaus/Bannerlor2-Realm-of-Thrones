@@ -1582,6 +1582,9 @@ namespace Armoury
             // 435-L1-p: pamiec niedoboru N (arm_lpn: "n1|doba|dob pomiaru|znaczniki|decyzje regulatora|komorki"); pisany tylko ze stanem; brak klucza = pamiec od pierwszej doby; starsza DLL ignoruje klucz
             try { string ln = dataStore.IsSaving ? SupplySignal.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(ln)) SaveText.Sync(dataStore, "arm_lpn", ref ln); if (dataStore.IsLoading) SupplySignal.Import(ln); }
             catch (Exception e) { Log.Error("SyncData.arm_lpn", e); }
+            // 435-N-C: pamiec N wyrobu (arm_lpu: "u1|doba|dob|miasto~kategoria~U~oferta;..."); pisany tylko ze stanem; brak klucza = pomiar od pierwszej doby; starsza DLL ignoruje klucz
+            try { string lu = dataStore.IsSaving ? SupplySignal.ExportWare() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lu)) SaveText.Sync(dataStore, "arm_lpu", ref lu); if (dataStore.IsLoading) SupplySignal.ImportWare(lu); }
+            catch (Exception e) { Log.Error("SyncData.arm_lpu", e); }
             // 345: ksiega kiesy gracza - 7 dob historii prognozy zlota ("g345|1|..."); pisany tylko z historia; brak klucza (stary zapis, Ironman Jeffa) = pusto; starsza DLL ignoruje klucz
             try { string pg = dataStore.IsSaving ? GoldForecast.Export() : null; if (!dataStore.IsSaving || pg != null) SaveText.Sync(dataStore, "arm_prog345", ref pg); if (dataStore.IsLoading) GoldForecast.Import(pg); }
             catch (Exception e) { Log.Error("SyncData.arm_prog345", e); }

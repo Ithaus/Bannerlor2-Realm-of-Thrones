@@ -40,7 +40,7 @@ namespace Armoury
         private static long _rentPaid, _rentBelow;
         private static int _noBkCons;
         // nawias konsumpcji
-        private sealed class Track { public double Pending = double.NaN, Spent, Add, First = double.NaN; public int Rows; }   // First - P1 (pomiar): budzet pierwszego wiersza kategorii
+        private sealed class Track { public double Pending = double.NaN, Spent, Add, First = double.NaN; public int Rows, Zero; }   // First - P1 (pomiar): budzet pierwszego wiersza kategorii; Zero - 435-N-C: wiersze z budzetem <= 0.01
         private static readonly Dictionary<ItemCategory, Track> _brTrack = new Dictionary<ItemCategory, Track>();
         private static readonly List<Track> _pool = new List<Track>();
         private static int _poolN;
@@ -234,7 +234,7 @@ namespace Armoury
                 Track tr;
                 if (!_brTrack.TryGetValue(__2, out tr))
                 {
-                    if (_poolN < _pool.Count) { tr = _pool[_poolN]; tr.Pending = double.NaN; tr.Spent = tr.Add = 0; tr.Rows = 0; tr.First = double.NaN; }
+                    if (_poolN < _pool.Count) { tr = _pool[_poolN]; tr.Pending = double.NaN; tr.Spent = tr.Add = 0; tr.Rows = 0; tr.Zero = 0; tr.First = double.NaN; }
                     else { tr = new Track(); _pool.Add(tr); }
                     _poolN++;
                     _brTrack[__2] = tr;
@@ -246,6 +246,7 @@ namespace Armoury
                 // wiersz z budzetem 0 - np. ArmsLeaks.ZeroTownBudget - nie zmienia slownika i nie wchodzi do wydatku, wiec nie wchodzi i tu)
                 if (__result > 0.01f) tr.Add += __result - __1;
                 tr.Pending = __result > 0.01f ? __result : double.NaN;       // BK przetwarza wiersz tylko przy budzecie > 0.01
+                if (!(__result > 0.01f)) tr.Zero++;                          // 435-N-C: wiersz bez budzetu (slownik zostaje surowym popytem - poza N wyrobu)
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }
             catch (Exception e) { Stumble("BudgetPostfix", e); }
@@ -264,18 +265,22 @@ namespace Armoury
                 if (f == null) return;
                 double spent = 0, add = 0; int rows = 0;
                 var grp = new double[3];
+                bool ware = SupplySignal.WareWanted(__0);                   // 435-N-C: N wyrobu (sam odczyt slownika po konsumpcji, bez wywolan CalculateBudget)
                 foreach (var kv in _brTrack)
                 {
                     var tr = kv.Value;
-                    if (!double.IsNaN(tr.Pending))
+                    bool lastOk = !double.IsNaN(tr.Pending);
+                    if (lastOk)
                     {
                         float rest;
                         if (__1 != null && __1.TryGetValue(kv.Key, out rest)) tr.Spent += tr.Pending - rest;
                         tr.Pending = double.NaN;
                     }
+                    if (ware) WareNote(__0, kv.Key, tr, lastOk, __1);
                     spent += tr.Spent; add += tr.Add; rows += tr.Rows;
                     grp[GroupOf(kv.Key)] += tr.Spent;
                 }
+                if (ware) WareBracket(__0, __1);                            // 435-N-C: kategorie bez wiersza polki (pominiete) i licznik nawiasow
                 OfferClose(f);   // P1 (pomiar, wlasny try): ile oferty nadwyzki tej osady znalazlo towar (wydatek kategorii ponad budzet gry)
                 f.ConsGold += __0.Gold - _brGold0;
                 double cv = double.NaN;
@@ -307,6 +312,41 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("ConsumePostfix", e); }
             finally { _brOpen = false; _brTown = null; _brLowFood = false; _brAnchor = false; _brHorse = false; }
+        }
+
+        /// <summary>435-N-C: nawias kiesy ludu otwiera sie (zrodlo U dla N wyrobu) - linia "LP N wyrobu".</summary>
+        internal static bool WareBracketOn { get { return Run; } }
+
+        /// <summary>435-N-C: reszta slownika budzetu kategorii po konsumpcji do N wyrobu (SupplySignal.NoteWare). Wlasny try - nie zaburza zamkniecia nawiasu.</summary>
+        private static void WareNote(Town town, ItemCategory c, Track tr, bool lastOk, Dictionary<ItemCategory, float> dict)
+        {
+            try
+            {
+                if (c == null || tr == null || tr.Rows == 0) return;
+                float rest;
+                double r = dict != null && dict.TryGetValue(c, out rest) ? rest : double.NaN;
+                double of;
+                if (!_brOfEff.TryGetValue(c, out of)) of = 0;
+                SupplySignal.NoteWare(town, c, lastOk, r, tr.First, of, tr.Zero);
+            }
+            catch (Exception e) { Stumble("WareNote", e); }
+        }
+
+        /// <summary>435-N-C: kategorie sledzone (MarketSales) w slowniku budzetu bez wiersza na polce - poza N wyrobu (krytyka 2), tylko licznik.</summary>
+        private static void WareBracket(Town town, Dictionary<ItemCategory, float> dict)
+        {
+            try
+            {
+                int n = 0; double v = 0;
+                if (dict != null)
+                    foreach (var kv in dict)
+                    {
+                        if (kv.Key == null || !(kv.Value > 0) || _brTrack.ContainsKey(kv.Key) || !MarketSales.Tracked(kv.Key)) continue;
+                        n++; v += kv.Value;
+                    }
+                SupplySignal.NoteWareBracket(town, n, v);
+            }
+            catch (Exception e) { Stumble("WareBracket", e); }
         }
 
         /// <summary>F3 (K1-3a krok 1, tylko pomiar): konie zdjete z polki tej osady w zamykanym nawiasie -> HorseBook ("ujscia poza K1: mieszczanie").

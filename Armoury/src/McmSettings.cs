@@ -10628,6 +10628,10 @@ namespace Armoury
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool SupplyQueueGrowth { get; set; } = true;
 
+        [SettingPropertyBool("Workshops Follow Goods Shortage", HintText = "with Supply Chain Log, Workshop Benches or Workshop Retool Idle: workshops also follow goods that the townsfolk want and cannot find at their own market. Each day the measure counts the coin the townsfolk meant to spend on a good (not their savings offered on top) that found the stall empty, and sets it against what the town really sold of that good over the same days. Where the unmet coin is at least half of the sales and enough for one full cycle of a workshop line, an idle workshop may change to that trade (at most one such change a day in the whole world; a trade whose inputs are short in the town still comes first) and a busy workshop may add benches (the gap must hold over four weeks and over the last week too). Goods missing from the stall entirely, weapons, horses and goods the townsfolk do not buy for their houses are not counted. Raw materials and village crafts are not touched. Off = workshops look only at short inputs, as before (the log still shows what would have happened)", RequireRestart = false)]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool WorkshopFollowGoodsShortage { get; set; } = true;
+
         [SettingPropertyBool("Measure Craft Rule", HintText = "log only, nothing in the game changes: once a week, and on the day the start calibration fills the stalls, the log gets a diagnosis of the rule that would let village parts change their work under the start calibration - how many parts would want to change at today's prices, at base prices and at the calibration's own prices, the ten most wanted changes with their hands, and a plain note that works are frozen while that rule is off; side villages outside the calibration get the same numbers in their daily line (off = no such lines)", RequireRestart = false)]
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool MeasureCraftRule { get; set; } = true;
@@ -15520,6 +15524,7 @@ namespace Armoury
             s.EconomyAuditLines = EconomyAuditLines;
             s.SupplyChainLog = SupplyChainLog;
             s.SupplyQueueGrowth = SupplyQueueGrowth;
+            s.WorkshopFollowGoodsShortage = WorkshopFollowGoodsShortage;
             s.MeasureCraftRule = MeasureCraftRule;
             s.MeasureRegaleShelf = MeasureRegaleShelf;
             s.MeasureCaravanTrade = MeasureCaravanTrade;

@@ -216,6 +216,27 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>435-N-C: zloto prawdziwej sprzedazy komorki (miasto, kategoria) z dob [from, to] w oknie 28 dob (0 - brak). Sam odczyt, nie rzuca.</summary>
+        internal static long GoldIn(Settlement st, ItemCategory c, int from, int to)
+        {
+            try
+            {
+                if (st == null || c == null) return 0;
+                var cell = CellOf(st, c, false);
+                if (cell == null) return 0;
+                int d = Today;
+                long g = 0;
+                for (int k = 0; k < Window; k++)
+                {
+                    int dd = cell.Day[k];
+                    if (dd < from || dd > to || dd > d || dd <= d - Window) continue;
+                    g += cell.G[k];
+                }
+                return g;
+            }
+            catch { return 0; }
+        }
+
         // ------------------------------------------------------------ H1: konsumpcja mieszczan
         private struct Snap { public EquipmentElement El; public int N; public int Price; }
         private sealed class ConsState { public Town T; public int Gold0; public List<Snap> Rows; }

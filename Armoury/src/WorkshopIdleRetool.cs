@@ -51,6 +51,7 @@ namespace Armoury
         private const int IdleDays = 60, PerDay = 3, PurseFloor = 4500, BandHigh = 10500;
         private const int StaleGap = 2, RetryDays = 7;   // 435-L9-p: przerwa pomiaru dluzsza niz 2 doby = pamiec od nowa; odmowa trwala - ponowna proba za 7 dob
         private const string MinesId = "mines";
+        private const int WarePerDay = 1;                // 435-N-C: najwyzej 1 przezbrojenie na dobe na swiat uzasadnione TYLKO N wyrobu (fala stojacych rozlozona na tygodnie)
 
         private sealed class Rec
         {
@@ -71,13 +72,14 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         // powody odmowy (linia doby)
-        private const int WNoType = 0, WNoShelf = 1, WCapital = 2, WNoBuyer = 3, WSeller = 4, WPay = 5, WLimit = 6, WSiege = 7, WKeyOff = 8, WOther = 9, WShared = 10, WKinds = 11;
+        private const int WNoType = 0, WNoShelf = 1, WCapital = 2, WNoBuyer = 3, WSeller = 4, WPay = 5, WLimit = 6, WSiege = 7, WKeyOff = 8, WOther = 9, WShared = 10, WWare = 11, WKinds = 12;
         private static readonly string[] WName =
         {
             "bez typu z N >= 1.3, wsadem w okregu i nowego w miescie", "polka bez polowy ceny w materiale", "kapital za maly, przejecie wylaczone",
             "zaden notabl miasta z kiesa (po zaplacie >= 4500)", "sprzedajacy ponad pasmem 10500 (bez Notable Gold Real)", "zaplata nieudana (polka / sufit ceny / sztuka / droga)",
             "limit (3 na swiat razem z E3-D3, 1 na miasto na dobe)", "miasto oblezone", "kapital starcza, ale Workshop Retool Idle wylaczone (przejecie tylko przy braku kapitalu)",
-            "inne (koszt, model, bez wlasciciela, blad)", "przerwa wspolna z E3-D3 (miasto 30 dob, warsztat 120 dob)"
+            "inne (koszt, model, bez wlasciciela, blad)", "przerwa wspolna z E3-D3 (miasto 30 dob, warsztat 120 dob)",
+            "limit N wyrobu (435-N-C: 1 przezbrojenie z samego N wyrobu na dobe na swiat)"
         };
 
         internal static bool RetoolOn { get { var s = Settings.Current; return s != null && s.WorkshopRetoolIdle; } }
@@ -156,6 +158,8 @@ namespace Armoury
         // 435-L9-p: zwrot wkladu, zaplacone bez zmiany typu, cena i zaplata zmian zrobionych, odlozone (ponowna proba), pamiec od nowa po przerwie
         private static long _dRefund, _dPaidNoType, _dCostDone, _dPaidDone;
         private static int _dDeferred, _dStale, _dStaleGap;
+        // 435-N-C: zmiany typu wedlug galezi wyboru (N towaru / N wyrobu), "bylby" przy kluczu NIE (kandydaci, dla ktorych bylby typ z N wyrobu)
+        private static int _dPickTown, _dPickWare, _dWould;
         private static readonly List<string> _dDone = new List<string>();
 
         private static void ZeroDay()
@@ -163,6 +167,7 @@ namespace Armoury
             _dRet = _dTake = _dTakeNoRet = _dPcs = _dDrop = _dDropUnknown = _dChanged = _dMeasured = 0;
             _dMat = _dWFolk = _dWCof = _dGap = _dPrice = _dInject = _dGapTake = 0;
             _dRefund = _dPaidNoType = _dCostDone = _dPaidDone = 0; _dDeferred = _dStale = _dStaleGap = 0;
+            _dPickTown = _dPickWare = _dWould = 0;
             _dDone.Clear();
         }
 
@@ -290,11 +295,16 @@ namespace Armoury
                         if (ty0 == null) continue;
                         bool tyCh = c.W.WorkshopType != ty0, owCh = c.W.Owner != o0;
                         if (tyCh) { _dChanged++; WorkshopRetool.SharedMark(c.T, c.W, today); }
+                        if (tyCh)                                                     // 435-N-C: galaz wyboru zmiany (takze po wyjatku) - licznik limitu WarePerDay
+                        {
+                            TownPick tq;
+                            if (picks.TryGetValue(c.T, out tq) && tq.ByWare && c.W.WorkshopType == tq.Pick) _dPickWare++; else _dPickTown++;
+                        }
                         if (tyCh || owCh) { done++; townsToday.Add(c.T); }
                         if (res >= 0 && res < WKinds)
                         {
                             why[res]++;
-                            if (res != WSiege && res != WLimit && res != WShared && !owCh && !tyCh) c.R.NextTry = today + RetryDays;
+                            if (res != WSiege && res != WLimit && res != WShared && res != WWare && !owCh && !tyCh) c.R.NextTry = today + RetryDays;
                         }
                     }
                     catch (Exception e) { Stumble("Run(po zmianie)", e); }
@@ -315,6 +325,9 @@ namespace Armoury
             if (f) sb.Append(" -");
             if (_dDeferred > 0) sb.Append(" | odlozone (ponowna proba za ").Append(RetryDays).Append(" dob) ").Append(_dDeferred);
             if (_dStale > 0) sb.Append(" | pamiec od nowa po przerwie pomiaru ").Append(_dStaleGap).Append(" dob: rekordow ").Append(_dStale);
+            sb.Append(" | N wyrobu (435-N-C, klucz Workshops Follow Goods Shortage ").Append(SupplySignal.WareKey ? "TAK" : "NIE").Append("): zmiany typu wybrane przez N towaru ").Append(_dPickTown)
+              .Append(", przez N wyrobu ").Append(_dPickWare).Append(" (najwyzej ").Append(WarePerDay).Append(" na dobe), bylby typ z N wyrobu przy kluczu NIE ").Append(_dWould)
+              .Append(", odmowa limitu N wyrobu ").Append(why[WWare]);
             sb.Append(" | zloto: z kapitalu ").Append(_dMat + _dWFolk + _dWCof).Append(" = material ").Append(_dMat).Append(" (sztuk ").Append(_dPcs).Append(") + rzemieslnicy do ludu ").Append(_dWFolk)
               .Append(" + zatrzymane w kasie miasta ").Append(_dWCof).Append("; kupujacy -> sprzedajacy ").Append(_dPrice).Append(", kupujacy -> kapital warsztatu ").Append(_dInject)
               .Append(", zwrot wkladu (kapital -> kupujacy) ").Append(_dRefund).Append(", zaplacone bez zmiany typu ").Append(_dPaidNoType)
@@ -332,14 +345,14 @@ namespace Armoury
             if (s.LogEnabled && (LogGate.Lines || events)) Log.Info(sb.ToString());
         }
 
-        private sealed class TownPick { public WorkshopType Pick; }
+        private sealed class TownPick { public WorkshopType Pick, Ware; public bool ByWare; }   // 435-N-C: Ware - typ z N wyrobu (liczony, gdy z N towaru brak); ByWare - Pick z N wyrobu
 
         /// <summary>435-L9-p (recenzja kosztu doby): nowy typ dla miasta - raz na miasto na dobe (typ obecny kazdego warsztatu miasta jest w `have`, wiec wynik nie zalezy
         /// od warsztatu). Najwyzsze N glownego wyrobu linii towarowej z wsadem w tym miescie, wsad w okregu, typu nie ma jeszcze w miescie.</summary>
-        private static WorkshopType PickFor(Town t, Settlement st, SupplySignal.NTable table, Dictionary<Town, TownPick> cache)
+        private static TownPick PickFor(Town t, Settlement st, SupplySignal.NTable table, Dictionary<Town, TownPick> cache)
         {
             TownPick tp;
-            if (cache.TryGetValue(t, out tp)) return tp.Pick;
+            if (cache.TryGetValue(t, out tp)) return tp;
             tp = new TownPick();
             cache[t] = tp;
             var have = new HashSet<WorkshopType>();
@@ -363,7 +376,28 @@ namespace Armoury
                 if (!WorkshopInputs.HasInput(wt, near)) continue;
                 tp.Pick = wt; pickN = nMax;
             }
-            return tp.Pick;
+            if (tp.Pick != null || table.Ware == null) return tp;
+            // 435-N-C: bez typu z N towaru (sprawdzony niedobor wsadu ma pierwszenstwo, krytyka 9) - typ, ktorego glownego wyrobu brakuje na targu: bramka N wyrobu
+            // (N_w >= 1.5 i U >= wartosc cyklu), ranga (U - S) / wartosc cyklu; te same filtry co wyzej. Klucz NIE - typ tylko liczony ("bylby"), Pick bez zmian.
+            double best = double.NegativeInfinity;
+            foreach (var wt in WorkshopType.All)
+            {
+                if (wt == null || wt.IsHidden || wt.StringId == MinesId || have.Contains(wt) || WorkshopTrade.ProbeHasArmsLine(wt)) continue;
+                double sc = double.NegativeInfinity, x;
+                foreach (var p in wt.Productions)
+                {
+                    if (!Paced(p)) continue;
+                    var main = p.Outputs[0].Item1;
+                    if (main == null) continue;
+                    if (SupplySignal.WareGate(table, st, main, p.Outputs[0].Item2, false, out x) && x > sc) sc = x;
+                }
+                if (double.IsNegativeInfinity(sc) || (tp.Ware != null && sc <= best)) continue;
+                if (near == null) near = WorkshopInputs.InputsNear(t);
+                if (!WorkshopInputs.HasInput(wt, near)) continue;
+                tp.Ware = wt; best = sc;
+            }
+            if (tp.Ware != null && SupplySignal.WareKey) { tp.Pick = tp.Ware; tp.ByWare = true; }
+            return tp;
         }
 
         /// <summary>Jeden kandydat: przezbrojenie z kapitalu albo przejecie i przezbrojenie. Zwraca indeks powodu odmowy albo -1 (zmiana zrobiona). Zmiane (typ, wlasciciel)
@@ -373,8 +407,10 @@ namespace Armoury
         {
             var t = c.T; var w = c.W; var st = t.Settlement;
             if (st.IsUnderSiege) return WSiege;
-            var pick = PickFor(t, st, table, picks);
-            if (pick == null) return WNoType;
+            var tpk = PickFor(t, st, table, picks);
+            var pick = tpk.Pick;
+            if (pick == null) { if (tpk.Ware != null) _dWould++; return WNoType; }   // 435-N-C: klucz NIE - bylby typ z N wyrobu
+            if (tpk.ByWare && _dPickWare >= WarePerDay) return WWare;             // 435-N-C: limit przezbrojen z samego N wyrobu
             int cost = Math.Max(0, model.GetConvertProductionCost(pick));
             if (cost < 20) return WOther;
             // materialy: narzedzia, deski, drewno - bez wyrobu nowego typu; polowa ceny musi lezec na polce PRZED kazdym przelewem

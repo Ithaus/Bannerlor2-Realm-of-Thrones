@@ -66,6 +66,7 @@ namespace Armoury
         private static bool _startLine, _frozenLine;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static ItemObject[] _items; private static int _itemsDay = int.MinValue;
+        private static int _dWareVia, _dWareWould;   // 435-N-C: oceny przepuszczone przez N wyrobu / "bylby" przy kluczu NIE (doba)
 
         // powody odmowy raty (linia doby)
         private const int WFull = 0, WUse = 1, WShort = 2, WInput = 3, WHands = 4, WTownCap = 5, WCapital = 6, WNoShelf = 7, WPriceCap = 8, WPace = 9, WOther = 10,
@@ -226,6 +227,7 @@ namespace Armoury
         private static void Run(Settings s, int today, bool measure, long t0)
         {
             int before = SumLevels();
+            _dWareVia = _dWareWould = 0;
             var lv = new int[MaxLevel + 1];
             var why = new int[WKinds];
             int recs = 0, playerRecs = 0, inProg = 0, towns = 0, cand = 0, up = 0, inst = 0, down = 0, downIdle = 0, lostType = 0, lostLevels = 0, pcs = 0, drop = 0, dropUnknown = 0, measured = 0, withF = 0;
@@ -317,6 +319,8 @@ namespace Armoury
             bool f = true;
             for (int i = 0; i < WKinds; i++) if (why[i] > 0) { sb.Append(f ? " " : ", ").Append(WName[i]).Append(' ').Append(why[i]); f = false; }
             if (f) sb.Append(" -");
+            sb.Append(" | N wyrobu (435-N-C, klucz Workshops Follow Goods Shortage ").Append(SupplySignal.WareKey ? "TAK" : "NIE").Append("): ocen przepuszczonych przez N wyrobu (N towaru < 1.3) ").Append(_dWareVia)
+              .Append(", bylby poziom z N wyrobu przy kluczu NIE ").Append(_dWareWould);
             sb.Append(" | cofniete ").Append(down).Append(" (w tym 182 doby bez proby ").Append(downIdle).Append("; przepadle raty ").Append(downPaid).Append(" zl), utracone zmiana typu ").Append(lostType)
               .Append(" (poziomow ").Append(lostLevels).Append(", raty ").Append(lostPaid).Append(" zl)")
               .Append(" | kontrola zlota (z kapitalu - kasa miasta - lud; kapital i kasa zmierzone na zywych kiesach, lud = wynik Earn) ").Append(gap)
@@ -356,7 +360,19 @@ namespace Armoury
                 if (n > nMax) nMax = n;
             }
             if (table == null) return WNoTable;                                // 435-L8-p: osobny powod (nie "N wyrobu < 1.3")
-            if (nMax < NeedN) return WShort;
+            if (nMax < NeedN)
+            {
+                // 435-N-C: N wyrobu (brak towaru na targu przy pieniadzu ludu) - bramka N_w >= 1.5 w oknie i w 7 dobach, U >= wartosc cyklu; klucz NIE - tylko "bylby"
+                bool wg = false; double sc;
+                foreach (var p in type.Productions)
+                {
+                    if (!Paced(p) || p.Outputs == null || p.Outputs.Count == 0 || p.Outputs[0].Item1 == null) continue;
+                    if (SupplySignal.WareGate(table, t.Settlement, p.Outputs[0].Item1, p.Outputs[0].Item2, true, out sc)) { wg = true; break; }
+                }
+                if (!wg) return WShort;
+                if (!SupplySignal.WareKey) { _dWareWould++; return WShort; }
+                _dWareVia++;
+            }
             if (near == null) near = WorkshopInputs.InputsNear(t);
             if (!WorkshopInputs.HasInput(type, near)) return WInput;
             if (FreeHands.Braked(t.Settlement)) return WHands;

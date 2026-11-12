@@ -48,7 +48,7 @@ namespace Armoury
     /// Klucz Supply Chain Log to GLOWNY WYLACZNIK pomiaru: bez niego kroki L5-L8 dzialaja jak dotad (N = 1).
     /// Watek glowny; wyjatek = potkniecie liczone w linii, bez globalnego wylacznika (CLAUDE.md 7).
     /// </summary>
-    internal static class SupplySignal
+    internal static partial class SupplySignal
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal const int Window = 28;
@@ -296,6 +296,8 @@ namespace Armoury
             public readonly Dictionary<ItemCategory, double> Stock = new Dictionary<ItemCategory, double>();
             public readonly HashSet<Settlement> Hungry = new HashSet<Settlement>();
             public ItemCategory Grain; public int Day;
+            // 435-N-C: N wyrobu (miasto targowe x wyrob, tylko N_w > 1) - czytaja WYLACZNIE L8 / L9 przez WareGate; TownN / WorldN jej nie widza
+            public Dictionary<Settlement, Dictionary<ItemCategory, WareCell>> Ware;
         }
         private static volatile NTable _pubT;
         /// <summary>435-L6: tablica N z ostatniej doby pomiaru; null - bez pomiaru w tej sesji albo klucz Supply Chain Log wylaczony (wtedy N = 1 wszedzie).</summary>
@@ -323,6 +325,7 @@ namespace Armoury
             {
                 int today = Today;
                 Resolve(today);
+                ResolveWare(today);                                           // 435-N-C
                 ShortageText(today);
             }
             catch (Exception e) { Stumble("EarlyTable", e); }
@@ -382,6 +385,7 @@ namespace Armoury
             _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>(); _pubT = null;
             _prevHome.Clear(); _prevHomeDay = int.MinValue;
             _dryDay = int.MinValue; _whyDay = int.MinValue;
+            WareReset();                                                      // 435-N-C
         }
 
         private static void ZeroDay()
@@ -390,6 +394,7 @@ namespace Armoury
             _dCat.Clear(); _dRound = 0; _dCapGold = 0; _dFoodSkip = 0; _dFoodSkipN = 0;
             Array.Clear(_wDay, 0, RKinds); _wArms = _wCastle = _wPlayer = _wSkip = 0; _wLine.Clear();
             _dOff = 0; _st = 0;
+            WareZeroDay();                                                    // 435-N-C
         }
 
         private static int Span(int today) { return _first == int.MinValue ? 1 : Math.Max(1, Math.Min(Window, today - _first + 1)); }
@@ -591,6 +596,7 @@ namespace Armoury
             try
             {
                 Resolve(today);                                               // 435-L1-p: pamiec N z zapisu (raz, w pierwszej dobie sesji)
+                ResolveWare(today);                                           // 435-N-C: pamiec N wyrobu z zapisu (arm_lpu)
                 if (_first == int.MinValue) _first = today;
                 if (!_startLine)
                 {
@@ -645,6 +651,8 @@ namespace Armoury
                       .Append(" | poza watkiem ").Append(_dOff).Append(" | potkniecia ").Append(_st).Append(" (sesja ").Append(_stSess).Append(").");
                     Log.Info(sb.ToString());
                     if (nLine != null) Log.Info("LP niedobor: dzien " + today + " | " + nLine);
+                    string wl = WareTake();
+                    if (wl != null) Log.Info("LP N wyrobu (435-N-C): dzien " + today + " | " + wl + " | poza watkiem " + _dOff + " | potkniecia " + _st + " (sesja " + _stSess + ")");
                     if (wLine != null) Log.Info("LP warsztaty: dzien " + today + " | " + wLine);
                 }
                 if (log && (_dryDay == int.MinValue || today - _dryDay >= 28))   // 435-L1-p (stabilnosc N6): jedna bramka logu dla wszystkich linii LP
@@ -837,6 +845,7 @@ namespace Armoury
             foreach (var kv in agg) if (kv.Value[5] > 0) kv.Value[0] += kv.Value[5];   // 435-N-A-p: przyrost swiata netto (ujemny -> 0) do braku swiata
             foreach (var h in hungry) { hot.Add(h); nt.Hungry.Add(h); }
             foreach (var kv in stock) if (kv.Value[0] > 1.0 + 1e-9) nt.Stock[kv.Key] = Math.Min(2.0, kv.Value[0]);
+            try { WareBuild(today, nt); } catch (Exception e) { Stumble("WareBuild", e); }   // 435-N-C: osobna tablica N wyrobu (tylko L8 / L9)
             _pubT = nt;
             var rows = new List<KeyValuePair<ItemCategory, double[]>>();
             int over = 0;

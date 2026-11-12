@@ -222,14 +222,19 @@ namespace Armoury
 
         // ============================================================ C1. kupione z oferty nadwyzki (nawias konsumpcji)
         /// <summary>DemandPostfix (otwarcie nawiasu konsumpcji osady): oferta tego nawiasu od zera.</summary>
-        private static void OfferOpen() { _ofN = 0; _ofOn = MeasureP1 || LadderOn; }   // P3: licznik kupionego z oferty takze bez pomiaru (poprawka Predict / Share)
+        private static void OfferOpen() { _ofN = 0; _ofOn = MeasureP1 || LadderOn; _brOfEff.Clear(); }   // P3: licznik kupionego z oferty takze bez pomiaru (poprawka Predict / Share)
+
+        // 435-N-C: oferta nadwyzki tego nawiasu na kategorie (zloto, ktore naprawde dochodzi do budzetu wiersza) - zawsze, takze bez pomiaru P1 (N wyrobu: oferta poza N)
+        private static readonly Dictionary<ItemCategory, double> _brOfEff = new Dictionary<ItemCategory, double>();
 
         /// <summary>AddOffer: oferta `x` zl dopisana do budzetu kategorii "lepszej" nr `bi` jako `add` jednostek budzetu przy budzecie gry `v` (tylko licznik).</summary>
         private static void OfferNote(int bi, ItemCategory c, double x, double add, double v)
         {
-            if (!_ofOn || _ofN >= OfMax || bi < 0 || bi >= OfMax || c == null || !(x > 0)) return;
+            if (c == null || !(x > 0)) return;
             // oferta, ktora naprawde dochodzi do budzetu wiersza: AddOffer liczy czesc domowa nie mniejsza niz 0.05, a budzet wiersza mnozy ja prawdziwa (plotno 0.02)
             double hs = HistoricalPrices.HouseShare(c);
+            { double e0 = hs >= 0.05 ? x : x * Math.Max(0, hs) / 0.05, p0; _brOfEff.TryGetValue(c, out p0); _brOfEff[c] = p0 + e0; }   // 435-N-C
+            if (!_ofOn || _ofN >= OfMax || bi < 0 || bi >= OfMax) return;
             _ofCat[_ofN] = c; _ofIdx[_ofN] = bi; _ofX[_ofN] = x; _ofAdd[_ofN] = add; _ofBase[_ofN] = v; _ofEff[_ofN] = hs >= 0.05 ? x : x * Math.Max(0, hs) / 0.05; _ofN++;
         }
 
