@@ -810,6 +810,9 @@ namespace Armoury
                 // 453: fale posilkow szturmu AI na pas z przyczolkiem (klucz SiegeWavesReinforceSuccess; przy NIE tylko pomiar "bylby"); samo sprawdza szturm
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new SiegeWaves453());
+                // 454: odwod obrony murow AI w szyku 8, wychodzi na przyczolek (klucz WallDefenceReserve; przy NIE tylko pomiar "bylby"); samo sprawdza szturm
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new SiegeReserve454());
                 // 371: zalamanie szturmu w misji gracza-obroncy (oddzial szturmowy, odstapienie spod murow, oblezenie trwa); 387: takze szturm gracza-wodza (klucz SiegePlayerAssaultBreaks); 387f: takze szturm armii AI z graczem w szeregu (klucz SiegeArmyAssaultBreaks); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission)
                     mission.AddMissionBehavior(new SiegeBreak371());

@@ -12340,6 +12340,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool SiegeWavesReinforceSuccess { get; set; } = true;
 
+        [SettingPropertyBool("Wall Defence Reserve", HintText = "In an assault on walls, when the AI defends the fortress (you attack, or you fight on the attacking side): once, while the stormers are still approaching - before any of them reach the walls - up to a fifth of the foot soldiers of each formation holding a wall point (each keeps at least 20) are pulled back into a reserve that waits behind the gate. Archers and crossbowmen, heroes, standard bearers and men at siege engines stay where they are, and a reserve of fewer than 10 men is not formed. The reserve goes in only once, all together: when the stormers really hold a foothold on the wall (the game's own 'point lost' state - at least 15 of them at a point and fewer than 15 defenders), when 15 or more stormers are inside the walls, or when the defence gives up holding the walls - it joins the men fighting for that point, or the men fighting the enemy inside. A ladder or a siege tower alone does not call it out. When you defend yourself your formations are never touched. Off = every defender stands at the walls from the start, as in the game. Counted in the Armoury log in each siege assault (line 454).", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
+        public bool WallDefenceReserve { get; set; } = true;
+
         [SettingPropertyBool("Siege Defender Archers To Walls", HintText = "When you defend a fortress and command your side yourself: at the end of deployment, once, your archers and crossbowmen (not heroes, not standard bearers, not men at siege engines) are moved out of your other formations into your formations that shoot from the wall posts, spread evenly; if none stands at a wall post, empty formations are sent to free posts. Afterwards you command as usual. Off = your formations stay as you deployed them", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool SiegeDefenderArchersToWalls { get; set; } = true;
@@ -15964,6 +15968,7 @@ namespace Armoury
             s.SiegeMainEffort = SiegeMainEffort;   // 451
             s.SiegeAbandonDeadLane = SiegeAbandonDeadLane;   // 452
             s.SiegeWavesReinforceSuccess = SiegeWavesReinforceSuccess;   // 453
+            s.WallDefenceReserve = WallDefenceReserve;   // 454
             s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;
             s.SiegeWoundedTakenPrisoner = SiegeWoundedTakenPrisoner;
             s.SiegeWoundedWallDistance = SiegeWoundedWallDistance;
