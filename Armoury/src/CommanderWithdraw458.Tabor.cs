@@ -30,6 +30,8 @@ namespace Armoury
     ///      wklad partii z wodzem odjety z migawki; zapasowa migawka przy koncu bitwy (CaptureSnapshot, sow 4738) - prefiks wyjmuje te partie.
     /// Nie ruszane: lup cial (LootDefeatedPartyCasualties, DTE z poleglych) - ranni i polegli; jency (LootDefeatedPartyPrisoners, B7); zloto (gra
     /// CalculatePlunderedAndLostGoldAmounts); statki (LootDefeatedPartyShips, tylko bitwa morska - 458 to pole); rozliczenie misji DTE (sprzet wystawionych).
+    /// 458-t-p (B1): w lupie przedmiotow gry DTE ItemRosterForPlayerLootSharePatch (OnCollectLootItems) bierze graczowi udzial ze zbrojowni pokonanych -
+    /// zbrojownie partii z wodzem schowane takze na czas LootDefeatedPartyItems (finalizer oddaje).
     /// Zbior partii zyje od lupu przedmiotow do konca okna DTE tej bitwy (porownanie MapEvent), czyszczony przy nowej misji / Reset.
     /// </summary>
     internal static partial class CommanderWithdraw458Map
@@ -43,6 +45,8 @@ namespace Armoury
             public readonly List<string> Dropped = new List<string>();
             public long DteHid, DteBack, DteAdded;
             public int DteParties;
+            public long LootHid, LootBack, LootAdded;   // 458-t-p (B1): zbrojownia schowana na czas lupu przedmiotow gry (udzial gracza DTE w OnCollectLootItems)
+            public int LootParties;
             public bool DteSeen;
             public int SowItems, SowGold;
             public string SowNote = "";
@@ -51,6 +55,7 @@ namespace Armoury
 
         private static Tabor _tab;
         private static List<KeyValuePair<MBGUID, Dictionary<ItemObject, int>>> _tabHidden;
+        private static List<KeyValuePair<MBGUID, Dictionary<ItemObject, int>>> _tabLootHidden;   // 458-t-p (B1)
         private static Harmony _hT;
         private static bool _tabApplied;
         private static string _hookTabLoot = "nie wpieta", _hookTabDte = "nie wpieta", _hookTabSow = "nie wpieta";
@@ -73,7 +78,8 @@ namespace Armoury
                     else
                     {
                         _hT.Patch(m, prefix: new HarmonyMethod(typeof(CommanderWithdraw458Map), nameof(TabLootPre)) { priority = Priority.First },
-                                  postfix: new HarmonyMethod(typeof(CommanderWithdraw458Map), nameof(TabLootPost)) { priority = Priority.Last });
+                                  postfix: new HarmonyMethod(typeof(CommanderWithdraw458Map), nameof(TabLootPost)) { priority = Priority.Last },
+                                  finalizer: new HarmonyMethod(typeof(CommanderWithdraw458Map), nameof(TabLootFin)));
                         _hookTabLoot = "wpieta";
                     }
                 }
@@ -111,7 +117,7 @@ namespace Armoury
             }
             try
             {
-                Log.Info("Odwrot wodza (458-t): tabor partii z wodzem, ktory uszedl - lup przedmiotow gry " + _hookTabLoot + " (prefiks MapEvent.LootDefeatedPartyItems, First), okno zbrojowni DTE "
+                Log.Info("Odwrot wodza (458-t): tabor partii z wodzem, ktory uszedl - lup przedmiotow gry " + _hookTabLoot + " (prefiks MapEvent.LootDefeatedPartyItems, First, zbrojownia DTE schowana na czas lupu - udzial gracza DTE w OnCollectLootItems), okno zbrojowni DTE "
                          + _hookTabDte + " (prefiks 1000 + finalizer EveryoneCampaignBehavior.OnMapEventEnded), migawka taboru Spoils of War " + _hookTabSow
                          + "; dziala tylko po misji z odwrotem wodza przy kluczu Commander Withdraws Under Rearguard.");
             }
@@ -146,9 +152,26 @@ namespace Armoury
                 if (t == null) return;
                 _tab = t;
                 __1 = rest;
+                // 458-t-p (B1): DTE ItemRosterForPlayerLootSharePatch (prefiks CampaignEventDispatcher.OnCollectLootItems, wolany z wnetrza tej metody,
+                // dte 7059-7125) bierze graczowi udzial ze zbrojowni KAZDEJ partii z PartiesOnSide(DefeatedSide) - pelnej listy, nie naszej __1.
+                // Zbrojownie partii z wodzem schowane na czas lupu, TabLootFin oddaje (finalizer - takze przy wyjatku).
+                TabHide(t, ref _tabLootHidden, ref t.LootHid, ref t.LootParties, "Tabor (zbrojownia na czas lupu)");
                 SowTrim(t);
             }
             catch (Exception e) { Stumble("Tabor (lup przedmiotow)", e); }
+        }
+
+        /// <summary>Finalizer LootDefeatedPartyItems (458-t-p, B1): zbrojownie DTE partii z wodzem oddane po lupie przedmiotow. Wyjatek gry idzie dalej.</summary>
+        public static Exception TabLootFin(Exception __exception)
+        {
+            if (_tabLootHidden != null)
+            {
+                var t = _tab;
+                long back = 0, added = 0;
+                TabRestoreList(ref _tabLootHidden, ref back, ref added);
+                if (t != null) { t.LootBack += back; t.LootAdded += added; }
+            }
+            return __exception;
         }
 
         private static bool TabHas(Tabor t, PartyBase pb) { return t != null && t.Parties.ContainsKey(pb); }
@@ -195,7 +218,10 @@ namespace Armoury
             t.Dropped.Add(Name(pb));
         }
 
-        /// <summary>Spoils of War: wklad partii z wodzem (sztuki IsBaggageItem i PartyTradeGold) odjety z migawki taboru bitwy - lup "Search baggage" bez nich.</summary>
+        /// <summary>Spoils of War: wklad partii z wodzem (sztuki IsBaggageItem i PartyTradeGold) odjety z migawki taboru bitwy - lup "Search baggage" bez nich.
+        /// 458-t-p (B4): odejmowany dzisiejszy ladunek (po bitwie) od migawki ze startu, wedlug rodzaju na cala strone - jesli partia z wodzem ma teraz wiecej
+        /// sztuk danego rodzaju niz na starcie, moze odjac wklad innych partii (nic nie powstaje z niczego); flagi migawki (IsLordParty, IsCaravan) zostaja.
+        /// Dziala tylko przy wylaczonym prawie pola bitwy (BattlefieldLaw gasi tabor Spoils).</summary>
         private static void SowTrim(Tabor t)
         {
             try
@@ -205,7 +231,14 @@ namespace Armoury
                 foreach (var b in Campaign.Current.GetCampaignBehaviors<CampaignBehaviorBase>())
                     if (b != null && _sowColl.IsInstanceOfType(b)) { coll = b; break; }
                 var snap = coll != null ? _sowSnapF.GetValue(coll) : null;
-                if (snap == null) { t.SowNote = "migawki brak (zapasowa przy koncu bitwy - bez tych partii)"; return; }
+                if (snap == null)
+                {
+                    // 458-t-p (B3): przy prawie pola bitwy BattlefieldLaw.NoBaggageTrain gasi EnableBaggageTrain - migawki nie ma ani na starcie, ani zapasowej
+                    var cfg = Settings.Current;
+                    t.SowNote = cfg != null && cfg.BattlefieldLawEnabled ? "tabor Spoils wylaczony (BattlefieldLaw) - nic do odjecia"
+                                                                         : "migawki brak (zapasowa przy koncu bitwy - bez tych partii)";
+                    return;
+                }
                 var itemsP = AccessTools.Property(snap.GetType(), "Items");
                 var goldP = AccessTools.Property(snap.GetType(), "TradeGold");
                 var list = itemsP != null ? itemsP.GetValue(snap, null) as List<(ItemObject item, int count)> : null;
@@ -272,16 +305,24 @@ namespace Armoury
         /// wyjete z PartyArmories na czas okna - DTE ich nie kopiuje zwyciezcom, HorseFate.LootMove z nich nie zdejmuje.</summary>
         public static void TabDtePre(MapEvent __0)
         {
-            if (_tabHidden != null) TabRestore();   // nie powinno sie zdarzyc (finalizer zawsze oddaje) - na wszelki wypadek najpierw oddanie
             var t = _tab;
             if (t == null || __0 == null || !ReferenceEquals(t.Me, __0)) return;
             t.DteSeen = true;
+            TabHide(t, ref _tabHidden, ref t.DteHid, ref t.DteParties, "Tabor (DTE schowanie)");
+        }
+
+        /// <summary>Zbrojownie DTE partii z wodzem wyjete z PartyArmories do listy (oddaje TabRestoreList). Potkniecie = od razu oddane.
+        /// Lista z poprzedniego okna (nie powinna zostac - finalizery zawsze oddaja) najpierw oddana.</summary>
+        private static void TabHide(Tabor t, ref List<KeyValuePair<MBGUID, Dictionary<ItemObject, int>>> slot, ref long hidPieces, ref int hidParties, string what)
+        {
+            long b0 = 0, a0 = 0;
+            if (slot != null) TabRestoreList(ref slot, ref b0, ref a0);
             try
             {
                 var all = AiGear.Armories();
                 if (all == null) return;
                 var hid = new List<KeyValuePair<MBGUID, Dictionary<ItemObject, int>>>();
-                _tabHidden = hid;
+                slot = hid;
                 foreach (var kv in t.Parties)
                 {
                     var mp = kv.Key.MobileParty;
@@ -289,11 +330,11 @@ namespace Armoury
                     if (mp == null || !all.TryGetValue(mp.Id, out a) || a == null) continue;
                     all.Remove(mp.Id);
                     hid.Add(new KeyValuePair<MBGUID, Dictionary<ItemObject, int>>(mp.Id, a));
-                    foreach (var x in a) if (x.Value > 0) t.DteHid += x.Value;
-                    t.DteParties++;
+                    foreach (var x in a) if (x.Value > 0) hidPieces += x.Value;
+                    hidParties++;
                 }
             }
-            catch (Exception e) { Stumble("Tabor (DTE schowanie)", e); TabRestore(); }
+            catch (Exception e) { Stumble(what, e); TabRestoreList(ref slot, ref b0, ref a0); }
         }
 
         /// <summary>Finalizer okna DTE (po wszystkich postfiksach, takze HorseFate.LootMove): zbrojownie oddane, linia taboru. Wyjatek DTE idzie dalej.</summary>
@@ -307,10 +348,18 @@ namespace Armoury
 
         private static void TabRestore()
         {
-            var hid = _tabHidden;
-            _tabHidden = null;
-            if (hid == null) return;
             var t = _tab;
+            long back = 0, added = 0;
+            TabRestoreList(ref _tabHidden, ref back, ref added);
+            if (t != null) { t.DteBack += back; t.DteAdded += added; }
+        }
+
+        /// <summary>Oddanie schowanych zbrojowni (to, co ktos dopisal partii w oknie, doliczone - nic nie ginie).</summary>
+        private static void TabRestoreList(ref List<KeyValuePair<MBGUID, Dictionary<ItemObject, int>>> slot, ref long back, ref long added)
+        {
+            var hid = slot;
+            slot = null;
+            if (hid == null) return;
             try
             {
                 var all = AiGear.Armories();
@@ -326,14 +375,14 @@ namespace Armoury
                             if (x.Key == null || x.Value <= 0) continue;
                             int c; kv.Value.TryGetValue(x.Key, out c);
                             kv.Value[x.Key] = c + x.Value;
-                            if (t != null) t.DteAdded += x.Value;
+                            added += x.Value;
                         }
                     }
                     all[kv.Key] = kv.Value;
-                    if (t != null) foreach (var x in kv.Value) if (x.Value > 0) t.DteBack += x.Value;
+                    foreach (var x in kv.Value) if (x.Value > 0) back += x.Value;
                 }
             }
-            catch (Exception e) { Stumble("Tabor (DTE oddanie)", e); }
+            catch (Exception e) { Stumble("Tabor (zbrojownia oddanie)", e); }
         }
 
         /// <summary>Linia "tabor zachowany" - raz na bitwe: z finalizera okna DTE, a bez okna DTE z naszego MapEventEnded.</summary>
@@ -355,17 +404,20 @@ namespace Armoury
                     names.Add(Name(kv.Key));
                 }
                 bool dteOk = t.DteBack == t.DteHid + t.DteAdded;
+                bool lootOk = t.LootBack == t.LootHid + t.LootAdded;
                 var sb = new StringBuilder(256);
                 sb.Append(PT).Append("tabor zachowany: partii ").Append(t.Parties.Count).Append(", przedmiotow ").Append(items).Append(", koni ").Append(horses)
-                  .Append(", zbrojownia DTE ").Append(t.DteHid).Append(" szt.");
+                  .Append(", zbrojownia DTE ").Append(t.LootParties > 0 ? t.LootHid : t.DteHid).Append(" szt.");
                 if (names.Count > 0) sb.Append(" (").Append(string.Join(", ", names.ToArray())).Append(')');
                 sb.Append(" | kontrola: tabor po lupie gry = przed - partii zgodnych ").Append(t.Parties.Count - bad - notChecked).Append(", niezgodnych ").Append(bad)
                   .Append(", niesprawdzonych ").Append(notChecked)
-                  .Append(" | zbrojownia DTE: schowana ").Append(t.DteHid).Append(" (partii ").Append(t.DteParties).Append("), oddana ").Append(t.DteBack)
+                  .Append(" | zbrojownia DTE na czas lupu gry (udzial gracza DTE): schowana ").Append(t.LootHid).Append(" (partii ").Append(t.LootParties).Append("), oddana ")
+                  .Append(t.LootBack).Append(", dopisane w oknie ").Append(t.LootAdded).Append(lootOk ? " OK" : " NIEZGODNE")
+                  .Append(" | zbrojownia DTE w oknie OnMapEventEnded: przed lupem ").Append(t.LootHid).Append(", schowana ").Append(t.DteHid).Append(" (partii ").Append(t.DteParties).Append("), oddana ").Append(t.DteBack)
                   .Append(", dopisane w oknie ").Append(t.DteAdded).Append(dteOk ? " OK" : " NIEZGODNE")
                   .Append(t.DteSeen ? "" : " (okna DTE nie bylo: " + _hookTabDte + ")")
                   .Append(" | Spoils of War: ").Append(t.SowNote.Length > 0 ? t.SowNote : _hookTabSow);
-                if (t.Dropped.Count > 0) sb.Append(" | oddane grze po lupie przedmiotow (ludzie jak w grze, tabor przedmiotow zostal, zbrojownia DTE jak w grze): ").Append(string.Join(", ", t.Dropped.ToArray()));
+                if (t.Dropped.Count > 0) sb.Append(" | oddane grze po lupie przedmiotow (ludzie jak w grze; tabor przedmiotow i udzial gracza DTE ze zbrojowni zostaly, kopia DTE OnMapEventEnded jak w grze): ").Append(string.Join(", ", t.Dropped.ToArray()));
                 sb.Append(" | ").Append(where).Append('.');
                 Log.Info(sb.ToString());
             }

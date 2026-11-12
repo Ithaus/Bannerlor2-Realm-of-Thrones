@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 458-t-p (12.11) - poprawki po recenzji 458-t: udzial gracza DTE ze zbrojowni partii z wodzem (lup przedmiotow gry), opis Spoils / oddanych grze
+
+**Problem:** recenzja 458-t (commit 123f7557), B1 (WYSOKA): partia wodza, ktory uszedl, nadal tracila czesc zbrojowni DTE na rzecz gracza. DTE ItemRosterForPlayerLootSharePatch (prefiks CampaignEventDispatcher.OnCollectLootItems, decout/full/dte.cs 7059-7125) jest wolany z wnetrza MapEvent.LootDefeatedPartyItems (cs_full.cs 112401, dla gracza zawsze), idzie po PartiesOnSide(DefeatedSide) - pelnej liscie, nie naszej przycietej __1 - i z kazdej pokonanej partii zabiera ze zbrojowni (SanitizePartyArmory, ten sam slownik, ilosci zmniejszane) udzial "wklad gracza x DropRate" do gainedLoots (BattlefieldLaw.AfterCollectLoot przenosi to do ShareQueue, LootTally "Bagaz"). U Jeffa dziala (DynamicTroopSettings.json: UseVanillaLootingSystem false). Okno DTE z 458-t chowalo zbrojownie dopiero w OnMapEventEnded, po tym przelewie, a kontrola "schowana = oddana" tego nie widziala. B3: przy prawie pola bitwy (BattlefieldLaw.NoBaggageTrain gasi EnableBaggageTrain) migawki Spoils nie ma (sow.cs 4569, 4735) - linia pisala mylace "migawki brak (zapasowa przy koncu bitwy ...)". B4: opis ograniczenia SowTrim. B6: opis partii oddanej grze nieprecyzyjny.
+
+**Przyczyna:** w 458-t zbrojownie partii z wodzem chowane tylko na czas DTE EveryoneCampaignBehavior.OnMapEventEnded; droga udzialu gracza w OnCollectLootItems (wczesniej, w lupie przedmiotow gry) przeoczona.
+
+**Zmiana (Armoury/src/CommanderWithdraw458.Tabor.cs):**
+- TabLootPre: po wybraniu partii z wodzem (_tab = t, __1 = rest) ich zbrojownie DTE wyjete z PartyArmories (TabHide, lista _tabLootHidden); nowy finalizer TabLootFin na MapEvent.LootDefeatedPartyItems oddaje je po lupie (finalizer - takze przy wyjatku gry; to, co ktos dopisal partii w oknie, doliczone). DTE SanitizePartyArmory zwraca null - udzial gracza z nich nie powstaje i nic z nich nie schodzi.
+- Schowanie / oddanie wspolne dla obu okien (TabHide / TabRestoreList, osobne liczniki LootHid/LootBack/LootAdded i DteHid/DteBack/DteAdded); TabRestore (okno DTE) bez zmian w dzialaniu.
+- Linia "tabor zachowany": "zbrojownia DTE X szt." = stan przed lupem gry; nowy odcinek "zbrojownia DTE na czas lupu gry (udzial gracza DTE): schowana X (partii P), oddana Y, dopisane w oknie Z OK|NIEZGODNE"; odcinek okna DTE zaczyna sie od "przed lupem X, schowana ..." (rozne liczby = partia oddana grze przez TaborDrop miedzy oknami).
+- B3: SowTrim bez migawki przy BattlefieldLawEnabled pisze "tabor Spoils wylaczony (BattlefieldLaw) - nic do odjecia".
+- B4: tylko opis w komentarzu SowTrim (odejmowany dzisiejszy ladunek od migawki ze startu, wedlug rodzaju na strone; flagi migawki zostaja; tylko przy wylaczonym BattlefieldLaw).
+- B6: opis oddanych grze: "tabor przedmiotow i udzial gracza DTE ze zbrojowni zostaly, kopia DTE OnMapEventEnded jak w grze".
+- Linia startu: przy lupie przedmiotow gry dopisek "zbrojownia DTE schowana na czas lupu - udzial gracza DTE w OnCollectLootItems".
+
+**Odrzucone / do decyzji:**
+- B5 (_tab = null po linii) - NIE zrobione: Spoils of War robi zapasowa migawke taboru w swoim sluchaczu OnMapEventEnded (sow.cs 4738), kolejnosc sluchaczy DTE/Spoils nieznana - wyzerowanie _tab w finalizerze DTE mogloby wpuscic partie z wodzem do zapasowej migawki (TabSowCapPre). Bledu nie ma (kazde uzycie porownuje MapEvent), referencja zyje do nastepnej misji / Reset.
+- B2 (sprzet zolnierzy, ktorzy uszli z wodzem, nie wraca przy rozliczeniu misji DTE: HandlePartyItems przy isDefeated, dte.cs 2963-2968, 3091-3108) - DO DECYZJI JEFFA: nie trafia do zwyciezcy (nic z niczego), ale ginie; mozliwa latka (prefiks DynamicTroopMissionLogic.HandlePartyItems, isDefeated = false dla partii z wodzem) - osobny wpis, nie przy okazji.
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci (w kodzie): klucz NIE - TabLootPre konczy przed schowaniem (_p null albo klucz NIE), _tabLootHidden null, TabLootFin zwraca __exception bez zmian - co do bitu jak przed. Nowy finalizer na LootDefeatedPartyItems: wyjatek gry przechodzi dalej (return __exception).
+- Okno lupu obejmuje cala metode gry: takze sluchacze OnLootDistributedToPartyEvent (BandFood) i OnCollectLootItems (DTE udzial gracza, BattlefieldLaw.AfterCollectLoot, Wyceny20 HideoutCampaignBehavior - kryjowki, nie dotyczy) nie widza zbrojowni partii z wodzem; pozostale partie bez zmian. Miedzy oknami (Prisoners, CaptureDefeatedPartyMembers / CapPre) zbrojownie sa na miejscu.
+- Zamknieta ekonomia: z partii z wodzem do gracza nie idzie ani tabor przedmiotow, ani udzial DTE, ani kopia DTE; schowane = oddane (kontrola w linii, dwa odcinki).
+- W logu po bitwie z odwrotem i wygrana gracza: "zbrojownia DTE na czas lupu gry ...: schowana X ... oddana X, dopisane w oknie 0 OK" i "w oknie OnMapEventEnded: przed lupem X, schowana X"; przy BattlefieldLaw "Spoils of War: tabor Spoils wylaczony (BattlefieldLaw) - nic do odjecia".
+- Skan IL: 30 trafien.
+
+**Status:** DO SPRAWDZENIA (nie wgrane, gry nie uruchamiano).
+
 ## 458-t (12.11) - odwrot wodza, mapa: partia wodza, ktory uszedl, odchodzi Z TABOREM (przedmioty, konie, zbrojownia DTE)
 
 **Problem:** decyzja Jeffa 12.11 na pytanie B6 z 458-p ("czy wodz, ktory uszedl, ma tracic tabor na rzecz zwyciezcy?"): "jak uciekl to chyba z taborem". Dotad partia z wodzem (458 mapa) tracila tabor jak kazda pokonana: gra zabierala ItemRoster (towary, jedzenie, konie taboru), DTE kopiowal zbrojownie zwyciezcom (przy LootIsTransfer TAK HorseFate.LootMove zdejmowal ja z partii - odchodzila z pusta zbrojownia, bez koni; przy NIE - kopia z niczego), Spoils of War dawal graczowi lup z migawki jej taboru. Gry nie uruchamiano - dowod z kodu i dekompilacji.
