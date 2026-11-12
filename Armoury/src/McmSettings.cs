@@ -11744,6 +11744,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool InfantryReserve { get; set; } = true;
 
+        [SettingPropertyBool("Line Relief", HintText = "When an AI infantry reserve (Infantry Reserve) stands behind a part of its line that is tired but still holding, the reserve relieves it. When at least 4 in 10 of the men in an AI infantry formation fighting hand to hand are nearly out of breath (stamina bar below 30%, two seconds running), the formation is not losing the fight (otherwise the reserve goes in as before), and the reserve has rested at least 30 seconds and is fresh (its average stamina at least 60%), the whole reserve marches up behind that formation and joins it. Once the fresh men are there (or after 25 seconds), as many tired men as fresh men arrived - only those with no enemy within 5 m, so nobody turns his back on a foe - fall back 25 m behind the line and become the new reserve, which can go in again later the same way. The formation keeps at least 30 men; with fewer than 12 tired men free to leave, the fresh men simply stay in the line. At most 3 reliefs per side and battle. Nobody already in close combat is ordered back - the line never breaks contact on its own. Needs Infantry Reserve and stamina from running and fighting (Sprint Fatigue Enabled). Every AI-led side - never your own troops. No bonus to any number on the field - only decisions. Field battles only. Off = exactly as before. Counted in the Armoury log at the end of each field battle (line 459).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool LineRelief { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15831,6 +15835,7 @@ namespace Armoury
             s.InfantrySquareAgainstFlankCharge = InfantrySquareAgainstFlankCharge;   // 446
             s.CavalryHuntsRearCommander = CavalryHuntsRearCommander;   // 447
             s.InfantryReserve = InfantryReserve;   // 457
+            s.LineRelief = LineRelief;   // 459
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

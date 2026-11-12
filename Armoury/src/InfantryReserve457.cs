@@ -59,7 +59,7 @@ namespace Armoury
     /// najnizszy stosunek sil linii, oslona strzelcow / szarza i dojscie do linii, kompanie wypisane / odmowy, AI szyku 8 cofniete, przesuniecia punktu).
     /// Wyjatek per czlowiek / szyk / druzyne = potkniecie (pierwsze 3 do logu), bez globalnego wylacznika. Pola statyczne MovementOrder tylko odbiciem (456-c).
     /// </summary>
-    internal sealed class InfantryReserve457 : MissionLogic
+    internal sealed partial class InfantryReserve457 : MissionLogic
     {
         private const string P = "Odwod piechoty (457): ";
         private const float Every = 1f, StartDelay = 3f, NoDeployStart = 10f, FormWindow = 120f, FormGap = 90f;
@@ -68,7 +68,7 @@ namespace Armoury
         private const float CavFar = 90f, CavNear = 30f, CavSpeed = 2f, CavEta = 15f, CavReach = 150f, GuardAhead = 10f, GuardCalmR = 50f, GuardCalm = 8f, GuardMax = 45f, GuardEvery = 3f;
         private const float ShareCalm = 0.25f, ShareNormal = 0.18f, ShareRash = 0.12f;
         private const int InfMin = 60, KeepMin = 30, ReserveMin = 12, LineMin = 10, ContactMin = 5, AttackMin = 5, CavMin = 5, ArchMin = 5, ErrMax = 3;
-        private const byte PhHold = 0, PhGuard = 1, PhCharge = 2, PhDone = 3;
+        private const byte PhHold = 0, PhGuard = 1, PhCharge = 2, PhDone = 3, PhRelief = 4;   // 459: PhRelief - zmiana zmeczonej linii (InfantryReserve457.Relief459.cs)
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly string[] ProfName = { "OSTROZNY", "ZWYKLY", "PORYWCZY" };
 
@@ -98,9 +98,10 @@ namespace Armoury
             public float MergeAt = -1f;
             public int MergeN;
             public string MergeTo = "-";
+            public readonly Rel459 R = new Rel459();   // 459: zmiana zmeczonej linii
         }
 
-        private bool _known, _field, _started, _ended, _keyOn;
+        private bool _known, _field, _started, _ended, _keyOn, _relOn;   // 459: _relOn = klucz LineRelief przy InfantryReserve TAK
         private float _startAt = -1f, _next, _t0, _lastScan;
         private int _stumbles, _errs;
         private readonly List<St> _teams = new List<St>();
@@ -166,6 +167,7 @@ namespace Armoury
                     _next = now;
                     _lastScan = now;
                     _keyOn = On;
+                    _relOn = _keyOn && RelOn;   // 459
                     _collect = a => _units.Add(a);
                 }
                 if (m.MissionEnded || now < _next) return;
@@ -560,6 +562,7 @@ namespace Armoury
             Formation weak = null, anyInf = null;
             float wr = 9f;
             bool retreat = false;
+            _contact.Clear();   // 459: szyki w zwarciu z ich stosunkiem sil (sam odczyt)
             var fl = t.FormationsIncludingEmpty;
             for (int j = 0; fl != null && j < fl.Count; j++)
             {
@@ -572,6 +575,7 @@ namespace Armoury
                     if (anyInf == null || f.CountOfUnits > anyInf.CountOfUnits) anyInf = f;
                     float r = LocalRatio(m, t, f, _keyOn ? s.F8 : null, _keyOn ? null : s.ResNo);
                     if (r < 0f) continue;
+                    _contact.Add(new KeyValuePair<Formation, float>(f, r));   // 459
                     if (r < s.MinRatio) s.MinRatio = r;
                     if (r < wr) { wr = r; weak = f; }
                 }
@@ -598,13 +602,14 @@ namespace Armoury
             Formation target = null;
             if (retreat) why = "odwrot druzyny (Retreat szyku piechoty)";
             else if (anyInf == null) why = "brak szyku piechoty AI z >= " + LineMin + " ludzi";
-            if (why == null && _keyOn)
+            bool walk = WalkBack(s, now);   // 459: zmeczeni po zmianie linii ida na tyl - warunki 2-4 czekaja (przy NIE zawsze false)
+            if (why == null && _keyOn && !walk)
             {
                 Vec2 c = Centre(s);
                 int foes = c.IsValid ? FoesNear(m, t, c, AttackR) : 0;
                 if (foes >= Math.Max(AttackMin, (int)(0.2f * alive))) { why = "odwod zaatakowany (" + foes + " wrogow w " + AttackR.ToString("0", Inv) + " m)"; ph = PhCharge; }
             }
-            if (why == null)
+            if (why == null && !walk)
             {
                 if (weak != null && wr < RatioOut)
                 {
@@ -614,13 +619,13 @@ namespace Armoury
                 }
                 else { s.LowAt = -1f; s.LowF = null; }
             }
-            if (why == null)
+            if (why == null && !walk)
             {
                 Formation arch, cav;
                 string cw;
                 if (CavOnArchers(m, s, step, out arch, out cav, out cw)) { why = cw; ph = PhGuard; s.Arch = arch; s.Cav = cav; }
             }
-            if (why == null) return;
+            if (why == null) { Relief(m, s, now, alive); return; }   // 459: zmeczona linia - ostatni warunek, tylko gdy zaden z 1-4 nie zaszedl
             Release(m, s, now, why, ph, target, alive);
         }
 
@@ -792,6 +797,7 @@ namespace Armoury
         private void Phase(Mission m, St s, float now)
         {
             var t = s.T;
+            if (s.Ph == PhRelief) { ReliefStep(m, s, now); return; }   // 459
             if (s.F8 == null || s.F8.CountOfUnits <= 0) { s.MergeTo = "odwod wyginal w " + (s.Ph == PhGuard ? "oslonie" : "szarzy"); s.Ph = PhDone; s.MergeAt = now; return; }
             try { if (s.F8.IsAIControlled) { s.F8.SetControlledByAI(false); s.ReAi++; } } catch (Exception e) { Stumble("AI8", e); }
             Vec2 c = Centre(s);
@@ -878,6 +884,7 @@ namespace Armoury
                       .Append(", udzial 25/18/12% (ostrozny / zwykly / porywczy), piechota >= ").Append(InfMin).Append(", szyk zostaje >= ").Append(KeepMin)
                       .Append(", odwod >= ").Append(ReserveMin).Append(" | potkniecia ").Append(_stumbles).Append('.');
                     Log.Info(sb.ToString());
+                    EndRelief(now);   // 459: osobna linia '(459) koniec'
                 }
             }
             catch (Exception e) { Stumble("Koniec", e); }
@@ -887,6 +894,7 @@ namespace Armoury
             _cavPrev.Clear();
             _cavNow.Clear();
             _units.Clear();
+            _contact.Clear();
             _bufA.Clear();
             _bufE.Clear();
             base.OnEndMission();

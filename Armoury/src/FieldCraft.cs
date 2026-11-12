@@ -504,6 +504,19 @@ namespace Armoury
             return f != null && a != null && f._states.TryGetValue(a, out st) && st.Winded;
         }
 
+        /// <summary>459 (zmiana zmeczonej linii, InfantryReserve457.Relief459.cs): biezacy pasek staminy / max (st.Ratio, 144) - tylko odczyt, glowny watek.
+        /// false = nieznany (brak FieldCraft w tej misji, SprintFatigueEnabled NIE - wtedy Ratio nie jest liczone, albo czlowiek bez stanu).</summary>
+        internal static bool BarOf(Agent a, out float bar)
+        {
+            bar = 1f;
+            var f = _live;
+            var c = Settings.Current;
+            State st;
+            if (f == null || a == null || c == null || !c.SprintFatigueEnabled || !f._states.TryGetValue(a, out st)) return false;
+            bar = st.Ratio;
+            return true;
+        }
+
         // ---- 313d: odczyty dla BrokenMen (rzut odwrotu 143) i RoutKeeper (powod "z bolu") - glowny watek
 
         /// <summary>Recenzja 313d: BrokenMen przed rzutami odwrotu 143 zdejmuje kolejke trafien (glowny watek) - licznik ran (HitsOf) jest juz po ciosie, ktory
