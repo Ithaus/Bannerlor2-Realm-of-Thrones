@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 462-b (12.11) - wczytanie pamieci N (arm_lpn): komorka juz zalozona w sesji nie wyrzuca 28-dobowej historii zapisu
+
+**Problem:** stara usterka z listy (SupplySignal.Resolve, "if (m.ContainsKey(cat)) { _loadBad++; continue; }"). Resolve rozwija zapis arm_lpn dopiero w pierwszej dobie sesji (EarlyTable / Daily); jesli warsztat (NoteInput) albo roboty (NoteWorksGap) zapisaly brak w tej komorce wczesniej, cala historia zapisu tej komorki szla do kosza jako "zly wpis" - akurat dla najczynniejszych komorek. Po wczytaniu N tych komorek liczyl sie od zera (kolejka 1 przez MinSpan dob). W logach autotestow brak dowodu wprost (testy laduja zapis bez arm_lpn: "zapis bez arm_lpn" x7) - usterka z kodu.
+
+**Przyczyna:** ContainsKey zamiast scalenia; analogiczna sciezka wyrobu (ResolveWare, 435-N-C) juz scala (merged).
+
+**Zmiana:** Resolve: istniejaca komorka dostaje doby zapisu tylko w gniazdach pierscienia bez nowszej doby (doby sesji nietkniete); nowa jak dotad. Licznik "polaczonych z dobami sesji (462-b) N" w linii wczytania; "zlych wpisow" liczy juz tylko prawdziwie zle wpisy. Bez klucza (naprawa wczytania).
+
+**Ryzyko / co sprawdzic:** tylko sciezka wczytania zapisu z arm_lpn (gra Jeffa po zapisie i ponownym wczytaniu): linia "arm_lpn wczytany: ... komorek N, ... polaczonych z dobami sesji M" - M kilka-kilkadziesiat albo 0, "zlych wpisow" 0. Doby z zapisu to srednie (jak dotad); _gFrom / _first bez zmian. Nowa gra / zapis bez arm_lpn - kod nie biegnie.
+
+**Status:** DO SPRAWDZENIA
+
 ## 462-a (12.11) - brak zboza do mlyna / browaru (i innego wsadu jedzenia warsztatu) wraca do tablicy N jako UDZIAL niezaspokojonego zapotrzebowania
 
 **Problem:** recenzja 435-N-B (WGRANIE 212): wylaczenie wsadu jedzenia z N usunelo tez prawdziwy czesciowy brak zboza dla mlynow i browarow. Autotest at-461 (doba 1101): "jedzenie i zwierzeta (tylko pomiar): grain 43, apple 28, butter 26, meat 8, grape 7 ... (razem 116)" cykli bez wsadu na dobe, przy zuzyciu jedzenia 621 cykli; linia LP: "435-N-B brak wsadu jedzenia i zwierzat poza N: 137.0 szt. w 116 brakach" - nic z tego nie trafia do N, wiec L6 / L5 / regulator nie widza, ze mlyny stoja bez zboza (N zboza tylko przy glodzie wsi).

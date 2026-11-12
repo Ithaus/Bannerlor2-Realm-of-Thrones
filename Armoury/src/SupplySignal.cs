@@ -388,7 +388,7 @@ namespace Armoury
         {
             _main = Environment.CurrentManagedThreadId; _dOff = 0;
             _st = _stSess = 0; _err.Clear(); _startLine = false; _first = int.MinValue; _gFrom = int.MinValue;
-            _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _offWarned = false; _heldBits = 0; _earlyTried = false; _loadFoodZero = 0;
+            _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _loadMerged = 0; _offWarned = false; _heldBits = 0; _earlyTried = false; _loadFoodZero = 0;
             _cells.Clear(); _price.Clear(); ZeroDay();
             _ws.Clear(); CycleBegin();
             _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>(); _pubT = null;
@@ -473,7 +473,7 @@ namespace Armoury
         // ============================================================ zapis (arm_lpn) - 435-L1-p (recenzje S4 / S1): pamiec N w zapisie
         private const string SaveVer = "n1";
         private static string _pend, _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)";
-        private static int _loadBad, _heldBits;
+        private static int _loadBad, _loadMerged, _heldBits;   // 462-b: _loadMerged - komorki zapisu polaczone z komorka juz zalozona w sesji
         private static bool _offWarned;
         private static bool IdOk(string x) { return !string.IsNullOrEmpty(x) && x.IndexOfAny(new[] { '|', '~', ';', ',', ':' }) < 0; }
         private static bool Num(string s, out double v) { return double.TryParse(s, NumberStyles.Float, Inv, out v) && !double.IsNaN(v) && !double.IsInfinity(v) && v >= 0; }
@@ -564,19 +564,25 @@ namespace Armoury
                         if (st == null || st.Town == null || cat == null) { _loadBad++; continue; }
                         Dictionary<ItemCategory, Cell> m;
                         if (!_cells.TryGetValue(st, out m)) { m = new Dictionary<ItemCategory, Cell>(); _cells[st] = m; }
-                        if (m.ContainsKey(cat)) { _loadBad++; continue; }
                         if (miss > 0 && !FoodShareOn && CommodityInputs284.Food(cat)) { miss = 0; _loadFoodZero++; }   // 435-N-B (klucz 462-a NIE): brak jedzenia poza kolejka N
-                        var cell = new Cell();
+                        // 462-b: komorka mogla juz powstac w tej sesji (warsztat / roboty zapisaly brak przed pierwsza doba sesji, kiedy Resolve rozwija zapis) - dawniej
+                        // ContainsKey wyrzucal wtedy cala 28-dobowa historie zapisu jako "zly wpis" (wlasnie dla najczynniejszych komorek). Teraz doby zapisu wpisywane
+                        // do tej komorki tylko w gniazda pierscienia bez nowszej doby - doby sesji zostaja nietkniete.
+                        Cell cell;
+                        bool had = m.TryGetValue(cat, out cell);
+                        if (!had) cell = new Cell();
                         for (int i = 0; i < span; i++)
                         {
                             int d = day - i, k = ((d % Window) + Window) % Window;
+                            if (had && cell.Day[k] != int.MinValue && cell.Day[k] >= d) continue;
                             cell.Day[k] = d; cell.Miss[k] = (float)miss; cell.Soft[k] = (float)soft; cell.Got[k] = (float)got;
                         }
-                        m[cat] = cell; cells++;
+                        if (!had) m[cat] = cell; else _loadMerged++;
+                        cells++;
                     }
                 if (cells > 0) _first = _first == int.MinValue ? day - span + 1 : Math.Min(_first, day - span + 1);
                 if (cells > 0) _gFrom = day + 1;                              // 435-N-A-p: przyrost tylko z dob po zapisie (doby z zapisu to srednia, nie poziom)
-                _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (_loadFoodZero > 0 ? ", brak wsadu jedzenia wyzerowany (435-N-B) w " + _loadFoodZero : "") + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
+                _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (_loadFoodZero > 0 ? ", brak wsadu jedzenia wyzerowany (435-N-B) w " + _loadFoodZero : "") + (_loadMerged > 0 ? ", polaczonych z dobami sesji (462-b) " + _loadMerged : "") + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
             }
             catch (Exception e) { Stumble("Resolve", e); _loadNote = "arm_lpn - blad wczytania (pamiec N od pierwszej doby)"; }
         }
