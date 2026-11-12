@@ -48,7 +48,7 @@ namespace Armoury
     /// Kontrola: na partie przed = po + do niewoli + bez odbiorcy (jak w grze) + bohaterowie wyjeci; niezgodnosc liczona. Potkniecie na partie - ta partia wraca
     /// do listy gry (rozliczy ja gra), bez globalnego wylacznika.
     /// </summary>
-    internal static class CommanderWithdraw458Map
+    internal static partial class CommanderWithdraw458Map
     {
         private const string P = "Odwrot wodza (458) mapa: ";
         // liczniki misji na (partia, postac) - indeksy wspolne z CommanderWithdraw458
@@ -76,16 +76,16 @@ namespace Armoury
         private static int _stumbles, _errs;
         private static bool _changed;   // 458-p: Settle zaczal zmieniac sklad (potkniecie potem nie oddaje partii grze)
 
-        internal static void Set(Pending p) { _p = p; _move = null; _moveParties = null; }
+        internal static void Set(Pending p) { _p = p; _move = null; _moveParties = null; _tab = null; }
 
         /// <summary>458-p (recenzja B9): nowa kampania / wczytanie (konstruktor ArmouryBehavior) - stan i liczniki od zera.</summary>
-        internal static void Reset() { _p = null; _move = null; _moveParties = null; _stumbles = 0; _errs = 0; }
+        internal static void Reset() { _p = null; _move = null; _moveParties = null; _stumbles = 0; _errs = 0; _tab = null; _tabHidden = null; }
 
         /// <summary>Nowa misja: stare oczekiwanie (bitwa trwala dalej - ContinueBattle - albo pojmanie sie nie odbylo) znika.</summary>
         internal static void Clear()
         {
             if (_p != null) { try { Log.Info(P + "oczekiwanie bez pojmania (bitwa trwa dalej albo nowa misja) - porzucone, nic nie zmieniono."); } catch { } }
-            _p = null; _move = null; _moveParties = null;
+            _p = null; _move = null; _moveParties = null; _tab = null;   // 458-t: zbior taboru poprzedniej bitwy tez
         }
 
         /// <summary>SubModuleMain (menu glowne, raz na proces): prefiks MapEvent.CaptureDefeatedPartyMembers (metoda zadeklarowana w MapEvent - DeclaredMethod).
@@ -216,6 +216,7 @@ namespace Armoury
                         {
                             tGame++;
                             rest.Add(mep);
+                            TaborDrop(pb);   // 458-t: zbrojownia DTE i migawka Spoils jak w grze
                             sb.Append(" || ").Append(Name(pb)).Append(": liczniki misji niezgodne z gra (").Append(bad).Append(") - rozliczy gra");
                             continue;
                         }
@@ -234,6 +235,7 @@ namespace Armoury
                         if (!_changed)
                         {
                             rest.Add(mep);   // potkniecie przed zmiana skladu - te partie rozliczy gra
+                            TaborDrop(pb);   // 458-t
                             sb.Append(" || ").Append(Name(pb)).Append(": potkniecie przed zmianami - rozliczy gra");
                         }
                         else
@@ -566,6 +568,8 @@ namespace Armoury
         /// <summary>MapEventEnded (ArmouryBehavior): partie z wodzem odchodza od zwyciezcy jak strona RetreatingSide w grze (AiMilitaryBehavior.OnMapEventEnded).</summary>
         internal static void OnMapEventEnded(MapEvent me)
         {
+            // 458-t: linia taboru tu tylko bez okna DTE (z oknem pisze ja finalizer DTE - sluchacz DTE biegnie po naszym)
+            if (_tab != null && me != null && ReferenceEquals(_tab.Me, me) && _hookTabDte != "wpieta") TabLine("MapEventEnded, bez okna DTE");
             var p = _move;
             if (p == null || me == null || !ReferenceEquals(p.Me, me)) return;
             var list = _moveParties;
