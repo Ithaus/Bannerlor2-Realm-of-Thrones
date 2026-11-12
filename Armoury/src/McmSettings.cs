@@ -11624,10 +11624,6 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public int ShootFirstSeconds { get; set; } = 90;
 
-        [SettingPropertyBool("Cavalry Seeks Flanks", HintText = "AI cavalry goes round a pinned enemy and strikes his archers and flanks instead of only charging the front. On by default (Jeff 25.10) - switch off if it misbehaves", RequireRestart = false)]
-        [SettingPropertyGroup("Marching and tactics")]
-        public bool CavalrySeeksFlanks { get; set; } = true;
-
         [SettingPropertyBool("Archers Fall Back Behind Infantry", HintText = "AI archers withdraw behind their infantry when enemy foot or horse comes within Archer Fall Back Distance, and step out again once it is pushed back. On by default (Jeff 25.10) - switch off if it misbehaves", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool ArchersFallBackBehindInfantry { get; set; } = true;
@@ -11691,6 +11687,10 @@ namespace Armoury
         [SettingPropertyBool("Cavalry Commander", HintText = "AI cavalry in field battles gets an Armoury cavalry commander: a behaviour of its own added to every AI formation, which later steps will use to give the cavalry a task (choosing whom to charge, raiding enemy archers, hiding behind its own foot from missiles, hammer and anvil, fighting the enemy cavalry first, breaking off a lost melee). In this version it is only the framework: every formation has no task, the behaviour stays idle and never takes over the formation - nothing changes on the field. No bonus to any number on the field - only decisions. Field battles only. Off = the behaviour is not added at all, exactly as before. Counted in the Armoury log at the end of each field battle (line 441).")]
         [SettingPropertyGroup("Marching and tactics")]
         public bool CavalryCommander { get; set; } = true;
+
+        [SettingPropertyBool("Cavalry Target Choice", HintText = "AI cavalry in field battles chooses whom to charge instead of always riding at the nearest large enemy formation: enemy archers in the open come first, then an enemy formation already locked in hand to hand fighting, then the infantry on the enemy flanks; the enemy centre that is not yet fighting and would only brace for the charge is avoided while the cavalry is closer to it than its own infantry. A closer target counts for more, and the cavalry changes its mind only for a clearly better target and never while it is fighting itself. The riders keep to the chosen target on the way in and do not peel off at whatever enemy foot is nearest; a rider already fighting someone next to him stays with him. Horse archers, your own formations and the enemy cavalry are left as they were. No bonus to any number on the field - only decisions. Field battles only. Off = the cavalry charges what RBM picks, exactly as before. Counted in the Armoury log at the end of each field battle (line 442). Replaces Cavalry Seeks Flanks, which never took effect and has been removed.", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CavalryTargetChoice { get; set; } = true;
 
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
@@ -15721,7 +15721,6 @@ namespace Armoury
             s.CultureDoctrines = CultureDoctrines;
             s.ShootBeforeAttacking = ShootBeforeAttacking;
             s.ShootFirstSeconds = ShootFirstSeconds;
-            s.CavalrySeeksFlanks = CavalrySeeksFlanks;
             s.ArchersFallBackBehindInfantry = ArchersFallBackBehindInfantry;
             s.ArcherFallBackDistance = ArcherFallBackDistance;
             s.DefendersAdvanceUnderFire = DefendersAdvanceUnderFire;
@@ -15738,6 +15737,7 @@ namespace Armoury
             s.CommanderPersonalityInBattle = CommanderPersonalityInBattle;   // 440
             s.CommandConfusionAfterCommanderDeath = CommandConfusionAfterCommanderDeath;   // 440
             s.CavalryCommander = CavalryCommander;   // 441
+            s.CavalryTargetChoice = CavalryTargetChoice;   // 442
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

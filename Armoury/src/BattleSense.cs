@@ -54,13 +54,14 @@ namespace Armoury
         /// marsz i doktryny (P1), dzwiek (P2), choragwie (P3). Czytane w SubModuleMain.OnMissionBehaviorInitialize.</summary>
         internal static bool NightKeys(Settings c)
         {
-            return c != null && (c.MarchToContactEnabled || c.CultureDoctrines || c.ShootBeforeAttacking || c.CavalrySeeksFlanks || c.ArchersFallBackBehindInfantry
+            return c != null && (c.MarchToContactEnabled || c.CultureDoctrines || c.ShootBeforeAttacking || c.ArchersFallBackBehindInfantry
                                  || c.BattleSoundsEnabled || c.BannerCompaniesEnabled
                                  || c.DefendersAdvanceUnderFire     // 141: S2 obronca pod ostrzalem (Doctrine.S2.cs) - wejscia tylko z BattleSense (Doctrine.Begin / Tick / End)
                                  || c.DefendersHoldTheirGround      // 291: obronca trzyma pozycje (Doctrine.Hold291.cs) - tak samo
                                  || c.BattlePlanVariety || c.CommandConfusionAfterCommanderDeath   // 440: wodz AI (Doctrine.Plan440.cs) - P440Tick z Doctrine.Tick
                                  || c.CommanderPersonalityInBattle   // 440-p: profil wodza tez z P440Tick (rzut) - sam ten klucz dotad nic nie robil
                                  || c.CavalryCommander   // 441: zachowanie roli jazdy (Doctrine.Cav441.cs) - C441Begin / C441Tick z Doctrine
+                                 || c.CavalryTargetChoice   // 442: cel szarzy jazdy (Doctrine.Target442.cs) - T442Begin / T442Tick z Doctrine (S3 CavalrySeeksFlanks wyciete)
                                  || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 
