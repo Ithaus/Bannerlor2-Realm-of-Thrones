@@ -20,6 +20,7 @@ namespace Armoury
             OutshotRush.Reset();   // 313b: segment E
             Doctrine.O438Reset();   // 438: linia "Ostrzal piechoty (438)"
             Doctrine.H439Reset();   // 439: linia "Obronca trzyma (439)"
+            Doctrine.P440Reset();   // 440: linia "Wodz AI (440)"
         }
 
         internal static void Write(Mission m, string kind, string segA)
@@ -39,6 +40,7 @@ namespace Armoury
             Log.Info(sb.ToString());
             Log.Info(Doctrine.O438Line(kind));   // 438: osobna linia (wyrazenia sprawdz_logi dla 'Bitwa (291)' bez zmian)
             Log.Info(Doctrine.H439Line(kind));   // 439: osobna linia
+            Log.Info(Doctrine.P440Line(kind));   // 440: osobna linia
         }
     }
 }

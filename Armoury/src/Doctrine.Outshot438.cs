@@ -249,7 +249,8 @@ namespace Armoury
         {
             dry = false;
             if (gap > O438Range || gap == float.MaxValue) return false;
-            if (O438Bleed(t) < FireDead) return false;
+            int bleed = O438Bleed(t);
+            if (bleed < P440FireThr(t, bleed, 0)) return false;   // 440 (3.3): prog wedlug profilu wodza (klucz NIE / ZWYKLY - FireDead)
             if (!_o438Loss) { dry = true; return false; }
             return true;
         }
@@ -266,7 +267,8 @@ namespace Armoury
         private static bool O438S2Loss(Team t, float ratio, bool outshot, Formation inf, float gap)
         {
             if (!outshot || inf == null || gap > S2Range || ratio >= S2Ratio) return false;
-            if (O438Bleed(t) < FireDead) return false;
+            int bleed = O438Bleed(t);
+            if (bleed < P440FireThr(t, bleed, 1)) return false;   // 440 (3.3): prog wedlug profilu wodza (klucz NIE / ZWYKLY - FireDead)
             if (!_o438Loss) { _o438S2LossDry++; return false; }
             _o438S2LossSec += TickEvery;
             return true;
@@ -278,6 +280,7 @@ namespace Armoury
         /// druzyna przegrywa wymiane ognia (S2 zywe albo puszczona 291e / 320d) - waga splitu przycieta do najwyzszej wagi obrony gry tej druzyny. Bez alokacji.</summary>
         private static void O438SplitPost(object __instance, ref float __result)
         {
+            P440Los(__instance, ref __result);   // 440 (3.4): los planu RBM PRZED przycieciem 1.3 - sufit obrony gry zostaje sufitem
             if (!_on) return;
             try
             {

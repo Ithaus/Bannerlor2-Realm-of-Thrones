@@ -188,7 +188,9 @@ namespace Armoury
                 if (ef != null && ef.CountOfUnits > 0)
                 {
                     float d = inf.CachedMedianPosition.AsVec2.Distance(ef.CachedMedianPosition.AsVec2) - 0.5f * (inf.Depth + ef.Depth);
-                    if (d <= S1ContactGap) { Interlocked.Increment(ref _h439Near); return; }
+                    // 440 (3.3): porywczy wodz puszcza Engage przy szyku wroga w 40 m (reszta i klucz NIE - 25 m)
+                    if (d <= P440Gap(team, ti)) { if (d > S1ContactGap) Interlocked.Increment(ref _cpGapEarly); Interlocked.Increment(ref _h439Near); return; }
+                    P440GapDry(team, ti, d);
                 }
                 if (!_h439HoldKey) { Interlocked.Increment(ref _h439Dry); return; }
                 __result = false;
@@ -231,7 +233,12 @@ namespace Armoury
             var inf = MainInfantry(t);
             // 2.1: flaga wrecz (czyta postfiks) - tylko druzyna w trzymaniu po rozstawieniu
             bool melee = false;
-            if (dep && _dhOn[ti]) melee = H439InMelee(t, now);
+            if (dep && _dhOn[ti])
+            {
+                bool baseMelee;
+                melee = H439InMelee(t, now, P440MeleeShare(t), out baseMelee);   // 440 (3.3): prog wrecz wedlug profilu wodza (klucz NIE - 35%)
+                P440NoteMelee(melee, baseMelee);
+            }
             _h439Melee[ti] = melee;
             // ozywiony kod: ile druzyn naraz stoi zamiast Engage (postfiks znaczy od ostatniego taktu)
             if (_h439CutTeam[ti])
@@ -307,8 +314,10 @@ namespace Armoury
         }
 
         /// <summary>2.1 (glowny watek): ktorykolwiek szyk piechoty druzyny ma >= 35% ludzi z ciosem wrecz zadanym / otrzymanym w ostatnich 6 s.</summary>
-        private static bool H439InMelee(Team t, float now)
+        private static bool H439InMelee(Team t, float now, float share, out bool baseHit)
         {
+            baseHit = false;
+            bool hit = false;
             var fl = t.FormationsIncludingSpecialAndEmpty;
             int nf = fl != null ? fl.Count : 0;
             for (int j = 0; j < nf; j++)
@@ -319,9 +328,14 @@ namespace Armoury
                 if (fq == null || !fq.IsInfantryFormation) continue;
                 _mlNow = now; _mlAll = _mlIn = 0;
                 f.ApplyActionOnEachUnit(H439MeleeMan);
-                if (_mlAll > 0 && _mlIn >= H439MeleeShare * _mlAll) return true;
+                if (_mlAll > 0)
+                {
+                    if (_mlIn >= share * _mlAll) hit = true;
+                    if (_mlIn >= H439MeleeShare * _mlAll) baseHit = true;   // 440: prog 439 bez profilu (licznik "wczesniej / pozniej")
+                }
+                if (hit && baseHit) return true;
             }
-            return false;
+            return hit;
         }
 
         private static readonly Action<Agent> H439MeleeMan = a =>

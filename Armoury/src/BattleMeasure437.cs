@@ -919,7 +919,8 @@ namespace Armoury
                 catch (Exception e) { Stum("Start.Druzyna", e); }
             }
             if (n == 0) sb.Append(" -");
-            sb.Append(" | rzut losu - (pakiet 3 nie wdrozony) | latki: ").Append(_note)
+            string r440 = Doctrine.P440StartNote();   // 440: rzut losu i profil druzyn; null = klucze 440 NIE - tekst jak dotad
+            sb.Append(r440 == null ? " | rzut losu - (pakiet 3 nie wdrozony) | latki: " : " | rzut losu (440): " + r440 + " | latki: ").Append(_note)
               .Append(" | os czasu co ").Append(F0(Every)).Append(" s, kontakt szyku < ").Append(F0(ContactGap)).Append(" m od najblizszego szyku wroga (mediana minus pol glebokosci obu).");
             Log.Info(sb.ToString());
         }

@@ -58,6 +58,7 @@ namespace Armoury
                                  || c.BattleSoundsEnabled || c.BannerCompaniesEnabled
                                  || c.DefendersAdvanceUnderFire     // 141: S2 obronca pod ostrzalem (Doctrine.S2.cs) - wejscia tylko z BattleSense (Doctrine.Begin / Tick / End)
                                  || c.DefendersHoldTheirGround      // 291: obronca trzyma pozycje (Doctrine.Hold291.cs) - tak samo
+                                 || c.BattlePlanVariety || c.CommandConfusionAfterCommanderDeath   // 440: wodz AI (Doctrine.Plan440.cs) - P440Tick z Doctrine.Tick
                                  || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 

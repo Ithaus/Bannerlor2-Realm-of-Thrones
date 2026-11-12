@@ -11676,6 +11676,18 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefenderSeeksHighGround { get; set; } = true;
 
+        [SettingPropertyBool("Battle Plan Variety", HintText = "Each AI side in a field battle rolls its own fortune once its troops are deployed: every battle plan it knows (full attack, charge, harassing with missiles, cavalry charge, defensive line, defensive engagement, ring, holding a choke point and the plans of Realistic Battle Mod) gets its own weight between 0.8 and 1.25 for that battle, and the side picks its opening plan afresh with those weights. The same army no longer opens every battle the same way. No bonus to any number on the field - only which plan is chosen. Not your own side. Field battles only. Off = plans are weighed as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool BattlePlanVariety { get; set; } = true;
+
+        [SettingPropertyBool("Commander Personality In Battle", HintText = "The AI commander fights the way he is: a lord with more Valor than Calculating is rash, with more Calculating than Valor he is cautious, otherwise (or a commander who is not a hero) ordinary. A rash commander's infantry runs in under fire after one man killed by missiles in 30 seconds and a holding defender charges when the enemy is within 40 m or a quarter of its infantry is fighting hand to hand; a cautious one waits for three men killed by missiles and charges from a held position only when half its infantry is fighting hand to hand. Ordinary commanders as before. No bonus to any number on the field - only when the decision is made. Field battles only. Off = all commanders as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CommanderPersonalityInBattle { get; set; } = true;
+
+        [SettingPropertyBool("Command Confusion After Commander Death", HintText = "When the commander of an AI side falls, is knocked out or flees, his side keeps the plan it had for 45 seconds - nobody gives new orders. Then the best tactician still standing on that side takes over, and if his Tactics skill is lower than the commander's was, the side only uses the plans he knows (below 30: charge, full attack and plain defence; below 60: no cavalry charge, ring or choke point). A side under deadly missile fire still reacts at once (Defenders Advance Under Fire, Defenders Charge When Outshot). No bonus to any number on the field - only who decides. Field battles only. Off = the side goes on choosing plans as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CommandConfusionAfterCommanderDeath { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15718,6 +15730,9 @@ namespace Armoury
             s.DefenderLeavesRbmSplitWhenOutshot = DefenderLeavesRbmSplitWhenOutshot;   // 438
             s.DefenderHoldsUntilMeleeContact = DefenderHoldsUntilMeleeContact;   // 439
             s.DefenderSeeksHighGround = DefenderSeeksHighGround;   // 439
+            s.BattlePlanVariety = BattlePlanVariety;   // 440
+            s.CommanderPersonalityInBattle = CommanderPersonalityInBattle;   // 440
+            s.CommandConfusionAfterCommanderDeath = CommandConfusionAfterCommanderDeath;   // 440
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

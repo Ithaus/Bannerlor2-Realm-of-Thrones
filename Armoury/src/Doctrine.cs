@@ -214,13 +214,14 @@ namespace Armoury
             string aim313 = OutshotRush.ApplyPatch(h);   // 313b: cel pieszy zamiast konnego strzelca (OutshotRush.cs)
             string o438 = O438ApplyPatch(h);   // 438: plany ataku RBM (1.1) i splity obrony RBM przy przegranym ostrzale (1.3) - Doctrine.Outshot438.cs
             string h439 = H439ApplyPatch(h);   // 439: obronca trzyma do zwarcia (2.1/2.2) i szuka wzgorza (2.3) - Doctrine.Hold439.cs; po 438 (typy splitow obrony RBM)
+            string p440 = P440ApplyPatch(h);   // 440: wodz AI - los planow (3.1/3.4), zamet po smierci wodza (3.5) - Doctrine.Plan440.cs; po 438 (typy planow RBM)
             string pend333 = Pendulum333.ApplyPatch(h);  // 333 (B): szyk bez wahadla przed kontaktem (Pendulum333.cs); 344: arbiter ruchu i ustawienia
             string nff344 = NoFastForward344.ApplyPatch(h);   // 344: bieg autotestu bez przewijania (tylko LogGate.Mode 1 i plik-flaga)
             pend333 += ", bez przewijania 344 " + nff344;
             return "GetTacticWeight " + _patched + "/" + _wanted + " (Priority.Last po com.rbmai" + (miss.Length > 0 ? "; NIE:" + miss.ToString() : "")
                    + "), Attack " + _patchedAttack + "/" + _wantedAttack + (missA.Length > 0 ? " (NIE:" + missA.ToString() + ")" : "")
                    + ", biezaca taktyka " + (_fCur != null ? "TAK" : "NIE") + ", typy RBM: RBMBehaviorCavalryCharge " + (_fChargeInf != null ? "TAK" : "NIE")
-                   + ", RBMBehaviorArcherSkirmish " + (_tRbmArcher != null ? "TAK" : "NIE") + ", wagi zachowan " + (_fBehaviors != null ? "TAK" : "NIE") + ", obrona gry 291d " + def291d + ", cel pieszy 313b " + aim313 + ", wahadlo 333 " + pend333 + ", ostrzal 438 " + o438 + ", obronca 439 " + h439;
+                   + ", RBMBehaviorArcherSkirmish " + (_tRbmArcher != null ? "TAK" : "NIE") + ", wagi zachowan " + (_fBehaviors != null ? "TAK" : "NIE") + ", obrona gry 291d " + def291d + ", cel pieszy 313b " + aim313 + ", wahadlo 333 " + pend333 + ", ostrzal 438 " + o438 + ", obronca 439 " + h439 + ", wodz 440 " + p440;
         }
 
         private static void PatchAttack(Harmony h, Type t, StringBuilder miss)
@@ -304,10 +305,11 @@ namespace Armoury
         }
 
         // 291: DhMul - obronca trzyma pozycje (wagi ataku 0, Doctrine.Hold291.cs); DhNote - ostatnia waga obrony druzyny obroncy
-        private static void PostShock(object __instance, ref float __result) { Mul(__instance, KShock, ref __result); DhMul(__instance, ref __result); }
-        private static void PostShot(object __instance, ref float __result) { Mul(__instance, KShot, ref __result); DhMul(__instance, ref __result); }
-        private static void PostHorse(object __instance, ref float __result) { Mul(__instance, KHorse, ref __result); DhMul(__instance, ref __result); }
-        private static void PostHold(object __instance, ref float __result) { Mul(__instance, KHold, ref __result); S2Mul(__instance, ref __result); DhNote(__instance, __result); }   // 141: S2 (Doctrine.S2.cs)
+        // 440: P440Los - los planow druzyny (3.1) i plany ponad prog nastepcy wodza (3.5), po mnozniku kultury, przed 291 / S2 / DhNote (Doctrine.Plan440.cs)
+        private static void PostShock(object __instance, ref float __result) { Mul(__instance, KShock, ref __result); P440Los(__instance, ref __result); DhMul(__instance, ref __result); }
+        private static void PostShot(object __instance, ref float __result) { Mul(__instance, KShot, ref __result); P440Los(__instance, ref __result); DhMul(__instance, ref __result); }
+        private static void PostHorse(object __instance, ref float __result) { Mul(__instance, KHorse, ref __result); P440Los(__instance, ref __result); DhMul(__instance, ref __result); }
+        private static void PostHold(object __instance, ref float __result) { Mul(__instance, KHold, ref __result); P440Los(__instance, ref __result); S2Mul(__instance, ref __result); DhNote(__instance, __result); }   // 141: S2 (Doctrine.S2.cs)
 
         /// <summary>Postfiks GetTacticWeight (tick druzyn): waga x mnoznik doktryny druzyny. Tylko odczyt tablicy, bez alokacji.</summary>
         private static void Mul(object inst, int k, ref float r)
@@ -395,6 +397,7 @@ namespace Armoury
             try { S2End(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.S2End", e); }
             try { DhEnd(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.DhEnd", e); }   // 291: probka do linii 'Bitwa (291)'
             try { O438End(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.O438End", e); }   // 438: stan druzyn bez misji (liczniki zostaja do linii)
+            try { P440End(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.P440End", e); }   // 440: migawka druzyn do linii "Wodz AI (440)"
             Clear();
             _m = null;
         }
@@ -414,6 +417,7 @@ namespace Armoury
             for (int i = 0; i < Slots; i++) { _sWho[i] = null; _sBack[i] = false; Drop(i); _sFlank[i] = false; }
             _sampleTeamA = _sampleTeamD = -1;
             _acc1 = 0f;
+            P440ClearMission();   // 440
         }
 
         /// <summary>WarCouncil.One (glowny watek, AfterStart albo pozna druzyna DR): doktryna druzyny AI i dodatki do listy taktyk. have/note - lista typow
@@ -490,6 +494,8 @@ namespace Armoury
         internal static void Tick(Mission m, float dt)
         {
             if (m == null) return;
+            // 440: rzut losu, profil i zamet po smierci wodza - wlasny zegar i wlasne klucze (bez AnyKey), pierwszy raz w pierwszej klatce po rozstawieniu
+            try { P440Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.P440Tick", e); }
             _acc += dt;
             _acc1 += dt;
             if (_acc1 >= S4Every)
