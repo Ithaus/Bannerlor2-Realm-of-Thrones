@@ -25,8 +25,14 @@ namespace Armoury
     ///     HoldChokePoint - w istniejacych postfiksach GetTacticWeight doktryny, po mnozniku kultury) i RBM (3.4: AttackSplitArchers / AttackSplitInfantry /
     ///     AttackSplitSkirmishers / Embolon - nowy postfiks, DeclaredMethod na klasie deklarujacej, sprawdzone w rbmai :559 :1358 :1746 :2068; DefendSplitInfantry /
     ///     DefendSplitArchers - w postfiksie 438 PRZED przycieciem 1.3, wiec sufit obrony gry zostaje sufitem). Zaraz po rzucie druzyna wybiera plan otwarcia od
-    ///     nowa (TeamAIComponent.ResetTactic(false) z glownego watku, jak gra w rozstawieniu - bez histerezy wobec wyboru przy skladzie 0); bez tego rzut
+    ///     nowa (TeamAIComponent.ResetTactic(true) z glownego watku - bez histerezy: waga biezacego planu / 1.5 tylko w tym jednym wyborze); bez tego rzut
     ///     (najwyzej x1.56 miedzy dwoma planami) prawie nigdy nie przebije histerezy x1.5. Pozne druzyny DR - sam rzut, bez ponownego wyboru.
+    ///     440-p (recenzja 440): ponowny wybor TYLKO miedzy planami o tym samym ukladzie szykow co plan z rozstawienia (ManageFormationCounts: gra 1121 -
+    ///     FullScaleAttack, RangedHarrass, DefensiveLine, DefensiveEngagement, DefensiveRing, HoldChokePoint; 1111 FrontalCavalryCharge i Embolon; 1221 splity
+    ///     lucznikow RBM; 3121 splity piechoty RBM; 2121 AttackSplitSkirmishers; Charge bez ukladu - dozwolony zawsze), inne plany maja w tym wyborze wage 0.
+    ///     Dotad ResetTactic(false) przy zmianie np. FullScaleAttack -> AttackSplitInfantry przenosil ludzi miedzy szykami tuz po rozstawieniu (teleport gry
+    ///     ustawil szyki pod stary plan). Plan z rozstawienia Charge, spoza listy albo druzyna bez ludzi - bez ponownego wyboru. Pozniejsze decyzje gry (co 5 s)
+    ///     - z losem i z histereza jak dotad.
     /// 3.2 + 3.3 CommanderPersonalityInBattle ("Commander Personality In Battle"). Profil wodza z cech bohatera Team.GeneralAgent: Valor minus Calculating
     ///     > 0 PORYWCZY, < 0 OSTROZNY, 0 albo brak bohatera ZWYKLY (ROT_lords.xml: ostroznych ok. 43%, porywczych ok. 8%). Profil przesuwa progi pakietow 1 i 2:
     ///     438 (1.2) wyzwalacz biegu i S2 od strat od pociskow - porywczy od 1 zabitego w 30 s, ostrozny od 3 (zwykly 2 = FireDead); 439 (2.1) obronca w trzymaniu
@@ -35,9 +41,11 @@ namespace Armoury
     /// 3.5 CommandConfusionAfterCommanderDeath ("Command Confusion After Commander Death"). Wodz (Team.GeneralAgent z chwili rzutu) przestaje byc aktywny
     ///     (zabity, nieprzytomny, uciekl) -> przez 45 s druzyna nie zmienia planu (prefiks TeamAIComponent.MakeDecision, DeclaredMethod; RBM go nie latuje -
     ///     audyt), potem lista planow wedlug najlepszego ZYWEGO taktyka druzyny (umiejetnosc Tactics bohaterow w ActiveAgents, progi rady wojennej 30 / 60):
-    ///     gdy nizszy prog niz na starcie - plany ponad jego prog maja wage 0 (nic nie jest dodawane ani zdejmowane z listy; tylko gdy na liscie zostaje plan
-    ///     w jego progu). Zamrozenie NIE obejmuje przetrwania: druzyna z S2 (141) zywym, puszczona bilansem ognia 291e / 320d albo tracaca od pociskow
-    ///     (>= FireDead zabitych w 30 s, 438) decyduje jak dotad - S2 / 291e potrzebuja MakeDecision (wybor taktyki, DhDefPost w CheckIsDefenseApplicable),
+    ///     gdy nizszy prog niz na starcie (440-p: start = Tactics strony z rady wojennej, z ktorej powstala lista; bez rady - najlepszy bohater druzyny przy rzucie)
+    ///     - plany ponad jego prog maja wage 0 (nic nie jest dodawane ani zdejmowane z listy; tylko gdy na liscie zostaje plan
+    ///     w jego progu). Zamrozenie NIE obejmuje przetrwania: druzyna z S2 (141) zywym, puszczona bilansem ognia 291e / 320d, trzymana przez 291 z co najmniej
+    ///     FireDead zabitych od pociskow (440-p: kandydat 291e / 320d - puszczenie rozstrzyga DhDefPost, a ten biegnie tylko w MakeDecision) albo tracaca od
+    ///     pociskow (zabitych w 30 s od progu profilu wodza 3.3 - 440-p: ten sam prog co bieg i S2 438) decyduje jak dotad - S2 / 291e potrzebuja MakeDecision (wybor taktyki, DhDefPost w CheckIsDefenseApplicable),
     ///     a 313b (OutshotRush) dziala na szykach niezaleznie od decyzji; linia liczy sekundy S2 i biegu 313b w zamecie. Bez biezacego planu - decyzja jak dotad.
     ///
     /// Watki: rzut, profil, smierc wodza, zamrozenie i nastepca w glownym watku (P440Tick z Doctrine.Tick, co 0.5 s, pierwszy raz w pierwszej klatce po
@@ -55,6 +63,8 @@ namespace Armoury
                                                    "DefendSplitInfantry", "DefendSplitArchers" };
         // prog rady wojennej (WarCouncil): 0 tlum (< 30: Charge, FullScaleAttack, obrona gry), 1 od 30 (zestaw RBM, RangedHarrass doktryny), 2 od 60 (konnica, pierscien, przesmyk)
         private static readonly byte[] BpTier = { 0, 0, 1, 2, 0, 0, 2, 2, 1, 1, 1, 1, 1, 1 };
+        // 440-p: uklad szykow planu (ManageFormationCounts): 0 Charge (bez ukladu), 1 gra 1121, 2 1111, 3 1221, 4 3121, 5 2121 - ponowny wybor otwarcia w ukladzie
+        private static readonly byte[] BpLay = { 1, 0, 1, 2, 1, 1, 1, 1, 3, 4, 5, 2, 4, 3 };
         private static readonly string[] CpName = { "OSTROZNY", "ZWYKLY", "PORYWCZY" };
         private static readonly IFormatProvider P4Inv = CultureInfo.InvariantCulture;
 
@@ -78,6 +88,12 @@ namespace Armoury
         private static readonly float[] _ccAt = new float[MaxTeams];
         private static readonly bool[] _ccDone = new bool[MaxTeams];
         private static readonly string[] _ccNote = new string[MaxTeams];
+        private static readonly string[] _p4Who = new string[MaxTeams];    // 440-p: wodz przy rzucie (klucz histogramu)
+        private static readonly Team[] _p4Tried = new Team[MaxTeams];      // 440-p: druzyna, dla ktorej rzut juz probowano (wyjatek - bez powtorki co 0.5 s)
+        // 440-p: bramka ponownego wyboru otwarcia - tylko glowny watek w trakcie ResetTactic tej druzyny (ti + 1; 0 = brak), plan z rozstawienia i jego uklad
+        [ThreadStatic] private static int _p4Gate;
+        [ThreadStatic] private static TacticComponent _p4GateCur;
+        [ThreadStatic] private static byte _p4GateLay;
         private static bool _p4Started;
         private static float _p4Acc;
 
@@ -88,19 +104,24 @@ namespace Armoury
 
         // ---- liczniki misji (P440Reset w Battle291.Begin); postfiksy - Interlocked
         private static int _p4Teams, _p4Late, _p4Reset, _p4ResetChg, _p4Stum, _bpCalls;
+        private static int _p4NoReset, _p4GateZero, _p4RollErr, _p4LayChg;   // 440-p: bez ponownego wyboru, wag innego ukladu szykow wyzerowanych (Interlocked), rzutow z bledem
         private static int _cpN0, _cpN1, _cpN2, _cpNoHero;
         private static int _cpFireEarly, _cpFireLate, _cpFireDry, _cpS2Early, _cpS2Late, _cpS2Dry;
         private static int _cpGapEarly, _cpGapDry, _cpMeleeEarly, _cpMeleeLate;
         private static int _ccDead, _ccDeadDry, _ccUnfreeze, _ccRestrict, _ccSkip, _ccZero;
         private static float _ccFrozenSec, _ccOverSec, _ccS2Sec, _ccRushSec;
+        private static float _ccDueSec, _ccStuckSec;   // 440-p: w zamecie kandydat 291e / 320d; po zamecie plan ponad prog nastepcy mimo zawezenia
         private static readonly List<string> _p4Snap = new List<string>();
-        // histogram planu otwarcia od startu procesu (strona + plan) - "ta sama armia w 6 biegach >= 3 rozne otwarcia" (audyt, pomiar pakietu 3)
+        // histogram planu otwarcia od startu procesu (strona + wodz + plan; 440-p: dotad bez wodza - armie sie mieszaly). Ocena "ta sama armia w 6 biegach >= 3
+        // rozne otwarcia" (audyt, pomiar pakietu 3) - z linii 'Wodz AI (440)' z 6 logow: kazdy bieg autotestu to nowy proces, histogram ma wtedy jedna bitwe
         private static readonly Dictionary<string, int> _p4Hist = new Dictionary<string, int>(StringComparer.Ordinal);
 
         /// <summary>Battle291.Begin (AfterStart): liczniki linii 440 od zera (stan druzyn czysci Doctrine.Clear).</summary>
         internal static void P440Reset()
         {
             _p4Teams = _p4Late = _p4Reset = _p4ResetChg = _p4Stum = 0;
+            _p4NoReset = _p4RollErr = _p4LayChg = 0;
+            Interlocked.Exchange(ref _p4GateZero, 0);
             Interlocked.Exchange(ref _bpCalls, 0);
             _cpN0 = _cpN1 = _cpN2 = _cpNoHero = 0;
             _cpFireEarly = _cpFireLate = _cpFireDry = _cpS2Early = _cpS2Late = _cpS2Dry = 0;
@@ -109,6 +130,7 @@ namespace Armoury
             _ccDead = _ccDeadDry = _ccUnfreeze = _ccRestrict = 0;
             Interlocked.Exchange(ref _ccSkip, 0); Interlocked.Exchange(ref _ccZero, 0);
             _ccFrozenSec = _ccOverSec = _ccS2Sec = _ccRushSec = 0f;
+            _ccDueSec = _ccStuckSec = 0f;
             _p4Snap.Clear();
             var c = Settings.Current;
             if (c != null) P440Keys(c);
@@ -137,6 +159,7 @@ namespace Armoury
             _cpProf[i] = 1; _ccTier[i] = -1; _ccFrozen[i] = false;
             _p4Gen[i] = null; _p4Open0[i] = null; _p4Open[i] = null; _p4RollAt[i] = 0f; _p4LateT[i] = false;
             _ccGen[i] = null; _ccTac0[i] = 0; _ccAt[i] = -1f; _ccDone[i] = false; _ccNote[i] = null;
+            _p4Who[i] = null; _p4Tried[i] = null;
         }
 
         // ------------------------------------------------------------ latki (raz na proces - ApplyMissionPatches, po O438ApplyPatch: typy RBM)
@@ -228,9 +251,18 @@ namespace Armoury
                 }
                 if (!_bpKey) return;
                 float f = _bpMul[ti * BpK + k];
-                if (f == 1f) return;
-                r *= f;
-                Interlocked.Increment(ref _bpCalls);
+                if (f != 1f)
+                {
+                    r *= f;
+                    Interlocked.Increment(ref _bpCalls);
+                }
+                // 440-p: ponowny wybor otwarcia (tylko glowny watek, w ResetTactic tej druzyny) - plan z rozstawienia bez histerezy x1.5 (MaxBy i porownanie
+                // DefensiveLine / Ring / ChokePoint mnoza go przez 1.5), plany innego ukladu szykow 0 (Charge bez ukladu - dozwolony)
+                if (_p4Gate == ti + 1)
+                {
+                    if (ReferenceEquals(tc, _p4GateCur)) r /= 1.5f;
+                    else if (BpLay[k] != 0 && BpLay[k] != _p4GateLay && r > 0f) { r = 0f; Interlocked.Increment(ref _p4GateZero); }
+                }
             }
             catch { Interlocked.Increment(ref _postErr); }
         }
@@ -281,6 +313,14 @@ namespace Armoury
                 else { if (kind == 0) _cpFireLate++; else _cpS2Late++; }
             }
             return _cpKey ? adj : FireDead;
+        }
+
+        /// <summary>440-p (P440Team, glowny watek): prog zabitych od pociskow w 30 s wedlug profilu - ten sam co P440FireThr (438), bez licznikow.</summary>
+        private static int P440FireLim(Team t)
+        {
+            if (!_cpKey) return FireDead;
+            sbyte p = P440Prof(t);
+            return p == 2 ? P440RashFire : (p == 0 ? P440CalmFire : FireDead);
         }
 
         /// <summary>439 (H439Tick, glowny watek - od 439-p): odleglosc zwolnienia od PIESZEGO wroga - porywczy 40 m, reszta 25 m (S1ContactGap). Tylko odczyt.</summary>
@@ -342,7 +382,11 @@ namespace Armoury
                 if (ti < 0 || ti >= MaxTeams) continue;
                 try
                 {
-                    if (!ReferenceEquals(_p4Ref[ti], t)) P440Roll(m, t, ti, c, now, late);
+                    if (!ReferenceEquals(_p4Ref[ti], t))
+                    {
+                        if (ReferenceEquals(_p4Tried[ti], t)) continue;   // 440-p: rzut tej druzyny juz sie wywrocil - raz, nie co 0.5 s
+                        P440Roll(m, t, ti, c, now, late);
+                    }
                     P440Team(m, t, ti, now, step);
                 }
                 catch (Exception e) { _p4Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Plan440 druzyna", e); }
@@ -353,6 +397,8 @@ namespace Armoury
         private static void P440Roll(Mission m, Team t, int ti, Settings c, float now, bool late)
         {
             P440ClearTeam(ti);
+            _p4Tried[ti] = t;   // 440-p: przed wszystkim, co moze sie wywrocic (licznik bledow rzutu nizej, profile liczone dopiero po udanym rzucie)
+            _p4RollErr++;
             // 3.2 profil z cech wodza
             Agent g = null;
             try { g = t.GeneralAgent; } catch { g = null; }
@@ -374,11 +420,13 @@ namespace Armoury
             int score = v - cal;
             sbyte prof = !hero ? (sbyte)1 : (score > 0 ? (sbyte)2 : (score < 0 ? (sbyte)0 : (sbyte)1));
             _cpProf[ti] = prof;
-            if (!hero) _cpNoHero++;
-            if (prof == 0) _cpN0++; else if (prof == 2) _cpN2++; else _cpN1++;
             string who;
             _ccGen[ti] = g;
-            _ccTac0[ti] = P440BestTactics(t, out who);
+            int best = P440BestTactics(t, out who);
+            // 440-p: prog startowy 3.5 - Tactics strony z rady wojennej (z niej powstala lista planow); bez rady tej misji - najlepszy bohater druzyny
+            int side;
+            bool council = WarCouncil.SideTactics(m, t.Side, out side);
+            _ccTac0[ti] = council ? side : best;
             // 3.1 / 3.4 los: kazdy typ planu osobno, rowno w logarytmie (0.8 i 1.25 to odwrotnosci)
             if (c.BattlePlanVariety)
             {
@@ -386,29 +434,48 @@ namespace Armoury
                 for (int k = 0; k < BpK; k++) _bpMul[ti * BpK + k] = (float)Math.Exp(lo + MBRandom.RandomFloat * (hi - lo));
             }
             _p4Ref[ti] = t;   // po tablicach - postfiks widzi calosc
-            string before = TacName(CurTactic(t));
-            // plan otwarcia od nowa (pierwsze przejscie po rozstawieniu; pozne DR - sam rzut)
+            var cur0 = CurTactic(t);
+            string before = TacName(cur0);
+            // plan otwarcia od nowa (pierwsze przejscie po rozstawieniu; pozne DR - sam rzut). 440-p: ResetTactic(true) z bramka ukladu szykow (P440Los) -
+            // plan z rozstawienia zostaje biezacy (bez wyboru nic sie nie zmienia), inne plany tego samego ukladu i Charge moga go zastapic bez histerezy
             if (c.BattlePlanVariety && !late)
             {
                 var ai = t.TeamAI;
                 var lst = ai != null && _fAvail != null ? _fAvail.GetValue(ai) as List<TacticComponent> : null;
-                if (ai != null && lst != null && lst.Count > 0)
+                int k0 = cur0 != null ? P440Slot(cur0) : -1;
+                bool men = false;
+                try { men = t.HasAnyFormationsIncludingSpecialThatIsNotEmpty(); } catch { men = false; }
+                if (ai == null || lst == null || lst.Count == 0 || k0 < 0 || BpLay[k0] == 0 || !men) _p4NoReset++;
+                else
                 {
                     try { var q = t.QuerySystem; if (q != null) q.Expire(); } catch { }
+                    _p4GateCur = cur0; _p4GateLay = BpLay[k0]; _p4Gate = ti + 1;
                     try
                     {
-                        ai.ResetTactic(false);
+                        ai.ResetTactic(true);
                         _p4Reset++;
-                        if (TacName(CurTactic(t)) != before) _p4ResetChg++;
+                        var cur1 = CurTactic(t);
+                        if (!ReferenceEquals(cur1, cur0))
+                        {
+                            _p4ResetChg++;
+                            int k1 = cur1 != null ? P440Slot(cur1) : -1;
+                            if (k1 < 0 || (BpLay[k1] != 0 && BpLay[k1] != BpLay[k0])) _p4LayChg++;   // nie powinno sie zdarzyc (latka wagi nie wpieta?)
+                        }
                     }
                     catch (Exception e) { _p4Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Plan440 ResetTactic", e); }
+                    finally { _p4Gate = 0; _p4GateCur = null; }
                 }
             }
             _p4Open0[ti] = before;
             _p4RollAt[ti] = now;
             _p4LateT[ti] = late;
+            _p4Who[ti] = gn;
             _p4Gen[ti] = gn + (hero ? " (Valor " + v.ToString(P4Inv) + ", Calculating " + cal.ToString(P4Inv) + ")" : " (bez bohatera)") + " " + CpName[prof]
-                         + ", taktyk " + who + " " + _ccTac0[ti].ToString(P4Inv);
+                         + ", taktyk " + who + " " + best.ToString(P4Inv) + (council ? ", rada strony " + _ccTac0[ti].ToString(P4Inv) : ", bez rady");
+            // 440-p: profile i druzyny liczone po udanym rzucie (dotad przed - wyjatek liczyl je co 0.5 s)
+            if (!hero) _cpNoHero++;
+            if (prof == 0) _cpN0++; else if (prof == 2) _cpN2++; else _cpN1++;
+            _p4RollErr--;
             _p4Teams++;
             if (late) _p4Late++;
         }
@@ -420,7 +487,7 @@ namespace Armoury
             {
                 string o = TacName(CurTactic(t));
                 _p4Open[ti] = o;
-                string key = (t.Side == BattleSideEnum.Attacker ? "A " : "O ") + o;
+                string key = (t.Side == BattleSideEnum.Attacker ? "A " : "O ") + (_p4Who[ti] ?? "?") + ": " + o;   // 440-p: z wodzem (tozsamosc armii)
                 int cnt;
                 _p4Hist.TryGetValue(key, out cnt);
                 _p4Hist[key] = cnt + 1;
@@ -444,15 +511,26 @@ namespace Armoury
                 if (now - _ccAt[ti] >= P440Confuse) { _ccDone[ti] = true; P440Successor(t, ti); }
                 else if (_ccKey && CurTactic(t) != null)
                 {
-                    // przetrwanie przed zametem: S2 (141), puszczona bilansem ognia 291e / 320d, straty od pociskow w 30 s (438) - decyzje jak dotad
-                    bool s2 = S2On(t), fire = FireReleased(t), bleed = O438Bleed(t) >= FireDead;
+                    // przetrwanie przed zametem: S2 (141), puszczona bilansem ognia 291e / 320d, straty od pociskow w 30 s (438) - decyzje jak dotad.
+                    // 440-p: takze kandydat 291e / 320d (trzyma 291, >= FireDead od pociskow) - puszczenie rozstrzyga DhDefPost, ktory biegnie tylko w MakeDecision;
+                    // prog strat w 30 s wedlug profilu wodza (ten sam co bieg i S2 438; dotad staly FireDead)
+                    bool s2 = S2On(t), fire = FireReleased(t), due = !fire && FireReleaseDue(t), bleed = O438Bleed(t) >= P440FireLim(t);
                     if (s2) _ccS2Sec += step;
                     if (OutshotRush.Live(t)) _ccRushSec += step;
-                    if (s2 || fire || bleed) _ccOverSec += step;
+                    if (due) _ccDueSec += step;
+                    if (s2 || fire || due || bleed) _ccOverSec += step;
                     else { frozen = true; _ccFrozenSec += step; }
                 }
             }
             _ccFrozen[ti] = frozen;
+            // 440-p: po zamecie plan ponad prog nastepcy zostal biezacy (np. wszystkie wagi 0 - MaxBy x1.5 go trzyma) - zawezenie nic nie zmienilo (sekundy)
+            sbyte tier = _ccTier[ti];
+            if (tier >= 0)
+            {
+                var cur = CurTactic(t);
+                int k = cur != null ? P440Slot(cur) : -1;
+                if (k >= 0 && BpTier[k] > tier) _ccStuckSec += step;
+            }
         }
 
         /// <summary>3.5 po 45 s: najlepszy zywy taktyk druzyny; nizszy prog rady wojennej niz na starcie - plany ponad prog z waga 0 (gdy zostaje plan w progu).</summary>
@@ -592,10 +670,13 @@ namespace Armoury
             sb.Append("Wodz AI (440): misja ").Append(kind ?? "-")
               .Append(" | klucze: los planow ").Append(k1 ? "TAK" : "NIE").Append(", charakter wodza ").Append(k2 ? "TAK" : "NIE")
               .Append(", zamet po smierci wodza ").Append(k3 ? "TAK" : "NIE")
-              .Append(" | 3.1/3.4 druzyn z rzutem ").Append(_p4Teams).Append(" (pozne DR ").Append(_p4Late).Append("), ponowny wybor otwarcia ").Append(_p4Reset)
-              .Append(" (inny plan niz przed rzutem ").Append(_p4ResetChg).Append("), wywolan wagi z losem ").Append(Volatile.Read(ref _bpCalls))
+              .Append(" | 3.1/3.4 druzyn z rzutem ").Append(_p4Teams).Append(" (pozne DR ").Append(_p4Late).Append(", rzut z bledem ").Append(_p4RollErr)
+              .Append("), ponowny wybor otwarcia w ukladzie szykow ").Append(_p4Reset)
+              .Append(" (inny plan niz przed rzutem ").Append(_p4ResetChg).Append(", inny uklad mimo bramki ").Append(_p4LayChg).Append(", wag innego ukladu wyzerowanych ")
+              .Append(Volatile.Read(ref _p4GateZero)).Append("; bez ponownego wyboru - Charge / spoza listy / bez ludzi ").Append(_p4NoReset)
+              .Append("), wywolan wagi z losem ").Append(Volatile.Read(ref _bpCalls))
               .Append("; druzyny: ").Append(_p4Snap.Count > 0 ? string.Join("; ", _p4Snap) : "-")
-              .Append(" | histogram otwarc od startu gry: ").Append(P440Hist())
+              .Append(" | histogram otwarc od startu procesu (strona wodz: plan): ").Append(P440Hist())
               .Append(" | 3.2 profile: ostrozny ").Append(_cpN0).Append(", zwykly ").Append(_cpN1).Append(", porywczy ").Append(_cpN2).Append(" (bez bohatera ").Append(_cpNoHero).Append(')')
               .Append(" | 3.3 bieg od strat (szyko-takty): wczesniej - porywczy od ").Append(P440RashFire).Append(' ').Append(_cpFireEarly)
               .Append(", pozniej - ostrozny od ").Append(P440CalmFire).Append(' ').Append(_cpFireLate).Append(", bylby (klucz NIE) ").Append(_cpFireDry)
@@ -606,9 +687,11 @@ namespace Armoury
               .Append("%, druzyno-takty): wczesniej ").Append(_cpMeleeEarly).Append(", pozniej ").Append(_cpMeleeLate)
               .Append(" | 3.5 smierc wodza: druzyn ").Append(_ccDead).Append(" (bylby, klucz NIE ").Append(_ccDeadDry).Append("), zamrozenie ")
               .Append(_ccFrozenSec.ToString("0", P4Inv)).Append(" s, decyzji pominietych ").Append(Volatile.Read(ref _ccSkip))
-              .Append(", przepuszczone przetrwaniem (S2 / 291e / straty od pociskow) ").Append(_ccOverSec.ToString("0", P4Inv)).Append(" s (S2 zywe ")
-              .Append(_ccS2Sec.ToString("0", P4Inv)).Append(" s, bieg 313b ").Append(_ccRushSec.ToString("0", P4Inv)).Append(" s); koniec zametu ").Append(_ccUnfreeze)
-              .Append(", lista zawezona do zywego taktyka ").Append(_ccRestrict).Append(" (wag wyzerowanych ").Append(Volatile.Read(ref _ccZero)).Append(')')
+              .Append(", przepuszczone przetrwaniem (S2 / 291e / kandydat 291e / straty od pociskow) ").Append(_ccOverSec.ToString("0", P4Inv)).Append(" s (S2 zywe ")
+              .Append(_ccS2Sec.ToString("0", P4Inv)).Append(" s, kandydat 291e ").Append(_ccDueSec.ToString("0", P4Inv)).Append(" s, bieg 313b ")
+              .Append(_ccRushSec.ToString("0", P4Inv)).Append(" s); koniec zametu ").Append(_ccUnfreeze)
+              .Append(", lista zawezona do zywego taktyka ").Append(_ccRestrict).Append(" (wag wyzerowanych ").Append(Volatile.Read(ref _ccZero))
+              .Append(", plan ponad prog zostal ").Append(_ccStuckSec.ToString("0", P4Inv)).Append(" s)")
               .Append(" | latka ").Append(_p4Patch).Append(" | potkniecia ").Append(_p4Stum).Append('.');
             return sb.ToString();
         }

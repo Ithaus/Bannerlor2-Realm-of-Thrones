@@ -482,6 +482,19 @@ namespace Armoury
             return ti >= 0 && ti < MaxTeams && ReferenceEquals(_dhRef[ti], t) && _dhOff[ti] == 3;
         }
 
+        /// <summary>440-p (P440Team, glowny watek - zamet 3.5): kandydat do puszczenia 291e / 320d - obronca trzymany przez 291 (nie puszczony, nie S2, nie po S2),
+        /// klucz DefendersChargeWhenOutshot, co najmniej FireDead zabitych od pociskow. Puszczenie rozstrzyga dopiero DhDefPost w MakeDecision (obrona gry
+        /// TAK / NIE, strzelcy strony) - zamet nie moze go zatrzymac. Tylko odczyt.</summary>
+        internal static bool FireReleaseDue(Team t)
+        {
+            if (t == null || !_on || !_dhFireKey || t.Side != BattleSideEnum.Defender) return false;
+            int ti = t.TeamIndex;
+            if (ti < 0 || ti >= MaxTeams || !ReferenceEquals(_dhRef[ti], t) || !_dhOn[ti] || _dhOff[ti] != 0 || _dhS2Was[ti]) return false;
+            if (_s2Live[ti] && ReferenceEquals(_s2Ref[ti], t)) return false;
+            var q = t.QuerySystem;
+            return q != null && q.DeathByRangedCount >= FireDead;
+        }
+
         /// <summary>313b krok 2 (OutshotRush.Tick, glowny watek): druzyna idzie pod ostrzalem - co najmniej FireDead zabitych od pociskow, nie trzyma pozycji 291,
         /// a jest puszczona (291e albo S2 141) albo ma biezaca taktyke ataku (FullScaleAttack, Charge, RangedHarrassmentOffensive, FrontalCavalryCharge).
         /// Ostrzal szyku (miara gry albo sygnal S4) sprawdzaja wolajacy. why: 1 291e, 2 S2, 3 taktyka ataku, 4 trzyma (291).</summary>

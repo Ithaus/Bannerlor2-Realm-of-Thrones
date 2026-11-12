@@ -145,6 +145,18 @@ namespace Armoury
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteTactics, "WarCouncil.PoznaDruzyna", e); }
         }
 
+        /// <summary>440-p (Doctrine.P440Roll, glowny watek): Tactics strony z rady wojennej tej misji (ta sama liczba, z ktorej One ustalil liste planow).
+        /// false - rada nie biegla dla tej misji (klucze NIE, brak danych).</summary>
+        internal static bool SideTactics(Mission m, BattleSideEnum side, out int tac)
+        {
+            tac = 0;
+            var w = _sideOf;
+            if (m == null || w == null || !ReferenceEquals(w.Target, m)) return false;
+            if (side == BattleSideEnum.Attacker) { tac = _tacA; return true; }
+            if (side == BattleSideEnum.Defender) { tac = _tacD; return true; }
+            return false;
+        }
+
         private static void One(Mission m, Team team, int tac, string culture, bool late)
         {
             if (!MissionTeams.Valid(team) || !team.HasTeamAi) return;
