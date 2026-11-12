@@ -42,6 +42,9 @@ namespace Armoury
     /// budzet robot bez pokrycia to ZAPAS (kiesa wsi ponad skrzynie), wiec do kolejki wchodzi jako poziom / 28 i tylko dla materialow wyczerpanych na polce
     /// (material ponad sufitem ceny i reszta mniejsza od sztuki - osobno, nie brak); kolejka N > 1 dopiero po 7 dobach pomiaru, sprzedaz w mianowniku >= 1 szt./d;
     /// cykl pominiety regula ruchu linii (kopalnia co N-ty cykl, zamknieta linia strzal, linia surowca bez wsadu - WorkshopLaw.RuleHeld) nie wchodzi do u.
+    /// 435-N-A (test 90 dob: 667 komorek z kolejka > 1, wapien / marmur / deski / narzedzia tylko z poziomu budzetu): do kolejki wchodzi PRZYROST poziomu niewydanego
+    /// budzetu robot na dobe (nachylenie w oknie, Grow), nie poziom / 28 - stojacy poziom to to samo zlecenie co dobe, nie nowy popyt. Klucz Supply Queue Growth NIE = poziom / 28.
+    /// Zapis arm_lpn bez zmian (srednie okna) - po wczytaniu historia stala, przyrost 0, dopoki nowe doby nie zmienia poziomu.
     /// Klucz Supply Chain Log to GLOWNY WYLACZNIK pomiaru: bez niego kroki L5-L8 dzialaja jak dotad (N = 1).
     /// Watek glowny; wyjatek = potkniecie liczone w linii, bez globalnego wylacznika (CLAUDE.md 7).
     /// </summary>
@@ -53,6 +56,8 @@ namespace Armoury
         private static readonly string[] SName = { "roboty gminy", "septy", "przebudowy zajec", "wsad warsztatow" };
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.SupplyChainLog; } }
+        // 435-N-A: do kolejki wchodzi PRZYROST niewydanego budzetu robot na dobe (nachylenie poziomu w oknie), nie poziom / 28; NIE = dawna miara (poziom / okno)
+        private static bool GrowOn { get { var s = Settings.Current; return s == null || s.SupplyQueueGrowth; } }
 
         private static int _main = -1, _dOff;
         private static int _st, _stSess;
@@ -396,7 +401,36 @@ namespace Armoury
             miss /= span; soft /= span; got /= span;
         }
 
-        /// <summary>435-L1-p: S_kolejka komorki albo swiata. `want` - brak wsadu szt./d + poziom niewydanego budzetu robot / okno; `sales` szt./d. Przed MinSpan dobami pomiaru 1.</summary>
+        /// <summary>
+        /// 435-N-A: przyrost niewydanego budzetu robot komorki w sztukach na dobe - nachylenie (najmniejsze kwadraty) poziomu Soft po dobach okna, ktore maja wpis
+        /// (doba bez wpisu = komorka tej doby nie mierzona, pominieta; wpis z samym kupionym / brakiem wsadu = poziom 0). Ujemne -> 0. Mniej niz 2 rozne doby -> 0
+        /// (pierwsza doba bez historii). Po wczytaniu zapisu historia to stala srednia (Resolve) - nachylenie 0, dopoki nowe doby nie zmienia poziomu.
+        /// Poziom stoi = nikt nowy nie czeka (to samo zlecenie wraca co dobe); rosnie = nowy niezaspokojony popyt. Sam odczyt.
+        /// </summary>
+        private static double Grow(Cell c, int today)
+        {
+            int n = 0; double sx = 0, sy = 0;
+            for (int k = 0; k < Window; k++)
+            {
+                int dd = c.Day[k];
+                if (dd > today || dd <= today - Window) continue;
+                n++; sx += dd - today; sy += c.Soft[k];
+            }
+            if (n < 2) return 0;
+            double mx = sx / n, my = sy / n, sxx = 0, sxy = 0;
+            for (int k = 0; k < Window; k++)
+            {
+                int dd = c.Day[k];
+                if (dd > today || dd <= today - Window) continue;
+                double x = dd - today - mx;
+                sxx += x * x; sxy += x * (c.Soft[k] - my);
+            }
+            if (!(sxx > 1e-9)) return 0;
+            double g = sxy / sxx;
+            return g > 0 && !double.IsInfinity(g) ? g : 0;
+        }
+
+        /// <summary>435-L1-p: S_kolejka komorki albo swiata. `want` - brak wsadu szt./d + przyrost niewydanego budzetu robot szt./d (435-N-A; klucz NIE: poziom / okno); `sales` szt./d. Przed MinSpan dobami pomiaru 1.</summary>
         private static double Queue(double want, double sales, int span)
         {
             if (span < MinSpan || !(want > 1e-6)) return 1.0;
@@ -550,7 +584,7 @@ namespace Armoury
                     _startLine = true;
                     Log.Info("LP start (435-L1): klucz Supply Chain Log TAK - pomiar; sam niczego nie zmienia, ale czytaja go kroki L5-L8 (klucze domyslnie wylaczone: kolejnosc zlecen sprzetu, "
                              + "zmiana zajec, zamowienia 363, miasta-fundatorzy, stanowiska warsztatow) | pamiec N w zapisie arm_lpn: " + _loadNote + " | kolejka N > 1 dopiero po " + MinSpan
-                             + " dobach pomiaru; budzet robot bez pokrycia liczony jako poziom / " + Window + " | "
+                             + " dobach pomiaru; budzet robot bez pokrycia liczony jako " + (GrowOn ? "przyrost poziomu na dobe (435-N-A, klucz Supply Queue Growth)" : "poziom / " + Window) + " | "
                              + "kolejnosc doby (ArmouryBehavior.OnDailyTick), wazna dla nastepnych krokow: TownPurse.BeforeRents -> DsTowns.DayStart -> PopulationLaw.Daily "
                              + "(tu zawor kasy miasta TownPurse.Valve: nadwyzka kasy do pana i korony) -> CastlePurse.Daily -> TownFolk.Daily -> TownGranary.Daily -> TownDebt.Daily -> "
                              + "BuildFunding.Daily -> TownFolk.DaWorksRun (zlecenia robot gminy i septow) -> GoodsLedger.Daily -> HarvestValve.Daily (regulator wsi) -> ... -> "
@@ -568,7 +602,7 @@ namespace Armoury
                 {
                     var sb = new StringBuilder(1400);
                     sb.Append("Lancuch podazy (LP): dzien ").Append(today).Append(" | pomiar L1 | material chciany i nieznaleziony dzis [szt.; wsad warsztatow = sztuki, ktorych zabraklo do cyklu; "
-                              + "roboty, septy, przebudowy = POZIOM niewydanego budzetu w sztukach materialow wyczerpanych na polce - do N wchodzi 1/").Append(Window).Append("]:");
+                              + "roboty, septy, przebudowy = POZIOM niewydanego budzetu w sztukach materialow wyczerpanych na polce - do N wchodzi ").Append(GrowOn ? "przyrost poziomu na dobe (435-N-A)" : "1/" + Window).Append("]:");
                     double mAll = 0, gAll = 0;
                     for (int i = 0; i < Streams; i++)
                     {
@@ -740,6 +774,9 @@ namespace Armoury
             var hot = new HashSet<Settlement>();
             int cells = 0, real = 0, qCeil = 0, qOver = 0, softOnly = 0;
             int span = Span(today);
+            bool growOn = GrowOn;
+            int qOverOld = 0, softOnlyOld = 0, growCells = 0;     // 435-N-A: porownanie z dawna miara (poziom / okno) - ile komorek mialoby kolejke > 1
+            double sumGrow = 0, sumSoftW = 0, sumSoft = 0;
             var nt = new NTable { Grain = grain, Day = today };   // 435-L6: tablica do odczytu (publikowana na koncu, po zbudowaniu)
             foreach (var tk in _cells)
             {
@@ -752,8 +789,14 @@ namespace Armoury
                     double sales = got;
                     double idx; int units;
                     if (MarketSales.Index(tk.Key, ck.Key, out idx, out units) && units / (double)Window > sales) { sales = units / (double)Window; real++; }
-                    // 435-L1-p (recenzje S1): poziom niewydanego budzetu robot rozlozony na okno; kolejka dopiero po MinSpan dobach; sprzedaz >= MinSales
-                    double want = miss + soft / Window;
+                    // 435-L1-p (recenzje S1): kolejka dopiero po MinSpan dobach; sprzedaz >= MinSales
+                    // 435-N-A: niewydany budzet robot wchodzi jako PRZYROST poziomu na dobe (Grow), nie poziom / okno - poziom stojacy co dobe to to samo zlecenie,
+                    // nie nowy popyt (test 90 dob: wapien, marmur, deski, narzedzia z N > 1 tylko z poziomu). Klucz NIE = dawna miara.
+                    double grow = Grow(ck.Value, today), softW = soft / Window;
+                    sumGrow += grow; sumSoftW += softW; sumSoft += soft; if (grow > 1e-6) growCells++;
+                    double sqOld = Queue(miss + softW, sales, span);
+                    if (sqOld > 1.0 + 1e-9) { qOverOld++; if (!(miss > 1e-6)) softOnlyOld++; }
+                    double want = miss + (growOn ? grow : softW);
                     double sq = Queue(want, sales, span);
                     if (sq > 1.0 + 1e-9) { qOver++; if (sq >= 2.0 - 1e-9) qCeil++; if (!(miss > 1e-6)) softOnly++; }
                     miss = want;
@@ -822,8 +865,11 @@ namespace Armoury
             sb.Append(" | zboze: miast z glodujacymi wsiami (N = 2) ").Append(hungry.Count)
               .Append(" | miast z N >= 1.5 dla jakiegos towaru: ").Append(hot.Count).Append(" | komorek (miasto x towar) z pomiarem ").Append(cells)
               .Append(", z kolejka > 1: ").Append(qOver).Append(" (na suficie 2: ").Append(qCeil).Append("; tylko z niewydanego budzetu robot: ").Append(softOnly).Append(")")
+              .Append(" | 435-N-A budzet robot w kolejce: ").Append(growOn ? "PRZYROST poziomu na dobe (klucz Supply Queue Growth TAK)" : "poziom / " + Window + " (klucz Supply Queue Growth NIE - dawna miara)")
+              .Append("; komorek z przyrostem > 0: ").Append(growCells).Append("; suma przyrostu ").Append(F1(sumGrow)).Append(" szt./d wobec suma poziom / ").Append(Window).Append(' ').Append(F1(sumSoftW))
+              .Append(" szt./d (suma poziomu ").Append(N0(sumSoft)).Append(" szt.); dawna miara dalaby kolejke > 1 w ").Append(qOverOld).Append(" komorkach (tylko z budzetu robot ").Append(softOnlyOld).Append(")")
               .Append(span < MinSpan ? "; KOLEJKA WYCISZONA - pomiar ma " + span + " dob z wymaganych " + MinSpan : "")
-              .Append("; brak = sztuki wsadu/d + poziom niewydanego budzetu robot / ").Append(Window).Append("; sprzedaz w mianowniku >= ").Append(F1(MinSales)).Append(" szt./d")
+              .Append(growOn ? "; brak = sztuki wsadu/d + przyrost niewydanego budzetu robot na dobe (nachylenie w oknie)" : "; brak = sztuki wsadu/d + poziom niewydanego budzetu robot / " + Window).Append("; sprzedaz w mianowniku >= ").Append(F1(MinSales)).Append(" szt./d")
               .Append(", w tym sprzedaz z prawdziwej sprzedazy miasta (241) ").Append(real).Append(", reszta: sztuki kupione tymi samymi drogami (odstepstwo od projektu - brak licznika calej sprzedazy surowcow)")
               .Append(" | poza pomiarem: surowiec warsztatow zbrojnych (linia 'Warsztaty: dzien' - brak surowca), kontrakty 174")
               .Append(" | ").Append(CraftShortage.LineText(nt))

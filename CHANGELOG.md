@@ -1,5 +1,22 @@
 # DZIENNIK ZMIAN
 
+## 435-N-A (12.11) - SYGNAL NIEDOBORU krok A: niewydany budzet robot wchodzi do S_kolejka jako PRZYROST poziomu na dobe, nie poziom / 28 (klucz Supply Queue Growth, domyslnie TAK)
+
+**Problem:** test 90 dob (at-lp90, lancuch podazy caly wlaczony): 667 komorek (miasto x towar) z kolejka > 1, wapien, marmur, deski, narzedzia z N > 1 prawie wszedzie. Diagnoza 12.11: niewydany budzet robot (220897 zl doba 7 -> 168785 zl doba 90) stoi co dobe, a i tak daje kolejke.
+
+**Przyczyna:** SupplySignal.ShortageText `want = miss + soft / Window`; soft to dzienny POZIOM niewydanego budzetu robot (NoteWorksGap - to samo zlecenie wraca co dobe, rowno na materialy wyczerpane), srednia z okna. Poziom dziala jak zapas, nie przeplyw: niedobor blokuje wydatki, pieniadz zostaje w kiesie wsi, sygnal tez - petla, ktora nigdy nie gasnie. Stojacy poziom to nie nowy popyt.
+
+**Zmiana:**
+- SupplySignal.Grow(cell, today): nachylenie (najmniejsze kwadraty) poziomu Soft po dobach okna 28, ktore maja wpis; ujemne -> 0; mniej niz 2 doby -> 0 (pierwsza doba bez historii). Najmniejsze kwadraty zamiast dwoch koncow (soft_teraz - soft_najstarszy) / dni - ten sam przyrost, ale skok jednego dnia (zmiana liczby wyczerpanych materialow dzieli budzet inaczej) nie przestawia N.
+- ShortageText: `want = miss + grow` (klucz NIE: `miss + soft / Window` - dokladnie jak przed). Reszta bez zmian: Queue, MinSpan 7, MinSales 1, agregat swiata (a[0] += want), tablica NTable / _pubN.
+- Nowy klucz Supply Queue Growth (Settings.cs + recznie McmSettings.cs, grupa Economy measurements, domyslnie TAK) - zmiana zmienia N czytane przez L5-L9, wiec zostawiony wylacznik powrotu bez nowego DLL. Nowego klucza nie ma w Armoury.json Jeffa -> wartosc domyslna TAK.
+- Zapis arm_lpn BEZ ZMIAN formatu (n1, srednie okna): stare zapisy laduja sie; Resolve wpisuje stala srednia w doby sprzed zapisu -> po wczytaniu przyrost 0, dopoki nowe doby nie zmienia poziomu.
+- Linie: "LP niedobor" dostaje segment "435-N-A budzet robot w kolejce: PRZYROST ... ; komorek z przyrostem > 0: X; suma przyrostu A szt./d wobec suma poziom / 28 B szt./d (suma poziomu C szt.); dawna miara dalaby kolejke > 1 w Q komorkach (tylko z budzetu robot S)" - obok dotychczasowego "z kolejka > 1: qOver (...; tylko z niewydanego budzetu robot: softOnly)" (teraz = tylko z przyrostu). Linia "Lancuch podazy (LP)" i "LP start" mowia, ktora miara wchodzi do N.
+
+**Ryzyko / co sprawdzic:** kontrola calosci (zasada 0): Soft / Miss czyta tylko SupplySignal (Means w Export i ShortageText; Grow nowy); N czytaja przez Table / TownN / WorldN: CraftShortage (L6 regula zmiany zajec i 363), StartCalibration.Rule (regale 444), VillageCrafts.CraftShortageN, VillageGear.OrderOf (L5), L7 / L8 / L9 - zadne nie czyta soft wprost, wiec zmiana dziala na nich tylko przez mniejsze N (oczekiwane: mniej towarow i miast z N > 1 - mniej zmian zajec ku wapniowi / marmurowi / deskom / narzedziom, mniej zamowien z nacisku, mniej funduszy miast). Brak wsadu warsztatow (miss) bez zmian. EarlyTable (pierwsza doba sesji przed Daily): historia z zapisu stala -> przyrost ~0, tablica jak z samych brakow wsadu i S_stos. Komorka z mieszanymi strumieniami (np. deski: wsad warsztatu kupiony co dobe = wpis z poziomem 0, roboty z luka tylko niektore doby) - poziom skacze 0 / L, nachylenie szumi (najmniejsze kwadraty to tlumia, ale nie zeruja). Po wczytaniu, gdy poziom przed zapisem rosl (srednia < poziomu biezacego), przez ok. 2 tygodnie przyrost pozorny do (L - srednia) / ~19 na dobe. W autotescie: segment 435-N-A w "LP niedobor": "z kolejka > 1" powinno spasc z ok. 667 (= "dawna miara dalaby ...") do ok. 100-130 w dlugim biegu (po 7+ dobach); "suma przyrostu" duzo mniejsza od "suma poziom / 28"; "tylko z niewydanego budzetu robot" male; towarow z N swiata > 1 ok. 11-12 z 22 dopiero po kroku B (jedzenie - sprzedaz 0 w mianowniku) - sam krok A zdejmuje wapien / marmur / deski / narzedzia. Klucz NIE: qOver = "dawna miara dalaby" (kontrola, ze NIE to stara miara).
+
+**Status:** DO SPRAWDZENIA
+
 ## 447-c (12.11) - OPIS MCM "Cavalry Commander" zgodny z kodem po 442-447
 
 **Problem:** opis klucza Cavalry Commander (Settings.cs i McmSettings.cs, z 441) mowil "In this version it is only the framework: every formation has no task ... nothing changes on the field" - od 442-447 role sa nadawane (RAID / HIDE / WAIT / STRIKE / CAVFIRST / DISENGAGE / HUNT), wiec Jeff czytalby w MCM nieprawde.

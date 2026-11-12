@@ -10620,6 +10620,10 @@ namespace Armoury
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool SupplyChainLog { get; set; } = true;
 
+        [SettingPropertyBool("Supply Queue Growth", HintText = "with Supply Chain Log: the unspent material budget of village works, septs and craft rebuilds (an order that found the market stall empty) counts towards a good's shortage only by how much it grows per day over the last 28 days, not by its size. The same order comes back every day while the stall is empty, so a budget that merely stands there is no new demand; a growing one is. This keeps goods such as lime, marble, planks and tools from looking short everywhere only because village purses hold money they cannot spend. Off = the budget's size divided by 28 counts every day, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool SupplyQueueGrowth { get; set; } = true;
+
         [SettingPropertyBool("Measure Craft Rule", HintText = "log only, nothing in the game changes: once a week, and on the day the start calibration fills the stalls, the log gets a diagnosis of the rule that would let village parts change their work under the start calibration - how many parts would want to change at today's prices, at base prices and at the calibration's own prices, the ten most wanted changes with their hands, and a plain note that works are frozen while that rule is off; side villages outside the calibration get the same numbers in their daily line (off = no such lines)", RequireRestart = false)]
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool MeasureCraftRule { get; set; } = true;
@@ -15506,6 +15510,7 @@ namespace Armoury
             s.DistrictIconCraftValue = DistrictIconCraftValue;
             s.EconomyAuditLines = EconomyAuditLines;
             s.SupplyChainLog = SupplyChainLog;
+            s.SupplyQueueGrowth = SupplyQueueGrowth;
             s.MeasureCraftRule = MeasureCraftRule;
             s.MeasureRegaleShelf = MeasureRegaleShelf;
             s.MeasureCaravanTrade = MeasureCaravanTrade;
