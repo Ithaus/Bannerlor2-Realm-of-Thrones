@@ -12996,6 +12996,14 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeCampForage { get; set; } = true;
 
+        [SettingPropertyBool("Siege Time By Factors", HintText = "Sieges between lords of the world (not yours) last as long as the place can hold: every siege gets a term set by the garrison's food, the walls, the odds and the defenders' morale - small castle 20-40 days, castle 40-90, town and great fortress 60-150; a relief army on its way stops the clock. When the term runs out with no relief in sight, or the garrison has starved for a week, the place yields: the garrison and the lords inside march out under arms to their own side and the besiegers take the place without a fight. No assault before the lower bound of the term unless the walls are empty or the defenders starve; a castle, town or great fortress is then stormed only through a breach. A siege that drags past Siege Time Limit Factor times the upper bound ends: the place yields if the besiegers are stronger, otherwise they give up and leave it alone for 30 days. Off = sieges end as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeTimeByFactors { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Time Limit Factor", 1.00f, 3.00f, "0.00", HintText = "With Siege Time By Factors: a siege older than this many times the upper bound of its term (small castle 40, castle 90, town 150 days) ends - the place yields to a stronger host, a weaker host leaves", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public float SiegeTimeLimitFactor { get; set; } = 1.5f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -16244,6 +16252,8 @@ namespace Armoury
             s.SiegeCampAttritionHighMedicinePercent = SiegeCampAttritionHighMedicinePercent;
             s.SiegeCampOutbreakChancePercent = SiegeCampOutbreakChancePercent;
             s.SiegeCampForage = SiegeCampForage;
+            s.SiegeTimeByFactors = SiegeTimeByFactors;
+            s.SiegeTimeLimitFactor = SiegeTimeLimitFactor;
         }
 
         internal static void Apply()

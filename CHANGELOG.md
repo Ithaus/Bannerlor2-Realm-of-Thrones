@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 471b-4 (13.11) - czas oblezenia z czynnikow DZIALA: kapitulacja z honorami z terminu R i z glodu, bramka szturmu, limit (D4)
+
+**Problem:** cele 471 (Jeff 12.11): maly zamek 20-40 dob, duzy zamek 40-90, miasto i wielka twierdza 60-150, limit 1.5 x gorna granica. Test 60 dob: oblezenia AI trwaja 6-16 dob (szturm taranem i wieza po ok. 6 dobach, mury 100%, trebuszy 0). 471a liczyl termin R tylko do logu. Jeff 13.11, D4: "wedle twojej rady" = zaloga, ktora poddala sie przed szturmem (termin R / glod), wychodzi wolno do swoich; zdobyta szturmem - niewola jak w grze.
+
+**Przyczyna:** nic w grze ani u nas nie konczy oblezenia terminem obrony; szturm AI blokuje tylko OB1 / 307c (`SiegeWalls.Veto`), a glod GL (`SiegeWalls2.StarveOne`) daje ok. 52 doby od zera do kapitulacji w niewole. Recenzja 471a: U2 (zegar zyje tylko z wlaczonym logiem), U8 (zegar bez zapisu).
+
+**Zmiana:** klucze `SiegeTimeByFactors` (MCM "Siege Time By Factors", TAK) i `SiegeTimeLimitFactor` 1.5 (1..3) w grupie 471 (Settings.cs + McmSettings.cs recznie, nazwa i zakres w `tools/gen_mcm.py`). `Armoury/src/SiegeWalls.Time471.cs`:
+- Regula dziala na oblezeniach AI: `Acts471` (nie gracz / Inni / skrypt fabuly, nie osada klanu gracza - D5 w 471b-5).
+- (a) kapitulacja z terminu: zegar >= R, odsiecz nie stoi (ta sama miara co 471a), oboz liczniejszy od obroncow (ludzie zdrowi, strona gry z milicja) -> `Yield471`.
+- (b) glod: `SiegeWalls2.StarveOne` - pierwsza doba glodu PO tygodniu laski GL, bez odsieczy, oboz liczniejszy -> `StarveYield471` -> `Yield471` (zamiast ok. 45 dob umierania i niewoli); odmowa = glod GL jak dotad.
+- (c) bramka w `SiegeWalls.Veto` (`Gate471`) za przerwa po odparciu, PRZED 307c, DR i OB1 (MB/`Unblock` konczy w Veto - tez podlega): przed dolna granica kategorii bez szturmu; od niej maly zamek jak dotad, wiekszy tylko przez wyrwe - bez wyrwy plan trebuszy (`TryBreach`); zawsze wolno przy pustych murach (obroncy 0) i glodzie obroncow (Food 0).
+- (e) limit: wiek >= 1.5 x gorna granica - oboz liczniejszy: `Yield471`, inaczej `Lift471` = `SiegeRansom.Lift384` (RemoveAllSiegeParties) + `Truce384` (rozejm 30 dob dla frakcji i rodow obozu, zawrocenie druzyn w drodze).
+- `Yield471` (D4, kapitulacja z honorami): `SiegeSurrender374.LeadOutLords` (z private na internal) - partie lordow obroncow wychodza; `BookHoldings.YieldOut(st, frakcja zdobywcy, null)` - zaloga do najblizszych druzyn i zalog starego pana (bez nich do domu), bohaterowie bez druzyny do najblizszej wlasnej twierdzy, ksiega ludzi i zbrojownia z ludzmi; potem `KingdomManager.SiegeCompleted(st, wodz obozu, true, Siege)` - droga 374 "slowo dotrzymane" bez relacji gracza, bez bitwy (bez lupu i rzezi). `BesiegedRelief.Finish` widzi kapitulacje jako zdobycie (`SiegeWalls.Yielding471`).
+- U2: `Time471Daily` wolany w `SiegeWalls.Daily` PRZED `if (!LogOn) return;` (linie same sprawdzaja LogOn). U8: zegar i doby z odsiecza w zapisie - dopisek `T|osada|start|zegar|doby` do arm_siege_walls (`Export471` / `Import471`); brak = zegar od wieku oblezenia. Rekord 471 tworzy tez bramka (`Rec471`), linia startu przy pierwszej dobie (`Started`).
+- Linie: `Czas oblezenia (471) start` (+ `471b: regula DZIALA (szturm od N doby[, potem tylko przez wyrwe], ...)` albo `bez akcji (powod)`), `(471) termin minal` (+ co 471b robi), `Czas oblezenia (471b) kapitulacja: osada | droga a/b/e | po N dob, kategoria (cel), zegar, R | oboz / obroncy X:1 | zdobywca, pan stary -> nowy | osada przeszla | partie lordow wyprowadzone | zaloga -> ... | wyjscie z honorami`, `Czas oblezenia (471b) odejscie po limicie: ... | oblezenie zakonczone tak, rozejm 30 dob (klucze), zawrocone`, w `(471) koniec` - `droga 471b: KAPITULACJA (a/b/e) / ODEJSCIE po limicie / inna (patrz KO)` i `oboz / obroncy ostatnio`; `Czas oblezen (471 doba)` + `klucz 471b`, `471b: kapitulacje N (z glodu K), odejscia po limicie, wstrzymane, szturmy zatrzymane bramka`; VetoLine (OB1) z powodem `471b: przed dolna granica ...` / `471b: duzy zamek bez wyrwy ... | ZMIANA: strategia -> trebusze`; linia GL `wynik: KAPITULACJA Z HONORAMI (471b, glod) - ...`.
+
+**Kalibracja (wyliczona, `scratchpad/n471b/calc471b4.py`; nie zmierzona):**
+- maly zamek (mury 1 po 471b-1) 400 vs 3000: R 26.5; 485 vs 13 400: R 22.0 -> szturm od 20. doby (taran i wieza gotowe po ok. 6) albo kapitulacja ok. 22-27; po odparciu SZ5 (przerwa 1-5 / 7-14 dob) i tak R. Oczekiwane 20-30 dob.
+- duzy zamek 500 vs 3000: R 68.8; 485 vs 13 400: R 55.9 -> do 40. doby bez szturmu, od 40 plan trebuszy (wyrwa ok. 19 dob - badanie 471), wiec zwykle kapitulacja z terminu ok. 56-69 dob, czasem szturm przez wyrwe ok. 59.
+- miasto 1500 vs 12 000 (136 dob jedzenia): R 76.4 -> od 60. doby szturm przez wyrwe (trebusz drugiej ekipy TB2 od 1. doby) albo kapitulacja ok. 76.
+- wielka twierdza 2500 vs 15 000: R 131.7; Casterly Rock 1500 vs 13 400: R 125.5 -> szturm przez wyrwe od 60. doby (mury 3 - odparcia SZ5) albo kapitulacja 125-132.
+- Limit: 60 / 135 / 225 dob.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: 307c / DR / OB1 / MB stoja ZA bramka - przed dolna granica szturmu AI nie ma (takze przy miazdzacej przewadze 27:1 - swiadomie, badanie dawalo wyjatek s >= 10, ale wtedy armia 13 tys. brala zamek po 6-7 dobach jak dzis); okup O0-O3 (`SiegeRansom.AssaultPost`) liczy sie tylko po "tak" Veto - w czasie bramki nie ma okupu (konczy kapitulacja). GL: kapitulacja w niewole (`TrySurrender`) zostaje dla oblezen poza regula i przy odmowie 471b.
+- Kolizje: 374 (`LeadOutLords` tylko widocznosc), `BookHoldings.YieldOut` (ta sama droga co 374), `BesiegedRelief` (zdobycie bez bitwy), `EnemyCaravans.SiegePre` - kapitulacja to `SiegeCompleted` z isWin, wiec karawany strony obroncow w murach traktowane jak przy szturmie (L5b-2), nie jak cesja 374 - do decyzji, jesli Jeff chce "wolne wyjscie" takze dla karawan. 330/334e ("pozostalo N dob", `LocalFront334e.Siege.cs`) i 274 (`CanonWarBalance.Levers.cs:221`) nie znaja R - dluzsze oblezenia moga czesciej konczyc sie odwrotem przed odsiecza 334e i dodatkowymi zbiorkami 274 (sprawdzic w tescie). BK ArmySiegePersistence trzyma armie - limit (e) jest droga wyjscia. Zamki z jedzeniem 486-807 dob - (b) dotyczy miast i zamkow pod dlugim glodem.
+- `SiegeCompleted` wolane z doby (`DailyTickEvent`), jak glod GL zmienia rostery w dobie; 374 robi to w takcie mapy. Wyjatek = Stumble, osada zostaje.
+- Starszy DLL czytajacy nowy zapis: wpisy `T|` liczy jako uszkodzone i pomija (linia "pominieto N uszkodzonych wpisow").
+- Duzy oboz (13 tys.) wyjada spichlerze 2 wsi zamku w ok. 50 dob (471b-3) - potem glod obozu i odejscie m116 przed R = mozliwe skrocenie (droga d).
+- Klucz NIE = zachowanie co do bitu jak przed (bramka, glod i akcje wychodza; zegar liczy sie dalej, takze bez logu - tylko odczyt).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-3 (13.11) - furaz obozu AI ze spichlerzy wsi okregu: rabunek bez zaplaty, wies gloduje, spada relacja lorda z notablami (D3)
 
 **Problem:** Jeff 13.11, odpowiedz D3: "Okay rabunek ma sens i zmniejsza opinie o lordzie". Test 60 dob (`Armoury-2026-11-12_22-47-01.log`, wiersze SZ): jedzenie obozu 8.5 doby, w Ashemark 15.6 -> 5.8 -> 3.0 -> 2.1 - oboz odchodzi z glodu po 8-16 dobach, wiec oblezenia 40-150 dob (cele 471) byly fizycznie niemozliwe.

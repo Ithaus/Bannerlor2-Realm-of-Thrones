@@ -392,6 +392,8 @@ RANGES = {
     'SiegeCampAttritionLowMedicinePercent': (0.0, 5.0, "0.00"),
     'SiegeCampAttritionHighMedicinePercent': (0.0, 5.0, "0.00"),
     'SiegeCampOutbreakChancePercent': (0.0, 50.0, "0.0"),
+    # 471b-4: limit oblezenia jako wielokrotnosc gornej granicy terminu - kod przycina do 1..3
+    'SiegeTimeLimitFactor': (1.0, 3.0, "0.00"),
     # 472-p (recenzja 472): mury historycznie - kod przycina czynnik ceny punktu do 1..10, najkrotszy czas do 0..20 lat (0 = bez limitu); McmSettings.cs wpisane recznie
     'WallCastlePointPriceFactor': (1.0, 10.0, "0.00"),
     'WallTownPointPriceFactor': (1.0, 10.0, "0.00"),
@@ -841,6 +843,7 @@ LABELS = {
     'SiegeSmallCastlesWalls1': 'Small Castles Start With Level 1 Walls',   # 471b-1
     'SiegeCampAttritionByMedicine': 'Siege Camp Attrition By Medicine',   # 471b-2
     'SiegeCampForage': 'Siege Camp Forages The Villages',   # 471b-3
+    'SiegeTimeByFactors': 'Siege Time By Factors',   # 471b-4
     'BkVetoNextTarget334': 'Army Objective Skips Vetoed Seats',
     'IronbornCanonReave334': 'Ironborn Reave The North',
     'PartyPositionGuard334c': 'Party Position Guard',   # paczka 334c

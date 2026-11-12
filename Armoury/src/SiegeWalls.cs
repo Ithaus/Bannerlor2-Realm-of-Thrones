@@ -431,6 +431,12 @@ namespace Armoury
                     if (LogOn && _vetoLogged.Add(ev)) VetoLine(camp, null, "przerwa po odparciu do dnia " + F(pz.Until, "0.0") + " (odparc w tym oblezeniu " + pz.Repels + ")", null);
                     return true;
                 }
+                string g471 = Gate471(camp, ev, st);                             // 471b-4 (c): bramka czasu oblezenia - przed 307c, DR i OB1
+                if (g471 != null)
+                {
+                    if (LogOn && _vetoLogged.Add(ev)) VetoLine(camp, null, g471, null);
+                    return true;
+                }
                 Meas mPre = null;
                 if (pz != null && pz.Repels > 0 && SiegeWalls2.LearnOn && !SiegeWalls2.Surrendered(st))
                 {
@@ -1346,6 +1352,7 @@ namespace Armoury
                 dead = null;
                 foreach (var kv in _prep) if (kv.Key == null || kv.Key.BesiegedSettlement == null || kv.Key.BesiegedSettlement.SiegeEvent != kv.Key) { if (dead == null) dead = new List<SiegeEvent>(); dead.Add(kv.Key); }
                 if (dead != null) foreach (var ev in dead) _prep.Remove(ev);
+                Time471Daily();                                                  // 471b-4 (U2): zegar, R i drogi konca 471b PRZED LogOn (linie 471 same sprawdzaja LogOn)
                 if (!LogOn) return;
                 // oblezenia trwajace
                 int going = 0; double longest = 0; string longestSt = "-"; var over45 = new List<string>();
@@ -1390,7 +1397,6 @@ namespace Armoury
                 SzDaily();                                                       // SZ: linia doby bitwy szturmu
                 LvlDaily();                                                      // 320c: linia doby czynnika poziomu murow
                 Eng377Daily();                                                   // 377: linia doby inzynierii obroncow
-                Time471Daily();                                                  // 471a: czas oblezenia z czynnikow - sam log przewidywania
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ZeroDay(); }
@@ -1463,12 +1469,13 @@ namespace Armoury
                 if (st == null || st.SiegeEvent == null || Math.Abs(st.SiegeEvent.SiegeStartTime.ToHours - p.Start) > 0.05) continue;
                 sb.Append(";P|").Append(p.St).Append('|').Append(p.Start.ToString("R", Inv)).Append('|').Append(p.Until.ToString("R", Inv)).Append('|').Append(p.Repels.ToString(Inv));
             }
+            Export471(sb);                                                       // 471b-4 (U8): zegar 471 trwajacych oblezen ("T|"); starszy DLL liczy nieznane wpisy jako uszkodzone i je pomija
             return sb.ToString();
         }
 
         internal static void Import(string s)
         {
-            _pendingPauses.Clear(); _pauses.Clear();
+            _pendingPauses.Clear(); _pauses.Clear(); _pend471.Clear();
             if (string.IsNullOrEmpty(s)) return;
             var parts = s.Split(';');
             if (parts.Length == 0 || parts[0] != "1") { Log.Info("Mury oblezen: zapis arm_siege_walls w nieznanej wersji - pominiety (przerwy po odparciu od nowa)."); return; }
@@ -1478,6 +1485,7 @@ namespace Armoury
                 try
                 {
                     var a = parts[i].Split('|');
+                    if (Import471(a)) continue;                                  // 471b-4 (U8): zegar 471
                     if (a.Length >= 5 && a[0] == "P")
                         _pendingPauses.Add(new Pause { St = a[1], Start = double.Parse(a[2], NumberStyles.Float, Inv), Until = float.Parse(a[3], NumberStyles.Float, Inv), Repels = int.Parse(a[4], Inv) });
                     else bad++;

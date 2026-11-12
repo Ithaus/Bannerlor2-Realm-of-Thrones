@@ -720,6 +720,17 @@ namespace Armoury
             bool story = StorySiege(camp, lp);
             bool inGrace = dayNo <= grace && !story;
             if (inGrace) _dGrace++;
+            // 471b-4 (b, D4): pierwsza doba glodu po tygodniu laski - zaloga kapituluje z honorami (bez odsieczy, oboz liczniejszy; regula 471b dziala) zamiast umierac
+            if (!battle && !story && dayNo > grace)
+            {
+                string y471 = SiegeWalls.StarveYield471(ev);
+                if (y471 != null)
+                {
+                    if (LogOn) Log.Info("Glod oblezenia (GL): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + Cls(st) + ") | glod od " + F(days, "0.0") + " dob (doba " + dayNo + ", laska do " + grace
+                                        + ") | zaloga i milicja " + n0 + " | wynik: " + y471 + ".");
+                    return;
+                }
+            }
             double pct = battle || inGrace ? 0.0 : LossPct;
             double p = pct / 100.0;
             int room; string fleeWhy = FleeBlock(st, camp, lp, battle, story, out room);

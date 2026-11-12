@@ -593,7 +593,7 @@ namespace Armoury
         }
 
         /// <summary>Partie lordow strony obroncow w osadzie wychodza przed zmiana pana (inaczej zostalyby w osadzie wroga).</summary>
-        private static int LeadOutLords(Settlement st, MobileParty cap)
+        internal static int LeadOutLords(Settlement st, MobileParty cap)   // 471b-4: takze kapitulacja z honorami AI (SiegeWalls.Yield471)
         {
             int n = 0;
             foreach (var mp in new List<MobileParty>(st.Parties))
