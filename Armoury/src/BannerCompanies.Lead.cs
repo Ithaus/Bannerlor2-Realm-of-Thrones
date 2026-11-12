@@ -287,7 +287,8 @@ namespace Armoury
             {
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
                 string side = co.T != null && co.T.IsPlayerTeam ? "druzyna gracza" : PlayerSide(co) ? "sojusznik gracza" : "wrog";
-                string srcName = src == 1 ? "sztandar" : src == 2 ? "dowodca" : src == 3 ? "udzial strat" : src == 4 ? "straty 305c / polowa" : src == 5 ? "1/6 strat" : src == 6 ? "zdarzenie strony" : "inne";
+                string srcName = src == 1 ? "sztandar" : src == 2 ? "dowodca" : src == 3 ? "udzial strat" : src == 4 ? "straty 305c / polowa" : src == 5 ? "1/6 strat" : src == 6 ? "zdarzenie strony"
+                               : src == 7 ? "TYL (ciosy w plecy, 448)" : src == 8 ? "BOK (ciosy z boku, 448)" : src == 9 ? "SASIAD (zalamal sie sasiad, 448)" : "inne";
                 Log.Info("Choragwie (318c): zalamanie | " + NameOf(co) + " (szyk " + ((int)co.F.FormationIndex + 1).ToString(inv) + ", kompania " + (co.Index + 1).ToString(inv)
                          + ") | strona " + side + " | " + (now - _deployedAt).ToString("0", inv) + " s po rozstawieniu | zrodlo " + srcName
                          + " | strata " + (share >= 0f ? share.ToString("0.00", inv) : "-") + " | tier " + tier.ToString("0.00", inv) + " (T x" + tf.ToString("0.000", inv) + ")"

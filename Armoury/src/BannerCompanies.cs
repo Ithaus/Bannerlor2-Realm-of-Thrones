@@ -111,7 +111,7 @@ namespace Armoury
         // zalamania wedlug zrodla rzutu (0 inne, 1 sztandar, 2 dowodca, 3 udzial strat 307b, 4 straty 305c / polowa skladu)
         internal static int StateRolls; internal static float StateSum, StateMin = 9f, StateMax;
         // 309: indeks 5 = rzut przy 1/6 strat (klucz BannerBreakEarly) - poza licznikami 307b (B307-2: rzutow = suma 2/6..5/6)
-        internal static readonly int[] BreakBySrc = new int[7];   // 318c: indeks 6 = zdarzenie strony (wodz / ostatni bohater)
+        internal static readonly int[] BreakBySrc = new int[10];  // 318c: indeks 6 = zdarzenie strony (wodz / ostatni bohater); 448: 7 TYL, 8 BOK, 9 SASIAD
         // 309 (klucz BannerBreakEarly): rzuty przy 1/6 strat (liczba, zalamania, suma p), kompanie bez nikogo zdolnego do rzutu (rozbite bez rzutu),
         // pominiete w szeregu (panika wedlug SurvivalMode.InPanic poza IsPanicked, ranni w odwrocie 143) - suma na przegladach InRanks z rzutem;
         // rzuty udzialu strat bez rzutu (n == 0) przy kluczu NIE (dawny brak spojnosci B307-2)
@@ -138,6 +138,7 @@ namespace Armoury
             EarlyRolls = EarlyBreaks = EmptyBroken = RanksPanicSkip = RanksWithdrawSkip = ShareNoRoll = EmptyWait = BreakShareN = 0; EarlyPSum = BreakShareSum = 0f;
             EventRolls = EventBreaks = 0; EventShareSum = EventPSum = 0f;
             Reset318();
+            Reset448();
         }
 
         internal static int Activity { get { return Companies + StdField + StdFell + CmdFell + Breaks + Stumbles; } }
@@ -190,6 +191,7 @@ namespace Armoury
             public int Wave, Chunk;
             public float NextWave;
             public int TierIx = 1;
+            public Dir448 D;                               // 448: wynik ciosow z tylu / z boku i przerwy (null do pierwszego trafienia z boku / tylu)
         }
 
         private BannerBearerLogic _bbl;
@@ -252,6 +254,7 @@ namespace Armoury
 
         protected override void OnEndMission()
         {
+            try { End448(); } catch { }
             try { if (!_lineDone) { _lineDone = true; if (_field) WriteEnd(); } }
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.OnEndMission", e); }
             // 158: biegacze zdjeci, linia "Sztandar (158)" (raz na misje)
@@ -276,6 +279,7 @@ namespace Armoury
         {
             _forms.Clear(); _all.Clear(); _mem.Clear(); _bearerOf.Clear(); _skip.Clear(); _buf.Clear(); _unpause.Clear(); _lazy.Clear(); _capCult.Clear();
             LeadClear();  // 318c
+            Clear448();   // 448
             RunClear();   // 158
         }
 
@@ -317,6 +321,7 @@ namespace Armoury
             }
             try { HeroScan(m); }   // 318c: spis bohaterow dla dowodztwa L
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.HeroScan", e); }
+            Start448(c);   // 448: kolejka trafien (takze przy kluczu NIE - pomiar)
             try { WriteStart(m, c); }
             catch (Exception e) { BannerCompanies.Stumble("BannerCompaniesMission.WriteStart", e); }
         }
@@ -637,6 +642,9 @@ namespace Armoury
                 _unpause.Clear();
             }
             if (_all.Count == 0 || m.MissionEnded) return;
+            // 448: trafienia z tylu / z boku i rzuty sasiadow - co klatke (kierunek liczony najwyzej klatke po ciosie)
+            try { Tick448(m); }
+            catch (Exception e) { BannerCompanies.Stumbles448++; BannerCompanies.Stumble("BannerCompaniesMission.Tick448", e); }
             _acc += dt;
             _accReview += dt;
             if (_acc < BannerCompanies.TickEvery) return;
@@ -1077,7 +1085,9 @@ namespace Armoury
             if (co.Broken) return false;
             bool shareRoll = share >= 0f && (src == 3 || src == 5);
             bool early = c.BannerBreakEarly && shareRoll;
-            bool evt = c.BannerEventRollByLoss && (src == 1 || src == 2 || src == 6);   // 318c: zdarzenie strony (6) jak zdarzenie dowodcy
+            // 448: TYL / BOK / SASIAD (7-9) zawsze jako zdarzenie - Roll z tymi zrodlami wola tylko klucz RearAndFlankHitsBreakCompanies TAK
+            bool dir448 = src >= BannerCompanies.SrcRear && src <= BannerCompanies.SrcNb;
+            bool evt = dir448 || (c.BannerEventRollByLoss && (src == 1 || src == 2 || src == 6));   // 318c: zdarzenie strony (6) jak zdarzenie dowodcy
             bool live = early || evt;
             var rk = live ? RoutHold.Live : null;
             float sum = 0f, tsum = 0f;
@@ -1125,6 +1135,7 @@ namespace Armoury
             float mm = share >= 0f ? 2f * share : 2f - avg / 25f;   // 307b: przy rzucie wedlug udzialu strat M z udzialu, nie z morale gry
             if (mm < 0.4f) mm = 0.4f;
             if (mm > 1.6f) mm = 1.6f;
+            if (dir448 && mm < BannerCompanies.DirMinM) mm = BannerCompanies.DirMinM;   // 448: wlasny dolny prog zdarzenia
             float p = (early ? c.BannerBreakEarlyChance : c.BannerBreakChance) * factor * mm * tf;
             // 318c (klucz BannerLeaderHold): dowodztwo L - zywy, czynny bohater strony trzyma kompanie; x1.3 tylko przy faktycznym upadku sztandaru (nie brak
             // chorazego, nie chorazy przeniesiony z szykiem), poza samym rzutem upadku (src 1 - upadek liczony raz)
@@ -1170,13 +1181,13 @@ namespace Armoury
                 BannerCompanies.SharePSum += p;
             }
             else if (src == 5) { BannerCompanies.EarlyRolls++; BannerCompanies.EarlyPSum += p; }
-            if (evt) { BannerCompanies.EventRolls++; BannerCompanies.EventShareSum += share; BannerCompanies.EventPSum += p; }
+            if (evt && !dir448) { BannerCompanies.EventRolls++; BannerCompanies.EventShareSum += share; BannerCompanies.EventPSum += p; }
             if (MBRandom.RandomFloat < p)
             {
                 if (share307) BannerCompanies.ShareBreaks++;
                 else if (src == 5) BannerCompanies.EarlyBreaks++;
                 if (share307 || src == 5) { BannerCompanies.BreakShareSum += share; BannerCompanies.BreakShareN++; }
-                if (evt) BannerCompanies.EventBreaks++;
+                if (evt && !dir448) BannerCompanies.EventBreaks++;   // 448: licznik 309 bez nowych zrodel
                 if (loss) { co.LossBreak = true; BannerCompanies.LossBreaks++; }
                 BannerCompanies.BreakBySrc[src >= 0 && src < BannerCompanies.BreakBySrc.Length ? src : 0]++;
                 if (bucket >= 0) BannerCompanies.LeadBreaks[bucket]++;
@@ -1273,6 +1284,8 @@ namespace Armoury
                 else BannerCompanies.CheersNoEnemy++;
             }
             BannerCompanies.CompanyBroke(co.F, co.Index, cen);
+            try { Neighbors448(co, cen, now); }   // 448: sasiedzi rzucaja po NbDelay s (przy kluczu NIE tylko pomiar)
+            catch (Exception e) { BannerCompanies.Stumbles448++; BannerCompanies.Stumble("BannerCompaniesMission.Neighbors448", e); }
         }
 
         private Formation NearestEnemy(Company co, Vec3 cen)
@@ -1455,6 +1468,7 @@ namespace Armoury
               .Append(" z ").Append(BannerCompanies.Companies).Append(" kompanii, sr. utracona czesc przy zalamaniu ")
               .Append(BannerCompanies.BreakShareN > 0 ? (BannerCompanies.BreakShareSum / BannerCompanies.BreakShareN).ToString("0.00", inv305) : "-");
             sb.Append(" | czekanie na rzut 1/6 (wszyscy chwilowo poza szeregiem, poprawka 309): taktow ").Append(BannerCompanies.EmptyWait);
+            BannerCompanies.Append448(sb, c305);   // 448: przed 318c i potknieciami
             BannerCompanies.Append318(sb, c305);   // 318c: przed potknieciami (CH-4 / B309 czytaja koniec linii)
             sb.Append(" | potkniecia ").Append(BannerCompanies.Stumbles).Append('.');
             Log.Info(sb.ToString());

@@ -12732,6 +12732,10 @@ namespace Armoury
         [SettingPropertyGroup("Battle: living commanders and veteran troops hold a shaken company (318c)")]
         public bool PainBreakTierSteadiness { get; set; } = true;
 
+        [SettingPropertyBool("Rear And Flank Hits Break Companies", HintText = "With Banner Companies: men struck from behind or from the side lose heart faster than men struck from the front, and a company also wavers when the company beside it breaks. Whether a blow came from behind or the side is judged by where each man was looking when he was hit, not by the formation's facing, so a square or a turned line is judged rightly. A company rolls to break once enough blows have come from behind (about 3) or from the side (about 5) within a few seconds, dealt by at least two different enemies - a single rider passing through the ranks is not enough; arrows and blows from riders count half, and riders struck from the side are not counted. A company within 25 m of one that breaks, or next to it in the same formation, rolls once a second later. Each such roll weighs at least as heavily as a company that has lost half its men; tier, living lords and how the battle stands still count as in every other roll, and the same company rolls again for the same cause only after 15 seconds. Both sides alike, your own companies too. Off = exactly as before. Counted in the Armoury log at the end of each field battle (line 448).", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: blows from behind and the side break a company (448)")]
+        public bool RearAndFlankHitsBreakCompanies { get; set; } = true;
+
         [SettingPropertyBool("Naval Realms", HintText = "Each realm keeps the fleet it has in the books: the Iron Islands twice the usual number of ships, Dragonstone, Braavos, Volantis and the Summer Isles half again as many, the crown, the Reach and most Free Cities the usual number, the Stormlands and the Vale fewer, Dorne half, the Riverlands and the Night's Watch very few, and the North none at all except House Manderly of White Harbor. Lords no longer buy ships beyond their realm's number, and ships they have beyond it are sold to ports one a day, up to three a day in a realm with no fleet (paid from the port's own purse; if no port can pay for ten days - three in a realm with no fleet - the ship is laid up in port for nothing). A lord stranded on an island keeps his ships until he is back on the mainland, and may buy one to get home. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Fleets of the realms and the conquests of the North (326)")]
         public bool NavalRealms { get; set; } = true;
@@ -16038,6 +16042,7 @@ namespace Armoury
             s.BannerLeaderHold = BannerLeaderHold;
             s.BannerRanksIgnoreKnockback = BannerRanksIgnoreKnockback;
             s.PainBreakTierSteadiness = PainBreakTierSteadiness;
+            s.RearAndFlankHitsBreakCompanies = RearAndFlankHitsBreakCompanies;   // 448
             s.NavalRealms = NavalRealms;
             s.NorthConquestReturn = NorthConquestReturn;
             s.Buildings338 = Buildings338;
