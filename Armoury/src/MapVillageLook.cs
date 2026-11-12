@@ -26,6 +26,12 @@
 // Potkniecia: wioska - licznik per wioska (3 = ta jedna pominieta, jak dotad); warstwa napisow - 3 potkniecia z rzedu = napisy wylaczone do
 // nastepnego wczytania mapy (obrazki bez zmian); nigdy wylacznik calosci. Wylaczniki: BurnedVillageLook, BurnedVillageLabels.
 // Poza paczka (projekt pkt 4): trwaly wyglad "looted" wsi GRY przy polowie jej osad (latka na SettlementVisual.RefreshLevelMask).
+// 474 P1 (Jeff 13.11 "Nazwy wioske, tylko jak mam alt"; projekt docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md pkt 1): przytrzymany LEWY Alt pokazuje
+// nazwy najwyzej 50 pokazanych wiosek pobocznych najblizszych punktu, na ktory patrzy kamera (bez progu wysokosci kamery - tyle, ile obrazkow stoi), z ikona
+// glownego towaru (SideVillageGoods: obrazek tabliczek wsi gry, widzet gry SettlementNameplateEventVisualBrushWidget) - ta sama warstwa i pula co napisy nad
+// spalonymi, prefab ArmVillageNameLabels.xml (napis + ikona). Spalona pod Altem - jej napis "X has been burned" (przy BurnedVillageLabels). Bez Altu - jak dotad.
+// Koszt bez Altu: jeden odczyt klawisza na klatke (zmiana stanu = wybor napisow od razu, bez czekania na cwierc sekundy). Towary okregu liczone raz na dobe
+// i dopiero pod Altem, najwyzej AltGoodsPerTick okregow na cwierc sekundy. Klucz SideVillageAltNames wylaczony = warstwa i prefab jak dotad (co do bitu).
 // Kompilacja zdjec (-p:W4Photo=true, stala W4_PHOTO; projekt T2 "jesli spalonych 0"): pierwsza wioska kazdego okregu (order 0) pokazana jako
 // spalona - TYLKO widok (obrazek, dym, napis), ksiega i gra bez zmian; w zwyklym DLL tego kodu nie ma.
 using System;
@@ -48,6 +54,26 @@ namespace Armoury
         private bool _isShown;
         internal float Wx, Wy, Wz;        // punkt na mapie (srodek postawionego obrazka)
         internal object Owner;            // wioska, ktorej napis teraz nosi (null = wolny)
+        internal bool AltMode;            // 474 P1: napis z wyboru pod Altem (nazwa) - zmiana trybu = nowy tekst
+        internal string IconId;           // 474 P1: styl ikony w liscie Icons (null = bez ikony)
+        private MBBindingList<MapLabelIconVM> _icons = new MBBindingList<MapLabelIconVM>();
+
+        /// <summary>474 P1: 0 albo 1 ikona glownego towaru (prefab ArmVillageNameLabels; stary prefab listy nie czyta). Widzet gry ustala obrazek raz, przy pierwszym
+        /// LateUpdate - zmiana ikony = pozycja zdjeta i dodana od nowa (nowy widzet), jak DistrictIcon.Apply.</summary>
+        [DataSourceProperty]
+        public MBBindingList<MapLabelIconVM> Icons
+        {
+            get { return _icons; }
+            set { if (value != _icons) { _icons = value; OnPropertyChangedWithValue(value, "Icons"); } }
+        }
+
+        internal void SetIcon(string id)
+        {
+            if (id == IconId) return;
+            IconId = id;
+            _icons.Clear();
+            if (id != null) _icons.Add(new MapLabelIconVM(id));
+        }
 
         [DataSourceProperty]
         public string Text
@@ -76,6 +102,20 @@ namespace Armoury
             get { return _isShown; }
             set { if (value != _isShown) { _isShown = value; OnPropertyChangedWithValue(value, "IsShown"); } }
         }
+    }
+
+    /// <summary>474 P1: ikona glownego towaru przy nazwie wioski - te same pola, co pozycja tabliczki wsi gry (SettlementNameplateEventItemVM: Type 6 = Production,
+    /// AdditionalParameters = nazwa stylu pedzla Settlement.Event.Type.Image).</summary>
+    public sealed class MapLabelIconVM : ViewModel
+    {
+        private readonly string _param;
+        public MapLabelIconVM(string param) { _param = param; }
+
+        [DataSourceProperty]
+        public int Type { get { return 6; } }
+
+        [DataSourceProperty]
+        public string AdditionalParameters { get { return _param; } }
     }
 
     /// <summary>Lista napisow (stala pula - widzety powstaja raz przy zaladowaniu prefabu, potem tylko zmiana tekstu, pozycji i widocznosci).</summary>
@@ -109,6 +149,9 @@ namespace Armoury
         private const int LabelOrder = 89;            // warstwa pod tabliczkami gry ("MapNameplateLayer" 90) i menu mapy (100)
         private const int LabelStrikesMax = 3;        // potkniecia warstwy z rzedu, po ktorych napisy sa wylaczone do nastepnego wczytania mapy
         private const string LabelMovie = "ArmBurnedVillageLabels";
+        private const string AltMovie = "ArmVillageNameLabels";       // 474 P1: napis + ikona (przy kluczu SideVillageAltNames)
+        private const int AltLabelMax = 50;                           // 474 P1: najwyzej tyle nazw pod Altem (projekt: 40-60)
+        private const int AltGoodsPerTick = 4;                        // 474 P1: najwyzej tyle okregow z towarami liczonych na cwierc sekundy
 
         private readonly List<Slot> _lookQueue = new List<Slot>();      // wioski z obrazkiem i brudnym stanem (albo czekajace na przebudowe)
         private readonly List<string> _lookIds = new List<string>();    // bufor id okregow z ksiegi
@@ -127,6 +170,9 @@ namespace Armoury
         private int _lblCount, _lblMax, _lblStrikes, _lblTickStrikes, _lblLayers, _lblFrames, _stLbl;
         private bool _lblBroken, _lblPrefabChecked, _lblNoPrefab;
         private long _lblFrameTicks;
+        // 474 P1: nazwy pod lewym Altem
+        private bool _lblAlt, _lblLayerAlt, _altPrefabChecked, _altNoPrefab, _altKeyLogged;
+        private int _altPresses, _altMax, _altGoodsCalc, _altNoIcon, _altIcons;
 
         /// <summary>O ile poziomow nizej stoi obrazek przy udziale pustych osad e (0-1); prev = poprzedni wynik tej wioski (histereza powrotu).</summary>
         internal static int LookDropFor(double e, int prev)
@@ -166,6 +212,13 @@ namespace Armoury
                     _lookSeenVer = ver - 1;   // pierwszy tick mapy zabiera liste ksiegi
                     all = true;
                     LookStartLine(keyLook, keyLbl, book);
+                    if (st.SideVillageAltNames && !_altKeyLogged)
+                    {
+                        _altKeyLogged = true;
+                        Log.Info("Wioski - nazwy pod Altem (474 P1): CZYNNE | przytrzymany lewy Alt: nazwy najwyzej " + AltLabelMax + " pokazanych wiosek pobocznych najblizszych"
+                                 + " srodka kadru, z ikona glownego towaru (towary okregu raz na dobe, najwyzej " + AltGoodsPerTick + " okregi na cwierc sekundy); prefab " + AltMovie
+                                 + ", ta sama warstwa " + LabelOrder + " co napisy nad spalonymi; bez Altu jeden odczyt klawisza na klatke.");
+                    }
                 }
                 else if (keyLook != _lookKeyOn || keyLbl != _lblKeyOn || book != _lookBookOn)
                 {
@@ -421,7 +474,16 @@ namespace Armoury
                    + _lookTinted + ")" + BookBurnedText(known) + " | napisy w kadrze teraz " + _lblCount + ", maks. " + _lblMax + ", warstwa " + (_lblLayer != null ? "stoi" : "brak")
                    + " (postawiona " + _lblLayers + " razy), przeliczenie pozycji sr. " + ms.ToString("0.0000", CultureInfo.InvariantCulture) + " ms/klatke (klatek z napisami "
                    + _lblFrames + ") | potkniecia: wyglad " + _stLook + ", napisy " + _stLbl + (_lblBroken ? " - NAPISY WYLACZONE do nastepnego wczytania mapy" : "")
-                   + (_lookKeyOn ? "" : " | wyglad WYLACZONY w MCM") + (_lblKeyOn ? "" : " | napisy WYLACZONE w MCM") + ".";
+                   + (_lookKeyOn ? "" : " | wyglad WYLACZONY w MCM") + (_lblKeyOn ? "" : " | napisy WYLACZONE w MCM") + AltLine() + ".";
+        }
+
+        /// <summary>474 P1: stan nazw pod Altem do linii wygladu ("" przy wylaczonym kluczu - linia jak dotad).</summary>
+        private string AltLine()
+        {
+            if (!Settings.Current.SideVillageAltNames) return "";
+            return " | nazwy pod lewym Altem (474 P1): wcisniec " + _altPresses + ", najwiecej nazw naraz " + _altMax + ", okregow z towarami policzonych " + _altGoodsCalc
+                   + " (pamiec dobowa, razem w sesji " + SideVillageGoods.Computed + ", potkniecia " + SideVillageGoods.Stumbles + "), nazwy z ikona " + _altIcons + ", bez ikony " + _altNoIcon
+                   + ", prefab " + (_altNoPrefab ? LabelMovie + " (BRAK " + AltMovie + ")" : AltMovie);
         }
 
         /// <summary>Jeff 16.10 (D4): spalone w calej ksiedze obok "spalonych w ksiedze" widoku (te liczy tylko wioski z odczytanym wygladem - postawione przy kamerze
@@ -443,30 +505,52 @@ namespace Armoury
             try
             {
                 if (_lblBroken) { _lblCount = 0; return; }   // audyt 13.10: po wylaczeniu (3 potkniecia z rzedu albo brak prefabu) warstwy juz nie ma - bez wyboru napisow, zeby staly wyjatek nie lecial dalej 4/s
-                if (!Settings.Current.BurnedVillageLabels)
+                Settings st = Settings.Current;
+                bool altKey = st.SideVillageAltNames, burnKey = st.BurnedVillageLabels;   // 474 P1
+                if (!burnKey && !altKey)
                 {
                     if (_lblLayer != null) RemoveLabelLayer(true);
                     _lblCount = 0;
+                    _lblAlt = false;
                     return;
                 }
+                if (_lblLayer != null && _lblLayerAlt != altKey) RemoveLabelLayer(true);   // 474 P1: klucz Alt zmieniony w sesji - warstwa od nowa z wlasciwym prefabem i pula
+                bool alt = altKey && AltDown();
+                if (alt && !_lblAlt) _altPresses++;
+                _lblAlt = alt;
                 int n = 0;
                 Camera camera = screen != null && screen.MapCameraView != null ? screen.MapCameraView.Camera : null;
                 if (camera != null)
                 {
                     Vec3 cam = camera.Position;
-                    if (cam.z <= LabelCameraZ) n = PickLabels(screen, camera, cam);
+                    if (alt) n = PickAltLabels(screen, camera, cam);
+                    else if (burnKey && cam.z <= LabelCameraZ) n = PickLabels(screen, camera, cam);
                 }
                 if (n > 0 && _lblLayer == null && (_lblBroken || !EnsureLabelLayer(screen))) n = 0;
                 MapBurnedLabelsVM vm = _lblVm;
                 if (_lblLayer == null || vm == null) { _lblCount = 0; return; }
                 MBBindingList<MapBurnedLabelVM> list = vm.Labels;
                 if (n > list.Count) n = list.Count;
+                int goodsBudget = AltGoodsPerTick;
                 for (int i = 0; i < n; i++)
                 {
                     Slot s = _lblCand[i];
                     MapBurnedLabelVM it = list[i];
-                    if (s.Label == null) s.Label = VillageTexts.Make(VillageTexts.VilBurned, "VILLAGE", s.R.Name).ToString();
-                    if (!ReferenceEquals(it.Owner, s)) { it.Owner = s; it.Text = s.Label; }
+                    if (!alt)
+                    {
+                        if (s.Label == null) s.Label = VillageTexts.Make(VillageTexts.VilBurned, "VILLAGE", s.R.Name).ToString();
+                        if (!ReferenceEquals(it.Owner, s) || it.AltMode) { it.Owner = s; it.AltMode = false; it.Text = s.Label; }
+                        if (it.IconId != null) it.SetIcon(null);
+                    }
+                    else
+                    {
+                        // 474 P1: pod Altem nazwa (spalona - jej napis przy BurnedVillageLabels) i ikona glownego towaru
+                        bool burnedText = burnKey && s.BookBurned;
+                        if (burnedText && s.Label == null) s.Label = VillageTexts.Make(VillageTexts.VilBurned, "VILLAGE", s.R.Name).ToString();
+                        string txt = burnedText ? s.Label : s.R.Name;
+                        if (!ReferenceEquals(it.Owner, s) || !it.AltMode || it.Text != txt) { it.Owner = s; it.AltMode = true; it.Text = txt; }
+                        it.SetIcon(AltIcon(s, ref goodsBudget));
+                    }
                     it.Wx = s.Cx; it.Wy = s.Cy; it.Wz = s.Z;
                 }
                 for (int i = n; i < list.Count; i++)
@@ -476,6 +560,7 @@ namespace Armoury
                     it.IsShown = false;
                     it.Owner = null;
                 }
+                if (alt && n > _altMax) _altMax = n;
                 _lblCount = n;
                 _lblTickStrikes = 0;   // audyt 13.10: wlasny licznik "z rzedu" wyboru napisow (4/s) - zeruje go tylko udany wybor (patrz LabelStumble)
                 if (n > _lblMax) _lblMax = n;
@@ -513,6 +598,66 @@ namespace Armoury
             }
             Array.Sort(_lblDist, _lblCand, 0, m);
             return LabelMax;
+        }
+
+        /// <summary>474 P1: lewy Alt wcisniety (sam odczyt stanu klawisza; wyjatek = nie).</summary>
+        private static bool AltDown()
+        {
+            try { return TaleWorlds.InputSystem.Input.IsKeyDown(TaleWorlds.InputSystem.InputKey.LeftAlt); }
+            catch { return false; }
+        }
+
+        /// <summary>474 P1 (co klatke, z OnVisualTick): klucz Alt czynny i stan lewego Altu inny niz przy ostatnim wyborze napisow - wybor od razu (bez czekania
+        /// na cwierc sekundy). Klucz wylaczony - false bez odczytu klawisza.</summary>
+        private bool AltFlip()
+        {
+            Settings st = Settings.Current;
+            if (st == null || !st.SideVillageAltNames || !st.MapVillagesEnabled || _lblBroken) return false;
+            return AltDown() != _lblAlt;
+        }
+
+        /// <summary>474 P1: pod Altem - wszystkie pokazane obrazki wiosek (stoja, polozone, bez porazki), najblizsze punktu, na ktory patrzy kamera; najwyzej 50.</summary>
+        private int PickAltLabels(MapScreen screen, Camera camera, Vec3 cam)
+        {
+            int m = 0;
+            for (int i = 0; i < _shown.Count; i++)
+            {
+                Slot s = _shown[i];
+                if (s.Root == null || !s.Placed || s.Failed) continue;
+                if (m == _lblCand.Length) { Array.Resize(ref _lblCand, m * 2); Array.Resize(ref _lblDist, m * 2); }
+                _lblCand[m] = s;
+                _lblDist[m] = 0f;
+                m++;
+            }
+            if (m <= AltLabelMax) return m;
+            float lx = cam.x, ly = cam.y;
+            try
+            {
+                Vec3 dir = camera.Direction;
+                float dist = screen.MapCameraView.CameraDistance;
+                if (dist > 0f && dist < 2000f && dir.z < 0f) { lx = cam.x + dir.x * dist; ly = cam.y + dir.y * dist; }
+            }
+            catch { lx = cam.x; ly = cam.y; }
+            for (int i = 0; i < m; i++)
+            {
+                float dx = _lblCand[i].Cx - lx, dy = _lblCand[i].Cy - ly;
+                _lblDist[i] = dx * dx + dy * dy;
+            }
+            Array.Sort(_lblDist, _lblCand, 0, m);
+            return AltLabelMax;
+        }
+
+        /// <summary>474 P1: ikona glownego towaru wioski z pamieci SideVillageGoods (okreg liczony raz na dobe; budzet okregow na wybor). null - jeszcze nie / brak.</summary>
+        private string AltIcon(Slot s, ref int budget)
+        {
+            if (s.D == null || s.D.S == null) return null;
+            bool did;
+            var info = SideVillageGoods.Cached(s.D.S, s.R.Uid, budget > 0, out did);
+            if (did) { budget--; _altGoodsCalc++; }
+            if (info == null) return null;
+            if (info.IconId == null) { _altNoIcon++; return null; }
+            _altIcons++;
+            return info.IconId;
         }
 
         /// <summary>Pozycje napisow w kadrze (co klatke, najwyzej 30): punkt mapy -> ekran i dwie liczby do widzetu. Zadnych encji mapy.
@@ -570,11 +715,26 @@ namespace Armoury
                                  + " do nastepnego wczytania mapy (obrazki bez zmian).");
                 }
                 if (_lblNoPrefab) { _lblBroken = true; return false; }
-                var vm = new MapBurnedLabelsVM(LabelMax);
+                // 474 P1: przy kluczu SideVillageAltNames prefab z ikona i pula 50; bez prefabu z ikona - stary prefab (same nazwy), raz w logu
+                bool altKey = Settings.Current.SideVillageAltNames;
+                string movieName = LabelMovie;
+                if (altKey)
+                {
+                    if (!_altPrefabChecked)
+                    {
+                        _altPrefabChecked = true;
+                        string ap = MapVillageTooltip.ModulePath("GUI", "Prefabs", AltMovie + ".xml");
+                        _altNoPrefab = ap == null || !System.IO.File.Exists(ap);
+                        if (_altNoPrefab)
+                            Log.Info("Wioski - nazwy pod Altem (474 P1): BRAK prefabu GUI\\Prefabs\\" + AltMovie + ".xml w module Armoury - nazwy bez ikon (prefab " + LabelMovie + ").");
+                    }
+                    if (!_altNoPrefab) movieName = AltMovie;
+                }
+                var vm = new MapBurnedLabelsVM(altKey ? AltLabelMax : LabelMax);
                 var layer = new GauntletLayer("ArmBurnedVillageLabels", LabelOrder, false);
                 screen.AddLayer(layer);
                 GauntletMovieIdentifier movie;
-                try { movie = layer.LoadMovie(LabelMovie, vm); }
+                try { movie = layer.LoadMovie(movieName, vm); }
                 catch
                 {
                     try { screen.RemoveLayer(layer); } catch { }
@@ -582,6 +742,7 @@ namespace Armoury
                 }
                 _lblVm = vm;
                 _lblLayer = layer;
+                _lblLayerAlt = altKey;
                 _lblMovie = movie;
                 _lblScreen = screen;
                 _lblConv = screen.GetMapView<MapConversationView>();

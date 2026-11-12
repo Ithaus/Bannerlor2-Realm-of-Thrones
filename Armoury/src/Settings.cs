@@ -3447,6 +3447,8 @@ namespace Armoury
         // z bliska (kamera z <= 90, najwyzej 30), wlasna warstwa bez wejscia i fokusu (prefab GUI\Prefabs\ArmBurnedVillageLabels.xml). Off = obrazki i mapa jak dotad
         public bool BurnedVillageLook = true;              // a village shrinks as its settlements empty, and a burned one stands dark
         public bool BurnedVillageLabels = true;            // "X has been burned" over burned villages, close up only
+        // 474 P1 (Jeff 13.11): przytrzymany lewy Alt - nazwy najwyzej 50 pokazanych wiosek pobocznych z ikona glownego towaru (MapVillageLook.cs, SideVillageGoods.cs, prefab GUI\Prefabs\ArmVillageNameLabels.xml); off = jak dotad
+        public bool SideVillageAltNames = true;        // hold the left Alt key on the map to see the names of nearby side villages, each with an icon of its main good. Off = no names, as before
         // Jeff 16.10 ("herb do jakiego lorda nalezy, nie tylko do jakiego krolestwa ... w kazdej wiosce gospodarzyl jakis lord, nawet jesli wioska nalezala do krola"):
         // herb GOSPODARZA kazdej wioski pobocznej (VillageHolders.cs, wybor na zywo raz na dobe, bez zapisu): (a) majatek BK tej wsi gry (wlasciciel zywy, rod z herbem,
         // rod pana albo jego krolestwa, nie glowa rodu pana; majatki po kolei na wioski wedlug order, uid), (a2) posiadacz tytulu wsi z BK (R12) na pierwszej wiosce bez

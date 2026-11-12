@@ -2000,7 +2000,8 @@ namespace Armoury
         public override void OnVisualTick(MapScreen screen, float realDt, float dt)
         {
             if (!_active || _finalized) return;
-            if (_lblCount > 0) LabelFrame(screen);   // E7/W4: pozycje napisow w kadrze (najwyzej 30) co klatke - samo przeliczenie na ekran, zadnych encji mapy
+            if (AltFlip()) LabelTick(screen);   // 474 P1: lewy Alt wcisniety / puszczony - wybor nazw od razu (LabelTick sam ustawia pozycje); klucz wylaczony - bez odczytu klawisza
+            else if (_lblCount > 0) LabelFrame(screen);   // E7/W4: pozycje napisow w kadrze (najwyzej 30) co klatke - samo przeliczenie na ekran, zadnych encji mapy
             MapHoverRing.Tick(realDt);   // m105-kolko: co klatke - dymek na innym obiekcie = kolko znika (drugie wywolanie w klatce nic nie robi)
             _acc += realDt;
             _sinceSummary += realDt;
