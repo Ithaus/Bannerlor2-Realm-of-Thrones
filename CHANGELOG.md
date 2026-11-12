@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 447-c (12.11) - OPIS MCM "Cavalry Commander" zgodny z kodem po 442-447
+
+**Problem:** opis klucza Cavalry Commander (Settings.cs i McmSettings.cs, z 441) mowil "In this version it is only the framework: every formation has no task ... nothing changes on the field" - od 442-447 role sa nadawane (RAID / HIDE / WAIT / STRIKE / CAVFIRST / DISENGAGE / HUNT), wiec Jeff czytalby w MCM nieprawde.
+
+**Przyczyna:** opis napisany w 441, kolejne kroki dodaly wlasne klucze, ale nie zmienily opisu klucza nadrzednego.
+
+**Zmiana:** tylko tekst (po angielsku): klucz daje jezdzie zachowanie, przez ktore dostaje zadania (lista 442-447, z polowaniem na wodza), kazde zadanie ma wlasny klucz i wymaga tego; szyk bez zadania zostaje przy RBM; NIE = zachowanie nie dodawane i zadne zadanie nie nadawane. Bez zmiany kodu i domyslnej (TAK).
+
+**Ryzyko / co sprawdzic:** brak w logice; w MCM nowy opis.
+
+**Status:** DO SPRAWDZENIA
+
 ## 447-b (12.11) - ZAMKNIECIE SERII AI BITWY 441-447 (jazda): wlaczenie na galaz zgubionego commita 441-p (odlaczony HEAD, ref noc/441-p-odlaczony) z rozwiazaniem konfliktow z 444-p (C441Hard) i 447; postoj 283 nie startuje na szyku w roli; czysty build
 
 **Problem:** agent 442-p zglosil: worktree n367c byl odlaczony na 7c1b9dec (441-p) - poprawki po recenzji 441 zacommitowano obok galezi noc/367c-jeniec-po-odejsciu, nie na niej (`git branch --contains 7c1b9dec` = tylko noc/441-p-odlaczony). Bez nich na galezi zostaly bledy z recenzji 441, ktore od 443-447 sa ZYWE (role sa nadawane): trwajacy postoj 283 gasil zachowanie roli (Snap -> WeightFactor 0, rola umiera po cichu) i po Give zostawial szyk z samymi zerami; straz 335 brala ludzi z szyku w roli; szyk w roli liczony jako "gracz przejal" w liniach 148 / 204 / 283; liczniki pominiec liczyly przebiegi; szarza roli trzymana klusem HoldCharge 128; override kary navmeshu. `git merge-tree HEAD 7c1b9dec`: konflikty w Doctrine.Cav441.cs, HeroCaution.Guard335.cs, HorsePursuit.Hunt.cs, HorsePursuit.cs, ShieldsUp.Riders.cs, CHANGELOG.md.
