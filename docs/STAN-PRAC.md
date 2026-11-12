@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 04:20 - WGRANIE 209 (435-L9 przezbrojenie/przejecie warsztatow, 435-L10 migracja za praca - oba WYLACZONE; 436 smierc czy rana w bitwie symulowanej jak w rozgrywanej - WLACZONE)
+
+- **W grze:** Armoury.dll `a67b69804cbeb32dd83ea2ffdff71d0b` (commit `f853be7c`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie209`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie209(-przed)`.
+- **Autotest at-436 (narzedzie n391), 30 dob + 2 bitwy, L9 i L10 tymczasowo TAK:** KONIEC OK, misje sprawdzone, wyjatkow 0. L9: 254 warsztaty w pamieci, u60 srednie 0.45, stojacych 0 (60 dob jeszcze nie minelo), kontrole 0, 0.05 ms. L10: zrodel 0 (zadna wies z m28 < 0.90), kontrole 0, 0.13 ms. 436: latka 1/1 (zamian 2/2, 2/2, 2/2); symulacja sesji 16405 powalonych: szansa smierci gry 0.63 -> po regule 0.30 (doba w polu 0.23); misje 421 tej sesji 0.17.
+- **Wczesniej tej nocy:** test lancucha 1-4 przez 30 dob (at-435lp2): rece bez sprzetu 0.06%, m 0.9999, kontrole 0. Klucze 1-4 zostaja TAK w Armoury.json Jeffa; L9/L10 NIE (kopia `.bak-2026-11-12-przed-test-436` = stan obecny).
+- **Narzedzie testu n391** (`bannerlord-autotest/cs/CrashScribe-at-n391.dll`, zrodlo `src/cs-at390`): gdy miasto druzyny testu zostaje oblezone (menu encounter_interrupted_siege_preparations) - klika Break out, miasto odpada, nastepne. Sprawdzone w at-435lp2. Uzywac n391 zamiast n390.
+- **W toku:** seria AI bitwy 437-440 (pakiety 0-3 audytu) - workflow wf_03baf55f-3fb, agenci Opus.
+
 ## STAN 12.11 03:40 - lancuch podazy kroki 1-4 WLACZONE w Armoury.json Jeffa (po tescie 14 dob)
 
 - **Armoury.json Jeffa:** dopisane RebuildStallReleaseDays 56, GrainHandsWinterLock true, VillageGear true, VillageGearOnSwitch true, CraftsFollowShortage true (sam pomiar), SupplyChainLog true. Kopia przed: `Armoury.json.bak-2026-11-12-przed-test-lancucha` (obok) i `D:/Backup-Bannerlord/Armoury.json.2026-11-12-przed-test-lancucha`. Cofniecie = przywrocic kopie albo wylaczyc w MCM.
