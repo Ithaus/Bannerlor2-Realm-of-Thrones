@@ -300,7 +300,7 @@ namespace Armoury
             Log.Info("Budynki (338): start sesji | glowny " + YN(Main) + " | zold " + YN(WageOn) + ", autowerbunek " + YN(AutoRecruitOn) + ", zapas jedzenia " + YN(FoodStockOn)
                      + ", dubel jedzenia BK " + YN(FoodDoubleOn) + ", murarz " + YN(MasonOn) + ", urzad podatkowy " + YN(TaxOfficeOn) + ", karawany " + YN(CaravansOn)
                      + ", asymilacja " + YN(AssimilationOn) + ", drogi " + YN(RoadsOn) + ", porty zamkow " + YN(PortsOn) + ", produkcja wsi " + YN(VillageProdOn) + ", projekt Production " + YN(VillageProjectOn)
-                     + ", towary wsi " + YN(VillageGoodsOn) + ", stadniny " + YN(StudsOn) + ", kopalnie zamkow " + YN(CastleMinesOn) + ", AI bez zbrojowni i sadu BK " + YN(Buildings338NoBuild.ArmCourtOn) + ", AI bez portu i Harbor zamkow " + YN(Buildings338NoBuild.CastlePortOn)
+                     + ", towary wsi " + YN(VillageGoodsOn) + ", stadniny " + YN(StudsOn) + ", kopalnie zamkow " + YN(CastleMinesOn) + ", AI bez zbrojowni i sadu BK " + YN(Buildings338NoBuild.On)
                      + " | BK " + (BkOk ? "jest" : "BRAK") + " | Courier Post na liscie budowy wsi BK: " + courier + " | latki: " + hooks);
         }
 
