@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 03:40 - lancuch podazy kroki 1-4 WLACZONE w Armoury.json Jeffa (po tescie 14 dob)
+
+- **Armoury.json Jeffa:** dopisane RebuildStallReleaseDays 56, GrainHandsWinterLock true, VillageGear true, VillageGearOnSwitch true, CraftsFollowShortage true (sam pomiar), SupplyChainLog true. Kopia przed: `Armoury.json.bak-2026-11-12-przed-test-lancucha` (obok) i `D:/Backup-Bannerlord/Armoury.json.2026-11-12-przed-test-lancucha`. Cofniecie = przywrocic kopie albo wylaczyc w MCM.
+- **Test at-435lp (30 dob z tymi kluczami):** NIE DOTARL - doba 14 z 30, czas stanal na menu `encounter_interrupted_siege_preparations` (Hornvale oblezone, druzyna testu czekala w miescie; wyjscie z miasta zablokowane, narzedzie klika tylko opcje wyjscia). Wada narzedzia testu, nie lancucha. Do naprawy w CrashScribe-at: w tym menu wybierac break_out albo test zaczynac poza miastem.
+- **14 dob z lancuchem:** wyjatkow 0, potkniecia 0 (159), kontrola sprzetu i ksiag = 0. L3: rece bez sprzetu 0.10%, m srednie 1.0000 (spadki tylko po najazdach - spalone 508 jedn. w 10 czesciach). L4: 34 czesci w zmianie zajecia, 0 czeka na sprzet. L2: stojace przebudowy zwolnione progiem 12 (ZW) / 60 (A7). Warsztaty u srednie 0.69.
+- **Dalej:** kroki 5-9 (zuzycie, niedobor jako regula, fundatorzy, stanowiska) po tescie dluzszym; L9, L10 i 436 (wyrownanie bitew symulowanych) pisze workflow wf_7f5d4774-e64.
+
 ## STAN 12.11 03:10 - WGRANIE 208 (427-435-L8 seria ekonomii po audycie + lancuch podazy L1-L8, lancuch WYLACZONY poza pomiarem)
 
 - **W grze:** Armoury.dll `8e198edbb7ce98eaef15267426f5540f` (galaz `noc/367c-jeniec-po-odejsciu`, commit `ca5e329d`, wypchniety). CrashScribe bez zmian. Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie208`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie208(-przed)`.
