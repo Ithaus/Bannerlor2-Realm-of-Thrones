@@ -38,6 +38,19 @@ namespace Armoury
     /// RegionMemberCount); fale posilkow (OnAgentBuild po starcie, przydzial do pasa po 2 s wedlug szyku czlowieka, fala zamknieta po 5 s bez nowych) -
     /// linia "fala posilkow (450)"; straty wedlug zrodla pociski / wrecz / inne (upadek, bez sprawcy) na szyk i na pas (mapa szyk -> pas z ostatniej probki,
     /// pod lockiem). Linia "pasy koniec (450)" przy koncu misji. Liczniki gry licza tylko glowna druzyne atakujaca i pamietaja 5 s.
+    /// 456 (pakiet 7 audytu AI bitwy, decyzja Jeffa 12 "zaloga twierdzy sie zalamuje -> odwrot do sali lorda"; TYLKO POMIAR, klucz SiegeMissionLog):
+    /// gra MA ten etap gotowy - SandBoxMissions.OpenSiegeMissionWithDeployment / NoDeployment (gracz atakuje, nie wypad, nie odsiecz) wola
+    /// BattleEndLogic.EnableEnemyDefenderPullBack(DefaultSiegeLordsHallFightModel.DefenderTroopNumberForSuccessfulPullBack = 20); OnAgentRemoved
+    /// (mb_full 79451-79458) liczy ludzi obroncow (strona wroga gracza) zdjetych jako Routed; przy wyczerpaniu strony obroncow i >= 20 zbieglych
+    /// MissionEnded daje CreateDefenderPushedBack (BattleState.DefenderPullBack) -> CampaignSiegeStateHandler przesuwa oblezenie do InTheLordsHall,
+    /// a menu oblezenia otwiera walke w sali lorda (scena "lordshall" osady). Sceny ROT (ROT-Map/ModuleData/settlements.xml, 227 osad z sala lorda):
+    /// keepy vanilli i 12 wlasnych scen ROT (red_keep, WinterFell_Keep, ROT_*_keep, ROT_sept_interior) - wszystkie maja FightAreaMarker (fight_area_1-3)
+    /// i punkty defender_archer / defender_infantry, ktorych wymaga LordsHallFightMissionController. Zalamanie zalogi = panika z morale (RBM nie gasi
+    /// odwrotu przy morale 0, rbmai 2825); TacticDefendCastle.MustRetreatToCastle zawsze false (mb_full 38754) - taktyka obrony sama do keepu nie schodzi.
+    /// Brak w logach jakiejkolwiek misji szturmu gracza, wiec bez dowodu, ze zaloga AI w ogole peka - najpierw liczby, regula (o ile potrzebna) potem.
+    /// Linia "sala lorda (456)" przy koncu misji: strona gracza, czy etap gry wlaczony (pole BattleEndLogic przez refleksje, tylko odczyt), prog gry,
+    /// zbiegli obroncy (w panice morale &lt; 0.01 / reszta), zabici, nieprzytomni, czas pierwszego zbiega i osiagniecia progu, zostalo do progu wg gry,
+    /// zepchnieci wg gry, obroncy w polu i w odwodzie spawnera, wynik misji. Licznik w OnAgentRemoved pod lockiem (zdarzenie bywa z ticku asynchronicznego).
     /// </summary>
     internal sealed class SiegeMissionLog370 : MissionLogic
     {
@@ -84,6 +97,15 @@ namespace Armoury
         private readonly float[] _waveT0 = new float[2];
         private readonly Dictionary<Formation, int>[] _waveF = { new Dictionary<Formation, int>(), new Dictionary<Formation, int>() };
 
+        // 456: zbiegli obroncy wobec etapu sali lorda gry - [0] zbiegli, [1] w tym w panice (morale < 0.01), [2] zabici, [3] nieprzytomni; pod _keepLock
+        private static FieldInfo _fPbOn, _fPbNeed, _fPbDone;
+        private static bool _pbReflTried;
+        private readonly int[] _keep = new int[4];
+        private readonly object _keepLock = new object();
+        private float _keepFirst = -1f, _keepThrAt = -1f;
+        private int _keepNeed0 = -1;
+        private bool _keepOn;
+
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
         private bool Siege(Mission m)
@@ -112,7 +134,9 @@ namespace Armoury
 
         public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
         {
-            if (!_started || _ended || !_siege || !_lanes437) return;
+            if (!_started || _ended || !_siege) return;
+            try { KeepCount(affectedAgent, agentState); } catch { _stumbles++; }   // 456: tylko licznik, niezaleznie od klucza pomiarow AI
+            if (!_lanes437) return;
             try
             {
                 if (affectedAgent == null || !affectedAgent.IsHuman || (agentState != AgentState.Killed && agentState != AgentState.Unconscious)) return;
@@ -186,6 +210,7 @@ namespace Armoury
                     _started = true;
                     try { var s437 = Settings.Current; _lanes437 = s437 != null && s437.BattleAiMeasurements; } catch { _lanes437 = false; }
                     _t0 = now;
+                    try { KeepStart(m); } catch (Exception e) { Stumble("SalaStart", e); }
                     if (_lanes437) { try { LaneSample(m, now, false); } catch (Exception e) { Stumble("Probka", e); } _laneNext = now + LaneEvery; }
                     Reading(m, "start");
                     _next = now + Every;
@@ -215,6 +240,7 @@ namespace Armoury
                     try { LaneSample(m, m.CurrentTime, true); } catch (Exception e) { Stumble("Probka", e); }
                     try { LaneEnd(m); } catch (Exception e) { Stumble("PasyKoniec", e); }
                 }
+                if (_started && !_ended && m != null) { try { KeepEnd(m); } catch (Exception e) { Stumble("SalaKoniec", e); } }
                 if (_started)
                     Log.Info("Oblezenie misja (370): koniec | odczytow " + _readings + " | strzaly calej misji: A " + _shotsAllA + ", O " + _shotsAllD
                              + " | potkniecia " + _stumbles + ".");
@@ -478,6 +504,93 @@ namespace Armoury
             }
             if (n == 0) sb.Append(" -");
             sb.Append('.');
+            Log.Info(sb.ToString());
+        }
+
+        // ------------------------------------------------------------ 456: zaloga a etap sali lorda gry (tylko odczyt)
+
+        private static void KeepRefl()
+        {
+            if (_pbReflTried) return;
+            _pbReflTried = true;
+            _fPbOn = AccessTools.Field(typeof(BattleEndLogic), "_enemyDefenderPullbackEnabled");
+            _fPbNeed = AccessTools.Field(typeof(BattleEndLogic), "_troopNumberNeededForEnemyDefenderPullBack");
+            _fPbDone = AccessTools.Field(typeof(BattleEndLogic), "_isEnemyDefenderPulledBack");
+        }
+
+        /// <summary>456: przy starcie - czy gra liczy zbieglych obroncow do sali lorda i ile ich potrzeba (pole BattleEndLogic, tylko odczyt).</summary>
+        private void KeepStart(Mission m)
+        {
+            KeepRefl();
+            var bel = m.GetMissionBehavior<BattleEndLogic>();
+            if (bel == null) return;
+            if (_fPbOn != null) _keepOn = (bool)_fPbOn.GetValue(bel);
+            if (_fPbNeed != null) _keepNeed0 = (int)_fPbNeed.GetValue(bel);
+        }
+
+        /// <summary>456: zdjety czlowiek strony obroncow - zbiegly (Routed; panika = morale &lt; 0.01), zabity, nieprzytomny; czas pierwszego zbiega i progu gry.</summary>
+        private void KeepCount(Agent a, AgentState st)
+        {
+            if (a == null || !a.IsHuman) return;
+            var t = a.Team;
+            if (t == null || t.Side != BattleSideEnum.Defender) return;
+            int k = st == AgentState.Routed ? 0 : (st == AgentState.Killed ? 2 : (st == AgentState.Unconscious ? 3 : -1));
+            if (k < 0) return;
+            bool panic = false;
+            if (k == 0) { try { panic = a.GetMorale() < 0.01f; } catch { } }
+            var m = Mission;
+            float now = m != null ? m.CurrentTime : 0f;
+            lock (_keepLock)
+            {
+                _keep[k]++;
+                if (k != 0) return;
+                if (panic) _keep[1]++;
+                if (_keepFirst < 0f) _keepFirst = now;
+                if (_keepThrAt < 0f && _keepNeed0 > 0 && _keep[0] >= _keepNeed0) _keepThrAt = now;
+            }
+        }
+
+        /// <summary>456: linia konca - zbiegli obroncy wobec progu gry, stan etapu sali lorda wg BattleEndLogic, obroncy w polu i w odwodzie, wynik misji.</summary>
+        private void KeepEnd(Mission m)
+        {
+            KeepRefl();
+            int[] c;
+            float first, thrAt;
+            lock (_keepLock) { c = (int[])_keep.Clone(); first = _keepFirst; thrAt = _keepThrAt; }
+            var sb = new StringBuilder(512);
+            sb.Append("Oblezenie misja (370) sala lorda (456): t=").Append(m.CurrentTime.ToString("0", Inv)).Append('s');
+            string ps = "?";
+            try { ps = m.PlayerTeam != null ? (m.PlayerTeam.Side == BattleSideEnum.Attacker ? "atakuje" : (m.PlayerTeam.Side == BattleSideEnum.Defender ? "broni" : "-")) : "brak"; } catch { }
+            sb.Append(" | gracz ").Append(ps);
+            sb.Append(" | etap sali lorda gry ").Append(_keepOn ? "wlaczony" : "nie (tylko gracz atakuje, nie wypad / odsiecz)");
+            if (_keepNeed0 >= 0) sb.Append(", prog ").Append(_keepNeed0).Append(" zbieglych");
+            sb.Append(" | obroncy zbiegli ").Append(c[0]).Append(" (w panice ").Append(c[1]).Append(", inni ").Append(c[0] - c[1]).Append("), zabici ").Append(c[2])
+              .Append(", nieprzytomni ").Append(c[3]);
+            sb.Append(" | pierwszy zbieg ").Append(first >= 0f ? "t=" + first.ToString("0", Inv) + "s" : "nigdy")
+              .Append(", prog ").Append(thrAt >= 0f ? "osiagniety t=" + thrAt.ToString("0", Inv) + "s" : "nieosiagniety");
+            var bel = m.GetMissionBehavior<BattleEndLogic>();
+            if (bel != null)
+            {
+                try
+                {
+                    if (_fPbNeed != null) sb.Append(" | zostalo do progu wg gry ").Append((int)_fPbNeed.GetValue(bel));
+                    if (_fPbDone != null) sb.Append(", zepchnieci wg gry ").Append((bool)_fPbDone.GetValue(bel) ? "TAK" : "NIE");
+                }
+                catch { sb.Append(" | stan gry ?"); }
+            }
+            int field = 0, rem = -1;
+            try
+            {
+                foreach (var t in m.Teams)
+                    if (t != null && t.Side == BattleSideEnum.Defender)
+                        foreach (var a in t.ActiveAgents) if (a != null && a.IsHuman) field++;
+            }
+            catch { field = -1; }
+            try { var sp = m.GetMissionBehavior<DefaultBattleMissionAgentSpawnLogic>(); if (sp != null) rem = sp.NumberOfRemainingDefenderTroops; } catch { rem = -1; }
+            sb.Append(" | obroncy na koniec: w polu ").Append(field).Append(", w odwodzie spawnera ").Append(rem >= 0 ? rem.ToString(Inv) : "?");
+            var r = m.MissionResult;
+            sb.Append(" | wynik ").Append(r != null ? r.BattleState.ToString() + (r.EnemyRetreated ? ", odwrot wroga" : "") : "brak (wyjscie bez wyniku)");
+            sb.Append(" | potkniecia ").Append(_stumbles).Append(". DefenderPullBack = gra przenosi oblezenie do sali lorda.");
             Log.Info(sb.ToString());
         }
 

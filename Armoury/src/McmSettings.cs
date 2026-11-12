@@ -12232,7 +12232,7 @@ namespace Armoury
         [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
         public int BattleStallSeconds { get; set; } = 60;
 
-        [SettingPropertyBool("Siege Mission Log", HintText = "log only, nothing changes on the field: in a siege assault the Armoury log gets a report after deployment, every 30 seconds and at the end - each side's tactic, every formation's men, behaviour, order and distance to its target and to the enemy, and how many men work the ram, the siege towers and the ladders. Off = no report", RequireRestart = false)]
+        [SettingPropertyBool("Siege Mission Log", HintText = "log only, nothing changes on the field: in a siege assault the Armoury log gets a report after deployment, every 30 seconds and at the end - each side's tactic, every formation's men, behaviour, order and distance to its target and to the enemy, and how many men work the ram, the siege towers and the ladders; at the end of an assault also how many defenders fled, against the game's own count that sends the fight on into the lord's hall when you storm a fortress. Off = no report", RequireRestart = false)]
         [SettingPropertyGroup("Battle: the fled, a stalled field, companies that see the day won (307e)")]
         public bool SiegeMissionLog { get; set; } = true;
 
