@@ -313,15 +313,20 @@ namespace Armoury
                         var market = st.IsTown ? st : NearestTown(st);
                         double idx = WageIdx(market);
                         double ppp = b.BuildingType.IsMilitaryProject ? Math.Max(1f, s.BuildPencePerPointMilitary) : Math.Max(1f, s.BuildPencePerPointCivil);
+                        if (WallOn) ppp *= WallFactor(t, b.BuildingType);   // 472 (BuildFunding.Walls.cs): punkt murow drozszy - ta sama cena co u pana
                         double H = hands * _pay.Heads * wageDay * idx;
                         int costL = b.GetConstructionCost();
                         double rem = costL - b.BuildingProgress;
-                        if (where == 0) { float cp = 0f; try { cp = t.Construction; } catch { cp = 0f; } rem -= Math.Max(0f, cp); }   // czolo: punkty pana (i mocy gry) tej doby
+                        float cp = 0f;
+                        if (where == 0) { try { cp = t.Construction; } catch { cp = 0f; } rem -= Math.Max(0f, cp); }   // czolo: punkty pana (i mocy gry) tej doby
                         if (rem < 1) { rec.Why = WhyLevel; nLevel++; continue; }
                         // recenzja (WAZNE 1, Jeff: "odbudowa mozliwa, ale wolna"): lud daje dzis najwyzej koszt poziomu / FolkWorksLevelDays punktow (60 dob na poziom =
                         // najwyzej ok. 6 poziomow rocznie na osade, takze w najwiekszym miescie, ktoremu pulap rak pozwalalby na ok. 12); pan bez tego limitu
                         double capD = ld > 0 && costL > 0 ? costL / ld : double.MaxValue;
                         double remD = Math.Min(rem, capD);
+                        // 472: mury - lud najwyzej reszta dziennego limitu murow (najkrotszy czas poziomu) po punktach pana tej doby (klucz wylaczony - bez zmian)
+                        double wcap = WallOn ? WallFolkCap(t, b, where, cp) : double.MaxValue;
+                        if (wcap < remD) { remD = Math.Max(0.0, wcap); WallFolkNote(b.BuildingType, 0, 0, true); }
                         double mFor = remD * ppp / (1 + r / idx);
                         double mT = Math.Min(B * ms, Math.Min(r > 0 ? H / r : double.MaxValue, mFor));
                         if (r > 0 && H / r <= Math.Min(B * ms, mFor)) nHands++;
@@ -341,6 +346,7 @@ namespace Armoury
                         float p = PointsFor(mPaid, (int)Math.Min(int.MaxValue, wPaid), (float)ppp, market);
                         if (market != null && market.Town != null) { try { TownFolk.Sale(market, mPaid, TownFolk.MixBuild); } catch { } }   // material - sprzedaz kupcow (podstawa robocizny)
                         rec.Mat = mPaid; rec.Wage = wPaid; rec.FromG = _pay.UsedG; rec.Pts = p; rec.Why = WhyBuilt;
+                        if (WallOn) WallFolkNote(b.BuildingType, mPaid + wPaid, p, false);   // 472: liczniki ludu na murach
                         built++; if (st.IsTown) towns++; else castles++;
                         mat += mPaid; wage += wPaid; fromG += _pay.UsedG; fromC += _pay.UsedC[0] + _pay.UsedC[1] + _pay.UsedC[2]; pts += p;
                         if (p > remD + 0.01) { overN++; overPts += p - remD; }   // kontrola (projekt prog 14): punkty ponad reszte poziomu i pulap dnia (oczekiwane 0)

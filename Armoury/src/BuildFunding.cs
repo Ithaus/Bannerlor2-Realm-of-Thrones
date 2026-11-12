@@ -141,7 +141,8 @@ namespace Armoury
             {
                 if (town.BoostBuildingProcess <= 0) return 0f;
                 int amount = Campaign.Current.Models.BuildingConstructionModel.GetBoostAmount(town);
-                return amount * Math.Min(1f, town.BoostBuildingProcess / (town.IsCastle ? 250f : 500f));
+                float bst = amount * Math.Min(1f, town.BoostBuildingProcess / (town.IsCastle ? 250f : 500f));
+                return WallOn ? WallBoost(town, bst) : bst;   // 472 (BuildFunding.Walls.cs): mury na czole - przyspieszenie zlotem przez czynnik ceny punktu murow
             }
             catch { return 0f; }
         }
@@ -157,7 +158,13 @@ namespace Armoury
                 // do mocy gry (projekt B rozdz. 6), reszta jak dotad
                 float fl = FolkHead(town);   // recenzja (6): tylko gdy czolem jest dalej budowla, za ktora lud zaplacil
                 if (fl > 0f && _folkTxt == null) _folkTxt = new TextObject("{=!}Town works (paid by the townsfolk)");
-                if (!Covered(town)) { if (fl > 0f) __result.Add(fl, _folkTxt); return; }
+                if (!Covered(town))
+                {
+                    if (WallOn) WallScaleGame(town, ref __result);   // 472: mury - moc gry przez czynnik ceny punktu murow (klucz wylaczony - nic)
+                    if (fl > 0f) __result.Add(fl, _folkTxt);
+                    if (WallOn) WallLimit(town, ref __result);       // 472: najkrotszy czas poziomu murow - granica mocy doby
+                    return;
+                }
                 float f; _funded.TryGetValue(town, out f);
                 var r = new ExplainedNumber(f, includeDescriptions, _txt);
                 float b = Boost(town);
@@ -165,6 +172,7 @@ namespace Armoury
                 EngAdd(town, f, b, ref r);   // R3-10b (BuildFunding.Engineering.cs): premia zarzadcy z Inzynierii i perki budowy do punktow pana i przyspieszenia zlotem
                 if (fl > 0f) r.Add(fl, _folkTxt);
                 Buildings338Mason.Add(town, f + fl + b, ref r);   // 338 grupa 4: Mason - min(punkty Masona, praca przy budowie); 347e (Jeff 07.11, Ashemark: "4 to daje moje przyspieszenie za kase", Mason +0) - rzemieslnicy z przyspieszenia zlotem tez sa praca
+                if (WallOn) WallLimit(town, ref r);   // 472 (BuildFunding.Walls.cs): mury - pan, lud, Mason, zarzadca i przyspieszenie razem najwyzej limit doby (klucz wylaczony - nic)
                 __result = r;
             }
             catch { }
@@ -175,8 +183,16 @@ namespace Armoury
         {
             if (_depth > 1 || !On || town == null) return;
             float fl = FolkHead(town);   // P2: punkty robot ludu (jak wyzej; recenzja 6 - tylko na budowle, za ktora lud zaplacil)
-            if (!Covered(town)) { if (fl > 0f) __result += (int)fl; return; }
-            float f; _funded.TryGetValue(town, out f); __result = (int)(f + fl + EngExtra(town, f, 0f, false) + Buildings338Mason.Extra(town, f + fl));   // 338: Mason min(punkty, oplacona praca)   // R3-10b: premia zarzadcy (bez przyspieszenia zlotem)
+            if (!Covered(town))
+            {
+                if (WallOn) __result = WallScaleGameInt(town, __result);   // 472: mury - moc gry przez czynnik ceny punktu murow
+                if (fl > 0f) __result += (int)fl;
+                if (WallOn) __result = WallLimitInt(town, __result);      // 472: granica mocy doby murow
+                return;
+            }
+            float f; _funded.TryGetValue(town, out f);
+            if (WallOn) { __result = WallLimitInt(town, f + fl + EngExtra(town, f, 0f, false) + Buildings338Mason.Extra(town, f + fl)); return; }   // 472: jak nizej, z granica murow
+            __result = (int)(f + fl + EngExtra(town, f, 0f, false) + Buildings338Mason.Extra(town, f + fl));   // 338: Mason min(punkty, oplacona praca)   // R3-10b: premia zarzadcy (bez przyspieszenia zlotem)
         }
 
         // ------------------------------------------------------------ materialy BK wylaczone
@@ -222,7 +238,7 @@ namespace Armoury
         internal static void Daily()
         {
             if (!On || Campaign.Current == null) return;
-            _funded.Clear(); EngDayStart();   // R3-10b: liczniki doby
+            _funded.Clear(); EngDayStart(); WallDayStart();   // R3-10b: liczniki doby; 472: liczniki murow
             _paidTowns = _stalledNoMat = _warSkipped = 0; _spent = _toPurses = _toMarkets = 0; _points = 0; _wageIdxSum = 0f; _wageIdxN = 0;
             try
             {
@@ -288,9 +304,11 @@ namespace Armoury
                     if (ClanBudget.BuildShare(clan, out share)) all = share;
                     float budget = all / Math.Max(1, count[clan]);
                     float ppp = military ? Math.Max(1f, s.BuildPencePerPointMilitary) : Math.Max(1f, s.BuildPencePerPointCivil);
+                    if (WallOn) ppp *= WallFactor(st.Town, b.BuildingType);   // 472 (BuildFunding.Walls.cs): punkt murow drozszy (zamek x3, miasto x2); takze R3-11a OneNeed
                     // materialy z targu (miasto - swoj, zamek - najblizsze miasto)
                     var market = st.IsTown ? st : NearestTown(st);
                     budget = OneBudget(st, b, clan, all, budget, ppp, market);   // R3-11a: rod AI z kilkoma budowami - reszta przydzialu na te budowe albo 0 (czeka w kolejce); reszta - budget bez zmian
+                    if (WallOn) budget = WallBudget(st, b, budget, ppp, market);   // 472: mury - budzet najwyzej na punkty do limitu doby (najkrotszy czas poziomu); reszta w kiesie / R3-11a dalej
                     budget = Math.Min(budget, Math.Max(0, lord.Gold));
                     if (budget < 1f) continue;
                     float matBudget = budget * MBMath.ClampFloat(s.BuildMaterialShare, 0f, 1f);
@@ -325,6 +343,7 @@ namespace Armoury
                     float pts = PointsFor(matSpent, labourI, ppp, market);
                     _wageIdxSum += WageIdx(market); _wageIdxN++;
                     _funded[st.Town] = pts;
+                    if (WallOn) WallPaid(st, b, matSpent, labourI, pts);   // 472: liczniki murow i kontrola limitu
                     EngPaid(st.Town, pts);   // R3-10b: XP Inzynierii zarzadcy na miejscu i liczniki
                     _paidTowns++; _spent += matSpent + labourI; _toMarkets += matSpent; _toPurses += labourI; _points += pts;
                     OnePaid(st, clan, matSpent + labourI, pts);   // R3-11a: reszta przydzialu rodu na nastepna budowe kolejki (rod spoza regul - nic)
@@ -338,6 +357,7 @@ namespace Armoury
             // P2 (lud buduje miasto): drugi platnik - roboty ludu PO budowach pana (pan pierwszy na targu); ta sama ramka ksiegi towarow "budowy" (wolajacy) i pozycja MBuild
             try { FolkWorks(); } catch (Exception e) { Log.Error("BuildFunding.FolkWorks", e); }
             EngLine();   // R3-10b: linia "Inzynieria przy budowach" (na koncu doby budow - z dala od linii "Budowy oplacone", ktora zmienia R3-11a)
+            WallLine();   // 472 (BuildFunding.Walls.cs): linia "Mury (472): dzien N" - osobna (nie doklejana do "Budowy oplacone": bramka N5-5 czyta koniec tamtej linii)
         }
 
         /// <summary>

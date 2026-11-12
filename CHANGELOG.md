@@ -1,5 +1,33 @@
 # DZIENNIK ZMIAN
 
+## 472 (12.11) - mury historycznie drogie i dlugie: osobna cena punktu murow (zamek x3, miasto x2) i najkrotszy czas poziomu
+
+**Problem:** Jeff 12.11: "okres budowy murow zamek 1 2 lub 3 powinny byc odpowiednio drogie i dlugie" (maly zamek = mury 1, sredni = 2, duzy = 3). Badanie 472 (dekompilacja gry 1.4.8, BK, BKROT; log `Modules/Armoury/Logs/2026-11-12_22-47-01/budowy.log`, doby 109735-109794): koszt poziomu murow w grze - miasto {0, 6000, 12000}, zamek {0, 1400, 2800} punktow (poziom 1 startowy, Castle Charters x0.8); punkt murow kosztowal 48 d jak kazda budowla wojskowa (ok. 62 d przy srednim wskazniku plac 1.43). Zmierzone tempo: miasto 8.5 pkt/d, zamek 3.6 pkt/d - zamek 2->3 ok. 2.1 roku i 174 tys. d, miasto 2->3 ok. 3.9 roku. Historycznie: Harlech 8 190 L w ok. 7 sezonow, Conwy ok. 15 tys. L, Beaumaris 11+ tys. L nieukonczony, mury miast - dziesieciolecia.
+
+**Przyczyna:** `BuildFunding.Daily` / `FolkWorks` - jedna cena punktu dla wszystkich budowli wojskowych (`BuildPencePerPointMilitary`), bez granicy tempa poza pieniedzmi (bogaty pan albo lud + Mason + przyspieszenie zlotem mogli podniesc mury szybciej niz w historii).
+
+**Zmiana (wariant B badania - koszt poziomu w grze i postep w zapisie bez zmian; `BuildFunding.Walls.cs` nowy, `BuildFunding.cs`, `BuildFunding.Folk.cs`, `ArmouryBehavior.cs` (linia startu), `Settings.cs` + `McmSettings.cs` recznie):**
+- Cena punktu murow = `BuildPencePerPointMilitary` x `WallCastlePointPriceFactor` (3.0 -> 144 d) / `WallTownPointPriceFactor` (2.0 -> 96 d): u pana (ta sama `ppp` idzie do R3-11a `OneBudget`/`OneNeed`) i u ludu (P2). Przyspieszenie zlotem na murach (`Boost`) dzielone przez ten czynnik; lenno gracza bez `PaidConstructionPlayer` (moc gry) - moc dzielona przez czynnik (pozycja dymku "Stone and mortar for the walls cost more").
+- Najkrotszy czas poziomu: dzienny limit punktow murow = koszt poziomu / (`WallMinYears*` x doby roku `LongYearTimeModel.DaysPerYear`, 364): zamek ->2 2 lata (1.92 pkt/d), ->3 4 lata (1.92 pkt/d); miasto ->2 3 lata (5.49 pkt/d), ->3 5 lat (6.59 pkt/d). Limit obejmuje razem pana, lud, Masona, zarzadce i przyspieszenie zlotem.
+- Zloto ograniczone PRZED zakupem: pan (`WallBudget` po `OneBudget`) - budzet najwyzej na punkty do limitu (`EngPaidNeed` odejmuje przyspieszenie, zarzadce i Masona), reszta zostaje w kiesie albo przy R3-11a idzie na nastepna budowe rodu (`OnePaid` odejmuje tylko wydane); lud (`WallFolkCap`) - reszta limitu po mocy osady tej doby (na czole kolejki; punkt ludu ponizej punktow Masona liczy sie podwojnie), poza czolem caly limit. Twarda granica w `PowerPostfix` (`ExplainedNumber.LimitMax`, dymek "Walls rise slowly (shortest time for this stage)") i `PowerIntPostfix`.
+- Klucze MCM (grupa "Army purchases"): `Wall Works Historical` (TAK), `Wall Castle Point Price Factor` 3.0, `Wall Town Point Price Factor` 2.0, `Wall Min Years Castle 2/3` 2/4, `Wall Min Years Town 2/3` 3/5. NIE = co do bitu jak dotad (kazda galaz pod `WallOn`; `Boost` liczy ta sama wartosc, `cp` w FolkWorks tylko wyniesione przed `if`).
+- Linie logu: start sesji "Mury (472): start sesji | ..." - zamek/miasto 1->2 i 2->3: koszt w punktach (zamek takze z Castle Charters), cena punktu, zloto na poziom przy dniowce 1.0 (d i L), najkrotszy czas w dobach i latach, limit pkt/d; mury na czole kolejek teraz. Dobowo "Mury (472): dzien N | ..." (osobna linia po "Inzynieria przy budowach", nie doklejana do "Budowy oplacone" - bramka N5-5): mury w toku (zamki/miasta ->2/->3, oblezone), sredni postep poziomu, moc doby razem i limit razem, osad na limicie; pan - murow w rozliczeniu, wydano (material, place), punkty, budzet obciety do limitu (osad, d oddane dalej albo w kiesie); lud - murow, zaplacone, punkty, na limicie; kontrola: punkty ponad limit przed granica (osad, pkt obciete), pan ponad limit (oczekiwane 0); potkniecia.
+
+**Przewidywania (badanie 472, przy obecnych budzetach rodow: miasto ok. 463 d/d, zamek ok. 215 d/d na budowy; sredni wskaznik plac 1.43):** zamek 1->2 ok. 3.2 roku / 260 tys. d, zamek 2->3 ok. 6.4 roku / 520 tys. d (x0.8 z Charters), miasto 1->2 ok. 3.9 roku / 744 tys. d, miasto 2->3 ok. 7.8 roku / 1.49 mln d (lud doklada swoje - u miast szybciej); bogaci (Lannisport, Sunspear) dochodza do limitu (5 lat miasto 2->3), biedni (Karhold, Hornfoot) dziesiatki lat - jak dzis, tempo dyktuja pieniadze. W ROT prawie kazda warownia ma do zrobienia tylko 2->3 (128 zamkow i 90 miast na poziomie 2).
+
+**Ryzyko / co sprawdzic:**
+- Regresje: wszystkie miejsca liczace punkty budow sprawdzone (`BuildPencePerPointMilitary` czytany tylko w Daily i FolkWorks; `Boost` w PowerPostfix, MasonDay, EngPaidNeed, EngPaid - wszedzie ta sama skalowana wartosc; `DayHeld` trzyma punkty doby juz ograniczone). Zapis bez nowych pol, `BuildingProgress` bez przeliczen - budowy w toku zachowuja ulamek, cofniecie DLL bezpieczne. Bez nowych latek Harmony (tylko nasze istniejace postfiksy).
+- Kolizje: R3-11a - limit po `OneBudget`, reszta przydzialu idzie dalej (rody z kilkoma lennami); `_oneLevel` ("poziom zaplacony do konca") rzadziej dla murow. N5-E/WarFront - bez zmian (mury dalej placone w wojnie). Mason / zarzadca - w limicie. CitySack.Burn - mury nie plona, bez zmian. 471 (oblezenia wedlug poziomu murow, `SiegeWalls.cs GetWallLevel`) - zamki wolniej przechodza ze "srednich" w "duze"; przy scalaniu sprawdzic, ze 471 nie zmienia kosztow murow.
+- Kolejka AI gry ma jedna pozycje i losuje budynek bez wag: mury 2-3 razy dluzsze zablokuja kolejke osady na lata (dzis mury na czole w 27 z 222 osad). Lagodza: R3-11a (reszta dalej), roboty ludu poza kolejka. Jesli pomiar pokaze zastoj - nastepny krok: osobny tor murow obok kolejki (NIE w tej zmianie).
+- Przyspieszenie zlotem gracza: gra zabiera zloto co dobe takze przy pelnym limicie (bcb.cs:113-120) - na murach u limitu placi sie za nic (widac w dymku "Walls rise slowly").
+- Licznik P2 "osad na tym pulapie" (tempo ludu) moze liczyc takze mury przyciete limitem 472 - tylko log.
+- BK: wolniej rosnie limit ludnosci (+5000 / +1500 za poziom murow). Bez przerwy zimowej (WesterosClimate: zimy 3-5 lat).
+- W logu: "Mury (472): start sesji" (tabela: zamek 1->2 1400 pkt, 144 d/pkt, najkrocej 728 dob, limit 1.92 pkt/d; miasto 2->3 12000 pkt, 96 d/pkt, 1820 dob, 6.59 pkt/d), dobowo "Mury (472): dzien" - "pan ponad limit 0", "potkniecia 0"; "osad na limicie" tylko u bogatych; linia "Budowy oplacone" - punkty swiata nizsze o czesc murow.
+- Build OK, skan IL 30 trafien. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+
 ## 467-p (12.11) - poprawki po recenzji 467: gracz dolaczajacy do szturmu AI = cala armia (U1), osobny licznik "bez progu" (U4)
 
 **Problem:**
