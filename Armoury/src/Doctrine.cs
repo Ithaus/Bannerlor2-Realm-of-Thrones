@@ -285,6 +285,7 @@ namespace Armoury
             R443Begin(m);   // 443: rajd / schowanie jazdy, ocena wymiany ognia, lucznicy przed jazda - wlasne klucze (bez AnyKey), pomiar takze przy NIE
             K444Begin(m);   // 444: kowadlo i mlot (WAIT / STRIKE) - wlasny klucz (bez AnyKey), pomiar takze przy NIE
             V445Begin(m);   // 445: najpierw jazda wroga / oderwanie (CAVFIRST / DISENGAGE) - wlasne klucze (bez AnyKey), pomiar takze przy NIE
+            Q446Begin(m);   // 446: czworobok piechoty przed jazda z boku / tylu - wlasny klucz (bez AnyKey), pomiar takze przy NIE
         }
 
         /// <summary>283 (HorsePursuit.ReactHalt, glowny watek): szyk trzymany teraz przez S4 (lucznicy za piechota - wagi zachowan przejete) - postoj 283 go
@@ -348,6 +349,7 @@ namespace Armoury
             R443ClearMission();   // 443
             K444ClearMission();   // 444
             V445ClearMission();   // 445
+            Q446ClearMission();   // 446
         }
 
         /// <summary>WarCouncil.One (glowny watek, AfterStart albo pozna druzyna DR): doktryna druzyny AI i dodatki do listy taktyk. have/note - lista typow
@@ -439,6 +441,8 @@ namespace Armoury
             try { K444Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.K444Tick", e); }
             // 442: cel szarzy jazdy - ocena szykow wroga, cel i kotwice slotow (wlasny zegar 1 s i wlasny klucz; po 441 - szyk w roli pominiety)
             try { T442Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.T442Tick", e); }
+            // 446: czworobok piechoty AI przed jazda z boku / tylu (wlasny zegar 0.5 s i wlasny klucz; glowny watek, przed CloseRanks.Tick - pass 146 / 310 pomija szyk w czworoboku)
+            try { Q446Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Q446Tick", e); }
             _acc += dt;
             _acc1 += dt;
             if (_acc1 >= S4Every)

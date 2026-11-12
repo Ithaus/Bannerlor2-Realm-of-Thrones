@@ -255,6 +255,8 @@ namespace Armoury
             __state = 0;
             Interlocked.Increment(ref _calls);
             if (!_live || formation == null) return true;
+            // 446: szyk w czworoboku - decyzji 146 nie ma (cialo RBM biegnie, jego zmiane odrzuca blokada 446 w prefiksie ustawienia i liczy)
+            if (Doctrine.Q446Holds(formation)) return true;
             try
             {
                 var cur = formation.ArrangementOrder.OrderEnum;
@@ -515,6 +517,7 @@ namespace Armoury
 
         private static void One(Mission m, Team t, Formation f, Team pt)
         {
+            if (Doctrine.Q446Holds(f)) return;   // 446: szyk w czworoboku przed jazda - jeden wlasciciel ustawienia (stan 146 / 310 bez zmian do wyjscia)
             St st;
             lock (Gate) Forms.TryGetValue(f, out st);
             var q = f.QuerySystem;

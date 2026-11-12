@@ -11720,6 +11720,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool CavalryDisengage { get; set; } = true;
 
+        [SettingPropertyBool("Infantry Square Against Flank Charge", HintText = "AI infantry in field battles that enemy cavalry is charging from the flank or the rear (it would reach them within about 10 seconds, or is already within 25 m and closing), with no cover - none of its own cavalry near that enemy cavalry and no other infantry of its own in the way - forms a square (a ring when fewer than 40 men) and holds it until the danger has passed for 5 seconds. Infantry already fighting hand to hand, charging, or with enemy foot within 25 m is left as it was; a charge from the front is left to the shield wall as before. A square moves slowly, so one square lasts at least 6 and at most 30 seconds, and a formation spends at most 90 seconds in squares in a battle, with 15 seconds between squares. While the square holds, other orders to change the formation's arrangement are refused. Every AI side, both sides, also against your cavalry - not the formations you command. No bonus to any number on the field - only decisions. Field battles only. Off = exactly as before. Counted in the Armoury log at the end of each field battle (line 446).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool InfantrySquareAgainstFlankCharge { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15773,6 +15777,7 @@ namespace Armoury
             s.HammerAndAnvil = HammerAndAnvil;   // 444
             s.CavalryFightsCavalryFirst = CavalryFightsCavalryFirst;   // 445
             s.CavalryDisengage = CavalryDisengage;   // 445
+            s.InfantrySquareAgainstFlankCharge = InfantrySquareAgainstFlankCharge;   // 446
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

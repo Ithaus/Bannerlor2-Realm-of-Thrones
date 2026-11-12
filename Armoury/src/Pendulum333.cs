@@ -200,6 +200,8 @@ namespace Armoury
         private static int _stum, _stumPatch;   // recenzja 333 (7): potkniecie latki (przed pierwszym Begin) nie ginie w Clear
         internal static int Stumbles { get { lock (L) return _stum + _stumPatch; } }
         private static string _patch = "nie wpieta", _patchArr = "nie wpieta";
+        /// <summary>446: prefiks ustawienia (PreArr) wpiety - blokada czworoboku 446 ma gdzie dzialac.</summary>
+        internal static bool ArrPatched { get { return _patchArr == "TAK"; } }
         // 344: jeden lock na caly stan (prefiksy w watku AI silnika i w glownym, pomiar w glownym); watek biezacego wywolania (pod lockiem)
         private static readonly object L = new object();
         private static bool _inMain = true;
@@ -749,6 +751,9 @@ namespace Armoury
         public static bool PreArr(Formation __instance, ArrangementOrder order, bool __runOriginal)
         {
             if (!__runOriginal) return false;   // recenzja 344 D3: inny prefiks (CloseRanks 310) juz odrzucil zmiane - bez zapisu blokady
+            // 446: szyk AI w czworoboku przed jazda z boku / tylu - kazda zmiana ustawienia odrzucona (RBM rbmai ok. 4688 / 13015 / 13050 ShieldWall, Regroup Line,
+            // decyzja szyku RBM, gra); tylko odczyt tablic slotow + licznik (dowolny watek), przed _live 344 (blokada niezalezna od klucza arbitra)
+            if (!Doctrine.Q446Guard(__instance, order)) return false;
             if (!_live) return true;
             bool main = Thread.CurrentThread.ManagedThreadId == _mainThread;
             long t0 = main ? 0L : System.Diagnostics.Stopwatch.GetTimestamp();

@@ -65,6 +65,7 @@ namespace Armoury
                                  || c.CavalryRaidsArchers || c.CavalryHidesFromMissiles || c.ArchersJudgeMissileDuel || c.ArchersShelterFromCavalry   // 443: Doctrine.Raid443.cs
                                  || c.HammerAndAnvil   // 444: kowadlo i mlot (Doctrine.Hammer444.cs) - K444Begin / K444Tick z Doctrine
                                  || c.CavalryFightsCavalryFirst || c.CavalryDisengage   // 445: Doctrine.CavFirst445.cs - V445Begin / V445Tick z Doctrine
+                                 || c.InfantrySquareAgainstFlankCharge   // 446: Doctrine.Square446.cs - Q446Begin / Q446Tick z Doctrine, blokada w prefiksie 344
                                  || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 
@@ -326,6 +327,8 @@ namespace Armoury
                 try { HeroCaution.OnRemoved(Mission, affectedAgent, agentState); }
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SiteHeroes, "HeroCaution.OnRemoved", e); }
                 // 310: strzelec padl - wpis bez wywolan silnika; cel padl - automat celu wraca w najblizszym ticku
+                // 446: strata piechoty AI od ciosu wrecz jezdzca wroga - tylko licznik (w czworoboku / bylby / poza)
+                Doctrine.Q446OnRemoved(affectedAgent, affectorAgent, agentState, in blow);
                 try { CleanShot.OnRemoved(Mission, affectedAgent); }
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "CleanShot.OnRemoved", e); }
             }
