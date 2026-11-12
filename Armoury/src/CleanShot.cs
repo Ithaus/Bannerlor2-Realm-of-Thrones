@@ -575,12 +575,21 @@ namespace Armoury
                 HoldSum[a] = s + dur;
             }
             if (!apply || a == null || !a.IsActive()) return;
+            if (FireRange469.Holds(a)) return;   // 469: jeden zarzadca wstrzyman - cel wciaz poza zasiegiem, rozkaz szyku przywroci 469
             try
             {
                 var f = a.Formation;
                 a.SetFiringOrder(f != null ? f.FiringOrder.OrderEnum : FiringOrder.RangedWeaponUsageOrderEnum.FireAtWill);
             }
             catch (Exception ex) { Stumble("CleanShot.Ogien", ex); }
+        }
+
+        /// <summary>469 (FireRange469.End): czy 310 wciaz trzyma ogien tego czlowieka - wtedy 469 nie przywraca rozkazu szyku.</summary>
+        internal static bool Held(Agent a)
+        {
+            if (!_live || a == null) return false;
+            Own e;
+            return By.TryGetValue(a, out e) && e.Held;
         }
 
         /// <summary>HorsePursuit.StartHunter (glowny watek): 204/283 bierze czlowieka - nasz wpis zdjety, wstrzymanie zdjete, celu nie ruszamy (ustawia go 204).</summary>

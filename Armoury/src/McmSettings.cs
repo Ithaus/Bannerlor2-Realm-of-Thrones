@@ -12760,6 +12760,10 @@ namespace Armoury
         [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
         public bool ArchersAvoidOwnMen { get; set; } = true;
 
+        [SettingPropertyBool("Archers Hold Fire Out Of Range", HintText = "An AI archer or crossbowman on foot holds his shot until his mark is within the fighting range of his own weapon, instead of loosing at the longest reach of the game, where most arrows fall short in the field before the enemy. The range is worked out from how fast his arrow or bolt really flies with Realistic Battle Mod - from the draw weight of his bow or crossbow, its quality and the weight of his arrows - so a strong war bow reaches farther than a hunting bow: 85% of the farthest the arrow can carry against the air, measured to the man he aims at (or to the edge of the nearest enemy formation), uphill shorter and downhill longer. He looses again as soon as the enemy comes within that range; an enemy close to him, an empty quiver, a melee weapon, panic or a horse frees him at once. Formations told to hold fire stay as ordered. Horse archers and archers placed in an infantry formation are left as they are. Both sides alike, your own men too when the AI commands them; you aim yourself. No change to arrow speed or damage. Counted in the Armoury log after each field battle (line 469). Off = they shoot whenever the game lets them, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
+        public bool ArchersHoldFireOutOfRange { get; set; } = true;
+
         [SettingPropertyBool("Shield Wall Under Fire Any Order", HintText = "With AI Formations Under Fire: every AI infantry formation of 8 men or more that stands under arrows before it closes - holding a hill, guarding a flank, regrouping or defending, or a company under 30 on the move - closes into a shield wall when six in ten hold a shield (open order when fewer do), and keeps the wall while the shooting lasts instead of being pulled back into a line. An advancing or charging formation whose side has already lost two men to missiles goes in open order instead and runs (Outshot Rush With Shields). A body of 30 or more advancing or charging is left to the RBM decision as before. Formations under your command are never touched. Off = only formations RBM itself asks about, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
         public bool ShieldWallUnderFireAnyOrder { get; set; } = true;
@@ -16117,6 +16121,7 @@ namespace Armoury
             s.PursuitStartNearVictims = PursuitStartNearVictims;
             s.FieldCraftSwingOnChange = FieldCraftSwingOnChange;
             s.ArchersAvoidOwnMen = ArchersAvoidOwnMen;
+            s.ArchersHoldFireOutOfRange = ArchersHoldFireOutOfRange;   // 469
             s.ShieldWallUnderFireAnyOrder = ShieldWallUnderFireAnyOrder;
             s.RoutKeeperTimeBudget = RoutKeeperTimeBudget;
             s.RoutKeeperCourseFirst = RoutKeeperCourseFirst;
