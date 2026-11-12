@@ -515,6 +515,27 @@ namespace Armoury
             }
         }
 
+        /// <summary>446-p (glowny watek, Doctrine.Q446End): szyk wrocil z czworoboku 446 na podane ustawienie - stan widziany zsynchronizowany, zeby powrot
+        /// nie liczyl sie jako zmiana "inna droga" (_outside / _oursLost). Gdy ustawienie rozni sie od naszego (146 / 310) - szyk juz nie nasz; zmiana
+        /// liczy sie do reguly 10 s (LastChange).</summary>
+        internal static void Q446Restored(Formation f, ArrangementOrder.ArrangementOrderEnum cur)
+        {
+            if (f == null) return;
+            try
+            {
+                lock (Gate)
+                {
+                    St st;
+                    if (!Forms.TryGetValue(f, out st)) return;
+                    if (!st.SeenOk || st.Seen != cur) st.LastChange = _now;
+                    if (st.Ours && cur != st.Applied) st.Ours = false;
+                    st.Seen = cur;
+                    st.SeenOk = true;
+                }
+            }
+            catch (Exception e) { PatchError("CloseRanks.Q446Restored", e); }
+        }
+
         private static void One(Mission m, Team t, Formation f, Team pt)
         {
             if (Doctrine.Q446Holds(f)) return;   // 446: szyk w czworoboku przed jazda - jeden wlasciciel ustawienia (stan 146 / 310 bez zmian do wyjscia)

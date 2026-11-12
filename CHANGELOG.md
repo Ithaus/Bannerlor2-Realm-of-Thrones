@@ -1,5 +1,43 @@
 # DZIENNIK ZMIAN
 
+## 446-p (12.11) - POPRAWKI PO RECENZJI 446 (czworobok piechoty przed jazda z boku): bok / tyl wedlug kierunku sprzed obrotu czola przez RBM, powrot do ostatniego odrzuconego ustawienia (szarza: ShieldWall -> Line), odstep wzdluz kierunku podejscia (Width / Depth), limit 30 / 90 s nie zrywa czworoboku przy jezdzie w 25 m (sufit 60 / 120 s), odwrot nie wchodzi i wychodzi od razu, szarza i piechota wroga wychodza przed 6 s, przejecie przez gracza przywraca ustawienie, pomiar strat na 10 szyko-s tylko piechoty, CloseRanks synchronizowany po powrocie (Doctrine.Square446.cs, CloseRanks.cs)
+
+**Problem:** recenzja zmiany 446 (9 znalezisk; wszystkie sprawdzone w kodzie i dekompilacji):
+- [sredni] bok / tyl liczone wzgledem Formation.Direction, a RBM przy jezdzie celujacej w szyk ustawia FacingOrderLookAtDirection na jazde (rbmai OverrideBehaviorCharge / Advance, potwierdzone: rbmai 4686 `FacingOrderLookAtDirection(vec.Normalized())`), a gra przepisuje Direction z FacingOrder w kazdym Formation.Tick (mb 71086-71089 SetPositioning). Szarza z boku wychodzila "z czola" i trafiala do licznika "tylko z czola" - klasyczny przypadek z audytu nieobjety. PRZYJETE.
+- [sredni] wyjscie przywracalo `_q6Before`, a zmiany zgloszone w trakcie (np. BehaviorCharge.OnBehaviorActivatedAux ShieldWall -> Line, mb 20090-20096, ustawiane tylko przy aktywacji) przepadaly - szyk mogl szarzowac w murze tarcz. PRZYJETE.
+- [sredni] odstep = mediana - polowa GLEBOKOSCI obu szykow; przy szarzy w skrzydlo szerokiej linii zawyzony o ok. Width/2 (25-35 m) - prog 10 s realnie ok. 6 s, "dojechala <= 5 m" prawie nigdy. PRZYJETE.
+- [sredni] pomiar strat: "10 s przed wejsciem" z konstrukcji bliskie 0 (wejscie przed kontaktem), okna nieporownywalne (10 s wobec 6-30 s), "poza" obejmowalo luczników i jazde, "maks na szyk" mieszal TAK i bylby. PRZYJETE.
+- [drobny] wyjscie po 30 s / 90 s bez sprawdzenia jazdy w kontakcie - szyk zmienial ustawienie w zwarciu z jazda, powrot blokowany przerwa i progiem zwarcia. PRZYJETE.
+- [drobny] Retreat / FallBack (OrderType w mb 31381-31385) nie wykluczone - szyk w odwrocie mogl stanac w czworoboku. PRZYJETE.
+- [drobny] szarza i piechota wroga sprawdzane dopiero po 6 s - przez pierwsze 6 s szyk stal w Square w zwarciu / mimo rozkazu Charge. PRZYJETE.
+- [drobny] przejecie przez gracza konczylo epizod bez przywrocenia ustawienia (gracz dostawal Square / Circle). PRZYJETE.
+- [drobny] CloseRanks: powrot z czworoboku liczony jako zmiana "inna droga" (_outside, _oursLost, zamrozenie 10 s). CZESCIOWO FALSZYWE dla dotychczasowego kodu: przy Q446Holds st.Seen nie byl ruszany, wiec zostawal na ustawieniu sprzed czworoboku, a powrot do `_q6Before` dawal cur == Seen (bez zmiany). PRAWDZIWE dopiero po poprawce 2 (powrot do ostatniego odrzuconego) i przy szarzy ShieldWall -> Line - dlatego dodana synchronizacja.
+
+**Przyczyna:** Doctrine.Square446.cs - Q446Threat (tylko biezacy Direction), Q446Guard (odrzucal bez zapamietania), Q446Rides (0.5 x (f.Depth + e.Depth)), Q446Ep (MinHold przed szarza / piechota, limity bez warunku kontaktu, brak Retreat / FallBack, gracz bez restore), Q446Form (brak Retreat / FallBack), Q446OnRemoved (bez filtra piechoty), Q446Line (porownanie przed / w trakcie); CloseRanks - brak metody synchronizujacej stan po powrocie z 446.
+
+**Zmiana:**
+- Pierscien kierunku szyku co 0.5 s (21 probek, slot). Jazda "z czola" wobec biezacego kierunku, a kierunek sprzed 4 s rozni sie o > 45 st. (cos < 0.7071) i wobec niego jazda jest z boku / tylu -> liczona jako bok / tyl ("czolo obrocone przez RBM w 4 s"). "Tylko z czola (od poczatku)" = czolo wedlug obu kierunkow.
+- Q446Guard zapisuje ostatnie odrzucone ustawienie (Volatile, slot); wyjscie przywraca je (jesli inne niz Square / Circle i _q6Before), w przeciwnym razie _q6Before. Wyjscie "szarza": ShieldWall -> Line (jak aktywacja BehaviorCharge).
+- Odstep: polowa rozmiaru naszego szyku wzdluz kierunku podejscia 0.5 x (|cos| x Depth + |sin| x Width) wzgledem Direction; ten sam odstep w dojezdzie, 25 m, wyjsciu i "dojechala".
+- Limit epizodu 30 s / budzet 90 s nie konczy czworoboku, gdy jazda wroga jest w 25 m - trwa do "zagrozenie minelo", twardy sufit 60 s epizod / 120 s na szyk (licznik "przedluzone").
+- Wejscie odrzucone przy OrderType.Retreat / FallBack ("w odwrocie"); w epizodzie Retreat / FallBack, Charge / ChargeWithTarget oraz piechota wroga w 25 m (bez jazdy w 25 m) - wyjscie od razu, przed najkrotszym czasem 6 s (zostaje dla "zagrozenie minelo" i limitow).
+- Szyk przejety przez gracza: powrot do ustawienia sprzed czworoboku (_q6Self; bez "odrzuconego"), licznik osobny.
+- Straty: Q446OnRemoved tylko szyki piechoty; nowe porownanie "na 10 szyko-s: w czworoboku X, bylby Y" (straty w trybie / sekundy w trybie); "10 s przed wejsciem" zostaje jako kontrola; "maks na szyk" osobno dla bylby.
+- CloseRanks.Q446Restored (glowny watek, pod Gate): po powrocie z czworoboku st.Seen = biezace; gdy rozne od widzianego - LastChange (regula 10 s), gdy rozne od naszego - st.Ours = false; bez _outside / _oursLost.
+- Klucz bez zmian: Infantry Square Against Flank Charge (TAK). Klucz NIE: dalej tylko epizody "bylby", ustawienie nie ruszane (co do znaku jak dotad).
+
+**Linia logu "Czworobok (446)" - nowe pola:** "czolo obrocone przez RBM w 4 s N" (w wejsciach), "wejscia i bylby z czolem obroconym N", "tylko z czola (od poczatku)", "w odwrocie", "maks na szyk X s (bylby Y s)", "limit laczny N (przedluzone przy jezdzie w 25 m N, sufit 60 / 120 s)", "szarza N (ShieldWall -> Line N), odwrot N", "szyk przejety przez gracza N, szyk pusty / nie piechota N", "powrot do odrzuconego w trakcie N", "na 10 szyko-s: w czworoboku X, bylby Y", "kontrola - 10 s przed wejsciem".
+
+**Oczekiwane liczby (bitwa polowa z jazda wroga, klucz TAK):** wejsc > 0, z czego czesc "czolo obrocone przez RBM" (dotad te szarze szly do "tylko z czola"); "tylko z czola (od poczatku)" mniejsze niz dotad; ShieldWall wsrod odrzuconych > 0 jest teraz oczekiwane (RBM probuje muru przeciw jezdzie w czworoboku obroconym); "kontrola - 10 s przed wejsciem" ok. 0 (z konstrukcji); glowne kryterium: "na 10 szyko-s: w czworoboku" mniejsze niz "bylby" (porownanie bitew TAK z NIE); "przedluzone" zwykle male (0-3); "szyk przejety przez gracza" zwykle 0; naraz maks jak dotad (kilka szykow); potkniecia 0.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: wiecej wejsc niz w 446 (szarze z boku obrocone przez RBM teraz wchodza) - sprawdzic "naraz maks" i "czas w czworoboku"; budzet 5.3 (Square bieg 0.3) moze byc przedluzony do 60 / 120 s tylko przy jezdzie w 25 m. Kierunek "sprzed 4 s" przy szyku, ktory sam skrecil marszem (nie RBM) - tez traktowany jako bok; akceptowane (szyk w skrecie i tak nie ma czola na jezdzie). Powrot do ostatniego odrzuconego: Regroup RBM (Line co tick) zwykle bedzie ostatni - to i tak ustawienie, ktore RBM nada w nastepnym ticku.
+- Kolizje: 291 (linia konca bitwy - tylko nowe pola), 313 / 333 / 344 (prefiks ustawienia - Q446Guard dalej tylko odczyt + Volatile.Write jednej komorki int; brak nowej latki, liczba latek bez zmian), 359 / 372 (bez zmian), 146 / 310 CloseRanks (Q446Restored tylko po naszym powrocie, glowny watek, lock Gate jak pass), 204 / 148 / 421 (bez zmian), 436 (symulowane - nie dotyczy, misja polowa), 442 (T442MeleeShare / T442Blocked bez zmian), 443-445 (jazda AI - nie czytaja stanu 446).
+- Martwy kod ozywiony: obrocone czolo - nowe wejscia; ile szykow naraz - "naraz maks" w linii. Watek silnika: prefiks dalej bez skanu; pierscien kierunkow i decyzje w glownym watku (Doctrine.Tick).
+- Nie sprawdzone w grze: czy szyk obrocony przez RBM zdazy przejsc w Square przy obnizonym (poprawnym) odstepie; czy 4 s to wlasciwe okno obrotu.
+
+**Status:** DO SPRAWDZENIA (build 0 bledow, nie testowane w grze, nie wgrane).
+
 ## 445-p (12.11) - POPRAWKI PO RECENZJI 445 (jazda na jazde i oderwanie): kontrszarza tylko najblizszy wolny szyk z progiem sily (cel zajety - nikt wiecej), przewaga konna z progiem sily szyku i bez jazdy wroga przy jej piechocie, CAVFIRST najwyzej 3 wejscia i zakaz po stracie 40%, przerwa 45 s tylko dla CAVFIRST, strata liczona zabitymi i rannymi, klucz NIE konczy role, dojazd DISENGAGE wedlug wolnych jezdzcow, punkt zbiorki w granicach pola, liczniki raz na epizod / role / szyk (Doctrine.CavFirst445.cs, BattleSense.cs, Settings.cs, McmSettings.cs)
 
 **Problem:** recenzja zmiany 445 (15 znalezisk, wszystkie sprawdzone w kodzie i przyjete; ostatnie uciete w JSON - odczytane z dowodu):
