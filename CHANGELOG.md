@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 451-p (12.11) - poprawki po recenzji 451: brama jako kandydat tylko z taranem / otwarta brama, losowanie "bylby" poza generatorem gry, pamiec pasa po przeniesieniu
+
+**Problem:** recenzja 451 (kod, bez gry - szturm nie ma autotestu). (1) Kind() uznawal pas za "brama", gdy HasGate && !CalculateIsLaneUnusable(); w dekompilacji 1.4.8 (rally_dec/mb_full.cs 44860-44885) CalculateIsLaneUnusable zwraca false dla kazdej nieodpalonej broni z PrimarySiegeWeapons pasa, a SiegeLadder to IPrimarySiegeWeapon - pas bramy z samymi drabinami (bez tarana: nie zbudowany albo zniszczony) mogl zostac pasem glownym (60% ludzi na drabiny, w logu mylace "brama"). (2) Choose() przy kluczu NIE wolal MBRandom.RandomInt dla pomiaru "bylby" - zabieral liczbe ze wspolnego generatora gry, wiec NIE nie bylo co do bitu jak przed. (3) Pamiec pasa glownego zapisywala sie w Choose(), zanim Decide mogl skonczyc sie na "nic" (boczny cel < 10, glowny >= celu, pas nie w uzyciu druzyny, klucz NIE) - kolejny szturm wykluczal pas, na ktory nigdy nie poszlo 60%, a "poprzedni w tym oblezeniu" w logu wprowadzal w blad.
+
+**Przyczyna:** Armoury/src/SiegeMainEffort451.cs - Kind() (warunek bramy przez CalculateIsLaneUnusable), Choose() (MBRandom niezaleznie od klucza, zapis _mem na koncu Choose).
+
+**Zmiana:** (1) "brama" tylko gdy pas ma brame i: IsOpen (gra: wszystkie bramy pasa zniszczone/otwarte) albo w DefensePoints jest CastleGate z IsGateOpen i tagiem "outer_gate" (jak w CalculateIsLaneUnusable), albo w PrimarySiegeWeapons jest BatteringRam z !IsDestroyed. Wylom i wieza bez zmian. (2) Przy NIE losowanie z osobnego System.Random (_rndOff, glowny watek); przy TAK nadal MBRandom.RandomInt. (3) Zapis pamieci przeniesiony do Remember(), wolanego tylko przy kluczu TAK i moved > 0 (w tym samym miejscu co zalozenie ochrony); _memKey/odczyt pamieci bez zmian. Klucz, linie logu, liczniki - bez zmian.
+
+**Ryzyko / co sprawdzic:** kontrola calosci: Kind() uzywane tylko w Choose() (lista kandydatow i opis wyboru); MBRandom w 451 tylko tu; _mem pisane tylko w Remember(), czytane tylko w Choose(). Inne latki oblezenia (370/450 tylko odczyt, 372, 381, 388, 441-449) nie czytaja tego stanu. Skutek (1): szturm bez tarana na pasie bramy ma mniej kandydatow - przy samych drabinach + bramie bez tarana linia "nic: brak kandydata" (gra dzieli po rowno jak przed). Skutek (3): przy dwoch druzynach atakujacych pamiec zapisuje ta, ktora przeniesie pierwsza (ten sam pas misji). W logu Armoury: "kandydaci:" nie powinni zawierac "brama" przy zniszczonym/niezbudowanym taranie i zamknietej bramie; przy NIE "bylby" losowany dalej.
+
+**Status:** DO SPRAWDZENIA (nie wgrane; build 0 bledow).
+
 ## 451 (12.11) - AI BITWY pakiet 7 krok 7.2: wysilek glowny szturmu AI - 60/20/20 ludzi na pasy w fazie podejscia, pas glowny losowany sposrod wylomu, wiezy i bramy (klucz Siege Main Effort)
 
 **Problem:** audyt AI bitwy 11.11 (docs/audyty-2026-11-11/AUDYT-AI-BITWA.md, pakiet 7.2; decyzja 8 Jeffa: "60% sil na jeden odcinek" = TAK, po sondzie na pas - sonda 450 jest). Szturm AI dzieli ludzi po rowno na 2-3 pasy (drabiny, wieza, brama): log 09.11 - grupa drabin 131 -> 4, zanim wieza i taran weszly do walki; drugi pas wchodzi na mur 150-210 s po pierwszym. Dowodu z gry dla nowego kodu brak: szturm nie ma autotestu, po 09.11 w logach nie ma misji szturmu.

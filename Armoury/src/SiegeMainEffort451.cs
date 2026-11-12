@@ -14,7 +14,7 @@ namespace Armoury
     /// <summary>
     /// 451 (pakiet 7 krok 7.2 audytu AI bitwy; Jeff 11.11 decyzja 8: "60% sil na jeden odcinek" = TAK, po sondzie na pas - sonda 450 jest).
     /// WYSILEK GLOWNY SZTURMU AI: w fazie podejscia szyki pasow druzyny atakujacej AI (TacticBreachWalls) dostaja 60 / 20 / 20 ludzi (2 pasy: 60 / 40)
-    /// zamiast po rowno; pas glowny losowany sposrod pasow z wylomem, wieza albo brama (sama drabina - nie); pamiec ostatniego pasa glownego w tym
+    /// zamiast po rowno; pas glowny losowany sposrod pasow z wylomem, wieza albo brama (niezniszczony taran / brama otwarta; sama drabina - nie); pamiec ostatniego pasa glownego (zapis tylko po przeniesieniu) w tym
     /// oblezeniu (osada + chwila poczatku oblezenia): kolejny szturm tego samego oblezenia losuje sposrod INNYCH kandydatow, jesli sa.
     /// Dowod (dekompilacja 1.4.8, rally_dec/mb_full.cs 37223-37244, 37757, 37766): TacticBreachWalls.TickOccasionally co takt wola
     /// BalanceAssaultLanes(szyki AI w UseSiegeMachines / WaitForLadders, IsAITickedAfterSplit) - przenosi ludzi do szyku, ktoremu do sredniej brakuje
@@ -49,6 +49,7 @@ namespace Armoury
         private static MethodInfo _mBalance;
         private static bool _reflTried;
         private static int _sErrs;
+        private static readonly Random _rndOff = new Random();   // 451-p: "bylby" przy kluczu NIE (glowny watek)
 
         // pamiec pasa glownego na oblezenie: klucz osada + SiegeStartTime (przezywa wczytanie zapisu); najwyzej MemMax wpisow
         private static readonly Dictionary<string, FormationAI.BehaviorSide> _mem = new Dictionary<string, FormationAI.BehaviorSide>(StringComparer.Ordinal);
@@ -243,7 +244,23 @@ namespace Armoury
                 var tw = pw[k] as SiegeTower;
                 if (tw != null && !tw.IsDestroyed && !tw.IsDisabled) return "wieza";
             }
-            if (l.HasGate && !l.CalculateIsLaneUnusable()) return "brama";   // taran czynny albo brama otwarta (CalculateIsLaneUnusable - sam odczyt)
+            // 451-p: brama tylko z niezniszczonym taranem albo otwarta brama zewnetrzna / pasem otwartym (IsOpen) - CalculateIsLaneUnusable
+            // zwraca false takze dla samych drabin (SiegeLadder to IPrimarySiegeWeapon), wiec pas bramy z drabinami bez tarana nie jest kandydatem
+            if (l.HasGate)
+            {
+                if (l.IsOpen) return "brama";
+                var dp = l.DefensePoints;
+                for (int k = 0; dp != null && k < dp.Count; k++)
+                {
+                    var g = dp[k] as CastleGate;
+                    if (g != null && g.IsGateOpen && g.GameEntity.HasTag("outer_gate")) return "brama";
+                }
+                for (int k = 0; pw != null && k < pw.Count; k++)
+                {
+                    var r = pw[k] as BatteringRam;
+                    if (r != null && !r.IsDestroyed) return "brama";
+                }
+            }
             return null;
         }
 
@@ -309,6 +326,7 @@ namespace Armoury
                 for (int i = 0; i < n; i++) { int c = used[i].Value.CountOfUnitsWithoutDetachedOnes; sb.Append(i > 0 ? "," : "").Append(' ').Append(used[i].Key.LaneSide).Append(' ').Append(c).Append(" (").Append(Pct(c, sum)).Append(')'); }
                 if (moved > 0)
                 {
+                    try { Remember(); } catch (Exception e) { Stumble("Pamiec.Zapis", e); }
                     st.G = new Guard { Tac = tac, Main = main, On = true };
                     st.GuardFrom = now;
                     var gs = _guards;
@@ -351,16 +369,20 @@ namespace Armoury
             {
                 for (int i = pool.Count - 1; i >= 0; i--) if (used[pool[i]].Key.LaneSide == prev && pool.Count > 1) pool.RemoveAt(i);
             }
-            int pick = pool[pool.Count == 1 ? 0 : MBRandom.RandomInt(pool.Count)];
+            // 451-p: przy NIE losowanie z osobnego generatora - wspolny MBRandom gry nietkniety (NIE = co do bitu jak przed)
+            int pick = pool[pool.Count == 1 ? 0 : (_keyOn ? MBRandom.RandomInt(pool.Count) : _rndOff.Next(pool.Count))];
             _mainLane = used[pick].Key.LaneSide;
             sb.Insert(0, "pas glowny " + _mainLane + " (" + Kind(used[pick].Key) + "; ");
             sb.Append("; poprzedni w tym oblezeniu ").Append(hasPrev ? prev.ToString() : "-").Append(')');
             _choice = sb.ToString();
-            if (_memKey != null)
-            {
-                if (!_mem.ContainsKey(_memKey)) { _memOrder.Add(_memKey); if (_memOrder.Count > MemMax) { _mem.Remove(_memOrder[0]); _memOrder.RemoveAt(0); } }
-                _mem[_memKey] = _mainLane;
-            }
+        }
+
+        /// <summary>451-p: pamiec pasa glownego zapisana dopiero po rzeczywistym przeniesieniu ludzi (klucz TAK, moved > 0).</summary>
+        private void Remember()
+        {
+            if (_memKey == null || _mainLane == FormationAI.BehaviorSide.BehaviorSideNotSet) return;
+            if (!_mem.ContainsKey(_memKey)) { _memOrder.Add(_memKey); if (_memOrder.Count > MemMax) { _mem.Remove(_memOrder[0]); _memOrder.RemoveAt(0); } }
+            _mem[_memKey] = _mainLane;
         }
 
         private static string MemKey()
