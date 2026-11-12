@@ -269,6 +269,7 @@ namespace Armoury
             {
                 var f = fl[j];
                 if (f == null || f.CountOfUnits <= 0) continue;
+                if (InfantryReserve457.HeldReserve(f)) continue;   // 457-p: odwod 457 w trzymaniu to nie linia
                 var fq = f.QuerySystem;
                 if (fq == null || !fq.IsInfantryFormation) continue;
                 if (best == null || f.CountOfUnits > best.CountOfUnits) best = f;

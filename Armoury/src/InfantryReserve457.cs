@@ -84,6 +84,8 @@ namespace Armoury
             public Formation F8, Anchor;
             public WorldPosition Hold = WorldPosition.Invalid;
             public readonly List<Agent> Res = new List<Agent>();
+            public HashSet<Agent> ResNo;   // 457-p: przy NIE wyliczeni do odwodu (poza sila linii w LocalRatio jak szyk 8 przy TAK)
+            public bool Held;              // 457-p: szyk 8 zgloszony w _held (MainInfantry go pomija)
             // wyjscie
             public bool Out;
             public byte Ph = PhHold;
@@ -107,6 +109,28 @@ namespace Armoury
         private readonly Dictionary<Formation, Vec2> _cavPrev = new Dictionary<Formation, Vec2>();
         private readonly Dictionary<Formation, Vec2> _cavNow = new Dictionary<Formation, Vec2>();
         private Action<Agent> _collect;
+
+        // 457-p: szyki 8 odwodu w fazie trzymania (klucz TAK) - Doctrine.MainInfantry ich nie bierze za glowna piechote.
+        // Kopia przy zapisie (zapis tylko w glownym watku, odczyt moze byc z innego).
+        private static volatile Formation[] _held = new Formation[0];
+
+        internal static bool HeldReserve(Formation f)
+        {
+            var h = _held;
+            for (int i = 0; i < h.Length; i++) if (ReferenceEquals(h[i], f)) return true;
+            return false;
+        }
+
+        private static void SetHeld(St s, bool on)
+        {
+            if (s.Held == on || s.F8 == null) return;
+            var h = _held;
+            var l = new List<Formation>(h.Length + 1);
+            for (int i = 0; i < h.Length; i++) if (!ReferenceEquals(h[i], s.F8)) l.Add(h[i]);
+            if (on) l.Add(s.F8);
+            _held = l.ToArray();
+            s.Held = on;
+        }
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
@@ -198,6 +222,7 @@ namespace Armoury
                     if (!s.Formed) { if (!s.GiveUp) TryForm(m, s, now); }
                     else if (!s.Out) Keep(m, s, now, step);
                     else if (_keyOn && s.Ph != PhDone) Phase(m, s, now);
+                    if (_keyOn) SetHeld(s, s.Formed && !s.Out);
                 }
                 catch (Exception e) { Stumble("Druzyna", e); }
             }
@@ -262,8 +287,8 @@ namespace Armoury
             return n;
         }
 
-        /// <summary>LocalPowerRatio wzorem gry (mb 42854) wlasnym zapytaniem, bez ludzi odwodu (f8); -1 = szyk nie w zwarciu (< 5 wrogow w 30 m).</summary>
-        private float LocalRatio(Mission m, Team t, Formation f, Formation f8)
+        /// <summary>LocalPowerRatio wzorem gry (mb 42854) wlasnym zapytaniem, bez ludzi odwodu (f8 przy TAK, resNo przy NIE); -1 = szyk nie w zwarciu (< 5 wrogow w 30 m).</summary>
+        private float LocalRatio(Mission m, Team t, Formation f, Formation f8, HashSet<Agent> resNo)
         {
             Vec2 c = f.CachedAveragePosition;
             m.GetNearbyEnemyAgents(c, LocalR, t, _bufE);
@@ -284,6 +309,7 @@ namespace Armoury
                 var a = _bufA[i];
                 if (a == null || !a.IsActive()) continue;
                 if (f8 != null && ReferenceEquals(a.Formation, f8)) continue;
+                if (resNo != null && resNo.Contains(a)) continue;
                 ap += a.CharacterPowerCached;
             }
             return MBMath.ClampFloat(TaleWorlds.Library.MathF.Sqrt((ap + 1f) / (ep + 1f)), 0.5f, 1.75f);
@@ -334,6 +360,7 @@ namespace Armoury
             Formation f8 = null;
             try { f8 = t.GetFormation(FormationClass.NumberOfRegularFormations); } catch (Exception e) { Stumble("Szyk8", e); }
             if (f8 == null) { s.GiveUp = true; s.Why = "szyk 8 niedostepny"; return; }
+            if (ReferenceEquals(t.GeneralsFormation, f8)) { s.GiveUp = true; s.Why = "szyk 8 to szyk wodza gry (GeneralsFormation)"; return; }
             if (f8.CountOfUnits > 0 || f8.PlayerOwner != null) { s.GiveUp = true; s.Why = "szyk 8 zajety (" + f8.CountOfUnits + " ludzi - szyk wodza gry)"; return; }
 
             // szyki zrodla
@@ -434,7 +461,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Rozkaz8", e); }
             }
-            else s.Res.AddRange(plan);
+            else { s.Res.AddRange(plan); s.ResNo = new HashSet<Agent>(plan); }
             s.Formed = true;
             s.FormAt = now;
             s.F8 = f8;
@@ -543,7 +570,7 @@ namespace Armoury
                     if (Retreat(f)) { retreat = true; continue; }
                     if (f.CountOfUnits < LineMin) continue;
                     if (anyInf == null || f.CountOfUnits > anyInf.CountOfUnits) anyInf = f;
-                    float r = LocalRatio(m, t, f, _keyOn ? s.F8 : null);
+                    float r = LocalRatio(m, t, f, _keyOn ? s.F8 : null, _keyOn ? null : s.ResNo);
                     if (r < 0f) continue;
                     if (r < s.MinRatio) s.MinRatio = r;
                     if (r < wr) { wr = r; weak = f; }
@@ -840,7 +867,7 @@ namespace Armoury
                               .Append(", powod: ").Append(s.OutWhy).Append(", polegli / uciekli przed wyjsciem ").Append(s.LostBefore)
                               .Append(", odleglosc ").Append(s.OutDist >= 0f ? s.OutDist.ToString("0", Inv) + " m" : "-");
                             if (s.LowFirst >= 0f && s.Weak != null) sb.Append(", od pierwszego spadku ").Append((s.OutAt - s.LowFirst).ToString("0", Inv)).Append(" s");
-                            if (_keyOn) sb.Append(", do linii ").Append(s.MergeAt >= 0f ? "t=" + s.MergeAt.ToString("0", Inv) + "s " + s.MergeN + " ludzi -> " + s.MergeTo : "nie (faza trwala do konca)");
+                            if (_keyOn) sb.Append(", do linii ").Append(s.MergeAt >= 0f ? "t=" + s.MergeAt.ToString("0", Inv) + "s " + s.MergeN + " ludzi -> " + s.MergeTo : s.OutTo == "-" ? "- (odwod wyginal / uciekl przed wyjsciem)" : "nie (faza trwala do konca)");
                         }
                         else sb.Append(" | wyjscia nie bylo (stal do konca), zywych w odwodzie ").Append(Alive(s)).Append(" z ").Append(s.Size)
                                .Append(s.LowFirst >= 0f ? ", linia ponizej progu od t=" + s.LowFirst.ToString("0", Inv) + "s" : "");
@@ -856,6 +883,7 @@ namespace Armoury
             catch (Exception e) { Stumble("Koniec", e); }
             _ended = true;
             _teams.Clear();
+            _held = new Formation[0];
             _cavPrev.Clear();
             _cavNow.Clear();
             _units.Clear();
