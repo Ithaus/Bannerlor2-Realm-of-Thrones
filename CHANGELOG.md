@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 471b-p2 (13.11) - jedna ocena "poza regula" dla calego 471b, klucz NIE bez "T|", zegar 471 czyszczony przy nowej kampanii (recenzje A2/B1, B5, A6)
+
+**Problem:** recenzje A2 i B1 (zgodnie): `Time471Daily` zapisywal `r.Why` na stale ("raz poza regula - zostaje", 471-p U3), a bramka szturmu, kapitulacja z glodu (b) i furaz pytaly na zywo (`Acts471`). Gracz raz przeszedl przez oboz albo stanal w osadzie i odszedl -> bramka dalej trzymala szturm (duzy zamek / miasto tylko przez wyrwe), furaz dzialal, a kapitulacja z terminu (a) i limit (e) nie dzialaly NIGDY; oblezenie konczyl dopiero glod obozu (m116) - cel "limit 1.5 x gorna granica" zlamany. Po wczytaniu (Export471 pomijal `Why != null`) regula wracala - trzeci stan. Recenzja B5: przy kluczu Siege Time By Factors NIE zegar zyl dalej (takze bez logu) i do `arm_siege_walls` szly wpisy `T|` (starszy DLL zglasza je jako uszkodzone). Recenzja A6: `_pend471` (zegar z zapisu) nie byl czyszczony w `Reset` - po wczytaniu i nowej kampanii w tym samym procesie zostawaly stare wpisy.
+
+**Przyczyna:** 471a byl samym logiem (staly "poza regula" wystarczal), 471b-4 dolozyl akcje z oceny na zywo; Export471 / Time471Daily bez warunku klucza; Reset bez `_pend471.Clear()`.
+
+**Zmiana:** `SiegeWalls.Time471.cs`, `SiegeWalls.cs`:
+- `Time471Daily`: `r.Why = Out471(...)` CO DOBE (na zywo) - ta sama ocena co `Acts471` w bramce, glodzie (b) i furazu. Poza regula zegar stoi (dob z graczem przy oblezeniu nie liczy). Nowa linia `Czas oblezenia (471) z powrotem w regule: dzien | osada | wiek, zegar, R`. Linia startu i R0 przy pierwszej dobie W REGULE (`StartDone`), nie przy pierwszej dobie rekordu.
+- `Time471Daily`: klucz NIE i log wylaczony -> wyjscie po sprzataniu (jak przed 471b-4: 471a zyl tylko z logiem).
+- `Export471`: tylko przy kluczu TAK; zapisuje takze rekordy chwilowo poza regula (zegar stoi, nie ginie po wczytaniu).
+- `SiegeWalls.Reset`: `_pend471.Clear()` (Import przychodzi po konstruktorze i wypelnia na nowo).
+
+**Ryzyko / co sprawdzic:**
+- Regresje: `Time471End` dalej pomija oblezenie, ktore w chwili konca jest poza regula (gracz przy nim) - jak dotad. Bramka / furaz / (b) bez zmian (juz byly na zywo). Linie 471a przy kluczu NIE: "poza regula" moze sie teraz zmieniac (gracz odszedl -> "z powrotem w regule") - tylko log.
+- W logu: oblezenie, przy ktorym gracz byl i odszedl: `poza regula od teraz` -> `z powrotem w regule` -> dalej zegar i drogi a/e.
+- Klucz NIE: zapis bez `T|` (co do bitu jak przed 471b-4), bez logu - zero pracy.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-p1 (13.11) - kapitulacja i odejscie 471b czekaja, gdy KTORAKOLWIEK druzyna obozu walczy (recenzja A1)
 
 **Problem:** recenzja A 471b, usterka 1 (ryzyko CTD): `Yield471` i `Lift471` sprawdzaly bitwe tylko wodza obozu, osady, zalogi i milicji (`InBattle471`). Gra w `KingdomManager.SiegeCompleted` (`RemoveAllSiegeParties` + `EnterSettlementAction.ApplyForParty` kazdej druzyny obozu) i w `RemoveAllSiegeParties` (odejscie) rusza wszystkie druzyny obozu - takze te, ktore w tej chwili walcza z odsiecza albo bandytami (MapEvent).

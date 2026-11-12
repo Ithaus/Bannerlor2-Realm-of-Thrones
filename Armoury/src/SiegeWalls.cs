@@ -1439,7 +1439,7 @@ namespace Armoury
         /// <summary>Z SiegeRansom.Reset (konstruktor ArmouryBehavior: nowa kampania i kazde wczytanie).</summary>
         internal static void Reset()
         {
-            _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear(); _bats.Clear(); _sz5.Clear(); _t471.Clear();   // zapis (Import) przychodzi PO konstruktorze
+            _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear(); _bats.Clear(); _sz5.Clear(); _t471.Clear(); _pend471.Clear();   // zapis (Import) przychodzi PO konstruktorze; 471b-p2 (recenzja A6): zegar 471 z poprzedniego zapisu nie przechodzi do nowej kampanii
             _lastCamp = null; _last = null; _lastAt = -1f; _lastDrCamp = null; _lastDrAt = -1f;
             SiegeWalls2.Reset();                                                 // oblezenia 2: trebusze, glod, drabiny - pamiec od zera
             SiegeCamp471.Reset();                                                // 471b-2: pamiec strat obozu i wybuchow choroby od zera

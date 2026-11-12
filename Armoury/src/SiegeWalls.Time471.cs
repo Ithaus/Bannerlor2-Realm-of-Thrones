@@ -70,6 +70,7 @@ namespace Armoury
             public int PausedDays;
             public double Ratio = -1; public string EndWay;   // 471b-4: stosunek ludzi oboz / obroncy (ostatnia doba), droga konca (a-e) do linii konca
             public bool Started;                              // 471b-4: pierwsza doba juz byla (rekord moze powstac wczesniej w bramce szturmu)
+            public bool StartDone;                            // 471b-p2: linia startu i R0 (pierwsza doba w regule)
         }
         private static readonly Dictionary<SiegeEvent, T471> _t471 = new Dictionary<SiegeEvent, T471>();
         private static int _d471Start, _d471End, _d471Out;
@@ -212,6 +213,7 @@ namespace Armoury
                 List<SiegeEvent> dead = null;
                 foreach (var kv in _t471) if (kv.Key == null || kv.Key.BesiegedSettlement == null || kv.Key.BesiegedSettlement.SiegeEvent != kv.Key) { if (dead == null) dead = new List<SiegeEvent>(); dead.Add(kv.Key); }
                 if (dead != null) foreach (var ev in dead) _t471.Remove(ev);
+                if (!act && !log) return;                                        // 471b-p2 (recenzja B5): klucz NIE i bez logu - nic (jak przed 471b-4: 471a zyl tylko z logiem)
                 int today = Today, going = 0, over = 0, overLim = 0, paused = 0, outside = 0;
                 var perCat = new int[4];
                 var sbList = new StringBuilder(600);
@@ -229,19 +231,26 @@ namespace Armoury
                         bool fresh = !r.Started;                                     // pierwsza doba rekordu (takze gdy powstal w bramce szturmu)
                         r.Started = true;
                         r.Seen = today;
-                        bool newOut = false;
-                        if (r.Why == null) { r.Why = Out471(ev, st, lp); newOut = r.Why != null; }   // 471-p U3: co dobe; raz poza regula - zostaje
-                        if (r.Why != null)
+                        // 471b-p2 (recenzje A2/B1): "poza regula" co dobe NA ZYWO - ta sama ocena co bramka szturmu, glod (b) i furaz (Acts471/Out471). Dawniej
+                        // (471-p U3) raz poza regula zostawalo na zawsze: gracz raz przeszedl przez oboz -> bramka dalej trzymala szturm, a (a) i (e) nie dzialaly nigdy.
+                        // Poza regula zegar stoi (nie liczy dob, w ktorych gracz jest przy oblezeniu).
+                        string why = Out471(ev, st, lp);
+                        bool newOut = why != null && r.Why == null, back = why == null && r.Why != null;
+                        r.Why = why;
+                        if (why != null)
                         {
                             outside++;
                             if (newOut)
                             {
                                 _d471Out++;
-                                if (log) Log.Info("Czas oblezenia (471) " + (fresh ? "start" : "poza regula od teraz") + ": dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ") | poza regula (" + r.Why + ")"
-                                    + (fresh ? "" : " | wiek " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob, zegar " + F(r.Clock, "0") + ", R " + F(r.R, "0.0")) + ".");
+                                if (log) Log.Info("Czas oblezenia (471) " + (fresh ? "start" : "poza regula od teraz") + ": dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ") | poza regula (" + why + ")"
+                                    + (fresh ? "" : " | wiek " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob, zegar " + F(r.Clock, "0") + " (stoi), R " + F(r.R, "0.0")) + ".");
                             }
                             continue;
                         }
+                        if (back && log)
+                            Log.Info("Czas oblezenia (471) z powrotem w regule: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ") | wiek " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0")
+                                + " dob, zegar " + F(r.Clock, "0") + ", R " + F(r.R, "0.0") + ".");
                         going++; perCat[r.Cat]++;
                         double q, sq, ratio; bool pz; string txt;
                         double R = R471(st, ev, r.Cat, r.Lvl, out q, out sq, out pz, out txt, out ratio);
@@ -250,8 +259,9 @@ namespace Armoury
                         if (pz) { r.PausedDays++; paused++; }
                         double age = ev.SiegeStartTime.ElapsedDaysUntilNow, lim = LimitK * CatHi[r.Cat];
                         string acts = act ? Acts471(ev) : "klucz Siege Time By Factors NIE";   // 471b: osada klanu gracza (D5) - zegar i linie tak, akcje nie
-                        if (fresh)
+                        if (!r.StartDone)                                              // 471b-p2: pierwsza doba W REGULE (moze byc pozniejsza niz pierwsza doba rekordu)
                         {
+                            r.StartDone = true;
                             r.R0 = R; r.Q0 = q; r.S0 = sq; _d471Start++;
                             if (log) Log.Info("Czas oblezenia (471) start: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ")" + (r.PlayerClan ? " [osada klanu gracza - D5]" : "")
                                 + " | kategoria " + CatName[r.Cat] + " (mury " + r.Lvl + "), cel " + CatLo[r.Cat] + "-" + CatHi[r.Cat] + " dob, limit " + F(lim, "0")
@@ -450,10 +460,11 @@ namespace Armoury
         // ------------------------------------------------------------ U8: zegar 471 w zapisie (dopisek do arm_siege_walls)
         private static void Export471(StringBuilder sb)
         {
+            if (!TimeOn) return;                                                 // 471b-p2 (recenzja B5): klucz NIE - zapis bez "T|" (co do bitu jak przed 471b-4)
             foreach (var kv in _t471)
             {
                 var ev = kv.Key; var r = kv.Value;
-                if (ev == null || r == null || r.Why != null || ev.BesiegedSettlement == null || ev.BesiegedSettlement.SiegeEvent != ev) continue;
+                if (ev == null || r == null || ev.BesiegedSettlement == null || ev.BesiegedSettlement.SiegeEvent != ev) continue;
                 sb.Append(";T|").Append(r.St).Append('|').Append(ev.SiegeStartTime.ToHours.ToString("R", Inv)).Append('|').Append(r.Clock.ToString("R", Inv)).Append('|').Append(r.PausedDays.ToString(Inv));
             }
         }
