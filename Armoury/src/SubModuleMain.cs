@@ -361,6 +361,8 @@ namespace Armoury
                 try { SiegeMainEffort451.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SiegeMainEffort451.ApplyAll", e); }
                 // 452: pas-lejek szturmu AI - postfiks TacticBreachWalls.DetermineCurrentLanes (porzucone pasy poza lista) i prefiks ShouldRetreat (pelna lista); przed JIT wolajacych jak 372
                 try { SiegeDeadLane452.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SiegeDeadLane452.ApplyAll", e); }
+                // 455: ogien w szturmie - prefiks TacticDefendCastle.ArcherShiftAround (strzelcy obrony za naciskiem) i postfiks BehaviorSparseSkirmish.TickOccasionally (cofanie strzelcow ataku); przed JIT wolajacych jak 372
+                try { SiegeFire455.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SiegeFire455.ApplyAll", e); }
                 BkSupplyTemper.ApplyAll(_harmony);
                 try { BkSupplyMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSupplyMarket.ApplyAll", e); }   // 3.4: zakupy zaopatrzenia BK wedlug zapasu partii, zaplata do kasy osady (PRZED ksiega towarow)
                 try { BkSeal34.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSeal34.ApplyAll", e); }               // 3.4: rynek wsi BK, sprzedaz niewolnikow, wyposazenie rycerza BKROT - bez zlota z niczego (PRZED oknami ksiegi obiegu)
@@ -813,6 +815,9 @@ namespace Armoury
                 // 454: odwod obrony murow AI w szyku 8, wychodzi na przyczolek (klucz WallDefenceReserve; przy NIE tylko pomiar "bylby"); samo sprawdza szturm
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new SiegeReserve454());
+                // 455: ogien w szturmie - strzelcy obrony AI za naciskiem na pas (klucz DefenderFireFollowsAssault), strzelcy ataku AI cofaja sie przy przegranej wymianie (klucz SiegeArchersFallBack); przy NIE tylko pomiar "bylby"; samo sprawdza szturm
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new SiegeFire455());
                 // 371: zalamanie szturmu w misji gracza-obroncy (oddzial szturmowy, odstapienie spod murow, oblezenie trwa); 387: takze szturm gracza-wodza (klucz SiegePlayerAssaultBreaks); 387f: takze szturm armii AI z graczem w szeregu (klucz SiegeArmyAssaultBreaks); samo sprawdza szturm i strone gracza
                 if (Campaign.Current != null && mission != null && Settings.Current.SiegeAssaultBreak && Settings.Current.SiegeAssaultBreakMission)
                     mission.AddMissionBehavior(new SiegeBreak371());

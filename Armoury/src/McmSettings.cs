@@ -12344,6 +12344,14 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool WallDefenceReserve { get; set; } = true;
 
+        [SettingPropertyBool("Defender Fire Follows Assault", HintText = "In an assault on walls, when the AI defends the fortress (you attack, or you fight on the attacking side): the defenders' archers and crossbowmen on the walls are no longer spread over their shooting posts only by the size of each post - a post next to the point of attack where the stormers press hardest (most stormers approaching it, and twice as much for those already at the wall) gets up to twice its usual share, so the fire follows the assault. A post far from the fighting keeps at least half of its usual share, and men are moved only when a post is short by more than a tenth of all archers, as in the game. When you defend yourself your formations are never touched. Off = the archers are spread by the size of the posts only, as in the game. Counted in the Armoury log in each siege assault (line 455).", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
+        public bool DefenderFireFollowsAssault { get; set; } = true;
+
+        [SettingPropertyBool("Siege Archers Fall Back", HintText = "In an assault on walls led by the AI (enemy or allied): the stormers' archers and crossbowmen no longer stand at their posts in the open field to the last man. When a formation of them loses the exchange of fire - at least 4 of its men killed or knocked out by arrows, bolts or stones in 30 seconds, and at least twice as many as its own men brought down with missiles - it falls back about 30 metres further from the walls for 45 seconds, then returns to its post. It does not fall back where there is no ground for it or when it already stands that far. Formations you command yourself are never touched. Off = the archers hold their posts in front of the walls, as in the game. Counted in the Armoury log in each siege assault (line 455).", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
+        public bool SiegeArchersFallBack { get; set; } = true;
+
         [SettingPropertyBool("Siege Defender Archers To Walls", HintText = "When you defend a fortress and command your side yourself: at the end of deployment, once, your archers and crossbowmen (not heroes, not standard bearers, not men at siege engines) are moved out of your other formations into your formations that shoot from the wall posts, spread evenly; if none stands at a wall post, empty formations are sent to free posts. Afterwards you command as usual. Off = your formations stay as you deployed them", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool SiegeDefenderArchersToWalls { get; set; } = true;
@@ -15969,6 +15977,8 @@ namespace Armoury
             s.SiegeAbandonDeadLane = SiegeAbandonDeadLane;   // 452
             s.SiegeWavesReinforceSuccess = SiegeWavesReinforceSuccess;   // 453
             s.WallDefenceReserve = WallDefenceReserve;   // 454
+            s.DefenderFireFollowsAssault = DefenderFireFollowsAssault;   // 455
+            s.SiegeArchersFallBack = SiegeArchersFallBack;   // 455
             s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;
             s.SiegeWoundedTakenPrisoner = SiegeWoundedTakenPrisoner;
             s.SiegeWoundedWallDistance = SiegeWoundedWallDistance;
