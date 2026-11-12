@@ -613,7 +613,7 @@ namespace Armoury
                     bool fireS = fireC || ShieldsUp.FormFire(f);
                     // 438 (1.2, klucz OutshotTriggerByMissileLosses): sygnal ostrzalu takze z przyrostu strat od pociskow druzyny (>= 2 w 30 s, wrog <= 200 m)
                     bool dryC = false;
-                    if (!fireS && Doctrine.O438LossFire(f.Team, gap, out dryC)) { fireS = true; Doctrine.O438NoteLoss(2, false); }
+                    if (!fireS && Doctrine.O438LossFire(f, out dryC)) { fireS = true; Doctrine.O438NoteLoss(2, false); }   // 438-p: pieszy wrog (FootGap)
                     else if (!fireS && dryC) Doctrine.O438NoteLoss(2, true);
                     if (fireS) { OutshotRush.NoteCharge(TickEvery); SpeedSample(f, idx, 2); _chgFire313[idx] = true; }
                 }
@@ -771,14 +771,28 @@ namespace Armoury
             {
                 bool fire = underFire || ShieldsUp.FormFire(f);
                 // 438 (1.2, klucz OutshotTriggerByMissileLosses): albo przyrost strat od pociskow druzyny (>= 2 w 30 s), gdy pieszy wrog jest blizej niz 200 m -
-                // chwilowy odsetek trafionych (gra pomija ludzi z tarcza) nie widzi strat (23:06: 0.07 przy 1911 trafieniach). byLoss - tylko ten sygnal
-                bool byLoss = false, dryLoss = false;
-                if (!fire && Doctrine.O438LossFire(f.Team, gap, out dryLoss)) { fire = true; byLoss = true; }
-                else if (dryLoss) Doctrine.O438NoteLoss(0, true);   // klucz NIE: bylby sygnal (szyko-takty)
+                // chwilowy odsetek trafionych (gra pomija ludzi z tarcza) nie widzi strat (23:06: 0.07 przy 1911 trafieniach).
+                // 438-p (recenzja 438): to sygnal CALEJ druzyny, nie tego szyku - bierze go tylko szyk piechoty (prawdziwy rodzaj: nie lucznicy przytrzymani
+                // w szarzy 128 jako KInf) druzyny, ktora idzie pod ostrzalem (OutshotRush.Live - nie trzyma 291), i ktory naprawde naciera (Advancing: AdvBeh /
+                // AdvMove, jak 313b). Dotad w biegu 291 C (bez tarcz) bez tych bramek: kazdy szyk bez tarcz z Move / Advance (pozycja obroncy 291, rezerwa, ruch
+                // w bok planu RBM) tracil cap marszu, gdy gdzie indziej w druzynie padlo 2 ludzi od strzal. Miara "fire" gry i 140 (sygnal szyku) - bez zmian.
+                bool loss = false, dryLoss = false;
+                if (!fire && _kind[idx] == KInf) loss = Doctrine.O438LossFire(f, out dryLoss);
                 bool bare = _rush && _shield[idx] >= 0f && _shield[idx] < CloseRanks.WallFrom;
-                if (bare && (fire || (_evalWasRush && !_evalWas313)))
+                bool bareCont = _evalWasRush && !_evalWas313;
+                bool byLoss = false;
+                if (bare && !bareCont && (loss || dryLoss) && OutshotRush.Live(f.Team))
                 {
-                    if (_evalWasRush && !_evalWas313) _rushOut--;   // dalej biegnie (zdjecie na poczatku Eval nie bylo koncem)
+                    byte advL = Advancing(f);
+                    if (advL == AdvBeh || advL == AdvMove)
+                    {
+                        if (loss) byLoss = true;
+                        else Doctrine.O438NoteLoss(0, true);   // klucz NIE: tu byloby wejscie w bieg
+                    }
+                }
+                if (bare && (fire || byLoss || bareCont))
+                {
+                    if (bareCont) _rushOut--;   // dalej biegnie (zdjecie na poczatku Eval nie bylo koncem)
                     else { _rushIn++; _rushShareSum += _shield[idx]; _rushForms.Add(idx); if (byLoss) Doctrine.O438NoteLoss(0, false); }
                     _rushNow[idx] = true;
                     _rushSec += TickEvery;
@@ -794,10 +808,13 @@ namespace Armoury
                 bool pre = !bare && _rushShielded && _shield[idx] >= CloseRanks.WallFrom && OutshotRush.Live(f.Team);
                 byte adv = pre ? Advancing(f) : AdvNo;
                 bool shielded = pre && (adv == AdvBeh || adv == AdvMove);
-                if (pre && !shielded && fire) { if (adv == AdvBack) _r320Back++; else if (adv == AdvStay) _r320Stay++; else _r320Away++; }   // szyko-takty
-                if (shielded && (fire || (_evalWasRush && _evalWas313)))
+                if (pre && !shielded && (fire || loss)) { if (adv == AdvBack) _r320Back++; else if (adv == AdvStay) _r320Stay++; else _r320Away++; }   // szyko-takty
+                bool cont313 = _evalWasRush && _evalWas313;
+                if (shielded && loss) byLoss = true;   // 438 (1.2): pre = Live, shielded = natarcie - bramki jak w 291 C wyzej
+                else if (shielded && dryLoss && !cont313) Doctrine.O438NoteLoss(1, true);   // 438-p: klucz NIE - tu byloby wejscie w bieg
+                if (shielded && (fire || byLoss || cont313))
                 {
-                    bool cont = _evalWasRush && _evalWas313;
+                    bool cont = cont313;
                     if (cont) OutshotRush.NoteRushEndUndo();   // dalej biegnie (zdjecie na poczatku Eval nie bylo koncem)
                     else if (adv == AdvBeh) _r320Beh++;
                     else { _r320Move++; NoteBeh(f); }
@@ -809,7 +826,7 @@ namespace Armoury
                     Set(f, idx, 0f, 0f, false);
                     return;
                 }
-                if (_rush && fire && !bare && _shield[idx] >= 0f && _rushKeptForms.Add(idx)) { _rushShieldKept++; _rushKeptShareSum += _shield[idx]; }
+                if (_rush && (fire || loss) && !bare && _shield[idx] >= 0f && _rushKeptForms.Add(idx)) { _rushShieldKept++; _rushKeptShareSum += _shield[idx]; }
             }
             Set(f, idx, pace, underFire ? 0f : pace, false);
         }
@@ -876,8 +893,9 @@ namespace Armoury
             return idx >= 0 && ReferenceEquals(_who[idx], f) && _rush313[idx];
         }
 
-        /// <summary>438 (Doctrine.O438Tick, glowny watek): ile szykow jest teraz w biegu pod ostrzalem (291 C i 313b); rbm - w tym szyki druzyn puszczonych
-        /// planem ataku RBM (1.1). Tylko odczyt tablic z ostatniego Eval.</summary>
+        /// <summary>438 (Doctrine.O438Tick, glowny watek): ile szykow jest teraz w biegu pod ostrzalem (291 C i 313b); rbm - w tym szyki z tarczami w biegu 313b
+        /// druzyn puszczonych planem ataku RBM (1.1). 438-p (recenzja 438): bez biegu 291 C - ten nie zalezy od OutshotRush.Live (biegl tak samo przed 438),
+        /// wiec nie jest skutkiem 1.1. Tylko odczyt tablic z ostatniego Eval.</summary>
         internal static int RushNowCount(out int rbm)
         {
             rbm = 0;
@@ -889,7 +907,7 @@ namespace Armoury
                 var f = _who[i];
                 if (f == null || f.CountOfUnits <= 0) continue;
                 n++;
-                if (Doctrine.O438RbmNow(f.Team)) rbm++;
+                if (_rush313[i] && Doctrine.O438RbmNow(f.Team)) rbm++;
             }
             return n;
         }

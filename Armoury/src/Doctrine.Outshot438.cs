@@ -38,6 +38,8 @@ namespace Armoury
     ///     albo puszczona bilansem ognia 291e / 320d (_dhOff 3) - waga splitu PRZYCIETA (nie mnozona) do skali gry = najwyzszej wagi obrony gry tej druzyny
     ///     (DefensiveEngagement / DefensiveLine / Ring / HoldChokePoint z DhNote - juz po S2Mul x0.3; po 291e gra daje im 0, bo IsDefenseApplicable NIE).
     ///     Brak wag 291 dla druzyny - sufit S2Hold (waga gry ok. 1 x 0.3). Split nie wygrywa wiec z obrona gry i wybor atak / obrona jest jak u innych ludow.
+    ///     438-p: takze PO S2 (druzyna 291 z _dhS2Was), gdy gra sama mowi obrona NIE - sufit 0 (jak taktyki obrony gry); bez tego wahadlo S2 -> atak -> split.
+    ///     1.2 438-p: sygnal ze strat bierze tylko szyk piechoty druzyny Live, ktory naciera (Advancing), odleglosc do PIESZEGO wroga (FootGap).
     /// 1.4 sam pomiar (co hamuje bieg - audyt: srednio 1.9 m/s, LOG:88577): co 2 s dla kazdego szyku w biegu (291 C / 313b) najwyzej 40 ludzi - predkosc
     ///     rzeczywista, pelny bieg (GetMaximumForwardUnlimitedSpeed), cap tchu AiBreath, znacznik tarczy 140, WalkMode, ulamek wolniej niz 2 m/s, szyk.
     ///
@@ -84,9 +86,9 @@ namespace Armoury
         private static int _o438LossBare, _o438LossShield, _o438LossChg, _o438LossDry;
         private static int _o438S2Loss, _o438S2LossDry;
         private static float _o438S2LossSec;
-        private static int _o438SplitS2, _o438SplitFire, _o438SplitDry;   // Interlocked (tick druzyn)
+        private static int _o438SplitS2, _o438SplitFire, _o438SplitDry, _o438SplitPost;   // Interlocked (tick druzyn); 438-p: _o438SplitPost - po S2
         private static float _o438SplitSec;
-        private static int _o438SplitLeft, _o438SplitLeftAtk;
+        private static int _o438SplitLeft, _o438SplitLeftAtk, _o438SplitBack;   // 438-p: _o438SplitBack - powrot do splitu przy przegranym ostrzale (wahadlo)
         private static int _o438Stum;
         // 1.4
         private static int _pbForms, _pbMen, _pbBreath, _pbMarked, _pbWalk, _pbSlow, _pbLoose, _pbWall, _pbOther;
@@ -109,8 +111,9 @@ namespace Armoury
             _o438S2Loss = _o438S2LossDry = 0;
             _o438S2LossSec = 0f;
             Interlocked.Exchange(ref _o438SplitS2, 0); Interlocked.Exchange(ref _o438SplitFire, 0); Interlocked.Exchange(ref _o438SplitDry, 0);
+            Interlocked.Exchange(ref _o438SplitPost, 0);   // 438-p
             _o438SplitSec = 0f;
-            _o438SplitLeft = _o438SplitLeftAtk = 0;
+            _o438SplitLeft = _o438SplitLeftAtk = _o438SplitBack = 0;
             _o438Stum = 0;
             _pbForms = _pbMen = _pbBreath = _pbMarked = _pbWalk = _pbSlow = _pbLoose = _pbWall = _pbOther = 0;
             _pbSpeed = _pbFull = _pbCap = _pbIntegrity = 0.0;
@@ -128,9 +131,18 @@ namespace Armoury
 
         private static void O438ClearTeam(int i)
         {
+            O438ClearHist(i);
+            _o438RbmNow[i] = false; _o438RbmEver[i] = false; _o438RbmDry[i] = false;
+        }
+
+        /// <summary>438-p (recenzja 438): nowa druzyna w miejscu tablicy w O438Tick - tylko historia strat i stan splitu (pisane wylacznie w O438Tick).
+        /// Flagi 1.1 (_o438RbmNow / Ever / Dry) ustawia OutshotAdvancing (OutshotRush.Tick, co 0.5 s) - zerowane tylko w O438Reset / O438End / zmianie misji,
+        /// inaczej pierwsza probka 2 s po rozstawieniu kasowala je i druzyna liczyla sie w 1.1 dwa razy.</summary>
+        private static void O438ClearHist(int i)
+        {
             _o438Ref[i] = null; _o438N[i] = 0; _o438Cur[i] = 0;
             for (int k = 0; k < O438Ring; k++) _o438Hist[i * O438Ring + k] = 0;
-            _o438RbmNow[i] = false; _o438RbmEver[i] = false; _o438RbmDry[i] = false; _o438SplitWas[i] = false;
+            _o438SplitWas[i] = false;
         }
 
         private static void O438Keys(Settings c)
@@ -244,13 +256,18 @@ namespace Armoury
         }
 
         /// <summary>1.2 (MarchToContact, glowny watek): sygnal ostrzalu szyku ze strat - druzyna stracila >= FireDead od pociskow w 30 s, a pieszy wrog
-        /// (szyk-cel) jest blizej niz 200 m. Klucz NIE - false (licznik "bylby" liczy wolajacy przez O438LossDry).</summary>
-        internal static bool O438LossFire(Team t, float gap, out bool dry)
+        /// (szyk bez konnicy i konnych lucznikow - FootGap, ta sama miara co S2) jest blizej niz 200 m. 438-p (recenzja 438): dotad odleglosc z EnemyGap
+        /// (najblizszy szyk wroga DOWOLNEGO rodzaju), wbrew opisowi i podpowiedzi MCM. Klucz NIE - false, dry = bylby sygnal (licznik "bylby" liczy wolajacy
+        /// przez O438NoteLoss tylko tam, gdzie przy kluczu TAK byloby wejscie).</summary>
+        internal static bool O438LossFire(Formation f, out bool dry)
         {
             dry = false;
-            if (gap > O438Range || gap == float.MaxValue) return false;
+            var t = f != null ? f.Team : null;
+            if (t == null) return false;
             int bleed = O438Bleed(t);
             if (bleed < P440FireThr(t, bleed, 0)) return false;   // 440 (3.3): prog wedlug profilu wodza (klucz NIE / ZWYKLY - FireDead)
+            float gap = FootGap(t, f);   // dopiero po progu strat - petla po szykach wroga tylko przy sygnale
+            if (gap > O438Range || gap == float.MaxValue) return false;
             if (!_o438Loss) { dry = true; return false; }
             return true;
         }
@@ -294,9 +311,16 @@ namespace Armoury
                 bool s2 = _s2Live[ti] && ReferenceEquals(_s2Ref[ti], team);
                 bool dh = ReferenceEquals(_dhRef[ti], team);
                 bool fire = dh && _dhOff[ti] == 3;
-                if (!s2 && !fire) return;
+                // 438-p (recenzja 438): po wyjsciu z S2 (S2Leave - 10 s ciszy przed zwarciem) ta sama regula co dla obrony gry (291d DhTick / DhDefPost:
+                // _dhS2Was - gra decyduje sama). Gdy gra mowi obrona NIE, wszystkie cztery taktyki obrony gry daja 0 (vanilla GetTacticWeight DefensiveEngagement,
+                // DefensiveLine, DefensiveRing, HoldChokePoint: "!IsDefenseApplicable -> 0"), wiec split tez 0. Dotad split wracal do wagi 10 / 5 RBM (RBM nie
+                // pyta o IsDefenseApplicable) i druzyna znow stawala pod ostrzalem: S2 -> atak -> split -> S2. Gdy gra mowi obrona TAK - bez przyciecia (jak dotad).
+                bool post = false;
+                if (!s2 && !fire && dh && _dhS2Was[ti]) { var ai = team.TeamAI; post = ai != null && !ai.IsDefenseApplicable; }
+                if (!s2 && !fire && !post) return;
                 float cap;
-                if (dh)
+                if (post) cap = 0f;
+                else if (dh)
                 {
                     cap = 0f;
                     for (int k = 0; k < DhK; k++) { float v = _dhW[ti * DhK + k]; if (v > cap) cap = v; }
@@ -305,7 +329,9 @@ namespace Armoury
                 if (r <= cap) return;
                 if (!_o438Split) { Interlocked.Increment(ref _o438SplitDry); return; }
                 __result = cap;
-                if (s2) Interlocked.Increment(ref _o438SplitS2); else Interlocked.Increment(ref _o438SplitFire);
+                if (s2) Interlocked.Increment(ref _o438SplitS2);
+                else if (post) Interlocked.Increment(ref _o438SplitPost);
+                else Interlocked.Increment(ref _o438SplitFire);
             }
             catch { Interlocked.Increment(ref _postErr); }
         }
@@ -351,15 +377,16 @@ namespace Armoury
                     if (ti < 0 || ti >= MaxTeams) continue;
                     try
                     {
-                        if (!ReferenceEquals(_o438Ref[ti], t)) { O438ClearTeam(ti); _o438Ref[ti] = t; }
+                        if (!ReferenceEquals(_o438Ref[ti], t)) { O438ClearHist(ti); _o438Ref[ti] = t; }   // 438-p: bez flag 1.1
                         var q = t.QuerySystem;
                         int d = q != null ? q.DeathByRangedCount : 0;
                         _o438Hist[ti * O438Ring + (_o438N[ti] % O438Ring)] = d;
                         _o438N[ti]++;
                         _o438Cur[ti] = d;
                         if (O438RbmNow(t)) { live++; _o438RbmSec += step; }
-                        // 1.3: druzyna przegrywa wymiane ognia (S2 / 291e) - czas w splicie obrony RBM i wyjscie z niego
+                        // 1.3: druzyna przegrywa wymiane ognia (S2 / 291e; 438-p: takze po S2, gdy gra mowi obrona NIE) - czas w splicie obrony RBM, wyjscia i powroty
                         bool outshot = (_s2Live[ti] && ReferenceEquals(_s2Ref[ti], t)) || FireReleased(t);
+                        if (!outshot && ReferenceEquals(_dhRef[ti], t) && _dhS2Was[ti]) { var ai = t.TeamAI; outshot = ai != null && !ai.IsDefenseApplicable; }
                         var cur = CurTactic(t);
                         bool split = O438DefSplit(cur);
                         if (outshot && split) _o438SplitSec += step;
@@ -368,6 +395,7 @@ namespace Armoury
                             _o438SplitLeft++;
                             if (cur is TacticFullScaleAttack || cur is TacticCharge) _o438SplitLeftAtk++;
                         }
+                        if (outshot && split && !_o438SplitWas[ti] && _o438N[ti] > 1) _o438SplitBack++;   // 438-p: powrot do splitu (wahadlo); bez pierwszej probki
                         _o438SplitWas[ti] = split;
                     }
                     catch (Exception e) { _o438Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.O438 druzyna", e); }
@@ -456,17 +484,18 @@ namespace Armoury
               .Append(", Embolon ").Append(_o438EmbN).Append("), druzyno-sekund ").Append(_o438RbmSec.ToString("0", O438Inv))
               .Append(", bylby (klucz NIE) ").Append(_o438RbmDryTeams)
               .Append("; naraz: druzyn maks ").Append(_o438PeakTeams).Append(", szykow w biegu maks ").Append(_o438PeakRush)
-              .Append(" (w tym z planu RBM ").Append(_o438PeakRushRbm).Append("), sr. ").Append(_o438RushTicks > 0 ? ((double)_o438RushSum / _o438RushTicks).ToString("0.0", O438Inv) : "-")
-              .Append(" przy biegu, szyko-sekund biegu z planu RBM ").Append(_o438RushRbmSec.ToString("0", O438Inv))
+              .Append(" (w tym z tarczami 313b z planu RBM ").Append(_o438PeakRushRbm).Append("), sr. ").Append(_o438RushTicks > 0 ? ((double)_o438RushSum / _o438RushTicks).ToString("0.0", O438Inv) : "-")
+              .Append(" przy biegu, szyko-sekund biegu 313b z planu RBM ").Append(_o438RushRbmSec.ToString("0", O438Inv))
               .Append(" | 1.2 wejsc w bieg tylko od strat (>= ").Append(FireDead).Append(" od pociskow w ").Append(O438LossWin.ToString("0", O438Inv))
-              .Append(" s, wrog <= ").Append(O438Range.ToString("0", O438Inv)).Append(" m): bez tarcz ").Append(_o438LossBare).Append(", z tarczami ").Append(_o438LossShield)
-              .Append(", szarza bez capu (szyko-takty) ").Append(_o438LossChg).Append(", bylby (klucz NIE, szyko-takty) ").Append(_o438LossDry)
+              .Append(" s, pieszy wrog <= ").Append(O438Range.ToString("0", O438Inv)).Append(" m): bez tarcz ").Append(_o438LossBare).Append(", z tarczami ").Append(_o438LossShield)
+              .Append(", szarza bez capu (szyko-takty) ").Append(_o438LossChg).Append(", bylby (klucz NIE: wejsc w bieg + szyko-takty szarzy) ").Append(_o438LossDry)
               .Append("; S2 warunek tylko od strat ").Append(_o438S2LossSec.ToString("0", O438Inv)).Append(" s, wejsc w S2 od strat ").Append(_o438S2Loss)
               .Append(", bylby (klucz NIE, takty) ").Append(_o438S2LossDry)
               .Append(" | 1.3 split obrony RBM przyciety do wagi obrony gry: decyzji przy S2 ").Append(Volatile.Read(ref _o438SplitS2))
-              .Append(", przy bilansie ognia 291e ").Append(Volatile.Read(ref _o438SplitFire)).Append(", bylby (klucz NIE) ").Append(Volatile.Read(ref _o438SplitDry))
+              .Append(", przy bilansie ognia 291e ").Append(Volatile.Read(ref _o438SplitFire)).Append(", po S2 (gra obrona NIE) ").Append(Volatile.Read(ref _o438SplitPost))
+              .Append(", bylby (klucz NIE) ").Append(Volatile.Read(ref _o438SplitDry))
               .Append("; przegrany ostrzal w splicie obrony ").Append(_o438SplitSec.ToString("0", O438Inv)).Append(" s, wyjsc ze splitu ").Append(_o438SplitLeft)
-              .Append(" (na atak ").Append(_o438SplitLeftAtk).Append("); latka ").Append(_o438Patch)
+              .Append(" (na atak ").Append(_o438SplitLeftAtk).Append("), powrotow do splitu ").Append(_o438SplitBack).Append("; latka ").Append(_o438Patch)
               .Append(" | 1.4 co hamuje bieg (probka co ").Append(O438ProbeEvery.ToString("0", O438Inv)).Append(" s, do ").Append(O438ProbeMen).Append(" ludzi na szyk): szyko-probek ")
               .Append(_pbForms).Append(" (Loose ").Append(_pbLoose).Append(", ShieldWall ").Append(_pbWall).Append(", inny ").Append(_pbOther).Append("), ludzi ").Append(_pbMen)
               .Append(", sr. predkosc ").Append(_pbMen > 0 ? (_pbSpeed / _pbMen).ToString("0.0", O438Inv) : "-")

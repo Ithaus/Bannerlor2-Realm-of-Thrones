@@ -11664,7 +11664,7 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool OutshotTriggerByMissileLosses { get; set; } = true;
 
-        [SettingPropertyBool("Defender Leaves RBM Split When Outshot", HintText = "An AI defender holding its ground in a Realistic Battle Mod split defence plan (split infantry or split archers - given by RBM to some cultures) leaves it like any other defender when it is losing the archery exchange (Defenders Advance Under Fire, Defenders Charge When Outshot): the plan no longer outweighs the base game choice between holding and attacking. No bonus to any number on the field - only the choice of plan. Field battles only. Off = the RBM split defence plan holds as before", RequireRestart = false)]
+        [SettingPropertyBool("Defender Leaves RBM Split When Outshot", HintText = "An AI defender holding its ground in a Realistic Battle Mod split defence plan (split infantry or split archers - given by RBM to some cultures) leaves it like any other defender when it is losing the archery exchange (Defenders Advance Under Fire, Defenders Charge When Outshot): the plan no longer outweighs the base game choice between holding and attacking, and after the volleys stop it does not pull the defender back into the split while the base game still says not to defend. No bonus to any number on the field - only the choice of plan. Field battles only. Off = the RBM split defence plan holds as before", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefenderLeavesRbmSplitWhenOutshot { get; set; } = true;
 
