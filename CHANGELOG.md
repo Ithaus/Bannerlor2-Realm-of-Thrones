@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 470-a (12.11) - S_stos (regulator wsi 221) tylko przy naprawde pustym stosie, bez nakrecania liczba decyzji
+
+**Problem:** autotest 60 dob (`Armoury-2026-11-12_22-47-01.log`, linia `LP niedobor` ostatniej doby): "towarow z N swiata > 1: 22 z 22" (WGRANIE 212: 15 z 22). flax / clay / hardwood / cow / hides / marble maja N 1.56 wylacznie z S_stos (kolejka ~1.0), limestone / wool / hog po 1.56 z S_stos. Regulator 221 w tej samej linii: "clay x1.30 decyzji 2, stos 9 dni ... hides x1.30 decyzji 2, stos 22 dni, wool x1.30 decyzji 2, stos 22 dni" - zapas 9-22 dni zuzycia to nie brak, a S_stos rosl z kazda decyzja (1.25 przy 1, 1.56 przy 2, 2 przy 4).
+
+**Przyczyna:** `SupplySignal.StockSignal` (`Armoury/src/SupplySignal.cs`): `_runs[g.Item] = g.AtCeil && g.Short ? r + 1 : 0` i `S_stos = min(2, 1.25 ^ r)`, a `LpGood.Short` z `HarvestValve.cs:678` to `stos < ValveStockDaysLow (30) dni zuzycia` - kazdy towar na suficie kroku z zapasem ponizej 30 dni po kilku decyzjach dochodzil do 2. Regulator 221 S_stos nie czyta (HarvestValve nie wola SupplySignal) - petli nie ma; czytelnicy: L5 WorldN, L6 TownN/CraftShortage (Stock), 363, VillageGear.
+
+**Zmiana:** nowy klucz `SupplyStockEmptyOnly` (MCM "Supply Stock Empty Only", grupa Economy measurements, domyslnie TAK; Settings.cs + McmSettings.cs recznie). Przy TAK: decyzja liczy sie tylko przy stosie ponizej `StockEmptyDays` = 5 dni zuzycia (stala), `S_stos = 2 - dni / 5` (pusty = 2, przy 5 dniach = 1) - nie zalezy od liczby decyzji i wygasa sam, gdy stos wraca (kazda decyzja 221 daje nowa migawke). Decyzje policzone wczesniej (np. zmiana klucza w sesji) przy niepustym stosie - bez S_stos. Po wczytaniu, przed pierwsza decyzja 221 w sesji (stos nieznany) S_stos = 1 (dawniej 1.25 ^ decyzji z zapisu). `_runs` i zapis arm_lpn bez zmian formatu (przy TAK licza kolejne decyzje przy pustym stosie). NIE = co do bitu jak przed (takze tekst linii).
+Linia `LP niedobor`: dopisek `470-a S_stos tylko przy pustym stosie (...): stos < 5.0 dni zuzycia, S_stos = 2 - dni / 5.0; odrzuconych towarow (na suficie, stos ponizej progu 221, ale nie pusty) X, na suficie bez migawki decyzji w tej sesji (S_stos 1) Y`.
+
+**Ryzyko / co sprawdzic:** regresje - Stock czytaja L5 (kolejnosc zlecen sprzetu wsi), L6 (zmiana zajec, pulap 363 przez TownN), StartCalibration.Rule, VillageGear.Fund: dostana mniej towarow z N > 1 (to jest cel); towar z prawdziwie pustym stosem dostaje do 2 jak dawniej po 4 decyzjach, ale od razu. Kolizje: S_kolejka, zboze N = 2 i N wyrobu (Ware) bez zmian. Po wczytaniu sygnal stosu wraca dopiero przy pierwszej decyzji 221 (do 28 dob) - S_kolejka dziala dalej. Oczekiwanie w autotescie 90 dob: "towarow z N swiata > 1" wyraznie mniej niz 22 z 22; flax / clay / hardwood / cow / hides / marble wypadaja (stos 9-22 dni), silver / butter zostaja (kolejka 2.00). Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 467-p (12.11) - poprawki po recenzji 467: gracz dolaczajacy do szturmu AI = cala armia (U1), osobny licznik "bez progu" (U4)
 
 **Problem:**

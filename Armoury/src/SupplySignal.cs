@@ -25,6 +25,8 @@ namespace Armoury
     ///  2. TABLICA N (towar x miasto targowe): N = max(1, S_stos, S_kolejka), najwyzej 2. Cena NIE wchodzi do N. Od 435-L5 czyta ja kolejnosc zlecen sprzetu wsi,
     ///     od 435-L6 (klucze domyslnie wylaczone) regula zmiany zajec i pulap zamowien 363 - przez opublikowana tablice (Table / TownN), CraftShortage.cs.
     ///     S_stos = 1.25 ^ (liczba kolejnych decyzji regulatora wsi 221 z mnoznikiem na suficie kroku i stosem ponizej dolnego progu), najwyzej 2;
+    ///     470-a (klucz Supply Stock Empty Only, domyslnie TAK): S_stos tylko przy stosie ponizej StockEmptyDays (5) dni zuzycia, S_stos = 2 - dni / 5 (pusty = 2) -
+    ///     nie zalezy od liczby decyzji i wygasa, gdy stos wraca; bez migawki decyzji po wczytaniu S_stos = 1. NIE = 1.25 ^ decyzji jak wyzej;
     ///     S_kolejka = 1 + min(1, brak / sprzedaz), srednie dobowe 28 dob w sztukach; zboze: N = 2 w miescie, ktorego wsie gloduja (Famine.HungerOf &gt; 0).
     ///     ODSTEPSTWO od projektu (do decyzji przed L6): "sprzedaz" = wieksza z dwoch liczb - prawdziwa sprzedaz miasta z 28 dob (MarketSales 241; tylko kategorie bedace
     ///     wyrobem warsztatu) i sztuki kupione przez te same trzy strumienie popytu. Licznika calej sprzedazy miasta dla surowcow wsi (drewno, glina, ruda) nie ma.
@@ -62,6 +64,11 @@ namespace Armoury
         // (brak / (zuzycie + brak)) - nie dzielony przez sprzedaz >= 1 szt./d, ktora dla jedzenia nie jest liczona (to dawalo N = 2 przy kazdym braku). Klucz NIE = 435-N-B.
         private static bool FoodShareOn { get { var s = Settings.Current; return s == null || s.SupplyFoodInputShare; } }
         private static double _dFoodShare; private static int _dFoodShareN;
+        // 470-a: S_stos tylko przy naprawde pustym stosie (ponizej StockEmptyDays dni zuzycia), wartosc z glebokosci braku, nie z liczby decyzji regulatora 221.
+        // NIE = 1.25 ^ kolejnych decyzji na suficie przy stosie ponizej ValveStockDaysLow (30) dni, jak przed 470-a.
+        private static bool StockEmptyOn { get { var s = Settings.Current; return s == null || s.SupplyStockEmptyOnly; } }
+        internal const double StockEmptyDays = 5.0;
+        private static int _sStockCut, _sStockUnk;   // 470-a: towary na suficie przy stosie < 30 dni, ale >= 5 dni (odrzucone); na suficie bez migawki po wczytaniu (S_stos 1)
         private static int _sFoodCells; private static double _sFoodMax = 1.0;   // 462-a: komorki jedzenia z N > 1 (udzial) w ostatniej tablicy
 
         private static int _main = -1, _dOff;
@@ -753,6 +760,8 @@ namespace Armoury
         {
             known = unknown = 0;
             var res = new Dictionary<ItemCategory, double[]>();   // kategoria -> [S_stos, kolejne decyzje, stos dni (-1 nieznany), mnoznik]
+            bool emptyOn = StockEmptyOn;
+            _sStockCut = 0; _sStockUnk = 0;
             int dec;
             var peek = HarvestValve.LpPeek(out dec);
             if (peek == null || dec < _seenDec) { if (dec < _seenDec) _runs.Clear(); _seenDec = dec; }
@@ -763,7 +772,7 @@ namespace Armoury
                 {
                     if (g == null || g.Item == null) continue;
                     int r; _runs.TryGetValue(g.Item, out r);
-                    _runs[g.Item] = g.AtCeil && g.Short ? r + 1 : 0;
+                    _runs[g.Item] = g.AtCeil && (emptyOn ? Empty(g) : g.Short) ? r + 1 : 0;   // 470-a: przy kluczu TAK licza sie tylko decyzje przy pustym stosie
                 }
             }
             var seen = new HashSet<ItemObject>();
@@ -773,9 +782,11 @@ namespace Armoury
                     if (g == null || g.Item == null || g.Item.ItemCategory == null) continue;
                     seen.Add(g.Item);
                     int r; _runs.TryGetValue(g.Item, out r);
-                    if (r <= 0) continue;
+                    // 470-a: stos ponizej progu 221, ale nie pusty - bez S_stos (takze gdy decyzje policzono przed zmiana klucza w tej sesji)
+                    if (emptyOn && r > 0 && !Empty(g)) r = 0;
+                    if (r <= 0) { if (emptyOn && g.AtCeil && g.Short) _sStockCut++; continue; }
                     known++;
-                    double sv = Math.Min(2.0, Math.Pow(1.25, r));
+                    double sv = emptyOn ? EmptyS(g.StockDays) : Math.Min(2.0, Math.Pow(1.25, r));
                     double[] cur;
                     if (!res.TryGetValue(g.Item.ItemCategory, out cur) || cur[0] < sv) res[g.Item.ItemCategory] = new[] { sv, r, g.StockDays, g.M };
                 }
@@ -787,6 +798,7 @@ namespace Armoury
                 foreach (var kv in f)
                 {
                     if (kv.Key == null || kv.Key.ItemCategory == null || seen.Contains(kv.Key) || kv.Value < ceil - 1e-3f) continue;
+                    if (emptyOn) { _sStockUnk++; continue; }   // 470-a: stos nieznany - nie wiadomo, czy pusty; S_stos 1 do pierwszej decyzji w sesji
                     unknown++;
                     // 435-L1-p (recenzja S4): liczba kolejnych decyzji na suficie jest w zapisie (arm_lpn) - po wczytaniu S_stos jak przed zapisem, nie 1.25
                     int r0; _runs.TryGetValue(kv.Key, out r0); if (r0 < 1) r0 = 1;
@@ -797,6 +809,11 @@ namespace Armoury
             }
             return res;
         }
+
+        /// <summary>470-a: stos towaru ponizej StockEmptyDays dni zuzycia (znany; towar bez odbiorcy - nie).</summary>
+        private static bool Empty(HarvestValve.LpGood g) { return g.StockDays >= 0.0 && g.StockDays < StockEmptyDays; }
+        /// <summary>470-a: S_stos z glebokosci braku: pusty stos = 2, przy progu StockEmptyDays = 1.</summary>
+        private static double EmptyS(double days) { return Math.Min(2.0, Math.Max(1.0, 2.0 - Math.Max(0.0, days) / StockEmptyDays)); }
 
         private static string ShortageText(int today)
         {
@@ -922,6 +939,9 @@ namespace Armoury
                 }
                 sb.Append(']');
             }
+            if (StockEmptyOn)
+                sb.Append(" | 470-a S_stos tylko przy pustym stosie (klucz Supply Stock Empty Only TAK): stos < ").Append(F1(StockEmptyDays)).Append(" dni zuzycia, S_stos = 2 - dni / ").Append(F1(StockEmptyDays))
+                  .Append("; odrzuconych towarow (na suficie, stos ponizej progu 221, ale nie pusty) ").Append(_sStockCut).Append(", na suficie bez migawki decyzji w tej sesji (S_stos 1) ").Append(_sStockUnk);
             sb.Append(" | zboze: miast z glodujacymi wsiami (N = 2) ").Append(hungry.Count)
               .Append(" | miast z N >= 1.5 dla jakiegos towaru: ").Append(hot.Count).Append(" | komorek (miasto x towar) z pomiarem ").Append(cells)
               .Append(", z kolejka > 1: ").Append(qOver).Append(" (na suficie 2: ").Append(qCeil).Append("; tylko z niewydanego budzetu robot: ").Append(softOnly).Append(")")

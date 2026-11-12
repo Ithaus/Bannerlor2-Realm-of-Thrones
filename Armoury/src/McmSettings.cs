@@ -10632,6 +10632,10 @@ namespace Armoury
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool SupplyFoodInputShare { get; set; } = true;
 
+        [SettingPropertyBool("Supply Stock Empty Only", HintText = "with Supply Chain Log: a village good counts as short from its stock only when the stock is really empty - less than 5 days of use - while the village output of that good is already at the step ceiling. The signal then goes from 1 at 5 days to 2 at an empty stock and falls back by itself as the stock refills; how many times the village rule has raised the output no longer adds to it. Goods with stock for 9 to 30 days of use no longer look short. Off = the signal grows by x1.25 with every raise at the ceiling while the stock is under 30 days, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool SupplyStockEmptyOnly { get; set; } = true;
+
         [SettingPropertyBool("Workshops Follow Goods Shortage", HintText = "with Supply Chain Log, Workshop Benches or Workshop Retool Idle: workshops also follow goods that the townsfolk want and cannot find at their own market. Each day the measure counts the coin the townsfolk meant to spend on a good (not their savings offered on top) that found the stall empty, and sets it against what the town really sold of that good over the same days. Where the unmet coin is at least half of the sales and enough for one full cycle of a workshop line, an idle workshop may change to that trade (at most one such change a day in the whole world; a trade whose inputs are short in the town still comes first) and a busy workshop may add benches (the gap must hold over four weeks and over the last week too). Goods missing from the stall entirely, weapons, horses and goods the townsfolk do not buy for their houses are not counted. Raw materials and village crafts are not touched. Off = workshops look only at short inputs, as before (the log still shows what would have happened)", RequireRestart = false)]
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool WorkshopFollowGoodsShortage { get; set; } = true;
@@ -15585,6 +15589,7 @@ namespace Armoury
             s.SupplyChainLog = SupplyChainLog;
             s.SupplyQueueGrowth = SupplyQueueGrowth;
             s.SupplyFoodInputShare = SupplyFoodInputShare;
+            s.SupplyStockEmptyOnly = SupplyStockEmptyOnly;
             s.WorkshopFollowGoodsShortage = WorkshopFollowGoodsShortage;
             s.MeasureCraftRule = MeasureCraftRule;
             s.MeasureRegaleShelf = MeasureRegaleShelf;
