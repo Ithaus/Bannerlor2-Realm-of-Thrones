@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 473-p1 (13.11) - poprawki po recenzjach 473-b6: linia startu po drugim wczytaniu, bledy od nowa w kampanii, kolejki gracz/AI osobno, licznik ludu po osadach
+
+**Problem:** recenzje A i B (tylko odczyt) kroku 473-b6 - bez usterek CTD i zapisu, cztery usterki samego logu i dwie luki w opisie. (A1/B2) `Buildings338NoBuild.SessionStart` przy drugim wczytaniu w tym samym procesie wychodzil przez `if (_patched) return;` przed `Buildings338.Hook(...)`, a `Buildings338.SessionStart` czysci `_hooks` co sesje - linia startu nie wymieniala dzialajacej latki. (A2) `_stumbles` i `_err` nie zerowane w `SessionStart` - "bledy" przechodzily miedzy kampaniami, pierwszy blad nowej kampanii nie trafial do logu. (A3) "w kolejkach teraz Q (gracz)" liczylo kolejki wszystkich miast. (B3) "lud pominal sad W" liczylo przejscia petli `FolkTarget` (kandydatow), nie osady. (B4) `FolkSkips` stal przed `BkAllows`, wiec `_bkSkip` przestal liczyc sad BK niedostepny w BK.
+
+**Przyczyna:** jak wyzej - kolejnosc instrukcji i liczniki w `Armoury/src/Buildings338NoBuild.cs` oraz `BuildFunding.Folk.cs:199`.
+
+**Zmiana:** `SessionStart`: zerowanie `_stumbles` i `_err`; przy `_patched` - `Buildings338.Hook("bez zbrojowni i sadu BK: " + _target)` i dopiero `return` (wzor `Buildings338Studs.cs:42`). `_folkSkip` to teraz `HashSet<Town>` na dobe (czyszczony w `Daily` i `SessionStart`). Linia doby: "osady z sadem pominietym w wyborze ludu N" i "w kolejkach teraz gracz X, AI Y" (przy TAK AI powinno byc 0). `BuildFunding.FolkTarget`: najpierw `BkAllows` (licznik `_bkSkip` jak przed 473-b6), potem `FolkSkips` - zachowanie to samo (obie galezie `continue`).
+Dopiski do 473-b6 (recenzja B5, B6): (a) w NOWEJ kampanii `BuildDevelopmentsAtGameStart` (`OnNewGameCreated`) idzie przed latka z `OnSessionLaunched` - startowe kolejki AI moga miec zbrojownie albo sad BK; zdejmuje je (2) `DropQueued` nastepnej doby, pan za nie nie placi (DropQueued przed `BuildFunding.Daily`). (b) Pusta kolejka po wyjeciu zmienia wynik BK `AvailableSlavesWorkForce` (bk_all.cs:74409): bez budowy niewolnicy nie sa odciagani do prac - to zachowanie gry przy pustej kolejce (nie nowe zrodlo), dotyczy tylko miast AI bez innej budowli. Zdanie "nic nowego" w 473-b6 dotyczy zapisu gry, nie tego skutku.
+
+**Ryzyko / co sprawdzic:** mechanika bez zmian - zmienione tylko liczniki i tekst linii startu/doby oraz kolejnosc dwoch warunkow `continue`. Klucz NIE - jak przed (FolkSkips zwraca false bez licznika, Daily nie pisze). W logu: po drugim wczytaniu w jednym procesie linia startu nadal ma "bez zbrojowni i sadu BK: <Typ>.GetNextBuilding"; "AI 0" w kolejkach. Build OK.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 473-b6 (13.11) - AI nie stawia zbrojowni (Armory) i sadu (Court House) Banner Kings
 
 **Problem:** Jeff 13.11 w czacie: "Wylaczam: Armory i Court House z BannerKings". Oba budynki BK sa tylko w miastach (`BKBuildings.IsCastleBuilding` zna tylko Castle Mines, Retinue, Port i Warhorse Studs - bk_all.cs:77348). AI stawia je losowo jak kazda inna budowle. Dowodu z logu nie ma, to decyzja Jeffa.

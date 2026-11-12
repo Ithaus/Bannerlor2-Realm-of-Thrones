@@ -196,8 +196,8 @@ namespace Armoury
             foreach (var b in t.Buildings)
             {
                 if (b == null || b.BuildingType == null || b.CurrentLevel >= 3 || !FolkPays(b.BuildingType) || q.Contains(b)) continue;
-                if (Buildings338NoBuild.FolkSkips(t, b)) continue;   // 473-b6: lud w osadzie AI nie stawia sadu BK (klucz wylaczony - false)
                 if (!BkAllows(bk, b)) { _bkSkip++; continue; }   // recenzja (5): niedostepna w BK (innowacja, port, murarstwo) - lud jej nie stawia
+                if (Buildings338NoBuild.FolkSkips(t, b)) continue;   // 473-b6: lud w osadzie AI nie stawia sadu BK (klucz wylaczony - false); 473-p1: po BkAllows - _bkSkip liczy jak przed
                 int cost = b.GetConstructionCost();
                 if (cost <= 0) continue;
                 double k = b.BuildingProgress / cost + (3 - b.CurrentLevel) * 1e-3;

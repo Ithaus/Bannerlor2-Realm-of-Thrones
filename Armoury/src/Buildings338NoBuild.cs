@@ -35,8 +35,9 @@ namespace Armoury
 
         private static bool _patched;
         private static string _target = "-";
-        private static int _repick, _repickNull, _dropped, _folkSkip, _stumbles;
+        private static int _repick, _repickNull, _dropped, _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
+        private static readonly HashSet<Town> _folkSkip = new HashSet<Town>();   // 473-p1: osady (nie przejscia petli), gdzie lud pominal sad BK tej doby
 
         internal static bool IsBlocked(BuildingType bt)
         {
@@ -61,8 +62,9 @@ namespace Armoury
         /// <summary>Z Buildings338.SessionStart (kampania, modele zarejestrowane): latka raz na proces na GetNextBuilding czynnego modelu.</summary>
         internal static void SessionStart()
         {
-            _repick = _repickNull = _dropped = _folkSkip = 0;
-            if (_patched) return;
+            _repick = _repickNull = _dropped = 0; _folkSkip.Clear();
+            _stumbles = 0; _err.Clear();   // 473-p1: licznik bledow i pierwszy wpis do logu - od nowa w kazdej kampanii
+            if (_patched) { Buildings338.Hook("bez zbrojowni i sadu BK: " + _target); return; }   // 473-p1: SessionStart czysci _hooks co sesje - latka znow w linii startu
             var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.BuildingScoreCalculationModel : null;
             if (model == null) { _target = "brak modelu"; return; }
             MethodInfo m = null;
@@ -126,7 +128,7 @@ namespace Armoury
         internal static bool FolkSkips(Town t, Building b)
         {
             if (b == null || !IsBlocked(b.BuildingType) || !AiTown(t)) return false;
-            _folkSkip++;
+            _folkSkip.Add(t);
             return true;
         }
 
@@ -136,7 +138,7 @@ namespace Armoury
             if (!On) return;
             try
             {
-                int arm = 0, court = 0, armLv = 0, courtLv = 0, inQ = 0;
+                int arm = 0, court = 0, armLv = 0, courtLv = 0, inQp = 0, inQai = 0;
                 foreach (var t in Town.AllTowns)
                 {
                     try
@@ -146,17 +148,18 @@ namespace Armoury
                         if (a > 0) { arm++; armLv += a; }
                         if (c > 0) { court++; courtLv += c; }
                         var q = t.BuildingsInProgress;
-                        if (q != null) foreach (var b in q) if (b != null && IsBlocked(b.BuildingType)) inQ++;
+                        bool pl = t.Settlement != null && t.Settlement.OwnerClan == Clan.PlayerClan;   // 473-p1: gracz i AI osobno (AI przy TAK powinno byc 0)
+                        if (q != null) foreach (var b in q) if (b != null && IsBlocked(b.BuildingType)) { if (pl) inQp++; else inQai++; }
                     }
                     catch (Exception e) { Stumble("Daily(osada)", e); }
                 }
                 Log.Info("Budynki (338) bez zbrojowni i sadu BK: dzien " + day + " | latka " + (_patched ? "tak (" + _target + ")" : "NIE (" + _target + ")")
-                         + " | AI losowalo ponownie " + _repick + " (bez innej budowli " + _repickNull + "), wyjete z kolejek AI " + _dropped + ", lud pominal sad " + _folkSkip
-                         + " | miasta z Armory " + arm + " (poziomow " + armLv + "), z Court House " + court + " (poziomow " + courtLv + "), w kolejkach teraz " + inQ
-                         + " (gracz) | bledy " + _stumbles);
+                         + " | AI losowalo ponownie " + _repick + " (bez innej budowli " + _repickNull + "), wyjete z kolejek AI " + _dropped + ", osady z sadem pominietym w wyborze ludu " + _folkSkip.Count
+                         + " | miasta z Armory " + arm + " (poziomow " + armLv + "), z Court House " + court + " (poziomow " + courtLv + "), w kolejkach teraz gracz " + inQp + ", AI " + inQai
+                         + " | bledy " + _stumbles);
             }
             catch (Exception e) { Stumble("Daily", e); }
-            _repick = _repickNull = _dropped = _folkSkip = 0;
+            _repick = _repickNull = _dropped = 0; _folkSkip.Clear();
         }
     }
 }
