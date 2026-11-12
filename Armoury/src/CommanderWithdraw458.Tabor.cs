@@ -114,12 +114,15 @@ namespace Armoury
                     }
                 }
                 catch (Exception e) { _hookTabSow = "blad " + e.GetType().Name; Log.Error("CommanderWithdraw458Map.TaborSessionStart (Spoils of War)", e); }
+                GearPatch();   // 458-u: sprzet zbieglych z wodzem (CommanderWithdraw458.Gear.cs)
             }
             try
             {
                 Log.Info("Odwrot wodza (458-t): tabor partii z wodzem, ktory uszedl - lup przedmiotow gry " + _hookTabLoot + " (prefiks MapEvent.LootDefeatedPartyItems, First, zbrojownia DTE schowana na czas lupu - udzial gracza DTE w OnCollectLootItems), okno zbrojowni DTE "
                          + _hookTabDte + " (prefiks 1000 + finalizer EveryoneCampaignBehavior.OnMapEventEnded), migawka taboru Spoils of War " + _hookTabSow
                          + "; dziala tylko po misji z odwrotem wodza przy kluczu Commander Withdraws Under Rearguard.");
+                Log.Info("Odwrot wodza (458-u): sprzet zbieglych z wodzem - " + _hookGear + " (prefiks + postfiks DTE DynamicTroopMissionLogic.OnAgentRemoved: zapis sztuk,"
+                         + " prefiks HandlePartyItems: decyzja DTE; zwrot do zbrojowni DTE w rozliczeniu partii z wodzem); dziala tylko po odwrocie na rozkaz przy kluczu Commander Withdraws Under Rearguard.");
             }
             catch { }
         }

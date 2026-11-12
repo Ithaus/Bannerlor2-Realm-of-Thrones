@@ -440,6 +440,7 @@ namespace Armoury
             var t = s.T;
             s.Rule = true;
             try { s.Me = PlayerEncounter.Battle; } catch { s.Me = null; }
+            try { CommanderWithdraw458Map.GearStart(this, s.Me); } catch (Exception e) { Stumble("Sprzet start", e); }   // 458-u: zapis sprzetu zbieglych z wodzem
             try { s.CmdParty = cmd.Origin != null ? cmd.Origin.BattleCombatant as PartyBase : null; } catch { s.CmdParty = null; }
             try { var co = cmd.Character as CharacterObject; s.CmdHero = co != null ? co.HeroObject : null; } catch { s.CmdHero = null; }
             try
@@ -551,6 +552,12 @@ namespace Armoury
                 }
             }
             catch (Exception e) { lock (_gate) _buildMiss++; Stumble("Wystawiony", e); }
+        }
+
+        /// <summary>458-u: wyprowadzany z wodzem (ten sam zbior co licznik "zbiegli z wodzem" w Track) - dla zapisu sprzetu w DTE OnAgentRemoved.</summary>
+        internal bool GearEscapee(Agent a)
+        {
+            lock (_gate) return !_ended && a != null && _esc.Contains(a);
         }
 
         private int[] Cnt(PartyBase pb, CharacterObject c)
@@ -800,6 +807,7 @@ namespace Armoury
                 _esc.Clear();
                 _panicOut.Clear();
             }
+            try { CommanderWithdraw458Map.GearStop(this); } catch { }   // 458-u
             _bufE.Clear();
             _result = null;
             base.OnEndMission();

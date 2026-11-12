@@ -79,13 +79,14 @@ namespace Armoury
         internal static void Set(Pending p) { _p = p; _move = null; _moveParties = null; _tab = null; }
 
         /// <summary>458-p (recenzja B9): nowa kampania / wczytanie (konstruktor ArmouryBehavior) - stan i liczniki od zera.</summary>
-        internal static void Reset() { _p = null; _move = null; _moveParties = null; _stumbles = 0; _errs = 0; _tab = null; _tabHidden = null; }
+        internal static void Reset() { _p = null; _move = null; _moveParties = null; _stumbles = 0; _errs = 0; _tab = null; _tabHidden = null; GearClear(); }
 
         /// <summary>Nowa misja: stare oczekiwanie (bitwa trwala dalej - ContinueBattle - albo pojmanie sie nie odbylo) znika.</summary>
         internal static void Clear()
         {
             if (_p != null) { try { Log.Info(P + "oczekiwanie bez pojmania (bitwa trwa dalej albo nowa misja) - porzucone, nic nie zmieniono."); } catch { } }
             _p = null; _move = null; _moveParties = null; _tab = null;   // 458-t: zbior taboru poprzedniej bitwy tez
+            GearClear();   // 458-u: sprzet zbieglych poprzedniej bitwy (nowa misja - konstruktor 458, przed StartRule)
         }
 
         /// <summary>SubModuleMain (menu glowne, raz na proces): prefiks MapEvent.CaptureDefeatedPartyMembers (metoda zadeklarowana w MapEvent - DeclaredMethod).
@@ -196,6 +197,7 @@ namespace Armoury
                 if (keep.Count == 0)
                 {
                     Log.Info(P + "zadna partia strony nie uszla z wodzem " + p.Cmd + " - pojmanie jak w grze.");
+                    GearLine(__instance);   // 458-u: sprzet zbieglych - partie jak w grze (bez zwrotu)
                     return;
                 }
                 MBList<KeyValuePair<MapEventParty, float>> wch = null, hch = null;
@@ -228,6 +230,7 @@ namespace Armoury
                         sb.Append(" || ").Append(line).Append(" | kontrola: przed ").Append(before).Append(" = po ").Append(after).Append(" + do niewoli ").Append(taken)
                           .Append(" + bez odbiorcy ").Append(lost).Append(" + bohaterowie wyjeci ").Append(heroOut).Append(ok ? " OK" : " NIEZGODNE");
                         if (pb.IsMobile && pb.MobileParty != null) moved.Add(pb.MobileParty);
+                        GearBack(__instance, pb);   // 458-u: sprzet zbieglych z wodzem do zbrojowni DTE tej partii
                     }
                     catch (Exception e)
                     {
@@ -243,6 +246,7 @@ namespace Armoury
                             // recenzja B5: sklad juz zmieniony - oddanie grze wzieloby ludzi drugi raz; partia zostaje jak jest (linia mowi to wprost)
                             tBad++;
                             if (pb.IsMobile && pb.MobileParty != null) moved.Add(pb.MobileParty);
+                            GearBack(__instance, pb);   // 458-u: partia zostaje (zbiegli w niej) - ich sprzet tez
                             sb.Append(" || ").Append(Name(pb)).Append(": potkniecie PO zmianach skladu - partia zostaje jak jest (nie oddana grze, bez podwojenia)");
                         }
                     }
@@ -255,6 +259,7 @@ namespace Armoury
                   .Append(", bohaterowie wyjeci ").Append(tHero).Append(", zbiegli z wodzem w partiach jak w grze ").Append(restEsc)
                   .Append(" | niezgodnych partii ").Append(tBad).Append(", oddanych grze po kontroli licznikow ").Append(tGame).Append(" | potkniecia ").Append(_stumbles).Append('.');
                 Log.Info(sb.ToString());
+                GearLine(__instance);   // 458-u
             }
             catch (Exception e) { Stumble("CapPre", e); }
         }
