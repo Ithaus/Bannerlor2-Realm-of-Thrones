@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 473-b (13.11) - sufit lacznej obnizki zoldu zalogi z budynkow: 50%
+
+**Problem:** Jeff 13.11 (odpowiedz 5 na pytania z `docs/BUDYNKI-TABELA-PROPOZYCJE-2026-11-13.md`: "Tak, limit do 50%"). Zamek z Barracks 3 (-30%), Castellan's Office 3 (-30%) i projektem Slacken Garrison (-5%) placil 35% zoldu zalogi. Log 60 dob: `Budynki (338) zold` - 214 twierdz z budynkiem (zamek Barracks 122, biuro 121), zold przed 210 827 po 164 779 zl/d.
+
+**Przyczyna:** `Buildings338Wage.Apply` dodaje `town.AddEffectOfBuildings(GarrisonWageReduction)` bez granicy (czynniki sumuja sie addytywnie).
+
+**Zmiana:** nowy klucz `Buildings338WageCap` (MCM "Buildings338 Wage Cap", domyslnie 0.50, zakres 0..1, 1 = bez sufitu; Settings.cs + McmSettings.cs recznie, zakres w gen_mcm.py - skryptu nie uruchamiano). W `Apply` po efekcie budynkow: gdy laczna obnizka > sufit - czynnik `+(obnizka - sufit)` z pozycja dymku "Garrison buildings cut wages by at most 50%". Limit zlota zalog AI (`LimitPostfix`, skala a / b z linii doby) liczy sie z zoldu z sufitem - ta sama liczba ludzi, pan placi roznice. Obnizka <= sufit albo sufit 1 - wynik co do bitu jak dotad.
+Linia `Budynki (338) zold: dzien N` - dopisek `| 473-b sufit obnizki 50%: twierdz na suficie X, zold wyzej o Y zl/d` (Y = zold z sufitem - zold bez sufitu, flaga `_noCap` w drugim wywolaniu TotalWage tylko dla twierdz ponad sufit).
+
+**Ryzyko / co sprawdzic:** miasta nie dochodza do sufitu (Barracks miasta najwyzej 15%, biuro tylko w zamkach) - zmiana tylko w zamkach z Barracks i biurem razem > 50% (3+3, albo 3+2 / 2+3 ze Slacken). Sciezki, w ktorych budynki liczy gra (`DefaultPartyWageModel`, licznik `_defCounts`) albo BK (`BkCounts`) - bez sufitu (w logu 60 dob obie 0). `RawWage` / ClanBudget (zold bez budynkow) bez zmian. Koszt: drugie `Over(town)` (przeglad budynkow twierdzy) przy kazdym zewnetrznym GetTotalWage zalogi - ok. 3 750 wywolan/d. Wplyw na zloto: Y zl/d wiecej zoldu panow (szacunek gorny ok. 8 tys. zl/d przy wszystkich 121 zamkach z biurem na 3+3; rzeczywista liczba w nowej linii). Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 473-a (13.11) - Mason: tanszy punkt budowy (-10/-20/-30%) zamiast darmowych punktow
 
 **Problem:** Jeff 13.11 (odpowiedz 2 na pytania z `docs/BUDYNKI-TABELA-PROPOZYCJE-2026-11-13.md`: "Tak"). Log 60 dob (`Armoury-2026-11-12_22-47-01.log`): `Budynki (338) murarz` srednio +314 pkt/d (116 osad, punkty Masona 510) przy `Budowy oplacone` 518 pkt/d pana i `Roboty ludu (P2)` ok. 300 pkt/d - ok. 38% oplaconej mocy budowy swiata bez platnika ("nic z niczego").

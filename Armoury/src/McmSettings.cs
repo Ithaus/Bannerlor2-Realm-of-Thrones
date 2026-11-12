@@ -12864,6 +12864,10 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Wage { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Buildings338 Wage Cap", 0.00f, 1.00f, "0.00", HintText = "With Buildings338 Wage: the barracks, the castellan's office and the Slacken Garrison project together lower a garrison's wages by at most this share (0.50 = half; a castle with all three at full level would otherwise pay 35% of its wages). 1 = no limit, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public float Buildings338WageCap { get; set; } = 0.50f;
+
         [SettingPropertyBool("Buildings338 Auto Recruit", HintText = "With Buildings338: the castellan's office (+1/+2/+3), the Train Militia project (+1) and the Raise Troops project (+2) let the garrison take more volunteers a day, as their description says - on top of the game's one a day and the Armoury daily bonus. Gold, room in the garrison and volunteers still limit it; not in lands without free hands. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338AutoRecruit { get; set; } = true;
@@ -16195,6 +16199,7 @@ namespace Armoury
             s.NorthConquestReturn = NorthConquestReturn;
             s.Buildings338 = Buildings338;
             s.Buildings338Wage = Buildings338Wage;
+            s.Buildings338WageCap = Buildings338WageCap;   // 473-b
             s.Buildings338AutoRecruit = Buildings338AutoRecruit;
             s.Buildings338FoodStock = Buildings338FoodStock;
             s.Buildings338FoodDouble = Buildings338FoodDouble;

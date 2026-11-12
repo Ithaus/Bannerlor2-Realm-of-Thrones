@@ -22,9 +22,14 @@ namespace Armoury
     /// Scalanie z 337: opcja B GarrisonBuildingWage337 to ten sam efekt - zostaje tylko 338; skalowanie limitu 337 (b = FullTotalWage, bez 337 i bez 338) i 338
     /// nie moga oba mnozyc limitu tej samej twierdzy (CHANGELOG 338).
     /// </summary>
+    // 473-b (Jeff 13.11, odpowiedz 5: "Tak, limit do 50%"): laczna obnizka zoldu zalogi z budynkow (zamek: Barracks 30% + Castellan's Office 30% + Slacken 5% = 65%)
+    // najwyzej Buildings338WageCap (0.50) - w Apply po efekcie budynkow czynnik +(obnizka - sufit) z wlasna pozycja dymku. Limit zlota AI (LimitPostfix) bierze
+    // skale a / b z linii doby, a "a" to zold z sufitem - spojne bez osobnej zmiany. Sufit >= 1 albo obnizka <= sufit - wynik co do bitu jak dotad.
     internal static class Buildings338Wage
     {
         [ThreadStatic] private static bool _skip;   // linia doby: zold bez budynkow 338
+        [ThreadStatic] private static bool _noCap;  // 473-b: linia doby - zold z budynkami bez sufitu (ile kosztuje sufit)
+        private static TaleWorlds.Localization.TextObject _capTxt; private static int _capPct = -1;
         private static int _calls, _bkCounts, _defCounts;
         [ThreadStatic] private static MobileParty _defRan;   // partia, dla ktorej biegl DefaultPartyWageModel.GetTotalWage (gra liczy budynki sama :147) - straznik dubla
         private static int _limScaled;
@@ -86,8 +91,37 @@ namespace Armoury
                 if (BkCounts(t)) { Interlocked.Increment(ref _bkCounts); return; }
                 t.AddEffectOfBuildings(BuildingEffectEnum.GarrisonWageReduction, ref r);   // jak DefaultPartyWageModel:147
                 Interlocked.Increment(ref _calls);
+                if (!_noCap)
+                {
+                    float over = Over(t);   // 473-b: obnizka ponad sufit - oddana jednym czynnikiem (0 - bez zmian)
+                    if (over > 0f)
+                    {
+                        int pct = (int)Math.Round(100f * Cap());
+                        if (_capTxt == null || _capPct != pct) { _capTxt = new TaleWorlds.Localization.TextObject("{=!}Garrison buildings cut wages by at most " + pct + "%"); _capPct = pct; }
+                        r.AddFactor(over, _capTxt);
+                    }
+                }
             }
             catch (Exception e) { Buildings338.Stumble(Buildings338.GWage, "Wage.Apply", e); }
+        }
+
+        /// <summary>473-b: sufit lacznej obnizki zoldu z budynkow (0..1; 1 - bez sufitu; klucz poza zakresem przycinany).</summary>
+        private static float Cap()
+        {
+            var s = Settings.Current;
+            float c = s != null ? s.Buildings338WageCap : 1f;
+            return float.IsNaN(c) ? 1f : Math.Max(0f, Math.Min(1f, c));
+        }
+
+        /// <summary>473-b: o ile laczna obnizka zoldu z budynkow twierdzy przekracza sufit (0 - nie przekracza albo sufit 1).</summary>
+        private static float Over(Town t)
+        {
+            float cap = Cap();
+            if (cap >= 1f) return 0f;
+            var x = new ExplainedNumber(1f);
+            t.AddEffectOfBuildings(BuildingEffectEnum.GarrisonWageReduction, ref x);
+            float red = 1f - x.ResultNumber;
+            return red > cap + 1e-5f ? red - cap : 0f;
         }
 
         public static void LimitPostfix(Clan __0)
@@ -118,8 +152,9 @@ namespace Armoury
 
         internal static void Daily(int day)
         {
-            int n = 0, tb = 0, cb = 0, off = 0, sl = 0;
-            long before = 0, after = 0, aiMen = 0;
+            int n = 0, tb = 0, cb = 0, off = 0, sl = 0, capN = 0;
+            long before = 0, after = 0, aiMen = 0, capGold = 0;
+            float capV = Cap();
             var scale = new Dictionary<Settlement, float>();
             bool on = Buildings338.WageOn;
             foreach (var mp in MobileParty.All)
@@ -146,6 +181,12 @@ namespace Armoury
                     try { b = mp.TotalWage; } finally { _skip = was; }
                     before += b; after += a;
                     if (!player && b > 0 && a < b) scale[st] = (float)a / b;
+                    if (1f - x.ResultNumber > capV + 1e-5f && !BkCounts(t))   // 473-b: twierdza na suficie - ile zlota/d kosztuje sufit (zold z sufitem - bez sufitu)
+                    {
+                        int u; bool wn = _noCap; _noCap = true;
+                        try { u = mp.TotalWage; } finally { _noCap = wn; }
+                        capN++; capGold += a - u;
+                    }
                 }
                 catch (Exception e) { Buildings338.Stumble(Buildings338.GWage, "Wage.Daily", e); }
             }
@@ -155,7 +196,8 @@ namespace Armoury
                      + " | zold przed " + before + " po " + after + " oszczednosc " + (before - after) + " zl/d"
                      + " | limit AI x s: " + scale.Count + " twierdz, skalowan " + lim
                      + " | pominiete (BK liczy) " + (Interlocked.Exchange(ref _bkCounts, 0) + Interlocked.Exchange(ref _defCounts, 0)) + " | wywolan " + Interlocked.Exchange(ref _calls, 0)
-                     + " | zalogi AI " + aiMen + " ludzi" + Buildings338.Tail(Buildings338.GWage));
+                     + " | zalogi AI " + aiMen + " ludzi"
+                     + " | 473-b sufit obnizki " + (int)Math.Round(100f * capV) + "%: twierdz na suficie " + capN + ", zold wyzej o " + capGold + " zl/d" + Buildings338.Tail(Buildings338.GWage));
         }
     }
 }
