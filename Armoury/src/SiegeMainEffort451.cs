@@ -140,6 +140,14 @@ namespace Armoury
             }
         }
 
+        /// <summary>452: czy szyk jest szykiem glownym 451 pod ochrona (pasa-lejka 452 wtedy nie porzuca) - tylko odczyt.</summary>
+        internal static bool IsGuardedMain(Formation f)
+        {
+            var gs = _guards;
+            for (int i = 0; f != null && i < gs.Length; i++) { var g = gs[i]; if (g != null && g.On && ReferenceEquals(g.Main, f)) return true; }
+            return false;
+        }
+
         // ------------------------------------------------------------ misja
 
         private bool Siege(Mission m)
