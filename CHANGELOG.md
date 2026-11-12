@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 470-b (12.11) - brak wsadu jedzenia ponizej 2 szt./d na komorke nie podnosi N
+
+**Problem:** autotest 60 dob (`Armoury-2026-11-12_22-47-01.log`, `LP niedobor`): hog N 2.00 z kolejka 2.00 przy braku 1.0 szt./d i zuzyciu 0, sheep 1.97 przy 1.0 szt./d - jedna brakujaca sztuka dziennie daje S_kolejka prawie 2, bo udzial 462-a to brak / (zuzycie + brak), a przy zuzyciu 0 kazdy brak = 100%.
+
+**Przyczyna:** `SupplySignal.QueueShare` (`Armoury/src/SupplySignal.cs`, 462-a) nie ma dolnego progu wielkosci braku; w `ShortageText` brak jedzenia komorki (`miss`) wchodzi do kolejki komorki i do braku swiata (`a[0]`) od pierwszej ulamkowej sztuki.
+
+**Zmiana:** nowy klucz `SupplyFoodShortageFloor` (MCM "Supply Food Shortage Floor", grupa Economy measurements, domyslnie TAK; Settings.cs + McmSettings.cs recznie). Przy TAK i czynnym 462-a: sredni brak wsadu jedzenia / zwierzat komorki (miasto x towar) ponizej `MinFoodShortage` = 2 szt./d (stala) jest zerowany przed kolejka - S_kolejka komorki 1 i brak nie wchodzi do wiersza swiata (zuzycie komorki zostaje w mianowniku). Komorka z brakiem >= 2 szt./d bez zmian. NIE = co do bitu jak przed (takze tekst linii).
+Linia `LP niedobor`: dopisek `470-b brak jedzenia warsztatow ponizej 2.0 szt./d na komorke poza N (...): komorek odrzuconych X (Y szt./d), towarow Z`.
+
+**Ryzyko / co sprawdzic:** regresje - te same czytelniki co 462-a (L6 CraftShortage, zboze w miescie z glodujacymi wsiami nadal N = 2 osobno, `Hungry`), WorldN (L5). Kolizja z 470-a: niezalezne (470-a = S_stos, 470-b = S_kolejka jedzenia), N = max obu. Wiele drobnych brakow w roznych miastach nie sumuje sie juz do braku swiata - swiadomie (prog na komorke). Komorka moze skakac wokol progu 2 szt./d (srednia 28 dob - wolno). Oczekiwanie: hog / sheep wypadaja z N > 1 (brak 1.0 szt./d), butter (17.4 szt./d) zostaje. Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 470-a (12.11) - S_stos (regulator wsi 221) tylko przy naprawde pustym stosie, bez nakrecania liczba decyzji
 
 **Problem:** autotest 60 dob (`Armoury-2026-11-12_22-47-01.log`, linia `LP niedobor` ostatniej doby): "towarow z N swiata > 1: 22 z 22" (WGRANIE 212: 15 z 22). flax / clay / hardwood / cow / hides / marble maja N 1.56 wylacznie z S_stos (kolejka ~1.0), limestone / wool / hog po 1.56 z S_stos. Regulator 221 w tej samej linii: "clay x1.30 decyzji 2, stos 9 dni ... hides x1.30 decyzji 2, stos 22 dni, wool x1.30 decyzji 2, stos 22 dni" - zapas 9-22 dni zuzycia to nie brak, a S_stos rosl z kazda decyzja (1.25 przy 1, 1.56 przy 2, 2 przy 4).

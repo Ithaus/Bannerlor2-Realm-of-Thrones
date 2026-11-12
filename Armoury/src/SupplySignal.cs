@@ -68,6 +68,11 @@ namespace Armoury
         // NIE = 1.25 ^ kolejnych decyzji na suficie przy stosie ponizej ValveStockDaysLow (30) dni, jak przed 470-a.
         private static bool StockEmptyOn { get { var s = Settings.Current; return s == null || s.SupplyStockEmptyOnly; } }
         internal const double StockEmptyDays = 5.0;
+        // 470-b: sredni brak wsadu jedzenia komorki ponizej MinFoodShortage szt./d nie podnosi N (S_kolejka 1) - drobny brak 1 sztuki to szum, nie niedobor.
+        // NIE = kazdy brak jedzenia > 0 liczony udzialem (462-a), jak przed 470-b.
+        private static bool FoodFloorOn { get { var s = Settings.Current; return s == null || s.SupplyFoodShortageFloor; } }
+        internal const double MinFoodShortage = 2.0;
+        private static int _sFloorCells; private static double _sFloorUnits; private static readonly HashSet<ItemCategory> _sFloorCats = new HashSet<ItemCategory>();
         private static int _sStockCut, _sStockUnk;   // 470-a: towary na suficie przy stosie < 30 dni, ale >= 5 dni (odrzucone); na suficie bez migawki po wczytaniu (S_stos 1)
         private static int _sFoodCells; private static double _sFoodMax = 1.0;   // 462-a: komorki jedzenia z N > 1 (udzial) w ostatniej tablicy
 
@@ -838,6 +843,8 @@ namespace Armoury
             var hot = new HashSet<Settlement>();
             int cells = 0, real = 0, qCeil = 0, qOver = 0, softOnly = 0;
             _sFoodCells = 0; _sFoodMax = 1.0;
+            _sFloorCells = 0; _sFloorUnits = 0; _sFloorCats.Clear();
+            bool floorOn = FoodFloorOn;
             int span = Span(today);
             bool growOn = GrowOn;
             int qOverOld = 0, softOnlyOld = 0, growCells = 0;     // 435-N-A: porownanie z dawna miara (poziom / okno) - ile komorek mialoby kolejke > 1
@@ -864,6 +871,8 @@ namespace Armoury
                     if (sqOld > 1.0 + 1e-9) { qOverOld++; if (!(miss > 1e-6)) softOnlyOld++; }
                     bool food = CommodityInputs284.Food(ck.Key), foodShare = food && FoodShareOn;
                     if (food && !foodShare) miss = 0;                 // 462-a klucz NIE: jak 435-N-B takze dla brakow zapisanych przy kluczu TAK
+                    // 470-b: brak jedzenia ponizej MinFoodShortage szt./d - poza kolejka komorki i poza brakiem swiata (wiersz swiata sumuje tylko komorki ponad progiem)
+                    if (foodShare && floorOn && miss > 1e-6 && miss < MinFoodShortage) { _sFloorCells++; _sFloorUnits += miss; _sFloorCats.Add(ck.Key); miss = 0; }
                     double want = miss + (growOn ? grow : softW);
                     // 462-a-p (recenzja D1): udzial jedzenia wobec ZUZYCIA warsztatow (got), nie sprzedazy targu - mieso robia tez ukryci rzemieslnicy BK (MarketSales je sledzi),
                     // a jest wsadem piekarni; sprzedaz mieszczanom w mianowniku dawala N ~ 1 przy pustych piekarniach.
@@ -939,6 +948,9 @@ namespace Armoury
                 }
                 sb.Append(']');
             }
+            if (FoodShareOn && FoodFloorOn)
+                sb.Append(" | 470-b brak jedzenia warsztatow ponizej ").Append(F1(MinFoodShortage)).Append(" szt./d na komorke poza N (klucz Supply Food Shortage Floor TAK): komorek odrzuconych ")
+                  .Append(_sFloorCells).Append(" (").Append(F1(_sFloorUnits)).Append(" szt./d), towarow ").Append(_sFloorCats.Count);
             if (StockEmptyOn)
                 sb.Append(" | 470-a S_stos tylko przy pustym stosie (klucz Supply Stock Empty Only TAK): stos < ").Append(F1(StockEmptyDays)).Append(" dni zuzycia, S_stos = 2 - dni / ").Append(F1(StockEmptyDays))
                   .Append("; odrzuconych towarow (na suficie, stos ponizej progu 221, ale nie pusty) ").Append(_sStockCut).Append(", na suficie bez migawki decyzji w tej sesji (S_stos 1) ").Append(_sStockUnk);

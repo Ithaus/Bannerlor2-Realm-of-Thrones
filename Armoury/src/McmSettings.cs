@@ -10632,6 +10632,10 @@ namespace Armoury
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool SupplyFoodInputShare { get; set; } = true;
 
+        [SettingPropertyBool("Supply Food Shortage Floor", HintText = "with Supply Chain Log and Supply Food Input Share: a workshop food input (grain, fruit, butter, meat and the like) that a town misses by less than 2 pieces a day on average no longer counts as a shortage of that good in that town, nor in the world total. One missing piece now and then is noise, not want; a town that really lacks the food still shows it. Off = any missing food input counts towards the shortage, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool SupplyFoodShortageFloor { get; set; } = true;
+
         [SettingPropertyBool("Supply Stock Empty Only", HintText = "with Supply Chain Log: a village good counts as short from its stock only when the stock is really empty - less than 5 days of use - while the village output of that good is already at the step ceiling. The signal then goes from 1 at 5 days to 2 at an empty stock and falls back by itself as the stock refills; how many times the village rule has raised the output no longer adds to it. Goods with stock for 9 to 30 days of use no longer look short. Off = the signal grows by x1.25 with every raise at the ceiling while the stock is under 30 days, as before", RequireRestart = false)]
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool SupplyStockEmptyOnly { get; set; } = true;
@@ -15590,6 +15594,7 @@ namespace Armoury
             s.SupplyQueueGrowth = SupplyQueueGrowth;
             s.SupplyFoodInputShare = SupplyFoodInputShare;
             s.SupplyStockEmptyOnly = SupplyStockEmptyOnly;
+            s.SupplyFoodShortageFloor = SupplyFoodShortageFloor;
             s.WorkshopFollowGoodsShortage = WorkshopFollowGoodsShortage;
             s.MeasureCraftRule = MeasureCraftRule;
             s.MeasureRegaleShelf = MeasureRegaleShelf;
