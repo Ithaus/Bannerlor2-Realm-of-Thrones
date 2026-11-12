@@ -65,6 +65,7 @@ namespace Armoury
             new Move("arm_estates_village", MenuAffairs, "Armoury", "Estates and livelihood - the estates of this place and how well they live."),
             new Move(DistrictMenu.OptVillage, MenuAffairs, "Armoury", "Look over the district - the villages around, their lords, their herds and their works."),
             new Move(DistrictWorks.OptVillage, MenuAffairs, "Armoury", "Invest in the district's works - pay the villagers for boats, herds, ploughs or tools."),
+            new Move("arm_gear_fund", MenuAffairs, "Armoury", "Fund gear - pay for the tools, boats or rows this village's hands lack, for a yearly rent."),   // 435-L7-p
             new Move("bee_village_root", MenuAffairs, "BEE", "Living Economy - the village's purse, stores and market."),
             new Move("bannerkings_village_submenu", MenuAffairs, "BK", "Banner Kings - demesne, titles, village projects and lands."),
             new Move("rc_home_buy_village", MenuAffairs, "RC", "Buy a house - a roof of your own, with a strongbox and a chest."),

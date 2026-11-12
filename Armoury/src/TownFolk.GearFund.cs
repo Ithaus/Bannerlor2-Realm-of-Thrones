@@ -36,6 +36,7 @@ namespace Armoury
         internal static GearPay GearFundPay(Hero payer, Village vil, Settlement mk, double matBudget, double k, double workPerMat, bool outsideTick)
         {
             var r = new GearPay();
+            bool gotMat = false; int pay0 = 0; Hero payerRef = null;
             try
             {
                 if (!DaWorksOn || OffMain()) { r.Why = GfRoad; return r; }
@@ -63,11 +64,19 @@ namespace Armoury
                 if (spent <= 0) { r.Why = !none && cap > 0 ? GfPriceCap : GfNoShelf; return r; }
                 long wage = (long)Math.Floor(k * spent), work = (long)Math.Floor(workPerMat * spent);
                 int c0 = mk.Town.Gold, v0 = vil.Gold, p0 = payer != null ? payer.Gold : 0;
+                // 435-L7-p (recenzje N7 / stab. 4): sztuki juz zeszly z polki - material zapisany OD RAZU; wyjatek dalej = Why GfErr z materialem i zaplata zmierzona
+                // w catch na zywej kiesie (wolajacy przyznaje jednostki za zaplacony material - nic w proznie)
+                r.Mat = spent; gotMat = true; pay0 = p0; payerRef = payer;
                 if (payer != null)
                 {
                     // bohater -> kasa targu: material i place rzemieslnikow (lud bierze swoja czesc z kasy nizej)
+                    double car0 = mf.CarBuy;
                     GiveGoldAction.ApplyForCharacterToSettlement(payer, mk, (int)Math.Min(int.MaxValue, spent + wage), true);
-                    mf.Sale[MixBuild] += spent;                                 // sprzedaz kupcow targu - podstawa robocizny (jak material robot gminy)
+                    // 435-L7-p (recenzje N1 / stab. 2): zakup GRACZA z menu nasluch zlota liczy juz jako zakup w miescie (CarBuy = material + place) - bez drugiego
+                    // dopisania do sprzedazy kupcow; place rzemieslnikow ida do ludu wprost (Earn nizej), wiec schodza z tej podstawy. Pan AI - jak dotad (Sale).
+                    double carAdd = mf.CarBuy - car0;
+                    if (carAdd > 0) mf.CarBuy -= Math.Min(carAdd, (double)wage);
+                    else mf.Sale[MixBuild] += spent;                            // sprzedaz kupcow targu - podstawa robocizny (jak material robot gminy)
                 }
                 long fin = 0;
                 if (wage > 0)
@@ -101,7 +110,17 @@ namespace Armoury
                 r.Why = GfOk;
                 return r;
             }
-            catch (Exception e) { DaStumble("GearFundPay", e); if (r.Mat <= 0) r.Why = GfErr; return r; }
+            catch (Exception e)
+            {
+                DaStumble("GearFundPay", e);
+                r.Why = GfErr;
+                if (gotMat)
+                {
+                    // sztuki zeszly: wklad = to, co naprawde wyszlo z kiesy bohatera (miasto-fundator: wartosc wlasnego towaru)
+                    try { r.Paid = payerRef != null ? Math.Max(0L, (long)pay0 - payerRef.Gold) : r.Mat; } catch { r.Paid = 0; }
+                }
+                return r;
+            }
         }
     }
 }

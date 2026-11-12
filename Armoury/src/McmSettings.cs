@@ -10256,9 +10256,13 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool VillageGearTownsInvest { get; set; } = false;
 
-        [SettingPropertyBool("Village Gear Player Funds", HintText = "with Village Gear: adds 'Fund gear for this village's hands' to the village menu. You pay the full price of the gear the hands lack - materials bought at the market town, wages to its craftsmen, the rest to the villagers - and the village pays you a yearly rent (Village Gear Rent) while the gear lasts. Raiders burn funded gear with the homesteads they empty. Off = the menu as before", RequireRestart = false)]
+        [SettingPropertyBool("Village Gear Player Funds", HintText = "with Village Gear: adds 'Fund gear for this village's hands' to the village menu. You pay for the gear the hands lack - materials bought at the market town and wages to its craftsmen (with Village Gear Funder Pays Village Work also the villagers' own work) - and the village pays you a yearly rent (Village Gear Rent) while the gear lasts. Raiders burn funded gear with the homesteads they empty. Off = the menu as before", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool VillageGearPlayerFunds { get; set; } = false;
+
+        [SettingPropertyBool("Village Gear Funder Pays Village Work", HintText = "with Village Gear: whoever funds a village's gear (a lord, a town, you) also pays the villagers for their own work on it, so the price is the full price of a gear set and the yearly rent is counted on all of it. Off (the default) = the funder pays what the village itself pays for gear: the materials from the market town's shelves and the town's craftsmen, nothing more - one price for one set, and no coin that drifts back to the lord through the village's dues while rent is still charged on it", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool VillageGearFunderPaysVillageWork { get; set; } = false;
 
         [SettingPropertyFloatingInteger("Village Gear Rent", 0.00f, 1.00f, "0.00", HintText = "yearly rent a village pays to whoever funded its gear, as a share of the sum paid (0.20 = a fifth a year). It runs only while the village stands unraided and is not at war with the funder; it is paid when the village's carts come home, from at most half of the village's part of the takings; rent owed for more than 28 days is forgiven. What the funder is owed shrinks each year as the gear wears (mines and felling 12%, boats 10%, traps 8%, fields 6%, orchards 3%) and with every fire", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
@@ -15311,6 +15315,7 @@ namespace Armoury
             s.VillageGearTownsInvest = VillageGearTownsInvest;
             s.VillageGearPlayerFunds = VillageGearPlayerFunds;
             s.VillageGearRent = VillageGearRent;
+            s.VillageGearFunderPaysVillageWork = VillageGearFunderPaysVillageWork;
             s.WorkshopBenches = WorkshopBenches;
             s.SideVillageCraftChangeDays = SideVillageCraftChangeDays;
             s.SideVillageCraftTreeDays = SideVillageCraftTreeDays;

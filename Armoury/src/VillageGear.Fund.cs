@@ -79,6 +79,14 @@ namespace Armoury
         private static double _dFundU;                    // jednostki od fundatorow od ostatniej linii sprzetu (kontrola sprzetu L3)
         private static double _gIn, _gDecay, _gBurn, _gDead, _gSmall, _gShift;   // _gShift (435-L4-p / L7-p): odstawione zmiana zajecia
         private static int _lClans, _lBank, _lCrown, _lBlocked, _lNeed, _lNoSurplus, _lVil, _lWarMk, _lBudget;
+        // 435-L7-p: dluznik drabiny, rod bez miary budzetu, naleznosc zdjeta z wpisami, pamiec naleznego (kontrola), pierwsza doba sesji bez wyceny (rody / miasta dnia przeniesione na jutro)
+        private static int _lDebtor, _lNoMeasure, _fundWait;
+        private static double _accGone, _prevAcc = double.NaN;
+        private static bool _carry, _carryNext;
+        /// <summary>435-L7-p (recenzja ksiegi S2, klucz Village Gear Funder Pays Village Work): NIE (domyslnie) - fundator placi jak gmina: material i rzemieslnicy
+        /// miasta (jedna cena jednostki, wierzytelnosc = to, co naprawde wyszlo z kiesy na sprzet); TAK - jak 435-L7: pelna cena jednostki, reszta jako "praca wsi"
+        /// do kiesy wsi (i w wierzytelnosci).</summary>
+        private static bool PaysWork { get { var s = Settings.Current; return s != null && s.VillageGearFunderPaysVillageWork; } }
         private static double _lWorld, _lPace;
         private static int _tLooked, _tSiege, _tKwit, _tDebt, _tCoffer, _tNoTable, _tNoShort, _tVil;
         private static double _rAcc, _rLapsed; private static long _rPaid, _rOut, _rIn, _rChest, _rHalf; private static int _rPaidN, _rHeld, _rWarCart;
@@ -88,7 +96,7 @@ namespace Armoury
         {
             _claims.Clear(); _claimN = 0; Array.Clear(_ring, 0, FundCycle); for (int i = 0; i < FundCycle; i++) _ringDay[i] = int.MinValue;
             _fundDay = int.MinValue; _fLoadBad = 0; _fLoadNote = "nowa kampania albo zapis bez arm_lpf (bez wierzytelnosci)";
-            _startLine7 = false; _vilById = null; _catsOf = null; _burnMsg.Clear(); _prevG = double.NaN; _prevGDay = int.MinValue; _st7All = 0; _dFundU = 0;
+            _startLine7 = false; _vilById = null; _catsOf = null; _burnMsg.Clear(); _prevG = double.NaN; _prevGDay = int.MinValue; _st7All = 0; _dFundU = 0; _prevAcc = double.NaN; _carry = false;
             FundZero();
         }
 
@@ -98,6 +106,7 @@ namespace Armoury
             Array.Clear(_fWork, 0, FKinds); Array.Clear(_fN, 0, FKinds); Array.Clear(_fPcs, 0, FKinds); Array.Clear(_fWhy, 0, _fWhy.Length);
             _fGap = 0; _fPcsBad = 0; _gIn = _gDecay = _gBurn = _gDead = _gSmall = _gShift = 0;
             _lClans = _lBank = _lCrown = _lBlocked = _lNeed = _lNoSurplus = _lVil = _lWarMk = _lBudget = 0;
+            _lDebtor = _lNoMeasure = _fundWait = 0; _accGone = 0;
             _tLooked = _tSiege = _tKwit = _tDebt = _tCoffer = _tNoTable = _tNoShort = _tVil = 0;
             _rAcc = _rLapsed = 0; _rPaid = _rOut = _rIn = _rChest = _rHalf = 0; _rPaidN = _rHeld = _rWarCart = 0; _st7 = 0; _ms7 = 0;
         }
@@ -119,7 +128,7 @@ namespace Armoury
         {
             unchecked { uint h = 2166136261; if (x != null) for (int i = 0; i < x.Length; i++) { h ^= x[i]; h *= 16777619; } return (int)(h & 0x7fffffff); }
         }
-        private static bool MyDay(string id, int today) { return ((SHash(id) % FundCycle) + today) % FundCycle == 0; }
+        private static bool MyDay(string id, int today) { return ((SHash(id) % FundCycle) + today) % FundCycle == 0 || (_carry && ((SHash(id) % FundCycle) + today - 1) % FundCycle == 0); }   // 435-L7-p: _carry - doba przeniesiona z pierwszej doby sesji
 
         private static Village VillageOf(string dist)
         {
@@ -162,27 +171,30 @@ namespace Armoury
             try { return a != null && b != null && a != b && FactionManager.IsAtWarAgainstFaction(a, b); } catch { return false; }
         }
 
-        /// <summary>Strona wierzytelnosci: rod (glowa rodu) albo miasto. false - fundatora juz nie ma (rod wymarl, osada nie jest miastem).</summary>
-        private static bool Funder(string who, out Hero leader, out Settlement town, out IFaction faction)
+        /// <summary>Strona wierzytelnosci: rod (glowa rodu) albo miasto. 1 - jest; 0 - fundatora juz nie ma (rod wymarl, osada nie jest miastem); 2 - rod zyje, ale
+        /// chwilowo bez zywej glowy (435-L7-p: wierzytelnosc ZOSTAJE, czynsz wstrzymany do nowej glowy rodu - stan przejsciowy nie kasuje wpisu na stale).</summary>
+        private static int Funder(string who, out Hero leader, out Settlement town, out IFaction faction)
         {
             leader = null; town = null; faction = null;
-            if (string.IsNullOrEmpty(who) || who.Length < 3) return false;
+            if (string.IsNullOrEmpty(who) || who.Length < 3) return 0;
             string id = who.Substring(2);
             if (who[0] == 'c')
             {
                 var clan = DistrictWorks.ClanOf(id);
-                if (clan == null || clan.IsEliminated || clan.Leader == null || !clan.Leader.IsAlive) return false;
-                leader = clan.Leader; faction = clan.MapFaction;
-                return true;
+                if (clan == null || clan.IsEliminated) return 0;
+                faction = clan.MapFaction;
+                if (clan.Leader == null || !clan.Leader.IsAlive) return 2;
+                leader = clan.Leader;
+                return 1;
             }
             if (who[0] == 't')
             {
                 var st = Settlement.Find(id);
-                if (st == null || !st.IsTown || st.Town == null) return false;
+                if (st == null || !st.IsTown || st.Town == null) return 0;
                 town = st; faction = st.MapFaction;
-                return true;
+                return 1;
             }
-            return false;
+            return 0;
         }
 
         // ============================================================ plan zakupu okregu (brakujace jednostki)
@@ -237,7 +249,9 @@ namespace Armoury
                 lock (Gate) p = PlanOf(v, mMax, cats);
                 if (p == null || p.Recs.Count == 0 || !(p.Mat >= 1.0)) return 0;
                 double k = WageK();
-                double wr = Math.Max(0.0, p.Price / p.Mat - (1.0 + k));       // praca wsi na zlotowke materialu: reszta ceny jednostki po materiale i rzemieslnikach
+                // praca wsi na zlotowke materialu: reszta ceny jednostki po materiale i rzemieslnikach - tylko przy kluczu Village Gear Funder Pays Village Work
+                // (435-L7-p: domyslnie fundator placi jak gmina - material + rzemieslnicy; moneta "pracy wsi" wracala do pana danina od skarbca, a czynsz liczyl sie i od niej)
+                double wr = PaysWork ? Math.Max(0.0, p.Price / p.Mat - (1.0 + k)) : 0.0;
                 double matBudget = Math.Min(p.Mat, cap / (1.0 + k + wr));
                 if (!(matBudget >= 1.0)) { why = WSmall; return 0; }
                 pay = TownFolk.GearFundPay(payer, v, mk, matBudget, k, wr, outside);
@@ -245,7 +259,8 @@ namespace Armoury
                 lock (Gate)
                 {
                     if (pay.Why >= 0 && pay.Why < _fWhy.Length) _fWhy[pay.Why]++;
-                    if (pay.Why != TownFolk.GfOk || pay.Mat <= 0) { why = WPay + pay.Why; return 0; }
+                    // 435-L7-p (recenzje N7 / stab. 4): wyjatek PO zdjeciu sztuk z polki (GfErr z materialem) - jednostki i wierzytelnosc za to, co naprawde zaplacone
+                    if ((pay.Why != TownFolk.GfOk && !(pay.Why == TownFolk.GfErr && pay.Mat > 0)) || pay.Mat <= 0) { why = WPay + pay.Why; return 0; }
                     double share = Math.Min(1.0, pay.Mat / p.Mat), price = share * p.Price;
                     string dist = v.Settlement.StringId;
                     List<Claim> cl;
@@ -290,8 +305,20 @@ namespace Armoury
             if (!lords && !towns && !s.VillageGearPlayerFunds && _claimN == 0) return;   // nic czynnego i zadnej wierzytelnosci - bez linii (jak przed 435-L7)
             long t0 = Stopwatch.GetTimestamp();
             try { ClaimsDay(s, today); } catch (Exception e) { Stumble7("ClaimsDay", e); }
-            if (lords) { try { FundLords(s, today); } catch (Exception e) { Stumble7("FundLords", e); } }
-            if (towns) { try { FundTowns(s, today); } catch (Exception e) { Stumble7("FundTowns", e); } }
+            // 435-L7-p (stabilnosc 5): pierwsza doba sesji - potrzeby i ceny jednostek to pamiec doby (licza sie w BeforeProduction, PO tym kroku); rody i miasta
+            // tej doby nie traca cyklu 28 dob: ich doba przechodzi na jutro
+            bool ready; lock (Gate) ready = _valuedAll;
+            if (!ready && (lords || towns)) { _fundWait = 1; _carryNext = true; }
+            else
+            {
+                _carry = _carryNext; _carryNext = false;
+                try
+                {
+                    if (lords) { try { FundLords(s, today); } catch (Exception e) { Stumble7("FundLords", e); } }
+                    if (towns) { try { FundTowns(s, today); } catch (Exception e) { Stumble7("FundTowns", e); } }
+                }
+                finally { _carry = false; }
+            }
             try
             {
                 string[] msgs = null;
@@ -311,6 +338,7 @@ namespace Armoury
             double rate = RentRate(s) / 364.0;
             var known = new Dictionary<string, IFaction>(StringComparer.Ordinal);
             var gone = new HashSet<string>(StringComparer.Ordinal);
+            var wait = new HashSet<string>(StringComparer.Ordinal);   // 435-L7-p: rod chwilowo bez glowy - czynsz wstrzymany, wpis zostaje
             lock (Gate)
             {
                 foreach (var kv in _claims)
@@ -327,14 +355,15 @@ namespace Armoury
                         {
                             var c = cl[i];
                             IFaction ff;
-                            if (!known.TryGetValue(c.Who, out ff) && !gone.Contains(c.Who))
+                            if (!known.TryGetValue(c.Who, out ff) && !gone.Contains(c.Who) && !wait.Contains(c.Who))
                             {
                                 Hero h; Settlement t;
-                                if (Funder(c.Who, out h, out t, out ff)) known[c.Who] = ff; else gone.Add(c.Who);
+                                int fs = Funder(c.Who, out h, out t, out ff);
+                                if (fs == 1) known[c.Who] = ff; else if (fs == 2) wait.Add(c.Who); else gone.Add(c.Who);
                             }
-                            if (gone.Contains(c.Who) || v == null) { _gDead += c.G; cl.RemoveAt(i); _claimN--; continue; }
+                            if (gone.Contains(c.Who) || v == null) { _gDead += c.G; _accGone += c.Acc; cl.RemoveAt(i); _claimN--; continue; }
                             double day = c.G * rate;
-                            if (normal && !AtWar(ff, vf)) { c.Acc += day; _rAcc += day; } else _rHeld++;
+                            if (normal && !wait.Contains(c.Who) && !AtWar(ff, vf)) { c.Acc += day; _rAcc += day; } else _rHeld++;
                             double max = RentKeepDays * day;
                             if (c.Acc > max) { _rLapsed += c.Acc - max; c.Acc = max; }
                             Rec r = recs != null ? Find(recs, c.Part) : null;
@@ -342,7 +371,7 @@ namespace Armoury
                             if (!(wear > 0)) wear = ClaimWearDefault;
                             double d = c.G * (1.0 - Math.Pow(1.0 - Math.Min(WearMaxYear, wear), 1.0 / 364.0));
                             if (d > 0 && !double.IsNaN(d)) { c.G -= d; _gDecay += d; }
-                            if (c.G < 1.0 && c.Acc < 1.0) { _gSmall += c.G; cl.RemoveAt(i); _claimN--; }
+                            if (c.G < 1.0 && c.Acc < 1.0) { _gSmall += c.G; _accGone += c.Acc; cl.RemoveAt(i); _claimN--; }
                         }
                     }
                     catch (Exception e) { _st7++; _st7All++; if (_err.Add("L7.ClaimsDay(okreg)")) { try { Log.Error("VillageGear.Fund.ClaimsDay(okreg)", e); } catch { } } }
@@ -418,7 +447,9 @@ namespace Armoury
             }
             world *= 364.0;
             _lWorld = world;
-            double budget = pace * world - ring, spent = 0;
+            // 435-L7-p (stabilnosc 6): okno tempa (28 dob) = cykl rodow (28 dob), wiec caly pulap bralyby zawsze te same rody; dzienna czesc pulapu (2 / 28) daje kolej
+            // rodom kazdej doby, a suma okna dalej nie przekracza pulapu
+            double budget = Math.Min(pace * world - ring, 2.0 * pace * world / FundCycle), spent = 0;
             foreach (var clan in Clan.All)
             {
                 try
@@ -433,9 +464,12 @@ namespace Armoury
                     if (IronBank.TryGetDebt(clan, out pr, out ms, out df, out dd)) { _lBank++; continue; }
                     if (DebtLadder.CrownLoanOf(clan) > 0) { _lCrown++; continue; }
                     if (DebtLadder.FolkLoanBlocked(clan)) { _lBlocked++; continue; }
+                    // 435-L7-p (stabilnosc 1): kazdy dluznik drabiny (dlug zoldu, dlug wobec korony inny niz 431, pozyczka rady / ludu) - pozyczka nie finansuje inwestycji
+                    if (DebtLadder.On && DebtLadder.IsDebtor(clan)) { _lDebtor++; continue; }
                     double f, G, R;
                     int band = KingdomTreasury.NeedOfClan(clan, out f, out G, out R);
                     if (band == 0 || band == 1) { _lNeed++; continue; }        // rod w potrzebie (kiesa ponizej 2R) dostaje doplate / pozyczke na zold - nie funduje
+                    if (band == 3 && ClanBudget.On) { _lNoMeasure++; continue; }   // 435-L7-p: budzet 166 czynny, a rod bez miary (dluznik, zajecie, bez budzetu) - nie funduje
                     int wages = 0; try { var pp = leader.PartyBelongedTo; wages = pp != null ? Math.Max(0, pp.TotalWage) : 0; } catch { wages = 0; }
                     long surplus = (long)leader.Gold - ((long)resDays * wages + resFlat);
                     double want = surplusShare * surplus;
@@ -596,7 +630,7 @@ namespace Armoury
                         want = Math.Min(want, Math.Max(0, home.Gold));
                         if (want < 1) continue;
                         Hero leader; Settlement town; IFaction ff;
-                        if (!Funder(kv.Key, out leader, out town, out ff)) continue;                  // fundatora nie ma - wierzytelnosc zdejmie doba
+                        if (Funder(kv.Key, out leader, out town, out ff) != 1) continue;              // fundatora nie ma (wierzytelnosc zdejmie doba) albo rod chwilowo bez glowy (czeka)
                         if (AtWar(ff, vf)) { lock (Gate) _rWarCart++; continue; }
                         int had = home.Gold; long got, inn;
                         if (leader != null)
@@ -618,6 +652,7 @@ namespace Armoury
                         if (got <= 0) continue;
                         MoneyLedger.CartWorksInWindow(cart, (int)got, 0);                              // okno powrotu wozu: kiesa wsi z utargu brutto (czynsz nie jest "zniklo")
                         MoneyLedger.Note169(MoneyLedger.N169Other, home.Settlement, -(int)got);        // kiesa wsi poza tickiem - nazwane ("inne")
+                        StartCalibration.KsVilOut(home.Settlement, got);                               // 435-L7-p: staly wydatek wsi spoza koszyka (jak danina DS) - alfa netto KS
                         paidAll += got;
                         lock (Gate)
                         {
@@ -662,13 +697,17 @@ namespace Armoury
             if (AtWar(Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null, v.Settlement.MapFaction)) { q.Why = "You are at war with this village's realm."; return q; }
             if (v.VillageState != Village.VillageStates.Normal) { q.Why = "The village has been raided."; return q; }
             Plan p; lock (Gate) p = PlanOf(v, 1.0, null);
-            if (p == null || !(p.Mat >= 1.0) || !(p.Price >= FundMinGold)) { q.Why = "Every hand here already has gear."; return q; }
+            // 435-L7-p: cena dla gracza ta sama co dla panow - przy kluczu Village Gear Funder Pays Village Work pelna cena jednostki, bez niego material + rzemieslnicy
+            double full = p != null ? (PaysWork ? p.Price : Math.Min(p.Price, p.Mat * (1.0 + WageK()))) : 0.0;
+            if (p == null || !(p.Mat >= 1.0) || !(full >= FundMinGold)) { q.Why = "Every hand here already has gear."; return q; }
             q.Mk = DistrictWorks.MarketOf(v);
             q.Town = q.Mk != null && q.Mk.Name != null ? q.Mk.Name.ToString() : "the market town";
             if (q.Mk == null || q.Mk.Town == null || !TownFolk.DaWorksOn) { q.Why = "No market town will sell the materials."; return q; }
-            double share = Math.Min(1.0, Math.Max(0, Hero.MainHero != null ? Hero.MainHero.Gold : 0) / p.Price);
+            // 435-L7-p (recenzje N6 / stab. 7): jedna regula dla trzech fundatorow - bez zakupu u kupcow miasta, z ktorym gracz wojuje
+            if (AtWar(Clan.PlayerClan != null ? Clan.PlayerClan.MapFaction : null, q.Mk.MapFaction)) { q.Why = "No market town will sell the materials - you are at war with " + q.Town + "."; return q; }
+            double share = Math.Min(1.0, Math.Max(0, Hero.MainHero != null ? Hero.MainHero.Gold : 0) / full);
             double units = 0; foreach (var u in p.Units) units += u;
-            q.Units = units * share; q.Gold = (long)Math.Floor(p.Price * share); q.Mat = (long)Math.Floor(p.Mat * share);
+            q.Units = units * share; q.Gold = (long)Math.Floor(full * share); q.Mat = (long)Math.Floor(p.Mat * share);
             q.Rent = (long)Math.Floor(q.Gold * RentRate(s));
             q.Kind = p.Kind >= 0 ? DistrictWorks.KindName[p.Kind] : "gear";
             if (q.Gold < FundMinGold) q.Why = "You need at least " + FundMinGold.ToString("N0", Inv) + " denars.";
@@ -678,7 +717,7 @@ namespace Armoury
         private static string QuoteText(PQuote q)
         {
             return "Pay for " + Math.Max(1.0, Math.Round(q.Units)).ToString("N0", Inv) + " sets of " + q.Kind + ": " + q.Gold.ToString("N0", Inv) + "{GOLD_ICON} (" + q.Mat.ToString("N0", Inv)
-                   + " for materials from " + q.Town + ", the rest to craftsmen and villagers). The village pays you " + q.Rent.ToString("N0", Inv) + "{GOLD_ICON} a year while the gear lasts.";
+                   + " for materials from " + q.Town + (PaysWork ? ", the rest to craftsmen and villagers" : ", the rest to its craftsmen") + "). The village pays you " + q.Rent.ToString("N0", Inv) + "{GOLD_ICON} a year while the gear lasts.";
         }
 
         private static bool FundCondition(MenuCallbackArgs args)
@@ -760,10 +799,30 @@ namespace Armoury
         private static void Line7(int today, Settings s)
         {
             double gAll = 0; int n = 0; var gk = new double[FKinds]; double accAll = 0;
+            double overG = 0; int overN = 0;                                  // 435-L7-p: wierzytelnosci czesci ponad wartosc jej sprzetu (K x cena jednostki) - pomiar
             string pid = null; try { pid = Clan.PlayerClan != null ? "c:" + Clan.PlayerClan.StringId : null; } catch { }
             lock (Gate)
                 foreach (var cl in _claims.Values)
-                    foreach (var c in cl) { gAll += c.G; accAll += c.Acc; n++; gk[c.Who == pid ? FPlayer : (c.Who.Length > 0 && c.Who[0] == 't' ? FTown : FLord)] += c.G; }
+                {
+                    Dictionary<string, double> byPart = null;
+                    foreach (var c in cl)
+                    {
+                        gAll += c.G; accAll += c.Acc; n++; gk[c.Who == pid ? FPlayer : (c.Who.Length > 0 && c.Who[0] == 't' ? FTown : FLord)] += c.G;
+                        if (byPart == null) byPart = new Dictionary<string, double>(StringComparer.Ordinal);
+                        double x; byPart.TryGetValue(c.Part ?? "", out x); byPart[c.Part ?? ""] = x + c.G;
+                    }
+                    if (byPart != null && cl.Count > 0)
+                    {
+                        List<Rec> recs; _byDist.TryGetValue(cl[0].Dist ?? "", out recs);
+                        foreach (var kv in byPart)
+                        {
+                            Rec r = recs != null ? Find(recs, kv.Key) : null;
+                            if (r == null || !(r.Unit > 1e-6) || r.K < 0) continue;
+                            double val = r.K * r.Unit;
+                            if (kv.Value > val + 1.0) { overG += kv.Value - val; overN++; }
+                        }
+                    }
+                }
             bool log = s.LogEnabled;
             double rate = RentRate(s);
             if (log && !_startLine7)
@@ -776,7 +835,7 @@ namespace Armoury
                          + "najwyzej Ds Works Wage Per Material x material -> lud, reszta (praca wsi) -> kiesa wsi; bez materialu - bez zakupu | wierzytelnosc = wklad; czynsz = wierzytelnosc x "
                          + F2(rate) + " / 364 na dobe (wies Normal, bez wojny), placony przy powrocie wozu z czesci wsi (najwyzej polowa czesci wsi z wozu; przy uldze pana tylko ponad skrzynie); nalezne ponad "
                          + RentKeepDays + " dob przepada; wierzytelnosc gasnie wedlug tabeli zuzycia rodzaju (takze przy zuzyciu sprzetu 0) i o ogien | panowie: wlasna doba rodu co " + FundCycle
-                         + " dob, progi District Works Ai (Reserve Days / Reserve Flat / Surplus Share / World Pace), bez dlugu Banku, pozyczki korony, zaleglosci i potrzeby; czesci z m < " + F2(FundMMax)
+                         + " dob, progi District Works Ai (Reserve Days / Reserve Flat / Surplus Share / World Pace), bez dlugu Banku, pozyczki korony, zaleglosci, dlugu drabiny, potrzeby i bez rodow bez miary budzetu; dzienna czesc tempa swiata 2 / " + FundCycle + "; czesci z m < " + F2(FundMMax)
                          + " | miasta: wlasna doba co " + FundCycle + " dob, zero rachunkow wsi, zero dlugu rady, kasa >= " + F2(TownCofferTimes) + " x zapas, najwyzej " + F2(TownSurplusShare)
                          + " nadwyzki, tylko wsad wlasnych warsztatow z N > 1 (wymaga Supply Chain Log: " + (SupplySignal.On ? "TAK" : "NIE - miasta nie funduja") + ") | droga prawdziwego materialu (Ds Works Real Material): "
                          + (TownFolk.DaWorksOn ? "czynna" : "NIECZYNNA - nikt nie funduje") + " | kolejnosc doby: po TownFolk.DaWorksRun, przed migawka MBuild.");
@@ -796,7 +855,7 @@ namespace Armoury
                   .Append(", polka bez materialu ").Append(_fWhy[TownFolk.GfNoShelf]).Append(", material ponad sufit ceny ").Append(_fWhy[TownFolk.GfPriceCap]).Append(", platnik bez zlota ").Append(_fWhy[TownFolk.GfNoGold])
                   .Append(", wyjatek ").Append(_fWhy[TownFolk.GfErr])
                   .Append(" | panowie (").Append(s.VillageGearLordsInvest ? "TAK" : "NIE").Append("): rodow w swojej dobie ").Append(_lClans).Append(", odrzucone: dlug Banku ").Append(_lBank).Append(", pozyczka korony ").Append(_lCrown)
-                  .Append(", zaleglosc drabiny ").Append(_lBlocked).Append(", w potrzebie ").Append(_lNeed).Append(", bez nadwyzki ").Append(_lNoSurplus).Append(", tempo swiata wyczerpane ").Append(_lBudget)
+                  .Append(", zaleglosc drabiny ").Append(_lBlocked).Append(", dluznik drabiny ").Append(_lDebtor).Append(", w potrzebie ").Append(_lNeed).Append(", bez miary budzetu ").Append(_lNoMeasure).Append(", bez nadwyzki ").Append(_lNoSurplus).Append(", tempo swiata wyczerpane ").Append(_lBudget)
                   .Append("; wsi z proba zakupu ").Append(_lVil).Append(", targ wroga ").Append(_lWarMk).Append("; tempo swiata w oknie ").Append(FundCycle).Append(" dob ").Append((100.0 * _lPace).ToString("0.0000", Inv))
                   .Append("% rocznej produkcji wsi (").Append(N0(_lWorld)).Append(" zl/rok; pulap ").Append((100.0 * Math.Max(0f, Math.Min(0.1f, s.DistrictWorksAiWorldPace))).ToString("0.00", Inv)).Append("%)")
                   .Append(" | miasta (").Append(s.VillageGearTownsInvest ? "TAK" : "NIE").Append("): w swojej dobie ").Append(_tLooked).Append(", odrzucone: oblezenie ").Append(_tSiege).Append(", rachunki wsi ").Append(_tKwit)
@@ -811,10 +870,16 @@ namespace Armoury
                 if (_prevGDay == today - 1 && !double.IsNaN(_prevG))
                     sb.Append(" | kontrola ksiegi: dzis - (wczoraj + przybylo - wygaslo - spalone - odstawione - znikle) = ").Append(F2(gAll - (_prevG + _gIn - _gDecay - _gBurn - _gShift - _gDead - _gSmall)));
                 else sb.Append(" | kontrola ksiegi: brak wczorajszej sumy (pierwsza doba sesji)");
+                sb.Append(" | wierzytelnosci ponad wartosc sprzetu czesci (K x cena jednostki): ").Append(N0(overG)).Append(" zl w ").Append(overN).Append(" czesciach")
+                  .Append(" | cena fundatora: ").Append(PaysWork ? "pelna cena jednostki z praca wsi (Village Gear Funder Pays Village Work TAK)" : "jak gmina - material + rzemieslnicy (praca wsi 0)")
+                  .Append(_fundWait > 0 ? " | pierwsza doba sesji bez wyceny czesci - rody i miasta tej doby funduja jutro" : "");
+                if (!double.IsNaN(_prevAcc) && _prevGDay == today - 1)
+                    sb.Append(" | kontrola naleznego czynszu: dzis - (wczoraj + naliczone - zaplacone - przepadle - zdjete z wpisami ").Append(F1(_accGone)).Append(") = ")
+                      .Append(F2(accAll - (_prevAcc + _rAcc - _rPaid - _rLapsed - _accGone)));
                 sb.Append(" | sprzet od fundatorow jest w linii L3 (kontrola sprzetu: + od fundatorow) | koszt ").Append(F2(_ms7)).Append(" ms | potkniecia ").Append(_st7).Append(" (sesja ").Append(_st7All).Append(").");
                 Log.Info(sb.ToString());
             }
-            _prevG = gAll; _prevGDay = today;
+            _prevG = gAll; _prevGDay = today; _prevAcc = accAll;
             lock (Gate) FundZero();
         }
 
