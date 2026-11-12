@@ -608,13 +608,14 @@ namespace Armoury
                     if (!A7sOn) ask = (int)Math.Min(Math.Ceiling(owe), Math.Max(0, ld.V.Gold) / 4);
                     else { int span = A7sPaySpan(ld, b, today); if (span > 0) ask = (int)Math.Min(Math.Ceiling(owe), A7sPayCap(ld.V.Gold, span)); }
                 }
+                EcoAudit427.RbWhy = EcoAudit427.WhyNone;   // 427-p: powod raty tej przebudowy (nie poprzedniej) - samo pole pomiaru
                 long got = ask > 0 && mt != null ? (A7sOn ? A7sPay(ld.V, mt, ask) : VillageCrafts.PayRebuild(ld.V, mt, ask, _tally)) : 0;   // f5-a7: ta sama rata + pomiar (zloto, material, polka)
                 b.Paid += got; _rPaid += got;
                 if (gm == 2) { double sh1 = VillageGear.SwitchPaid(ld.V, GearUid(b), b.Target, _tally.Mat - gmat0); if (sh1 >= 0) b.Paid = sh1 >= 1.0 ? b.Cost : (float)(b.Cost * sh1); }
                 double fPay = b.Paid >= b.Cost - 0.5 ? 1.0 : Math.Max(0.0, b.Paid / (double)b.Cost);
                 double moved = b.X0 > 1e-6f ? Math.Max(0.0, Math.Min(1.0, 1.0 - b.X[ci] / (double)b.X0)) : 1.0;
                 progress = Math.Max(0.0, Math.Min(1.0, (fPay - moved) * T));
-                if (progress < 1.0 - 1e-6) { _rStall++; EcoAudit427.RbStall(EcoAudit427.SysKs, owe, ask, got, ld.V.Gold, mt != null, !A7sOn || A7sPaySpan(ld, b, today) > 0); }   // 427 A1: powod doby postoju (sam licznik)
+                if (progress < 1.0 - 1e-6) { _rStall++; EcoAudit427.RbStall(EcoAudit427.SysKs, owe, ask, got, ld.V.Gold, mt != null, !A7sOn || A7sPaySpan(ld, b, today) > 0, gm == 2); }   // 427 A1: powod doby postoju (sam licznik)
             }
             double dx = Math.Min(b.X[ci], b.X0 / T * progress);
             b.X[ci] -= (float)dx; b.X[ti] += (float)dx;

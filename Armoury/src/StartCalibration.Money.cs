@@ -520,6 +520,14 @@ namespace Armoury
                     long pv; purse.TryGetValue(st, out pv);
                     long p0; bool had = _vilPurse.TryGetValue(st, out p0);
                     string name = st.Name != null ? st.Name.ToString().Replace(';', ',') : st.StringId;
+                    // 427-p (recenzja): odczyty stanu gry dla kolumn 427 PRZED dopisaniem wiersza - wyjatek nie sklei wiersza z nastepnym (pomija caly wiersz jak inne)
+                    int raided427 = 0, siege427 = 0;
+                    if (csv427)
+                    {
+                        var bv = st.BoundVillages;
+                        if (bv != null) for (int vi = 0; vi < bv.Count; vi++) { var v = bv[vi]; if (v != null && (v.VillageState == Village.VillageStates.BeingRaided || v.VillageState == Village.VillageStates.Looted)) raided427++; }
+                        siege427 = st.IsUnderSiege ? 1 : 0;
+                    }
                     sb.Append(day).Append(';').Append(st.StringId).Append(';').Append(name).Append(';').Append(TownMarket(t) == 0 ? "Westeros" : "Essos").Append(';')
                       .Append(zt != null ? zt.Lam.ToString("0.00", Inv) : "-").Append(';').Append(zt != null ? F0(zt.People) : "-").Append(';').Append(med.ToString("0.00", Inv)).Append(';')
                       .Append(ceil).Append(';').Append(floor).Append(';').Append(gx.ToString("0.00", Inv)).Append(';').Append(gs).Append(';').Append(gd.ToString("0.0", Inv)).Append(';')
@@ -527,14 +535,8 @@ namespace Armoury
                       .Append(w != null ? F0(w[0]) : "0").Append(';').Append(w != null ? F0(w[1]) : "0").Append(';').Append(w != null ? F0(w[2]) : "0").Append(';')
                       .Append(w != null ? F0(w[3]) : "0").Append(';').Append(w != null ? F0(w[4]) : "0").Append(';').Append(pv).Append(';').Append(had ? (pv - p0).ToString(Inv) : "-")
                       .Append(';').Append(TownLandOf(st)).Append(';').Append(KsFoodCarts.Incoming(st, ZGrain));  // KS-R3: kraina miasta (NKS-23 - krainy bez ujscia) i zboze w drodze KS-H
-                    if (csv427)
-                    {
-                        // 427 A1: znacznik oblezenia i wsie miasta w rabunku albo spladrowane (sam odczyt stanu gry) - dwie kolumny NA KONCU wiersza
-                        int raided = 0;
-                        var bv = st.BoundVillages;
-                        if (bv != null) for (int vi = 0; vi < bv.Count; vi++) { var v = bv[vi]; if (v != null && (v.VillageState == Village.VillageStates.BeingRaided || v.VillageState == Village.VillageStates.Looted)) raided++; }
-                        sb.Append(';').Append(st.IsUnderSiege ? 1 : 0).Append(';').Append(raided);
-                    }
+                    // 427 A1: znacznik oblezenia i wsie miasta w rabunku albo spladrowane - dwie kolumny NA KONCU wiersza (427-p: policzone przed wierszem, tu sam dopisek)
+                    if (csv427) sb.Append(';').Append(siege427).Append(';').Append(raided427);
                     sb.Append(Environment.NewLine);
                     rows++;
                 }

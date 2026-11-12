@@ -2445,12 +2445,13 @@ namespace Armoury
                 long gmat0 = _tally.Mat;
                 double owe = Math.Min(s.Cost - s.Paid, fTime * s.Cost - s.Paid);
                 int ask = owe >= 0.5 ? (int)Math.Min(Math.Ceiling(owe), Math.Max(0, di.V.Gold) / 4) : 0;
+                EcoAudit427.RbWhy = EcoAudit427.WhyNone;   // 427-p: powod raty tej przebudowy (nie poprzedniej) - samo pole pomiaru
                 long got = ask > 0 ? PayRebuild(di.V, mt, ask, _tally) : 0;
                 s.Paid += got; _dPaid += got;
                 if (gm == 2) { double sh1 = VillageGear.SwitchPaid(di.V, s.Uid, s.Target, _tally.Mat - gmat0); if (sh1 >= 0) s.Paid = sh1 >= 1.0 ? s.Cost : (float)(s.Cost * sh1); }
                 double fPay = s.Paid >= s.Cost - 0.5f ? 1.0 : Math.Max(0.0, s.Paid / s.Cost);
                 progress = Math.Max(0.0, Math.Min(1.0, (fPay - s.F) * T));
-                if (progress < 1.0 - 1e-6) { _dStall++; EcoAudit427.RbStall(EcoAudit427.SysZw, owe, ask, got, di.V.Gold, true, true); }   // 427 A1: powod doby postoju (sam licznik)
+                if (progress < 1.0 - 1e-6) { _dStall++; EcoAudit427.RbStall(EcoAudit427.SysZw, owe, ask, got, di.V.Gold, true, true, gm == 2); }   // 427 A1: powod doby postoju (sam licznik)
             }
             s.F = (float)Math.Min(1.0, s.F + progress / T);
             if (s.F >= 0.9999f)

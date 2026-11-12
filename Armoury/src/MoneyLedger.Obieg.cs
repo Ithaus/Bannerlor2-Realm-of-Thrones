@@ -895,12 +895,14 @@ namespace Armoury
               .Append(" (w tym do notabli ").Append(WvS(Sm[CW.IEstatesNotBee], CW.WBeeEstates)).Append(')')
               // 427 A2 (sledztwo 11.11): to PRZELEW, nie kran - DefaultClanFinanceModel.CalculateHeroIncomeFromAssets zdejmuje dochod z kas karawan (PartyTradeGold) i z
               // kapitalu warsztatow (Workshop.ChangeGold), a ClanVariablesCampaignBehavior.DailyTickHero wyplaca go zdarzeniem "nikt -> notabl"; 114 dob logow: netto +0.
-              // Klucz Economy Audit Lines: sama etykieta (liczby te same); wylaczony - napis jak dotad
-              .Append(a427 ? " | dochod z aktywow - PRZELEW, nie kran (427 A2: gra zdejmuje go z kapitalu warsztatow i kas karawan notabla, a wyplaca zdarzeniem 'nikt -> notabl'): wyplata "
-                           : " | dochod z aktywow: wyplata zgloszona jako z niczego ").Append(WvS(inc, CW.WNotableIncome)).Append(" (").Append(Sm[CW.INotableIncomeN]).Append(" notabli)")
+              // Klucz Economy Audit Lines: sam dopisek PO liczbach (liczby te same); wylaczony - napis jak dotad.
+              // 427-p (recenzja): dawne napisy "wyplata zgloszona jako z niczego" i "zloto z niczego netto (zaulki, majatki BK, minus podatek warsztatow BK)" zostaja
+              // DOSLOWNIE - szukaja ich tools/obieg169_sprawdz.py i tools/sprawdz_logi.py (audyt Z-2); wyjasnienie 427 stoi w nawiasie kwadratowym po liczbie
+              .Append(" | dochod z aktywow: wyplata zgloszona jako z niczego ").Append(WvS(inc, CW.WNotableIncome)).Append(" (").Append(Sm[CW.INotableIncomeN]).Append(" notabli)")
+              .Append(a427 ? " [427 A2: to PRZELEW, nie kran - gra zdejmuje ten dochod z kapitalu warsztatow i kas karawan notabla, a wyplaca zdarzeniem 'nikt -> notabl']" : "")
               .Append(", z kapitalu warsztatow i kas karawan zeszlo ").Append(WvNeg(k1, CW.WNotableIncome))
-              .Append(a427 ? ", KRAN = wyplata bez pokrycia w aktywach (oczekiwane 0; zaulki placi kasa miasta, majatki BK zablokowane, podatek warsztatow BK - linia Szczelnosc) "
-                           : ", zloto z niczego netto (zaulki, majatki BK, minus podatek warsztatow BK) ").Append(WvS(inc - k1, CW.WNotableIncome))
+              .Append(", zloto z niczego netto (zaulki, majatki BK, minus podatek warsztatow BK) ").Append(WvS(inc - k1, CW.WNotableIncome))
+              .Append(a427 ? " [427 A2: to jest KRAN = wyplata bez pokrycia w aktywach, oczekiwane 0; zaulki placi kasa miasta, majatki BK zablokowane, podatek warsztatow BK - linia Szczelnosc]" : "")
               .Append(" | karawany notabli [P]: ").Append(Sm[CW.ICaravanN]).Append(" karawan u ").Append(Sm[CW.ICaravanNotables]).Append(" notabli, zold nalezny ")
               .Append(Sm[CW.ICaravanDue]).Append(", zold w nicosc ").Append(WvNeg(u1c + u1n, CW.WCaravanWage)).Append(" (z kas karawan ").Append(Neg(u1c)).Append(", z kies notabli ")
               .Append(Neg(u1n)).Append("), niedoplata ").Append(Sm[CW.ICaravanShort]).Append(" (karawan, ktorych kasa nie starczyla na zold: ").Append(Sm[CW.ICaravanShortN])

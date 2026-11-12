@@ -25,7 +25,7 @@ namespace Armoury
             return new[] { h[HFolkTown], h[HFolkCastle], h[HGmina], h[HVillages], w };
         }
 
-        /// <summary>427: linia "Kiesy ludu - rozbicie zmiany (427)" - wolana z Daily zaraz po "Pompach" (`hold` - koniec tej doby, `last` - koniec poprzedniej).</summary>
+        /// <summary>427: linia "Kiesy ludu - rozbicie zmiany (427)" - wolana z Daily tuz PRZED linia "Pompy" (`hold` - koniec tej doby, `last` - koniec poprzedniej).</summary>
         private static void A427FolkLine(int day, long[] hold, long[] last)
         {
             if (!EcoAudit427.On) return;

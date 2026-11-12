@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 427-p (12.11) - poprawki po dwoch recenzjach zmiany 427 (pomiary audytu ekonomii): dawne napisy linii "Obieg: notable i karawany" wracaja doslownie (narzedzia logow), poprawione podpisy i okna pomiarow; gra bez zmian, 0 nowych kluczy
+
+**Problem:** dwie recenzje 427 (ksiegi, stabilnosc): zarzutow krytycznych brak, 1 SREDNI i kilka NISKICH - wszystkie w tresci linii logu. SREDNI: przy kluczu `Economy Audit Lines` TAK (domyslnym) zmiana etykiety A2 usuwala dwa napisy, ktorych szukaja narzedzia: `tools/sprawdz_logi.py:8033` ("zloto z niczego netto (zaulki, majatki BK, minus podatek warsztatow BK)" - wiersz "audyt Z-2" znikal po cichu) i `tools/obieg169_sprawdz.py:311` ("wyplata zgloszona jako z niczego +N" - 0 zamiast ok. 100 tys./d i falszywe "CZESCIOWO").
+
+**Przyczyna:** `MoneyLedger.Obieg.cs` podmienial przy kluczu TAK oba napisy na nowe ("PRZELEW, nie kran", "KRAN = ..."). Reszta: `EcoAudit427.FolkLine` sumowal liczniki, ktore przy braku doby kiesy czynnej zwracaja -1; podpisy "danina od skarbca ludu miast i podzamczy" i "majatek ludu miast = kiesy + kwity" obiecywaly wiecej / mniej, niz licza; licznik "znikle dzis" zerowal sie co dobe, a linia przy cichych logach wychodzi co 7 dob; `RbStall` nie znal zmiany za sprzetem (435-L4) ani wyjatku raty; "faktycznie pobrano" bez czesci korony; `TownDebt.A427FolkClaims` zawsze true; blok 427 w ks-miasta.csv stal miedzy wierszem a koncem linii.
+
+**Zmiana:** (wszystko pod istniejacym kluczem `Economy Audit Lines`; NIE = linie jak przed 427)
+- **SREDNI, poprawione:** oba dawne napisy linii "Obieg: notable i karawany" zostaja DOSLOWNIE przy kluczu TAK i NIE; wyjasnienie 427 A2 stoi w nawiasie kwadratowym PO liczbie ("[427 A2: to PRZELEW, nie kran ...]", "[427 A2: to jest KRAN = wyplata bez pokrycia ..., oczekiwane 0 ...]"). Narzedzi nie trzeba ruszac.
+- "zwrot z kas osad do ludu": kazdy z czterech licznikow przez `Math.Max(0, ...)` (bylo mozliwe -4).
+- podpisy: "danina od skarbca - kiesa2 i straznik (lud miast i podzamczy, z czescia koron i wsiami starej reguly obieg2)", "danina od skarbca wsi DS", "majatek ludu miast = kiesy + kwity rad miast (bez pozyczek ludu rodom i koronom ...)".
+- "Kto rozbija bandy (427)": okno zeruje sie dopiero po wydruku, podpis "znikle od poprzedniej linii (N dob)" - przy cichych logach linia zbiera 7 dob, jak linie ZW i warsztatow.
+- powody postoju przebudowy: dwa nowe - "zmiana za sprzetem - rata zaplacona, czeka na sprzet nowego zajecia (435-L4)" (tryb sprzetu `gm == 2`, rata dnia zaplacona w calosci) i "potkniecie raty (wyjatek - log bledow)"; `RbWhy` zerowane przed kazda rata w obu `Progress` (ZW i KS), wiec powod nie zostaje po poprzedniej przebudowie.
+- "Straznik obiegu": "faktycznie pobrano" z czescia koron (`_gdCrownT`, pokazana w nawiasie); powod "straznik NIE steruje" rozrozniony: firmy DS / wylaczony kluczem / jeszcze niegotowy.
+- `TownDebt.A427FolkClaims` zwraca klucz modulu (`Town Debt` NIE - w linii "-" zamiast 0).
+- ks-miasta.csv: odczyty oblezenia i wsi w rabunku policzone PRZED dopisaniem wiersza (wyjatek pomija caly wiersz, nie skleja dwoch).
+- komentarze: linia kies ludu wychodzi tuz PRZED "Pompami".
+
+**Odrzucone / zostawione:** rozdzielenie daniny miast od wsi starej reguly na osobne liczby (u Jeffa przy firmach DS obie dodatkowe czesci = 0; poprawiony sam podpis); doliczenie pozyczek ludu rodom i koronom do "majatku ludu" (wymaga czytania ksiag f8 i pozyczek koron - poprawiony podpis, liczba bez zmian); martwe galezie `last == null` w `FolkLine` zostaja jako zabezpieczenie.
+
+**Ryzyko / co sprawdzic:** zmiana rusza tylko napisy i liczniki pomiaru - zadnego zlota, ludzi ani towaru (w diffie brak ChangeGold / GiveGold / rosteru; `RbWhy` to pole pomiaru zapisywane takze przy kluczu NIE, jak od 427). Kontrola calosci: `RbStall` ma dwa wywolania (ZW, KS) - oba z nowym parametrem; suma powodow dalej = doby bez pelnej zaplaty (nowe powody sa w tej samej tablicy, kontrola linii 0). Narzedzia: grep po `tools/*.py` - zadne nie szuka napisow zmienionych w 427-p ("znikle dzis", "faktycznie pobrano", "majatek ludu miast", "danina od skarbca ludu miast i podzamczy"). W logu: "Obieg: notable i karawany" ma znow "wyplata zgloszona jako z niczego +N" (ok. 100 tys./d) i "zloto z niczego netto (...) +0"; `python tools/sprawdz_logi.py` pokazuje wiersz "audyt Z-2"; "Kto rozbija bandy (427)" ma "znikle od poprzedniej linii (7 dob)" przy cichych logach; "kontrola: powody - doby bez pelnej zaplaty = 0". Nie sprawdzono w grze (sam build, 0 bledow).
+
+**Status:** DO SPRAWDZENIA
+
 ## 435-L8 (12.11) - LANCUCH PODAZY, krok 8: STANOWISKA WARSZTATOW z kapitalu warsztatu - warsztat pracujacy pelna para, ktorego wyrobu brakuje, dokupuje stanowiska (poziom 1-4) za prawdziwy material; 1 nowy klucz MCM (domyslnie "jak dotad")
 
 **Problem:** polecenie Jeffa (lancuch podazy): "jak produkuja warsztaty juz na 100% to powstaja nowe warsztaty, tak jak w realnej ekonomii". Projekt po krytyce (PROJEKT-LANCUCH-po-krytyce 11.11, II.8, II.10, II.11, wiersz L8; krytyka B10, T5, T12). Tempo linii warsztatu idzie dzis tylko za ludzmi miasta i cena wyrobu (WorkshopPace, F 0.3-4) - warsztat, ktory ma wsad i zbyt, nie ma jak urosnac, a czwartego-piatego warsztatu w miescie gra nie pozwala dodac (`Town.Workshops` to tablica 4 miejsc ze znacznikami sceny, cs_full.cs:162636). Dowod z logu Armoury-2026-11-11_13-19-13.log, d109814: "Tempo warsztatow (E3-D2)": warsztatow z tempem 252, cykle linii swiata przed 865.8 / po 1097.4 (x1.268), smithy 39 warsztatow przed 66.6 / po 48.3 (kuznie zwalniaja, choc narzedzi brakuje: produkcja 191/d przy zuzyciu 187/d i polkach 296 szt. - liczby z projektu [L]).

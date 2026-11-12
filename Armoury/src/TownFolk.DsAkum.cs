@@ -587,7 +587,7 @@ namespace Armoury
                 mat = matPaid; wage = wagePaid;
                 return Math.Max(0, got);
             }
-            catch (Exception e) { DaStumble("CraftsRebuildPay", e); return 0; }
+            catch (Exception e) { EcoAudit427.RbWhy = EcoAudit427.WhyStumble; DaStumble("CraftsRebuildPay", e); return 0; }   // 427-p: powod "potkniecie", nie "brak materialu"
         }
 
         /// <summary>Lud miasta placi za septy z dziesieciny: kiesy klas (wagi dziesieciny) -> kasa miasta (material; ksiega kies _ctlOut) i rzemieslnicy tego ludu (przelew wewnatrz).

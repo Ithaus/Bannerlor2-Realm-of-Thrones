@@ -52,7 +52,7 @@ namespace Armoury
             WsZero();
             Array.Clear(_rb, 0, _rb.Length); Array.Clear(_rbAge, 0, _rbAge.Length); Array.Clear(_rbMaxOver, 0, _rbMaxOver.Length); RbWhy = 0;
             ReserveZero();
-            Array.Clear(_kDay, 0, _kDay.Length); Array.Clear(_kSess, 0, _kSess.Length); _kDays = 0;
+            Array.Clear(_kDay, 0, _kDay.Length); Array.Clear(_kSess, 0, _kSess.Length); _kDays = 0; _kSince = 0;
             _fkBase = null; _fkDays = 0; Array.Clear(_fkSum, 0, _fkSum.Length); _fkClaim0 = double.NaN; _fkClaimPrev = double.NaN;
         }
 
@@ -91,16 +91,17 @@ namespace Armoury
         internal const int SysZw = 0, SysKs = 1;
         // powody doby postoju (RbStall) - kolejnosc = kolejnosc w linii
         private const int RNoDue = 0, RNotPayDay = 1, RNoTown = 2, RPurseEmpty = 3, RPayNoFolk = 4, RPayChest = 5, RPaySmall = 6, RPayNoShelf = 7, RPayPriceCap = 8,
-                          RPayOldEmpty = 9, RPartial = 10, RQuarter = 11, RArrears = 12, RKinds = 13;
+                          RPayOldEmpty = 9, RPartial = 10, RQuarter = 11, RArrears = 12, RGear = 13, RPayStumble = 14, RKinds = 15;
         private static readonly string[] RName =
         {
             "rata jeszcze nienalezna (ponizej 0.5 zl - rece czekaja na czas)", "nie dzien raty (KS: rata co 7 dob)", "brak miasta targowego",
             "kiesa wsi pusta (cwierc kiesy = 0)", "targ bez czynnej kiesy ludu", "kiesa wsi nie ponad skrzynie DS", "rata ponizej ceny sztuki materialu (budzet < 2 zl)",
             "brak materialu na polce targu", "material tylko ponad sufit ceny", "droga dawna: wies bez zlota", "zaplacone czesciowo (materialu albo kiesy ponad skrzynie mniej niz rata)",
-            "rata przycieta do cwierci kiesy (zaplacona w calosci)", "rata dnia zaplacona, zalega wczesniejsza"
+            "rata przycieta do cwierci kiesy (zaplacona w calosci)", "rata dnia zaplacona, zalega wczesniejsza",
+            "zmiana za sprzetem - rata zaplacona, czeka na sprzet nowego zajecia (435-L4)", "potkniecie raty (wyjatek - log bledow)"
         };
         // kody CraftsRebuildPay (ostatnie wywolanie; 0 = nie ustawione / zaplacone)
-        internal const int WhyNone = 0, WhyOld = 1, WhySmall = 2, WhyNoFolk = 3, WhyChest = 4, WhyNoShelf = 5, WhyPriceCap = 6;
+        internal const int WhyNone = 0, WhyOld = 1, WhySmall = 2, WhyNoFolk = 3, WhyChest = 4, WhyNoShelf = 5, WhyPriceCap = 6, WhyStumble = 7;
         /// <summary>TownFolk.CraftsRebuildPay: powod ostatniego zwrotu 0 / -1 (watek glowny; RbStall czyta zaraz po racie).</summary>
         internal static int RbWhy;
         private static readonly int[] _rb = new int[2 * RKinds];
@@ -110,8 +111,10 @@ namespace Armoury
         /// <summary>
         /// Doba postoju przebudowy (postep &lt; 1 w Progress): klasyfikacja jednym powodem. `owe` - rata nalezna wedlug czasu, `ask` - o ile poproszono (po cwierci
         /// kiesy / dniu raty), `got` - ile zeszlo z kiesy wsi, `payDay` - false tylko w KS z rata co 7 dob poza dniem raty. Sam licznik.
+        /// 427-p (recenzja): `gear` - zmiana ZA SPRZETEM (435-L4, tryb 2: "zaplacone" to lustro sprzetu) - doba z rata zaplacona w calosci stoi wtedy na sprzecie, nie
+        /// na "wczesniejszej zaleglosci".
         /// </summary>
-        internal static void RbStall(int sys, double owe, int ask, long got, int vilGold, bool hasTown, bool payDay)
+        internal static void RbStall(int sys, double owe, int ask, long got, int vilGold, bool hasTown, bool payDay, bool gear)
         {
             if (!On || sys < 0 || sys > 1) return;
             try
@@ -130,10 +133,12 @@ namespace Armoury
                         case WhySmall: r = RPaySmall; break;
                         case WhyPriceCap: r = RPayPriceCap; break;
                         case WhyOld: r = RPayOldEmpty; break;
+                        case WhyStumble: r = RPayStumble; break;
                         default: r = RPayNoShelf; break;
                     }
                 }
                 else if (got < ask) r = RPartial;
+                else if (gear) r = RGear;
                 else if (ask < Math.Ceiling(owe) - 0.5) r = RQuarter;
                 else r = RArrears;
                 _rb[sys * RKinds + r]++;
@@ -268,7 +273,7 @@ namespace Armoury
         private static readonly string[] VName = { "bandy", "karawany", "tabory wsi" };
         private static readonly int[] _kDay = new int[VKinds * DKinds];
         private static readonly int[] _kSess = new int[VKinds * DKinds];
-        private static int _kDays;
+        private static int _kDays, _kSince;   // doby od wczytania / od poprzedniej linii (427-p)
 
         /// <summary>CampaignEvents.MobilePartyDestroyed: licznik "kto" dla band (bez umarlych), karawan i taborow wsi. Niczego nie zmienia.</summary>
         internal static void OnPartyDestroyed(MobileParty party, PartyBase destroyer)
@@ -333,8 +338,8 @@ namespace Armoury
         {
             try
             {
-                if (!On) { Array.Clear(_kDay, 0, _kDay.Length); return; }
-                _kDays++;
+                if (!On) { Array.Clear(_kDay, 0, _kDay.Length); _kSince = 0; return; }
+                _kDays++; _kSince++;
                 var s = Settings.Current;
                 if (s != null && s.LogEnabled && LogGate.Lines)
                 {
@@ -343,17 +348,18 @@ namespace Armoury
                               + "nie kazda partia, ktora walczyla; umarli poza)");
                     for (int v = 0; v < VKinds; v++)
                     {
-                        sb.Append(" | ").Append(VName[v]).Append(" znikle dzis ");
+                        sb.Append(" | ").Append(VName[v]).Append(" znikle od poprzedniej linii (").Append(_kSince).Append(" dob) ");
                         KillPart(sb, _kDay, v);
                         sb.Append(", od wczytania (").Append(_kDays).Append(" dob) ");
                         KillPart(sb, _kSess, v);
                     }
                     sb.Append(" | potkniecia ").Append(_st).Append(" (sesja ").Append(_stSess).Append(").");
                     Log.Info(sb.ToString());
+                    // 427-p (recenzja): okno zeruje sie dopiero PO wydruku - przy cichych logach (linia co 7 dob) zbiera cale okno jak linie ZW i warsztatow
+                    Array.Clear(_kDay, 0, _kDay.Length); _kSince = 0; _st = 0;
                 }
             }
             catch (Exception e) { Stumble("DailyKills", e); }
-            Array.Clear(_kDay, 0, _kDay.Length); _st = 0;
         }
 
         // ============================================================ 9. kiesy ludu - rozbicie zmiany
@@ -369,7 +375,7 @@ namespace Armoury
         private static double _fkClaim0 = double.NaN, _fkClaimPrev = double.NaN;
 
         /// <summary>
-        /// MoneyLedger.Daily (zaraz po linii "Pompy"): linia "Kiesy ludu - rozbicie zmiany (427)". `now` / `last` - [lud miast, podzamcza, gminy, wsie, swiat] z ksiegi
+        /// MoneyLedger.Daily (tuz przed linia "Pompy"): linia "Kiesy ludu - rozbicie zmiany (427)". `now` / `last` - [lud miast, podzamcza, gminy, wsie, swiat] z ksiegi
         /// pieniadza na koniec tej i poprzedniej doby (`last` null - pierwsza doba ksiegi po wczytaniu). Tylko odczyt licznikow innych modulow z tej samej doby.
         /// </summary>
         internal static void FolkLine(int day, long[] now, long[] last)
@@ -382,7 +388,8 @@ namespace Armoury
                 long hoard = 0, hoardVill = 0, farmFolk = 0, coffers = 0;
                 try { hoard = TownFolk.A427HoardTake; hoardVill = TownFolk.A427VillHoardTake; } catch (Exception e) { Stumble("FolkLine(daniny)", e); }
                 try { farmFolk = DsTowns.A427PaidFolk; } catch (Exception e) { Stumble("FolkLine(firma)", e); }
-                try { coffers = TownFolk.LastLabourTowns + TownFolk.LastTurnTowns + TownFolk.LastTopUpTowns + TownFolk.LastLabourCastles; } catch (Exception e) { Stumble("FolkLine(kasy)", e); }
+                try { coffers = Math.Max(0, TownFolk.LastLabourTowns) + Math.Max(0, TownFolk.LastTurnTowns) + Math.Max(0, TownFolk.LastTopUpTowns) + Math.Max(0, TownFolk.LastLabourCastles); }   // 427-p: -1 = brak doby kiesy czynnej
+                catch (Exception e) { Stumble("FolkLine(kasy)", e); }
                 if (last != null) { _fkSum[SHoard] += hoard; _fkSum[SHoardVill] += hoardVill; _fkSum[SFarmFolk] += farmFolk; _fkSum[SFromCoffers] += coffers; }
                 double cP = 0, cR = 0; bool claimOk = false;
                 try { claimOk = TownDebt.A427FolkClaims(out cP, out cR); } catch (Exception e) { Stumble("FolkLine(kwity)", e); }
@@ -402,15 +409,15 @@ namespace Armoury
                     }
                     sb.Append("; razem ").Append(tot).Append(" (").Append(last != null ? Sg(tot - totL) : "-").Append(", ").Append(Sg(tot - tot0)).Append(") = ")
                       .Append(Pc(tot, now[FKinds])).Append(" swiata")
-                      .Append(" | nazwane odplywy z kies do panow, kas osad i koron (dzis / od wczytania): danina od skarbca ludu miast i podzamczy ").Append(hoard).Append(" / ").Append(_fkSum[SHoard])
-                      .Append(", danina od skarbca wsi ").Append(hoardVill).Append(" / ").Append(_fkSum[SHoardVill])
+                      .Append(" | nazwane odplywy z kies do panow, kas osad i koron (dzis / od wczytania): danina od skarbca - kiesa2 i straznik (lud miast i podzamczy, z czescia koron i wsiami starej reguly obieg2) ").Append(hoard).Append(" / ").Append(_fkSum[SHoard])
+                      .Append(", danina od skarbca wsi DS ").Append(hoardVill).Append(" / ").Append(_fkSum[SHoardVill])
                       .Append(", czesc firmy pana z oszczednosci ludu (okno linii Firmy DS) ").Append(farmFolk).Append(" / ").Append(_fkSum[SFarmFolk])
                       .Append("; razem ").Append(hoard + hoardVill + farmFolk).Append(" / ").Append(_fkSum[SHoard] + _fkSum[SHoardVill] + _fkSum[SFarmFolk])
                       .Append(" | zwrot z kas osad do ludu (robocizna, obrot P, doplata do 35%, robocizna zamkow) ").Append(coffers).Append(" / ").Append(_fkSum[SFromCoffers])
                       .Append(" | kwity ludu wobec rad miast (pozyczka to kiesa -> kwit, nie strata): P ").Append(claimOk ? N0(cP) : "-").Append(", R ").Append(claimOk ? N0(cR) : "-")
                       .Append(", razem ").Append(claimOk ? N0(claim) : "-").Append(" (").Append(claimOk && !double.IsNaN(_fkClaimPrev) ? Sg((long)Math.Round(claim - _fkClaimPrev)) : "-")
                       .Append(", ").Append(claimOk && !double.IsNaN(_fkClaim0) ? Sg((long)Math.Round(claim - _fkClaim0)) : "-").Append(")")
-                      .Append(" | majatek ludu miast = kiesy + kwity ").Append(claimOk ? N0(now[FTown] + claim) : "-").Append(" (od wczytania ")
+                      .Append(" | majatek ludu miast = kiesy + kwity rad miast (bez pozyczek ludu rodom i koronom - linia 'Pozyczki miejskie (f8)') ").Append(claimOk ? N0(now[FTown] + claim) : "-").Append(" (od wczytania ")
                       .Append(claimOk && !double.IsNaN(_fkClaim0) ? Sg((long)Math.Round(now[FTown] - _fkBase[FTown] + claim - _fkClaim0)) : "-").Append(")")
                       .Append(" | reszta zmiany kies (zakupy, dochod z zewnatrz, podatki stale, pozyczki rodom i koronom) - linie 'Kiesa ludu', 'Dlugi miast', 'Pozyczki miejskie (f8)'")
                       .Append(" | potkniecia od wczytania ").Append(_stSess).Append('.');

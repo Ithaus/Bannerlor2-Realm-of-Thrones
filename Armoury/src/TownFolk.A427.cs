@@ -9,7 +9,8 @@ namespace Armoury
     /// </summary>
     internal static partial class TownFolk
     {
-        /// <summary>427: danina od skarbca ludu tej doby z kies ludu miast i podzamczy oraz (dawna regula obieg2) wsi - to samo co pozycja "kiesa2 i straznik" linii "Pompy".</summary>
+        /// <summary>427: danina od skarbca tej doby - pozycja "kiesa2 i straznik" linii "Pompy": lud miast i podzamczy, czesc koron i (dawna regula obieg2) wsie. 427-p: podpis w
+        /// linii "Kiesy ludu" mowi to wprost (przy firmach DS wsie starej reguly i korona to zera).</summary>
         internal static long A427HoardTake
         {
             get { return LastHoardLord + LastHoardTown + LastHoardCastle + LastHoardCrown + LastVillHoardLord + LastVillHoardTown + LastVillHoardCastle; }
@@ -33,12 +34,14 @@ namespace Armoury
                 var sb = new StringBuilder(520);
                 bool ds = DaDueOn, guard = GuardOn && _gdReady;
                 double rate = ds ? DaRateNow(s) : HoardRateNow(s);
-                long take = _hdTake[0] + _hdTake[1] + _hdTake[2] + _hdTake[3];
+                // 427-p (recenzja): "pobrano" z czescia korony (_hdTake jej nie ma - TownFolk.Hoard.cs: x - cp), inaczej stawka faktyczna zanizona
+                long take = _hdTake[0] + _hdTake[1] + _hdTake[2] + _hdTake[3] + _gdCrownT;
                 sb.Append(" | 427 stawka OBOWIAZUJACA danin od skarbca ludu miast i podzamczy dzis ").Append((100 * rate).ToString("0.000", Inv)).Append("%/d - regula: ")
                   .Append(ds ? "danina przy firmach DS (Ds Hoard Due; klasy z placa wedlug koszyka maja stawke nizsza - linia 'Akumulator kies')"
                              : guard ? "straznik obiegu (stawka doby tej linii)" : "stawka podstawowa (Folk Hoard Tax Rate)")
-                  .Append(guard ? "" : "; straznik NIE steruje poborem (przy firmach DS wylaczony) - 'mnoznik' i 'stawka doby' tej linii to cien")
-                  .Append("; faktycznie pobrano ").Append(take).Append(" z nadwyzki ponad poziom normalny ").Append(N0(_hdE0)).Append(" = ")
+                  .Append(guard ? "" : "; straznik NIE steruje poborem (" + (DsTowns.FarmsLive ? "przy firmach DS wylaczony" : !GuardOn ? "wylaczony kluczem" : "jeszcze niegotowy")
+                                       + ") - 'mnoznik' i 'stawka doby' tej linii to cien")
+                  .Append("; faktycznie pobrano (z czescia koron ").Append(_gdCrownT).Append(") ").Append(take).Append(" z nadwyzki ponad poziom normalny ").Append(N0(_hdE0)).Append(" = ")
                   .Append(_hdE0 > 0 ? (100.0 * take / _hdE0).ToString("0.000", Inv) + "%/d" : "-");
                 long player, ai;
                 if (_gdShares && MoneyLedger.A427LordsSplit(out player, out ai))

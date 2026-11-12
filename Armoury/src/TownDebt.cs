@@ -741,7 +741,7 @@ namespace Armoury
         {
             p = r = 0;
             foreach (var kv in _b) { p += kv.Value.P; r += kv.Value.R; }
-            return true;
+            return On;   // 427-p: klucz Town Debt wylaczony - linia pokaze "-" zamiast 0
         }
 
         // ------------------------------------------------------------ zapis
