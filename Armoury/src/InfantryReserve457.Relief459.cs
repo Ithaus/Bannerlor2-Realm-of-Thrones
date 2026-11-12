@@ -10,7 +10,7 @@ namespace Armoury
     /// <summary>Stan zmiany linii 459 jednej druzyny (pole St.R w InfantryReserve457).</summary>
     internal sealed class Rel459
     {
-        public int N, Pulled, Refused, Short, Gone, WaitRest, WaitBar, WaitSmall;
+        public int N, Pulled, Refused, Short, Gone, WaitRest, WaitBar, WaitSmall, Left, LeftCharge;
         public float At = -1f, MaxShare = -1f, MaxShareAt = -1f, MinMean = 9f, WalkTo = -1f, PhAt;
         public Formation F, Line;
         public bool Dry;
@@ -36,7 +36,8 @@ namespace Armoury
     ///  3. ZMECZENI NA TYL - dopiero gdy swiezi doszli (srodek swiezych w polowie glebokosci szyku + 10 m od jego mediany) albo po 25 s: ludzie tego szyku z paskiem
     ///     &lt; 0.30, kryterium odwodu 457 (Fit: piesi AI bez luku / kuszy, nie bohaterowie, nie chorazowie, nie dowodcy kompanii, nie w panice / odwrocie rannego 143 /
     ///     zbiorce 359, wolni od kompanii) i BEZ WROGA W 5 M (nie w zwarciu - nikt nie odwraca sie plecami do przeciwnika), najdalej od wroga; tylu, ilu swiezych
-    ///     doszlo, szyk zostaje >= 30, co najmniej 12 (inaczej swiezi zostaja w linii, a odwod sie konczy jak w 457). Wypisani z kompanii (Detach457), szyk 8
+    ///     doszlo, szyk zostaje >= 30, co najmniej 12 (inaczej swiezi zostaja w linii, a odwod sie konczy jak w 457). Wypisani z kompanii (Detach457 z keepShare
+    ///     459-p: udzial strat kompanii nie rosnie od wypisania zywych; wypisanie dopiero, gdy ludzi dosc), szyk 8
     ///     bez AI, Move na punkt 25 m za tym szykiem (HoldPoint 457) - to NOWY ODWOD 457 (te same warunki wyjscia, ta sama zmiana nastepnym razem).
     ///     Przez 30 s marszu na tyl (albo do dojscia w 15 m od punktu) warunki wyjscia 2-4 czekaja (zmeczeni nie zawracaja w pol drogi); odwrot druzyny / brak
     ///     linii (warunek 1) - od razu jak w 457.
@@ -220,6 +221,7 @@ namespace Armoury
                 return;
             }
             r.Gone++;
+            Strand(s, f);   // 459-p: swiezi, ktorzy utkneli w szyku 8 (potkniecie przy przelozeniu) - do linii albo szarza
             s.Ph = PhDone;
             s.MergeAt = now;
             s.MergeN = fresh;
@@ -233,6 +235,7 @@ namespace Armoury
             var r = s.R;
             var t = s.T;
             var f = r.Line;
+            Strand(s, f);   // 459-p: inaczej "szyk 8 niedostepny" i swiezi zostaja w szyku 8 bez AI do konca bitwy
             Vec2 foe;
             bool hasFoe = FoeCentre(m, t, out foe);
             _units.Clear();
@@ -265,18 +268,29 @@ namespace Armoury
             var moved = new List<Agent>(k > 0 ? k : 0);
             if (no == null)
             {
-                for (int i = 0; i < cand.Count && moved.Count < k; i++)
+                // 459-p (recenzja 459): najpierw wybor bez skutkow (Free457), wypisanie z kompanii dopiero gdy ludzi dosc - nikt nie zostaje wypisany a nieprzelozony
+                var pick = new List<Agent>(k);
+                for (int i = 0; i < cand.Count && pick.Count < k; i++)
                 {
-                    int d = BannerCompanies.Detach457(cand[i].Value);
-                    if (d < 0) { r.Refused++; s.Refused++; continue; }
-                    if (d > 0) s.Detached++;
-                    moved.Add(cand[i].Value);
+                    if (!BannerCompanies.Free457(cand[i].Value)) { r.Refused++; s.Refused++; continue; }
+                    pick.Add(cand[i].Value);
                 }
-                if (moved.Count < ReserveMin) no = "po odmowach kompanii za malo ludzi (" + moved.Count + ")";
+                if (pick.Count < ReserveMin) no = "po odmowach kompanii za malo ludzi (" + pick.Count + ")";
+                else
+                {
+                    for (int i = 0; i < pick.Count; i++)
+                    {
+                        // keepShare: Peak tak, by udzial strat kompanii nie skoczyl od wypisania zywych (inaczej rzut zlamania bez poleglych)
+                        int d = BannerCompanies.Detach457(pick[i], true);
+                        if (d < 0) { r.Refused++; s.Refused++; continue; }
+                        if (d > 0) s.Detached++;
+                        moved.Add(pick[i]);
+                    }
+                    if (moved.Count == 0) no = "po odmowach kompanii nikogo";   // tylko potkniecie Detach457 - wtedy i tak nikt nie wypisany
+                }
             }
             if (no != null)
             {
-                // wypisani z kompanii, a nieprzelozeni - przeglad 3 s zapisze ich z powrotem (Joined), jak posilki
                 r.Short++;
                 s.Ph = PhDone;
                 s.MergeAt = now;
@@ -321,6 +335,43 @@ namespace Armoury
                      + r.Refused + ") - nowy odwod w szyku 8, " + HoldBack.ToString("0", Inv) + " m za F" + (int)f.FormationIndex + ".");
         }
 
+        /// <summary>459-p (recenzja 459): swiezi, ktorzy po potknieciu Transfer zostali w szyku 8 (bez AI, ostatni rozkaz) - ponownie do szyku linii, a gdy
+        /// nie ma linii albo przelozenie znow sie nie uda i w szyku 8 sa tylko oni - szarza szyku 8 (jak Merge 457 bez szyku 0-7). Cudzych ludzi szyku 8 nie rusza.</summary>
+        private void Strand(St s, Formation f)
+        {
+            var r = s.R;
+            var t = s.T;
+            var f8 = s.F8;
+            if (f8 == null || t == null || r.Fresh.Count == 0) return;
+            try
+            {
+                if (f8.CountOfUnits <= 0 || ReferenceEquals(t.GeneralsFormation, f8) || f8.PlayerOwner != null) return;
+            }
+            catch (Exception e) { Stumble("Utkneli8", e); return; }
+            var left = new List<Agent>();
+            foreach (var a in r.Fresh)
+            {
+                try { if (a != null && a.IsActive() && ReferenceEquals(a.Formation, f8)) left.Add(a); }
+                catch (Exception e) { Stumble("Utkneli", e); }
+            }
+            if (left.Count == 0) return;
+            r.Left += left.Count;
+            bool line = false;
+            try { line = f != null && f.CountOfUnits > 0 && AiForm(f, t); } catch { line = false; }
+            if (line) Transfer(t, left, f, new List<Formation> { f8 });
+            try
+            {
+                int still = 0;
+                for (int i = 0; i < left.Count; i++) if (left[i].IsActive() && ReferenceEquals(left[i].Formation, f8)) still++;
+                if (still > 0 && f8.CountOfUnits <= still)
+                {
+                    object ch = ChargeOrder();
+                    if (ch != null) { f8.SetMovementOrder((MovementOrder)ch); r.LeftCharge += still; }
+                }
+            }
+            catch (Exception e) { Stumble("Utkneli8Szarza", e); }
+        }
+
         /// <summary>Linia "Zmiana linii (459) koniec" (OnEndMission 457, po linii konca 457).</summary>
         private void EndRelief(float now)
         {
@@ -338,6 +389,7 @@ namespace Armoury
                 if (!s.Formed) { sb.Append("bez odwodu"); continue; }
                 sb.Append("zmian ").Append(r.N).Append(", zmeczonych na tyl ").Append(r.Pulled).Append(", bez nowego odwodu ").Append(r.Short).Append(", przerwane ").Append(r.Gone)
                   .Append(", odmowy kompanii ").Append(r.Refused)
+                  .Append(", utkneli w szyku 8 ").Append(r.Left).Append(" (szarza ").Append(r.LeftCharge).Append(')')
                   .Append(", najwiekszy udzial zmeczonych w zwarciu ").Append(r.MaxShare >= 0f ? (r.MaxShare * 100f).ToString("0", Inv) + "% t=" + r.MaxShareAt.ToString("0", Inv) + "s" : "-")
                   .Append(", najnizszy sredni pasek ").Append(r.MinMean < 9f ? r.MinMean.ToString("0.00", Inv) : "-")
                   .Append(", czekanie: odpoczynek ").Append(r.WaitRest).Append(" / pasek odwodu ").Append(r.WaitBar).Append(" / maly odwod ").Append(r.WaitSmall);

@@ -21,12 +21,13 @@ namespace Armoury
             catch (Exception e) { Stumble("BannerCompaniesMission.Free457", e); return false; }
         }
 
-        /// <summary>1 = wypisany z kompanii, 0 = nie byl w kompanii, -1 = odmowa (patrz Free457).</summary>
-        internal static int Detach457(Agent a)
+        /// <summary>1 = wypisany z kompanii, 0 = nie byl w kompanii, -1 = odmowa (patrz Free457). keepShare (459-p, zmiana linii w trakcie bitwy):
+        /// Peak zmniejszony tak, by udzial strat kompanii nie wzrosl (patrz BannerCompaniesMission.Detach457).</summary>
+        internal static int Detach457(Agent a, bool keepShare = false)
         {
             var k = RunLive;
             if (k == null || a == null || !ReferenceEquals(k.Mission, a.Mission)) return 0;
-            try { return k.Detach457(a); }
+            try { return k.Detach457(a, keepShare); }
             catch (Exception e) { Stumble("BannerCompaniesMission.Detach457", e); return -1; }
         }
     }
@@ -44,13 +45,23 @@ namespace Armoury
             return true;
         }
 
-        internal int Detach457(Agent a)
+        internal int Detach457(Agent a, bool keepShare)
         {
             if (!Free457(a)) return -1;
             Company co;
             if (!_mem.TryGetValue(a, out co)) return 0;
+            // 459-p (recenzja 459): zywy wypisany z kompanii ze stratami (r w szeregu < Peak) - Peak - 1 podnosilby udzial strat 1 - r/Peak ((r-1)/(P-1) < r/P),
+            // choc nikt nie padl (Peak 20, w szeregu 14 -> 5 wypisanych: 0.30 -> 0.40, krok 1 -> 2, rzut zlamania). Przy keepShare Peak' = floor(P x (r-1) / r)
+            // na tej samej mierze "w szeregu" co rzut strat (BannerBreakEarly: InRanksLive, inaczej InRanks) - udzial nie rosnie; przy r == P to dokladnie P - 1.
+            int peak = co.Peak > 0 ? co.Peak - 1 : 0;
+            if (keepShare && co.Peak > 0)
+            {
+                var c = Settings.Current;
+                int r = c != null && c.BannerBreakEarly ? InRanksLive(co, false) : InRanks(co);
+                if (r > 0 && r < co.Peak) peak = (int)((long)co.Peak * (r - 1) / r);
+            }
             co.Men.Remove(a);
-            if (co.Peak > 0) co.Peak--;
+            co.Peak = peak;
             _mem.Remove(a);
             return 1;
         }
