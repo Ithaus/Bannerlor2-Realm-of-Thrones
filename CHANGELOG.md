@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 473-p2 COFNIETE (13.11) - AI znowu moze stawiac port BK w zamkach
+
+**Problem:** 473-p2 (790afd62) wylaczyl AI budowe portu i Harbor BK w zamkach wg zdania z propozycji sesji ("Wylaczam: ... port i Harbor w zamku"). Jeff potem zapytal, czemu port w zamku nie ma sensu, i przyjal propozycje: port w zamku = rybacy, ryby do zapasu jedzenia zamku ("I tak na pozostale sie zgadzam rob budynki").
+
+**Przyczyna:** agent workflow wykonal starsza wersje planu.
+
+**Zmiana:** git revert 790afd62 (kod, klucz Buildings338AiSkipCastlePort i wpis usuniete). Ryby z portu zamku liczy juz Buildings338Ports (338c); nowy efekt portu zamku (rybacy z ludnosci) - w paczce budynkow 2.
+
+**Ryzyko / co sprawdzic:** zachowanie zamkow jak w 473-p1. Linia "Budynki (338) bez zbrojowni i sadu BK" bez czesci o porcie zamku.
+
+**Status:** COFNIETE
+
 ## 473-p1 (13.11) - poprawki po recenzjach 473-b6: linia startu po drugim wczytaniu, bledy od nowa w kampanii, kolejki gracz/AI osobno, licznik ludu po osadach
 
 **Problem:** recenzje A i B (tylko odczyt) kroku 473-b6 - bez usterek CTD i zapisu, cztery usterki samego logu i dwie luki w opisie. (A1/B2) `Buildings338NoBuild.SessionStart` przy drugim wczytaniu w tym samym procesie wychodzil przez `if (_patched) return;` przed `Buildings338.Hook(...)`, a `Buildings338.SessionStart` czysci `_hooks` co sesje - linia startu nie wymieniala dzialajacej latki. (A2) `_stumbles` i `_err` nie zerowane w `SessionStart` - "bledy" przechodzily miedzy kampaniami, pierwszy blad nowej kampanii nie trafial do logu. (A3) "w kolejkach teraz Q (gracz)" liczylo kolejki wszystkich miast. (B3) "lud pominal sad W" liczylo przejscia petli `FolkTarget` (kandydatow), nie osady. (B4) `FolkSkips` stal przed `BkAllows`, wiec `_bkSkip` przestal liczyc sad BK niedostepny w BK.
