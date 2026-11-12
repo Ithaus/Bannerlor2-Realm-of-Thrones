@@ -11656,6 +11656,18 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool OutshotRushWithShields { get; set; } = true;
 
+        [SettingPropertyBool("Outshot Rush In RBM Attack Plans", HintText = "Under fire, AI infantry runs in the attack plans of Realistic Battle Mod too: once an AI side has lost at least two men killed by missiles, its infantry advancing under fire in an RBM attack plan (split archers, split infantry, split skirmishers or wedge - given by RBM to some cultures) runs to close the distance the same way as in the base game attack plans (Outshot Rush With Shields, Unshielded Rush Under Fire), keeping a quarter of its breath for the fight. Field battles only, AI formations only. Off = in RBM attack plans the infantry walks as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool OutshotRushInRbmAttackPlans { get; set; } = true;
+
+        [SettingPropertyBool("Outshot Trigger By Missile Losses", HintText = "AI infantry treats its side's losses to missiles as being under fire: when its side has lost at least two men killed by missiles in the last 30 seconds and the enemy foot is within 200 m, an advancing formation runs to close the distance (Unshielded Rush Under Fire, Outshot Rush With Shields), and a defender that cannot answer the archery (Defenders Advance Under Fire) counts as shot down, even when few of its men were hit in the last seconds (men holding shields are not counted as hit by the base game). Field battles only, AI formations only. Off = only the share of men hit counts, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool OutshotTriggerByMissileLosses { get; set; } = true;
+
+        [SettingPropertyBool("Defender Leaves RBM Split When Outshot", HintText = "An AI defender holding its ground in a Realistic Battle Mod split defence plan (split infantry or split archers - given by RBM to some cultures) leaves it like any other defender when it is losing the archery exchange (Defenders Advance Under Fire, Defenders Charge When Outshot): the plan no longer outweighs the base game choice between holding and attacking. No bonus to any number on the field - only the choice of plan. Field battles only. Off = the RBM split defence plan holds as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool DefenderLeavesRbmSplitWhenOutshot { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15693,6 +15705,9 @@ namespace Armoury
             s.UnshieldedRushUnderFire = UnshieldedRushUnderFire;
             s.DefendersChargeWhenOutshot = DefendersChargeWhenOutshot;
             s.OutshotRushWithShields = OutshotRushWithShields;
+            s.OutshotRushInRbmAttackPlans = OutshotRushInRbmAttackPlans;   // 438
+            s.OutshotTriggerByMissileLosses = OutshotTriggerByMissileLosses;   // 438
+            s.DefenderLeavesRbmSplitWhenOutshot = DefenderLeavesRbmSplitWhenOutshot;   // 438
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

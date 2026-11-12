@@ -212,13 +212,14 @@ namespace Armoury
             else missA.Append(" brak pol konnicy");
             string def291d = DhPatchDefense(h);   // 291d: obrona gry w trzymaniu (Doctrine.Hold291.cs)
             string aim313 = OutshotRush.ApplyPatch(h);   // 313b: cel pieszy zamiast konnego strzelca (OutshotRush.cs)
+            string o438 = O438ApplyPatch(h);   // 438: plany ataku RBM (1.1) i splity obrony RBM przy przegranym ostrzale (1.3) - Doctrine.Outshot438.cs
             string pend333 = Pendulum333.ApplyPatch(h);  // 333 (B): szyk bez wahadla przed kontaktem (Pendulum333.cs); 344: arbiter ruchu i ustawienia
             string nff344 = NoFastForward344.ApplyPatch(h);   // 344: bieg autotestu bez przewijania (tylko LogGate.Mode 1 i plik-flaga)
             pend333 += ", bez przewijania 344 " + nff344;
             return "GetTacticWeight " + _patched + "/" + _wanted + " (Priority.Last po com.rbmai" + (miss.Length > 0 ? "; NIE:" + miss.ToString() : "")
                    + "), Attack " + _patchedAttack + "/" + _wantedAttack + (missA.Length > 0 ? " (NIE:" + missA.ToString() + ")" : "")
                    + ", biezaca taktyka " + (_fCur != null ? "TAK" : "NIE") + ", typy RBM: RBMBehaviorCavalryCharge " + (_fChargeInf != null ? "TAK" : "NIE")
-                   + ", RBMBehaviorArcherSkirmish " + (_tRbmArcher != null ? "TAK" : "NIE") + ", wagi zachowan " + (_fBehaviors != null ? "TAK" : "NIE") + ", obrona gry 291d " + def291d + ", cel pieszy 313b " + aim313 + ", wahadlo 333 " + pend333;
+                   + ", RBMBehaviorArcherSkirmish " + (_tRbmArcher != null ? "TAK" : "NIE") + ", wagi zachowan " + (_fBehaviors != null ? "TAK" : "NIE") + ", obrona gry 291d " + def291d + ", cel pieszy 313b " + aim313 + ", wahadlo 333 " + pend333 + ", ostrzal 438 " + o438;
         }
 
         private static void PatchAttack(Harmony h, Type t, StringBuilder miss)
@@ -392,6 +393,7 @@ namespace Armoury
             // 141: linia "S2 (141)" raz na misje (przed Clear - stan druzyn; _m zerowane nizej, drugie wywolanie End nic nie pisze)
             try { S2End(m); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.S2End", e); }
             try { DhEnd(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.DhEnd", e); }   // 291: probka do linii 'Bitwa (291)'
+            try { O438End(); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.O438End", e); }   // 438: stan druzyn bez misji (liczniki zostaja do linii)
             Clear();
             _m = null;
         }

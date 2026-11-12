@@ -18,6 +18,7 @@ namespace Armoury
             Doctrine.Dh291Reset();
             MarchToContact.Rush291Reset();
             OutshotRush.Reset();   // 313b: segment E
+            Doctrine.O438Reset();   // 438: linia "Ostrzal piechoty (438)"
         }
 
         internal static void Write(Mission m, string kind, string segA)
@@ -35,6 +36,7 @@ namespace Armoury
               .Append(" | ").Append(MarchToContact.Rush291Segment())
               .Append('.');
             Log.Info(sb.ToString());
+            Log.Info(Doctrine.O438Line(kind));   // 438: osobna linia (wyrazenia sprawdz_logi dla 'Bitwa (291)' bez zmian)
         }
     }
 }

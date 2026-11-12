@@ -149,6 +149,9 @@ namespace Armoury
             if (inf != null) { ratio = HitRatio(inf, now); gap = FootGap(t, inf); }
             else if (outshot) _s2NoInf++;
             bool cond = outshot && inf != null && ratio >= S2Ratio && gap <= S2Range;
+            // 438 (1.2, klucz OutshotTriggerByMissileLosses): albo przyrost strat od pociskow (>= FireDead w 30 s) zamiast chwilowego odsetka trafionych
+            bool byLoss = !cond && O438S2Loss(t, ratio, outshot, inf, gap);
+            if (byLoss) cond = true;
             if (outshot && !_s2Outshot[ti]) { _s2Outshot[ti] = true; _s2OutTeams++; }
             if (outshot && inf != null && gap <= S2Range)
             {
@@ -167,7 +170,7 @@ namespace Armoury
                     if (_s2Since[ti] < 0f) _s2Since[ti] = now;
                     if (now - _s2Since[ti] >= S2EnterSec)
                     {
-                        if (_s2Atk[ti]) S2Enter(t, ti, now, ratio, ours, enemy, key);
+                        if (_s2Atk[ti]) { S2Enter(t, ti, now, ratio, ours, enemy, key); if (ratio < S2Ratio) _o438S2Loss++; }   // 438: wejscie bez progu trafionych = od strat
                         else if (!_s2NoAtkSeen[ti]) { _s2NoAtkSeen[ti] = true; _s2NoAttack++; }
                     }
                 }

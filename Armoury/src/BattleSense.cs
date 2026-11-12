@@ -224,6 +224,7 @@ namespace Armoury
                 t309 = FrameCost309.T();
                 try { Doctrine.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Tick", e); }
                 try { OutshotRush.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "OutshotRush.Tick", e); }   // 313b: po 291e / S2 tego taktu
+                try { Doctrine.O438Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.O438Tick", e); }   // 438: straty od pociskow, liczniki, probka biegu
                 FrameCost309.Add(FrameCost309.MDoctrine, t309);
                 t309 = FrameCost309.T();
                 try { BattleSound.Tick(Mission, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteSound, "BattleSound.Tick", e); }

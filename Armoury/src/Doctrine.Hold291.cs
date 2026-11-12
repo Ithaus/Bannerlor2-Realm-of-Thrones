@@ -485,15 +485,20 @@ namespace Armoury
             if (t == null) return false;
             int ti = t.TeamIndex;
             if (ti < 0 || ti >= MaxTeams) return false;
+            _o438RbmNow[ti] = false;   // 438 (1.1): ustawiane nizej w tym samym wywolaniu
             var q = t.QuerySystem;
             if (q == null || q.DeathByRangedCount < FireDead) return false;
             if (ReferenceEquals(_dhRef[ti], t) && _dhOn[ti]) { why = 4; return false; }   // trzyma pozycje (291) - nie idzie
             if (FireReleased(t)) { why = 1; return true; }
             if (S2On(t) || (ReferenceEquals(_dhRef[ti], t) && _dhS2Was[ti])) { why = 2; return true; }
-            if (Offensive(CurTactic(t))) { why = 3; return true; }
+            var cur = CurTactic(t);
+            if (Offensive(cur)) { why = 3; return true; }
             // 320d (Jeff 02.11 "1. tak"): strona przestrzelana (nie odpowie ogniem: strzelcy x3 < wroga) takze bez taktyki ataku (DefensiveEngagement po
             // 'napastnik nie podchodzi'); czy szyk naprawde idzie NA wroga, sprawdza MarchToContact.Advancing. Druzyna gracza - nigdy (szyki gracza i tak poza)
             if (!t.IsPlayerTeam && CannotAnswerFire(t)) { why = 5; return true; }
+            // 438 (1.1, klucz OutshotRushInRbmAttackPlans): plan ataku RBM (AttackSplitArchers / AttackSplitInfantry / AttackSplitSkirmishers / Embolon) tez jest
+            // natarciem - na koncu, wiec druzyny Live z powodow 1-5 licza sie jak dotad. Klucz NIE - false (licznik "bylby")
+            if (O438RbmAdvancing(t, ti, cur)) { why = 3; return true; }
             return false;
         }
 

@@ -610,7 +610,12 @@ namespace Armoury
                     try { fireC = q.UnderRangedAttackRatio >= 0.33f; } catch { fireC = false; }
                     // 313y (recenzja integracji, WAZNA): ten sam zapas tchu pod ostrzalem (25%) co bieg 313b w MarchCap - inaczej przy 2-3 trafieniach na 10 s
                     // (UnderRangedAttackRatio < 0.33) zwykly zapas 50% dawal cap kroku i banda znow "wolno szla" na strzelca (AiBreath.Reserve czyta Rushing)
-                    if (fireC || ShieldsUp.FormFire(f)) { OutshotRush.NoteCharge(TickEvery); SpeedSample(f, idx, 2); _chgFire313[idx] = true; }
+                    bool fireS = fireC || ShieldsUp.FormFire(f);
+                    // 438 (1.2, klucz OutshotTriggerByMissileLosses): sygnal ostrzalu takze z przyrostu strat od pociskow druzyny (>= 2 w 30 s, wrog <= 200 m)
+                    bool dryC = false;
+                    if (!fireS && Doctrine.O438LossFire(f.Team, gap, out dryC)) { fireS = true; Doctrine.O438NoteLoss(2, false); }
+                    else if (!fireS && dryC) Doctrine.O438NoteLoss(2, true);
+                    if (fireS) { OutshotRush.NoteCharge(TickEvery); SpeedSample(f, idx, 2); _chgFire313[idx] = true; }
                 }
                 Set(f, idx, 0f, 0f, false);
                 return;
@@ -765,11 +770,16 @@ namespace Armoury
             if (kind == KInf && (_rush || _rushShielded) && !_player[idx] && !_dragon[idx] && _evalOe != MovementOrder.MovementOrderEnum.FallBack)
             {
                 bool fire = underFire || ShieldsUp.FormFire(f);
+                // 438 (1.2, klucz OutshotTriggerByMissileLosses): albo przyrost strat od pociskow druzyny (>= 2 w 30 s), gdy pieszy wrog jest blizej niz 200 m -
+                // chwilowy odsetek trafionych (gra pomija ludzi z tarcza) nie widzi strat (23:06: 0.07 przy 1911 trafieniach). byLoss - tylko ten sygnal
+                bool byLoss = false, dryLoss = false;
+                if (!fire && Doctrine.O438LossFire(f.Team, gap, out dryLoss)) { fire = true; byLoss = true; }
+                else if (dryLoss) Doctrine.O438NoteLoss(0, true);   // klucz NIE: bylby sygnal (szyko-takty)
                 bool bare = _rush && _shield[idx] >= 0f && _shield[idx] < CloseRanks.WallFrom;
                 if (bare && (fire || (_evalWasRush && !_evalWas313)))
                 {
                     if (_evalWasRush && !_evalWas313) _rushOut--;   // dalej biegnie (zdjecie na poczatku Eval nie bylo koncem)
-                    else { _rushIn++; _rushShareSum += _shield[idx]; _rushForms.Add(idx); }
+                    else { _rushIn++; _rushShareSum += _shield[idx]; _rushForms.Add(idx); if (byLoss) Doctrine.O438NoteLoss(0, false); }
                     _rushNow[idx] = true;
                     _rushSec += TickEvery;
                     Set(f, idx, 0f, 0f, false);
@@ -791,6 +801,7 @@ namespace Armoury
                     if (cont) OutshotRush.NoteRushEndUndo();   // dalej biegnie (zdjecie na poczatku Eval nie bylo koncem)
                     else if (adv == AdvBeh) _r320Beh++;
                     else { _r320Move++; NoteBeh(f); }
+                    if (!cont && byLoss) Doctrine.O438NoteLoss(1, false);   // 438 (1.2)
                     OutshotRush.NoteRush(f, !cont, TickEvery);
                     SpeedSample(f, idx, 1);
                     _rushNow[idx] = true;
@@ -863,6 +874,37 @@ namespace Armoury
             if (!_on || f == null) return false;
             int idx = Idx(f);
             return idx >= 0 && ReferenceEquals(_who[idx], f) && _rush313[idx];
+        }
+
+        /// <summary>438 (Doctrine.O438Tick, glowny watek): ile szykow jest teraz w biegu pod ostrzalem (291 C i 313b); rbm - w tym szyki druzyn puszczonych
+        /// planem ataku RBM (1.1). Tylko odczyt tablic z ostatniego Eval.</summary>
+        internal static int RushNowCount(out int rbm)
+        {
+            rbm = 0;
+            if (!_on) return 0;
+            int n = 0;
+            for (int i = 0; i < Slots; i++)
+            {
+                if (!_rushNow[i]) continue;
+                var f = _who[i];
+                if (f == null || f.CountOfUnits <= 0) continue;
+                n++;
+                if (Doctrine.O438RbmNow(f.Team)) rbm++;
+            }
+            return n;
+        }
+
+        /// <summary>438 (1.4, Doctrine.O438Tick, glowny watek): wola probke dla kazdego szyku w biegu pod ostrzalem (291 C i 313b). Sam odczyt.</summary>
+        internal static void RushProbe(Action<Formation> probe)
+        {
+            if (!_on || probe == null) return;
+            for (int i = 0; i < Slots; i++)
+            {
+                if (!_rushNow[i]) continue;
+                var f = _who[i];
+                if (f == null || f.CountOfUnits <= 0) continue;
+                probe(f);
+            }
         }
 
         /// <summary>320d: czlon MarchToContact segmentu F linii 'Bitwa (291)'.</summary>
