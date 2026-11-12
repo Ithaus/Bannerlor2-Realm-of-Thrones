@@ -12880,6 +12880,14 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Mason { get; set; } = true;
 
+        [SettingPropertyBool("Buildings338 Mason Cheaper", HintText = "With Buildings338 and Buildings338 Mason: the mason makes every point of paid building work cheaper instead of adding free points - a point of works costs 10/20/30% less at mason level 1/2/3 (Buildings338 Mason Price Cut per level), for the lord, the townsfolk and gold paid to the craftsmen, so the same money builds more (walls still rise no faster than Wall Min Years). Off = the mason adds his points (town 3/6/9, castle 2/4/6) to the paid work for nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338MasonCheaper { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Buildings338 Mason Price Cut", 0.00f, 0.30f, "0.00", HintText = "With Buildings338 Mason Cheaper: how much cheaper a point of building work is per level of the mason (0.10 = 10/20/30% at level 1/2/3; at most 0.30)", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public float Buildings338MasonPriceCut { get; set; } = 0.10f;
+
         [SettingPropertyBool("Buildings338 Tax Office", HintText = "With Buildings338: the town tax office raises what the lord and the crown take from the town's purse each week by 5/10/15%, as its description says - paid only from the town's money above its reserve, like the rest of the payment. Off = the tax office does nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338TaxOffice { get; set; } = true;
@@ -16191,6 +16199,8 @@ namespace Armoury
             s.Buildings338FoodStock = Buildings338FoodStock;
             s.Buildings338FoodDouble = Buildings338FoodDouble;
             s.Buildings338Mason = Buildings338Mason;
+            s.Buildings338MasonCheaper = Buildings338MasonCheaper;   // 473-a
+            s.Buildings338MasonPriceCut = Buildings338MasonPriceCut;
             s.Buildings338TaxOffice = Buildings338TaxOffice;
             s.Buildings338Caravans = Buildings338Caravans;
             s.Buildings338Assimilation = Buildings338Assimilation;

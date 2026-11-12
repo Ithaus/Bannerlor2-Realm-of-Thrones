@@ -142,6 +142,8 @@ namespace Armoury
                 if (town.BoostBuildingProcess <= 0) return 0f;
                 int amount = Campaign.Current.Models.BuildingConstructionModel.GetBoostAmount(town);
                 float bst = amount * Math.Min(1f, town.BoostBuildingProcess / (town.IsCastle ? 250f : 500f));
+                float mcut = Covered(town) ? Buildings338Mason.PriceFactor(town) : 1f;   // 473-a: Mason - te same pensy przyspieszenia kupuja wiecej punktow (zamiast dopisku min(Mason, praca + przyspieszenie) z 347e)
+                if (mcut < 1f) bst /= mcut;
                 return WallOn ? WallBoost(town, bst) : bst;   // 472 (BuildFunding.Walls.cs): mury na czole - przyspieszenie zlotem przez czynnik ceny punktu murow
             }
             catch { return 0f; }
@@ -305,6 +307,8 @@ namespace Armoury
                     float budget = all / Math.Max(1, count[clan]);
                     float ppp = military ? Math.Max(1f, s.BuildPencePerPointMilitary) : Math.Max(1f, s.BuildPencePerPointCivil);
                     if (WallOn) ppp *= WallFactor(st.Town, b.BuildingType);   // 472 (BuildFunding.Walls.cs): punkt murow drozszy (zamek x3, miasto x2); takze R3-11a OneNeed
+                    float mcut = Buildings338Mason.PriceFactor(st.Town);   // 473-a: Mason - punkt tanszy o 10/20/30% (klucz wylaczony - 1, ppp bez zmian); takze OneNeed i WallBudget (ta sama ppp)
+                    if (mcut < 1f) ppp *= mcut;
                     // materialy z targu (miasto - swoj, zamek - najblizsze miasto)
                     var market = st.IsTown ? st : NearestTown(st);
                     budget = OneBudget(st, b, clan, all, budget, ppp, market);   // R3-11a: rod AI z kilkoma budowami - reszta przydzialu na te budowe albo 0 (czeka w kolejce); reszta - budget bez zmian
@@ -344,6 +348,7 @@ namespace Armoury
                     ClanIncomeBook.NoteOwnPaid(st, clan, labourI - folk);   // 110-p (K8): "wlasne" D stalego - place budowy w kasie wlasnego zamku albo miasta wracaja zaworem (E5/B1: place w kiesie ludu nie wracaja)
                     try { TownFolk.Note(st, labourI, TownFolk.KBuildLabour); } catch { }   // E5/0 (195): place budowy (tylko licznik)
                     float pts = PointsFor(matSpent, labourI, ppp, market);
+                    if (mcut < 1f) Buildings338Mason.NoteCut(st.Town, mcut, matSpent + labourI, pts, false);   // 473-a: linia murarza (tylko licznik)
                     _wageIdxSum += WageIdx(market); _wageIdxN++;
                     _funded[st.Town] = pts;
                     if (WallOn) WallPaid(st, b, matSpent, labourI, pts);   // 472: liczniki murow i kontrola limitu
