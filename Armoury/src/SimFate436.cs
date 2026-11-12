@@ -199,11 +199,13 @@ namespace Armoury
                      + " obuch " + F(s != null ? s.BlowDeathBluntFactor : 0f) + " | latka " + _patched + "/" + _wanted
                      + " | SYMULACJA doby (szeregowi)" + Block("", dk, dw, _dK, _dW, _dRolls, _dBase, _dNew)
                      + ", bez reguly (klucz NIE) " + _dOff + ", szansa gry 0 " + _dEdge + (_dStum > 0 ? ", potkniecia " + _dStum : "")
-                     + " | SYMULACJA sesji" + Block("", sk, sw, _sK, _sW, _sRolls, _sBase, _sNew)
+                     + " | SYMULACJA sesji (pole, szturmy i najazdy razem)" + Block("", sk, sw, _sK, _sW, _sRolls, _sBase, _sNew)
                      + " | dla porownania MISJE 421 sesji (bitwy w polu i kryjowki, " + BlowFate421.SessMissions + "): powaleni " + (mk + mw) + ", zabici " + mk + ", ranni " + mw
                      + ", ranni do zabitych " + Ratio(mk, mw) + ", zabici/powaleni " + (mk + mw > 0 ? ((double)mk / (mk + mw)).ToString("0.00", Inv) : "-")
                      + ", srednia szansa smierci gry " + (BlowFate421.SessRolls > 0 ? F(BlowFate421.SessBase / BlowFate421.SessRolls) : "-")
-                     + " -> po regule " + (BlowFate421.SessRolls > 0 ? F(BlowFate421.SessNew / BlowFate421.SessRolls) : "-") + ".");
+                     + " -> po regule " + (BlowFate421.SessRolls > 0 ? F(BlowFate421.SessNew / BlowFate421.SessRolls) : "-")
+                     + " | MISJE 421 sesji szturmy i wypady gracza (osobno, " + BlowFate421.SessSiegeMissions + "): powaleni " + (BlowFate421.SessSiegeKilled + BlowFate421.SessSiegeWounded)
+                     + ", zabici " + BlowFate421.SessSiegeKilled + ", ranni " + BlowFate421.SessSiegeWounded + ", ranni do zabitych " + Ratio(BlowFate421.SessSiegeKilled, BlowFate421.SessSiegeWounded) + ".");
             Array.Clear(_dK, 0, 2); Array.Clear(_dW, 0, 2);
             _dRolls = 0; _dEdge = 0; _dStum = 0; _dOff = 0; _dBase = 0; _dNew = 0;
         }

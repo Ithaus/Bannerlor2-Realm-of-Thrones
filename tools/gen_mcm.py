@@ -4,6 +4,13 @@ import re, sys, os
 # T1: godziny obozu (regula ogolna [0, max(10, 4 x domyslna)] dawala przy domyslnej 0 suwak 0..10 - nie dalo sie ustawic 22)
 # recenzja 174: suwaki 174 zgodne z przycieciem w kodzie; K1: odsetki 0..100 (regula ogolna dawala 0..200 i 0..300)
 RANGES = {
+    # 436-p: smierc czy rana (421) i w symulacji (436) - zakresy jak w recznym McmSettings.cs (regula ogolna dalaby 421 0..1.40 / 0..2.40 / 0..0.60 / 0..2.00,
+    # a 436 0..2.00 z dozwolonym 0 - w symulacji nikt by nie ginal)
+    'BlowDeathBluntFactor': (0.0, 1.0, "0.00"),
+    'BlowDeathTorsoFactor': (0.0, 1.0, "0.00"),
+    'BlowDeathLimbFactor': (0.0, 1.0, "0.00"),
+    'BlowDeathShallowFactor': (0.0, 1.0, "0.00"),
+    'SimulatedBattlesDeathFactor': (0.05, 1.0, "0.00"),
     # 426a: tryb roszczenia do unikatow pokonanych - zakres jak w recznym McmSettings.cs (UniqueSpoils.ClaimMode przycina do 0..2)
     'UniqueSpoilsClaim': (0, 2, "0"),
     # 425b: cena rydwanu - zakres jak w recznym McmSettings.cs (HistoricalPrices.ChariotFactor przycina do 0.25..1; regula ogolna dalaby 0..1.20)
@@ -791,6 +798,8 @@ RANGES = {
 # m103-lektor (21.10): nazwa pola w MCM inna niz z podzialu nazwy klucza - klucze Lektor* (polskie slowo) pokazane po angielsku (CLAUDE.md: napisy w grze
 # po angielsku); id pola w Armoury.json zostaje nazwa klucza. Reszta pol - jak dotad (podzial nazwy na slowa).
 LABELS = {
+    'BlowDecidesDeathEnabled': 'Blow Decides Death Or Wound',   # 421 (436-p: nazwa jak w recznym McmSettings.cs - odwoluja sie do niej opisy 421 i 436)
+    'SimulatedBattlesMatchPlayed': 'Simulated Battles Match Fought Battles',   # 436 (436-p: jak w recznym McmSettings.cs)
     'ChariotsLeaveWesteros': 'Chariots Stay In Essos',   # 425a (nazwa jak w recznym McmSettings.cs)
     'ChariotsNotRiddenInWesteros': 'Chariots Not Ridden In Westeros',   # 425-p (jak w recznym McmSettings.cs)
     'ArmourLadderEnabled': 'ROT Body Armour In RBM Scale',   # 423a (423-p: nazwy jak w recznym McmSettings.cs - odwoluja sie do nich opisy i log)

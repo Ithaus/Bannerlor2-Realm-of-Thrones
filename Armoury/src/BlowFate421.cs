@@ -189,9 +189,15 @@ namespace Armoury
         }
 
         // 436: suma misji tej sesji (bitwy w polu i kryjowki) - tylko odczyt w SimFate436, czyszczona razem z kampania (SimFate436.Reset)
+        // 436-p: szturmy i wypady gracza (Mission.IsSiegeBattle / IsSallyOutBattle) osobno (SessSiege*), bitwa wlasna (Campaign.Current null) wcale
         internal static int SessMissions, SessKilled, SessWounded, SessRolls;
         internal static float SessBase, SessNew;
-        internal static void ResetSession() { SessMissions = 0; SessKilled = 0; SessWounded = 0; SessRolls = 0; SessBase = 0f; SessNew = 0f; }
+        internal static int SessSiegeMissions, SessSiegeKilled, SessSiegeWounded;
+        internal static void ResetSession()
+        {
+            SessMissions = 0; SessKilled = 0; SessWounded = 0; SessRolls = 0; SessBase = 0f; SessNew = 0f;
+            SessSiegeMissions = 0; SessSiegeKilled = 0; SessSiegeWounded = 0;
+        }
 
         private static void Reset()
         {
@@ -238,8 +244,16 @@ namespace Armoury
             for (int t = 0; t < T; t++)
                 for (int p = 0; p < P; p++) { kt[t] += _killed[t * P + p]; wt[t] += _wounded[t * P + p]; kp[p] += _killed[t * P + p]; wp[p] += _wounded[t * P + p]; }
             // 436: suma sesji do porownania z symulacja (linia doby "Smierc czy rana w symulacji (436)") - tylko bitwy w polu i kryjowki
-            // (arena / turniej: ludzie bez partii z szansa gry 1.00)
-            if (kind == "bitwa" || kind == "kryjowka") { SessMissions++; SessKilled += k; SessWounded += w; SessRolls += _rolls; SessBase += _sumBase; SessNew += _sumNew; }
+            // (arena / turniej: ludzie bez partii z szansa gry 1.00). 436-p: rodzaj "bitwa" maja tez szturm / wypad gracza i bitwa wlasna
+            // (MissionTeams.KindOf: Campaign.Current null albo PlayerMapEvent) - bitwa wlasna poza suma (zostalaby do nastepnej kampanii),
+            // szturm i wypad w osobnej sumie (Mission.IsSiegeBattle / IsSallyOutBattle - jak AiBreath)
+            bool camp = false, siege = false;
+            try { camp = TaleWorlds.CampaignSystem.Campaign.Current != null; siege = m != null && (m.IsSiegeBattle || m.IsSallyOutBattle); } catch { }
+            if (camp && (kind == "bitwa" || kind == "kryjowka"))
+            {
+                if (siege && kind == "bitwa") { SessSiegeMissions++; SessSiegeKilled += k; SessSiegeWounded += w; }
+                else { SessMissions++; SessKilled += k; SessWounded += w; SessRolls += _rolls; SessBase += _sumBase; SessNew += _sumNew; }
+            }
             Log.Info("Smierc czy rana (421): koniec misji (" + kind + ") | klucz " + (s != null && s.BlowDecidesDeathEnabled ? "TAK" : "NIE")
                      + " obuch " + F(s != null ? s.BlowDeathBluntFactor : 0f) + " tulow " + F(s != null ? s.BlowDeathTorsoFactor : 0f)
                      + " konczyna " + F(s != null ? s.BlowDeathLimbFactor : 0f) + " plytki " + F(s != null ? s.BlowDeathShallowFactor : 0f)
