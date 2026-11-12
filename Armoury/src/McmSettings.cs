@@ -12316,6 +12316,14 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeAssaultBreakTakenShare { get; set; } = 0.15f;
 
+        [SettingPropertyBool("Assault Party Fights, Not The Whole Army", HintText = "With Siege Assault Break: in a simulated assault between lords of the world (not a battle you are in), only the assault party (Siege Assault Party Share of the army) strikes in the gate and the breach - the rest waits in the camp and only fills the gaps. A great host no longer overwhelms a small garrison in one go: the assault party breaks, falls back and the siege goes on. Off = the whole army strikes, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public bool SiegeAssaultPartyStrikes { get; set; } = true;
+
+        [SettingPropertyInteger("Assault Party Fights Until Repels", 0, 10, "0", HintText = "With Assault Party Fights, Not The Whole Army: after this many broken assaults in the same siege the whole army goes in, so a siege cannot last for ever. 0 = no limit", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
+        public int SiegeAssaultPartyStrikesRepels { get; set; } = 2;
+
         [SettingPropertyFloatingInteger("Siege Repel Pause Min Days", 0.25f, 28.00f, "0.0", HintText = "With Siege Assault Break: the shortest pause in days before the besiegers try again after a broken assault when their rams and siege towers still stand", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: assault party, breaking and the next assault (371)")]
         public float SiegeRepelPauseMinDays { get; set; } = 1f;
@@ -15994,6 +16002,8 @@ namespace Armoury
             s.SiegeAssaultBreakGateExchangeFactor = SiegeAssaultBreakGateExchangeFactor;
             s.SiegeAssaultBreakHardCap = SiegeAssaultBreakHardCap;
             s.SiegeAssaultBreakTakenShare = SiegeAssaultBreakTakenShare;
+            s.SiegeAssaultPartyStrikes = SiegeAssaultPartyStrikes;
+            s.SiegeAssaultPartyStrikesRepels = SiegeAssaultPartyStrikesRepels;
             s.SiegeRepelPauseMinDays = SiegeRepelPauseMinDays;
             s.SiegeRepelPauseMidDays = SiegeRepelPauseMidDays;
             s.SiegeRepelPauseMaxDays = SiegeRepelPauseMaxDays;

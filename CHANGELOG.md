@@ -1,5 +1,38 @@
 # DZIENNIK ZMIAN
 
+## 467 (12.11) - SZ5: w szturmie AI kontra AI bije oddzial szturmowy, nie cala armia - oblezenia AI dluzsze i trudniejsze
+
+**Problem:** Jeff 12.11: "trzeba zrobic ze oblezenia trwaja dluzej i sa trudniejsze, np. mamy juz jak jest oblezenie to nie atakuja calym wojskiem tylko po stratach wycofuja sie i odczekuja ... Czy to tez dziala dla AI?". Pakiet 7 (450-456) to reguly MISJI - dla AI kontra AI nie dziala (bitwa rozstrzygana symulacja). Dla AI dziala odpowiednik kampanii (OB1, OB2/371, SZ1-SZ4), ale logi 12.11 (`Armoury-2026-11-12_*.log`, wiersze "Bitwa szturmu (SZ)"): armia Polnocy ok. 13,5 tys. na zamek ok. 500 - 10 z 10 zamkow padlo w PIERWSZYM szturmie po 6,0-6,6 doby, straty atakujacych 467-710 (3-5% armii, 14-21% oddzialu K) - ponizej progu 371 (ok. 22% K), wiec odwrot sie nie wlaczal; obroncy 100% (np. Deep Den `16-58-45.log` 30754-30767).
+
+**Przyczyna:** `SiegeWalls.SzTicks`: czesc polowa rundy (taran i wieza / wyrwa) liczyla ciosy atakujacych `Math.Pow(A, 0.6)` z A = CALA armia (13 577 -> 302, razem ok. 45 ciosow na runde zamiast 16). Oddzial szturmowy 371 zmienial tylko mianownik progu zalamania, nie sile ciosow - "atakuja calym wojskiem".
+
+**Zmiana (`SiegeWalls.Party467.cs` nowy, `SiegeWalls.cs`, `Settings.cs` + `McmSettings.cs` klucze recznie, `tools/gen_mcm.py` tylko etykiety):**
+- `AssaultTicks` (bitwa Siege): Ak = `Sz5Party` = min(A, K), K = oddzial szturmowy z rekordu szturmu OB2/371 (`Assault.K` = PartyOf(ludzie, obroncy) - ten sam, wobec ktorego liczony jest prog zalamania). `SzTicks` dostal parametr Ak i uzywa go w `attF`, `defF` (Math.Min(2 x Ak, ...)) i `(D+1)/(Ak+1)`. A maleje z rundami - oddzial uzupelniany z obozu (fale), az straty K przekrocza prog 371 -> obecny OB2 robi odwrot i przerwe 1-5 / 7-14 dob.
+- Tylko szturm AI bez gracza (`IsPlayerMapEvent` = bez zmian: misje i autobitwa gracza), z rekordem szturmu i czynnym progiem; bitwa z murow z odsiecza (SiegeOutside, OB3) bez zmian (Ak = A).
+- Limit (zamrozenie wojen): po `SiegeAssaultPartyStrikesRepels` (domyslnie 2, 0 = bez limitu) odparciach w tym samym oblezeniu idzie cala armia - jak przed 467.
+- Klucze MCM (grupa 371): "Assault Party Fights, Not The Whole Army" (`SiegeAssaultPartyStrikes`, TAK; dziala tylko z Siege Assault Break) i "Assault Party Fights Until Repels" (`SiegeAssaultPartyStrikesRepels`, 2). NIE = Ak = A, wzor co do bitu jak przed (zostaja tylko linie logu).
+- Wyjatek w decyzji bitwy = potkniecie (Stumble) i cala armia w tej bitwie, bez globalnego wylacznika.
+
+**Linie logu:**
+- "Bitwa szturmu (SZ)": dopisek `| SZ5 (467) oddzial K / A0 (ciosy z oddzialu, nie z calej armii), rund z oddzialem N, przycietych M` albo `| SZ5 (467) cala armia (powod: limit / bitwa gracza / klucz NIE / bez rekordu / bitwa z murow)`.
+- "Mury oblezen (OB0)" (doba): `| SZ5 (467): klucz TAK, limit odparc 2 | szturmy AI z oddzialem N (zdobyte, odparte, inne), cala armia: po limicie, klucz NIE, bez rekordu, gracz | rund z oddzialem, przycietych | oblezenia w pamieci`.
+- Nowa linia na oblezenie (przy OnSiegeEventEnded, gdy byl szturm AI): "Oblezenie (467): dzien | osada | oblegajacy | czas oblezenia X dob | szturmow N (z oddzialem, cala armia) | zdobyte, odparte (odstapienie po stratach), inne | rund z oddzialem, przycietych | straty w szturmach: atakujacy, obroncy, wymiana | klucz".
+- "Bitwa szturmu (SZ start)": `| SZ5 (467) bije oddzial, nie armia: TAK (tylko szturm AI bez gracza), limit odparc 2`.
+
+**Oczekiwane (wyliczenie, nie pomiar):** armia ok. 13,5 tys. na zamek ok. 500: ciosy ok. 45 -> ok. 28 na runde, wymiana ok. 1,2 -> ok. 1,9; pierwszy szturm lamie sie po ok. 750 stratach przy 60-70% zabitych obroncow, przerwa 7-14 dob, drugi szturm zdobywa - oblezenie zamku ok. 6 -> ok. 15-22 dob. Armie ok. 5 tys. odparte szybciej, przy mniejszych stratach obroncow; po 2 odparciach - cala armia jak dotad.
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci (w kodzie): `SzTicks` wolany w 2 miejscach (AssaultTicks z Ak, TicksPost/OB3 z A); `Assault.K` liczone w `NewAssault` przy MapEventStarted (przed pierwsza runda - ten sam warunek co `Thr0` w BatOf). MapEventEnded (SzEnd, Sz5End) biegnie PRZED SiegeCompleted/OnSiegeEventEnded (MapEvent.FinalizeEventAux) - ostatni szturm wchodzi do linii oblezenia. Pamiec `_sz5` czyszczona: OnSiegeEnded, Daily (oblezenia bez zdarzenia konca), Reset.
+- Zamrozenie: limit 2 odparc; 307c (po 2 odparciach szturm tylko przez wyrwe albo przy przewadze 6:1), trebusze TB, glod GL. Kryterium testu 90-dobowego: "ponad 45 dob" w OB0 puste dla zamkow, zdobycia Polnocy w 12-25 dobach.
+- Glod armii i straty obozu: dluzsze oblezenie = wiecej strat RealisticBannerlord `SiegeAttritionBehavior` (rosna z dobami) i nizsze morale SZ3 z jedzenia obozu.
+- 274: oblezenie liczy sie jako walka tylko w dniu startu (`CanonWarBalance.OnSiegeStarted`), szturm na sama zaloge (bez druzyny lorda po stronie obrony) nie liczy sie w `OnMapEventEnded` (HasLord) - dluzsze oblezenia moga podbic "bez walki N dob" strony oblegajacej i wywolac zbiorke 274. Sprawdzic linie "Rownowaga wojny (274) ... zbiorka".
+- 334 / 334e: ocena "pozostalo N dob" (Sila lokalna 334e: oblezenie) nie zna przerw po odparciu - bedzie zanizona.
+- 330 / 326c: dluzsze oblezenia = wiecej czasu na odsiecz (zamierzone). 465/466: bez kolizji (cele i wlasnosc, nie przebieg szturmu). 370 / pakiet 7: tylko misja - bez kolizji. BK i RBM nie lataja `GetSimulationTicksForBattleRound`.
+- SK (szturm do konca) / mysl wodza: dluzszy szturm w godzinach - wiecej okazji do przerwania szturmu przez mysl wodza (linie KO "szturm przerwany").
+- Build OK (0 bledow), skan IL 30 trafien. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 466 (12.11) - 326b zwrot zdobyczy Polnocy WYLACZONY domyslnie: co Polnoc zdobedzie, zatrzymuje
 
 **Problem:** Jeff 12.11: "anuluj regule oddawania zamkow po zdobyciu dla polnocy jak zdobyli to maja". Regula 326b (`NorthConquest.cs`, klucz `NorthConquestReturn`, domyslnie TAK) oddawala twierdze zdobyte przez Polnoc spoza jej ziem panu startowemu / krolowi jego krolestwa i nakladala 60-dobowe weto oblezen. Gry nie uruchamiano - dowod z kodu.

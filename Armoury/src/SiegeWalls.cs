@@ -784,6 +784,7 @@ namespace Armoury
             public double Pm = 50, Ma = 50, FA = 1, AFood, ASick, ARep, CampDays = -1, WoundShare; public int Repels;
             public int Rounds, FieldRounds, Mode0 = -1, ModeL = -1; public long DefT, AttT, GDefT, GAttT; public double W0, K0, O0, Adv0, Mf0; public float Thr0 = -1f;
             public int Lvl; public double LvlF = 1.0; public string LvlWhy;   // 320c: czynnik poziomu murow ze startu szturmu
+            public int Sz5 = -1, K5, Sz5Rounds, Sz5Cut; public string Sz5Why, Fac5; public SiegeEvent Ev5;   // 467: -1 nie ustalone, 1 bije oddzial K5, 0 cala armia (Sz5Why)
         }
         private static readonly Dictionary<MapEvent, Bat> _bats = new Dictionary<MapEvent, Bat>();
         private static readonly string[] ModeName = { "drabiny", "jedna machina (taran albo wieza)", "taran i wieza", "wyrwa" };
@@ -828,7 +829,7 @@ namespace Armoury
                 Bat b = SzAny && st.Town != null ? BatOf(mapEvent, st) : null;
                 if (b != null && !b.Excl)
                 {
-                    SzTicks(b, st, D, A, out dfn, out atk);                       // ta sama regula co szturm (SZ1-SZ4)
+                    SzTicks(b, st, D, A, A, out dfn, out atk);                    // ta sama regula co szturm (SZ1-SZ4); 467 SZ5 nie dotyczy bitwy z odsiecza
                     b.GDefT += __result.Item1; b.GAttT += __result.Item2; b.DefT += dfn; b.AttT += atk; b.Rounds++;
                 }
                 else
@@ -860,7 +861,8 @@ namespace Armoury
                 if (b == null || b.Excl) return;
                 if (!AnyGarrisonOn && D <= (st.IsTown ? 100 : 30)) { b.FieldRounds++; return; }   // SZ1 wylaczony: mala zaloga w polu, jak gra
                 int dfn, atk;
-                SzTicks(b, st, D, A, out dfn, out atk);
+                int Ak = Sz5Party(me, b, A);                                     // 467 SZ5: w szturmie AI bije oddzial szturmowy K, nie cala armia (klucz NIE - Ak = A)
+                SzTicks(b, st, D, A, Ak, out dfn, out atk);
                 b.GDefT += __result.Item1; b.GAttT += __result.Item2; b.DefT += dfn; b.AttT += atk; b.Rounds++;
                 __result = new ValueTuple<int, int>(dfn, atk);
             }
@@ -869,7 +871,8 @@ namespace Armoury
 
         /// <summary>Tury rundy SZ: waski front murow (wzor gry z przewaga W = przewaga x drabiny x morale obroncow, sufit WCap) zmieszany z bitwa w polu
         /// w udziale frontu o (taran i wieza / wyrwa); ciosy szturmujacych x minusy oblezenia. Bez kluczy (k 1, o 0, morale 1) = wzor murow gry.</summary>
-        private static void SzTicks(Bat b, Settlement st, int D, int A, out int dfn, out int atk)
+        /// 467: Ak - atakujacy, ktorzy bija (oddzial szturmowy SZ5 albo A); A zostaje do zgodnosci wywolan.
+        private static void SzTicks(Bat b, Settlement st, int D, int A, int Ak, out int dfn, out int atk)
         {
             double adv = Campaign.Current.Models.CombatSimulationModel.GetSettlementAdvantage(st);   // gra + AdvPost (stolica, machiny obroncow, wyrwa SZ2)
             bool ram = false, tower = false;
@@ -899,10 +902,10 @@ namespace Armoury
             double mf = 0.7 * adv * (breached ? 1.0 : BreachBase(st)) * fD;     // w polu po bramie / wyrwie: tylko to, co zostaje z murow w wyrwie
             float p3 = TaleWorlds.Library.MathF.Pow(D, 0.3f);
             int attS = TaleWorlds.Library.MathF.Round(1.5f + p3) * 2;
-            double attF = Math.Min(2.0 * D, Math.Pow(A, 0.6));
+            double attF = Math.Min(2.0 * D, Math.Pow(Ak, 0.6));
             atk = Math.Max(1, TaleWorlds.Library.MathF.Round((float)(((1.0 - o) * attS + o * attF) * fA)));
-            int defS = TaleWorlds.Library.MathF.Round(0.5f + TaleWorlds.Library.MathF.Max(1f + p3 * (float)W * 0.7f, (float)((D + 1) / (A + 1)))) * 2;
-            double defF = Math.Min(2.0 * A, Math.Pow(D, 0.6)) * mf;
+            int defS = TaleWorlds.Library.MathF.Round(0.5f + TaleWorlds.Library.MathF.Max(1f + p3 * (float)W * 0.7f, (float)((D + 1) / (Ak + 1)))) * 2;
+            double defF = Math.Min(2.0 * Ak, Math.Pow(D, 0.6)) * mf;
             dfn = Math.Max(1, TaleWorlds.Library.MathF.Round((float)((1.0 - o) * defS + o * defF)));
             if (b.Mode0 < 0) { b.Mode0 = mode; b.W0 = W; b.K0 = k; b.O0 = o; b.Adv0 = adv; b.Mf0 = mf; }
             b.ModeL = mode;
@@ -1088,6 +1091,7 @@ namespace Armoury
                     else { _dLvlBat[li]++; if (res == 0) _dLvlWon[li]++; else if (res == 1) _dLvlRep[li]++; else _dLvlOther[li]++; _dLvlCasA[li] += casA; _dLvlCasD[li] += casD; }
                 }
                 if (b.Small && res != 0 && b.Rounds > 0) _dSzSmallHeld++;
+                if (b.Rounds > 0) Sz5End(b, res, casA, casD);                   // 467: przebieg oblezenia i liczniki SZ5
                 if (!LogOn || b.Rounds <= 0) return;
                 var st = b.St;
                 string resTxt = res == 0 ? "zdobyte" : res == 1 ? "odparty (OB2)" : res == 2 ? "obronca wygral" : res == 4 ? "pole pod murami wygrane przez oblegajacych - twierdza stoi (326c)" : res == 5 ? "odsiecz rozbila oboz - twierdza stoi (326c)" : "bez rozstrzygniecia";
@@ -1113,7 +1117,7 @@ namespace Armoury
                   .Append(", ciosy obrony / ataku ").Append(b.DefT).Append(" / ").Append(b.AttT).Append(" (gra ").Append(b.GDefT).Append(" / ").Append(b.GAttT).Append(')')
                   .Append(" | straty: atakujacy ").Append(casA).Append(" (").Append(F(b.A0 > 0 ? casA * 100.0 / b.A0 : 0.0, "0")).Append("%), obroncy ").Append(casD)
                   .Append(" (").Append(F(dAll > 0 ? casD * 100.0 / dAll : 0.0, "0")).Append("%").Append(dAll > b.D0 ? " z " + dAll + " w bitwie" : "").Append("), wymiana ").Append(F(casA / (double)Math.Max(1, casD), "0.00"))
-                  .Append(" | wynik ").Append(resTxt).Append('.');
+                  .Append(Sz5Text(b)).Append(" | wynik ").Append(resTxt).Append('.');
                 Log.Info(sb.ToString());
                 // 320c: osobna linia czynnika poziomu murow (sprawdz_logi --grupa mury320c)
                 double advNo = b.LvlF > 0 ? b.Adv0 / b.LvlF : b.Adv0;
@@ -1311,6 +1315,7 @@ namespace Armoury
                 var pz = PauseOf(ev, false);
                 SiegeWalls2.NoteSiegeEndForBan(ev, pz != null ? pz.Repels : 0);       // m116-fabula: krotkie oblezenie bez bitwy - zakaz powtorki (przed EndLine - ta sama chwila)
                 SiegeWalls2.EndLine(ev, pz != null ? pz.Repels : 0);                  // oblezenia 3 (KO): przyczyna konca oblezenia - PRZED czyszczeniem przerw OB2
+                Sz5SiegeEnded(ev);                                               // 467: przebieg oblezenia (szturmy, odstapienia, straty)
                 _pauses.Remove(ev);
                 _prep.Remove(ev);
                 _vetoLogged.Remove(ev);
@@ -1333,6 +1338,7 @@ namespace Armoury
                 deadMe = null;
                 foreach (var kv in _bats) if (kv.Key == null || kv.Key.IsFinalized) { if (deadMe == null) deadMe = new List<MapEvent>(); deadMe.Add(kv.Key); }
                 if (deadMe != null) foreach (var me in deadMe) _bats.Remove(me);   // SZ: bitwy bez MapEventEnded (np. przerwane)
+                Sz5Clean();                                                      // 467: oblezenia bez OnSiegeEventEnded
                 List<SiegeEvent> dead = null;
                 foreach (var kv in _pauses) if (kv.Key == null || kv.Key.BesiegedSettlement == null || kv.Key.BesiegedSettlement.SiegeEvent != kv.Key) { if (dead == null) dead = new List<SiegeEvent>(); dead.Add(kv.Key); }
                 if (dead != null) foreach (var ev in dead) _pauses.Remove(ev);
@@ -1377,7 +1383,7 @@ namespace Armoury
                   .Append(" | oblezenia: nowe ").Append(_dSiegesNew).Append(", trwajace ").Append(going).Append(", najdluzsze ").Append(F(longest, "0.0")).Append(" dob (").Append(longestSt).Append(')')
                   .Append(", ponad 45 dob: ").Append(over45.Count == 0 ? "-" : string.Join(", ", over45.ToArray()))
                   .Append(" | w pamieci: szturmy ").Append(_assaults.Count).Append(", przerwy ").Append(_pauses.Count + _pendingPauses.Count)
-                  .Append(" | ").Append(SiegeWalls2.Day307Text()).Append(Break371DayText())
+                  .Append(" | ").Append(SiegeWalls2.Day307Text()).Append(Break371DayText()).Append(Sz5DayText())
                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (od wczytania ").Append(_stumbles).Append(").");
                 Log.Info(sb.ToString());
                 SzDaily();                                                       // SZ: linia doby bitwy szturmu
@@ -1415,6 +1421,7 @@ namespace Armoury
             _dLossSum = _dThrSum = _dPauseSum = 0;
             ZeroDay371();
             ZeroDay377();
+            ZeroDay467();
             _dEngWall = _dEngAnti = _dEngRam = _dEngTower = _dEngPlayer = _dWallHits = _dWallBroken = _dSiegesNew = 0;
             _dDispersed.Clear(); _dPrepAi.Clear(); _dPrepPlayer.Clear(); _dPrepExcl.Clear(); _vetoLogged.Clear(); _dStumbles = 0;
             _dSz = _dSzPlayer = _dSzExcl = _dSzSmall = _dSzSmallHeld = _dSzEnded = _dSzPushed = 0; _dSzMd = _dSzMa = 0; _dSzDefT = _dSzAttT = _dSzGDefT = _dSzGAttT = 0;
@@ -1424,7 +1431,7 @@ namespace Armoury
         /// <summary>Z SiegeRansom.Reset (konstruktor ArmouryBehavior: nowa kampania i kazde wczytanie).</summary>
         internal static void Reset()
         {
-            _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear(); _bats.Clear();   // zapis (Import) przychodzi PO konstruktorze
+            _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear(); _bats.Clear(); _sz5.Clear();   // zapis (Import) przychodzi PO konstruktorze
             _lastCamp = null; _last = null; _lastAt = -1f; _lastDrCamp = null; _lastDrAt = -1f;
             SiegeWalls2.Reset();                                                 // oblezenia 2: trebusze, glod, drabiny - pamiec od zera
             ZeroDay();
@@ -1563,7 +1570,8 @@ namespace Armoury
                          + (s != null ? F(s.SiegeTownPrepFactor, "0.00") : "-") + ", stolica x" + (s != null ? F(s.SiegeCapitalPrepFactor, "0.00") : "-") + "), poziom murow (320c) " + LvlKeys()
                          + ", log " + (LogOn ? "tak" : "nie") + Start387Text() + Start387fText() + ".");
                 Log.Info("Bitwa szturmu (SZ start): latka tur rundy (GetSimulationTicksForBattleRound) " + _hookTicks + ", przewaga osady " + _hookAdv + " | klucze: " + SzKeys()
-                         + " | regula: " + (SzAny ? "czynna - szturm AI i autobitwa gracza (bez Innych, skryptu fabuly, morza)" : "wylaczona - tury rundy gry") + ".");
+                         + " | regula: " + (SzAny ? "czynna - szturm AI i autobitwa gracza (bez Innych, skryptu fabuly, morza)" : "wylaczona - tury rundy gry")
+                         + " | SZ5 (467) bije oddzial, nie armia: " + (Sz5On ? "TAK" : "NIE") + " (tylko szturm AI bez gracza), limit odparc " + (Sz5Limit > 0 ? Sz5Limit.ToString() : "brak") + ".");
                 SiegeWalls2.SessionStart();                                      // oblezenia 2: linia startowa (latki, modele, klucze)
             }
             catch (Exception e) { Stumble("SessionStart", e); }
