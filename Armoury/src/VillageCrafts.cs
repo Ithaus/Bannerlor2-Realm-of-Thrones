@@ -2260,15 +2260,17 @@ namespace Armoury
                 s.Cost = (float)(CostDays * KsTab.KCost[bc] * hands / sigma);
                 // 435-L4 (klucz Village Gear On Switch): zmiana przez sprzet - OD RAZU (pola, lasy): bez raty w zlocie, sprzet nowego zajecia z robot gminy; ZA SPRZETEM
                 // (szyby, sady, lodzie): koszt = cena sprzetu rak wioski, rata jak dotad. Tryb 0 (klucz wylaczony, cel poza LP, bez wyceny) - koszt jak dotad
+                float cost0 = s.Cost; int gmodeN = 0;                          // 435-L4-p (ksiegi S3): koszt dawny obok nowego w nocie startu (kalibracja trybu ZA SPRZETEM)
                 {
                     double gcost; int gmode = VillageGear.SwitchBegin(di.V, s.Uid, s.Craft, bc, 1.0, out gcost);
                     if (gmode == 1) s.Cost = 0f; else if (gmode == 2) s.Cost = (float)gcost;
+                    gmodeN = gmode;
                 }
                 _regionMoved[di.Region ?? "-"] = moved + hands;
                 busy = true; _dStarted++;
                 if (nf != null) CraftShortage.NoteStart(CraftShortage.SysZw, bc, rawPress, hands);   // 435-L6: zmiana zaczeta przy czynniku niedoboru (sam licznik)
                 string nm; if (!vname.TryGetValue(s.Uid, out nm)) nm = s.Uid;
-                if (_notes.Count < 10) _notes.Add(nm + " (" + Name(di) + ") " + KsTab.Crafts[s.Craft] + "->" + KsTab.Crafts[bc] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(s.Cost) + " zl)");
+                if (_notes.Count < 10) _notes.Add(nm + " (" + Name(di) + ") " + KsTab.Crafts[s.Craft] + "->" + KsTab.Crafts[bc] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(s.Cost) + " zl" + (gmodeN > 0 ? "; przez sprzet tryb " + gmodeN + ", dawny koszt " + Math.Round(cost0) + " zl" : "") + ")");
                 Notify(di, s, bc, mt);
             }
         }
@@ -2447,14 +2449,16 @@ namespace Armoury
                 // 435-L4 (zmiana ZA SPRZETEM): "zaplacone" = lustro sprzetu nowego zajecia (koszt x sprzet / rece w zmianie) - sprzet z robot gminy liczy sie jak rata,
                 // material raty tej doby jest sprzetem; bez zmiany przez sprzet (tryb 0, klucz wylaczony) gm = 0 i rachunek jak dotad
                 int gm = VillageGear.SwitchMode(di.V, s.Uid, s.Target, s.Cost);
-                if (gm == 2) { double sh0 = VillageGear.SwitchPaid(di.V, s.Uid, s.Target, 0); if (sh0 >= 0) s.Paid = sh0 >= 1.0 ? s.Cost : (float)(s.Cost * sh0); }
+                // 435-L4-p (ksiegi N3 / recenzja L2 9): lustro NIEMALEJACE - powrot ludzi (srednia rak rosnie) nie cofa "zaplaconego" i nie robi postoju L2
+                if (gm == 2) { double sh0 = VillageGear.SwitchPaid(di.V, s.Uid, s.Target, 0); if (sh0 >= 0) s.Paid = Math.Min(s.Cost, Math.Max(s.Paid, sh0 >= 1.0 ? s.Cost : (float)(s.Cost * sh0))); }
                 long gmat0 = _tally.Mat;
                 double owe = Math.Min(s.Cost - s.Paid, fTime * s.Cost - s.Paid);
                 int ask = owe >= 0.5 ? (int)Math.Min(Math.Ceiling(owe), Math.Max(0, di.V.Gold) / 4) : 0;
+                if (gm == 2 && ask > 0 && !VillageGear.SwitchCanPay(di.V, s.Uid, s.Target)) ask = 0;   // 435-L4-p (S1): bez wyceny materialu jednostki rata nie jest brana (nie byloby jej na co zaliczyc)
                 EcoAudit427.RbWhy = EcoAudit427.WhyNone;   // 427-p: powod raty tej przebudowy (nie poprzedniej) - samo pole pomiaru
                 long got = ask > 0 ? PayRebuild(di.V, mt, ask, _tally) : 0;
                 s.Paid += got; _dPaid += got;
-                if (gm == 2) { double sh1 = VillageGear.SwitchPaid(di.V, s.Uid, s.Target, _tally.Mat - gmat0); if (sh1 >= 0) s.Paid = sh1 >= 1.0 ? s.Cost : (float)(s.Cost * sh1); }
+                if (gm == 2) { double sh1 = VillageGear.SwitchPaid(di.V, s.Uid, s.Target, _tally.Mat - gmat0); if (sh1 >= 0) s.Paid = Math.Min(s.Cost, Math.Max(s.Paid, sh1 >= 1.0 ? s.Cost : (float)(s.Cost * sh1))); }
                 double fPay = s.Paid >= s.Cost - 0.5f ? 1.0 : Math.Max(0.0, s.Paid / s.Cost);
                 progress = Math.Max(0.0, Math.Min(1.0, (fPay - s.F) * T));
                 if (progress < 1.0 - 1e-6) { _dStall++; EcoAudit427.RbStall(EcoAudit427.SysZw, owe, ask, got, di.V.Gold, true, true, gm == 2); }   // 427 A1: powod doby postoju (sam licznik)

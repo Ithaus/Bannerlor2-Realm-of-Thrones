@@ -412,6 +412,15 @@ namespace Armoury
                         double area = BlockArea(ld, b);
                         double after = b.LandUse + b.X[ci] * (b.LandOf(best, type) - b.LandOf(cur, type));
                         if (area > 0 && after > area * 1.02 && after > b.LandUse) { _rLand++; continue; }
+                        // 435-L4-p (ksiegi S2, N2 / stabilnosc N1): czesc okregu ma juz zmiane przez sprzet do tego zajecia (inny blok wsi gry) - ten blok czeka do jej
+                        // konca; inny blok tej czesci w DAWNEJ przebudowie do tego zajecia - ten blok tez idzie dawna droga (jedna zmiana przez sprzet na czesc i cel)
+                        bool gOther = false;
+                        if (gsw && !ld.TF && ld.V != null && b.K != null)
+                        {
+                            if (VillageGear.SwitchBusy(ld.V, GearUid(b), best)) continue;
+                            string gu = GearUid(b);
+                            foreach (var ob in ld.B) if (ob != null && !ReferenceEquals(ob, b) && ob.K != null && ob.Target == best && GearUid(ob) == gu) { gOther = true; break; }
+                        }
                         double hands = b.Hands * b.X[ci];
                         double rh, moved;
                         _regionHands.TryGetValue(region ?? "-", out rh); _regionMoved.TryGetValue(region ?? "-", out moved);
@@ -425,11 +434,13 @@ namespace Armoury
                         b.Cost = ld.TF ? 0f : (float)(CostDays * KsTab.KCost[best] * hands / sigma); b.Paid = 0f;
                         // 435-L4 (klucz Village Gear On Switch): zmiana przez sprzet - OD RAZU (pola, lasy): bez raty w zlocie, sprzet nowego zajecia z robot gminy;
                         // ZA SPRZETEM (szyby, sady, lodzie): koszt = cena sprzetu rak w zmianie, rata jak dotad. Tryb 0 (klucz wylaczony, cel poza LP, bez wyceny) - koszt jak dotad
-                        if (gsw && !ld.TF && ld.V != null)
+                        float cost0 = b.Cost; int gmodeN = 0;                 // 435-L4-p (ksiegi S3): koszt dawny obok nowego w nocie startu
+                        if (gsw && !ld.TF && ld.V != null && !gOther)
                         {
                             double ph = GearPartHands(ld, b), gcost = 0;
                             int gmode = ph > 0 ? VillageGear.SwitchBegin(ld.V, GearUid(b), cur, best, hands / ph, out gcost) : 0;
                             if (gmode == 1) b.Cost = 0f; else if (gmode == 2) b.Cost = (float)gcost;
+                            gmodeN = gmode;
                         }
                         _regionMoved[region ?? "-"] = moved + hands;
                         if (IndexOfCraft(b, best) < 0)
@@ -442,7 +453,7 @@ namespace Armoury
                         if (nf != null && !fachRet) CraftShortage.NoteStart(CraftShortage.SysKs, best, rawPress, hands);   // 435-L6: zmiana zaczeta przy czynniku niedoboru (sam licznik)
                         if (fachRet) { _fStart++; _fStartAll++; }                   // m106-wozy P1: przebudowa do zajecia typu wsi
                         if (sig) A7sNoteStart(ld, b, cur, best, hands, mt, T, today);   // f5-a7: sezon wedlug rynku i przejscia, powroty, komunikat gracza (jego wies)
-                        if (_rStarted <= 12) _startNotes.Add((ld.St.Name != null ? ld.St.Name.ToString() : ld.Id) + " " + KsTab.Crafts[cur] + "->" + KsTab.Crafts[best] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(b.Cost) + " zl)");
+                        if (_rStarted <= 12) _startNotes.Add((ld.St.Name != null ? ld.St.Name.ToString() : ld.Id) + " " + KsTab.Crafts[cur] + "->" + KsTab.Crafts[best] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(b.Cost) + " zl" + (gmodeN > 0 ? "; przez sprzet tryb " + gmodeN + ", dawny koszt " + Math.Round(cost0) + " zl" : "") + ")");
                     }
                 }
                 catch (Exception e) { Stumble("RuleDaily(okreg)", e); }
@@ -604,7 +615,8 @@ namespace Armoury
                 // 435-L4 (zmiana ZA SPRZETEM): "zaplacone" = lustro sprzetu nowego zajecia (koszt x sprzet / rece w zmianie) - sprzet z robot gminy liczy sie jak rata,
                 // material raty tej doby jest sprzetem; bez zmiany przez sprzet (tryb 0, klucz wylaczony) gm = 0 i rachunek jak dotad
                 int gm = b.K != null ? VillageGear.SwitchMode(ld.V, GearUid(b), b.Target, b.Cost) : 0;
-                if (gm == 2) { double sh0 = VillageGear.SwitchPaid(ld.V, GearUid(b), b.Target, 0); if (sh0 >= 0) b.Paid = sh0 >= 1.0 ? b.Cost : (float)(b.Cost * sh0); }
+                // 435-L4-p (ksiegi N3 / recenzja L2 9): lustro NIEMALEJACE - powrot ludzi nie cofa "zaplaconego" i nie robi postoju L2
+                if (gm == 2) { double sh0 = VillageGear.SwitchPaid(ld.V, GearUid(b), b.Target, 0); if (sh0 >= 0) b.Paid = Math.Min(b.Cost, Math.Max(b.Paid, sh0 >= 1.0 ? b.Cost : (float)(b.Cost * sh0))); }
                 long gmat0 = _tally.Mat;
                 double owe = Math.Min(b.Cost - b.Paid, fTime * b.Cost - b.Paid);
                 // f5-a7 (klucz Ks Switch Signal): rata co 7 dob (material kupowany wiekszym zamowieniem, zakup z polki raz na tydzien na przebudowe - ok. 1/7 wywolan
@@ -617,10 +629,11 @@ namespace Armoury
                     if (!A7sOn) ask = (int)Math.Min(Math.Ceiling(owe), Math.Max(0, ld.V.Gold) / 4);
                     else { int span = A7sPaySpan(ld, b, today); if (span > 0) ask = (int)Math.Min(Math.Ceiling(owe), A7sPayCap(ld.V.Gold, span)); }
                 }
+                if (gm == 2 && ask > 0 && !VillageGear.SwitchCanPay(ld.V, GearUid(b), b.Target)) ask = 0;   // 435-L4-p (S1): bez wyceny materialu jednostki rata nie jest brana
                 EcoAudit427.RbWhy = EcoAudit427.WhyNone;   // 427-p: powod raty tej przebudowy (nie poprzedniej) - samo pole pomiaru
                 long got = ask > 0 && mt != null ? (A7sOn ? A7sPay(ld.V, mt, ask) : VillageCrafts.PayRebuild(ld.V, mt, ask, _tally)) : 0;   // f5-a7: ta sama rata + pomiar (zloto, material, polka)
                 b.Paid += got; _rPaid += got;
-                if (gm == 2) { double sh1 = VillageGear.SwitchPaid(ld.V, GearUid(b), b.Target, _tally.Mat - gmat0); if (sh1 >= 0) b.Paid = sh1 >= 1.0 ? b.Cost : (float)(b.Cost * sh1); }
+                if (gm == 2) { double sh1 = VillageGear.SwitchPaid(ld.V, GearUid(b), b.Target, _tally.Mat - gmat0); if (sh1 >= 0) b.Paid = Math.Min(b.Cost, Math.Max(b.Paid, sh1 >= 1.0 ? b.Cost : (float)(b.Cost * sh1))); }
                 double fPay = b.Paid >= b.Cost - 0.5 ? 1.0 : Math.Max(0.0, b.Paid / (double)b.Cost);
                 double moved = b.X0 > 1e-6f ? Math.Max(0.0, Math.Min(1.0, 1.0 - b.X[ci] / (double)b.X0)) : 1.0;
                 progress = Math.Max(0.0, Math.Min(1.0, (fPay - moved) * T));

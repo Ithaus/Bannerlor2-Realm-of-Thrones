@@ -77,7 +77,7 @@ namespace Armoury
         private static readonly int[] _fWhy = new int[TownFolk.GfKinds];
         private static long _fGap; private static int _fPcsBad;
         private static double _dFundU;                    // jednostki od fundatorow od ostatniej linii sprzetu (kontrola sprzetu L3)
-        private static double _gIn, _gDecay, _gBurn, _gDead, _gSmall;
+        private static double _gIn, _gDecay, _gBurn, _gDead, _gSmall, _gShift;   // _gShift (435-L4-p / L7-p): odstawione zmiana zajecia
         private static int _lClans, _lBank, _lCrown, _lBlocked, _lNeed, _lNoSurplus, _lVil, _lWarMk, _lBudget;
         private static double _lWorld, _lPace;
         private static int _tLooked, _tSiege, _tKwit, _tDebt, _tCoffer, _tNoTable, _tNoShort, _tVil;
@@ -96,7 +96,7 @@ namespace Armoury
         {
             Array.Clear(_fU, 0, FKinds); Array.Clear(_fPaid, 0, FKinds); Array.Clear(_fMat, 0, FKinds); Array.Clear(_fWageFolk, 0, FKinds); Array.Clear(_fWageCof, 0, FKinds);
             Array.Clear(_fWork, 0, FKinds); Array.Clear(_fN, 0, FKinds); Array.Clear(_fPcs, 0, FKinds); Array.Clear(_fWhy, 0, _fWhy.Length);
-            _fGap = 0; _fPcsBad = 0; _gIn = _gDecay = _gBurn = _gDead = _gSmall = 0;
+            _fGap = 0; _fPcsBad = 0; _gIn = _gDecay = _gBurn = _gDead = _gSmall = _gShift = 0;
             _lClans = _lBank = _lCrown = _lBlocked = _lNeed = _lNoSurplus = _lVil = _lWarMk = _lBudget = 0;
             _tLooked = _tSiege = _tKwit = _tDebt = _tCoffer = _tNoTable = _tNoShort = _tVil = 0;
             _rAcc = _rLapsed = 0; _rPaid = _rOut = _rIn = _rChest = _rHalf = 0; _rPaidN = _rHeld = _rWarCart = 0; _st7 = 0; _ms7 = 0;
@@ -370,6 +370,22 @@ namespace Armoury
                     try { var v = VillageOf(rec.Dist); if (v != null && v.Name != null) name = v.Name.ToString(); } catch { }
                     _burnMsg.Add("Raiders burned " + Math.Round(100.0 * fr).ToString("0", Inv) + "% of the gear you funded at " + name + ".");
                 }
+            }
+        }
+
+        /// <summary>EndCore (pod Gate): koniec zmiany zajecia odstawil `fr` sprzetu czesci (bezczynny albo odpisany). 435-L7-p: wierzytelnosci fundatorow tej czesci
+        /// maleja o te sama czesc (czynsz "dopoki sprzet pracuje").</summary>
+        private static void FundShift(Rec rec, double fr)
+        {
+            if (_claimN == 0 || rec == null || !(fr > 0)) return;
+            List<Claim> cl;
+            if (!_claims.TryGetValue(rec.Dist, out cl)) return;
+            if (fr > 1.0) fr = 1.0;
+            foreach (var c in cl)
+            {
+                if (c.Part != rec.Part || !(c.G > 0)) continue;
+                double d = c.G * fr;
+                c.G -= d; _gShift += d;
             }
         }
 
@@ -788,12 +804,12 @@ namespace Armoury
                   .Append("; wsi z proba zakupu ").Append(_tVil)
                   .Append(" | czynsz: naliczone ").Append(F1(_rAcc)).Append(", zaplacone ").Append(_rPaid).Append(" zl przy ").Append(_rPaidN).Append(" wozach, przepadlo (ponad ").Append(RentKeepDays).Append(" dob) ").Append(F1(_rLapsed))
                   .Append("; wstrzymane: wies nie Normal albo wojna ").Append(_rHeld).Append(" wpisow, wojna przy wozie ").Append(_rWarCart).Append(", skrzynia ").Append(_rChest).Append(" zl, polowa czesci wsi ").Append(_rHalf).Append(" zl")
-                  .Append(" | wierzytelnosci: przybylo ").Append(N0(_gIn)).Append(", wygaslo zuzyciem ").Append(F1(_gDecay)).Append(", spalone ").Append(F1(_gBurn)).Append(", fundator zniknal ").Append(F1(_gDead))
+                  .Append(" | wierzytelnosci: przybylo ").Append(N0(_gIn)).Append(", wygaslo zuzyciem ").Append(F1(_gDecay)).Append(", spalone ").Append(F1(_gBurn)).Append(", odstawione zmiana zajecia ").Append(F1(_gShift)).Append(", fundator zniknal ").Append(F1(_gDead))
                   .Append(", ponizej 1 zl ").Append(F2(_gSmall))
                   .Append(" | kontrola zlota zakupow: z kies platnikow - (kasy targow + lud + kiesy wsi) = ").Append(_fGap).Append("; wklad - (material + rzemieslnicy + praca wsi) = ").Append(buyOut - buyIn)
                   .Append("; sztuki zakupu inne niz zmiana polki w ").Append(_fPcsBad).Append(" zakupach | kontrola czynszu: z kies wsi - u fundatorow = ").Append(_rOut - _rIn);
                 if (_prevGDay == today - 1 && !double.IsNaN(_prevG))
-                    sb.Append(" | kontrola ksiegi: dzis - (wczoraj + przybylo - wygaslo - spalone - znikle) = ").Append(F2(gAll - (_prevG + _gIn - _gDecay - _gBurn - _gDead - _gSmall)));
+                    sb.Append(" | kontrola ksiegi: dzis - (wczoraj + przybylo - wygaslo - spalone - odstawione - znikle) = ").Append(F2(gAll - (_prevG + _gIn - _gDecay - _gBurn - _gShift - _gDead - _gSmall)));
                 else sb.Append(" | kontrola ksiegi: brak wczorajszej sumy (pierwsza doba sesji)");
                 sb.Append(" | sprzet od fundatorow jest w linii L3 (kontrola sprzetu: + od fundatorow) | koszt ").Append(F2(_ms7)).Append(" ms | potkniecia ").Append(_st7).Append(" (sesja ").Append(_st7All).Append(").");
                 Log.Info(sb.ToString());

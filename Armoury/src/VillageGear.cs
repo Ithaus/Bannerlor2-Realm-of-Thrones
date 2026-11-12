@@ -82,6 +82,7 @@ namespace Armoury
         private const double Tolerance = 0.98;            // stosunek K / H od tej liczby w gore liczony jak 1 (pas martwy 2% rak)
         internal const string P4 = "Sprzet wsi (LP, 435-L4) zmiana zajecia: ";
         internal const int SlotDays = 182;                // 435-L4: zmiana "od razu" trzyma miejsce w okregu najdluzej tyle dob (projekt II.6)
+        private const int SwitchMaxDays = 364 + 364 + 7;  // 435-L4-p: zmiana bez znaku konca z drogi produkcji konczona po tylu dobach
         internal const double SlotGear = 0.5;             // 435-L4: ... albo do sprzetu nowego zajecia dla polowy rak w zmianie
         private static readonly object Gate = new object();
 
@@ -196,6 +197,7 @@ namespace Armoury
         private static double _dBuyU, _dBuyGold, _dMatGold, _dOpenU, _dOpenVal, _dBurnU, _dKsKg;
         private static int _dBuyN, _dMatN, _dOpenN, _dBurnN, _dFirst, _dNoPrice, _dChanged, _dValued, _dKsN, _dOff;
         // 435-L4: liczniki od ostatniej linii (zdarzenia zmiany zajecia) i stan ostatniej doby
+        private static int _dSwNoUnit, _dSwWait, _dEndTime;   // 435-L4-p: rata wstrzymana bez wyceny, blok czeka na koniec zmiany czesci, koniec po limicie czasu
         private static int _dSw1, _dSw2, _dSwJoin, _dSwNoRec, _dSwNoPrice, _dSwBusy, _dSwOut, _dSwRoad, _dEndDone, _dEndLeft, _dEndBack, _dEndLost, _dFold, _dFoldLate, _dFoldKey, _dBackN, _dWriteN, _dOutN, _dInstN;
         private static double _dBackU, _dWriteU, _dOutU, _dInstU, _dInstGold, _dNewBuyU;
         private static int _sRun1, _sRun2, _sAfter, _sHold, _sFree, _sOldN;
@@ -229,6 +231,7 @@ namespace Armoury
         {
             _dBuyU = _dBuyGold = _dMatGold = _dOpenU = _dOpenVal = _dBurnU = _dKsKg = 0;
             _dBuyN = _dMatN = _dOpenN = _dBurnN = _dFirst = _dNoPrice = _dChanged = _dValued = _dKsN = _dOff = 0; _st = 0;
+            _dSwNoUnit = _dSwWait = _dEndTime = 0;
             _dSw1 = _dSw2 = _dSwJoin = _dSwNoRec = _dSwNoPrice = _dSwBusy = _dSwOut = _dSwRoad = _dEndDone = _dEndLeft = _dEndBack = _dEndLost = _dFold = _dFoldLate = _dFoldKey = _dBackN = _dWriteN = _dOutN = _dInstN = 0;
             _dBackU = _dWriteU = _dOutU = _dInstU = _dInstGold = _dNewBuyU = 0;
             _dWearU = _dWearOldU = _dWearMat = _dRepU = _dRepGold = 0; _dWearN = _dWearOldN = _dWearFloor = _dWearGrain = _dWearOpen = _dRepN = _dOrdRep = _dOrdHot = 0;
@@ -467,7 +470,7 @@ namespace Armoury
                                         {
                                             // 435-L4: ten sam ogien dla sprzetu nowego zajecia i zapamietanego bezczynnego
                                             double fr = Math.Max(0.0, Math.Min(1.0, rec.L)) * Math.Min(1.0, dR / sBefore), l2 = fr * (Math.Max(0.0, rec.NewK) + Math.Max(0.0, rec.OldK));
-                                            if (l2 > 0) { rec.NewK -= fr * Math.Max(0.0, rec.NewK); rec.OldK -= fr * Math.Max(0.0, rec.OldK); _dBurnU += l2; _dBurnN++; }
+                                            if (l2 > 0) { rec.NewK -= fr * Math.Max(0.0, rec.NewK); rec.OldK -= fr * Math.Max(0.0, rec.OldK); _dBurnU += l2; if (!(rec.K > 0)) _dBurnN++; }   // 435-L4-p: czesc liczona raz
                                         }
                                     }
                                     else rec.Br0 = p.Br;
@@ -516,7 +519,9 @@ namespace Armoury
                                     double rt = xn * rn + (1.0 - xn) * rec.Ratio;
                                     rt = rt >= Tolerance ? 1.0 : Math.Round(rt * 100.0) / 100.0;
                                     rec.RatioNew = path ? rt : 1.0;
-                                    rec.UnitMatNew = kn >= 0 && gn != GOut && rec.VPer > 0 ? DistrictWorks.KM[kn] * GDays[gn] * rec.VPer : 0.0;
+                                    // 435-L4-p: bez wartosci dnia (zima bez plonu, pierwsza doba po wczytaniu) zostaje cena z poprzedniej wyceny / z zapisu
+                                    if (kn < 0 || gn == GOut) rec.UnitMatNew = 0.0;
+                                    else if (rec.VPer > 0) rec.UnitMatNew = DistrictWorks.KM[kn] * GDays[gn] * rec.VPer;
                                     rec.NeedNew = path && hT >= 0.5 && rec.NewK < Tolerance * hT ? Math.Max(0.0, hT - rec.NewK) : 0.0;
                                     if (dn == null) dn = new Dictionary<string, NewR>(StringComparer.Ordinal);
                                     dn[rec.Part] = new NewR { Craft = rec.NewCraft, Ratio = (float)rec.RatioNew };
@@ -818,7 +823,10 @@ namespace Armoury
             }
             rec.NewEnd = true;
             double sur = Math.Max(0.0, rec.K - Math.Max(0.0, rec.Hs - hN));
-            if (sur > 1e-9) { rec.K -= sur; Remember(rec, rec.NewFrom, sur); }
+            // 435-L4-p (stabilnosc S2): bezczynny zostaje tylko sprzet rak, ktore ODESZLY (i ich czesc nadwyzki ludzi poza domem) - sprzet ludzi, ktorzy nie zmienili
+            // zajecia, tylko sa poza domem (uchodzcy), czeka na nich w K jak w L3
+            sur = Math.Min(sur, hN + C01(rec.NewW) * q * Math.Max(0.0, rec.K - rec.Hs));
+            if (sur > 1e-9) { double kAll = rec.K; rec.K -= sur; Remember(rec, rec.NewFrom, sur); FundShift(rec, sur / kAll); }
         }
 
         /// <summary>Doba czesci ze sprzetem nowego zajecia (BeforeProduction, pod Gate): udzial rak w zmianie i postep z drogi produkcji; zmiana zniknela bez znaku konca
@@ -837,6 +845,9 @@ namespace Armoury
                     else { EndCore(rec, rec.NewQ); _dEndLost++; }
                 }
             }
+            // 435-L4-p (stabilnosc N2): droga produkcji trwale nie zna tej zmiany (wioska zniknela, okreg wypadl z mapy) - koniec przy ostatnim znanym postepie po
+            // najdluzszym okresie zmiany + roku (inaczej wpis blokowalby kazda inna zmiane tej czesci bez konca)
+            if (rec.NewCraft >= 0 && !rec.NewEnd && rec.SwDay >= 0 && today - rec.SwDay > SwitchMaxDays) { EndCore(rec, rec.NewQ); _dEndTime++; }
             if (rec.NewCraft < 0) return 0.0;
             double hN = rec.Hs * C01(rec.NewW) * C01(rec.NewQ);
             if (rec.NewEnd)
@@ -875,7 +886,7 @@ namespace Armoury
                     {
                         if (rec.NewEnd) { Fold(rec); _dFold++; }
                         else if (rec.NewCraft != target) { _dSwBusy++; return 0; }
-                        else { rec.NewW = C01(rec.NewW + w); join = true; _dSwJoin++; }
+                        else { _dSwBusy++; return 0; }   // 435-L4-p: zmiana do tego zajecia juz w toku (wolajacy sprawdza SwitchBusy przed poczatkiem) - bez dolaczania
                     }
                     if (!join)
                     {
@@ -903,7 +914,9 @@ namespace Armoury
         {
             try
             {
-                if (!SwitchOn || v == null) return 0;
+                // 435-L4-p (recenzje S1): droga prawdziwego materialu wylaczona w trakcie zmiany - rata idzie dawna droga (bez materialu = bez sprzetu), wiec rachunek
+                // przebudowy tez dawny (Paid += zaplacone), nie lustro sprzetu
+                if (!SwitchOn || v == null || !TownFolk.DaWorksOn) return 0;
                 lock (Gate)
                 {
                     Rec rec = RecOf(v, uid);
@@ -912,6 +925,43 @@ namespace Armoury
                 }
             }
             catch { return 0; }
+        }
+
+        /// <summary>435-L4-p (recenzje S1): zmiana ZA SPRZETEM moze dzis brac rate - material raty da sie zaliczyc na sprzet (jest cena materialu jednostki nowego
+        /// zajecia). false - bez wyceny (wolajacy nie prosi o rate tej doby: zloto i sztuki nie schodza w proznie; licznik w linii L4). Nie rzuca.</summary>
+        internal static bool SwitchCanPay(Village v, string uid, int target)
+        {
+            try
+            {
+                if (!SwitchOn || v == null) return true;
+                lock (Gate)
+                {
+                    Rec rec = RecOf(v, uid);
+                    if (rec == null || rec.NewCraft != target || rec.NewEnd) return true;
+                    if (rec.UnitMatNew > 1e-6) return true;
+                    _dSwNoUnit++;
+                    return false;
+                }
+            }
+            catch { return true; }
+        }
+
+        /// <summary>435-L4-p (recenzja ksiegi S2): czesc okregu ma juz zmiane przez sprzet do TEGO zajecia w toku - kolejny blok tej czesci (wies gry: 20 blokow) czeka
+        /// do jej konca (regula "nowe zajecie = nowy sprzet" liczy rece i sprzet jednej zmiany naraz). Sam odczyt i licznik, nie rzuca.</summary>
+        internal static bool SwitchBusy(Village v, string uid, int target)
+        {
+            try
+            {
+                if (!SwitchOn || v == null) return false;
+                lock (Gate)
+                {
+                    Rec rec = RecOf(v, uid);
+                    if (rec == null || rec.NewCraft != target || rec.NewEnd) return false;
+                    _dSwWait++;
+                    return true;
+                }
+            }
+            catch { return false; }
         }
 
         /// <summary>Miejsce "jedna czesc okregu naraz" zmiany OD RAZU w toku: 0 - to nie zmiana przez sprzet, 1 - trzyma miejsce (sprzet nowego zajecia ponizej polowy rak
@@ -973,7 +1023,7 @@ namespace Armoury
         {
             try
             {
-                if (v == null) return;
+                if (v == null || !SwitchOn) return;   // 435-L4-p: przy wylaczonym kluczu stan zamrozony (Village Gear NIE) albo zwijany przez Fold (On Switch NIE) - bez przestawiania stosow
                 if (_main >= 0 && Environment.CurrentManagedThreadId != _main) { _dOff++; return; }
                 lock (Gate)
                 {
@@ -984,6 +1034,12 @@ namespace Armoury
                     if (SwitchQuery(v, rec.Part, target, out trans, out w, out q2, out tAll) && trans) return;
                     if (done) _dEndDone++; else _dEndLeft++;
                     EndCore(rec, q);
+                    // 435-L4-p (stabilnosc N3): miejsce okregu trzymane od razu (migawka HoldsAfter jest z poczatku doby - w dobie kroku druga czesc zaczelaby zmiane)
+                    if (rec.NewEnd && rec.NewCraft >= 0)
+                    {
+                        double hT = rec.Hs * C01(rec.NewW) * C01(rec.NewQ);
+                        if (Today() - rec.SwDay < SlotDays && hT >= 0.5 && rec.NewK < SlotGear * hT && !_holdAfter.Contains(v)) { var h = new HashSet<Village>(_holdAfter); h.Add(v); _holdAfter = h; }
+                    }
                 }
             }
             catch (Exception e) { Stumble("SwitchEnd", e); }
@@ -1006,7 +1062,7 @@ namespace Armoury
             }
             if (!LogGate.Lines) return;
             int run = _sRun1 + _sRun2;
-            bool any = run + _sAfter + _sOldN > 0 || _dSw1 + _dSw2 + _dSwJoin + _dSwNoRec + _dSwNoPrice + _dSwBusy + _dSwRoad + _dEndDone + _dEndLeft + _dEndBack + _dEndLost + _dFold + _dFoldLate + _dFoldKey + _dWriteN + _dOutN + _dInstN > 0;
+            bool any = run + _sAfter + _sOldN > 0 || _dSwNoUnit + _dSwWait + _dEndTime + _dSw1 + _dSw2 + _dSwJoin + _dSwNoRec + _dSwNoPrice + _dSwBusy + _dSwRoad + _dEndDone + _dEndLeft + _dEndBack + _dEndLost + _dFold + _dFoldLate + _dFoldKey + _dWriteN + _dOutN + _dInstN > 0;
             if (!sw && !any) return;
             var sb = new StringBuilder(1100);
             sb.Append(P4).Append("dzien ").Append(today).Append(" | klucz ").Append(sw ? "TAK" : "NIE (sprzet nowych zajec wszedl do sprzetu czesci: " + _dFoldKey + ")")
@@ -1020,7 +1076,8 @@ namespace Armoury
               .Append("; jak dotad (tryb 0): cel poza LP ").Append(_dSwOut).Append(", czesc bez wpisu / drogi / rak ").Append(_dSwNoRec).Append(", bez wyceny ").Append(_dSwNoPrice)
               .Append(", czesc w innej zmianie ").Append(_dSwBusy).Append(", droga prawdziwego materialu nieczynna ").Append(_dSwRoad)
               .Append(" | skonczone ").Append(_dEndDone).Append(", porzucone z rekami przy nowym ").Append(_dEndLeft).Append(", bez rak przy nowym (sprzet zapamietany) ").Append(_dEndBack)
-              .Append(", koniec bez znaku ").Append(_dEndLost)
+              .Append(", koniec bez znaku ").Append(_dEndLost).Append(", koniec po limicie ").Append(SwitchMaxDays).Append(" dob ").Append(_dEndTime)
+              .Append(" | rata ZA SPRZETEM wstrzymana - brak wyceny materialu jednostki (zloto nie schodzi) ").Append(_dSwNoUnit).Append(", blok czeka na koniec zmiany swojej czesci do tego zajecia ").Append(_dSwWait)
               .Append(" | sprzet nowego zajecia do sprzetu czesci: wyposazone ").Append(_dFold).Append(", po ").Append(SlotDays).Append(" dobach ").Append(_dFoldLate)
               .Append(" | kupione: z rat przebudowy ").Append(F1(_dInstU)).Append(" jedn. za ").Append(N0(_dInstGold)).Append(" zl materialu w ").Append(_dInstN).Append(" ratach, z robot gminy ").Append(F1(_dNewBuyU)).Append(" jedn. (w liczbie 'na sprzet' linii L3)")
               .Append(" | wrocil stary sprzet ").Append(F1(_dBackU)).Append(" jedn. (").Append(_dBackN).Append("), odpisane ").Append(F1(_dWriteU)).Append(" jedn. (").Append(_dWriteN)
@@ -1183,7 +1240,7 @@ namespace Armoury
                               .Append('~').Append(D(r.Br0));
                             if (r.NewCraft < 0) continue;                                       // bez zmiany zajecia w toku - wpis jak L3 (12 pol)
                             sb.Append('~').Append(CraftId(r.NewCraft)).Append('~').Append(D(Math.Max(0.0, r.NewK))).Append('~').Append(D(r.NewW)).Append('~').Append(D(r.NewQ)).Append('~').Append(r.SwDay)
-                              .Append('~').Append(CraftId(r.NewFrom)).Append('~').Append(r.NewEnd ? '1' : '0');
+                              .Append('~').Append(CraftId(r.NewFrom)).Append('~').Append(r.NewEnd ? '1' : '0').Append('~').Append(D(Math.Max(0.0, r.UnitMatNew)));   // 435-L4-p: 20. pole - cena materialu jednostki nowego zajecia
                         }
                     return sb.ToString();
                 }
@@ -1225,7 +1282,8 @@ namespace Armoury
                                 // 435-L4: sprzet nowego zajecia w zmianie; zle pola - wpis czesci zostaje, sama zmiana pominieta i policzona
                                 double nk, nw, nq; int sd;
                                 if (Num(a[13], out nk) && Num(a[14], out nw) && Num(a[15], out nq) && int.TryParse(a[16], NumberStyles.Integer, Inv, out sd) && nk >= 0)
-                                { nr.NewCraft = CraftIx(a[12]); nr.NewK = nk; nr.NewW = Math.Max(0.0, Math.Min(1.0, nw)); nr.NewQ = Math.Max(0.0, Math.Min(1.0, nq)); nr.SwDay = sd; nr.NewFrom = CraftIx(a[17]); nr.NewEnd = a[18] == "1"; }
+                                { nr.NewCraft = CraftIx(a[12]); nr.NewK = nk; nr.NewW = Math.Max(0.0, Math.Min(1.0, nw)); nr.NewQ = Math.Max(0.0, Math.Min(1.0, nq)); nr.SwDay = sd; nr.NewFrom = CraftIx(a[17]); nr.NewEnd = a[18] == "1";
+                                  double um; if (a.Length >= 20 && Num(a[19], out um) && um > 0) nr.UnitMatNew = um; }   // 435-L4-p: brak pola (zapis L4) - cena z pierwszej wyceny
                                 else _loadBad++;
                             }
                             list.Add(nr);
