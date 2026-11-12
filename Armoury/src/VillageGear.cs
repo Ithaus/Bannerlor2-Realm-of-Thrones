@@ -130,7 +130,9 @@ namespace Armoury
         /// <summary>435-L4: zmiana zajecia przez sprzet czynna (oba klucze). Wylaczona - sprzet idzie za czescia, przebudowa placona jak dotad.</summary>
         internal static bool SwitchOn { get { var s = Settings.Current; return s != null && s.VillageGear && s.VillageGearOnSwitch; } }
         /// <summary>435-L5: zuzycie sprzetu czynne (Village Gear i skala zuzycia ponad 0). Wylaczone - sprzet sie nie zuzywa, kolejnosc zlecen jak L3.</summary>
-        internal static bool WearOn { get { var s = Settings.Current; return s != null && s.VillageGear && s.VillageGearWearScale > 0f; } }
+        internal static bool WearOn { get { var s = Settings.Current; return s != null && s.VillageGear && s.VillageGearWearScale >= WearMinScale; } }
+        internal const float WearMinScale = 0.005f;       // 435-L5-p: suwak pokazuje 0.00 dla wartosci ponizej - licza sie jak 0 (jeden prog: WearOn, doba, linia)
+        internal const double RepMinShare = 0.005;        // 435-L5-p: do grupy (b) kolejki zlecen liczy sie odtworzenie co najmniej 0.5% rak czesci
 
         private static ItemCategory[] _catOf; private static bool[] _catTried;
         /// <summary>435-L5: kategoria glownego towaru zajecia (pierwszy towar tabeli P0) - do odczytu niedoboru N; null - brak przedmiotu w grze.</summary>
@@ -351,6 +353,7 @@ namespace Armoury
                     rec.WLp = lp / all;
                     if (lp > 0) rec.L = lw / lp;
                     if (price > 0) { rec.WearNG = wNg / price; rec.WearGr = wGr / price; }
+                    else { rec.WearNG = 0; rec.WearGr = 0; }                              // 435-L5-p: czesc bez zajec LP (stado) nie zuzywa sprzetu stara stopa - jedna zasada z czescia, ktora nigdy LP nie miala
                     double H = pc.Book != null ? pc.Book.Home : 0;
                     if (H >= 1 && lp > 0) { rec.Unit = price / H; rec.UnitMat = mat / H; }
                     if (H >= 1) rec.VPer = all / H;                                      // 435-L4: wartosc dnia czlowieka czesci - cena sprzetu nowego zajecia przy zmianie
@@ -361,7 +364,8 @@ namespace Armoury
                     int g = GroupOfCraft(pc.Craft), kind = pc.Craft >= 0 && pc.Craft < KsTab.Crafts.Length ? DistrictWorks.KindOfCraft(KsTab.Crafts[pc.Craft]) : -1;
                     rec.WLp = g == GOut || kind < 0 ? 0.0 : 1.0;
                     if (kind >= 0) rec.L = DistrictWorks.KL[kind];
-                    if (g != GOut && kind >= 0 && !(rec.WearNG + rec.WearGr > 0)) { rec.WearNG = g == GGrain ? 0.0 : GWear[g]; rec.WearGr = g == GGrain ? GWear[g] : 0.0; }
+                    if (g != GOut && kind >= 0) { rec.WearNG = g == GGrain ? 0.0 : GWear[g]; rec.WearGr = g == GGrain ? GWear[g] : 0.0; }   // 435-L5-p: zawsze z rodzaju zajecia czesci
+                    else { rec.WearNG = 0; rec.WearGr = 0; }
                 }
             }
         }
@@ -394,7 +398,7 @@ namespace Armoury
             bool sw = s.VillageGearOnSwitch;
             // 435-L5: skala zuzycia (0 - nieczynne), rampa od doby wlaczenia, zima (zboze w krainie z zima bez zuzycia)
             double wearScale = Math.Max(0.0, Math.Min(3.0, (double)s.VillageGearWearScale)), wearRamp = 0;
-            if (double.IsNaN(wearScale)) wearScale = 0;
+            if (double.IsNaN(wearScale) || wearScale < WearMinScale) wearScale = 0;
             bool winterNow = false;
             if (wearScale > 0) { try { winterNow = WinterBite.WinterNow(); } catch { winterNow = false; } }
             _sRepNeed = 0; _sRepN = 0;
@@ -410,7 +414,12 @@ namespace Armoury
                     foreach (var l0 in _byDist.Values) foreach (var r0 in l0) { r0.Need = 0; r0.NeedNew = 0; r0.NeedRep = 0; }
                     _sOrphan = 0; _sNoRoad = 0;
                     if (wearScale > 0) { if (_wearDay < 0 || _wearDay > today) _wearDay = today; wearRamp = Math.Max(0.0, Math.Min(1.0, (today - _wearDay) / WearRampDays)); }
-                    else _wearDay = -1;                                            // klucz 0: naglowek zapisu jak L4, rampa po ponownym wlaczeniu od zera
+                    else
+                    {
+                        // klucz 0: naglowek zapisu jak L4, rampa po ponownym wlaczeniu od zera; 435-L5-p: slad w logu (kalibracja z linii L5 po takiej dobie nieporownywalna)
+                        if (_wearDay >= 0 && s.LogEnabled) { try { Log.Info(P5 + "dzien " + today + " | klucz Village Gear Wear Scale 0 - doba wlaczenia zuzycia wyzerowana (byla " + _wearDay + "); po ponownym wlaczeniu rampa od zera."); } catch { } }
+                        _wearDay = -1;
+                    }
                     _sWearScale = wearScale; _sWearRamp = wearRamp;
                     double wearK = wearScale * wearRamp;
                     foreach (var v in Village.All)
@@ -638,7 +647,8 @@ namespace Armoury
                     {
                         if (r.Need > 0 && r.UnitMat > 1e-6) { a += r.Need * r.UnitMat; na = Math.Max(na, NOfCraft(r.Craft)); }
                         if (r.NeedNew > 0 && r.UnitMatNew > 1e-6) { a += r.NeedNew * r.UnitMatNew; na = Math.Max(na, NOfCraft(r.NewCraft)); }
-                        if (r.NeedRep > 0 && r.UnitMat > 1e-6) { b += r.NeedRep * r.UnitMat; nb = Math.Max(nb, NOfCraft(r.Craft)); }
+                        // 435-L5-p (recenzje 1): grupa (b) dopiero od istotnego ubytku (0.5% rak czesci) - inaczej po pierwszej dobie zuzycia bylaby w niej kazda wies
+                        if (r.NeedRep > 0 && r.UnitMat > 1e-6 && r.NeedRep >= RepMinShare * Math.Max(1.0, r.Hs)) { b += r.NeedRep * r.UnitMat; nb = Math.Max(nb, NOfCraft(r.Craft)); }
                     }
                     if (a >= 1.0) { n = na; return 0; }
                     if (b >= 1.0) { n = nb; return 1; }
@@ -1090,7 +1100,7 @@ namespace Armoury
         private static void Line5(int today, Settings s, bool log, double sum, double sumHs)
         {
             if (!log) return;
-            bool on = s.VillageGearWearScale > 0f;
+            bool on = s.VillageGearWearScale >= WearMinScale;
             if (on && !_startLine5)
             {
                 _startLine5 = true;
@@ -1101,7 +1111,7 @@ namespace Armoury
                 t.Append(" (czesc z mieszanka zajec: wazone cena sprzetu zajec) | zboze w krainie z zima bez zuzycia | sprzet bezczynny zuzywa sie jak pracujacy (stary zapamietany bez podlogi)")
                  .Append(" | sprzet nowego zajecia w zmianie nie zuzywa sie do wejscia do sprzetu czesci | okreg bez drogi produkcji i czesc w ").Append(OpenDays).Append(" dobach bilansu otwarcia - bez zuzycia")
                  .Append(" | odtworzenie (priorytet b): ubytek w pasie martwym (K / H od ").Append(F2(Tolerance)).Append(" do 1) z materialu robot gminy po rekach bez sprzetu")
-                 .Append(" | kolejnosc zlecen robot: (a) rece bez sprzetu, (b) odtworzenie, reszta; w (a) i (b) malejaco wedlug niedoboru N towaru zajecia (pomiar Supply Chain Log: ")
+                 .Append(" | kolejnosc zlecen robot WSI miedzy soba (septy i zlecenia ludu miast zostaja na swoich miejscach): (a) rece bez sprzetu, (b) odtworzenie od ").Append(F2(100.0 * RepMinShare)).Append("% rak czesci, reszta; w (a) i (b) malejaco wedlug niedoboru N towaru zajecia - zadnego stalego pierwszenstwa rudy ani drewna, tylko pomiar (Supply Chain Log: ")
                  .Append(SupplySignal.On ? "TAK" : "NIE - N = 1, kolejnosc dotychczasowa w grupach").Append(") | zloto: L5 nie dodaje zadnego przelewu.");
                 Log.Info(t.ToString());
             }
@@ -1109,7 +1119,7 @@ namespace Armoury
             if (!on && !(_dWearU > 0) && !(_dRepU > 0)) return;
             double gs = 0; for (int g = 0; g < GN; g++) gs += _dWearG[g];
             var sb = new StringBuilder(1100);
-            sb.Append(P5).Append("dzien ").Append(today).Append(" | klucz x").Append(F2(_sWearScale)).Append(", doba wlaczenia zuzycia ").Append(_wearDay).Append(", rampa ").Append(_sWearRamp.ToString("0.000", Inv))
+            sb.Append(P5).Append("dzien ").Append(today).Append(" | klucz x").Append(_sWearScale.ToString("0.000", Inv)).Append(", doba wlaczenia zuzycia ").Append(_wearDay).Append(", rampa ").Append(_sWearRamp.ToString("0.000", Inv))
               .Append(" | zuzyte dzis ").Append(_dWearU.ToString("0.00", Inv)).Append(" jedn. (").Append(sum > 0 ? (100.0 * _dWearU / (sum + _dWearU)).ToString("0.0000", Inv) : "-").Append("% sprzetu; rocznie przy tym tempie ")
               .Append(sum > 0 ? F2(100.0 * 364.0 * _dWearU / (sum + _dWearU)) : "-").Append("%), material po cenie jednostki ").Append(N0(_dWearMat)).Append(" zl, czesci ").Append(_dWearN)
               .Append("; w tym stary bezczynny ").Append(_dWearOldU.ToString("0.00", Inv)).Append(" jedn. (").Append(_dWearOldN).Append(" czesci) | wedlug rodzaju [jedn.]:");
@@ -1120,7 +1130,9 @@ namespace Armoury
               .Append("% rak), kupione od poprzedniej linii ").Append(F1(_dRepU)).Append(" jedn. za ").Append(N0(_dRepGold)).Append(" zl materialu w ").Append(_dRepN).Append(" okregach (w liczbie 'na sprzet' linii L3)")
               .Append(" | kolejnosc zlecen robot: (a) rece bez sprzetu ").Append(_dFirst).Append(", (b) samo odtworzenie ").Append(_dOrdRep).Append(", z niedoborem N > 1 towaru zajecia ").Append(_dOrdHot)
               .Append(" | N swiata (wczoraj): tools ").Append(F2(NOfId("tools"))).Append(", iron ").Append(F2(NOfId("iron"))).Append(", hardwood ").Append(F2(NOfId("hardwood")))
-              .Append(" | kontrola: zuzyte wedlug rodzaju - zuzyte razem = ").Append(F2(gs - _dWearU)).Append("; sprzet: linia L3 (dzis - wczoraj - kupione + zuzyte + spalone = 0); zloto - L5 nie rusza.");
+              .Append(" | POKRYCIE zuzycia: zuzyte dzis ").Append(N0(_dWearMat)).Append(" zl materialu wobec kupionego na sprzet od poprzedniej linii ").Append(N0(_dBuyGold)).Append(" zl = ")
+              .Append(_dBuyGold > 0 ? F2(_dWearMat / _dBuyGold) : (_dWearMat > 0 ? "bez zakupow" : "-")).Append(" (ponad 1 trwale = sprzet swiata schodzi do podlogi; skale podnosic tylko przy <= 1)")
+              .Append(" | tozsamosc licznikow (nie kontrola): zuzyte wedlug rodzaju - zuzyte razem = ").Append(F2(gs - _dWearU)).Append("; prawdziwa kontrola sprzetu: linia L3 (dzis - wczoraj - kupione + zuzyte + spalone = 0); zloto - L5 nie rusza.");
             Log.Info(sb.ToString());
         }
 

@@ -323,18 +323,24 @@ namespace Armoury
                 var empty = new HashSet<Settlement>();                       // targi bez materialu w tym przebiegu - kolejne zlecenia bez czytania polki
                 // 435-L3 (klucz Village Gear; NIE - kolejnosc jak dotad): zlecenia robot wsi z rekami bez sprzetu pierwsze do polki (priorytet a projektu), reszta w dotychczasowej kolejnosci
                 // 435-L5 (klucz Village Gear Wear Scale > 0; 0 - kolejnosc L3 ponizej): trzy grupy - (a) rece bez sprzetu, (b) odtworzenie zuzytego, reszta; w grupach (a) i (b)
-                // malejaco wedlug niedoboru N towaru zajecia (SupplySignal, wczorajszy pomiar), przy rownym N kolejnosc dotychczasowa (hamulec spirali: ruda i drewno pierwsze)
+                // malejaco wedlug niedoboru N towaru zajecia (SupplySignal, wczorajszy pomiar), przy rownym N kolejnosc dotychczasowa (435-L5-p: bez stalego pierwszenstwa rudy i drewna - decyduje pomiar N; bez pomiaru kolejnosc w grupach dotychczasowa)
                 if (VillageGear.WearOn)
                 {
                     try
                     {
-                        var ka = new List<KeyValuePair<double, int>>(); var kr = new List<KeyValuePair<double, int>>(); var rest = new List<DaOrder>(q.Count);
+                        // 435-L5-p (recenzja ksiegi 1): przestawiane sa tylko zlecenia robot WSI miedzy soba - na pozycjach, ktore i tak zajmowaly; septy i zlecenia
+                        // ludu miast zostaja na swoich miejscach w kolejce do polki (L5 nie wypycha budowy septow)
+                        var pos = new List<int>(q.Count);
+                        var ka = new List<KeyValuePair<double, int>>(); var kr = new List<KeyValuePair<double, int>>(); var rest = new List<int>(q.Count);
                         int hot = 0;
                         for (int i = 0; i < q.Count; i++)
                         {
-                            var o = q[i]; double n = 1.0;
-                            int tier = !o.Sept && o.Vil != null ? VillageGear.OrderOf(o.Vil, out n) : 2;
-                            if (tier == 0) ka.Add(new KeyValuePair<double, int>(n, i)); else if (tier == 1) kr.Add(new KeyValuePair<double, int>(n, i)); else rest.Add(o);
+                            var o = q[i];
+                            if (o.Sept || o.Vil == null) continue;
+                            pos.Add(i);
+                            double n = 1.0;
+                            int tier = VillageGear.OrderOf(o.Vil, out n);
+                            if (tier == 0) ka.Add(new KeyValuePair<double, int>(n, i)); else if (tier == 1) kr.Add(new KeyValuePair<double, int>(n, i)); else rest.Add(i);
                             if (tier < 2 && n > 1.0 + 1e-9) hot++;
                         }
                         VillageGear.NoteFirst(ka.Count); VillageGear.NoteOrder(kr.Count, hot);
@@ -342,11 +348,16 @@ namespace Armoury
                         {
                             Comparison<KeyValuePair<double, int>> cmp = (x, y) => { int c = y.Key.CompareTo(x.Key); return c != 0 ? c : x.Value.CompareTo(y.Value); };
                             ka.Sort(cmp); kr.Sort(cmp);
-                            var nq = new List<DaOrder>(q.Count);
-                            foreach (var k in ka) nq.Add(q[k.Value]);
-                            foreach (var k in kr) nq.Add(q[k.Value]);
-                            nq.AddRange(rest);
-                            if (nq.Count == q.Count) q = nq;
+                            var seq = new List<int>(pos.Count);
+                            foreach (var k in ka) seq.Add(k.Value);
+                            foreach (var k in kr) seq.Add(k.Value);
+                            seq.AddRange(rest);
+                            if (seq.Count == pos.Count)
+                            {
+                                var nq = new List<DaOrder>(q);
+                                for (int j = 0; j < pos.Count; j++) nq[pos[j]] = q[seq[j]];
+                                q = nq;
+                            }
                         }
                     }
                     catch (Exception e) { DaStumble("DaWorksRun(sprzet-kolejnosc-L5)", e); }
