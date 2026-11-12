@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 03:10 - WGRANIE 208 (427-435-L8 seria ekonomii po audycie + lancuch podazy L1-L8, lancuch WYLACZONY poza pomiarem)
+
+- **W grze:** Armoury.dll `8e198edbb7ce98eaef15267426f5540f` (galaz `noc/367c-jeniec-po-odejsciu`, commit `ca5e329d`, wypchniety). CrashScribe bez zmian. Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie208`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie208(-przed)`.
+- **Autotest at-435 (n390), 14 dob + 2 bitwy:** KONIEC OK, bledy 23 (stale, cudze), kod 0, wyjatkow w Armoury.log 0. Nowe linie obecne co dobe (LP, LP niedobor, LP warsztaty, Komis 429, Hamulce 428, Okupy 430, Pozyczka korony 431, Lata zimy 432, Zbojcy 433, Kto rozbija bandy 427, Kiesy ludu 427, stanowiska L8): potkniecia 0 (128 wystapien), wszystkie kontrole ksiag i tozsamosci licznikow = 0.
+- **Zmienionych domyslnych: 0** - Armoury.json Jeffa bez poprawek. 72 nowe klucze, lista i wylaczniki: CHANGELOG 427..435-L8-p.
+- **Lancuch podazy (L2-L8) WYLACZONY** - dziala tylko pomiar (Supply Chain Log). Kolejnosc wlaczania (opis zamkniecia): Rebuild Stall Release Days 56, Grain Hands Winter Lock, Village Gear, Village Gear On Switch -> test 30 dob -> Wear Scale 0.25, Crafts Follow Shortage (+Rule), Lords/Towns/Player Invest, Workshop Benches. Kroki L9-L10 (migracja za praca) NIE napisane.
+- **NIE widziane w grze:** okno pozyczki korony dla gracza, odmowa okupu, spadek ceny lupu przy sprzedazy, wiesc o roku zimy, komis broni na polce.
+- **Dalej (Jeff 12.11 noc, sesja przelaczona na Opus 5.5):** test lancucha z wlaczonym 1-4, L9-L10, wyrownanie bitew symulowanych (Jeff: "tak wyrownaj"), seria AI bitwy.
+
 ## STAN 11.11 22:10 - WGRANIE 207 (413-423 walka po audycie RBM + 424-426 sprzet olbrzymow, rydwany, unikaty); gra z powrotem na 1.4.8
 
 - **Gra cofnieta przez Jeffa do 1.4.8** (Version.xml v1.4.8, TaleWorlds.MountAndBlade.dll = libs bajt w bajt). Kopie bibliotek: `D:/Backup-Bannerlord/gra-1.4.8-dll` i `gra-1.5.7-dll`. UWAGA: appmanifest ma AutoUpdateBehavior 0 (zawsze aktualizuj) - Jeff ma to zmienic w Steam. Blokada z wpisu nizej NIEAKTUALNA.
