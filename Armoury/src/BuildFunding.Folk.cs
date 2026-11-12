@@ -326,12 +326,13 @@ namespace Armoury
                         double remD = Math.Min(rem, capD);
                         // 472: mury - lud najwyzej reszta dziennego limitu murow (najkrotszy czas poziomu) po punktach pana tej doby (klucz wylaczony - bez zmian)
                         double wcap = WallOn ? WallFolkCap(t, b, where, cp) : double.MaxValue;
-                        if (wcap < remD) { remD = Math.Max(0.0, wcap); WallFolkNote(b.BuildingType, 0, 0, true); }
+                        bool wCut = false;   // 472-p (recenzja U5): mury przy limicie - nie licza sie jako "poziom oplacony" ani "na pulapie ludu" (licznik "na limicie" w linii murow)
+                        if (wcap < remD) { remD = Math.Max(0.0, wcap); WallFolkNote(b.BuildingType, 0, 0, true); wCut = true; }
                         double mFor = remD * ppp / (1 + r / idx);
                         double mT = Math.Min(B * ms, Math.Min(r > 0 ? H / r : double.MaxValue, mFor));
                         if (r > 0 && H / r <= Math.Min(B * ms, mFor)) nHands++;
-                        else if (capD < rem && mFor <= B * ms) nSlow++;
-                        if (mT < 1) { rec.Why = H < 1 ? WhyNoCoin : WhyLevel; if (H < 1) nNoCoin++; else nLevel++; continue; }
+                        else if (!wCut && capD < rem && mFor <= B * ms) nSlow++;
+                        if (mT < 1) { rec.Why = H < 1 ? WhyNoCoin : WhyLevel; if (H < 1) nNoCoin++; else if (!wCut) nLevel++; continue; }
                         int m;
                         var gfm = GoodsLedger.Begin(GoodsLedger.FBuild, market);   // KS-R3 G7: material robot ludu ksiegowany na osade targu (rynek osady)
                         try { m = FolkBuy(market, mT, pieces); }

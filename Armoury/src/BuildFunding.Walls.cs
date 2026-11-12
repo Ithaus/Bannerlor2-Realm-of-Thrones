@@ -1,7 +1,10 @@
 using System;
 using System.Globalization;
 using System.Text;
+using HarmonyLib;
+using Helpers;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Library;
@@ -35,6 +38,12 @@ namespace Armoury
         private static long _wLordGold, _wLordMat, _wLordWage, _wFolkGold, _wReleased;
         private static double _wLordPts, _wFolkPts;
         private static bool _wErrLogged;
+        // 472-p (recenzja U1, U4): liczniki z ticku osady gry (po linii doby) - zerowane dopiero po wypisaniu w WallLine, nie na starcie Daily
+        private static long _wBoostBack; private static int _wBoostN, _wCutIdle;
+        // 472-p: latki w kampanii (raz na proces) - zwrot niewykorzystanego przyspieszenia zlotem (U1) i dni w oknie budowy (U2)
+        private static bool _wHooksTried, _wTickHooked, _wDaysHooked, _wNoCap;
+        private static Harmony _wH;
+        private static Town _tkTown; private static int _tkPool; private static double _tkU;
 
         /// <summary>Mury (fortyfikacje miasta albo zamku) - te same id co P2 (WallIds).</summary>
         internal static bool IsWall(BuildingType bt) { return bt != null && bt.StringId != null && Array.IndexOf(WallIds, bt.StringId) >= 0; }
@@ -90,6 +99,7 @@ namespace Armoury
         {
             try
             {
+                if (_wNoCap) return;   // 472-p: liczenie mocy bez granicy (udzial przyspieszenia zlotem - WallBoostUse)
                 var b = WallHead(t);
                 if (b == null) return;
                 float cap = WallCap(t, b);
@@ -105,7 +115,7 @@ namespace Armoury
         {
             try
             {
-                var b = WallHead(t);
+                var b = _wNoCap ? null : WallHead(t);   // 472-p: bez granicy przy WallBoostUse
                 if (b != null) { float cap = WallCap(t, b); if (v > cap) v = cap; }
             }
             catch { _wPowerErr++; }
@@ -133,6 +143,130 @@ namespace Armoury
             try { var b = WallHead(t); if (b != null && v > 0) return (int)(v / WallFactor(t, b.BuildingType)); }
             catch { _wPowerErr++; }
             return v;
+        }
+
+        /// <summary>472-p: udzial przyspieszenia zlotem, ktory miesci sie pod dziennym limitem murow (0..1; 1 - bez limitu, przyspieszenie nic nie daje albo moc
+        /// ponizej limitu). pu - moc doby z przyspieszeniem bez granicy, w - bez przyspieszenia i bez granicy (u pana zmiennoprzecinkowo, jak PowerIntPostfix).</summary>
+        private static double WallBoostUse(Town t, Building b, out double pu, out double w)
+        {
+            pu = w = 0;
+            float cap = WallCap(t, b);
+            if (cap >= float.MaxValue) return 1.0;
+            var model = Campaign.Current.Models.BuildingConstructionModel;
+            _wNoCap = true;
+            try
+            {
+                pu = model.CalculateDailyConstructionPower(t, false).ResultNumber;
+                if (Covered(t)) { float f0; _funded.TryGetValue(t, out f0); float fl = FolkHead(t); w = f0 + fl + EngExtra(t, f0, 0f, false) + Buildings338Mason.Extra(t, f0 + fl); }
+                else w = model.CalculateDailyConstructionPowerWithoutBoost(t);
+            }
+            finally { _wNoCap = false; }
+            if (!(pu > cap) || !(pu > w + 1e-4)) return 1.0;
+            return Math.Max(0.0, Math.Min(1.0, (cap - w) / (pu - w)));
+        }
+
+        /// <summary>472-p (OnSessionLaunched, raz na proces): latki na tick budowy osady (zwrot niewykorzystanego przyspieszenia zlotem - recenzja U1) i na dni
+        /// w oknie budowy (recenzja U2). Zakladane zawsze; przy kluczu wylaczonym nic nie robia (prefiks wychodzi od razu, postfiks nie rusza wyniku).</summary>
+        internal static void WallHooks()
+        {
+            if (_wHooksTried || Campaign.Current == null) return;
+            _wHooksTried = true;
+            if (_wH == null) _wH = new Harmony("com.jeff.armoury.walls472");
+            try
+            {
+                var m = AccessTools.DeclaredMethod(typeof(BuildingsCampaignBehavior), "TickCurrentBuildingForTown", new[] { typeof(Town) });
+                if (m != null)
+                {
+                    _wH.Patch(m, prefix: new HarmonyMethod(typeof(BuildFunding), nameof(WallTickPrefix)), postfix: new HarmonyMethod(typeof(BuildFunding), nameof(WallTickPostfix)));
+                    _wTickHooked = true;
+                }
+            }
+            catch (Exception e) { Log.Error("BuildFunding.WallHooks(tick)", e); }
+            try
+            {
+                var m = AccessTools.DeclaredMethod(typeof(BuildingHelper), "GetDaysToComplete", new[] { typeof(Building), typeof(Town) });
+                if (m != null)
+                {
+                    _wH.Patch(m, postfix: new HarmonyMethod(typeof(BuildFunding), nameof(WallDaysPostfix)) { priority = Priority.Last });
+                    _wDaysHooked = true;
+                }
+            }
+            catch (Exception e) { Log.Error("BuildFunding.WallHooks(dni)", e); }
+        }
+
+        /// <summary>Tick budowy osady (gra: postep += moc doby, potem pula przyspieszenia -= koszt dzienny 250/500). Mury na czole na limicie - zapamietaj, jaka
+        /// czesc przyspieszenia zmiescila sie pod limitem; postfiks oddaje do puli osady reszte pobranego kosztu (zloto gracza zostaje w puli na nastepne doby).</summary>
+        public static void WallTickPrefix(Town town)
+        {
+            _tkTown = null;
+            if (!On || !WallOn || town == null) return;
+            try
+            {
+                if (town.BoostBuildingProcess <= 0 || town.Settlement == null || town.Settlement.IsUnderSiege) return;
+                var b = WallHead(town);   // gra zdejmuje z kolejki poziom 3 na poczatku ticku - WallHead i tak pomija poziom 3
+                if (b == null) return;
+                double pu, w;
+                double u = WallBoostUse(town, b, out pu, out w);
+                if (u >= 0.9999) return;
+                _tkTown = town; _tkPool = town.BoostBuildingProcess; _tkU = u;
+            }
+            catch { _wPowerErr++; _tkTown = null; }
+        }
+
+        public static void WallTickPostfix(Town town)
+        {
+            if (_tkTown == null) return;
+            try
+            {
+                if (_tkTown != town) return;
+                int charged = _tkPool - town.BoostBuildingProcess;   // gra: min(koszt dzienny, pula)
+                if (charged <= 0) return;
+                int back = (int)(charged * (1.0 - _tkU));
+                if (back <= 0) return;
+                town.BoostBuildingProcess += back;
+                _wBoostBack += back; _wBoostN++;
+            }
+            catch { _wPowerErr++; }
+            finally { _tkTown = null; }
+        }
+
+        /// <summary>Okno budowy (BuildingHelper.GetDaysToComplete): gra dzieli przez (int)moc doby - przy limicie murow zamku 1.5-1.9 pkt/d pokazywala 1.3-1.9 razy
+        /// za duzo dni (ponizej 1 pkt/d: -1). Mury na czole: dni z mocy zmiennoprzecinkowej; przyspieszenie zlotem jak w grze, z pula schodzaca o koszt x udzial
+        /// (zwrot WallTickPostfix). Klucz wylaczony / nie mury na czole - wynik gry bez zmian.</summary>
+        public static void WallDaysPostfix(Building building, Town town, ref int __result)
+        {
+            if (!On || !WallOn || town == null || building == null) return;
+            try
+            {
+                var b = WallHead(town);
+                if (b == null || b != building) return;
+                float cap = WallCap(town, b);
+                if (cap >= float.MaxValue) return;
+                double p = town.Construction;
+                if (!(p > 1e-4)) return;
+                double rem = b.GetConstructionCost() - b.BuildingProgress;
+                int days = (int)(rem / p);
+                var model = Campaign.Current.Models.BuildingConstructionModel;
+                int bc = town.IsCastle ? model.CastleBoostCost : model.TownBoostCost;
+                if (bc > 0 && town.BoostBuildingProcess >= bc)
+                {
+                    double pu, w;
+                    double u = WallBoostUse(town, b, out pu, out w);
+                    if (!_wTickHooked) u = 1.0;
+                    double wc = Math.Min(w, cap);
+                    if (u > 1e-4 && wc < p - 1e-4)
+                    {
+                        int nb = (int)Math.Min(int.MaxValue / 2, town.BoostBuildingProcess / (bc * u));   // doby z przyspieszeniem
+                        if (days > nb)
+                        {
+                            if (!(wc > 1e-4)) { __result = -1; return; }
+                            days = nb + Math.Max((int)Math.Min(int.MaxValue / 2, (rem - nb * p) / wc), 1);
+                        }
+                    }
+                }
+                __result = Math.Max(days, 1);
+            }
+            catch { _wPowerErr++; }
         }
 
         private static void WallStumble(string where, Exception e)
@@ -213,7 +347,7 @@ namespace Armoury
 
         private static void WallDayStart()
         {
-            _wLordN = _wLordCap = _wLordOver = _wFolkN = _wFolkCap = _wStumbles = 0; _wPowerErr = 0;
+            _wLordN = _wLordCap = _wLordOver = _wFolkN = _wFolkCap = _wStumbles = _wCutIdle = 0;   // 472-p (U4): _wPowerErr i zwroty przyspieszenia - zerowane dopiero po wypisaniu w WallLine (powstaja tez w ticku osady po linii)
             _wLordGold = _wLordMat = _wLordWage = _wFolkGold = _wReleased = 0; _wLordPts = _wFolkPts = 0;
         }
 
@@ -267,11 +401,14 @@ namespace Armoury
                   .Append("), punktow ").Append(_wLordPts.ToString("0.0", inv)).Append(", budzet obciety do limitu ").Append(_wLordCap).Append(" osad (oddane dalej albo w kiesie ").Append(_wReleased).Append(" d)")
                   .Append(" | lud: murow ").Append(_wFolkN).Append(", zaplacone ").Append(_wFolkGold).Append(", punktow ").Append(_wFolkPts.ToString("0.0", inv)).Append(", na limicie ").Append(_wFolkCap)
                   .Append(" | kontrola: punkty ponad limit przed granica ").Append(clampN).Append(" osad (").Append(clampPts.ToString("0.0", inv)).Append(" pkt obciete), pan ponad limit ").Append(_wLordOver)
+                  .Append(", pan bez zakupu (limit pelny) ").Append(_wCutIdle)
+                  .Append(" | przyspieszenie zlotem (472-p, od poprzedniej linii): do puli osady wrocilo ").Append(_wBoostBack).Append(" d w ").Append(_wBoostN).Append(" tickach (latki: zwrot ")
+                  .Append(_wTickHooked ? "tak" : "NIE").Append(", dni w oknie ").Append(_wDaysHooked ? "tak" : "NIE").Append(')')
                   .Append(" | potkniecia ").Append(_wStumbles).Append(_wPowerErr > 0 ? ", bledy mocy " + _wPowerErr : "").Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { WallStumble("WallLine", e); }
-            WallDayStart();
+            finally { WallDayStart(); _wPowerErr = 0; _wBoostBack = 0; _wBoostN = 0; }   // 472-p (U4): takze przy wylaczonym logu
         }
 
         /// <summary>Start sesji (OnSessionLaunched): tabela poziomow murow - koszt w punktach, cena punktu, zloto na poziom przy dniowce 1.0, najkrotszy czas i limit dnia.
@@ -303,7 +440,8 @@ namespace Armoury
                         sb.Append(" | ").Append(castle ? "zamek" : "miasto").Append(' ').Append(lvl - 1).Append("->").Append(lvl).Append(": ").Append(cost).Append(" pkt")
                           .Append(castle ? " (Castle Charters " + (int)(cost * 0.8f) + ")" : "")
                           .Append(", ").Append(ppp.ToString("0", inv)).Append(" d/pkt, zloto ok. ").Append((cost * ppp).ToString("0", inv)).Append(" d (").Append((cost * ppp / 240.0).ToString("0", inv)).Append(" L)")
-                          .Append(", najkrocej ").Append(days > 0 ? days.ToString("0", inv) + " dob (" + (days / Math.Max(1, LongYearTimeModel.DaysPerYear(s))).ToString("0.#", inv) + " r.), limit " + (cost / days).ToString("0.00", inv) + " pkt/d" : "bez limitu");
+                          .Append(", najkrocej ").Append(days > 0 ? days.ToString("0", inv) + " dob (" + (days / Math.Max(1, LongYearTimeModel.DaysPerYear(s))).ToString("0.#", inv) + " r.), limit " + (cost / days).ToString("0.00", inv) + " pkt/d"
+                              + (castle ? " (Castle Charters " + ((int)(cost * 0.8f) / days).ToString("0.00", inv) + ")" : "") : "bez limitu");   // 472-p (U6): limit z Castle Charters
                     }
                 }
                 int c2 = 0, c3 = 0, t2 = 0, t3 = 0;
@@ -320,6 +458,7 @@ namespace Armoury
                     }
                     catch { }
                 }
+                sb.Append(" | latki 472-p: zwrot przyspieszenia zlotem ").Append(_wTickHooked ? "tak" : "NIE").Append(", dni w oknie budowy ").Append(_wDaysHooked ? "tak" : "NIE");
                 sb.Append(" | mury na czole kolejki teraz: zamki ->2 ").Append(c2).Append(", ->3 ").Append(c3).Append("; miasta ->2 ").Append(t2).Append(", ->3 ").Append(t3)
                   .Append(" (postep w zapisie bez zmian - budowy w toku zachowuja ulamek poziomu).");
                 Log.Info(sb.ToString());

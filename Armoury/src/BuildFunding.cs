@@ -308,7 +308,9 @@ namespace Armoury
                     // materialy z targu (miasto - swoj, zamek - najblizsze miasto)
                     var market = st.IsTown ? st : NearestTown(st);
                     budget = OneBudget(st, b, clan, all, budget, ppp, market);   // R3-11a: rod AI z kilkoma budowami - reszta przydzialu na te budowe albo 0 (czeka w kolejce); reszta - budget bez zmian
+                    float preWall = budget;
                     if (WallOn) budget = WallBudget(st, b, budget, ppp, market);   // 472: mury - budzet najwyzej na punkty do limitu doby (najkrotszy czas poziomu); reszta w kiesie / R3-11a dalej
+                    bool wallCut = WallOn && budget < preWall;   // 472-p (recenzja U3): budzet murow obciety limitem - jedna sztuka materialu i place najwyzej w budzecie (klucz wylaczony - false)
                     budget = Math.Min(budget, Math.Max(0, lord.Gold));
                     if (budget < 1f) continue;
                     float matBudget = budget * MBMath.ClampFloat(s.BuildMaterialShare, 0f, 1f);
@@ -319,15 +321,16 @@ namespace Armoury
                     {
                         matSpent = BuyMaterials(market, matBudget);
                         // wpis 86 (audyt pkt 15): towar jest, tylko drozszy niz dzienny budzet - jedna najtansza sztuka, jesli pana stac
-                        if (matBudget > 0f && matSpent <= 0) matSpent = BuyOneCheapest(market, Math.Max(0, lord.Gold));
+                        if (matBudget > 0f && matSpent <= 0) matSpent = BuyOneCheapest(market, wallCut ? Math.Max(0, Math.Min(lord.Gold, (int)budget)) : Math.Max(0, lord.Gold));
                     }
                     finally { GoodsLedger.End(gfm); }
-                    if (matBudget > 0f && matSpent <= 0) { _stalledNoMat++; continue; }   // nie ma z czego budowac
+                    if (matBudget > 0f && matSpent <= 0) { if (wallCut) _wCutIdle++; else _stalledNoMat++; continue; }   // nie ma z czego budowac   // 472-p: mury przy limicie (reszta limitu ponizej ceny sztuki) - osobny licznik linii murow
                     float labour = Math.Min(budget - matBudget, matSpent * Math.Max(0f, (1f - s.BuildMaterialShare) / Math.Max(0.01f, s.BuildMaterialShare)));
                     int labourI = MBRandom.RoundRandomized(labour);
                     // poprawka po audycie TOWARY 3: material drozszy niz budzet (BuyOneCheapest do calej kiesy) + robocizna z budzetu moglo dac
                     // wiecej niz lord ma - ChangeHeroGold obcina kiese do 0, a kasy dostawaly pelne kwoty (zloto z niczego); robota najwyzej z reszty kiesy
                     labourI = Math.Min(labourI, Math.Max(0, lord.Gold - matSpent));
+                    if (wallCut) labourI = Math.Min(labourI, Math.Max(0, (int)budget - matSpent));   // 472-p (U3): mury przy limicie - material i place razem najwyzej budzet do limitu
                     lord.ChangeHeroGold(-(matSpent + labourI));
                     CirculationWindows.NoteHeroGold(lord, -(matSpent + labourI));   // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
                     if (market != null && market.Town != null)
