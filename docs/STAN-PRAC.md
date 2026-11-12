@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 17:25 - WGRANIE 215 (450-456-c: AI bitwy pakiet 7 szturm) - reguly szturmu NA NIE w Armoury.json (tylko pomiar "bylby")
+
+- **W grze:** Armoury.dll `0088831e27481342839545b2def3ea6d` (commit `e26584fb`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie215`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie215(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-456c-po-tescie.sav`.
+- **Pierwszy test at-456 (commit c308bcd4): CTD na arenie** - TypeInitializationException MovementOrder. Przyczyna: SiegeReserve454.Release czytal pole MovementOrder.MovementOrderCharge wprost; siec CrashScribe JIT-uje metody Armoury przy starcie, cctor MovementOrder (Mission.Current.CurrentTime) padl poza misja i typ byl zepsuty na caly proces. Naprawa 456-c: pole czytane odbiciem tylko w trwajacej misji (wzor 333t2). Skan IL calego DLL: zadna inna zwykla metoda nie czyta pol MovementOrder. Pamiec: movementorder-pole-poza-misja.
+- **Test at-456c (n391, 15 dob + 7 bitew):** KONIEC OK, misje sprawdzone, wyjatkow 0, bledy 23 (stale). Latki: 451 BalanceAssaultLanes, 452 DetermineCurrentLanes / ShouldRetreat / SetAreLaddersReady, 455 ArcherShiftAround / BehaviorSparseSkirmish.TickOccasionally - wszystkie "wpieta". Szturmu autotest NIE ma - reguly szturmu niesprawdzone w misji.
+- **Armoury.json Jeffa:** SiegeMainEffort, SiegeAbandonDeadLane, SiegeWavesReinforceSuccess, WallDefenceReserve, DefenderFireFollowsAssault, SiegeArchersFallBack = NIE (decyzja 8: 60% dopiero po sondzie; bezpieczny pierwszy krok). Kopia przed: `Armoury.json.bak-2026-11-12-przed-szturm-NIE`; stan: `D:/Backup-Bannerlord/Armoury.json.2026-11-12-szturm-NIE`. SiegeLadderWaitSeconds 240 (decyzja 7).
+- **Po pierwszym szturmie Jeffa:** czytac linie "Oblezenie misja (370) pasy koniec (450)", "wysilek glowny (451)", "pas-lejek (452)", "fale na przyczolek (453)", "odwod obrony (454)", "ogien (455)", "sala lorda (456)" - "bylby" - i wlaczac klucze po kolei.
+- **456:** zalamanie zalogi -> sala lorda: gra robi to sama (prog 20 zbieglych), tylko pomiar.
+
 ## STAN 12.11 15:55 - WGRANIE 214 (435-N-C: N wyrobu - brak wyrobow na targu dla L8/L9) + drabiny 240 s w Armoury.json
 
 - **W grze:** Armoury.dll `8215a1a619b17ef796c5bf026c374878` (commit `f4c2152f`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie214`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie214(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-435c-po-tescie.sav`.
