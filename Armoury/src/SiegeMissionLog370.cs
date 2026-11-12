@@ -31,6 +31,13 @@ namespace Armoury
     /// 437-p: liczniki zapytan czytane z pamieci QueryData (GetCachedValue przez refleksje) - wlasciwosci SiegeQuerySystem wolaja .Value, ktore po 5 s
     /// przelicza (LocateAttackers) i zapisuje cache czytany przez AI szturmu; sonda nie przesuwa juz chwili tego przeliczenia.
     /// Straty z OnAgentRemoved pod lockiem (zdarzenie bywa z ticku asynchronicznego). Klucz NIE - linii pasow brak, reszta 370 jak dotad.
+    /// 450 (pakiet 7.0 audytu AI bitwy - sonda na pas, rozszerzenie; TYLKO ODCZYT, ten sam klucz BattleAiMeasurements): probka pasow co 1 s w OnMissionTick
+    /// (glowny watek) z pamieci QueryData (bez przeliczania): przyczolek jak w grze (SiegeLane.IsUnderAttack && !IsDefended: >= 15 atakujacych przy punkcie
+    /// obrony i < 15 obroncow - stan Conceited), pierwsze wejscie na mur (>= 5 atakujacych przy punkcie), czas przyczolka, maksima licznikow; udzial pasa
+    /// glownego w pierwszych 180 s po rozstawieniu (przydzial: ludzie szykow z GetLastAssignedFormation druzyn atakujacych, szyk liczony raz; obecnosc:
+    /// RegionMemberCount); fale posilkow (OnAgentBuild po starcie, przydzial do pasa po 2 s wedlug szyku czlowieka, fala zamknieta po 5 s bez nowych) -
+    /// linia "fala posilkow (450)"; straty wedlug zrodla pociski / wrecz / inne (upadek, bez sprawcy) na szyk i na pas (mapa szyk -> pas z ostatniej probki,
+    /// pod lockiem). Linia "pasy koniec (450)" przy koncu misji. Liczniki gry licza tylko glowna druzyne atakujaca i pamietaja 5 s.
     /// </summary>
     internal sealed class SiegeMissionLog370 : MissionLogic
     {
@@ -54,6 +61,28 @@ namespace Armoury
         private readonly Dictionary<Formation, int[]> _lost = new Dictionary<Formation, int[]>();
         private readonly object _lostLock = new object();
         private bool _lanes437;
+
+        // 450 (7.0): probka pasow co 1 s (glowny watek), indeks pasa = pozycja w TeamAISiegeComponent.SiegeLanes (najwyzej 3); 3 = bez pasa
+        private const float LaneEvery = 1f, OpenWindow = 180f, WaveGap = 5f, WaveSettle = 2f;
+        private const int WallMin = 5, HoldMin = 15, LaneMax = 3;
+        private float _laneNext, _t0, _lastSample = -1f, _lastBuild = -1f;
+        private int _laneN, _shareSamples, _dupAsg;
+        private readonly string[] _laneName = new string[LaneMax];
+        private readonly float[] _wallAt = { -1f, -1f, -1f }, _holdAt = { -1f, -1f, -1f }, _holdSec = new float[LaneMax];
+        private readonly int[] _closeMax = new int[LaneMax], _defMax = new int[LaneMax];
+        private readonly double[] _shareAsg = new double[LaneMax], _sharePres = new double[LaneMax];
+        // straty wedlug strony (0 A, 1 O), pasa (0..2, 3 bez pasa) i zrodla (0 pociski, 1 wrecz, 2 inne); pod _lostLock razem z mapa szyk -> pas
+        private readonly int[,,] _laneLost = new int[2, LaneMax + 1, 3];
+        private readonly Dictionary<Formation, int> _fLane = new Dictionary<Formation, int>();
+        private readonly Dictionary<Formation, int> _fLaneTmp = new Dictionary<Formation, int>();
+        // posilki: zbudowani po starcie (OnAgentBuild), przydzial po WaveSettle; fala na strone: [pas 0..2, 3 bez pasa, 4 padl / bez szyku]
+        private readonly List<Agent> _built = new List<Agent>();
+        private readonly List<float> _builtAt = new List<float>();
+        private readonly object _buildLock = new object();
+        private readonly int[,] _wave = new int[2, LaneMax + 2], _reinf = new int[2, LaneMax + 2];
+        private readonly int[] _waveN = new int[2], _waves = new int[2];
+        private readonly float[] _waveT0 = new float[2];
+        private readonly Dictionary<Formation, int>[] _waveF = { new Dictionary<Formation, int>(), new Dictionary<Formation, int>() };
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
@@ -88,13 +117,39 @@ namespace Armoury
             {
                 if (affectedAgent == null || !affectedAgent.IsHuman || (agentState != AgentState.Killed && agentState != AgentState.Unconscious)) return;
                 var f = affectedAgent.Formation;
-                if (f == null) return;
+                // 450: zrodlo - pociski / wrecz / inne (upadek z muru, brak sprawcy, sam sobie)
+                int src = blow.IsMissile ? 0
+                        : (affectorAgent == null || affectorAgent == affectedAgent || blow.OverrideKillInfo == Agent.KillInfo.Gravity) ? 2 : 1;
+                var t = affectedAgent.Team;
+                int s = t == null ? -1 : (t.Side == BattleSideEnum.Attacker ? 0 : (t.Side == BattleSideEnum.Defender ? 1 : -1));
                 lock (_lostLock)
                 {
-                    int[] l;
-                    if (!_lost.TryGetValue(f, out l)) { l = new int[2]; _lost[f] = l; }
-                    l[blow.IsMissile ? 0 : 1]++;
+                    if (f != null)
+                    {
+                        int[] l;
+                        if (!_lost.TryGetValue(f, out l)) { l = new int[3]; _lost[f] = l; }
+                        l[src]++;
+                    }
+                    if (s >= 0 && _laneN > 0)
+                    {
+                        int li;
+                        if (f == null || !_fLane.TryGetValue(f, out li)) li = LaneMax;
+                        _laneLost[s, li, src]++;
+                    }
                 }
+            }
+            catch { _stumbles++; }
+        }
+
+        public override void OnAgentBuild(Agent agent, Banner banner)
+        {
+            if (!_started || _ended || !_siege || !_lanes437) return;
+            try
+            {
+                if (agent == null || !agent.IsHuman) return;
+                var m = Mission;
+                float now = m != null ? m.CurrentTime : 0f;
+                lock (_buildLock) { _built.Add(agent); _builtAt.Add(now); _lastBuild = now; }
             }
             catch { _stumbles++; }
         }
@@ -130,11 +185,18 @@ namespace Armoury
                     if (now < _startAt) return;
                     _started = true;
                     try { var s437 = Settings.Current; _lanes437 = s437 != null && s437.BattleAiMeasurements; } catch { _lanes437 = false; }
+                    _t0 = now;
+                    if (_lanes437) { try { LaneSample(m, now, false); } catch (Exception e) { Stumble("Probka", e); } _laneNext = now + LaneEvery; }
                     Reading(m, "start");
                     _next = now + Every;
                     return;
                 }
                 if (m.MissionEnded) return;   // linia konca w OnEndMission
+                if (_lanes437 && now >= _laneNext)
+                {
+                    _laneNext = now + LaneEvery;
+                    try { LaneSample(m, now, false); } catch (Exception e) { Stumble("Probka", e); }
+                }
                 if (now < _next) return;
                 _next = now + Every;
                 Reading(m, null);
@@ -148,6 +210,11 @@ namespace Armoury
             {
                 var m = Mission;
                 if (_started && !_ended && m != null) Reading(m, "koniec");
+                if (_started && !_ended && m != null && _lanes437)
+                {
+                    try { LaneSample(m, m.CurrentTime, true); } catch (Exception e) { Stumble("Probka", e); }
+                    try { LaneEnd(m); } catch (Exception e) { Stumble("PasyKoniec", e); }
+                }
                 if (_started)
                     Log.Info("Oblezenie misja (370): koniec | odczytow " + _readings + " | strzaly calej misji: A " + _shotsAllA + ", O " + _shotsAllD
                              + " | potkniecia " + _stumbles + ".");
@@ -156,7 +223,9 @@ namespace Armoury
             _ended = true;
             _hits.Clear();
             _mix.Clear();
-            lock (_lostLock) _lost.Clear();
+            lock (_lostLock) { _lost.Clear(); _fLane.Clear(); }
+            lock (_buildLock) { _built.Clear(); _builtAt.Clear(); }
+            _waveF[0].Clear(); _waveF[1].Clear();
             base.OnEndMission();
         }
 
@@ -223,8 +292,10 @@ namespace Armoury
                         {
                             // 437-p: pamiec podreczna QueryData (GetCachedValue) - wlasciwosci (.Value) przeliczaja i odswiezaja cache, ktory czyta AI szturmu
                             string ls = side == FormationAI.BehaviorSide.Left ? "_left" : (side == FormationAI.BehaviorSide.Middle ? "_middle" : "_right");
+                            int ca = QVal(q, ls + "CloseAttackerCount"), dc = QVal(q, ls + "DefenderCount");
                             sb.Append(", atak blisko ").Append(QCached(q, ls + "CloseAttackerCount")).Append(", w regionie ").Append(QCached(q, ls + "RegionMemberCount"))
-                              .Append(", obroncy ").Append(QCached(q, ls + "DefenderCount"));
+                              .Append(", obroncy ").Append(QCached(q, ls + "DefenderCount"))
+                              .Append(", przyczolek ").Append(ca < 0 || dc < 0 ? "?" : (ca >= HoldMin && dc < HoldMin ? "TAK" : "NIE"));   // 450: jak SiegeLane.IsUnderAttack && !IsDefended
                         }
                         catch { sb.Append(", liczniki ?"); }
                     }
@@ -240,15 +311,219 @@ namespace Armoury
                         var b = f.AI != null ? f.AI.ActiveBehavior : null;
                         sb.Append(wn++ > 0 ? "," : "").Append(" T").Append(f.Team != null ? f.Team.TeamIndex : -1).Append('F').Append((int)f.FormationIndex).Append(' ').Append(f.CountOfUnits)
                           .Append(' ').Append(BehName(b)).Append(f.IsSplittableByAI ? " dzielony" : " niedzielony")
-                          .Append(" straty30s ").Append(ls != null ? ls[0] : 0).Append('/').Append(ls != null ? ls[1] : 0);
+                          .Append(" straty30s ").Append(ls != null ? ls[0] : 0).Append('/').Append(ls != null ? ls[1] : 0).Append('/').Append(ls != null ? ls[2] : 0);
                     }
                     if (wn == 0) sb.Append(" -");
                 }
                 catch (Exception e) { Stumble("Pas", e); sb.Append(" ?"); }
             }
             try { if (q != null) sb.Append(" | atakujacy w srodku ").Append(QCached(q, "_insideAttackerCount")); } catch { sb.Append(" | atakujacy w srodku ?"); }
-            sb.Append(" | straty30s = pociski/reszta (zabici + nieprzytomni); liczniki z pamieci gry bez przeliczania.");
+            sb.Append(" | straty30s = pociski/wrecz/inne (zabici + nieprzytomni; inne = upadek, bez sprawcy); przyczolek = >= 15 atak blisko i < 15 obroncow; liczniki z pamieci gry bez przeliczania.");
             Log.Info(sb.ToString());
+        }
+
+        // ------------------------------------------------------------ 450 (7.0): probka pasow co 1 s, fale posilkow, linia konca
+
+        /// <summary>
+        /// 450: probka pasow (glowny watek, tylko odczyt pamieci gry): wejscie na mur, przyczolek, maksima, udzial pasa w 180 s, mapa szyk -> pas dla strat,
+        /// przydzial zbudowanych posilkow do pasow. flush = koniec misji (przydziel wszystkich czekajacych i zamknij fale).
+        /// </summary>
+        private void LaneSample(Mission m, float now, bool flush)
+        {
+            List<SiegeLane> lanes = null;
+            SiegeQuerySystem q = null;
+            try { lanes = TeamAISiegeComponent.SiegeLanes; q = TeamAISiegeComponent.QuerySystem; } catch { lanes = null; }
+            if (lanes != null && lanes.Count > 0 && _laneN == 0)
+            {
+                _laneN = Math.Min(LaneMax, lanes.Count);
+                for (int i = 0; i < _laneN; i++) { try { _laneName[i] = lanes[i] != null ? lanes[i].LaneSide.ToString() : "?"; } catch { _laneName[i] = "?"; } }
+            }
+            var map = _fLaneTmp;
+            map.Clear();
+            if (_laneN > 0 && lanes != null)
+            {
+                float dt = _lastSample >= 0f ? Math.Max(0f, now - _lastSample) : 0f;
+                _lastSample = now;
+                bool open = now - _t0 <= OpenWindow && !flush;
+                var teams = m.Teams;
+                int[] asg = new int[LaneMax], pres = new int[LaneMax];
+                for (int i = 0; i < _laneN && i < lanes.Count; i++)
+                {
+                    try
+                    {
+                        var l = lanes[i];
+                        if (l == null) continue;
+                        string lp = LanePrefix(l.LaneSide);
+                        int ca = QVal(q, lp + "CloseAttackerCount"), dc = QVal(q, lp + "DefenderCount"), rg = QVal(q, lp + "RegionMemberCount");
+                        if (ca > _closeMax[i]) _closeMax[i] = ca;
+                        if (dc > _defMax[i]) _defMax[i] = dc;
+                        if (ca >= WallMin && _wallAt[i] < 0f) _wallAt[i] = now;
+                        if (ca >= HoldMin && dc >= 0 && dc < HoldMin)
+                        {
+                            if (_holdAt[i] < 0f) _holdAt[i] = now;
+                            _holdSec[i] += dt;
+                        }
+                        if (rg > 0) pres[i] = rg;
+                        for (int ti = 0; teams != null && ti < teams.Count; ti++)
+                        {
+                            Formation f = null;
+                            try { f = l.GetLastAssignedFormation(ti); } catch { f = null; }
+                            if (f == null) continue;
+                            bool att = f.Team != null && f.Team.Side == BattleSideEnum.Attacker;
+                            if (map.ContainsKey(f)) { if (open && att) _dupAsg++; continue; }   // szyk liczony raz - na pierwszym pasie listy
+                            map[f] = i;
+                            if (att) asg[i] += Math.Max(0, f.CountOfUnits);
+                        }
+                    }
+                    catch (Exception e) { Stumble("Probka.Pas", e); }
+                }
+                if (open)
+                {
+                    _shareSamples++;
+                    for (int i = 0; i < _laneN; i++) { _shareAsg[i] += asg[i]; _sharePres[i] += pres[i]; }
+                }
+                lock (_lostLock)
+                {
+                    _fLane.Clear();
+                    foreach (var kv in map) _fLane[kv.Key] = kv.Value;
+                }
+            }
+            Waves(now, flush, map);
+        }
+
+        /// <summary>450: przydzial posilkow do pasow wedlug szyku czlowieka WaveSettle s po zbudowaniu; fala zamknieta po WaveGap s bez nowych.</summary>
+        private void Waves(float now, bool flush, Dictionary<Formation, int> map)
+        {
+            List<Agent> ready = null;
+            List<float> readyAt = null;
+            bool pending, quiet;
+            lock (_buildLock)
+            {
+                for (int i = 0; i < _built.Count; )
+                {
+                    if (flush || _builtAt[i] <= now - WaveSettle)
+                    {
+                        if (ready == null) { ready = new List<Agent>(); readyAt = new List<float>(); }
+                        ready.Add(_built[i]); readyAt.Add(_builtAt[i]);
+                        _built.RemoveAt(i); _builtAt.RemoveAt(i);
+                    }
+                    else i++;
+                }
+                pending = _built.Count > 0;
+                quiet = _lastBuild < 0f || now - _lastBuild >= WaveGap;
+            }
+            for (int k = 0; ready != null && k < ready.Count; k++)
+            {
+                try
+                {
+                    var a = ready[k];
+                    var t = a != null ? a.Team : null;
+                    int s = t == null ? -1 : (t.Side == BattleSideEnum.Attacker ? 0 : (t.Side == BattleSideEnum.Defender ? 1 : -1));
+                    if (s < 0) continue;
+                    if (_waveN[s] == 0) _waveT0[s] = readyAt[k];
+                    _waveN[s]++;
+                    Formation f = a.IsActive() ? a.Formation : null;
+                    int b;
+                    if (f == null) b = LaneMax + 1;
+                    else
+                    {
+                        int li;
+                        b = map.TryGetValue(f, out li) ? li : LaneMax;
+                        int n;
+                        _waveF[s].TryGetValue(f, out n);
+                        _waveF[s][f] = n + 1;
+                    }
+                    _wave[s, b]++;
+                }
+                catch (Exception e) { Stumble("Fala", e); }
+            }
+            if (!flush && (pending || !quiet)) return;
+            for (int s = 0; s < 2; s++)
+            {
+                if (_waveN[s] == 0) continue;
+                try { WaveLine(s, map); } catch (Exception e) { Stumble("Fala.Linia", e); }
+                for (int b = 0; b < LaneMax + 2; b++) { _reinf[s, b] += _wave[s, b]; _wave[s, b] = 0; }
+                _waves[s]++;
+                _waveN[s] = 0;
+                _waveF[s].Clear();
+            }
+        }
+
+        private void WaveLine(int s, Dictionary<Formation, int> map)
+        {
+            var sb = new StringBuilder(256);
+            sb.Append("Oblezenie misja (370) fala posilkow (450): t=").Append(_waveT0[s].ToString("0", Inv)).Append("s | strona ").Append(s == 0 ? "A" : "O")
+              .Append(" | ludzi ").Append(_waveN[s]).Append(" | cel:");
+            for (int i = 0; i < _laneN; i++) sb.Append(i > 0 ? "," : "").Append(' ').Append(_laneName[i]).Append(' ').Append(_wave[s, i]);
+            if (_laneN == 0) sb.Append(" pasow brak");
+            sb.Append(", bez pasa ").Append(_wave[s, LaneMax]).Append(", padl / bez szyku ").Append(_wave[s, LaneMax + 1]).Append(" | szyki:");
+            int n = 0;
+            foreach (var kv in _waveF[s])
+            {
+                var f = kv.Key;
+                int li;
+                sb.Append(n++ > 0 ? "," : "").Append(" T").Append(f.Team != null ? f.Team.TeamIndex : -1).Append('F').Append((int)f.FormationIndex).Append(' ').Append(kv.Value)
+                  .Append(" (").Append(map.TryGetValue(f, out li) && li < _laneN ? _laneName[li] : "bez pasa").Append(')');
+            }
+            if (n == 0) sb.Append(" -");
+            sb.Append('.');
+            Log.Info(sb.ToString());
+        }
+
+        /// <summary>450: linia konca szturmu - na pas wejscie na mur, przyczolek, maksima, posilki, straty wg zrodla; odstep wejsc 1. i 2. pasa; udzial pasa glownego 0-180 s.</summary>
+        private void LaneEnd(Mission m)
+        {
+            var sb = new StringBuilder(1024);
+            sb.Append("Oblezenie misja (370) pasy koniec (450): t=").Append(m.CurrentTime.ToString("0", Inv)).Append('s');
+            if (_laneN == 0) { sb.Append(" | pasow brak (SiegeLanes puste przez cala misje) | potkniecia ").Append(_stumbles).Append('.'); Log.Info(sb.ToString()); return; }
+            int[,,] lost;
+            lock (_lostLock) lost = (int[,,])_laneLost.Clone();
+            for (int i = 0; i < _laneN; i++)
+            {
+                sb.Append(i > 0 ? " ||" : " |").Append(' ').Append(_laneName[i]).Append(": na murze ").Append(_wallAt[i] >= 0f ? "t=" + _wallAt[i].ToString("0", Inv) + "s" : "nigdy")
+                  .Append(", przyczolek ").Append(_holdAt[i] >= 0f ? "od t=" + _holdAt[i].ToString("0", Inv) + "s, lacznie " + _holdSec[i].ToString("0", Inv) + "s" : "nigdy")
+                  .Append(", max atak blisko ").Append(_closeMax[i]).Append(", max obroncow ").Append(_defMax[i])
+                  .Append(", posilki A ").Append(_reinf[0, i]).Append(" / O ").Append(_reinf[1, i])
+                  .Append(", straty A ").Append(lost[0, i, 0]).Append('/').Append(lost[0, i, 1]).Append('/').Append(lost[0, i, 2])
+                  .Append(", O ").Append(lost[1, i, 0]).Append('/').Append(lost[1, i, 1]).Append('/').Append(lost[1, i, 2]);
+            }
+            sb.Append(" | bez pasa: posilki A ").Append(_reinf[0, LaneMax]).Append(" / O ").Append(_reinf[1, LaneMax])
+              .Append(", padl / bez szyku A ").Append(_reinf[0, LaneMax + 1]).Append(" / O ").Append(_reinf[1, LaneMax + 1])
+              .Append(", straty A ").Append(lost[0, LaneMax, 0]).Append('/').Append(lost[0, LaneMax, 1]).Append('/').Append(lost[0, LaneMax, 2])
+              .Append(", O ").Append(lost[1, LaneMax, 0]).Append('/').Append(lost[1, LaneMax, 1]).Append('/').Append(lost[1, LaneMax, 2]);
+            // odstep wejsc na mur: pierwszy i drugi pas wedlug czasu
+            int first = -1, second = -1;
+            for (int i = 0; i < _laneN; i++)
+            {
+                if (_wallAt[i] < 0f) continue;
+                if (first < 0 || _wallAt[i] < _wallAt[first]) { second = first; first = i; }
+                else if (second < 0 || _wallAt[i] < _wallAt[second]) second = i;
+            }
+            sb.Append(" | wejscie na mur: ");
+            if (first < 0) sb.Append("zaden pas");
+            else
+            {
+                sb.Append("pierwszy ").Append(_laneName[first]).Append(" t=").Append(_wallAt[first].ToString("0", Inv)).Append("s, ");
+                if (second < 0) sb.Append("drugi pas nie wszedl");
+                else sb.Append("drugi ").Append(_laneName[second]).Append(" po ").Append((_wallAt[second] - _wallAt[first]).ToString("0", Inv)).Append(" s");
+            }
+            sb.Append(" | udzial pasa glownego 0-").Append(OpenWindow.ToString("0", Inv)).Append(" s (probek ").Append(_shareSamples).Append("): przydzial ").Append(Share(_shareAsg))
+              .Append(", obecnosc w regionie ").Append(Share(_sharePres)).Append(", szyk na dwoch pasach ").Append(_dupAsg)
+              .Append(" | fale posilkow A ").Append(_waves[0]).Append(", O ").Append(_waves[1])
+              .Append(" | straty = pociski/wrecz/inne; na murze = >= ").Append(WallMin).Append(" atak blisko, przyczolek = >= ").Append(HoldMin).Append(" atak blisko i < ").Append(HoldMin)
+              .Append(" obroncow; probka co 1 s z pamieci gry (5 s), liczniki tylko glownej druzyny atakujacej | potkniecia ").Append(_stumbles).Append('.');
+            Log.Info(sb.ToString());
+        }
+
+        private string Share(double[] v)
+        {
+            double sum = 0; int best = -1;
+            for (int i = 0; i < _laneN; i++) { sum += v[i]; if (best < 0 || v[i] > v[best]) best = i; }
+            if (best < 0 || sum <= 0) return "-";
+            var s = new StringBuilder();
+            s.Append(_laneName[best]).Append(' ').Append((100.0 * v[best] / sum).ToString("0", Inv)).Append("% (");
+            for (int i = 0; i < _laneN; i++) s.Append(i > 0 ? " " : "").Append((100.0 * v[i] / sum).ToString("0", Inv));
+            return s.Append(')').ToString();
         }
 
         // 437-p: pola QueryData<int> SiegeQuerySystem (refleksja raz na nazwe); odczyt GetCachedValue - bez Evaluate i bez zapisu czasu waznosci
@@ -256,15 +531,27 @@ namespace Armoury
 
         private static string QCached(SiegeQuerySystem q, string field)
         {
+            int v = QVal(q, field);
+            return v >= 0 ? v.ToString(Inv) : "?";
+        }
+
+        /// <summary>450: wartosc z pamieci QueryData (GetCachedValue) albo -1, gdy pola brak (liczniki gry sa nieujemne).</summary>
+        private static int QVal(SiegeQuerySystem q, string field)
+        {
             FieldInfo fi;
             if (!QFields.TryGetValue(field, out fi))
             {
                 try { fi = AccessTools.Field(typeof(SiegeQuerySystem), field); } catch { fi = null; }
                 QFields[field] = fi;
             }
-            if (fi == null) return "?";
+            if (fi == null || q == null) return -1;
             var qd = fi.GetValue(q) as QueryData<int>;
-            return qd != null ? qd.GetCachedValue().ToString(Inv) : "?";
+            return qd != null ? qd.GetCachedValue() : -1;
+        }
+
+        private static string LanePrefix(FormationAI.BehaviorSide side)
+        {
+            return side == FormationAI.BehaviorSide.Left ? "_left" : (side == FormationAI.BehaviorSide.Middle ? "_middle" : "_right");
         }
 
         private void Side(Mission m, BattleSideEnum side, string head, List<string> bad)
