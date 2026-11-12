@@ -282,13 +282,15 @@ namespace Armoury
                     // 435-L2: przebudowa stojaca (zaleglosc raty >= prog) nie zajmuje miejsca "jedna czesc okregu naraz"; klucz 0 - Released zawsze false (jak dotad)
                     // 435-L4 (klucz Village Gear On Switch): zmiana OD RAZU (koszt 0, sprzet z robot gminy) trzyma miejsce tylko do sprzetu dla polowy rak w zmianie albo
                     // 182 dob - takze po przejsciu rak (HoldsAfter); klucz wylaczony - gsw false, petla jak dotad
-                    bool busy = false, stalled = false;
+                    bool busy = false, stalled = false; int stalledN = 0;
                     foreach (var b in ld.B) if (b != null && b.Target >= 0)
                     {
                         int slot = gsw && !ld.TF && b.K != null && b.Cost <= 0f ? VillageGear.SlotOf(ld.V, GearUid(b), b.Target) : 0;
                         if (slot == 2) continue;
-                        if (slot != 1 && CraftUnblock.Released(RbLag(b, today))) stalled = true; else { busy = true; break; }
+                        if (slot != 1 && CraftUnblock.Released(RbLag(b, today, mt))) { stalled = true; stalledN++; } else { busy = true; break; }
                     }
+                    // 435-L2-p (recenzje 2, N2): najwyzej jedna stojaca przebudowa okregu zwalnia miejsce - druga stojaca znow je trzyma
+                    if (!busy && stalledN > CraftUnblock.MaxStalled) { busy = true; CraftUnblock.NoteCap(CraftUnblock.SysKs); }
                     if (gsw && !busy && !ld.TF && VillageGear.HoldsAfter(ld.V)) busy = true;
                     string region = ld.TF ? ld.St.StringId : (ld.V.Bound != null ? ld.V.Bound.StringId : ld.St.StringId);
                     // m106-wozy P1: fach okregu w dobie kroku - zajecie typu (bez regale: tych pilnuje cykl regali), produkcja na targ wobec celu z Planu i blok powrotu:
@@ -333,7 +335,7 @@ namespace Armoury
                         if (b.Target >= 0)
                         {
                             EcoAudit427.RbAge(EcoAudit427.SysKs, today - b.TEnd); Progress(ld, b, today, mt); active++;
-                            if (b.Target >= 0) CraftUnblock.Seen(CraftUnblock.SysKs, RbLag(b, today), b.Cost > 0 && b.Paid >= b.Cost - 0.5f);   // 435-L2: stan do linii (sam licznik)
+                            if (b.Target >= 0) CraftUnblock.Seen(CraftUnblock.SysKs, RbLag(b, today, mt), b.Cost > 0 && b.Paid >= b.Cost - 0.5f);   // 435-L2: stan do linii (sam licznik)
                             continue;
                         }   // 427 A1: wiek przebudowy wobec terminu (sam licznik)
                         // f5-a7 (klucz Ks Switch Signal): doba bez kroku i bez regali przy przebudowach w toku - blok bez Held nie ma tu nic do zrobienia (blokada prac zeruje
@@ -401,9 +403,10 @@ namespace Armoury
                         if (!rule) { _rWould++; continue; }                  // klucz wylaczony - sam pomiar nacisku (zmiana bylaby tu)
                         // 435-L2 (klucz Grain Hands Winter Lock): bezpiecznik zboza - zmiana Z zboza nie zaczyna sie w zimie krainy, przy glodzie gospodarzy i gdy plon
                         // okregu po odejsciu tych rak spadlby ponizej 1.2 x potrzeby; nacisk (Held) zostaje. Klucz wylaczony - bez liczenia (jak dotad)
-                        if (cur == KsTab.CWheat && best != KsTab.CWheat && CraftUnblock.GrainKey
-                            && CraftUnblock.GrainLock(CraftUnblock.SysKs, ld.TF ? null : ld.V, ld.TF ? ld.T : null, b.Hands * b.X[ci], WheatHands(ld), today) != 0) continue;
                         if (busy) { _rBusy++; continue; }
+                        // 435-L2-p (stabilnosc N3): bezpiecznik PO "inna czesc okregu"; przejscie na inne jedzenie wolne (pod KS jedzenie -> nie-jedzenie pilnuje dalej FeedKeeps)
+                        if (cur == KsTab.CWheat && best != KsTab.CWheat && CraftUnblock.GrainKey
+                            && CraftUnblock.GrainLock(CraftUnblock.SysKs, ld.TF ? null : ld.V, ld.TF ? ld.T : null, b.Hands * b.X[ci], FoodCraft(best), today) != 0) continue;
                         if (FeedKeeps(ld, cur, best)) { _rFeed++; continue; }   // r4-polnoc: najpierw wyzywic siebie - czesc przy jedzeniu nie idzie na zajecie tylko na targ
                         // ziemia bloku: po zmianie rak X0 z cur na best ziemia zajeta nie moze przekroczyc powierzchni bloku
                         double area = BlockArea(ld, b);
@@ -413,9 +416,9 @@ namespace Armoury
                         double rh, moved;
                         _regionHands.TryGetValue(region ?? "-", out rh); _regionMoved.TryGetValue(region ?? "-", out moved);
                         // 435-L2: stojace przebudowy tego sezonu oddaja regionowi rece, ktore jeszcze nie przeszly (relRefund null przy kluczu 0 - rachunek jak dotad)
-                        double refund = 0; if (relRefund != null) relRefund.TryGetValue(region ?? "-", out refund);
-                        if (Math.Max(0.0, moved - refund) + hands > RegionShare * rh) { _rBudget++; continue; }
-                        if (refund > 0 && moved + hands > RegionShare * rh) CraftUnblock.NoteStartRefund(CraftUnblock.SysKs, hands);
+                        double refund = 0; if (relRefund != null && relRefund.TryGetValue(region ?? "-", out refund) && refund > 0 && !CraftUnblock.RefundFree(CraftUnblock.SysKs, region, season)) refund = 0;   // 435-L2-p: zwrot raz na sezon
+                        if (Math.Max(0.0, moved - refund) + hands > RegionShare * rh) { _rBudget++; if (!(moved > 0) && hands > RegionShare * rh) CraftUnblock.NoteShareSmall(CraftUnblock.SysKs); continue; }
+                        if (refund > 0 && moved + hands > RegionShare * rh) CraftUnblock.NoteStartRefund(CraftUnblock.SysKs, hands, region, season);
                         if (stalled) CraftUnblock.NoteStartPast(CraftUnblock.SysKs);
                         int T = Tree(best) ? 364 : 60;
                         b.Cur = (sbyte)cur; b.Target = (sbyte)best; b.TStart = today; b.TEnd = today + T; b.X0 = b.X[ci]; b.H0 = (float)hands;
@@ -472,7 +475,10 @@ namespace Armoury
         private static readonly List<string> _startNotes = new List<string>();
 
         /// <summary>435-L2: zaleglosc raty przebudowy bloku w dobach (CraftUnblock.Lag z pol zapisu bloku; 0 przy koszcie 0 - pola mieszczan).</summary>
-        private static double RbLag(LiveBlock b, int today) { return CraftUnblock.Lag(today, b.TStart, b.TEnd, b.Cost, b.Paid); }
+        private static double RbLag(LiveBlock b, int today, Town mt) { return CraftUnblock.Lag(today, b.TStart, b.TEnd, b.Cost, b.Paid, CraftUnblock.MinOwe(mt)); }
+
+        /// <summary>435-L2-p: zajecie dajace jedzenie (ta sama miara co FeedKeeps) - bezpiecznik zboza przepuszcza przejscie zboze -> inne jedzenie.</summary>
+        internal static bool FoodCraftOf(int c) { try { return FoodCraft(c); } catch { return false; } }
 
         // ------------------------------------------------------------ 435-L4: zmiana zajecia przez sprzet (VillageGear) - czesc okregu bloku i jej rece
         /// <summary>Czesc okregu bloku w ksiedze sprzetu: wies gry (20 blokow) - null, wioska poboczna - uid.</summary>
@@ -546,7 +552,7 @@ namespace Armoury
                 foreach (var b in ld.B)
                 {
                     if (b == null || b.Target < 0 || b.TStart < 0 || b.TStart / Season != season || !(b.Cost > 0) || !(b.X0 > 1e-6f) || b.X == null) continue;
-                    if (!CraftUnblock.Released(RbLag(b, today))) continue;
+                    if (!CraftUnblock.Released(RbLag(b, today, ld.TF ? ld.T : (ld.V.TradeBound != null ? ld.V.TradeBound.Town : (ld.V.Bound != null ? ld.V.Bound.Town : null))))) continue;
                     int ci = IndexOfCraft(b, b.Cur);
                     if (ci < 0 || ci >= b.X.Length) continue;
                     double back = b.H0 * Math.Max(0.0, Math.Min(1.0, b.X[ci] / (double)b.X0));
@@ -571,7 +577,10 @@ namespace Armoury
             int ci = IndexOfCraft(b, b.Cur), ti = IndexOfCraft(b, b.Target);
             // 435-L2 (klucz Rebuild Stall Release Days > 0): przebudowa nie zaplacona w calosci z zalegloscia raty >= max(91, prog) dob - porzucona ta sama galezia
             // co dotad rok po terminie (rece zostaja, gdzie doszly); klucz 0 - Abandon zawsze false
-            bool stallOut = ci >= 0 && ti >= 0 && CraftUnblock.Abandon(RbLag(b, today), b.Cost, b.Paid);
+            // 435-L2-p (recenzja 8): postoj o ziemie (blok pelny - rece nie przechodza, rata nie jest brana) to nie brak zaplaty - nie porzucac regula postoju
+            string type0 = ld.K != null ? ld.K.Type : null; double area0 = BlockArea(ld, b);
+            bool landStall = ci >= 0 && ti >= 0 && type0 != null && area0 > 0 && b.LandUse > area0 * 1.02 && b.LandOf(b.Target, type0) > b.LandOf(b.Cur, type0);
+            bool stallOut = ci >= 0 && ti >= 0 && !landStall && CraftUnblock.Abandon(RbLag(b, today, mt), b.Cost, b.Paid);
             if (stallOut) CraftUnblock.NoteAbandon(CraftUnblock.SysKs);
             if (ci < 0 || ti < 0 || today > b.TEnd + 364 || stallOut)
             {

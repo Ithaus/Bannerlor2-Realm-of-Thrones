@@ -1690,21 +1690,24 @@ namespace Armoury
                     fall++;
                     // przebudowy w toku (co dobe) i regula zmiany (co 7 dob)
                     Town mt = di.V.TradeBound != null ? di.V.TradeBound.Town : (di.V.Bound != null ? di.V.Bound.Town : null);
-                    bool busy = false, moved = false, stalled = false;
+                    bool busy = false, moved = false, stalled = false; int stalledN = 0;
+                    double minOwe = mt != null ? CraftUnblock.MinOwe(mt) : 0.0;   // 435-L2-p: najmniejsza rata, ktora kupi sztuke materialu (0 przy kluczu postoju 0)
                     foreach (var s in di.Sides)
                         if (s.Target >= 0)
                         {
                             Progress(di, s, today, mt); moved = true;
                             if (s.Target < 0) continue;
                             // 435-L2: przebudowa stojaca (zaleglosc raty >= prog) nie zajmuje miejsca "jedna czesc okregu naraz"; klucz 0 - Released zawsze false (jak dotad)
-                            double lag = CraftUnblock.Lag(today, s.TStart, s.TEnd, s.Cost, s.Paid);
+                            double lag = CraftUnblock.Lag(today, s.TStart, s.TEnd, s.Cost, Math.Max(s.Paid, s.F * s.Cost), minOwe);   // 435-L2-p: bez miasta targowego postep idzie bez zaplaty (F) - to nie postoj
                             CraftUnblock.Seen(CraftUnblock.SysZw, lag, s.Cost > 0 && s.Paid >= s.Cost - 0.5f);
                             // 435-L4 (klucz Village Gear On Switch): zmiana OD RAZU (koszt 0, sprzet z robot gminy) trzyma miejsce tylko do sprzetu dla polowy rak w zmianie
                             // albo 182 dob; klucz wylaczony - gsw false, jak dotad
                             int slot = gsw && s.Cost <= 0f ? VillageGear.SlotOf(di.V, s.Uid, s.Target) : 0;
                             if (slot == 2) continue;
-                            if (slot != 1 && CraftUnblock.Released(lag)) stalled = true; else busy = true;
+                            if (slot != 1 && CraftUnblock.Released(lag)) { stalled = true; stalledN++; } else busy = true;
                         }
+                    // 435-L2-p (recenzje 2, N2): najwyzej jedna stojaca przebudowa okregu zwalnia miejsce - druga stojaca znow je trzyma (koniec petli "stoi - nastepna - stoi")
+                    if (!busy && stalledN > CraftUnblock.MaxStalled) { busy = true; CraftUnblock.NoteCap(CraftUnblock.SysZw); }
                     if (gsw && !busy && VillageGear.HoldsAfter(di.V)) busy = true;   // 435-L4: rece przeszly, sprzet nowego zajecia jeszcze ponizej polowy (przed 182 doba)
                     if (step && mt != null) { int before = _dStarted; Rule(di, mt, today, busy, stalled, relRefund); if (_dStarted != before) moved = true; }
                     // koszt doby: plan okregu przeliczany co 7 dob na zmiane (udzialy ludzi w domu zmieniaja sie powoli), od razu przy przebudowie, pracach i pierwszej dobie sesji
@@ -2240,15 +2243,16 @@ namespace Armoury
                 double hands = h * 0.5;                                       // rece wioski: polowa ludzi w domu pracuje w polu (jak udzial pracy chlopow KS)
                 // 435-L2 (klucz Grain Hands Winter Lock): bezpiecznik zboza - zmiana Z zboza nie zaczyna sie w zimie krainy, przy glodzie gospodarzy i gdy plon okregu
                 // po odejsciu tych rak spadlby ponizej 1.2 x potrzeby; nacisk (Held) zostaje. Klucz wylaczony - bez liczenia (jak dotad)
-                if (s.Craft == KsTab.CWheat && bc != KsTab.CWheat && CraftUnblock.GrainKey && CraftUnblock.GrainLock(CraftUnblock.SysZw, di.V, null, hands, WheatHands(di, parts), today) != 0) continue;
                 if (busy) { _dBusy++; continue; }
+                // 435-L2-p (stabilnosc N3): bezpiecznik PO "inna wioska okregu" - liczniki obu linii nie zachodza na siebie; przejscie na inne jedzenie wolne
+                if (s.Craft == KsTab.CWheat && bc != KsTab.CWheat && CraftUnblock.GrainKey && CraftUnblock.GrainLock(CraftUnblock.SysZw, di.V, null, hands, StartCalibration.FoodCraftOf(bc), today) != 0) continue;
                 double rh = RegionHands(di.Region, today), moved;
                 _regionMoved.TryGetValue(di.Region ?? "-", out moved);
                 float share = s0 != null ? Math.Max(0f, Math.Min(1f, s0.SideVillageCraftRegionShare)) : 0.05f;
                 // 435-L2: stojace przebudowy tego sezonu oddaja regionowi rece, ktore jeszcze nie przeszly (relRefund null przy kluczu 0 - rachunek jak dotad)
-                double refund = 0; if (relRefund != null) relRefund.TryGetValue(di.Region ?? "-", out refund);
-                if (Math.Max(0.0, moved - refund) + hands > share * rh) { _dBudget++; continue; }
-                if (refund > 0 && moved + hands > share * rh) CraftUnblock.NoteStartRefund(CraftUnblock.SysZw, hands);
+                double refund = 0; if (relRefund != null && relRefund.TryGetValue(di.Region ?? "-", out refund) && refund > 0 && !CraftUnblock.RefundFree(CraftUnblock.SysZw, di.Region, today / Season)) refund = 0;   // 435-L2-p: zwrot raz na sezon
+                if (Math.Max(0.0, moved - refund) + hands > share * rh) { _dBudget++; if (!(moved > 0) && hands > share * rh) CraftUnblock.NoteShareSmall(CraftUnblock.SysZw); continue; }
+                if (refund > 0 && moved + hands > share * rh) CraftUnblock.NoteStartRefund(CraftUnblock.SysZw, hands, di.Region, today / Season);
                 if (stalled) CraftUnblock.NoteStartPast(CraftUnblock.SysZw);
                 int T = meta[bc].Tree ? Math.Max(7, s0 != null ? s0.SideVillageCraftTreeDays : 364) : Math.Max(7, s0 != null ? s0.SideVillageCraftChangeDays : 60);
                 double sigma = Math.Max(1, DailyLife.KsSigma);
@@ -2364,7 +2368,8 @@ namespace Armoury
                 foreach (var s in di.Sides)
                 {
                     if (s.Target < 0 || s.Target >= KsTab.NC || s.TStart < 0 || s.TStart / Season != season || !(s.Cost > 0)) continue;
-                    if (!CraftUnblock.Released(CraftUnblock.Lag(today, s.TStart, s.TEnd, s.Cost, s.Paid))) continue;
+                    Town smt = di.V.TradeBound != null ? di.V.TradeBound.Town : (di.V.Bound != null ? di.V.Bound.Town : null);
+                    if (!CraftUnblock.Released(CraftUnblock.Lag(today, s.TStart, s.TEnd, s.Cost, Math.Max(s.Paid, s.F * s.Cost), CraftUnblock.MinOwe(smt)))) continue;
                     double k = KsTab.KCost[s.Target];
                     if (!(k > 0)) continue;
                     double back = s.Cost * sigma / (CostDays * k) * (1.0 - Math.Max(0f, Math.Min(1f, s.F)));
@@ -2421,7 +2426,8 @@ namespace Armoury
             int T = Math.Max(1, s.TEnd - s.TStart);
             // 435-L2 (klucz Rebuild Stall Release Days > 0): przebudowa nie zaplacona w calosci z zalegloscia raty >= max(91, prog) dob - porzucona ta sama galezia
             // co dotad rok po terminie (rece zostaja, gdzie doszly); klucz 0 - Abandon zawsze false
-            bool stallOut = CraftUnblock.Abandon(CraftUnblock.Lag(today, s.TStart, s.TEnd, s.Cost, s.Paid), s.Cost, s.Paid);
+            double paidEff = Math.Max(s.Paid, s.F * s.Cost);   // 435-L2-p: bez miasta targowego postep idzie bez zaplaty - liczy sie jak zaplacony
+            bool stallOut = CraftUnblock.Abandon(CraftUnblock.Lag(today, s.TStart, s.TEnd, s.Cost, paidEff, CraftUnblock.MinOwe(mt)), s.Cost, paidEff);
             if (today > s.TEnd + 364 || stallOut)
             {
                 int tg0 = s.Target; bool over = s.F >= 0.5f;
