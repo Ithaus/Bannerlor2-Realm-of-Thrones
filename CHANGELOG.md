@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 469-q-p (13.11) - poprawki po recenzji 469-q: wstrzymany z bronia biala zostaje wstrzymany, histereza zastoju, wstrzymanie bez budzetu, punkt Move = front
+
+**Problem:** recenzja 469-q. U1 WYSOKA - logi 469-p Jeffa (Armoury-2026-11-12_23-38-10.log, Armoury-2026-11-13_00-09-26.log): "wstrzyman 384 ... bron / kolczan 372", "276 / 276", "151 / 151", czas wstrzymania sr. 0.5-0.6 s. Prawie kazdy wstrzymany lucznik w ciagu jednego przegladu nie ma luku w reku (natywna AI przy HoldYourFire bierze bron biala). W 469-q (bez przerwy 469-p) - petla wstrzymanie / zwolnienie (FireAtWill, mozliwy strzal poza G), liczba wstrzymanych szyku miga ponizej 30% i zeruje zastoj co sekunde - podejscia nigdy by nie ruszyly, a trwajace konczylyby sie falszywie jako "ludzie w G". U2 SREDNIA - przy wyczerpanym budzecie zapytan "wrog w 6 m" (log 469-p: ponad budzet 3347 / 5105 / 1346) czlowiek poza G nie byl wstrzymywany. U3 - strzal poza G po zwolnieniu wrogiem w 6 m liczony jako blad reguly. U5 - punkt Move to front szyku, nie srodek. U6 - postfiks wpisywal rozkaz takze nieczynnemu zachowaniu.
+
+**Przyczyna:** `Look`: `Weapon()` patrzy tylko na bron w reku - wstrzymany z bronia biala szedl w `End` (rozkaz szyku wraca). `Form`: `!enough` w jednej sekundzie zerowal zastoj / konczyl podejscie. `Look`: `if (_frameNear >= NearPer) return` przed `SetFiringOrder`. `Formation.CurrentPosition` = srodek - OrderLocalAveragePosition (mb_full.cs:69315-69330), czyli Move ustawia front. `FindBestBehavior` (mb_full.cs:25318) wola `PrecalculateMovementOrder` -> `CalculateCurrentOrder` (mb_full.cs:20426) na kazdym zachowaniu.
+
+**Zmiana (`FireRange469.cs`):**
+- U1: `Stowed()` / `WeaponAt()` - wstrzymany bez luku w reku, ale z lukiem / kusza i amunicja gdziekolwiek w ekwipunku, zostaje wstrzymany (dalej sprawdzany jak kazdy: wrog w G, w 6 m, panika, kon itd. - G liczone dla schowanej broni); zwolnienie z powodu broni tylko bez amunicji w calym ekwipunku. Licznik "wstrzymany z lukiem schowanym (przegladow)". Histereza `LowMax` = 3 kolejne sekundy "za malo wstrzymanych" przed zerowaniem zastoju i przed koncem podejscia "ludzie w G".
+- U2: bez budzetu zapytan - wstrzymanie od razu, wrog w 6 m sprawdzony w nastepnym przegladzie (sciezka held juz tak dziala). Bez budzetu symulacji - nowy czlowiek wstrzymany od razu, gdy d > zasieg historyczny 469-b (przy kluczu 469-b G <= Hist); inaczej jak dotad nastepny przeglad.
+- U3: `NearT` (czas ostatniego wroga w 6 m na czlowieka, czyszczone w Clear / OnRemoved); strzal poza G czlowieka w regule w 1.5 s po wrogu w 6 m - osobny licznik "po wrogu w 6 m (walka o zycie)", nie w "ma byc 0".
+- U5: punkt Move = cel srodka + pol glebokosci szyku w strone wroga (front); "stoj tu" = `Formation.CurrentPosition` (obecny front), nie mediana - bez cofniecia o pol glebokosci.
+- U6: postfiks wpisuje rozkaz i liczy odbior tylko, gdy `f.AI.ActiveBehavior` == ta instancja.
+- Odrzucone: U4 (ponowienie Hold w postfiksie `Formation.SetFiringOrder` / `AddUnit`) - okno najwyzej jeden przeglad, przypadki pojedyncze, a latka na metode wolana z zachowan (rozne watki taktu AI) to nowe ryzyko; widac w liczniku "ma byc 0". U7 (want ze sredniej odleglosci do celu silnika) - podejscie idzie w strone najblizszego szyku, a liczenie kroku z dalszego celu silnika prowadziloby szyk za blisko najblizszego wroga; przypadek rzadki (log 469-p: 0-3), licznik "wstrzymany, choc najblizszy szyk wroga w G" zostaje.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: klucz NIE - `By` puste, `Stowed` nie wolane (tylko dla held), sciezka bez budzetu zwraca przed `SetFiringOrder` (`!_key` -> `_wouldHold`), `NearT` tylko pomiar, sloty puste - co do bitu jak przed 469. Postfiks: dodatkowy odczyt `f.AI.ActiveBehavior` (referencja, watek AI - tak jak RBM).
+- Wstrzymany z bronia biala zostaje wstrzymany do wroga w G - po zwolnieniu AI musi wziac luk (ok. 1-2 s): widac w "pierwsza salwa po kontakcie". Jesli natywna AI przy HoldYourFire i bronia biala wychodzi z szyku do zwarcia - "poza szykiem" w zwolnieniach.
+- Wstrzymanie bez sprawdzenia wroga w 6 m (budzet) trwa najwyzej do nastepnego przegladu z budzetem; HoldYourFire nie blokuje walki wrecz.
+- Punkt Move dalej o pol glebokosci: "na koniec" w linii ma byc bliskie "do celu" (oba srodek szyku - skraj wroga). Oslona piechoty liczona dla frontu bez zmian.
+- Kolizje 443 / 441 / 344 / 455 / 457 bez zmian wzgledem 469-q (te same warunki). Build 0 bledow, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 469-q (13.11) - lucznik AI poza zasiegiem G nie strzela nigdy; zamiast wylacznika zastoju szyk strzelcow sam podchodzi
 
 **Problem:** Jeff 13.11: "jak nie ma zasiegu to nie strzelaja ... maja strzelac po 20 sekundach jak wroga nie ma w zasiegu, logika mistrza". Wylacznik zastoju 469-p (20 s bez zblizenia celu o 10 m -> rozkaz ognia szyku i 30 s przerwy) z definicji puszczal strzaly poza G. Do tego wstrzymanie wchodzilo dopiero od 1.1 G (strzal miedzy G a 1.1 G mozliwy), a przerwa 30 s po zwolnieniu z powodu broni tez puszczala ogien poza G. Bez dowodu z gry (469-p nie wgrane).

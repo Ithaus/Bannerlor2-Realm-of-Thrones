@@ -48,6 +48,9 @@ namespace Armoury
     /// TickOccasionally sam go wydaje (SetMovementOrder, przez arbitra 344). Koniec: dotarl / ludzie w G (wstrzymanych < 30%) / jazda / 60 s / zachowanie inne,
     /// 441 / 443 / gracz; potem RBM (jego CurrentOrder zostaje naszym punktem albo "stoj tu" przy przerwaniu). Szyk gracza, konni strzelcy, oblezenia (469 tylko
     /// w bitwie polowej) - bez ruchu.
+    /// 469-q-p (recenzja 469-q): wstrzymany z bronia biala, ale z lukiem / kusza i amunicja w ekwipunku zostaje wstrzymany (bez petli zwolnienie -> FireAtWill);
+    /// histereza LowMax s na "za malo wstrzymanych"; bez budzetu zapytan / symulacji - wstrzymanie od razu; strzaly poza G po wrogu w 6 m liczone osobno;
+    /// punkt Move = front szyku (cel dla srodka + pol glebokosci), "stoj tu" = obecny front; postfiks wpisuje rozkaz tylko czynnemu zachowaniu.
     /// </summary>
     internal static class FireRange469
     {
@@ -58,6 +61,10 @@ namespace Armoury
         // bez podejscia; podejscie najwyzej AdvMaxT s; postfiks musi odebrac rozkaz w NoHitT s; zatrzymanie trzymane do odbioru, najwyzej StopMax s
         internal const float FormEvery = 1f, AdvStall = 15f, AdvStallD = 10f, AdvShare = 0.3f, AdvFrac = 0.9f, AdvMinStep = 8f, CoverAhead = 5f, CavNear = 80f;
         internal const float AdvMaxT = 60f, AdvReach = 10f, NoHitT = 5f, StopMax = 5f;
+        // 469-q-p: NearKeep - strzal po wrogu w 6 m liczony osobno przez tyle s; LowMax - kolejne sekundy "za malo wstrzymanych", po ktorych zastoj / podejscie
+        // konczy sie (histereza, recenzja U1)
+        internal const float NearKeep = 1.5f;
+        internal const int LowMax = 3;
         internal const int AdvMinMen = 3, CavMinMen = 3, CoverMinMen = 5, SlotTeams = 16;
         internal const int MinPer = 8, MaxPer = 96, NearPer = 16, SimPer = 2, WeapMax = 8;
         // koniec podejscia: 0 dotarl, 1 ludzie w G, 2 jazda, 3 limit czasu, 4 inne zachowanie / 441 / 443, 5 przejete (gracz, szyk pusty, nie pieszy strzelec), 6 bez odbioru
@@ -85,6 +92,7 @@ namespace Armoury
         private sealed class FS
         {
             public float Since = -1f, BestDe, ProgT;
+            public int Low;              // 469-q-p: kolejne sekundy bez dosc wstrzymanych (histereza)
             public Slot Adv;
             public bool Stopping;
             public float AdvT0, StopT;
@@ -151,6 +159,9 @@ namespace Armoury
         private static int _heldFoeInG;   // 469-p: wstrzymany choc najblizszy szyk wroga w G (tylko pomiar)
         // 469-q: strzaly poza G (wszystkie / ludzie w regule), pierwszy wrog w G wg strony, podejscia
         private static int _shotsOverG, _shotsOverGRule;
+        // 469-q-p: strzaly poza G po zwolnieniu wrogiem w 6 m (U3), przeglady wstrzymanych z lukiem schowanym (U1)
+        private static int _shotsOverGNear, _heldStowed;
+        private static readonly Dictionary<Agent, float> NearT = new Dictionary<Agent, float>();
         private static readonly float[] InGT0 = new float[2];
         private static int _adv, _advCovered, _advPull, _advDe1N, _advHits;
         private static float _advDe0Sum, _advToSum, _advGSum, _advDe1Sum, _advSecs, _cavHeldSec;
@@ -207,7 +218,8 @@ namespace Armoury
             for (int i = 0; i < Slots.Length; i++) Volatile.Write(ref Slots[i], null);
             FBy.Clear(); HeldN.Clear(); HeldG.Clear(); FTmp.Clear(); AdvForms.Clear();
             _formAcc = 0f; _depT = -1f;
-            _shotsOverG = _shotsOverGRule = 0;
+            _shotsOverG = _shotsOverGRule = _shotsOverGNear = _heldStowed = 0;
+            NearT.Clear();
             InGT0[0] = InGT0[1] = -1f;
             _adv = _advCovered = _advPull = _advDe1N = _advHits = 0;
             _advDe0Sum = _advToSum = _advGSum = _advDe1Sum = _advSecs = _cavHeldSec = 0f;
@@ -252,7 +264,27 @@ namespace Armoury
             noAmmo = false;
             var eq = a.Equipment;
             if (eq == null) return null;
-            var wi = a.GetPrimaryWieldedItemIndex();
+            return WeaponAt(eq, a.GetPrimaryWieldedItemIndex(), needAmmo, out noAmmo);
+        }
+
+        /// <summary>469-q-p (recenzja U1): luk / kusza z amunicja gdziekolwiek w ekwipunku (nie w reku) - wstrzymany czlowiek, ktoremu natywna AI przy
+        /// HoldYourFire dala bron biala, zostaje wstrzymany (log 469-p: zwolnien "bron / kolczan" ~ wstrzyman, czas sr. 0.5 s). null = zadnej broni strzeleckiej z amunicja.</summary>
+        private static Wp Stowed(Agent a)
+        {
+            var eq = a.Equipment;
+            if (eq == null) return null;
+            for (var i = EquipmentIndex.WeaponItemBeginSlot; i < EquipmentIndex.NumAllWeaponSlots; i++)
+            {
+                bool na;
+                var p = WeaponAt(eq, i, true, out na);
+                if (p != null) return p;
+            }
+            return null;
+        }
+
+        private static Wp WeaponAt(MissionEquipment eq, EquipmentIndex wi, bool needAmmo, out bool noAmmo)
+        {
+            noAmmo = false;
             if (wi < EquipmentIndex.WeaponItemBeginSlot || wi >= EquipmentIndex.NumAllWeaponSlots) return null;
             var w = eq[wi];
             if (w.IsEmpty) return null;
@@ -470,9 +502,16 @@ namespace Armoury
             var p = Weapon(a, true, out noAmmo);
             if (p == null)
             {
-                if (held) { _relWeapon++; End(s, now, true); }   // 469-q: bez przerwy 469-p - z lukiem w reku znow wstrzymany w nastepnym przegladzie
-                else if (noAmmo) _skNoAmmo++;
-                return;
+                // 469-q-p (U1): wstrzymany bez luku w reku, ale z lukiem / kusza i amunicja w ekwipunku - zostaje wstrzymany (bron biala: HoldYourFire bez znaczenia);
+                // zwolnienie tylko bez amunicji w calym ekwipunku (dawniej End -> FireAtWill -> luk -> wstrzymanie: petla co 0.5 s)
+                if (held) p = Stowed(a);
+                if (p == null)
+                {
+                    if (held) { _relWeapon++; End(s, now, true); }
+                    else if (noAmmo) _skNoAmmo++;
+                    return;
+                }
+                _heldStowed++;
             }
             _scanned++;
             if (a.HasMount) { if (held) { _relMount++; End(s, now, true); } else _skMount++; return; }
@@ -515,12 +554,17 @@ namespace Armoury
                 if (d < 0f) { if (held) { _relNoFoe++; End(s, now, true); } return; }
             }
             float g = Gate(p, dz, true);
-            if (g < 0f) return;   // bez budzetu symulacji - nastepny przeglad
+            if (g < 0f)
+            {
+                // 469-q-p (U2): bez budzetu symulacji wstrzymany zostaje; nowy - wstrzymany od razu, gdy d ponad zasieg historyczny (przy 469-b G <= Hist), inaczej nastepny przeglad
+                if (held || !_hist || p.Hist <= 0 || d <= p.Hist) return;
+                g = p.Hist;
+            }
             if (d <= g) NoteInG(a, now);
             if (held)
             {
                 if (d <= g) { _relRange++; End(s, now, true); return; }
-                if (d < ThreatR + 1f || Near(m, a)) { _relNear++; End(s, now, true); return; }
+                if (d < ThreatR + 1f || Near(m, a)) { _relNear++; NearT[a] = now; End(s, now, true); return; }
                 // 469-q: bez wylacznika zastoju 469-p - szyk, ktory nie podchodzi, podchodzi sam (Forms); czlowiek poza G nie strzela
                 s.G = g;
                 if (!noTarget && FoeInG(f, a, g)) _heldFoeInG++;
@@ -528,9 +572,10 @@ namespace Armoury
                 return;
             }
             if (d <= g * HoldOver) return;
-            if (d < ThreatR + 1f) return;
-            if (_frameNear >= NearPer) { _overNear++; return; }
-            if (Near(m, a)) return;
+            if (d < ThreatR + 1f) { NearT[a] = now; return; }
+            // 469-q-p (U2): bez budzetu zapytan - wstrzymanie od razu (bezpiecznie), wrog w 6 m sprawdzony w nastepnym przegladzie (sciezka held)
+            if (_frameNear >= NearPer) _overNear++;
+            else if (Near(m, a)) { NearT[a] = now; return; }
             if (!_key) { _wouldHold++; return; }   // NIE: tylko pomiar
             if (s == null) { s = new St { A = a }; By[a] = s; }
             a.SetFiringOrder(FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire);
@@ -602,10 +647,11 @@ namespace Armoury
         /// <summary>BattleSense.OnAgentRemoved (glowny watek): wpis bez wywolan silnika.</summary>
         internal static void OnRemoved(Mission m, Agent affected)
         {
-            if (!Mine(m) || affected == null || By.Count == 0) return;
+            if (!Mine(m) || affected == null || (By.Count == 0 && NearT.Count == 0)) return;
             try
             {
                 St s;
+                NearT.Remove(affected);
                 if (By.TryGetValue(affected, out s)) { if (s.Held) { _relDead++; End(s, m.CurrentTime, false); } By.Remove(affected); }
             }
             catch (Exception e) { Stumble("FireRange469.OnRemoved", e); }
@@ -642,7 +688,16 @@ namespace Armoury
             _shots++;
             ShotBy[d < 50f ? 0 : d < 100f ? 1 : d < 150f ? 2 : d < 200f ? 3 : 4]++;
             if (g >= 0f && d > g * OldOver) _shotsOver++;
-            if (g >= 0f && d > g) { _shotsOverG++; if (InRule(s)) _shotsOverGRule++; }   // 469-q: ma byc 0 u ludzi w regule
+            if (g >= 0f && d > g)
+            {
+                _shotsOverG++;
+                if (InRule(s))
+                {
+                    // 469-q-p (U3): zwolniony / niewstrzymany z powodu wroga w 6 m (walczy o zycie, 310) - osobno; reszta ma byc 0
+                    float nt;
+                    if (NearT.TryGetValue(s, out nt) && m.CurrentTime - nt <= NearKeep) _shotsOverGNear++; else _shotsOverGRule++;
+                }
+            }
             if (Holds(s)) _shotsHeld++;
             p.Shots++;
             if (g >= 0f) { p.GSum += g; p.GN++; }
@@ -706,12 +761,14 @@ namespace Armoury
               .Append("), poza ").Append(OldOver.ToString("0.0", Inv)).Append(" G ").Append(_shotsOver).Append(", mimo wstrzymania ").Append(_shotsHeld)
               .Append(", bez celu ").Append(_shotsNoTarget)
               .Append(" | 469-q strzaly poza G ").Append(_shotsOverG).Append(" (ludzie w regule - szyk strzelcow AI - ").Append(_shotsOverGRule)
-              .Append(" - ma byc 0; reszta: szyk piechoty / poza szykiem / szyk gracza)")
+              .Append(" - ma byc 0; osobno po wrogu w ").Append(F0(ThreatR)).Append(" m (walka o zycie) ").Append(_shotsOverGNear)
+              .Append("; reszta: szyk piechoty / poza szykiem / szyk gracza)")
               .Append(" | pierwsza salwa (").Append(F0(FirstVolley)).Append(" s): obrona ").Append(Fv(0)).Append("; atak ").Append(Fv(1))
               .Append(" | kontakt (pierwszy wrog w G czlowieka w regule) od rozstawienia: obrona ").Append(Since0(InGT0[0])).Append(", atak ").Append(Since0(InGT0[1]))
               .Append("; pierwsza salwa po kontakcie: obrona ").Append(Gap(InGT0[0], FvT0[0])).Append(", atak ").Append(Gap(InGT0[1], FvT0[1]))
               .Append(" | wstrzyman ").Append(_holds).Append(" (ludzi ").Append(_heldMen).Append(", bez celu - szyk wroga dalej ").Append(_heldNoTarget)
               .Append("), na sucho przegladow z wstrzymaniem ").Append(_wouldHold).Append(", ponowien rozkazu ").Append(_reHold)
+              .Append(", wstrzymany z lukiem schowanym (przegladow) ").Append(_heldStowed)
               .Append(", czas sr. ").Append(_holdN > 0 ? (_holdSecs / _holdN).ToString("0.0", Inv) : "-").Append(" s, najdluzszy ").Append(_holdMax.ToString("0.0", Inv)).Append(" s")
               .Append(" | zwolnienia: w zasiegu ").Append(_relRange).Append(", wrog w ").Append(F0(ThreatR)).Append(" m ").Append(_relNear)
               .Append(", bron / kolczan ").Append(_relWeapon).Append(", panika ").Append(_relPanic).Append(", przejete / gracz ").Append(_relTaken)
@@ -858,11 +915,13 @@ namespace Armoury
                 if (!ai || !foot) why = EnTaken;
                 else if (!rbm || Doctrine.C441Owned(f) || Doctrine.R443Why(f) != 0) why = EnBeh;
                 else if (cav) why = EnCav;
-                else if (!enough) why = EnInG;
+                else if (!enough && ++st.Low >= LowMax) why = EnInG;
                 else if (pos.IsValid && pos.Distance(st.AdvTo) <= Math.Max(AdvReach, f.Depth)) why = EnReached;
                 else if (now - st.AdvT0 > AdvMaxT) why = EnTime;
                 else if (Volatile.Read(ref st.Adv.Hits) == 0 && now - st.AdvT0 > NoHitT) why = EnNoHit;
+                if (enough) st.Low = 0;
                 if (why < 0) return;
+                st.Low = 0;
                 AdvEnd[why]++;
                 if (de >= 0f) { _advDe1Sum += de; _advDe1N++; }
                 _advSecs += Math.Max(0f, now - st.AdvT0);
@@ -872,7 +931,14 @@ namespace Armoury
                 st.ProgT = now;   // zastoj liczony od nowa
                 return;
             }
-            if (!ai || !foot || !enough || de < 0f || ef == null) { st.Since = -1f; return; }
+            if (!ai || !foot || de < 0f || ef == null) { st.Since = -1f; st.Low = 0; return; }
+            if (!enough)
+            {
+                // 469-q-p (U1): jedna sekunda "za malo wstrzymanych" nie zeruje zastoju - dopiero LowMax kolejnych
+                if (st.Since < 0f || ++st.Low >= LowMax) { st.Since = -1f; st.Low = 0; }
+                return;
+            }
+            st.Low = 0;
             if (st.Since < 0f) { st.Since = now; st.BestDe = de; st.ProgT = now; return; }
             if (de < st.BestDe - AdvStallD) { st.BestDe = de; st.ProgT = now; }
             if (cav) _cavHeldSec += FormEvery;
@@ -895,7 +961,8 @@ namespace Armoury
             if (step < AdvMinStep) { Blk[BkCover] += FormEvery; return; }
             Vec2 to = pos + dir * step;
             var wp = f.CachedMedianPosition;
-            wp.SetVec2(to);
+            // 469-q-p (U5): punkt Move to front szyku (OrderPosition; CurrentPosition = srodek - OrderLocalAveragePosition, mb_full.cs:69315) - cel liczony dla srodka
+            wp.SetVec2(to + dir * (f.Depth * 0.5f));
             var slot = new Slot { F = f, Order = MovementOrder.MovementOrderMove(wp) };
             Volatile.Write(ref Slots[idx], slot);
             st.Adv = slot; st.Stopping = false; st.AdvT0 = now; st.AdvTo = to;
@@ -963,7 +1030,9 @@ namespace Armoury
             int idx = Idx(f);
             if (idx < 0) { Release(f, st); return; }
             if (st.Adv != null) _advHits += Volatile.Read(ref st.Adv.Hits);
-            var slot = new Slot { F = f, Order = MovementOrder.MovementOrderMove(f.CachedMedianPosition) };
+            var wp = f.CachedMedianPosition;
+            wp.SetVec2(f.CurrentPosition);   // 469-q-p (U5): "stoj tu" = obecny front (punkt Move), nie mediana - bez cofniecia o pol glebokosci
+            var slot = new Slot { F = f, Order = MovementOrder.MovementOrderMove(wp) };
             Volatile.Write(ref Slots[idx], slot);
             st.Adv = slot; st.Stopping = true; st.StopT = now;
         }
@@ -1015,6 +1084,9 @@ namespace Armoury
                 if (idx < 0) return;
                 var s = Volatile.Read(ref Slots[idx]);
                 if (s == null || !ReferenceEquals(s.F, f)) return;
+                // 469-q-p (U6): tylko czynne zachowanie - FindBestBehavior wola PrecalculateMovementOrder -> CalculateCurrentOrder takze na nieczynnym (mb_full.cs:25318, 20426)
+                var ai = f.AI;
+                if (ai == null || !ReferenceEquals(ai.ActiveBehavior, __instance)) return;
                 ____currentOrder = s.Order;
                 ___IsCurrentOrderChanged = true;
                 Interlocked.Increment(ref s.Hits);
