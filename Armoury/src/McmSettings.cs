@@ -10236,6 +10236,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float VillageGearRent { get; set; } = 0.20f;
 
+        [SettingPropertyBool("Workshop Benches", HintText = "with Workshop Pace By Market and Supply Chain Log: a town workshop of a notable or a lord that has worked at full pace for eight weeks while its goods are short at its own market adds benches, up to four levels. Each level speeds its trade lines by half of the base pace (the whole pace still at most four times the usual). A level costs what changing the workshop's trade costs; it is paid in instalments from the workshop's own till above its working capital - half for real tools, planks or hardwood from the town's shelves, half to the town's craftsmen. No materials, no bench. A workshop that stands idle for half a year loses a level; a workshop that changes its trade loses them all. Your own workshops are not touched. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool WorkshopBenches { get; set; } = false;
+
         [SettingPropertyFloatingInteger("Side Village Craft Region Share", 0.000f, 1.000f, "0.000", HintText = "with Side Village Crafts: at most this share of the side villages' hands of one region (a stronghold and its villages) may change craft in one season (91 days); at most one village per district changes at a time", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float SideVillageCraftRegionShare { get; set; } = 0.05f;
@@ -15272,6 +15276,7 @@ namespace Armoury
             s.VillageGearTownsInvest = VillageGearTownsInvest;
             s.VillageGearPlayerFunds = VillageGearPlayerFunds;
             s.VillageGearRent = VillageGearRent;
+            s.WorkshopBenches = WorkshopBenches;
             s.SideVillageCraftChangeDays = SideVillageCraftChangeDays;
             s.SideVillageCraftTreeDays = SideVillageCraftTreeDays;
             s.SideVillageCraftRegionShare = SideVillageCraftRegionShare;

@@ -36,6 +36,7 @@ namespace Armoury
     ///     ile produkcji dnia stoi za sprzetem (1 - phi). Liczby tabeli (phi, dni, zuzycie) sa tu TYLKO do wyceny - nic ich nie czyta.
     ///  5. ILE OKREGOW I CZESCI ZMIENIA RECE (ludzi w domu) o ponad 1% na dobe - koszt i szarpanie przyszlego czynnika sprzetu m (II.18).
     ///  6. DLACZEGO PRACE GRACZA NIE PLACA - co 7 dob (DistrictWorks.Lp1Text, powody zbierane przy wozach).
+    /// Od 435-L8 wynik cyklu (pkt 3) czyta tez pamiec stanowisk warsztatow (WorkshopBenches.Observe; klucz Workshop Benches domyslnie wylaczony).
     /// Powody postoju przebudow zajec sa juz w linii ZW / A7 (427, EcoAudit427.RbText) - tu nie powtarzane.
     /// Stan tylko sesyjny (bez zapisu): po wczytaniu srednie licza sie od pierwszej doby (N = 1 dopoki nie ma danych); pamiec N w zapisie przyjdzie z arm_lp (L3).
     /// Watek glowny; wyjatek = potkniecie liczone w linii, bez globalnego wylacznika (CLAUDE.md 7).
@@ -231,6 +232,7 @@ namespace Armoury
                 if (!_wLine.TryGetValue(w, out ln)) { ln = new int[3]; _wLine[w] = ln; }
                 if (reason == ROk) ln[0]++; else { ln[1]++; ln[2] = reason; }
                 if (w.Owner == Hero.MainHero) _wPlayer++;
+                WorkshopBenches.Observe(w, reason == ROk);   // 435-L8: wykorzystanie warsztatu do pamieci stanowisk (wlasny try; klucz wylaczony - nic)
             }
             catch (Exception e) { Stumble("CycleEnd", e); }
         }
@@ -685,6 +687,8 @@ namespace Armoury
               .Append(" | poza: cykle linii uzbrojenia ").Append(_wArms).Append(" (WorkshopLaw), warsztaty zamkow ").Append(_wCastle).Append(", cykle warsztatow gracza w liczbach wyzej ").Append(_wPlayer)
               .Append(" | kontrola: cykle warsztatow z listy - cykle z licznika powodow = ").Append(done + fail - cyc).Append(" (rozne od 0: warsztat zmienil wlasciciela albo miasto w tej dobie)")
               .Append(", warsztaty z proba - (pracuje + stoi wedlug powodu) = ").Append(tried - worked - SumA(stand));
+            string bl = WorkshopBenches.TakeLine();   // 435-L8: stanowiska warsztatow (policzone tej doby w WorkshopBenches.Daily, przed ta linia)
+            if (bl != null) sb.Append(" | ").Append(bl);
             return sb.ToString();
         }
 

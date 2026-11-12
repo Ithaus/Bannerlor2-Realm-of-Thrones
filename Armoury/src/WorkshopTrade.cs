@@ -526,6 +526,14 @@ namespace Armoury
             return fromPurse + paid;
         }
 
+        /// <summary>435-L8 (WorkshopBenches): nasz modul zmienil kapital warsztatu o `delta` poza tickiem warsztatu (zaplata za stanowiska) - znacznik konca doby przesuniety
+        /// o ten sam przelew, zeby RunPrefix nie policzyl go jako wyplaty zysku wlascicielowi (jak RetoolSettle). Sam licznik linii dnia, nie rzuca.</summary>
+        internal static void ShiftCapEnd(Workshop w, int delta)
+        {
+            try { Rec rec; if (w != null && delta != 0 && _rec.TryGetValue(w, out rec) && rec.HasEnd) rec.CapEnd += delta; }
+            catch (Exception e) { Stumble("WorkshopTrade.ShiftCapEnd", e); }
+        }
+
         // ------------------------------------------------------------ latki: cykl produkcji
         /// <summary>
         /// WorkshopsCampaignBehavior.RunTownWorkshop - kapital przed (sam odczyt). Przy okazji pomiar do linii dnia: o ile kapital

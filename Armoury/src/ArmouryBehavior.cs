@@ -820,6 +820,9 @@ namespace Armoury
         // 435-L3 (lancuch podazy, sprzet wsi): stan arm_lp i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L1 i L2)
         private readonly bool _lp3Reset = Lp3Reset();
         private static bool Lp3Reset() { try { VillageGear.Reset(); } catch (Exception e) { Log.Error("Lp3Reset", e); } return true; }
+        // 435-L8 (lancuch podazy, stanowiska warsztatow): stan arm_lpw i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L3)
+        private readonly bool _lp8Reset = Lp8Reset();
+        private static bool Lp8Reset() { try { WorkshopBenches.Reset(); } catch (Exception e) { Log.Error("Lp8Reset", e); } return true; }
         // m96-dlugi: ksiegi dlugow rad miast od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6-a7)
         private readonly bool _m96DlugiReset = M96DlugiReset();
         private static bool M96DlugiReset() { try { TownDebt.Reset(); } catch (Exception e) { Log.Error("M96DlugiReset", e); } return true; }
@@ -1561,6 +1564,9 @@ namespace Armoury
             // 435-L7: wierzytelnosci fundatorow sprzetu wsi i okno tempa panow (arm_lpf: "lpf1|okno|wierzytelnosci"); pisany tylko ze stanem; brak klucza = stan pusty; starsza DLL ignoruje klucz
             try { string lf = dataStore.IsSaving ? VillageGear.FundExport() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lf)) SaveText.Sync(dataStore, "arm_lpf", ref lf); if (dataStore.IsLoading) VillageGear.FundImport(lf); }
             catch (Exception e) { Log.Error("SyncData.arm_lpf", e); }
+            // 435-L8: stanowiska warsztatow i pamiec wykorzystania (arm_lpw: "lpw1|warsztaty"); pisany tylko ze stanem; brak klucza = stan pusty (kazdy warsztat poziom 1); starsza DLL ignoruje klucz
+            try { string lw = dataStore.IsSaving ? WorkshopBenches.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lw)) SaveText.Sync(dataStore, "arm_lpw", ref lw); if (dataStore.IsLoading) WorkshopBenches.Import(lw); }
+            catch (Exception e) { Log.Error("SyncData.arm_lpw", e); }
             // 345: ksiega kiesy gracza - 7 dob historii prognozy zlota ("g345|1|..."); pisany tylko z historia; brak klucza (stary zapis, Ironman Jeffa) = pusto; starsza DLL ignoruje klucz
             try { string pg = dataStore.IsSaving ? GoldForecast.Export() : null; if (!dataStore.IsSaving || pg != null) SaveText.Sync(dataStore, "arm_prog345", ref pg); if (dataStore.IsLoading) GoldForecast.Import(pg); }
             catch (Exception e) { Log.Error("SyncData.arm_prog345", e); }
@@ -3100,6 +3106,9 @@ namespace Armoury
             // 435-L7 (klucze Village Gear Lords / Towns Invest; wylaczone i bez wierzytelnosci - nic): fundatorzy sprzetu wsi PO budowach i zleceniach gminy tej doby (nie zabieraja
             // im materialu), czynsz doby (naliczenie, gasniecie), linia "LP czynsz" - przed migawka MBuild (ta sama natura przeplywu: material z polek, rzemieslnicy, kiesy wsi)
             try { VillageGear.FundDaily(); } catch (Exception e) { Log.Error("VillageGear.FundDaily", e); } DayProfile.Lap("VillageGear.FundDaily");
+            // 435-L8 (klucz Workshop Benches; wylaczony - nic): stanowiska warsztatow - pamiec wykorzystania z cykli minionej doby, raty z kapitalu warsztatu ponad znacznik (material
+            // z polki wlasnego miasta, rzemieslnicy -> lud), cofniecia; PO budowach, zleceniach gminy i fundatorach tej doby (nie zabiera im materialu), przed migawka MBuild
+            try { WorkshopBenches.Daily(); } catch (Exception e) { Log.Error("WorkshopBenches.Daily", e); } DayProfile.Lap("WorkshopBenches.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
             try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); } DayProfile.Lap("BuildDiary.Daily");
             // 24c (14.10, klucz DragonsEatHerds): smoki jedza zwierzeta z taborow i stad wsi - PRZED ksiegami (ramka FDragon w tej samej dobie co linia "Smoki (24c)")

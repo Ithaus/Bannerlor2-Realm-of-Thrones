@@ -59,6 +59,8 @@ namespace Armoury
         private static bool _startDone;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.WorkshopPaceByMarket; } }
+        /// <summary>435-L8: latka szybkosci linii wpieta (bez niej F nie dziala - stanowiska nie maja skutku i nie sa kupowane). Sam odczyt.</summary>
+        internal static bool Wired { get { return _target != null; } }
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
 
         internal static void Reset()
@@ -104,7 +106,7 @@ namespace Armoury
             _avgM = n > 0 && sum > 0 ? (float)(sum / n) : 1f;
         }
 
-        private static bool HasTradeLine(WorkshopType t)
+        internal static bool HasTradeLine(WorkshopType t)
         {
             foreach (var p in t.Productions) if (Paced(p)) return true;
             return false;
@@ -181,7 +183,8 @@ namespace Armoury
             catch { idx = 1f; }
             if (!(idx > 0f) || float.IsInfinity(idx)) idx = 1f;
             pp = MBMath.ClampFloat((float)Math.Sqrt(idx), PMin, PMax);
-            f = MBMath.ClampFloat(mp * pp, MMin, FMax);   // razem 0.3-4 (progi NE3-23)
+            // 435-L8 (klucz Workshop Benches; wylaczony albo warsztat bez stanowisk - dokladnie 1): stanowiska warsztatu x (1 + 0.5 x (poziom - 1)) PRZED zaciskiem - sufit 4 zostaje
+            f = MBMath.ClampFloat(mp * pp * WorkshopBenches.Factor(w), MMin, FMax);   // razem 0.3-4 (progi NE3-23)
             return true;
         }
 
