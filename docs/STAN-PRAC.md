@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 12:15 - lancuch podazy CALY WLACZONY w Armoury.json Jeffa po tescie 90 dob (at-lp90)
+
+- **Dopisane do Armoury.json Jeffa (ponad kroki 1-4):** VillageGearWearScale 0.25, CraftsFollowShortageRule, VillageGearLordsInvest, VillageGearTownsInvest, VillageGearPlayerFunds, WorkshopBenches, WorkshopRetoolIdle, WorkshopTakeover, WorkMigration = TAK. Kopia przed: `Armoury.json.bak-2026-11-12-przed-test-lancucha90` (obok); stan po: `D:/Backup-Bannerlord/Armoury.json.2026-11-12-lancuch-caly-wlaczony`.
+- **at-lp90 (n391, DLL WGRANIE 210, 90 dob):** KONIEC OK, wyjatkow 0, kontrole i potkniecia linii 427-436 = 0 (kontrola: TM0/Z/naliczone w starych liniach to zrzut zmiennych, jest tez w logu sprzed zmian).
+- **Co lancuch zrobil w 90 dobach - prawie nic, bo swiat jest wyposazony:** rece bez sprzetu 0.04%, m 0.9999; zuzycie 0.19%/rok, odtwarzane zakupami; fundatorzy 0 zakupow (nikomu nie brakuje); L8 stanowiska 0 (warunek u56 >= 0.90 przez 56 dob); L9 stojacych 67, kandydatow 20, przezbrojen 0 - odmowa "bez typu z N >= 1.3, wsadem w okregu i nowego w miescie", 19-25 odlozonych; L10 zrodel 0 (zadna wies z m28 < 0.90).
+- **DO SPRAWDZENIA (podejrzenie):** LP niedobor - N > 1 dla 21 z 22 towarow, wiele na suficie 2.00 przez skladnik kolejki (S_kolejka = 2.00 przy S_stos = 1.00: silver, planks, apple, butter). Sygnal kolejki chyba stale nasycony - wtedy regula 435-L6 (zmiana zajec za niedoborem, mnoznik do 1.15) i L9 (N >= 1.3) widza "niedobor wszystkiego". Zbadac przed podnoszeniem progow.
+- **Ruch lancucha zacznie sie po najazdach, glodzie i wojnie** (spalony sprzet -> fundatorzy, migracja); w spokojnym swiecie testu tego nie widac.
+
 ## STAN 12.11 11:35 - WGRANIE 210 (437-440: AI bitwy pakiety 0-3 audytu - pomiary, piechota pod ostrzalem, obronca trzyma pozycje, los planu i charakter wodza)
 
 - **W grze:** Armoury.dll `cb18171e1efaeedf789b98f3ee6defc0` (commit `a5612a07`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie210`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie210(-przed)`.
