@@ -12896,6 +12896,10 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338AiSkipArmoryCourt { get; set; } = true;
 
+        [SettingPropertyBool("Buildings338 AI Skips Castle Port And Harbor", HintText = "With Buildings338: lords run by the game no longer start the Banner Kings Port or Harbor in their castles, and drop them from a castle's building queue (progress made so far is kept on the building; a level already built stays and keeps working). Towns are not affected. You can still build them in your own castles. Off = the lords build them in castles as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338AiSkipCastlePort { get; set; } = true;
+
         [SettingPropertyBool("Buildings338 Tax Office", HintText = "With Buildings338: the town tax office raises what the lord and the crown take from the town's purse each week by 5/10/15%, as its description says - paid only from the town's money above its reserve, like the rest of the payment. Off = the tax office does nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338TaxOffice { get; set; } = true;
@@ -16211,6 +16215,7 @@ namespace Armoury
             s.Buildings338MasonCheaper = Buildings338MasonCheaper;   // 473-a
             s.Buildings338MasonPriceCut = Buildings338MasonPriceCut;
             s.Buildings338AiSkipArmoryCourt = Buildings338AiSkipArmoryCourt;   // 473-b6
+            s.Buildings338AiSkipCastlePort = Buildings338AiSkipCastlePort;   // 473-p2
             s.Buildings338TaxOffice = Buildings338TaxOffice;
             s.Buildings338Caravans = Buildings338Caravans;
             s.Buildings338Assimilation = Buildings338Assimilation;
