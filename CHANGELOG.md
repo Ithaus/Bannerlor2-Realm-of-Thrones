@@ -122,6 +122,63 @@
 - Zaleznosc od id osad ROT-Map 8.1.8 - po zmianie mapy ROT lista do sprawdzenia (T1b sprawdza tylko logike, nie istnienie osad).
 - Build OK, skan IL 30 trafien. Gry nie uruchamiano.
 
+## 468-p (12.11) - poprawki po recenzji 468: licznik zepchniec w logu, utkniety wlocznik nie blokuje drabiny
+
+**Problem (recenzja 468, gry nie uruchamiano - dowod z dekompilacji):**
+- U1: linia "spycha drabina #" i liczniki zepchniec zawsze 0 - setter `SiegeLadder.State` od razu wola `OnLadderStateChange`, a ten zmienia `BeingPushedBackStartFromWall` w `BeingPushedBack` w tej samej klatce (d370/SiegeLadder.cs:228-247, 488-496); pomiar co klatke nigdy nie widzial StartFromWall.
+- U2: idacy na punkt spychania bez drzewca w rece stal przy punkcie cale okno (wejscie wymaga drzewca: `CanReachAndUseObject` -> `IsDisabledForAgent`, MB/UsableMachineAIBase.cs:77; zdejmuje go tylko deaktywacja punktu), a (b) w tym czasie zamykalo widly - drabina nie do zepchniecia, choc w grze bez latki droga po widly bylaby wolna. Limit 10 prob liczony na cala misje - po wyczerpaniu nikt juz nie dobywal, a postfiks dalej wpuszczal.
+- U3: blizszy wlocznik mogl przejac slot od idacego z widlami (DetachmentManager, MB/DetachmentManager.cs:173-212, UsableMachine.cs:869-876).
+- U4: `TryToWieldWeaponInSlot` (natywne) bez sprawdzenia `IsActive`.
+- U5: dobycie broni stojacemu na punkcie mogloby przerwac animacje spychania.
+- U6: dobycie drzewca komus z widlami w dodatkowym slocie (i tak niedopuszczony).
+- U7: podpowiedz MCM "past the middle", a prog gry to 55%.
+
+**Zmiana (Armoury/src/SiegeLadderPush468.cs; Settings.cs, McmSettings.cs - tylko tekst podpowiedzi):**
+- U1: poczatek zepchniecia = `BeingPushedBackStartFromWall` albo wejscie w `BeingPushedBack` prosto z `OnWall` / `FallToWall` / StartFromWall, przy `!PushStarted` (`BeingRaisedStopped -> BeingPushedBack` to nieudane podniesienie, nie liczone).
+- U2: proby dobycia liczone na jedno wyslanie (zerowane przy zmianie idacego), najwyzej 6 (co 0.5 s = 3 s); gdy dalej bez drzewca w rece albo drzewca nie ma - `StopUsingGameObject(false)` (jak gra dla idacego, MB/UsableMissionObject.cs:376) i wpis do zbioru odmowionych (podmieniany w calosci, `volatile`, czytany w `Eligible`, zerowany na starcie i koncu misji) - punkt wolny dla widel jak w grze, odmowiony nie wraca do punktu w tej misji.
+- U3: postfiks (a) nie otwiera punktu innemu, gdy `MovingAgent` ma cos w dodatkowym slocie (widly).
+- U4/U6: `Wield` wychodzi, gdy idacy nieaktywny, nie AI, trzyma widly albo ma zajety dodatkowy slot.
+- U5: galaz dobycia stojacemu na punkcie usunieta.
+- U7: podpowiedz "while no stormer has climbed past 55% of its height".
+- Linia koncowa: "prob dobycia drzewca N, odeslanych bez drzewca w rece po 3 s M" (zamiast "dobyc drzewca (nieudanych po 10 probach)").
+
+**Ryzyko / co sprawdzic:**
+- Klucz NIE: bez zmian wzgledem 468 - postfiks wychodzi przed zmiana `__result` (`_refused` przy NIE zawsze pusty), `Wield` (w tym `StopUsingGameObject`) tylko pod `On`.
+- `StopUsingGameObject(false)` na idacym (nie uzywajacym) - ta sama sciezka co gra w `UsableMissionObject.OnUse`; wolane z ticku logiki misji, nie z petli DetachmentManager. Po odeslaniu gra moze dac punkt innemu wlocznikowi albo wyslac kogos po widly.
+- Do logu: "spycha drabina #i, kto: <id drzewca> | widly" musi sie pojawic przy kazdym zepchnieciu (pierwsze 10); w linii koncowej "zepchniec zaczetych: widly / drzewce" > 0, "do ziemi", "odeslanych bez drzewca w rece" (duza liczba = AI nie trzyma drzewca - wtedy zawezic do broni dwurecznej).
+- Build czysty OK, skan IL 30 trafien (jedyny MovementOrder: BehaviorCavRole441..ctor). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+
+## 468 (12.11) - obroncy AI spychaja drabiny takze dluga bronia drzewcowa (wlocznia, halabarda, pika), bez widel
+
+**Problem:** Jeff 12.11: "tak rob ... a czemu nie moga odpechanc dluga bronia jak maja? np wlocznia halabarda ??" (odpowiedz na propozycje: obronca przy drabinie spycha ja, gdy staje na murze). Gry nie uruchamiano - dowod z dekompilacji; logu ze szturmu nie ma (logi 370 z dawnych szturmow wyczyszczone), nie wiadomo, jak czesto AI spycha dzis.
+
+**Przyczyna (dekompilacja 1.4.8, scratchpad d370/SiegeLadder.cs, rv441/mb):**
+- Punkt spychania drabiny (`_pushingWithForkStandingPoint`, `StandingPointWithWeaponRequirement`, `InitRequiredWeapon(push_fork)`, SL:293) wpuszcza tylko kogos z widlami `push_fork` w glownej rece (`StandingPointWithWeaponRequirement.IsDisabledForAgent` :46-51). Obronca AI musi najpierw dojsc do lezacych widel (`_forkPickUpStandingPoint`), podniesc je (animacja), potem dojsc do punktu (SL:777-811).
+- Okno spychania krotkie: punkty obroncow czynne tylko na murze i przy `CanLadderBePushed` (nikt wyzej niz 55% drabiny, suma <= 170, SL:1137-1158; deaktywacja SL:773), kolejka atakujacych rusza zaraz po OnWall (SL:714-724) - droga po widly zjada okno.
+- Przydzial i wejscie na punkt ida przez `IsDisabledForAgent`: `UsableMachine.IsSlotAtIndexAvailableForAgent` (DetachmentManager) i `Agent.CanReachAndUseObject` -> `CanUseObject` (UsableMachineAIBase.OnTick przy dojsciu); w trakcie uzycia nikt go nie sprawdza (StandingPoint.TickAux). Animacja `act_usage_ladder_push_back` to akcja postaci (kanal 1) - kod zarzadzany nie sprawdza przedmiotu w rece (SL:960-990). `DropExtraWeaponOnStopUsageComponent` wyrzuca tylko ExtraWeaponSlot.
+- RBMAI `OverrideSiegeLadder` (prefiks `SiegeLadder.IsDisabledForBattleSide` -> true dla obroncow) zdejmuja w AfterStart VanillaAISiegesforRBM (RestoreSiegeLadder, domyslnie TAK) i EpicSieges - prawdopodobnie zdjety, dowodu z logu brak (linia startu 468 pokaze wlascicieli prefiksow).
+
+**Zmiana (nowy plik Armoury/src/SiegeLadderPush468.cs; Settings.cs, McmSettings.cs, SubModuleMain.cs):**
+- Klucz MCM "Defenders Push Ladders" (`SiegeDefendersPushLadders`, domyslnie TAK; grupa 383), recznie w Settings.cs + McmSettings.cs.
+- Jedyna latka: postfiks `StandingPointWithWeaponRequirement.IsDisabledForAgent(Agent)` (`AccessTools.DeclaredMethod` na klasie deklarujacej), wpinany obok `SiegeStones383.Install`. Wychodzi od razu, gdy zbior punktow misji pusty (poza szturmem kampanii), klucz NIE albo punkt nie jest punktem drabiny.
+  - (a) punkt spychania zamkniety przez gre: otwarty dla obroncy AI (nie gracz), bez konia, `IsAbleToUseMachine`, z pustym ExtraWeaponSlot (chorazy nie straci sztandaru), z bronia TwoHandedPolearm / LowGripPolearm / OneHandedPolearm o dlugosci >= 150 (nie zuzywalna) w slotach 0-3 - przy przydziale; przy wejsciu (czlowiek idacy do punktu) drzewce musi byc juz w glownej rece, inaczej czeka przy punkcie (gra ponawia co tick, a gdy okno sie zamknie - punkt deaktywowany i gra go zwalnia).
+  - (b) punkt podniesienia widel tej drabiny: zamkniety dla AI, gdy ktos idzie do punktu spychania albo na nim stoi (jeden czlowiek na drabine; gra ma to w GetSuitableAgentForStandingPoint, nie w DetachmentManager).
+  - Postfiks tylko czyta (zbior podmieniany w calosci, `volatile`), bez licznikow i bez wolan natywnych poza tymi, ktore robi baza - moze biec rownolegle. Warunek "nie w walce wrecz" z badania pominiety (ImmediateEnemy to wolanie natywne, a postfiks moze biec poza watkiem glownym).
+- Logika misji `SiegeLadderPush468.Logic` (tylko kampania, szturm, nie multiplayer): co 5 s przeglad drabin (`FieldRefAccess` na `_pushingWithForkStandingPoint` / `_forkPickUpStandingPoint`), co 0.5 s dobycie drzewca (`TryToWieldWeaponInSlot`, WithAnimation, najwyzej 10 prob na czlowieka) idacemu na punkt / stojacemu bez widel i drzewca w rece (tylko przy TAK), co klatke pomiar stanow drabin.
+- Linie: "Oblezenie misja (370) drabiny (468): latka ... wpieta" (start procesu); "...: start | klucz, drabin, widly push_fork, latka, prefiksy SiegeLadder.IsDisabledForBattleSide: <wlasciciele>" (com.rbmai = obroncy nie dostaja drabin, regula martwa); pierwsze 10 "spycha drabina #i, kto: widly | <id drzewca> | gracz, od oparcia na murze X s"; "koniec | oparc na murze, okien spychania (srednio s), przy NIE okien z wlocznikiem w 10 m (bylby), wyslanych z widlami / z drzewcem, po widly, zepchniec zaczetych widly / drzewce / gracz (od oparcia srednio s), zatrzymanych, do ziemi, dobyc drzewca (nieudanych), potkniecia".
+- Wyjatek per drabina / czlowiek = potkniecie (pierwsze 3 do logu), bez globalnego wylacznika. Bez MovementOrder.
+
+**Ryzyko / co sprawdzic:**
+- Klucz NIE: postfiks wychodzi przed jakakolwiek zmiana `__result`, logika nie dobywa broni - gra co do bitu jak przed; zostaje pomiar (odczyt stanow, AgentProximityMap 10 m przy otwartym oknie co 0.5 s).
+- Animacja spychania z wlocznia / halabarda: kod zarzadzany jej nie blokuje, silnika natywnego dekompilacja nie pokaze - TEST W GRZE (wyglad, CTD). Jednoreczna wlocznia z tarcza (OneHandedPolearm) moze zle ukladac rece; jesli tak - zostawic tylko TwoHandedPolearm i LowGripPolearm.
+- Kolizje: 383 (kamienie, StonePile - inny typ punktu), 454 (odwod pomija ludzi przy machinach i odlaczonych - spychajacy jest odlaczony), 455 (strzelcy), 372 (drabiny atakujacych) - postfiks dotyczy tylko punktow drabin zebranych w misji. Postfiks wolany tez dla amunicji machin i kamieni - koszt jedno sprawdzenie zbioru. Widly gry dzialaja jak dotad (baza zwraca false - postfiks nic nie zmienia).
+- Gracz-wodz obrony: jego szyki nie sa pod AI, gra nie daje im drabin (BehaviorDefendCastleKeyPosition) - jak w 383, osobna decyzja Jeffa. Gracz sam nie spycha drzewcem.
+- Do logu: linia startu (prefiksy), "spycha ... kto: <drzewce>" i "zepchniec zaczetych ... drzewce N", "do ziemi", "dobyc drzewca (nieudanych)"; potkniecia 0.
+- Build OK, skan IL 30 trafien (jedyny MovementOrder: BehaviorCavRole441..ctor). Gry nie uruchamiano. Drabiny 30 s (Armoury.json) ustawione przez sesje glowna - tu nie ruszane.
+
 **Status:** DO SPRAWDZENIA (nie wgrane).
 
 ## 458-u-p (12.11) - poprawki po recenzji 458-u: kon zbieglego z wodzem wedlug losu WLASNEGO konia, linia "zapis porzucony", etykiety kontroli

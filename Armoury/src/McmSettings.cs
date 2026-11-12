@@ -12496,6 +12496,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: defenders drop stones from the walls (383)")]
         public bool SiegeDefendersUseStones { get; set; } = true;
 
+        [SettingPropertyBool("Defenders Push Ladders", HintText = "In an assault on walls, defenders under AI command push ladders off the wall with long polearms as well: a defender who carries a spear, pike, halberd or another polearm at least 150 long (not on a horse, not a standard bearer) may take the pushing place of a ladder that has just been set against the wall without first fetching the pushing fork lying next to it - he draws his polearm on the way and pushes as soon as he stands there. Only one man goes to each ladder: while someone is going to its pushing place, nobody is sent for the fork. The ladder can still only be pushed while no stormer has climbed past 55% of its height, as in the game - the rule only shortens the way. Your own formations and you yourself are not changed. Off = only a defender holding the pushing fork can push a ladder, as in the game. Counted in the Armoury log in each siege assault (line 468).", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: defenders drop stones from the walls (383)")]
+        public bool SiegeDefendersPushLadders { get; set; } = true;
+
         [SettingPropertyBool("Story Guard", HintText = "Story Guard: characters the Realm of Thrones storyline still needs cannot die before their event. Once the event has happened, or can never happen, they are as mortal as anyone. Off = no protection.", RequireRestart = false)]
         [SettingPropertyGroup("Story Guard: Realm of Thrones story characters live until their event (396)")]
         public bool StoryGuard { get; set; } = true;
@@ -16047,6 +16051,7 @@ namespace Armoury
             s.SiegeJoinedAssaultBreaks = SiegeJoinedAssaultBreaks;
             s.SiegeAllyLordsStayBack = SiegeAllyLordsStayBack;
             s.SiegeDefendersUseStones = SiegeDefendersUseStones;
+            s.SiegeDefendersPushLadders = SiegeDefendersPushLadders;   // 468
             s.StoryGuard = StoryGuard;
             s.StoryGuardBattleAndAge = StoryGuardBattleAndAge;
             s.StoryGuardExecutions = StoryGuardExecutions;
