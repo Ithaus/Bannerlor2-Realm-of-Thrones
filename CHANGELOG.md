@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 465-p (12.11) - poprawka po recenzji 465: licznik "weta BK" siedzib Zachodu bez wet 274
+
+**Problem:** recenzja 465 (uwaga 1, tylko pomiar): w `WarFront334.Theatre.cs` (BkFirstPostfix) `_dVetoWestBk` liczyl kazde weto BK celu z typem 4, takze gdy przyczyna w `VetoedAny` byla "siedziba 274" (Casterly Rock `castle_V5` jest w `CanonWarBalance.SeatIds`, a 274 sprawdzane jest przed teatrem). Liczba "weta BK" w linii dobowej 334 (`siedziby Zachodu 465: ... weta BK M`) bylaby zawyzona o weta 274 Skaly.
+
+**Przyczyna:** warunek `if (tv == 4) _dVetoWestBk++;` nie patrzyl na `why`.
+
+**Zmiana:** `if (tv == 4 && why == "siedziba Zachodu 465") _dVetoWestBk++;` - licznik 465 tylko gdy weto 465 jest przyczyna. Weto samo w sobie bez zmian (cel i tak zawetowany przez 274 albo 465). Licznik mysli `_dVetoWest` zostaje: liczy tylko oceny, ktorych nikt wczesniej nie zbil do -1 (to wlasnie "weto 465 jako przyczyna").
+
+**Ryzyko / co sprawdzic:** zmiana tylko licznika logu, zachowanie AI bez zmian. Przy czynnym 274 "weta BK" 465 moze byc mniejsze niz przed poprawka (Skala liczona w 274). Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 467 (12.11) - SZ5: w szturmie AI kontra AI bije oddzial szturmowy, nie cala armia - oblezenia AI dluzsze i trudniejsze
 
 **Problem:** Jeff 12.11: "trzeba zrobic ze oblezenia trwaja dluzej i sa trudniejsze, np. mamy juz jak jest oblezenie to nie atakuja calym wojskiem tylko po stratach wycofuja sie i odczekuja ... Czy to tez dziala dla AI?". Pakiet 7 (450-456) to reguly MISJI - dla AI kontra AI nie dziala (bitwa rozstrzygana symulacja). Dla AI dziala odpowiednik kampanii (OB1, OB2/371, SZ1-SZ4), ale logi 12.11 (`Armoury-2026-11-12_*.log`, wiersze "Bitwa szturmu (SZ)"): armia Polnocy ok. 13,5 tys. na zamek ok. 500 - 10 z 10 zamkow padlo w PIERWSZYM szturmie po 6,0-6,6 doby, straty atakujacych 467-710 (3-5% armii, 14-21% oddzialu K) - ponizej progu 371 (ok. 22% K), wiec odwrot sie nie wlaczal; obroncy 100% (np. Deep Den `16-58-45.log` 30754-30767).

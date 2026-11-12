@@ -375,7 +375,7 @@ namespace Armoury
                 if (!VetoedAny(__1, v.Item1, out why, __0, out local)) return;
                 int tv = TheatreVeto(__1, v.Item1);
                 if (tv != 0) _dVetoBk++;
-                if (tv == 4) _dVetoWestBk++;
+                if (tv == 4 && why == "siedziba Zachodu 465") _dVetoWestBk++;   // 465-p: Skala przy czynnym 274 - weto liczy 274 ("siedziba 274"), nie 465
                 // po recenzji 334e (W9): sila lokalna nie daje null - bez nastepnego celu zostaje wybor BK, a cel wyzeruje ocena celu (ScorePost) w mysli armii
                 if (!BkNextOn) return;   // 167: 274 / 326b daja null jak dotad; teatr ponizej (BkLastPostfix)
                 var next = NextBkTarget(__0, __1);
