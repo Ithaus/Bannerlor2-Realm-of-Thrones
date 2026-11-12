@@ -215,6 +215,18 @@
 
 **Status:** DO SPRAWDZENIA (nie wgrane; wymaga NOWEJ kampanii).
 
+## 475 (13.11) - mury: czas budowy o polowe krotszy (zamek 1 / 2 lata, miasto 1.5 / 2.5 roku), cena punktu murow o polowe nizsza
+
+**Problem:** Jeff 13.11: "Mury, tak okres jest okay tylko zmniejsz wszystko o 50% dlugosc budowy." Po 472 przewidywane czasy przy dzisiejszych budzetach: zamek 1->2 ok. 3.2 roku, 2->3 ok. 6.4; miasto ok. 3.9 / 7.8 roku.
+
+**Przyczyna:** czas murow wyznaczaja dwie rzeczy: najkrotszy czas (dzienny limit punktow = koszt poziomu / (WallMinYears x 364)) i budzet panow (cena punktu x3 zamek, x2 miasto). Samo skrocenie najkrotszego czasu nie skrocilo by budow ograniczonych pieniedzmi.
+
+**Zmiana (tylko domyslne w Settings.cs i McmSettings.cs; w Armoury.json Jeffa tych kluczy nie ma):** WallMinYearsCastle2/3 2/4 -> 1/2, WallMinYearsTown2/3 3/5 -> 1.5/2.5, WallCastlePointPriceFactor 3.0 -> 1.5, WallTownPointPriceFactor 2.0 -> 1.0. Przy tym samym budzecie dziennym murow wychodzi o polowe szybciej; laczny koszt poziomu w zlocie tez o polowe nizszy (zamek 1->2 ok. 100 tys. d, 2->3 ok. 200 tys.; miasto ok. 288 tys. / 576 tys.). Kod bez zmian.
+
+**Ryzyko / co sprawdzic:** linia "Mury (472): start sesji" pokazuje nowe liczby (1.5 / 1.0, lata 1/2, 1.5/2.5); mury szybciej zjedza kolejke budow osady (krocej blokuja inne budowle). Jesli Jeff chce polowy czasu przy TYM SAMYM koszcie - trzeba podniesc dzienny budzet murow panow (osobna zmiana).
+
+**Status:** DO SPRAWDZENIA
+
 ## 470-p (12.11) - poprawki po recenzji 470: prawdziwy brak jedzenia swiata zostaje w N (U1), S_stos po wczytaniu z zapisu (U2), Empty wymaga progu 221 (U3), napisy (U4, U5)
 
 **Problem:** recenzja 470-a / 470-b. U1: prog 470-b 2 szt./d jest na komorke - maslo (brak swiata 17.4 szt./d, sprzedaz 0, 10 miast z N >= 1.5) przy rownym rozkladzie ok. 1.74 szt./d na miasto wypadloby z N calkiem, choc to prawdziwy brak. U2: przy 470-a TAK po kazdym wczytaniu S_stos = 1 dla wszystkich towarow do pierwszej decyzji 221 (do 28 dob) - regresja wobec 435-L1-p. U3: `Empty()` nie wymagal `g.Short` (przy ValveStockDaysLow < 5 towar, ktorego 221 nie uwaza za krotki, dostawal S_stos). U4: napis MCM "falls back by itself as the stock refills" nieprawdziwy (StockDays to migawka decyzji co 28 dob). U5: linia LP przy TAK pisala "liczone 1.25" i "decyzji N" (to liczba pustych decyzji).

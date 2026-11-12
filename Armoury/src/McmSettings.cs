@@ -3184,29 +3184,29 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool WallWorksHistorical { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Wall Castle Point Price Factor", 1.00f, 10.00f, "0.00", HintText = "with Wall Works Historical: a point of castle walls costs this many times Build Pence Per Point Military (3 = 144 pence)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Wall Castle Point Price Factor", 1.00f, 10.00f, "0.00", HintText = "with Wall Works Historical: a point of castle walls costs this many times Build Pence Per Point Military (3 = 144 pence; 475: default 1.5 = 72 pence, walls in half the time)", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
-        public float WallCastlePointPriceFactor { get; set; } = 3.0f;
+        public float WallCastlePointPriceFactor { get; set; } = 1.5f;
 
-        [SettingPropertyFloatingInteger("Wall Town Point Price Factor", 1.00f, 10.00f, "0.00", HintText = "with Wall Works Historical: a point of town walls costs this many times Build Pence Per Point Military (2 = 96 pence)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Wall Town Point Price Factor", 1.00f, 10.00f, "0.00", HintText = "with Wall Works Historical: a point of town walls costs this many times Build Pence Per Point Military (2 = 96 pence; 475: default 1.0 = 48 pence, walls in half the time)", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
-        public float WallTownPointPriceFactor { get; set; } = 2.0f;
+        public float WallTownPointPriceFactor { get; set; } = 1.0f;
 
         [SettingPropertyFloatingInteger("Wall Min Years Castle 2", 0.00f, 20.00f, "0.0", HintText = "with Wall Works Historical: the shortest time in years to raise castle walls to level 2 (0 = no limit)", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
-        public float WallMinYearsCastle2 { get; set; } = 2f;
+        public float WallMinYearsCastle2 { get; set; } = 1f;
 
         [SettingPropertyFloatingInteger("Wall Min Years Castle 3", 0.00f, 20.00f, "0.0", HintText = "with Wall Works Historical: the shortest time in years to raise castle walls to level 3 (0 = no limit)", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
-        public float WallMinYearsCastle3 { get; set; } = 4f;
+        public float WallMinYearsCastle3 { get; set; } = 2f;
 
         [SettingPropertyFloatingInteger("Wall Min Years Town 2", 0.00f, 20.00f, "0.0", HintText = "with Wall Works Historical: the shortest time in years to raise town walls to level 2 (0 = no limit)", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
-        public float WallMinYearsTown2 { get; set; } = 3f;
+        public float WallMinYearsTown2 { get; set; } = 1.5f;
 
         [SettingPropertyFloatingInteger("Wall Min Years Town 3", 0.00f, 20.00f, "0.0", HintText = "with Wall Works Historical: the shortest time in years to raise town walls to level 3 (0 = no limit)", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
-        public float WallMinYearsTown3 { get; set; } = 5f;
+        public float WallMinYearsTown3 { get; set; } = 2.5f;
 
         [SettingPropertyBool("Build Wood Above Craft Stock", HintText = "building works (the lord's and the townsfolk's) take timber off the market only above the stock the town keeps for its own smiths, bloomeries, workshops and households, never less than 40 loads (the same stock caravans fill for it - Caravan Bulk Stock Days of their use, building works not counted); below it the works buy the other materials or wait, so the armourers and fletchers are not left without wood. Off = the works buy timber down to the last piece (the townsfolk's works leave 50), as before", RequireRestart = false)]
         [SettingPropertyGroup("Army purchases")]
