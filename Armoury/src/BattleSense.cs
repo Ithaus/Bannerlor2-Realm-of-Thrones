@@ -66,6 +66,7 @@ namespace Armoury
                                  || c.HammerAndAnvil   // 444: kowadlo i mlot (Doctrine.Hammer444.cs) - K444Begin / K444Tick z Doctrine
                                  || c.CavalryFightsCavalryFirst || c.CavalryDisengage   // 445: Doctrine.CavFirst445.cs - V445Begin / V445Tick z Doctrine
                                  || c.InfantrySquareAgainstFlankCharge   // 446: Doctrine.Square446.cs - Q446Begin / Q446Tick z Doctrine, blokada w prefiksie 344
+                                 || c.CavalryHuntsRearCommander   // 447: Doctrine.Hunt447.cs - H447Begin / H447Tick z Doctrine
                                  || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 
@@ -307,6 +308,8 @@ namespace Armoury
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.OnHit", e); }
                 // 443: trafienie pociskiem czlowieka albo konia (konia - w szyk jezdzca) - licznik slotu szyku (Interlocked, bez logu; tick asynchroniczny mozliwy)
                 Doctrine.R443OnHit(affectedAgent, affectorAgent, in blow);
+                // 447: cios jezdzca polowania w gracza / jego konia - licznik (Interlocked, bez logu)
+                Doctrine.H447OnHit(affectedAgent, affectorAgent, in blow);
             }
         }
 
@@ -329,6 +332,8 @@ namespace Armoury
                 // 310: strzelec padl - wpis bez wywolan silnika; cel padl - automat celu wraca w najblizszym ticku
                 // 446: strata piechoty AI od ciosu wrecz jezdzca wroga - tylko licznik (w czworoboku / bylby / poza)
                 Doctrine.Q446OnRemoved(affectedAgent, affectorAgent, agentState, in blow);
+                // 447: gracz padl w czasie polowania (od jezdzca polowania albo innego) - tylko licznik
+                Doctrine.H447OnRemoved(affectedAgent, affectorAgent, agentState);
                 try { CleanShot.OnRemoved(Mission, affectedAgent); }
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "CleanShot.OnRemoved", e); }
             }
@@ -354,6 +359,8 @@ namespace Armoury
             // 140: strzal - S2 (cel AI) / S3 (punkt upadku) i rzuty; tylko kolejka pod lockiem
             try { ShieldsUp.OnShoot(Mission, shooterAgent, weaponIndex, position, velocity); }
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteShields, "ShieldsUp.OnShoot", e); }
+            // 447: strzal gracza - licznik Interlocked (gracz-wodz, ktory strzela, nie jest "z tylu")
+            Doctrine.H447OnShoot(shooterAgent);
         }
 
         // noc 25.10 P0 (K15): trafienie pociskiem - rozkaz "shields" (P2); czeste, jak wyzej

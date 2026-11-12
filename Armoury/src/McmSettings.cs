@@ -11724,6 +11724,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool InfantrySquareAgainstFlankCharge { get; set; } = true;
 
+        [SettingPropertyBool("Cavalry Hunts Rear Commander", HintText = "AI cavalry in field battles hunts you as the commander when you stay at the back: when you lead your side, stand still behind your own troops (one of your formations at least 30 m nearer the enemy than you), with no enemy within 80 m, have not shot or fought for a while and have fewer than 5 of your men within 20 m, for 10 seconds without a break, the nearest free enemy cavalry formation within 300 m whose way to you is not blocked by your infantry rides for you - its riders go straight at you. You are warned with a message. Once per battle; the hunt is given up after 40 seconds or when the cavalry has lost three tenths of its men. Cavalry already busy with something more urgent (raids, hammer blows, fighting enemy cavalry, chasing) is not taken. Your side has no automatic bodyguard - keep men near you or keep shooting. Needs Cavalry Commander. No bonus to any number on the field - only decisions. Field battles only. Off = exactly as before. Counted in the Armoury log at the end of each field battle (line 447).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CavalryHuntsRearCommander { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15778,6 +15782,7 @@ namespace Armoury
             s.CavalryFightsCavalryFirst = CavalryFightsCavalryFirst;   // 445
             s.CavalryDisengage = CavalryDisengage;   // 445
             s.InfantrySquareAgainstFlankCharge = InfantrySquareAgainstFlankCharge;   // 446
+            s.CavalryHuntsRearCommander = CavalryHuntsRearCommander;   // 447
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

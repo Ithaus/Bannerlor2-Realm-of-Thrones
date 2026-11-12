@@ -286,6 +286,7 @@ namespace Armoury
             K444Begin(m);   // 444: kowadlo i mlot (WAIT / STRIKE) - wlasny klucz (bez AnyKey), pomiar takze przy NIE
             V445Begin(m);   // 445: najpierw jazda wroga / oderwanie (CAVFIRST / DISENGAGE) - wlasne klucze (bez AnyKey), pomiar takze przy NIE
             Q446Begin(m);   // 446: czworobok piechoty przed jazda z boku / tylu - wlasny klucz (bez AnyKey), pomiar takze przy NIE
+            H447Begin(m);   // 447: polowanie jazdy na gracza-wodza z tylu (HUNT) - wlasny klucz (bez AnyKey), pomiar takze przy NIE
         }
 
         /// <summary>283 (HorsePursuit.ReactHalt, glowny watek): szyk trzymany teraz przez S4 (lucznicy za piechota - wagi zachowan przejete) - postoj 283 go
@@ -350,6 +351,7 @@ namespace Armoury
             K444ClearMission();   // 444
             V445ClearMission();   // 445
             Q446ClearMission();   // 446
+            H447ClearMission();   // 447 (po 441 - rola juz oddana przez C441ClearMission; jezdzcy oddani grze tutaj)
         }
 
         /// <summary>WarCouncil.One (glowny watek, AfterStart albo pozna druzyna DR): doktryna druzyny AI i dodatki do listy taktyk. have/note - lista typow
@@ -439,6 +441,9 @@ namespace Armoury
             // 444: kowadlo i mlot - WAIT / STRIKE (role 441; wlasny zegar 1 s i wlasny klucz); po 443 (rajd / schowanie biora szyk w WAIT - widoczne tu), przed 442
             // (cel uderzenia w slocie jezdzca 442)
             try { K444Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.K444Tick", e); }
+            // 447: polowanie na gracza-wodza z tylu (HUNT, rola 441; pass co 1 s, krok jezdzcow co 0.25 s, wlasny klucz); po 443 / 445 / 444 - bierze tylko szyk
+            // w roli NONE (pilniejsze role maja pierwszenstwo), przed 442 (szyk w roli - slot 442 pusty w tym samym takcie)
+            try { H447Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.H447Tick", e); }
             // 442: cel szarzy jazdy - ocena szykow wroga, cel i kotwice slotow (wlasny zegar 1 s i wlasny klucz; po 441 - szyk w roli pominiety)
             try { T442Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.T442Tick", e); }
             // 446: czworobok piechoty AI przed jazda z boku / tylu (wlasny zegar 0.5 s i wlasny klucz; glowny watek, przed CloseRanks.Tick - pass 146 / 310 pomija szyk w czworoboku)

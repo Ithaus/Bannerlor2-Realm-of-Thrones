@@ -601,7 +601,8 @@ namespace Armoury
         {
             if (x == null || ReferenceEquals(x, hero) || !x.IsHuman || x.IsHero || x.IsMainAgent || !x.IsAIControlled || !x.IsActive()) return false;
             if (!ReferenceEquals(x.Team, t) || x.IsRunningAway || SurvivalMode.InPanic(x) || SurvivalMode.OrderedRetreat(x, x.CommonAIComponent) || Withdrawing(x)) return false;
-            if (GuardSet.Contains(x) || HorsePursuit.Banner(x) || HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x)) return false;
+            if (GuardSet.Contains(x) || HorsePursuit.Banner(x) || HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x)
+                || Doctrine.H447AnyThread(x)) return false;   // 447: jezdziec polowania na gracza-wodza
             var rk = RoutHold.Live;
             if (rk != null && rk.InRally(x)) return false;                                                            // 359: zawrocony w zbiorce (przed szykiem)
             var f = x.Formation;
@@ -673,7 +674,7 @@ namespace Armoury
                 if (x == null || !x.IsActive()) why = 3;
                 else if (o == null || o.Out || o.A == null || !o.A.IsActive()) why = 3;
                 else if (x.IsRunningAway || SurvivalMode.InPanic(x) || Withdrawing(x)) why = 2;
-                else if (HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x)) why = 5;   // inny mechanizm wzial czlowieka - jego pozycja
+                else if (HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x) || Doctrine.H447AnyThread(x)) why = 5;   // inny mechanizm wzial czlowieka - jego pozycja
                 else if (!(o.Mode == ModeThreat || (o.Mode == ModeWounded && o.St == StTravel) || o.Mode == ModeRally)) why = 0;   // 359: straz jedzie z dowodca do uciekajacych
                 else if (now - g.Since > (o.Mode == ModeRally ? RideMax + RideHoldMax + 1f : TravelMax)) why = 1;   // przeglad 359: straz do konca postoju przy uciekajacych
                 if (why >= 0)

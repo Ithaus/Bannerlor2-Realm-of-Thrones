@@ -27,6 +27,7 @@ namespace Armoury
             Doctrine.K444Reset();   // 444: linia "Kowadlo i mlot (444)"
             Doctrine.V445Reset();   // 445: linia "Jazda na jazde i oderwanie (445)"
             Doctrine.Q446Reset();   // 446: linia "Czworobok (446)"
+            Doctrine.H447Reset();   // 447: linia "Polowanie na wodza (447)"
         }
 
         internal static void Write(Mission m, string kind, string segA)
@@ -53,6 +54,7 @@ namespace Armoury
             Log.Info(Doctrine.K444Line(kind));   // 444: osobna linia
             Log.Info(Doctrine.V445Line(kind));   // 445: osobna linia
             Log.Info(Doctrine.Q446Line(kind));   // 446: osobna linia
+            Log.Info(Doctrine.H447Line(kind));   // 447: osobna linia
         }
     }
 }
