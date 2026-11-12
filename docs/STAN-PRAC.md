@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 14:35 - WGRANIE 212 (435-N-A/A-p/B: sygnal niedoboru N - przyrost niewydanego budzetu robot zamiast poziomu, jedzenie poza N)
+
+- **W grze:** Armoury.dll `80e53a1d490f3fea0b49d6f3b9cff0ff` (commit `3b0bb522`, wypchniety; zawiera tez 441-447). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie212`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie212(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-435n-po-tescie.sav`.
+- **Autotest at-435n (n391, 30 dob, lancuch caly wlaczony):** KONIEC OK, wyjatkow 0, bledy 23 (stale), linie LP: kontrola ksiag 0.00, potkniecia 0.
+- **Efekt (doba 30):** towarow z N swiata > 1: 15 z 22 (przed: 21 z 22); komorek z kolejka > 1: 211 (dawna miara w tym samym biegu: 435); suma przyrostu 488 szt./d wobec poziom/28 2177 szt./d. Jedzenie zniknelo z listy (435-N-B pomija ok. 100-124 szt. w 67-103 brakach na dobe). Zostaja: srebro 2.00 (prawdziwy brak, 16 z 18 miast), wapien 2.00 z kolejki (brak 45 szt./d przy sprzedazy 7 - rosnace zlecenia robot), welna 1.54; reszta 1.25 tylko z S_stos (regulator wsi 221).
+- **Ponizej prognozy:** diagnoza mowila 100-130 komorek, jest 211 - 157 z nich nadal z samego budzetu robot (przyrost w pierwszych 4 tygodniach zawyzony: nowe zlecenia na pustej polce licza sie jako skok 0 -> L). Sprawdzic w dluzszym biegu, czy spada.
+- **Klucz:** Supply Queue Growth (TAK) - NIE przywraca stara miare. Uwaga z recenzji B: krok B usuwa tez prawdziwy czesciowy brak zboza do mlyna / browaru.
+- **Dalej:** krok 3 - sygnal braku WYROBOW (strona produktu) dla L8/L9; pakiet 6 AI bitwy (448-449) w pracy.
+
 ## STAN 12.11 14:20 - WGRANIE 211 (441-447: AI bitwy pakiet 4 jazda + pakiet 5 obrona przed jazda + polowanie na gracza-wodza)
 
 - **W grze:** Armoury.dll `35acf49b25ca455dd195bd0eb082f7f3` (commit `7d3db4c7`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie211`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie211(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-447-po-tescie.sav`.
