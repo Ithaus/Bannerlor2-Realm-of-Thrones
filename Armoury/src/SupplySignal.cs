@@ -64,6 +64,7 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _startLine;
         private static int _first = int.MinValue;         // pierwsza doba pomiaru w sesji (dzielnik srednich)
+        private static int _gFrom = int.MinValue;         // 435-N-A-p: pierwsza doba z prawdziwym poziomem po wczytaniu zapisu (doby z zapisu = stala srednia, nie poziom) - Grow liczy od niej
 
         private static void Stumble(string where, Exception e)
         {
@@ -369,7 +370,7 @@ namespace Armoury
         internal static void Reset()
         {
             _main = Environment.CurrentManagedThreadId; _dOff = 0;
-            _st = _stSess = 0; _err.Clear(); _startLine = false; _first = int.MinValue;
+            _st = _stSess = 0; _err.Clear(); _startLine = false; _first = int.MinValue; _gFrom = int.MinValue;
             _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _offWarned = false; _heldBits = 0; _earlyTried = false;
             _cells.Clear(); _price.Clear(); ZeroDay();
             _ws.Clear(); CycleBegin();
@@ -402,32 +403,37 @@ namespace Armoury
         }
 
         /// <summary>
-        /// 435-N-A: przyrost niewydanego budzetu robot komorki w sztukach na dobe - nachylenie (najmniejsze kwadraty) poziomu Soft po dobach okna, ktore maja wpis
-        /// (doba bez wpisu = komorka tej doby nie mierzona, pominieta; wpis z samym kupionym / brakiem wsadu = poziom 0). Ujemne -> 0. Mniej niz 2 rozne doby -> 0
-        /// (pierwsza doba bez historii). Po wczytaniu zapisu historia to stala srednia (Resolve) - nachylenie 0, dopoki nowe doby nie zmienia poziomu.
-        /// Poziom stoi = nikt nowy nie czeka (to samo zlecenie wraca co dobe); rosnie = nowy niezaspokojony popyt. Sam odczyt.
+        /// 435-N-A: przyrost niewydanego budzetu robot komorki w sztukach na dobe - nachylenie (najmniejsze kwadraty) poziomu Soft po KAZDEJ dobie pomiaru w oknie.
+        /// 435-N-A-p (recenzja A, usterka 2): doba bez wpisu = poziom 0 (nikt nie czeka), tak samo jak doba z samym kupionym / brakiem wsadu i jak w Means (dzielnik Span) -
+        /// wynik nie zalezy od tego, czy tego dnia cos kupiono; nowe zlecenie od pierwszej doby na pustej polce to skok 0 -> L, czyli przyrost.
+        /// 435-N-A-p (usterka 1): doby z wczytanego zapisu (Resolve: stala srednia, doby bez wpisu wliczone w nia jako 0) pominiete - liczy od _gFrom, wiec wczytanie
+        /// nie daje pozornego przyrostu. Mniej niz MinSpan dob -> 0 (jak kolejka na starcie kampanii; po wczytaniu przez pierwsze doby przyrost 0, kolejka z brakow wsadu).
+        /// ZE ZNAKIEM (ujemny = poziom spada): komorka obcina do 0 u siebie, agregat swiata sumuje ze znakiem (usterka 3). Sam odczyt.
         /// </summary>
         private static double Grow(Cell c, int today)
         {
-            int n = 0; double sx = 0, sy = 0;
-            for (int k = 0; k < Window; k++)
+            if (_first == int.MinValue) return 0;
+            int from = Math.Max(today - Window + 1, Math.Max(_first, _gFrom));
+            int n = today - from + 1;
+            if (n < MinSpan) return 0;
+            double sy = 0;
+            for (int d = from; d <= today; d++) sy += Level(c, d);
+            double mx = (from + today) / 2.0, my = sy / n, sxx = 0, sxy = 0;
+            for (int d = from; d <= today; d++)
             {
-                int dd = c.Day[k];
-                if (dd > today || dd <= today - Window) continue;
-                n++; sx += dd - today; sy += c.Soft[k];
-            }
-            if (n < 2) return 0;
-            double mx = sx / n, my = sy / n, sxx = 0, sxy = 0;
-            for (int k = 0; k < Window; k++)
-            {
-                int dd = c.Day[k];
-                if (dd > today || dd <= today - Window) continue;
-                double x = dd - today - mx;
-                sxx += x * x; sxy += x * (c.Soft[k] - my);
+                double x = d - mx;
+                sxx += x * x; sxy += x * (Level(c, d) - my);
             }
             if (!(sxx > 1e-9)) return 0;
             double g = sxy / sxx;
-            return g > 0 && !double.IsInfinity(g) ? g : 0;
+            return double.IsNaN(g) || double.IsInfinity(g) ? 0 : g;
+        }
+
+        /// <summary>435-N-A-p: poziom Soft komorki w dobie d (doba bez wpisu albo nadpisana w pierscieniu = 0).</summary>
+        private static double Level(Cell c, int d)
+        {
+            int k = ((d % Window) + Window) % Window;
+            return c.Day[k] == d ? c.Soft[k] : 0.0;
         }
 
         /// <summary>435-L1-p: S_kolejka komorki albo swiata. `want` - brak wsadu szt./d + przyrost niewydanego budzetu robot szt./d (435-N-A; klucz NIE: poziom / okno); `sales` szt./d. Przed MinSpan dobami pomiaru 1.</summary>
@@ -541,6 +547,7 @@ namespace Armoury
                         m[cat] = cell; cells++;
                     }
                 if (cells > 0) _first = _first == int.MinValue ? day - span + 1 : Math.Min(_first, day - span + 1);
+                if (cells > 0) _gFrom = day + 1;                              // 435-N-A-p: przyrost tylko z dob po zapisie (doby z zapisu to srednia, nie poziom)
                 _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
             }
             catch (Exception e) { Stumble("Resolve", e); _loadNote = "arm_lpn - blad wczytania (pamiec N od pierwszej doby)"; }
@@ -769,7 +776,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Shortage(glod)", e); }
             }
-            // kategoria -> [brak swiata, sprzedaz swiata, miast z N >= 1.5, najwieksze N miasta, miast z komorka]
+            // kategoria -> [brak swiata, sprzedaz swiata, miast z N >= 1.5, najwieksze N miasta, miast z komorka, przyrost budzetu robot swiata ZE ZNAKIEM (435-N-A-p)]
             var agg = new Dictionary<ItemCategory, double[]>();
             var hot = new HashSet<Settlement>();
             int cells = 0, real = 0, qCeil = 0, qOver = 0, softOnly = 0;
@@ -792,13 +799,15 @@ namespace Armoury
                     // 435-L1-p (recenzje S1): kolejka dopiero po MinSpan dobach; sprzedaz >= MinSales
                     // 435-N-A: niewydany budzet robot wchodzi jako PRZYROST poziomu na dobe (Grow), nie poziom / okno - poziom stojacy co dobe to to samo zlecenie,
                     // nie nowy popyt (test 90 dob: wapien, marmur, deski, narzedzia z N > 1 tylko z poziomu). Klucz NIE = dawna miara.
-                    double grow = Grow(ck.Value, today), softW = soft / Window;
+                    // 435-N-A-p: komorka bierze przyrost obciety do 0; swiat sumuje ze znakiem (a[5]) - spadek w jednym miescie znosi wzrost w innym (przerzut zlecen)
+                    double growS = Grow(ck.Value, today), grow = growS > 0 ? growS : 0, softW = soft / Window;
                     sumGrow += grow; sumSoftW += softW; sumSoft += soft; if (grow > 1e-6) growCells++;
                     double sqOld = Queue(miss + softW, sales, span);
                     if (sqOld > 1.0 + 1e-9) { qOverOld++; if (!(miss > 1e-6)) softOnlyOld++; }
                     double want = miss + (growOn ? grow : softW);
                     double sq = Queue(want, sales, span);
                     if (sq > 1.0 + 1e-9) { qOver++; if (sq >= 2.0 - 1e-9) qCeil++; if (!(miss > 1e-6)) softOnly++; }
+                    double wantW = growOn ? miss : want;          // 435-N-A-p: do swiata brak wsadu (+ poziom / okno przy kluczu NIE); przyrost osobno ze znakiem
                     miss = want;
                     double[] st; double ss = stock.TryGetValue(ck.Key, out st) ? st[0] : 1.0;
                     double n = Math.Min(2.0, Math.Max(1.0, Math.Max(ss, sq)));
@@ -810,13 +819,15 @@ namespace Armoury
                         tm[ck.Key] = n;
                     }
                     double[] a;
-                    if (!agg.TryGetValue(ck.Key, out a)) { a = new double[5]; agg[ck.Key] = a; }
-                    a[0] += miss; a[1] += sales; a[4]++;
+                    if (!agg.TryGetValue(ck.Key, out a)) { a = new double[6]; agg[ck.Key] = a; }
+                    a[0] += wantW; a[1] += sales; a[4]++;
+                    if (growOn) a[5] += growS;
                     if (n >= 1.5) { a[2]++; hot.Add(tk.Key); }
                     if (n > a[3]) a[3] = n;
                 }
             }
-            foreach (var kv in stock) if (!agg.ContainsKey(kv.Key)) agg[kv.Key] = new double[5];
+            foreach (var kv in stock) if (!agg.ContainsKey(kv.Key)) agg[kv.Key] = new double[6];
+            foreach (var kv in agg) if (kv.Value[5] > 0) kv.Value[0] += kv.Value[5];   // 435-N-A-p: przyrost swiata netto (ujemny -> 0) do braku swiata
             foreach (var h in hungry) { hot.Add(h); nt.Hungry.Add(h); }
             foreach (var kv in stock) if (kv.Value[0] > 1.0 + 1e-9) nt.Stock[kv.Key] = Math.Min(2.0, kv.Value[0]);
             _pubT = nt;
