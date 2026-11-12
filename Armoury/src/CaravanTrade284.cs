@@ -77,6 +77,9 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki doby
         private static readonly long[] _pN = new long[Paths], _pG = new long[Paths], _pT = new long[Paths], _pC = new long[Paths], _pR = new long[Paths];
         private static readonly long[] _pLossN = new long[Paths], _pLossG = new long[Paths], _pLossC = new long[Paths], _plG = new long[Paths], _plR = new long[Paths];
+        private static int _rCoin434, _cutCoin434;   // 434-p: odmowy "ponad dawny sufit bez monety ponad podloge" (wliczone w _rCap) i sztuki ciete ta regula; czyta linia E3-T2
+        /// <summary>434-p (linia E3-T2): odmowy kupna i sztuki ciete regula monety ponad podloge od poprzedniej linii - odczyt z zerowaniem.</summary>
+        internal static void TakeCoin434(out int refusals, out int pieces) { refusals = _rCoin434; pieces = _cutCoin434; _rCoin434 = 0; _cutCoin434 = 0; }
         private static int _rGate, _rCap, _rWage, _rGain, _rFood, _skipExempt, _buyVisits, _bkExit, _bulkHeldGlut, _stumbles, _stumbleSess, _fCalls, _fWould, _fSkip;
         private static long _bkHeldN, _bkHeldC, _bulkHeldN, _spongeN, _spongeG, _ticks;
         // recenzja 284: wizyty z podloga >= kapital (regula kapitalu pominieta), przeliczenie jukow po wczytaniu przed pierwsza doba, sztuki wstrzymane zdjete z dostaw P1
@@ -850,7 +853,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zakup BK (BuyGoods -> CalculateBuyValue)
-        private sealed class Buy { public MobileParty Mp; public bool Exempt; public int Capital, Floor, Wage, Purse0; public double Stock0, Pen = -1, Toll; public readonly HashSet<ItemCategory> Seen = new HashSet<ItemCategory>(), SeenD = new HashSet<ItemCategory>();
+        private sealed class Buy { public MobileParty Mp; public bool Exempt; public int Capital, Floor, Wage, Purse0, OldCeil, PurseFloor; public double Stock0, Pen = -1, Toll; public readonly HashSet<ItemCategory> Seen = new HashSet<ItemCategory>(), SeenD = new HashSet<ItemCategory>();
             public Town PeekTown; public readonly Dictionary<ItemCategory, int> PeekK = new Dictionary<ItemCategory, int>(); public readonly Dictionary<ItemObject, double> PeekNet = new Dictionary<ItemObject, double>(); }
         private static readonly Buy _b = new Buy();
         private static readonly Buy _pk = new Buy();   // 294c: ocena celu BK (WhyPeek) - osobny stan, _b (wizyta BuyGoods) nietkniety
@@ -863,8 +866,9 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null || mp == null || !(s.CaravanBuyByFlow || s.CaravanBuyWorkingCapital || s.CaravanBuyProfitCheck)) return false;
             if (!mp.IsCaravan || mp.Owner == null || !CaravanBulk.TradesForT1(mp) || MaterialOrders.HasContract(mp) || CaravanBulk.HasOrders(mp)) return false;
-            int cap, floor;
-            CaravanSettle.WorkCapFloor(mp, out cap, out floor);   // 434: karawana pod jedna regula - kapital obrotowy K (inaczej CapFloor jak dotad)
+            int cap, floor, oc, pf;
+            CaravanSettle.WorkCapFloor(mp, out cap, out floor, out oc, out pf);   // 434: karawana pod jedna regula - kapital obrotowy K (inaczej CapFloor jak dotad)
+            _pk.OldCeil = oc; _pk.PurseFloor = pf;
             _pk.Capital = cap; _pk.Floor = floor; _pk.Wage = Math.Max(0, mp.TotalWage); _pk.Purse0 = mp.PartyTradeGold;
             _pk.Stock0 = CaravanGoods.CargoCost(mp);
             _pk.Mp = mp;
@@ -961,8 +965,9 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             try
             {
-                int cap, floor;
-                CaravanSettle.WorkCapFloor(mp, out cap, out floor);   // 434: karawana pod jedna regula - kapital obrotowy K (inaczej CapFloor jak dotad)
+                int cap, floor, oc, pf;
+                CaravanSettle.WorkCapFloor(mp, out cap, out floor, out oc, out pf);   // 434: karawana pod jedna regula - kapital obrotowy K (inaczej CapFloor jak dotad)
+                _b.OldCeil = oc; _b.PurseFloor = pf;
                 _b.Capital = cap; _b.Floor = floor; _b.Wage = Math.Max(0, mp.TotalWage); _b.Purse0 = mp.PartyTradeGold;
                 _b.Stock0 = CaravanGoods.CargoCost(mp);
                 _b.Toll = TownToll.CaravanRateFor(mp, town.Settlement);
@@ -987,7 +992,7 @@ namespace Armoury
             {
                 int why = Why(mp, cat, town, s);
                 if (why != 0 && _b.Seen.Add(cat))
-                    switch (why) { case 1: _rGate++; break; case 2: _rCap++; break; case 3: _rWage++; break; case 4: _rGain++; break; case 6: _rWind++; break; default: _rFood++; break; }
+                    switch (why) { case 1: _rGate++; break; case 2: _rCap++; break; case 7: _rCap++; _rCoin434++; break; case 3: _rWage++; break; case 4: _rGain++; break; case 6: _rWind++; break; default: _rFood++; break; }
                 return why != 0;
             }
             catch (Exception e) { Stumble("BuyBlocked", e); return false; }
@@ -1010,6 +1015,9 @@ namespace Armoury
                 // recenzja 284 (drobna 4): podloga z rezerwa 30 dni zoldu (karawana bez zwrotu zoldu) moze byc >= kapital - to podloga wyplaty, nie granica handlu;
                 // wtedy bez reguly kapitalu (kiese dalej pilnuje rezerwa zoldu nizej)
                 if (b.Capital - b.Floor > 0 && cargo >= b.Capital - b.Floor) return 2;
+                // 434-p (stabilnosc S1): karawana pod jedna regula - ladunek PONAD dawny sufit tylko z monety ponad podloge kiesy (zatrzymany zysk, nie doplata
+                // notabla); do dawnego sufitu jak przed 434. Nie przy ocenie celu (kiesa w miescie celu bedzie inna po sprzedazy - jak regula 3)
+                if (!peek && b.PurseFloor > 0 && cargo >= b.OldCeil && purse - spend < b.PurseFloor) return 7;
                 if (!peek && purse - spend < CashDays * b.Wage) return 3;
             }
             if (s.CaravanBuyProfitCheck)
@@ -1279,6 +1287,14 @@ namespace Armoury
                         double room = _b.Capital - _b.Floor - cargo;
                         int nc = room > 0 ? (int)Math.Min(int.MaxValue, Math.Ceiling(room / p1)) : 0;
                         nc = Math.Max(free, nc);
+                        if (_b.PurseFloor > 0)
+                        {
+                            // 434-p (stabilnosc S1): ponad dawny sufit tylko z monety ponad podloge kiesy - miejsce = max(do dawnego sufitu, moneta ponad podloge)
+                            double roomCoin = Math.Max(_b.OldCeil - cargo, (double)mp.PartyTradeGold - _b.PurseFloor);
+                            int n4 = roomCoin > 0 ? (int)Math.Min(int.MaxValue, Math.Ceiling(roomCoin / p1)) : 0;
+                            n4 = Math.Max(free, n4);
+                            if (n4 < nc) { if (n4 < n) _cutCoin434 += Math.Min(n, nc) - n4; nc = n4; }
+                        }
                         if (nc < n) { cCap = n - nc; n = nc; }
                     }
                     if (n > free && s.CaravanBuyByFlow && _days >= FlowMinDays)

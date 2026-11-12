@@ -245,10 +245,30 @@ namespace Armoury
         // Wplata BK przy wjezdzie (wszystko ponad 10 000 w siedzibie / osadzie wlasciciela) dla tych karawan wstrzymana (SettlePre) - inaczej druga regula zdejmowalaby
         // monete, ktora ma stac sie towarem; E3/9 tak samo (Seal31B.ProfitPre). Nic z niczego: zadnego nowego zlota - kiesa karawany -> wlasciciel jak dotad, tylko pozniej.
         // Karawany rozliczane przez rod (259) - bez zmian (maja juz jedna regule: ten sam kapital i podloga w wyplacie i w kupnie). Konwoje DTE i karawany z wodzem - bez zmian.
+        // 434-p (po recenzjach; ksiegi 1 + stabilnosc S1): wiekszy sufit ladunku NIE moze byc finansowany automatyczna doplata notabla (gra dopelnia kiese ponizej
+        // 5 000 z kiesy notabla, a notabla ponizej pasma - kasa miasta): (a) ladunek PONAD dawny sufit (kapital modelu - podloga, ok. 4 900) wolno kupic tylko z monety
+        // ponad PODLOGE KIESY (klucz Caravan One Capital Buys From Own Coin; do dawnego sufitu - jak przed 434), (b) podloga kiesy w wyplacie i w (a) = prog doplaty +
+        // Caravan One Capital Floor Wage Days dni zoldu (7; odcinek drogi to ok. 3.7 doby - zold drogi idzie z zapasu, nie z doplaty). K i sufit K - prog - zold doby
+        // bez zmian. Kapital dorasta do K z ZATRZYMANEGO ZYSKU. (c) regula wymaga latki na BK AddRealisticIncome (OneCapHook). (d) 139 'pelny ladunek' - dawny sufit.
         private static int _d434BkN; private static long _d434BkV;
 
         /// <summary>434: klucze reguly (bez odczytu przelacznika BK).</summary>
         internal static bool OneCapKey { get { var s = S; return s != null && s.CaravanOneWorkingCapital && s.CaravanProfitToOwner; } }
+
+        /// <summary>434-p (rec. ksiegi 4): latka na BK AddRealisticIncome weszla - bez niej BK dalej wplaca "ponad 10 000" przy wjezdzie, wiec regula 434 NIE moze
+        /// dzialac (dwie reguly zdejmowalyby monete); wtedy wszystko jak przed 434 (tak jak Settled wymaga _wIncome).</summary>
+        internal static bool OneCapHook { get { return _wBkIncome; } }
+
+        /// <summary>434-p (rec. ksiegi 1, stabilnosc S1): PODLOGA KIESY karawany pod jedna regula = prog doplaty wlasciciela + Caravan One Capital Floor Wage Days dni
+        /// zoldu (1 = jak 434). Ponizej niej nie schodzi ani wyplata zysku, ani kupno ladunku ponad dawny sufit - zold drogi idzie z tego zapasu, nie z doplaty
+        /// notabla. K i sufit ladunku (K - prog - zold doby) bez zmian. Tylko odczyt.</summary>
+        internal static int OneCapPurseFloor(MobileParty mp)
+        {
+            var s = S;
+            int days = s != null ? Math.Max(1, s.CaravanOneCapitalFloorWageDays) : 1;
+            long f = (long)Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold + (long)days * Math.Max(0, mp.TotalWage);
+            return (int)Math.Min(int.MaxValue, f);
+        }
 
         /// <summary>434: karawana, ktora rozlicza E3-T2 (czynna, bez wodza, nie konwoj DTE, nie rozliczana przez rod). Tylko odczyt.</summary>
         internal static bool OneCapShape(MobileParty mp)
@@ -259,7 +279,7 @@ namespace Armoury
         /// <summary>434: karawana pod jedna regula kapitalu obrotowego (klucze, kampania, E3-T2 czynne: BK Realistic Caravan Income). Tylko odczyt; blad - false (jak dotad).</summary>
         internal static bool OneCap(MobileParty mp)
         {
-            try { return OneCapKey && Live && OneCapShape(mp) && Seal31B.RealisticCaravanIncome(); }
+            try { return OneCapKey && _wBkIncome && Live && OneCapShape(mp) && Seal31B.RealisticCaravanIncome(); }
             catch { return false; }
         }
 
@@ -275,10 +295,25 @@ namespace Armoury
             return (int)Math.Min(int.MaxValue, k);
         }
 
-        /// <summary>434: kapital i podloga do REGUL KUPNA (284 regula 2, 139 'pelny ladunek', 294c): karawana pod jedna regula - K i podloga 434; inaczej CapFloor (jak dotad).</summary>
-        internal static void WorkCapFloor(MobileParty mp, out int capital, out int floor)
+        /// <summary>434: kapital i podloga do REGUL KUPNA (284 regula 2, 294c): karawana pod jedna regula - K i podloga 434; inaczej CapFloor (jak dotad).
+        /// 434-p (stabilnosc S1): oldCeil - sufit ladunku sprzed 434 (kapital modelu - podloga), purseFloor - podloga kiesy (OneCapPurseFloor); oba > 0 tylko dla
+        /// karawany pod jedna regula przy kluczu Caravan One Capital Buys From Own Coin: ladunek PONAD oldCeil wolno kupic tylko z monety ponad purseFloor
+        /// (kapital dorasta do K z zatrzymanego zysku, nie z doplaty notabla); do oldCeil - jak przed 434. 0 / 0 = bez tej reguly.</summary>
+        internal static void WorkCapFloor(MobileParty mp, out int capital, out int floor, out int oldCeil, out int purseFloor)
         {
-            if (OneCap(mp)) { capital = OneCapital(mp, out floor); return; }
+            oldCeil = 0; purseFloor = 0;
+            if (OneCap(mp))
+            {
+                capital = OneCapital(mp, out floor);
+                var s = S;
+                if (s != null && s.CaravanOneCapitalOwnCoin)
+                {
+                    int c0, f0;
+                    CapFloor(mp, out c0, out f0);
+                    if (c0 - f0 > 0) { oldCeil = c0 - f0; purseFloor = OneCapPurseFloor(mp); }   // bez dawnego sufitu (podloga >= kapital) - bez tej reguly, jak przed 434
+                }
+                return;
+            }
             CapFloor(mp, out capital, out floor);
         }
 

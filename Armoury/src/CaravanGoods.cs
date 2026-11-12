@@ -1510,7 +1510,8 @@ namespace Armoury
             int n = 0, below = 0, paidN = 0, notN = 0, lordN = 0, plN = 0, sDis = 0, sBat = 0, sLead = 0, sOwn = 0, sModel = 0, sClan = 0;
             long keepAll = 0, held = 0, paid = 0, pNot = 0, pLord = 0, pPl = 0, ctlFrom = 0, ctlTo = 0;
             // 434 (audyt B1): jedna regula kapitalu obrotowego (CaravanSettle.OneCapital) - liczniki linii
-            bool oneKey = CaravanSettle.OneCapKey;
+            bool oneKey = CaravanSettle.OneCapKey && CaravanSettle.OneCapHook;   // 434-p (rec. ksiegi 4): bez latki na wplate BK - stara regula (inaczej dwie zdejmowalyby monete)
+            int o4Sea = 0, o4NoOwner = 0;
             int o4N = 0, o4OverN = 0, o4Stuck = 0, o4Low = 0, o4PaidN = 0, o4OldN = 0, o4Full = 0;
             long o4K = 0, o4Coin = 0, o4Goods = 0, o4Cost = 0, o4Ceil = 0, o4Over = 0, o4Due = 0, o4Paid = 0, o4Old = 0, pPlOne = 0;
             var cfm = Campaign.Current.Models.ClanFinanceModel;
@@ -1526,21 +1527,28 @@ namespace Armoury
                     int g = mp.PartyTradeGold;
                     long keep = KeepOf(mp.TotalWage);
                     keepAll += keep; held += Math.Min(Math.Max(0, g), keep);
-                    bool one = oneKey && CaravanSettle.OneCapShape(mp);
+                    // 434-p (stabilnosc N3): karawana bez wlasciciela nie wchodzi w regule (OneCapital pyta model o kapital wlasciciela) - stara galaz, licznik "bez zywego wlasciciela"
+                    bool one = oneKey && mp.Owner != null && CaravanSettle.OneCapShape(mp);
+                    if (oneKey && mp.Owner == null) o4NoOwner++;
                     int due;
                     if (one)
                     {
                         // 434: wyplata = max(0, min(wartosc - K, kiesa - podloga)) - wzor 259 (Formula) na kapitale obrotowym K; stary prog tylko jako pomiar
                         if (g <= keep) below++;
-                        int fl4;
-                        int k4 = CaravanSettle.OneCapital(mp, out fl4);
+                        int fl1;
+                        int k4 = CaravanSettle.OneCapital(mp, out fl1);
+                        int fl4 = CaravanSettle.OneCapPurseFloor(mp);   // 434-p (rec. ksiegi 1): podloga WYPLATY = prog doplaty + N dni zoldu (zold drogi z zapasu, nie z doplaty notabla)
                         long cst4, mkt4, oth4; int kd4, un4;
                         long goods4 = WorthOf(mp, out cst4, out mkt4, out kd4, out un4, out oth4);
                         long worth4 = Math.Max(0, g) + goods4;
                         due = CaravanSettle.Formula(worth4, k4, g, fl4);
-                        long ceil4 = Math.Max(0, k4 - fl4);
+                        long ceil4 = Math.Max(0, k4 - fl1);
+                        cst4 = (long)Math.Round(CargoCost(mp));          // 434-p (rec. ksiegi 6): ta sama miara ladunku co regula kupna 284 (CargoCost), nie koszt z WorthOf
                         o4N++; o4K += k4; o4Coin += Math.Max(0, g); o4Goods += goods4; o4Cost += cst4; o4Ceil += ceil4;
                         if (g < fl4) o4Low++;
+                        // 434-p (stabilnosc N2): gra kupuje statki karawanie morskiej z kiesa > 10 000 (do polowy kiesy) - przed 434 E3-T2 scinal kiese do 10 000; sam pomiar
+                        var cpc4 = mp.CaravanPartyComponent;
+                        if (g > 10000 && cpc4 != null && cpc4.CanHaveNavalNavigationCapability) o4Sea++;
                         if (ceil4 > 0 && cst4 >= ceil4) o4Full++;
                         if (worth4 > k4) { o4OverN++; o4Over += worth4 - k4; if (due <= 0) o4Stuck++; }
                         if (g > keep) { o4OldN++; o4Old += g - keep; }
@@ -1593,21 +1601,28 @@ namespace Armoury
             // 434 (audyt B1): jedna regula kapitalu obrotowego - pomiar i kontrola (wzor = zdjete z kies)
             int bk4N; long bk4V;
             CaravanSettle.TakeBk434(out bk4N, out bk4V);
-            if (!oneKey) sb.Append(" | 434 jedna regula kapitalu obrotowego NIE (Caravan One Working Capital) - prog 10 000 w monecie i sufit towaru osobno, jak przed 434");
+            if (!oneKey && CaravanSettle.OneCapKey) sb.Append(" | 434 jedna regula kapitalu obrotowego NIECZYNNA - brak latki BK AddRealisticIncome (wplata BK przy wjezdzie dziala) - wszystko jak przed 434");
+            else if (!oneKey) sb.Append(" | 434 jedna regula kapitalu obrotowego NIE (Caravan One Working Capital) - prog 10 000 w monecie i sufit towaru osobno, jak przed 434");
             else
             {
                 long worthAll = o4Coin + o4Goods;
-                sb.Append(" | 434 jedna regula kapitalu obrotowego TAK: K = max(").Append(KeepGold).Append(", ").Append(KeepWageDays).Append(" dni zoldu) + (kapital modelu - podloga), podloga = prog doplaty + zold doby")
+                int rc4, pc4;
+                CaravanTrade284.TakeCoin434(out rc4, out pc4);
+                sb.Append(" | 434 jedna regula kapitalu obrotowego TAK: K = max(").Append(KeepGold).Append(", ").Append(KeepWageDays).Append(" dni zoldu) + (kapital modelu - prog doplaty - zold doby), podloga kiesy = prog doplaty + ")
+                  .Append(Math.Max(1, s.CaravanOneCapitalFloorWageDays)).Append(" dni zoldu; ladunek ponad dawny sufit tylko z monety ponad podloge ").Append(s.CaravanOneCapitalOwnCoin ? "TAK" : "NIE")
+                  .Append(" (odmowy kupna ").Append(rc4).Append(", sztuki ciete ").Append(pc4).Append(")")
                   .Append("; karawan pod regula ").Append(o4N).Append(", K lacznie ").Append(o4K).Append(" (srednio ").Append(o4N > 0 ? (o4K / o4N).ToString(Inv) : "-")
                   .Append("), moneta ").Append(o4Coin).Append(" + towar ").Append(o4Goods).Append(" = wartosc ").Append(worthAll)
                   .Append(" (").Append(o4K > 0 ? (100.0 * worthAll / o4K).ToString("0.0", Inv) : "-").Append("% K; udzial towaru ").Append(worthAll > 0 ? (100.0 * o4Goods / worthAll).ToString("0.0", Inv) : "-")
                   .Append("%), sufit ladunku lacznie ").Append(o4Ceil).Append(", ladunek po koszcie ").Append(o4Cost).Append(" (").Append(o4Ceil > 0 ? (100.0 * o4Cost / o4Ceil).ToString("0.0", Inv) : "-")
                   .Append("% sufitu; karawan z pelnym ladunkiem ").Append(o4Full).Append("), kiesa ponizej podlogi ").Append(o4Low)
                   .Append(" | wartosc ponad K: ").Append(o4OverN).Append(" karawan, nadwyzka ").Append(o4Over).Append(", z tego nalezne dzis wedlug wzoru ").Append(o4Due)
-                  .Append(", zysk stoi w towarze (kiesa <= podloga) ").Append(o4Stuck)
+                  .Append(", zysk stoi w towarze (kiesa <= podloga kiesy) ").Append(o4Stuck)
                   .Append(" | kontrola 434: wzor ").Append(o4Due).Append(" = zdjete z kies ").Append(o4Paid).Append(" (roznica ").Append(o4Due - o4Paid).Append("), wyplat ").Append(o4PaidN)
                   .Append(" | pomiar: stary prog (moneta ponad max(10 000, 30 dni zoldu)) oddalby ").Append(o4Old).Append(" zl z ").Append(o4OldN).Append(" karawan (przed pominieciami)")
-                  .Append("; wplata BK przy wjezdzie wstrzymana ").Append(bk4N).Append(" (zdjelaby ").Append(bk4V).Append(')');
+                  .Append("; wplata BK przy wjezdzie wstrzymana ").Append(bk4N).Append(" (zdjelaby ").Append(bk4V).Append(')')
+                  .Append("; karawany morskie z kiesa > 10 000 (gra moze im kupic statek) ").Append(o4Sea).Append("; bez wlasciciela poza regula ").Append(o4NoOwner)
+                  .Append("; ladunek liczony jak regula kupna (CargoCost)");
             }
             sb.Append(" | potkniecia ").Append(_oStumbles).Append(" (sesja ").Append(_oStumbleSess).Append(").");
             Log.Info(sb.ToString());

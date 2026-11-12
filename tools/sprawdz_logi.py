@@ -33903,6 +33903,11 @@ N3E_2_PAID = re.compile(r"\| CZYNNE \| karawan (\d+), oddaly (\d+) za (\d+) zl \
 N3E_2_KEEP = re.compile(r"razem (\d+), w kiesach do kapitalu (\d+)")
 N3E_2_CTL = re.compile(r"kontrola: kiesy karawan -(-?\d+) = wlasciciele \+(-?\d+) \(roznica (-?\d+)\)")
 N3E_OB_TOPUP = re.compile(r"doplaty notabli do 5000 ([+-]?\d+)")
+# 434 / 434-p: segment "434 jedna regula kapitalu obrotowego TAK" linii E3-T2
+N3E_2_434 = re.compile(r"\| 434 jedna regula kapitalu obrotowego TAK")
+N3E_2_434OWN = re.compile(r"ladunek ponad dawny sufit tylko z monety ponad podloge (TAK|NIE)")
+N3E_2_434N = re.compile(r"karawan pod regula (\d+)")
+N3E_2_434CTL = re.compile(r"kontrola 434: wzor (-?\d+) = zdjete z kies (-?\d+) \(roznica (-?\d+)\)")
 N3E_1_PORT = re.compile(r"wstrzymane \(porcja\) (\d+) \(")
 N3E_1_KIND = re.compile(r"spadek indeksu wedlug rodzaju sprzedazy \(najwiekszy w jednym miescie dzis\): z zyskiem (-?[\d.]+)%, na stracie porcjami (-?[\d.]+)% "
                         r"\(granica [\d.]+%\), bez wyjscia \(rozwiazanie, brak na zold\) (-?[\d.]+)%")
@@ -35487,7 +35492,11 @@ def nekon3_main(logp, bdp=None):
         # NE3-14c (uwaga recenzji 2: myto karawan i cienka marza) - kiesy karawan na koniec nie nizsze niz w bazie o wiecej niz 5%;
         # strojenie po tescie 120 dob (S2): przy czynnym E3-T2 kiesy karawan schodza do kapitalu obrotowego z zamiaru (nadwyzka do wlascicieli) - miara "T1 i myto
         # nie topia kapitalu" to doplaty notabli do 5000 (gra dopelnia kase karawany ponizej 5000 z kiesy notabla; E3-T2 nigdy nie schodzi ponizej 10 000)
+        # 434 / 434-p: pod jedna regula kapitalu obrotowego kiesa moze zejsc do podlogi (prog doplaty + N dni zoldu). Przy "ladunek ponad dawny sufit tylko z monety
+        # ponad podloge TAK" doplaty NIE powinny rosnac - prog zostaje (to test poprawki 434-p); przy NIE doplaty rosna z zamiaru (notabl finansuje ladunek) - INFO
         t2on = [x for x, s in D["t2"].items() if " | CZYNNE | " in s]
+        own434 = [N3E_2_434OWN.search(s) for s in D["t2"].values() if N3E_2_434.search(s)]
+        loose434 = bool(own434) and any(a is None or a.group(1) == "NIE" for a in own434)
         top = {x: num(N3E_OB_TOPUP.pattern, s, int, None) for x, s in D["obnc"].items()}
         top = {x: v for x, v in top.items() if v is not None}
         btop = {}
@@ -35503,7 +35512,9 @@ def nekon3_main(logp, bdp=None):
                 be3 = BWd[sorted(BWd)[-1]]
                 tinfo = f"; kiesy karawan na koniec {W[days[-1]]['karawany']} wobec bazy {be3['karawany']} (INFO - E3-T2 oddaje nadwyzke wlascicielom)"
             rep.add("NE3-14c: przy E3-T2 - doplaty notabli do 5000 (gra dopelnia biedne karawany) srednio 30 dob <= 1.1 x baza (bez bazy 80 000; T1 i myto nie topia kapitalu karawan)",
-                    f"{tt30:.0f} zl/d" + (f" (baza {tb30:.0f})" if tb30 else "") + tinfo, f"<= {tlim:.0f}", tt30 <= tlim)
+                    f"{tt30:.0f} zl/d" + (f" (baza {tb30:.0f})" if tb30 else "") + tinfo
+                    + ("; 434 bez reguly wlasnej monety - doplaty rosna z zamiaru (INFO)" if loose434 else ("; 434 z regula wlasnej monety - prog obowiazuje" if own434 else "")),
+                    f"<= {tlim:.0f}" + (" (INFO)" if loose434 else ""), None if loose434 else tt30 <= tlim)
         elif BWd and nd:
             be2 = BWd[sorted(BWd)[-1]]
             ce, cb = W[days[-1]]["karawany"], be2["karawany"]
@@ -35575,11 +35586,35 @@ def nekon3_main(logp, bdp=None):
             if k:
                 keep2.append(int(k.group(1))); held2.append(int(k.group(2)))
         p30 = _n3e_mean(paid2[-30:]) if paid2 else 0
-        rep.add("NE3-25: E3-T2 zysk karawan do wlascicieli - linia w >= 95% dob, kontrola 'kiesy karawan = wlasciciele' 0 kazdej doby, oddane > 0 (srednio 30 dob); kwoty - INFO",
+        # 434: pod jedna regula kapitalu obrotowego karawany przez pierwsze tygodnie zatrzymuja zysk (wartosc dorasta do K) - "oddane > 0" wymagane dopiero,
+        # gdy log ma >= 60 dob z regula 434
+        on434 = [x for x in on2 if N3E_2_434.search(D["t2"][x])]
+        grow434 = bool(on434) and len(on434) < 60
+        if grow434 and p30 <= 0:
+            p30 = 0.0
+        rep.add("NE3-25: E3-T2 zysk karawan do wlascicieli - linia w >= 95% dob, kontrola 'kiesy karawan = wlasciciele' 0 kazdej doby, oddane > 0 (srednio 30 dob; przy 434 dopiero od 60. doby reguly); kwoty - INFO",
                 f"linia {cov2 * 100:.0f}% dob (czynna {len(on2)}), z roznica {len(bad2)}" + (f" (np. d{bad2[0]})" if bad2 else "")
                 + f"; oddane srednio 30 dob {p30:.0f} zl/d u {(_n3e_mean(n2[-30:]) or 0):.0f} karawan, pierwsza doba {paid2[0] if paid2 else '-'}"
                 + (f"; kapital obrotowy na koniec {keep2[-1]}, w kiesach do kapitalu {held2[-1]}" if keep2 else ""),
-                ">= 95% / 0 / > 0", bool(on2) and cov2 >= 0.95 and not bad2 and p30 > 0)
+                ">= 95% / 0 / > 0", bool(on2) and cov2 >= 0.95 and not bad2 and (p30 > 0 or grow434))
+        # NE3-25b (434 / 434-p): jedna regula kapitalu obrotowego - kontrola "wzor = zdjete z kies" 0 kazdej doby, karawany pod regula > 0
+        if on434:
+            bad4, n4, miss4 = [], [], []
+            for x in on434:
+                s = D["t2"][x]
+                c, k = N3E_2_434CTL.search(s), N3E_2_434N.search(s)
+                if not c:
+                    miss4.append(x)
+                elif int(c.group(3)) != 0:
+                    bad4.append(x)
+                if k:
+                    n4.append(int(k.group(1)))
+            rep.add("NE3-25b: 434 jedna regula kapitalu obrotowego - 'kontrola 434: wzor = zdjete z kies' roznica 0 kazdej doby, karawan pod regula > 0",
+                    f"dob z regula {len(on434)}, z roznica {len(bad4)}" + (f" (np. d{bad4[0]})" if bad4 else "") + f", bez segmentu kontroli {len(miss4)}"
+                    + f"; karawan pod regula srednio {(_n3e_mean(n4) or 0):.0f} (min {min(n4) if n4 else '-'})",
+                    "0 / 0 / > 0", not bad4 and not miss4 and bool(n4) and min(n4) > 0)
+        else:
+            rep.add("NE3-25b: 434 jedna regula kapitalu obrotowego", "brak segmentu '434 ... TAK'", "INFO (klucz NIE, brak latki BK albo log sprzed 434)", None)
     else:
         rep.add("NE3-25: E3-T2 zysk karawan do wlascicieli", "brak linii", "INFO (log sprzed strojenia S2)", None)
     _n3e_part2(rep, logp, bdp, D, W, days)   # czesc 2: NE3-0b, NE3-1c, NE3-4, NE3-15c2, NE3-16c2, NE3-17..24

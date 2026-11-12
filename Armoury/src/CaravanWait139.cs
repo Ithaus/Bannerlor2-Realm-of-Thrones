@@ -594,7 +594,9 @@ namespace Armoury
                 if (!loaded && mp.Owner != null)
                 {
                     int cap, floor;
-                    CaravanSettle.WorkCapFloor(mp, out cap, out floor);   // 434: ten sam sufit ladunku co regula kupna 284 (karawana pod jedna regula - K)
+                    // 434-p (stabilnosc N1): DAWNY sufit (CapFloor) - karawana z ladunkiem ok. 4 900-6 000, ktora nie ma za co albo czego dokupic, zostaje w wyborze
+                    // celu 139 jak przed 434; sufit K obowiazuje w regule kupna 284, nie tutaj
+                    CaravanSettle.CapFloor(mp, out cap, out floor);
                     loaded = cap - floor > 0 && cargo >= cap - floor;
                 }
                 bool stuck = AOn(s) && CaravanTrade284.Stuck7(mp, (int)CampaignTime.Now.ToDays);   // recenzja 139: ksiega 284 co najmniej 7 dob (nie nowa karawana)

@@ -9088,9 +9088,17 @@ namespace Armoury
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool CaravanProfitToOwner { get; set; } = true;
 
-        [SettingPropertyBool("Caravan One Working Capital", HintText = "one rule for the working capital of a merchant's caravan (a caravan settled by its house under Caravan Clan Settlement already has one). The 10,000 it used to keep in coin (or a month of wages, if more) and the stock it was allowed to carry on top of that are counted together as its working capital - about 15,000 for an ordinary caravan - and it may hold it as coin or as goods, as trade demands. It buys while its goods at cost are below that capital less the coin it must keep for wages (about twice the old load), and once a day hands its owner only what its coin and goods together are worth above the capital, never dipping into the coin kept for wages. Banner Kings' own deposit of everything above 10,000 at the owner's town is switched off for these caravans, so there is one rule. Caravans carry bigger loads and even out prices between towns; merchants see less profit for a while as the caravans fill up. Needs Caravan Profit To Owner. Off = as before: 10,000 kept in coin and the goods capped separately", RequireRestart = false)]
+        [SettingPropertyBool("Caravan One Working Capital", HintText = "one rule for the working capital of a merchant's caravan (a caravan settled by its house under Caravan Clan Settlement already has one). The 10,000 it used to keep in coin (or a month of wages, if more) and the stock it was allowed to carry on top of that are counted together as its working capital - about 15,000 for an ordinary caravan - and it may hold it as coin or as goods, as trade demands. It buys while its goods at cost are below that capital less the coin it must keep for wages (about twice the old load), and once a day hands its owner only what its coin and goods together are worth above the capital, never dipping into the coin kept for wages (Caravan One Capital Floor Wage Days). Banner Kings' own deposit of everything above 10,000 at the owner's town is switched off for these caravans, so there is one rule. Needs Caravan Profit To Owner. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool CaravanOneWorkingCapital { get; set; } = true;
+
+        [SettingPropertyBool("Caravan One Capital Buys From Own Coin", HintText = "with Caravan One Working Capital: the bigger load is bought with the caravan's own kept profit. Up to its old load a caravan buys as before; beyond it, it buys only with coin it holds above the coin kept for wages, so its capital grows from what it earns over some weeks and not from its owner topping up an emptied purse. Off = it may spend its purse down on the bigger load and the owner (and behind him his town) refills it", RequireRestart = false)]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool CaravanOneCapitalOwnCoin { get; set; } = true;
+
+        [SettingPropertyInteger("Caravan One Capital Floor Wage Days", 1, 30, "0", HintText = "with Caravan One Working Capital: how many days of wages a merchant's caravan keeps in coin on top of the 5,000 below which its owner must top it up. Neither the daily profit handed to the owner nor a purchase beyond the old load takes its purse below this, so the wages of a road are paid from the caravan's own coin (1 = one day of wages)", RequireRestart = false)]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public int CaravanOneCapitalFloorWageDays { get; set; } = 7;
 
         [SettingPropertyBool("Caravan Clan Settlement", HintText = "once a day the caravans of lords, of their companions and yours - whose wages the house pays - send the house what they have earned: what the caravan is worth (coin plus its goods, counted at what it paid or at the market if that is lower) above what it was given to trade with (15,000 for yours, 10,000 for a lord's; more for armed and sea caravans), but never so much that its coin falls below 5,000 and a day of wages. It is paid with the house's daily income ('Caravan income' in the clan finances) and replaces the game's 10% a day and the Banner Kings deposit at the owner's home, so nothing is paid twice; notables' caravans keep their own rule (off = as before)", RequireRestart = false)]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
@@ -15004,6 +15012,8 @@ namespace Armoury
             s.CaravanSellWhereDear = CaravanSellWhereDear;
             s.CaravanProfitToOwner = CaravanProfitToOwner;
             s.CaravanOneWorkingCapital = CaravanOneWorkingCapital;
+            s.CaravanOneCapitalOwnCoin = CaravanOneCapitalOwnCoin;
+            s.CaravanOneCapitalFloorWageDays = CaravanOneCapitalFloorWageDays;
             s.CaravanClanSettlement = CaravanClanSettlement;
             s.CaravanReports = CaravanReports;
             s.VillageCartBringsGoods = VillageCartBringsGoods;
