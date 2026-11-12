@@ -650,8 +650,15 @@ namespace Armoury
                         {
                             if ((b0 || why != 0) && screen) TakeOver(m, f, idx, b0, why);
                         }
-                        else if ((!b0 && why == 0) || !screen) Restore(m, f, idx);
-                        else { _s4Why[idx] |= why; Keep(m, f, idx); }
+                        else if ((!b0 && why == 0) || !screen) Restore(m, f, idx, b0 || why != 0);   // 443-p: true = puszczone, bo oslona znikla
+                        else
+                        {
+                            // 443-p: powody aktywne w tym takcie (bit 1 S4, 2 / 4 443) - liczniki powrotu wedlug ostatnich powodow
+                            byte cur = (byte)((b0 ? 1 : 0) | why);
+                            if ((cur & ~_s4Prev[idx] & 6) != 0) R443NoteJoined();
+                            _s4Prev[idx] = cur;
+                            Keep(m, f, idx);
+                        }
                     }
                     catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Szyk", e); }
                 }
@@ -764,8 +771,7 @@ namespace Armoury
             else R443NoteTake(r, why);
             if (r != 0) return;
             _sBack[idx] = true;
-            _s4Old[idx] = b0;
-            _s4Why[idx] = why;
+            _s4Prev[idx] = (byte)((b0 ? 1 : 0) | why);
             ArchersFellBack(f);
         }
 
@@ -778,18 +784,22 @@ namespace Armoury
             if (Apply(lst, idx) == 0) return;
             _sBack[idx] = false;
             Drop(idx);
-            if (_s4Old[idx]) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Lost++; } }
+            if ((_s4Prev[idx] & 1) != 0) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Lost++; } }
             else R443NoteLost();
+            _s4Prev[idx] = 0;
         }
 
-        private static void Restore(Mission m, Formation f, int idx)
+        /// <summary>noScreen (443-p): powod dalej jest, ale glowna piechota znikla / za mala - liczone osobno, nie jako "wystawieni ponownie".</summary>
+        private static void Restore(Mission m, Formation f, int idx, bool noScreen)
         {
             var lst = f.AI != null ? _fBehaviors(f.AI) : null;
             PutBack(lst, idx);
             _sBack[idx] = false;
             Drop(idx);
-            if (_s4Old[idx]) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Return++; } }
-            else R443NoteReturn(_s4Why[idx]);
+            byte last = _s4Prev[idx];
+            _s4Prev[idx] = 0;
+            if ((last & 1) != 0) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Return++; } }   // S4 jak dotad (takze przy braku oslony)
+            if ((last & 6) != 0) { if (noScreen) R443NoteScreenGone(); else R443NoteReturn(last); }
         }
 
         /// <summary>Zapisane wagi wracaja do TYCH SAMYCH obiektow zachowan (ReferenceEquals), gdziekolwiek sa teraz na liscie; zachowania spoza kopii

@@ -40,14 +40,21 @@ namespace Armoury
     ///   (c) i (d) dla kazdej druzyny AI (TeamAIGeneral) obu stron, takze bez doktryny (tlum) i takze przeciw graczowi; szyk gracza - nigdy.
     /// Klucze NIE: decyzje liczone (tylko odczyt), role nie nadawane, powody S4 443 = 0 - co do znaku jak dotad; liczniki "bylby".
     /// Watki: R443OnHit (tick mozliwie asynchroniczny) - tylko Interlocked na tablicach; reszta glowny watek; wyjatki per szyk liczone (potkniecia).
+    /// 443-p (recenzja): (1) w fazie szarzy rajd sprawdza droge (T442Blocked 2 takty z rzedu) -> znow z boku, bez punktu -> koniec "brak drogi" i HIDE;
+    ///   (2) straty jazdy laczne ze wszystkich rajdow szyku w bitwie (baza = liczebnosc przy pierwszym rajdzie, >= 40% -> bez nowego rajdu), po koncach
+    ///   straty / czas / brak drogi i po "ostrzal ustal" przerwa 30 s, po "czas" cel zakazany dla szyku; (3) trafienie liczy sie tylko od pieszego strzelca
+    ///   (konni strzelcy - osobny licznik), "near" po odrzuceniu zwiazanych walka; (4) schowani z powodu wymiany trzymani, dopoki wymiana przegrana;
+    ///   (6) punkt HIDE odsuniety w bok od wlasnych strzelcow; (7)/(10) 5.1 bez wejscia w zwarciu i tylko gdy wlasna piechota stoi miedzy jazda wroga
+    ///   a punktem, gdzie RBM stawia lucznikow (front glownej piechoty - rbmai OverrideBehaviorScreenedSkirmish); (8) liczniki S4 / 443 wedlug powodow
+    ///   aktywnych w ostatnim takcie. "Wodz wystawia lucznikow" przy wygranej wymianie - NIE zrobione (osobny krok).
     /// </summary>
     internal static partial class Doctrine
     {
         internal const float R443Every = 1f, R443Latch = 30f, R443Reenter = 10f, R443RaidRange = 250f, R443FlankOff = 40f, R443FlankReach = 30f, R443FlankStale = 30f;
         internal const float R443RaidMax = 75f, R443RaidLoss = 0.4f, R443TgtBroken = 0.5f, R443HideGap = 10f, R443HideMove = 8f, R443Gap = 15f, R443TgtMelee = 0.2f;
         internal const float R443DuelRatio = 1.5f, R443CavEta = 8f, R443CavNear = 20f, R443CavDot = 0.33f, R443CavSpeed = 2f, R443CavHold = 3f, R443Still = 1.5f;
-        internal const float R443ExpMin = 30f, R443ExpMax = 200f;
-        internal const int R443CavHits = 4, R443ArcherHits = 2, R443DuelMin = 3, R443CavMin = 5, R443InfMin = 10;
+        internal const float R443ExpMin = 30f, R443ExpMax = 200f, R443ChargeCheck = 30f, R443OwnArch = 15f;
+        internal const int R443CavHits = 4, R443ArcherHits = 2, R443DuelMin = 3, R443CavMin = 5, R443InfMin = 10, R443BlockTicks = 2;
         private const int R4W = 11, R4DW = 31;   // pierscien: 10 s trafien slotu, 30 s strat druzyny (probka co takt 1 s)
         private const byte RmNone = 0, RmRaid = 1, RmHide = 2;
         private static readonly IFormatProvider R4Inv = CultureInfo.InvariantCulture;
@@ -74,31 +81,41 @@ namespace Armoury
         private static readonly Formation[] _r4Tgt = new Formation[CrSlots];
         private static readonly bool[] _r4Flank = new bool[CrSlots], _r4Contact = new bool[CrSlots];
         private static readonly Vec2[] _r4P = new Vec2[CrSlots], _r4TgtAt = new Vec2[CrSlots], _r4Prev = new Vec2[CrSlots];
-        private static readonly int[] _r4Men0 = new int[CrSlots], _r4TgtMen0 = new int[CrSlots];
+        private static readonly int[] _r4TgtMen0 = new int[CrSlots], _r4Blk = new int[CrSlots];
+        // 443-p: stan szyku jazdy na cala bitwe (nie czyszczony przez R443CavClear; od zera przy zmianie szyku w slocie i w ClearMission)
+        private static readonly int[] _r4Base = new int[CrSlots];   // liczebnosc przy pierwszym rajdzie w bitwie - straty laczne
+        private static readonly float[] _r4Wait = new float[CrSlots];   // przerwa po oddaniu (10 s, po strata / czas / brak drogi / ostrzal ustal 30 s)
+        private static readonly Formation[] _r4Ban = new Formation[CrSlots], _r4LastTgt = new Formation[CrSlots];
+        private static readonly bool[] _r4CapSeen = new bool[CrSlots], _r4HideSeen = new bool[CrSlots];
         // strzelcy (slot FormationIndex)
         private static readonly Formation[] _r4AWho = new Formation[CrSlots];
         private static readonly float[] _r4DuelUntil = new float[CrSlots], _r4CavUntil = new float[CrSlots];
-        // S4 (indeks Manoeuvres): wejscie z powodu S4 (liczniki S4) i powody 443 (2 wymiana, 4 jazda)
-        private static readonly bool[] _s4Old = new bool[Slots];
-        private static readonly byte[] _s4Why = new byte[Slots];
+        // S4 (indeks Manoeuvres): powody aktywne w ostatnim takcie schowania - bit 1 S4, 2 wymiana (443), 4 jazda (443)
+        private static readonly byte[] _s4Prev = new byte[Slots];
         private static readonly Dictionary<Formation, float> _r4Melee = new Dictionary<Formation, float>();
 
         // ---- liczniki misji (R443Reset w Battle291.Begin)
-        private static float _r4FireSec, _r4FireStill, _r4ExpStill, _r4NoArchSec, _r4RaidSec, _r4HideSec, _r4LostSec, _r4EvenSec, _r4HeldSec, _r4NoScreenSec, _r4EtaSum;
+        private static float _r4FireSec, _r4FireStill, _r4ExpSec, _r4ExpStill, _r4NoArchSec, _r4RaidSec, _r4HideSec, _r4LostSec, _r4EvenSec, _r4HeldSec, _r4NoScreenSec, _r4EtaSum;
+        private static float _r4CavMeleeSec, _r4CavWrongSec;
         private static int _r4HitRider, _r4HitHorse, _r4RaidN, _r4RaidDirect, _r4RaidFlank, _r4FlankToCharge, _r4RaidDry, _r4RaidBroken, _r4RaidContact, _r4RaidCut;
         private static int _r4CutLoss, _r4CutTime, _r4CutRoute, _r4RaidDone, _r4HideN, _r4HideDry, _r4HideMelee, _r4HideCalm, _r4HideToRaid, _r4HideNoInf, _r4HideNoInfN;
         private static int _r4Refused, _r4Back, _r4LostIn, _r4DuelIn, _r4DuelDry, _r4DuelTake, _r4DuelOut, _r4CavIn, _r4CavDry, _r4CavTake, _r4CavOut;
         private static int _r4NotSkirm, _r4NoBeh, _r4S4Lost, _r4HeldMax, _r4Stum, _r4Open;
+        private static int _r4ChargeToFlank, _r4ChargeCut, _r4CapStop, _r4Again, _r4BanSkip, _r4HideAgain, _r4HideShift, _r4HideOwnNear, _r4ScreenGone, _r4Joined;
+        private static int _r4HitSkip;   // trafienia od konnych strzelcow wroga - pominiete (Interlocked, dowolny watek)
         private static double _r4TgtLossSum;
 
         /// <summary>Battle291.Begin (AfterStart): liczniki linii 443 od zera.</summary>
         internal static void R443Reset()
         {
-            _r4FireSec = _r4FireStill = _r4ExpStill = _r4NoArchSec = _r4RaidSec = _r4HideSec = _r4LostSec = _r4EvenSec = _r4HeldSec = _r4NoScreenSec = _r4EtaSum = 0f;
+            _r4FireSec = _r4FireStill = _r4ExpSec = _r4ExpStill = _r4NoArchSec = _r4RaidSec = _r4HideSec = _r4LostSec = _r4EvenSec = _r4HeldSec = _r4NoScreenSec = _r4EtaSum = 0f;
+            _r4CavMeleeSec = _r4CavWrongSec = 0f;
             _r4HitRider = _r4HitHorse = _r4RaidN = _r4RaidDirect = _r4RaidFlank = _r4FlankToCharge = _r4RaidDry = _r4RaidBroken = _r4RaidContact = _r4RaidCut = 0;
             _r4CutLoss = _r4CutTime = _r4CutRoute = _r4RaidDone = _r4HideN = _r4HideDry = _r4HideMelee = _r4HideCalm = _r4HideToRaid = _r4HideNoInf = _r4HideNoInfN = 0;
             _r4Refused = _r4Back = _r4LostIn = _r4DuelIn = _r4DuelDry = _r4DuelTake = _r4DuelOut = _r4CavIn = _r4CavDry = _r4CavTake = _r4CavOut = 0;
             _r4NotSkirm = _r4NoBeh = _r4S4Lost = _r4HeldMax = _r4Stum = _r4Open = 0;
+            _r4ChargeToFlank = _r4ChargeCut = _r4CapStop = _r4Again = _r4BanSkip = _r4HideAgain = _r4HideShift = _r4HideOwnNear = _r4ScreenGone = _r4Joined = 0;
+            Interlocked.Exchange(ref _r4HitSkip, 0);
             _r4TgtLossSum = 0.0;
         }
 
@@ -122,12 +139,13 @@ namespace Armoury
                 _r4RWho[i] = null; _r4LastHit[i] = _r4LastHorse[i] = 0;
                 R443CavClear(i);
                 _r4CWho[i] = null; _r4Prev[i] = Vec2.Invalid; _r4Exit[i] = -1000f; _r4DryUntil[i] = -1000f;
+                R443SlotNew(i);
                 _r4AWho[i] = null; _r4DuelUntil[i] = _r4CavUntil[i] = -1000f;
             }
             for (int i = 0; i < _r4Ring.Length; i++) _r4Ring[i] = 0;
             for (int i = 0; i < _r4DRing.Length; i++) _r4DRing[i] = 0;
             for (int i = 0; i < MaxTeams; i++) { _r4DTeam[i] = null; _r4DNow[i] = _r4DOld[i] = 0; _r4Lost[i] = false; }
-            for (int i = 0; i < Slots; i++) { _s4Old[i] = false; _s4Why[i] = 0; }
+            for (int i = 0; i < Slots; i++) _s4Prev[i] = 0;
             _r4Melee.Clear();
             _r4Pos = _r4DPos = 0;
             _r4Acc = 0f;
@@ -136,7 +154,13 @@ namespace Armoury
         private static void R443CavClear(int i)
         {
             _r4Mode[i] = RmNone; _r4Tgt[i] = null; _r4Flank[i] = false; _r4Contact[i] = false;
-            _r4P[i] = Vec2.Invalid; _r4TgtAt[i] = Vec2.Invalid; _r4Men0[i] = _r4TgtMen0[i] = 0; _r4Since[i] = 0f;
+            _r4P[i] = Vec2.Invalid; _r4TgtAt[i] = Vec2.Invalid; _r4TgtMen0[i] = 0; _r4Blk[i] = 0; _r4Since[i] = 0f;
+        }
+
+        /// <summary>443-p: stan slotu jazdy na cala bitwe od zera (nowy szyk w slocie / koniec misji).</summary>
+        private static void R443SlotNew(int i)
+        {
+            _r4Base[i] = 0; _r4Wait[i] = R443Reenter; _r4Ban[i] = null; _r4LastTgt[i] = null; _r4CapSeen[i] = false; _r4HideSeen[i] = false;
         }
 
         // ------------------------------------------------------------ trafienie (BattleSense.OnAgentHit - dowolny watek)
@@ -155,6 +179,9 @@ namespace Armoury
                 var t = man.Team;
                 var at = by != null ? by.Team : null;
                 if (f == null || t == null || at == null || !t.IsEnemyOf(at)) return;
+                // 443-p: jezdziec / kon (sygnal rajdu i HIDE) - tylko od pieszego strzelca (regula dotyczy pieszych strzelcow wroga); konni strzelcy
+                // i jezdziec-gracz - osobny licznik, bez sygnalu. Piesza ofiara (ocena wymiany c) - jak dotad, kazdy strzelec wroga.
+                if ((horse || man.MountAgent != null) && (!by.IsHuman || by.MountAgent != null)) { Interlocked.Increment(ref _r4HitSkip); return; }
                 int idx = C441Idx(f);
                 if (idx < 0) return;
                 Interlocked.Increment(ref _r4Hit[idx]);
@@ -189,6 +216,10 @@ namespace Armoury
         }
 
         internal static void R443NoteLost() { _r4S4Lost++; }
+
+        internal static void R443NoteScreenGone() { _r4ScreenGone++; }
+
+        internal static void R443NoteJoined() { _r4Joined++; }
 
         internal static void R443NoteReturn(byte why)
         {
@@ -321,7 +352,7 @@ namespace Armoury
             }
             // 4) schowania S4 z powodow 443 naraz (indeks Manoeuvres)
             int held = 0;
-            for (int i = 0; i < Slots; i++) if (_sBack[i] && !_s4Old[i]) held++;
+            for (int i = 0; i < Slots; i++) if (_sBack[i] && (_s4Prev[i] & 6) != 0) held++;
             _r4HeldSec += held * step;
             if (held > _r4HeldMax) _r4HeldMax = held;
         }
@@ -352,7 +383,7 @@ namespace Armoury
             else { _r4LastHit[idx] = Volatile.Read(ref _r4Hit[idx]); _r4LastHorse[idx] = Volatile.Read(ref _r4Horse[idx]); }
             if (cavCls) R443Cav(m, t, f, idx, mine && f.CountOfUnits >= R443CavMin, hits, now, step);
             else if (_r4Mode[idx] != RmNone && ReferenceEquals(_r4CWho[idx], f)) R443End(f, idx, now, 0);   // szyk przestal byc jazda
-            if (q != null && q.IsRangedFormation && !cavCls) R443Arch(t, f, idx, mine && f.CountOfUnits >= R443CavMin, hits, now);
+            if (q != null && q.IsRangedFormation && !cavCls) R443Arch(t, f, idx, mine && f.CountOfUnits >= R443CavMin, hits, now, step);
             else if (ReferenceEquals(_r4AWho[idx], f)) { _r4DuelUntil[idx] = _r4CavUntil[idx] = -1000f; }
         }
 
@@ -364,6 +395,7 @@ namespace Armoury
             {
                 R443CavClear(idx);
                 _r4CWho[idx] = f; _r4Prev[idx] = Vec2.Invalid; _r4Exit[idx] = -1000f; _r4DryUntil[idx] = -1000f;
+                R443SlotNew(idx);
             }
             if (!ok)
             {
@@ -377,7 +409,7 @@ namespace Armoury
             if (_r4Mode[idx] != RmNone)
             {
                 byte want = _r4Mode[idx] == RmRaid ? CrRaid : CrHide;
-                if (C441RoleOf(f) != want) { _r4Back++; R443CavClear(idx); _r4Exit[idx] = now; }
+                if (C441RoleOf(f) != want) { _r4Back++; R443CavClear(idx); _r4Exit[idx] = now; _r4Wait[idx] = R443Reenter; }
             }
             float gap = R443GapOf(f);
             float own = R443Melee(f);
@@ -388,18 +420,25 @@ namespace Armoury
             bool flank, expNear;
             Vec2 fp;
             WorldPosition fwp;
-            R443FindRaid(t, f, me, out tgt, out flank, out fp, out fwp, out near, out expNear);
+            R443FindRaid(t, f, me, _r4Ban[idx], out tgt, out flank, out fp, out fwp, out near, out expNear);
             // pomiar: jazda pod ostrzalem (trafienie ludzi albo koni w 10 s) poza zwarciem - stala / stala przy odslonietych strzelcach
             if (hits > 0 && gap >= R443Gap)
             {
                 _r4FireSec += step;
+                if (expNear) _r4ExpSec += step;
                 if (still) { _r4FireStill += step; if (expNear) _r4ExpStill += step; }
             }
             bool pressure = hits >= R443CavHits && own < T442OwnMelee && gap >= R443Gap;
             byte mode = _r4Mode[idx];
+            // 443-p (2): straty jazdy laczne ze wszystkich rajdow szyku w bitwie >= 40% - bez nowego rajdu (zostaje schowanie)
+            if (tgt != null && mode != RmRaid && _r4Base[idx] > 0 && f.CountOfUnits < (1f - R443RaidLoss) * _r4Base[idx])
+            {
+                if (pressure && !_r4CapSeen[idx]) { _r4CapSeen[idx] = true; _r4CapStop++; }
+                tgt = null; flank = false;
+            }
             if (mode == RmNone)
             {
-                if (!pressure || now - _r4Exit[idx] < R443Reenter) return;
+                if (!pressure || now - _r4Exit[idx] < _r4Wait[idx]) return;
                 if (V445Busy(f)) return;   // 445: szyk w CAVFIRST / DISENGAGE - bez rajdu / schowania (rola 445 nie nadpisywana)
                 if (K444Striking(f)) return;   // 444: uderzenie kowadla i mlota w toku - bez rajdu / schowania (WAIT oddaje szyk 443)
                 if (H447Busy(f)) return;   // 447: polowanie na gracza-wodza w toku - bez rajdu / schowania (rola 447 nie nadpisywana)
@@ -408,7 +447,7 @@ namespace Armoury
                 R443StartHide(t, f, idx, near, now);
                 return;
             }
-            if (mode == RmRaid) { _r4RaidSec += step; R443RaidTick(t, f, idx, me, now); return; }
+            if (mode == RmRaid) { _r4RaidSec += step; R443RaidTick(t, f, idx, me, near, now); return; }
             // HIDE
             _r4HideSec += step;
             var inf = R443MainInf(t, f);
@@ -417,15 +456,16 @@ namespace Armoury
             if (now - _r4Since[idx] >= R443Latch)
             {
                 if (tgt != null && _r4KRaid && hits > 0) { _r4HideToRaid++; R443End(f, idx, now, 4); _r4Exit[idx] = -1000f; R443StartRaid(f, idx, tgt, flank, fp, fwp, now); return; }
-                if (hits == 0) { _r4HideCalm++; R443End(f, idx, now, 4); return; }
+                if (hits == 0) { _r4HideCalm++; R443End(f, idx, now, 4); _r4Wait[idx] = R443Latch; return; }
             }
             if (near == null) return;
             Vec2 hp;
             WorldPosition hwp;
-            if (!R443HidePoint(f, inf, near, out hp, out hwp)) return;
+            int sh;
+            if (!R443HidePoint(f, inf, near, out hp, out hwp, out sh)) return;
             if (!_r4P[idx].IsValid || hp.Distance(_r4P[idx]) > R443HideMove)
             {
-                if (C441SetRole(f, CrHide, MovementOrder.MovementOrderMove(hwp))) _r4P[idx] = hp;
+                if (C441SetRole(f, CrHide, MovementOrder.MovementOrderMove(hwp))) { _r4P[idx] = hp; R443NoteShift(sh); }
             }
         }
 
@@ -445,7 +485,10 @@ namespace Armoury
             _r4Mode[idx] = RmRaid; _r4Since[idx] = now; _r4Tgt[idx] = tgt; _r4Flank[idx] = flank; _r4Contact[idx] = false;
             _r4P[idx] = flank ? fp : Vec2.Invalid;
             _r4TgtAt[idx] = tgt.CachedMedianPosition.AsVec2;
-            _r4Men0[idx] = f.CountOfUnits; _r4TgtMen0[idx] = tgt.CountOfUnits;
+            _r4TgtMen0[idx] = tgt.CountOfUnits; _r4Blk[idx] = 0;
+            if (_r4Base[idx] <= 0) _r4Base[idx] = f.CountOfUnits;   // 443-p: baza strat lacznych - pierwszy rajd szyku w bitwie
+            if (ReferenceEquals(_r4LastTgt[idx], tgt)) _r4Again++;
+            _r4LastTgt[idx] = tgt;
             _r4RaidN++;
             if (flank) _r4RaidFlank++; else _r4RaidDirect++;
         }
@@ -455,7 +498,8 @@ namespace Armoury
             var inf = R443MainInf(t, f);
             Vec2 hp;
             WorldPosition hwp;
-            if (inf == null || R443Melee(inf) >= T442OwnMelee || !R443HidePoint(f, inf, near, out hp, out hwp))
+            int sh = 0;
+            if (inf == null || R443Melee(inf) >= T442OwnMelee || !R443HidePoint(f, inf, near, out hp, out hwp, out sh))
             {
                 if (now >= _r4DryUntil[idx]) { _r4HideNoInfN++; _r4DryUntil[idx] = now + R443Latch; }
                 return;
@@ -472,21 +516,42 @@ namespace Armoury
             }
             _r4Mode[idx] = RmHide; _r4Since[idx] = now; _r4P[idx] = hp; _r4Tgt[idx] = null; _r4Flank[idx] = false;
             _r4HideN++;
+            R443NoteShift(sh);
+            if (_r4HideSeen[idx]) _r4HideAgain++;
+            _r4HideSeen[idx] = true;
         }
 
-        private static void R443RaidTick(Team t, Formation f, int idx, Vec2 me, float now)
+        private static void R443RaidTick(Team t, Formation f, int idx, Vec2 me, Formation near, float now)
         {
             var tg = _r4Tgt[idx];
             int men0 = _r4TgtMen0[idx];
             bool alive = tg != null && tg.CountOfUnits >= T442MinMen && MissionTeams.Enemies(t, tg.Team);
             if (!alive || (men0 > 0 && tg.CountOfUnits <= (1f - R443TgtBroken) * men0)) { R443End(f, idx, now, 1); return; }
             if (!_r4Contact[idx] && R443Melee(tg) >= R443TgtMelee) { _r4Contact[idx] = true; _r4RaidContact++; }
-            if (f.CountOfUnits < (1f - R443RaidLoss) * _r4Men0[idx]) { _r4CutLoss++; R443End(f, idx, now, 2); return; }
-            if (now - _r4Since[idx] > R443RaidMax) { _r4CutTime++; R443End(f, idx, now, 2); return; }
-            if (!_r4Flank[idx]) return;
-            // dojazd z boku: w 30 m od punktu albo droga wprost otwarta -> szarza
+            // 443-p (2): straty laczne od pierwszego rajdu szyku w bitwie; po strata / czas przerwa 30 s, po czas cel zakazany dla szyku
+            if (f.CountOfUnits < (1f - R443RaidLoss) * _r4Base[idx]) { _r4CutLoss++; R443End(f, idx, now, 2); _r4Wait[idx] = R443Latch; return; }
+            if (now - _r4Since[idx] > R443RaidMax) { _r4CutTime++; _r4Ban[idx] = tg; R443End(f, idx, now, 2); _r4Wait[idx] = R443Latch; return; }
             Vec2 ep = tg.CachedMedianPosition.AsVec2;
             if (!ep.IsValid) return;
+            if (!_r4Flank[idx])
+            {
+                // 443-p (1): faza szarzy - droga zamknieta piechota wroga 2 takty z rzedu (strzelcy schowali sie za piechote) -> znow z boku; bez punktu -> koniec
+                // "brak drogi" i schowanie. Nie, gdy jazda juz w zwarciu albo w 30 m od celu.
+                if (R443Melee(f) >= T442OwnMelee || me.Distance(ep) < R443ChargeCheck || !T442Blocked(t, tg, me, ep)) { _r4Blk[idx] = 0; return; }
+                if (++_r4Blk[idx] < R443BlockTicks) return;
+                _r4Blk[idx] = 0;
+                Vec2 cp;
+                WorldPosition cwp;
+                if (R443FlankPoint(t, tg, f, me, ep, out cp, out cwp) && C441SetRole(f, CrRaid, MovementOrder.MovementOrderMove(cwp)))
+                {
+                    _r4Flank[idx] = true; _r4P[idx] = cp; _r4TgtAt[idx] = ep; _r4ChargeToFlank++;
+                    return;
+                }
+                _r4ChargeCut++;
+                R443RouteEnd(t, f, idx, near, now);
+                return;
+            }
+            // dojazd z boku: w 30 m od punktu albo droga wprost otwarta -> szarza
             bool open = !T442Blocked(t, tg, me, ep);
             if (open || (_r4P[idx].IsValid && me.Distance(_r4P[idx]) < R443FlankReach))
             {
@@ -498,9 +563,18 @@ namespace Armoury
             {
                 Vec2 p;
                 WorldPosition wp;
-                if (!R443FlankPoint(t, tg, f, me, ep, out p, out wp)) { _r4CutRoute++; R443End(f, idx, now, 2); return; }
+                if (!R443FlankPoint(t, tg, f, me, ep, out p, out wp)) { R443RouteEnd(t, f, idx, near, now); return; }
                 if (C441SetRole(f, CrRaid, MovementOrder.MovementOrderMove(wp))) { _r4P[idx] = p; _r4TgtAt[idx] = ep; }
             }
+        }
+
+        /// <summary>443-p: koniec rajdu "brak drogi" - oddanie, przerwa 30 s; strzelcy wroga w zasiegu -> od razu schowanie za piechote (HIDE).</summary>
+        private static void R443RouteEnd(Team t, Formation f, int idx, Formation near, float now)
+        {
+            _r4CutRoute++;
+            R443End(f, idx, now, 2);
+            _r4Wait[idx] = R443Latch;
+            if (near != null && near.CountOfUnits > 0) R443StartHide(t, f, idx, near, now);
         }
 
         /// <summary>Oddanie roli. why: 0 bez wyniku (szyk zniknal / gracz), 1 cel rozbity, 2 rajd przerwany, 4 koniec schowania (licznik powodu u wolajacego).</summary>
@@ -522,11 +596,12 @@ namespace Armoury
             try { if (f != null) C441SetRole(f, CrNone, default(MovementOrder)); } catch (Exception e) { _r4Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Raid443 oddanie", e); }
             R443CavClear(idx);
             _r4Exit[idx] = now;
+            _r4Wait[idx] = R443Reenter;   // dluzsza przerwa (30 s) ustawia wolajacy po koncach strata / czas / brak drogi / ostrzal ustal
         }
 
         /// <summary>Szyki strzelcow wroga (piesi, >= 8, nie zwiazani walka) do 250 m: cel rajdu - najblizszy odsloniety, inaczej najblizszy z droga z boku;
         /// near - najblizszy strzelec w zasiegu (takze zasloniety); expNear - odsloniety w 30-200 m (pomiar jak 437).</summary>
-        private static void R443FindRaid(Team t, Formation f, Vec2 me, out Formation tgt, out bool flank, out Vec2 fp, out WorldPosition fwp, out Formation near, out bool expNear)
+        private static void R443FindRaid(Team t, Formation f, Vec2 me, Formation ban, out Formation tgt, out bool flank, out Vec2 fp, out WorldPosition fwp, out Formation near, out bool expNear)
         {
             tgt = null; near = null; flank = false; expNear = false; fp = Vec2.Invalid; fwp = default(WorldPosition);
             float bDirect = float.MaxValue, bFlank = float.MaxValue, bNear = float.MaxValue;
@@ -550,8 +625,9 @@ namespace Armoury
                     if (!ep.IsValid) continue;
                     float d = me.Distance(ep);
                     if (d > R443RaidRange) continue;
+                    if (R443Melee(e) >= T442OwnMelee) continue;   // strzelcy zwiazani walka - cel 442 (zwiazany), nie rajd i nie kierunek schowania (443-p)
                     if (d < bNear) { bNear = d; near = e; }
-                    if (R443Melee(e) >= T442OwnMelee) continue;   // strzelcy zwiazani walka - cel 442 (zwiazany), nie rajd
+                    if (ReferenceEquals(e, ban)) { _r4BanSkip++; continue; }   // 443-p: cel po rajdzie zakonczonym czasem - nie wracamy na niego
                     bool blocked = T442Blocked(t, e, me, ep);
                     if (!blocked)
                     {
@@ -602,11 +678,15 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>Punkt za glowna piechota (strona przeciwna do strzelcow) na siatce nawigacji; przy braku siatki - polowa odstepu.</summary>
-        private static bool R443HidePoint(Formation f, Formation inf, Formation near, out Vec2 p, out WorldPosition wp)
+        /// <summary>Punkt za glowna piechota (strona przeciwna do strzelcow) na siatce nawigacji; przy braku siatki - polowa odstepu.
+        /// 443-p (6): punkt wypada na wlasnych strzelcach (schowanych S4 / 443 albo w ScreenedSkirmish RBM - ten sam pas za piechota) -> przesuniecie w bok
+        /// o pol szerokosci (piechoty albo strzelcow, wieksza) + pol szerokosci jazdy + 5 m, na strone dalsza od strzelcow wroga. sh: 0 bez kolizji,
+        /// 1 przesuniety, 2 kolizja zostala (zaden punkt w bok nie wolny / nie na siatce).</summary>
+        private static bool R443HidePoint(Formation f, Formation inf, Formation near, out Vec2 p, out WorldPosition wp, out int sh)
         {
             p = Vec2.Invalid;
             wp = default(WorldPosition);
+            sh = 0;
             Vec2 ip = inf.CachedMedianPosition.AsVec2, ap = near.CachedMedianPosition.AsVec2;
             if (!ip.IsValid || !ap.IsValid) return false;
             Vec2 d = ap - ip;
@@ -619,10 +699,62 @@ namespace Armoury
                 WorldPosition w = inf.CachedMedianPosition;
                 w.SetVec2(c);
                 if (!w.IsValid || w.GetNavMesh() == UIntPtr.Zero) continue;
+                float aw;
+                if (R443OwnArchAt(f, c, out aw))
+                {
+                    Vec2 side = d.RightVec();
+                    float off = 0.5f * Math.Max(inf.Width, aw) + 0.5f * f.Width + 5f;
+                    Vec2 s1 = c + side * off, s2 = c - side * off;
+                    if (s1.DistanceSquared(ap) < s2.DistanceSquared(ap)) { var x = s1; s1 = s2; s2 = x; }
+                    sh = 2;
+                    for (int q = 0; q < 2; q++)
+                    {
+                        Vec2 sc = q == 0 ? s1 : s2;
+                        float aw2;
+                        if (R443OwnArchAt(f, sc, out aw2)) continue;
+                        WorldPosition sw = inf.CachedMedianPosition;
+                        sw.SetVec2(sc);
+                        if (!sw.IsValid || sw.GetNavMesh() == UIntPtr.Zero) continue;
+                        c = sc; w = sw; sh = 1;
+                        break;
+                    }
+                }
                 p = c; wp = w;
                 return true;
             }
             return false;
+        }
+
+        /// <summary>443-p (6): czy jazda f postawiona w c wejdzie w wlasny pieszy szyk strzelcow (prostokat szyku strzelcow powiekszony o pol jazdy
+        /// i 15 m w glab). aw = szerokosc tego szyku strzelcow.</summary>
+        private static bool R443OwnArchAt(Formation f, Vec2 c, out float aw)
+        {
+            aw = 0f;
+            var t = f.Team;
+            var fl = t != null ? t.FormationsIncludingSpecialAndEmpty : null;
+            for (int j = 0; fl != null && j < fl.Count; j++)
+            {
+                var a = fl[j];
+                if (a == null || ReferenceEquals(a, f) || a.CountOfUnits <= 0) continue;
+                var aq = a.QuerySystem;
+                if (aq == null || !aq.IsRangedFormation || aq.IsCavalryFormation || aq.IsRangedCavalryFormation) continue;
+                Vec2 apos = a.CachedMedianPosition.AsVec2;
+                Vec2 dir = a.Direction;
+                if (!apos.IsValid || !dir.IsValid || dir.LengthSquared < 0.0001f) continue;
+                dir = dir.Normalized();
+                Vec2 r = c - apos;
+                float fwd = Math.Abs(r.x * dir.x + r.y * dir.y);
+                Vec2 rt = dir.RightVec();
+                float lat = Math.Abs(r.x * rt.x + r.y * rt.y);
+                if (lat < 0.5f * (a.Width + f.Width) && fwd < 0.5f * (a.Depth + f.Depth) + R443OwnArch) { aw = a.Width; return true; }
+            }
+            return false;
+        }
+
+        private static void R443NoteShift(int sh)
+        {
+            if (sh == 1) _r4HideShift++;
+            else if (sh == 2) _r4HideOwnNear++;
         }
 
         /// <summary>Glowna (najwieksza) piechota druzyny, >= 10 ludzi.</summary>
@@ -662,31 +794,66 @@ namespace Armoury
 
         // ------------------------------------------------------------ strzelcy: wymiana ognia i jazda wroga
 
-        private static void R443Arch(Team t, Formation f, int idx, bool ok, int hits, float now)
+        private static void R443Arch(Team t, Formation f, int idx, bool ok, int hits, float now, float step)
         {
             if (!ReferenceEquals(_r4AWho[idx], f)) { _r4AWho[idx] = f; _r4DuelUntil[idx] = _r4CavUntil[idx] = -1000f; }
             if (!ok) { _r4DuelUntil[idx] = _r4CavUntil[idx] = -1000f; return; }
             int ti = t.TeamIndex;
-            // (c) przegrana wymiana ognia druzyny i ten szyk trafiany, poza zwarciem
-            if (_r4Lost[ti] && hits >= R443ArcherHits && R443Melee(f) < T442OwnMelee)
+            bool melee = R443Melee(f) >= T442OwnMelee;
+            // (c) przegrana wymiana ognia druzyny, poza zwarciem: wejscie - ten szyk trafiany (>= 2 w 10 s); 443-p (4): juz schowany z tego powodu -
+            // trzymany, dopoki wymiana przegrana (schowani prawie nie obrywaja; wyjscie nie od braku trafien, tylko od wymiany), nie krocej niz 30 s
+            bool duelHeld = now < _r4DuelUntil[idx];
+            if (_r4Lost[ti] && !melee && (duelHeld || hits >= R443ArcherHits))
             {
-                if (now >= _r4DuelUntil[idx]) { _r4DuelIn++; if (!_r4KDuel) _r4DuelDry++; }
-                _r4DuelUntil[idx] = now + R443Latch;
+                if (!duelHeld) { _r4DuelIn++; if (!_r4KDuel) _r4DuelDry++; }
+                _r4DuelUntil[idx] = Math.Max(_r4DuelUntil[idx], duelHeld ? now + R443CavHold : now + R443Latch);
             }
-            // (d) 5.1 jazda wroga dojedzie za <= 8 s (albo jest w 20 m), z dowolnej strony
+            // (d) 5.1 jazda wroga dojedzie za <= 8 s (albo jest w 20 m), z dowolnej strony; 443-p (7)/(10): wejscie nie w zwarciu; tylko gdy wlasna piechota
+            // zaslania punkt, gdzie RBM stawia lucznikow (za frontem glownej piechoty), przed KAZDA grozna jazda - inaczej schowanie wiodloby na jazde
             float eta;
-            if (R443CavThreat(t, f, out eta))
+            bool wrong;
+            if (R443CavThreat(t, f, out eta, out wrong))
             {
-                if (now >= _r4CavUntil[idx]) { _r4CavIn++; _r4EtaSum += eta; if (!_r4KShelter) _r4CavDry++; }
+                bool entry = now >= _r4CavUntil[idx];
+                if (wrong) { _r4CavWrongSec += step; return; }   // bez odswiezenia - flaga gasnie w <= 3 s
+                if (entry && melee) { _r4CavMeleeSec += step; return; }
+                if (entry) { _r4CavIn++; _r4EtaSum += eta; if (!_r4KShelter) _r4CavDry++; }
                 _r4CavUntil[idx] = now + R443CavHold;
             }
         }
 
-        private static bool R443CavThreat(Team t, Formation f, out float eta)
+        /// <summary>443-p (10): glowna piechota, za ktora RBM stawia lucznikow w BehaviorScreenedSkirmish (rbmai OverrideBehaviorScreenedSkirmish.
+        /// PostfixCalculateCurrentOrder: mediana glownej piechoty - Direction piechoty x (pol glebokosci obu + 5 m) - wzgledem jej FRONTU, nie zagrozenia).
+        /// ip / dir - mediana i kierunek frontu; false - brak glownej piechoty (Manoeuvres i tak nie schowa - Screen).</summary>
+        private static bool R443ScreenInf(Team t, Formation f, out Formation g, out Vec2 ip, out Vec2 dir)
+        {
+            g = null; ip = Vec2.Invalid; dir = Vec2.Invalid;
+            var fl = t.FormationsIncludingSpecialAndEmpty;
+            for (int j = 0; fl != null && j < fl.Count; j++)
+            {
+                var x = fl[j];
+                if (x == null || ReferenceEquals(x, f) || x.CountOfUnits <= 0 || x.AI == null || !x.AI.IsMainFormation) continue;
+                var xq = x.QuerySystem;
+                if (xq == null || !xq.IsInfantryFormation) continue;
+                Vec2 p = x.CachedMedianPosition.AsVec2, d = x.Direction;
+                if (!p.IsValid || !d.IsValid || d.LengthSquared < 0.0001f) return false;
+                g = x; ip = p; dir = d.Normalized();
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Jazda wroga (nie konni strzelcy, >= 5) w 20 m albo jadaca na szyk (dojazd <= 8 s). wrong (443-p): ktoras grozna jazda NIE jest
+        /// przed frontem glownej piechoty (schowanie RBM jest wzgledem frontu piechoty).</summary>
+        private static bool R443CavThreat(Team t, Formation f, out float eta, out bool wrong)
         {
             eta = float.MaxValue;
+            wrong = false;
             Vec2 fp = f.CachedMedianPosition.AsVec2;
             if (!fp.IsValid) return false;
+            Formation g;
+            Vec2 ip, idir;
+            bool hasSp = R443ScreenInf(t, f, out g, out ip, out idir);
             var teams = t.Mission != null ? t.Mission.Teams : null;
             int n = teams != null ? teams.Count : 0;
             bool thr = false;
@@ -706,15 +873,31 @@ namespace Armoury
                     Vec2 to = fp - ep;
                     float len = to.Length;
                     float gap = Math.Max(0f, len - 0.5f * (f.Depth + e.Depth));
-                    if (gap <= R443CavNear) { thr = true; eta = 0f; continue; }
-                    Vec2 v = e.CachedCurrentVelocity;
-                    if (!v.IsValid) continue;
-                    float sp = v.Length;
-                    if (sp <= R443CavSpeed || len < 0.1f) continue;
-                    float cos = (v.x * to.x + v.y * to.y) / (sp * len);
-                    if (cos <= R443CavDot) continue;
-                    float tt = gap / sp;
-                    if (tt <= R443CavEta) { thr = true; if (tt < eta) eta = tt; }
+                    float tt;
+                    if (gap <= R443CavNear) tt = 0f;
+                    else
+                    {
+                        Vec2 v = e.CachedCurrentVelocity;
+                        if (!v.IsValid) continue;
+                        float sp2 = v.Length;
+                        if (sp2 <= R443CavSpeed || len < 0.1f) continue;
+                        float cos = (v.x * to.x + v.y * to.y) / (sp2 * len);
+                        if (cos <= R443CavDot) continue;
+                        tt = gap / sp2;
+                        if (tt > R443CavEta) continue;
+                    }
+                    thr = true;
+                    if (tt < eta) eta = tt;
+                    // zaslona: jazda przed frontem glownej piechoty (dalej niz pol glebokosci) i w klinie 45 st. od jej szerokosci - wtedy piechota stoi
+                    // miedzy jazda a pasem za piechota; z boku / z tylu - schowanie RBM zostawia lucznikow na drodze jazdy
+                    if (hasSp)
+                    {
+                        Vec2 r = ep - ip;
+                        float fw = r.x * idir.x + r.y * idir.y;
+                        Vec2 rt = idir.RightVec();
+                        float lat = Math.Abs(r.x * rt.x + r.y * rt.y);
+                        if (fw <= 0.5f * g.Depth || lat > 0.5f * g.Width + fw) wrong = true;
+                    }
                 }
             }
             return thr;
@@ -733,16 +916,20 @@ namespace Armoury
               .Append(", lucznicy przed jazda ").Append(c != null && c.ArchersShelterFromCavalry ? "TAK" : "NIE")
               .Append(" | jazda AI pod ostrzalem (trafienie ludzi albo koni w 10 s, odstep >= ").Append(R443Gap.ToString("0", R4Inv)).Append(" m) ")
               .Append(_r4FireSec.ToString("0", R4Inv)).Append(" szyko-s: stala ").Append(_r4FireStill.ToString("0", R4Inv)).Append(" (").Append(R443Pct(_r4FireStill, _r4FireSec))
-              .Append("), strzelcy wroga odslonieci (").Append(R443ExpMin.ToString("0", R4Inv)).Append('-').Append(R443ExpMax.ToString("0", R4Inv)).Append(" m), a jazda stala ")
-              .Append(_r4ExpStill.ToString("0", R4Inv)).Append(" (").Append(R443Pct(_r4ExpStill, _r4FireSec)).Append("; cel ponizej 30%)")
-              .Append(" | trafienia pociskami jazdy AI: ludzie ").Append(_r4HitRider).Append(", konie ").Append(_r4HitHorse)
+              .Append("; audyt: dzis 85%, cel ponizej 30%); z tego strzelcy wroga odslonieci (").Append(R443ExpMin.ToString("0", R4Inv)).Append('-').Append(R443ExpMax.ToString("0", R4Inv))
+              .Append(" m) ").Append(_r4ExpSec.ToString("0", R4Inv)).Append(" szyko-s, a jazda stala ").Append(_r4ExpStill.ToString("0", R4Inv)).Append(" (").Append(R443Pct(_r4ExpStill, _r4ExpSec)).Append(')')
+              .Append(" | trafienia pociskami jazdy AI od pieszych strzelcow: ludzie ").Append(_r4HitRider).Append(", konie ").Append(_r4HitHorse)
+              .Append("; od konnych (pominiete) ").Append(Volatile.Read(ref _r4HitSkip))
               .Append(" | rajdy na strzelcow ").Append(_r4RaidN).Append(" (wprost ").Append(_r4RaidDirect).Append(", z boku ").Append(_r4RaidFlank)
-              .Append(", z boku -> szarza ").Append(_r4FlankToCharge).Append("), bylby (klucz NIE / bez dowodcy jazdy) ").Append(_r4RaidDry)
-              .Append(", ").Append(_r4RaidSec.ToString("0", R4Inv)).Append(" szyko-s | wynik: cel rozbity ").Append(_r4RaidBroken).Append(", zwarcie z celem ").Append(_r4RaidContact)
-              .Append(", przerwany ").Append(_r4RaidCut).Append(" (straty jazdy ").Append(_r4CutLoss).Append(", czas ").Append(_r4CutTime).Append(", brak drogi ").Append(_r4CutRoute)
-              .Append("), w toku przy koncu ").Append(_r4Open).Append(", cel stracil srednio ")
+              .Append(", z boku -> szarza ").Append(_r4FlankToCharge).Append(", szarza -> znow z boku (droga zamknieta) ").Append(_r4ChargeToFlank)
+              .Append("), ponowny na ten sam cel ").Append(_r4Again).Append(", bylby (klucz NIE / bez dowodcy jazdy) ").Append(_r4RaidDry)
+              .Append(", ").Append(_r4RaidSec.ToString("0", R4Inv)).Append(" szyko-s | wynik: cel rozbity ").Append(_r4RaidBroken).Append(", cel w zwarciu (z kimkolwiek) ").Append(_r4RaidContact)
+              .Append(", przerwany ").Append(_r4RaidCut).Append(" (straty jazdy laczne ").Append(_r4CutLoss).Append(", czas ").Append(_r4CutTime).Append(", brak drogi ").Append(_r4CutRoute)
+              .Append(" - w tym w szarzy ").Append(_r4ChargeCut).Append("), w toku przy koncu ").Append(_r4Open).Append(", bez nowego rajdu po stratach lacznych >= 40% ").Append(_r4CapStop)
+              .Append(", cel zakazany po czasie pominiety ").Append(_r4BanSkip).Append(" szyko-s, cel stracil srednio ")
               .Append(_r4RaidDone > 0 ? (100.0 * _r4TgtLossSum / _r4RaidDone).ToString("0", R4Inv) + "%" : "-")
-              .Append(" | jazda schowana za piechote ").Append(_r4HideN).Append(", bylaby ").Append(_r4HideDry).Append(", ").Append(_r4HideSec.ToString("0", R4Inv))
+              .Append(" | jazda schowana za piechote ").Append(_r4HideN).Append(" (ponownie ").Append(_r4HideAgain).Append(", punkt odsuniety od wlasnych strzelcow ").Append(_r4HideShift)
+              .Append(", przy wlasnych strzelcach mimo to ").Append(_r4HideOwnNear).Append("), bylaby ").Append(_r4HideDry).Append(", ").Append(_r4HideSec.ToString("0", R4Inv))
               .Append(" szyko-s, koniec: zwarcie piechoty ").Append(_r4HideMelee).Append(", ostrzal ustal ").Append(_r4HideCalm).Append(", w rajd ").Append(_r4HideToRaid)
               .Append(", brak piechoty ").Append(_r4HideNoInf).Append("; nie bylo gdzie sie schowac ").Append(_r4HideNoInfN)
               .Append("; pod ostrzalem bez pieszych strzelcow wroga w zasiegu ").Append(_r4NoArchSec.ToString("0", R4Inv)).Append(" szyko-s")
@@ -753,8 +940,11 @@ namespace Armoury
               .Append(" | lucznicy przed jazda (dojazd <= ").Append(R443CavEta.ToString("0", R4Inv)).Append(" s albo ").Append(R443CavNear.ToString("0", R4Inv)).Append(" m): zagrozen ")
               .Append(_r4CavIn).Append(" (srednio ").Append(_r4CavIn > 0 ? (_r4EtaSum / _r4CavIn).ToString("0.0", R4Inv) : "-").Append(" s), schowani ").Append(_r4CavTake)
               .Append(", bylby (klucz NIE) ").Append(_r4CavDry).Append(", wyszli po zagrozeniu ").Append(_r4CavOut)
+              .Append("; bez schowania: jazda z boku / tylu glownej piechoty ").Append(_r4CavWrongSec.ToString("0", R4Inv)).Append(" szyko-s, w zwarciu ")
+              .Append(_r4CavMeleeSec.ToString("0", R4Inv)).Append(" szyko-s")
               .Append(" | schowanie S4 z powodow 443: nie ostrzeliwal sie ").Append(_r4NotSkirm).Append(", bez ScreenedSkirmish ").Append(_r4NoBeh)
-              .Append(", puszczone po zmianie taktyki ").Append(_r4S4Lost).Append(", bez oslony piechoty ").Append(_r4NoScreenSec.ToString("0", R4Inv))
+              .Append(", puszczone po zmianie taktyki ").Append(_r4S4Lost).Append(", puszczone - oslona znikla ").Append(_r4ScreenGone)
+              .Append(", powod 443 dolaczyl w schowaniu ").Append(_r4Joined).Append(", bez oslony piechoty ").Append(_r4NoScreenSec.ToString("0", R4Inv))
               .Append(" szyko-s, w schowaniu ").Append(_r4HeldSec.ToString("0", R4Inv)).Append(" szyko-s (naraz maks ").Append(_r4HeldMax).Append(')')
               .Append(" | potkniecia ").Append(_r4Stum).Append('.');
             return sb.ToString();
