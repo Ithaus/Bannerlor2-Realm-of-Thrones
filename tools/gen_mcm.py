@@ -388,6 +388,10 @@ RANGES = {
     'BuildMaterialPriceCap': (0.0, 5.0, "0.0"),
     # P2 recenzja: najmniej dob na poziom budowli z robot ludu - kod przycina do 0..3650 (0 = bez limitu)
     'FolkWorksLevelDays': (0.0, 365.0, "0"),
+    # 471b-2: straty obozu wedlug medycyny i szansa wybuchu choroby - kod przycina procenty do 0..5 i szanse do 0..50; McmSettings.cs wpisane recznie
+    'SiegeCampAttritionLowMedicinePercent': (0.0, 5.0, "0.00"),
+    'SiegeCampAttritionHighMedicinePercent': (0.0, 5.0, "0.00"),
+    'SiegeCampOutbreakChancePercent': (0.0, 50.0, "0.0"),
     # 472-p (recenzja 472): mury historycznie - kod przycina czynnik ceny punktu do 1..10, najkrotszy czas do 0..20 lat (0 = bez limitu); McmSettings.cs wpisane recznie
     'WallCastlePointPriceFactor': (1.0, 10.0, "0.00"),
     'WallTownPointPriceFactor': (1.0, 10.0, "0.00"),
@@ -835,6 +839,7 @@ LABELS = {
     'SiegeAssaultPartyStrikes': 'Assault Party Fights, Not The Whole Army',   # 467
     'SiegeAssaultPartyStrikesRepels': 'Assault Party Fights Until Repels',   # 467
     'SiegeSmallCastlesWalls1': 'Small Castles Start With Level 1 Walls',   # 471b-1
+    'SiegeCampAttritionByMedicine': 'Siege Camp Attrition By Medicine',   # 471b-2
     'BkVetoNextTarget334': 'Army Objective Skips Vetoed Seats',
     'IronbornCanonReave334': 'Ironborn Reave The North',
     'PartyPositionGuard334c': 'Party Position Guard',   # paczka 334c

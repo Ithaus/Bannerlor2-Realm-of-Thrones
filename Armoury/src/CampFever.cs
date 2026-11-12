@@ -228,7 +228,7 @@ namespace Armoury
             {
                 _warned.Add(st.StringId);
                 // 398-p: _warned nie jest w zapisie - po wczytaniu trwajacego oblezenia graczowi nie powtarzamy (linia logu zostaje)
-                if ((mainAttacks || mainDefends) && days - incub <= 1)
+                if ((mainDefends || (mainAttacks && !SiegeCamp471.On)) && days - incub <= 1)   // 471b-2: oboz choruje tylko w wybuchu (SiegeCamp471 pisze graczowi przy wybuchu)
                     Log.Player("Camp fever stirs among the tents at " + st.Name + " - the longer the siege, the deeper it bites.", true);
                 Log.Info("CampFever: oblezenie " + st.StringId + " dzien " + days + " - zaraza wstaje.");
             }
@@ -251,8 +251,14 @@ namespace Armoury
             }
             float campCrowd = whole ? Crowd(campMen) : -1f;
             att.Corpse = SiegeMisery.CorpseTerm(st, false, campMen);   // 399: niepogrzebani pod murami (stan sprzed tej doby)
-            for (int i = 0; i < attackers.Count; i++)
-                StrikeParty(s, attackers[i], st, ramp, 1f, campCrowd, false, mainAttacks || mainDefends, false, WinterTerm(attackers[i]), ref att);
+            // 471b-2 (D2): przy kluczu Siege Camp Attrition By Medicine oboz choruje tylko w czasie WYBUCHU (szansa dobowa wedlug najlepszej Medycyny obozu),
+            // narost od dnia wybuchu; poza wybuchem - bez zarazy obozu. Klucz NIE: narost od konca inkubacji, codziennie (jak dotad).
+            float attRamp = ramp;
+            bool campSick = !SiegeCamp471.On || SiegeCamp471.Outbreak(siege, st, Math.Max(0, s.SiegeSicknessRampPercent), rampCap, out attRamp);
+            if (campSick)
+                for (int i = 0; i < attackers.Count; i++)
+                    StrikeParty(s, attackers[i], st, attRamp, 1f, campCrowd, false, mainAttacks || mainDefends, false, WinterTerm(attackers[i]), ref att);
+            if (SiegeCamp471.On) SiegeCamp471.NoteFever(siege, att.Sick, att.Dead);
 
             // --- OBRONCY: garnizon + milicja (398) + partie lordow w srodku ---
             var town = st.Town;

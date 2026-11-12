@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 471b-2 (13.11) - straty obozu oblezniczego 0.1-0.5% na dobe wedlug medycyny i dobowa szansa wybuchu choroby (D2) - zamiast stawki RB
+
+**Problem:** Jeff 13.11, odpowiedz D2: "liczyc strate od 0.1% do 0.5% dziennie w zaleznbosci od medycyny plus szansa ze kazdego dnia ktos zachoruje gdy wieksza medycyna wieksza szansa ze nie". Badanie 471: RealisticBannerlord liczy straty na DRUZYNE (armia 65 druzyn traci ok. 11.7 tys. do 30. doby), a zaraza obozowa CampFever po inkubacji (14 dob) bije codziennie bez konca, z narostem do x4 (0.6% x narost x tlok do 2.5 x czynnik do 3, sufit 6%/d) - przy oblezeniach 40-150 dob (cele 471) oboz by stopnial.
+
+**Przyczyna:** `RealisticBannerlord.Systems.Siege.SiegeAttritionBehavior.OnDailyTickParty` (dekompilacja RealisticBannerlord.dll :22-51): U(Min..Max) + min(doba/5, 10) szeregowych na druzyne, chirurg Medicine >= 50 x0.75, >= 100 x0.5 (CrashScribe `Mends.RbSiegeCampFed` puszcza je tylko przy glodzie druzyny - w logach CrashScribe 13.11 "oboz oblezniczy nie gnije, gdy jest nakarmiony"). `CampFever.TickSiege` (`Armoury/src/CampFever.cs`): zaraza obozu od konca inkubacji co dobe.
+
+**Zmiana:** nowy plik `Armoury/src/SiegeCamp471.cs`, klucze (grupa MCM "Sieges: length, supplies and yielding (471)", Settings.cs + McmSettings.cs recznie, nazwa i zakresy w `tools/gen_mcm.py` - skryptu nie uruchamialem): `SiegeCampAttritionByMedicine` (TAK), `SiegeCampAttritionLowMedicinePercent` 0.5, `SiegeCampAttritionHighMedicinePercent` 0.1, `SiegeCampOutbreakChancePercent` 4.0.
+- (1) Prefiks na `SiegeAttritionBehavior.OnDailyTickParty` (AccessTools.DeclaredMethod na klasie RB, zakladany w kampanii z `SiegeWalls.EnsureHooks`): druzyna oblegajaca - straty RB pominiete. Straty RB oblezonej twierdzy (`OnDailyTickSettlement`) bez zmian.
+- (2) `SiegeCamp471.Daily` (ArmouryBehavior, po `CampFever.OnDaily`, przed trupami): kazda druzyna obozu traci p zdrowych szeregowych (losowo, wazone liczebnoscia), p = 0.5% - 0.4% x min(1, Med / 200), Med = najlepsza Medycyna chirurga (`EffectiveSurgeon`) wsrod druzyn obozu. Zmarli: PeopleBook `FDiePlague` (jak zaraza), `Measure40.NoteDisease`, `SiegeMisery.AddCorpses` pod murami. Bez Innych, bez druzyn w bitwie, bez oblezen fabuly oszczedzonych przez zaraze (`CampFever.Spared`). Gracz w obozie: "Hardship in the siege camp before X: N of your men died today".
+- (3) Choroba: w `CampFever.TickSiege` oboz choruje tylko w czasie WYBUCHU (`SiegeCamp471.Outbreak`): po inkubacji co dobe szansa 4% x (1 - 0.75 x min(1, Med / 200)) = 4% .. 1%, wybuch 5-9 dob, narost zarazy od dnia wybuchu (ten sam sufit). Obroncy w murach - zaraza bez zmian. Gracz: "Sickness breaks out in the siege camp before X ..." (stary komunikat "Camp fever stirs" tylko dla obroncy).
+- Linie: `Straty obozu (471b-2 start)` (klucz, latka RB, stawki, szanse), `Straty obozu (471b-2): ... WYBUCH choroby w obozie (nr, do dnia) | szansa, Medycyna, ludzi`, `Straty obozu (471b-2 doba): oblezen ze stratami, zmarli dzis, stawka RB pominieta (druzyn), wybuchy | osada ludzi, Med (chirurg), p% -> zmarli, razem, CHOROBA do dnia / bez choroby (szansa)`; w `Czas oblezenia (471) start` dopisek stawki i szansy, w `(471) koniec` - zmarli ze strat, srednia stawka, wybuchy, chorzy i zmarli zarazy obozu.
+
+**Kalibracja (wyliczona):** oboz 13 tys. z chirurgiem Medicine 100: 0.3%/d = ok. 40 zmarlych na dobe, po 60 dobach ok. 16% obozu; wybuch 2.5%/d - po inkubacji ok. 1.1 wybuchu na 46 dob (ok. 8 dob zarazy po 1.5%/d chorych przy tloku 2.5, 10% chorych umiera = ok. 1% obozu). Dawniej (fever bez konca) w tym czasie zachorowania do sufitu 6%/d.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: CrashScribe `RbSiegeCampFed` (drugi prefiks na tym samym celu) zostaje - oba prefiksy biegna, nasz zwraca false; przy kluczu NIE nasz przepuszcza i zostaje stan sprzed (CrashScribe: straty RB tylko przy glodzie). Glodujacy oboz traci teraz tylko p (dawniej RB 2-5+ na druzyne) - glod obozu konczy sie nadal odejsciem (m116) i karami morale gry.
+- Kolizje: zaraza obozu nie jest liczona drugi raz (stawka p = ciezkie warunki, choroba = tylko wybuch CampFever); trupy p pod murami podnosza czlon TRUPY zarazy (399) - jedno zrodlo `SrcFever`; ksiega ludzi FDiePlague - ta sama przyczyna. Obroncy bez zmian (RB OnDailyTickSettlement, GL, CampFever w murach).
+- Stan wybuchu tylko w pamieci sesji (po wczytaniu losowanie od nowa) - opisane w linii.
+- Klucz NIE = co do bitu jak przed: prefiks przepuszcza, Daily wychodzi, CampFever liczy oboz jak dotad (tylko dodatkowa linia startu).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-1 (13.11) - male zamki nowej kampanii zaczynaja z murami poziomu 1 (D1)
 
 **Problem:** Jeff 13.11, odpowiedz D1: "daj mniejsze zamki pozim murow 1". Kategorie 471 (maly zamek = mury 1, 20-40 dob) nie mialy ani jednego zamku: w ROT 8.1.8 (`ROT-Map/ModuleData/settlements.xml`) 128 zamkow ma `building_castle_fortifications` level 2, Casterly Rock (`castle_V5`) i Red Keep (`ROT_castle61`) - 3. Linie `Czas oblezenia (471) start` pokazywaly wiec same "duze zamki".

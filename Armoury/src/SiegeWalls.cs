@@ -1436,6 +1436,7 @@ namespace Armoury
             _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear(); _bats.Clear(); _sz5.Clear(); _t471.Clear();   // zapis (Import) przychodzi PO konstruktorze
             _lastCamp = null; _last = null; _lastAt = -1f; _lastDrCamp = null; _lastDrAt = -1f;
             SiegeWalls2.Reset();                                                 // oblezenia 2: trebusze, glod, drabiny - pamiec od zera
+            SiegeCamp471.Reset();                                                // 471b-2: pamiec strat obozu i wybuchow choroby od zera
             ZeroDay();
             Reset377();                                                          // 377: liczniki kampanii i kolejka XP od zera
             Reset387();                                                          // 387: rekord szturmu gracza i liczniki od zera
@@ -1527,6 +1528,7 @@ namespace Armoury
             }
             catch (Exception e) { _hookTicks = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooks.Ticks", e); }
             try { SiegeWalls2.EnsureHooks(); } catch (Exception e) { Stumble("EnsureHooks.Oblezenia2", e); }   // oblezenia 2: plan machin AI, druga ekipa, bilans jedzenia, straty RB
+            SiegeCamp471.EnsureHooks();                                          // 471b-2: straty obozu wedlug medycyny zamiast RB (prefiks OnDailyTickParty; nie rzuca)
             EnsureHooks387();                                                    // 387: szturm gracza w przerwie po zalamaniu - 4 warunki menu (nie rzuca)
             EnsureHooks387f();                                                   // 387f: koniec bitwy po zalamanym szturmie armii AI z graczem - PlayerEncounter.ContinueBattle (nie rzuca)
         }
@@ -1575,6 +1577,7 @@ namespace Armoury
                          + " | regula: " + (SzAny ? "czynna - szturm AI i autobitwa gracza (bez Innych, skryptu fabuly, morza)" : "wylaczona - tury rundy gry")
                          + " | SZ5 (467) bije oddzial, nie armia: " + (Sz5On ? "TAK" : "NIE") + " (tylko szturm AI bez gracza), limit odparc " + (Sz5Limit > 0 ? Sz5Limit.ToString() : "brak") + ".");
                 SiegeWalls2.SessionStart();                                      // oblezenia 2: linia startowa (latki, modele, klucze)
+                SiegeCamp471.SessionStart();                                     // 471b-2: linia "Straty obozu (471b-2 start)"
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }

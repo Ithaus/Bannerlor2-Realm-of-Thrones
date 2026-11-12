@@ -2995,6 +2995,7 @@ namespace Armoury
             try { SimFate436.Daily(); } catch (Exception e) { Log.Error("SimFate436.Daily", e); } DayProfile.Lap("SimFate436.Daily");   // 436: linia "Smierc czy rana w symulacji (436)" - same liczniki, zloto i ludzie nie ruszaja
             try { SmallCastles471.Daily(); } catch (Exception e) { Log.Error("SmallCastles471.Daily", e); }   // 471b-1: kontrola murow malych zamkow - raz, pierwsza doba nowej kampanii (tylko log)
             try { CampFever.OnDaily(); } catch (Exception e) { Log.Error("CampFever", e); } DayProfile.Lap("CampFever.OnDaily");
+            try { SiegeCamp471.Daily(); } catch (Exception e) { Log.Error("SiegeCamp471.Daily", e); } DayProfile.Lap("SiegeCamp471.Daily");   // 471b-2: straty obozow wedlug medycyny (po zarazie, przed trupami - zmarli tej doby gasna z nimi)
             try { SiegeMisery.DailyCorpses(); } catch (Exception e) { Log.Error("SiegeMisery.DailyCorpses", e); } DayProfile.Lap("SiegeMisery.DailyCorpses");   // 399: trupy oblezen - gasniecie, palenie AI, ostrzezenia, linia "Trupy oblezenia" (po zarazie, przed glodem GL)
             try { RecruitKit.Reconcile("doba"); } catch (Exception e) { Log.Error("RecruitKit.Reconcile", e); } DayProfile.Lap("RecruitKit.Reconcile");   // 161: komplety bez ochotnika w puli (sieroty)
             // audyt predkosci STAD, nie z postfixa - w postfixie SpeedExplained

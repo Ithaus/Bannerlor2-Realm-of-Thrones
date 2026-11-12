@@ -12976,6 +12976,22 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeSmallCastlesWalls1 { get; set; } = true;
 
+        [SettingPropertyBool("Siege Camp Attrition By Medicine", HintText = "A siege camp loses a share of its men every day to hardship - from Siege Camp Attrition Low Medicine Percent with no surgeon to Siege Camp Attrition High Medicine Percent when the best surgeon of the camp has 200 Medicine - instead of the Realistic Bannerlord losses counted per party. The camp fever no longer runs without end: every day after the clean days there is a chance (Siege Camp Outbreak Chance Percent, smaller the better the camp's best surgeon) that sickness breaks out in the camp and runs for 5 to 9 days. The defenders behind the walls are not changed. Off = Realistic Bannerlord losses and the endless camp fever, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeCampAttritionByMedicine { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Camp Attrition Low Medicine Percent", 0.00f, 5.00f, "0.00", HintText = "With Siege Camp Attrition By Medicine: the daily share of the camp's men lost when nobody in the camp knows any Medicine", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public float SiegeCampAttritionLowMedicinePercent { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Siege Camp Attrition High Medicine Percent", 0.00f, 5.00f, "0.00", HintText = "With Siege Camp Attrition By Medicine: the daily share of the camp's men lost when the best surgeon of the camp has 200 Medicine or more (in between - in proportion)", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public float SiegeCampAttritionHighMedicinePercent { get; set; } = 0.1f;
+
+        [SettingPropertyFloatingInteger("Siege Camp Outbreak Chance Percent", 0.00f, 50.00f, "0.0", HintText = "With Siege Camp Attrition By Medicine: the daily chance that sickness breaks out in a siege camp whose best surgeon has no Medicine; a surgeon with 200 Medicine cuts it to a quarter. 0 = the camp never sickens", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public float SiegeCampOutbreakChancePercent { get; set; } = 4f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -16219,6 +16235,10 @@ namespace Armoury
             s.CaptiveGrudgeRansom = CaptiveGrudgeRansom;
             s.CaptiveTermsBendKnee = CaptiveTermsBendKnee;
             s.SiegeSmallCastlesWalls1 = SiegeSmallCastlesWalls1;
+            s.SiegeCampAttritionByMedicine = SiegeCampAttritionByMedicine;
+            s.SiegeCampAttritionLowMedicinePercent = SiegeCampAttritionLowMedicinePercent;
+            s.SiegeCampAttritionHighMedicinePercent = SiegeCampAttritionHighMedicinePercent;
+            s.SiegeCampOutbreakChancePercent = SiegeCampOutbreakChancePercent;
         }
 
         internal static void Apply()

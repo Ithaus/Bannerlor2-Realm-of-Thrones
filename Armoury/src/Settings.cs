@@ -6075,6 +6075,11 @@ namespace Armoury
         // --- Sieges: length, supplies and yielding (471) ---
         // 471b-1 (Jeff 13.11 D1 "daj mniejsze zamki poziom murow 1"): SiegeSmallCastles471.cs - tylko nowa kampania
         public bool SiegeSmallCastlesWalls1 = true;        // When a new campaign starts, the lesser castles - those of houses of tier 3 or lower, not the great fortresses (Casterly Rock, the Red Keep) - begin with walls of level 1 instead of 2, so they fall sooner than the seats of the great houses. Only a new campaign; a saved game keeps its walls. Off = all castles begin with the walls of the map
+        // 471b-2 (Jeff 13.11 D2 "liczyc strate od 0.1% do 0.5% dziennie w zaleznosci od medycyny plus szansa ze kazdego dnia ktos zachoruje"): SiegeCamp471.cs
+        public bool SiegeCampAttritionByMedicine = true;   // A siege camp loses a share of its men every day to hardship - from Siege Camp Attrition Low Medicine Percent with no surgeon to Siege Camp Attrition High Medicine Percent when the best surgeon of the camp has 200 Medicine - instead of the Realistic Bannerlord losses counted per party. The camp fever no longer runs without end: every day after the clean days there is a chance (Siege Camp Outbreak Chance Percent, smaller the better the camp's best surgeon) that sickness breaks out in the camp and runs for 5 to 9 days. The defenders behind the walls are not changed. Off = Realistic Bannerlord losses and the endless camp fever, as before
+        public float SiegeCampAttritionLowMedicinePercent = 0.5f;   // With Siege Camp Attrition By Medicine: the daily share of the camp's men lost when nobody in the camp knows any Medicine
+        public float SiegeCampAttritionHighMedicinePercent = 0.1f;  // With Siege Camp Attrition By Medicine: the daily share of the camp's men lost when the best surgeon of the camp has 200 Medicine or more (in between - in proportion)
+        public float SiegeCampOutbreakChancePercent = 4f;           // With Siege Camp Attrition By Medicine: the daily chance that sickness breaks out in a siege camp whose best surgeon has no Medicine; a surgeon with 200 Medicine cuts it to a quarter. 0 = the camp never sickens
 
         public static void Load(string moduleDataDir)
         {

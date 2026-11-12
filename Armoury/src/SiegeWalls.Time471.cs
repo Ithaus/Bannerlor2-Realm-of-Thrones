@@ -194,7 +194,7 @@ namespace Armoury
                                 + " | kategoria " + CatName[r.Cat] + " (mury " + r.Lvl
                                 + (r.Cat <= 1 ? ", wariant D1 'maly = mury <= 2': " + CatName[r.Lvl <= 2 ? 0 : 1] : "") + "), cel " + CatLo[r.Cat] + "-" + CatHi[r.Cat] + " dob, limit " + F(lim, "0")
                                 + " | wodz " + Hn(lp) + " | wiek " + F(age, "0.0") + " dob"
-                                + " | termin obrony R " + F(R, "0.0") + " dob (q " + F(q, "0.00") + " -> s " + F(sq, "0.00") + ") | " + txt + " | TYLKO PRZEWIDYWANIE - zachowanie bez zmian.");
+                                + " | termin obrony R " + F(R, "0.0") + " dob (q " + F(q, "0.00") + " -> s " + F(sq, "0.00") + ") | " + txt + " | " + SiegeCamp471.StartText(ev) + " | TYLKO PRZEWIDYWANIE - zachowanie bez zmian.");
                         }
                         if (r.Clock >= R) { over++; if (!r.Over) { r.Over = true; Log.Info("Czas oblezenia (471) termin minal: dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ", " + CatName[r.Cat] + ")" + (r.PlayerClan ? " [osada klanu gracza - D5]" : "") + " | zegar " + F(r.Clock, "0") + " >= R " + F(R, "0.0") + " (wiek " + F(age, "0.0") + ") | " + txt + " | wedlug 471b tu bylaby kapitulacja z terminu (przy s > 1)."); } }
                         if (age >= lim) { overLim++; r.OverLimit = true; }
@@ -229,7 +229,7 @@ namespace Armoury
                     + ", dob z odsiecza " + r.PausedDays + (r.OverLimit ? ", PONAD LIMITEM " + F(Limit471 * CatHi[c], "0") : "") + " | HP murow " + F(WallHp(st) * 100, "0") + "%"
                     + " | wlasciciel w chwili konca " + (st != null && st.OwnerClan != null ? st.OwnerClan.StringId : "-")
                     + " (gra zmienia wlasciciela PO tym zdarzeniu - zdobycie widac w linii KO)"   // 471-p U10: SiegeCompleted: RemoveAllSiegeParties -> koniec oblezenia -> ApplyBySiege
-                    + (r.PlayerClan ? " [osada klanu gracza - D5]" : "") + ".");
+                    + (r.PlayerClan ? " [osada klanu gracza - D5]" : "") + " | " + SiegeCamp471.EndText(ev) + ".");
             }
             catch (Exception e) { Stumble("Time471End", e); }
         }
