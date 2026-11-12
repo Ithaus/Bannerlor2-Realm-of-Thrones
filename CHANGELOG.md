@@ -38,6 +38,70 @@ Linia `LP niedobor`: dopisek `470-a S_stos tylko przy pustym stosie (...): stos 
 
 **Ryzyko / co sprawdzic:** regresje - Stock czytaja L5 (kolejnosc zlecen sprzetu wsi), L6 (zmiana zajec, pulap 363 przez TownN), StartCalibration.Rule, VillageGear.Fund: dostana mniej towarow z N > 1 (to jest cel); towar z prawdziwie pustym stosem dostaje do 2 jak dawniej po 4 decyzjach, ale od razu. Kolizje: S_kolejka, zboze N = 2 i N wyrobu (Ware) bez zmian. Po wczytaniu sygnal stosu wraca dopiero przy pierwszej decyzji 221 (do 28 dob) - S_kolejka dziala dalej. Oczekiwanie w autotescie 90 dob: "towarow z N swiata > 1" wyraznie mniej niz 22 z 22; flax / clay / hardwood / cow / hides / marble wypadaja (stos 9-22 dni), silver / butter zostaja (kolejka 2.00). Build OK, skan IL 30.
 
+## 469-p (12.11) - poprawki po recenzji 469: wylacznik zastoju, szyk gracza, lot pod gore, pomiar zasiegu natywnego
+
+**Problem:** recenzja 469-a/469-b. (1) WYSOKA, ryzyko: szyk strzelcow moze stac cala bitwe bez strzalu - `RBMBehaviorArcherSkirmish` (rbmai.cs:8580-8650) stawia szyk na `num2 = Depth/2 + MaximumMissileRange/2 + Depth wroga/2` i przy braku strzelania (`IsFormationShooting` false) po 15 s "Approaching" od razu wraca do "Shooting", bo `num < 0.9 num2` - szyk nie podchodzi. Jesli natywny `MaximumMissileRange` (max `Agent.GetMissileRange` ludzi szyku, mb_full.cs:42818) > ok. 2.4 G (np. luk mysliwski w prozni v^2/g = 297 m -> szyk ok. 148 m, 1.1 G = 110 m), ludzie stoja wstrzymani. (2) SREDNIA: szyk pod rozkazami gracza nie byl pominiety - rozkaz "Fire at will" Jeffa nadpisany po ok. 0.5 s, wbrew podpowiedzi MCM. (3) cel silnika daleko, a inny szyk wroga w G - brak pomiaru. (4) mozliwa petla luk / wstrzymanie / bron biala (natywny wybor broni przy HoldYourFire na czlowieku niewidoczny w C#). (5) `Fly()` dla celu wyzej, ktorego strzala nie siega, zwracal odleglosc wierzcholka lotu. (6) bledny komentarz o kolejnosci nasluchow (StartTable biegnie PRZED RotBows420.ApplyLore).
+
+**Przyczyna:** badanie 469 zakladalo wanilowy `BehaviorSkirmish`, ktory sam podciaga szyk przy wstrzymanym ogniu; RBM go podmienia (rbmai.cs:462, 842, 1273). Pominiecie gracza sprawdzalo tylko `Agent.IsMainAgent / IsPlayerControlled`, nie `Formation.IsAIControlled`. `MbEvent.AddNonSerializedListener` dopisuje na poczatek listy.
+
+**Zmiana (`FireRange469.cs`, `McmSettings.cs` tylko podpowiedz, `ArmouryBehavior.cs` tylko komentarz):**
+- (1a) Wylacznik zastoju: wstrzymany czlowiek, ktorego cel przez 20 s nie podszedl o 10 m (najmniejsza odleglosc w tym wstrzymaniu), dostaje rozkaz szyku z powrotem i 30 s przerwy od 469 (`Paused`, czas misji). Szyk zaczyna strzelac -> RBM ma "Shooting" jak przed 469. Licznik "zastoj" w zwolnieniach, "przerwa po zastoju / broni" w pominietych.
+- (1b) Pomiar: dla kazdej broni natywny statyczny `Mission.GetMissileRange(v, 0)` (mb_full.cs:53901, raz na bron w misji) i nasz zasieg symulowany z oporem - kolumny w tabeli broni linii 469. Natywny ~ v^2/g = silnik liczy bez oporu.
+- (2) `if (!f.IsAIControlled)` - szyk pod rozkazami gracza pominiety (`_skPlayer`, "szyk gracza"), wstrzymany - zwolniony ("przejete / gracz").
+- (3) Tylko licznik "wstrzymany, choc najblizszy szyk wroga w G (przegladow)" - zmiana celu osobnym krokiem, jesli liczba duza.
+- (4) Zwolnienie z powodu broni (bron biala / kolczan / nieznany uzytek) daje te sama 30 s przerwe - petla najwyzej raz na 30 s.
+- (5) `Fly()`: zwraca odleglosc tylko, gdy strzala choc raz byla na wysokosci celu lub wyzej, inaczej 0. Dla dz <= 1.5 m wynik bez zmian.
+- (6) Komentarz poprawiony; bez skutku - `ApplyLore` zmienia tylko `ThrustDamage` (RotBows420.cs:339-343), naciagu nie.
+- Podpowiedz MCM (po angielsku): zastoj 20 s i szyki pod rozkazami gracza.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: przy kluczu NIE `By` puste -> brak wstrzyman, brak zastojow, `Paused` puste - zachowanie jak przed 469 co do bitu (zostaje pomiar na sucho + jedno wywolanie natywnego `Mission.GetMissileRange` na bron w misji; czysta funkcja balistyczna, nieuzywana w C# gry - jedyne nowe wywolanie natywne).
+- Zastoj oznacza powrot do strzalow spoza G (jak przed 469) przez 30 s, potem znow wstrzymanie i kolejne 20 s - w zastoju szyk strzela ok. 60% czasu zamiast 0%. W linii: "zastoj" duzy + "natywny statyczny" bliski v^2/g = potwierdzony pat RBM; wtedy decyzja: wyzsze progi albo przesuniecie szyku.
+- Kolizje: 310 (CleanShot) - wspolny zarzadca bez zmian; `Paused` czyszczone w Clear (Begin / End misji) i w OnRemoved. Szyk gracza: 310 nadal dziala wg wlasnych regul.
+- Skan IL 30, build 0 bledow. Nic nie wgrane, gra nie uruchamiana.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+## 469-b (12.11) - zasieg bojowy lukow i kusz wedlug naciagu z wartosciami historycznymi (klucz "Historical Bow And Crossbow Range")
+
+**Problem:** Jeff 12.11: "luki powinny miec rozny zasieg w zaleznosci od naciagu, daj wartosci historyczne dla kusz i lukow". Po 469-a prog ognia G = 0.85 zasiegu fizycznego - dla wszystkich lukow 157-245 m, wiec luk mysliwski strzela prawie z tej samej odleglosci co luk wojenny.
+
+**Przyczyna:** zasieg fizyczny z predkosci RBM rosnie z naciagiem wolno (v ~ pierwiastek z naciagu; 60 lb 185 m, 166 lb 284 m), a historycznie skuteczna salwa slabego luku byla duzo krotsza niz jego lot maksymalny.
+
+**Zmiana (`FireRange469.cs`, `Settings.cs`, `McmSettings.cs`):**
+- `HistRange(uzytek, naciag)` - zasieg salwy w skali naciagu RBM (pole MissileSpeed + hit_points modyfikatora): luk < 70 lb 100 m, 70-110 lb 150 m, 110-150 lb 180 m, >= 150 lb 200 m; luk dlugi < 110 lb 130 m, 110-150 lb 170 m, >= 150 lb 200 m; kusza szybka (crossbow_fast) 110 m; kusza < 250 lb 140 m, >= 250 lb 170 m (badanie 469 rozdz. 3 i 4b, wartosci z wiedzy - niepewnosc srednia do duzej; kusze RBM 80-330 lb przy skoku 0.508 m, realnie 150-1200 lb przy 0.10-0.18 m, wiec progi w skali RBM).
+- `Gate`: G = min(HistRange, 0.85 x zasieg fizyczny) - fizyka dalej skraca pod gore. Nieznany uzytek / brak RBM (naciag nieznany) - tylko fizyka.
+- WYBOR WARIANTU: predkosci strzaly (MissileSpeed) NIE zmieniamy. RBM juz liczy predkosc z naciagu i jakosci przy strzale (rbmcombat.cs:4490-4631) i obrazenia z energii; zmiana dla silnika = drugi raz to samo i rozjechane celowanie (mechanizm P3 badania). Odrzucone tez globalne `Mission.SetMissileRangeModifier` (jedno na misje, nie wg naciagu). Naciag decyduje tylko o progu decyzji 469-a.
+- Linie: "Ogien w zasiegu (469)" naglowek `G = min(zasieg historyczny wg naciagu 469-b, 0.85 x ...)`; "Zasieg lukow (469)" - kolumna "historyczny m" i G po ograniczeniu, `zasieg historyczny TAK/NIE`.
+- Klucz `HistoricalBowAndCrossbowRange` (recznie, grupa 310, domyslnie TAK). NIE = G jak w 469-a co do bitu.
+
+**Ryzyko / co sprawdzic:**
+- Pat: szyk strzelcow RBM staje ok. pol natywnego MaximumMissileRange od wroga (RBMBehaviorArcherSkirmish, rbmai.cs:8580; bez strzelania co 15 s "Approaching" tylko do 0.9 tej odleglosci). Gdy natywny zasieg slabej broni jest bliski lotu w prozni (luk mysliwski v^2/g = 297 m -> pol 148 m) a G = 100 m, taki szyk w obronie moze stac poza swoim zasiegiem i nie strzelac, dopoki wrog nie podejdzie. Sprawdzic w linii 469: bronie "natywny sr." / 2 vs "G sr.", czas wstrzymania sr. / najdluzszy, "w zasiegu". Gdyby slabe luki staly bezczynnie - podniesc progi albo NIE.
+- Kolizje: tylko prog decyzji 469-a; predkosc, celowanie, obrazenia, wycena (XbowPrice, RangedRank) bez zmian. Skan IL 30, build 0 bledow.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+## 469-a (12.11) - lucznicy AI trzymaja ogien poza zasiegiem swojej broni (klucz "Archers Hold Fire Out Of Range")
+
+**Problem:** Jeff 12.11: "lucznicy zaczynaja strzelac na poczatku bitwy nawet jak nie maja zasiegu ... strzaly laduja w polu przed wojskiem, moze niech sprawdzaja czy jest zasieg i dopiero wtedy strzelaja". Brak linii logu, ktora mierzy odleglosc strzalu - posrednio: "Czysty strzal (310)" 297/300 i 662/703 strzal AI w klebowisko z 100+ m (Armoury-2026-11-12_23-15-40.log), autotest CrashScribe: ok. 3% kolizji pociskow to trafienia.
+
+**Przyczyna (badanie 469, dekompilacja):** decyzja o strzale jest natywna i patrzy na zasieg balistyczny (`Agent.GetMissileRange`, mb_full.cs:13520); dla piechoty nie ma progu "strzelaj od X m" (konni maja AiRangedHorsebackMissileRange 0.35 od RBM); RBM wlacza strzelcom `IgnoreAmmoLimitForRangeCalculation` (rbmai.cs:2509) i zdejmuje skrocenie zasiegu pogoda (rbmai.cs:3026). Przy krancu zasiegu z rozrzutem pionowym RBM strzaly spadaja przed celem (hipoteza P1 - silnik natywny, nie do zdekompilowania). Zasieg juz zalezy od naciagu: RBM liczy predkosc strzaly z naciagu (Utilities.calculateMissileSpeed, rbmcombat.cs:5466-5500).
+
+**Zmiana:**
+- Nowy `FireRange469.cs`: bitwa polowa, czlowiek AI pieszo z lukiem / kusza w reku (ludzie gracza pod SI tez, gracz nie). Przeglad wszystkich ludzi misji co ok. 0.5 s (8..96 na klatke wg dt). Odleglosc do celu silnika (`GetTargetAgent`), bez celu - do skraju najblizszego szyku wroga (`Formation.CachedClosestEnemyFormation`, mediana - pol glebokosci). Zasieg bojowy G = 0.85 x zasieg maksymalny z oporem powietrza (AirFrictionArrow z ManagedParameters, wzor silnika v -= k v^2 dt; symulacja katow 4..60 st, wynik per predkosc i koszyk 5 m roznicy wysokosci) przy predkosci liczonej wzorem RBM co do linijki (naciag lb z danych broni zapisany na start sesji + hit_points modyfikatora jakosci, waga strzaly z naladowanej amunicji / kolczana, 0.07 kg bez niej; bez RBM - predkosc gry). d > 1.1 G -> `Agent.SetFiringOrder(HoldYourFire)` (ponawiane co przeglad - zmiana rozkazu szyku nadpisuje rozkaz czlowieka, Formation.SetFiringOrder mb_full.cs:69551); d <= G -> rozkaz ognia szyku wraca. Zwolnienie od razu: wrog w 6 m (zapytanie, 16 na klatke), bron biala / pusty kolczan, panika / odwrot, kon, przejecie przez 204/283/148/447, chorazy, wstrzymanie calego szyku, brak wroga. Pominieci: konni, szyk piechoty (prefiks RBM na Agent.SetFiringOrder, rbmai.cs:4403 - jak 310), poza szykiem, machiny, nieznany uzytek broni (RBM daje mu 10 m/s). Predkosci, celowania i obrazen nie zmieniamy.
+- Jeden zarzadca wstrzyman z 310: `CleanShot.EndHold` nie przywraca rozkazu szyku, gdy `FireRange469.Holds(a)`; `FireRange469.End` nie przywraca, gdy `CleanShot.Held(a)` (nowa metoda, tylko odczyt).
+- Wpiecie: `ShieldsUp.Begin` (po CleanShot.Begin; `_live` z `FireRange469.Live`), `ShieldsUp.Tick` (po CleanShot.Tick), `ShieldsUp.Drain` (strzal z kolejki 140 po CleanShot.OnShot - tylko pomiar), `BattleSense.OnAgentRemoved` i `BattleSense.Clean` (po CleanShot.End). `ArmouryBehavior`: osobny nasluch OnAfterSessionLaunched po nasluchu z RotBows420.ApplyLore -> `FireRange469.StartTable`.
+- Log: linia "Ogien w zasiegu (469)" raz na bitwe polowa - strzaly AI pieszo z luku / kuszy wg odleglosci do celu (<50/50-99/100-149/150-199/200+ m), poza 1.1 G, mimo wstrzymania, pierwsza salwa kazdej strony (6 s od jej pierwszego strzalu: sredni dystans vs srednie G i natywny GetMissileRange), wstrzymania (ludzie, bez celu, ponowienia, czas), zwolnienia wg powodu, pominiete, bronie (naciag / v / G / natywny / strzaly), koszt ms. Linia "Zasieg lukow (469)" na start sesji: 16 typowych broni (uzytek, naciag, v przy strzale 0.043 / belcie 0.06 kg, zasieg maks., G).
+- Klucz `ArchersHoldFireOutOfRange` (Settings.cs + McmSettings.cs recznie, grupa 310, domyslnie TAK). NIE = ten sam przeglad na sucho ("na sucho przegladow z wstrzymaniem"), bez wywolan silnika.
+
+**Ryzyko / co sprawdzic:**
+- Regresja przy NIE: zadnego SetFiringOrder; `ShieldsUp._live` w bitwie polowej i tak jest prawda (CleanShot.Live zywy takze na sucho), `deployed` w Drain liczone jak dotad; `CleanShot.EndHold` zachowuje sie co do bitu jak przed (Holds = false). Skan IL 30.
+- Kolizje: 310 (wspolny zarzadca - sprawdzone obie strony i kolejnosc End: CleanShot.End przed FireRange469.End); 204/283/148/447 i chorazy - zwolnienie przy przegladzie (do 0.5 s); 443 ocena wymiany ognia liczy straty od pociskow - mniej strzal z daleka w poczatku bitwy, logika bez zmian; BattleStall307e - pierwszy strzal bitwy pozniej (zastoj liczony od pierwszego ciosu, wiec bez wplywu na start), w zastoju wstrzymani lucznicy z bronia nie sa odsylani (SendOff tylko bez broni).
+- Pat: RBM ustawia szyk strzelcow ok. pol MaximumMissileRange od wroga (rbmai.cs:8580) - G (0.85 zasiegu maks.) jest zwykle wieksze, wiec strzelcy z pozycji RBM strzelaja; szyk calkiem strzelecki szarzuje (RangedRatio >= 0.9). Do sprawdzenia w autotescie: czas wstrzymania i "w zasiegu" w linii 469.
+- G liczone z predkosci RBM, a silnik celuje z MissileSpeed + modyfikator (badanie P3) - osobna sprawa, nie ruszana.
+- Koszt: przeglad ludzi wg dt (8..96 na klatke) + symulacje lotu (najwyzej 2 w przegladzie i 2 przy strzalach na klatke, wynik przechowany) - linia podaje ms.
+- Build OK (0 bledow), skan IL 30.
+
 **Status:** DO SPRAWDZENIA (nie wgrane).
 
 ## 467-p (12.11) - poprawki po recenzji 467: gracz dolaczajacy do szturmu AI = cala armia (U1), osobny licznik "bez progu" (U4)

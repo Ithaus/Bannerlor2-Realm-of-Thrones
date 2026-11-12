@@ -444,7 +444,8 @@ namespace Armoury
             _hist = _key || (c != null && c.HitScribeEnabled);
             CavBegin(m, c);
             CleanShot.Begin(m, c);   // 310: czysty strzal (klucz albo pomiar na sucho) - kolejka zywa takze dla niego, tylko bitwa polowa
-            _live = _hist || _cavLog || _counterKey || _huntKey || CleanShot.Live;
+            FireRange469.Begin(m, c);   // 469: ogien w zasiegu (klucz albo pomiar na sucho) - tylko bitwa polowa, jak 310
+            _live = _hist || _cavLog || _counterKey || _huntKey || CleanShot.Live || FireRange469.Live;
             _on = _key;
         }
 
@@ -507,6 +508,8 @@ namespace Armoury
             Drain(m);
             // 310: przeglad wlasnosci celu i wstrzyman (co 0.5 s, najwyzej 16 wpisow; padly cel - od razu)
             if (CleanShot.Live) { try { CleanShot.Tick(m, dt); } catch (Exception e) { Stumble("ShieldsUp.CzystyStrzal", e); } }
+            // 469: przeglad strzelcow pieszych - wstrzymanie ognia poza zasiegiem (po rozstawieniu; budzet ludzi na klatke)
+            if (FireRange469.Live) { try { FireRange469.Tick(m, dt); } catch (Exception e) { Stumble("ShieldsUp.OgienWZasiegu", e); } }
             // 157 P1: pomiar konnicy AI pod ostrzalem (co 1 s, bitwa polowa) - takze przy kluczu 140 NIE
             if (!_on && !_cavLog) return;
             bool deployed = false;
@@ -591,10 +594,12 @@ namespace Armoury
             bool act = _on;
             bool deployed = false;
             bool clean = CleanShot.Live;
-            if (n > 0 && (act || _cavLog || _counterKey || _huntKey || clean)) { try { deployed = m.IsDeploymentFinished; } catch { } }
+            bool range = FireRange469.Live;   // 469: pomiar strzalow (odleglosc vs zasieg)
+            if (n > 0 && (act || _cavLog || _counterKey || _huntKey || clean || range)) { try { deployed = m.IsDeploymentFinished; } catch { } }
             bool hunt = _huntKey && deployed;
             if (hunt) HorsePursuit.FireFrame();
             clean = clean && deployed;
+            range = range && deployed;
             if (clean) CleanShot.Frame();
             for (int i = 0; i < n; i++)
             {
@@ -609,6 +614,8 @@ namespace Armoury
                 // 310: strzal AI - czysty cel (po 204, ktory moze wziac strzelca; wlasny try w OnShot, niezaleznie od bramki 140).
                 // Poprawka recenzji 310: PO 140 (S2) - 140 czyta cel, w ktory strzala naprawde leci; CleanShot moze go potem zmienic
                 if (clean && q[i].K == 1) CleanShot.OnShot(m, q[i].A, q[i].Thrown);
+                // 469: strzal AI pieszo z luku / kuszy - odleglosc do celu vs zasieg (tylko pomiar; wlasny try w OnShot)
+                if (range && q[i].K == 1) FireRange469.OnShot(m, q[i].A, q[i].Thrown);
                 q[i].A = null; q[i].V = null;
             }
             if (clean) CleanShot.FrameEnd();

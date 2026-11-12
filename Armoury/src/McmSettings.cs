@@ -12768,6 +12768,14 @@ namespace Armoury
         [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
         public bool ArchersAvoidOwnMen { get; set; } = true;
 
+        [SettingPropertyBool("Archers Hold Fire Out Of Range", HintText = "An AI archer or crossbowman on foot holds his shot until his mark is within the fighting range of his own weapon, instead of loosing at the longest reach of the game, where most arrows fall short in the field before the enemy. The range is worked out from how fast his arrow or bolt really flies with Realistic Battle Mod - from the draw weight of his bow or crossbow, its quality and the weight of his arrows - so a strong war bow reaches farther than a hunting bow: 85% of the farthest the arrow can carry against the air, measured to the man he aims at (or to the edge of the nearest enemy formation), uphill shorter and downhill longer. He looses again as soon as the enemy comes within that range; an enemy close to him, an empty quiver, a melee weapon, panic or a horse frees him at once. Formations told to hold fire stay as ordered. Horse archers and archers placed in an infantry formation are left as they are. If he has waited 20 seconds and the enemy has come no closer, he looses anyway and is left alone for half a minute, so a line of archers never stands idle all battle. Both sides alike, your own men too when the AI commands them; formations under your own orders and you yourself are left as you command. No change to arrow speed or damage. Counted in the Armoury log after each field battle (line 469). Off = they shoot whenever the game lets them, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
+        public bool ArchersHoldFireOutOfRange { get; set; } = true;
+
+        [SettingPropertyBool("Historical Bow And Crossbow Range", HintText = "With Archers Hold Fire Out Of Range: the range at which an archer or crossbowman starts to shoot also follows what such weapons reached in history, by kind and draw weight - a hunting bow under 70 lb looses from 100 m, a bow of 70-110 lb from 150 m, 110-150 lb from 180 m, a stronger war bow from 200 m; a longbow under 110 lb from 130 m, 110-150 lb from 170 m, a heavier one from 200 m; a light quick-loading crossbow from 110 m, a crossbow under 250 lb from 140 m, a heavier one from 170 m (draw weights as Realistic Battle Mod gives them). The flight of the arrow still decides when it is shorter, so uphill he waits longer. Arrow speed and damage stay as Realistic Battle Mod makes them. Needs Realistic Battle Mod for the draw weight. Off = only the flight of the arrow decides (85% of the farthest it can carry)", RequireRestart = false)]
+        [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
+        public bool HistoricalBowAndCrossbowRange { get; set; } = true;
+
         [SettingPropertyBool("Shield Wall Under Fire Any Order", HintText = "With AI Formations Under Fire: every AI infantry formation of 8 men or more that stands under arrows before it closes - holding a hill, guarding a flank, regrouping or defending, or a company under 30 on the move - closes into a shield wall when six in ten hold a shield (open order when fewer do), and keeps the wall while the shooting lasts instead of being pulled back into a line. An advancing or charging formation whose side has already lost two men to missiles goes in open order instead and runs (Outshot Rush With Shields). A body of 30 or more advancing or charging is left to the RBM decision as before. Formations under your command are never touched. Off = only formations RBM itself asks about, as before", RequireRestart = false)]
         [SettingPropertyGroup("Battle: archers spare their own men, shields up wherever the arrows fall, a rout that does not stall the game (310)")]
         public bool ShieldWallUnderFireAnyOrder { get; set; } = true;
@@ -16127,6 +16135,8 @@ namespace Armoury
             s.PursuitStartNearVictims = PursuitStartNearVictims;
             s.FieldCraftSwingOnChange = FieldCraftSwingOnChange;
             s.ArchersAvoidOwnMen = ArchersAvoidOwnMen;
+            s.ArchersHoldFireOutOfRange = ArchersHoldFireOutOfRange;   // 469
+            s.HistoricalBowAndCrossbowRange = HistoricalBowAndCrossbowRange;   // 469-b
             s.ShieldWallUnderFireAnyOrder = ShieldWallUnderFireAnyOrder;
             s.RoutKeeperTimeBudget = RoutKeeperTimeBudget;
             s.RoutKeeperCourseFirst = RoutKeeperCourseFirst;
