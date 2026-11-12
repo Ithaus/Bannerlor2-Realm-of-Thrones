@@ -32,6 +32,10 @@ namespace Armoury
     ///  - warunek trwa nieprzerwanie 15 s; zostaje co najmniej jeden inny pas w uzyciu druzyny, ktory sam nie spelnia warunku (nie porzucamy wszystkich);
     ///  - w stanie AssaultUnderRangedCover: pozostale pasy maja stanowisko strzelcow, jesli mialy je wszystkie (inaczej gra przeszlaby w TotalAttack, 37630-37640);
     ///  - najwyzej jeden pas na druzyne na takt; ZAPADKA - porzucony pas nie wraca do konca misji (poza bezpiecznikiem "nigdy pusta lista").
+    /// 452-p (recenzja): procent poleglych liczony od calego szyku (CountOfUnits, z odlaczonymi) i pas nie jest porzucany, gdy ktos z szyku obsluguje machine
+    /// (odlaczeni) albo machina pasa jeszcze jedzie (HoldLadders - wieza/taran nie dojechaly); kandydat i "inny pas" tylko sposrod pasow z ostatniej listy gry
+    /// (maska wyniku DetermineCurrentLanes przed filtrem, zapisywana w postfiksie per taktyka); gotowosc drabin (SetAreLaddersReady z konca TickOccasionally)
+    /// liczona tez na pelnej liscie gry (prefiks: false -> wzor gry na pelnej liscie) - przefiltrowana lista nie zatrzymuje drabin (372 ustawia true - bez zmian).
     /// Klucz SiegeAbandonDeadLane (TAK). NIE = maska nigdy nie publikowana, postfiks i prefiks wracaja od razu - co do bitu jak przed; ta sama decyzja liczona
     /// i wypisana jako "bylby". Linie: "Oblezenie misja (370) pas-lejek (452)" przy decyzji i "... (452) koniec" przy koncu misji (polegli / zostali przy
     /// porzuceniu, szyk pasa po 5 s - czy gra przelala ludzi, ile razy lista gry przefiltrowana, ile bez skutku). Wyjatek per druzyna / pas = potkniecie
@@ -45,7 +49,7 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private static FieldInfo _fTactic, _fState, _fAiSiege;
-        private static MethodInfo _mLanes, _mRetreat;
+        private static MethodInfo _mLanes, _mRetreat, _mLadders;
         private static bool _reflTried;
         private static int _sErrs;
 
@@ -53,10 +57,15 @@ namespace Armoury
         private sealed class Drop
         {
             internal TacticBreachWalls Tac;
+            internal volatile object Ai;                        // TeamAISiegeAttacker tej taktyki (prefiks SetAreLaddersReady)
+            internal volatile List<SiegeLane> LastOrig;         // pelna lista gry z ostatniego przefiltrowanego wyniku (null = wynik nieprzefiltrowany)
             internal volatile int Mask;
             internal volatile bool On;
-            internal int Filtered, Empty;
+            internal int Filtered, Empty, Ladders;
         }
+        /// <summary>Maska stron pasow z ostatniego wyniku gry (przed filtrem) per taktyka; -1 = jeszcze nie widziana.</summary>
+        private sealed class Seen { internal volatile int Mask = -1; }
+        private static readonly ConditionalWeakTable<TacticBreachWalls, Seen> _seen = new ConditionalWeakTable<TacticBreachWalls, Seen>();
         private static volatile Drop[] _drops = new Drop[0];
         // przefiltrowana lista -> oryginalny wynik gry (dla ShouldRetreat); slabe klucze - lista gry nie zostaje w pamieci
         private static readonly ConditionalWeakTable<List<SiegeLane>, List<SiegeLane>> _orig = new ConditionalWeakTable<List<SiegeLane>, List<SiegeLane>>();
@@ -99,7 +108,7 @@ namespace Armoury
         internal static void ApplyAll(Harmony h)
         {
             Refl();
-            bool okL = false, okR = false;
+            bool okL = false, okR = false, okD = false;
             try
             {
                 if (_mLanes != null)
@@ -112,10 +121,15 @@ namespace Armoury
                     h.Patch(_mRetreat, prefix: new HarmonyMethod(typeof(SiegeDeadLane452), nameof(RetreatPrefix)));
                     okR = true;
                 }
+                if (okL && _mLadders != null)
+                {
+                    h.Patch(_mLadders, prefix: new HarmonyMethod(typeof(SiegeDeadLane452), nameof(LaddersPrefix)));
+                    okD = true;
+                }
             }
             catch (Exception e) { Log.Error("SiegeDeadLane452.ApplyAll", e); }
             Log.Info("Szturm (452): latka TacticBreachWalls.DetermineCurrentLanes " + (okL ? "wpieta" : "NIE wpieta (" + (_mLanes == null ? "brak metody" : "blad") + ")")
-                     + ", ShouldRetreat (pelna lista pasow) " + (okR ? "wpieta" : "NIE wpieta") + ", pola taktyka/stan/AI " + (_fTactic != null ? "+" : "-") + (_fState != null ? "+" : "-")
+                     + ", ShouldRetreat (pelna lista pasow) " + (okR ? "wpieta" : "NIE wpieta") + ", SetAreLaddersReady (pelna lista pasow) " + (okD ? "wpieta" : "NIE wpieta") + ", pola taktyka/stan/AI " + (_fTactic != null ? "+" : "-") + (_fState != null ? "+" : "-")
                      + (_fAiSiege != null ? "+" : "-") + " | klucz Siege Abandon Dead Lane " + (On ? "TAK" : "NIE") + ".");
         }
 
@@ -129,6 +143,8 @@ namespace Armoury
             // obie zadeklarowane w samym TacticBreachWalls (DeclaredMethod - pulapka 15.10 nie dotyczy); Patch tym samym MethodInfo
             try { _mLanes = AccessTools.DeclaredMethod(typeof(TacticBreachWalls), "DetermineCurrentLanes", Type.EmptyTypes); } catch { _mLanes = null; }
             try { _mRetreat = AccessTools.DeclaredMethod(typeof(TacticBreachWalls), "ShouldRetreat", new[] { typeof(List<SiegeLane>), typeof(int) }); } catch { _mRetreat = null; }
+            // zadeklarowana w TeamAISiegeComponent (dec 1.4.8, 46156) - DeclaredMethod na klasie deklarujacej
+            try { _mLadders = AccessTools.DeclaredMethod(typeof(TeamAISiegeComponent), "SetAreLaddersReady", new[] { typeof(bool) }); } catch { _mLadders = null; }
         }
 
         /// <summary>Pasy porzucone wypadaja z listy pasow taktyki; nigdy pusta lista, lista jednego pasa bez zmian.</summary>
@@ -136,11 +152,20 @@ namespace Armoury
         {
             try
             {
+                // maska pasow wyniku gry (przed filtrem) - dla decyzji w glownym watku (pasy, ktore gra naprawde uzywa); takze przy NIE (pomiar "bylby")
+                if (__instance != null && __result != null)
+                {
+                    int sm = 0;
+                    for (int i = 0; i < __result.Count; i++) { var l = __result[i]; if (l != null) { int k = (int)l.LaneSide; if (k >= 0 && k < LaneN) sm |= 1 << k; } }
+                    _seen.GetOrCreateValue(__instance).Mask = sm;
+                }
                 var ds = _drops;
-                if (ds.Length == 0 || __result == null || __result.Count < 2) return;
+                if (ds.Length == 0) return;
+                if (__result == null || __result.Count < 2) { ClearOrig(ds, __instance); return; }
                 Drop d = null;
                 for (int i = 0; i < ds.Length; i++) { var x = ds[i]; if (x != null && x.On && ReferenceEquals(x.Tac, __instance)) { d = x; break; } }
                 if (d == null) return;
+                d.LastOrig = null;
                 int mask = d.Mask;
                 if (mask == 0) return;
                 var src = __result;
@@ -151,12 +176,49 @@ namespace Armoury
                 var r = new List<SiegeLane>(keep);
                 for (int i = 0; i < src.Count; i++) { var l = src[i]; if (l == null || (mask & (1 << (int)l.LaneSide)) == 0) r.Add(l); }
                 _orig.Add(r, src);
+                d.LastOrig = src;
                 __result = r;
                 Interlocked.Increment(ref d.Filtered);
             }
             catch (Exception e)
             {
                 if (_sErrs < ErrMax) { _sErrs++; try { Log.Error("SiegeDeadLane452.LanesPostfix", e); } catch { } }
+            }
+        }
+
+        private static void ClearOrig(Drop[] ds, TacticBreachWalls tac)
+        {
+            for (int i = 0; i < ds.Length; i++) { var x = ds[i]; if (x != null && ReferenceEquals(x.Tac, tac)) x.LastOrig = null; }
+        }
+
+        /// <summary>Gotowosc drabin: gdy gra (z przefiltrowanej listy) mowi "czekac", liczona jeszcze raz wzorem gry (mb_full 37776) na pelnej liscie -
+        /// porzucony pas nie zatrzymuje drabin (pas z SendLadders albo wylom nie znika z rachunku). Wywolania z wartoscia true (372) bez zmian.</summary>
+        private static void LaddersPrefix(TeamAISiegeComponent __instance, ref bool areLaddersReady)
+        {
+            try
+            {
+                if (areLaddersReady || __instance == null) return;
+                var ds = _drops;
+                if (ds.Length == 0) return;
+                List<SiegeLane> full = null;
+                Drop d = null;
+                for (int i = 0; i < ds.Length; i++) { var x = ds[i]; if (x != null && x.On && ReferenceEquals(x.Ai, __instance)) { d = x; full = x.LastOrig; break; } }
+                if (d == null || full == null) return;
+                int breach = 0;
+                bool hold = false, send = false;
+                for (int i = 0; i < full.Count; i++)
+                {
+                    var l = full[i];
+                    if (l == null) continue;
+                    if (l.IsBreach) breach++;
+                    var ws = l.PrimarySiegeWeapons;
+                    for (int j = 0; ws != null && j < ws.Count; j++) { var w = ws[j]; if (w == null) continue; if (w.HoldLadders) hold = true; if (w.SendLadders) send = true; }
+                }
+                if (breach > 1 || !hold || send) { areLaddersReady = true; Interlocked.Increment(ref d.Ladders); }
+            }
+            catch (Exception e)
+            {
+                if (_sErrs < ErrMax) { _sErrs++; try { Log.Error("SiegeDeadLane452.LaddersPrefix", e); } catch { } }
             }
         }
 
@@ -262,7 +324,11 @@ namespace Armoury
                     if (tac == null) continue;
                     var st = Find(t);
                     if (st == null) { st = new TeamState { T = t, Tac = tac }; _teams.Add(st); }
-                    else if (!ReferenceEquals(st.Tac, tac)) { st.Tac = tac; if (st.D != null) st.D.Tac = tac; }
+                    else if (!ReferenceEquals(st.Tac, tac))
+                    {
+                        st.Tac = tac;
+                        if (st.D != null) { st.D.Tac = tac; st.D.LastOrig = null; try { st.D.Ai = _fAiSiege != null ? _fAiSiege.GetValue(tac) : null; } catch { st.D.Ai = null; } }
+                    }
                     var f = new Formation[LaneN];
                     var sl = new SiegeLane[LaneN];
                     for (int i = 0; lanes != null && i < lanes.Count; i++)
@@ -299,14 +365,20 @@ namespace Armoury
             }
         }
 
-        private bool Cond(TeamState st, int k, Formation f, SiegeQuerySystem q, out int dead, out int cur, out int close, out string why)
+        private bool Cond(TeamState st, int k, Formation f, SiegeLane l, SiegeQuerySystem q, out int dead, out int cur, out int close, out string why)
         {
             dead = 0; cur = 0; close = -1; why = null;
             if (f == null) { why = "pas bez szyku"; return false; }
             lock (_lock) dead = st.L[k].Dead;
-            cur = Math.Max(0, f.CountOfUnitsWithoutDetachedOnes);
+            // caly szyk (polegli licza takze odlaczonych do machin - mianownik tak samo)
+            cur = Math.Max(0, f.CountOfUnits);
             if (dead < DeadMin) { why = "polegli " + dead + " < " + DeadMin; return false; }
             if (dead < DeadShare * (dead + cur)) { why = "polegli " + dead + ", zostalo " + cur; return false; }
+            // ktos z szyku przy machinie (pcha wieze, bije taranem, niesie drabine) - pas jeszcze pracuje
+            if (f.CountOfUnits > f.CountOfUnitsWithoutDetachedOnes) { why = "ludzie szyku przy machinie"; return false; }
+            // machina pasa jeszcze jedzie (wieza / taran nie dojechaly - HoldLadders); porzucenie nie zdejmuje wiec HoldLadders z rachunku drabin
+            var ws = l != null ? l.PrimarySiegeWeapons : null;
+            for (int j = 0; ws != null && j < ws.Count; j++) { var w = ws[j]; if (w != null && w.HoldLadders) { why = "machina pasa w drodze"; return false; } }
             close = SiegeMissionLog370.QVal(q, SiegeMissionLog370.LanePrefix((FormationAI.BehaviorSide)k) + "CloseAttackerCount");
             if (close < 0 || close >= WallMin) { why = "przy murze " + close; return false; }
             if (!f.IsAIControlled || !f.IsSplittableByAI) { why = "szyk nie pod AI albo ktos w zamku"; return false; }
@@ -318,6 +390,13 @@ namespace Armoury
             int s = State(tac);
             if (s != StAssault && s != StTotal) { st.Why = "stan taktyki " + s; for (int k = 0; k < LaneN; k++) st.L[k].CondFrom = -1f; return; }
             if (now - _t0 < MinTime) { st.Why = "przed " + MinTime.ToString("0", Inv) + " s szturmu"; return; }
+            // tylko pasy z ostatniej listy gry (przed filtrem); bez niej - brak decyzji
+            Seen sn;
+            int gm = _seen.TryGetValue(tac, out sn) && sn != null ? sn.Mask : -1;
+            if (gm < 0) { st.Why = "brak listy pasow gry"; for (int k = 0; k < LaneN; k++) st.L[k].CondFrom = -1f; return; }
+            var g = new Formation[LaneN];
+            for (int k = 0; k < LaneN; k++) g[k] = (gm & (1 << k)) != 0 ? f[k] : null;
+            f = g;
             var ok = new bool[LaneN];
             var dead = new int[LaneN];
             var cur = new int[LaneN];
@@ -329,7 +408,7 @@ namespace Armoury
                 if (ls.Dropped || f[k] == null) { ls.CondFrom = -1f; continue; }
                 used++;
                 string why;
-                try { ok[k] = Cond(st, k, f[k], q, out dead[k], out cur[k], out close[k], out why); }
+                try { ok[k] = Cond(st, k, f[k], sl[k], q, out dead[k], out cur[k], out close[k], out why); }
                 catch (Exception e) { Stumble("Pas", e); ok[k] = false; }
                 if (!ok[k]) { ls.CondFrom = -1f; continue; }
                 if (ls.CondFrom < 0f) ls.CondFrom = now;
@@ -388,7 +467,9 @@ namespace Armoury
             {
                 if (st.D == null)
                 {
-                    st.D = new Drop { Tac = tac, On = true };
+                    object ai = null;
+                    try { ai = _fAiSiege != null ? _fAiSiege.GetValue(tac) : null; } catch { ai = null; }
+                    st.D = new Drop { Tac = tac, Ai = ai, On = true };
                     var ds = _drops;
                     var nd = new Drop[ds.Length + 1];
                     Array.Copy(ds, nd, ds.Length);
@@ -439,13 +520,14 @@ namespace Armoury
                                   .Append(ls.After >= 0 ? ls.After.ToString(Inv) : "-").Append(')');
                             }
                             sb.Append("; pasow ").Append(_keyOn ? "porzuconych " : "bylby porzuconych ").Append(n);
-                            if (st.D != null) sb.Append(", lista pasow gry przefiltrowana ").Append(Volatile.Read(ref st.D.Filtered)).Append(" razy, bez skutku (bylaby pusta) ").Append(Volatile.Read(ref st.D.Empty));
+                            if (st.D != null) sb.Append(", lista pasow gry przefiltrowana ").Append(Volatile.Read(ref st.D.Filtered)).Append(" razy, bez skutku (bylaby pusta) ").Append(Volatile.Read(ref st.D.Empty))
+                                                .Append(", drabiny zwolnione wg pelnej listy ").Append(Volatile.Read(ref st.D.Ladders));
                             sb.Append(", wstrzymane ").Append(st.Skips).Append(" (ostatnio: ").Append(st.Why ?? "-").Append(')');
                         }
                         catch (Exception e) { Stumble("Koniec.Druzyna", e); sb.Append(" ?"); }
                     }
                     sb.Append(" | lejek = >= ").Append(DeadMin).Append(" poleglych i >= ").Append((DeadShare * 100f).ToString("0", Inv)).Append("% szyku pasa, < ").Append(WallMin)
-                      .Append(" przy murze, nikt w zamku, ").Append(HoldSec.ToString("0", Inv)).Append(" s, od ").Append(MinTime.ToString("0", Inv)).Append(" s szturmu | potkniecia ").Append(_stumbles).Append('.');
+                      .Append(" przy murze, nikt w zamku ani przy machinie, machina pasa nie w drodze, ").Append(HoldSec.ToString("0", Inv)).Append(" s, od ").Append(MinTime.ToString("0", Inv)).Append(" s szturmu | potkniecia ").Append(_stumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
             }
