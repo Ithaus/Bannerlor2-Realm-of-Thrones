@@ -39,7 +39,7 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const int ErrMax = 3;
         private const int MinLength = 150;
-        private const int MaxWieldTries = 10;
+        private const int MaxWieldTries = 6;   // 468-p: proby na jedno wyslanie (co 0.5 s = 3 s), potem odeslany
         private const int PushLines = 10;
 
         private static bool _installed;
@@ -52,6 +52,8 @@ namespace Armoury
             internal readonly Dictionary<StandingPoint, StandingPoint> PickToPush = new Dictionary<StandingPoint, StandingPoint>();
         }
         private static volatile Points _points;
+        // 468-p (U2): odmowieni - nie dobyli drzewca w 3 s; zbior podmieniany w calosci (czytany w postfiksie)
+        private static volatile HashSet<Agent> _refused;
 
         private static int _stumbles, _errs;
 
@@ -96,6 +98,9 @@ namespace Armoury
                     // (a) punkt spychania zamkniety przez gre - drzewce zamiast widel
                     if (!pts.Push.Contains(__instance) || !On) return;
                     if (__instance.IsDeactivated || !Eligible(agent)) return;
+                    // 468-p (U3): nie podmieniac idacego z widlami (gra wyslala go po widly i teraz niesie je do punktu)
+                    var mv = __instance.MovingAgent;
+                    if (mv != null && mv != agent && !mv.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty) return;
                     EquipmentIndex slot;
                     if (__instance.MovingAgent == agent)
                     {
@@ -120,7 +125,9 @@ namespace Armoury
         {
             if (!agent.IsAIControlled || agent.MountAgent != null || agent.Team == null || agent.Team.Side != BattleSideEnum.Defender) return false;
             if (!agent.IsAbleToUseMachine()) return false;
-            return agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty;
+            if (!agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty) return false;
+            var r = _refused;
+            return r == null || !r.Contains(agent);
         }
 
         private static bool IsPolearm(ItemObject it)
@@ -165,6 +172,7 @@ namespace Armoury
                 internal bool WasOnWall, WindowOpen, PushStarted, WindowWould;
                 internal float OnWallAt = -1f, WindowAt = -1f;
                 internal Agent LastMover, LastPicker;
+                internal int MoverTries;   // 468-p: proby dobycia drzewca obecnemu idacemu
             }
 
             private static readonly AccessTools.FieldRef<SiegeLadder, StandingPointWithWeaponRequirement> _fPush = Ref("_pushingWithForkStandingPoint");
@@ -177,7 +185,6 @@ namespace Armoury
 
             private readonly List<Lad> _lads = new List<Lad>();
             private readonly Dictionary<SiegeLadder, Lad> _byLadder = new Dictionary<SiegeLadder, Lad>();
-            private readonly Dictionary<Agent, int> _tries = new Dictionary<Agent, int>();
             private bool _known, _siege, _written, _started;
             private float _nextScan = -1f, _nextWield = -1f;
             private string _prefixes = "-";
@@ -195,6 +202,7 @@ namespace Armoury
             {
                 base.OnBehaviorInitialize();
                 _points = null;
+                _refused = null;
                 _stumbles = _errs = 0;
             }
 
@@ -312,14 +320,17 @@ namespace Armoury
 
                     // wyslani do punktu spychania
                     var mover = d.Push.MovingAgent;
-                    if (mover != null && mover != d.LastMover)
+                    if (mover != d.LastMover)
                     {
-                        if (HoldsFork(mover) || (_fork != null && mover.Equipment[EquipmentIndex.ExtraWeaponSlot].Item == _fork)) _sentFork++; else _sentPole++;
+                        d.MoverTries = 0;
+                        if (mover != null)
+                        {
+                            if (HoldsFork(mover) || (_fork != null && mover.Equipment[EquipmentIndex.ExtraWeaponSlot].Item == _fork)) _sentFork++; else _sentPole++;
+                        }
                     }
                     d.LastMover = mover;
-                    if (mover != null && wield && On && !HoldsFork(mover)) Wield(mover);
-                    var user = d.Push.UserAgent;
-                    if (user != null && wield && On && user.IsAIControlled && !HoldsFork(user) && !WieldedPolearm(user)) Wield(user);
+                    // 468-p (U5): stojacemu na punkcie broni nie dobywamy (wejscie i tak wymaga drzewca w rece; dobycie przerwaloby spychanie)
+                    if (mover != null && wield && On) Wield(d, mover);
                 }
                 // wyslani po widly
                 if (d.Pick != null)
@@ -331,7 +342,12 @@ namespace Armoury
 
                 if (st != d.Prev)
                 {
-                    if (st == SiegeLadder.LadderState.BeingPushedBackStartFromWall)
+                    // 468-p (U1): StartFromWall przechodzi w BeingPushedBack w tej samej klatce (OnLadderStateChange, SL:488-496) - poczatek
+                    // zepchniecia to wejscie w BeingPushedBack prosto z muru (BeingRaisedStopped -> BeingPushedBack to nieudane podniesienie, nie liczy sie)
+                    bool fromWall = d.Prev == SiegeLadder.LadderState.OnWall || d.Prev == SiegeLadder.LadderState.FallToWall
+                                    || d.Prev == SiegeLadder.LadderState.BeingPushedBackStartFromWall;
+                    if (!d.PushStarted && (st == SiegeLadder.LadderState.BeingPushedBackStartFromWall
+                                           || (st == SiegeLadder.LadderState.BeingPushedBack && fromWall)))
                     {
                         d.PushStarted = true;
                         var u = d.Push != null ? d.Push.UserAgent : null;
@@ -361,23 +377,36 @@ namespace Armoury
                 }
             }
 
-            private void Wield(Agent a)
+            private void Wield(Lad d, Agent a)
             {
                 try
                 {
+                    // 468-p (U4, U6): nieaktywny w tej klatce, gracz, idacy z widlami (w rece albo w dodatkowym slocie) - bez zmian
+                    if (!a.IsActive() || !a.IsAIControlled || HoldsFork(a) || !a.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty) return;
                     if (WieldedPolearm(a)) return;
                     EquipmentIndex slot;
-                    if (!PolearmSlot(a, out slot)) return;
-                    int n;
-                    _tries.TryGetValue(a, out n);
-                    if (n >= MaxWieldTries) return;
-                    n++;
-                    _tries[a] = n;
-                    if (n == MaxWieldTries) _wieldFail++;
+                    bool has = PolearmSlot(a, out slot);
+                    if (!has || d.MoverTries >= MaxWieldTries)
+                    {
+                        // 468-p (U2): nie dobyl drzewca w 3 s (AI wrocilo do innej broni) - odeslany, punkt wolny dla widel jak w grze
+                        Refuse(a);
+                        _wieldFail++;
+                        a.StopUsingGameObject(false);   // jak UsableMissionObject.OnUse dla idacego (MB/UsableMissionObject.cs:376)
+                        return;
+                    }
+                    d.MoverTries++;
                     a.TryToWieldWeaponInSlot(slot, Agent.WeaponWieldActionType.WithAnimation, false);
                     _wields++;
                 }
                 catch (Exception e) { Stumble("Wield", e); }
+            }
+
+            private static void Refuse(Agent a)
+            {
+                var old = _refused;
+                var n = old != null ? new HashSet<Agent>(old) : new HashSet<Agent>();
+                n.Add(a);
+                _refused = n;
             }
 
             private bool WouldHave(Lad d)
@@ -415,6 +444,7 @@ namespace Armoury
                 if (_written) return;
                 _written = true;
                 _points = null;
+                _refused = null;
                 try
                 {
                     if (!_siege || _lads.Count == 0) return;
@@ -429,7 +459,7 @@ namespace Armoury
                              + ", zepchniec zaczetych: widly " + _pushFork + " / drzewce " + _pushPole + " / gracz " + _pushPlayer + (_pushOther > 0 ? " / inne " + _pushOther : "")
                              + (_toPushN > 0 ? " (od oparcia srednio " + (_toPushSum / _toPushN).ToString("0.0", Inv) + " s)" : "")
                              + ", zatrzymanych " + _stopped + ", do ziemi " + _down
-                             + ", dobyc drzewca " + _wields + " (nieudanych po " + MaxWieldTries + " probach " + _wieldFail + ")"
+                             + ", prob dobycia drzewca " + _wields + ", odeslanych bez drzewca w rece po 3 s " + _wieldFail
                              + ", potkniecia " + _stumbles + " | prefiksy IsDisabledForBattleSide: " + Prefixes() + ".");
                 }
                 catch (Exception e) { Stumble("Final", e); }

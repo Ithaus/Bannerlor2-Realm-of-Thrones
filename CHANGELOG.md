@@ -1,5 +1,34 @@
 # DZIENNIK ZMIAN
 
+## 468-p (12.11) - poprawki po recenzji 468: licznik zepchniec w logu, utkniety wlocznik nie blokuje drabiny
+
+**Problem (recenzja 468, gry nie uruchamiano - dowod z dekompilacji):**
+- U1: linia "spycha drabina #" i liczniki zepchniec zawsze 0 - setter `SiegeLadder.State` od razu wola `OnLadderStateChange`, a ten zmienia `BeingPushedBackStartFromWall` w `BeingPushedBack` w tej samej klatce (d370/SiegeLadder.cs:228-247, 488-496); pomiar co klatke nigdy nie widzial StartFromWall.
+- U2: idacy na punkt spychania bez drzewca w rece stal przy punkcie cale okno (wejscie wymaga drzewca: `CanReachAndUseObject` -> `IsDisabledForAgent`, MB/UsableMachineAIBase.cs:77; zdejmuje go tylko deaktywacja punktu), a (b) w tym czasie zamykalo widly - drabina nie do zepchniecia, choc w grze bez latki droga po widly bylaby wolna. Limit 10 prob liczony na cala misje - po wyczerpaniu nikt juz nie dobywal, a postfiks dalej wpuszczal.
+- U3: blizszy wlocznik mogl przejac slot od idacego z widlami (DetachmentManager, MB/DetachmentManager.cs:173-212, UsableMachine.cs:869-876).
+- U4: `TryToWieldWeaponInSlot` (natywne) bez sprawdzenia `IsActive`.
+- U5: dobycie broni stojacemu na punkcie mogloby przerwac animacje spychania.
+- U6: dobycie drzewca komus z widlami w dodatkowym slocie (i tak niedopuszczony).
+- U7: podpowiedz MCM "past the middle", a prog gry to 55%.
+
+**Zmiana (Armoury/src/SiegeLadderPush468.cs; Settings.cs, McmSettings.cs - tylko tekst podpowiedzi):**
+- U1: poczatek zepchniecia = `BeingPushedBackStartFromWall` albo wejscie w `BeingPushedBack` prosto z `OnWall` / `FallToWall` / StartFromWall, przy `!PushStarted` (`BeingRaisedStopped -> BeingPushedBack` to nieudane podniesienie, nie liczone).
+- U2: proby dobycia liczone na jedno wyslanie (zerowane przy zmianie idacego), najwyzej 6 (co 0.5 s = 3 s); gdy dalej bez drzewca w rece albo drzewca nie ma - `StopUsingGameObject(false)` (jak gra dla idacego, MB/UsableMissionObject.cs:376) i wpis do zbioru odmowionych (podmieniany w calosci, `volatile`, czytany w `Eligible`, zerowany na starcie i koncu misji) - punkt wolny dla widel jak w grze, odmowiony nie wraca do punktu w tej misji.
+- U3: postfiks (a) nie otwiera punktu innemu, gdy `MovingAgent` ma cos w dodatkowym slocie (widly).
+- U4/U6: `Wield` wychodzi, gdy idacy nieaktywny, nie AI, trzyma widly albo ma zajety dodatkowy slot.
+- U5: galaz dobycia stojacemu na punkcie usunieta.
+- U7: podpowiedz "while no stormer has climbed past 55% of its height".
+- Linia koncowa: "prob dobycia drzewca N, odeslanych bez drzewca w rece po 3 s M" (zamiast "dobyc drzewca (nieudanych po 10 probach)").
+
+**Ryzyko / co sprawdzic:**
+- Klucz NIE: bez zmian wzgledem 468 - postfiks wychodzi przed zmiana `__result` (`_refused` przy NIE zawsze pusty), `Wield` (w tym `StopUsingGameObject`) tylko pod `On`.
+- `StopUsingGameObject(false)` na idacym (nie uzywajacym) - ta sama sciezka co gra w `UsableMissionObject.OnUse`; wolane z ticku logiki misji, nie z petli DetachmentManager. Po odeslaniu gra moze dac punkt innemu wlocznikowi albo wyslac kogos po widly.
+- Do logu: "spycha drabina #i, kto: <id drzewca> | widly" musi sie pojawic przy kazdym zepchnieciu (pierwsze 10); w linii koncowej "zepchniec zaczetych: widly / drzewce" > 0, "do ziemi", "odeslanych bez drzewca w rece" (duza liczba = AI nie trzyma drzewca - wtedy zawezic do broni dwurecznej).
+- Build czysty OK, skan IL 30 trafien (jedyny MovementOrder: BehaviorCavRole441..ctor). Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+
 ## 468 (12.11) - obroncy AI spychaja drabiny takze dluga bronia drzewcowa (wlocznia, halabarda, pika), bez widel
 
 **Problem:** Jeff 12.11: "tak rob ... a czemu nie moga odpechanc dluga bronia jak maja? np wlocznia halabarda ??" (odpowiedz na propozycje: obronca przy drabinie spycha ja, gdy staje na murze). Gry nie uruchamiano - dowod z dekompilacji; logu ze szturmu nie ma (logi 370 z dawnych szturmow wyczyszczone), nie wiadomo, jak czesto AI spycha dzis.
