@@ -185,18 +185,18 @@ namespace Armoury
             var l = Of(c, false);
             var d = IronBank.DebtOf(c, false);
             bool any = (d != null && d.Principal >= 1) || ClaimsLeft(l) > 0;
-            if (l != null && l.Seized) return SaleRegime(l, d) ? "wyprzedaz" : "zajecie";
+            if (l != null && l.Seized) return SaleRegime(l, d, c) ? "wyprzedaz" : "zajecie";
             if (l != null && l.Missed > 0) return "zaleglosc";
             return any ? "kredyt" : "-";
         }
 
-        private static bool SaleRegime(L l, IronBank.Debt d)
+        private static bool SaleRegime(L l, IronBank.Debt d, Clan c = null)
         {
             var s = Settings.Current;
             if (l == null || !l.Seized) return false;
             if (l.ZeroDays >= Math.Max(1, s.SaleAfterZeroSeizeDays)) return true;
             if (l.SeizeEma <= 0) return false;
-            double owed = (d != null && d.Principal >= 1 ? d.Principal : 0) + ClaimsLeft(l);
+            double owed = (d != null && d.Principal >= 1 ? d.Principal : 0) + ClaimsLeft(l) - GracedLeft(c, l);   // 431-p: pozyczka korony w karencji nie pcha rodu w wyprzedaz
             return owed / l.SeizeEma > Math.Max(1, s.SaleForecastDays);
         }
 
@@ -488,6 +488,17 @@ namespace Armoury
 
         private static long CrownLeft(L l) { long t = 0; if (l != null) foreach (var x in l.Claims) if (IsCrownLoan(x)) t += x.Left; return t; }
 
+        /// <summary>431-p (recenzje S2 / S1): KARENCJA pozyczki korony - tylko gdy rod dalej sluzy koronie-wierzycielowi, a ta korona jest w wojnie. Rod, ktory
+        /// z dlugiem przeszedl do innej korony (albo jest bez korony), placi raty jak w pokoju - dotad kazda wojna obecnej frakcji dluznika wstrzymywala raty bez konca.</summary>
+        private static bool CrownGrace(Clan c, Claim x)
+        {
+            try { return IsCrownLoan(x) && c != null && c.Kingdom != null && !c.Kingdom.IsEliminated && c.Kingdom.StringId == x.Creditor && AtWar(c); }
+            catch { return false; }
+        }
+
+        /// <summary>431-p: czesc dlugu rodu w karencji (pozyczki korony nienalezne w wojnie) - poza zajeciem i wyprzedaza.</summary>
+        private static long GracedLeft(Clan c, L l) { long t = 0; if (l != null && c != null) foreach (var x in l.Claims) if (CrownGrace(c, x)) t += x.Left; return t; }
+
         /// <summary>431: dlug rodu z pozyczek koron na zold (wszystkie korony, z narosnietymi odsetkami). Tylko odczyt; nie rzuca.</summary>
         internal static long CrownLoanOf(Clan c)
         {
@@ -675,7 +686,7 @@ namespace Armoury
             long townOwed = TownLeft(l);   // f8-pozyczka: czesc "innych" to pozyczki od rad miast i ludzi zamkow
             if (townOwed > 0) sb.Append(" Of that, " + townOwed + " gold is owed to town councils and castle folk.");
             long crownOwed = CrownLeft(l);   // 431: pozyczka korony na zold wojenny
-            if (crownOwed > 0) sb.Append(" " + crownOwed + " gold of it is the crown's loan toward your war wages - nothing of it is due while your realm is at war.");
+            if (crownOwed > 0) sb.Append(" " + crownOwed + " gold of it is the crown's loan toward your war wages - while you serve that crown and it is at war, only its interest is due.");
             if (l != null && l.Seized) sb.Append(" Your creditors take the income of your villages and every coin above " + s.SeizeFloorGold + " in your purse until all is paid.");
             else if (l != null && l.Missed > 0) sb.Append(" Missed instalments in a row: " + l.Missed + "/3 - at the third your creditors seize your villages' income.");
             return sb.ToString();
@@ -981,14 +992,23 @@ namespace Armoury
                 if (cl.Kind == KTown && war && !player) left = Math.Min(left, Math.Max(0, cl.Acc));   // f8-pozyczka: w wojnie z D tylko odsetki (kapital z lupow i po pokoju)
                 // 431: pozyczka korony na zold - w wojnie nic z D (odsetki narastaja; AI splaca z lupow) - sama pozyczka nie robi zaleglosci w wojnie; po wojnie rata
                 // = narosle odsetki albo 1/RoyalWarWageLoanRepayDays dlugu z dnia ostatniej pozyczki (wieksze z dwojga), w tym samym limicie rat co wszyscy wierzyciele
+                // 431-p (recenzja S2): karencja tylko u korony-wierzyciela w wojnie (CrownGrace), nie przy dowolnej wojnie dluznika; gracz w karencji placi z D
+                // narosle odsetki (AI oddaje w wojnie z lupow - gracz tej drogi nie ma, a "nie za darmo" obowiazuje i jego)
                 if (cl.Kind == KCrownLoan)
-                    left = war ? 0 : Math.Min(left, Math.Max(Math.Max(0, cl.Acc), (long)Math.Ceiling((double)Math.Max(cl.Total, cl.Left) / Math.Max(28, Math.Min(1456, s.RoyalWarWageLoanRepayDays)))));
+                    left = CrownGrace(c, cl) ? (player ? Math.Min(left, Math.Max(0, cl.Acc)) : 0)
+                                             : Math.Min(left, Math.Max(Math.Max(0, cl.Acc), (long)Math.Ceiling((double)Math.Max(cl.Total, cl.Left) / Math.Max(28, Math.Min(1456, s.RoyalWarWageLoanRepayDays)))));
                 long x = Math.Min(left, room);
                 if (x <= 0) continue;
                 dues.Add(new KeyValuePair<Claim, long>(cl, x)); room -= x; claimsDue += x;
             }
             long total = bankDue + claimsDue;
-            if (total <= 0) return;   // nic do zaplaty z D (D bliskie 0) - bez zaleglosci
+            if (total <= 0)   // nic do zaplaty z D (D bliskie 0) - bez zaleglosci
+            {
+                // 431-p (recenzja N1): rod, ktoremu zostala tylko pozyczka korony w karencji, nie jest w zaleglosci (przed 431 taki rod wychodzil wyzej z Missed = 0;
+                // utkniete Missed robilo z niego "dluznika 166" i blokowalo nowa pozyczke na cala wojne)
+                if (!bank && room > 0 && l.Missed > 0) { long cl0 = ClaimsLeft(l); if (cl0 > 0 && cl0 == GracedLeft(c, l)) l.Missed = 0; }
+                return;
+            }
             if (total > cap15 + 1) _dOver15++;
             if (!player && head.Gold < total) { try { IronBank.FamilyCoverAll(c, (int)Math.Min(int.MaxValue, total - head.Gold)); } catch (Exception e) { Stumble("FamilyCover", e); } }
             if (head.Gold >= total)
@@ -1039,7 +1059,9 @@ namespace Armoury
         // ------------------------------------------------------------ zajecie (D3) i wyprzedaz (D4)
         private static void Seize(Clan c, L l, IronBank.Debt d, Hero head, int today, Settings s, ref int paidN, ref long paidSum)
         {
-            long owed = (d != null && d.Principal >= 1 ? (long)d.Principal : 0) + ClaimsLeft(l);
+            // 431-p (recenzja S1): pozyczka korony w karencji ("w wojnie nic nie jest nalezne") nie jest sciagana zajeciem ani wyprzedaza i nie przedluza zajecia -
+            // wszystkie "owed" ponizej bez niej; po wojnie (albo po odejsciu od korony) wraca do rat z D jak kazde roszczenie
+            long owed = (d != null && d.Principal >= 1 ? (long)d.Principal : 0) + ClaimsLeft(l) - GracedLeft(c, l);
             if (owed <= 0) { EndSeizure(c, l, d, today); return; }
             long vill = ClanIncomeBook.VillageIncomeOf(c);
             long fromVill = Math.Min(Math.Max(0, head.Gold), vill);
@@ -1049,23 +1071,23 @@ namespace Armoury
             {
                 head.ChangeHeroGold(-(int)Math.Min(int.MaxValue, take));
                 CirculationWindows.NoteHeroGold(head, -take);
-                long left = Distribute(c, l, d, take);
+                long left = Distribute(c, l, d, take, true);
                 if (left > 0) { head.ChangeHeroGold((int)left); CirculationWindows.NoteHeroGold(head, left); take -= left; }
                 long v = Math.Min(fromVill, take);
                 _dSeizedVill += v; _dSeizedPurse += take - v; paidN++; paidSum += take; _dPaidN++;
             }
             l.SeizeEma = l.SeizeEma <= 0 ? take : l.SeizeEma + (take - l.SeizeEma) / 28.0;
             l.ZeroDays = take > 0 ? 0 : l.ZeroDays + 1;
-            owed = (d != null && d.Principal >= 1 ? (long)d.Principal : 0) + ClaimsLeft(l);
+            owed = (d != null && d.Principal >= 1 ? (long)d.Principal : 0) + ClaimsLeft(l) - GracedLeft(c, l);
             if (owed <= 0) { EndSeizure(c, l, d, today); return; }
             // D4: co 7 dni, tylko przy 14 dobach zerowego zajecia albo prognozie > 728 dni
-            if (today - l.SaleDay >= 7 && SaleRegime(l, d))
+            if (today - l.SaleDay >= 7 && SaleRegime(l, d, c))
             {
                 l.SaleDay = today;
                 long got = 0;
                 try { got = Sale(c, l, d, head, owed); } catch (Exception e) { Stumble("Sale", e); }
                 _dSales++;
-                owed = (d != null && d.Principal >= 1 ? (long)d.Principal : 0) + ClaimsLeft(l);
+                owed = (d != null && d.Principal >= 1 ? (long)d.Principal : 0) + ClaimsLeft(l) - GracedLeft(c, l);
                 if (got > 0) { paidSum += got; }
                 if (owed <= 0) EndSeizure(c, l, d, today);
             }
@@ -1076,8 +1098,11 @@ namespace Armoury
             l.Seized = false; l.FreeDay = today; l.Missed = 0; l.ZeroDays = 0; l.SeizeEma = 0; l.Kw = 0;
             if (d != null) { d.Missed = 0; if (d.Principal < 1) d.Principal = 0; }
             _dSeizeEnded++;
-            Log.Info("Dlugi (168): " + c.Name + " - zajecie zakonczone, dlugi splacone; kredyt wojenny dopiero po " + Settings.Current.CreditAfterSeizureDays + " dobach.");
-            if (c == Clan.PlayerClan) Log.Player("Your debts are paid. The income of your villages is yours again.");
+            long graced = GracedLeft(c, l);   // 431-p: pozyczka korony w karencji zostaje w ksiedze (raty po wojnie)
+            Log.Info("Dlugi (168): " + c.Name + " - zajecie zakonczone, dlugi splacone" + (graced > 0 ? " (poza pozyczka korony na zold " + graced + " zl w karencji do konca wojny - 431)" : "")
+                     + "; kredyt wojenny dopiero po " + Settings.Current.CreditAfterSeizureDays + " dobach.");
+            if (c == Clan.PlayerClan) Log.Player(graced > 0 ? "Your debts are paid, save the crown's war loan, which waits for peace. The income of your villages is yours again."
+                                                            : "Your debts are paid. The income of your villages is yours again.");
         }
 
         /// <summary>D4: nadwyzki zbrojowni partii AI w miescie na targ (zloto przez kiese glowy), karawany bez bohatera i warsztaty do najbogatszego notabla
@@ -1149,7 +1174,7 @@ namespace Armoury
             }
             if (got > 0)
             {
-                long left = Distribute(c, l, d, got);
+                long left = Distribute(c, l, d, got, true);   // 431-p: wyprzedaz nie splaca pozyczki korony w karencji
                 if (left > 0) { head.ChangeHeroGold((int)left); CirculationWindows.NoteHeroGold(head, left); }   // nadwyzka ponad dlug wraca do rodu
             }
             _dSoldArm += arm; _dSoldCar += car; _dSoldWs += ws; _dSoldCarN += nCar; _dSoldWsN += nWs;
@@ -1203,7 +1228,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ wierzyciele
         /// <summary>Zloto zdjete juz z dluznika: Bank pierwszy, potem roszczenia w kolejnosci. Zwraca reszte (ponad dlug).</summary>
-        private static long Distribute(Clan c, L l, IronBank.Debt d, long amount)
+        private static long Distribute(Clan c, L l, IronBank.Debt d, long amount, bool skipGraced = false)
         {
             if (amount <= 0) return 0;
             if (d != null && d.Principal >= 1)
@@ -1214,6 +1239,7 @@ namespace Armoury
             foreach (var cl in Ordered(l).ToList())
             {
                 if (amount <= 0) break;
+                if (skipGraced && CrownGrace(c, cl)) continue;   // 431-p: zajecie i wyprzedaz (dobrowolna sprzedaz ziemi - LandProceeds - splaca wszystko)
                 long x = Math.Min(amount, cl.Left);
                 Deliver(c, cl, x); amount -= x;
             }
@@ -1331,7 +1357,7 @@ namespace Armoury
                     cl.Acc -= ipc;
                     var k = KingdomById(cl.Creditor);
                     if (k == null || k.IsEliminated) k = debtor != null ? debtor.Kingdom : null;
-                    if (k != null && !k.IsEliminated) { k.KingdomBudgetWallet += ix; CrownWarLoan431.NoteRepaid(x, ipc, false); return; }
+                    if (k != null && !k.IsEliminated) { k.KingdomBudgetWallet += ix; CrownWarLoan431.NoteRepaid(x, ipc, false); CrownWarLoan431.NoteCapitalBack(k, x - ipc); return; }
                     SpareTown(debtor, ix); _dSpare += x; CrownWarLoan431.NoteRepaid(x, ipc, true);
                     return;
                 }

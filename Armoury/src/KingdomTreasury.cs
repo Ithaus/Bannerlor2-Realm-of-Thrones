@@ -167,6 +167,16 @@ namespace Armoury
         // f6-zwrot: Full - pelny zwrot wiersza (zold x pct), Need - mnoznik i pasmo rodu (KingdomTreasury.RefundNeed.cs); Due - nalezny do wyplaty
         private sealed class RefundCalc { public Kingdom K; public List<KeyValuePair<Hero, int>> List; public int[] Due, Full; public NeedRow[] Need; public long PaidSum, Want, Have, Lent; }
         private static readonly Dictionary<Kingdom, RefundRow> _refund = new Dictionary<Kingdom, RefundRow>();
+        // 431-p: zwrot zoldu wyplacony rodowi w dzisiejszym rozliczeniu (WageRefund biegnie przed zoldem 314c / pozyczka 431 tej samej doby)
+        private static readonly Dictionary<Clan, long> _rfClan = new Dictionary<Clan, long>();
+        private static int _rfClanDay = -1;
+
+        /// <summary>431-p: ile zwrotu zoldu (f6) korona wyplacila temu rodowi DZIS. 0 - inna doba albo brak. Nie rzuca.</summary>
+        internal static long RefundGivenToday(Clan c)
+        {
+            try { long v; return c != null && Campaign.Current != null && _rfClanDay == (int)CampaignTime.Now.ToDays && _rfClan.TryGetValue(c, out v) ? Math.Max(0, v) : 0; }
+            catch { return 0; }
+        }
 
         internal static void Reset() { _refund.Clear(); _refundErr = false; ZeroLast(); _arrear.Clear(); _duesSkippedSess = 0; _duesModelErrSess = 0; _duesErrLogged.Clear(); DuesToday.Clear(); LeviesToday.Clear(); TownLevyToday.Clear(); MarketAndCrown.Reset(); NeedAidReset(); RbnReset(); }   // E8/R (254): liczniki linii "Rynek i korona (E8/R)" od zera; f6-zwrot: stan zwrotu wedlug potrzeby
 
@@ -257,6 +267,7 @@ namespace Armoury
         internal static void WageRefund()
         {
             _refund.Clear();
+            _rfClan.Clear(); _rfClanDay = Campaign.Current != null ? (int)CampaignTime.Now.ToDays : -1;
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             try
@@ -400,6 +411,7 @@ namespace Armoury
                             ClanIncomeBook.NoteInflow(h, give[i], ClanIncomeBook.KRefund);   // paczka 169: D rodu (tylko licznik)
                             given += give[i];
                             clans.Add(h.Clan); allClans.Add(h.Clan);
+                            if (h.Clan != null) { long rg; _rfClan.TryGetValue(h.Clan, out rg); _rfClan[h.Clan] = rg + give[i]; }   // 431-p
                             if (h.Clan == Clan.PlayerClan) playerGot += give[i];
                             // tylko pomiar: rod dluzny koronie (Clan.DebtToKingdom) - gra przy najblizszym rozliczeniu zabierze mu kiese na splate
                             // dlugu (vanilla AddPaymentForDebts), a ta splata nie trafia do skarbca

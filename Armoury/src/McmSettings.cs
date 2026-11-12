@@ -4996,6 +4996,10 @@ namespace Armoury
         [SettingPropertyGroup("The soldier's pay")]
         public bool RoyalWarWageLoanAskPlayer { get; set; } = true;
 
+        [SettingPropertyBool("Royal War Wage Loan Keeps Refund", HintText = "with Royal War Wage Loan: the crown's loan does not lessen what the crown repays of a house's wages the next day (a loan is not a gift), and a house is lent no more than the part of its serving men's wages that today's repayment has not covered; off = the loan is cut from the next day's repayment like the old gift", RequireRestart = false)]
+        [SettingPropertyGroup("The soldier's pay")]
+        public bool RoyalWarWageLoanKeepsRefund { get; set; } = true;
+
         [SettingPropertyBool("Royal Victory Reward Enabled", HintText = "the king's reward for a great victory: beating a lord's party or an army of a kingdom you are at war with earns the houses of your kingdom that fought a gift from the treasury (by their share in the battle) and influence; bandits and looters earn nothing. The gift is paid at the next crown settlement and only while the treasury has gold above its war reserve; the king's own house and mercenaries get no gift. AI lords and you alike", RequireRestart = false)]
         [SettingPropertyGroup("The soldier's pay")]
         public bool RoyalVictoryRewardEnabled { get; set; } = true;
@@ -13976,6 +13980,7 @@ namespace Armoury
             s.RoyalWarWageLoanLimitDays = RoyalWarWageLoanLimitDays;
             s.RoyalWarWageLoanRepayDays = RoyalWarWageLoanRepayDays;
             s.RoyalWarWageLoanAskPlayer = RoyalWarWageLoanAskPlayer;
+            s.RoyalWarWageLoanKeepsRefund = RoyalWarWageLoanKeepsRefund;
             s.RoyalVictoryRewardEnabled = RoyalVictoryRewardEnabled;
             s.RoyalVictoryGoldPerEnemy = RoyalVictoryGoldPerEnemy;
             s.RoyalVictoryArmyMultiplier = RoyalVictoryArmyMultiplier;

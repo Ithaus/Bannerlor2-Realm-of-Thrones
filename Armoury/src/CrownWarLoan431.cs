@@ -44,6 +44,11 @@ namespace Armoury
         private static string _plKingdom = "";
         private static int _plYear = int.MinValue, _plAns;
         private static bool _plAsked;             // okno pokazane w tej sesji (bez zapisu - po wczytaniu pytanie wraca raz, gdy dalej brak odpowiedzi)
+        private static int _plAskFails;           // 431-p: nieudane proby pokazania okna (wyjatek) - najwyzej 3 ponowienia w sesji
+        // 431-p (recenzja N3): kapital splacony koronie od ostatniego CrownIncome.Begin (id krolestwa -> zl) - do zapasu korony, nie do wplywow dnia. Bez zapisu
+        // (wczytanie w srodku okna: najwyzej jedna doba splat policzona jako wplyw, jak przed 431-p).
+        private static readonly Dictionary<string, long> _back = new Dictionary<string, long>(StringComparer.Ordinal);
+        private static long _dBackStock, _dRefCap; private static int _dRefCapN;
 
         private static long _prevSum = -1;         // dlug ksiegi przy poprzedniej linii (zapis); -1 = brak punktu odniesienia
         private static int _stumbles, _importN = -1, _importBad;
@@ -65,7 +70,7 @@ namespace Armoury
         internal static void Reset()
         {
             _plKingdom = ""; _plYear = int.MinValue; _plAns = 0; _plAsked = false; _prevSum = -1;
-            _stumbles = 0; _importN = -1; _importBad = 0; _err.Clear();
+            _stumbles = 0; _importN = -1; _importBad = 0; _err.Clear(); _back.Clear(); _plAskFails = 0;
             ZeroDay();
         }
 
@@ -76,6 +81,7 @@ namespace Armoury
             _dLimitN = _dBlockedN = _dLentN = 0;
             _dInterest = _dRepaid = _dRepInt = _dToCrown = _dSpare = _dLoot = _dInst = _dOrphan = 0;
             _dPlLent = 0; _dPlF = -1; _dPlBand = -1;
+            _dBackStock = 0; _dRefCap = 0; _dRefCapN = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -102,10 +108,32 @@ namespace Armoury
             if (spare) _dSpare += x; else _dToCrown += x;
         }
 
+        /// <summary>431-p: DebtLadder.Deliver - kapital (bez odsetek) pozyczki wrocil do skarbca korony k.</summary>
+        internal static void NoteCapitalBack(Kingdom k, long x)
+        {
+            try { if (k == null || k.StringId == null || x <= 0) return; long v; _back.TryGetValue(k.StringId, out v); _back[k.StringId] = v + x; }
+            catch (Exception e) { Stumble("NoteCapitalBack", e); }
+        }
+
+        /// <summary>431-p: CrownIncome.Begin - splacony kapital od poprzedniego Begin, najwyzej `room` (tyle "inne" zostalo po jednorazowych). Zeruje okno. Nie rzuca.</summary>
+        internal static long TakeCapitalBack(Kingdom k, long room)
+        {
+            try
+            {
+                long v;
+                if (k == null || k.StringId == null || !_back.TryGetValue(k.StringId, out v)) return 0;
+                _back.Remove(k.StringId);
+                long x = Math.Max(0, Math.Min(v, room));
+                _dBackStock += x;
+                return x;
+            }
+            catch (Exception e) { Stumble("TakeCapitalBack", e); return 0; }
+        }
+
         // ------------------------------------------------------------ regula (wola CrownWar314.PayWages)
         /// <summary>Ile z pelnego zoldu 314c `full` korona k chce dzis POZYCZYC rodowi c: wedlug potrzeby f, w limicie dlugu, bez rodow w zaleglosci, gracz po zgodzie.
         /// 0 - nic. Liczniki linii. Nie rzuca (wyjatek - 0 i potkniecie: lepiej nie pozyczyc, niz dac z niczego regule).</summary>
-        internal static long Want(Clan c, Kingdom k, long full, int year)
+        internal static long Want(Clan c, Kingdom k, long full, int year, long wageServing = long.MaxValue)
         {
             try
             {
@@ -122,6 +150,14 @@ namespace Armoury
                 _bN[band]++; _bFull[band] += full; _bNeed[band] += need;
                 if (player) { _dPlF = f; _dPlBand = band; }
                 if (need <= 0) return 0;
+                // 431-p (recenzja S1, klucz Royal War Wage Loan Keeps Refund): pozyczka nie tnie juz jutrzejszego zwrotu 70% (CrownWar314.RefundCut), wiec nie moze
+                // razem z dzisiejszym zwrotem przekroczyc zoldu sluzacych - rod pozycza najwyzej na te czesc zoldu, ktorej zwrot nie pokryl
+                if (s.RoyalWarWageLoanKeepsRefund && wageServing != long.MaxValue)
+                {
+                    long uncovered = Math.Max(0, wageServing - KingdomTreasury.RefundGivenToday(c));
+                    if (need > uncovered) { _dRefCap += need - uncovered; _dRefCapN++; need = uncovered; }
+                    if (need <= 0) return 0;
+                }
                 double D = DebtLadder.DebtD(c);
                 long limit = (long)Math.Floor(LimitDays(s) * Math.Max(0, D));
                 long room = Math.Max(0, limit - DebtLadder.CrownLoanOf(c));
@@ -172,7 +208,8 @@ namespace Armoury
             if (_plAns == 0 && !_plAsked)
             {
                 _plAsked = true;
-                try { Ask(s, k, kid, year, want, limit); } catch (Exception e) { Stumble("Ask", e); }
+                try { Ask(s, k, kid, year, want, limit); }
+                catch (Exception e) { Stumble("Ask", e); if (++_plAskFails <= 3) _plAsked = false; }   // 431-p (recenzja N2): wyjatek nie wycisza okna na cala sesje
             }
             return false;
         }
@@ -181,9 +218,10 @@ namespace Armoury
         {
             string text = "Your house has served its free days in the armies of " + Name(k) + " this year. The crown no longer gives war wages away - it lends them, "
                           + "and only to houses in need.\n\nIt offers your house a loan toward the wages of your men in the king's army: about " + want
-                          + " denars today, less as your house grows richer and nothing once it holds twice its war reserve. The debt grows by "
+                          + " denars today if the treasury can spare it, less as your house grows richer and nothing once it holds twice its war reserve. The debt grows by "
                           + (Rate(s) * 100).ToString("0.#", Inv) + "% a year and the crown lends no more once you owe it " + limit + " denars ("
-                          + LimitDays(s) + " days of your steady income).\n\nNothing is due while the realm is at war. After the war the crown takes it back in daily "
+                          + LimitDays(s) + " days of your steady income).\n\nWhile the realm is at war and you serve it you pay only the interest, day by day, out of your steady "
+                          + "income; the loan itself cannot be paid back early. After the war - or at once, should you leave this crown - it is taken back in daily "
                           + "instalments out of your steady income, spread over about " + Math.Max(28, Math.Min(1456, s.RoyalWarWageLoanRepayDays))
                           + " days; three missed instalments and your creditors seize the income of your villages.\n\n"
                           + "Your answer stands until the end of the year.";
@@ -232,6 +270,8 @@ namespace Armoury
                     sb.Append(" | razem pelny (dar sprzed 431) ").Append(full).Append(", wedlug potrzeby ").Append(need)
                       .Append(", ponad limit dlugu ").Append(_dLimitCut).Append(" (rodow ").Append(_dLimitN).Append(')')
                       .Append(", rody w zaleglosci / zajeciu / czarnej ksiedze ").Append(_dBlocked).Append(" (rodow ").Append(_dBlockedN).Append(')')
+                      .Append(", ponad zold niepokryty dzisiejszym zwrotem f6 (431-p, klucz Royal War Wage Loan Keeps Refund ").Append(s.RoyalWarWageLoanKeepsRefund ? "tak" : "nie").Append(") ")
+                      .Append(_dRefCap).Append(" (rodow ").Append(_dRefCapN).Append(')')
                       .Append(", gracz bez zgody ").Append(_dPlHeld).Append(", gracz poza drabina ").Append(_dNoLadder)
                       .Append(" | do pozyczenia ").Append(_dWant).Append(", POZYCZONE ").Append(_dLent).Append(" (rodow ").Append(_dLentN)
                       .Append("; reszta - skarbiec bez zlota ponad zapas wojny) | zostalo w skarbcach wobec daru sprzed 431: ").Append(Math.Max(0, full - _dLent))
@@ -239,6 +279,7 @@ namespace Armoury
                       .Append(" (oczekiwane 0; bez wpisu ").Append(_dUnbooked).Append(')')
                       .Append(" | splaty od poprzedniej linii ").Append(_dRepaid).Append(" (w tym odsetki ").Append(_dRepInt).Append("; z jednorazowych ").Append(_dLoot)
                       .Append(", raty z D ").Append(_dInst).Append(", reszta - zajecie, wyprzedaz, cena ziemi) -> skarbce ").Append(_dToCrown).Append(", zapasowe kasy miast ").Append(_dSpare)
+                      .Append(" | splacony kapital do zapasu koron (nie wplyw dnia, 431-p) ").Append(_dBackStock)
                       .Append(" | odsetki narosle ").Append(_dInterest).Append(", do dlugu bez platnika (rod wymarl bez wsi) ").Append(_dOrphan)
                       .Append(" | KSIEGA: dlug ").Append(debt).Append(" (w tym odsetki niezaplacone ").Append(acc).Append(") u ").Append(clans).Append(" rodow, w zaleglosci ").Append(arr)
                       .Append(", w zajeciu ").Append(seized);
@@ -287,7 +328,7 @@ namespace Armoury
             {
                 string claims = DebtLadder.ExportCrownLoans();
                 bool dec = _plAns != 0 && !string.IsNullOrEmpty(_plKingdom) && _plKingdom.IndexOfAny(Bad) < 0;
-                if (string.IsNullOrEmpty(claims) && !dec && _prevSum < 0) return "";
+                if (string.IsNullOrEmpty(claims) && !dec && _prevSum <= 0) return "";   // 431-p (recenzja N5): bez roszczen i decyzji - brak klucza w zapisie (takze przy kluczu NIE)
                 return "cw1|" + _prevSum.ToString(Inv) + "|" + (dec ? _plKingdom : "") + "|" + (dec ? _plYear : 0).ToString(Inv) + "|" + (dec ? _plAns : 0).ToString(Inv) + "|" + claims;
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -295,7 +336,7 @@ namespace Armoury
 
         internal static void Import(string data)
         {
-            _plKingdom = ""; _plYear = int.MinValue; _plAns = 0; _plAsked = false; _prevSum = -1; _importN = -1; _importBad = 0;
+            _plKingdom = ""; _plYear = int.MinValue; _plAns = 0; _plAsked = false; _prevSum = -1; _importN = -1; _importBad = 0; _back.Clear(); _plAskFails = 0;
             try
             {
                 if (string.IsNullOrEmpty(data)) return;   // zapis sprzed 431 - brak pozyczek, brak decyzji

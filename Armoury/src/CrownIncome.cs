@@ -342,6 +342,9 @@ namespace Armoury
                         else d.Other = 0;                               // brak wczorajszej migawki (wczytanie starego zapisu, nowe krolestwo) - tylko nasze liczniki
                         d.Windfall = WindfallOf(k, d, s);               // ds-akumulator: jednorazowe "inne" do zapasu (klucz wylaczony - 0, wzor jak dotad)
                         if (d.Windfall > 0) { _dWf += d.Windfall; _dWfN++; }
+                        // 431-p (recenzja N3): kapital pozyczek korony na zold splacony od wczorajszego End (raty i zajecia biegna po End, sprzedaz ziemi poza blokiem doby)
+                        // siedzi w "inne" - to zwrot wlasnego zlota korony, nie wplyw dnia: do zapasu jak jednorazowe (odsetki zostaja wplywem). Bez splat - 0 i wzor jak dotad.
+                        { long lb = CrownWarLoan431.TakeCapitalBack(k, Math.Max(0, d.Other - d.Windfall)); if (lb > 0) d.Windfall += lb; }
                         d.Measured = Math.Max(0, d.Own + d.Other - d.Windfall);     // netto: wydatki skarbca spoza nas (Diplomacy, gra) zmniejszaja wplywy dnia
                         d.Stock = Math.Max(0, w - d.Measured);
                         d.Release = (long)(Math.Max(0, d.Stock - reserve - TownFolk.CrownTownDebt(k)) / days);   // korona2: zloto pozyczone od miast to zapas trzymany, nie do rozdania (klucz wylaczony - 0)

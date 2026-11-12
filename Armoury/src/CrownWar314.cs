@@ -65,6 +65,9 @@ namespace Armoury
         private static readonly Dictionary<string, Svc> _svc = new Dictionary<string, Svc>();          // id rodu -> rok i dni sluzby w tym roku
         private static readonly Dictionary<string, long> _paid = new Dictionary<string, long>();       // id rodu -> zold 314c wyplacony w dobie _paidDay (ciecie zwrotu nastepnej doby)
         private static int _paidDay = -1;
+        // 431-p (recenzja S1): czesc _paid, ktora jest POZYCZKA korony (klucz Royal War Wage Loan Keeps Refund) - zostaje w PaidToday (gotowka na tych samych ludzi:
+        // pulap W5, b.Aid budzetu), ale NIE tnie podstawy zwrotu 70% nastepnej doby (pozyczka nie jest darem - korona nie "oplacila" tego zoldu)
+        private static readonly Dictionary<string, long> _lentKeep = new Dictionary<string, long>();
         private static readonly List<Gift> _gifts = new List<Gift>();
         // 326d: dar gracza z ostatnich bitew (bitwa -> wpis kolejki) - tylko odczyt dla okna lupu (SpoilsWindow); bez zapisu, najwyzej 16 pozycji, czyszczone w Reset
         private static readonly List<KeyValuePair<MapEvent, Gift>> _plGiftBy = new List<KeyValuePair<MapEvent, Gift>>();
@@ -99,7 +102,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _svc.Clear(); _paid.Clear(); _paidDay = -1; _gifts.Clear(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _rewarded.Clear(); _rewardedDay = -1; _plGiftBy.Clear(); _curMe = null; ZeroDay();
+            _svc.Clear(); _paid.Clear(); _lentKeep.Clear(); _paidDay = -1; _gifts.Clear(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _rewarded.Clear(); _rewardedDay = -1; _plGiftBy.Clear(); _curMe = null; ZeroDay();
         }
 
         private static void ZeroDay()
@@ -147,7 +150,10 @@ namespace Armoury
                 long have;
                 if (c == null || paid <= 0 || Campaign.Current == null || c.StringId == null) return 0;
                 if (_paidDay != (int)CampaignTime.Now.ToDays - 1 || !_paid.TryGetValue(c.StringId, out have) || have <= 0) return 0;
-                long cut = Math.Min(paid, have);
+                long keep; _lentKeep.TryGetValue(c.StringId, out keep);   // 431-p: pozyczka korony nie jest podstawa ciecia
+                keep = Math.Max(0, Math.Min(keep, have));
+                long cut = Math.Min(paid, have - keep);
+                if (cut <= 0) return 0;
                 _paid[c.StringId] = have - cut;
                 _dCut += cut;
                 return cut;
@@ -272,11 +278,12 @@ namespace Armoury
 
         private static void PayWages(Settings s, int day, Dictionary<Kingdom, Purse> cache)
         {
-            _paid.Clear(); _paidDay = day;                      // wczorajszy zold zuzyty juz przez dzisiejszy zwrot (WageRefund biegnie wczesniej w bloku)
+            _paid.Clear(); _lentKeep.Clear(); _paidDay = day;   // wczorajszy zold zuzyty juz przez dzisiejszy zwrot (WageRefund biegnie wczesniej w bloku)
             if (!s.RoyalWarWageEnabled) return;
             int year = CampaignTime.Now.GetYear, free = FreeDays(s);
             double pct = Math.Max(0f, Math.Min(100f, s.RoyalWarWagePercent)) / 100.0;
             bool loan = CrownWarLoan431.On;   // 431: zold tylko rodom w potrzebie i jako pozyczka korony (klucz wylaczony - dar jak dotad)
+            bool keepRefund = loan && s.RoyalWarWageLoanKeepsRefund;   // 431-p: pozyczka nie tnie zwrotu 70% i nie przekracza zoldu niepokrytego dzisiejszym zwrotem
             foreach (var k in Kingdom.All)
             {
                 if (k == null || k.IsEliminated) continue;
@@ -321,7 +328,7 @@ namespace Armoury
                             long c277 = Math.Min(due, (long)Math.Floor(Math.Max(0, CanonHouses277.CashOf(c))));
                             if (c277 > 0) { due -= c277; _dCut277 += c277; }
                             if (due <= 0) continue;
-                            if (loan) { due = CrownWarLoan431.Want(c, k, due, year); if (due <= 0) continue; }   // 431: x f potrzeby, limit dlugu, zgoda gracza
+                            if (loan) { due = CrownWarLoan431.Want(c, k, due, year, wage); if (due <= 0) continue; }   // 431: x f potrzeby, limit dlugu, zgoda gracza; 431-p: najwyzej zold niepokryty zwrotem
                             rows.Add(new Row { C = c, Base = due, Men = men });
                         }
                         catch (Exception e) { Stumble("PayWages(rod)", e); }
@@ -342,6 +349,7 @@ namespace Armoury
                         _dPaidN++; _dPaidAmt += x; got += x;
                         if (loan) CrownWarLoan431.Lent(c, k, x);   // 431: wyplacone = dlug rodu wobec tej korony (ksiega drabiny 168)
                         long prev; _paid.TryGetValue(c.StringId, out prev); _paid[c.StringId] = prev + x;
+                        if (keepRefund) { long pk; _lentKeep.TryGetValue(c.StringId, out pk); _lentKeep[c.StringId] = pk + x; }
                         if (c == Clan.PlayerClan) _dPlWage += x;
                     }
                     if (got < want) _dShortK++;
@@ -518,7 +526,8 @@ namespace Armoury
         // ------------------------------------------------------------ zapis (SaveText, "arm_zold314")
         private static readonly char[] Bad = { '|', ';', ':', ',' };
 
-        /// <summary>"v1|rod:rok:dni[:krolestwo];...|doba|rod:zl;...|rod:krolestwo:reszta:doba;..."</summary>
+        /// <summary>"v1|rod:rok:dni[:krolestwo];...|doba|rod:zl;...|rod:krolestwo:reszta:doba;...|rod:zl;..." (ostatnie pole od 431-p: czesc zoldu doby bedaca pozyczka
+        /// korony, ktora nie tnie zwrotu; starsza DLL czyta tylko 5 pierwszych pol, brak pola = pusto)</summary>
         internal static string Export()
         {
             try
@@ -531,6 +540,11 @@ namespace Armoury
                 foreach (var kv in _paid) { if (kv.Value <= 0 || kv.Key.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(kv.Key).Append(':').Append(kv.Value.ToString(Inv)); }
                 sb.Append('|'); f = true;
                 foreach (var g in _gifts) { if (g.Left <= 0 || g.Clan.IndexOfAny(Bad) >= 0 || g.Kingdom.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(g.Clan).Append(':').Append(g.Kingdom).Append(':').Append(g.Left.ToString(Inv)).Append(':').Append(g.Day.ToString(Inv)); }
+                if (_lentKeep.Count > 0)
+                {
+                    sb.Append('|'); f = true;
+                    foreach (var kv in _lentKeep) { if (kv.Value <= 0 || kv.Key.IndexOfAny(Bad) >= 0) continue; if (!f) sb.Append(';'); f = false; sb.Append(kv.Key).Append(':').Append(kv.Value.ToString(Inv)); }
+                }
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -538,12 +552,13 @@ namespace Armoury
 
         internal static void Import(string data)
         {
-            _svc.Clear(); _paid.Clear(); _paidDay = -1; _gifts.Clear(); _importN = 0; _importBad = 0;
+            _svc.Clear(); _paid.Clear(); _lentKeep.Clear(); _paidDay = -1; _gifts.Clear(); _importN = 0; _importBad = 0;
             try
             {
                 if (string.IsNullOrEmpty(data)) return;
                 var f = data.Split('|');
                 if (f.Length < 5 || f[0] != "v1") { _importBad++; return; }
+                if (f.Length >= 6) foreach (var p in f[5].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); long v; if (x.Length == 2 && long.TryParse(x[1], NumberStyles.Integer, Inv, out v) && v > 0) _lentKeep[x[0]] = v; else _importBad++; }   // 431-p
                 foreach (var p in f[1].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); int y, d; if ((x.Length == 3 || x.Length == 4) && int.TryParse(x[1], NumberStyles.Integer, Inv, out y) && int.TryParse(x[2], NumberStyles.Integer, Inv, out d)) { _svc[x[0]] = new Svc { Year = y, Days = Math.Max(0, d), Kingdom = x.Length == 4 ? x[3] : null }; _importN++; } else _importBad++; }
                 int pd; if (int.TryParse(f[2], NumberStyles.Integer, Inv, out pd)) _paidDay = pd; else _importBad++;
                 foreach (var p in f[3].Split(';')) { if (p.Length == 0) continue; var x = p.Split(':'); long v; if (x.Length == 2 && long.TryParse(x[1], NumberStyles.Integer, Inv, out v) && v > 0) { _paid[x[0]] = v; _importN++; } else _importBad++; }
