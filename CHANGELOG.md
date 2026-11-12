@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 471a (12.11) - czas oblezenia z czynnikow: KROK 1, sam log przewidywania (zachowanie bez zmian)
+
+**Problem:** Jeff 12.11: "tak ustaw takie cele i zrob test 90 dob ale co toznaczy maly zmaek lub duzy zamek??" oraz "i od czego zalezne beda doby??". Cele: maly zamek 20-40 dob, duzy zamek 40-90, miasto i wielka twierdza 60-150. Dzis (test 60 dob, `Armoury-2026-11-12_22-47-01.log`) oblezenia AI trwaja 6-16 dob: koncza sie szturmem taranem i wieza po ok. 6 dobach (mury 100%, trebuszy 0, wylomow 0) albo odejsciem przez glod OBOZU (8-16 dob). Jedzenie obroncow nie gra roli (zamki 486-807 dob zapasu).
+
+**Przyczyna:** dlugosc wynika z czasu budowy taranu i wiezy oraz z jedzenia oblegajacych; gra nie zna kapitulacji z terminu, a GL (`SiegeWalls2.StarveOne`) daje ok. 52 doby od zera do kapitulacji.
+
+**Zmiana (nowy `SiegeWalls.Time471.cs`, wpiecia w `SiegeWalls.cs`: `Daily`, `OnSiegeEnded`, `Reset`):** tylko odczyt i log. Termin obrony R = lo + (hi - lo) x q, q = 0.35 qJ + 0.25 qM + 0.25 qS + 0.15 qMo: qJ jedzenie zalogi (zapas / ubytek / 365), qM mury (HP x poziom / 3), qS sily (1 - ln(ludzie obozu / obroncy z milicja) / ln 20), qMo morale obroncow (wzor SZ3 DefMorale). Odsiecz w drodze >= polowy sily obozu (miara SZ3/OB5) = zegar R stoi. Kategorie: lista wielkich twierdz (castle_V5, town_EW4, ROT_castle61, town_B2, town_V2, ROT_town3, town_EW3, town_V5, town_EW1, town_EN1, town_A1, town_S3, town_V6 - sprawdzone w ROT-Map settlements.xml), miasto, zamek mury 1 = maly / 2-3 = duzy (linia pokazuje tez wariant D1 "maly = mury <= 2", bo w ROT 8.1.8 zaden zamek nie ma murow 1). Limit 1.5 x hi. Linie: `Czas oblezenia (471) start`, `(471) termin minal`, `(471) koniec` (trwalo / cel / R / zegar / doby z odsiecza / HP / wlasciciel), `Czas oblezen (471 doba)`. Gracz, Inni, skrypt fabuly - "poza regula". Bez klucza MCM (nic nie zmienia; klucz "Historical Siege Length" przyjdzie z 471b, gdy regula zacznie dzialac). Pamiec poza zapisem: po wczytaniu zegar od wieku oblezenia.
+
+**Ryzyko / co sprawdzic:** zero latek, zero zapisow w grze; raz na dobe petla po Settlement.All (jak OB0) + jedna linia startu na oblezenie. Wyjatek per oblezenie = Stumble i pominiecie tego oblezenia. Odsiecz liczona jak `ReliefStrength`, ale bez warunku MapEvent (poza bitwa). Nie liczy drugi raz strat RB ani jedzenia - tylko czyta. Build OK, skan IL 30. W logu sprawdzic: R w startach (oczekiwane z calc471: duzy zamek ok. 60-80, miasto/twierdza ok. 110-130), "koniec" dzis PONIZEJ celu (6-16 dob) - to jest pomiar wyjsciowy przed 471b. Decyzje Jeffa przed 471b: D1 (podzial zamkow), D2 (straty RB na druzyne -> procent ludzi), D3 (zaopatrzenie obozu), D4 (kapitulacja z honorami czy niewola) - bez D2/D3 oblezenia > ok. 30 dob sa niemozliwe (oboz gloduje i topnieje).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 467-p (12.11) - poprawki po recenzji 467: gracz dolaczajacy do szturmu AI = cala armia (U1), osobny licznik "bez progu" (U4)
 
 **Problem:**

@@ -1316,6 +1316,7 @@ namespace Armoury
                 SiegeWalls2.NoteSiegeEndForBan(ev, pz != null ? pz.Repels : 0);       // m116-fabula: krotkie oblezenie bez bitwy - zakaz powtorki (przed EndLine - ta sama chwila)
                 SiegeWalls2.EndLine(ev, pz != null ? pz.Repels : 0);                  // oblezenia 3 (KO): przyczyna konca oblezenia - PRZED czyszczeniem przerw OB2
                 Sz5SiegeEnded(ev);                                               // 467: przebieg oblezenia (szturmy, odstapienia, straty)
+                Time471End(ev);                                                  // 471a: faktyczny czas wobec terminu R (tylko log)
                 _pauses.Remove(ev);
                 _prep.Remove(ev);
                 _vetoLogged.Remove(ev);
@@ -1389,6 +1390,7 @@ namespace Armoury
                 SzDaily();                                                       // SZ: linia doby bitwy szturmu
                 LvlDaily();                                                      // 320c: linia doby czynnika poziomu murow
                 Eng377Daily();                                                   // 377: linia doby inzynierii obroncow
+                Time471Daily();                                                  // 471a: czas oblezenia z czynnikow - sam log przewidywania
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ZeroDay(); }
@@ -1431,7 +1433,7 @@ namespace Armoury
         /// <summary>Z SiegeRansom.Reset (konstruktor ArmouryBehavior: nowa kampania i kazde wczytanie).</summary>
         internal static void Reset()
         {
-            _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear(); _bats.Clear(); _sz5.Clear();   // zapis (Import) przychodzi PO konstruktorze
+            _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear(); _bats.Clear(); _sz5.Clear(); _t471.Clear();   // zapis (Import) przychodzi PO konstruktorze
             _lastCamp = null; _last = null; _lastAt = -1f; _lastDrCamp = null; _lastDrAt = -1f;
             SiegeWalls2.Reset();                                                 // oblezenia 2: trebusze, glod, drabiny - pamiec od zera
             ZeroDay();
