@@ -237,6 +237,22 @@ namespace Armoury
             catch (Exception e) { Stumble("GrainLock", e); return 0; }
         }
 
+        /// <summary>435-L6-p (recenzja 4): okreg moze oddac rece pola na zamowienie materialu - gospodarze nie gloduja i spichlerz trzyma co najmniej prog przednowka
+        /// (w zimie krainy 2 x tyle) - ta sama miara co bezpiecznik zboza. Bez migawki spichlerza: poza zima tak, w zimie nie. Sam odczyt, nie rzuca.</summary>
+        internal static bool FieldHandsFree(Village v, int today)
+        {
+            try
+            {
+                if (v == null) return false;
+                bool winter = WinterBite.WinterNow() && WinterRealm.OfVillage(v) > 0f;
+                double home, harvest, food, cap; float u; int day;
+                if (!Famine.DayOf(v, out home, out harvest, out food, out cap, out u, out day) || day < today - 2 || !(home > 0)) return !winter;
+                if (u > 0f) return false;
+                return food / home >= (winter ? 2.0 : 1.0) * RationDays;
+            }
+            catch (Exception e) { Stumble("FieldHandsFree", e); return false; }
+        }
+
         /// <summary>Prog zapasu przednowka w dniach potrzeby (Famine Ration Days, 30-364).</summary>
         internal static int RationDays { get { var s = Settings.Current; return Math.Max(30, Math.Min(364, s != null ? s.FamineRationDays : 90)); } }
 

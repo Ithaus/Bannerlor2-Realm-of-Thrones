@@ -265,6 +265,11 @@ namespace Armoury
             // 435-L6 (klucz Crafts Follow Shortage): w dobie kroku przychod zajecia x sqrt(N towarow zajecia w miescie targowym) - ta sama funkcja czynnika co ZW
             // (CraftShortage.Row); klucz wylaczony albo miasto bez niedoboru - nf null i rachunek co do bitu jak dotad
             bool lp6 = step && CraftShortage.On;
+            // 435-L6-p: lp6Rule - czynnik STERUJE (klucz Crafts Follow Shortage Rule); bez niego liczony obok do licznikow (sam pomiar, decyzje jak dotad);
+            // lp6No - regula sterowana czynnikiem bez tablicy N: czesci bez oceny w tym kroku (nacisk zostaje); pierwszy krok z czynnikiem - nacisk od zera (miara sie zmienila)
+            bool lp6Rule = lp6 && CraftShortage.RuleOn, lp6No = lp6 && !CraftShortage.TableReady();
+            if (lp6Rule && !lp6No && CraftShortage.NeedHeldZero(CraftShortage.SysKs)) HeldZeroL6();
+            var lp6Tab = reg && CraftShortage.RuleOn && CraftShortage.TableReady() ? SupplySignal.Table : null;   // regale: cykl regali nie musi wypadac w dobie kroku A7
             foreach (var ld in _live.Values)
             {
                 if (ld.St == null || ld.K == null || ld.B == null) continue;
@@ -277,7 +282,11 @@ namespace Armoury
                     double[] vRow = null;
                     if (vTab != null && !vTab.TryGetValue(px, out vRow)) { vRow = new double[KsTab.NC]; for (int c0 = 0; c0 < vRow.Length; c0++) vRow[c0] = double.NaN; vTab[px] = vRow; }
                     double[] sRow = sig && step ? A7sRow(mt) : null, sV = sRow != null ? A7sVRow(sRow) : null;   // f5-a7: cena sygnalu miasta targowego (srednia 4 krokow)
-                    double[] nf = lp6 ? CraftShortage.Row(mt) : null;        // 435-L6: czynnik niedoboru na zajecie (null - wszedzie 1)
+                    double[] nf = lp6 && !lp6No ? CraftShortage.Row(mt) : null;
+                    double[] nfU = lp6Rule ? nf : null, nfO = lp6Rule ? null : nf;   // 435-L6-p: nfU - czynnik w rachunku DECYZJI, nfO - w rachunku obok (liczniki)
+                    bool regHungry = false;
+                    if (lp6Tab != null && reg && !ld.TF && ld.V != null) { try { regHungry = Famine.HungerOf(ld.V) > 0f; } catch { regHungry = false; } }
+                    // nf: czynnik niedoboru na zajecie (null - wszedzie 1)
                     string type = ld.K.Type;
                     // 435-L2: przebudowa stojaca (zaleglosc raty >= prog) nie zajmuje miejsca "jedna czesc okregu naraz"; klucz 0 - Released zawsze false (jak dotad)
                     // 435-L4 (klucz Village Gear On Switch): zmiana OD RAZU (koszt 0, sprzet z robot gminy) trzyma miejsce tylko do sprzetu dla polowy rak w zmianie albo
@@ -320,8 +329,8 @@ namespace Armoury
                                     if (bc == fct) continue;
                                     double L = b.L(fct, type);
                                     if (!(L > bl) || KsWorksLock(ld, b)) continue;
-                                    double fi = FachInc(b, type, fct, sig, sRow, sV, px, vRow, nf != null ? nf[fct] : 1.0);
-                                    if (!(fi > 0) || fi < FachInc(b, type, bc, sig, sRow, sV, px, vRow, nf != null ? nf[bc] : 1.0) || FeedKeeps(ld, bc, fct)) continue;
+                                    double fi = FachInc(b, type, fct, sig, sRow, sV, px, vRow, nfU != null ? nfU[fct] : 1.0);
+                                    if (!(fi > 0) || fi < FachInc(b, type, bc, sig, sRow, sV, px, vRow, nfU != null ? nfU[bc] : 1.0) || FeedKeeps(ld, bc, fct)) continue;
                                     double area = BlockArea(ld, b), after = b.LandUse + b.X[mi] * (b.LandOf(fct, type) - b.LandOf(bc, type));
                                     if (area > 0 && after > area * 1.02 && after > b.LandUse) continue;
                                     bl = L; fRet = b;
@@ -341,9 +350,10 @@ namespace Armoury
                         // f5-a7 (klucz Ks Switch Signal): doba bez kroku i bez regali przy przebudowach w toku - blok bez Held nie ma tu nic do zrobienia (blokada prac zeruje
                         // tylko Held > 0); wynik ten sam, bez sprawdzania blokady prac dla ~15 tys. blokow co dobe
                         if (sig && !step && !reg && b.Held <= 0) continue;
-                        if (reg && b.RC != null) RegaleCycle(b, px, f4reg ? mt : null, f4reg, ld.Market);
+                        if (reg && b.RC != null) RegaleCycle(b, px, f4reg ? mt : null, f4reg, ld.Market, lp6Tab, mt.Settlement, regHungry);
                         if (KsWorksLock(ld, b)) { b.Held = 0; continue; }   // inwest: czesc z pracami okregu nie zmienia zajecia (projekt A7)
                         if (!step || b.Cand == null || b.Cand.Count < 2) continue;
+                        if (lp6Rule && lp6No) { CraftShortage.NoteNoTable(CraftShortage.SysKs); continue; }   // 435-L6-p: bez tablicy N - bez oceny (nacisk bez zmian)
                         int ci = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[ci]) ci = i;
                         int cur = b.C[ci];
                         double incCur, incBest = double.NegativeInfinity; int best = -1;
@@ -353,12 +363,13 @@ namespace Armoury
                             // f5-a7 (klucz Ks Switch Signal): dochod rodziny przy cenie sygnalu KS (wzor Planu); miasto bez sygnalu - blok bez oceny (Held bez zmian)
                             if (sRow == null) { _a7sNoSig++; continue; }
                             double rent = A7sRent(b);
-                            incCur = A7sIncome(b, type, cur, sRow, sV, rent, nf != null ? nf[cur] : 1.0);
-                            foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent, nf != null ? nf[c] : 1.0); if (v > incBest) { incBest = v; best = c; } }
+                            incCur = A7sIncome(b, type, cur, sRow, sV, rent, nfU != null ? nfU[cur] : 1.0);
+                            foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent, nfU != null ? nfU[c] : 1.0); if (v > incBest) { incBest = v; best = c; } }
                             if (nf != null)
                             {
-                                double r0 = A7sIncome(b, type, cur, sRow, sV, rent), rb = double.NegativeInfinity; bool any = false;
-                                foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent); if (v > rb) { rb = v; any = true; } }
+                                // 435-L6-p: rachunek OBOK (przy regule - bez czynnika, przy samym pomiarze - z czynnikiem); rawPress = nacisk w rachunku obok
+                                double r0 = A7sIncome(b, type, cur, sRow, sV, rent, nfO != null ? nfO[cur] : 1.0), rb = double.NegativeInfinity; bool any = false;
+                                foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent, nfO != null ? nfO[c] : 1.0); if (v > rb) { rb = v; any = true; } }
                                 rawPress = any && rb >= SwitchRatio * Math.Max(0.02, r0);
                                 CraftShortage.NoteEval(CraftShortage.SysKs);
                             }
@@ -367,16 +378,17 @@ namespace Armoury
                         // f5-koszt (klucz Ks Cost Fast2; scalenie fali 5: tylko bez sygnalu KS f5-a7 - sygnal liczony na watku glownym w regule): te same dochody przy cenach gry policzyla dzis diagnoza A7 (ten sam wiersz cen miasta, to samo zajecie biezace, ta sama
                         // lista kandydatow i kolejnosc) - bez liczenia drugi raz; probka 1/64 sprawdza je starym rachunkiem (linia "KS: koszt f5")
                         // (recenzja: po roznicy w probce F5Fallback - od nastepnego bloku do konca sesji starym rachunkiem; blok z roznica bierze liczby starego rachunku)
-                        else if (nf == null && f5g && !F5Off && b.F5Day == today && b.F5Cur == cur && ReferenceEquals(b.F5Px, px)) { incCur = b.F5Ic; incBest = b.F5Ib; best = b.F5Best; F5RuleNote(b, type, cur, px, vRow, today, ref incCur, ref incBest, ref best); }
+                        else if (nfU == null && f5g && !F5Off && b.F5Day == today && b.F5Cur == cur && ReferenceEquals(b.F5Px, px)) { incCur = b.F5Ic; incBest = b.F5Ib; best = b.F5Best; F5RuleNote(b, type, cur, px, vRow, today, ref incCur, ref incBest, ref best); }
                         else
                         {
                             // 435-L6: przy czynniku niedoboru (nf) zawsze ten rachunek (dochody z diagnozy f5 sa bez czynnika); nf null - co do bitu jak dotad
-                            incCur = vRow != null ? IncomeV(b, type, cur, px, vRow, nf != null ? nf[cur] : 1.0) : Income(b, type, cur, px, nf != null ? nf[cur] : 1.0);
-                            foreach (int c in b.Cand) { if (c == cur) continue; double f6 = nf != null ? nf[c] : 1.0; double v = vRow != null ? IncomeV(b, type, c, px, vRow, f6) : Income(b, type, c, px, f6); if (v > incBest) { incBest = v; best = c; } }
+                            incCur = vRow != null ? IncomeV(b, type, cur, px, vRow, nfU != null ? nfU[cur] : 1.0) : Income(b, type, cur, px, nfU != null ? nfU[cur] : 1.0);
+                            foreach (int c in b.Cand) { if (c == cur) continue; double f6 = nfU != null ? nfU[c] : 1.0; double v = vRow != null ? IncomeV(b, type, c, px, vRow, f6) : Income(b, type, c, px, f6); if (v > incBest) { incBest = v; best = c; } }
                             if (nf != null)
                             {
-                                double r0 = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px), rb = double.NegativeInfinity; bool any = false;
-                                foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > rb) { rb = v; any = true; } }
+                                double o0 = nfO != null ? nfO[cur] : 1.0;
+                                double r0 = vRow != null ? IncomeV(b, type, cur, px, vRow, o0) : Income(b, type, cur, px, o0), rb = double.NegativeInfinity; bool any = false;
+                                foreach (int c in b.Cand) { if (c == cur) continue; double oc = nfO != null ? nfO[c] : 1.0; double v = vRow != null ? IncomeV(b, type, c, px, vRow, oc) : Income(b, type, c, px, oc); if (v > rb) { rb = v; any = true; } }
                                 rawPress = any && rb >= SwitchRatio * Math.Max(0.02, r0);
                                 CraftShortage.NoteEval(CraftShortage.SysKs);
                             }
@@ -387,15 +399,15 @@ namespace Armoury
                         bool fachRet = false;
                         if (fct >= 0)
                         {
-                            double fInc = FachInc(b, type, fct, sig, sRow, sV, px, vRow, nf != null ? nf[fct] : 1.0);
+                            double fInc = FachInc(b, type, fct, sig, sRow, sV, px, vRow, nfU != null ? nfU[fct] : 1.0);
                             if (cur == fct)
                             {
                                 if (fM <= 1.05 * fT && fInc > 0) { b.Held = 0; _fKeep++; if (nf != null) CraftShortage.NoteFach(CraftShortage.SysKs); continue; }
                             }
                             else if (ReferenceEquals(b, fRet) && fM < 0.95 * fT && fInc > 0 && fInc >= incCur) { best = fct; fachRet = true; }   // recenzja R3: nie na gorzej platna prace
                         }
-                        if (!fachRet && (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur))) { b.Held = 0; if (nf != null) CraftShortage.Note(CraftShortage.SysKs, false, rawPress, b.Hands * b.X[ci]); continue; }
-                        if (nf != null) { if (fachRet) CraftShortage.NoteFach(CraftShortage.SysKs); else CraftShortage.Note(CraftShortage.SysKs, true, rawPress, b.Hands * b.X[ci]); }   // 435-L6: sam licznik
+                        if (!fachRet && (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur))) { b.Held = 0; if (nf != null) CraftShortage.Note(CraftShortage.SysKs, lp6Rule ? false : rawPress, lp6Rule ? rawPress : false, b.Hands * b.X[ci]); continue; }
+                        if (nf != null) { if (fachRet) CraftShortage.NoteFach(CraftShortage.SysKs); else CraftShortage.Note(CraftShortage.SysKs, lp6Rule ? true : rawPress, lp6Rule ? rawPress : true, b.Hands * b.X[ci]); }   // 435-L6: sam licznik
                         b.Held += StepDays; _rPress++; if (b.Held > _rMaxHeld) _rMaxHeld = b.Held;
                         if (fachRet) _fPress++;
                         if (sig) A7sNotePress(b, ci);                    // f5-a7: rece pod naciskiem i trzymane >= 60 dob
@@ -405,8 +417,11 @@ namespace Armoury
                         // okregu po odejsciu tych rak spadlby ponizej 1.2 x potrzeby; nacisk (Held) zostaje. Klucz wylaczony - bez liczenia (jak dotad)
                         if (busy) { _rBusy++; continue; }
                         // 435-L2-p (stabilnosc N3): bezpiecznik PO "inna czesc okregu"; przejscie na inne jedzenie wolne (pod KS jedzenie -> nie-jedzenie pilnuje dalej FeedKeeps)
-                        if (cur == KsTab.CWheat && best != KsTab.CWheat && CraftUnblock.GrainKey
-                            && CraftUnblock.GrainLock(CraftUnblock.SysKs, ld.TF ? null : ld.V, ld.TF ? ld.T : null, b.Hands * b.X[ci], FoodCraft(best), today) != 0) continue;
+                        // 435-L6-p (recenzja 4): nacisk TYLKO z niedoboru (bez czynnika by go nie bylo) nie odciaga rak od zboza bez bezpiecznika - liczony takze przy
+                        // wylaczonym kluczu Grain Hands Winter Lock
+                        bool gForce = nfU != null && !fachRet && !rawPress && !CraftUnblock.GrainKey;
+                        if (cur == KsTab.CWheat && best != KsTab.CWheat && (CraftUnblock.GrainKey || gForce)
+                            && CraftUnblock.GrainLock(CraftUnblock.SysKs, ld.TF ? null : ld.V, ld.TF ? ld.T : null, b.Hands * b.X[ci], FoodCraft(best), today, gForce) != 0) continue;
                         if (FeedKeeps(ld, cur, best)) { _rFeed++; continue; }   // r4-polnoc: najpierw wyzywic siebie - czesc przy jedzeniu nie idzie na zajecie tylko na targ
                         // ziemia bloku: po zmianie rak X0 z cur na best ziemia zajeta nie moze przekroczyc powierzchni bloku
                         double area = BlockArea(ld, b);
@@ -450,7 +465,7 @@ namespace Armoury
                             b.C = nc; b.X = nx;
                         }
                         busy = true; _rStarted++; _rWinStarted++; active++;
-                        if (nf != null && !fachRet) CraftShortage.NoteStart(CraftShortage.SysKs, best, rawPress, hands);   // 435-L6: zmiana zaczeta przy czynniku niedoboru (sam licznik)
+                        if (nfU != null && !fachRet) CraftShortage.NoteStart(CraftShortage.SysKs, best, rawPress, hands);   // 435-L6: zmiana zaczeta przy czynniku niedoboru (sam licznik)
                         if (fachRet) { _fStart++; _fStartAll++; }                   // m106-wozy P1: przebudowa do zajecia typu wsi
                         if (sig) A7sNoteStart(ld, b, cur, best, hands, mt, T, today);   // f5-a7: sezon wedlug rynku i przejscia, powroty, komunikat gracza (jego wies)
                         if (_rStarted <= 12) _startNotes.Add((ld.St.Name != null ? ld.St.Name.ToString() : ld.Id) + " " + KsTab.Crafts[cur] + "->" + KsTab.Crafts[best] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(b.Cost) + " zl" + (gmodeN > 0 ? "; przez sprzet tryb " + gmodeN + ", dawny koszt " + Math.Round(cost0) + " zl" : "") + ")");
@@ -656,7 +671,25 @@ namespace Armoury
             }
         }
 
-        private static void RegaleCycle(LiveBlock b, double[] px, Town mt, bool f4, int mk)
+        private static ItemCategory[] _regCat; private static bool[] _regCatTried;
+        /// <summary>435-L6-p: kategoria towaru regale (indeks KsTab.Goods) do odczytu tablicy N; null - brak przedmiotu. Watek glowny.</summary>
+        private static ItemCategory RegCat(int g)
+        {
+            if (g < 0 || g >= KsTab.Goods.Length) return null;
+            if (_regCat == null) { _regCat = new ItemCategory[KsTab.Goods.Length]; _regCatTried = new bool[KsTab.Goods.Length]; }
+            if (_regCatTried[g]) return _regCat[g];
+            _regCatTried[g] = true;
+            try { var it = ItemOf(KsTab.Goods[g]); _regCat[g] = it != null ? it.ItemCategory : null; } catch { _regCat[g] = null; }
+            return _regCat[g];
+        }
+
+        /// <summary>435-L6-p: pierwszy krok reguly A7 z czynnikiem niedoboru sterujacym - nacisk (Held) wszystkich blokow od zera (miara sie zmienila; raz, znacznik w zapisie).</summary>
+        private static void HeldZeroL6()
+        {
+            foreach (var ld in _live.Values) { if (ld == null || ld.B == null) continue; foreach (var b in ld.B) if (b != null && b.Held > 0) b.Held = 0; }
+        }
+
+        private static void RegaleCycle(LiveBlock b, double[] px, Town mt, bool f4, int mk, SupplySignal.NTable nTab = null, Settlement nMk = null, bool nHungry = false)
         {
             double sum = 0;
             for (int j = 0; j < b.RC.Length; j++)
@@ -678,6 +711,18 @@ namespace Armoury
                 if (_surCycle && RelGood(b.RC[j])) dir = SurDir(b, j, g, mk, dir);
                 // 360r-c/d: przy 360d bez decyzji 360c (klucz wylaczony / blad SurBegin) indeks srebra i zlota stale widzi towar w drodze - cena nie rusza rak
                 else if (RelGood(b.RC[j]) && OrePrice360.On) dir = 0;
+                // 435-L6-p (recenzja 1): regale (sol, glina, kamien, wapien, drewno, przyprawy) nie sa kandydatami reguly zmiany zajec - niedobor steruje nimi TU:
+                // towar z N >= 1.5 w miescie targowym: kierunek o jeden w gore (0 -> w gore, w dol -> bez zmian); krok x1.1 i sufit rak regali bez zmian. Poza:
+                // zelazo (F5), sol i daktyle po D+49 (F20) - maja wlasne reguly wyzej; srebro i zloto (360). Okreg glodny - bez ciagniecia rak od pola.
+                if (nTab != null && dir <= 0 && !RelGood(b.RC[j]))
+                {
+                    var rc = RegCat(g);
+                    if (rc != null && SupplySignal.TownN(nTab, nMk, rc) >= CraftShortage.RegN)
+                    {
+                        if (nHungry) CraftShortage.NoteReg(-1);
+                        else { CraftShortage.NoteReg(dir < 0 ? 0 : 1); dir++; }
+                    }
+                }
                 if (f4) { try { F4RegNote(b, j, g, ix, mt, dir); } catch (Exception e) { Stumble("F4RegNote", e); } }   // f4-pomiary: polka wobec celu obok progu (tylko liczniki)
                 if (rel) RelNoteBefore(g, b, j, r, dir);
                 if (dir > 0) { b.RF[j] *= 1.1f; _rUp++; }

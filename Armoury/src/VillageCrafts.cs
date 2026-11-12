@@ -2199,7 +2199,12 @@ namespace Armoury
             if (kss && _zwHeldKind != 1) ZwHeldZero();
             // 435-L6 (klucz Crafts Follow Shortage): wynik zajecia x sqrt(N towarow zajecia w miescie targowym) - przy sygnale KS czynnik mnozy przychod (jak A7),
             // bez sygnalu caly wynik przydatnosc x sqrt(indeks); klucz wylaczony albo miasto bez niedoboru - nf null i rachunek co do bitu jak dotad
-            double[] nf = CraftShortage.On ? CraftShortage.Row(mt) : null;
+            // 435-L6-p: rule6 - czynnik STERUJE (klucz Crafts Follow Shortage Rule), inaczej liczony obok (sam pomiar, decyzje jak dotad); regula sterowana czynnikiem
+            // bez tablicy N nie ocenia wiosek w tym kroku (nacisk zostaje); pierwszy krok z czynnikiem - nacisk wszystkich wiosek od zera (miara sie zmienila)
+            bool rule6 = CraftShortage.RuleOn, tab6 = CraftShortage.On && CraftShortage.TableReady();
+            if (rule6 && !tab6) { CraftShortage.NoteNoTable(CraftShortage.SysZw); return; }
+            if (rule6 && CraftShortage.NeedHeldZero(CraftShortage.SysZw)) HeldZeroL6();
+            double[] nf = tab6 ? CraftShortage.Row(mt) : null;
             foreach (var s in di.Sides)
             {
                 if (s.Target >= 0 || s.Cand == null || s.Cand.Count < 2 || s.Row == null) continue;
@@ -2207,6 +2212,7 @@ namespace Armoury
                 var cm = meta[s.Craft];
                 if (cm == null) continue;
                 double cur, best = double.NegativeInfinity; int bc = -1; bool rawPress = false;
+                double f4cur = 0, f4best = double.NegativeInfinity; int f4bc = -1; bool decided = false;   // 435-L6-p: liczby BEZ czynnika do pomiaru f4; `decided` nizej
                 if (nf == null)
                 {
                     cur = kss ? StartCalibration.SideSignalIncome(mt, s.Row, s.Craft, dtype) : StartCalibration.Suit(s.Row, s.Craft, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, cm)));
@@ -2228,14 +2234,22 @@ namespace Armoury
                         if (c == s.Craft || meta[c] == null) continue;
                         double v0 = kss ? StartCalibration.SideSignalIncome(mt, s.Row, c, dtype) : StartCalibration.Suit(s.Row, c, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, meta[c])));
                         double v = kss ? StartCalibration.SideSignalIncome(mt, s.Row, c, dtype, nf[c]) : v0 * nf[c];
-                        if (v0 > rb) { rb = v0; any = true; }
+                        if (v0 > rb) { rb = v0; any = true; f4bc = c; }
                         if (v > best) { best = v; bc = c; }
                     }
                     rawPress = any && rb >= sw * Math.Max(0.02, r0);
+                    f4cur = r0; f4best = rb;
+                    if (!rule6)
+                    {
+                        // sam pomiar: decyzja z rachunku BEZ czynnika (jak dotad); rawPress = nacisk w rachunku obok (tu: z czynnikiem)
+                        bool adjP = !(bc < 0 || best < sw * Math.Max(0.02, cur));
+                        cur = r0; best = rb; bc = f4bc; rawPress = adjP;
+                    }
                     CraftShortage.NoteEval(CraftShortage.SysZw);
                 }
-                if (F4On) { try { double h0; home.TryGetValue(s.Uid, out h0); F4ZwNote(s.Craft, bc, cur, best, sw, h0 * 0.5); } catch (Exception e) { Stumble("F4ZwNote", e); } }   // f4-pomiary: nacisk i przejscia (tylko liczniki; blad nie przerywa reguly)
-                if (nf != null) { double hn; home.TryGetValue(s.Uid, out hn); CraftShortage.Note(CraftShortage.SysZw, !(bc < 0 || best < sw * Math.Max(0.02, cur)), rawPress, hn * 0.5); }   // 435-L6: sam licznik
+                if (F4On) { try { double h0; home.TryGetValue(s.Uid, out h0); F4ZwNote(s.Craft, nf != null ? f4bc : bc, nf != null ? f4cur : cur, nf != null ? f4best : best, sw, h0 * 0.5); } catch (Exception e) { Stumble("F4ZwNote", e); } }   // f4-pomiary: nacisk i przejscia (tylko liczniki; blad nie przerywa reguly)
+                decided = !(bc < 0 || best < sw * Math.Max(0.02, cur));
+                if (nf != null) { double hn; home.TryGetValue(s.Uid, out hn); CraftShortage.Note(CraftShortage.SysZw, rule6 ? decided : rawPress, rule6 ? rawPress : decided, hn * 0.5); }   // 435-L6: sam licznik
                 if (bc < 0 || best < sw * Math.Max(0.02, cur)) { s.Held = 0; continue; }
                 s.Held += StepDays; _dPress++;
                 if (s.Held < hold) continue;
@@ -2245,7 +2259,9 @@ namespace Armoury
                 // po odejsciu tych rak spadlby ponizej 1.2 x potrzeby; nacisk (Held) zostaje. Klucz wylaczony - bez liczenia (jak dotad)
                 if (busy) { _dBusy++; continue; }
                 // 435-L2-p (stabilnosc N3): bezpiecznik PO "inna wioska okregu" - liczniki obu linii nie zachodza na siebie; przejscie na inne jedzenie wolne
-                if (s.Craft == KsTab.CWheat && bc != KsTab.CWheat && CraftUnblock.GrainKey && CraftUnblock.GrainLock(CraftUnblock.SysZw, di.V, null, hands, StartCalibration.FoodCraftOf(bc), today) != 0) continue;
+                // 435-L6-p (recenzja 4): nacisk TYLKO z niedoboru nie odciaga rak od zboza bez bezpiecznika - liczony takze przy wylaczonym kluczu Grain Hands Winter Lock
+                bool gForce = rule6 && nf != null && !rawPress && !CraftUnblock.GrainKey;
+                if (s.Craft == KsTab.CWheat && bc != KsTab.CWheat && (CraftUnblock.GrainKey || gForce) && CraftUnblock.GrainLock(CraftUnblock.SysZw, di.V, null, hands, StartCalibration.FoodCraftOf(bc), today, gForce) != 0) continue;
                 double rh = RegionHands(di.Region, today), moved;
                 _regionMoved.TryGetValue(di.Region ?? "-", out moved);
                 float share = s0 != null ? Math.Max(0f, Math.Min(1f, s0.SideVillageCraftRegionShare)) : 0.05f;
@@ -2268,11 +2284,19 @@ namespace Armoury
                 }
                 _regionMoved[di.Region ?? "-"] = moved + hands;
                 busy = true; _dStarted++;
-                if (nf != null) CraftShortage.NoteStart(CraftShortage.SysZw, bc, rawPress, hands);   // 435-L6: zmiana zaczeta przy czynniku niedoboru (sam licznik)
+                if (nf != null && rule6) CraftShortage.NoteStart(CraftShortage.SysZw, bc, rawPress, hands);   // 435-L6: zmiana zaczeta przy czynniku niedoboru (sam licznik)
                 string nm; if (!vname.TryGetValue(s.Uid, out nm)) nm = s.Uid;
                 if (_notes.Count < 10) _notes.Add(nm + " (" + Name(di) + ") " + KsTab.Crafts[s.Craft] + "->" + KsTab.Crafts[bc] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(s.Cost) + " zl" + (gmodeN > 0 ? "; przez sprzet tryb " + gmodeN + ", dawny koszt " + Math.Round(cost0) + " zl" : "") + ")");
                 Notify(di, s, bc, mt);
             }
+        }
+
+        /// <summary>435-L6-p: pierwszy krok ZW z czynnikiem niedoboru sterujacym - nacisk wszystkich wiosek pobocznych od zera (raz; znacznik w zapisie arm_lpn).</summary>
+        private static void HeldZeroL6()
+        {
+            int z = 0;
+            lock (Gate) foreach (var s in _side.Values) if (s != null && s.Held > 0) { s.Held = 0; z++; }
+            _dHeldZero += z;
         }
 
         /// <summary>Recenzja calosci fali 5: pierwszy krok ZW z sygnalem KS - Held wszystkich wiosek pobocznych od zera (raz; miara w zapisie arm_crafts). Watek glowny.</summary>

@@ -10232,11 +10232,19 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float VillageGearWearScale { get; set; } = 0f;
 
-        [SettingPropertyBool("Crafts Follow Shortage", HintText = "with Supply Chain Log: village parts weigh a craft by what the world is short of, not by price alone. When a craft change is considered (every 7 days), the income of each craft is multiplied by the square root of the shortage of its goods at the village's market town - unmet orders for materials, workshop inputs missing from the shelves, goods whose village stock stays empty although villages already work them at full push; hungry villages count grain as short. The multiplier is between 1 and 1.41; price itself is not counted twice. All the brakes stay: the new craft must be 1.25 times better for 60 days, one part of a district at a time, 5% of a region's hands a season, land, food and the grain lock. Off = as before", RequireRestart = false)]
+        [SettingPropertyBool("Crafts Follow Shortage", HintText = "with Supply Chain Log: village parts weigh a craft by what the world is short of, not by price alone. When a craft change is considered (every 7 days), the income of each craft is multiplied by the square root of the shortage of its goods at the village's market town - unmet orders for materials, workshop inputs missing from the shelves, goods whose village stock stays empty although villages already work them at full push; hungry villages count grain as short. The multiplier is between 1 and Crafts Follow Shortage Cap; price itself is not counted twice. BY ITSELF THIS KEY ONLY MEASURES (the log shows what the shortage would change) - it decides only with Crafts Follow Shortage Rule. All the brakes stay: the new craft must be 1.25 times better for 60 days, one part of a district at a time, 5% of a region's hands a season, land and food. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool CraftsFollowShortage { get; set; } = false;
 
-        [SettingPropertyFloatingInteger("Village Order Shortage Boost", 1.00f, 8.00f, "0.00", HintText = "with Village Made To Order and Supply Chain Log: multiplier of the share of field hands a producing village may put to work on orders while the ordered material (timber, clay, limestone, marble) is short at its market town (1 = as before, 2 = double). The share never goes above a quarter of the field hands, and it still grows by one hand in a hundred at a time", RequireRestart = false)]
+        [SettingPropertyBool("Crafts Follow Shortage Rule", HintText = "with Crafts Follow Shortage: the shortage really steers the change of crafts. Off (the default) = Crafts Follow Shortage only measures - the log line 'LP niedobor' shows how many village parts WOULD come under pull thanks to shortage, and nothing in the game changes. On = the multiplied income decides: parts are weighed anew from the first step (the 60 days of pull start over), a pull that exists only thanks to shortage never takes hands off grain unless the district's granary is safe, and village hands at deposits (salt, clay, stone, limestone, timber, spice) grow while that good is short at the market town even if its price says nothing", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool CraftsFollowShortageRule { get; set; } = false;
+
+        [SettingPropertyFloatingInteger("Crafts Follow Shortage Cap", 1.00f, 1.41f, "0.00", HintText = "with Crafts Follow Shortage: the highest multiplier a shortage may give to a craft's income (1.00 = none, 1.41 = the full square root of a doubled shortage). The default 1.15 stays below the 1.25 a new craft must beat: shortage alone never moves hands, it only tips a craft that already pays nearly enough", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float CraftsFollowShortageCap { get; set; } = 1.15f;
+
+        [SettingPropertyFloatingInteger("Village Order Shortage Boost", 1.00f, 8.00f, "0.00", HintText = "with Village Made To Order and Supply Chain Log: multiplier of the share of field hands a producing village may put to work on orders while the ordered material (timber, clay, limestone, marble) is short at its market town (1 = as before, 2 = double). The share never goes above a quarter of the field hands, and it still grows by one hand in a hundred at a time; once raised it holds until the shortage is nearly gone, and it is never raised in a district whose granary is not safe (hungry, or under Famine Ration Days of food - twice that in winter)", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float VillageOrderShortageBoost { get; set; } = 1f;
 
@@ -15296,6 +15304,8 @@ namespace Armoury
             s.VillageGearOnSwitch = VillageGearOnSwitch;
             s.VillageGearWearScale = VillageGearWearScale;
             s.CraftsFollowShortage = CraftsFollowShortage;
+            s.CraftsFollowShortageRule = CraftsFollowShortageRule;
+            s.CraftsFollowShortageCap = CraftsFollowShortageCap;
             s.VillageOrderShortageBoost = VillageOrderShortageBoost;
             s.VillageGearLordsInvest = VillageGearLordsInvest;
             s.VillageGearTownsInvest = VillageGearTownsInvest;

@@ -43,6 +43,34 @@ namespace Armoury
         internal static bool KeyOn { get { var s = Settings.Current; return s != null && s.CraftsFollowShortage; } }
         /// <summary>Czynnik niedoboru w regule zmiany zajec czynny: klucz i pomiar N (Supply Chain Log).</summary>
         internal static bool On { get { return KeyOn && SupplySignal.On; } }
+        /// <summary>435-L6-p (recenzja 3): czynnik STERUJE regula (klucz Crafts Follow Shortage Rule); bez niego Crafts Follow Shortage to sam pomiar - czynnik liczony
+        /// obok, decyzje reguly jak dotad (wzorem Ks Switch Signal / Ks Switch Signal Rule).</summary>
+        internal static bool RuleOn { get { var s = Settings.Current; return On && s != null && s.CraftsFollowShortageRule; } }
+        /// <summary>435-L6-p (recenzja 3): sufit czynnika przychodu (klucz Crafts Follow Shortage Cap, 1.00-1.41; domyslnie 1.15 - ponizej progu zmiany x1.25: sam
+        /// niedobor nie wystarcza, potrzebna jest tez przewaga dochodu, jak pasmo +-15% sygnalu KS).</summary>
+        internal static double Cap
+        {
+            get { var s = Settings.Current; double c = s != null ? s.CraftsFollowShortageCap : 1.15; return double.IsNaN(c) || c < 1.0 ? 1.0 : (c > Sqrt2 ? Sqrt2 : c); }
+        }
+        internal const double RegN = 1.5;                 // 435-L6-p: niedobor regale, od ktorego rece przy zlozu ida w gore (ten sam prog co pulap zamowien 363)
+        private static int _noTab, _heldZero, _regUp, _regStop, _regHungry, _ordUnsafe;
+
+        /// <summary>Tablica N gotowa dla reguly (klucz i pomiar czynne): w pierwszej dobie sesji budowana z zapisu (SupplySignal.EarlyTable). false - regula sterowana
+        /// czynnikiem NIE ocenia czesci w tym kroku (nacisk zostaje bez zmian), zamiast liczyc bez czynnika i zerowac nacisk (recenzja 2).</summary>
+        internal static bool TableReady() { try { return !On || SupplySignal.EarlyTable(); } catch (Exception e) { Stumble("TableReady", e); return false; } }
+        internal static void NoteNoTable(int sys) { _noTab++; }
+        /// <summary>Pierwszy krok reguly z czynnikiem sterujacym na tej drodze: nacisk (Held) wszystkich czesci od zera - miara sie zmienila (znacznik w zapisie arm_lpn;
+        /// kasowany, gdy czynnik przestaje sterowac). true - wolajacy zeruje nacisk swojej drogi.</summary>
+        internal static bool NeedHeldZero(int sys)
+        {
+            if (sys < 0 || sys > 1 || !RuleOn) return false;
+            int bit = 1 << sys, b = SupplySignal.HeldBits;
+            if ((b & bit) != 0) return false;
+            SupplySignal.HeldBits = b | bit; _heldZero++;
+            return true;
+        }
+        /// <summary>Cykl regali: +1 kierunek podniesiony niedoborem, 0 - obnizka wstrzymana niedoborem, -1 - okreg glodny (niedobor nie ciagnie rak od pola).</summary>
+        internal static void NoteReg(int kind) { if (kind > 0) _regUp++; else if (kind == 0) _regStop++; else _regHungry++; }
 
         // czynniki zajec na miasto - pamiec na jedna opublikowana tablice N (nowa tablica = nowa pamiec)
         private static SupplySignal.NTable _for;
@@ -54,7 +82,6 @@ namespace Armoury
         private static readonly int[][] _c = { new int[CN], new int[CN] };
         private static readonly double[][] _h = { new double[CN], new double[CN] };
         private static readonly int[] _stepDay = { int.MinValue, int.MinValue };
-        private static readonly HashSet<Town>[] _towns = { new HashSet<Town>(), new HashSet<Town>() };
         private static readonly Dictionary<int, int> _to = new Dictionary<int, int>();   // zaczete dzieki niedoborowi wedlug zajecia docelowego (sesja)
         private static int _sessStartSig, _sessStart;
         private static int _st;
@@ -70,8 +97,8 @@ namespace Armoury
         internal static void Reset()
         {
             _for = null; _rows.Clear();
-            for (int i = 0; i < 2; i++) { Array.Clear(_c[i], 0, CN); Array.Clear(_h[i], 0, CN); _stepDay[i] = int.MinValue; _towns[i].Clear(); }
-            _to.Clear(); _sessStartSig = _sessStart = 0; _st = 0;
+            for (int i = 0; i < 2; i++) { Array.Clear(_c[i], 0, CN); Array.Clear(_h[i], 0, CN); _stepDay[i] = int.MinValue; }
+            _to.Clear(); _sessStartSig = _sessStart = 0; _st = 0; _noTab = _heldZero = _regUp = _regStop = _regHungry = _ordUnsafe = 0;
             lock (_err) _err.Clear();
         }
 
@@ -94,10 +121,11 @@ namespace Armoury
                 if (_rows.TryGetValue(mt, out r)) return ReferenceEquals(r, None) ? null : r;
                 r = new double[KsTab.NC];
                 bool any = false;
+                double cap = Cap;                                             // 435-L6-p: sufit czynnika (klucz), nie sqrt(2)
                 for (int c = 0; c < r.Length; c++)
                 {
                     double n = VillageCrafts.CraftShortageN(tab, mt.Settlement, c);
-                    double f = n > 1.0 + 1e-9 && !double.IsNaN(n) && !double.IsInfinity(n) ? Math.Min(Sqrt2, Math.Sqrt(n)) : 1.0;
+                    double f = n > 1.0 + 1e-9 && !double.IsNaN(n) && !double.IsInfinity(n) ? Math.Min(cap, Math.Sqrt(n)) : 1.0;
                     r[c] = f;
                     if (f > 1.0) any = true;
                 }
@@ -111,7 +139,7 @@ namespace Armoury
         {
             int d = (int)CampaignTime.Now.ToDays;
             if (_stepDay[sys] == d) return;
-            _stepDay[sys] = d; Array.Clear(_c[sys], 0, CN); Array.Clear(_h[sys], 0, CN); _towns[sys].Clear();
+            _stepDay[sys] = d; Array.Clear(_c[sys], 0, CN); Array.Clear(_h[sys], 0, CN);
         }
 
         /// <summary>Regula zmiany zajec: czesc oceniona z czynnikiem niedoboru (sam licznik; pierwsza ocena doby zeruje liczniki kroku tej drogi).</summary>
@@ -151,16 +179,21 @@ namespace Armoury
         /// Zamowienia 363 (StartCalibration.OrderKs): mnoznik pulapu rak pola wytworcy - klucz Village Order Shortage Boost, gdy material `it` ma N &gt;= 1.5 w miescie
         /// targowym wsi `v`; 1 - klucz 1, brak pomiaru N albo brak niedoboru. Sam odczyt opublikowanej tablicy; nie rzuca.
         /// </summary>
-        internal static double OrderBoost(Village v, ItemObject it)
+        internal static double OrderBoost(Village v, ItemObject it, bool was = false)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || v == null || it == null || !(s.VillageOrderShortageBoost > 1f)) return 1.0;
                 var tab = SupplySignal.Table;
-                if (tab == null) return 1.0;
+                if (tab == null && SupplySignal.EarlyTable()) tab = SupplySignal.Table;   // pierwsza doba sesji: tablica z pamieci N zapisu (watek glowny - OrderKs liczy tylko gra)
+                if (tab == null) return was ? Math.Min(8.0, (double)s.VillageOrderShortageBoost) : 1.0;   // 435-L6-p: doba bez tablicy (pierwsza doba sesji) nie zbija pulapu
                 var mk = v.TradeBound != null ? v.TradeBound : v.Bound;
-                return SupplySignal.TownN(tab, mk, it.ItemCategory) >= 1.5 ? Math.Min(8.0, (double)s.VillageOrderShortageBoost) : 1.0;
+                // 435-L6-p (recenzje 5 / stab. 2): histereza - pulap podniesiony przy N >= 1.5 trzyma sie do N < 1.25 (bez pily "rosnie 147 dob, spada w jedna");
+                // (recenzja 4) tylko gdy okreg wytworcy ma zapas zboza (CraftUnblock.FieldHandsFree) - rece schodza z pola zboza
+                if (!(SupplySignal.TownN(tab, mk, it.ItemCategory) >= (was ? 1.25 : RegN))) return 1.0;
+                if (!CraftUnblock.FieldHandsFree(v, (int)CampaignTime.Now.ToDays)) { _ordUnsafe++; return 1.0; }
+                return Math.Min(8.0, (double)s.VillageOrderShortageBoost);
             }
             catch (Exception e) { Stumble("OrderBoost", e); return 1.0; }
         }
@@ -170,9 +203,11 @@ namespace Armoury
         {
             var s = Settings.Current;
             bool a = On, b = s != null && s.VillageOrderShortageBoost > 1f;
+            bool rule = RuleOn;
+            if (!rule && SupplySignal.HeldBits != 0) SupplySignal.HeldBits = 0;   // 435-L6-p: czynnik przestal sterowac - przy ponownym wlaczeniu nacisk znow od zera
             if (!a && !b) return "pomiar; N czyta tylko kolejnosc zlecen sprzetu wsi (L5) - klucze L6 (Crafts Follow Shortage, Village Order Shortage Boost) w stanie 'jak dotad'";
-            return "435-L6: N steruje" + (a ? " regula zmiany zajec (Crafts Follow Shortage TAK)" : "") + (a && b ? " i" : "") + (b ? " pulapem zamowien 363 (Village Order Shortage Boost)" : "")
-                   + "; reguly czytaja tablice z poprzedniej doby";
+            return "435-L6: " + (a ? (rule ? "N STERUJE regula zmiany zajec i regalami (Crafts Follow Shortage Rule TAK)" : "czynnik niedoboru liczony obok reguly zmiany zajec - SAM POMIAR (Crafts Follow Shortage Rule NIE)") : "")
+                   + (a && b ? " i" : "") + (b ? " N steruje pulapem zamowien 363 (Village Order Shortage Boost)" : "") + "; reguly czytaja tablice z poprzedniej doby";
         }
 
         /// <summary>Koniec linii "LP niedobor" (SupplySignal.ShortageText, co dobe): uzycie N - liczniki ostatniego kroku reguly obu drog, zamowienia 363, kontrola ocen.
@@ -186,6 +221,11 @@ namespace Armoury
                 sb.Append("uzycie N (435-L6): Crafts Follow Shortage ").Append(KeyOn ? "TAK" : "NIE (jak dotad)");
                 if (KeyOn)
                 {
+                    sb.Append(", Crafts Follow Shortage Rule ").Append(RuleOn ? "TAK - czynnik steruje" : "NIE - sam pomiar (decyzje reguly jak dotad; 'tylko dzieki niedoborowi' = ile czesci DOSTALOBY nacisk)")
+                      .Append(", sufit czynnika x").Append(Cap.ToString("0.00", Inv))
+                      .Append(" | sesja: krokow czesci bez oceny (brak tablicy N) ").Append(_noTab).Append(", zerowan nacisku przy wlaczeniu miary ").Append(_heldZero)
+                      .Append(", regale: kierunek w gore z niedoboru (N >= ").Append(RegN.ToString("0.0", Inv)).Append(") ").Append(_regUp).Append(", obnizka wstrzymana niedoborem ").Append(_regStop)
+                      .Append(", pominiete - okreg glodny ").Append(_regHungry);
                     for (int y = 0; y < 2; y++)
                     {
                         var c = _c[y]; var h = _h[y];
@@ -196,8 +236,8 @@ namespace Armoury
                           .Append("), zdjety niedoborem ").Append(c[CLost]).Append(" (rak ").Append(h[CLost].ToString("0", Inv)).Append("), bez nacisku ").Append(c[CNone]);
                         if (y == SysKs) sb.Append(", regula fachu wsi ").Append(c[CFach]);
                         sb.Append("; zaczete zmiany ").Append(c[CStart]).Append(" (rak ").Append(h[CStart].ToString("0", Inv)).Append("), z tego dzieki niedoborowi ").Append(c[CStartSig])
-                          .Append(" (rak ").Append(h[CStartSig].ToString("0", Inv)).Append(')')
-                          .Append("; kontrola ocen - wynikow = ").Append(c[CEval] - c[CBoth] - c[CSig] - c[CLost] - c[CNone] - c[CFach]);
+                          .Append(" (rak ").Append(h[CStartSig].ToString("0", Inv)).Append("; podzial wedlug nacisku w DOBIE STARTU, nie z 60 dob)")
+                          .Append("; tozsamosc licznikow ocen - wynikow = ").Append(c[CEval] - c[CBoth] - c[CSig] - c[CLost] - c[CNone] - c[CFach]);
                     }
                     sb.Append(" | sesja: zmian zaczetych przy czynniku ").Append(_sessStart).Append(", dzieki niedoborowi ").Append(_sessStartSig);
                     if (_to.Count > 0)
@@ -209,7 +249,6 @@ namespace Armoury
                             sb.Append(i == 0 ? " " : ", ").Append(l[i].Key >= 0 && l[i].Key < KsTab.Crafts.Length ? KsTab.Crafts[l[i].Key] : "?").Append(' ').Append(l[i].Value);
                         sb.Append(')');
                     }
-                    if (!SupplySignal.On) sb.Append(" | UWAGA: pomiar N wylaczony - czynnik 1 wszedzie");
                 }
                 // czynnik swiata (sam S_stos - towar na suficie regulatora wsi) wedlug zajec: to dostaje kazda wies bez wzgledu na miasto
                 if (tab != null)
@@ -220,7 +259,7 @@ namespace Armoury
                     {
                         double n = VillageCrafts.CraftShortageN(tab, null, c);
                         if (!(n > 1.0 + 1e-9)) continue;
-                        sb.Append(shown == 0 ? " " : ", ").Append(KsTab.Crafts[c]).Append(" x").Append(Math.Min(Sqrt2, Math.Sqrt(n)).ToString("0.00", Inv));
+                        sb.Append(shown == 0 ? " " : ", ").Append(KsTab.Crafts[c]).Append(" x").Append(Math.Min(Cap, Math.Sqrt(n)).ToString("0.00", Inv));
                         shown++;
                     }
                     if (shown == 0) sb.Append(" -");
@@ -234,7 +273,8 @@ namespace Armoury
                     int n; double over;
                     StartCalibration.OrderBoostStats(out n, out over);
                     sb.Append(", wytworcow z podniesionym pulapem przy ostatnim rachunku ").Append(n).Append(", rece na zamowienie ponad dawny pulap ").Append(over.ToString("0", Inv))
-                      .Append(" (twardy sufit 25% rak pola bez zmian)");
+                      .Append(" (twardy sufit 25% rak pola bez zmian; pulap trzyma sie do N < 1.25; czyta N miasta targowego WYTWORCY - brak zapisany u zamawiajacego dziala tylko przez stos swiata)")
+                      .Append(", odmowy - okreg wytworcy bez zapasu zboza (sesja) ").Append(_ordUnsafe);
                 }
                 sb.Append(" | L6 nie dodaje zadnego przelewu zlota, ludzi ani towaru | potkniecia L6 (sesja) ").Append(_st);
             }

@@ -284,7 +284,35 @@ namespace Armoury
         }
         private static volatile NTable _pubT;
         /// <summary>435-L6: tablica N z ostatniej doby pomiaru; null - bez pomiaru w tej sesji albo klucz Supply Chain Log wylaczony (wtedy N = 1 wszedzie).</summary>
-        internal static NTable Table { get { return On ? _pubT : null; } }
+        internal static NTable Table
+        {
+            get
+            {
+                if (!On) return null;
+                var t = _pubT;
+                // 435-L6-p (recenzja 9): tablica starsza niz 2 doby (blad linii niedoboru zostawilby stara bez sladu) - jak brak tablicy
+                return t != null && Today - t.Day <= 2 ? t : null;
+            }
+        }
+
+        private static bool _earlyTried;
+        /// <summary>435-L6-p (recenzja 2): pierwsza doba sesji - reguly zmiany zajec biegna PRZED SupplySignal.Daily, wiec tablicy jeszcze nie ma. Raz na sesje buduje ja
+        /// z pamieci N wczytanej z zapisu (arm_lpn) i stanu regulatora. Sam odczyt stanu gry; watek glowny; nie rzuca. true - tablica jest.</summary>
+        internal static bool EarlyTable()
+        {
+            if (!On) return false;
+            if (Table != null) return true;
+            if (_earlyTried || Campaign.Current == null) return false;
+            _earlyTried = true;
+            try
+            {
+                int today = Today;
+                Resolve(today);
+                ShortageText(today);
+            }
+            catch (Exception e) { Stumble("EarlyTable", e); }
+            return Table != null;
+        }
         /// <summary>435-L6: niedobor N towaru `c` w miescie targowym `mk` wedlug tablicy `t` (1 - bez niedoboru; najwyzej 2). Sam odczyt, nie rzuca.</summary>
         internal static double TownN(NTable t, Settlement mk, ItemCategory c)
         {
@@ -333,7 +361,7 @@ namespace Armoury
         {
             _main = Environment.CurrentManagedThreadId; _dOff = 0;
             _st = _stSess = 0; _err.Clear(); _startLine = false; _first = int.MinValue;
-            _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _offWarned = false; _heldBits = 0;
+            _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _offWarned = false; _heldBits = 0; _earlyTried = false;
             _cells.Clear(); _price.Clear(); ZeroDay();
             _ws.Clear(); CycleBegin();
             _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>(); _pubT = null;
@@ -490,6 +518,7 @@ namespace Armoury
             if (!s.SupplyChainLog)
             {
                 ZeroDay(); _price.Clear(); if (_pubN.Count > 0) _pubN = new Dictionary<ItemCategory, double>(); _pubT = null; CraftShortage.ZeroLine();
+                _heldBits = 0;                                                // 435-L6-p: bez pomiaru regula wraca do dawnej miary nacisku - po wlaczeniu nacisk znow od zera
                 // 435-L1-p (recenzje S3): klucz jest glownym wylacznikiem pomiaru, na ktorym stoja kroki L5-L8 - raz na sesje slad w logu, gdy cos go potrzebuje
                 try
                 {

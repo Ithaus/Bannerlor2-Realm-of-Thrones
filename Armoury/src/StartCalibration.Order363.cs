@@ -171,9 +171,10 @@ namespace Armoury
                 double share = s != null ? Math.Max(0.0, Math.Min(0.25, (double)s.VillageOrderFieldShare)) : 0.0;
                 // 435-L6 (klucz Village Order Shortage Boost > 1): material zamowienia z N >= 1.5 w miescie targowym wytworcy - pulap rak x mnoznik (najwyzej 0.25 rak pola);
                 // mnoznik 1 albo brak niedoboru - pulap co do bitu jak dotad. Narastanie +1% rak pola na przeliczenie bez zmian
+                bool obWas = ld.OrdBoost > 1.0;                                  // 435-L6-p: histereza pulapu (poprzedni rachunek)
                 ld.OrdBoost = 1.0;
                 {
-                    double ob = CraftShortage.OrderBoost(ld.V, _items != null && it >= 0 && it < _items.Length ? _items[it] : null);
+                    double ob = CraftShortage.OrderBoost(ld.V, _items != null && it >= 0 && it < _items.Length ? _items[it] : null, obWas);
                     if (ob > 1.0 && share > 0) { double sh2 = Math.Min(0.25, share * ob); ld.OrdBoost = sh2 / share; share = sh2; }
                 }
                 ld.OrdCapH = share * Fcap;
