@@ -57,8 +57,30 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.WorkshopRetoolByPrice; } }
 
+        // 435-L9-p (recenzja L9, "jedna zasada na jedno zjawisko"): wspolne liczniki ze zmiana typu stojacego warsztatu (WorkshopIdleRetool). L9 wpisuje swoje zmiany
+        // do _townLast/_shopLast (te same przerwy 30/120 dob) i do licznika doby; limit 3 na dobe na swiat jest wspolny. Klucze L9 NIE - L9 nic nie wpisuje, E3-D3 co do znaku jak dotad.
+        private static int _shDay = -1, _shL9, _shE3;
+        private static void ShDay(int today) { if (_shDay != today) { _shDay = today; _shL9 = 0; _shE3 = 0; } }
+        /// <summary>435-L9-p: zmiany typu E3-D3 tej doby (L9 dolicza je do swojego limitu dobowego).</summary>
+        internal static int E3Today(int today) { return _shDay == today ? _shE3 : 0; }
+        /// <summary>435-L9-p: przy czynnym E3-D3 - miasto zmienione (E3-D3 albo L9) mniej niz 30 dob temu albo warsztat mniej niz 120 dob temu.</summary>
+        internal static bool SharedBlocked(Town t, Workshop w, int today)
+        {
+            if (!On || !WorkshopTrade.On || !WorkshopTrade.ConvertWired || t == null || w == null) return false;   // E3-D3 czynne (jak `live` w Daily)
+            int last;
+            return (_townLast.TryGetValue(t, out last) && today - last < TownGapDays) || (_shopLast.TryGetValue(w, out last) && today - last < ShopGapDays);
+        }
+        /// <summary>435-L9-p: L9 zmienil typ warsztatu - wpis do wspolnych przerw i licznika doby.</summary>
+        internal static void SharedMark(Town t, Workshop w, int today)
+        {
+            if (t != null) _townLast[t] = today;
+            if (w != null) _shopLast[w] = today;
+            ShDay(today); _shL9++;
+        }
+
         internal static void Reset()
         {
+            _shDay = -1; _shL9 = 0; _shE3 = 0;
             _townLast.Clear(); _shopLast.Clear(); _err.Clear(); _sessStumbles = 0; _sessChanged = 0; _sessRe = 0; _sessYoung = 0; _startDone = false;
             ZeroDay();
         }
@@ -187,7 +209,7 @@ namespace Armoury
                     int done = 0;
                     foreach (var c in cands)
                     {
-                        if (done >= PerDay) { _dLimit++; continue; }
+                        if (done + (_shDay == today ? _shL9 : 0) >= PerDay) { _dLimit++; continue; }   // 435-L9-p: limit wspolny ze zmianami L9 tej doby (L9 NIE - 0)
                         try
                         {
                             int last;
@@ -222,6 +244,7 @@ namespace Armoury
                             ChangeProductionTypeOfWorkshopAction.Apply(c.W, best, false);   // koszt sprzetu: wlasciciel -> kasa miasta (WorkshopTrade.ConvertPrefix/Postfix)
                             if (c.W.WorkshopType != best) continue;
                             done++; _dChanged++; _sessChanged++;
+                            ShDay(today); _shE3++;   // 435-L9-p: licznik doby dla wspolnego limitu z L9
                             _dGear += Math.Max(0, g0 - o.Gold);
                             if (_shopLast.ContainsKey(c.W)) { _dRe++; _sessRe++; }   // 312d krok 0: ten sam warsztat zmieniony drugi raz w tej sesji (pamiec sesji, jak blokada 120 dob)
                             if (c.Days < YoungDays) { _dYoung++; _sessYoung++; }      // recenzja 312d: obecny typ mlodszy niz 180 dob rachunku (widac takze po wczytaniu zapisu)

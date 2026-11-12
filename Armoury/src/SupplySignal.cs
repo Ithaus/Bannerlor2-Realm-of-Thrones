@@ -531,7 +531,7 @@ namespace Armoury
                     {
                         _offWarned = true;
                         Log.Info("LP: klucz Supply Chain Log WYLACZONY, a wlaczone sa klucze, ktore czytaja pomiar (Crafts Follow Shortage / Village Order Shortage Boost / Village Gear Towns Invest / "
-                                 + "Village Gear Wear Scale / Workshop Benches / Workshop Retool Idle / Workshop Takeover) - bez pomiaru N = 1 wszedzie: zmiana zajec i zamowienia jak dotad, miasta nie funduja sprzetu, stanowiska bez rat, "
+                                 + "Village Gear Wear Scale / Workshop Benches" + (s.WorkshopRetoolIdle || s.WorkshopTakeover ? " / Workshop Retool Idle / Workshop Takeover" : "") + ") - bez pomiaru N = 1 wszedzie: zmiana zajec i zamowienia jak dotad, miasta nie funduja sprzetu, stanowiska bez rat, "
                                  + "kolejnosc zlecen sprzetu bez N (linia raz na sesje).");
                     }
                 }

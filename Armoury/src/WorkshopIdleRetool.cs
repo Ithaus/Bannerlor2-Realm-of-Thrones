@@ -38,14 +38,18 @@ namespace Armoury
     /// zmiana polek; zmiany typu zrobione - zmierzone; Town.Workshops dzis - przed. Zloto tylko miedzy posiadaczami swiata (kiesy, kapital, kasa, lud).
     /// Zapis arm_lpr ("lpr1|warsztat~typ~u60~dob pamieci~dob stojacych;..."); brak klucza = pamiec od zera; zly wpis pominiety i policzony.
     /// Bez Supply Chain Log pomiar i tablica N stoja: nic nie jest zmieniane. Zadnej nowej latki Harmony. Watek glowny; wyjatek per warsztat = potkniecie.
+    /// 435-L9-p (recenzja): wspolne liczniki z E3-D3 (WorkshopRetool: limit 3 na dobe na swiat razem, przy wlaczonym E3-D3 przerwa miasta 30 dob i warsztatu 120 dob);
+    /// przerwa pomiaru > 2 doby (klucze NIE, Supply Chain Log NIE, stary zapis) - pamiec od nowa; zaplata nieudana albo typ bez zmiany - wklad wraca do kupujacego,
+    /// typ nie zmienia sie bez pelnej ceny; przejecie i zmiana typu ksiegowane takze przy wyjatku; wybor typu raz na miasto na dobe, odmowa trwala - ponowna proba za 7 dob.
     /// </summary>
     internal static class WorkshopIdleRetool
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        private const string Ver = "lpr1";
+        private const string Ver = "lpr2", VerOld = "lpr1";   // 435-L9-p: lpr2 = dzien ostatniego pomiaru + rekordy
         internal const string P9 = "LP przezbrojenia (435-L9): ";
         private const double IdleU = 0.10, NeedN = 1.3;
         private const int IdleDays = 60, PerDay = 3, PurseFloor = 4500, BandHigh = 10500;
+        private const int StaleGap = 2, RetryDays = 7;   // 435-L9-p: przerwa pomiaru dluzsza niz 2 doby = pamiec od nowa; odmowa trwala - ponowna proba za 7 dob
         private const string MinesId = "mines";
 
         private sealed class Rec
@@ -54,6 +58,7 @@ namespace Armoury
             public float U60 = -1f;     // srednia kroczaca dobowego u; -1 = bez pomiaru
             public int Age, Low;        // doby pamieci w obecnym typie; kolejne doby z u60 < 0.10
             public int DDone, DFail;    // cykle tej doby (sesja)
+            public int NextTry;         // 435-L9-p: najwczesniejsza doba ponownej proby po odmowie trwalej (sesja, bez zapisu)
         }
 
         private static readonly object Gate = new object();
@@ -62,15 +67,17 @@ namespace Armoury
         private static string _loadNote = "nowa kampania (bez zapisu)";
         private static int _loadBad, _st, _stSess, _sessDone, _sessTake;
         private static bool _startLine, _frozenLine;
+        private static int _lastRun = -1;   // 435-L9-p: doba ostatniego pomiaru (Run); -1 = brak; w zapisie lpr2
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         // powody odmowy (linia doby)
-        private const int WNoType = 0, WNoShelf = 1, WCapital = 2, WNoBuyer = 3, WSeller = 4, WPay = 5, WLimit = 6, WSiege = 7, WKeyOff = 8, WOther = 9, WKinds = 10;
+        private const int WNoType = 0, WNoShelf = 1, WCapital = 2, WNoBuyer = 3, WSeller = 4, WPay = 5, WLimit = 6, WSiege = 7, WKeyOff = 8, WOther = 9, WShared = 10, WKinds = 11;
         private static readonly string[] WName =
         {
             "bez typu z N >= 1.3, wsadem w okregu i nowego w miescie", "polka bez polowy ceny w materiale", "kapital za maly, przejecie wylaczone",
             "zaden notabl miasta z kiesa (po zaplacie >= 4500)", "sprzedajacy ponad pasmem 10500 (bez Notable Gold Real)", "zaplata nieudana (polka / sufit ceny / sztuka / droga)",
-            "limit (3 na swiat, 1 na miasto na dobe)", "miasto oblezone", "kapital starcza, ale Workshop Retool Idle wylaczone (przejecie tylko przy braku kapitalu)", "inne (koszt, model, blad)"
+            "limit (3 na swiat razem z E3-D3, 1 na miasto na dobe)", "miasto oblezone", "kapital starcza, ale Workshop Retool Idle wylaczone (przejecie tylko przy braku kapitalu)",
+            "inne (koszt, model, bez wlasciciela, blad)", "przerwa wspolna z E3-D3 (miasto 30 dob, warsztat 120 dob)"
         };
 
         internal static bool RetoolOn { get { var s = Settings.Current; return s != null && s.WorkshopRetoolIdle; } }
@@ -89,7 +96,7 @@ namespace Armoury
             lock (Gate)
             {
                 _byKey.Clear(); _byShop.Clear(); _loadNote = "nowa kampania (bez zapisu)"; _loadBad = 0;
-                _st = _stSess = _sessDone = _sessTake = 0; _startLine = false; _frozenLine = false; _err.Clear();
+                _st = _stSess = _sessDone = _sessTake = 0; _startLine = false; _frozenLine = false; _err.Clear(); _lastRun = -1;
             }
         }
 
@@ -146,12 +153,16 @@ namespace Armoury
         // liczniki doby
         private static int _dRet, _dTake, _dTakeNoRet, _dPcs, _dDrop, _dDropUnknown, _dChanged, _dMeasured;
         private static long _dMat, _dWFolk, _dWCof, _dGap, _dPrice, _dInject, _dGapTake;
+        // 435-L9-p: zwrot wkladu, zaplacone bez zmiany typu, cena i zaplata zmian zrobionych, odlozone (ponowna proba), pamiec od nowa po przerwie
+        private static long _dRefund, _dPaidNoType, _dCostDone, _dPaidDone;
+        private static int _dDeferred, _dStale, _dStaleGap;
         private static readonly List<string> _dDone = new List<string>();
 
         private static void ZeroDay()
         {
             _dRet = _dTake = _dTakeNoRet = _dPcs = _dDrop = _dDropUnknown = _dChanged = _dMeasured = 0;
             _dMat = _dWFolk = _dWCof = _dGap = _dPrice = _dInject = _dGapTake = 0;
+            _dRefund = _dPaidNoType = _dCostDone = _dPaidDone = 0; _dDeferred = _dStale = _dStaleGap = 0;
             _dDone.Clear();
         }
 
@@ -203,6 +214,14 @@ namespace Armoury
 
         private static void Run(Settings s, int today, bool canAct, long t0)
         {
+            // 435-L9-p: pamiec stala (klucze L9 NIE, Supply Chain Log NIE albo stary zapis) - po przerwie dluzszej niz 2 doby 60 dob liczy sie od nowa
+            if (_lastRun >= 0 && today - _lastRun > StaleGap)
+            {
+                _dStaleGap = today - _lastRun;
+                foreach (var r in _byKey.Values) if (r.U60 >= 0f || r.Age > 0 || r.Low > 0) { r.U60 = -1f; r.Age = 0; r.Low = 0; _dStale++; }
+                Log.Info(P9 + "dzien " + today + " | przerwa pomiaru " + _dStaleGap + " dob (ostatni pomiar dzien " + _lastRun + ") - pamiec od nowa: rekordow " + _dStale + ".");
+            }
+            _lastRun = today;
             int shops0 = ShopCount();
             int recs = 0, player = 0, idle = 0, seen = 0;
             double uSum = 0;
@@ -250,17 +269,35 @@ namespace Armoury
             var townsToday = new HashSet<Town>();
             var model = Campaign.Current.Models != null ? Campaign.Current.Models.WorkshopModel : null;
             var table = SupplySignal.Table;
+            var picks = new Dictionary<Town, TownPick>();   // 435-L9-p: wybor typu raz na miasto na dobe
             if (canAct && model != null && table != null)
                 foreach (var c in cands)
                 {
+                    Hero o0 = null; WorkshopType ty0 = null;
+                    int res = -2;
                     try
                     {
-                        if (done >= PerDay || townsToday.Contains(c.T)) { why[WLimit]++; continue; }
-                        int res = TryOne(s, c, today, model, table);
-                        if (res >= 0 && res < WKinds) why[res]++;
-                        else { done++; townsToday.Add(c.T); }
+                        if (c.R.NextTry > today) { _dDeferred++; continue; }   // 435-L9-p: odmowa trwala - ponowna proba za RetryDays dob
+                        if (WorkshopRetool.SharedBlocked(c.T, c.W, today)) { why[WShared]++; continue; }
+                        if (done + WorkshopRetool.E3Today(today) >= PerDay || townsToday.Contains(c.T)) { why[WLimit]++; continue; }
+                        o0 = c.W.Owner; ty0 = c.W.WorkshopType;
+                        res = TryOne(s, c, today, model, table, picks);
                     }
                     catch (Exception e) { Stumble("Run(zmiana)", e); }
+                    // 435-L9-p: zmiana zmierzona na warsztacie (takze po wyjatku) - limit doby i miasta, wspolny licznik z E3-D3
+                    try
+                    {
+                        if (ty0 == null) continue;
+                        bool tyCh = c.W.WorkshopType != ty0, owCh = c.W.Owner != o0;
+                        if (tyCh) { _dChanged++; WorkshopRetool.SharedMark(c.T, c.W, today); }
+                        if (tyCh || owCh) { done++; townsToday.Add(c.T); }
+                        if (res >= 0 && res < WKinds)
+                        {
+                            why[res]++;
+                            if (res != WSiege && res != WLimit && res != WShared && !owCh && !tyCh) c.R.NextTry = today + RetryDays;
+                        }
+                    }
+                    catch (Exception e) { Stumble("Run(po zmianie)", e); }
                 }
             int shops1 = ShopCount();
             var sb = new StringBuilder(1200);
@@ -276,34 +313,42 @@ namespace Armoury
             bool f = true;
             for (int i = 0; i < WKinds; i++) if (why[i] > 0) { sb.Append(f ? " " : ", ").Append(WName[i]).Append(' ').Append(why[i]); f = false; }
             if (f) sb.Append(" -");
+            if (_dDeferred > 0) sb.Append(" | odlozone (ponowna proba za ").Append(RetryDays).Append(" dob) ").Append(_dDeferred);
+            if (_dStale > 0) sb.Append(" | pamiec od nowa po przerwie pomiaru ").Append(_dStaleGap).Append(" dob: rekordow ").Append(_dStale);
             sb.Append(" | zloto: z kapitalu ").Append(_dMat + _dWFolk + _dWCof).Append(" = material ").Append(_dMat).Append(" (sztuk ").Append(_dPcs).Append(") + rzemieslnicy do ludu ").Append(_dWFolk)
               .Append(" + zatrzymane w kasie miasta ").Append(_dWCof).Append("; kupujacy -> sprzedajacy ").Append(_dPrice).Append(", kupujacy -> kapital warsztatu ").Append(_dInject)
-              .Append(" | kontrola zlota (z kapitalu - kasa miasta - lud) ").Append(_dGap).Append(", (z kiesy kupujacych - kiesy sprzedajacych - kapital) ").Append(_dGapTake)
+              .Append(", zwrot wkladu (kapital -> kupujacy) ").Append(_dRefund).Append(", zaplacone bez zmiany typu ").Append(_dPaidNoType)
+              .Append(" | kontrola zlota (z kapitalu - kasa miasta - wynik Earn) ").Append(_dGap).Append(", (z kiesy kupujacych - kiesy sprzedajacych - kapital) ").Append(_dGapTake)
+              .Append(", cena - zaplacone (zmiany zrobione) ").Append(_dCostDone - _dPaidDone)
               .Append(", sztuk (kupione - zmiana polek) ").Append(_dPcs - _dDrop).Append(_dDropUnknown > 0 ? " (polka nie przeczytana " + _dDropUnknown + " razy)" : "")
               .Append(", zmian typu (zrobione - zmierzone) ").Append(_dRet + _dTake - _dChanged)
-              .Append(", Town.Workshops (dzis - przed) ").Append(shops1 - shops0)
+              .Append(", straznik liczby warsztatow Town.Workshops (dzis - przed; L9 jej nie zmienia) ").Append(shops1 - shops0)
               .Append(" | w sesji: przezbrojen ").Append(_sessDone).Append(", przejec ").Append(_sessTake)
               .Append(" | koszt ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms")
               .Append(" | potkniecia ").Append(_st).Append(" (sesja ").Append(_stSess).Append(")");
             _st = 0;
-            bool events = _dRet > 0 || _dTake > 0 || _dTakeNoRet > 0 || _dGap != 0 || _dGapTake != 0 || shops1 != shops0;
+            bool events = _dRet > 0 || _dTake > 0 || _dTakeNoRet > 0 || _dGap != 0 || _dGapTake != 0 || shops1 != shops0 || _dPaidNoType > 0 || _dRefund > 0 || _dStale > 0
+                          || _dCostDone != _dPaidDone || _dRet + _dTake != _dChanged;
             if (s.LogEnabled && (LogGate.Lines || events)) Log.Info(sb.ToString());
         }
 
-        /// <summary>Jeden kandydat: przezbrojenie z kapitalu albo przejecie i przezbrojenie. Zwraca indeks powodu odmowy albo -1 (zmiana zrobiona).</summary>
-        private static int TryOne(Settings s, Cand c, int today, TaleWorlds.CampaignSystem.ComponentInterfaces.WorkshopModel model, SupplySignal.NTable table)
+        private sealed class TownPick { public WorkshopType Pick; }
+
+        /// <summary>435-L9-p (recenzja kosztu doby): nowy typ dla miasta - raz na miasto na dobe (typ obecny kazdego warsztatu miasta jest w `have`, wiec wynik nie zalezy
+        /// od warsztatu). Najwyzsze N glownego wyrobu linii towarowej z wsadem w tym miescie, wsad w okregu, typu nie ma jeszcze w miescie.</summary>
+        private static WorkshopType PickFor(Town t, Settlement st, SupplySignal.NTable table, Dictionary<Town, TownPick> cache)
         {
-            var t = c.T; var w = c.W; var st = t.Settlement;
-            if (st.IsUnderSiege) return WSiege;
-            var cur = w.WorkshopType;
-            // nowy typ: najwyzsze N glownego wyrobu linii towarowej z wsadem w tym miescie, wsad w okregu, typu nie ma jeszcze w miescie
+            TownPick tp;
+            if (cache.TryGetValue(t, out tp)) return tp.Pick;
+            tp = new TownPick();
+            cache[t] = tp;
             var have = new HashSet<WorkshopType>();
             foreach (var x in t.Workshops) if (x != null && x.WorkshopType != null) have.Add(x.WorkshopType);
             Dictionary<ItemCategory, float> near = null;
-            WorkshopType pick = null; double pickN = 0;
+            double pickN = 0;
             foreach (var wt in WorkshopType.All)
             {
-                if (wt == null || wt.IsHidden || wt == cur || wt.StringId == MinesId || have.Contains(wt) || WorkshopTrade.ProbeHasArmsLine(wt)) continue;
+                if (wt == null || wt.IsHidden || wt.StringId == MinesId || have.Contains(wt) || WorkshopTrade.ProbeHasArmsLine(wt)) continue;
                 double nMax = 1.0;
                 foreach (var p in wt.Productions)
                 {
@@ -313,11 +358,22 @@ namespace Armoury
                     double n = SupplySignal.TownN(table, st, main);
                     if (n > nMax) nMax = n;
                 }
-                if (nMax < NeedN || (pick != null && nMax <= pickN)) continue;
+                if (nMax < NeedN || (tp.Pick != null && nMax <= pickN)) continue;
                 if (near == null) near = WorkshopInputs.InputsNear(t);
                 if (!WorkshopInputs.HasInput(wt, near)) continue;
-                pick = wt; pickN = nMax;
+                tp.Pick = wt; pickN = nMax;
             }
+            return tp.Pick;
+        }
+
+        /// <summary>Jeden kandydat: przezbrojenie z kapitalu albo przejecie i przezbrojenie. Zwraca indeks powodu odmowy albo -1 (zmiana zrobiona). Zmiane (typ, wlasciciel)
+        /// liczy Run z warsztatu, takze po wyjatku (435-L9-p).</summary>
+        private static int TryOne(Settings s, Cand c, int today, TaleWorlds.CampaignSystem.ComponentInterfaces.WorkshopModel model, SupplySignal.NTable table,
+                                  Dictionary<Town, TownPick> picks)
+        {
+            var t = c.T; var w = c.W; var st = t.Settlement;
+            if (st.IsUnderSiege) return WSiege;
+            var pick = PickFor(t, st, table, picks);
             if (pick == null) return WNoType;
             int cost = Math.Max(0, model.GetConvertProductionCost(pick));
             if (cost < 20) return WOther;
@@ -349,6 +405,7 @@ namespace Armoury
             else
             {
                 if (!s.WorkshopTakeover) return WCapital;
+                if (seller == null) return WOther;              // 435-L9-p: bez wlasciciela cena nie ma odbiorcy (zloto w nicosc) - bez przejecia
                 price = Math.Max(0L, capital);
                 inject = Math.Max(0L, floor + cost - capital);
                 long need = price + inject;
@@ -359,37 +416,61 @@ namespace Armoury
                     if (buyer == null || h.Gold > buyer.Gold) buyer = h;
                 }
                 if (buyer == null) return WNoBuyer;
-                if (seller != null && seller.IsNotable && !NotableGold.On && (long)seller.Gold + price > BandHigh) return WSeller;
+                if (seller.IsNotable && !NotableGold.On && (long)seller.Gold + price > BandHigh) return WSeller;
             }
             string from = TypeOf(w);
+            long capPre = w.Capital;   // 435-L9-p: kapital przed wkladem - przy porazce wraca do kupujacego tylko to, co ponad nim
             // przejecie: cena kupujacy -> sprzedajacy, zmiana wlasciciela (kapital zostaje), wklad kupujacy -> kapital warsztatu
             if (buyer != null)
             {
-                long b0 = buyer.Gold, s0 = seller != null ? seller.Gold : 0, c0 = w.Capital;
-                if (price > 0)
+                long b0 = buyer.Gold, s0 = seller.Gold, c0 = w.Capital;
+                bool priceOut = false, owned = false, injected = false;
+                // 435-L9-p (recenzja stabilnosci): ksiegowanie w finally - wyjatek (sluchacze OnWorkshopOwnerChanged, np. BK ChangeRelationAction) nie gubi przelewu
+                try
                 {
-                    buyer.ChangeHeroGold(-(int)price); CirculationWindows.NoteHeroGold(buyer, -price);
-                    if (seller != null) { seller.ChangeHeroGold((int)price); CirculationWindows.NoteHeroGold(seller, price); }
+                    if (price > 0)
+                    {
+                        buyer.ChangeHeroGold(-(int)price); CirculationWindows.NoteHeroGold(buyer, -price); priceOut = true;
+                        seller.ChangeHeroGold((int)price); CirculationWindows.NoteHeroGold(seller, price);
+                    }
+                    // gra 1.4.8: ApplyInternal najpierw zmienia wlasciciela, potem zdarzenie - wyjatek sluchacza zostawia warsztat u kupujacego
+                    try { ChangeOwnerOfWorkshopAction.ApplyByDeath(w, buyer); }   // kapital = w.Capital, bez ceny gry (DebtLadder D4)
+                    catch (Exception e) { Stumble("Przejecie(ApplyByDeath)", e); }
+                    owned = w.Owner == buyer;
+                    if (!owned)
+                    {
+                        // wlasciciel bez zmiany - cena wraca do kupujacego
+                        if (priceOut)
+                        {
+                            seller.ChangeHeroGold(-(int)price); CirculationWindows.NoteHeroGold(seller, -price);
+                            buyer.ChangeHeroGold((int)price); CirculationWindows.NoteHeroGold(buyer, price);
+                            priceOut = false;
+                        }
+                    }
+                    else if (inject > 0)
+                    {
+                        buyer.ChangeHeroGold(-(int)inject); CirculationWindows.NoteHeroGold(buyer, -inject);
+                        w.ChangeGold((int)inject); injected = true;
+                        WorkshopTrade.ShiftCapEnd(w, (int)inject);         // wklad wlasciciela - nie wynik warsztatu (linia "Warsztaty towarowe")
+                    }
                 }
-                ChangeOwnerOfWorkshopAction.ApplyByDeath(w, buyer);    // kapital = w.Capital, bez ceny gry (DebtLadder D4)
-                if (inject > 0)
+                finally
                 {
-                    buyer.ChangeHeroGold(-(int)inject); CirculationWindows.NoteHeroGold(buyer, -inject);
-                    w.ChangeGold((int)inject);
-                    WorkshopTrade.ShiftCapEnd(w, (int)inject);         // wklad wlasciciela - nie wynik warsztatu (linia "Warsztaty towarowe")
+                    long bOut = b0 - buyer.Gold, sIn = (long)seller.Gold - s0, cIn = (long)w.Capital - c0;
+                    _dGapTake += bOut - sIn - cIn;
+                    if (priceOut) _dPrice += price;
+                    if (injected) _dInject += inject;
+                    if (owned) _sessTake++;
                 }
-                long bOut = b0 - buyer.Gold, sIn = (seller != null ? seller.Gold : 0) - s0, cIn = (long)w.Capital - c0;
-                _dGapTake += bOut - sIn - cIn;
-                _dPrice += price; _dInject += inject; _sessTake++;
+                if (!owned) return WOther;
             }
-            // zaplata za przezbrojenie z kapitalu warsztatu: material (najwyzej polowa ceny) i rzemieslnicy, potem reszta ceny samymi placami
+            // zaplata za przezbrojenie z kapitalu warsztatu: material (najwyzej polowa ceny - gorna granica, nie wymog) i rzemieslnicy, potem reszta ceny samymi placami
             var p1 = TownFolk.BenchPayRun(w, st, half, items, 0);
             long paid = 0;
             if (p1.Why != TownFolk.GfOk)
             {
-                if (p1.Paid > 0) Book(p1);
-                if (buyer != null) { _dTakeNoRet++; Note(today, t, w, from, null, buyer, seller, price, inject, cost, p1.Paid, "zaplata nieudana"); }
-                return WPay;
+                if (p1.Paid > 0) { Book(p1); paid += p1.Paid; }
+                return Failed(c, today, t, w, from, buyer, seller, price, inject, capPre, cost, paid, "zaplata nieudana (powod " + p1.Why + ")", WPay);
             }
             Book(p1); paid += p1.Paid;
             long rest = cost - paid;
@@ -398,13 +479,53 @@ namespace Armoury
                 var p2 = TownFolk.BenchPayRun(w, st, 0, items, rest);
                 if (p2.Why == TownFolk.GfOk || p2.Paid > 0) { Book(p2); paid += p2.Paid; }
             }
-            ChangeProductionTypeOfWorkshopAction.Apply(w, pick, true);   // ignoreCost: koszt zaplacony wyzej (ConvertPrefix bez poboru)
-            if (w.WorkshopType == pick) _dChanged++;
+            // 435-L9-p: bez pelnej ceny typ sie nie zmienia (ignoreCost: gra nie pobiera - "nic z niczego")
+            if (paid < cost) return Failed(c, today, t, w, from, buyer, seller, price, inject, capPre, cost, paid, "druga rata nieudana", WPay);
+            try { ChangeProductionTypeOfWorkshopAction.Apply(w, pick, true); }   // ignoreCost: koszt zaplacony wyzej (ConvertPrefix bez poboru)
+            catch (Exception e) { Stumble("Przezbrojenie(Apply)", e); }        // gra 1.4.8: ChangeWorkshopProduction przed zdarzeniem - typ liczy sie z warsztatu
+            if (w.WorkshopType != pick) return Failed(c, today, t, w, from, buyer, seller, price, inject, capPre, cost, paid, "typ bez zmiany po zaplacie", WOther);
             if (buyer != null) _dTake++; else _dRet++;
+            _dCostDone += cost; _dPaidDone += paid;
             _sessDone++;
             c.R.Type = TypeOf(w); c.R.U60 = -1f; c.R.Age = 0; c.R.Low = 0;
             Note(today, t, w, from, pick, buyer, seller, price, inject, cost, paid, null);
             return -1;
+        }
+
+        /// <summary>435-L9-p: przezbrojenie nie wyszlo. Po przejeciu wklad (to, co w kapitale ponad stan sprzed wkladu) wraca do kiesy kupujacego - kapital nie zostaje
+        /// zawyzony (znacznik starego typu, ProfitMade gry). Przejete albo zaplacone - pamiec od nowa (bez drugiej zaplaty i ponownego przejecia przez 60 dob).</summary>
+        private static int Failed(Cand c, int today, Town t, Workshop w, string from, Hero buyer, Hero seller, long price, long inject, long capPre, int cost, long paid, string why, int code)
+        {
+            long back = 0;
+            if (buyer != null)
+            {
+                _dTakeNoRet++;
+                if (inject > 0)
+                {
+                    back = Math.Min(inject, Math.Max(0L, (long)w.Capital - capPre));
+                    if (back > 0)
+                    {
+                        long b0 = buyer.Gold, c0 = w.Capital;
+                        try
+                        {
+                            w.ChangeGold(-(int)back); WorkshopTrade.ShiftCapEnd(w, -(int)back);
+                            buyer.ChangeHeroGold((int)back); CirculationWindows.NoteHeroGold(buyer, back);
+                        }
+                        finally
+                        {
+                            _dGapTake += (b0 - buyer.Gold) - ((long)w.Capital - c0);   // kapital -> kiesa kupujacego: ma byc 0
+                            _dRefund += Math.Max(0L, (long)buyer.Gold - b0);
+                        }
+                    }
+                }
+            }
+            if (paid > 0 && w.WorkshopType != null && TypeOf(w) == from) _dPaidNoType += paid;
+            if (buyer != null || paid > 0)
+            {
+                c.R.Type = TypeOf(w); c.R.U60 = -1f; c.R.Age = 0; c.R.Low = 0;
+                Note(today, t, w, from, null, buyer, seller, price, inject, cost, paid, why + (back > 0 ? ", wklad zwrocony " + back : ""));
+            }
+            return code;
         }
 
         private static void Book(TownFolk.BenchPay p)
@@ -441,7 +562,7 @@ namespace Armoury
                     {
                         if (r.Age <= 0 && r.U60 < 0f) continue;
                         if (!IdOk(r.Key) || !IdOk(r.Type)) continue;
-                        if (f) { sb.Append(Ver).Append('|'); f = false; } else sb.Append(';');
+                        if (f) { sb.Append(Ver).Append('|').Append(_lastRun.ToString(Inv)).Append('|'); f = false; } else sb.Append(';');   // 435-L9-p: lpr2|dzien ostatniego pomiaru|rekordy
                         sb.Append(r.Key).Append('~').Append(r.Type).Append('~').Append(D(r.U60)).Append('~').Append(r.Age).Append('~').Append(r.Low);
                     }
                     return sb.ToString();
@@ -457,11 +578,21 @@ namespace Armoury
             {
                 lock (Gate)
                 {
-                    _byKey.Clear(); _byShop.Clear(); _loadBad = 0;
+                    _byKey.Clear(); _byShop.Clear(); _loadBad = 0; _lastRun = -1;
                     if (string.IsNullOrEmpty(data)) { _loadNote = "zapis bez arm_lpr (pamiec od zera)"; return; }
                     int bar = data.IndexOf('|');
-                    if (bar <= 0 || data.Substring(0, bar) != Ver) { _loadNote = "arm_lpr w nieznanej wersji '" + (bar > 0 ? data.Substring(0, bar) : "") + "' - pominiety (pamiec od zera)"; return; }
+                    string ver = bar > 0 ? data.Substring(0, bar) : "";
+                    if (ver != Ver && ver != VerOld) { _loadNote = "arm_lpr w nieznanej wersji '" + ver + "' - pominiety (pamiec od zera)"; return; }
                     string body = data.Substring(bar + 1);
+                    if (ver == Ver)
+                    {
+                        // 435-L9-p: dzien ostatniego pomiaru (przerwa > 2 doby przy pierwszej dobie = pamiec od nowa)
+                        int bar2 = body.IndexOf('|'), last;
+                        if (bar2 < 0 || !int.TryParse(body.Substring(0, bar2), NumberStyles.Integer, Inv, out last)) { _loadNote = "arm_lpr lpr2 bez dnia pomiaru - pominiety (pamiec od zera)"; return; }
+                        _lastRun = last < 0 ? -1 : last;
+                        body = body.Substring(bar2 + 1);
+                    }
+                    else _lastRun = 0;   // lpr1 (bez dnia pomiaru): pierwsza doba uzna przerwe - pamiec od nowa
                     int n = 0;
                     if (body.Length > 0)
                         foreach (var e in body.Split(';'))
@@ -476,7 +607,7 @@ namespace Armoury
                             _byKey[a[0]] = new Rec { Key = a[0], Type = a[1], U60 = u60 < 0f ? -1f : Math.Min(1f, u60), Age = age, Low = low };
                             n++;
                         }
-                    _loadNote = "wczytano arm_lpr: warsztatow " + n + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
+                    _loadNote = "wczytano arm_lpr (" + ver + "): warsztatow " + n + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "") + (ver == Ver ? ", ostatni pomiar dzien " + _lastRun : ", stara wersja - pamiec od nowa przy pierwszej dobie");
                 }
             }
             catch (Exception e) { Stumble("Import", e); }
