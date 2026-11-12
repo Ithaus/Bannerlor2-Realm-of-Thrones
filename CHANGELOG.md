@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 450-p (12.11) - poprawki po recenzji 450: szyk na dwoch pasach przypisany do pasa o stronie szyku, opis licznika "szyk na dwoch pasach"
+
+**Problem:** recenzja 450 (commit 47b002e5), bez testu w grze: (1) szyk przeniesiony przez AI z jednego pasa na drugi zostaje w starym slocie pasa (gra nie czysci wpisu), a probka liczyla go na pierwszym pasie listy - zawyzony udzial tego pasa w "przydzial pasa glownego" (glowna liczba dla 7.2), do zlego pasa szly tez straty (mapa szyk -> pas) i cel fal posilkow, dotyczy obu stron; (2) "szyk na dwoch pasach K" liczy probki x szyki (jeden stary wpis przez 180 s = ok. 180), a opis sugerowal liczbe szykow.
+
+**Przyczyna:** dekompilacja (rally_dec/mb_full.cs): TacticBreachWalls i TacticDefendCastle przy kazdym przydziale robia `formation.AI.Side = lane.LaneSide` i `lane.SetLastAssignedFormation(teamIndex, formation)`, starego slotu nikt nie zeruje (drugi przydzial w podziale wpisuje tylko przy `if (flag)`). SiegeMissionLog370.LaneSample: `if (map.ContainsKey(f)) { ... continue; }` - wygrywal pierwszy pas listy.
+
+**Zmiana (A/SiegeMissionLog370.cs, dalej tylko odczyt):** przy szyku na dwoch pasach wygrywa pas, ktorego LaneSide == f.AI.Side (strona ustawiana przez gre przy kazdym przydziale); gdy zaden albo oba pasujace - pierwszy na liscie jak przed. Ludzie szyku (przydzial atakujacych) przenoszeni ze starego pasa na nowy w tej samej probce; mapa szyk -> pas (straty, fale) idzie za tym samym wyborem. Odczyt f.AI.Side w wlasnym try (wyjatek = pierwszy pas, bez potkniecia pasa). W linii konca opis "szyk na dwoch pasach (probki x szyki) K".
+
+**Ryzyko / co sprawdzic:** zachowanie gry bez zmian (odczyt pol AI i tablicy pasow, glowny watek); klucz NIE - blok pasow nie biegnie, co do bitu jak przed. Nieobjety przypadek: stary wpis bez duplikatu (szyk przeniesiony na pas, ktorego slot zajal potem inny szyk) - nadal liczony na starym pasie; jesli w logu "szyk na dwoch pasach" jest duze, a udzial rozny od obecnosci w regionie, to sygnal, ze trzeba odrzucac wpisy o stronie innej niz f.AI.Side. Latki 372/381/388, drabiny, 441-449 nietkniete.
+
+**Status:** DO SPRAWDZENIA
+
 ## 450 (12.11) - AI BITWY pakiet 7 krok 7.0: sonda na pas w szturmie (tylko odczyt, klucz Battle AI Measurements) - przyczolek, wejscie na mur, fale posilkow, straty wedlug zrodla i pasa, udzial pasa glownego w pierwszych 3 min
 
 **Problem:** audyt AI bitwy 11.11 (docs/audyty-2026-11-11/AUDYT-AI-BITWA.md, pakiet 7, decyzja 8 Jeffa: "60% sil na jeden odcinek" = TAK, ale dopiero po sondzie na pas). Progi 7.2 (wysilek glowny), 7.3 (pas-lejek) i 7.5 (odwod obrony) bez pomiaru sa zgadywaniem. Sonda 437 (linia "pasy" co 30 s) mowila stan, pojemnosc, liczniki i cel fali, ale nie: kiedy pas mial przyczolek, kiedy ktora grupa weszla na mur (audyt: 150-210 s miedzy pierwsza a druga, cel ponizej 60 s), dokad szla kazda fala posilkow, ile pas kosztowal i jaki byl udzial pasa glownego w pierwszych 3 min. Szturm nie ma autotestu, po 09.11 brak misji szturmu w logach.

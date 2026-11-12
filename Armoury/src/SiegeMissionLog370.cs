@@ -34,7 +34,7 @@ namespace Armoury
     /// 450 (pakiet 7.0 audytu AI bitwy - sonda na pas, rozszerzenie; TYLKO ODCZYT, ten sam klucz BattleAiMeasurements): probka pasow co 1 s w OnMissionTick
     /// (glowny watek) z pamieci QueryData (bez przeliczania): przyczolek jak w grze (SiegeLane.IsUnderAttack && !IsDefended: >= 15 atakujacych przy punkcie
     /// obrony i < 15 obroncow - stan Conceited), pierwsze wejscie na mur (>= 5 atakujacych przy punkcie), czas przyczolka, maksima licznikow; udzial pasa
-    /// glownego w pierwszych 180 s po rozstawieniu (przydzial: ludzie szykow z GetLastAssignedFormation druzyn atakujacych, szyk liczony raz; obecnosc:
+    /// glownego w pierwszych 180 s po rozstawieniu (przydzial: ludzie szykow z GetLastAssignedFormation druzyn atakujacych, szyk liczony raz - przy dwoch pasach ten o stronie f.AI.Side (450-p); obecnosc:
     /// RegionMemberCount); fale posilkow (OnAgentBuild po starcie, przydzial do pasa po 2 s wedlug szyku czlowieka, fala zamknieta po 5 s bez nowych) -
     /// linia "fala posilkow (450)"; straty wedlug zrodla pociski / wrecz / inne (upadek, bez sprawcy) na szyk i na pas (mapa szyk -> pas z ostatniej probki,
     /// pod lockiem). Linia "pasy koniec (450)" przy koncu misji. Liczniki gry licza tylko glowna druzyne atakujaca i pamietaja 5 s.
@@ -370,9 +370,20 @@ namespace Armoury
                             try { f = l.GetLastAssignedFormation(ti); } catch { f = null; }
                             if (f == null) continue;
                             bool att = f.Team != null && f.Team.Side == BattleSideEnum.Attacker;
-                            if (map.ContainsKey(f)) { if (open && att) _dupAsg++; continue; }   // szyk liczony raz - na pierwszym pasie listy
+                            int units = att ? Math.Max(0, f.CountOfUnits) : 0;
+                            if (map.TryGetValue(f, out int prev))
+                            {
+                                // 450-p: gra wpisuje szyk na nowy pas (SetLastAssignedFormation), a starego wpisu nie czysci; przy kazdym przydziale
+                                // ustawia tez f.AI.Side = LaneSide - przy szyku na dwoch pasach wygrywa pas o stronie szyku, inaczej pierwszy na liscie
+                                if (open && att) _dupAsg++;
+                                bool here = false, there = false;
+                                try { var fs = f.AI != null ? f.AI.Side : FormationAI.BehaviorSide.BehaviorSideNotSet; here = l.LaneSide == fs; there = lanes[prev] != null && lanes[prev].LaneSide == fs; }
+                                catch { here = false; }
+                                if (here && !there) { map[f] = i; asg[prev] -= units; asg[i] += units; }
+                                continue;
+                            }
                             map[f] = i;
-                            if (att) asg[i] += Math.Max(0, f.CountOfUnits);
+                            asg[i] += units;
                         }
                     }
                     catch (Exception e) { Stumble("Probka.Pas", e); }
@@ -508,7 +519,7 @@ namespace Armoury
                 else sb.Append("drugi ").Append(_laneName[second]).Append(" po ").Append((_wallAt[second] - _wallAt[first]).ToString("0", Inv)).Append(" s");
             }
             sb.Append(" | udzial pasa glownego 0-").Append(OpenWindow.ToString("0", Inv)).Append(" s (probek ").Append(_shareSamples).Append("): przydzial ").Append(Share(_shareAsg))
-              .Append(", obecnosc w regionie ").Append(Share(_sharePres)).Append(", szyk na dwoch pasach ").Append(_dupAsg)
+              .Append(", obecnosc w regionie ").Append(Share(_sharePres)).Append(", szyk na dwoch pasach (probki x szyki) ").Append(_dupAsg)
               .Append(" | fale posilkow A ").Append(_waves[0]).Append(", O ").Append(_waves[1])
               .Append(" | straty = pociski/wrecz/inne; na murze = >= ").Append(WallMin).Append(" atak blisko, przyczolek = >= ").Append(HoldMin).Append(" atak blisko i < ").Append(HoldMin)
               .Append(" obroncow; probka co 1 s z pamieci gry (5 s), liczniki tylko glownej druzyny atakujacej | potkniecia ").Append(_stumbles).Append('.');
