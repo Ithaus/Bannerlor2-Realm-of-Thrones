@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 11:35 - WGRANIE 210 (437-440: AI bitwy pakiety 0-3 audytu - pomiary, piechota pod ostrzalem, obronca trzyma pozycje, los planu i charakter wodza)
+
+- **W grze:** Armoury.dll `cb18171e1efaeedf789b98f3ee6defc0` (commit `a5612a07`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie210`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie210(-przed)`.
+- **Autotest at-440 (n391), 5 dob + 7 bitew (4 planu + 3 z partia lorda):** KONIEC OK, misje sprawdzone, wyjatkow 0. Latki: 438 splity 2/2 i plany ataku RBM 4/4, 439 HasBattleBeenJoined 4/4 + HoldHighGround, 440 MakeDecision + lista taktyk, 437 wagi taktyk 21/21, GetAiWeight 54/54. Linie 437-440: bledy latek 0, zgubione zdarzenia 0, potkniecia 0 ("potkniecia 287/294/..." w logu to stare etykiety linii, sa tez w logu sprzed zmian).
+- **Widziane w tescie:** 439 Engage RBM 75 m zatrzymany 4-6 razy na bitwe, punkt wzgorza znaleziony (stok silnika, 2-9 m wyzej), 377-769 rozkazow w punkt; 438 obronca wyszedl ze splitu RBM na atak 1 raz, S2 od strat 1 wejscie; 440 profile (ZWYKLY, PORYWCZY: Harys Swyft Valor 1), rzut losu x0.81-1.22. NIE widziane: bieg w planach AttackSplit* (zadna druzyna ataku w tych planach), smierc wodza w trakcie (tylko nieprzytomny pod koniec).
+- **9 nowych kluczy, wszystkie TAK** (Battle AI Measurements, Outshot Rush In RBM Attack Plans, Outshot Trigger By Missile Losses, Defender Leaves RBM Split When Outshot, Defender Holds Until Melee Contact, Defender Seeks High Ground, Battle Plan Variety, Commander Personality In Battle, Command Confusion After Commander Death). Zmienionych domyslnych 0. Drobne: podpowiedz MCM Defender Holds Until Melee Contact nie zgadza sie z kodem po 439-p (tekst).
+- **Dalej:** pakiet 4 (jazda) z 5 (obrona przed jazda) - decyzje Jeffa w pamieci jeff-11-11; lancuch podazy 5-9 + L9/L10 dlugim testem 60-90 dob.
+
 ## STAN 12.11 04:20 - WGRANIE 209 (435-L9 przezbrojenie/przejecie warsztatow, 435-L10 migracja za praca - oba WYLACZONE; 436 smierc czy rana w bitwie symulowanej jak w rozgrywanej - WLACZONE)
 
 - **W grze:** Armoury.dll `a67b69804cbeb32dd83ea2ffdff71d0b` (commit `f853be7c`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie209`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie209(-przed)`.
