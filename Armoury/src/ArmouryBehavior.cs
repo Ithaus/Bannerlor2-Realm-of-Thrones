@@ -823,6 +823,9 @@ namespace Armoury
         // 435-L8 (lancuch podazy, stanowiska warsztatow): stan arm_lpw i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L3)
         private readonly bool _lp8Reset = Lp8Reset();
         private static bool Lp8Reset() { try { WorkshopBenches.Reset(); } catch (Exception e) { Log.Error("Lp8Reset", e); } return true; }
+        // 435-L9 (lancuch podazy, przezbrojenie stojacego warsztatu i przejecie): stan arm_lpr i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L8)
+        private readonly bool _lp9Reset = Lp9Reset();
+        private static bool Lp9Reset() { try { WorkshopIdleRetool.Reset(); } catch (Exception e) { Log.Error("Lp9Reset", e); } return true; }
         // m96-dlugi: ksiegi dlugow rad miast od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6-a7)
         private readonly bool _m96DlugiReset = M96DlugiReset();
         private static bool M96DlugiReset() { try { TownDebt.Reset(); } catch (Exception e) { Log.Error("M96DlugiReset", e); } return true; }
@@ -1567,6 +1570,9 @@ namespace Armoury
             // 435-L8: stanowiska warsztatow i pamiec wykorzystania (arm_lpw: "lpw1|warsztaty"); pisany tylko ze stanem; brak klucza = stan pusty (kazdy warsztat poziom 1); starsza DLL ignoruje klucz
             try { string lw = dataStore.IsSaving ? WorkshopBenches.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lw)) SaveText.Sync(dataStore, "arm_lpw", ref lw); if (dataStore.IsLoading) WorkshopBenches.Import(lw); }
             catch (Exception e) { Log.Error("SyncData.arm_lpw", e); }
+            // 435-L9: pamiec stojacych warsztatow (arm_lpr: "lpr1|warsztaty"); pisany tylko ze stanem; brak klucza = pamiec od zera; starsza DLL ignoruje klucz
+            try { string lr = dataStore.IsSaving ? WorkshopIdleRetool.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lr)) SaveText.Sync(dataStore, "arm_lpr", ref lr); if (dataStore.IsLoading) WorkshopIdleRetool.Import(lr); }
+            catch (Exception e) { Log.Error("SyncData.arm_lpr", e); }
             // 435-L1-p: pamiec niedoboru N (arm_lpn: "n1|doba|dob pomiaru|znaczniki|decyzje regulatora|komorki"); pisany tylko ze stanem; brak klucza = pamiec od pierwszej doby; starsza DLL ignoruje klucz
             try { string ln = dataStore.IsSaving ? SupplySignal.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(ln)) SaveText.Sync(dataStore, "arm_lpn", ref ln); if (dataStore.IsLoading) SupplySignal.Import(ln); }
             catch (Exception e) { Log.Error("SyncData.arm_lpn", e); }
@@ -3112,6 +3118,9 @@ namespace Armoury
             // 435-L8 (klucz Workshop Benches; wylaczony - nic): stanowiska warsztatow - pamiec wykorzystania z cykli minionej doby, raty z kapitalu warsztatu ponad znacznik (material
             // z polki wlasnego miasta, rzemieslnicy -> lud), cofniecia; PO budowach, zleceniach gminy i fundatorach tej doby (nie zabiera im materialu), przed migawka MBuild
             try { WorkshopBenches.Daily(); } catch (Exception e) { Log.Error("WorkshopBenches.Daily", e); } DayProfile.Lap("WorkshopBenches.Daily");
+            // 435-L9 (klucze Workshop Retool Idle / Workshop Takeover; oba wylaczone - nic): przezbrojenie warsztatu stojacego 60 dob na wyrob z niedoborem w jego miescie,
+            // z kapitalu warsztatu albo po przejeciu przez notabla miasta; PO stanowiskach tej doby (material z tej samej polki), przed migawka MBuild
+            try { WorkshopIdleRetool.Daily(); } catch (Exception e) { Log.Error("WorkshopIdleRetool.Daily", e); } DayProfile.Lap("WorkshopIdleRetool.Daily");
             try { MoneyLedger.Mark(MoneyLedger.MBuild); } catch { }
             try { BuildDiary.Daily(); } catch (Exception e) { Log.Error("BuildDiary.Daily", e); } DayProfile.Lap("BuildDiary.Daily");
             // 24c (14.10, klucz DragonsEatHerds): smoki jedza zwierzeta z taborow i stad wsi - PRZED ksiegami (ramka FDragon w tej samej dobie co linia "Smoki (24c)")

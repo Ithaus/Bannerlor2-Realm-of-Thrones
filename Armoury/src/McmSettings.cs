@@ -10272,6 +10272,14 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool WorkshopBenches { get; set; } = false;
 
+        [SettingPropertyBool("Workshop Retool Idle", HintText = "with Supply Chain Log: a town workshop of a notable or a lord that has stood nearly idle for 60 days (fewer than one cycle in ten works) changes to a trade whose goods are short at its own market, has its inputs nearby and is not yet in the town - even if its books show no loss. It pays from its own till what changing the trade costs: half for real tools, planks or hardwood from the town's shelves, the rest to the town's craftsmen, and it keeps enough working coin afterwards. No materials, no change. Your own workshops are not touched. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool WorkshopRetoolIdle { get; set; } = false;
+
+        [SettingPropertyBool("Workshop Takeover", HintText = "with Supply Chain Log: when such an idle workshop has too little in its till to change trade, another notable of the same town with coin to spare buys it - he pays the owner what the till holds, puts in the working coin and pays for the new trade the same way. A buyer never goes below the purse the game keeps notables at. Your own workshops are not touched. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool WorkshopTakeover { get; set; } = false;
+
         [SettingPropertyFloatingInteger("Side Village Craft Region Share", 0.000f, 1.000f, "0.000", HintText = "with Side Village Crafts: at most this share of the side villages' hands of one region (a stronghold and its villages) may change craft in one season (91 days); at most one village per district changes at a time", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float SideVillageCraftRegionShare { get; set; } = 0.05f;
@@ -15317,6 +15325,8 @@ namespace Armoury
             s.VillageGearRent = VillageGearRent;
             s.VillageGearFunderPaysVillageWork = VillageGearFunderPaysVillageWork;
             s.WorkshopBenches = WorkshopBenches;
+            s.WorkshopRetoolIdle = WorkshopRetoolIdle;
+            s.WorkshopTakeover = WorkshopTakeover;
             s.SideVillageCraftChangeDays = SideVillageCraftChangeDays;
             s.SideVillageCraftTreeDays = SideVillageCraftTreeDays;
             s.SideVillageCraftRegionShare = SideVillageCraftRegionShare;

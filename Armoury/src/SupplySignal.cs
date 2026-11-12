@@ -257,6 +257,8 @@ namespace Armoury
                 // 435-L8: wykorzystanie warsztatu do pamieci stanowisk (wlasny try; klucz wylaczony - nic); 435-L8-p: tylko linie z wsadem - te same, ktore dostaja
                 // mnoznik stanowisk (zamknieta linia strzal i kopalnia co N-ty cykl sa juz poza u: RuleHeld)
                 if (p.Inputs != null && p.Inputs.Count > 0) WorkshopBenches.Observe(w, reason == ROk);
+                // 435-L9: ten sam wynik cyklu do pamieci stojacych warsztatow (oba klucze L9 wylaczone - nic)
+                if (p.Inputs != null && p.Inputs.Count > 0) WorkshopIdleRetool.Observe(w, reason == ROk);
             }
             catch (Exception e) { Stumble("CycleEnd", e); }
         }
@@ -524,12 +526,12 @@ namespace Armoury
                 // 435-L1-p (recenzje S3): klucz jest glownym wylacznikiem pomiaru, na ktorym stoja kroki L5-L8 - raz na sesje slad w logu, gdy cos go potrzebuje
                 try
                 {
-                    if (!_offWarned && s.LogEnabled && (CraftShortage.KeyOn || s.VillageOrderShortageBoost > 1f || s.WorkshopBenches
+                    if (!_offWarned && s.LogEnabled && (CraftShortage.KeyOn || s.VillageOrderShortageBoost > 1f || s.WorkshopBenches || s.WorkshopRetoolIdle || s.WorkshopTakeover
                                                          || (s.VillageGear && (s.VillageGearTownsInvest || s.VillageGearWearScale > 0f))))
                     {
                         _offWarned = true;
                         Log.Info("LP: klucz Supply Chain Log WYLACZONY, a wlaczone sa klucze, ktore czytaja pomiar (Crafts Follow Shortage / Village Order Shortage Boost / Village Gear Towns Invest / "
-                                 + "Village Gear Wear Scale / Workshop Benches) - bez pomiaru N = 1 wszedzie: zmiana zajec i zamowienia jak dotad, miasta nie funduja sprzetu, stanowiska bez rat, "
+                                 + "Village Gear Wear Scale / Workshop Benches / Workshop Retool Idle / Workshop Takeover) - bez pomiaru N = 1 wszedzie: zmiana zajec i zamowienia jak dotad, miasta nie funduja sprzetu, stanowiska bez rat, "
                                  + "kolejnosc zlecen sprzetu bez N (linia raz na sesje).");
                     }
                 }
