@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 463-p (12.11) - ikony warsztatow: rezerwa "slowa w id" porownuje krotkie slowa (ore / ale / oil) jako caly czlon id
+
+**Problem:** recenzja 463 (WorkshopIcons463.cs:162/164/166): rezerwa KeyFor dla typu spoza listy Known szukala fragmentow "ore", "ale", "oil" w id - trafialyby tez w "store", "sale", "scale", "toil" i dalyby bledna ikone (np. typ "salt_store" -> srebrnik). Dzis kod martwy (wszystkie 9 typow BK + artisans sa w Known), objawu w grze nie ma.
+
+**Przyczyna:** string.Contains na krotkich slowach zamiast porownania calych czlonow id.
+
+**Zmiana:** KeyFor: id dzielone po "_" i "-" na czlony (HashSet); "ore", "ale", "oil" sprawdzane jako caly czlon, reszta slow (dluzsze rdzenie, takze w zlozeniach typu "weaponsmithy") bez zmian. Odrzucone uwagi recenzji (bez zmian): artisans -> garncarz (zgodne z prosba Jeffa), wpis "stable" w Known (nieszkodliwy, typ zakomentowany w grze), Debug.FailedAssert gry w ShopVisualIconBrushWidget (kod gry, bylo tak przed 463).
+
+**Ryzyko / co sprawdzic:** zachowanie dla typow znanych identyczne (Known sprawdzane przed rezerwa) - linia "Ikony warsztatow (463)" taka sama jak po 463. Regresji brak: KeyFor wolane tylko z Apply (dwa miejsca), nikt inny. Build 0 bledow. Zamknieta ekonomia - nie dotyczy (tylko UI).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 463 (12.11) - ikony warsztatow BK zamiast niebieskiego prostokata (finanse rodu, okno produkcji, encyklopedia osady BK, ekran miasta)
 
 **Problem:** Jeff 12.11: "daj warsztatom storz ikony bo niektore maja a niektore maja jakas niebieski prostokat". Czesc warsztatow ma ikone, czesc pelny niebieski prostokat.

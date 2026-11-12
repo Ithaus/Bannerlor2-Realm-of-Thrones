@@ -159,11 +159,13 @@ namespace Armoury
             string k;
             if (Known.TryGetValue(id, out k)) return k;
             string s = id.ToLowerInvariant();
-            if (s.Contains("silver") || s.Contains("jewel") || s.Contains("gold") || s.Contains("mine") || s.Contains("ore")) return "silversmithy";
+            // 463-p: krotkie slowa (ore / ale / oil) tylko jako caly czlon id (podzial po _ i -) - fragment trafial w "store", "sale", "toil"
+            var parts = new HashSet<string>(s.Split(new[] { '_', '-' }, StringSplitOptions.RemoveEmptyEntries));
+            if (s.Contains("silver") || s.Contains("jewel") || s.Contains("gold") || s.Contains("mine") || parts.Contains("ore")) return "silversmithy";
             if (s.Contains("smith") || s.Contains("forge") || s.Contains("armor") || s.Contains("armour") || s.Contains("weapon")) return "smithy";
-            if (s.Contains("brew") || s.Contains("mead") || s.Contains("ale") || s.Contains("beer")) return "brewery";
+            if (s.Contains("brew") || s.Contains("mead") || parts.Contains("ale") || s.Contains("beer")) return "brewery";
             if (s.Contains("wine") || s.Contains("vine")) return "wine_press";
-            if (s.Contains("olive") || s.Contains("oil")) return "olive_press";
+            if (s.Contains("olive") || parts.Contains("oil")) return "olive_press";
             if (s.Contains("velvet") || s.Contains("silk")) return "velvet_weavery";
             if (s.Contains("linen") || s.Contains("flax")) return "linen_weavery";
             if (s.Contains("wool") || s.Contains("weav") || s.Contains("cloth")) return "wool_weavery";
