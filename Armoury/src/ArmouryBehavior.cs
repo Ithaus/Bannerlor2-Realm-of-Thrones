@@ -1567,6 +1567,9 @@ namespace Armoury
             // 435-L8: stanowiska warsztatow i pamiec wykorzystania (arm_lpw: "lpw1|warsztaty"); pisany tylko ze stanem; brak klucza = stan pusty (kazdy warsztat poziom 1); starsza DLL ignoruje klucz
             try { string lw = dataStore.IsSaving ? WorkshopBenches.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lw)) SaveText.Sync(dataStore, "arm_lpw", ref lw); if (dataStore.IsLoading) WorkshopBenches.Import(lw); }
             catch (Exception e) { Log.Error("SyncData.arm_lpw", e); }
+            // 435-L1-p: pamiec niedoboru N (arm_lpn: "n1|doba|dob pomiaru|znaczniki|decyzje regulatora|komorki"); pisany tylko ze stanem; brak klucza = pamiec od pierwszej doby; starsza DLL ignoruje klucz
+            try { string ln = dataStore.IsSaving ? SupplySignal.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(ln)) SaveText.Sync(dataStore, "arm_lpn", ref ln); if (dataStore.IsLoading) SupplySignal.Import(ln); }
+            catch (Exception e) { Log.Error("SyncData.arm_lpn", e); }
             // 345: ksiega kiesy gracza - 7 dob historii prognozy zlota ("g345|1|..."); pisany tylko z historia; brak klucza (stary zapis, Ironman Jeffa) = pusto; starsza DLL ignoruje klucz
             try { string pg = dataStore.IsSaving ? GoldForecast.Export() : null; if (!dataStore.IsSaving || pg != null) SaveText.Sync(dataStore, "arm_prog345", ref pg); if (dataStore.IsLoading) GoldForecast.Import(pg); }
             catch (Exception e) { Log.Error("SyncData.arm_prog345", e); }
@@ -3333,7 +3336,7 @@ namespace Armoury
             // PO zleceniach robot (DaWorksRun), regulatorze wsi (HarvestValve.Daily), przebudowach zajec (StartCalibration.Daily, VillageCrafts.Daily) i pracach okregu tej doby
             try { SupplySignal.Daily(); } catch (Exception e) { Log.Error("SupplySignal.Daily", e); } DayProfile.Lap("SupplySignal.Daily");
             // 435-L2 (odblokowanie zmiany zajec): linia "LP zajecia" - PO przebudowach tej doby obu drog (StartCalibration.Daily, VillageCrafts.Daily); sam odczyt licznikow
-            try { CraftUnblock.Daily(); } catch (Exception e) { Log.Error("CraftUnblock.Daily", e); }
+            try { CraftUnblock.Daily(); } catch (Exception e) { Log.Error("CraftUnblock.Daily", e); } DayProfile.Lap("CraftUnblock.Daily");
             try { LandSale.Daily(); } catch (Exception e) { Log.Error("LandSale.Daily", e); } DayProfile.Lap("LandSale.Daily");   // m113-zakup: linia na sucho (raz na sesje i co 28 dob), linia doby z ruchem albo co 7 dob
             try { FiefInvestments.Daily(); } catch (Exception e) { Log.Error("FiefInvestments.Daily", e); }   // m112-inwest: komunikat wyplat prac i majatkow minionej doby, linia "Majatki i prace w Fiefs (m112)"
             try { SideVillageVisit.Daily(); } catch (Exception e) { Log.Error("SideVillageVisit.Daily", e); }   // m97-wioski: linia "Wioski poboczne (WP): dzien N" (tylko z ruchem)   // n20-wioska: linia "Wioska gracza (n20): dzien N" i srednia 7 dob udzialu

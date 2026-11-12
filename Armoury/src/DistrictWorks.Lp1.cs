@@ -13,13 +13,13 @@ namespace Armoury
     internal static partial class DistrictWorks
     {
         private const int LwPaid = 0, LwNoPath = 1, LwNoE = 2, LwEaten = 3, LwNoWindow = 4, LwPoolSmall = 5, LwPartNoBonus = 6, LwNoUnits = 7, LwShareSmall = 8, LwWar = 9,
-                          LwEmptyPurse = 10, LwKinds = 11;
+                          LwEmptyPurse = 10, LwNoTakings = 11, LwKinds = 12;
         private static readonly string[] LwName =
         {
             "wyplata", "okreg bez drogi produkcji dodatku (rampa KS albo produkcja wsi niewpieta)", "okreg bez dodatku w wycenie doby (E = 0 albo V = 0)",
             "caly dodatek zjedzony w okregu (na targ 0)", "nic nie weszlo w oknie wozu (licznik pana i kiesa wsi bez przyrostu)", "pula ponizej 1 zl (maly utarg wozu albo maly udzial dodatku)",
             "czesc bez dodatku (inne zajecie niz prace, dodatek 0 albo czesc poza wycena)", "wiersz bez czynnych jednostek (rampa, bezczynne, spalone)", "udzial rodu ponizej 1 zl",
-            "wojna z krolestwem okregu", "licznik pana i kiesa wsi puste przy wyplacie"
+            "wojna z krolestwem okregu", "licznik pana i kiesa wsi puste przy wyplacie", "woz wrocil bez utargu"
         };
         private static readonly Dictionary<Row, int[]> _lwLast = new Dictionary<Row, int[]>();   // wiersz gracza -> [powod, doba, powroty wozu od wczytania]
 
@@ -111,7 +111,7 @@ namespace Armoury
                       .Append(" (razem ").Append(Math.Round(paid28).ToString("0", Inv)).Append(" zl), bez wyplaty ").Append(n - paidN).Append(": brak powrotu wozu okregu od wczytania ").Append(noCart);
                     for (int c = 0; c < LwKinds; c++) if (by[c] > 0) sb.Append(", ").Append(c == LwPaid ? "wyplata ponizej 1 zl w 28 dobach albo starsza" : LwName[c]).Append(' ').Append(by[c]);
                     int sum = paidN + noCart; for (int c = 0; c < LwKinds; c++) sum += by[c];
-                    sb.Append(" | kontrola: wiersze - (placace + powody) = ").Append(n - sum).Append(" | wiersze: ").Append(string.Join("; ", list.ToArray()));
+                    sb.Append(" | tozsamosc licznikow (nie kontrola ksiag): wiersze - (placace + powody) = ").Append(n - sum).Append(" | wiersze: ").Append(string.Join("; ", list.ToArray()));
                     if (n > list.Count) sb.Append("; ... (").Append(n - list.Count).Append(" dalszych)");
                 }
                 return sb.ToString();

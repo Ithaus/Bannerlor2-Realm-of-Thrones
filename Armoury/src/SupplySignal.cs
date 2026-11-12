@@ -38,7 +38,11 @@ namespace Armoury
     ///  6. DLACZEGO PRACE GRACZA NIE PLACA - co 7 dob (DistrictWorks.Lp1Text, powody zbierane przy wozach).
     /// Od 435-L8 wynik cyklu (pkt 3) czyta tez pamiec stanowisk warsztatow (WorkshopBenches.Observe; klucz Workshop Benches domyslnie wylaczony).
     /// Powody postoju przebudow zajec sa juz w linii ZW / A7 (427, EcoAudit427.RbText) - tu nie powtarzane.
-    /// Stan tylko sesyjny (bez zapisu): po wczytaniu srednie licza sie od pierwszej doby (N = 1 dopoki nie ma danych); pamiec N w zapisie przyjdzie z arm_lp (L3).
+    /// 435-L1-p (poprawki po recenzjach): pamiec N w zapisie arm_lpn (srednie komorek i liczba decyzji regulatora na suficie - po wczytaniu N jak przed zapisem);
+    /// budzet robot bez pokrycia to ZAPAS (kiesa wsi ponad skrzynie), wiec do kolejki wchodzi jako poziom / 28 i tylko dla materialow wyczerpanych na polce
+    /// (material ponad sufitem ceny i reszta mniejsza od sztuki - osobno, nie brak); kolejka N > 1 dopiero po 7 dobach pomiaru, sprzedaz w mianowniku >= 1 szt./d;
+    /// cykl pominiety regula ruchu linii (kopalnia co N-ty cykl, zamknieta linia strzal, linia surowca bez wsadu - WorkshopLaw.RuleHeld) nie wchodzi do u.
+    /// Klucz Supply Chain Log to GLOWNY WYLACZNIK pomiaru: bez niego kroki L5-L8 dzialaja jak dotad (N = 1).
     /// Watek glowny; wyjatek = potkniecie liczone w linii, bez globalnego wylacznika (CLAUDE.md 7).
     /// </summary>
     internal static class SupplySignal
@@ -78,28 +82,34 @@ namespace Armoury
         private sealed class Cell
         {
             public readonly int[] Day = new int[Window];
-            public readonly float[] Miss = new float[Window], Got = new float[Window];
+            public readonly float[] Miss = new float[Window], Soft = new float[Window], Got = new float[Window];   // Miss - sztuki wsadu (twardy brak); Soft - POZIOM niewydanego budzetu robot w sztukach
             public Cell() { for (int i = 0; i < Window; i++) Day[i] = int.MinValue; }
         }
         private static readonly Dictionary<Settlement, Dictionary<ItemCategory, Cell>> _cells = new Dictionary<Settlement, Dictionary<ItemCategory, Cell>>();
-        private static readonly double[] _dMiss = new double[Streams], _dGot = new double[Streams], _dGapGold = new double[Streams];
-        private static readonly Dictionary<ItemCategory, double[]> _dCat = new Dictionary<ItemCategory, double[]>();   // doba: [brak, kupione]
+        private static readonly double[] _dMiss = new double[Streams], _dSoft = new double[Streams], _dGot = new double[Streams], _dGapGold = new double[Streams];
+        private static readonly Dictionary<ItemCategory, double[]> _dCat = new Dictionary<ItemCategory, double[]>();   // doba: [brak wsadu, kupione, poziom niewydanego budzetu]
         private static double _dRound;                    // reszty budzetu ponizej ceny najtanszej sztuki (nie sa brakiem)
+        private static double _dCapGold;                  // 435-L1-p: budzet bez pokrycia, gdy material lezy na polce tylko ponad sufitem ceny (nie brak)
+        // 435-L1-p (recenzje S1): budzet robot bez pokrycia to ZAPAS (kiesa wsi ponad skrzynie, to samo zlecenie wraca co dobe), nie strumien - do kolejki N wchodzi
+        // rozlozony na okno (poziom / 28); kolejka N > 1 dopiero po MinSpan dobach pomiaru; sprzedaz w mianowniku nie mniejsza niz MinSales szt./d (pusta polka)
+        internal const int MinSpan = 7;
+        private const double MinSales = 1.0;
         private static readonly Dictionary<Town, Dictionary<ItemObject, int>> _price = new Dictionary<Town, Dictionary<ItemObject, int>>();   // cena targu, pamiec doby
 
-        private static void Add(Settlement st, ItemCategory c, double miss, double got, int stream)
+        private static void Add(Settlement st, ItemCategory c, double miss, double soft, double got, int stream)
         {
-            if (st == null || c == null || (!(miss > 0) && !(got > 0))) return;
+            if (st == null || c == null || (!(miss > 0) && !(soft > 0) && !(got > 0))) return;
             Dictionary<ItemCategory, Cell> m;
             if (!_cells.TryGetValue(st, out m)) { m = new Dictionary<ItemCategory, Cell>(); _cells[st] = m; }
             Cell cell;
             if (!m.TryGetValue(c, out cell)) { cell = new Cell(); m[c] = cell; }
             int d = Today, k = ((d % Window) + Window) % Window;
-            if (cell.Day[k] != d) { cell.Day[k] = d; cell.Miss[k] = 0f; cell.Got[k] = 0f; }
+            if (cell.Day[k] != d) { cell.Day[k] = d; cell.Miss[k] = 0f; cell.Soft[k] = 0f; cell.Got[k] = 0f; }
             if (_first == int.MinValue) _first = d;
             double[] dc;
-            if (!_dCat.TryGetValue(c, out dc)) { dc = new double[2]; _dCat[c] = dc; }
+            if (!_dCat.TryGetValue(c, out dc)) { dc = new double[3]; _dCat[c] = dc; }
             if (miss > 0) { cell.Miss[k] += (float)miss; _dMiss[stream] += miss; dc[0] += miss; }
+            if (soft > 0) { cell.Soft[k] += (float)soft; _dSoft[stream] += soft; dc[2] += soft; }
             if (got > 0) { cell.Got[k] += (float)got; _dGot[stream] += got; dc[1] += got; }
         }
 
@@ -122,7 +132,7 @@ namespace Armoury
             {
                 if (OffMain()) return;
                 for (int i = 0; i < pcs.Length && i < items.Length; i++)
-                    if (pcs[i] > 0 && items[i] != null) Add(mk, items[i].ItemCategory, 0, pcs[i], stream);
+                    if (pcs[i] > 0 && items[i] != null) Add(mk, items[i].ItemCategory, 0, 0, pcs[i], stream);
             }
             catch (Exception e) { Stumble("NoteWorksGot", e); }
         }
@@ -138,18 +148,25 @@ namespace Armoury
             try
             {
                 if (OffMain()) return;
-                int n = 0, minP = int.MaxValue;
+                // 435-L1-p (recenzje S1 / N3): reszta budzetu po zakupie oznacza, ze kazdy material jest (a) wyczerpany do zapasu polki, (b) drozszy od reszty,
+                // albo (c) lezy na polce ponad sufitem ceny. Brakiem jest tylko (a): reszta dzielona miedzy materialy wyczerpane; (b) to zaokraglenie, (c) osobny licznik.
+                int n = 0, shortN = 0, capN = 0;
+                var sh = new bool[items.Length];
                 for (int i = 0; i < items.Length; i++)
                 {
                     if (items[i] == null) continue;
                     int p = PriceOf(mk.Town, items[i]);
-                    n++; if (p < minP) minP = p;
+                    n++;
+                    if (p > gapGold) continue;
+                    int cap = BuildFunding.DsWorksCap(items[i]);
+                    if (cap > 0 && p > cap) { capN++; continue; }
+                    sh[i] = true; shortN++;
                 }
                 if (n == 0) return;
-                if (gapGold < minP) { _dRound += gapGold; return; }
-                double each = gapGold / n;
+                if (shortN == 0) { if (capN > 0) _dCapGold += gapGold; else _dRound += gapGold; return; }
+                double each = gapGold / shortN;
                 for (int i = 0; i < items.Length; i++)
-                    if (items[i] != null) Add(mk, items[i].ItemCategory, each / PriceOf(mk.Town, items[i]), 0, stream);
+                    if (sh[i]) Add(mk, items[i].ItemCategory, 0, each / PriceOf(mk.Town, items[i]), 0, stream);
                 _dGapGold[stream] += gapGold;
             }
             catch (Exception e) { Stumble("NoteWorksGap", e); }
@@ -158,11 +175,11 @@ namespace Armoury
         /// <summary>CommodityInputs284: wsad linii towarowej warsztatu w miescie - `miss` sztuk zabraklo do cyklu, `got` sztuk zdjetych z polki w udanym cyklu. Sam licznik, nie rzuca.</summary>
         internal static void NoteInput(Town town, ItemCategory c, int miss, int got)
         {
-            if (!On || town == null || c == null) return;
+            if (!On || town == null || c == null || !town.IsTown) return;   // 435-L1-p: warsztaty zamkow poza tablica N (jak CycleEnd)
             try
             {
                 if (OffMain()) return;
-                Add(town.Settlement, c, Math.Max(0, miss), Math.Max(0, got), SShop);
+                Add(town.Settlement, c, Math.Max(0, miss), 0, Math.Max(0, got), SShop);
             }
             catch (Exception e) { Stumble("NoteInput", e); }
         }
@@ -171,7 +188,7 @@ namespace Armoury
         private const int ROk = 0, RHeld = 1, RInput = 2, RPrice = 3, RCoffer = 4, RCapital = 5, ROther = 6, RKinds = 7;
         private static readonly string[] RName =
         {
-            "udane", "wstrzymane regula przed sprawdzeniem wsadu (bramka narzedzi 215, kopalnia co N-ty cykl, strzelarze, inne prefiksy)", "brak wsadu na polce",
+            "udane", "wstrzymane przed sprawdzeniem wsadu (bramka narzedzi 215, dymarka bez drewna, inne prefiksy)", "brak wsadu na polce",
             "prog ceny (utarg wedlug ceny kupca nie pokrywa wsadu i plac)", "kasa miasta ponizej utargu", "kapital warsztatu ponizej wsadu", "inne (po wsadzie, bez wyceny)"
         };
         private sealed class WRec
@@ -183,11 +200,15 @@ namespace Armoury
         private static readonly Dictionary<Workshop, WRec> _ws = new Dictionary<Workshop, WRec>();
         private static readonly int[] _wDay = new int[RKinds];
         private static readonly Dictionary<Workshop, int[]> _wLine = new Dictionary<Workshop, int[]>();   // od poprzedniej linii: [udane, nieudane, ostatni powod]
-        private static int _wArms, _wCastle, _wPlayer;
-        private static bool _cySuf, _cySufOk, _cyInc; private static int _cyIncome; private static Workshop _cyIncShop;
+        private static int _wArms, _wCastle, _wPlayer, _wSkip;
+        private static bool _cySuf, _cySufOk, _cyInc, _cyRule; private static int _cyIncome; private static Workshop _cyIncShop;
 
         /// <summary>CommodityInputs284.CyclePre (Priority.First - przed kazdym cyklem warsztatu): znaczniki cyklu od zera.</summary>
-        internal static void CycleBegin() { _cySuf = false; _cySufOk = false; _cyInc = false; _cyIncShop = null; _cyIncome = 0; }
+        internal static void CycleBegin() { _cySuf = false; _cySufOk = false; _cyInc = false; _cyRule = false; _cyIncShop = null; _cyIncome = 0; }
+
+        /// <summary>435-L1-p (recenzja S2): WorkshopLaw - cykl pominiety REGULA RUCHU LINII (kopalnia co N-ty cykl, zamknieta linia strzal, linia surowca bez wsadu):
+        /// to nie postoj warsztatu - taki cykl nie wchodzi do wykorzystania u (ani do udanych, ani do nieudanych). Sam znacznik, nie rzuca.</summary>
+        internal static void RuleHeld() { _cyRule = true; }
 
         /// <summary>CommodityInputs284.SufPost: gra sprawdzila wsad cyklu (`ok` - jest; false - brak na polce miasta).</summary>
         internal static void SufSeen(bool ok) { _cySuf = true; _cySufOk = ok; }
@@ -206,6 +227,7 @@ namespace Armoury
                 if (town == null || OffMain()) return;
                 if (!effectCapital) { _wArms++; return; }                 // linia uzbrojenia - WorkshopLaw (linia "Warsztaty: dzien")
                 if (!w.Settlement.IsTown) { _wCastle++; return; }
+                if (!result && _cyRule) { _wSkip++; return; }             // 435-L1-p: cykl pominiety regula ruchu linii - poza u (osobny licznik)
                 int reason;
                 if (result) reason = ROk;
                 else if (!_cySuf) reason = RHeld;
@@ -311,6 +333,7 @@ namespace Armoury
         {
             _main = Environment.CurrentManagedThreadId; _dOff = 0;
             _st = _stSess = 0; _err.Clear(); _startLine = false; _first = int.MinValue;
+            _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _offWarned = false; _heldBits = 0;
             _cells.Clear(); _price.Clear(); ZeroDay();
             _ws.Clear(); CycleBegin();
             _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>(); _pubT = null;
@@ -320,25 +343,141 @@ namespace Armoury
 
         private static void ZeroDay()
         {
-            Array.Clear(_dMiss, 0, Streams); Array.Clear(_dGot, 0, Streams); Array.Clear(_dGapGold, 0, Streams);
-            _dCat.Clear(); _dRound = 0;
-            Array.Clear(_wDay, 0, RKinds); _wArms = _wCastle = _wPlayer = 0; _wLine.Clear();
+            Array.Clear(_dMiss, 0, Streams); Array.Clear(_dSoft, 0, Streams); Array.Clear(_dGot, 0, Streams); Array.Clear(_dGapGold, 0, Streams);
+            _dCat.Clear(); _dRound = 0; _dCapGold = 0;
+            Array.Clear(_wDay, 0, RKinds); _wArms = _wCastle = _wPlayer = _wSkip = 0; _wLine.Clear();
             _dOff = 0; _st = 0;
         }
 
         private static int Span(int today) { return _first == int.MinValue ? 1 : Math.Max(1, Math.Min(Window, today - _first + 1)); }
 
-        private static void Means(Cell c, int today, out double miss, out double got)
+        private static void Means(Cell c, int today, out double miss, out double soft, out double got)
         {
-            miss = got = 0;
+            miss = soft = got = 0;
             for (int k = 0; k < Window; k++)
             {
                 int dd = c.Day[k];
                 if (dd > today || dd <= today - Window) continue;
-                miss += c.Miss[k]; got += c.Got[k];
+                miss += c.Miss[k]; soft += c.Soft[k]; got += c.Got[k];
             }
             double span = Span(today);
-            miss /= span; got /= span;
+            miss /= span; soft /= span; got /= span;
+        }
+
+        /// <summary>435-L1-p: S_kolejka komorki albo swiata. `want` - brak wsadu szt./d + poziom niewydanego budzetu robot / okno; `sales` szt./d. Przed MinSpan dobami pomiaru 1.</summary>
+        private static double Queue(double want, double sales, int span)
+        {
+            if (span < MinSpan || !(want > 1e-6)) return 1.0;
+            return 1.0 + Math.Min(1.0, want / Math.Max(MinSales, sales));
+        }
+
+        // ============================================================ zapis (arm_lpn) - 435-L1-p (recenzje S4 / S1): pamiec N w zapisie
+        private const string SaveVer = "n1";
+        private static string _pend, _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)";
+        private static int _loadBad, _heldBits;
+        private static bool _offWarned;
+        private static bool IdOk(string x) { return !string.IsNullOrEmpty(x) && x.IndexOfAny(new[] { '|', '~', ';', ',', ':' }) < 0; }
+        private static bool Num(string s, out double v) { return double.TryParse(s, NumberStyles.Float, Inv, out v) && !double.IsNaN(v) && !double.IsInfinity(v) && v >= 0; }
+        private static string D(double v) { return v.ToString("0.####", Inv); }
+        /// <summary>435-L6-p: znaczniki "nacisk wyzerowany dla miary z niedoborem" obu drog (CraftShortage) - jada w naglowku tego zapisu.</summary>
+        internal static int HeldBits { get { return _heldBits; } set { _heldBits = value & 3; } }
+
+        /// <summary>Zapis: "n1|doba|dob pomiaru|znaczniki|towar:decyzje,...|miasto~kategoria~brak~poziom~kupione;..." (srednie dobowe okna). "" - nic do zapisania.
+        /// Wczytany, a jeszcze nie rozwiniety napis (zapis przed pierwsza doba sesji) wraca bez zmian. Watek glowny, nie rzuca.</summary>
+        internal static string Export()
+        {
+            try
+            {
+                if (_pend != null) return _pend;
+                if (_cells.Count == 0 && _runs.Count == 0 && _heldBits == 0) return "";
+                int today = Today, span = Span(today);
+                var sb = new StringBuilder(_cells.Count * 160 + 64);
+                sb.Append(SaveVer).Append('|').Append(today).Append('|').Append(span).Append('|').Append(_heldBits).Append('|');
+                bool f = true;
+                foreach (var kv in _runs)
+                {
+                    if (kv.Key == null || kv.Value <= 0 || !IdOk(kv.Key.StringId)) continue;
+                    if (!f) sb.Append(','); f = false;
+                    sb.Append(kv.Key.StringId).Append(':').Append(kv.Value);
+                }
+                sb.Append('|');
+                f = true;
+                foreach (var tk in _cells)
+                {
+                    if (tk.Key == null || !IdOk(tk.Key.StringId)) continue;
+                    foreach (var ck in tk.Value)
+                    {
+                        if (ck.Key == null || !IdOk(ck.Key.StringId)) continue;
+                        double miss, soft, got;
+                        Means(ck.Value, today, out miss, out soft, out got);
+                        if (!(miss > 1e-4) && !(soft > 1e-4) && !(got > 1e-4)) continue;
+                        if (!f) sb.Append(';'); f = false;
+                        sb.Append(tk.Key.StringId).Append('~').Append(ck.Key.StringId).Append('~').Append(D(miss)).Append('~').Append(D(soft)).Append('~').Append(D(got));
+                    }
+                }
+                return sb.ToString();
+            }
+            catch (Exception e) { Stumble("Export", e); return ""; }
+        }
+
+        /// <summary>Wczytanie (po Reset z konstruktora): napis czeka do pierwszej doby sesji (osady i przedmioty sa wtedy pewne). Brak klucza - stan pusty.</summary>
+        internal static void Import(string data)
+        {
+            _pend = string.IsNullOrEmpty(data) ? null : data;
+            _loadNote = _pend == null ? "zapis bez arm_lpn (pamiec N od pierwszej doby)" : "arm_lpn czeka na pierwsza dobe sesji";
+        }
+
+        /// <summary>Rozwiniecie wczytanego zapisu: srednie okna wpisane rowno w doby pomiaru sprzed zapisu (srednie i dzielnik po wczytaniu jak przed zapisem). Zly wpis
+        /// pominiety i policzony. Watek glowny.</summary>
+        private static void Resolve(int today)
+        {
+            string data = _pend;
+            if (data == null) return;
+            _pend = null;
+            try
+            {
+                var p = data.Split('|');
+                int day, span, bits;
+                if (p.Length < 6 || p[0] != SaveVer || !int.TryParse(p[1], NumberStyles.Integer, Inv, out day) || !int.TryParse(p[2], NumberStyles.Integer, Inv, out span))
+                { _loadNote = "arm_lpn w nieznanej wersji - pominiety (pamiec N od pierwszej doby)"; return; }
+                if (int.TryParse(p[3], NumberStyles.Integer, Inv, out bits)) _heldBits = bits & 3;
+                span = Math.Max(1, Math.Min(Window, span));
+                if (day > today) day = today;
+                int runs = 0, cells = 0;
+                var om = MBObjectManager.Instance;
+                if (p[4].Length > 0 && om != null)
+                    foreach (var e in p[4].Split(','))
+                    {
+                        int c = e.IndexOf(':'), r;
+                        if (c <= 0 || !int.TryParse(e.Substring(c + 1), NumberStyles.Integer, Inv, out r) || r <= 0) { _loadBad++; continue; }
+                        var it = om.GetObject<ItemObject>(e.Substring(0, c));
+                        if (it == null) { _loadBad++; continue; }
+                        _runs[it] = Math.Min(8, r); runs++;
+                    }
+                if (p[5].Length > 0 && om != null && today - day < Window)
+                    foreach (var e in p[5].Split(';'))
+                    {
+                        var a = e.Split('~');
+                        double miss, soft, got;
+                        if (a.Length < 5 || !Num(a[2], out miss) || !Num(a[3], out soft) || !Num(a[4], out got)) { _loadBad++; continue; }
+                        var st = Settlement.Find(a[0]);
+                        var cat = om.GetObject<ItemCategory>(a[1]);
+                        if (st == null || st.Town == null || cat == null) { _loadBad++; continue; }
+                        Dictionary<ItemCategory, Cell> m;
+                        if (!_cells.TryGetValue(st, out m)) { m = new Dictionary<ItemCategory, Cell>(); _cells[st] = m; }
+                        if (m.ContainsKey(cat)) { _loadBad++; continue; }
+                        var cell = new Cell();
+                        for (int i = 0; i < span; i++)
+                        {
+                            int d = day - i, k = ((d % Window) + Window) % Window;
+                            cell.Day[k] = d; cell.Miss[k] = (float)miss; cell.Soft[k] = (float)soft; cell.Got[k] = (float)got;
+                        }
+                        m[cat] = cell; cells++;
+                    }
+                if (cells > 0) _first = _first == int.MinValue ? day - span + 1 : Math.Min(_first, day - span + 1);
+                _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
+            }
+            catch (Exception e) { Stumble("Resolve", e); _loadNote = "arm_lpn - blad wczytania (pamiec N od pierwszej doby)"; }
         }
 
         // ============================================================ doba
@@ -347,17 +486,38 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
-            if (!s.SupplyChainLog) { ZeroDay(); _price.Clear(); if (_pubN.Count > 0) _pubN = new Dictionary<ItemCategory, double>(); _pubT = null; CraftShortage.ZeroLine(); return; }
+            _main = Environment.CurrentManagedThreadId;   // 435-L1-p (stabilnosc N2): watek taktu doby, nie konstruktora
+            if (!s.SupplyChainLog)
+            {
+                ZeroDay(); _price.Clear(); if (_pubN.Count > 0) _pubN = new Dictionary<ItemCategory, double>(); _pubT = null; CraftShortage.ZeroLine();
+                // 435-L1-p (recenzje S3): klucz jest glownym wylacznikiem pomiaru, na ktorym stoja kroki L5-L8 - raz na sesje slad w logu, gdy cos go potrzebuje
+                try
+                {
+                    if (!_offWarned && s.LogEnabled && (CraftShortage.KeyOn || s.VillageOrderShortageBoost > 1f || s.WorkshopBenches
+                                                         || (s.VillageGear && (s.VillageGearTownsInvest || s.VillageGearWearScale > 0f))))
+                    {
+                        _offWarned = true;
+                        Log.Info("LP: klucz Supply Chain Log WYLACZONY, a wlaczone sa klucze, ktore czytaja pomiar (Crafts Follow Shortage / Village Order Shortage Boost / Village Gear Towns Invest / "
+                                 + "Village Gear Wear Scale / Workshop Benches) - bez pomiaru N = 1 wszedzie: zmiana zajec i zamowienia jak dotad, miasta nie funduja sprzetu, stanowiska bez rat, "
+                                 + "kolejnosc zlecen sprzetu bez N (linia raz na sesje).");
+                    }
+                }
+                catch (Exception e) { Stumble("OffWarn", e); }
+                return;
+            }
             long t0 = Stopwatch.GetTimestamp();
             int today = Today;
             bool log = s.LogEnabled && LogGate.Lines;
             try
             {
+                Resolve(today);                                               // 435-L1-p: pamiec N z zapisu (raz, w pierwszej dobie sesji)
                 if (_first == int.MinValue) _first = today;
                 if (!_startLine)
                 {
                     _startLine = true;
-                    Log.Info("LP start (435-L1): klucz Supply Chain Log TAK - SAM POMIAR, zadna liczba gry sie nie zmienia; pamiec sesji (srednie 28 dob licza sie od tej doby) | "
+                    Log.Info("LP start (435-L1): klucz Supply Chain Log TAK - pomiar; sam niczego nie zmienia, ale czytaja go kroki L5-L8 (klucze domyslnie wylaczone: kolejnosc zlecen sprzetu, "
+                             + "zmiana zajec, zamowienia 363, miasta-fundatorzy, stanowiska warsztatow) | pamiec N w zapisie arm_lpn: " + _loadNote + " | kolejka N > 1 dopiero po " + MinSpan
+                             + " dobach pomiaru; budzet robot bez pokrycia liczony jako poziom / " + Window + " | "
                              + "kolejnosc doby (ArmouryBehavior.OnDailyTick), wazna dla nastepnych krokow: TownPurse.BeforeRents -> DsTowns.DayStart -> PopulationLaw.Daily "
                              + "(tu zawor kasy miasta TownPurse.Valve: nadwyzka kasy do pana i korony) -> CastlePurse.Daily -> TownFolk.Daily -> TownGranary.Daily -> TownDebt.Daily -> "
                              + "BuildFunding.Daily -> TownFolk.DaWorksRun (zlecenia robot gminy i septow) -> GoodsLedger.Daily -> HarvestValve.Daily (regulator wsi) -> ... -> "
@@ -374,46 +534,48 @@ namespace Armoury
                 if (log)
                 {
                     var sb = new StringBuilder(1400);
-                    sb.Append("Lancuch podazy (LP): dzien ").Append(today).Append(" | L1 SAM POMIAR (zadna liczba gry sie nie zmienia) | material chciany i nieznaleziony dzis [szt.]:");
+                    sb.Append("Lancuch podazy (LP): dzien ").Append(today).Append(" | pomiar L1 | material chciany i nieznaleziony dzis [szt.; wsad warsztatow = sztuki, ktorych zabraklo do cyklu; "
+                              + "roboty, septy, przebudowy = POZIOM niewydanego budzetu w sztukach materialow wyczerpanych na polce - do N wchodzi 1/").Append(Window).Append("]:");
                     double mAll = 0, gAll = 0;
                     for (int i = 0; i < Streams; i++)
                     {
-                        mAll += _dMiss[i]; gAll += _dGot[i];
-                        sb.Append(i == 0 ? " " : ", ").Append(SName[i]).Append(' ').Append(F1(_dMiss[i]));
+                        mAll += _dMiss[i] + _dSoft[i]; gAll += _dGot[i];
+                        sb.Append(i == 0 ? " " : ", ").Append(SName[i]).Append(' ').Append(F1(_dMiss[i] + _dSoft[i]));
                         if (i != SShop) sb.Append(" (budzet bez pokrycia ").Append(N0(_dGapGold[i])).Append(" zl)");
                     }
-                    sb.Append("; razem ").Append(F1(mAll)).Append(" | kupione tymi drogami dzis [szt.]:");
+                    sb.Append("; razem ").Append(F1(mAll)).Append(" (gorna granica: ta sama moneta wsi moze stac za zleceniem robot i rata przebudowy tej doby) | kupione tymi drogami dzis [szt.]:");
                     for (int i = 0; i < Streams; i++) sb.Append(i == 0 ? " " : ", ").Append(SName[i]).Append(' ').Append(F1(_dGot[i]));
-                    sb.Append("; razem ").Append(F1(gAll)).Append(" | reszty budzetu ponizej ceny najtanszej sztuki (nie brak) ").Append(N0(_dRound)).Append(" zl")
-                      .Append(" | wedlug towaru dzis (brak / kupione): ");
+                    sb.Append("; razem ").Append(F1(gAll)).Append(" | reszty budzetu ponizej ceny sztuki (nie brak) ").Append(N0(_dRound)).Append(" zl")
+                      .Append(", budzet przy materiale tylko ponad sufitem ceny (nie brak) ").Append(N0(_dCapGold)).Append(" zl")
+                      .Append(" | wedlug towaru dzis (brak wsadu + poziom budzetu / kupione): ");
                     var l = new List<KeyValuePair<ItemCategory, double[]>>(_dCat);
-                    l.Sort((a, b) => b.Value[0].CompareTo(a.Value[0]));
+                    l.Sort((a, b) => (b.Value[0] + b.Value[2]).CompareTo(a.Value[0] + a.Value[2]));
                     double cm = 0;
                     for (int i = 0; i < l.Count; i++)
                     {
-                        cm += l[i].Value[0];
-                        if (i < 14) sb.Append(i > 0 ? ", " : "").Append(l[i].Key.StringId).Append(' ').Append(F1(l[i].Value[0])).Append('/').Append(F1(l[i].Value[1]));
+                        cm += l[i].Value[0] + l[i].Value[2];
+                        if (i < 14) sb.Append(i > 0 ? ", " : "").Append(l[i].Key.StringId).Append(' ').Append(F1(l[i].Value[0] + l[i].Value[2])).Append('/').Append(F1(l[i].Value[1]));
                     }
                     if (l.Count == 0) sb.Append('-'); else if (l.Count > 14) sb.Append(", ... (").Append(l.Count - 14).Append(" dalszych)");
-                    sb.Append(" | przelicznik: budzet bez pokrycia rowno miedzy materialy budow po cenie targu (szacunek); wsad: potrzeba cyklu - stan polki; zlecenie robot ponawia sie co dobe - to poziom, nie suma")
+                    sb.Append(" | przelicznik: budzet bez pokrycia rowno miedzy materialy WYCZERPANE na polce (cena <= reszta i nie ponad sufitem ceny) po cenie targu (szacunek); wsad: potrzeba cyklu - stan polki; zlecenie robot ponawia sie co dobe - to poziom, nie suma")
                       .Append(" | ").Append(hands ?? "rece: brak pomiaru")
-                      .Append(" | kontrola: brak wedlug drog - brak wedlug towarow = ").Append(F2(mAll - cm))
+                      .Append(" | tozsamosc licznikow (nie kontrola ksiag): brak wedlug drog - brak wedlug towarow = ").Append(F2(mAll - cm))
                       .Append(" | koszt ").Append(F2((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency)).Append(" ms (z tego rece ").Append(F2(msHands)).Append(" ms)")
                       .Append(" | poza watkiem ").Append(_dOff).Append(" | potkniecia ").Append(_st).Append(" (sesja ").Append(_stSess).Append(").");
                     Log.Info(sb.ToString());
                     if (nLine != null) Log.Info("LP niedobor: dzien " + today + " | " + nLine);
                     if (wLine != null) Log.Info("LP warsztaty: dzien " + today + " | " + wLine);
                 }
-                if (_dryDay == int.MinValue || today - _dryDay >= 28)
+                if (log && (_dryDay == int.MinValue || today - _dryDay >= 28))   // 435-L1-p (stabilnosc N6): jedna bramka logu dla wszystkich linii LP
                 {
                     _dryDay = today;
-                    try { string d = DryText(); if (d != null && s.LogEnabled) Log.Info("LP wycena na sucho: dzien " + today + " | " + d); }
+                    try { string d = DryText(); if (d != null) Log.Info("LP wycena na sucho: dzien " + today + " | " + d); }
                     catch (Exception e) { Stumble("Dry", e); }
                 }
-                if (_whyDay == int.MinValue || today - _whyDay >= 7)
+                if (log && (_whyDay == int.MinValue || today - _whyDay >= 7))
                 {
                     _whyDay = today;
-                    try { string w = DistrictWorks.Lp1Text(today); if (w != null && s.LogEnabled) Log.Info("LP prace gracza: dzien " + today + " | sam pomiar, ostatni powod kazdego wiersza przy powrocie wozu okregu | " + w); }
+                    try { string w = DistrictWorks.Lp1Text(today); if (w != null) Log.Info("LP prace gracza: dzien " + today + " | sam pomiar, ostatni powod kazdego wiersza przy powrocie wozu okregu | " + w); }
                     catch (Exception e) { Stumble("Why", e); }
                 }
             }
@@ -512,7 +674,11 @@ namespace Armoury
                 {
                     if (kv.Key == null || kv.Key.ItemCategory == null || seen.Contains(kv.Key) || kv.Value < ceil - 1e-3f) continue;
                     unknown++;
-                    if (!res.ContainsKey(kv.Key.ItemCategory)) res[kv.Key.ItemCategory] = new[] { 1.25, 1, -1.0, kv.Value };
+                    // 435-L1-p (recenzja S4): liczba kolejnych decyzji na suficie jest w zapisie (arm_lpn) - po wczytaniu S_stos jak przed zapisem, nie 1.25
+                    int r0; _runs.TryGetValue(kv.Key, out r0); if (r0 < 1) r0 = 1;
+                    double sv0 = Math.Min(2.0, Math.Pow(1.25, r0));
+                    double[] c0;
+                    if (!res.TryGetValue(kv.Key.ItemCategory, out c0) || c0[0] < sv0) res[kv.Key.ItemCategory] = new[] { sv0, r0, -1.0, kv.Value };
                 }
             }
             return res;
@@ -539,20 +705,25 @@ namespace Armoury
             // kategoria -> [brak swiata, sprzedaz swiata, miast z N >= 1.5, najwieksze N miasta, miast z komorka]
             var agg = new Dictionary<ItemCategory, double[]>();
             var hot = new HashSet<Settlement>();
-            int cells = 0, real = 0;
+            int cells = 0, real = 0, qCeil = 0, qOver = 0, softOnly = 0;
+            int span = Span(today);
             var nt = new NTable { Grain = grain, Day = today };   // 435-L6: tablica do odczytu (publikowana na koncu, po zbudowaniu)
             foreach (var tk in _cells)
             {
                 foreach (var ck in tk.Value)
                 {
-                    double miss, got;
-                    Means(ck.Value, today, out miss, out got);
-                    if (!(miss > 0) && !(got > 0)) continue;
+                    double miss, soft, got;
+                    Means(ck.Value, today, out miss, out soft, out got);
+                    if (!(miss > 0) && !(soft > 0) && !(got > 0)) continue;
                     cells++;
                     double sales = got;
                     double idx; int units;
                     if (MarketSales.Index(tk.Key, ck.Key, out idx, out units) && units / (double)Window > sales) { sales = units / (double)Window; real++; }
-                    double sq = miss > 1e-6 ? 1.0 + Math.Min(1.0, sales > 1e-9 ? miss / sales : 1.0) : 1.0;
+                    // 435-L1-p (recenzje S1): poziom niewydanego budzetu robot rozlozony na okno; kolejka dopiero po MinSpan dobach; sprzedaz >= MinSales
+                    double want = miss + soft / Window;
+                    double sq = Queue(want, sales, span);
+                    if (sq > 1.0 + 1e-9) { qOver++; if (sq >= 2.0 - 1e-9) qCeil++; if (!(miss > 1e-6)) softOnly++; }
+                    miss = want;
                     double[] st; double ss = stock.TryGetValue(ck.Key, out st) ? st[0] : 1.0;
                     double n = Math.Min(2.0, Math.Max(1.0, Math.Max(ss, sq)));
                     if (grain != null && ck.Key == grain && hungry.Contains(tk.Key)) n = 2.0;
@@ -578,7 +749,7 @@ namespace Armoury
             foreach (var kv in agg)
             {
                 double[] st; double ss = stock.TryGetValue(kv.Key, out st) ? st[0] : 1.0;
-                double sq = kv.Value[0] > 1e-6 ? 1.0 + Math.Min(1.0, kv.Value[1] > 1e-9 ? kv.Value[0] / kv.Value[1] : 1.0) : 1.0;
+                double sq = Queue(kv.Value[0], kv.Value[1], span);
                 double nw = Math.Min(2.0, Math.Max(1.0, Math.Max(ss, sq)));
                 if (nw > 1.0 + 1e-9) over++;
                 rows.Add(new KeyValuePair<ItemCategory, double[]>(kv.Key, new[] { nw, ss, sq, kv.Value[0], kv.Value[1], kv.Value[2], kv.Value[3], kv.Value[4] }));
@@ -617,6 +788,9 @@ namespace Armoury
             }
             sb.Append(" | zboze: miast z glodujacymi wsiami (N = 2) ").Append(hungry.Count)
               .Append(" | miast z N >= 1.5 dla jakiegos towaru: ").Append(hot.Count).Append(" | komorek (miasto x towar) z pomiarem ").Append(cells)
+              .Append(", z kolejka > 1: ").Append(qOver).Append(" (na suficie 2: ").Append(qCeil).Append("; tylko z niewydanego budzetu robot: ").Append(softOnly).Append(")")
+              .Append(span < MinSpan ? "; KOLEJKA WYCISZONA - pomiar ma " + span + " dob z wymaganych " + MinSpan : "")
+              .Append("; brak = sztuki wsadu/d + poziom niewydanego budzetu robot / ").Append(Window).Append("; sprzedaz w mianowniku >= ").Append(F1(MinSales)).Append(" szt./d")
               .Append(", w tym sprzedaz z prawdziwej sprzedazy miasta (241) ").Append(real).Append(", reszta: sztuki kupione tymi samymi drogami (odstepstwo od projektu - brak licznika calej sprzedazy surowcow)")
               .Append(" | poza pomiarem: surowiec warsztatow zbrojnych (linia 'Warsztaty: dzien' - brak surowca), kontrakty 174")
               .Append(" | ").Append(CraftShortage.LineText(nt))
@@ -672,7 +846,7 @@ namespace Armoury
             }
             int cyc = 0; for (int r = 0; r < RKinds; r++) cyc += _wDay[r];
             var sb = new StringBuilder(900);
-            sb.Append("L1 sam pomiar | warsztaty towarowe miast (bez ukrytych rzemieslnikow) ").Append(total).Append(", w tym gracza ").Append(player)
+            sb.Append("pomiar L1 | warsztaty towarowe miast (bez ukrytych rzemieslnikow) ").Append(total).Append(", w tym gracza ").Append(player)
               .Append(" | od poprzedniej linii: z proba cyklu linii towarowej ").Append(tried).Append(", pracuje (>= 1 udany cykl) ").Append(worked).Append(", stoi ").Append(tried - worked)
               .Append(" wedlug ostatniego powodu:");
             bool f = true;
@@ -685,7 +859,9 @@ namespace Armoury
               .Append(", warsztatow z pomiarem ").Append(seen28).Append(": u >= 0.90 ").Append(hi).Append(", 0.30-0.90 ").Append(mid).Append(", ponizej 0.30 ").Append(low)
               .Append(" (w tym ponizej 0.10 ").Append(dead).Append("), bez proby w oknie ").Append(noData)
               .Append(" | poza: cykle linii uzbrojenia ").Append(_wArms).Append(" (WorkshopLaw), warsztaty zamkow ").Append(_wCastle).Append(", cykle warsztatow gracza w liczbach wyzej ").Append(_wPlayer)
-              .Append(" | kontrola: cykle warsztatow z listy - cykle z licznika powodow = ").Append(done + fail - cyc).Append(" (rozne od 0: warsztat zmienil wlasciciela albo miasto w tej dobie)")
+              .Append(", cykle pominiete regula ruchu linii (kopalnia co N-ty cykl, zamknieta linia strzal, linia surowca bez wsadu) - poza u: ").Append(_wSkip)
+              .Append(CommodityInputs284.SufWired ? "" : " | UWAGA: latka sprawdzenia wsadu (284) NIE wpieta - powod 'wstrzymane przed sprawdzeniem wsadu' obejmuje wszystkie nieudane cykle")
+              .Append(" | tozsamosc licznikow (nie kontrola ksiag): cykle warsztatow z listy - cykle z licznika powodow = ").Append(done + fail - cyc).Append(" (rozne od 0: warsztat zmienil wlasciciela albo miasto w tej dobie)")
               .Append(", warsztaty z proba - (pracuje + stoi wedlug powodu) = ").Append(tried - worked - SumA(stand));
             string bl = WorkshopBenches.TakeLine();   // 435-L8: stanowiska warsztatow (policzone tej doby w WorkshopBenches.Daily, przed ta linia)
             if (bl != null) sb.Append(" | ").Append(bl);
@@ -742,7 +918,7 @@ namespace Armoury
                 catch (Exception e) { Stumble("Dry(wies)", e); }
             }
             var sb = new StringBuilder(1500);
-            sb.Append("L1 sam pomiar, co 28 dob - wycena bilansu otwarcia sprzetu (projekt II.4) i tabeli II.2; nic tych liczb nie czyta | okregow ").Append(dist).Append(" (pod KS ").Append(ksN)
+            sb.Append("pomiar L1, co 28 dob - wycena bilansu otwarcia sprzetu (projekt II.4) i tabeli II.2; nic tych liczb nie czyta | okregow ").Append(dist).Append(" (pod KS ").Append(ksN)
               .Append("), czesci bez zajecia ").Append(noCraft).Append(", bez wartosci dnia ").Append(empty)
               .Append(" | rodzaj: czesci-zajec; rece w domu / poza domem; wartosc dnia zl; phi; cena jednostki dni; K0 jednostek (stracone ogniem); wartosc K0 zl; z tego material zl; "
                       + "produkcja dnia stojaca za sprzetem (1 - phi) zl; material na 1% rak zl; material zuzycia na dobe przy pelnej tabeli zl");

@@ -10576,7 +10576,7 @@ namespace Armoury
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool EconomyAuditLines { get; set; } = true;
 
-        [SettingPropertyBool("Supply Chain Log", HintText = "log only, nothing in the game changes: write the daily supply chain lines to the Armoury log (measurement only) - pieces of building material and workshop input that were wanted and not found, by good and market town; a shortage table by good and town that nothing uses yet; how fully the towns' workshops work and why a cycle makes nothing; how many districts change their hands by more than 1% a day; every 28 days a dry valuation of village gear; every 7 days why the player's district works pay nothing. Off = no such lines and the counters do not count, exactly as before", RequireRestart = false)]
+        [SettingPropertyBool("Supply Chain Log", HintText = "the master switch of the supply chain measurement. By itself it changes nothing in the game: it counts pieces of building material and workshop input that were wanted and not found (by good and market town), keeps the shortage table, how fully the towns' workshops work and why a cycle makes nothing, and writes the daily supply chain lines to the Armoury log. But the supply chain options read this measurement: Crafts Follow Shortage, Village Order Shortage Boost, Village Gear Towns Invest, Workshop Benches and the order of village gear purchases (Village Gear Wear Scale). Off = no lines, no counting, and those options work as if nothing were short (crafts and orders as before, towns do not fund gear, workshops buy no benches)", RequireRestart = false)]
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool SupplyChainLog { get; set; } = true;
 

@@ -31,6 +31,8 @@ namespace Armoury
         private static readonly Dictionary<ItemCategory, int> _miss = new Dictionary<ItemCategory, int>(), _use = new Dictionary<ItemCategory, int>();
         private static int _missCycles, _okCycles, _toOrders, _useOrders, _stumbles, _stumbleSess;
         private static bool _wCycle, _wSuf;
+        /// <summary>435-L1-p: latka sprawdzenia wsadu wpieta (SupplySignal: bez niej powod cyklu bez wyrobu jest nieznany).</summary>
+        internal static bool SufWired { get { return _wSuf; } }
         private static readonly HashSet<string> _err = new HashSet<string>();
 
         internal static void Reset() { _ctx = null; _ctxChecked = false; _stumbleSess = 0; _err.Clear(); ZeroDay(); }
@@ -46,7 +48,7 @@ namespace Armoury
         public static void CyclePre(Workshop __1)
         {
             _ctxChecked = false; _ctxMarket = false;
-            SupplySignal.CycleBegin();   // 435-L1: znaczniki cyklu od zera (prefiks First - biegnie takze, gdy pozniejszy prefiks pominie cykl)
+            try { SupplySignal.CycleBegin(); } catch { }   // 435-L1: znaczniki cyklu od zera (prefiks First - biegnie takze, gdy pozniejszy prefiks pominie cykl); 435-L1-p: w try
             try { _ctx = __1 != null && __1.WorkshopType != null && !__1.WorkshopType.IsHidden && __1.Settlement != null && __1.Settlement.Town != null ? __1 : null; }
             catch { _ctx = null; }
         }

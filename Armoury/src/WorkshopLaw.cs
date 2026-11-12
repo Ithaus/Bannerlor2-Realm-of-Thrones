@@ -226,7 +226,7 @@ namespace Armoury
                 // paczka 172: linia "arrows" (strzaly i belty) - BK robi z niej towar handlowy (BKItemCategories :122), wiec szla droga gry
                 // BEZ wsadu (artisans x4, fletcher x1) i z mnoznikiem BK - snopy z niczego. Przy czynnych strzelarzach miasta (TownFletchers)
                 // zamknieta w warsztatach notabli: jedna droga amunicji - z rudy i drewna. Warsztat gracza tu nie przychodzi (ForPlayerWorkshop - poprawka 174b: PlayerCyclePrefix).
-                if (TownFletchers.ClosesLine(production, workshop)) { TownFletchers.NoteClosed(production, workshop); __result = false; return false; }
+                if (TownFletchers.ClosesLine(production, workshop)) { TownFletchers.NoteClosed(production, workshop); SupplySignal.RuleHeld(); __result = false; return false; }   // 435-L1-p: poza wykorzystaniem u
                 // KONIEC SUROWCOW Z NICZEGO (Jeff 04.10, docs/AUDYT-TOWARY.md 6.2): ukryty warsztat BK
                 // "artisans" w kazdym miescie mial linie BEZ wsadu, ktore robily drewno, rude, skory surowe,
                 // mieso, skore i plotno z powietrza. Surowce maja przychodzic ze wsi (wiesniacy, karawany).
@@ -240,10 +240,11 @@ namespace Armoury
                     if (TanOrWeave(production, workshop)) { __result = true; return false; }
                     _freeRawBlocked++;
                     NoteFreeRaw(workshop, false);   // AM-30: licznik wedlug typu
+                    SupplySignal.RuleHeld();        // 435-L1-p: linia surowca bez wsadu zamknieta regula - poza wykorzystaniem u
                     __result = false;
                     return false;
                 }
-                if (BulkLineSkip(production)) { __result = false; return false; }
+                if (BulkLineSkip(production)) { SupplySignal.RuleHeld(); __result = false; return false; }   // 435-L1-p: kopalnia co N-ty cykl pracuje - poza wykorzystaniem u
                 if (Bloomery.TownMineBlocked(production, workshop)) { __result = false; return false; }   // E6/R1 (214): kopalnia BK w miescie/zamku - lupa tylko z drewnem z polki tego miasta
                 if (ToolsByUse.Held(production, workshop)) { __result = false; return false; }   // E6/R3 (215): linia narzedzi przy zapasie miasta >= 30 dni popytu - cykl nie idzie (wsad zostaje)
                 if (!On || !AllOutputsArms(production) || workshop == null || workshop.Settlement == null) return true;
@@ -1684,7 +1685,7 @@ namespace Armoury
                 // HistBulkUnitFactor-ty cykl, zeby kg rudy sie nie zmienily). Dotad warsztat gracza go omijal: x10 metalu z niczego. Wlasny klucz.
                 // Kopalnia w takim cyklu pracuje (ladunek zbiera sie z dziesieciu cykli) - znacznik ostatniej pracy idzie dalej, zeby ekran rodu
                 // nie pisal "Halted" (LastRunCampaignTime czyta tylko ten ekran; gra stawia go po udanym cyklu).
-                if (s.PlayerMineBulkSkip && BulkLineSkip(__0)) { SmallFixes8.NotePlayerMine(); __1.UpdateLastRunTime(); __result = false; return false; }
+                if (s.PlayerMineBulkSkip && BulkLineSkip(__0)) { SmallFixes8.NotePlayerMine(); __1.UpdateLastRunTime(); SupplySignal.RuleHeld(); __result = false; return false; }
                 if (!s.PlayerWorkshopsSameRule) return PlayerFirm(__instance, __0, __1, ref __result);   // 305b: klucz PlayerArmsAsFirm niezalezny od 174b
                 // audyt 13.10 (drobne, [zloto]): kopalnia BK w rekach gracza - ta sama regula dymarki co u notabla (E6/R1, CyclePrefix): lupa tylko
                 // z drewnem z polki tego miasta, kupionym z kapitalu warsztatu (zloto do kasy miasta). Dotad cykl gracza omijal TownMineBlocked i lupy
@@ -1693,10 +1694,11 @@ namespace Armoury
                 bool noInput = __0.Inputs == null || __0.Inputs.Count == 0;   // Production to struct
                 if (ToolsByUse.Held(__0, __1, true)) { __result = false; return false; }   // E6/R3 (215): linia narzedzi gracza - ta sama regula co u notabli (licznik w ToolsByUse)
                 // AM-30 (regula A): linia bez wsadu z surowcem (np. rzeznik BK: kura / ges, ktorych gra nie przeczytala) - ta sama regula co u notabli
-                if (s.WorkshopNoFreeRawAllTypes && FreeRawLine(__0, __1)) { RollDay(); NoteFreeRaw(__1, true); __result = false; return false; }
+                if (s.WorkshopNoFreeRawAllTypes && FreeRawLine(__0, __1)) { RollDay(); NoteFreeRaw(__1, true); SupplySignal.RuleHeld(); __result = false; return false; }
                 if (!TownFletchers.ClosesLine(__0, __1) && !(noInput && On && AllOutputsArms(__0))) return PlayerFirm(__instance, __0, __1, ref __result);   // 305b: linia broni z wsadem - firma
                 RollDay();
                 _plFree++;
+                SupplySignal.RuleHeld();   // 435-L1-p: zamknieta linia strzal / linia uzbrojenia bez wsadu gracza - poza wykorzystaniem u
                 __result = false;
                 return false;
             }

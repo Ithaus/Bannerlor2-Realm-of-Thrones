@@ -29,6 +29,9 @@ namespace Armoury
             return a;
         }
 
+        /// <summary>435-L1-p: sufit ceny sztuki materialu robot (0 - bez sufitu) - do pomiaru SupplySignal (material ponad sufitem to nie brak na polce).</summary>
+        internal static int DsWorksCap(ItemObject it) { try { return CapOf(it); } catch { return 0; } }
+
         internal static int DsWorksBuy(Settlement market, double budget, ItemObject[] items, int[] pieces, out int capSkip, out bool none, out int shelfDrop)
         {
             capSkip = 0; none = false; shelfDrop = 0;   // none - na polce nie ma zadnego materialu ponad zapas (wolajacy pomija ten targ do konca przebiegu)

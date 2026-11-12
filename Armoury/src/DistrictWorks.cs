@@ -950,6 +950,7 @@ namespace Armoury
         internal static void OnCartReturn(MobileParty cart, Village home, int handed, long tax, long purse, out long paid)
         {
             paid = 0;
+            if (home != null && home.Settlement != null && handed <= 0 && On) LwDist(home.Settlement.StringId, LwNoTakings);   // 435-L1-p: powod "woz wrocil bez utargu" (sam licznik)
             if (home == null || home.Settlement == null || handed <= 0 || !On) return;
             string id = home.Settlement.StringId;
             try
