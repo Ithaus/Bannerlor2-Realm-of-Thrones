@@ -39,17 +39,30 @@ namespace Armoury
     /// Linie: "Oblezenie misja (370) odwod obrony (454)" przy utworzeniu i wyjsciu, "... (454) koniec" przy koncu misji (utworzony / powod, wielkosc,
     /// polegli w odwodzie przed wyjsciem, wyjscie: chwila, powod, cel, odleglosc, czas reakcji od pierwszego Conceited / wrogow w srodku, dotarcie polowy
     /// do szyku celu, AI szyku 8 cofniete). Wyjatek per czlowiek / szyk = potkniecie (pierwsze 3 do logu), bez globalnego wylacznika.
+    /// 454-p (recenzja 454): taktyka gry liczy piechote tylko w szykach 0-7 (_meleeFormations, CheckAndChangeState mb_full 39668-39675) i przy
+    /// piechocie < 0.33 * (piechota + strzelcy) RAZ NA STALE ustawia _areRangedNeededForLaneDefense = strzelcy schodza z murow do obrony pasow.
+    /// Odwod w szyku 8 znika z tego rachunku, wiec: (a) odwod najwyzej tyle, by piechota gry zostala >= 0.40 * (piechota + strzelcy) (g <= M - 2/3 R;
+    /// liczone z list taktyki, odczyt pol); za malo albo przelacznik juz wlaczony albo listy nieczytelne = odwodu nie ma; (b) wyjscie takze, gdy piechota
+    /// gry (przy NIE: bez ludzi "bylby" odwodu) spadnie ponizej 0.37 * (piechota + strzelcy) - przed progiem gry; (c) linia konca mowi, czy i kiedy
+    /// przelacznik gry zaskoczyl. Znane roznice wzgledem NIE bez zmiany kodu: wypad gry (IsSallyOutApplicable 38759) liczy sile obroncow bez szyku 8 -
+    /// wypad rzadszy / pozniejszy, dopoki odwod stoi; przy pierwszym przyczolku gra moze przez <= 1 s (do naszego skanu) przydzielic mniej wolnych szykow.
     /// </summary>
     internal sealed class SiegeReserve454 : MissionLogic
     {
         private const string P = "Oblezenie misja (370) odwod obrony (454): ";
         private const float Every = 1f, StartDelay = 3f, NoDeployStart = 10f, FormWindow = 60f, ArriveDist = 20f;
         private const float Pct = 0.2f;
+        private const float GameC = 0.33f, CapC = 0.40f, OutC = 0.37f;   // 454-p: prog lukow gry, zapas przy tworzeniu, wyjscie przed progiem
         private const int KeepMin = 20, ReserveMin = 10, WallMin = 5, InsideN = 15, LaneN = 3, ErrMax = 3;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-        private static FieldInfo _fTactic;
+        private static FieldInfo _fTactic, _fMelee, _fRanged, _fRangedNeeded;
         private static bool _reflTried;
+
+        // 454-p: przelacznik lukow gry (_areRangedNeededForLaneDefense)
+        private float _swFirst = -1f;
+        private bool _swKnown;
+        private string _gauge = "-";
 
         private bool _known, _siege, _started, _ended, _keyOn;
         private float _startAt = -1f, _next, _t0;
@@ -87,6 +100,29 @@ namespace Armoury
             if (_reflTried) return;
             _reflTried = true;
             try { _fTactic = AccessTools.Field(typeof(TeamAIComponent), "_currentTactic"); } catch { _fTactic = null; }
+            try { _fMelee = AccessTools.Field(typeof(TacticDefendCastle), "_meleeFormations"); } catch { _fMelee = null; }
+            try { _fRanged = AccessTools.Field(typeof(TacticDefendCastle), "_rangedFormations"); } catch { _fRanged = null; }
+            try { _fRangedNeeded = AccessTools.Field(typeof(TacticDefendCastle), "_areRangedNeededForLaneDefense"); } catch { _fRangedNeeded = null; }
+        }
+
+        /// <summary>454-p: piechota i strzelcy tak, jak liczy je taktyka gry (listy szykow 0-7, CountOfUnits), i jej przelacznik lukow. Sam odczyt pol.</summary>
+        private bool Gauge(TacticDefendCastle tac, out int melee, out int ranged, out bool sw)
+        {
+            melee = 0; ranged = 0; sw = false;
+            if (tac == null || _fMelee == null || _fRanged == null || _fRangedNeeded == null) return false;
+            try
+            {
+                var ml = _fMelee.GetValue(tac) as List<Formation>;
+                var rl = _fRanged.GetValue(tac) as List<Formation>;
+                if (ml == null || rl == null) return false;
+                for (int i = 0; i < ml.Count; i++) { var f = ml[i]; if (f != null) melee += f.CountOfUnits; }
+                for (int i = 0; i < rl.Count; i++) { var f = rl[i]; if (f != null) ranged += f.CountOfUnits; }
+                if (melee < 1) melee = 1;      // jak gra: Max(sum, 1)
+                if (ranged < 1) ranged = 1;
+                sw = (bool)_fRangedNeeded.GetValue(tac);
+                return true;
+            }
+            catch (Exception e) { Stumble("Prog", e); return false; }
         }
 
         private bool Siege(Mission m)
@@ -177,6 +213,10 @@ namespace Armoury
             if (inside >= InsideN && _insideFirst < 0f) _insideFirst = now;
             bool proper = false;
             try { proper = tac != null && tac.CurrentTacticState == TacticDefendCastle.TacticState.ProperDefense; } catch { proper = false; }
+            int gm, gr;
+            bool sw;
+            bool gauge = Gauge(tac, out gm, out gr, out sw);
+            if (gauge) { _swKnown = true; if (sw && _swFirst < 0f) _swFirst = now; }
 
             if (!_formed)
             {
@@ -187,7 +227,9 @@ namespace Armoury
                 if (!closeKnown || inside < 0) { _formWhy = "liczniki pasow nieznane"; return; }
                 if (anyConc || inside != 0) { _formWhy = "przyczolek / wrogowie w srodku"; return; }
                 for (int k = 0; k < LaneN; k++) if (close[k] >= WallMin) { _formWhy = "atakujacy przy murze"; return; }
-                Form(m, t, now);
+                if (!gauge) { _formWhy = "progu lukow gry nie da sie policzyc (listy taktyki nieczytelne)"; return; }
+                if (sw) { _formGiveUp = true; _formWhy = "przelacznik lukow gry juz wlaczony (piechota " + gm + " < " + GameC.ToString("0.00", Inv) + " x " + (gm + gr) + ")"; return; }
+                Form(m, t, now, gm, gr);
                 return;
             }
             if (_out)
@@ -221,6 +263,13 @@ namespace Armoury
             if (lane != null) why = "przyczolek (Conceited) pas " + lane.LaneSide + " od t=" + _concFirst[(int)lane.LaneSide].ToString("0", Inv) + "s, przy punkcie " + close[(int)lane.LaneSide];
             else if (inside >= InsideN) why = "w srodku " + inside + " atakujacych (od t=" + _insideFirst.ToString("0", Inv) + "s)";
             else if (!proper) why = tac == null ? "taktyka obroncow zniknela" : "taktyka obroncow " + SafeState(tac);
+            else if (gauge && !sw && alive > 0)
+            {
+                // 454-p: piechota gry blisko progu lukow - odwod wraca, zanim gra sciagnie strzelcow z murow (przy NIE ludzie "bylby" odwodu sa w szykach gry)
+                int me = _keyOn ? gm : Math.Max(gm - alive, 1);
+                int tot = _keyOn ? gm + gr : Math.Max(gm + gr - alive, 1);
+                if (me < OutC * tot) why = "piechota gry blisko progu lukow (" + me + " < " + OutC.ToString("0.00", Inv) + " x " + tot + ")";
+            }
             if (why == null) return;
             Release(m, t, now, lane, why, alive);
         }
@@ -274,8 +323,12 @@ namespace Armoury
             return false;
         }
 
-        private void Form(Mission m, Team t, float now)
+        private void Form(Mission m, Team t, float now, int gm, int gr)
         {
+            // 454-p: odwod g tak, by piechota gry zostala >= CapC * (piechota + strzelcy): g <= M - CapC/(1-CapC) * R
+            int cap = (int)Math.Floor(gm - CapC / (1f - CapC) * gr);
+            _gauge = "piechota gry " + gm + ", strzelcy " + gr + ", odwod najwyzej " + Math.Max(cap, 0) + " (zostaje >= " + CapC.ToString("0.00", Inv) + " piechoty; prog gry " + GameC.ToString("0.00", Inv) + ")";
+            if (cap < ReserveMin) { _formGiveUp = true; _formWhy = "blisko progu lukow gry (" + _gauge + ")"; return; }
             WorldPosition hold;
             string place;
             if (!Place(m, t, out hold, out place)) { _formGiveUp = true; _formWhy = "brak miejsca odwodu (brama bez pozycji oczekiwania na siatce)"; return; }
@@ -322,6 +375,7 @@ namespace Armoury
                 int n = f.CountOfUnitsWithoutDetachedOnes;
                 int give = Math.Min((int)(n * Pct), n - KeepMin);
                 give = Math.Min(give, kv.Value.Count);
+                give = Math.Min(give, cap - plan.Count);   // 454-p: zapas przed progiem lukow gry
                 if (give <= 0) continue;
                 kv.Value.Sort((x, y) => x.Key.CompareTo(y.Key));
                 for (int i = 0; i < give; i++) plan.Add(kv.Value[i].Value);
@@ -385,7 +439,8 @@ namespace Armoury
             _size = _res.Count;
             _formWhy = "utworzony";
             Log.Info(P + "t=" + now.ToString("0", Inv) + "s | T" + t.TeamIndex + " | klucz " + (_keyOn ? "TAK" : "NIE") + " | " + (_keyOn ? "odwod " : "bylby odwod ") + _size
-                     + " ludzi w szyku 8 (" + place + ") z: " + _src + " | wyjscie: pas Conceited albo >= " + InsideN + " atakujacych w srodku.");
+                     + " ludzi w szyku 8 (" + place + ") z: " + _src + " | " + _gauge + " | wyjscie: pas Conceited albo >= " + InsideN + " atakujacych w srodku albo piechota gry < "
+                     + OutC.ToString("0.00", Inv) + ".");
         }
 
         /// <summary>Szyk celu: Conceited - szyk pasa; wrogowie w srodku - Eliminate, potem Retake; zapas - najblizszy szyk 0-7 pod AI z ludzmi (nie strzelcy z murow).</summary>
@@ -556,6 +611,7 @@ namespace Armoury
                     sb.Append(" | pierwszy Conceited:");
                     for (int k = 0; k < LaneN; k++) sb.Append(k > 0 ? "," : "").Append(' ').Append((FormationAI.BehaviorSide)k).Append(' ').Append(_concFirst[k] >= 0f ? "t=" + _concFirst[k].ToString("0", Inv) + "s" : "nigdy");
                     sb.Append(" | w srodku >= ").Append(InsideN).Append(": ").Append(_insideFirst >= 0f ? "t=" + _insideFirst.ToString("0", Inv) + "s" : "nigdy").Append(", maks ").Append(_insideMax)
+                      .Append(" | przelacznik lukow gry (_areRangedNeededForLaneDefense): ").Append(!_swKnown ? "nieznany" : _swFirst >= 0f ? "wlaczony od t=" + _swFirst.ToString("0", Inv) + "s" : "nie")
                       .Append(" | AI szyku 8 wlaczone przez gre i cofniete ").Append(_reAi)
                       .Append(" | odwod = do ").Append((Pct * 100f).ToString("0", Inv)).Append("% szyku pasa (zostaje >= ").Append(KeepMin).Append("), piesi bez broni dystansowej, razem >= ").Append(ReserveMin)
                       .Append(", tworzony 0-").Append(FormWindow.ToString("0", Inv)).Append(" s przy < ").Append(WallMin).Append(" atak przy kazdym punkcie | potkniecia ").Append(_stumbles).Append('.');
