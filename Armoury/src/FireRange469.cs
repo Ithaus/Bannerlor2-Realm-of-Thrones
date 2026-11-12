@@ -51,6 +51,14 @@ namespace Armoury
     /// 469-q-p (recenzja 469-q): wstrzymany z bronia biala, ale z lukiem / kusza i amunicja w ekwipunku zostaje wstrzymany (bez petli zwolnienie -> FireAtWill);
     /// histereza LowMax s na "za malo wstrzymanych"; bez budzetu zapytan / symulacji - wstrzymanie od razu; strzaly poza G po wrogu w 6 m liczone osobno;
     /// punkt Move = front szyku (cel dla srodka + pol glebokosci), "stoj tu" = obecny front; postfiks wpisuje rozkaz tylko czynnemu zachowaniu.
+    /// 469-r (Jeff 13.11: "czesc lucznikow ma luki z zasiegiem na 100 metrow a czesc na 200 ... czy ci co maja zasieg strzelaja"; test at-472b: prawie wszystkie
+    /// strzaly oddali lucznicy szyku gracza - sr. 345-410 m przy G 200 m, pominieci jako "szyk gracza"): (1) szyk pod rozkazami gracza (IsAIControlled false) -
+    /// ludzie wstrzymani poza swoim G jak w szyku AI (klucz PlayerArchersHoldFireOutOfRange, NIE = pominieci jak przed 469-r); szyku gracza NIE przesuwamy
+    /// (Form: ai false), rozkaz HoldYourFire gracza zostaje (szyk wstrzymany - nic), bohater gracza (IsMainAgent / IsPlayerControlled) nietkniety. (2) strzelcy
+    /// w szyku piechoty (AI i gracza) - wstrzymani poza G, szyk piechoty bez ruchu (Form: IsRangedFormation false); prefiks RBM OverrideAgent.SetFiringOrder
+    /// (rbmai.cs:4403) zmienia rozkaz tylko przy ChargeWithTarget i szarzy jazdy wroga (hamowanie), inaczej przepuszcza. (3) podejscie szyku AI: cel = 30. percentyl
+    /// G lucznikow szyku w regule (ok. 70% ma skraj wroga w zasiegu; lucznicy z dluzszym G zwolnieni w drodze), "dosc wstrzymanych" liczone od lucznikow
+    /// w regule (nie od calego szyku). (4) linia: strzaly poza G osobno szyk AI / gracza / piechoty, wstrzymania gracza i piechoty.
     /// </summary>
     internal static class FireRange469
     {
@@ -59,7 +67,9 @@ namespace Armoury
         // 469-q: podejscie szyku (zastep wylacznika zastoju 469-p): zastoj AdvStall s bez zblizenia wroga o AdvStallD m, >= AdvShare ludzi szyku (min. AdvMinMen)
         // wstrzymanych; cel AdvFrac x sr. G; krok >= AdvMinStep; oslona: front szyku najwyzej CoverAhead m przed frontem wlasnej piechoty; jazda wroga w CavNear m -
         // bez podejscia; podejscie najwyzej AdvMaxT s; postfiks musi odebrac rozkaz w NoHitT s; zatrzymanie trzymane do odbioru, najwyzej StopMax s
-        internal const float FormEvery = 1f, AdvStall = 15f, AdvStallD = 10f, AdvShare = 0.3f, AdvFrac = 0.9f, AdvMinStep = 8f, CoverAhead = 5f, CavNear = 80f;
+        // 469-r: AdvPct - cel podejscia = percentyl G lucznikow szyku (0.3 -> ok. 70% ma wroga w zasiegu; 469-q: 0.9 x sr. G wstrzymanych);
+        // GFresh - G czlowieka z przegladu starszego niz tyle s nie wchodzi do percentyla
+        internal const float FormEvery = 1f, AdvStall = 15f, AdvStallD = 10f, AdvShare = 0.3f, AdvPct = 0.3f, GFresh = 1.5f, AdvMinStep = 8f, CoverAhead = 5f, CavNear = 80f;
         internal const float AdvMaxT = 60f, AdvReach = 10f, NoHitT = 5f, StopMax = 5f;
         // 469-q-p: NearKeep - strzal po wrogu w 6 m liczony osobno przez tyle s; LowMax - kolejne sekundy "za malo wstrzymanych", po ktorych zastoj / podejscie
         // konczy sie (histereza, recenzja U1)
@@ -124,7 +134,7 @@ namespace Armoury
         }
 
         private static WeakReference _m;
-        private static bool _live, _key, _written, _rbm, _hist;
+        private static bool _live, _key, _written, _rbm, _hist, _player;   // 469-r: _player - szyk pod rozkazami gracza tez w regule (tylko z _key)
         private static string _kind = "?";
         private static float _k = 0.003f;
         private static int _rot, _frameNear, _frameSim;
@@ -141,6 +151,10 @@ namespace Armoury
         // 469-q: podejscie szyku - sloty (postfiks), stan szykow, tally wstrzymanych na szyk (glowny watek)
         private static readonly Slot[] Slots = new Slot[SlotTeams * 10];
         private static readonly Dictionary<Formation, FS> FBy = new Dictionary<Formation, FS>();
+        // 469-r: G kazdego lucznika w regule z ostatniego przegladu (wstrzymanego i nie) - percentyl szyku do podejscia (tylko klucz TAK)
+        private sealed class GE { public float G, T; public Formation F; }
+        private static readonly Dictionary<Agent, GE> GOf = new Dictionary<Agent, GE>();
+        private static readonly Dictionary<Formation, List<float>> FGs = new Dictionary<Formation, List<float>>();
         private static readonly Dictionary<Formation, int> HeldN = new Dictionary<Formation, int>();
         private static readonly Dictionary<Formation, float> HeldG = new Dictionary<Formation, float>();
         private static readonly List<Formation> FTmp = new List<Formation>();
@@ -159,12 +173,15 @@ namespace Armoury
         private static int _heldFoeInG;   // 469-p: wstrzymany choc najblizszy szyk wroga w G (tylko pomiar)
         // 469-q: strzaly poza G (wszystkie / ludzie w regule), pierwszy wrog w G wg strony, podejscia
         private static int _shotsOverG, _shotsOverGRule;
-        // 469-q-p: strzaly poza G po zwolnieniu wrogiem w 6 m (U3), przeglady wstrzymanych z lukiem schowanym (U1)
-        private static int _shotsOverGNear, _heldStowed;
+        // 469-q-p: przeglady wstrzymanych z lukiem schowanym (U1)
+        private static int _heldStowed;
+        // 469-r: wg rodzaju szyku [0] strzelcy AI, [1] szyk gracza, [2] szyk piechoty (AI i gracza): strzaly poza G (bez / po wrogu w 6 m - walka o zycie), wstrzymania, ludzie
+        private const int CAi = 0, CPl = 1, CInf = 2, CK = 3;
+        private static readonly int[] OverG = new int[CK], OverGNear = new int[CK], HoldsBy = new int[CK], HeldMenBy = new int[CK];
         private static readonly Dictionary<Agent, float> NearT = new Dictionary<Agent, float>();
         private static readonly float[] InGT0 = new float[2];
         private static int _adv, _advCovered, _advPull, _advDe1N, _advHits;
-        private static float _advDe0Sum, _advToSum, _advGSum, _advDe1Sum, _advSecs, _cavHeldSec;
+        private static float _advDe0Sum, _advToSum, _advGSum, _advDe1Sum, _advSecs, _cavHeldSec, _advNaSum;
         private static readonly int[] AdvEnd = new int[EnK];
         private static readonly float[] Blk = new float[BkK];
         private static readonly int[] ShotBy = new int[5];
@@ -195,6 +212,7 @@ namespace Armoury
             _key = c == null || c.ArchersHoldFireOutOfRange;
             _rbm = RangedRank.RbmLoaded;
             _hist = c == null || c.HistoricalBowAndCrossbowRange;
+            _player = _key && (c == null || c.PlayerArchersHoldFireOutOfRange);
             _k = Friction();
             _live = true;
         }
@@ -218,11 +236,13 @@ namespace Armoury
             for (int i = 0; i < Slots.Length; i++) Volatile.Write(ref Slots[i], null);
             FBy.Clear(); HeldN.Clear(); HeldG.Clear(); FTmp.Clear(); AdvForms.Clear();
             _formAcc = 0f; _depT = -1f;
-            _shotsOverG = _shotsOverGRule = _shotsOverGNear = _heldStowed = 0;
+            _shotsOverG = _heldStowed = 0;
+            Array.Clear(OverG, 0, CK); Array.Clear(OverGNear, 0, CK); Array.Clear(HoldsBy, 0, CK); Array.Clear(HeldMenBy, 0, CK);
+            GOf.Clear(); FGs.Clear();
             NearT.Clear();
             InGT0[0] = InGT0[1] = -1f;
             _adv = _advCovered = _advPull = _advDe1N = _advHits = 0;
-            _advDe0Sum = _advToSum = _advGSum = _advDe1Sum = _advSecs = _cavHeldSec = 0f;
+            _advDe0Sum = _advToSum = _advGSum = _advDe1Sum = _advSecs = _cavHeldSec = _advNaSum = 0f;
             Array.Clear(AdvEnd, 0, AdvEnd.Length); Array.Clear(Blk, 0, Blk.Length);
             Interlocked.Exchange(ref _postErr, 0);
             _rot = _frameNear = _frameSim = 0;
@@ -521,10 +541,16 @@ namespace Armoury
             var f = a.Formation;
             if (f == null || a.IsDetachedFromFormation) { if (held) { _relForm++; End(s, now, true); } else _skDetached++; return; }
             // 469-p: szyk pod rozkazami gracza (nie pod SI) - jego rozkaz ognia zostaje (Formation.IsAIControlled, mb_full.cs:68947 / 69563)
-            if (!f.IsAIControlled) { if (held) { _relTaken++; End(s, now, true); } else _skPlayer++; return; }
+            // 469-r: z kluczem gracza (PlayerArchersHoldFireOutOfRange, tylko przy _key) - w regule jak szyk AI (bez ruchu szyku, HoldYourFire gracza nizej - nic)
+            bool pl = !f.IsAIControlled;
+            if (pl && !_player) { if (held) { _relTaken++; End(s, now, true); } else _skPlayer++; return; }
             if (a.IsUsingGameObject) { if (held) { _relForm++; End(s, now, true); } else _skObject++; return; }
             var q = f.QuerySystem;
-            if (q != null && q.IsInfantryFormation) { if (held) { _relForm++; End(s, now, true); } else _skInf++; return; }   // prefiks RBM na SetFiringOrder - jak 310
+            // 469-r: strzelec w szyku piechoty (AI i gracza) w regule przy kluczu TAK; prefiks RBM OverrideAgent.SetFiringOrder (rbmai.cs:4403) zmienia rozkaz tylko
+            // przy ChargeWithTarget i szarzy jazdy wroga (hamowanie / ogien), inaczej przepuszcza. NIE - pominiety jak przed 469-r
+            bool inf = q != null && q.IsInfantryFormation;
+            if (inf && !_key) { if (held) { _relForm++; End(s, now, true); } else _skInf++; return; }
+            int cat = inf ? CInf : pl ? CPl : CAi;
             if (f.FiringOrder.OrderEnum == FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire) { if (held) { _relForm++; s.Held = false; Close(s, now); } else _skFormHold++; return; }
             if (!p.Ok) { if (held) { _relWeapon++; End(s, now, true); } else _skUsage++; return; }
             _archers++;
@@ -560,6 +586,13 @@ namespace Armoury
                 if (held || !_hist || p.Hist <= 0 || d <= p.Hist) return;
                 g = p.Hist;
             }
+            if (_key)
+            {
+                // 469-r: G czlowieka do percentyla szyku (podejscie liczy tylko szyki AI piesze strzeleckie - reszta odpada w Form)
+                GE ge;
+                if (!GOf.TryGetValue(a, out ge)) { ge = new GE(); GOf[a] = ge; }
+                ge.G = g; ge.T = now; ge.F = f;
+            }
             if (d <= g) NoteInG(a, now);
             if (held)
             {
@@ -583,8 +616,9 @@ namespace Armoury
             s.Since = now;
             s.G = g;
             _holds++;
+            HoldsBy[cat]++;
             if (noTarget) _heldNoTarget++;
-            if (HeldEver.Add(a)) _heldMen++;
+            if (HeldEver.Add(a)) { _heldMen++; HeldMenBy[cat]++; }
         }
 
         /// <summary>469-p (tylko pomiar): wstrzymany wg celu silnika, a skraj najblizszego szyku wroga jest w G (cel silnika dalej niz inny wrog).</summary>
@@ -647,11 +681,12 @@ namespace Armoury
         /// <summary>BattleSense.OnAgentRemoved (glowny watek): wpis bez wywolan silnika.</summary>
         internal static void OnRemoved(Mission m, Agent affected)
         {
-            if (!Mine(m) || affected == null || (By.Count == 0 && NearT.Count == 0)) return;
+            if (!Mine(m) || affected == null || (By.Count == 0 && NearT.Count == 0 && GOf.Count == 0)) return;
             try
             {
                 St s;
                 NearT.Remove(affected);
+                GOf.Remove(affected);
                 if (By.TryGetValue(affected, out s)) { if (s.Held) { _relDead++; End(s, m.CurrentTime, false); } By.Remove(affected); }
             }
             catch (Exception e) { Stumble("FireRange469.OnRemoved", e); }
@@ -691,11 +726,12 @@ namespace Armoury
             if (g >= 0f && d > g)
             {
                 _shotsOverG++;
-                if (InRule(s))
+                int cat = Cat(s);
+                if (cat >= 0)
                 {
-                    // 469-q-p (U3): zwolniony / niewstrzymany z powodu wroga w 6 m (walczy o zycie, 310) - osobno; reszta ma byc 0
+                    // 469-q-p (U3): zwolniony / niewstrzymany z powodu wroga w 6 m (walczy o zycie, 310) - osobno; reszta ma byc 0 (469-r: wg rodzaju szyku)
                     float nt;
-                    if (NearT.TryGetValue(s, out nt) && m.CurrentTime - nt <= NearKeep) _shotsOverGNear++; else _shotsOverGRule++;
+                    if (NearT.TryGetValue(s, out nt) && m.CurrentTime - nt <= NearKeep) OverGNear[cat]++; else OverG[cat]++;
                 }
             }
             if (Holds(s)) _shotsHeld++;
@@ -760,13 +796,19 @@ namespace Armoury
               .Append(ShotBy[0]).Append('/').Append(ShotBy[1]).Append('/').Append(ShotBy[2]).Append('/').Append(ShotBy[3]).Append('/').Append(ShotBy[4])
               .Append("), poza ").Append(OldOver.ToString("0.0", Inv)).Append(" G ").Append(_shotsOver).Append(", mimo wstrzymania ").Append(_shotsHeld)
               .Append(", bez celu ").Append(_shotsNoTarget)
-              .Append(" | 469-q strzaly poza G ").Append(_shotsOverG).Append(" (ludzie w regule - szyk strzelcow AI - ").Append(_shotsOverGRule)
-              .Append(" - ma byc 0; osobno po wrogu w ").Append(F0(ThreatR)).Append(" m (walka o zycie) ").Append(_shotsOverGNear)
-              .Append("; reszta: szyk piechoty / poza szykiem / szyk gracza)")
+              .Append(" | 469-r strzaly poza G ").Append(_shotsOverG).Append(": szyk strzelcow AI ").Append(OverG[CAi])
+              .Append(", szyk gracza ").Append(OverG[CPl]).Append(_player ? "" : " (klucz gracza NIE - poza regula)")
+              .Append(", szyk piechoty ").Append(OverG[CInf]).Append(_key ? "" : " (klucz NIE - poza regula)")
+              .Append(" - ma byc 0; osobno po wrogu w ").Append(F0(ThreatR)).Append(" m (walka o zycie) AI / gracz / piechota ")
+              .Append(OverGNear[CAi]).Append('/').Append(OverGNear[CPl]).Append('/').Append(OverGNear[CInf])
+              .Append("; reszta (poza szykiem) ").Append(_shotsOverG - OverG[CAi] - OverG[CPl] - OverG[CInf] - OverGNear[CAi] - OverGNear[CPl] - OverGNear[CInf])
               .Append(" | pierwsza salwa (").Append(F0(FirstVolley)).Append(" s): obrona ").Append(Fv(0)).Append("; atak ").Append(Fv(1))
               .Append(" | kontakt (pierwszy wrog w G czlowieka w regule) od rozstawienia: obrona ").Append(Since0(InGT0[0])).Append(", atak ").Append(Since0(InGT0[1]))
               .Append("; pierwsza salwa po kontakcie: obrona ").Append(Gap(InGT0[0], FvT0[0])).Append(", atak ").Append(Gap(InGT0[1], FvT0[1]))
               .Append(" | wstrzyman ").Append(_holds).Append(" (ludzi ").Append(_heldMen).Append(", bez celu - szyk wroga dalej ").Append(_heldNoTarget)
+              .Append("; 469-r wstrzyman / ludzi: szyk strzelcow AI ").Append(HoldsBy[CAi]).Append('/').Append(HeldMenBy[CAi])
+              .Append(", szyk gracza ").Append(HoldsBy[CPl]).Append('/').Append(HeldMenBy[CPl]).Append(_player ? "" : " (klucz gracza NIE)")
+              .Append(", szyk piechoty ").Append(HoldsBy[CInf]).Append('/').Append(HeldMenBy[CInf])
               .Append("), na sucho przegladow z wstrzymaniem ").Append(_wouldHold).Append(", ponowien rozkazu ").Append(_reHold)
               .Append(", wstrzymany z lukiem schowanym (przegladow) ").Append(_heldStowed)
               .Append(", czas sr. ").Append(_holdN > 0 ? (_holdSecs / _holdN).ToString("0.0", Inv) : "-").Append(" s, najdluzszy ").Append(_holdMax.ToString("0.0", Inv)).Append(" s")
@@ -777,8 +819,9 @@ namespace Armoury
               .Append(" | wstrzymany, choc najblizszy szyk wroga w G (przegladow) ").Append(_heldFoeInG)
               .Append(" | podejscia szyku 469-q (latka ").Append(_patch).Append("): ").Append(_adv).Append(" (szykow ").Append(AdvForms.Count).Append(')');
             if (_adv > 0)
-                sb.Append(", sr. od ").Append(F0(_advDe0Sum / _adv)).Append(" m do celu ").Append(F0(_advToSum / _adv)).Append(" m (").Append(AdvFrac.ToString("0.0", Inv))
-                  .Append(" x sr. G ").Append(F0(_advGSum / _adv)).Append(" m; srodek szyku - skraj wroga)").Append(", na koniec ").Append(_advDe1N > 0 ? F0(_advDe1Sum / _advDe1N) : "-")
+                sb.Append(", sr. od ").Append(F0(_advDe0Sum / _adv)).Append(" m do celu ").Append(F0(_advToSum / _adv)).Append(" m (").Append(F0(AdvPct * 100f))
+                  .Append(". percentyl G lucznikow szyku ").Append(F0(_advGSum / _adv)).Append(" m, lucznikow sr. ").Append((_advNaSum / (float)_adv).ToString("0.0", Inv))
+                  .Append("; srodek szyku - skraj wroga)").Append(", na koniec ").Append(_advDe1N > 0 ? F0(_advDe1Sum / _advDe1N) : "-")
                   .Append(" m, sr. czas ").Append((_advSecs / _adv).ToString("0.0", Inv)).Append(" s, skrocone oslona piechoty ").Append(_advCovered)
                   .Append(", cel blizej niz 0.4 num2 RBM (moze cofnac) ").Append(_advPull).Append(", odbiorow przez RBM ").Append(_advHits);
             sb.Append("; koniec: dotarl ").Append(AdvEnd[EnReached]).Append(", ludzie w G ").Append(AdvEnd[EnInG]).Append(", jazda wroga ").Append(AdvEnd[EnCav])
@@ -833,13 +876,15 @@ namespace Armoury
             if (InGT0[side] < 0f) InGT0[side] = now;
         }
 
-        /// <summary>469-q (pomiar strzalu): strzelec w regule 469 - szyk AI nie piechoty, w szyku (bez sprawdzania broni / wroga w 6 m - przyblizenie).</summary>
-        private static bool InRule(Agent s)
+        /// <summary>469-r (pomiar strzalu): rodzaj szyku strzelca - CInf szyk piechoty (AI i gracza), CPl szyk pod rozkazami gracza, CAi szyk AI; -1 poza szykiem
+        /// (bez sprawdzania broni / wroga w 6 m - przyblizenie; czy rodzaj jest w regule - wg kluczy, w linii).</summary>
+        private static int Cat(Agent s)
         {
             var f = s.Formation;
-            if (f == null || s.IsDetachedFromFormation || !f.IsAIControlled) return false;
+            if (f == null || s.IsDetachedFromFormation) return -1;
             var q = f.QuerySystem;
-            return q != null && !q.IsInfantryFormation;
+            if (q != null && q.IsInfantryFormation) return CInf;
+            return f.IsAIControlled ? CAi : CPl;
         }
 
         // ------------------------------------------------------------ 469-q: podejscie szyku (glowny watek, co FormEvery)
@@ -873,6 +918,19 @@ namespace Armoury
                 int n; HeldN.TryGetValue(f, out n); HeldN[f] = n + 1;
                 float g; HeldG.TryGetValue(f, out g); HeldG[f] = g + s.G;
             }
+            // 469-r: G lucznikow w regule wg szyku (swieze - z przegladu w GFresh s; stare wypadaja), posortowane - percentyl
+            foreach (var kv in FGs) kv.Value.Clear();
+            Drop.Clear();
+            foreach (var kv in GOf)
+            {
+                var e = kv.Value;
+                if (e.F == null || now - e.T > GFresh) { Drop.Add(kv.Key); continue; }
+                List<float> l;
+                if (!FGs.TryGetValue(e.F, out l)) { l = new List<float>(); FGs[e.F] = l; }
+                l.Add(e.G);
+            }
+            for (int i = 0; i < Drop.Count; i++) GOf.Remove(Drop[i]);
+            Drop.Clear();
             FTmp.Clear();
             foreach (var kv in HeldN) FTmp.Add(kv.Key);
             foreach (var kv in FBy) if (!HeldN.ContainsKey(kv.Key)) FTmp.Add(kv.Key);
@@ -881,9 +939,19 @@ namespace Armoury
                 var f = FTmp[i];
                 int n; HeldN.TryGetValue(f, out n);
                 float gs; HeldG.TryGetValue(f, out gs);
+                // 469-r: na - lucznikow w regule ze swiezym G; gp - 30. percentyl ich G (ok. 70% ma G >= gp); bez danych - sr. G wstrzymanych jak 469-q
+                List<float> gl;
+                int na = 0;
+                float gp = n > 0 ? gs / n : 0f;
+                if (FGs.TryGetValue(f, out gl) && gl.Count > 0)
+                {
+                    gl.Sort();
+                    na = gl.Count;
+                    gp = gl[(int)Math.Floor(AdvPct * (na - 1))];
+                }
                 FS st;
                 if (!FBy.TryGetValue(f, out st)) { st = new FS(); FBy[f] = st; }
-                try { Form(m, f, st, n, gs, now); }
+                try { Form(m, f, st, n, na, gp, now); }
                 catch (Exception e) { Stumble("FireRange469.Szyk", e); try { Release(f, st); } catch { } st.Since = -1f; }
                 if (st.Adv == null && st.Since < 0f) FBy.Remove(f);
             }
@@ -891,13 +959,15 @@ namespace Armoury
         }
 
         /// <summary>Jeden szyk: trwajace podejscie (koniec?) albo zastoj wstrzymanego szyku (podejscie, gdy wolno).</summary>
-        private static void Form(Mission m, Formation f, FS st, int n, float gSum, float now)
+        private static void Form(Mission m, Formation f, FS st, int n, int na, float gp, float now)
         {
             int units = f.CountOfUnits;
             var q = units > 0 ? f.QuerySystem : null;
+            // szyk gracza (469-r: jego ludzie tez wstrzymani) i szyk piechoty (469-r) - ai / foot false: zadnego ruchu
             bool ai = units > 0 && f.IsAIControlled && !f.IsPlayerTroopInFormation && !f.HasPlayerControlledTroop;
             bool foot = q != null && q.IsRangedFormation && !q.IsCavalryFormation && !q.IsRangedCavalryFormation;
-            bool enough = n >= AdvMinMen && n >= AdvShare * units;
+            // 469-r: udzial wstrzymanych wsrod lucznikow w regule (469-q: wsrod wszystkich ludzi szyku)
+            bool enough = n >= AdvMinMen && n >= AdvShare * (na > 0 ? na : units);
             Vec2 pos = units > 0 ? f.CachedAveragePosition : Vec2.Invalid;
             Formation ef = null;
             float de = -1f;
@@ -949,8 +1019,9 @@ namespace Armoury
             if (!_patchOk || idx < 0) { Blk[BkPatch] += FormEvery; return; }
             if (!RbmActive(f)) { Blk[BkBeh] += FormEvery; return; }
             if (Doctrine.C441Owned(f) || Doctrine.R443Why(f) != 0) { Blk[Bk443] += FormEvery; return; }
-            float gf = gSum / n;
-            float want = de - AdvFrac * gf;
+            // 469-r: cel - skraj wroga w 30. percentylu G lucznikow szyku od srodka (ok. 70% w zasiegu; dalej siegajacy zwalniani w drodze)
+            float gf = gp;
+            float want = de - gf;
             if (want < AdvMinStep) { Blk[BkClose] += FormEvery; return; }
             Vec2 dir = ef.CachedMedianPosition.AsVec2 - pos;
             float len = dir.Normalize();
@@ -966,7 +1037,7 @@ namespace Armoury
             var slot = new Slot { F = f, Order = MovementOrder.MovementOrderMove(wp) };
             Volatile.Write(ref Slots[idx], slot);
             st.Adv = slot; st.Stopping = false; st.AdvT0 = now; st.AdvTo = to;
-            _adv++; _advDe0Sum += de; _advToSum += de - step; _advGSum += gf;
+            _adv++; _advDe0Sum += de; _advToSum += de - step; _advGSum += gf; _advNaSum += na;
             if (step < want) _advCovered++;
             float n2 = f.Depth * 0.5f + q.MaximumMissileRange * 0.5f + ef.Depth * 0.5f;   // num2 RBM (rbmai.cs:8580, bez dodatku SplitArchers)
             if (de - step + ef.Depth * 0.5f < 0.4f * n2) _advPull++;
