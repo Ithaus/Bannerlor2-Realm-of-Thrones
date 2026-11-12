@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 469-p (12.11) - poprawki po recenzji 469: wylacznik zastoju, szyk gracza, lot pod gore, pomiar zasiegu natywnego
+
+**Problem:** recenzja 469-a/469-b. (1) WYSOKA, ryzyko: szyk strzelcow moze stac cala bitwe bez strzalu - `RBMBehaviorArcherSkirmish` (rbmai.cs:8580-8650) stawia szyk na `num2 = Depth/2 + MaximumMissileRange/2 + Depth wroga/2` i przy braku strzelania (`IsFormationShooting` false) po 15 s "Approaching" od razu wraca do "Shooting", bo `num < 0.9 num2` - szyk nie podchodzi. Jesli natywny `MaximumMissileRange` (max `Agent.GetMissileRange` ludzi szyku, mb_full.cs:42818) > ok. 2.4 G (np. luk mysliwski w prozni v^2/g = 297 m -> szyk ok. 148 m, 1.1 G = 110 m), ludzie stoja wstrzymani. (2) SREDNIA: szyk pod rozkazami gracza nie byl pominiety - rozkaz "Fire at will" Jeffa nadpisany po ok. 0.5 s, wbrew podpowiedzi MCM. (3) cel silnika daleko, a inny szyk wroga w G - brak pomiaru. (4) mozliwa petla luk / wstrzymanie / bron biala (natywny wybor broni przy HoldYourFire na czlowieku niewidoczny w C#). (5) `Fly()` dla celu wyzej, ktorego strzala nie siega, zwracal odleglosc wierzcholka lotu. (6) bledny komentarz o kolejnosci nasluchow (StartTable biegnie PRZED RotBows420.ApplyLore).
+
+**Przyczyna:** badanie 469 zakladalo wanilowy `BehaviorSkirmish`, ktory sam podciaga szyk przy wstrzymanym ogniu; RBM go podmienia (rbmai.cs:462, 842, 1273). Pominiecie gracza sprawdzalo tylko `Agent.IsMainAgent / IsPlayerControlled`, nie `Formation.IsAIControlled`. `MbEvent.AddNonSerializedListener` dopisuje na poczatek listy.
+
+**Zmiana (`FireRange469.cs`, `McmSettings.cs` tylko podpowiedz, `ArmouryBehavior.cs` tylko komentarz):**
+- (1a) Wylacznik zastoju: wstrzymany czlowiek, ktorego cel przez 20 s nie podszedl o 10 m (najmniejsza odleglosc w tym wstrzymaniu), dostaje rozkaz szyku z powrotem i 30 s przerwy od 469 (`Paused`, czas misji). Szyk zaczyna strzelac -> RBM ma "Shooting" jak przed 469. Licznik "zastoj" w zwolnieniach, "przerwa po zastoju / broni" w pominietych.
+- (1b) Pomiar: dla kazdej broni natywny statyczny `Mission.GetMissileRange(v, 0)` (mb_full.cs:53901, raz na bron w misji) i nasz zasieg symulowany z oporem - kolumny w tabeli broni linii 469. Natywny ~ v^2/g = silnik liczy bez oporu.
+- (2) `if (!f.IsAIControlled)` - szyk pod rozkazami gracza pominiety (`_skPlayer`, "szyk gracza"), wstrzymany - zwolniony ("przejete / gracz").
+- (3) Tylko licznik "wstrzymany, choc najblizszy szyk wroga w G (przegladow)" - zmiana celu osobnym krokiem, jesli liczba duza.
+- (4) Zwolnienie z powodu broni (bron biala / kolczan / nieznany uzytek) daje te sama 30 s przerwe - petla najwyzej raz na 30 s.
+- (5) `Fly()`: zwraca odleglosc tylko, gdy strzala choc raz byla na wysokosci celu lub wyzej, inaczej 0. Dla dz <= 1.5 m wynik bez zmian.
+- (6) Komentarz poprawiony; bez skutku - `ApplyLore` zmienia tylko `ThrustDamage` (RotBows420.cs:339-343), naciagu nie.
+- Podpowiedz MCM (po angielsku): zastoj 20 s i szyki pod rozkazami gracza.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: przy kluczu NIE `By` puste -> brak wstrzyman, brak zastojow, `Paused` puste - zachowanie jak przed 469 co do bitu (zostaje pomiar na sucho + jedno wywolanie natywnego `Mission.GetMissileRange` na bron w misji; czysta funkcja balistyczna, nieuzywana w C# gry - jedyne nowe wywolanie natywne).
+- Zastoj oznacza powrot do strzalow spoza G (jak przed 469) przez 30 s, potem znow wstrzymanie i kolejne 20 s - w zastoju szyk strzela ok. 60% czasu zamiast 0%. W linii: "zastoj" duzy + "natywny statyczny" bliski v^2/g = potwierdzony pat RBM; wtedy decyzja: wyzsze progi albo przesuniecie szyku.
+- Kolizje: 310 (CleanShot) - wspolny zarzadca bez zmian; `Paused` czyszczone w Clear (Begin / End misji) i w OnRemoved. Szyk gracza: 310 nadal dziala wg wlasnych regul.
+- Skan IL 30, build 0 bledow. Nic nie wgrane, gra nie uruchamiana.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 469-b (12.11) - zasieg bojowy lukow i kusz wedlug naciagu z wartosciami historycznymi (klucz "Historical Bow And Crossbow Range")
 
 **Problem:** Jeff 12.11: "luki powinny miec rozny zasieg w zaleznosci od naciagu, daj wartosci historyczne dla kusz i lukow". Po 469-a prog ognia G = 0.85 zasiegu fizycznego - dla wszystkich lukow 157-245 m, wiec luk mysliwski strzela prawie z tej samej odleglosci co luk wojenny.

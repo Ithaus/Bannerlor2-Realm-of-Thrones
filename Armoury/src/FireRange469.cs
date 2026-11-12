@@ -34,10 +34,16 @@ namespace Armoury
     /// 469-b (klucz HistoricalBowAndCrossbowRange): G dodatkowo ograniczone zasiegiem historycznym wg rodzaju i naciagu (HistRange) - tylko prog decyzji,
     /// predkosc strzaly zostaje z RBM (zmiana MissileSpeed = podwojne liczenie naciagu i rozjechane celowanie, badanie P3).
     /// Linia "Zasieg lukow (469)" na start sesji: tabela kilku typowych broni. Potkniecia liczone (RoutHold miejsce "tarcze"), funkcji nie gasimy.
+    /// 469-p (recenzja): szyk pod rozkazami gracza pominiety; wylacznik zastoju (20 s bez zblizenia celu o 10 m - ogien wolny, 30 s przerwy) i ta sama przerwa
+    /// po zwolnieniu z powodu broni; Fly() bez wierzcholka lotu dla celu wyzej; w linii natywny statyczny zasieg i licznik "najblizszy szyk wroga w G".
     /// </summary>
     internal static class FireRange469
     {
         internal const float Every = 0.5f, HoldOver = 1.1f, Eff = 0.85f, ThreatR = 6f, FirstVolley = 6f, ArrowW = 0.043f, BoltW = 0.06f, DzStep = 5f;
+        // 469-p: wylacznik zastoju - wstrzymany StallT s, a cel nie podszedl o StallD m: ogien wolny i PauseT s przerwy od 469 (RBMBehaviorArcherSkirmish,
+        // rbmai.cs:8580-8650, stawia szyk na ok. polowie natywnego MaximumMissileRange i nie podchodzi, gdy szyk nie strzela - bez tego szyk moglby stac cala bitwe);
+        // ta sama przerwa po zwolnieniu z powodu broni (bron biala / kolczan) - bez petli luk / wstrzymanie / bron biala
+        internal const float StallT = 20f, StallD = 10f, PauseT = 30f;
         internal const int MinPer = 8, MaxPer = 96, NearPer = 16, SimPer = 2, WeapMax = 8;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -46,6 +52,7 @@ namespace Armoury
             public Agent A;
             public bool Held;
             public float Since;
+            public float BestD, ProgT;   // 469-p: najmniejsza odleglosc do celu w tym wstrzymaniu i czas ostatniego zblizenia o StallD
         }
 
         private struct WKey : IEquatable<WKey>
@@ -69,6 +76,7 @@ namespace Armoury
             public bool Ok;            // false = nieznany uzytek (RBM 10 m/s) - czlowiek pominiety
             public int Shots, NatN, GN;
             public float NatSum, GSum;
+            public float NatStatic = -1f;   // 469-p: natywny Mission.GetMissileRange(v, 0) (mb_full.cs:53901) - czy silnik liczy zasieg z oporem powietrza
         }
 
         private static WeakReference _m;
@@ -86,12 +94,15 @@ namespace Armoury
         private static readonly List<Agent> Drop = new List<Agent>();
         // naciag z danych broni zapisany na start sesji (poza misja - bez okna, w ktorym RBM podmienia MissileSpeed na m/s przy spawnie / strzale)
         private static readonly Dictionary<ItemObject, int> LbAtStart = new Dictionary<ItemObject, int>();
+        // 469-p: przerwa od 469 (czas misji, do ktorego czlowieka nie wstrzymujemy) po zastoju albo zwolnieniu z powodu broni
+        private static readonly Dictionary<Agent, float> Paused = new Dictionary<Agent, float>();
 
         // liczniki misji
         private static int _scanned, _archers, _holds, _heldMen, _reHold, _wouldHold, _stum, _overNear, _overSim;
         private static int _relRange, _relNear, _relWeapon, _relPanic, _relTaken, _relMount, _relForm, _relNoFoe, _relEnd, _relDead;
         private static int _skMount, _skInf, _skDetached, _skObject, _skUsage, _skFormHold, _skPlayer, _skNoAmmo, _skHunt, _skBanner, _skPanic;
         private static int _heldNoTarget, _shots, _shotsOver, _shotsHeld, _shotsNoTarget;
+        private static int _relStall, _skPaused, _heldFoeInG;   // 469-p: zastoj, przerwa, wstrzymany choc najblizszy szyk wroga w G (tylko pomiar)
         private static readonly int[] ShotBy = new int[5];
         private static float _holdSecs, _holdMax;
         private static int _holdN;
@@ -137,7 +148,8 @@ namespace Armoury
 
         private static void Clear()
         {
-            By.Clear(); Weap.Clear(); WeapSeen.Clear(); TBuf.Clear(); Drop.Clear(); HeldEver.Clear();
+            By.Clear(); Weap.Clear(); WeapSeen.Clear(); TBuf.Clear(); Drop.Clear(); HeldEver.Clear(); Paused.Clear();
+            _relStall = _skPaused = _heldFoeInG = 0;
             _rot = _frameNear = _frameSim = 0;
             _sumTicks = _maxTicks = 0;
             _scanned = _archers = _holds = _heldMen = _reHold = _wouldHold = _stum = _overNear = _overSim = 0;
@@ -221,6 +233,7 @@ namespace Armoury
                 try { p.V = w.GetModifiedMissileSpeedForCurrentUsage(); } catch { p.V = u.MissileSpeed; }
                 p.Ok = p.V > 5;
             }
+            if (p.Ok && p.V > 0) { try { p.NatStatic = Mission.GetMissileRange(p.V, 0f); } catch { p.NatStatic = -1f; } }
             Weap[key] = p;
             if (WeapSeen.Count < 64) WeapSeen.Add(p);
             return p;
@@ -279,12 +292,14 @@ namespace Armoury
             return best;
         }
 
-        /// <summary>Jeden lot pod katem ang (st): odleglosc, na ktorej strzala schodzi na wysokosc celu; 0 = nie dochodzi.</summary>
+        /// <summary>Jeden lot pod katem ang (st): odleglosc, na ktorej strzala schodzi na wysokosc celu; 0 = nie dochodzi (469-p: takze gdy cel wyzej,
+        /// a strzala ani razu nie wzniosla sie na jego wysokosc - dawniej zwracalo odleglosc wierzcholka lotu).</summary>
         private static float Fly(float v, int ang, float dz, float k)
         {
             const float dt = 0.01f, g = 9.81f;
             double a = ang * Math.PI / 180.0;
             float vx = v * (float)Math.Cos(a), vz = v * (float)Math.Sin(a), x = 0f, z = 1.5f - dz;
+            bool up = z >= 0f;
             for (int s = 0; s < 3000; s++)
             {
                 float sp = (float)Math.Sqrt(vx * vx + vz * vz);
@@ -293,7 +308,8 @@ namespace Armoury
                 vz -= (f * vz + g) * dt;
                 x += vx * dt;
                 z += vz * dt;
-                if (z < 0f && vz < 0f) return x;
+                if (z >= 0f) up = true;
+                else if (vz < 0f) return up ? x : 0f;
             }
             return 0f;
         }
@@ -383,7 +399,7 @@ namespace Armoury
             var p = Weapon(a, true, out noAmmo);
             if (p == null)
             {
-                if (held) { _relWeapon++; End(s, now, true); }
+                if (held) { _relWeapon++; End(s, now, true); Paused[a] = now + PauseT; }
                 else if (noAmmo) _skNoAmmo++;
                 return;
             }
@@ -394,11 +410,13 @@ namespace Armoury
             if (a.IsRunningAway || SurvivalMode.InPanic(a) || a.IsRetreating()) { if (held) { _relPanic++; End(s, now, true); } else _skPanic++; return; }
             var f = a.Formation;
             if (f == null || a.IsDetachedFromFormation) { if (held) { _relForm++; End(s, now, true); } else _skDetached++; return; }
+            // 469-p: szyk pod rozkazami gracza (nie pod SI) - jego rozkaz ognia zostaje (Formation.IsAIControlled, mb_full.cs:68947 / 69563)
+            if (!f.IsAIControlled) { if (held) { _relTaken++; End(s, now, true); } else _skPlayer++; return; }
             if (a.IsUsingGameObject) { if (held) { _relForm++; End(s, now, true); } else _skObject++; return; }
             var q = f.QuerySystem;
             if (q != null && q.IsInfantryFormation) { if (held) { _relForm++; End(s, now, true); } else _skInf++; return; }   // prefiks RBM na SetFiringOrder - jak 310
             if (f.FiringOrder.OrderEnum == FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire) { if (held) { _relForm++; s.Held = false; Close(s, now); } else _skFormHold++; return; }
-            if (!p.Ok) { if (held) { _relWeapon++; End(s, now, true); } else _skUsage++; return; }
+            if (!p.Ok) { if (held) { _relWeapon++; End(s, now, true); Paused[a] = now + PauseT; } else _skUsage++; return; }
             _archers++;
             // odleglosc: cel silnika, bez celu - skraj najblizszego szyku wroga
             float d, dz = 0f;
@@ -431,6 +449,10 @@ namespace Armoury
             {
                 if (d <= g) { _relRange++; End(s, now, true); return; }
                 if (d < ThreatR + 1f || Near(m, a)) { _relNear++; End(s, now, true); return; }
+                // 469-p: zastoj - cel nie podchodzi (szyk RBM stoi na polowie natywnego zasiegu): ogien wolny, przerwa PauseT
+                if (d < s.BestD - StallD) { s.BestD = d; s.ProgT = now; }
+                else if (now - s.ProgT > StallT) { _relStall++; End(s, now, true); Paused[a] = now + PauseT; return; }
+                if (!noTarget && FoeInG(f, a, g)) _heldFoeInG++;
                 if (_key) { a.SetFiringOrder(FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire); _reHold++; }
                 return;
             }
@@ -438,14 +460,30 @@ namespace Armoury
             if (d < ThreatR + 1f) return;
             if (_frameNear >= NearPer) { _overNear++; return; }
             if (Near(m, a)) return;
+            float until;
+            if (Paused.TryGetValue(a, out until)) { if (now < until) { _skPaused++; return; } Paused.Remove(a); }
             if (!_key) { _wouldHold++; return; }   // NIE: tylko pomiar
             if (s == null) { s = new St { A = a }; By[a] = s; }
             a.SetFiringOrder(FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire);
             s.Held = true;
             s.Since = now;
+            s.BestD = d;
+            s.ProgT = now;
             _holds++;
             if (noTarget) _heldNoTarget++;
             if (HeldEver.Add(a)) _heldMen++;
+        }
+
+        /// <summary>469-p (tylko pomiar): wstrzymany wg celu silnika, a skraj najblizszego szyku wroga jest w G (cel silnika dalej niz inny wrog).</summary>
+        private static bool FoeInG(Formation f, Agent a, float g)
+        {
+            try
+            {
+                var eq = f.CachedClosestEnemyFormation;
+                var ef = eq != null ? eq.Formation : null;
+                return ef != null && ef.CountOfUnits > 0 && a.Position.AsVec2.Distance(ef.CachedMedianPosition.AsVec2) - ef.Depth * 0.5f <= g;
+            }
+            catch { return false; }
         }
 
         /// <summary>Aktywny, nieuciekajacy wrog w 6 m (jedno zapytanie, budzet klatki).</summary>
@@ -496,11 +534,12 @@ namespace Armoury
         /// <summary>BattleSense.OnAgentRemoved (glowny watek): wpis bez wywolan silnika.</summary>
         internal static void OnRemoved(Mission m, Agent affected)
         {
-            if (!Mine(m) || affected == null || By.Count == 0) return;
+            if (!Mine(m) || affected == null || (By.Count == 0 && Paused.Count == 0)) return;
             try
             {
                 St s;
                 if (By.TryGetValue(affected, out s)) { if (s.Held) { _relDead++; End(s, m.CurrentTime, false); } By.Remove(affected); }
+                Paused.Remove(affected);
             }
             catch (Exception e) { Stumble("FireRange469.OnRemoved", e); }
         }
@@ -606,12 +645,15 @@ namespace Armoury
               .Append(", bron / kolczan ").Append(_relWeapon).Append(", panika ").Append(_relPanic).Append(", przejete / gracz ").Append(_relTaken)
               .Append(", kon ").Append(_relMount).Append(", szyk (piechota / wstrzymanie szyku / poza szykiem) ").Append(_relForm)
               .Append(", bez wroga ").Append(_relNoFoe).Append(", padl ").Append(_relDead).Append(", koniec misji ").Append(_relEnd)
+              .Append(", zastoj (").Append(F0(StallT)).Append(" s bez zblizenia o ").Append(F0(StallD)).Append(" m) ").Append(_relStall)
+              .Append(" | wstrzymany, choc najblizszy szyk wroga w G (przegladow) ").Append(_heldFoeInG)
               .Append(" | przegladow strzelcow ").Append(_scanned).Append(", w regule ").Append(_archers)
               .Append(" | pominiete: konni ").Append(_skMount).Append(", szyk piechoty ").Append(_skInf).Append(", szyk wstrzymany ").Append(_skFormHold)
               .Append(", poza szykiem ").Append(_skDetached).Append(", machina ").Append(_skObject).Append(", nieznany uzytek ").Append(_skUsage)
               .Append(", bez amunicji ").Append(_skNoAmmo).Append(", 204/283/148/447 ").Append(_skHunt).Append(", chorazy ").Append(_skBanner)
-              .Append(", panika / odwrot ").Append(_skPanic).Append(", ponad budzet (zapytania ").Append(_overNear).Append(", symulacje ").Append(_overSim).Append(')')
-              .Append(" | bronie (naciag lb / v m/s / G sr. / natywny sr. / strzal):");
+              .Append(", panika / odwrot ").Append(_skPanic).Append(", szyk gracza ").Append(_skPlayer).Append(", przerwa po zastoju / broni ").Append(_skPaused)
+              .Append(", ponad budzet (zapytania ").Append(_overNear).Append(", symulacje ").Append(_overSim).Append(')')
+              .Append(" | bronie (naciag lb / v m/s / G sr. / natywny sr. / strzal / zasieg sym. z oporem / natywny statyczny GetMissileRange(v,0)):");
             WeapSeen.Sort((x, y) => y.Shots.CompareTo(x.Shots));
             int shown = 0;
             for (int i = 0; i < WeapSeen.Count && shown < WeapMax; i++)
@@ -620,7 +662,9 @@ namespace Armoury
                 if (p.Shots <= 0) continue;
                 shown++;
                 sb.Append(' ').Append(p.Name).Append(' ').Append(p.Lb).Append('/').Append(p.V).Append('/').Append(p.GN > 0 ? F0(p.GSum / p.GN) : "-").Append('/')
-                  .Append(p.NatN > 0 ? F0(p.NatSum / p.NatN) : "-").Append('/').Append(p.Shots).Append(';');
+                  .Append(p.NatN > 0 ? F0(p.NatSum / p.NatN) : "-").Append('/').Append(p.Shots).Append('/');
+                float r0;
+                sb.Append(RangeCache.TryGetValue(p.V * 64 + 6, out r0) ? F0(r0) : "-").Append('/').Append(p.NatStatic > 0f ? F0(p.NatStatic) : "-").Append(';');
             }
             if (shown == 0) sb.Append(" brak");
             sb.Append(" | koszt ").Append(Ms(_sumTicks).ToString("0.0", Inv)).Append(" ms razem, najwiecej ").Append(Ms(_maxTicks).ToString("0.000", Inv))
