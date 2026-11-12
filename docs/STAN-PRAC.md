@@ -1,5 +1,17 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 23:35 - WGRANIE 219 (465/466/467 + -p: Polnoc bez oblezen Casterly Rock i miast Zachodu, bez zwrotu zdobyczy 326b, szturm AI oddzialem; 468/468-p spychanie drabin widlami i dluga bronia)
+
+- **W grze:** Armoury.dll `f41139e1040964d209116fce55609b9a` (galaz `noc/367c-jeniec-po-odejsciu`, commit `b6d09b2e`, wypchniety; = 218 + 465-467 + scalenie noc/468-widly). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie219`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie219(-przed)`. Zapisy: `at-467-po-tescie.sav`, `at-468-po-tescie.sav`.
+- **Jeff 12.11:** "Robimy 1 ... anuluj regule oddawania zamkow ... oblezenia trwaja dluzej i sa trudniejsze"; "wlacz oblezenia aby dzialaly tez dla moich oblezen"; "ustaw drabiny na 30"; spychanie drabin "dluga bronia jak maja".
+- **Armoury.json Jeffa (gra zamknieta, kopie .bak-2026-11-12-przed-szturm-TAK / -przed-drabiny30, D:):** pakiet 7 szturmu TAK (SiegeMainEffort, SiegeAbandonDeadLane, SiegeWavesReinforceSuccess, WallDefenceReserve, DefenderFireFollowsAssault, SiegeArchersFallBack); SiegeLadderWaitSeconds 30. Nowe klucze domyslne: NorthSparesWestSeats465 TAK, SiegeAssaultPartyStrikes TAK (limit odparc 2), NorthConquestReturn NIE (zmieniona domyslna; w json brak klucza), Defenders Push Ladders TAK.
+- **Autotest at-467 (60 dob, n391):** KONIEC OK, wyjatkow 0, bledy 23. 465: weta mysli ~200, weta BK 5, oblezenia mimo zakazu 0. 467: 3 oblezenia AI - Goldentooth (Polnoc) 7 dob, wziety 1. szturmem; Ashemark (korona) 15.4 dob odparta 1x, potem 16.1 dob 3 szturmy odparte; wymiana strat 1.6-2.6. Potkniecia 0.
+- **Autotest at-468 (5 dob + 7 bitew):** KONIEC OK, wyjatkow 0, latka drabin 468 wpieta (IsDisabledForAgent). Szturmu w tescie brak - spychanie drabin i pakiet 7 niesprawdzone w walce (pierwszy szturm Jeffa). VanillaAISiegesforRBM i EpicSieges wlaczone (zdejmuja blokade drabin RBM dla obroncow).
+- **Tytul krolestwa Joffreya:** BKROTPatch titles_6_3.xml daje ROTlord_1 (Duram Bar Emmon), ale CrashScribe BkTitles (AM-26/27, od 14.10) podaje BK wlasny plik bk_titles_rot818.xml z lord_7_1 (Joffrey); kampania Jeffa pozniejsza - powinno byc dobrze, brak linii logu potwierdzajacej.
+- **Regula 274:** w testach 90 dob nie wlaczyla progu (B/A 1.09-1.35, korona silniejsza); dziala tylko weto 5 siedzib i zbiorka.
+- **W toku:** 469 (strzelcy AI tylko w zasiegu, zasieg lukow/kusz wg naciagu - wartosci historyczne; worktree n469), 470 (sygnal niedoboru: S_stos 221 tylko przy pustym zapasie, male braki jedzenia < 2 szt./d poza N; worktree n470) - test 60 dob pokazal "towarow z N swiata > 1: 22 z 22" (glownie S_stos 1.56 z 2. decyzji regulatora 221).
+- **Do decyzji Jeffa:** kapitulacja Polnocy (WarTruce.Surrender) dalej oddaje koronie twierdze spoza ziem Polnocy; Goldentooth zostaje "wolno" (zamek).
+
 ## STAN 12.11 22:05 - WGRANIE 218 (458 odwrot wodza AI - REGULA wg decyzji 9: 458-r/p/q/s/s-p/t/t-p/u/u-p; zawiera WGRANIE 217)
 
 - **W grze:** Armoury.dll `41f73e58b7fab3217128afde2ec2e450` (galaz `noc/367c-jeniec-po-odejsciu`, commit `be3e3f2a`, wypchniety; scalenie 217 = e55e4b05). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie218`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie218(-przed)`. Zapisy testow: `at-458*-po-tescie.sav`.
