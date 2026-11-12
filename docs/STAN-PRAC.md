@@ -1,5 +1,15 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 19:55 - WGRANIE 217 (462-a/b/a-p ekonomia: brak wsadu jedzenia warsztatow w N udzialem; scalanie arm_lpn; 463/463-p ikony warsztatow BK)
+
+- **W grze:** Armoury.dll `e83eeac7ee4ff30b9b9f1210299ce308` (galaz `noc/462-ekonomia-zboze`, commit `f97892b0`, wypchniety; = WGRANIE 216 + 462 + 463). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie217`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie217(-przed)`. Zapisy testow: `at-463-po-tescie.sav`, `at-463b-po-tescie.sav`.
+- **Autotesty 30 dob (n391, lancuch caly wlaczony):** at-463 (przed poprawkami recenzji) i at-463b (wersja wgrana): KONIEC OK, wyjatkow 0, bledy CrashScribe 23, potkniecia 0.
+- **462-a (klucz Supply Food Input Share TAK):** brak wsadu jedzenia warsztatow wraca do N jako udzial brak/(zuzycie+brak); 92-125 szt./d w 67-101 brakach, komorek jedzenia z N > 1 ok. 247. Swiat: butter 2.00 (warsztaty nie dostaja masla wcale), apple 1.53, olives 1.42, meat 1.39, grape 1.31, hog/sheep/cow 1.3-1.6 przy 0.3-0.6 szt./d (male ilosci - obserwowac, czy L6 nie przestawia wsi na hodowle bez sensu). Zboze swiata <= 1 (mlyny dostaja wiekszosc; brak 36 cykli/d). Zmiana zajec L6 w 30 dobach 0 (oba testy).
+- **462-b:** wczytanie arm_lpn scala komorke zamiast ContainsKey (sprawdzalne tylko w grze Jeffa po zapisie/wczytaniu - linia "polaczonych z dobami sesji").
+- **463 ikony:** "typow 20", podstawione 9 (bakery->mill, barding-smithy->stable, armorsmithy/weaponsmithy->smithy, artisans->pottery_shop, fletcher->wood, butcher->tannery, mines->silversmithy, meadery->brewery) w oknie rodu/encyklopedii i na ekranie miasta. Jeff: sprawdzic Clan -> Income.
+- **Uwaga procesowa:** agent workflow odmowil 462 (bral ostatnia wiadomosc czatu - o ikonach - za zakres); 462 napisane w sesji glownej, niezalezna recenzja (D1 mieso wg zuzycia, D2 zboze pierwsze przy glodzie, D3 tekst przy NIE) - poprawione w 462-a-p.
+- **Dalej:** 458-r/458-p (odwrot wodza - decyzja 9) scalone z 217 na galezi noc/367c (e55e4b05) - autotest bitew w toku. Pytanie do Jeffa: wodz, ktory uszedl, traci tabor (lup DTE przy LootIsTransfer TAK) - zostawic?
+
 ## STAN 12.11 19:05 - WGRANIE 216 (457-461: AI bitwy pakiet 8 - odwod piechoty, zmiana linii, pozorowany odwrot jazdy; 458 i 461 sam pomiar)
 
 - **W grze:** Armoury.dll `8f5cf045099a1b792ea8227233da8c8c` (commit `63a7604f`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie216`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie216(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-461-po-tescie.sav`.
