@@ -213,13 +213,14 @@ namespace Armoury
             string def291d = DhPatchDefense(h);   // 291d: obrona gry w trzymaniu (Doctrine.Hold291.cs)
             string aim313 = OutshotRush.ApplyPatch(h);   // 313b: cel pieszy zamiast konnego strzelca (OutshotRush.cs)
             string o438 = O438ApplyPatch(h);   // 438: plany ataku RBM (1.1) i splity obrony RBM przy przegranym ostrzale (1.3) - Doctrine.Outshot438.cs
+            string h439 = H439ApplyPatch(h);   // 439: obronca trzyma do zwarcia (2.1/2.2) i szuka wzgorza (2.3) - Doctrine.Hold439.cs; po 438 (typy splitow obrony RBM)
             string pend333 = Pendulum333.ApplyPatch(h);  // 333 (B): szyk bez wahadla przed kontaktem (Pendulum333.cs); 344: arbiter ruchu i ustawienia
             string nff344 = NoFastForward344.ApplyPatch(h);   // 344: bieg autotestu bez przewijania (tylko LogGate.Mode 1 i plik-flaga)
             pend333 += ", bez przewijania 344 " + nff344;
             return "GetTacticWeight " + _patched + "/" + _wanted + " (Priority.Last po com.rbmai" + (miss.Length > 0 ? "; NIE:" + miss.ToString() : "")
                    + "), Attack " + _patchedAttack + "/" + _wantedAttack + (missA.Length > 0 ? " (NIE:" + missA.ToString() + ")" : "")
                    + ", biezaca taktyka " + (_fCur != null ? "TAK" : "NIE") + ", typy RBM: RBMBehaviorCavalryCharge " + (_fChargeInf != null ? "TAK" : "NIE")
-                   + ", RBMBehaviorArcherSkirmish " + (_tRbmArcher != null ? "TAK" : "NIE") + ", wagi zachowan " + (_fBehaviors != null ? "TAK" : "NIE") + ", obrona gry 291d " + def291d + ", cel pieszy 313b " + aim313 + ", wahadlo 333 " + pend333 + ", ostrzal 438 " + o438;
+                   + ", RBMBehaviorArcherSkirmish " + (_tRbmArcher != null ? "TAK" : "NIE") + ", wagi zachowan " + (_fBehaviors != null ? "TAK" : "NIE") + ", obrona gry 291d " + def291d + ", cel pieszy 313b " + aim313 + ", wahadlo 333 " + pend333 + ", ostrzal 438 " + o438 + ", obronca 439 " + h439;
         }
 
         private static void PatchAttack(Harmony h, Type t, StringBuilder miss)
@@ -537,6 +538,9 @@ namespace Armoury
                 {
                     try { DhTick(m, t, ti, c, now); }
                     catch (Exception e) { _dhStum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hold291", e); }
+                    // 439: obronca trzyma do zwarcia i szuka wzgorza - wlasny try, po DhTick (stan trzymania tego taktu)
+                    try { H439Tick(m, t, ti, c, now); }
+                    catch (Exception e) { _h439Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Hold439", e); }
                 }
             }
             if (_stumLocal > 0) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _stum += _stumLocal; } _stumLocal = 0; }

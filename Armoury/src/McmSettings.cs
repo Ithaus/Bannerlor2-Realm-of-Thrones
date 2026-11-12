@@ -11668,6 +11668,14 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool DefenderLeavesRbmSplitWhenOutshot { get; set; } = true;
 
+        [SettingPropertyBool("Defender Holds Until Melee Contact", HintText = "An AI defender holding its ground (Defenders Hold Their Ground) no longer leaves its position to charge as soon as the enemy foot or archers come within 75 m: it keeps its line until real close combat - an enemy formation within 25 m of its main infantry, or a third of that infantry fighting hand to hand. Archers shooting at it are answered by the rules for being outshot (Defenders Advance Under Fire, Defenders Charge When Outshot), not by this one. No bonus to any number on the field - only the decision when to charge. Field battles only. Off = the defender charges at 75 m as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool DefenderHoldsUntilMeleeContact { get; set; } = true;
+
+        [SettingPropertyBool("Defender Seeks High Ground", HintText = "An AI defender holding its ground (Defenders Hold Their Ground) takes the high ground before the attacker arrives: before the battle starts it picks a hill marked on the battle map near its main infantry, or else the steepest rise behind its line facing the enemy, and its main infantry forms up there instead of walking forward until the enemy is 200 m away. Only a rise of at least 2 m, at most 120 m away and not towards the enemy. No bonus to any number on the field - only where it stands. Field battles only. Off = the defender takes its position as before", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool DefenderSeeksHighGround { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15708,6 +15716,8 @@ namespace Armoury
             s.OutshotRushInRbmAttackPlans = OutshotRushInRbmAttackPlans;   // 438
             s.OutshotTriggerByMissileLosses = OutshotTriggerByMissileLosses;   // 438
             s.DefenderLeavesRbmSplitWhenOutshot = DefenderLeavesRbmSplitWhenOutshot;   // 438
+            s.DefenderHoldsUntilMeleeContact = DefenderHoldsUntilMeleeContact;   // 439
+            s.DefenderSeeksHighGround = DefenderSeeksHighGround;   // 439
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

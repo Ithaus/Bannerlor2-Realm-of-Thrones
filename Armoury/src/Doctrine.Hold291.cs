@@ -153,6 +153,7 @@ namespace Armoury
             _dhTac[i] = null; _dhTac0[i] = null; _dhHasDE[i] = false; _dhS2Was[i] = false; _dhS2Cnt[i] = 0;
             _dhDead2At[i] = -1f; _dhFireAt[i] = -1f; _dhFireP[i] = 0f; _dhFireSeen[i] = false; _dhFireDry[i] = false;   // 313b 291e
             _dhOut[i] = false; _dhFireOurs[i] = false;   // 320d
+            H439ClearTeam(i);   // 439
             for (int k = 0; k < DhK; k++) _dhW[i * DhK + k] = 0f;
         }
 
