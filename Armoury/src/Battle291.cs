@@ -23,6 +23,7 @@ namespace Armoury
             Doctrine.P440Reset();   // 440: linia "Wodz AI (440)"
             Doctrine.C441Reset();   // 441: linia "Jazda AI (441)"
             Doctrine.T442Reset();   // 442: linia "Cel szarzy (442)"
+            Doctrine.R443Reset();   // 443: linia "Rajd i ostrzal (443)"
         }
 
         internal static void Write(Mission m, string kind, string segA)
@@ -45,6 +46,7 @@ namespace Armoury
             Log.Info(Doctrine.P440Line(kind));   // 440: osobna linia
             Log.Info(Doctrine.C441Line(kind));   // 441: osobna linia
             Log.Info(Doctrine.T442Line(kind));   // 442: osobna linia
+            Log.Info(Doctrine.R443Line(kind));   // 443: osobna linia
         }
     }
 }

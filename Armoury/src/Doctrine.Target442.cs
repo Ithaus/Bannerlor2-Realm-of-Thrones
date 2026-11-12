@@ -322,6 +322,18 @@ namespace Armoury
 
         private static void T442Form(Mission m, Team t, Formation f, int idx, float step)
         {
+            // 443: szyk w roli RAID w fazie szarzy - slot z celem rajdu (postfiks jezdzca GetCorrectTarget trzyma jezdzcow na strzelcach, fakt 3); ocena 442 i liczniki
+            // 442 pominiete (jeden wlasciciel - rola). Inny szyk w roli (HIDE, RAID w dojezdzie z boku) - slot pusty jak w 442.
+            if (C441Owned(f))
+            {
+                var rt = R443AimTarget(f, idx);
+                if (rt == null) { if (Volatile.Read(ref _t4Who[idx]) != null) T442Drop(idx); return; }
+                if (!ReferenceEquals(Volatile.Read(ref _t4Who[idx]), f)) T442Drop(idx);
+                Volatile.Write(ref _t4Who[idx], f);
+                T442SetAnchors(idx, rt);
+                Volatile.Write(ref _t4Tgt[idx], rt);
+                return;
+            }
             var q = f.QuerySystem;
             bool cav = f.CountOfUnits >= T442MinCav && q != null && q.IsCavalryFormation && !q.IsRangedCavalryFormation && f.IsAIControlled
                        && !HorsePursuit.PlayerForm(f) && !f.HasPlayerControlledTroop && !C441Owned(f);

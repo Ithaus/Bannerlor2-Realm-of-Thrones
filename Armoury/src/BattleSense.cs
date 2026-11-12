@@ -62,6 +62,7 @@ namespace Armoury
                                  || c.CommanderPersonalityInBattle   // 440-p: profil wodza tez z P440Tick (rzut) - sam ten klucz dotad nic nie robil
                                  || c.CavalryCommander   // 441: zachowanie roli jazdy (Doctrine.Cav441.cs) - C441Begin / C441Tick z Doctrine
                                  || c.CavalryTargetChoice   // 442: cel szarzy jazdy (Doctrine.Target442.cs) - T442Begin / T442Tick z Doctrine (S3 CavalrySeeksFlanks wyciete)
+                                 || c.CavalryRaidsArchers || c.CavalryHidesFromMissiles || c.ArchersJudgeMissileDuel || c.ArchersShelterFromCavalry   // 443: Doctrine.Raid443.cs
                                  || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 
@@ -301,6 +302,8 @@ namespace Armoury
             {
                 try { HorsePursuit.OnHit(affectedAgent, affectorAgent, in blow); }
                 catch (Exception e) { RoutHold.Stumble(RoutHold.SitePursuit, "HorsePursuit.OnHit", e); }
+                // 443: trafienie pociskiem czlowieka albo konia (konia - w szyk jezdzca) - licznik slotu szyku (Interlocked, bez logu; tick asynchroniczny mozliwy)
+                Doctrine.R443OnHit(affectedAgent, affectorAgent, in blow);
             }
         }
 

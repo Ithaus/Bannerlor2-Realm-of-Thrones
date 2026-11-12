@@ -11692,6 +11692,22 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool CavalryTargetChoice { get; set; } = true;
 
+        [SettingPropertyBool("Cavalry Raids Archers", HintText = "AI cavalry in field battles that is losing riders or horses to enemy archers on foot (4 hits in 10 seconds while not fighting hand to hand) rides them down: archers standing in the open are charged straight away; when enemy infantry stands in the way, the cavalry rides round to the archers' flank first and charges from the side, and the riders keep to the archers on the way in. The raid ends when the archers have lost half their men, when the cavalry has lost two fifths of its riders or after 75 seconds; a raid is kept at least 30 seconds. Horse archers, your own formations and your side's formations you command are left as they were. Needs Cavalry Commander. No bonus to any number on the field - only decisions. Field battles only. Off = the cavalry is left to RBM, exactly as before. Counted in the Armoury log at the end of each field battle (line 443).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CavalryRaidsArchers { get; set; } = true;
+
+        [SettingPropertyBool("Cavalry Hides From Missiles", HintText = "AI cavalry in field battles under fire from enemy archers on foot that it cannot reach (enemy infantry covers them and there is no way round) pulls back behind its own main infantry instead of standing in the open, and stays there until its infantry closes with the enemy - then it is left to charge as before. After 30 seconds it rides out again if the fire has stopped, or raids the archers if a way to them has opened (with Cavalry Raids Archers). Needs Cavalry Commander and a main infantry formation not yet fighting. No bonus to any number on the field - only decisions. Field battles only. Off = the cavalry stays where RBM keeps it, exactly as before. Counted in the Armoury log at the end of each field battle (line 443).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CavalryHidesFromMissiles { get; set; } = true;
+
+        [SettingPropertyBool("Archers Judge Missile Duel", HintText = "AI archers weigh the exchange of missiles: when their side has lost at least 3 men to missiles in the last 30 seconds and more than one and a half times what the enemy lost to missiles, and the archers are being hit themselves, they fall back behind their own main infantry and shoot from there instead of standing and being shot down. They come out again when the exchange is no longer lost, but not sooner than 30 seconds. Only archers that are shooting, and only with a main infantry formation at least half their number. Every AI side, both sides, also against you - not the formations you command. No bonus to any number on the field - only decisions. Field battles only. Off = exactly as before. Counted in the Armoury log at the end of each field battle (line 443).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool ArchersJudgeMissileDuel { get; set; } = true;
+
+        [SettingPropertyBool("Archers Shelter From Cavalry", HintText = "AI archers that see enemy cavalry (not horse archers) riding at them that will reach them within about 8 seconds, from the front, the flank or the rear, or that is already within 20 m, fall back behind their own main infantry and shoot from there; they come out again 3 seconds after the threat has passed. Only archers that are shooting, and only with a main infantry formation at least half their number. Both sides, also against your cavalry - not the formations you command. No bonus to any number on the field - only decisions. Field battles only. Off = exactly as before. Counted in the Armoury log at the end of each field battle (line 443).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool ArchersShelterFromCavalry { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15738,6 +15754,10 @@ namespace Armoury
             s.CommandConfusionAfterCommanderDeath = CommandConfusionAfterCommanderDeath;   // 440
             s.CavalryCommander = CavalryCommander;   // 441
             s.CavalryTargetChoice = CavalryTargetChoice;   // 442
+            s.CavalryRaidsArchers = CavalryRaidsArchers;   // 443
+            s.CavalryHidesFromMissiles = CavalryHidesFromMissiles;   // 443
+            s.ArchersJudgeMissileDuel = ArchersJudgeMissileDuel;   // 443
+            s.ArchersShelterFromCavalry = ArchersShelterFromCavalry;   // 443
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

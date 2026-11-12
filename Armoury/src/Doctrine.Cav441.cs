@@ -165,6 +165,18 @@ namespace Armoury
 
         internal static void C441NoteFullPace() { _c4Pace++; }
 
+        /// <summary>443 (glowny watek): rola szyku wedlug 441 (NONE, gdy klucz NIE, slot innego szyku albo rola oddana przez 441 - gracz / szyk pusty).</summary>
+        internal static byte C441RoleOf(Formation f)
+        {
+            if (!_c4Live || f == null) return CrNone;
+            int idx = C441Idx(f);
+            if (idx < 0 || !ReferenceEquals(_c4Who[idx], f)) return CrNone;
+            return _c4Role[idx];
+        }
+
+        /// <summary>443: dowodca jazdy w tej misji (klucz Cavalry Commander, bitwa polowa) - bez niego role RAID / HIDE nie wchodza (tylko "bylby").</summary>
+        internal static bool C441Live { get { return _c4Live; } }
+
         /// <summary>Pominiecie szyku w roli: 0 = 148, 1 = szyki 204 / 283 / 311a / 344 (pass), 2 = odruch 344 na trafienie jezdzca.</summary>
         internal static void C441NoteSkip(int who)
         {

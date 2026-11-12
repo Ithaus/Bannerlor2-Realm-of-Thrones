@@ -45,6 +45,8 @@ namespace Armoury
     ///    (zmiana fazy) - przejmujemy od nowa, gdy dalej sie ostrzeliwuje, inaczej puszczamy.
     ///    Recenzja 25.10: kopia wag WEDLUG OBIEKTU zachowania (para zachowanie - waga), nie wedlug pozycji - FormationAI.FindBestBehavior (co 0.5 s)
     ///    przenosi wybrane zachowanie na indeks 0 listy _behaviors (Remove + Insert(0)), wiec po przejeciu kolejnosc listy jest inna niz przy zapisie.
+    ///    443: to samo schowanie z dwoch nowych powodow (Doctrine.Raid443.cs) - przegrana wymiana ognia (ArchersJudgeMissileDuel) i jazda wroga dojedzie za
+    ///    <= 8 s (ArchersShelterFromCavalry); takze druzyny AI bez doktryny i bez klucza S4; liczniki S4 tylko dla wejsc z powodu S4, reszta w linii 443.
     ///  - S4 to v1.1 w ZAKRESIE krytyka (noc/projekty/krytyk.txt:253) - kod jest, klucze domyslnie NIE (wlacza Jeff albo integrator w MCM); 124 (noc-final): domyslnie TAK.
     ///  - RangedHarrass dodany przez nas (nie lista RBM khuzait) liczy sie od 10% strzelcow druzyny (ZAKRES v1 "RangedHarrass na liscie od 10% strzelcow"):
     ///    progu nie da sie sprawdzic w ApplyList (AfterStart - ludzi jeszcze nie ma, rozstawienie wystawia ich w OnSetupTeamsOfSide,
@@ -280,6 +282,7 @@ namespace Armoury
             _on = AnyKey(c) && m != null && m.IsFieldBattle && _patched > 0;
             C441Begin(m);   // 441: zachowanie roli jazdy - wlasny klucz (bez AnyKey)
             T442Begin(m);   // 442: cel szarzy jazdy - wlasny klucz (bez AnyKey)
+            R443Begin(m);   // 443: rajd / schowanie jazdy, ocena wymiany ognia, lucznicy przed jazda - wlasne klucze (bez AnyKey), pomiar takze przy NIE
         }
 
         /// <summary>283 (HorsePursuit.ReactHalt, glowny watek): szyk trzymany teraz przez S4 (lucznicy za piechota - wagi zachowan przejete) - postoj 283 go
@@ -340,6 +343,7 @@ namespace Armoury
             P440ClearMission();   // 440
             C441ClearMission();   // 441
             T442ClearMission();   // 442
+            R443ClearMission();   // 443
         }
 
         /// <summary>WarCouncil.One (glowny watek, AfterStart albo pozna druzyna DR): doktryna druzyny AI i dodatki do listy taktyk. have/note - lista typow
@@ -419,6 +423,9 @@ namespace Armoury
             try { P440Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.P440Tick", e); }
             // 441: zachowanie roli jazdy - zalegle szyki, miary, oddanie roli graczowi (wlasny zegar 1 s i wlasny klucz)
             try { C441Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.C441Tick", e); }
+            // 443: rajd jazdy / schowanie za piechote (role 441), bilans ognia druzyn, zagrozenie lucznikow jazda (wlasny zegar 1 s i wlasne klucze); po 441
+            // (rola oddana graczowi / pustemu szykowi widoczna), przed 442 (cel rajdu w slocie jezdzca 442) i przed Manoeuvres (flagi S4 443 tego taktu)
+            try { R443Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.R443Tick", e); }
             // 442: cel szarzy jazdy - ocena szykow wroga, cel i kotwice slotow (wlasny zegar 1 s i wlasny klucz; po 441 - szyk w roli pominiety)
             try { T442Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.T442Tick", e); }
             _acc += dt;
@@ -581,7 +588,10 @@ namespace Armoury
             var c = Settings.Current;
             if (c == null || !m.IsFieldBattle || m.MissionEnded || !m.IsDeploymentFinished) return;
             bool s4 = c.ArchersFallBackBehindInfantry && _fBehaviors != null;
-            if (!s4) { ReleaseAllS4(); return; }
+            // 443: ocena wymiany ognia (4.2 b) i lucznicy przed jazda (5.1) uzywaja tego samego schowania S4 (BehaviorScreenedSkirmish 2) - takze bez klucza S4
+            // i takze w druzynach AI bez doktryny (tlum, przetrwanie jak S2); oba klucze NIE - co do znaku jak dotad (powody 443 zawsze 0)
+            bool n443 = _fBehaviors != null && (c.ArchersJudgeMissileDuel || c.ArchersShelterFromCavalry);
+            if (!s4 && !n443) { ReleaseAllS4(); return; }
             float dist = Math.Max(20f, Math.Min(100f, c.ArcherFallBackDistance));
             var teams = m.Teams;
             int n = teams != null ? teams.Count : 0;
@@ -591,7 +601,9 @@ namespace Armoury
                 try { t = teams[i]; } catch { t = null; }
                 if (!MissionTeams.Valid(t)) continue;
                 int ti = t.TeamIndex;
-                if (ti < 0 || ti >= MaxTeams || !_doct[ti] || !ReferenceEquals(_teamRef[ti], t)) continue;
+                if (ti < 0 || ti >= MaxTeams) continue;
+                bool doct = s4 && _doct[ti] && ReferenceEquals(_teamRef[ti], t);   // S4 (powod 0) - jak dotad tylko druzyny z doktryna
+                if (!doct && !n443) continue;
                 var fl = t.FormationsIncludingSpecialAndEmpty;
                 int nf = fl != null ? fl.Count : 0;
                 for (int j = 0; j < nf && j < 10; j++)
@@ -608,15 +620,18 @@ namespace Armoury
                         if (q.IsCavalryFormation) continue;   // 442: S3 (zdarzenie flanki) wyciete
                         // lucznicy jako glowny szyk druzyny (BehaviorScreenedSkirmish da im wtedy wage 0) - bez S4
                         if (!q.IsRangedFormation || (f.AI != null && f.AI.IsMainFormation && !_sBack[idx])) continue;
-                        if (!s4) { if (_sBack[idx]) Restore(m, f, idx); continue; }
-                        float gap = MeleeGap(t, f);
+                        float gap = doct ? MeleeGap(t, f) : float.MaxValue;
                         bool screen = Screen(t, f);
+                        // powod 0 (S4): wejscie od dist, trzymanie do dist + 25 m (jak dotad); 443: 2 przegrana wymiana ognia, 4 jazda wroga dojedzie (flagi z R443Tick)
+                        bool b0 = doct && (_sBack[idx] ? gap <= dist + S4Back : gap <= dist);
+                        byte why = n443 ? R443Why(f) : (byte)0;
+                        if (why != 0 && !screen && !_sBack[idx]) R443NoteNoScreen();
                         if (!_sBack[idx])
                         {
-                            if (gap <= dist && screen) TakeOver(m, f, idx);
+                            if ((b0 || why != 0) && screen) TakeOver(m, f, idx, b0, why);
                         }
-                        else if (gap > dist + S4Back || !screen) Restore(m, f, idx);
-                        else Keep(m, f, idx);
+                        else if ((!b0 && why == 0) || !screen) Restore(m, f, idx);
+                        else { _s4Why[idx] |= why; Keep(m, f, idx); }
                     }
                     catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Szyk", e); }
                 }
@@ -712,18 +727,25 @@ namespace Armoury
             return 0;
         }
 
-        private static void TakeOver(Mission m, Formation f, int idx)
+        /// <summary>443: b0 = powod S4 (liczniki S4 jak dotad), why = powody 443 (2 wymiana ognia, 4 jazda) - liczniki linii 443, gdy wejscie bez powodu S4.</summary>
+        private static void TakeOver(Mission m, Formation f, int idx, bool b0, byte why)
         {
             var lst = _fBehaviors(f.AI);
             if (lst == null) return;
             int r = Apply(lst, idx);
-            lock (RoutHold.Gate)
+            if (b0)
             {
-                RoutHold.EnsureLocked(m);
-                if (r == 0) _s4Back++; else if (r == 1) _s4NoScreen++; else _s4Other++;
+                lock (RoutHold.Gate)
+                {
+                    RoutHold.EnsureLocked(m);
+                    if (r == 0) _s4Back++; else if (r == 1) _s4NoScreen++; else _s4Other++;
+                }
             }
+            else R443NoteTake(r, why);
             if (r != 0) return;
             _sBack[idx] = true;
+            _s4Old[idx] = b0;
+            _s4Why[idx] = why;
             ArchersFellBack(f);
         }
 
@@ -736,7 +758,8 @@ namespace Armoury
             if (Apply(lst, idx) == 0) return;
             _sBack[idx] = false;
             Drop(idx);
-            lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Lost++; }
+            if (_s4Old[idx]) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Lost++; } }
+            else R443NoteLost();
         }
 
         private static void Restore(Mission m, Formation f, int idx)
@@ -745,7 +768,8 @@ namespace Armoury
             PutBack(lst, idx);
             _sBack[idx] = false;
             Drop(idx);
-            lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Return++; }
+            if (_s4Old[idx]) { lock (RoutHold.Gate) { RoutHold.EnsureLocked(m); _s4Return++; } }
+            else R443NoteReturn(_s4Why[idx]);
         }
 
         /// <summary>Zapisane wagi wracaja do TYCH SAMYCH obiektow zachowan (ReferenceEquals), gdziekolwiek sa teraz na liscie; zachowania spoza kopii
