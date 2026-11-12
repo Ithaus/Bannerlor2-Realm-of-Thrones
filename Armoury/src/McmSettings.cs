@@ -11740,6 +11740,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool CavalryHuntsRearCommander { get; set; } = true;
 
+        [SettingPropertyBool("Infantry Reserve", HintText = "AI infantry in field battles keeps part of its men back as a reserve instead of putting every man in the line. Once, before the armies meet (no enemy within 90 m of its infantry), when an AI side has at least 60 foot soldiers in its infantry formations, its commander pulls the rear ranks of each of them back into a reserve that stands about 25 m behind the line and follows it: a cautious commander keeps a quarter of his infantry back, an ordinary one about a sixth, a rash one about an eighth (with Commander Personality In Battle off - an ordinary one). Each formation keeps at least 30 men and a reserve of fewer than 12 is not formed. Archers and crossbowmen, heroes, standard bearers, company commanders and men already shaken stay in the line. The reserve goes in once: when a part of its line is losing the fight - the men there are clearly outmatched by the enemy around them (the game's local strength ratio below 0.8 for two seconds) - it joins that very formation; when enemy cavalry charges its archers, it marches out in front of the archers to cover them and joins the line once the riders are gone; when the enemy falls on the reserve itself, it charges them and then joins the line. It also joins the line at once when its side falls back or has no infantry line left. Every AI-led side, enemies and allied lords alike - never your own troops. No bonus to any number on the field - only decisions. Field battles only. Off = exactly as before. Counted in the Armoury log at the end of each field battle (line 457).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool InfantryReserve { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15826,6 +15830,7 @@ namespace Armoury
             s.CavalryDisengage = CavalryDisengage;   // 445
             s.InfantrySquareAgainstFlankCharge = InfantrySquareAgainstFlankCharge;   // 446
             s.CavalryHuntsRearCommander = CavalryHuntsRearCommander;   // 447
+            s.InfantryReserve = InfantryReserve;   // 457
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

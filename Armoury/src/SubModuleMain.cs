@@ -864,6 +864,9 @@ namespace Armoury
                 // 437: pomiary AI bitwy polowej (pakiet 0 audytu) - tylko odczyt, linie 'Pomiary AI bitwy (437)'; samo sprawdza bitwe polowa, latki raz na proces
                 if (Settings.Current.BattleAiMeasurements && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new BattleMeasure437.Logic());
+                // 457: odwod piechoty AI w szyku 8 w bitwie polowej (klucz InfantryReserve; przy NIE tylko pomiar "bylby"); samo sprawdza bitwe polowa
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new InfantryReserve457());
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
                     && (NightRest.PlayerCamped || CampScene.TestWanted()))   // m109-oboz: test autotestu (plik armoury-oboz-bitwa.flag) - kazda bitwa w polu jak w obozie
                     mission.AddMissionBehavior(new CampScene());
