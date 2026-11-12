@@ -75,11 +75,13 @@ namespace Armoury
         // 449: liczniki misji (glowny watek)
         internal static int K449Starts, PtBanner, PtForm, PtLead, PtSafe, PtExposed, OldChecked, OldInRange, Gathered449, GroupsOut, GroupMen, SoloOut, LateOut;
         internal static int RetArrived, RetTimeout, NoForm449, Joined, FellGather, FellReturn, FellJoined, FellJoinedSoon, Stum449;
+        internal static int PtNone, LeadKept, RetNoPt;   // 449-p: bez punktu (dawny), zawracajacy padl - zostali, droga bez punktu za szykiem
 
         internal static void ResetCounters()
         {
             K449Starts = PtBanner = PtForm = PtLead = PtSafe = PtExposed = OldChecked = OldInRange = Gathered449 = GroupsOut = GroupMen = SoloOut = LateOut = 0;
             RetArrived = RetTimeout = NoForm449 = Joined = FellGather = FellReturn = FellJoined = FellJoinedSoon = Stum449 = 0;
+            PtNone = LeadKept = RetNoPt = 0;
             RalGen.Clear(); RalCap.Clear(); RalPlayer = false;
             InRange.Clear(); SkipWounded.Clear(); SkipNoArms.Clear(); SkipFoe.Clear();
             Rolls = OkGen = OkCap = OkPlayer = Fail = Gone = BrokenSideScans = 0;
@@ -148,12 +150,13 @@ namespace Armoury
             sb.Append("ZBIORKA PRZY SZTANDARZE (449): klucz ").Append(key ? "TAK" : "NIE")
               .Append(" | zawroceni ").Append(Starts).Append(" (w trybie 449 ").Append(K449Starts).Append(')')
               .Append(" | punkt: sztandar ").Append(PtBanner).Append(" / za szykiem ").Append(PtForm).Append(" / przy zawracajacym ").Append(PtLead)
-              .Append(", poza zasiegiem lukow ").Append(PtSafe).Append(", w zasiegu mimo odsuniecia ").Append(PtExposed)
+              .Append(", poza zasiegiem lukow ").Append(PtSafe).Append(", w zasiegu mimo odsuniecia ").Append(PtExposed).Append(", bez punktu (dawny) ").Append(PtNone)
               .Append(" | dawny punkt (6 m za zawracajacym) w zasiegu lukow ").Append(OldInRange).Append(" z ").Append(OldChecked).Append(key ? "" : " (bylby)")
               .Append(" | zebrani przy sztandarze ").Append(Gathered449)
               .Append(" | powrot grupa: grup ").Append(GroupsOut).Append(", ludzi ").Append(GroupMen).Append("; sam po ").Append((int)GroupWait).Append(" s ").Append(SoloOut)
               .Append(", bez dotarcia do punktu (").Append((int)GatherMax449).Append(" s) ").Append(LateOut)
-              .Append(" | za szyk: dotarli ").Append(RetArrived).Append(", po czasie ").Append(RetTimeout).Append(", bez szyku ").Append(NoForm449)
+              .Append(" | za szyk: dotarli ").Append(RetArrived).Append(", po czasie ").Append(RetTimeout).Append(", bez punktu za szykiem ").Append(RetNoPt).Append(", bez szyku ").Append(NoForm449)
+              .Append(" | zawracajacy padl - zostali ").Append(LeadKept)
               .Append(" | wrocili do szyku ").Append(Joined)
               .Append(" | padli ").Append(key ? "(klucz TAK)" : "(klucz NIE - bylby)").Append(": w zbiorce ").Append(FellGather).Append(", w drodze do szyku ").Append(FellReturn)
               .Append(", po powrocie ").Append(FellJoined).Append(" z ").Append(Joined).Append(" (w ").Append((int)FellSoon).Append(" s ").Append(FellJoinedSoon).Append(')')
@@ -183,7 +186,7 @@ namespace Armoury
             public SpawnedItemEntity Item;
             public bool Arms, Done;
             // 449: K - tryb sztandaru od startu; F - szyk docelowy (klucz grupy); Ph 0 zbiorka, 1 powrot za szyk; Base - punkt bez rozrzutu Off
-            public bool K, Gat;
+            public bool K, Gat, Fp;   // 449-p: Fp - punkt z punktu szyku g.F (Bank), nie przy zawracajacym
             public Formation F;
             public int Ph;
             public Vec2 Base = Vec2.Invalid, Off, Ret = Vec2.Invalid;
@@ -796,7 +799,15 @@ namespace Armoury
             // druga panika - Break / gra prowadzi; chwilowy odwrot komponentu bez paniki (odrzut szarzy RBM) - czekamy, pozycja wraca nizej
             if (Knows(a) || (cai != null && cai.IsPanicked)) { RallyRelease(g); RallyOut(g); return; }
             var by = g.By;
-            if (by == null || !by.IsActive() || SurvivalMode.InPanic(by) || Knows(by)) { ReAdmit(g, m, now, c); return; }   // zawracajacy padl / spanikowal
+            if (by == null || !by.IsActive() || SurvivalMode.InPanic(by) || Knows(by))
+            {
+                // 449-p: zebrany przy sztandarze albo w drodze za szyk - juz nie zalezy od zawracajacego (szyk wybiera PickForm / JoinOk)
+                if (g.K && g.Item == null && (g.Gat || g.Ph == 1) && Rally449On(c))
+                {
+                    if (g.By != null) { Rally359.LeadKept++; g.By = null; }
+                }
+                else { ReAdmit(g, m, now, c); return; }   // zawracajacy padl / spanikowal
+            }
             // bron
             if (g.Item != null)
             {
@@ -873,11 +884,21 @@ namespace Armoury
         }
 
         /// <summary>Do szyku: sprzed paniki, zawracajacego, klasy postaci (>= 3 ludzi, nie w odwrocie, bez zalamania kompanii).</summary>
-        private bool Join(Rg g, Agent a)
+        private bool Join(Rg g, Agent a, Formation pref = null)
         {
             var t = a.Team;
             int kind;
-            Formation f = PickForm(g, a, out kind);   // 449: ta sama kolejnosc wydzielona (PickForm) - wybor szyku bez zmian
+            Formation f;
+            if (pref != null && JoinOk(pref, t))
+            {
+                // 449-p: tryb sztandaru - szyk, za ktory doszedl (g.F); rodzaj do licznikow jak w PickForm
+                f = pref;
+                Formation own;
+                if (_fledFrom.TryGetValue(a, out own) && ReferenceEquals(own, pref)) kind = 0;
+                else if (g.By != null && ReferenceEquals(g.By.Formation, pref)) kind = 1;
+                else kind = 2;
+            }
+            else f = PickForm(g, a, out kind);   // 449: ta sama kolejnosc wydzielona (PickForm) - wybor szyku bez zmian
             if (f == null) return false;
             RallyRelease(g);
             a.Formation = f;
@@ -1101,6 +1122,8 @@ namespace Armoury
                     var q = f.QuerySystem;
                     if (q == null) continue;
                     float ratio = q.RangedUnitRatioReadOnly + q.RangedCavalryUnitRatioReadOnly;
+                    // 449-p: udzial nigdy nie liczony (podreczna 0, np. szyk pod rozkazami gracza) - szyk strzelcow wedlug klasy (pole, bez przeliczania)
+                    if (ratio <= 0f && (f.RepresentativeClass == FormationClass.Ranged || f.RepresentativeClass == FormationClass.HorseArcher)) ratio = 1f;
                     if (ratio < Rally359.BowRatio) continue;
                     float r = q.MissileRangeAdjustedReadOnly / Math.Min(1f, ratio);
                     if (r <= 1f) r = q.MaximumMissileRangeReadOnly;
@@ -1115,9 +1138,10 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>Odsuniecie od kotwicy w tyl (back) od start m co 10 m do 80 m: pierwszy punkt w polu (10 m od granicy), bez wroga w 30 m i poza zasiegiem lukow;
-        /// bez takiego - najdalszy punkt w polu (safe false).</summary>
-        private static Vec2 Push(Mission m, Team t, Vec2 anchor, Vec2 back, float start, out bool safe)
+        /// <summary>Odsuniecie od kotwicy w tyl (back) od start m co 10 m do 80 m: pierwszy punkt w polu (10 m od granicy), na navmeshu, bez wroga w 30 m i poza
+        /// zasiegiem lukow; bez takiego - najdalszy punkt w polu na navmeshu (safe false); bez zadnego - Invalid (wolajacy zostawia dawny punkt).
+        /// 449-p: dawniej zapas = sama kotwica (w szeregach szyku) i bez sprawdzenia navmesha (rzeka / urwisko - nikt nie dochodzil).</summary>
+        private static Vec2 Push(Mission m, Team t, Vec2 anchor, WorldPosition basis, Vec2 back, float start, out bool safe)
         {
             safe = false;
             Vec2 last = Vec2.Invalid;
@@ -1128,13 +1152,23 @@ namespace Armoury
                 Vec2 edge = Vec2.Invalid;
                 try { edge = m.GetClosestBoundaryPosition(q); } catch { edge = Vec2.Invalid; }
                 if (edge.IsValid && edge.DistanceSquared(q) < HeroCaution.EdgeMargin * HeroCaution.EdgeMargin) break;
+                if (!OnMesh(basis, q)) continue;   // 449-p: woda / skala - dalej moze byc ziemia
                 last = q;
                 if (InBow(m, t, q)) continue;
                 if (m.GetNearbyEnemyAgentCount(t, q, Rally359.FoeClear) > 0) continue;
                 safe = true;
                 return q;
             }
-            return last.IsValid ? last : anchor;
+            return last;
+        }
+
+        /// <summary>449-p: punkt na navmeshu (wzor 445 / 444: WorldPosition.SetVec2 + GetNavMesh), glowny watek.</summary>
+        private static bool OnMesh(WorldPosition basis, Vec2 q)
+        {
+            if (!basis.IsValid) return false;
+            WorldPosition w = basis;
+            w.SetVec2(q);
+            return w.IsValid && w.GetNavMesh() != UIntPtr.Zero;
         }
 
         private Vec2 BackOf(Team t, Formation f)
@@ -1156,11 +1190,12 @@ namespace Armoury
             if (!back.IsValid) { bp.P = Vec2.Invalid; return bp; }
             var b = StandingBanner(f, m, -back);
             Vec2 anchor;
-            if (b != null) { anchor = b.Position.AsVec2; bp.Kind = 1; }
-            else { anchor = f.CachedMedianPosition.AsVec2; bp.Kind = 2; }
+            WorldPosition basis;
+            if (b != null) { anchor = b.Position.AsVec2; basis = b.GetWorldPosition(); bp.Kind = 1; }
+            else { basis = f.CachedMedianPosition; anchor = basis.AsVec2; bp.Kind = 2; }
             if (!anchor.IsValid) { bp.P = Vec2.Invalid; return bp; }
             bool safe;
-            bp.P = Push(m, t, anchor, back, f.Depth * 0.5f + Rally359.BehindForm, out safe);
+            bp.P = Push(m, t, anchor, basis, back, f.Depth * 0.5f + Rally359.BehindForm, out safe);
             bp.Safe = safe;
             return bp;
         }
@@ -1183,10 +1218,17 @@ namespace Armoury
                 if (by == null || !by.IsActive()) return false;
                 Vec2 back = BackOf(g.T, by.Formation);
                 if (!back.IsValid) return false;
-                b = Push(m, g.T, by.Position.AsVec2, back, Rally359.Back, out safe);
+                b = Push(m, g.T, by.Position.AsVec2, by.GetWorldPosition(), back, Rally359.Back, out safe);
                 kind = 3;
             }
-            if (!b.IsValid) return false;
+            if (!b.IsValid)
+            {
+                // 449-p: bez punktu w polu na navmeshu - zostaje dawny punkt (start: 6 m za zawracajacym), grupa nie liczy go do szyku
+                g.Fp = false;
+                if (count) Rally359.PtNone++;
+                return false;
+            }
+            g.Fp = kind != 3;
             if (count)
             {
                 if (kind == 1) Rally359.PtBanner++; else if (kind == 2) Rally359.PtForm++; else Rally359.PtLead++;
@@ -1194,7 +1236,7 @@ namespace Armoury
             }
             if (g.Base.IsValid && g.Base.DistanceSquared(b) <= Rally359.Repath * Rally359.Repath) return false;
             Vec2 p = b + g.Off;
-            if (!m.IsPositionInsideBoundaries(p)) p = b;
+            if (!m.IsPositionInsideBoundaries(p) || !OnMesh(a.GetWorldPosition(), p)) p = b;   // 449-p: rozrzut tez na navmeshu
             g.Base = b;
             g.Point = p;
             if (m.Scene != null) g.Wp = new WorldPosition(m.Scene, UIntPtr.Zero, new Vec3(p.x, p.y, a.Position.z), false);
@@ -1217,7 +1259,7 @@ namespace Armoury
             for (int i = 0; i < _rallyList.Count; i++)
             {
                 var g = _rallyList[i];
-                if (g.Done || !g.K || g.Ph != 0 || g.F == null || g.Item != null || g.Arrived < 0f || now - g.Arrived < Rally359.Hold) continue;
+                if (g.Done || !g.K || g.Ph != 0 || g.F == null || !g.Fp || g.Item != null || g.Arrived < 0f || now - g.Arrived < Rally359.Hold) continue;
                 int n;
                 _goCnt.TryGetValue(g.F, out n);
                 _goCnt[g.F] = n + 1;
@@ -1246,13 +1288,8 @@ namespace Armoury
                     g.Arrived = now;
                     if (!g.Gat) { g.Gat = true; Rally359.Gathered449++; }
                 }
-                bool go = false;
-                if (g.Arrived >= 0f && g.F != null && _goF.Contains(g.F))
-                {
-                    go = true;
-                    if (_goSeen.Add(g.F)) Rally359.GroupsOut++;
-                    Rally359.GroupMen++;
-                }
+                bool go = false, grp = false;
+                if (g.Arrived >= 0f && g.F != null && g.Fp && _goF.Contains(g.F)) { go = true; grp = true; }
                 else if (g.Arrived >= 0f && now - g.Arrived >= Rally359.GroupWait) { go = true; Rally359.SoloOut++; }
                 else if (g.Arrived < 0f && now - g.Start >= Rally359.GatherMax449) { go = true; Rally359.LateOut++; }
                 if (go)
@@ -1261,6 +1298,12 @@ namespace Armoury
                     int kind;
                     var f = PickForm(g, a, out kind);
                     if (f == null) { Rally359.NoForm449++; Rally359.NoForm++; ReAdmit(g, m, now, c); return; }
+                    if (grp)
+                    {
+                        // 449-p: liczone dopiero po wyjsciu (bez tych z ReAdmit)
+                        if (_goSeen.Add(g.F)) Rally359.GroupsOut++;
+                        Rally359.GroupMen++;
+                    }
                     g.F = f;
                     g.Ph = 1;
                     g.Out = now;
@@ -1302,8 +1345,8 @@ namespace Armoury
             if (there || timeOut || !rp.IsValid)
             {
                 if (!HasArms(a)) { ReAdmit(g, m, now, c); return; }
-                if (there) Rally359.RetArrived++; else Rally359.RetTimeout++;
-                if (!Join(g, a)) { Rally359.NoForm449++; Rally359.NoForm++; ReAdmit(g, m, now, c); }
+                if (there) Rally359.RetArrived++; else if (timeOut) Rally359.RetTimeout++; else Rally359.RetNoPt++;
+                if (!Join(g, a, ff)) { Rally359.NoForm449++; Rally359.NoForm++; ReAdmit(g, m, now, c); }
                 return;
             }
             if (now >= g.NextSet)
