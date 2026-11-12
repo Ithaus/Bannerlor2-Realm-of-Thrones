@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 15:55 - WGRANIE 214 (435-N-C: N wyrobu - brak wyrobow na targu dla L8/L9) + drabiny 240 s w Armoury.json
+
+- **W grze:** Armoury.dll `8215a1a619b17ef796c5bf026c374878` (commit `f4c2152f`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie214`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie214(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-435c-po-tescie.sav`.
+- **Autotest at-435c (n391, 90 dob, lancuch caly wlaczony):** KONIEC OK, wyjatkow 0; linia "LP N wyrobu (435-N-C)": kontrola 0, poza watkiem 0, potkniecia 0; L9 kontrole zlota/sztuk 0.
+- **Wynik doby 90:** targ miast prawie nasycony wyrobami - suma U (niewydane pieniadze mieszczan) 2530 zl/d wobec sprzedazy 344239 zl/d; N_w >= 1.5 tylko chleb w 3 miastach. L9: 60 stojacych, 14 kandydatow, 0 przezbrojen (ani z N towaru, ani z N wyrobu) - na nic nie brakuje popytu. Sygnal dziala i mowi "brak braku"; L8/L9 rusza po najazdach/wojnie.
+- **Klucz:** Workshops Follow Goods Shortage (TAK; dziala tylko z L8/L9).
+- **Decyzja Jeffa nr 7 audytu (drabiny):** w Armoury.json Jeffa dopisane `SiegeLadderWaitSeconds` = 240 (wczesniej klucza brak = domyslne 60). Kopia przed: `Armoury.json.bak-2026-11-12-przed-drabiny240` (obok), stan po: `D:/Backup-Bannerlord/Armoury.json.2026-11-12-drabiny240`. Do sprawdzenia w pierwszym szturmie Jeffa (sonda 370: czas wejscia drabin wzgledem wiezy/taranu).
+- **W pracy:** pakiet 7 szturm (450-456).
+
 ## STAN 12.11 15:00 - WGRANIE 213 (448-449: AI bitwy pakiet 6 - ciosy w plecy/bok i zalamanie sasiada lamia kompanie; zbiorka przy sztandarze)
 
 - **W grze:** Armoury.dll `71dfaa5374c2894732d8301f73d1a92a` (commit `f41dc0a7`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie213`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie213(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-449-po-tescie.sav`.
