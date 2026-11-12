@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 15:00 - WGRANIE 213 (448-449: AI bitwy pakiet 6 - ciosy w plecy/bok i zalamanie sasiada lamia kompanie; zbiorka przy sztandarze)
+
+- **W grze:** Armoury.dll `71dfaa5374c2894732d8301f73d1a92a` (commit `f41dc0a7`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie213`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie213(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-449-po-tescie.sav`.
+- **Autotest at-449 (n391), 5 dob + 7 bitew:** KONIEC OK, misje sprawdzone, wyjatkow 0. Segment 448 w "Choragwie (CH) koniec" w 7 bitwach: poza kolejka 0, potkniecia 448 0. Linia 449 w 7 bitwach, potkniecia 0. Nowych latek Harmony brak.
+- **Widziane:** 448 kierunek ciosow liczony (wrecz przod/bok/tyl np. 262/96/65 w bitwie armii), rzuty SASIAD 4-5 na bitwe -> 2 zalamania SASIAD w 7 bitwach, lancuch uciety 0 (bez lawiny). Rzuty TYL/BOK 0 - progi trafien (3 z tylu / 5 z boku w kilka s od 2 wrogow) nie przekroczone. 449: w bitwie lord-jazda 31 zawroconych dostalo punkt przy sztandarze poza zasiegiem lukow (dawny punkt byl w zasiegu 31 z 31); bitwa skonczyla sie (strona rozbita) zanim doszli - zebrani 0, padli w zbiorce 7.
+- **NIE widziane:** zalamanie od TYL/BOK, powrot grupa do szyku. Progi 448 to szacunki do strojenia po grze.
+- **Klucze (TAK):** Rear And Flank Hits Break Companies, Rally At Standing Banner.
+- **W pracy:** 435-N-C sygnal braku wyrobow dla L8/L9 (potem autotest 60+ dob).
+
 ## STAN 12.11 14:35 - WGRANIE 212 (435-N-A/A-p/B: sygnal niedoboru N - przyrost niewydanego budzetu robot zamiast poziomu, jedzenie poza N)
 
 - **W grze:** Armoury.dll `80e53a1d490f3fea0b49d6f3b9cff0ff` (commit `3b0bb522`, wypchniety; zawiera tez 441-447). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie212`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie212(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-435n-po-tescie.sav`.
