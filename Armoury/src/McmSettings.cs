@@ -1956,6 +1956,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool RallyRoutedMen { get; set; } = true;
 
+        [SettingPropertyBool("Rally At Standing Banner", HintText = "with Rally Routed Men on: men turned back by a commander no longer gather right beside him and then drift back to the front one by one. They gather by their formation's standing banner - or, if it has none, just behind the formation - at a spot pushed back out of reach of the enemy's archers where the ground allows, wait there until a few of them are together, and then walk back to the rear of their formation as one group. A man left waiting alone too long goes back on his own, still from the rear. Both sides alike, your men too. Off = exactly as before. Counted in the Armoury log at the end of each field battle (line 449).", RequireRestart = false)]
+        [SettingPropertyGroup("The master's parry")]
+        public bool RallyAtStandingBanner { get; set; } = true;
+
         [SettingPropertyBool("Routed Men Keep Arms", HintText = "with Routed Men Never Rally on and Artem's Lively Animations installed: in a field battle a man who panics keeps his weapons instead of throwing them all down - he still shows his fright and runs, but if a commander turns him back he has something to fight with. Sieges, sorties, sea battles and hideouts are left as they were. Off = he drops everything, as Artem's mod does", RequireRestart = false)]
         [SettingPropertyGroup("The master's parry")]
         public bool RoutedMenKeepArms { get; set; } = true;
@@ -13348,6 +13352,7 @@ namespace Armoury
             s.WoundedFightWarily = WoundedFightWarily;
             s.RoutedMenNeverRally = RoutedMenNeverRally;
             s.RallyRoutedMen = RallyRoutedMen;
+            s.RallyAtStandingBanner = RallyAtStandingBanner;   // 449
             s.RoutedMenKeepArms = RoutedMenKeepArms;
             s.CommanderShoutsHoldLine = CommanderShoutsHoldLine;
             s.HeroesKeepBehindTheirMen = HeroesKeepBehindTheirMen;

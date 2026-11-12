@@ -49,6 +49,12 @@ namespace Armoury
         internal const float GroupRadius = 15f, GroupFar = 120f;
         internal const int GroupMin = 3, RollsPerScan = 8, StartsPerFrame = 4, ArmsSearchPerScan = 4, MaxFails = 5;
         internal const float BrokenSide = 0.3f;
+        // 449: zbiorka przy stojacym sztandarze poza zasiegiem lukow, powrot grupa od tylu
+        internal const float BowMin = 50f, BowMax = 130f, BowRatio = 0.2f;   // zasieg szyku strzelcow wroga: MissileRangeAdjusted / udzial strzelcow, 50..130 m
+        internal const float BehindForm = 8f, PushStep = 10f, PushMax = 80f;  // punkt: pol glebokosci szyku + 8 m za sztandarem / szykiem, odsuwany co 10 m do 80 m
+        internal const float PointEvery = 2f, Repath = 4f, Arrive449 = 4f;
+        internal const float GatherMax449 = 45f, GroupWait = 20f, ReturnMax = 30f, RetBehind = 4f, RetArrive = 5f, FellSoon = 30f;
+        internal const int GroupGo = 3;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         // ---- liczniki misji (glowny watek; zeruje RoutHold.Ensure)
@@ -66,9 +72,14 @@ namespace Armoury
         internal static long CostSum, CostMax;
         // 359b: bron w ucieczce (RoutedKeepArms359)
         internal static int ArmsKept;
+        // 449: liczniki misji (glowny watek)
+        internal static int K449Starts, PtBanner, PtForm, PtLead, PtSafe, PtExposed, OldChecked, OldInRange, Gathered449, GroupsOut, GroupMen, SoloOut, LateOut;
+        internal static int RetArrived, RetTimeout, NoForm449, Joined, FellGather, FellReturn, FellJoined, FellJoinedSoon, Stum449;
 
         internal static void ResetCounters()
         {
+            K449Starts = PtBanner = PtForm = PtLead = PtSafe = PtExposed = OldChecked = OldInRange = Gathered449 = GroupsOut = GroupMen = SoloOut = LateOut = 0;
+            RetArrived = RetTimeout = NoForm449 = Joined = FellGather = FellReturn = FellJoined = FellJoinedSoon = Stum449 = 0;
             RalGen.Clear(); RalCap.Clear(); RalPlayer = false;
             InRange.Clear(); SkipWounded.Clear(); SkipNoArms.Clear(); SkipFoe.Clear();
             Rolls = OkGen = OkCap = OkPlayer = Fail = Gone = BrokenSideScans = 0;
@@ -124,6 +135,30 @@ namespace Armoury
               .Append(" | potkniecia ").Append(Stum)
               .Append(" | koszt ").Append(CostTicks > 0 ? Ms(CostSum / (double)CostTicks) : "-").Append(" ms sr. / ").Append(Ms(CostMax)).Append(" ms maks. (taktow ").Append(CostTicks).Append(").");
             Log.Info(sb.ToString());
+            Write449(c, key);
+        }
+
+        /// <summary>449: linia "ZBIORKA PRZY SZTANDARZE (449)" zaraz po "ZBIORKA (359)" - przy kluczu 359 albo przy jakimkolwiek zawroceniu. Przy kluczu NIE
+        /// punkt odniesienia "bylby": dawny punkt (6 m za zawracajacym) w zasiegu lukow i padli wedlug etapu.</summary>
+        private static void Write449(Settings c, bool key359)
+        {
+            if (!key359 && Starts == 0) return;
+            bool key = c != null && c.RallyAtStandingBanner;
+            var sb = new StringBuilder(700);
+            sb.Append("ZBIORKA PRZY SZTANDARZE (449): klucz ").Append(key ? "TAK" : "NIE")
+              .Append(" | zawroceni ").Append(Starts).Append(" (w trybie 449 ").Append(K449Starts).Append(')')
+              .Append(" | punkt: sztandar ").Append(PtBanner).Append(" / za szykiem ").Append(PtForm).Append(" / przy zawracajacym ").Append(PtLead)
+              .Append(", poza zasiegiem lukow ").Append(PtSafe).Append(", w zasiegu mimo odsuniecia ").Append(PtExposed)
+              .Append(" | dawny punkt (6 m za zawracajacym) w zasiegu lukow ").Append(OldInRange).Append(" z ").Append(OldChecked).Append(key ? "" : " (bylby)")
+              .Append(" | zebrani przy sztandarze ").Append(Gathered449)
+              .Append(" | powrot grupa: grup ").Append(GroupsOut).Append(", ludzi ").Append(GroupMen).Append("; sam po ").Append((int)GroupWait).Append(" s ").Append(SoloOut)
+              .Append(", bez dotarcia do punktu (").Append((int)GatherMax449).Append(" s) ").Append(LateOut)
+              .Append(" | za szyk: dotarli ").Append(RetArrived).Append(", po czasie ").Append(RetTimeout).Append(", bez szyku ").Append(NoForm449)
+              .Append(" | wrocili do szyku ").Append(Joined)
+              .Append(" | padli ").Append(key ? "(klucz TAK)" : "(klucz NIE - bylby)").Append(": w zbiorce ").Append(FellGather).Append(", w drodze do szyku ").Append(FellReturn)
+              .Append(", po powrocie ").Append(FellJoined).Append(" z ").Append(Joined).Append(" (w ").Append((int)FellSoon).Append(" s ").Append(FellJoinedSoon).Append(')')
+              .Append(" | potkniecia ").Append(Stum449).Append('.');
+            Log.Info(sb.ToString());
         }
     }
 
@@ -147,7 +182,21 @@ namespace Armoury
             public WorldPosition Wp = WorldPosition.Invalid;
             public SpawnedItemEntity Item;
             public bool Arms, Done;
+            // 449: K - tryb sztandaru od startu; F - szyk docelowy (klucz grupy); Ph 0 zbiorka, 1 powrot za szyk; Base - punkt bez rozrzutu Off
+            public bool K, Gat;
+            public Formation F;
+            public int Ph;
+            public Vec2 Base = Vec2.Invalid, Off, Ret = Vec2.Invalid;
+            public float Out = -1f, NextPt;
         }
+        /// <summary>449: punkt zbiorki szyku (wspolny dla grupy), liczony co 2 s.</summary>
+        private sealed class Bp { public Vec2 P = Vec2.Invalid; public float At = -99f; public int Kind; public bool Safe; }
+        private readonly Dictionary<Formation, Bp> _bpt = new Dictionary<Formation, Bp>();
+        private readonly Dictionary<Formation, int> _goCnt = new Dictionary<Formation, int>();
+        private readonly HashSet<Formation> _goF = new HashSet<Formation>(), _goSeen = new HashSet<Formation>();
+        private readonly Dictionary<Agent, float> _joinedAt = new Dictionary<Agent, float>();
+        private BannerBearerLogic _bbl449;
+        private Mission _bblM;
         private struct RqItem { public Entry E; public Agent By; public Team T; public int Role; public SpawnedItemEntity Item; }
 
         private readonly HashSet<Agent> _rallyTried = new HashSet<Agent>();
@@ -205,6 +254,7 @@ namespace Armoury
             {
                 _rallyTried.Clear(); _rallied.Clear(); _rallyBy.Clear(); _rallyList.Clear(); _rallyQ.Clear(); _ralliers.Clear();
                 _tinfo.Clear(); _groups.Clear(); _gcand.Clear(); _armsWait.Clear();
+                _bpt.Clear(); _goCnt.Clear(); _goF.Clear(); _goSeen.Clear(); _joinedAt.Clear(); _bbl449 = null; _bblM = null;   // 449
                 for (int i = 0; i < _rallyEnts.Length; i++) _rallyEnts[i] = default(WeakGameEntity);
             }
             catch { }
@@ -258,6 +308,7 @@ namespace Armoury
                 if (_rallyStepAcc >= Rally359.StepEvery && _rallyList.Count > 0)
                 {
                     _rallyStepAcc = 0f;
+                    if (Rally449On(c)) { try { GroupPass449(now); } catch (Exception e) { Rally359.Stum449++; Rally359.Stumble("RoutKeeper.Grupa449", e); } }
                     bool done = false;
                     for (int i = 0; i < _rallyList.Count; i++)
                     {
@@ -682,6 +733,29 @@ namespace Armoury
             if (!m.IsPositionInsideBoundaries(pt)) pt = bp;
             g.Point = pt;
             if (m.Scene != null) g.Wp = new WorldPosition(m.Scene, UIntPtr.Zero, new Vec3(pt.x, pt.y, by.Position.z), false);
+            // 449: pomiar dawnego punktu w obu trybach (sam odczyt podrecznych wartosci gry, bez losowania); przy kluczu - punkt szyku przy stojacym sztandarze
+            try { Rally359.OldChecked++; if (InBow(m, a.Team, pt)) Rally359.OldInRange++; }
+            catch (Exception ex) { Rally359.Stum449++; Rally359.Stumble("RoutKeeper.Pomiar449", ex); }
+            if (Rally449On(Settings.Current))
+            {
+                try
+                {
+                    g.K = true;
+                    g.Off = new Vec2((float)Math.Cos(ang) * rad, (float)Math.Sin(ang) * rad);
+                    int kind;
+                    g.F = PickForm(g, a, out kind);
+                    if (!Target449(g, m, now, true)) { g.Point = pt; g.Base = Vec2.Invalid; }   // bez punktu - dawny, ponowienie w kroku
+                    g.NextPt = now + Rally359.PointEvery;
+                    Rally359.K449Starts++;
+                }
+                catch (Exception ex)
+                {
+                    // potkniecie na czlowieku: zostaje w dawnej zbiorce (punkt 6 m za zawracajacym)
+                    g.K = false; g.F = null; g.Point = pt;
+                    if (m.Scene != null) g.Wp = new WorldPosition(m.Scene, UIntPtr.Zero, new Vec3(pt.x, pt.y, by.Position.z), false);
+                    Rally359.Stum449++; Rally359.Stumble("RoutKeeper.Start449", ex);
+                }
+            }
             if (q.Item != null && !HasArms(a))
             {
                 g.Item = q.Item;
@@ -745,6 +819,12 @@ namespace Armoury
                     return;
                 }
             }
+            if (g.K && Rally449On(c))
+            {
+                try { Step449(g, a, m, now, c); }
+                catch { Rally359.Stum449++; throw; }   // potkniecie na czlowieku: g.Fails w RallyTick, po 5 ReAdmit
+                return;
+            }
             Vec2 pos = a.Position.AsVec2;
             if (g.Arrived < 0f && pos.IsValid && g.Point.IsValid && pos.DistanceSquared(g.Point) <= Rally359.Arrive * Rally359.Arrive) g.Arrived = now;
             bool ready = (g.Arrived >= 0f && now - g.Arrived >= Rally359.Hold) || now - g.Start >= Rally359.GatherMax;
@@ -796,17 +876,8 @@ namespace Armoury
         private bool Join(Rg g, Agent a)
         {
             var t = a.Team;
-            Formation f = null;
-            int kind = -1;
-            Formation own;
-            if (_fledFrom.TryGetValue(a, out own) && JoinOk(own, t)) { f = own; kind = 0; }
-            if (f == null && g.By != null && JoinOk(g.By.Formation, t)) { f = g.By.Formation; kind = 1; }
-            if (f == null)
-            {
-                Formation cf = null;
-                try { cf = t.GetFormation(a.Character.DefaultFormationClass); } catch { cf = null; }
-                if (JoinOk(cf, t)) { f = cf; kind = 2; }
-            }
+            int kind;
+            Formation f = PickForm(g, a, out kind);   // 449: ta sama kolejnosc wydzielona (PickForm) - wybor szyku bez zmian
             if (f == null) return false;
             RallyRelease(g);
             a.Formation = f;
@@ -814,6 +885,10 @@ namespace Armoury
             if (a.IsHero && f.Captain == null) { try { f.Captain = a; } catch { } }
             if (kind == 0) Rally359.BackOwn++; else if (kind == 1) Rally359.BackLead++; else Rally359.BackClass++;
             RallyOut(g);
+            // 449: czas powrotu do szyku (sam zapis - "padli po powrocie" w obu trybach)
+            Rally359.Joined++;
+            var m = Mission;
+            if (m != null) _joinedAt[a] = m.CurrentTime;
             return true;
         }
 
@@ -925,17 +1000,328 @@ namespace Armoury
             else Rally359.RePanicFlee++;
         }
 
-        /// <summary>Zawrocony padl (zabity / nieprzytomny) nie w panice - "padli po powrocie".</summary>
+        /// <summary>Zawrocony padl (zabity / nieprzytomny) nie w panice - "padli po powrocie". 449: etap (zbiorka / droga do szyku / w szyku) - w obu trybach klucza.</summary>
         private void RallyRemoved(Agent a, AgentState state)
         {
             if (a == null) return;
+            int ph = -1;
+            Rg rg;
+            if (a.IsHuman && _rallyBy.TryGetValue(a, out rg) && rg != null && !rg.Done) ph = rg.K ? rg.Ph : 0;
             RallyEvent(a, false);
             if (!_rallied.Contains(a)) return;
             if ((state == AgentState.Killed || state == AgentState.Unconscious) && !Knows(a))
             {
                 bool panic = false;
                 try { var cai = a.CommonAIComponent; panic = cai != null && cai.IsPanicked; } catch { }
-                if (!panic) Rally359.FellAfter++;
+                if (!panic)
+                {
+                    Rally359.FellAfter++;
+                    // 449: etap smierci (sam odczyt)
+                    float jt;
+                    if (ph == 0) Rally359.FellGather++;
+                    else if (ph == 1) Rally359.FellReturn++;
+                    else if (_joinedAt.TryGetValue(a, out jt))
+                    {
+                        Rally359.FellJoined++;
+                        var m = Mission;
+                        if (m != null && m.CurrentTime - jt <= Rally359.FellSoon) Rally359.FellJoinedSoon++;
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------------------ 449: zbiorka przy stojacym sztandarze, powrot grupa od tylu (glowny watek)
+
+        private static bool Rally449On(Settings c)
+        {
+            return c != null && c.RallyAtStandingBanner;
+        }
+
+        /// <summary>Szyk docelowy - kolejnosc jak dotad w Join: sprzed paniki, zawracajacego, klasy postaci (JoinOk). kind 0 / 1 / 2, -1 brak.</summary>
+        private Formation PickForm(Rg g, Agent a, out int kind)
+        {
+            var t = a.Team;
+            kind = -1;
+            Formation own;
+            if (_fledFrom.TryGetValue(a, out own) && JoinOk(own, t)) { kind = 0; return own; }
+            if (g.By != null && JoinOk(g.By.Formation, t)) { kind = 1; return g.By.Formation; }
+            Formation cf = null;
+            try { cf = t.GetFormation(a.Character.DefaultFormationClass); } catch { cf = null; }
+            if (JoinOk(cf, t)) { kind = 2; return cf; }
+            return null;
+        }
+
+        private BannerBearerLogic Bbl(Mission m)
+        {
+            if (!ReferenceEquals(_bblM, m))
+            {
+                _bblM = m;
+                try { _bbl449 = m.GetMissionBehavior<BannerBearerLogic>(); } catch { _bbl449 = null; }
+            }
+            return _bbl449;
+        }
+
+        /// <summary>Stojacy sztandar szyku: chorazy gry z drzewcem w reku, czynny, w tym szyku, nie w ucieczce / panice / odwrocie rannego; z kilku - najdalej z tylu.</summary>
+        private Agent StandingBanner(Formation f, Mission m, Vec2 toFoe)
+        {
+            var bbl = Bbl(m);
+            if (bbl == null) return null;
+            List<Agent> bs = null;
+            try { bs = bbl.GetFormationBannerBearers(f); } catch { bs = null; }
+            if (bs == null) return null;
+            Agent best = null;
+            float bd = float.MaxValue;
+            for (int i = 0; i < bs.Count; i++)
+            {
+                var b = bs[i];
+                if (b == null || !b.IsActive() || b.IsFadingOut() || b.Banner == null || b.IsRunningAway || !ReferenceEquals(b.Formation, f)) continue;
+                if (SurvivalMode.InPanic(b) || Knows(b) || Withdrawing(b)) continue;
+                float d = toFoe.IsValid ? b.Position.AsVec2.DotProduct(toFoe) : 0f;
+                if (best == null || d < bd) { bd = d; best = b; }
+            }
+            return best;
+        }
+
+        /// <summary>Punkt w zasiegu lukow wroga druzyny t: szyk wroga (od 3 ludzi) z udzialem strzelcow od 0.2, zasieg = MissileRangeAdjusted / udzial
+        /// (bez niego MaximumMissileRange), 50..130 m, od krawedzi szyku (pol szerokosci, do 30 m). Tylko wartosci podreczne gry (ReadOnly - bez przeliczania).</summary>
+        private static bool InBow(Mission m, Team t, Vec2 p)
+        {
+            var teams = m.Teams;
+            int nt = teams != null ? teams.Count : 0;
+            for (int i = 0; i < nt; i++)
+            {
+                var o = teams[i];
+                if (!MissionTeams.Valid(o) || !MissionTeams.Enemies(t, o)) continue;
+                var fl = o.FormationsIncludingSpecialAndEmpty;
+                int nf = fl != null ? fl.Count : 0;
+                for (int j = 0; j < nf; j++)
+                {
+                    var f = fl[j];
+                    if (f == null || f.CountOfUnits < 3) continue;
+                    var q = f.QuerySystem;
+                    if (q == null) continue;
+                    float ratio = q.RangedUnitRatioReadOnly + q.RangedCavalryUnitRatioReadOnly;
+                    if (ratio < Rally359.BowRatio) continue;
+                    float r = q.MissileRangeAdjustedReadOnly / Math.Min(1f, ratio);
+                    if (r <= 1f) r = q.MaximumMissileRangeReadOnly;
+                    if (r <= 1f) r = Rally359.BowMax;
+                    r = Math.Max(Rally359.BowMin, Math.Min(Rally359.BowMax, r));
+                    Vec2 c0 = f.CachedMedianPosition.AsVec2;
+                    if (!c0.IsValid) continue;
+                    float d = p.Distance(c0) - Math.Min(f.Width * 0.5f, 30f);
+                    if (d < r) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>Odsuniecie od kotwicy w tyl (back) od start m co 10 m do 80 m: pierwszy punkt w polu (10 m od granicy), bez wroga w 30 m i poza zasiegiem lukow;
+        /// bez takiego - najdalszy punkt w polu (safe false).</summary>
+        private static Vec2 Push(Mission m, Team t, Vec2 anchor, Vec2 back, float start, out bool safe)
+        {
+            safe = false;
+            Vec2 last = Vec2.Invalid;
+            for (float k = 0f; k <= Rally359.PushMax + 0.1f; k += Rally359.PushStep)
+            {
+                Vec2 q = anchor + back * (start + k);
+                if (!m.IsPositionInsideBoundaries(q)) break;
+                Vec2 edge = Vec2.Invalid;
+                try { edge = m.GetClosestBoundaryPosition(q); } catch { edge = Vec2.Invalid; }
+                if (edge.IsValid && edge.DistanceSquared(q) < HeroCaution.EdgeMargin * HeroCaution.EdgeMargin) break;
+                last = q;
+                if (InBow(m, t, q)) continue;
+                if (m.GetNearbyEnemyAgentCount(t, q, Rally359.FoeClear) > 0) continue;
+                safe = true;
+                return q;
+            }
+            return last.IsValid ? last : anchor;
+        }
+
+        private Vec2 BackOf(Team t, Formation f)
+        {
+            TInfo ti;
+            if (t != null && _tinfo.TryGetValue(t, out ti) && ti.Away.IsValid) return ti.Away;
+            if (f != null && f.Direction.IsValid && f.Direction.LengthSquared > 0.25f) return -f.Direction.Normalized();
+            return Vec2.Invalid;
+        }
+
+        /// <summary>Punkt zbiorki szyku (wspolny, co 2 s): stojacy sztandar (kind 1), bez niego srodek szyku (kind 2); pol glebokosci + 8 m w tyl, odsuwany poza luki.</summary>
+        private Bp Bank(Formation f, Team t, Mission m, float now)
+        {
+            Bp bp;
+            if (!_bpt.TryGetValue(f, out bp)) { bp = new Bp(); _bpt[f] = bp; }
+            if (bp.P.IsValid && now - bp.At < Rally359.PointEvery) return bp;
+            bp.At = now;
+            Vec2 back = BackOf(t, f);
+            if (!back.IsValid) { bp.P = Vec2.Invalid; return bp; }
+            var b = StandingBanner(f, m, -back);
+            Vec2 anchor;
+            if (b != null) { anchor = b.Position.AsVec2; bp.Kind = 1; }
+            else { anchor = f.CachedMedianPosition.AsVec2; bp.Kind = 2; }
+            if (!anchor.IsValid) { bp.P = Vec2.Invalid; return bp; }
+            bool safe;
+            bp.P = Push(m, t, anchor, back, f.Depth * 0.5f + Rally359.BehindForm, out safe);
+            bp.Safe = safe;
+            return bp;
+        }
+
+        /// <summary>Cel zbiorki czlowieka: punkt szyku g.F, bez szyku - 6 m za zawracajacym odsuniete poza luki (kind 3). true - punkt sie przesunal (nowa pozycja).</summary>
+        private bool Target449(Rg g, Mission m, float now, bool count)
+        {
+            var a = g.A;
+            Vec2 b;
+            int kind;
+            bool safe;
+            if (g.F != null && JoinOk(g.F, g.T))
+            {
+                var bp = Bank(g.F, g.T, m, now);
+                b = bp.P; kind = bp.Kind; safe = bp.Safe;
+            }
+            else
+            {
+                var by = g.By;
+                if (by == null || !by.IsActive()) return false;
+                Vec2 back = BackOf(g.T, by.Formation);
+                if (!back.IsValid) return false;
+                b = Push(m, g.T, by.Position.AsVec2, back, Rally359.Back, out safe);
+                kind = 3;
+            }
+            if (!b.IsValid) return false;
+            if (count)
+            {
+                if (kind == 1) Rally359.PtBanner++; else if (kind == 2) Rally359.PtForm++; else Rally359.PtLead++;
+                if (safe) Rally359.PtSafe++; else Rally359.PtExposed++;
+            }
+            if (g.Base.IsValid && g.Base.DistanceSquared(b) <= Rally359.Repath * Rally359.Repath) return false;
+            Vec2 p = b + g.Off;
+            if (!m.IsPositionInsideBoundaries(p)) p = b;
+            g.Base = b;
+            g.Point = p;
+            if (m.Scene != null) g.Wp = new WorldPosition(m.Scene, UIntPtr.Zero, new Vec3(p.x, p.y, a.Position.z), false);
+            return true;
+        }
+
+        /// <summary>Punkt za szykiem (od strony przeciwnej do jego czola): pol glebokosci + 4 m.</summary>
+        private static Vec2 RetPoint(Formation f)
+        {
+            Vec2 c0 = f.CachedMedianPosition.AsVec2;
+            Vec2 d = f.Direction;
+            if (!c0.IsValid || !d.IsValid || d.LengthSquared < 0.25f) return Vec2.Invalid;
+            return c0 - d.Normalized() * (f.Depth * 0.5f + Rally359.RetBehind);
+        }
+
+        /// <summary>Przed krokiem (co 0.25 s): szyki, przy ktorych czeka co najmniej 3 zebranych (kazdy od 6 s) - cala grupa rusza teraz.</summary>
+        private void GroupPass449(float now)
+        {
+            _goCnt.Clear(); _goF.Clear(); _goSeen.Clear();
+            for (int i = 0; i < _rallyList.Count; i++)
+            {
+                var g = _rallyList[i];
+                if (g.Done || !g.K || g.Ph != 0 || g.F == null || g.Item != null || g.Arrived < 0f || now - g.Arrived < Rally359.Hold) continue;
+                int n;
+                _goCnt.TryGetValue(g.F, out n);
+                _goCnt[g.F] = n + 1;
+            }
+            foreach (var kv in _goCnt) if (kv.Value >= Rally359.GroupGo) _goF.Add(kv.Key);
+        }
+
+        /// <summary>Krok czlowieka w trybie 449 (po broni): zbiorka przy punkcie szyku, wyjscie grupa (albo sam po 20 s / bez dotarcia po 45 s), droga za szyk,
+        /// dolaczenie przy tyle szyku (albo po 30 s drogi).</summary>
+        private void Step449(Rg g, Agent a, Mission m, float now, Settings c)
+        {
+            Vec2 pos = a.Position.AsVec2;
+            if (g.Ph == 0)
+            {
+                bool moved = false;
+                if (now >= g.NextPt)
+                {
+                    g.NextPt = now + Rally359.PointEvery;
+                    int kind;
+                    var f2 = PickForm(g, a, out kind);
+                    if (f2 != null && !ReferenceEquals(f2, g.F)) { g.F = f2; g.Base = Vec2.Invalid; g.Arrived = -1f; }   // inny szyk - inny punkt, zbiorka od nowa
+                    moved = Target449(g, m, now, false);
+                }
+                if (g.Arrived < 0f && pos.IsValid && g.Point.IsValid && pos.DistanceSquared(g.Point) <= Rally359.Arrive449 * Rally359.Arrive449)
+                {
+                    g.Arrived = now;
+                    if (!g.Gat) { g.Gat = true; Rally359.Gathered449++; }
+                }
+                bool go = false;
+                if (g.Arrived >= 0f && g.F != null && _goF.Contains(g.F))
+                {
+                    go = true;
+                    if (_goSeen.Add(g.F)) Rally359.GroupsOut++;
+                    Rally359.GroupMen++;
+                }
+                else if (g.Arrived >= 0f && now - g.Arrived >= Rally359.GroupWait) { go = true; Rally359.SoloOut++; }
+                else if (g.Arrived < 0f && now - g.Start >= Rally359.GatherMax449) { go = true; Rally359.LateOut++; }
+                if (go)
+                {
+                    if (!HasArms(a)) { ReAdmit(g, m, now, c); return; }
+                    int kind;
+                    var f = PickForm(g, a, out kind);
+                    if (f == null) { Rally359.NoForm449++; Rally359.NoForm++; ReAdmit(g, m, now, c); return; }
+                    g.F = f;
+                    g.Ph = 1;
+                    g.Out = now;
+                    g.Ret = Vec2.Invalid;
+                    g.NextSet = now;
+                }
+                else
+                {
+                    if (moved) { SetPoint(g); g.NextSet = now + 0.5f; }
+                    else if (now >= g.NextSet)
+                    {
+                        g.NextSet = now + 0.5f;
+                        bool lost = false;
+                        try { lost = (a.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) == 0; } catch { lost = false; }
+                        if (lost) SetPoint(g);
+                    }
+                    return;
+                }
+            }
+            // droga za szyk (grupa idzie razem - ten sam punkt z rozrzutem o polowe)
+            if (g.F == null || !JoinOk(g.F, g.T))
+            {
+                int kind;
+                var f = PickForm(g, a, out kind);
+                if (f == null) { Rally359.NoForm449++; Rally359.NoForm++; ReAdmit(g, m, now, c); return; }
+                g.F = f;
+                g.Ret = Vec2.Invalid;
+            }
+            var ff = g.F;
+            bool timeOut = now - g.Out >= Rally359.ReturnMax;
+            bool there = false;
+            Vec2 rp = RetPoint(ff);
+            if (rp.IsValid && pos.IsValid)
+            {
+                Vec2 c0 = ff.CachedMedianPosition.AsVec2;
+                float rr = ff.Depth * 0.5f + Rally359.RetBehind + 2f;
+                there = pos.DistanceSquared(rp) <= Rally359.RetArrive * Rally359.RetArrive || (c0.IsValid && pos.DistanceSquared(c0) <= rr * rr);
+            }
+            if (there || timeOut || !rp.IsValid)
+            {
+                if (!HasArms(a)) { ReAdmit(g, m, now, c); return; }
+                if (there) Rally359.RetArrived++; else Rally359.RetTimeout++;
+                if (!Join(g, a)) { Rally359.NoForm449++; Rally359.NoForm++; ReAdmit(g, m, now, c); }
+                return;
+            }
+            if (now >= g.NextSet)
+            {
+                g.NextSet = now + 0.5f;
+                bool lost = false;
+                try { lost = (a.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) == 0; } catch { lost = false; }
+                if (lost || !g.Ret.IsValid || g.Ret.DistanceSquared(rp) > 2f * 2f)
+                {
+                    g.Ret = rp;
+                    Vec2 p = rp + g.Off * 0.5f;
+                    if (!m.IsPositionInsideBoundaries(p)) p = rp;
+                    if (m.Scene != null)
+                    {
+                        g.Wp = new WorldPosition(m.Scene, UIntPtr.Zero, new Vec3(p.x, p.y, a.Position.z), false);
+                        SetPoint(g);
+                    }
+                }
             }
         }
     }
