@@ -51,6 +51,70 @@ Linie: 'Odwrot wodza (458): t=..s | T. Side (wrog gracza) | ODWROT NA ROZKAZ (re
 
 **Status:** DO SPRAWDZENIA (nie wgrane).
 
+## 462-a-p (12.11) - poprawki po recenzji 462: udzial jedzenia wobec zuzycia warsztatow, zboze pierwsze przy glodzie, tekst linii przy NIE
+
+**Problem:** recenzja 462 (niezalezny agent): D1 - dla miesa "sprzedaz" w mianowniku to sprzedaz calego targu (ukryci rzemieslnicy BK robia mieso bez wsadu, BannerKings.Redux workshops.xml:22-25, wiec MarketSales je sledzi), a mieso jest wsadem piekarni (workshops.xml:616-620) - udzial wychodzil ~1 przy pustych piekarniach. D2 - w miescie z glodujacymi wsiami zboze (N = 2) tracilo wylaczne pierwszenstwo w L6, bo winogrona / jablka / bydlo mogly tez dojsc do 2. D3 - fragment "462-a" dopisywal sie do linii LP takze przy NIE.
+
+**Przyczyna:** QueueShare dostawal `sales` (max z got i sprzedazy targu) zamiast `got`; brak oslony glodu dla innego jedzenia; tekst bez warunku klucza.
+
+**Zmiana:** komorka i wiersz swiata jedzenia: QueueShare(brak, got) - wobec zuzycia warsztatow; w miescie z glodujacymi wsiami jedzenie inne niz zboze ma S_kolejka 1 (zboze dalej N = 2); linia LP: przy TAK fragment 462-a, przy NIE fragment 435-N-B jak przed. Klucz NIE nadal co do bitu jak 435-N-B. Odrzucone / do wiadomosci: D4 (brak to jeden cykl na linie na dobe - udzial jest dolna granica; calkowity brak dalej 2) - projekt, nie blad; uwaga 462-b (zanizenie doby zapisu w scalonej komorce najwyzej 1/28) - bez zmian.
+
+**Ryzyko / co sprawdzic:** N miesa wzrosnie w miastach z piekarniami bez miesa - L8 / L9 czytaja N wyrobu (tablica Ware), nie te kolejke, ale L5 / L6 / pulap zamowien 363 / finansowanie sprzetu wsi przez miasta (VillageGear.Fund) zobacza zboze, owoce, mieso i zwierzeta - nowy przeplyw zlota do sprawdzenia w tescie (kontrole ksiag 0). Stare zapisy z zerami 435-N-B: przez 28 dob udzial zanizony (historia bez brakow) - przejsciowe. Linia CommodityInputs284 "jedzenie i zwierzeta (tylko pomiar)" bez zmian (tekst nieaktualny przy TAK).
+
+**Status:** DO SPRAWDZENIA
+
+## 462-b (12.11) - wczytanie pamieci N (arm_lpn): komorka juz zalozona w sesji nie wyrzuca 28-dobowej historii zapisu
+
+**Problem:** stara usterka z listy (SupplySignal.Resolve, "if (m.ContainsKey(cat)) { _loadBad++; continue; }"). Resolve rozwija zapis arm_lpn dopiero w pierwszej dobie sesji (EarlyTable / Daily); jesli warsztat (NoteInput) albo roboty (NoteWorksGap) zapisaly brak w tej komorce wczesniej, cala historia zapisu tej komorki szla do kosza jako "zly wpis" - akurat dla najczynniejszych komorek. Po wczytaniu N tych komorek liczyl sie od zera (kolejka 1 przez MinSpan dob). W logach autotestow brak dowodu wprost (testy laduja zapis bez arm_lpn: "zapis bez arm_lpn" x7) - usterka z kodu.
+
+**Przyczyna:** ContainsKey zamiast scalenia; analogiczna sciezka wyrobu (ResolveWare, 435-N-C) juz scala (merged).
+
+**Zmiana:** Resolve: istniejaca komorka dostaje doby zapisu tylko w gniazdach pierscienia bez nowszej doby (doby sesji nietkniete); nowa jak dotad. Licznik "polaczonych z dobami sesji (462-b) N" w linii wczytania; "zlych wpisow" liczy juz tylko prawdziwie zle wpisy. Bez klucza (naprawa wczytania).
+
+**Ryzyko / co sprawdzic:** tylko sciezka wczytania zapisu z arm_lpn (gra Jeffa po zapisie i ponownym wczytaniu): linia "arm_lpn wczytany: ... komorek N, ... polaczonych z dobami sesji M" - M kilka-kilkadziesiat albo 0, "zlych wpisow" 0. Doby z zapisu to srednie (jak dotad); _gFrom / _first bez zmian. Nowa gra / zapis bez arm_lpn - kod nie biegnie.
+
+**Status:** DO SPRAWDZENIA
+
+## 462-a (12.11) - brak zboza do mlyna / browaru (i innego wsadu jedzenia warsztatu) wraca do tablicy N jako UDZIAL niezaspokojonego zapotrzebowania
+
+**Problem:** recenzja 435-N-B (WGRANIE 212): wylaczenie wsadu jedzenia z N usunelo tez prawdziwy czesciowy brak zboza dla mlynow i browarow. Autotest at-461 (doba 1101): "jedzenie i zwierzeta (tylko pomiar): grain 43, apple 28, butter 26, meat 8, grape 7 ... (razem 116)" cykli bez wsadu na dobe, przy zuzyciu jedzenia 621 cykli; linia LP: "435-N-B brak wsadu jedzenia i zwierzat poza N: 137.0 szt. w 116 brakach" - nic z tego nie trafia do N, wiec L6 / L5 / regulator nie widza, ze mlyny stoja bez zboza (N zboza tylko przy glodzie wsi).
+
+**Przyczyna:** 435-N-B zerowal brak jedzenia, bo S_kolejka = 1 + brak / max(1 szt./d, sprzedaz), a jedzenie nie ma liczonej sprzedazy targu (mianownik 1) - kazdy brak >= 1 szt./d dawal N = 2 (test 90 dob: jablka, maslo, oliwki, winogrona, mieso).
+
+**Zmiana:** SupplySignal: brak wsadu JEDZENIA warsztatu liczony znowu (NoteInput, wczytanie arm_lpn), ale S_kolejka jedzenia = QueueShare = 1 + brak / max(1, zuzycie + brak) - udzial zapotrzebowania warsztatow, ktorego polka nie pokryla (polowa brakuje -> 1.5, calosc -> 2; jeden brak przy duzym zuzyciu ~1.0x). Ta sama miara w wierszu swiata. Glod wsi (zboze N = 2) bez zmian. Jedzenie ludnosci nadal poza N (NoteInput to tylko wsad warsztatow). Nowy klucz **Supply Food Input Share** (grupa Economy measurements, TAK); NIE = 435-N-B co do bitu (brak jedzenia zerowany przy zapisie, wczytaniu i w petli tablicy - takze braki zapisane przy TAK). Linia LP: "462-a brak wsadu jedzenia w N udzialem (klucz ...): X szt. w Y brakach, komorek jedzenia z N > 1 Z, najwyzsze W".
+
+**Ryzyko / co sprawdzic:** czytelnicy N (L5 kolejnosc zlecen sprzetu wsi, L6 zmiana zajec x do 1.15, CraftsFollowShortage, L8) zobacza zboze / owoce w miastach z mlynami bez wsadu - to cel (wies przesuwa rece do zboza). Sprawdzic w autotescie 30 dob: komorek jedzenia z N > 1 kilkanascie-kilkadziesiat, najwyzsze < 2 poza miastami z calkowitym brakiem; "towarow z N swiata > 1" nie wraca do 21 z 22; kontrole LP = 0, potkniecia 0. Tablica N wyrobu (435-N-C, L8/L9) nie czyta tej kolejki. Zamknieta ekonomia: sama miara, zadne zloto ani sztuka nie powstaje.
+
+**Status:** DO SPRAWDZENIA
+
+## 463-p (12.11) - ikony warsztatow: rezerwa "slowa w id" porownuje krotkie slowa (ore / ale / oil) jako caly czlon id
+
+**Problem:** recenzja 463 (WorkshopIcons463.cs:162/164/166): rezerwa KeyFor dla typu spoza listy Known szukala fragmentow "ore", "ale", "oil" w id - trafialyby tez w "store", "sale", "scale", "toil" i dalyby bledna ikone (np. typ "salt_store" -> srebrnik). Dzis kod martwy (wszystkie 9 typow BK + artisans sa w Known), objawu w grze nie ma.
+
+**Przyczyna:** string.Contains na krotkich slowach zamiast porownania calych czlonow id.
+
+**Zmiana:** KeyFor: id dzielone po "_" i "-" na czlony (HashSet); "ore", "ale", "oil" sprawdzane jako caly czlon, reszta slow (dluzsze rdzenie, takze w zlozeniach typu "weaponsmithy") bez zmian. Odrzucone uwagi recenzji (bez zmian): artisans -> garncarz (zgodne z prosba Jeffa), wpis "stable" w Known (nieszkodliwy, typ zakomentowany w grze), Debug.FailedAssert gry w ShopVisualIconBrushWidget (kod gry, bylo tak przed 463).
+
+**Ryzyko / co sprawdzic:** zachowanie dla typow znanych identyczne (Known sprawdzane przed rezerwa) - linia "Ikony warsztatow (463)" taka sama jak po 463. Regresji brak: KeyFor wolane tylko z Apply (dwa miejsca), nikt inny. Build 0 bledow. Zamknieta ekonomia - nie dotyczy (tylko UI).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+## 463 (12.11) - ikony warsztatow BK zamiast niebieskiego prostokata (finanse rodu, okno produkcji, encyklopedia osady BK, ekran miasta)
+
+**Problem:** Jeff 12.11: "daj warsztatom storz ikony bo niektore maja a niektore maja jakas niebieski prostokat". Czesc warsztatow ma ikone, czesc pelny niebieski prostokat.
+
+**Przyczyna (sprawdzone w xml i dekompilacji 1.4.8):** typy warsztatow w grze: SandBox/ModuleData/spworkshops.xml (artisans, brewery, velvet_weavery, linen_weavery, wine_press, pottery_shop, olive_press, wool_weavery, tannery, wood_WorkshopType, smithy, silversmithy; stable zakomentowany) + BannerKings.Redux/ModuleData/workshops.xml (artisans, weaponsmithy, armorsmithy, barding-smithy, fletcher, bakery, butcher, mines, meadery); ROT, BKROTPatch i nasze mody nie dodaja typow (brak WorkshopTypes w SubModule.xml, brak "new WorkshopType" w kodzie). Ikone rysuje ClanWorkshopTypeVisualBrushWidget (TaleWorlds.MountAndBlade.GauntletUI.Widgets.Clan): RegisterBrushStatesOfWidget + SetState(StringId typu) na pedzlu "Clan.Workshop.Type.Image" (SandBox i ROT-Content GUI/Brushes/Clan.xml - ta sama tresc; uzywaja go ClanIncomeTuple, ClanCardSelectionPopup i BK SettlementEncyclopediaExtension, WorkshopType="@WorkshopTypeId"). Pedzel ma style tylko dla 11 typow gry; typ bez stylu -> Brush.GetStyleOrDefault -> styl Default = warstwa BlankWhiteSquare_9 Color #2168DDFF = NIEBIESKI PROSTOKAT. Styl "artisans" jest tym samym prostokatem jawnie. Czyli prostokat maja: weaponsmithy, armorsmithy, barding-smithy, fletcher, bakery, butcher, mines, meadery, artisans. Ekran zarzadzania miastem (ShopVisualIconBrushWidget.OnLateUpdate, switch na 13 id gry, pedzel TownManamgement.Shop.Icon.Brush) dla tych typow daje Default = warstwa ukryta (brak ikony). Sprajty ikon: Native/GUI/NativeSpriteData.xml General\Icons\ShopIcons\* (_large/_small), kategoria ui_group1 - jest tez mill_large i stable_large, ktorych pedzel rodu nie uzywa.
+
+**Zmiana:** nowy Armoury/src/WorkshopIcons463.cs, bez nowych grafik (tylko sprajty gry):
+- start sesji (WorkshopIconsBehavior, OnSessionLaunched): do pedzla Clan.Workshop.Type.Image w pamieci (UIResourceManager.BrushFactory) dochodzi styl o nazwie kazdego typu z WorkshopType.All bez dobrej ikony (brak stylu albo widoczny tylko BlankWhiteSquare) - kopia stylu najblizszej ikony gry; mlyn i stajnia jako nowe warstwy pedzla ze sprajtow mill_large / stable_large. Mapa: weaponsmithy, armorsmithy -> smithy; barding-smithy -> stable; fletcher -> wood_WorkshopType; bakery -> mill; butcher -> tannery; mines -> silversmithy; meadery -> brewery; artisans -> pottery_shop (zly styl zastapiony); typ nieznany -> slowa w id, na koniec wood_WorkshopType. Dane pedzla, nie kod widzetu - dziala tez w gotowym kodzie SandBox.GauntletUI.AutoGenerated.
+- ekran miasta: postfiks ShopVisualIconBrushWidget.OnLateUpdate (metoda wirtualna, wpieta w OnBeforeInitialModuleScreenSetAsRoot odbiciem, raz na proces): gdy widzet po swojej inicjalizacji stoi w Default, a id typu ma odpowiednik - SetState(stan ikony gry, np. Smithy / Mill / Stable). Brak celu = linia logu, potkniecia liczone (3 pierwsze w logu), nic nie gasnie.
+- linia logu raz na sesje: "Ikony warsztatow (463): typow N | rod/encyklopedia BK (bez ikony -> podstawiona): ... | ekran miasta: ... (stan latki)".
+Bez klucza MCM, bez zmian ekonomii.
+
+**Ryzyko / co sprawdzic:** w Armoury.log linia "Ikony warsztatow (463)" z 9 typami (8 BK + artisans) i linia "postfiks ShopVisualIconBrushWidget.OnLateUpdate wpiety". W grze: Clan (L) -> Income -> warsztaty BK (kuznia broni, piekarnia, kopalnia...) z ikona zamiast prostokata; okno zmiany produkcji warsztatu; encyklopedia osady BK (lista warsztatow); menu miasta -> Manage town -> warsztaty. Regresje: pedzel zmieniany tylko o NOWE style (i zastapiony zly "artisans"), style gry nietkniete; nowe warstwy pedzla sa ukryte we wszystkich istniejacych stylach (Brush.AddLayer dodaje StyleLayer ze zrodla IsHidden=true). Styl Default (pusty WorkshopType) dalej niebieski jak w grze - nie ruszany. Postfiks dziala tylko gdy stan = Default i id na mapie (typy gry nie sa na mapie). Kolizje: nikt inny w naszych modach nie dotyka tych pedzli ani widzetow (grep BrushFactory / ShopVisualIcon). UIResourceManager.Refresh (nowa fabryka pedzli) w zwyklej grze nie wystepuje; gdyby wystapil - style wroca przy nastepnym wczytaniu. Zamknieta ekonomia - nie dotyczy (tylko UI).
+
+**Status:** DO SPRAWDZENIA
+
 ## 461 (12.11) - AI BITWY pakiet 8 krok 8.5: szerokosc szyku i omijanie stoku w natarciu - SAM POMIAR "bylby" (regula i klucz Formation Width By Ground nie wdrozone)
 
 **Problem:** audyt AI bitwy 11.11 (docs/audyty-2026-11-11/AUDYT-AI-BITWA.md rozdz. 3 pakiet 8.5 "Omijanie stoku w natarciu, szerokosc szyku (gleboki / dopasowany) - jeden prefiks Formation.SetFormOrder; zysk do zmierzenia, nie pewny"; mapa-gra-taktyki: wybor terenu przez atakujacego BRAK; Jeff 11.11 "rob wszystko po kolei tak jak radzisz"). Dowodu z gry nie ma - zadna linia logu nie mowi dzis, jak szerokie byly szyki w chwili zetkniecia, ani czy atak pod gore / wezszy szyk traci wiecej.

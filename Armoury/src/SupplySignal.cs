@@ -58,6 +58,11 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.SupplyChainLog; } }
         // 435-N-A: do kolejki wchodzi PRZYROST niewydanego budzetu robot na dobe (nachylenie poziomu w oknie), nie poziom / 28; NIE = dawna miara (poziom / okno)
         private static bool GrowOn { get { var s = Settings.Current; return s == null || s.SupplyQueueGrowth; } }
+        // 462-a: brak wsadu JEDZENIA warsztatu (zboze do mlyna / browaru, owoce, maslo...) wraca do N jako UDZIAL niezaspokojonego zapotrzebowania warsztatow
+        // (brak / (zuzycie + brak)) - nie dzielony przez sprzedaz >= 1 szt./d, ktora dla jedzenia nie jest liczona (to dawalo N = 2 przy kazdym braku). Klucz NIE = 435-N-B.
+        private static bool FoodShareOn { get { var s = Settings.Current; return s == null || s.SupplyFoodInputShare; } }
+        private static double _dFoodShare; private static int _dFoodShareN;
+        private static int _sFoodCells; private static double _sFoodMax = 1.0;   // 462-a: komorki jedzenia z N > 1 (udzial) w ostatniej tablicy
 
         private static int _main = -1, _dOff;
         private static int _st, _stSess;
@@ -189,7 +194,11 @@ namespace Armoury
             {
                 if (OffMain()) return;
                 int m = Math.Max(0, miss);
-                if (m > 0 && CommodityInputs284.Food(c)) { _dFoodSkip += m; _dFoodSkipN++; m = 0; }   // 435-N-B: jedzenie poza kolejka N (kupione liczone dalej)
+                if (m > 0 && CommodityInputs284.Food(c))
+                {
+                    if (FoodShareOn) { _dFoodShare += m; _dFoodShareN++; }      // 462-a: liczony udzialem w zapotrzebowaniu warsztatow
+                    else { _dFoodSkip += m; _dFoodSkipN++; m = 0; }             // 435-N-B: jedzenie poza kolejka N (kupione liczone dalej)
+                }
                 Add(town.Settlement, c, m, 0, Math.Max(0, got), SShop);
             }
             catch (Exception e) { Stumble("NoteInput", e); }
@@ -379,7 +388,7 @@ namespace Armoury
         {
             _main = Environment.CurrentManagedThreadId; _dOff = 0;
             _st = _stSess = 0; _err.Clear(); _startLine = false; _first = int.MinValue; _gFrom = int.MinValue;
-            _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _offWarned = false; _heldBits = 0; _earlyTried = false; _loadFoodZero = 0;
+            _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _loadMerged = 0; _offWarned = false; _heldBits = 0; _earlyTried = false; _loadFoodZero = 0;
             _cells.Clear(); _price.Clear(); ZeroDay();
             _ws.Clear(); CycleBegin();
             _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>(); _pubT = null;
@@ -391,7 +400,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             Array.Clear(_dMiss, 0, Streams); Array.Clear(_dSoft, 0, Streams); Array.Clear(_dGot, 0, Streams); Array.Clear(_dGapGold, 0, Streams);
-            _dCat.Clear(); _dRound = 0; _dCapGold = 0; _dFoodSkip = 0; _dFoodSkipN = 0;
+            _dCat.Clear(); _dRound = 0; _dCapGold = 0; _dFoodSkip = 0; _dFoodSkipN = 0; _dFoodShare = 0; _dFoodShareN = 0;
             Array.Clear(_wDay, 0, RKinds); _wArms = _wCastle = _wPlayer = _wSkip = 0; _wLine.Clear();
             _dOff = 0; _st = 0;
             WareZeroDay();                                                    // 435-N-C
@@ -453,10 +462,18 @@ namespace Armoury
             return 1.0 + Math.Min(1.0, want / Math.Max(MinSales, sales));
         }
 
+        /// <summary>462-a: S_kolejka wsadu jedzenia - udzial niezaspokojonego zapotrzebowania warsztatow: 1 + brak / (zuzycie + brak). Caly wsad brakujacy = 2, polowa = 1.5.
+        /// Przed MinSpan dobami pomiaru 1.</summary>
+        private static double QueueShare(double want, double sales, int span)
+        {
+            if (span < MinSpan || !(want > 1e-6)) return 1.0;
+            return 1.0 + Math.Min(1.0, want / Math.Max(MinSales, sales + want));
+        }
+
         // ============================================================ zapis (arm_lpn) - 435-L1-p (recenzje S4 / S1): pamiec N w zapisie
         private const string SaveVer = "n1";
         private static string _pend, _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)";
-        private static int _loadBad, _heldBits;
+        private static int _loadBad, _loadMerged, _heldBits;   // 462-b: _loadMerged - komorki zapisu polaczone z komorka juz zalozona w sesji
         private static bool _offWarned;
         private static bool IdOk(string x) { return !string.IsNullOrEmpty(x) && x.IndexOfAny(new[] { '|', '~', ';', ',', ':' }) < 0; }
         private static bool Num(string s, out double v) { return double.TryParse(s, NumberStyles.Float, Inv, out v) && !double.IsNaN(v) && !double.IsInfinity(v) && v >= 0; }
@@ -547,19 +564,25 @@ namespace Armoury
                         if (st == null || st.Town == null || cat == null) { _loadBad++; continue; }
                         Dictionary<ItemCategory, Cell> m;
                         if (!_cells.TryGetValue(st, out m)) { m = new Dictionary<ItemCategory, Cell>(); _cells[st] = m; }
-                        if (m.ContainsKey(cat)) { _loadBad++; continue; }
-                        if (miss > 0 && CommodityInputs284.Food(cat)) { miss = 0; _loadFoodZero++; }   // 435-N-B: zapis sprzed 435-N-B (brak jedzenia poza kolejka N)
-                        var cell = new Cell();
+                        if (miss > 0 && !FoodShareOn && CommodityInputs284.Food(cat)) { miss = 0; _loadFoodZero++; }   // 435-N-B (klucz 462-a NIE): brak jedzenia poza kolejka N
+                        // 462-b: komorka mogla juz powstac w tej sesji (warsztat / roboty zapisaly brak przed pierwsza doba sesji, kiedy Resolve rozwija zapis) - dawniej
+                        // ContainsKey wyrzucal wtedy cala 28-dobowa historie zapisu jako "zly wpis" (wlasnie dla najczynniejszych komorek). Teraz doby zapisu wpisywane
+                        // do tej komorki tylko w gniazda pierscienia bez nowszej doby - doby sesji zostaja nietkniete.
+                        Cell cell;
+                        bool had = m.TryGetValue(cat, out cell);
+                        if (!had) cell = new Cell();
                         for (int i = 0; i < span; i++)
                         {
                             int d = day - i, k = ((d % Window) + Window) % Window;
+                            if (had && cell.Day[k] != int.MinValue && cell.Day[k] >= d) continue;
                             cell.Day[k] = d; cell.Miss[k] = (float)miss; cell.Soft[k] = (float)soft; cell.Got[k] = (float)got;
                         }
-                        m[cat] = cell; cells++;
+                        if (!had) m[cat] = cell; else _loadMerged++;
+                        cells++;
                     }
                 if (cells > 0) _first = _first == int.MinValue ? day - span + 1 : Math.Min(_first, day - span + 1);
                 if (cells > 0) _gFrom = day + 1;                              // 435-N-A-p: przyrost tylko z dob po zapisie (doby z zapisu to srednia, nie poziom)
-                _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (_loadFoodZero > 0 ? ", brak wsadu jedzenia wyzerowany (435-N-B) w " + _loadFoodZero : "") + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
+                _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (_loadFoodZero > 0 ? ", brak wsadu jedzenia wyzerowany (435-N-B) w " + _loadFoodZero : "") + (_loadMerged > 0 ? ", polaczonych z dobami sesji (462-b) " + _loadMerged : "") + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
             }
             catch (Exception e) { Stumble("Resolve", e); _loadNote = "arm_lpn - blad wczytania (pamiec N od pierwszej doby)"; }
         }
@@ -633,7 +656,9 @@ namespace Armoury
                     for (int i = 0; i < Streams; i++) sb.Append(i == 0 ? " " : ", ").Append(SName[i]).Append(' ').Append(F1(_dGot[i]));
                     sb.Append("; razem ").Append(F1(gAll)).Append(" | reszty budzetu ponizej ceny sztuki (nie brak) ").Append(N0(_dRound)).Append(" zl")
                       .Append(", budzet przy materiale tylko ponad sufitem ceny (nie brak) ").Append(N0(_dCapGold)).Append(" zl")
-                      .Append(" | 435-N-B brak wsadu jedzenia i zwierzat poza N (bez liczonej sprzedazy): ").Append(F1(_dFoodSkip)).Append(" szt. w ").Append(_dFoodSkipN).Append(" brakach")
+                      .Append(FoodShareOn
+                          ? " | 462-a brak wsadu jedzenia w N udzialem wobec zuzycia warsztatow (klucz Supply Food Input Share TAK): " + F1(_dFoodShare) + " szt. w " + _dFoodShareN + " brakach, komorek jedzenia z N > 1 " + _sFoodCells + ", najwyzsze " + _sFoodMax.ToString("0.00", Inv)
+                          : " | 435-N-B brak wsadu jedzenia i zwierzat poza N (bez liczonej sprzedazy): " + F1(_dFoodSkip) + " szt. w " + _dFoodSkipN + " brakach")   // 462-a-p (D3): przy NIE tekst jak przed
                       .Append(" | wedlug towaru dzis (brak wsadu + poziom budzetu / kupione): ");
                     var l = new List<KeyValuePair<ItemCategory, double[]>>(_dCat);
                     l.Sort((a, b) => (b.Value[0] + b.Value[2]).CompareTo(a.Value[0] + a.Value[2]));
@@ -795,6 +820,7 @@ namespace Armoury
             var agg = new Dictionary<ItemCategory, double[]>();
             var hot = new HashSet<Settlement>();
             int cells = 0, real = 0, qCeil = 0, qOver = 0, softOnly = 0;
+            _sFoodCells = 0; _sFoodMax = 1.0;
             int span = Span(today);
             bool growOn = GrowOn;
             int qOverOld = 0, softOnlyOld = 0, growCells = 0;     // 435-N-A: porownanie z dawna miara (poziom / okno) - ile komorek mialoby kolejke > 1
@@ -819,8 +845,15 @@ namespace Armoury
                     sumGrow += grow; sumSoftW += softW; sumSoft += soft; if (grow > 1e-6) growCells++;
                     double sqOld = Queue(miss + softW, sales, span);
                     if (sqOld > 1.0 + 1e-9) { qOverOld++; if (!(miss > 1e-6)) softOnlyOld++; }
+                    bool food = CommodityInputs284.Food(ck.Key), foodShare = food && FoodShareOn;
+                    if (food && !foodShare) miss = 0;                 // 462-a klucz NIE: jak 435-N-B takze dla brakow zapisanych przy kluczu TAK
                     double want = miss + (growOn ? grow : softW);
-                    double sq = Queue(want, sales, span);
+                    // 462-a-p (recenzja D1): udzial jedzenia wobec ZUZYCIA warsztatow (got), nie sprzedazy targu - mieso robia tez ukryci rzemieslnicy BK (MarketSales je sledzi),
+                    // a jest wsadem piekarni; sprzedaz mieszczanom w mianowniku dawala N ~ 1 przy pustych piekarniach.
+                    double sq = foodShare ? QueueShare(want, got, span) : Queue(want, sales, span);
+                    // 462-a-p (recenzja D2): w miescie z glodujacymi wsiami pierwszenstwo ma zboze (N = 2 nizej) - inne jedzenie warsztatow nie konkuruje z nim w L6.
+                    if (foodShare && grain != null && ck.Key != grain && hungry.Contains(tk.Key)) sq = 1.0;
+                    if (foodShare && sq > 1.0 + 1e-9) { _sFoodCells++; if (sq > _sFoodMax) _sFoodMax = sq; }
                     if (sq > 1.0 + 1e-9) { qOver++; if (sq >= 2.0 - 1e-9) qCeil++; if (!(miss > 1e-6)) softOnly++; }
                     double wantW = growOn ? miss : want;          // 435-N-A-p: do swiata brak wsadu (+ poziom / okno przy kluczu NIE); przyrost osobno ze znakiem
                     miss = want;
@@ -835,7 +868,7 @@ namespace Armoury
                     }
                     double[] a;
                     if (!agg.TryGetValue(ck.Key, out a)) { a = new double[6]; agg[ck.Key] = a; }
-                    a[0] += wantW; a[1] += sales; a[4]++;
+                    a[0] += wantW; a[1] += foodShare ? got : sales; a[4]++;   // 462-a-p: wiersz swiata jedzenia tez wobec zuzycia warsztatow
                     if (growOn) a[5] += growS;
                     if (n >= 1.5) { a[2]++; hot.Add(tk.Key); }
                     if (n > a[3]) a[3] = n;
@@ -852,7 +885,7 @@ namespace Armoury
             foreach (var kv in agg)
             {
                 double[] st; double ss = stock.TryGetValue(kv.Key, out st) ? st[0] : 1.0;
-                double sq = Queue(kv.Value[0], kv.Value[1], span);
+                double sq = FoodShareOn && CommodityInputs284.Food(kv.Key) ? QueueShare(kv.Value[0], kv.Value[1], span) : Queue(kv.Value[0], kv.Value[1], span);
                 double nw = Math.Min(2.0, Math.Max(1.0, Math.Max(ss, sq)));
                 if (nw > 1.0 + 1e-9) over++;
                 rows.Add(new KeyValuePair<ItemCategory, double[]>(kv.Key, new[] { nw, ss, sq, kv.Value[0], kv.Value[1], kv.Value[2], kv.Value[3], kv.Value[4] }));
