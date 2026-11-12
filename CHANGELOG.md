@@ -1,5 +1,45 @@
 # DZIENNIK ZMIAN
 
+## 470-p (12.11) - poprawki po recenzji 470: prawdziwy brak jedzenia swiata zostaje w N (U1), S_stos po wczytaniu z zapisu (U2), Empty wymaga progu 221 (U3), napisy (U4, U5)
+
+**Problem:** recenzja 470-a / 470-b. U1: prog 470-b 2 szt./d jest na komorke - maslo (brak swiata 17.4 szt./d, sprzedaz 0, 10 miast z N >= 1.5) przy rownym rozkladzie ok. 1.74 szt./d na miasto wypadloby z N calkiem, choc to prawdziwy brak. U2: przy 470-a TAK po kazdym wczytaniu S_stos = 1 dla wszystkich towarow do pierwszej decyzji 221 (do 28 dob) - regresja wobec 435-L1-p. U3: `Empty()` nie wymagal `g.Short` (przy ValveStockDaysLow < 5 towar, ktorego 221 nie uwaza za krotki, dostawal S_stos). U4: napis MCM "falls back by itself as the stock refills" nieprawdziwy (StockDays to migawka decyzji co 28 dob). U5: linia LP przy TAK pisala "liczone 1.25" i "decyzji N" (to liczba pustych decyzji).
+
+**Przyczyna:** `Armoury/src/SupplySignal.cs`: `ShortageText` zerowal brak jedzenia komorki ponizej `MinFoodShortage` bez patrzenia na brak swiata; `StockSignal` przy kluczu TAK pomijal towary bez migawki (`_sStockUnk++; continue`), a dni stosu nie byly w zapisie; `Empty` = tylko `StockDays < 5`.
+
+**Zmiana:** (U1) przed petla komorek suma brakow wsadu jedzenia swiata wedlug towaru (przed progiem); prog 470-b dziala tylko, gdy ta suma < `WorldFoodShortage` = 5 szt./d (stala) - maslo 17.4 zostaje, wieprz / owce (1.0) wypadaja. (U2) slownik `_emptyDays` (dni stosu przy ostatniej pustej decyzji, tylko klucz TAK) w zapisie arm_lpn jako 7. pole `towar:dni,...` - dopisywane tylko gdy niepuste, SaveVer `n1` bez zmian: stary odczyt pola nie czyta (wycofanie DLL bezpieczne), nowy odczyt zapisu bez pola = jak 470-a (S_stos 1 do decyzji). Po wczytaniu towar na suficie z `_runs > 0` i dniami z zapisu dostaje `S_stos = 2 - dni / 5` jak przed zapisem. (U3) `Empty` = `g.Short && 0 <= dni < 5`. (U4) napisy MCM/Settings i komentarz: sygnal czytany przy decyzji 221 (co 28 dob), spada przy nastepnej decyzji po odbudowie stosu; hint 470-b wspomina prog swiata 5 szt./d. (U5) przy TAK linia pisze "(470-a: S_stos z dni stosu w zapisie)" i "pustych decyzji".
+Linia `LP niedobor`: dopisek 470-b rozszerzony o `[lista odrzuconych towarow], najwiekszy odrzucony brak komorki X.XX <towar>; komorek ponizej progu zostawionych w N przez brak swiata >= 5.0 szt./d (470-p): K`; dopisek 470-a: `na suficie bez migawki decyzji w tej sesji: z dniami pustego stosu z zapisu (470-p) A, bez nich (S_stos 1) B`. Linia wczytania arm_lpn: `, z dniami pustego stosu (470-p) N`.
+Odrzucone: U6 (licznik `softOnly` po progu 470-b - kosmetyka logu: po progu komorka faktycznie nie ma liczonego braku wsadu, wiec "tylko z niewydanego budzetu robot" opisuje, co podnioslo jej N), U7 (przelaczenie klucza TAK -> NIE w sesji: do 28 dob nizsze 1.25 ^ r z pustych decyzji - dopuszczalne, tylko odnotowane tutaj).
+
+**Ryzyko / co sprawdzic:** klucze NIE co do bitu jak przed: 470-b NIE / 462-a NIE - slownik swiata nie liczony, warunek bez zmian; 470-a NIE - `_emptyDays` tylko usuwany (pusty), zapis bez 7. pola, tekst linii jak przed. Wyjatek: zapis z TAK wczytany przy NIE zachowuje 7. pole w kolejnym zapisie (same dane, nieczytane przy NIE). Regresje: czytelnicy N (L5 `_pubN`, L6 / 363 / VillageGear przez `TownN`) - te same `ss` i `sq`, zmiana spojna. Zapis: stary DLL czyta p[0..5] (`p.Length < 6` jedyny warunek), 7. pole ignoruje. Koszt: drugie przejscie `Means` po komorkach jedzenia raz na dobe (jak petla glowna). Prog swiata 5 szt./d: brak swiata 2-5 szt./d rozlozony po komorkach < 2 nadal wypada (swiadomie). Oczekiwanie 90 dob: "towarow z N swiata > 1" ok. 12-14 z 22 (szacunek); w dopisku 470-b lista odrzuconych bez butter (hog, sheep tak), K > 0 jesli maslo rozlozone; po wczytaniu w trakcie testu dopisek 470-a A > 0 dla towarow pustych przed zapisem. Build czysty OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+## 470-b (12.11) - brak wsadu jedzenia ponizej 2 szt./d na komorke nie podnosi N
+
+**Problem:** autotest 60 dob (`Armoury-2026-11-12_22-47-01.log`, `LP niedobor`): hog N 2.00 z kolejka 2.00 przy braku 1.0 szt./d i zuzyciu 0, sheep 1.97 przy 1.0 szt./d - jedna brakujaca sztuka dziennie daje S_kolejka prawie 2, bo udzial 462-a to brak / (zuzycie + brak), a przy zuzyciu 0 kazdy brak = 100%.
+
+**Przyczyna:** `SupplySignal.QueueShare` (`Armoury/src/SupplySignal.cs`, 462-a) nie ma dolnego progu wielkosci braku; w `ShortageText` brak jedzenia komorki (`miss`) wchodzi do kolejki komorki i do braku swiata (`a[0]`) od pierwszej ulamkowej sztuki.
+
+**Zmiana:** nowy klucz `SupplyFoodShortageFloor` (MCM "Supply Food Shortage Floor", grupa Economy measurements, domyslnie TAK; Settings.cs + McmSettings.cs recznie). Przy TAK i czynnym 462-a: sredni brak wsadu jedzenia / zwierzat komorki (miasto x towar) ponizej `MinFoodShortage` = 2 szt./d (stala) jest zerowany przed kolejka - S_kolejka komorki 1 i brak nie wchodzi do wiersza swiata (zuzycie komorki zostaje w mianowniku). Komorka z brakiem >= 2 szt./d bez zmian. NIE = co do bitu jak przed (takze tekst linii).
+Linia `LP niedobor`: dopisek `470-b brak jedzenia warsztatow ponizej 2.0 szt./d na komorke poza N (...): komorek odrzuconych X (Y szt./d), towarow Z`.
+
+**Ryzyko / co sprawdzic:** regresje - te same czytelniki co 462-a (L6 CraftShortage, zboze w miescie z glodujacymi wsiami nadal N = 2 osobno, `Hungry`), WorldN (L5). Kolizja z 470-a: niezalezne (470-a = S_stos, 470-b = S_kolejka jedzenia), N = max obu. Wiele drobnych brakow w roznych miastach nie sumuje sie juz do braku swiata - swiadomie (prog na komorke). Komorka moze skakac wokol progu 2 szt./d (srednia 28 dob - wolno). Oczekiwanie: hog / sheep wypadaja z N > 1 (brak 1.0 szt./d), butter (17.4 szt./d) zostaje. Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+## 470-a (12.11) - S_stos (regulator wsi 221) tylko przy naprawde pustym stosie, bez nakrecania liczba decyzji
+
+**Problem:** autotest 60 dob (`Armoury-2026-11-12_22-47-01.log`, linia `LP niedobor` ostatniej doby): "towarow z N swiata > 1: 22 z 22" (WGRANIE 212: 15 z 22). flax / clay / hardwood / cow / hides / marble maja N 1.56 wylacznie z S_stos (kolejka ~1.0), limestone / wool / hog po 1.56 z S_stos. Regulator 221 w tej samej linii: "clay x1.30 decyzji 2, stos 9 dni ... hides x1.30 decyzji 2, stos 22 dni, wool x1.30 decyzji 2, stos 22 dni" - zapas 9-22 dni zuzycia to nie brak, a S_stos rosl z kazda decyzja (1.25 przy 1, 1.56 przy 2, 2 przy 4).
+
+**Przyczyna:** `SupplySignal.StockSignal` (`Armoury/src/SupplySignal.cs`): `_runs[g.Item] = g.AtCeil && g.Short ? r + 1 : 0` i `S_stos = min(2, 1.25 ^ r)`, a `LpGood.Short` z `HarvestValve.cs:678` to `stos < ValveStockDaysLow (30) dni zuzycia` - kazdy towar na suficie kroku z zapasem ponizej 30 dni po kilku decyzjach dochodzil do 2. Regulator 221 S_stos nie czyta (HarvestValve nie wola SupplySignal) - petli nie ma; czytelnicy: L5 WorldN, L6 TownN/CraftShortage (Stock), 363, VillageGear.
+
+**Zmiana:** nowy klucz `SupplyStockEmptyOnly` (MCM "Supply Stock Empty Only", grupa Economy measurements, domyslnie TAK; Settings.cs + McmSettings.cs recznie). Przy TAK: decyzja liczy sie tylko przy stosie ponizej `StockEmptyDays` = 5 dni zuzycia (stala), `S_stos = 2 - dni / 5` (pusty = 2, przy 5 dniach = 1) - nie zalezy od liczby decyzji i wygasa sam, gdy stos wraca (kazda decyzja 221 daje nowa migawke). Decyzje policzone wczesniej (np. zmiana klucza w sesji) przy niepustym stosie - bez S_stos. Po wczytaniu, przed pierwsza decyzja 221 w sesji (stos nieznany) S_stos = 1 (dawniej 1.25 ^ decyzji z zapisu). `_runs` i zapis arm_lpn bez zmian formatu (przy TAK licza kolejne decyzje przy pustym stosie). NIE = co do bitu jak przed (takze tekst linii).
+Linia `LP niedobor`: dopisek `470-a S_stos tylko przy pustym stosie (...): stos < 5.0 dni zuzycia, S_stos = 2 - dni / 5.0; odrzuconych towarow (na suficie, stos ponizej progu 221, ale nie pusty) X, na suficie bez migawki decyzji w tej sesji (S_stos 1) Y`.
+
+**Ryzyko / co sprawdzic:** regresje - Stock czytaja L5 (kolejnosc zlecen sprzetu wsi), L6 (zmiana zajec, pulap 363 przez TownN), StartCalibration.Rule, VillageGear.Fund: dostana mniej towarow z N > 1 (to jest cel); towar z prawdziwie pustym stosem dostaje do 2 jak dawniej po 4 decyzjach, ale od razu. Kolizje: S_kolejka, zboze N = 2 i N wyrobu (Ware) bez zmian. Po wczytaniu sygnal stosu wraca dopiero przy pierwszej decyzji 221 (do 28 dob) - S_kolejka dziala dalej. Oczekiwanie w autotescie 90 dob: "towarow z N swiata > 1" wyraznie mniej niz 22 z 22; flax / clay / hardwood / cow / hides / marble wypadaja (stos 9-22 dni), silver / butter zostaja (kolejka 2.00). Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 467-p (12.11) - poprawki po recenzji 467: gracz dolaczajacy do szturmu AI = cala armia (U1), osobny licznik "bez progu" (U4)
 
 **Problem:**
