@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 13.11 00:15 - WGRANIE 220 (470-a/b/p: sygnal niedoboru - S_stos 221 tylko przy pustym stosie < 5 dni, male braki jedzenia < 2 szt./d poza N przy braku swiata < 5 szt./d)
+
+- **W grze:** Armoury.dll `78154f9c1d1fd552324d9fa81a358fbd` (galaz `noc/470-sygnal`, commit `b4075330`, wypchniety; = WGRANIE 219 + 470). Kopie: `Armoury.dll.bak-2026-11-13-przed-wgranie220`, `D:/Backup-Bannerlord/wgrane/2026-11-13-wgranie220(-przed)`. Zapis: `at-470-po-tescie.sav`.
+- **Jeff 12.11:** "i wgraj dwie poprawki ekonomii".
+- **Autotest at-470 (60 dob na zapisie Ironman, n391):** KONIEC OK, wyjatkow 0, bledy 23, potkniecia 0. "towarow z N swiata > 1: 12 z 20" (przed 470: 22 z 22). Zostaja: silver 2.00, butter 2.00, apple 1.54, olives 1.48, wool 1.42, grape 1.37, meat 1.31, flax 1.22; grain 1.07, clay 1.08, tools/iron 1.02 (male). 470-b odrzucil cow/hog/sheep (6 komorek, 2.7 szt./d); 470-a odrzucil 12 towarow (stos ponizej progu 221, ale nie pusty).
+- **Klucze (domyslnie TAK, istniejace):** Supply Stock Empty Only, Supply Food Shortage Floor; stala WorldFoodShortage 5.
+- **W kolejce do scalenia i testu (nowa kampania 90 dob + bitwy):** noc/469-zasieg (5f31f843 lucznicy w zasiegu, zasieg wg naciagu), noc/471-czas-oblezen (739fe985 SAM POMIAR terminu obrony - regula 471b czeka na decyzje Jeffa D1-D5), noc/472-mury (cfe39bd8 mury historyczne: zamek 2/4 lata, miasto 3/5 lat, cena punktu x3/x2). Czekaja tez odpowiedzi Jeffa: audyt budynkow (docs/AUDYT-BUDYNKI-2026-11-12.md, pytania 1-5), wsie poboczne i karczmy (docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md, pytania 1-6).
+
 ## STAN 12.11 23:35 - WGRANIE 219 (465/466/467 + -p: Polnoc bez oblezen Casterly Rock i miast Zachodu, bez zwrotu zdobyczy 326b, szturm AI oddzialem; 468/468-p spychanie drabin widlami i dluga bronia)
 
 - **W grze:** Armoury.dll `f41139e1040964d209116fce55609b9a` (galaz `noc/367c-jeniec-po-odejsciu`, commit `b6d09b2e`, wypchniety; = 218 + 465-467 + scalenie noc/468-widly). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie219`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie219(-przed)`. Zapisy: `at-467-po-tescie.sav`, `at-468-po-tescie.sav`.
