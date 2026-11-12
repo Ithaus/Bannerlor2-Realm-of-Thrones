@@ -391,6 +391,32 @@ namespace Armoury
             try { return DistrictWorks.Locks(ld.V, b.K.Main ? null : (b.Uid ?? b.K.Uid)); } catch { return false; }
         }
 
+        /// <summary>435-L3-p: okreg pod KS z pelna stawka rynku (poza rampa) - czytane z mapy okregow, ktora istnieje od wczytania zapisu (stawki wsi _rates powstaja
+        /// dopiero w StartCalibration.Daily, PO VillageGear.BeforeProduction - pierwsza doba sesji dawala m = 1 i brak zakupow sprzetu). Sam odczyt, nie rzuca.</summary>
+        internal static bool GearPathKs(Village v)
+        {
+            if (v == null || _state != StateApplied || !KeyOn) return false;
+            try
+            {
+                var st = v.Settlement; LiveDist ld;
+                if (st == null || st.StringId == null || !_live.TryGetValue(st.StringId, out ld) || ld == null) return false;
+                return RampFull(ld.Market == 0 ? 0 : 1);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>435-L3-p (recenzje 7 / N4): zmienil sie sam czynnik sprzetu m okregu - rachunek okregu od nowa nastepnej doby, ale BEZ gaszenia szybkiej sciezki
+        /// kosztu A7 (m nie wplywa na blokade prac ani na przebudowy). Nie rzuca.</summary>
+        internal static void KsDirtyRes(Village v)
+        {
+            try
+            {
+                if (v == null || v.Settlement == null || v.Settlement.StringId == null || _state != StateApplied) return;
+                LiveDist ld; if (_live.TryGetValue(v.Settlement.StringId, out ld) && ld != null) ld.Res = null;
+            }
+            catch { }
+        }
+
         /// <summary>inwest: okreg do przeliczenia nastepnej doby (nowe prace, ogien) - dodatek wchodzi do stawek KS bez czekania na kolejke 7 dob. Nie rzuca.</summary>
         internal static void KsDirty(Village v)
         {

@@ -203,10 +203,22 @@ namespace Armoury
                     // rece z pola: kg zajecia wheat_farm (zboze i drobny inwentarz P0) spada o H / F (363b: H / F calego okregu - uproszczenie, rece z blokow ze zlozem)
                     double frac = Math.Min(1.0, H / F);
                     var tmp = new double[ItemCount];
+                    // 435-L3-p (stabilnosc N1): GearKs zdjal juz (1 - m) kg zboza bloku z niedoborem sprzetu - zamowienie zdejmuje czesc z tego, co zostalo
+                    // (m x kg x frac), nie z pelnego kg; bez niedoboru (albo klucz Village Gear wylaczony) m = 1 i rachunek co do bitu jak dotad
+                    bool gcut = VillageGear.Any(ld.V);
+                    var one = gcut ? new double[ItemCount] : null;
                     foreach (var lb in ld.B)
                     {
                         if (lb == null || lb.K == null || lb.C == null || lb.X == null) continue;
-                        for (int j = 0; j < lb.C.Length; j++) if (lb.C[j] == KsTab.CWheat) BlockCraftKg(ld.K, lb, j, type, tmp);
+                        double gm = gcut ? VillageGear.MOf(ld.V, lb.K.Main ? null : (lb.Uid ?? lb.K.Uid), KsTab.CWheat) : 1.0;
+                        for (int j = 0; j < lb.C.Length; j++)
+                        {
+                            if (lb.C[j] != KsTab.CWheat) continue;
+                            if (!(gm < 1.0)) { BlockCraftKg(ld.K, lb, j, type, tmp); continue; }
+                            Array.Clear(one, 0, one.Length);
+                            BlockCraftKg(ld.K, lb, j, type, one);
+                            for (int i = 0; i < ItemCount; i++) tmp[i] += gm * one[i];
+                        }
                     }
                     for (int i = 0; i < ItemCount; i++)
                     {

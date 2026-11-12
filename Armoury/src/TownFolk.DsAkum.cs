@@ -240,6 +240,18 @@ namespace Armoury
         // ============================================================ 2. roboty gminy i septy z prawdziwym materialem (zlecenia po budowach)
         /// <summary>DsWorksRealMaterial czynne (kiesa ludu czynna).</summary>
         internal static bool DaWorksOn { get { var s = Settings.Current; return s != null && s.DsWorksRealMaterial && Live; } }
+        /// <summary>435-L3-p: targ `mk` przyjmuje zlecenia robot z prawdziwym materialem (droga czynna, targ z zywa kiesa ludu; zamek tylko przy zaworze zamku) -
+        /// ten sam warunek co DaRunOne. Sam odczyt, watek glowny.</summary>
+        internal static bool DaMarketLive(Settlement mk)
+        {
+            try
+            {
+                if (!DaWorksOn || mk == null || mk.Town == null) return false;
+                Folk mf; if (!_f.TryGetValue(mk, out mf) || mf == null) return false;
+                return !(mf.Kind > 1 || (mf.Kind == 1 && !CastleLive));
+            }
+            catch { return false; }
+        }
 
         /// <summary>Zlecenie robot: wies (kiesa wsi) albo lud miasta (septy z dziesieciny ludu: wagi klas w0..w2) placi za material z polki `mk` i rzemieslnikow - wykonanie
         /// w DaWorksRun. Zloto zostaje u placacego do wykonania. Wies z robotami gminy (nie septy), ktora nie wydala zlecenia w calosci - danina od skarbca wsi po wykonaniu

@@ -368,7 +368,10 @@ namespace Armoury
                     q.VNorm = q.V / Math.Max(0.05, 1.0 - wq);
                     q.ShareDist = vd > 0 ? pc.ValDay / vd : 0;
                     q.Bmax = pc.Main ? bMain : bSide;
-                    q.KitPer = q.S > 0.5 ? years * 364.0 * q.VNorm / q.S : 0;
+                    // 435-L3-p (recenzja 2): cena jednostki prac z wartosci dnia BEZ czynnika sprzetu m (jak VillageGear.Value) - brak sprzetu wsi nie robi rabatu
+                    // inwestorowi (wyplata E dalej z prawdziwego dodatku, z m); klucz Village Gear wylaczony - m = 1, cena co do bitu jak dotad
+                    double gm = q.Craft >= 0 ? VillageGear.MOf(v, pc.Main ? null : pc.Uid, q.Craft) : 1.0;
+                    q.KitPer = q.S > 0.5 ? years * 364.0 * (q.VNorm / Math.Max(0.05, gm)) / q.S : 0;
                     double x = q.S > 0 ? Math.Min(1.0, q.UEff / q.S) : 0;
                     q.B = q.Bmax * (2 * x - x * x);
                     q.Room = Math.Max(0, (q.N - q.UHeld) * q.KitPer);
@@ -807,7 +810,18 @@ namespace Armoury
 
         /// <summary>435-L3 (VillageGear): okreg ze zmienionym czynnikiem sprzetu m - to samo przeliczenie co przy zmianie b (rachunek KS, plan zajec, wycena doby
         /// dla wyplat prac). Nie rzuca.</summary>
-        internal static void NoteGearChanged(Village v) { MarkChanged(v); }
+        internal static void NoteGearChanged(Village v)
+        {
+            // 435-L3-p: jak MarkChanged, ale rachunek KS bez gaszenia szybkiej sciezki kosztu A7 (KsDirtyRes)
+            try
+            {
+                if (v == null || v.Settlement == null) return;
+                StartCalibration.KsDirtyRes(v);
+                VillageCrafts.MarkDirty(v);
+                lock (Gate) { _val.Remove(v.Settlement.StringId); _dDirty++; }
+            }
+            catch { }
+        }
 
         // ============================================================ ogien, glod, powroty (burning)
         /// <summary>Devastation.Strike po ksiedze wiosek: okreg z pracami - roznica pustych osad od razu (stado do napastnika uderzenia). Nie rzuca.</summary>
