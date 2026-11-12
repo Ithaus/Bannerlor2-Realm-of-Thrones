@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 462-a-p (12.11) - poprawki po recenzji 462: udzial jedzenia wobec zuzycia warsztatow, zboze pierwsze przy glodzie, tekst linii przy NIE
+
+**Problem:** recenzja 462 (niezalezny agent): D1 - dla miesa "sprzedaz" w mianowniku to sprzedaz calego targu (ukryci rzemieslnicy BK robia mieso bez wsadu, BannerKings.Redux workshops.xml:22-25, wiec MarketSales je sledzi), a mieso jest wsadem piekarni (workshops.xml:616-620) - udzial wychodzil ~1 przy pustych piekarniach. D2 - w miescie z glodujacymi wsiami zboze (N = 2) tracilo wylaczne pierwszenstwo w L6, bo winogrona / jablka / bydlo mogly tez dojsc do 2. D3 - fragment "462-a" dopisywal sie do linii LP takze przy NIE.
+
+**Przyczyna:** QueueShare dostawal `sales` (max z got i sprzedazy targu) zamiast `got`; brak oslony glodu dla innego jedzenia; tekst bez warunku klucza.
+
+**Zmiana:** komorka i wiersz swiata jedzenia: QueueShare(brak, got) - wobec zuzycia warsztatow; w miescie z glodujacymi wsiami jedzenie inne niz zboze ma S_kolejka 1 (zboze dalej N = 2); linia LP: przy TAK fragment 462-a, przy NIE fragment 435-N-B jak przed. Klucz NIE nadal co do bitu jak 435-N-B. Odrzucone / do wiadomosci: D4 (brak to jeden cykl na linie na dobe - udzial jest dolna granica; calkowity brak dalej 2) - projekt, nie blad; uwaga 462-b (zanizenie doby zapisu w scalonej komorce najwyzej 1/28) - bez zmian.
+
+**Ryzyko / co sprawdzic:** N miesa wzrosnie w miastach z piekarniami bez miesa - L8 / L9 czytaja N wyrobu (tablica Ware), nie te kolejke, ale L5 / L6 / pulap zamowien 363 / finansowanie sprzetu wsi przez miasta (VillageGear.Fund) zobacza zboze, owoce, mieso i zwierzeta - nowy przeplyw zlota do sprawdzenia w tescie (kontrole ksiag 0). Stare zapisy z zerami 435-N-B: przez 28 dob udzial zanizony (historia bez brakow) - przejsciowe. Linia CommodityInputs284 "jedzenie i zwierzeta (tylko pomiar)" bez zmian (tekst nieaktualny przy TAK).
+
+**Status:** DO SPRAWDZENIA
+
 ## 462-b (12.11) - wczytanie pamieci N (arm_lpn): komorka juz zalozona w sesji nie wyrzuca 28-dobowej historii zapisu
 
 **Problem:** stara usterka z listy (SupplySignal.Resolve, "if (m.ContainsKey(cat)) { _loadBad++; continue; }"). Resolve rozwija zapis arm_lpn dopiero w pierwszej dobie sesji (EarlyTable / Daily); jesli warsztat (NoteInput) albo roboty (NoteWorksGap) zapisaly brak w tej komorce wczesniej, cala historia zapisu tej komorki szla do kosza jako "zly wpis" - akurat dla najczynniejszych komorek. Po wczytaniu N tych komorek liczyl sie od zera (kolejka 1 przez MinSpan dob). W logach autotestow brak dowodu wprost (testy laduja zapis bez arm_lpn: "zapis bez arm_lpn" x7) - usterka z kodu.

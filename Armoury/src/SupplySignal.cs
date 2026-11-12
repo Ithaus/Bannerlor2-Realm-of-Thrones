@@ -656,8 +656,9 @@ namespace Armoury
                     for (int i = 0; i < Streams; i++) sb.Append(i == 0 ? " " : ", ").Append(SName[i]).Append(' ').Append(F1(_dGot[i]));
                     sb.Append("; razem ").Append(F1(gAll)).Append(" | reszty budzetu ponizej ceny sztuki (nie brak) ").Append(N0(_dRound)).Append(" zl")
                       .Append(", budzet przy materiale tylko ponad sufitem ceny (nie brak) ").Append(N0(_dCapGold)).Append(" zl")
-                      .Append(" | 435-N-B brak wsadu jedzenia i zwierzat poza N (bez liczonej sprzedazy): ").Append(F1(_dFoodSkip)).Append(" szt. w ").Append(_dFoodSkipN).Append(" brakach")
-                      .Append(" | 462-a brak wsadu jedzenia w N udzialem (klucz Supply Food Input Share ").Append(FoodShareOn ? "TAK" : "NIE").Append("): ").Append(F1(_dFoodShare)).Append(" szt. w ").Append(_dFoodShareN).Append(" brakach, komorek jedzenia z N > 1 ").Append(_sFoodCells).Append(", najwyzsze ").Append(_sFoodMax.ToString("0.00", Inv))
+                      .Append(FoodShareOn
+                          ? " | 462-a brak wsadu jedzenia w N udzialem wobec zuzycia warsztatow (klucz Supply Food Input Share TAK): " + F1(_dFoodShare) + " szt. w " + _dFoodShareN + " brakach, komorek jedzenia z N > 1 " + _sFoodCells + ", najwyzsze " + _sFoodMax.ToString("0.00", Inv)
+                          : " | 435-N-B brak wsadu jedzenia i zwierzat poza N (bez liczonej sprzedazy): " + F1(_dFoodSkip) + " szt. w " + _dFoodSkipN + " brakach")   // 462-a-p (D3): przy NIE tekst jak przed
                       .Append(" | wedlug towaru dzis (brak wsadu + poziom budzetu / kupione): ");
                     var l = new List<KeyValuePair<ItemCategory, double[]>>(_dCat);
                     l.Sort((a, b) => (b.Value[0] + b.Value[2]).CompareTo(a.Value[0] + a.Value[2]));
@@ -847,7 +848,11 @@ namespace Armoury
                     bool food = CommodityInputs284.Food(ck.Key), foodShare = food && FoodShareOn;
                     if (food && !foodShare) miss = 0;                 // 462-a klucz NIE: jak 435-N-B takze dla brakow zapisanych przy kluczu TAK
                     double want = miss + (growOn ? grow : softW);
-                    double sq = foodShare ? QueueShare(want, sales, span) : Queue(want, sales, span);
+                    // 462-a-p (recenzja D1): udzial jedzenia wobec ZUZYCIA warsztatow (got), nie sprzedazy targu - mieso robia tez ukryci rzemieslnicy BK (MarketSales je sledzi),
+                    // a jest wsadem piekarni; sprzedaz mieszczanom w mianowniku dawala N ~ 1 przy pustych piekarniach.
+                    double sq = foodShare ? QueueShare(want, got, span) : Queue(want, sales, span);
+                    // 462-a-p (recenzja D2): w miescie z glodujacymi wsiami pierwszenstwo ma zboze (N = 2 nizej) - inne jedzenie warsztatow nie konkuruje z nim w L6.
+                    if (foodShare && grain != null && ck.Key != grain && hungry.Contains(tk.Key)) sq = 1.0;
                     if (foodShare && sq > 1.0 + 1e-9) { _sFoodCells++; if (sq > _sFoodMax) _sFoodMax = sq; }
                     if (sq > 1.0 + 1e-9) { qOver++; if (sq >= 2.0 - 1e-9) qCeil++; if (!(miss > 1e-6)) softOnly++; }
                     double wantW = growOn ? miss : want;          // 435-N-A-p: do swiata brak wsadu (+ poziom / okno przy kluczu NIE); przyrost osobno ze znakiem
@@ -863,7 +868,7 @@ namespace Armoury
                     }
                     double[] a;
                     if (!agg.TryGetValue(ck.Key, out a)) { a = new double[6]; agg[ck.Key] = a; }
-                    a[0] += wantW; a[1] += sales; a[4]++;
+                    a[0] += wantW; a[1] += foodShare ? got : sales; a[4]++;   // 462-a-p: wiersz swiata jedzenia tez wobec zuzycia warsztatow
                     if (growOn) a[5] += growS;
                     if (n >= 1.5) { a[2]++; hot.Add(tk.Key); }
                     if (n > a[3]) a[3] = n;
