@@ -11428,7 +11428,7 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool NorthSparesWestSeats465 { get; set; } = true;
 
-        [SettingPropertyBool("Army Objective Skips Vetoed Seats", HintText = "When the army plan of Banner Kings picks a siege target that is forbidden (a great seat before the Red Wedding, a place outside the North's theatre of war, a castle just given back), it takes the next enemy stronghold in its usual range instead of raising no army that day. Off = no army that day, as before", RequireRestart = false)]
+        [SettingPropertyBool("Army Objective Skips Vetoed Seats", HintText = "When the army plan of Banner Kings picks a siege target that is forbidden (a great seat before the Red Wedding, a place outside the North's theatre of war, a castle just given back while North Conquest Return is on), it takes the next enemy stronghold in its usual range instead of raising no army that day. Off = no army that day, as before", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool BkVetoNextTarget334 { get; set; } = true;
 

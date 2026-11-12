@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 466-p (12.11) - poprawka po recenzji 466: podpowiedz "Army Objective Skips Vetoed Seats" nie mowi juz, ze zamki sa zawsze oddawane
+
+**Problem:** recenzja 466 (uwaga 2, napis w grze): podpowiedz MCM klucza `BkVetoNextTarget334` wymieniala "a castle just given back" jako stale weto, a od 466 zwrot zdobyczy 326b jest domyslnie NIE - Jeff czytalby, ze zamki dalej wracaja. To samo w naglowku `WarFront334.Theatre.cs` (komentarz B7).
+
+**Przyczyna:** tekst sprzed 466.
+
+**Zmiana:** `McmSettings.cs` i `Settings.cs` (komentarz pola): "a castle just given back while North Conquest Return is on". Naglowek B7 w `WarFront334.Theatre.cs`: "zwraca 326b - tylko przy kluczu TAK, od 466 domyslnie NIE". `tools/gen_mcm.py` bez zmian (trzyma tylko etykiete klucza, nie podpowiedz). Logika bez zmian.
+
+**Ryzyko / co sprawdzic:** tylko napis. Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 465-p (12.11) - poprawka po recenzji 465: licznik "weta BK" siedzib Zachodu bez wet 274
 
 **Problem:** recenzja 465 (uwaga 1, tylko pomiar): w `WarFront334.Theatre.cs` (BkFirstPostfix) `_dVetoWestBk` liczyl kazde weto BK celu z typem 4, takze gdy przyczyna w `VetoedAny` byla "siedziba 274" (Casterly Rock `castle_V5` jest w `CanonWarBalance.SeatIds`, a 274 sprawdzane jest przed teatrem). Liczba "weta BK" w linii dobowej 334 (`siedziby Zachodu 465: ... weta BK M`) bylaby zawyzona o weta 274 Skaly.

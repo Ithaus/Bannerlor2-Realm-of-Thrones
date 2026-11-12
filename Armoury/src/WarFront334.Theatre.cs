@@ -17,7 +17,7 @@ namespace Armoury
     ///      osady, ktorej Settlement.Culture (ROT-Map, nie zmienia sie po zdobyciu) NIE jest z teatru: battania (Polnoc), river (Dorzecze), vlandia (Westerlands) i ziemie
     ///      za Murem / przy Polnocy (freefolk, wildlings, nightswatch, skagosi). Poza teatrem m.in. crownlands, reach, stormlands, dragonstone, vale, aserai, sturgia
     ///      (rdzen Wysp) i Essos - Robb wygrywa w Dorzeczu i na Zachodzie, nie podbija ziem koronnych ani Reach i nie plynie na Pyke. Wyjatek: odbicie osady spoza
-    ///      teatru, ktora z danych ROT nalezy do Polnocy i Polnoc ja trzymala (lista co dobe; zdobycze spoza ziem Polnocy zwraca 326b). Trwajace oblezenie Polnocy -
+    ///      teatru, ktora z danych ROT nalezy do Polnocy i Polnoc ja trzymala (lista co dobe; zdobycze spoza ziem Polnocy zwraca 326b - tylko przy kluczu TAK, od 466 domyslnie NIE). Trwajace oblezenie Polnocy -
     ///      dolaczenie bez weta. Obrona i odsiecz bez zmian.
     ///      Druzyna gracza nie ma weta (wybor gracza; jego zdobycz zostaje u niego - 326b pomija gracza). Faza: do Krwawych Godow (CanonWarClock - ta sama regula co 264/274).
     ///  B9 teatr Wysp: do Krwawych Godow bez celow kultury reach, stormlands, dragonstone, vale, aserai; po Krwawych Godach Reach dozwolony (wojna z nim to osobna paczka).
