@@ -101,7 +101,10 @@ namespace Armoury
                            // do domu (ClanBudget.ToVillage: MDebt - czesc bez pochodzenia, tylko licznik; MBackDebt - z pochodzeniem, z hearth). Pierwsze wolne numery
                            MWatchLevy = 49, MDebt = 50, MBackDebt = 51,
                            // L6 lupu miast (CitySack.People.cs): zabici przez BK przy zdobyciu miasta - stan miasta "t:" (TownSackKilled), bez hearth wsi; pierwszy wolny numer
-                           MSackTown = 52, MKinds = 53;
+                           MSackTown = 52,
+                           // 435-L10 (lancuch podazy, migracja za praca - WorkMigration.cs): rece bez sprzetu ze wsi do wsi z bezczynnym sprzetem albo do miasta targowego
+                           // z brakiem rak - wyjscie z DOM wsi zrodla i wejscie do DOM wsi celu (hearth po obu stronach, kazda wlasnym k_v) albo do stanu miasta; pierwsze wolne numery
+                           MWorkOut = 53, MWorkIn = 54, MKinds = 55;
         private static readonly string[] MName = { "siew puli wyrzutkow (bilans otwarcia)", "bieda i wojna do lasu", "spalona wies do lasu", "z puli do domu (OutlawLaw.ReturnHome)",
             "tabory wsi i lodzie (gra, okna E4/0)", "rozbite tabory do swojej wsi (LosersFlee.SendHome)", "rozwiazane tabory i lodzie do swojej wsi (R18)",
             "prosci i bandyci do wsi (LosersFlee.SendHome -> OutlawLaw.ReturnHome)", "zolnierze do ludnosci BK (LosersFlee.SendHome: rozbici, uwolnieni, I1, pula)",
@@ -123,7 +126,8 @@ namespace Armoury
             "weterani niewynajeci po czasie czekania do domu (E4/10)", "starzy zolnierze z ludzi miast do karczm (siew E4/10, stan miasta E4/4)",
             "powrot z pochodzeniem: niewzieci z poboru wymuszonego gracza do swojej wsi (E4/7b)",
             "pobor do Strazy z ludnosci Westeros (E4/9)", "dluznicy: odeszli z braku pieniedzy do domu (E4/9 DLUG 4, ClanBudget.ToVillage)",
-            "powrot z pochodzeniem: dluznicy do domu (E4/9 DLUG 4)", "zdobycie: zabici mieszczanie (L6 lupu miast, BK - stan miasta)" };
+            "powrot z pochodzeniem: dluznicy do domu (E4/9 DLUG 4)", "zdobycie: zabici mieszczanie (L6 lupu miast, BK - stan miasta)",
+            "migracja za praca: wyszli z wsi (435-L10)", "migracja za praca: weszli do wsi albo miasta (435-L10)" };
         // czy przyczyna rusza hearth wsi. SLUZBA -> DOM (zolnierze do BK, 166, W4c, 179) BEZ pochodzenia tylko liczona: przy werbunku tego czlowieka z DOM nikt nie zdjal
         // (zolnierz sprzed siewu albo z kanalu bez okna), wiec powrot dopisany do hearth bylby ludzmi z niczego (i zaklocalby prog przyrostu E4/4); 280: zolnierz z pochodzeniem
         // zszedl z DOM przy werbunku (E4/7 LevyLive) i wraca do hearth regionu przez MBack* nizej; incydenty i podloga 10 - hearth zmienila gra (licznik).
@@ -138,7 +142,8 @@ namespace Armoury
                                                    true, false,                                                              // E4/10: MBackVeteran (hearth), MVetStart (stan miasta)
                                                    true,                                                                     // E4/7b: MBackPress (hearth wsi zdjecia)
                                                    true, false, true,                                                        // E4/9: MWatchLevy (hearth), MDebt (licznik), MBackDebt (hearth)
-                                                   false };                                                                  // L6 lupu miast: MSackTown (stan miasta)
+                                                   false,                                                                    // L6 lupu miast: MSackTown (stan miasta)
+                                                   true, true };                                                             // 435-L10: MWorkOut, MWorkIn (hearth wsi; miasto - TownShift)
         private static readonly object Gate = new object();
         private static readonly double[] _mMen = new double[MKinds], _mHearth = new double[MKinds];   // doba linii "Ludzie (ksiega)"
         private static readonly double[] _h40 = new double[MKinds];                                     // od ostatniej linii "Hearth (E4/0)" (Measure40 czyta i zeruje)

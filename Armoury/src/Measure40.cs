@@ -894,9 +894,11 @@ namespace Armoury
             double o14 = mv[PeopleBook.MBackVeteran];
             // E4/9: pobor do Strazy z ludnosci Westeros (ujemne, -1/k) i dluznicy do domu z pochodzeniem (dodatnie) - hearth z ksiegi (inaczej RESZTA wchlonie je)
             double o15w = mv[PeopleBook.MWatchLevy], o15d = mv[PeopleBook.MBackDebt];
+            // 435-L10: migracja za praca - wyjscie z wsi zrodla (ujemne) i wejscie do wsi celu (dodatnie; do miasta - stan miasta, bez hearth) - hearth z ksiegi (inaczej RESZTA)
+            double o16 = mv[PeopleBook.MWorkOut] + mv[PeopleBook.MWorkIn];
             double seedH = -mv[PeopleBook.MSeed];
             bool seedInside = !first && seedH != 0;
-            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 + o13 + o14 + o15w + o15d - (seedInside ? seedH : 0);
+            double named = _vTick + _decreeH - cartsH - fishH - _raidH - o1 - o2 + o3 + o4 + o5 + o6 + o7 + o8 + o9 + o10 + o11 + o12 + o13 + o14 + o15w + o15d + o16 - (seedInside ? seedH : 0);
             int devSteps = 0; long devLootAi = 0, devLootPlayer = 0;
             try { Devastation.StepsToday(out devSteps, out devLootAi, out devLootPlayer); } catch (Exception e) { Stumble("Daily(Devastation)", e); }
             double dH = H - Hlast;
@@ -935,7 +937,7 @@ namespace Armoury
                   .Append(", nasze (E4/8): milicja z wolnych rak ").Append(S(e8Mil)).Append(", milicja do domu ").Append(S(e8MilHome)).Append(", nowe druzyny ").Append(S(e8Spawn))
                   .Append(", karawany ").Append(S(e8Car)).Append(", wedrowcy BK ").Append(S(e8RoadOut)).Append("/").Append(S(e8RoadIn)).Append(", migracja do miast ").Append(S(e8Mig))
                   .Append(", powroty weteranow (E4/10) +").Append(F2(o14))
-                  .Append(", pobor do Strazy z ludnosci Westeros (E4/9) ").Append(S(o15w)).Append(", dluznicy do domu (E4/9) +").Append(F2(o15d));
+                  .Append(", pobor do Strazy z ludnosci Westeros (E4/9) ").Append(S(o15w)).Append(", dluznicy do domu (E4/9) +").Append(F2(o15d)).Append(o16 != 0 ? ", migracja za praca (435-L10) " + S(o16) : "");
             }
             sb.Append(" | powrot z puli w regionie bez wsi (zeszli z puli, hearth bez zmian) ").Append(_noVillage.ToString("0.0", Inv)).Append(" ludzi");
             if (seedH != 0) sb.Append(" | siew puli wyrzutkow -").Append(F2(seedH)).Append(seedInside ? " (w bilansie, poza RESZTA)" : " (przed pierwsza migawka sesji - poza bilansem)");

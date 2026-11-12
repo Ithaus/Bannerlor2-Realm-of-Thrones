@@ -826,6 +826,9 @@ namespace Armoury
         // 435-L9 (lancuch podazy, przezbrojenie stojacego warsztatu i przejecie): stan arm_lpr i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L8)
         private readonly bool _lp9Reset = Lp9Reset();
         private static bool Lp9Reset() { try { WorkshopIdleRetool.Reset(); } catch (Exception e) { Log.Error("Lp9Reset", e); } return true; }
+        // 435-L10 (lancuch podazy, migracja za praca): pamiec m okregow arm_lpm i liczniki od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak L9)
+        private readonly bool _lp10Reset = Lp10Reset();
+        private static bool Lp10Reset() { try { WorkMigration.Reset(); } catch (Exception e) { Log.Error("Lp10Reset", e); } return true; }
         // m96-dlugi: ksiegi dlugow rad miast od zera przy nowej kampanii / przed wczytaniem (osobna linia, jak p6-a7)
         private readonly bool _m96DlugiReset = M96DlugiReset();
         private static bool M96DlugiReset() { try { TownDebt.Reset(); } catch (Exception e) { Log.Error("M96DlugiReset", e); } return true; }
@@ -1573,6 +1576,9 @@ namespace Armoury
             // 435-L9: pamiec stojacych warsztatow (arm_lpr: "lpr1|warsztaty"); pisany tylko ze stanem; brak klucza = pamiec od zera; starsza DLL ignoruje klucz
             try { string lr = dataStore.IsSaving ? WorkshopIdleRetool.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lr)) SaveText.Sync(dataStore, "arm_lpr", ref lr); if (dataStore.IsLoading) WorkshopIdleRetool.Import(lr); }
             catch (Exception e) { Log.Error("SyncData.arm_lpr", e); }
+            // 435-L10: pamiec m okregow dla migracji za praca (arm_lpm: "lpm1|wies~m28~dob;..."); pisany tylko ze stanem; brak klucza = pamiec od zera; starsza DLL ignoruje klucz
+            try { string lm = dataStore.IsSaving ? WorkMigration.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(lm)) SaveText.Sync(dataStore, "arm_lpm", ref lm); if (dataStore.IsLoading) WorkMigration.Import(lm); }
+            catch (Exception e) { Log.Error("SyncData.arm_lpm", e); }
             // 435-L1-p: pamiec niedoboru N (arm_lpn: "n1|doba|dob pomiaru|znaczniki|decyzje regulatora|komorki"); pisany tylko ze stanem; brak klucza = pamiec od pierwszej doby; starsza DLL ignoruje klucz
             try { string ln = dataStore.IsSaving ? SupplySignal.Export() : null; if (!dataStore.IsSaving || !string.IsNullOrEmpty(ln)) SaveText.Sync(dataStore, "arm_lpn", ref ln); if (dataStore.IsLoading) SupplySignal.Import(ln); }
             catch (Exception e) { Log.Error("SyncData.arm_lpn", e); }
@@ -3253,6 +3259,9 @@ namespace Armoury
             try { EcoAudit427.DailyKills((int)CampaignTime.Now.ToDays); } catch (Exception e) { Log.Error("EcoAudit427.DailyKills", e); } DayProfile.Lap("EcoAudit427.DailyKills");   // 427 A1: linia "Kto rozbija bandy (427)" (tylko log)
             try { BanditLimit.Daily(); } catch (Exception e) { Log.Error("BanditLimit.Daily", e); } DayProfile.Lap("BanditLimit.Daily");   // f8-bandy: linia "Bandy i limit (f8-bandy): dzien N" - bandy wobec celu, narodziny, koszt AI band, doba realna (PO OutlawLaw.Daily - czas jego odcinka z profilu doby)
             try { Risk433.Daily(); } catch (Exception e) { Log.Error("Risk433.Daily", e); } DayProfile.Lap("Risk433.Daily");   // 433 (C4 + C1 + C2): linia "Zbojcy i ryzyko (433)" - PO OutlawLaw.Daily (naplyw biedy tej doby) i po liniach karawan
+            // 435-L10 (klucz Work Migration; wylaczony - nic): migracja za praca - rece bez sprzetu do wsi z bezczynnym sprzetem albo do miasta targowego z brakiem rak; PO OutlawLaw.Daily
+            // (bieda do lasu z tej samej puli ludzi, obie pilnuja podlogi 50 - II.17), PRZED ksiega ludzi (OthersRise -> PeopleBook.Daily) i VillageGear.BeforeProduction (rece tej doby)
+            try { WorkMigration.Daily(); } catch (Exception e) { Log.Error("WorkMigration.Daily", e); } DayProfile.Lap("WorkMigration.Daily");
             try { MoneyLedger.Probe169("BanditLimit.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); } DayProfile.Lap("IronBank.Daily");   // Bank Zelazny: pozyczki AI, raty, bankructwa
             // 166 + 162m (projekt etapu 2, 2.0b): budzet rodow po Banku, przed ksiega rodow (na D z wczoraj); osobna pozycja ksiegi pieniadza (dwor do kas siedzib,

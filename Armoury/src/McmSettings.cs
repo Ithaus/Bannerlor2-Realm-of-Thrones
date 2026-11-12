@@ -10280,6 +10280,14 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool WorkshopTakeover { get; set; } = false;
 
+        [SettingPropertyBool("Work Migration", HintText = "with Village Gear and People Unit Enabled: once a week per region, people leave a village whose hands have lacked tools, shafts, boats or rows for four weeks (the village's average gear yield below 90%), or whose people go hungry, for a village that has idle gear - first in the same region, then within a short land road - or for their own market town when it pays more for missing hands. A village takes only as many as its idle gear can equip, gear kept for its refugees does not count, and no village falls below 50 hearth. A village that does not grow 1.2 times its own grain needs keeps its people unless they go hungry. Each migrant takes a share of the village purse above its emergency chest (at most four weeks of the village basket). You hear only about your own villages. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool WorkMigration { get; set; } = false;
+
+        [SettingPropertyFloatingInteger("Work Migration Year Share", 0.000f, 0.100f, "0.000", HintText = "with Work Migration: the largest share of a village's people that may leave for work in a year (0.01 = 1%; twice that while they go hungry)", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public float WorkMigrationYearShare { get; set; } = 0.01f;
+
         [SettingPropertyFloatingInteger("Side Village Craft Region Share", 0.000f, 1.000f, "0.000", HintText = "with Side Village Crafts: at most this share of the side villages' hands of one region (a stronghold and its villages) may change craft in one season (91 days); at most one village per district changes at a time", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public float SideVillageCraftRegionShare { get; set; } = 0.05f;
@@ -15327,6 +15335,8 @@ namespace Armoury
             s.WorkshopBenches = WorkshopBenches;
             s.WorkshopRetoolIdle = WorkshopRetoolIdle;
             s.WorkshopTakeover = WorkshopTakeover;
+            s.WorkMigration = WorkMigration;
+            s.WorkMigrationYearShare = WorkMigrationYearShare;
             s.SideVillageCraftChangeDays = SideVillageCraftChangeDays;
             s.SideVillageCraftTreeDays = SideVillageCraftTreeDays;
             s.SideVillageCraftRegionShare = SideVillageCraftRegionShare;
