@@ -511,7 +511,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("StartLine.theatre", e); }
             Log.Info(Tag + "start sesji | klucze: front " + Key01(s.CanonWarFront334) + ", SCA front " + Key01(s.ScaFrontThreat334) + ", SCA glowna wojna " + Key01(s.ScaFightsOnMainWarLocked334)
-                     + ", najem kompanii " + Key01(s.CanonWarBalanceHireCompanies) + ", rozejm uzbrojony " + Key01(s.WarTruceArmed334) + ", teatr Polnocy " + Key01(s.NorthCanonTheatre334)
+                     + ", najem kompanii " + Key01(s.CanonWarBalanceHireCompanies) + ", rozejm uzbrojony " + Key01(s.WarTruceArmed334) + ", teatr Polnocy " + Key01(s.NorthCanonTheatre334) + ", siedziby Zachodu 465 " + Key01(s.NorthSparesWestSeats465)
                      + ", BK nastepny cel " + Key01(s.BkVetoNextTarget334) + ", Zelazni " + Key01(s.IronbornCanonReave334)
                      + ", postawa 334c " + Key01(s.CanonWarStance334c) + ", SCA swoi koalicji 334c " + Key01(s.ScaCoalitionOwn334c) + ", straznik pozycji 334c " + Key01(s.PartyPositionGuard334c)
                      + " | zakres: " + (Canon ? "kampania kanonu" : "kampania klasyczna - nie dotyczy")

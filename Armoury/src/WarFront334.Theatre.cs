@@ -33,6 +33,13 @@ namespace Armoury
         private static readonly string[] IronOutsideAfterRw = { "stormlands", "dragonstone", "vale", "aserai" };
 
         private static int _dVetoCrown;
+        // 465 (Jeff 12.11, propozycja 1): do Krwawych Godow Polnoc na Zachodzie tylko najazdy i male zamki - jak w kanonie (Robb bierze Crag, Ashemark, bije pod Oxcross
+        // i pali wsie, ale nie oblega Casterly Rock ani miast Zachodu). Lista z ROT-Map settlements.xml (kultura vlandia, Town bez is_castle = miasta Zachodu):
+        //   castle_V5 Casterly Rock - siedziba Lannisterow, w kanonie nie do wziecia sila (w ROT zamek, ale glowna twierdza Zachodu);
+        //   town_V9 Lannisport, town_V8 Kayce, ROT_town29 Hornvale - jedyne miasta kultury vlandia w ROT-Map (Robb zadnego nie oblegal).
+        // Pozostale zamki Zachodu (Crakehall, Clegane's Keep, Goldentooth, Cornfield, Crag, Deep Den, Banefort, Silverhill, Ashemark, Faircastle, Sarsfield) - wolno.
+        private static readonly string[] WestSeats465 = { "castle_V5", "town_V9", "town_V8", "ROT_town29" };
+        private static int _dVetoWest, _dVetoWestBk, _dWestSiegeAi;
         private static int _dVetoThink, _dVetoIron, _dVetoBk, _dBkNext, _dBkNone, _dBkNull, _dBkIron, _dOutSiegeAi, _dOutTaken, _sOutTaken;
         private static readonly HashSet<string> _dSaid = new HashSet<string>(StringComparer.Ordinal);
         private static readonly List<string> _dBkNotes = new List<string>();
@@ -45,6 +52,7 @@ namespace Armoury
         {
             _dVetoCrown = 0;
             _dVetoThink = _dVetoIron = _dVetoBk = _dBkNext = _dBkNone = _dBkNull = _dBkIron = _dOutSiegeAi = _dOutTaken = 0;
+            _dVetoWest = _dVetoWestBk = _dWestSiegeAi = 0;
             _dSaid.Clear(); _dBkNotes.Clear(); _dTakenNotes.Clear();
         }
 
@@ -67,6 +75,14 @@ namespace Armoury
             if (realm == NorthId) return !afterRw && !retake && !InNorthTheatre(cult);
             if (realm == IronId) return Array.IndexOf(afterRw ? IronOutsideAfterRw : IronOutsideBeforeRw, cult) >= 0;
             return false;
+        }
+
+        internal static bool WestSeatsOn { get { var s = S; return s != null && s.NorthSparesWestSeats465 && Canon; } }
+
+        /// <summary>Czyste (autotest) 465: zakaz oblezenia wielkiej siedziby / miasta Zachodu przez Polnoc do Krwawych Godow (po StringId osady).</summary>
+        internal static bool WestSeatVetoKind(string realm, string sid, bool afterRw)
+        {
+            return realm == NorthId && !afterRw && sid != null && Array.IndexOf(WestSeats465, sid) >= 0;
         }
 
         /// <summary>Osada w teatrze Polnocy (linia startu): kultura nie z listy "poza".</summary>
@@ -92,7 +108,7 @@ namespace Armoury
             return _crownSide;
         }
 
-        /// <summary>Weto teatru dla frakcji f na osade st teraz: 0 brak, 1 teatr Polnocy, 2 teatr Wysp, 3 teatr korony (334e).</summary>
+        /// <summary>Weto teatru dla frakcji f na osade st teraz: 0 brak, 1 teatr Polnocy, 2 teatr Wysp, 3 teatr korony (334e), 4 wielka siedziba / miasto Zachodu (465).</summary>
         internal static int TheatreVeto(IFaction f, Settlement st)
         {
             if (f == null || st == null) return 0;
@@ -106,8 +122,10 @@ namespace Armoury
             }
             if (id == NorthId)
             {
-                if (!TheatreKey || CanonWarClock.OverNow()) return 0;
-                return TheatreVetoKind(NorthId, CultureOf(st), Retake(st), false) ? 1 : 0;
+                if (CanonWarClock.OverNow()) return 0;
+                if (TheatreKey && TheatreVetoKind(NorthId, CultureOf(st), Retake(st), false)) return 1;
+                if (WestSeatsOn && WestSeatVetoKind(NorthId, st.StringId, false)) return 4;   // 465: same twierdze z listy - najazdy na ich wsie bez weta
+                return 0;
             }
             if (id == IronId)
             {
@@ -225,11 +243,11 @@ namespace Armoury
                 if (siege && BesiegedBy(st, f)) continue;   // trwajace oblezenie swojej strony - dolaczenie bez weta
                 var d = e.Item1;
                 p.SetBehaviorScore(in d, -1f);
-                if (kind == 1) _dVetoThink++; else if (kind == 3) _dVetoCrown++; else _dVetoIron++;
+                if (kind == 1) _dVetoThink++; else if (kind == 3) _dVetoCrown++; else if (kind == 4) _dVetoWest++; else _dVetoIron++;
                 if (Say("teatr|" + party.StringId + "|" + st.StringId))
                     Log.Info(Tag + "weto teatru | dzien " + Today + " | " + Nm(party) + " (" + Nm(f) + (party.Army != null ? ", wodz armii" + (ArmyHasPlayer(party.Army) ? " z graczem" : "") : "") + ") -> "
                              + (siege ? "oblezenie " : "najazd ") + Nm(st) + " (" + st.StringId + ", kultura " + (CultureOf(st) ?? "-") + ", " + Nm(st.MapFaction) + ", ocena gry " + F2(e.Item2) + ")"
-                             + (kind == 1 ? " - Polnoc do Krwawych Godow walczy na Polnocy, w Dorzeczu i na Zachodzie." : kind == 3 ? " - korona do Krwawych Godow nie idzie za Przesmyk (334e)." : " - Wyspy: cel poza teatrem tej fazy."));
+                             + (kind == 1 ? " - Polnoc do Krwawych Godow walczy na Polnocy, w Dorzeczu i na Zachodzie." : kind == 4 ? " - Polnoc do Krwawych Godow nie oblega Casterly Rock ani miast Zachodu (465)." : kind == 3 ? " - korona do Krwawych Godow nie idzie za Przesmyk (334e)." : " - Wyspy: cel poza teatrem tej fazy."));
             }
         }
 
@@ -252,6 +270,17 @@ namespace Armoury
                 string id = lead.MapFaction.StringId;
                 if (id == IronId) { NoteIronSiege(lead, st); return; }
                 if (id != NorthId || CanonWarClock.OverNow()) return;
+                if (WestSeatVetoKind(NorthId, st.StringId, false))
+                {
+                    // 465: oblezenie wielkiej siedziby / miasta Zachodu mimo zakazu (droga spoza mysli AI i BK) - tylko pomiar
+                    bool pl = lead.IsMainParty;
+                    if (!pl) _dWestSiegeAi++;
+                    var s5 = S;
+                    if (s5 != null && s5.LogEnabled)
+                        Log.Info(Tag + "oblezenie siedziby Zachodu | dzien " + Today + " | " + Nm(lead) + " (" + Nm(lead.MapFaction) + (pl ? ", GRACZ - bez weta" : ", AI") + ") oblega " + Nm(st)
+                                 + " (" + st.StringId + ")" + (pl ? "." : " - zakaz 465 " + (WestSeatsOn ? "nie zadzialal (droga spoza mysli AI i BK)" : "wylaczony (klucz NIE)") + "."));
+                    return;
+                }
                 if (!OutsideNorthCulture(CultureOf(st)) || Retake(st)) return;
                 bool player = lead.IsMainParty;
                 if (!player) _dOutSiegeAi++;
@@ -291,6 +320,7 @@ namespace Armoury
                      + ", Wysp " + _dVetoIron + ", korony 334e " + _dVetoCrown + ", weta BK " + _dVetoBk + ", oblezenia AI Polnocy poza teatrem " + _dOutSiegeAi
                      + ", cele poza teatrem zdobyte przez AI Polnocy " + _dOutTaken + " (sesja " + _sOutTaken + ")" + (_dTakenNotes.Count > 0 ? " [" + string.Join(", ", _dTakenNotes.ToArray()) + "]" : "")
                      + ", osad na odbicie " + _northHeld.Count
+                     + " | siedziby Zachodu 465: klucz " + Key01(WestSeatsOn) + ", weta mysli " + _dVetoWest + ", weta BK " + _dVetoWestBk + ", oblezenia AI mimo zakazu " + _dWestSiegeAi
                      + " | BK nastepny cel: klucz " + Key01(BkNextOn) + ", zamian " + _dBkNext + ", bez innego celu " + _dBkNone + ", BK null " + _dBkNull + ", cele Wysp (lad i morze) " + _dBkIron
                      + (_dBkNotes.Count > 0 ? " [" + string.Join("; ", _dBkNotes.ToArray()) + "]" : "") + ".");
         }
@@ -312,7 +342,7 @@ namespace Armoury
             if (v == 1) { why = "siedziba 274"; return true; }
             if (v == 2) { why = "za frontem 274"; return true; }
             int t = TheatreVeto(k, st);
-            if (t != 0) { why = t == 1 ? "teatr Polnocy" : t == 3 ? "teatr korony" : "teatr Wysp"; return true; }
+            if (t != 0) { why = t == 1 ? "teatr Polnocy" : t == 4 ? "siedziba Zachodu 465" : t == 3 ? "teatr korony" : "teatr Wysp"; return true; }
             try { if (NorthConquest.VetoedFor(k, st)) { why = "zwrot 326b"; return true; } } catch { }
             if (leader != null)
             {
@@ -343,7 +373,9 @@ namespace Armoury
                 if (!Canon) return;
                 string why; bool local;
                 if (!VetoedAny(__1, v.Item1, out why, __0, out local)) return;
-                if (TheatreVeto(__1, v.Item1) != 0) _dVetoBk++;
+                int tv = TheatreVeto(__1, v.Item1);
+                if (tv != 0) _dVetoBk++;
+                if (tv == 4) _dVetoWestBk++;
                 // po recenzji 334e (W9): sila lokalna nie daje null - bez nastepnego celu zostaje wybor BK, a cel wyzeruje ocena celu (ScorePost) w mysli armii
                 if (!BkNextOn) return;   // 167: 274 / 326b daja null jak dotad; teatr ponizej (BkLastPostfix)
                 var next = NextBkTarget(__0, __1);

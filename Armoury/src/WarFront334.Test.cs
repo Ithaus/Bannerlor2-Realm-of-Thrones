@@ -68,6 +68,11 @@ namespace Armoury
                           && !WarFront334.TheatreVetoKind("battania", "freefolk", false, false) && WarFront334.TheatreVetoKind("battania", "ghiscari", false, false)
                           && WarFront334.TheatreVetoKind("battania", "vale", false, false) && !WarFront334.TheatreVetoKind("battania", null, false, false);
                 Say("T1 tabela teatru (Polnoc / Wyspy, odbicie, Krwawe Gody)", t1, "16 przypadkow");
+                // 465: siedziby Zachodu
+                bool t1b = WarFront334.WestSeatVetoKind("battania", "castle_V5", false) && WarFront334.WestSeatVetoKind("battania", "town_V9", false)
+                           && !WarFront334.WestSeatVetoKind("battania", "castle_V5", true) && !WarFront334.WestSeatVetoKind("battania", "castle_EN6", false)
+                           && !WarFront334.WestSeatVetoKind("sturgia", "town_V9", false) && !WarFront334.WestSeatVetoKind("battania", null, false);
+                Say("T1b siedziby Zachodu 465 (Rock / Lannisport tak, po Krwawych Godach, Crag, Wyspy, brak id - nie)", t1b, "6 przypadkow");
                 // T2
                 bool t2 = WarFront334.LockedShare(5, 10) == true && WarFront334.LockedShare(4.9, 10) == false && WarFront334.LockedShare(0, 0) == null;
                 Say("T2 udzial zablokowanego zagrozenia (B3)", t2, "5/10, 4.9/10, 0/0");

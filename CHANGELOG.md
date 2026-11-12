@@ -1,5 +1,34 @@
 # DZIENNIK ZMIAN
 
+## 465 (12.11) - teatr Polnocy na Zachodzie: do Krwawych Godow tylko najazdy i male zamki, bez oblezen Casterly Rock i miast Zachodu
+
+**Problem:** diagnoza balansu Polnoc vs korona (12.11): teatr 334 trzyma kulture vlandia (Westerlands) na bialej liscie celow Polnocy (`WarFront334.Theatre.cs` NorthTheatreCultures), wiec AI Polnocy moze do Krwawych Godow oblegac takze Casterly Rock i miasta Zachodu - wbrew kanonowi (Robb na Zachodzie bierze Crag, Ashemark, bije pod Oxcross i pali wsie, ale nie oblega Skaly ani Lannisportu). Jeff 12.11: "Robimy 1" (propozycja 1). Gry nie uruchamiano - dowod z kodu i danych ROT.
+
+**Przyczyna:** `TheatreVeto` dla Polnocy patrzyl tylko na kulture osady; na Zachodzie zadnego rozroznienia najazd / maly zamek / wielka siedziba.
+
+**Zmiana (`WarFront334.Theatre.cs`, `WarFront334.cs` linia startu, `WarFront334.Test.cs` T1b, `Settings.cs` + `McmSettings.cs` klucz, `tools/gen_mcm.py` tylko etykieta):**
+- Lista jawna `WestSeats465` z ROT-Map `settlements.xml` (kultura vlandia; Town bez is_castle = miasto): `castle_V5` Casterly Rock (w ROT zamek, ale siedziba Lannisterow), `town_V9` Lannisport, `town_V8` Kayce, `ROT_town29` Hornvale (jedyne miasta kultury vlandia). Wolne zostaja zamki: Crakehall, Clegane's Keep, Goldentooth, Cornfield, The Crag, Deep Den, Banefort, Silverhill, Ashemark, Faircastle, Sarsfield; wsie (najazdy) - wszystkie, takze wsie tych czterech.
+- `TheatreVeto` Polnoc: przed Krwawymi Godami (CanonWarClock) -> 1 jak dotad (klucz teatru), potem nowy rodzaj 4 = osada z listy (klucz `NorthSparesWestSeats465`, kanon). Rodzaj 4 idzie tymi samymi drogami co teatr: mysl AI (postfiks AiHourlyTick prio 48 - ocena -1, dolaczenie do trwajacego oblezenia Polnocy bez weta), BK FindArmyObjective (nastepny cel / null), opcje 334e (`VetoedFor334e` - armie lupia, KONTYNUUJ), BkLastPostfix. Gracz (wlasna armia) bez weta; wodz AI armii z graczem - weto jak w 334.
+- Pomiar: `OnSiegeStarted` - oblezenie siedziby Zachodu przez Polnoc (AI mimo zakazu albo gracz) - linia "oblezenie siedziby Zachodu".
+- Klucz MCM "North Spares The Rock And Western Cities" (grupa Wars of the books), domyslnie TAK; NIE = jak przed.
+
+**Linie logu:**
+- dobowa linia teatru 334: "... | siedziby Zachodu 465: klucz TAK, weta mysli N, weta BK M, oblezenia AI mimo zakazu K | BK nastepny cel ...".
+- "Balans wojny (334): weto teatru | ... -> oblezenie Lannisport (...) - Polnoc do Krwawych Godow nie oblega Casterly Rock ani miast Zachodu (465)." (raz na partie i osade na dobe).
+- BK: "BK nastepny cel | ... zawetowany Lannisport (siedziba Zachodu 465) -> nowy ...".
+- start sesji: "teatr Polnocy TAK, siedziby Zachodu 465 TAK"; autotest 334: "T1b siedziby Zachodu 465 ... wynik TAK".
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci (w kodzie): wszyscy wolajacy `TheatreVeto` (TheatreThink, VetoedAny -> BkFirstPostfix / NextBkTarget / VetoedFor334e w LocalFront334e.Score/Siege, BkLastPostfix) traktuja kazdy niezerowy rodzaj jak weto - rodzaj 4 nie wymaga zmian u nich; liczniki rozdzielone (kind 4 nie liczy sie juz jako "Wysp"). Napisy "why" nie sa nigdzie parsowane.
+- Najazdy: lista zawiera tylko twierdze, wies nigdy nie ma rodzaju 4 - najazdy na Zachodzie bez zmian.
+- Klucz teatru NIE przy kluczu 465 TAK: rodzaj 4 dziala sam (po Krwawych Godach nie). Oba NIE - co do bitu jak przed (TheatreVeto 0; dodatkowa linia OnSiegeStarted dla oblezenia z listy - tylko pomiar, klucz "wylaczony").
+- Odbicie: _northHeld trzyma tylko osady spoza teatru (vlandia w teatrze), wiec Polnoc nie odbije tych czterech, gdyby gracz je zdobyl i stracil przed Krwawymi Godami - swiadomie (kanon).
+- Mniej celow dla armii Polnocy na Zachodzie: BK nastepny cel bierze nastepna twierdze (male zamki Zachodu albo Dorzecze); gdy nic - null (jak przy wecie 274). Obserwowac "BK nastepny cel ... bez innego celu" i "armii 0" Polnocy.
+- Zaleznosc od id osad ROT-Map 8.1.8 - po zmianie mapy ROT lista do sprawdzenia (T1b sprawdza tylko logike, nie istnienie osad).
+- Build OK, skan IL 30 trafien. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 458-u-p (12.11) - poprawki po recenzji 458-u: kon zbieglego z wodzem wedlug losu WLASNEGO konia, linia "zapis porzucony", etykiety kontroli
 
 **Problem (recenzja 458-u, gry nie uruchamiano - dowod z kodu):**

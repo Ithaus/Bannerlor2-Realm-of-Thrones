@@ -824,6 +824,7 @@ LABELS = {
     'CanonWarBalanceHireCompanies': 'Weaker Side Hires Sellswords',
     'WarTruceArmed334': 'Armed Truce',
     'NorthCanonTheatre334': 'North Canon Theatre',
+    'NorthSparesWestSeats465': 'North Spares The Rock And Western Cities',
     'BkVetoNextTarget334': 'Army Objective Skips Vetoed Seats',
     'IronbornCanonReave334': 'Ironborn Reave The North',
     'PartyPositionGuard334c': 'Party Position Guard',   # paczka 334c

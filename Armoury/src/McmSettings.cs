@@ -11424,6 +11424,10 @@ namespace Armoury
         [SettingPropertyGroup("Wars of the books")]
         public bool NorthCanonTheatre334 { get; set; } = true;
 
+        [SettingPropertyBool("North Spares The Rock And Western Cities", HintText = "Until the Red Wedding the North fights in the Westerlands as in the books: its AI lords and armies (also an AI marshal whose army you ride in) raid the villages and besiege the lesser castles of the West, but start no siege of Casterly Rock or of the western cities - Lannisport, Kayce and Hornvale. Joining a siege already led by the North stays allowed, and your own army is free. After the Red Wedding the rule ends. Off = the North may besiege them, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Wars of the books")]
+        public bool NorthSparesWestSeats465 { get; set; } = true;
+
         [SettingPropertyBool("Army Objective Skips Vetoed Seats", HintText = "When the army plan of Banner Kings picks a siege target that is forbidden (a great seat before the Red Wedding, a place outside the North's theatre of war, a castle just given back), it takes the next enemy stronghold in its usual range instead of raising no army that day. Off = no army that day, as before", RequireRestart = false)]
         [SettingPropertyGroup("Wars of the books")]
         public bool BkVetoNextTarget334 { get; set; } = true;
@@ -15767,6 +15771,7 @@ namespace Armoury
             s.CanonWarBalanceHireCompanies = CanonWarBalanceHireCompanies;
             s.WarTruceArmed334 = WarTruceArmed334;
             s.NorthCanonTheatre334 = NorthCanonTheatre334;
+            s.NorthSparesWestSeats465 = NorthSparesWestSeats465;
             s.BkVetoNextTarget334 = BkVetoNextTarget334;
             s.IronbornCanonReave334 = IronbornCanonReave334;
             s.PartyPositionGuard334c = PartyPositionGuard334c;
