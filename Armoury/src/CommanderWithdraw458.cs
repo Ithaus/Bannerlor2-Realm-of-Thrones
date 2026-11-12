@@ -4,9 +4,12 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -58,6 +61,27 @@ namespace Armoury
     ///    dowod przeszkody 1 w logu).
     /// Linie: "Odwrot wodza (458): ..." w chwili "widzi przegrana" (raz na druzyne) i "Odwrot wodza (458) koniec: ..." na koniec misji.
     /// Wyjatek per druzyne / czlowieka = potkniecie (pierwsze 3 do logu), bez globalnego wylacznika. Zadnych pol MovementOrder.
+    ///
+    /// 458-r REGULA (decyzja Jeffa 12.11: "1. Rob B 2. Rob B - ... wodz ktory sie wycofa odszedl jak najszybciej a wygrany pewnie grabi rannych 3. odchodza z wodzem,
+    /// bitwa przegrana wycofujemy sie i tylna straz walczy do konca"; klucz Commander Withdraws Under Rearguard, TAK; NIE = co do bitu jak przed - sam pomiar):
+    /// wyzwalacz = ta sama chwila "widzi przegrana" (progi profilu 440). Tylko druzyna AI wroga gracza (nigdy strona gracza), jedyna druzyna AI swojej strony,
+    /// MapEvent gracza = bitwa polowa na ladzie, wodz na polu. Przeszkody 1-3 z opisu wyzej rozwiazane tak:
+    ///  1. ODWROT W SZEREGACH bez latki na RBM: natywny Agent.Retreat(pozycja) (SetRetreatMode) komponentu CommonAIComponent nie dotyka, a RBM OnTickPatch wola
+    ///     CommonAIComponent.StopRetreating, ktore dziala tylko przy IsRetreating komponentu (wzor 143 RoutHold.Withdraw, 371, 381 - sprawdzone w grze). Kazdy
+    ///     wyprowadzany (zdolni spoza tylnej strazy + wodz) idzie do JEDNEGO punktu ucieczki swojego szyku (Mission.GetClosestFleePositionForFormation - punkty
+    ///     ucieczki strony z omijaniem scigajacych, jak gra; bez szyku - GetClosestFleePositionForAgent); gra sama zdejmuje go z pola przy punkcie (StartFadingOut).
+    ///     Co 0.5 s: morale >= 15 (skala gry 0-100; ponizej 0.01 gra sama wola Panic i wypisuje ze skladu), odwrot ponowiony, gdy zgasl (np. StopRetreating RBM po
+    ///     szarzy konnej). PANIKA (SurvivalMode.InPanic: komponent / RoutHold) - nie ruszamy (cudza droga), liczone. Natywny odwrot = ROZSADEK w SurvivalMode;
+    ///     457 / 459 / 448 / 307e / 335 pomijaja IsRunningAway.
+    ///  2. TYLNA STRAZ = szyk z najwieksza liczba wrogow w 30 m (nie szyk wodza): bez rozkazu odwrotu, bez zmian morale - walczy pod swoim AI do konca.
+    ///  3. POSILKI: IMissionAgentSpawnLogic.StopSpawner(strona) (wzor 371) - niewprowadzeni zostaja w skladzie. Strona nie jest wtedy "wyczerpana"
+    ///     (IsSideDepleted wymaga RemainingSpawnNumber == 0), wiec koniec misji idzie droga "wrog uciekl" (BattleEndLogic: wszyscy IsRunningAway przez interwal + 3 s).
+    ///     Gdy jednak skonczy sie "wyczerpaniem" (EnemyRetreated = false - gra dalej toczylaby bitwe ze zbieglymi, ContinueBattle), w OnMissionResultReady (po
+    ///     CampaignMissionComponent) PlayerEncounter.CampaignBattleResult = GetResult(stan, enemyRetreated: true) - bitwa rozstrzygnieta, strona przegrala.
+    ///  4. MAPA (CommanderWithdraw458.Map.cs): od startu misji liczymy kazdego wystawionego czlowieka strony wroga (partia, postac) i jego los; przy udanym zejsciu
+    ///     wodza (zszedl z morale >= 0.01 albo stoi na koniec) i wygranej gracza - Pending do pojmania tej bitwy: w partii zostaja zbiegli z wodzem, posilki
+    ///     niewprowadzone i ranni sprzed bitwy; ranni z pola i reszta do zwyciezcy jak w grze; partia odchodzi od zwyciezcy jak RetreatingSide w grze.
+    /// Linie: "Odwrot wodza (458): ... ODWROT NA ROZKAZ" (decyzja), "Odwrot wodza (458) koniec: ..." (z rozliczeniem misji i kontrola sum), "Odwrot wodza (458) mapa:".
     /// </summary>
     internal sealed class CommanderWithdraw458 : MissionLogic
     {
@@ -93,6 +117,15 @@ namespace Armoury
             public readonly HashSet<Agent> R = new HashSet<Agent>();
             public readonly int[] WFate = new int[Fates];
             public readonly int[] RFate = new int[Fates];
+            // 458-r
+            public bool Rule, CmdKept, Forced, SpawnStopped;
+            public string RuleWhy = "-", ResultNote = "-";
+            public MapEvent Me;
+            public PartyBase CmdParty;
+            public Hero CmdHero;
+            public readonly List<Agent> Wd = new List<Agent>();
+            public readonly Dictionary<Formation, WorldPosition> Exit = new Dictionary<Formation, WorldPosition>();
+            public int Sent, Resent, Pins, PanicOut, NoExit;
         }
 
         private bool _known, _field, _started, _ended;
@@ -104,6 +137,26 @@ namespace Armoury
         private readonly MBList<Agent> _bufE = new MBList<Agent>();
 
         private static string _rbmTick;   // wlasciciele postfiksow HumanAIComponent.OnTick (raz na proces)
+
+        // ------------------------------------------------------------ 458-r regula
+        private const float MaintainEvery = 0.5f, MoraleFloor = 15f, Routed = 0.01f;
+        private readonly bool _measure, _ruleKey;
+        private readonly object _gate = new object();
+        private sealed class Org { public PartyBase P; public CharacterObject C; }
+        private readonly Dictionary<Agent, Org> _trk = new Dictionary<Agent, Org>();
+        private readonly Dictionary<PartyBase, Dictionary<CharacterObject, int[]>> _cnt = new Dictionary<PartyBase, Dictionary<CharacterObject, int[]>>();
+        private readonly HashSet<Hero> _spawnedHeroes = new HashSet<Hero>(), _keptHeroes = new HashSet<Hero>();
+        private readonly HashSet<Agent> _esc = new HashSet<Agent>(), _panicOut = new HashSet<Agent>();
+        private int _heroRm, _heroWs, _heroK;
+        private float _nextMaintain;
+
+        public CommanderWithdraw458()
+        {
+            var c = Settings.Current;
+            _measure = c != null && c.BattleAiMeasurements;
+            _ruleKey = c != null && c.CommanderWithdrawsUnderRearguard;
+            if (_ruleKey) { try { CommanderWithdraw458Map.Clear(); } catch { } }
+        }
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
@@ -135,9 +188,10 @@ namespace Armoury
                     _started = true;
                     _next = now;
                 }
+                if (_ruleKey && now >= _nextMaintain) { _nextMaintain = now + MaintainEvery; Maintain(m); }
                 if (m.MissionEnded || now < _next) return;
                 _next = now + Every;
-                Scan(m, now);
+                lock (_gate) Scan(m, now);
             }
             catch (Exception e) { Stumble("Tick", e); }
         }
@@ -332,7 +386,15 @@ namespace Armoury
                 catch (Exception e) { Stumble("Jazda", e); }
             }
             float eta = s.CmdEdge >= 0f ? s.CmdEdge / (s.CmdMounted ? HorseSpeed : FootSpeed) : -1f;
-            Log.Info(P + "t=" + F0(now) + "s | T" + t.TeamIndex + " " + t.Side + (s.EnemyOfPlayer ? " (wrog gracza)" : " (sojusznik gracza)") + " | bylby odwrot (nic nie rozkazano)"
+            // 458-r: regula albo powod, dla ktorego tylko "bylby"
+            string why = _ruleKey ? RuleWhy(m, s, cmd) : "klucz Commander Withdraws Under Rearguard NIE";
+            if (why == null) StartRule(m, s, cmd);
+            else s.RuleWhy = why;
+            if (!_measure && !s.Rule) return;
+            Log.Info(P + "t=" + F0(now) + "s | T" + t.TeamIndex + " " + t.Side + (s.EnemyOfPlayer ? " (wrog gracza)" : " (sojusznik gracza)")
+                     + (s.Rule ? " | ODWROT NA ROZKAZ (regula 458): wyslano " + s.Sent + " do punktow ucieczki szykow (" + s.Exit.Count + " szykow), bez punktu " + s.NoExit
+                                 + ", posilki strony " + (s.SpawnStopped ? "zatrzymane (StopSpawner)" : "NIE zatrzymane") + ", partia wodza " + PName(s.CmdParty)
+                               : " | bylby odwrot (nic nie rozkazano; " + s.RuleWhy + ")")
                      + " | wodz " + ProfName[Math.Max(0, Math.Min(2, (int)s.Prof))] + (s.ProfKnown ? "" : " (profil nieznany)") + " prog " + Thr[Math.Max(0, Math.Min(2, (int)s.Prof))].ToString("0.0", Inv)
                      + " | zdolni " + s.TrigOwn + " z szczytu " + s.TrigPeak + " (" + Pct(s.TrigOwn, s.TrigPeak) + "), wroga " + s.TrigFoe + " | od kontaktu " + F0(now - s.ContactAt) + " s"
                      + " | wodz: " + s.Cmd + (cmd != null ? ", " + (s.CmdMounted ? "konno" : "pieszo") + ", do granicy pola " + (s.CmdEdge >= 0f ? F0(s.CmdEdge) + " m (ok. " + F0(eta) + " s)" : "?") : "")
@@ -340,14 +402,169 @@ namespace Armoury
                      + " | jazda wroga w 100 m " + s.FoeCav + ".");
         }
 
+        // ------------------------------------------------------------ 458-r: decyzja i prowadzenie odwrotu
+
+        /// <summary>null = regula dziala dla tej druzyny; inaczej powod "bylby".</summary>
+        private string RuleWhy(Mission m, St s, Agent cmd)
+        {
+            if (!s.EnemyOfPlayer) return "strona gracza - regula tylko dla wroga gracza";
+            if (cmd == null) return "brak wodza na polu";
+            int aiTeams = 0;
+            var teams = m.Teams;
+            for (int i = 0; teams != null && i < teams.Count; i++)
+            {
+                var o = teams[i];
+                if (!MissionTeams.Valid(o) || o.Side != s.T.Side) continue;
+                if (o.IsPlayerTeam || o.IsPlayerAlly) return "gracz po tej stronie";
+                if (o.HasTeamAi) aiTeams++;
+            }
+            if (aiTeams != 1) return "druzyn AI strony " + aiTeams + " (regula tylko przy jednej)";
+            MapEvent me = null;
+            try { me = PlayerEncounter.Battle; } catch { me = null; }
+            if (me == null) return "brak MapEvent gracza";
+            if (!me.IsFieldBattle || me.IsNavalMapEvent) return "MapEvent nie jest bitwa polowa na ladzie";
+            if (me.GetMapEventSide(s.T.Side) == null) return "brak strony MapEvent";
+            return null;
+        }
+
+        private void StartRule(Mission m, St s, Agent cmd)
+        {
+            var t = s.T;
+            s.Rule = true;
+            try { s.Me = PlayerEncounter.Battle; } catch { s.Me = null; }
+            try { s.CmdParty = cmd.Origin != null ? cmd.Origin.BattleCombatant as PartyBase : null; } catch { s.CmdParty = null; }
+            try { var co = cmd.Character as CharacterObject; s.CmdHero = co != null ? co.HeroObject : null; } catch { s.CmdHero = null; }
+            try
+            {
+                var sp = m.GetMissionBehavior<IMissionAgentSpawnLogic>();
+                if (sp != null) { sp.StopSpawner(t.Side); s.SpawnStopped = true; }
+            }
+            catch (Exception e) { Stumble("StopSpawner", e); }
+            foreach (var a in s.W)
+            {
+                try
+                {
+                    if (a == null || !a.IsActive()) continue;
+                    _esc.Add(a);
+                    s.Wd.Add(a);
+                    Send(m, s, a, false);
+                }
+                catch (Exception e) { Stumble("Wyslij", e); }
+            }
+        }
+
+        /// <summary>Natywny odwrot do punktu ucieczki szyku (jeden punkt na szyk - idzie w szeregach), podloga morale.</summary>
+        private static void Send(Mission m, St s, Agent a, bool again)
+        {
+            if (a.IsUsingGameObject) a.StopUsingGameObject(false, Agent.StopUsingGameObjectFlags.None);
+            WorldPosition wp = WorldPosition.Invalid;
+            var f = a.Formation;
+            if (f != null && f.CountOfUnits > 0)
+            {
+                if (!s.Exit.TryGetValue(f, out wp)) { wp = m.GetClosestFleePositionForFormation(f); s.Exit[f] = wp; }
+            }
+            if (!wp.IsValid) wp = m.GetClosestFleePositionForAgent(a);
+            if (!wp.IsValid) { s.NoExit++; return; }
+            if (a.GetMorale() < MoraleFloor) a.SetMorale(MoraleFloor);
+            a.Retreat(wp);
+            if (again) s.Resent++; else s.Sent++;
+        }
+
+        /// <summary>Co 0.5 s (glowny watek): wyprowadzani dalej ida (ponowienie zgaszonego natywnego odwrotu), morale nie spada do paniki gry; PANIKA - nie ruszamy.</summary>
+        private void Maintain(Mission m)
+        {
+            lock (_gate)
+            {
+                for (int i = 0; i < _teams.Count; i++)
+                {
+                    var s = _teams[i];
+                    if (!s.Rule) continue;
+                    for (int j = s.Wd.Count - 1; j >= 0; j--)
+                    {
+                        var a = s.Wd[j];
+                        try
+                        {
+                            if (a == null || !a.IsActive()) { s.Wd.RemoveAt(j); continue; }
+                            if (SurvivalMode.InPanic(a)) { if (_panicOut.Add(a)) s.PanicOut++; continue; }
+                            if (a.GetMorale() < MoraleFloor) { a.SetMorale(MoraleFloor); s.Pins++; }
+                            if (!a.IsRetreating()) Send(m, s, a, true);
+                        }
+                        catch (Exception e) { Stumble("Prowadzenie", e); }
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------------------ 458-r: liczniki wystawionych (partia, postac) od startu misji
+
+        public override void OnAgentBuild(Agent agent, Banner banner)
+        {
+            if (!_ruleKey || _ended || agent == null) return;
+            try
+            {
+                if (!agent.IsHuman) return;
+                var m = Mission;
+                var t = agent.Team;
+                if (m == null || !MissionTeams.Valid(t) || t.IsPlayerTeam || !MissionTeams.Enemies(t, m.PlayerTeam)) return;
+                var pb = agent.Origin != null ? agent.Origin.BattleCombatant as PartyBase : null;
+                var c = agent.Character as CharacterObject;
+                if (pb == null || c == null) return;
+                lock (_gate)
+                {
+                    _trk[agent] = new Org { P = pb, C = c };
+                    if (c.IsHero) { if (c.HeroObject != null) _spawnedHeroes.Add(c.HeroObject); }
+                    else Cnt(pb, c)[CommanderWithdraw458Map.CS]++;
+                }
+            }
+            catch (Exception e) { Stumble("Wystawiony", e); }
+        }
+
+        private int[] Cnt(PartyBase pb, CharacterObject c)
+        {
+            Dictionary<CharacterObject, int[]> d;
+            if (!_cnt.TryGetValue(pb, out d)) { d = new Dictionary<CharacterObject, int[]>(); _cnt[pb] = d; }
+            int[] k;
+            if (!d.TryGetValue(c, out k)) { k = new int[CommanderWithdraw458Map.CN]; d[c] = k; }
+            return k;
+        }
+
+        /// <summary>Los wystawionego tak, jak go zapisze gra (SandBox BattleAgentLogic.OnAgentRemoved: zabity / nieprzytomny = ranny / reszta: morale &lt; 0.01
+        /// wypisany ze skladu, inaczej zostaje zdrowy); zszedl zywy z morale &gt;= 0.01 sposrod wyprowadzanych = zbiegl z wodzem. Pod _gate.</summary>
+        private void Track(Agent a, AgentState st, bool atEnd)
+        {
+            Org o;
+            if (!_trk.TryGetValue(a, out o)) return;
+            _trk.Remove(a);
+            bool hero = o.C.IsHero;
+            var h = hero ? o.C.HeroObject : null;
+            if (st == AgentState.Killed) { if (hero) _heroK++; else Cnt(o.P, o.C)[CommanderWithdraw458Map.CK]++; return; }
+            if (st == AgentState.Unconscious) { if (hero) _heroWs++; else Cnt(o.P, o.C)[CommanderWithdraw458Map.CWS]++; return; }
+            float mor = 0f;
+            try { mor = a.GetMorale(); } catch { mor = 0f; }
+            if (mor < Routed) { if (hero) _heroRm++; else Cnt(o.P, o.C)[CommanderWithdraw458Map.CRm]++; return; }
+            bool esc = _esc.Contains(a);
+            if (hero) { if (esc && h != null) _keptHeroes.Add(h); return; }
+            var k = Cnt(o.P, o.C);
+            k[CommanderWithdraw458Map.CHS]++;
+            if (esc) k[CommanderWithdraw458Map.CE]++;
+            if (atEnd) k[CommanderWithdraw458Map.CEnd]++;
+        }
+
         // ------------------------------------------------------------ los po chwili "widzi przegrana"
 
         public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
         {
-            if (_ended || affectedAgent == null || _teams.Count == 0) return;
+            if (_ended || affectedAgent == null) return;
+            if (_ruleKey)
+            {
+                try { lock (_gate) Track(affectedAgent, agentState, false); }
+                catch (Exception e) { Stumble("Licznik", e); }
+            }
+            if (_teams.Count == 0) return;
             try
             {
                 if (!affectedAgent.IsHuman) return;
+                lock (_gate)
                 for (int i = 0; i < _teams.Count; i++)
                 {
                     var s = _teams[i];
@@ -368,6 +585,7 @@ namespace Armoury
                     {
                         s.CmdFate = (k == FKilled ? "zabity" : k == FUncon ? "nieprzytomny" : k == FLeft ? "zszedl z pola (morale >= 0.01)" : "uciekl w panice")
                                     + " t=" + F0(Mission != null ? Mission.CurrentTime : 0f) + "s";
+                        s.CmdKept = k == FLeft;   // 458-r: uszedl z pola i zostaje w skladzie
                         s.CmdA = null;
                     }
                     break;
@@ -380,6 +598,93 @@ namespace Armoury
         {
             _result = missionResult;
             _resultSeen = true;
+            if (_ruleKey && missionResult != null) { try { ForceRetreated(missionResult); } catch (Exception e) { Stumble("Wynik", e); } }
+        }
+
+        /// <summary>458-r: misja skonczona "wyczerpaniem" strony wodza (EnemyRetreated = false) przy zbieglych w skladzie - gra toczylaby bitwe dalej
+        /// (PlayerEncounter.CheckIfBattleShouldContinueAfterBattleMissionInternal, cs 99456). Wynik dla mapy jak przy ucieczce wroga: CampaignBattleResult
+        /// nadpisany PO CampaignMissionComponent (ta sama metoda gry GetResult, enemyRetreated: true). Tylko gdy wodz nie padl (zabity / nieprzytomny).</summary>
+        private void ForceRetreated(MissionResult r)
+        {
+            St s = null;
+            lock (_gate) foreach (var x in _teams) if (x.Rule) { s = x; break; }
+            if (s == null) return;
+            if (!r.PlayerVictory) { s.ResultNote = "gracz nie wygral - mapa jak w grze"; return; }
+            if (r.EnemyRetreated) { s.ResultNote = "EnemyRetreated z gry (wszyscy wroga uciekali)"; return; }
+            bool down = s.CmdA == null && !s.CmdKept;
+            if (down) { s.ResultNote = "wyczerpanie strony, wodz padl - mapa jak w grze"; return; }
+            if (PlayerEncounter.Current == null || PlayerEncounter.CampaignBattleResult == null) { s.ResultNote = "brak CampaignBattleResult (kolejnosc zachowan) - mapa jak w grze"; return; }
+            PlayerEncounter.CampaignBattleResult = CampaignBattleResult.GetResult(r.BattleState, true);
+            s.Forced = true;
+            s.ResultNote = "wyczerpanie strony (gra: bitwa dalej) -> wynik mapy EnemyRetreated (nadpisany)";
+        }
+
+        /// <summary>458-r koniec misji: los ludzi jeszcze na polu (jak BattleEndLogic.OnEndMission / brak usuniecia: morale &gt;= 0.01 - zostaja w skladzie),
+        /// linia rozliczenia misji z kontrola sum i - przy udanym zejsciu wodza i wygranej gracza - oczekiwanie na pojmanie (CommanderWithdraw458Map).</summary>
+        private bool RuleEnd(Mission m)
+        {
+            St s = null;
+            lock (_gate)
+            {
+                foreach (var x in _teams) if (x.Rule) { s = x; break; }
+                if (s == null) return false;
+                var left = new List<Agent>(_trk.Keys);
+                foreach (var a in left)
+                {
+                    try { if (a != null && a.IsActive()) Track(a, AgentState.Active, true); }
+                    catch (Exception e) { Stumble("NaPolu", e); }
+                }
+                if (s.CmdA != null && s.CmdA.IsActive())
+                {
+                    float mor = 0f;
+                    try { mor = s.CmdA.GetMorale(); } catch { mor = 0f; }
+                    s.CmdKept = mor >= Routed;
+                }
+                int sp = 0, k = 0, ws = 0, rm = 0, hs = 0, esc = 0, end = 0, parties = 0;
+                foreach (var pv in _cnt)
+                {
+                    parties++;
+                    foreach (var cv in pv.Value)
+                    {
+                        var c = cv.Value;
+                        sp += c[CommanderWithdraw458Map.CS]; k += c[CommanderWithdraw458Map.CK]; ws += c[CommanderWithdraw458Map.CWS]; rm += c[CommanderWithdraw458Map.CRm];
+                        hs += c[CommanderWithdraw458Map.CHS]; esc += c[CommanderWithdraw458Map.CE]; end += c[CommanderWithdraw458Map.CEnd];
+                    }
+                }
+                int lost = 0;
+                foreach (var kv in _trk) if (kv.Value != null && !kv.Value.C.IsHero) lost++;   // wystawieni bez losu (nie powinno byc)
+                var r = _result;
+                MapEvent me = null;
+                try { me = PlayerEncounter.Battle; } catch { me = null; }
+                string map;
+                if (r == null || !r.PlayerVictory) map = "gracz nie wygral - mapa jak w grze (zbiegli z morale >= 0.01 zostaja w skladzie)";
+                else if (!s.CmdKept) map = "wodz nie uszedl (" + s.CmdFate + ") - pojmanie jak w grze (decyzja 9: tylko jesli mu sie udalo)";
+                else if (s.Me == null || !ReferenceEquals(s.Me, me)) map = "MapEvent misji nie ten sam co przy rozkazie - pojmanie jak w grze";
+                else if (s.CmdParty == null) map = "brak partii wodza - pojmanie jak w grze";
+                else
+                {
+                    var pend = new CommanderWithdraw458Map.Pending
+                    {
+                        Me = s.Me, Side = s.T.Side, CmdParty = s.CmdParty, CmdHero = s.CmdHero, Cmd = s.Cmd,
+                        Cnt = new Dictionary<PartyBase, Dictionary<CharacterObject, int[]>>(_cnt),
+                        Spawned = new HashSet<Hero>(_spawnedHeroes), Kept = new HashSet<Hero>(_keptHeroes)
+                    };
+                    if (s.CmdHero != null) pend.Kept.Add(s.CmdHero);
+                    CommanderWithdraw458Map.Set(pend);
+                    map = "wodz uszedl - rozliczenie przy pojmaniu (linia 'Odwrot wodza (458) mapa')";
+                }
+                Log.Info(P + "rozliczenie misji: T" + s.T.TeamIndex + " " + s.T.Side + " | wodz " + s.Cmd + " -> " + s.CmdFate + (s.CmdKept ? " (uszedl)" : "")
+                         + " | szeregowi strony: wystawieni " + sp + " = zabici " + k + " + ranni z pola " + ws + " + wypisani (morale < 0.01) " + rm + " + wrocili do skladu zdrowi " + hs
+                         + " (w tym stali na koniec " + end + ") + bez losu " + lost + " -> " + (sp == k + ws + rm + hs + lost ? "OK" : "NIEZGODNE")
+                         + " | zbiegli z wodzem " + esc + " | bohaterowie: wystawieni " + _spawnedHeroes.Count + ", uszli z wodzem " + _keptHeroes.Count + ", zabici " + _heroK + ", ranni " + _heroWs + ", wypisani " + _heroRm
+                         + " | partii strony " + parties + " | wynik: " + s.ResultNote + " | mapa: " + map + " | latka rozliczenia " + CommanderWithdraw458Map.Hook + " | potkniecia " + _stumbles + ".");
+            }
+            return true;
+        }
+
+        private static string PName(PartyBase pb)
+        {
+            try { return pb != null && pb.Name != null ? pb.Name.ToString() : "?"; } catch { return "?"; }
         }
 
         // ------------------------------------------------------------ koniec misji
@@ -389,12 +694,17 @@ namespace Armoury
             try
             {
                 var m = Mission;
-                if (_started && !_ended && _field)
+                bool anyRule = false;
+                if (_ruleKey && _started && !_ended && _field)
+                {
+                    try { anyRule = RuleEnd(m); } catch (Exception e) { Stumble("Rozliczenie", e); }
+                }
+                if (_started && !_ended && _field && (_measure || anyRule))
                 {
                     float now = m != null ? m.CurrentTime : 0f;
                     var r = _result;
                     var sb = new StringBuilder(1024);
-                    sb.Append("Odwrot wodza (458) koniec: t=").Append(F0(now)).Append("s | sam pomiar (regula i klucz Commander Withdraws Under Rearguard nie wdrozone - opis 458)")
+                    sb.Append("Odwrot wodza (458) koniec: t=").Append(F0(now)).Append(_ruleKey ? "s | klucz Commander Withdraws Under Rearguard TAK" : "s | sam pomiar (klucz Commander Withdraws Under Rearguard NIE)")
                       .Append(" | wynik misji ").Append(r == null ? (_resultSeen ? "null" : "brak (wyjscie bez wyniku)") : r.BattleState + (r.PlayerVictory ? ", zwyciestwo gracza" : "")
                           + (r.PlayerDefeated ? ", gracz pokonany" : "") + (r.EnemyRetreated ? ", EnemyRetreated" : ""))
                       .Append(" | druzyn AI ").Append(_teams.Count);
@@ -415,7 +725,7 @@ namespace Armoury
                         foreach (var a in s.R) if (a != null && a.IsActive()) rLive++;
                         if (s.CmdA != null && s.CmdA.IsActive()) s.CmdFate = "na polu na koniec" + (s.CmdA.IsRunningAway ? " (ucieka)" : "");
                         int wAll = s.WFate[0] + s.WFate[1] + s.WFate[2] + s.WFate[3] + wLive;
-                        sb.Append(" | bylby odwrot t=").Append(F0(s.TrigAt)).Append("s (do konca ").Append(F0(now - s.TrigAt)).Append(" s), zdolni ").Append(s.TrigOwn).Append(" / wroga ").Append(s.TrigFoe)
+                        sb.Append(s.Rule ? " | ODWROT NA ROZKAZ t=" : " | bylby odwrot t=").Append(F0(s.TrigAt)).Append("s (do konca ").Append(F0(now - s.TrigAt)).Append(" s), zdolni ").Append(s.TrigOwn).Append(" / wroga ").Append(s.TrigFoe)
                           .Append(" | wodz ").Append(s.Cmd).Append(" -> ").Append(s.CmdFate)
                           .Append(s.CmdEdge >= 0f ? ", granica pola " + F0(s.CmdEdge) + " m" : "")
                           .Append(" | wyprowadzani ").Append(wAll).Append(": zabici ").Append(s.WFate[FKilled]).Append(", nieprzytomni ").Append(s.WFate[FUncon])
@@ -423,6 +733,10 @@ namespace Armoury
                           .Append(" | tylna straz ").Append(s.Rear).Append(s.RearF == null ? "" : ": zabici " + s.RFate[FKilled] + ", nieprzytomni " + s.RFate[FUncon] + ", zeszli " + s.RFate[FLeft]
                               + ", uciekli " + s.RFate[FFled] + ", na polu " + rLive)
                           .Append(" | jazda wroga w 100 m ").Append(s.FoeCav);
+                        if (s.Rule)
+                            sb.Append(" | regula: wyslano ").Append(s.Sent).Append(", ponowien ").Append(s.Resent).Append(", podloga morale ").Append(s.Pins)
+                              .Append(", w panice (nie ruszani) ").Append(s.PanicOut).Append(", bez punktu ucieczki ").Append(s.NoExit).Append(", wynik: ").Append(s.ResultNote);
+                        else sb.Append(" | regula nie dziala: ").Append(s.RuleWhy);
                         sb.Append(" | mapa: ").Append(MapText(m, me, s, r));
                     }
                     sb.Append(" || razem: widzialo przegrana ").Append(trig).Append(" | HumanAIComponent.OnTick postfiksy: ").Append(RbmTick())
@@ -432,7 +746,14 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Koniec", e); }
             _ended = true;
-            _teams.Clear();
+            lock (_gate)
+            {
+                _teams.Clear();
+                _trk.Clear();
+                _cnt.Clear();
+                _esc.Clear();
+                _panicOut.Clear();
+            }
             _bufE.Clear();
             _result = null;
             base.OnEndMission();
@@ -474,7 +795,8 @@ namespace Armoury
                     if (r.EnemyRetreated) sb.Append("pobici, caly sklad (zdrowi i ranni) do niewoli");
                     else if (healthy >= 1) sb.Append("strona wyczerpana na polu, zdrowi w skladzie - bitwa trwa dalej (ContinueBattle)");
                     else sb.Append("pobici, ranni do niewoli");
-                    sb.Append("; regula 458 (bylaby, przy udanym zejsciu wodza): RetreatingSide - strona uchodzi z calym skladem");
+                    if (!s.Rule) sb.Append("; regula 458 nie dziala (").Append(s.RuleWhy).Append(")");
+                    else sb.Append("; regula 458: w skladzie zostaja tylko zbiegli z wodzem, posilki niewprowadzone i ranni sprzed bitwy (gdy wodz uszedl)");
                 }
                 else if (r.PlayerDefeated) sb.Append("gracz pokonany - regula nie dotyczy");
                 else sb.Append("bez zwyciezcy");

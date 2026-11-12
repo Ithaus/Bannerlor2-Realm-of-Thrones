@@ -11752,6 +11752,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool CavalryFeignedRetreat { get; set; } = true;
 
+        [SettingPropertyBool("Commander Withdraws Under Rearguard", HintText = "When the general of an enemy AI army in a field battle sees the battle lost (his men able to fight down to 6, 5 or 4 tenths of their peak by his nerve - cautious, usual, rash - and outnumbered one and a half to one), he leads his army off the field in ranks: every man able to fight, except the formation most closely engaged, retreats with him to the nearest edge of the field away from the enemy, and that formation stays as the rearguard and fights to the end without an order to fall back. Reinforcements still waiting off the field are not sent in. If the general gets away, only the men who really left the field with him, the reinforcements that never came on and the men already wounded before the battle stay in his party; the wounded lying on the field and everyone else of his army go to the victor as in any lost battle (captured or lost as usual). Lords whose own lord did not get away lose their men as usual. After the battle his party moves away from the victor at once instead of standing next to him. Only the enemy side in your battles - your own side, your troops and armies you lead are never ordered away. Field battles only, not sieges, sea battles, hideouts or tournaments. Off = exactly as before (with Battle AI Measurements only the line 'Odwrot wodza (458)' saying what would have happened).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CommanderWithdrawsUnderRearguard { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15841,6 +15845,7 @@ namespace Armoury
             s.InfantryReserve = InfantryReserve;   // 457
             s.LineRelief = LineRelief;   // 459
             s.CavalryFeignedRetreat = CavalryFeignedRetreat;   // 460
+            s.CommanderWithdrawsUnderRearguard = CommanderWithdrawsUnderRearguard;   // 458-r
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

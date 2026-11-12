@@ -383,7 +383,8 @@ namespace Armoury
                 try { VillageFruit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageFruit.ApplyAll", e); }   // poprawka po recenzji noc-ekonomia2 16.10: magazyn wsi + 5 dob owocow, miodu i jaj z listy BK (GetWarehouseCapacity)
                 try { StartCalibration.ApplyAll(_harmony); } catch (Exception e) { Log.Error("StartCalibration.ApplyAll", e); }   // KS (kalibracja startu): wies zastosowana bez zywnosci wsi gry z niczego (TickFoodProduction)
                 try { FreeFolkRaids.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FreeFolkRaids.ApplyAll", e); }   // fix-mur: Wolni Ludzie nie bija wlasnych band najazdu (postfiks ShouldConsiderAttacking; klucz Free Folk Raid Kin Peace)
-                try { PlayerCaptives385d.Apply(_harmony); } catch (Exception e) { Log.Error("PlayerCaptives385d.Apply", e); }   // 385d: rejestr zwyklych zolnierzy gracza w niewoli (prefiks + finalizer MapEvent.CaptureDefeatedPartyMembers, tylko odczyt)
+                try { PlayerCaptives385d.Apply(_harmony); } catch (Exception e) { Log.Error("PlayerCaptives385d.Apply", e); }
+                try { CommanderWithdraw458Map.Apply(_harmony); } catch (Exception e) { Log.Error("CommanderWithdraw458Map.Apply", e); }   // 458-r: rozliczenie partii wodza, ktory uszedl z pola (prefiks Priority.Last MapEvent.CaptureDefeatedPartyMembers; bez oczekiwania z misji 458 nic nie robi)   // 385d: rejestr zwyklych zolnierzy gracza w niewoli (prefiks + finalizer MapEvent.CaptureDefeatedPartyMembers, tylko odczyt)
                 try { PrisonerTerms384.ApplyPact(_harmony); } catch (Exception e) { Log.Error("PrisonerTerms384.ApplyPact", e); }   // 386: pakt o nieagresji chroni partie rodu gracza (postfiksy ShouldConsiderAttacking / ShouldConsiderAvoiding; 386c: + postfiks 140 CampaignEventDispatcher.AiHourlyTick - cel podejscia)
                 SkillsDecide.ApplyAll(_harmony);
                 MusterOut.ApplyAll(_harmony);
@@ -867,8 +868,8 @@ namespace Armoury
                 // 457: odwod piechoty AI w szyku 8 w bitwie polowej (klucz InfantryReserve; przy NIE tylko pomiar "bylby"); samo sprawdza bitwe polowa
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new InfantryReserve457());
-                // 458: odwrot wodza AI z przegranej bitwy - SAM POMIAR "bylby" (regula nie wdrozona, opis w CommanderWithdraw458.cs); pod kluczem pomiarow 437
-                if (Settings.Current.BattleAiMeasurements && Campaign.Current != null && mission != null)
+                // 458: odwrot wodza AI z przegranej bitwy - pomiar "bylby" (klucz pomiarow 437) i 458-r regula (klucz CommanderWithdrawsUnderRearguard; opis w CommanderWithdraw458.cs)
+                if ((Settings.Current.BattleAiMeasurements || Settings.Current.CommanderWithdrawsUnderRearguard) && Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new CommanderWithdraw458());
                 // 461: szerokosc szyku i stok w natarciu piechoty AI - SAM POMIAR "bylby" (regula nie wdrozona, opis w FormationWidth461.cs); pod kluczem pomiarow 437
                 if (Settings.Current.BattleAiMeasurements && Campaign.Current != null && mission != null)
