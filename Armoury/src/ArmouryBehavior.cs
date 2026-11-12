@@ -2523,6 +2523,7 @@ namespace Armoury
             RawPrice.MemoryLive = true;   // 299b: od teraz wygladzanie podazy rynku w tempie PriceSupplyMemoryDaily (ticki startowe nowej kampanii byly przed - tempo gry)
             try { HideoutBossTalk.AddDialogs(starter); } catch (Exception e) { Log.Error("HideoutBossTalk.AddDialogs", e); }   // 293: rozmowa z hersztem kryjowki zawsze pyta o pojedynek (warunek w kluczu HideoutBossTalkFix)
             try { TavernKeeperAle.AddDialogs(starter); } catch (Exception e) { Log.Error("TavernKeeperAle.AddDialogs", e); }   // 474-P3: "Pour me an ale. What's the news?" u karczmarza miasta (klucz InnKeeperAleLine)
+            try { TavernMusic.EnsurePatch(); } catch (Exception e) { Log.Error("TavernMusic.EnsurePatch", e); }   // 474-P4: muzyka karczmy miasta wedlug regionu (postfiks w kampanii, raz na proces; klucz TavernMusicByRegion)
             try { CaptiveTerms.AddDialogs(starter); } catch (Exception e) { Log.Error("CaptiveTerms.AddDialogs", e); }   // 366: "Let us speak of the terms of your release." przy jencu-krolu albo nastepcy (klucz CaptiveTerms)
             try { DungeonFate.AddDialogs(starter); } catch (Exception e) { Log.Error("DungeonFate.AddDialogs", e); }   // 409: "I have decided what is to be done with you." przy jencu-lordzie (klucz CaptiveFate)
             try { SiegeSurrender374.AddDialogs(starter); SiegeSurrender374.AddMenus(starter); } catch (Exception e) { Log.Error("SiegeSurrender374.Add", e); }   // 374: "I would yield the keep, on terms." z wodzem oblegajacych (parley) + menu arm374_yield

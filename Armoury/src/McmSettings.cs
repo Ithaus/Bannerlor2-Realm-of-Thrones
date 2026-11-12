@@ -6092,6 +6092,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool InnKeeperAleLine { get; set; } = true;
 
+        [SettingPropertyBool("Tavern Music By Region", HintText = "the musicians in a town tavern play the music of the town's own land - the North, the Iron Islands, the Westerlands and the Reach, Dorne, the Free Cities, the east - instead of tunes from all over the world at once, which is what the game plays in lands it has no music of its own for. Off = the game's choice, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool TavernMusicByRegion { get; set; } = true;
+
         [SettingPropertyBool("Gossip Per Drink By Charm", HintText = "how much the drinkers tell you over one tankard depends on your Charm: below 50 - one piece of news, 50 to 109 - two, 110 to 169 - three, 170 to 229 - four, from 230 - all there is. Buy another round to hear more. Each piece you hear teaches you a little Charm (5 xp). Off = one tankard tells you everything", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool GossipPerDrinkByCharm { get; set; } = true;
@@ -14506,6 +14510,7 @@ namespace Armoury
             s.InnGossipPages = InnGossipPages;
             s.InnGossipNeedsDrink = InnGossipNeedsDrink;
             s.InnKeeperAleLine = InnKeeperAleLine;
+            s.TavernMusicByRegion = TavernMusicByRegion;
             s.GossipPerDrinkByCharm = GossipPerDrinkByCharm;
             s.GossipPerDrinkByPersuasion = GossipPerDrinkByPersuasion;
             s.GossipTournaments = GossipTournaments;
