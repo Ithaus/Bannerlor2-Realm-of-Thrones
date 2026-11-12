@@ -26,7 +26,8 @@ namespace Armoury
     ///     od 435-L6 (klucze domyslnie wylaczone) regula zmiany zajec i pulap zamowien 363 - przez opublikowana tablice (Table / TownN), CraftShortage.cs.
     ///     S_stos = 1.25 ^ (liczba kolejnych decyzji regulatora wsi 221 z mnoznikiem na suficie kroku i stosem ponizej dolnego progu), najwyzej 2;
     ///     470-a (klucz Supply Stock Empty Only, domyslnie TAK): S_stos tylko przy stosie ponizej StockEmptyDays (5) dni zuzycia, S_stos = 2 - dni / 5 (pusty = 2) -
-    ///     nie zalezy od liczby decyzji i wygasa, gdy stos wraca; bez migawki decyzji po wczytaniu S_stos = 1. NIE = 1.25 ^ decyzji jak wyzej;
+    ///     nie zalezy od liczby decyzji; migawka decyzji 221 (co 28 dob) - wygasa przy nastepnej decyzji, gdy stos wrocil; po wczytaniu dni stosu z zapisu (470-p),
+    ///     bez nich S_stos = 1 do pierwszej decyzji w sesji. NIE = 1.25 ^ decyzji jak wyzej;
     ///     S_kolejka = 1 + min(1, brak / sprzedaz), srednie dobowe 28 dob w sztukach; zboze: N = 2 w miescie, ktorego wsie gloduja (Famine.HungerOf &gt; 0).
     ///     ODSTEPSTWO od projektu (do decyzji przed L6): "sprzedaz" = wieksza z dwoch liczb - prawdziwa sprzedaz miasta z 28 dob (MarketSales 241; tylko kategorie bedace
     ///     wyrobem warsztatu) i sztuki kupione przez te same trzy strumienie popytu. Licznika calej sprzedazy miasta dla surowcow wsi (drewno, glina, ruda) nie ma.
@@ -72,8 +73,12 @@ namespace Armoury
         // NIE = kazdy brak jedzenia > 0 liczony udzialem (462-a), jak przed 470-b.
         private static bool FoodFloorOn { get { var s = Settings.Current; return s == null || s.SupplyFoodShortageFloor; } }
         internal const double MinFoodShortage = 2.0;
+        // 470-p (recenzja U1): prog komorki nie dziala, gdy brak swiata tego jedzenia (suma komorek przed progiem) >= WorldFoodShortage szt./d - prawdziwy brak
+        // rozlozony rowno po wielu miastach (maslo: 17.4 szt./d w ok. 10 miastach = ponizej 2 na miasto) zostaje w N; drobny brak 1 sztuki swiata (wieprz, owce) - nie.
+        internal const double WorldFoodShortage = 5.0;
         private static int _sFloorCells; private static double _sFloorUnits; private static readonly HashSet<ItemCategory> _sFloorCats = new HashSet<ItemCategory>();
-        private static int _sStockCut, _sStockUnk;   // 470-a: towary na suficie przy stosie < 30 dni, ale >= 5 dni (odrzucone); na suficie bez migawki po wczytaniu (S_stos 1)
+        private static int _sFloorKept; private static double _sFloorMax; private static ItemCategory _sFloorMaxCat;   // 470-p: komorki ponizej progu zostawione przez brak swiata; najwiekszy odrzucony brak
+        private static int _sStockCut, _sStockUnk, _sStockSaved;   // 470-a: towary na suficie przy stosie < 30 dni, ale >= 5 dni (odrzucone); na suficie bez migawki po wczytaniu (S_stos 1); 470-p: S_stos z dni stosu w zapisie
         private static int _sFoodCells; private static double _sFoodMax = 1.0;   // 462-a: komorki jedzenia z N > 1 (udzial) w ostatniej tablicy
 
         private static int _main = -1, _dOff;
@@ -297,6 +302,8 @@ namespace Armoury
 
         // ============================================================ 2. S_stos (regulator wsi 221)
         private static readonly Dictionary<ItemObject, int> _runs = new Dictionary<ItemObject, int>();   // kolejne decyzje na suficie przy stosie ponizej progu (sesja)
+        // 470-p (recenzja U2): dni stosu przy ostatniej pustej decyzji (klucz 470-a TAK) - w zapisie (7. pole arm_lpn), po wczytaniu S_stos jak przed zapisem, nie 1
+        private static readonly Dictionary<ItemObject, double> _emptyDays = new Dictionary<ItemObject, double>();
         private static int _seenDec = -1;
         // 435-L5: N swiata z ostatniej linii niedoboru (tylko towary z N > 1); jedna podmieniana referencja - odczyt kolejnosci zlecen sprzetu wsi (VillageGear.OrderOf)
         private static volatile Dictionary<ItemCategory, double> _pubN = new Dictionary<ItemCategory, double>();
@@ -403,7 +410,7 @@ namespace Armoury
             _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _loadMerged = 0; _offWarned = false; _heldBits = 0; _earlyTried = false; _loadFoodZero = 0;
             _cells.Clear(); _price.Clear(); ZeroDay();
             _ws.Clear(); CycleBegin();
-            _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>(); _pubT = null;
+            _runs.Clear(); _emptyDays.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>(); _pubT = null;
             _prevHome.Clear(); _prevHomeDay = int.MinValue;
             _dryDay = int.MinValue; _whyDay = int.MinValue;
             WareReset();                                                      // 435-N-C
@@ -526,6 +533,18 @@ namespace Armoury
                         sb.Append(tk.Key.StringId).Append('~').Append(ck.Key.StringId).Append('~').Append(D(miss)).Append('~').Append(D(soft)).Append('~').Append(D(got));
                     }
                 }
+                // 470-p: 7. pole (dni stosu przy pustej decyzji) tylko gdy jest co zapisac - stary odczyt n1 pola nie czyta, zapis bez niego jak przed 470-p
+                if (_emptyDays.Count > 0)
+                {
+                    sb.Append('|');
+                    f = true;
+                    foreach (var kv in _emptyDays)
+                    {
+                        int r; if (kv.Key == null || !IdOk(kv.Key.StringId) || !_runs.TryGetValue(kv.Key, out r) || r <= 0) continue;
+                        if (!f) sb.Append(','); f = false;
+                        sb.Append(kv.Key.StringId).Append(':').Append(D(kv.Value));
+                    }
+                }
                 return sb.ToString();
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
@@ -565,6 +584,16 @@ namespace Armoury
                         if (it == null) { _loadBad++; continue; }
                         _runs[it] = Math.Min(8, r); runs++;
                     }
+                int emptyN = 0;
+                if (p.Length > 6 && p[6].Length > 0 && om != null)          // 470-p: dni stosu przy pustej decyzji (zapis od 470-p)
+                    foreach (var e in p[6].Split(','))
+                    {
+                        int c = e.IndexOf(':'); double dd;
+                        if (c <= 0 || !Num(e.Substring(c + 1), out dd)) { _loadBad++; continue; }
+                        var it = om.GetObject<ItemObject>(e.Substring(0, c));
+                        if (it == null) { _loadBad++; continue; }
+                        _emptyDays[it] = dd; emptyN++;
+                    }
                 if (p[5].Length > 0 && om != null && today - day < Window)
                     foreach (var e in p[5].Split(';'))
                     {
@@ -594,7 +623,7 @@ namespace Armoury
                     }
                 if (cells > 0) _first = _first == int.MinValue ? day - span + 1 : Math.Min(_first, day - span + 1);
                 if (cells > 0) _gFrom = day + 1;                              // 435-N-A-p: przyrost tylko z dob po zapisie (doby z zapisu to srednia, nie poziom)
-                _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (_loadFoodZero > 0 ? ", brak wsadu jedzenia wyzerowany (435-N-B) w " + _loadFoodZero : "") + (_loadMerged > 0 ? ", polaczonych z dobami sesji (462-b) " + _loadMerged : "") + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
+                _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (emptyN > 0 ? ", z dniami pustego stosu (470-p) " + emptyN : "") + (_loadFoodZero > 0 ? ", brak wsadu jedzenia wyzerowany (435-N-B) w " + _loadFoodZero : "") + (_loadMerged > 0 ? ", polaczonych z dobami sesji (462-b) " + _loadMerged : "") + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
             }
             catch (Exception e) { Stumble("Resolve", e); _loadNote = "arm_lpn - blad wczytania (pamiec N od pierwszej doby)"; }
         }
@@ -766,10 +795,10 @@ namespace Armoury
             known = unknown = 0;
             var res = new Dictionary<ItemCategory, double[]>();   // kategoria -> [S_stos, kolejne decyzje, stos dni (-1 nieznany), mnoznik]
             bool emptyOn = StockEmptyOn;
-            _sStockCut = 0; _sStockUnk = 0;
+            _sStockCut = 0; _sStockUnk = 0; _sStockSaved = 0;
             int dec;
             var peek = HarvestValve.LpPeek(out dec);
-            if (peek == null || dec < _seenDec) { if (dec < _seenDec) _runs.Clear(); _seenDec = dec; }
+            if (peek == null || dec < _seenDec) { if (dec < _seenDec) { _runs.Clear(); _emptyDays.Clear(); } _seenDec = dec; }
             if (peek != null && dec != _seenDec)
             {
                 _seenDec = dec;
@@ -778,6 +807,7 @@ namespace Armoury
                     if (g == null || g.Item == null) continue;
                     int r; _runs.TryGetValue(g.Item, out r);
                     _runs[g.Item] = g.AtCeil && (emptyOn ? Empty(g) : g.Short) ? r + 1 : 0;   // 470-a: przy kluczu TAK licza sie tylko decyzje przy pustym stosie
+                    if (emptyOn && g.AtCeil && Empty(g)) _emptyDays[g.Item] = g.StockDays; else _emptyDays.Remove(g.Item);   // 470-p: do zapisu
                 }
             }
             var seen = new HashSet<ItemObject>();
@@ -803,7 +833,18 @@ namespace Armoury
                 foreach (var kv in f)
                 {
                     if (kv.Key == null || kv.Key.ItemCategory == null || seen.Contains(kv.Key) || kv.Value < ceil - 1e-3f) continue;
-                    if (emptyOn) { _sStockUnk++; continue; }   // 470-a: stos nieznany - nie wiadomo, czy pusty; S_stos 1 do pierwszej decyzji w sesji
+                    if (emptyOn)
+                    {
+                        // 470-p (recenzja U2): dni stosu z ostatniej pustej decyzji przed zapisem - S_stos jak przed zapisem; bez nich (zapis sprzed 470-p albo przy kluczu NIE)
+                        // stos nieznany, S_stos 1 do pierwszej decyzji w sesji
+                        int re; double de;
+                        if (!_runs.TryGetValue(kv.Key, out re) || re <= 0 || !_emptyDays.TryGetValue(kv.Key, out de)) { _sStockUnk++; continue; }
+                        _sStockSaved++; unknown++;
+                        double sve = EmptyS(de);
+                        double[] ce;
+                        if (!res.TryGetValue(kv.Key.ItemCategory, out ce) || ce[0] < sve) res[kv.Key.ItemCategory] = new[] { sve, re, de, kv.Value };
+                        continue;
+                    }
                     unknown++;
                     // 435-L1-p (recenzja S4): liczba kolejnych decyzji na suficie jest w zapisie (arm_lpn) - po wczytaniu S_stos jak przed zapisem, nie 1.25
                     int r0; _runs.TryGetValue(kv.Key, out r0); if (r0 < 1) r0 = 1;
@@ -815,10 +856,20 @@ namespace Armoury
             return res;
         }
 
-        /// <summary>470-a: stos towaru ponizej StockEmptyDays dni zuzycia (znany; towar bez odbiorcy - nie).</summary>
-        private static bool Empty(HarvestValve.LpGood g) { return g.StockDays >= 0.0 && g.StockDays < StockEmptyDays; }
+        /// <summary>470-a: stos towaru ponizej StockEmptyDays dni zuzycia i ponizej progu 221 ValveStockDaysLow (znany; towar bez odbiorcy - nie).</summary>
+        private static bool Empty(HarvestValve.LpGood g) { return g.Short && g.StockDays >= 0.0 && g.StockDays < StockEmptyDays; }   // 470-p (U3): tez ponizej progu 221
         /// <summary>470-a: S_stos z glebokosci braku: pusty stos = 2, przy progu StockEmptyDays = 1.</summary>
         private static double EmptyS(double days) { return Math.Min(2.0, Math.Max(1.0, 2.0 - Math.Max(0.0, days) / StockEmptyDays)); }
+
+        /// <summary>470-p (recenzja U1): nazwy towarow odrzuconych progiem 470-b (do linii LP).</summary>
+        private static string FloorCatsText()
+        {
+            if (_sFloorCats.Count == 0) return "";
+            var ids = new List<string>();
+            foreach (var c in _sFloorCats) if (c != null) ids.Add(c.StringId);
+            ids.Sort(StringComparer.Ordinal);
+            return " [" + string.Join(", ", ids) + "]";
+        }
 
         private static string ShortageText(int today)
         {
@@ -843,8 +894,20 @@ namespace Armoury
             var hot = new HashSet<Settlement>();
             int cells = 0, real = 0, qCeil = 0, qOver = 0, softOnly = 0;
             _sFoodCells = 0; _sFoodMax = 1.0;
-            _sFloorCells = 0; _sFloorUnits = 0; _sFloorCats.Clear();
+            _sFloorCells = 0; _sFloorUnits = 0; _sFloorCats.Clear(); _sFloorKept = 0; _sFloorMax = 0; _sFloorMaxCat = null;
             bool floorOn = FoodFloorOn;
+            // 470-p (recenzja U1): brak swiata jedzenia przed progiem komorki (suma brakow wsadu komorek) - prog 470-b dziala tylko ponizej WorldFoodShortage
+            var foodWorld = new Dictionary<ItemCategory, double>();
+            if (floorOn && FoodShareOn)
+                foreach (var tk in _cells)
+                    foreach (var ck in tk.Value)
+                    {
+                        if (!CommodityInputs284.Food(ck.Key)) continue;
+                        double m0, s0, g0;
+                        Means(ck.Value, today, out m0, out s0, out g0);
+                        if (!(m0 > 1e-6)) continue;
+                        double w0; foodWorld.TryGetValue(ck.Key, out w0); foodWorld[ck.Key] = w0 + m0;
+                    }
             int span = Span(today);
             bool growOn = GrowOn;
             int qOverOld = 0, softOnlyOld = 0, growCells = 0;     // 435-N-A: porownanie z dawna miara (poziom / okno) - ile komorek mialoby kolejke > 1
@@ -872,7 +935,12 @@ namespace Armoury
                     bool food = CommodityInputs284.Food(ck.Key), foodShare = food && FoodShareOn;
                     if (food && !foodShare) miss = 0;                 // 462-a klucz NIE: jak 435-N-B takze dla brakow zapisanych przy kluczu TAK
                     // 470-b: brak jedzenia ponizej MinFoodShortage szt./d - poza kolejka komorki i poza brakiem swiata (wiersz swiata sumuje tylko komorki ponad progiem)
-                    if (foodShare && floorOn && miss > 1e-6 && miss < MinFoodShortage) { _sFloorCells++; _sFloorUnits += miss; _sFloorCats.Add(ck.Key); miss = 0; }
+                    if (foodShare && floorOn && miss > 1e-6 && miss < MinFoodShortage)
+                    {
+                        double fw; foodWorld.TryGetValue(ck.Key, out fw);
+                        if (fw >= WorldFoodShortage) _sFloorKept++;   // 470-p: prawdziwy brak swiata rozlozony po miastach - komorka zostaje w N
+                        else { _sFloorCells++; _sFloorUnits += miss; _sFloorCats.Add(ck.Key); if (miss > _sFloorMax) { _sFloorMax = miss; _sFloorMaxCat = ck.Key; } miss = 0; }
+                    }
                     double want = miss + (growOn ? grow : softW);
                     // 462-a-p (recenzja D1): udzial jedzenia wobec ZUZYCIA warsztatow (got), nie sprzedazy targu - mieso robia tez ukryci rzemieslnicy BK (MarketSales je sledzi),
                     // a jest wsadem piekarni; sprzedaz mieszczanom w mianowniku dawala N ~ 1 przy pustych piekarniach.
@@ -935,14 +1003,14 @@ namespace Armoury
                 shown++;
             }
             if (shown == 0) sb.Append('-');
-            sb.Append(" | S_stos (regulator wsi 221): towarow na suficie przy stosie ponizej progu ").Append(known).Append(", na suficie bez migawki decyzji w tej sesji (stos nieznany, liczone 1.25) ").Append(unknown);
+            sb.Append(" | S_stos (regulator wsi 221): towarow na suficie przy stosie ponizej progu ").Append(known).Append(", na suficie bez migawki decyzji w tej sesji ").Append(StockEmptyOn ? "(470-a: S_stos z dni stosu w zapisie) " : "(stos nieznany, liczone 1.25) ").Append(unknown);
             if (stock.Count > 0)
             {
                 sb.Append(" [");
                 bool f = true;
                 foreach (var kv in stock)
                 {
-                    sb.Append(f ? "" : ", ").Append(kv.Key.StringId).Append(" x").Append(F2(kv.Value[3])).Append(" decyzji ").Append((int)kv.Value[1])
+                    sb.Append(f ? "" : ", ").Append(kv.Key.StringId).Append(" x").Append(F2(kv.Value[3])).Append(StockEmptyOn ? " pustych decyzji " : " decyzji ").Append((int)kv.Value[1])
                       .Append(kv.Value[2] >= 0 ? ", stos " + N0(kv.Value[2]) + " dni" : ", stos ?");
                     f = false;
                 }
@@ -950,10 +1018,13 @@ namespace Armoury
             }
             if (FoodShareOn && FoodFloorOn)
                 sb.Append(" | 470-b brak jedzenia warsztatow ponizej ").Append(F1(MinFoodShortage)).Append(" szt./d na komorke poza N (klucz Supply Food Shortage Floor TAK): komorek odrzuconych ")
-                  .Append(_sFloorCells).Append(" (").Append(F1(_sFloorUnits)).Append(" szt./d), towarow ").Append(_sFloorCats.Count);
+                  .Append(_sFloorCells).Append(" (").Append(F1(_sFloorUnits)).Append(" szt./d), towarow ").Append(_sFloorCats.Count).Append(FloorCatsText())
+                  .Append(", najwiekszy odrzucony brak komorki ").Append(_sFloorMaxCat != null ? F2(_sFloorMax) + " " + _sFloorMaxCat.StringId : "-")
+                  .Append("; komorek ponizej progu zostawionych w N przez brak swiata >= ").Append(F1(WorldFoodShortage)).Append(" szt./d (470-p): ").Append(_sFloorKept);
             if (StockEmptyOn)
                 sb.Append(" | 470-a S_stos tylko przy pustym stosie (klucz Supply Stock Empty Only TAK): stos < ").Append(F1(StockEmptyDays)).Append(" dni zuzycia, S_stos = 2 - dni / ").Append(F1(StockEmptyDays))
-                  .Append("; odrzuconych towarow (na suficie, stos ponizej progu 221, ale nie pusty) ").Append(_sStockCut).Append(", na suficie bez migawki decyzji w tej sesji (S_stos 1) ").Append(_sStockUnk);
+                  .Append("; odrzuconych towarow (na suficie, stos ponizej progu 221, ale nie pusty) ").Append(_sStockCut).Append(", na suficie bez migawki decyzji w tej sesji: z dniami pustego stosu z zapisu (470-p) ")
+                  .Append(_sStockSaved).Append(", bez nich (S_stos 1) ").Append(_sStockUnk);
             sb.Append(" | zboze: miast z glodujacymi wsiami (N = 2) ").Append(hungry.Count)
               .Append(" | miast z N >= 1.5 dla jakiegos towaru: ").Append(hot.Count).Append(" | komorek (miasto x towar) z pomiarem ").Append(cells)
               .Append(", z kolejka > 1: ").Append(qOver).Append(" (na suficie 2: ").Append(qCeil).Append("; tylko z niewydanego budzetu robot: ").Append(softOnly).Append(")")
