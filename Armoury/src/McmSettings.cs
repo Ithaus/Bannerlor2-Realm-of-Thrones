@@ -620,6 +620,14 @@ namespace Armoury
         [SettingPropertyGroup("Wear and tear")]
         public float BlowDeathShallowFactor { get; set; } = 0.50f;
 
+        [SettingPropertyBool("Simulated Battles Match Fought Battles", HintText = "With Blow Decides Death Or Wound: battles resolved without fighting (auto-resolve, battles between AI parties, and Send Troops) decide death or wound the way a battle you fight on the field does. Until now a soldier felled in such a battle died on the game's chance alone (his level and his party's surgeon: a recruit without a surgeon nine times in ten), while in a battle you fight the blow that felled him lowers that chance - so a resolved battle killed about twice as many men as the same battle fought. A resolved battle knows no part of the body and no weight of the blow, so the chance of death is multiplied by Simulated Battles Death Factor (the average of what the body part and the weight of the blow give in fought battles) and, for a blunt blow, also by Blow Death Blunt Factor. With the defaults a felled soldier dies at about 0.47 of the game's chance in battles between AI parties and 0.40 in your own auto-resolved battles, as in fought battles (0.42 to 0.48). Level, surgeon and perks count as before. More of the fallen are wounded rather than dead: more men to heal, and more prisoners for the victor. Heroes are not changed. Off = as before this change. The same rule for you and for the AI. Counted in the Armoury log once a day (line 436).", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public bool SimulatedBattlesMatchPlayed { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Simulated Battles Death Factor", 0.05f, 1.00f, "0.00", HintText = "With Simulated Battles Match Fought Battles: the chance of death of a soldier felled in a battle resolved without fighting is multiplied by this (and by Blow Death Blunt Factor for a blunt blow). 0.50 = the average that the part of the body and the weight of the blow give in battles you fight. 1.00 = only the kind of blow counts.", RequireRestart = false)]
+        [SettingPropertyGroup("Wear and tear")]
+        public float SimulatedBattlesDeathFactor { get; set; } = 0.50f;
+
         [SettingPropertyInteger("Armor Pool Min Points", 0, 160, "0", HintText = "gloves, greaves and capes wear like the rest of the harness: their wear pool counts at least this many armour points", RequireRestart = false)]
         [SettingPropertyGroup("Wear and tear")]
         public int ArmorPoolMinPoints { get; set; } = 40;
@@ -12922,6 +12930,8 @@ namespace Armoury
             s.BlowDeathTorsoFactor = BlowDeathTorsoFactor;
             s.BlowDeathLimbFactor = BlowDeathLimbFactor;
             s.BlowDeathShallowFactor = BlowDeathShallowFactor;
+            s.SimulatedBattlesMatchPlayed = SimulatedBattlesMatchPlayed;
+            s.SimulatedBattlesDeathFactor = SimulatedBattlesDeathFactor;
             s.ArmorPoolMinPoints = ArmorPoolMinPoints;
             s.WearPerBattle = WearPerBattle;
             s.WearDamageFactor = WearDamageFactor;
