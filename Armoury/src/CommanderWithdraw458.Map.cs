@@ -26,11 +26,14 @@ namespace Armoury
     ///
     /// REGULA (tylko bitwa, ktora misja 458 oznaczyla: Pending z OnEndMission - wodz wroga gracza uszedl z pola, gracz wygral):
     ///  - prefiks MapEvent.CaptureDefeatedPartyMembers (Priority.Last - po migawkach PeopleBook (First), 312/Measure40, 385d; okno pojmania PeopleBook / 312
-    ///    obejmuje tez nasze pojmanie, wiec ksiegi widza je jak pojmanie gry): partie "z wodzem" = partia wodza + partie, ktorych pan uszedl z nim albo nie
-    ///    wszedl na pole. Te partie wyjmujemy z listy gry i rozliczamy sami TAK SAMO jak gra (te same szanse, ten sam rzut odbiorcy, CanTroopBeTakenPrisoner,
-    ///    bohaterowie jak w grze), ale tylko ludzi, ktorzy NIE zeszli z wodzem: na element skladu ranni z pola = min(ranni, ranni misji), zdrowi do niewoli =
-    ///    zdrowi wystawieni, ktorzy wrocili do skladu (zeszli z pola z morale >= 0.01 albo stali na koniec), minus zbiegli z wodzem. Zostaja: zbiegli z wodzem,
-    ///    posilki niewprowadzone (zdrowi skladu minus wystawieni, ktorzy wrocili) i ranni sprzed bitwy. Pozostale partie strony - gra (ich zbiegli tez).
+    ///    obejmuje tez nasze pojmanie, wiec ksiegi widza je jak pojmanie gry): partie "z wodzem" = partia wodza + partie, ktorych pan uszedl z nim albo
+    ///    (zdrowy) nie wszedl na pole - posilki czekajace. Te partie wyjmujemy z listy gry i rozliczamy sami TAK SAMO jak gra (te same szanse, ten sam rzut
+    ///    odbiorcy, CanTroopBeTakenPrisoner, bohaterowie jak w grze), ale tylko ludzi, ktorzy NIE zeszli z wodzem: na element skladu WSZYSCY ranni (z pola i
+    ///    sprzed bitwy - decyzja 2B "wygrany grabi rannych"), zdrowi do niewoli = zdrowi wystawieni, ktorzy wrocili do skladu (zeszli z pola bez wodza albo stali
+    ///    na koniec), minus zbiegli z wodzem. Zostaja: zbiegli z wodzem i posilki niewprowadzone (zdrowi skladu minus wystawieni, ktorzy wrocili), bohaterowie
+    ///    zbiegli z wodzem / zdrowi niewprowadzeni. Pozostale partie strony - gra (ich zbiegli tez).
+    ///    458-p: przed rozliczeniem kontrola licznikow misji z licznikami gry (MapEventParty.DiedInBattle / WoundedInBattle / RoutedInBattle na postac);
+    ///    rozjazd = partia do listy gry (rozlicza ja gra), bez zgadywania.
     ///  - MapEventEnded (nasluch ArmouryBehavior): partie "z wodzem" (ruchome, nie przypiete do armii) odchodza jak strona z RetreatingSide w grze
     ///    (AiMilitaryBehavior.OnMapEventEnded, cs 220459): TeleportPartyToOutSideOfEncounterRadius + Ai.CalculateFleePosition od wodza zwyciezcow + SetMoveGoToPoint.
     ///    RetreatingSide NIE ustawiamy (ratowalby caly sklad, wylaczal lup DTE i drogi H3 / 312 / A17).
@@ -60,8 +63,12 @@ namespace Armoury
         private static List<MobileParty> _moveParties;
         private static string _hook = "nie wpieta";
         private static int _stumbles, _errs;
+        private static bool _changed;   // 458-p: Settle zaczal zmieniac sklad (potkniecie potem nie oddaje partii grze)
 
         internal static void Set(Pending p) { _p = p; _move = null; _moveParties = null; }
+
+        /// <summary>458-p (recenzja B9): nowa kampania / wczytanie (konstruktor ArmouryBehavior) - stan i liczniki od zera.</summary>
+        internal static void Reset() { _p = null; _move = null; _moveParties = null; _stumbles = 0; _errs = 0; }
 
         /// <summary>Nowa misja: stare oczekiwanie (bitwa trwala dalej - ContinueBattle - albo pojmanie sie nie odbylo) znika.</summary>
         internal static void Clear()
@@ -98,6 +105,8 @@ namespace Armoury
             _p = null;
             try
             {
+                var cfg = Settings.Current;
+                if (cfg == null || !cfg.CommanderWithdrawsUnderRearguard) { Log.Info(P + "klucz Commander Withdraws Under Rearguard NIE - oczekiwanie porzucone, pojmanie jak w grze."); return; }   // recenzja A4
                 if (__instance.DefeatedSide != p.Side || __1 == null || __0 == null)
                 {
                     Log.Info(P + "strona wodza " + p.Side + " nie jest pokonana (pokonana " + __instance.DefeatedSide + ") - pojmanie jak w grze.");
@@ -132,12 +141,21 @@ namespace Armoury
                 var sb = new StringBuilder(512);
                 sb.Append(P).Append("wodz ").Append(p.Cmd).Append(" uszedl - partie z wodzem ").Append(keep.Count).Append(", jak w grze ").Append(rest.Count);
                 var moved = new List<MobileParty>();
-                int tBefore = 0, tAfter = 0, tTaken = 0, tLost = 0, tHero = 0, tBad = 0;
+                int tBefore = 0, tAfter = 0, tTaken = 0, tLost = 0, tHero = 0, tBad = 0, tGame = 0;
                 foreach (var mep in keep)
                 {
                     var pb = mep.Party;
+                    _changed = false;
                     try
                     {
+                        string bad = GameCheck(p, mep);
+                        if (bad != null)
+                        {
+                            tGame++;
+                            rest.Add(mep);
+                            sb.Append(" || ").Append(Name(pb)).Append(": liczniki misji niezgodne z gra (").Append(bad).Append(") - rozliczy gra");
+                            continue;
+                        }
                         int before, after, taken, lost, heroOut;
                         string line = Settle(__instance, p, pb, wch, hch, out before, out after, out taken, out lost, out heroOut);
                         bool ok = before == after + taken + lost + heroOut;
@@ -150,8 +168,18 @@ namespace Armoury
                     catch (Exception e)
                     {
                         Stumble("Settle " + Name(pb), e);
-                        rest.Add(mep);   // potkniecie - te partie rozliczy gra (to, co juz przeniesione, przeszlo zwyklymi AddToCounts)
-                        sb.Append(" || ").Append(Name(pb)).Append(": potkniecie - rozliczy gra");
+                        if (!_changed)
+                        {
+                            rest.Add(mep);   // potkniecie przed zmiana skladu - te partie rozliczy gra
+                            sb.Append(" || ").Append(Name(pb)).Append(": potkniecie przed zmianami - rozliczy gra");
+                        }
+                        else
+                        {
+                            // recenzja B5: sklad juz zmieniony - oddanie grze wzieloby ludzi drugi raz; partia zostaje jak jest (linia mowi to wprost)
+                            tBad++;
+                            if (pb.IsMobile && pb.MobileParty != null) moved.Add(pb.MobileParty);
+                            sb.Append(" || ").Append(Name(pb)).Append(": potkniecie PO zmianach skladu - partia zostaje jak jest (nie oddana grze, bez podwojenia)");
+                        }
                     }
                 }
                 __1 = rest;
@@ -160,19 +188,73 @@ namespace Armoury
                 if (restNames.Count > 0) sb.Append(" || jak w grze: ").Append(string.Join(", ", restNames.ToArray()));
                 sb.Append(" || razem: przed ").Append(tBefore).Append(", zostaje ").Append(tAfter).Append(", do niewoli ").Append(tTaken).Append(", bez odbiorcy ").Append(tLost)
                   .Append(", bohaterowie wyjeci ").Append(tHero).Append(", zbiegli z wodzem w partiach jak w grze ").Append(restEsc)
-                  .Append(" | niezgodnych partii ").Append(tBad).Append(" | potkniecia ").Append(_stumbles).Append('.');
+                  .Append(" | niezgodnych partii ").Append(tBad).Append(", oddanych grze po kontroli licznikow ").Append(tGame).Append(" | potkniecia ").Append(_stumbles).Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("CapPre", e); }
         }
 
-        /// <summary>Partia uchodzi z wodzem: partia wodza albo jej pan zszedl z pola z wodzem / nie wszedl na pole (i zyje, nie jest jencem).</summary>
+        /// <summary>Partia uchodzi z wodzem: partia wodza albo jej pan zszedl z pola z wodzem / zdrowy nie wszedl na pole (posilki; i zyje, nie jest jencem).</summary>
         private static bool WithCommander(Pending p, PartyBase pb)
         {
             if (ReferenceEquals(pb, p.CmdParty)) return true;
             var h = pb.LeaderHero;
             if (h == null || !h.IsAlive || h.IsPrisoner) return false;
-            return p.Kept.Contains(h) || !p.Spawned.Contains(h);
+            return HeroStays(p, h);
+        }
+
+        /// <summary>Bohater zostaje: zszedl z pola z wodzem albo ZDROWY nie wszedl na pole (posilki czekajace - decyzja 3). Ranny sprzed bitwy nie byl
+        /// wystawiony, ale posilkami nie jest - idzie jak w grze (recenzja B1).</summary>
+        private static bool HeroStays(Pending p, Hero h)
+        {
+            return p.Kept.Contains(h) || (!p.Spawned.Contains(h) && !h.IsWounded);
+        }
+
+        /// <summary>458-p (recenzja B3): liczniki misji (zabici / ranni z pola / wypisani na postac) == liczniki gry tej partii (MapEventParty.DiedInBattle /
+        /// WoundedInBattle / RoutedInBattle). null = zgodne; inaczej opis rozjazdu (np. wczesniejsza runda tej samej bitwy albo agent bez licznika).</summary>
+        private static string GameCheck(Pending p, MapEventParty mep)
+        {
+            var g = new Dictionary<CharacterObject, int[]>();
+            AddGame(g, mep.DiedInBattle, 0);
+            AddGame(g, mep.WoundedInBattle, 1);
+            AddGame(g, mep.RoutedInBattle, 2);
+            Dictionary<CharacterObject, int[]> d;
+            if (p.Cnt == null || !p.Cnt.TryGetValue(mep.Party, out d)) d = new Dictionary<CharacterObject, int[]>();
+            int bad = 0;
+            string first = null;
+            foreach (var kv in g)
+            {
+                int[] k;
+                d.TryGetValue(kv.Key, out k);
+                int ck = k != null ? k[CK] : 0, cw = k != null ? k[CWS] : 0, cr = k != null ? k[CRm] : 0;
+                if (ck != kv.Value[0] || cw != kv.Value[1] || cr != kv.Value[2])
+                {
+                    bad++;
+                    if (first == null) first = (kv.Key.Name != null ? kv.Key.Name.ToString() : "?") + ": gra " + kv.Value[0] + "/" + kv.Value[1] + "/" + kv.Value[2] + ", misja " + ck + "/" + cw + "/" + cr;
+                }
+            }
+            foreach (var kv in d)
+            {
+                if (g.ContainsKey(kv.Key)) continue;
+                if (kv.Value[CK] + kv.Value[CWS] + kv.Value[CRm] == 0) continue;
+                bad++;
+                if (first == null) first = (kv.Key.Name != null ? kv.Key.Name.ToString() : "?") + ": gra 0/0/0, misja " + kv.Value[CK] + "/" + kv.Value[CWS] + "/" + kv.Value[CRm];
+            }
+            return bad == 0 ? null : "postaci " + bad + ", np. " + first + " (zabici/ranni/wypisani)";
+        }
+
+        private static void AddGame(Dictionary<CharacterObject, int[]> g, TaleWorlds.CampaignSystem.Roster.TroopRoster r, int slot)
+        {
+            if (r == null) return;
+            for (int i = 0; i < r.Count; i++)
+            {
+                var e = r.GetElementCopyAtIndex(i);
+                var c = e.Character;
+                if (c == null || c.IsHero || e.Number <= 0) continue;
+                int[] v;
+                if (!g.TryGetValue(c, out v)) { v = new int[3]; g[c] = v; }
+                v[slot] += e.Number;
+            }
         }
 
         private static int[] Get(Pending p, PartyBase pb, CharacterObject c)
@@ -212,7 +294,7 @@ namespace Armoury
             var r = pb.MemberRoster;
             before = r.TotalManCount;
             var model = Campaign.Current.Models.BattleRewardModel;
-            int keepEsc = 0, keepRes = 0, keepW0 = 0, capW = 0, capH = 0, skew = 0, heroKept = 0, heroTaken = 0, heroFled = 0;
+            int keepEsc = 0, keepRes = 0, capW = 0, capH = 0, skew = 0, heroKept = 0, heroTaken = 0, heroFled = 0;
             // plan (bez zmian)
             var planC = new List<CharacterObject>();
             var planH = new List<int>();
@@ -227,43 +309,55 @@ namespace Armoury
                 {
                     var h = c.HeroObject;
                     if (h == null) continue;
-                    if (p.Kept.Contains(h) || !p.Spawned.Contains(h)) heroKept++;
+                    if (HeroStays(p, h)) heroKept++;
                     else heroes.Add(h);
                     continue;
                 }
                 var k = Get(p, pb, c);
-                int hs = k != null ? k[CHS] : 0, ws = k != null ? k[CWS] : 0, es = k != null ? k[CE] : 0;
+                int hs = k != null ? k[CHS] : 0, es = k != null ? k[CE] : 0;
                 int wn = Math.Min(e.WoundedNumber, e.Number), hn = e.Number - wn;
-                int cw = Math.Min(wn, ws);
+                int cw = wn;   // 458-p (recenzja B2): wszyscy ranni do zwyciezcy - z pola i sprzed bitwy (decyzja 2B: zostaja TYLKO ci, co zeszli z wodzem + posilki)
                 int ch = Math.Max(0, Math.Min(hn, hs - es));
-                if (hs > hn || ws > wn) skew++;
-                keepEsc += Math.Min(es, hn);
-                keepRes += Math.Max(0, hn - ch - Math.Min(es, hn));
-                keepW0 += wn - cw;
+                if (hs > hn) skew++;
+                int ke = Math.Min(es, hn - ch);   // recenzja B12: zbiegli w skladzie po odjeciu bioracych do niewoli
+                keepEsc += ke;
+                keepRes += Math.Max(0, hn - ch - ke);
                 if (cw + ch == 0) continue;
                 planC.Add(c); planH.Add(ch); planW.Add(cw);
                 capW += cw; capH += ch;
             }
             // szeregowi do niewoli (jak gra: kazdy osobno, odbiorca z rzutu; nie-jeniec albo brak odbiorcy - znika jak w grze)
+            // 458-p (recenzja B5): najpierw zdjecie ze skladu, potem rozdanie - kazdy czlowiek osobno (potkniecie = "bez odbiorcy", jak brak odbiorcy w grze);
+            // nikt nie jest naraz w skladzie i u zwyciezcy
             for (int i = 0; i < planC.Count; i++)
             {
                 var c = planC[i];
                 int ch = planH[i], cw = planW[i];
                 bool can = model.CanTroopBeTakenPrisoner(c);
+                int idx = r.FindIndexOfTroop(c);
+                if (idx < 0) { skew++; continue; }
+                _changed = true;
+                r.AddToCountsAtIndex(idx, -(ch + cw), -cw, 0, false);
                 for (int j = 0; j < cw; j++)
                 {
-                    var to = can ? Pick(wch) : null;
-                    var recv = to != null ? to.RosterToReceiveLootPrisoners : null;
-                    if (recv != null) { recv.AddToCounts(c, 1, false, 1); taken++; } else lost++;
+                    try
+                    {
+                        var to = can ? Pick(wch) : null;
+                        var recv = to != null ? to.RosterToReceiveLootPrisoners : null;
+                        if (recv != null) { recv.AddToCounts(c, 1, false, 1); taken++; } else lost++;
+                    }
+                    catch (Exception e) { lost++; Stumble("Jeniec ranny", e); }
                 }
                 for (int j = 0; j < ch; j++)
                 {
-                    var to = can ? Pick(hch) : null;
-                    var recv = to != null ? to.RosterToReceiveLootPrisoners : null;
-                    if (recv != null) { recv.AddToCounts(c, 1); taken++; } else lost++;
+                    try
+                    {
+                        var to = can ? Pick(hch) : null;
+                        var recv = to != null ? to.RosterToReceiveLootPrisoners : null;
+                        if (recv != null) { recv.AddToCounts(c, 1); taken++; } else lost++;
+                    }
+                    catch (Exception e) { lost++; Stumble("Jeniec zdrowy", e); }
                 }
-                int idx = r.FindIndexOfTroop(c);
-                if (idx >= 0) r.AddToCountsAtIndex(idx, -(ch + cw), -cw, 0, false);
             }
             // bohaterowie, ktorzy nie uszli z wodzem (ranni z pola, zostali): jak gra (CaptureDefeatedPartyMembers, cs 112722-112750)
             foreach (var h in heroes)
@@ -274,6 +368,7 @@ namespace Armoury
                     int idx = r.FindIndexOfTroop(c);
                     if (idx < 0) continue;
                     int n0 = r.TotalManCount;
+                    _changed = true;
                     if (h.DeathMark != KillCharacterAction.KillCharacterActionDetail.DiedInBattle && h.DeathMark != KillCharacterAction.KillCharacterActionDetail.DiedInLabor && h.Occupation != Occupation.Special)
                     {
                         if (pb.IsMobile && pb.LeaderHero == h) pb.MobileParty.RemovePartyLeader();
@@ -303,8 +398,8 @@ namespace Armoury
             r.RemoveZeroCounts();
             after = r.TotalManCount;
             return Name(pb) + (ReferenceEquals(pb, p.CmdParty) ? " [wodz]" : "") + ": przed " + before
-                   + " | zostaje: zbiegli z wodzem " + keepEsc + ", posilki niewprowadzone " + keepRes + ", ranni sprzed bitwy " + keepW0 + ", bohaterowie " + heroKept
-                   + " | do niewoli wg gry: ranni z pola " + capW + ", zdrowi na polu / zeszli bez wodza " + capH + " (wzieci " + taken + ", bez odbiorcy " + lost + ")"
+                   + " | zostaje: zbiegli z wodzem " + keepEsc + ", posilki niewprowadzone " + keepRes + ", bohaterowie " + heroKept
+                   + " | do niewoli wg gry: ranni (z pola i sprzed bitwy) " + capW + ", zdrowi na polu / zeszli bez wodza " + capH + " (wzieci " + taken + ", bez odbiorcy " + lost + ")"
                    + " | bohaterowie bez wodza: pojmani " + heroTaken + ", zbiegli (fugitive) " + heroFled
                    + " | po " + after + (skew > 0 ? " | elementow z liczbami misji ponad sklad " + skew : "");
         }

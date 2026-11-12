@@ -79,8 +79,10 @@ namespace Armoury
     ///     Gdy jednak skonczy sie "wyczerpaniem" (EnemyRetreated = false - gra dalej toczylaby bitwe ze zbieglymi, ContinueBattle), w OnMissionResultReady (po
     ///     CampaignMissionComponent) PlayerEncounter.CampaignBattleResult = GetResult(stan, enemyRetreated: true) - bitwa rozstrzygnieta, strona przegrala.
     ///  4. MAPA (CommanderWithdraw458.Map.cs): od startu misji liczymy kazdego wystawionego czlowieka strony wroga (partia, postac) i jego los; przy udanym zejsciu
-    ///     wodza (zszedl z morale >= 0.01 albo stoi na koniec) i wygranej gracza - Pending do pojmania tej bitwy: w partii zostaja zbiegli z wodzem, posilki
-    ///     niewprowadzone i ranni sprzed bitwy; ranni z pola i reszta do zwyciezcy jak w grze; partia odchodzi od zwyciezcy jak RetreatingSide w grze.
+    ///     wodza (zszedl z pola z morale >= 0.01 - stojacy na koniec NIE) i wygranej gracza (EnemyRetreated albo wymuszone) - Pending do pojmania tej bitwy:
+    ///     w partii zostaja zbiegli z wodzem (naprawde zeszli z pola) i posilki niewprowadzone; wszyscy ranni (z pola i sprzed bitwy) i reszta do zwyciezcy
+    ///     jak w grze; partia odchodzi od zwyciezcy jak RetreatingSide w grze.
+    /// 458-p (recenzje A i B): bez tylnej strazy / wodz nie-bohater - "bylby"; ranni w odwrocie 143 prowadzi 143; zwolnienie modulow przed odwrotem jak 143.
     /// Linie: "Odwrot wodza (458): ... ODWROT NA ROZKAZ" (decyzja), "Odwrot wodza (458) koniec: ..." (z rozliczeniem misji i kontrola sum), "Odwrot wodza (458) mapa:".
     /// </summary>
     internal sealed class CommanderWithdraw458 : MissionLogic
@@ -125,7 +127,8 @@ namespace Armoury
             public Hero CmdHero;
             public readonly List<Agent> Wd = new List<Agent>();
             public readonly Dictionary<Formation, WorldPosition> Exit = new Dictionary<Formation, WorldPosition>();
-            public int Sent, Resent, Pins, PanicOut, NoExit;
+            public readonly Dictionary<Formation, float> ExitAt = new Dictionary<Formation, float>();   // 458-p: chwila wyliczenia punktu (ponowienie po ExitStale liczy na nowo)
+            public int Sent, Resent, Pins, PanicOut, NoExit, ByRh;
         }
 
         private bool _known, _field, _started, _ended;
@@ -139,7 +142,7 @@ namespace Armoury
         private static string _rbmTick;   // wlasciciele postfiksow HumanAIComponent.OnTick (raz na proces)
 
         // ------------------------------------------------------------ 458-r regula
-        private const float MaintainEvery = 0.5f, MoraleFloor = 15f, Routed = 0.01f;
+        private const float MaintainEvery = 0.5f, MoraleFloor = 15f, Routed = 0.01f, ExitStale = 10f;
         private readonly bool _measure, _ruleKey;
         private readonly object _gate = new object();
         private sealed class Org { public PartyBase P; public CharacterObject C; }
@@ -148,6 +151,7 @@ namespace Armoury
         private readonly HashSet<Hero> _spawnedHeroes = new HashSet<Hero>(), _keptHeroes = new HashSet<Hero>();
         private readonly HashSet<Agent> _esc = new HashSet<Agent>(), _panicOut = new HashSet<Agent>();
         private int _heroRm, _heroWs, _heroK;
+        private int _buildMiss;   // 458-p: wystawiony czlowiek wroga bez licznika (brak partii / postaci / potkniecie) - mapa wtedy jak w grze
         private float _nextMaintain;
 
         public CommanderWithdraw458()
@@ -155,7 +159,7 @@ namespace Armoury
             var c = Settings.Current;
             _measure = c != null && c.BattleAiMeasurements;
             _ruleKey = c != null && c.CommanderWithdrawsUnderRearguard;
-            if (_ruleKey) { try { CommanderWithdraw458Map.Clear(); } catch { } }
+            try { CommanderWithdraw458Map.Clear(); } catch { }   // 458-p: takze przy kluczu NIE - stare oczekiwanie nie przezyje nowej misji
         }
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
@@ -342,6 +346,7 @@ namespace Armoury
                 {
                     var f = fl[j];
                     if (f == null || f.CountOfUnits <= 0 || ReferenceEquals(f, cmdF)) continue;
+                    if ((int)f.FormationIndex >= 8) continue;   // 458-p: szyki 8-9 (odwod 457) nie sa tylna straza - zgodnie z opisem 0-7
                     int n = FoesNear(m, t, f.CachedMedianPosition.AsVec2, ContactR);
                     if (n >= ContactMin && n > s.RearFoes) { s.RearFoes = n; s.RearF = f; }
                 }
@@ -409,6 +414,8 @@ namespace Armoury
         {
             if (!s.EnemyOfPlayer) return "strona gracza - regula tylko dla wroga gracza";
             if (cmd == null) return "brak wodza na polu";
+            if (!cmd.IsHero) return "wodz nie jest bohaterem (Team.GeneralAgent szeregowy)";   // 458-p (recenzja B4)
+            if (s.RearF == null) return "brak tylnej strazy (zaden szyk 0-7 poza szykiem wodza nie ma >= " + ContactMin + " wrogow w 30 m)";   // 458-p (recenzja A1): bez strazy nie ma kogo zostawic
             int aiTeams = 0;
             var teams = m.Teams;
             for (int i = 0; teams != null && i < teams.Count; i++)
@@ -446,6 +453,7 @@ namespace Armoury
                 {
                     if (a == null || !a.IsActive()) continue;
                     _esc.Add(a);
+                    if (Rh(a)) { s.ByRh++; continue; }   // 458-p (recenzja A2): ranny w odwrocie 143 - prowadzi go 143, my tylko liczymy jego zejscie
                     s.Wd.Add(a);
                     Send(m, s, a, false);
                 }
@@ -454,14 +462,29 @@ namespace Armoury
         }
 
         /// <summary>Natywny odwrot do punktu ucieczki szyku (jeden punkt na szyk - idzie w szeregach), podloga morale.</summary>
-        private static void Send(Mission m, St s, Agent a, bool again)
+        private void Send(Mission m, St s, Agent a, bool again)
         {
+            if (!again)
+            {
+                // 458-p (recenzja A3): zwolnienie przez moduly trzymajace agenta - ta sama kolejnosc co odwrot rannego 143 (RoutHold.Withdraw); kazdy osobno
+                try { HeroCaution.BeforeWithdraw(a); } catch (Exception e) { Stumble("HeroCaution.BeforeWithdraw", e); }
+                try { Doctrine.H447BeforeWithdraw(a); } catch (Exception e) { Stumble("Doctrine.H447BeforeWithdraw", e); }
+                try { HorsePursuit.BeforeWithdraw(a); } catch (Exception e) { Stumble("HorsePursuit.BeforeWithdraw", e); }
+                try { BannerCompanies.BeforeWithdraw(a); } catch (Exception e) { Stumble("BannerCompanies.BeforeWithdraw", e); }
+            }
             if (a.IsUsingGameObject) a.StopUsingGameObject(false, Agent.StopUsingGameObjectFlags.None);
             WorldPosition wp = WorldPosition.Invalid;
             var f = a.Formation;
             if (f != null && f.CountOfUnits > 0)
             {
-                if (!s.Exit.TryGetValue(f, out wp)) { wp = m.GetClosestFleePositionForFormation(f); s.Exit[f] = wp; }
+                // 458-p (recenzja A5): punkt szyku liczony na nowo, gdy starszy niz ExitStale s (scigajacy sie przesuneli)
+                float now = m.CurrentTime, at;
+                if (!s.Exit.TryGetValue(f, out wp) || !s.ExitAt.TryGetValue(f, out at) || now - at > ExitStale)
+                {
+                    wp = m.GetClosestFleePositionForFormation(f);
+                    s.Exit[f] = wp;
+                    s.ExitAt[f] = now;
+                }
             }
             if (!wp.IsValid) wp = m.GetClosestFleePositionForAgent(a);
             if (!wp.IsValid) { s.NoExit++; return; }
@@ -484,8 +507,11 @@ namespace Armoury
                         var a = s.Wd[j];
                         try
                         {
-                            if (a == null || !a.IsActive()) { s.Wd.RemoveAt(j); continue; }
-                            if (SurvivalMode.InPanic(a)) { if (_panicOut.Add(a)) s.PanicOut++; continue; }
+                            if (a == null || !a.IsActive()) { if (a != null && _panicOut.Remove(a)) s.PanicOut++; s.Wd.RemoveAt(j); continue; }
+                            // 458-p (recenzja A6): panika liczona dopiero przy zejsciu / koncu misji - ofiara szarzy RBM wraca pod nasze prowadzenie
+                            if (SurvivalMode.InPanic(a)) { _panicOut.Add(a); continue; }
+                            _panicOut.Remove(a);
+                            if (Rh(a)) continue;   // 458-p (recenzja A2): 143 przejal rannego - nie przeciagamy liny
                             if (a.GetMorale() < MoraleFloor) { a.SetMorale(MoraleFloor); s.Pins++; }
                             if (!a.IsRetreating()) Send(m, s, a, true);
                         }
@@ -493,6 +519,13 @@ namespace Armoury
                     }
                 }
             }
+        }
+
+        /// <summary>458-p: ranny w odwrocie 143 (RoutHold, w drodze albo na postoju) - wzor HorsePursuit.Withdrawing.</summary>
+        private static bool Rh(Agent a)
+        {
+            var k = RoutHold.Live;
+            return k != null && k.Withdrawing(a);
         }
 
         // ------------------------------------------------------------ 458-r: liczniki wystawionych (partia, postac) od startu misji
@@ -508,7 +541,7 @@ namespace Armoury
                 if (m == null || !MissionTeams.Valid(t) || t.IsPlayerTeam || !MissionTeams.Enemies(t, m.PlayerTeam)) return;
                 var pb = agent.Origin != null ? agent.Origin.BattleCombatant as PartyBase : null;
                 var c = agent.Character as CharacterObject;
-                if (pb == null || c == null) return;
+                if (pb == null || c == null) { lock (_gate) _buildMiss++; return; }
                 lock (_gate)
                 {
                     _trk[agent] = new Org { P = pb, C = c };
@@ -516,7 +549,7 @@ namespace Armoury
                     else Cnt(pb, c)[CommanderWithdraw458Map.CS]++;
                 }
             }
-            catch (Exception e) { Stumble("Wystawiony", e); }
+            catch (Exception e) { lock (_gate) _buildMiss++; Stumble("Wystawiony", e); }
         }
 
         private int[] Cnt(PartyBase pb, CharacterObject c)
@@ -542,7 +575,8 @@ namespace Armoury
             float mor = 0f;
             try { mor = a.GetMorale(); } catch { mor = 0f; }
             if (mor < Routed) { if (hero) _heroRm++; else Cnt(o.P, o.C)[CommanderWithdraw458Map.CRm]++; return; }
-            bool esc = _esc.Contains(a);
+            // 458-p (recenzja A1): zbiegly z wodzem = wyprowadzany, ktory NAPRAWDE zszedl z pola (usuniety w misji); stojacy / idacy przez pole na koniec - nie
+            bool esc = !atEnd && _esc.Contains(a);
             if (hero) { if (esc && h != null) _keptHeroes.Add(h); return; }
             var k = Cnt(o.P, o.C);
             k[CommanderWithdraw458Map.CHS]++;
@@ -611,8 +645,8 @@ namespace Armoury
             if (s == null) return;
             if (!r.PlayerVictory) { s.ResultNote = "gracz nie wygral - mapa jak w grze"; return; }
             if (r.EnemyRetreated) { s.ResultNote = "EnemyRetreated z gry (wszyscy wroga uciekali)"; return; }
-            bool down = s.CmdA == null && !s.CmdKept;
-            if (down) { s.ResultNote = "wyczerpanie strony, wodz padl - mapa jak w grze"; return; }
+            // 458-p (recenzja B8): wymuszenie tylko, gdy wodz JUZ zszedl z pola (FLeft) - inaczej gra toczy bitwe dalej jak bez reguly
+            if (!s.CmdKept) { s.ResultNote = "wyczerpanie strony, wodz nie zszedl z pola (" + s.CmdFate + ") - mapa jak w grze (bitwa dalej)"; return; }
             if (PlayerEncounter.Current == null || PlayerEncounter.CampaignBattleResult == null) { s.ResultNote = "brak CampaignBattleResult (kolejnosc zachowan) - mapa jak w grze"; return; }
             PlayerEncounter.CampaignBattleResult = CampaignBattleResult.GetResult(r.BattleState, true);
             s.Forced = true;
@@ -634,12 +668,8 @@ namespace Armoury
                     try { if (a != null && a.IsActive()) Track(a, AgentState.Active, true); }
                     catch (Exception e) { Stumble("NaPolu", e); }
                 }
-                if (s.CmdA != null && s.CmdA.IsActive())
-                {
-                    float mor = 0f;
-                    try { mor = s.CmdA.GetMorale(); } catch { mor = 0f; }
-                    s.CmdKept = mor >= Routed;
-                }
+                // 458-p (recenzja A1): wodz stojacy / idacy przez pole na koniec NIE uszedl - CmdKept tylko z OnAgentRemoved (FLeft)
+                foreach (var a in s.Wd) if (a != null && _panicOut.Remove(a)) s.PanicOut++;   // recenzja A6: w panice do konca
                 int sp = 0, k = 0, ws = 0, rm = 0, hs = 0, esc = 0, end = 0, parties = 0;
                 foreach (var pv in _cnt)
                 {
@@ -659,8 +689,11 @@ namespace Armoury
                 string map;
                 if (r == null || !r.PlayerVictory) map = "gracz nie wygral - mapa jak w grze (zbiegli z morale >= 0.01 zostaja w skladzie)";
                 else if (!s.CmdKept) map = "wodz nie uszedl (" + s.CmdFate + ") - pojmanie jak w grze (decyzja 9: tylko jesli mu sie udalo)";
+                else if (!r.EnemyRetreated && !s.Forced) map = "wynik bez EnemyRetreated i bez wymuszenia (" + s.ResultNote + ") - gra rozstrzyga dalej, bez oczekiwania";   // recenzja A4
                 else if (s.Me == null || !ReferenceEquals(s.Me, me)) map = "MapEvent misji nie ten sam co przy rozkazie - pojmanie jak w grze";
                 else if (s.CmdParty == null) map = "brak partii wodza - pojmanie jak w grze";
+                else if (s.CmdHero == null || !ReferenceEquals(s.CmdParty.LeaderHero, s.CmdHero)) map = "wodz nie jest panem swojej partii - pojmanie jak w grze";   // recenzja B4
+                else if (_buildMiss > 0) map = "wystawionych bez licznika " + _buildMiss + " - liczby misji niepewne, pojmanie jak w grze";   // recenzja B3
                 else
                 {
                     var pend = new CommanderWithdraw458Map.Pending
@@ -677,7 +710,7 @@ namespace Armoury
                          + " | szeregowi strony: wystawieni " + sp + " = zabici " + k + " + ranni z pola " + ws + " + wypisani (morale < 0.01) " + rm + " + wrocili do skladu zdrowi " + hs
                          + " (w tym stali na koniec " + end + ") + bez losu " + lost + " -> " + (sp == k + ws + rm + hs + lost ? "OK" : "NIEZGODNE")
                          + " | zbiegli z wodzem " + esc + " | bohaterowie: wystawieni " + _spawnedHeroes.Count + ", uszli z wodzem " + _keptHeroes.Count + ", zabici " + _heroK + ", ranni " + _heroWs + ", wypisani " + _heroRm
-                         + " | partii strony " + parties + " | wynik: " + s.ResultNote + " | mapa: " + map + " | latka rozliczenia " + CommanderWithdraw458Map.Hook + " | potkniecia " + _stumbles + ".");
+                         + " | partii strony " + parties + " | wystawieni bez licznika " + _buildMiss + " | wynik: " + s.ResultNote + " | mapa: " + map + " | latka rozliczenia " + CommanderWithdraw458Map.Hook + " | potkniecia " + _stumbles + ".");
             }
             return true;
         }
@@ -735,7 +768,7 @@ namespace Armoury
                           .Append(" | jazda wroga w 100 m ").Append(s.FoeCav);
                         if (s.Rule)
                             sb.Append(" | regula: wyslano ").Append(s.Sent).Append(", ponowien ").Append(s.Resent).Append(", podloga morale ").Append(s.Pins)
-                              .Append(", w panice (nie ruszani) ").Append(s.PanicOut).Append(", bez punktu ucieczki ").Append(s.NoExit).Append(", wynik: ").Append(s.ResultNote);
+                              .Append(", w panice (nie ruszani) ").Append(s.PanicOut).Append(", prowadzil 143 (ranni) ").Append(s.ByRh).Append(", bez punktu ucieczki ").Append(s.NoExit).Append(", wynik: ").Append(s.ResultNote);
                         else sb.Append(" | regula nie dziala: ").Append(s.RuleWhy);
                         sb.Append(" | mapa: ").Append(MapText(m, me, s, r));
                     }
@@ -796,7 +829,7 @@ namespace Armoury
                     else if (healthy >= 1) sb.Append("strona wyczerpana na polu, zdrowi w skladzie - bitwa trwa dalej (ContinueBattle)");
                     else sb.Append("pobici, ranni do niewoli");
                     if (!s.Rule) sb.Append("; regula 458 nie dziala (").Append(s.RuleWhy).Append(")");
-                    else sb.Append("; regula 458: w skladzie zostaja tylko zbiegli z wodzem, posilki niewprowadzone i ranni sprzed bitwy (gdy wodz uszedl)");
+                    else sb.Append("; regula 458: w skladzie zostaja tylko zbiegli z wodzem i posilki niewprowadzone (gdy wodz uszedl); wszyscy ranni do zwyciezcy");
                 }
                 else if (r.PlayerDefeated) sb.Append("gracz pokonany - regula nie dotyczy");
                 else sb.Append("bez zwyciezcy");
