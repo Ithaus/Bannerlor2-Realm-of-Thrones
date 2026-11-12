@@ -1,5 +1,35 @@
 # DZIENNIK ZMIAN
 
+## 468 (12.11) - obroncy AI spychaja drabiny takze dluga bronia drzewcowa (wlocznia, halabarda, pika), bez widel
+
+**Problem:** Jeff 12.11: "tak rob ... a czemu nie moga odpechanc dluga bronia jak maja? np wlocznia halabarda ??" (odpowiedz na propozycje: obronca przy drabinie spycha ja, gdy staje na murze). Gry nie uruchamiano - dowod z dekompilacji; logu ze szturmu nie ma (logi 370 z dawnych szturmow wyczyszczone), nie wiadomo, jak czesto AI spycha dzis.
+
+**Przyczyna (dekompilacja 1.4.8, scratchpad d370/SiegeLadder.cs, rv441/mb):**
+- Punkt spychania drabiny (`_pushingWithForkStandingPoint`, `StandingPointWithWeaponRequirement`, `InitRequiredWeapon(push_fork)`, SL:293) wpuszcza tylko kogos z widlami `push_fork` w glownej rece (`StandingPointWithWeaponRequirement.IsDisabledForAgent` :46-51). Obronca AI musi najpierw dojsc do lezacych widel (`_forkPickUpStandingPoint`), podniesc je (animacja), potem dojsc do punktu (SL:777-811).
+- Okno spychania krotkie: punkty obroncow czynne tylko na murze i przy `CanLadderBePushed` (nikt wyzej niz 55% drabiny, suma <= 170, SL:1137-1158; deaktywacja SL:773), kolejka atakujacych rusza zaraz po OnWall (SL:714-724) - droga po widly zjada okno.
+- Przydzial i wejscie na punkt ida przez `IsDisabledForAgent`: `UsableMachine.IsSlotAtIndexAvailableForAgent` (DetachmentManager) i `Agent.CanReachAndUseObject` -> `CanUseObject` (UsableMachineAIBase.OnTick przy dojsciu); w trakcie uzycia nikt go nie sprawdza (StandingPoint.TickAux). Animacja `act_usage_ladder_push_back` to akcja postaci (kanal 1) - kod zarzadzany nie sprawdza przedmiotu w rece (SL:960-990). `DropExtraWeaponOnStopUsageComponent` wyrzuca tylko ExtraWeaponSlot.
+- RBMAI `OverrideSiegeLadder` (prefiks `SiegeLadder.IsDisabledForBattleSide` -> true dla obroncow) zdejmuja w AfterStart VanillaAISiegesforRBM (RestoreSiegeLadder, domyslnie TAK) i EpicSieges - prawdopodobnie zdjety, dowodu z logu brak (linia startu 468 pokaze wlascicieli prefiksow).
+
+**Zmiana (nowy plik Armoury/src/SiegeLadderPush468.cs; Settings.cs, McmSettings.cs, SubModuleMain.cs):**
+- Klucz MCM "Defenders Push Ladders" (`SiegeDefendersPushLadders`, domyslnie TAK; grupa 383), recznie w Settings.cs + McmSettings.cs.
+- Jedyna latka: postfiks `StandingPointWithWeaponRequirement.IsDisabledForAgent(Agent)` (`AccessTools.DeclaredMethod` na klasie deklarujacej), wpinany obok `SiegeStones383.Install`. Wychodzi od razu, gdy zbior punktow misji pusty (poza szturmem kampanii), klucz NIE albo punkt nie jest punktem drabiny.
+  - (a) punkt spychania zamkniety przez gre: otwarty dla obroncy AI (nie gracz), bez konia, `IsAbleToUseMachine`, z pustym ExtraWeaponSlot (chorazy nie straci sztandaru), z bronia TwoHandedPolearm / LowGripPolearm / OneHandedPolearm o dlugosci >= 150 (nie zuzywalna) w slotach 0-3 - przy przydziale; przy wejsciu (czlowiek idacy do punktu) drzewce musi byc juz w glownej rece, inaczej czeka przy punkcie (gra ponawia co tick, a gdy okno sie zamknie - punkt deaktywowany i gra go zwalnia).
+  - (b) punkt podniesienia widel tej drabiny: zamkniety dla AI, gdy ktos idzie do punktu spychania albo na nim stoi (jeden czlowiek na drabine; gra ma to w GetSuitableAgentForStandingPoint, nie w DetachmentManager).
+  - Postfiks tylko czyta (zbior podmieniany w calosci, `volatile`), bez licznikow i bez wolan natywnych poza tymi, ktore robi baza - moze biec rownolegle. Warunek "nie w walce wrecz" z badania pominiety (ImmediateEnemy to wolanie natywne, a postfiks moze biec poza watkiem glownym).
+- Logika misji `SiegeLadderPush468.Logic` (tylko kampania, szturm, nie multiplayer): co 5 s przeglad drabin (`FieldRefAccess` na `_pushingWithForkStandingPoint` / `_forkPickUpStandingPoint`), co 0.5 s dobycie drzewca (`TryToWieldWeaponInSlot`, WithAnimation, najwyzej 10 prob na czlowieka) idacemu na punkt / stojacemu bez widel i drzewca w rece (tylko przy TAK), co klatke pomiar stanow drabin.
+- Linie: "Oblezenie misja (370) drabiny (468): latka ... wpieta" (start procesu); "...: start | klucz, drabin, widly push_fork, latka, prefiksy SiegeLadder.IsDisabledForBattleSide: <wlasciciele>" (com.rbmai = obroncy nie dostaja drabin, regula martwa); pierwsze 10 "spycha drabina #i, kto: widly | <id drzewca> | gracz, od oparcia na murze X s"; "koniec | oparc na murze, okien spychania (srednio s), przy NIE okien z wlocznikiem w 10 m (bylby), wyslanych z widlami / z drzewcem, po widly, zepchniec zaczetych widly / drzewce / gracz (od oparcia srednio s), zatrzymanych, do ziemi, dobyc drzewca (nieudanych), potkniecia".
+- Wyjatek per drabina / czlowiek = potkniecie (pierwsze 3 do logu), bez globalnego wylacznika. Bez MovementOrder.
+
+**Ryzyko / co sprawdzic:**
+- Klucz NIE: postfiks wychodzi przed jakakolwiek zmiana `__result`, logika nie dobywa broni - gra co do bitu jak przed; zostaje pomiar (odczyt stanow, AgentProximityMap 10 m przy otwartym oknie co 0.5 s).
+- Animacja spychania z wlocznia / halabarda: kod zarzadzany jej nie blokuje, silnika natywnego dekompilacja nie pokaze - TEST W GRZE (wyglad, CTD). Jednoreczna wlocznia z tarcza (OneHandedPolearm) moze zle ukladac rece; jesli tak - zostawic tylko TwoHandedPolearm i LowGripPolearm.
+- Kolizje: 383 (kamienie, StonePile - inny typ punktu), 454 (odwod pomija ludzi przy machinach i odlaczonych - spychajacy jest odlaczony), 455 (strzelcy), 372 (drabiny atakujacych) - postfiks dotyczy tylko punktow drabin zebranych w misji. Postfiks wolany tez dla amunicji machin i kamieni - koszt jedno sprawdzenie zbioru. Widly gry dzialaja jak dotad (baza zwraca false - postfiks nic nie zmienia).
+- Gracz-wodz obrony: jego szyki nie sa pod AI, gra nie daje im drabin (BehaviorDefendCastleKeyPosition) - jak w 383, osobna decyzja Jeffa. Gracz sam nie spycha drzewcem.
+- Do logu: linia startu (prefiksy), "spycha ... kto: <drzewce>" i "zepchniec zaczetych ... drzewce N", "do ziemi", "dobyc drzewca (nieudanych)"; potkniecia 0.
+- Build OK, skan IL 30 trafien (jedyny MovementOrder: BehaviorCavRole441..ctor). Gry nie uruchamiano. Drabiny 30 s (Armoury.json) ustawione przez sesje glowna - tu nie ruszane.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 458-u-p (12.11) - poprawki po recenzji 458-u: kon zbieglego z wodzem wedlug losu WLASNEGO konia, linia "zapis porzucony", etykiety kontroli
 
 **Problem (recenzja 458-u, gry nie uruchamiano - dowod z kodu):**

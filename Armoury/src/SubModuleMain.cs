@@ -96,6 +96,8 @@ namespace Armoury
                 try { SiegeAim379.Install(_harmony); } catch (Exception e) { Log.Error("SiegeAim379.Install", e); }
                 // 383: obroncy zrzucaja kamienie - transpiler StonePile (flaga rozkazu dla szykow obroncow nie pod AI, jak gra dla machin miotajacych); klucz czytany na zywo; wlasny try
                 try { SiegeStones383.Install(_harmony); } catch (Exception e) { Log.Error("SiegeStones383.Install", e); }
+                // 468: obroncy AI spychaja drabiny takze dluga bronia drzewcowa - postfiks StandingPointWithWeaponRequirement.IsDisabledForAgent; klucz czytany na zywo (NIE = wyjscie od razu); wlasny try
+                try { SiegeLadderPush468.Install(_harmony); } catch (Exception e) { Log.Error("SiegeLadderPush468.Install", e); }
                 ThrownWobblePatch.ApplyAll(_harmony);
                 FairXpPatch.ApplyAll(_harmony);
                 try { RaceLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RaceLaw.ApplyAll", e); }   // Jeff 10.10: sluby i ciaze tylko w obrebie rasy (olbrzymy z olbrzymami) - model slubu, MarriageAction, ciaza, porod
@@ -836,6 +838,9 @@ namespace Armoury
                 // 383: linia 'Kamienie (383)' co 60 s i na koniec misji szturmu (kupy kamieni, rzuty, trafienia, machiny obrony); samo sprawdza szturm
                 if (mission != null && (Settings.Current.SiegeDefendersUseStones || Settings.Current.SiegeMissionLog))
                     mission.AddMissionBehavior(new SiegeStones383.Logic());
+                // 468: spychanie drabin drzewcem - zbior punktow spychania dla postfiksu, dobycie drzewca idacym na punkt, linie "drabiny (468)" (przy NIE tylko pomiar "bylby"); samo sprawdza szturm
+                if (Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new SiegeLadderPush468.Logic());
                 // 382: linia sumy "Nadzy (382): koniec misji" (pomiar i wypelnianie w prefiksie HeroDress382)
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new HeroDress382.Logic());
