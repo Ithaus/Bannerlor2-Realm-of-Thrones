@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 466 (12.11) - 326b zwrot zdobyczy Polnocy WYLACZONY domyslnie: co Polnoc zdobedzie, zatrzymuje
+
+**Problem:** Jeff 12.11: "anuluj regule oddawania zamkow po zdobyciu dla polnocy jak zdobyli to maja". Regula 326b (`NorthConquest.cs`, klucz `NorthConquestReturn`, domyslnie TAK) oddawala twierdze zdobyte przez Polnoc spoza jej ziem panu startowemu / krolowi jego krolestwa i nakladala 60-dobowe weto oblezen. Gry nie uruchamiano - dowod z kodu.
+
+**Przyczyna:** domyslna klucza `NorthConquestReturn = true`; w MCM Jeffa (`Armoury.json`) tego klucza NIE MA (grep 12.11 22:3x), wiec gra bierze domyslna z kodu.
+
+**Zmiana (`Settings.cs`, `McmSettings.cs`, `WarFront334.Theatre.cs` tekst linii):**
+- `NorthConquestReturn` domyslnie NIE (Settings.cs i McmSettings.cs; podpowiedz MCM "Off (default) = the North keeps what it takes"). Kod 326b bez zmian - klucz TAK przywraca regule (ze spisem po wlaczeniu, jak dotad).
+- Linia 334 "zdobycie poza teatrem" mowila zawsze "326b zwroci" - teraz wedlug klucza ("326b NIE - zostaje u Polnocy (466)").
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci (w kodzie): przy `On == false` 326b nic nie robi - `Hourly` wychodzi (tylko `_wasOff`), `OnOwnerChanged` wychodzi, `VetoedFor` / `VetoPostfix` / `BkObjectivePostfix` zwracaja bez weta; latki dalej wpiete (EnsureHooks), ale puste. Wolajacy: `WarFront334.VetoedFor334e` (334e LocalFront Score/Siege), BK B8 - dostaja "bez weta 326b". Stare weta i kolejka w zapisie (arm_k326b) zostaja nieczynne, zapis bez zmian formatu.
+- Nic martwego nie ozywa: 334 `_northHeld` (odbicia) bierze tylko osady o panu startowym z Polnocy - zdobycze w Crownlands/Reach/Stormlands/Wyspach nadal nie wchodza na liste; teatr 334 i 465 dalej zabraniaja Polnocy celow spoza teatru do Krwawych Godow, wiec zatrzymane zdobycze to glownie male zamki Zachodu i Dorzecza (oraz zdobycze po Krwawych Godach).
+- 369 (PlayerClaims369) czyta `NorthConquest.HasVeto` tylko do jednorazowej naprawy zapisu - bez zmian.
+- POZA zakresem (nie ruszane, do decyzji Jeffa): kapitulacja Polnocy `WarTruce.Surrender` (cesja twierdz Polnocy spoza jej ziem do korony przy pokoju) uzywa drogi BookHoldings niezaleznie od klucza 326b - przy kapitulacji Polnoc nadal oddaje zdobycze.
+- 274 mierzy sile druzyn, nie liczbe twierdz - wiecej twierdz Polnocy dziala na 274 tylko posrednio (werbunek, dochod).
+- `tools/sprawdz_logi.py` P326-4..7: bez linii 326b (spis/zwroty) - oczekiwane przy NIE.
+- Start sesji: "Zwrot zdobyczy Polnocy (326b): start sesji | klucz North Conquest Return NIE".
+- Build OK (0 bledow), skan IL 30 trafien. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 465 (12.11) - teatr Polnocy na Zachodzie: do Krwawych Godow tylko najazdy i male zamki, bez oblezen Casterly Rock i miast Zachodu
 
 **Problem:** diagnoza balansu Polnoc vs korona (12.11): teatr 334 trzyma kulture vlandia (Westerlands) na bialej liscie celow Polnocy (`WarFront334.Theatre.cs` NorthTheatreCultures), wiec AI Polnocy moze do Krwawych Godow oblegac takze Casterly Rock i miasta Zachodu - wbrew kanonowi (Robb na Zachodzie bierze Crag, Ashemark, bije pod Oxcross i pali wsie, ale nie oblega Skaly ani Lannisportu). Jeff 12.11: "Robimy 1" (propozycja 1). Gry nie uruchamiano - dowod z kodu i danych ROT.

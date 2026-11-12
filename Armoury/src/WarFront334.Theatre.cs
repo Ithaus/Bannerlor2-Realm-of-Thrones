@@ -308,7 +308,7 @@ namespace Armoury
                 var s = S;
                 if (s != null && s.LogEnabled)
                     Log.Info(Tag + "zdobycie poza teatrem | dzien " + Today + " | " + Nm(st) + " (" + st.StringId + ", kultura " + cult + ") zdobyte przez " + Nm(capturer) + " dla Polnocy"
-                             + (player ? " - GRACZ (wolnosc gracza, zdobycz zostaje u niego)." : " - AI (326b zwroci; weto teatru " + Key01(TheatreKey) + ")."));
+                             + (player ? " - GRACZ (wolnosc gracza, zdobycz zostaje u niego)." : " - AI (" + (NorthConquest.On ? "326b zwroci" : "326b NIE - zostaje u Polnocy (466)") + "; weto teatru " + Key01(TheatreKey) + ")."));
             }
             catch (Exception e) { Stumble("OnOwnerChanged", e); }
         }
