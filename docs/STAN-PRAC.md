@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 14:20 - WGRANIE 211 (441-447: AI bitwy pakiet 4 jazda + pakiet 5 obrona przed jazda + polowanie na gracza-wodza)
+
+- **W grze:** Armoury.dll `35acf49b25ca455dd195bd0eb082f7f3` (commit `7d3db4c7`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie211`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie211(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-447-po-tescie.sav`.
+- **Autotest at-447 (n391), 5 dob + 7 bitew (4 planu + 3 z partia lorda):** KONIEC OK, misje sprawdzone, wyjatkow 0, bledy CrashScribe 23 (stale, cudze). Latki: jazda 441 dodanie roli 1/1, cel szarzy 2/2. Linie 441-447 w kazdej z 7 bitew, potkniecia 0.
+- **Widziane:** 441 zachowanie roli dodane do szykow (postfiks), WAIT (444) w 3 bitwach (360-481 szyko-s), koniec czekania: jazda wroga w 60 m; 446 czworobok 1 wejscie (6 s, wyjscie "zagrozenie minelo"), blokada odrzucila 36 prob nadpisania Line; 443 jazda AI pod ostrzalem 10 szyko-s - stala 0%; lucznicy schowani S4 1 raz.
+- **NIE widziane (bitwy krotkie ok. 50 s, wrog w obronie):** 442 podmiana celu 0 (RBM szarzy jazda 0 szyko-s), RAID / HIDE / STRIKE / CAVFIRST / DISENGAGE 0, 447 polowanie 0 (brak wolnej jazdy wroga albo w innej roli). Zachowanie potwierdzi dopiero gra Jeffa albo dluzsze bitwy armii.
+- **11 nowych kluczy, wszystkie TAK** (grupa Marching and tactics): Cavalry Commander (wylacza wszystkie role jazdy), Cavalry Target Choice, Cavalry Raids Archers, Cavalry Hides From Missiles, Archers Judge Missile Duel, Archers Shelter From Cavalry, Hammer And Anvil, Cavalry Fights Cavalry First, Cavalry Disengage, Infantry Square Against Flank Charge, Cavalry Hunts Rear Commander. Usuniety martwy Cavalry Seeks Flanks.
+- **Na galezi, NIEWGRANE:** 435-N-A / A-p / B (sygnal niedoboru: przyrost niewydanego budzetu robot zamiast poziomu, klucz Supply Queue Growth TAK; brak wsadu jedzenia poza N) - czeka na autotest 30 dob. Uwaga z recenzji B: usuwa tez prawdziwy czesciowy brak zboza do mlyna / browaru - ocenic po tescie.
+
 ## STAN 12.11 12:15 - lancuch podazy CALY WLACZONY w Armoury.json Jeffa po tescie 90 dob (at-lp90)
 
 - **Dopisane do Armoury.json Jeffa (ponad kroki 1-4):** VillageGearWearScale 0.25, CraftsFollowShortageRule, VillageGearLordsInvest, VillageGearTownsInvest, VillageGearPlayerFunds, WorkshopBenches, WorkshopRetoolIdle, WorkshopTakeover, WorkMigration = TAK. Kopia przed: `Armoury.json.bak-2026-11-12-przed-test-lancucha90` (obok); stan po: `D:/Backup-Bannerlord/Armoury.json.2026-11-12-lancuch-caly-wlaczony`.
