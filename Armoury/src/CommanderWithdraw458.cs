@@ -188,7 +188,7 @@ namespace Armoury
                 if (!MissionTeams.Valid(t) || t.IsPlayerTeam || !t.HasTeamAi) continue;
                 if (t.Side != BattleSideEnum.Attacker && t.Side != BattleSideEnum.Defender) continue;
                 var s = Of(t);
-                if (s.Trig) continue;
+                // 458-p: po "widzi przegrana" dalej liczymy zdolnych, szczyt i progi (dane do wyboru progu) - pomijamy tylko ponowne Trigger (w Watch)
                 try { Watch(m, s, now); }
                 catch (Exception e) { Stumble("Druzyna", e); }
             }
@@ -222,6 +222,7 @@ namespace Armoury
             bool outnumbered = s.Foe >= FoeRatio * Math.Max(s.Own, 1);
             for (int k = 0; k < Thr.Length; k++)
                 if (s.First[k] < 0f && outnumbered && s.Own <= Thr[k] * s.Peak) s.First[k] = now;
+            if (s.Trig) return;   // 458-p: chwila "widzi przegrana" raz na druzyne
             if (!s.ProfKnown)
             {
                 bool known;

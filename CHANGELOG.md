@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 458-p (12.11) - poprawka po recenzji 458: progi 0.6 / 0.5 / 0.4 zapisywane takze po chwili "widzi przegrana" (sam pomiar)
+
+**Problem:** recenzja 458 (HEAD f3ad4562) - jedna usterka, w pomiarze, nie w grze: opis mowi, ze pierwsze chwile progow 0.6 / 0.5 / 0.4 sa zapisywane zawsze, a po wyzwoleniu skan pomijal druzyne. Wodz OSTROZNY wyzwala przy 0.6, druzyna topnieje potem do 0.5 i 0.4, a linia konca pisze "progi 0.6 / 0.5 / 0.4 t=Xs / - / -" (jakby nigdy tam nie zeszla); u ZWYKLY tak samo "-" dla 0.4. Dane do wyboru progu (cel pomiaru) przeklamane dla OSTROZNY i ZWYKLY. Dowod: kod, nie log (458 nie byl w grze).
+
+**Przyczyna:** CommanderWithdraw458.Scan: `if (s.Trig) continue;` przed Watch - po wyzwoleniu nie liczyl sie juz Own / Foe / Peak ani First[k].
+
+**Zmiana:** Scan wola Watch takze po wyzwoleniu; w Watch po zapisie First[k] `if (s.Trig) return;` - pomijane tylko profil / seria / ponowne Trigger (chwila "widzi przegrana" nadal raz na druzyne). Nic wiecej.
+
+**Ryzyko / co sprawdzic (kontrola calosci w kodzie):** dalej same odczyty w glownym watku; koszt po wyzwoleniu jak przed nim (AbleOf druzyny i wrogow co 1 s; kontakt juz zapisany, wiec bez zapytan o sasiadow). Szczyt moze jeszcze rosnac po wyzwoleniu (posilki) - w linii chwili i w "bylby odwrot ... zdolni / wroga" stoja zapamietane TrigOwn / TrigFoe / TrigPeak, bez zmian; "szczyt" w linii konca = najwiekszy stan calej bitwy. Los wyprowadzanych / tylnej strazy (OnAgentRemoved) bez zmian. Klucz BattleAiMeasurements NIE = klasa nie dodana, co do bitu jak przed. Skan IL czysty (MovementOrder tylko konstruktor BehaviorCavRole441 jak dotad, 458 bez trafien). Build 0 bledow.
+
+**Status:** DO SPRAWDZENIA (nie wgrane; sam pomiar).
+
 ## 458 (12.11) - AI BITWY pakiet 8 krok 8.2 + decyzja Jeffa 9 (odwrot wodza AI z przegranej bitwy pod oslona tylnej strazy): SAM POMIAR "bylby" - regula i klucz Commander Withdraws Under Rearguard NIE wdrozone (ryzyko konca misji / MapEvent)
 
 **Problem:** audyt AI bitwy 11.11 (docs/audyty-2026-11-11/AUDYT-AI-BITWA.md, tabela rozdz. 2 "Bitwa przegrana: odwrot zorganizowany wylaczony (RBM zeruje), strona walczy do rozpadu, przegrany traci 92-100% - ZLE", pakiet 8.2; decyzja 9: Jeff - wodz uchodzi z tym, co zeszlo w szyku, TYLKO jesli mu sie udalo). Warunki wstepne audytu: regula na mapie (dzis strona, ktora zeszla, i tak jest pobita), zamrozenie rzutow kompanii, wlasny znacznik dla SurvivalMode. Dowodu z gry na odwrot nie ma (nie istnieje) - ponizej dekompilacja 1.4.8 (rally_dec/mb_full.cs, decout/cs_full.cs, SandBox decout/v/all_sb), RBM (decout/full/rbmai.cs), DTE (dte_ecb.cs).
