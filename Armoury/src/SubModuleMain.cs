@@ -867,6 +867,9 @@ namespace Armoury
                 // 457: odwod piechoty AI w szyku 8 w bitwie polowej (klucz InfantryReserve; przy NIE tylko pomiar "bylby"); samo sprawdza bitwe polowa
                 if (Campaign.Current != null && mission != null)
                     mission.AddMissionBehavior(new InfantryReserve457());
+                // 458: odwrot wodza AI z przegranej bitwy - SAM POMIAR "bylby" (regula nie wdrozona, opis w CommanderWithdraw458.cs); pod kluczem pomiarow 437
+                if (Settings.Current.BattleAiMeasurements && Campaign.Current != null && mission != null)
+                    mission.AddMissionBehavior(new CommanderWithdraw458());
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
                     && (NightRest.PlayerCamped || CampScene.TestWanted()))   // m109-oboz: test autotestu (plik armoury-oboz-bitwa.flag) - kazda bitwa w polu jak w obozie
                     mission.AddMissionBehavior(new CampScene());
