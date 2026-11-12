@@ -246,6 +246,7 @@ namespace Armoury
                 int best = -1, bestPrice = int.MaxValue;
                 int bestNat = -1, priceNat = int.MaxValue;   // GearFit: najtansza uzywalna sztuka wlasnej kultury
                 bool resHit = false, fitHit = false;
+                bool capHit = false;   // 429-p: kandydat odpadl na suficie ceny AI (A7) - do powodu cofnietego awansu
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var el = roster.GetElementCopyAtIndex(i);
@@ -267,7 +268,7 @@ namespace Armoury
                         try { price = market.Town.MarketData.GetPrice(el.EquipmentElement, null, false, market.Party); } catch { price = cand.Value; }
                         if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; }
                     }
-                    if (AiBuyRules.OverCapA7(el.EquipmentElement, price, true)) continue;   // 429 (A7): cena ponad sufit AiGearMaxPriceFactor - nie dla notabla (brak = zamowienie dla warsztatow, jak przy pustej polce)
+                    if (AiBuyRules.OverCapA7(el.EquipmentElement, price, true)) { capHit = true; continue; }   // 429 (A7): cena ponad sufit AiGearMaxPriceFactor - nie dla notabla (brak = zamowienie dla warsztatow, jak przy pustej polce)
                     if (price < bestPrice) { bestPrice = price; best = i; }
                     if (natOn && price < priceNat && GearFit.CultureRank(y, cand) == 0) { priceNat = price; bestNat = i; }
                 }
@@ -279,7 +280,7 @@ namespace Armoury
                     if (resHit) Measure174b.NoteHeld(Measure174b.BNotable, 1);
                     if (fitHit && countWhy) GearFit.NoteRevertNoFit();   // GearFit: na polce byly tylko sztuki, ktorych ten ochotnik nie uzyje
                     // 174b.4 (krytyka 13): awans cofniety przez rezerwe kramu - osobny powod i licznik
-                    if (countWhy) { Why((resHit ? "rezerwa kramu " : "") + it.ItemType + " t" + ((int)it.Tier + 1)); if (resHit) _revReserve++; if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
+                    if (countWhy) { Why((resHit ? "rezerwa kramu " : capHit ? "sufit ceny " : "") + it.ItemType + " t" + ((int)it.Tier + 1)); if (resHit) _revReserve++; if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
                     return false;
                 }
                 var pickEl = roster.GetElementCopyAtIndex(best).EquipmentElement;

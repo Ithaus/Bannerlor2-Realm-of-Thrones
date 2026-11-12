@@ -220,6 +220,7 @@ namespace Armoury
                     bool fire = kind == KDevastate && have > 0;
                     int off = carried + (fire ? have : 0);
                     if (off > 0) roster.AddToCounts(l.El, -off);
+                    if (off > 0 && st.Town != null) WorkshopLaw.KomisScrapped(st.Town, it, off);   // 429-p (recenzja N5): lup i pozar to nie sprzedaz - sztuki z komisu jak zlom (cena wyprzedazy), nie pelna cena; nie rzuca
                     for (int p = 0; p < live.Count; p++)
                     {
                         if (got[p] <= 0) continue;

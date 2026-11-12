@@ -13,7 +13,8 @@ using TaleWorlds.ObjectSystem;
 namespace Armoury
 {
     /// <summary>
-    /// 429 (audyt ekonomii 11.11, A5; decyzja Jeffa 2 "tak") - BRON W KOMIS. Klucz ArmsConsign (NIE = kod jak przed 429: gotowa sztuka czeka w warsztacie).
+    /// 429 (audyt ekonomii 11.11, A5 - PYTANIE 2 z listy audytu; Jeff zatwierdzil ogolnym "rob wszystko po kolei tak jak radzisz" - to NIE jego odpowiedz nr 2
+    /// "nizszy lub moze odmowic", ktora dotyczy drugiego okupu) - BRON W KOMIS. Klucz ArmsConsign (NIE = kod jak przed 429: gotowa sztuka czeka w warsztacie).
     ///  - DOWOD: linia "Warsztaty: dzien" - "brak zlota/kupca" 1049-1214 cykli na dobe przez cale sesje (gotowa sztuka czeka, bo wolna kasa miasta - kasa minus
     ///    zapas kupcow - jest nizsza od ceny sztuki albo warsztat nie ma kapitalu na place), a panowie chca wydac ok. 112 tys. zl/d i 94% zostaje ("bez towaru").
     ///  - REGULA: gotowa sztuka, ktorej miasto nie moze dzis kupic, idzie na polke miasta W KOMIS: zadne zloto nie rusza, warsztat ma zapis (sztuka, cena umowiona
@@ -37,6 +38,12 @@ namespace Armoury
     ///  - ZAPIS: klucz "arm_komis429" (SaveText.Sync). Brak klucza (stary zapis) - stan pusty. Starsza DLL klucz pomija (sztuki zostaja na polkach jako
     ///    towar miasta, warsztaty nie dostana zaplaty - nic nie powstaje z niczego). Warsztat rozpoznawany po osadzie i miejscu na liscie miasta.
     ///  - Warsztat GRACZA (305b, PlayerFirm) poza regula - jak dotad (odlozone). Wyjatek per miasto / per zapis - licznik potkniec, reszta liczy sie dalej.
+    ///  - 429-p (poprawki po recenzjach 12.11 - nadpisuja opis wyzej tam, gdzie sie roznia): wyplata tylko z kasy PONAD podloge wierzycieli miasta (ta sama co
+    ///    rachunki wsi i miast: Ks Consign Floor Share x zapas kupcow; regulator kas 1 - caly zapas) - kasa nie schodzi przez komis do zera; naleznosc, ktora sie
+    ///    nie miesci, czeka, a mlodsze / tansze ida dalej (bez blokady kolejki); niezaplacone licza sie do limitu miasta; zapis schodzi z listy zaraz po przelewie
+    ///    kasa -> warsztat (wyjatek w placach nie daje drugiej wyplaty), kontrola zlota liczona takze po wyjatku; zaplata spoza wlasnego ticku warsztatu wchodzi
+    ///    do jego wyniku doby (WorkshopTrade.NoteOutsideIncome); zlom i lup / pozar miasta zdejmuja najpierw wlasny towar miasta (jak sprzedaz), dopiero potem
+    ///    sztuki z komisu; przy wylaczonym kluczu warsztatow zbrojnych zapisy rozlicza takt doby (KomisDailyFallback).
     /// </summary>
     internal static partial class WorkshopLaw
     {
@@ -55,6 +62,8 @@ namespace Armoury
         // liczniki doby (zerowane w KomisFlush)
         private static int _kIn, _kInTown, _kInWage, _kInBoth, _kCapBasket, _kCapTown, _kSold, _kScrapN, _kExpired, _kPaidN, _kNoPayee, _kStumbles, _kTownsDone, _kFree;
         private static long _kInRev, _kInWages, _kPaid, _kWagesPaid, _kFolk, _kPriceCut, _kDueNew, _kNoPayeeGold, _kGoldCheck;
+        // 429-p: wyplaty wstrzymane podloga kasy (zapisy / zl / miasta - stan ostatniego rozliczenia kazdego miasta tej doby), wyplaty graczowi, limit miasta z niezaplaconymi
+        private static int _kFloorN, _kPlayerN; private static long _kFloorGold, _kPlayerGold; private static readonly HashSet<Town> _kFloorTowns = new HashSet<Town>();
         // stan na poczatku doby (do kontroli zamkniecia)
         private static long _kShelf0, _kDueN0, _kDueG0;
 
@@ -75,6 +84,7 @@ namespace Armoury
         {
             _kIn = _kInTown = _kInWage = _kInBoth = _kCapBasket = _kCapTown = _kSold = _kScrapN = _kExpired = _kPaidN = _kNoPayee = _kStumbles = _kTownsDone = _kFree = 0;
             _kInRev = _kInWages = _kPaid = _kWagesPaid = _kFolk = _kPriceCut = _kDueNew = _kNoPayeeGold = _kGoldCheck = 0;
+            _kFloorN = _kPlayerN = 0; _kFloorGold = _kPlayerGold = 0; _kFloorTowns.Clear();   // 429-p
         }
 
         private static void KStumble(string where, Exception e)
@@ -110,7 +120,8 @@ namespace Armoury
                 List<KLot> list;
                 if (!_kLots.TryGetValue(town, out list) || list == null) return true;
                 int b = BasketOf(it), inB = 0, inT = 0;
-                foreach (var l in list) { if (l.Gone) continue; inT++; if (BasketOf(l.Item) == b) inB++; }
+                // 429-p (recenzja N6): limit miasta liczy takze zapisy 'sprzedane, niezaplacone' - miasto, ktore nie placi, nie dostaje kolejnych sztuk bez sufitu
+                foreach (var l in list) { inT++; if (l.Gone) continue; if (BasketOf(l.Item) == b) inB++; }
                 if (inB >= KCapBasket) { _kCapBasket++; return false; }
                 if (inT >= KCapTown) { _kCapTown++; return false; }
                 return true;
@@ -132,16 +143,31 @@ namespace Armoury
             catch (Exception e) { KStumble("Add", e); }
         }
 
-        /// <summary>ArmsScrap: n sztuk przedmiotu zdjetych z polki miasta na zlom (bez sprzedazy) - przy rozliczeniu licza sie najpierw, po cenie wyprzedazy. Nie rzuca.</summary>
+        /// <summary>ArmsScrap / CitySack: n sztuk przedmiotu zdjetych z polki miasta BEZ sprzedazy (zlom z nadmiaru, lup i pozar zdobytego miasta) - wolane PO zdjeciu
+        /// z polki. Przy rozliczeniu licza sie najpierw, po cenie wyprzedazy. 429-p (recenzja N4): wlasny towar miasta schodzi pierwszy takze tutaj (jedna zasada
+        /// ze sprzedaza) - z komisu liczy sie tylko to, czego wlasne sztuki miasta nie pokryly (sztuki na polce przed zdjeciem minus zapisy komisu jeszcze na polce
+        /// minus zlom juz przypisany komisowi od ostatniego rozliczenia). Nie rzuca.</summary>
         internal static void KomisScrapped(Town town, ItemObject it, int n)
         {
             try
             {
                 List<KLot> list;
                 if (n <= 0 || town == null || it == null || !_kLots.TryGetValue(town, out list) || list == null || list.Count == 0) return;
+                int lots = 0;
+                foreach (var l in list) if (!l.Gone && l.Item == it) lots++;
+                if (lots == 0) return;
                 Dictionary<ItemObject, int> d;
-                if (!_kScrap.TryGetValue(town, out d)) { d = new Dictionary<ItemObject, int>(); _kScrap[town] = d; }
-                int v; d.TryGetValue(it, out v); d[it] = v + n;
+                int v = 0;
+                if (_kScrap.TryGetValue(town, out d)) d.TryGetValue(it, out v);
+                int have = 0;
+                var shelf = town.Owner != null ? town.Owner.ItemRoster : null;
+                if (shelf != null)
+                    for (int i = 0; i < shelf.Count; i++) { var el = shelf.GetElementCopyAtIndex(i); if (el.EquipmentElement.Item == it && el.Amount > 0) have += el.Amount; }
+                int own = Math.Max(0, have + n - Math.Max(0, lots - v));   // wlasne sztuki miasta przed tym zdjeciem
+                int k = Math.Min(n, Math.Max(0, n - own));
+                if (k <= 0) return;
+                if (d == null) { d = new Dictionary<ItemObject, int>(); _kScrap[town] = d; }
+                d[it] = v + k;
             }
             catch (Exception e) { KStumble("Scrapped", e); }
         }
@@ -215,40 +241,79 @@ namespace Armoury
                     }
                 }
                 if (_kScrap.Count > 0) _kScrap.Remove(town);
-                // wyplata: najstarsze pierwsze, dopoki kasa miasta starcza na cala naleznosc
+                // wyplata: najstarsze pierwsze. 429-p (recenzja S2): tylko z kasy PONAD podloge wierzycieli miasta (KomisFloor - ta sama co splata rachunkow wsi i miast)
+                // - komis nie sciaga kasy biednego miasta do zera (tam zyja niedoplaty pustej kasy N3 / G24). Naleznosc, ktora sie nie miesci, czeka; mlodsza albo
+                // tansza idzie dalej (recenzja N6 - jedna droga naleznosc nie blokuje reszty)
                 var st = town.Settlement;
+                long floorG = KomisFloor(town);
                 for (int i = 0; i < list.Count; i++)
                 {
                     var l = list[i];
                     if (!l.Gone) continue;
+                    bool moved = false; long g0 = 0, c0 = 0; int folk = 0; Workshop pw = null;
                     try
                     {
                         if (l.Due <= 0) { _kFree++; list.RemoveAt(i--); continue; }
                         if (l.W == null || l.W.Settlement != st) { _kNoPayee++; _kNoPayeeGold += l.Due; list.RemoveAt(i--); continue; }   // warsztatu juz nie ma - naleznosc zostaje w kasie miasta
-                        if (town.Gold < l.Due) break;   // kolejka: starsza naleznosc przed mlodsza
+                        if (town.Gold - floorG < l.Due) { _kFloorN++; _kFloorGold += l.Due; _kFloorTowns.Add(town); continue; }
                         int pay = l.Due, wages = Math.Min(l.Wages, pay);
-                        long g0 = town.Gold, c0 = l.W.Capital;
+                        pw = l.W; g0 = town.Gold; c0 = pw.Capital; moved = true;
                         town.ChangeGold(-pay);
-                        l.W.ChangeGold(pay);
-                        int folk = 0;
+                        pw.ChangeGold(pay);
+                        // 429-p (recenzje N2 / stabilnosc 1): zapis schodzi z listy ZARAZ po przelewie kasa -> warsztat - wyjatek w placach nie zostawia zapisu do drugiej wyplaty
+                        list.RemoveAt(i--);
+                        _kPaidN++; _kPaid += pay;
+                        if (pw.Owner == Hero.MainHero) { _kPlayerN++; _kPlayerGold += pay; }   // warsztat kupiony przez gracza po oddaniu sztuki w komis (tylko licznik)
                         if (wages > 0)
                         {
-                            l.W.ChangeGold(-wages);
+                            pw.ChangeGold(-wages);
                             folk = TownFolk.Earn(st, wages, TownFolk.KCraftPaid);   // place cyklu do kiesy ludu W70/R30 - jak przy zwyklej sprzedazy
                             town.ChangeGold(wages - folk);                           // place wydane w miescie
                             MoneyLedger.Note(MoneyLedger.NShop, st, wages - folk);
                         }
                         MoneyLedger.Note(MoneyLedger.NShop, st, -pay);
                         if (wages > 0) { try { TownFolk.Note(st, wages, TownFolk.KCraftPaid); } catch { } }
-                        _kPaidN++; _kPaid += pay; _kWagesPaid += wages; _kFolk += folk;
-                        _kGoldCheck += (town.Gold - g0) + (l.W.Capital - c0) + folk;   // kasa miasta + kapital warsztatu + kiesa ludu = 0
-                        list.RemoveAt(i--);
+                        _kWagesPaid += wages; _kFolk += folk;
+                        WorkshopTrade.NoteOutsideIncome(pw, pay - wages);            // 429-p (recenzja S1): utarg komisu do wyniku doby warsztatu (poza jego tickiem)
                     }
                     catch (Exception e) { KStumble("Settle(wyplata)", e); }
+                    finally
+                    {
+                        // kasa miasta + kapital warsztatu + kiesa ludu = 0 - liczone takze po wyjatku (wtedy roznica pokaze, ile zlota utknelo)
+                        if (moved) { try { _kGoldCheck += (town.Gold - g0) + (pw.Capital - c0) + folk; } catch { } }
+                    }
                 }
-                if (list.Count == 0) { _kLots.Remove(town); _kDay.Remove(town); }
+                if (list.Count == 0) _kLots.Remove(town);   // 429-p (stabilnosc 4): _kDay zostaje - drugie rozliczenie tej samej doby nie zawyza "miast rozliczonych"
             }
             catch (Exception e) { KStumble("Settle", e); }
+        }
+
+        /// <summary>429-p (recenzja S2): podloga kasy miasta dla wyplat komisu - ta sama granica co splata rachunkow miasta (KsFoodCredit: Ks Consign Floor Share x
+        /// zapas kupcow; udzial 0 = bez podlogi, jak przed 429-p); przy regulatorze kas 1 (dosypka do zapasu) caly zapas - zeby wyplata nie byla dosypywana z niczego.</summary>
+        private static long KomisFloor(Town town)
+        {
+            try
+            {
+                var s = Settings.Current;
+                double share = s != null && s.TownPurseRegulator == 1 ? 1.0 : KsFoodCredit.FloorShare;
+                return (long)Math.Ceiling(share * Math.Max(0, TownPurse.Reserve(town)));
+            }
+            catch (Exception e) { KStumble("Floor", e); return 0; }
+        }
+
+        /// <summary>429-p (stabilnosc 5): takt doby (WorkshopLaw.DailyFast). Przy WYLACZONYM kluczu warsztatow zbrojnych CyclePrefix nie dochodzi do KomisSettle -
+        /// zapisy z wczesniejszej gry rozlicza wtedy ten takt (raz na dobe na miasto) i on drukuje linie doby. Klucz wlaczony - nic (rozliczenie w cyklu, jak dotad).</summary>
+        internal static void KomisDailyFallback()
+        {
+            try
+            {
+                if (On || (_kLots.Count == 0 && _kPending == null)) return;
+                if (_kPending != null) KomisResolve("takt doby przy wylaczonych warsztatach zbrojnych");
+                int day = (int)CampaignTime.Now.ToDays;
+                KomisFlush(day - 1);
+                foreach (var t in new List<Town>(_kLots.Keys)) { try { KomisSettle(t, day); } catch (Exception e) { KStumble("Fallback(miasto)", e); } }
+            }
+            catch (Exception e) { KStumble("Fallback", e); }
         }
 
         // ------------------------------------------------------------ linia doby (z Flush - doba poprzednia)
@@ -265,6 +330,8 @@ namespace Armoury
                     long goneN = (long)_kSold + _kScrapN + _kExpired;
                     long cDueN = _kDueN0 + goneN - _kPaidN - _kNoPayee - _kFree - dueN;
                     long cDueG = _kDueG0 + _kDueNew - _kPaid - _kNoPayeeGold - dueG;
+                    int zeroTowns = 0, lotTowns = 0;
+                    foreach (var kv in _kLots) { if (kv.Key == null || kv.Value == null || kv.Value.Count == 0) continue; lotTowns++; if (kv.Key.Gold <= 0) zeroTowns++; }
                     var sb = new StringBuilder();
                     sb.Append("Komis broni (429): dzien ").Append(day).Append(" - klucz ").Append(on ? "TAK" : "NIE (nowych sztuk nie przyjmuje, stare rozlicza)")
                       .Append(" | na polke w komis ").Append(_kIn).Append(" szt. (cena umowiona ").Append(_kInRev).Append(" zl, place odroczone ").Append(_kInWages)
@@ -274,13 +341,17 @@ namespace Armoury
                       .Append(", niesprzedane po ").Append(KUnsoldDays).Append(" dobach przejete przez kupca za ").Append((KUnsoldShare * 100f).ToString("0", CultureInfo.InvariantCulture))
                       .Append("% ").Append(_kExpired).Append(" | wyplacono warsztatom ").Append(_kPaid).Append(" zl za ").Append(_kPaidN).Append(" szt. (z tego place rzemieslnikow ")
                       .Append(_kWagesPaid).Append(" zl, w tym wprost do kiesy ludu ").Append(_kFolk).Append(" zl; cena dnia nizsza od umowionej o ").Append(_kPriceCut)
-                      .Append(" zl - zostalo w kasach) | sprzedane, czeka na zaplate (kasa miasta ponizej naleznosci) ").Append(dueN).Append(" szt. / ").Append(dueG)
+                      .Append(" zl - zostalo w kasach) | sprzedane, czeka na zaplate ").Append(dueN).Append(" szt. / ").Append(dueG)
                       .Append(" zl; bez zaplaty (naleznosc 0) ").Append(_kFree).Append(", bez odbiorcy (warsztatu nie ma - zostaje w kasie miasta) ").Append(_kNoPayee).Append(" szt. / ")
                       .Append(_kNoPayeeGold).Append(" zl | stan: w komisie na polkach ").Append(shelf).Append(" szt. w ").Append(towns).Append(" miastach (cena umowiona ").Append(shelfRev)
                       .Append(" zl, najstarsza ").Append(shelf > 0 && oldest != int.MaxValue ? (day - oldest).ToString(CultureInfo.InvariantCulture) : "0").Append(" dob), miast rozliczonych dzis ")
-                      .Append(_kTownsDone).Append(" | KONTROLA sztuk (start ").Append(_kShelf0).Append(" + przyjete - sprzedane - zlom - przejete - stan): roznica ").Append(cPieces)
-                      .Append("; KONTROLA naleznosci (start ").Append(_kDueN0).Append(" szt. / ").Append(_kDueG0).Append(" zl + nowe - wyplacone - bez odbiorcy - stan): roznica ")
-                      .Append(cDueN).Append(" szt. / ").Append(cDueG).Append(" zl; KONTROLA zlota wyplat (kasy miast + kapital warsztatow + kiesy ludu): roznica ").Append(_kGoldCheck)
+                      .Append(_kTownsDone)
+                      .Append(" | 429-p podloga wyplat (Ks Consign Floor Share x zapas kupcow - jak rachunki miasta): wstrzymane podloga ").Append(_kFloorN).Append(" zapisow / ")
+                      .Append(_kFloorGold).Append(" zl w ").Append(_kFloorTowns.Count).Append(" miastach; miast z komisem ").Append(lotTowns).Append(", z nich z kasa 0: ").Append(zeroTowns)
+                      .Append("; wyplaty warsztatom gracza (kupione po oddaniu sztuki) ").Append(_kPlayerN).Append(" szt. / ").Append(_kPlayerGold).Append(" zl")
+                      .Append(" | rachunek licznikow sztuk (start ").Append(_kShelf0).Append(" + przyjete - sprzedane - zlom - przejete - stan): roznica ").Append(cPieces)
+                      .Append("; rachunek licznikow naleznosci (start ").Append(_kDueN0).Append(" szt. / ").Append(_kDueG0).Append(" zl + nowe - wyplacone - bez odbiorcy - stan): roznica ")
+                      .Append(cDueN).Append(" szt. / ").Append(cDueG).Append(" zl; KONTROLA zlota wyplat (zywe salda, takze po wyjatku: kasy miast + kapital warsztatow + kiesy ludu): roznica ").Append(_kGoldCheck)
                       .Append(" | potkniecia ").Append(_kStumbles).Append('.');
                     Log.Info(sb.ToString());
                 }

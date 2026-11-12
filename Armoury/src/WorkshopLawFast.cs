@@ -232,6 +232,7 @@ namespace Armoury
         /// <summary>E8/O2 (266): linia doby "Warsztaty bez powtorzen (E8/O2)" (ArmouryBehavior, takt doby) - sam log.</summary>
         internal static void DailyFast()
         {
+            KomisDailyFallback();   // 429-p: zapisy komisu broni przy wylaczonym kluczu warsztatow zbrojnych (wlasny try; klucz wlaczony - nic)
             try
             {
                 var s = Settings.Current;

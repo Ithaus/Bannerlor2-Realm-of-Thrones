@@ -37,7 +37,7 @@ namespace Armoury
         private static readonly Dictionary<string, int> _lastDay = new Dictionary<string, int>();
         // liczniki doby (linia "Dozbrajanie: dzien")
         private static int _dStamp = -1, _dLogged;
-        private static int _dPlayerN, _dLordN, _dGarN, _dSold, _dKept, _dNoBetter, _dNoMoney, _dNoLift, _dHeld, _dGarWageN, _dGarGapN, _dBattleArmory, _dBattleTemplate, _dGarEmptyN;
+        private static int _dPlayerN, _dLordN, _dGarN, _dSold, _dKept, _dNoBetter, _dNoMoney, _dNoLift, _dHeld, _dGarWageN, _dGarGapN, _dBattleArmory, _dBattleTemplate, _dGarEmptyN, _dCapA7;
         private static long _dPlayerGold, _dLordGold, _dGarGold, _dSoldGold, _dSaved, _dOverCap, _dGarWage, _dGarGapGold, _dGarEmptyGold;
         // K1 (przeglad): obrot w kolko - ta sama partia kupila i sprzedala sztuke tego samego id tej samej doby (autotest: 0)
         private static readonly HashSet<string> _boughtToday = new HashSet<string>(), _soldToday = new HashSet<string>();
@@ -57,7 +57,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _dLogged = 0;
-            _dPlayerN = _dLordN = _dGarN = _dSold = _dKept = _dNoBetter = _dNoMoney = _dNoLift = _dHeld = _dGarWageN = _dGarGapN = _dBattleArmory = _dBattleTemplate = _dGarEmptyN = 0;
+            _dPlayerN = _dLordN = _dGarN = _dSold = _dKept = _dNoBetter = _dNoMoney = _dNoLift = _dHeld = _dGarWageN = _dGarGapN = _dBattleArmory = _dBattleTemplate = _dGarEmptyN = _dCapA7 = 0;
             _dPlayerGold = _dLordGold = _dGarGold = _dSoldGold = _dSaved = _dOverCap = _dGarWage = _dGarGapGold = _dGarEmptyGold = 0;
             _boughtToday.Clear(); _soldToday.Clear(); _dChurn = 0; _churnIds.Clear(); _dTempSlots = 0; _dBareSlots = 0; _dNoEmerg = 0; _dNothing = 0; _dLordLent = 0; _dWaitCart = 0;
             _dAmmoUp = _dAmmoDown = _dAmmoLowTier = _dAmmoShort = _dAmmoFacErr = 0;
@@ -147,7 +147,7 @@ namespace Armoury
                     catch { }
                     Log.Info("Dozbrajanie: dzien " + _dStamp + " - gracz " + _dPlayerN + "/" + _dPlayerGold + ", lordowie " + _dLordN + "/" + _dLordGold
                              + ", zalogi " + _dGarN + "/" + _dGarGold + " (szt./zloto; zamki czekaja na woz z dozbrajaniem " + _dWaitCart + "); stare sprzedane " + _dSold + " za " + _dSoldGold + " (do zbrojowni " + _dKept + ")"
-                             + "; pominiete koszyki: brak lepszej na polce " + _dNoBetter + MenUpgradeOrders.DayText() + ", za malo w sakiewce " + _dNoMoney + ", nikt nie udzwignie " + _dNoLift + ", lepsza tylko w rezerwie kramu (174b.4) " + _dHeld
+                             + "; pominiete koszyki: brak lepszej na polce " + _dNoBetter + MenUpgradeOrders.DayText() + ", za malo w sakiewce " + _dNoMoney + ", lepsza tylko ponad sufit ceny AI (429 A7 - zamowienie jak brak) " + _dCapA7 + ", nikt nie udzwignie " + _dNoLift + ", lepsza tylko w rezerwie kramu (174b.4) " + _dHeld
                              + "; odlozone przy wyjazdach " + _dSaved + ", ponad limit na zycie " + _dOverCap
                              + "; zold zalog do sakiewek " + _dGarWage + " (" + _dGarWageN + " zalog), w sakiewkach zalog " + garPurses + " (" + garN + " zalog)"
                              + "; braki zalog z ich sakiewek " + _dGarGapGold + " (" + _dGarGapN + " zakupow), sakiewki pustych zalog do kas osad " + _dGarEmptyGold + " (" + _dGarEmptyN + ")"
@@ -455,7 +455,7 @@ namespace Armoury
                     var w = Pick(c, oldP, oldEl, oldSell, gain, budget, wares, mp, shop1, shop2, player, out why, out heldAt);
                     if (w == null)
                     {
-                        if (k == 0) { if (why == 1) _dNoLift++; else if (why == 2) _dNoMoney++; else if (why == 3) _dHeld++; else if (why == 4) _dAmmoShort++; else { _dNoBetter++; if (why == 5) _dAmmoLowTier++; MenUpgradeOrders.Note(mp, shop1, shop2, c.Type, oldP.Tier, c.Ceil, c.Slot.N); } }   // sklad8-s S4: 4 i 5; E3-Z1: podzial "na suficie / pod sufitem" i zamowienie tier+1 (wlasny try)
+                        if (k == 0) { if (why == 1) _dNoLift++; else if (why == 2) _dNoMoney++; else if (why == 3) _dHeld++; else if (why == 4) _dAmmoShort++; else if (why == 6) { _dCapA7++; MenUpgradeOrders.Note(mp, shop1, shop2, c.Type, oldP.Tier, c.Ceil, c.Slot.N); } else { _dNoBetter++; if (why == 5) _dAmmoLowTier++; MenUpgradeOrders.Note(mp, shop1, shop2, c.Type, oldP.Tier, c.Ceil, c.Slot.N); } }   // sklad8-s S4: 4 i 5; E3-Z1: podzial "na suficie / pod sufitem" i zamowienie tier+1 (wlasny try)
                         // sklad8-p (uwaga 1): rezerwa kramu 174b.4 - lepsza sztuka zostala na straganie (licznik "zatrzymane" linii M2, jak AiGear i notable:
                         // gdy wybor nic nie dal, a choc jeden kandydat odpadl na rezerwie)
                         if (heldAt != null) Measure174b.NoteHeld(BuyerOf(mp, player, heldAt, cart != null && heldAt == cartFrom), 1);
@@ -551,12 +551,13 @@ namespace Armoury
         /// <summary>Najlepsza sztuka z polki dla tego slotu: najpierw shop1 (zamek: polka zamku), potem shop2. why: 0 brak lepszej,
         /// 1 nikt nie udzwignie, 2 za malo w sakiewce, 3 (sklad8-p) lepsza sztuka do udzwigniecia jest, ale to ostatnia sztuka pasma zbroi
         /// w rezerwie kramu (174b.4; heldAt - targ, na ktorym zostala); sklad8-s S4 (amunicja przy MenUpgradeAmmoNeedsSurplus): 4 lepszy kolczan do udzwigniecia
-        /// jest tylko w koszyku z brakiem na polce, 5 wyraznie lepszy jest tylko nizszego albo tego samego tieru.</summary>
+        /// jest tylko w koszyku z brakiem na polce, 5 wyraznie lepszy jest tylko nizszego albo tego samego tieru; 6 (429-p) lepsza jest tylko ponad sufit ceny AI (A7).</summary>
         private static Ware Pick(Cand c, SwapMath.Piece oldP, EquipmentElement oldEl, int oldSell, double gain, int budget, Dictionary<string, List<Ware>> wares,
                                  MobileParty mp, Settlement shop1, Settlement shop2, bool player, out int why, out Settlement heldAt)
         {
             why = 0; heldAt = null;
             bool better = false, lift = false, priced = false, lowTier = false, shortage = false;
+            bool capped = false, pricedOk = false;   // 429-p: kandydat odpadl na suficie ceny AI / jakis kandydat przeszedl sufit
             int poorMin = int.MaxValue;   // m96: najtansza lepsza sztuka, na ktora nie starczylo sakiewki
             bool ammoRule = AmmoRule(c.Type);   // sklad8-s S4
             var oldIt = oldEl.Item;
@@ -588,7 +589,8 @@ namespace Armoury
                     if (ammoRule && SupplyDemand.Active && FacOf(w) > 1f) { shortage = true; continue; }
                     priced = true;
                     if (w.Price < 0) { try { w.Price = shop.Town.MarketData.GetPrice(w.El, mp, false, shop.Party); } catch { w.Price = 0; } }   // cena dopiero dla kandydata
-                    if (!player && AiBuyRules.OverCapA7(w.El, w.Price, false)) continue;   // 429 (A7): sufit ceny AiGearMaxPriceFactor takze w dozbrajaniu AI (lordowie, zalogi, zamowienia zamkow); ludzie gracza bez sufitu
+                    if (!player && AiBuyRules.OverCapA7(w.El, w.Price, false)) { capped = true; continue; }
+                    pricedOk = true;   // 429 (A7): sufit ceny AiGearMaxPriceFactor takze w dozbrajaniu AI (lordowie, zalogi, zamowienia zamkow); ludzie gracza bez sufitu
                     if (SwapMath.UpgradeVerdict(ceil, oldP.Tier, oldP.Power, w.Tier, w.Power, gain, true, w.Price, budget) != SwapMath.UpOk) { if (w.Price > budget && w.Price < poorMin) poorMin = w.Price; continue; }
                     double score = SwapMath.UpgradeScore(oldP.Power, w.Power, w.Price, oldSell);
                     if (score > bestScore) { bestScore = score; best = w; }
@@ -596,6 +598,9 @@ namespace Armoury
                 if (best != null) return best;
             }
             why = !better ? (lowTier ? 5 : 0) : (!lift ? 1 : (!priced && heldAt != null ? 3 : (!priced && shortage ? 4 : 2)));
+            // 429-p (recenzja N1): wszyscy wycenieni kandydaci odpadli na suficie ceny AI - to nie "za malo w sakiewce", tylko brak sztuki w rozsadnej cenie:
+            // osobny powod 6 (wolajacy: wlasny licznik i zamowienie dla warsztatow jak przy braku lepszej - tak samo jak u notabli)
+            if (why == 2 && capped && !pricedOk) why = 6;
             if (why == 2) SavingsByNeed.NoteWant(poorMin, false);   // m96: koszyk "za malo w sakiewce" - cel oszczedzania (tylko suma wizyty, nie rzuca)
             return null;
         }

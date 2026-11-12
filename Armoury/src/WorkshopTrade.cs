@@ -534,6 +534,16 @@ namespace Armoury
             catch (Exception e) { Stumble("WorkshopTrade.ShiftCapEnd", e); }
         }
 
+        /// <summary>429-p (recenzja S1): dochod warsztatu z produkcji, ktory wplynal POZA jego wlasnym tickiem (zaplata komisu broni minus place - KomisSettle biegnie
+        /// w cyklu pierwszej linii zbrojnej miasta, czyli zwykle w ticku innego warsztatu). Znacznik konca doby przesuwa sie o te kwote (RunPrefix nie policzy jej jako
+        /// ujemnej "wyplaty zysku wlascicielowi"), a kwota wchodzi do wyniku doby Op (RunPostfix jej nie widzi - liczy tylko zmiane kapitalu we wlasnym ticku).
+        /// W trakcie wlasnego ticku (HasEnd false) - nic: RunPostfix policzy sam. Ukryci rzemieslnicy i warsztat bez rachunku - nic. Same liczniki, nie rzuca.</summary>
+        internal static void NoteOutsideIncome(Workshop w, int delta)
+        {
+            try { Rec rec; if (w != null && delta != 0 && On && Live && _rec.TryGetValue(w, out rec) && rec.HasEnd) { rec.CapEnd += delta; rec.Op += delta; } }
+            catch (Exception e) { Stumble("WorkshopTrade.NoteOutsideIncome", e); }
+        }
+
         // ------------------------------------------------------------ latki: cykl produkcji
         /// <summary>
         /// WorkshopsCampaignBehavior.RunTownWorkshop - kapital przed (sam odczyt). Przy okazji pomiar do linii dnia: o ile kapital

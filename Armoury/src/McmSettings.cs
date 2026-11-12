@@ -9936,7 +9936,7 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool TownPaysVillagesFirst { get; set; } = true;
 
-        [SettingPropertyBool("Arms Consign", HintText = "a finished piece of arms or armour that the town's merchants cannot pay for today (their purse is at its working stock, or the workshop cannot cover the wages) goes onto the town's stall on consignment instead of waiting in the workshop: no gold moves, and when the piece is bought the town pays the workshop out of the takings - the merchant's price of that day, never more than the price agreed when it was put on the stall - and the workshop pays its craftsmen their wages from it. The player's own workshops are not covered (off = the piece waits in the workshop until the town can pay, as before; pieces already on consignment are still settled)", RequireRestart = false)]
+        [SettingPropertyBool("Arms Consign", HintText = "a finished piece of arms or armour that the town's merchants cannot pay for today (their purse is at its working stock, or the workshop cannot cover the wages) goes onto the town's stall on consignment instead of waiting in the workshop: no gold moves, and when the piece is bought the town pays the workshop out of the takings - the merchant's price of that day, never more than the price agreed when it was put on the stall, and only from what its purse holds above the floor it keeps for its other creditors (a town deep in debt pays later) - and the workshop pays its craftsmen their wages from it. The player's own workshops are not covered (off = the piece waits in the workshop until the town can pay, as before; pieces already on consignment are still settled)", RequireRestart = false)]
         [SettingPropertyGroup("Arms production")]
         public bool ArmsConsign { get; set; } = true;
 
@@ -9944,7 +9944,7 @@ namespace Armoury
         [SettingPropertyGroup("Arms production")]
         public int ArmsConsignPerBasket { get; set; } = 6;
 
-        [SettingPropertyInteger("Arms Consign Per Town", 1, 1000, "0", HintText = "with Arms Consign: most pieces a town's stall holds on consignment at a time, all kinds together; beyond it a finished piece waits in the workshop as before", RequireRestart = false)]
+        [SettingPropertyInteger("Arms Consign Per Town", 1, 1000, "0", HintText = "with Arms Consign: most pieces a town's stall holds on consignment at a time, all kinds together, counting those sold but not yet paid for; beyond it a finished piece waits in the workshop as before", RequireRestart = false)]
         [SettingPropertyGroup("Arms production")]
         public int ArmsConsignPerTown { get; set; } = 80;
 
