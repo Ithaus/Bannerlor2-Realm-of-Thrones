@@ -566,6 +566,8 @@ namespace Armoury
             if (m == null) return null;
             if (m.StartsWith("Kronika unikatow", false, ci) || m.StartsWith("UniqueSpoils", false, ci)) return "unikaty";
             if (m.StartsWith("Bitwa:", false, ci)) return "bitwy";
+            // 437-p: os czasu, plan, ostrzal i pierwszy cios pomiarow AI bitwy - do ai-bitwy.log; linie "start:" i ": koniec" zostaja w glownym
+            if (m.StartsWith("Pomiary AI bitwy (437) ", false, ci) && !m.StartsWith("Pomiary AI bitwy (437) start:", false, ci)) return "ai-bitwy";
             if (m.StartsWith("Balans krolestw (175) wedlug krolestw", false, ci)) return "balans";   // 175.0: szczegoly wedlug krolestw (krotka linia dnia zostaje w glownym)
             if (m.StartsWith("Budowa:", false, ci)) return "budowy";
             if (m.StartsWith("Finanse:", false, ci)) return "finanse";

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using HarmonyLib;
@@ -22,7 +24,8 @@ namespace Armoury
     ///    rzut losu "-" (pakiet 3 nie wdrozony), stan latek;
     ///  - os czasu co 15 s dla KAZDEJ druzyny AI (druzyna gracza-wodza pominieta): plan, a dla kazdego szyku klasa wedlug skladu, ludzi, zachowanie, rozkaz,
     ///    odleglosc od najblizszego szyku wroga, trafienia pociskami w oknie (ludzie p / konie k); jazda: stan szarzy RBM i klasa celu, trzy najwyzsze wagi
-    ///    zachowan (WeightFactor x premia aktywnego 1.2-2.0 jak FormationAI.FindBestBehavior; GetAiWeight NIE wolany - liczenie zachowania zostaje w watku AI);
+    ///    zachowan (GetAiWeight x WeightFactor x premia aktywnego 1.2-2.0 jak FormationAI.FindBestBehavior, bez kary navmesh; GetAiWeight NIE wolany przez nas -
+    ///    437-p: postfiks na kazdym GetAiWeight zachowania gry i RBM tylko zapamietuje ostatni wynik z watku AI; brak wyniku = WeightFactor z "?");
     ///  - plan: kazda zmiana planu po starcie - trzy najwyzsze wagi z tej decyzji (wartosci po wszystkich postfiksach RBM i doktryny; biezacy x1.5 jak gra),
     ///    powod (ResetTacticalPositions = false albo waga nowego > 1.5 x biezacego), numer zmiany druzyny bez pierwszego wyboru;
     ///  - ostrzal: szyk AI stracil >= 5% (i >= 2) od pociskow w 30 s (ludzie i konie) -> co zrobil w nastepnych 30 s (stal / szedl / biegl / szarza / odwrot / w bok);
@@ -32,7 +35,8 @@ namespace Armoury
     ///    szyku ofiary i po), straty stron w % wejsc, wynik, plany druzyn (otwarcie, zmiany, czas w planach), jazda pod ostrzalem (szyko-s, w tym stala),
     ///    "strzelcy wroga odslonieci w zasiegu szarzy, a jazda stala" (szyko-s), trafienia pociskami jazdy AI (ludzie / konie), reakcje na ostrzal wedlug klasy,
     ///    pierwsze ciosy szarzy, zachowania szykow AI przed i po kontakcie (szyko-s), wywolania latek wedlug watku, potkniecia.
-    /// Miary sukcesu planu (rozdzial 4): (a) "plan otwarcia" w linii start na druzyne i wodza; (b) "jazda pod ostrzalem ... stala X%" w linii koniec;
+    /// Miary sukcesu planu (rozdzial 4): (a) "plan otwarcia" w linii start na druzyne i wodza; (b) "jazda pod ostrzalem poza zwarciem ... stala X%" w linii koniec
+    /// (437-p: tylko szyki z odstepem >= 15 m od wroga - jazda w zwarciu nie "stoi pod ostrzalem");
     /// (c) "straty: A x%, O y%" i "wynik" w linii koniec.
     /// Latki (raz na proces, przy pierwszej bitwie polowej z kluczem; wlasna instancja Harmony, Priority.Last po com.rbmai i com.jeff.armoury - wagi czytane
     /// PO doktrynie): prefiks + postfiks TeamAIComponent.MakeDecision (DeclaredMethod), postfiksy GetTacticWeight i ResetTacticalPositions na kazdym typie
@@ -77,12 +81,18 @@ namespace Armoury
         {
             public Team T;
             public string From, To, Top, Why;
+            public bool First;   // 437-p: pierwszy wybor planu (nie liczy sie do zmian)
         }
 
         [ThreadStatic] private static Ctx _ctx;
         private static volatile bool _on;
         private static int _mainThread = -1;
         private static int _decMain, _decOther, _wMain, _wOther, _postErr, _pendDrop;   // Interlocked (watek ticku druzyn)
+        // 437-p: ostatni wynik GetAiWeight kazdego zachowania (zapis w watku AI, odczyt w glownym; ConditionalWeakTable jest bezpieczna watkowo)
+        private sealed class WBox { public volatile float V; public volatile bool Has; }
+        private static volatile ConditionalWeakTable<BehaviorComponent, WBox> _bw =new ConditionalWeakTable<BehaviorComponent, WBox>();
+        private static int _bMain, _bOther;   // Interlocked: wywolania GetAiWeight (watek zachowan szyku)
+        private static int _bwHit, _bwMiss;   // glowny watek: wagi jazdy z GetAiWeight / bez
         private static readonly object L = new object();
         private static readonly List<PlanEv> Pend = new List<PlanEv>();
 
@@ -90,8 +100,9 @@ namespace Armoury
         {
             if (_tried) return _note;
             _tried = true;
-            int wWant = 0, wOk = 0, rWant = 0, rOk = 0;
+            int wWant = 0, wOk = 0, rWant = 0, rOk = 0, bWant = 0, bOk = 0, scanErr = 0;
             string dec = "NIE";
+            var sw = Stopwatch.StartNew();   // 437-p: czas zakladania latek (synchronicznie w AfterStart pierwszej bitwy polowej)
             try
             {
                 var h = new Harmony(HarmonyId);
@@ -131,7 +142,27 @@ namespace Armoury
                         if (ts == null) continue;
                         foreach (var t in ts)
                         {
-                            if (t == null || !typeof(TacticComponent).IsAssignableFrom(t)) continue;
+                          try   // 437-p: wyjatek na jednym typie nie przerywa skanu reszty (potkniecie z nazwa typu)
+                          {
+                            if (t == null) continue;
+                            // 437-p: zachowania szyku - postfiks GetAiWeight (tylko zapis wyniku) na kazdym typie, ktory go deklaruje
+                            if (typeof(BehaviorComponent).IsAssignableFrom(t))
+                            {
+                                MethodInfo mb = null;
+                                try { mb = AccessTools.DeclaredMethod(t, "GetAiWeight", Type.EmptyTypes); } catch { }
+                                if (mb != null && !mb.IsAbstract && mb.ReturnType == typeof(float))
+                                {
+                                    bWant++;
+                                    try
+                                    {
+                                        h.Patch(mb, postfix: new HarmonyMethod(typeof(BattleMeasure437), nameof(PostBW)) { priority = Priority.Last, after = after });
+                                        if (Ours(mb, false)) bOk++;
+                                    }
+                                    catch (Exception e) { Stum("Latka.WagaZachowania " + t.Name, e); }
+                                }
+                                continue;
+                            }
+                            if (!typeof(TacticComponent).IsAssignableFrom(t)) continue;
                             MethodInfo mw = null, mr = null;
                             try { mw = AccessTools.DeclaredMethod(t, "GetTacticWeight", Type.EmptyTypes); } catch { }
                             try { mr = AccessTools.DeclaredMethod(t, "ResetTacticalPositions", Type.EmptyTypes); } catch { }
@@ -155,14 +186,31 @@ namespace Armoury
                                 }
                                 catch (Exception e) { Stum("Latka.Reset " + t.Name, e); }
                             }
+                          }
+                          catch (Exception e)
+                          {
+                              scanErr++;
+                              string tn;
+                              try { tn = t != null ? t.FullName : "?"; } catch { tn = "?"; }
+                              Stum("Latki.Typ " + tn, e);
+                          }
                         }
                     }
                 }
                 else dec = "NIE (brak pola TeamAIComponent._currentTactic)";
             }
-            catch (Exception e) { dec = "NIE (" + e.GetType().Name + ")"; Stum("Latki", e); }
+            catch (Exception e)
+            {
+                // 437-p: blad poza MakeDecision nie nadpisuje juz sprawdzonej decyzji - osobno w linii start
+                scanErr++;
+                if (dec == "NIE") dec = "NIE (" + e.GetType().Name + ")";
+                Stum("Latki", e);
+            }
+            sw.Stop();
             _note = "decyzja " + dec + ", wagi taktyk " + wOk + "/" + wWant + ", reset pozycji " + rOk + "/" + rWant
-                    + ", wagi zachowan " + (_fBeh != null ? "TAK" : "NIE") + ", szarza RBM " + (_fChargeState != null ? "TAK" : "NIE");
+                    + ", wagi zachowan " + (_fBeh != null ? "TAK" : "NIE") + " (GetAiWeight " + bOk + "/" + bWant + ")"
+                    + ", szarza RBM " + (_fChargeState != null ? "TAK" : "NIE")
+                    + (scanErr > 0 ? ", bledy skanu " + scanErr : "") + ", zalozone w " + sw.ElapsedMilliseconds.ToString(Inv) + " ms";
             return _note;
         }
 
@@ -227,6 +275,20 @@ namespace Armoury
             catch { Interlocked.Increment(ref _postErr); }
         }
 
+        /// <summary>437-p: postfiks GetAiWeight zachowania szyku (watek AI / silnika): tylko zapis wyniku do tablicy i licznik watku. Bez decyzji.</summary>
+        private static void PostBW(BehaviorComponent __instance, float __result)
+        {
+            if (!_on || __instance == null) return;
+            try
+            {
+                Thr(ref _bMain, ref _bOther);
+                var box = _bw.GetOrCreateValue(__instance);
+                box.V = __result;
+                box.Has = true;
+            }
+            catch { Interlocked.Increment(ref _postErr); }
+        }
+
         /// <summary>Postfiks MakeDecision: zmiana planu -> zdarzenie do kolejki (trzy najwyzsze wagi, powod). Linia w glownym watku.</summary>
         private static void PostDec(TeamAIComponent __instance)
         {
@@ -238,7 +300,7 @@ namespace Armoury
             {
                 var now = _fCur(__instance);
                 if (ReferenceEquals(now, c.Before) || now == null) return;
-                var ev = new PlanEv { T = now.Team, From = c.Before != null ? TacName(c.Before) : "-", To = TacName(now) };
+                var ev = new PlanEv { T = now.Team, From = c.Before != null ? TacName(c.Before) : "-", To = TacName(now), First = c.Before == null };
                 // trzy najwyzsze (wagi surowe; biezacy w MaxBy gry x1.5)
                 int n = c.WT.Count;
                 var idx = new List<int>(n);
@@ -262,8 +324,9 @@ namespace Armoury
                         if (ReferenceEquals(c.WT[i], now)) wNew = c.WV[i];
                         if (ReferenceEquals(c.WT[i], c.Before)) wOld = c.WV[i];
                     }
-                    if (c.Reset == 0) ev.Why = "ResetTacticalPositions biezacego = false (zmiana bez progu 1.5)";
-                    else if (wNew >= 0f && wOld >= 0f && wNew > wOld * 1.5f) ev.Why = "waga nowego > 1.5 x biezacego";
+                    // 437-p: MaxBy gry juz mnozy biezacy x1.5 - kazda zmiana przeszla ten prog; ResetTacticalPositions decyduje tylko o drugim porownaniu
+                    if (c.Reset == 0) ev.Why = "wygral MaxBy (biezacy x1.5); ResetTacticalPositions biezacego = false - bez drugiego porownania";
+                    else if (wNew >= 0f && wOld >= 0f && wNew > wOld * 1.5f) ev.Why = "wygral MaxBy i drugie porownanie wag (nowy > 1.5 x biezacy; ResetTacticalPositions = true)";
                     else ev.Why = "inny (np. brak wroga - TacticCharge gry; reset " + (c.Reset < 0 ? "-" : (c.Reset == 1 ? "true" : "false")) + ")";
                 }
                 lock (L)
@@ -299,10 +362,11 @@ namespace Armoury
             public int WinHit, WinHorse;
             public float FireAt = -1000f;
             public readonly List<float> MLoss = new List<float>();
+            public readonly List<float> MLossH = new List<float>();   // 437-p: konie od pociskow osobno (prog 5% tylko na ludziach)
             // reakcja na ostrzal
             public float EvAt = -1f, EvCool = -1000f;
             public Vec2 EvPos = Vec2.Invalid, EvAxis = Vec2.Invalid;
-            public int EvLoss, EvN;
+            public int EvLoss, EvN, EvHorse;
             public string EvBeh, EvCls;
             public bool EvCharge;
             // szarza jazdy
@@ -314,7 +378,7 @@ namespace Armoury
         {
             public Team T;
             public string Open, Cur, Gen = "-";
-            public int Chg, ChgSeen, Dec0, Men0;
+            public int Chg, ChgSeen, Dec0, Men0, First;   // 437-p: First = pierwsze wybory po starcie (poza Chg)
             public readonly Dictionary<string, float> Sec = new Dictionary<string, float>(StringComparer.Ordinal);
         }
 
@@ -355,6 +419,9 @@ namespace Armoury
             Interlocked.Exchange(ref _decMain, 0); Interlocked.Exchange(ref _decOther, 0);
             Interlocked.Exchange(ref _wMain, 0); Interlocked.Exchange(ref _wOther, 0);
             Interlocked.Exchange(ref _postErr, 0); Interlocked.Exchange(ref _pendDrop, 0);
+            Interlocked.Exchange(ref _bMain, 0); Interlocked.Exchange(ref _bOther, 0);
+            _bwHit = _bwMiss = 0;
+            _bw = new ConditionalWeakTable<BehaviorComponent, WBox>();   // wagi poprzedniej misji nie przechodza (stara tablica - smiec)
         }
 
         private static bool Here(Mission m)
@@ -496,7 +563,7 @@ namespace Armoury
                     DrainPlansBeforeStart();
                     _started = true;
                     _t0 = now;
-                    lock (Q) _q.Clear();   // ciosy z rozstawienia nie licza sie
+                    lock (Q) { _q.Clear(); _qDrop = 0; }   // ciosy z rozstawienia nie licza sie; 437-p: zgubione przed startem tez nie
                     SampleAll(m, now, 0f);
                     WriteStart(m, now);
                     _lastSample = now;
@@ -655,7 +722,7 @@ namespace Armoury
                 return;
             }
             // strata
-            if (e.Missile && vf != null && vf.Ai) vf.MLoss.Add(now);   // okno 30 s czyszczone w React (tylko szyki AI)
+            if (e.Missile && vf != null && vf.Ai) (e.Horse ? vf.MLossH : vf.MLoss).Add(now);   // okno 30 s czyszczone w React (tylko szyki AI); 437-p: konie osobno
             if (e.Horse || e.Side < 0) return;
             bool after = vf != null ? vf.Contact : _anyContact;
             int src = e.Flee ? 4 : (e.Missile ? 0 : (e.Coll ? 3 : (e.ByMounted ? 2 : 1)));
@@ -739,8 +806,8 @@ namespace Armoury
                     bd[bk] = b0 + dt;
                     bool still = s.Moved >= 0f && s.Moved < StillPerSec * dt;
                     bool cav = s.Cls == "jaz";
-                    // jazda pod ostrzalem (ludzie albo konie trafieni pociskiem w ostatnich 10 s)
-                    if (cav && f.CountOfUnits >= MinCav && now - s.FireAt <= FireRecent)
+                    // jazda pod ostrzalem (ludzie albo konie trafieni pociskiem w ostatnich 10 s); 437-p: tylko poza zwarciem (w zwarciu srodek szyku stoi)
+                    if (cav && f.CountOfUnits >= MinCav && s.Gap >= ContactGap && now - s.FireAt <= FireRecent)
                     {
                         _cavFire += dt;
                         if (still) _cavFireStill += dt;
@@ -770,6 +837,8 @@ namespace Armoury
         {
             var ml = s.MLoss;
             while (ml.Count > 0 && ml[0] < now - LossWin) ml.RemoveAt(0);
+            var mh = s.MLossH;
+            while (mh.Count > 0 && mh[0] < now - LossWin) mh.RemoveAt(0);
             if (s.EvAt >= 0f)
             {
                 if (beh.IndexOf("Charge", StringComparison.Ordinal) >= 0 || ord == MovementOrder.MovementOrderEnum.Charge) s.EvCharge = true;
@@ -797,7 +866,7 @@ namespace Armoury
                 {
                     _evLines++;
                     Log.Info(Tag + " ostrzal: t=" + F0(s.EvAt - _t0) + " | szyk " + FName(f) + " " + s.EvCls + " " + s.EvN + " ludzi (" + SideTxt(s.T) + ") | strata od pociskow "
-                             + s.EvLoss + " (" + Pct(s.EvLoss, s.EvN + s.EvLoss) + ") w " + F0(LossWin) + " s | nastepne " + F0(ReactWin) + " s: " + kind
+                             + s.EvLoss + " (" + Pct(s.EvLoss, s.EvN + s.EvLoss) + ")" + (s.EvHorse > 0 ? ", konie " + s.EvHorse : "") + " w " + F0(LossWin) + " s | nastepne " + F0(ReactWin) + " s: " + kind
                              + (dist >= 0f ? ", przesuniecie " + F0(dist) + " m (ku wrogowi " + F0(along) + " m, " + F1(along / ReactWin) + " m/s)" : "")
                              + ", zachowanie " + s.EvBeh + " -> " + beh + ".");
                 }
@@ -822,6 +891,7 @@ namespace Armoury
                 }
             }
             s.EvLoss = loss;
+            s.EvHorse = mh.Count;
             s.EvN = men;
             s.EvBeh = beh;
             s.EvCls = s.Cls;
@@ -869,11 +939,11 @@ namespace Armoury
                 if (e.T == null || !AiTeam(e.T)) return;
                 var tr = Tr(e.T);
                 if (!_started) { tr.Dec0++; return; }
-                tr.Chg++;
+                if (e.First) tr.First++; else tr.Chg++;   // 437-p: pierwszy wybor po starcie (np. ResetTactic) poza licznikiem zmian
                 if (_planLines >= MaxPlanLines) { _planSkip++; return; }
                 _planLines++;
                 Log.Info(Tag + " plan: t=" + F0(now - _t0) + " | T" + e.T.TeamIndex + " (" + SideTxt(e.T) + ") | " + e.From + " -> " + e.To + " | wagi " + e.Top
-                         + " | powod: " + e.Why + " | zmiana nr " + tr.Chg + ".");
+                         + " | powod: " + e.Why + " | " + (e.First ? "pierwszy wybor po starcie (nie liczony)" : "zmiana nr " + tr.Chg) + ".");
             }
             catch (Exception x) { Stum("Plan", x); }
         }
@@ -914,14 +984,15 @@ namespace Armoury
                     tr.Men0 = men;
                     tr.Gen = General(t);
                     sb.Append(n++ > 0 ? ";" : "").Append(" T").Append(t.TeamIndex).Append(" (").Append(SideTxt(t)).Append(") ludzi ").Append(men).Append(", wodz ").Append(tr.Gen)
-                      .Append(", plan otwarcia ").Append(tr.Open ?? "-").Append(" (decyzji przed startem ").Append(tr.Dec0).Append(')');
+                      .Append(", plan otwarcia ").Append(tr.Open ?? "-").Append(" (zmian planu przed startem ").Append(tr.Dec0).Append(')');
                 }
                 catch (Exception e) { Stum("Start.Druzyna", e); }
             }
             if (n == 0) sb.Append(" -");
             string r440 = Doctrine.P440StartNote();   // 440: rzut losu i profil druzyn; null = klucze 440 NIE - tekst jak dotad
             sb.Append(r440 == null ? " | rzut losu - (pakiet 3 nie wdrozony) | latki: " : " | rzut losu (440): " + r440 + " | latki: ").Append(_note)
-              .Append(" | os czasu co ").Append(F0(Every)).Append(" s, kontakt szyku < ").Append(F0(ContactGap)).Append(" m od najblizszego szyku wroga (mediana minus pol glebokosci obu).");
+              .Append(" | os czasu co ").Append(F0(Every)).Append(" s, kontakt szyku < ").Append(F0(ContactGap)).Append(" m od najblizszego szyku wroga (mediana minus pol glebokosci obu)")
+              .Append(" | wagi zachowan jazdy = GetAiWeight x WeightFactor x premia aktywnego (bez kary navmesh; ? = bez GetAiWeight).");
             Log.Info(sb.ToString());
         }
 
@@ -992,7 +1063,8 @@ namespace Armoury
             foreach (var s in Forms.Values) { s.WinHit = 0; s.WinHorse = 0; }
         }
 
-        /// <summary>Jazda: stan szarzy RBM i klasa celu, trzy najwyzsze wagi zachowan (WeightFactor x premia aktywnego jak FindBestBehavior).</summary>
+        /// <summary>Jazda: stan szarzy RBM i klasa celu, trzy najwyzsze wagi zachowan (GetAiWeight x WeightFactor x premia aktywnego jak FindBestBehavior,
+        /// bez kary navmesh - jej getter pisze stan zegara, nie czytamy).</summary>
         private static string CavTxt(Formation f, BehaviorComponent active, float now)
         {
             var sb = new StringBuilder(120);
@@ -1029,6 +1101,10 @@ namespace Armoury
                             if (b == null) continue;
                             float w = b.WeightFactor;
                             if (w <= 1e-7f) continue;
+                            // 437-p: ostatni wynik GetAiWeight z watku AI (postfiks PostBW); brak = sam WeightFactor ze znakiem "?"
+                            WBox box;
+                            bool has = _bw.TryGetValue(b, out box) && box != null && box.Has;
+                            if (has) { w *= box.V; _bwHit++; } else _bwMiss++;
                             bool act = ReferenceEquals(b, ai.ActiveBehavior);
                             if (act)
                             {
@@ -1036,7 +1112,7 @@ namespace Armoury
                                 if (k < 0f) k = 0f; else if (k > 1f) k = 1f;
                                 w *= 1.2f + 0.8f * k;
                             }
-                            ws.Add(new KeyValuePair<string, float>(BehName(b) + (act ? "*" : ""), w));
+                            ws.Add(new KeyValuePair<string, float>(BehName(b) + (act ? "*" : "") + (has ? "" : "?"), w));
                         }
                         ws.Sort((a, b) => b.Value.CompareTo(a.Value));
                         sb.Append(" [wagi");
@@ -1081,11 +1157,11 @@ namespace Armoury
             {
                 if (tr.T == null) continue;
                 sb.Append(tn++ > 0 ? ";" : "").Append(" T").Append(tr.T.TeamIndex).Append(" (").Append(SideTxt(tr.T)).Append(", ").Append(tr.Gen)
-                  .Append(") otwarcie ").Append(tr.Open ?? "-").Append(", zmian ").Append(tr.Chg).Append(" (co 1 s widzianych ").Append(tr.ChgSeen).Append("), czas w planach ")
+                  .Append(") otwarcie ").Append(tr.Open ?? "-").Append(", zmian ").Append(tr.Chg).Append(tr.First > 0 ? " (+ pierwszych wyborow po starcie " + tr.First + ")" : "").Append(" (co 1 s widzianych ").Append(tr.ChgSeen).Append("), czas w planach ")
                   .Append(Top(tr.Sec, 4));
             }
             if (tn == 0) sb.Append(" -");
-            sb.Append(" | jazda AI pod ostrzalem (trafienie w ").Append(F0(FireRecent)).Append(" s) szyko-s ").Append(F0(_cavFire)).Append(", w tym stala ").Append(F0(_cavFireStill))
+            sb.Append(" | jazda AI pod ostrzalem poza zwarciem (trafienie w ").Append(F0(FireRecent)).Append(" s, odstep >= ").Append(F0(ContactGap)).Append(" m) szyko-s ").Append(F0(_cavFire)).Append(", w tym stala ").Append(F0(_cavFireStill))
               .Append(" (").Append(_cavFire > 0.5f ? (100f * _cavFireStill / _cavFire).ToString("0", Inv) + "%" : "-").Append(')')
               .Append(" | strzelcy wroga odslonieci w zasiegu szarzy (").Append(F0(ExposeMin)).Append('-').Append(F0(ExposeMax)).Append(" m) szyko-s ").Append(F0(_exp))
               .Append(", jazda stala ").Append(F0(_expStill))
@@ -1093,8 +1169,10 @@ namespace Armoury
               .Append(" | reakcje na ostrzal (strata >= ").Append((LossShare * 100f).ToString("0", Inv)).Append("% w ").Append(F0(LossWin)).Append(" s): ").Append(TopI(Reac, 16))
               .Append(" | szarze jazdy AI ").Append(_chargeEp).Append(" (bez ciosu ").Append(_chargeNoBlow).Append("), pierwszy cios: ").Append(TopI(FirstBlow, 10))
               .Append(" | zachowania AI szyko-s przed kontaktem ").Append(Top(BehPre, 8)).Append("; po kontakcie ").Append(Top(BehPost, 10))
-              .Append(" | latki wedlug watku: decyzje glowny ").Append(Volatile.Read(ref _decMain)).Append(" / inny ").Append(Volatile.Read(ref _decOther))
-              .Append(", wagi glowny ").Append(Volatile.Read(ref _wMain)).Append(" / inny ").Append(Volatile.Read(ref _wOther))
+              .Append(" | latki pomiaru 437 wedlug watku: decyzje glowny ").Append(Volatile.Read(ref _decMain)).Append(" / inny ").Append(Volatile.Read(ref _decOther))
+              .Append(", wagi taktyk glowny ").Append(Volatile.Read(ref _wMain)).Append(" / inny ").Append(Volatile.Read(ref _wOther))
+              .Append(", GetAiWeight zachowan glowny ").Append(Volatile.Read(ref _bMain)).Append(" / inny ").Append(Volatile.Read(ref _bOther))
+              .Append(" (wagi jazdy z GetAiWeight ").Append(_bwHit).Append(", bez ").Append(_bwMiss).Append(')')
               .Append(", bledy latek ").Append(Volatile.Read(ref _postErr)).Append(", zgubione plany ").Append(Volatile.Read(ref _pendDrop))
               .Append(" | linie osi ").Append(_lines).Append(" (pominiete ").Append(_linesSkip).Append("), odczytow ").Append(_readings).Append(", linie planu pominiete ").Append(_planSkip)
               .Append(", zgubione zdarzenia ").Append(_qDrop)

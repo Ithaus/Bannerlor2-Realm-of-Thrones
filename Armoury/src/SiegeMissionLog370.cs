@@ -28,6 +28,8 @@ namespace Armoury
     /// na kazdy pas (TeamAISiegeComponent.SiegeLanes): stan LaneState i stan obrony, otwarty / wylom / brama, pojemnosc CalculateLaneCapacity, machiny pasa,
     /// liczniki zapytan oblezenia (atakujacy blisko, w regionie pasa, obroncy przy punkcie - pamiec gry 5 s), cel fali kazdej druzyny (GetLastAssignedFormation:
     /// szyk, ludzi, zachowanie, IsSplittableByAI) i straty szyku w oknie 30 s wedlug zrodla (pociski / reszta); do tego atakujacy w srodku (InsideAttackerCount).
+    /// 437-p: liczniki zapytan czytane z pamieci QueryData (GetCachedValue przez refleksje) - wlasciwosci SiegeQuerySystem wolaja .Value, ktore po 5 s
+    /// przelicza (LocateAttackers) i zapisuje cache czytany przez AI szturmu; sonda nie przesuwa juz chwili tego przeliczenia.
     /// Straty z OnAgentRemoved pod lockiem (zdarzenie bywa z ticku asynchronicznego). Klucz NIE - linii pasow brak, reszta 370 jak dotad.
     /// </summary>
     internal sealed class SiegeMissionLog370 : MissionLogic
@@ -219,10 +221,10 @@ namespace Armoury
                     {
                         try
                         {
-                            int close = side == FormationAI.BehaviorSide.Left ? q.LeftCloseAttackerCount : (side == FormationAI.BehaviorSide.Middle ? q.MiddleCloseAttackerCount : q.RightCloseAttackerCount);
-                            int reg = side == FormationAI.BehaviorSide.Left ? q.LeftRegionMemberCount : (side == FormationAI.BehaviorSide.Middle ? q.MiddleRegionMemberCount : q.RightRegionMemberCount);
-                            int def = side == FormationAI.BehaviorSide.Left ? q.LeftDefenderCount : (side == FormationAI.BehaviorSide.Middle ? q.MiddleDefenderCount : q.RightDefenderCount);
-                            sb.Append(", atak blisko ").Append(close).Append(", w regionie ").Append(reg).Append(", obroncy ").Append(def);
+                            // 437-p: pamiec podreczna QueryData (GetCachedValue) - wlasciwosci (.Value) przeliczaja i odswiezaja cache, ktory czyta AI szturmu
+                            string ls = side == FormationAI.BehaviorSide.Left ? "_left" : (side == FormationAI.BehaviorSide.Middle ? "_middle" : "_right");
+                            sb.Append(", atak blisko ").Append(QCached(q, ls + "CloseAttackerCount")).Append(", w regionie ").Append(QCached(q, ls + "RegionMemberCount"))
+                              .Append(", obroncy ").Append(QCached(q, ls + "DefenderCount"));
                         }
                         catch { sb.Append(", liczniki ?"); }
                     }
@@ -244,9 +246,25 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Pas", e); sb.Append(" ?"); }
             }
-            try { if (q != null) sb.Append(" | atakujacy w srodku ").Append(q.InsideAttackerCount); } catch { sb.Append(" | atakujacy w srodku ?"); }
-            sb.Append(" | straty30s = pociski/reszta (zabici + nieprzytomni).");
+            try { if (q != null) sb.Append(" | atakujacy w srodku ").Append(QCached(q, "_insideAttackerCount")); } catch { sb.Append(" | atakujacy w srodku ?"); }
+            sb.Append(" | straty30s = pociski/reszta (zabici + nieprzytomni); liczniki z pamieci gry bez przeliczania.");
             Log.Info(sb.ToString());
+        }
+
+        // 437-p: pola QueryData<int> SiegeQuerySystem (refleksja raz na nazwe); odczyt GetCachedValue - bez Evaluate i bez zapisu czasu waznosci
+        private static readonly Dictionary<string, FieldInfo> QFields = new Dictionary<string, FieldInfo>(StringComparer.Ordinal);
+
+        private static string QCached(SiegeQuerySystem q, string field)
+        {
+            FieldInfo fi;
+            if (!QFields.TryGetValue(field, out fi))
+            {
+                try { fi = AccessTools.Field(typeof(SiegeQuerySystem), field); } catch { fi = null; }
+                QFields[field] = fi;
+            }
+            if (fi == null) return "?";
+            var qd = fi.GetValue(q) as QueryData<int>;
+            return qd != null ? qd.GetCachedValue().ToString(Inv) : "?";
         }
 
         private void Side(Mission m, BattleSideEnum side, string head, List<string> bad)
