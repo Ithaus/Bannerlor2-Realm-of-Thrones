@@ -26,7 +26,7 @@ namespace Armoury
         private static int Sz5Limit { get { var s = Settings.Current; return s == null ? 2 : Math.Max(0, Math.Min(10, s.SiegeAssaultPartyStrikesRepels)); } }
 
         // liczniki doby 467
-        private static int _d5Party, _d5Limit, _d5Player, _d5NoRec, _d5Off, _d5Rounds, _d5Cut, _d5Won, _d5Rep, _d5Other;
+        private static int _d5Party, _d5Limit, _d5Player, _d5NoRec, _d5NoThr, _d5Off, _d5Rounds, _d5Cut, _d5Won, _d5Rep, _d5Other;
 
         /// <summary>467: przebieg jednego oblezenia (tylko log - linia "Oblezenie (467)" przy koncu oblezenia).</summary>
         private sealed class Siege5 { public string Fac = "-"; public int Assaults, Party, Full, Repelled, Won, Other, Rounds, Cut; public long CasA, CasD; }
@@ -37,6 +37,9 @@ namespace Armoury
         {
             if (b.Sz5 < 0) Sz5Decide(me, b);
             if (b.Sz5 != 1) return A;
+            // 467-p (recenzja U1): gracz dolaczyl do trwajacego szturmu AI (autobitwa) - od tej rundy cala armia; odwrot OB2 (UpdatePost) w bitwie gracza nie dziala,
+            // wiec oddzial bez odwrotu bilby slabiej i nie mogl sie wycofac. Bitwy z graczem bez zmian.
+            if (me.IsPlayerMapEvent) { b.Sz5 = 0; b.Sz5Why = "gracz dolaczyl - cala armia"; _d5Player++; return A; }
             b.Sz5Rounds++; _d5Rounds++;
             if (A > b.K5) { b.Sz5Cut++; _d5Cut++; return b.K5; }
             return A;
@@ -54,7 +57,7 @@ namespace Armoury
                 if (!_assaults.TryGetValue(me, out a) || a == null) { b.Sz5Why = "bez rekordu szturmu OB2"; _d5NoRec++; return; }
                 b.Fac5 = a.Fac;
                 if (!Sz5On) { b.Sz5Why = "klucz NIE"; _d5Off++; return; }
-                if (a.Off || a.K <= 0 || RepelLoss <= 0f || a.Thr <= 0f) { b.Sz5Why = "bez progu zalamania (OB2/371 nieczynne)"; _d5NoRec++; return; }
+                if (a.Off || a.K <= 0 || RepelLoss <= 0f || a.Thr <= 0f) { b.Sz5Why = "bez progu zalamania (OB2/371 nieczynne)"; _d5NoThr++; return; }
                 int lim = Sz5Limit;
                 if (lim > 0 && b.Repels >= lim) { b.Sz5Why = "limit: odparc w tym oblezeniu " + b.Repels + " >= " + lim + " - idzie cala armia"; _d5Limit++; return; }
                 b.K5 = a.K; b.Sz5 = 1; b.Sz5Why = null; _d5Party++;
@@ -94,10 +97,10 @@ namespace Armoury
         {
             return " | SZ5 (467): klucz " + (Sz5On ? "TAK" : "NIE") + ", limit odparc " + (Sz5Limit > 0 ? Sz5Limit.ToString() : "brak") + " | szturmy AI z oddzialem " + _d5Party
                  + " (zdobyte " + _d5Won + ", odparte " + _d5Rep + ", inne " + _d5Other + "), cala armia: po limicie " + _d5Limit + ", klucz NIE " + _d5Off
-                 + ", bez rekordu " + _d5NoRec + ", gracz " + _d5Player + " | rund z oddzialem " + _d5Rounds + ", przycietych " + _d5Cut + " | oblezenia w pamieci " + _sz5.Count;
+                 + ", bez rekordu " + _d5NoRec + ", bez progu " + _d5NoThr + ", gracz " + _d5Player + " | rund z oddzialem " + _d5Rounds + ", przycietych " + _d5Cut + " | oblezenia w pamieci " + _sz5.Count;
         }
 
-        private static void ZeroDay467() { _d5Party = _d5Limit = _d5Player = _d5NoRec = _d5Off = _d5Rounds = _d5Cut = _d5Won = _d5Rep = _d5Other = 0; }
+        private static void ZeroDay467() { _d5Party = _d5Limit = _d5Player = _d5NoRec = _d5NoThr = _d5Off = _d5Rounds = _d5Cut = _d5Won = _d5Rep = _d5Other = 0; }
 
         /// <summary>467: z OnSiegeEnded - linia przebiegu oblezenia (tylko gdy byl szturm AI z rundami SZ). Nie rzuca.</summary>
         private static void Sz5SiegeEnded(SiegeEvent ev)

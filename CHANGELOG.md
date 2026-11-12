@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 467-p (12.11) - poprawki po recenzji 467: gracz dolaczajacy do szturmu AI = cala armia (U1), osobny licznik "bez progu" (U4)
+
+**Problem:**
+- U1 (recenzja 467): decyzja SZ5 zapada raz, w pierwszej rundzie (`b.Player` ustawiane w `BatOf`). Gdy gracz dolaczy do trwajacego szturmu AI i wybierze autobitwe, kolejne rundy dalej licza ciosy z oddzialu K, a odwrot OB2 (`UpdatePost`, `SiegeWalls.cs:660`) w bitwie gracza sie wylacza - szturmujacy bija slabiej i nie moga sie wycofac. Lamie zasade 467 "bitwy z graczem bez zmian".
+- U4: "bez progu zalamania (OB2/371 nieczynne)" liczone w `_d5NoRec` razem z "bez rekordu szturmu" - linia OB0 pokazywala oba jako "bez rekordu".
+
+**Przyczyna:** `Sz5Party` nie sprawdzal `IsPlayerMapEvent` po decyzji; wspolny licznik.
+
+**Zmiana (`SiegeWalls.Party467.cs`):**
+- `Sz5Party`: po decyzji, gdy `b.Sz5 == 1 && me.IsPlayerMapEvent` - `b.Sz5 = 0`, powod "gracz dolaczyl - cala armia", licznik `_d5Player`, od tej rundy Ak = A (wzor sprzed 467). Linia "Bitwa szturmu (SZ)" pokaze `cala armia (gracz dolaczyl - cala armia)`, linia oblezenia policzy ten szturm jako "cala armia".
+- Nowy licznik `_d5NoThr`, w linii OB0: `..., bez rekordu N, bez progu M, gracz ...`; zerowany w `ZeroDay467`.
+
+**Ryzyko / co sprawdzic:** sprawdzenie raz na runde (wlasciwosc gry, bez alokacji). Rundy przed dolaczeniem gracza zostaja policzone z oddzialem (`_d5Party` i `_d5Player` moga oba liczyc ten szturm - tylko log). Szturmy AI bez gracza bez zmian. Recenzja U5 (pamiec `_sz5` poza zapisem - linia "Oblezenie (467)" po wczytaniu liczy szturmy od wczytania) odrzucona: tylko log, czytac z tym zastrzezeniem. U2/U3 (dluzsze oblezenia niz wyliczone, slabe armie odpierane czesciej) - do pomiaru w autotescie, bez zmiany kodu. Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 466-p (12.11) - poprawka po recenzji 466: podpowiedz "Army Objective Skips Vetoed Seats" nie mowi juz, ze zamki sa zawsze oddawane
 
 **Problem:** recenzja 466 (uwaga 2, napis w grze): podpowiedz MCM klucza `BkVetoNextTarget334` wymieniala "a castle just given back" jako stale weto, a od 466 zwrot zdobyczy 326b jest domyslnie NIE - Jeff czytalby, ze zamki dalej wracaja. To samo w naglowku `WarFront334.Theatre.cs` (komentarz B7).
