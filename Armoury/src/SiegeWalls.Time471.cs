@@ -344,7 +344,7 @@ namespace Armoury
             {
                 var lp = ev != null && ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null;
                 if (st == null || lp == null || !lp.IsActive) { info = "brak obozu"; _d471Refused++; return false; }
-                if (InBattle471(st, lp)) { info = "bitwa w toku"; _d471Refused++; return false; }
+                if (InBattle471(st, lp) || SiegeSurrender374.CampBusy(st)) { info = "bitwa w toku"; _d471Refused++; return false; }   // 471b-p1: kazda druzyna obozu (SiegeCompleted wciaga je do osady)
                 if (lp.MapFaction == null || st.MapFaction == null || !FactionManager.IsAtWarAgainstFaction(lp.MapFaction, st.MapFaction)) { info = "pokoj miedzy stronami"; _d471Refused++; return false; }
                 T471 r;
                 if (_t471.TryGetValue(ev, out r)) r.EndWay = "KAPITULACJA (" + way + ")";
@@ -382,7 +382,7 @@ namespace Armoury
                 var camp = ev != null ? ev.BesiegerCamp : null;
                 var lp = camp != null ? camp.LeaderParty : null;
                 if (st == null || camp == null || lp == null) { info = "brak obozu"; _d471Refused++; return false; }
-                if (InBattle471(st, lp)) { info = "bitwa w toku"; _d471Refused++; return false; }
+                if (InBattle471(st, lp) || SiegeSurrender374.CampBusy(st)) { info = "bitwa w toku"; _d471Refused++; return false; }   // 471b-p1: RemoveAllSiegeParties - zadna druzyna obozu w bitwie
                 T471 r;
                 if (_t471.TryGetValue(ev, out r)) r.EndWay = "ODEJSCIE po limicie";
                 double age = ev.SiegeStartTime.ElapsedDaysUntilNow, ratio = Ratio471(ev, st);

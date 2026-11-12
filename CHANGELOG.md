@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 471b-p1 (13.11) - kapitulacja i odejscie 471b czekaja, gdy KTORAKOLWIEK druzyna obozu walczy (recenzja A1)
+
+**Problem:** recenzja A 471b, usterka 1 (ryzyko CTD): `Yield471` i `Lift471` sprawdzaly bitwe tylko wodza obozu, osady, zalogi i milicji (`InBattle471`). Gra w `KingdomManager.SiegeCompleted` (`RemoveAllSiegeParties` + `EnterSettlementAction.ApplyForParty` kazdej druzyny obozu) i w `RemoveAllSiegeParties` (odejscie) rusza wszystkie druzyny obozu - takze te, ktore w tej chwili walcza z odsiecza albo bandytami (MapEvent).
+
+**Przyczyna:** 471b-4 nie uzyl `SiegeSurrender374.CampBusy` (recenzja 374: "SiegeCompleted nie moze ruszac partii w bitwie").
+
+**Zmiana:** `SiegeWalls.Time471.cs` - w `Yield471` i `Lift471`: `if (InBattle471(st, lp) || SiegeSurrender374.CampBusy(st))` -> "bitwa w toku", licznik "wstrzymane"; droga probuje znow nastepnej doby (a, e z doby; b z GL - nastepna doba glodu).
+
+**Ryzyko / co sprawdzic:** `CampBusy` tylko czyta (osada i kazda druzyna obozu, MapEvent). Kapitulacja / odejscie moze przyjsc dobe pozniej. W logu: `Czas oblezen (471 doba)` pole "wstrzymane". Klucze NIE - bez zmian (sciezka tylko przy TAK).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-5 (13.11) - osady klanu gracza oblegane przez AI: te same reguly 471b (D5)
 
 **Problem:** Jeff 13.11, odpowiedz D5: "tak" - osady klanu gracza oblegane przez AI pod nieobecnosc gracza maja te same reguly (recenzja 471a U4). Do 471b-4 byly poza regula (`Acts471`: "osada klanu gracza (D5)") - tylko szturm i stary glod GL.
