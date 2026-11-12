@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 458-q (12.11) - odwrot wodza: wynik misji brany z Mission.MissionResult, gdy OnMissionResultReady nie dochodzi
+
+**Problem:** autotest at-458 (n391, 7 bitew): regula zadzialala 3 razy (Tywin Lannister, Shierle Swyft, Harys Swyft - "ODWROT NA ROZKAZ", wodz "zszedl z pola (uszedl)", rozliczenie misji "-> OK", zbiegli z wodzem 13 / 19 / 36), ale czesc na mapie nie ruszyla: "wynik misji brak (wyjscie bez wyniku)" i "mapa: gracz nie wygral - mapa jak w grze"; Harys Swyft po bitwie "Fugitive, partia rozbita". W logach 11-12.11 wszystkie 14 linii 458 maja "wynik misji brak" - OnMissionResultReady nie doszlo do tej logiki ani razu, choc bitwy konczyly sie same (autotest wychodzi TryExit po zakonczeniu; BattleEndLogic.MissionEnded -> Mission.CheckMissionEnded).
+
+**Przyczyna:** nieustalona do konca (Mission.CheckMissionEnded ustawia Mission.MissionResult, potem petla MissionResultReady po MissionLogics - do tej logiki nie dochodzi; brak wyjatku w CrashScribe). Regula zalezala tylko od tego zdarzenia.
+
+**Zmiana:** OnEndMission: gdy wyniku nie bylo, odczyt Mission.MissionResult (ustawiony przed petla) i to samo co w OnMissionResultReady (ForceRetreated przy kluczu TAK). Linia konca: "wynik misji (z Mission.MissionResult przy koncu - OnMissionResultReady nie doszlo) ...".
+
+**Ryzyko / co sprawdzic:** czesc mapy 458 (pojmanie tylko tych, ktorzy nie zeszli z wodzem) zacznie dzialac - linie "Odwrot wodza (458) mapa:" (A = B + C + D + E, D = 0, "OK"), partia wodza po bitwie zostaje na mapie i odchodzi. Gdy CampaignBattleResult jeszcze null przy OnEndMission - ForceRetreated pisze "brak CampaignBattleResult" (mapa jak w grze, bez szkody). Klucz NIE - bez zmian (sam pomiar).
+
+**Status:** DO SPRAWDZENIA
+
 ## 458-p (12.11) - poprawka po recenzjach A i B reguly 458-r (odwrot wodza pod oslona tylnej strazy)
 
 **Problem:** recenzje A (misja) i B (mapa) commitu 0fff4e3a. Najwazniejsze: (A1) bez tylnej strazy / po jej padnieciu cala armia liczyla sie jako "zbiegli z wodzem" - misja konczyla sie "wrog uciekl" po ok. 13 s, a stojacy na polu na koniec (takze wodz) zostawali w partii - wbrew 2B ("tylko ci, ktorzy faktycznie zeszli") i 3 ("tylna straz walczy do konca"); (B1) ranny lord, ktory nie wszedl na pole, uchodzil z partia jak posilki; (B2) ranni sprzed bitwy zostawali w partii, a 2B mowi "pozostali ida do zwyciezcy", Jeff: "wygrany pewnie grabi rannych"; (B3) gdy liczniki misji czegos nie zlapaly, partia zatrzymywala ludzi, a kontrola sum byla prawdziwa z budowy; (B5) potkniecie w srodku rozliczenia moglo zdublowac ludzi (u zwyciezcy i w skladzie). Gry nie uruchamiano - dowod z kodu i dekompilacji (decout/cs_full.cs, rbmai.cs).

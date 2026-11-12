@@ -136,6 +136,7 @@ namespace Armoury
         private int _stumbles, _errs;
         private MissionResult _result;
         private bool _resultSeen;
+        private bool _resultLate;   // 458-q: wynik z Mission.MissionResult przy OnEndMission (OnMissionResultReady nie doszlo)
         private readonly List<St> _teams = new List<St>();
         private readonly MBList<Agent> _bufE = new MBList<Agent>();
 
@@ -727,6 +728,18 @@ namespace Armoury
             try
             {
                 var m = Mission;
+                // 458-q: autotest at-458 - OnMissionResultReady nie doszlo do tej logiki w ZADNEJ bitwie (14 x "wynik misji brak"), choc bitwy konczyly sie
+                // same (CheckMissionEnded ustawia Mission.MissionResult PRZED petla MissionResultReady). Wynik brany wtedy z Mission.MissionResult.
+                if (!_resultSeen && m != null)
+                {
+                    MissionResult mr = null;
+                    try { mr = m.MissionResult; } catch { mr = null; }
+                    if (mr != null)
+                    {
+                        _result = mr; _resultSeen = true; _resultLate = true;
+                        if (_ruleKey) { try { ForceRetreated(mr); } catch (Exception e) { Stumble("WynikPozno", e); } }
+                    }
+                }
                 bool anyRule = false;
                 if (_ruleKey && _started && !_ended && _field)
                 {
@@ -738,7 +751,7 @@ namespace Armoury
                     var r = _result;
                     var sb = new StringBuilder(1024);
                     sb.Append("Odwrot wodza (458) koniec: t=").Append(F0(now)).Append(_ruleKey ? "s | klucz Commander Withdraws Under Rearguard TAK" : "s | sam pomiar (klucz Commander Withdraws Under Rearguard NIE)")
-                      .Append(" | wynik misji ").Append(r == null ? (_resultSeen ? "null" : "brak (wyjscie bez wyniku)") : r.BattleState + (r.PlayerVictory ? ", zwyciestwo gracza" : "")
+                      .Append(" | wynik misji ").Append(_resultLate ? "(z Mission.MissionResult przy koncu - OnMissionResultReady nie doszlo) " : "").Append(r == null ? (_resultSeen ? "null" : "brak (wyjscie bez wyniku)") : r.BattleState + (r.PlayerVictory ? ", zwyciestwo gracza" : "")
                           + (r.PlayerDefeated ? ", gracz pokonany" : "") + (r.EnemyRetreated ? ", EnemyRetreated" : ""))
                       .Append(" | druzyn AI ").Append(_teams.Count);
                     MapEvent me = null;
