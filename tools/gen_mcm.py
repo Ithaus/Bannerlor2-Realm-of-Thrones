@@ -844,6 +844,7 @@ LABELS = {
     'SiegeCampAttritionByMedicine': 'Siege Camp Attrition By Medicine',   # 471b-2
     'SiegeCampForage': 'Siege Camp Forages The Villages',   # 471b-3
     'SiegeTimeByFactors': 'Siege Time By Factors',   # 471b-4
+    'SiegeTimeRulesPlayerHoldings': 'Siege Time Rules For Your Fortresses',   # 471b-5
     'BkVetoNextTarget334': 'Army Objective Skips Vetoed Seats',
     'IronbornCanonReave334': 'Ironborn Reave The North',
     'PartyPositionGuard334c': 'Party Position Guard',   # paczka 334c

@@ -1,5 +1,23 @@
 # DZIENNIK ZMIAN
 
+## 471b-5 (13.11) - osady klanu gracza oblegane przez AI: te same reguly 471b (D5)
+
+**Problem:** Jeff 13.11, odpowiedz D5: "tak" - osady klanu gracza oblegane przez AI pod nieobecnosc gracza maja te same reguly (recenzja 471a U4). Do 471b-4 byly poza regula (`Acts471`: "osada klanu gracza (D5)") - tylko szturm i stary glod GL.
+
+**Przyczyna:** `SiegeWalls.Acts471` (SiegeWalls.Time471.cs) wylaczal kazda osade `OwnerClan == Clan.PlayerClan`.
+
+**Zmiana:** klucz `SiegeTimeRulesPlayerHoldings` (MCM "Siege Time Rules For Your Fortresses", grupa 471, TAK; Settings.cs + McmSettings.cs recznie, nazwa w `tools/gen_mcm.py`).
+- `Acts471`: osada klanu gracza wylaczona tylko przy kluczu NIE. Przy TAK: bramka szturmu (przed dolna granica bez szturmu, wiekszy niz maly zamek tylko przez wyrwe), kapitulacja z honorami z terminu R / z glodu po tygodniu laski, limit, furaz wsi gracza - jak u AI. Gracz w osadzie albo w obozie - dalej poza regula (`Out471`, bez zmian).
+- Komunikaty dla gracza (po angielsku): kapitulacja - "X has yielded to Y after N days of siege. The garrison marches out under arms to the lords of your realm."; odejscie po limicie - "The siege of X is lifted: Y's host gives up and marches away."; furaz - raz na wies i oblezenie: "The besiegers of X are stripping the granary of your village V."
+- Zaloga rodu gracza przy kapitulacji idzie droga `BookHoldings.YieldOut(..., toParty null)`: do najblizszych druzyn lordow i zalog krolestwa (bez druzyn i zalog rodu gracza - `RecipientOk`), bez nich do domu. NIE do druzyny gracza (gracza nie ma przy murach - w 374 gracz jest w osadzie i bierze ich sam).
+
+**Ryzyko / co sprawdzic:**
+- Regresje: 369 (`PlayerClaims369`) - kapitulacja to zmiana pana BySiege bez cesji, wiec roszczenie gracza zapisane i komunikat "has fallen ... It is still yours by right" obok naszego (dwa komunikaty - zamierzone: utrata jest prawdziwa). 384 / 374 (rozmowy gracza) - nie dotyczy (gracz poza osada).
+- Do decyzji Jeffa: czy zaloga rodu gracza ma isc do jego innych zamkow / druzyny zamiast do lordow krolestwa (dzis `RecipientOk` wyklucza rod gracza - regula 374/W4c).
+- Klucz NIE = co do bitu jak 471b-4 (osada klanu gracza poza regula).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-4 (13.11) - czas oblezenia z czynnikow DZIALA: kapitulacja z honorami z terminu R i z glodu, bramka szturmu, limit (D4)
 
 **Problem:** cele 471 (Jeff 12.11): maly zamek 20-40 dob, duzy zamek 40-90, miasto i wielka twierdza 60-150, limit 1.5 x gorna granica. Test 60 dob: oblezenia AI trwaja 6-16 dob (szturm taranem i wieza po ok. 6 dobach, mury 100%, trebuszy 0). 471a liczyl termin R tylko do logu. Jeff 13.11, D4: "wedle twojej rady" = zaloga, ktora poddala sie przed szturmem (termin R / glod), wychodzi wolno do swoich; zdobyta szturmem - niewola jak w grze.

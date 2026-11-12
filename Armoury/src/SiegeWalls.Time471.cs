@@ -56,6 +56,7 @@ namespace Armoury
         private const double Limit471 = 1.5;   // qJ: jedzenie zalogi wzgledem 1.5 x gornej granicy (kalibracja 471-p, niezalezna od klucza limitu)
         // 471b-4 (D4 i bramka/limit): klucz SiegeTimeByFactors, limit = SiegeTimeLimitFactor x gorna granica (1..3, domyslnie 1.5)
         internal static bool TimeOn { get { var s = Settings.Current; return s != null && s.SiegeTimeByFactors; } }
+        private static bool PlayerHoldingsOn { get { var s = Settings.Current; return s != null && s.SiegeTimeRulesPlayerHoldings; } }   // 471b-5 (D5)
         private static double LimitK { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeTimeLimitFactor) ? 1.5 : Clamp(s.SiegeTimeLimitFactor, 1.0, 3.0); } }
         internal const int LiftTruceDays = 30;   // 471b-4 (e): oboz slabszy niz obroncy odchodzi po limicie - rozejm tej osady dla jego frakcji i rodow (droga 384)
         private static string _yield471;          // okno SiegeCompleted kapitulacji 471b (BesiegedRelief: wynik "ZDOBYTE" bez bitwy)
@@ -157,7 +158,7 @@ namespace Armoury
         }
 
         /// <summary>471b: czy regula 471b DZIALA na tym oblezeniu (furaz 471b-3, kapitulacja / bramka / limit 471b-4). Powod pominiecia albo null:
-        /// brak wodza obozu, gracz / Inni / skrypt fabuly (Out471), osada klanu gracza (D5 - do 471b-5 poza regula). Nie rzuca.</summary>
+        /// brak wodza obozu, gracz / Inni / skrypt fabuly (Out471), osada klanu gracza przy kluczu SiegeTimeRulesPlayerHoldings NIE (471b-5, D5). Nie rzuca.</summary>
         internal static string Acts471(SiegeEvent ev)
         {
             try
@@ -168,7 +169,7 @@ namespace Armoury
                 if (lp == null) return "oboz bez wodza";
                 string why = Out471(ev, st, lp);
                 if (why != null) return why;
-                if (st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan) return "osada klanu gracza (D5)";
+                if (st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan && !PlayerHoldingsOn) return "osada klanu gracza (klucz D5 NIE)";   // 471b-5: D5 "tak" - te same reguly
                 return null;
             }
             catch (Exception e) { Stumble("Acts471", e); return "blad"; }
@@ -357,6 +358,8 @@ namespace Armoury
                 finally { _yield471 = null; }
                 bool ok = st.SiegeEvent != ev && st.MapFaction == lp.MapFaction;
                 _d471Yield++;
+                if (oldClan != null && oldClan == Clan.PlayerClan)   // 471b-5 (D5): osada rodu gracza
+                    try { Log.Player(Nm(st) + " has yielded to " + Hn(lp) + " after " + F(age, "0") + " days of siege. The garrison marches out under arms to the lords of your realm.", true); } catch { }
                 info = (ok ? "osada przeszla" : "SiegeCompleted bez zmiany pana") + " | partie lordow wyprowadzone " + lords + " | " + out1;
                 if (LogOn)
                     Log.Info("Czas oblezenia (471b) kapitulacja: dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ") | droga " + way + " | po " + F(age, "0.0") + " dob"
@@ -388,6 +391,8 @@ namespace Armoury
                 bool ended = SiegeRansom.Lift384(st, out li);
                 int turned = ended ? SiegeRansom.Truce384(st, keys, Today + LiftTruceDays) : 0;
                 _d471Lift++;
+                if (ended && st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan)   // 471b-5 (D5): osada rodu gracza
+                    try { Log.Player("The siege of " + Nm(st) + " is lifted: " + Hn(lp) + "'s host gives up and marches away.", false); } catch { }
                 info = li + (ended ? ", rozejm " + LiftTruceDays + " dob (" + string.Join(", ", keys.ToArray()) + "), zawrocone " + turned : "");
                 if (LogOn)
                     Log.Info("Czas oblezenia (471b) odejscie po limicie: dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ") | po " + F(age, "0.0") + " dob (limit " + (r != null ? F(LimitK * CatHi[r.Cat], "0") : "-") + ")"

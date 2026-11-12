@@ -37,6 +37,7 @@ namespace Armoury
 
         private sealed class Rec { public long Pieces; public int Days, Rel; public readonly Dictionary<string, int> RelOf = new Dictionary<string, int>(StringComparer.Ordinal); public readonly HashSet<string> Vill = new HashSet<string>(StringComparer.Ordinal), Done = new HashSet<string>(StringComparer.Ordinal); }
         private static readonly Dictionary<SiegeEvent, Rec> _recs = new Dictionary<SiegeEvent, Rec>();
+        private static readonly HashSet<string> _told = new HashSet<string>(StringComparer.Ordinal);   // 471b-5: wsie gracza, o ktorych juz napisano (osada|wies|start oblezenia)
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static long _dPieces; private static double _dDrop, _dBal; private static int _dParties, _dRel, _dSieges, _dEmpty;
@@ -49,7 +50,7 @@ namespace Armoury
         private static string F(double v, string f) { return v.ToString(f, Inv); }
 
         /// <summary>Z SiegeWalls.Reset (nowa kampania i kazde wczytanie).</summary>
-        internal static void Reset() { _recs.Clear(); _stumbles = 0; _err.Clear(); Zero(); }
+        internal static void Reset() { _recs.Clear(); _told.Clear(); _stumbles = 0; _err.Clear(); Zero(); }
         private static void Zero() { _dPieces = 0; _dDrop = _dBal = 0.0; _dParties = _dRel = _dSieges = _dEmpty = 0; }
 
         /// <summary>Z SiegeWalls.SessionStart: linia startowa 471b-3.</summary>
@@ -145,6 +146,8 @@ namespace Armoury
                         if (rec == null && !_recs.TryGetValue(ev, out rec)) { rec = new Rec(); _recs[ev] = rec; }
                         rec.Pieces += n; rec.Vill.Add(v.Settlement.StringId);
                         Opinion(rec, mp.LeaderHero, v);
+                        if (v.Settlement.OwnerClan != null && v.Settlement.OwnerClan == Clan.PlayerClan && _told.Add(st.StringId + "|" + v.Settlement.StringId + "|" + ev.SiegeStartTime.ToHours.ToString("0.0", Inv)))   // 471b-5 (D5)
+                            try { Log.Player("The besiegers of " + st.Name + " are stripping the granary of your village " + v.Settlement.Name + ".", true); } catch { }
                     }
                     if (got > 0) { fed++; _dParties++; }
                 }
