@@ -703,7 +703,7 @@ namespace Armoury
               .Append(" | piechota wrocila: padl ").Append(FEnd[UGone]).Append(", smycz ").Append(F0(MarchToContact.InfRearm)).Append(" m ").Append(FEnd[ULeash]).Append(", czas ")
               .Append(F0(MaxSeconds)).Append(" s ").Append(FEnd[UTime]).Append(", cel padl ").Append(FEnd[UThreat]).Append(", zwarcie ").Append(FEnd[UMelee]).Append(", konny uszedl ")
               .Append(FEnd[URange]).Append(", przy szyku nekajacego ").Append(FEnd[UIntact]).Append(", panika ").Append(FEnd[UPanic]).Append(", inne ")
-              .Append(FEnd[UOther] + FEnd[UPlayer] + FEnd[UKey] + FEnd[URetreat] + FEnd[UEnded])
+              .Append(FEnd[UOther] + FEnd[UPlayer] + FEnd[UKey] + FEnd[URetreat] + FEnd[UEnded] + FEnd[URole])
               .Append("; nie wyslani: szyk w zwarciu ").Append(Fw[FwEngaged]).Append(", ponizej polowy ").Append(Fw[FwHalf]).Append(", bohater ").Append(Fw[FwHero])
               .Append(", chorazy ").Append(Fw[FwBanner]).Append(", zajety ").Append(Fw[FwBusy]).Append(", przerwa ").Append(Fw[FwCool]).Append(", w zwarciu ").Append(Fw[FwMelee])
               .Append(", przy szyku nekajacego ").Append(Fw[FwIntact]).Append(", limit zapytan ").Append(Fw[FwQuery]).Append(", panika ").Append(Fw[FwPanic])

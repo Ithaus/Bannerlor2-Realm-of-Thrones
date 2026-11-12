@@ -86,7 +86,7 @@ namespace Armoury
         // jezdziec zawrocony
         private const int OFar = 0, OIntact = 1, OHorse = 2, OPanic = 3, OCheer = 4, OOther = 5, OKinds = 6;
         // koniec poscigu szyku
-        private const int ETime = 0, EQuiet = 1, EHorses = 2, EPlayer = 3, EEmpty = 4, EMission = 5, EKey = 6, EKinds = 7;
+        private const int ETime = 0, EQuiet = 1, EHorses = 2, EPlayer = 3, EEmpty = 4, EMission = 5, EKey = 6, ERole = 7, EKinds = 8;   // ERole: 441-p - szyk dostal role jazdy Armoury (w linii 441)
         // nie zaczal (przypadki w passach, gdy uciekajacy byli w 150 m)
         private const int NIntact = 0, NHorses = 1, NRest = 2, NFar = 3, NNotBroken = 4, NEnded = 5, NCool = 6, NKinds = 7;
         // wykluczeni jezdzcy (rozni ludzie)
@@ -160,6 +160,7 @@ namespace Armoury
         private static int _dryEpisodes;
         private static float _drySec;
         private static readonly int[] EndWhy = new int[EKinds];
+        internal static int PursuitRoleEnds441 { get { return EndWhy[ERole]; } }   // 441-p
         private static readonly int[] OutWhy = new int[OKinds];
         private static readonly int[] NoStart = new int[NKinds];
         private static readonly int[] Excluded = new int[XKinds];
@@ -706,8 +707,9 @@ namespace Armoury
             Vec2 c = f.CachedAveragePosition;
             if (!c.IsValid) return;
             bool player = _delegated ? PlayerFormDirect(f) : PlayerForm(f);
-            // 441 (jeden wlasciciel): szyk w roli jazdy Armoury jak szyk gracza - poscig nie zaczyna sie, trwajacy konczy (EPlayer); licznik w linii 441
-            if (!player && Doctrine.C441Hard(f)) { player = true; Doctrine.C441NoteSkip(0); }   // 444-p: WAIT nie blokuje
+            // 441 (jeden wlasciciel): szyk w roli jazdy Armoury - poscig nie zaczyna sie, trwajacy konczy; 441-p: osobna przyczyna ERole i bez PlayerSkipped
+            // (linia 148 nie liczy roli jako gracza), licznik w linii 441; 444-p: WAIT nie blokuje (C441Hard)
+            bool role = !player && Doctrine.C441Hard(f);
             if (st.Active)
             {
                 st.HasMain = hasMain;
@@ -715,6 +717,7 @@ namespace Armoury
                 float age = now - st.Start;
                 int end = -1;
                 if (player) end = EPlayer;
+                else if (role) end = ERole;
                 else if (st.Dry == _key) end = EKey;                  // klucz przelaczony w trakcie
                 else if (age >= _maxSec) end = ETime;
                 else if (Blown(HorseWind.AvgStamina(f))) end = EHorses;
@@ -731,6 +734,7 @@ namespace Armoury
             int e = 1 - st.Side;
             if (NearCount(e, c) < MinFleeing) return;
             if (player) { PlayerSkipped.Add(f); return; }
+            if (role) { Doctrine.C441NoteSkip(0, f); return; }   // 441-p: tylko gdy poscig by sie rozwazal (uciekajacy przy szyku)
             int why = -1;
             if (now < st.CoolUntil) why = NCool;
             else if (!Broke(st.Side, e)) why = NNotBroken;

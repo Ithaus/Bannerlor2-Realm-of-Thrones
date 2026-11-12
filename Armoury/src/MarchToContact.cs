@@ -577,7 +577,10 @@ namespace Armoury
                 RestCap(f, idx);
                 return;
             }
-            if (charge && HoldCharge(idx, kind, gap, now))
+            // 441-p (recenzja 441): szyk w roli z galopem bez trzymania szarzy klusem 128 (kontrszarza roli); licznik wyjatku klusa w linii 441
+            bool roleFull = charge && kind == KCav && Doctrine.C441FullPace(f);
+            if (roleFull) Doctrine.C441NoteFullPace(f);
+            if (charge && !roleFull && HoldCharge(idx, kind, gap, now))
             {
                 if (!_chargeHeld[idx]) { _chargeHeld[idx] = true; _tHeld++; }
                 MarchCap(f, idx, kind == KArch ? KInf : kind, gap, q);   // lucznicy w szarzy ida do progu biegu jak piechota
@@ -647,7 +650,7 @@ namespace Armoury
                 // jak galop ponizej. Odpoczynek koni 136 (RestCav) wyzej zostaje. W 441 zadna rola nie jest nadawana - galaz nie wchodzi (licznik w linii 441)
                 if (Doctrine.C441FullPace(f))
                 {
-                    Doctrine.C441NoteFullPace();
+                    Doctrine.C441NoteFullPace(f);
                     Release(idx, now);
                     Set(f, idx, 0f, 0f, false);
                     return;

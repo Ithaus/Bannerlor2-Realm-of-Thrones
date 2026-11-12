@@ -41,7 +41,7 @@ namespace Armoury
             public Vec2 FaceDir;
         }
 
-        private const int LEnd = 0, LTime = 1, LNear = 2, LCharge = 3, LPlayer = 4, LTactic = 5, LRetreat = 6, LS4 = 7, LKey = 8, LBattle = 9, LFire = 10, LKinds = 11;   // LFire: 313b - druzyna puszczona 291e albo bieg pod ostrzalem
+        private const int LEnd = 0, LTime = 1, LNear = 2, LCharge = 3, LPlayer = 4, LTactic = 5, LRetreat = 6, LS4 = 7, LKey = 8, LBattle = 9, LFire = 10, LRole = 11, LKinds = 12;   // LFire: 313b - druzyna puszczona 291e albo bieg pod ostrzalem; LRole: 441-p - szyk dostal role jazdy Armoury (liczony w linii 441, nie w linii 283)
         private static readonly int[] LRel = new int[LKinds];
         private static readonly Dictionary<Formation, Halt> Halts = new Dictionary<Formation, Halt>();
         private static readonly List<Halt> HaltList = new List<Halt>(), HaltTmp = new List<Halt>();
@@ -69,6 +69,17 @@ namespace Armoury
         internal static int NoHaltFire { get { return _lNoFire; } }
         internal static int NoHaltRush { get { return _lNoRush; } }
         internal static int HaltFireRel { get { return LRel[LFire]; } }
+        internal static int HaltRoleRel441 { get { return LRel[LRole]; } }   // 441-p: postoje 283 zwolnione przez role jazdy Armoury
+
+        /// <summary>441-p (recenzja 441, jeden wlasciciel): Doctrine.C441SetRole PRZED Take - trwajacy postoj 283 szyku zwolniony, poki wagi sa jeszcze nasze
+        /// (Release oddaje zapisane wagi zachowan gry i RBM). Glowny watek. false = szyk nie stal.</summary>
+        internal static bool ReleaseHaltForRole441(Formation f)
+        {
+            Halt h;
+            if (f == null || !Halts.TryGetValue(f, out h) || h == null) return false;
+            Release(h, LRole);
+            return true;
+        }
 
         private static void HaltClear()
         {
@@ -134,6 +145,7 @@ namespace Armoury
         {
             if (fi.Player || fi.Retreat || fi.F == null || fi.F.CountOfUnits <= 0 || fi.F.AI == null) return false;
             if (Halts.ContainsKey(fi.F)) return false;
+            if (Doctrine.C441Owned(fi.F)) return false;   // 447-b: szyk w roli 441 (takze WAIT 444) nie staje w postoju 283 - HaltWhy i tak oddalby go od razu (LRole)
             if (fi.FootGap <= HuntClose) { if (LNo(fi.F, 1)) _lNoEng++; return false; }
             if (Charging(fi.F) || Doctrine.S4Held(fi.F)) return false;
             if (!Moving(fi.F)) { if (LNo(fi.F, 2)) _lNoMove++; return false; }
@@ -290,7 +302,7 @@ namespace Armoury
             for (int i = 0; i < lst.Count; i++)
             {
                 var b = lst[i];
-                if (b == null) continue;
+                if (b == null || b is BehaviorCavRole441) continue;   // 441-p: wage roli prowadzi Doctrine.C441SetRole (przy NONE i tak 0)
                 b.WeightFactor = ReferenceEquals(b, h.Stop) ? 1f : 0f;
             }
         }
@@ -330,7 +342,7 @@ namespace Armoury
             for (int i = 0; i < lst.Count; i++)
             {
                 var b = lst[i];
-                if (b == null) continue;
+                if (b == null || b is BehaviorCavRole441) continue;   // 441-p: waga roli nie jest waga taktyki
                 if (ReferenceEquals(b, h.Stop)) { if (Math.Abs(b.WeightFactor - 1f) > 0.001f) return false; }
                 else if (b.WeightFactor > 1E-07f) return false;
             }
@@ -351,7 +363,7 @@ namespace Armoury
                     for (int k = 0; k < h.Who.Length; k++)
                     {
                         var b = h.Who[k];
-                        if (b == null || ReferenceEquals(b, h.Stop)) continue;
+                        if (b == null || ReferenceEquals(b, h.Stop) || b is BehaviorCavRole441) continue;   // 441-p: waga roli zostaje (Take / Give)
                         for (int i = 0; i < lst.Count; i++)
                             if (ReferenceEquals(lst[i], b)) { b.WeightFactor = h.W[k]; break; }
                     }
@@ -404,6 +416,7 @@ namespace Armoury
             if (m.MissionEnded) return LBattle;
             if (!_rHaltKey) return LKey;
             if (PlayerForm(f)) return LPlayer;
+            if (Doctrine.C441Owned(f)) return LRole;   // 441-p: zabezpieczenie - rola nadana z pominieciem ReleaseHaltForRole441
             if (FormRetreat(f)) return LRetreat;
             if (Charging(f)) return LCharge;
             if (Doctrine.S4Held(f)) return LS4;

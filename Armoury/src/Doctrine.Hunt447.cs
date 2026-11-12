@@ -24,7 +24,7 @@ namespace Armoury
     ///   w 300 m od gracza, droga wolna (zaden szyk piechoty strony gracza >= 10 ludzi nie zaslania odcinka szyk - gracz, jak T442Blocked), >= 5 wolnych jezdzcow.
     /// WSPOLNA PULA Z 204 / 148 (jawne pierwszenstwo): szyk, w ktorym >= 50% jezdzcow jest juz pod 148 (poscig) / 204 (jazda na strzelca) / testem 283a, jest zajety
     ///   pilniejszym - HUNT go nie bierze. Po nadaniu roli HUNT szyk jest dla 148 / 204 / 283 / 311a / 344 szykiem w roli (C441Owned - nie biora z niego jezdzcow,
-    ///   ich jezdzcy tego szyku wracaja: UPlayer / EPlayer) - HUNT ma pierwszenstwo w swoim szyku, a zwolnieni dolaczaja w nastepnym passie. Jezdziec HUNT jest
+    ///   ich jezdzcy tego szyku wracaja: URole / ERole - 441-p, wlaczone w 447-b) - HUNT ma pierwszenstwo w swoim szyku, a zwolnieni dolaczaja w nastepnym passie. Jezdziec HUNT jest
     ///   dla 149 (straz bohatera 335) i chorazych 158 tym, czym jezdziec 204 (H447AnyThread obok HuntAnyThread / RidingAnyThread). 443 nie zaczyna rajdu / schowania
     ///   szykiem w HUNT (H447Busy).
     /// POLOWANIE (raz na bitwe, wszystkie druzyny razem): rola 441 CrHunt (galop - wyjatek klusa 441) z rozkazem Move na miejsce gracza (odswiezany, gdy gracz

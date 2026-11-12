@@ -98,7 +98,8 @@ namespace Armoury
         private static readonly int[] GKindSend = new int[KKinds];
         private static readonly int[] GEnd = new int[EKinds];
         private static int _gGuardEps, _gGuardMen, _gGuardReached, _gGuardNone;
-        private static readonly int[] GGuardEnd = new int[6];   // 0 koniec zagrozenia, 1 czas, 2 panika / odwrot, 3 czlowiek padl / dowodca padl, 4 koniec bitwy, 5 przejety (148/204/333)
+        private static readonly int[] GGuardEnd = new int[7];   // 0 koniec zagrozenia, 1 czas, 2 panika / odwrot, 3 czlowiek padl / dowodca padl, 4 koniec bitwy, 5 przejety (148/204/333), 6 szyk w roli 441 (441-p, w linii 441)
+        internal static int GuardRoleEnds441 { get { return GGuardEnd[6]; } }
         private static float _gLoneSum, _gPresentSum, _gLoneMax;
         private static string _gLoneWho = "-";
         private static int _gCmdKilled, _gCmdKo, _gFateThreat, _gFatePost, _gFateOther, _gStum;
@@ -607,6 +608,7 @@ namespace Armoury
             if (rk != null && rk.InRally(x)) return false;                                                            // 359: zawrocony w zbiorce (przed szykiem)
             var f = x.Formation;
             if (f == null || f.HasPlayerControlledTroop || HorsePursuit.PlayerForm(f)) return false;
+            if (Doctrine.C441Hard(f)) { Doctrine.C441NoteSkip(3, f); return false; }                                   // 441-p: szyk w roli jazdy Armoury - jeden wlasciciel (447-b: C441Hard - WAIT nie blokuje)
             if (charge ? InMelee(x) : Busy(x)) return false;                                                           // recenzja 335: nie z walki wrecz ani z szarzy (340: szarza w 2. przejsciu)
             try { if ((x.GetScriptedFlags() & Agent.AIScriptedFrameFlags.GoToPosition) != 0) return false; } catch { return false; }   // cudza pozycja skryptowa
             return true;
@@ -675,6 +677,7 @@ namespace Armoury
                 else if (o == null || o.Out || o.A == null || !o.A.IsActive()) why = 3;
                 else if (x.IsRunningAway || SurvivalMode.InPanic(x) || Withdrawing(x)) why = 2;
                 else if (HorsePursuit.HuntAnyThread(x) || HorsePursuit.RidingAnyThread(x) || HorsePursuit.TestRunAnyThread(x) || Doctrine.H447AnyThread(x)) why = 5;   // inny mechanizm wzial czlowieka - jego pozycja
+                else if (Doctrine.C441Hard(x.Formation)) why = 6;   // 441-p: szyk straznika dostal role jazdy Armoury - pozycja skryptowa zdjeta, rozkaz roli prowadzi (447-b: C441Hard)
                 else if (!(o.Mode == ModeThreat || (o.Mode == ModeWounded && o.St == StTravel) || o.Mode == ModeRally)) why = 0;   // 359: straz jedzie z dowodca do uciekajacych
                 else if (now - g.Since > (o.Mode == ModeRally ? RideMax + RideHoldMax + 1f : TravelMax)) why = 1;   // przeglad 359: straz do konca postoju przy uciekajacych
                 if (why >= 0)

@@ -78,7 +78,7 @@ namespace Armoury
         // recenzja 204: UMelee - wrog inny niz strzelec w RaiseNear (bron sie sam), UIntact - jezdziec w CounterFootGap od nietknietego szyku strony strzelca
         // (bez wjazdu w jego szyk, jak OIntact 148), UNoCheck - lucznicy bez sprawdzenia swoich przy strzelcu (limit zapytan) - cel zdjety
         private const int UGone = 0, UPanic = 1, UHorse = 2, ULeash = 3, URetreat = 4, UPlayer = 5, UKey = 6, UEnded = 7, UOther = 8, UThreat = 9, URange = 10, UFriend = 11,
-                          UMelee = 12, UIntact = 13, UNoCheck = 14, UTrim = 15, UTime = 16, UZone = 17, UPs344 = 18, UKinds = 19;   // UTrim - recenzja 204 (2): nadwyzka po obnizeniu poziomu; UTime - 283: piechota 60 s
+                          UMelee = 12, UIntact = 13, UNoCheck = 14, UTrim = 15, UTime = 16, UZone = 17, UPs344 = 18, URole = 19, UKinds = 20;   // UTrim - recenzja 204 (2): nadwyzka po obnizeniu poziomu; UTime - 283: piechota 60 s
         // nie wyslani (rozni ludzie)
         private const int NwMelee = 0, NwPanic = 1, NwChase = 2, NwHero = 3, NwBanner = 4, NwHorse = 5, NwFar = 6, NwPlayer = 7, NwLosing = 8, NwBusy = 9, NwCool = 10,
                           NwQuery = 11, NwOther = 12, NwIntact = 13, NwZone = 14, NwKinds = 15;   // 333: UZone / NwZone - strefa armii strzelca (HorsePursuit.Bait333.cs)
@@ -192,6 +192,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki misji
         private static readonly int[] HDet = new int[DKinds], HOut = new int[HKinds], HEpL = new int[4], UEnd = new int[UKinds], Nw = new int[NwKinds];
+        internal static int HunterRoleEnds441 { get { return UEnd[URole] + FEnd[URole]; } }   // 441-p: powroty jezdzcow 204 i piechoty 283 przez role szyku
         private static readonly HashSet<int> HGroupShooters = new HashSet<int>();
         private static int _hGroupCut, _hGroupMax, _hChkOver;
         private static readonly HashSet<int> HShooters = new HashSet<int>(), HRiders = new HashSet<int>(), HHorseArch = new HashSet<int>(), HFootArch = new HashSet<int>();
@@ -481,8 +482,7 @@ namespace Armoury
                     if (!c.IsValid) continue;
                     bool cav = q.IsCavalryFormation || q.IsRangedCavalryFormation;
                     // 441 (jeden wlasciciel): szyk w roli jazdy Armoury - 204 / 283 / 311a / 344 traktuja go jak szyk gracza (nie biora z niego jezdzcow)
-                    bool role = Doctrine.C441Hard(f);   // 444-p: WAIT nie blokuje
-                    if (role) Doctrine.C441NoteSkip(1);
+                    bool role = Doctrine.C441Hard(f);   // 444-p: WAIT nie blokuje; 441-p: licznik w NotePlayerForm (szyk w zasiegu odpowiedzi), nie co przebieg
                     var fi = new FI
                     {
                         F = f, C = c, N = f.CountOfUnits, R = Math.Min(RadiusCap, 0.5f * Math.Max(f.Width, f.Depth)),
@@ -807,7 +807,8 @@ namespace Armoury
             if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) return UPanic;
             if (!ReferenceEquals(a.Formation, h.F)) return UOther;
             if (m.MissionEnded || a.GetComponent<VictoryComponent>() != null) return UEnded;
-            if (h.F == null || PlayerForm(h.F) || Doctrine.C441Hard(h.F)) return UPlayer;   // 441: szyk jezdzca dostal role jazdy Armoury - jezdziec wraca
+            if (h.F == null || PlayerForm(h.F)) return UPlayer;
+            if (Doctrine.C441Hard(h.F)) return URole;   // 441 / 441-p: szyk jezdzca dostal role jazdy Armoury - jezdziec wraca (osobna przyczyna, w linii 441); 444-p: WAIT nie
             var s = h.T.S;
             if (s == null || !s.IsActive()) return UThreat;
             // recenzja 204: jezdziec nie wjezdza w nietkniety szyk strony strzelca (jak OIntact 148; zaslona przy piechocie trzyma 30 m od jej krawedzi);
@@ -1011,7 +1012,7 @@ namespace Armoury
         /// <summary>Szyk gracza w zasiegu odpowiedzi - nie rusza (ludzi szyku liczonych raz na bitwe).</summary>
         private static void NotePlayerForm(Threat t, FI fi, float e)
         {
-            if (fi.Role) return;   // 441: szyk w roli jazdy Armoury - liczony w linii 441, nie jako szyk gracza
+            if (fi.Role) { Doctrine.C441NoteSkip(1, fi.F); return; }   // 441: szyk w roli jazdy Armoury - liczony w linii 441 (441-p: rozne szyki), nie jako szyk gracza
             if (NwPlayerForms.Add(fi.F)) Nw[NwPlayer] += fi.N;
         }
 

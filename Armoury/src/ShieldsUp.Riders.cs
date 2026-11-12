@@ -158,7 +158,7 @@ namespace Armoury
             // 441 (jeden wlasciciel): jezdziec szyku w roli jazdy Armoury nie wchodzi w odruch / kontre 344
             if (!HorsePursuit.PlayerForm(f))
             {
-                if (Doctrine.C441Hard(f)) Doctrine.C441NoteSkip(2);   // 444-p: WAIT nie blokuje
+                if (Doctrine.C441Hard(f)) Doctrine.C441NoteSkip(2, f);   // 444-p: WAIT nie blokuje
                 else HorsePursuit.OnRiderShotAny(m, rider, at);
             }   // 344 (recenzja D5: bez klucza ShieldsUp - OnRiderShotAny sprawdza klucze 204/344): kazdy konny AI (nie tylko szyk konnicy) - kontra / odruch
             var q = f.QuerySystem;

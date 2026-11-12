@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Threading;
@@ -24,10 +25,13 @@ namespace Armoury
     ///   swoje zachowania drugi raz, my nie (GetBehavior - licznik "juz bylo"). Latki zakladane przy pierwszej bitwie procesu (NightHooks.FirstBattle -> AfterStart):
     ///   szyki zapelnione przed latka (albo przed AfterStart) dostaja zachowanie w takcie glownego watku (licznik "zalegle").
     /// Wyjatek limitu klusa (MarchToContact.Eval, galaz konnicy): szyk w roli z galopem (RoleGallop) jedzie rozkazem Move bez capu marszu 128 - inaczej kazdy nasz
-    ///   Move jazdy szedlby klusem. W 441 bez rol - wyjatek nigdy nie wchodzi (licznik 0).
+    ///   Move jazdy szedlby klusem; 441-p: takze szarza roli nie jest trzymana klusem (HoldCharge 128 pominiety). W 441 bez rol - wyjatek nigdy nie wchodzi (licznik 0).
     /// Jeden wlasciciel szyku: szyk w roli (C441Owned) jest dla 148 (poscig), 204 (jazda na strzelca), 283 (nekanie), 311a (oslona) i 344 (front / kontra / odruch)
-    ///   tym, czym szyk gracza - nie bierze z niego jezdzcow, a jezdziec takiego szyku wraca (HunterCheck UPlayer, koniec poscigu EPlayer). Pominiecia liczone
-    ///   osobno (nie w licznikach "szyk gracza"). W 441 bez rol - 0. 444-p: 148 / 204 / 344 czytaja C441Hard - rola WAIT (czekanie 444) ich nie blokuje.
+    ///   tym, czym szyk gracza - nie bierze z niego jezdzcow, a jezdziec takiego szyku wraca (441-p: HunterCheck URole, koniec poscigu ERole - osobne przyczyny,
+    ///   nie "gracz przejal"). 441-p: takze straz 335 (GuardOk; straznik z szyku w roli zwolniony) i trwajacy postoj 283 (zwolniony w C441SetRole przed Take,
+    ///   HaltWhy LRole). NIE objete: chorazy 158 / odbior sztandaru i ostroznosc bohatera 149/335 (RoleOf) - decyzja krokow 4.x. Pominiecia liczone jako rozne
+    ///   szyki na misje, osobno (nie w licznikach "szyk gracza"). W 441 bez rol - 0. 444-p: 148 / 204 / 344 czytaja C441Hard - rola WAIT (czekanie 444) ich nie blokuje;
+    ///   447-b (wlaczenie 441-p na galaz): straz 335 i start postoju 283 tez C441Hard / C441Owned jak nizej (WAIT oddaje postoj 283 - rola prowadzi ruch szyku).
     /// Role: NONE, RAID (4.2 rajd na strzelcow), HIDE (4.2 schowaj za piechote), WAIT / STRIKE (4.3 kowadlo i mlot), CAVFIRST (4.4 najpierw jazda wroga),
     ///   DISENGAGE (4.5 wyjscie z grzezawiska), HUNT (polowanie na wodza). Nadaje je tylko C441SetRole z glownego watku (kolejne kroki) - najpierw rola i rozkaz,
     ///   potem WeightFactor; oddanie odwrotnie.
@@ -45,7 +49,8 @@ namespace Armoury
         private static readonly bool[] CrGallop = { false, true, true, false, true, true, true, true };
         internal const float C441Every = 1f;
         private const int CrSlots = MaxTeams * 10, CrRegular = 8;   // FormationClass.NumberOfRegularFormations
-        private const int SkPursuit = 0, SkRiders = 1, SkShot = 2, SkK = 3;   // 148 / szyki 204-283-311a-344 (FI) / odruch 344 na trafienie jezdzca
+        // 148 / szyki 204-283-311a-344 (szyk w zasiegu odpowiedzi - NotePlayerForm) / odruch 344 na trafienie jezdzca / straz 335 (441-p)
+        private const int SkPursuit = 0, SkRiders = 1, SkShot = 2, SkGuard = 3, SkK = 4;
         private static readonly IFormatProvider C4Inv = CultureInfo.InvariantCulture;
 
         // ---- stan czytany z innych watkow (pisze glowny watek): klucz misji, rola i szyk slotu [TeamIndex x 10 + FormationIndex]
@@ -61,6 +66,11 @@ namespace Armoury
         // ---- liczniki misji (C441Reset w Battle291.Begin); z watku AI - Interlocked
         private static int _c4AddPost, _c4AddTick, _c4Dup, _c4PostErr, _c4Weight, _c4Reset, _c4ResetRole, _c4Pace, _c4Stum, _c4Back;
         private static readonly int[] _c4Skip = new int[SkK];
+        // 441-p (recenzja 441): pominiecia i wyjatek klusa liczone jako ROZNE szyki na misje (nie przebiegi skanu); odruch 344 - trafienia (zdarzenia)
+        private static readonly object C4Lock = new object();
+        private static readonly HashSet<Formation>[] _c4SkipF = { new HashSet<Formation>(), new HashSet<Formation>(), new HashSet<Formation>(), new HashSet<Formation>() };
+        private static readonly HashSet<Formation> _c4PaceF = new HashSet<Formation>();
+        private static int _c4HaltRel;   // postoje 283 zwolnione w C441SetRole przed Take
         private static float _c4CavSec, _c4NoBehSec, _c4ActSec;
         private static readonly float[] _c4RoleSec = new float[CrK];
 
@@ -70,7 +80,8 @@ namespace Armoury
             Interlocked.Exchange(ref _c4AddPost, 0); Interlocked.Exchange(ref _c4Dup, 0); Interlocked.Exchange(ref _c4PostErr, 0);
             Interlocked.Exchange(ref _c4Weight, 0); Interlocked.Exchange(ref _c4Reset, 0); Interlocked.Exchange(ref _c4ResetRole, 0);
             for (int k = 0; k < SkK; k++) Interlocked.Exchange(ref _c4Skip[k], 0);
-            _c4AddTick = _c4Pace = _c4Stum = _c4Back = 0;
+            lock (C4Lock) { for (int k = 0; k < SkK; k++) _c4SkipF[k].Clear(); _c4PaceF.Clear(); }
+            _c4AddTick = _c4Pace = _c4Stum = _c4Back = _c4HaltRel = 0;
             _c4CavSec = _c4NoBehSec = _c4ActSec = 0f;
             for (int k = 0; k < CrK; k++) _c4RoleSec[k] = 0f;
         }
@@ -95,6 +106,7 @@ namespace Armoury
                 if (b != null) { try { b.Give(); } catch { } }
                 _c4Role[i] = CrNone; _c4Who[i] = null; _c4Beh[i] = null;
             }
+            lock (C4Lock) { for (int k = 0; k < SkK; k++) _c4SkipF[k].Clear(); _c4PaceF.Clear(); }   // 441-p: bez referencji do szykow po misji
             _c4Acc = 0f;
         }
 
@@ -172,7 +184,12 @@ namespace Armoury
             return r != CrNone && r < CrK && CrGallop[r] && ReferenceEquals(_c4Who[idx], f);
         }
 
-        internal static void C441NoteFullPace() { _c4Pace++; }
+        /// <summary>441-p: wyjatek klusa - rozne szyki na misje (nie takty Eval).</summary>
+        internal static void C441NoteFullPace(Formation f)
+        {
+            if (f == null) return;
+            lock (C4Lock) { if (_c4PaceF.Add(f)) _c4Pace++; }
+        }
 
         /// <summary>443 (glowny watek): rola szyku wedlug 441 (NONE, gdy klucz NIE, slot innego szyku albo rola oddana przez 441 - gracz / szyk pusty).</summary>
         internal static byte C441RoleOf(Formation f)
@@ -186,10 +203,13 @@ namespace Armoury
         /// <summary>443: dowodca jazdy w tej misji (klucz Cavalry Commander, bitwa polowa) - bez niego role RAID / HIDE nie wchodza (tylko "bylby").</summary>
         internal static bool C441Live { get { return _c4Live; } }
 
-        /// <summary>Pominiecie szyku w roli: 0 = 148, 1 = szyki 204 / 283 / 311a / 344 (pass), 2 = odruch 344 na trafienie jezdzca.</summary>
-        internal static void C441NoteSkip(int who)
+        /// <summary>Pominiecie szyku w roli: 0 = 148, 1 = szyki 204 / 283 / 311a / 344 (szyk w zasiegu odpowiedzi), 3 = straz 335 - ROZNE szyki na misje (441-p);
+        /// 2 = odruch 344 na trafienie jezdzca - trafienia.</summary>
+        internal static void C441NoteSkip(int who, Formation f)
         {
-            if (who >= 0 && who < SkK) Interlocked.Increment(ref _c4Skip[who]);
+            if (who < 0 || who >= SkK) return;
+            if (who == SkShot || f == null) { Interlocked.Increment(ref _c4Skip[who]); return; }
+            lock (C4Lock) { if (_c4SkipF[who].Add(f)) _c4Skip[who]++; }
         }
 
         internal static void C441NoteWeight(BehaviorComponent b, float w)
@@ -215,6 +235,10 @@ namespace Armoury
             if (b == null) return false;
             if (role == CrNone) { b.Give(); _c4Role[idx] = CrNone; _c4Who[idx] = null; _c4Beh[idx] = null; return true; }
             if (HorsePursuit.PlayerForm(f) || f.HasPlayerControlledTroop) return false;
+            // 441-p (recenzja 441, jeden wlasciciel): trwajacy postoj 283 zwolniony PRZED Take - Release oddaje zapisane wagi, poki sa nasze (po Take wagi roli
+            // != 0 i OursHalt by odmowil; Snap przy ponownym przejeciu zgasilby zachowanie roli)
+            try { if (HorsePursuit.ReleaseHaltForRole441(f)) _c4HaltRel++; }
+            catch (Exception e) { _c4Stum++; RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Cav441 postoj 283", e); }
             _c4Who[idx] = f;
             _c4Beh[idx] = b;
             _c4Role[idx] = role;
@@ -270,6 +294,7 @@ namespace Armoury
                 return;
             }
             var b = ai.GetBehavior<BehaviorCavRole441>();
+            bool missing = b == null;   // 441-p (recenzja 441): miara B - brak zachowania PRZED dodaniem w tym takcie (postfiks go nie dodal)
             if (b == null)
             {
                 // zalegle: szyk zapelniony przed latka (pierwsza bitwa procesu) albo przed AfterStart - dodanie tutaj (OnMissionTick nie biegnie razem z tickiem druzyn)
@@ -285,7 +310,7 @@ namespace Armoury
             var q = f.QuerySystem;
             if (q == null || !q.IsCavalryFormation || !f.IsAIControlled) return;
             _c4CavSec += step;
-            if (b == null) _c4NoBehSec += step;
+            if (missing) _c4NoBehSec += step;
             byte r = ReferenceEquals(_c4Who[idx], f) ? _c4Role[idx] : CrNone;
             if (r < CrK) _c4RoleSec[r] += step;
         }
@@ -300,15 +325,19 @@ namespace Armoury
               .Append(" | klucz dowodca jazdy ").Append(c != null && c.CavalryCommander ? "TAK" : "NIE")
               .Append(" | zachowanie roli dodane: postfiks ").Append(Volatile.Read(ref _c4AddPost)).Append(", zalegle w takcie ").Append(_c4AddTick)
               .Append(", juz bylo (ponowne zapelnienie szyku) ").Append(Volatile.Read(ref _c4Dup))
-              .Append(" | jazda AI ").Append(_c4CavSec.ToString("0", C4Inv)).Append(" szyko-s (bez zachowania roli ").Append(_c4NoBehSec.ToString("0", C4Inv)).Append(") w rolach:");
+              .Append(" | jazda AI ").Append(_c4CavSec.ToString("0", C4Inv)).Append(" szyko-s (bez zachowania roli ").Append(_c4NoBehSec.ToString("0", C4Inv)).Append(" - przed dodaniem w takcie) w rolach:");
             for (int k = 0; k < CrK; k++) sb.Append(' ').Append(CrName[k]).Append(' ').Append(_c4RoleSec[k].ToString("0", C4Inv));
             sb.Append(" | rola aktywnym zachowaniem ").Append(_c4ActSec.ToString("0", C4Inv)).Append(" szyko-s, GetAiWeight roli ").Append(Volatile.Read(ref _c4Weight))
               .Append(", ResetBehavior ").Append(Volatile.Read(ref _c4Reset)).Append(" (przy roli ").Append(Volatile.Read(ref _c4ResetRole)).Append(')')
               .Append(", rola oddana (gracz / szyk pusty) ").Append(_c4Back)
-              .Append(" | wyjatek klusa (Move w roli galopem) ").Append(_c4Pace)
-              .Append(" | szyk w roli pominiety: poscig 148 ").Append(Volatile.Read(ref _c4Skip[SkPursuit]))
+              .Append(" | wyjatek klusa (Move / szarza w roli galopem, szykow) ").Append(_c4Pace)
+              .Append(" | szyk w roli pominiety (szykow): poscig 148 ").Append(Volatile.Read(ref _c4Skip[SkPursuit]))
               .Append(", szyki 204/283/311a/344 ").Append(Volatile.Read(ref _c4Skip[SkRiders]))
-              .Append(", odruch 344 ").Append(Volatile.Read(ref _c4Skip[SkShot]))
+              .Append(", straz 335 ").Append(Volatile.Read(ref _c4Skip[SkGuard]))
+              .Append(", odruch 344 (trafien) ").Append(Volatile.Read(ref _c4Skip[SkShot]))
+              .Append(" | przez role: koniec poscigu 148 ").Append(HorsePursuit.PursuitRoleEnds441).Append(", powroty 204/283 ").Append(HorsePursuit.HunterRoleEnds441)
+              .Append(", postoj 283 zwolniony ").Append(HorsePursuit.HaltRoleRel441).Append(" (przy nadaniu roli ").Append(_c4HaltRel).Append(')')
+              .Append(", straz 335 zwolniona ").Append(HeroCaution.GuardRoleEnds441)
               .Append(" | latka ").Append(_c4Patch).Append(" | potkniecia ").Append(_c4Stum).Append(" (postfiks ").Append(Volatile.Read(ref _c4PostErr)).Append(").");
             return sb.ToString();
         }
@@ -337,7 +366,7 @@ namespace Armoury
             BehaviorCoherence = 0f;
         }
 
-        public override float NavmeshlessTargetPositionPenalty => 1f;
+        // 441-p (recenzja 441): bez nadpisania NavmeshlessTargetPositionPenalty - kara gry za cel poza navmeshem (FindBestBehavior) dziala tez dla roli
 
         internal byte Role => _role;
 
