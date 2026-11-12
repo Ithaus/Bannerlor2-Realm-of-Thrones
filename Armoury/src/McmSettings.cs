@@ -2040,6 +2040,10 @@ namespace Armoury
         [SettingPropertyGroup("Shields under fire")]
         public bool CavalryFaceShooterAtArmyEdge { get; set; } = true;
 
+        [SettingPropertyBool("Battle AI Measurements", HintText = "Log only, nothing changes on the field. In field battles the Armoury log gets lines 'Pomiary AI bitwy (437)': both sides by kind of troops at the start, the opening plan of every AI army with its general's Valor and Calculating, every 15 seconds each AI army's plan and each of its formations (kind, men, behaviour, order, distance to the enemy, missile hits on men and horses; for cavalry the RBM charge state and the three strongest behaviour weights), every change of plan with the three highest weights and the reason, what a formation did in the 30 seconds after losing 5% of its men to missiles, the first blow of every cavalry charge, and at the end the fallen by cause and phase, losses of each side, time cavalry stood under fire and with enemy archers open to a charge, and behaviours after contact. In a siege assault (with Siege Mission Log) the 30-second report adds one line per lane. Off = no such lines, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Shields under fire")]
+        public bool BattleAiMeasurements { get; set; } = true;
+
         [SettingPropertyBool("Formation Order Arbiter", HintText = "AI infantry and archer formations follow one plan at a time while the enemy is still more than 75 m away, instead of walking forward and back as one order replaces another. A formation keeps the spot it was last sent to (a new spot less than 12 m away, or less than its depth, is ignored), holds it for at least 10 seconds, never turns back the other way within 10 seconds of a move, and does not turn back within 30 seconds of its last step forward or back (60, 120, up to 240 after each turn). A change of behaviour counts only when it lasts 6 seconds or the whole army changes its tactic. Flank and screening formations move only when the formation they follow has really moved. Line and loose order change at most once in 20 seconds, and they go back to line only after 20 seconds without arrows. Enemy cavalry close by or charging counts as contact. Formations of your own party are left alone. Once the lines are close, everything is as in the game and RBM. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Shields under fire")]
         public bool FormationOrderArbiter { get; set; } = true;
@@ -13285,6 +13289,7 @@ namespace Armoury
             s.HuntHarasserInAutotest = HuntHarasserInAutotest;
             s.CommanderHuntInAutotest = CommanderHuntInAutotest;
             s.CavalryFaceShooterAtArmyEdge = CavalryFaceShooterAtArmyEdge;
+            s.BattleAiMeasurements = BattleAiMeasurements;
             s.FormationOrderArbiter = FormationOrderArbiter;
             s.FormationsAnswerHarassers = FormationsAnswerHarassers;
             s.ArmyHaltsForHarassers = ArmyHaltsForHarassers;

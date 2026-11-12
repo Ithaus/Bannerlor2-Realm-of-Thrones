@@ -1170,7 +1170,11 @@ namespace Armoury
         {
             var q = f.QuerySystem;
             var t = f.Team;
-            return f.FormationIndex + " (" + f.CountOfUnits + " ludzi, " + (q != null && q.IsRangedFormation ? "lucznicy" : "piechota") + ", strona "
+            // 437: przy kluczu BattleAiMeasurements klasa wedlug skladu (zapytania ReadOnly), nie "lucznicy / piechota" z IsRangedFormation - indeks szyku
+            // (HorseArcher, Skirmisher...) to miejsce, nie klasa ludzi (mapa-dowody-z-logow.md rozdz. 8); NIE = jak dotad
+            var s437 = Settings.Current;
+            string kind = s437 != null && s437.BattleAiMeasurements ? BattleMeasure437.ClassLong(f) : (q != null && q.IsRangedFormation ? "lucznicy" : "piechota");
+            return f.FormationIndex + " (" + f.CountOfUnits + " ludzi, " + kind + ", strona "
                 + (t != null ? t.Side.ToString() : "?") + ", " + (t != null && (t.IsPlayerTeam || t.IsPlayerAlly) ? "z graczem" : "wrog gracza") + ")";
         }
 

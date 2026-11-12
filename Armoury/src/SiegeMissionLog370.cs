@@ -24,6 +24,11 @@ namespace Armoury
     /// Odczyt pozycji: tylko wlasciwosci (OrderPosition, OrderPositionIsValid) - nie MovementOrder.GetPosition (ta liczy i zapisuje pamiec podreczna rozkazu).
     /// Koszt: co 30 s jeden przeglad MissionObjects i szykow; co klatke tylko porownanie czasu; per cios / pocisk - licznik. Wyjatki per obiekt / szyk
     /// liczone (potkniecia), pierwszy slad do logu, bez globalnego wylacznika.
+    /// 437 (pakiet 0 audytu AI bitwy, krok 7.0 - sonda na pas): przy kluczu BattleAiMeasurements kazdy odczyt dopisuje linie "Oblezenie misja (370) ... pasy" -
+    /// na kazdy pas (TeamAISiegeComponent.SiegeLanes): stan LaneState i stan obrony, otwarty / wylom / brama, pojemnosc CalculateLaneCapacity, machiny pasa,
+    /// liczniki zapytan oblezenia (atakujacy blisko, w regionie pasa, obroncy przy punkcie - pamiec gry 5 s), cel fali kazdej druzyny (GetLastAssignedFormation:
+    /// szyk, ludzi, zachowanie, IsSplittableByAI) i straty szyku w oknie 30 s wedlug zrodla (pociski / reszta); do tego atakujacy w srodku (InsideAttackerCount).
+    /// Straty z OnAgentRemoved pod lockiem (zdarzenie bywa z ticku asynchronicznego). Klucz NIE - linii pasow brak, reszta 370 jak dotad.
     /// </summary>
     internal sealed class SiegeMissionLog370 : MissionLogic
     {
@@ -43,6 +48,10 @@ namespace Armoury
         // 372: sklad szyku przy odczycie - [0] z bronia dystansowa i amunicja (Agent.IsRangedCached), [1] konno (HasMount)
         private readonly Dictionary<Formation, int[]> _mix = new Dictionary<Formation, int[]>();
         private readonly StringBuilder _sb = new StringBuilder(1024);
+        // 437 (7.0): straty szyku w oknie odczytu - [0] od pocisku, [1] reszta (zabici + nieprzytomni); zapis pod _lostLock
+        private readonly Dictionary<Formation, int[]> _lost = new Dictionary<Formation, int[]>();
+        private readonly object _lostLock = new object();
+        private bool _lanes437;
 
         public override MissionBehaviorType BehaviorType { get { return MissionBehaviorType.Other; } }
 
@@ -66,6 +75,24 @@ namespace Armoury
                 int n;
                 _hits.TryGetValue(f, out n);
                 _hits[f] = n + 1;
+            }
+            catch { _stumbles++; }
+        }
+
+        public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
+        {
+            if (!_started || _ended || !_siege || !_lanes437) return;
+            try
+            {
+                if (affectedAgent == null || !affectedAgent.IsHuman || (agentState != AgentState.Killed && agentState != AgentState.Unconscious)) return;
+                var f = affectedAgent.Formation;
+                if (f == null) return;
+                lock (_lostLock)
+                {
+                    int[] l;
+                    if (!_lost.TryGetValue(f, out l)) { l = new int[2]; _lost[f] = l; }
+                    l[blow.IsMissile ? 0 : 1]++;
+                }
             }
             catch { _stumbles++; }
         }
@@ -100,6 +127,7 @@ namespace Armoury
                     if (_startAt < 0f) { _startAt = now + StartDelay; return; }   // klatka po rozstawieniu: szyki dostaja pierwsze rozkazy
                     if (now < _startAt) return;
                     _started = true;
+                    try { var s437 = Settings.Current; _lanes437 = s437 != null && s437.BattleAiMeasurements; } catch { _lanes437 = false; }
                     Reading(m, "start");
                     _next = now + Every;
                     return;
@@ -126,6 +154,7 @@ namespace Armoury
             _ended = true;
             _hits.Clear();
             _mix.Clear();
+            lock (_lostLock) _lost.Clear();
             base.OnEndMission();
         }
 
@@ -148,6 +177,7 @@ namespace Armoury
             Side(m, BattleSideEnum.Attacker, head, bad);
             Side(m, BattleSideEnum.Defender, head, bad);
             Machines(m, head);
+            if (_lanes437) { try { Lanes(m, head); } catch (Exception e) { Stumble("Pasy", e); } }
             if (bad != null)
             {
                 _firstDone = true;
@@ -155,6 +185,68 @@ namespace Armoury
             }
             _hits.Clear();
             _shotsA = 0; _shotsD = 0;
+            lock (_lostLock) _lost.Clear();
+        }
+
+        /// <summary>437 (7.0): linia pasow - stan, pojemnosc, machiny, liczniki zapytan oblezenia, cel fali kazdej druzyny i jego straty w oknie.</summary>
+        private void Lanes(Mission m, string head)
+        {
+            var sb = _sb;
+            sb.Length = 0;
+            sb.Append(head).Append(" | pasy:");
+            List<SiegeLane> lanes = null;
+            SiegeQuerySystem q = null;
+            try { lanes = TeamAISiegeComponent.SiegeLanes; q = TeamAISiegeComponent.QuerySystem; } catch (Exception e) { Stumble("Pasy.Lista", e); }
+            if (lanes == null || lanes.Count == 0) { sb.Append(" brak (SiegeLanes puste)."); Log.Info(sb.ToString()); return; }
+            Dictionary<Formation, int[]> lost;
+            lock (_lostLock) lost = new Dictionary<Formation, int[]>(_lost);
+            var teams = m.Teams;
+            for (int i = 0; i < lanes.Count; i++)
+            {
+                try
+                {
+                    var l = lanes[i];
+                    if (l == null) continue;
+                    var side = l.LaneSide;
+                    sb.Append(i > 0 ? " ||" : "").Append(' ').Append(side.ToString()).Append(": ").Append(l.LaneState.ToString()).Append(", obrona ").Append(l.GetDefenseState().ToString())
+                      .Append(", otwarty ").Append(l.IsOpen ? "TAK" : "NIE").Append(", wylom ").Append(l.IsBreach ? "TAK" : "NIE").Append(", brama ").Append(l.HasGate ? "TAK" : "NIE");
+                    try { sb.Append(", pojemnosc ").Append(l.CalculateLaneCapacity().ToString("0", Inv)); } catch { sb.Append(", pojemnosc ?"); }
+                    sb.Append(", machiny ");
+                    var pw = l.PrimarySiegeWeapons;
+                    if (pw == null || pw.Count == 0) sb.Append('-');
+                    else for (int k = 0; k < pw.Count; k++) sb.Append(k > 0 ? "," : "").Append(pw[k] != null ? pw[k].GetType().Name : "?");
+                    if (q != null)
+                    {
+                        try
+                        {
+                            int close = side == FormationAI.BehaviorSide.Left ? q.LeftCloseAttackerCount : (side == FormationAI.BehaviorSide.Middle ? q.MiddleCloseAttackerCount : q.RightCloseAttackerCount);
+                            int reg = side == FormationAI.BehaviorSide.Left ? q.LeftRegionMemberCount : (side == FormationAI.BehaviorSide.Middle ? q.MiddleRegionMemberCount : q.RightRegionMemberCount);
+                            int def = side == FormationAI.BehaviorSide.Left ? q.LeftDefenderCount : (side == FormationAI.BehaviorSide.Middle ? q.MiddleDefenderCount : q.RightDefenderCount);
+                            sb.Append(", atak blisko ").Append(close).Append(", w regionie ").Append(reg).Append(", obroncy ").Append(def);
+                        }
+                        catch { sb.Append(", liczniki ?"); }
+                    }
+                    sb.Append(", fale:");
+                    int wn = 0;
+                    for (int ti = 0; teams != null && ti < teams.Count; ti++)
+                    {
+                        Formation f = null;
+                        try { f = l.GetLastAssignedFormation(ti); } catch { f = null; }
+                        if (f == null) continue;
+                        int[] ls;
+                        lost.TryGetValue(f, out ls);
+                        var b = f.AI != null ? f.AI.ActiveBehavior : null;
+                        sb.Append(wn++ > 0 ? "," : "").Append(" T").Append(f.Team != null ? f.Team.TeamIndex : -1).Append('F').Append((int)f.FormationIndex).Append(' ').Append(f.CountOfUnits)
+                          .Append(' ').Append(BehName(b)).Append(f.IsSplittableByAI ? " dzielony" : " niedzielony")
+                          .Append(" straty30s ").Append(ls != null ? ls[0] : 0).Append('/').Append(ls != null ? ls[1] : 0);
+                    }
+                    if (wn == 0) sb.Append(" -");
+                }
+                catch (Exception e) { Stumble("Pas", e); sb.Append(" ?"); }
+            }
+            try { if (q != null) sb.Append(" | atakujacy w srodku ").Append(q.InsideAttackerCount); } catch { sb.Append(" | atakujacy w srodku ?"); }
+            sb.Append(" | straty30s = pociski/reszta (zabici + nieprzytomni).");
+            Log.Info(sb.ToString());
         }
 
         private void Side(Mission m, BattleSideEnum side, string head, List<string> bad)

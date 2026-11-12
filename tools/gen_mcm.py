@@ -800,6 +800,7 @@ RANGES = {
 LABELS = {
     'BlowDecidesDeathEnabled': 'Blow Decides Death Or Wound',   # 421 (436-p: nazwa jak w recznym McmSettings.cs - odwoluja sie do niej opisy 421 i 436)
     'SimulatedBattlesMatchPlayed': 'Simulated Battles Match Fought Battles',   # 436 (436-p: jak w recznym McmSettings.cs)
+    'BattleAiMeasurements': 'Battle AI Measurements',   # 437 (jak w recznym McmSettings.cs)
     'ChariotsLeaveWesteros': 'Chariots Stay In Essos',   # 425a (nazwa jak w recznym McmSettings.cs)
     'ChariotsNotRiddenInWesteros': 'Chariots Not Ridden In Westeros',   # 425-p (jak w recznym McmSettings.cs)
     'ArmourLadderEnabled': 'ROT Body Armour In RBM Scale',   # 423a (423-p: nazwy jak w recznym McmSettings.cs - odwoluja sie do nich opisy i log)
