@@ -1,5 +1,23 @@
 # DZIENNIK ZMIAN
 
+## 471b-p3 (13.11) - bramka szturmu: glod obroncow czeka na kapitulacje (b), licznik i plan trebuszy raz na dobe (recenzje B2, A4/B7)
+
+**Problem:** recenzja B2: `Gate471` przepuszczal szturm od pierwszej godziny glodu obroncow (`FoodStocks <= 0`), a kapitulacja z glodu (b) przychodzi dopiero po tygodniu laski GL - przez ten tydzien decydowalo dawne OB1/DR, AI szturmowalo glodujaca zaloge i brala ja w niewole, zanim zadzialalo `StarveYield471` (wbrew D4: zaloga, ktora poddala sie z glodu, wychodzi wolno). Recenzje A4/B7: `_d471Gate++` i `TryBreach(camp, Measure(camp))` przy KAZDYM wywolaniu Veto (kilka decyzji AI na dobe) - pole "szturmy zatrzymane bramka" liczylo wywolania, `Measure` liczony za kazdym razem.
+
+**Przyczyna:** wyjatek "glod obroncow" w bramce bez warunku (b); licznik i plan trebuszy bez pamieci doby.
+
+**Zmiana:** `SiegeWalls.Time471.cs` `Gate471`:
+- glod obroncow: gdy (b) moze przyjsc - glod GL wlaczony (`SiegeWalls2.StarveOn`), odsiecz nie stoi (ta sama miara co zegar R i `StarveYield471`), oboz liczniejszy (`Ratio471 > 1`) - BEZ szturmu, powod OB1 `471b: glod obroncow - kapitulacja z honorami (b) po tygodniu laski GL, do niej bez szturmu` (najwyzej tydzien laski); inaczej szturm wolno jak dotad. Puste mury - wolno zawsze (bez zmian).
+- licznik bramki i `TryBreach(Measure)` raz na dobe i oblezenie (`T471.GateDay`); kolejne wywolania tej doby zwracaja ten sam powod bez liczenia. Pole doby: `oblezen trzymanych bramka (raz na dobe) N`.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: szturm glodujacej twierdzy wstrzymany do 7 dob (laska GL) tylko, gdy (b) ma warunki; jesli `Yield471` odmowi (bitwa przy obozie - p1) - probuje nastepnej doby, GL dalej zabija po lasce, a przy pustych murach bramka otwiera. Glod GL wylaczony - jak dotad.
+- Plan trebuszy: AI moze zmienic strategie w ciagu doby - powrot do trebuszy najwyzej dobe pozniej (dawniej przy kazdej decyzji).
+- W logu: OB1 z powodem `glod obroncow`, potem linia GL `wynik: KAPITULACJA Z HONORAMI (471b, glod)`; pole `oblezen trzymanych bramka` <= liczby trwajacych oblezen w regule.
+- Klucz NIE: bramka nieczynna (bez zmian).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-p2 (13.11) - jedna ocena "poza regula" dla calego 471b, klucz NIE bez "T|", zegar 471 czyszczony przy nowej kampanii (recenzje A2/B1, B5, A6)
 
 **Problem:** recenzje A2 i B1 (zgodnie): `Time471Daily` zapisywal `r.Why` na stale ("raz poza regula - zostaje", 471-p U3), a bramka szturmu, kapitulacja z glodu (b) i furaz pytaly na zywo (`Acts471`). Gracz raz przeszedl przez oboz albo stanal w osadzie i odszedl -> bramka dalej trzymala szturm (duzy zamek / miasto tylko przez wyrwe), furaz dzialal, a kapitulacja z terminu (a) i limit (e) nie dzialaly NIGDY; oblezenie konczyl dopiero glod obozu (m116) - cel "limit 1.5 x gorna granica" zlamany. Po wczytaniu (Export471 pomijal `Why != null`) regula wracala - trzeci stan. Recenzja B5: przy kluczu Siege Time By Factors NIE zegar zyl dalej (takze bez logu) i do `arm_siege_walls` szly wpisy `T|` (starszy DLL zglasza je jako uszkodzone). Recenzja A6: `_pend471` (zegar z zapisu) nie byl czyszczony w `Reset` - po wczytaniu i nowej kampanii w tym samym procesie zostawaly stare wpisy.

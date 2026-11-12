@@ -32,7 +32,8 @@ namespace Armoury
     ///  (a) kapitulacja z terminu: zegar >= R, odsiecz nie stoi, oboz liczniejszy od obroncow (ludzie zdrowi, z milicja) -> Yield471;
     ///  (b) glod: pierwsza doba glodu po tygodniu laski GL, bez odsieczy, oboz liczniejszy -> Yield471 (StarveYield471 z SiegeWalls2.StarveOne);
     ///  (c) bramka szturmu w Veto (Gate471): przed dolna granica kategorii bez szturmu, potem maly zamek jak dotad, wiekszy tylko przez wyrwe (bez wyrwy - plan
-    ///      trebuszy TryBreach); zawsze wolno przy pustych murach i glodzie obroncow; stoi PRZED 307c, DR i OB1 (MB/Unblock konczy w Veto, wiec tez jej podlega);
+    ///      trebuszy TryBreach); zawsze wolno przy pustych murach; przy glodzie obroncow wolno tylko, gdy (b) nie przyjdzie (471b-p3); stoi PRZED 307c, DR i OB1
+    ///      (MB/Unblock konczy w Veto, wiec tez jej podlega);
     ///  (d) odstapienie - bez zmian (glod obozu m116, odsiecz OB5/334e);
     ///  (e) limit: wiek >= SiegeTimeLimitFactor x gorna granica - oboz liczniejszy: Yield471, inaczej Lift471 (RemoveAllSiegeParties + rozejm 30 dob, droga 384).
     /// Yield471 (D4, kapitulacja z honorami): partie lordow obroncow wychodza, zaloga do swoich (BookHoldings.YieldOut), potem KingdomManager.SiegeCompleted -
@@ -71,6 +72,7 @@ namespace Armoury
             public double Ratio = -1; public string EndWay;   // 471b-4: stosunek ludzi oboz / obroncy (ostatnia doba), droga konca (a-e) do linii konca
             public bool Started;                              // 471b-4: pierwsza doba juz byla (rekord moze powstac wczesniej w bramce szturmu)
             public bool StartDone;                            // 471b-p2: linia startu i R0 (pierwsza doba w regule)
+            public int GateDay = -1;                          // 471b-p3: doba ostatniego wstrzymania bramka (licznik i TryBreach raz na dobe)
         }
         private static readonly Dictionary<SiegeEvent, T471> _t471 = new Dictionary<SiegeEvent, T471>();
         private static int _d471Start, _d471End, _d471Out;
@@ -307,7 +309,7 @@ namespace Armoury
                     Log.Info("Czas oblezen (471 doba): dzien " + today + " | klucz 471b " + (act ? "TAK" : "NIE") + " | trwajace w regule " + going + " (maly zamek " + perCat[0] + ", duzy zamek " + perCat[1] + ", miasto " + perCat[2] + ", wielka twierdza " + perCat[3]
                         + "), poza regula " + outside + " | po terminie R " + over + ", ponad limitem " + overLim + ", zegar stoi (odsiecz) " + paused
                         + " | dzis: start " + _d471Start + ", koniec " + _d471End + ", poza regula " + _d471Out
-                        + " | 471b: kapitulacje " + _d471Yield + " (z glodu " + _d471Starve + "), odejscia po limicie " + _d471Lift + ", wstrzymane " + _d471Refused + ", szturmy zatrzymane bramka " + _d471Gate
+                        + " | 471b: kapitulacje " + _d471Yield + " (z glodu " + _d471Starve + "), odejscia po limicie " + _d471Lift + ", wstrzymane " + _d471Refused + ", oblezen trzymanych bramka (raz na dobe) " + _d471Gate
                         + " | wiek/R: " + (sbList.Length == 0 ? "-" : sbList.ToString()) + ".");
             }
             catch (Exception e) { Stumble("Time471Daily", e); }
@@ -433,7 +435,9 @@ namespace Armoury
 
         /// <summary>471b-4 (c): bramka szturmu z SiegeWalls.Veto (za przerwa po odparciu, przed 307c / DR / OB1). Powod wstrzymania albo null (decyzja dalej jak dotad):
         /// przed dolna granica kategorii - bez szturmu; od niej maly zamek jak dotad, wiekszy tylko przez wyrwe (bez wyrwy: zmiana planu na trebusze - TryBreach).
-        /// Zawsze wolno: puste mury (obroncy 0) i glod obroncow (Food 0). Nie rzuca (wyjatek = null).</summary>
+        /// Zawsze wolno: puste mury (obroncy 0). Glod obroncow (Food 0): 471b-p3 (recenzja B2) - gdy kapitulacja z glodu (b) moze przyjsc (glod GL wlaczony, odsiecz nie
+        /// stoi, oboz liczniejszy) bez szturmu do niej (najwyzej tydzien laski GL; D4: zaloga, ktora poddala sie z glodu, wychodzi wolno), inaczej wolno jak dotad.
+        /// 471b-p3 (recenzje A4/B7): licznik bramki i plan trebuszy (Measure + TryBreach) raz na dobe i oblezenie, nie przy kazdym wywolaniu Veto. Nie rzuca (wyjatek = null).</summary>
         private static string Gate471(BesiegerCamp camp, SiegeEvent ev, Settlement st)
         {
             try
@@ -441,18 +445,27 @@ namespace Armoury
                 if (!TimeOn || Acts471(ev) != null) return null;
                 bool fresh;
                 var r = Rec471(ev, st, out fresh);
-                if (Ratio471(ev, st) >= 999.0) return null;                            // puste mury
-                if (st.Town.FoodStocks <= 0f) return null;                              // glod obroncow
+                double ratio = Ratio471(ev, st);
+                if (ratio >= 999.0) return null;                                       // puste mury
+                int today = Today;
+                bool first = r.GateDay != today;                                       // pierwsze wstrzymanie tej doby
+                if (st.Town.FoodStocks <= 0f)                                          // glod obroncow
+                {
+                    double bes, rel = ReliefStrength(st, null, out bes);
+                    if (!SiegeWalls2.StarveOn || (rel > 0 && bes > 0 && rel >= 0.5 * bes) || ratio <= 1.0) return null;   // (b) nie przyjdzie - szturm jak dotad
+                    if (first) { r.GateDay = today; _d471Gate++; }
+                    return "471b: glod obroncow - kapitulacja z honorami (b) po tygodniu laski GL, do niej bez szturmu";
+                }
                 double age = ev.SiegeStartTime.ElapsedDaysUntilNow;
                 if (age < CatLo[r.Cat])
                 {
-                    _d471Gate++;
-                    return "471b: przed dolna granica kategorii " + CatName[r.Cat] + " (" + F(age, "0.0") + " < " + CatLo[r.Cat] + " dob) - szturm dopiero od niej, przy glodzie obroncow albo pustych murach";
+                    if (first) { r.GateDay = today; _d471Gate++; }
+                    return "471b: przed dolna granica kategorii " + CatName[r.Cat] + " (" + F(age, "0.0") + " < " + CatLo[r.Cat] + " dob) - szturm dopiero od niej albo przy pustych murach";
                 }
                 if (r.Cat == 0 || WallHpMin(st) <= 0.0) return null;
-                _d471Gate++;
-                string sw = TryBreach(camp, Measure(camp));
-                return "471b: " + CatName[r.Cat] + " bez wyrwy (najslabszy odcinek " + F(WallHpMin(st) * 100.0, "0") + "%) - szturm tylko przez wyrwe albo przy glodzie obroncow" + (sw != null ? " | ZMIANA: " + sw : "");
+                string sw = null;
+                if (first) { r.GateDay = today; _d471Gate++; sw = TryBreach(camp, Measure(camp)); }
+                return "471b: " + CatName[r.Cat] + " bez wyrwy (najslabszy odcinek " + F(WallHpMin(st) * 100.0, "0") + "%) - szturm tylko przez wyrwe" + (sw != null ? " | ZMIANA: " + sw : "");
             }
             catch (Exception e) { Stumble("Gate471", e); return null; }
         }
