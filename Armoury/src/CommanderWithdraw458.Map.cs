@@ -79,14 +79,14 @@ namespace Armoury
         internal static void Set(Pending p) { _p = p; _move = null; _moveParties = null; _tab = null; }
 
         /// <summary>458-p (recenzja B9): nowa kampania / wczytanie (konstruktor ArmouryBehavior) - stan i liczniki od zera.</summary>
-        internal static void Reset() { _p = null; _move = null; _moveParties = null; _stumbles = 0; _errs = 0; _tab = null; _tabHidden = null; GearClear(); }
+        internal static void Reset() { _p = null; _move = null; _moveParties = null; _stumbles = 0; _errs = 0; _tab = null; _tabHidden = null; GearClear("nowa kampania / wczytanie"); }
 
         /// <summary>Nowa misja: stare oczekiwanie (bitwa trwala dalej - ContinueBattle - albo pojmanie sie nie odbylo) znika.</summary>
         internal static void Clear()
         {
             if (_p != null) { try { Log.Info(P + "oczekiwanie bez pojmania (bitwa trwa dalej albo nowa misja) - porzucone, nic nie zmieniono."); } catch { } }
             _p = null; _move = null; _moveParties = null; _tab = null;   // 458-t: zbior taboru poprzedniej bitwy tez
-            GearClear();   // 458-u: sprzet zbieglych poprzedniej bitwy (nowa misja - konstruktor 458, przed StartRule)
+            GearClear("nowa misja - bitwa trwa dalej albo bez rozliczenia na mapie");   // 458-u: sprzet zbieglych poprzedniej bitwy (nowa misja - konstruktor 458, przed StartRule)
         }
 
         /// <summary>SubModuleMain (menu glowne, raz na proces): prefiks MapEvent.CaptureDefeatedPartyMembers (metoda zadeklarowana w MapEvent - DeclaredMethod).
@@ -169,10 +169,11 @@ namespace Armoury
             try
             {
                 var cfg = Settings.Current;
-                if (cfg == null || !cfg.CommanderWithdrawsUnderRearguard) { Log.Info(P + "klucz Commander Withdraws Under Rearguard NIE - oczekiwanie porzucone, pojmanie jak w grze."); return; }   // recenzja A4
+                if (cfg == null || !cfg.CommanderWithdrawsUnderRearguard) { Log.Info(P + "klucz Commander Withdraws Under Rearguard NIE - oczekiwanie porzucone, pojmanie jak w grze."); GearClear("klucz NIE"); return; }   // recenzja A4; 458-u-p U2
                 if (__instance.DefeatedSide != p.Side || __1 == null || __0 == null)
                 {
                     Log.Info(P + "strona wodza " + p.Side + " nie jest pokonana (pokonana " + __instance.DefeatedSide + ") - pojmanie jak w grze.");
+                    GearClear("strona wodza nie jest pokonana");   // 458-u-p U2
                     return;
                 }
                 var keep = new List<MapEventParty>();
@@ -261,7 +262,7 @@ namespace Armoury
                 Log.Info(sb.ToString());
                 GearLine(__instance);   // 458-u
             }
-            catch (Exception e) { Stumble("CapPre", e); }
+            catch (Exception e) { Stumble("CapPre", e); GearClear("potkniecie CapPre"); }   // 458-u-p U2 (po GearLine zapis juz pusty - bez linii)
         }
 
         /// <summary>Partia uchodzi z wodzem: partia wodza albo jej pan zszedl z pola z wodzem / zdrowy nie wszedl na pole (posilki; i zyje, nie jest jencem).</summary>

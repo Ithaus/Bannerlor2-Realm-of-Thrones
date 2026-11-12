@@ -32,11 +32,14 @@ namespace Armoury
     ///
     /// ZMIANA: prefiks + postfiks DTE OnAgentRemoved - dla zbieglego z wodzem (ten sam warunek co licznik "zbiegli z wodzem" misji 458: wyprowadzany, Routed /
     /// Deleted, morale >= 0.01, szeregowy z przydzialem DTE) roznica ItemsToRecover jego partii = dokladnie sztuki, ktore DTE z niego zapisal. Kon i uprzaz tylko,
-    /// gdy zszedl z pola na koniu (MountAgent przy usunieciu - Mission.OnAgentRemoved odpina konia dopiero po zachowaniach); kon padl / zostal - sztuki
-    /// nie wracaja (HorseFate liczy go jako zgon jezdzca pokonanego, bez zdjecia). Prefiks HandlePartyItems zapisuje decyzje DTE dla partii (isDefeated).
+    /// gdy z pola zszedl z nim jego WLASNY kon ze spawnu (458-u-p, recenzja U1: rozstrzygane przy OnEndMission 458 - kon nie zabity i jezdziec siedzial na
+    /// nim przy usunieciu albo kon zdjety z pola zywy najwyzej 1 s od jezdzca; kolejnosc odpiecia konia przy FadeOut ustala silnik, a cudzy kon dosiadziety
+    /// po stracie wlasnego to nie jego sztuka); kon padl / zostal - sztuki nie wracaja (HorseFate liczy padlego jako zgon jezdzca pokonanego, bez zdjecia).
+    /// Prefiks HandlePartyItems zapisuje decyzje DTE dla partii (isDefeated).
     /// Na mapie (CapPre, po Settle partii z wodzem) - tylko partia, ktora zostaje z wodzem, i tylko gdy DTE jej nie oddal (isDefeated TAK): sztuki do
     /// zbrojowni ta sama metoda DTE co ReturnItem (AiGear.AddToArmory -> AddItemToPartyArmory). Sprzet rannych, poleglych i pojmanych - bez zmian.
-    /// Kontrola w linii: zapisane z agentow = wrocilo + DTE nie przyjal + kon/uprzaz nie zeszly z nim + partie jak w grze + DTE oddal sam + bez zbrojowni DTE.
+    /// Kontrola w linii: zapisane z agentow = wrocilo + DTE nie przyjal + kon/uprzaz nie zeszly z nim + partie jak w grze + DTE oddal sam + DTE nie rozliczylo.
+    /// Zapis porzucony bez linii kontroli (klucz NIE w trakcie, strona nie pokonana, potkniecie CapPre, nowa misja / kampania) - linia "zapis porzucony" (U2).
     /// </summary>
     internal static partial class CommanderWithdraw458Map
     {
@@ -47,8 +50,17 @@ namespace Armoury
             public bool HasId, Done, Kept;
             public int Dte = -1;   // HandlePartyItems: -1 nie wolane (partia bez rozdzielacza DTE), 0 isDefeated NIE (DTE oddal sam), 1 isDefeated TAK (DTE nie oddal)
             public int Men, MenRec, MenNoRec, MenLate, MenNoAsg;
-            public long Pieces, Horses, HorseOff, Back, HorsesBack, Refused;
+            public long Pieces, Horses, HorseOff, Back, HorsesBack, Refused, HorseApart;
             public readonly Dictionary<ItemObject, int> Items = new Dictionary<ItemObject, int>();
+            public readonly List<HorsePend> Pend = new List<HorsePend>();   // 458-u-p: kon/uprzaz czekaja na rozstrzygniecie przy OnEndMission
+        }
+
+        internal sealed class HorsePend
+        {
+            public Agent Own;
+            public float T;
+            public bool MountedOwn;
+            public ItemObject Horse, Harness;
         }
 
         internal sealed class GearSnap
@@ -56,7 +68,9 @@ namespace Armoury
             public Gear G;
             public MBGUID Id;
             public Dictionary<ItemObject, int> Before;
-            public bool Mounted;
+            public Agent Own;          // 458-u-p: wlasny kon ze spawnu (zapis 458 OnAgentBuild)
+            public bool MountedOwn;    // siedzial na WLASNYM koniu przy usunieciu
+            public float T;
             public ItemObject Horse, Harness;
         }
 
@@ -106,10 +120,62 @@ namespace Armoury
         /// <summary>Misja skonczona (OnEndMission 458): zapis zamkniety, zebrany sprzet czeka na mape.</summary>
         internal static void GearStop(CommanderWithdraw458 live)
         {
-            if (ReferenceEquals(_gearLive, live)) _gearLive = null;
+            if (!ReferenceEquals(_gearLive, live)) return;
+            GearResolve(live);
+            _gearLive = null;
         }
 
-        private static void GearClear() { _gearLive = null; _gearMe = null; _gear.Clear(); }
+        /// <summary>458-u-p (U1): kon i uprzaz zbieglych z wodzem wedlug losu WLASNEGO konia (live - zapis misji; null - misja bez OnEndMission: nie wracaja).</summary>
+        private static void GearResolve(CommanderWithdraw458 live)
+        {
+            foreach (var g in _gear.Values)
+            {
+                foreach (var hp in g.Pend)
+                {
+                    int left = 0;
+                    try { left = live != null ? live.GearMountLeft(hp.Own, hp.T, hp.MountedOwn) : 0; }
+                    catch (Exception e) { left = 0; Stumble("Sprzet (kon)", e); }
+                    int n = (hp.Horse != null ? 1 : 0) + (hp.Harness != null ? 1 : 0);
+                    if (left == 0) { g.HorseOff += n; continue; }
+                    if (left == 2) g.HorseApart++;
+                    int k;
+                    if (hp.Horse != null)
+                    {
+                        g.Items.TryGetValue(hp.Horse, out k); g.Items[hp.Horse] = k + 1;
+                        if (hp.Horse.ItemType == ItemObject.ItemTypeEnum.Horse) g.Horses++;
+                    }
+                    if (hp.Harness != null) { g.Items.TryGetValue(hp.Harness, out k); g.Items[hp.Harness] = k + 1; }
+                }
+                g.Pend.Clear();
+            }
+        }
+
+        private static void GearClear(string why)
+        {
+            GearDrop(why);
+            _gearLive = null; _gearMe = null; _gear.Clear();
+        }
+
+        /// <summary>458-u-p (recenzja U2): zapis sprzetu porzucony bez linii kontroli - jedna linia z powodem (zachowanie jak przed 458-u: sztuki bez zwrotu
+        /// przepadaja w rozliczeniu DTE pokonanego; wczesniej juz zwrocone - zostaja).</summary>
+        private static void GearDrop(string why)
+        {
+            if (_gear.Count == 0) return;
+            try
+            {
+                int men = 0, pend = 0;
+                long pieces = 0, back = 0, refused = 0, dteSelf = 0;
+                foreach (var g in _gear.Values)
+                {
+                    men += g.Men; pieces += g.Pieces; back += g.Back; refused += g.Refused; pend += g.Pend.Count;
+                    if (g.Dte == 0) dteSelf += g.Pieces;   // DTE nie uznal partii za pokonana - oddal ItemsToRecover sam (w tym kon i uprzaz)
+                }
+                Log.Info(P + "sprzet zbieglych z wodzem - zapis porzucony (" + why + "): zbiegli z wodzem w zapisie " + men + ", sztuk zapisanych przez DTE " + pieces
+                         + ", wrocilo dotad " + back + (refused > 0 ? ", DTE nie przyjal " + refused : "") + (pend > 0 ? ", koni nierozstrzygnietych " + pend : "")
+                         + ", DTE oddal sam " + dteSelf + ", bez zwrotu " + (pieces - back - refused - dteSelf) + " (jak przed 458-u).");
+            }
+            catch { }
+        }
 
         /// <summary>Prefiks DTE OnAgentRemoved(affectedAgent, affectorAgent, agentState, blow): zbiegly z wodzem - migawka ItemsToRecover jego partii.</summary>
         public static void GearRemPre(object __instance, Agent __0, AgentState __2, out GearSnap __state)
@@ -141,9 +207,12 @@ namespace Armoury
                 var asg = _gAssign.GetValue(__instance) as IDictionary;
                 if (asg == null || !asg.Contains(__0)) { g.MenNoAsg++; return; }   // bez przydzialu DTE - sprzet nie ze zbrojowni (zwrot bylby z niczego)
                 var eq = __0.SpawnEquipment;
+                var own = live.GearOwnMount(__0);
+                var cur = __0.MountAgent;
                 __state = new GearSnap
                 {
-                    G = g, Id = g.Id, Before = Recover(__instance, g.Id), Mounted = __0.MountAgent != null,
+                    G = g, Id = g.Id, Before = Recover(__instance, g.Id), Own = own, MountedOwn = own != null && ReferenceEquals(cur, own),
+                    T = __0.Mission != null ? __0.Mission.CurrentTime : 0f,
                     Horse = eq != null ? eq[EquipmentIndex.Horse].Item : null, Harness = eq != null ? eq[EquipmentIndex.HorseHarness].Item : null
                 };
             }
@@ -170,11 +239,12 @@ namespace Armoury
                 if (got == 0) { g.MenNoRec++; return; }
                 g.MenRec++;
                 g.Pieces += got;
-                if (!__state.Mounted)
+                // 458-u-p (U1): kon i uprzaz czekaja na los WLASNEGO konia (GearResolve przy OnEndMission); wystawiony bez konia - nie zeszly z nim
+                bool hTook = Take1(delta, __state.Horse) > 0, rTook = Take1(delta, __state.Harness) > 0;
+                if (hTook || rTook)
                 {
-                    // zszedl bez konia (kon padl / zostal) - kon i uprzaz nie zeszly z nim z pola
-                    g.HorseOff += Take1(delta, __state.Horse);
-                    g.HorseOff += Take1(delta, __state.Harness);
+                    if (__state.Own == null) g.HorseOff += (hTook ? 1 : 0) + (rTook ? 1 : 0);
+                    else g.Pend.Add(new HorsePend { Own = __state.Own, T = __state.T, MountedOwn = __state.MountedOwn, Horse = hTook ? __state.Horse : null, Harness = rTook ? __state.Harness : null });
                 }
                 foreach (var kv in delta)
                 {
@@ -224,6 +294,7 @@ namespace Armoury
             if (pb == null || me == null || !ReferenceEquals(_gearMe, me)) return;
             Gear g;
             if (!_gear.TryGetValue(pb, out g) || g.Done) return;
+            if (g.Pend.Count > 0) GearResolve(null);   // misja bez OnEndMission 458 (nie powinno sie zdarzyc) - konie nierozstrzygniete nie wracaja
             g.Done = true;
             g.Kept = true;
             if (g.Dte != 1) return;
@@ -251,17 +322,18 @@ namespace Armoury
             try
             {
                 if (_gear.Count == 0) return;
+                GearResolve(null);   // nierozstrzygniete (bez OnEndMission 458) - nie wracaja; po GearStop pusto
                 int men = 0, menAll = 0, noRec = 0, late = 0, noAsg = 0, parties = 0;
-                long pieces = 0, back = 0, horsesBack = 0, refused = 0, horseOff = 0, game = 0, dteSelf = 0, noDte = 0;
+                long pieces = 0, back = 0, horsesBack = 0, refused = 0, horseOff = 0, game = 0, dteSelf = 0, noDte = 0, apart = 0;
                 var names = new List<string>();
                 foreach (var g in _gear.Values)
                 {
                     menAll += g.Men; noRec += g.MenNoRec; late += g.MenLate; noAsg += g.MenNoAsg;
-                    pieces += g.Pieces; horseOff += g.HorseOff;
+                    pieces += g.Pieces; horseOff += g.HorseOff; apart += g.HorseApart;
                     long rest = g.Pieces - g.HorseOff;
-                    if (!g.Kept) { game += rest; names.Add(Name(g.Pb) + ": jak w grze " + rest); continue; }
+                    if (!g.Kept) { game += rest; names.Add(Name(g.Pb) + ": jak w grze (bez zwrotu) " + rest); continue; }
                     if (g.Dte == 0) { dteSelf += rest; names.Add(Name(g.Pb) + ": DTE oddal sam " + rest); continue; }
-                    if (g.Dte != 1) { noDte += rest; names.Add(Name(g.Pb) + ": bez zbrojowni DTE " + rest); continue; }
+                    if (g.Dte != 1) { noDte += rest; names.Add(Name(g.Pb) + ": DTE nie rozliczylo partii " + rest); continue; }
                     parties++;
                     men += g.MenRec;
                     back += g.Back; horsesBack += g.HorsesBack; refused += g.Refused;
@@ -269,11 +341,11 @@ namespace Armoury
                 }
                 bool ok = pieces == back + refused + horseOff + game + dteSelf + noDte;
                 var sb = new StringBuilder(384);
-                sb.Append(P).Append("sprzet zbieglych z wodzem wrocil do zbrojowni: ludzi ").Append(men).Append(", sztuk ").Append(back).Append(" (w tym koni ").Append(horsesBack).Append(')')
+                sb.Append(P).Append("sprzet zbieglych z wodzem wrocil do zbrojowni: ludzi ").Append(men).Append(", sztuk ").Append(back).Append(" (w tym koni ").Append(horsesBack).Append(", kon zdjety z pola osobno do 1 s od jezdzca ").Append(apart).Append(')')
                   .Append(", partii ").Append(parties)
                   .Append(" | kontrola: zapisane przez DTE z agentow ").Append(pieces).Append(" = wrocilo ").Append(back).Append(" + DTE nie przyjal ").Append(refused)
-                  .Append(" + kon/uprzaz nie zeszly z nim (zszedl bez konia) ").Append(horseOff).Append(" + partie jak w grze (pojmani) ").Append(game)
-                  .Append(" + DTE oddal sam ").Append(dteSelf).Append(" + bez zbrojowni DTE ").Append(noDte).Append(ok ? " OK" : " NIEZGODNE")
+                  .Append(" + kon/uprzaz nie zeszly z nim (wlasny kon padl / zostal / wystawiony pieszo) ").Append(horseOff).Append(" + partie jak w grze (bez zwrotu) ").Append(game)
+                  .Append(" + DTE oddal sam ").Append(dteSelf).Append(" + DTE nie rozliczylo partii ").Append(noDte).Append(ok ? " OK" : " NIEZGODNE")
                   .Append(" | zbiegli z wodzem w zapisie: ").Append(menAll).Append(" (bez sztuk w zapisie DTE ").Append(noRec).Append(", po rozliczeniu DTE - sprzet oddal DTE ").Append(late)
                   .Append(", bez przydzialu DTE ").Append(noAsg).Append(')');
                 if (names.Count > 0) sb.Append(" | ").Append(string.Join("; ", names.ToArray()));

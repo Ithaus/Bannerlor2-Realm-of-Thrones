@@ -1,5 +1,29 @@
 # DZIENNIK ZMIAN
 
+## 458-u-p (12.11) - poprawki po recenzji 458-u: kon zbieglego z wodzem wedlug losu WLASNEGO konia, linia "zapis porzucony", etykiety kontroli
+
+**Problem (recenzja 458-u, gry nie uruchamiano - dowod z kodu):**
+- U1: zwrot konia i uprzezy zalezal od `MountAgent` jezdzca w chwili usuniecia. Kolejnosc odpiecia konia przy `Agent.FadeOut` ustala silnik (d450/agent.cs 4270 - natywne FadeOut jezdzca, potem konia), wiec (a) gdy kon odpiety wczesniej - wszystkie konie przepadaja; (b) jezdziec, ktory stracil wlasnego konia (padl) i dosiadl cudzego, dostawal zwrot konia ze spawnu = kon z niczego (HorseFate liczy padlego jako zgon bez zdjecia).
+- U2: wczesne wyjscia CapPre (klucz NIE w trakcie, strona wodza nie pokonana, potkniecie CapPre) i nowa misja / kampania kasowaly zapis sprzetu bez slowa w logu.
+- U3 / U4: etykiety kontroli "partie jak w grze (pojmani)" i "bez zbrojowni DTE" mylace.
+- U5 (raport, nie kod): CHANGELOG 458-u to 46209 -> 46237, nie 46210 -> 46238; nic nie uciete. Bez zmiany.
+
+**Przyczyna:** `Gear.cs` GearRemPre `Mounted = __0.MountAgent != null`; `GearClear()` bez linii; etykiety w GearLine.
+
+**Zmiana:**
+- `CommanderWithdraw458.cs`: OnAgentBuild (pod `_ruleKey`, wystawieni wroga gracza, szeregowi) zapisuje wlasnego konia jezdzca (`MountAgent` przy budowie - kon posadzony przed OnAgentBuild jezdzca, jak HorseFateMission). OnAgentRemoved (pod `_ruleKey`) zapisuje pierwszy los tego konia (stan + chwila). `GearOwnMount`, `GearMountLeft`: kon wraca, gdy NIE zabity i (jezdziec siedzial na WLASNYM koniu przy usunieciu albo kon zdjety z pola zywy - Routed/Deleted - najwyzej 1 s od jezdzca). Los z wlasnego zapisu, nie `Agent.State` (wskaznik silnika po usunieciu; OnAgentDeleted nadpisuje stan na Deleted). Zapis czyszczony po GearStop w OnEndMission. Mission.EndMissionInternal wola na koncu tylko `agent.OnRemove()`, bez OnAgentRemoved - kon stojacy na polu do konca nie ma losu = nie wraca.
+- `Gear.cs`: kon i uprzaz ze spawnu wyjete z roznicy DTE czekaja (`Pend`) na rozstrzygniecie w GearStop (`GearResolve`); wystawiony bez konia - "nie zeszly z nim" jak dotad. Bez OnEndMission 458 (nie powinno sie zdarzyc) - nierozstrzygniete nie wracaja. Linia: "(w tym koni K, kon zdjety z pola osobno do 1 s od jezdzca A)" - A pokazuje, czy zachodzi przypadek (a) z recenzji. Etykiety: "partie jak w grze (bez zwrotu)", "DTE nie rozliczylo partii", "wlasny kon padl / zostal / wystawiony pieszo".
+- `Gear.cs` / `Map.cs`: `GearClear(powod)` -> `GearDrop`: przy niepustym zapisie jedna linia "Odwrot wodza (458) mapa: sprzet zbieglych z wodzem - zapis porzucony (powod): zbiegli .., sztuk zapisanych przez DTE .., wrocilo dotad .., DTE oddal sam .., bez zwrotu .. (jak przed 458-u)." Wolane: Reset (nowa kampania / wczytanie), Clear (nowa misja), CapPre klucz NIE, strona nie pokonana, potkniecie CapPre (po GearLine zapis pusty - bez linii).
+
+**Ryzyko / co sprawdzic:**
+- Klucz NIE: `_ruleKey` false - zapisu koni nie ma, StartRule nie rusza, zapis sprzetu pusty, GearDrop nic nie pisze - co do bitu jak przed.
+- Regresje: liczniki 458 (Track) bez zmian - zapis konia obok w tym samym `lock(_gate)`; mounts nie sa w `_trk`, Track wychodzi jak dotad. HorseFate: kon zabity - nie wraca (zgon bez zdjecia, jak dotad); kon zywy, ktory zszedl z jezdzcem - wraca do zbrojowni, HorseFate go nie liczy. Cudzy kon dosiadziety - nie jego sztuka, nie wraca (zostaje u wlasciciela / na polu jak dotad).
+- Kontrola sum bez zmian w budowie: zapisane = wrocilo + DTE nie przyjal + kon/uprzaz nie zeszly + jak w grze + DTE oddal sam + DTE nie rozliczylo (kon czekajacy liczony w Pieces, po rozstrzygnieciu albo w Items, albo w HorseOff).
+- Do logu: linia "sprzet zbieglych z wodzem wrocil ... OK"; A ("osobno do 1 s") - jesli ~ liczba konnych zbieglych, silnik odpina konia przed usunieciem jezdzca (przypadek a) i okno 1 s go ratuje; "kon/uprzaz nie zeszly z nim" duze przy konnym odwrocie = do zbadania. Linia "zapis porzucony" tylko po bitwie z regula bez rozliczenia na mapie.
+- Build OK, skan IL 30 trafien. Gry nie uruchamiano.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 458-u (12.11) - odwrot wodza: sprzet zolnierzy, ktorzy uszli z wodzem, wraca do zbrojowni DTE ich partii
 
 **Problem:** recenzja 458-t, B2 (zostawione w 458-t-p do decyzji): sprzet zolnierzy, ktorzy uszli z wodzem, przepadal przy rozliczeniu misji DTE - nie trafial do zwyciezcy, ale ginal; partia wodza odchodzila z ludzmi bez ich broni, zbroi i koni. Jeff 12.11: "rob to, jak uciekli to nie uciekli nago tylko w sprzecie ktorym walczyli." Gry nie uruchamiano - dowod z dekompilacji.

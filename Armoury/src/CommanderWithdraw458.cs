@@ -154,6 +154,11 @@ namespace Armoury
         private int _heroRm, _heroWs, _heroK;
         private int _buildMiss;   // 458-p: wystawiony czlowiek wroga bez licznika (brak partii / postaci / potkniecie) - mapa wtedy jak w grze
         private float _nextMaintain;
+        // 458-u-p (recenzja U1): wlasny kon jezdzca-szeregowego ze spawnu i los tego konia (stan + chwila zejscia) - zwrot konia zbieglego z wodzem wedlug
+        // losu WLASNEGO wierzchowca, nie MountAgent w chwili usuniecia (kolejnosc odpiecia konia ustala silnik; cudzy kon dosiadziety = nie jego sztuka)
+        private readonly Dictionary<Agent, Agent> _ownMount = new Dictionary<Agent, Agent>();
+        private readonly Dictionary<Agent, KeyValuePair<AgentState, float>> _mountFate = new Dictionary<Agent, KeyValuePair<AgentState, float>>();
+        private const float MountWith = 1f;   // kon zdjety z pola osobno najwyzej tyle sekund od jezdzca = zszedl razem z nim (jedno FadeOut)
 
         public CommanderWithdraw458()
         {
@@ -548,7 +553,12 @@ namespace Armoury
                 {
                     _trk[agent] = new Org { P = pb, C = c };
                     if (c.IsHero) { if (c.HeroObject != null) _spawnedHeroes.Add(c.HeroObject); }
-                    else Cnt(pb, c)[CommanderWithdraw458Map.CS]++;
+                    else
+                    {
+                        Cnt(pb, c)[CommanderWithdraw458Map.CS]++;
+                        var mount = agent.MountAgent;   // kon posadzony przed OnAgentBuild jezdzca (Mission.SpawnAgent, jak HorseFateMission)
+                        if (mount != null) _ownMount[agent] = mount;
+                    }
                 }
             }
             catch (Exception e) { lock (_gate) _buildMiss++; Stumble("Wystawiony", e); }
@@ -558,6 +568,28 @@ namespace Armoury
         internal bool GearEscapee(Agent a)
         {
             lock (_gate) return !_ended && a != null && _esc.Contains(a);
+        }
+
+        /// <summary>458-u-p: wlasny kon jezdzca ze spawnu (null - wystawiony pieszo / bez zapisu).</summary>
+        internal Agent GearOwnMount(Agent rider)
+        {
+            Agent m;
+            lock (_gate) return rider != null && _ownMount.TryGetValue(rider, out m) ? m : null;
+        }
+
+        /// <summary>458-u-p: wlasny kon zszedl z pola z jezdzcem - nie zabity i (jezdziec siedzial na nim przy usunieciu albo kon zdjety z pola zywy
+        /// najwyzej MountWith s od jezdzca). Wolane przy OnEndMission (przed czyszczeniem), los konia z wlasnego zapisu (Agent.State po usunieciu - wskaznik silnika).
+        /// Wynik: 1 zszedl na nim, 2 kon zdjety osobno w oknie, 0 nie (padl / zostal na polu / zszedl osobno pozniej).</summary>
+        internal int GearMountLeft(Agent own, float tRider, bool mountedOwn)
+        {
+            if (own == null) return 0;
+            KeyValuePair<AgentState, float> f;
+            bool has;
+            lock (_gate) has = _mountFate.TryGetValue(own, out f);
+            if (has && f.Key == AgentState.Killed) return 0;
+            if (mountedOwn) return 1;
+            if (has && (f.Key == AgentState.Routed || f.Key == AgentState.Deleted) && Math.Abs(f.Value - tRider) <= MountWith) return 2;
+            return 0;
         }
 
         private int[] Cnt(PartyBase pb, CharacterObject c)
@@ -599,7 +631,16 @@ namespace Armoury
             if (_ended || affectedAgent == null) return;
             if (_ruleKey)
             {
-                try { lock (_gate) Track(affectedAgent, agentState, false); }
+                try
+                {
+                    lock (_gate)
+                    {
+                        Track(affectedAgent, agentState, false);
+                        // 458-u-p: los wlasnego konia jezdzca-szeregowego (pierwsze zejscie z pola)
+                        if (affectedAgent.IsMount && _ownMount.Count > 0 && !_mountFate.ContainsKey(affectedAgent) && _ownMount.ContainsValue(affectedAgent))
+                            _mountFate[affectedAgent] = new KeyValuePair<AgentState, float>(agentState, Mission != null ? Mission.CurrentTime : 0f);
+                    }
+                }
                 catch (Exception e) { Stumble("Licznik", e); }
             }
             if (_teams.Count == 0) return;
@@ -807,7 +848,8 @@ namespace Armoury
                 _esc.Clear();
                 _panicOut.Clear();
             }
-            try { CommanderWithdraw458Map.GearStop(this); } catch { }   // 458-u
+            try { CommanderWithdraw458Map.GearStop(this); } catch { }   // 458-u (458-u-p: tu rozstrzyga konie wedlug _mountFate - czyszczone ponizej)
+            lock (_gate) { _ownMount.Clear(); _mountFate.Clear(); }
             _bufE.Clear();
             _result = null;
             base.OnEndMission();
