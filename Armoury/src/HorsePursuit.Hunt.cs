@@ -144,6 +144,7 @@ namespace Armoury
             public float R;
             public int N;
             public bool Cav, Ha, Foot, Rng, Player, Retreat, Charging;
+            public bool Role;      // 441: szyk w roli jazdy Armoury (Player = true - jeden wlasciciel; bez licznika szyku gracza)
             public float Gap;      // 283: odleglosc do najblizszego szyku wroga (poprawka 132b: nietknietego - od IntactMin ludzi; bez takiego MarchToContact.EnemyGap)
             public bool Engaged;   // 283: w zwarciu (Gap <= ContactGap 25 m)
             public float D;        // poprawka 132b: glebokosc szyku (Formation.Depth - miara EnemyGap)
@@ -479,11 +480,14 @@ namespace Armoury
                     Vec2 c = mp.IsValid ? mp.AsVec2 : f.CachedAveragePosition;
                     if (!c.IsValid) continue;
                     bool cav = q.IsCavalryFormation || q.IsRangedCavalryFormation;
+                    // 441 (jeden wlasciciel): szyk w roli jazdy Armoury - 204 / 283 / 311a / 344 traktuja go jak szyk gracza (nie biora z niego jezdzcow)
+                    bool role = Doctrine.C441Owned(f);
+                    if (role) Doctrine.C441NoteSkip(1);
                     var fi = new FI
                     {
                         F = f, C = c, N = f.CountOfUnits, R = Math.Min(RadiusCap, 0.5f * Math.Max(f.Width, f.Depth)),
                         Cav = cav, Ha = q.IsRangedCavalryFormation, Foot = !cav && (q.IsInfantryFormation || q.IsRangedFormation), Rng = !cav && q.IsRangedFormation,
-                        Player = PlayerForm(f) || f.HasPlayerControlledTroop
+                        Player = PlayerForm(f) || f.HasPlayerControlledTroop || role, Role = role
                     };
                     fi.Rest = c;
                     int rc;
@@ -803,7 +807,7 @@ namespace Armoury
             if (a.IsRunningAway || SurvivalMode.InPanic(a) || Withdrawing(a)) return UPanic;
             if (!ReferenceEquals(a.Formation, h.F)) return UOther;
             if (m.MissionEnded || a.GetComponent<VictoryComponent>() != null) return UEnded;
-            if (h.F == null || PlayerForm(h.F)) return UPlayer;
+            if (h.F == null || PlayerForm(h.F) || Doctrine.C441Owned(h.F)) return UPlayer;   // 441: szyk jezdzca dostal role jazdy Armoury - jezdziec wraca
             var s = h.T.S;
             if (s == null || !s.IsActive()) return UThreat;
             // recenzja 204: jezdziec nie wjezdza w nietkniety szyk strony strzelca (jak OIntact 148; zaslona przy piechocie trzyma 30 m od jej krawedzi);
@@ -1007,6 +1011,7 @@ namespace Armoury
         /// <summary>Szyk gracza w zasiegu odpowiedzi - nie rusza (ludzi szyku liczonych raz na bitwe).</summary>
         private static void NotePlayerForm(Threat t, FI fi, float e)
         {
+            if (fi.Role) return;   // 441: szyk w roli jazdy Armoury - liczony w linii 441, nie jako szyk gracza
             if (NwPlayerForms.Add(fi.F)) Nw[NwPlayer] += fi.N;
         }
 

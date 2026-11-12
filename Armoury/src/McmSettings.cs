@@ -11688,6 +11688,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool CommandConfusionAfterCommanderDeath { get; set; } = true;
 
+        [SettingPropertyBool("Cavalry Commander", HintText = "AI cavalry in field battles gets an Armoury cavalry commander: a behaviour of its own added to every AI formation, which later steps will use to give the cavalry a task (choosing whom to charge, raiding enemy archers, hiding behind its own foot from missiles, hammer and anvil, fighting the enemy cavalry first, breaking off a lost melee). In this version it is only the framework: every formation has no task, the behaviour stays idle and never takes over the formation - nothing changes on the field. No bonus to any number on the field - only decisions. Field battles only. Off = the behaviour is not added at all, exactly as before. Counted in the Armoury log at the end of each field battle (line 441).")]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool CavalryCommander { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15733,6 +15737,7 @@ namespace Armoury
             s.BattlePlanVariety = BattlePlanVariety;   // 440
             s.CommanderPersonalityInBattle = CommanderPersonalityInBattle;   // 440
             s.CommandConfusionAfterCommanderDeath = CommandConfusionAfterCommanderDeath;   // 440
+            s.CavalryCommander = CavalryCommander;   // 441
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;

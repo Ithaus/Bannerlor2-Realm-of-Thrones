@@ -155,7 +155,12 @@ namespace Armoury
             if (rider.IsMainAgent || !rider.IsAIControlled) return;
             var f = rider.Formation;
             if (f == null) return;
-            if (!HorsePursuit.PlayerForm(f)) HorsePursuit.OnRiderShotAny(m, rider, at);   // 344 (recenzja D5: bez klucza ShieldsUp - OnRiderShotAny sprawdza klucze 204/344): kazdy konny AI (nie tylko szyk konnicy) - kontra / odruch
+            // 441 (jeden wlasciciel): jezdziec szyku w roli jazdy Armoury nie wchodzi w odruch / kontre 344
+            if (!HorsePursuit.PlayerForm(f))
+            {
+                if (Doctrine.C441Owned(f)) Doctrine.C441NoteSkip(2);
+                else HorsePursuit.OnRiderShotAny(m, rider, at);
+            }   // 344 (recenzja D5: bez klucza ShieldsUp - OnRiderShotAny sprawdza klucze 204/344): kazdy konny AI (nie tylko szyk konnicy) - kontra / odruch
             var q = f.QuerySystem;
             if (q == null || !q.IsCavalryFormation || HorsePursuit.PlayerForm(f)) return;
             bool horse = v.IsMount;

@@ -643,6 +643,15 @@ namespace Armoury
 
             if (kind == KCav)
             {
+                // 441 (pakiet 4 krok 4.0, wyjatek limitu klusa): szyk w roli jazdy Armoury z galopem (Doctrine.C441FullPace) jedzie rozkazem Move bez capu marszu 128 -
+                // jak galop ponizej. Odpoczynek koni 136 (RestCav) wyzej zostaje. W 441 zadna rola nie jest nadawana - galaz nie wchodzi (licznik w linii 441)
+                if (Doctrine.C441FullPace(f))
+                {
+                    Doctrine.C441NoteFullPace();
+                    Release(idx, now);
+                    Set(f, idx, 0f, 0f, false);
+                    return;
+                }
                 // 344: konnica liczy odleglosc takze do aktywnego konnego strzelca, ktory strzela w jej strone (nie tylko do szykow jego armii - klus 128 pod jego
                 // strzalami), a szyk w powrocie szykiem 344 (PS) jedzie bez capu marszu (galop - bez klusa tylem pod ostrzalem)
                 float sg = float.MaxValue;

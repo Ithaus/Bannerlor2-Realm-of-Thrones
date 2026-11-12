@@ -289,6 +289,20 @@ namespace Armoury
             catch { Interlocked.Increment(ref _postErr); }
         }
 
+        /// <summary>441: wynik GetAiWeight zachowania roli jazdy Armoury (typ spoza skanu latek 437) do tej samej tablicy - os czasu pokazuje jego wage.</summary>
+        // Bez licznika wywolan 437 (GetAiWeight glowny / inny liczy tylko latki 437 - wywolania roli liczy linia 441).
+        internal static void NoteWeight(BehaviorComponent b, float w)
+        {
+            if (!_on || b == null) return;
+            try
+            {
+                var box = _bw.GetOrCreateValue(b);
+                box.V = w;
+                box.Has = true;
+            }
+            catch { Interlocked.Increment(ref _postErr); }
+        }
+
         /// <summary>Postfiks MakeDecision: zmiana planu -> zdarzenie do kolejki (trzy najwyzsze wagi, powod). Linia w glownym watku.</summary>
         private static void PostDec(TeamAIComponent __instance)
         {

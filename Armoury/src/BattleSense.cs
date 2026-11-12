@@ -60,6 +60,7 @@ namespace Armoury
                                  || c.DefendersHoldTheirGround      // 291: obronca trzyma pozycje (Doctrine.Hold291.cs) - tak samo
                                  || c.BattlePlanVariety || c.CommandConfusionAfterCommanderDeath   // 440: wodz AI (Doctrine.Plan440.cs) - P440Tick z Doctrine.Tick
                                  || c.CommanderPersonalityInBattle   // 440-p: profil wodza tez z P440Tick (rzut) - sam ten klucz dotad nic nie robil
+                                 || c.CavalryCommander   // 441: zachowanie roli jazdy (Doctrine.Cav441.cs) - C441Begin / C441Tick z Doctrine
                                  || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 

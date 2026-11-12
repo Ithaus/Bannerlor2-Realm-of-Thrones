@@ -215,13 +215,14 @@ namespace Armoury
             string o438 = O438ApplyPatch(h);   // 438: plany ataku RBM (1.1) i splity obrony RBM przy przegranym ostrzale (1.3) - Doctrine.Outshot438.cs
             string h439 = H439ApplyPatch(h);   // 439: obronca trzyma do zwarcia (2.1/2.2) i szuka wzgorza (2.3) - Doctrine.Hold439.cs; po 438 (typy splitow obrony RBM)
             string p440 = P440ApplyPatch(h);   // 440: wodz AI - los planow (3.1/3.4), zamet po smierci wodza (3.5) - Doctrine.Plan440.cs; po 438 (typy planow RBM)
+            string c441 = C441ApplyPatch(h);   // 441: zachowanie roli jazdy (pakiet 4 krok 4.0) - Doctrine.Cav441.cs
             string pend333 = Pendulum333.ApplyPatch(h);  // 333 (B): szyk bez wahadla przed kontaktem (Pendulum333.cs); 344: arbiter ruchu i ustawienia
             string nff344 = NoFastForward344.ApplyPatch(h);   // 344: bieg autotestu bez przewijania (tylko LogGate.Mode 1 i plik-flaga)
             pend333 += ", bez przewijania 344 " + nff344;
             return "GetTacticWeight " + _patched + "/" + _wanted + " (Priority.Last po com.rbmai" + (miss.Length > 0 ? "; NIE:" + miss.ToString() : "")
                    + "), Attack " + _patchedAttack + "/" + _wantedAttack + (missA.Length > 0 ? " (NIE:" + missA.ToString() + ")" : "")
                    + ", biezaca taktyka " + (_fCur != null ? "TAK" : "NIE") + ", typy RBM: RBMBehaviorCavalryCharge " + (_fChargeInf != null ? "TAK" : "NIE")
-                   + ", RBMBehaviorArcherSkirmish " + (_tRbmArcher != null ? "TAK" : "NIE") + ", wagi zachowan " + (_fBehaviors != null ? "TAK" : "NIE") + ", obrona gry 291d " + def291d + ", cel pieszy 313b " + aim313 + ", wahadlo 333 " + pend333 + ", ostrzal 438 " + o438 + ", obronca 439 " + h439 + ", wodz 440 " + p440;
+                   + ", RBMBehaviorArcherSkirmish " + (_tRbmArcher != null ? "TAK" : "NIE") + ", wagi zachowan " + (_fBehaviors != null ? "TAK" : "NIE") + ", obrona gry 291d " + def291d + ", cel pieszy 313b " + aim313 + ", wahadlo 333 " + pend333 + ", ostrzal 438 " + o438 + ", obronca 439 " + h439 + ", wodz 440 " + p440 + ", jazda 441 " + c441;
         }
 
         private static void PatchAttack(Harmony h, Type t, StringBuilder miss)
@@ -360,6 +361,7 @@ namespace Armoury
             catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.Begin druzyny", e); }
             var c = Settings.Current;
             _on = AnyKey(c) && m != null && m.IsFieldBattle && _patched + _patchedAttack > 0;
+            C441Begin(m);   // 441: zachowanie roli jazdy - wlasny klucz (bez AnyKey)
         }
 
         /// <summary>283 (HorsePursuit.ReactHalt, glowny watek): szyk trzymany teraz przez S4 (lucznicy za piechota - wagi zachowan przejete) - postoj 283 go
@@ -418,6 +420,7 @@ namespace Armoury
             _sampleTeamA = _sampleTeamD = -1;
             _acc1 = 0f;
             P440ClearMission();   // 440
+            C441ClearMission();   // 441
         }
 
         /// <summary>WarCouncil.One (glowny watek, AfterStart albo pozna druzyna DR): doktryna druzyny AI i dodatki do listy taktyk. have/note - lista typow
@@ -496,6 +499,8 @@ namespace Armoury
             if (m == null) return;
             // 440: rzut losu, profil i zamet po smierci wodza - wlasny zegar i wlasne klucze (bez AnyKey), pierwszy raz w pierwszej klatce po rozstawieniu
             try { P440Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.P440Tick", e); }
+            // 441: zachowanie roli jazdy - zalegle szyki, miary, oddanie roli graczowi (wlasny zegar 1 s i wlasny klucz)
+            try { C441Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.C441Tick", e); }
             _acc += dt;
             _acc1 += dt;
             if (_acc1 >= S4Every)
