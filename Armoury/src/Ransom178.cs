@@ -392,7 +392,15 @@ namespace Armoury
             if (price <= 0) _dZeroN++;
             // M6a-2: licznik okupu powtornego (cena pelna = cena bez mnoznika; po mnozniku = cena przed pulapem dlugu - pulap liczy sie osobno, jak dotad)
             // 430 (C5): cena pelna liczona z mnoznika, ktory naprawde zadzialal (mniejszy z osoby i rodu); okup z wiazacym mnoznikiem rodu - licznik linii 430
-            try { double rf = RansomRepeat.Factor(captive), cf = RepeatFactor(captive); RansomRepeat.Note(cf > 0 && cf < 1.0 ? (long)Math.Round(fullBase / cf) : fullBase, fullBase, rf < 1.0); RansomHouse430.NoteDeal(captive, captorClan, fullBase, rf); } catch { }
+                // 430-p (recenzja N5): gdy wiaze mnoznik rodu (hf <= rf, ten sam warunek co NoteDeal), okup liczy tylko linia 430 - nie obie
+            try
+            {
+                double rf = RansomRepeat.Factor(captive), hf = RansomHouse430.Factor(captive), cf = rf < hf ? rf : hf;
+                bool house = hf < 1.0 && hf > 0 && hf <= rf;
+                RansomRepeat.Note(cf > 0 && cf < 1.0 ? (long)Math.Round(fullBase / cf) : fullBase, fullBase, rf < 1.0 && !house);
+                RansomHouse430.NoteDeal(captive, captorClan, fullBase, rf);
+            }
+            catch { }
             _dPrice += price; _dCash += cash; _dDebt += debt;
             _lastExecPrice = price;
             if (price > _dMaxV) { _dMaxV = price; _dMax = Name(payerClan) + " -> " + (rcv.Crown != null ? "korona " + rcv.Crown.Name : Name(rcv.Hero)) + " " + price + " za " + Name(captive); }
@@ -729,9 +737,16 @@ namespace Armoury
             try
             {
                 if (!On || h == null || !Lord(h) || h.Clan == Clan.PlayerClan) return -1;
-                if (seller == Hero.MainHero && RansomHouse430.Refused(h)) return 0;   // 430 (C5): rod odmowil - posrednik nie ma od kogo wziac monety
+                // 430-p (recenzja K1): gra wycenia wyplate PO uwolnieniu jenca (SellPrisonersAction: ApplyByRansom, potem PrisonerRansomValue) - wtedy odmowy juz nie widac
+                // (IsPrisoner = false, decyzja skasowana), mnoznik rodu = 1, a mnoznik osoby M6a-2 wlasnie spadl do podlogi. W srodku sprzedazy bierzemy cene
+                // zapamietana PRZED uwolnieniem (SalePrefix): -1 = rod odmowil -> 0; inaczej ta sama cena, z ktorej SalePostfix zdejmie gotowke z rodziny.
+                long pre = 0;
+                bool inSale = seller == Hero.MainHero && !h.IsPrisoner && _salePre.TryGetValue(h, out pre);
+                if (inSale && pre < 0) return 0;
+                if (!inSale && seller == Hero.MainHero && RansomHouse430.Refused(h)) return 0;   // 430 (C5): rod odmowil - posrednik nie ma od kogo wziac monety
                 bool byCrown; double D;
                 long price = PriceOf(h, out byCrown, out D);
+                if (inSale) price = pre;
                 if (seller != Hero.MainHero) return (int)Math.Min(int.MaxValue, price);
                 long cash = byCrown ? CrownCash((Kingdom)h.MapFaction, price) : CashCap(h.Clan, price);
                 return (int)Math.Min(int.MaxValue, cash);
@@ -739,12 +754,18 @@ namespace Armoury
             catch (Exception e) { Stumble("RcLordPrice", e); return -1; }
         }
 
-        public static void SalePrefix(PartyBase __0, TroopRoster __2, out List<KeyValuePair<Hero, long>> __state)
+        // 430-p (recenzja K1): cena jenca sprzed uwolnienia na czas jednej sprzedazy (SalePrefix -> RcLordPrice -> SalePostfix); -1 = rod odmowil. Watek glowny.
+        // Czytana tylko dla bohatera juz uwolnionego (!IsPrisoner) - wpis, ktory zostal po wyjatku w metodzie gry, nie zmieni zadnej pozniejszej wyceny jenca.
+        private static readonly Dictionary<Hero, long> _salePre = new Dictionary<Hero, long>();
+
+        public static void SalePrefix(PartyBase __0, PartyBase __1, TroopRoster __2, out List<KeyValuePair<Hero, long>> __state)
         {
             __state = null;
             try
             {
+                _salePre.Clear();
                 if (!On || __0 != PartyBase.MainParty || __2 == null) return;
+                List<TroopRosterElement> kept = null;
                 foreach (var el in __2.GetTroopRoster())
                 {
                     var h = el.Character != null && el.Character.IsHero ? el.Character.HeroObject : null;
@@ -752,18 +773,46 @@ namespace Armoury
                     bool byCrown; double D;
                     long price = PriceOf(h, out byCrown, out D);
                     // 430 (C5): rod odmowil - cena RC byla 0, rod nic nie oddaje i nic nie jest winien (znacznik -1); inaczej mnoznik rodu sprzed uwolnienia do licznika
-                    if (RansomHouse430.Refused(h)) price = -1; else RansomHouse430.SalePeek(h);
+                    if (RansomHouse430.Refused(h))
+                    {
+                        // 430-p (recenzja S3): u posrednika i w ekranie okupu (kupujacy null) jeniec z odmowa NIE jest sprzedawany - zostaje w niewoli gracza
+                        // ("wykup wszystkich" nie oddaje krola za 0 jednym kliknieciem). Inne drogi (kupujacy = osada) - jak dotad, znacznik -1.
+                        if (__1 == null) { if (kept == null) kept = new List<TroopRosterElement>(); kept.Add(el); continue; }
+                        price = -1;
+                    }
+                    else RansomHouse430.SalePeek(h);
+                    _salePre[h] = price;
                     if (__state == null) __state = new List<KeyValuePair<Hero, long>>();
                     __state.Add(new KeyValuePair<Hero, long>(h, price));
                 }
+                if (kept != null)
+                    foreach (var el in kept)
+                    {
+                        var h = el.Character.HeroObject;
+                        try
+                        {
+                            __2.AddToCounts(el.Character, -el.Number, false, -el.WoundedNumber);   // z listy sprzedazy (kopia / lista ekranu), nie z lochu druzyny
+                            RansomHouse430.NoteKept();
+                            Log.Info("Okupy (178): posrednik - " + Name(h) + " (" + Name(h.Clan) + ") zostaje w niewoli gracza: rod odmowil zaplaty (430), jeniec zdjety z listy sprzedazy.");
+                            Log.Player(Name(h.Clan) + " refuses to pay for " + Name(h) + ": the broker will not take this prisoner, who stays in your keeping.", true);
+                        }
+                        catch (Exception e)
+                        {
+                            Stumble("SalePrefix.Keep", e);   // nie udalo sie zdjac z listy - sprzedany za 0 (znacznik -1), jak przed 430-p
+                            _salePre[h] = -1;
+                            if (__state == null) __state = new List<KeyValuePair<Hero, long>>();
+                            __state.Add(new KeyValuePair<Hero, long>(h, -1));
+                        }
+                    }
             }
-            catch (Exception e) { Stumble("SalePrefix", e); __state = null; }
+            catch (Exception e) { Stumble("SalePrefix", e); __state = null; _salePre.Clear(); }
         }
 
         /// <summary>Gra zaplacila graczowi za lordow z niczego tyle, ile gotowki zaplaci rod jenca (cena RC) - rod jenca oddaje te gotowke (w nicosc, rownowazy),
         /// reszta ceny to dlug rodu wobec gracza (ksiega 168). Jeniec przeniesiony do lochu osady (nie uwolniony) - jak w grze, licznik.</summary>
         public static void SalePostfix(List<KeyValuePair<Hero, long>> __state)
         {
+            _salePre.Clear();   // 430-p: wycena gry (w srodku ApplyInternal) juz za nami
             if (__state == null) return;
             foreach (var kv in __state)
             {
@@ -775,6 +824,7 @@ namespace Armoury
                     {
                         RansomHouse430.NoteBlocked(1);
                         Log.Info("Okupy (178): posrednik - gracz oddal " + Name(h) + " (" + Name(h.Clan) + ") mimo odmowy rodu (430): gotowka 0, dlug 0.");
+                        Log.Player(Name(h) + " was handed over for nothing: " + Name(h.Clan) + " had refused to pay.", true);   // 430-p (recenzja S3)
                         continue;
                     }
                     RansomHouse430.SaleDone(h, price, true);

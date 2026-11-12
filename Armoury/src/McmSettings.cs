@@ -9984,6 +9984,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int PlayerSaleCeilPercent { get; set; } = 100;
 
+        [SettingPropertyBool("Player Sale Ceil Fades", HintText = "with Player Sale Saturation: the ceiling of Player Sale Ceil Percent also comes down with every piece of the same kind and tier you have sold in that town - from the full ceiling for the first Player Sale Free Pieces towards the plain price the merchant pays when the stall is not short (never below it), by the same fading as the short-stall premium; off = the ceiling stays flat", RequireRestart = false)]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool PlayerSaleCeilFades { get; set; } = true;
+
         [SettingPropertyBool("Ransom House Fatigue", HintText = "with Lord Ransom By Income: a house that has already paid ransoms to the same captor house within Ransom House Window Days pays less for the next captive - the price is multiplied by Ransom House Step for every ransom already paid, never below Ransom House Floor; with Ransom Repeat Cheaper the lower of the two discounts counts, not both. Applies to ransoms paid to your house (see Ransom House All Captors); off = prices as before", RequireRestart = false)]
         [SettingPropertyGroup("Ransoms by wealth (stage 2)")]
         public bool RansomHouseFatigue { get; set; } = true;
@@ -15219,6 +15223,7 @@ namespace Armoury
             s.PlayerSaleFadePieces = PlayerSaleFadePieces;
             s.PlayerSaleRecoverPerDay = PlayerSaleRecoverPerDay;
             s.PlayerSaleCeilPercent = PlayerSaleCeilPercent;
+            s.PlayerSaleCeilFades = PlayerSaleCeilFades;
             s.RansomHouseFatigue = RansomHouseFatigue;
             s.RansomHouseWindowDays = RansomHouseWindowDays;
             s.RansomHouseStep = RansomHouseStep;

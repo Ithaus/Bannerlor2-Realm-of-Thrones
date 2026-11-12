@@ -54,6 +54,7 @@ namespace Armoury
 
         // liczniki doby
         private static int _dayStart, _dNew, _dExpired, _dDeals, _dDecided, _dRefused, _dAgreed, _dAgain, _dBlkCourier, _dBlkBroker, _dBlkBarter, _dBlkTerms, _dBlkAi, _dFreedRefused;
+        private static int _dRecount, _dKept;   // 430-p: ponowne decyzje po nowym okupie rodu; jency zatrzymani u posrednika mimo proby sprzedazy
         private static long _dFull, _dPaid;
         private static double _dPSum;
         private static int _stumbles, _importN = -1, _importBad;
@@ -73,6 +74,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _dNew = _dExpired = _dDeals = _dDecided = _dRefused = _dAgreed = _dAgain = _dBlkCourier = _dBlkBroker = _dBlkBarter = _dBlkTerms = _dBlkAi = _dFreedRefused = 0;
+            _dRecount = _dKept = 0;
             _dFull = _dPaid = 0; _dPSum = 0;
         }
 
@@ -154,7 +156,11 @@ namespace Armoury
                 var captor = Ransom178.HolderOf(h);
                 if (!InScope(captor)) return false;
                 var d = Valid(h, captor);
-                return d != null && d.State == 2 && Today < d.Until;
+                if (d == null) return false;
+                // 430-p (recenzja N4): odmowa wygasla - rod rozwaza ponownie TU (pierwsza wycena po terminie), nie dopiero w dobowym takcie kuriera (Blocks) -
+                // inaczej od switu doby Until posrednik i barter placily bez rzutu, a przy odprawianych kurierach (404) rzutu nie bylo wcale
+                if (d.State == 2 && Today >= d.Until && h.Clan != null && h.Clan != Clan.PlayerClan && Ransom178.IsRansomLord(h)) { _dAgain++; d = Decide(h, captor, d.Tries + 1); }
+                return d.State == 2 && Today < d.Until;
             }
             catch (Exception e) { Stumble("Refused", e); return false; }
         }
@@ -225,15 +231,15 @@ namespace Armoury
                 try
                 {
                     if (d.State == 2)
-                        Log.Player(Name(h.Clan) + " will not pay a ransom for " + Name(h) + (tries > 0 ? " yet" : "") + ": they have paid you " + n + (n == 1 ? " ransom" : " ransoms")
-                                   + " within the year. They may think again in " + Math.Max(1, s.RansomHouseRefuseDays) + " days.", true);
+                        Log.Player(Name(h.Clan) + " will not pay a ransom for " + Name(h) + (tries > 0 ? " yet" : "") + ": they have paid " + n + (n == 1 ? " ransom" : " ransoms")
+                                   + " for captives of your house within the year. They may think again in " + Math.Max(1, s.RansomHouseRefuseDays) + " days.", true);
                     else if (tries > 0)
                         Log.Player(Name(h.Clan) + " is ready to talk about a ransom for " + Name(h) + " again.");
                     else if (n > 0)
                     {
                         double f = Math.Min(FactorFor(h.Clan, captor), RansomRepeat.Factor(h));
                         if (f < 0.995)
-                            Log.Player(Name(h.Clan) + " has paid you " + n + (n == 1 ? " ransom" : " ransoms") + " within the year: for " + Name(h) + " they will offer about "
+                            Log.Player(Name(h.Clan) + " has paid " + n + (n == 1 ? " ransom" : " ransoms") + " for captives of your house within the year: for " + Name(h) + " they will offer about "
                                        + Math.Round(f * 100).ToString(Inv) + "% of the usual price.");
                     }
                 }
@@ -269,12 +275,17 @@ namespace Armoury
                 var d = Valid(h, captor);
                 if (d == null) d = Decide(h, captor, 0);
                 else if (d.State == 2 && Today >= d.Until) { _dAgain++; d = Decide(h, captor, d.Tries + 1); }
+                // 430-p (recenzja N6): rod zaplacil w miedzyczasie kolejny okup temu porywaczowi (jency z jednej bitwy maja przy pojmaniu wszyscy n = 0) - rozwaza ponownie
+                else if (d.State == 1 && Count(h.Clan, captor) > d.N) { _dRecount++; d = Decide(h, captor, d.Tries); }
                 if (d.State != 2) return false;
                 if (captor == Clan.PlayerClan) _dBlkCourier++; else _dBlkAi++;
                 return true;
             }
             catch (Exception e) { Stumble("Blocks", e); return false; }
         }
+
+        /// <summary>430-p: jeniec z odmowa rodu zdjety z listy sprzedazy u posrednika (zostal w niewoli gracza).</summary>
+        internal static void NoteKept() { _dKept++; _dBlkBroker++; }
 
         /// <summary>Licznik drogi monety zamknietej odmowa: 1 posrednik / ekran druzyny, 2 barter, 3 rokowania 366 / przeplyw okupu.</summary>
         internal static void NoteBlocked(int what)
@@ -389,10 +400,10 @@ namespace Armoury
                       .Append(" | okupy dzis z mnoznikiem rodu (gdzie nie wyzszy od mnoznika osoby M6a-2): ").Append(_dDeals).Append(", cena pelna ").Append(_dFull).Append(", zaplacona ")
                       .Append(_dPaid).Append(", zostalo u rodzin jencow ").Append(_dFull - _dPaid)
                       .Append(" | decyzje rodow dzis ").Append(_dDecided).Append(" (zaplaci ").Append(_dAgreed).Append(", odmowa ").Append(_dRefused).Append(", srednia szansa odmowy ")
-                      .Append((_dDecided > 0 ? _dPSum / _dDecided * 100 : 0).ToString("0", Inv)).Append("%; w tym ponowne po uplywie odmowy ").Append(_dAgain).Append("), odmowy czynne ").Append(refusing)
+                      .Append((_dDecided > 0 ? _dPSum / _dDecided * 100 : 0).ToString("0", Inv)).Append("%; w tym ponowne po uplywie odmowy ").Append(_dAgain).Append(", po nowym okupie rodu ").Append(_dRecount).Append("), odmowy czynne ").Append(refusing)
                       .Append(", decyzji w pamieci ").Append(_dec.Count)
                       .Append(" | drogi monety zamkniete odmowa dzis: kurier ").Append(_dBlkCourier).Append(", posrednik / ekran druzyny ").Append(_dBlkBroker).Append(", barter (wyceny) ").Append(_dBlkBarter)
-                      .Append(", rokowania / przeplyw ").Append(_dBlkTerms).Append(", AI-AI ").Append(_dBlkAi).Append("; jency oddani posrednikowi mimo odmowy (bez wpisu okupu) ").Append(_dFreedRefused)
+                      .Append(", rokowania / przeplyw ").Append(_dBlkTerms).Append(", AI-AI ").Append(_dBlkAi).Append("; jency oddani posrednikowi mimo odmowy (bez wpisu okupu) ").Append(_dFreedRefused).Append(", zatrzymani w niewoli zamiast sprzedazy ").Append(_dKept)
                       .Append(" | pamiec okupow: start ").Append(_dayStart).Append(" + nowe ").Append(_dNew).Append(" - wygasle ").Append(_dExpired).Append(" = stan ").Append(now)
                       .Append(" (par rod -> porywacz ").Append(_ev.Count).Append(", do rodu gracza ").Append(toPlayer).Append("); KONTROLA pamieci roznica ").Append(diff)
                       .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "")

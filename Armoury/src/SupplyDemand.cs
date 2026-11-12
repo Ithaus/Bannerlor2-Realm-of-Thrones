@@ -407,6 +407,9 @@ namespace Armoury
             foreach (var kv in live) if (kv.Value > 0) into[kv.Key] = kv.Value;
         }
 
+        /// <summary>430-p: zdjecie migawki jednej polki (koniec transakcji gracza) - nastepna wycena w ekranie handlu zrobi nowa, juz po transakcji.</summary>
+        internal static void DropSnapshot(ItemRoster shelf) { if (shelf != null && _frozen.Count > 0) _frozen.Remove(shelf); }
+
         /// <summary>430 (A6): klucz koszyka pamieci sprzedazy gracza (typ x 8 + tier) - ten sam koszyk co prawo podazy.</summary>
         internal static int BucketKey(ItemObject it) { return (int)it.ItemType * 8 + TierOf(it); }
 
@@ -700,7 +703,9 @@ namespace Armoury
                 int ceilP = 0;
                 if (satK >= 0f)
                 {
-                    ceilP = PlayerSale430.Ceil(__0);
+                    // 430-p: pulap maleje ze sztukami ku cenie bez premii niedoboru (polka najwyzej x1, te same surowce i podstawa); nie ponizej podlogi zlomu
+                    ceilP = PlayerSale430.CeilAt(__0, Math.Max(1, (int)Math.Round(baseP * Math.Min(shelfF, 1f) * arms)), satK);
+                    if (ceilP > 0 && floorP > 0 && ceilP < floorP) ceilP = floorP;
                     if (ceilP > 0 && __result > ceilP)
                     {
                         if (SellByCondition.InPlayerTransfer) PlayerSale430.NoteCeil(__result - ceilP);

@@ -78,12 +78,38 @@ namespace Armoury
                 var s = Settings.Current;
                 k += Stored(st != null ? st.StringId : null, bucket);
                 float hi = Math.Max(1f, s.SupplyDemandMaxFactor);
-                float free = Math.Max(0, s.PlayerSaleFreePieces), fade = Math.Max(0.25f, s.PlayerSaleFadePieces);
-                float g = k < free ? 1f : 1f / (1f + (k - free + 1f) / fade);
+                float g = Fade(k);
                 cap = 1f + (hi - 1f) * g;
                 return shelfF > cap ? cap : shelfF;
             }
             catch (Exception e) { Stumble("CapShelf", e); return shelfF; }
+        }
+
+        /// <summary>Zanik premii przy k sztukach: 1 dla pierwszych Player Sale Free Pieces, potem 1 / (1 + (k - wolne + 1) / Player Sale Fade Pieces). Jedna krzywa dla sufitu
+        /// mnoznika polki i dla pulapu wartosci (430-p).</summary>
+        internal static float Fade(float k)
+        {
+            var s = Settings.Current;
+            float free = Math.Max(0, s.PlayerSaleFreePieces), fade = Math.Max(0.25f, s.PlayerSaleFadePieces);
+            return k < free ? 1f : 1f / (1f + (k - free + 1f) / fade);
+        }
+
+        /// <summary>430-p (recenzja A6-2, decyzja Jeffa 3 "cena spada z kazda sztuka"): pulap wartosci tez maleje ze sztukami. plain = cena tej sztuki bez premii
+        /// niedoboru (polka najwyzej x1); pulap = plain + (pulap pelny - plain) x zanik(k) - ta sama krzywa co sufit premii, nigdy ponizej ceny bez premii.
+        /// W przypadku z logu (rydwany, Hornvale) sam sufit mnoznika polki nie wiazal do ok. 19. sztuki - wszystkie 11 szly po pulapie 100%.
+        /// Klucz Player Sale Ceil Fades NIE - pulap staly jak w 430. 0 = bez pulapu.</summary>
+        internal static int CeilAt(EquipmentElement el, int plain, float k)
+        {
+            int full = Ceil(el);
+            try
+            {
+                var s = Settings.Current;
+                if (full <= 0 || s == null || !s.PlayerSaleCeilFades || plain >= full) return full;
+                float g = Fade(Math.Max(0f, k));
+                if (g >= 1f) return full;
+                return Math.Max(1, (int)Math.Round(plain + (full - plain) * (double)g));
+            }
+            catch (Exception e) { Stumble("CeilAt", e); return full; }
         }
 
         /// <summary>Pulap ceny sprzedazy sztuki (zl): Player Sale Ceil Percent wartosci ze stanem; 0 = bez pulapu albo klucz NIE.</summary>
@@ -117,10 +143,14 @@ namespace Armoury
         /// sprzetu na polce miasta wobec migawki z otwarcia idzie do pamieci miasta. Pamiec prowadzona takze przy kluczu NIE (jak RansomRepeat).</summary>
         internal static void OnPlayerExchange(List<(ItemRosterElement, int)> purchased, List<(ItemRosterElement, int)> sold, bool isTrading)
         {
+            // 430-p (recenzja A6-3): migawka polki z otwarcia ekranu zdejmowana po kazdym zamknieciu handlu (Done) - takze bez sprzedazy. Bez tego druga wizyta
+            // pod rzad (bez zadnej wyceny przy zamknietym ekranie pomiedzy) dostawala stara migawke: sztuki pierwszej wizyty liczone drugi raz w k i w pamieci miasta.
+            Settlement here = null;
             try
             {
-                if (!isTrading || QuartermasterEscrow.Active || !SupplyDemand.Active || sold == null || sold.Count == 0) return;
-                Settlement here = Settlement.CurrentSettlement ?? (MobileParty.MainParty != null ? MobileParty.MainParty.CurrentSettlement : null);
+                if (!isTrading) return;
+                here = Settlement.CurrentSettlement ?? (MobileParty.MainParty != null ? MobileParty.MainParty.CurrentSettlement : null);
+                if (QuartermasterEscrow.Active || !SupplyDemand.Active || sold == null || sold.Count == 0) return;
                 if (here == null || here.StringId == null || (!here.IsTown && !here.IsCastle) || here.ItemRoster == null) return;
                 var add = new Dictionary<int, int>();
                 SupplyDemand.VisitDeltas(here.ItemRoster, add);
@@ -139,6 +169,7 @@ namespace Armoury
                              + SumOf(d).ToString("0.#", Inv) + " szt.");
             }
             catch (Exception e) { Stumble("OnPlayerExchange", e); }
+            finally { try { if (here != null && here.ItemRoster != null) SupplyDemand.DropSnapshot(here.ItemRoster); } catch (Exception e) { Stumble("OnPlayerExchange.Drop", e); } }
         }
 
         private static double SumOf(Dictionary<int, float> d) { double t = 0; foreach (var x in d) t += x.Value; return t; }
@@ -177,7 +208,7 @@ namespace Armoury
                     sb.Append("Sprzedaz gracza (430 A6): dzien ").Append((int)CampaignTime.Now.ToDays)
                       .Append(" | klucz Player Sale Saturation ").Append(On ? "tak" : "nie").Append(" (wolne ").Append(Math.Max(0, s.PlayerSaleFreePieces))
                       .Append(" szt., zanik premii ").Append(Math.Max(0.25f, s.PlayerSaleFadePieces).ToString("0.##", Inv)).Append(" szt., odnowa ").Append(eat.ToString("0.##", Inv))
-                      .Append(" szt./d, pulap ").Append(s.PlayerSaleCeilPercent).Append("% wartosci ze stanem; sufit polki gry x").Append(Math.Max(1f, s.SupplyDemandMaxFactor).ToString("0.##", Inv)).Append(')')
+                      .Append(" szt./d, pulap ").Append(s.PlayerSaleCeilPercent).Append("% wartosci ze stanem").Append(s.PlayerSaleCeilFades ? ", maleje ze sztukami do ceny bez premii (430-p)" : ", staly").Append("; sufit polki gry x").Append(Math.Max(1f, s.SupplyDemandMaxFactor).ToString("0.##", Inv)).Append(')')
                       .Append(" | ruchy sprzedazy w ekranie handlu dzis (takze cofniete): z obnizona premia polki ").Append(_dCutMoves).Append(" (o ").Append(_dCut)
                       .Append(" zl przed granicami), na pulapie wartosci ").Append(_dCeilMoves).Append(" (o ").Append(_dCeilCut).Append(" zl)")
                       .Append(" | pamiec: wizyt z przyrostem ").Append(_dVisits).Append(", start ").Append(_dayStart.ToString("0.##", Inv)).Append(" + sprzedane ").Append(_dAdded.ToString("0.##", Inv))
