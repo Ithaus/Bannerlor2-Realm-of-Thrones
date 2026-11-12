@@ -1,5 +1,15 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 12.11 19:05 - WGRANIE 216 (457-461: AI bitwy pakiet 8 - odwod piechoty, zmiana linii, pozorowany odwrot jazdy; 458 i 461 sam pomiar)
+
+- **W grze:** Armoury.dll `8f5cf045099a1b792ea8227233da8c8c` (commit `63a7604f`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie216`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie216(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-461-po-tescie.sav`.
+- **Autotest at-461 (n391), 15 dob + 7 bitew (4 planu + 3 z partia lorda):** KONIEC OK, misje sprawdzone, wyjatkow 0, bledy CrashScribe 23 (stale), TypeInitialization 0. Skan IL czysty (jedyny zwykly odczyt pola MovementOrder: stary ctor BehaviorCavRole441).
+- **Widziane:** 457 odwod utworzony w 4 bitwach (14-34 ludzi, 12/18% wg wodza, wypisani z kompanii = odwod, odmowy 0); wyjscia: pekajaca linia 2x (LocalPowerRatio 0.72 / 0.67, 1 s od spadku), odwod zaatakowany 1x, oslona strzelcow przed szarza jazdy 1x; w bandach < 60 piechoty "piechoty za malo". 458 "bylby odwrot" w kazdej przegranej (prog 0.4-0.5, 50-110 s przed koncem). 461: 2 zetkniecia (szeregi 10/8 i 6/9), objazd stoku 0. Potkniecia nowych linii 0.
+- **NIE widziane:** 459 zmiana linii 0 (najnizszy sredni pasek 0.91 - bitwy za krotkie na zmeczenie), 460 przynet 0 (brak warunku: jazda AI szarzowana przez liczniejsza piechote).
+- **3 nowe klucze TAK:** Infantry Reserve, Line Relief, Cavalry Feigned Retreat (NIE = jak przed).
+- **Decyzja 9 (Jeff 12.11 po wyjasnieniu):** 458 jako regula - (1) odwrot calym szykiem w szeregach, latka na RBM dla tego szyku; (2) ocaleni tylko zeszli z wodzem, ranni z pola i reszta do zwyciezcy, wodz na mapie odchodzi jak najszybciej; (3) posilki odchodza z wodzem, bitwa przegrana, tylna straz walczy do konca. Pamiec `jeff-12-11-decyzja-9-odwrot-wodza`. Nastepny krok.
+- **Ekonomia do poprawy potem:** brak zboza do mlyna/browaru ukryty przez 435-N-B; ContainsKey arm_lpn w SupplySignal.Resolve; potem dlugi test 60-90 dob z wojna.
+
 ## STAN 12.11 17:25 - WGRANIE 215 (450-456-c: AI bitwy pakiet 7 szturm) - reguly szturmu NA NIE w Armoury.json (tylko pomiar "bylby")
 
 - **W grze:** Armoury.dll `0088831e27481342839545b2def3ea6d` (commit `e26584fb`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-12-przed-wgranie215`, `D:/Backup-Bannerlord/wgrane/2026-11-12-wgranie215(-przed)`. Zapis testu: `D:/Backup-Bannerlord/zapisy-testowe/at-456c-po-tescie.sav`.
