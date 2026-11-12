@@ -318,6 +318,29 @@ namespace Armoury
                     bad++;
                     if (first == null) first = (kv.Key.Name != null ? kv.Key.Name.ToString() : "?") + ": sklad przy migawce " + kv.Value[0] + ", teraz 0";
                 }
+                // 458-s-p (recenzja 2): dowod, ze po migawce przybylo TYLKO rannych (RBM) - biezace DiedInBattle i RoutedInBattle rowne migawce,
+                // WoundedInBattle nie mniejsze; inaczej ktos zabil/wypisal po migawce - partia do gry
+                var cur = new Dictionary<CharacterObject, int[]>();
+                AddGame(cur, mep.DiedInBattle, 0, 3);
+                AddGame(cur, mep.WoundedInBattle, 1, 3);
+                AddGame(cur, mep.RoutedInBattle, 2, 3);
+                foreach (var kv in cur)
+                {
+                    int[] q;
+                    pre.TryGetValue(kv.Key, out q);
+                    int d0 = q != null ? q[2] : 0, w0 = q != null ? q[3] : 0, r0 = q != null ? q[4] : 0;
+                    if (kv.Value[0] != d0 || kv.Value[2] != r0 || kv.Value[1] < w0)
+                    {
+                        bad++;
+                        if (first == null) first = (kv.Key.Name != null ? kv.Key.Name.ToString() : "?") + ": licznik gry przy migawce " + d0 + "/" + w0 + "/" + r0 + ", teraz " + kv.Value[0] + "/" + kv.Value[1] + "/" + kv.Value[2];
+                    }
+                }
+                foreach (var kv in pre)
+                {
+                    if (cur.ContainsKey(kv.Key) || kv.Value[2] + kv.Value[3] + kv.Value[4] == 0) continue;
+                    bad++;
+                    if (first == null) first = (kv.Key.Name != null ? kv.Key.Name.ToString() : "?") + ": licznik gry przy migawce " + kv.Value[2] + "/" + kv.Value[3] + "/" + kv.Value[4] + ", teraz 0/0/0";
+                }
             }
             else
             {
@@ -356,7 +379,7 @@ namespace Armoury
         }
 
         /// <summary>458-s: ile rannych dopisano tej partii po migawce (RBM SetRoutedPatch): licznik gry WoundedInBattle (zostaje - lup cial gry, cs 112447,
-        /// juz go uzyl przed pojmaniem) i ranni w skladzie (cofnieci w Settle).</summary>
+        /// juz go uzyl przed pojmaniem, o ile nie wyciety przez BattlefieldLaw.CutCasualtyLootPrefix; czyta go tez perk BattleHardened, cs 169110) i ranni w skladzie (cofnieci w Settle).</summary>
         private static string RbmNote(Pending p, MapEventParty mep)
         {
             var pre = PreOf(p, mep.Party);

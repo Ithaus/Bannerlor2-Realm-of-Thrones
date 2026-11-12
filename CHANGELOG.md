@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 458-s-p (12.11) - poprawki po recenzji 458-s: kontrola licznikow gry miedzy migawka a pojmaniem, zastrzezenie BattlefieldLaw
+
+**Problem:** recenzja 458-s (commit 3eb3e33f): (1) komentarz RbmNote i CHANGELOG 458-s mowia, ze LootDefeatedPartyCasualties (cs 112447) zawsze lupi z zawyzonego WoundedInBattle - w bitwie stoczonej osobiscie BattlefieldLaw.CutCasualtyLootPrefix (BattlefieldLaw.cs 1338-1356) te loterie wycina; (2) GameCheck przy migawce sprawdzal tylko sklad (liczba rowna, rannych nie mniej) - kazde zranienie po migawce uznawal za RBM bez dowodu z licznikow gry.
+
+**Przyczyna:** (1) niedokladny opis; (2) brak porownania biezacych DiedInBattle / WoundedInBattle / RoutedInBattle z migawka.
+
+**Zmiana (CommanderWithdraw458.Map.cs):**
+- GameCheck (galaz z migawka): dodatkowo biezace liczniki gry na postac - DiedInBattle i RoutedInBattle rowne migawce, WoundedInBattle nie mniejsze (takze postac z licznikami w migawce, a bez nich teraz); inaczej rozjazd "licznik gry przy migawce d/w/r, teraz d/w/r" i partia do gry. Dowod, ze po migawce przybylo tylko rannych (RBM).
+- Komentarz RbmNote: "o ile nie wyciety przez BattlefieldLaw.CutCasualtyLootPrefix; czyta go tez perk BattleHardened". Kod Settle/RbmNote bez zmian.
+- Odrzucone / bez zmian: uwaga 3 recenzji (deskryptory zbieglych w MapEventParty._roster ze stanem WoundedInThisBattle) - nikt po pojmaniu nie odbudowuje z nich skladu, tylko informacyjnie. Liczba linii CHANGELOG po 458-s: 46132 (wc -l), raport podawal 46133 - historia cala.
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci (w kodzie): warunek tylko zaostrza (wiecej przypadkow do gry, nigdy mniej); RBM dopisuje wylacznie WoundedInBattle, wiec przy samym RBM wynik jak w 458-s. Bez migawki - galaz bez zmian. Klucz NIE - Pending nie powstaje, kod nie biegnie.
+- Uwaga do 458-s: zawyzony WoundedInBattle czyta lup cial gry (cs 112447) tylko gdy nie wyciety przez BattlefieldLaw (BattlefieldLawEnabled + bitwa stoczona / Send troops), zawsze perk BattleHardened (cs 169110) oraz nasze CasualtyLoot i Measure31.
+- W logu jak w 458-s; nowy rozjazd "licznik gry przy migawce ..." nie powinien sie pojawic.
+- Skan IL: 30 trafien, jedyny MovementOrder: BehaviorCavRole441..ctor.
+
+**Status:** DO SPRAWDZENIA
+
 ## 458-s (12.11) - odwrot wodza, mapa: kontrola licznikow z migawki PRZED RBM SetRoutedPatch (RBM dopisuje rannych calej pokonanej strony)
 
 **Problem:** autotest at-458q (Armoury-2026-11-12_20-13-53.log): regula zadzialala, wodz uszedl (Tywin Lannister: wystawieni 281 = zabici 30 + ranni z pola 219 + wypisani 15 + wrocili 17; Harys Swyft 203 = 19 + 152 + 5 + 27, "-> OK"), wynik misji dochodzi (458-q), ale "Odwrot wodza (458) mapa:" odrzucal partie: "liczniki misji niezgodne z gra (postaci 11, np. Lannister Archer: gra 4/38/0, misja 4/15/0)" i Harys "Westerlands Levy Crossbowman: gra 3/41/3, misja 3/17/3" -> "rozliczy gra" (wszyscy do niewoli, lord zbiegiem). Zabici i wypisani zgodne, ranni gry ok. 2.5x wieksi. Sklad na koniec misji zgodny z misja (Tywin: rannych 219 = ranni z pola 219).
