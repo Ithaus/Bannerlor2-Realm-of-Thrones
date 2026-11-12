@@ -150,6 +150,23 @@ namespace Armoury
             return best >= 0 ? best : p.Craft;
         }
 
+        private static int _noteMakes, _noteIcon;
+
+        /// <summary>474 P2: slad w logu - pierwsze 3 linie "Makes" i pierwsze 3 ikony okna prac od startu gry (dowod, ze droga dziala; potem cisza).</summary>
+        internal static void NoteMakes(string uid, string line)
+        {
+            if (_noteMakes >= 3) return;
+            _noteMakes++;
+            Log.Info("Wioski - linia Makes (474 P2, " + _noteMakes + "/3 od startu gry): " + uid + " | " + line);
+        }
+
+        internal static void NoteIcon(string name, string sprite)
+        {
+            if (_noteIcon >= 3) return;
+            _noteIcon++;
+            Log.Info("Wioski - ikona glownego towaru w oknie prac (474 P2, " + _noteIcon + "/3 od startu gry): " + name + " | " + (sprite ?? "BRAK obrazka - bez ikony"));
+        }
+
         private static string Low(ItemObject it) { return it.Name.ToString().ToLowerInvariant(); }
 
         /// <summary>Nazwa stylu jak DistrictIcon.IconId (camel / horse / StringId).</summary>

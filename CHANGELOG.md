@@ -1,5 +1,19 @@
 # DZIENNIK ZMIAN
 
+## 474-P2 (13.11) - linia "Makes: x (main), y, z" wioski pobocznej i ikona glownego towaru w oknie prac
+
+**Problem:** Jeff 13.11 (projekt `docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md` pkt 1 "Inwestycje z ikona glownego surowca i lista x, y, z", paczka 2): menu i dymek wioski pobocznej pisza zajecie i towary zajecia ("Makes: grain (wheat, flax)"), nie to, co wioska naprawde robi i co z tego jest najwazniejsze; okno prac nie ma ikony towaru.
+
+**Przyczyna:** `DistrictWorks.PartLines` (`Armoury/src/DistrictWorks.cs`) buduje linie z opisu zajecia (`VillageCrafts.Meta(q.Pc.Craft).GoodsText`), a nie z wyceny towarow czesci (`q.Pc.Pcs`), ktora juz jest policzona w tym samym wywolaniu.
+
+**Zmiana:** nowy klucz `SideVillageMakesLine` (MCM "Side Village Goods Line", grupa The map and its crossings (stage 7), domyslnie TAK; Settings.cs + McmSettings.cs recznie). Przy TAK dla wioski pobocznej (nie wsi gry) linia `Makes: wheat (main), flax, hemp` z `SideVillageGoods.Of` (474-P1: glowne zajecie wedlug reguly ikony okregu, glowny towar = najdrozszy dziennie towar tego zajecia, potem do 3 pozostalych od najdrozszego; sztuki dnia x cena miasta targowego); dopiski ", turning to X (N% done)" / ", changing its craft" bez zmian; bez towarow - linia jak dotad. Ta sama linia trafia wszedzie, gdzie `PartLines`: menu wioski pobocznej (`SideVillageVisit.MenuText`), dymek (`MapVillageTooltip.Build`), "Look over the district" (`DistrictMenu`), menu wioski gracza (`SideVillageFief`).
+Okno prac jednej czesci (`DistrictWorks.OpenPart`, krotki opis `top`): przed linia "Makes ... worth about" obrazek glownego towaru `<img src="General\Icons\Production\..." extend="6">` - nazwa obrazka ze stylu pedzla gry `Settlement.Event.Type.Image` (`SideVillageGoods.SpriteOf`, `UIResourceManager.BrushFactory`); opis okna to RichText (ROT-Content `MultiSelectionQueryPopup.xml`, `AutoHideRichTextWidget Text="@PopUpLabel"`), a gra sama wstawia `<img>` w teksty (np. `<img src="General\Icons\Coin@2x" extend="6">` w TaleWorlds.CampaignSystem). Bez stylu - bez ikony.
+Log: pierwsze 3 linie od startu gry `Wioski - linia Makes (474 P2, k/3 od startu gry): <uid> | Makes: ...` i pierwsze 3 ikony okna `Wioski - ikona glownego towaru w oknie prac (474 P2, k/3 ...): <wioska> | General\Icons\Production\...` (albo `BRAK obrazka - bez ikony`).
+
+**Ryzyko / co sprawdzic:** NIE = co do bitu jak przed (linia i okno bez zmian, bez logu). Regresje: `PartLines` czytaja menu, dymek, DistrictMenu i SideVillageFief - wszedzie tylko inny tekst jednej linii; `SideVillageFief.cs:1577` porownuje zbiory linii tip=false / tip=true - obie wersje licza linie Makes tak samo, wiec dedup dziala. Nic nie liczy sie podwojnie: `SideVillageGoods.Of` czyta gotowe `q.Pc` (bez drugiego `PartsOf`). Kolizje: linia "Makes" wsi gry (main) bez zmian. Pod KS `Pcs` to towary blokow KS (takze to, co wioska je sama) - na liscie moga byc np. chleb / drewno; glowny towar i tak z glownego zajecia. NIE sprawdzone w grze: czy `<img>` rysuje sie w opisie okna ROT (kategoria obrazkow tabliczek ladowana na mapie) i czy nie rozpycha linii (extend 6 dobrany na oko). Build czysty OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 474-P1 (13.11) - nazwy wiosek pobocznych pod lewym Altem, z ikona glownego towaru
 
 **Problem:** Jeff 13.11 ("Nazwy wioske, tylko jak mam alt"; projekt `docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md` pkt 1, paczka 1): na mapie nie widac, jak nazywaja sie wioski poboczne i co robia - nazwa jest tylko w dymku po najechaniu. Gra nie ma klawisza "pokaz nazwy".

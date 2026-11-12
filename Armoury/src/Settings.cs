@@ -3449,6 +3449,8 @@ namespace Armoury
         public bool BurnedVillageLabels = true;            // "X has been burned" over burned villages, close up only
         // 474 P1 (Jeff 13.11): przytrzymany lewy Alt - nazwy najwyzej 50 pokazanych wiosek pobocznych z ikona glownego towaru (MapVillageLook.cs, SideVillageGoods.cs, prefab GUI\Prefabs\ArmVillageNameLabels.xml); off = jak dotad
         public bool SideVillageAltNames = true;        // hold the left Alt key on the map to see the names of nearby side villages, each with an icon of its main good. Off = no names, as before
+        // 474 P2 (Jeff 13.11): linia 'Makes: x (main), y, z' wioski pobocznej w menu i dymku (DistrictWorks.PartLines) i ikona glownego towaru w oknie prac (DistrictWorks.OpenPart, SideVillageGoods.cs); off = jak dotad
+        public bool SideVillageMakesLine = true;       // a side village's menu and tooltip list its goods as 'Makes: wheat (main), flax, ...', the main good first; the works window shows that good's icon. Off = the craft and its goods, as before
         // Jeff 16.10 ("herb do jakiego lorda nalezy, nie tylko do jakiego krolestwa ... w kazdej wiosce gospodarzyl jakis lord, nawet jesli wioska nalezala do krola"):
         // herb GOSPODARZA kazdej wioski pobocznej (VillageHolders.cs, wybor na zywo raz na dobe, bez zapisu): (a) majatek BK tej wsi gry (wlasciciel zywy, rod z herbem,
         // rod pana albo jego krolestwa, nie glowa rodu pana; majatki po kolei na wioski wedlug order, uid), (a2) posiadacz tytulu wsi z BK (R12) na pierwszej wiosce bez

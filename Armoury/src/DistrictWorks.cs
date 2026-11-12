@@ -1778,6 +1778,13 @@ namespace Armoury
                 if (m != null)
                 {
                     string makes = "Makes: " + m.Name + (m.GoodsText != m.Name ? " (" + m.GoodsText + ")" : "");
+                    // 474 P2 (Jeff 13.11, klucz SideVillageMakesLine): wioska poboczna - "Makes: wheat (main), flax, hemp" - glowny towar i reszta od najdrozszego
+                    // (SideVillageGoods - ta sama wycena czesci, co ta linia i okno prac); bez towarow - linia jak dotad
+                    if (!q.Pc.Main && Settings.Current != null && Settings.Current.SideVillageMakesLine)
+                    {
+                        var gi = SideVillageGoods.Of(q.Pc, SideVillageGoods.TownOf(v));
+                        if (gi != null && gi.Makes != null) { makes = "Makes: " + gi.Makes; SideVillageGoods.NoteMakes(uid, makes); }
+                    }
                     if (q.Pc.Target >= 0) { var mt = VillageCrafts.Meta(q.Pc.Target); if (mt != null) makes += ", turning to " + mt.Name + " (" + Math.Round(100 * q.Pc.F) + "% done)"; }
                     else if (q.Pc.Ks && q.Pc.F > 0) makes += ", changing its craft";
                     outl.Add(makes);
