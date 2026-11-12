@@ -24,11 +24,14 @@ namespace Armoury
     ///  - NOWY POZIOM, gdy razem: u56 &gt;= 0.90 i co najmniej 56 dob z proba od ostatniej zmiany poziomu; N glownego wyrobu ktorejs linii w tym miescie &gt;= 1.3 (tablica
     ///    SupplySignal - cena poza N); caly wsad ktorejs linii jest w okregu miasta (WorkshopInputs.InputsNear / kontrakt); kraina ma wolne rece (FreeHands.Braked);
     ///    stanowisk ponad pierwsze w miescie mniej niz 2 x m_t (ludzie rynku, PeopleMarket.WorkersScale; 1-8);
-    ///  - PLATNIK: kapital warsztatu PONAD znacznik kapitalu poczatkowego (Workshop.InitialCapital - to niewyplacony zysk; gra wyplaca wlascicielowi 1/5 na dobe), nigdy kiesa
+    ///  - PLATNIK: kapital warsztatu PONAD znacznik kapitalu poczatkowego (Workshop.InitialCapital - to niewyplacony zysk; 435-L8-p: czynny model BK wyplaca wlascicielowi POLOWE zysku na dobe (bk.cs: ProfitMade / 2), nie 1/5 - nadwyzka jednej doby jest mala, dlatego warsztat w trakcie rat oceniany co dobe), nigdy kiesa
     ///    notabla (gra trzyma ja w pasie 4500-10500 i moze dosypac - krytyka B10). Cena poziomu = koszt zmiany produkcji typu (GetConvertProductionCost, juz x Workshop Trade
     ///    Equipment Scale). Placona RATAMI co 7 dob (1/7 miast na dobe): polowa raty to material z polki WLASNEGO miasta (narzedzia, deski albo drewno - nie towar, ktory
     ///    warsztat sam wyrabia; zapasy polki i sufit ceny jak roboty gminy) -> kasa miasta, druga polowa -> rzemieslnicy (kiesy ludu; czesc nieprzyjeta zostaje w kasie).
-    ///    Bez materialu - bez raty. Koncowka ceny mniejsza od 5% (mniej niz sztuka materialu) - same place. Poziom rosnie po zaplaceniu calej ceny;
+    ///    Bez materialu - bez raty. Koncowka ceny mniejsza od 5% albo od sztuki materialu - same place. Poziom rosnie po zaplaceniu calej ceny;
+    ///    435-L8-p: poziom nie jest kupowany, gdy pod sufitem F dalby mniej niz +10% tempa (towar i kapital bez wyrobu); najmniejsza rata 5% ceny (bylo 10%);
+    ///    warsztat z wplaconymi ratami oceniany CO DOBE (nie co 7), bo zysk doby w polowie wychodzi do wlasciciela. Stanowiska nie maja obsady w ksiedze ludzi
+    ///    (wiecej cykli = wiecej plac cyklu, ale "wiecej miejsc pracy" Jeffa to dlug kroku L10);
     ///  - ZANIK: u182 &lt; 0.30 przy co najmniej 182 dobach z proba od ostatniej zmiany poziomu, albo 182 doby bez zadnej proby cyklu -> poziom - 1 (wplacone raty przepadaja -
     ///    odpis w logu); zmiana typu warsztatu (przezbrojenie, bankructwo) -> poziom 1.
     /// Zamkniecie: kapital warsztatu -> kasa miasta + kiesy ludu (TownFolk.BenchPayRun, zmierzone na zywych kiesach); sztuki zdjete z polki = sztuki kupione (ksiega towarow
@@ -65,11 +68,14 @@ namespace Armoury
         private static ItemObject[] _items; private static int _itemsDay = int.MinValue;
 
         // powody odmowy raty (linia doby)
-        private const int WFull = 0, WUse = 1, WShort = 2, WInput = 3, WHands = 4, WTownCap = 5, WCapital = 6, WNoShelf = 7, WPriceCap = 8, WPace = 9, WOther = 10, WKinds = 11;
+        private const int WFull = 0, WUse = 1, WShort = 2, WInput = 3, WHands = 4, WTownCap = 5, WCapital = 6, WNoShelf = 7, WPriceCap = 8, WPace = 9, WOther = 10,
+                          WCeil = 11, WPiece = 12, WNoTable = 13, WKinds = 14;   // 435-L8-p: sufit tempa, rata mniejsza od sztuki materialu, brak tablicy N
+        private const double MinGain = 1.10;          // 435-L8-p: poziom kupowany tylko, gdy da co najmniej +10% tempa pod sufitem F
         private static readonly string[] WName =
         {
             "poziom 4", "u56 < 0.90 albo mniej niz 56 dob z proba", "N wyrobu < 1.3", "bez wsadu w okregu", "kraina bez wolnych rak", "pulap stanowisk miasta (2 x m_t)",
-            "kapital nie ponad znacznik (albo rata za mala)", "bez materialu na polce", "material ponad sufit ceny", "tempo rynku nieczynne / bez linii z wsadem", "inne (droga materialu, lud miasta, blad)"
+            "kapital nie ponad znacznik (albo rata za mala)", "bez materialu na polce", "material ponad sufit ceny", "tempo rynku nieczynne / bez linii z wsadem", "inne (droga materialu, lud miasta, blad)",
+            "sufit tempa (nastepny poziom dalby mniej niz +10%)", "rata mniejsza od sztuki materialu (czeka na wiekszy zysk)", "brak tablicy N (pierwsza doba sesji albo pomiar bez danych)"
         };
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.WorkshopBenches; } }
@@ -284,7 +290,7 @@ namespace Armoury
                     var w = kv.Key; var r = kv.Value;
                     try
                     {
-                        if (slot && measure)
+                        if ((slot || r.Paid > 0) && measure)                    // 435-L8-p: warsztat w trakcie rat - co dobe
                         {
                             cand++;
                             int res = TryBuy(t, w, r, today, canBuy, table, model, ref near, ref extra, ref inst, ref up, ref pcs, ref drop, ref dropUnknown, ref mat, ref wFolk, ref wCof, ref gap);
@@ -304,7 +310,7 @@ namespace Armoury
               .Append(lv[1]).Append('/').Append(lv[2]).Append('/').Append(lv[3]).Append('/').Append(lv[4])
               .Append(", z mnoznikiem ponad 1: ").Append(withF).Append(", w trakcie rat ").Append(inProg).Append(" (wplacone ").Append(progGold).Append(" zl)")
               .Append(" | u56 srednie ").Append(measured > 0 ? (uSum / measured).ToString("0.00", Inv) : "-").Append(" z ").Append(measured).Append(" warsztatow")
-              .Append(" | dzis miast w kolejce ").Append(towns).Append(" (1/7), warsztatow ocenionych ").Append(cand)
+              .Append(" | dzis miast w kolejce ").Append(towns).Append(" (1/7), warsztatow ocenionych (z kolejki i w trakcie rat) ").Append(cand)
               .Append(": rat ").Append(inst).Append(" za ").Append(mat + wFolk + wCof).Append(" zl = material ").Append(mat).Append(" (sztuk ").Append(pcs).Append(") + rzemieslnicy do ludu ").Append(wFolk)
               .Append(" + rzemieslnicy zatrzymane w kasie miasta ").Append(wCof).Append("; nowych poziomow ").Append(up)
               .Append(" | odmowy:");
@@ -313,7 +319,7 @@ namespace Armoury
             if (f) sb.Append(" -");
             sb.Append(" | cofniete ").Append(down).Append(" (w tym 182 doby bez proby ").Append(downIdle).Append("; przepadle raty ").Append(downPaid).Append(" zl), utracone zmiana typu ").Append(lostType)
               .Append(" (poziomow ").Append(lostLevels).Append(", raty ").Append(lostPaid).Append(" zl)")
-              .Append(" | kontrola zlota (z kapitalu - kasa miasta - lud) ").Append(gap)
+              .Append(" | kontrola zlota (z kapitalu - kasa miasta - lud; kapital i kasa zmierzone na zywych kiesach, lud = wynik Earn) ").Append(gap)
               .Append(", sztuk (kupione - zmiana polek) ").Append(pcs - drop).Append(dropUnknown > 0 ? " (polka nie przeczytana " + dropUnknown + " razy)" : "")
               .Append(", poziomow (dzis - (wczoraj + kupione - cofniete - utracone)) ").Append(after - (before + up - down - lostLevels))
               .Append(" | koszt ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms")
@@ -349,7 +355,8 @@ namespace Armoury
                 double n = SupplySignal.TownN(table, t.Settlement, main);
                 if (n > nMax) nMax = n;
             }
-            if (table == null || nMax < NeedN) return WShort;
+            if (table == null) return WNoTable;                                // 435-L8-p: osobny powod (nie "N wyrobu < 1.3")
+            if (nMax < NeedN) return WShort;
             if (near == null) near = WorkshopInputs.InputsNear(t);
             if (!WorkshopInputs.HasInput(type, near)) return WInput;
             if (FreeHands.Braked(t.Settlement)) return WHands;
@@ -357,6 +364,16 @@ namespace Armoury
             if (!(m > 0f) || float.IsInfinity(m)) m = 1f;
             int capTown = Math.Max(1, Math.Min(8, (int)Math.Floor(2.0 * m + 0.5)));
             if (extra >= capTown) return WTownCap;
+            // 435-L8-p (recenzja 1): pod sufitem F nastepny poziom moze nie dac nic - bez zakupu, gdy sredni F warsztatu po poziomie wzroslby o mniej niz 10%
+            // (przyblizenie ze sredniego F linii: baza = F teraz / mnoznik stanowisk; warsztat na suficie ma F teraz = sufit)
+            {
+                float fNow = Factor(w), cur = WorkshopPace.ShopFactor(w);
+                if (fNow >= 1f && cur > 0f && !float.IsNaN(cur))
+                {
+                    double next = Math.Min(WorkshopPace.PaceMax, cur / fNow * (fNow + Step));
+                    if (next < cur * MinGain) return WCeil;
+                }
+            }
             int cost = Math.Max(0, model.GetConvertProductionCost(type));
             if (cost < 20) return WOther;
             long excess = (long)w.Capital - Math.Max(0, w.InitialCapital);
@@ -366,7 +383,7 @@ namespace Armoury
             if (remaining > tail)
             {
                 long budget = Math.Min(remaining, excess);
-                if (budget < Math.Min(remaining, Math.Max(20L, cost / 10))) return WCapital;
+                if (budget < Math.Min(remaining, Math.Max(20L, cost / 20))) return WCapital;   // 435-L8-p: najmniejsza rata 5% ceny (bylo 10%)
                 // materialy: narzedzia, deski, drewno - bez towaru, ktory warsztat sam wyrabia (kuznia narzedzi nie wykupuje narzedzi, ktorych miastu brakuje)
                 var basis = BenchItems(today);
                 var items = new ItemObject[basis.Length];
@@ -379,11 +396,23 @@ namespace Armoury
                 }
                 if (!any) return WNoShelf;
                 pay = TownFolk.BenchPayRun(w, t.Settlement, Math.Floor(budget / 2.0), items, 0);
-                if (pay.Why != TownFolk.GfOk)
+                if (pay.Why == TownFolk.GfPiece)
+                {
+                    // 435-L8-p (recenzje 3 / stab. 2): material jest, ale polowa raty nie starcza na sztuke - to nie "brak materialu"; gdy cala reszta ceny miesci sie
+                    // w kapitale ponad znacznik - koncowka samymi placami (nizej), inaczej warsztat czeka na wiekszy zysk
+                    if (excess >= remaining) { tail = remaining; pay = null; } else return WPiece;
+                }
+                else if (pay.Why != TownFolk.GfOk)
+                {
+                    if (pay.Paid > 0) Book(pay, r, ref inst, ref pcs, ref drop, ref dropUnknown, ref mat, ref wFolk, ref wCof, ref gap);   // wyjatek po przelewie - zaksiegowane, co zeszlo
                     return pay.Why == TownFolk.GfNoShelf ? WNoShelf : pay.Why == TownFolk.GfPriceCap ? WPriceCap : pay.Why == TownFolk.GfNoGold ? WCapital : WOther;
-                Book(pay, r, ref inst, ref pcs, ref drop, ref dropUnknown, ref mat, ref wFolk, ref wCof, ref gap);
-                remaining = Math.Max(0L, cost - r.Paid);
-                excess = (long)w.Capital - Math.Max(0, w.InitialCapital);
+                }
+                else
+                {
+                    Book(pay, r, ref inst, ref pcs, ref drop, ref dropUnknown, ref mat, ref wFolk, ref wCof, ref gap);
+                    remaining = Math.Max(0L, cost - r.Paid);
+                    excess = (long)w.Capital - Math.Max(0, w.InitialCapital);
+                }
             }
             if (remaining > 0 && remaining <= tail)
             {

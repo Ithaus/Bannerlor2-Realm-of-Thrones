@@ -191,6 +191,9 @@ namespace Armoury
         /// <summary>305b (WorkshopBuyerPaceCorrection): sredni F linii towarowych warsztatu (wazony szybkoscia linii; linia towarowa bez tempa = 1) przy dzisiejszych
         /// ludziach i cenach - tyle szybciej (wolniej) niz gracz pracuje ten warsztat u notabla albo lorda. 1 - regula wylaczona, latka nie wpieta, zamek, warsztat
         /// gracza, warsztat poza regula (niezgodny licznik). Sam odczyt, bez licznikow doby.</summary>
+        /// <summary>435-L8-p: sufit F linii (do oceny, czy nastepne stanowisko cokolwiek da).</summary>
+        internal static float PaceMax { get { return FMax; } }
+
         internal static float ShopFactor(Workshop w)
         {
             try

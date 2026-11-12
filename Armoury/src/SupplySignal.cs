@@ -254,7 +254,9 @@ namespace Armoury
                 if (!_wLine.TryGetValue(w, out ln)) { ln = new int[3]; _wLine[w] = ln; }
                 if (reason == ROk) ln[0]++; else { ln[1]++; ln[2] = reason; }
                 if (w.Owner == Hero.MainHero) _wPlayer++;
-                WorkshopBenches.Observe(w, reason == ROk);   // 435-L8: wykorzystanie warsztatu do pamieci stanowisk (wlasny try; klucz wylaczony - nic)
+                // 435-L8: wykorzystanie warsztatu do pamieci stanowisk (wlasny try; klucz wylaczony - nic); 435-L8-p: tylko linie z wsadem - te same, ktore dostaja
+                // mnoznik stanowisk (zamknieta linia strzal i kopalnia co N-ty cykl sa juz poza u: RuleHeld)
+                if (p.Inputs != null && p.Inputs.Count > 0) WorkshopBenches.Observe(w, reason == ROk);
             }
             catch (Exception e) { Stumble("CycleEnd", e); }
         }

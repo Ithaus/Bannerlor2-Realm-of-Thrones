@@ -16,7 +16,7 @@ namespace Armoury
     /// </summary>
     internal static partial class TownFolk
     {
-        internal const int GfOk = 0, GfRoad = 1, GfNoFolk = 2, GfSmall = 3, GfNoShelf = 4, GfPriceCap = 5, GfNoGold = 6, GfErr = 7, GfKinds = 8;
+        internal const int GfOk = 0, GfRoad = 1, GfNoFolk = 2, GfSmall = 3, GfNoShelf = 4, GfPriceCap = 5, GfNoGold = 6, GfErr = 7, GfPiece = 8, GfKinds = 9;   // GfPiece (435-L8-p): budzet materialu mniejszy od sztuki
 
         internal sealed class GearPay
         {

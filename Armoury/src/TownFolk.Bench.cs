@@ -11,7 +11,8 @@ namespace Armoury
     /// rzemieslnikow (TownFolk.Earn KBuildLabour: lud przyjmuje, czesc zatrzymana regula f5 zostaje w kasie miasta - "wolajacy daje kasie amt - wynik").
     /// Platnik: kapital warsztatu (Workshop.ChangeGold); odbiorcy: kasa WLASNEGO miasta (material) i kiesy ludu tego miasta (rzemieslnicy). Kiesa wlasciciela nietknieta.
     /// Brak materialu na polce - nic nie schodzi (zadnej drogi "same place"); wyjatek: `wageOnly` - koncowka ceny poziomu mniejsza od sztuki materialu, same place.
-    /// Wolajacy pilnuje, zeby `matBudget` + place (1:1) miescily sie w kapitale ponad znacznik. Wszystkie strony zmierzone na zywych kiesach (kontrola w linii
+    /// Wolajacy pilnuje, zeby `matBudget` + place (1:1) miescily sie w kapitale ponad znacznik. Kapital i kasa miasta zmierzone na zywych kiesach, strona ludu to
+    /// wynik Earn (435-L8-p: kontrola dowodzi zgodnosci kapital - kasa; kies ludu nie mierzy) (kontrola w linii
     /// "LP warsztaty"). Watek glowny, nie rzuca.
     /// </summary>
     internal static partial class TownFolk
@@ -60,13 +61,17 @@ namespace Armoury
                     for (int i = 0; i < pc.Length; i++) r.Pcs += pc[i];
                     r.Drop = drop;
                     SupplySignal.NoteWorksGot(st, items, pc, SupplySignal.SWorks);  // sztuki kupione wedlug towaru (sam licznik)
-                    if (sp <= 0) { r.Why = !none && cap > 0 ? GfPriceCap : GfNoShelf; return r; }
+                    // 435-L8-p: polka ma material ponad zapas i ponizej sufitu ceny, a nic nie kupiono - budzet materialu mniejszy od sztuki (nie "brak materialu")
+                    if (sp <= 0) { r.Why = none ? GfNoShelf : (cap > 0 ? GfPriceCap : GfPiece); return r; }
                     spent = sp; wage = spent;
                     if (spent + wage > cap0) wage = Math.Max(0L, cap0 - spent);
                 }
                 int total = (int)Math.Min(int.MaxValue, spent + wage);
                 w.ChangeGold(-total);                                              // kapital warsztatu -> kasa miasta: material i place (lud bierze swoja czesc z kasy nizej)
                 st.Town.ChangeGold(total);
+                // 435-L8-p (recenzje 4): przelew zrobiony - wynik zapisany OD RAZU (wyjatek nizej nie gubi raty: Book dostaje to, co zeszlo z kapitalu; place
+                // nieprzyjete przez lud zostaja w kasie miasta i sa poprawiane po Earn)
+                r.Mat = spent; r.WageCof = wage; r.WageFolk = 0;
                 WorkshopTrade.ShiftCapEnd(w, -total);                              // to nie wyplata zysku wlascicielowi (linia "Warsztaty towarowe")
                 if (spent > 0) mf.Sale[MixBuild] += spent;                         // sprzedaz kupcow miasta - podstawa robocizny (jak material robot gminy)
                 long fin = 0;
