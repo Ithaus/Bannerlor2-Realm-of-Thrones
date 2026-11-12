@@ -135,6 +135,24 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>471b: czy regula 471b DZIALA na tym oblezeniu (furaz 471b-3, kapitulacja / bramka / limit 471b-4). Powod pominiecia albo null:
+        /// brak wodza obozu, gracz / Inni / skrypt fabuly (Out471), osada klanu gracza (D5 - do 471b-5 poza regula). Nie rzuca.</summary>
+        internal static string Acts471(SiegeEvent ev)
+        {
+            try
+            {
+                var st = ev != null ? ev.BesiegedSettlement : null;
+                if (st == null || st.SiegeEvent != ev || st.Town == null) return "brak oblezenia";
+                var lp = ev.BesiegerCamp != null ? ev.BesiegerCamp.LeaderParty : null;
+                if (lp == null) return "oboz bez wodza";
+                string why = Out471(ev, st, lp);
+                if (why != null) return why;
+                if (st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan) return "osada klanu gracza (D5)";
+                return null;
+            }
+            catch (Exception e) { Stumble("Acts471", e); return "blad"; }
+        }
+
         /// <summary>Z Daily (po LogOn): start (raz na oblezenie), zegar doby i linia doby 471. 471-p U2: w 471a zegar zyje tylko z wlaczonym logiem
         /// (nic poza logiem go nie czyta); 471b, ktory na nim dziala, MUSI wyniesc zegar i R przed LogOn i zapisywac zegar w save (U8).</summary>
         private static void Time471Daily()
@@ -229,7 +247,7 @@ namespace Armoury
                     + ", dob z odsiecza " + r.PausedDays + (r.OverLimit ? ", PONAD LIMITEM " + F(Limit471 * CatHi[c], "0") : "") + " | HP murow " + F(WallHp(st) * 100, "0") + "%"
                     + " | wlasciciel w chwili konca " + (st != null && st.OwnerClan != null ? st.OwnerClan.StringId : "-")
                     + " (gra zmienia wlasciciela PO tym zdarzeniu - zdobycie widac w linii KO)"   // 471-p U10: SiegeCompleted: RemoveAllSiegeParties -> koniec oblezenia -> ApplyBySiege
-                    + (r.PlayerClan ? " [osada klanu gracza - D5]" : "") + " | " + SiegeCamp471.EndText(ev) + ".");
+                    + (r.PlayerClan ? " [osada klanu gracza - D5]" : "") + " | " + SiegeCamp471.EndText(ev) + " | " + SiegeForage471.EndText(ev) + ".");
             }
             catch (Exception e) { Stumble("Time471End", e); }
         }

@@ -6080,6 +6080,8 @@ namespace Armoury
         public float SiegeCampAttritionLowMedicinePercent = 0.5f;   // With Siege Camp Attrition By Medicine: the daily share of the camp's men lost when nobody in the camp knows any Medicine
         public float SiegeCampAttritionHighMedicinePercent = 0.1f;  // With Siege Camp Attrition By Medicine: the daily share of the camp's men lost when the best surgeon of the camp has 200 Medicine or more (in between - in proportion)
         public float SiegeCampOutbreakChancePercent = 4f;           // With Siege Camp Attrition By Medicine: the daily chance that sickness breaks out in a siege camp whose best surgeon has no Medicine; a surgeon with 200 Medicine cuts it to a quarter. 0 = the camp never sickens
+        // 471b-3 (Jeff 13.11 D3 "Okay rabunek ma sens i zmniejsza opinie o lordzie"): SiegeForage471.cs
+        public bool SiegeCampForage = true;                 // A besieging host of the lords of the world (not you) that runs low on food takes grain from the granaries of the besieged place's villages without paying - each piece is taken from a village's granary, the village goes hungry sooner, and the lord who takes it loses one point of relation with the village's notables for each day his men rob it (at most 20 per siege). Off = the camp lives on what it carries, as before
 
         public static void Load(string moduleDataDir)
         {

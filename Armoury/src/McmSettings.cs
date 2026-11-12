@@ -12992,6 +12992,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public float SiegeCampOutbreakChancePercent { get; set; } = 4f;
 
+        [SettingPropertyBool("Siege Camp Forages The Villages", HintText = "A besieging host of the lords of the world (not you) that runs low on food takes grain from the granaries of the besieged place's villages without paying - each piece is taken from a village's granary, the village goes hungry sooner, and the lord who takes it loses one point of relation with the village's notables for each day his men rob it (at most 20 per siege). Off = the camp lives on what it carries, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeCampForage { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -16239,6 +16243,7 @@ namespace Armoury
             s.SiegeCampAttritionLowMedicinePercent = SiegeCampAttritionLowMedicinePercent;
             s.SiegeCampAttritionHighMedicinePercent = SiegeCampAttritionHighMedicinePercent;
             s.SiegeCampOutbreakChancePercent = SiegeCampOutbreakChancePercent;
+            s.SiegeCampForage = SiegeCampForage;
         }
 
         internal static void Apply()

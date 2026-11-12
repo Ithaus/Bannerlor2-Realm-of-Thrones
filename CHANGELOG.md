@@ -1,5 +1,26 @@
 # DZIENNIK ZMIAN
 
+## 471b-3 (13.11) - furaz obozu AI ze spichlerzy wsi okregu: rabunek bez zaplaty, wies gloduje, spada relacja lorda z notablami (D3)
+
+**Problem:** Jeff 13.11, odpowiedz D3: "Okay rabunek ma sens i zmniejsza opinie o lordzie". Test 60 dob (`Armoury-2026-11-12_22-47-01.log`, wiersze SZ): jedzenie obozu 8.5 doby, w Ashemark 15.6 -> 5.8 -> 3.0 -> 2.1 - oboz odchodzi z glodu po 8-16 dobach, wiec oblezenia 40-150 dob (cele 471) byly fizycznie niemozliwe.
+
+**Przyczyna:** oboz AI zyje tylko z tego, co niesie; gra nie ma furazu, a spichlerze wsi (Famine E4/6) karmily dotad tylko gospodarzy, uchodzcow i napastnikow rabunku osada po osadzie (DistrictRaid.Eat).
+
+**Zmiana:** nowy plik `Armoury/src/SiegeForage471.cs`, klucz `SiegeCampForage` (MCM "Siege Camp Forages The Villages", grupa 471, TAK; Settings.cs + McmSettings.cs recznie, nazwa w `tools/gen_mcm.py`). Nowa funkcja `SiegeWalls.Acts471` (SiegeWalls.Time471.cs): regula 471b dziala, gdy oboz ma wodza i nie jest to gracz / Inni / skrypt fabuly (`Out471`) ani osada klanu gracza (D5 - do 471b-5).
+- Doba (ArmouryBehavior, po `SiegeCamp471.Daily`): kazda druzyna obozu AI z zapasem < 5 dob bierze najwyzej 2 doby swojego zuzycia na dobe (do 5 dob) ze spichlerzy wsi okregu oblezonej osady (`Settlement.BoundVillages`), najpierw z najwiekszego, tylko wsie strony wroga. Ta sama droga co rabunek E7/R1: `Famine.Take(wies, sztuk, 20 racji)` + zboze (`DefaultItems.Grain`) do taboru w ramce `GoodsLedger.FRaid` - zamknieta ekonomia, kazda sztuka zdjeta ze spichlerza. Pusty spichlerz = glod wsi regula Famine.
+- Opinia: kazdej doby, gdy ludzie lorda (LeaderHero druzyny) zabrali cos z wsi - relacja lorda z kazdym notablem tej wsi -1 (`ChangeRelationAction.ApplyRelationChangeBetweenHeroes`, bez komunikatu), najwyzej 20 na pare lord-wies w oblezeniu.
+- Linie: `Furaz obozu (471b-3 start)` (klucz, Famine, parametry), `Furaz obozu (471b-3 doba): oblezen z furazem, druzyn nakarmionych, bez jedzenia we wsiach | zboze do obozow N szt. (racji), spichlerze wsi ubyly R racji, kontrola (przybyle - ubyle) X | relacja z notablami -K | osada: glodnych druzyn, nakarmionych, wsie id N szt.`; w `(471) koniec` - `furaz (471b-3): N szt. zboza (racji) z W wsi w D dob, relacja obnizona K razy`.
+
+**Kalibracja (wyliczona):** oboz 13 tys. je ok. 670 szt./d (13 400 racji); spichlerz wsi przy pelnym sufice (2 lata potrzeby gospodarzy) - wies 500 ludzi ok. 364 tys. racji = ok. 27 dob takiego obozu; zamek z 2 wsiami - ok. 50 dob, potem wies gloduje i oboz znow wraca do m116 (odejscie z glodu). Oboz 3 tys. - kilka razy dluzej.
+
+**Ryzyko / co sprawdzic:**
+- Regresje: Famine `_dEaten` (linia spichlerzy "zjedzone przez napastnikow") liczy teraz takze furaz - bilans spichlerzy zgodny, etykieta szersza. GoodsLedger FRaid - nowe zrodlo zboza w tej samej kategorii.
+- Kolizje: furaz trzyma oboz pod murami dluzej - 274 (dodatkowe zbiorki przy dlugich oblezeniach, `CanonWarBalance.Levers.cs:221`) i m116 (odejscie z glodu obozu) widza to dopiero w tescie; wies z pustym spichlerzem gloduje i traci ludzi (Famine) - zamierzone ("wies cierpi").
+- Kontrola w linii doby: "kontrola (przybyle - ubyle)" powinna byc 0.0.
+- Klucz NIE albo Famine wylaczony = nic (oboz jak dotad).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-2 (13.11) - straty obozu oblezniczego 0.1-0.5% na dobe wedlug medycyny i dobowa szansa wybuchu choroby (D2) - zamiast stawki RB
 
 **Problem:** Jeff 13.11, odpowiedz D2: "liczyc strate od 0.1% do 0.5% dziennie w zaleznbosci od medycyny plus szansa ze kazdego dnia ktos zachoruje gdy wieksza medycyna wieksza szansa ze nie". Badanie 471: RealisticBannerlord liczy straty na DRUZYNE (armia 65 druzyn traci ok. 11.7 tys. do 30. doby), a zaraza obozowa CampFever po inkubacji (14 dob) bije codziennie bez konca, z narostem do x4 (0.6% x narost x tlok do 2.5 x czynnik do 3, sufit 6%/d) - przy oblezeniach 40-150 dob (cele 471) oboz by stopnial.

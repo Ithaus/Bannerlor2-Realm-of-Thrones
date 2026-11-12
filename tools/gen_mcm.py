@@ -840,6 +840,7 @@ LABELS = {
     'SiegeAssaultPartyStrikesRepels': 'Assault Party Fights Until Repels',   # 467
     'SiegeSmallCastlesWalls1': 'Small Castles Start With Level 1 Walls',   # 471b-1
     'SiegeCampAttritionByMedicine': 'Siege Camp Attrition By Medicine',   # 471b-2
+    'SiegeCampForage': 'Siege Camp Forages The Villages',   # 471b-3
     'BkVetoNextTarget334': 'Army Objective Skips Vetoed Seats',
     'IronbornCanonReave334': 'Ironborn Reave The North',
     'PartyPositionGuard334c': 'Party Position Guard',   # paczka 334c

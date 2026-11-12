@@ -1437,6 +1437,7 @@ namespace Armoury
             _lastCamp = null; _last = null; _lastAt = -1f; _lastDrCamp = null; _lastDrAt = -1f;
             SiegeWalls2.Reset();                                                 // oblezenia 2: trebusze, glod, drabiny - pamiec od zera
             SiegeCamp471.Reset();                                                // 471b-2: pamiec strat obozu i wybuchow choroby od zera
+            SiegeForage471.Reset();                                              // 471b-3: pamiec furazu od zera
             ZeroDay();
             Reset377();                                                          // 377: liczniki kampanii i kolejka XP od zera
             Reset387();                                                          // 387: rekord szturmu gracza i liczniki od zera
@@ -1578,6 +1579,7 @@ namespace Armoury
                          + " | SZ5 (467) bije oddzial, nie armia: " + (Sz5On ? "TAK" : "NIE") + " (tylko szturm AI bez gracza), limit odparc " + (Sz5Limit > 0 ? Sz5Limit.ToString() : "brak") + ".");
                 SiegeWalls2.SessionStart();                                      // oblezenia 2: linia startowa (latki, modele, klucze)
                 SiegeCamp471.SessionStart();                                     // 471b-2: linia "Straty obozu (471b-2 start)"
+                SiegeForage471.SessionStart();                                   // 471b-3: linia "Furaz obozu (471b-3 start)"
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
