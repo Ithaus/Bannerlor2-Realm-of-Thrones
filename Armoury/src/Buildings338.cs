@@ -280,6 +280,7 @@ namespace Armoury
             try { Buildings338Village.SessionStart(); } catch (Exception e) { Stumble(GVProd, "Village.SessionStart", e); }
             try { Buildings338Ports.SessionStart(); } catch (Exception e) { Stumble(GPorts, "Ports.SessionStart", e); }
             try { Buildings338Studs.SessionStart(); } catch (Exception e) { Stumble(GStuds, "Studs.SessionStart", e); }
+            try { Buildings338NoBuild.SessionStart(); } catch (Exception e) { Stumble(GCore, "NoBuild.SessionStart", e); }   // 473-b6
             string courier = "?";
             try
             {
@@ -299,7 +300,7 @@ namespace Armoury
             Log.Info("Budynki (338): start sesji | glowny " + YN(Main) + " | zold " + YN(WageOn) + ", autowerbunek " + YN(AutoRecruitOn) + ", zapas jedzenia " + YN(FoodStockOn)
                      + ", dubel jedzenia BK " + YN(FoodDoubleOn) + ", murarz " + YN(MasonOn) + ", urzad podatkowy " + YN(TaxOfficeOn) + ", karawany " + YN(CaravansOn)
                      + ", asymilacja " + YN(AssimilationOn) + ", drogi " + YN(RoadsOn) + ", porty zamkow " + YN(PortsOn) + ", produkcja wsi " + YN(VillageProdOn) + ", projekt Production " + YN(VillageProjectOn)
-                     + ", towary wsi " + YN(VillageGoodsOn) + ", stadniny " + YN(StudsOn) + ", kopalnie zamkow " + YN(CastleMinesOn)
+                     + ", towary wsi " + YN(VillageGoodsOn) + ", stadniny " + YN(StudsOn) + ", kopalnie zamkow " + YN(CastleMinesOn) + ", AI bez zbrojowni i sadu BK " + YN(Buildings338NoBuild.On)
                      + " | BK " + (BkOk ? "jest" : "BRAK") + " | Courier Post na liscie budowy wsi BK: " + courier + " | latki: " + hooks);
         }
 
@@ -319,6 +320,7 @@ namespace Armoury
             try { Buildings338Village.Daily(day); } catch (Exception e) { Stumble(GVProd, "Village.Daily", e); }
             try { Buildings338Ports.Daily(day); } catch (Exception e) { Stumble(GPorts, "Ports.Daily", e); }
             try { Buildings338Studs.Daily(day); } catch (Exception e) { Stumble(GStuds, "Studs.Daily", e); }
+            try { Buildings338NoBuild.Daily(day); } catch (Exception e) { Stumble(GCore, "NoBuild.Daily", e); }   // 473-b6
         }
 
         internal static string Tail(int g) { return " | bledy " + Errors(g); }
