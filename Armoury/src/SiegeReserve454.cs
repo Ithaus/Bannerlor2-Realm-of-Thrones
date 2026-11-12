@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.Core;
@@ -544,7 +545,8 @@ namespace Armoury
                 }
                 else
                 {
-                    try { _f8.SetMovementOrder(MovementOrder.MovementOrderCharge); } catch (Exception e) { Stumble("Szarza", e); }
+                    // 456-c: szarza przez ChargeOrder() (odbicie w trwajacej misji), nie wprost MovementOrder.MovementOrderCharge - patrz ChargeOrder
+                    try { object ch = ChargeOrder(); if (ch != null) _f8.SetMovementOrder((MovementOrder)ch); else Stumble("Szarza", new InvalidOperationException("brak MovementOrder.MovementOrderCharge")); } catch (Exception e) { Stumble("Szarza", e); }
                 }
             }
             float react = Reaction(lane, now);
@@ -625,6 +627,30 @@ namespace Armoury
             _target = null;
             _f8 = null;
             base.OnEndMission();
+        }
+
+        // 456-c (autotest at-456 12.11: TypeInitializationException MovementOrder przy wejsciu na arene, INNER NullReference w MovementOrder..ctor <- ..cctor):
+        // pola statyczne MovementOrder (Charge / Stop / ...) tworzy konstruktor statyczny przez new Timer(Mission.Current.CurrentTime) - poza misja NullReference
+        // i typ zepsuty do konca procesu. Typ jest beforefieldinit, wiec JIT moze odpalic ten konstruktor juz przy KOMPILACJI metody, ktora czyta pole wprost;
+        // siec CrashScribe (Net) zaklada finalizator na kazda metode Armoury przy starcie gry i tym kompiluje ja poza misja (ta sama pulapka co 333t2).
+        // Dlatego odczyt pola tylko odbiciem, tylko w trwajacej misji, raz na proces (potem z pamieci) - wzor HorsePursuit.ArmyOrders (333t2).
+        private static object _charge;
+        private static bool _chargeTried;
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static object ChargeOrder()
+        {
+            if (_charge != null) return _charge;
+            var m = Mission.Current;
+            if (_chargeTried || m == null || m.CurrentState != Mission.State.Continuing) return null;
+            _chargeTried = true;
+            try
+            {
+                var fc = typeof(MovementOrder).GetField("MovementOrderCharge", BindingFlags.Public | BindingFlags.Static);
+                _charge = fc != null ? fc.GetValue(null) : null;
+            }
+            catch (Exception e) { _charge = null; try { Log.Error("SiegeReserve454.ChargeOrder", e); } catch { } }
+            return _charge;
         }
 
         private void Stumble(string where, Exception e)
