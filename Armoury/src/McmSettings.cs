@@ -12932,6 +12932,10 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Studs { get; set; } = true;
 
+        [SettingPropertyBool("Buildings338 Works Need Local Resources", HintText = "With Buildings338: a mine (town Mines, Castle Mines) works only where the villages around have a deposit (iron, silver, salt, clay, limestone, marble, gold) and digs only those minerals; warhorse studs breed only where the villages around keep horses or the pastures are wide, and each studs level adds 2% to the daily chance of a foal. Lords run by the game do not start these buildings where the land has nothing for them. Off = mines and studs as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Works { get; set; } = true;
+
         [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338CastleMines { get; set; } = true;
@@ -16220,6 +16224,7 @@ namespace Armoury
             s.Buildings338VillageProject = Buildings338VillageProject;
             s.Buildings338VillageGoods = Buildings338VillageGoods;
             s.Buildings338Studs = Buildings338Studs;
+            s.Buildings338Works = Buildings338Works;
             s.Buildings338CastleMines = Buildings338CastleMines;
             s.GoldForecastReal = GoldForecastReal;
             s.GoldDailySummary = GoldDailySummary;

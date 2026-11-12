@@ -184,6 +184,7 @@ namespace Armoury
                 foreach (var kv in mins)
                 {
                     if (!(MBRandom.RandomFloat * (rich + 0.5f) < kv.Value)) continue;   // losowanie BK RunMines (opis: zloza i bogactwo gruntu)
+                    if (Buildings338Works.On && !Buildings338Works.InDeposit(t, kv.Key)) { Buildings338Works.NoteCastleOreFiltered(); continue; }   // 476-a: tylko mineraly zloza okolicy
                     double hpu = HandsPerUnit(kv.Key);
                     int n = lvl;                                                       // poziom = sztuki (BK)
                     if (hpu > 0) n = (int)Math.Min(n, Math.Floor(hands / hpu));

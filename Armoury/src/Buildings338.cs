@@ -281,6 +281,7 @@ namespace Armoury
             try { Buildings338Ports.SessionStart(); } catch (Exception e) { Stumble(GPorts, "Ports.SessionStart", e); }
             try { Buildings338Studs.SessionStart(); } catch (Exception e) { Stumble(GStuds, "Studs.SessionStart", e); }
             try { Buildings338NoBuild.SessionStart(); } catch (Exception e) { Stumble(GCore, "NoBuild.SessionStart", e); }   // 473-b6
+            try { Buildings338Works.SessionStart(); } catch (Exception e) { Stumble(GCore, "Works.SessionStart", e); }   // 476-a
             string courier = "?";
             try
             {
@@ -321,6 +322,7 @@ namespace Armoury
             try { Buildings338Ports.Daily(day); } catch (Exception e) { Stumble(GPorts, "Ports.Daily", e); }
             try { Buildings338Studs.Daily(day); } catch (Exception e) { Stumble(GStuds, "Studs.Daily", e); }
             try { Buildings338NoBuild.Daily(day); } catch (Exception e) { Stumble(GCore, "NoBuild.Daily", e); }   // 473-b6
+            try { Buildings338Works.Daily(day); } catch (Exception e) { Stumble(GCore, "Works.Daily", e); }   // 476-a
         }
 
         internal static string Tail(int g) { return " | bledy " + Errors(g); }

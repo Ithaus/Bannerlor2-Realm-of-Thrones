@@ -86,12 +86,12 @@ namespace Armoury
         {
             try
             {
-                if (__result == null || !IsBlocked(__result.BuildingType)) return;
+                if (__result == null) return;
                 var town = __args != null && __args.Length > 0 ? __args[0] as Town : null;
-                if (!AiTown(town)) return;
+                if (!Skip(town, __result.BuildingType)) return;
                 var pick = new List<Building>();
                 foreach (var b in town.Buildings)
-                    if (b != null && b.BuildingType != null && !b.BuildingType.IsDailyProject && b.CurrentLevel < 3 && !IsBlocked(b.BuildingType)
+                    if (b != null && b.BuildingType != null && !b.BuildingType.IsDailyProject && b.CurrentLevel < 3 && !Skip(town, b.BuildingType)
                         && (town.BuildingsInProgress == null || !town.BuildingsInProgress.Contains(b)))
                         pick.Add(b);
                 if (pick.Count == 0) { __result = null; _repickNull++; return; }
@@ -101,22 +101,31 @@ namespace Armoury
             catch (Exception e) { Stumble("NextPostfix", e); }
         }
 
-        /// <summary>(2) Z ArmouryBehavior przed BuildFunding.Daily: zbrojownia i sad BK wychodza z kolejki osad AI (postep i poziom zostaja na budowli).</summary>
+        /// <summary>476-a: AI nie stawia tej budowli w tej osadzie - zbrojownia / sad BK (473-b6, klucz On) albo zaklad bez zasobu okolicy (Buildings338Works, klucz Works).</summary>
+        private static bool Skip(Town t, BuildingType bt)
+        {
+            if (IsBlocked(bt) && AiTown(t)) return true;
+            return Buildings338Works.AiBlocks(t, bt);
+        }
+
+        /// <summary>(2) Z ArmouryBehavior przed BuildFunding.Daily: zbrojownia i sad BK (i 476-a: zaklad bez zasobu) wychodza z kolejki osad AI (postep i poziom zostaja na budowli).</summary>
         internal static void DropQueued()
         {
-            if (!On || Campaign.Current == null) return;
-            foreach (var t in Town.AllTowns)
+            if ((!On && !Buildings338Works.On) || Campaign.Current == null) return;
+            var all = new List<Town>(Town.AllTowns);
+            if (Buildings338Works.On) all.AddRange(Town.AllCastles);   // 476-a: kopalnie i stadniny zamkow
+            foreach (var t in all)
             {
                 try
                 {
-                    if (!AiTown(t)) continue;
+                    if (t == null || t.Settlement == null || t.Settlement.OwnerClan == Clan.PlayerClan) continue;
                     var q = t.BuildingsInProgress;
                     if (q == null || q.Count == 0) continue;
                     bool any = false;
-                    foreach (var b in q) if (b != null && IsBlocked(b.BuildingType)) { any = true; break; }
+                    foreach (var b in q) if (b != null && Skip(t, b.BuildingType)) { any = true; break; }
                     if (!any) continue;
                     var keep = new List<Building>();
-                    foreach (var b in q) if (b == null || !IsBlocked(b.BuildingType)) keep.Add(b); else _dropped++;
+                    foreach (var b in q) if (b == null || !Skip(t, b.BuildingType)) keep.Add(b); else _dropped++;
                     q.Clear();
                     foreach (var b in keep) q.Enqueue(b);
                 }

@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-a (13.11) - zaklady przy zasobach okolicy: kopalnie (miasto, zamek) tylko przy zlozu, stadnina tylko przy pastwisku, poziom stadniny = szansa przychowku
+
+**Problem:** Jeff 13.11: "Mines rob od razu i tylko tam gdzie jest zloze, jesli nie ma budynku mines to nie ma wydobycia ... im wiekszy poziom mines tym wiecej osob moze pracowac"; "Castle mines ... jesli okolica nie ma zasobow to nie mozna budowac"; "warhorse studs rob od razu". Audyt 12.11: kopalnie BK stawiane wszedzie (AI losuje), stadnina 2% stale (poziom podnosil tylko limit).
+
+**Przyczyna:** AI wybiera budowle losowo (DefaultBuildingScoreCalculationModel); BK RunMines kopie mineraly z MineralData osady bez wzgledu na wsie okolicy; Buildings338Studs - stala Chance 0.02.
+
+**Zmiana:** nowy Buildings338Works.cs: mapa zasobow okolicy twierdzy z wsi (VillageType.PrimaryProduction + Productions; zloze = iron/silver/salt/clay/limestone/marble/gold_ore; pastwisko koni = wies z koniem albo pastwiska BK >= 20000). AI (osady nie gracza) nie wybiera kopalni (building_town_mines, building_castle_mines) bez zloza ani stadniny bez pastwiska - postfiks GetNextBuilding 473-b6 rozszerzony (Skip), kolejki AI miast i zamkow czyszczone z takich budow. Produkcja: prefiks na BK RunMines - miasto bez zloza nie kopie; kopalnia zamku (Buildings338Ports.MineCastle) kopie tylko mineraly zloza okolicy. Stadnina: bez pastwiska brak przychowku, szansa 2% x poziom na dobe. Poziom kopalni = sztuki na dobe = gornicy z wolnych rak (BK, bez zmian). Linia startu "zaklady (476): ... mapa zasobow okolic" i doby "Budynki (338) zaklady (476)". Klucz Buildings338 Works Need Local Resources (TAK; NIE = jak przed). Decyzja domyslna (noc 13.11): "pulap inwestycji" = miejsca pracy (poziom), bez osobnego systemu inwestycji regionu.
+
+**Ryzyko / co sprawdzic:** miasta bez wsi mineralnych z kopalnia BK przestaja kopac (ruda miast swiat i tak ok. 50-90 zl/d); gracz widzi kopalnie w menu nawet bez zloza (lista BK nieruszana - wczytanie zerowaloby poziomy), ale bez zloza nie daje urobku; stadniny x2-x3 czesciej przychowek przy L2/L3 (kon z konia - nic z niczego). Mapa zasobow liczona z VillageType - wsie ROT z jednym produktem glownym moga zanizyc zloza (sprawdzic liczby w linii startu).
+
+**Status:** DO SPRAWDZENIA
+
 ## 473-p2 COFNIETE (13.11) - AI znowu moze stawiac port BK w zamkach
 
 **Problem:** 473-p2 (790afd62) wylaczyl AI budowe portu i Harbor BK w zamkach wg zdania z propozycji sesji ("Wylaczam: ... port i Harbor w zamku"). Jeff potem zapytal, czemu port w zamku nie ma sensu, i przyjal propozycje: port w zamku = rybacy, ryby do zapasu jedzenia zamku ("I tak na pozostale sie zgadzam rob budynki").

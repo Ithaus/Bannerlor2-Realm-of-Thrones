@@ -110,7 +110,8 @@ namespace Armoury
                         if (el.EquipmentElement.Item != null && el.EquipmentElement.Item.ItemCategory == DefaultItemCategories.WarHorse) have += el.Amount;
                     }
                     if (!(have < limit)) { _full++; continue; }
-                    if (!(MBRandom.RandomFloat < Chance)) continue;
+                    if (Buildings338Works.StudsNoPasture(t)) continue;                                  // 476-a: bez pastwiska okolicy brak hodowli
+                    if (!(MBRandom.RandomFloat < Buildings338Works.StudsChance(lvl))) continue;        // 476-a: 2% x poziom (NIE - 2%)
                     var war = HorseType(t);
                     if (war == null) { _noType++; continue; }
                     // zrodlo: zwykly kon (bez konia z niczego)
