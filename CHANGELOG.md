@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 456-b (12.11) - pakiet 7: klucz NIE w 451 i 452 co do bitu jak przed (IsSplittableByAI bez przeliczania zapytania przy NIE)
+
+**Problem:** zamkniecie pakietu 7 wskazalo otwarta sprawe po 453-p: 451 (SiegeMainEffort451.Decide) i 452 (SiegeDeadLane452.Cond) przy kluczu NIE licza decyzje "bylby" i czytaja Formation.IsSplittableByAI, ktore przelicza QueryData szyku, gdy dane sa stare. Pomiar przy NIE zmienial wiec chwile przeliczenia zapytan gry - nie co do bitu jak przed. Plan wgrania: klucze 451-455 na NIE (Jeff, decyzja 8: 60% sil dopiero po sondzie na pas), wiec sciezka NIE musi byc czysta.
+
+**Przyczyna:** odczyt wlasciwosci gry z efektem ubocznym (przeliczenie zapytania) w sciezce pomiaru.
+
+**Zmiana:** w obu plikach nowa metoda Splittable(f) wedlug wzoru 453-p: przy TAK - IsSplittableByAI gry (jak dotad), przy NIE - ten sam warunek z pamieci (IsAIOwned + QuerySystem.InsideCastleUnitCountIncludingUnpositionedReadOnly == 0), bez przeliczania. Jedyne miejsca wywolania podmienione. Sonda 370 (linia szykow, klucz pomiarow) czyta IsSplittableByAI jak dotad - poza ta zmiana.
+
+**Ryzyko / co sprawdzic:** przy TAK bez zmian. Przy NIE decyzja "bylby" moze rzadko roznic sie od TAK, gdy pamiec zapytania jest stara (rozbieznosc tylko w pomiarze). Kontrola calosci: 453 juz tak dziala; zadnego innego czytelnika tych metod. Build 0 bledow.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 456 (12.11) - AI BITWY pakiet 7, decyzja Jeffa 12 (zaloga twierdzy sie zalamuje -> odwrot do sali lorda): gra robi to juz sama - TYLKO POMIAR, bez reguly i bez klucza "Broken Garrison Falls Back To Keep"
 
 **Problem:** audyt AI bitwy 11.11 (docs/audyty-2026-11-11/AUDYT-AI-BITWA.md, pakiet 7 "Zalamanie obrony" i decyzja 12; Jeff 11.11 "rob wszystko po kolei tak jak radzisz" - rekomendacja: sala lorda, po sprawdzeniu scen ROT). W logach (Armoury-2026-11-11 .. 2026-11-12, wszystkie pliki w Modules/Armoury) NIE MA zadnej misji szturmu ("Oblezenie misja (370)" - 0 linii), wiec nie ma dowodu, czy zaloga AI w szturmie gracza w ogole peka i czy etap sali lorda kiedykolwiek sie wlacza.

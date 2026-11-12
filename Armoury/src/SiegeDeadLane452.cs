@@ -365,6 +365,17 @@ namespace Armoury
             }
         }
 
+        /// <summary>456-b: szyk bez nikogo w zamku. Przy TAK - IsSplittableByAI gry (przelicza zapytanie, gdy stare). Przy NIE - ten sam warunek
+        /// z pamieci (IsAIOwned + InsideCastleUnitCountIncludingUnpositionedReadOnly), bez przeliczania QueryData - pomiar 'bylby' nie zmienia stanu
+        /// gry (co do bitu jak przed); wzor 453-p.</summary>
+        private bool Splittable(Formation f)
+        {
+            if (_keyOn) return f.IsSplittableByAI;
+            if (!f.IsAIOwned) return false;
+            var q = f.QuerySystem;
+            return q == null || q.InsideCastleUnitCountIncludingUnpositionedReadOnly == 0;
+        }
+
         private bool Cond(TeamState st, int k, Formation f, SiegeLane l, SiegeQuerySystem q, out int dead, out int cur, out int close, out string why)
         {
             dead = 0; cur = 0; close = -1; why = null;
@@ -381,7 +392,7 @@ namespace Armoury
             for (int j = 0; ws != null && j < ws.Count; j++) { var w = ws[j]; if (w != null && w.HoldLadders) { why = "machina pasa w drodze"; return false; } }
             close = SiegeMissionLog370.QVal(q, SiegeMissionLog370.LanePrefix((FormationAI.BehaviorSide)k) + "CloseAttackerCount");
             if (close < 0 || close >= WallMin) { why = "przy murze " + close; return false; }
-            if (!f.IsAIControlled || !f.IsSplittableByAI) { why = "szyk nie pod AI albo ktos w zamku"; return false; }
+            if (!f.IsAIControlled || !Splittable(f)) { why = "szyk nie pod AI albo ktos w zamku"; return false; }
             return true;
         }
 

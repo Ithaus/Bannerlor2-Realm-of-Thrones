@@ -272,6 +272,17 @@ namespace Armoury
             return null;
         }
 
+        /// <summary>456-b: szyk bez nikogo w zamku. Przy TAK - IsSplittableByAI gry (przelicza zapytanie, gdy stare). Przy NIE - ten sam warunek
+        /// z pamieci (IsAIOwned + InsideCastleUnitCountIncludingUnpositionedReadOnly), bez przeliczania QueryData - pomiar 'bylby' nie zmienia stanu
+        /// gry (co do bitu jak przed); wzor 453-p.</summary>
+        private bool Splittable(Formation f)
+        {
+            if (_keyOn) return f.IsSplittableByAI;
+            if (!f.IsAIOwned) return false;
+            var q = f.QuerySystem;
+            return q == null || q.InsideCastleUnitCountIncludingUnpositionedReadOnly == 0;
+        }
+
         private void Decide(Mission m, float now, TeamState st, TacticBreachWalls tac, List<SiegeLane> lanes, SiegeQuerySystem q)
         {
             if (now - _t0 > Window) { st.Done = true; st.Why = "nie bylo warunkow w " + Window.ToString("0", Inv) + " s po rozstawieniu (ostatnio: " + (st.Why ?? "-") + ")"; Line(st, null); return; }
@@ -282,7 +293,7 @@ namespace Armoury
             for (int i = 0; i < used.Count; i++)
             {
                 var f = used[i].Value;
-                if (!f.IsAIControlled || !f.IsSplittableByAI) { st.Done = true; st.Why = "szyk F" + (int)f.FormationIndex + " nie pod AI albo ktos w zamku (IsSplittableByAI)"; Line(st, null); return; }
+                if (!f.IsAIControlled || !Splittable(f)) { st.Done = true; st.Why = "szyk F" + (int)f.FormationIndex + " nie pod AI albo ktos w zamku (IsSplittableByAI)"; Line(st, null); return; }
                 if (!f.IsAITickedAfterSplit) { st.Why = "szyk F" + (int)f.FormationIndex + " przed pierwszym taktem AI"; return; }
                 int ca = SiegeMissionLog370.QVal(q, SiegeMissionLog370.LanePrefix(used[i].Key.LaneSide) + "CloseAttackerCount");
                 if (ca >= WallMin) { st.Done = true; st.Why = "pas " + used[i].Key.LaneSide + " juz na murze (" + ca + " przy punkcie)"; Line(st, null); return; }
