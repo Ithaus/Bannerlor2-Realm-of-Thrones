@@ -364,14 +364,23 @@ namespace Armoury
                 double age = ev.SiegeStartTime.ElapsedDaysUntilNow;
                 double ratio = Ratio471(ev, st);
                 int lords = SiegeSurrender374.LeadOutLords(st, lp);
-                string out1 = BookHoldings.YieldOut(st, lp.MapFaction, null, "471-" + st.StringId);
+                // 471b-p5 (recenzja B3, D4 "do najblizszej wlasnej twierdzy"): zaloga rodu gracza - do najblizszej nieoblezonej twierdzy rodu gracza, bez niej do druzyny
+                // gracza; bez obu - droga YieldOut jak u AI (lordowie krolestwa). Inne rody - jak dotad (toParty null).
+                Settlement toSt = null;
+                MobileParty toP = oldClan != null && oldClan == Clan.PlayerClan ? PlayerRefuge471(st, out toSt) : null;
+                string out1 = BookHoldings.YieldOut(st, lp.MapFaction, toP, "471-" + st.StringId);
                 _yield471 = st.StringId;
                 try { Campaign.Current.KingdomManager.SiegeCompleted(st, lp, true, TaleWorlds.CampaignSystem.MapEvents.MapEvent.BattleTypes.Siege); }
                 finally { _yield471 = null; }
                 bool ok = st.SiegeEvent != ev && st.MapFaction == lp.MapFaction;
                 _d471Yield++;
                 if (oldClan != null && oldClan == Clan.PlayerClan)   // 471b-5 (D5): osada rodu gracza
-                    try { Log.Player(Nm(st) + " has yielded to " + Hn(lp) + " after " + F(age, "0") + " days of siege. The garrison marches out under arms to the lords of your realm.", true); } catch { }
+                    try
+                    {
+                        string dest = toSt != null ? Nm(toSt) : toP != null ? "join you" : "the lords of your realm";
+                        Log.Player(Nm(st) + " has yielded to " + Hn(lp) + " after " + F(age, "0") + " days of siege. The garrison marches out under arms to " + dest + ".", true);
+                    }
+                    catch { }
                 info = (ok ? "osada przeszla" : "SiegeCompleted bez zmiany pana") + " | partie lordow wyprowadzone " + lords + " | " + out1;
                 if (LogOn)
                     Log.Info("Czas oblezenia (471b) kapitulacja: dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ") | droga " + way + " | po " + F(age, "0.0") + " dob"
@@ -381,6 +390,35 @@ namespace Armoury
                 return ok;
             }
             catch (Exception e) { Stumble("Yield471", e); _yield471 = null; info = "blad"; return false; }
+        }
+
+        /// <summary>471b-p5 (D5, recenzja B3): odbiorca zalogi rodu gracza przy kapitulacji 471b - zaloga najblizszej (od bramy) twierdzy rodu gracza, ktora nie jest
+        /// oblezona ani w bitwie; bez niej druzyna gracza (aktywna, poza bitwa, oblezeniem i morzem, gracz nie w niewoli); bez obu null (YieldOut: lordowie krolestwa).
+        /// toSt - twierdza odbiorcy (null przy druzynie gracza).</summary>
+        private static MobileParty PlayerRefuge471(Settlement st, out Settlement toSt)
+        {
+            toSt = null;
+            try
+            {
+                var pc = Clan.PlayerClan;
+                if (pc == null || pc.Settlements == null) return null;
+                var p = st.GatePosition.ToVec2();
+                MobileParty best = null; float bd = float.MaxValue;
+                foreach (var s in pc.Settlements)
+                {
+                    if (s == null || s == st || !s.IsFortification || s.Town == null || s.IsUnderSiege) continue;
+                    var g = s.Town.GarrisonParty;
+                    if (g == null || !g.IsActive || g.MapEvent != null || g.MemberRoster == null || g.Party == null) continue;
+                    float d = s.GatePosition.ToVec2().Distance(p);
+                    if (d < bd) { bd = d; best = g; toSt = s; }
+                }
+                if (best != null) return best;
+                var main = MobileParty.MainParty;
+                if (main != null && main.IsActive && main.MapEvent == null && main.SiegeEvent == null && main.BesiegerCamp == null && !main.IsCurrentlyAtSea
+                    && Hero.MainHero != null && !Hero.MainHero.IsPrisoner) return main;
+            }
+            catch (Exception e) { Stumble("PlayerRefuge471", e); toSt = null; }
+            return null;
         }
 
         /// <summary>471b-4 (e): limit przy obozie nie liczniejszym od obroncow albo (471b-p4) z odsiecza w drodze - oboz zwiniety droga gry (SiegeRansom.Lift384 = RemoveAllSiegeParties) i rozejm tej

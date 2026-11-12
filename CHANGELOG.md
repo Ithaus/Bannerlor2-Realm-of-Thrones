@@ -1,5 +1,24 @@
 # DZIENNIK ZMIAN
 
+## 471b-p5 (13.11) - kapitulacja osady rodu gracza (D5): zaloga do najblizszej twierdzy rodu gracza albo do gracza; opis klucza D5 (recenzje B3, A9)
+
+**Problem:** recenzja B3: przy D5 `Yield471` wolal `BookHoldings.YieldOut(st, ..., null)` - `RecipientOk` wyklucza rod gracza i druzyne gracza, `Recipients` pomija twierdze gracza, `HeadParty` gracza = null. Ludzie gracza szli do lordow AI krolestwa, a przy wlasnym krolestwie jednego rodu - rozpuszczani do domu. Wbrew D4 ("wychodzi wolno do najblizszej wlasnej twierdzy"). Recenzja A9: opis klucza D5 mowil "With Siege Time By Factors", a furaz wsi gracza zalezy od klucza furazu (Siege Camp Forages The Villages), nie od Siege Time By Factors.
+
+**Przyczyna:** 471b-5 zostawil droge YieldOut bez odbiorcy (`toParty` null) i opis z jednym kluczem.
+
+**Zmiana:**
+- `SiegeWalls.Time471.cs`: nowe `PlayerRefuge471(st, out toSt)` - zaloga najblizszej (od bramy) twierdzy rodu gracza, nieoblezonej i nie w bitwie; bez niej druzyna gracza (aktywna, poza bitwa, oblezeniem i morzem, gracz nie w niewoli); bez obu null. `Yield471`: dla osady rodu gracza `YieldOut(st, frakcja zdobywcy, toP, ...)` (ta sama droga co 374 `mine ? MainParty`: ludzie, ksiega ludzi FToGarrison/FFromGarrison, zbrojownia z ludzmi `GarrisonArmory.KitsWithMen`). Inne rody - bez zmian.
+- Komunikat gracza (angielski): "X has yielded to Y after N days of siege. The garrison marches out under arms to <twierdza> / to join you / to the lords of your realm."
+- Opis klucza `SiegeTimeRulesPlayerHoldings` (Settings.cs i McmSettings.cs): "...with Siege Time By Factors - no assault before ..., they yield with honours ... (the garrison marches out to your nearest fortress that is not besieged, or to your own party; failing both, to the lords of your realm); with Siege Camp Forages The Villages - the besiegers forage your villages ...". Nazwa w `tools/gen_mcm.py` bez zmian (gen_mcm NIE uruchamiany).
+
+**Ryzyko / co sprawdzic:**
+- Zaloga przenoszona w calosci (jak 374 "ponad limit") - twierdza odbiorcy moze przekroczyc limit zalogi; nadmiar zalatwia istniejaca regula przepelnienia W4c (ClanBudget/OverflowHome), druzyna gracza - kara morale gry jak w 374.
+- Zold: ci sami ludzie dalej na utrzymaniu rodu gracza (nie nowi).
+- W logu: `Czas oblezenia (471b) kapitulacja ... | zaloga N -> <zaloga twierdzy gracza / druzyna gracza> N (ponad limit)`.
+- Klucz D5 NIE - osady gracza poza regula (bez zmian).
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 471b-p4 (13.11) - limit (e) z odsiecza w drodze: oboz odchodzi zamiast kapitulacji zalogi (recenzja B6)
 
 **Problem:** recenzja B6: droga (e) (wiek >= 1.5 x gorna granica) nie patrzyla na odsiecz - przy obozie liczniejszym zaloga kapitulowala, choc odsiecz byla w drodze. Drogi (a) i (b) (`StarveYield471`) przy odsieczy czekaja - niespojna regula.

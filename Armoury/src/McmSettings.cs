@@ -13004,7 +13004,7 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public float SiegeTimeLimitFactor { get; set; } = 1.5f;
 
-        [SettingPropertyBool("Siege Time Rules For Your Fortresses", HintText = "With Siege Time By Factors: the fortresses of your own house besieged by the lords of the world (while you are not inside or in the camp) follow the same rules - no assault before the lower bound of the term, they yield with honours when the term runs out with no relief in sight or after a week of hunger (the garrison marches out to the lords of your realm), and the besiegers forage your villages. You get a message when that happens. Off = your own fortresses keep only the old rules (assault and the old hunger)", RequireRestart = false)]
+        [SettingPropertyBool("Siege Time Rules For Your Fortresses", HintText = "The fortresses of your own house besieged by the lords of the world (while you are not inside or in the camp) follow the same siege rules as everyone else's: with Siege Time By Factors - no assault before the lower bound of the term, they yield with honours when the term runs out with no relief in sight or after a week of hunger (the garrison marches out to your nearest fortress that is not besieged, or to your own party; failing both, to the lords of your realm); with Siege Camp Forages The Villages - the besiegers forage your villages. You get a message when that happens. Off = your own fortresses keep only the old rules (assault, the old hunger, no foraging)", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeTimeRulesPlayerHoldings { get; set; } = true;
 
