@@ -139,7 +139,8 @@ namespace Armoury
             return sb.Length > 0 ? sb.ToString() : "-";
         }
 
-        private static bool Food(ItemCategory c) { return c.IsAnimal || CaravanTrade284.IsFoodCat(c); }
+        // 435-N-B: internal - czyta tez SupplySignal.NoteInput (brak wsadu jedzenia poza kolejka N); zachowanie bez zmian
+        internal static bool Food(ItemCategory c) { return c.IsAnimal || CaravanTrade284.IsFoodCat(c); }
 
         internal static void Daily()
         {

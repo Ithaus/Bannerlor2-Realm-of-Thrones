@@ -96,6 +96,9 @@ namespace Armoury
         private static readonly Dictionary<ItemCategory, double[]> _dCat = new Dictionary<ItemCategory, double[]>();   // doba: [brak wsadu, kupione, poziom niewydanego budzetu]
         private static double _dRound;                    // reszty budzetu ponizej ceny najtanszej sztuki (nie sa brakiem)
         private static double _dCapGold;                  // 435-L1-p: budzet bez pokrycia, gdy material lezy na polce tylko ponad sufitem ceny (nie brak)
+        // 435-N-B: brak wsadu JEDZENIA i zwierzat (CommodityInputs284.Food) poza kolejka N - zywnosc nie ma liczonej sprzedazy w mianowniku (MinSales = 1 szt./d),
+        // wiec kazdy brak >= 1 szt./d dawal N = 2 (test 90 dob: jablka, maslo, oliwki, winogrona, mieso). Doba: sztuki i wywolania pominiete; sesja: komorki z zapisu wyzerowane.
+        private static double _dFoodSkip; private static int _dFoodSkipN, _loadFoodZero;
         // 435-L1-p (recenzje S1): budzet robot bez pokrycia to ZAPAS (kiesa wsi ponad skrzynie, to samo zlecenie wraca co dobe), nie strumien - do kolejki N wchodzi
         // rozlozony na okno (poziom / 28); kolejka N > 1 dopiero po MinSpan dobach pomiaru; sprzedaz w mianowniku nie mniejsza niz MinSales szt./d (pusta polka)
         internal const int MinSpan = 7;
@@ -185,7 +188,9 @@ namespace Armoury
             try
             {
                 if (OffMain()) return;
-                Add(town.Settlement, c, Math.Max(0, miss), 0, Math.Max(0, got), SShop);
+                int m = Math.Max(0, miss);
+                if (m > 0 && CommodityInputs284.Food(c)) { _dFoodSkip += m; _dFoodSkipN++; m = 0; }   // 435-N-B: jedzenie poza kolejka N (kupione liczone dalej)
+                Add(town.Settlement, c, m, 0, Math.Max(0, got), SShop);
             }
             catch (Exception e) { Stumble("NoteInput", e); }
         }
@@ -371,7 +376,7 @@ namespace Armoury
         {
             _main = Environment.CurrentManagedThreadId; _dOff = 0;
             _st = _stSess = 0; _err.Clear(); _startLine = false; _first = int.MinValue; _gFrom = int.MinValue;
-            _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _offWarned = false; _heldBits = 0; _earlyTried = false;
+            _pend = null; _loadNote = "nowa kampania albo zapis bez arm_lpn (pamiec N od pierwszej doby)"; _loadBad = 0; _offWarned = false; _heldBits = 0; _earlyTried = false; _loadFoodZero = 0;
             _cells.Clear(); _price.Clear(); ZeroDay();
             _ws.Clear(); CycleBegin();
             _runs.Clear(); _seenDec = -1; _pubN = new Dictionary<ItemCategory, double>(); _pubT = null;
@@ -382,7 +387,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             Array.Clear(_dMiss, 0, Streams); Array.Clear(_dSoft, 0, Streams); Array.Clear(_dGot, 0, Streams); Array.Clear(_dGapGold, 0, Streams);
-            _dCat.Clear(); _dRound = 0; _dCapGold = 0;
+            _dCat.Clear(); _dRound = 0; _dCapGold = 0; _dFoodSkip = 0; _dFoodSkipN = 0;
             Array.Clear(_wDay, 0, RKinds); _wArms = _wCastle = _wPlayer = _wSkip = 0; _wLine.Clear();
             _dOff = 0; _st = 0;
         }
@@ -538,6 +543,7 @@ namespace Armoury
                         Dictionary<ItemCategory, Cell> m;
                         if (!_cells.TryGetValue(st, out m)) { m = new Dictionary<ItemCategory, Cell>(); _cells[st] = m; }
                         if (m.ContainsKey(cat)) { _loadBad++; continue; }
+                        if (miss > 0 && CommodityInputs284.Food(cat)) { miss = 0; _loadFoodZero++; }   // 435-N-B: zapis sprzed 435-N-B (brak jedzenia poza kolejka N)
                         var cell = new Cell();
                         for (int i = 0; i < span; i++)
                         {
@@ -548,7 +554,7 @@ namespace Armoury
                     }
                 if (cells > 0) _first = _first == int.MinValue ? day - span + 1 : Math.Min(_first, day - span + 1);
                 if (cells > 0) _gFrom = day + 1;                              // 435-N-A-p: przyrost tylko z dob po zapisie (doby z zapisu to srednia, nie poziom)
-                _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
+                _loadNote = "arm_lpn wczytany: zapis z doby " + day + " (dob pomiaru " + span + "), komorek " + cells + ", towarow z decyzjami regulatora " + runs + (_loadFoodZero > 0 ? ", brak wsadu jedzenia wyzerowany (435-N-B) w " + _loadFoodZero : "") + (_loadBad > 0 ? ", zlych wpisow " + _loadBad : "");
             }
             catch (Exception e) { Stumble("Resolve", e); _loadNote = "arm_lpn - blad wczytania (pamiec N od pierwszej doby)"; }
         }
@@ -621,6 +627,7 @@ namespace Armoury
                     for (int i = 0; i < Streams; i++) sb.Append(i == 0 ? " " : ", ").Append(SName[i]).Append(' ').Append(F1(_dGot[i]));
                     sb.Append("; razem ").Append(F1(gAll)).Append(" | reszty budzetu ponizej ceny sztuki (nie brak) ").Append(N0(_dRound)).Append(" zl")
                       .Append(", budzet przy materiale tylko ponad sufitem ceny (nie brak) ").Append(N0(_dCapGold)).Append(" zl")
+                      .Append(" | 435-N-B brak wsadu jedzenia i zwierzat poza N (bez liczonej sprzedazy): ").Append(F1(_dFoodSkip)).Append(" szt. w ").Append(_dFoodSkipN).Append(" brakach")
                       .Append(" | wedlug towaru dzis (brak wsadu + poziom budzetu / kupione): ");
                     var l = new List<KeyValuePair<ItemCategory, double[]>>(_dCat);
                     l.Sort((a, b) => (b.Value[0] + b.Value[2]).CompareTo(a.Value[0] + a.Value[2]));
