@@ -158,7 +158,7 @@ namespace Armoury
         // 435-L9-p: zwrot wkladu, zaplacone bez zmiany typu, cena i zaplata zmian zrobionych, odlozone (ponowna proba), pamiec od nowa po przerwie
         private static long _dRefund, _dPaidNoType, _dCostDone, _dPaidDone;
         private static int _dDeferred, _dStale, _dStaleGap;
-        // 435-N-C: zmiany typu wedlug galezi wyboru (N towaru / N wyrobu), "bylby" przy kluczu NIE (kandydaci, dla ktorych bylby typ z N wyrobu)
+        // 435-N-C: zmiany typu wedlug galezi wyboru (N towaru / N wyrobu), "bylby" przy kluczu NIE (435-N-C-p: miasta, nie kandydaci)
         private static int _dPickTown, _dPickWare, _dWould;
         private static readonly List<string> _dDone = new List<string>();
 
@@ -326,7 +326,7 @@ namespace Armoury
             if (_dDeferred > 0) sb.Append(" | odlozone (ponowna proba za ").Append(RetryDays).Append(" dob) ").Append(_dDeferred);
             if (_dStale > 0) sb.Append(" | pamiec od nowa po przerwie pomiaru ").Append(_dStaleGap).Append(" dob: rekordow ").Append(_dStale);
             sb.Append(" | N wyrobu (435-N-C, klucz Workshops Follow Goods Shortage ").Append(SupplySignal.WareKey ? "TAK" : "NIE").Append("): zmiany typu wybrane przez N towaru ").Append(_dPickTown)
-              .Append(", przez N wyrobu ").Append(_dPickWare).Append(" (najwyzej ").Append(WarePerDay).Append(" na dobe), bylby typ z N wyrobu przy kluczu NIE ").Append(_dWould)
+              .Append(", przez N wyrobu ").Append(_dPickWare).Append(" (najwyzej ").Append(WarePerDay).Append(" na dobe), miast z typem z N wyrobu przy kluczu NIE (bylby) ").Append(_dWould)
               .Append(", odmowa limitu N wyrobu ").Append(why[WWare]);
             sb.Append(" | zloto: z kapitalu ").Append(_dMat + _dWFolk + _dWCof).Append(" = material ").Append(_dMat).Append(" (sztuk ").Append(_dPcs).Append(") + rzemieslnicy do ludu ").Append(_dWFolk)
               .Append(" + zatrzymane w kasie miasta ").Append(_dWCof).Append("; kupujacy -> sprzedajacy ").Append(_dPrice).Append(", kupujacy -> kapital warsztatu ").Append(_dInject)
@@ -345,7 +345,7 @@ namespace Armoury
             if (s.LogEnabled && (LogGate.Lines || events)) Log.Info(sb.ToString());
         }
 
-        private sealed class TownPick { public WorkshopType Pick, Ware; public bool ByWare; }   // 435-N-C: Ware - typ z N wyrobu (liczony, gdy z N towaru brak); ByWare - Pick z N wyrobu
+        private sealed class TownPick { public WorkshopType Pick, Ware; public bool ByWare, Would; }   // 435-N-C-p: Would - miasto juz policzone w "bylby"   // 435-N-C: Ware - typ z N wyrobu (liczony, gdy z N towaru brak); ByWare - Pick z N wyrobu
 
         /// <summary>435-L9-p (recenzja kosztu doby): nowy typ dla miasta - raz na miasto na dobe (typ obecny kazdego warsztatu miasta jest w `have`, wiec wynik nie zalezy
         /// od warsztatu). Najwyzsze N glownego wyrobu linii towarowej z wsadem w tym miescie, wsad w okregu, typu nie ma jeszcze w miescie.</summary>
@@ -409,7 +409,7 @@ namespace Armoury
             if (st.IsUnderSiege) return WSiege;
             var tpk = PickFor(t, st, table, picks);
             var pick = tpk.Pick;
-            if (pick == null) { if (tpk.Ware != null) _dWould++; return WNoType; }   // 435-N-C: klucz NIE - bylby typ z N wyrobu
+            if (pick == null) { if (tpk.Ware != null && !tpk.Would) { tpk.Would = true; _dWould++; } return WNoType; }   // 435-N-C(-p): klucz NIE - bylby typ z N wyrobu (raz na miasto)
             if (tpk.ByWare && _dPickWare >= WarePerDay) return WWare;             // 435-N-C: limit przezbrojen z samego N wyrobu
             int cost = Math.Max(0, model.GetConvertProductionCost(pick));
             if (cost < 20) return WOther;

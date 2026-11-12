@@ -270,13 +270,14 @@ namespace Armoury
                 {
                     var tr = kv.Value;
                     bool lastOk = !double.IsNaN(tr.Pending);
+                    double lastB = tr.Pending;                                  // 435-N-C-p: budzet ostatniego przetworzonego wiersza (kontrola reszty w N wyrobu)
                     if (lastOk)
                     {
                         float rest;
                         if (__1 != null && __1.TryGetValue(kv.Key, out rest)) tr.Spent += tr.Pending - rest;
                         tr.Pending = double.NaN;
                     }
-                    if (ware) WareNote(__0, kv.Key, tr, lastOk, __1);
+                    if (ware) WareNote(__0, kv.Key, tr, lastOk, lastB, __1);
                     spent += tr.Spent; add += tr.Add; rows += tr.Rows;
                     grp[GroupOf(kv.Key)] += tr.Spent;
                 }
@@ -318,7 +319,7 @@ namespace Armoury
         internal static bool WareBracketOn { get { return Run; } }
 
         /// <summary>435-N-C: reszta slownika budzetu kategorii po konsumpcji do N wyrobu (SupplySignal.NoteWare). Wlasny try - nie zaburza zamkniecia nawiasu.</summary>
-        private static void WareNote(Town town, ItemCategory c, Track tr, bool lastOk, Dictionary<ItemCategory, float> dict)
+        private static void WareNote(Town town, ItemCategory c, Track tr, bool lastOk, double lastB, Dictionary<ItemCategory, float> dict)
         {
             try
             {
@@ -327,7 +328,7 @@ namespace Armoury
                 double r = dict != null && dict.TryGetValue(c, out rest) ? rest : double.NaN;
                 double of;
                 if (!_brOfEff.TryGetValue(c, out of)) of = 0;
-                SupplySignal.NoteWare(town, c, lastOk, r, tr.First, of, tr.Zero);
+                SupplySignal.NoteWare(town, c, lastOk, r, tr.First, tr.Spent, lastB, of, tr.Zero);   // tr.Spent - po zamknieciu ostatniego wiersza (petla wyzej)
             }
             catch (Exception e) { Stumble("WareNote", e); }
         }

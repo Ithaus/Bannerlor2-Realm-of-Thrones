@@ -82,26 +82,31 @@ namespace Armoury
 
         /// <summary>
         /// TownFolk.ConsumePostfix (zamkniecie nawiasu konsumpcji miasta, po petli wierszy BK): kategoria `c` z wierszem na polce. `lastOk` - ostatni wiersz przetworzony
-        /// (budzet &gt; 0.01); `rest` - wartosc slownika budzetu po konsumpcji; `first` - budzet pierwszego wiersza; `offer` - oferta P3 tej kategorii w zlocie budzetu;
-        /// `zeroRows` - wiersze z budzetem &lt;= 0.01. Sam licznik, nie rzuca.
+        /// (budzet &gt; 0.01); `rest` - wartosc slownika budzetu po konsumpcji; `first` - budzet pierwszego wiersza; `spent` - wydatek wszystkich wierszy (po zamknieciu
+        /// ostatniego); `lastB` - budzet ostatniego przetworzonego wiersza; `offer` - oferta P3 tej kategorii w zlocie budzetu; `zeroRows` - wiersze z budzetem &lt;= 0.01.
+        /// Sam licznik, nie rzuca.
         /// </summary>
-        internal static void NoteWare(Town town, ItemCategory c, bool lastOk, double rest, double first, double offer, int zeroRows)
+        internal static void NoteWare(Town town, ItemCategory c, bool lastOk, double rest, double first, double spent, double lastB, double offer, int zeroRows)
         {
             if (!On || town == null || !town.IsTown || c == null) return;
             try
             {
                 if (OffMain() || !MarketSales.Tracked(c)) return;
+                if (_wPend != null) ResolveWare(Today);                      // 435-N-C-p: wpisy z zapisu PRZED pierwsza komorka sesji (dzienne ticki miast sa rozlozone na dobe)
                 _dwNotes++;
                 double u = 0;
                 if (lastOk && !double.IsNaN(rest))
                 {
                     u = rest;
                     if (u < 0) { _dwNeg++; u = 0; }                          // dokup jedzenia BK (zapas <= 10%) zawyza kupione - reszta ujemna
-                    if (!double.IsNaN(first) && u > first) { _dwCap++; u = Math.Max(0, first); }
+                    // 435-N-C-p (recenzja 2): BK liczy budzet kazdego wiersza od nowa (x idx^0.15 + dobrobyt) - przyrost wierszy 2.. to nie pieniadz ludu;
+                    // pieniadz ludu po polce = budzet 1. wiersza - wydatek wszystkich wierszy (przy 1 wierszu rowne reszcie slownika)
+                    double cap = double.IsNaN(first) ? u : Math.Max(0, double.IsNaN(spent) ? first : first - spent);
+                    if (u > cap + 1e-6) { _dwCap++; u = cap; }
                     if (zeroRows > 0 && u > 0) _dwMixed++;
+                    if (!double.IsNaN(lastB) && rest > lastB + 0.5) _dwCtl++;   // kontrola (recenzja 3): reszta slownika ponad budzet ostatniego wiersza - BK kupuje >= 0 sztuk, ma byc 0
                 }
                 else if (!double.IsNaN(rest) && rest > 0) { _dwGhost++; _dwGhostDict += rest; }   // krytyka 1: wiersz bez budzetu - surowy popyt, nie pieniadz
-                if (!lastOk && u > 0) _dwCtl++;                              // kontrola: ma byc 0
                 double o = Math.Min(u, Math.Max(0, double.IsNaN(offer) ? 0 : offer)), ub = u - o;
                 var st = town.Settlement;
                 Dictionary<ItemCategory, WCell> m;
@@ -288,10 +293,10 @@ namespace Armoury
             if (shown == 0) sb.Append('-');
             sb.Append(" | pominiete (poza U): kategorie bez wiersza polki ").Append(_dwNoRow).Append(" (slownik ").Append(N0(_dwNoRowDict)).Append(" jedn. - popyt przed przeliczeniem na budzet)")
               .Append(", ostatni wiersz bez budzetu (bron, konie, strzaly, deski ZC1) ").Append(_dwGhost).Append(" (slownik ").Append(N0(_dwGhostDict)).Append(" jedn.)")
-              .Append(", reszta ujemna obcieta (dokup jedzenia BK) ").Append(_dwNeg).Append(", reszta ponad budzet 1. wiersza obcieta ").Append(_dwCap)
+              .Append(", reszta ujemna obcieta (dokup jedzenia BK) ").Append(_dwNeg).Append(", reszta ponad (budzet 1. wiersza - wydatek wierszy) obcieta ").Append(_dwCap)
               .Append(", U z kategorii z czescia wierszy bez budzetu ").Append(_dwMixed)
               .Append(", komorek bez przedmiotu wzorcowego (poza N) ").Append(noRep).Append(cats ? "" : " | KATEGORIE WYROBOW NIEGOTOWE - N wyrobu pominiete tej doby")
-              .Append(" | kontrola: U > 0 przy ostatnim wierszu bez budzetu = ").Append(_dwCtl).Append(" (ma byc 0)");
+              .Append(" | kontrola: reszta slownika ponad budzet ostatniego wiersza = ").Append(_dwCtl).Append(" (ma byc 0)");
             _wareLine = sb.ToString();
         }
 
@@ -349,7 +354,8 @@ namespace Armoury
                 { _wLoadNote = "arm_lpu w nieznanej wersji - pominiety (pomiar od pierwszej doby)"; return; }
                 span = Math.Max(1, Math.Min(WareSpanMax, span));
                 if (day > today) day = today;
-                int cells = 0;
+                int cells = 0, merged = 0;
+                var seen = new HashSet<KeyValuePair<Settlement, ItemCategory>>();   // 435-N-C-p: powtorzony wpis w samym zapisie - zly wpis
                 var om = MBObjectManager.Instance;
                 if (p[3].Length > 0 && om != null && today - day < WareSpanMax)
                     foreach (var e in p[3].Split(';'))
@@ -362,17 +368,21 @@ namespace Armoury
                         if (st == null || st.Town == null || cat == null) { _wLoadBad++; continue; }
                         Dictionary<ItemCategory, WCell> m;
                         if (!_ware.TryGetValue(st, out m)) { m = new Dictionary<ItemCategory, WCell>(); _ware[st] = m; }
-                        if (m.ContainsKey(cat)) { _wLoadBad++; continue; }
-                        var cell = new WCell();
+                        if (!seen.Add(new KeyValuePair<Settlement, ItemCategory>(st, cat))) { _wLoadBad++; continue; }
+                        // 435-N-C-p (recenzja 1): komorka mogla juz powstac w tej sesji (NoteWare przed rozwinieciem) - scalenie: doby z zapisu tylko w przegrodki
+                        // starsze od nich (doby sesji >= doby zapisu zostaja)
+                        WCell cell;
+                        if (m.TryGetValue(cat, out cell)) merged++; else { cell = new WCell(); m[cat] = cell; }
                         for (int i = 1; i <= span; i++)
                         {
                             int d = day - i, k = ((d % Window) + Window) % Window;
+                            if (cell.Day[k] >= d) continue;
                             cell.Day[k] = d; cell.U[k] = (float)u; cell.O[k] = (float)o;
                         }
-                        m[cat] = cell; cells++;
+                        cells++;
                     }
                 if (cells > 0) _wFirst = _wFirst == int.MinValue ? day - span : Math.Min(_wFirst, day - span);
-                _wLoadNote = "arm_lpu wczytany: zapis z doby " + day + " (dob " + span + "), komorek " + cells + (_wLoadBad > 0 ? ", zlych wpisow " + _wLoadBad : "");
+                _wLoadNote = "arm_lpu wczytany: zapis z doby " + day + " (dob " + span + "), komorek " + cells + (merged > 0 ? " (scalonych z pomiarem sesji " + merged + ")" : "") + (_wLoadBad > 0 ? ", zlych wpisow " + _wLoadBad : "");
             }
             catch (Exception e) { Stumble("ResolveWare", e); _wLoadNote = "arm_lpu - blad wczytania (pomiar od pierwszej doby)"; }
         }

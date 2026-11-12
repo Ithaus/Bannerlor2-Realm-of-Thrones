@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 435-N-C-p (12.11) - poprawki po recenzji 435-N-C: scalenie arm_lpu z pomiarem sesji, U bez przyrostu budzetu kolejnych wierszy polki, prawdziwa kontrola reszty, "bylby" L9 na miasto
+
+**Problem:** recenzja 435-N-C (commit 2896529a), bez testu w grze: (1) po wczytaniu zapisu w polowie doby czesc miast przechodzi konsumpcje (dzienne ticki miast rozlozone na dobe - CampaignPeriodicEventManager._dailyTickTownTicker) ZANIM ResolveWare rozwinie arm_lpu; NoteWare zaklada komorke z sama doba D, a ResolveWare odrzucal wpis z zapisu (ContainsKey -> "zly wpis") - do 27 dob U tracone, N_w zanizone, falszywe "zlych wpisow", a gdy zderzyly sie wszystkie komorki - _wFirst = D, span 0 i N wyrobu wyciszone na 7 dob po kazdym wczytaniu; (2) U obciete do budzetu 1. wiersza przepuszczalo przyrost budzetu kolejnych wierszy tej samej kategorii (BK CalculateBudget od nowa na kazdy wiersz: demand x idx^0.15 + dobrobyt) - pozorny niedobor przy 2-3 wyczyszczonych wierszach; (3) "kontrola: U > 0 przy ostatnim wierszu bez budzetu" byla zawsze 0 z konstrukcji (u nie dostaje wartosci w tej galezi); (4) "bylby" L9 liczyl kandydatow, nie miasta.
+
+**Przyczyna:** (1) SupplySignal.Ware.cs ResolveWare `if (m.ContainsKey(cat)) { _wLoadBad++; continue; }`; (2) NoteWare `u > first` zamiast `u > first - wydatek wszystkich wierszy`; (3) NoteWare `if (!lastOk && u > 0)`; (4) WorkshopIdleRetool.TryOne `_dWould++` na kazdego kandydata.
+
+**Zmiana:**
+- NoteWare: gdy arm_lpu czeka (_wPend), najpierw ResolveWare(Today) - wpisy z zapisu powstaja przed pierwsza komorka sesji. ResolveWare scala: istniejaca komorka dostaje doby z zapisu tylko w przegrodki starsze od nich (doby sesji >= doby zapisu zostaja); powtorzony wpis w samym zapisie nadal "zly wpis"; linia wczytania mowi "scalonych z pomiarem sesji N".
+- U = min(reszta slownika, max(0, budzet 1. wiersza - wydatek wszystkich wierszy)) - TownFolk.WareNote podaje tr.Spent po zamknieciu ostatniego wiersza; przy 1 wierszu wynik co do bitu jak przed. Licznik "reszta ponad (budzet 1. wiersza - wydatek wierszy) obcieta".
+- Kontrola w linii LP N wyrobu: "reszta slownika ponad budzet ostatniego wiersza" (BK kupuje >= 0 sztuk, ma byc 0) - TownFolk podaje budzet ostatniego przetworzonego wiersza (lastB).
+- L9: "bylby" raz na miasto na dobe (TownPick.Would), tekst "miast z typem z N wyrobu przy kluczu NIE (bylby)".
+
+**Ryzyko / co sprawdzic:** kontrola calosci: ResolveWare wolany z 3 miejsc (SupplySignal.cs EarlyTable i Daily, NoteWare) - _wPend zerowany na wejsciu, wiec rozwiniecie raz; NoteWare tylko na watku glownym (OffMain), Settlement.Find / MBObjectManager w srodku doby dostepne. Pierscien: doby zapisu day-1..day-27 nie dziela przegrodki z doba D; doba D+1 (gdyby rozwiniecie sie spoznilo) jest nowsza i zostaje. Zmiana (2) tylko obniza U (L8 / L9 rzadziej ponad bramka - zgodnie z zamiarem); czytelnicy tablicy N wyrobu bez zmian (tylko L8 / L9); TownN / WorldN, L5-L7, VillageCrafts, 444 nietkniete. Nic z niczego: sam odczyt. W logu: po wczytaniu zapisu "arm_lpu wczytany ... komorek X (scalonych ...)" bez "zlych wpisow"; "kontrola: reszta slownika ponad budzet ostatniego wiersza = 0"; "reszta ponad (...) obcieta" > 0 tylko w kategoriach z kilkoma wierszami. Ten sam wzorzec ContainsKey jest w Resolve dla arm_lpn (SupplySignal.cs) - NIE ruszany (osobna zmiana, jesli Jeff zechce). Build 0 bledow.
+
+**Status:** DO SPRAWDZENIA
+
 ## 435-N-C (12.11) - SYGNAL NIEDOBORU krok C: N wyrobu - brak wyrobu na targu przy pieniadzu ludu, osobna tablica czytana tylko przez stanowiska L8 i przezbrojenie L9 (klucz Workshops Follow Goods Shortage, domyslnie TAK)
 
 **Problem:** test 90 dob (Armoury-2026-11-12_11-29-43.log): L9 - stojacych 76 -> 67, kandydatow 25 -> 20, przezbrojen 0, wszystkie odmowy "bez typu z N >= 1.3"; L8 slepy na strone wyrobu tak samo. Tablica N (SupplySignal: TownN / WorldN) ma tylko WSADY warsztatow i materialy robot - czyste wyroby (plotno, wino, olej, narzedzia jako produkt ...) maja zawsze N = 1, wiec warsztat nie moze przejsc na to, czego brakuje na targu. Plan dla Jeffa 12.11, krok 3: "Dodac sygnal braku wyrobow, zeby warsztaty mogly przechodzic na to, czego brakuje na targu".
