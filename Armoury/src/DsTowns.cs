@@ -56,6 +56,7 @@ namespace Armoury
             public double SW, LW;                                  // okno pomiaru: sprzedaz kasy (podstawa M7) i danina miasta 1%/d (recenzja 17.10: pomoc ponad nia zdjeta z firmy korony)
             public double FL, FC;                                  // firmy roczne z kasy (rata = F / 52): pan, korona
             public double FLf;                                     // firma pana z oszczednosci ludu (DsFarmFolkFromSavings - "scot and lot"; wylaczony - z kasy)
+            public double LfTop;                                   // 428-p (A8b): FLf sprzed pierwszej obnizki hamulcem ludu - sufit powrotu (0 = bez obnizki; zapis: pole ze znacznikiem T)
             public double AidCut;                                  // przy ustaleniu: firma korony zmniejszona o pomoc od sprzedazy (g = 1) ponad dawna danine miasta (zl/rok)
             public int Fixed = -1;                                 // doba ustalenia albo ostatniej odnowy
             public double Share = double.NaN;                      // firma na dobe / doplyw netto na dobe przy ustaleniu
@@ -412,7 +413,7 @@ namespace Armoury
                     if (st == null || !(st.IsTown || st.IsCastle) || st.Town == null) continue;
                     var f = FarmOf(st, true);
                     if (f == null) continue;
-                    f.FL = YearDays * Math.Max(0, f.ML) / days; f.FC = YearDays * Math.Max(0, f.MC) / days; f.FLf = YearDays * Math.Max(0, f.MLf) / days;
+                    f.FL = YearDays * Math.Max(0, f.ML) / days; f.FC = YearDays * Math.Max(0, f.MC) / days; f.FLf = YearDays * Math.Max(0, f.MLf) / days; f.LfTop = 0;
                     // recenzja 17.10: kasa placi firme (ok. 96% doplywu netto) i pomoc od sprzedazy - przy g = 1 razem tyle, ile w oknie zawor i danina miasta 1%/d:
                     // pomoc (g = 1) ponad dawna danine tej osady zdjeta z firmy korony (najwyzej do 0); w ciezkiej wojnie (g > 1) kasa placi wiecej - nadanie
                     double aidPlus = Math.Max(0, rate1 * Math.Max(0, f.SW) / days - Math.Max(0, f.LW) / days) * YearDays;
@@ -502,7 +503,7 @@ namespace Armoury
                     if (r < 1 - 1e-9 && SurplusHolds(f, s)) { r = 1.0; KsFolkIncome.NoteNoCut(); }   // f5-lud: bez obnizki przy nadwyzce kasy (Ks Farm Follows Surplus)
                     if (f.SRaised) { f.SRaised = false; if (r < 1 - 1e-9) KsFolkIncome.NoteCutAfterRaise(); }   // recenzja f5 (uwaga 2): miara pily (tylko licznik)
                     if (r > 1 + 1e-9 || r < 1 - 1e-9) { f.SG0 = long.MinValue; f.SGDay = -1; }   // recenzja f5 (uwaga 2): pomiar przyrostu kasy (SurplusReview) od nowa - bez tych samych dob drugi raz
-                    f.FL *= r; f.FC *= r; f.FLf *= r;
+                    f.FL *= r; f.FC *= r; f.FLf *= r; if (f.LfTop > 0) f.LfTop *= r;   // 428-p: sufit czesci ludu w tym samym stosunku
                     if (r > 1 + 1e-9) _renewUp++; else if (r < 1 - 1e-9) _renewDown++;
                 }
                 catch (Exception e) { Stumble("Renew", e); }
@@ -564,7 +565,7 @@ namespace Armoury
                     }
                     if (f.SRaised) { f.SRaised = false; if (r < 1 - 1e-9) KsFolkIncome.NoteCutAfterRaise(); }   // recenzja f5 (uwaga 2): miara pily (tylko licznik; wymuszony tez)
                     if (r > 1 + 1e-9 || r < 1 - 1e-9) { f.SG0 = long.MinValue; f.SGDay = -1; }   // recenzja f5 (uwaga 2): przeglad zwykly zmienil firme - pomiar przyrostu kasy (SurplusReview) od nowa, bez tych samych dob drugi raz
-                    f.FL *= r; f.FC *= r; f.FLf *= r;
+                    f.FL *= r; f.FC *= r; f.FLf *= r; if (f.LfTop > 0) f.LfTop *= r;   // 428-p: sufit czesci ludu w tym samym stosunku
                     double d = all0 * (r - 1);
                     if (r > 1 + 1e-9) { _renewUp++; _revUpAmt += d; }
                     else if (r < 1 - 1e-9) { _renewDown++; _revDownAmt -= d; if (forced) { _revArrN++; if (early) _revEarly++; } }
@@ -741,9 +742,10 @@ namespace Armoury
                     var t = st.Town;
                     if (!StartCalibration.KsTownApplied(t))
                     {
-                        // 428 A8 (Ds Farm Brakes All Towns): miasto bez KS - same hamulce (szybka obnizka i obnizka z dochodu), bez podwyzek i gersumy; klucz NIE - jak dotad
-                        f.SG0 = long.MinValue; f.SGDay = -1;
-                        if (!capNet || !s.DsFarmBrakesAllTowns || inRamp) f.SLow = -1; else A428Brakes(f, st, t, today, days, mx, s, fastOn);
+                        // 428 A8 (Ds Farm Brakes All Towns): miasto bez KS - hamulce (obnizka z dochodu; szybka obnizka tylko z Ds Farm Brakes Fast Cut) i - 428-p - podwyzka
+                        // do doplywu przy kasie ponad 1.5 x zapas (ten sam krok co (a); pomiar przyrostu kasy SG0 / SGDay prowadzi A428Brakes), bez gersumy; klucz NIE - jak dotad
+                        if (!capNet || !s.DsFarmBrakesAllTowns || inRamp) { f.SG0 = long.MinValue; f.SGDay = -1; f.SLow = -1; }
+                        else A428Brakes(f, st, t, today, days, mx, s, fastOn);
                         continue;
                     }
                     if (inRamp) { f.SG0 = long.MinValue; f.SGDay = -1; f.SLow = -1; continue; }
@@ -1662,7 +1664,7 @@ namespace Armoury
                 long gF = FolkToLord(st, lord, (long)Math.Floor(wantLf));
                 f.ALf = Math.Max(0, wantLf - gF);
                 _paidLf += gF;
-                if (town && folkPays && s.DsFarmFolkPartCut && rn >= 1.0) forgOld += A428FolkCut(f, iLf, wantLf, gF, s);   // 428 A8: hamulec czesci z oszczednosci ludu (zmniejszona zaleglosc to nie "splacona")
+                if (town && folkPays && s.DsFarmFolkPartCut && rn >= 1.0) forgOld += A428FolkCut(f, iLf, wantLf, gF, s, _lfMeasured, _lfRoom);   // 428 A8: hamulec czesci z oszczednosci ludu (zmniejszona zaleglosc to nie "splacona")
             }
             else f.ALf = wantLf;
             // 3. dziesiata od ruchomosci kasy (M9): wymiar w pierwszy dzien raty po nadaniu wojennym, potem 1/13 co 7 dob; w przejsciu rata x rampa (reszta darowana)
@@ -1715,12 +1717,14 @@ namespace Armoury
         /// Wyjatek przy przelewie oddaje zloto ludowi. Zwraca zaplacone.</summary>
         private static long FolkToLord(Settlement st, Hero lord, long want)
         {
+            _lfMeasured = false; _lfRoom = 0;                         // 428-p (A8b): czy ten zwrot to pomiar kies ludu (nie zero techniczne) i ile nadwyzki ludowi zostalo
             if (want <= 0 || lord == null) return 0;
             long took = TownFolk.DsFolkRate(st, want);
+            _lfMeasured = TownFolk.DsFolkRateMeasured; _lfRoom = TownFolk.DsFolkRateRoomLeft;
             if (took <= 0) return 0;
             int h0 = lord.Gold;
             try { lord.ChangeHeroGold((int)Math.Min(int.MaxValue, took)); }
-            catch (Exception e) { TownFolk.DsFolkRateUndo(st, took); Stumble("FolkToLord", e); return 0; }
+            catch (Exception e) { _lfMeasured = false; TownFolk.DsFolkRateUndo(st, took); Stumble("FolkToLord", e); return 0; }
             long inL = (long)lord.Gold - h0;
             var clan = st.OwnerClan;
             if (clan != null) { int r0; PopulationLaw.RentToday.TryGetValue(clan, out r0); PopulationLaw.RentToday[clan] = (int)Math.Min(int.MaxValue, (long)r0 + took); }
@@ -1990,6 +1994,11 @@ namespace Armoury
                       .Append(" (-").Append(N0(_cfAmt)).Append(" zl/rok), w sesji ").Append(_cfNS).Append(" (-").Append(N0(_cfAmtS)).Append(" zl/rok); zaleglosci z kas zamkow zmniejszone z firma dzis ")
                       .Append(N0(_ccArrFree)).Append(" zl, w sesji ").Append(N0(_ccArrFreeS)).Append(" zl; zaleglosci zamkow: z kas ").Append(N0(zC)).Append(" zl, z oszczednosci podzamcza ").Append(N0(zLf)).Append(" zl");
                 }
+                // 428-p (recenzja 5 / N4): "nalezne" tej linii zawiera raty darowane przez pierwszenstwo wsi, a "zaleglosci razem" maleja o czesc zmniejszona z firma -
+                // obie pozycje tu, zeby linia sie bilansowala bez linii 428 (klucze 428 NIE - linia jak dotad)
+                if (_fixDay >= 0 && (s.TownPaysVillagesFirst || s.DsFarmFolkPartCut))
+                    sb.Append(" | 428 w bilansie rat: darowane - wies przed panem ").Append(N0(_vfRemit)).Append(" zl (w 'nalezne', poza 'zaplacone' i 'nowe zaleglosci'), zaleglosc z oszczednosci ludu zmniejszona z firma ")
+                      .Append(N0(_a8fArr)).Append(" zl (poza 'splacone')");
                 sb.Append(" | kontrola: platnicy - odbiorcy = ").Append(_payOut - _payIn);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');
@@ -2107,12 +2116,15 @@ namespace Armoury
                             sb.Append('~').Append(f.NF.ToString(Inv)).Append('~').Append(R(NetAvg(f, 1)));
                             if (twn) sb.Append('~').Append(f.FastDay.ToString(Inv));
                         }
-                        else if (f.NF == 0 && f.NImpN > 0)
+                        else if (f.NF == 0 && f.NImpN > 0 && (f.St == null || (k3Save && f.St.IsCastle) || (a3Save && twn)))   // 428-p (N5): klucz jednego typu nie zapisuje pamieci drugiego
                         {
                             sb.Append('~').Append(f.NImpN.ToString(Inv)).Append('~').Append(R(f.NImpAvg));
                             if (f.NImpFast != int.MinValue) sb.Append('~').Append(f.NImpFast.ToString(Inv));
                         }
                     }
+                    // 428-p (A8b): sufit czesci z oszczednosci ludu - pole ZE ZNACZNIKIEM "T" na koncu wpisu (tylko po obnizce hamulcem ludu; bez obnizki wpis jak dotad).
+                    // Starsza DLL: pole na pozycji 24-26 nie jest liczba - czyta je jak brak pamieci doplywu (0 / NaN / -1), dalsze pomija
+                    if (f.LfTop > f.FLf + 1e-6) sb.Append("~T").Append(R(f.LfTop));
                 }
                 DsSeason.Export(sb);
                 return sb.ToString();
@@ -2156,11 +2168,21 @@ namespace Armoury
                                 f.FLf = D0(a[17]); f.ALf = D0(a[18]); f.MLf = D0(a[19]); f.SW = D0(a[20]); f.LW = D0(a[21]); f.AidCut = D0(a[22]); f.MovCur = D0(a[23]);
                             }
                             else f.MovCur = f.MovLeft;   // zapis sprzed recenzji: cala niezebrana dziesiata jak wymiar biezacy
-                            if (a.Length >= 26)          // m107 K3 (poprawka R2): pamiec doplywu zamku - do pierwszej probki sesji (CastleSample, tylko przy kluczu TAK)
+                            // 428-p (A8b): pola ze znacznikiem litery stoja na koncu wpisu (T = sufit czesci z oszczednosci ludu) - nie licza sie do pol pozycyjnych
+                            int np = a.Length;
+                            for (int j = a.Length - 1; j >= 24; j--)
+                            {
+                                string x = a[j];
+                                if (x.Length < 2 || x[0] != 'T') break;
+                                double top = D(x.Substring(1));
+                                if (!double.IsNaN(top) && top > f.FLf) f.LfTop = top;
+                                np = j;
+                            }
+                            if (np >= 26)                // m107 K3 (poprawka R2): pamiec doplywu zamku - do pierwszej probki sesji (CastleSample, tylko przy kluczu TAK)
                             {
                                 int n = I(a[24], 0); double avg = D(a[25]);
                                 if (n > 0 && !double.IsNaN(avg)) { f.NImpN = Math.Min(NetDays, n); f.NImpAvg = avg; }
-                                if (a.Length >= 27) f.NImpFast = I(a[26], -1);   // 428 A3: doba ostatniej szybkiej obnizki miasta
+                                if (np >= 27) f.NImpFast = I(a[26], -1);   // 428 A3: doba ostatniej szybkiej obnizki miasta
                             }
                             if (f.AidArr <= 0) f.AidK = null;
                             if (f.MovLeft <= 0) { f.MovLeft = 0; f.MovPer = 0; }

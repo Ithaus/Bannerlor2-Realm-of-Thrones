@@ -92,6 +92,22 @@ namespace Armoury
         // + niewykorzystane (kasa zeszla ponizej podlogi miedzy rata a splata, rachunek przepadl wojna). Sesja - bez zapisu (wstrzymanie zyje jedna dobe).
         private static readonly Dictionary<Settlement, long> _vilHold = new Dictionary<Settlement, long>();
         private static int _vilHoldDay = int.MinValue;
+        // 428-p (recenzja 3 / N3): ile z wstrzymania miasta PayDaily tej doby wyplacila wsiom - DsTowns cofa darowanie raty pana, ktorego wies nie dostala
+        private static readonly Dictionary<Settlement, long> _vilHoldUsed = new Dictionary<Settlement, long>();
+
+        /// <summary>428-p: wstrzymane dla wsi w kasie miasta tej doby, jeszcze nie wyplacone (miedzy rata firmy a splata rachunkow) - rada miasta go nie rusza (TdKeep). Nie rzuca.</summary>
+        internal static long HeldToday(Settlement town)
+        {
+            try { long h; return town != null && _vilHoldDay == Today() && _vilHold.TryGetValue(town, out h) && h > 0 ? h : 0; }
+            catch { return 0; }
+        }
+
+        /// <summary>428-p: ile z wstrzymania doby `day` splata rachunkow wyplacila wsiom miasta (0 - splaty nie bylo albo inna doba). Nie rzuca.</summary>
+        internal static long HoldUsedOf(Settlement town, int day)
+        {
+            try { long u; return town != null && _vilHoldDay == day && _vilHoldUsed.TryGetValue(town, out u) && u > 0 ? u : 0; }
+            catch { return 0; }
+        }
         internal static long HoldSet, HoldPaid, HoldUnused; internal static int HoldTowns;
 
         /// <summary>428 A8: rachunki wsi otwarte wobec miasta `town` (zl; bez komisu - ten splaca sprzedaz). Nie rzuca.</summary>
@@ -102,7 +118,13 @@ namespace Armoury
             {
                 Resolve();
                 if (town == null || _acc.Count == 0) return 0;
-                foreach (var a in _acc.Values) { if (!a.Vil || a.Dst != town) continue; foreach (var b in a.B) if (b.Left > 0) s += b.Left; }
+                foreach (var a in _acc.Values)
+                {
+                    if (!a.Vil || a.Dst != town) continue;
+                    // 428-p (recenzja N1): rachunek, ktory PayDaily umorzy (wierzyciel nie istnieje, wojna wies - miasto), nie jest "winne wsiom" - bez wstrzymania dla niego
+                    if (!SrcOk(a) || AtWar(a.Src, a.Dst)) continue;
+                    foreach (var b in a.B) if (b.Left > 0) s += b.Left;
+                }
             }
             catch (Exception e) { Stumble("VillageOpenOf", e); return 0; }
             return s;
@@ -118,7 +140,7 @@ namespace Armoury
                 long h = Math.Min(avail, VillageOpenOf(town));
                 if (h <= 0) return 0;
                 int today = Today();
-                if (_vilHoldDay != today) { foreach (var v in _vilHold.Values) HoldUnused += v; _vilHold.Clear(); _vilHoldDay = today; }
+                if (_vilHoldDay != today) { foreach (var v in _vilHold.Values) HoldUnused += v; _vilHold.Clear(); _vilHoldUsed.Clear(); _vilHoldDay = today; }
                 long had; _vilHold.TryGetValue(town, out had); _vilHold[town] = had + h;
                 HoldSet += h; if (had <= 0) HoldTowns++;
                 return h;
@@ -143,7 +165,7 @@ namespace Armoury
             _payDay = int.MinValue; _relDay = int.MinValue; _paidToday.Clear(); _paidPrev.Clear(); _released.Clear();
             _lordPaidToday.Clear(); _lordPaidPrev.Clear();
             _vilRepaidLast = 0; _vilRepaidDay = int.MinValue;
-            _vilHold.Clear(); _vilHoldDay = int.MinValue; HoldSet = HoldPaid = HoldUnused = 0; HoldTowns = 0;   // 428
+            _vilHold.Clear(); _vilHoldUsed.Clear(); _vilHoldDay = int.MinValue; HoldSet = HoldPaid = HoldUnused = 0; HoldTowns = 0;   // 428
             ClearDay();
         }
 
@@ -356,6 +378,7 @@ namespace Armoury
                                 b.Left -= got; left -= got; free -= got; used += got; DRepaid += got; paidS += got; DVilRepaid += got;
                             }
                             HoldPaid += used; HoldUnused += Math.Max(0L, hold - used);
+                            if (used > 0) _vilHoldUsed[dst] = used;   // 428-p: per miasto (DsTowns.A428Line - darowanie bez pokrycia wraca do zaleglosci)
                         }
                         foreach (var p in l)
                         {

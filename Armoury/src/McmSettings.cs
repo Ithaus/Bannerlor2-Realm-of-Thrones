@@ -9920,11 +9920,15 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsTownInflowSaved { get; set; } = true;
 
-        [SettingPropertyBool("Ds Farm Brakes All Towns", HintText = "with Ks Farm Follows Surplus and Ks Farm Surplus Cap Net: towns outside the start calibration (about half of the world) get the same brakes as the calibrated ones - a town whose merchants' purse, after what it owes, is below their working stock or that is behind on its dues has its lord's and crown's yearly due lowered to what the town earns, and the quarterly review never aims above the town's whole earnings; such towns get no rises beyond the quarterly review (off = these towns are only reviewed once a quarter, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Ds Farm Brakes All Towns", HintText = "with Ks Farm Follows Surplus and Ks Farm Surplus Cap Net: towns outside the start calibration (about half of the world) get the same brakes as the calibrated ones - a town whose merchants' purse, after what it owes, stays low or that is behind on its dues has its lord's and crown's yearly due lowered step by step towards what the town earns, and the quarterly review never aims above the town's whole earnings; when the purse stands well above the merchants' working stock again, the due rises back by the same step, never above what the town earns (off = these towns are only reviewed once a quarter, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsFarmBrakesAllTowns { get; set; } = true;
 
-        [SettingPropertyBool("Ds Farm Folk Part Cut", HintText = "with Ds Farm Folk From Savings: when the townsfolk cannot pay the whole weekly instalment of the part of the town's farm raised from their savings, that part drops towards what they did pay (by no more than Ks Farm Surplus Review Max an instalment) and its arrears shrink in the same measure, instead of piling up for a year; it rises again with the quarterly review (off = that part is never lowered when the people cannot pay, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Ds Farm Brakes Fast Cut", HintText = "with Ds Farm Brakes All Towns and Ds Farm Cut Below Reserve: a town outside the start calibration whose merchants' purse is below their working stock, or that is behind on its dues, has its yearly due lowered at once to what it earned over the last four weeks, instead of step by step. Off by default: with the towns' earnings now kept in the save, about half of the world's towns could drop in the same week (off = such towns are lowered only step by step)", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool DsFarmBrakesFastCut { get; set; } = false;
+
+        [SettingPropertyBool("Ds Farm Folk Part Cut", HintText = "with Ds Farm Folk From Savings: when the townsfolk have fallen four weekly instalments or more behind on the part of the town's farm raised from their savings, that part drops towards what they did pay (by no more than Ks Farm Surplus Review Max an instalment) and its arrears shrink in the same measure, instead of piling up for a year; one bad week changes nothing. Once they pay in full again and still have savings to spare, it rises back by the same step, up to where it stood before (off = that part is never lowered when the people cannot pay, as before)", RequireRestart = false)]
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public bool DsFarmFolkPartCut { get; set; } = true;
 
@@ -15200,6 +15204,7 @@ namespace Armoury
             s.DsCastleFastCut = DsCastleFastCut;
             s.DsTownInflowSaved = DsTownInflowSaved;
             s.DsFarmBrakesAllTowns = DsFarmBrakesAllTowns;
+            s.DsFarmBrakesFastCut = DsFarmBrakesFastCut;
             s.DsFarmFolkPartCut = DsFarmFolkPartCut;
             s.TownPaysVillagesFirst = TownPaysVillagesFirst;
             s.ArmsConsign = ArmsConsign;

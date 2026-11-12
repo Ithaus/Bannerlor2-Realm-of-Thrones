@@ -27,7 +27,12 @@ namespace Armoury
                 al = Math.Max(0, f.AL); ac = Math.Max(0, f.AC);
                 weekly = Math.Max(0, (f.FL + f.FC) / Weeks * NewShare);
                 var s = Settings.Current;
-                if (s != null && st.Town != null) cover = Math.Max(0, st.Town.Gold - FloorOf(s, TownPurse.Reserve(st.Town)));
+                if (s != null && st.Town != null)
+                {
+                    cover = Math.Max(0, st.Town.Gold - FloorOf(s, TownPurse.Reserve(st.Town)));
+                    // 428-p (recenzja): przy Town Pays Villages First z tej kasy w dzien raty najpierw zostaje to, co miasto winne wsiom - tego kasa panu nie zaplaci
+                    if (s.TownPaysVillagesFirst && cover > 0) cover = Math.Max(0, cover - KsFoodCredit.VillageOpenOf(st));
+                }
                 return true;
             }
             catch (Exception e) { Stumble("TdArrears", e); return false; }
@@ -53,6 +58,8 @@ namespace Armoury
                 owe += Math.Max(0, f.AidArr);
                 if (f.MovLeft >= 1) owe += Math.Min(Math.Max(0, f.MovPer), f.MovLeft) * rn;
                 owe += Math.Max(0, f.CLeft);
+                // 428-p (recenzja N2): zloto wstrzymane dzis dla wsi (miedzy rata firmy a splata rachunkow tej doby) nie jest nadwyzka - rada nie splaca nim dlugu
+                if (s.TownPaysVillagesFirst) owe += KsFoodCredit.HeldToday(st);
                 double k = floor + owe;
                 return double.IsNaN(k) || double.IsInfinity(k) ? floor : k;
             }

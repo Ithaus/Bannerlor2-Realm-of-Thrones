@@ -76,6 +76,9 @@ namespace Armoury
         }
 
         private static readonly long[] _dsFr = new long[3];   // ostatnie zdjecie DsFolkRate wedlug klasy (zwrot po wyjatku przelewu)
+        /// <summary>428-p (recenzja, A8b): ostatnie wywolanie DsFolkRate policzylo kiesy ludu (false - brak wpisu ludu, kiesa bez kalibracji, poza watkiem glownym, wyjatek:
+        /// zwrot 0 nie znaczy wtedy "lud nie ma"); DsFolkRateRoomLeft - nadwyzka ponad zapas dni, ktora zostala ludowi po zdjeciu (zl). Watek glowny, tylko odczyt.</summary>
+        internal static bool DsFolkRateMeasured; internal static double DsFolkRateRoomLeft;
 
         /// <summary>
         /// DS F3 (recenzja 17.10, "scot and lot"): czesc firmy pana z oszczednosci ludu (dawny podatek od skarbca ludu - czesc pana - i W7 z ludu) placi lud osady: kiesy
@@ -86,6 +89,7 @@ namespace Armoury
         internal static long DsFolkRate(Settlement st, long want)
         {
             _dsFr[0] = _dsFr[1] = _dsFr[2] = 0;
+            DsFolkRateMeasured = false; DsFolkRateRoomLeft = 0;       // 428-p: pomiar ostatniego wywolania (same pola odczytu dla DsTowns - A8b)
             try
             {
                 if (want <= 0 || st == null || !Live || OffMain()) return 0;
@@ -104,6 +108,7 @@ namespace Armoury
                     room[c] = now >= 1 ? Math.Floor(now) : 0;
                     e += room[c];
                 }
+                DsFolkRateMeasured = true;                                  // 428-p: kiesy policzone - zwrot 0 ponizej to prawdziwy brak nadwyzki ludu
                 if (e < 1) return 0;
                 long goal = (long)Math.Min((double)want, e);
                 long took = 0;
@@ -120,9 +125,10 @@ namespace Armoury
                     AddPurse(f, c, -x); _dsFr[c] += x; took += x;
                 }
                 if (took > 0) { _ctlOut += took; f.LDayOut += took; }
+                DsFolkRateRoomLeft = Math.Max(0.0, e - took);
                 return took;
             }
-            catch (Exception ex) { Stumble("DsFolkRate", ex); return 0; }
+            catch (Exception ex) { DsFolkRateMeasured = false; Stumble("DsFolkRate", ex); return 0; }
         }
 
         /// <summary>Zwrot zdjetego przez DsFolkRate (wyjatek przy przelewie do pana - zloto wraca do tych samych klas; nic w nicosc).</summary>
