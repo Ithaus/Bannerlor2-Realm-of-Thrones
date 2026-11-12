@@ -64,6 +64,7 @@ namespace Armoury
                                  || c.CavalryTargetChoice   // 442: cel szarzy jazdy (Doctrine.Target442.cs) - T442Begin / T442Tick z Doctrine (S3 CavalrySeeksFlanks wyciete)
                                  || c.CavalryRaidsArchers || c.CavalryHidesFromMissiles || c.ArchersJudgeMissileDuel || c.ArchersShelterFromCavalry   // 443: Doctrine.Raid443.cs
                                  || c.HammerAndAnvil   // 444: kowadlo i mlot (Doctrine.Hammer444.cs) - K444Begin / K444Tick z Doctrine
+                                 || c.CavalryFightsCavalryFirst || c.CavalryDisengage   // 445: Doctrine.CavFirst445.cs - V445Begin / V445Tick z Doctrine
                                  || c.AiSavesBreath || c.WindedShowsIt || c.WindedBreathSound);   // 144: AiBreath / WindedShow - bitwa z BattleSense.InBattle i latka AdjustSpeedLimit (NightHooks.FirstBattle)
         }
 

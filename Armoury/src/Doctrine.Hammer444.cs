@@ -75,7 +75,7 @@ namespace Armoury
         private static int _k4WaitN, _k4WaitDry, _k4WaitAnvil, _k4WaitCap, _k4WaitThreat, _k4WaitNoInf, _k4WaitNoFoe, _k4WaitTo443, _k4WaitBack, _k4WaitNoSpot;
         private static int _k4StrikeN, _k4StrikeDry, _k4StrikeFromWait, _k4StrikeFree, _k4Direct, _k4FlankN, _k4FlankToCharge, _k4FlankLate, _k4NoRoute, _k4Restale;
         private static int _k4Contact, _k4NoContact, _k4AfterC, _k4Broken, _k4CutLoss, _k4CutTime, _k4StrikeBack, _k4Open, _k4Keep443, _k4Stum, _k4Refused;
-        private static int _k4MaxWait, _k4MaxStrike, _k4StrikeDone;
+        private static int _k4MaxWait, _k4MaxStrike, _k4StrikeDone, _k4WaitTo445;
         private static readonly int[] _k4Angle = new int[KaK];
         private static readonly int[] _k4WaitProfN = new int[3];
         private static readonly float[] _k4WaitProfSec = new float[3];
@@ -88,7 +88,7 @@ namespace Armoury
             _k4WaitN = _k4WaitDry = _k4WaitAnvil = _k4WaitCap = _k4WaitThreat = _k4WaitNoInf = _k4WaitNoFoe = _k4WaitTo443 = _k4WaitBack = _k4WaitNoSpot = 0;
             _k4StrikeN = _k4StrikeDry = _k4StrikeFromWait = _k4StrikeFree = _k4Direct = _k4FlankN = _k4FlankToCharge = _k4FlankLate = _k4NoRoute = _k4Restale = 0;
             _k4Contact = _k4NoContact = _k4AfterC = _k4Broken = _k4CutLoss = _k4CutTime = _k4StrikeBack = _k4Open = _k4Keep443 = _k4Stum = _k4Refused = 0;
-            _k4MaxWait = _k4MaxStrike = _k4StrikeDone = 0;
+            _k4MaxWait = _k4MaxStrike = _k4StrikeDone = _k4WaitTo445 = 0;
             for (int k = 0; k < KaK; k++) _k4Angle[k] = 0;
             for (int k = 0; k < 3; k++) { _k4WaitProfN[k] = 0; _k4WaitProfSec[k] = 0f; }
             _k4WaitSec = _k4StrikeSec = 0f;
@@ -220,7 +220,7 @@ namespace Armoury
             if (mode != KmNone && role != (mode == KmWait ? CrWait : CrStrike))
             {
                 // rola zmieniona przez kogos innego: 443 (RAID / HIDE) albo 441 (gracz / szyk pusty) - stan 444 od zera, roli nie ruszamy
-                if (mode == KmWait) { if (role == CrRaid || role == CrHide) _k4WaitTo443++; else _k4WaitBack++; }
+                if (mode == KmWait) { if (role == CrRaid || role == CrHide) _k4WaitTo443++; else if (role == CrCavFirst) _k4WaitTo445++; else _k4WaitBack++; }
                 else { _k4StrikeBack++; K444Score(f, idx); }
                 K444SlotClear(idx);
                 _k4Exit[idx] = now;
@@ -632,7 +632,7 @@ namespace Armoury
               .Append(" (OSTROZNY ").Append(K444Avg(0)).Append(", ZWYKLY ").Append(K444Avg(1)).Append(", PORYWCZY ").Append(K444Avg(2)).Append(')')
               .Append(", koniec: kowadlo -> uderzenie ").Append(_k4WaitAnvil).Append(", limit czekania ").Append(_k4WaitCap).Append(", zwarcie / wrog w 15 m ").Append(_k4WaitThreat)
               .Append(", brak glownej piechoty ").Append(_k4WaitNoInf).Append(", brak pieszego wroga ").Append(_k4WaitNoFoe)
-              .Append(", przejete przez 443 ").Append(_k4WaitTo443).Append(", oddane przez 441 ").Append(_k4WaitBack).Append("; brak miejsca ").Append(_k4WaitNoSpot)
+              .Append(", przejete przez 443 ").Append(_k4WaitTo443).Append(", przez 445 (jazda na jazde) ").Append(_k4WaitTo445).Append(", oddane przez 441 ").Append(_k4WaitBack).Append("; brak miejsca ").Append(_k4WaitNoSpot)
               .Append(" | uderzenia STRIKE ").Append(_k4StrikeN).Append(" (po czekaniu ").Append(_k4StrikeFromWait).Append(", jazda wolna ").Append(_k4StrikeFree)
               .Append("), bylby (klucz NIE / bez dowodcy jazdy) ").Append(_k4StrikeDry).Append(", ").Append(_k4StrikeSec.ToString("0", K4Inv)).Append(" szyko-s")
               .Append(" | dojazd: wprost (juz z boku / tylu) ").Append(_k4Direct - _k4NoRoute).Append(", wprost bez drogi z boku ").Append(_k4NoRoute)

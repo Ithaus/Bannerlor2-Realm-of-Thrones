@@ -400,6 +400,7 @@ namespace Armoury
             if (mode == RmNone)
             {
                 if (!pressure || now - _r4Exit[idx] < R443Reenter) return;
+                if (V445Busy(f)) return;   // 445: szyk w CAVFIRST / DISENGAGE - bez rajdu / schowania (rola 445 nie nadpisywana)
                 if (K444Striking(f)) return;   // 444: uderzenie kowadla i mlota w toku - bez rajdu / schowania (WAIT oddaje szyk 443)
                 if (tgt != null) { R443StartRaid(f, idx, tgt, flank, fp, fwp, now); return; }
                 if (near == null) { _r4NoArchSec += step; return; }   // ostrzal bez pieszych strzelcow wroga w zasiegu (konni strzelcy / gracz) - nie ta regula
