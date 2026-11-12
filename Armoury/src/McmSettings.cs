@@ -12336,6 +12336,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool SiegeAbandonDeadLane { get; set; } = true;
 
+        [SettingPropertyBool("Siege Waves Reinforce Success", HintText = "In an assault on walls led by the AI (enemy or allied), fresh reinforcements no longer go to the point of attack that has lost the most men: while the stormers hold a foothold at one ladder, siege tower, gate or breach - at least 15 of them at that point and fewer than 15 defenders, for 5 seconds - newly arrived men who were put into the formation of another point are sent to the foothold instead (to the smallest such formation if there are several). A point with its men on the wall or inside never gives up its new men, a formation of the main point (Siege Main Effort) keeps them while it is protected, and every other point keeps at least 15 men. Heroes, mounted men, standard bearers and men at siege engines stay where they are. Formations you command yourself are never touched. Off = reinforcements go where the game puts them. Counted in the Armoury log in each siege assault (line 453).", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
+        public bool SiegeWavesReinforceSuccess { get; set; } = true;
+
         [SettingPropertyBool("Siege Defender Archers To Walls", HintText = "When you defend a fortress and command your side yourself: at the end of deployment, once, your archers and crossbowmen (not heroes, not standard bearers, not men at siege engines) are moved out of your other formations into your formations that shoot from the wall posts, spread evenly; if none stands at a wall post, empty formations are sent to free posts. Afterwards you command as usual. Off = your formations stay as you deployed them", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: stormers hold on and raise their ladders (372)")]
         public bool SiegeDefenderArchersToWalls { get; set; } = true;
@@ -15959,6 +15963,7 @@ namespace Armoury
             s.SiegeLadderWaitSeconds = SiegeLadderWaitSeconds;
             s.SiegeMainEffort = SiegeMainEffort;   // 451
             s.SiegeAbandonDeadLane = SiegeAbandonDeadLane;   // 452
+            s.SiegeWavesReinforceSuccess = SiegeWavesReinforceSuccess;   // 453
             s.SiegeDefenderArchersToWalls = SiegeDefenderArchersToWalls;
             s.SiegeWoundedTakenPrisoner = SiegeWoundedTakenPrisoner;
             s.SiegeWoundedWallDistance = SiegeWoundedWallDistance;
