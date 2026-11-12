@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 462-a (12.11) - brak zboza do mlyna / browaru (i innego wsadu jedzenia warsztatu) wraca do tablicy N jako UDZIAL niezaspokojonego zapotrzebowania
+
+**Problem:** recenzja 435-N-B (WGRANIE 212): wylaczenie wsadu jedzenia z N usunelo tez prawdziwy czesciowy brak zboza dla mlynow i browarow. Autotest at-461 (doba 1101): "jedzenie i zwierzeta (tylko pomiar): grain 43, apple 28, butter 26, meat 8, grape 7 ... (razem 116)" cykli bez wsadu na dobe, przy zuzyciu jedzenia 621 cykli; linia LP: "435-N-B brak wsadu jedzenia i zwierzat poza N: 137.0 szt. w 116 brakach" - nic z tego nie trafia do N, wiec L6 / L5 / regulator nie widza, ze mlyny stoja bez zboza (N zboza tylko przy glodzie wsi).
+
+**Przyczyna:** 435-N-B zerowal brak jedzenia, bo S_kolejka = 1 + brak / max(1 szt./d, sprzedaz), a jedzenie nie ma liczonej sprzedazy targu (mianownik 1) - kazdy brak >= 1 szt./d dawal N = 2 (test 90 dob: jablka, maslo, oliwki, winogrona, mieso).
+
+**Zmiana:** SupplySignal: brak wsadu JEDZENIA warsztatu liczony znowu (NoteInput, wczytanie arm_lpn), ale S_kolejka jedzenia = QueueShare = 1 + brak / max(1, zuzycie + brak) - udzial zapotrzebowania warsztatow, ktorego polka nie pokryla (polowa brakuje -> 1.5, calosc -> 2; jeden brak przy duzym zuzyciu ~1.0x). Ta sama miara w wierszu swiata. Glod wsi (zboze N = 2) bez zmian. Jedzenie ludnosci nadal poza N (NoteInput to tylko wsad warsztatow). Nowy klucz **Supply Food Input Share** (grupa Economy measurements, TAK); NIE = 435-N-B co do bitu (brak jedzenia zerowany przy zapisie, wczytaniu i w petli tablicy - takze braki zapisane przy TAK). Linia LP: "462-a brak wsadu jedzenia w N udzialem (klucz ...): X szt. w Y brakach, komorek jedzenia z N > 1 Z, najwyzsze W".
+
+**Ryzyko / co sprawdzic:** czytelnicy N (L5 kolejnosc zlecen sprzetu wsi, L6 zmiana zajec x do 1.15, CraftsFollowShortage, L8) zobacza zboze / owoce w miastach z mlynami bez wsadu - to cel (wies przesuwa rece do zboza). Sprawdzic w autotescie 30 dob: komorek jedzenia z N > 1 kilkanascie-kilkadziesiat, najwyzsze < 2 poza miastami z calkowitym brakiem; "towarow z N swiata > 1" nie wraca do 21 z 22; kontrole LP = 0, potkniecia 0. Tablica N wyrobu (435-N-C, L8/L9) nie czyta tej kolejki. Zamknieta ekonomia: sama miara, zadne zloto ani sztuka nie powstaje.
+
+**Status:** DO SPRAWDZENIA
+
 ## 463-p (12.11) - ikony warsztatow: rezerwa "slowa w id" porownuje krotkie slowa (ore / ale / oil) jako caly czlon id
 
 **Problem:** recenzja 463 (WorkshopIcons463.cs:162/164/166): rezerwa KeyFor dla typu spoza listy Known szukala fragmentow "ore", "ale", "oil" w id - trafialyby tez w "store", "sale", "scale", "toil" i dalyby bledna ikone (np. typ "salt_store" -> srebrnik). Dzis kod martwy (wszystkie 9 typow BK + artisans sa w Known), objawu w grze nie ma.
