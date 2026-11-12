@@ -326,7 +326,7 @@ namespace Armoury
             // 442 pominiete (jeden wlasciciel - rola). Inny szyk w roli (HIDE, RAID w dojezdzie z boku) - slot pusty jak w 442.
             if (C441Owned(f))
             {
-                var rt = R443AimTarget(f, idx);
+                var rt = R443AimTarget(f, idx) ?? K444AimTarget(f, idx);   // 444: szyk w STRIKE w fazie szarzy - cel uderzenia
                 if (rt == null) { if (Volatile.Read(ref _t4Who[idx]) != null) T442Drop(idx); return; }
                 if (!ReferenceEquals(Volatile.Read(ref _t4Who[idx]), f)) T442Drop(idx);
                 Volatile.Write(ref _t4Who[idx], f);

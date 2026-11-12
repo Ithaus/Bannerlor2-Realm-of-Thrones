@@ -283,6 +283,7 @@ namespace Armoury
             C441Begin(m);   // 441: zachowanie roli jazdy - wlasny klucz (bez AnyKey)
             T442Begin(m);   // 442: cel szarzy jazdy - wlasny klucz (bez AnyKey)
             R443Begin(m);   // 443: rajd / schowanie jazdy, ocena wymiany ognia, lucznicy przed jazda - wlasne klucze (bez AnyKey), pomiar takze przy NIE
+            K444Begin(m);   // 444: kowadlo i mlot (WAIT / STRIKE) - wlasny klucz (bez AnyKey), pomiar takze przy NIE
         }
 
         /// <summary>283 (HorsePursuit.ReactHalt, glowny watek): szyk trzymany teraz przez S4 (lucznicy za piechota - wagi zachowan przejete) - postoj 283 go
@@ -344,6 +345,7 @@ namespace Armoury
             C441ClearMission();   // 441
             T442ClearMission();   // 442
             R443ClearMission();   // 443
+            K444ClearMission();   // 444
         }
 
         /// <summary>WarCouncil.One (glowny watek, AfterStart albo pozna druzyna DR): doktryna druzyny AI i dodatki do listy taktyk. have/note - lista typow
@@ -426,6 +428,9 @@ namespace Armoury
             // 443: rajd jazdy / schowanie za piechote (role 441), bilans ognia druzyn, zagrozenie lucznikow jazda (wlasny zegar 1 s i wlasne klucze); po 441
             // (rola oddana graczowi / pustemu szykowi widoczna), przed 442 (cel rajdu w slocie jezdzca 442) i przed Manoeuvres (flagi S4 443 tego taktu)
             try { R443Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.R443Tick", e); }
+            // 444: kowadlo i mlot - WAIT / STRIKE (role 441; wlasny zegar 1 s i wlasny klucz); po 443 (rajd / schowanie biora szyk w WAIT - widoczne tu), przed 442
+            // (cel uderzenia w slocie jezdzca 442)
+            try { K444Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.K444Tick", e); }
             // 442: cel szarzy jazdy - ocena szykow wroga, cel i kotwice slotow (wlasny zegar 1 s i wlasny klucz; po 441 - szyk w roli pominiety)
             try { T442Tick(m, dt); } catch (Exception e) { RoutHold.Stumble(RoutHold.SiteDoctrine, "Doctrine.T442Tick", e); }
             _acc += dt;

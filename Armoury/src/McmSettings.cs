@@ -11708,6 +11708,10 @@ namespace Armoury
         [SettingPropertyGroup("Marching and tactics")]
         public bool ArchersShelterFromCavalry { get; set; } = true;
 
+        [SettingPropertyBool("Hammer And Anvil", HintText = "AI cavalry in field battles works as the hammer against its own infantry's anvil: before its first charge it waits beside its own main infantry, out of the fight, until an enemy formation on foot is locked in hand to hand fighting with your side's foot (half of its men fighting; a rash commander strikes at a third, a cautious one waits for two thirds), and then rides round to that formation's flank or rear and charges it from there; the riders keep to that formation on the way in. Ten seconds after the cavalry closes it is left to Realistic Battle Mod again; a cavalry formation that is free again strikes the next locked formation the same way. A rash commander's cavalry waits at most 90 seconds, an ordinary one 150, a cautious one 210 - then it is left to charge as before. Cavalry being shot at by archers may still raid them or hide (Cavalry Raids Archers, Cavalry Hides From Missiles); cavalry that is attacked while waiting fights at once. Needs Cavalry Commander and a main infantry formation at least half the cavalry's size. Horse archers, your own formations and the ones you command are left as they were. No bonus to any number on the field - only decisions. Field battles only. Off = the cavalry is left to RBM, exactly as before. Counted in the Armoury log at the end of each field battle (line 444).", RequireRestart = false)]
+        [SettingPropertyGroup("Marching and tactics")]
+        public bool HammerAndAnvil { get; set; } = true;
+
         [SettingPropertyBool("AI Saves Breath", HintText = "AI soldiers on foot pace themselves: a man runs only as far as his breath will carry him with some of it left, and walks the rest of the way at a true walk, so his breath comes back; within the last metres before the enemy he always runs. A fresh charge, men already in close combat, fleeing or panicking men, the badly wounded falling back, horsemen, men sent to ladders, towers, rams or the gate, a formation following you and you yourself are never held back; a chase after a fleeing man lasts only as long as the chaser's breath. Both sides alike, field battles. Off = the men run as before (the rule is only measured for the log)", RequireRestart = false)]
         [SettingPropertyGroup("Marching and tactics")]
         public bool AiSavesBreath { get; set; } = true;
@@ -15758,6 +15762,7 @@ namespace Armoury
             s.CavalryHidesFromMissiles = CavalryHidesFromMissiles;   // 443
             s.ArchersJudgeMissileDuel = ArchersJudgeMissileDuel;   // 443
             s.ArchersShelterFromCavalry = ArchersShelterFromCavalry;   // 443
+            s.HammerAndAnvil = HammerAndAnvil;   // 444
             s.AiSavesBreath = AiSavesBreath;
             s.AiArriveWithBreathPercent = AiArriveWithBreathPercent;
             s.AiRunsLastMetres = AiRunsLastMetres;
