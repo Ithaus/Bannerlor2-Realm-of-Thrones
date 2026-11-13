@@ -6,6 +6,7 @@
 - at-220z (Armoury-2026-11-13_20-05-48.log): 220/220 dob, 23 bledy cudze (SUMMARY md5 jak at-220c), 0 BLAD, 0 potkniec, ARYTMETYKA OK 219/219. Ceny jedzenia na koniec jak at-220c (mieso 1.82-2.84, ser 0.96-1.29, maslo 0.84-1.15, zboze 0.66-1.03, ryby 0.86-1.34).
 - 479-k: Plan Westeros oddaje stan pozny (np. 108759 mieso 0.480 / swinie 8689 zamiast 0.161 / 58); w grze polki miesa dalej 0.2-0.3 T* - mieso NIE naprawione, Essos mieso na podlodze 0.05 w 21/32 Planach, skoki mt 2.5 <-> 13-22 (inne towary niz przy granicy).
 - 482: R4 na koniec 60-67 (bez 482: 88-98); reszta to ZAMKI ("przydzial rodu 0") - poza 482 z zalozenia, decyzja do Jeffa.
+- DECYZJA Jeffa 13.11 22:00: zamki zadluzonych rodow NIE placa budow z zadnej kasy (opcja 1) - dlug hamuje budowy, jak zasada 12.10. 482 zostaje tylko dla miast.
 - 483: dziala mechanicznie (9 gersum, 220 tys.), ale kas nie zdejmuje (ponad prog 3.23 mln, kasy 17.3 mln); przyczyna: minimum okna 14 dob ponizej progu keep.
 - Uwaga: log bazowy at-220c (08-52-41) wypadl z rotacji (gra trzyma 12 logow) - porownania z CHANGELOG i at-220g/at-220i.
 - Testy z Heraldry Studio: HS wylaczany na czas autotestu (C:/Users/GAME/bannerlord-autotest/hs-przelacz.py off/on) - edytor herbu HS zatrzymuje kreator postaci w autotescie. Po tescie HS wlaczony.
