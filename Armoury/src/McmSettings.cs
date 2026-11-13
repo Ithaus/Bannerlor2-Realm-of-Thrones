@@ -10524,6 +10524,10 @@ namespace Armoury
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public bool SideVillageRecruitScreen { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Walk", HintText = "'Walk through the village' in a side village's menu: walk among its homesteads in 3D - a village scene of the same people as its district (side villages have no scenes of their own, so it is always the same scene for a given village, not the district's own where its people have another), with villagers of that culture standing about, fewer at night. Not at war with its lord, not while its lands are raided, not in a burned or abandoned village. Campaign time stands still; hold Tab to go back. Off = no option", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageWalk { get; set; } = true;
+
         [SettingPropertyBool("Land Sales", HintText = "houses in need may sell you land of their own will: ask a clan leader 'I hear your house needs coin. Would you sell me land?' (or use the offer option in a side village or main village menu). The price is the holding's real worth - what it truly earns its lord a year, net of its costs, times 14 to 20 years of it by how well the seller thinks of you (Land Years Of Purchase for a close friend, Land Years Worst when he only just will sell) - never a token price; a house deep in debt may take somewhat less. The coin goes to the seller's head and his creditors take their due from it first. Off = no land is for sale", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
         public bool LandSales { get; set; } = true;
@@ -15630,6 +15634,7 @@ namespace Armoury
             s.SideVillageHouseLevy = SideVillageHouseLevy;
             s.CastellanLevyFromPool = CastellanLevyFromPool;
             s.SideVillageRecruitScreen = SideVillageRecruitScreen;
+            s.SideVillageWalk = SideVillageWalk;
             s.LandSales = LandSales;
             s.LandSalesSideVillages = LandSalesSideVillages;
             s.LandSalesLordships = LandSalesLordships;

@@ -557,6 +557,7 @@ namespace Armoury
                 catch (Exception e) { _chatLogFails++; Log.Error("MapChatLog: nie laduje sie (proba " + _chatLogFails + "/3)", e); }
             }
             CampWalk.TestTick();   // m109-oboz: test spaceru pod plikiem autotestu (armoury-oboz-spacer.flag; w grze zamyka sie po pierwszym sprawdzeniu, wlasny try)
+            SideVillageVisit.WalkTestTick();   // 474-P7: test spaceru po wiosce pobocznej pod plikiem autotestu (armoury-wies-spacer.flag; w grze zamyka sie po pierwszym sprawdzeniu, wlasny try)
             // m109-kuznia: autotest ekranu kucia (ForgeBillTest - tylko plik armoury-kuznia.flag; bez niego od razu wyjscie, wlasny try w srodku) - tu tylko blad
             // ladowania typu, liczony (po 3 test nie startuje do konca sesji). PRZED returnem wiosek.
             if (_forgeTestFails < 3)
