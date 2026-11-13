@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 478-S7 (13.11) - log 471: "ZEGAR STOI" nie pisze sie, gdy zegar idzie (R3)
+
+**Problem:** analiza at-120c (NISKIE): linia "Czas oblezenia (471)" pisala "-> ZEGAR STOI" przy kazdej odsieczy >= 0.5 sily obozu, a od R3 (noc 13.11) zegar stoi tylko przy odsieczy bliskiej i co najmniej rownej obozowi - log przeczyl licznikom.
+
+**Przyczyna:** SiegeWalls.Time471.cs:174 - tekst z warunku paused sprzed R3 (R3 nadpisuje pz dopiero w petli doby, :294).
+
+**Zmiana:** przy kluczu Siege Near Relief Only tekst "-> odsiecz >= 0.5 obozu (czy zegar stoi - R3: bliska i silna, linia doby)"; bez klucza "-> ZEGAR STOI" jak dotad. Tylko log. Decyzja domyslna (noc 13.11): pozostale drobne pozycje NISKIE (etykieta dworzan BK w A16, licznik _noRaw, przeniesienie limitu murow malych zamkow, licznik SellItemsAction, ruda w 37 miastach) - nie ruszane w tej rundzie.
+
+**Ryzyko / co sprawdzic:** brak (tekst logu).
+
+**Status:** DO SPRAWDZENIA
+
 ## 478-S6 (13.11) - sygnal N: komorka bez zadnego zakupu w oknie liczy stojacy budzet robot (poziom / 28), nie tylko jego przyrost
 
 **Problem:** at-120c: wapien - zakupy 0.0 przez caly bieg, a od doby 108717 (l.54099) wapienia i marmuru nie ma w liscie N > 1; niewydany budzet robot spada z 266 tys. do 57 tys. (nachylenie ujemne).

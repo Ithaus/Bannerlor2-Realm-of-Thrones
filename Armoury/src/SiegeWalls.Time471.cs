@@ -171,7 +171,7 @@ namespace Armoury
                 + ", qM " + F(qM, "0.00") + " (mury poziom " + lvl + ", HP " + F(hp * 100, "0") + "%)"
                 + ", qS " + F(qS, "0.00") + " (oboz " + att + " / obroncy (strona gry, z milicja) " + def + " = " + (def <= 0 ? "pusta" : F(ratio, "0.0") + ":1") + ")"
                 + ", qMo " + F(qMo, "0.00") + " (Md bez odsieczy " + F(md, "0") + ")"
-                + " | odsiecz w drodze " + F(rel, "0") + " / sila obozu " + F(bes, "0") + (paused ? " -> ZEGAR STOI" : "")
+                + " | odsiecz w drodze " + F(rel, "0") + " / sila obozu " + F(bes, "0") + (paused ? (LocalFront334e.NearReliefOnly ? " -> odsiecz >= 0.5 obozu (czy zegar stoi - R3: bliska i silna, linia doby)" : " -> ZEGAR STOI") : "")
                 + " | jedzenie obozu " + (campCh < 0 ? F(campDays, "0.0") + " dob" : "bez ubytku") + " (" + F(campFood, "0") + ", " + F(campCh, "0.0") + "/d)"
                 + " | trebusze obozu " + trebs + ", najslabszy odcinek " + F(WallHpMin(st) * 100, "0") + "%";
             return r;
