@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-g (13.11) - spustoszenie zdobytej osady: polowa spalonych poziomow budowli zniszczona na dobre (bez zgliszcz, odbudowa za pelna cene)
+
+**Problem:** Jeff 13.11: "jak jest oblezenie i ktos wybiera oszczedz to budynki nie sa niszczone, jak jest rabunek lub pillage ten ostrzejszy to mocno cierpia budynki, czesc moze zostac zniszczona i trzeba je odbudowac, naprawic, szansa jest ze niektore zostana zniszczone na dobre i trzeba od nowa odbudowac".
+
+**Przyczyna:** sprawdzone w kodzie: LB (CitySack.Burn.cs, od 13.10, klucz SackBurnsBuildings TAK u Jeffa) juz robi: laska 0, grabiez 1/3, spustoszenie 2/3 poziomow palnych (bez murow, gra przy nastepstwach 0 - prefiks GetSiegeAftermathProjectsLoss); kazdy spalony poziom zostawia zgliszcza (naprawa za SackRuinRebuildShare = 1/4 kosztu), osady AI odbudowuja zgliszcza najpierw. Brakowalo "zniszczone na dobre".
+
+**Zmiana:** CitySack.Burn.BurnPost: przy spustoszeniu kazdy spalony poziom z szansa SackDevastateRazedShare (nowe ustawienie MCM "Sack Devastate Razed Share", domyslnie 0.5) jest zniszczony na dobre - bez zgliszcz (odbudowa za pelny koszt). Grabiez - same zgliszcza (naprawa), laska - nic (bez zmian). Linie: "Lup miast (LB budowle)" + "zniszczone na dobre (476-g, bez zgliszcz, pelny koszt) N", linia doby LB "(zniszczone na dobre 476-g N, ...)". Dotyczy AI i gracza, miast i zamkow (jak LB). 0 = jak przed.
+
+**Ryzyko / co sprawdzic:** spustoszone osady odbudowuja sie dluzej (polowa poziomow za pelna cene) - zgodne z decyzja; Grant zgliszcz przez TryGetValue (budowla tylko z poziomami zniszczonymi nie ma wpisu zgliszcz).
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-f (13.11) - wybor budowy AI wedlug potrzeb osady (glod, zold, front, zloze) zamiast losu
 
 **Problem:** audyt budynkow 12.11: AI wybiera budowe losowo (DefaultBuildingScoreCalculationModel.GetNextBuilding:16-18) - 48.7% punktow zamkow (ok. 430 tys. zl w 59 dobach) na budowle slabe/martwe, koszary i spichlerze czekaja. Sesja zaproponowala wybor wg potrzeb, Jeff: "na pozostale sie zgadzam".

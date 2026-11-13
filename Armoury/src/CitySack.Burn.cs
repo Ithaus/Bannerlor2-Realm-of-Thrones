@@ -88,7 +88,7 @@ namespace Armoury
         private static string _ruinPending;
 
         // liczniki doby
-        private static int _dbSacks, _dbLevels, _dbRebuilt, _dbQueued, _dbWarWait, _dbFront;
+        private static int _dbSacks, _dbLevels, _dbRebuilt, _dbQueued, _dbWarWait, _dbFront, _dbRazed;
         private static long _dbPts, _dbGrant, _dbProgLost;
 
         private static void Grant(Ruin r)
@@ -134,7 +134,7 @@ namespace Armoury
                 double share = ShareOf(kind);
                 int a0 = BurnableLevels(t), w0 = WallLevels(t);
                 int plan = (int)Math.Floor(share * a0);
-                int done = 0; long pts = 0; double progLost = 0;
+                int done = 0, razedHere = 0; long pts = 0; double progLost = 0;
                 var lost = new Dictionary<Building, int>();
                 for (int i = 0; i < plan; i++)
                 {
@@ -159,11 +159,15 @@ namespace Armoury
                     if (prog > 0f) progLost += prog;                         // postep w toku plonie z poziomem (LevelDown gry zeruje) - recenzja: jawnie w linii
                     pts += pick.GetConstructionCost();                       // koszt odbudowy tego poziomu od nowa
                     int c; lost.TryGetValue(pick, out c); lost[pick] = c + 1;
+                    // 476-g (Jeff 13.11: "przy spustoszeniu czesc moze zostac zniszczona na dobre i trzeba od nowa odbudowac"): czesc spalonych poziomow bez zgliszcz - pelny koszt
+                    var s476 = Settings.Current;
+                    float razed = s476 != null ? Math.Max(0f, Math.Min(1f, s476.SackDevastateRazedShare)) : 0f;
+                    if (kind == KDevastate && razed > 0f && MBRandom.RandomFloat < razed) { _dbRazed++; razedHere++; continue; }
                     Ruin r;
                     if (!_ruins.TryGetValue(pick, out r)) { r = new Ruin { St = st, B = pick }; _ruins[pick] = r; }
                     r.R++; r.Lvl = -1; r.Day = Now;
                 }
-                foreach (var kv in lost) Grant(_ruins[kv.Key]);
+                foreach (var kv in lost) { Ruin rr; if (_ruins.TryGetValue(kv.Key, out rr)) Grant(rr); }   // 476-g: zniszczone na dobre nie maja zgliszcz
                 if (kind != KMercy) _dbSacks++;
                 _dbLevels += done; _dbPts += pts; _dbProgLost += (long)progLost;
                 if (MeasureOn)
@@ -177,7 +181,8 @@ namespace Armoury
                       .Append(" (splonelo ").Append(done).Append(" z planu ").Append(plan).Append(" = floor(czesc x ").Append(a0).Append(")) | mury ").Append(w0).Append(" -> ").Append(WallLevels(t))
                       .Append(" | koszt spalonych poziomow ").Append(pts).Append(" pkt, odbudowa ze zgliszcz ").Append((long)Math.Ceiling(pts * RuinShare)).Append(" pkt (x").Append(RuinShare.ToString("0.000", Inv)).Append(')')
                       .Append(" | zgliszcza osady: budowli ").Append(rb).Append(", poziomow ").Append(rl)
-                      .Append(" | postep w toku spalony ").Append((long)progLost).Append(" pkt");
+                      .Append(" | postep w toku spalony ").Append((long)progLost).Append(" pkt")
+                      .Append(" | zniszczone na dobre (476-g, bez zgliszcz, pelny koszt) ").Append(razedHere);
                     if (lost.Count > 0)
                     {
                         sb.Append(" | spalone:");
@@ -289,14 +294,14 @@ namespace Armoury
             foreach (var kv in _ruins) if (kv.Value.R > 0) { rb++; rl += kv.Value.R; if (seen.Add(kv.Value.St)) rs++; }
             sb.Append(" | LB: ");
             if (!BurnOn) sb.Append("WYLACZONE (Sack Burns Buildings) - budowle zdejmuje gra; ");
-            sb.Append("lupow z pozarem ").Append(_dbSacks).Append(", spalone poziomy ").Append(_dbLevels).Append(" (koszt ").Append(_dbPts).Append(" pkt, postep w toku spalony ").Append(_dbProgLost).Append(" pkt)")
+            sb.Append("lupow z pozarem ").Append(_dbSacks).Append(", spalone poziomy ").Append(_dbLevels).Append(" (zniszczone na dobre 476-g ").Append(_dbRazed).Append(", koszt ").Append(_dbPts).Append(" pkt, postep w toku spalony ").Append(_dbProgLost).Append(" pkt)")
               .Append("; zgliszcza: osad ").Append(rs).Append(", budowli ").Append(rb).Append(", poziomow ").Append(rl)
               .Append("; odbudowane ze zgliszcz dzis ").Append(_dbRebuilt).Append(", postep ze zgliszcz dany ").Append(_dbGrant).Append(" pkt")
               .Append("; kolejka AI: zgliszcza na czele ").Append(_dbQueued).Append(", cywilne czekaja (front albo pan bez luzu zoldu) ").Append(_dbWarWait)
               .Append(", przy froncie wojskowa przed cywilnym zgliszczem ").Append(_dbFront);
         }
 
-        private static void LBClear() { _dbSacks = _dbLevels = _dbRebuilt = _dbQueued = _dbWarWait = _dbFront = 0; _dbPts = _dbGrant = _dbProgLost = 0; }
+        private static void LBClear() { _dbSacks = _dbLevels = _dbRebuilt = _dbQueued = _dbWarWait = _dbFront = _dbRazed = 0; _dbPts = _dbGrant = _dbProgLost = 0; }
 
         private static bool LBAny { get { return _dbSacks > 0 || _dbLevels > 0 || _dbRebuilt > 0 || _dbQueued > 0 || _ruins.Count > 0; } }
 
