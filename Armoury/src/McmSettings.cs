@@ -10728,6 +10728,10 @@ namespace Armoury
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool SupplyQueueGrowth { get; set; } = true;
 
+        [SettingPropertyBool("Supply No Buy Counts Level", HintText = "with Supply Chain Log and Supply Queue Growth: a good that nobody in a town managed to buy at all over the last 28 days, while village works there still hold unspent money for it, counts its standing unspent budget (spread over 28 days) as shortage, not only its growth - a stone or clay that is simply never there no longer drops out of the shortage table when the orders stop growing. Off = growth only, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool SupplyNoBuyCountsLevel { get; set; } = true;
+
         [SettingPropertyBool("Supply Food Input Share", HintText = "with Supply Chain Log: a workshop that could not find its food input at the market (grain for a mill or brewery, fruit, butter, meat and the like) counts again towards that good's shortage, measured as the share of the workshops' need that went unmet (missing / (used + missing)): half the grain missing gives 1.5, all of it 2. The townsfolk's own food is still not counted here. So a town whose mills stand idle for want of grain shows grain as short, and the village and craft rules that read the shortage table can answer it. Off = workshop food inputs are left out of the shortage table, as before", RequireRestart = false)]
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool SupplyFoodInputShare { get; set; } = true;
@@ -15817,6 +15821,7 @@ namespace Armoury
             s.EconomyAuditLines = EconomyAuditLines;
             s.SupplyChainLog = SupplyChainLog;
             s.SupplyQueueGrowth = SupplyQueueGrowth;
+            s.SupplyNoBuyCountsLevel = SupplyNoBuyCountsLevel;
             s.SupplyFoodInputShare = SupplyFoodInputShare;
             s.SupplyStockEmptyOnly = SupplyStockEmptyOnly;
             s.SupplyFoodShortageFloor = SupplyFoodShortageFloor;

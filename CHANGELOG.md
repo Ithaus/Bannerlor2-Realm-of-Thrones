@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 478-S6 (13.11) - sygnal N: komorka bez zadnego zakupu w oknie liczy stojacy budzet robot (poziom / 28), nie tylko jego przyrost
+
+**Problem:** at-120c: wapien - zakupy 0.0 przez caly bieg, a od doby 108717 (l.54099) wapienia i marmuru nie ma w liscie N > 1; niewydany budzet robot spada z 266 tys. do 57 tys. (nachylenie ujemne).
+
+**Przyczyna:** SupplySignal.cs: grow obcinany do 0, want = miss + grow; kamien nie ma wsadu warsztatow (miss = 0), wiec przy spadajacym budzecie N = 1 - towar, ktorego nikt nie moze kupic, wypada z tablicy.
+
+**Zmiana:** nowy klucz Supply No Buy Counts Level (TAK): komorka nie-jedzenie z got = 0 w oknie 28 dob i softW > grow bierze softW (poziom / okno) zamiast przyrostu; licznik "478-S6 komorek bez zakupu z poziomem budzetu" w linii LP (dopisek przy fragmencie 462-a). Wiersz swiata bez zmian (dalej przyrost ze znakiem). NIE = jak przed co do bitu (poza tekstem przy kluczu TAK). Decyzja domyslna (noc 13.11): warunek "pusta polka" zastapiony "0 zakupow w oknie" (zakup 0 przez 28 dob przy budzecie = brak towaru na polce w zasiegu ceny).
+
+**Ryzyko / co sprawdzic:** czesc zawyzenia sprzed 435-N-A wraca, ale tylko dla towarow bez zadnej podazy (kamien, marmur, wapno); czytelnicy komorek N (L6, regale, 363 OrderBoost, VillageGear.Fund) zobacza je znow - wiecej rak przesuwanych na kamien. W tescie: komorek bez zakupu kilkadziesiat, "towarow z N swiata > 1" bez skoku do 22/22.
+
+**Status:** DO SPRAWDZENIA
+
 ## 478-S5 (13.11) - KS: podwyzka firmy rolnej miasta przy przegladzie do 50% (bylo 25%) - mniej zlota ludu zamrozonego w kasach miast
 
 **Problem:** at-120c (KS uzbrojona): kasy miast 15.12 mln (w 120b 6.07 mln), lud 7.8% zlota swiata (120b 10.2%), kiesy ludu 0.544 normy (l.94342), glod z braku pieniedzy w 7 osadach (120b 2), chleb biedoty 62 tys. zl/d (120b 12.9 tys.); m96 przelal 74 245 zl przy 414 096 zl placy zatrzymanej w kasach (l.93800).

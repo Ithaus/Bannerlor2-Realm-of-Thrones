@@ -61,6 +61,8 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.SupplyChainLog; } }
         // 435-N-A: do kolejki wchodzi PRZYROST niewydanego budzetu robot na dobe (nachylenie poziomu w oknie), nie poziom / 28; NIE = dawna miara (poziom / okno)
         private static bool GrowOn { get { var s = Settings.Current; return s == null || s.SupplyQueueGrowth; } }
+        private static bool NoBuyOn { get { var s = Settings.Current; return s != null && s.SupplyNoBuyCountsLevel; } }   // 478-S6
+        private static int _sNoBuyCells;   // 478-S6: komorki z poziomem budzetu zamiast przyrostu w ostatniej tablicy
         // 462-a: brak wsadu JEDZENIA warsztatu (zboze do mlyna / browaru, owoce, maslo...) wraca do N jako UDZIAL niezaspokojonego zapotrzebowania warsztatow
         // (brak / (zuzycie + brak)) - nie dzielony przez sprzedaz >= 1 szt./d, ktora dla jedzenia nie jest liczona (to dawalo N = 2 przy kazdym braku). Klucz NIE = 435-N-B.
         private static bool FoodShareOn { get { var s = Settings.Current; return s == null || s.SupplyFoodInputShare; } }
@@ -698,7 +700,7 @@ namespace Armoury
                     sb.Append("; razem ").Append(F1(gAll)).Append(" | reszty budzetu ponizej ceny sztuki (nie brak) ").Append(N0(_dRound)).Append(" zl")
                       .Append(", budzet przy materiale tylko ponad sufitem ceny (nie brak) ").Append(N0(_dCapGold)).Append(" zl")
                       .Append(FoodShareOn
-                          ? " | 462-a brak wsadu jedzenia w N udzialem wobec zuzycia warsztatow (klucz Supply Food Input Share TAK): " + F1(_dFoodShare) + " szt. w " + _dFoodShareN + " brakach, komorek jedzenia z N > 1 " + _sFoodCells + ", najwyzsze " + _sFoodMax.ToString("0.00", Inv)
+                          ? " | 462-a brak wsadu jedzenia w N udzialem wobec zuzycia warsztatow (klucz Supply Food Input Share TAK): " + F1(_dFoodShare) + " szt. w " + _dFoodShareN + " brakach, komorek jedzenia z N > 1 " + _sFoodCells + ", najwyzsze " + _sFoodMax.ToString("0.00", Inv) + " | 478-S6 komorek bez zakupu z poziomem budzetu (klucz Supply No Buy Counts Level " + (NoBuyOn ? "TAK" : "NIE") + ") " + _sNoBuyCells
                           : " | 435-N-B brak wsadu jedzenia i zwierzat poza N (bez liczonej sprzedazy): " + F1(_dFoodSkip) + " szt. w " + _dFoodSkipN + " brakach")   // 462-a-p (D3): przy NIE tekst jak przed
                       .Append(" | wedlug towaru dzis (brak wsadu + poziom budzetu / kupione): ");
                     var l = new List<KeyValuePair<ItemCategory, double[]>>(_dCat);
@@ -893,7 +895,7 @@ namespace Armoury
             var agg = new Dictionary<ItemCategory, double[]>();
             var hot = new HashSet<Settlement>();
             int cells = 0, real = 0, qCeil = 0, qOver = 0, softOnly = 0;
-            _sFoodCells = 0; _sFoodMax = 1.0;
+            _sFoodCells = 0; _sFoodMax = 1.0; _sNoBuyCells = 0;
             _sFloorCells = 0; _sFloorUnits = 0; _sFloorCats.Clear(); _sFloorKept = 0; _sFloorMax = 0; _sFloorMaxCat = null;
             bool floorOn = FoodFloorOn;
             // 470-p (recenzja U1): brak swiata jedzenia przed progiem komorki (suma brakow wsadu komorek) - prog 470-b dziala tylko ponizej WorldFoodShortage
@@ -941,7 +943,11 @@ namespace Armoury
                         if (fw >= WorldFoodShortage) _sFloorKept++;   // 470-p: prawdziwy brak swiata rozlozony po miastach - komorka zostaje w N
                         else { _sFloorCells++; _sFloorUnits += miss; _sFloorCats.Add(ck.Key); if (miss > _sFloorMax) { _sFloorMax = miss; _sFloorMaxCat = ck.Key; } miss = 0; }
                     }
-                    double want = miss + (growOn ? grow : softW);
+                    // 478-S6 (analiza 120c pkt 5): komorka bez zadnego zakupu w oknie (got 0) przy niewydanym budzecie robot - stojacy budzet (poziom / okno) liczy sie
+                    // jako brak, nie tylko jego przyrost (wapien i marmur wypadaly z N > 1, gdy zlecenia przestawaly rosnac, choc nikt nic nie kupil)
+                    double growUse = grow;
+                    if (growOn && NoBuyOn && !food && !(got > 1e-6) && softW > grow) { growUse = softW; _sNoBuyCells++; }
+                    double want = miss + (growOn ? growUse : softW);
                     // 462-a-p (recenzja D1): udzial jedzenia wobec ZUZYCIA warsztatow (got), nie sprzedazy targu - mieso robia tez ukryci rzemieslnicy BK (MarketSales je sledzi),
                     // a jest wsadem piekarni; sprzedaz mieszczanom w mianowniku dawala N ~ 1 przy pustych piekarniach.
                     double sq = foodShare ? QueueShare(want, got, span) : Queue(want, sales, span);
