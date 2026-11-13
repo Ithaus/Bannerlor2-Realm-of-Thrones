@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -168,6 +169,12 @@ namespace Armoury
         private static Type _tArch;
         private static bool _patchOk;
         private static string _patch = "nie wpiete";
+        // 469-s: wstrzymani dla prefiksu Agent.SetFiringOrder (watek AI / glowny) - zmiana rozkazu ognia szyku (Formation.SetFiringOrder -> agent.SetFiringOrder
+        // dla kazdego czlowieka, mb_full.cs:69551; dolaczenie do szyku 70919) nadpisywala HoldYourFire miedzy przegladami (at-476b: "mimo wstrzymania" 72 / 44)
+        private static readonly ConcurrentDictionary<Agent, byte> HeldSet = new ConcurrentDictionary<Agent, byte>();
+        private static volatile bool _liveKey;
+        private static int _blocked, _holdAfterShot;
+        private static string _patchSfo = "nie wpiete";
         private static int _postErr;   // watek AI - Interlocked
         private static float _formAcc, _depT = -1f;
 
@@ -224,6 +231,7 @@ namespace Armoury
             _player = _key && (c == null || c.PlayerArchersHoldFireOutOfRange);
             _k = Friction();
             _live = true;
+            _liveKey = _key;
         }
 
         private static float Friction()
@@ -239,6 +247,7 @@ namespace Armoury
 
         private static void Clear()
         {
+            _liveKey = false; HeldSet.Clear(); Interlocked.Exchange(ref _blocked, 0); _holdAfterShot = 0;
             By.Clear(); Weap.Clear(); WeapSeen.Clear(); TBuf.Clear(); Drop.Clear(); HeldEver.Clear();
             _heldFoeInG = 0;
             // 469-q: sloty najpierw (postfiks w watku AI przestaje wpisywac), potem stan szykow
@@ -562,7 +571,7 @@ namespace Armoury
             bool inf = q != null && q.IsInfantryFormation;
             if (inf && !_key) { if (held) { _relForm++; End(s, now, true); } else _skInf++; return; }
             int cat = inf ? CInf : pl ? CPl : CAi;
-            if (f.FiringOrder.OrderEnum == FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire) { if (held) { _relForm++; s.Held = false; Close(s, now); } else _skFormHold++; return; }
+            if (f.FiringOrder.OrderEnum == FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire) { if (held) { _relForm++; s.Held = false; Unheld(a); Close(s, now); } else _skFormHold++; return; }
             if (!p.Ok) { if (held) { _relWeapon++; End(s, now, true); } else _skUsage++; return; }
             _archers++;
             // odleglosc: cel silnika, bez celu - skraj najblizszego szyku wroga
@@ -624,6 +633,7 @@ namespace Armoury
             if (s == null) { s = new St { A = a }; By[a] = s; }
             a.SetFiringOrder(FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire);
             s.Held = true;
+            HeldSet[a] = 0;
             s.Since = now;
             s.G = g;
             _holds++;
@@ -673,11 +683,29 @@ namespace Armoury
             return false;
         }
 
+        /// <summary>469-s: wstrzymanie po strzale poza G (glowny watek, z OnShot).</summary>
+        private static void HoldNow(Mission m, Agent a, float g, int cat)
+        {
+            var f = a.Formation;
+            if (f == null || f.FiringOrder.OrderEnum == FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire) return;
+            St s;
+            if (!By.TryGetValue(a, out s)) { s = new St { A = a }; By[a] = s; }
+            a.SetFiringOrder(FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire);
+            s.Held = true;
+            HeldSet[a] = 0;
+            s.Since = m.CurrentTime;
+            s.G = g;
+            _holds++; _holdAfterShot++;
+            HoldsBy[cat]++;
+            if (HeldEver.Add(a)) { _heldMen++; HeldMenBy[cat]++; }
+        }
+
         /// <summary>Koniec wstrzymania: rozkaz szyku wraca, chyba ze 310 wciaz trzyma ogien tego czlowieka (apply = false: padl - bez wywolan silnika).</summary>
         private static void End(St s, float now, bool apply)
         {
             if (s == null || !s.Held) return;
             s.Held = false;
+            Unheld(s.A);
             Close(s, now);
             var a = s.A;
             if (!apply || a == null || !a.IsActive() || CleanShot.Held(a)) return;
@@ -687,6 +715,23 @@ namespace Armoury
                 a.SetFiringOrder(f != null ? f.FiringOrder.OrderEnum : FiringOrder.RangedWeaponUsageOrderEnum.FireAtWill);
             }
             catch (Exception e) { Stumble("FireRange469.Ogien", e); }
+        }
+
+        private static void Unheld(Agent a)
+        {
+            if (a == null) return;
+            byte x;
+            HeldSet.TryRemove(a, out x);
+        }
+
+        /// <summary>469-s: prefiks Agent.SetFiringOrder (Priority.Last, po RBM OverrideAgent): czlowiek wstrzymany przez 469 dostaje HoldYourFire zamiast rozkazu
+        /// szyku, dopoki przeglad go nie zwolni (End zdejmuje go z HeldSet przed przywroceniem rozkazu). Watek dowolny: tylko odczyt ConcurrentDictionary.</summary>
+        public static void SfoPre(Agent __instance, ref int order)
+        {
+            if (!_liveKey || __instance == null || order == (int)FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire) return;
+            if (!HeldSet.ContainsKey(__instance)) return;
+            order = (int)FiringOrder.RangedWeaponUsageOrderEnum.HoldYourFire;
+            Interlocked.Increment(ref _blocked);
         }
 
         private static void Close(St s, float now)
@@ -750,7 +795,14 @@ namespace Armoury
                 {
                     // 469-q-p (U3): zwolniony / niewstrzymany z powodu wroga w 6 m (walczy o zycie, 310) - osobno; reszta ma byc 0 (469-r: wg rodzaju szyku)
                     float nt;
-                    if (NearT.TryGetValue(s, out nt) && m.CurrentTime - nt <= NearKeep) OverGNear[cat]++; else OverG[cat]++;
+                    if (NearT.TryGetValue(s, out nt) && m.CurrentTime - nt <= NearKeep) OverGNear[cat]++;
+                    else
+                    {
+                        OverG[cat]++;
+                        // 469-s: strzal poza G czlowieka niewstrzymanego (jeszcze nie przegladniety / cel odszedl miedzy przegladami) - wstrzymany od razu,
+                        // nastepny strzal juz nie pojdzie; zwolnienie jak zwykle przegladem (d <= G)
+                        if (_key && (cat != CPl || _player) && !Holds(s)) HoldNow(m, s, g, cat);
+                    }
                 }
             }
             if (Holds(s)) _shotsHeld++;
@@ -815,6 +867,7 @@ namespace Armoury
               .Append(ShotBy[0]).Append('/').Append(ShotBy[1]).Append('/').Append(ShotBy[2]).Append('/').Append(ShotBy[3]).Append('/').Append(ShotBy[4])
               .Append("), poza ").Append(OldOver.ToString("0.0", Inv)).Append(" G ").Append(_shotsOver).Append(", mimo wstrzymania ").Append(_shotsHeld)
               .Append(", bez celu ").Append(_shotsNoTarget)
+              .Append(" | 469-s: rozkaz ognia szyku nadpisujacy wstrzymanie zablokowany ").Append(Volatile.Read(ref _blocked)).Append(" (latka ").Append(_patchSfo).Append("), wstrzymanych od razu po strzale poza G ").Append(_holdAfterShot)
               .Append(" | 469-r strzaly poza G ").Append(_shotsOverG).Append(": szyk strzelcow AI ").Append(OverG[CAi])
               .Append(", szyk gracza ").Append(OverG[CPl]).Append(_player ? "" : " (klucz gracza NIE - poza regula)")
               .Append(", szyk piechoty ").Append(OverG[CInf]).Append(_key ? "" : " (klucz NIE - poza regula)")
@@ -1184,6 +1237,30 @@ namespace Armoury
         /// <summary>NightHooks.FirstBattle (raz na proces): postfiks RBMBehaviorArcherSkirmish.CalculateCurrentOrder (DeclaredMethod - metoda zadeklarowana w nim,
         /// rbmai.cs:8552). Brak RBM - bez latki, bez podejsc (wstrzymanie dziala dalej).</summary>
         internal static string ApplyMissionPatches(Harmony h)
+        {
+            string sfo = SfoPatch(h);
+            return ArchPatch(h) + ", rozkaz ognia " + sfo;
+        }
+
+        /// <summary>469-s: prefiks Agent.SetFiringOrder (DeclaredMethod na Agent, mb_full.cs:12886), Priority.Last, po RBM (com.rbmai OverrideAgent rbmai.cs:4403).</summary>
+        private static string SfoPatch(Harmony h)
+        {
+            try
+            {
+                var target = AccessTools.DeclaredMethod(typeof(Agent), "SetFiringOrder", new[] { typeof(FiringOrder.RangedWeaponUsageOrderEnum) });
+                if (target == null) return _patchSfo = "NIE (brak Agent.SetFiringOrder)";
+                h.Patch(target, prefix: new HarmonyMethod(typeof(FireRange469), nameof(SfoPre)) { priority = Priority.Last, after = new[] { "com.rbmai" } });
+                var info = Harmony.GetPatchInfo(target);
+                bool ok = false;
+                if (info != null)
+                    foreach (var p in info.Prefixes)
+                        if (p != null && p.owner == h.Id && p.PatchMethod != null && p.PatchMethod.Name == nameof(SfoPre)) ok = true;
+                return _patchSfo = ok ? "1/1" : "0/1 (latka polknieta)";
+            }
+            catch (Exception e) { return _patchSfo = "NIE (" + e.GetType().Name + ")"; }
+        }
+
+        private static string ArchPatch(Harmony h)
         {
             try
             {
