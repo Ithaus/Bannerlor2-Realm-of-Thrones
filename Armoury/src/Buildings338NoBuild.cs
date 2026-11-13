@@ -104,7 +104,11 @@ namespace Armoury
         /// <summary>476-a: AI nie stawia tej budowli w tej osadzie - zbrojownia / sad BK (473-b6, klucz On) albo zaklad bez zasobu okolicy (Buildings338Works, klucz Works).</summary>
         private static bool Skip(Town t, BuildingType bt)
         {
-            if (IsBlocked(bt) && AiTown(t)) return true;
+            if (IsBlocked(bt) && AiTown(t))
+            {
+                if (bt.StringId == CourtId) { var w = Buildings338Civic.AiWantsWorship(t); if (w.HasValue) return !w.Value; }   // 476-c: slot sadu BK = miejsce kultu
+                return true;
+            }
             return Buildings338Works.AiBlocks(t, bt);
         }
 

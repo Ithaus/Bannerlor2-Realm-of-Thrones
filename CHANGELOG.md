@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-c (13.11) - Temple (teatr BK), sad gry bez zmian, Place of Worship w slocie BK Court House (waga wiary pana, lojalnosc przy wierze panujacej)
+
+**Problem:** Jeff 13.11: "Teatr tak zwieksza lojalnosc, i nazwij to swiatynia"; "courthouse [BK] wylacz, a courthouse ktory zostaje daje tez wplywy i lojalnosc mieszkancow"; "Dodaj budynek wiary". Budynku wiary nie ma w zadnym module (audyt 12.11); BK Court House daje tylko +0.02 stabilnosci/poziom.
+
+**Przyczyna:** brak budynku wiary; nazwa teatru BK.
+
+**Zmiana:** nowy Buildings338Civic.cs: (1) BK Theater - nazwa "Temple" (efekt BK bez zmian); (2) sad gry - sprawdzone: juz daje wplywy +0.2/0.5/1 i lojalnosc +0.3/0.6/1 (DefaultBuildingTypes:234-237, BKLoyaltyModel:283 AddEffectOfBuildings) - bez dopisku (bez podwojenia); (3) slot BK Court House = "Place of Worship" (nazwa + opis po angielsku): E1 postfiks BKReligionModel.CalculateReligionWeight - wiara pana +10 x poziom w osadzie; E2 postfiks CalculateLoyaltyChange czynnego modelu (PatchTarget.OfActive) - lojalnosc +0.25 x poziom, gdy wiara pana jest wiara panujaca osady; E3 napiecie BK nieruszane. AI (473-b6 Skip): miejsce kultu tylko gdy wiara pana nie panuje albo lojalnosc < 60, inaczej jak 473-b6. Linia doby "Budynki (338) swiatynia i miejsce kultu (476-c)". Klucz Buildings338 Temples And Worship (TAK). Decyzje domyslne (noc 13.11): nazwa ogolna "Place of Worship" (typ budowli jest jeden dla swiata - opis wymienia sept/godswood/sale Utopionego Boga/swiatynie R'hllora); platnik - oplacona praca budowy pana jak kazda budowla (dziesiecina "budowa septow" bez zmian - osobny krok).
+
+**Ryzyko / co sprawdzic:** zmiana nazwy przez refleksje (BuildingType.Name/Explanation prywatne settery) - w zapisie nic; BK Court House juz zbudowany w miastach dostaje efekty E1/E2 od razu. Wywolania refleksji BK tylko w miastach z poziomem > 0. Linia startu: "swiatynia i miejsce kultu (476-c): lojalnosc <model>, waga wiary BKReligionModel, nazwy tak".
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-b (13.11) - rzemieslnicy zamku (Craftmans Quarters): surowiec okolicy -> towar na targ miasta okregu, place i podatek
 
 **Problem:** Jeff 13.11: "Craftmans - daj rzemieslnicy". Audyt budynkow 12.11: Craftmans Quarters zamku martwy (DenarByBoundVillageHeartPerDay czyta tylko podatek gry, zastapiony przez PopulationLaw.TownTaxPostfix) - 11-20 tys. zl za nic.

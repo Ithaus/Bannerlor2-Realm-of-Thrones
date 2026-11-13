@@ -12940,6 +12940,10 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338CastleCraftsmen { get; set; } = true;
 
+        [SettingPropertyBool("Buildings338 Temples And Worship", HintText = "With Buildings338: the Banner Kings Theater is called Temple (loyalty and the lord's culture as before); the game's Courthouse keeps its influence and loyalty (+0.3/0.6/1 a day, as in the game); the Banner Kings Court House slot becomes a Place of Worship - a sept, godswood, hall of the Drowned God or temple of R'hllor after the lord's faith: the lord's faith gains weight in the town (+10 per level) and, while it is the faith of the town, loyalty rises by 0.25 a day per level. Lords run by the game build it only where their faith does not hold the town or loyalty is below 60. Off = names and effects as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Worship { get; set; } = true;
+
         [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338CastleMines { get; set; } = true;
@@ -16230,6 +16234,7 @@ namespace Armoury
             s.Buildings338Studs = Buildings338Studs;
             s.Buildings338Works = Buildings338Works;
             s.Buildings338CastleCraftsmen = Buildings338CastleCraftsmen;
+            s.Buildings338Worship = Buildings338Worship;
             s.Buildings338CastleMines = Buildings338CastleMines;
             s.GoldForecastReal = GoldForecastReal;
             s.GoldDailySummary = GoldDailySummary;
