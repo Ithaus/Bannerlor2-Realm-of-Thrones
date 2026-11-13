@@ -50,7 +50,19 @@ namespace Armoury
         internal static InnTable Now { get { var l = InnInteriorLogic.Current; return l != null ? l.Tables : null; } }
 
         // ------------------------------------------------------------ budowa
-        private sealed class SeatPt { public StandingPoint Sp; public Vec3 Pos; public int Group; }
+        // 485: jedno siedzisko = krzeslo + grupa punktow (GroupId); punkty podejscia (right/left/front/back) to JEDNO miejsce, nie cztery
+        private sealed class SeatPt { public Chair Ch; public StandingPoint Sp; public Vec3 Pos; public int Group; }
+        private sealed class SitCheck { public Agent A; public StandingPoint Sp; public Chair Ch; public string Pt; public int ChId; }
+        private readonly List<SitCheck> _checks = new List<SitCheck>();
+        private float _checkAt = -1f;
+        private int _blocked, _ptsAll;
+
+        private static string PtName(StandingPoint sp)
+        {
+            try { return sp.GameEntity.Name ?? "-"; } catch { return "?"; }
+        }
+
+        private static bool IsFront(StandingPoint sp) { return PtName(sp).IndexOf("front", StringComparison.OrdinalIgnoreCase) >= 0; }
 
         /// <summary>Sadza do want bywalcow przy stolach sceny. Zwraca liczbe posadzonych.</summary>
         internal int Seat(Mission m, int want, Random rng)
@@ -61,15 +73,31 @@ namespace Armoury
                 var ch = mo as Chair;
                 if (ch == null || ch.StandingPoints == null) continue;
                 _chairs++;
-                foreach (var sp in ch.StandingPoints)
+                try
                 {
-                    if (sp == null || sp.IsDeactivated || sp.HasUser || !(sp is SandBox.Objects.AnimationPoints.AnimationPoint)) continue;
-                    try { seats.Add(new SeatPt { Sp = sp, Pos = sp.GameEntity.GlobalPosition, Group = -1 }); }
-                    catch (Exception e) { RoadsideInnInterior.Stumble("Table.Seat", e); }
+                    // (a)+(b): jeden wpis na grupe; grupa, w ktorej ktorykolwiek punkt ma uzytkownika, odpada; w grupie unikamy punktu "front" (od strony stolu)
+                    var best = new Dictionary<int, StandingPoint>();
+                    var taken = new HashSet<int>();
+                    int solo = -1000;
+                    foreach (var sp in ch.StandingPoints)
+                    {
+                        var ap = sp as SandBox.Objects.AnimationPoints.AnimationPoint;
+                        if (ap == null) continue;
+                        _ptsAll++;
+                        int g = ap.GroupId >= 0 ? ap.GroupId : solo--;
+                        if (sp.HasUser) { taken.Add(g); continue; }
+                        if (sp.IsDeactivated) continue;
+                        StandingPoint cur;
+                        if (!best.TryGetValue(g, out cur) || (IsFront(cur) && !IsFront(sp))) best[g] = sp;
+                    }
+                    Vec3 cpos = ch.GameEntity.GlobalPosition;
+                    foreach (var kv in best)
+                        if (!taken.Contains(kv.Key)) seats.Add(new SeatPt { Ch = ch, Sp = kv.Value, Pos = cpos, Group = -1 });
                 }
+                catch (Exception e) { RoadsideInnInterior.Stumble("Table.Seat", e); }
             }
             _seats = seats.Count;
-            // grupy (pojedyncze wiazanie do Join metrow)
+            // (d) stoly po pozycji KRZESLA (encja maszyny), nie punktow podejscia; pojedyncze wiazanie do Join metrow
             var groups = new List<List<SeatPt>>();
             for (int i = 0; i < seats.Count; i++)
             {
@@ -99,9 +127,28 @@ namespace Armoury
                 var people = new List<Agent>();
                 for (int i = 0; i < k; i++)
                 {
-                    var a = _l.SpawnAt(m, _l.PatronKind(), t[i].Sp.GameEntity.GetGlobalFrame(), "_villager", true, InnInteriorLogic.RolePatron);
+                    var sp = t[i].Sp;
+                    var a = _l.SpawnAt(m, _l.PatronKind(), sp.GameEntity.GetGlobalFrame(), "_villager", true, InnInteriorLogic.RolePatron);
                     if (a == null) continue;
-                    if (InnInteriorLogic.UseSeat(a, t[i].Sp)) _sitOk++;
+                    // (c) strona krzesla wg gry (Chair.GetBestPointAlternativeTo - najblizszy wolny punkt grupy), bez "front";
+                    // punkt zablokowany (IsDisabledForAgent) = bywalec zostaje stojacy w tym miejscu (licznik)
+                    try
+                    {
+                        var alt = t[i].Ch.GetBestPointAlternativeTo(sp, a);
+                        if (alt != null && alt != sp && !IsFront(alt) && !alt.HasUser) sp = alt;
+                    }
+                    catch (Exception e) { RoadsideInnInterior.Stumble("Table.Alt", e); }
+                    bool blocked = true;
+                    try { blocked = sp.HasUser || sp.IsDisabledForAgent(a); }
+                    catch (Exception e) { RoadsideInnInterior.Stumble("Table.Disabled", e); }
+                    if (blocked) _blocked++;
+                    else if (InnInteriorLogic.UseSeat(a, sp))
+                    {
+                        _sitOk++;
+                        int cid = -1;
+                        try { cid = t[i].Ch.Id.Id; } catch { }
+                        _checks.Add(new SitCheck { A = a, Sp = sp, Ch = t[i].Ch, Pt = PtName(sp), ChId = cid });
+                    }
                     people.Add(a);
                     seated++;
                 }
@@ -114,7 +161,33 @@ namespace Armoury
 
         internal string BuildText()
         {
-            return "stoly (474-P9): krzesel " + _chairs + ", miejsc " + _seats + ", stolow " + _tablesAll + ", zajete " + _tables.Count + ", siadanie " + _sitOk;
+            return "stoly (474-P9): krzesel " + _chairs + ", miejsc (485: krzeslo+grupa) " + _seats + " z punktow " + _ptsAll + ", stolow " + _tablesAll + ", zajete " + _tables.Count
+                   + ", siadanie " + _sitOk + ", punkt zablokowany (stoi) " + _blocked;
+        }
+
+        /// <summary>485 (e): jednorazowa kontrola ok. 3 s po wejsciu - gdzie naprawde sa posadzeni (punkt, krzeslo, odleglosc od srodka krzesla).</summary>
+        internal void Tick(float now)
+        {
+            if (_checks.Count == 0) return;
+            if (_checkAt < 0f) { _checkAt = now + 3f; return; }
+            if (now < _checkAt) return;
+            var sb = new System.Text.StringBuilder();
+            int far = 0;
+            foreach (var c in _checks)
+            {
+                try
+                {
+                    if (c.A == null || !c.A.IsActive()) { sb.Append(" [").Append(c.Pt).Append(" krzeslo ").Append(c.ChId).Append(": brak agenta]"); continue; }
+                    Vec3 cp = c.Ch.GameEntity.GlobalPosition, ap = c.A.Position;
+                    float dxy = cp.AsVec2.Distance(ap.AsVec2), dz = ap.z - cp.z;
+                    if (dxy > 0.5f || Math.Abs(dz) > 0.3f) far++;
+                    sb.Append(" [").Append(c.Pt).Append(" krzeslo ").Append(c.ChId).Append(": ").Append(dxy.ToString("0.00", CultureInfo.InvariantCulture))
+                      .Append(" m, dz ").Append(dz.ToString("0.00", CultureInfo.InvariantCulture)).Append(c.Sp.UserAgent == c.A ? ", uzywa" : ", NIE uzywa").Append("]");
+                }
+                catch (Exception e) { RoadsideInnInterior.Stumble("Table.Check", e); }
+            }
+            _checks.Clear();
+            Log.Info(P + "siedzacy po 3 s (485): dalej niz 0.5 m poziomo / 0.3 m w pionie od srodka krzesla " + far + " |" + sb + ".");
         }
 
         internal string ExitText()

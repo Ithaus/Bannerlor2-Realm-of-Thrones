@@ -533,6 +533,7 @@ namespace Armoury
         {
             _t += dt;
             if (_t >= _nextMurmur) Murmur();
+            if (Tables != null) Tables.Tick(_t);   // 485: jednorazowa kontrola siedzacych po ok. 3 s (sam log)
             if (_testClock != null && _testClock.ElapsedMilliseconds >= 8000)
             {
                 _testClock = null;
