@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P8-p3 (13.11) - wnetrze zajazdu: grajkowie i stojacy bywalcy z kontrolerem AI (poprawka po recenzji A3)
+
+**Problem:** recenzja A3 (kod, do sprawdzenia w tescie): grajkowie i stojacy bywalcy (na `npc_common`) powstawali z `AgentControllerType.None`. Rozmowa z nimi idzie przez `MissionConversationLogic.StartConversation`, a ta wola na kazdym rozmowcy `Agent.ForceAiBehaviorSelection()` (wywolanie silnika `MBAPI.IMBAgent`) i animacje rozmowy. W grze wszyscy rozmowcy w misjach sa sterowani przez AI - droga z agentem bez AI jest niesprawdzona (ryzyko po stronie silnika).
+
+**Przyczyna:** DOWOD: `SandBox.Conversation.MissionLogics.MissionConversationLogic.StartConversation` (dekompilacja 1.4.8, `decout/v/all_sb/.../MissionConversationLogic.cs:280-293`) - `foreach (conversationAgent in ConversationAgents) conversationAgent.ForceAiBehaviorSelection()`; `SetConversationAgentAnimations` sprawdza `AgentNavigator?` na null (nawigatora i tak nie ma, jak u barmana).
+
+**Zmiana:** `InnInteriorLogic.Build` - grajkowie i stojacy bywalcy `SpawnAt(..., ai: true, ...)` (kontroler AI, bez nawigatora i bez punktu uzycia - stoja jak barman przed `UseGameObject`). Siedzacy bywalcy (474-P9), barman i kelnerka bez zmian (juz AI). Spacer po wiosce (474-P7) bez zmian - tam nie ma logiki rozmowy.
+
+**Ryzyko / co sprawdzic:** klucz `RoadsideInnInterior` NIE - misja nie istnieje. W grze: czy grajkowie i stojacy bywalcy stoja w miejscu (AI bez celu) i czy rozmowa z grajkiem i ze stojacym bywalcem sie otwiera i zamyka. Koszt: do 17 agentow AI wiecej niz None - tyle, co w karczmie miasta gry.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 474-P6-p (13.11) - okno werbunku wioski pobocznej: powod, gdy przyszlo mniej ludzi niz w koszyku (poprawka po recenzji A4 / B8)
 
 **Problem:** recenzja A4 i B8 (kod): prefiks `RecruitmentVM.ExecuteDone` (474-P6) zastepuje cale zatwierdzenie, wiec znika okno gry "Over Limit". `LevyDo` tnie liczbe do `RoomNow()` / zlota / gotowych, wiec druzyna nie przekroczy limitu i placi sie tylko za przybylych, ale koszyk wiekszy niz wolne miejsce przepadal po cichu (tylko linia logu).

@@ -641,7 +641,7 @@ namespace Armoury
                         musPts++;
                         if (mus >= 3) continue;
                         Agent a = null;
-                        try { a = SpawnAt(m, Pick(c => c.Musician, cultFrom), sp.GameEntity.GetGlobalFrame(), "_musician", false, RoleMusician); }
+                        try { a = SpawnAt(m, Pick(c => c.Musician, cultFrom), sp.GameEntity.GetGlobalFrame(), "_musician", true, RoleMusician); }   // 474-P8-p3: kontroler AI (rozmowa wola ForceAiBehaviorSelection na rozmowcach - w grze zawsze AI)
                         catch (Exception e) { RoadsideInnInterior.Stumble("Musician", e); }
                         if (a != null) mus++;
                     }
@@ -667,7 +667,7 @@ namespace Armoury
                 for (int i = 0; i < pts.Count && seated + standing < want; i++)
                 {
                     if (pts[i].origin.AsVec2.Distance(me) < 2f) continue;
-                    if (SpawnAt(m, PatronKind(), pts[i], "_villager", false, RolePatron) != null) standing++;
+                    if (SpawnAt(m, PatronKind(), pts[i], "_villager", true, RolePatron) != null) standing++;   // 474-P8-p3: AI jak wyzej (stoi - bez nawigatora i bez punktu uzycia)
                 }
             }
 
