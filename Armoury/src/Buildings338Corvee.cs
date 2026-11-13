@@ -77,6 +77,9 @@ namespace Armoury
         {
             lvl = 0;
             if (town == null || !town.IsCastle) return 0f;
+            // 476-p1 (recenzje A1 / B1): w oblezeniu BK nie daje produkcji ludnosci (bk_all.cs:39383), a gra nie dodaje FoodProduction budowli - nie ma czego
+            // przesuwac ani odejmowac (dotad -6/-12/-18 na dobe jedzenia, ktorego zamek nie dostal - krotsza obrona 471b)
+            if (town.IsUnderSiege) return 0f;
             var b = Buildings338.FindBuilding(town, "building_castle_farmlands");
             lvl = b != null ? b.CurrentLevel : 0;
             if (lvl <= 0) return 0f;

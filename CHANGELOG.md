@@ -1,5 +1,18 @@
 # DZIENNIK ZMIAN
 
+## 476-p1 (13.11) - panszczyzna Farmlands nie odejmuje jedzenia w oblezeniu; uczciwy opis bilansu
+
+**Problem:** recenzje 476 (A1 srednia, B1 wysoka): w oblezeniu BKFoodModel.GetPopulationFoodProduction zwraca 0 (bk_all.cs:39383), a DefaultSettlementFoodModel nie dodaje FoodProduction budowli (AddEffectOfBuildings tylko poza oblezeniem). Delta 476-e zwracala wtedy -GameFood = -6/-12/-18 na dobe jedzenia, ktorego zamek nie dostal - oblezony zamek z Farmlands glodowal szybciej, obrona 471b krotsza.
+Recenzja B2 (srednia): "przesuwane, nie tworzone" bylo tylko z nazwy - zamek bierze 20/25/30% produkcji ludnosci bez premii zamiast 15% z premia; pozostalych 85% (chlopi) BK w bilansie Food nie modeluje, wiec nadwyzka ponad 15% nikomu nie jest odejmowana.
+
+**Przyczyna:** brak warunku oblezenia w Buildings338Corvee.Delta.
+
+**Zmiana:** Delta: `if (town.IsUnderSiege) return 0f;` (bez korekty w oblezeniu - gra i BK same nic nie licza). B2 - decyzja domyslna (noc 13.11): bez zmiany kodu, opis uczciwy: Farmlands daje zamkowi +5/+10/+15% produkcji ludnosci ponad 15% bez budynku - nadal czesciowo "z niczego", ale mniej niz przed 476-e (+22.5/+30/+37.5% wg BK). Pelne zdjecie z chlopow wymagaloby modelu ich 85% (osobny krok). HandleExcessFood BK (tygodniowy wykup nadwyzki) liczy dalej z premia - do sprawdzenia w tescie.
+
+**Ryzyko / co sprawdzic:** linia "Budynki (338) panszczyzna Farmlands (476-e)": zamki oblezone bez zmiany jedzenia; bilans zamkow < 0 jak w projekcie.
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-g (13.11) - spustoszenie zdobytej osady: polowa spalonych poziomow budowli zniszczona na dobre (bez zgliszcz, odbudowa za pelna cene)
 
 **Problem:** Jeff 13.11: "jak jest oblezenie i ktos wybiera oszczedz to budynki nie sa niszczone, jak jest rabunek lub pillage ten ostrzejszy to mocno cierpia budynki, czesc moze zostac zniszczona i trzeba je odbudowac, naprawic, szansa jest ze niektore zostana zniszczone na dobre i trzeba od nowa odbudowac".
