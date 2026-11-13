@@ -673,8 +673,13 @@ namespace Armoury
 
             // gwar (gdy scena nie ma wlasnego) i muzyka
             bool crowdOwn = Scene != null && CrowdInScene.Contains(Scene);
-            if (!crowdOwn) _crowd = PlaySound(m, EvCrowd);
-            _music = PlaySound(m, EvMusic);
+            // 474-P8-p4 (recenzja A7): zrodla w sali, nie w (0,0,0) sceny - muzyka przy grupie grajkow (jak MusicianGroup gry: SetPosition(GetGlobalFrame().origin)),
+            // gwar przy punkcie gracza (srodek sali)
+            Vec3 musAt = pf.origin;
+            try { if (machines.TryGetValue("musician", out ml) && ml != null && ml.Count > 0 && ml[0] != null && ml[0].GameEntity != null) musAt = ml[0].GameEntity.GetGlobalFrame().origin; }
+            catch (Exception e) { RoadsideInnInterior.Stumble("MusicAt", e); }
+            if (!crowdOwn) _crowd = PlaySound(m, EvCrowd, pf.origin);
+            _music = PlaySound(m, EvMusic, musAt);
 
             Log.Info(RoadsideInnInterior.P + "wejscie - " + InnName + " (" + (Inn != null ? Inn.Uid : "-") + ", region tekstow " + Region + ") | scena " + Scene + " | gracz na " + _spawnAt
                      + " | barman " + keep + ", kelnerka " + wench + ", grajkowie " + mus + " (punktow " + musPts + ") | bywalcy chcianych " + want + ": przy stolach " + seated
@@ -814,12 +819,13 @@ namespace Armoury
             catch (Exception e) { RoadsideInnInterior.Stumble("SpawnPlayer", e); }
         }
 
-        private static SoundEvent PlaySound(Mission m, string ev)
+        private static SoundEvent PlaySound(Mission m, string ev, Vec3 at)
         {
             try
             {
                 var s = SoundEvent.CreateEventFromString(ev, m.Scene);
                 if (s == null || !s.IsValid) return null;
+                try { s.SetPosition(at); } catch (Exception e) { RoadsideInnInterior.Stumble("SoundAt(" + ev + ")", e); }
                 s.Play();
                 return s;
             }

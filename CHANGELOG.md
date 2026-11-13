@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P8-p4 (13.11) - wnetrze zajazdu: gwar i muzyka w sali, nie w poczatku ukladu sceny (poprawka po recenzji A7)
+
+**Problem:** recenzja A7 (kod): gwar (`tavern` area) i `tavern_track_01` powstawaly bez `SetPosition`, czyli w (0,0,0) sceny. W scenach, gdzie sala lezy daleko od tego punktu, dzwiek moze byc nieslyszalny albo dochodzic ze zlej strony.
+
+**Przyczyna:** DOWOD: gra ustawia pozycje toru grajkow (`MusicianGroup`, `decout/full/v_sandbox.cs:9386-9388`: `CreateEvent` + `SetPosition(GameEntity.GetGlobalFrame().origin)`); nasze `PlaySound` tego nie robilo.
+
+**Zmiana:** `PlaySound(m, ev, at)` - `SetPosition(at)` przed `Play` (wlasny try). Muzyka - przy pierwszej grupie grajkow sceny (tag `musician`), bez niej przy punkcie gracza; gwar - przy punkcie gracza (srodek sali).
+
+**Ryzyko / co sprawdzic:** klucz `RoadsideInnInterior` NIE - misja nie istnieje. Zwalnianie zrodel przy wyjsciu bez zmian. W grze: czy muzyka slychac od strony grajkow, a gwar w calej sali.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 474-P8-p3 (13.11) - wnetrze zajazdu: grajkowie i stojacy bywalcy z kontrolerem AI (poprawka po recenzji A3)
 
 **Problem:** recenzja A3 (kod, do sprawdzenia w tescie): grajkowie i stojacy bywalcy (na `npc_common`) powstawali z `AgentControllerType.None`. Rozmowa z nimi idzie przez `MissionConversationLogic.StartConversation`, a ta wola na kazdym rozmowcy `Agent.ForceAiBehaviorSelection()` (wywolanie silnika `MBAPI.IMBAgent`) i animacje rozmowy. W grze wszyscy rozmowcy w misjach sa sterowani przez AI - droga z agentem bez AI jest niesprawdzona (ryzyko po stronie silnika).
