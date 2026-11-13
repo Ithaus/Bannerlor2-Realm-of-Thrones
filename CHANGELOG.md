@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 479-g (13.11) - KS: pelny hamulec 479-e nie zabiera bloku przejscia, ktore robil bez 479-e
+
+**Problem:** at-220e (m220e, Armoury-2026-11-13_10-20-30.log): technicznie OK (220 dob, 23 bledy cudze, 0 BLAD), ale indeks cen miast gorszy niz at-220c: ser 1.32-1.87 (220c 0.81-1.22), maslo 1.10-1.66 (0.86-1.13), zboze 1.13-1.52 (0.63-1.02), ryby 0.90-1.84 (0.80-1.29); mieso bez zmian (ok. 1.9-2.8). Linia "KS: A7 regula zajec" co krok: "inny cel dzieki 479-e 0", "hamulec wzrostu ... wstrzymal 588-1040 (rak 0.9-2.1 mln)".
+
+**Przyczyna:** StartCalibration.A7s.cs A7eGate: sygnal z polek pcha prawie wszystkie bloki ku malym zajeciom (mieso, oliwki - polki 0.2-0.3 T*), hamulec 10% rak celu na sezon (min 0.1% rak rynku) jest pelny od razu, a odrzucony blok w Rule.cs robil `continue` - nie robil ZADNEGO przejscia, takze tego, ktore wybieral bez 479-e (ser, maslo w 220c).
+
+**Zmiana:** decyzja domyslna (noc 13.11), bez nowego klucza (pod Ks Switch Food Shelves). Nowe A7eFallback (A7s.cs), wolane w Rule.cs zaraz po wyborze celu (przed progiem x1.25 i Held): gdy przejscie do celu z polek nie zmiesci sie w hamulcu (wzrost celu albo odplyw zrodla w tym sezonie, ten sam rachunek co A7eGate), blok liczy cel, dochod i nacisk wedlug wiersza BEZ 479-e (_sigOld). Wtedy bramka przy starcie widzi "jak bez 479-e" i przepuszcza. 479-e tylko dodaje przejscia w granicy hamulca. Linia A7: "479-g: hamulec pelny - cel wedlug sygnalu bez 479-e N (rak), bez nacisku N".
+
+**Ryzyko / co sprawdzic:** regresja: przy kluczu NIE - return (bez zmian); bez wiersza dawnego - bez zmian (bramka zamknieta jak 479-f). Koszt: drugi rachunek dochodow tylko dla blokow z pelnym hamulcem, tylko w dobie kroku sygnalu (sRow tylko co 7 dob). Kolizje: rawPress/CraftShortage licza po celu zastepczym (tak jak liczylyby bez 479-e); fach (fachRet) pominiety jak w bramce; Held dalej wspolny - blok z naciskiem ku polkom >= 60 dob zaczyna od razu przejscie dawne (tak samo jak bez 479-e). W tescie: ceny ser/maslo wracaja do poziomu 220c, licznik 479-g > 0, "inny cel dzieki 479-e" > 0.
+
+**Status:** DO SPRAWDZENIA (test at-220g)
 ## 479-f (13.11) - KS: poprawki 479-e po recenzji (hamulec przed zwrotem, tablica f20 z data, ZW bez polek, hamulec odplywu, bramka zamknieta po wczytaniu)
 
 **Problem:** recenzja 479-e (workflow wm22oc97w, 5 usterek potwierdzonych przez weryfikatorow): (1) Rule.cs - A7eGate stal PO CraftUnblock.NoteStartRefund / NoteStartPast; start odrzucony hamulcem zuzywal zwrot regionu raz na sezon (_refSeason) i liczyl sie w LP jako start po zwrocie / po terminie, choc nic nie ruszylo; (2) _f20Cov/_f20Hc pisane tylko w F20Week i czyszczone tylko w F20Reset - po wylaczeniu f20 (Ks Food Hands Follow Market / Ks Food Hands With A7) w MCM w polowie sesji sygnal A7 i hamulec zostawaly na zamrozonej tablicy do konca sesji, a linia A7 mowila "tablica f20 jest"; (3) ZW wsie poboczne (SideSignalIncome -> A7sRow) dostawaly pelny sygnal polek x3 bez hamulca 479-e; (4) hamulec liczyl tylko wzrost zajecia celu - nadmiar jedzenia (cena 1/x) wypychal rece ze zrodla bez limitu, a przy 364 dobach drzew grozi wahaniem A->B->A; (5) po wczytaniu _sigOld/_a7eSeaH (pamiec sesji) puste - A7eGate zwracal true (otwarty), a _sig z zapisu niesie jeszcze ceny z polek.

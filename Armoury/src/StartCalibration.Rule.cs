@@ -406,6 +406,7 @@ namespace Armoury
                             }
                             else if (ReferenceEquals(b, fRet) && fM < 0.95 * fT && fInc > 0 && fInc >= incCur) { best = fct; fachRet = true; }   // recenzja R3: nie na gorzej platna prace
                         }
+                        if (sig && !fachRet) A7eFallback(b, type, cur, mt, ld.Market == 0 ? 0 : 1, b.Hands * b.X[ci], nfU, ref best, ref incCur, ref incBest);   // 479-g: hamulec pelny - cel bez 479-e
                         if (!fachRet && (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur))) { b.Held = 0; if (nf != null) CraftShortage.Note(CraftShortage.SysKs, lp6Rule ? false : rawPress, lp6Rule ? rawPress : false, b.Hands * b.X[ci]); continue; }
                         if (nf != null) { if (fachRet) CraftShortage.NoteFach(CraftShortage.SysKs); else CraftShortage.Note(CraftShortage.SysKs, lp6Rule ? true : rawPress, lp6Rule ? rawPress : true, b.Hands * b.X[ci]); }   // 435-L6: sam licznik
                         b.Held += StepDays; _rPress++; if (b.Held > _rMaxHeld) _rMaxHeld = b.Held;

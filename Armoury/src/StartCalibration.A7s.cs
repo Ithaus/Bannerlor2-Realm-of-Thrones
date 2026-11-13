@@ -127,6 +127,31 @@ namespace Armoury
             return true;
         }
 
+        // 479-g (noc 13.11, test at-220e): polki pchaja prawie wszystkie bloki ku malym zajeciom (mieso, oliwki) - hamulec 10%/sezon pelny od razu, a zablokowany blok
+        // nie robil ZADNEGO przejscia, takze tego, ktore robil bez 479-e (ser, maslo - ceny gorsze niz w at-220c). Teraz: gdy przejscie do celu z polek nie zmiesci sie
+        // w hamulcu (wzrost celu albo odplyw zrodla w tym sezonie), blok liczy cel i nacisk wedlug wiersza BEZ 479-e - 479-e tylko dodaje przejscia w granicy hamulca
+        private static int _a7gFall, _a7gNone;
+        private static double _a7gFallH;
+        private static void A7eFallback(LiveBlock b, string type, int cur, Town mt, int m, double hands, double[] nfU, ref int best, ref double incCur, ref double incBest)
+        {
+            if (!A7eOn || best < 0 || best == cur || mt == null) return;
+            int NC = KsTab.NC;
+            double used = 0, usedOut = 0;
+            if (_a7eSea == _regionSeason && _a7eSeaH != null && _a7eSeaOut != null) { used = _a7eSeaH[m * NC + best]; usedOut = _a7eSeaOut[m * NC + cur]; }
+            var hc = F20TabLive(Today()) ? _f20Hc : null; double baseH = 0, srcH = 0, all = 0;
+            if (hc != null && hc.Length == 2 * NC) { baseH = Math.Max(0.0, hc[m * NC + best]); srcH = Math.Max(0.0, hc[m * NC + cur]); for (int c = 0; c < NC; c++) all += Math.Max(0.0, hc[m * NC + c]); }
+            double cap = Math.Max(A7eGrowCap * baseH, A7eGrowFloor * all), capOut = Math.Max(A7eGrowCap * srcH, A7eGrowFloor * all);
+            if (used + hands <= cap && usedOut + hands <= capOut) return;   // zmiesci sie - decyduje bramka przy starcie
+            double[] o;
+            if (!_sigOld.TryGetValue(mt, out o) || o == null || o.Length != KsTab.NG) return;   // bez wiersza dawnego - bramka zamknieta jak w 479-f
+            var oV = A7sVRow(o); double rent = A7sRent(b);
+            double ic = A7sIncome(b, type, cur, o, oV, rent, nfU != null ? nfU[cur] : 1.0), ib = double.NegativeInfinity; int ob = -1;
+            foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, o, oV, rent, nfU != null ? nfU[c] : 1.0); if (v > ib) { ib = v; ob = c; } }
+            if (ob == best) return;                                          // ten sam cel bez 479-e - bramka przepusci (jak bez 479-e)
+            best = ob; incCur = ic; incBest = ib;
+            if (ob >= 0 && ib >= SwitchRatio * Math.Max(0.02, ic)) { _a7gFall++; _a7gFallH += hands; } else _a7gNone++;
+        }
+
         private static string A7eText()
         {
             if (!A7eOn) return " | jedzenie z polek (479-e, Ks Switch Food Shelves): WYL. - jak dotad";
@@ -139,6 +164,7 @@ namespace Armoury
                  + "; hamulec wzrostu (10% rak zajecia celu na sezon) wstrzymal " + _a7eCap + " (rak " + _a7eCapH.ToString("0", inv) + ")"
                  + "; 479-f: hamulec odplywu (10% rak zajecia zrodla na sezon) wstrzymal " + _a7eOutCap + " (rak " + _a7eOutCapH.ToString("0", inv) + "), bez wiersza dawnego - bramka zamknieta " + _a7eNoOld
                  + ", bez zywej tablicy f20 (cap 0) " + _a7eNoTab + ", krokow sygnalu z tablica przeterminowana albo f20 nieczynnym (sygnal jak dotad) " + _a7eStale + ", ZW wsie poboczne na wierszu bez polek"
+                 + "; 479-g: hamulec pelny - cel wedlug sygnalu bez 479-e " + _a7gFall + " (rak " + _a7gFallH.ToString("0", inv) + "), bez nacisku " + _a7gNone
                  + (parts.Count > 0 ? "; dzieki 479-e (top): " + string.Join(", ", parts.ToArray()) : "");
         }
 
@@ -192,6 +218,7 @@ namespace Armoury
             _a7sNotes.Clear();
             _a7eDev = _a7eSame = _a7eDiff = _a7eNew = _a7eCap = _a7eNoOld = 0; _a7eDiffH = _a7eNewH = _a7eCapH = 0; _a7eTr.Clear();   // 479-e
             _a7eOutCap = _a7eStale = _a7eNoTab = 0; _a7eOutCapH = 0;                                                               // 479-f
+            _a7gFall = _a7gNone = 0; _a7gFallH = 0;                                                                               // 479-g
         }
 
         // ------------------------------------------------------------ cena sygnalu
