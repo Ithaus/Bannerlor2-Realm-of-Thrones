@@ -295,6 +295,19 @@ namespace Armoury
                                + "; at war with " + realm + " you are paid nothing.";
                 // krotki opis (m115-okno): co robi, pelny sprzet i ile stoi, dochod z wiersza "full kit" (q.Room liczy tez puste zagrody, wiec nie "reszta" pelnego sprzetu), targ i wozy, zloto
                 var top = new StringBuilder(400);
+                // 474 P2 (klucz SideVillageMakesLine): ikona glownego towaru czesci przed linia (obrazek tabliczek wsi gry; opis okna to RichText - ROT-Content
+                // MultiSelectionQueryPopup.xml PopUpLabel); bez stylu - bez ikony
+                if (s != null && s.SideVillageMakesLine)
+                {
+                    try
+                    {
+                        var gi = SideVillageGoods.Of(q.Pc, SideVillageGoods.TownOf(v));
+                        string sp = gi != null ? SideVillageGoods.SpriteOf(gi.IconId) : null;
+                        SideVillageGoods.NoteIcon(q.Name, sp);
+                        if (sp != null) top.Append("<img src=\"").Append(sp).Append("\" extend=\"6\"> ");
+                    }
+                    catch (Exception e) { Stumble("OpenPart(ikona)", e); }
+                }
                 top.Append("Makes ").Append(craft).Append(" worth about ").Append(Math.Round(q.V).ToString("N0", Inv)).Append(" a day (").Append(Math.Round(q.V * 364).ToString("N0", Inv)).Append(" a year).\n");
                 top.Append("Full kit for ").Append(Math.Round(q.S)).Append(" homesteads: ").Append(Math.Round(full).ToString("N0", Inv)).Append(". In place: ")
                    .Append(Math.Round(100 * Math.Min(1, q.S > 0 ? q.UEff / q.S : 0))).Append("%.\n");

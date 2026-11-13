@@ -268,29 +268,67 @@ namespace Armoury
         {
             int price = TankardPrice(priceTown);
             MBTextManager.SetTextVariable(var, ShortLabels.Pick("Buy a tankard and listen (" + price + " d)", "Buy a tankard of ale and listen to the gossip (" + price + " d)"));
+            string tip;
+            args.IsEnabled = DrinkState(at, key, priceTown, barred, price, out tip);
+            args.Tooltip = new TextObject("{=!}" + tip);
+            return true;
+        }
+
+        /// <summary>474-P3: kufel z rozmowy z karczmarzem miasta ("Pour me an ale. What's the news?") - ten sam stan co opcja menu karczmy (DrinkState), ta sama pula
+        /// i ksiega uslyszanych (klucz miasta = StringId osady), ta sama zaplata (DrinkConsequence). true = mozna nalac; tip - powod albo opis jak w menu.</summary>
+        internal static bool KeeperAleState(Settlement st, out string tip)
+        {
+            if (st == null || !st.IsTown) { tip = "Nobody pours ale here now."; return false; }
+            return DrinkState(st.GetPosition2D, st.StringId, st, st.Town != null ? null : "Nobody pours ale here now.", TankardPrice(st), out tip);
+        }
+
+        /// <summary>474-P3: kufel po rozmowie z karczmarzem - dokladnie to, co opcja menu karczmy miasta przy InnGossipNeedsDrink (TownGossipConsequence).</summary>
+        internal static void KeeperAle(Settlement st)
+        {
+            if (st == null || !st.IsTown) return;
+            DrinkConsequence(st.GetPosition2D, st.StringId, st.Name.ToString(), true, st, null);
+        }
+
+        /// <summary>474-P8: kufel u barmana we wnetrzu zajazdu ("Pour me an ale. What's the news?") - ten sam stan co opcja menu zajazdu (RoadGossipCondition):
+        /// przy InnGossipNeedsDrink DrinkState z cena miasta zajazdu (RoadTown), zakazem wojny / rabunku (RoadDrinkBarred) i ksiega uslyszanych zajazdu (uid);
+        /// bez kufla (klucz NIE) - plotki darmowe jak w menu.</summary>
+        internal static bool RoadAleState(RoadsideInns.Inn inn, out string tip)
+        {
+            if (inn == null) { tip = "Nobody pours ale here now."; return false; }
+            if (!InnDrink.On) { tip = "Drovers, pilgrims and pedlars by the hearth trade the news of the road - the nearer and fresher, the truer."; return true; }
+            var at = new Vec2(inn.X, inn.Y);
+            var town = RoadTown(inn, at);
+            return DrinkState(at, inn.Uid, town, TownInns.RoadDrinkBarred(inn), TankardPrice(town), out tip);
+        }
+
+        /// <summary>474-P9: cena kufla w zajezdzie (miasto ceny zajazdu - RoadTown, jak opcja menu) - kolejka przy stole = ta cena na glowe.</summary>
+        internal static int RoadTankardPrice(RoadsideInns.Inn inn)
+        {
+            if (inn == null) return 2;
+            return TankardPrice(RoadTown(inn, new Vec2(inn.X, inn.Y)));
+        }
+
+        /// <summary>474-P8: kufel u barmana po rozmowie - dokladnie skutek opcji menu zajazdu (RoadGossipConsequence).</summary>
+        internal static void RoadAle(RoadsideInns.Inn inn)
+        {
+            if (inn == null) return;
+            if (InnDrink.On) { DrinkConsequence(new Vec2(inn.X, inn.Y), inn.Uid, inn.Name, false, null, inn); return; }
+            _dHeardRoad++;
+            Show(new Vec2(inn.X, inn.Y), inn.Uid, inn.Name, false);
+        }
+
+        /// <summary>Stan kufla (dawniej cialo DrinkCondition, 474-P3 wydzielone bez zmiany tekstow i kolejnosci): false + powod (zajazd zakazany, nic nowego, karczmarz
+        /// nie naleje, brak pieniedzy) albo true + opis kufla.</summary>
+        private static bool DrinkState(Vec2 at, string key, Settlement priceTown, string barred, int price, out string tip)
+        {
             var me = Hero.MainHero;
-            if (barred != null || me == null) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}" + (barred ?? "Nobody pours ale here now.")); return true; }   // recenzja (gra): zajazd wroga / rabowany - jak nocleg
+            if (barred != null || me == null) { tip = barred ?? "Nobody pours ale here now."; return false; }   // recenzja (gra): zajazd wroga / rabowany - jak nocleg
             var fresh = Fresh(Pool(at, key), key);
             Persuasion.Parts pp;
             int cups = InnDrink.Cups, max = InnDrink.MaxCups(), ch = InnDrink.Talk(priceTown != null ? priceTown.Culture : null, out pp);   // m109-przesluch: miara perswazji (klucz off - Urok)
-            if (fresh.Count == 0)
-            {
-                args.IsEnabled = false;
-                args.Tooltip = new TextObject("{=!}You have heard all the talk here. Come back when there is fresh news.");
-                return true;
-            }
-            if (cups >= max)
-            {
-                args.IsEnabled = false;
-                args.Tooltip = new TextObject("{=!}The innkeeper will pour you no more - sleep it off first.");
-                return true;
-            }
-            if (me.Gold < price)
-            {
-                args.IsEnabled = false;
-                args.Tooltip = new TextObject("{=!}A tankard of ale costs " + price + " d and you cannot pay it - nobody talks to a man with a dry tongue.");
-                return true;
-            }
+            if (fresh.Count == 0) { tip = "You have heard all the talk here. Come back when there is fresh news."; return false; }
+            if (cups >= max) { tip = "The innkeeper will pour you no more - sleep it off first."; return false; }
+            if (me.Gold < price) { tip = "A tankard of ale costs " + price + " d and you cannot pay it - nobody talks to a man with a dry tongue."; return false; }
             int per = InnDrink.PerDrink(ch, fresh.Count);
             var t = new StringBuilder("Nobody talks to a man with a dry tongue: a tankard of ale costs " + price + " d, and the coin goes to the innkeeper. ");
             t.Append("Over it you hear ").Append(per == fresh.Count ? "all " + fresh.Count : per + " of the " + fresh.Count).Append(fresh.Count == 1 ? " piece" : " pieces")
@@ -304,7 +342,7 @@ namespace Armoury
                 t.Append("\nTankards since you last slept: ").Append(cups).Append(" - you get drunk after ").Append(th).Append('.');
                 if (InnDrink.Drunk) t.Append(" You are drunk already.");
             }
-            args.Tooltip = new TextObject("{=!}" + t.ToString());
+            tip = t.ToString();
             return true;
         }
 
@@ -393,7 +431,21 @@ namespace Armoury
             InnDrink.DItems += n; InnDrink.DTourn += tn; InnDrink.DMatch += mn; InnDrink.DTournFalse += tn - tTrue; InnDrink.DMatchFalse += mn - mTrue;
             try { if (n > 0) me.AddSkillXp(DefaultSkills.Charm, CharmXpPerItem * n); } catch (Exception e) { Stumble("CharmXp", e); }
             if (town) _dHeardTown++; else _dHeardRoad++;
+            // 474-P10 (klucz TavernTalkLines): rama barmana wokol plotek - zdanie otwarcia po zaplacie, zamkniecie na koniec (region kultury miasta / wsi okregu zajazdu;
+            // migawka swiata dla miejsca kufla). Lektor tych zdan nie czyta (noRead). Klucz NIE - open i close null, naglowek co do bitu jak dotad.
+            string fOpen = null, fClose = null;
+            try
+            {
+                var fc = town ? (st != null ? st.Culture : null) : (inn != null && inn.Village != null ? inn.Village.Culture : null);
+                var ff = town ? (st != null ? st.MapFaction : null) : (inn != null && inn.Village != null ? inn.Village.MapFaction : null);
+                TavernLines.Frame(TavernLines.RegionOf(fc != null ? fc.StringId : null), at, ff, out fOpen, out fClose);
+                if (fOpen != null) fOpen = "\"" + fOpen.Replace("{INN}", place) + "\"";
+                if (fClose != null) fClose = "\"" + fClose.Replace("{INN}", place) + "\"";
+            }
+            catch (Exception e) { Stumble("Frame", e); fOpen = fClose = null; }
+            string fIns = fOpen != null ? (town ? "" : "The keeper leans over the bench. ") + fOpen + " " : null;
             string head = (town ? "You buy a tankard of ale (" + paid + " d), and the innkeeper leans on his counter. " : "You buy a tankard of ale (" + paid + " d) and sit by the hearth. ")
+                          + (fIns ?? "")
                           + (n == 1 ? "Over it you hear one piece of news" : "Over it you hear " + n + " pieces of news")
                           + (left > 0 ? " - another round would loosen more tongues (" + left + " more):" : ":");
             Log.Info(InnDrink.P + "kufel w " + place + " (" + (town ? "karczma miasta" : "zajazd") + ", " + key + ") dzien " + Today + " - cena " + price
@@ -404,8 +456,9 @@ namespace Armoury
                      + " [bandy " + cats[0] + ", kryjowki " + cats[1] + ", wojska " + cats[2] + ", karawany " + cats[3] + ", ceny " + cats[4] + ", wojny " + cats[5]
                      + ", turnieje " + cats[CatTourn] + ", swaty " + cats[CatMatch] + "]"
                      + " | turnieje " + tn + " (prawdziwe " + tTrue + "), swaty " + mn + " (prawdziwe " + mTrue + ")" + (refs.Length > 0 ? ": " + refs : "")
-                     + " | XP Uroku +" + (CharmXpPerItem * n) + " | " + state + ".");
-            Show(at, key, place, town, take, head);
+                     + " | XP Uroku +" + (CharmXpPerItem * n) + " | " + state
+                     + (fIns != null || fClose != null ? " | rama barmana (474-P10): otwarcie " + (fIns != null ? "tak" : "nie") + ", zamkniecie " + (fClose != null ? "tak" : "nie") : "") + ".");
+            Show(at, key, place, town, take, head, fClose, fOpen != null || fClose != null ? new[] { fIns, fClose } : null);
         }
     }
 }

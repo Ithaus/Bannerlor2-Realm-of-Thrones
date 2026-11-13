@@ -1,0 +1,40 @@
+<Prefab>
+  <Constants>
+  </Constants>
+  <VisualDefinitions>
+  </VisualDefinitions>
+  <Window>
+    <!-- Armoury 474 P1: nazwy wiosek pobocznych pod lewym Altem z ikona glownego towaru (MapVillageLook.cs, VM MapBurnedLabelsVM - stala pula 50 napisow) oraz,
+         bez Altu, napisy "X has been burned" nad spalonymi (jak ArmBurnedVillageLabels.xml). Uzywany tylko przy kluczu Side Village Names Under Alt.
+         Caly ekran BEZ zdarzen (jak ArmBurnedVillageLabels.xml): korzen DoNotAcceptEvents + DoNotPassEventsToChildren - klik w mape i dymek pod napisem dzialaja.
+         Napis: punkt 2x2 przesuwany w pikselach (ScaledPositionXOffset / YOffset), nad nim poziomy rzad wysrodkowany: ikona (0 albo 1 - lista Icons) i tekst.
+         Ikona: widzet gry SettlementNameplateEventVisualBrushWidget z pedzlem Settlement.Event.Type.Image (SandBox Nameplates.xml - jak tabliczka wsi gry,
+         SettlementNameplateItemSmall.xml); Type 6 = Production, AdditionalParameters = nazwa stylu (np. grain). Pedzel tekstu Map.Tracker.Name (jak napisy spalonych). -->
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+      <Children>
+
+        <Widget DataSource="{Labels}" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+          <ItemTemplate>
+
+            <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="2" SuggestedHeight="2" HorizontalAlignment="Left" VerticalAlignment="Top" ScaledPositionXOffset="@X" ScaledPositionYOffset="@Y" IsVisible="@IsShown" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+              <Children>
+                <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" HorizontalAlignment="Center" VerticalAlignment="Bottom" StackLayout.LayoutMethod="HorizontalLeftToRight" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+                  <Children>
+                    <ListPanel DataSource="{Icons}" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" VerticalAlignment="Center" StackLayout.LayoutMethod="HorizontalLeftToRight" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+                      <ItemTemplate>
+                        <SettlementNameplateEventVisualBrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedHeight="22" VerticalAlignment="Center" Brush="Settlement.Event.Type.Image" Type="@Type" AdditionalParameters="@AdditionalParameters" DoNotAcceptEvents="true" />
+                      </ItemTemplate>
+                    </ListPanel>
+                    <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" VerticalAlignment="Center" Brush="Map.Tracker.Name" Text="@Text" DoNotAcceptEvents="true" />
+                  </Children>
+                </ListPanel>
+              </Children>
+            </Widget>
+
+          </ItemTemplate>
+        </Widget>
+
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

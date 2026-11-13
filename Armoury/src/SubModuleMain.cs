@@ -519,6 +519,13 @@ namespace Armoury
                 try { RoadsideInnStay.AppTick(); }
                 catch (Exception e) { _innStayFails++; Log.Error("RoadsideInns.Stay: straznik nie laduje sie (proba " + _innStayFails + "/3)", e); }
             }
+            // 474-P8b: dzwiek karczmy na mapie przy zajezdzie (10 razy na sekunde; klucz NIE i nic nie gra - jedno porownanie; wlasny try w srodku) - tu tylko blad
+            // ladowania typu (SandBox.View.Map), liczony; po 3 dzwiek nie startuje do konca sesji (gra bez zmian)
+            if (_innSoundFails < 3)
+            {
+                try { RoadsideInnMapSound.AppTick(); }
+                catch (Exception e) { _innSoundFails++; Log.Error("RoadsideInnMapSound: nie laduje sie (proba " + _innSoundFails + "/3)", e); }
+            }
             // m103-sceny: straznik scen prologu 298 i okien opowiesci (4 razy na sekunde; zamkniecie okna bez przycisku, kolejka zwolnien obrazkow z plikow - w kazdej
             // kampanii; sceny tylko w kampanii z prologiem; wlasny try w srodku) - tu tylko blad ladowania typu (okno dziedziczy po typie ROT), liczony; po 3 straznik
             // nie startuje do konca sesji (gra bez zmian). PRZED returnem wiosek - inaczej klucz Map Villages = off wylaczylby sceny.
@@ -557,6 +564,8 @@ namespace Armoury
                 catch (Exception e) { _chatLogFails++; Log.Error("MapChatLog: nie laduje sie (proba " + _chatLogFails + "/3)", e); }
             }
             CampWalk.TestTick();   // m109-oboz: test spaceru pod plikiem autotestu (armoury-oboz-spacer.flag; w grze zamyka sie po pierwszym sprawdzeniu, wlasny try)
+            SideVillageVisit.WalkTestTick();   // 474-P7: test spaceru po wiosce pobocznej pod plikiem autotestu (armoury-wies-spacer.flag; w grze zamyka sie po pierwszym sprawdzeniu, wlasny try)
+            RoadsideInnInterior.TestTick();   // 474-P8: test wnetrza zajazdu pod plikiem autotestu (armoury-zajazd-wnetrze.flag; w grze zamyka sie po pierwszym sprawdzeniu, wlasny try)
             // m109-kuznia: autotest ekranu kucia (ForgeBillTest - tylko plik armoury-kuznia.flag; bez niego od razu wyjscie, wlasny try w srodku) - tu tylko blad
             // ladowania typu, liczony (po 3 test nie startuje do konca sesji). PRZED returnem wiosek.
             if (_forgeTestFails < 3)
@@ -598,6 +607,7 @@ namespace Armoury
         private static int _mapRoadsLoadFails;
         private static int _innsLoadFails;
         private static int _innStayFails;   // m95-zajazd: blad ladowania typu straznika pobytu (RoadsideInnStay.AppTick)
+        private static int _innSoundFails;   // 474-P8b: blad ladowania typu dzwieku karczmy na mapie (RoadsideInnMapSound.AppTick)
         private static int _storyTickFails;   // m103-sceny: blad ladowania typu straznika scen prologu (Prologue.ScenesAppTick)
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
@@ -682,6 +692,7 @@ namespace Armoury
             try { DungeonFate.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (loch 402)", e); }   // 402: chorzy lochu i stan lochow nie zostaja po kampanii
             try { StoryGuard.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (straz fabuly 396)", e); }   // 396: pamiec strazy (bohaterowie, obiekty wydarzen ROT) nie zostaje po kampanii
             try { SpoilsReport.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (raport lupu)", e); }                     // noc 25.10 P5: raport w pamieci od zera
+            try { RoadsideInnMapSound.GameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (dzwiek karczmy na mapie 474-P8b)", e); }   // 474-P8b-p: zrodlo zwolnione przed zniszczeniem sceny mapy
         }
         private static int _lektorFails;    // m103-lektor: blad ladowania typu lektora (Lektor.AppTick)
 

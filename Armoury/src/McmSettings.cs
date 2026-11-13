@@ -6080,6 +6080,22 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool RoadsideInnTavernSound { get; set; } = true;
 
+        [SettingPropertyBool("Roadside Inn Interior", HintText = "'Enter the Inn' in a roadside inn's menu: step inside in 3D - the tavern room of the nearest town of the same people, with the keeper at his counter, a serving girl, players in the corner and travellers about. Ask the keeper 'Pour me an ale. What's the news?' (the same tankard, price and gossip as the menu option) or about beds (you take them in the menu when you step out). The hubbub and the music of a tavern play inside. Campaign time stands still; hold Tab to step out. Off = no option, the inn menu as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RoadsideInnInterior { get; set; } = true;
+
+        [SettingPropertyBool("Roadside Inn Map Sound", HintText = "on the map, a roadside inn sounds like one as you ride by: the muffled hubbub and music of a tavern, louder the nearer your party passes, fading to nothing about six map steps away. Only the nearest inn is heard, and only on the open map - not in menus, conversations or scenes. Off = silent inns on the map, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RoadsideInnMapSound { get; set; } = true;
+
+        [SettingPropertyBool("Tavern Talk Lines", HintText = "the talk in town taverns and roadside inns grows to thousands of lines of their own, by region - the North, the Iron Islands, the West, the Reach, the riverlands, the Vale, the stormlands, the crownlands, Dorne and Essos. The keeper wraps his news in words of his own when you buy a tankard, the tables tell longer stories with women among the talkers, inside a roadside inn you overhear snatches of talk from the room, and the talk follows the world - wars, sieges, hunger nearby, winter, a lord's death, a wedding, the dead in the far north. Words only, no voices. Off = the few lines as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool TavernTalkLines { get; set; } = true;
+
+        [SettingPropertyBool("Inn Table Talk", HintText = "inside a roadside inn (Roadside Inn Interior), travellers sit at the tables in twos, threes and fours. Talk to one and you sit down with the whole table: they talk among themselves of the road, the weather, the war and the lords, each in turn. 'Tell me more' starts a new story (one more for free), 'Let me buy this table a round' pays a tankard a head to the keeper and the village whose lands the inn stands on and opens another, or leave them to it. Words only, no voices yet. Off = the travellers stand about as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnTableTalk { get; set; } = true;
+
         [SettingPropertyBool("Inn Gossip Pages", HintText = "the gossip window never overflows its frame: when there is more talk than fits, it is split into pages - 'Hear more' shows the next one, 'Enough talk' ends it. Off = all the gossip in one window, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
@@ -6087,6 +6103,14 @@ namespace Armoury
         [SettingPropertyBool("Inn Gossip Needs Drink", HintText = "nobody talks to a man with a dry tongue: to hear the gossip in a town inn or a roadside inn you buy a tankard of ale first - a tenth of what a cask of beer costs in the town nearby (a cask is some twenty tankards, and the innkeeper takes his share). The coin goes to the innkeepers - the townsfolk, or the village by a roadside inn - as for a night's lodging. You hear only news you have not heard in that place yet; when all of it is told, the option waits for fresh news. Off = the gossip is free and all of it at once, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipNeedsDrink { get; set; } = true;
+
+        [SettingPropertyBool("Innkeeper Ale Line", HintText = "talk to the innkeeper in a town tavern and you can say 'Pour me an ale. What's the news?' - the same tankard as the tavern menu's gossip option: the same price, the same coin to the innkeeper, the same news you have not heard in that town yet, and what you hear there is not told again in the menu. Needs Inn Gossip Needs Drink. Off = no such line, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnKeeperAleLine { get; set; } = true;
+
+        [SettingPropertyBool("Tavern Music By Region", HintText = "the musicians in a town tavern play the music of the town's own land - the North, the Iron Islands, the Westerlands and the Reach, Dorne, the Free Cities, the east - instead of tunes from all over the world at once, which is what the game plays in lands it has no music of its own for. Off = the game's choice, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool TavernMusicByRegion { get; set; } = true;
 
         [SettingPropertyBool("Gossip Per Drink By Charm", HintText = "how much the drinkers tell you over one tankard depends on your Charm: below 50 - one piece of news, 50 to 109 - two, 110 to 169 - three, 170 to 229 - four, from 230 - all there is. Buy another round to hear more. Each piece you hear teaches you a little Charm (5 xp). Off = one tankard tells you everything", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
@@ -8392,6 +8416,14 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool BurnedVillageLabels { get; set; } = true;
 
+        [SettingPropertyBool("Side Village Names Under Alt", HintText = "hold the left Alt key on the map to see the names of nearby side villages, each with an icon of its main good. Off = no names, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool SideVillageAltNames { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Goods Line", HintText = "a side village's menu and tooltip list its goods as 'Makes: wheat (main), flax, ...', the main good first; the works window shows that good's icon. Off = the craft and its goods, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool SideVillageMakesLine { get; set; } = true;
+
         [SettingPropertyBool("Village Banner Per Holder", HintText = "every map village flies the banner of the house that keeps it - a knight with a Banner Kings estate there, the knight who holds the village's Banner Kings title, the village's own knight, or another house of the lord's realm - and its tooltip and 'Look over the district' name him and the lord he is sworn to. Off = every village of a district shows its lord's banner, as before", RequireRestart = false)]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageBannerPerHolder { get; set; } = true;
@@ -10499,6 +10531,22 @@ namespace Armoury
         [SettingPropertyInteger("Side Recruit Resettle Days", 28, 1092, "0", HintText = "with Side Village Recruit: the days over which the farms emptied by your recruiting are taken up again by people from the rest of the district (until then that village alone has fewer hands; the district keeps fewer people for good)", RequireRestart = false)]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
         public int SideRecruitResettleDays { get; set; } = 364;
+
+        [SettingPropertyBool("Side Village House Levy", HintText = "with Side Village Recruit: in a side village on the land of a great house - a seat of Realm of Thrones with its own men at arms (Raventree Hall of House Blackwood, Stonehedge of House Bracken, Winterfell of House Stark and the others whose castellan trains household troops) and the villages of that seat - one in five of the men who come in a day are that house's own levies, dearer than plain peasants. It is the land that makes them: a house's men stay its men when someone else takes the land - you too, once you hold it, can raise them. They come from the same pool of young men of that village, and the money goes to their families as for any man of the village. The house must think well of you, as with its castellan: its head's regard of at least 30, unless the land or its seat is yours, you are of that house, or the house is no more. Off = only plain peasants, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageHouseLevy { get; set; } = true;
+
+        [SettingPropertyBool("Castellan Levy From Pool", HintText = "the castellan of a great house's seat (Raventree Hall, Winterfell, Riverrun and the others) no longer conjures household troops out of nothing: the men you recruit from him are sons of the seat's own villages, as many as those villages can spare above their last homesteads, and they are gone from those fields for good. You pay the same price as before, but the money goes to their families (the purse of each village, for its own men) instead of vanishing. The Red Keep's Kingsguard stay as they were. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool CastellanLevyFromPool { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Recruit Screen", HintText = "with Side Village Recruit: 'Recruit men of the village' opens the same recruitment screen as in a main village - a row 'Men of X' under the portrait of its headman and, on the land of a great house, a row for that house's men under the portrait of its head - instead of a list of numbers. Each slot is one man from the village's pool at the village's price; the cart, Recruit All and Reset work as in the game. Off = the list of numbers, as before", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageRecruitScreen { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Walk", HintText = "'Walk through the village' in a side village's menu: walk among its homesteads in 3D - a village scene of the same people as its district (side villages have no scenes of their own, so it is always the same scene for a given village, not the district's own where its people have another), with villagers of that culture standing about, fewer at night. Not at war with its lord, not while its lands are raided, not in a burned or abandoned village. Campaign time stands still; hold Tab to go back. Off = no option", RequireRestart = false)]
+        [SettingPropertyGroup("District works and side-village crafts (18.10)")]
+        public bool SideVillageWalk { get; set; } = true;
 
         [SettingPropertyBool("Land Sales", HintText = "houses in need may sell you land of their own will: ask a clan leader 'I hear your house needs coin. Would you sell me land?' (or use the offer option in a side village or main village menu). The price is the holding's real worth - what it truly earns its lord a year, net of its costs, times 14 to 20 years of it by how well the seller thinks of you (Land Years Of Purchase for a close friend, Land Years Worst when he only just will sell) - never a token price; a house deep in debt may take somewhat less. The coin goes to the seller's head and his creditors take their due from it first. Off = no land is for sale", RequireRestart = false)]
         [SettingPropertyGroup("Land sales (m113)")]
@@ -14575,8 +14623,14 @@ namespace Armoury
             s.InnGossipLeaderNames = InnGossipLeaderNames;
             s.RoadsideInnHideParty = RoadsideInnHideParty;
             s.RoadsideInnTavernSound = RoadsideInnTavernSound;
+            s.RoadsideInnInterior = RoadsideInnInterior;
+            s.RoadsideInnMapSound = RoadsideInnMapSound;
+            s.TavernTalkLines = TavernTalkLines;
+            s.InnTableTalk = InnTableTalk;
             s.InnGossipPages = InnGossipPages;
             s.InnGossipNeedsDrink = InnGossipNeedsDrink;
+            s.InnKeeperAleLine = InnKeeperAleLine;
+            s.TavernMusicByRegion = TavernMusicByRegion;
             s.GossipPerDrinkByCharm = GossipPerDrinkByCharm;
             s.GossipPerDrinkByPersuasion = GossipPerDrinkByPersuasion;
             s.GossipTournaments = GossipTournaments;
@@ -15153,6 +15207,8 @@ namespace Armoury
             s.VillagePennants = VillagePennants;
             s.BurnedVillageLook = BurnedVillageLook;
             s.BurnedVillageLabels = BurnedVillageLabels;
+            s.SideVillageAltNames = SideVillageAltNames;
+            s.SideVillageMakesLine = SideVillageMakesLine;
             s.VillageBannerPerHolder = VillageBannerPerHolder;
             s.VillageCanonHouses = VillageCanonHouses;
             s.VillageTwoPennants = VillageTwoPennants;
@@ -15680,6 +15736,10 @@ namespace Armoury
             s.SideRecruitLevyPrice = SideRecruitLevyPrice;
             s.SideRecruitGeneralLevyPrice = SideRecruitGeneralLevyPrice;
             s.SideRecruitResettleDays = SideRecruitResettleDays;
+            s.SideVillageHouseLevy = SideVillageHouseLevy;
+            s.CastellanLevyFromPool = CastellanLevyFromPool;
+            s.SideVillageRecruitScreen = SideVillageRecruitScreen;
+            s.SideVillageWalk = SideVillageWalk;
             s.LandSales = LandSales;
             s.LandSalesSideVillages = LandSalesSideVillages;
             s.LandSalesLordships = LandSalesLordships;

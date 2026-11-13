@@ -537,7 +537,8 @@ namespace Armoury
         }
 
         // m98-plotki: given/headGiven - plotki wybrane za kufel (Rumours.Drink) i naglowek z zaplata; null - jak dotad (cala pula, zwykly naglowek)
-        private static void Show(Vec2 at, string key, string place, bool town, List<Item> given = null, string headGiven = null)
+        // 474-P10: tail - zamkniecie ramy barmana (ostatni akapit), noRead - wstawki ramy, ktorych lektor nie czyta (bez kosztu znakow ElevenLabs); null - jak dotad
+        private static void Show(Vec2 at, string key, string place, bool town, List<Item> given = null, string headGiven = null, string tail = null, string[] noRead = null)
         {
             long t0 = Stopwatch.GetTimestamp();
             List<Item> items;
@@ -556,12 +557,13 @@ namespace Armoury
             // n20-plotki (InnGossipPages): strony mieszczace sie w ramce; klucz wylaczony - jedno okno jak dotad
             var lines = new List<int>();
             List<string> pages;
-            if (PagesOn) pages = Paginate(head, items, lines);
+            if (PagesOn) pages = Paginate(head, items, lines, tail);
             else
             {
                 var sb = new StringBuilder(head);
                 if (items.Count == 0) sb.Append("\n\n").Append(Empty);
                 foreach (var it in items) sb.Append("\n\n- ").Append(it.Text);
+                if (tail != null) sb.Append("\n\n").Append(tail);   // 474-P10
                 pages = new List<string> { sb.ToString() };
                 lines.Add(EstLines(pages[0]));
             }
@@ -583,7 +585,7 @@ namespace Armoury
                 if (heard[pg] == null) heard[pg] = new List<string>();
                 heard[pg].Add(it.Id.Substring(2));
             }
-            ShowPage(place, pages, 0, heard);
+            ShowPage(place, pages, 0, heard, noRead);
         }
 
         // ------------------------------------------------------------ strony w ramce (n20-plotki, klucz InnGossipPages)
@@ -631,7 +633,7 @@ namespace Armoury
         }
 
         /// <summary>Plotki na strony: naglowek na pierwszej, wpisy w kolejnosci, pusta linia miedzy wpisami; nowa strona, gdy wpis by sie nie zmiescil (PageLines).</summary>
-        private static List<string> Paginate(string head, List<Item> items, List<int> lines)
+        private static List<string> Paginate(string head, List<Item> items, List<int> lines, string tail = null)
         {
             var pages = new List<string>();
             var sb = new StringBuilder(head);
@@ -639,6 +641,7 @@ namespace Armoury
             var texts = new List<string>();
             if (items.Count == 0) texts.Add(Empty);
             foreach (var it in items) texts.Add("- " + it.Text);
+            if (tail != null) texts.Add(tail);   // 474-P10: zamkniecie ramy barmana
             foreach (var t in texts)
             {
                 int need = EstLines(t) + 1;   // + pusta linia przed wpisem
@@ -656,7 +659,7 @@ namespace Armoury
 
         /// <summary>Okno strony i: "Hear more" (nastepna strona - gra kolejkuje okno i pokazuje je po zamknieciu tego, GauntletQueryManager.CloseQuery) i "Enough talk";
         /// ostatnia strona - samo "Enough talk" jak dotad.</summary>
-        private static void ShowPage(string place, List<string> pages, int i, List<List<string>> heard = null)
+        private static void ShowPage(string place, List<string> pages, int i, List<List<string>> heard = null, string[] noRead = null)
         {
             if (heard != null && i < heard.Count && heard[i] != null) foreach (var id in heard[i]) HideoutSight.Heard(id, place);   // m100-kryjowki
             bool more = i + 1 < pages.Count;
@@ -665,11 +668,13 @@ namespace Armoury
             if (more)
             {
                 int k = i + 1;
-                next = () => { try { _dPagesTurned++; ShowPage(place, pages, k, heard); } catch (Exception e) { Stumble("NextPage", e); } };
+                next = () => { try { _dPagesTurned++; ShowPage(place, pages, k, heard, noRead); } catch (Exception e) { Stumble("NextPage", e); } };
             }
             // m103-lektor: lektor czyta naglowek i plotki tej strony (pamiec nagran albo ElevenLabs w tle - Lektor.Live; wlasny try w srodku); "Enough talk" zatrzymuje
             // glos (akcja okna - dotad null; "Hear more" wola next -> nowa strona zastepuje stara). Klucz LektorEnabled wylaczony - obie wywolania nic nie robia.
-            Lektor.GossipPage(place, pages[i], i);
+            string read = pages[i];
+            if (noRead != null) foreach (var x in noRead) if (!string.IsNullOrEmpty(x)) read = read.Replace("\n\n" + x, "").Replace(x, "");   // 474-P10: rama barmana bez lektora
+            Lektor.GossipPage(place, read, i);
             Action stop = Lektor.GossipStopAction;   // jeden delegat na proces - InquiryData.HasSameContentWith (porownuje akcje) jak dotad dla tej samej ostatniej strony
             InformationManager.ShowInquiry(new InquiryData(title, pages[i], true, more, more ? "Hear more" : "Enough talk", more ? "Enough talk" : null, more ? next : stop, more ? stop : null), true);
         }

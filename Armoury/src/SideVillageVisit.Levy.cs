@@ -103,6 +103,8 @@ namespace Armoury
             public double G; public string GWhy; public bool GFb;   // n36 (P3): stopa odnowy wsi okregu (% rocznie, ze znakiem), kod przyczyny, zapas
             public int Callable, Muster, Ready, Stage = 1, Idx, Price, Today, Room;
             public CharacterObject Troop;
+            // 474-P5: levy rodu ziemi (RotHouses - siedziba z tabeli ROT i jej okreg); H null - ziemia bez rodu albo klucz NIE
+            public RotHouses.House H; public string HouseWhy; public int HouseReady, HousePrice, HouseToday;
         }
         private static LvQuote _lvQ;
         private static readonly Dictionary<string, KeyValuePair<int, CharacterObject>> _lvOffer = new Dictionary<string, KeyValuePair<int, CharacterObject>>(StringComparer.Ordinal);
@@ -116,9 +118,15 @@ namespace Armoury
         private static readonly HashSet<string> _ldRefused = new HashSet<string>(StringComparer.Ordinal);
         private static readonly Dictionary<string, int> _ldWhy = new Dictionary<string, int>(StringComparer.Ordinal);
         private static readonly List<string> _ldEx = new List<string>();
+        // 474-P5: levy rodow - ilu ludzi rodu przyszlo dzis z wioski (tylko pamiec: uid -> doba, ilu) i licznik doby
+        private const double HouseShare = 0.2;   // "1 na 5" (projekt 13.11): ludzie rodu to czesc dziennego naplywu wioski, nie dodatek
+        private static readonly Dictionary<string, KeyValuePair<int, int>> _lvHouseToday = new Dictionary<string, KeyValuePair<int, int>>(StringComparer.Ordinal);
+        private static int _ldHouseRec, _ldHouseMen;
+        private static long _ldHouseGold;
 
         // ------------------------------------------------------------ klucze
         internal static bool LevyKey { get { var s = Settings.Current; return s != null && s.SideVillageRecruit; } }
+        internal static bool HouseKey { get { var s = Settings.Current; return s != null && s.SideVillageRecruit && s.SideVillageHouseLevy; } }   // 474-P5
         private static double LvPoolPct { get { var s = Settings.Current; return s == null ? 10.0 : Clamp(s.SideRecruitPoolPercent, 1.0, 20.0); } }
         private static double LvYouthPct { get { var s = Settings.Current; return s == null ? 1.0 : Clamp(s.SideRecruitYouthPercent, 0.0, 3.0); } }
         private static double LvDailyPct { get { var s = Settings.Current; return s == null ? 3.0 : Clamp(s.SideRecruitDailyPercent, 0.5, 10.0); } }
@@ -142,6 +150,8 @@ namespace Armoury
             _lv = new Dictionary<string, LvRec>(StringComparer.Ordinal);
             _lvLack = new Dictionary<string, double[]>(StringComparer.Ordinal);
             _lvQ = null; _lvOffer.Clear(); RecruitingAt = null;
+            _lvHouseToday.Clear();   // 474-P5
+            _scr = null;             // 474-P6: wiazanie okna gry
             _lvSt = 0;
             _lvGDay = int.MinValue; _lvG.Clear();
             LevyDayZero();
@@ -152,6 +162,7 @@ namespace Armoury
         {
             _ldRec = _ldMen = _ldDue = _ldDrop = _ldLostN = 0; _ldGold = 0; _ldGot = _ldFloor = _ldLack = _ldGrown = _ldLost = _ldVan = 0.0; _ldTicks = 0; _lvStDay = 0;
             _ldRefused.Clear(); _ldWhy.Clear(); _ldEx.Clear(); _lvOffer.Clear();
+            _ldHouseRec = _ldHouseMen = 0; _ldHouseGold = 0;   // 474-P5
         }
 
         // ------------------------------------------------------------ wpisy
@@ -341,8 +352,41 @@ namespace Armoury
             q.Troop = TroopFor(st, uid, today);
             if (q.Troop == null) { q.Hide = true; _lvQ = q; return q; }
             q.Price = PriceOf(q.Troop, q.Stage);
+            HouseQuote(q, st, uid, today);   // 474-P5
             _lvQ = q;
             return q;
+        }
+
+        /// <summary>474-P5: levy rodu ziemi w wycenie - rod siedziby okregu (RotHouses.OfVillage: Village.Bound, pochodzenie ziemi, nie obecny pan), zgoda rodu
+        /// (zasada kasztelana ROT), ilu ludzi rodu dzis: ceil(naplyw doby x 1/5) minus juz wzieci dzis, nie wiecej niz gotowi (ci sami ludzie z puli tej wioski);
+        /// cena = koszt rekruta gry dla tego oddzialu x mnoznik etapu (jak chlopi). Klucz NIE albo ziemia bez rodu - H null (wycena jak przed). Nie rzuca.</summary>
+        private static void HouseQuote(LvQuote q, Settlement st, string uid, int today)
+        {
+            try
+            {
+                if (!HouseKey) return;
+                var h = RotHouses.OfVillage(st);
+                if (h == null || h.Troop == null) return;
+                q.H = h;
+                q.HouseWhy = RotHouses.Refusal(h, st);
+                KeyValuePair<int, int> ht;
+                q.HouseToday = _lvHouseToday.TryGetValue(uid, out ht) && ht.Key == today ? ht.Value : 0;
+                int cap = (int)Math.Ceiling(q.Muster * HouseShare - 1e-9);
+                q.HouseReady = q.HouseWhy != null ? 0 : Math.Max(0, Math.Min(q.Ready, cap - q.HouseToday));
+                q.HousePrice = PriceOf(h.Troop, q.Stage);
+            }
+            catch (Exception e) { q.H = null; q.HouseReady = 0; LvStumble("HouseQuote", e); }
+        }
+
+        /// <summary>474-P5: zdanie o ludziach rodu do dymku i okna (null - brak rodu).</summary>
+        private static string HouseWords(LvQuote q)
+        {
+            if (q == null || q.H == null) return null;
+            string tn = Txt(q.H.Troop.Name);
+            if (q.HouseWhy != null) return q.HouseWhy;
+            if (q.HouseReady < 1) return "No more men of " + q.H.Name + " will come today (" + tn + ") - come back tomorrow.";
+            return "This is the land of " + q.H.Name + ": " + (q.HouseReady == 1 ? "one of its men" : q.HouseReady + " of its men") + " (" + tn + ") will come today, at "
+                   + q.HousePrice + " denars each - one in five of those who come.";
         }
 
         private static int RoomNow()
@@ -440,7 +484,7 @@ namespace Armoury
                 if (why != null) { a.IsEnabled = false; a.Tooltip = new TextObject("{=!}" + why); NoteRefusal(uid, code); return true; }
                 a.Tooltip = new TextObject("{=!}" + q.Ready + (q.Ready == 1 ? " man" : " men") + " of this village will follow you today, at " + q.Price + " denars each (" + StageWords(q.Stage)
                                            + "). " + q.Callable.ToString("N0", Inv) + " of its " + Num(q.P) + " people could still be spared; " + YouthWords(q)
-                                           + ". Every man you take leaves its fields.");
+                                           + ". Every man you take leaves its fields." + (q.H != null ? " " + HouseWords(q) : ""));
                 return true;
             }
             catch (Exception e) { LvStumble("Condition", e); return false; }
@@ -510,6 +554,7 @@ namespace Armoury
                 string why = LevyGate(st, uid, fief, out hide, out code, out q);
                 if (hide || q == null) return;
                 if (why != null) { Log.Player(why, true); return; }
+                if (ScrTryOpen(st, uid, fief)) return;   // 474-P6: okno werbunku gry (klucz SideVillageRecruitScreen); nie wyszlo - lista wyboru jak dotad
                 int max = Math.Min(Math.Min(q.Ready, RoomNow()), Hero.MainHero.Gold / Math.Max(1, q.Price));
                 max = Math.Min(max, LvOfferMax);
                 if (max < 1) return;
@@ -524,11 +569,26 @@ namespace Armoury
                     try { img = new CharacterImageIdentifier(CharacterCode.CreateFrom(q.Troop)); } catch { img = null; }
                     list.Add(new InquiryElement(c, (c == max && c > 1 ? "All " : "") + c + (c == 1 ? " man" : " men") + " (" + tn + ") - " + (c * q.Price).ToString("N0", Inv) + " denars", img, true, null));
                 }
+                // 474-P5: wiersze ludzi rodu ziemi (ta sama pula wioski, wlasna cena); wybor - HousePick
+                int hmax = q.H != null && q.HouseReady > 0 ? Math.Min(Math.Min(q.HouseReady, RoomNow()), Math.Min(Hero.MainHero.Gold / Math.Max(1, q.HousePrice), LvOfferMax)) : 0;
+                if (hmax >= 1)
+                {
+                    string hn = Txt(q.H.Troop.Name);
+                    ImageIdentifier himg = null;
+                    try { himg = new CharacterImageIdentifier(CharacterCode.CreateFrom(q.H.Troop)); } catch { himg = null; }
+                    var hc = new List<int>();
+                    foreach (int c in new[] { 1, 5, 10, 20 }) if (c < hmax) hc.Add(c);
+                    hc.Add(hmax);
+                    foreach (int c in hc)
+                        list.Add(new InquiryElement(new HousePick(c), q.H.Name + ": " + (c == hmax && c > 1 ? "all " : "") + c + (c == 1 ? " man" : " men") + " (" + hn + ") - "
+                                                    + (c * q.HousePrice).ToString("N0", Inv) + " denars", himg, true, null));
+                }
                 string stage = q.Stage >= 3 ? "Only the last men are left - a general levy. Their families ask dearly."
                              : q.Stage == 2 ? "The willing are gone; the rest are a levy - their families want more for them."
                              : "Young men of " + vn + " are willing to follow you.";
                 string desc = stage + " Each man costs " + q.Price + " denars - the money goes to the families (the purse of " + dn + ").\n\nEvery man you take leaves its fields: fewer hands"
                               + " for its harvest, and he does not come back if he falls. " + Cap1(YouthWords(q)) + ".";
+                if (q.H != null) desc += "\n\n" + HouseWords(q);   // 474-P5
                 if (max < q.Ready)
                     desc += " Now you can take " + max + " (" + (RoomNow() <= max ? "room in your party" : Hero.MainHero.Gold / Math.Max(1, q.Price) <= max ? "what you can pay" : "at most " + LvOfferMax + " at a time") + ").";
                 MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData("Men of " + vn, desc, list, true, 1, 1, "Recruit", GameTexts.FindText("str_cancel").ToString(),
@@ -536,8 +596,12 @@ namespace Armoury
                     {
                         try
                         {
-                            if (sel == null || sel.Count == 0 || !(sel[0].Identifier is int)) return;
-                            var res = LevyDo(st, uid, (int)sel[0].Identifier, fief ? "okno (wioska gracza)" : "okno");
+                            if (sel == null || sel.Count == 0) return;
+                            LvDone res;
+                            var hp = sel[0].Identifier as HousePick;   // 474-P5: ludzie rodu
+                            if (hp != null) res = LevyDo(st, uid, hp.N, fief ? "okno (wioska gracza), rod" : "okno, rod", true);
+                            else if (sel[0].Identifier is int) res = LevyDo(st, uid, (int)sel[0].Identifier, fief ? "okno (wioska gracza)" : "okno");
+                            else return;
                             // recenzja: tekst menu (pula, etap, ludzie) od nowa - ten sam wzor co okup (Raid.cs PayTribute)
                             if (res != null && res.Keep > 0 && Campaign.Current != null && Campaign.Current.CurrentMenuContext != null)
                                 GameMenu.SwitchToMenu(fief ? SideVillageFief.Menu : Menu);
@@ -549,6 +613,9 @@ namespace Armoury
         }
 
         private static string Cap1(string t) { return string.IsNullOrEmpty(t) ? t : char.ToUpperInvariant(t[0]) + t.Substring(1); }
+
+        /// <summary>474-P5: wybor wiersza ludzi rodu w oknie poboru (Identifier InquiryElement).</summary>
+        private sealed class HousePick { public readonly int N; public HousePick(int n) { N = n; } }
 
         internal static void LevyOpenFief(MenuCallbackArgs a)
         {
@@ -571,7 +638,7 @@ namespace Armoury
         }
 
         /// <summary>A3: werbunek k ludzi z wioski uid (watek glowny, okno albo sonda testu). Kolejnosc: DOM (TakeLevyHere) -&gt; ludzie -&gt; pochodzenie -&gt; zaplata za przybylych.</summary>
-        private static LvDone LevyDo(Settlement st, string uid, int k, string how)
+        private static LvDone LevyDo(Settlement st, string uid, int k, string how, bool house = false)
         {
             var res = new LvDone { Asked = k };
             try
@@ -584,14 +651,28 @@ namespace Armoury
                 if (hide || q == null) { res.Why = "wioska nieznana"; return res; }
                 if (why != null) { res.Why = code; NoteRefusal(uid, code); Log.Player(why, true); return res; }
                 var mp = MobileParty.MainParty; var hero = Hero.MainHero;
-                k = Math.Min(Math.Min(k, q.Ready), Math.Min(RoomNow(), hero.Gold / Math.Max(1, q.Price)));
+                // 474-P5: ludzie rodu ziemi - ten sam pobor (pula, DOM, brak rak, zaplata rodzinom), inny oddzial i cena, limit 1 na 5 naplywu doby
+                CharacterObject troop = q.Troop; int price = q.Price; int ready = q.Ready;
+                if (house)
+                {
+                    if (q.H == null || q.HouseWhy != null || q.HouseReady < 1)
+                    {
+                        string hw = q.H == null ? null : HouseWords(q);
+                        res.Why = q.H == null ? "rod: brak" : q.HouseWhy != null ? "rod: zgoda" : "rod: koniec dnia";
+                        NoteRefusal(uid, res.Why);
+                        if (hw != null) Log.Player(hw, true);
+                        return res;
+                    }
+                    troop = q.H.Troop; price = q.HousePrice; ready = q.HouseReady;
+                }
+                k = Math.Min(Math.Min(k, ready), Math.Min(RoomNow(), hero.Gold / Math.Max(1, price)));
                 if (k < 1) { res.Why = "nic do wziecia"; return res; }
-                res.Asked = k; res.Price = q.Price; res.Stage = q.Stage; res.Idx = q.Idx; res.Troop = q.Troop; res.Cap = q.Cap; res.P = q.P; res.Home = q.Home;
+                res.Asked = k; res.Price = price; res.Stage = q.Stage; res.Idx = q.Idx; res.Troop = troop; res.Cap = q.Cap; res.P = q.P; res.Home = q.Home;
                 var r0 = LvGet(uid);
                 res.Pool0 = r0 != null ? r0.Pool : q.Cap;
                 res.HeroGold0 = hero.Gold; res.Purse0 = st.Village.Gold;
                 var roster = mp.MemberRoster;
-                res.Men0 = roster.GetTroopCount(q.Troop);
+                res.Men0 = roster.GetTroopCount(troop);
                 // 2. DOM okregu - ludzie TEJ wioski (przed pieniedzmi)
                 Settlement region;
                 double got = PeopleBook.TakeLevyHere(st, k, PeopleBook.MLevyVillage, out region);
@@ -609,12 +690,12 @@ namespace Armoury
                 RecruitingAt = st;
                 try
                 {
-                    roster.AddToCounts(q.Troop, keep);
-                    try { CampaignEventDispatcher.Instance.OnUnitRecruited(q.Troop, keep); } catch (Exception e) { LvStumble("OnUnitRecruited", e); }
-                    try { res.DtePcs = PlayerRecruit.SideVillageKit(q.Troop, keep); } catch (Exception e) { LvStumble("Kit", e); }
+                    roster.AddToCounts(troop, keep);
+                    try { CampaignEventDispatcher.Instance.OnUnitRecruited(troop, keep); } catch (Exception e) { LvStumble("OnUnitRecruited", e); }
+                    try { res.DtePcs = PlayerRecruit.SideVillageKit(troop, keep); } catch (Exception e) { LvStumble("Kit", e); }
                 }
                 finally { RecruitingAt = null; }
-                try { res.Men1 = roster.GetTroopCount(q.Troop); } catch (Exception e) { LvStumble("Men1", e); }
+                try { res.Men1 = roster.GetTroopCount(troop); } catch (Exception e) { LvStumble("Men1", e); }
                 // 4. brak rak wioski i wpis puli - zaraz po zejsciu ludzi z DOM (recenzja: wyjatek w zaplacie nie zostawia puli bez ubytku)
                 double sh = -1.0; LvRec r = null;
                 try
@@ -630,6 +711,7 @@ namespace Armoury
                         if (!LvPut(r)) r = null;
                     }
                     if (r != null) { r.Pool = Math.Max(0.0, r.Pool - keep); r.Today += keep; r.Total += keep; res.Pool1 = r.Pool; }
+                    if (house) _lvHouseToday[uid] = new KeyValuePair<int, int>(today, q.HouseToday + keep);   // 474-P5: 1 na 5 naplywu doby
                 }
                 catch (Exception e) { LvStumble("Pool", e); }
                 _lvQ = null;
@@ -641,22 +723,25 @@ namespace Armoury
                 }
                 catch (Exception e) { LvStumble("Origin", e); }
                 // 6. zaplata tylko za przybylych - zdarzenie gry gracz -> kiesa wsi okregu (osobny try - wyjatek sluchacza nie cofa werbunku)
-                res.Total = keep * q.Price;
+                res.Total = keep * price;
                 try { if (res.Total > 0) GiveGoldAction.ApplyForCharacterToSettlement(hero, st, res.Total, true); }
                 catch (Exception e) { LvStumble("Pay", e); }
                 try { res.HeroGold1 = hero.Gold; res.Purse1 = st.Village.Gold; } catch (Exception e) { LvStumble("Gold1", e); }
                 _ldRec++; _ldMen += keep; _ldGold += res.Total; _ldGot += got; _ldFloor += Math.Max(0.0, keep - got); _ldLack += res.Lack;
-                if (_ldEx.Count < 3) _ldEx.Add(NameOf(Rec(uid)) + " " + keep + "x" + res.Price);
+                if (_ldEx.Count < 3) _ldEx.Add(NameOf(Rec(uid)) + " " + keep + "x" + res.Price + (house ? " (rod)" : ""));
+                if (house) { _ldHouseRec++; _ldHouseMen += keep; _ldHouseGold += res.Total; }   // 474-P5
                 // 7. linie
                 string vn = NameOf(Rec(uid));
-                Log.Info(LP + vn + " (" + uid + ", okreg " + Txt(st.Name) + " " + st.StringId + ") - " + how + ": " + keep + " ludzi typu " + Txt(q.Troop.Name) + " (" + q.Troop.StringId + ", tier "
-                         + q.Troop.Tier + ") z prosby " + k + ", etap " + q.Stage + " (cena x" + (q.Stage >= 3 ? LvGeneralPrice : q.Stage == 2 ? LvLevyPrice : 1.0).ToString("0.##", Inv) + "), cena "
-                         + q.Price + " x " + keep + " = " + res.Total + " | gracz " + res.HeroGold0 + " -> " + res.HeroGold1 + ", kiesa wsi okregu " + res.Purse0 + " -> " + res.Purse1
+                Log.Info(LP + vn + " (" + uid + ", okreg " + Txt(st.Name) + " " + st.StringId + ") - " + how + ": " + keep + " ludzi typu " + Txt(troop.Name) + " (" + troop.StringId + ", tier "
+                         + troop.Tier + ") z prosby " + k + ", etap " + q.Stage + " (cena x" + (q.Stage >= 3 ? LvGeneralPrice : q.Stage == 2 ? LvLevyPrice : 1.0).ToString("0.##", Inv) + "), cena "
+                         + price + " x " + keep + " = " + res.Total + " | gracz " + res.HeroGold0 + " -> " + res.HeroGold1 + ", kiesa wsi okregu " + res.Purse0 + " -> " + res.Purse1
                          + " | DOM -" + got.ToString("0.##", Inv) + " (podloga " + Math.Max(0.0, keep - got).ToString("0.##", Inv) + ", region " + (region != null ? region.StringId : "-") + ")"
                          + " | pula " + res.Pool0.ToString("0.##", Inv) + " -> " + res.Pool1.ToString("0.##", Inv) + " z pulapu " + q.Cap.ToString("0.#", Inv) + " (ludzi " + q.P.ToString("0", Inv)
                          + ", w domu " + q.Home.ToString("0", Inv) + "), dzis " + (r != null ? r.Today : keep) + ", razem " + (r != null ? r.Total : keep) + " | brak rak +" + res.Lack.ToString("0.##", Inv)
-                         + " (udzial w osadach " + (sh >= 0.0 ? (100 * sh).ToString("0.#", Inv) + "%" : "-") + ") | zaufanie " + q.Idx + " | DTE tier 1 szt. " + res.DtePcs + ".");
-                Log.Player((keep == 1 ? "One man of " + vn + " joins" : keep + " men of " + vn + " join") + " your party. " + (keep == 1 ? "His family got " : "Their families got ")
+                         + " (udzial w osadach " + (sh >= 0.0 ? (100 * sh).ToString("0.#", Inv) + "%" : "-") + ") | zaufanie " + q.Idx + " | DTE tier 1 szt. " + res.DtePcs
+                         + (house ? " | levy rodu (474-P5): " + q.H.Name + ", siedziba " + q.H.Seat.StringId + " (pan " + (q.H.Seat.OwnerClan != null ? Txt(q.H.Seat.OwnerClan.Name) : "-")
+                                    + "), ludzi rodu dzis " + (q.HouseToday + keep) + " z " + (int)Math.Ceiling(q.Muster * HouseShare - 1e-9) + " (1/5 naplywu " + q.Muster + ")" : "") + ".");
+                Log.Player((keep == 1 ? "One man of " + (house ? q.H.Name + " from " : "") + vn + " joins" : keep + " men of " + (house ? q.H.Name + " from " : "") + vn + " join") + " your party. " + (keep == 1 ? "His family got " : "Their families got ")
                            + res.Total.ToString("N0", Inv) + " denars.");
             }
             catch (Exception e) { RecruitingAt = null; res.Why = "wyjatek"; LvStumble("Do", e); }
@@ -836,6 +921,7 @@ namespace Armoury
                     double ms = _ldTicks * 1000.0 / Stopwatch.Frequency;
                     Log.Info(LP + "dzien " + (today - 1) + " | klucz " + (LevyKey ? "TAK" : "WYL") + " | werbunki " + _ldRec + " (ludzi " + _ldMen + ", zlota do kies wsi " + _ldGold + ", z DOM "
                              + _ldGot.ToString("0.##", Inv) + ", podloga " + _ldFloor.ToString("0.##", Inv) + ", brak rak +" + _ldLack.ToString("0.#", Inv) + ")"
+                             + (_ldHouseRec > 0 ? " | w tym levy rodow (474-P5): werbunki " + _ldHouseRec + ", ludzi " + _ldHouseMen + ", zlota " + _ldHouseGold : "")
                              + " | odmowy (wioska x powod, bez powtorzen): " + (sb.Length > 0 ? sb.ToString() : "-")
                              + " | pule: wpisow " + _lv.Count + ", przyrost mlodych w " + _ldDue + " (+" + _ldGrown.ToString("0.##", Inv) + "), odnowa: " + rs.Text() + ", pelne usuniete " + _ldDrop
                              + ", straty obroncow " + _ldLostN + " (" + _ldLost.ToString("0.#", Inv) + "), pobor gry z okregu -" + _ldVan.ToString("0.##", Inv) + " | braki rak " + _lvLack.Count + " wiosek (razem " + lackSum.ToString("0.#", Inv) + ")"
@@ -887,7 +973,10 @@ namespace Armoury
                    + " dob z dobowej stopy wsi okregu: " + rs.Text() + " (rok " + LvYearDays() + " dob), dziennie " + LvDailyPct.ToString("0.#", Inv) + "% pulapu x zaufanie/6 x 1/0.5/0.25, ceny x1/x"
                    + LvLevyPrice.ToString("0.##", Inv) + "/x" + LvGeneralPrice.ToString("0.##", Inv) + ", brak rak wraca przez " + LvResettleDays + " dob; ksiega pochodzenia LevyLive "
                    + (PeopleBook.LevyLive ? "TAK" : "NIE") + ") | wpisy puli " + _lv.Count + " (suma " + sum.ToString("0.##", Inv) + "), braki rak " + _lvLack.Count
-                   + " | Straz: bez poboru | AI: bez zmian (nie wjezdza do wiosek pobocznych) | potkniecia " + _lvSt;
+                   + " | Straz: bez poboru | AI: bez zmian (nie wjezdza do wiosek pobocznych)"
+                   + " | levy rodow (474-P5, klucz Side Village House Levy " + (HouseKey ? "TAK" : "NIE") + "): ziemia rodu = siedziba z tabeli ROT i jej okreg (pochodzenie, nie pan), 1 na 5 naplywu doby, tabela "
+                   + (HouseKey ? RotHouses.Count + " siedzib (czytana przy pierwszym poborze), potkniecia tabeli " + RotHouses.Stumbles : "-")
+                   + " | potkniecia " + _lvSt;
         }
 
         // ------------------------------------------------------------ zapis arm_sidelevy

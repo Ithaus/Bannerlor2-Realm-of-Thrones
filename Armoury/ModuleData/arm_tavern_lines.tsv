@@ -1,0 +1,74 @@
+# 474-P8/P9/P10: kwestie karczmy (same teksty, bez nagran). rodzaj<TAB>region<TAB>temat<TAB>tekst. Wlasne zdania, bez cytatow z ksiazek i serialu.
+# rodzaj: greet (barman), wench (kelnerka), music (grajkowie), sit (bywalec zaprasza), table (scenka: kwestie rozdzielone " || ")
+# region: any north iron west reach river vale storm crown dorne essos | temat: general war peace winter
+greet	any	general	Welcome to {INN}. Ale, bread, a bench by the fire - what'll it be?
+greet	any	general	Shut the door behind you, the draught eats my fire. Now, what can I pour you?
+greet	any	general	Coin first, talk after. That's the rule in {INN}. What are you drinking?
+greet	any	war	Mind your sword in here. We've had soldiers through all week and I'm short two stools already.
+greet	any	winter	Come in out of the cold. There's mulled ale on the hearth, if you've the coin.
+greet	north	general	Stamp the snow off your boots. Ale's brown, the stew's hot, and nobody asks your business.
+greet	north	general	Sit where you like, only not by the old man at the fire. That's been his seat since before the last winter.
+greet	north	winter	Winter's teeth are out tonight. A cup of something hot, friend?
+greet	iron	general	Salt on your cloak and coin in your fist, I hope. What will it be?
+greet	west	general	Good day to you. The wine comes up from the Reach, the ale is our own. Which will you have?
+greet	reach	general	Welcome, welcome. Summerwine or ale - we have the one in plenty and the other in better plenty.
+greet	river	general	Another traveller on the road. Sit, eat, keep your head down - these days that's the best advice in the riverlands.
+greet	river	war	If you've come to burn us out, you're late, someone did it last spring. If you've come to drink, sit down.
+greet	vale	general	You've come down from the high road? Then you've earned a cup. What'll it be?
+greet	storm	general	Hang your cloak by the fire, the storms will have soaked you through. Ale or something stronger?
+greet	crown	general	Fresh from the city or bound for it? Either way, you'll want a drink.
+greet	dorne	general	Out of the sun, friend. Our wine is red and strong, and the shade is free.
+greet	essos	general	Come, come, sit. Wine from three cities and tales from nine. What will you have?
+wench	any	general	Ale's at the counter, love. Ask the keeper - he counts every drop.
+wench	any	general	Mind the floor, it's wet. Someone's always spilling something in here.
+wench	any	general	If you want a bed, it's the keeper you want. If you want gossip, it's the drovers by the fire.
+wench	any	war	Three lots of soldiers this month, and not one of them paid for their own cup.
+wench	north	general	Keep your hands to yourself and your boots near the fire, and we'll get on fine.
+wench	river	general	Don't sit by the window. Things come through windows these days.
+wench	dorne	general	You look thirsty. Everyone who comes in off that road looks thirsty.
+wench	essos	general	The keeper says I'm to smile at every traveller. There. Now go and pay him.
+music	any	general	We play for the room. A coin in the cup keeps the strings in tune.
+music	any	general	A request? We know a dozen songs, and half of them are even decent.
+music	any	general	Hush now, we're between songs. The next one is sad, so drink first.
+music	north	general	We've a song about a winter that lasted a lifetime. It goes on a bit, like the winter.
+music	river	general	We don't sing the war songs here. Folk have heard enough of the real thing.
+music	reach	general	A love song, a drinking song or a song about a knight? We do all three at once, if you pay double.
+sit	any	general	Pull up a stool, friend. We were just putting the world to rights.
+sit	any	general	Sit, sit. There's room if Wat moves his elbows.
+sit	any	general	A new face! Sit down and tell us nothing - we'll do the talking.
+sit	north	general	Shove up, lads, let the traveller near the fire.
+sit	dorne	general	Join us. In this heat a man shouldn't drink alone.
+sit	essos	general	Sit, sit, and do not mind our tongues - we argue about everything.
+toast	any	general	Now that's a friend! Your health, stranger.
+toast	any	general	Gods bless an open purse. Drink, lads!
+toast	any	general	To the road, and to whoever pays for it!
+toast	north	general	To warm hearths and short winters.
+toast	dorne	general	To the sun, and to a guest who knows his manners.
+table	any	general	Roads are worse every year. || Roads? It's the tolls I mind. Every bridge has a lord's man on it now. || And every lord's man has a hand out. || Drink up. Talking won't mend either.
+table	any	general	My cousin swears he saw a two-headed calf at the last market. || Your cousin swears he saw a lot of things after his third cup. || He did say it was a small calf. || Then it's settled. Small calf, two heads, one cousin too many.
+table	any	general	Price of salt went up again. || Everything's gone up but the price of a man's work. || My grandfather said the same. || Then your grandfather was right too.
+table	any	general	Who's the stranger? || Paying customer, by the look of the purse. || Then he's no stranger. Sit, sit.
+table	any	general	They say the keeper waters the ale. || The keeper says he waters the floor and the ale finds its own way. || Either way it's wet and it's cheap. || Cheap is the only thing anybody can afford.
+table	any	general	I've a mule that knows the road better than I do. || Then why don't you send the mule to market and stay home? || Because the mule doesn't haggle. || Neither do you, from what I've seen.
+table	any	war	Soldiers came through again last week. Took two pigs and a cart. || Did they pay? || One of them said thank you. That's something. || That's more than the last lot.
+table	any	war	Which side are we on this month? || The side of whoever is standing in the village with a spear. || That's no side at all. || It's the only one that ever wins round here.
+table	any	war	My boy was taken for the levy. || Mine too, two harvests back. He came home. || Whole? || Most of him. He laughs less.
+table	any	peace	Quiet on the roads this season. || Too quiet. Quiet means someone's planning something. || Or it means folk are tired of fighting. || I'll believe that when the lords do.
+table	any	winter	Snow's early. || Snow's always early to the man with no firewood. || I've got firewood. || Then you'll be getting visitors.
+table	any	winter	My well froze last night. || So did my wife's temper. || The well thaws by noon at least. || Aye. You've the better bargain there.
+table	north	general	The old woman down the track says the winter will be long. || She says that every year. || And every year it's long. || Fine. Next year I'll listen to her.
+table	north	general	A man came through from the hills, said he heard drums at night. || Drums or his own head? || He'd been drinking, if that's what you're asking. || That's the only way anyone hears drums up there.
+table	north	general	Stew's thin tonight. || The stew is honest. It's the winter that's thin. || Then we'll eat honest and be cold. || Same as always.
+table	iron	general	My brother went reaving and came back with a bell. || A bell? What use is a bell? || He says it's worth more than the silver. || Then he was robbed by the men he robbed.
+table	west	general	The miners up the valley are paid in coin again. || Gold coin? || Copper. Gold stays where it's dug. || As it always does.
+table	reach	general	Best harvest in years, and the price fell through the floor. || That's how it goes. Too much is as bad as too little. || Not for the man buying. || The man buying never ploughs.
+table	reach	general	A knight passed through, looking for a tourney. || Did he find one? || He found the keeper's daughter. || Then he found a tourney after all.
+table	river	general	Fields by the ford flooded again. || They flood every spring. || Not like this. The water came right to the doors. || Then build higher, or pray harder.
+table	river	general	Burned out three farms down by the lake, they did. || Who? || Does it matter? Banners change. Fire doesn't. || Pour another. I don't want to think about it.
+table	river	war	My neighbour hid his grain under the floor. || Smart man. || Not smart enough - the soldiers burned the floor. || Then he's warm, at least, for a while.
+table	vale	general	The road down from the mountains is closed again. || Rockfall? || Clansmen. They take a toll in sheep. || Better sheep than heads.
+table	storm	general	Lost half the roof in the last storm. || Only half? You're lucky. || The other half landed on my brother's barn. || Then he's the lucky one. Two roofs.
+table	crown	general	The city's full of people and empty of bread. || Then why does everyone go there? || Because the bread there is the only bread there is. || Or because they think it is.
+table	dorne	general	The water seller raised his prices again. || In this heat he can charge what he likes. || He'll charge it once too often. || Then we'll drink wine like sensible folk.
+table	essos	general	The galley from the east brought silk and fever. || Which sold faster? || The fever. It's free. || Then the silk merchant's ruined.
+table	essos	general	A sellsword was here last night, offering his sword to anyone. || Any takers? || Only the keeper, to pay his tab. || A man of many uses, then.

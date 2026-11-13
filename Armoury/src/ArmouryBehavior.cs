@@ -1828,6 +1828,7 @@ namespace Armoury
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SiegeRansom.Tick(); });
             // n20-napisy: linia kontrolna napisow przyciskow menu - dopisana PRZED SiegeRansom.AddMenus, wiec gra wola ja PO nim (sluchacze od ostatnio dopisanego)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, ShortLabels.Audit);
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, CastellanLevy.Hook);   // 474-P5b: kasztelan ROT - ludzie rodu z DOM wsi siedziby, zloto do kies wsi (klucz CastellanLevyFromPool)
             // O3: opcja "Demand a ransom" w menu oblezenia gry - po wszystkich OnSessionLaunched (menu gry juz jest; wstawiona przed "Leave")
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
             // 375: zbrojownia wojska (DTE) i kit dla zalogi w menu oblezonej twierdzy (gracz w srodku) - przed "Leave"; tylko ekran, bez przelaczania menu
@@ -1836,6 +1837,7 @@ namespace Armoury
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.BountySessionStart(); NoticeBoard.BandMarkersOff(); NoticeBoard.BandMarkersSync("start sesji"); } catch (Exception e) { Log.Error("NoticeBoard.BountySessionStart", e); } });
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { NoticeBoard.AddMenus(s); } catch (Exception e) { Log.Error("NoticeBoard.AddMenus", e); } });   // m102-tablica: "Read the notice board" w menu miasta - po wszystkich OnSessionLaunched (opcje gry "town" juz stoja; miejsce za karczma)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { LandSale.AddDialogs(s); LandSale.AddMenus(s); } catch (Exception e) { Log.Error("LandSale.AddMenus", e); } });   // m113-zakup: rozmowa o ziemi, "Offer to buy ..." w menu wiosek (po wszystkich opcjach)
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => { try { SideVillageVisit.AddWalkMenu(s); } catch (Exception e) { Log.Error("SideVillageVisit.AddWalkMenu", e); } });   // 474-P7: "Walk through the village" w menu wioski pobocznej - indeks 0 PO wszystkich opcjach z indeksem (takze LandSale 6), wiec pierwsza i bez przesuwania reszty
             // HT (15.10 noc, PatchTarget.cs): linia "Latki czynnego modelu (HT): start sesji" - po OnSessionLaunched wszystkich modow (latki modeli w kampanii)
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => PatchTarget.Report());
             // m96-wzory: rozdanie wzorow tieru 1, sanacja, naprawa zapisu i ksiega PO OnSessionLaunched wszystkich modow (ROT-RBM przepisuje luki po nas); nowa kampania - ksiegi od zera
@@ -1999,6 +2001,7 @@ namespace Armoury
             Ransom178.RegisterEvents(this);     // 178: wielki jeniec przy pojmaniu przechodzi na korone zdobywcy (nagroda 1/10)
             Measure169c.RegisterEvents(this);   // 169c: niewola lordow, dezercja, sluby AI, Bliznaki - same liczniki (tylko log)
             AiDowry.RegisterEvents(this);       // R3-01c: posag przy slubach AI z AI (BeforeHeroesMarried)
+            CampaignEvents.BeforeHeroesMarried.AddNonSerializedListener(this, WorldTalk.OnMarried);   // 474-P10: sluby do rozmow karczmy (tylko imiona i doba; klucz Tavern Talk Lines)
             ArmyCohesionYear.RegisterEvents(this);   // AC (Jeff 14.10): armie zalozone / rozwiazane - wiek armii i przyczyny do linii doby
             ArmedStrength.RegisterEvents(this);   // p9 (Jeff 25.10): gotowosc zbrojowni partii - doba partii, godzina (brudne, publikacja; ArmsFirst), koniec bitwy, nowa / zniszczona partia
             LordEscort.RegisterEvents(this);   // 223 (Jeff 26.10): eskorta lordow - godzina (dolaczenie do armii, eskorta z zalogi po wejsciu), wejscie do osady, pojmanie, zniszczona partia
@@ -2523,6 +2526,10 @@ namespace Armoury
             SaveText.ReportAfterLoad();   // 161: ile dlugich napisow uratowal ratunek przy wczytaniu
             RawPrice.MemoryLive = true;   // 299b: od teraz wygladzanie podazy rynku w tempie PriceSupplyMemoryDaily (ticki startowe nowej kampanii byly przed - tempo gry)
             try { HideoutBossTalk.AddDialogs(starter); } catch (Exception e) { Log.Error("HideoutBossTalk.AddDialogs", e); }   // 293: rozmowa z hersztem kryjowki zawsze pyta o pojedynek (warunek w kluczu HideoutBossTalkFix)
+            try { TavernKeeperAle.AddDialogs(starter); } catch (Exception e) { Log.Error("TavernKeeperAle.AddDialogs", e); }   // 474-P3: "Pour me an ale. What's the news?" u karczmarza miasta (klucz InnKeeperAleLine)
+            try { RoadsideInnInterior.AddDialogs(starter); } catch (Exception e) { Log.Error("RoadsideInnInterior.AddDialogs", e); }   // 474-P8: rozmowy wnetrza zajazdu (barman, kelnerka, grajkowie; start tylko dla agentow tej misji)
+            try { TavernMusic.EnsurePatch(); } catch (Exception e) { Log.Error("TavernMusic.EnsurePatch", e); }   // 474-P4: muzyka karczmy miasta wedlug regionu (postfiks w kampanii, raz na proces; klucz TavernMusicByRegion)
+            try { SideVillageVisit.ScreenEnsurePatch(); } catch (Exception e) { Log.Error("SideVillageVisit.ScreenEnsurePatch", e); }   // 474-P6: okno werbunku gry dla wioski pobocznej (3 latki RecruitmentVM w kampanii, raz na proces; klucz SideVillageRecruitScreen)
             try { CaptiveTerms.AddDialogs(starter); } catch (Exception e) { Log.Error("CaptiveTerms.AddDialogs", e); }   // 366: "Let us speak of the terms of your release." przy jencu-krolu albo nastepcy (klucz CaptiveTerms)
             try { DungeonFate.AddDialogs(starter); } catch (Exception e) { Log.Error("DungeonFate.AddDialogs", e); }   // 409: "I have decided what is to be done with you." przy jencu-lordzie (klucz CaptiveFate)
             try { SiegeSurrender374.AddDialogs(starter); SiegeSurrender374.AddMenus(starter); } catch (Exception e) { Log.Error("SiegeSurrender374.Add", e); }   // 374: "I would yield the keep, on terms." z wodzem oblegajacych (parley) + menu arm374_yield
@@ -2585,6 +2592,8 @@ namespace Armoury
             try { DistrictWorks.SessionStart(); } catch (Exception e) { Log.Error("DistrictWorks.SessionStart", e); }   // inwest: prace okregu z zapisu i dodatek czesci przed pierwszym rachunkiem KS doby
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
             try { RoadsideInns.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInns.SessionStart", e); }
+            try { RoadsideInnInterior.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInnInterior.SessionStart", e); }   // 474-P8: linia startu wnetrza (klucz, plik kwestii)
+            try { RoadsideInnMapSound.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInnMapSound.SessionStart", e); }   // 474-P8b: dzwiek karczmy na mapie - linia startu, zrodlo poprzedniej sesji zwolnione
             try { SideVillageVisit.SessionStart(); } catch (Exception e) { Log.Error("SideVillageVisit.SessionStart", e); }   // m97-wioski: linia "Wioski poboczne (WP): start sesji"   // sw-zajazdy: linia "Zajazdy (ZJ): start sesji" - plik, zajazdy wedlug ludzi, najblizszy sasiad
             try { HarvestFairs.SessionStart(); } catch (Exception e) { Log.Error("HarvestFairs.SessionStart", e); }   // R3-05a: latka popytu (raz na proces), kalendarz krain, linia "Jarmarki po zniwach (R3-05a): start sesji"
             try { RiverBarges.SessionStart(); } catch (Exception e) { Log.Error("RiverBarges.SessionStart", e); }   // R3-05b: plik arm_rivers.tsv, latka oceny miast BK (raz na proces), linia "Barki rzeczne (R3-05b): start sesji"
@@ -2741,6 +2750,7 @@ namespace Armoury
             try { NightHooks.InCampaign(); } catch (Exception e) { Log.Error("NightHooks.InCampaign", e); }       // noc 25.10 P0 (K3): latki kampanii choragwi P3 (BannerKit) - raz na proces
             try { TownInns.AddMenus(starter); } catch (Exception e) { Log.Error("TownInns.AddMenus", e); }   // KA (16.10): "Take lodgings at an inn" w menu miasta (sen - arm_sleep_wait z NightRest)
             try { RoadsideInns.AddMenus(starter); } catch (Exception e) { Log.Error("RoadsideInns.AddMenus", e); }   // sw-zajazdy: menu zajazdu przy szlaku (nocleg, plotki, dalej w droge)
+            try { RoadsideInnInterior.AddMenus(starter); } catch (Exception e) { Log.Error("RoadsideInnInterior.AddMenus", e); }   // 474-P8: "Enter the Inn" na poczatku menu zajazdu (indeks 0 PO opcjach zajazdu)
             try { if (!LoreSeedFix.On) RangedLore.ReportLedger(false); } catch (Exception e) { Log.Error("RangedLore.ReportLedger", e); }   // m96-wzory: przy kluczu - po zmianach statystyk (LoreSeedFix)
             try { ArmyClothing.StartLine(); } catch (Exception e) { Log.Error("ArmyClothing.StartLine", e); }   // 150: stawki odziezy wojska i zaleznosci
             try { HorseState.OnSessionLaunched(); } catch (Exception e) { Log.Error("HorseState.OnSessionLaunched", e); }   // E6/K0 (209): licznik koni gry wedlug klucza (pelne przeliczenie przy zmianie), stan koni partii od nowa - PO porzadkach taborow wyzej
