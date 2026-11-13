@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 478-S5 (13.11) - KS: podwyzka firmy rolnej miasta przy przegladzie do 50% (bylo 25%) - mniej zlota ludu zamrozonego w kasach miast
+
+**Problem:** at-120c (KS uzbrojona): kasy miast 15.12 mln (w 120b 6.07 mln), lud 7.8% zlota swiata (120b 10.2%), kiesy ludu 0.544 normy (l.94342), glod z braku pieniedzy w 7 osadach (120b 2), chleb biedoty 62 tys. zl/d (120b 12.9 tys.); m96 przelal 74 245 zl przy 414 096 zl placy zatrzymanej w kasach (l.93800).
+
+**Przyczyna:** regula f5/M6 (KsFolkIncome.cs) zostawia w kasach ok. 260 tys. zl/d; podwyzka firmy przy przegladzie ograniczona KsFarmSurplusReviewMax = 0.25 (Settings.cs:4423), wiec firma (place ludu) nadaza za nadwyzka za wolno.
+
+**Zmiana:** domyslna KsFarmSurplusReviewMax 0.25 -> 0.50 (Settings.cs, McmSettings.cs) ORAZ w Armoury.json Jeffa 0.25 -> 0.50 (gra zamknieta; kopie Armoury.json.bak-2026-11-13-przed-ksreview obok i D:/Backup-Bannerlord/Armoury.json.2026-11-13-przed-ksreview, stan po: D:/Backup-Bannerlord/Armoury.json.2026-11-13-ksreview050; json z kontrola liczby kluczy 1999). Kod bez zmian. Decyzja domyslna (noc 13.11): wariant progu (alternatywa: m96 przelewa nadwyzke kasy ponad 1.5 x zapas kupcow) - nie robiony.
+
+**Ryzyko / co sprawdzic:** szybsze podwyzki firm - wiecej zlota do ludu (kiesy, popyt na jedzenie - ceny), mniej w kasach miast i dalej u panow/korony; w tescie: kasy miast ponizej 15 mln, udzial ludu w zlocie swiata > 7.8%, glod z braku pieniedzy < 7, koszyk przetrwania.
+
+**Status:** DO SPRAWDZENIA
+
 ## 478-S4 (13.11) - odstapienie 334e przez cale oblezenie wymaga tez przewagi wedlug miary startu (ZFor)
 
 **Problem:** at-120c, Lorath (l.70848): w tej samej chwili q_obl 1.31 (miara odsieczy "idzie/pamiec") i q miary startu 1.01 - odstapienie po 2.1 doby, czyli zaraz po koncu karencji 477-c (2 doby); trzy liczby odsieczy (KO, OB5, 471) sie nie zgadzaja.

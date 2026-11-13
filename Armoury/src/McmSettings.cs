@@ -9966,7 +9966,7 @@ namespace Armoury
 
         [SettingPropertyFloatingInteger("Ks Farm Surplus Review Max", 0.00f, 1.00f, "0.00", HintText = "with Ks Farm Follows Surplus: the largest raise of a town's farm at one such review (share of the farm)", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
-        public float KsFarmSurplusReviewMax { get; set; } = 0.25f;
+        public float KsFarmSurplusReviewMax { get; set; } = 0.50f;
 
         [SettingPropertyBool("Ks Folk Wage To Short Classes", HintText = "with the start calibration applied in a town: the pay its townsfolk did not take because their purses are already full (mostly the labourers') goes to the craftsmen and patricians of that town who are short - first food for two days, then their full basket for Ks Folk Short Basket Days days; never more than that pay and never more than the town's purse. Off = that pay stays with the merchants", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
