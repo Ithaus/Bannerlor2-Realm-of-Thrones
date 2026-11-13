@@ -45,7 +45,8 @@ namespace Armoury
     ///   Zloto do kiesy ludu miasta (karczmarze, uslugi KLife): szeregowi MenPurse.InnPay (TownFolk.Earn calosci), bohaterowie GiveGoldAction do kasy miasta
     ///   i TownFolk.EarnFromTown (droga oplat gracza PlayerFees8); kiesa ludu nieczynna - zostaje w kasie miasta. Kontrola obiegu przy kazdym noclegu: suma
     ///   posiadaczy (sakiewki ludzi, kiesy gracza i towarzyszy, kasa miasta, kiesy ludu miast i gminy) przed i po - roznica 0.
-    /// T3 Sen w miescie bez noclegu - bez zmian (NightRest: postoj pod dachem jak oboz, baza bez premii). Dom gracza: POMINIETY - dom jest w RealisticCaptivity
+    /// T3 Sen w miescie bez noclegu - 486 (klucz TownLodgingNightly, TownInns.Nightly.cs): noc w miescie placona o swicie w zarezerwowanym pokoju; klucz NIE - jak
+    ///   dotad bez zmian (NightRest: postoj pod dachem jak oboz, baza bez premii). Dom gracza: POMINIETY - dom jest w RealisticCaptivity
     ///   (Homes.Vault, pole internal innego DLL), Armoury nie ma do niego API; refleksja w cudze pole to nie "czyste API" (decyzja projektu).
     /// T4 Zapis "arm_inns" (SaveText.Sync, wlasny try): tylko stan noclegu - faza (1 oplacony sen, 2 wypoczety), jakosc, miasto, godziny, premie, zysk z cen (pole
     ///   opcjonalne). Brak klucza = brak. Czasy z zapisu sprawdzane na starcie sesji (CheckTimes: wypoczeci > 24 h, pobudka > 12 h, nocleg z przyszlosci).
@@ -103,6 +104,7 @@ namespace Armoury
             internal bool Price;                                    // gracz spal w dobrym domu - ceny w tym miescie (klucz TownInnPriceBonus czytany na zywo)
             internal long PriceGain;                                // szacowany zysk gracza z premii cen w tym noclegu (limit PriceGainCap)
             internal string RoadUid;                                // sw-zajazdy: nocleg w zajezdzie przy szlaku (uid z arm_roadside_inns.tsv; TownId = wies okregu); null = karczma miasta
+            internal bool Auto;                                     // 486: stan z noclegu z urzedu o swicie (tylko pamiec - po wczytaniu false; CommitMin = swit)
             internal string HostUid;                                // n20-wioska: nocleg we wlasnej wiosce pobocznej gracza (uid wioski; TownId = wies gry okregu) - TownInns.Host.cs
 
             /// <summary>Nazwa miasta do logu i komunikatow (po wczytaniu szukana przy pierwszym uzyciu, na watku glownym).</summary>
@@ -124,7 +126,7 @@ namespace Armoury
             {
                 return new Rest { Phase = phase, Q = Q, PlayerQ = PlayerQ, TownId = TownId, TownName = TownName, CommitMin = CommitMin, StartMin = StartMin,
                                   WakeMin = WakeMin, UntilMin = UntilMin, Speed = Speed, Morale = Morale, Sleep = Sleep, Heal = Heal, Price = Price, PriceGain = PriceGain,
-                                  RoadUid = RoadUid, HostUid = HostUid };
+                                  RoadUid = RoadUid, HostUid = HostUid, Auto = Auto };
             }
         }
         private static volatile Rest _rest;
@@ -149,6 +151,7 @@ namespace Armoury
         internal static void Reset()
         {
             _rest = null;
+            NightlyReset();   // 486: liczniki nocy w miescie, rezerwacja (TownInns.Nightly.cs)
             DayReset();
             _stumbles = 0; _errLogged = false; _freeAt = -1;
             Interlocked.Exchange(ref _parStumbles, 0);
@@ -159,6 +162,7 @@ namespace Armoury
             _dStays = _dHorses = _dArmHorses = _dWoke = _dNoRest = _dDropped = _dHealH = _dBuyN = _dSellN = _dPriceCut = _stumblesDay = 0;
             Interlocked.Exchange(ref _parStumblesDay, 0);
             Array.Clear(_dPeople, 0, 4);
+            NightlyDayReset();   // 486
             _dMen = _dComp = _dCompPurse = _dPlayer = _dFolk = _dCoffer = _dDiff = _dBuy = _dSell = 0;
         }
 
@@ -432,7 +436,8 @@ namespace Armoury
         {
             try
             {
-                starter.AddGameMenuOption("town", "arm_inn_enter", "{=!}Take lodgings at an inn", EnterCondition,
+                // 486: napis dynamiczny ("Lodgings (tonight: ...)" przy kluczu TownLodgingNightly); id bez zmian - TownMenus przenosi po id do dzielnicy karczm
+                starter.AddGameMenuOption("town", "arm_inn_enter", "{=!}{ARM_INN_ENTER}", EnterCondition,
                     delegate (MenuCallbackArgs a) { GameMenu.SwitchToMenu(Menu); }, false, 8);
                 starter.AddGameMenu(Menu, "{=!}{ARM_INN_TEXT}", MenuInit, GameMenu.MenuOverlayType.SettlementWithBoth);
                 for (int i = 0; i < 3; i++)
@@ -440,8 +445,11 @@ namespace Armoury
                     int q = i;
                     starter.AddGameMenuOption(Menu, "arm_inn_q" + q, "{=!}{ARM_INN_Q" + q + "}",
                         delegate (MenuCallbackArgs a) { return QCondition(a, q); },
-                        delegate (MenuCallbackArgs a) { Commit(q); }, false, q);
+                        delegate (MenuCallbackArgs a) { if (NightlyOn) Book(q); else Commit(q); }, false, q);   // 486: przy kluczu rezerwacja na pobyt, bez klucza jak dotad
                 }
+                // 486: "Go to bed now" - dotychczasowy nocleg z zaplata z gory i snem, w zarezerwowanej jakosci (tylko przy kluczu TownLodgingNightly)
+                starter.AddGameMenuOption(Menu, "arm_inn_sleep", "{=!}{ARM_INN_SLEEP}", SleepNowCondition,
+                    delegate (MenuCallbackArgs a) { Commit(CurQ(Settlement.CurrentSettlement)); }, false, 3);
                 // sw-zajazdy (InnGossip): plotki karczmarza w miescie - okno z tekstem (bez zmiany menu); klucz wylaczony - opcji nie ma
                 starter.AddGameMenuOption(Menu, "arm_inn_gossip", "{=!}{ARM_GOSSIP_TOWN}", Rumours.TownGossipCondition, Rumours.TownGossipConsequence, false, 5);
                 // m95-menu (recenzja): napis mowi, dokad prowadzi - "Back to the tavern district", gdy wejscie stoi w dzielnicy karczm; inaczej jak dotad
@@ -460,7 +468,11 @@ namespace Armoury
                 var st = Settlement.CurrentSettlement;
                 if (!On || st == null || !st.IsTown) return false;
                 string why;
-                if (!Allowed(st, out why)) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}" + why); }
+                bool allowed = Allowed(st, out why);
+                EnterLabel(st, allowed);   // 486: napis wejscia (klucz NIE - "Take lodgings at an inn" jak dotad)
+                if (!allowed) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}" + why); }
+                else if (NightlyOn) args.Tooltip = new TextObject("{=!}" + (OwnTown(st) ? "Your clan holds this town - you sleep in the keep for free. You may still take a room at an inn."
+                                                   : "Every night in town is paid at dawn at the inn you have booked (the common room unless you book better). See the kinds of night and their prices, book one, or go to bed now."));
                 // m110-sam: bez zolnierzy (sam albo z towarzyszami) - podpowiedz do gracza, nie o "ludziach"
                 else args.Tooltip = new TextObject("{=!}A common room, a decent inn or a good house" + PartyWords.Pick(" - the men pay for themselves", "", " - your companions pay for themselves") + ". Taken from " + HoldFrom()
                                                    + " on, you sleep until dawn; by day, until " + PartyWords.Pick("the men have slept", "you have slept enough", "you and your companions have slept") + ". You wake rested until dusk, at most 12 hours.");
@@ -512,6 +524,7 @@ namespace Armoury
                     }
                     if (spare + arm > 0) sb.Append(" Horses that carry nobody: ").Append(spare + arm).Append(arm > 0 ? " (" + spare + " in the baggage, " + arm + " in the armoury)." : ".");
                 }
+                NightlyMenuText(sb, st);   // 486: noc placona o swicie, rezerwacja na pobyt
                 MBTextManager.SetTextVariable("ARM_INN_TEXT", sb.ToString());
             }
             catch (Exception e) { Stumble("MenuInit", e); }
@@ -534,6 +547,9 @@ namespace Armoury
                                + (men > 0 ? ", the men " + (b.Sacked ? "nothing (the sack)" : b.MenCost.ToString(Inv)) : "")
                                + (b.Comp.Count > 0 ? ", companions " + b.CompCostSum : "");
                 // n20-napisy: na przycisku rodzaj noclegu i suma; co daje i kto ile placi - pierwsza linia podpowiedzi
+                if (NightlyOn)   // 486: opcja = rezerwacja na pobyt; cena za noc, dopisek przy aktualnej rezerwacji
+                    MBTextManager.SetTextVariable("ARM_INN_Q" + q, "Book " + QName[q].ToLowerInvariant() + " - " + b.Total + " d a night" + (Booked(st) && CurQ(st) == q ? " (booked)" : ""));
+                else
                 MBTextManager.SetTextVariable("ARM_INN_Q" + q, ShortLabels.Pick(QName[q] + " - " + b.Total + " d", QName[q] + " (" + QWhat[q] + ") - " + split));
                 var t = new StringBuilder();
                 if (ShortLabels.On) t.Append(QName[q]).Append(" (").Append(QWhat[q]).Append(") - ").Append(split).Append(".\n");
@@ -605,6 +621,55 @@ namespace Armoury
             return paid;
         }
 
+        /// <summary>486: zaplata noclegu w miescie wedlug rachunku b (wydzielone z Commit bez zmian w obiegu): sakiewka ludzi (InnPay), kiesy towarzyszy i gracza (HeroPays),
+        /// kontrola obiegu World() przed i po, liczniki doby, linia logu "Karczmy (KA): " + head. Wolane z Commit (menu) i DawnCharge (nocleg z urzedu o swicie).
+        /// Settlement st z rachunku, nie z CurrentSettlement (o swicie gracz mogl juz wyjechac).</summary>
+        private static void PayCore(Settlement st, int q, Bill b, string head, out int menPaid, out int compPaid, out int compPursePaid, out int playerPaid, out int folkAll)
+        {
+            var mp = MobileParty.MainParty;
+            var me = Hero.MainHero;
+            long w0 = World(st, b.Comp);
+            // sakiewka ludzi: szeregowi i doplata towarzyszy jednym przelewem (ta sama ksiega InnPay); rozdzial zaplaconego - najpierw szeregowi
+            int purseFolk = 0, pursePaid = 0, purseNeed = b.MenCost + b.CompPurseSum;
+            if (purseNeed > 0) pursePaid = MenPurse.InnPay(mp, st, purseNeed, out purseFolk);
+            menPaid = Math.Min(pursePaid, b.MenCost); compPursePaid = pursePaid - menPaid;
+            int compGoldPaid = 0, compFolk = 0;
+            var compLog = new StringBuilder();
+            for (int i = 0; i < b.Comp.Count; i++)
+            {
+                int f, paid = HeroPays(b.Comp[i], st, b.CompGold[i], true, out f);
+                compGoldPaid += paid; compFolk += f;
+                if (compLog.Length > 0) compLog.Append(", ");
+                compLog.Append(b.Comp[i].StringId).Append(' ').Append(b.CompQ[i] < 0 ? "stajnia" : QLog[b.CompQ[i]]).Append(' ').Append(paid + b.CompPurse[i])
+                       .Append(" (kiesa ").Append(paid).Append(", sakiewka ludzi ").Append(b.CompPurse[i]).Append(')');
+            }
+            compPaid = compGoldPaid + compPursePaid;
+            int playerFolk; playerPaid = HeroPays(me, st, b.PlayerCost, PayNotes.Quiet(false), out playerFolk);   // m96-wies: komunikat gry wylaczony przy PlayerPaymentReasons (InnNote)
+            long diff = World(st, b.Comp) - w0;
+            int paidAll = menPaid + compPaid + playerPaid; folkAll = purseFolk + compFolk + playerFolk;
+            float sp, mo, sl, he; Bonus(b, out sp, out mo, out sl, out he);
+            long now = NowMin();
+            _lastTownPaidMin = now;   // 486: noc oplacona w karczmie miasta - swit tej doby nie placi drugi raz (TownInns.Nightly.cs)
+            _dStays++; _dHorses += b.Spare; _dArmHorses += b.ArmorySpare; for (int l = 0; l < 4; l++) _dPeople[l] += b.People[l];
+            _dMen += menPaid; _dComp += compPaid; _dCompPurse += compPursePaid; _dPlayer += playerPaid; _dFolk += folkAll; _dCoffer += paidAll - folkAll; _dDiff += diff;
+            Log.Info(P + head + st.Name + " (" + st.StringId + ") " + When(now) + " - wybor " + q + " (" + QLog[q] + ")"
+                     + " | szeregowi " + (b.Foot + b.Mounted) + " (pieszych " + b.Foot + ", konnych " + b.Mounted
+                     + (b.Unhorsed > 0 ? ", konnych bez konia w zbrojowni (jak piesi) " + b.Unhorsed : "") + "): wspolna izba " + (b.FootAt[0] + b.MountAt[0])
+                     + ", porzadna karczma " + (b.FootAt[1] + b.MountAt[1]) + ", dobry dom " + (b.FootAt[2] + b.MountAt[2]) + ", stajnia " + b.MenStable
+                     + "; sakiewka ludzi " + b.MenPurse + ", wolne " + b.MenFree + ", zaplacili " + menPaid + " z " + b.MenCost
+                     + (b.MenNoPurse ? " (sakiewki wylaczone)" : "") + (b.Sacked ? " (okno lupu - bez zaplaty z sakiewki)" : "")
+                     + " | towarzysze " + b.Comp.Count + (compLog.Length > 0 ? ": " + compLog : "") + ", z kiesy " + compGoldPaid + ", z sakiewki ludzi " + compPursePaid
+                     + " z " + b.CompPurseSum + (b.CompWaivedSum > 0 ? ", darowane w oknie lupu " + b.CompWaivedSum : "")
+                     + " | gracz: pokoj " + RoomOf(q) + ", swoj kon " + (b.OwnHorse ? 1 : 0)
+                     + ", konie bez jezdzca " + (b.Spare + b.ArmorySpare) + " (tabor " + b.Spare + ", zbrojownia " + (b.Armory ? b.ArmorySpare.ToString(Inv) : "brak") + ") x " + PHorse[q]
+                     + " = " + b.PlayerCost + ", zaplacil " + playerPaid
+                     + " | razem " + paidAll + " (ludzie " + menPaid + ", towarzysze " + compPaid + ", gracz " + playerPaid + ") -> kiesa ludu " + folkAll + ", kasa miasta " + (paidAll - folkAll)
+                     + " | kontrola obiegu: roznica " + diff
+                     + " | osoby " + b.Persons + ": stajnia " + b.People[0] + ", wspolna izba " + b.People[1] + ", porzadna karczma " + b.People[2] + ", dobry dom " + b.People[3]
+                     + " | premia po snie: predkosc +" + F1(sp) + "%, morale +" + F1(mo) + ", sen x" + sl.ToString("0.00", Inv) + ", gojenie +" + (he * 100f).ToString("0", Inv) + "%"
+                     + ", cena " + (q == 2 && PriceKey ? "tak" : "nie") + ".");
+        }
+
         private static void Commit(int q)
         {
             try
@@ -616,47 +681,14 @@ namespace Armoury
                 if (!On || !Allowed(st, out why)) { if (On) Log.Player(why ?? "No inn takes you in now.", true); return; }
                 var b = Plan(st, q, true, SackedHere(st, mp));
                 if (!b.PlayerCan) { Log.Player("You cannot pay your own part of the lodging (" + b.PlayerCost + " d).", true); return; }
-                long w0 = World(st, b.Comp);
-                // sakiewka ludzi: szeregowi i doplata towarzyszy jednym przelewem (ta sama ksiega InnPay); rozdzial zaplaconego - najpierw szeregowi
-                int purseFolk = 0, pursePaid = 0, purseNeed = b.MenCost + b.CompPurseSum;
-                if (purseNeed > 0) pursePaid = MenPurse.InnPay(mp, st, purseNeed, out purseFolk);
-                int menPaid = Math.Min(pursePaid, b.MenCost), compPursePaid = pursePaid - menPaid;
-                int compGoldPaid = 0, compFolk = 0;
-                var compLog = new StringBuilder();
-                for (int i = 0; i < b.Comp.Count; i++)
-                {
-                    int f, paid = HeroPays(b.Comp[i], st, b.CompGold[i], true, out f);
-                    compGoldPaid += paid; compFolk += f;
-                    if (compLog.Length > 0) compLog.Append(", ");
-                    compLog.Append(b.Comp[i].StringId).Append(' ').Append(b.CompQ[i] < 0 ? "stajnia" : QLog[b.CompQ[i]]).Append(' ').Append(paid + b.CompPurse[i])
-                           .Append(" (kiesa ").Append(paid).Append(", sakiewka ludzi ").Append(b.CompPurse[i]).Append(')');
-                }
-                int compPaid = compGoldPaid + compPursePaid;
-                int playerFolk, playerPaid = HeroPays(me, st, b.PlayerCost, PayNotes.Quiet(false), out playerFolk);   // m96-wies: komunikat gry wylaczony przy PlayerPaymentReasons (InnNote)
-                long diff = World(st, b.Comp) - w0;
-                int paidAll = menPaid + compPaid + playerPaid, folkAll = purseFolk + compFolk + playerFolk;
+                // 486: zaplata wydzielona (PayCore) - ta sama ksiega, kontrola obiegu i linia logu dla noclegu z menu i noclegu z urzedu o swicie (TownInns.Nightly.cs)
+                int menPaid, compPaid, compPursePaid, playerPaid, folkAll;
+                PayCore(st, q, b, "nocleg w ", out menPaid, out compPaid, out compPursePaid, out playerPaid, out folkAll);
+                int paidAll = menPaid + compPaid + playerPaid;
                 float sp, mo, sl, he; Bonus(b, out sp, out mo, out sl, out he);
                 long now = NowMin();
                 _rest = new Rest { Phase = 1, Q = q, PlayerQ = q, TownId = st.StringId, TownName = st.Name.ToString(), CommitMin = now,
                                    Speed = sp, Morale = mo, Sleep = sl, Heal = he, Price = q == 2 };
-                _dStays++; _dHorses += b.Spare; _dArmHorses += b.ArmorySpare; for (int l = 0; l < 4; l++) _dPeople[l] += b.People[l];
-                _dMen += menPaid; _dComp += compPaid; _dCompPurse += compPursePaid; _dPlayer += playerPaid; _dFolk += folkAll; _dCoffer += paidAll - folkAll; _dDiff += diff;
-                Log.Info(P + "nocleg w " + st.Name + " (" + st.StringId + ") " + When(now) + " - wybor " + q + " (" + QLog[q] + ")"
-                         + " | szeregowi " + (b.Foot + b.Mounted) + " (pieszych " + b.Foot + ", konnych " + b.Mounted
-                         + (b.Unhorsed > 0 ? ", konnych bez konia w zbrojowni (jak piesi) " + b.Unhorsed : "") + "): wspolna izba " + (b.FootAt[0] + b.MountAt[0])
-                         + ", porzadna karczma " + (b.FootAt[1] + b.MountAt[1]) + ", dobry dom " + (b.FootAt[2] + b.MountAt[2]) + ", stajnia " + b.MenStable
-                         + "; sakiewka ludzi " + b.MenPurse + ", wolne " + b.MenFree + ", zaplacili " + menPaid + " z " + b.MenCost
-                         + (b.MenNoPurse ? " (sakiewki wylaczone)" : "") + (b.Sacked ? " (okno lupu - bez zaplaty z sakiewki)" : "")
-                         + " | towarzysze " + b.Comp.Count + (compLog.Length > 0 ? ": " + compLog : "") + ", z kiesy " + compGoldPaid + ", z sakiewki ludzi " + compPursePaid
-                         + " z " + b.CompPurseSum + (b.CompWaivedSum > 0 ? ", darowane w oknie lupu " + b.CompWaivedSum : "")
-                         + " | gracz: pokoj " + RoomOf(q) + ", swoj kon " + (b.OwnHorse ? 1 : 0)
-                         + ", konie bez jezdzca " + (b.Spare + b.ArmorySpare) + " (tabor " + b.Spare + ", zbrojownia " + (b.Armory ? b.ArmorySpare.ToString(Inv) : "brak") + ") x " + PHorse[q]
-                         + " = " + b.PlayerCost + ", zaplacil " + playerPaid
-                         + " | razem " + paidAll + " (ludzie " + menPaid + ", towarzysze " + compPaid + ", gracz " + playerPaid + ") -> kiesa ludu " + folkAll + ", kasa miasta " + (paidAll - folkAll)
-                         + " | kontrola obiegu: roznica " + diff
-                         + " | osoby " + b.Persons + ": stajnia " + b.People[0] + ", wspolna izba " + b.People[1] + ", porzadna karczma " + b.People[2] + ", dobry dom " + b.People[3]
-                         + " | premia po snie: predkosc +" + F1(sp) + "%, morale +" + F1(mo) + ", sen x" + sl.ToString("0.00", Inv) + ", gojenie +" + (he * 100f).ToString("0", Inv) + "%"
-                         + ", cena " + (q == 2 && PriceKey ? "tak" : "nie") + ".");
                 string men = b.Foot + b.Mounted == 0 ? "" : b.Sacked ? " Your men take their beds by right of the sack and pay nothing." : " Your men paid " + menPaid + " from their purses" + (b.MenStable > 0 ? ", " + b.MenStable + " of them sleep in the stable." : ".");
                 string comps = compPaid > 0 ? " Your companions paid " + compPaid + (compPursePaid > 0 ? " (" + compPursePaid + " of it from the men's purse, where their pay goes)." : ".") : "";
                 InnNote("inn", q, st.Name.ToString(), b, playerPaid, men + comps,   // m96-wies: jeden komunikat z powodem i rozbiciem (klucz wylaczony - jak dotad)
@@ -1011,7 +1043,8 @@ namespace Armoury
         {
             var s = Settings.Current;
             return "klucze: Town Inns " + (s != null && s.TownInns ? "tak" : "WYLACZONE") + ", Town Inn Price Bonus " + (s != null && s.TownInnPriceBonus ? "tak" : "WYLACZONE")
-                   + ", Night Rest " + (s != null && s.NightRestEnabled ? "tak" : "WYLACZONE");
+                   + ", Night Rest " + (s != null && s.NightRestEnabled ? "tak" : "WYLACZONE")
+                   + ", Charge Town Lodging Every Night (486) " + (s != null && s.TownLodgingNightly ? "tak" : "WYLACZONE");
         }
 
         private static string StateText()
@@ -1080,7 +1113,7 @@ namespace Armoury
                          + " | cena dobrego domu: kupione " + _dBuyN + " szt. za " + _dBuy + " (taniej ok. " + est(_dBuy, 1f - PriceStep) + "), sprzedane " + _dSellN + " szt. za " + _dSell
                          + " (drozej ok. " + est(_dSell, 1f + PriceStep) + "), premia zdjeta po limicie " + _dPriceCut
                          + " | potkniecia dzis " + _stumblesDay + " (od wczytania " + _stumbles + "), w predkosci i morale dzis " + Volatile.Read(ref _parStumblesDay)
-                         + " (od wczytania " + Volatile.Read(ref _parStumbles) + ").");
+                         + " (od wczytania " + Volatile.Read(ref _parStumbles) + ")" + NightlyDayText() + ".");
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { DayReset(); }

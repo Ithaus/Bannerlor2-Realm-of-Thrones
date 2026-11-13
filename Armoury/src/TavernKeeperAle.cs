@@ -43,6 +43,9 @@ namespace Armoury
                 if (starter == null) return;
                 starter.AddPlayerLine("arm474_tk_ale", "tavernkeeper_talk", "arm474_tk_ale_pour", "{=!}Pour me an ale. What's the news?", Cond, Asked, 105, Click);
                 starter.AddDialogLine("arm474_tk_ale_pour", "arm474_tk_ale_pour", "close_window", "{=!}{ARM474_TK_POUR}", PourCond, Pour, 105);
+                // 486: "Have you beds for the night?" - ceny noclegu z tablic menu karczmy i rezerwacja (TownInns.BedsLine), bez zaplaty w rozmowie; wraca do opcji karczmarza
+                starter.AddPlayerLine("arm486_tk_beds", "tavernkeeper_talk", "arm486_tk_beds_a", "{=!}Have you beds for the night?", BedsAsk, null, 104);
+                starter.AddDialogLine("arm486_tk_beds_a", "arm486_tk_beds_a", "tavernkeeper_talk", "{=!}{ARM486_TK_BEDS}", BedsCond, null, 104);
                 Log.Info(P + "linia \"Pour me an ale. What's the news?\" dodana do rozmowy z karczmarzem miasta (tavernkeeper_talk) - klucz Innkeeper Ale Line " + (On ? "TAK" : "NIE (albo brak plotek / kufla / karczm miast)") + ".");
             }
             catch (Exception e) { Stumble("AddDialogs", e); }
@@ -65,6 +68,27 @@ namespace Armoury
                 return true;
             }
             catch (Exception e) { Stumble("Cond", e); return false; }
+        }
+
+        /// <summary>486: linia o lozkach - karczmarz miasta, karczmy miast wlaczone (bez wymogu kufla i plotek).</summary>
+        private static bool BedsAsk()
+        {
+            try
+            {
+                if (!TownInns.On || CurTown() == null) return false;
+                var c = CharacterObject.OneToOneConversationCharacter;
+                return c != null && c.Occupation == Occupation.Tavernkeeper;
+            }
+            catch (Exception e) { Stumble("BedsAsk", e); return false; }
+        }
+
+        private static bool BedsCond()
+        {
+            string t = "We have beds. Ask in the common room.";
+            try { t = TownInns.BedsLine(CurTown()); }
+            catch (Exception e) { Stumble("BedsCond", e); }
+            MBTextManager.SetTextVariable("ARM486_TK_BEDS", t);
+            return true;
         }
 
         private static bool Click(out TextObject why)

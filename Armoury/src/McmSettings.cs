@@ -6088,6 +6088,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool TownInnPriceBonus { get; set; } = true;
 
+        [SettingPropertyBool("Charge Town Lodging Every Night", HintText = "every night you spend in a town is paid at an inn at dawn: you, your companions and the men, in the kind of room you booked at the inn (a common room unless you booked better), at the usual prices and with the usual rest the next day after a full night. Not in a town of your own clan, a besieged town, in another lord's army or service, in disguise or in captivity; a night already paid at an inn is not paid twice. Who cannot pay sleeps in the stable, as in camp. Off = sleeping in town is free unless you take lodgings yourself, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool TownLodgingNightly { get; set; } = true;
+
         [SettingPropertyBool("Roadside Inns", HintText = "inns stand by the roads between the towns and castles - fewer where fewer people live, none beyond the Wall. Click one on the map and your party rides there and goes in (stopping next to one asks you in): take lodgings at the same prices and with the same rest as a town inn - most roadside inns have only a common room, or a common room and a decent inn - and the coin goes to the purse of the village whose lands the inn stands on (its lord takes his usual share, the same rule as for the sutlers - Village Tribute From Sutlers). Lodgings need Town Inns and Night Rest. Off = no roadside inns, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool RoadsideInns { get; set; } = true;
@@ -14705,6 +14709,7 @@ namespace Armoury
             s.TownInns = TownInns;
             s.InnCommonRoomSharedBed = InnCommonRoomSharedBed;
             s.TownInnPriceBonus = TownInnPriceBonus;
+            s.TownLodgingNightly = TownLodgingNightly;
             s.RoadsideInns = RoadsideInns;
             s.InnGossip = InnGossip;
             s.InnGossipLootWords = InnGossipLootWords;

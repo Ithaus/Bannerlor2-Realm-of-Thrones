@@ -331,6 +331,7 @@ namespace Armoury
                 }
                 if (resting && !forced && !work) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
                 InnDrink.RestHour(resting && !forced && !work ? (night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f)) : 0f, _sleeping);   // m98-plotki: odsypianie kufli tym samym odpoczynkiem (wlasny try)
+                TownInns.NightHour(mp, night);   // 486: godzina nocy ksiegi w miescie - licznik do oplaty noclegu o swicie (wlasny try)
 
                 // noc 15/16.10 (NightMarchNotice): numer nocy obozu - pytanie, ostrzezenie i komunikat obozu najwyzej raz na noc
                 long nightId = NightClock.NightId(CampStart);
@@ -497,6 +498,7 @@ namespace Armoury
                     _lastDawnMsg = null;
                     ForcedMarch.Dawn(s, restBefore, sleepingNow);   // R3-08c recenzja: zanik zmeczenia z odpoczynkiem doby PO godzinie 5-6, przed zerowaniem doby
                     SettleNight(s);
+                    TownInns.DawnCharge(restBefore);   // 486: noc w miescie placona o swicie, po rozliczeniu dlugu snu (wlasny try)
                     LogPlayerDawn(s, restBefore, debtBefore, sleepingNow, creditedBefore, marchH, autoCamps, cuts, _menuSleptDay || sleepingNow);
                     _menuSleptDay = _sleeping;   // 316b: nowa doba - sen trwajacy przez swit liczy sie tez do niej
                     TbsDawnLine();   // 311e: linia doby treningu przed snem (wlasny try)
