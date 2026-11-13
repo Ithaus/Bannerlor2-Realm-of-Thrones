@@ -35,7 +35,10 @@ namespace Armoury
     /// i tkaniny 40%, metal luku/kuszy 30%, groty 40%; stal (Iron4+) +5% (odweglenie - liczymy jako strata, gatunek bez zmian, jak przetop broni z czesci).
     /// Nigdy wiecej niz udzial przetopu (SmeltingReturnShare + Smithing x bonus, najwyzej polowa - Jeff 30.08) z kg PRZEPISU tej sztuki: kucie + przetop
     /// zawsze traci okolo polowy metalu, przetopem nie da sie zarabiac. Drewno, skora, len i rog przepadaja.
-    /// Wylaczony klucz = przepisy jak dotad (Recipes.BuildRecipe). Tarcze - bez zmian (stary przepis; poza zakresem).
+    /// Wylaczony klucz = przepisy jak dotad (Recipes.BuildRecipe). Tarcze - od 488 (klucz ShieldRecipeByMass, Jeff 13.11 "tarcze tak") tez z masy, ta sama
+    /// regula co wycena (ArmsPricing.CostOf): okucia i umbo 10% wagi x1.4 metalu gatunku wyceny, deski 80% x1.5 drewna, obicie 10% skory (bez odpadu - jak
+    /// wycena); bez wegla (jak pancerze z masy). Dotad (audyt 13.11) stary przepis w CALYCH belach lnu i skorach po 10 kg: steel_round_shield t6 4 kg = 40 kg
+    /// skory (160 d) przy wartosci 128 d, 178 z 183 tarcz z surowcem 3-14x drozszym od sztuki. Czas kucia, stamina i prog - bez zmian (BuildRecipe).
     /// </summary>
     internal static partial class Recipes
     {
@@ -73,13 +76,17 @@ namespace Armoury
             if (_massStumbles <= 5 || _massStumbles % 100 == 0) Log.Error("Recipes.Mass." + where + " (potkniecie " + _massStumbles + ")", e);
         }
 
-        /// <summary>Ktore przepisy ida z masy: luki, kusze, strzaly, belty i pancerze (z peleryna i rzedem konskim). Tarcze - stary przepis.</summary>
+        /// <summary>488: tarcze z masy (klucz ShieldRecipeByMass, dziala tylko razem z RecipesByMass).</summary>
+        internal static bool ShieldMassOn { get { var s = Settings.Current; return s != null && s.ShieldRecipeByMass; } }
+
+        /// <summary>Ktore przepisy ida z masy: luki, kusze, strzaly, belty i pancerze (z peleryna i rzedem konskim); tarcze przy ShieldRecipeByMass (488),
+        /// bez niego stary przepis.</summary>
         internal static bool MassCovers(ItemObject it)
         {
             if (it == null) return false;
             var t = it.ItemType;
             if (t == ItemObject.ItemTypeEnum.Bow || t == ItemObject.ItemTypeEnum.Crossbow || t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts) return true;
-            if (t == ItemObject.ItemTypeEnum.Shield) return false;
+            if (t == ItemObject.ItemTypeEnum.Shield) return ShieldMassOn;
             return it.HasArmorComponent;
         }
 
@@ -255,6 +262,14 @@ namespace Armoury
                 float heads = c.MetalKg * batch;
                 AddMetal(l, c.Grade, heads, heads / 1.2f, LossHeads, "heads", legend);
                 AddKg(l, _wood, -1, c.WoodKg * batch, c.WoodKg * batch / WoodWaste, 0f, "shafts");
+            }
+            else if (tp == ItemObject.ItemTypeEnum.Shield)
+            {
+                // 488: kg z receptury wartosci (CostOf: metal 10% wagi x1.4 w gatunku wyceny, drewno 80% x1.5, skora 10%) - te same kg, z ktorych gra liczy
+                // wartosc tarczy i ktore zuzywa warsztat AI (regula R7 "jedna wycena"); przetop: metal okuc minus strata okuc (40%), drewno i skora przepadaja
+                AddMetal(l, c.Grade, c.MetalKg, c.MetalKg / MetalWaste, LossFittings, "boss", legend);
+                AddKg(l, _wood, -1, c.WoodKg, c.WoodKg / WoodWaste, 0f, "boards");
+                AddKg(l, _leather, 0, c.LeatherKg, c.LeatherKg, 0f, "facing");
             }
             else if (it.HasArmorComponent)
             {
@@ -696,8 +711,42 @@ namespace Armoury
         private static readonly string[] Samples =
         {
             "dragonbone_bow", "goldenheart_longbow", "stealth_bow", "hunting_bow", "composite_bow", "noble_long_bow", "crossbow_a", "crossbow_g",
-            "default_arrows", "hardened_125_gr_arrows", "bolt_a", "royce_armor", "steppe_leather_boots", "knight_cap"
+            "default_arrows", "hardened_125_gr_arrows", "bolt_a", "royce_armor", "steppe_leather_boots", "knight_cap",
+            "steel_round_shield", "desert_round_shield", "stark_shield"   // 488: tarcze z audytu 13.11
         };
+
+        /// <summary>488 (linia startu): cena surowca przepisu wedlug wartosci jednostek (sztaba, bela, skora, ladunek drewna) - stary przepis (sztuki) albo z masy (kg).</summary>
+        private static float MatValue(Recipe r)
+        {
+            float v = 0f;
+            float wkg = Math.Max(0.01f, WoodKg());
+            if (r.Kg != null)
+            {
+                foreach (var k in r.Kg)
+                {
+                    if (k.Item == null) continue;
+                    v += k.Grade < 0 ? k.Kg / wkg * k.Item.Value : k.Kg / Math.Max(0.01f, UnitKg(k)) * k.Item.Value;
+                }
+                return v;
+            }
+            if (r.Parts != null)
+                foreach (var p in r.Parts)
+                {
+                    if (p.Item == null || p.Count <= 0) continue;
+                    if (p.Item == _wood && r.WoodKg > 0f) continue;
+                    v += p.Count * (float)p.Item.Value;
+                }
+            if (r.WoodKg > 0f && _wood != null) v += r.WoodKg / wkg * _wood.Value;
+            return v;
+        }
+
+        private static float OldMatValue(ItemObject it)
+        {
+            bool keep = _massOff;
+            _massOff = true;
+            try { return MatValue(For(it)); }
+            finally { _massOff = keep; }
+        }
 
         /// <summary>OnAfterSessionLaunched: ile przepisow liczy sie z masy, przyklady przed/po, najwieksze odchylenia masy surowca od masy wyrobu, otwarte ladunki.</summary>
         internal static void MassStartLine()
@@ -709,6 +758,8 @@ namespace Armoury
                 if (mgr == null || Campaign.Current == null) return;
                 if (!MassOn) { Log.Info("Przepisy z masy (m96-receptury): start sesji | klucz RecipesByMass NIE - przepisy w sztukach jak dotad | potkniecia " + _massStumbles + "."); return; }
                 int armour = 0, bows = 0, xbows = 0, ammo = 0, legends = 0, old = 0, metalInBows = 0;
+                int shields = 0, shOldOver = 0, shNewOver = 0;   // 488: tarcze z surowcem drozszym od sztuki - stary przepis / z masy
+                var shSamples = new List<string>();
                 var ratios = new List<KeyValuePair<float, string>>();
                 var samples = new List<string>();
                 var want = new HashSet<string>(Samples);
@@ -721,6 +772,19 @@ namespace Armoury
                     if (t == ItemObject.ItemTypeEnum.Bow) { bows++; foreach (var k in r.Kg) if (k.Grade >= 1) metalInBows++; }
                     else if (t == ItemObject.ItemTypeEnum.Crossbow) xbows++;
                     else if (t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts) ammo++;
+                    else if (t == ItemObject.ItemTypeEnum.Shield)
+                    {
+                        shields++;
+                        try
+                        {
+                            float nv = MatValue(r), ov = OldMatValue(it);
+                            if (ov > it.Value) shOldOver++;
+                            if (nv > it.Value) shNewOver++;
+                            if (want.Contains(it.StringId) && shSamples.Count < 4)
+                                shSamples.Add(it.StringId + " t" + Grade(it) + " wartosc " + it.Value + " d: surowiec BYLO " + ((int)Math.Round(ov)) + " d -> JEST " + ((int)Math.Round(nv)) + " d");
+                        }
+                        catch (Exception e) { MassStumble("MassStartLine(tarcza " + it.StringId + ")", e); }
+                    }
                     else armour++;
                     if (IsLegendary(it)) legends++;
                     float nk; string nd = New(r, out nk);
@@ -728,7 +792,7 @@ namespace Armoury
                     if (t == ItemObject.ItemTypeEnum.Arrows || t == ItemObject.ItemTypeEnum.Bolts)
                         piece *= Math.Max(1, it.PrimaryWeapon != null ? (int)it.PrimaryWeapon.MaxDataValue : 30) * Math.Max(1, Settings.Current.AmmoBatchStacks);
                     if (it.Weight > 0.05f) ratios.Add(new KeyValuePair<float, string>(nk / piece, it.StringId + " " + Kg(nk) + "/" + Kg(piece) + " kg"));
-                    if (want.Contains(it.StringId) && samples.Count < 16)
+                    if (want.Contains(it.StringId) && samples.Count < 20)
                     {
                         float ok; string od = Old(it, out ok);
                         samples.Add(it.StringId + " t" + Grade(it) + " " + Kg(piece) + " kg: BYLO " + od + " (" + Kg(ok) + " kg) -> JEST " + nd);
@@ -739,12 +803,15 @@ namespace Armoury
                 var lo = new List<string>(); var hi = new List<string>();
                 for (int i = 0; i < ratios.Count && i < 3; i++) lo.Add(ratios[i].Value + " x" + ratios[i].Key.ToString("0.00", Inv));
                 for (int i = ratios.Count - 1; i >= 0 && i >= ratios.Count - 5; i--) hi.Add(ratios[i].Value + " x" + ratios[i].Key.ToString("0.00", Inv));
-                Log.Info("Przepisy z masy (m96-receptury): start sesji | klucz RecipesByMass TAK | policzone " + (armour + bows + xbows + ammo) + " (pancerze " + armour + ", luki " + bows
-                         + ", kusze " + xbows + ", strzaly i belty " + ammo + "; legendy " + legends + " x" + Kg(LegendFactor()) + " kazdego kg"
+                Log.Info("Przepisy z masy (m96-receptury): start sesji | klucz RecipesByMass TAK | policzone " + (armour + bows + xbows + ammo + shields) + " (pancerze " + armour + ", luki " + bows
+                         + ", kusze " + xbows + ", strzaly i belty " + ammo + ", tarcze " + shields + " - klucz ShieldRecipeByMass " + (ShieldMassOn ? "TAK" : "NIE")
+                         + "; legendy " + legends + " x" + Kg(LegendFactor()) + " kazdego kg"
                          + "), latka SpendMaterials CRAFT BK " + FletchForge.MassHookState + ", stary przepis bez receptury wartosci " + old + ", metal w lukach " + metalInBows
                          + " (ma byc 0) | jednostki: sztaba " + Kg(MatKg(CraftingMaterials.Iron4)) + " kg, len " + Kg(SmithStock.UnitKg(_linen)) + " kg, skora " + Kg(SmithStock.UnitKg(_leather))
                          + " kg, drewno ladunek " + Kg(SmithWood.LoadKg) + " kg | masa surowca / masa wyrobu: mediana x" + med + ", najmniej: " + string.Join("; ", lo.ToArray())
                          + ", najwiecej: " + string.Join("; ", hi.ToArray()) + " | otwarte ladunki: " + OpenText(false) + " | przyklady: " + string.Join("; ", samples.ToArray())
+                         + (shields > 0 ? " | tarcze (488): surowiec drozszy od sztuki - stary przepis " + shOldOver + " z " + shields + ", z masy " + shNewOver + " z " + shields
+                                          + (shSamples.Count > 0 ? "; " + string.Join("; ", shSamples.ToArray()) : "") : "")
                          + " | potkniecia " + _massStumbles + ".");
             }
             catch (Exception e) { MassStumble("MassStartLine", e); }

@@ -167,7 +167,9 @@ namespace Armoury
                 bool metalArmour = item.HasArmorComponent && (item.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Plate
                                                              || item.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Chainmail);
                 // m96-receptury: przy RecipesByMass kazdy pancerz (takze skora i tkanina) bierze kwit z przepisu z masy - jeden kwit w CRAFT BK, w naszej kuzni i w zapisie kg
-                if (metalArmour || (Recipes.MassOn && Recipes.MassCovers(item)) || item.ItemType == ItemObject.ItemTypeEnum.Bow || item.ItemType == ItemObject.ItemTypeEnum.Crossbow
+                // 488: tarcza z masy tylko razem z BkShieldBillByRecipe (bez niego CRAFT BK liczy tarcze wlasnym kwitem, jak dotad)
+                bool massPiece = Recipes.MassOn && Recipes.MassCovers(item) && (item.ItemType != ItemObject.ItemTypeEnum.Shield || FletchForge.ShieldRecipeOn(item));
+                if (metalArmour || massPiece || item.ItemType == ItemObject.ItemTypeEnum.Bow || item.ItemType == ItemObject.ItemTypeEnum.Crossbow
                     || item.ItemType == ItemObject.ItemTypeEnum.Arrows || item.ItemType == ItemObject.ItemTypeEnum.Bolts)
                 {
                     var rr = Recipes.For(item);
