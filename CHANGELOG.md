@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P8-p2 (13.11) - barman wnetrza zajazdu: ceny noclegu z tablic menu, "your bed" przy wspolnym lozku (poprawka po recenzji B4)
+
+**Problem:** recenzja B4 (kod): odpowiedz barmana na "Have you beds for the night?" (`RoadsideInnInterior.BedsCond`) miala ceny przepisane na sztywno ("1 and 1", "2 and 2", "8", "4 and 3", "20"). Przy kluczu `InnCommonRoomSharedBed` `RoomOf(0)` daje 1, a tekst mowil "your own room 1", podczas gdy menu pisze "your bed" (`TownInns.RoomWord`).
+
+**Przyczyna:** tablice `TownInns.PMan/PHorse` sa prywatne - tekst je powtarzal.
+
+**Zmiana:** `TownInns.ManPrice(q)` / `HorsePrice(q)` (odczyt tych samych tablic); `BedsCond` sklada ceny z `ManPrice`/`HorsePrice`/`RoomOf` i slowo z `RoomWord(0)`. Liczby przy dzisiejszych tablicach takie same jak dotad.
+
+**Ryzyko / co sprawdzic:** tylko tekst rozmowy - nic nie jest pobierane w misji (nocleg dalej w menu po wyjsciu). Klucz `RoadsideInnInterior` NIE - linia nie istnieje.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 474-P9-p (13.11) - kolejka dla stolu: kufel gracza liczy sie do upicia, kolejka szara, gdy nic nie daje (poprawka po recenzji B3)
 
 **Problem:** recenzja B3 (kod): `InnTable.RoundPrice` liczy kufel gracza ("and one for you", glowy = stol + 1), ale `RoundCons` nie podbijal licznika kufli (`InnDrink`) - kolejki nie upijaly i nie dochodzily do `MaxCups`. Kolejek nie ograniczalo nic poza zlotem - przy pelnym zapasie scenek (`_scenesLeft == MaxScenes`) gracz dalej placil, nic za to nie dostajac.

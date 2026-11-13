@@ -212,6 +212,9 @@ namespace Armoury
         private static bool SackedHere(Settlement st, MobileParty mp) { return MenPurse.On && CitySack.StayWindow(st, mp); }
 
         private static int ManCost(int q, bool horse) { return q < 0 ? 0 : PMan[q] + (horse ? PHorse[q] : 0); }
+        /// <summary>474-P8-p (recenzja B4): ceny czlowieka i konia jakosci q (0-2) dla tekstu barmana wnetrza zajazdu - te same tablice co menu.</summary>
+        internal static int ManPrice(int q) { return PMan[Math.Max(0, Math.Min(2, q))]; }
+        internal static int HorsePrice(int q) { return PHorse[Math.Max(0, Math.Min(2, q))]; }
 
         private static bool HasMount(Hero h)
         {

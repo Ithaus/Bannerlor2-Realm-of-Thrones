@@ -374,8 +374,10 @@ namespace Armoury
                 var inn = l != null ? l.Inn : null;
                 if (inn == null) return false;
                 _dBeds++;
-                string t = RoadsideInns.BedsText(inn) + " A man and his horse pay 1 and 1 in the common room, your own room " + TownInns.RoomOf(0) + "."
-                           + (inn.Tiers >= 2 ? " Decent beds 2 and 2, a room 8." : "") + (inn.Tiers >= 3 ? " The good rooms 4 and 3, the best 20." : "")
+                // 474-P8-p (recenzja B4): ceny z tych samych tablic co menu (TownInns), slowo "bed"/"room" wedlug klucza Inn Common Room Shared Bed
+                string t = RoadsideInns.BedsText(inn) + " A man and his horse pay " + TownInns.ManPrice(0) + " and " + TownInns.HorsePrice(0) + " in the common room, " + TownInns.RoomWord(0) + " " + TownInns.RoomOf(0) + "."
+                           + (inn.Tiers >= 2 ? " Decent beds " + TownInns.ManPrice(1) + " and " + TownInns.HorsePrice(1) + ", a room " + TownInns.RoomOf(1) + "." : "")
+                           + (inn.Tiers >= 3 ? " The good rooms " + TownInns.ManPrice(2) + " and " + TownInns.HorsePrice(2) + ", the best " + TownInns.RoomOf(2) + "." : "")
                            + " Settle it with me on your way out and I'll have them made up.";
                 MBTextManager.SetTextVariable("ARM474_INN_BEDS", t);
                 return true;
