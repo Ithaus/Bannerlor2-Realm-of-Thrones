@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 14.11 - WGRANIE 227 (484-490, BEZ autotestu - decyzja Jeffa "wgrywaj od razu", sprawdzanie na jego grze)
+
+- Armoury.dll md5 95f6ea4fdaf50ca2f90279b432017084 = galaz noc/367c-jeniec-po-odejsciu 1c49d1ee (WGRANIE 226 + 484 wbite pociski, 485 karczma jedno krzeslo jedno miejsce, 486 nocleg w miescie co noc + wybor pokoju, 487 zajazdy dostaja drogi boczne, 488 tarcze z masy, 489 prog oszczednosci miast x1, 490 pomiar Plan-gra). CrashScribe bez zmian (62174c0a).
+- Jeff 14.11: "po co test, masz moj log z gry" / "wgrywaj od razu" - wgrane bez autotestu; kopia przed: Armoury.dll.bak-2026-11-14-przed-wgranie227 (= WGRANIE 226 e3bc96f5) oraz C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-14-wgranie227 i -przed). Przy problemie: cofnac do e3bc96f5.
+- Do sprawdzenia w logu gry Jeffa: "Wbite pociski (484)", "Stoly zajazdu (474-P9): siedzacy po 3 s (485)", "Nocleg w miescie (486)", "Drogi boczne (f11): plan ... zajazdy (487)", "Przepisy z masy ... tarcze (488)", "f7-kasy ... (489)", "KS: rozjazd Plan - gra (490)"; potkniecia 0, BLAD 0.
+- Kusze: pomiar (jakie kusze wydaje DTE wedlug umiejetnosci i obrazenia belt -> kolczuga przy rownej randze) przy najblizszym tescie bitwy; bez zmiany zestawow (Jeff: bron dobierana wedlug umiejetnosci).
+
 ## STAN 13.11 21:55 - WGRANIE 226 (test zbiorczy at-220z: 479-e..k, 482 budowy z kasy miasta, 483 gersuma bez przyrostu, 480 XP gracza)
 
 - Armoury.dll md5 e3bc96f522acc1b18940eae08b15ff63 = galaz noc/367c-jeniec-po-odejsciu 795fa72c (scalone: 479-a..k, 480/480-a, 482, 483; potem 039e90e6 scala tez 481 CrashScribe). CrashScribe bez zmian (62174c0a, WGRANIE 225). Klucze domyslne: KsSwitchFoodShelves TAK, KsPlanEqSteadyBest TAK, BuildTownChestWhenLordBarred TAK, KsFarmCatchUpWhenFlat TAK, PlayerSkillXpMult 0.75.
