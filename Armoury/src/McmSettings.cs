@@ -220,6 +220,10 @@ namespace Armoury
         [SettingPropertyGroup("Experience")]
         public float SmithingXpFactor { get; set; } = 0.70f;
 
+        [SettingPropertyFloatingInteger("Player Skill XP Multiplier", 0.10f, 2.00f, "0.00", HintText = "Skill experience gained by your own hero is multiplied by this - battles, tournaments, trade, scouting, books, smithing and every other source (0.75 = 25 percent slower, 1 = as before). Only your hero: companions, family, lords and troops are not touched. Only the skills are slowed - your character level grows as before. Skill levels set outright (character creation, education, events) are not touched. Smithing is also cut by Smithing Xp Factor", RequireRestart = false)]
+        [SettingPropertyGroup("Experience")]
+        public float PlayerSkillXpMult { get; set; } = 0.75f;
+
         [SettingPropertyBool("Armour Orders Enabled", HintText = "lords leave armour commissions with town smiths", RequireRestart = false)]
         [SettingPropertyGroup("Orders from the lords")]
         public bool ArmourOrdersEnabled { get; set; } = true;
@@ -13198,6 +13202,7 @@ namespace Armoury
             s.WeaponXpFromValueCapped = WeaponXpFromValueCapped;
             s.WeaponXpCapPerTier = WeaponXpCapPerTier;
             s.SmithingXpFactor = SmithingXpFactor;
+            s.PlayerSkillXpMult = PlayerSkillXpMult;
             s.ArmourOrdersEnabled = ArmourOrdersEnabled;
             s.OrderOfferChance = OrderOfferChance;
             s.OrderTownCooldownDays = OrderTownCooldownDays;

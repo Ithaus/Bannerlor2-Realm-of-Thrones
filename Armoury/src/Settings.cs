@@ -77,6 +77,7 @@ namespace Armoury
         public int WeaponXpCapPerTier = 500;               // ceiling per weapon = this times the tier
         // m109-kuznia (Jeff 23.10 "smithing za szybko rosnie ... zmniejszyc o 30%"): jeden mnoznik XP Smithing w HeroDeveloper.AddSkillXp (SmithXp.cs); 1.00 = jak 44c03a05
         public float SmithingXpFactor = 0.70f;             // Smithing grows slower: every gain of Smithing experience is multiplied by this - forging weapons, armour, bows, crossbows and arrows, smelting, refining, mending, commissions and any other Smithing experience, for every hero (0.7 = 30 percent slower, 1 = as before). Only the skill is slowed - the character level you earn by smithing grows as before. The caps (Xp Cap Per Tier, Weapon Xp Cap Per Tier, Refine Xp Cap) count before this cut. A skill level set outright (events, education) is not touched
+        public float PlayerSkillXpMult = 0.75f;  // 480: skill experience gained by the player hero is multiplied by this (0.75 = 25% slower). 1.0 = as before
         // --- Orders from the lords ---
         public bool ArmourOrdersEnabled = true;            // lords leave armour commissions with town smiths
         public float OrderOfferChance = 0.5f;              // chance a fresh offer waits when you ride in
