@@ -11048,6 +11048,10 @@ namespace Armoury
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsGrowGroves { get; set; } = true;
 
+        [SettingPropertyBool("Ks Food Hands With Switch Rule", HintText = "with Ks Food Hands Follow Market and the work-switch rule on (Start Calibration Switch Rule, Ks Switch Signal Rule): the weekly food rule still runs in every village part that is not in the middle of a switch - the switch rule judges by the plan's own prices and hardly ever fires, while the stalls stay empty of olives, grapes, fruit, cheese and meat for months. Off = with the switch rule on, only that rule moves the works (as before)", RequireRestart = false)]
+        [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
+        public bool KsFoodHandsWithA7 { get; set; } = true;
+
         [SettingPropertyBool("Bloomery Colliers", HintText = "under the start calibration, with Bloomery At Mine: when a mine's bloomery has too little wood for the day's ore, the miners who would stand idle burn charcoal instead - they cut the district's own wood (the world's woodcutter output times how fit the mine's land is for timber: 0 in deserts and on the steppe) and char it for the bloomery. The mine smelts fewer blooms than with bought wood (part of its hands make charcoal), but no hands stand idle and no gold changes hands; bought, forest and credited wood still come first. Off = idle hands, as before", RequireRestart = false)]
         [SettingPropertyGroup("Charcoal for bloomeries under the start calibration (night 18.10)")]
         public bool BloomeryColliers { get; set; } = true;
@@ -15901,6 +15905,7 @@ namespace Armoury
             s.VillageCartMilitiaEscort = VillageCartMilitiaEscort;
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
+            s.KsFoodHandsWithA7 = KsFoodHandsWithA7;
             s.BloomeryColliers = BloomeryColliers;
             s.BanditLimitPerHideout = BanditLimitPerHideout;
             s.BanditBirthsWherePeople = BanditBirthsWherePeople;

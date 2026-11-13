@@ -74,7 +74,11 @@ namespace Armoury
         /// Switch Rule, Ks Switch Signal + Ks Switch Signal Rule albo plik autotestu) zajecia przesuwa TYLKO A7 (z kosztem i 60/364 dobami) - f20-d4 bez kosztu i od razu
         /// w tych samych blokach bylaby druga regula na to samo zjawisko. Ten sam warunek: krok F20Week, RegaleCycle bez soli i daktyli (_f20RegSkip - przy A7 regale
         /// wracaja do soli i daktyli jak przed paczka), napisy linii A7 / KS: produkcja / ZW (te i tak pisza f20 tylko przy A7 wylaczonej).</summary>
-        private static bool F20Active(int today, int d0) { return d0 >= 0 && today > d0 + CtlEnd && F20On && !A7RuleOn; }
+        /// r4-jedzenie (noc 13.11, decyzja domyslna): przy czynnej A7 (klucz Ks Food Hands With A7, TAK) f20-d4 tez dziala - tylko w blokach bez przebudowy A7 (b.Target < 0,
+        /// jak dotad pomijane w F20Week). Powod (at-220a): A7 liczy sygnal cen cienia Planu (Plan narzuca zbozu x3) i od D zaczela 217 zmian, a polki oliwek/winogron/sera/miesa
+        /// stoja ponizej 0.3 T* przez 160 dob (ceny gry x1.4-2.7); f20-d4 patrzy na prawdziwe polki rynku.
+        private static bool F20WithA7 { get { var s = Settings.Current; return s != null && s.KsFoodHandsWithA7; } }
+        private static bool F20Active(int today, int d0) { return d0 >= 0 && today > d0 + CtlEnd && F20On && (!A7RuleOn || F20WithA7); }
 
         /// <summary>Scalenie f20-d4 z f19-e4: regula czynna dzis - linia ZW (VillageCrafts.KsWorksText) mowi "zamrozone" tylko wtedy, gdy rece jedzenia i soli
         /// nie ida za polkami rynku (ten sam warunek co dopisek linii "KS: produkcja" F4FrozenText). Tylko odczyt.</summary>
@@ -257,7 +261,8 @@ namespace Armoury
               .Append(F20Lo.ToString("0.0", inv)).Append(" T*, NADMIAR - polki i polki + w drodze > ").Append(F20Hi.ToString("0.0", inv))
               .Append(" T*; zajecie x(1 + ").Append(F20Rate.ToString("0.00", inv)).Append(" x wynik), najwyzej ").Append((100 * F20MaxRel).ToString("0", inv))
               .Append("% rak zajecia na krok, tylko miedzy zajeciami ziemi bloku; drzewa biora rece ").Append(groves ? "TAK" : "NIE").Append(" (Ks Food Hands Grow Groves))")
-              .Append(" | zima: ").Append(winter ? "TAK - rece bez zmian (decyzje tylko do wgladu)" : "nie");
+              .Append(" | zima: ").Append(winter ? "TAK - rece bez zmian (decyzje tylko do wgladu)" : "nie")
+              .Append(" | regula A7 ").Append(A7RuleOn ? "TAK - razem z nia (r4-jedzenie, Ks Food Hands With A7), bloki w przebudowie A7 pominiete" : "NIE");
             for (int m = 0; m < 2; m++)
             {
                 sb.Append(" | ").Append(mn[m]).Append(" (miast ").Append(nTown[m]).Append("):");

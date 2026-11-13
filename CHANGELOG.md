@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 479-a (13.11) - KS: rece jedzenia ida za polkami rynku takze przy czynnej regule A7 (f20-d4 razem z A7)
+
+**Problem:** at-220a (220 dob od prologu, KS uzbrojona): kontrola wczesna D+7 - w pasmie 3 z 24 cen (orange x3.7, date x3.8, salt x2.8, olives 1.89 przy starcie 0.70; plik armoury-ks-przerwij.flag). Po 166 dobach (l.174169 "KS: ceny miast dzien 108864") dalej: owoce 2.11, oliwki 1.57, ser 1.71, mieso 2.47, Essos zboze 2.35; polki (l.176855) oliwki q50 0.12 d przy T* 12.7, winogrona 0.26/7.0, mieso 0.17/7.0, ser 0.29/10.4, Essos zboze 0.24/3.6. Rece stoja: "zmiany zajec: zaczete 0 (od D razem 217)", "przegladow ponad progiem 0" (l.176858).
+
+**Przyczyna:** reguly zajec pod KS: A7 (Ks Switch Signal Rule TAK w Armoury.json Jeffa) liczy dochod przy cenach cienia Planu, a Plan sam narzuca zbozu, rybom, pomaranczom x3.0 (l.175972 "towary z narzutem 10 (grain x3.000 ...)") - sygnal KS daje nacisk tylko 13.7% blokow (ceny gry: 89.9%, glownie pszenica -> owce, winnice, gaje oliwne; "A7 diagnoza" l.~176700). Regula, ktora patrzy na prawdziwe polki rynku (f20-d4, Ks Food Hands Follow Market), byla wylaczona warunkiem `!A7RuleOn` (StartCalibration.Jedzenie.cs F20Active) - "jedna regula zajec naraz" (recenzja noc-ks4). Linia "Jedzenie KS (f20-d4)" w at-220a: 0 razy.
+
+**Zmiana:** nowy klucz Ks Food Hands With Switch Rule (`KsFoodHandsWithA7`, TAK): F20Active = klucz f20 && (A7 wylaczona || nowy klucz). f20-d4 i tak pomija bloki w przebudowie A7 (b.Target >= 0, licznik "przebudowa A7" w linii), wiec obie reguly nie ruszaja tego samego bloku tej samej doby. Przy tym kluczu RegaleCycle nie rusza soli i daktyli po D+49 (_f20RegSkip - regale soli/daktyli robi tygodniowy krok f20, jak przy A7 wylaczonej). Linia f20 dopisuje "| regula A7 TAK - razem z nia". Decyzja domyslna (noc 13.11): wlaczone domyslnie - Jeff: "ekonomia jak nie poprawiaj".
+
+**Ryzyko / co sprawdzic:** (1) druga regula zajec obok A7 (swiadome odstepstwo od noc-ks4): A7 przesuwa cale czesci z kosztem w 60/364 doby, f20 przesuwa do 5% rak zajecia na tydzien bez kosztu - laczny ruch rak regionu moze przekroczyc limit A7 5%/sezon (limit A7 nie liczy f20). (2) kierunek: A7 moze dalej przestawiac pszenice na jedwab (sygnal Planu), f20 na gaje i stada - nie sprzeczne co do bloku (f20 pomija blok w przebudowie), ale moga sie znosic w regionie. (3) zima - f20 nie rusza rak. (4) nie naprawia kontroli D+7 (f20 startuje od D+56) - plik armoury-ks-przerwij nadal bedzie zapisany. W tescie: grep "Jedzenie KS (f20-d4)" (co 7 dob od D+56), "bloki ... zmienione N", "grupy zajec ... w brak X -> Y" rosnace; "KS: ceny miast" oliwki/owoce/ser/mieso w dol ku 1.0-1.3, "KS: polki miast" oliwki/winogrona q50 w gore. Klucz NIE = jak przed 479-a co do bitu.
+
+**Status:** DO SPRAWDZENIA
 ## 478-S7 (13.11) - log 471: "ZEGAR STOI" nie pisze sie, gdy zegar idzie (R3)
 
 **Problem:** analiza at-120c (NISKIE): linia "Czas oblezenia (471)" pisala "-> ZEGAR STOI" przy kazdej odsieczy >= 0.5 sily obozu, a od R3 (noc 13.11) zegar stoi tylko przy odsieczy bliskiej i co najmniej rownej obozowi - log przeczyl licznikom.

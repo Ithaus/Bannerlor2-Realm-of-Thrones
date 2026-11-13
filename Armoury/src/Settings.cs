@@ -5018,6 +5018,7 @@ namespace Armoury
         // Recenzja f20-d4 (decyzja Jeffa): wiecej rak w winnicy, gaju oliwnym, sadzie cytrusowym albo gaju daktylowym = wiecej ziemi pod drzewami od razu (regula A7 sadzi
         // drzewa 364 doby z kosztem). TAK - drzewa biora rece jak inne zajecia (szybsze wyjscie z braku oliwek i winogron); NIE - drzewa tylko oddaja rece.
         public bool KsFoodHandsGrowGroves = true;          // with Ks Food Hands Follow Market: vineyards, olive groves, citrus orchards and date groves take more hands when the market lacks their fruit, like any other work - the new trees bear at once (the switch rule plants trees over 364 days and charges for it). Off = trees only give hands up under this rule, they never gain
+        public bool KsFoodHandsWithA7 = true;              // with Ks Food Hands Follow Market and the work-switch rule on (Start Calibration Switch Rule, Ks Switch Signal Rule): the weekly food rule still runs in every village part that is not in the middle of a switch - the switch rule judges by the plan's own prices and hardly ever fires, while the stalls stay empty of olives, grapes, fruit, cheese and meat for months. Off = with the switch rule on, only that rule moves the works (as before)
 
         // --- Charcoal for bloomeries under the start calibration (night 18.10) ---
         // Paczka f7-wegiel (noc 18.10): pod KS dymarki stoja bez wegla (fin91 NOP-8 93.8 lup/d, bez KS 28.1, fin88 45.4). Przyczyna: kopalnie bez zlota (Akirys 40 lup/d,
