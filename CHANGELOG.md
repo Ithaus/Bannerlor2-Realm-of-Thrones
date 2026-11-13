@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## R6 (13.11) - wojna korona-Polnoc bez frontu w tescie 120a: zgodne z rozciagnieta osia fabuly (bez zmiany kodu)
+
+**Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 2): RiverlandsDeclareWarEvent WYSTARTOWALO (dzien 109), "skutkow 0"; Dorzecze w pokoju przez caly test (KRONIKA bez Riverlands), 274 "B bitwy 0 oblezenia 0", Krol Polnocy (272) "czeka - wojna z korona: Polnoc TAK, Dorzecze NIE".
+
+**Przyczyna (dekompilacja ROT.dll 8.1.8):** (1) ROT.Events.RiverlandsDeclareWarEvent NIE wypowiada wojny - DailyTickEvent zmienia tylko relacje Brynden/Edmure Tully <-> Robb Stark o +80 i konczy zdarzenie ("skutkow 0" w CrashScribe jest poprawne). (2) Wojne Dorzecza wypowiada ROT.CampaignBehaviors.ROTStorylineWars.EnforceWars: wpis Westerlands(vlandia)->Riverlands, StartDay 30, ale w kampanii KLASYCZNEJ (test bez armoury-prolog.flag: "Prolog (m101): ... KLASYCZNY 299") os Fabuli CrashScribe rozciaga StartDay x4.33 -> ok. dnia 130, czyli po koncu testu 120 dob. W kampanii z prologiem wojne korona-Dorzecze wymusza od smierci Roberta postfiks Prologue.RiverWarEnforcedPostfix (A1, klucz CanonRiverlandsWarAtPrologueEnd). (3) Nasze reguly (264/330/312c/334/WarTruce) nie blokowaly: 264 i 334 pilnuja pokoju/teatru, nie wypowiedzenia; "zablokowane dzis 0, sesja 0".
+
+**Zmiana:** brak (decyzja domyslna (noc 13.11): nic nie wymuszac - os fabuly klasycznej dziala jak zaprojektowano). Nastepny test 120 dob z plikiem armoury-prolog.flag (start od prologu - tak zacznie Jeff) albo 150+ dob w klasycznej.
+
+**Ryzyko / co sprawdzic:** w tescie z prologiem: wojna korona-Dorzecze od konca prologu, linia "Wojny kanonu (m104): ... (4) Dorzecze" WYPOWIEDZIANA, 272 unia po holdzie, 274 "B bitwy/oblezenia" > 0.
+
+**Status:** DO SPRAWDZENIA
+
 ## R4 (13.11) - kopalnie na starcie nowej kampanii, histereza miejsca kultu, powod budow, ktore stoja
 
 **Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 9 i 10): (a) start nowej kampanii "kopalnia ma z czego kopac: miasta 0, zamki 0" (po wczytaniu zapisu 19 / 23), w 1. dobie "AI pominelo zaklad bez zasobu 27", "wyjete z kolejek AI 39" - trwale; (b) miejsce kultu (476-c) wchodzi do kolejki AI i co dobe z niej wypada (prog lojalnosci 60 bez histerezy); (c) budowy 'STOI' ponad 100 dob bez powodu - BuildFunding 'budget < 1 -> continue' bez licznika.
