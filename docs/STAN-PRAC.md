@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 13.11 07:25 - WGRANIE 223 (runda 3: 478-S1..S7; test at-220a 220 dob od prologu z uzbrojona KS)
+
+- **W grze:** Armoury.dll `aea8ef718584992a9fcd350e6ff846f2` (galaz `noc/367c-jeniec-po-odejsciu`, commit `f81738a2`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-13-przed-wgranie223` oraz **C:/Users/GAME/Backup-Bannerlord-C/wgrane/2026-11-13-wgranie223(-przed)** - **D: PELNY (44 KB wolne)**, kopie na D: nie weszly. Na D: jest 725 kopii autotestow (`D:/Backup-Bannerlord/autotest-kopie`) - nie kasowane bez zgody Jeffa. Zapisy testowe at-220a w `C:/Users/GAME/Backup-Bannerlord-C/zapisy-testowe`.
+- **Test at-220a:** KONIEC OK 220/220 dob, 86.8 min, bledy 23 (stala liczba cudzych), bez zawieszen, Armoury BLAD 0.
+- **Efekty rundy 3 w logu (doby 216-220):** 478-S2 lordowie kupuja u wytworcow 363 ok. 180-235 szt./d w 22-26 budowach; "brak materialow" 6-9 budow (120c: 77); A16 ludnosc BK prawie stala (wsie -246/d, reszta +76; 478-S1 zaokraglenie +941 osob na dobe zamiast obcinania); 478-S3 zakaz powtorki oblezenia dziala (2 razy w logu, np. bravos/Anogar).
+- **Wojna Westeros po prologu:** KRONIKA dzien 33 roku 299 - Baratheon (King's Landing) vs Polnoc i Dorzecze, sojusz Polnoc+Dorzecze; plus Vale-Iron Islands, Reach-Dorne, Dragonstone-Stormlands, wojny Essos.
+- **KS:** kontrola wczesna dalej zapisala `armoury-ks-przerwij.flag` (ceny owocow/soli/welny poza pasmem; flage usunieto po tescie). To tylko linia w logu, nic sie nie wylacza - kalibracja planu KS w nastepnej rundzie.
+- **Dalej (petla nocy):** analiza at-220a (workflow), runda 4: kalibracja cen KS, ruda w 29 miastach bez zapasu, porty bez nadwyzki (Tolos 208 dob).
+
 ## STAN 13.11 05:50 - WGRANIE 222 (runda 2: 477-a..e, lucznicy 469-t; test at-120c z prologiem i uzbrojona KS - gotowe do gry)
 
 - **W grze:** Armoury.dll `364f9557afeb7c80f133e160b2b9328a` (commit `5cf2bb8a`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-13-przed-wgranie222`, `D:/Backup-Bannerlord/wgrane/2026-11-13-wgranie222(-przed)`.
