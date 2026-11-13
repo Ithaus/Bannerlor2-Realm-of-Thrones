@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P6-p (13.11) - okno werbunku wioski pobocznej: powod, gdy przyszlo mniej ludzi niz w koszyku (poprawka po recenzji A4 / B8)
+
+**Problem:** recenzja A4 i B8 (kod): prefiks `RecruitmentVM.ExecuteDone` (474-P6) zastepuje cale zatwierdzenie, wiec znika okno gry "Over Limit". `LevyDo` tnie liczbe do `RoomNow()` / zlota / gotowych, wiec druzyna nie przekroczy limitu i placi sie tylko za przybylych, ale koszyk wiekszy niz wolne miejsce przepadal po cichu (tylko linia logu).
+
+**Przyczyna:** brak komunikatu dla gracza w `ScrDonePre`.
+
+**Zmiana:** po werbunku z okna: gdy przybylo mniej niz w koszyku - "Only N of the M men you picked could join you - your party is full." (gdy `RoomNow()` = 0) albo "... - the village could not spare more, or your purse ran short."; gdy nie przyszedl nikt z powodu "nic do wziecia" - "None of the M men ...". Inne odmowy (`LevyDo`: zgoda rodu, podloga DOM) - jak dotad, `LevyDo` sam pisze graczowi.
+
+**Ryzyko / co sprawdzic:** tylko komunikat - ekonomia bez zmian. Klucz `SideVillageRecruitScreen` NIE - okno nie jest otwierane. Swiadomie NIE zrobione (recenzja A4): odswiezenie tekstu menu wioski po zamknieciu okna (pula, gotowi) - wymagaloby `SwitchToMenu` z ramki VM albo nowej flagi w takcie menu; warunki opcji i tak licza od nowa przy kliknieciu. Do decyzji, jesli Jeffowi przeszkadza.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 474-P10-p (13.11) - rozmowy karczmy: temat Innych tylko, gdy umarli sa przy Murze albo na poludnie od niego (poprawka po recenzji B5)
 
 **Problem:** recenzja B5 (kod): `WorldTalk` ustawial temat "others", gdy klan Innych mial jakakolwiek partie wojenna albo osade. W ROT umarli stoja za Murem od poczatku kampanii (CrashScribe "UMARLI: ... trupow w polu"), wiec 40% kwestii biezacych o Innych moglo isc od pierwszego dnia we wszystkich regionach, takze w Dorne i Essos.

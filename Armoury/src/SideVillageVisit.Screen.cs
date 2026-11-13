@@ -225,6 +225,14 @@ namespace Armoury
                     LvDone rv = nv > 0 ? LevyDo(c.St, c.Uid, nv, how) : null;
                     Log.Info(SP + NameOf(Rec(c.Uid)) + " (" + c.Uid + "): koszyk - ludzie rodu " + nh + " (przybylo " + (rh != null ? rh.Keep : 0) + (rh != null && rh.Why != null ? ", " + rh.Why : "")
                              + "), chlopi " + nv + " (przybylo " + (rv != null ? rv.Keep : 0) + (rv != null && rv.Why != null ? ", " + rv.Why : "") + ") | zatwierdzone " + _scrDone + "x, potkniecia " + _scrSt + ".");
+                    // 474-P6-p (recenzja A4/B8): prefiks omija okno gry "Over Limit"; LevyDo tnie do RoomNow / zlota / gotowych - gracz dostaje powod zamiast cichej straty
+                    int came = (rh != null ? rh.Keep : 0) + (rv != null ? rv.Keep : 0);
+                    if (came < nh + nv && (came > 0 || (rh != null && rh.Why == "nic do wziecia") || (rv != null && rv.Why == "nic do wziecia")))   // reszta powodow - LevyDo sam pisze graczowi
+                    {
+                        int room = 0;
+                        try { room = RoomNow(); } catch { room = 0; }
+                        Log.Player((came > 0 ? "Only " + came + " of the " + (nh + nv) + " men you picked could join you" : "None of the " + (nh + nv) + " men you picked could join you") + (room <= 0 ? " - your party is full." : " - the village could not spare more, or your purse ran short."), true);
+                    }
                 }
             }
             catch (Exception e) { ScrStumble("Done", e); }
