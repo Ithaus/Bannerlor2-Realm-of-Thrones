@@ -336,6 +336,9 @@ namespace Armoury
                 if (t == null || t._l.Inn == null) { why = new TextObject("{=!}Not now."); return false; }
                 string barred = TownInns.RoadDrinkBarred(t._l.Inn);
                 if (barred != null) { why = new TextObject("{=!}" + barred); return false; }
+                // 474-P9-p (recenzja B3): kolejka to tez kufel gracza ("and one for you") - ten sam prog co kufel u barmana; i nic za nia, gdy stol i tak ma pelno do gadania
+                if (InnDrink.Cups >= InnDrink.MaxCups()) { why = new TextObject("{=!}The keeper will pour you no more - sleep it off first."); return false; }
+                if (t._scenesLeft >= MaxScenes) { why = new TextObject("{=!}The table is talking freely already - a round would buy you nothing more just now."); return false; }
                 int heads, price = t.RoundPrice(out heads);
                 if (Hero.MainHero == null || Hero.MainHero.Gold < price) { why = new TextObject("{=!}A round for " + heads + " costs " + price + " d - you cannot pay it."); return false; }
                 why = new TextObject("{=!}A tankard for everyone at the table and one for you: " + heads + " x " + (price / Math.Max(1, heads)) + " d. The coin goes to the keeper and the village whose lands the inn stands on.");
@@ -361,12 +364,13 @@ namespace Armoury
                 if (paid <= 0) { Log.Info(P + "kolejka w " + inn.Name + " - zaplata nie przeszla (cena " + price + ", zloto gracza " + g0 + ")."); MBTextManager.SetTextVariable("ARM474_TB_TOAST", "The keeper won't take your coin, it seems. Never mind - sit anyway."); return; }
                 if (PayNotes.On) PayNotes.Paid("tankard", paid, " for a round at " + inn.Name + ".");
                 t._rounds++; t._roundGold += paid;
+                string cup = InnDrink.OnTankard();   // 474-P9-p: kufel gracza z kolejki - licznik kufli i pijanstwo jak kufel u barmana (bez plotek; zaplata wyzej, nie liczona w DPaid)
                 t._scenesLeft = Math.Min(MaxScenes, t._scenesLeft + 1);
                 if (t._talkTable >= 0 && t._tables[t._talkTable].Count > 0) t._speaker = t._tables[t._talkTable][MBRandom.RandomInt(t._tables[t._talkTable].Count)];
                 MBTextManager.SetTextVariable("ARM474_TB_TOAST", TavernLines.Pick("toast", t._l.Region, "Now that's a friend! Your health, stranger."));
                 Log.Info(P + "kolejka w " + inn.Name + " (" + inn.Uid + ") przy stole " + t._talkTable + " - " + heads + " kufli, zaplacil " + paid + " (gracz " + g0 + " -> " + Hero.MainHero.Gold
                          + ") -> kiesa wsi " + vs.StringId + " " + (paid - tax - crown) + ", podatek pana " + tax + ", korona (DS) " + crown + " | kontrola obiegu: roznica " + diff
-                         + " | kolejek tej wizyty " + t._rounds + ".");
+                         + " | kolejek tej wizyty " + t._rounds + " | kufel gracza (474-P9-p): " + cup + ".");
             }
             catch (Exception e) { RoadsideInnInterior.Stumble("Table.Round", e); }
         }

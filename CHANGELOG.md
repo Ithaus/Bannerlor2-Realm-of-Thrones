@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P9-p (13.11) - kolejka dla stolu: kufel gracza liczy sie do upicia, kolejka szara, gdy nic nie daje (poprawka po recenzji B3)
+
+**Problem:** recenzja B3 (kod): `InnTable.RoundPrice` liczy kufel gracza ("and one for you", glowy = stol + 1), ale `RoundCons` nie podbijal licznika kufli (`InnDrink`) - kolejki nie upijaly i nie dochodzily do `MaxCups`. Kolejek nie ograniczalo nic poza zlotem - przy pelnym zapasie scenek (`_scenesLeft == MaxScenes`) gracz dalej placil, nic za to nie dostajac.
+
+**Przyczyna:** `RoundCons` bez `InnDrink.OnTankard`; `RoundClick` bez progu kufli i bez sprawdzenia zapasu scenek.
+
+**Zmiana:** `RoundClick` - szara z powodem po angielsku, gdy karczmarz nie naleje (`InnDrink.Cups >= MaxCups()`, ten sam prog co kufel u barmana) albo stol ma juz pelny zapas scenek ("The table is talking freely already ..."). `RoundCons` - po udanej zaplacie `InnDrink.OnTankard()` (licznik, pijanstwo, komunikat "One more tankard ..." jak kufel); wynik dopisany do linii kolejki `| kufel gracza (474-P9-p): ...`. Zaplata i liczniki doby kufli (`DCups`/`DPaid`) bez zmian - kolejka ma wlasna linie logu.
+
+**Ryzyko / co sprawdzic:** klucz `InnTableTalk` NIE - stoly nie istnieja, nic sie nie zmienia. Pijanstwo wylaczone (`DrunkOn` NIE) - `MaxCups` = bez limitu, OnTankard tylko liczy. Sprawdzic w grze: kolejka przy progu upicia (komunikat), szara kolejka po dwoch kolejnych.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 474-P5b-p (13.11) - kasztelan ROT: pule mlodych wiosek pobocznych tez traca ludzi; w logu siedziby bez wsi (poprawka po recenzji B1, B2)
 
 **Problem:** recenzja B1 (kod): kasztelan (474-P5b) bral ludzi z DOM wsi siedziby przez `PeopleBook.TakeLevyHere`, a ta przekazuje do `FromVillage` `notePool=false` (`PeopleBook.Origin.cs:1292`) - `SideVillageVisit.LevyNoteDistrictDraw` sie nie wykonywal, choc komentarz `CastellanLevy.cs` to obiecywal. Wioski poboczne tych wsi dalej "mialy" swoja mlodziez - ci sami ludzie liczeni dwa razy; gdy DOM zejdzie do podlogi 50 hearth, pobor z wioski pobocznej dorabial brakujacych z niczego (`GiveNone` FNoneFloor) - dokladnie to, czego decyzja 3 kazala sie pozbyc. Recenzja B2: siedziba bez przypisanych wsi = u kasztelana wszystkie pozycje szare (w ROT zawsze sie dalo) - nikt nie sprawdzil, czy taka siedziba jest w ROT.
