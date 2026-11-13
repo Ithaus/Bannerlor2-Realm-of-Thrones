@@ -127,6 +127,35 @@ Linia A7: "479-f: hamulec odplywu ... wstrzymal N (rak), bez wiersza dawnego - b
 **Zmiana:** decyzja domyslna (noc 13.11): SAM POMIAR, zero zmiany ekonomii. StartCalibration.Jedzenie.cs F20Week: migawka kazdego bloku po kroku f20 (Hands, HomeFrac, suma RF, udzialy sheep_farm/swine_farm/cattle_farm/olive_trees/vineyard, czy w przebudowie A7); w nastepnym kroku zmiana rak pola tych zajec rozbita dokladnie (teleskop) na: A7 (blok w przebudowie teraz albo przy poprzednim kroku), udzial poza A7, ludzie bloku, praca domowa, zloza, bloki nowe/znikniete + kontrola (reszta, ma byc 0) i obok ruch f20 w tym kroku. Linia "Jedzenie KS (f20-d4)": "rece pola miedzy krokami (479-d, sam pomiar; ...)". Pamiec sesji czyszczona w F20Reset (RuleReset - nowa kampania i wczytanie); bez zapisu. Pierwszy krok sesji - tylko migawka.
 
 **Ryzyko / co sprawdzic:** tylko czyta stan blokow (X, Hands, HomeFrac, RF, Target) - nie pisze nic poza wlasna pamiecia; potkniecie pomiaru lapane per blok (licznik "potkniecia pomiaru"), nie rusza reguly. Pamiec: ok. 15 tys. migawek (5 liczb + 5 udzialow) - kilka MB. Kolizje: brak (nowe pola prywatne F20*). Sprawdzic w logu: "kontrola 0" przy kazdym zajeciu; ktora skladowa robi spadek sheep_farm (A7 / dom / ludzie).
+## 480-a (13.11) - XP gracza: Kowalstwo ciete tylko raz
+
+**Problem:** Jeff 13.11: "kowalstwo ma byc tylko raz zwalniane". Po 480 Kowalstwo gracza dostawalo dwa ciecia: SmithXp (SmithingXpFactor 0.70, dla wszystkich bohaterow) i 480 (x0.75) - razem 0.525.
+
+**Przyczyna:** PlayerXp480.XpPrefix tnie kazda umiejetnosc gracza, a SmithXp osobno tnie Crafting na tym samym celu (HeroDeveloper.AddSkillXp).
+
+**Zmiana:** PlayerXp480.XpPrefix pomija Crafting, gdy SmithXp naprawde tnie (SmithXp.Factor < 0.999); przy SmithingXpFactor = 1.00 Kowalstwo gracza tnie 480 (tez raz). Licznik "Kowalstwo pominiete (tnie je SmithXp xF)" w linii doby. Decyzja domyslna: zostaje ciecie kowalstwa 0.70 (to samo dla wszystkich bohaterow).
+
+**Ryzyko / co sprawdzic:** tylko galaz Crafting w prefiksie gracza; reszta umiejetnosci bez zmian; SmithXp bez zmian. W logu: linia doby "XP gracza (480)" z licznikiem Kowalstwa pominietego > 0 po kuciu.
+
+**Status:** DO SPRAWDZENIA
+
+## 480 (13.11) - XP umiejetnosci gracza x0.75 (klucz Player Skill XP Multiplier)
+
+**Problem:** Jeff 13.11: "zmniejsz przyrost doswiadczenia o 25% dla gracza czyli dla mnie, bo w 3 lata prawie zdobylem wszystko na ponad 300, za szybko sie rozwija bohater" (3 lata = kalendarz Armoury, 364 dni na rok).
+
+**Przyczyna:** XP umiejetnosci bohatera gracza nie mialo zadnego wlasnego mnoznika - GenericXpModel to DefaultGenericXpModel (1.0), czynny model rozwoju BKLearningModel liczy tempo nauki jak gra (sufit ok. 330); jedyne ciecia to SmithXp (Crafting x0.70, wszyscy) i FairXp/XpFair u zrodla (arena, turniej, bitwa, strzal RBM).
+
+**Zmiana:** nowy PlayerXp480.cs - prefiks Priority.LowerThanNormal na HeroDeveloper.AddSkillXp(SkillObject, float, bool, bool) (AccessTools.DeclaredMethod na klasie deklarujacej, ten sam cel co SmithXp/SkillLedger/ROT patch30), wpinany w OnSessionLaunched raz na proces. Tylko Hero.MainHero (porownanie na biezaco), tylko isAffectedByFocusFactor = true i rawXp > 0: rawXp x PlayerSkillXpMult (domyslnie 0.75). Decyzja domyslna (jak SmithXp, recenzja K3): tnie tylko umiejetnosci - poziomowi postaci oddaje roznice GainRawXp(Round(przed) - Round(po)) przez delegat, wiec skupienia/cechy rosna jak dotad (bez kaskady przez nizsze limity nauki). Nowy klucz Settings.cs PlayerSkillXpMult = 0.75f i MCM "Player Skill XP Multiplier" (grupa Experience, 0.10-2.00) - dopisane recznie, bez gen_mcm.py. Linie Armoury.log: "XP gracza (480): start sesji | mnoznik ... | latka ... wpieta", 3 pierwsze wywolania sesji, doba "XP gracza (480): mnoznik X, dzis XP przed/po: A / B w N wywolaniach (dzien D), ..., potkniecia N". Bledy liczone per wywolanie, bez wylacznika.
+
+**Ryzyko / co sprawdzic:**
+- Drogi XP przez ten cel: walka gry i RBM, DefaultSkillLevelingManager, BK (ksiazki 1500/300, edukacja, rada, rytualy, rycerstwo), ROT pojedynki, Spoils, AIInfluence, RealisticBannerlord, nasze Armoury (kuznia) i RealisticCaptivity (praca w niewoli) - wszystko u gracza x0.75, raz.
+- Kolejnosc prefiksow: ROT patch30 (Normal, x GlobalXPBonus na sluzbie - u Jeffa 1.0) -> 480 (LowerThanNormal) -> SmithXp (Low, Crafting x0.70) -> SkillLedger (Last, liczy po cieciach). Kowalstwo gracza = 0.75 x 0.70 = 0.525 (zgodne z "wszystko -25%"; jesli Jeff chce kowalstwo tylko -30%, wykluczyc Crafting). Kazdy prefiks oddaje poziomowi tylko swoja roznice - suma GainRawXp = Round(przed).
+- Bez zmian: ChangeSkillLevel (isAffectedByFocusFactor false - tworzenie postaci ROT/gry, edukacja BK, zdarzenia), towarzysze, rod, lordowie, wojsko (TroopRoster). Licznik "bez mnoznika (ustawianie poziomu)" w linii doby.
+- Sufit nauki sie nie zmienia (ok. 330) - 480 tylko opoznia dojscie do 300 (ok. 1/3 dluzej); juz zdobytych poziomow nie cofa.
+- Goracy punkt (ok. 20 tys. wywolan na dobe): pierwszy test to porownanie referencji z Hero.MainHero, bez alokacji poza 3 liniami sesji.
+- Klucza PlayerSkillXpMult nie ma w Armoury.json Jeffa (grep 0) - domyslna 0.75 zadziala.
+- W logu: linia startu "latka ... wpieta", "poziom postaci bez ciecia TAK (GainRawXp)", proporcja po/przed w linii doby = 0.75; ksiega E8/P1 grupa "gracz" mniejsza o 25%.
+- Zbudowane na 44976761 (WGRANIE 224), galaz noc/480-xp-gracza; nie zawiera zmian ekonomii z noc/367c.
 
 **Status:** DO SPRAWDZENIA
 
