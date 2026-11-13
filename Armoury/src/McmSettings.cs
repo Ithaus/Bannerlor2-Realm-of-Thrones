@@ -6088,6 +6088,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool RoadsideInnMapSound { get; set; } = true;
 
+        [SettingPropertyBool("Inn Table Talk", HintText = "inside a roadside inn (Roadside Inn Interior), travellers sit at the tables in twos, threes and fours. Talk to one and you sit down with the whole table: they talk among themselves of the road, the weather, the war and the lords, each in turn. 'Tell me more' starts a new story (one more for free), 'Let me buy this table a round' pays a tankard a head to the keeper and the village whose lands the inn stands on and opens another, or leave them to it. Words only, no voices yet. Off = the travellers stand about as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool InnTableTalk { get; set; } = true;
+
         [SettingPropertyBool("Inn Gossip Pages", HintText = "the gossip window never overflows its frame: when there is more talk than fits, it is split into pages - 'Hear more' shows the next one, 'Enough talk' ends it. Off = all the gossip in one window, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
@@ -14533,6 +14537,7 @@ namespace Armoury
             s.RoadsideInnTavernSound = RoadsideInnTavernSound;
             s.RoadsideInnInterior = RoadsideInnInterior;
             s.RoadsideInnMapSound = RoadsideInnMapSound;
+            s.InnTableTalk = InnTableTalk;
             s.InnGossipPages = InnGossipPages;
             s.InnGossipNeedsDrink = InnGossipNeedsDrink;
             s.InnKeeperAleLine = InnKeeperAleLine;

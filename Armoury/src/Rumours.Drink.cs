@@ -301,6 +301,13 @@ namespace Armoury
             return DrinkState(at, inn.Uid, town, TownInns.RoadDrinkBarred(inn), TankardPrice(town), out tip);
         }
 
+        /// <summary>474-P9: cena kufla w zajezdzie (miasto ceny zajazdu - RoadTown, jak opcja menu) - kolejka przy stole = ta cena na glowe.</summary>
+        internal static int RoadTankardPrice(RoadsideInns.Inn inn)
+        {
+            if (inn == null) return 2;
+            return TankardPrice(RoadTown(inn, new Vec2(inn.X, inn.Y)));
+        }
+
         /// <summary>474-P8: kufel u barmana po rozmowie - dokladnie skutek opcji menu zajazdu (RoadGossipConsequence).</summary>
         internal static void RoadAle(RoadsideInns.Inn inn)
         {

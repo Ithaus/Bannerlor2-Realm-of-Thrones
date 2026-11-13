@@ -33,3 +33,42 @@ music	any	general	Hush now, we're between songs. The next one is sad, so drink f
 music	north	general	We've a song about a winter that lasted a lifetime. It goes on a bit, like the winter.
 music	river	general	We don't sing the war songs here. Folk have heard enough of the real thing.
 music	reach	general	A love song, a drinking song or a song about a knight? We do all three at once, if you pay double.
+sit	any	general	Pull up a stool, friend. We were just putting the world to rights.
+sit	any	general	Sit, sit. There's room if Wat moves his elbows.
+sit	any	general	A new face! Sit down and tell us nothing - we'll do the talking.
+sit	north	general	Shove up, lads, let the traveller near the fire.
+sit	dorne	general	Join us. In this heat a man shouldn't drink alone.
+sit	essos	general	Sit, sit, and do not mind our tongues - we argue about everything.
+toast	any	general	Now that's a friend! Your health, stranger.
+toast	any	general	Gods bless an open purse. Drink, lads!
+toast	any	general	To the road, and to whoever pays for it!
+toast	north	general	To warm hearths and short winters.
+toast	dorne	general	To the sun, and to a guest who knows his manners.
+table	any	general	Roads are worse every year. || Roads? It's the tolls I mind. Every bridge has a lord's man on it now. || And every lord's man has a hand out. || Drink up. Talking won't mend either.
+table	any	general	My cousin swears he saw a two-headed calf at the last market. || Your cousin swears he saw a lot of things after his third cup. || He did say it was a small calf. || Then it's settled. Small calf, two heads, one cousin too many.
+table	any	general	Price of salt went up again. || Everything's gone up but the price of a man's work. || My grandfather said the same. || Then your grandfather was right too.
+table	any	general	Who's the stranger? || Paying customer, by the look of the purse. || Then he's no stranger. Sit, sit.
+table	any	general	They say the keeper waters the ale. || The keeper says he waters the floor and the ale finds its own way. || Either way it's wet and it's cheap. || Cheap is the only thing anybody can afford.
+table	any	general	I've a mule that knows the road better than I do. || Then why don't you send the mule to market and stay home? || Because the mule doesn't haggle. || Neither do you, from what I've seen.
+table	any	war	Soldiers came through again last week. Took two pigs and a cart. || Did they pay? || One of them said thank you. That's something. || That's more than the last lot.
+table	any	war	Which side are we on this month? || The side of whoever is standing in the village with a spear. || That's no side at all. || It's the only one that ever wins round here.
+table	any	war	My boy was taken for the levy. || Mine too, two harvests back. He came home. || Whole? || Most of him. He laughs less.
+table	any	peace	Quiet on the roads this season. || Too quiet. Quiet means someone's planning something. || Or it means folk are tired of fighting. || I'll believe that when the lords do.
+table	any	winter	Snow's early. || Snow's always early to the man with no firewood. || I've got firewood. || Then you'll be getting visitors.
+table	any	winter	My well froze last night. || So did my wife's temper. || The well thaws by noon at least. || Aye. You've the better bargain there.
+table	north	general	The old woman down the track says the winter will be long. || She says that every year. || And every year it's long. || Fine. Next year I'll listen to her.
+table	north	general	A man came through from the hills, said he heard drums at night. || Drums or his own head? || He'd been drinking, if that's what you're asking. || That's the only way anyone hears drums up there.
+table	north	general	Stew's thin tonight. || The stew is honest. It's the winter that's thin. || Then we'll eat honest and be cold. || Same as always.
+table	iron	general	My brother went reaving and came back with a bell. || A bell? What use is a bell? || He says it's worth more than the silver. || Then he was robbed by the men he robbed.
+table	west	general	The miners up the valley are paid in coin again. || Gold coin? || Copper. Gold stays where it's dug. || As it always does.
+table	reach	general	Best harvest in years, and the price fell through the floor. || That's how it goes. Too much is as bad as too little. || Not for the man buying. || The man buying never ploughs.
+table	reach	general	A knight passed through, looking for a tourney. || Did he find one? || He found the keeper's daughter. || Then he found a tourney after all.
+table	river	general	Fields by the ford flooded again. || They flood every spring. || Not like this. The water came right to the doors. || Then build higher, or pray harder.
+table	river	general	Burned out three farms down by the lake, they did. || Who? || Does it matter? Banners change. Fire doesn't. || Pour another. I don't want to think about it.
+table	river	war	My neighbour hid his grain under the floor. || Smart man. || Not smart enough - the soldiers burned the floor. || Then he's warm, at least, for a while.
+table	vale	general	The road down from the mountains is closed again. || Rockfall? || Clansmen. They take a toll in sheep. || Better sheep than heads.
+table	storm	general	Lost half the roof in the last storm. || Only half? You're lucky. || The other half landed on my brother's barn. || Then he's the lucky one. Two roofs.
+table	crown	general	The city's full of people and empty of bread. || Then why does everyone go there? || Because the bread there is the only bread there is. || Or because they think it is.
+table	dorne	general	The water seller raised his prices again. || In this heat he can charge what he likes. || He'll charge it once too often. || Then we'll drink wine like sensible folk.
+table	essos	general	The galley from the east brought silk and fever. || Which sold faster? || The fever. It's free. || Then the silk merchant's ruined.
+table	essos	general	A sellsword was here last night, offering his sword to anyone. || Any takers? || Only the keeper, to pay his tab. || A man of many uses, then.

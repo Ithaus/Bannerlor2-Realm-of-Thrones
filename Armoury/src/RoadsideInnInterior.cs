@@ -230,6 +230,7 @@ namespace Armoury
                 starter.AddDialogLine("arm474_inn_beds_a", "arm474_inn_beds_a", "arm474_inn_bar", "{=!}{ARM474_INN_BEDS}", BedsCond, null, 110);
                 starter.AddPlayerLine("arm474_inn_bye", "arm474_inn_bar", "close_window", "{=!}Nothing for now.", null, null, 100);
                 starter.AddDialogLine("arm474_inn_staff", "start", "close_window", "{=!}{ARM474_INN_STAFF}", StaffStart, null, TopPriority - 1);
+                InnTable.AddDialogs(starter);   // 474-P9: bywalcy przy stolach (wlasny try; linia startu TopPriority - 2, warunek: klucz InnTableTalk i agent przy stole)
                 starter.AddDialogLine("arm474_inn_any", "start", "close_window", "{=!}{ARM474_INN_ANY}", AnyStart, null, TopPriority - 3);
                 Log.Info(P + "rozmowy zajazdu dodane (barman: kufel i lozka, kelnerka, grajkowie, reszta; priorytet startu " + TopPriority + ").");
             }
@@ -449,6 +450,7 @@ namespace Armoury
         internal RoadsideInns.Inn Inn;
         internal string InnName = "the inn", Region = "any", Scene;
         internal CultureObject Cult;
+        internal InnTable Tables;   // 474-P9: stoly (null przy kluczu InnTableTalk NIE)
         private Settlement _from;
         private readonly Dictionary<Agent, int> _roles = new Dictionary<Agent, int>();
         private readonly Random _rng = new Random();
@@ -507,7 +509,7 @@ namespace Armoury
             try
             {
                 Log.Info(RoadsideInnInterior.P + "wyjscie z " + InnName + " (" + (Inn != null ? Inn.Uid : "-") + ") po " + _t.ToString("0", CultureInfo.InvariantCulture)
-                         + " s | potkniecia razem " + RoadsideInnInterior.Stumbles + ".");
+                         + " s | " + (Tables != null ? Tables.ExitText() + " | " : "") + "potkniecia razem " + RoadsideInnInterior.Stumbles + ".");
             }
             catch { }
             _testClock = null;
@@ -592,9 +594,16 @@ namespace Armoury
                 }
             }
 
-            // bywalcy na npc_common
+            // bywalcy: przy stolach (474-P9, klucz InnTableTalk), reszta na npc_common
             int want = Patrons();
             int seated = 0, standing = 0;
+            if (InnTable.On)
+            {
+                Tables = new InnTable(this);
+                try { seated = Tables.Seat(m, want, _rng); }
+                catch (Exception e) { RoadsideInnInterior.Stumble("Seat", e); }
+            }
+            if (seated < want)
             {
                 var pts = new List<MatrixFrame>();
                 try { foreach (var e in m.Scene.FindEntitiesWithTag("npc_common")) if (e != null) pts.Add(e.GetGlobalFrame()); }
@@ -615,7 +624,7 @@ namespace Armoury
 
             Log.Info(RoadsideInnInterior.P + "wejscie - " + InnName + " (" + (Inn != null ? Inn.Uid : "-") + ", region tekstow " + Region + ") | scena " + Scene + " | gracz na " + _spawnAt
                      + " | barman " + keep + ", kelnerka " + wench + ", grajkowie " + mus + " (punktow " + musPts + ") | bywalcy chcianych " + want + ": przy stolach " + seated
-                     + ", stojacych " + standing
+                     + ", stojacych " + standing + (Tables != null ? " | " + Tables.BuildText() : "")
                      + " | gwar " + (crowdOwn ? "ze sceny" : (_crowd != null ? "nasz" : "BRAK")) + ", muzyka " + (_music != null ? "tak" : "BRAK")
                      + " | potkniecia budowy " + (RoadsideInnInterior.Stumbles - st0) + ".");
         }
