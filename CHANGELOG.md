@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-d (13.11) - urzad podatkowy wsi: lepszy pobor istniejacego czynszu (pozniejsze darowanie i szybsza splata zaleglosci), bez nowego zlota
+
+**Problem:** Jeff 13.11: "Tax office w wiosce - czemu wylaczyc?"; sesja zaproponowala "lepszy pobor czynszu, nowe zloto nie powstaje", Jeff: "na pozostale sie zgadzam". Dzis budynek martwy - BK dosypuje zloto z niczego (BKTaxModel.AddVillagePopulationTaxes), co blokuje KingdomTreasury.TaxOfficePrefix (PolicyIncomeConserved TAK u Jeffa), a AI dalej go stawia.
+
+**Przyczyna:** brak efektu zgodnego z zamknieta ekonomia.
+
+**Zmiana:** nowy Buildings338VillageTax.cs; DsVillage.RentPay: zaleglosc czynszu DS wsi darowana dopiero po DsRentForgiveDays x (1 + 0.5 x poziom urzedu) rat (364 -> 546 / 728 / 910), rata splaty zaleglosci DsRentArrearsPayDays / (1 + 0.5 x poziom) (28 -> 19 / 14 / 11) - nadal tylko z kiesy ponad koszyk dnia. Zloto tylko z kiesy wsi do pana (to samo roszczenie). Licznik w linii "Budynki (338) zaklady (476)". Klucz Buildings338 Village Tax Office (TAK; NIE = jak przed).
+
+**Ryzyko / co sprawdzic:** dziala tylko przy DuesMedieval i DsRentArrears (u Jeffa TAK); wies biedna z urzedem placi zaleglosci szybciej - kiesa ponad koszyk chroniona. Wplyw maly (wsi z urzedem BK niewiele).
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-c (13.11) - Temple (teatr BK), sad gry bez zmian, Place of Worship w slocie BK Court House (waga wiary pana, lojalnosc przy wierze panujacej)
 
 **Problem:** Jeff 13.11: "Teatr tak zwieksza lojalnosc, i nazwij to swiatynia"; "courthouse [BK] wylacz, a courthouse ktory zostaje daje tez wplywy i lojalnosc mieszkancow"; "Dodaj budynek wiary". Budynku wiary nie ma w zadnym module (audyt 12.11); BK Court House daje tylko +0.02 stabilnosci/poziom.

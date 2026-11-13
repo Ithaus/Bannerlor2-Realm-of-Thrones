@@ -157,7 +157,7 @@ namespace Armoury
         {
             if (!On) return;
             Log.Info("Budynki (338) zaklady (476): dzien " + day + " | AI pominelo zaklad bez zasobu " + _aiBlocked + ", miasta z kopalnia bez zloza (bez wydobycia) " + _townMinesSkipped
-                     + ", losowan rudy zamkow spoza zloza okolicy (pominiete) " + _castleOreFiltered + " | bledy " + _stumbles);
+                     + ", losowan rudy zamkow spoza zloza okolicy (pominiete) " + _castleOreFiltered + " | urzad podatkowy wsi (476-d): klucz " + Buildings338.YN(Buildings338VillageTax.On) + ", wsi z dluzszym darowaniem zaleglosci dzis " + Buildings338VillageTax.TakeHits() + " | bledy " + _stumbles);
             _aiBlocked = _townMinesSkipped = _castleOreFiltered = 0;
         }
     }

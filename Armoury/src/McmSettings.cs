@@ -12944,6 +12944,10 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Worship { get; set; } = true;
 
+        [SettingPropertyBool("Buildings338 Village Tax Office", HintText = "With Buildings338 and the medieval dues: a village Tax Office (Banner Kings) no longer makes gold out of nothing - its clerks collect the rent the village already owes: arrears are forgiven only after 1.5 / 2 / 2.5 times as many days (level 1 / 2 / 3) and are paid back faster, still only from what the village has beyond its daily basket. Off = the building gives nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338VillageTaxOffice { get; set; } = true;
+
         [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338CastleMines { get; set; } = true;
@@ -16235,6 +16239,7 @@ namespace Armoury
             s.Buildings338Works = Buildings338Works;
             s.Buildings338CastleCraftsmen = Buildings338CastleCraftsmen;
             s.Buildings338Worship = Buildings338Worship;
+            s.Buildings338VillageTaxOffice = Buildings338VillageTaxOffice;
             s.Buildings338CastleMines = Buildings338CastleMines;
             s.GoldForecastReal = GoldForecastReal;
             s.GoldDailySummary = GoldDailySummary;
