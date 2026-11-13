@@ -115,8 +115,12 @@ namespace Armoury
             var sb = new System.Text.StringBuilder(400);
             int n = 0;
             foreach (var h in d.Values) { if (n++ < 6) sb.Append(n > 1 ? ", " : "").Append(h.Seat.StringId).Append(" -> ").Append(h.TroopId); }
+            // 474-P5b-p (recenzja B2): siedziby bez przypisanych wsi - u ich kasztelana (CastellanLevy) nie ma skad brac ludzi, wszystkie pozycje szare
+            var noVil = new List<string>();
+            try { foreach (var h in d.Values) if (h.Seat.BoundVillages == null || h.Seat.BoundVillages.Count == 0) noVil.Add(h.Seat.StringId); } catch (Exception e) { Stumble("NoVil", e); }
             Log.Info("Levy rodow (474-P5): tabela siedzib rodow z ROT (ROTHouseTroopsBehavior._castellans) - " + d.Count + " siedzib, pominiete " + skipped
-                     + " (Gwardia Krolewska / braki danych); np. " + sb + (d.Count > 6 ? ", ..." : "") + ".");
+                     + " (Gwardia Krolewska / braki danych); np. " + sb + (d.Count > 6 ? ", ..." : "") + " | siedziby bez wsi (474-P5b-p, kasztelan bez ludzi): "
+                     + (noVil.Count > 0 ? noVil.Count + " - " + string.Join(", ", noVil.ToArray()) : "0") + ".");
             return d;
         }
 

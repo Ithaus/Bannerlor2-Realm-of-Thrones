@@ -37,7 +37,7 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static ConversationSentence.OnConsequenceDelegate _orig;
         private static ConversationSentence.OnConsequenceDelegate _mine;
-        private static int _stumbles, _rec, _men, _orgCalls;
+        private static int _stumbles, _rec, _men, _orgCalls, _poolNotes;
         private static long _gold;
         private static readonly HashSet<string> _err = new HashSet<string>(StringComparer.Ordinal);
 
@@ -54,7 +54,7 @@ namespace Armoury
         {
             try
             {
-                _rec = _men = _orgCalls = 0; _gold = 0;
+                _rec = _men = _orgCalls = _poolNotes = 0; _gold = 0;
                 var cm = Campaign.Current != null ? Campaign.Current.ConversationManager : null;
                 var f = AccessTools.Field(typeof(ConversationManager), "_sentences");
                 var list = cm != null && f != null ? f.GetValue(cm) as IList : null;
@@ -183,6 +183,9 @@ namespace Armoury
                 double got = 0.0;
                 try { got = PeopleBook.TakeLevyHere(kv.Key, ask, PeopleBook.MLevyVillage, out region); }
                 catch (Exception e) { Stumble("Take", e); continue; }
+                // 474-P5b-p (recenzja B1): TakeLevyHere idzie z notePool=false (wlasny pobor wioski pobocznej) - tu bierzemy z DOM wsi siedziby, wiec pule mlodych
+                // wiosek pobocznych tej wsi traca swoj udzial tak samo jak przy poborze gry z DOM (FromVillage notePool) - bez tego ci sami ludzie liczeni dwa razy.
+                if (got > 0.0 && kv.Key.Village != null) { try { SideVillageVisit.LevyNoteDistrictDraw(kv.Key.Village, got); _poolNotes++; } catch (Exception e) { Stumble("PoolNote", e); } }
                 int keep = Math.Min(ask, (int)Math.Ceiling(got - 1e-6));
                 if (keep <= 0) continue;
                 try
@@ -203,7 +206,7 @@ namespace Armoury
             Log.Info(P + Txt(seat.Name) + " (" + seat.StringId + ", " + h.Name + ", pan " + (seat.OwnerClan != null ? Txt(seat.OwnerClan.Name) : "-") + "): " + keepAll + " x " + troop.StringId
                      + " z prosby " + n + ", cena ROT " + cost + " | gracz " + gold0 + " -> " + hero.Gold + " (zaplacone " + total + ") | z DOM wsi " + gotAll.ToString("0.##", Inv)
                      + " (wolne przed " + room + "): " + (paid.Count > 0 ? string.Join(", ", paid.ToArray()) : "-") + " | od startu gry: werbunki " + _rec + ", ludzi " + _men
-                     + ", zlota " + _gold + ", skutek ROT bez zmian " + _orgCalls + "x, potkniecia " + _stumbles + ".");
+                     + ", zlota " + _gold + ", pule wiosek pobocznych pomniejszone (474-P5b-p) " + _poolNotes + "x, skutek ROT bez zmian " + _orgCalls + "x, potkniecia " + _stumbles + ".");
             if (keepAll > 0)
             {
                 Log.Player((keepAll == 1 ? "One man of " + h.Name + " joins" : keepAll + " men of " + h.Name + " join") + " your party. Their families in the villages of "

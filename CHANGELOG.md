@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P5b-p (13.11) - kasztelan ROT: pule mlodych wiosek pobocznych tez traca ludzi; w logu siedziby bez wsi (poprawka po recenzji B1, B2)
+
+**Problem:** recenzja B1 (kod): kasztelan (474-P5b) bral ludzi z DOM wsi siedziby przez `PeopleBook.TakeLevyHere`, a ta przekazuje do `FromVillage` `notePool=false` (`PeopleBook.Origin.cs:1292`) - `SideVillageVisit.LevyNoteDistrictDraw` sie nie wykonywal, choc komentarz `CastellanLevy.cs` to obiecywal. Wioski poboczne tych wsi dalej "mialy" swoja mlodziez - ci sami ludzie liczeni dwa razy; gdy DOM zejdzie do podlogi 50 hearth, pobor z wioski pobocznej dorabial brakujacych z niczego (`GiveNone` FNoneFloor) - dokladnie to, czego decyzja 3 kazala sie pozbyc. Recenzja B2: siedziba bez przypisanych wsi = u kasztelana wszystkie pozycje szare (w ROT zawsze sie dalo) - nikt nie sprawdzil, czy taka siedziba jest w ROT.
+
+**Przyczyna:** `TakeLevyHere` jest zrobione dla wlasnego poboru wioski pobocznej (tam pula zmniejszana wprost, wiec notePool=false); kasztelan bierze z DOM wsi jak pobor gry i potrzebuje rozkladu na pule.
+
+**Zmiana:** `CastellanLevy.Recruit` - po kazdym `got > 0` z wsi: `SideVillageVisit.LevyNoteDistrictDraw(wies, got)` (ta sama funkcja co `FromVillage` przy poborze gry; nie rzuca, wlasny try). Linia werbunku dostaje `pule wiosek pobocznych pomniejszone (474-P5b-p) Nx`. `RotHouses.Table` - linia tabeli dopisuje `| siedziby bez wsi (474-P5b-p, kasztelan bez ludzi): N - id, ...` (tylko log; zachowanie dla takich siedzib bez zmian - decyzja 3: ludzie tylko z wsi).
+
+**Ryzyko / co sprawdzic:** klucz `CastellanLevyFromPool` NIE - skutek ROT co do bitu (Recruit nie biegnie). Przy kluczu `SideVillage...` levy wylaczonym `LevyNoteDistrictDraw` nic nie robi (LevyKey). Spojnosc: ta sama zasada co pobor gry z DOM wsi (jedna zasada na jedno zjawisko); wlasny pobor wioski pobocznej i levy rodu 474-P5 bez zmian (dalej notePool=false + pula wprost). Sprawdzic w logu: linia tabeli rodow (ile siedzib bez wsi - jesli >0, decyzja Jeffa: zostawic szare czy brac z miasta/ROT), linia werbunku kasztelana z licznikiem pul.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 474-P8-p / 474-P7-p (13.11) - wnetrze zajazdu i spacer po wiosce: flaga "w scenie" zdejmowana, gdy scena nie wstala (poprawka po recenzji A2)
 
 **Problem:** recenzja A2 (kod): `RoadsideInnInterior.Active` i `SideVillageVisit.WalkActive` sa ustawiane przed `MissionState.OpenNew`, a zdejmuje je tylko `OnEndMission` logiki misji albo wyjatek w samym `Open`. Gdy scena nie wstanie po `OpenNew` (np. blad ladowania sceny ROT), flaga zostaje do konca sesji - "Enter the Inn" i "Walk through the village" szare z "Already in a scene.", test autotestu czeka bez konca.
