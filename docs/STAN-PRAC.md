@@ -1,5 +1,12 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 13.11 11:55 - WGRANIE 224 (479-a/b/c: f20 razem z A7; test at-220c OK)
+
+- W grze Armoury.dll md5 90558038cf7751a6b498b491a8c69127 (galaz noc/367c-jeniec-po-odejsciu, commit 44976761 = 479-a+b+c). Kopia przed: `Armoury.dll.bak-2026-11-13-przed-wgranie224` (aea8ef71 = WGRANIE 223), kopie w C:/Users/GAME/Backup-Bannerlord-C/wgrane i D:/Backup-Bannerlord/wgrane (2026-11-13-wgranie224 i -przed). Reszta DLL bez zmian.
+- at-220c: 220/220 dob, 23 bledy (cudze, jak zawsze), 0 BLAD. Indeks cen miast p25-p75: ser 0.81-1.22, maslo 0.86-1.13, zboze 0.63-1.02, ryby 0.80-1.29, mieso 1.82-2.78 (dalej za drogie), oliwki 1.52-2.82.
+- at-220e (479-d/e/f, m220e 62c57f7d): technicznie OK (220 dob, 23 bledy, 0 BLAD), ale NIE wgrane - ceny gorsze niz 220c (ser 1.32-1.87, maslo 1.10-1.66, zboze 1.13-1.52, ryby 0.90-1.84; mieso bez zmian). Linia A7: "inny cel dzieki 479-e 0" - sygnal z polek nie zmienil zadnego celu; dzialal tylko hamulec wzrostu 10%/sezon (wstrzymal ok. 1000 przejsc na krok, 2 mln rak), ktory zablokowal tez przejscia A7 dajace ser i maslo. Plus 220e: znikl nadmiar zboza (polki 1.0 T* zamiast 5.7 T*). Decyzja domyslna (noc 13.11): wgrac 220c, 479-e/f do poprawy (sygnal z polek ma realnie zmieniac cel, hamulec nie moze dusic przejsc w strone braku).
+- Dalej: miesa brak w obu (polki 0.2 T*); nastepna runda - przyczyna, czemu 479-e nie zmienia celu, i mieso.
+
 ## STAN 13.11 07:25 - WGRANIE 223 (runda 3: 478-S1..S7; test at-220a 220 dob od prologu z uzbrojona KS)
 
 - **W grze:** Armoury.dll `aea8ef718584992a9fcd350e6ff846f2` (galaz `noc/367c-jeniec-po-odejsciu`, commit `f81738a2`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-13-przed-wgranie223` oraz **C:/Users/GAME/Backup-Bannerlord-C/wgrane/2026-11-13-wgranie223(-przed)** - **D: PELNY (44 KB wolne)**, kopie na D: nie weszly. Na D: jest 725 kopii autotestow (`D:/Backup-Bannerlord/autotest-kopie`) - nie kasowane bez zgody Jeffa. Zapisy testowe at-220a w `C:/Users/GAME/Backup-Bannerlord-C/zapisy-testowe`.
