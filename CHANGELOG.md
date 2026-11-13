@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 480-a (13.11) - XP gracza: Kowalstwo ciete tylko raz
+
+**Problem:** Jeff 13.11: "kowalstwo ma byc tylko raz zwalniane". Po 480 Kowalstwo gracza dostawalo dwa ciecia: SmithXp (SmithingXpFactor 0.70, dla wszystkich bohaterow) i 480 (x0.75) - razem 0.525.
+
+**Przyczyna:** PlayerXp480.XpPrefix tnie kazda umiejetnosc gracza, a SmithXp osobno tnie Crafting na tym samym celu (HeroDeveloper.AddSkillXp).
+
+**Zmiana:** PlayerXp480.XpPrefix pomija Crafting, gdy SmithXp naprawde tnie (SmithXp.Factor < 0.999); przy SmithingXpFactor = 1.00 Kowalstwo gracza tnie 480 (tez raz). Licznik "Kowalstwo pominiete (tnie je SmithXp xF)" w linii doby. Decyzja domyslna: zostaje ciecie kowalstwa 0.70 (to samo dla wszystkich bohaterow).
+
+**Ryzyko / co sprawdzic:** tylko galaz Crafting w prefiksie gracza; reszta umiejetnosci bez zmian; SmithXp bez zmian. W logu: linia doby "XP gracza (480)" z licznikiem Kowalstwa pominietego > 0 po kuciu.
+
+**Status:** DO SPRAWDZENIA
+
 ## 480 (13.11) - XP umiejetnosci gracza x0.75 (klucz Player Skill XP Multiplier)
 
 **Problem:** Jeff 13.11: "zmniejsz przyrost doswiadczenia o 25% dla gracza czyli dla mnie, bo w 3 lata prawie zdobylem wszystko na ponad 300, za szybko sie rozwija bohater" (3 lata = kalendarz Armoury, 364 dni na rok).

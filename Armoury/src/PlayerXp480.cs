@@ -34,7 +34,7 @@ namespace Armoury
         private static readonly HashSet<System.Reflection.MethodBase> _patched = new HashSet<System.Reflection.MethodBase>();
         private static string _hook = "nie wpiete";
         private static int _stumbles, _lines;
-        private static int _dN, _dPlain;
+        private static int _dN, _dPlain, _dCraft;   // 480-a: _dCraft - Kowalstwo pominiete (tnie je juz SmithXp)
         private static double _dBefore, _dAfter;
         private static Action<HeroDeveloper, float, bool> _gainRaw;
         private static bool _gainLooked;
@@ -64,7 +64,7 @@ namespace Armoury
         internal static void EnsureHooks()
         {
             _lines = 0;
-            _dN = 0; _dPlain = 0; _dBefore = 0; _dAfter = 0;
+            _dN = 0; _dPlain = 0; _dCraft = 0; _dBefore = 0; _dAfter = 0;
             int others = -1;
             try
             {
@@ -125,6 +125,8 @@ namespace Armoury
             try
             {
                 if (!isAffectedByFocusFactor) { _dPlain++; return; }
+                // 480-a (Jeff 13.11: "kowalstwo ma byc tylko raz zwalniane"): Kowalstwo tnie juz SmithXp (SmithingXpFactor) - gdy ono dziala, tu bez drugiego ciecia
+                if (SmithXp.Factor < 0.999f && (object)skill == (object)DefaultSkills.Crafting) { _dCraft++; return; }
                 float f = Factor;
                 if (Neutral(f)) { _dN++; _dBefore += rawXp; _dAfter += rawXp; return; }
                 float before = rawXp;
@@ -152,12 +154,12 @@ namespace Armoury
         {
             try
             {
-                if (_dN > 0 || _dPlain > 0 || _stumbles > 0)
+                if (_dN > 0 || _dPlain > 0 || _dCraft > 0 || _stumbles > 0)
                     Log.Info(P + "mnoznik " + F2(Factor) + ", dzis XP przed/po: " + F1(_dBefore) + " / " + F1(_dAfter) + " w " + _dN + " wywolaniach (dzien " + day
-                             + "), bez mnoznika (ustawianie poziomu) " + _dPlain + ", latka " + _hook + ", potkniecia " + _stumbles + ".");
+                             + "), bez mnoznika (ustawianie poziomu) " + _dPlain + ", Kowalstwo pominiete (tnie je SmithXp x" + F2(SmithXp.Factor) + ") " + _dCraft + ", latka " + _hook + ", potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("Daily", e); }
-            _dN = 0; _dPlain = 0; _dBefore = 0; _dAfter = 0;
+            _dN = 0; _dPlain = 0; _dCraft = 0; _dBefore = 0; _dAfter = 0;
         }
     }
 }
