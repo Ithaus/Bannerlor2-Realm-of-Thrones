@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## R5-b/c, R1 (13.11) - garbarnie, handel karawan z kasa miasta, brak materialow budow: ustalenia bez zmiany kodu (decyzje domyslne noc 13.11)
+
+**Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md): pkt 8 garbarnie 0 cykli przy skorach 240 -> 4869; pkt 3 kasy miast drenowane przez karawany, reszta "Przeplywy osad" -20 mln w 118 dobach; pkt 1 brak materialow budowlanych (zlecone 503 726/d, material z polek 0, kiesy wsi 1.4 -> 10.7 mln).
+
+**Ustalenia:** (R5-b) garbarnie istnieja (tannery 12 -> 3 w liscie warsztatow), cykle 0, regula zmiany zajec mowi "bez typu z wsadem i zyskiem" (srednia -4 d/d); bramka 216 (prog ceny: utarg wedlug ceny kupca nie pokrywa wsadu i plac) dotyczy wszystkich branz (95 z 823 cykli), skor jest na polkach 4869 i skory na polkach 1561 - wyglada na prawdziwa nieoplacalnosc (cena skory wobec skor surowych i plac), nie na blad kodu; potwierdzic per-warsztat w nastepnym tescie. (R5-c) handel karawan z kasa miasta idzie przez targ (sprzedaz/kupno), nie przez GiveGoldAction, ktory czyta ksiega przeplywow - pomiar wymaga latki na sciezce handlu targu; decyzja domyslna: osobny krok po tescie 120b, nie teraz. (R1) zloto zlecen bez materialu zostaje w kiesach wsi (nic nie znika - ksiega OK), a sygnal braku kamienia/gliny/marmuru jest prawdziwy (wsie kamieniolomow: quarry 99, lime_pit 210, clay_mine 107 rak wobec iron_mine 330 619) i to on ma pchac zmiany zajec; ograniczenie zlecen do materialu na polce zgasiloby ten sygnal - decyzja domyslna: nie zmieniac zlecen ani sufitu ceny 2.0; podaz materialow (zmiana zajec wsi na kamieniolomy) - osobny krok po pomiarze, czemu L6 nie przestawia wsi mimo N 2.00 (zmiana zajec 0 w 120 dobach).
+
+**Zmiana:** brak (tylko wpis).
+
+**Ryzyko / co sprawdzic:** w 120b: linia zmiany zajec L6 (czy N 2.00 kamienia przestawia wsie), garbarnie per warsztat (powod nieudanego cyklu), Akumulator kies.
+
+**Status:** DO SPRAWDZENIA
+
 ## R5-a (13.11) - pomiar: skad nowi lordowie (rod, zawod, stos pierwszego wywolania)
 
 **Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 6): "stworzeni doroslymi" 22-23 co 7 dob przy porodach 0 i jednym zgonie; lordow 1980 -> 2276 (w roku 364 dob ok. +1100). A16 widzial tylko OnHeroCreated bez zrodla.
