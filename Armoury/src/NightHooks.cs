@@ -48,6 +48,8 @@ namespace Armoury
             Part(sb, "dzwiek", RoutHold.SiteSound, () => BattleSound.ApplyMissionPatches(_h));
             sb.Append(" | ");
             Part(sb, "bron w ucieczce (359b)", RoutHold.SiteRally, () => RoutedKeepArms359.ApplyMissionPatches(_h));   // 359b: prefiks na Artem DropAllWeapons
+            sb.Append(" | ");
+            Part(sb, "podejscie strzelcow (469-q)", RoutHold.SiteShields, () => FireRange469.ApplyMissionPatches(_h));   // 469-q: postfiks RBMBehaviorArcherSkirmish.CalculateCurrentOrder
             sb.Append('.');
             Log.Info(sb.ToString());
         }
