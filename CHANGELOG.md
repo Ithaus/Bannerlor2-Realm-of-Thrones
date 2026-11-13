@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P8b-p (13.11) - dzwiek karczmy na mapie: zwolnienie przy koncu gry, sprawdzenie IsValid, cisza pod menu Esc (poprawka po recenzji A1)
+
+**Problem:** recenzja A1 (kod, nie gra - 474-P8b nie byl jeszcze uruchomiony): zrodlo `tavern_exterior` na scenie mapy nie bylo zwalniane przy znikaniu sceny mapy (wyjscie do menu glownego, wczytanie innego zapisu) - `Stop`/`ReleaseById` szly dopiero przy nastepnym takcie albo w `SessionStart` nowej sesji, na zdarzeniu ze zniszczonej sceny, a `FreeNow` wolal `ev.Stop()` bez sprawdzenia `IsValid`. Do tego gwar gral dalej pod menu Esc / encyklopedia nad mapa.
+
+**Przyczyna:** `RoadsideInnMapSound.FreeNow` bez `ev.IsValid`; brak wywolania w `SubModuleMain.OnGameEnd`; `Want` nie sprawdzal `GameStateManager.ActiveStateDisabledByUser` (to samo pole, ktorego uzywa `CampWalk` i `Prologue.Scenes`).
+
+**Zmiana:** `FreeNow` - przy niewaznym zdarzeniu nic nie wola (tylko zeruje uchwyt); nowe `RoadsideInnMapSound.GameEnd()` (Stop + zwolnienie) wolane w `SubModuleMain.OnGameEnd` (wlasny try, jak reszta wpisow tam); `Want` - `ActiveStateDisabledByUser` -> cisza z powodem "menu Esc".
+
+**Ryzyko / co sprawdzic:** klucz `RoadsideInnMapSound` NIE - bez zmian (GameEnd przy braku zrodla nic nie robi). Regresje: inne miejsca grajace dzwiek na mapie (EventMusic, MapCameraView) nietkniete; `OnGameEnd` - jedna dodatkowa linia na koncu. Sprawdzic w grze: gwar przy zajezdzie cichnie po Esc i wraca po zamknieciu menu; wyjscie do menu glownego przy grajacym gwarze i wczytanie zapisu - bez bledu w logu CrashScribe.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 474-P11 (13.11) - PLAN: dziedziniec zajazdu ze stajnia (NIE wdrozone)
 
 **Problem:** Jeff 13.11 ("Wioski, i karczmy rob wszystko"; projekt `docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md` paczka 11): przed wejsciem do zajazdu (474-P8 "Enter the Inn") brak dziedzinca - gracz od razu stoi w sali. Paczka miala byc zrobiona tylko, jesli po P1-P10 jest bezpieczna.

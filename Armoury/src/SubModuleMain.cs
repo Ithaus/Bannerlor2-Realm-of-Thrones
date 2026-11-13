@@ -692,6 +692,7 @@ namespace Armoury
             try { DungeonFate.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (loch 402)", e); }   // 402: chorzy lochu i stan lochow nie zostaja po kampanii
             try { StoryGuard.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (straz fabuly 396)", e); }   // 396: pamiec strazy (bohaterowie, obiekty wydarzen ROT) nie zostaje po kampanii
             try { SpoilsReport.Reset(); } catch (Exception e) { Log.Error("OnGameEnd (raport lupu)", e); }                     // noc 25.10 P5: raport w pamieci od zera
+            try { RoadsideInnMapSound.GameEnd(); } catch (Exception e) { Log.Error("OnGameEnd (dzwiek karczmy na mapie 474-P8b)", e); }   // 474-P8b-p: zrodlo zwolnione przed zniszczeniem sceny mapy
         }
         private static int _lektorFails;    // m103-lektor: blad ladowania typu lektora (Lektor.AppTick)
 

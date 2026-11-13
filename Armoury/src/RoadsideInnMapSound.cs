@@ -79,6 +79,7 @@ namespace Armoury
             if (c == null) { why = "poza kampania"; return null; }
             var gsm = Game.Current != null ? Game.Current.GameStateManager : null;
             if (gsm == null || !(gsm.ActiveState is MapState)) { why = "nie mapa"; return null; }
+            if (gsm.ActiveStateDisabledByUser) { why = "menu Esc"; return null; }   // 474-P8b-p: menu Esc / encyklopedia nad mapa - cisza (jak CampWalk)
             if (LoadingWindow.IsLoadingWindowActive || Mission.Current != null) { why = "ladowanie / misja"; return null; }
             var ms = MapScreen.Instance;
             if (ms == null || !ms.IsReady || ms.MapScene == null) { why = "ekran mapy"; return null; }
@@ -163,11 +164,18 @@ namespace Armoury
             if (ev == null) return;
             try
             {
+                if (!ev.IsValid) return;   // 474-P8b-p: zdarzenie juz niewazne (scena mapy zniszczona) - nic nie wolamy
                 int id = ev.GetSoundId();
                 ev.Stop();
                 BattleSound.ReleaseById(id);
             }
             catch (Exception e) { Stumble("Free", e); }
+        }
+
+        /// <summary>474-P8b-p: SubModuleMain.OnGameEnd - zrodlo zatrzymane i zwolnione, zanim zniknie scena mapy (wyjscie do menu, wczytanie innego zapisu).</summary>
+        internal static void GameEnd()
+        {
+            try { Stop("koniec gry"); } catch (Exception e) { Stumble("GameEnd", e); }
         }
 
         internal static void SessionStart()
