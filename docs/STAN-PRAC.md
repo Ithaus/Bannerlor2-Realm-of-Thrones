@@ -1,5 +1,13 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 13.11 05:50 - WGRANIE 222 (runda 2: 477-a..e, lucznicy 469-t; test at-120c z prologiem i uzbrojona KS - gotowe do gry)
+
+- **W grze:** Armoury.dll `364f9557afeb7c80f133e160b2b9328a` (commit `5cf2bb8a`, wypchniety). Kopie: `Armoury.dll.bak-2026-11-13-przed-wgranie222`, `D:/Backup-Bannerlord/wgrane/2026-11-13-wgranie222(-przed)`.
+- **Testy:** at-120b (120 dob prolog, KS nieuzbrojona) OK - docs/ANALIZA-120B-2026-11-13.md; at-469t (bitwy) OK - strzaly poza G: szyki AI 0, gracz/piechota pojedyncze (ciesciwa zwolniona w chwili wstrzymania); at-120c (120 dob prolog, KS UZBROJONA jak u Jeffa - StartCalibrationAutoArm TAK, narzedzie n392 z postojem na mapie) OK, potkniecia 0, zloto swiata OK, spacery P7 3/3 - docs/ANALIZA-120C-2026-11-13.md; at-inn (wnetrze zajazdu) OK - 2 wejscia (The Blind Anvil, The Red Boar), bez CTD.
+- **Werdykt analizy 120c:** gotowe do grania; nieidealne: ludnosc wsi BK -7.4%/120 dob (obcinanie ulamkow w BK MirrorClassCount), zloto ludu zbiera sie w kasach miast (15 mln) i glod z braku pieniedzy w 7 osadach, budowy panow bez kamienia (produkcja 363 idzie do robot wsi), AI ping-pong oblezen; kontrola wczesna KS D+7: ceny owocow/oliwek poza pasmem (orange x3.8).
+- **Narzedzie autotestu:** cs/CrashScribe-at-n392.dll (postoj na mapie dla testow 474). Flagi w CrashScribe: armoury-prolog, armoury-ks-auto, armoury-wies-spacer, armoury-zajazd-wnetrze (zostaje tylko zajazd; ks-przerwij usuniety).
+- **W toku:** runda 3 (S1-S7 + ceny KS), potem test 200+ dob od prologu (wojna Westeros po dniu 186 prologu, bramki krain KS ok. 207 doby).
+
 ## STAN 13.11 03:40 - WGRANIE 221 (noc 13.11: lucznicy 469-q/r/s, oblezenia 471a/471b, mury 472/475, Mason i sufit zoldu 473, budynki 476-a..g, wsie poboczne i karczmy 474 P1-P10, runda 1 po tescie 120 dob)
 
 - **W grze:** Armoury.dll `e78cf95920ab07210affc55c88df8316` (galaz `noc/367c-jeniec-po-odejsciu`, commit `dbfee276`, wypchniety). Pliki danych 474 w Modules/Armoury: `GUI/Prefabs/ArmVillageNameLabels.xml`, `ModuleData/arm_tavern_lines.tsv`, `ModuleData/arm_tavern_talk.tsv` (kopie D:/Backup-Bannerlord/wgrane/2026-11-13-pliki-474). Kopie DLL: `Armoury.dll.bak-2026-11-13-przed-wgranie221`, `D:/Backup-Bannerlord/wgrane/2026-11-13-wgranie221(-przed)`.
