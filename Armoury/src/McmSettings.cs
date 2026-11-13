@@ -13128,6 +13128,10 @@ namespace Armoury
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeAbandonGrace { get; set; } = true;
 
+        [SettingPropertyBool("Siege Abandon Start Measure", HintText = "with Siege Abandon Grace: through the whole siege, not only its first two days, the besieging AI army leaves for a relief only if the enemy is also stronger by the measure it used to start the siege (enemies in the field within reach); a relief that only one count sees no longer drives it off. Off = only the first two days, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
+        public bool SiegeAbandonStartMeasure { get; set; } = true;
+
         [SettingPropertyBool("Siege Time Rules For Your Fortresses", HintText = "The fortresses of your own house besieged by the lords of the world (while you are not inside or in the camp) follow the same siege rules as everyone else's: with Siege Time By Factors - no assault before the lower bound of the term, they yield with honours when the term runs out with no relief in sight or after a week of hunger (the garrison marches out to your nearest fortress that is not besieged, or to your own party; failing both, to the lords of your realm); with Siege Camp Forages The Villages - the besiegers forage your villages. You get a message when that happens. Off = your own fortresses keep only the old rules (assault, the old hunger, no foraging)", RequireRestart = false)]
         [SettingPropertyGroup("Sieges: length, supplies and yielding (471)")]
         public bool SiegeTimeRulesPlayerHoldings { get; set; } = true;
@@ -16413,6 +16417,7 @@ namespace Armoury
             s.SiegeTimeLimitFactor = SiegeTimeLimitFactor;
             s.SiegeNearReliefOnly = SiegeNearReliefOnly;
             s.SiegeAbandonGrace = SiegeAbandonGrace;
+            s.SiegeAbandonStartMeasure = SiegeAbandonStartMeasure;
             s.SiegeTimeRulesPlayerHoldings = SiegeTimeRulesPlayerHoldings;
         }
 

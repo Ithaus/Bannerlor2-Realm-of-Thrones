@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 478-S4 (13.11) - odstapienie 334e przez cale oblezenie wymaga tez przewagi wedlug miary startu (ZFor)
+
+**Problem:** at-120c, Lorath (l.70848): w tej samej chwili q_obl 1.31 (miara odsieczy "idzie/pamiec") i q miary startu 1.01 - odstapienie po 2.1 doby, czyli zaraz po koncu karencji 477-c (2 doby); trzy liczby odsieczy (KO, OB5, 471) sie nie zgadzaja.
+
+**Przyczyna:** LocalFront334e.Siege.cs:511-518 - miara startu (ZFor) obowiazywala tylko do AbandonGraceDays = 2.0.
+
+**Zmiana:** nowy klucz Siege Abandon Start Measure (TAK, dziala razem z Siege Abandon Grace i Siege Near Relief Only): odstapienie (stan 4) w kazdym wieku oblezenia wymaga takze q miary startu > AbandonQ; inaczej stan 3 (zostaje), licznik _dGrace, w linii "miara startu 478-S4: wiek ..." (do 2 dob dalej "karencja 477-c"). NIE = tylko pierwsze 2 doby jak dotad. ZFor liczony tylko przy kandydacie do odstapienia.
+
+**Ryzyko / co sprawdzic:** wodz zostaje przy prawdziwej odsieczy, ktorej miara pola nie widzi (np. odsiecz poza zasiegiem ZFor) - bitwa przy obozie; razem z 478-S3 armie zostaja dluzej. W tescie: powtorki oblezen tej samej osady ~0, liczba odstapien i bitew z odsiecza, straty 312f.
+
+**Status:** DO SPRAWDZENIA
+
 ## 478-S3 (13.11) - oblezenia AI: trzymanie swiezego oblezenia do 10 doby, zakaz powrotu po krotkim oblezeniu (do 10 dob) na 7 dob
 
 **Problem:** at-120c: AI zwija oblezenie po 2-4 dobach i wraca pod te same mury - Oros 2.8 doby (l.77158) i znow 3.0 (l.79608), Bisa i Lorath po dwa razy; tylko 2 z 8 zakonczonych oblezen w celu 471; "zakaz powtorki" 0 razy w logu.

@@ -510,12 +510,12 @@ namespace Armoury
                 if (state == 4 && AbandonGraceOn)
                 {
                     double age = 99; try { age = ev.SiegeStartTime.ElapsedDaysUntilNow; } catch { }
-                    if (age < AbandonGraceDays)
+                    if (age < AbandonGraceDays || AbandonWholeOn)   // 478-S4 (analiza 120c pkt 6, Lorath: q_obl 1.31 przy q miary startu 1.01, odstapienie po 2.1 doby)
                     {
                         float gf; double ga;
                         double zs = ZFor(st, k, party, SiegeDays, out gf, out ga);
                         double qs = Ratio(zs, camp0 + ga);
-                        if (qs <= AbandonQ) { state = 3; _dGrace++; grace = " | karencja 477-c: wiek " + F2((float)age) + " doby, q miary startu " + F2(qs) + " <= " + F2(AbandonQ) + " - zostaje"; }
+                        if (qs <= AbandonQ) { state = 3; _dGrace++; grace = (age < AbandonGraceDays ? " | karencja 477-c: wiek " : " | miara startu 478-S4: wiek ") + F2((float)age) + " doby, q miary startu " + F2(qs) + " <= " + F2(AbandonQ) + " - zostaje"; }
                     }
                 }
                 qr = Ratio(relief + GarCap(gar, campS), campS);
