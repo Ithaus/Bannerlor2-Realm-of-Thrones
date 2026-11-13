@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 479-c (13.11) - KS: nacisk A7 (Held) zeruje sie, gdy f20-d4 zmieni glowne zajecie bloku
+
+**Problem:** recenzja 479-a (potwierdzone, niskie): b.Held to jedna liczba na blok, liczona w petli A7 wobec glownego zajecia (argmax X). Od 479-a f20-d4 przepisuje X blokow bez przebudowy co 7 dob (przed petla A7 tej samej doby) - w bloku prawie remisowym (np. 0.51/0.49) glowne zajecie sie odwraca, a Held przechodzi dalej: A7 moze zaczac zmiane zajecia, ktore bylo pod naciskiem krocej niz 60 dob.
+
+**Przyczyna:** StartCalibration.Jedzenie.cs F20Block zmienia b.X bez ruszania b.Held; Held zeruja tylko sciezki A7 (brak nacisku, prace okregu, fach, koniec/anulowanie przebudowy).
+
+**Zmiana:** decyzja domyslna (noc 13.11): F20Block liczy glowne zajecie przed i po kroku (ta sama zasada co petla A7 - pierwsze najwieksze X); gdy sie zmienilo, Held > 0 i A7 czynna - b.Held = 0 (A7 liczy 60 dob od nowa). Licznik w linii "Jedzenie KS (f20-d4)": "nacisk A7 wyzerowany - f20 zmienil glowne zajecie bloku (479-c) N". A7 wylaczona - bez zmian (Held to wtedy sam pomiar).
+
+**Ryzyko / co sprawdzic:** czytelnicy Held: petla A7 (Rule.cs - narastanie, prog HoldDays, zerowania), pomiar A7s.cs:285 (Held >= 60), zapis Live.cs (^Held) - zerowanie zgodne z kazdym z nich; ruszaja tylko bloki Target < 0 (te same co f20). Mozliwe opoznienie zmian A7 w blokach remisowych o 60 dob; licznik 479-c powinien byc maly (pojedyncze bloki na krok).
+
+**Status:** DO SPRAWDZENIA
+
 ## 479-b (13.11) - KS: f20-d4 przy czynnej A7 nie sadzi nowych gajow (nowe drzewa tylko platna A7)
 
 **Problem:** recenzja 479-a (2 niezalezne przeglady + weryfikacja): przy KsFoodHandsWithA7 TAK f20-d4 z kluczem Ks Food Hands Grow Groves TAK dodaje rece winnicom, gajom oliwnym, sadom cytrusowym i daktylowym od razu i za darmo, a A7 za te sama zmiane bierze koszt i 364 doby - darmowa droga obok platnej (nic z niczego), dwie reguly o odwrotnej ekonomii dla jednego zjawiska.

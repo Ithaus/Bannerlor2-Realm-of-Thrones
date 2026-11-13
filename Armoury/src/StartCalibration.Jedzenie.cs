@@ -207,7 +207,7 @@ namespace Armoury
             var rg0 = new double[2 * NG]; var rg1 = new double[2 * NG]; var rUp = new int[2 * NG]; var rDn = new int[2 * NG];
             var mvM = new double[2];
             int nBlk = 0, nChg = 0, nFlat = 0, nSingle = 0, nBusy = 0, nLock = 0, nNoHands = 0, nLandCut = 0, nLandStop = 0, nGuard = 0, nRegCap = 0, nBack = 0, nDist = 0, nOver = 0;
-            int nWinter = 0, nTree = 0, nRegGuard = 0, nRegTree = 0;               // recenzja: bloki zima bez ruchu, drzewa bez wzrostu (klucz Grow Groves NIE), regale bez wzrostu
+            int nWinter = 0, nTree = 0, nRegGuard = 0, nRegTree = 0, nHeldReset = 0;               // recenzja: bloki zima bez ruchu, drzewa bez wzrostu (klucz Grow Groves NIE), regale bez wzrostu
             double maxPct = 0; string maxId = "-";
             var cnt = new F20Count();
             foreach (var ld in _live.Values)
@@ -238,7 +238,7 @@ namespace Armoury
                         {
                             cnt.Clear();
                             moved += F20Block(ld, b, m, type, guard, groves, fh, sc, hc1, mvG, cnt);
-                            nChg += cnt.Chg; nFlat += cnt.Flat; nSingle += cnt.Single; nLock += cnt.Lock; nLandCut += cnt.LandCut; nLandStop += cnt.LandStop; nTree += cnt.Tree;
+                            nChg += cnt.Chg; nFlat += cnt.Flat; nSingle += cnt.Single; nLock += cnt.Lock; nLandCut += cnt.LandCut; nLandStop += cnt.LandStop; nTree += cnt.Tree; nHeldReset += cnt.HeldReset;
                             moved += F20Regale(b, m, sig, guard, groves, rg0, rg1, rUp, rDn, mvG, ref nRegCap, ref nRegGuard, ref nRegTree);
                         }
                         if (cnt.Applied == 0) for (int j = 0; j < b.C.Length && j < b.X.Length; j++) hc1[m * NC + b.C[j]] += b.X[j] * fh;
@@ -291,7 +291,8 @@ namespace Armoury
               .Append(", ziemia skrocila ").Append(nLandCut).Append(", ziemia zatrzymala ").Append(nLandStop).Append(", przebudowa A7 ").Append(nBusy).Append(", prace okregu ").Append(nLock)
               .Append(", bez rachunku rak ").Append(nNoHands).Append(", zima bez ruchu ").Append(nWinter).Append("; okregi w progu najpierw wyzywic siebie ").Append(nGuard).Append(", krainy wrocone ").Append(nBack)
               .Append("; drzewa bez wzrostu (Grow Groves NIE albo A7 czynna) ").Append(nTree)
-              .Append("; wzrost gajow pominiety przez A7 (479-b): bloki ").Append(grovesA7 ? nTree : 0).Append(", regale daktyli ").Append(grovesA7 ? nRegTree : 0);
+              .Append("; wzrost gajow pominiety przez A7 (479-b): bloki ").Append(grovesA7 ? nTree : 0).Append(", regale daktyli ").Append(grovesA7 ? nRegTree : 0)
+              .Append("; nacisk A7 wyzerowany - f20 zmienil glowne zajecie bloku (479-c) ").Append(nHeldReset);
             // grupy zajec: w brak (wynik >= 0.5) i w nadmiarze (<= -0.5) - rece pola przed -> po (bez zmiany regale)
             for (int m = 0; m < 2; m++)
             {
@@ -340,8 +341,8 @@ namespace Armoury
 
         private sealed class F20Count
         {
-            public int Chg, Flat, Single, Lock, LandCut, LandStop, Applied, Tree;
-            public void Clear() { Chg = Flat = Single = Lock = LandCut = LandStop = Applied = Tree = 0; }
+            public int Chg, Flat, Single, Lock, LandCut, LandStop, Applied, Tree, HeldReset;
+            public void Clear() { Chg = Flat = Single = Lock = LandCut = LandStop = Applied = Tree = HeldReset = 0; }
         }
 
         private static string F20DecText(int d)
@@ -408,6 +409,9 @@ namespace Armoury
                     if (tl < t) { t = tl; cnt.LandCut++; }
                 }
             }
+            // 479-c (noc 13.11, decyzja domyslna - recenzja 479-a): nacisk A7 (b.Held) liczony jest wobec glownego zajecia bloku (argmax X, ta sama zasada co petla A7 -
+            // pierwsze najwieksze); gdy krok f20 zmieni glowne zajecie, nacisk dotyczyl innego zajecia - zeruje sie (A7 liczy 60 dob od nowa)
+            int ciA = 0; for (int j = 1; j < b.X.Length; j++) if (b.X[j] > b.X[ciA]) ciA = j;
             double moved = 0, s = 0;
             for (int j = 0; j < n; j++)
             {
@@ -415,6 +419,8 @@ namespace Armoury
                 s += b.X[j];
             }
             if (s > 0) for (int j = 0; j < n; j++) b.X[j] = (float)(b.X[j] / s);
+            int ciB = 0; for (int j = 1; j < b.X.Length; j++) if (b.X[j] > b.X[ciB]) ciB = j;
+            if (ciB != ciA && b.Held > 0 && A7RuleOn) { b.Held = 0; cnt.HeldReset++; }
             for (int j = 0; j < n; j++)
             {
                 int c = b.C[j];
