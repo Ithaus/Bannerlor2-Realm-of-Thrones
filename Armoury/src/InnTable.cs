@@ -55,11 +55,27 @@ namespace Armoury
         private sealed class SitCheck { public Agent A; public StandingPoint Sp; public Chair Ch; public string Pt; public int ChId; }
         private readonly List<SitCheck> _checks = new List<SitCheck>();
         private float _checkAt = -1f;
-        private int _blocked, _ptsAll;
+        private int _blocked, _ptsAll, _disHint, _disNotAble;
 
         private static string PtName(StandingPoint sp)
         {
             try { return sp.GameEntity.Name ?? "-"; } catch { return "?"; }
+        }
+
+        /// <summary>485-p: wolnosc punktu bez pytania agenta (warunki punktu z AnimationPoint.IsDisabledForAgent 1.4.8).</summary>
+        private static bool PointFree(StandingPoint sp, Chair ch)
+        {
+            var ap = sp as SandBox.Objects.AnimationPoints.AnimationPoint;
+            if (ap == null || sp.HasUser || sp.IsDeactivated || !ap.IsActive) return false;
+            if (!sp.GameEntity.HasTag("alternative")) return true;
+            if (ch.GameEntity.HasTag("reserved")) return false;
+            foreach (var o in ch.StandingPoints)
+            {
+                var op = o as SandBox.Objects.AnimationPoints.AnimationPoint;
+                if (op == null || o == sp || op.GroupId != ap.GroupId || o.IsDeactivated) continue;
+                if ((o.HasUser || o.HasAIMovingTo) && o.GameEntity.HasTag("alternative")) return false;
+            }
+            return true;
         }
 
         private static bool IsFront(StandingPoint sp) { return PtName(sp).IndexOf("front", StringComparison.OrdinalIgnoreCase) >= 0; }
@@ -138,9 +154,26 @@ namespace Armoury
                         if (alt != null && alt != sp && !IsFront(alt) && !alt.HasUser) sp = alt;
                     }
                     catch (Exception e) { RoadsideInnInterior.Stumble("Table.Alt", e); }
+                    // 485-p: twarda bramka tylko po stronie PUNKTU (zajety / wylaczony / zarezerwowany / grupa zajeta).
+                    // IsDisabledForAgent pyta tez agenta (IsAbleToUseMachine = MovementMode), a swiezo zrodzony agent
+                    // nie mial jeszcze ticku - wtedy tylko licznik w logu, UseSeat i tak (jak przed 485, "siadanie 6").
                     bool blocked = true;
-                    try { blocked = sp.HasUser || sp.IsDisabledForAgent(a); }
-                    catch (Exception e) { RoadsideInnInterior.Stumble("Table.Disabled", e); }
+                    try { blocked = !PointFree(sp, t[i].Ch); }
+                    catch (Exception e) { RoadsideInnInterior.Stumble("Table.Free", e); }
+                    if (!blocked)
+                    {
+                        try
+                        {
+                            if (sp.IsDisabledForAgent(a))
+                            {
+                                _disHint++;
+                                bool able = false;
+                                try { able = a.IsAbleToUseMachine(); } catch { }
+                                if (!able) _disNotAble++;
+                            }
+                        }
+                        catch (Exception e) { RoadsideInnInterior.Stumble("Table.Disabled", e); }
+                    }
                     if (blocked) _blocked++;
                     else if (InnInteriorLogic.UseSeat(a, sp))
                     {
@@ -162,7 +195,8 @@ namespace Armoury
         internal string BuildText()
         {
             return "stoly (474-P9): krzesel " + _chairs + ", miejsc (485: krzeslo+grupa) " + _seats + " z punktow " + _ptsAll + ", stolow " + _tablesAll + ", zajete " + _tables.Count
-                   + ", siadanie " + _sitOk + ", punkt zablokowany (stoi) " + _blocked;
+                   + ", siadanie " + _sitOk + ", punkt zablokowany (stoi) " + _blocked
+                   + ", gra mowi 'niedostepny dla agenta' (mimo to siada) " + _disHint + " (w tym agent jeszcze nie IsAbleToUseMachine " + _disNotAble + ")";
         }
 
         /// <summary>485 (e): jednorazowa kontrola ok. 3 s po wejsciu - gdzie naprawde sa posadzeni (punkt, krzeslo, odleglosc od srodka krzesla).</summary>
