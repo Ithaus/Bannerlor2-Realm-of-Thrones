@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-b (13.11) - rzemieslnicy zamku (Craftmans Quarters): surowiec okolicy -> towar na targ miasta okregu, place i podatek
+
+**Problem:** Jeff 13.11: "Craftmans - daj rzemieslnicy". Audyt budynkow 12.11: Craftmans Quarters zamku martwy (DenarByBoundVillageHeartPerDay czyta tylko podatek gry, zastapiony przez PopulationLaw.TownTaxPostfix) - 11-20 tys. zl za nic.
+
+**Przyczyna:** brak czytnika efektu w naszej ekonomii.
+
+**Zmiana:** nowy Buildings338Crafts.cs (tick dobowy zamkow z Buildings338.Daily): zamek z CQ poziomu L przerabia najwyzej 2 x L szt./d surowca okolicy (tylko towary wsi zamku - mapa zasobow 476-a): welna -> sukno, len -> plotno, skory -> skora, drewno -> deski, zelazo -> narzedzia, 1:1. Surowiec z polki miasta handlowego okregu (Buildings338Ports.MarketTown, teraz internal) - kasa zamku placi miastu cene kupna; towar na te sama polke - miasto placi zamkowi cene sprzedazy (tylko przy dodatniej marzy). 60% marzy - place rzemieslnikow (TownFolk.Earn KCraftPaid, kiesa podzamcza), reszta - podatek pana. Ramka GoodsLedger FTownCraft. Linia doby "Budynki (338) rzemieslnicy zamkow (476)". Klucz Buildings338 Castle Craftsmen (TAK; NIE = jak przed).
+
+**Ryzyko / co sprawdzic:** zloto: zamek -buy, miasto +buy -sell, zamek +sell -place (place do kiesy) - suma zerowa; towary: polka -surowiec +towar (ramka FTownCraft - kontrola ksiegi 0). Skala mala (2-6 szt./d na zamek); kolizja z warsztatami miasta (ten sam surowiec z polki) - obserwowac "bez surowca na polce". Decyzja domyslna (noc 13.11): limit 2 x poziom, place 60% marzy.
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-a (13.11) - zaklady przy zasobach okolicy: kopalnie (miasto, zamek) tylko przy zlozu, stadnina tylko przy pastwisku, poziom stadniny = szansa przychowku
 
 **Problem:** Jeff 13.11: "Mines rob od razu i tylko tam gdzie jest zloze, jesli nie ma budynku mines to nie ma wydobycia ... im wiekszy poziom mines tym wiecej osob moze pracowac"; "Castle mines ... jesli okolica nie ma zasobow to nie mozna budowac"; "warhorse studs rob od razu". Audyt 12.11: kopalnie BK stawiane wszedzie (AI losuje), stadnina 2% stale (poziom podnosil tylko limit).

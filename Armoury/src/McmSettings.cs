@@ -12936,6 +12936,10 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Works { get; set; } = true;
 
+        [SettingPropertyBool("Buildings338 Castle Craftsmen", HintText = "With Buildings338: the Craftsmen's Quarters of a castle put the craftsmen of the castle to work - each day they buy raw goods that the castle's own villages produce (wool, flax, hides, hardwood, iron) from the shelf of the district's market town and sell back cloth, linen, leather, planks or tools, up to 2 pieces per level. The castle pays for the raw goods and the town pays for the wares; 60% of the margin is the craftsmen's pay, the rest is the lord's tax. Off = the building gives nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338CastleCraftsmen { get; set; } = true;
+
         [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338CastleMines { get; set; } = true;
@@ -16225,6 +16229,7 @@ namespace Armoury
             s.Buildings338VillageGoods = Buildings338VillageGoods;
             s.Buildings338Studs = Buildings338Studs;
             s.Buildings338Works = Buildings338Works;
+            s.Buildings338CastleCraftsmen = Buildings338CastleCraftsmen;
             s.Buildings338CastleMines = Buildings338CastleMines;
             s.GoldForecastReal = GoldForecastReal;
             s.GoldDailySummary = GoldDailySummary;

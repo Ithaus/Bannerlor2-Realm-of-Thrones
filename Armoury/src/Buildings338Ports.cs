@@ -135,7 +135,7 @@ namespace Armoury
         }
 
         /// <summary>338d: miasto handlowe okregu zamku - TradeBound pierwszej wsi zamku (jak wsie zamku sprzedaja plony); null - brak.</summary>
-        private static Town MarketTown(Town castle)
+        internal static Town MarketTown(Town castle)
         {
             var st = castle != null ? castle.Settlement : null;
             if (st == null || st.BoundVillages == null) return null;
