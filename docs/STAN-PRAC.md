@@ -1,5 +1,14 @@
 # Stan prac - przekazanie dla drugiego konta (2026-10-07 02:47: W GRZE 101-107 + GRUPA TOWARY 2 = 115-120, NIEPRZETESTOWANE - czeka na test Jeffa: nowa kampania 20 dob, potem --grupa 2b)
 
+## STAN 13.11 03:40 - WGRANIE 221 (noc 13.11: lucznicy 469-q/r/s, oblezenia 471a/471b, mury 472/475, Mason i sufit zoldu 473, budynki 476-a..g, wsie poboczne i karczmy 474 P1-P10, runda 1 po tescie 120 dob)
+
+- **W grze:** Armoury.dll `e78cf95920ab07210affc55c88df8316` (galaz `noc/367c-jeniec-po-odejsciu`, commit `dbfee276`, wypchniety). Pliki danych 474 w Modules/Armoury: `GUI/Prefabs/ArmVillageNameLabels.xml`, `ModuleData/arm_tavern_lines.tsv`, `ModuleData/arm_tavern_talk.tsv` (kopie D:/Backup-Bannerlord/wgrane/2026-11-13-pliki-474). Kopie DLL: `Armoury.dll.bak-2026-11-13-przed-wgranie221`, `D:/Backup-Bannerlord/wgrane/2026-11-13-wgranie221(-przed)`.
+- **Jeff (noc 13.11):** "nie przestawaj az nie skonczysz najwyzej podmien defaultowe decyzje"; "rob testy 120 dniowe ... az wszystko bedzie dzialac idealnie". Decyzje domyslne w CHANGELOG ("decyzja domyslna (noc 13.11)").
+- **Testy:** at-471n (90 dob nowa kampania) OK; at-120a (120 dob nowa kampania klasyczna, bez prologu) OK, 0 wyjatkow, potkniecia 0, zloto swiata stale - analiza docs/ANALIZA-120A-2026-11-13.md; at-476b (bitwy) OK po poprawce 476-p7 (TargetException panszczyzny); at-474b WYWROTKA: wnetrze zajazdu - NRE AnimationPoint.SetAgentItemVisibility przy koncu misji + test otwieral wnetrze po bitwie -> naprawione 474-P8-p5; at-474c (bitwy + 3 spacery po wsiach) OK, 7/7, bledy 23. Wnetrze zajazdu w at-474c NIE weszlo (brak spokojnej chwili przy zajezdzie) - niesprawdzone w grze.
+- **Lucznicy:** strzaly poza zasiegiem G spadly z ok. 100% (sr. 380 m) do kilku-kilkuset na bitwe (at-474c: 11 / 0 / 3 / 0 / 25 / 139 piechota / 108 gracz). Dalej do zbadania.
+- **Runda 1 po at-120a:** R2 log weta 334 tylko ocena > 0; R3 oblezenia - odstapienie tylko przed odsiecza < 3 doby, zegar 471 stoi tylko przy silnej bliskiej odsieczy (max 30 dob); R4 kopalnie na starcie, histereza miejsca kultu, powod stojacych budow; R5 pomiar nowych lordow. R6: wojna Dorzecza - ROTStorylineWars dzien 30 x4.33 = ok. 130 doba (nie blad). R1: brak materialu (kamien/glina/marmur) - sygnal prawdziwy; L6 nie przestawia wsi na kamien - do zbadania.
+- **W toku:** test 120 dob od PROLOGU (at-120b, flagi armoury-prolog / wies-spacer / zajazd-wnetrze) -> analiza -> runda 2.
+
 ## STAN 13.11 00:15 - WGRANIE 220 (470-a/b/p: sygnal niedoboru - S_stos 221 tylko przy pustym stosie < 5 dni, male braki jedzenia < 2 szt./d poza N przy braku swiata < 5 szt./d)
 
 - **W grze:** Armoury.dll `78154f9c1d1fd552324d9fa81a358fbd` (galaz `noc/470-sygnal`, commit `b4075330`, wypchniety; = WGRANIE 219 + 470). Kopie: `Armoury.dll.bak-2026-11-13-przed-wgranie220`, `D:/Backup-Bannerlord/wgrane/2026-11-13-wgranie220(-przed)`. Zapis: `at-470-po-tescie.sav`.
