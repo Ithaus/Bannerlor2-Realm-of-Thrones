@@ -481,6 +481,86 @@ namespace Armoury
             return sb.ToString();
         }
 
+        // 479-i (noc 13.11, sam pomiar): linia "KS: popyt miesa (479-i)" - na rynek W/E dla miesa, zboza, sera, masla i ryb: popyt Planu D (kg/d i szt./d - kg / (sigma x
+        // kg sztuki ZC4), ten sam dzielnik co TownItems w grze), popyt przy cenach startu (bez narzutu miast), narzut Mu, podaz, zjedzone w okregach, podaz i popyt na targ,
+        // cena cienia. Tylko odczyt wyniku Planu i jego wejscia - bez ponownej rownowagi.
+        // Popyt przy cenach startu: D Planu pochodzi z t.Need miast po przedostatniej rundzie kroku 8 (drabina z narzutem - UnpaidToNeed); ostatnia runda liczy te sama
+        // drabine przy cenach startu do gry (ClearTownExport -> R.TownPaid, R.TownExtra). Tu: kopia t.NeedR8 - niezaplacone przy cenach startu (koszyk klas x (1 - TownPaid))
+        // + dokupiona podstawa (TownExtra), roznica do t.Need dodana do D (Demand jest liniowy w potrzebach dla tych towarow). To przyblizenie: wsie (drabina wsi i praca
+        // domowa) zostaja jak w Planie. Nienaruszony popyt drabiny (x.Dm sprzed kroku 8) nie jest w KsResult - "brak" (Ctx nie wychodzi poza Solve)
+        private static int _demPlanSt;
+        private static readonly int[] DemPlanGoods = { KsTab.GMeat, KsTab.GGrain, KsTab.GCheese, KsTab.GButter, KsTab.GFish };
+        private static string DemandPlanLine(KsResult r, KsInput inp)
+        {
+            if (r == null || r.Error != null || r.P == null || r.S == null || r.D == null) return null;
+            int NG = KsTab.NG, NZ = KsBasket.N;
+            var dd = new double[2 * NG]; int nT = 0, nSkip = 0;
+            bool startOk = inp != null && inp.Towns != null && r.TownPaid != null;
+            if (startOk)
+            {
+                var tq = new double[NZ]; var us = new double[NZ]; var ex = new double[NZ]; var n = new double[KsTab.NN];
+                foreach (var t in inp.Towns)
+                {
+                    try
+                    {
+                        float[] fp;
+                        if (t == null || t.Id == null || t.Need == null || t.NeedR8 == null || t.Budget == null || t.ClassNeed == null || t.Budget.Length < 3 || t.ClassNeed.Length < 3
+                            || !r.TownPaid.TryGetValue(t.Id, out fp) || fp == null) { nSkip++; continue; }
+                        Array.Clear(tq, 0, NZ); Array.Clear(us, 0, NZ); Array.Clear(ex, 0, NZ);
+                        for (int c = 0; c < 3; c++) { if (t.ClassNeed[c] == null) continue; double fk; KsBasket.TownKg(t.ClassNeed[c], 0.0, tq, out fk); }
+                        for (int z = 0; z < NZ && z < fp.Length; z++) us[z] = tq[z] * (1.0 - Math.Max(0.0, Math.Min(1.0, fp[z])));
+                        float[] fx;
+                        if (inp.CheapBasket && r.TownExtra != null && r.TownExtra.TryGetValue(t.Id, out fx) && fx != null)
+                            for (int z = 0; z < NZ && z < fx.Length; z++) ex[z] = Math.Max(0.0, fx[z]) * tq[z];
+                        Array.Copy(t.NeedR8, n, KsTab.NN);
+                        KsCore.UnpaidToNeed(n, us, true);
+                        if (inp.CheapBasket) KsCheap.ExtraToNeed(n, ex);
+                        int o = (t.Market == 0 ? 0 : 1) * NG;
+                        dd[o + KsTab.GMeat] += n[KsTab.NMeat] - t.Need[KsTab.NMeat];
+                        dd[o + KsTab.GFish] += n[KsTab.NFish] - t.Need[KsTab.NFish];
+                        dd[o + KsTab.GCheese] += n[KsTab.NCheese] - t.Need[KsTab.NCheese];
+                        dd[o + KsTab.GButter] += n[KsTab.NButter] - t.Need[KsTab.NButter];
+                        dd[o + KsTab.GGrain] += (n[KsTab.NG_] - t.Need[KsTab.NG_]) + (n[KsTab.NBeer] - t.Need[KsTab.NBeer]) * KsTab.BeerGrain;
+                        nT++;
+                    }
+                    catch { _demPlanSt++; nSkip++; }
+                }
+            }
+            double sig = Math.Max(1, DailyLife.KsSigma); var zkg = _zKg;
+            var sb = new StringBuilder(2000);
+            sb.Append(PK).Append("popyt miesa (479-i) plan doba ").Append(_wDay)
+              .Append(" (sam pomiar; kg/d i szt./d = kg / (sigma ").Append(sig.ToString("0", Inv)).Append(" x kg sztuki ZC4); zboze = ziarno z chlebem, plackiem i piwem; popyt przy cenach startu = D + roznica potrzeb miast")
+              .Append(" (drabina klas przy cenach startu - TownPaid/TownExtra, ktore idzie do gry - wobec drabiny z narzutem Planu), miast ").Append(nT).Append(", pominiete ").Append(nSkip)
+              .Append(startOk ? "" : " - brak wejscia albo TownPaid").Append("; popyt drabiny przed krokiem 8 (x.Dm) brak - nie ma go w wyniku Planu)");
+            for (int m = 0; m < 2; m++)
+            {
+                sb.Append(" | ").Append(r.Markets[m]).Append(":");
+                bool f = true;
+                foreach (int g in DemPlanGoods)
+                {
+                    try
+                    {
+                        int i = m * NG + g; int z = DemZ(g);
+                        double kpp = zkg != null && z >= 0 && z < zkg.Length && zkg[z] > 0 ? sig * zkg[z] : double.NaN;
+                        double D = r.D[i], S = r.S[i], E = r.Eaten != null && i < r.Eaten.Length ? r.Eaten[i] : double.NaN;
+                        double D0 = startOk ? D + dd[i] : double.NaN;
+                        double mu = r.Mu != null && i < r.Mu.Length ? r.Mu[i] : double.NaN;
+                        sb.Append(f ? " " : "; ").Append(KsTab.Goods[g]).Append(" popyt Planu ").Append(F0(D)).Append(" kg (").Append(F0(D / kpp)).Append(" szt.)")
+                          .Append(", przy cenach startu ").Append(startOk ? F0(D0) + " kg (" + F0(D0 / kpp) + " szt.)" : "brak")
+                          .Append(", narzut x").Append(double.IsNaN(mu) ? "brak" : mu.ToString("0.000", Inv))
+                          .Append(", podaz ").Append(F0(S)).Append(" kg, zjedzone w okregach ").Append(F0(E))
+                          .Append(", na targ: podaz ").Append(F0(S - E)).Append(" kg (").Append(F0((S - E) / kpp)).Append(" szt.), popyt ").Append(F0(D - E)).Append(" kg (").Append(F0((D - E) / kpp)).Append(" szt.)")
+                          .Append(startOk ? ", popyt przy cenach startu " + F0(D0 - E) + " kg (" + F0((D0 - E) / kpp) + " szt.)" : "")
+                          .Append(", cena cienia ").Append(r.P[i].ToString("0.000", Inv));
+                    }
+                    catch { _demPlanSt++; }
+                    f = false;
+                }
+            }
+            sb.Append(" | potkniecia linii ").Append(_demPlanSt).Append(" | gra bez zmian.");
+            return sb.ToString();
+        }
+
         private static void PlanLines(int day, KsResult r, KsInput inp)
         {
             if (r.Error != null)
@@ -579,6 +659,7 @@ namespace Armoury
                 Log.Info(c.ToString());
             }
             try { string ml = MeatPlanLine(r); if (ml != null) Log.Info(ml); } catch { _meatPlanSt++; }   // 479-h: sam pomiar
+            try { string dl = DemandPlanLine(r, inp); if (dl != null) Log.Info(dl); } catch { _demPlanSt++; }   // 479-i: sam pomiar
             var w = new StringBuilder(1500);
             w.Append(PK).Append("zajecia (plan doba ").Append(_wDay).Append(", tys. rak):");
             var order = new List<int>(); for (int c = 0; c < KsTab.NC; c++) if (r.CraftLabour[c] >= 500) order.Add(c);

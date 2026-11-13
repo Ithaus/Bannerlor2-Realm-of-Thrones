@@ -465,6 +465,7 @@ namespace Armoury
               .Append(" | czas ").Append(ms.ToString("0.0", inv)).Append(" ms | potkniecia ").Append(_f20Stum).Append('.');
             Log.Info(sb.ToString());
             try { Log.Info(MeatOwnLine(today)); } catch { _meatOwnSt++; }   // 479-h: sam pomiar
+            try { Log.Info(DemandShelfLine(today)); } catch { _demShelfSt++; }   // 479-i: sam pomiar
             _f20Stum = 0;
         }
 
@@ -475,6 +476,7 @@ namespace Armoury
         {
             var inv = CultureInfo.InvariantCulture;
             var a = new double[2 * 9]; var nv = new int[2];
+            var tf = new double[2 * MeatTfN]; var ra = new double[2 * MeatRaN]; var nr = new int[2];   // 479-i
             // [m * 9 + k]: 0 zywiec produkcja, 1 zywiec zjedzony, 2 zywiec na targ, 3 mieso produkcja, 4 mieso zjedzone, 5 mieso na targ, 6 potrzeba miesa z wlasnego pola, 7 hog na targ, 8 hog zjedzony
             int[] live = { KsDeliver.ICow, KsDeliver.IHog, KsDeliver.ISheep }, meat = { KsDeliver.IMeat, KsDeliver.IWhaleMeat };
             if (_live != null)
@@ -482,7 +484,9 @@ namespace Armoury
                 {
                     try
                     {
-                        if (ld == null || ld.TF || ld.Res == null) continue;
+                        if (ld == null || ld.Res == null) continue;
+                        if (ld.TF) { MeatTfAdd(ld, tf); continue; }                              // 479-i: pola mieszczan osobno (dawne kolumny - tylko wsie jak w 479-h)
+                        MeatRateAdd(ld, ra, nr);                                              // 479-i: stawka wsi po Buildings338Village.ScaleRates (to, co gra dostaje)
                         var r = ld.Res; int o = (ld.Market == 0 ? 0 : 1) * 9;
                         nv[o / 9]++;
                         foreach (int i in live) { a[o + 0] += r.Prod[i]; a[o + 1] += r.Own[i]; a[o + 2] += r.MarketKg[i]; }
@@ -505,7 +509,169 @@ namespace Armoury
                   .Append("; mieso i wieloryb produkcja ").Append(a[o + 3].ToString("0", inv)).Append(", na wlasny stol ").Append(a[o + 4].ToString("0", inv)).Append(", na targ ").Append(a[o + 5].ToString("0", inv))
                   .Append("; potrzeba miesa z wlasnego pola ").Append(a[o + 6].ToString("0", inv));
             }
+            // 479-i: pola mieszczan (ld.TF) i stawki wsi po ScaleRates (drogi, budynki BK, 338c) - w sztukach gry na dobe i w kg (kg na sztuke z rachunku okregu)
+            for (int m = 0; m < 2; m++)
+            {
+                int o = m * MeatTfN, q = m * MeatRaN;
+                sb.Append(m == 0 ? " | 479-i Westeros" : " | 479-i Essos")
+                  .Append(": pola mieszczan (okregow ").Append(tf[o + 8].ToString("0", inv)).Append(") zywiec produkcja ").Append(tf[o].ToString("0", inv)).Append(" kg, na targ ").Append(tf[o + 1].ToString("0", inv))
+                  .Append(" kg (").Append(tf[o + 2].ToString("0.0", inv)).Append(" szt., x beta rampy ").Append(tf[o + 3].ToString("0.0", inv)).Append(" szt.)")
+                  .Append(", mieso i wieloryb produkcja ").Append(tf[o + 4].ToString("0", inv)).Append(" kg, na targ ").Append(tf[o + 5].ToString("0", inv))
+                  .Append(" kg (").Append(tf[o + 6].ToString("0.0", inv)).Append(" szt., x beta rampy ").Append(tf[o + 7].ToString("0.0", inv)).Append(" szt.)")
+                  .Append("; stawki wsi po ScaleRates (wsi ze stawka ").Append(nr[m]).Append(") zywiec ").Append(ra[q].ToString("0.0", inv)).Append(" szt. = ").Append(ra[q + 1].ToString("0", inv))
+                  .Append(" kg (= mieso ").Append((ra[q + 1] * KsTab.MeatOfLive).ToString("0", inv)).Append("), x beta rampy ").Append(ra[q + 2].ToString("0.0", inv)).Append(" szt.")
+                  .Append(", mieso i wieloryb ").Append(ra[q + 3].ToString("0.0", inv)).Append(" szt. = ").Append(ra[q + 4].ToString("0", inv)).Append(" kg, x beta rampy ").Append(ra[q + 5].ToString("0.0", inv)).Append(" szt.")
+                  .Append("; dodatek ScaleRates wobec rachunku okregu: zywiec ").Append(F20Sg(ra[q + 1] - ra[q + 6], inv)).Append(" kg, mieso ").Append(F20Sg(ra[q + 4] - ra[q + 7], inv)).Append(" kg");
+            }
+            sb.Append(" (beta < 1 - rampa: gra miesza (1 - beta) x lancuch gry + beta x stawka; czesc lancucha gry tu niewidoczna)");
             sb.Append(" | potkniecia pomiaru ").Append(_meatOwnSt).Append(" | gra bez zmian.");
+            return sb.ToString();
+        }
+
+        // 479-i (noc 13.11, sam pomiar): pola mieszczan - [m * MeatTfN + k]: 0 zywiec produkcja kg, 1 zywiec na targ kg, 2 zywiec na targ szt., 3 to samo x beta (DeliverTownFields),
+        // 4 mieso produkcja kg, 5 mieso na targ kg, 6 mieso na targ szt., 7 to samo x beta, 8 okregow. Tylko odczyt ld.Res
+        private const int MeatTfN = 9, MeatRaN = 8;
+        private static readonly int[] MeatLiveIx = { KsDeliver.ICow, KsDeliver.IHog, KsDeliver.ISheep }, MeatMeatIx = { KsDeliver.IMeat, KsDeliver.IWhaleMeat };
+        private static void MeatTfAdd(LiveDist ld, double[] tf)
+        {
+            try
+            {
+                var r = ld.Res; int m = ld.Market == 0 ? 0 : 1; int o = m * MeatTfN;
+                tf[o + 8] += 1;
+                foreach (int i in MeatLiveIx) { tf[o] += r.Prod[i]; tf[o + 1] += r.MarketKg[i]; tf[o + 2] += r.Market[i]; tf[o + 3] += r.Market[i] * Beta(m, i); }
+                foreach (int i in MeatMeatIx) { tf[o + 4] += r.Prod[i]; tf[o + 5] += r.MarketKg[i]; tf[o + 6] += r.Market[i]; tf[o + 7] += r.Market[i] * Beta(m, i); }
+            }
+            catch { _meatOwnSt++; }
+        }
+
+        // 479-i (noc 13.11, sam pomiar): stawka wsi _rates[V].A (sztuki gry na dobe po Buildings338Village.ScaleRates - to bierze ProdStep) - [m * MeatRaN + k]:
+        // 0 zywiec szt., 1 zywiec kg, 2 zywiec szt. x beta, 3 mieso szt., 4 mieso kg, 5 mieso szt. x beta, 6 zywiec kg z rachunku okregu (MarketKg), 7 mieso kg z rachunku.
+        // kg na sztuke = MarketKg / Market rachunku okregu (sigma x kg sztuki, ten sam dzielnik co stawka); bez towaru na targ - sigma x waga sztuki gry. Tylko odczyt
+        private static void MeatRateAdd(LiveDist ld, double[] ra, int[] nr)
+        {
+            try
+            {
+                var rates = _rates; VRate vr;
+                if (ld.V == null || rates == null || !rates.TryGetValue(ld.V, out vr) || vr == null || vr.A == null) return;
+                var r = ld.Res; int m = vr.M == 0 ? 0 : 1; int o = m * MeatRaN;
+                nr[m]++;
+                double sig = Math.Max(1, DailyLife.KsSigma);
+                for (int pass = 0; pass < 2; pass++)
+                    foreach (int i in pass == 0 ? MeatLiveIx : MeatMeatIx)
+                    {
+                        if (i >= vr.A.Length) continue;
+                        double a = Math.Max(0.0, vr.A[i]);
+                        double kpp = r.Market[i] > 1e-12 ? r.MarketKg[i] / r.Market[i] : sig * (_itemKg != null && i < _itemKg.Length ? _itemKg[i] : 10.0);
+                        int b = pass == 0 ? 0 : 3;
+                        ra[o + b] += a; ra[o + b + 1] += a * kpp; ra[o + b + 2] += a * Beta(m, i);
+                        ra[o + 6 + pass] += r.MarketKg[i];
+                    }
+            }
+            catch { _meatOwnSt++; }
+        }
+
+        // 479-i (noc 13.11, sam pomiar): co krok f20 (7 dob) - popyt zaplacony gry, z ktorego idzie cel polki T* (ZTstar x (Q + QV + Der + One), jak w kroku f20),
+        // jego skladniki na dobe, polki, w drodze, zuzycie w ksiedze towarow (ostatnia doba ksiegi i srednia 28 dob sterowania) i popyt ostatniego Planu w tych samych
+        // sztukach (kg / (sigma x kg sztuki ZC4) - ten sam dzielnik co TownItems). Mieso = pozycje meat + WhaleMeat (CtlGood); zboze = tylko pozycja grain (chleb, placek,
+        // piwo poza T* ziarna, a w popycie Planu ziarna sa). Tylko odczyt - nic nie zmienia
+        private static int _demShelfSt;
+        private static readonly int[] DemGoods = { KsTab.GMeat, KsTab.GGrain, KsTab.GCheese, KsTab.GButter, KsTab.GFish };
+        private static readonly Dictionary<string, long[]> _demLedger = new Dictionary<string, long[]>(StringComparer.Ordinal);
+        private static int DemZ(int g)
+        {
+            return g == KsTab.GMeat ? ZMeat : g == KsTab.GGrain ? ZGrain : g == KsTab.GCheese ? ZCheese : g == KsTab.GButter ? ZButter : g == KsTab.GFish ? ZFish : -1;
+        }
+
+        private static string DemandShelfLine(int today)
+        {
+            var inv = CultureInfo.InvariantCulture; int NG = KsTab.NG;
+            var sb = new StringBuilder(2500);
+            sb.Append("Jedzenie KS (479-i): popyt a polki dzien ").Append(today)
+              .Append(" (sam pomiar; szt./d: popyt zaplacony gry = Q lud miasta + QV wsie kupujace + Der wsad przetworow + One 1:1, T* = suma dni polki x popyt; polki, w drodze KS-H w szt.;")
+              .Append(" ksiega - zuzycie z targu rynku i produkcja na targ ostatniej doby ksiegi; srednia 28 dob - zuzycie i brak sterowania rynku; Plan - popyt ostatniego Planu kg/d i szt./d)");
+            var map = _zt;
+            if (map == null || map.Count == 0) { sb.Append(" | brak mapy koszyka ZC4 | potkniecia pomiaru ").Append(_demShelfSt).Append(" | gra bez zmian."); return sb.ToString(); }
+            var q = new double[2 * NG]; var qv = new double[2 * NG]; var der = new double[2 * NG]; var one = new double[2 * NG];
+            var tt = new double[2 * NG]; var sh = new double[2 * NG]; var rd = new double[2 * NG]; var nTown = new int[2];
+            foreach (var zt in map.Values)
+            {
+                try
+                {
+                    if (zt == null || zt.St == null) continue;
+                    int m = zt.Market == 0 ? 0 : 1; nTown[m]++;
+                    for (int z = 0; z < ZN; z++)
+                    {
+                        int g = CtlGood(z); if (g < 0) continue;
+                        int i = m * NG + g;
+                        q[i] += zt.Q[z]; qv[i] += zt.QV[z]; der[i] += zt.Der[z]; one[i] += zt.One[z];
+                        double dp = zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z];
+                        if (dp > 0 && !double.IsNaN(dp) && !double.IsInfinity(dp)) tt[i] += ZTstar(m, z) * dp;
+                        sh[i] += Math.Max(0, zt.Cnt[z]);
+                        int inc = 0; try { inc = KsFoodCarts.Incoming(zt.St, z); } catch { inc = 0; _demShelfSt++; }
+                        rd[i] += Math.Max(0, inc);
+                    }
+                }
+                catch { _demShelfSt++; }
+            }
+            // ksiega towarow (GoodsLedger.KsMarketTake: [0 + m] produkcja na targ m, [3 + m] zuzycie z targu m) - kopia liczb ostatniej doby ksiegi
+            var lp = new double[2 * NG]; var lc = new double[2 * NG]; int lday = -1;
+            try
+            {
+                lday = GoodsLedger.KsMarketTake(_demLedger);
+                if (lday >= 0)
+                    foreach (var kv in _demLedger)
+                    {
+                        int z = Array.IndexOf(ZIds, kv.Key); if (z < 0) continue;
+                        int g = CtlGood(z); if (g < 0 || kv.Value == null || kv.Value.Length < 5) continue;
+                        for (int m = 0; m < 2; m++) { lp[m * NG + g] += Math.Max(0, kv.Value[m]); lc[m * NG + g] += Math.Max(0, kv.Value[3 + m]); }
+                    }
+            }
+            catch { lday = -1; _demShelfSt++; }
+            var pl = _plan; double sig = Math.Max(1, DailyLife.KsSigma); var zkg = _zKg;
+            string[] mn = { "Westeros", "Essos" };
+            for (int m = 0; m < 2; m++)
+            {
+                sb.Append(" | ").Append(mn[m]).Append(" (miast ").Append(nTown[m]).Append("):");
+                bool f = true;
+                foreach (int g in DemGoods)
+                {
+                    try
+                    {
+                        int i = m * NG + g; double dp = q[i] + qv[i] + der[i] + one[i];
+                        int z = DemZ(g);
+                        bool kz = zkg != null && z >= 0 && z < zkg.Length && zkg[z] > 0;
+                        sb.Append(f ? " " : "; ").Append(KsTab.Goods[g]).Append(" popyt zaplacony ").Append(dp.ToString("0", inv))
+                          .Append(" (Q ").Append(q[i].ToString("0", inv)).Append(", QV ").Append(qv[i].ToString("0", inv)).Append(", Der ").Append(der[i].ToString("0", inv)).Append(", One ").Append(one[i].ToString("0", inv))
+                          .Append("), T*/7 ").Append((tt[i] / 7.0).ToString("0", inv)).Append(" (T* ").Append(tt[i].ToString("0", inv)).Append(", dni polki ").Append(dp > 0 ? (tt[i] / dp).ToString("0.0", inv) : "-")
+                          .Append("), polki ").Append(sh[i].ToString("0", inv)).Append(", w drodze ").Append(rd[i].ToString("0", inv));
+                        if (lday >= 0) sb.Append(", ksiega doba ").Append(lday).Append(": zuzycie ").Append(lc[i].ToString("0", inv)).Append(", produkcja ").Append(lp[i].ToString("0", inv));
+                        else sb.Append(", ksiega brak");
+                        sb.Append(", srednia 28 dob: zuzycie ").Append(_c28[i].ToString("0", inv)).Append(", brak ").Append(_u28[i].ToString("0", inv));
+                        if (pl != null && pl.D != null && i < pl.D.Length)
+                        {
+                            double kg = pl.D[i];
+                            sb.Append(", Plan popyt ").Append(kg.ToString("0", inv)).Append(" kg");
+                            if (kz) sb.Append(" (").Append((kg / (sig * zkg[z])).ToString("0", inv)).Append(" szt.)");
+                            if (pl.Eaten != null && i < pl.Eaten.Length)
+                            {
+                                double mk = Math.Max(0.0, kg - pl.Eaten[i]);
+                                sb.Append(", Plan popyt na targ ").Append(mk.ToString("0", inv)).Append(" kg");
+                                if (kz) sb.Append(" (").Append((mk / (sig * zkg[z])).ToString("0", inv)).Append(" szt.)");
+                            }
+                        }
+                        else sb.Append(", Plan brak");
+                    }
+                    catch { _demShelfSt++; }
+                    f = false;
+                }
+            }
+            sb.Append(" | sigma ").Append(sig.ToString("0", inv)).Append(", kg na sztuke ZC4:");
+            for (int k = 0; k < DemGoods.Length; k++)
+            {
+                int z = DemZ(DemGoods[k]);
+                sb.Append(k == 0 ? " " : ", ").Append(ZIds[z]).Append(' ').Append(zkg != null && z >= 0 && z < zkg.Length ? zkg[z].ToString("0.00", inv) : "-");
+            }
+            sb.Append(" | potkniecia pomiaru ").Append(_demShelfSt).Append(" | gra bez zmian.");
             return sb.ToString();
         }
 
