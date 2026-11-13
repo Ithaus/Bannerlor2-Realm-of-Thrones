@@ -55,6 +55,32 @@ namespace Armoury
         private const string TestFlag = "armoury-zajazd-wnetrze.flag";
         internal const int TopPriority = 2000000000;
         internal static bool Active;
+        private static long _activeT0;   // 474-P8-p: chwila ustawienia Active (Stopwatch)
+
+        /// <summary>474-P8-p (recenzja A2): Active, ktore zostalo po scenie, ktora nie wstala (blad ladowania sceny po OpenNew - OnEndMission nie przyjdzie),
+        /// zdejmowane przy odczycie: po ponad 5 s od otwarcia, gdy nie ma misji, stan gry to mapa i nie ma ekranu ladowania. Liczone tylko przy odczycie
+        /// (warunek menu, test) - nic na tick.</summary>
+        internal static bool Busy
+        {
+            get
+            {
+                if (Active && Stuck(_activeT0)) { Active = false; try { Log.Info(P + "flaga wnetrza zdjeta - scena nie wstala (brak misji na mapie ponad 5 s po otwarciu)."); } catch { } }
+                return Active;
+            }
+        }
+
+        /// <summary>474-P8-p: wspolne dla wnetrza zajazdu i spaceru po wiosce (SideVillageVisit.WalkBusy).</summary>
+        internal static bool Stuck(long t0)
+        {
+            try
+            {
+                if (System.Diagnostics.Stopwatch.GetTimestamp() - t0 < System.Diagnostics.Stopwatch.Frequency * 5) return false;
+                if (Mission.Current != null || LoadingWindow.IsLoadingWindowActive) return false;
+                var gsm = GameStateManager.Current;
+                return gsm != null && gsm.ActiveState is TaleWorlds.CampaignSystem.GameState.MapState;
+            }
+            catch { return false; }
+        }
         internal static bool On { get { var s = Settings.Current; return s != null && s.RoadsideInnInterior && RoadsideInns.On; } }
         private static int _opened, _st, _dTalk, _dAle, _dBeds;
         private static readonly HashSet<string> _err = new HashSet<string>(StringComparer.Ordinal);
@@ -114,7 +140,7 @@ namespace Armoury
             if (mp.MapEvent != null || mp.SiegeEvent != null || PlayerEncounter.Current != null) return "Not while in a battle or siege.";
             if (mp.CurrentSettlement != null) return "Leave the settlement first.";
             if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress) return "Only on land.";
-            if (Mission.Current != null || Active || CampWalk.Active || SideVillageVisit.WalkActive) return "Already in a scene.";
+            if (Mission.Current != null || Busy || CampWalk.Active || SideVillageVisit.WalkBusy) return "Already in a scene.";
             if (!Hero.MainHero.IsAlive || Hero.MainHero.IsPrisoner) return "Not now.";
             string barred = TownInns.RoadDrinkBarred(inn);
             if (barred != null) return barred;
@@ -135,6 +161,7 @@ namespace Armoury
                 string scene = SceneFor(inn, out from, out level);
                 if (string.IsNullOrEmpty(scene)) { Log.Player("The inn is shut.", true); Log.Info(P + "brak sceny karczmy dla " + inn.Name + " (" + inn.Uid + ", kultura " + CultOf(inn) + ")."); return; }
                 Active = true;
+                _activeT0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 _opened++;
                 InnInteriorLogic.Setup(inn, scene, from, test);
                 string levels = "";
@@ -393,7 +420,7 @@ namespace Armoury
                 _tState = 1;
                 Log.Info(P + "test - plik " + TestFlag + ": do 2 wejsc (najblizszy zajazd od partii), kazde przy wolnej chwili na mapie po wyjsciu z osady, wyjscie po 8 s.");
             }
-            if (Active) return;
+            if (Busy) return;
             string why = TestGate();
             if (why == null)
             {
@@ -437,7 +464,7 @@ namespace Armoury
             if (InformationManager.IsAnyInquiryActive()) return "okno (zapytanie)";
             if (mp == null || mp.MapEvent != null || mp.SiegeEvent != null || PlayerEncounter.Current != null) return "bitwa / spotkanie";
             if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress) return "na morzu";
-            if (Mission.Current != null || CampWalk.Active || SideVillageVisit.WalkActive) return "inna scena";
+            if (Mission.Current != null || CampWalk.Active || SideVillageVisit.WalkBusy) return "inna scena";
             return null;
         }
     }

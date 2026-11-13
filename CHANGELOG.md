@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 474-P8-p / 474-P7-p (13.11) - wnetrze zajazdu i spacer po wiosce: flaga "w scenie" zdejmowana, gdy scena nie wstala (poprawka po recenzji A2)
+
+**Problem:** recenzja A2 (kod): `RoadsideInnInterior.Active` i `SideVillageVisit.WalkActive` sa ustawiane przed `MissionState.OpenNew`, a zdejmuje je tylko `OnEndMission` logiki misji albo wyjatek w samym `Open`. Gdy scena nie wstanie po `OpenNew` (np. blad ladowania sceny ROT), flaga zostaje do konca sesji - "Enter the Inn" i "Walk through the village" szare z "Already in a scene.", test autotestu czeka bez konca.
+
+**Przyczyna:** brak drogi zdjecia flagi poza `OnEndMission`.
+
+**Zmiana:** nowe `RoadsideInnInterior.Busy` i `SideVillageVisit.WalkBusy` (odczyt flagi): jesli flaga stoi ponad 5 s od otwarcia, nie ma misji, stan gry to mapa i nie ma ekranu ladowania (`RoadsideInnInterior.Stuck`) - flaga zdjeta z linia logu. Uzyte w warunkach menu (`Block`, `WalkBlock`), bramce testu i w krzyzowych sprawdzeniach "inna scena". Liczone tylko przy odczycie (warunek menu, test) - nic na tick. `CampWalk.Active` nietkniety (inny mod kodu, nie zglaszany).
+
+**Ryzyko / co sprawdzic:** w trakcie misji `Mission.Current != null` -> flaga nie jest ruszana; po zwyklym wyjsciu `OnEndMission` zdejmuje ja jak dotad. Klucze NIE - opcje i tak nie istnieja. Nowe linie logu (tylko przy usterce): `Wnetrze zajazdu (474-P8): flaga wnetrza zdjeta - scena nie wstala ...`, `Spacer po wiosce (474-P7): flaga spaceru zdjeta - ...`.
+
+**Status:** DO SPRAWDZENIA (zbudowane, nie wgrane).
+
 ## 474-P8b-p (13.11) - dzwiek karczmy na mapie: zwolnienie przy koncu gry, sprawdzenie IsValid, cisza pod menu Esc (poprawka po recenzji A1)
 
 **Problem:** recenzja A1 (kod, nie gra - 474-P8b nie byl jeszcze uruchomiony): zrodlo `tavern_exterior` na scenie mapy nie bylo zwalniane przy znikaniu sceny mapy (wyjscie do menu glownego, wczytanie innego zapisu) - `Stop`/`ReleaseById` szly dopiero przy nastepnym takcie albo w `SessionStart` nowej sesji, na zdarzeniu ze zniszczonej sceny, a `FreeNow` wolal `ev.Stop()` bez sprawdzenia `IsValid`. Do tego gwar gral dalej pod menu Esc / encyklopedia nad mapa.

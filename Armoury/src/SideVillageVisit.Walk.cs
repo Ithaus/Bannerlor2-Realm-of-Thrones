@@ -51,6 +51,17 @@ namespace Armoury
         private const string WalkTestFlag = "armoury-wies-spacer.flag";
         internal const int WalkMaxFolk = 20;
         internal static bool WalkActive;
+        private static long _walkT0;   // 474-P7-p: chwila ustawienia WalkActive (Stopwatch)
+
+        /// <summary>474-P7-p (recenzja A2): WalkActive po scenie, ktora nie wstala, zdejmowane przy odczycie (RoadsideInnInterior.Stuck: ponad 5 s, brak misji, mapa).</summary>
+        internal static bool WalkBusy
+        {
+            get
+            {
+                if (WalkActive && RoadsideInnInterior.Stuck(_walkT0)) { WalkActive = false; try { Log.Info(WP + "flaga spaceru zdjeta - scena nie wstala (brak misji na mapie ponad 5 s po otwarciu)."); } catch { } }
+                return WalkActive;
+            }
+        }
         private static int _wOpened, _wSt;
         private static readonly HashSet<string> _wErr = new HashSet<string>(StringComparer.Ordinal);
         // sceny "village_center" wsi gry wedlug kultury (raz na kampanie, leniwie przy pierwszym spacerze): kultura -> (scena, wies) bez powtorzen scen
@@ -113,7 +124,7 @@ namespace Armoury
             if (mp.MapEvent != null || mp.SiegeEvent != null || PlayerEncounter.Current != null) return "Not while in a battle or siege.";
             if (mp.CurrentSettlement != null) return "Leave the settlement first.";
             if (mp.IsCurrentlyAtSea || mp.IsTransitionInProgress) return "Only on land.";
-            if (Mission.Current != null || WalkActive || CampWalk.Active) return "Already in a scene.";
+            if (Mission.Current != null || WalkBusy || CampWalk.Active) return "Already in a scene.";
             if (!Hero.MainHero.IsAlive || Hero.MainHero.IsPrisoner) return "Not now.";
             if (AtWar(st)) return "You are at war with " + Txt(st.MapFaction.Name) + " - the villagers bar their doors against you.";
             if (st.Village != null && st.Village.VillageState == Village.VillageStates.BeingRaided) return "Raiders are on the lands of " + Txt(st.Name) + " - the village is barred and quiet.";
@@ -141,6 +152,7 @@ namespace Armoury
                 VillageBook.PartView me; double homeAll, nAll;
                 double home = PartOf(st, uid, out me, out homeAll, out nAll) ? me.Home : 0.0;
                 WalkActive = true;
+                _walkT0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 _wOpened++;
                 SideVillageWalkLogic.Setup(uid, NameOf(r), st.Culture, home, test);
                 var rec = SandBoxMissions.CreateSandBoxMissionInitializerRecord(scene, "land_raid", false, DecalAtlasGroup.Town);
@@ -254,7 +266,7 @@ namespace Armoury
                 _wTestState = 1;
                 Log.Info(WP + "test - plik " + WalkTestFlag + ": do 3 spacerow (wioski 3 roznych kultur), kazdy przy wolnej chwili na mapie po wyjsciu z osady, wyjscie po 8 s.");
             }
-            if (WalkActive) return;
+            if (WalkBusy) return;
             string why = WalkTestGate();
             if (why == null)
             {
