@@ -613,9 +613,10 @@ namespace Armoury
                 catch (Exception e) { Stumble("ShieldsUp.Zdarzenie", e); }
                 // 310: strzal AI - czysty cel (po 204, ktory moze wziac strzelca; wlasny try w OnShot, niezaleznie od bramki 140).
                 // Poprawka recenzji 310: PO 140 (S2) - 140 czyta cel, w ktory strzala naprawde leci; CleanShot moze go potem zmienic
-                if (clean && q[i].K == 1) CleanShot.OnShot(m, q[i].A, q[i].Thrown);
-                // 469: strzal AI pieszo z luku / kuszy - odleglosc do celu vs zasieg (tylko pomiar; wlasny try w OnShot)
+                // 469-t: 469 PRZED 310 - pomiar odleglosci do celu, w ktory strzala poleciala (310 moze potem przestawic cel na inny; at-474c: strzaly
+                // "poza G" liczone do celu ustawionego przez 310 po strzale)
                 if (range && q[i].K == 1) FireRange469.OnShot(m, q[i].A, q[i].Thrown);
+                if (clean && q[i].K == 1) CleanShot.OnShot(m, q[i].A, q[i].Thrown);
                 q[i].A = null; q[i].V = null;
             }
             if (clean) CleanShot.FrameEnd();

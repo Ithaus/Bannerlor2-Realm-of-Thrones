@@ -73,7 +73,7 @@ namespace Armoury
         // liczniki misji (glowny watek)
         private static int _seen, _checks, _clean, _dirty, _line, _over, _queries, _rays, _stum;
         private static readonly int[] DirtyBy = new int[4], LineBy = new int[4];
-        private static int _newRear, _newRanged, _newOther, _held, _heldInf, _noCand, _shotHeld, _reDirty;
+        private static int _newRear, _newRanged, _newOther, _held, _heldInf, _noCand, _shotHeld, _reDirty, _cutG;
         private static int _relDead, _relTime, _relPanic, _relTaken, _relBanner, _relEnd;
         private static int _relNear, _relWeapon, _relCharge, _holdExt, _holdNear, _skOrder, _threatChecks, _skNear, _skCharge;
         private static int _skPlayer, _skThrown, _skNoTarget, _skHunt, _skBanner, _skPanic, _skDetached, _skObject;
@@ -108,7 +108,7 @@ namespace Armoury
             _frameTicks = _sumTicks = _maxTicks = 0;
             _seen = _checks = _clean = _dirty = _line = _over = _queries = _rays = _stum = 0;
             Array.Clear(DirtyBy, 0, 4); Array.Clear(LineBy, 0, 4);
-            _newRear = _newRanged = _newOther = _held = _heldInf = _noCand = _shotHeld = _reDirty = 0;
+            _newRear = _newRanged = _newOther = _held = _heldInf = _noCand = _shotHeld = _reDirty = _cutG = 0;
             _relDead = _relTime = _relPanic = _relTaken = _relBanner = _relEnd = 0;
             _relNear = _relWeapon = _relCharge = _holdExt = _holdNear = _skOrder = _threatChecks = _skNear = _skCharge = 0;
             _skPlayer = _skThrown = _skNoTarget = _skHunt = _skBanner = _skPanic = _skDetached = _skObject = 0;
@@ -314,6 +314,9 @@ namespace Armoury
             float mr = 0f;
             try { mr = s.GetMissileRange(); } catch { mr = 0f; }
             if (mr > 1f && range > mr) range = mr;
+            // 469-t: przy regule 469 nowy cel nie dalej niz zasieg G strzelca (at-474c: 310 przestawial cel na dalszy szyk, 469 liczyl strzal do niego jako poza G)
+            float g469 = FireRange469.RangeFor(s, 0f);
+            if (g469 > 1f && range > g469) { range = g469; _cutG++; }
             Vec2 sp = s.Position.AsVec2, tp = t.Position.AsVec2;
             Agent tr = t.IsMount ? t.RiderAgent : t;
             var tf = tr != null ? tr.Formation : null;
@@ -672,7 +675,7 @@ namespace Armoury
               .Append(", brudne: klebowisko ").Append(_dirty).Append(" (<10/10-39/40-99/100+ m ").Append(B4(DirtyBy)).Append("), linia zajeta ").Append(_line)
               .Append(" (").Append(B4(LineBy)).Append("), nasz cel znow brudny ").Append(_reDirty)
               .Append(" | reakcja: nowy cel ").Append(_newRear + _newRanged + _newOther).Append(" (tyl szyku ").Append(_newRear).Append(", strzelcy ").Append(_newRanged)
-              .Append(", inny szyk ").Append(_newOther).Append("), bez czystego celu ").Append(_noCand).Append(" (wstrzyman ").Append(_held)
+              .Append(", inny szyk ").Append(_newOther).Append("), bez czystego celu ").Append(_noCand).Append(" (469-t: zasieg kandydatow przyciety do G strzelca ").Append(_cutG).Append(")").Append(" (wstrzyman ").Append(_held)
               .Append(", szyk piechoty bez wstrzymania ").Append(_heldInf).Append("), wstrzymanie sr. ").Append(_holdN > 0 ? (_holdSecs / _holdN).ToString("0.0", Inv) : "-")
               .Append(" s, najdluzsze ").Append(_holdMax.ToString("0.0", Inv)).Append(" s, ludzi wstrzymanych ponad 20 s lacznie ").Append(over20)
               .Append(", strzalow mimo wstrzymania ").Append(_shotHeld).Append(", przedluzen (cel silnika wciaz w klebowisku, do ").Append(HoldMax.ToString("0", Inv))

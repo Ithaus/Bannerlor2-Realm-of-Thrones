@@ -76,6 +76,9 @@ namespace Armoury
         // 469-q-p: NearKeep - strzal po wrogu w 6 m liczony osobno przez tyle s; LowMax - kolejne sekundy "za malo wstrzymanych", po ktorych zastoj / podejscie
         // konczy sie (histereza, recenzja U1)
         internal const float NearKeep = 1.5f;
+        // 469-t: zwolnienie wstrzymanego dopiero przy d <= ReleaseUnder x G (histereza - at-474c: 1810 wstrzyman / 2 ludzi w szyku piechoty, cel silnika skacze
+        // przez granice G co przeglad); strzal 'mimo wstrzymania' w ciagu InFlight s od wstrzymania = cieciwa juz zwolniona (osobny licznik)
+        internal const float ReleaseUnder = 0.92f, InFlight = 1.0f;
         internal const int LowMax = 3;
         internal const int AdvMinMen = 3, CavMinMen = 3, CoverMinMen = 5, SlotTeams = 16;
         internal const int MinPer = 8, MaxPer = 96, NearPer = 16, SimPer = 2, WeapMax = 8;
@@ -183,6 +186,8 @@ namespace Armoury
         private static int _relRange, _relNear, _relWeapon, _relPanic, _relTaken, _relMount, _relForm, _relNoFoe, _relEnd, _relDead;
         private static int _skMount, _skInf, _skDetached, _skObject, _skUsage, _skFormHold, _skPlayer, _skNoAmmo, _skHunt, _skBanner, _skPanic;
         private static int _heldNoTarget, _shots, _shotsOver, _shotsHeld, _shotsNoTarget;
+        private static int _shotsHeldFlight, _shotsHeldMen, _overMen;   // 469-t
+        private static readonly HashSet<Agent> HeldShooters = new HashSet<Agent>(), OverMen = new HashSet<Agent>();
         private static int _heldFoeInG;   // 469-p: wstrzymany choc najblizszy szyk wroga w G (tylko pomiar)
         // 469-q: strzaly poza G (wszystkie / ludzie w regule), pierwszy wrog w G wg strony, podejscia
         private static int _shotsOverG, _shotsOverGRule;
@@ -270,6 +275,7 @@ namespace Armoury
             _relRange = _relNear = _relWeapon = _relPanic = _relTaken = _relMount = _relForm = _relNoFoe = _relEnd = _relDead = 0;
             _skMount = _skInf = _skDetached = _skObject = _skUsage = _skFormHold = _skPlayer = _skNoAmmo = _skHunt = _skBanner = _skPanic = 0;
             _heldNoTarget = _shots = _shotsOver = _shotsHeld = _shotsNoTarget = 0;
+            _shotsHeldFlight = _shotsHeldMen = _overMen = 0; HeldShooters.Clear(); OverMen.Clear();
             Array.Clear(ShotBy, 0, ShotBy.Length);
             _holdSecs = _holdMax = 0f; _holdN = 0;
             for (int i = 0; i < 2; i++) { FvT0[i] = -1f; FvD[i] = FvG[i] = FvNat[i] = 0f; FvN[i] = FvNatN[i] = FvGN[i] = 0; }
@@ -285,6 +291,21 @@ namespace Armoury
         {
             _stum++;
             RoutHold.Stumble(RoutHold.SiteShields, where, e);
+        }
+
+        /// <summary>469-t: zasieg G strzelca (bron w reku albo schowana luk / kusza) dla 310 CleanShot.Pick - nowy cel nie dalej niz G; -1 = 469 nieczynne
+        /// albo bron nieznana / bez budzetu symulacji (310 jak przed). Glowny watek.</summary>
+        internal static float RangeFor(Agent s, float dz)
+        {
+            if (!_live || !_key || s == null) return -1f;
+            try
+            {
+                bool noAmmo;
+                var p = Weapon(s, false, out noAmmo);
+                if (p == null || !p.Ok) return -1f;
+                return Gate(p, dz, true);
+            }
+            catch { return -1f; }
         }
 
         /// <summary>310 (CleanShot.EndHold): czy 469 wciaz trzyma ogien tego czlowieka - wtedy 310 nie przywraca rozkazu szyku.</summary>
@@ -616,7 +637,7 @@ namespace Armoury
             if (d <= g) NoteInG(a, now);
             if (held)
             {
-                if (d <= g) { _relRange++; End(s, now, true); return; }
+                if (d <= g * ReleaseUnder) { _relRange++; End(s, now, true); return; }
                 if (d < ThreatR + 1f || Near(m, a, true)) { _relNear++; NearT[a] = now; End(s, now, true); return; }
                 // 469-q: bez wylacznika zastoju 469-p - szyk, ktory nie podchodzi, podchodzi sam (Forms); czlowiek poza G nie strzela
                 s.G = g;
@@ -805,7 +826,14 @@ namespace Armoury
                     }
                 }
             }
-            if (Holds(s)) _shotsHeld++;
+            if (Holds(s))
+            {
+                _shotsHeld++;
+                St hs;
+                if (By.TryGetValue(s, out hs) && m.CurrentTime - hs.Since <= InFlight) _shotsHeldFlight++;
+                if (HeldShooters.Add(s)) _shotsHeldMen++;
+            }
+            if (g >= 0f && d > g && OverMen.Add(s)) _overMen++;
             p.Shots++;
             if (g >= 0f) { p.GSum += g; p.GN++; }
             if (nat > 0f) { p.NatSum += nat; p.NatN++; }
@@ -865,7 +893,7 @@ namespace Armoury
               .Append("; wstrzymanie powyzej ").Append(HoldOver.ToString("0.0", Inv)).Append(" G, ogien od G)")
               .Append(" | strzaly AI z luku / kuszy pieszo: ").Append(_shots).Append(" (<50/50-99/100-149/150-199/200+ m ")
               .Append(ShotBy[0]).Append('/').Append(ShotBy[1]).Append('/').Append(ShotBy[2]).Append('/').Append(ShotBy[3]).Append('/').Append(ShotBy[4])
-              .Append("), poza ").Append(OldOver.ToString("0.0", Inv)).Append(" G ").Append(_shotsOver).Append(", mimo wstrzymania ").Append(_shotsHeld)
+              .Append("), poza ").Append(OldOver.ToString("0.0", Inv)).Append(" G ").Append(_shotsOver).Append(", mimo wstrzymania ").Append(_shotsHeld).Append(" (469-t: w ciagu ").Append(InFlight.ToString("0.0", Inv)).Append(" s od wstrzymania - cieciwa juz zwolniona ").Append(_shotsHeldFlight).Append(", ludzi ").Append(_shotsHeldMen).Append("; strzelcow poza G ludzi ").Append(_overMen).Append(")")
               .Append(", bez celu ").Append(_shotsNoTarget)
               .Append(" | 469-s: rozkaz ognia szyku nadpisujacy wstrzymanie zablokowany ").Append(Volatile.Read(ref _blocked)).Append(" (latka ").Append(_patchSfo).Append("), wstrzymanych od razu po strzale poza G ").Append(_holdAfterShot)
               .Append(" | 469-r strzaly poza G ").Append(_shotsOverG).Append(": szyk strzelcow AI ").Append(OverG[CAi])

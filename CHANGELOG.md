@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 469-t (13.11) - lucznicy: pomiar strzalu do celu, w ktory strzala poleciala (469 przed 310), nowy cel 310 nie dalej niz G, histereza zwolnienia
+
+**Problem:** autotest at-474c (Armoury-2026-11-13_03-18-26.log, "Ogien w zasiegu (469)"): po 469-s nadal strzaly poza G - bitwa 5 szyk AI 25, bitwa 6 szyk piechoty 139 (wstrzyman 1810 / ludzi 2), bitwa 7 szyk gracza 108; "mimo wstrzymania" 140 / 109 przy "wstrzymanych od razu po strzale" 15 / 17.
+
+**Przyczyna:** (1) ShieldsUp.cs:616-618 - 310 CleanShot.OnShot biegl PRZED FireRange469.OnShot i po strzale w klebowisko przestawial cel strzelca (SetAutomaticTargetSelection(false) + SetTargetAgent na tyl szyku / inny szyk), a 469 liczyl odleglosc strzalu do tego NOWEGO celu - strzaly do celu w G liczone jako poza G. (2) CleanShot.Pick szukal kandydatow do min(1.2 d, natywny zasieg silnika ~295 m) - przy d blisko G nowy cel bywal ponad G (prawdziwe strzaly poza G przy nastepnym strzale). (3) zwolnienie przy d <= G i wstrzymanie przy d > G bez histerezy - cel silnika skakal przez granice, czlowiek byl wstrzymywany i zwalniany co przeglad (1810 / 2 ludzi), strzal szedl tuz po zwolnieniu.
+
+**Zmiana:** ShieldsUp: 469 wolany przed 310. CleanShot.Pick: przy czynnej regule 469 zasieg kandydatow <= G strzelca (nowe FireRange469.RangeFor; brak broni / budzetu = jak przed), licznik "zasieg kandydatow przyciety do G strzelca". FireRange469: zwolnienie wstrzymanego dopiero przy d <= 0.92 G (ReleaseUnder); w linii: strzaly mimo wstrzymania w ciagu 1 s od wstrzymania (cieciwa juz zwolniona - nie do zablokowania z C#) osobno, liczba ludzi strzelajacych mimo wstrzymania i ludzi ze strzalem poza G. Klucze bez zmian (Archers Hold Fire Out Of Range NIE: RangeFor -1, 310 jak przed; kolejnosc wywolan nie zmienia 310 - czyta ten sam cel silnika przed swoja zmiana).
+
+**Ryzyko / co sprawdzic:** w autotescie bitew "poza G ... ma byc 0" ma spasc wyraznie (oczekiwane pojedyncze), "mimo wstrzymania" glownie w 1 s (cieciwa w toku), wstrzyman / ludzi bez ping-pongu (setki, nie tysiace na 2 ludzi). 310: wiecej "bez czystego celu" (krotszy zasieg kandydatow) - wtedy 310 wstrzymuje czlowieka na 3 s jak dotad.
+
+**Status:** DO SPRAWDZENIA
+
 ## 474-P8-p5 (13.11) - wnetrze zajazdu: wywrotka przy koncu misji (NRE AnimationPoint.SetAgentItemVisibility) i zawieszenie testu
 
 **Problem:** autotest at-474b (13.11): 02:49:43 test otworzyl wnetrze The Blind Anvil (vlandia_tavern_interior_a, bywalcy przy stolach 5) tuz po "Leave" z bitwy 2/7; misja nie zamknela sie po 8 s ("po bitwie mapa nie wrocila do spokoju w 300 s ... MissionState"); 03:04 EndGame -> crash-original-2026-11-13_03-04-36.log: NullReferenceException w SandBox.Objects.AnimationPoints.AnimationPoint.SetAgentItemVisibility <- SetAgentItemsVisibility <- AnimationPoint.OnUseStopped <- Agent.StopUsingGameObjectAux <- UsableMachine.OnMissionEnded <- Mission.set_MissionEnded <- Mission.EndMission <- MBGameManager.EndGame (gra zawieszona, zabita recznie).
