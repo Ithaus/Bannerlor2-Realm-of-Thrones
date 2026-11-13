@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 477-e (13.11) - budowy STOI: powod takze przy oblezeniu, wojnie, braku materialu i limicie murow; powody od nowa co dobe
+
+**Problem:** analiza at-120b (P6): budowy.log doba 108768 - 114 linii "STOI", powod tylko w 4 (R4 pisal powod tylko w galezi "doba bez budzetu").
+
+**Przyczyna:** BuildFunding.Daily ustawial NoBudgetWhy tylko przy budget < 1 (BuildFunding.cs ~327) i usuwal tylko przy finansowaniu; oblezenie (warunek `st.IsUnderSiege` w filtrze petli), wojna (WarFront.CivilAllowed, "mury pierwsze") i brak materialu (`matSpent <= 0`) konczyly sie `continue` bez powodu; stare powody zostawaly z dawnych dob.
+
+**Zmiana (tylko log):** NoBudgetWhy.Clear() na poczatku doby; powody: "oblezenie", "wojna: budowa cywilna wstrzymana (front albo brak luzu zoldu)", "wojna: rod buduje najpierw wojskowe", "brak materialu na targu (albo ponad sufit ceny)", "mury: limit doby (reszta ponizej ceny sztuki)" obok dotychczasowych z R4. Filtr oblezenia przesuniety za odczyt kolejki (bez zmian zachowania - wczesniej tez continue, bez efektow ubocznych).
+
+**Ryzyko / co sprawdzic:** budowy.log - prawie kazda linia "STOI N dni" z powodem. Zachowanie budow bez zmian.
+
+**Status:** DO SPRAWDZENIA
+
 ## 477-d (13.11) - Przeplywy osad (przyczyny): pozycja "inne" rozbita wedlug pliku wolajacego
 
 **Problem:** analiza at-120b (P4): kasy miast 6.05 mln wobec celu 7.63 mln (56 z 97 ponizej celu), w linii "Przeplywy osad (przyczyny)": "inne +19183" i "reszta po nowym pomiarze +31203; srednia 28 dob +75302 - prog 10000: PONAD" - zrodlo niewyjasnione.

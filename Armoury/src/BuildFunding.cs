@@ -243,6 +243,7 @@ namespace Armoury
         {
             if (!On || Campaign.Current == null) return;
             _funded.Clear(); EngDayStart(); WallDayStart();   // R3-10b: liczniki doby; 472: liczniki murow
+            NoBudgetWhy.Clear();   // 477-e: powody od nowa co dobe (dotad zostawaly z dawnych dob)
             _paidTowns = _stalledNoMat = _warSkipped = _dNoBudget = 0; _spent = _toPurses = _toMarkets = 0; _points = 0; _wageIdxSum = 0f; _wageIdxN = 0;
             try
             {
@@ -254,9 +255,10 @@ namespace Armoury
                 var civilWar = new List<KeyValuePair<Settlement, TaleWorlds.CampaignSystem.Settlements.Buildings.Building>>();   // N5-E: budowle cywilne w wojnie dopuszczone z dala od frontu
                 foreach (var st in Settlement.All)
                 {
-                    if (st == null || st.Town == null || (!st.IsTown && !st.IsCastle) || st.OwnerClan == null || st.IsUnderSiege) continue;
+                    if (st == null || st.Town == null || (!st.IsTown && !st.IsCastle) || st.OwnerClan == null) continue;
                     var q = st.Town.BuildingsInProgress;
                     var b = q != null && q.Count > 0 ? q.Peek() : null;
+                    if (st.IsUnderSiege) { if (b != null && b.BuildingType != null && !b.BuildingType.IsDailyProject) NoBudgetWhy[st.StringId] = "oblezenie"; continue; }   // 477-e: powod
                     if (b == null || b.BuildingType == null || b.BuildingType.IsDailyProject) continue;
                     if (st.OwnerClan == Clan.PlayerClan && !s.PaidConstructionPlayer) continue;
                     // wpis 86 (audyt pkt 8): wojna wstrzymuje cywilne JUZ TU - nie zabieraja dzialki murom
@@ -266,7 +268,7 @@ namespace Armoury
                     {
                         // N5-E (poprawka 5 po biegu rocznym): o budowli cywilnej w wojnie decyduje prawdziwe zagrozenie warowni, nie flaga wojny krolestwa
                         // (WarFront.CivilAllowed: spokoj wokol warowni od CivilWorksCalmDays dob i luz pana w pulapie zoldu). Klucz wylaczony - false, jak dotad
-                        if (!WarFront.CivilAllowed(st)) { _warSkipped++; continue; }
+                        if (!WarFront.CivilAllowed(st)) { _warSkipped++; NoBudgetWhy[st.StringId] = "wojna: budowa cywilna wstrzymana (front albo brak luzu zoldu)"; continue; }
                         civilWar.Add(new KeyValuePair<Settlement, TaleWorlds.CampaignSystem.Settlements.Buildings.Building>(st, b));
                         continue;
                     }
@@ -282,7 +284,7 @@ namespace Armoury
                     foreach (var kv in civilWar)
                     {
                         var clan = kv.Key.OwnerClan;
-                        if (wallClans.Contains(clan)) { _warSkipped++; WarFront.NoteWallsFirst(); continue; }
+                        if (wallClans.Contains(clan)) { _warSkipped++; WarFront.NoteWallsFirst(); NoBudgetWhy[kv.Key.StringId] = "wojna: rod buduje najpierw wojskowe"; continue; }
                         jobs.Add(kv); WarFront.NoteGo();
                         int nc; count.TryGetValue(clan, out nc); count[clan] = nc + 1;
                     }
@@ -339,7 +341,7 @@ namespace Armoury
                         if (matBudget > 0f && matSpent <= 0) matSpent = BuyOneCheapest(market, wallCut ? Math.Max(0, Math.Min(lord.Gold, (int)budget)) : Math.Max(0, lord.Gold));
                     }
                     finally { GoodsLedger.End(gfm); }
-                    if (matBudget > 0f && matSpent <= 0) { if (wallCut) _wCutIdle++; else _stalledNoMat++; continue; }   // nie ma z czego budowac   // 472-p: mury przy limicie (reszta limitu ponizej ceny sztuki) - osobny licznik linii murow
+                    if (matBudget > 0f && matSpent <= 0) { if (wallCut) { _wCutIdle++; NoBudgetWhy[st.StringId] = "mury: limit doby (reszta ponizej ceny sztuki)"; } else { _stalledNoMat++; NoBudgetWhy[st.StringId] = "brak materialu na targu (albo ponad sufit ceny)"; } continue; }   // nie ma z czego budowac   // 472-p: mury przy limicie (reszta limitu ponizej ceny sztuki) - osobny licznik linii murow
                     float labour = Math.Min(budget - matBudget, matSpent * Math.Max(0f, (1f - s.BuildMaterialShare) / Math.Max(0.01f, s.BuildMaterialShare)));
                     int labourI = MBRandom.RoundRandomized(labour);
                     // poprawka po audycie TOWARY 3: material drozszy niz budzet (BuyOneCheapest do calej kiesy) + robocizna z budzetu moglo dac
