@@ -444,6 +444,7 @@ namespace Armoury
                         if (Math.Max(0.0, moved - refund) + hands > RegionShare * rh) { _rBudget++; if (!(moved > 0) && hands > RegionShare * rh) CraftUnblock.NoteShareSmall(CraftUnblock.SysKs); continue; }
                         if (refund > 0 && moved + hands > RegionShare * rh) CraftUnblock.NoteStartRefund(CraftUnblock.SysKs, hands, region, season);
                         if (stalled) CraftUnblock.NoteStartPast(CraftUnblock.SysKs);
+                        if (sig && !fachRet && !A7eGate(b, type, cur, best, mt, ld.Market == 0 ? 0 : 1, hands, nfU)) continue;   // 479-e: hamulec wzrostu przejsc z polek
                         int T = Tree(best) ? 364 : 60;
                         b.Cur = (sbyte)cur; b.Target = (sbyte)best; b.TStart = today; b.TEnd = today + T; b.X0 = b.X[ci]; b.H0 = (float)hands;
                         b.Cost = ld.TF ? 0f : (float)(CostDays * KsTab.KCost[best] * hands / sigma); b.Paid = 0f;

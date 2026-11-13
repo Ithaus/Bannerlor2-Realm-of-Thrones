@@ -11048,6 +11048,14 @@ namespace Armoury
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsGrowGroves { get; set; } = true;
 
+        [SettingPropertyBool("Ks Switch Food Shelves", HintText = "with the work-switch rule under the start calibration: for food the rule reads the real market stalls (stock and goods on the way against the stall target) instead of the plan's prices moved at most 15% - a good missing from the stalls pays more, a glut pays less; a switch that happens only because of this may grow the target work by at most a tenth of its hands per season. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
+        public bool KsSwitchFoodShelves { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Switch Food Shelf Band", 1.00f, 10.00f, "0.0", HintText = "with Ks Switch Food Shelves: how far the stalls may move a food price in the switch rule (3 = up to three times up or down)", RequireRestart = false)]
+        [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
+        public float KsSwitchFoodShelfBand { get; set; } = 3.0f;
+
         [SettingPropertyBool("Ks Food Hands With Switch Rule", HintText = "with Ks Food Hands Follow Market and the work-switch rule on (Start Calibration Switch Rule, Ks Switch Signal Rule): the weekly food rule still runs in every village part that is not in the middle of a switch - the switch rule judges by the plan's own prices and hardly ever fires, while the stalls stay empty of olives, grapes, fruit, cheese and meat for months. Off = with the switch rule on, only that rule moves the works (as before)", RequireRestart = false)]
         [SettingPropertyGroup("Food follows the market under the start calibration (night 18.10)")]
         public bool KsFoodHandsWithA7 { get; set; } = true;
@@ -15906,6 +15914,8 @@ namespace Armoury
             s.KsFoodHandsFollowMarket = KsFoodHandsFollowMarket;
             s.KsFoodHandsGrowGroves = KsFoodHandsGrowGroves;
             s.KsFoodHandsWithA7 = KsFoodHandsWithA7;
+            s.KsSwitchFoodShelves = KsSwitchFoodShelves;
+            s.KsSwitchFoodShelfBand = KsSwitchFoodShelfBand;
             s.BloomeryColliers = BloomeryColliers;
             s.BanditLimitPerHideout = BanditLimitPerHideout;
             s.BanditBirthsWherePeople = BanditBirthsWherePeople;

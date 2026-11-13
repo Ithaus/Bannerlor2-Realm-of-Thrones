@@ -70,6 +70,65 @@ namespace Armoury
             return "plik " + A7sTestFlagName + " - autotest";
         }
 
+        // 479-e (noc 13.11, decyzja domyslna - analiza at-220b): sygnal A7 dla jedzenia z polek rynku. Dotad odchylenie rynku miasta +-15% wzgledem mediany
+        // (A7sBand) przy cenach cienia Planu, ktory uwaza jedzenie za zrownowazone (KS: bilans 1.00) - A7 nie widzial pustych polek oliwek, winogron, miesa
+        // (Essos oliwki 0.15-0.18 T*). Teraz dla towarow KsCore.Food dev = T*/(polki + w drodze) z kroku f20 (_f20Cov), w pasmie 1/x..x (Ks Switch Food Shelf Band,
+        // domyslnie x3); brak tablicy albo celu - jak dotad. Koszt, czas (60/364 doby), nacisk 60 dob, x1.25, 5% regionu, ziemia, GrainLock, FeedKeeps, 479-b bez zmian.
+        // Hamulec (A7eGate): przejscie, ktorego BEZ 479-e by nie bylo (wiersz dawny _sigOld nie daje nacisku albo daje inny cel), zaczyna sie tylko do 10% rak pola
+        // zajecia celu na rynku na sezon (min 0.1% rak pola rynku) - drzewa rodza po 364 dobach, wiec sygnal polek trwa rok i bez hamulca zamienilby za duzo pol.
+        private static bool A7eOn { get { var s = Settings.Current; return s != null && s.KsSwitchFoodShelves; } }
+        private static double A7eBand { get { var s = Settings.Current; double b = s != null ? s.KsSwitchFoodShelfBand : 3.0; if (!(b >= 1.0)) b = 1.0; return Math.Min(10.0, b); } }
+        private const double A7eGrowCap = 0.10, A7eGrowFloor = 0.001;
+        private static bool[] _a7eFood;
+        private static readonly Dictionary<Town, double[]> _sigOld = new Dictionary<Town, double[]>();   // wiersz sygnalu BEZ 479-e (ta sama srednia) - do licznika i hamulca
+        private static readonly Dictionary<Town, int> _sigOldN = new Dictionary<Town, int>();
+        private static int _a7eDev, _a7eSame, _a7eDiff, _a7eNew, _a7eCap, _a7eNoOld, _a7eSea = -1;
+        private static double _a7eDiffH, _a7eNewH, _a7eCapH;
+        private static double[] _a7eSeaH;
+        private static readonly Dictionary<string, int> _a7eTr = new Dictionary<string, int>();
+
+        private static bool A7eFood(int g)
+        {
+            if (_a7eFood == null) { var f = new bool[KsTab.NG]; foreach (int x in KsCore.Food) if (x >= 0 && x < f.Length) f[x] = true; _a7eFood = f; }
+            return g >= 0 && g < _a7eFood.Length && _a7eFood[g];
+        }
+
+        /// <summary>479-e: czy przejscie cur -> best zaczac. true - zaczac (takze gdy klucz wylaczony albo bez wiersza dawnego); false - hamulec wzrostu zajecia celu.</summary>
+        private static bool A7eGate(LiveBlock b, string type, int cur, int best, Town mt, int m, double hands, double[] nfU)
+        {
+            if (!A7eOn) return true;
+            double[] o;
+            if (mt == null || !_sigOld.TryGetValue(mt, out o) || o == null) { _a7eNoOld++; return true; }
+            var oV = A7sVRow(o); double rent = A7sRent(b);
+            double ic = A7sIncome(b, type, cur, o, oV, rent, nfU != null ? nfU[cur] : 1.0), ib = double.NegativeInfinity; int ob = -1;
+            foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, o, oV, rent, nfU != null ? nfU[c] : 1.0); if (v > ib) { ib = v; ob = c; } }
+            bool oldPress = ob >= 0 && ib >= SwitchRatio * Math.Max(0.02, ic);
+            if (oldPress && ob == best) { _a7eSame++; return true; }
+            int NC = KsTab.NC;
+            if (_a7eSea != _regionSeason || _a7eSeaH == null) { _a7eSea = _regionSeason; _a7eSeaH = new double[2 * NC]; }
+            var hc = _f20Hc; double baseH = 0, all = 0;
+            if (hc != null && hc.Length == 2 * NC) { baseH = Math.Max(0.0, hc[m * NC + best]); for (int c = 0; c < NC; c++) all += Math.Max(0.0, hc[m * NC + c]); }
+            double cap = Math.Max(A7eGrowCap * baseH, A7eGrowFloor * all);
+            if (_a7eSeaH[m * NC + best] + hands > cap) { _a7eCap++; _a7eCapH += hands; return false; }
+            _a7eSeaH[m * NC + best] += hands;
+            if (oldPress) { _a7eDiff++; _a7eDiffH += hands; } else { _a7eNew++; _a7eNewH += hands; }
+            string key = KsTab.Crafts[cur] + "->" + KsTab.Crafts[best]; int n; _a7eTr.TryGetValue(key, out n); _a7eTr[key] = n + 1;
+            return true;
+        }
+
+        private static string A7eText()
+        {
+            if (!A7eOn) return " | jedzenie z polek (479-e, Ks Switch Food Shelves): WYL. - jak dotad";
+            var inv = Inv;
+            var top = new List<KeyValuePair<string, int>>(_a7eTr); top.Sort((x, y) => y.Value.CompareTo(x.Value));
+            var parts = new List<string>(); for (int i = 0; i < top.Count && i < 6; i++) parts.Add(top[i].Key + " " + top[i].Value);
+            return " | jedzenie z polek (479-e, Ks Switch Food Shelves TAK, pasmo x" + A7eBand.ToString("0.0", inv) + ", tablica f20 " + (_f20Cov != null ? "jest" : "BRAK - sygnal jak dotad")
+                 + "): wpisow towar x miasto z polek od linii " + _a7eDev + "; przejscia zaczete: jak bez 479-e " + _a7eSame + ", inny cel dzieki 479-e " + _a7eDiff + " (rak " + _a7eDiffH.ToString("0", inv)
+                 + "), bez 479-e bez nacisku " + _a7eNew + " (rak " + _a7eNewH.ToString("0", inv) + "), bez wiersza dawnego " + _a7eNoOld
+                 + "; hamulec wzrostu (10% rak zajecia celu na sezon) wstrzymal " + _a7eCap + " (rak " + _a7eCapH.ToString("0", inv) + ")"
+                 + (parts.Count > 0 ? "; dzieki 479-e (top): " + string.Join(", ", parts.ToArray()) : "");
+        }
+
         private static double A7sBand { get { var s = Settings.Current; double b = s != null ? s.KsSwitchMarketBand : 0.15; if (!(b >= 0)) b = 0; return Math.Min(0.5, b); } }
 
         private const int A7sAvg = 4;               // srednia wykladnicza 4 krokow (co 7 dob - ok. 28 dob)
@@ -105,6 +164,7 @@ namespace Armoury
 
         private static void A7sReset()
         {
+            _sigOld.Clear(); _sigOldN.Clear(); _a7eSeaH = null; _a7eSea = -1;   // 479-e
             _sig.Clear(); _sigN.Clear(); _sigLoad = null; _sigDay = -1; _sigPlanDay = -1; _heldKind = -1; _a7sSea = new A7sSeason();
             _sigMv = null; _sigRent = null; _sigRentFor = null; _sigV.Clear(); _a7sMat = null; _a7sLast.Clear();
             _a7sFlagDay = int.MinValue; _a7sFlagVal = false;
@@ -117,6 +177,7 @@ namespace Armoury
             _a7sHands = _a7sPressH = _a7sHeldH = _a7sMsSum = _a7sMsMax = 0;
             _a7sVil = _a7sTown = _a7sFolk = _a7sCof = _a7sMatG = _a7sOld = _a7sPcs = _a7sDrop = 0;
             _a7sNotes.Clear();
+            _a7eDev = _a7eSame = _a7eDiff = _a7eNew = _a7eCap = _a7eNoOld = 0; _a7eDiffH = _a7eNewH = _a7eCapH = 0; _a7eTr.Clear();   // 479-e
         }
 
         // ------------------------------------------------------------ cena sygnalu
@@ -146,8 +207,9 @@ namespace Armoury
         }
 
         /// <summary>Cena sygnalu miasta t dzis (bez sredniej): P rynku x gradient krainy x odchylenie rynku wzgledem mediany towarow pola miasta (pasmo).</summary>
-        private static double[] A7sInst(Town t, double[] P, double band)
+        private static double[] A7sInst(Town t, double[] P, double band, bool shelf = false)
         {
+            var cov = shelf ? _f20Cov : null; double fb = A7eBand;                 // 479-e: jedzenie z polek rynku (null - jak dotad)
             int m = TownMarket(t) == 0 ? 0 : 1;
             string land = t.Settlement != null ? TownLandOf(t.Settlement) : "?";
             double[] px; _px.TryGetValue(t, out px);
@@ -174,6 +236,11 @@ namespace Armoury
                 p = Math.Max(0.05, Math.Min(5.0, p));
                 double dev = 1.0;
                 if (!double.IsNaN(ratio[g]) && med > 0) dev = Math.Max(lo, Math.Min(hi, ratio[g] / med));
+                if (cov != null && A7eFood(g) && m * KsTab.NG + g < cov.Length)
+                {
+                    double cv = cov[m * KsTab.NG + g];
+                    if (!double.IsNaN(cv)) { dev = Math.Max(1.0 / fb, Math.Min(fb, cv)); _a7eDev++; }
+                }
                 row[g] = p * A7sGrad(land, g) * dev;
             }
             return row;
@@ -187,12 +254,23 @@ namespace Armoury
             if (P == null) return;
             A7sResolveLoad();
             double band = A7sBand;
+            bool shelf = A7eOn && _f20Cov != null;                                   // 479-e
+            if (!shelf) { _sigOld.Clear(); _sigOldN.Clear(); }
             foreach (var t in Town.AllTowns)
             {
                 if (t == null || t.Settlement == null) continue;
                 try
                 {
-                    var inst = A7sInst(t, P, band);
+                    var inst = A7sInst(t, P, band, shelf);
+                    if (shelf)
+                    {
+                        // 479-e: wiersz dawny (bez polek) ta sama srednia - tylko do licznika i hamulca
+                        var io = A7sInst(t, P, band, false); double[] ao; int no;
+                        _sigOldN.TryGetValue(t, out no);
+                        if (!_sigOld.TryGetValue(t, out ao) || ao == null || ao.Length != KsTab.NG) { _sigOld[t] = io; no = 0; }
+                        else { double wo = 1.0 / Math.Min(A7sAvg, no + 1); for (int g = 0; g < KsTab.NG; g++) ao[g] += (io[g] - ao[g]) * wo; }
+                        _sigOldN[t] = Math.Min(999, no + 1);
+                    }
                     double[] a; int n;
                     _sigN.TryGetValue(t, out n);
                     if (!_sig.TryGetValue(t, out a) || a == null || a.Length != KsTab.NG) { _sig[t] = inst; n = 0; }
@@ -456,6 +534,7 @@ namespace Armoury
             sb.Append(A7sP).Append("A7 regula zajec (f5-a7) dzien ").Append(today).Append(" | D ").Append(d0).Append(" (D+").Append(today - d0).Append(")")
               .Append(" | sygnal: ceny KS (cena cienia Planu doby ").Append(_sigPlanDay).Append(" x gradient krainy x rynek miasta +-").Append((100 * A7sBand).ToString("0", Inv))
               .Append("% wzgledem mediany, srednia ").Append(A7sAvg).Append(" krokow, miast ").Append(_sig.Count).Append(")")
+              .Append(A7eText())
               .Append(" | regula: ").Append(rule ? "TAK (" + A7sRuleSrc() + ")" : "WYLACZONA - sam pomiar")
               .Append(" | ocenionych ").Append(_a7sN).Append(" blokow, rak ").Append(_a7sHands.ToString("0", Inv)).Append(", bez sygnalu miasta ").Append(_a7sNoSig)
               .Append("; nacisk (>= x").Append(SwitchRatio.ToString("0.00", Inv)).Append(") ").Append(_a7sPress).Append(" blokow (").Append(Pc(_a7sPress, _a7sN)).Append("%), rak ").Append(_a7sPressH.ToString("0", Inv))

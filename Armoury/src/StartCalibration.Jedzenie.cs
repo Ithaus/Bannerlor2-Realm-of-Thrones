@@ -58,7 +58,12 @@ namespace Armoury
         /// <summary>Recenzja f20-d4: drzewa (Tree() - winnica, gaj oliwny, sad cytrusowy, gaj daktylowy) biora rece od razu (TAK) albo tylko je oddaja (NIE - jak A7: drzewa 364 doby).</summary>
         private static bool F20Groves { get { var s = Settings.Current; return s == null || s.KsFoodHandsGrowGroves; } }
 
-        private static void F20Reset() { _f20Wg = null; _f20Ww = null; _f20Stum = 0; _f20RegSkip = false; _f20Snap = null; _f20Gen = 0; _f20MeasC = null; _f20PrevAfter = null; }
+        private static void F20Reset() { _f20Wg = null; _f20Ww = null; _f20Stum = 0; _f20RegSkip = false; _f20Snap = null; _f20Gen = 0; _f20MeasC = null; _f20PrevAfter = null; _f20Cov = null; _f20Hc = null; }
+
+        // 479-e (noc 13.11): pokrycie polek rynku jedzenia z kroku f20 - T* / (polki + w drodze), [m * NG + g]; NaN - bez celu (T* < 1), +inf - pusto.
+        // Czyta sygnal A7 (A7sInst) przy kluczu Ks Switch Food Shelves; _f20Hc - rece pola zajec rynku przed krokiem f20 ([m * NC + c], hamulec wzrostu 479-e).
+        // Pamiec sesji (bez zapisu): po wczytaniu do pierwszego kroku f20 sygnal A7 jak dotad.
+        private static double[] _f20Cov, _f20Hc;
 
         // 479-d (noc 13.11, decyzja domyslna - analiza at-220b, workflow mieso/drzewa): SAM POMIAR, bez zmiany ekonomii. Rece pola zajec stada i drzew miedzy
         // krokami f20 rozbite na przyczyny: A7 (blok w przebudowie teraz albo przy poprzednim kroku), inna zmiana udzialu X (poza A7), ludzie bloku (Hands),
@@ -215,6 +220,20 @@ namespace Armoury
                     else dec[i] = F20DBand;
                     sig[i] = winter ? 0 : dec[i] == F20DUp ? 1 : dec[i] == F20DDown ? -1 : 0;
                 }
+            // 479-e: pokrycie polek do sygnalu A7 (ta sama miara co decyzja f20: polki + w drodze wobec T*)
+            {
+                var cov = new double[2 * NG];
+                for (int i = 0; i < cov.Length; i++) cov[i] = double.NaN;
+                for (int m = 0; m < 2; m++)
+                    foreach (int g in KsCore.Food)
+                    {
+                        int i = m * NG + g; double t = T[i];
+                        if (!(t >= 1.0)) continue;
+                        double sum = S[i] + R[i];
+                        cov[i] = sum > 0 ? t / sum : double.PositiveInfinity;
+                    }
+                _f20Cov = cov;
+            }
             // 2. wynik zajecia na rynku (-1..1): wartosc towarow jedzenia z celem x sygnal / wartosc towarow jedzenia z celem
             var sc = new double[2 * NC];
             for (int m = 0; m < 2; m++)
@@ -325,6 +344,7 @@ namespace Armoury
                 }
                 catch (Exception e) { _f20Stum++; Stumble("F20Week(okreg)", e); }
             }
+            _f20Hc = hc0;                                                                  // 479-e: rece pola zajec przed krokiem (hamulec wzrostu A7 z polek)
             // 479-d: bloki z migawka, ktorych ten krok nie widzial (kraina wrocona, okreg z potknieciem, blok zniknal) - poza rachunkiem od tego kroku
             if (meas)
             {
