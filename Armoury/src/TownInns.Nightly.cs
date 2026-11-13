@@ -18,7 +18,7 @@ namespace Armoury
     ///    w miescie = +1 godzina dla tego miasta. Kazda godzina obecnosci (kuznia, menu oczekiwania gry, scena) - gdzies trzeba spac. Godzina nadrabiana (NightClock
     ///    NomH ta sama co ostatnio liczona) nie liczy sie drugi raz; przerwa > 14 h bez godziny nocy w miescie - liczniki od zera (swit pominiety nie skleja dwoch nocy).
     /// N2 Zaplata o swicie gracza (NightRest, blok switu raz na 12 h, PO SettleNight): miasto z najwieksza liczba godzin tej nocy, gdy >= polowa bazy snu
-    ///    (SleepHoursNeeded / 2, w gore; 6 -> 3 h). Bez oplaty (linia logu z powodem): klucz, noc juz oplacona od poprzedniego switu (Commit z menu - _lastTownPaidMin,
+    ///    (SleepHoursNeeded / 2, w gore; 6 -> 3 h). Bez oplaty (linia logu z powodem): klucz, noc juz oplacona w oknie czekania na swit (swit-12 h; 486-p) (Commit z menu - _lastTownPaidMin,
     ///    zajazd / wioska - _rest.CommitMin), miasto rodu gracza (spi w zamku pana), oblezenie, sluzba ROT, cudza armia, przebranie, niewola, bitwa. Bramka wlasna,
     ///    nie Allowed() - o swicie gracz bywa w menu snu, ktore Allowed odrzuca. Dom RealisticCaptivity (Homes.Vault, internal innego DLL) - NIE rozrozniany (Jeff ma
     ///    dom tylko we wsi); krok nastepny: publiczne API w RC.
@@ -37,7 +37,7 @@ namespace Armoury
         private const string P486 = "Nocleg w miescie (486): ";
         private const int DefaultQ = 0;          // bez rezerwacji - wspolna izba
         private const long GapResetH = 14;       // przerwa w godzinach nocy w miescie, po ktorej liczniki od zera
-        private const long SinceDawnMin = 1440 - 120;   // oplata "od poprzedniego switu" (zapas 2 h na tick godzinowy)
+        private const long DawnLateMin = 60;     // 486-p: tick switu najwyzej tyle przed pelna godzina switu (zegar ksiegi / nadrabianie)
 
         internal static bool NightlyOn { get { var s = Settings.Current; return On && s != null && s.TownLodgingNightly; } }
 
@@ -106,10 +106,12 @@ namespace Armoury
         {
             if (!NightlyOn) return "klucz Charge Town Lodging Every Night albo Town Inns / Night Rest wylaczone";
             if (st == null || !st.IsTown || st.Town == null) return "brak miasta";
-            // "od poprzedniego switu" z zapasem 2 h (swit liczony tickiem godzinowym - dwa swity nie sa co do minuty 1440 od siebie)
-            if (_lastTownPaidMin >= 0 && _lastTownPaidMin > now - SinceDawnMin) return "juz oplacone w karczmie od poprzedniego switu (" + When(_lastTownPaidMin) + ")";
+            // 486-p (recenzja): oplata pokrywa TE noc tylko w oknie czekania na swit (HoldFrom: swit-12 h .. teraz) - ta sama regula co HoldAbed (sen z karczmy,
+            // zajazdu, wioski trwa do switu tylko, gdy swit najwyzej HoldMaxMin przed nami). Drzemka za dnia (np. 10:00 przy swicie 3:00) nie zwalnia nastepnej nocy.
+            long dawn = DawnOf(now);
+            if (_lastTownPaidMin >= 0 && CoversNight(_lastTownPaidMin, dawn, now)) return "juz oplacone w karczmie tej nocy (" + When(_lastTownPaidMin) + ")";
             var r = _rest;
-            if (r != null && !r.Auto && r.CommitMin > now - SinceDawnMin) return "juz oplacone (" + (r.RoadUid != null ? "zajazd" : r.HostUid != null ? "wlasna wioska" : "karczma") + " " + When(r.CommitMin) + ")";
+            if (r != null && !r.Auto && CoversNight(r.CommitMin, dawn, now)) return "juz oplacone (" + (r.RoadUid != null ? "zajazd" : r.HostUid != null ? "wlasna wioska" : "karczma") + " " + When(r.CommitMin) + ")";
             if (OwnTown(st)) return "miasto rodu gracza - sen w zamku pana";
             if (st.IsUnderSiege) return "miasto oblezone";
             if (PlayerCaptivity.IsCaptive) return "gracz w niewoli";
@@ -119,6 +121,16 @@ namespace Armoury
             if (mp.MapEvent != null) return "bitwa";
             return null;
         }
+
+        /// <summary>486-p: minuta switu rozliczanej nocy - ostatnia pelna godzina PlayerDawn nie pozniej niz teraz (tick najwyzej DawnLateMin przed nia - ta sama noc).</summary>
+        private static long DawnOf(long now)
+        {
+            long since = Mod(now - NightRest.PlayerDawn * 60L + DawnLateMin, 1440) - DawnLateMin;   // [-DawnLateMin, 1440 - DawnLateMin)
+            return now - since;
+        }
+
+        /// <summary>486-p: oplata z chwili pay nalezy do nocy konczacej sie o switie dawn (okno czekania na swit HoldMaxMin; oplata po switie - juz nastepna doba).</summary>
+        private static bool CoversNight(long pay, long dawn, long now) { return pay >= 0 && pay <= Math.Min(now, dawn) && dawn - pay <= HoldMaxMin; }
 
         /// <summary>NightRest, blok switu gracza (raz na 12 h), PO SettleNight: zaplata nocy w miescie. restBefore - odpoczynek doby przed switem (premia N4).</summary>
         internal static void DawnCharge(float restBefore)
