@@ -397,6 +397,10 @@ RANGES = {
     # 472-p (recenzja 472): mury historycznie - kod przycina czynnik ceny punktu do 1..10, najkrotszy czas do 0..20 lat (0 = bez limitu); McmSettings.cs wpisane recznie
     'WallCastlePointPriceFactor': (1.0, 10.0, "0.00"),
     'WallTownPointPriceFactor': (1.0, 10.0, "0.00"),
+    # 473-a: rabat Masona na poziom - kod przycina do 0..0.30; McmSettings.cs wpisane recznie
+    'Buildings338MasonPriceCut': (0.0, 0.3, "0.00"),
+    # 473-b: sufit obnizki zoldu zalogi z budynkow - kod przycina do 0..1 (1 = bez sufitu); McmSettings.cs wpisane recznie
+    'Buildings338WageCap': (0.0, 1.0, "0.00"),
     'WallMinYearsCastle2': (0.0, 20.0, "0.0"),
     'WallMinYearsCastle3': (0.0, 20.0, "0.0"),
     'WallMinYearsTown2': (0.0, 20.0, "0.0"),

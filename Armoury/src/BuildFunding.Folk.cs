@@ -197,6 +197,7 @@ namespace Armoury
             {
                 if (b == null || b.BuildingType == null || b.CurrentLevel >= 3 || !FolkPays(b.BuildingType) || q.Contains(b)) continue;
                 if (!BkAllows(bk, b)) { _bkSkip++; continue; }   // recenzja (5): niedostepna w BK (innowacja, port, murarstwo) - lud jej nie stawia
+                if (Buildings338NoBuild.FolkSkips(t, b)) continue;   // 473-b6: lud w osadzie AI nie stawia sadu BK (klucz wylaczony - false); 473-p1: po BkAllows - _bkSkip liczy jak przed
                 int cost = b.GetConstructionCost();
                 if (cost <= 0) continue;
                 double k = b.BuildingProgress / cost + (3 - b.CurrentLevel) * 1e-3;
@@ -314,6 +315,8 @@ namespace Armoury
                         double idx = WageIdx(market);
                         double ppp = b.BuildingType.IsMilitaryProject ? Math.Max(1f, s.BuildPencePerPointMilitary) : Math.Max(1f, s.BuildPencePerPointCivil);
                         if (WallOn) ppp *= WallFactor(t, b.BuildingType);   // 472 (BuildFunding.Walls.cs): punkt murow drozszy - ta sama cena co u pana
+                        float mcut = Covered(t) ? Buildings338Mason.PriceFactor(t) : 1f;   // 473-a: Mason - punkt tanszy (ta sama cena co u pana; klucz wylaczony - 1; lenno gracza bez PaidConstructionPlayer - BK liczy Masona sam w mocy gry, bez dubla)
+                        if (mcut < 1f) ppp *= mcut;
                         double H = hands * _pay.Heads * wageDay * idx;
                         int costL = b.GetConstructionCost();
                         double rem = costL - b.BuildingProgress;
@@ -345,6 +348,7 @@ namespace Armoury
                         long wPaid = Math.Max(0, got - m);
                         int mPaid = (int)Math.Min(m, got);
                         float p = PointsFor(mPaid, (int)Math.Min(int.MaxValue, wPaid), (float)ppp, market);
+                        if (mcut < 1f) Buildings338Mason.NoteCut(t, mcut, mPaid + wPaid, p, true);   // 473-a: linia murarza (tylko licznik)
                         if (market != null && market.Town != null) { try { TownFolk.Sale(market, mPaid, TownFolk.MixBuild); } catch { } }   // material - sprzedaz kupcow (podstawa robocizny)
                         rec.Mat = mPaid; rec.Wage = wPaid; rec.FromG = _pay.UsedG; rec.Pts = p; rec.Why = WhyBuilt;
                         if (WallOn) WallFolkNote(b.BuildingType, mPaid + wPaid, p, false);   // 472: liczniki ludu na murach

@@ -8688,6 +8688,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public float SackRuinRebuildShare { get; set; } = 0.25f;
 
+        [SettingPropertyFloatingInteger("Sack Devastate Razed Share", 0.000f, 1.000f, "0.000", HintText = "with Sack Burns Buildings: under devastation this part of the burnt building levels is razed for good - nothing is left to rebuild from, the level costs its full price again; the rest leaves ruins (cheaper repair, Sack Ruin Rebuild Share). Pillage leaves only ruins, mercy burns nothing. 0 = all burnt levels leave ruins, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SackDevastateRazedShare { get; set; } = 0.5f;
+
         [SettingPropertyBool("Sack Takes Goods", HintText = "the sack empties the shelves too: the same part as the coin (a third under pillage, two thirds under devastation, nothing under mercy) of every stack of goods, horses and arms in the market of a stormed town or castle. Unique pieces go to the army's leader, horses and beasts walk off with the parties (as many as their men can herd), food only up to ten days of rations for each party, the rest as far as the wagons can carry - most valuable by weight first; what they cannot carry stays under pillage and burns under devastation (food never burns). Lords put the arms they took in their armouries (off = the shelves are left untouched)", RequireRestart = false)]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackTakesGoods { get; set; } = true;
@@ -12868,6 +12872,10 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Wage { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Buildings338 Wage Cap", 0.00f, 1.00f, "0.00", HintText = "With Buildings338 Wage: the barracks, the castellan's office and the Slacken Garrison project together lower a garrison's wages by at most this share (0.50 = half; a castle with all three at full level would otherwise pay 35% of its wages). 1 = no limit, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public float Buildings338WageCap { get; set; } = 0.50f;
+
         [SettingPropertyBool("Buildings338 Auto Recruit", HintText = "With Buildings338: the castellan's office (+1/+2/+3), the Train Militia project (+1) and the Raise Troops project (+2) let the garrison take more volunteers a day, as their description says - on top of the game's one a day and the Armoury daily bonus. Gold, room in the garrison and volunteers still limit it; not in lands without free hands. Off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338AutoRecruit { get; set; } = true;
@@ -12880,9 +12888,21 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338FoodDouble { get; set; } = false;
 
-        [SettingPropertyBool("Buildings338 Mason", HintText = "With Buildings338: where the lord pays for the building work, the mason makes the paid builders work faster - his points (town 3/6/9, castle 2/4/6) raise the work done for the same money, at most double; with nothing paid he adds nothing. Off = the mason does nothing to paid building work, as before", RequireRestart = false)]
+        [SettingPropertyBool("Buildings338 Mason", HintText = "With Buildings338: where the lord pays for the building work, the mason makes the paid builders work faster - his points (town 3/6/9, castle 2/4/6) raise the work done for the same money, at most double; with nothing paid he adds nothing. With Buildings338 Mason Cheaper on, the mason lowers the price of a point instead (see below). Off = the mason does nothing to paid building work, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Mason { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Mason Cheaper", HintText = "With Buildings338 and Buildings338 Mason: the mason makes every point of paid building work cheaper instead of adding free points - a point of works costs 10/20/30% less at mason level 1/2/3 (Buildings338 Mason Price Cut per level), for the lord, the townsfolk and gold paid to the craftsmen, so the same money builds more (walls still rise no faster than Wall Min Years). Off = the mason adds his points (town 3/6/9, castle 2/4/6) to the paid work for nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338MasonCheaper { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Buildings338 Mason Price Cut", 0.00f, 0.30f, "0.00", HintText = "With Buildings338 Mason Cheaper: how much cheaper a point of building work is per level of the mason (0.10 = 10/20/30% at level 1/2/3; at most 0.30)", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public float Buildings338MasonPriceCut { get; set; } = 0.10f;
+
+        [SettingPropertyBool("Buildings338 AI Skips Armory And Court House", HintText = "With Buildings338: lords run by the game no longer start the Banner Kings Armory or Court House in their towns, and drop them from their building queue (progress made so far is kept on the building; levels already built stay and keep working). You can still build them in your own fiefs. Off = the lords build them as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338AiSkipArmoryCourt { get; set; } = true;
 
         [SettingPropertyBool("Buildings338 Tax Office", HintText = "With Buildings338: the town tax office raises what the lord and the crown take from the town's purse each week by 5/10/15%, as its description says - paid only from the town's money above its reserve, like the rest of the payment. Off = the tax office does nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
@@ -12919,6 +12939,30 @@ namespace Armoury
         [SettingPropertyBool("Buildings338 Studs", HintText = "With Buildings338: castle warhorse studs breed warhorses into the castle stash (chance 2% a day, up to pastures / 10000 + 2 per level) - each from an ordinary horse of the castle or bought from its villages, never from nothing, and always a real warhorse of the castle's culture or the nearest one. Off = studs never breed, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Studs { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Works Need Local Resources", HintText = "With Buildings338: a mine (town Mines, Castle Mines) works only where the villages around have a deposit (iron, silver, salt, clay, limestone, marble, gold) and digs only those minerals (a castle mine filters each mineral; a town mine runs while at least one mineral of its own lode is found in the villages around); warhorse studs breed only where the villages around keep horses or the pastures are wide, and each studs level adds 2% to the daily chance of a foal. Lords run by the game do not start these buildings where the land has nothing for them. Off = mines and studs as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Works { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Castle Craftsmen", HintText = "With Buildings338: the Craftsmen's Quarters of a castle put the craftsmen of the castle to work - each day they buy raw goods that the castle's own villages produce (wool, flax, hides, hardwood, iron) from the shelf of the district's market town and sell back cloth, linen, leather, planks or tools, up to 2 pieces per level. The castle pays for the raw goods and the town pays for the wares; 60% of the margin is the craftsmen's pay, the rest is the lord's tax. Off = the building gives nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338CastleCraftsmen { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Temples And Worship", HintText = "With Buildings338: the Banner Kings Theater is called Temple (loyalty and the lord's culture as before); the game's Courthouse keeps its influence and loyalty (+0.3/0.6/1 a day, as in the game); the Banner Kings Court House slot becomes a Place of Worship - a sept, godswood, hall of the Drowned God or temple of R'hllor after the lord's faith: the lord's faith gains weight in the town (+10 per level) and, while it is the faith of the town, loyalty rises by 0.25 a day per level. Lords run by the game build it only where their faith does not hold the town or loyalty is below 60. Off = names and effects as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338Worship { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Village Tax Office", HintText = "With Buildings338 and the medieval dues: a village Tax Office (Banner Kings) no longer makes gold out of nothing - its clerks collect the rent the village already owes: arrears are forgiven only after 1.5 / 2 / 2.5 times as many days (level 1 / 2 / 3) and are paid back faster, still only from what the village has beyond its daily basket. Off = the building gives nothing, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338VillageTaxOffice { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 Farmlands Corvee", HintText = "With Buildings338: castle Farmlands become the lord's demesne fields worked by the peasants' corvee - they make no food out of nothing any more: the castle takes 20 / 25 / 30% (level 1 / 2 / 3) of what its people grow instead of 15% plus the Banner Kings bonus of +50% per level and the game's +6 / 12 / 18, and the heavier labour costs 0.1 loyalty a day per level. Town warehouses are not touched. Off = as before", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338FarmlandsCorvee { get; set; } = true;
+
+        [SettingPropertyBool("Buildings338 AI Builds By Need", HintText = "With Buildings338: lords run by the game no longer pick their next building at random - each building still has a chance, but one that answers the settlement need weighs six times more: a granary, warehouse, fields or waterworks when food runs short, barracks or the castellan office for a large garrison, walls, siege workshop or guard house near the front, a mine where the land has ore; studs by pastures and roads weigh three times more. Off = random, as in the game", RequireRestart = false)]
+        [SettingPropertyGroup("Buildings do what their description says (338)")]
+        public bool Buildings338AiByNeed { get; set; } = true;
 
         [SettingPropertyBool("Buildings338 Castle Mines", HintText = "With Buildings338: castle mines dig ore from the castle's deposits as their description says (castles never had the daily building tick) - only with the castle's free hands (people not needed on its fields and pastures). When the castle can pay the market price it pays the miners and the ore goes to the castle market, otherwise the ore goes to the castle stash. Off = castle mines dig nothing, as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
@@ -15183,6 +15227,7 @@ namespace Armoury
             s.SackKilledInPeopleBook = SackKilledInPeopleBook;
             s.SackBurnsBuildings = SackBurnsBuildings;
             s.SackRuinRebuildShare = SackRuinRebuildShare;
+            s.SackDevastateRazedShare = SackDevastateRazedShare;   // 476-g
             s.SackTakesGoods = SackTakesGoods;
             s.CapitalTreasurySeized = CapitalTreasurySeized;
             s.CapitalTreasuryShare = CapitalTreasuryShare;
@@ -16228,10 +16273,14 @@ namespace Armoury
             s.NorthConquestReturn = NorthConquestReturn;
             s.Buildings338 = Buildings338;
             s.Buildings338Wage = Buildings338Wage;
+            s.Buildings338WageCap = Buildings338WageCap;   // 473-b
             s.Buildings338AutoRecruit = Buildings338AutoRecruit;
             s.Buildings338FoodStock = Buildings338FoodStock;
             s.Buildings338FoodDouble = Buildings338FoodDouble;
             s.Buildings338Mason = Buildings338Mason;
+            s.Buildings338MasonCheaper = Buildings338MasonCheaper;   // 473-a
+            s.Buildings338MasonPriceCut = Buildings338MasonPriceCut;
+            s.Buildings338AiSkipArmoryCourt = Buildings338AiSkipArmoryCourt;   // 473-b6
             s.Buildings338TaxOffice = Buildings338TaxOffice;
             s.Buildings338Caravans = Buildings338Caravans;
             s.Buildings338Assimilation = Buildings338Assimilation;
@@ -16241,6 +16290,12 @@ namespace Armoury
             s.Buildings338VillageProject = Buildings338VillageProject;
             s.Buildings338VillageGoods = Buildings338VillageGoods;
             s.Buildings338Studs = Buildings338Studs;
+            s.Buildings338Works = Buildings338Works;
+            s.Buildings338CastleCraftsmen = Buildings338CastleCraftsmen;
+            s.Buildings338Worship = Buildings338Worship;
+            s.Buildings338VillageTaxOffice = Buildings338VillageTaxOffice;
+            s.Buildings338FarmlandsCorvee = Buildings338FarmlandsCorvee;
+            s.Buildings338AiByNeed = Buildings338AiByNeed;
             s.Buildings338CastleMines = Buildings338CastleMines;
             s.GoldForecastReal = GoldForecastReal;
             s.GoldDailySummary = GoldDailySummary;

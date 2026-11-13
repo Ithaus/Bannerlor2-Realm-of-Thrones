@@ -3125,6 +3125,7 @@ namespace Armoury
             try { WarFront.Daily(); } catch (Exception e) { Log.Error("WarFront.Daily", e); } DayProfile.Lap("WarFront.Daily");   // N5-E: warownie przy froncie (skan doby) - PRZED rozliczeniem budow
             try { MoneyLedger.Probe169("WarFront.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)
             var gfBuild = GoodsLedger.Begin(GoodsLedger.FBuild);     // paczka 146: ksiega towarow - material zdjety przez budowy (tylko licznik)
+            try { Buildings338NoBuild.DropQueued(); } catch (Exception e) { Log.Error("Buildings338NoBuild.DropQueued", e); }   // 473-b6: zbrojownia i sad BK z kolejek AI przed oplata budow
             try { BuildFunding.Daily(); } catch (Exception e) { Log.Error("BuildFunding.Daily", e); }
             finally { GoodsLedger.End(gfBuild); } DayProfile.Lap("BuildFunding.Daily");
             try { MoneyLedger.Probe169("BuildFunding.Daily"); } catch { }   // f19-e1: bisekcja RB (tylko log)

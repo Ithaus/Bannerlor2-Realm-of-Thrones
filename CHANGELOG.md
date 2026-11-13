@@ -227,6 +227,246 @@
 
 **Status:** DO SPRAWDZENIA
 
+## 476-p6 (13.11) - drobne po recenzji 476: nazwy BK wracaja przy kluczu NIE, cache odbicia wiary, front i budowle cywilne, martwy id, komentarz WarFront
+
+**Problem:** recenzja 476 A: (A3) zmiana nazw Theater -> "Temple" i Court House -> "Place of Worship" zostawala po wylaczeniu klucza (wbrew "NIE = jak przed"), flagi linii doby nie zerowane miedzy sesjami; (A8) Religion() przy kazdym liczeniu lojalnosci robil AccessTools.Property(BannerKingsConfig, "Instance"); (A6) przy froncie waga glodu x6 trafiala tez na budowle cywilne, za ktore BuildFunding przy froncie nie placi - wstrzymana cywilna blokowala kolejke; (A5) martwy id "building_settlement_granary" (w 1.4.8 spichlerz jest tylko zamkowy); (A7) dwa summary nad FrontPeek, Calm bez opisu.
+
+**Przyczyna:** jw.
+
+**Zmiana:** Buildings338Civic: oryginalne Name/Explanation zapamietane przed zmiana, przywracane przy kluczu NIE (SessionStart i Daily), flagi _loyWired/_relWired zerowane w SessionStart; BannerKingsConfig.Instance raz na sesje (_cfgInst). Buildings338Need: przy froncie waga glodu tylko dla budowli wojskowych; usuniety martwy id. WarFront: opis wrocil nad Calm.
+
+**Ryzyko / co sprawdzic:** po wylaczeniu "Buildings338 Temples And Worship" nazwy BK nastepnej doby. Wybor AI przy froncie rzadziej cywilny.
+
+**Status:** DO SPRAWDZENIA
+
+## 476-p5 (13.11) - urzad podatkowy wsi nie podnosi dziennej raty zaleglosci ponad dawny sufit
+
+**Problem:** recenzja 476 B6 (niska, kalibracja): 476-d wydluzal darowanie (sufit zaleglosci fd x czynsz, przy L3 ok. 910 rat) i skracal splate (pd = 11), wiec maksymalna rata wynosila ok. 83 x czynsz dnia zamiast 13 x (364/28) - sumy ponad koszyk wsi (zbytki P5, roboty gminy, zakupy KS) schodzily do pana ok. 6 razy szybciej, wbrew opisowi "mniej przepada po drodze".
+
+**Przyczyna:** dwa efekty naraz bez sufitu raty.
+
+**Zmiana:** DsVillage: gdy urzad zmienia dni splaty (pd != ArrPayDays), rata zaleglosci najwyzej max(czynsz, ForgiveDays x czynsz / ArrPayDays) - jak bez urzedu. Bez urzedu (pd == ArrPayDays) - co do bitu jak dotad.
+
+**Ryzyko / co sprawdzic:** linia DS "zaleglosci splacone" - wzrost umiarkowany, nie skokowy.
+
+**Status:** DO SPRAWDZENIA
+
+## 476-p4 (13.11) - rzemieslnicy zamku w ksiedze rudy: wsad zelaza i drewna w "przetwory miast"
+
+**Problem:** recenzja 476 B5: przerob iron->tools i hardwood->planks (476-b) szedl w ramce FTownCraft (grupa GCraft ksiegi towarow), a kontrola rudy (GoodsLedger.cs:1820-1826) wymaga crafts == o[7] ("przetwory miast" OreLedger), liczone tylko w nawiasie OreLedger.CraftEnter/Exit z OnConsumed. shelf.AddToCounts nie wola OnConsumed - linia zelaza i drewna bylaby "NIEZGODNA" w kazda dobe przerobu.
+
+**Przyczyna:** brak nawiasu ksiegi rudy wokol przerobu zamku.
+
+**Zmiana:** Buildings338Crafts: OreLedger.CraftEnter() przed przerobem, OreLedger.OnConsumed(surowiec, miasto, n) po zdjeciu z polki, CraftExit w finally. Sygnal KS "rzemioslo miasta" (code 5) dla wsadu zostaje - to prawdziwy popyt na tym targu (decyzja domyslna noc 13.11).
+
+**Ryzyko / co sprawdzic:** linie ksiegi rudy i drewna: "przetwory miast X/X" zgodne w dobach przerobu rzemieslnikow zamkow.
+
+**Status:** DO SPRAWDZENIA
+
+## 476-p3 (13.11) - kopalnia stoi tylko tam, gdzie ma z czego kopac (sklad mineralow BK twierdzy x zloze okolicy); jedna regula dla miasta i zamku
+
+**Problem:** recenzje 476 B3/B4 (srednie), A4 (niska): AiBlocks i wybor AI (476-f, waga x6 "zloze") pozwalaly na kopalnie, gdy wsie okolicy mialy jakikolwiek mineral, a urobek zamku to przeciecie losowego skladu BK MineralData twierdzy (bk_all.cs:75025-75090) ze zlozem wsi - np. wies solna przy zamku ze skladem wapien+zelazo = pusta kopalnia na zawsze. Miasto przepuszczalo cale BK RunMines przy jakimkolwiek zlozu (BK kopie wtedy caly swoj sklad). Gdy BK tyka zamki sam (BkTicksCastles), zamek bez zloza kopal i hodowal bez filtra. Podpowiedz MCM mowila "digs only those minerals" takze dla miast.
+
+**Przyczyna:** kryterium "jakikolwiek mineral okolicy" zamiast przeciecia ze skladem BK; brak bramki w galezi BkTicksCastles.
+
+**Zmiana:** Buildings338Works.OreUsable(t) (pamiec na dobe): przeciecie Buildings338.Minerals(pop) ze zlozem okolicy niepuste (brak danych BK - jak dotad). Uzywane w AiBlocks (miasto i zamek), Need.Pick (waga zloza), RunMinesPrefix (miasto; zamek tylko gdy BK tyka zamki sam). Przy pominieciu RunMines zerowana kwota miningRevenues (BuildFunding.MinesPrefix - pewnosc niezalezna od kolejnosci prefiksow). Stadnina w galezi BkTicksCastles bez pastwiska nie hoduje. Linia startu: "kopalnia ma z czego kopac: miasta N, zamki M". Podpowiedz MCM opisuje roznice: zamek filtruje mineral po minerale, miasto kopie swoj sklad, gdy choc jeden mineral jest w zlozu okolicy (decyzja domyslna noc 13.11 - pelny filtr miasta wymagalby przepisania BK RunMines).
+
+**Ryzyko / co sprawdzic:** linia "Budynki (338) zaklady (476): start sesji" - liczby "ma z czego kopac" nie zero; mniej kopalni AI. Klucz NIE - bez zmian (On false).
+
+**Status:** DO SPRAWDZENIA
+
+## 476-p2 (13.11) - zgliszcza budowli wyjmowanej z kolejki AI nie blokuja odbudowy; licznik "AI pominelo zaklad" liczy decyzje
+
+**Problem:** recenzja 476 A2 (srednia): CitySack.Prioritize stawial na czele kolejki zgliszcze z najmniejsza reszta kosztu bez sprawdzenia, czy AI tej osady tej budowli nie wyjmie (473-b6 / 476-a kopalnia lub stadnina bez zasobu, 476-c miejsce kultu, gdy AI go nie chce); DropQueued tej samej doby je wyrzucal, a nazajutrz Prioritize wybieral to samo - pozostale zgliszcza osady (np. koszary) nigdy nie szly. Recenzja B7 (niska): `_aiBlocked++` w AiBlocks liczyl kazde wywolanie (Skip w kazdej petli), a nie decyzje.
+
+**Przyczyna:** brak wspolnej bramki Skip w Prioritize; licznik w funkcji-predykacie.
+
+**Zmiana:** Buildings338NoBuild.AiSkips(t, bt) (= Skip); Prioritize pomija takie zgliszcza i nie uznaje ich za "czolo juz ze zgliszcz". Licznik `_aiBlocked` tylko w DropQueued (wyjeta budowla zakladu) i NextPostfix (wylosowany zaklad bez zasobu) przez NoteAiBlocked.
+
+**Ryzyko / co sprawdzic:** linia LB budowle (odbudowa zgliszcz postepuje), linia zakladow "AI pominelo zaklad bez zasobu N" mala. Klucze NIE - bez zmian (Skip false).
+
+**Status:** DO SPRAWDZENIA
+
+## 476-p1 (13.11) - panszczyzna Farmlands nie odejmuje jedzenia w oblezeniu; uczciwy opis bilansu
+
+**Problem:** recenzje 476 (A1 srednia, B1 wysoka): w oblezeniu BKFoodModel.GetPopulationFoodProduction zwraca 0 (bk_all.cs:39383), a DefaultSettlementFoodModel nie dodaje FoodProduction budowli (AddEffectOfBuildings tylko poza oblezeniem). Delta 476-e zwracala wtedy -GameFood = -6/-12/-18 na dobe jedzenia, ktorego zamek nie dostal - oblezony zamek z Farmlands glodowal szybciej, obrona 471b krotsza.
+Recenzja B2 (srednia): "przesuwane, nie tworzone" bylo tylko z nazwy - zamek bierze 20/25/30% produkcji ludnosci bez premii zamiast 15% z premia; pozostalych 85% (chlopi) BK w bilansie Food nie modeluje, wiec nadwyzka ponad 15% nikomu nie jest odejmowana.
+
+**Przyczyna:** brak warunku oblezenia w Buildings338Corvee.Delta.
+
+**Zmiana:** Delta: `if (town.IsUnderSiege) return 0f;` (bez korekty w oblezeniu - gra i BK same nic nie licza). B2 - decyzja domyslna (noc 13.11): bez zmiany kodu, opis uczciwy: Farmlands daje zamkowi +5/+10/+15% produkcji ludnosci ponad 15% bez budynku - nadal czesciowo "z niczego", ale mniej niz przed 476-e (+22.5/+30/+37.5% wg BK). Pelne zdjecie z chlopow wymagaloby modelu ich 85% (osobny krok). HandleExcessFood BK (tygodniowy wykup nadwyzki) liczy dalej z premia - do sprawdzenia w tescie.
+
+**Ryzyko / co sprawdzic:** linia "Budynki (338) panszczyzna Farmlands (476-e)": zamki oblezone bez zmiany jedzenia; bilans zamkow < 0 jak w projekcie.
+
+**Status:** DO SPRAWDZENIA
+
+## 476-g (13.11) - spustoszenie zdobytej osady: polowa spalonych poziomow budowli zniszczona na dobre (bez zgliszcz, odbudowa za pelna cene)
+
+**Problem:** Jeff 13.11: "jak jest oblezenie i ktos wybiera oszczedz to budynki nie sa niszczone, jak jest rabunek lub pillage ten ostrzejszy to mocno cierpia budynki, czesc moze zostac zniszczona i trzeba je odbudowac, naprawic, szansa jest ze niektore zostana zniszczone na dobre i trzeba od nowa odbudowac".
+
+**Przyczyna:** sprawdzone w kodzie: LB (CitySack.Burn.cs, od 13.10, klucz SackBurnsBuildings TAK u Jeffa) juz robi: laska 0, grabiez 1/3, spustoszenie 2/3 poziomow palnych (bez murow, gra przy nastepstwach 0 - prefiks GetSiegeAftermathProjectsLoss); kazdy spalony poziom zostawia zgliszcza (naprawa za SackRuinRebuildShare = 1/4 kosztu), osady AI odbudowuja zgliszcza najpierw. Brakowalo "zniszczone na dobre".
+
+**Zmiana:** CitySack.Burn.BurnPost: przy spustoszeniu kazdy spalony poziom z szansa SackDevastateRazedShare (nowe ustawienie MCM "Sack Devastate Razed Share", domyslnie 0.5) jest zniszczony na dobre - bez zgliszcz (odbudowa za pelny koszt). Grabiez - same zgliszcza (naprawa), laska - nic (bez zmian). Linie: "Lup miast (LB budowle)" + "zniszczone na dobre (476-g, bez zgliszcz, pelny koszt) N", linia doby LB "(zniszczone na dobre 476-g N, ...)". Dotyczy AI i gracza, miast i zamkow (jak LB). 0 = jak przed.
+
+**Ryzyko / co sprawdzic:** spustoszone osady odbudowuja sie dluzej (polowa poziomow za pelna cene) - zgodne z decyzja; Grant zgliszcz przez TryGetValue (budowla tylko z poziomami zniszczonymi nie ma wpisu zgliszcz).
+
+**Status:** DO SPRAWDZENIA
+
+## 476-f (13.11) - wybor budowy AI wedlug potrzeb osady (glod, zold, front, zloze) zamiast losu
+
+**Problem:** audyt budynkow 12.11: AI wybiera budowe losowo (DefaultBuildingScoreCalculationModel.GetNextBuilding:16-18) - 48.7% punktow zamkow (ok. 430 tys. zl w 59 dobach) na budowle slabe/martwe, koszary i spichlerze czekaja. Sesja zaproponowala wybor wg potrzeb, Jeff: "na pozostale sie zgadzam".
+
+**Przyczyna:** losowy model gry; BK go nie podmienia.
+
+**Zmiana:** nowy Buildings338Need.cs + postfiks GetNextBuilding 473-b6 (osada nie gracza): kandydaci jak u gry (bez projektow dziennych, poziom < 3, nie w kolejce, bez Skip 473-b6/476-a/476-c), waga 1; x6 gdy odpowiada potrzebie: glod (bilans < 0 albo maly bilans przy malym zapasie) - spichlerz/magazyn/pola/wodociagi; zaloga >= 150 - koszary/biuro kasztelana; front (nowe WarFront.FrontPeek - odczyt Calm) - mury/warsztat oblezniczy/straznica; zloze - kopalnia; x3 stadnina przy pastwisku i drogi. Linia doby "wybor budowy AI wg potrzeb (476-f)". Klucz Buildings338 AI Builds By Need (TAK; NIE = losowo jak gra).
+
+**Ryzyko / co sprawdzic:** ocena tylko przy wyborze (kolejka pusta, 10%/d) - koszt pomijalny; FrontPeek dziala tylko przy CivilWorksAwayFromFront (inaczej front = false). Mury czesciej przy froncie - kolejka murow 472/475 dluzsza (blokuje inne budowy). Obserwowac licznik "na potrzebe".
+
+**Status:** DO SPRAWDZENIA
+
+## 476-e (13.11) - Farmlands zamku = pola dworskie (panszczyzna): udzial 20/25/30% plonu ludnosci bez premii z niczego, lojalnosc -0.1/poziom
+
+**Problem:** projekt budynkow 13.11 (czesc B, liczby): premia BK Farmlands +50%/poziom produkcji ludnosci to odpowiednik ok. 1500/3000/4500 nieistniejacych parobkow na typowy zamek, plus +6/12/18 gry - jedzenie z niczego (wiekszosc przepada nad sufitem zapasu: 110 ze 130 zamkow na suficie). Jeff: "wyjasnij na liczbach", po wyjasnieniu propozycji: "na pozostale sie zgadzam".
+
+**Przyczyna:** BKFoodModel.GetPopulationFoodProduction:39425 (czynnik +0.5 x L Farmlands) i FoodProduction budynku gry; zamek bierze 15% produkcji (CalculateTownFoodChangeInternal).
+
+**Zmiana:** nowy Buildings338Corvee.cs: postfiks na BKFoodModel.CalculateTownFoodChangeInternal (DeclaredMethod; tylko zamki z Farmlands > 0) - pozycja "Lord's fields (corvee)" = udzial (0.20/0.25/0.30) x produkcja ludnosci BEZ premii budynku - 0.15 x produkcja z premia - FoodProduction budynku gry; postfiks CalculateLoyaltyChange czynnego modelu (PatchTarget.OfActive) - "Corvee on the lord's fields" -0.1 x poziom. Miasta (Warehouse) bez zmian. Linia doby "Budynki (338) panszczyzna Farmlands (476-e)": zamki wg poziomu, suma zmiany jedzenia, zamki z bilansem < 0. Klucz Buildings338 Farmlands Corvee (TAK; NIE = co do bitu jak przed).
+
+**Ryzyko / co sprawdzic:** projekt: typowy zamek L2 bilans +45 -> ok. +9, swiat ok. -4650 jedzenia/d w zamkach (glownie nadmiar ponad sufit), ok. 59 zamkow ponizej 0 ale z zapasem na lata - OBSERWOWAC w tescie 120 dob (linia: zamki z bilansem < 0, sufity, glod garnizonow 471b!). Kolizja z 471b (oblezenia: jedzenie zalogi czynnikiem R) - nizszy bilans = krotsza obrona. Jesli zamkow z bilansem < 0 > 30% - obnizyc udzialy albo wylaczyc klucz. Decyzja domyslna (noc 13.11): wdrozone z kluczem TAK.
+
+**Status:** DO SPRAWDZENIA
+
+## 476-d (13.11) - urzad podatkowy wsi: lepszy pobor istniejacego czynszu (pozniejsze darowanie i szybsza splata zaleglosci), bez nowego zlota
+
+**Problem:** Jeff 13.11: "Tax office w wiosce - czemu wylaczyc?"; sesja zaproponowala "lepszy pobor czynszu, nowe zloto nie powstaje", Jeff: "na pozostale sie zgadzam". Dzis budynek martwy - BK dosypuje zloto z niczego (BKTaxModel.AddVillagePopulationTaxes), co blokuje KingdomTreasury.TaxOfficePrefix (PolicyIncomeConserved TAK u Jeffa), a AI dalej go stawia.
+
+**Przyczyna:** brak efektu zgodnego z zamknieta ekonomia.
+
+**Zmiana:** nowy Buildings338VillageTax.cs; DsVillage.RentPay: zaleglosc czynszu DS wsi darowana dopiero po DsRentForgiveDays x (1 + 0.5 x poziom urzedu) rat (364 -> 546 / 728 / 910), rata splaty zaleglosci DsRentArrearsPayDays / (1 + 0.5 x poziom) (28 -> 19 / 14 / 11) - nadal tylko z kiesy ponad koszyk dnia. Zloto tylko z kiesy wsi do pana (to samo roszczenie). Licznik w linii "Budynki (338) zaklady (476)". Klucz Buildings338 Village Tax Office (TAK; NIE = jak przed).
+
+**Ryzyko / co sprawdzic:** dziala tylko przy DuesMedieval i DsRentArrears (u Jeffa TAK); wies biedna z urzedem placi zaleglosci szybciej - kiesa ponad koszyk chroniona. Wplyw maly (wsi z urzedem BK niewiele).
+
+**Status:** DO SPRAWDZENIA
+
+## 476-c (13.11) - Temple (teatr BK), sad gry bez zmian, Place of Worship w slocie BK Court House (waga wiary pana, lojalnosc przy wierze panujacej)
+
+**Problem:** Jeff 13.11: "Teatr tak zwieksza lojalnosc, i nazwij to swiatynia"; "courthouse [BK] wylacz, a courthouse ktory zostaje daje tez wplywy i lojalnosc mieszkancow"; "Dodaj budynek wiary". Budynku wiary nie ma w zadnym module (audyt 12.11); BK Court House daje tylko +0.02 stabilnosci/poziom.
+
+**Przyczyna:** brak budynku wiary; nazwa teatru BK.
+
+**Zmiana:** nowy Buildings338Civic.cs: (1) BK Theater - nazwa "Temple" (efekt BK bez zmian); (2) sad gry - sprawdzone: juz daje wplywy +0.2/0.5/1 i lojalnosc +0.3/0.6/1 (DefaultBuildingTypes:234-237, BKLoyaltyModel:283 AddEffectOfBuildings) - bez dopisku (bez podwojenia); (3) slot BK Court House = "Place of Worship" (nazwa + opis po angielsku): E1 postfiks BKReligionModel.CalculateReligionWeight - wiara pana +10 x poziom w osadzie; E2 postfiks CalculateLoyaltyChange czynnego modelu (PatchTarget.OfActive) - lojalnosc +0.25 x poziom, gdy wiara pana jest wiara panujaca osady; E3 napiecie BK nieruszane. AI (473-b6 Skip): miejsce kultu tylko gdy wiara pana nie panuje albo lojalnosc < 60, inaczej jak 473-b6. Linia doby "Budynki (338) swiatynia i miejsce kultu (476-c)". Klucz Buildings338 Temples And Worship (TAK). Decyzje domyslne (noc 13.11): nazwa ogolna "Place of Worship" (typ budowli jest jeden dla swiata - opis wymienia sept/godswood/sale Utopionego Boga/swiatynie R'hllora); platnik - oplacona praca budowy pana jak kazda budowla (dziesiecina "budowa septow" bez zmian - osobny krok).
+
+**Ryzyko / co sprawdzic:** zmiana nazwy przez refleksje (BuildingType.Name/Explanation prywatne settery) - w zapisie nic; BK Court House juz zbudowany w miastach dostaje efekty E1/E2 od razu. Wywolania refleksji BK tylko w miastach z poziomem > 0. Linia startu: "swiatynia i miejsce kultu (476-c): lojalnosc <model>, waga wiary BKReligionModel, nazwy tak".
+
+**Status:** DO SPRAWDZENIA
+
+## 476-b (13.11) - rzemieslnicy zamku (Craftmans Quarters): surowiec okolicy -> towar na targ miasta okregu, place i podatek
+
+**Problem:** Jeff 13.11: "Craftmans - daj rzemieslnicy". Audyt budynkow 12.11: Craftmans Quarters zamku martwy (DenarByBoundVillageHeartPerDay czyta tylko podatek gry, zastapiony przez PopulationLaw.TownTaxPostfix) - 11-20 tys. zl za nic.
+
+**Przyczyna:** brak czytnika efektu w naszej ekonomii.
+
+**Zmiana:** nowy Buildings338Crafts.cs (tick dobowy zamkow z Buildings338.Daily): zamek z CQ poziomu L przerabia najwyzej 2 x L szt./d surowca okolicy (tylko towary wsi zamku - mapa zasobow 476-a): welna -> sukno, len -> plotno, skory -> skora, drewno -> deski, zelazo -> narzedzia, 1:1. Surowiec z polki miasta handlowego okregu (Buildings338Ports.MarketTown, teraz internal) - kasa zamku placi miastu cene kupna; towar na te sama polke - miasto placi zamkowi cene sprzedazy (tylko przy dodatniej marzy). 60% marzy - place rzemieslnikow (TownFolk.Earn KCraftPaid, kiesa podzamcza), reszta - podatek pana. Ramka GoodsLedger FTownCraft. Linia doby "Budynki (338) rzemieslnicy zamkow (476)". Klucz Buildings338 Castle Craftsmen (TAK; NIE = jak przed).
+
+**Ryzyko / co sprawdzic:** zloto: zamek -buy, miasto +buy -sell, zamek +sell -place (place do kiesy) - suma zerowa; towary: polka -surowiec +towar (ramka FTownCraft - kontrola ksiegi 0). Skala mala (2-6 szt./d na zamek); kolizja z warsztatami miasta (ten sam surowiec z polki) - obserwowac "bez surowca na polce". Decyzja domyslna (noc 13.11): limit 2 x poziom, place 60% marzy.
+
+**Status:** DO SPRAWDZENIA
+
+## 476-a (13.11) - zaklady przy zasobach okolicy: kopalnie (miasto, zamek) tylko przy zlozu, stadnina tylko przy pastwisku, poziom stadniny = szansa przychowku
+
+**Problem:** Jeff 13.11: "Mines rob od razu i tylko tam gdzie jest zloze, jesli nie ma budynku mines to nie ma wydobycia ... im wiekszy poziom mines tym wiecej osob moze pracowac"; "Castle mines ... jesli okolica nie ma zasobow to nie mozna budowac"; "warhorse studs rob od razu". Audyt 12.11: kopalnie BK stawiane wszedzie (AI losuje), stadnina 2% stale (poziom podnosil tylko limit).
+
+**Przyczyna:** AI wybiera budowle losowo (DefaultBuildingScoreCalculationModel); BK RunMines kopie mineraly z MineralData osady bez wzgledu na wsie okolicy; Buildings338Studs - stala Chance 0.02.
+
+**Zmiana:** nowy Buildings338Works.cs: mapa zasobow okolicy twierdzy z wsi (VillageType.PrimaryProduction + Productions; zloze = iron/silver/salt/clay/limestone/marble/gold_ore; pastwisko koni = wies z koniem albo pastwiska BK >= 20000). AI (osady nie gracza) nie wybiera kopalni (building_town_mines, building_castle_mines) bez zloza ani stadniny bez pastwiska - postfiks GetNextBuilding 473-b6 rozszerzony (Skip), kolejki AI miast i zamkow czyszczone z takich budow. Produkcja: prefiks na BK RunMines - miasto bez zloza nie kopie; kopalnia zamku (Buildings338Ports.MineCastle) kopie tylko mineraly zloza okolicy. Stadnina: bez pastwiska brak przychowku, szansa 2% x poziom na dobe. Poziom kopalni = sztuki na dobe = gornicy z wolnych rak (BK, bez zmian). Linia startu "zaklady (476): ... mapa zasobow okolic" i doby "Budynki (338) zaklady (476)". Klucz Buildings338 Works Need Local Resources (TAK; NIE = jak przed). Decyzja domyslna (noc 13.11): "pulap inwestycji" = miejsca pracy (poziom), bez osobnego systemu inwestycji regionu.
+
+**Ryzyko / co sprawdzic:** miasta bez wsi mineralnych z kopalnia BK przestaja kopac (ruda miast swiat i tak ok. 50-90 zl/d); gracz widzi kopalnie w menu nawet bez zloza (lista BK nieruszana - wczytanie zerowaloby poziomy), ale bez zloza nie daje urobku; stadniny x2-x3 czesciej przychowek przy L2/L3 (kon z konia - nic z niczego). Mapa zasobow liczona z VillageType - wsie ROT z jednym produktem glownym moga zanizyc zloza (sprawdzic liczby w linii startu).
+
+**Status:** DO SPRAWDZENIA
+
+## 473-p2 COFNIETE (13.11) - AI znowu moze stawiac port BK w zamkach
+
+**Problem:** 473-p2 (790afd62) wylaczyl AI budowe portu i Harbor BK w zamkach wg zdania z propozycji sesji ("Wylaczam: ... port i Harbor w zamku"). Jeff potem zapytal, czemu port w zamku nie ma sensu, i przyjal propozycje: port w zamku = rybacy, ryby do zapasu jedzenia zamku ("I tak na pozostale sie zgadzam rob budynki").
+
+**Przyczyna:** agent workflow wykonal starsza wersje planu.
+
+**Zmiana:** git revert 790afd62 (kod, klucz Buildings338AiSkipCastlePort i wpis usuniete). Ryby z portu zamku liczy juz Buildings338Ports (338c); nowy efekt portu zamku (rybacy z ludnosci) - w paczce budynkow 2.
+
+**Ryzyko / co sprawdzic:** zachowanie zamkow jak w 473-p1. Linia "Budynki (338) bez zbrojowni i sadu BK" bez czesci o porcie zamku.
+
+**Status:** COFNIETE
+
+## 473-p1 (13.11) - poprawki po recenzjach 473-b6: linia startu po drugim wczytaniu, bledy od nowa w kampanii, kolejki gracz/AI osobno, licznik ludu po osadach
+
+**Problem:** recenzje A i B (tylko odczyt) kroku 473-b6 - bez usterek CTD i zapisu, cztery usterki samego logu i dwie luki w opisie. (A1/B2) `Buildings338NoBuild.SessionStart` przy drugim wczytaniu w tym samym procesie wychodzil przez `if (_patched) return;` przed `Buildings338.Hook(...)`, a `Buildings338.SessionStart` czysci `_hooks` co sesje - linia startu nie wymieniala dzialajacej latki. (A2) `_stumbles` i `_err` nie zerowane w `SessionStart` - "bledy" przechodzily miedzy kampaniami, pierwszy blad nowej kampanii nie trafial do logu. (A3) "w kolejkach teraz Q (gracz)" liczylo kolejki wszystkich miast. (B3) "lud pominal sad W" liczylo przejscia petli `FolkTarget` (kandydatow), nie osady. (B4) `FolkSkips` stal przed `BkAllows`, wiec `_bkSkip` przestal liczyc sad BK niedostepny w BK.
+
+**Przyczyna:** jak wyzej - kolejnosc instrukcji i liczniki w `Armoury/src/Buildings338NoBuild.cs` oraz `BuildFunding.Folk.cs:199`.
+
+**Zmiana:** `SessionStart`: zerowanie `_stumbles` i `_err`; przy `_patched` - `Buildings338.Hook("bez zbrojowni i sadu BK: " + _target)` i dopiero `return` (wzor `Buildings338Studs.cs:42`). `_folkSkip` to teraz `HashSet<Town>` na dobe (czyszczony w `Daily` i `SessionStart`). Linia doby: "osady z sadem pominietym w wyborze ludu N" i "w kolejkach teraz gracz X, AI Y" (przy TAK AI powinno byc 0). `BuildFunding.FolkTarget`: najpierw `BkAllows` (licznik `_bkSkip` jak przed 473-b6), potem `FolkSkips` - zachowanie to samo (obie galezie `continue`).
+Dopiski do 473-b6 (recenzja B5, B6): (a) w NOWEJ kampanii `BuildDevelopmentsAtGameStart` (`OnNewGameCreated`) idzie przed latka z `OnSessionLaunched` - startowe kolejki AI moga miec zbrojownie albo sad BK; zdejmuje je (2) `DropQueued` nastepnej doby, pan za nie nie placi (DropQueued przed `BuildFunding.Daily`). (b) Pusta kolejka po wyjeciu zmienia wynik BK `AvailableSlavesWorkForce` (bk_all.cs:74409): bez budowy niewolnicy nie sa odciagani do prac - to zachowanie gry przy pustej kolejce (nie nowe zrodlo), dotyczy tylko miast AI bez innej budowli. Zdanie "nic nowego" w 473-b6 dotyczy zapisu gry, nie tego skutku.
+
+**Ryzyko / co sprawdzic:** mechanika bez zmian - zmienione tylko liczniki i tekst linii startu/doby oraz kolejnosc dwoch warunkow `continue`. Klucz NIE - jak przed (FolkSkips zwraca false bez licznika, Daily nie pisze). W logu: po drugim wczytaniu w jednym procesie linia startu nadal ma "bez zbrojowni i sadu BK: <Typ>.GetNextBuilding"; "AI 0" w kolejkach. Build OK.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+## 473-b6 (13.11) - AI nie stawia zbrojowni (Armory) i sadu (Court House) Banner Kings
+
+**Problem:** Jeff 13.11 w czacie: "Wylaczam: Armory i Court House z BannerKings". Oba budynki BK sa tylko w miastach (`BKBuildings.IsCastleBuilding` zna tylko Castle Mines, Retinue, Port i Warhorse Studs - bk_all.cs:77348). AI stawia je losowo jak kazda inna budowle. Dowodu z logu nie ma, to decyzja Jeffa.
+
+**Przyczyna:** gra wybiera budowle AI w `BuildingsCampaignBehavior.DecideBuildingQueue`: przy pustej kolejce, w osadzie nie gracza, z szansa 10% na dobe wola `Models.BuildingScoreCalculationModel.GetNextBuilding(town)`. `DefaultBuildingScoreCalculationModel` zwraca losowa budowle z poziomem < 3, bez projektow dziennych i spoza kolejki. Ta sama droga dziala w `BuildDevelopmentsAtGameStart` (nowa kampania). BK nie podmienia tego modelu. Lud (P2 `BuildFunding.FolkTarget`, osada AI, budowa poza kolejka) mogl stawiac sad BK, bo jest cywilny. Zbrojownia BK byla juz w `LordOnly`, wiec lud jej nie stawial.
+Odrzucona droga: latka na BK `InnovationData.GetAvailableBuildings` nie wchodzi w gre. `BKBuildingsBehavior.OnGameLoaded` (bk_all.cs:89063-89080) budowle spoza tej listy USUWA i wstawia od nowa na poziomie 0, wiec zbudowane zbrojownie i sady wyzerowalyby sie przy wczytaniu.
+
+**Zmiana:** nowy klucz `Buildings338AiSkipArmoryCourt` (MCM "Buildings338 AI Skips Armory And Court House", domyslnie TAK, dziala razem z `Buildings338`). Dodany recznie w Settings.cs i McmSettings.cs, bool bez zakresu. Nowy plik `Armoury/src/Buildings338NoBuild.cs`:
+(1) Postfiks na `GetNextBuilding` czynnego modelu (`AccessTools.DeclaredMethod` na klasie deklarujacej, raz na proces z `Buildings338.SessionStart` w kampanii). Gdy w osadzie nie gracza wynik to `bk_building_armory` albo `bk_building_courthouse`, losuje ponownie z tych samych budowli bez tych dwoch. Gdy nie ma innej, zwraca null i kolejka zostaje pusta, jak w grze.
+(2) `DropQueued` w `ArmouryBehavior` tuz przed `BuildFunding.Daily`, czyli zanim pan zaplaci za budowy tej doby. Usuwa te dwie budowle z kolejek osad AI, reszta kolejki zostaje w tej samej kolejnosci. Postep (`BuildingProgress`) i poziom zostaja na obiekcie budowli.
+(3) `BuildFunding.FolkTarget` w galezi "poza kolejka" w osadzie AI pomija sad BK (`FolkSkips`).
+Gracz: bez zmian, w swoich lennach buduje co chce. Zbudowane poziomy dzialaja dalej: BK czyta poziom (Armory +4%/poziom, bk_all.cs:41328), nie kolejke. Zapis gry: nic nowego.
+Linia startu `Budynki (338): start sesji` - dopisek `AI bez zbrojowni i sadu BK TAK` i w latkach `bez zbrojowni i sadu BK: <Typ>.GetNextBuilding`. Linia doby `Budynki (338) bez zbrojowni i sadu BK: dzien N | latka tak (...) | AI losowalo ponownie X (bez innej budowli Y), wyjete z kolejek AI Z, lud pominal sad W | miasta z Armory A (poziomow), z Court House C (poziomow), w kolejkach teraz Q (gracz) | bledy E`.
+NIE w tym wpisie: Theater -> "Temple" i wplywy/lojalnosc z sadu gry (vanilla Courthouse) - poza wiadomoscia Jeffa w tym przebiegu, czekaja na jego decyzje. Port i Harbor w zamku (Jeff: "wylaczam") - osobny krok, nie zrobiony tutaj.
+
+**Ryzyko / co sprawdzic:** regresje - nikt w Armoury nie wybiera budowli AI poza FolkTarget. `BuildFunding.Daily`, Mason, Walls i Engineering czytaja tylko czolo kolejki, a po (2) czolem jest juz inna budowla albo projekt dzienny (`Town.CurrentBuilding` przy pustej kolejce = projekt dzienny, `TickCurrentBuildingForTown` wtedy nie wolany). `CitySack.Burn` i `AddProgress` przebudowuja kolejke tym samym wzorem (Clear + Enqueue). Jedna doba po wczytaniu: AI z zbrojownia/sadem na czole traci kolejke (ta doba bez budowy, nowa budowla z 10%/dobe jak w grze). Kolizje - inna latka na `GetNextBuilding` (BK, ROT, BetterEconomy) nieznana. Jesli model podmienia inny mod, postfiks idzie na jego metode; linia startu podaje typ. Jesli metody brak - "latka NIE" w linii doby, wtedy dziala tylko (2) i (3). Klucz NIE = postfiks wychodzi od razu, DropQueued i FolkSkips nic nie robia, linii doby brak - jak przed co do bitu. W logu sprawdzic: "latka tak", "wyjete z kolejek AI" > 0 tylko w pierwszych dobach, potem 0, "bledy 0", liczba miast z Armory/Court House nie rosnie. Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+## 473-p (13.11) - poprawki po recenzji 473: opis MCM Masona, linia murarza bez lenn gracza nieobjetych, dopisek o przyspieszeniu zlotem, licznik twierdz na suficie zoldu
+
+**Problem:** recenzja 473-a / 473-b (tylko odczyt, bez usterek blokujacych). U1: opis MCM "Buildings338 Mason" (`Settings.cs`, `McmSettings.cs`) nadal mowil o darmowych punktach Masona "at most double" - przy domyslnym Cheaper TAK nieprawda. U2: linia `Budynki (338) murarz` (`Buildings338Mason.CutLine`) liczyla osady z Masonem takze w lennach gracza bez PaidConstructionPlayer, gdzie rabatu nie ma (BK liczy Masona sam). U3: rabat w przyspieszeniu zlotem (`BuildFunding.Boost`) nie trafia do licznika "z rabatu E pkt/d" - linia zanizala bez slowa. U4: `Buildings338Wage.Daily` liczyl twierdze "na suficie" takze, gdy wolanie TotalWage przeszlo przez `_defRan` (Apply nic nie dodalo, roznica 0).
+
+**Przyczyna:** U1 - tekst sprzed 473-a. U2 - `PriceFactor` nie sprawdza `Covered` (prywatne w BuildFunding). U3 - `Boost` wolany wiele razy na dobe (dymek, PowerPostfix, MasonDay), liczenie tam dublowaloby. U4 - `capN++` bez warunku `a != u`.
+
+**Zmiana:** U1 - do obu opisow dopisane "With Buildings338 Mason Cheaper on, the mason lowers the price of a point instead (see below).". U2 - `CutLine` pomija osady bez wlasciciela i lenna gracza bez PaidConstructionPlayer (ten sam warunek co `BuildFunding.Covered`). U3 - linia mowi wprost "bez przyspieszenia zlotem - tam rabat nie liczony w linii" (bez nowego licznika). U4 - `if (a != u) { capN++; capGold += a - u; }`.
+Odrzucone: U5 (pozycja dymku "Mason (cheaper work -X%)") - recenzja sama nazywa to dopiskiem do decyzji Jeffa, nie usterka; zmiana UI nie objeta poleceniem ("nic przy okazji") - do pytania Jeffa.
+
+**Ryzyko / co sprawdzic:** mechanika bez zmian - zmienione tylko napisy MCM i liczniki/tekst linii doby (CutLine czyta, Wage.Daily: capGold przy a == u i tak dodawal 0). Build czysty OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+## 473-b (13.11) - sufit lacznej obnizki zoldu zalogi z budynkow: 50%
+
+**Problem:** Jeff 13.11 (odpowiedz 5 na pytania z `docs/BUDYNKI-TABELA-PROPOZYCJE-2026-11-13.md`: "Tak, limit do 50%"). Zamek z Barracks 3 (-30%), Castellan's Office 3 (-30%) i projektem Slacken Garrison (-5%) placil 35% zoldu zalogi. Log 60 dob: `Budynki (338) zold` - 214 twierdz z budynkiem (zamek Barracks 122, biuro 121), zold przed 210 827 po 164 779 zl/d.
+
+**Przyczyna:** `Buildings338Wage.Apply` dodaje `town.AddEffectOfBuildings(GarrisonWageReduction)` bez granicy (czynniki sumuja sie addytywnie).
+
+**Zmiana:** nowy klucz `Buildings338WageCap` (MCM "Buildings338 Wage Cap", domyslnie 0.50, zakres 0..1, 1 = bez sufitu; Settings.cs + McmSettings.cs recznie, zakres w gen_mcm.py - skryptu nie uruchamiano). W `Apply` po efekcie budynkow: gdy laczna obnizka > sufit - czynnik `+(obnizka - sufit)` z pozycja dymku "Garrison buildings cut wages by at most 50%". Limit zlota zalog AI (`LimitPostfix`, skala a / b z linii doby) liczy sie z zoldu z sufitem - ta sama liczba ludzi, pan placi roznice. Obnizka <= sufit albo sufit 1 - wynik co do bitu jak dotad.
+Linia `Budynki (338) zold: dzien N` - dopisek `| 473-b sufit obnizki 50%: twierdz na suficie X, zold wyzej o Y zl/d` (Y = zold z sufitem - zold bez sufitu, flaga `_noCap` w drugim wywolaniu TotalWage tylko dla twierdz ponad sufit).
+
+**Ryzyko / co sprawdzic:** miasta nie dochodza do sufitu (Barracks miasta najwyzej 15%, biuro tylko w zamkach) - zmiana tylko w zamkach z Barracks i biurem razem > 50% (3+3, albo 3+2 / 2+3 ze Slacken). Sciezki, w ktorych budynki liczy gra (`DefaultPartyWageModel`, licznik `_defCounts`) albo BK (`BkCounts`) - bez sufitu (w logu 60 dob obie 0). `RawWage` / ClanBudget (zold bez budynkow) bez zmian. Koszt: drugie `Over(town)` (przeglad budynkow twierdzy) przy kazdym zewnetrznym GetTotalWage zalogi - ok. 3 750 wywolan/d. Wplyw na zloto: Y zl/d wiecej zoldu panow (szacunek gorny ok. 8 tys. zl/d przy wszystkich 121 zamkach z biurem na 3+3; rzeczywista liczba w nowej linii). Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
+## 473-a (13.11) - Mason: tanszy punkt budowy (-10/-20/-30%) zamiast darmowych punktow
+
+**Problem:** Jeff 13.11 (odpowiedz 2 na pytania z `docs/BUDYNKI-TABELA-PROPOZYCJE-2026-11-13.md`: "Tak"). Log 60 dob (`Armoury-2026-11-12_22-47-01.log`): `Budynki (338) murarz` srednio +314 pkt/d (116 osad, punkty Masona 510) przy `Budowy oplacone` 518 pkt/d pana i `Roboty ludu (P2)` ok. 300 pkt/d - ok. 38% oplaconej mocy budowy swiata bez platnika ("nic z niczego").
+
+**Przyczyna:** `Buildings338Mason.Extra` = min(punkty Masona, punkty pana + ludu + przyspieszenie) dopisywane w `BuildFunding.PowerPostfix` / `PowerIntPostfix` (338 grupa 4, 347e) - punkty bez zaplaty.
+
+**Zmiana:** nowe klucze `Buildings338MasonCheaper` (MCM "Buildings338 Mason Cheaper", domyslnie TAK) i `Buildings338MasonPriceCut` (0.10, zakres 0..0.30; Settings.cs + McmSettings.cs recznie, zakres w gen_mcm.py - skryptu nie uruchamiano). Przy TAK: `Buildings338Mason.PriceFactor(town)` = 1 - poziom Masona (SettlementMason / CastleMason, 1..3) x 0.10 mnozy cene punktu `ppp`: u pana (`BuildFunding.Daily` po czynniku murow 472 - ta sama ppp idzie do R3-11a `OneBudget/OneNeed` i 472 `WallBudget`), u ludu (`FolkWorks`, tylko osady objete rozliczeniem - lenno gracza bez PaidConstructionPlayer liczy Masona BK w mocy gry) i w przyspieszeniu zlotem (`Boost` / czynnik, osady objete). `Buildings338Mason.Points` = 0 przy TAK, wiec dopisek (`Extra`, `MasonDay`), `EngPaidNeed` i `WallFolkCap` licza bez Masona. NIE = dawny dopisek co do bitu (`mcut < 1f` - ppp i przyspieszenie nietkniete).
+Linia `Budynki (338) murarz: dzien N` przy TAK: `473-a tanszy punkt budowy (...) | osad z Masonem X (poz. 1/2/3: a/b/c), z budowa w kolejce Y | oplacone tej doby po tanszej cenie: osad Z (wplat pana P, ludu L), zaplacono G zl za Q pkt, w tym z rabatu E pkt/d, zaoszczedzone zloto S zl/d (te punkty po pelnej cenie) | darmowe punkty Masona 0`.
+
+**Ryzyko / co sprawdzic:** regresje - wszyscy czytelnicy `Buildings338Mason.Points/Extra` (PowerPostfix, PowerIntPostfix, MasonDay, EngPaidNeed, WallBoostUse, WallFolkCap, WallLine) dostaja 0 - spojne; ppp liczona w 2 miejscach (pan, lud) - oba z rabatem; `Walls` start sesji (tabela cen) pokazuje cene bez Masona (tylko log). Mury: rabat i czynnik murow mnoza sie (zamek x3 x0.7 = 100.8 d/pkt przy Masonie 3), dzienny limit murow bez zmian - pan placi teraz cala moc doby do limitu (dawniej do polowy limitu robil Mason za darmo), wiec mury z Masonem kosztuja wiecej zlota niz w 472 (punkt 0.7 zamiast ok. 0.5 pelnej ceny), tempo przy limicie to samo. Ekonomia: budzety pana i ludu bez zmian, zloto tymi samymi drogami (targ - material, kasa / kiesa ludu - place); tempo swiata spada o ok. 12-22% (szacunek: zamiast +314 pkt/d za darmo rabat daje +67..175 pkt/d przy sredniej -17.6%; srodek ok. 1132 -> 950 pkt/d). Przyspieszenie zlotem gracza: dawniej + min(Mason, ...), teraz x 1/(1-d). Naprawa murow po oblezeniu (SiegeWalls) - bez zmian. Build OK, skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 470-p (12.11) - poprawki po recenzji 470: prawdziwy brak jedzenia swiata zostaje w N (U1), S_stos po wczytaniu z zapisu (U2), Empty wymaga progu 221 (U3), napisy (U4, U5)
 
 **Problem:** recenzja 470-a / 470-b. U1: prog 470-b 2 szt./d jest na komorke - maslo (brak swiata 17.4 szt./d, sprzedaz 0, 10 miast z N >= 1.5) przy rownym rozkladzie ok. 1.74 szt./d na miasto wypadloby z N calkiem, choc to prawdziwy brak. U2: przy 470-a TAK po kazdym wczytaniu S_stos = 1 dla wszystkich towarow do pierwszej decyzji 221 (do 28 dob) - regresja wobec 435-L1-p. U3: `Empty()` nie wymagal `g.Short` (przy ValveStockDaysLow < 5 towar, ktorego 221 nie uwaza za krotki, dostawal S_stos). U4: napis MCM "falls back by itself as the stock refills" nieprawdziwy (StockDays to migawka decyzji co 28 dob). U5: linia LP przy TAK pisala "liczone 1.25" i "decyzji N" (to liczba pustych decyzji).

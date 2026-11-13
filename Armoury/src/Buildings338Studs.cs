@@ -42,7 +42,12 @@ namespace Armoury
             Buildings338.Hook("stadniny: BK RunStuds " + (_hooked ? "przejety dla zamkow" : "BRAK"));
         }
 
-        public static bool RunStudsPrefix(Town town) { return !(town != null && town.IsCastle && Buildings338.StudsOn && !Buildings338Ports.BkTicksCastles); }   // BK tyka zamki sam - nasz tick stoi, wiec BK hoduje (recenzja 338)
+        public static bool RunStudsPrefix(Town town)
+        {
+            if (town != null && town.IsCastle && Buildings338.StudsOn && !Buildings338Ports.BkTicksCastles) return false;
+            if (town != null && town.IsCastle && Buildings338Works.On && Buildings338Ports.BkTicksCastles && !Buildings338Works.HasPasture(town)) return false;   // 476-p3 (recenzja A4): BK tyka zamki sam - bez pastwiska tez nie hoduje
+            return true;
+        }   // BK tyka zamki sam - nasz tick stoi, wiec BK hoduje (recenzja 338)
 
         private static List<ItemObject> WarHorses()
         {
@@ -110,7 +115,8 @@ namespace Armoury
                         if (el.EquipmentElement.Item != null && el.EquipmentElement.Item.ItemCategory == DefaultItemCategories.WarHorse) have += el.Amount;
                     }
                     if (!(have < limit)) { _full++; continue; }
-                    if (!(MBRandom.RandomFloat < Chance)) continue;
+                    if (Buildings338Works.StudsNoPasture(t)) continue;                                  // 476-a: bez pastwiska okolicy brak hodowli
+                    if (!(MBRandom.RandomFloat < Buildings338Works.StudsChance(lvl))) continue;        // 476-a: 2% x poziom (NIE - 2%)
                     var war = HorseType(t);
                     if (war == null) { _noType++; continue; }
                     // zrodlo: zwykly kon (bez konia z niczego)

@@ -280,6 +280,11 @@ namespace Armoury
             try { Buildings338Village.SessionStart(); } catch (Exception e) { Stumble(GVProd, "Village.SessionStart", e); }
             try { Buildings338Ports.SessionStart(); } catch (Exception e) { Stumble(GPorts, "Ports.SessionStart", e); }
             try { Buildings338Studs.SessionStart(); } catch (Exception e) { Stumble(GStuds, "Studs.SessionStart", e); }
+            try { Buildings338NoBuild.SessionStart(); } catch (Exception e) { Stumble(GCore, "NoBuild.SessionStart", e); }   // 473-b6
+            try { Buildings338Works.SessionStart(); } catch (Exception e) { Stumble(GCore, "Works.SessionStart", e); }   // 476-a
+            try { Buildings338Crafts.SessionStart(); } catch (Exception e) { Stumble(GCore, "Crafts.SessionStart", e); }   // 476-b
+            try { Buildings338Civic.SessionStart(); } catch (Exception e) { Stumble(GCore, "Civic.SessionStart", e); }   // 476-c
+            try { Buildings338Corvee.SessionStart(); } catch (Exception e) { Stumble(GStock, "Corvee.SessionStart", e); }   // 476-e
             string courier = "?";
             try
             {
@@ -299,7 +304,7 @@ namespace Armoury
             Log.Info("Budynki (338): start sesji | glowny " + YN(Main) + " | zold " + YN(WageOn) + ", autowerbunek " + YN(AutoRecruitOn) + ", zapas jedzenia " + YN(FoodStockOn)
                      + ", dubel jedzenia BK " + YN(FoodDoubleOn) + ", murarz " + YN(MasonOn) + ", urzad podatkowy " + YN(TaxOfficeOn) + ", karawany " + YN(CaravansOn)
                      + ", asymilacja " + YN(AssimilationOn) + ", drogi " + YN(RoadsOn) + ", porty zamkow " + YN(PortsOn) + ", produkcja wsi " + YN(VillageProdOn) + ", projekt Production " + YN(VillageProjectOn)
-                     + ", towary wsi " + YN(VillageGoodsOn) + ", stadniny " + YN(StudsOn) + ", kopalnie zamkow " + YN(CastleMinesOn)
+                     + ", towary wsi " + YN(VillageGoodsOn) + ", stadniny " + YN(StudsOn) + ", kopalnie zamkow " + YN(CastleMinesOn) + ", AI bez zbrojowni i sadu BK " + YN(Buildings338NoBuild.On)
                      + " | BK " + (BkOk ? "jest" : "BRAK") + " | Courier Post na liscie budowy wsi BK: " + courier + " | latki: " + hooks);
         }
 
@@ -310,6 +315,7 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays;
             try { Buildings338Ports.CastleTick(); } catch (Exception e) { Stumble(GPorts, "CastleTick", e); }
             try { Buildings338Studs.CastleTick(); } catch (Exception e) { Stumble(GStuds, "Studs.CastleTick", e); }
+            try { Buildings338Crafts.CastleTick(); } catch (Exception e) { Stumble(GCore, "Crafts.CastleTick", e); }   // 476-b
             try { Buildings338Wage.Daily(day); } catch (Exception e) { Stumble(GWage, "Wage.Daily", e); }
             try { Buildings338AutoRecruit.Daily(day); } catch (Exception e) { Stumble(GRecruit, "AutoRecruit.Daily", e); }
             try { Buildings338Food.Daily(day); } catch (Exception e) { Stumble(GStock, "Food.Daily", e); }
@@ -319,6 +325,12 @@ namespace Armoury
             try { Buildings338Village.Daily(day); } catch (Exception e) { Stumble(GVProd, "Village.Daily", e); }
             try { Buildings338Ports.Daily(day); } catch (Exception e) { Stumble(GPorts, "Ports.Daily", e); }
             try { Buildings338Studs.Daily(day); } catch (Exception e) { Stumble(GStuds, "Studs.Daily", e); }
+            try { Buildings338NoBuild.Daily(day); } catch (Exception e) { Stumble(GCore, "NoBuild.Daily", e); }   // 473-b6
+            try { Buildings338Works.Daily(day); } catch (Exception e) { Stumble(GCore, "Works.Daily", e); }   // 476-a
+            try { Buildings338Crafts.Daily(day); } catch (Exception e) { Stumble(GCore, "Crafts.Daily", e); }   // 476-b
+            try { Buildings338Civic.Daily(day); } catch (Exception e) { Stumble(GCore, "Civic.Daily", e); }   // 476-c
+            try { Buildings338Corvee.Daily(day); } catch (Exception e) { Stumble(GStock, "Corvee.Daily", e); }   // 476-e
+            try { Buildings338Need.Daily(day); } catch (Exception e) { Stumble(GCore, "Need.Daily", e); }   // 476-f
         }
 
         internal static string Tail(int g) { return " | bledy " + Errors(g); }
