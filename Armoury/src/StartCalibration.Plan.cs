@@ -733,16 +733,20 @@ namespace Armoury
             {
             mk = new double[ItemCount]; tf = new double[ItemCount]; own = new double[ItemCount]; kcal = 0; need = 0; nd = 0;
             var live = BuildLive(r, inp, false);
+            var p490 = new double[2 * 2 * G490 * 3];   // 490: sam pomiar (Plan wedlug rynku i grupy towaru - odbior bez sum z watku roboczego)
             foreach (var ld in live)
             {
                 var res = ComputeDistrict(ld, false, null);
                 if (res == null) continue;
                 nd++;
+                try { P490Add(ld, res, p490, _itemKg); } catch { r.P490St++; }   // 490: sam pomiar
                 for (int i = 0; i < ItemCount; i++) { if (ld.TF) tf[i] += res.Market[i]; else { mk[i] += res.Market[i]; own[i] += res.Own[i]; } }
                 kcal += res.OwnKcal; need += res.KcalNeed;
             }
+            if (r.P490 == null) r.P490 = p490;   // 490
             }
             _t0[T0CMk] += T0Now() - tNt;
+            try { string l490 = Rozjazd490Line(r); if (l490 != null) Log.Info(l490); } catch { _r490St++; }   // 490: sam pomiar (po sumach na targ - Plan z watku roboczego albo z odbioru)
             var qb = new StringBuilder(2000);
             qb.Append(PK).Append("na targ (plan doba ").Append(_wDay).Append(", szt. gry/d = kg / (sigma x kg sztuki); wsie + pola mieszczan) wobec wsi dzis (ksiega towarow, srednia ").Append(_emaDays).Append(" dob):");
             bool f3 = true;

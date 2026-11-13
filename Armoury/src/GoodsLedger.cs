@@ -160,6 +160,8 @@ namespace Armoury
             public readonly long[] MkP = new long[3], MkC = new long[3], MkS = new long[2];
             // KS r4 P10 (r4-ceny, pomiar NKS-5u): "wies je swoje" (G3, z magazynu wsi - poza targiem, w MkC[2]) wedlug rynku wsi - linia "KS: rynki" rozdziela "bez rynku"
             public readonly long[] MkOwn = new long[2];
+            // 490 (sam pomiar): plon wsi (GVil) i pola mieszczan (GKs) doby wedlug rynku osady ramki - [0..1] wsie W/E, [2..3] pola mieszczan W/E (tylko licznik)
+            public readonly long[] Vil490 = new long[4];
             // f14-ksiega (recenzja): zrodlo z niczego nazwane, ale przy KS NIE zamykane (dar BK herszta) - czesc z otwartej ramki (dotad "inne ticki dobowe"),
             // dalej liczona do bramki KS (3) w KsNote; tylko licznik
             public long GateOpen;
@@ -169,6 +171,7 @@ namespace Armoury
                 Src.Clear(); Sink.Clear(); Array.Clear(Tr, 0, Tr.Length); Array.Clear(Hold, 0, Hold.Length);
                 Extra = 0; WagonUnits = 0; WagonGold = 0; GateOpen = 0;
                 Array.Clear(MkP, 0, 3); Array.Clear(MkC, 0, 3); Array.Clear(MkOwn, 0, 2);
+                Array.Clear(Vil490, 0, 4);   // 490
             }
         }
 
@@ -216,6 +219,7 @@ namespace Armoury
             _woodLeft = 0; _armsLeft = 0; _wagonGold = 0; _wagonSales = 0;
             _lastDay = -1; _wasOn = false;
             WatchDay = -1;   // N1(b) (noc 16.10)
+            _v490.Clear(); _v490Days = 0;   // 490
         }
 
         private static void Stumble(string where, Exception e)
@@ -696,7 +700,8 @@ namespace Armoury
             var a = _acc[i];
             // recenzja runda 3 (drobne): wies je swoje z magazynu (G3) - poza targiem (rynek 2): nie jest zuzyciem rynku (sterowanie P4, NKS-5), towar nie doszedl do straganu
             if (_mkOn) { int m = _settleMk >= 0 && !ReferenceEquals(group, GKsOwn) ? _settleMk : 2; if (n > 0) a.MkP[m] += n; else a.MkC[m] -= n; }
-            if (_mkOn && n < 0 && (_settleMk == 0 || _settleMk == 1) && ReferenceEquals(group, GKsOwn)) a.MkOwn[_settleMk] -= n;   // KS r4 P10: wies je swoje wedlug rynku wsi (tylko pomiar)
+            if (_mkOn && n < 0 && (_settleMk == 0 || _settleMk == 1) && ReferenceEquals(group, GKsOwn)) a.MkOwn[_settleMk] -= n;
+            if (_mkOn && n > 0 && (_settleMk == 0 || _settleMk == 1)) { if (ReferenceEquals(group, GVil)) a.Vil490[_settleMk] += n; else if (ReferenceEquals(group, GKs)) a.Vil490[2 + _settleMk] += n; }   // 490: sam pomiar   // KS r4 P10: wies je swoje wedlug rynku wsi (tylko pomiar)
             var d = n > 0 ? a.Src : a.Sink;
             Dictionary<string, long> subs;
             if (!d.TryGetValue(group, out subs)) { subs = new Dictionary<string, long>(); d[group] = subs; }
@@ -1375,6 +1380,28 @@ namespace Armoury
             if (gt > 0 || gr > 0) _ksGate[it.StringId] = new[] { gt, gr };
             // KS r4 P10 (r4-ceny): [8..10] - wies je swoje W/E (czesc "bez rynku" z magazynu wsi) i stracone w drodze KS-H (czesc "bez rynku"); [0..7] bez zmian
             if (_ksMkOn) _ksMk[it.StringId] = new[] { a.MkP[0], a.MkP[1], a.MkP[2], a.MkC[0], a.MkC[1], a.MkC[2], a.MkS[0], a.MkS[1], a.MkOwn[0], a.MkOwn[1], Group(a.Sink, GKsLost) };
+            if (_ksMkOn) V490Add(it.StringId, a.Vil490);   // 490: sam pomiar
+        }
+
+        // 490 (sam pomiar, linia "KS: rozjazd Plan - gra (490)"): plon wsi i pol mieszczan wedlug rynku narastajaco od ostatniego odbioru (V490Take) - zboze, mieso,
+        // wieloryb, zywiec; dob z podzialem na rynki. Tylko licznik
+        private static readonly string[] V490Ids = { "grain", "meat", "WhaleMeat", "cow", "hog", "sheep" };
+        private static readonly Dictionary<string, long[]> _v490 = new Dictionary<string, long[]>(StringComparer.Ordinal);
+        private static int _v490Days;
+        private static void V490Add(string id, long[] v)
+        {
+            if (v == null || Array.IndexOf(V490Ids, id) < 0) return;
+            long[] s; if (!_v490.TryGetValue(id, out s)) _v490[id] = s = new long[4];
+            for (int k = 0; k < 4; k++) s[k] += v[k];
+        }
+
+        /// <summary>490: kopia sum plonu wsi i pol mieszczan wedlug rynku od ostatniego odbioru (StringId -> [wsie W, wsie E, pola W, pola E]) i zero; zwraca liczbe dob. Nie rzuca.</summary>
+        internal static int V490Take(Dictionary<string, long[]> dst)
+        {
+            if (dst == null) return 0;
+            dst.Clear();
+            try { foreach (var kv in _v490) dst[kv.Key] = (long[])kv.Value.Clone(); int n = _v490Days; _v490.Clear(); _v490Days = 0; return n; }
+            catch { dst.Clear(); return 0; }
         }
 
         // KS: produkcja, zuzycie i zapas miast doby wedlug rynku (P W/E/bez, C W/E/bez, S W/E) - linia "KS: rynki" (StartCalibration.MarketLine)
@@ -1561,6 +1588,7 @@ namespace Armoury
                 _ksDay.Clear(); _ksDayN = day;    // KS: ta sama doba
                 _ksGate.Clear();                  // ks-arm: bramki KS (zrodla bez nazwy, RemoveParty) - ta sama doba
                 _ksMk.Clear(); _ksMkOn = mkOn;
+                if (mkOn) _v490Days++;            // 490: doba z podzialem na rynki (sumy V490Add)
                 string ts = DateTime.Now.ToString("HH:mm:ss");
                 var all = new StringBuilder();
                 long sumP = 0, sumC = 0, sumD = 0, sumU = 0; int moving = 0, closed = 0;

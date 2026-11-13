@@ -663,6 +663,7 @@ namespace Armoury
                     if ((c == CTown && k != N169Dues && k != N169BkCourt) || v != 0) arm.Add(N169Name[k] + " " + S(v));   // DS (recenzja 17.10): pozycja DS tylko gdy != 0 - log przy wylaczonym DS jak WGRANIE 74; f19-e1: zakupy dworu BK tak samo (doba bez zakupow - linia jak dotad)
                 }
                 fresh += armSum;
+                try { C490Causes(c); } catch { _c490St++; }   // 490: sam pomiar - nowe pozycje 169 narastajaco od wczytania (MoneyLedger.Start490.cs)
                 if (arm.Count > 0) parts.Add("Armoury bez licznika: " + string.Join(", ", arm.ToArray()));
                 // 477-d: "inne" wedlug pliku (netto, najwieksze 8 co do wartosci bezwzglednej)
                 if (c < _otherBy.Length && _otherBy[c].Count > 0)

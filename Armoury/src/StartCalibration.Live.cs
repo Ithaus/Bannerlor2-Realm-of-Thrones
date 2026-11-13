@@ -87,7 +87,8 @@ namespace Armoury
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed;
-            public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; public double[] WSpareKg; public double OrdPcs; }   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
+            public double[] WorksMkt, WorksAll; public Dictionary<string, double[]> WorksPart; public double[] WSpareKg; public double OrdPcs;
+            public double[] S490; }   // 490 (sam pomiar): kroki drogi towaru okregu w grze (StartCalibration.Rozjazd490.cs); null - rachunek bez czynnikow (Plan)   // m114-prace: dodatek prac okregu, ktory idzie NA TARG (sztuki gry na dobe, po zimie i czynnikach rak); null - okreg bez dodatku
         // m114-prace (recenzja): WorksAll - caly dodatek po czynnikach (sztuki gry na dobe), WorksPart - kg dodatku czesci przed zima (klucz DistrictWorks.PartKey):
         // udzial czesci w dodatku na targ (wycena okna i podzial puli miedzy posiadaczy wedlug dodatku NA TARG, nie wedlug calego E)
 
@@ -383,12 +384,14 @@ namespace Armoury
             var res = new DistResult();
             var prod = res.Prod;
             KsDeliver.Produce(d, ld.B, prod);
+            if (factors) { res.S490 = new double[K490 * G490]; S490Snap(res.S490, 0, prod, kgT, 1.0); }   // 490: sam pomiar (tylko odczyt prod)
             if (factors && !ld.TF) GearKs(ld, prod);        // 435-L3: czynnik sprzetu m zajec czesci (rece bez sprzetu) - tylko gra, przed stadem, zamowieniami i pracami okregu; klucz NIE - nic
             if (factors && !ld.TF) HerdKs(ld, prod, kgT);   // R3-06c (p5-stada, recenzja): stado wsi PRZED pracami okregu (stado prac pedzi DistrictWorks) - tylko gra; StartCalibration.Stada.cs
             bool ord = factors && !ld.TF && OrderKs(ld, prod, kgT);   // 363: rece z pola na zamowienie materialu (wies-wytworca) - przed pracami okregu i czynnikami; tylko gra
             Dictionary<string, double[]> wPart = null;
             double[] wx = factors ? WorksKs(ld, prod, out wPart) : null;   // inwest: dodatek prac okregu (b x kg zajecia czesci) przed zima i czynnikami rak - tylko gra (Plan nie)
             double[] wSnap = wx != null ? (double[])prod.Clone() : null;   // m114-prace: produkcja z dodatkiem przed zima i czynnikami (dodatek po nich = wx x po / przed)
+            if (res.S490 != null) { S490Snap(res.S490, 1, prod, kgT, 1.0); S490Snap(res.S490, 2, prod, kgT, W490(ld)); }   // 490: sam pomiar - po dodatkach przed zima, x sama zima
             double f = 1.0;
             if (factors)
             {
@@ -418,11 +421,13 @@ namespace Armoury
                     }
                     res.WSpareKg = sk;                                // linia 297: kg produkcji okregu, ktorej zima juz nie zabiera (przed stolem okregu i targiem)
                 }
+                if (res.S490 != null) S490Snap(res.S490, 3, prod, kgT, 1.0);   // 490: sam pomiar - x zima x rece
                 HarvestYear.KsApply(ld.TF ? (ld.T != null ? ld.T.Settlement : null) : (ld.V != null ? ld.V.Settlement : null), prod);   // R3-05e: plony pol okregu x rok urodzaju (rok zniw - poza zima; 432: rok trybu zimy takze w zimie)
                 // R3-06d (TiredLand): ziemia zajeta ponad baze okregu - tylko gra (Plan bez zmian); przedtem kopia plonu bez stada i ziemi do bramki krainy (StartCalibration.Stada.cs)
                 LandKs(ld, prod, f);
                 // 363: towar zamowienia po zimie i czynnikach rak wyjety z produkcji PRZED stolem okregu i targiem (okreg go nie spala, wozy go nie wioza) - sztuki doby dla zamawiajacych
                 if (ord) OrderAfter(ld, res, prod, kgT);
+                if (res.S490 != null) S490Snap(res.S490, 4, prod, kgT, 1.0);   // 490: sam pomiar - po roku urodzaju, ziemi i zamowieniach
             }
             if (wx != null && wSnap != null)
                 for (int i = 0; i < ItemCount; i++) wx[i] = wx[i] > 0 && wSnap[i] > 1e-12 ? wx[i] * Math.Max(0.0, prod[i] / wSnap[i]) : 0.0;   // m114-prace: dodatek po czynnikach (przed stolem okregu)
@@ -444,6 +449,7 @@ namespace Armoury
                 res.MarketKg[i] = m;
                 res.Market[i] = m / (sigma * kgT[i]);
             }
+            if (res.S490 != null) S490End(res, kgT);   // 490: sam pomiar - wlasny stol i na targ
             if (wx != null)
             {
                 // m114-prace: okreg zjada stala ilosc (Own = min(produkcja, potrzeba)), wiec dodatek na targ = min(dodatek, na targ) - targ z dodatkiem minus targ bez niego
