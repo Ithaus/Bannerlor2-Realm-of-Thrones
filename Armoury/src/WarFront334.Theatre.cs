@@ -244,7 +244,8 @@ namespace Armoury
                 var d = e.Item1;
                 p.SetBehaviorScore(in d, -1f);
                 if (kind == 1) _dVetoThink++; else if (kind == 3) _dVetoCrown++; else if (kind == 4) _dVetoWest++; else _dVetoIron++;
-                if (Say("teatr|" + party.StringId + "|" + st.StringId))
+                // R2 (analiza 120a, 13.11): 41% logu to weta opcji z ocena gry 0.00 - log tylko, gdy gra realnie rozwazala cel (ocena > 0); weto i liczniki bez zmian
+                if (e.Item2 > 0f && Say("teatr|" + party.StringId + "|" + st.StringId))
                     Log.Info(Tag + "weto teatru | dzien " + Today + " | " + Nm(party) + " (" + Nm(f) + (party.Army != null ? ", wodz armii" + (ArmyHasPlayer(party.Army) ? " z graczem" : "") : "") + ") -> "
                              + (siege ? "oblezenie " : "najazd ") + Nm(st) + " (" + st.StringId + ", kultura " + (CultureOf(st) ?? "-") + ", " + Nm(st.MapFaction) + ", ocena gry " + F2(e.Item2) + ")"
                              + (kind == 1 ? " - Polnoc do Krwawych Godow walczy na Polnocy, w Dorzeczu i na Zachodzie." : kind == 4 ? " - Polnoc do Krwawych Godow nie oblega Casterly Rock ani miast Zachodu (465)." : kind == 3 ? " - korona do Krwawych Godow nie idzie za Przesmyk (334e)." : " - Wyspy: cel poza teatrem tej fazy."));

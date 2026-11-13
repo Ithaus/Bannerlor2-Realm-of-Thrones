@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## R2 (13.11) - weto teatru 334: log tylko opcji, ktore gra realnie rozwazala (ocena > 0)
+
+**Problem:** analiza 120a (docs/ANALIZA-120A-2026-11-13.md, pkt 5): 66 723 ze 162 121 linii logu (41%) to "weto teatru", z tego 65 933 dla opcji z "ocena gry 0.00".
+
+**Przyczyna:** WarFront334.Theatre.cs logowal kazde weto; Say() tlumi tylko powtorki pary w ciagu doby.
+
+**Zmiana:** linia "weto teatru" tylko, gdy ocena gry opcji > 0. Samo weto (SetBehaviorScore -1) i liczniki _dVeto* bez zmian.
+
+**Ryzyko / co sprawdzic:** zachowanie bez zmian; log ok. 40% mniejszy; liczniki dobowe 334 jak dotad.
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-p7 (13.11) - panszczyzna: linia doby wolala GetPopulationFoodProduction na czynnym modelu jedzenia innego typu (TargetException)
 
 **Problem:** autotest at-476b (13.11 01:48, session-2026-11-13_01-35-58.log): "ERROR IN A MOD [Armoury] Armoury.Buildings338Corvee.Delta | TargetException: Object does not match target type" ze sciezki Buildings338Corvee.Daily -> Delta (bledy CrashScribe 25 zamiast 23).
