@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 474-P8b (13.11) - dzwiek karczmy na mapie przy zajezdzie (glosniej blisko, cichnie z odlegloscia)
+
+**Problem:** Jeff 13.11, decyzja 4: "jak przejezdzam obok karczmy to slysze odglosy karczmy, jak sie oddalam na mapie to cichna i milkna". Dzis zajazd na mapie jest cichy; tlo karczmy gra tylko w menu zajazdu (m95-zajazd U2, 2D).
+
+**Przyczyna:** brak zrodla dzwieku przy budynku zajazdu. DOWOD (dekompilacja 1.4.8): mapa gra dzwieki na scenie mapy (`SoundEvent.CreateEvent(id, _mapScene)` - MapCameraView, deszcz/snieg), sluchacz = cel kamery podniesiony o 7.5% ku kamerze (`MapCameraView`: `SoundManager.SetListenerFrame` co klatke); `SoundEvent` NIE ma glosnosci (`Play/Stop/SetPosition/SetParameter/SetEventMinMaxDistance`, bez `SetVolume`); `SoundEvent.Release` po `Stop` nie zwalnia (Stop zeruje id). Zdarzenie gry `event:/mission/ambient/detail/tavern_exterior` (Native `sound_event_data.gen.xml`: `max_distance` 50) - gwar i muzyka zza scian karczmy, tlumione przez FMOD z odlegloscia.
+
+**Zmiana:** nowy klucz `RoadsideInnMapSound` (MCM "Roadside Inn Map Sound", grupa A night's rest, domyslnie TAK; Settings.cs + McmSettings.cs recznie, bool). Nowy `Armoury/src/RoadsideInnMapSound.cs`, wolany z `SubModuleMain.OnApplicationTick` (wlasny licznik bledu ladowania typu, po 3 - koniec do konca sesji):
+- 10 razy na sekunde: najblizszy zajazd w promieniu 6 jedn. od DRUZYNY gracza (siatka zajazdow 3 x 3 komorki - `RoadsideInns.Nearest`); tylko na mapie (MapState, ekran mapy gotowy, bez ladowania, bez misji), bez otwartego menu (menu zajazdu ma swoje tlo) i rozmowy, druzyna na ladzie poza osada;
+- jedno zrodlo naraz na scenie mapy, tworzone raz przy wjezdzie w zasieg; glosnosc wedlug odleglosci druzyny: zrodlo stawiane od sluchacza (`SoundManager.GetListenerFrame`) w kierunku zajazdu od druzyny, w odleglosci d / 6 x zasieg zdarzenia (`GetEventMinMaxDistance`, zapas 50) - przy 6 jedn. zrodlo na granicy zasiegu FMOD = cisza, dalej zatrzymane i zwolnione (Stop + `BattleSound.ReleaseById`); kierunek (lewo / prawo) zostaje;
+- wywrotka przy tworzeniu - ten zajazd pomijany 10 s, licznik potkniec (bez globalnego wylacznika).
+Log: start `Dzwiek karczmy na mapie (474-P8b): start sesji | klucz Roadside Inn Map Sound TAK | zdarzenie event:/mission/ambient/detail/tavern_exterior | cisza od 6 jedn. od zajazdu, jedno zrodlo naraz | potkniecia 0.`; pierwsze 10 wejsc w zasieg na sesje `... slychac <zajazd> (<uid>) - druzyna D jedn. (cisza od 6) | zasieg zdarzenia X | wejscie w zasieg nr N dzis.`; w linii doby `Zajazdy (ZJ): dzien N` dopisek `dzwiek na mapie (474-P8b): wejscia w zasieg a, zatrzymania b, gralo S s, ticki T (srednio M ms), potkniecia 0` (tylko przy kluczu TAK).
+
+**Ryzyko / co sprawdzic:** NIE = jedno porownanie na tick aplikacji, nic nie gra, linia doby bez dopisku. Regresje: tlo menu zajazdu (RoadsideInnStay U2) - przy otwartym menu nasze zrodlo zatrzymane, wiec bez dwoch karczm naraz; sen w zajezdzie to menu - tez cisza mapy. Kolizje: muzyka mapy m165 (psai / nasze utwory) - inna droga (kanal muzyki), nie dotykamy; dzwieki mapy gry (TickAmbientSounds) - osobne zrodla. Wydajnosc: 10 x na sekunde siatka 9 komorek + `SetPosition`; zrodlo tworzone raz na przejazd. NIE sprawdzone w grze: czy `tavern_exterior` (zdarzenie misji) gra na scenie mapy i z jaka glosnoscia (linia "slychac" pokaze zasieg zdarzenia; zrodlo przy sluchaczu przy d = 0 moze byc za glosne albo za ciche wzgledem tla mapy), czy parametr Daytime z mapy pasuje. Build czysty (0 bledow), skan IL 30.
+
+**Status:** DO SPRAWDZENIA (nie wgrane).
+
 ## 474-P8 (13.11) - wnetrze zajazdu przy szlaku 3D ("Enter the Inn")
 
 **Problem:** Jeff 13.11, decyzja 4 ("Enter the Inn"; projekt `docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md` pkt 2, paczka 8): zajazd przy szlaku (135 z `arm_roadside_inns.tsv`) to dzis samo menu `arm_roadinn` (nocleg, plotki, "Ride on") - nie da sie wejsc do srodka.

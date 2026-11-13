@@ -519,6 +519,13 @@ namespace Armoury
                 try { RoadsideInnStay.AppTick(); }
                 catch (Exception e) { _innStayFails++; Log.Error("RoadsideInns.Stay: straznik nie laduje sie (proba " + _innStayFails + "/3)", e); }
             }
+            // 474-P8b: dzwiek karczmy na mapie przy zajezdzie (10 razy na sekunde; klucz NIE i nic nie gra - jedno porownanie; wlasny try w srodku) - tu tylko blad
+            // ladowania typu (SandBox.View.Map), liczony; po 3 dzwiek nie startuje do konca sesji (gra bez zmian)
+            if (_innSoundFails < 3)
+            {
+                try { RoadsideInnMapSound.AppTick(); }
+                catch (Exception e) { _innSoundFails++; Log.Error("RoadsideInnMapSound: nie laduje sie (proba " + _innSoundFails + "/3)", e); }
+            }
             // m103-sceny: straznik scen prologu 298 i okien opowiesci (4 razy na sekunde; zamkniecie okna bez przycisku, kolejka zwolnien obrazkow z plikow - w kazdej
             // kampanii; sceny tylko w kampanii z prologiem; wlasny try w srodku) - tu tylko blad ladowania typu (okno dziedziczy po typie ROT), liczony; po 3 straznik
             // nie startuje do konca sesji (gra bez zmian). PRZED returnem wiosek - inaczej klucz Map Villages = off wylaczylby sceny.
@@ -600,6 +607,7 @@ namespace Armoury
         private static int _mapRoadsLoadFails;
         private static int _innsLoadFails;
         private static int _innStayFails;   // m95-zajazd: blad ladowania typu straznika pobytu (RoadsideInnStay.AppTick)
+        private static int _innSoundFails;   // 474-P8b: blad ladowania typu dzwieku karczmy na mapie (RoadsideInnMapSound.AppTick)
         private static int _storyTickFails;   // m103-sceny: blad ladowania typu straznika scen prologu (Prologue.ScenesAppTick)
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]

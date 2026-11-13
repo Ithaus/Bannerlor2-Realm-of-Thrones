@@ -644,6 +644,7 @@ namespace Armoury
                          + " | " + TownInns.RoadDayText()
                          + " | widok: " + InnViewStats.DayText()
                          + (RoadsideInnInterior.On ? " | " + RoadsideInnInterior.DayText() : "")
+                         + (RoadsideInnMapSound.On ? " | " + RoadsideInnMapSound.DayText() : "")
                          + " | tick dojazdu: " + _dTickN + " sprawdzen, srednio " + tickMs.ToString("0.0000", Inv) + " ms"
                          + " | potkniecia dzis " + _dStumbles + " (od wczytania " + _stumbles + ").");
             }

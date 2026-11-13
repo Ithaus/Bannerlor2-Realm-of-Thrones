@@ -6084,6 +6084,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool RoadsideInnInterior { get; set; } = true;
 
+        [SettingPropertyBool("Roadside Inn Map Sound", HintText = "on the map, a roadside inn sounds like one as you ride by: the muffled hubbub and music of a tavern, louder the nearer your party passes, fading to nothing about six map steps away. Only the nearest inn is heard, and only on the open map - not in menus, conversations or scenes. Off = silent inns on the map, as before", RequireRestart = false)]
+        [SettingPropertyGroup("A night's rest")]
+        public bool RoadsideInnMapSound { get; set; } = true;
+
         [SettingPropertyBool("Inn Gossip Pages", HintText = "the gossip window never overflows its frame: when there is more talk than fits, it is split into pages - 'Hear more' shows the next one, 'Enough talk' ends it. Off = all the gossip in one window, as before", RequireRestart = false)]
         [SettingPropertyGroup("A night's rest")]
         public bool InnGossipPages { get; set; } = true;
@@ -14528,6 +14532,7 @@ namespace Armoury
             s.RoadsideInnHideParty = RoadsideInnHideParty;
             s.RoadsideInnTavernSound = RoadsideInnTavernSound;
             s.RoadsideInnInterior = RoadsideInnInterior;
+            s.RoadsideInnMapSound = RoadsideInnMapSound;
             s.InnGossipPages = InnGossipPages;
             s.InnGossipNeedsDrink = InnGossipNeedsDrink;
             s.InnKeeperAleLine = InnKeeperAleLine;

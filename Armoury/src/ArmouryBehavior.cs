@@ -2591,6 +2591,7 @@ namespace Armoury
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
             try { RoadsideInns.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInns.SessionStart", e); }
             try { RoadsideInnInterior.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInnInterior.SessionStart", e); }   // 474-P8: linia startu wnetrza (klucz, plik kwestii)
+            try { RoadsideInnMapSound.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInnMapSound.SessionStart", e); }   // 474-P8b: dzwiek karczmy na mapie - linia startu, zrodlo poprzedniej sesji zwolnione
             try { SideVillageVisit.SessionStart(); } catch (Exception e) { Log.Error("SideVillageVisit.SessionStart", e); }   // m97-wioski: linia "Wioski poboczne (WP): start sesji"   // sw-zajazdy: linia "Zajazdy (ZJ): start sesji" - plik, zajazdy wedlug ludzi, najblizszy sasiad
             try { HarvestFairs.SessionStart(); } catch (Exception e) { Log.Error("HarvestFairs.SessionStart", e); }   // R3-05a: latka popytu (raz na proces), kalendarz krain, linia "Jarmarki po zniwach (R3-05a): start sesji"
             try { RiverBarges.SessionStart(); } catch (Exception e) { Log.Error("RiverBarges.SessionStart", e); }   // R3-05b: plik arm_rivers.tsv, latka oceny miast BK (raz na proces), linia "Barki rzeczne (R3-05b): start sesji"
