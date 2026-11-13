@@ -75,6 +75,8 @@ namespace Armoury
             public bool SRaised;                                   // recenzja f5 (uwaga 2): podwyzka wedlug nadwyzki od ostatniego przegladu zwyklego (sesja; tylko licznik pily)
             public long SMin = long.MaxValue;                      // f7-kasy (Ks Farm Catch Up): najmniejsza kasa od poczatku pomiaru przyrostu (sesja) - zapas, ktory przelezal cale okno
             public long CLeft, CPer;                               // f7-kasy: reszta gersumy do zaplaty i czesc na dobe (rozlozona na okno przegladu; placi TownDay; sesja)
+            public long CBelow;                                    // 489-p: gersuma zdjeta z kasy PONIZEJ starego progu (1.5 x zapas + dni firmy) - doliczana do kasy w decyzjach o firmie (sesja)
+            public int BDay = -1; public long BMin = long.MaxValue; // 489-p: okno gersumy w pasmie (Ks Town Surplus Reserve Mult .. 1.5) x zapas - doba startu, najmniejsza kasa (sesja)
             public int SLow = -1;                                  // m103 P3 (e, Ks Farm Surplus Cap Net): doba startu cyklu obnizki z dochodu (kasa po naleznosciach do 1.5 x zapas albo zaleglosci; sesja)
             public int FastDay = -1;                               // m105 G1 (Ds Farm Cut Below Reserve): doba ostatniej szybkiej obnizki (najwyzej raz na FastGapDays; sesja)
             public int DebtCutDay = -1;                            // 322d (Town Debt Farm Cut): doba ostatniej obnizki firmy przy duzym dlugu rady (najwyzej raz na FastGapDays; sesja)
@@ -119,6 +121,9 @@ namespace Armoury
         private static int _cuRev, _cuDec, _cuNone, _cuNoGrow, _cuNoFarm, _cuPaidN, _cuShortN, _cuHouse, _cuArr, _cuRemit, _cuLow, _cuStum, _cuStumSess, _cuNS;
         // 483 (Ks Farm Catch Up When Flat): gersuma postanowiona przy kasie bez przyrostu (liczba, zl) - doba (od linii do linii)
         private static int _cuFlat; private static double _cuFlatAmt;
+        // 489-p: pasmo (Ks Town Surplus Reserve Mult .. 1.5) x zapas - miasto-doby w pasmie, gersumy postanowione w pasmie (liczba, zl), miasto-doby z brama firmy
+        // otwarta tylko dzieki doliczeniu CBelow, zdjete ponizej starego progu (zl) - doba (od linii do linii)
+        private static int _cuBand, _cuBandDec, _cuHeld; private static double _cuBandAmt; private static long _cuBelowTook;
         private static double _cuDecAmt, _cuBills;
         private static long _cuPaidL, _cuPaidC, _cuTook, _cuShort, _cuNoLord, _cuPaidLS, _cuPaidCS;
         private static long _cuTicks;
@@ -131,6 +136,7 @@ namespace Armoury
         {
             _cuRev = _cuDec = _cuNone = _cuNoGrow = _cuNoFarm = _cuPaidN = _cuShortN = _cuHouse = _cuArr = _cuRemit = _cuLow = _cuStum = 0;
             _cuFlat = 0; _cuFlatAmt = 0;                                   // 483
+            _cuBand = _cuBandDec = _cuHeld = 0; _cuBandAmt = 0; _cuBelowTook = 0;   // 489-p
             _cuDecAmt = _cuBills = 0; _cuPaidL = _cuPaidC = _cuTook = _cuShort = _cuNoLord = 0; _cuTicks = 0;
             _tlFloorUp = _tlFloorN = _tlSgOut = _tlSgIn = 0; _tlSgN = 0;   // scalenie f7/f8: okno linii kasy kupcow
             _klFloorUp = _klFloorN = _klSgOut = _klSgIn = 0; _klSgN = 0;   // recenzja calosci 18.10: to samo dla korona2 (pozyczki koron od miast i zaliczki DS)
@@ -668,7 +674,8 @@ namespace Armoury
                 // 298 tys./tydz, doplyw 225 tys./tydz - zaleglosci +136 tys. w tydzien). Z raty firmy tylko czesc zebrana od ostatniego dnia raty (GatheredShare) - tuz
                 // po racie kasa juz ja oddala, cala rata odjeta drugi raz ciela miasta placace w pelni wedlug dnia raty z hasza id (recenzja f16). Klucz wylaczony - cala kasa jak dotad
                 double owes = s.KsFarmSurplusNetOfDues ? CofferOwes(f, s) : 0.0;
-                return StartCalibration.KsTownApplied(t) && t.Gold - owes > OverReserve * TownPurse.Reserve(t);
+                // 489-p: gersuma zdjeta ponizej starego progu (CBelow) doliczona - obnizka firmy (podatek biezacy) jak przy starym progu 1.5; przy 1.5 CBelow = 0 (jak dotad)
+                return StartCalibration.KsTownApplied(t) && t.Gold - owes + Math.Max(0, f.CBelow) > OverReserve * TownPurse.Reserve(t);
             }
             catch (Exception e) { Stumble("SurplusHolds", e); return false; }
         }
@@ -759,16 +766,51 @@ namespace Armoury
                     // kasa przed dniem raty trzyma doplyw zebrany na te rate, reszte gersumy i zaleglosci - to nie nadwyzka kupcow. Klucz wylaczony - cala kasa (jak dotad)
                     double gq = capNet ? g - CofferOwes(f, s) : g;
                     int remit = RemitOf(st);
-                    if (gq <= OverReserve * TownPurse.Reserve(t) || remit != 0 || arrears)
+                    // 489-p (recenzja): decyzje o FIRMIE (podwyzka, obnizka z dochodu, szybka obnizka, SurplusHolds) na kasie jak przy starym progu gersumy - z doliczona
+                    // gersuma zdjeta ponizej 1.5 x zapas + dni firmy (CBelow, najwyzej (1.5 - mnoznik) x zapas); podatek biezacy nie idzie w dol tylko dlatego, ze gersuma
+                    // zeszla do 1.0 x. Kasa sama ponad 1.5 x zapas - CBelow od nowa (stary i nowy prog zgodne). Mnoznik >= 1.5 - CBelow zawsze 0 (co do monety jak dotad)
+                    int resv = TownPurse.Reserve(t);
+                    if (gq > OverReserve * resv) f.CBelow = 0;
+                    double gqF = gq + Math.Max(0, f.CBelow);
+                    if (gqF <= OverReserve * resv || remit != 0 || arrears)
                     {
-                        if (cu) CatchUpWhy(st, t, gq, arrears);                  // f7-kasy: tylko licznik powodu (linia)
+                        if (cu) CatchUpWhy(st, t, gqF, arrears);                 // f7-kasy: tylko licznik powodu (linia)
                         f.SG0 = long.MinValue; f.SGDay = -1;
                         // m105 G1 (Ds Farm Cut Below Reserve): kasa po naleznosciach PONIZEJ zapasu kupcow albo zaleglosci - firma od razu do biezacego doplywu (FastCut);
                         // gdy szybka obnizka nic nie zmienila (firma juz przy doplywie, bez pomiaru, odstep 7 dob) - obnizka z dochodu (e) jak dotad
-                        bool fast = capNet && fastOn && remit == 0 && (gq < TownPurse.Reserve(t) || arrears) && FastCut(f, today);
+                        bool fast = capNet && fastOn && remit == 0 && (gqF < resv || arrears) && FastCut(f, today);
                         if (capNet && !fast) IncomeCut(f, today, days, mx, remit != 0);  // m103 P3 (e): obnizka z dochodu w tym samym cyklu co podwyzka
+                        // 489-p (recenzja, Jeff "obnizyc do x 1"): miasto, ktorego kasa po naleznosciach stoi w pasmie (mnoznik .. 1.5] x zapas, bez oblezenia / zaleglosci,
+                        // nie "domy najpierw" - gersuma z zapasu okna jak w przegladzie (CatchUpDecide: udzial x (najmniejsza kasa okna - rachunki - CLeft - prog 1.0 x
+                        // zapas + dni firmy)), co Ks Farm Surplus Review Days; BEZ podwyzki firmy (brama firmy zamknieta). Wlasne okno (BDay / BMin) - pomiar przyrostu
+                        // podwyzki (SG0) zostaje zamkniety jak dotad. Ta sama droga zlota (CatchUpPay: kasa -> pan / skarbiec korony)
+                        try
+                        {
+                            if (cu && remit == 0 && !arrears && CatchUpMult(s) < OverReserve && gq > CatchUpMult(s) * resv && !KsFolkIncome.HousesFirst(st))
+                            {
+                                _cuBand++;
+                                long gb = t.Gold;
+                                if (f.BDay < 0 || f.BDay > today) { f.BDay = today; f.BMin = gb; }
+                                else
+                                {
+                                    if (gb < f.BMin) f.BMin = gb;
+                                    if (today - f.BDay >= days)
+                                    {
+                                        int d0 = _cuDec; double a0 = _cuDecAmt;
+                                        CatchUpDecide(f, st, t, gb, f.BMin, s, days);    // wlasny try/catch (licznik potkniec)
+                                        f.SG0 = long.MinValue; f.SGDay = -1;            // brama firmy zamknieta - bez pomiaru przyrostu (CatchUpDecide ustawia SG0)
+                                        if (_cuDec > d0) { _cuBandDec++; _cuBandAmt += _cuDecAmt - a0; }
+                                        f.BDay = today; f.BMin = gb;
+                                    }
+                                }
+                            }
+                            else f.BDay = -1;
+                        }
+                        catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUpBand", e); }
                         continue;
                     }
+                    f.BDay = -1;                                                 // 489-p: brama firmy otwarta - gersuma idzie zwykla droga przegladu
+                    if (gq <= OverReserve * resv) _cuHeld++;                     // 489-p: otwarta tylko dzieki CBelow (licznik linii f7)
                     f.SLow = -1;                                                 // m103 P3 (e): kasa ponad progiem - cykl obnizki od nowa (klucz wylaczony - pole nieczytane)
                     // domy najpierw: R albo P miasta ponizej dolnej granicy pasma - nadwyzka kupcow idzie do nich wyplata kupcom M6 (pelna stawka), firma bez podwyzki (model
                     // simlud: biedne R/P 35 miast Essos d160 8.3 zamiast 5.6 dnia koszyka); pomiar od nowa
@@ -1193,6 +1235,8 @@ namespace Armoury
                 long avail = Math.Max(0L, (long)Math.Floor(t.Gold - CatchUpKeep(f, reserve, s)));
                 long pay = Math.Min(want, avail);
                 if (pay <= 0) return;
+                double oldKeep = CatchUpKeep(f, reserve, s, OverReserve);         // 489-p: stary prog (1.5 x zapas + dni firmy) - czesc zaplaty ponizej niego do CBelow
+                long gBefore = t.Gold;
                 double F = f.FL + f.FC;
                 long pL = k == null || !(F > 0) ? pay : (long)Math.Floor(pay * f.FL / F), pC = pay - pL;
                 // m103 P3 (f): gersuma miasta bez firmy (Ks Farm Surplus Cap Net) - podzial pan / korona jak w firmach miast swiata (dotad calosc panu)
@@ -1205,6 +1249,19 @@ namespace Armoury
                 // f19-e3: ta sama kwota co w lordPay / crownFarm (RentToday pana, CrownToday korony) - osobno, jako jednorazowa (licznik; klucz czyta wolajacy)
                 if (gL > 0) { long g1; _gersLord.TryGetValue(st, out g1); _gersLord[st] = g1 + gL; }
                 if (gC > 0 && k != null) { long g2; _gersCrown.TryGetValue(k, out g2); _gersCrown[k] = g2 + gC; }
+                // 489-p: czesc zdjeta ponizej starego progu (min(kasa przed, prog) - kasa po), najwyzej (1.5 - mnoznik) x zapas na miasto; przy mnozniku >= 1.5 zawsze 0
+                try
+                {
+                    double below = Math.Min((double)gBefore, oldKeep) - t.Gold;
+                    if (below > 0)
+                    {
+                        long b = (long)Math.Min(below, (double)Math.Max(0L, gBefore - t.Gold));
+                        double cap = Math.Max(0.0, (OverReserve - CatchUpMult(s)) * Math.Max(0, reserve));
+                        f.CBelow = (long)Math.Min(cap, (double)Math.Max(0, f.CBelow) + b);
+                        _cuBelowTook += b;
+                    }
+                }
+                catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUpPay(CBelow)", e); }
                 _cuTook += g0 - t.Gold; _cuPaidL += (long)lord.Gold - h0; _cuPaidC += k != null ? (long)k.KingdomBudgetWallet - w0 : 0;
                 _cuPaidLS += gL; _cuPaidCS += gC;
                 if (got > 0) { _cuPaidN++; _cuNS++; }
@@ -1229,7 +1286,7 @@ namespace Armoury
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
-                long gold = 0, res = 0, over15 = 0, overKeep = 0, left = 0; int n = 0, nOver = 0, nKeep = 0, nBelow = 0, nLeft = 0;
+                long gold = 0, res = 0, over15 = 0, overKeep = 0, left = 0; int n = 0, nOver = 0, nKeep = 0, nBelow = 0, nLeft = 0, nBand = 0; long below = 0;
                 foreach (var f in _farm.Values)
                 {
                     try
@@ -1247,6 +1304,8 @@ namespace Armoury
                         double ok = g - CatchUpKeep(f, r, s);
                         if (ok > 0) { overKeep += (long)ok; nKeep++; }
                         if (g < r) nBelow++;
+                        if (g > CatchUpMult(s) * r && g <= OverReserve * r) nBand++;      // 489-p: pasmo (mnoznik .. 1.5] x zapas (cala kasa, bez naleznosci)
+                        if (f.CBelow > 0) below += f.CBelow;
                     }
                     catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUpLine(miasto)", e); }
                 }
@@ -1269,6 +1328,9 @@ namespace Armoury
                   .Append(" | miasta z KS ").Append(n).Append(": kasy razem ").Append(gold).Append(", zapas kupcow razem ").Append(res)
                   .Append(", ponad 1.5 x zapas ").Append(over15).Append(" (").Append(nOver).Append(" miast), ponad prog gersumy ").Append(overKeep).Append(" (").Append(nKeep).Append(" miast)")
                   .Append(", ponizej zapasu kupcow ").Append(nBelow).Append(" miast")
+                  .Append(" | 489-p pasmo ").Append(CatchUpMult(s).ToString("0.00", Inv)).Append("-1.50 x zapas: miast teraz ").Append(nBand).Append(", miasto-doby w przegladzie pasma ").Append(_cuBand)
+                  .Append(", gersuma postanowiona w pasmie ").Append(_cuBandDec).Append(" (").Append(N0(_cuBandAmt)).Append(" zl), zdjete dzis ponizej starego progu ").Append(_cuBelowTook)
+                  .Append(", doliczone do kasy w decyzjach o firmie (CBelow) razem ").Append(below).Append(", brama firmy otwarta tylko dzieki temu ").Append(_cuHeld).Append(" miasto-dob")
                   .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_cuStum).Append(" (sesja ").Append(_cuStumSess).Append(").");
                 Log.Info(sb.ToString());
             }
