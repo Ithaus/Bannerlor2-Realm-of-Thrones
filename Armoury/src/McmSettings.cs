@@ -2524,6 +2524,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SiegeAiRetryCooldown { get; set; } = true;
 
+        [SettingPropertyBool("Siege Hold Ten Days", HintText = "with Siege AI Holds Fresh Siege and Siege AI Retry Cooldown: an AI host stays at a fresh siege for up to ten days (not two) unless relief, hunger or the defence of its own stronghold call it away, and a realm that gives up a siege within ten days without a battle does not come back to the same town or castle for a week (not three days). Stops armies from leaving a siege after two or three days and coming straight back. Off = two days and three days, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeHoldTenDays { get; set; } = true;
+
         [SettingPropertyBool("Siege Ai Trebuchets Hit Walls", HintText = "AI trebuchets aim at the walls while any stretch of wall still stands - the game rolled between the walls and the defenders' engines, and walls were almost never hit; other engines still choose as in the game. Your own camp is unchanged. Off = as in the game", RequireRestart = false)]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeAiTrebuchetsHitWalls { get; set; } = true;
@@ -13758,6 +13762,7 @@ namespace Armoury
             s.SiegeAiHoldsFreshSiege = SiegeAiHoldsFreshSiege;
             s.SiegeCaptureLineOnlyOnCapture = SiegeCaptureLineOnlyOnCapture;
             s.SiegeAiRetryCooldown = SiegeAiRetryCooldown;
+            s.SiegeHoldTenDays = SiegeHoldTenDays;
             s.SiegeAiTrebuchetsHitWalls = SiegeAiTrebuchetsHitWalls;
             s.SiegeTrebuchetEarly = SiegeTrebuchetEarly;
             s.SiegeWallsLog = SiegeWallsLog;

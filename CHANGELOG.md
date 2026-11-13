@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 478-S3 (13.11) - oblezenia AI: trzymanie swiezego oblezenia do 10 doby, zakaz powrotu po krotkim oblezeniu (do 10 dob) na 7 dob
+
+**Problem:** at-120c: AI zwija oblezenie po 2-4 dobach i wraca pod te same mury - Oros 2.8 doby (l.77158) i znow 3.0 (l.79608), Bisa i Lorath po dwa razy; tylko 2 z 8 zakonczonych oblezen w celu 471; "zakaz powtorki" 0 razy w logu.
+
+**Przyczyna:** SiegeWalls2.Hold.cs: FreshHours = 48 (po 48 h nic nie trzyma wodza przy oblezeniu), RetryShortDays = 1.0 (zakaz powrotu tylko po oblezeniu krotszym niz doba), RetryBanDays = 3.
+
+**Zmiana:** nowy klucz Siege Hold Ten Days (TAK): FreshHours 240 (10 dob), RetryShortDays 10, RetryBanDays 7; NIE = 48 h / 1 / 3 jak dotad. Dotychczasowe wyjscia trzymania bez zmian (odsiecz OB5, jedzenie druzyny >= 1.5 doby, obrona wlasnej twierdzy, 334e FreshYields, skrypt, Inni).
+
+**Ryzyko / co sprawdzic:** armie dluzej pod murami - wiecej bitew z odsiecza i wiecej furazu (471b-3) / strat obozu (471b-2); w tescie: "zakaz powtorki" > 0, brak par oblezen tej samej osady w < 7 dob, wiecej oblezen konczacych sie w celu 471, "mysl wodza" w wieku >= 10 dob.
+
+**Status:** DO SPRAWDZENIA
+
 ## 478-S2 (13.11) - budowy panow dokupuja brakujacy material u wytworcow 363 (kamien, glina, deski - jak roboty wsi)
 
 **Problem:** at-120c "Budowy oplacone" brak materialow 77 (jak w 120b); wapien: produkcja 564/d, roboty wsi biora 531, budowy 39; marmur 3143/d, wsie 3109, budowy 22; na polkach miast 41 szt. wapienia i 34 marmuru; 96 z 219 budow stoi, 56 z braku materialu.

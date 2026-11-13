@@ -24,10 +24,13 @@ namespace Armoury
     {
         internal static bool FreshOn { get { var s = Settings.Current; return s != null && s.SiegeAiHoldsFreshSiege; } }
         internal static bool RetryOn { get { var s = Settings.Current; return s != null && s.SiegeAiRetryCooldown; } }
-        private const double FreshHours = 48.0;
+        // 478-S3 (analiza at-120c pkt 3): AI zwijalo oblezenie po 2-4 dobach i wracalo pod te same mury (Oros 2.8 + 3.0 doby, Bisa i Lorath dwa razy); trzymanie
+        // do 10 doby i zakaz powrotu po krotkim oblezeniu (do 10 dob) na 7 dob - klucz Siege Hold Ten Days (NIE = 48 h / 1 doba / 3 doby jak dotad)
+        private static bool LongOn { get { var s = Settings.Current; return s != null && s.SiegeHoldTenDays; } }
+        private static double FreshHours { get { return LongOn ? 240.0 : 48.0; } }
         private const float FreshFoodDays = 1.5f;
-        private const double RetryShortDays = 1.0;   // oblezenie krotsze niz doba ...
-        private const double RetryBanDays = 3.0;     // ... = ta frakcja nie wraca pod te osade przez 3 dni
+        private static double RetryShortDays { get { return LongOn ? 10.0 : 1.0; } }   // oblezenie krotsze niz doba (478-S3: 10 dob) ...
+        private static double RetryBanDays { get { return LongOn ? 7.0 : 3.0; } }      // ... = ta frakcja nie wraca pod te osade przez 3 dni (478-S3: 7)
 
         private static readonly Dictionary<SiegeEvent, string> _besFac = new Dictionary<SiegeEvent, string>();   // frakcja oblegajaca (oboz bywa zwiniety przed zdarzeniem konca)
         private static readonly HashSet<SiegeEvent> _freshSaved = new HashSet<SiegeEvent>();                      // oblezenia, ktore trzymanie zatrzymalo dzis
