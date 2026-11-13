@@ -16,14 +16,14 @@ namespace Armoury
     /// rodu R3-11a (OneBudget) - kazde miasto placi swoja budowe ze swojej kasy. Mury 472 (WallBudget, limit doby) jak dotad. Tylko MIASTA (zamki - CastlePurse, inny
     /// regulator - jak dotad), nie lenna gracza, nie oblezone, nie rody najemne.
     /// ZLOTO (ekonomia zamknieta, nic z niczego): material z targu miasta - kasa osady -> kasa targu (miasto: ta sama kasa, netto 0 zl, towar schodzi z polki);
-    /// place - kasa -> kiesa ludu (TownFolk.Earn KBuildLabour; reszta placy zostaje w kasie, jak przy budowie pana). Kiesa pana i jego dlug nietkniete: bez
+    /// place - kasa -> kiesa ludu (TownFolk.Earn KBuildLabour); punkty tylko od placy naprawde wyplaconej (482-p), sprzedaz kupcow tylko od obcego targu (482-p). Kiesa pana i jego dlug nietkniete: bez
     /// ChangeHeroGold, bez CirculationWindows.NoteHeroGold i bez ClanIncomeBook.NoteOwnPaid (to nie D rodu), bez zakupu u wytworcow 363 (LordProducerBuy - kiesa pana).
     /// Kazde wywolanie we wlasnym try (licznik potkniec, blad raz na sesje) - bez globalnego wylacznika. Klucz wylaczony - Daily idzie stara droga co do monety.
     /// </summary>
     internal static partial class BuildFunding
     {
         private static int _chN, _chRefused, _chNoBase, _chWall, _chNoMat, _chStumbles;
-        private static long _chGold, _chMat, _chWage, _chFolk;
+        private static long _chGold, _chMat, _chMatMoved, _chWage, _chWageOff;
         private static double _chPts;
         private static bool _chErrLogged;
 
@@ -32,7 +32,7 @@ namespace Armoury
         private static void ChestDayStart()
         {
             _chN = _chRefused = _chNoBase = _chWall = _chNoMat = _chStumbles = 0;
-            _chGold = _chMat = _chWage = _chFolk = 0; _chPts = 0;
+            _chGold = _chMat = _chMatMoved = _chWage = _chWageOff = 0; _chPts = 0;
         }
 
         private static void ChestReset() { ChestDayStart(); _chErrLogged = false; }
@@ -84,25 +84,29 @@ namespace Armoury
                 int labourI = MBRandom.RoundRandomized(Math.Max(0f, labour));
                 labourI = Math.Min(labourI, Math.Max(0, (int)tb - matSpent));   // material i place razem najwyzej budzet kasy (tb <= nadwyzka / 30 < kasa)
                 // material: kasa osady -> kasa targu (miasto - ta sama kasa, netto 0 zl; towar zszedl z polki w ramce budow ksiegi towarow)
+                int matMoved = 0;
                 if (matSpent > 0 && market.Town != t)
                 {
                     int had = t.Gold;
                     t.ChangeGold(-matSpent);
                     int took = had - t.Gold;
-                    if (took > 0) market.Town.ChangeGold(took);
+                    if (took > 0) { market.Town.ChangeGold(took); matMoved = took; }
                 }
-                try { if (matSpent > 0) TownFolk.Sale(market, matSpent, TownFolk.MixBuild); } catch { }   // E5/0 (195): material budow - sprzedaz kupcow (tylko licznik)
-                // place: kasa -> kiesa ludu (Earn zwraca przyjete; z kasy schodzi tylko to - reszta placy zostaje w kasie, jak przy budowie pana)
+                // 482-p (recenzja): sprzedaz kupcow (f.Sale - podstawa robocizny handlu "z kasy do ludu" i sprzedazy DS M7) TYLKO gdy obcy targ naprawde dostal zloto;
+                // wlasny targ miasta - nikt nie zaplacil (kasa sama sobie), wiec bez wpisu (inaczej kasa placilaby ludowi robocizne od fantomowej sprzedazy)
+                try { if (matMoved > 0) TownFolk.Sale(market, matMoved, TownFolk.MixBuild); } catch { }
+                // place: kasa -> kiesa ludu (Earn zwraca przyjete; z kasy schodzi tylko to). 482-p (recenzja): reszta placy u pana szla z kiesy pana do kasy - tu kasa
+                // placilaby sama sobie (zadne zloto sie nie rusza), wiec punkty i liczniki licza TYLKO place naprawde wyplacone ludowi (folk); B1 wylaczony - same materialy
                 int folk = labourI > 0 ? TownFolk.Earn(st, labourI, TownFolk.KBuildLabour) : 0;
                 if (folk > 0) t.ChangeGold(-folk);
-                try { if (labourI > 0) TownFolk.Note(st, labourI, TownFolk.KBuildLabour); } catch { }   // E5/0 (195): place budowy (tylko licznik)
-                float pts = PointsFor(matSpent, labourI, ppp, market);
-                if (mcut < 1f) Buildings338Mason.NoteCut(st.Town, mcut, matSpent + labourI, pts, false);   // 473-a: linia murarza (tylko licznik)
+                try { if (folk > 0) TownFolk.Note(st, folk, TownFolk.KBuildLabour); } catch { }   // E5/0 (195): place budowy (tylko licznik)
+                float pts = PointsFor(matSpent, folk, ppp, market);
+                if (mcut < 1f) Buildings338Mason.NoteCut(st.Town, mcut, matSpent + folk, pts, false);   // 473-a: linia murarza (tylko licznik)
                 _funded[st.Town] = pts;
-                if (WallOn) WallPaid(st, b, matSpent, labourI, pts);   // 472: liczniki murow i kontrola limitu
+                if (WallOn) WallPaid(st, b, matSpent, folk, pts);   // 472: liczniki murow i kontrola limitu
                 EngPaid(st.Town, pts);   // R3-10b: XP Inzynierii zarzadcy na miejscu i liczniki
                 NoBudgetWhy.Remove(st.StringId);
-                _chN++; _chGold += matSpent + labourI; _chMat += matSpent; _chWage += labourI; _chFolk += folk; _chPts += pts;
+                _chN++; _chGold += matMoved + folk; _chMat += matSpent; _chMatMoved += matMoved; _chWage += folk; _chWageOff += labourI - folk; _chPts += pts;
                 return true;
             }
             catch (Exception e)
@@ -122,7 +126,7 @@ namespace Armoury
             {
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
                 return " | 482 kasa miasta za pana bez przydzialu budow (Town Treasury Funds Own Build When Lord Has No Build Share tak): z kasy miasta oplacone " + _chN
-                     + " budow, " + _chGold + " zl (material z targu miasta " + _chMat + " - netto 0 zl, place " + _chWage + ", z tego do kies ludu " + _chFolk + "), punktow " + ((long)_chPts).ToString(inv)
+                     + " budow, z kasy zeszlo " + _chGold + " zl (material " + _chMat + " zl, z tego do obcych targow " + _chMatMoved + " - reszta wlasny targ, netto 0 zl; place do kies ludu " + _chWage + ", place bez platnika nie liczone " + _chWageOff + "), punktow " + ((long)_chPts).ToString(inv)
                      + "; odmowa - kasa bez nadwyzki ponad zapas, rate DS i dlug rady " + _chRefused + ", rod bez podstawy przydzialu " + _chNoBase
                      + "; po wejsciu wstrzymane: mury limit doby " + _chWall + ", brak materialu " + _chNoMat + "; potkniecia " + _chStumbles + ".";
             }
