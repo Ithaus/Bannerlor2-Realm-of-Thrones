@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 474-P11 (13.11) - PLAN: dziedziniec zajazdu ze stajnia (NIE wdrozone)
+
+**Problem:** Jeff 13.11 ("Wioski, i karczmy rob wszystko"; projekt `docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md` paczka 11): przed wejsciem do zajazdu (474-P8 "Enter the Inn") brak dziedzinca - gracz od razu stoi w sali. Paczka miala byc zrobiona tylko, jesli po P1-P10 jest bezpieczna.
+
+**Przyczyna (dlaczego NIE teraz):** DOWOD w danych i kodzie, nie zalozenie:
+- `ROT-Map/Prefabs/SWAN_Houses.xml:40922` `Tavern_Village` to zestaw zagniezdzonych prefabow ze skryptami `UsablePlace` (7) i `AnimationPoint` (6), punktami `sp_npc` / `npc_common(_limited)` i znacznikiem `NavMeshPrefabName`; `Swan_Deco.xml:1404` `Stable` ma `sp_horse` / `sp_horse_hunter` ze skryptem `AnimalSpawnSettings`. Nasze stawianie scenografii (`CampWalk.cs:1406` `CampLayout.Put`, `CampScene.cs:581`) robi `GameEntity.InstantiateWithRestOffset(..., callScriptCallbacks: false, ...)` bez fizyki - punkty uzycia nie sa rejestrowane w misji, a nawigacja prefabu nie jest dokladana do siatki sceny terenu. Budynek bylby wiec dekoracja, przez ktora AI nie umie chodzic (i gracz moze przenikac), a prefab z wlaczonymi skryptami w misji "Camp" to nowa, niesprawdzona droga (rejestracja UsableMachine po starcie misji).
+- Drzwi do sali = przejscie z misji do misji (dziedziniec -> wnetrze 474-P8). Dzis wnetrze startuje z menu zajazdu; z misji trzeba by wyjsc przez `ExitToLast` i otworzyc druga misje z mapy - dwa ekrany ladowania, nowy stan "w trakcie wizyty" do sprzatania przy kazdym wyjsciu (Tab, smierc, wczytanie).
+- P1-P10 (11 commitow na galezi `noc/474-wsie-karczmy`) sa NIEPRZETESTOWANE w grze. Zasada 8.2 (jedna zmiana naraz) i 8.3 (nic "przy okazji"): dziedziniec wymaga iteracji w grze (ustawienie budynku na nierownym terenie, drzwi, kamera) - bez testu P8 nie ma na czym budowac.
+
+**Zmiana:** brak zmian w kodzie. Plan na pozniej (po tescie P8/P9 w grze):
+1. Klucz `RoadsideInnCourtyard` (MCM "Roadside Inn Courtyard", domyslnie TAK; NIE = "Enter the Inn" jak w 474-P8 co do bitu).
+2. Misja dziedzinca: ta sama droga co spacer po obozie (`CampWalk` - scena `SceneModel.GetBattleSceneForMapPatch` z miejsca zajazdu, misja "Camp", cywilna, wyjscie Tab, bez `SwitchToMenu`).
+3. Scenografia przez `CampLayout.Put` (obrysy bez nakladania, potkniecia per prefab): `bd_trough_a`, `bd_hay_cart_a/b`, `hay_a`, pochodnie; budynek - najpierw sprawdzic w edytorze/teście, czy `Tavern_Village` stoi bez skryptow (callbacks false) i czy ma kolizje; jesli nie - sama sciana stajni `Stable` jako tlo, bez wchodzenia.
+4. Konie druzyny: `CampLayout.HeroHorse` + uwiazane konie (`HoldHorses`, jak oboz m97/m109), najwyzej kilka (wydajnosc minimalna).
+5. Drzwi: strefa przy wejsciu (odleglosc gracza co 0.5 s, nie co klatke) -> napis "Press E to enter the inn" -> zakonczenie misji przez `Mission.EndMission`, flaga "wnetrze po dziedzincu", start wnetrza 474-P8 z menu zajazdu przy nastepnym ticku mapy (wzor: test spaceru `WalkTestTick`). Stan flagi czyszczony przy wyjsciu, wczytaniu i nowej kampanii.
+6. Ekonomia: dziedziniec niczego nie sprzedaje - nic z niczego.
+7. Test: autotest z flaga (np. `armoury-dziedziniec.flag`): wejscie, 8 s, drzwi, wnetrze, Tab, mapa; liczniki postawionych/pominietych prefabow w logu.
+
+**Ryzyko / co sprawdzic:** nic nie zmienione - brak ryzyka regresji. Przed wdrozeniem planu: test P8 (wnetrze, nocleg, Tab) i P9 (stoly, kamera na siedzaco) w grze; w edytorze lub krotkim tescie - czy `Tavern_Village` i `Stable` postawione z `callScriptCallbacks: false` maja kolizje i nie rzucaja wyjatkow; ile encji daje `Tavern_Village` (wydajnosc).
+
+**Status:** PLAN (nie wdrozone, czeka na test 474-P8/P9 i decyzje Jeffa).
+
 ## 474-P10 (13.11) - rozmowy karczmy: ok. 3800 wlasnych zdan wedlug regionu i migawki swiata (same teksty, bez nagran)
 
 **Problem:** Jeff 13.11 ("Wioski, i karczmy rob wszystko, nagrania na razie olej ... 5. tez, ale glosy pozniej, na razie zrob tylko teksty"; projekt `docs/PROJEKT-WSIE-POBOCZNE-KARCZMY-2026-11-13.md` pkt 3, paczka 10): w karczmach i zajazdach jest po kilka kwestii na rodzaj (`arm_tavern_lines.tsv`, 74 wiersze), scenki stolu powtarzaja sie po kilku rozmowach, barman podaje plotki bez slowa od siebie, w sali zajazdu nikt nic nie mowi, a rozmowy nie wiedza o wojnach, oblezeniach, glodzie, smierci lordow, slubach ani o Innych.
