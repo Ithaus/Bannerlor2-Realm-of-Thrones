@@ -38,7 +38,7 @@ namespace Armoury
                 int garrison = town.GarrisonParty != null && town.GarrisonParty.MemberRoster != null ? town.GarrisonParty.MemberRoster.TotalManCount : 0;
                 bool wage = garrison >= 150;
                 bool front = WarFront.FrontPeek(town.Settlement);
-                bool ore = Buildings338Works.HasDeposit(town);
+                bool ore = Buildings338Works.OreUsable(town);   // 476-p3
                 bool pasture = Buildings338Works.HasPasture(town);
                 var cand = new List<Building>(); var w = new List<float>(); float sum = 0f;
                 foreach (var b in town.Buildings)

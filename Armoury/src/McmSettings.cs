@@ -12936,7 +12936,7 @@ namespace Armoury
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Studs { get; set; } = true;
 
-        [SettingPropertyBool("Buildings338 Works Need Local Resources", HintText = "With Buildings338: a mine (town Mines, Castle Mines) works only where the villages around have a deposit (iron, silver, salt, clay, limestone, marble, gold) and digs only those minerals; warhorse studs breed only where the villages around keep horses or the pastures are wide, and each studs level adds 2% to the daily chance of a foal. Lords run by the game do not start these buildings where the land has nothing for them. Off = mines and studs as before", RequireRestart = false)]
+        [SettingPropertyBool("Buildings338 Works Need Local Resources", HintText = "With Buildings338: a mine (town Mines, Castle Mines) works only where the villages around have a deposit (iron, silver, salt, clay, limestone, marble, gold) and digs only those minerals (a castle mine filters each mineral; a town mine runs while at least one mineral of its own lode is found in the villages around); warhorse studs breed only where the villages around keep horses or the pastures are wide, and each studs level adds 2% to the daily chance of a foal. Lords run by the game do not start these buildings where the land has nothing for them. Off = mines and studs as before", RequireRestart = false)]
         [SettingPropertyGroup("Buildings do what their description says (338)")]
         public bool Buildings338Works { get; set; } = true;
 

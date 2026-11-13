@@ -30,7 +30,7 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.Buildings338 && s.Buildings338Works; } }
 
         private static readonly HashSet<string> MineralIds = new HashSet<string>(StringComparer.Ordinal) { "iron", "silver", "salt", "clay", "limestone", "marble", "gold_ore" };
-        private sealed class Res { public int Day; public readonly HashSet<string> Items = new HashSet<string>(StringComparer.Ordinal); public bool Horses; }
+        private sealed class Res { public int Day; public readonly HashSet<string> Items = new HashSet<string>(StringComparer.Ordinal); public bool Horses; public int Ore = -1; }   // 476-p3: Ore - mineral skladu BK twierdzy w zlozu okolicy (-1 nie liczone)
         private static readonly Dictionary<Town, Res> _res = new Dictionary<Town, Res>();
         private static bool _minesHooked;
         private static int _aiBlocked, _townMinesSkipped, _castleOreFiltered, _stumbles;
@@ -50,12 +50,13 @@ namespace Armoury
             {
                 int towns = 0, withOre = 0, castles = 0, castlesOre = 0, horses = 0;
                 var byMin = new SortedDictionary<string, int>(StringComparer.Ordinal);
-                foreach (var t in Town.AllTowns) { towns++; var r = Get(t); if (Deposit(r)) { withOre++; Count(byMin, r); } }
-                foreach (var t in Town.AllCastles) { castles++; var r = Get(t); if (Deposit(r)) { castlesOre++; Count(byMin, r); } if (HasPasture(t)) horses++; }
+                int townsUse = 0, castlesUse = 0;
+                foreach (var t in Town.AllTowns) { towns++; var r = Get(t); if (Deposit(r)) { withOre++; Count(byMin, r); } if (OreUsable(t)) townsUse++; }
+                foreach (var t in Town.AllCastles) { castles++; var r = Get(t); if (Deposit(r)) { castlesOre++; Count(byMin, r); } if (OreUsable(t)) castlesUse++; if (HasPasture(t)) horses++; }
                 var sb = new StringBuilder(400);
                 foreach (var kv in byMin) sb.Append(sb.Length > 0 ? ", " : "").Append(kv.Key).Append(' ').Append(kv.Value);
                 Log.Info("Budynki (338) zaklady (476): start sesji | klucz TAK | mapa zasobow okolic: miasta ze zlozem " + withOre + " z " + towns + ", zamki ze zlozem " + castlesOre + " z " + castles
-                         + " (twierdz wg mineralu: " + (sb.Length > 0 ? sb.ToString() : "-") + "), zamki z pastwiskiem koni " + horses + " | kopalnia i stadnina tylko przy zasobie okolicy");
+                         + " (twierdz wg mineralu: " + (sb.Length > 0 ? sb.ToString() : "-") + "), kopalnia ma z czego kopac (sklad BK x zloze, 476-p3): miasta " + townsUse + ", zamki " + castlesUse + ", zamki z pastwiskiem koni " + horses + " | kopalnia i stadnina tylko przy zasobie okolicy");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
@@ -77,7 +78,7 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays;
             Res r;
             if (_res.TryGetValue(t, out r) && r.Day == day) return r;
-            if (r == null) { r = new Res(); _res[t] = r; } else { r.Items.Clear(); r.Horses = false; }
+            if (r == null) { r = new Res(); _res[t] = r; } else { r.Items.Clear(); r.Horses = false; r.Ore = -1; }
             r.Day = day;
             try
             {
@@ -105,6 +106,34 @@ namespace Armoury
 
         internal static bool HasDeposit(Town t) { return t != null && Deposit(Get(t)); }
 
+        /// <summary>476-p3 (recenzje B3/B4, A4): kopalnia twierdzy ma z czego kopac - przeciecie skladu mineralow BK twierdzy (MineralData.GetLocalMinerals) ze zlozem
+        /// wsi okolicy jest niepuste. Ta sama regula dla miasta i zamku, dla wyboru AI (AiBlocks, Need) i dla ticku (RunMinesPrefix). Brak danych BK - jak HasDeposit.</summary>
+        internal static bool OreUsable(Town t)
+        {
+            if (t == null) return false;
+            var r = Get(t);
+            if (r.Ore >= 0) return r.Ore > 0;
+            bool ok = false;
+            try
+            {
+                if (Deposit(r))
+                {
+                    var pop = Buildings338.PopData(t.Settlement);
+                    if (pop == null) ok = true;
+                    else
+                    {
+                        int rich;
+                        var mins = Buildings338.Minerals(pop, out rich);
+                        if (mins.Count == 0) ok = false;
+                        else foreach (var kv in mins) if (kv.Key != null && kv.Key.StringId != null && r.Items.Contains(kv.Key.StringId)) { ok = true; break; }
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("OreUsable", e); ok = Deposit(r); }
+            r.Ore = ok ? 1 : 0;
+            return ok;
+        }
+
         /// <summary>Mineral jest w zlozu okolicy twierdzy.</summary>
         internal static bool InDeposit(Town t, ItemObject it) { return t != null && it != null && it.StringId != null && Get(t).Items.Contains(it.StringId); }
 
@@ -123,7 +152,7 @@ namespace Armoury
             {
                 var id = bt.StringId;
                 bool b = false;
-                if (id == TownMinesId || id == Buildings338Ports.CastleMinesId) b = !HasDeposit(t);
+                if (id == TownMinesId || id == Buildings338Ports.CastleMinesId) b = !OreUsable(t);   // 476-p3: przeciecie skladu BK ze zlozem
                 else if (id == StudsId) b = !HasPasture(t);
                 return b;   // 476-p2 (recenzja B7): licznik tylko w miejscu faktycznego odrzucenia (NoteAiBlocked)
             }
@@ -131,14 +160,16 @@ namespace Armoury
         }
 
         /// <summary>BK RunMines (tick miast): miasto bez zloza okolicy nie kopie (zamki - wlasny tick 338, filtr w Buildings338Ports.MineCastle).</summary>
-        public static bool RunMinesPrefix(Town town)
+        public static bool RunMinesPrefix(object __instance, Town town)
         {
             try
             {
-                if (!On || town == null || town.IsCastle) return true;
+                if (!On || town == null) return true;
+                if (town.IsCastle && !Buildings338Ports.BkTicksCastles) return true;   // zamki - wlasny tick 338 z filtrem mineralu (476-p3: gdy BK tyka zamki sam, ta sama bramka co miasto)
                 if (Buildings338.Level(town, TownMinesId) <= 0 && Buildings338.Level(town, Buildings338Ports.CastleMinesId) <= 0) return true;
-                if (HasDeposit(town)) return true;
+                if (OreUsable(town)) return true;
                 _townMinesSkipped++;
+                BuildFunding.MinesPrefix(__instance, town);   // 476-p3: zero dawnej kwoty miningRevenues takze, gdy original nie biegnie
                 return false;
             }
             catch (Exception e) { Stumble("RunMinesPrefix", e); return true; }

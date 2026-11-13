@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 476-p3 (13.11) - kopalnia stoi tylko tam, gdzie ma z czego kopac (sklad mineralow BK twierdzy x zloze okolicy); jedna regula dla miasta i zamku
+
+**Problem:** recenzje 476 B3/B4 (srednie), A4 (niska): AiBlocks i wybor AI (476-f, waga x6 "zloze") pozwalaly na kopalnie, gdy wsie okolicy mialy jakikolwiek mineral, a urobek zamku to przeciecie losowego skladu BK MineralData twierdzy (bk_all.cs:75025-75090) ze zlozem wsi - np. wies solna przy zamku ze skladem wapien+zelazo = pusta kopalnia na zawsze. Miasto przepuszczalo cale BK RunMines przy jakimkolwiek zlozu (BK kopie wtedy caly swoj sklad). Gdy BK tyka zamki sam (BkTicksCastles), zamek bez zloza kopal i hodowal bez filtra. Podpowiedz MCM mowila "digs only those minerals" takze dla miast.
+
+**Przyczyna:** kryterium "jakikolwiek mineral okolicy" zamiast przeciecia ze skladem BK; brak bramki w galezi BkTicksCastles.
+
+**Zmiana:** Buildings338Works.OreUsable(t) (pamiec na dobe): przeciecie Buildings338.Minerals(pop) ze zlozem okolicy niepuste (brak danych BK - jak dotad). Uzywane w AiBlocks (miasto i zamek), Need.Pick (waga zloza), RunMinesPrefix (miasto; zamek tylko gdy BK tyka zamki sam). Przy pominieciu RunMines zerowana kwota miningRevenues (BuildFunding.MinesPrefix - pewnosc niezalezna od kolejnosci prefiksow). Stadnina w galezi BkTicksCastles bez pastwiska nie hoduje. Linia startu: "kopalnia ma z czego kopac: miasta N, zamki M". Podpowiedz MCM opisuje roznice: zamek filtruje mineral po minerale, miasto kopie swoj sklad, gdy choc jeden mineral jest w zlozu okolicy (decyzja domyslna noc 13.11 - pelny filtr miasta wymagalby przepisania BK RunMines).
+
+**Ryzyko / co sprawdzic:** linia "Budynki (338) zaklady (476): start sesji" - liczby "ma z czego kopac" nie zero; mniej kopalni AI. Klucz NIE - bez zmian (On false).
+
+**Status:** DO SPRAWDZENIA
+
 ## 476-p2 (13.11) - zgliszcza budowli wyjmowanej z kolejki AI nie blokuja odbudowy; licznik "AI pominelo zaklad" liczy decyzje
 
 **Problem:** recenzja 476 A2 (srednia): CitySack.Prioritize stawial na czele kolejki zgliszcze z najmniejsza reszta kosztu bez sprawdzenia, czy AI tej osady tej budowli nie wyjmie (473-b6 / 476-a kopalnia lub stadnina bez zasobu, 476-c miejsce kultu, gdy AI go nie chce); DropQueued tej samej doby je wyrzucal, a nazajutrz Prioritize wybieral to samo - pozostale zgliszcza osady (np. koszary) nigdy nie szly. Recenzja B7 (niska): `_aiBlocked++` w AiBlocks liczyl kazde wywolanie (Skip w kazdej petli), a nie decyzje.

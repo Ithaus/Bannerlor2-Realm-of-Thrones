@@ -42,7 +42,12 @@ namespace Armoury
             Buildings338.Hook("stadniny: BK RunStuds " + (_hooked ? "przejety dla zamkow" : "BRAK"));
         }
 
-        public static bool RunStudsPrefix(Town town) { return !(town != null && town.IsCastle && Buildings338.StudsOn && !Buildings338Ports.BkTicksCastles); }   // BK tyka zamki sam - nasz tick stoi, wiec BK hoduje (recenzja 338)
+        public static bool RunStudsPrefix(Town town)
+        {
+            if (town != null && town.IsCastle && Buildings338.StudsOn && !Buildings338Ports.BkTicksCastles) return false;
+            if (town != null && town.IsCastle && Buildings338Works.On && Buildings338Ports.BkTicksCastles && !Buildings338Works.HasPasture(town)) return false;   // 476-p3 (recenzja A4): BK tyka zamki sam - bez pastwiska tez nie hoduje
+            return true;
+        }   // BK tyka zamki sam - nasz tick stoi, wiec BK hoduje (recenzja 338)
 
         private static List<ItemObject> WarHorses()
         {
